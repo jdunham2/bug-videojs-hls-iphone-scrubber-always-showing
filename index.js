@@ -4,9 +4,11 @@ import videojs from "video.js";
 
 var options = {
   controls: true,
-  autoplay: true,
   preload: "auto",
   liveui: true,
+  playsinline: true,
+  autoplay: true,
+  fill: true,
   liveTracker: {
     /**
      * Minimum amount of seconds of live playlist duration
@@ -34,6 +36,7 @@ var isPlayerReady = false;
 
 var player = videojs("videoPlayer", options, function onPlayerReady() {
   videojs.log("Player is ready!");
+
   isPlayerReady = true;
 });
 
