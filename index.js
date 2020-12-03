@@ -11,7 +11,7 @@ var options = {
     /**
      * Minimum amount of seconds of live playlist duration
      * in order to display the live UI with scrub bar.
-     * 
+     *
      * On Desktop No scrubber is present
      * On iPhone it is there.
      */
