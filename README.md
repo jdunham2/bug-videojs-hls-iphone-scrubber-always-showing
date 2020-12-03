@@ -1,6 +1,6 @@
 # bug-videojs-hls-iphone-scrubber-always-showing
 
-###VideoJS Player Tester
+### VideoJS Player Tester
 
 This is a simple implementation of VideoJS ready to test.
 
