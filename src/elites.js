@@ -84,3 +84,52 @@ export function updateElite(enemy, dt) {
     if (enemy.sinceHit > 2 && enemy.hp < enemy.maxHp) enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.05 * dt);
   }
 }
+
+const CHAMPION_NAMES = ['Brakka the Cruel', 'Old Grimtooth', 'Vorga Ironhide', 'Skarn the Quick', 'Hrolf Bonebreaker', 'Mudge the Grim', 'Kettle-Jaw Torvik', 'Ulla Redhand'];
+
+/**
+ * A named Champion: a big elite with two affixes, a name over its head and a
+ * guaranteed piece of gear. The first affix is one whose effect doesn't hang
+ * on enemy.affix (Armored, Swift), so both stay active.
+ */
+export function makeChampion(enemy) {
+  const first = Math.random() < 0.5 ? 'shielded' : 'swift';
+  const rest = Object.keys(AFFIXES).filter((k) => k !== first);
+  const second = rest[Math.floor(Math.random() * rest.length)];
+  makeElite(enemy, first);
+  makeElite(enemy, second);
+  enemy.isChampion = true;
+  enemy.maxHp = enemy.hp = enemy.hp * 1.5;
+  enemy.group.scale.multiplyScalar(1.12);
+  enemy.radius *= 1.12;
+  enemy.championName = CHAMPION_NAMES[Math.floor(Math.random() * CHAMPION_NAMES.length)];
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 112;
+  const g = c.getContext('2d');
+  g.textAlign = 'center';
+  g.font = '800 46px Cinzel, Georgia, serif';
+  g.lineWidth = 8;
+  g.strokeStyle = 'rgba(0,0,0,0.9)';
+  g.strokeText(enemy.championName, 256, 50);
+  g.fillStyle = '#ffcf5a';
+  g.fillText(enemy.championName, 256, 50);
+  g.font = '600 30px "Trebuchet MS", sans-serif';
+  const sub = `Champion · ${AFFIXES[first].name} · ${AFFIXES[second].name}`;
+  g.strokeText(sub, 256, 96);
+  g.fillStyle = '#f3e6c4';
+  g.fillText(sub, 256, 96);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  tag.scale.set(2.6, 0.57, 1);
+  tag.position.y = 2.6;
+  tag.renderOrder = 6;
+  enemy.group.add(tag);
+  enemy.nameTag = tag;
+  const crown = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: 0xffcf5a, transparent: true, opacity: 0.9, depthWrite: false }));
+  crown.scale.setScalar(1.25);
+  crown.position.y = 0.06;
+  enemy.group.add(crown);
+  return enemy;
+}

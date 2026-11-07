@@ -17,7 +17,7 @@ const WAVE_EVENTS = [
   { id: 'elite', name: 'War Party', text: 'Elite warriors lead this wave. Beat it for a Rare piece of gear.', count: 0.75 },
   { id: 'golden', name: 'Golden Wave', text: 'Every gem dropped this wave is doubled!', count: 1 },
 ];
-import { makeElite, AFFIXES } from './elites.js';
+import { makeElite, makeChampion, AFFIXES } from './elites.js';
 import { build, stat } from './skills.js';
 import { profile, saveProfile } from './profile.js';
 
@@ -34,6 +34,8 @@ export class FlowMethods {
     if (this.mission ? n === this.mission.waves : n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
     this.waveState = 'active';
+    // From wave 6, sometimes a named Champion leads the wave.
+    if (n >= 6 && Math.random() < 0.2) setTimeout(() => this.state === 'playing' && this.wave === n && this.waveState === 'active' && this.spawnChampion(), 2500 + Math.random() * 3000);
     // Now and then a loot thief turns up partway through a wave.
     if (n >= 3 && Math.random() < 0.3) setTimeout(() => this.state === 'playing' && this.wave === n && this.waveState === 'active' && this.spawnThief(), 4000 + Math.random() * 5000);
     // From wave 4, some waves come with a twist.
@@ -241,6 +243,17 @@ export class FlowMethods {
       this.gearDrops.spawn(this.player.pos, rollItem(['bow', 'armor', 'gadget'][Math.floor(Math.random() * 3)], this.enemyLevel() + (this.difficulty?.lootPower || 0) + 1, 'rare'));
       setTimeout(() => this.banner('War party defeated!', 'They left something behind', 1.6), 600);
     }
+  }
+
+  /** A named Champion leaps in at a gate. */
+  spawnChampion() {
+    const Kind = this.enemyClass() === Archer ? Grunt : this.enemyClass();
+    const gate = spawnGates[Math.floor(Math.random() * spawnGates.length)] || { x: 0, z: -ARENA_HALF + 2 };
+    const e = makeChampion(this.toughen(new Kind(this, new THREE.Vector3(gate.x, 0, gate.z + 1), this.enemyLevel() + 1)));
+    this.enemies.push(e);
+    this.toSpawn = Math.max(0, this.toSpawn - 1);
+    this.banner(e.championName, 'A Champion joins the fight', 2.2);
+    this.sfx.bossRoar();
   }
 
   /** A loot thief drops in at the far side of the arena and runs. */

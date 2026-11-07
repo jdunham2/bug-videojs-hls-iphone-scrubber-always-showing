@@ -56,6 +56,18 @@ export class GearMethods {
     el.querySelector('span').textContent = `${Math.max(0, Math.ceil(t.life))}s`;
   }
 
+  /** A named Champion is down: gems, a guaranteed Rare-or-better and a fanfare. */
+  championSlain(enemy, gems) {
+    this.loot.drop(enemy.pos, gems(15), 2);
+    const unique = Math.random() < 0.25;
+    this.gearDrops.spawn(enemy.pos, rollItem(['bow', 'armor', 'gadget'][Math.floor(Math.random() * 3)], dropPower(this, 2), unique ? 'unique' : 'rare'));
+    this.banner('Champion slain!', enemy.championName, 1.8);
+    this.sfx.sample('jingleClear', { vol: 0.6, rate: 0.9, jitter: 0 });
+    this.slowmo = Math.max(this.slowmo, 0.4);
+    this.slowmoScale = 0.35;
+    this.bounty('champion');
+  }
+
   /** The loot thief is down: the sack bursts. */
   thiefCaught(enemy, gems) {
     this.loot.drop(enemy.pos, gems(30), 2);

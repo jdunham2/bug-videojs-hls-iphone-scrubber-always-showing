@@ -80,6 +80,7 @@ const POOL = [
   { id: 'chests', text: 'Find {n} hidden treasure chests', one: 'Find a hidden treasure chest', n: [1, 2, 3], key: 'chest', gems: 50, xp: 100 },
   { id: 'gadgets', text: 'Use gadgets {n} times', n: [10, 18, 28], key: 'gadget', gems: 30, xp: 60 },
   { id: 'missions', text: 'Clear {n} missions', one: 'Clear a mission', n: [1, 2, 3], key: 'mission', gems: 60, xp: 140 },
+  { id: 'champions', text: 'Defeat {n} named Champions', one: 'Defeat a named Champion', n: [1, 2, 3], key: 'champion', gems: 55, xp: 110 },
   { id: 'thieves', text: 'Catch {n} loot thieves', one: 'Catch a loot thief', n: [1, 2, 3], key: 'thief', gems: 50, xp: 100 },
   { id: 'waves', text: 'Survive {n} waves', n: [15, 25, 40], key: 'wave', gems: 40, xp: 80 },
 ];
