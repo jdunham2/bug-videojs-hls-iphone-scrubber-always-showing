@@ -26,6 +26,9 @@ export function levelFor(xp = 0) {
   return { level, into: left, need: xpToNext(level), frac: left / xpToNext(level) };
 }
 
+/** The level at which the falcon companion joins you. */
+export const FALCON_LEVEL = 4;
+
 export const heroLevel = () => levelFor(profile.xp || 0).level;
 
 /** XP for a finished run, itemised for the results screen. */
@@ -52,6 +55,7 @@ export function addXp(amount) {
     profile.gems += gems;
     profile.totalGems = (profile.totalGems || 0) + gems;
     const r = { level: l, gems };
+    if (l === FALCON_LEVEL) r.unlock = 'Falcon companion: it circles above you and dives at enemies';
     if (l % 3 === 0) {
       const slot = ['bow', 'armor', 'gadget'][l % 9 === 0 ? 0 : (l / 3) % 3];
       r.item = rollItem(slot, Math.max(1, heroPower() + 1), l % 9 === 0 ? 'unique' : 'rare');

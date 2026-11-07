@@ -21,6 +21,7 @@ import { selectedMission, ENDLESS } from './missions.js';
 import { modEffects, dailyScore, recordDaily } from './daily.js';
 import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
+import { Falcon, falconUnlocked } from './companion.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel, saveSettingsNow } from './settings.js';
@@ -132,6 +133,7 @@ export class Game {
     this.loot = new Loot(this);
     this.gearDrops = new GearDrops(this);
     this.gadgets = new Gadgets(this);
+    this.falcon = new Falcon(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
 
@@ -302,6 +304,7 @@ export class Game {
     this.runUnlocks = [];
     this.runStartBest = { ...profile.best };
     noteRunStart();
+    this.falcon.attach(this.scene, falconUnlocked());
     this.sfx.runStart();
     if (this.mission) setTimeout(() => this.state === 'playing' && this.bossCard(this.mission.name, `${this.difficulty.name} · ${this.mission.challenge.text}`), 300);
     this.state = 'playing';
@@ -319,6 +322,7 @@ export class Game {
     document.body.classList.remove('title-backdrop');
     this.setScene(this.camp.scene);
     this.camp.enter();
+    this.falcon.attach(this.camp.scene, falconUnlocked());
     document.body.classList.add('in-camp');
     this.fade();
   }
@@ -558,6 +562,8 @@ export class Game {
       this.player.update(dt, this.input, this.aimPoint, this);
       this.camp.update(dt, this.time);
     }
+    if (this.state === 'playing') this.falcon.update(dt, this.enemies, true);
+    else if (this.state === 'camp' && !this.camp.room) this.falcon.update(dt, this.camp.dummy ? [this.camp.dummy] : [], !this.camp.openKind);
 
     this.particles.update(dt);
     this.decals.update(realDt);

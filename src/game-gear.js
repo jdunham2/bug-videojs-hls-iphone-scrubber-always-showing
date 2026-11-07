@@ -169,7 +169,7 @@ export class GearMethods {
     const up = r.after.level > r.before.level;
     const parts = r.parts.map(([k, v]) => `<span>${k} <b>+${v}</b></span>`).join('');
     const rewards = r.rewards
-      .map((w) => `<div class="xp-reward">Level ${w.level}: <b>◆ ${w.gems}</b>${w.item ? ` · <span class="xp-item" style="color:${RARITIES[w.item.rarity].color}">${gearIcon(w.item)}${w.item.name}</span>` : ''}</div>`)
+      .map((w) => `<div class="xp-reward">Level ${w.level}: <b>◆ ${w.gems}</b>${w.item ? ` · <span class="xp-item" style="color:${RARITIES[w.item.rarity].color}">${gearIcon(w.item)}${w.item.name}</span>` : ''}${w.unlock ? `<div class="xp-unlock">New: ${w.unlock}</div>` : ''}</div>`)
       .join('');
     return `<div class="xpbox ${up ? 'up' : ''}" style="--from:${r.before.frac.toFixed(3)};--to:${up ? 1 : r.after.frac.toFixed(3)};--after:${r.after.frac.toFixed(3)}">
       <div class="xp-head"><span class="xp-lv">Hero level <b>${r.before.level}</b></span><span class="xp-gain">+${r.gained} XP</span></div>

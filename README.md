@@ -48,6 +48,7 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 
 ### Progression
 - **Skill draft:** after each wave, pick 1 of 3 cards (one reroll per run). Twelve skills stack up to level III, from Heavy Draw and Split Shot to Blasting, Fire and Pinning arrows, Second Wind and the legendary Overdraw.
+- **Falcon companion:** at hero level 4 a hunting falcon joins you. It circles overhead and every few seconds dives at the nearest enemy (it practises on the training dummy in camp).
 - **Loot thief:** now and then a bandit with a glowing sack of treasure drops in and runs for it. He never fights back; bring him down within about 14 seconds (an edge-of-screen pointer shows where he is and how long is left) and the sack bursts into gems and a piece of gear.
 - **Boss signature moves:** each Gorvak form has its own telegraphed ranged attack: boulders, falling icicles, or pots of burning oil that leave fire on the ground.
 - **Hero level and bounties:** every run earns XP (kills, waves, bosses, perfect shots, missions); each level pays gems and every third level a piece of gear, with an animated XP bar on the results screen. The Trophy Board holds three bounties (defeat elites, land perfect shots, find chests...) that carry across runs and pay gems and XP when claimed.
