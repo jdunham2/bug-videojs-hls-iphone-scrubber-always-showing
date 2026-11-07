@@ -672,7 +672,7 @@ export class Player {
     this.stringKick = 1;
     game.sfx.drawStop();
 
-    let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge) * stat.damage();
+    let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge) * stat.damage() * (game.mods?.damage || 1);
     if (perfect) damage *= cfg.perfectMultiplier * (1 + gearStats().perk('keenEye'));
     if (mega) damage *= 3;
     // Momentum (gear): the first shot after a dodge hits harder.
@@ -705,7 +705,7 @@ export class Player {
     if (this.dead) return false;
     if (this.rollInvuln) return 'dodged';
     if (this.iframes > 0) return false;
-    amount *= stat.damageTaken() * (game?.difficulty?.enemyDamage || 1);
+    amount *= stat.damageTaken() * (game?.difficulty?.enemyDamage || 1) * (game?.mods?.taken || 1);
     this.hp = Math.max(0, this.hp - amount);
     this.iframes = config.player.iFrames;
     this.hurtFlash = 0.25;

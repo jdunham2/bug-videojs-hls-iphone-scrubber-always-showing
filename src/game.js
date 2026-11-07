@@ -18,6 +18,7 @@ import { GearMethods } from './game-gear.js';
 import { Gadgets } from './gadgets.js';
 import { MissionMethods } from './game-mission.js';
 import { selectedMission, ENDLESS } from './missions.js';
+import { modEffects, dailyScore, recordDaily } from './daily.js';
 import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
@@ -247,6 +248,7 @@ export class Game {
     // A mission from the world map, or the Endless Siege (also used to continue from a save point).
     const pick = selectedMission();
     this.mission = !fromCheckpoint && pick !== ENDLESS ? pick : null;
+    this.mods = modEffects(this.mission?.mods);
     this.setupMission();
     this.setArena(this.mission ? this.mission.theme : fromCheckpoint && cp ? cp.arena ?? 0 : 0);
     if (fromCheckpoint && cp) {
@@ -336,6 +338,8 @@ export class Game {
     const prev = this.runStartBest || { ...profile.best };
     const newBest = this.wave > prev.wave || (this.wave === prev.wave && this.stats.kills > prev.kills);
     this.newUnlocks = [...(this.runUnlocks || []), ...bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills })];
+    this.dailyResult = this.mission?.daily ? { score: dailyScore(this.stats, { cleared: false, elapsed: this.elapsed, wave: this.wave }) } : null;
+    if (this.dailyResult) Object.assign(this.dailyResult, recordDaily(this.dailyResult.score, false));
     this.loot.runGems = 0;
     this.showOverlay('gameover', newBest);
   }

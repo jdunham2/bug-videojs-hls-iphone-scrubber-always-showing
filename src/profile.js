@@ -141,6 +141,8 @@ export function saveProfile() {
 // blocked browser storage and follows them to other devices.
 
 let cloud = null;
+/** The page's db, user namespaces and the viewer's id once connected (for the daily leaderboard). */
+export const cloudCtx = { db: null, user: null, id: null };
 let writing = false;
 let dirty = false;
 let timer = 0;
@@ -180,6 +182,7 @@ export async function connectCloudSave(onChange) {
       saveStatus.cloud = 'off';
       return;
     }
+    Object.assign(cloudCtx, { db, user, id });
     const ref = db.collection(`data/users/${id}`).doc('profile');
     const snap = await ref.get();
     const remote = snap.exists ? snap.data() : null;

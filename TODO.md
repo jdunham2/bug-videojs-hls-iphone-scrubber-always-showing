@@ -10,8 +10,7 @@ yours.
 
 ## Proposed: replayability roadmap (pick order with the user)
 
-1. Daily/weekly challenge runs with modifiers and a leaderboard.
-2. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
+1. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
    music per stage.
 
 ## Next

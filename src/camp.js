@@ -9,6 +9,7 @@ import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
+import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
@@ -34,6 +35,7 @@ const MAP_ICONS = {
   ruins: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 9 L 7 9 L 7 20 M 10 20 L 10 6 L 14 6 L 14 20 M 17 20 L 17 11 L 20 11 L 20 20 M 2 20 L 22 20" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
   keep: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 8 L 6 8 L 6 6 L 8 6 L 8 8 L 10 8 L 10 6 L 14 6 L 14 8 L 16 8 L 16 6 L 18 6 L 18 8 L 20 8 L 20 20 Z M 10 20 L 10 15 C 10 13, 14 13, 14 15 L 14 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
   forge: '<svg viewBox="0 0 24 24"><path d="M3 14 L 15 14 C 15 11, 18 10, 21 10 L 21 12 C 19 12, 18 13, 18 14 L 18 16 L 15 16 L 13 20 L 7 20 L 5 16 L 3 16 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4 C 11 6, 8 7, 10 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  daily: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2 L 12 5 M 12 19 L 12 22 M 2 12 L 5 12 M 19 12 L 22 12 M 5 5 L 7 7 M 17 17 L 19 19 M 5 19 L 7 17 M 17 7 L 19 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   endless: '<svg viewBox="0 0 24 24"><path d="M12 3 L 20 7 L 20 13 C 20 17, 16 20, 12 21 C 8 20, 4 17, 4 13 L 4 7 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12 L 16 12 M 12 8 L 12 16" stroke="currentColor" stroke-width="1.8"/></svg>',
 };
 
@@ -379,14 +381,24 @@ export class Camp {
     };
     const node = (m, icon) => {
       const open = m === ENDLESS || missionUnlocked(m);
-      return `<button class="mnode ${sel.id === m.id ? 'sel' : ''} ${open ? '' : 'locked'}" data-act="mission" data-v="${m.id}" style="left:${m.map.x}%;top:${m.map.y}%" ${open ? '' : 'disabled'}>
-        <span class="mi">${open ? icon : '🔒'}</span><span class="mn">${m.name}</span>${m === ENDLESS ? '<span class="ms">∞</span>' : `<span class="ms">${stars(m.id)}</span>`}</button>`;
+      const badge = m === ENDLESS ? '<span class="ms">∞</span>' : m.daily ? `<span class="ms daily">${dailyRecord().best ? dailyRecord().best.toLocaleString() : 'New today'}</span>` : `<span class="ms">${stars(m.id)}</span>`;
+      return `<button class="mnode ${sel.id === m.id ? 'sel' : ''} ${open ? '' : 'locked'} ${m.daily ? 'daily' : ''}" data-act="mission" data-v="${m.id}" style="left:${m.map.x}%;top:${m.map.y}%" ${open ? '' : 'disabled'}>
+        <span class="mi">${open ? icon : '🔒'}</span><span class="mn">${m.name}</span>${badge}</button>`;
     };
     const icons = { ruins: MAP_ICONS.ruins, keep: MAP_ICONS.keep, forge: MAP_ICONS.forge };
     const path = (a, b) => `<path d="M${a.map.x} ${a.map.y} Q ${(a.map.x + b.map.x) / 2} ${Math.min(a.map.y, b.map.y) - 12} ${b.map.x} ${b.map.y}" />`;
     const paths = MISSIONS.slice(1).map((m, i) => path(MISSIONS[i], m)).join('') + path(MISSIONS[0], ENDLESS);
     let detail;
-    if (sel === ENDLESS) {
+    const daily = dailyMission();
+    if (sel.daily) {
+      const rec = dailyRecord();
+      detail = `<h3>Daily Trial</h3><p>${daily.blurb}</p>
+        <div class="dmods">${daily.mods.map((id) => `<div class="dmod"><b>${MODIFIERS[id].name}</b> ${MODIFIERS[id].text}</div>`).join('')}</div>
+        <p class="dbest">Your best today: <b>${rec.best ? rec.best.toLocaleString() : '—'}</b>${rec.rewarded ? ' · reward claimed' : ' · first clear pays gear'}</p>
+        <div class="dboard" id="daily-board"><div class="db-title">Today's leaderboard</div><div class="db-rows">Loading…</div></div>
+        ${this.tierPicker()}<div class="actions"><button data-act="new" class="gold">Start trial</button></div>`;
+      setTimeout(() => this.fillLeaderboard(), 0);
+    } else if (sel === ENDLESS) {
       detail = `<h3>${ENDLESS.name}</h3><p>${ENDLESS.blurb}</p>${this.tierPicker()}<div class="actions">
         <button data-act="new" class="gold">Start · Wave 1</button>
         ${cp ? `<button data-act="continue">Continue · Wave ${cp.wave + 1}</button>` : ''}</div>`;
@@ -402,7 +414,7 @@ export class Camp {
     }
     return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>
       <div class="wmap-wrap"><div class="wmap">${MAP_ART}<svg class="wpaths" viewBox="0 0 100 100" preserveAspectRatio="none">${paths}</svg>
-        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}</div>
+        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}${node(daily, MAP_ICONS.daily)}</div>
       <div class="mdetail">${detail}</div></div>`;
   }
 
@@ -489,6 +501,37 @@ export class Camp {
     if (ok) G.player.hp = G.maxHp();
     this.refreshHud();
     this.render();
+  }
+
+  /** Fill in the daily leaderboard (names set as text, never HTML). */
+  async fillLeaderboard() {
+    const board = await leaderboard(8);
+    const el = document.querySelector('#daily-board .db-rows');
+    if (!el) return;
+    if (!board) {
+      el.textContent = 'The shared leaderboard appears when the game runs as a claude.ai page.';
+      return;
+    }
+    if (!board.top.length) {
+      el.textContent = 'No scores yet today. Be the first!';
+      return;
+    }
+    el.innerHTML = '';
+    board.top.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = `db-row ${r.me ? 'me' : ''}`;
+      row.innerHTML = '<span class="r"></span><span class="n"></span><span class="s"></span>';
+      row.querySelector('.r').textContent = `${i + 1}`;
+      row.querySelector('.n').textContent = r.me ? `${r.name} (you)` : r.name;
+      row.querySelector('.s').textContent = r.score.toLocaleString();
+      el.appendChild(row);
+    });
+    if (board.rank && board.rank > board.top.length) {
+      const you = document.createElement('div');
+      you.className = 'db-row me';
+      you.textContent = `You: #${board.rank} of ${board.total}`;
+      el.appendChild(you);
+    }
   }
 
   /** Difficulty cards: pick the tier for the next run. */

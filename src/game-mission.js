@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { spawnProp } from './models.js';
 import { pillars, ARENA_HALF } from './world.js';
 import { recordMission, MISSIONS, fmtTime } from './missions.js';
+import { dailyScore, recordDaily } from './daily.js';
 import { rollItem, addToStash, RARITIES, gearIcon } from './gear.js';
 import { bankRun } from './profile.js';
 
@@ -116,10 +117,16 @@ export class MissionMethods {
     this.music.stinger(true);
     this.sfx.sample('jingleClear', { vol: 0.8, jitter: 0 });
     const got = { clear: true, secret: !!this.stats.secret, challenge: m.challenge.check(this) };
-    const fresh = recordMission(m.id, got);
+    const fresh = m.daily ? { clear: false, secret: false, challenge: false } : recordMission(m.id, got);
+    this.dailyResult = null;
+    if (m.daily) {
+      const score = dailyScore(this.stats, { cleared: true, elapsed: this.elapsed, wave: this.wave });
+      this.dailyResult = { score, ...recordDaily(score, true) };
+      fresh.clear = this.dailyResult.firstClear; // first clear of the day pays a gear reward
+    }
     // Rewards: a gem purse that grows with the mission and tier, plus a guaranteed
     // Rare-or-better piece of gear the first time you clear it.
-    const index = MISSIONS.indexOf(m);
+    const index = m.daily ? 2 : MISSIONS.indexOf(m);
     const purse = Math.round((25 + 15 * index) * (this.difficulty?.gems || 1));
     const gems = this.loot.runGems + purse;
     this.gemsThisRun = (this.stats.gemsBanked || 0) + gems;
@@ -144,20 +151,24 @@ export class MissionMethods {
     const r = this.reward;
     return `
       <div class="eyebrow">${this.difficulty?.name || ''}</div>
-      <h1 class="victory">Mission Complete</h1>
+      <h1 class="victory">${m.daily ? 'Trial Complete' : 'Mission Complete'}</h1>
       <p class="tag">${m.name}</p>
-      <div class="vstars">
+      ${
+        m.daily
+          ? `<div class="vscore"><div class="vs-num">${this.dailyResult.score.toLocaleString()}</div><div class="vs-label">${this.dailyResult.isBest ? 'New best today!' : `Today's best: ${this.dailyResult.best.toLocaleString()}`}</div></div>`
+          : `<div class="vstars">
         ${star(v.got.clear, v.fresh.clear, 'Cleared', 0)}
         ${star(v.got.secret, v.fresh.secret, 'Secret chest', 1)}
         ${star(v.got.challenge, v.fresh.challenge, m.challenge.text + ` (${m.challenge.progress(this)})`, 2)}
-      </div>
+      </div>`
+      }
       <div class="summary">
         <div><b>${fmtTime(this.elapsed)}</b><span>Time</span></div>
         <div><b>${s.kills}</b><span>Kills</span></div>
         <div><b>${s.perfects}</b><span>Perfect shots</span></div>
         <div><b>◆ ${this.gemsThisRun}</b><span>Gems (+${v.purse} reward)</span></div>
       </div>
-      ${r ? `<div class="vreward" style="--rar:${RARITIES[r.rarity].color}"><span class="gi">${gearIcon(r)}</span><div><div class="vr-label">First clear reward</div><div class="vr-name"></div><div class="vr-meta">${RARITIES[r.rarity].name} · Power ${r.power}</div></div></div>` : ''}
+      ${r ? `<div class="vreward" style="--rar:${RARITIES[r.rarity].color}"><span class="gi">${gearIcon(r)}</span><div><div class="vr-label">${m.daily ? "Today's reward" : 'First clear reward'}</div><div class="vr-name"></div><div class="vr-meta">${RARITIES[r.rarity].name} · Power ${r.power}</div></div></div>` : ''}
       ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
       ${this.gearSummary() ? `<p class="gear-found">${this.gearSummary()}</p>` : ''}
       <button>Return to camp</button>`;

@@ -211,6 +211,7 @@ export class UiMethods {
       const secs = Math.floor(this.elapsed);
       o.innerHTML = `
         <h1>You fell</h1>
+        ${this.dailyResult ? `<div class="vscore"><div class="vs-num">${this.dailyResult.score.toLocaleString()}</div><div class="vs-label">Daily Trial score · ${this.dailyResult.isBest ? 'new best today!' : `today's best ${this.dailyResult.best.toLocaleString()}`}</div></div>` : ''}
         <p class="tag">${this.difficulty && this.difficulty.id !== 'adventurer' ? `<b style="color:${this.difficulty.color}">${this.difficulty.name}</b> · ` : ''}${newBest ? 'New best!' : `Best: wave ${profile.best.wave}, ${profile.best.kills} kills`}</p>
         <div class="summary">
           <div><b>${this.wave}</b><span>Wave reached</span></div>

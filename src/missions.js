@@ -4,6 +4,7 @@
 // (arena after arena, with save points) and is always available.
 
 import { profile, saveProfile } from './profile.js';
+import { dailyMission } from './daily.js';
 
 export const MISSIONS = [
   {
@@ -77,12 +78,13 @@ export function recordMission(id, got) {
 /** The mission the gate is pointing at (last picked, if still available). */
 export function selectedMission() {
   if (profile.mission === 'endless') return ENDLESS;
+  if (profile.mission === 'daily') return dailyMission();
   const m = missionById(profile.mission);
   return m && missionUnlocked(m) ? m : MISSIONS[0];
 }
 
 export function selectMission(id) {
-  if (id !== 'endless') {
+  if (id !== 'endless' && id !== 'daily') {
     const m = missionById(id);
     if (!m || !missionUnlocked(m)) return false;
   }

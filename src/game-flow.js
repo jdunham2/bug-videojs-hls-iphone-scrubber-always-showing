@@ -21,7 +21,7 @@ export class FlowMethods {
     if (n === 2) this.tips.show('gadget');
     if (this.mission && n === this.secretWave) setTimeout(() => this.state === 'playing' && this.spawnSecret(), 4000);
     const w = config.waves;
-    this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
+    this.toSpawn = Math.max(1, Math.round((w.baseCount + w.countPerWave * (n - 1)) * (this.mods?.count || 1)));
     if (this.env.active) this.hazards.restock(this.arena);
     if (this.mission ? n === this.mission.waves : n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
@@ -142,7 +142,7 @@ export class FlowMethods {
       this.player.cheer();
       this.noteProgress({ wave: this.wave, kills: this.stats.kills });
       if (!this.mission && this.wave % config.boss.every === 0) this.saveCheckpoint();
-      const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
+      const heal = this.mods?.noHeal ? 0 : Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
       this.sfx.cleared(!this.waveHurt);
@@ -153,7 +153,7 @@ export class FlowMethods {
   /** Which enemy type to spawn this time. */
   enemyClass() {
     const s = config.archer;
-    const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
+    const chance = this.mods?.archers ? 0.45 : this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
     const ranged = Math.random() < chance;
     // Each arena brings its own enemies: raiders in the Keep, fire-pot bombers in the Forge.
     const theme = (this.arena || 0) % THEMES.length;
@@ -164,14 +164,15 @@ export class FlowMethods {
 
   /** Scale a fresh enemy's health for the difficulty tier. */
   toughen(enemy) {
-    const k = this.difficulty?.enemyHp || 1;
+    const k = (this.difficulty?.enemyHp || 1) * (this.mods?.hp || 1);
     enemy.maxHp = enemy.hp = enemy.hp * k;
+    if (!enemy.isBoss) enemy.speed *= this.mods?.speed || 1;
     return enemy;
   }
 
   /** Occasionally promote a fresh spawn to an elite (from wave 4). */
   maybeElite(enemy) {
-    const chance = this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0;
+    const chance = (this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0) * (this.mods?.elites || 1);
     if (Math.random() >= chance) return enemy;
     const keys = Object.keys(AFFIXES);
     makeElite(enemy, keys[Math.floor(Math.random() * keys.length)]);

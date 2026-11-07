@@ -49,6 +49,7 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 ### Progression
 - **Skill draft:** after each wave, pick 1 of 3 cards (one reroll per run). Twelve skills stack up to level III, from Heavy Draw and Split Shot to Blasting, Fire and Pinning arrows, Second Wind and the legendary Overdraw.
 - **World map and missions:** the camp gate opens a painted world map. Missions (The Sunken Ruins, Frostpeak Keep, The Molten Forge) are short runs ending in a boss, each with a hidden treasure chest and a bonus challenge for up to three stars; clearing one opens the next, and a first clear pays a Rare-or-better piece of gear. The Endless Siege is the open-ended mode with save points.
+- **Daily Trial:** one run a day, the same for everyone: today's date picks the arena and two twists (Glass Cannon, Swarm, Elite Hunt, Frenzy, Volley Line, Iron Will). Scored on kills, perfect shots, perfect dodges and a fast clear; the first clear each day pays gear. On the published page, everyone's best of the day goes on a shared leaderboard.
 - **Arenas:** in the Endless Siege, beating a boss opens the far gate. Walk through to march on: **Sunken Ruins → Frostpeak Keep → Molten Forge**, each with its own architecture, lighting, floor, weather and enemies.
 - **Hazards and boons:** powder barrels (shoot them; they chain and hurt you too), spike traps, fresh-water springs, war drums (shoot one for a burst of speed), ballistas you load with an arrow, ice patches (Keep) and lava vents (Forge).
 - **Gear:** bows and armor drop from enemies (more from elites, two pieces from every boss) as beams of light in their rarity colour: Common, Rare or Unique, with a power level and perks (Keen Eye, Broadheads, Barbed Heads, Momentum, Padded, Tumbler, Scavenger and more). Bow types play differently: Longbow, Shortbow, War Bow, Hunting Bow, Horse Bow. Equip on pickup with E, or compare, equip and salvage at the **Armory** in camp.
@@ -96,6 +97,7 @@ Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kill
 | `src/loot.js` | Gems and health orbs |
 | `src/gear.js` | Gear data: bow and armor types, rarities, perks, stash, stats |
 | `src/missions.js`, `src/game-mission.js` | Missions, stars, the secret chest and the Mission Complete screen |
+| `src/daily.js` | Daily Trial: seeded twists, scoring, leaderboard |
 | `src/shops.js` | Merchant stock and prices, blacksmith tempering and honing |
 | `src/difficulty.js` | Difficulty tiers and unlocks |
 | `src/gadgets.js` | Gadget effects and the gadget HUD |
