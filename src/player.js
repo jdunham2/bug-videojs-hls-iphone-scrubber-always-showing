@@ -25,6 +25,7 @@ export class Player {
     this.vel = new THREE.Vector3();
     this.knock = new THREE.Vector3();
     this.aimDir = new THREE.Vector3(0, 0, -1);
+    this.rollDir = new THREE.Vector3(0, 0, 1);
     this.yaw = Math.PI;
 
     this.group = new THREE.Group();
@@ -124,9 +125,27 @@ export class Player {
     this.hurtFlash = 0;
     this.recoil = 0;
     this.walkT = 0;
+    this.rolling = false;
+    this.rollT = 0;
+    this.dodgeCd = 0;
+    this.dodgeBuffer = 0;
+    this.counterT = 0;
     this.rig.rotation.set(0, 0, 0);
     this.rig.position.set(0, 0, 0);
+    this.rig.scale.set(1, 1, 1);
     this.group.visible = true;
+  }
+
+  /** True during the invulnerable part of a roll. */
+  get rollInvuln() {
+    const d = config.dodge;
+    return this.rolling && this.rollT >= d.iFrameStart && this.rollT <= d.iFrameEnd;
+  }
+
+  /** 0..1, how ready the dodge is (1 = ready). */
+  get dodgeReady() {
+    const total = config.dodge.duration + config.dodge.cooldown;
+    return total > 0 ? 1 - Math.max(0, this.dodgeCd) / total : 1;
   }
 
   get charge() {
@@ -148,6 +167,9 @@ export class Player {
     this.iframes = Math.max(0, this.iframes - dt);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
+    this.dodgeCd = Math.max(0, this.dodgeCd - dt);
+    this.counterT = Math.max(0, this.counterT - dt);
+    this.dodgeBuffer = Math.max(0, this.dodgeBuffer - dt);
 
     if (this.dead) {
       this.deathT += dt;
@@ -162,12 +184,24 @@ export class Player {
     const az = aimPoint.z - this.pos.z;
     if (ax * ax + az * az > 0.04) this.aimDir.set(ax, 0, az).normalize();
 
+    // Dodge (buffered briefly so a slightly early press still counts)
+    if (input.dodgePressed()) this.dodgeBuffer = 0.15;
+    if (this.dodgeBuffer > 0 && !this.rolling && this.dodgeCd <= 0) this.startRoll(input, game);
+
     // Draw / release
-    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0) {
+    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling) {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
-      game.sfx.drawStart(bowCfg.drawTime);
+      if (this.counterT > 0) {
+        // Counter shot after a perfect dodge: start already at full draw.
+        this.drawT = bowCfg.drawTime;
+        this.counterT = 0;
+        this.perfectCued = true;
+        game.sfx.perfectReady();
+      } else {
+        game.sfx.drawStart(bowCfg.drawTime);
+      }
     }
     if (this.drawing) {
       this.drawT += dt;
@@ -179,32 +213,78 @@ export class Player {
     }
 
     // Movement (screen-relative)
-    const axis = input.axis();
-    const speed = config.player.moveSpeed * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
-    const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
-    const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
-    const k = 1 - Math.exp(-18 * dt);
-    this.vel.x += (tx - this.vel.x) * k;
-    this.vel.z += (tz - this.vel.z) * k;
+    if (this.rolling) {
+      const d = config.dodge;
+      this.rollT += dt;
+      const p = Math.min(1, this.rollT / d.duration);
+      // Fast out of the gate, easing off: integrates to exactly `distance`.
+      const v = (d.distance / d.duration) * (0.6 + 0.8 * (1 - p));
+      this.vel.set(this.rollDir.x * v, 0, this.rollDir.z * v);
+      if (Math.random() < 0.6) {
+        game.particles.spawn(new THREE.Vector3(this.pos.x, 0.1, this.pos.z), { count: 1, color: 0x8a7a66, speed: 1, up: 1, life: 0.35, size: 0.12, gravity: 4 });
+      }
+      if (this.rollT >= d.duration) this.rolling = false;
+    } else {
+      const axis = input.axis();
+      const speed = config.player.moveSpeed * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
+      const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
+      const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
+      const k = 1 - Math.exp(-18 * dt);
+      this.vel.x += (tx - this.vel.x) * k;
+      this.vel.z += (tz - this.vel.z) * k;
+    }
     this.pos.x += (this.vel.x + this.knock.x) * dt;
     this.pos.z += (this.vel.z + this.knock.z) * dt;
     this.knock.multiplyScalar(Math.exp(-10 * dt));
     resolveCircle(this.pos, PLAYER_RADIUS);
 
     // Facing follows aim
-    this.yaw = lerpAngle(this.yaw, Math.atan2(this.aimDir.x, this.aimDir.z), 1 - Math.exp(-25 * dt));
+    const faceDir = this.rolling ? this.rollDir : this.aimDir;
+    this.yaw = lerpAngle(this.yaw, Math.atan2(faceDir.x, faceDir.z), 1 - Math.exp(-(this.rolling ? 40 : 25) * dt));
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
 
-    // Walk bob
-    const moving = Math.hypot(this.vel.x, this.vel.z);
-    this.walkT += dt * moving * 1.6;
-    this.rig.position.y = Math.abs(Math.sin(this.walkT)) * 0.06 * Math.min(1, moving / 3);
-    this.rig.rotation.x = -this.recoil * 0.15;
+    if (this.rolling) {
+      // Tucked forward roll around a pivot at hip height.
+      const p = Math.min(1, this.rollT / config.dodge.duration);
+      const a = p * Math.PI * 2;
+      const c = 0.5;
+      this.rig.scale.set(1, 0.62, 1);
+      this.rig.rotation.x = a;
+      this.rig.position.set(0, c - c * Math.cos(a), -c * Math.sin(a));
+    } else {
+      // Walk bob
+      const moving = Math.hypot(this.vel.x, this.vel.z);
+      this.walkT += dt * moving * 1.6;
+      this.rig.scale.set(1, 1, 1);
+      this.rig.position.set(0, Math.abs(Math.sin(this.walkT)) * 0.06 * Math.min(1, moving / 3), 0);
+      this.rig.rotation.x = -this.recoil * 0.15;
+    }
 
     this.updateBow();
     this.updateIndicators();
     this.updateMaterials();
+  }
+
+  startRoll(input, game) {
+    const d = config.dodge;
+    const axis = input.axis();
+    if (axis.x || axis.y) {
+      this.rollDir
+        .set(game.camRight.x * axis.x + game.camForward.x * axis.y, 0, game.camRight.z * axis.x + game.camForward.z * axis.y)
+        .normalize();
+    } else {
+      this.rollDir.copy(this.aimDir).negate(); // standing still: hop back, away from your aim
+    }
+    this.rolling = true;
+    this.rollT = 0;
+    this.dodgeBuffer = 0;
+    this.dodgeCd = d.duration + d.cooldown;
+    if (this.drawing && d.cancelsDraw) {
+      this.drawing = false;
+      game.sfx.drawStop();
+    }
+    game.onDodge();
   }
 
   release(game) {
@@ -222,8 +302,11 @@ export class Player {
     game.fireArrow(origin, this.aimDir.clone(), speed, damage, charge, perfect);
   }
 
+  /** Returns true if damage landed, 'dodged' if a roll avoided it, false otherwise. */
   takeDamage(amount, dir, game) {
-    if (this.dead || this.iframes > 0) return false;
+    if (this.dead) return false;
+    if (this.rollInvuln) return 'dodged';
+    if (this.iframes > 0) return false;
     this.hp = Math.max(0, this.hp - amount);
     this.iframes = config.player.iFrames;
     this.hurtFlash = 0.25;
@@ -252,7 +335,9 @@ export class Player {
     const shake = phase === 'late' ? 0.025 : 0;
     this.bow.position.x = 0.05 + (Math.random() - 0.5) * shake;
     this.bow.position.y = 1.05 + (Math.random() - 0.5) * shake;
-    this.bowMat.emissive.setRGB(phase === 'perfect' ? 1.2 : 0, phase === 'perfect' ? 0.8 : 0, phase === 'perfect' ? 0.2 : 0);
+    const glow = phase === 'perfect' || this.counterT > 0 ? 1 : 0;
+    this.bowMat.emissive.setRGB(1.2 * glow, 0.8 * glow, 0.2 * glow);
+    this.bow.visible = !this.rolling;
   }
 
   updateIndicators() {
@@ -263,9 +348,20 @@ export class Player {
     this.aimLine.position.set(this.pos.x, 0.03, this.pos.z);
     this.aimLine.rotation.y = Math.atan2(this.aimDir.x, this.aimDir.z);
 
+    if (phase === 'none' && this.counterT > 0) {
+      // Counter ready: pulsing gold ring says "tap to fire a perfect shot".
+      this.targetRingMat.color.copy(RING_PERFECT);
+      this.targetRingMat.opacity = 0.4 + 0.3 * Math.sin(performance.now() * 0.02);
+      this.chargeRingMat.opacity = 0;
+      this.aimMat.color.copy(RING_PERFECT);
+      this.aimMat.opacity = 0.25;
+      this.aimLine.scale.z = config.bow.range * 0.6;
+      return;
+    }
     if (phase === 'none') {
       this.targetRingMat.opacity = 0;
       this.chargeRingMat.opacity = 0;
+      this.aimMat.color.copy(RING_IDLE);
       this.aimMat.opacity = 0.08;
       this.aimLine.scale.z = 3;
       return;
@@ -289,7 +385,8 @@ export class Player {
 
   updateMaterials() {
     const f = this.hurtFlash > 0 ? this.hurtFlash / 0.25 : 0;
-    this.bodyMat.emissive.setRGB(f * 1.5, 0, 0);
+    const ghost = this.rollInvuln ? 1 : 0; // faint blue tint = can't be hit
+    this.bodyMat.emissive.setRGB(f * 1.5 + ghost * 0.04, ghost * 0.08, ghost * 0.22);
     // Blink while invulnerable.
     this.rig.visible = this.dead || this.iframes <= 0 || Math.floor(this.iframes * 20) % 2 === 0;
   }

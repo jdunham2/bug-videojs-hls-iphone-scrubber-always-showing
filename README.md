@@ -28,6 +28,7 @@ One-time setup: in the repo, go to **Settings → Pages** and set **Source** to 
 | Mouse | Aim |
 | Hold left mouse | Draw the bow (you move slower while drawing) |
 | Release | Fire. Releasing during the **gold flash** is a *perfect* shot: 2× damage and it pierces |
+| Space / right mouse / Shift | Dodge roll |
 | `` ` `` | Show/hide the tuning panel |
 | P / Esc | Pause |
 | M | Mute |
@@ -36,6 +37,7 @@ One-time setup: in the repo, go to **Settings → Pages** and set **Source** to 
 ## What's in the slice
 
 - **Charge shot:** damage and arrow speed scale with draw time. A short perfect window opens at full draw, shown by the closing ring snapping gold plus a chime. Holding past it ("overdraw") makes the bow tremble and loses the perfect bonus.
+- **Dodge roll:** rolls the way you're moving, or backwards if you're standing still. You're invulnerable for most of it and can roll through grunts. Rolling through a lunge as it would have hit you is a **perfect dodge**: time slows briefly, and your next draw within 1.5s starts at full, so a quick tap fires a perfect counter shot. By default, rolling cancels a draw in progress (toggle in the tuning panel).
 - **Grunt:** chases you, then winds up (glows red and shows a wedge on the ground for its lunge path), commits to a direction, lunges, and pauses to recover. A full-draw or perfect hit during the windup **staggers** it.
 - **Waves:** each wave adds more grunts with more HP and speed. You heal a little between waves.
 - **Feedback:** hit-stop, screen shake, knockback, damage numbers, arrows that stick in enemies, walls and the floor, and synthesized sound.
@@ -45,7 +47,7 @@ One-time setup: in the repo, go to **Settings → Pages** and set **Source** to 
 
 1. Is the draw → release rhythm satisfying, and does hitting the perfect window feel rewarding?
 2. Does moving slowly while drawing create good tension when grunts close in?
-3. Is spacing against melee enemies interesting on its own, or does it clearly need a dodge?
+3. Does the dodge make fights feel better or too safe? Is the perfect-dodge counter worth going for?
 4. Does it hold up for 3–5 minutes of waves?
 
 ## Code map

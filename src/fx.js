@@ -100,11 +100,12 @@ export class DamageNumbers {
     el.className = `dmg ${kind}`;
     el.textContent = text;
     this.container.appendChild(el);
-    const life = kind === 'perfect' || kind === 'callout' ? 1.1 : 0.8;
+    const callout = kind.startsWith('callout');
+    const life = kind === 'perfect' || callout ? 1.1 : 0.8;
     this.items.push({
       el,
       pos: pos.clone(),
-      vy: kind === 'callout' ? 1.2 : 2.6,
+      vy: callout ? 1.2 : 2.6,
       dx: (Math.random() - 0.5) * 30,
       life,
       max: life,

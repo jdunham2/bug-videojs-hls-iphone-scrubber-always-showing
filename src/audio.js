@@ -138,6 +138,15 @@ export class Sfx {
     this.tone('sawtooth', 300, 80, 0.25, 0.22);
     this.noise(0.2, 0.3, 'lowpass', 700);
   }
+  dodge() {
+    this.noise(0.18, 0.2, 'bandpass', 1400);
+    this.tone('sine', 300, 140, 0.15, 0.06);
+  }
+  perfectDodge() {
+    this.tone('sine', 520, 1560, 0.35, 0.14);
+    this.tone('triangle', 1040, 2080, 0.4, 0.06, 0.05);
+    this.noise(0.3, 0.12, 'highpass', 5000);
+  }
   wave() {
     this.tone('triangle', 392, 392, 0.15, 0.13);
     this.tone('triangle', 523, 523, 0.15, 0.13, 0.12);

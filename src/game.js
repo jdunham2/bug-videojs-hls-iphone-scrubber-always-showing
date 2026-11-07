@@ -69,6 +69,8 @@ export class Game {
       root: $('hud'),
       hpFill: $('hp-fill'),
       hpText: $('hp-text'),
+      dodgeFill: $('dodge-fill'),
+      dodgeBox: $('dodge'),
       stats: $('stats'),
       wave: $('wave-label'),
       enemies: $('enemies-label'),
@@ -108,7 +110,8 @@ export class Game {
     this.particles.clear();
     this.numbers.clear();
     this.player.reset();
-    this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0 };
+    this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0, dodges: 0, perfectDodges: 0 };
+    this.slowmo = 0;
     this.wave = 0;
     this.waveState = 'break';
     this.breakTimer = 1.2;
@@ -116,6 +119,7 @@ export class Game {
     this.elapsed = 0;
     this.deathTimer = 0;
     this.hitStop = 0;
+    this.hud?.vignette.classList.remove('slowmo');
     this.camTarget.copy(this.player.pos);
   }
 
@@ -269,6 +273,22 @@ export class Game {
     }
   }
 
+  onDodge() {
+    this.stats.dodges++;
+    this.sfx.dodge();
+  }
+
+  onPerfectDodge(enemy) {
+    const d = config.dodge;
+    this.stats.perfectDodges++;
+    this.player.counterT = d.counterWindow;
+    this.slowmo = d.slowmoTime;
+    this.sfx.perfectDodge();
+    this.numbers.spawn(this.player.pos.clone().setY(2.2), 'PERFECT DODGE', 'callout gold');
+    this.particles.spawn(this.player.pos.clone().setY(0.8), { count: 18, color: [2.4, 2.4, 3], speed: 4, up: 1, life: 0.4, size: 0.07, gravity: 0 });
+    this.hud.vignette.classList.add('slowmo');
+  }
+
   onPlayerHit(enemy) {
     this.sfx.hurt();
     this.shake.add(0.6);
@@ -298,6 +318,11 @@ export class Game {
     let dt = 0;
     if (this.state === 'playing') {
       dt = realDt;
+      if (this.slowmo > 0) {
+        this.slowmo -= realDt;
+        dt *= config.dodge.slowmoScale;
+        if (this.slowmo <= 0) this.hud.vignette.classList.remove('slowmo');
+      }
       if (this.hitStop > 0) {
         this.hitStop -= realDt;
         dt = realDt * 0.03;
@@ -372,7 +397,7 @@ export class Game {
           b.pos.z += (dz / d) * push;
         }
       }
-      if (a.state !== 'lunge' && !this.player.dead) {
+      if (a.state !== 'lunge' && !this.player.dead && !this.player.rolling) {
         const dx = a.pos.x - this.player.pos.x;
         const dz = a.pos.z - this.player.pos.z;
         const d = Math.hypot(dx, dz);
@@ -412,6 +437,10 @@ export class Game {
     h.hpFill.style.width = `${pct * 100}%`;
     h.hpFill.classList.toggle('low', pct < 0.3);
     h.hpText.textContent = `${Math.ceil(p.hp)} / ${config.player.maxHp}`;
+    const ready = p.dodgeReady;
+    h.dodgeFill.style.width = `${ready * 100}%`;
+    h.dodgeBox.classList.toggle('ready', ready >= 1);
+    h.dodgeBox.classList.toggle('counter', p.counterT > 0);
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     h.stats.textContent = `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`;
     h.wave.textContent = this.wave ? `Wave ${this.wave}` : '';
@@ -424,7 +453,7 @@ export class Game {
     const r = h.reticle;
     r.style.transform = `translate(${this.input.mouse.x}px, ${this.input.mouse.y}px)`;
     r.style.setProperty('--size', `${44 - 26 * p.charge}px`);
-    r.dataset.phase = this.state === 'playing' ? p.drawPhase : 'none';
+    r.dataset.phase = this.state !== 'playing' ? 'none' : p.drawPhase === 'none' && p.counterT > 0 ? 'perfect' : p.drawPhase;
     r.style.display = this.state === 'playing' ? 'block' : 'none';
   }
 
@@ -450,6 +479,7 @@ export class Game {
         <div><kbd>Mouse</kbd><span>Aim</span></div>
         <div><kbd>Hold LMB</kbd><span>Draw the bow (slows you down)</span></div>
         <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
+        <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through grunts)</span></div>
         <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
         <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
       </div>`;
@@ -458,7 +488,7 @@ export class Game {
         <h1>Draw &amp; Release</h1>
         <p class="tag">A bow-combat prototype. Survive the waves.</p>
         ${controls}
-        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them.</p>
+        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot.</p>
         <button>Click to start</button>
         ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}`;
     } else if (kind === 'paused') {
@@ -475,6 +505,7 @@ export class Game {
           <div><b>${perf}%</b><span>Perfect shots</span></div>
           <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
           <div><b>${s.staggers}</b><span>Staggers</span></div>
+          <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
         <button>Click to try again</button>
@@ -509,6 +540,17 @@ export class Game {
     pl.add(config.player, 'maxHp', 20, 400, 10).name('Max HP');
     pl.add(config.player, 'iFrames', 0, 2, 0.05).name('Invuln after hit (s)');
     pl.add(config.player, 'healPerWave', 0, 100, 5).name('Heal per wave');
+
+    const dg = gui.addFolder('Dodge');
+    dg.add(config.dodge, 'distance', 1, 10, 0.1).name('Distance');
+    dg.add(config.dodge, 'duration', 0.1, 0.8, 0.01).name('Duration (s)');
+    dg.add(config.dodge, 'iFrameStart', 0, 0.5, 0.01).name('Invuln starts (s)');
+    dg.add(config.dodge, 'iFrameEnd', 0, 0.8, 0.01).name('Invuln ends (s)');
+    dg.add(config.dodge, 'cooldown', 0, 3, 0.05).name('Cooldown (s)');
+    dg.add(config.dodge, 'cancelsDraw').name('Rolling cancels draw');
+    dg.add(config.dodge, 'slowmoTime', 0, 2, 0.05).name('Perfect: slow-mo (s)');
+    dg.add(config.dodge, 'slowmoScale', 0.05, 1, 0.05).name('Perfect: slow-mo speed');
+    dg.add(config.dodge, 'counterWindow', 0, 5, 0.1).name('Perfect: counter window (s)');
 
     const g = gui.addFolder('Grunt');
     g.add(config.grunt, 'baseHp', 5, 200, 1).name('Base HP');
@@ -565,6 +607,7 @@ export class Game {
     gui.add(actions, 'reset').name('⟲ Reset to defaults');
 
     for (const folder of [pl, g, w, f]) folder.close();
+    dg.open();
     gui.onFinishChange(() => saveConfig());
   }
 

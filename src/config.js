@@ -20,6 +20,17 @@ export const DEFAULTS = {
     iFrames: 0.7, // invulnerability after being hit
     healPerWave: 20,
   },
+  dodge: {
+    distance: 4.2, // units travelled per roll
+    duration: 0.3, // seconds a roll lasts
+    iFrameStart: 0.02, // invulnerability starts this many seconds into the roll
+    iFrameEnd: 0.26, // ...and ends here
+    cooldown: 0.45, // seconds after a roll ends before you can roll again
+    cancelsDraw: true, // rolling drops a draw in progress
+    slowmoTime: 0.45, // real seconds of slow motion after a perfect dodge
+    slowmoScale: 0.3, // game speed during that slow motion
+    counterWindow: 1.5, // seconds after a perfect dodge where your next draw starts at full
+  },
   grunt: {
     baseHp: 30,
     speed: 3.4,

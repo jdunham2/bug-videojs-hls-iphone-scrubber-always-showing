@@ -191,7 +191,9 @@ export class Grunt {
         clubAngle = 1.6;
         if (!this.hasHit && dist < this.radius + PLAYER_RADIUS + 0.25) {
           this.hasHit = true;
-          if (player.takeDamage(g.damage, this.lungeDir, this.game)) this.game.onPlayerHit(this);
+          const res = player.takeDamage(g.damage, this.lungeDir, this.game);
+          if (res === true) this.game.onPlayerHit(this);
+          else if (res === 'dodged') this.game.onPerfectDodge(this);
         }
         if (this.t >= g.lungeTime) this.enter('recover');
         break;

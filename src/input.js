@@ -4,7 +4,7 @@ export class Input {
   constructor(canvas) {
     this.keys = new Set();
     this.pressed = new Set();
-    this.mouse = { x: innerWidth / 2, y: innerHeight / 2, ndcX: 0, ndcY: 0, down: false, clicked: false };
+    this.mouse = { x: innerWidth / 2, y: innerHeight / 2, ndcX: 0, ndcY: 0, down: false, clicked: false, rightClicked: false };
 
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement) return;
@@ -22,6 +22,7 @@ export class Input {
     });
     // Only the canvas starts a draw, so clicking the tuning panel never fires.
     canvas.addEventListener('pointerdown', (e) => {
+      if (e.button === 2) this.mouse.rightClicked = true;
       if (e.button !== 0) return;
       this.mouse.down = true;
       this.mouse.clicked = true;
@@ -48,6 +49,11 @@ export class Input {
     return len > 0 ? { x: x / len, y: y / len } : { x: 0, y: 0 };
   }
 
+  /** Dodge: Space, Shift or right mouse button. */
+  dodgePressed() {
+    return this.pressed.has('Space') || this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight') || this.mouse.rightClicked;
+  }
+
   wasPressed(code) {
     return this.pressed.has(code);
   }
@@ -55,5 +61,6 @@ export class Input {
   endFrame() {
     this.pressed.clear();
     this.mouse.clicked = false;
+    this.mouse.rightClicked = false;
   }
 }
