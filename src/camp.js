@@ -12,6 +12,7 @@ import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, ou
 import { Preview } from './preview.js';
 import { interiorHtml } from './interiors.js';
 import { mapArt } from './worldmap-art.js';
+import { Room, ROOM_KINDS } from './rooms.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
@@ -57,12 +58,14 @@ export class Camp {
     this.panel = document.getElementById('camp-panel');
     this.interior = document.getElementById('camp-interior');
     this.fly = 0; // 0 = out in the camp, 1 = camera pushed up to a building's door
+    this.rooms = {}; // walkable interiors, built on first visit
+    this.room = null;
     this.prompt = document.getElementById('camp-prompt');
     // The prompt is a real button: click or tap it to go inside.
     const enter = (e) => {
       e.stopPropagation();
       e.preventDefault();
-      if (this.near && !this.openKind) this.open(this.near);
+      if (this.near && !this.openKind) this.room ? this.useStation(this.near) : this.open(this.near);
     };
     this.prompt.addEventListener('pointerdown', enter);
     this.prompt.addEventListener('click', (e) => e.stopPropagation());
@@ -210,6 +213,10 @@ export class Camp {
     const G = this.game;
     const P = G.player;
     this.active = true;
+    this.room = null;
+    document.body.classList.remove('in-room');
+    this.flyHold = false;
+    this.leaving = this.entering = false;
     // The hero and their draw indicators (charge ring, aim line) come along to camp.
     this.scene.add(P.group, ...P.indicators);
     P.collide = this.collide;
@@ -228,6 +235,8 @@ export class Camp {
   leave() {
     const G = this.game;
     this.active = false;
+    this.room = null;
+    document.body.classList.remove('in-room');
     G.scene.add(G.player.group, ...G.player.indicators);
     G.player.collide = null;
     this.close();
@@ -240,6 +249,7 @@ export class Camp {
     if (!this.built) return;
     this.time += dt;
     const P = this.game.player;
+    if (this.room) return this.updateRoom(dt);
     this.fireLight.intensity = 40 * (0.85 + 0.1 * Math.sin(time * 11) + 0.05 * Math.sin(time * 27));
     if (Math.random() < dt * 25) {
       this.particles.spawn(new THREE.Vector3(rand(-0.3, 0.3), 0.5, rand(-0.3, 0.3)), { count: 1, color: [3, 1.2, 0.25], speed: 0.4, up: 3, life: 1, size: 0.07, gravity: -1.5, drag: 0.5 });
@@ -255,7 +265,8 @@ export class Camp {
     }
     this.particles.update(dt);
     // Camera push toward the door while a building is open (eased in game.updateCamera).
-    this.fly += ((this.openKind ? 1 : 0) - this.fly) * (1 - Math.exp(-(this.openKind ? 5 : 7) * dt));
+    const flyTo = this.flyHold || (this.openKind && !this.room) ? 1 : 0;
+    this.fly += (flyTo - this.fly) * (1 - Math.exp(-(flyTo ? 5 : 7) * dt));
     if (this.openKind) this.preview?.update(dt);
     if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
     if (this.dummy?.rig) {
@@ -284,8 +295,113 @@ export class Camp {
     }
     const I = this.game.input;
     const use = I.wasPressed('KeyE') || I.wasPressed('Enter') || I.wasPressed('NumpadEnter') || I.wasPressed('KeyF');
-    if (use && near && !this.openKind) this.open(near);
+    if (use && near && !this.openKind && !this.entering) this.open(near);
     if (this.game.input.wasPressed('Escape') && this.openKind) this.close();
+  }
+
+  // ------------------------------------------------------------ walkable interiors
+
+  /** Walk in: the camera pushes to the door, a quick fade, and you're inside. */
+  enterRoom(spot) {
+    const G = this.game;
+    this.entering = true;
+    this.flySpot = spot;
+    this.flyHold = true;
+    this.prompt.classList.remove('show');
+    G.sfx.sample('whoosh', { vol: 0.3, rate: 0.7, jitter: 0 });
+    setTimeout(() => {
+      if (!this.active || !this.entering) return;
+      G.fade();
+      setTimeout(() => this.switchToRoom(spot), 240);
+    }, 330);
+  }
+
+  switchToRoom(spot) {
+    const G = this.game;
+    const P = G.player;
+    if (!this.active || !this.entering) return;
+    const room = (this.rooms[spot.kind] ||= new Room(spot.kind, G, spot.label));
+    room.refresh();
+    G.setScene(room.scene);
+    room.scene.add(P.group, ...P.indicators);
+    P.collide = room.collide;
+    P.pos.copy(room.entry);
+    P.vel.set(0, 0, 0);
+    P.drawing = false;
+    P.hideIndicators();
+    G.camTarget.copy(P.pos);
+    this.room = room;
+    this.roomSpot = spot;
+    this.entering = this.flyHold = false;
+    this.fly = 0;
+    this.near = null;
+    this.prompt.classList.remove('show');
+    G.sfx.sample('uiConfirm', { vol: 0.35, rate: 0.8, jitter: 0 });
+    G.tips.hide();
+    document.body.classList.add('in-room');
+    G.banner(spot.label, 'Walk up to things and press E · the doormat leads back out', 1.6);
+  }
+
+  leaveRoom() {
+    const G = this.game;
+    if (this.leaving) return;
+    this.leaving = true;
+    this.close();
+    this.prompt.classList.remove('show');
+    G.fade();
+    G.sfx.sample('whoosh', { vol: 0.25, rate: 0.9, jitter: 0 });
+    setTimeout(() => {
+      this.leaving = false;
+      if (!this.active || !this.room) return;
+      const P = G.player;
+      const spot = this.roomSpot;
+      this.room = null;
+      document.body.classList.remove('in-room');
+      G.setScene(this.scene);
+      this.scene.add(P.group, ...P.indicators);
+      P.collide = this.collide;
+      P.pos.set(spot.x, 0, spot.z);
+      P.vel.set(0, 0, 0);
+      G.camTarget.copy(P.pos);
+      this.near = null;
+    }, 240);
+  }
+
+  /** Inside a building: tick the room, show the nearest station, use it on E. */
+  updateRoom(dt) {
+    const room = this.room;
+    const P = this.game.player;
+    let near = null;
+    let best = Infinity;
+    for (const s of room.allStations()) {
+      const d = Math.hypot(P.pos.x - s.x, P.pos.z - s.z);
+      if (d < s.r && d < best) {
+        best = d;
+        near = s;
+      }
+    }
+    room.update(dt, P.pos, this.openKind ? null : near);
+    if (this.openKind) this.preview?.update(dt);
+    if (near !== this.near) {
+      this.near = near;
+      this.prompt.classList.toggle('show', !!near && !this.openKind);
+      if (near) {
+        this.prompt.innerHTML = `<span class="cp-btn">${near.verb}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
+        this.prompt.querySelector('b').textContent = near.label;
+      }
+    }
+    const I = this.game.input;
+    const use = I.wasPressed('KeyE') || I.wasPressed('Enter') || I.wasPressed('NumpadEnter') || I.wasPressed('KeyF');
+    if (use && near && !this.openKind) this.useStation(near);
+    if (I.wasPressed('Escape')) {
+      if (this.openKind) this.close();
+      else this.leaveRoom();
+    }
+  }
+
+  useStation(s) {
+    if (s.act === 'exit') return this.leaveRoom();
+    this.showPanel({ kind: s.panel, label: s.label }, s.focus);
   }
 
   refreshHud() {
@@ -298,26 +414,39 @@ export class Camp {
 
   open(spot) {
     spot = this.spots.find((s) => s.kind === spot.kind) || spot;
+    if (ROOM_KINDS.includes(spot.kind) && !this.room && modelStatus.state !== 'loading') return this.enterRoom(spot);
+    this.showPanel(spot);
+  }
+
+  /** Open a building's screen. Out in the camp it gets the painted interior behind it. */
+  showPanel(spot, focus) {
     this.preview ||= new Preview(this.game.renderer);
     this.hallFocus = this.tailorFocus = null;
     this.openKind = spot.kind;
     this.shopNote = '';
-    this.flySpot = spot;
+    if (spot.kind === 'hall' && focus) this.hallFocus = focus;
+    if (spot.kind === 'wardrobe' && focus) this.tailorFocus = focus;
     this.prompt.classList.remove('show');
     this.game.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
-    this.game.sfx.sample('whoosh', { vol: 0.25, rate: 0.7, jitter: 0 });
-    // Step inside: the camera pushes to the door, then the room fades up behind the screen.
-    this.interior.innerHTML = interiorHtml(spot.kind);
-    this.interior.className = `show k-${spot.kind}`;
+    if (!this.room) {
+      // Step inside: the camera pushes to the door, then the room fades up behind the screen.
+      this.flySpot = spot;
+      this.game.sfx.sample('whoosh', { vol: 0.25, rate: 0.7, jitter: 0 });
+      this.interior.innerHTML = interiorHtml(spot.kind);
+      this.interior.className = `show k-${spot.kind}`;
+    }
     this.render();
     this.panel.classList.add('show');
   }
 
   close() {
     this.preview?.hide();
+    const wasOpen = this.openKind;
     this.openKind = null;
     this.interior.classList.remove('show');
     this.panel.classList.remove('show');
+    // Purchases and equips change what's on display.
+    if (wasOpen && this.room) this.room.refresh();
     if (this.near) this.prompt.classList.add('show');
   }
 

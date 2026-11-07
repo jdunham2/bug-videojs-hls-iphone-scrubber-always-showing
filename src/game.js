@@ -778,6 +778,11 @@ export class Game {
       if (k.t >= k.dur) this.killCam = null;
     }
     const C = this.camp;
+    if (C.active && C.room) {
+      // Inside a building: keep most of the room in frame, drifting with the hero.
+      target.lerp(C.room.center, 0.6);
+      zoom *= 0.84;
+    }
     if (C.active && C.fly > 0.001 && Number.isFinite(C.flySpot?.bx)) {
       // Walking into a camp building: glide toward its door and push in.
       const f = C.fly * C.fly * (3 - 2 * C.fly);

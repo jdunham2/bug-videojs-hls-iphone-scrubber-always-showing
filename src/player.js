@@ -282,7 +282,7 @@ export class Player {
     if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1 && !(game.state === 'camp' && game.camp.openKind)) this.startRoll(input, game);
 
     // Draw / release
-    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && !(game.state === 'camp' && game.camp.openKind) && game.state !== 'title') {
+    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && !(game.state === 'camp' && (game.camp.openKind || game.camp.room)) && game.state !== 'title') {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
