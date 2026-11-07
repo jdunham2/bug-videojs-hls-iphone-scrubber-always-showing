@@ -11,6 +11,7 @@ import { World, ARENA_HALF, pillars } from './world.js';
 import { Environment, spawnGates } from './environment.js';
 import { Decals, Portals } from './juice.js';
 import { Skeleton, EnemyArrows } from './skeleton.js';
+import { Boss, BOSS_NAME } from './boss.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -119,6 +120,11 @@ export class Game {
       dodgeFill: $('dodge-fill'),
       dodgeBox: $('dodge'),
       build: $('build'),
+      bossBar: $('boss-bar'),
+      bossFill: $('boss-fill'),
+      bossPoise: $('boss-poise'),
+      bossName: $('boss-name'),
+      bossCard: $('boss-card'),
       draft: $('draft'),
       stats: $('stats'),
       wave: $('wave-label'),
@@ -248,6 +254,9 @@ export class Game {
     this.portals.clear();
     this.enemyArrows.clear();
     this.killCam = null;
+    this.cinematic = null;
+    this.boss = null;
+    document.body.classList.remove('letterbox');
     this.zoomKick = 0;
     this.aberration = 0;
     for (const b of this.bolts || []) b.line.removeFromParent();
@@ -308,11 +317,90 @@ export class Game {
     this.wave = n;
     const w = config.waves;
     this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
+    if (n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
     this.waveState = 'active';
     this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
     this.sfx.wave(n);
     this.waveHurt = false;
+  }
+
+  startBossWave(n) {
+    this.toSpawn = 0;
+    this.waveState = 'active';
+    this.waveHurt = false;
+    this.bossIndex = Math.round(n / config.boss.every);
+    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
+    const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
+    this.boss = new Boss(this, p, n, this.bossIndex);
+    this.enemies.push(this.boss);
+    this.portals.spawn(p, 2.2, 5, new THREE.Color(3, 0.5, 0.3));
+    this.banner('A boss approaches', BOSS_NAME, 2.2);
+    this.sfx.wave(n);
+    this.sfx.bossRoar();
+    this.shake.add(0.4);
+  }
+
+  onBossIntro(boss) {
+    this.cinematic = { t: 0, dur: config.boss.introTime, target: boss };
+    document.body.classList.add('letterbox');
+    this.sfx.bossRoar();
+    this.shake.add(0.5);
+    this.bossCard(BOSS_NAME, this.bossIndex > 1 ? `Returns stronger · ${this.bossIndex}` : 'Warlord of the Ruins');
+  }
+
+  onBossPhase(boss) {
+    this.banner('Enraged!', 'He moves faster and calls for help', 1.8);
+    this.sfx.bossRoar();
+    this.shake.add(0.5);
+    this.aberration = 1;
+    this.particles.spawn(boss.pos.clone().setY(2), { count: 40, color: [3, 0.4, 0.2], speed: 6, up: 3, life: 0.8, size: 0.14 });
+  }
+
+  onBossStunned(boss, broken = false) {
+    this.numbers.spawn(boss.pos.clone().setY(4.6), broken ? 'POISE BROKEN' : 'STUNNED', 'callout gold');
+    this.sfx.stagger(this.panAt(boss.pos));
+    this.sfx.sample('clang', { vol: 0.9, rate: 0.6 });
+    this.shake.add(0.4);
+    this.zoomKick = Math.min(0.12, this.zoomKick + 0.08);
+  }
+
+  onBossSummon(boss) {
+    this.sfx.bossRoar();
+    const n = boss.phase === 2 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
+      const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
+      this.enemies.push(new Grunt(this, p, this.wave));
+      this.portals.spawn(p);
+    }
+  }
+
+  onBossDefeated(boss) {
+    this.boss = null;
+    this.banner('Boss defeated!', BOSS_NAME, 2.6);
+    this.sfx.cleared(true);
+    this.sfx.bossRoar();
+    this.shake.add(0.8);
+    this.slowmo = 2;
+    this.slowmoScale = 0.18;
+    this.hud.vignette.classList.add('slowmo');
+    this.killCam = { t: 0, dur: 2.4, target: boss.pos.clone() };
+    this.particles.spawn(boss.pos.clone().setY(2.5), { count: 80, color: [3, 1.6, 0.4], speed: 9, up: 5, life: 1.4, size: 0.16 });
+    this.decals.spawn(boss.pos, 'scorch', 5, 30);
+    // Kill the summoned grunts too, so the wave ends with the boss.
+    for (const e of this.enemies) if (e !== boss && e.isHittable()) e.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+    this.stats.bossesDefeated = (this.stats.bossesDefeated || 0) + 1;
+  }
+
+  bossCard(title, sub) {
+    const el = this.hud.bossCard;
+    el.innerHTML = '<div class="name"></div><div class="sub"></div>';
+    el.querySelector('.name').textContent = title;
+    el.querySelector('.sub').textContent = sub;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
   }
 
   updateWaves(dt) {
@@ -455,7 +543,7 @@ export class Game {
     this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
     // Last enemy of the wave: slow-motion kill cam.
     const others = this.enemies.some((e) => e !== enemy && e.state !== 'dying' && !e.removed);
-    if (this.waveState === 'active' && this.toSpawn === 0 && !others && !this.player.dead) {
+    if (!enemy.isBoss && this.waveState === 'active' && this.toSpawn === 0 && !others && !this.player.dead) {
       this.killCam = { t: 0, dur: 1.3, target: enemy.pos.clone() };
       this.slowmo = 1.1;
       this.slowmoScale = 0.22;
@@ -762,6 +850,18 @@ export class Game {
     if (look.length() > 7) look.setLength(7);
     const target = this.player.pos.clone().addScaledVector(look, 0.2);
     let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0));
+    if (this.cinematic) {
+      // Boss intro: swing to the boss and push in, letterboxed.
+      const c = this.cinematic;
+      c.t += dt;
+      const w = Math.sin(Math.min(1, c.t / c.dur) * Math.PI);
+      target.lerp(c.target.pos, 0.85 * Math.min(1, w * 1.6));
+      zoom *= 1 - 0.3 * w;
+      if (c.t >= c.dur) {
+        this.cinematic = null;
+        document.body.classList.remove('letterbox');
+      }
+    }
     if (this.killCam) {
       // Swing toward the final kill and push in, then ease back out.
       const k = this.killCam;
@@ -789,6 +889,13 @@ export class Game {
     h.hpFill.style.width = `${pct * 100}%`;
     h.hpFill.classList.toggle('low', pct < 0.3);
     h.hpText.textContent = `${Math.ceil(p.hp)} / ${maxHp}`;
+    const boss = this.boss && !this.boss.removed && this.boss.state !== 'spawning' ? this.boss : null;
+    h.bossBar.classList.toggle('show', !!boss);
+    if (boss) {
+      h.bossName.textContent = BOSS_NAME + (boss.phase === 2 ? ' · Enraged' : '');
+      h.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
+      h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
+    }
     const maxCharges = stat.dodgeCharges();
     h.dodgeFill.style.width = `${(p.dodgeMeter / maxCharges) * 100}%`;
     h.dodgeBox.style.setProperty('--segs', maxCharges);

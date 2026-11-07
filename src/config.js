@@ -53,6 +53,30 @@ export const DEFAULTS = {
     damage: 14,
     firstWave: 3,
   },
+  boss: {
+    every: 5, // a boss arrives on every Nth wave
+    baseHp: 520, // +60% per later boss
+    speed: 2.4,
+    height: 4.2,
+    introTime: 2.6,
+    swingWindup: 0.9,
+    slamWindup: 1.2,
+    chargeWindup: 1.0,
+    chargeSpeed: 15,
+    chargeTime: 1.1,
+    swingDamage: 30,
+    slamDamage: 34,
+    chargeDamage: 28,
+    waveDamage: 18,
+    stunTime: 2.2,
+    stunDamageMult: 1.6, // extra damage while stunned
+    recoverTime: 0.9,
+    cooldown: 1.6,
+    poise: 120, // damage to break him (perfect shots count double)
+    summonCooldown: 14,
+    swingHitAt: 0.88, // clip fractions where the blow lands (checked against the Meshy clips)
+    slamHitAt: 0.64,
+  },
   waves: {
     baseCount: 3,
     countPerWave: 2,

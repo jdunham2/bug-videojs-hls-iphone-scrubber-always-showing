@@ -306,6 +306,19 @@ export class Sfx {
     this.tone('sine', 90, 30, 0.45, 0.35);
   }
 
+  bossRoar() {
+    this.tone('sawtooth', 70, 38, 1.2, 0.12);
+    this.tone('square', 52, 30, 1.1, 0.06, 0.05);
+    this.noise(1.0, 0.18, 'lowpass', 500);
+    this.sample('boom', { vol: 0.6, rate: 0.45, jitter: 0 });
+  }
+
+  bossSlam() {
+    this.sample('slam', { vol: 1, rate: 0.6 });
+    this.sample('boom', { vol: 0.8, rate: 0.55 });
+    this.tone('sine', 70, 24, 0.6, 0.45);
+  }
+
   uiHover() {
     this.sample('uiSelect', { vol: 0.35, jitter: 0.02 });
   }
