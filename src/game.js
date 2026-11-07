@@ -623,6 +623,7 @@ export class Game {
     this.loot.update(dt);
     this.gearDrops.update(dt);
     this.updateGearCard(dt);
+    this.updateThiefPointer();
     this.gadgets.update(dt);
     this.updateSecret(dt);
     for (const n of [1, 2]) if (this.input.wasPressed(`Digit${n}`) && !this.player.dead) this.gadgets.use(n, this.aimPoint);

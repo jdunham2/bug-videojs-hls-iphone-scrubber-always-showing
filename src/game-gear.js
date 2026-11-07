@@ -29,6 +29,43 @@ export class GearMethods {
     if (Math.random() < chance) this.gearDrops.spawn(enemy.pos, roll(enemy.elite ? 'elite' : 'enemy', enemy.elite ? 1 : 0));
   }
 
+  /** Point at the loot thief from the screen edge, with his time left. */
+  updateThiefPointer() {
+    const el = (this.thiefEl ||= document.getElementById('thief-arrow'));
+    const t = this.enemies.find((e) => e.isThief && e.state === 'chase' && !e.removed);
+    if (!t || this.state !== 'playing') {
+      el.classList.remove('show');
+      return;
+    }
+    const v = (this.thiefTmp ||= t.pos.clone()).copy(t.pos).setY(1.2).project(this.camera);
+    const onScreen = Math.abs(v.x) < 0.92 && Math.abs(v.y) < 0.88 && v.z < 1;
+    let x = v.x;
+    let y = v.y;
+    if (v.z > 1) {
+      x = -x;
+      y = -y;
+    }
+    const m = Math.max(Math.abs(x) / 0.9, Math.abs(y) / 0.84, 1);
+    x /= m;
+    y /= m;
+    el.classList.add('show');
+    el.classList.toggle('edge', !onScreen);
+    el.style.left = `${(x * 0.5 + 0.5) * innerWidth}px`;
+    el.style.top = `${(-y * 0.5 + 0.5) * innerHeight - (onScreen ? 60 : 0)}px`;
+    el.querySelector('i').style.transform = `rotate(${Math.atan2(-y, x)}rad)`;
+    el.querySelector('span').textContent = `${Math.max(0, Math.ceil(t.life))}s`;
+  }
+
+  /** The loot thief is down: the sack bursts. */
+  thiefCaught(enemy, gems) {
+    this.loot.drop(enemy.pos, gems(30), 2);
+    this.gearDrops.spawn(enemy.pos, rollItem(['bow', 'armor', 'gadget'][Math.floor(Math.random() * 3)], dropPower(this, 2), rollRarity('elite', (this.difficulty?.rarityBoost || 0) + 0.2)));
+    this.banner('Thief caught!', 'The sack bursts open', 1.6);
+    this.sfx.sample('jingleClear', { vol: 0.6, jitter: 0 });
+    this.particles.spawn(enemy.pos.clone().setY(1.2), { count: 50, color: [3, 2.4, 0.7], speed: 6, up: 5, life: 1, size: 0.08, gravity: 5 });
+    this.bounty('thief');
+  }
+
   /** A Unique dropped: a beat of slow motion, a golden flash and a fanfare. */
   onUniqueDrop(pos) {
     this.banner('UNIQUE!', 'Something special dropped', 1.6);

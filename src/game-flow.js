@@ -8,7 +8,7 @@ import { spawnGates, THEMES } from './environment.js';
 import { Grunt } from './enemy.js';
 import { Archer } from './archer.js';
 import { Boss } from './boss.js';
-import { Raider, Bomber } from './variants.js';
+import { Raider, Bomber, Thief } from './variants.js';
 import { makeElite, AFFIXES } from './elites.js';
 import { build, stat } from './skills.js';
 import { profile, saveProfile } from './profile.js';
@@ -26,6 +26,8 @@ export class FlowMethods {
     if (this.mission ? n === this.mission.waves : n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
     this.waveState = 'active';
+    // Now and then a loot thief turns up partway through a wave.
+    if (n >= 3 && Math.random() < 0.3) setTimeout(() => this.state === 'playing' && this.wave === n && this.waveState === 'active' && this.spawnThief(), 4000 + Math.random() * 5000);
     this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
     this.sfx.wave(n);
     this.waveHurt = false;
@@ -206,6 +208,16 @@ export class FlowMethods {
       if (farFromPlayer && clearOfPillars) break;
     }
     this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.enemyLevel()))));
+  }
+
+  /** A loot thief drops in at the far side of the arena and runs. */
+  spawnThief() {
+    const H = ARENA_HALF - 3;
+    const p = new THREE.Vector3(-Math.sign(this.player.pos.x || 1) * H * 0.7, 0, -Math.sign(this.player.pos.z || 1) * H * 0.7);
+    const t = new Thief(this, p, this.enemyLevel());
+    this.enemies.push(this.toughen(t));
+    this.banner('A loot thief!', 'Bring him down before he gets away', 2);
+    this.sfx.sample('jingleClear', { vol: 0.4, rate: 1.5, jitter: 0 });
   }
 
   /** An enemy dropped into the arena: dust and a thud (a big one for the boss). */

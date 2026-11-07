@@ -113,6 +113,7 @@ export class CombatMethods {
     const gems = (n) => Math.round(n * gm);
     if (enemy.elite) this.loot.drop(enemy.pos, gems(5), 1);
     if (enemy.isBoss) this.loot.drop(enemy.pos, gems(25), 3);
+    else if (enemy.isThief) this.thiefCaught(enemy, gems);
     else this.loot.drop(enemy.pos, gems(enemy.kind === 'archer' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0)), Math.random() < 0.15 ? 1 : 0);
     this.ultimate.gain(config.ultimate.perKill);
     const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';

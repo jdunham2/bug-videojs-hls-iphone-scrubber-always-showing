@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { Grunt } from './enemy.js';
 import { Archer } from './archer.js';
-import { arrowBlocked } from './world.js';
+import { arrowBlocked, resolveCircle, ARENA_HALF } from './world.js';
 import { PLAYER_RADIUS, ARROW_HEIGHT } from './player.js';
 
 export class Raider extends Grunt {
@@ -143,4 +143,96 @@ export class Fireballs {
     this.list.length = 0;
     this.fires.length = 0;
   }
+}
+
+/**
+ * Loot Thief: a bandit with a sack of treasure who turns up now and then and
+ * runs for it. He never fights back. Bring him down before he slips away
+ * (about 14 seconds) and the sack bursts: a shower of gems and a piece of gear.
+ */
+export class Thief extends Grunt {
+  constructor(game, pos, level) {
+    super(game, pos, level);
+    this.kind = 'thief';
+    this.isThief = true;
+    this.speed *= 1.3;
+    this.maxHp = this.hp = this.hp * 2.4;
+    this.life = 14;
+    this.zig = Math.random() * 10;
+    // A glowing sack on his back so he's easy to pick out.
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sackGlow(), color: 0xffc040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glow.position.set(0, 1.5, -0.35);
+    glow.scale.setScalar(1.6);
+    const sack = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10).scale(1, 1.2, 1), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.9, emissive: 0x4a3000 }));
+    sack.position.set(0, 1.3, -0.35);
+    this.group.add(sack, glow);
+    this.sackGlow = glow;
+    if (this.model) for (const m of this.model.materials) m.color.multiplyScalar(0.8);
+  }
+  get modelId() {
+    return 'bandit';
+  }
+  get propId() {
+    return 'none';
+  }
+
+  update(realDt, player) {
+    if (this.state !== 'chase') return super.update(realDt, player);
+    this.flash = Math.max(0, this.flash - realDt);
+    this.hitT = Math.max(0, this.hitT - realDt);
+    if (this.updateStatus(realDt)) return;
+    const dt = realDt * this.timeScale;
+    this.t += dt;
+    this.life -= realDt;
+    // Run away from the hero, steering off the walls, with a weave.
+    const away = new THREE.Vector3(this.pos.x - player.pos.x, 0, this.pos.z - player.pos.z);
+    const d = away.length() || 1;
+    away.divideScalar(d);
+    const center = new THREE.Vector3(-this.pos.x, 0, -this.pos.z);
+    const edge = Math.max(Math.abs(this.pos.x), Math.abs(this.pos.z)) / (ARENA_HALF - 1);
+    away.addScaledVector(center.normalize(), Math.max(0, edge - 0.55) * 3);
+    const side = new THREE.Vector3(-away.z, 0, away.x).multiplyScalar(Math.sin(this.t * 2.6 + this.zig) * 0.6);
+    away.add(side).normalize();
+    const pace = d < 9 ? this.speed : this.speed * 0.55; // eases off when you're far behind
+    this.pos.x += (away.x * pace + this.knock.x) * dt;
+    this.pos.z += (away.z * pace + this.knock.z) * dt;
+    this.knock.multiplyScalar(Math.exp(-9 * realDt));
+    resolveCircle(this.pos, this.radius);
+    const yaw = Math.atan2(away.x, away.z);
+    let dy = yaw - this.yaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.yaw += dy * (1 - Math.exp(-10 * dt));
+    this.group.position.copy(this.pos);
+    this.group.rotation.y = this.yaw;
+    this.sackGlow.material.opacity = 0.6 + 0.3 * Math.sin(this.t * 8);
+    if (Math.random() < dt * 14) this.game.particles.spawn(this.pos.clone().setY(1.2), { count: 1, color: [3, 2.3, 0.6], speed: 0.6, up: 0.6, life: 0.7, size: 0.06, gravity: 1 });
+    this.bodyMat.emissive.setRGB(this.flash > 0 ? 0.8 : 0, this.flash > 0 ? 0.8 : 0, this.flash > 0 ? 0.8 : 0);
+    if (this.model) for (const m of this.model.materials) m.emissive.setRGB(this.flash > 0 ? 0.5 : 0.08, this.flash > 0 ? 0.5 : 0.06, this.flash > 0 ? 0.5 : 0);
+    this.updateModel(realDt);
+    if (this.life <= 0) this.escape();
+  }
+
+  /** Gone in a puff of smoke. */
+  escape() {
+    const G = this.game;
+    G.particles.spawn(this.pos.clone().setY(0.8), { count: 40, color: 0x6a6460, speed: 3, up: 2, life: 1, size: 0.35, gravity: -0.5, drag: 0.5 });
+    G.banner('The thief got away', 'Faster next time!', 1.6);
+    G.sfx.sample('whoosh', { vol: 0.5, rate: 1.3, jitter: 0 });
+    this.dispose();
+  }
+}
+
+let glowTex = null;
+function sackGlow() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
 }
