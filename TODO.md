@@ -6,7 +6,7 @@ yours.
 
 ## Now
 
-- [ ] Waiting on the user (Build 59): build label in the corner, which
+- [ ] Waiting on the user (Build 69): build label in the corner, which
       characters "aren't working" and how, and a Copy diagnostics report if
       walking still stops after wave 4 or the merchant/blacksmith misbehave.
       None of these reproduce here with their real save.
@@ -15,7 +15,10 @@ yours.
 
 - More missions per arena (new layouts), mission modifiers, a fourth arena.
 - A second boss type with its own moves.
-- Walkable building interiors (step inside and use the counter, anvil, racks).
+- A walkable war room for the Camp Gate and a trophy hall for the Trophy Board.
+- Merchant NPC behind the counter; the smith swinging his hammer (needs a clip).
+- Falcon looks and other companions (a hound?) at the Tailor.
+- A fourth arena and mission; a second boss with its own model.
 - Co-op on the published page (room capability); cosmetic capes.
 - Weekly trial with a bigger reward; a season track.
 
