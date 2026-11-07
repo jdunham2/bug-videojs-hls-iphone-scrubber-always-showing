@@ -36,8 +36,15 @@ const config = JSON.parse(fs.readFileSync(path.join(HERE, 'assets.json'), 'utf8'
 const state = fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) : {};
 const saveState = () => fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 
-// A placeholder is fine in the cloud environment: the proxy swaps in the real key.
-const KEY = process.env.MESHY_API_KEY || 'msy_placeholder_replaced_by_proxy';
+// Key lookup: MESHY_API_KEY, else tools/meshy/.env (gitignored), else a placeholder
+// that the cloud environment's proxy replaces when a network secret is configured.
+function readEnvFile() {
+  const file = path.join(HERE, '.env');
+  if (!fs.existsSync(file)) return null;
+  const m = fs.readFileSync(file, 'utf8').match(/^MESHY_API_KEY=(.+)$/m);
+  return m ? m[1].trim() : null;
+}
+const KEY = process.env.MESHY_API_KEY || readEnvFile() || 'msy_placeholder_replaced_by_proxy';
 const headers = { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
@@ -173,7 +180,8 @@ function refineBody(asset) {
 async function animationNames() {
   const res = await fetch(LIBRARY_URL);
   const data = await res.json();
-  const list = data.list || data.result || data;
+  const list = data.result?.list || data.list || data.result || data;
+  if (!Array.isArray(list)) throw new Error('Unexpected animation library format');
   return new Map(list.map((a) => [a.id, a.name]));
 }
 
