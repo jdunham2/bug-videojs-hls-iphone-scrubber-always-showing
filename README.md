@@ -12,6 +12,14 @@ npm run dev
 
 Then open the URL Vite prints (usually http://localhost:5173). `npm run build` produces a static build in `dist/`.
 
+## Play online (GitHub Pages)
+
+`.github/workflows/pages.yml` builds the game and deploys it to GitHub Pages on every push to `master` (and the current dev branch):
+
+https://jdunham2.github.io/bug-videojs-hls-iphone-scrubber-always-showing/
+
+One-time setup: in the repo, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
+
 ## Controls
 
 | Input | Action |
