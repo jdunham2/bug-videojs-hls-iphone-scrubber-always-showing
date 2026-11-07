@@ -147,6 +147,28 @@ export class Sfx {
     this.tone('triangle', 1040, 2080, 0.4, 0.06, 0.05);
     this.noise(0.3, 0.12, 'highpass', 5000);
   }
+  zap() {
+    this.noise(0.12, 0.2, 'highpass', 3000);
+    this.tone('square', 1800, 300, 0.14, 0.06);
+  }
+  freeze() {
+    this.tone('sine', 1800, 2600, 0.2, 0.1);
+    this.noise(0.25, 0.15, 'highpass', 6000);
+  }
+  megaReady() {
+    this.tone('sawtooth', 110, 220, 0.25, 0.08);
+    this.tone('sine', 440, 880, 0.3, 0.1, 0.05);
+  }
+  megaRelease() {
+    this.tone('sine', 90, 30, 0.45, 0.4);
+    this.noise(0.3, 0.3, 'lowpass', 1200);
+  }
+  pick() {
+    this.tone('triangle', 523, 523, 0.12, 0.12);
+    this.tone('triangle', 659, 659, 0.12, 0.12, 0.08);
+    this.tone('triangle', 784, 784, 0.12, 0.12, 0.16);
+    this.tone('triangle', 1047, 1047, 0.35, 0.12, 0.24);
+  }
   wave() {
     this.tone('triangle', 392, 392, 0.15, 0.13);
     this.tone('triangle', 523, 523, 0.15, 0.13, 0.12);

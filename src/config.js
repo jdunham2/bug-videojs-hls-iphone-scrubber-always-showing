@@ -45,7 +45,7 @@ export const DEFAULTS = {
   waves: {
     baseCount: 3,
     countPerWave: 2,
-    hpGrowth: 0.15, // +15% grunt HP per wave
+    hpGrowth: 0.2, // +20% grunt HP per wave (you pick up skills, so they need to keep up)
     speedGrowth: 0.06, // +6% grunt speed per wave
     spawnInterval: 0.8,
     breakTime: 3,

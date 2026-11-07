@@ -12,12 +12,15 @@ const shaftMat = new THREE.MeshStandardMaterial({ color: 0xc9a26b, roughness: 0.
 const headMat = new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.6, roughness: 0.35 });
 const fletchMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.9 });
 const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.1, 0.5) });
+const megaMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 0.7, 2.4) });
 
-export function makeArrowMesh(perfect = false) {
+export function makeArrowMesh(perfect = false, mega = false) {
   const g = new THREE.Group();
-  const shaft = new THREE.Mesh(shaftGeo, perfect ? glowMat : shaftMat);
+  const special = mega ? megaMat : perfect ? glowMat : null;
+  const shaft = new THREE.Mesh(shaftGeo, special || shaftMat);
   shaft.castShadow = true;
-  g.add(shaft, new THREE.Mesh(headGeo, perfect ? glowMat : headMat));
+  g.add(shaft, new THREE.Mesh(headGeo, special || headMat));
+  if (mega) g.scale.setScalar(1.8);
   g.add(new THREE.Mesh(fletchA, fletchMat), new THREE.Mesh(fletchB, fletchMat));
   return g;
 }
@@ -35,6 +38,8 @@ function segCircle(ax, az, bx, bz, cx, cz, r) {
 }
 
 const MAX_STUCK = 60;
+const RICOCHET_RANGE = 9;
+const TRAIL = { fire: [3, 1.1, 0.2], frost: [0.8, 1.8, 3] };
 const tmp = new THREE.Vector3();
 
 export class ArrowSystem {
@@ -43,8 +48,9 @@ export class ArrowSystem {
     this.list = [];
   }
 
-  spawn(origin, dir, speed, damage, charge, perfect) {
-    const mesh = makeArrowMesh(perfect);
+  /** opts: { mega, extra, bounces, element } */
+  spawn(origin, dir, speed, damage, charge, perfect, opts = {}) {
+    const mesh = makeArrowMesh(perfect, opts.mega);
     mesh.position.copy(origin);
     mesh.lookAt(tmp.copy(origin).add(dir));
     this.scene.add(mesh);
@@ -57,7 +63,11 @@ export class ArrowSystem {
       damage,
       charge,
       perfect,
-      pierce: perfect,
+      mega: !!opts.mega,
+      extra: !!opts.extra, // side arrows from Split Shot (not counted as separate shots)
+      bounces: opts.bounces || 0,
+      element: opts.element || null,
+      pierce: perfect || !!opts.mega,
       hitSet: new Set(),
       hitCount: 0,
       traveled: 0,
@@ -105,6 +115,7 @@ export class ArrowSystem {
       game.onArrowHit(a, e, point);
       a.hitCount++;
       if (!a.pierce) {
+        if (a.bounces > 0 && this.ricochet(a, e, point, enemies, game)) return;
         // Embed the arrow in the enemy so it rides along (and falls with it).
         a.pos.copy(point).addScaledVector(a.dir, 0.3);
         a.mesh.position.copy(a.pos);
@@ -115,8 +126,13 @@ export class ArrowSystem {
       }
     }
 
-    if (a.perfect) {
+    if (a.mega) {
+      game.particles.spawn(a.pos, { count: 3, color: [3, 0.6, 2.4], speed: 1, up: 0, life: 0.35, size: 0.12, gravity: 0 });
+    } else if (a.perfect) {
       game.particles.spawn(a.pos, { count: 1, color: [3, 2, 0.5], speed: 0.4, up: 0, life: 0.25, size: 0.07, gravity: 0 });
+    }
+    if (a.element && Math.random() < 0.5) {
+      game.particles.spawn(a.pos, { count: 1, color: TRAIL[a.element], speed: 0.5, up: 0.5, life: 0.3, size: 0.06, gravity: 0 });
     }
 
     if (arrowBlocked(a.pos)) {
@@ -126,6 +142,30 @@ export class ArrowSystem {
       a.state = 'falling';
     }
     a.mesh.position.copy(a.pos);
+  }
+
+  /** Redirect an arrow from `from` to the nearest other grunt. Returns false if none in range. */
+  ricochet(a, from, point, enemies, game) {
+    let best = null;
+    let bestD = RICOCHET_RANGE;
+    for (const e of enemies) {
+      if (e === from || !e.isHittable() || a.hitSet.has(e)) continue;
+      const d = Math.hypot(e.pos.x - point.x, e.pos.z - point.z);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    if (!best) return false;
+    a.bounces--;
+    a.pos.copy(point);
+    a.dir.set(best.pos.x - point.x, 0, best.pos.z - point.z).normalize();
+    a.vel.copy(a.dir).multiplyScalar(a.speed);
+    a.traveled = 0;
+    a.mesh.position.copy(a.pos);
+    a.mesh.lookAt(tmp.copy(a.pos).add(a.dir));
+    game.onRicochet(point);
+    return true;
   }
 
   fall(a, dt, game) {

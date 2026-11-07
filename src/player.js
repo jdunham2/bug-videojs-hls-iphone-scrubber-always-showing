@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeArrowMesh } from './arrows.js';
+import { stat, lv, OVERDRAW_TIME } from './skills.js';
 
 export const PLAYER_RADIUS = 0.45;
 export const ARROW_HEIGHT = 1.1;
 
 const lerp = THREE.MathUtils.lerp;
+const UP = new THREE.Vector3(0, 1, 0);
 
 function lerpAngle(a, b, t) {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -17,6 +19,8 @@ function lerpAngle(a, b, t) {
 const RING_IDLE = new THREE.Color(0xffffff);
 const RING_PERFECT = new THREE.Color(3, 2.2, 0.6);
 const RING_LATE = new THREE.Color(0x777777);
+const RING_OVER = new THREE.Color(1.6, 0.4, 1.8);
+const RING_MEGA = new THREE.Color(3.2, 0.7, 2.2);
 
 export class Player {
   constructor(scene) {
@@ -114,7 +118,7 @@ export class Player {
     this.pos.set(0, 0, 3);
     this.vel.set(0, 0, 0);
     this.knock.set(0, 0, 0);
-    this.hp = config.player.maxHp;
+    this.hp = stat.maxHp();
     this.dead = false;
     this.deathT = 0;
     this.drawing = false;
@@ -127,8 +131,10 @@ export class Player {
     this.walkT = 0;
     this.rolling = false;
     this.rollT = 0;
-    this.dodgeCd = 0;
+    this.charges = stat.dodgeCharges();
+    this.rechargeT = 0;
     this.dodgeBuffer = 0;
+    this.megaCued = false;
     this.counterT = 0;
     this.rig.rotation.set(0, 0, 0);
     this.rig.position.set(0, 0, 0);
@@ -142,23 +148,41 @@ export class Player {
     return this.rolling && this.rollT >= d.iFrameStart && this.rollT <= d.iFrameEnd;
   }
 
-  /** 0..1, how ready the dodge is (1 = ready). */
-  get dodgeReady() {
-    const total = config.dodge.duration + config.dodge.cooldown;
-    return total > 0 ? 1 - Math.max(0, this.dodgeCd) / total : 1;
+  get rechargeTime() {
+    return config.dodge.duration + config.dodge.cooldown;
+  }
+
+  /** Dodge charges as a 0..max float, counting the one currently recharging. */
+  get dodgeMeter() {
+    const max = stat.dodgeCharges();
+    const partial = this.charges < max && this.rechargeTime > 0 ? this.rechargeT / this.rechargeTime : 0;
+    return Math.min(max, this.charges + partial);
+  }
+
+  refillDodge() {
+    this.charges = stat.dodgeCharges();
+    this.rechargeT = 0;
   }
 
   get charge() {
-    return this.drawing ? Math.min(this.drawT / config.bow.drawTime, 1) : 0;
+    return this.drawing ? Math.min(this.drawT / stat.drawTime(), 1) : 0;
   }
 
-  /** 'none' | 'charging' | 'perfect' | 'late' */
+  /** 'none' | 'charging' | 'perfect' | 'late', plus 'overcharge' | 'mega' with Overdraw. */
   get drawPhase() {
     if (!this.drawing) return 'none';
-    const { drawTime, perfectWindow } = config.bow;
+    const drawTime = stat.drawTime();
+    const windowEnd = drawTime + stat.perfectWindow();
     if (this.drawT < drawTime) return 'charging';
-    if (this.drawT <= drawTime + perfectWindow) return 'perfect';
+    if (this.drawT <= windowEnd) return 'perfect';
+    if (lv('overdraw')) return this.drawT >= windowEnd + OVERDRAW_TIME ? 'mega' : 'overcharge';
     return 'late';
+  }
+
+  /** 0..1 progress from the end of the perfect window to a mega-shot. */
+  get overchargeProgress() {
+    const windowEnd = stat.drawTime() + stat.perfectWindow();
+    return Math.min(1, Math.max(0, (this.drawT - windowEnd) / OVERDRAW_TIME));
   }
 
   update(dt, input, aimPoint, game) {
@@ -167,7 +191,16 @@ export class Player {
     this.iframes = Math.max(0, this.iframes - dt);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
-    this.dodgeCd = Math.max(0, this.dodgeCd - dt);
+    const maxCharges = stat.dodgeCharges();
+    if (this.charges < maxCharges) {
+      this.rechargeT += dt;
+      if (this.rechargeT >= this.rechargeTime) {
+        this.charges++;
+        this.rechargeT = 0;
+      }
+    } else {
+      this.rechargeT = 0;
+    }
     this.counterT = Math.max(0, this.counterT - dt);
     this.dodgeBuffer = Math.max(0, this.dodgeBuffer - dt);
 
@@ -186,28 +219,33 @@ export class Player {
 
     // Dodge (buffered briefly so a slightly early press still counts)
     if (input.dodgePressed()) this.dodgeBuffer = 0.15;
-    if (this.dodgeBuffer > 0 && !this.rolling && this.dodgeCd <= 0) this.startRoll(input, game);
+    if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1) this.startRoll(input, game);
 
     // Draw / release
     if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling) {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
+      this.megaCued = false;
       if (this.counterT > 0) {
         // Counter shot after a perfect dodge: start already at full draw.
-        this.drawT = bowCfg.drawTime;
+        this.drawT = stat.drawTime();
         this.counterT = 0;
         this.perfectCued = true;
         game.sfx.perfectReady();
       } else {
-        game.sfx.drawStart(bowCfg.drawTime);
+        game.sfx.drawStart(stat.drawTime());
       }
     }
     if (this.drawing) {
       this.drawT += dt;
-      if (!this.perfectCued && this.drawT >= bowCfg.drawTime) {
+      if (!this.perfectCued && this.drawT >= stat.drawTime()) {
         this.perfectCued = true;
         game.sfx.perfectReady();
+      }
+      if (!this.megaCued && this.drawPhase === 'mega') {
+        this.megaCued = true;
+        game.sfx.megaReady();
       }
       if (!input.mouse.down) this.release(game);
     }
@@ -279,7 +317,7 @@ export class Player {
     this.rolling = true;
     this.rollT = 0;
     this.dodgeBuffer = 0;
-    this.dodgeCd = d.duration + d.cooldown;
+    this.charges--;
     if (this.drawing && d.cancelsDraw) {
       this.drawing = false;
       game.sfx.drawStop();
@@ -289,17 +327,36 @@ export class Player {
 
   release(game) {
     const cfg = config.bow;
-    const charge = Math.min(this.drawT / cfg.drawTime, 1);
-    const perfect = this.drawPhase === 'perfect';
+    const charge = this.charge;
+    const phase = this.drawPhase;
+    const perfect = phase === 'perfect';
+    const mega = phase === 'mega';
     this.drawing = false;
     this.cooldown = cfg.fireCooldown;
-    this.recoil = 0.5 + 0.5 * charge;
+    this.recoil = mega ? 1.6 : 0.5 + 0.5 * charge;
     game.sfx.drawStop();
 
-    const damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (perfect ? cfg.perfectMultiplier : 1);
-    const speed = lerp(cfg.minArrowSpeed, cfg.maxArrowSpeed, charge);
+    let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge);
+    if (perfect) damage *= cfg.perfectMultiplier;
+    if (mega) damage *= 3;
+    const speed = lerp(cfg.minArrowSpeed, cfg.maxArrowSpeed, charge) * (mega ? 1.2 : 1);
     const origin = new THREE.Vector3(this.pos.x, ARROW_HEIGHT, this.pos.z).addScaledVector(this.aimDir, 0.7);
-    game.fireArrow(origin, this.aimDir.clone(), speed, damage, charge, perfect);
+    game.fireArrow(origin, this.aimDir.clone(), speed, damage, charge, perfect, { mega });
+
+    const split = lv('splitShot');
+    if (split && charge >= 1) {
+      const angles = split >= 3 ? [-0.34, -0.17, 0.17, 0.34] : [-0.2, 0.2];
+      const factor = split >= 2 ? 1 : 0.5;
+      for (const a of angles) {
+        const dir = this.aimDir.clone().applyAxisAngle(UP, a);
+        game.fireArrow(origin, dir, speed, damage * factor, charge, perfect, { mega, extra: true });
+      }
+    }
+
+    if (perfect && lv('refresh') && this.charges < stat.dodgeCharges()) {
+      this.refillDodge();
+      game.onRefresh();
+    }
   }
 
   /** Returns true if damage landed, 'dodged' if a roll avoided it, false otherwise. */
@@ -331,12 +388,17 @@ export class Player {
     this.limb.scale.set(1, 1 - 0.08 * c, 1 + 0.15 * c);
     this.nocked.visible = this.drawing;
     this.nocked.position.set(0, 0, 0.5 - pull);
-    // Overdrawn: the bow trembles.
-    const shake = phase === 'late' ? 0.025 : 0;
+    // Overdrawn: the bow trembles (harder while charging a mega-shot).
+    const shake = phase === 'late' ? 0.025 : phase === 'overcharge' ? 0.02 + 0.04 * this.overchargeProgress : phase === 'mega' ? 0.07 : 0;
     this.bow.position.x = 0.05 + (Math.random() - 0.5) * shake;
     this.bow.position.y = 1.05 + (Math.random() - 0.5) * shake;
     const glow = phase === 'perfect' || this.counterT > 0 ? 1 : 0;
-    this.bowMat.emissive.setRGB(1.2 * glow, 0.8 * glow, 0.2 * glow);
+    if (phase === 'mega' || phase === 'overcharge') {
+      const m = phase === 'mega' ? 1 : this.overchargeProgress * 0.6;
+      this.bowMat.emissive.setRGB(2 * m, 0.3 * m, 1.6 * m);
+    } else {
+      this.bowMat.emissive.setRGB(1.2 * glow, 0.8 * glow, 0.2 * glow);
+    }
     this.bow.visible = !this.rolling;
   }
 
@@ -366,15 +428,26 @@ export class Player {
       this.aimLine.scale.z = 3;
       return;
     }
-    this.chargeRing.scale.setScalar(lerp(2.6, 1, c));
+    // With Overdraw, the ring keeps closing inward after the perfect window.
+    const over = phase === 'overcharge' || phase === 'mega' ? this.overchargeProgress : 0;
+    this.chargeRing.scale.setScalar(over > 0 ? lerp(1, 0.45, over) : lerp(2.6, 1, c));
     this.targetRingMat.opacity = 0.35;
     this.chargeRingMat.opacity = 0.35 + 0.5 * c;
-    const col = phase === 'perfect' ? RING_PERFECT : phase === 'late' ? RING_LATE : RING_IDLE;
+    const col =
+      phase === 'perfect'
+        ? RING_PERFECT
+        : phase === 'late'
+          ? RING_LATE
+          : phase === 'overcharge'
+            ? RING_OVER
+            : phase === 'mega'
+              ? RING_MEGA
+              : RING_IDLE;
     this.chargeRingMat.color.copy(col);
     this.targetRingMat.color.copy(col);
     this.aimMat.opacity = 0.12 + 0.3 * c;
     this.aimLine.scale.z = lerp(3, config.bow.range * 0.6, c);
-    this.aimMat.color.copy(phase === 'perfect' ? RING_PERFECT : RING_IDLE);
+    this.aimMat.color.copy(phase === 'perfect' ? RING_PERFECT : phase === 'mega' ? RING_MEGA : RING_IDLE);
   }
 
   hideIndicators() {

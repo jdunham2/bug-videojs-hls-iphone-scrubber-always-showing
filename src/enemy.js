@@ -44,6 +44,14 @@ export class Grunt {
     this.flash = 0;
     this.removed = false;
     this.staggered = false;
+    // Status effects from elemental arrows.
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.burnShown = 0;
+    this.slowT = 0;
+    this.slowAmt = 0;
+    this.frostHits = 0;
+    this.frozenT = 0;
 
     // Higher levels get darker, more saturated skin.
     const color = new THREE.Color().setHSL(0.01, Math.min(0.85, 0.6 + 0.03 * level), Math.max(0.12, 0.24 - 0.015 * (level - 1)));
@@ -124,15 +132,84 @@ export class Grunt {
     this.wedge.visible = state === 'windup';
   }
 
-  update(dt, player) {
+  applyBurn(dps, duration) {
+    this.burnT = duration;
+    this.burnDps = Math.max(this.burnDps, dps);
+  }
+
+  /** Returns true if this hit froze the grunt. */
+  applyFrost(slow, duration, hitsToFreeze, freezeTime) {
+    this.slowT = duration;
+    this.slowAmt = slow;
+    this.frostHits++;
+    if (this.frostHits >= hitsToFreeze) {
+      this.frostHits = 0;
+      this.frozenT = freezeTime;
+      // Freezing interrupts an attack in progress.
+      if (this.state === 'windup' || this.state === 'lunge') this.enter('recover');
+      return true;
+    }
+    return false;
+  }
+
+  /** Burn damage and effect timers (real time). Returns true if the burn killed it. */
+  updateStatus(dt) {
+    if (this.burnT > 0) {
+      this.burnT -= dt;
+      const dmg = this.burnDps * Math.min(dt, this.burnT + dt);
+      this.hp -= dmg;
+      this.burnShown += dmg;
+      if (Math.random() < dt * 18) {
+        this.game.particles.spawn(this.pos.clone().setY(0.6 + Math.random()), {
+          count: 1,
+          color: [3, 1.1, 0.2],
+          speed: 0.6,
+          up: 2.5,
+          life: 0.45,
+          size: 0.1,
+          gravity: -2,
+        });
+      }
+      if (this.burnShown >= 4 || (this.burnT <= 0 && this.burnShown >= 1)) {
+        this.game.numbers.spawn(this.pos.clone().setY(2), Math.round(this.burnShown), 'burn');
+        this.burnShown = 0;
+      }
+      if (this.burnT <= 0) this.burnDps = 0;
+      if (this.hp <= 0) {
+        this.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+        this.game.onKill(this);
+        return true;
+      }
+    }
+    if (this.slowT > 0) {
+      this.slowT -= dt;
+      if (this.slowT <= 0) {
+        this.slowAmt = 0;
+        this.frostHits = 0;
+      }
+    }
+    if (this.frozenT > 0) this.frozenT -= dt;
+    return false;
+  }
+
+  /** How fast this grunt's own clock runs (frozen = 0, slowed < 1). */
+  get timeScale() {
+    if (this.frozenT > 0) return 0;
+    return 1 - this.slowAmt;
+  }
+
+  update(realDt, player) {
     const g = config.grunt;
-    this.t += dt;
-    this.flash = Math.max(0, this.flash - dt);
+    this.flash = Math.max(0, this.flash - realDt);
 
     if (this.state === 'dying') {
-      this.updateDying(dt);
+      this.t += realDt;
+      this.updateDying(realDt);
       return;
     }
+    if (this.updateStatus(realDt)) return;
+    const dt = realDt * this.timeScale;
+    this.t += dt;
 
     tmp.set(player.pos.x - this.pos.x, 0, player.pos.z - this.pos.z);
     const dist = tmp.length();
@@ -163,7 +240,7 @@ export class Grunt {
         mx = tmp.x * this.speed;
         mz = tmp.z * this.speed;
         lean = 0.1;
-        if (dist < g.attackRange && !player.dead) this.enter('windup');
+        if (dist < g.attackRange && !player.dead && this.frozenT <= 0) this.enter('windup');
         break;
       case 'windup': {
         // Tracks you for the first 70% of the windup, then commits.
@@ -207,9 +284,9 @@ export class Grunt {
       }
     }
 
-    this.pos.x += (mx + this.knock.x) * dt;
-    this.pos.z += (mz + this.knock.z) * dt;
-    this.knock.multiplyScalar(Math.exp(-9 * dt));
+    this.pos.x += mx * dt + this.knock.x * realDt;
+    this.pos.z += mz * dt + this.knock.z * realDt;
+    this.knock.multiplyScalar(Math.exp(-9 * realDt));
     resolveCircle(this.pos, this.radius);
 
     const targetYaw = Math.atan2(faceX, faceZ);
@@ -226,7 +303,23 @@ export class Grunt {
 
     const windGlow = this.state === 'windup' ? Math.min(1, this.t / g.windupTime) : 0;
     const f = this.flash > 0 ? 1 : 0;
-    this.bodyMat.emissive.setRGB(f * 2 + windGlow * 0.9, f * 2, f * 2);
+    let r = f * 2 + windGlow * 0.9;
+    let gr = f * 2;
+    let b = f * 2;
+    if (this.frozenT > 0) {
+      r += 0.35;
+      gr += 0.75;
+      b += 1.4;
+    } else if (this.slowT > 0) {
+      gr += 0.1;
+      b += 0.45;
+    }
+    if (this.burnT > 0) {
+      const fl = 0.35 + 0.2 * Math.sin(performance.now() * 0.03 + this.yaw * 10);
+      r += fl;
+      gr += fl * 0.3;
+    }
+    this.bodyMat.emissive.setRGB(r, gr, b);
 
     this.updateHpBar();
   }

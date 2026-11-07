@@ -12,6 +12,7 @@ import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
+import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL } from './skills.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const BEST_KEY = 'draw-release.best.v1';
@@ -71,6 +72,8 @@ export class Game {
       hpText: $('hp-text'),
       dodgeFill: $('dodge-fill'),
       dodgeBox: $('dodge'),
+      build: $('build'),
+      draft: $('draft'),
       stats: $('stats'),
       wave: $('wave-label'),
       enemies: $('enemies-label'),
@@ -99,6 +102,87 @@ export class Game {
       if (this.state === 'paused') this.setPaused(false);
       else this.start();
     });
+    this.hud.draft.addEventListener('pointerdown', (e) => {
+      const card = e.target.closest('[data-pick]');
+      if (card) this.pickSkill(Number(card.dataset.pick));
+      else if (e.target.closest('[data-reroll]')) this.reroll();
+    });
+  }
+
+  // ---------------------------------------------------------------- skill draft
+
+  openDraft() {
+    this.state = 'choosing';
+    this.player.drawing = false;
+    this.sfx.drawStop();
+    this.draftCards = rollCards(3, this.wave);
+    this.renderDraft();
+  }
+
+  renderDraft() {
+    const cards = this.draftCards
+      .map((c, i) => {
+        const level = c.max === Infinity ? '' : c.max === 1 ? 'Unique' : `Level ${ROMAN[c.next]} / ${ROMAN[c.max]}`;
+        const type = c.rarity === 'legendary' ? 'Legendary' : TYPE_LABEL[c.type];
+        return `
+        <button class="card r-${c.rarity} t-${c.type}" data-pick="${i}">
+          <span class="key">${i + 1}</span>
+          <span class="type">${type}</span>
+          <span class="name"></span>
+          <span class="level">${level}</span>
+          <span class="desc"></span>
+          ${c.note ? '<span class="note"></span>' : ''}
+        </button>`;
+      })
+      .join('');
+    const d = this.hud.draft;
+    d.innerHTML = `
+      <div class="draft-head">
+        <div class="eyebrow">Wave ${this.wave} cleared</div>
+        <h2>Choose a skill</h2>
+      </div>
+      <div class="cards">${cards}</div>
+      <button class="reroll" data-reroll ${build.rerolls > 0 ? '' : 'disabled'}>Reroll (${build.rerolls} left) · F</button>`;
+    // Text set via textContent so names/descriptions can't inject markup.
+    d.querySelectorAll('.card').forEach((el, i) => {
+      const c = this.draftCards[i];
+      el.querySelector('.name').textContent = c.name;
+      el.querySelector('.desc').textContent = c.text;
+      if (c.note) el.querySelector('.note').textContent = c.note;
+    });
+    d.classList.add('visible');
+  }
+
+  hideDraft() {
+    this.hud.draft.classList.remove('visible');
+    this.hud.draft.innerHTML = '';
+  }
+
+  reroll() {
+    if (this.state !== 'choosing' || build.rerolls <= 0) return;
+    build.rerolls--;
+    this.sfx.thunk();
+    this.draftCards = rollCards(3, this.wave);
+    this.renderDraft();
+  }
+
+  pickSkill(i) {
+    if (this.state !== 'choosing') return;
+    const card = this.draftCards[i];
+    if (!card) return;
+    build.add(card.id);
+    const p = this.player;
+    if (card.id === 'vitality') p.hp = stat.maxHp();
+    if (card.id === 'secondWind') p.charges++;
+    if (card.id === 'patchUp') p.hp = Math.min(stat.maxHp(), p.hp + 40);
+    this.sfx.pick();
+    this.hideDraft();
+    this.state = 'playing';
+    this.waveState = 'break';
+    this.breakTimer = config.waves.breakTime;
+    const level = card.max > 1 && card.max !== Infinity ? ` ${ROMAN[card.next]}` : '';
+    this.banner(`${card.name}${level}`, card.text, 2);
+    this.particles.spawn(p.pos.clone().setY(1), { count: 24, color: [3, 2.2, 0.6], speed: 4, up: 3, life: 0.7, size: 0.08, gravity: 3 });
   }
 
   // ---------------------------------------------------------------- run state
@@ -109,7 +193,11 @@ export class Game {
     this.arrows.clear();
     this.particles.clear();
     this.numbers.clear();
+    for (const b of this.bolts || []) b.line.removeFromParent();
+    this.bolts = [];
+    build.reset();
     this.player.reset();
+    this.hideDraft?.();
     this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0, dodges: 0, perfectDodges: 0 };
     this.slowmo = 0;
     this.wave = 0;
@@ -174,6 +262,11 @@ export class Game {
       if (this.breakTimer <= 0) this.startWave(this.wave + 1);
       return;
     }
+    if (this.waveState === 'cleared') {
+      this.clearTimer -= dt;
+      if (this.clearTimer <= 0) this.openDraft();
+      return;
+    }
     this.spawnTimer -= dt;
     if (this.toSpawn > 0 && this.spawnTimer <= 0) {
       this.spawnEnemy();
@@ -181,9 +274,9 @@ export class Game {
       this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
     }
     if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
-      this.waveState = 'break';
-      this.breakTimer = config.waves.breakTime;
-      const heal = Math.min(config.player.healPerWave, config.player.maxHp - this.player.hp);
+      this.waveState = 'cleared';
+      this.clearTimer = 1.1;
+      const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
       this.sfx.cleared();
@@ -211,9 +304,17 @@ export class Game {
 
   // ---------------------------------------------------------------- combat events
 
-  fireArrow(origin, dir, speed, damage, charge, perfect) {
-    this.arrows.spawn(origin, dir, speed, damage, charge, perfect);
+  /** opts: { mega, extra } */
+  fireArrow(origin, dir, speed, damage, charge, perfect, opts = {}) {
+    const element = lv('fire') ? 'fire' : lv('frost') ? 'frost' : null;
+    this.arrows.spawn(origin, dir, speed, damage, charge, perfect, { ...opts, bounces: lv('ricochet'), element });
+    if (opts.extra) return; // Split Shot side arrows share the main shot's sound and stats
     this.sfx.release(charge, perfect);
+    if (opts.mega) {
+      this.sfx.megaRelease();
+      this.shake.add(0.5);
+      this.particles.spawn(origin, { count: 24, color: [3, 0.6, 2.4], speed: 6, up: 1, life: 0.4, size: 0.1, gravity: 1, dir, spread: 1 });
+    }
     this.stats.shots++;
     if (perfect) {
       this.stats.perfects++;
@@ -228,17 +329,17 @@ export class Game {
   }
 
   onArrowHit(arrow, enemy, point) {
-    const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect);
+    const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect || arrow.mega);
     if (!result) return;
-    if (arrow.hitCount === 0) this.stats.hits++;
+    if (arrow.hitCount === 0 && !arrow.extra) this.stats.hits++;
     const feel = config.feel;
     const full = arrow.charge >= 0.999;
 
-    const kind = arrow.perfect ? 'perfect' : full ? 'crit' : 'normal';
+    const kind = arrow.mega ? 'mega' : arrow.perfect ? 'perfect' : full ? 'crit' : 'normal';
     this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 0.8, 0)), Math.round(arrow.damage), kind);
     this.particles.spawn(point, {
-      count: arrow.perfect ? 22 : 8 + Math.round(arrow.charge * 8),
-      color: arrow.perfect ? [3, 2.1, 0.5] : 0xb33a2a,
+      count: arrow.perfect || arrow.mega ? 22 : 8 + Math.round(arrow.charge * 8),
+      color: arrow.mega ? [3, 0.6, 2.4] : arrow.perfect ? [3, 2.1, 0.5] : 0xb33a2a,
       speed: 3 + arrow.charge * 5,
       up: 2,
       life: 0.5,
@@ -247,8 +348,9 @@ export class Game {
       spread: 1.1,
     });
 
-    this.hitStop = Math.max(this.hitStop, arrow.perfect ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
-    this.shake.add(arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
+    const big = arrow.perfect || arrow.mega;
+    this.hitStop = Math.max(this.hitStop, big ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
+    this.shake.add(arrow.mega ? 0.6 : arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
     this.sfx.hit(arrow.perfect);
 
     if (result === 'stagger') {
@@ -256,12 +358,100 @@ export class Game {
       this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 1.6, 0)), 'STAGGER', 'callout');
       this.sfx.stagger();
     }
-    if (result === 'kill') {
-      this.stats.kills++;
-      this.sfx.kill();
-      this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 26, color: 0x7a2a20, speed: 6, up: 4, life: 0.8, size: 0.16 });
-      this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 10, color: 0x2a2420, speed: 3, up: 3, life: 1, size: 0.25 });
+    if (result === 'kill') this.onKill(enemy);
+    else this.applyElement(enemy, point);
+    if (arrow.perfect) this.chainLightning(enemy, arrow.damage);
+  }
+
+  onKill(enemy) {
+    this.stats.kills++;
+    this.sfx.kill();
+    this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 26, color: 0x7a2a20, speed: 6, up: 4, life: 0.8, size: 0.16 });
+    this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 10, color: 0x2a2420, speed: 3, up: 3, life: 1, size: 0.25 });
+  }
+
+  applyElement(enemy, point) {
+    const fire = lv('fire');
+    const frost = lv('frost');
+    if (fire) enemy.applyBurn(1 + 3 * fire, 3);
+    if (frost && enemy.applyFrost(0.2 + 0.1 * frost, 2, 3, 1.5)) {
+      this.numbers.spawn(point.clone().setY(2.4), 'FROZEN', 'callout');
+      this.sfx.freeze();
+      this.particles.spawn(enemy.pos.clone().setY(1), { count: 16, color: [1.2, 2.2, 3], speed: 4, up: 2, life: 0.6, size: 0.1 });
     }
+  }
+
+  /** Thunderstrike: arc from the struck grunt through the nearest others. */
+  chainLightning(source, damage) {
+    const n = lv('thunderstrike');
+    if (!n) return;
+    const targets = this.enemies
+      .filter((e) => e !== source && e.isHittable() && e.pos.distanceTo(source.pos) < 7)
+      .sort((a, b) => a.pos.distanceTo(source.pos) - b.pos.distanceTo(source.pos))
+      .slice(0, n + 1);
+    if (!targets.length) return;
+    this.sfx.zap();
+    let from = source.pos;
+    for (const t of targets) {
+      this.bolt(from, t.pos);
+      const dir = new THREE.Vector3().subVectors(t.pos, from).setY(0).normalize();
+      const res = t.hit(damage * 0.6, dir, 0, false);
+      this.numbers.spawn(t.pos.clone().setY(2.1), Math.round(damage * 0.6), 'zap');
+      if (res === 'kill') this.onKill(t);
+      from = t.pos;
+    }
+  }
+
+  bolt(a, b) {
+    // WebGL lines are 1px wide, so draw a few jittered strands for a thicker bolt.
+    for (let k = 0; k < 3; k++) this.boltStrand(a, b);
+    this.particles.spawn(b.clone().setY(1.1), { count: 6, color: [1.5, 2.4, 4], speed: 3, up: 1, life: 0.25, size: 0.06, gravity: 0 });
+  }
+
+  boltStrand(a, b) {
+    const pts = [];
+    const segs = 9;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const jitter = i === 0 || i === segs ? 0 : 0.35;
+      pts.push(
+        new THREE.Vector3(
+          a.x + (b.x - a.x) * t + (Math.random() - 0.5) * jitter,
+          1.1 + (Math.random() - 0.5) * jitter,
+          a.z + (b.z - a.z) * t + (Math.random() - 0.5) * jitter,
+        ),
+      );
+    }
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: new THREE.Color(1.5, 2.4, 4), transparent: true }),
+    );
+    this.scene.add(line);
+    this.bolts.push({ line, life: 0.2 });
+  }
+
+  updateBolts(dt) {
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      const b = this.bolts[i];
+      b.life -= dt;
+      b.line.material.opacity = Math.max(0, b.life / 0.2);
+      if (b.life <= 0) {
+        b.line.removeFromParent();
+        b.line.geometry.dispose();
+        b.line.material.dispose();
+        this.bolts.splice(i, 1);
+      }
+    }
+  }
+
+  onRicochet(point) {
+    this.sfx.thunk();
+    this.particles.spawn(point, { count: 6, color: 0xffe9b0, speed: 3, up: 1, life: 0.25, size: 0.05, gravity: 0 });
+  }
+
+  onRefresh() {
+    this.numbers.spawn(this.player.pos.clone().setY(2.2), 'REFRESH', 'callout');
+    this.particles.spawn(this.player.pos.clone().setY(0.8), { count: 10, color: [1.6, 2.2, 3], speed: 3, up: 1, life: 0.35, size: 0.06, gravity: 0 });
   }
 
   onArrowStopped(arrow, hitWall) {
@@ -331,6 +521,7 @@ export class Game {
     }
 
     this.particles.update(dt);
+    this.updateBolts(realDt);
     this.numbers.update(this.state === 'paused' ? 0 : realDt);
     this.shake.update(realDt);
     this.world.update(realDt, this.time);
@@ -342,6 +533,12 @@ export class Game {
 
   handleKeys() {
     const i = this.input;
+    if (this.state === 'choosing') {
+      ['Digit1', 'Digit2', 'Digit3'].forEach((code, n) => {
+        if (i.wasPressed(code)) this.pickSkill(n);
+      });
+      if (i.wasPressed('KeyF')) this.reroll();
+    }
     if (i.wasPressed('Backquote')) {
       this.guiHidden = !this.guiHidden;
       this.gui.show(!this.guiHidden);
@@ -354,7 +551,7 @@ export class Game {
       if (this.state === 'playing') this.setPaused(true);
       else if (this.state === 'paused') this.setPaused(false);
     }
-    if (i.wasPressed('KeyR') && (this.state === 'playing' || this.state === 'gameover' || this.state === 'paused')) {
+    if (i.wasPressed('KeyR') && this.state !== 'title') {
       this.sfx.unlock();
       this.start();
     }
@@ -433,13 +630,20 @@ export class Game {
     const h = this.hud;
     const p = this.player;
     const s = this.stats;
-    const pct = Math.max(0, p.hp / config.player.maxHp);
+    const maxHp = stat.maxHp();
+    const pct = Math.max(0, p.hp / maxHp);
     h.hpFill.style.width = `${pct * 100}%`;
     h.hpFill.classList.toggle('low', pct < 0.3);
-    h.hpText.textContent = `${Math.ceil(p.hp)} / ${config.player.maxHp}`;
-    const ready = p.dodgeReady;
-    h.dodgeFill.style.width = `${ready * 100}%`;
-    h.dodgeBox.classList.toggle('ready', ready >= 1);
+    h.hpText.textContent = `${Math.ceil(p.hp)} / ${maxHp}`;
+    const maxCharges = stat.dodgeCharges();
+    h.dodgeFill.style.width = `${(p.dodgeMeter / maxCharges) * 100}%`;
+    h.dodgeBox.style.setProperty('--segs', maxCharges);
+    h.dodgeBox.classList.toggle('ready', p.charges >= 1);
+    const buildKey = JSON.stringify(build.levels);
+    if (buildKey !== this.lastBuildKey) {
+      this.lastBuildKey = buildKey;
+      h.build.innerHTML = this.buildChips();
+    }
     h.dodgeBox.classList.toggle('counter', p.counterT > 0);
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     h.stats.textContent = `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`;
@@ -488,7 +692,7 @@ export class Game {
         <h1>Draw &amp; Release</h1>
         <p class="tag">A bow-combat prototype. Survive the waves.</p>
         ${controls}
-        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot.</p>
+        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
         <button>Click to start</button>
         ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}`;
     } else if (kind === 'paused') {
@@ -508,10 +712,21 @@ export class Game {
           <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
+        ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
         <button>Click to try again</button>
         <p class="tip">Or press R</p>`;
     }
     o.classList.add('visible');
+  }
+
+  buildChips() {
+    return build
+      .owned()
+      .map((s) => {
+        const level = s.max > 1 ? ` ${ROMAN[s.level]}` : '';
+        return `<span class="chip t-${s.type} r-${s.rarity}">${s.name}${level}</span>`;
+      })
+      .join('');
   }
 
   hideOverlay() {
