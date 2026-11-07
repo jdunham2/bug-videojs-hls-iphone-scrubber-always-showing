@@ -92,6 +92,20 @@ function merge(a, b) {
 function replaceProfile(next) {
   for (const k of Object.keys(profile)) delete profile[k];
   Object.assign(profile, next);
+  repairRecords();
+}
+
+/**
+ * Older builds only updated records when you died, so a run that ended any other
+ * way left them at zero. A save point proves how far you got: a checkpoint after
+ * wave N means you reached wave N and beat a boss every 5 waves on the way.
+ */
+function repairRecords() {
+  const cp = profile.checkpoint;
+  if (!cp?.wave) return;
+  if (profile.best.wave < cp.wave) profile.best = { wave: cp.wave, kills: profile.best.kills };
+  profile.bosses = Math.max(profile.bosses, Math.floor(cp.wave / 5));
+  profile.runs = Math.max(profile.runs, 1);
 }
 
 export function loadProfile() {
