@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeArrowMesh } from './arrows.js';
-import { stat, lv, OVERDRAW_TIME } from './skills.js';
+import { stat, lv, OVERDRAW_TIME, buffs } from './skills.js';
 import { models, outfits, instantiate, attachProp, findBone, orientProp, loadTexture } from './models.js';
 import { profile } from './profile.js';
 
@@ -282,7 +282,7 @@ export class Player {
       const speed = stat.moveSpeed() * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
       const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
       const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
-      const k = 1 - Math.exp(-18 * dt);
+      const k = 1 - Math.exp(-(buffs.slippery ? 2.2 : 18) * dt); // ice: slow to start and stop
       this.vel.x += (tx - this.vel.x) * k;
       this.vel.z += (tz - this.vel.z) * k;
       // Footsteps every ~1.6 units travelled.

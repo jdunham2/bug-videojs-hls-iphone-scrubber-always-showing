@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
 import { loadConfig } from './config.js';
-import { build, stat } from './skills.js';
+import { build, stat, buffs } from './skills.js';
 import { loadModels, models, modelStatus } from './models.js';
 import { Game } from './game.js';
 import { loadProfile, profile } from './profile.js';
@@ -35,5 +35,6 @@ window.__stat = stat;
 window.__buildAdd = (id) => build.add(id);
 window.__models = models;
 window.__profile = profile;
+window.__buffs = buffs;
 window.__THREE = THREE;
 window.__modelStatus = modelStatus;

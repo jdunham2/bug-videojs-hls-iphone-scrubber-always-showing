@@ -155,13 +155,16 @@ export const lv = (id) => build.lv(id);
 /** Stats after skills are applied. */
 const perk = (k) => currentCharacter().stats[k] ?? 1;
 
+/** Temporary effects from the arena (haste runes, ice patches). */
+export const buffs = { haste: 0, slippery: false };
+
 export const stat = {
-  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime'),
+  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime') * (buffs.haste > 0 ? 0.8 : 1),
   perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')),
   maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality')) * perk('maxHp')),
   dodgeCharges: () => 1 + lv('secondWind'),
   damage: () => perk('damage'),
-  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed'),
+  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * (buffs.haste > 0 ? 1.4 : 1),
 };
 
 export const OVERDRAW_TIME = 0.9; // extra seconds past the perfect window to reach a mega-shot

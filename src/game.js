@@ -16,6 +16,7 @@ import { ArrowStorm } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
 import { Camp, portalTexture } from './camp.js';
+import { Hazards } from './hazards.js';
 import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
@@ -23,7 +24,7 @@ import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
-import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL } from './skills.js';
+import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL, buffs } from './skills.js';
 import { modelStatus } from './models.js';
 import { audioStatus } from './audio.js';
 
@@ -109,6 +110,7 @@ export class Game {
     this.ultimate = new ArrowStorm(this);
     this.loot = new Loot(this);
     this.camp = new Camp(this);
+    this.hazards = new Hazards(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -280,6 +282,7 @@ export class Game {
     this.boss = null;
     this.pendingDescent = false;
     this.descending = false;
+    buffs.haste = 0;
     if (this.arenaPortal) this.arenaPortal.visible = false;
     document.body.classList.remove('letterbox');
     this.zoomKick = 0;
@@ -403,6 +406,7 @@ export class Game {
     this.wave = n;
     const w = config.waves;
     this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
+    if (this.env.active) this.hazards.restock(this.arena);
     if (n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
     this.waveState = 'active';
@@ -441,6 +445,8 @@ export class Game {
     this.arena = index;
     if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
     else this.env.themeIndex = index % THEMES.length;
+    // Hazards depend on the arena's layout, so lay them out after the dressing.
+    if (this.env.active) this.hazards.setup(index);
   }
 
   /** After a boss: a portal opens in the far gate; walking into it descends to the next arena. */
@@ -994,7 +1000,8 @@ export class Game {
     this.player.update(dt, this.input, this.aimPoint, this);
     for (const e of this.enemies) e.update(dt, this.player);
     this.separate();
-    this.arrows.update(dt, this.enemies, this);
+    this.arrows.update(dt, [...this.enemies, ...this.hazards.targets], this);
+    this.hazards.update(dt);
     this.enemyArrows.update(dt);
     this.ultimate.update(dt);
     this.loot.update(dt);

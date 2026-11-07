@@ -1,0 +1,383 @@
+// Arena hazards and boons: things in the world that help or hurt.
+//   Explosive barrel  – one arrow blows it up; hurts everything nearby (you too) and chains.
+//   Spike trap        – glows, then springs on anyone standing on it, enemies included.
+//   Healing spring    – stand in the glow to heal (limited per wave).
+//   Haste rune        – pickup: faster movement and draw for a few seconds.
+//   Lightning totem   – shoot it to wake it; it zaps nearby enemies for a while.
+//   Ice patch (Crypt) – slippery footing, slows enemies.
+//   Lava vent (Forge) – erupts in flame on a timer.
+
+import * as THREE from 'three';
+import { spawnProp } from './models.js';
+import { pillars, ARENA_HALF } from './world.js';
+import { buffs } from './skills.js';
+import { PLAYER_RADIUS } from './player.js';
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const plane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+
+function glowDisc(color, r, opacity = 0.4) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.6, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const mat = new THREE.MeshBasicMaterial({
+    map: new THREE.CanvasTexture(c),
+    color,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const m = new THREE.Mesh(plane, mat);
+  m.scale.setScalar(r * 2);
+  m.position.y = 0.04;
+  m.renderOrder = 1;
+  return m;
+}
+
+/** What each arena brings (counts per type). */
+const SETS = [
+  { barrel: 3, spikes: 2, spring: 1, rune: 1, totem: 1 },
+  { barrel: 2, spikes: 2, spring: 1, rune: 1, totem: 1, ice: 4 },
+  { barrel: 5, spikes: 1, spring: 1, rune: 1, totem: 1, vent: 4 },
+];
+
+export class Hazards {
+  constructor(game) {
+    this.game = game;
+    this.root = new THREE.Group();
+    game.scene.add(this.root);
+    this.list = [];
+  }
+
+  /** Targets arrows can hit (barrels and totems behave like enemies for arrow collision). */
+  get targets() {
+    return this.list.filter((h) => h.hittable && !h.removed);
+  }
+
+  /** Lay out a fresh set of hazards for an arena. */
+  setup(arenaIndex) {
+    this.clear();
+    const set = SETS[arenaIndex % SETS.length];
+    this.taken = [];
+    for (const [type, n] of Object.entries(set)) {
+      for (let i = 0; i < n; i++) {
+        const spot = this.findSpot(type === 'ice' || type === 'vent' ? 2.5 : 3);
+        if (spot) this.add(type, spot);
+      }
+    }
+  }
+
+  /** Each new wave restocks barrels and runes and refills springs. */
+  restock(arenaIndex) {
+    const set = SETS[arenaIndex % SETS.length];
+    const count = (t) => this.list.filter((h) => h.type === t && !h.removed).length;
+    for (const t of ['barrel', 'rune']) {
+      for (let i = count(t); i < set[t]; i++) {
+        const spot = this.findSpot(3);
+        if (spot) this.add(t, spot);
+      }
+    }
+    for (const h of this.list) if (h.type === 'spring') h.charge = 45;
+  }
+
+  findSpot(spacing) {
+    const P = this.game.player.pos;
+    for (let k = 0; k < 60; k++) {
+      const x = rand(-ARENA_HALF + 2.5, ARENA_HALF - 2.5);
+      const z = rand(-ARENA_HALF + 2.5, ARENA_HALF - 2.5);
+      if (Math.hypot(x, z) < 3.5) continue; // keep the rune circle clear
+      if (Math.hypot(x - P.x, z - P.z) < 3) continue;
+      if (pillars.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 1.5)) continue;
+      if ((this.taken || []).some((t) => Math.hypot(x - t.x, z - t.z) < spacing)) continue;
+      const spot = { x, z };
+      (this.taken ||= []).push(spot);
+      return spot;
+    }
+    return null;
+  }
+
+  add(type, { x, z }) {
+    const h = { type, pos: new THREE.Vector3(x, 0, z), t: rand(0, 2), removed: false };
+    const group = new THREE.Group();
+    group.position.copy(h.pos);
+    this.root.add(group);
+    h.group = h.rig = group;
+    const model = (id, size) => {
+      const p = spawnProp(id, size);
+      if (p) group.add(p);
+      return p;
+    };
+    if (type === 'barrel') {
+      h.model = model('explosiveBarrel', 1.1) || group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1, 10), new THREE.MeshStandardMaterial({ color: 0xaa2a1a })));
+      h.hittable = true;
+      h.radius = 0.5;
+      h.collider = { x, z, r: 0.5, h: 1.1, hazardSpot: true };
+      pillars.push(h.collider);
+    } else if (type === 'spikes') {
+      h.model = model('spikeTrap', 0.5);
+      if (h.model) h.model.position.y = -0.32;
+      h.glow = glowDisc(new THREE.Color(3, 0.4, 0.2), 1.2, 0);
+      group.add(h.glow);
+      h.phase = 'idle';
+      h.t = rand(1, 3);
+    } else if (type === 'spring') {
+      model('healSpring', 1.1);
+      h.glow = glowDisc(new THREE.Color(0.4, 2.6, 1.2), 2.2, 0.35);
+      group.add(h.glow);
+      h.charge = 45;
+      pillars.push({ x, z, r: 0.7, h: 0.9, hazardSpot: true });
+    } else if (type === 'rune') {
+      h.model = model('hasteRune', 0.25);
+      h.glow = glowDisc(new THREE.Color(3, 2.4, 0.6), 1.0, 0.5);
+      group.add(h.glow);
+    } else if (type === 'totem') {
+      h.model = model('totem', 2.6);
+      h.hittable = true;
+      h.radius = 0.5;
+      h.active = 0;
+      h.cool = 0;
+      h.glow = glowDisc(new THREE.Color(0.8, 1.8, 3), 2.6, 0.1);
+      group.add(h.glow);
+      pillars.push({ x, z, r: 0.5, h: 2.6, hazardSpot: true });
+    } else if (type === 'ice') {
+      h.glow = glowDisc(new THREE.Color(1.2, 1.8, 2.4), 2.0, 0.35);
+      group.add(h.glow);
+      h.radius = 2.0;
+    } else if (type === 'vent') {
+      h.glow = glowDisc(new THREE.Color(3, 0.9, 0.2), 1.4, 0.15);
+      group.add(h.glow);
+      h.phase = 'idle';
+      h.t = rand(2, 5);
+    }
+    // Arrow-collision interface (shared with enemies).
+    h.isHittable = () => !h.removed && h.hittable && !(h.type === 'totem' && (h.active > 0 || h.cool > 0));
+    h.hit = () => {
+      if (h.type === 'barrel') this.explode(h);
+      if (h.type === 'totem') this.wakeTotem(h);
+      return null; // not an enemy: no damage numbers or kill credit
+    };
+    this.list.push(h);
+    return h;
+  }
+
+  explode(h) {
+    if (h.removed) return;
+    h.removed = true;
+    h.group.visible = false;
+    const i = pillars.indexOf(h.collider);
+    if (i >= 0) pillars.splice(i, 1);
+    const G = this.game;
+    const pos = h.pos;
+    const R = 3.6;
+    G.sfx.bossSlam();
+    G.sfx.sample('boom', { vol: 1, rate: 0.9, jitter: 0.1 });
+    G.shake.add(0.7);
+    G.aberration = 1;
+    G.zoomKick = Math.min(0.12, G.zoomKick + 0.07);
+    G.decals.spawn(pos, 'scorch', 4.5, 20);
+    G.particles.spawn(pos.clone().setY(0.8), { count: 50, color: [3, 1.3, 0.3], speed: 9, up: 4, life: 0.7, size: 0.18, gravity: 6 });
+    G.particles.spawn(pos.clone().setY(1), { count: 20, color: 0x2a2420, speed: 3, up: 3, life: 1.6, size: 0.4, gravity: -1, drag: 1 });
+    for (const e of G.enemies) {
+      if (!e.isHittable()) continue;
+      const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z);
+      if (d > R + e.radius) continue;
+      const dir = new THREE.Vector3(e.pos.x - pos.x, 0, e.pos.z - pos.z).normalize();
+      const dmg = 75 * (1 - 0.5 * (d / R));
+      const res = e.hit(dmg, dir, 1, false);
+      e.knock?.addScaledVector(dir, 10);
+      G.numbers.spawn(e.pos.clone().setY(2.2), Math.round(dmg), 'crit');
+      if (res === 'kill') G.onKill(e);
+      else e.applyBurn?.(6, 3);
+    }
+    const P = G.player;
+    const dp = Math.hypot(P.pos.x - pos.x, P.pos.z - pos.z);
+    if (dp < R) {
+      const dir = new THREE.Vector3(P.pos.x - pos.x, 0, P.pos.z - pos.z).normalize();
+      const res = P.takeDamage(22, dir, G);
+      if (res === true) G.onPlayerHit({ lungeDir: dir }, 22);
+    }
+    // Chain reaction.
+    for (const o of this.list) {
+      if (o !== h && o.type === 'barrel' && !o.removed && o.pos.distanceTo(pos) < R) setTimeout(() => this.explode(o), 140);
+    }
+  }
+
+  wakeTotem(h) {
+    h.active = 8;
+    h.zap = 0;
+    this.game.sfx.zap(this.game.panAt(h.pos));
+    this.game.numbers.spawn(h.pos.clone().setY(3), 'TOTEM AWAKENED', 'callout');
+  }
+
+  update(dt) {
+    const G = this.game;
+    const P = G.player;
+    buffs.haste = Math.max(0, buffs.haste - dt);
+    buffs.slippery = false;
+    for (const h of this.list) {
+      if (h.removed) continue;
+      h.t -= dt;
+      const pd = Math.hypot(P.pos.x - h.pos.x, P.pos.z - h.pos.z);
+      switch (h.type) {
+        case 'spikes':
+          this.updateSpikes(h, dt, pd);
+          break;
+        case 'spring': {
+          const on = pd < 2.0 && h.charge > 0 && P.hp < G.maxHp() && !P.dead;
+          h.glow.material.opacity = h.charge > 0 ? 0.3 + (on ? 0.25 : 0) + 0.08 * Math.sin(G.elapsed * 3) : 0.06;
+          if (on) {
+            const heal = Math.min(9 * dt, h.charge, G.maxHp() - P.hp);
+            P.hp += heal;
+            h.charge -= heal;
+            h.healShown = (h.healShown || 0) + heal;
+            if (h.healShown >= 5) {
+              G.numbers.spawn(P.pos.clone().setY(2.2), `+${Math.round(h.healShown)}`, 'heal');
+              h.healShown = 0;
+            }
+            if (Math.random() < dt * 20) G.particles.spawn(P.pos.clone().setY(0.3), { count: 1, color: [0.5, 3, 1.2], speed: 0.4, up: 2.5, life: 0.6, size: 0.06, gravity: -1 });
+          }
+          break;
+        }
+        case 'rune':
+          if (h.model) {
+            h.model.position.y = 0.15 + Math.sin(G.elapsed * 3) * 0.08;
+            h.model.rotation.y += dt * 1.5;
+          }
+          if (pd < 1.0 && !P.dead) {
+            h.removed = true;
+            h.group.visible = false;
+            buffs.haste = 6;
+            G.numbers.spawn(P.pos.clone().setY(2.4), 'HASTE!', 'callout gold');
+            G.sfx.ultimateReady();
+            G.particles.spawn(P.pos.clone().setY(1), { count: 24, color: [3, 2.4, 0.6], speed: 4, up: 2, life: 0.6, size: 0.08 });
+          }
+          break;
+        case 'totem':
+          h.cool = Math.max(0, h.cool - dt);
+          h.glow.material.opacity = h.active > 0 ? 0.45 + 0.2 * Math.sin(G.elapsed * 20) : h.cool > 0 ? 0.05 : 0.12 + 0.06 * Math.sin(G.elapsed * 2);
+          if (h.active > 0) {
+            h.active -= dt;
+            h.zap -= dt;
+            if (h.zap <= 0) {
+              h.zap = 0.55;
+              const target = G.enemies.filter((e) => e.isHittable() && e.pos.distanceTo(h.pos) < 8).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos))[0];
+              if (target) {
+                G.bolt(h.pos.clone().setY(2.4), target.pos);
+                G.sfx.zap(G.panAt(target.pos));
+                const dir = new THREE.Vector3().subVectors(target.pos, h.pos).setY(0).normalize();
+                const res = target.hit(22, dir, 0.3, false);
+                G.numbers.spawn(target.pos.clone().setY(2.1), 22, 'zap');
+                if (res === 'kill') G.onKill(target);
+              }
+            }
+            if (h.active <= 0) h.cool = 10;
+          }
+          break;
+        case 'ice':
+          if (pd < h.radius) buffs.slippery = true;
+          for (const e of G.enemies) {
+            if (e.state === 'dying' || e.isBoss) continue;
+            if (Math.hypot(e.pos.x - h.pos.x, e.pos.z - h.pos.z) < h.radius && e.slowT <= 0.1) {
+              e.slowT = 0.2;
+              e.slowAmt = Math.max(e.slowAmt, 0.3);
+            }
+          }
+          break;
+        case 'vent':
+          this.updateVent(h, dt, pd);
+          break;
+      }
+    }
+  }
+
+  updateSpikes(h, dt, pd) {
+    const G = this.game;
+    if (h.phase === 'idle' && h.t <= 0) {
+      h.phase = 'warn';
+      h.t = 0.75;
+    } else if (h.phase === 'warn') {
+      h.glow.material.opacity = 0.25 + 0.35 * Math.abs(Math.sin(h.t * 20));
+      if (h.model) h.model.position.y = -0.32 + 0.06 * (1 - h.t / 0.75);
+      if (h.t <= 0) {
+        h.phase = 'up';
+        h.t = 0.6;
+        h.hitIds = new Set();
+        G.sfx.sample('clang', { vol: 0.35, rate: 1.4, pan: G.panAt(h.pos) });
+      }
+    } else if (h.phase === 'up') {
+      h.glow.material.opacity = 0.15;
+      if (h.model) h.model.position.y = Math.min(0, h.model.position.y + dt * 6);
+      if (pd < 1.1 && !h.hitIds.has('player')) {
+        h.hitIds.add('player');
+        const res = G.player.takeDamage(15, new THREE.Vector3(G.player.pos.x - h.pos.x, 0, G.player.pos.z - h.pos.z).normalize(), G);
+        if (res === true) G.onPlayerHit({ lungeDir: new THREE.Vector3(0, 0, 1) }, 15);
+      }
+      for (const e of G.enemies) {
+        if (!e.isHittable() || h.hitIds.has(e) || Math.hypot(e.pos.x - h.pos.x, e.pos.z - h.pos.z) > 1.1 + e.radius * 0.5) continue;
+        h.hitIds.add(e);
+        const res = e.hit(28, new THREE.Vector3(0, 0, 1), 0.3, false);
+        G.numbers.spawn(e.pos.clone().setY(2), 28, 'normal');
+        if (res === 'kill') G.onKill(e);
+      }
+      if (h.t <= 0) {
+        h.phase = 'idle';
+        h.t = rand(2.5, 4.5);
+      }
+    } else {
+      h.glow.material.opacity = 0;
+      if (h.model) h.model.position.y = Math.max(-0.32, h.model.position.y - dt * 1.5);
+    }
+  }
+
+  updateVent(h, dt, pd) {
+    const G = this.game;
+    if (h.phase === 'idle') {
+      h.glow.material.opacity = 0.12 + 0.05 * Math.sin(G.elapsed * 2 + h.pos.x);
+      if (Math.random() < dt * 3) G.particles.spawn(h.pos.clone().setY(0.1), { count: 1, color: [3, 0.9, 0.2], speed: 0.3, up: 1.2, life: 0.5, size: 0.05, gravity: -1 });
+      if (h.t <= 0) {
+        h.phase = 'warn';
+        h.t = 0.9;
+      }
+    } else if (h.phase === 'warn') {
+      h.glow.material.opacity = 0.3 + 0.4 * Math.abs(Math.sin(h.t * 16));
+      if (Math.random() < dt * 30) G.particles.spawn(h.pos.clone().setY(0.1), { count: 1, color: [3, 1.2, 0.3], speed: 0.8, up: 2, life: 0.4, size: 0.06 });
+      if (h.t <= 0) {
+        h.phase = 'erupt';
+        h.t = 0.5;
+        G.sfx.sample('boom', { vol: 0.5, rate: 1.3, pan: G.panAt(h.pos) });
+        G.particles.spawn(h.pos.clone().setY(0.3), { count: 40, color: [3, 1.1, 0.2], speed: 2, up: 9, life: 0.8, size: 0.14, gravity: 5, dir: new THREE.Vector3(0, 1, 0), spread: 0.35 });
+        if (pd < 1.6) {
+          const res = G.player.takeDamage(14, new THREE.Vector3(G.player.pos.x - h.pos.x, 0, G.player.pos.z - h.pos.z).normalize(), G);
+          if (res === true) G.onPlayerHit({ lungeDir: new THREE.Vector3(0, 0, 1) }, 14);
+        }
+        for (const e of G.enemies) {
+          if (!e.isHittable() || Math.hypot(e.pos.x - h.pos.x, e.pos.z - h.pos.z) > 1.6 + e.radius) continue;
+          const res = e.hit(30, new THREE.Vector3(0, 0, 1), 0.3, false);
+          G.numbers.spawn(e.pos.clone().setY(2), 30, 'burn');
+          if (res === 'kill') G.onKill(e);
+          else e.applyBurn?.(6, 3);
+        }
+      }
+    } else {
+      h.glow.material.opacity = 0.6;
+      if (h.t <= 0) {
+        h.phase = 'idle';
+        h.t = rand(3.5, 6);
+      }
+    }
+  }
+
+  clear() {
+    for (let i = pillars.length - 1; i >= 0; i--) if (pillars[i].hazardSpot) pillars.splice(i, 1);
+    this.root.clear();
+    this.list = [];
+    this.taken = [];
+  }
+}
