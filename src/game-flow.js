@@ -94,6 +94,7 @@ export class FlowMethods {
     // Kill the summoned grunts too, so the wave ends with the boss.
     for (const e of this.enemies) if (e !== boss && e.isHittable()) e.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
     this.stats.bossesDefeated = (this.stats.bossesDefeated || 0) + 1;
+    this.noteProgress({ bosses: 1, wave: this.wave - 1, kills: this.stats.kills });
   }
 
   updateWaves(dt) {
@@ -121,6 +122,7 @@ export class FlowMethods {
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
       this.player.cheer();
+      this.noteProgress({ wave: this.wave, kills: this.stats.kills });
       if (this.wave % config.boss.every === 0) this.saveCheckpoint();
       const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;

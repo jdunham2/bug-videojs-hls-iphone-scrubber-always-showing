@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
+import { makeBowParts, orientUpright, holdInHand } from './bow.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME, buffs } from './skills.js';
-import { models, outfits, instantiate, attachProp, findBone, orientProp, loadTexture } from './models.js';
+import { models, outfits, instantiate, findBone, loadTexture } from './models.js';
 import { profile } from './profile.js';
 
 export const PLAYER_RADIUS = 0.45;
@@ -91,33 +92,46 @@ export class Player {
     this.reset();
   }
 
+  /**
+   * A recurve bow built from curves, so it is clean from every angle and its
+   * string really pulls back with the draw. Local frame: +Y along the limbs,
+   * +Z toward the target, limbs curving back toward the archer, grip at the origin.
+   */
   buildBow() {
     const bow = new THREE.Group();
     bow.position.set(0.05, 1.05, 0.42);
     bow.rotation.z = -0.25;
-    const r = 0.55;
-    const arc = Math.PI * 0.8;
-    const tipZ = r * Math.cos(arc / 2);
-    const tipY = r * Math.sin(arc / 2);
-    const geo = new THREE.TorusGeometry(r, 0.035, 6, 20, arc);
-    geo.rotateZ(-arc / 2).rotateY(-Math.PI / 2).translate(0, 0, -tipZ);
-    this.bowMat = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.6, emissive: 0x000000 });
-    this.limb = new THREE.Mesh(geo, this.bowMat);
-    this.limb.castShadow = true;
-    bow.add(this.limb);
+    const inner = new THREE.Group();
+    bow.add(inner);
+    const parts = makeBowParts();
+    this.bowMat = parts.mat;
+    this.limbs = parts.limbs;
+    this.bowTip = parts.tip;
+    inner.add(parts.limbs, parts.grip);
+    const tip = parts.tip;
 
     const sg = new THREE.BufferGeometry();
-    sg.setAttribute('position', new THREE.Float32BufferAttribute([0, tipY, 0, 0, 0, 0, 0, -tipY, 0], 3));
+    sg.setAttribute('position', new THREE.Float32BufferAttribute([0, tip.y, tip.z, 0, 0, tip.z, 0, -tip.y, tip.z], 3));
     this.string = new THREE.Line(sg, new THREE.LineBasicMaterial({ color: 0xf3ead2 }));
-    bow.add(this.string);
+    this.string.frustumCulled = false;
+    inner.add(this.string);
 
     this.nocked = makeArrowMesh(false);
     this.nocked.getObjectByName('trail').visible = false;
     this.nocked.visible = false;
-    bow.add(this.nocked);
+    inner.add(this.nocked);
 
     this.bow = bow;
+    this.bowInner = inner;
+    this.stringKick = 0;
     this.rig.add(bow);
+  }
+
+  /** Move the bow into the model's bow hand (it stays world-upright; see updateModel). */
+  holdBow(hand) {
+    if (!hand) return;
+    holdInHand(this.bow, hand, 0.95);
+    this.bowInHand = true;
   }
 
   reset() {
@@ -299,11 +313,12 @@ export class Player {
     this.knock.multiplyScalar(Math.exp(-10 * dt));
     (this.collide || resolveCircle)(this.pos, PLAYER_RADIUS);
 
-    // Facing follows aim
     // Face where you're running; turn to the cursor only while drawing, shooting or casting.
     const aimingNow = this.drawing || this.releaseT > 0 || this.casting > 0;
     if (Math.hypot(this.vel.x, this.vel.z) > 0.8) this.moveDir.set(this.vel.x, 0, this.vel.z).normalize();
-    const faceDir = this.rolling ? this.rollDir : aimingNow ? this.aimDir : this.moveDir;
+    // Standing still, the hero turns to the aim too; running, they face the way they run.
+    const still = Math.hypot(this.vel.x, this.vel.z) < 0.8;
+    const faceDir = this.rolling ? this.rollDir : aimingNow || still ? this.aimDir : this.moveDir;
     this.yaw = lerpAngle(this.yaw, Math.atan2(faceDir.x, faceDir.z), 1 - Math.exp(-(this.rolling ? 40 : 25) * dt));
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
@@ -332,6 +347,33 @@ export class Player {
   }
 
   /** Swap the placeholder body for the Meshy hero (called once models finish loading). */
+  /**
+   * The hand that holds the bow is the one the shoot clip pushes out straight at
+   * full draw (the other pulls the string back to the face). Clips differ on
+   * which side that is, so measure it instead of assuming the left hand.
+   */
+  bowHand(inst) {
+    const L = findBone(inst.root, [/hand/i, /left|(^|[_.])l([_.]|$)/i]);
+    const R = findBone(inst.root, [/hand/i, /right|(^|[_.])r([_.]|$)/i]);
+    const head = findBone(inst.root, [/head/i]);
+    const A = inst.animator;
+    if (!L || !R || !head || !A.has('shoot')) return L || R;
+    const a = A.action('shoot');
+    a.reset().play();
+    a.time = A.duration('shoot') * config.models.shootFullAt;
+    A.mixer.update(0);
+    inst.holder.updateMatrixWorld(true);
+    const h = head.getWorldPosition(new THREE.Vector3());
+    const reach = (bone) => {
+      const p = bone.getWorldPosition(new THREE.Vector3());
+      return Math.hypot(p.x - h.x, p.z - h.z);
+    };
+    const hand = reach(R) > reach(L) ? R : L;
+    a.stop();
+    A.mixer.update(0);
+    return hand;
+  }
+
   /** Use the selected character and outfit from the profile (called on load and from the camp). */
   attachModel() {
     const id = models[profile.character] ? profile.character : 'hero';
@@ -352,8 +394,7 @@ export class Player {
     this.characterId = id;
     this.rig.visible = false;
     this.group.add(inst.holder);
-    const hand = findBone(inst.root, [/hand/i, /left|(^|[_.])l([_.]|$)/i]);
-    this.bowProp = attachProp('bow', hand, 1.1);
+    this.holdBow(this.bowHand(inst));
     this.applyOutfit(outfitId);
   }
 
@@ -398,7 +439,9 @@ export class Player {
       const rate = A.duration('roll') / config.dodge.duration;
       A.set(['roll'], { once: true, fade: 0.05, timeScale: rate || 1 });
     } else if (this.drawing || this.releaseT > 0) {
-      const shoot = A.has('shoot:upper') ? 'shoot:upper' : 'shoot';
+      // Moving: arms aim while the legs keep running. Standing still: the whole body
+      // takes the archery stance (no idle sway in the legs).
+      const shoot = moving && A.has('shoot:upper') ? 'shoot:upper' : 'shoot';
       const lowerBase = moving && A.has('aimWalk') ? 'aimWalk' : loco;
       const lower = shoot === 'shoot:upper' ? `${lowerBase}:lower` : null;
       A.set(lower ? [shoot, lower] : [shoot], { fade: 0.12 });
@@ -417,6 +460,8 @@ export class Player {
           a.time = dur * mc.shootReleaseAt;
         }
         a.timeScale = 1.6;
+        // Switched between full-body and upper-body mid follow-through: don't replay the draw.
+        if (a.time < dur * mc.shootReleaseAt) a.time = dur * mc.shootReleaseAt;
       }
     } else if (this.hitT > 0 && A.has('hit')) {
       A.set(['hit'], { once: true, fade: 0.06 });
@@ -427,17 +472,17 @@ export class Player {
       A.action(loco).timeScale = locoScale;
     }
     A.update(dt);
-    if (this.bowProp) {
-      // The bow sits in the hand but keeps a clean pose: always upright with its
-      // curve pointing where the hero faces, turning to the aim line while drawing
-      // (the hand's own rotation in these clips points it in odd directions).
+    if (this.bowInHand) {
+      // The bow sits in the hand but keeps a clean pose: upright, facing where the
+      // hero faces, turning to the aim line while drawing (the hand's own rotation
+      // in these clips would point it in odd directions).
       const aiming = this.drawing || this.releaseT > 0;
       this.bowBlend += ((aiming ? 1 : 0) - this.bowBlend) * (1 - Math.exp(-14 * dt));
       this.bowFwd ||= new THREE.Vector3();
       const facing = TMP.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       this.bowFwd.copy(facing).lerp(this.aimDir, this.bowBlend).normalize();
       this.group.updateMatrixWorld(true);
-      orientProp(this.bowProp, UP, this.bowFwd);
+      orientUpright(this.bow, this.bowFwd);
     }
   }
 
@@ -477,6 +522,7 @@ export class Player {
     this.cooldown = cfg.fireCooldown;
     this.recoil = mega ? 1.6 : 0.5 + 0.5 * charge;
     this.releaseT = 0.35;
+    this.stringKick = 1;
     game.sfx.drawStop();
 
     let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge) * stat.damage();
@@ -524,18 +570,27 @@ export class Player {
   updateBow() {
     const c = this.charge;
     const phase = this.drawPhase;
-    const pull = 0.42 * c;
+    const tip = this.bowTip;
+    // The string pulls back to the nock with the draw, then snaps forward and
+    // quivers for a moment after release.
+    this.stringKick *= 0.82;
+    const pull = this.drawing ? 0.45 * c : 0;
+    const quiver = Math.sin(performance.now() * 0.09) * 0.03 * this.stringKick;
     const p = this.string.geometry.attributes.position;
-    p.setZ(1, -pull);
+    p.setZ(1, tip.z - pull + quiver);
+    // Limbs flex as you draw: tips come back and in.
+    const flex = this.drawing ? c : 0;
+    this.limbs.scale.set(1, 1 - 0.06 * flex, 1 + 0.35 * flex);
+    p.setY(0, tip.y * (1 - 0.06 * flex));
+    p.setZ(0, tip.z * (1 + 0.35 * flex));
+    p.setY(2, -tip.y * (1 - 0.06 * flex));
+    p.setZ(2, tip.z * (1 + 0.35 * flex));
     p.needsUpdate = true;
-    // Limbs flex a little as you draw.
-    this.limb.scale.set(1, 1 - 0.08 * c, 1 + 0.15 * c);
     this.nocked.visible = this.drawing;
-    this.nocked.position.set(0, 0, 0.5 - pull);
+    this.nocked.position.set(0, 0, tip.z - pull + 0.5);
     // Overdrawn: the bow trembles (harder while charging a mega-shot).
-    const shake = phase === 'late' ? 0.025 : phase === 'overcharge' ? 0.02 + 0.04 * this.overchargeProgress : phase === 'mega' ? 0.07 : 0;
-    this.bow.position.x = 0.05 + (Math.random() - 0.5) * shake;
-    this.bow.position.y = 1.05 + (Math.random() - 0.5) * shake;
+    const shake = phase === 'late' ? 0.012 : phase === 'overcharge' ? 0.01 + 0.025 * this.overchargeProgress : phase === 'mega' ? 0.04 : 0;
+    this.bowInner.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0);
     const glow = phase === 'perfect' || this.counterT > 0 ? 1 : 0;
     if (phase === 'mega' || phase === 'overcharge') {
       const m = phase === 'mega' ? 1 : this.overchargeProgress * 0.6;
@@ -543,7 +598,7 @@ export class Player {
     } else {
       this.bowMat.emissive.setRGB(1.2 * glow, 0.8 * glow, 0.2 * glow);
     }
-    this.bow.visible = !this.rolling;
+    this.bow.visible = !this.rolling || this.bowInHand;
   }
 
   updateIndicators() {

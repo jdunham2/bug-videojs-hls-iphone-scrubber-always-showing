@@ -5,6 +5,21 @@ import { modelStatus } from './models.js';
 import { audioStatus } from './audio.js';
 import { profile } from './profile.js';
 
+// The HUD updates every frame; only touch the DOM when a value actually changes.
+const setText = (el, v) => {
+  if (el._text !== v) {
+    el._text = v;
+    el.textContent = v;
+  }
+};
+const setWidth = (el, pct) => {
+  const v = Math.round(pct * 10) / 10;
+  if (el._width !== v) {
+    el._width = v;
+    el.style.width = `${v}%`;
+  }
+};
+
 /** Methods mixed into Game (see game.js). */
 export class UiMethods {
   openDraft() {
@@ -95,18 +110,18 @@ export class UiMethods {
     const s = this.stats;
     const maxHp = stat.maxHp();
     const pct = Math.max(0, p.hp / maxHp);
-    h.hpFill.style.width = `${pct * 100}%`;
+    setWidth(h.hpFill, pct * 100);
     h.hpFill.classList.toggle('low', pct < 0.3);
-    h.hpText.textContent = `${Math.ceil(p.hp)} / ${maxHp}`;
+    setText(h.hpText, `${Math.ceil(p.hp)} / ${maxHp}`);
     const boss = this.boss && !this.boss.removed && this.boss.state !== 'spawning' ? this.boss : null;
     h.bossBar.classList.toggle('show', !!boss);
     if (boss) {
-      h.bossName.textContent = boss.displayName + (boss.phase === 2 ? ' · Enraged' : '');
-      h.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
-      h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
+      setText(h.bossName, boss.displayName + (boss.phase === 2 ? ' · Enraged' : ''));
+      setWidth(h.bossFill, Math.max(0, boss.hp / boss.maxHp) * 100);
+      setWidth(h.bossPoise, (boss.poise / config.boss.poise) * 100);
     }
-    h.ultFill.style.width = `${this.ultimate.meter}%`;
-    h.gems.textContent = `◆ ${this.loot.runGems}`;
+    setWidth(h.ultFill, this.ultimate.meter);
+    setText(h.gems, `◆ ${this.loot.runGems}`);
     // Music follows the fight: calm between waves, building with enemy count, full on for bosses.
     const aliveNow = this.enemies.filter((e) => e.state !== 'dying' && !e.removed).length;
     const fighting = this.state === 'playing' && this.waveState === 'active';
@@ -114,7 +129,7 @@ export class UiMethods {
     h.ult.classList.toggle('ready', this.ultimate.ready);
     h.ult.classList.toggle('active', !!this.ultimate.active);
     const maxCharges = stat.dodgeCharges();
-    h.dodgeFill.style.width = `${(p.dodgeMeter / maxCharges) * 100}%`;
+    setWidth(h.dodgeFill, (p.dodgeMeter / maxCharges) * 100);
     h.dodgeBox.style.setProperty('--segs', maxCharges);
     h.dodgeBox.classList.toggle('ready', p.charges >= 1);
     const buildKey = JSON.stringify(build.levels);
@@ -124,11 +139,11 @@ export class UiMethods {
     }
     h.dodgeBox.classList.toggle('counter', p.counterT > 0);
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
-    h.stats.textContent = `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`;
-    h.wave.textContent = this.wave ? `Wave ${this.wave}` : '';
+    setText(h.stats, `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`);
+    setText(h.wave, this.wave ? `Wave ${this.wave}` : '');
     const alive = this.enemies.filter((e) => e.state !== 'dying').length + this.toSpawn;
-    h.enemies.textContent = this.wave && this.waveState === 'active' ? `${alive} remaining` : '';
-    h.streak.textContent = s.streak >= 2 ? `Perfect ×${s.streak}` : '';
+    setText(h.enemies, this.wave && this.waveState === 'active' ? `${alive} remaining` : '');
+    setText(h.streak, s.streak >= 2 ? `Perfect ×${s.streak}` : '');
     h.streak.classList.toggle('show', s.streak >= 2);
 
     // Reticle follows the mouse and tightens with charge.
@@ -176,7 +191,8 @@ export class UiMethods {
         <button>Click to enter the camp</button>
         ${profile.best.wave ? `<p class="best">Best: wave ${profile.best.wave}, ${profile.best.kills} kills</p>` : ''}
         <p class="model-status" id="model-status">${this.modelStatusText()}</p>
-        <p class="model-status" id="audio-status">${this.audioStatusText()}</p>`;
+        <p class="model-status" id="audio-status">${this.audioStatusText()}</p>
+        <p class="model-status">${window.__BUILD || ''}</p>`;
     } else if (kind === 'paused') {
       o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
     } else {

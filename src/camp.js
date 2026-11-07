@@ -7,10 +7,18 @@ import * as THREE from 'three';
 import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
-import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey } from './profile.js';
+import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
+
+/** One line on where progress is kept, shown at the shrine. */
+function saveWhere() {
+  if (saveStatus.cloud === 'on') return '✓ Progress is saved to your account';
+  if (saveStatus.cloud === 'connecting') return 'Connecting to your account save…';
+  if (saveStatus.local) return '✓ Progress is saved in this browser';
+  return 'This browser is blocking saves: progress lasts until you close the page';
+}
 
 export class Camp {
   constructor(game) {
@@ -241,6 +249,8 @@ export class Camp {
 
   refreshHud() {
     document.getElementById('camp-gems').textContent = `◆ ${profile.gems}`;
+    const r = document.getElementById('camp-records');
+    if (r) r.textContent = `Best wave ${profile.best.wave} · Bosses ${profile.bosses} · Runs ${profile.runs}`;
   }
 
   // ------------------------------------------------------------ panels
@@ -280,7 +290,8 @@ export class Camp {
           <div><b>${profile.runs}</b><span>Runs</span></div>
           <div><b>◆ ${profile.totalGems}</b><span>Gems found</span></div>
         </div>
-        ${cp ? `<p class="save">Saved: after wave ${cp.wave} with ${Object.keys(cp.build).length} skills. Enter the gate to continue from wave ${cp.wave + 1}.</p>` : '<p class="save none">No save yet.</p>'}`;
+        ${cp ? `<p class="save">Saved: after wave ${cp.wave} with ${Object.keys(cp.build).length} skills. Enter the gate to continue from wave ${cp.wave + 1}.</p>` : '<p class="save none">No save yet.</p>'}
+        <p class="where">${saveWhere()}</p>`;
     } else if (k === 'gate') {
       const cp = profile.checkpoint;
       html = `<h2>Ruin Gate</h2><p class="lead">The portal hums. The ruins are waiting.</p><div class="actions">

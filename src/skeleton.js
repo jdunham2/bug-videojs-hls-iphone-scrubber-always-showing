@@ -237,6 +237,7 @@ export class Skeleton extends Grunt {
       }
     }
     A.update(dt);
+    this.orientBow();
   }
 
   dispose() {

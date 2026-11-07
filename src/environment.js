@@ -158,7 +158,9 @@ export class Environment {
   }
 
   place(id, size, x, z, rotY = 0, opts = {}) {
-    const p = spawnProp(id, size, opts);
+    // Props outside the walls sit beyond the shadow camera's useful area: skip their shadow pass.
+    const outside = Math.abs(x) > ARENA_HALF + 2 || Math.abs(z) > ARENA_HALF + 2;
+    const p = spawnProp(id, size, outside ? { ...opts, shadows: false } : opts);
     if (!p) return null;
     // Tall props can stand between the camera and the hero; those fade out when they do.
     if (size > 1.6) this.fadeable.push(p);

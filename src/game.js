@@ -18,7 +18,7 @@ import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel } from './settings.js';
 import { Tips } from './tips.js';
-import { profile, bankRun } from './profile.js';
+import { profile, bankRun, noteProgress, noteRunStart } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
@@ -244,6 +244,9 @@ export class Game {
       this.player.refillDodge();
       this.banner(`Wave ${cp.wave + 1}`, 'Continuing from the shrine', 1.6);
     }
+    this.runUnlocks = [];
+    this.runStartBest = { ...profile.best };
+    noteRunStart();
     this.sfx.runStart();
     this.state = 'playing';
     this.hideOverlay();
@@ -314,11 +317,37 @@ export class Game {
     this.sfx.gameOver();
     this.music.stinger(false);
     this.gemsThisRun = (this.stats.gemsBanked || 0) + this.loot.runGems;
-    const prev = { ...profile.best };
+    const prev = this.runStartBest || { ...profile.best };
     const newBest = this.wave > prev.wave || (this.wave === prev.wave && this.stats.kills > prev.kills);
-    this.newUnlocks = bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills, bosses: this.stats.bossesDefeated || 0 });
+    this.newUnlocks = [...(this.runUnlocks || []), ...bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills })];
     this.loot.runGems = 0;
     this.showOverlay('gameover', newBest);
+  }
+
+  /** Save mid-run progress (records, unlocks) and tell the player about new unlocks. */
+  noteProgress(progress) {
+    const fresh = noteProgress(progress);
+    if (fresh.length) {
+      this.runUnlocks.push(...fresh);
+      setTimeout(() => this.state === 'playing' && this.banner('Unlocked in camp', fresh.join(', '), 2.2), 2600);
+    }
+  }
+
+  /** The account save arrived and changed the profile: refresh what shows it. */
+  onProfileSynced() {
+    if (this.state === 'title' || this.state === 'camp') {
+      if (this.player.characterId && this.player.characterId !== profile.character) this.player.attachModel();
+      this.camp.refreshHud();
+      if (this.camp.openKind) this.camp.render();
+    }
+  }
+
+  /** The tab is closing mid-run: keep the gems picked up so far. */
+  bankOnExit() {
+    if ((this.state === 'playing' || this.state === 'paused') && this.loot.runGems > 0) {
+      bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills });
+      this.loot.runGems = 0;
+    }
   }
 
   // ---------------------------------------------------------------- waves

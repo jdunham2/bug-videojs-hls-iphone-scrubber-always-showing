@@ -283,33 +283,6 @@ export function attachProp(id, bone, length) {
   return holder;
 }
 
-const _m = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
-const _pq = new THREE.Quaternion();
-const _cols = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-
-/**
- * Point a held prop in world space regardless of the hand's rotation:
- * its longest side along `up`, its middle side along `forward`.
- * Used for the bow so it always reads as an upright bow, whatever the clip does.
- */
-export function orientProp(holder, up, forward) {
-  const [L, M, S] = holder.userData.axes || [1, 2, 0];
-  const side = new THREE.Vector3().crossVectors(up, forward).normalize();
-  // Columns of the rotation: where each local axis should point in the world.
-  _cols[L].copy(up);
-  _cols[M].copy(forward);
-  _cols[S].copy(side);
-  _m.makeBasis(_cols[0], _cols[1], _cols[2]);
-  if (_m.determinant() < 0) {
-    _cols[S].negate();
-    _m.makeBasis(_cols[0], _cols[1], _cols[2]);
-  }
-  _q.setFromRotationMatrix(_m);
-  holder.parent.getWorldQuaternion(_pq);
-  holder.quaternion.copy(_pq.invert().multiply(_q));
-}
-
 /**
  * Small animation state helper around AnimationMixer.
  * - play(name): crossfade to a looping or one-shot clip.

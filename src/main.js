@@ -4,14 +4,22 @@ import { loadConfig } from './config.js';
 import { build, stat, buffs } from './skills.js';
 import { loadModels, models, modelStatus } from './models.js';
 import { Game } from './game.js';
-import { loadProfile, profile } from './profile.js';
+import { loadProfile, profile, connectCloudSave } from './profile.js';
 import { loadSettings } from './settings.js';
 
 loadConfig();
+// Which build this is (set by vite.config.js), shown in a corner and on the title.
+const BUILD = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
+document.getElementById('build-tag').textContent = BUILD;
+window.__BUILD = BUILD;
+console.info('Draw & Release', BUILD);
 loadProfile();
 loadSettings();
 const game = new Game(document.getElementById('app'));
 game.run();
+// Also keep progress with the viewer's account when running as a claude.ai page.
+connectCloudSave(() => game.onProfileSynced());
+window.addEventListener('pagehide', () => game.bankOnExit());
 
 // Meshy models load in the background; the placeholder shapes are used until
 // (or unless) they arrive. Grunts spawned after this point use the model too.

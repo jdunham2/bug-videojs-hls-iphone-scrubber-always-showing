@@ -175,25 +175,47 @@ export class Sfx {
   drawStart(drawTime) {
     if (!this.ok) return;
     this.drawStop();
-    // A soft leather rustle as the arrow is nocked, then a quiet string-tension
-    // swell (filtered noise, no pitched creak) that rises with the draw.
-    this.sample('whoosh', { vol: 0.12, rate: 0.6, jitter: 0.05 });
+    // A small wooden click as the arrow is nocked, then a soft leather-and-fibre
+    // stretch (low filtered noise, nothing pitched) that thickens with the draw.
+    this.sample('thunkWood', { vol: 0.07, rate: 2.4, jitter: 0.08 });
     const c = this.ctx;
     const t = c.currentTime;
     const src = c.createBufferSource();
     src.buffer = this.noiseBuf;
     src.loop = true;
     const f = c.createBiquadFilter();
-    f.type = 'bandpass';
-    f.Q.value = 1.2;
-    f.frequency.setValueAtTime(500, t);
-    f.frequency.exponentialRampToValueAtTime(900, t + drawTime);
+    f.type = 'lowpass';
+    f.Q.value = 0.4;
+    f.frequency.setValueAtTime(350, t);
+    f.frequency.exponentialRampToValueAtTime(1100, t + drawTime);
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.025, t + drawTime);
+    g.gain.exponentialRampToValueAtTime(0.03, t + drawTime);
     src.connect(f).connect(g).connect(this.sfxBus);
-    src.start(t);
+    src.start(t, Math.random() * 0.5);
     this.drawNode = { o: src, g };
+  }
+
+  /** Band-passed noise whose centre sweeps from `f0` to `f1` Hz: an airy "fwip". */
+  sweep(vol, dur, f0, f1, pan = 0, q = 0.9) {
+    if (!this.ok) return;
+    const c = this.ctx;
+    const t = c.currentTime;
+    const src = c.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = c.createGain();
+    this.env(g, t, vol, 0.004, dur);
+    const p = c.createStereoPanner ? c.createStereoPanner() : null;
+    if (p) p.pan.value = pan;
+    src.connect(f).connect(g);
+    (p ? g.connect(p) : g).connect(this.sfxBus);
+    src.start(t, Math.random() * 0.5);
+    src.stop(t + dur + 0.05);
   }
 
   drawStop() {
@@ -214,14 +236,15 @@ export class Sfx {
   }
 
   release(charge, perfect, pan = 0) {
-    // String twang (pitched by draw strength) + the arrow's whoosh.
-    const twang = this.sample('twang', { vol: 0.75, rate: 0.5 + 0.3 * charge, pan });
-    this.sample('whoosh', { vol: 0.25 + 0.35 * charge, rate: 1.5, pan });
-    if (!twang) {
-      this.tone('triangle', 200 + 220 * charge, 80, 0.12, 0.25);
-      this.noise(0.07 + 0.07 * charge, 0.22, 'highpass', 2500);
-    }
-    if (perfect) this.sample('ding', { vol: 0.35, rate: 1.8, jitter: 0, pan });
+    if (!this.ok) return;
+    // A bow shot is a dull string slap and a rush of air, not a note:
+    //   slap: a very short low noise burst; body: a quick sub thump;
+    //   air: a fast downward noise sweep, louder and longer with a full draw.
+    this.noise(0.03, 0.22 + 0.2 * charge, 'lowpass', 900 + 500 * charge);
+    this.tone('sine', 120 + 30 * charge, 45, 0.07, 0.18 + 0.12 * charge);
+    this.sweep(0.1 + 0.08 * charge, 0.14 + 0.08 * charge, 4200, 700, pan);
+    this.sample('whoosh', { vol: 0.12 + 0.22 * charge, rate: 1.7, pan });
+    if (perfect) this.sample('ding', { vol: 0.3, rate: 1.8, jitter: 0, pan });
   }
 
   hit(perfect, pan = 0) {

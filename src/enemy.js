@@ -3,7 +3,10 @@ import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
 import { instantiate, attachProp, findBone, enableDissolve } from './models.js';
+import { makeSimpleBow, holdInHand, orientUpright } from './bow.js';
 import { updateElite } from './elites.js';
+
+const BOW_FWD = new THREE.Vector3();
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
@@ -153,7 +156,15 @@ export class Grunt {
     const tint = new THREE.Color(1, 1 - k, 1 - k * 1.2);
     for (const m of inst.materials) m.color?.multiply(tint);
     const side = this.propRightHand ? /right|(^|[_.])r([_.]|$)/i : /left|(^|[_.])l([_.]|$)/i;
-    this.prop = attachProp(this.propId, findBone(inst.root, [/hand/i, side]), this.propLength);
+    const hand = findBone(inst.root, [/hand/i, side]);
+    if (this.propId === 'bow' && hand) {
+      // Archers carry the built bow (kept upright, see orientBow) rather than a mesh prop.
+      this.prop = makeSimpleBow(0x4a3a2a);
+      holdInHand(this.prop, hand, 0.9 * this.group.scale.x);
+      this.heldBow = this.prop;
+    } else {
+      this.prop = attachProp(this.propId, hand, this.propLength);
+    }
   }
 
   /** Pick the grunt's animation from its state. `dt` is its own (slowed/frozen) clock. */
@@ -205,6 +216,14 @@ export class Grunt {
         break;
     }
     A.update(dt);
+    this.orientBow();
+  }
+
+  /** Keep a held bow upright and facing where the archer faces. */
+  orientBow() {
+    if (!this.heldBow) return;
+    this.group.updateMatrixWorld(true);
+    orientUpright(this.heldBow, BOW_FWD.set(Math.sin(this.yaw), 0, Math.cos(this.yaw)));
   }
 
   isHittable() {
