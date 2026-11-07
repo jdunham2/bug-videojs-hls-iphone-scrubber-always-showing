@@ -12,7 +12,6 @@ export const ARROW_HEIGHT = 1.1;
 
 const lerp = THREE.MathUtils.lerp;
 const UP = new THREE.Vector3(0, 1, 0);
-const TMP = new THREE.Vector3();
 
 function lerpAngle(a, b, t) {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -21,10 +20,12 @@ function lerpAngle(a, b, t) {
 }
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const MAX_TWIST = THREE.MathUtils.degToRad(115); // how far the upper body may turn from the legs
+const MAX_TWIST = THREE.MathUtils.degToRad(100); // how far the upper body may turn from the legs
 const _q1 = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
 
 const RING_IDLE = new THREE.Color(0xffffff);
 const RING_PERFECT = new THREE.Color(3, 2.2, 0.6);
@@ -41,7 +42,6 @@ export class Player {
     this.aimDir = new THREE.Vector3(0, 0, -1);
     this.rollDir = new THREE.Vector3(0, 0, 1);
     this.moveDir = new THREE.Vector3(0, 0, -1);
-    this.bowBlend = 0;
     this.yaw = Math.PI;
 
     this.group = new THREE.Group();
@@ -320,27 +320,39 @@ export class Player {
     this.knock.multiplyScalar(Math.exp(-10 * dt));
     (this.collide || resolveCircle)(this.pos, PLAYER_RADIUS);
 
-    // Face where you're running; turn to the cursor only while drawing, shooting or casting.
+    // Facing. The legs (the whole group) and the upper body are aimed separately:
+    //  - not aiming: face where you run (or the cursor when standing still);
+    //  - aiming, standing: the whole body takes the side-on archery stance;
+    //  - aiming on the run: the legs run (or backpedal) along the movement, picking
+    //    whichever keeps the upper body's turn smallest (never past 90°), and the
+    //    spine makes up the rest (see applyTwist).
     const aimingNow = this.drawing || this.releaseT > 0 || this.casting > 0;
-    if (Math.hypot(this.vel.x, this.vel.z) > 0.8) this.moveDir.set(this.vel.x, 0, this.vel.z).normalize();
-    // Standing still, the hero turns to the aim too; running, they face the way they run.
-    const still = Math.hypot(this.vel.x, this.vel.z) < 0.8;
-    // Drawing on the run: the legs keep running their way and the upper body
-    // twists toward the aim (see applyTwist) — unless the aim is too far round,
-    // then the whole body turns.
-    this.twistTarget = 0;
-    let faceAim = aimingNow || still;
-    if (aimingNow && !still && !this.rolling && this.spineBones?.length && this.casting <= 0) {
-      const moveYaw = Math.atan2(this.moveDir.x, this.moveDir.z);
-      const need = wrapAngle(Math.atan2(this.aimDir.x, this.aimDir.z) + THREE.MathUtils.degToRad(config.models.heroAimYaw) - moveYaw);
-      if (Math.abs(need) <= MAX_TWIST) {
-        faceAim = false;
-        this.twistTarget = need;
-      }
+    const speedNow = Math.hypot(this.vel.x, this.vel.z);
+    if (speedNow > 0.8) this.moveDir.set(this.vel.x, 0, this.vel.z).normalize();
+    const still = speedNow < 0.8;
+    const aimYaw = Math.atan2(this.aimDir.x, this.aimDir.z);
+    const moveYaw = Math.atan2(this.moveDir.x, this.moveDir.z);
+    const canTwist = !!this.spineBones?.length;
+    // Body heading that puts the bow arm on the aim line (the archery stance is
+    // side-on; armOffset is measured from the animation, see measureArm).
+    const upperYaw = canTwist ? aimYaw - this.armOffset : aimYaw;
+    let legYaw;
+    this.backpedal = false;
+    if (this.rolling) legYaw = Math.atan2(this.rollDir.x, this.rollDir.z);
+    else if (!aimingNow) legYaw = still ? aimYaw : moveYaw;
+    else if (still || !canTwist) legYaw = upperYaw;
+    else {
+      // Forward or backpedal, with some hysteresis so it doesn't flicker at the boundary.
+      const fwd = Math.abs(wrapAngle(upperYaw - moveYaw));
+      const back = Math.abs(wrapAngle(upperYaw - moveYaw - Math.PI));
+      this.legsBack = this.legsBack ? back < fwd + 0.35 : back < fwd - 0.35;
+      this.backpedal = this.legsBack;
+      const base = this.legsBack ? moveYaw + Math.PI : moveYaw;
+      // Angle the stride up to ~35° toward the stance (a strafe) so the spine twists less.
+      legYaw = base + THREE.MathUtils.clamp(wrapAngle(upperYaw - base), -0.6, 0.6);
     }
-    this.twisting = this.twistTarget !== 0;
-    const faceDir = this.rolling ? this.rollDir : faceAim ? this.aimDir : this.moveDir;
-    this.yaw = lerpAngle(this.yaw, Math.atan2(faceDir.x, faceDir.z), 1 - Math.exp(-(this.rolling ? 40 : 25) * dt));
+    this.yaw = lerpAngle(this.yaw, legYaw, 1 - Math.exp(-(this.rolling ? 40 : 18) * dt));
+    this.aimingNow = aimingNow;
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
 
@@ -415,7 +427,15 @@ export class Player {
     this.characterId = id;
     this.rig.visible = false;
     this.group.add(inst.holder);
-    this.holdBow(this.bowHand(inst));
+    const bowHand = this.bowHand(inst);
+    this.holdBow(bowHand);
+    const L = findBone(inst.root, [/hand/i, /left|(^|[_.])l([_.]|$)/i]);
+    const R = findBone(inst.root, [/hand/i, /right|(^|[_.])r([_.]|$)/i]);
+    this.stringHand = bowHand === L ? R : L;
+    // The side-on stance: the bow arm points this far round from the body heading.
+    this.armOffset = -THREE.MathUtils.degToRad(config.models.heroAimYaw);
+    this.twist = 0;
+    this.spineBase = null;
     // Spine bones (root to chest) for the upper-body twist while aiming on the run.
     this.spineBones = [];
     inst.root.traverse((o) => o.isBone && /spine/i.test(o.name) && this.spineBones.push(o));
@@ -452,7 +472,8 @@ export class Player {
     const locoScale = moving ? THREE.MathUtils.clamp(speed / mc.runAnimSpeed, 0.5, 1.6) : 1;
     // Turn side-on archery poses so the bow arm points down the aim line.
     const aiming = this.drawing || this.releaseT > 0;
-    const yawTarget = aiming && !this.twisting ? THREE.MathUtils.degToRad(mc.heroAimYaw) : 0;
+    // Without spine bones to twist, turn the whole model side-on while aiming instead.
+    const yawTarget = aiming && !this.spineBones?.length ? THREE.MathUtils.degToRad(mc.heroAimYaw) : 0;
     this.model.holder.rotation.y += (yawTarget - this.model.holder.rotation.y) * (1 - Math.exp(-20 * dt));
 
     if (this.dead) {
@@ -467,11 +488,11 @@ export class Player {
       // Moving: arms aim while the legs keep running. Standing still: the whole body
       // takes the archery stance (no idle sway in the legs).
       const shoot = moving && A.has('shoot:upper') ? 'shoot:upper' : 'shoot';
-      // Twisting: the legs run normally; otherwise a forward aim-walk.
-      const lowerBase = moving && !this.twisting && A.has('aimWalk') ? 'aimWalk' : loco;
+      // Legs: an aim-walk along the movement, played backwards when backpedalling.
+      const lowerBase = moving && A.has('aimWalk') ? 'aimWalk' : loco;
       const lower = shoot === 'shoot:upper' ? `${lowerBase}:lower` : null;
       A.set(lower ? [shoot, lower] : [shoot], { fade: 0.12 });
-      if (lower) A.action(lower).timeScale = locoScale;
+      if (lower) A.action(lower).timeScale = locoScale * (this.backpedal ? -1 : 1);
       const dur = A.duration('shoot');
       const a = A.action(shoot);
       if (a && this.drawing) {
@@ -497,20 +518,47 @@ export class Player {
       A.set([loco], { fade: 0.2 });
       A.action(loco).timeScale = locoScale;
     }
+    // A held (scrubbed) clip doesn't always rewrite the spine, so put back last
+    // frame's untwisted spine first; otherwise each frame's twist would pile up.
+    const spine = this.spineBones || [];
+    if (this.spineBase) spine.forEach((b, i) => b.quaternion.copy(this.spineBase[i]));
     A.update(dt);
+    this.spineBase ||= spine.map(() => new THREE.Quaternion());
+    spine.forEach((b, i) => this.spineBase[i].copy(b.quaternion));
+    this.measureArm();
     this.applyTwist(dt);
     if (this.bowInHand) {
       // The bow sits in the hand but keeps a clean pose: upright, facing where the
       // hero faces, turning to the aim line while drawing (the hand's own rotation
       // in these clips would point it in odd directions).
+      // Its heading eases round by angle (never through zero), so it can't flip or spin.
       const aiming = this.drawing || this.releaseT > 0;
-      this.bowBlend += ((aiming ? 1 : 0) - this.bowBlend) * (1 - Math.exp(-14 * dt));
+      const want = aiming ? Math.atan2(this.aimDir.x, this.aimDir.z) : this.yaw;
+      this.bowYaw = lerpAngle(this.bowYaw ?? want, want, 1 - Math.exp(-(aiming ? 30 : 12) * dt));
       this.bowFwd ||= new THREE.Vector3();
-      const facing = TMP.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-      this.bowFwd.copy(facing).lerp(this.aimDir, this.bowBlend).normalize();
+      this.bowFwd.set(Math.sin(this.bowYaw), 0, Math.cos(this.bowYaw));
       this.group.updateMatrixWorld(true);
       orientUpright(this.bow, this.bowFwd);
     }
+  }
+
+  /**
+   * Where does the bow arm point in this frame's pose (before any twist)? The
+   * direction from the string hand to the bow hand, compared with the aim, gives
+   * the spine turn needed; compared with the body heading, it gives armOffset.
+   */
+  measureArm() {
+    this.twistTarget = 0;
+    if (!this.aimingNow || this.rolling || !this.spineBones?.length || !this.stringHand) return;
+    this.group.updateMatrixWorld(true);
+    const b = this.bow.parent.getWorldPosition(_v1);
+    const s = this.stringHand.getWorldPosition(_v2);
+    const dx = b.x - s.x;
+    const dz = b.z - s.z;
+    if (Math.hypot(dx, dz) < 0.25) return; // hands together (reaching for an arrow): no reading
+    const armYaw = Math.atan2(dx, dz);
+    this.armOffset = lerpAngle(this.armOffset, wrapAngle(armYaw - this.yaw), 0.1);
+    this.twistTarget = THREE.MathUtils.clamp(wrapAngle(Math.atan2(this.aimDir.x, this.aimDir.z) - armYaw), -MAX_TWIST, MAX_TWIST);
   }
 
   /**
@@ -518,7 +566,8 @@ export class Player {
    * up axis (on top of whatever the clip is doing). Eases in and out.
    */
   applyTwist(dt) {
-    this.twist = lerpAngle(this.twist || 0, this.twistTarget || 0, 1 - Math.exp(-18 * dt));
+    // Plain (not wrapped) easing: the target is clamped to ±MAX_TWIST, so this stays bounded.
+    this.twist = (this.twist || 0) + ((this.twistTarget || 0) - (this.twist || 0)) * (1 - Math.exp(-18 * dt));
     const bones = this.spineBones;
     if (!bones?.length || Math.abs(this.twist) < 1e-3) return;
     const per = this.twist / bones.length;
