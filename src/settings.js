@@ -10,6 +10,7 @@ export const settings = {
   quality: 'auto', // auto | high | medium | low
   shake: 1,
   damageNumbers: true,
+  compat: 0, // 0 normal, 1 no post-processing, 2 also no shadows (set by the black-screen guard)
 };
 
 export function loadSettings() {
@@ -19,6 +20,8 @@ export function loadSettings() {
     /* defaults */
   }
 }
+
+export const saveSettingsNow = () => saveSettings();
 
 function saveSettings() {
   try {
@@ -43,7 +46,7 @@ export function applySettings(game) {
   // Shadows stay on at every level (low just uses a small, cheap shadow map).
   // Switching shadows off mid-game needs every shader rebuilt; without that many
   // GPUs draw the whole scene black.
-  const wantShadows = true;
+  const wantShadows = (s.compat || 0) < 2;
   if (r.shadowMap.enabled !== wantShadows) {
     r.shadowMap.enabled = wantShadows;
     for (const scene of [game.scene, game.camp?.scene]) {
@@ -105,6 +108,10 @@ export class SettingsPanel {
         <select id="set-quality" data-k="quality">
           ${['auto', 'high', 'medium', 'low'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
         </select><b></b></label>
+      <label class="row"><span>Compatibility</span>
+        <select id="set-compat" data-k="compat">
+          ${[['0', 'Normal'], ['1', 'Simple (no effects)'], ['2', 'Safe (no shadows)']].map(([v, l]) => `<option value="${v}" ${String(s.compat || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select><b></b></label>
       <label class="row"><span>Damage numbers</span><input type="checkbox" id="set-damageNumbers" data-k="damageNumbers" ${s.damageNumbers ? 'checked' : ''}><b></b></label>
       <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y Arrow Volley · LT/LB gadgets · X use · Start pause</p>
       <button data-close>Done</button>`;
@@ -113,7 +120,8 @@ export class SettingsPanel {
   onInput(e) {
     const k = e.target.dataset.k;
     if (!k) return;
-    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'range' ? Number(e.target.value) : e.target.value;
+    let v = e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'range' ? Number(e.target.value) : e.target.value;
+    if (k === 'compat') v = Number(v);
     settings[k] = v;
     const b = e.target.parentElement.querySelector('b');
     if (b && e.target.type === 'range') b.textContent = `${Math.round(v * 100)}%`;

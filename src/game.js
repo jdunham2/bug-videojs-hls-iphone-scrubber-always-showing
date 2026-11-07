@@ -23,7 +23,7 @@ import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
-import { settings, applySettings, SettingsPanel } from './settings.js';
+import { settings, applySettings, SettingsPanel, saveSettingsNow } from './settings.js';
 import { Tips } from './tips.js';
 import { profile, bankRun, noteProgress, noteRunStart } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
@@ -63,6 +63,21 @@ const GradeShader = {
       gl_FragColor = c;
     }`,
 };
+// Stops a single bad pixel (NaN / infinity from any shader) from being smeared
+// across the whole screen by the bloom blur, which shows as a black screen.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 v = c.rgb;
+      if (isnan(v.r) || isnan(v.g) || isnan(v.b) || isinf(v.r) || isinf(v.g) || isinf(v.b)) v = vec3(0.0);
+      gl_FragColor = vec4(clamp(v, 0.0, 64.0), 1.0);
+    }`,
+};
+
 export class Game {
   constructor(container) {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
@@ -73,6 +88,13 @@ export class Game {
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     container.appendChild(r.domElement);
+    // Keep shader compile errors so the compatibility check can report them.
+    this.shaderErrors = [];
+    r.debug.onShaderError = (gl, program, vs, fs) => {
+      const log = (gl.getProgramInfoLog(program) || '') + (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '');
+      this.shaderErrors.push(log.trim().slice(0, 300));
+      console.error('Shader error:', log);
+    };
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 200);
@@ -89,6 +111,7 @@ export class Game {
     this.ao.blendIntensity = 0.85;
     this.ao.enabled = config.feel.ambientOcclusion;
     this.composer.addPass(this.ao);
+    this.composer.addPass(new ShaderPass(SanitizeShader));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), config.feel.bloomStrength, 0.5, 0.9);
     this.bloom.enabled = config.feel.bloom;
     this.composer.addPass(this.bloom);
@@ -414,6 +437,46 @@ export class Game {
   }
 
   /**
+   * Black-screen guard. Some graphics drivers render this scene black (a shader
+   * that fails on that GPU, or bad pixels spread by post-processing). Every so
+   * often, sample a few pixels of the frame just drawn; if the picture stays
+   * pure black, step down to simpler rendering and remember it.
+   */
+  watchForBlack() {
+    const live = this.state === 'playing' || this.state === 'camp';
+    if (!live || this.contextLost) return;
+    this.blackCheck = (this.blackCheck || 0) + 1;
+    if (this.blackCheck % 15) return;
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const px = new Uint8Array(4);
+    let max = 0;
+    for (const [fx, fy] of [[0.5, 0.5], [0.3, 0.35], [0.7, 0.35], [0.3, 0.65], [0.7, 0.65], [0.5, 0.25], [0.5, 0.75]]) {
+      gl.readPixels(Math.floor(w * fx), Math.floor(h * fy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      max = Math.max(max, px[0] + px[1] + px[2]);
+    }
+    this.blackFrames = max < 6 ? (this.blackFrames || 0) + 1 : 0;
+    if (this.blackFrames < 4) return;
+    this.blackFrames = 0;
+    const level = (settings.compat || 0) + 1;
+    if (level <= 2) {
+      settings.compat = level;
+      saveSettingsNow();
+      applySettings(this);
+      this.banner('Graphics adjusted', level === 1 ? 'Switched to simpler rendering for your graphics card' : 'Switched to safe rendering (no shadows)', 2.6);
+      console.warn('Black frames detected: compatibility level', level, this.shaderErrors);
+    } else if (!this.blackReported) {
+      this.blackReported = true;
+      const o = this.hud.overlay;
+      o.innerHTML = `<h1>Can't draw the 3D view</h1><p class="tag">Your browser shows a black screen even in safe mode. Please send this to the developer:</p><pre class="diag"></pre><button data-reload>Reload</button>`;
+      o.querySelector('.diag').textContent = [navigator.userAgent, gl.getParameter(gl.VERSION), ...(this.shaderErrors.length ? this.shaderErrors : ['no shader errors'])].join('\n');
+      o.classList.add('visible');
+      this.contextLost = true; // reuse the reload-only overlay handling
+    }
+  }
+
+  /**
    * "Auto" graphics: watch the frame time and step quality down (high → medium → low)
    * if this machine can't hold ~48 fps.
    */
@@ -472,7 +535,12 @@ export class Game {
     }
     this.updateCamera(realDt);
     this.updateHud();
-    if (render) this.composer.render();
+    if (render) {
+      // Compatibility mode 1+: draw the scene directly, skipping post-processing.
+      if (settings.compat >= 1) this.renderer.render(this.renderPass.scene, this.camera);
+      else this.composer.render();
+      this.watchForBlack();
+    }
     this.input.endFrame();
   }
 
