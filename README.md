@@ -1,7 +1,8 @@
 # Draw & Release
 
-A browser prototype for a top-down, bow-focused action game built with three.js.
-This first vertical slice tests one mechanic: **the charge shot**.
+A top-down action roguelite for the browser, built with three.js. You're an archer descending through monster-filled arenas: draw your bow, release in the gold flash for perfect shots, roll through attacks, pick a new skill after every wave, and take down a boss every five waves to open the gate to the next arena. Between runs you return to camp to spend soul gems on new heroes and outfits.
+
+All characters, enemies and props are generated with the [Meshy](https://www.meshy.ai) API (models, textures, rigs and animations); sounds are CC0 samples from [Kenney](https://kenney.nl); the music is synthesized live.
 
 ## Run it
 
@@ -10,95 +11,107 @@ npm install
 npm run dev
 ```
 
-Then open the URL Vite prints (usually http://localhost:5173). `npm run build` produces a static build in `dist/`.
-
-## Play online (GitHub Pages)
-
-`.github/workflows/pages.yml` builds the game and deploys it to GitHub Pages on every push to `master` (and the current dev branch):
-
-https://jdunham2.github.io/bug-videojs-hls-iphone-scrubber-always-showing/
-
-One-time setup: in the repo, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
+Open the URL Vite prints (usually http://localhost:5173). `npm run build` produces a static site in `dist/`; `.github/workflows/pages.yml` deploys it to GitHub Pages (enable it once under **Settings → Pages → Source: GitHub Actions**).
 
 ## Controls
 
-| Input | Action |
-| --- | --- |
-| WASD / arrows | Move |
-| Mouse | Aim |
-| Hold left mouse | Draw the bow (you move slower while drawing) |
-| Release | Fire. Releasing during the **gold flash** is a *perfect* shot: 2× damage and it pierces |
-| Space / right mouse / Shift | Dodge roll |
-| `` ` `` | Show/hide the tuning panel |
-| P / Esc | Pause |
-| M | Mute |
-| R | Restart |
+| Action | Keyboard / mouse | Gamepad |
+| --- | --- | --- |
+| Move | WASD / arrows | Left stick |
+| Aim | Mouse | Right stick |
+| Draw / fire | Hold / release left mouse | Hold / release RT (or RB) |
+| Dodge roll | Space, Shift or right mouse | A or B |
+| Arrow Storm (ultimate) | Q or E | Y or LB |
+| Use building (camp) | E | X |
+| Pause | P / Esc | Start |
+| Settings | O or the ⚙ button | |
+| Mute / restart | M / R | |
+| Developer tuning panel | `` ` `` | |
 
-## What's in the slice
+## The game
 
-- **Charge shot:** damage and arrow speed scale with draw time. A short perfect window opens at full draw, shown by the closing ring snapping gold plus a chime. Holding past it ("overdraw") makes the bow tremble and loses the perfect bonus.
-- **Dodge roll:** rolls the way you're moving, or backwards if you're standing still. You're invulnerable for most of it and can roll through grunts. Rolling through a lunge as it would have hit you is a **perfect dodge**: time slows briefly, and your next draw within 1.5s starts at full, so a quick tap fires a perfect counter shot. By default, rolling cancels a draw in progress (toggle in the tuning panel).
-- **Skill draft:** after each wave you pick 1 of 3 skill cards (one reroll per run). Skills stack up to level III, rarer cards are stronger, and legendaries get likelier in later waves. Your build shows under the HUD stats and on the game-over screen.
-- **Grunt:** chases you, then winds up (glows red and shows a wedge on the ground for its lunge path), commits to a direction, lunges, and pauses to recover. A full-draw or perfect hit during the windup **staggers** it.
-- **Waves:** each wave adds more grunts with more HP and speed. You heal a little between waves.
-- **Feedback:** hit-stop, screen shake, knockback, damage numbers, arrows that stick in enemies, walls and the floor, and synthesized sound.
-- **Tuning panel:** every number lives in `src/config.js` and can be changed live. Changes are saved in your browser. Use *Copy settings JSON* to share a tuning.
+### Combat
+- **Charge shot:** damage and arrow speed grow with draw time. Releasing in the short gold window at full draw is a **perfect** shot (2× damage, pierces). With the Overdraw skill, holding past it charges a 3× mega-shot.
+- **Dodge roll:** invulnerable for most of the roll. Rolling through an attack as it lands (or past an arrow at close range) is a **perfect dodge**: time slows and your next draw starts at full.
+- **Arrow Storm:** a meter filled by perfect shots, hits, kills and perfect dodges. Unleash a rain of ~70 golden arrows on the area under your cursor.
+- **Feedback:** hit-stop, camera punch and chromatic aberration on big hits, knockback, flinches, floor decals (blood, scorch, frost, cracks), dissolving spawns and deaths, a slow-motion kill cam on the last kill of a wave.
 
-## 3D models (Meshy)
+### Enemies
+| Enemy | Where | Behavior |
+| --- | --- | --- |
+| Grunt | Everywhere | Chases, telegraphs (red glow and wedge), then leaps. A full-draw or perfect hit during the windup staggers it. |
+| Skeleton Archer | From wave 3 | Keeps its distance; a cyan aim line tracks you, then locks before it fires. |
+| Frost Ghoul | Frozen Crypt | Faster grunt; its hits chill you (−40% speed). |
+| Fire Imp | Infernal Forge | Throws fireballs that leave burning ground; bursts into flame when it dies. |
+| Elites | From wave 4 | Double HP and an aura: **Swift**, **Shielded** (break it with a full-draw or perfect shot), **Vampiric**, **Volatile** (explodes after death). |
+| **Gorvak** (boss) | Every 5th wave | Hammer swing (cone), tracking ground slam with shockwaves to roll through, a charge that stuns him if he hits a wall or pillar, grunt summons and double shockwaves when enraged, a poise bar broken by perfect shots. Appears as the Ogre Warlord, the Frostbound and the Infernal. |
 
-Characters and props are generated with the [Meshy API](https://docs.meshy.ai) by `tools/meshy/generate.mjs`, driven by the asset list in `tools/meshy/assets.json` (prompts, shared art style, polycount, and which library animations each character gets).
+### Progression
+- **Skill draft:** after each wave, pick 1 of 3 cards (one reroll per run). Twelve skills stack up to level III, from Heavy Draw and Split Shot to Thunderstrike, Fire/Frost arrows, Second Wind and the legendary Overdraw.
+- **Arenas:** each boss opens a portal in the far gate. Walk through to descend: **Sunken Ruins → Frozen Crypt → Infernal Forge**, each with its own architecture, lighting, floor, weather and enemies.
+- **Hazards and boons:** explosive barrels (shoot them; they chain and hurt you too), spike traps, healing springs, haste runes, lightning totems you wake with an arrow, ice patches (Crypt) and lava vents (Forge).
+- **Loot:** soul gems and health orbs burst out of enemies and home in on you.
+- **Save points:** beating a boss saves a checkpoint (wave, arena and skills) and banks your gems. Continue from the camp's Ruin Gate.
 
-```bash
-npm run meshy -- --dry-run      # list assets and the credit cost
-npm run meshy -- --balance      # check your Meshy credits
-npm run meshy -- hero grunt     # generate (or resume) specific assets
-npm run meshy                   # everything in assets.json
-```
+### Camp
+A walkable hub before and between runs. Walk up to a building and press E:
+- **Hall of Heroes:** choose Rowan the Ranger, Sylva the Huntress (faster draw) or Brom Ironbeard (more HP and damage). Unlock with soul gems after milestones.
+- **Tailor's Tent:** outfits (Crimson Hunter, Frost Warden, Shadow Stalker, Golden Champion), retextured on the same rig so every animation carries over.
+- **Rune Shrine:** records and your save.
+- **Ruin Gate:** start a new run or continue from the last save.
 
-- **API key:** set `MESHY_API_KEY` in your shell. Never commit it or put it in game code: the game is a public page. (In the Claude Code cloud environment the key is stored as an environment network secret and attached automatically.)
-- **Pipeline per character:** text → low-poly mesh (`smart-topology`, A-pose) → texture → auto-rig → all animations merged into one GLB → optimized with gltf-transform (meshopt + WebP, 1024px textures) → `public/models/<id>.glb`. Props skip rigging.
-- **Resumable:** task IDs are saved to `tools/meshy/state.json` the moment a task is created, so re-running resumes instead of paying again. Raw downloads go to `tools/meshy/raw/` (gitignored). Meshy deletes generated files after 3 days.
-- **In game:** `src/models.js` loads `public/models/manifest.json`. Missing models fall back to the built-in placeholder shapes. The hero's bow draw is scrubbed in sync with your charge, the legs run while the upper body aims, and grunts' attack clips follow their windup and lunge timers. Alignment values (heights, aim turn, release and hit points) are in the tuning panel under **Models (Meshy)**.
-
-## Skills
-
-| Skill | Type | Rarity | Effect |
-| --- | --- | --- | --- |
-| Heavy Draw | Bow | Common | +20% full-draw damage per level |
-| Quick Hands | Bow | Common | Draw 15% faster per level (compounding) |
-| Steady Aim | Bow | Common | Perfect window 40% wider per level |
-| Ricochet | Bow | Rare | Arrows bounce to 1 more grunt per level |
-| Split Shot | Bow | Rare | Full-draw shots add side arrows (2 at 50%, then full damage, then 4) |
-| Thunderstrike | Perfect shot | Rare | Perfect hits chain lightning to 2/3/4 grunts for 60% damage |
-| Refresh | Perfect shot | Common | Perfect shots refill your dodge charges |
-| Fire Arrows | Element | Rare | Hits burn for 4/7/10 damage per second over 3s |
-| Frost Arrows | Element | Rare | Hits slow 30/40/50%; every 3rd hit freezes for 1.5s |
-| Second Wind | Dodge | Rare | +1 dodge charge per level (max 2) |
-| Vitality | Survival | Common | +25 max HP per level and a full heal |
-| Overdraw | Bow | Legendary | Hold past the perfect window to charge a 3× piercing mega-shot |
-
-Fire and Frost don't stack: taking one replaces the other. Skill definitions live in `src/skills.js`.
-
-## What to evaluate
-
-1. Is the draw → release rhythm satisfying, and does hitting the perfect window feel rewarding?
-2. Does moving slowly while drawing create good tension when grunts close in?
-3. Does the dodge make fights feel better or too safe? Is the perfect-dodge counter worth going for?
-4. Does it hold up for 3–5 minutes of waves?
+### Audio
+Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kills and flawless waves) layered with synthesis and stereo-panned by screen position, plus an adaptive soundtrack: an ambient drone between waves, drums and bass that build with the number of enemies, brass for bosses.
 
 ## Code map
 
 | File | What it does |
 | --- | --- |
-| `src/config.js` | All tunable numbers and their defaults |
-| `src/skills.js` | Skill catalogue, the current run's build, card rolling |
-| `src/models.js` | Meshy model loading, per-character instances, animation state helper |
-| `tools/meshy/` | Meshy generation pipeline and asset list |
-| `src/game.js` | Main loop, waves, combat events, HUD, tuning panel |
-| `src/player.js` | Movement, draw/release, bow and charge-ring visuals |
-| `src/enemy.js` | Grunt state machine (spawn → chase → windup → lunge → recover) |
-| `src/arrows.js` | Arrow flight, swept hit detection, piercing, sticking |
-| `src/world.js` | Arena, pillars, torches, collision helpers |
-| `src/fx.js` | Particles, damage numbers, screen shake |
-| `src/audio.js` | Synthesized sound effects (Web Audio) |
-| `src/input.js` | Keyboard and mouse |
+| `src/main.js` | Boot: settings, profile, models, game |
+| `src/game.js` | Main loop, states (title, camp, playing, draft, game over), waves, combat events, camera, HUD |
+| `src/config.js` | Tunable numbers (also editable live in the tuning panel) |
+| `src/player.js` | Hero movement, bow draw/release, dodge, animation state |
+| `src/enemy.js` | Grunt (the base enemy class: AI, status effects, dissolve, hit reactions) |
+| `src/skeleton.js` | Skeleton Archer and enemy arrows |
+| `src/variants.js` | Frost Ghoul, Fire Imp and fireballs |
+| `src/boss.js` | Gorvak: attacks, telegraphs, shockwaves, phases, poise |
+| `src/elites.js` | Elite affixes and auras |
+| `src/skills.js` | Skill catalogue, the run's build, derived stats, temporary buffs |
+| `src/ultimate.js` | Arrow Storm |
+| `src/arrows.js` | Player arrows: flight, swept hits, pierce, ricochet, trails |
+| `src/world.js` | Base arena, collision helpers |
+| `src/environment.js` | Arena themes and dressing (props, floor, lighting, grass, mist, light shafts) |
+| `src/hazards.js` | Hazards and boons |
+| `src/camp.js` | Camp hub scene and building menus |
+| `src/profile.js` | Saved profile: gems, unlocks, characters, outfits, records, checkpoint |
+| `src/models.js` | Loading Meshy models, instancing, animation helper, dissolve shader, outfit textures |
+| `src/juice.js`, `src/fx.js` | Decals, portals, particles, damage numbers, screen shake |
+| `src/loot.js` | Soul gems and health orbs |
+| `src/audio.js`, `src/music.js` | Sound effects and the adaptive soundtrack |
+| `src/input.js`, `src/settings.js` | Keyboard/mouse/gamepad input; settings menu |
+
+## Asset pipeline (Meshy)
+
+`tools/meshy/generate.mjs` turns the entries in `tools/meshy/assets.json` into game-ready files:
+
+```bash
+npm run meshy -- --dry-run          # list assets and credit cost
+npm run meshy -- --balance          # Meshy credit balance
+npm run meshy -- hero grunt         # generate (or resume) specific assets
+```
+
+- **Characters:** text → low-poly mesh (A-pose) → texture → auto-rig → library animations merged into one GLB.
+- **Props:** mesh and texture only.
+- **Outfits:** a retexture on the base character's original UVs (keeps its rig and animations).
+- Output is optimized with gltf-transform (meshopt geometry, WebP textures) into `public/models/` with a `manifest.json`. Task IDs are saved to `tools/meshy/state.json` so runs resume instead of paying twice.
+- **API key:** `MESHY_API_KEY`, or a gitignored `tools/meshy/.env` containing `MESHY_API_KEY=...`. Never commit it.
+
+## Preview builds for sandboxed hosts
+
+`python3 tools/build-preview.py OUT.html` builds a page for hosts that block `data:`/`blob:` requests (like the claude.ai artifact viewer): the code and sounds are embedded, and each model goes in its own JSON file under `pmodels/` next to the page.
+
+## Credits
+
+- 3D models, textures, rigs and animations: generated with Meshy.
+- Sound effects and announcer: [Kenney](https://kenney.nl) (CC0), see `public/audio/LICENSE-kenney.txt`.
+- Built with [three.js](https://threejs.org), [Vite](https://vite.dev), [gltf-transform](https://gltf-transform.dev) and [lil-gui](https://lil-gui.georgealt.com).
