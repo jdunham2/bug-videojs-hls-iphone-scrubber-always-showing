@@ -13,6 +13,8 @@ import { Decals, Portals } from './juice.js';
 import { Skeleton, EnemyArrows } from './skeleton.js';
 import { Boss, BOSS_NAME } from './boss.js';
 import { ArrowStorm } from './ultimate.js';
+import { Music } from './music.js';
+import { Loot } from './loot.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -102,10 +104,12 @@ export class Game {
     this.portals = new Portals(this.scene);
     this.enemyArrows = new EnemyArrows(this);
     this.ultimate = new ArrowStorm(this);
+    this.loot = new Loot(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
     this.sfx.init(); // decode samples now; playback starts on the first click
+    this.music = new Music(this.sfx);
     this.input = new Input(r.domElement);
     this.enemies = [];
 
@@ -121,6 +125,7 @@ export class Game {
       hpText: $('hp-text'),
       dodgeFill: $('dodge-fill'),
       dodgeBox: $('dodge'),
+      gems: $('gems'),
       ult: $('ult'),
       ultFill: $('ult-fill'),
       build: $('build'),
@@ -155,6 +160,7 @@ export class Game {
     this.hud.overlay.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.sfx.unlock();
+      this.music.start();
       if (this.state === 'paused') this.setPaused(false);
       else this.start();
     });
@@ -258,6 +264,7 @@ export class Game {
     this.portals.clear();
     this.enemyArrows.clear();
     this.ultimate.clear();
+    this.loot.clear();
     this.zoomPull = 0;
     this.killCam = null;
     this.cinematic = null;
@@ -305,6 +312,7 @@ export class Game {
   gameOver() {
     this.state = 'gameover';
     this.sfx.gameOver();
+    this.music.stinger(false);
     const newBest = this.wave > this.best.wave || (this.wave === this.best.wave && this.stats.kills > this.best.kills);
     if (newBest) {
       this.best = { wave: this.wave, kills: this.stats.kills };
@@ -443,6 +451,7 @@ export class Game {
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
       this.sfx.cleared(!this.waveHurt);
+      this.music.stinger(true);
     }
   }
 
@@ -558,6 +567,8 @@ export class Game {
 
   onKill(enemy) {
     this.stats.kills++;
+    if (enemy.isBoss) this.loot.drop(enemy.pos, 25, 3);
+    else this.loot.drop(enemy.pos, enemy.kind === 'skeleton' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
     this.ultimate.gain(config.ultimate.perKill);
     const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
     this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
@@ -697,6 +708,10 @@ export class Game {
     if (d < 8) this.shake.add(0.25 * strength * (1 - d / 8));
   }
 
+  maxHp() {
+    return stat.maxHp();
+  }
+
   /** Stereo position (-1 left … 1 right) of a world point on screen. */
   panAt(pos) {
     const v = this.tmpPan || (this.tmpPan = new THREE.Vector3());
@@ -817,6 +832,7 @@ export class Game {
     this.arrows.update(dt, this.enemies, this);
     this.enemyArrows.update(dt);
     this.ultimate.update(dt);
+    this.loot.update(dt);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
       if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
         this.numbers.spawn(this.player.pos.clone().setY(2.3), `Storm ${Math.floor(this.ultimate.meter)}%`, 'callout');
@@ -926,6 +942,11 @@ export class Game {
       h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
     }
     h.ultFill.style.width = `${this.ultimate.meter}%`;
+    h.gems.textContent = `◆ ${this.loot.runGems}`;
+    // Music follows the fight: calm between waves, building with enemy count, full on for bosses.
+    const aliveNow = this.enemies.filter((e) => e.state !== 'dying' && !e.removed).length;
+    const fighting = this.state === 'playing' && this.waveState === 'active';
+    this.music.setIntensity(fighting ? 0.45 + Math.min(0.4, aliveNow * 0.06) + (this.boss ? 0.3 : 0) : 0.08, !!this.boss && fighting);
     h.ult.classList.toggle('ready', this.ultimate.ready);
     h.ult.classList.toggle('active', !!this.ultimate.active);
     const maxCharges = stat.dodgeCharges();
@@ -1006,6 +1027,7 @@ export class Game {
           <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
           <div><b>${s.staggers}</b><span>Staggers</span></div>
           <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
+          <div><b>◆ ${this.loot.runGems}</b><span>Soul gems</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
         ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
