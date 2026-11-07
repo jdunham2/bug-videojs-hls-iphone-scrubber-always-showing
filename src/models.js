@@ -56,7 +56,7 @@ export async function loadModels() {
   await Promise.all(
     entries.map(async ([id, entry]) => {
       try {
-        const gltf = embedded ? await parseEmbedded(loader, embedded.files[entry.file]) : await loader.loadAsync(entry.file);
+        const gltf = embedded ? await parseEmbedded(loader, await embeddedFile(embedded, entry.file)) : await loader.loadAsync(entry.file);
         gltf.animations.forEach(stripRootMotion);
         const clips = {};
         for (const [logical, ref] of Object.entries(entry.clips || {})) {
@@ -73,6 +73,19 @@ export async function loadModels() {
   );
   modelStatus.state = modelStatus.loaded === modelStatus.total ? 'ready' : modelStatus.loaded ? 'partial' : 'failed';
   return models;
+}
+
+/**
+ * Base64 for a bundled file: inline in the page, or (for big bundles) in a JSON
+ * file published next to the page ({ b64 }) that we fetch by relative URL.
+ */
+export async function embeddedFile(embedded, path) {
+  if (embedded.files?.[path]) return embedded.files[path];
+  const url = embedded.remote?.[path];
+  if (!url) return null;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  return (await res.json()).b64;
 }
 
 /** Parse a base64 GLB without any network request. */
@@ -122,13 +135,16 @@ export function loadTexture(path, cb) {
   if (textureCache[path]?.tex) return cb(textureCache[path].tex);
   if (textureCache[path]) return textureCache[path].waiting.push(cb);
   textureCache[path] = { waiting: [cb] };
-  const b64 = window.__EMBEDDED_MODELS?.files?.[path];
-  const url = b64 ? `data:image/webp;base64,${b64}` : path;
-  new THREE.TextureLoader().load(url, (tex) => {
+  const done = (tex) => {
     tex.flipY = false;
     tex.colorSpace = THREE.SRGBColorSpace;
     textureCache[path].tex = tex;
     for (const fn of textureCache[path].waiting) fn(tex);
+  };
+  const embedded = window.__EMBEDDED_MODELS;
+  if (!embedded) return new THREE.TextureLoader().load(path, done);
+  embeddedFile(embedded, path).then((b64) => {
+    if (b64) new THREE.TextureLoader().load(`data:image/webp;base64,${b64}`, done);
   });
 }
 

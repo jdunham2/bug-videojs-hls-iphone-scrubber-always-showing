@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Build a single-file preview page for sandboxed hosts (e.g. the claude.ai artifact viewer).
+"""Build a preview page for sandboxed hosts (e.g. the claude.ai artifact viewer).
 
-The page embeds the built JS/CSS, every model (uncompressed geometry, WebP textures,
-no WebAssembly decoder needed), outfit textures and sound samples as base64, so it
-needs no network requests at all. Run `npm run build` first.
+The page embeds the built JS/CSS and the sound samples. Each model and outfit
+texture goes in its own JSON file ({ "b64": ... }) under pmodels/ next to the page,
+fetched by relative URL and parsed without data:/blob: requests (which such hosts
+block). Models use uncompressed geometry and WebP textures, so no WebAssembly
+decoder is needed. Run `npm run build` first.
 
     python3 tools/build-preview.py OUTPUT.html
 """
@@ -36,7 +38,16 @@ html = open('dist/index.html').read()
 css = open(glob.glob('dist/assets/*.css')[0]).read()
 js = open(glob.glob('dist/assets/*.js')[0]).read()
 body = re.sub(r'<script[^>]*src="[^"]*"[^>]*></script>', '', re.search(r'<body>(.*)</body>', html, re.S).group(1))
-models_json = json.dumps({'manifest': manifest, 'files': {**model_files, **extra}}, separators=(',', ':'))
+# Write each bundled file as pmodels/<name>.json next to the page.
+pdir = os.path.join(os.path.dirname(out_path) or '.', 'pmodels')
+os.makedirs(pdir, exist_ok=True)
+remote = {}
+for path, b64 in {**model_files, **extra}.items():
+    name = os.path.basename(path).rsplit('.', 1)[0] + '.json'
+    with open(os.path.join(pdir, name), 'w') as f:
+        json.dump({'b64': b64}, f)
+    remote[path] = f'pmodels/{name}'
+models_json = json.dumps({'manifest': manifest, 'remote': remote}, separators=(',', ':'))
 audio_json = json.dumps({'manifest': amanifest, 'files': audio_files}, separators=(',', ':'))
 for chunk in (js, models_json, audio_json):
     assert '</script' not in chunk.lower()
