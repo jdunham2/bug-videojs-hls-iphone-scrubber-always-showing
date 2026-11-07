@@ -6,8 +6,8 @@ yours.
 
 ## Now
 
-- [ ] Ask the user: dwarf hero has a horned leather cap (viking style); keep or
-      regenerate? Hero outfit "Shadow Stalker" name okay?
+- [ ] Get the user's feedback on Build 42's run-and-shoot pose (legs stride or
+      backpedal, spine twists up to 100°, bow arm measured onto the aim).
 
 ## Next
 
