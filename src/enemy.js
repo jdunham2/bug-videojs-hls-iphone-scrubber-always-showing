@@ -3,6 +3,8 @@ import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
 import { instantiate, attachProp, findBone, enableDissolve } from './models.js';
+import { updateElite } from './elites.js';
+import { buffs } from './skills.js';
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
@@ -308,6 +310,7 @@ export class Grunt {
     if (this.updateStatus(realDt)) return;
     const dt = realDt * this.timeScale;
     this.t += dt;
+    if (this.state === 'windup' && this.timeBoost) this.t += dt * (this.timeBoost - 1);
 
     tmp.set(player.pos.x - this.pos.x, 0, player.pos.z - this.pos.z);
     const dist = tmp.length();
@@ -368,7 +371,10 @@ export class Grunt {
         if (!this.hasHit && dist < this.radius + PLAYER_RADIUS + 0.25) {
           this.hasHit = true;
           const res = player.takeDamage(g.damage, this.lungeDir, this.game);
-          if (res === true) this.game.onPlayerHit(this, g.damage);
+          if (res === true) {
+            this.game.onPlayerHit(this, g.damage);
+            if (this.kind === 'ghoul') this.game.onChilled();
+          }
           else if (res === 'dodged') this.game.onPerfectDodge(this);
         }
         if (this.t >= g.lungeTime) this.enter('recover');
@@ -428,6 +434,7 @@ export class Grunt {
       this.model.holder.rotation.x = -0.45 * this.flinch * this.flinch;
     }
 
+    updateElite(this, realDt);
     this.updateHpBar();
     this.updateModel(dt);
   }

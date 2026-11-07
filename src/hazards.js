@@ -176,33 +176,10 @@ export class Hazards {
     const G = this.game;
     const pos = h.pos;
     const R = 3.6;
+    G.explosion(pos, R, 75, 22);
     G.sfx.bossSlam();
-    G.sfx.sample('boom', { vol: 1, rate: 0.9, jitter: 0.1 });
-    G.shake.add(0.7);
-    G.aberration = 1;
-    G.zoomKick = Math.min(0.12, G.zoomKick + 0.07);
     G.decals.spawn(pos, 'scorch', 4.5, 20);
-    G.particles.spawn(pos.clone().setY(0.8), { count: 50, color: [3, 1.3, 0.3], speed: 9, up: 4, life: 0.7, size: 0.18, gravity: 6 });
-    G.particles.spawn(pos.clone().setY(1), { count: 20, color: 0x2a2420, speed: 3, up: 3, life: 1.6, size: 0.4, gravity: -1, drag: 1 });
-    for (const e of G.enemies) {
-      if (!e.isHittable()) continue;
-      const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z);
-      if (d > R + e.radius) continue;
-      const dir = new THREE.Vector3(e.pos.x - pos.x, 0, e.pos.z - pos.z).normalize();
-      const dmg = 75 * (1 - 0.5 * (d / R));
-      const res = e.hit(dmg, dir, 1, false);
-      e.knock?.addScaledVector(dir, 10);
-      G.numbers.spawn(e.pos.clone().setY(2.2), Math.round(dmg), 'crit');
-      if (res === 'kill') G.onKill(e);
-      else e.applyBurn?.(6, 3);
-    }
-    const P = G.player;
-    const dp = Math.hypot(P.pos.x - pos.x, P.pos.z - pos.z);
-    if (dp < R) {
-      const dir = new THREE.Vector3(P.pos.x - pos.x, 0, P.pos.z - pos.z).normalize();
-      const res = P.takeDamage(22, dir, G);
-      if (res === true) G.onPlayerHit({ lungeDir: dir }, 22);
-    }
+    G.zoomKick = Math.min(0.12, G.zoomKick + 0.07);
     // Chain reaction.
     for (const o of this.list) {
       if (o !== h && o.type === 'barrel' && !o.removed && o.pos.distanceTo(pos) < R) setTimeout(() => this.explode(o), 140);

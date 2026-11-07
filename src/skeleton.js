@@ -8,6 +8,7 @@ import { Grunt } from './enemy.js';
 import { makeArrowMesh } from './arrows.js';
 import { PLAYER_RADIUS, ARROW_HEIGHT } from './player.js';
 import { arrowBlocked } from './world.js';
+import { updateElite } from './elites.js';
 
 const tmp = new THREE.Vector3();
 const aimGeo = new THREE.PlaneGeometry(0.12, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5);
@@ -45,6 +46,10 @@ export class Skeleton extends Grunt {
 
   get modelId() {
     return 'skeleton';
+  }
+  /** Archery clips stand side-on, so the model turns while aiming. */
+  get aimYawDeg() {
+    return config.models.heroAimYaw;
   }
   get modelHeight() {
     return 2.0;
@@ -172,9 +177,10 @@ export class Skeleton extends Grunt {
       this.model.holder.rotation.x = -0.45 * this.flinch * this.flinch;
       // Archery clips stand side-on; turn so the bow arm points at the target while aiming.
       const aiming = this.state === 'aim' || this.state === 'recover';
-      const yawT = aiming ? THREE.MathUtils.degToRad(config.models.heroAimYaw) : 0;
+      const yawT = aiming ? THREE.MathUtils.degToRad(this.aimYawDeg) : 0;
       this.model.holder.rotation.y += (yawT - this.model.holder.rotation.y) * (1 - Math.exp(-15 * realDt));
     }
+    updateElite(this, realDt);
     this.updateHpBar();
     this.updateModel(dt);
   }

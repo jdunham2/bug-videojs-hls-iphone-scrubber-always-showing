@@ -7,10 +7,17 @@ import { config } from './config.js';
 import { resolveCircle, pillars, ARENA_HALF } from './world.js';
 import { Grunt } from './enemy.js';
 import { PLAYER_RADIUS } from './player.js';
+import { outfits, loadTexture } from './models.js';
 
 const tmp = new THREE.Vector3();
 
 export const BOSS_NAME = 'Gorvak the Ogre Warlord';
+/** Gorvak changes with each arena: a new name and a retextured skin (same rig). */
+export const BOSS_FORMS = [
+  { name: 'Gorvak the Ogre Warlord', sub: 'Warlord of the Ruins', outfit: null },
+  { name: 'Gorvak the Frostbound', sub: 'Risen from the ice', outfit: 'bossFrost' },
+  { name: 'Gorvak the Infernal', sub: 'Reforged in fire', outfit: 'bossInferno' },
+];
 
 /** Ground warning shapes that fill up as an attack charges. */
 class Telegraph {
@@ -141,8 +148,20 @@ class Shockwave {
 }
 
 export class Boss extends Grunt {
-  constructor(game, pos, level, index = 1) {
+  constructor(game, pos, level, index = 1, form = 0) {
     super(game, pos, level);
+    this.form = BOSS_FORMS[form % BOSS_FORMS.length];
+    this.displayName = this.form.name;
+    const o = outfits[this.form.outfit];
+    if (o && this.model) {
+      const mats = this.model.materials;
+      loadTexture(o.texture, (tex) => {
+        for (const m of mats) {
+          m.map = tex;
+          m.needsUpdate = true;
+        }
+      });
+    }
     const b = config.boss;
     this.kind = 'boss';
     this.isBoss = true;

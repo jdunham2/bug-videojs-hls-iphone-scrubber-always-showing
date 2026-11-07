@@ -17,6 +17,8 @@ import { Music } from './music.js';
 import { Loot } from './loot.js';
 import { Camp, portalTexture } from './camp.js';
 import { Hazards } from './hazards.js';
+import { makeElite, AFFIXES } from './elites.js';
+import { Ghoul, Imp, Fireballs } from './variants.js';
 import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
@@ -111,6 +113,7 @@ export class Game {
     this.loot = new Loot(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
+    this.fireballs = new Fireballs(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -274,6 +277,7 @@ export class Game {
     this.decals.clear();
     this.portals.clear();
     this.enemyArrows.clear();
+    this.fireballs.clear();
     this.ultimate.clear();
     this.loot.clear();
     this.zoomPull = 0;
@@ -283,6 +287,7 @@ export class Game {
     this.pendingDescent = false;
     this.descending = false;
     buffs.haste = 0;
+    buffs.chill = 0;
     if (this.arenaPortal) this.arenaPortal.visible = false;
     document.body.classList.remove('letterbox');
     this.zoomKick = 0;
@@ -422,10 +427,10 @@ export class Game {
     this.bossIndex = Math.round(n / config.boss.every);
     const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
     const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
-    this.boss = new Boss(this, p, n, this.bossIndex);
+    this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
     this.enemies.push(this.boss);
     this.portals.spawn(p, 2.2, 5, new THREE.Color(3, 0.5, 0.3));
-    this.banner('A boss approaches', BOSS_NAME, 2.2);
+    this.banner('A boss approaches', this.boss.displayName, 2.2);
     this.sfx.wave(n);
     this.sfx.bossRoar();
     this.shake.add(0.4);
@@ -531,7 +536,7 @@ export class Game {
     document.body.classList.add('letterbox');
     this.sfx.bossRoar();
     this.shake.add(0.5);
-    this.bossCard(BOSS_NAME, this.bossIndex > 1 ? `Returns stronger · ${this.bossIndex}` : 'Warlord of the Ruins');
+    this.bossCard(boss.displayName, boss.form.sub);
   }
 
   onBossPhase(boss) {
@@ -563,7 +568,7 @@ export class Game {
 
   onBossDefeated(boss) {
     this.boss = null;
-    this.banner('Boss defeated!', BOSS_NAME, 2.6);
+    this.banner('Boss defeated!', boss.displayName, 2.6);
     this.sfx.cleared(true);
     this.sfx.bossRoar();
     this.shake.add(0.8);
@@ -626,7 +631,21 @@ export class Game {
   enemyClass() {
     const s = config.skeleton;
     const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
-    return Math.random() < chance ? Skeleton : Grunt;
+    const ranged = Math.random() < chance;
+    // Each arena brings its own enemies: ghouls in the Crypt, imps in the Forge.
+    const theme = (this.arena || 0) % THEMES.length;
+    if (theme === 1) return ranged ? Skeleton : Math.random() < 0.7 ? Ghoul : Grunt;
+    if (theme === 2) return ranged ? Imp : Grunt;
+    return ranged ? Skeleton : Grunt;
+  }
+
+  /** Occasionally promote a fresh spawn to an elite (from wave 4). */
+  maybeElite(enemy) {
+    const chance = this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0;
+    if (Math.random() >= chance) return enemy;
+    const keys = Object.keys(AFFIXES);
+    makeElite(enemy, keys[Math.floor(Math.random() * keys.length)]);
+    return enemy;
   }
 
   spawnEnemy() {
@@ -637,7 +656,7 @@ export class Game {
     if (gates.length && Math.random() < 0.5) {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
-      this.enemies.push(new Kind(this, p, this.wave));
+      this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
       this.portals.spawn(p);
       return;
     }
@@ -655,7 +674,7 @@ export class Game {
       const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
       if (farFromPlayer && clearOfPillars) break;
     }
-    this.enemies.push(new Kind(this, p, this.wave));
+    this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
     this.portals.spawn(p, 1.2, 2.2, Kind === Skeleton ? new THREE.Color(0.7, 2.2, 2.8) : new THREE.Color(3, 0.7, 0.5));
   }
 
@@ -734,6 +753,12 @@ export class Game {
 
   onKill(enemy) {
     this.stats.kills++;
+    if (enemy.affix === 'volatile' || enemy.kind === 'imp') {
+      const pos = enemy.pos.clone();
+      const big = enemy.affix === 'volatile';
+      setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);
+    }
+    if (enemy.elite) this.loot.drop(enemy.pos, 5, 1);
     if (enemy.isBoss) this.loot.drop(enemy.pos, 25, 3);
     else this.loot.drop(enemy.pos, enemy.kind === 'skeleton' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
     this.ultimate.gain(config.ultimate.perKill);
@@ -875,6 +900,47 @@ export class Game {
     if (d < 8) this.shake.add(0.25 * strength * (1 - d / 8));
   }
 
+  onChilled() {
+    buffs.chill = 2;
+    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'CHILLED', 'callout');
+    this.sfx.freeze(0);
+  }
+
+  onShieldBreak(enemy) {
+    this.numbers.spawn(enemy.pos.clone().setY(2.6), 'SHIELD BROKEN', 'callout gold');
+    this.sfx.sample('freeze', { vol: 0.7, rate: 0.8, pan: this.panAt(enemy.pos) });
+    this.particles.spawn(enemy.pos.clone().setY(1.1), { count: 30, color: [0.8, 1.8, 3], speed: 5, up: 2, life: 0.5, size: 0.08 });
+  }
+
+  /** A blast that hurts enemies (and the hero if close). Used by barrels, volatile elites and imps. */
+  explosion(pos, radius, enemyDamage, playerDamage) {
+    this.sfx.sample('boom', { vol: 0.9, rate: 0.9, jitter: 0.1, pan: this.panAt(pos) });
+    this.sfx.sample('slam', { vol: 0.6, rate: 0.7 });
+    this.shake.add(0.5);
+    this.aberration = Math.min(1, this.aberration + 0.6);
+    this.decals.spawn(pos, 'scorch', radius * 1.2, 16);
+    this.particles.spawn(pos.clone().setY(0.8), { count: 40, color: [3, 1.3, 0.3], speed: 8, up: 4, life: 0.6, size: 0.16, gravity: 6 });
+    this.particles.spawn(pos.clone().setY(1), { count: 14, color: 0x2a2420, speed: 2.5, up: 3, life: 1.4, size: 0.35, gravity: -1, drag: 1 });
+    for (const e of this.enemies) {
+      if (!e.isHittable()) continue;
+      const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z);
+      if (d > radius + e.radius) continue;
+      const dir = new THREE.Vector3(e.pos.x - pos.x, 0, e.pos.z - pos.z).normalize();
+      const dmg = enemyDamage * (1 - 0.5 * (d / radius));
+      const res = e.hit(dmg, dir, 1, false);
+      e.knock?.addScaledVector(dir, 8);
+      this.numbers.spawn(e.pos.clone().setY(2.2), Math.round(dmg), 'crit');
+      if (res === 'kill') this.onKill(e);
+      else e.applyBurn?.(6, 3);
+    }
+    const P = this.player;
+    if (Math.hypot(P.pos.x - pos.x, P.pos.z - pos.z) < radius) {
+      const dir = new THREE.Vector3(P.pos.x - pos.x, 0, P.pos.z - pos.z).normalize();
+      const res = P.takeDamage(playerDamage, dir, this);
+      if (res === true) this.onPlayerHit({ lungeDir: dir }, playerDamage);
+    }
+  }
+
   maxHp() {
     return stat.maxHp();
   }
@@ -905,6 +971,10 @@ export class Game {
   }
 
   onPlayerHit(enemy, damage = config.grunt.damage) {
+    if (enemy?.affix === 'vampiric' && enemy.isHittable?.()) {
+      enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage * 1.5);
+      this.numbers.spawn(enemy.pos.clone().setY(2.4), `+${Math.round(damage * 1.5)}`, 'heal');
+    }
     this.aberration = Math.min(1, this.aberration + 0.8);
     this.decals.spawn(this.player.pos, 'blood', 0.8);
     this.sfx.hurt();
@@ -1003,6 +1073,8 @@ export class Game {
     this.arrows.update(dt, [...this.enemies, ...this.hazards.targets], this);
     this.hazards.update(dt);
     this.enemyArrows.update(dt);
+    this.fireballs.update(dt);
+    buffs.chill = Math.max(0, buffs.chill - dt);
     this.ultimate.update(dt);
     this.loot.update(dt);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
@@ -1109,7 +1181,7 @@ export class Game {
     const boss = this.boss && !this.boss.removed && this.boss.state !== 'spawning' ? this.boss : null;
     h.bossBar.classList.toggle('show', !!boss);
     if (boss) {
-      h.bossName.textContent = BOSS_NAME + (boss.phase === 2 ? ' · Enraged' : '');
+      h.bossName.textContent = boss.displayName + (boss.phase === 2 ? ' · Enraged' : '');
       h.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
       h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
     }
