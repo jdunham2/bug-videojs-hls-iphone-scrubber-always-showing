@@ -8,6 +8,10 @@ import { loadProfile, profile, connectCloudSave } from './profile.js';
 import { loadSettings } from './settings.js';
 
 loadConfig();
+// Keep the last few runtime errors for the diagnostic report.
+window.__errors = [];
+window.addEventListener('error', (e) => window.__errors.push(String(e.message).slice(0, 160)));
+window.addEventListener('unhandledrejection', (e) => window.__errors.push(String(e.reason?.message || e.reason).slice(0, 160)));
 // Which build this is (set by vite.config.js), shown in a corner and on the title.
 const BUILD = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
 document.getElementById('build-tag').textContent = BUILD;

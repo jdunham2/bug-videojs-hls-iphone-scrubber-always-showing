@@ -10,12 +10,19 @@ export const settings = {
   quality: 'auto', // auto | high | medium | low
   shake: 1,
   damageNumbers: true,
+  compatVersion: 2,
   compat: 0, // 0 normal, 1 no post-processing, 2 also no shadows (set by the black-screen guard)
 };
 
 export function loadSettings() {
   try {
-    Object.assign(settings, JSON.parse(localStorage.getItem(KEY) || '{}'));
+    const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+    // Build 55's guard could leave a compatibility level behind; start fresh once.
+    if (saved.compatVersion !== 2) {
+      saved.compat = 0;
+      saved.compatVersion = 2;
+    }
+    Object.assign(settings, saved);
   } catch {
     /* defaults */
   }

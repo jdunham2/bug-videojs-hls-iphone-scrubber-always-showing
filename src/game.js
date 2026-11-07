@@ -452,9 +452,18 @@ export class Game {
     const h = gl.drawingBufferHeight;
     const px = new Uint8Array(4);
     let max = 0;
+    let alpha = 0;
     for (const [fx, fy] of [[0.5, 0.5], [0.3, 0.35], [0.7, 0.35], [0.3, 0.65], [0.7, 0.65], [0.5, 0.25], [0.5, 0.75]]) {
       gl.readPixels(Math.floor(w * fx), Math.floor(h * fy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       max = Math.max(max, px[0] + px[1] + px[2]);
+      alpha = Math.max(alpha, px[3]);
+    }
+    // A drawn frame is opaque; all-zero alpha means this browser can't read the
+    // canvas back, so the check can't tell anything: switch it off.
+    this.readable = alpha > 0;
+    if (!this.readable) {
+      this.blackCheck = -1e9;
+      return;
     }
     this.blackFrames = max < 6 ? (this.blackFrames || 0) + 1 : 0;
     if (this.blackFrames < 4) return;
@@ -469,11 +478,36 @@ export class Game {
     } else if (!this.blackReported) {
       this.blackReported = true;
       const o = this.hud.overlay;
-      o.innerHTML = `<h1>Can't draw the 3D view</h1><p class="tag">Your browser shows a black screen even in safe mode. Please send this to the developer:</p><pre class="diag"></pre><button data-reload>Reload</button>`;
-      o.querySelector('.diag').textContent = [navigator.userAgent, gl.getParameter(gl.VERSION), ...(this.shaderErrors.length ? this.shaderErrors : ['no shader errors'])].join('\n');
+      o.innerHTML = `<h1>Can't draw the 3D view</h1><p class="tag">Your browser shows a black screen even in safe mode. Please copy this and send it to the developer:</p><pre class="diag"></pre><button data-copy>Copy report</button> <button data-reload>Reload</button>`;
+      o.querySelector('.diag').textContent = this.diagnosticReport();
+      o.querySelector('[data-copy]').addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(this.diagnosticReport()).then(() => (e.target.textContent = 'Copied!'), () => (e.target.textContent = 'Select the text above and copy it'));
+      });
       o.classList.add('visible');
       this.contextLost = true; // reuse the reload-only overlay handling
     }
+  }
+
+  /** Everything useful for working out a black screen remotely. */
+  diagnosticReport() {
+    const gl = this.renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const v3 = (v) => v.toArray().map((n) => (Number.isFinite(n) ? n.toFixed(2) : String(n))).join(',');
+    const info = this.renderer.info.render;
+    return [
+      window.__BUILD,
+      navigator.userAgent,
+      gl.getParameter(gl.VERSION),
+      dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'renderer hidden',
+      `state ${this.state} arena ${this.arena} compat ${settings.compat} quality ${settings.quality}/${this.perf?.level}`,
+      `camera ${v3(this.camera.position)} target ${v3(this.camTarget)} player ${v3(this.player.pos)}`,
+      `draw calls ${info.calls} triangles ${info.triangles} readable ${this.readable}`,
+      `canvas ${gl.drawingBufferWidth}x${gl.drawingBufferHeight} ratio ${this.renderer.getPixelRatio()}`,
+      `repairs: ${(this.repairs || []).join(' | ') || 'none'}`,
+      `errors: ${(window.__errors || []).slice(-5).join(' | ') || 'none'}`,
+      `shaders: ${this.shaderErrors.length ? this.shaderErrors.join(' | ') : 'ok'}`,
+    ].join('\n');
   }
 
   /**
@@ -650,7 +684,63 @@ export class Game {
     this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
   }
 
+  /**
+   * Repair any position that has become NaN/Infinity (a camera that follows a
+   * NaN target never recovers and draws nothing: a black screen). Notes what
+   * was broken for the diagnostic report.
+   */
+  repairPositions() {
+    const bad = (v) => !Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z);
+    const P = this.player;
+    const fixes = [];
+    if (bad(P.pos)) {
+      fixes.push('player.pos');
+      P.pos.set(0, 0, 3);
+    }
+    if (bad(P.vel)) {
+      fixes.push('player.vel');
+      P.vel.set(0, 0, 0);
+    }
+    if (bad(P.knock)) {
+      fixes.push('player.knock');
+      P.knock.set(0, 0, 0);
+    }
+    if (!Number.isFinite(P.yaw)) {
+      fixes.push('player.yaw');
+      P.yaw = 0;
+    }
+    if (bad(P.aimDir) || P.aimDir.lengthSq() < 1e-6) {
+      if (bad(P.aimDir)) fixes.push('player.aimDir');
+      P.aimDir.set(0, 0, -1);
+    }
+    if (bad(this.aimPoint)) {
+      fixes.push('aimPoint');
+      this.aimPoint.copy(P.pos).setY(1.1);
+    }
+    if (bad(this.camTarget)) {
+      fixes.push('camTarget');
+      this.camTarget.copy(P.pos);
+    }
+    if (bad(this.camera.position) || !Number.isFinite(this.camera.quaternion.x)) {
+      fixes.push('camera');
+      this.camera.position.copy(P.pos).add(this.camOffset);
+      this.camera.lookAt(P.pos);
+    }
+    for (const k of ['zoomKick', 'zoomPullAmt', 'aberration', 'slowmo']) {
+      if (this[k] !== undefined && !Number.isFinite(this[k])) {
+        fixes.push(k);
+        this[k] = 0;
+      }
+    }
+    if (fixes.length) {
+      (this.repairs ||= []).push(`${fixes.join(',')} @${this.state}`);
+      if (this.repairs.length > 20) this.repairs.shift();
+      console.warn('Repaired invalid values:', fixes.join(', '));
+    }
+  }
+
   updateCamera(dt) {
+    this.repairPositions();
     // Look slightly toward the cursor so you can see what you're aiming at.
     const look = new THREE.Vector3(this.aimPoint.x - this.player.pos.x, 0, this.aimPoint.z - this.player.pos.z);
     if (look.length() > 7) look.setLength(7);
@@ -658,6 +748,11 @@ export class Game {
     // Pull the camera back while Arrow Volley rains down so the whole area is in view.
     this.zoomPullAmt = (this.zoomPullAmt || 0) + ((this.ultimate.active ? 1 : 0) - (this.zoomPullAmt || 0)) * (1 - Math.exp(-3 * dt));
     let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0)) * (1 + 0.22 * this.zoomPullAmt);
+    if (!Number.isFinite(zoom) || zoom <= 0) {
+      (this.repairs ||= []).push(`zoom ${zoom}`);
+      this.zoomKick = this.zoomPullAmt = 0;
+      zoom = 1;
+    }
     if (this.cinematic) {
       // Boss intro: swing to the boss and push in, letterboxed.
       const c = this.cinematic;

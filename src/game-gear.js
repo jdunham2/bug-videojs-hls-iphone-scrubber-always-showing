@@ -77,7 +77,7 @@ export class GearMethods {
     const c = this.gearCard;
     if (!c) return;
     c.t -= dt;
-    if (this.input.wasPressed('KeyE') && this.state === 'playing') {
+    if ((this.input.wasPressed('KeyE') || this.input.wasPressed('Enter')) && this.state === 'playing') {
       this.input.pressed.delete('KeyE'); // E equips here rather than firing the volley
       equip(c.item);
       this.numbers.spawn(this.player.pos.clone().setY(2.4), `${c.item.name} equipped`, 'callout gold');

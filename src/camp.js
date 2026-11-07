@@ -61,10 +61,14 @@ export class Camp {
     this.time = 0;
     this.panel = document.getElementById('camp-panel');
     this.prompt = document.getElementById('camp-prompt');
-    this.prompt.addEventListener('pointerdown', (e) => {
+    // The prompt is a real button: click or tap it to go inside.
+    const enter = (e) => {
       e.stopPropagation();
-      if (this.near) this.open(this.near);
-    });
+      e.preventDefault();
+      if (this.near && !this.openKind) this.open(this.near);
+    };
+    this.prompt.addEventListener('pointerdown', enter);
+    this.prompt.addEventListener('click', (e) => e.stopPropagation());
     this.panel.addEventListener('pointerdown', (e) => this.onPanelClick(e));
   }
 
@@ -273,10 +277,12 @@ export class Camp {
     if (near !== this.near) {
       this.near = near;
       this.prompt.classList.toggle('show', !!near && !this.openKind);
-      if (near) this.prompt.innerHTML = `<kbd>E</kbd> ${near.kind === 'gate' ? 'Enter' : 'Visit'} <b></b>`;
+      if (near) this.prompt.innerHTML = `<span class="cp-btn">${near.kind === 'gate' ? 'Enter' : 'Go inside'}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
       if (near) this.prompt.querySelector('b').textContent = near.label;
     }
-    if (this.game.input.wasPressed('KeyE') && near && !this.openKind) this.open(near);
+    const I = this.game.input;
+    const use = I.wasPressed('KeyE') || I.wasPressed('Enter') || I.wasPressed('NumpadEnter') || I.wasPressed('KeyF');
+    if (use && near && !this.openKind) this.open(near);
     if (this.game.input.wasPressed('Escape') && this.openKind) this.close();
   }
 
