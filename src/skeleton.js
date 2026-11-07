@@ -217,7 +217,8 @@ export class Skeleton extends Grunt {
         if (a) a.timeScale = 0;
         const dur = A.duration('shoot');
         const p = Math.min(1, this.t / config.skeleton.aimTime);
-        A.scrub('shoot', dur * THREE.MathUtils.lerp(mc.shootStartAt, mc.shootFullAt, p));
+        // This clip runs reach → nock (≈45%) → full draw (end); the aim follows nock → full draw.
+        A.scrub('shoot', dur * THREE.MathUtils.lerp(0.45, 0.98, p));
         break;
       }
       case 'recover': {
@@ -225,11 +226,8 @@ export class Skeleton extends Grunt {
           A.set(['hit'], { once: true, fade: 0.05 });
           break;
         }
-        const a = A.action('shoot');
-        if (a && a.timeScale === 0) {
-          a.time = A.duration('shoot') * mc.shootReleaseAt;
-          a.timeScale = 1.5;
-        }
+        // The clip has no release frames: relax straight back to idle.
+        A.set(['idle'], { fade: 0.25 });
         break;
       }
     }
