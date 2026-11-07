@@ -8,7 +8,7 @@
 //   Lava vent (Forge) – erupts in flame on a timer.
 
 import * as THREE from 'three';
-import { spawnProp } from './models.js';
+import { spawnProp, disposeTree } from './models.js';
 import { pillars, ARENA_HALF } from './world.js';
 import { buffs } from './skills.js';
 
@@ -361,6 +361,7 @@ export class Hazards {
 
   clear() {
     for (let i = pillars.length - 1; i >= 0; i--) if (pillars[i].hazardSpot) pillars.splice(i, 1);
+    disposeTree(this.root);
     this.root.clear();
     this.list = [];
     this.taken = [];

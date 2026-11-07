@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
-import { instantiate, attachProp, findBone } from './models.js';
+import { instantiate, attachProp, findBone, disposeInstance, disposeTree } from './models.js';
 import { makeSimpleBow, holdInHand, orientUpright } from './bow.js';
 import { updateElite } from './elites.js';
 
@@ -544,7 +544,10 @@ export class Grunt {
     this.wedge.removeFromParent();
     this.hpBar.removeFromParent();
     this.bodyMat.dispose();
-    if (this.model) for (const m of this.model.materials) m.dispose();
+    disposeInstance(this.model);
+    this.anim?.mixer.stopAllAction();
+    if (this.prop && this.heldBow) disposeTree(this.prop);
+    if (this.aura) this.aura.material.dispose();
     this.spawnRingMat.dispose();
     this.wedgeMat.dispose();
   }

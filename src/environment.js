@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { ARENA_HALF, pillars } from './world.js';
-import { models, spawnProp } from './models.js';
+import { models, spawnProp, disposeTree } from './models.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const faceCenter = (x, z) => Math.atan2(-x, -z);
@@ -100,6 +100,9 @@ export const THEMES = [
   },
 ];
 
+const floorCache = {};
+const groundCache = {};
+
 export class Environment {
   constructor(game) {
     this.game = game;
@@ -144,6 +147,9 @@ export class Environment {
   }
 
   clear() {
+    // Free the last arena's canvas textures, materials and geometry before rebuilding,
+    // or GPU memory grows with every arena until the browser drops the 3D context.
+    disposeTree(this.root);
     this.root.clear();
     if (this.basePillars != null) pillars.length = this.basePillars;
     this.fires = [];
@@ -186,7 +192,11 @@ export class Environment {
   }
 
   floor() {
-    const { map, normalMap, emissiveMap } = floorTextures(this.theme.floor);
+    // Built once per arena theme and kept: regenerating them on every visit was slow
+    // and leaked GPU memory.
+    const key = this.themeIndex;
+    floorCache[key] ||= floorTextures(this.theme.floor);
+    const { map, normalMap, emissiveMap } = floorCache[key];
     const mat = this.world.floor.material;
     mat.map = map;
     mat.normalMap = normalMap;
@@ -198,7 +208,7 @@ export class Environment {
     mat.roughness = 0.9;
     mat.needsUpdate = true;
     const out = this.world.outside.material;
-    out.map = grassTexture(this.theme.ground);
+    out.map = groundCache[this.theme.ground] ||= grassTexture(this.theme.ground);
     out.color.set(0xffffff);
     out.needsUpdate = true;
   }

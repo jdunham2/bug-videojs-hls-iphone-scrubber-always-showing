@@ -334,3 +334,66 @@ function filterClip(clip, keepBone, name) {
   const tracks = clip.tracks.filter((t) => keepBone(t.name.split('.')[0]));
   return new THREE.AnimationClip(name, clip.duration, tracks);
 }
+
+// ------------------------------------------------------------ freeing GPU memory
+
+const TEX_KEYS = ['map', 'normalMap', 'emissiveMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'bumpMap', 'lightMap'];
+let shared = null;
+let sharedCount = -1;
+
+/** Everything owned by the loaded models (clones share these, so they must never be freed). */
+function sharedResources() {
+  const n = Object.keys(models).length;
+  if (shared && n === sharedCount) return shared;
+  shared = new Set();
+  sharedCount = n;
+  for (const m of Object.values(models)) {
+    m.scene.traverse((o) => {
+      if (o.geometry) shared.add(o.geometry);
+      for (const mat of [].concat(o.material || [])) {
+        shared.add(mat);
+        for (const k of TEX_KEYS) if (mat[k]) shared.add(mat[k]);
+      }
+    });
+  }
+  return shared;
+}
+
+/**
+ * Free the GPU memory of everything under `root` that was made for it (canvas
+ * textures, materials, geometry), leaving anything shared with the loaded models.
+ * Call when tearing a scene part down for good (arena rebuilds, hazards).
+ */
+export function disposeTree(root, keep = null) {
+  const sh = sharedResources();
+  const skip = (x) => sh.has(x) || keep?.has(x);
+  const done = new Set();
+  root.traverse((o) => {
+    if (o.geometry && !skip(o.geometry) && !done.has(o.geometry)) {
+      done.add(o.geometry);
+      o.geometry.dispose();
+    }
+    if (o.isInstancedMesh) o.dispose?.();
+    for (const mat of [].concat(o.material || [])) {
+      if (skip(mat) || done.has(mat)) continue;
+      done.add(mat);
+      for (const k of TEX_KEYS) {
+        const t = mat[k];
+        if (t && !skip(t) && !done.has(t)) {
+          done.add(t);
+          t.dispose();
+        }
+      }
+      mat.dispose();
+    }
+  });
+}
+
+/** Free a character instance: its skeletons' bone textures and its own materials. */
+export function disposeInstance(inst) {
+  if (!inst) return;
+  inst.root.traverse((o) => {
+    if (o.isSkinnedMesh) o.skeleton?.dispose();
+  });
+  for (const m of inst.materials) m.dispose();
+}

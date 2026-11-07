@@ -54,7 +54,7 @@ export class Music {
     };
     this.layers = { pad: layer(0.5), arp: layer(0), drums: layer(0), bass: layer(0), brass: layer(0) };
     // A soft echo for the arp and brass, so the dungeon feels big.
-    this.delay = c.createDelay(1);
+    this.delay = c.createDelay(2);
     this.delay.delayTime.value = this.stepDur * 3;
     const fb = c.createGain();
     fb.gain.value = 0.32;

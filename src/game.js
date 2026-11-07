@@ -168,7 +168,22 @@ export class Game {
     window.addEventListener('blur', () => {
       if (this.state === 'playing') this.setPaused(true);
     });
+    // If the browser drops the 3D context (GPU memory pressure, driver reset), say so
+    // instead of leaving a black screen. Progress is saved, so a reload is safe.
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      this.bankOnExit?.();
+      const o = this.hud.overlay;
+      o.innerHTML = '<h1>Graphics reset</h1><p class="tag">Your browser reset the 3D graphics (this can happen when the GPU runs low on memory). Your progress is saved.</p><button data-reload>Reload the game</button>';
+      o.classList.add('visible');
+    });
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => location.reload());
     this.hud.overlay.addEventListener('pointerdown', (e) => {
+      if (this.contextLost) {
+        if (e.target.closest('[data-reload]')) location.reload();
+        return;
+      }
       e.preventDefault();
       this.sfx.unlock();
       this.music.start();

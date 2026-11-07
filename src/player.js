@@ -5,7 +5,7 @@ import { makeBowParts, holdInHand } from './bow.js';
 import { gearStats, equipped, baseOf, onGearChange } from './gear.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME, buffs } from './skills.js';
-import { models, outfits, instantiate, findBone, loadTexture } from './models.js';
+import { models, outfits, instantiate, findBone, loadTexture, disposeInstance } from './models.js';
 import { profile } from './profile.js';
 
 export const PLAYER_RADIUS = 0.45;
@@ -445,7 +445,8 @@ export class Player {
     if (!models[id]) return;
     if (this.model) {
       this.model.holder.removeFromParent();
-      for (const m of this.model.materials) m.dispose();
+      this.anim?.mixer.stopAllAction();
+      disposeInstance(this.model);
     }
     const height = id === 'dwarf' ? config.models.heroHeight * 0.82 : config.models.heroHeight;
     const inst = instantiate(id, height);
