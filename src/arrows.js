@@ -68,9 +68,11 @@ const TRAIL = { fire: [3, 1.1, 0.2], frost: [0.8, 1.8, 3] };
 const tmp = new THREE.Vector3();
 
 export class ArrowSystem {
-  constructor(scene) {
+  /** `blocked(pos)` decides where arrows stick (defaults to the arena's walls and pillars). */
+  constructor(scene, blocked = arrowBlocked) {
     this.scene = scene;
     this.list = [];
+    this.blocked = blocked;
   }
 
   /** opts: { mega, extra, bounces, element } */
@@ -111,7 +113,7 @@ export class ArrowSystem {
       else {
         a.life += dt;
         stuckCount++;
-        const gone = a.state === 'attached' ? a.enemy.removed : a.life > 7 || stuckCount > MAX_STUCK;
+        const gone = a.state === 'attached' ? a.enemy.removed || a.life > 8 : a.life > 7 || stuckCount > MAX_STUCK;
         if (a.state === 'stuck' && a.life > 6) a.mesh.position.y -= dt * 0.6; // sink away
         if (gone) {
           a.mesh.removeFromParent();
@@ -161,7 +163,7 @@ export class ArrowSystem {
       game.particles.spawn(a.pos, { count: 1, color: TRAIL[a.element], speed: 0.5, up: 0.5, life: 0.3, size: 0.06, gravity: 0 });
     }
 
-    if (arrowBlocked(a.pos)) {
+    if (this.blocked(a.pos)) {
       a.state = 'stuck';
       a.mesh.getObjectByName('trail').visible = false;
       game.onArrowStopped(a, true);
@@ -203,7 +205,7 @@ export class ArrowSystem {
     a.pos.addScaledVector(a.vel, dt);
     a.mesh.position.copy(a.pos);
     a.mesh.lookAt(tmp.copy(a.pos).add(a.vel));
-    if (a.pos.y <= 0.15 || arrowBlocked(a.pos)) {
+    if (a.pos.y <= 0.15 || this.blocked(a.pos)) {
       a.pos.y = Math.max(a.pos.y, 0.15);
       a.mesh.position.copy(a.pos);
       a.state = 'stuck';

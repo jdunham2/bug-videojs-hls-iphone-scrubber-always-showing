@@ -20,6 +20,7 @@ import { Hazards } from './hazards.js';
 import { makeElite, AFFIXES } from './elites.js';
 import { Ghoul, Imp, Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel } from './settings.js';
+import { Tips } from './tips.js';
 import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
@@ -122,6 +123,7 @@ export class Game {
     this.sfx.init(); // decode samples now; playback starts on the first click
     this.music = new Music(this.sfx);
     this.settingsPanel = new SettingsPanel(this);
+    this.tips = new Tips();
     applySettings(this);
     this.input = new Input(r.domElement);
     this.enemies = [];
@@ -176,8 +178,13 @@ export class Game {
       this.sfx.unlock();
       this.music.start();
       applySettings(this);
-      if (this.state === 'paused') this.setPaused(false);
-      else this.enterCamp(); // title and game over both lead to the camp
+      if (this.state === 'paused') return this.setPaused(false);
+      if (this.state === 'gameover') {
+        // Only the button leaves the game-over screen, and not in the first moment, so
+        // clicks meant for shooting don't skip straight past it.
+        if (performance.now() < this.overlayReadyAt || !e.target.closest('button')) return;
+      }
+      this.enterCamp(); // title and game over both lead to the camp
     });
     this.hud.draft.addEventListener('pointerover', (e) => {
       const card = e.target.closest('.card');
@@ -194,6 +201,7 @@ export class Game {
   // ---------------------------------------------------------------- skill draft
 
   openDraft() {
+    this.tips.show('draft');
     this.state = 'choosing';
     this.player.drawing = false;
     this.sfx.drawStop();
@@ -250,6 +258,7 @@ export class Game {
 
   pickSkill(i) {
     if (this.state !== 'choosing') return;
+    this.tips.done('draft');
     const card = this.draftCards[i];
     if (!card) return;
     build.add(card.id);
@@ -291,6 +300,7 @@ export class Game {
     this.boss = null;
     this.pendingDescent = false;
     this.descending = false;
+    this.deathShown = false;
     buffs.haste = 0;
     buffs.chill = 0;
     if (this.arenaPortal) this.arenaPortal.visible = false;
@@ -337,6 +347,8 @@ export class Game {
   /** The hub between runs. */
   enterCamp() {
     this.hideOverlay();
+    this.tips.hide();
+    setTimeout(() => this.state === 'camp' && this.tips.show('camp'), 1500);
     this.resetRun();
     this.state = 'camp';
     document.body.classList.remove('title-backdrop');
@@ -361,6 +373,7 @@ export class Game {
   }
 
   startFromCamp(fromCheckpoint) {
+    this.tips.hide();
     this.fade();
     this.sfx.sample('boom', { vol: 0.4, rate: 0.8, jitter: 0 });
     setTimeout(() => this.start(fromCheckpoint), 250);
@@ -414,6 +427,7 @@ export class Game {
 
   startWave(n) {
     this.wave = n;
+    if (n === 1) this.tips.show('draw');
     const w = config.waves;
     this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
     if (this.env.active) this.hazards.restock(this.arena);
@@ -442,6 +456,7 @@ export class Game {
   }
 
   onUltimateReady() {
+    this.tips.show('ult');
     this.sfx.ultimateReady();
     this.numbers.spawn(this.player.pos.clone().setY(2.4), 'ARROW STORM READY · Q', 'callout gold');
   }
@@ -480,6 +495,7 @@ export class Game {
     this.arenaPortal.visible = true;
     this.portalPos = new THREE.Vector3(gate.x, 0, gate.z - 0.6);
     this.banner('The gate is open', `Walk through to descend into the ${next.name}`, 3);
+    this.tips.show('portal');
     this.sfx.ultimateReady();
   }
 
@@ -504,6 +520,7 @@ export class Game {
 
   descend() {
     this.descending = true;
+    this.tips.done('portal');
     this.fade();
     this.sfx.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0 });
     setTimeout(() => {
@@ -688,8 +705,17 @@ export class Game {
   /** opts: { mega, extra } */
   fireArrow(origin, dir, speed, damage, charge, perfect, opts = {}) {
     const element = lv('fire') ? 'fire' : lv('frost') ? 'frost' : null;
-    this.arrows.spawn(origin, dir, speed, damage, charge, perfect, { ...opts, bounces: lv('ricochet'), element });
+    // In camp, arrows fly in the camp scene (training dummy practice).
+    const arrows = this.state === 'camp' ? this.camp.arrows : this.arrows;
+    arrows.spawn(origin, dir, speed, damage, charge, perfect, { ...opts, bounces: lv('ricochet'), element });
+    if (this.state === 'camp') {
+      this.sfx.release(charge, perfect, this.panAt(origin));
+      return;
+    }
     if (opts.extra) return; // Split Shot side arrows share the main shot's sound and stats
+    this.tips.done('draw');
+    if (perfect) this.tips.done('perfect');
+    else this.tips.show('perfect');
     this.sfx.release(charge, perfect, this.panAt(origin));
     if (opts.mega) {
       this.sfx.megaRelease();
@@ -958,6 +984,7 @@ export class Game {
   }
 
   onDodge() {
+    this.tips.done('dodge');
     this.stats.dodges++;
     this.sfx.dodge();
   }
@@ -976,6 +1003,14 @@ export class Game {
   }
 
   onPlayerHit(enemy, damage = config.grunt.damage) {
+    if (this.player.dead && !this.deathShown) {
+      // Make the death unmissable: slow motion and a banner before the summary.
+      this.deathShown = true;
+      this.slowmo = 1.5;
+      this.slowmoScale = 0.25;
+      this.banner('You fell', `Wave ${this.wave}`, 2.2);
+      this.input.mouse.down = false;
+    }
     if (enemy?.affix === 'vampiric' && enemy.isHittable?.()) {
       enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage * 1.5);
       this.numbers.spawn(enemy.pos.clone().setY(2.4), `+${Math.round(damage * 1.5)}`, 'heal');
@@ -1246,6 +1281,7 @@ export class Game {
   }
 
   showOverlay(kind, newBest = false) {
+    this.overlayReadyAt = performance.now() + (kind === 'gameover' ? 1200 : 0);
     const o = this.hud.overlay;
     const s = this.stats;
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;

@@ -43,6 +43,7 @@ export class ArrowStorm {
 
   activate(target) {
     if (!this.ready) return false;
+    this.game.tips.done('ult');
     const u = config.ultimate;
     this.meter = 0;
     this.active = { t: 0, target: target.clone().setY(0), spawned: 0 };

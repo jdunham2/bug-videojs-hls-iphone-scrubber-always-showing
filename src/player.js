@@ -11,6 +11,7 @@ export const ARROW_HEIGHT = 1.1;
 
 const lerp = THREE.MathUtils.lerp;
 const UP = new THREE.Vector3(0, 1, 0);
+const TMP = new THREE.Vector3();
 
 function lerpAngle(a, b, t) {
   let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -237,7 +238,7 @@ export class Player {
     if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1) this.startRoll(input, game);
 
     // Draw / release
-    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && game.state !== 'camp') {
+    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && !(game.state === 'camp' && game.camp.openKind) && game.state !== 'title') {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
@@ -427,20 +428,16 @@ export class Player {
     }
     A.update(dt);
     if (this.bowProp) {
-      // The bow stays in the hand as animated, and only straightens up along the
-      // aim line while drawing (blended so it never snaps).
+      // The bow sits in the hand but keeps a clean pose: always upright with its
+      // curve pointing where the hero faces, turning to the aim line while drawing
+      // (the hand's own rotation in these clips points it in odd directions).
       const aiming = this.drawing || this.releaseT > 0;
       this.bowBlend += ((aiming ? 1 : 0) - this.bowBlend) * (1 - Math.exp(-14 * dt));
-      const bp = this.bowProp;
-      bp.userData.baseQ ||= bp.quaternion.clone();
-      if (this.bowBlend > 0.001) {
-        this.group.updateMatrixWorld(true);
-        orientProp(bp, UP, this.aimDir);
-        const aimQ = bp.quaternion.clone();
-        bp.quaternion.copy(bp.userData.baseQ).slerp(aimQ, this.bowBlend);
-      } else {
-        bp.quaternion.copy(bp.userData.baseQ);
-      }
+      this.bowFwd ||= new THREE.Vector3();
+      const facing = TMP.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+      this.bowFwd.copy(facing).lerp(this.aimDir, this.bowBlend).normalize();
+      this.group.updateMatrixWorld(true);
+      orientProp(this.bowProp, UP, this.bowFwd);
     }
   }
 

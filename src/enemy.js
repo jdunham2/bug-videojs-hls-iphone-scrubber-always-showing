@@ -217,7 +217,10 @@ export class Grunt {
     this.state = state;
     this.t = 0;
     const pan = this.game.panAt(this.pos);
-    if (state === 'windup') this.game.sfx.windup(pan);
+    if (state === 'windup') {
+      this.game.sfx.windup(pan);
+      if (this.pos.distanceTo(this.game.player.pos) < 5) this.game.tips.show('dodge');
+    }
     if (state === 'lunge') {
       this.hasHit = false;
       this.game.sfx.lunge(pan);

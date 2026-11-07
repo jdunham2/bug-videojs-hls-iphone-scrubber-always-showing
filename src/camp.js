@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
+import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey } from './profile.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -68,7 +69,7 @@ export class Camp {
     S.add(this.portal);
 
     this.prop('campfire', 1.0, 0, 0, 0, 1.0);
-    this.prop('dummy', 2.0, 5, 1.5, -2.2, 0.5);
+    this.addDummy(5, 1.5);
     this.prop('weaponRack', 1.7, -5, 9.5, 0.6, 0.8);
     this.prop('signpost', 2.2, -5, -5, 0.8, 0.4);
     this.prop('tent', 2.4, -11, -5, 1.0, 1.8);
@@ -96,6 +97,36 @@ export class Camp {
       const d = rand(RADIUS + 3, RADIUS + 14);
       this.prop(Math.random() < 0.5 ? 'deadTree' : 'rocks', Math.random() < 0.5 ? rand(4, 7) : rand(1, 2.5), Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6, 0);
     }
+  }
+
+  /** Training dummy: arrows hit it like an enemy; it wobbles and reports damage. */
+  addDummy(x, z) {
+    const p = this.prop('dummy', 2.0, x, z, -2.2, 0.5);
+    this.arrows = new ArrowSystem(this.scene, (pos) => {
+      if (Math.hypot(pos.x, pos.z) > RADIUS + 1) return true;
+      return this.colliders.some((c) => c !== dummyCollider && Math.hypot(pos.x - c.x, pos.z - c.z) < c.r);
+    });
+    const dummyCollider = this.colliders[this.colliders.length - 1];
+    const G = this.game;
+    const d = {
+      pos: new THREE.Vector3(x, 0, z),
+      radius: 0.5,
+      rig: p || new THREE.Group(),
+      removed: false,
+      wobble: 0,
+      isHittable: () => true,
+      hit: (damage, dir, charge, perfect) => {
+        d.wobble = Math.min(1.4, d.wobble + 0.5 + charge * 0.6 + (perfect ? 0.5 : 0));
+        d.dir = dir.clone();
+        G.numbers.spawn(d.pos.clone().setY(2.2), Math.round(damage), perfect ? 'perfect' : charge >= 0.999 ? 'crit' : 'normal');
+        if (perfect) G.numbers.spawn(d.pos.clone().setY(3), 'PERFECT!', 'callout gold');
+        G.sfx.hit(perfect, G.panAt(d.pos));
+        this.particles.spawn(d.pos.clone().setY(1.3), { count: perfect ? 20 : 8, color: perfect ? [3, 2.1, 0.5] : 0xd8c48a, speed: 3, up: 2, life: 0.5, size: 0.08, dir, spread: 1 });
+        G.tips?.done('camp');
+        return null;
+      },
+    };
+    this.dummy = d;
   }
 
   prop(id, size, x, z, rotY, collideR, opts = {}) {
@@ -172,6 +203,15 @@ export class Camp {
       this.particles.spawn(new THREE.Vector3(0, 1.2, 0), { count: 1, color: 0x2b2a2a, speed: 0.2, up: 1.2, life: 2, size: 0.3, gravity: -0.5, drag: 0.3 });
     }
     this.particles.update(dt);
+    if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
+    if (this.dummy?.rig) {
+      // Springy wobble away from the hit.
+      const D = this.dummy;
+      D.wobble *= Math.exp(-3 * dt);
+      const sway = Math.sin(this.time * 14) * D.wobble * 0.25;
+      D.rig.rotation.x = D.dir ? sway * D.dir.z : 0;
+      D.rig.rotation.z = D.dir ? -sway * D.dir.x : 0;
+    }
     this.portal.rotateZ(dt * 1.5);
     this.portalMat.opacity = 0.75 + 0.2 * Math.sin(time * 3);
     // Nearest building in reach.
