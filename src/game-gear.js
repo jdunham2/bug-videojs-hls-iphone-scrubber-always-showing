@@ -6,7 +6,7 @@ import { rollItem, rollRarity, addToStash, equip, equipped, equippedGadget, stat
 /** Item power for a drop: grows with the wave and the arena. */
 function dropPower(game, bonus = 0) {
   const tier = game.difficulty?.lootPower || 0;
-  return Math.max(1, Math.round((game.wave || 1) * 0.9 + (game.arena || 0) * 2 + tier + bonus + (Math.random() * 2 - 1)));
+  return Math.max(1, Math.round((game.enemyLevel?.() || game.wave || 1) * 0.9 + (game.arena || 0) * 2 + tier + bonus + (Math.random() * 2 - 1)));
 }
 
 export class GearMethods {

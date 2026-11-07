@@ -9,11 +9,32 @@ import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
+import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
+
+// Painted-map backdrop for the world map: hills, mountains, forest, a river.
+const MAP_ART = `<svg class="wart" viewBox="0 0 100 60" preserveAspectRatio="none">
+  <defs><radialGradient id="wvig" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#3a2410" stop-opacity=".55"/></radialGradient></defs>
+  <path d="M0 44 C 15 40, 25 47, 40 43 S 70 38, 100 44 L 100 60 L 0 60 Z" fill="#b7a273" opacity=".55"/>
+  <path d="M-2 12 C 10 26, 22 30, 34 34 S 52 44, 58 60" fill="none" stroke="#6f93a8" stroke-width="1.6" opacity=".7"/>
+  <g fill="#8c7a5a" opacity=".75"><path d="M38 20 L 45 8 L 52 20 Z"/><path d="M46 21 L 54 6 L 62 21 Z"/><path d="M57 21 L 63 11 L 69 21 Z"/></g>
+  <g fill="#fff" opacity=".55"><path d="M43 11.5 L 45 8 L 47 11.5 Z"/><path d="M51.6 10.5 L 54 6 L 56.4 10.5 Z"/></g>
+  <g fill="#6b7f4a" opacity=".7">${Array.from({ length: 14 }, (_, i) => `<circle cx="${8 + (i % 7) * 3.2}" cy="${28 + Math.floor(i / 7) * 3.4 + (i % 2)}" r="1.9"/>`).join('')}</g>
+  <g fill="#7a4a2a" opacity=".55"><path d="M87 30 L 91 22 L 95 30 Z"/><path d="M92 31 L 96 21 L 100 31 Z"/></g>
+  <circle cx="96" cy="20" r="1.2" fill="#ff8a3c" opacity=".8"/>
+  <rect width="100" height="60" fill="url(#wvig)"/>
+</svg>`;
+
+const MAP_ICONS = {
+  ruins: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 9 L 7 9 L 7 20 M 10 20 L 10 6 L 14 6 L 14 20 M 17 20 L 17 11 L 20 11 L 20 20 M 2 20 L 22 20" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  keep: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 8 L 6 8 L 6 6 L 8 6 L 8 8 L 10 8 L 10 6 L 14 6 L 14 8 L 16 8 L 16 6 L 18 6 L 18 8 L 20 8 L 20 20 Z M 10 20 L 10 15 C 10 13, 14 13, 14 15 L 14 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  forge: '<svg viewBox="0 0 24 24"><path d="M3 14 L 15 14 C 15 11, 18 10, 21 10 L 21 12 C 19 12, 18 13, 18 14 L 18 16 L 15 16 L 13 20 L 7 20 L 5 16 L 3 16 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4 C 11 6, 8 7, 10 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  endless: '<svg viewBox="0 0 24 24"><path d="M12 3 L 20 7 L 20 13 C 20 17, 16 20, 12 21 C 8 20, 4 17, 4 13 L 4 7 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12 L 16 12 M 12 8 L 12 16" stroke="currentColor" stroke-width="1.8"/></svg>',
+};
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -298,12 +319,9 @@ export class Camp {
     } else if (k === 'armory') {
       html = this.armoryHtml();
     } else if (k === 'gate') {
-      const cp = profile.checkpoint;
-      html = `<h2>Camp Gate</h2><p class="lead">The road to the ruins starts here. Hero power <b>${heroPower()}</b>.</p>${this.tierPicker()}<div class="actions">
-        <button data-act="new">New run · Wave 1</button>
-        ${cp ? `<button data-act="continue" class="gold">Continue · Wave ${cp.wave + 1}</button>` : ''}
-      </div>`;
+      html = this.worldMapHtml();
     }
+    this.panel.classList.toggle('wide', k === 'gate');
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
   }
 
@@ -341,6 +359,45 @@ export class Camp {
       <div class="gslots">${slotCard('bow', 'Bow')}${slotCard('armor', 'Armor')}${slotCard('gadget1', 'Gadget · 1')}${slotCard('gadget2', 'Gadget · 2')}</div>
       <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}${tab('gadget', 'Gadgets')}<span class="gcount">${items.length} / 40</span></div>
       <div class="ggrid">${shown.map(tile).join('')}</div></div>${detail}</div>`;
+  }
+
+  // ------------------------------------------------------------ world map
+
+  /** The world map: mission nodes on a painted map, details and the tier picker. */
+  worldMapHtml() {
+    const sel = selectedMission();
+    const cp = profile.checkpoint;
+    const stars = (id) => {
+      const st = missionStars(id);
+      return [st.clear, st.secret, st.challenge].map((on) => `<i class="${on ? 'on' : ''}">★</i>`).join('');
+    };
+    const node = (m, icon) => {
+      const open = m === ENDLESS || missionUnlocked(m);
+      return `<button class="mnode ${sel.id === m.id ? 'sel' : ''} ${open ? '' : 'locked'}" data-act="mission" data-v="${m.id}" style="left:${m.map.x}%;top:${m.map.y}%" ${open ? '' : 'disabled'}>
+        <span class="mi">${open ? icon : '🔒'}</span><span class="mn">${m.name}</span>${m === ENDLESS ? '<span class="ms">∞</span>' : `<span class="ms">${stars(m.id)}</span>`}</button>`;
+    };
+    const icons = { ruins: MAP_ICONS.ruins, keep: MAP_ICONS.keep, forge: MAP_ICONS.forge };
+    const path = (a, b) => `<path d="M${a.map.x} ${a.map.y} Q ${(a.map.x + b.map.x) / 2} ${Math.min(a.map.y, b.map.y) - 12} ${b.map.x} ${b.map.y}" />`;
+    const paths = MISSIONS.slice(1).map((m, i) => path(MISSIONS[i], m)).join('') + path(MISSIONS[0], ENDLESS);
+    let detail;
+    if (sel === ENDLESS) {
+      detail = `<h3>${ENDLESS.name}</h3><p>${ENDLESS.blurb}</p>${this.tierPicker()}<div class="actions">
+        <button data-act="new" class="gold">Start · Wave 1</button>
+        ${cp ? `<button data-act="continue">Continue · Wave ${cp.wave + 1}</button>` : ''}</div>`;
+    } else {
+      const st = missionStars(sel.id);
+      detail = `<h3>${sel.name}</h3><p>${sel.blurb}</p>
+        <ul class="mobj">
+          <li class="${st.clear ? 'done' : ''}">★ Defeat the boss (${sel.waves} waves)</li>
+          <li class="${st.secret ? 'done' : ''}">★ Find the hidden treasure chest</li>
+          <li class="${st.challenge ? 'done' : ''}">★ ${sel.challenge.text}</li>
+        </ul>${this.tierPicker()}
+        <div class="actions"><button data-act="new" class="gold">Start mission</button></div>`;
+    }
+    return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>
+      <div class="wmap-wrap"><div class="wmap">${MAP_ART}<svg class="wpaths" viewBox="0 0 100 100" preserveAspectRatio="none">${paths}</svg>
+        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}</div>
+      <div class="mdetail">${detail}</div></div>`;
   }
 
   /** Difficulty cards: pick the tier for the next run. */
@@ -415,6 +472,10 @@ export class Camp {
     const G = this.game;
     if (act === 'close') return this.close();
     if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
+    if (act === 'mission') {
+      if (selectMission(v)) G.sfx.sample('uiSelect', { vol: 0.35, jitter: 0 });
+      return this.render();
+    }
     if (act === 'tier') {
       if (selectDifficulty(v)) G.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
       return this.render();

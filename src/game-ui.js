@@ -173,7 +173,7 @@ export class UiMethods {
   }
 
   showOverlay(kind, newBest = false) {
-    this.overlayReadyAt = performance.now() + (kind === 'gameover' ? 1200 : 0);
+    this.overlayReadyAt = performance.now() + (kind === 'gameover' ? 1200 : kind === 'victory' ? 1500 : 0);
     const o = this.hud.overlay;
     const s = this.stats;
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
@@ -201,6 +201,10 @@ export class UiMethods {
         <p class="model-status" id="model-status">${this.modelStatusText()}</p>
         <p class="model-status" id="audio-status">${this.audioStatusText()}</p>
         <p class="model-status">${window.__BUILD || ''}</p>`;
+    } else if (kind === 'victory') {
+      o.innerHTML = this.victoryHtml();
+      const n = o.querySelector('.vr-name');
+      if (n && this.reward) n.textContent = this.reward.name;
     } else if (kind === 'paused') {
       o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
     } else {

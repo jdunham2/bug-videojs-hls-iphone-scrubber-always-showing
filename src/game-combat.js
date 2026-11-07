@@ -270,6 +270,7 @@ export class CombatMethods {
   }
 
   onPlayerHit(enemy, damage = config.grunt.damage) {
+    this.stats.hitsTaken = (this.stats.hitsTaken || 0) + 1;
     if (this.player.dead && !this.deathShown) {
       // Make the death unmissable: slow motion and a banner before the summary.
       this.deathShown = true;

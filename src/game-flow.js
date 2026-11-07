@@ -19,10 +19,11 @@ export class FlowMethods {
     this.wave = n;
     if (n === 1) this.tips.show('draw');
     if (n === 2) this.tips.show('gadget');
+    if (this.mission && n === this.secretWave) setTimeout(() => this.state === 'playing' && this.spawnSecret(), 4000);
     const w = config.waves;
     this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
     if (this.env.active) this.hazards.restock(this.arena);
-    if (n % config.boss.every === 0) return this.startBossWave(n);
+    if (this.mission ? n === this.mission.waves : n % config.boss.every === 0) return this.startBossWave(n);
     this.spawnTimer = 0.3;
     this.waveState = 'active';
     this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
@@ -37,7 +38,7 @@ export class FlowMethods {
     this.bossIndex = Math.round(n / config.boss.every);
     const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
     const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
-    this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
+    this.boss = new Boss(this, p, this.enemyLevel(), this.bossIndex, this.arena || 0);
     this.enemies.push(this.toughen(this.boss));
     this.banner('A boss approaches', this.boss.displayName, 2.2);
     this.sfx.wave(n);
@@ -77,7 +78,7 @@ export class FlowMethods {
     for (let i = 0; i < n; i++) {
       const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
       const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
-      this.enemies.push(this.toughen(new Grunt(this, p, this.wave)));
+      this.enemies.push(this.toughen(new Grunt(this, p, this.enemyLevel())));
     }
   }
 
@@ -112,6 +113,11 @@ export class FlowMethods {
       if (this.clearTimer <= 0) this.openDraft();
       return;
     }
+    if (this.waveState === 'mission-won') {
+      this.clearTimer -= dt;
+      if (this.clearTimer <= 0) this.missionComplete();
+      return;
+    }
     if (this.waveState === 'portal') {
       this.updateArenaPortal(dt);
       return;
@@ -123,11 +129,19 @@ export class FlowMethods {
       this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
     }
     if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
+      if (this.mission && this.wave >= this.mission.waves) {
+        // The mission's boss is down: let the kill cam play, then the victory screen.
+        this.waveState = 'mission-won';
+        this.clearTimer = 2.8;
+        this.player.cheer();
+        this.noteProgress({ wave: this.wave, kills: this.stats.kills });
+        return;
+      }
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
       this.player.cheer();
       this.noteProgress({ wave: this.wave, kills: this.stats.kills });
-      if (this.wave % config.boss.every === 0) this.saveCheckpoint();
+      if (!this.mission && this.wave % config.boss.every === 0) this.saveCheckpoint();
       const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
@@ -172,7 +186,7 @@ export class FlowMethods {
     if (gates.length && Math.random() < 0.5) {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
-      this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.wave))));
+      this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.enemyLevel()))));
       return;
     }
     const H = ARENA_HALF - 1.5;
@@ -189,7 +203,7 @@ export class FlowMethods {
       const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
       if (farFromPlayer && clearOfPillars) break;
     }
-    this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.wave))));
+    this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.enemyLevel()))));
   }
 
   /** An enemy dropped into the arena: dust and a thud (a big one for the boss). */

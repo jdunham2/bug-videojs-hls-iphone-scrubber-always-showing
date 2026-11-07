@@ -16,6 +16,8 @@ import { Loot } from './loot.js';
 import { GearDrops } from './gear-drops.js';
 import { GearMethods } from './game-gear.js';
 import { Gadgets } from './gadgets.js';
+import { MissionMethods } from './game-mission.js';
+import { selectedMission, ENDLESS } from './missions.js';
 import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
@@ -171,7 +173,7 @@ export class Game {
       this.music.start();
       applySettings(this);
       if (this.state === 'paused') return this.setPaused(false);
-      if (this.state === 'gameover') {
+      if (this.state === 'gameover' || this.state === 'victory') {
         // Only the button leaves the game-over screen, and not in the first moment, so
         // clicks meant for shooting don't skip straight past it.
         if (performance.now() < this.overlayReadyAt || !e.target.closest('button')) return;
@@ -223,7 +225,8 @@ export class Game {
     build.reset();
     this.player.reset();
     this.hideDraft?.();
-    this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0, dodges: 0, perfectDodges: 0 };
+    this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0, dodges: 0, perfectDodges: 0, hitsTaken: 0, secret: false };
+    this.clearSecret?.();
     this.slowmo = 0;
     this.wave = 0;
     this.waveState = 'break';
@@ -241,7 +244,11 @@ export class Game {
     this.resetRun();
     const cp = profile.checkpoint;
     this.difficulty = fromCheckpoint && cp?.difficulty ? difficultyById(cp.difficulty) : selectedDifficulty();
-    this.setArena(fromCheckpoint && cp ? cp.arena ?? 0 : 0);
+    // A mission from the world map, or the Endless Siege (also used to continue from a save point).
+    const pick = selectedMission();
+    this.mission = !fromCheckpoint && pick !== ENDLESS ? pick : null;
+    this.setupMission();
+    this.setArena(this.mission ? this.mission.theme : fromCheckpoint && cp ? cp.arena ?? 0 : 0);
     if (fromCheckpoint && cp) {
       // Resume after the last boss beaten, with the skills you had then.
       // Skills that no longer exist (renamed or removed) are dropped.
@@ -256,6 +263,7 @@ export class Game {
     this.runStartBest = { ...profile.best };
     noteRunStart();
     this.sfx.runStart();
+    if (this.mission) setTimeout(() => this.state === 'playing' && this.bossCard(this.mission.name, `${this.difficulty.name} · ${this.mission.challenge.text}`), 300);
     this.state = 'playing';
     this.hideOverlay();
   }
@@ -490,6 +498,7 @@ export class Game {
     this.gearDrops.update(dt);
     this.updateGearCard(dt);
     this.gadgets.update(dt);
+    this.updateSecret(dt);
     for (const n of [1, 2]) if (this.input.wasPressed(`Digit${n}`) && !this.player.dead) this.gadgets.use(n, this.aimPoint);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
       if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
@@ -601,7 +610,7 @@ export class Game {
 }
 
 // Game's methods live in a few focused modules; mix them in here.
-for (const Mixin of [UiMethods, CombatMethods, FlowMethods, TuningMethods, GearMethods]) {
+for (const Mixin of [UiMethods, CombatMethods, FlowMethods, TuningMethods, GearMethods, MissionMethods]) {
   for (const key of Object.getOwnPropertyNames(Mixin.prototype)) {
     if (key !== 'constructor') Game.prototype[key] = Mixin.prototype[key];
   }
