@@ -8,14 +8,14 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { config, saveConfig, resetConfig } from './config.js';
 import { World, ARENA_HALF, pillars } from './world.js';
-import { Environment, spawnGates } from './environment.js';
+import { Environment, spawnGates, THEMES } from './environment.js';
 import { Decals, Portals } from './juice.js';
 import { Skeleton, EnemyArrows } from './skeleton.js';
 import { Boss, BOSS_NAME } from './boss.js';
 import { ArrowStorm } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
-import { Camp } from './camp.js';
+import { Camp, portalTexture } from './camp.js';
 import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
@@ -252,6 +252,10 @@ export class Game {
     this.state = 'playing';
     this.waveState = 'break';
     this.breakTimer = config.waves.breakTime;
+    if (this.pendingDescent) {
+      this.pendingDescent = false;
+      this.openArenaPortal();
+    }
     const level = card.max > 1 && card.max !== Infinity ? ` ${ROMAN[card.next]}` : '';
     this.banner(`${card.name}${level}`, card.text, 2);
     this.particles.spawn(p.pos.clone().setY(1), { count: 24, color: [3, 2.2, 0.6], speed: 4, up: 3, life: 0.7, size: 0.08, gravity: 3 });
@@ -274,6 +278,9 @@ export class Game {
     this.killCam = null;
     this.cinematic = null;
     this.boss = null;
+    this.pendingDescent = false;
+    this.descending = false;
+    if (this.arenaPortal) this.arenaPortal.visible = false;
     document.body.classList.remove('letterbox');
     this.zoomKick = 0;
     this.aberration = 0;
@@ -299,6 +306,7 @@ export class Game {
     if (this.camp.active) this.leaveCamp();
     this.resetRun();
     const cp = profile.checkpoint;
+    this.setArena(fromCheckpoint && cp ? cp.arena ?? 0 : 0);
     if (fromCheckpoint && cp) {
       // Resume after the last boss beaten, with the skills you had then.
       Object.assign(build.levels, cp.build);
@@ -419,9 +427,82 @@ export class Game {
     this.shake.add(0.2);
   }
 
+  /** Switch the arena dressing (Ruins → Crypt → Forge, then around again). */
+  setArena(index) {
+    this.arena = index;
+    if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
+    else this.env.themeIndex = index % THEMES.length;
+  }
+
+  /** After a boss: a portal opens in the far gate; walking into it descends to the next arena. */
+  openArenaPortal() {
+    this.waveState = 'portal';
+    const next = THEMES[(this.arena + 1) % THEMES.length];
+    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 1.6 };
+    if (!this.arenaPortal) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: portalTexture(),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        color: new THREE.Color(1.6, 0.9, 3),
+      });
+      this.arenaPortal = new THREE.Mesh(new THREE.CircleGeometry(1.5, 48), mat);
+      this.scene.add(this.arenaPortal);
+    }
+    this.arenaPortal.position.set(gate.x, 1.8, gate.z - 1.9);
+    this.arenaPortal.visible = true;
+    this.portalPos = new THREE.Vector3(gate.x, 0, gate.z - 0.6);
+    this.banner('The gate is open', `Walk through to descend into the ${next.name}`, 3);
+    this.sfx.ultimateReady();
+  }
+
+  updateArenaPortal(dt) {
+    const p = this.arenaPortal;
+    p.rotateZ(dt * 1.5);
+    p.scale.setScalar(1 + 0.05 * Math.sin(this.elapsed * 4));
+    if (Math.random() < dt * 30) {
+      const a = Math.random() * Math.PI * 2;
+      this.particles.spawn(new THREE.Vector3(p.position.x + Math.cos(a) * 1.3, 1.8 + Math.sin(a) * 1.3, p.position.z + 0.3), {
+        count: 1,
+        color: [1.8, 0.9, 3],
+        speed: 0.5,
+        up: 0.5,
+        life: 0.8,
+        size: 0.07,
+        gravity: 0,
+      });
+    }
+    if (this.player.pos.distanceTo(this.portalPos) < 2.2 && !this.descending) this.descend();
+  }
+
+  descend() {
+    this.descending = true;
+    this.fade();
+    this.sfx.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0 });
+    setTimeout(() => {
+      // Anything still on the floor is scooped up on the way through.
+      this.loot.scoop();
+      this.arrows.clear();
+      this.enemyArrows.clear();
+      this.decals.clear();
+      this.arenaPortal.visible = false;
+      this.setArena(this.arena + 1);
+      this.player.pos.set(0, 0, 4);
+      this.camTarget.copy(this.player.pos);
+      this.waveState = 'break';
+      this.breakTimer = 2.5;
+      this.descending = false;
+      this.bossCard(THEMES[this.arena % THEMES.length].name, `Depth ${this.arena + 1}`);
+      this.sfx.bossRoar();
+    }, 280);
+  }
+
   /** Save point: after each boss, store the run so it can be resumed from the camp, and bank gems. */
   saveCheckpoint() {
-    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls };
+    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls, arena: this.arena + 1 };
+    this.pendingDescent = true;
     profile.gems += this.loot.runGems;
     profile.totalGems += this.loot.runGems;
     this.stats.gemsBanked = (this.stats.gemsBanked || 0) + this.loot.runGems;
@@ -501,6 +582,10 @@ export class Game {
     if (this.waveState === 'cleared') {
       this.clearTimer -= dt;
       if (this.clearTimer <= 0) this.openDraft();
+      return;
+    }
+    if (this.waveState === 'portal') {
+      this.updateArenaPortal(dt);
       return;
     }
     this.spawnTimer -= dt;

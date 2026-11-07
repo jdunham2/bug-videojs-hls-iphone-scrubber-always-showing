@@ -92,8 +92,10 @@ export class World {
   }
 
   buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xb8c8ff, 0x3a2a1c, 0.8));
+    this.hemi = new THREE.HemisphereLight(0xb8c8ff, 0x3a2a1c, 0.8);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xffdcb0, 2.2);
+    this.sun = sun;
     sun.position.set(10, 22, 4);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -262,8 +264,11 @@ export class World {
     }
     const p = this.embers.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) {
-      let y = p.getY(i) + dt * 0.35;
+      // Rising embers (or, with a negative speed, falling snow).
+      const speed = this.emberSpeed ?? 0.35;
+      let y = p.getY(i) + dt * speed;
       if (y > 6) y = 0.2;
+      if (y < 0.1) y = 6;
       p.setY(i, y);
       p.setX(i, p.getX(i) + Math.sin(time + i) * dt * 0.15);
     }

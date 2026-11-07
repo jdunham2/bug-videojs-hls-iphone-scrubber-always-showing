@@ -319,7 +319,7 @@ function groundTexture() {
   return t;
 }
 
-function portalTexture() {
+export function portalTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');

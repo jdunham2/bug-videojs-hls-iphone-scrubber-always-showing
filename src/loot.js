@@ -99,6 +99,15 @@ export class Loot {
     }
   }
 
+  /** Collect every gem still on the floor (used when leaving an arena). */
+  scoop() {
+    for (const it of this.items) {
+      if (it.type === 'gem') this.runGems++;
+      it.mesh.removeFromParent();
+    }
+    this.items.length = 0;
+  }
+
   clear() {
     for (const it of this.items) it.mesh.removeFromParent();
     this.items.length = 0;
