@@ -90,11 +90,30 @@ export class SettingsPanel {
     this.el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       if (e.target.closest('[data-close]')) this.toggle(false);
+      const d = e.target.closest('[data-diag]');
+      if (d) {
+        const text = this.game.diagnosticReport();
+        const done = () => (d.textContent = 'Copied!');
+        if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => this.showDiag(text));
+        else this.showDiag(text);
+      }
     });
+  }
+
+  /** Fallback when the clipboard is blocked: show the report to select by hand. */
+  showDiag(text) {
+    let pre = this.el.querySelector('pre.diag');
+    if (!pre) {
+      pre = document.createElement('pre');
+      pre.className = 'diag';
+      this.el.querySelector('.diag-row').after(pre);
+    }
+    pre.textContent = text;
   }
 
   toggle(show = !this.open) {
     this.open = show;
+    if (!show) document.activeElement?.blur?.(); // hand the keyboard back to the game
     if (show) this.render();
     this.el.classList.toggle('show', show);
     // Pause gameplay while the panel is open.
@@ -120,6 +139,7 @@ export class SettingsPanel {
           ${[['0', 'Normal'], ['1', 'Simple (no effects)'], ['2', 'Safe (no shadows)']].map(([v, l]) => `<option value="${v}" ${String(s.compat || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select><b></b></label>
       <label class="row"><span>Damage numbers</span><input type="checkbox" id="set-damageNumbers" data-k="damageNumbers" ${s.damageNumbers ? 'checked' : ''}><b></b></label>
+      <div class="row diag-row"><button data-diag>Copy diagnostics</button><span class="diag-note">Something wrong? Copy this and paste it to the developer.</span></div>
       <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y Arrow Volley · LT/LB gadgets · X use · Start pause</p>
       <button data-close>Done</button>`;
   }

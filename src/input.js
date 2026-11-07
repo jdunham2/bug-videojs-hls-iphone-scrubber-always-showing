@@ -7,7 +7,12 @@ export class Input {
     this.mouse = { x: innerWidth / 2, y: innerHeight / 2, ndcX: 0, ndcY: 0, down: false, clicked: false, rightClicked: false };
 
     window.addEventListener('keydown', (e) => {
-      if (e.target instanceof HTMLInputElement) return;
+      // Only a text box keeps keys to itself. A slider, checkbox, dropdown or
+      // button that still has focus (say, after closing Settings) must not swallow
+      // WASD, or the hero stops walking while the mouse still works.
+      const t = e.target;
+      if (t instanceof HTMLInputElement && (t.type === 'text' || t.type === 'search')) return;
+      if (t instanceof HTMLElement && t !== document.body && GAME_KEYS.includes(e.code)) t.blur();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
       if (GAME_KEYS.includes(e.code)) e.preventDefault();

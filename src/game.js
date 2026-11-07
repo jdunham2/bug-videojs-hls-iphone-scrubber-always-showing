@@ -25,7 +25,7 @@ import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel, saveSettingsNow } from './settings.js';
 import { Tips } from './tips.js';
-import { profile, bankRun, noteProgress, noteRunStart } from './profile.js';
+import { profile, bankRun, noteProgress, noteRunStart, saveStatus } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
@@ -505,6 +505,9 @@ export class Game {
       `draw calls ${info.calls} triangles ${info.triangles} readable ${this.readable}`,
       `canvas ${gl.drawingBufferWidth}x${gl.drawingBufferHeight} ratio ${this.renderer.getPixelRatio()}`,
       `repairs: ${(this.repairs || []).join(' | ') || 'none'}`,
+      `move: vel ${v3(this.player.vel)} speed ${stat.moveSpeed().toFixed(2)} rolling ${this.player.rolling} casting ${this.player.casting?.toFixed?.(2)} dead ${this.player.dead} collide ${!!this.player.collide} keys ${[...this.input.keys].join(' ') || '-'} pad ${!!this.input.pad}`,
+      `run: wave ${this.wave} ${this.waveState} mission ${this.mission?.id || 'endless'} tier ${this.difficulty?.id} boss ${this.boss?.state || '-'} enemies ${this.enemies.length}`,
+      `save: local ${saveStatus.local} cloud ${saveStatus.cloud} runs ${profile.runs} gems ${profile.gems}`,
       `errors: ${(window.__errors || []).slice(-5).join(' | ') || 'none'}`,
       `shaders: ${this.shaderErrors.length ? this.shaderErrors.join(' | ') : 'ok'}`,
     ].join('\n');

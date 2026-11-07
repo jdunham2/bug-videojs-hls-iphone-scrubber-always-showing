@@ -8,7 +8,8 @@ import { doorwayTexture } from './juice.js';
 import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
-import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
+import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus, currentCharacter } from './profile.js';
+import { Preview } from './preview.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
@@ -38,6 +39,9 @@ const MAP_ICONS = {
   daily: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2 L 12 5 M 12 19 L 12 22 M 2 12 L 5 12 M 19 12 L 22 12 M 5 5 L 7 7 M 17 17 L 19 19 M 5 19 L 7 17 M 17 7 L 19 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   endless: '<svg viewBox="0 0 24 24"><path d="M12 3 L 20 7 L 20 13 C 20 17, 16 20, 12 21 C 8 20, 4 17, 4 13 L 4 7 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12 L 16 12 M 12 8 L 12 16" stroke="currentColor" stroke-width="1.8"/></svg>',
 };
+
+/** A colour per outfit for its swatch and the pedestal glow. */
+const OUTFIT_COLORS = { default: '#5f8f4a', heroCrimson: '#c8443a', heroFrost: '#7fc4ff', heroShadow: '#6a5a8a', heroGold: '#ffc04d' };
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -70,6 +74,8 @@ export class Camp {
     this.prompt.addEventListener('pointerdown', enter);
     this.prompt.addEventListener('click', (e) => e.stopPropagation());
     this.panel.addEventListener('pointerdown', (e) => this.onPanelClick(e));
+    this.panel.addEventListener('pointerover', (e) => this.onPanelHover(e));
+    this.panel.addEventListener('pointerleave', () => this.syncPreview());
   }
 
   build() {
@@ -255,6 +261,7 @@ export class Camp {
       this.particles.spawn(new THREE.Vector3(Math.cos(a) * r, rand(0.4, 2.2), Math.sin(a) * r), { count: 1, color: [2.2, 2.8, 0.7], speed: 0.25, up: 0.15, life: rand(2.5, 4), size: 0.06, gravity: -0.05, drag: 0.4 });
     }
     this.particles.update(dt);
+    if (this.openKind) this.preview?.update(dt);
     if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
     if (this.dummy?.rig) {
       // Springy wobble away from the hit.
@@ -295,6 +302,8 @@ export class Camp {
   // ------------------------------------------------------------ panels
 
   open(spot) {
+    this.preview ||= new Preview(this.game.renderer);
+    this.hallFocus = this.tailorFocus = null;
     this.openKind = spot.kind;
     this.shopNote = '';
     this.prompt.classList.remove('show');
@@ -304,6 +313,7 @@ export class Camp {
   }
 
   close() {
+    this.preview?.hide();
     this.openKind = null;
     this.panel.classList.remove('show');
     if (this.near) this.prompt.classList.add('show');
@@ -312,15 +322,12 @@ export class Camp {
   render() {
     const k = this.openKind;
     let html = '';
+    this.previewWhat = null;
+    this.previewItem = null;
     if (k === 'hall') {
-      html = `<h2>Hall of Heroes</h2><p class="lead">Choose who walks into the ruins.</p><div class="choices">${CHARACTERS.map((c) => this.card(c.id, c.name, c.perk, c.blurb, c.cost, c.requires, c.id, profile.character === c.id, !!models[c.id])).join('')}</div>`;
+      html = this.hallHtml();
     } else if (k === 'wardrobe') {
-      const list = OUTFITS.filter((o) => o.base === profile.character);
-      const cur = profile.outfit[profile.character] || 'default';
-      html = `<h2>Tailor's Tent</h2><p class="lead">New looks for ${CHARACTERS.find((c) => c.id === profile.character).name.split(' ')[0]}.</p>`;
-      html += list.length
-        ? `<div class="choices">${list.map((o) => this.card(outfitKey(o), o.name, '', '', o.cost, o.requires, `${o.base}:${o.id}`, cur === o.id, true)).join('')}</div>`
-        : `<p class="empty">The tailor is still working on outfits for this hero. Come back soon.</p>`;
+      html = this.tailorHtml();
     } else if (k === 'shrine') {
       const cp = profile.checkpoint;
       html = `<h2>Trophy Board</h2><p class="lead">Every victory gets carved into the board. Beat a boss to mark a save point.</p>
@@ -341,8 +348,9 @@ export class Camp {
     } else if (k === 'gate') {
       html = this.worldMapHtml();
     }
-    this.panel.classList.toggle('wide', k === 'gate');
+    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe');
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
+    this.syncPreview();
   }
 
   // ------------------------------------------------------------ armory
@@ -355,7 +363,7 @@ export class Camp {
     const sel = findItem(this.gearSel) || equipped('bow');
     this.gearSel = sel?.uid;
     const tile = (i) =>
-      `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="gear-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}">
+      `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="gear-select" data-uid="${i.uid}" data-preview="item:${i.uid}" style="--rar:${RARITIES[i.rarity].color}">
         <span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`;
     const slotCard = (key, label) => {
       const i = key.startsWith('gadget') ? equippedGadget(Number(key.slice(-1))) : equipped(key);
@@ -366,7 +374,8 @@ export class Camp {
     if (sel) {
       const cur = sel.slot === 'gadget' ? equippedGadget(1) || equippedGadget(2) : equipped(sel.slot);
       const R = RARITIES[sel.rarity];
-      detail = `<div class="gear-detail" style="--rar:${R.color}">
+      this.previewItem = sel;
+      detail = `<div class="gear-detail" style="--rar:${R.color}"><div class="cp-stage small"><canvas id="camp-preview"></canvas><div class="cp-icon" style="display:none"></div></div>
         <div class="gc-top"><span class="gc-rar">${R.name} ${slotLabel(sel.slot)}</span><span class="gc-pow">Power ${sel.power}</span></div>
         <div class="gc-name">${esc(sel.name)}</div>
         <div class="gc-base">${baseOf(sel).blurb}${isEquipped(sel) || !cur || cur.base !== sel.base && sel.slot === 'gadget' ? '' : ` Compared with ${esc(cur.name)}.`}</div>
@@ -375,7 +384,7 @@ export class Camp {
         <div class="actions">${this.gearActions(sel)}</div></div>`;
     }
     const tab = (f, label) => `<button class="gtab ${filter === f ? 'on' : ''}" data-act="gear-filter" data-f="${f}">${label}</button>`;
-    return `<h2>Armory</h2><p class="lead">Hero power <b>${heroPower()}</b>. Gear you find in the ruins ends up here.</p>
+    return `<div class="cp-head"><h2>Armory</h2><p class="lead">Hero power <b>${heroPower()}</b>. Gear you find in the ruins ends up here.</p></div>
       <div class="gslots">${slotCard('bow', 'Bow')}${slotCard('armor', 'Armor')}${slotCard('gadget1', 'Gadget · 1')}${slotCard('gadget2', 'Gadget · 2')}</div>
       <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}${tab('gadget', 'Gadgets')}<span class="gcount">${items.length} / 40</span></div>
       <div class="ggrid">${shown.map(tile).join('')}</div></div>${detail}</div>`;
@@ -432,10 +441,116 @@ export class Camp {
 
   // ------------------------------------------------------------ shops
 
+  // ------------------------------------------------------------ hall & tailor
+
+  /** Status line + action button for a character or outfit. */
+  unlockAction(key, cost, req, value, selected, available) {
+    const owned = !!profile.owned[key];
+    if (!available) return '<span class="tag">Coming soon</span>';
+    if (selected) return '<span class="tag on">Equipped</span>';
+    if (owned) return `<button data-act="equip" data-v="${value}" class="gold big">Equip</button>`;
+    if (!requirementMet(req)) return `<span class="tag lock">🔒 ${req.label}</span>`;
+    return `<button data-act="buy" data-v="${value}" data-cost="${cost}" class="gold big" ${profile.gems < cost ? 'disabled' : ''}>Unlock · ◆ ${cost}</button>`;
+  }
+
+  hallHtml() {
+    const focus = CHARACTERS.find((c) => c.id === this.hallFocus) || currentCharacter();
+    this.hallFocus = focus.id;
+    this.previewWhat = { kind: 'character', id: focus.id, outfit: profile.outfit[focus.id] || 'default' };
+    this.previewAccent = '#ffc860';
+    const owned = !!profile.owned[focus.id];
+    const cards = CHARACTERS.map((c) => {
+      const has = !!profile.owned[c.id];
+      const met = requirementMet(c.requires);
+      return `<button class="hcard ${c.id === focus.id ? 'sel' : ''} ${!has && !met ? 'locked' : ''}" data-act="focus" data-v="${c.id}" data-preview="char:${c.id}">
+        <span class="hc-name">${c.name}</span><span class="hc-perk">${c.perk}</span>
+        <span class="hc-state">${profile.character === c.id ? '<i class="on">Equipped</i>' : has ? 'Owned' : met ? `◆ ${c.cost}` : `🔒 ${c.requires.label}`}</span></button>`;
+    }).join('');
+    return `<div class="cp-head"><h2>Hall of Heroes</h2><p class="lead">Choose who walks into the ruins.</p></div>
+      <div class="cp-split">
+        <div class="cp-stage"><canvas id="camp-preview"></canvas>
+          <div class="cp-info"><div class="cp-name">${focus.name}</div><div class="cp-perk">${focus.perk}</div><div class="cp-blurb">${focus.blurb}</div>
+          <div class="cp-act">${this.unlockAction(focus.id, focus.cost, focus.requires, focus.id, profile.character === focus.id, !!models[focus.id])}</div>
+          ${owned ? '' : `<div class="cp-note">${requirementMet(focus.requires) ? 'Preview: unlock to play as this hero.' : 'Preview of a locked hero.'}</div>`}</div></div>
+        <div class="cp-list">${cards}</div>
+      </div>`;
+  }
+
+  tailorHtml() {
+    const hero = currentCharacter();
+    const list = OUTFITS.filter((o) => o.base === hero.id);
+    if (!list.length) return `<div class="cp-head"><h2>Tailor's Tent</h2></div><p class="empty">The tailor is still working on outfits for ${hero.name.split(' ')[0]}. Come back soon.</p>`;
+    const cur = profile.outfit[hero.id] || 'default';
+    const focus = list.find((o) => o.id === this.tailorFocus) || list.find((o) => o.id === cur) || list[0];
+    this.tailorFocus = focus.id;
+    this.previewWhat = { kind: 'character', id: hero.id, outfit: focus.id };
+    this.previewAccent = OUTFIT_COLORS[focus.id] || '#ffc860';
+    const key = outfitKey(focus);
+    const cards = list
+      .map((o) => {
+        const has = !!profile.owned[outfitKey(o)];
+        const met = requirementMet(o.requires);
+        return `<button class="hcard swatch ${o.id === focus.id ? 'sel' : ''} ${!has && !met ? 'locked' : ''}" data-act="focus" data-v="${o.id}" data-preview="outfit:${o.id}" style="--sw:${OUTFIT_COLORS[o.id] || '#888'}">
+          <span class="sw"></span><span class="hc-name">${o.name}</span>
+          <span class="hc-state">${cur === o.id ? '<i class="on">Wearing</i>' : has ? 'Owned' : met ? `◆ ${o.cost}` : `🔒 ${o.requires.label}`}</span></button>`;
+      })
+      .join('');
+    return `<div class="cp-head"><h2>Tailor's Tent</h2><p class="lead">New looks for ${hero.name.split(' ')[0]}. Try anything on before you buy.</p></div>
+      <div class="cp-split">
+        <div class="cp-stage"><canvas id="camp-preview"></canvas>
+          <div class="cp-info"><div class="cp-name">${focus.name}</div>
+          <div class="cp-act">${this.unlockAction(key, focus.cost, focus.requires, key, cur === focus.id, true)}</div>
+          ${profile.owned[key] ? '' : '<div class="cp-note">Trying it on. Unlock to keep it.</div>'}</div></div>
+        <div class="cp-list">${cards}</div>
+      </div>`;
+  }
+
+  /** Hovering a choice previews it on the stand (without re-rendering the panel). */
+  onPanelHover(e) {
+    const el = e.target.closest('[data-preview]');
+    if (!el || !this.preview) return;
+    const canvas = this.panel.querySelector('#camp-preview');
+    const [kind, id] = el.dataset.preview.split(':');
+    if (kind === 'char') this.preview.show(canvas, { kind: 'character', id, outfit: profile.outfit[id] || 'default' }, '#ffc860');
+    else if (kind === 'outfit') this.preview.show(canvas, { kind: 'character', id: profile.character, outfit: id }, OUTFIT_COLORS[id] || '#ffc860');
+    else if (kind === 'item') {
+      const item = findItem(id) || merchantStock().find((i) => i.uid === id);
+      if (item) this.showItemPreview(item);
+    }
+  }
+
+  /** Put an item on the stand (bows in 3D; armor and gadgets as a big icon). */
+  showItemPreview(item) {
+    const stage = this.panel.querySelector('.cp-stage');
+    if (!stage || !item) return;
+    const color = RARITIES[item.rarity].color;
+    stage.style.setProperty('--rar', color);
+    const canvas = stage.querySelector('#camp-preview');
+    const icon = stage.querySelector('.cp-icon');
+    if (item.slot === 'bow') {
+      canvas.style.display = '';
+      icon.style.display = 'none';
+      this.preview?.show(canvas, { kind: 'bow', item: { base: item.base, rarity: item.rarity } }, color);
+    } else {
+      canvas.style.display = 'none';
+      icon.style.display = '';
+      icon.innerHTML = gearIcon(item);
+    }
+  }
+
+  /** After rendering a panel: wire the preview stand to whatever it should show. */
+  syncPreview() {
+    if (!this.preview) return;
+    const canvas = this.panel.querySelector('#camp-preview');
+    if (!canvas) return this.preview.hide();
+    if (this.previewItem) return this.showItemPreview(this.previewItem);
+    if (this.previewWhat) this.preview.show(canvas, this.previewWhat, this.previewAccent);
+  }
+
   /** A compact card for one item (used by the shops). */
   itemCard(item, extra = '') {
     const R = RARITIES[item.rarity];
-    return `<div class="icard" style="--rar:${R.color}"><div class="ic-head"><span class="gi">${gearIcon(item)}</span><div><div class="gc-rar">${R.name} ${slotLabel(item.slot)}</div><div class="ic-name">${esc(item.name)}</div><div class="ic-meta">Power ${item.power}</div></div></div>
+    return `<div class="icard" data-preview="item:${item.uid}" style="--rar:${R.color}"><div class="ic-head"><span class="gi">${gearIcon(item)}</span><div><div class="gc-rar">${R.name} ${slotLabel(item.slot)}</div><div class="ic-name">${esc(item.name)}</div><div class="ic-meta">Power ${item.power}</div></div></div>
       <div class="gc-perks">${perkLines(item) || '<div class="pk none">No perks</div>'}</div>${extra}</div>`;
   }
 
@@ -445,9 +560,10 @@ export class Camp {
       .map((item, i) => this.itemCard(item, item.sold ? '<div class="ic-act"><span class="tag">Sold</span></div>' : `<div class="ic-act"><button data-act="shop-buy" data-i="${i}" class="gold" ${profile.gems < price(item) ? 'disabled' : ''}>Buy · ◆ ${price(item)}</button></div>`))
       .join('');
     const mystery = ['bow', 'armor', 'gadget'].map((sl) => `<button data-act="shop-mystery" data-slot="${sl}" ${profile.gems < MYSTERY_COST ? 'disabled' : ''}>Mystery ${slotLabel(sl)} · ◆ ${MYSTERY_COST}</button>`).join('');
-    return `<h2>Merchant</h2><p class="lead">“Finest goods this side of the mountains. New stock every time you come back.”</p>
+    this.previewItem = stock.find((i) => !i.sold) || stock[0];
+    return `<div class="cp-head"><h2>Merchant</h2><p class="lead">“Finest goods this side of the mountains. New stock every time you come back.”</p></div>
       ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
-      <div class="icards">${cards}</div>
+      <div class="cp-split shop"><div class="cp-stage small"><canvas id="camp-preview"></canvas><div class="cp-icon" style="display:none"></div></div><div class="icards">${cards}</div></div>
       <div class="actions">${mystery}<button data-act="shop-restock" ${profile.gems < RESTOCK_COST ? 'disabled' : ''}>Restock · ◆ ${RESTOCK_COST}</button></div>`;
   }
 
@@ -457,13 +573,14 @@ export class Camp {
     this.smithSel = sel?.uid;
     const tiles = items
       .sort((a, b) => (isEquipped(b) - isEquipped(a)) || score(b) - score(a))
-      .map((i) => `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="smith-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}"><span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`)
+      .map((i) => `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="smith-select" data-uid="${i.uid}" data-preview="item:${i.uid}" style="--rar:${RARITIES[i.rarity].color}"><span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`)
       .join('');
     let detail = '';
     if (sel) {
       const target = honeTarget(sel);
       const maxed = sel.power >= MAX_POWER;
-      detail = this.itemCard(
+      this.previewItem = sel;
+      detail = '<div class="cp-stage small"><canvas id="camp-preview"></canvas><div class="cp-icon" style="display:none"></div></div>' + this.itemCard(
         sel,
         `<div class="ic-act col">
           <button data-act="smith-temper" class="gold" ${maxed || profile.gems < temperCost(sel) ? 'disabled' : ''}>${maxed ? 'Fully tempered' : `Temper: Power ${sel.power} → ${sel.power + 1} · ◆ ${temperCost(sel)}`}</button>
@@ -471,7 +588,7 @@ export class Camp {
         </div>`,
       );
     }
-    return `<h2>Blacksmith</h2><p class="lead">“Bring me your gear. I'll make it hit harder and hold up longer.”</p>
+    return `<div class="cp-head"><h2>Blacksmith</h2><p class="lead">“Bring me your gear. I'll make it hit harder and hold up longer.”</p></div>
       ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
       <div class="garmory"><div class="ggrid">${tiles}</div>${detail}</div>`;
   }
@@ -619,6 +736,12 @@ export class Camp {
     if (act === 'close') return this.close();
     if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
     if (act.startsWith('shop-') || act.startsWith('smith-')) return this.onShopAct(act, b.dataset);
+    if (act === 'focus') {
+      if (this.openKind === 'hall') this.hallFocus = v;
+      else this.tailorFocus = v;
+      G.sfx.sample('uiSelect', { vol: 0.3, jitter: 0 });
+      return this.render();
+    }
     if (act === 'mission') {
       if (selectMission(v)) G.sfx.sample('uiSelect', { vol: 0.35, jitter: 0 });
       return this.render();
