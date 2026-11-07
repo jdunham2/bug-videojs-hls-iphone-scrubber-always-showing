@@ -6,14 +6,7 @@ yours.
 
 ## Now
 
-- [ ] World map: make it look AAA (painted parchment, terrain art, animated
-      clouds and marching path, hero marker that travels between nodes, fog
-      over locked regions, title cartouche).
-- [ ] Entering buildings: camera flies to the door and each panel gets an
-      interior backdrop (hall with banners and torches, tailor's tent,
-      armory racks, merchant shelves, blacksmith forge glow and sparks,
-      trophy board, map table at the gate). Later: walkable interiors.
-- [ ] Waiting on the user (Build 57): build label in the corner, which
+- [ ] Waiting on the user (Build 58): build label in the corner, which
       characters "aren't working" and how, and a Copy diagnostics report if
       walking still stops after wave 4 or the merchant/blacksmith misbehave.
       None of these reproduce here with their real save.
@@ -22,6 +15,7 @@ yours.
 
 - More missions per arena (new layouts), mission modifiers, a fourth arena.
 - A second boss type with its own moves.
+- Walkable building interiors (step inside and use the counter, anvil, racks).
 - Co-op on the published page (room capability); cosmetic capes.
 - Weekly trial with a bigger reward; a season track.
 

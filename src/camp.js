@@ -10,6 +10,8 @@ import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus, currentCharacter } from './profile.js';
 import { Preview } from './preview.js';
+import { interiorHtml } from './interiors.js';
+import { mapArt } from './worldmap-art.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
@@ -19,20 +21,9 @@ import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip,
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
 
-// Painted-map backdrop for the world map: hills, mountains, forest, a river.
-const MAP_ART = `<svg class="wart" viewBox="0 0 100 60" preserveAspectRatio="none">
-  <defs><radialGradient id="wvig" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#3a2410" stop-opacity=".55"/></radialGradient></defs>
-  <path d="M0 44 C 15 40, 25 47, 40 43 S 70 38, 100 44 L 100 60 L 0 60 Z" fill="#b7a273" opacity=".55"/>
-  <path d="M-2 12 C 10 26, 22 30, 34 34 S 52 44, 58 60" fill="none" stroke="#6f93a8" stroke-width="1.6" opacity=".7"/>
-  <g fill="#8c7a5a" opacity=".75"><path d="M38 20 L 45 8 L 52 20 Z"/><path d="M46 21 L 54 6 L 62 21 Z"/><path d="M57 21 L 63 11 L 69 21 Z"/></g>
-  <g fill="#fff" opacity=".55"><path d="M43 11.5 L 45 8 L 47 11.5 Z"/><path d="M51.6 10.5 L 54 6 L 56.4 10.5 Z"/></g>
-  <g fill="#6b7f4a" opacity=".7">${Array.from({ length: 14 }, (_, i) => `<circle cx="${8 + (i % 7) * 3.2}" cy="${28 + Math.floor(i / 7) * 3.4 + (i % 2)}" r="1.9"/>`).join('')}</g>
-  <g fill="#7a4a2a" opacity=".55"><path d="M87 30 L 91 22 L 95 30 Z"/><path d="M92 31 L 96 21 L 100 31 Z"/></g>
-  <circle cx="96" cy="20" r="1.2" fill="#ff8a3c" opacity=".8"/>
-  <rect width="100" height="60" fill="url(#wvig)"/>
-</svg>`;
-
 const MAP_ICONS = {
+  lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11 V 8 a 4 4 0 0 1 8 0 V 11" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>',
+  hero: '<svg viewBox="0 0 24 24"><path d="M8 4 Q 18 12 8 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M8 4 L 8 20 M 5 12 L 19 12 M 16 9.5 L 19 12 L 16 14.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   ruins: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 9 L 7 9 L 7 20 M 10 20 L 10 6 L 14 6 L 14 20 M 17 20 L 17 11 L 20 11 L 20 20 M 2 20 L 22 20" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
   keep: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 8 L 6 8 L 6 6 L 8 6 L 8 8 L 10 8 L 10 6 L 14 6 L 14 8 L 16 8 L 16 6 L 18 6 L 18 8 L 20 8 L 20 20 Z M 10 20 L 10 15 C 10 13, 14 13, 14 15 L 14 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
   forge: '<svg viewBox="0 0 24 24"><path d="M3 14 L 15 14 C 15 11, 18 10, 21 10 L 21 12 C 19 12, 18 13, 18 14 L 18 16 L 15 16 L 13 20 L 7 20 L 5 16 L 3 16 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 4 C 11 6, 8 7, 10 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
@@ -64,6 +55,8 @@ export class Camp {
     this.built = false;
     this.time = 0;
     this.panel = document.getElementById('camp-panel');
+    this.interior = document.getElementById('camp-interior');
+    this.fly = 0; // 0 = out in the camp, 1 = camera pushed up to a building's door
     this.prompt = document.getElementById('camp-prompt');
     // The prompt is a real button: click or tap it to go inside.
     const enter = (e) => {
@@ -194,7 +187,7 @@ export class Camp {
     const rot = Math.atan2(-x, -z); // face the campfire
     const p = this.prop(id, size, x, z, rot, collideR);
     const toCenter = new THREE.Vector2(-x, -z).normalize();
-    this.spots.push({ kind, label, x: x + toCenter.x * (collideR + 1.6), z: z + toCenter.y * (collideR + 1.6), obj: p });
+    this.spots.push({ kind, label, x: x + toCenter.x * (collideR + 1.6), z: z + toCenter.y * (collideR + 1.6), bx: x, bz: z, obj: p });
   }
 
   /** Keep the hero inside the camp and out of buildings. */
@@ -261,6 +254,8 @@ export class Camp {
       this.particles.spawn(new THREE.Vector3(Math.cos(a) * r, rand(0.4, 2.2), Math.sin(a) * r), { count: 1, color: [2.2, 2.8, 0.7], speed: 0.25, up: 0.15, life: rand(2.5, 4), size: 0.06, gravity: -0.05, drag: 0.4 });
     }
     this.particles.update(dt);
+    // Camera push toward the door while a building is open (eased in game.updateCamera).
+    this.fly += ((this.openKind ? 1 : 0) - this.fly) * (1 - Math.exp(-(this.openKind ? 5 : 7) * dt));
     if (this.openKind) this.preview?.update(dt);
     if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
     if (this.dummy?.rig) {
@@ -302,12 +297,18 @@ export class Camp {
   // ------------------------------------------------------------ panels
 
   open(spot) {
+    spot = this.spots.find((s) => s.kind === spot.kind) || spot;
     this.preview ||= new Preview(this.game.renderer);
     this.hallFocus = this.tailorFocus = null;
     this.openKind = spot.kind;
     this.shopNote = '';
+    this.flySpot = spot;
     this.prompt.classList.remove('show');
     this.game.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
+    this.game.sfx.sample('whoosh', { vol: 0.25, rate: 0.7, jitter: 0 });
+    // Step inside: the camera pushes to the door, then the room fades up behind the screen.
+    this.interior.innerHTML = interiorHtml(spot.kind);
+    this.interior.className = `show k-${spot.kind}`;
     this.render();
     this.panel.classList.add('show');
   }
@@ -315,6 +316,7 @@ export class Camp {
   close() {
     this.preview?.hide();
     this.openKind = null;
+    this.interior.classList.remove('show');
     this.panel.classList.remove('show');
     if (this.near) this.prompt.classList.add('show');
   }
@@ -404,13 +406,36 @@ export class Camp {
       const open = m === ENDLESS || missionUnlocked(m);
       const badge = m === ENDLESS ? '<span class="ms">∞</span>' : m.daily ? `<span class="ms daily">${dailyRecord().best ? dailyRecord().best.toLocaleString() : 'New today'}</span>` : `<span class="ms">${stars(m.id)}</span>`;
       return `<button class="mnode ${sel.id === m.id ? 'sel' : ''} ${open ? '' : 'locked'} ${m.daily ? 'daily' : ''}" data-act="mission" data-v="${m.id}" style="left:${m.map.x}%;top:${m.map.y}%" ${open ? '' : 'disabled'}>
-        <span class="mi">${open ? icon : '🔒'}</span><span class="mn">${m.name}</span>${badge}</button>`;
+        <span class="mi">${open ? icon : MAP_ICONS.lock}</span><span class="mn">${m.name}</span>${badge}</button>`;
     };
     const icons = { ruins: MAP_ICONS.ruins, keep: MAP_ICONS.keep, forge: MAP_ICONS.forge };
-    const path = (a, b) => `<path d="M${a.map.x} ${a.map.y} Q ${(a.map.x + b.map.x) / 2} ${Math.min(a.map.y, b.map.y) - 12} ${b.map.x} ${b.map.y}" />`;
-    const paths = MISSIONS.slice(1).map((m, i) => path(MISSIONS[i], m)).join('') + path(MISSIONS[0], ENDLESS);
-    let detail;
+    // Roads between places, drawn in the art's 500x300 box; roads to locked places fade out.
+    const road = (a, b, open) => {
+      const [x1, y1, x2, y2] = [a.map.x * 5, a.map.y * 3, b.map.x * 5, b.map.y * 3];
+      const d = `M${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) * 1 - 36} ${x2} ${y2}`;
+      return `<path class="rd-under ${open ? '' : 'off'}" d="${d}"/><path class="rd ${open ? '' : 'off'}" d="${d}"/>`;
+    };
     const daily = dailyMission();
+    const roads =
+      MISSIONS.slice(1).map((m, i) => road(MISSIONS[i], m, missionUnlocked(m))).join('') + road(MISSIONS[0], ENDLESS, true) + road(MISSIONS[0], daily, true);
+    // Fog hides the places you haven't reached yet.
+    const fog = MISSIONS.filter((m) => !missionUnlocked(m))
+      .map((m) => `<div class="wfog" style="left:${m.map.x}%;top:${m.map.y}%"></div>`)
+      .join('');
+    // Clouds keep drifting across redraws: start each one where its loop has got to.
+    const now = performance.now() / 1000;
+    const clouds = [
+      [14, 70, 0, 1],
+      [38, 95, 30, 0.8],
+      [62, 80, 55, 1.2],
+      [80, 110, 12, 0.9],
+    ]
+      .map(([top, dur, off, sc]) => `<div class="wcloud" style="top:${top}%;animation-duration:${dur}s;animation-delay:-${((now + off) % dur).toFixed(2)}s;--s:${sc}"></div>`)
+      .join('');
+    const hero = this.heroAt || sel.map;
+    const heroMarker = `<div class="whero" style="left:${hero.x}%;top:${hero.y}%"><div class="wh-flag">${MAP_ICONS.hero}</div><div class="wh-shadow"></div></div>`;
+    setTimeout(() => this.moveHero(), 0);
+    let detail;
     if (sel.daily) {
       const rec = dailyRecord();
       detail = `<h3>Daily Trial</h3><p>${daily.blurb}</p>
@@ -434,12 +459,36 @@ export class Camp {
         <div class="actions"><button data-act="new" class="gold">Start mission</button></div>`;
     }
     return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>
-      <div class="wmap-wrap"><div class="wmap">${MAP_ART}<svg class="wpaths" viewBox="0 0 100 100" preserveAspectRatio="none">${paths}</svg>
-        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}${node(daily, MAP_ICONS.daily)}</div>
+      <div class="wmap-wrap"><div class="wmap">${mapArt()}<svg class="wpaths" viewBox="0 0 500 300" preserveAspectRatio="none">${roads}</svg>
+        ${fog}${clouds}<div class="wcart"><span>The Borderlands</span></div>
+        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}${node(daily, MAP_ICONS.daily)}${heroMarker}</div>
       <div class="mdetail">${detail}</div></div>`;
   }
 
-  // ------------------------------------------------------------ shops
+  /** Walk the hero marker along the road from the last place picked to the new one. */
+  moveHero() {
+    const el = this.panel.querySelector('.whero');
+    if (!el) return;
+    const to = selectedMission().map;
+    const from = this.heroAt || to;
+    this.heroAt = { ...to };
+    if (from.x === to.x && from.y === to.y) return;
+    const t0 = performance.now();
+    const cx = (from.x + to.x) / 2;
+    const cy = Math.min(from.y, to.y) - 12;
+    el.classList.add('walking');
+    const step = (now) => {
+      if (!el.isConnected) return;
+      const t = Math.min(1, (now - t0) / 750);
+      const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      const u = 1 - e;
+      el.style.left = `${u * u * from.x + 2 * u * e * cx + e * e * to.x}%`;
+      el.style.top = `${u * u * from.y + 2 * u * e * cy + e * e * to.y}%`;
+      if (t < 1) requestAnimationFrame(step);
+      else el.classList.remove('walking');
+    };
+    requestAnimationFrame(step);
+  }
 
   // ------------------------------------------------------------ hall & tailor
 

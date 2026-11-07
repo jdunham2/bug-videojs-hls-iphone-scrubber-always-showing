@@ -94,7 +94,7 @@ export class Preview {
         }
       });
     }
-    this.frame(h * 0.52, h * 1.5);
+    this.frame(h * 0.5, h * 1.8);
   }
 
   showBow(item) {
@@ -132,7 +132,8 @@ export class Preview {
   update(dt) {
     if (!this.canvas || !this.subject || !this.canvas.isConnected) return;
     this.t += dt;
-    this.turn.rotation.y = Math.sin(this.t * 0.45) * 0.9 + 0.35;
+    // Turn a little either side of facing you, never round to the back.
+    this.turn.rotation.y = Math.sin(this.t * 0.5) * 0.55;
     this.anim?.update(dt);
     this.acc += dt;
     if (this.acc < 0.05) return;

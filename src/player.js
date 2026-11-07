@@ -279,7 +279,7 @@ export class Player {
 
     // Dodge (buffered briefly so a slightly early press still counts)
     if (input.dodgePressed()) this.dodgeBuffer = 0.15;
-    if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1) this.startRoll(input, game);
+    if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1 && !(game.state === 'camp' && game.camp.openKind)) this.startRoll(input, game);
 
     // Draw / release
     if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && !(game.state === 'camp' && game.camp.openKind) && game.state !== 'title') {
@@ -323,7 +323,9 @@ export class Player {
       }
       if (this.rollT >= d.duration) this.rolling = false;
     } else {
-      const axis = this.casting > 0 ? { x: 0, y: 0 } : input.axis();
+      // Stand still while casting, or while inside a camp building.
+      const inside = game.state === 'camp' && game.camp.openKind;
+      const axis = this.casting > 0 || inside ? { x: 0, y: 0 } : input.axis();
       const speed = stat.moveSpeed() * (this.drawing ? stat.drawMove() : 1);
       const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
       const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;

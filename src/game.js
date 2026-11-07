@@ -777,6 +777,13 @@ export class Game {
       zoom *= 1 - 0.35 * w;
       if (k.t >= k.dur) this.killCam = null;
     }
+    const C = this.camp;
+    if (C.active && C.fly > 0.001 && Number.isFinite(C.flySpot?.bx)) {
+      // Walking into a camp building: glide toward its door and push in.
+      const f = C.fly * C.fly * (3 - 2 * C.fly);
+      target.lerp(new THREE.Vector3(C.flySpot.bx * 0.7 + C.flySpot.x * 0.3, 1.2, C.flySpot.bz * 0.7 + C.flySpot.z * 0.3), f * 0.9);
+      zoom *= 1 - 0.55 * f;
+    }
     this.camTarget.lerp(target, 1 - Math.exp(-6 * dt));
     this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, zoom);
     this.camera.lookAt(this.camTarget);
