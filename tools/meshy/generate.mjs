@@ -26,7 +26,7 @@ const MANIFEST_FILE = path.join(OUT_DIR, 'manifest.json');
 const API = 'https://api.meshy.ai/openapi';
 const LIBRARY_URL = 'https://api.meshy.ai/web/public/animations/resources';
 
-const COST = { preview: 5, refine: 10, rig: 5, perAction: 3 };
+const COST = { preview: 5, refine: 10, rig: 5, perAction: 3, retexture: 10 };
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
@@ -185,7 +185,27 @@ async function animationNames() {
   return new Map(list.map((a) => [a.id, a.name]));
 }
 
+/** Outfit: a new texture painted onto an existing character's UV layout (keeps its rig and animations). */
+async function generateOutfit(asset, manifest) {
+  const baseRefine = state[asset.base]?.refine?.taskId;
+  if (!baseRefine) throw new Error(`Generate "${asset.base}" before its outfit "${asset.id}"`);
+  const task = await step(asset, 'retexture', '/v1/retexture', () => ({
+    input_task_id: baseRefine,
+    text_style_prompt: `${asset.texturePrompt}, ${config.textureStyle}`.slice(0, 600),
+    enable_original_uv: true,
+    target_formats: ['glb'],
+  }));
+  const url = task.texture_urls?.[0]?.base_color;
+  if (!url) throw new Error('Retexture returned no base color texture');
+  const raw = await download(url, path.join(RAW_DIR, `${asset.id}.png`));
+  const out = path.join(OUT_DIR, 'outfits', `${asset.id}.webp`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', raw, '-vf', 'scale=1024:1024', '-quality', '85', out]);
+  manifest[asset.id] = { kind: 'outfit', base: asset.base, name: asset.name, texture: `models/outfits/${asset.id}.webp` };
+}
+
 async function generate(asset, manifest, library) {
+  if (asset.kind === 'outfit') return generateOutfit(asset, manifest);
   await step(asset, 'preview', '/v2/text-to-3d', previewBody(asset));
   const refined = await step(asset, 'refine', '/v2/text-to-3d', refineBody(asset));
 
@@ -224,7 +244,8 @@ function plan(assets) {
   let total = 0;
   for (const a of assets) {
     const actions = a.kind === 'character' ? Object.keys(a.animations).length : 0;
-    const cost = COST.preview + COST.refine + (a.kind === 'character' ? COST.rig + actions * COST.perAction : 0);
+    const cost =
+      a.kind === 'outfit' ? COST.retexture : COST.preview + COST.refine + (a.kind === 'character' ? COST.rig + actions * COST.perAction : 0);
     total += cost;
     const done = Object.entries(state[a.id] || {})
       .filter(([, v]) => v.status === 'SUCCEEDED')
@@ -259,7 +280,8 @@ async function main() {
       failed++;
       console.error(`[${assets[i].id}] FAILED: ${r.reason.message}`);
     } else {
-      console.log(`[${assets[i].id}] done → public/${manifest[assets[i].id].file}`);
+      const m = manifest[assets[i].id];
+      console.log(`[${assets[i].id}] done → public/${m.file || m.texture}`);
     }
   });
   if (failed) process.exitCode = 1;

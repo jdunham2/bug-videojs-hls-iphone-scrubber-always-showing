@@ -169,6 +169,48 @@ export function spawnProp(id, size, { axis = 'y', shadows = true } = {}) {
   return holder;
 }
 
+/**
+ * Add a burn-away dissolve to materials (used for spawns and deaths).
+ * Returns a uniform: 0 = solid, 1 = gone. Edges glow `edgeColor`.
+ */
+export function enableDissolve(materials, edgeColor = new THREE.Color(3, 1, 0.25)) {
+  const u = { value: 0 };
+  const edge = { value: edgeColor };
+  for (const m of materials) {
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uDissolve = u;
+      sh.uniforms.uEdge = edge;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vDPos;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvDPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+          varying vec3 vDPos; uniform float uDissolve; uniform vec3 uEdge;
+          float dHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+          float dNoise(vec3 x) {
+            vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(mix(dHash(i), dHash(i + vec3(1,0,0)), f.x), mix(dHash(i + vec3(0,1,0)), dHash(i + vec3(1,1,0)), f.x), f.y),
+                       mix(mix(dHash(i + vec3(0,0,1)), dHash(i + vec3(1,0,1)), f.x), mix(dHash(i + vec3(0,1,1)), dHash(i + vec3(1,1,1)), f.x), f.y), f.z);
+          }`,
+        )
+        .replace(
+          '#include <dithering_fragment>',
+          `#include <dithering_fragment>
+          if (uDissolve > 0.001) {
+            float n = dNoise(vDPos * 3.5) * 0.7 + dNoise(vDPos * 9.0) * 0.3;
+            if (n < uDissolve) discard;
+            gl_FragColor.rgb += uEdge * smoothstep(uDissolve + 0.07, uDissolve, n);
+          }`,
+        );
+    };
+    m.customProgramCacheKey = () => 'dissolve';
+    m.needsUpdate = true;
+  }
+  return { u, edge };
+}
+
 /** Attach a prop model (bow, club) to a bone, sized to `length` meters along its longest side. */
 export function attachProp(id, bone, length) {
   const src = models[id];

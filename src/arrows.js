@@ -12,6 +12,26 @@ const shaftMat = new THREE.MeshStandardMaterial({ color: 0xc9a26b, roughness: 0.
 const headMat = new THREE.MeshStandardMaterial({ color: 0xa8b0b8, metalness: 0.6, roughness: 0.35 });
 const fletchMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.9 });
 const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.1, 0.5) });
+const trailTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = 8;
+  c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(1, 'rgba(255,255,255,1)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 8, 128);
+  return new THREE.CanvasTexture(c);
+})();
+const trailGeo = new THREE.PlaneGeometry(0.07, 2.2).rotateX(-Math.PI / 2).translate(0, 0, -1.4);
+const trailMat = (color, opacity) =>
+  new THREE.MeshBasicMaterial({ map: trailTex, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+const trailMats = {
+  normal: trailMat(new THREE.Color(1, 0.95, 0.85), 0.35),
+  perfect: trailMat(new THREE.Color(3, 2, 0.5), 0.8),
+  mega: trailMat(new THREE.Color(3, 0.6, 2.4), 0.9),
+};
 const megaMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 0.7, 2.4) });
 
 export function makeArrowMesh(perfect = false, mega = false) {
@@ -21,6 +41,11 @@ export function makeArrowMesh(perfect = false, mega = false) {
   shaft.castShadow = true;
   g.add(shaft, new THREE.Mesh(headGeo, special || headMat));
   if (mega) g.scale.setScalar(1.8);
+  // Streak behind the arrow so fast shots read clearly.
+  const trail = new THREE.Mesh(trailGeo, mega ? trailMats.mega : perfect ? trailMats.perfect : trailMats.normal);
+  trail.name = 'trail';
+  trail.renderOrder = 2;
+  g.add(trail);
   g.add(new THREE.Mesh(fletchA, fletchMat), new THREE.Mesh(fletchB, fletchMat));
   return g;
 }
@@ -121,6 +146,7 @@ export class ArrowSystem {
         a.mesh.position.copy(a.pos);
         e.rig.attach(a.mesh);
         a.state = 'attached';
+        a.mesh.getObjectByName('trail').visible = false;
         a.enemy = e;
         return;
       }
@@ -137,9 +163,11 @@ export class ArrowSystem {
 
     if (arrowBlocked(a.pos)) {
       a.state = 'stuck';
+      a.mesh.getObjectByName('trail').visible = false;
       game.onArrowStopped(a, true);
     } else if (a.traveled > config.bow.range) {
       a.state = 'falling';
+      a.mesh.getObjectByName('trail').visible = false;
     }
     a.mesh.position.copy(a.pos);
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
-import { instantiate, attachProp, findBone } from './models.js';
+import { instantiate, attachProp, findBone, enableDissolve } from './models.js';
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
@@ -127,6 +127,9 @@ export class Grunt {
     this.anim = inst.animator;
     for (const c of this.rig.children) c.visible = false;
     this.rig.add(inst.holder);
+    this.dissolve = enableDissolve(inst.materials, new THREE.Color(2.2, 0.8, 3)).u;
+    this.dissolveEdge = null;
+    this.dissolve.value = 1; // materializes during the spawn
     // Higher levels: darker, redder skin.
     const k = Math.min(0.45, 0.05 * (level - 1));
     const tint = new THREE.Color(1, 1 - k, 1 - k * 1.2);
@@ -200,7 +203,10 @@ export class Grunt {
       this.hasHit = false;
       this.game.sfx.lunge(pan);
     }
-    if (state === 'recover' && this.lastState === 'lunge' && !this.staggered) this.game.sfx.slam(pan);
+    if (state === 'recover' && this.lastState === 'lunge' && !this.staggered) {
+      this.game.sfx.slam(pan);
+      this.game.onSlam(this.pos.clone().addScaledVector(this.lungeDir, 0.6), 1);
+    }
     if (state === 'chase') this.staggered = false;
     this.wedge.visible = state === 'windup';
   }
@@ -301,7 +307,8 @@ export class Grunt {
     switch (this.state) {
       case 'spawning': {
         const p = Math.min(1, this.t / 0.9);
-        this.rig.position.y = -1.8 * (1 - easeOut(p));
+        this.rig.position.y = (this.model ? -0.6 : -1.8) * (1 - easeOut(p));
+        if (this.dissolve) this.dissolve.value = 1 - easeOut(p);
         this.spawnRingMat.opacity = 0.7 * (1 - p * 0.5);
         this.spawnRing.scale.setScalar(0.6 + p * 0.6);
         if (p >= 1) {
@@ -399,6 +406,9 @@ export class Grunt {
     this.bodyMat.emissive.setRGB(r, gr, b);
     if (this.model) {
       for (const m of this.model.materials) m.emissive.setRGB(r * 0.4, gr * 0.4, b * 0.4);
+      // Flinch: snap back from the hit, then settle.
+      this.flinch = Math.max(0, (this.flinch || 0) - realDt * 5);
+      this.model.holder.rotation.x = -0.45 * this.flinch * this.flinch;
     }
 
     this.updateHpBar();
@@ -419,6 +429,7 @@ export class Grunt {
     if (!this.isHittable()) return null;
     this.hp -= damage;
     this.flash = 0.08;
+    this.flinch = Math.min(1, 0.5 + charge * 0.5 + (perfect ? 0.3 : 0));
     const kb = config.feel.knockback * (0.35 + 0.65 * charge) * (perfect ? 1.5 : 1) * (this.state === 'lunge' ? 0.3 : 1);
     this.knock.addScaledVector(dir, kb);
     if (this.hp <= 0) {
@@ -452,8 +463,30 @@ export class Grunt {
     this.knock.multiplyScalar(Math.exp(-6 * dt));
     this.group.position.x = this.pos.x;
     this.group.position.z = this.pos.z;
-    if (this.t > 0.9) this.group.position.y -= dt * 1.2;
-    if (this.t > 1.8) this.dispose();
+    if (this.dissolve) {
+      // Burn away with glowing edges once the death animation has played a little.
+      const k = Math.max(0, (this.t - 0.75) / 0.9);
+      if (k > 0 && !this.dissolveEdge) {
+        this.dissolveEdge = true;
+        for (const m of this.model.materials) m.emissive.setRGB(0, 0, 0);
+      }
+      this.dissolve.value = Math.min(1, k);
+      if (k > 0 && k < 1 && Math.random() < dt * 40) {
+        this.game.particles.spawn(this.pos.clone().setY(0.3 + Math.random() * 1.4), {
+          count: 1,
+          color: [2.2, 0.8, 3],
+          speed: 0.5,
+          up: 2,
+          life: 0.6,
+          size: 0.07,
+          gravity: -2,
+        });
+      }
+      if (this.t > 1.75) this.dispose();
+    } else {
+      if (this.t > 0.9) this.group.position.y -= dt * 1.2;
+      if (this.t > 1.8) this.dispose();
+    }
   }
 
   dispose() {

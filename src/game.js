@@ -9,6 +9,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { config, saveConfig, resetConfig } from './config.js';
 import { World, ARENA_HALF, pillars } from './world.js';
 import { Environment, spawnGates } from './environment.js';
+import { Decals, Portals } from './juice.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -23,12 +24,17 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 // Final look: gentle teal-shadow / warm-highlight split tone, contrast, vignette.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.45 }, uGrade: { value: 1 } },
+  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.45 }, uGrade: { value: 1 }, uAberration: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uVignette; uniform float uGrade; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uVignette; uniform float uGrade; uniform float uAberration; varying vec2 vUv;
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
+      if (uAberration > 0.0001) {
+        vec2 dir = (vUv - 0.5) * uAberration;
+        c.r = texture2D(tDiffuse, vUv + dir).r;
+        c.b = texture2D(tDiffuse, vUv - dir).b;
+      }
       float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
       vec3 graded = c.rgb;
       graded = mix(graded, graded * vec3(0.92, 1.0, 1.06), (1.0 - l) * 0.5);   // cool shadows
@@ -89,6 +95,8 @@ export class Game {
     this.player = new Player(this.scene);
     this.arrows = new ArrowSystem(this.scene);
     this.particles = new Particles(this.scene);
+    this.decals = new Decals(this.scene);
+    this.portals = new Portals(this.scene);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -234,6 +242,11 @@ export class Game {
     this.arrows.clear();
     this.particles.clear();
     this.numbers.clear();
+    this.decals.clear();
+    this.portals.clear();
+    this.killCam = null;
+    this.zoomKick = 0;
+    this.aberration = 0;
     for (const b of this.bolts || []) b.line.removeFromParent();
     this.bolts = [];
     build.reset();
@@ -335,6 +348,7 @@ export class Game {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
       this.enemies.push(new Grunt(this, p, this.wave));
+      this.portals.spawn(p);
       return;
     }
     const H = ARENA_HALF - 1.5;
@@ -352,6 +366,7 @@ export class Game {
       if (farFromPlayer && clearOfPillars) break;
     }
     this.enemies.push(new Grunt(this, p, this.wave));
+    this.portals.spawn(p, 1.2, 2.2, new THREE.Color(3, 0.7, 0.5));
   }
 
   // ---------------------------------------------------------------- combat events
@@ -404,6 +419,13 @@ export class Game {
     const big = arrow.perfect || arrow.mega;
     this.hitStop = Math.max(this.hitStop, big ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
     this.shake.add(arrow.mega ? 0.6 : arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
+    if (big) {
+      this.zoomKick = Math.min(0.12, this.zoomKick + (arrow.mega ? 0.09 : 0.05));
+      this.aberration = Math.min(1, this.aberration + (arrow.mega ? 1 : 0.6));
+    }
+    if (Math.random() < (big ? 0.9 : 0.35)) {
+      this.decals.spawn(enemy.pos.clone().addScaledVector(arrow.dir, 0.4 + Math.random() * 0.6), 'blood', big ? 1.2 : 0.7);
+    }
     this.sfx.hit(arrow.perfect, this.panAt(point));
 
     if (result === 'stagger') {
@@ -418,6 +440,16 @@ export class Game {
 
   onKill(enemy) {
     this.stats.kills++;
+    const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
+    this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
+    // Last enemy of the wave: slow-motion kill cam.
+    const others = this.enemies.some((e) => e !== enemy && e.state !== 'dying' && !e.removed);
+    if (this.waveState === 'active' && this.toSpawn === 0 && !others && !this.player.dead) {
+      this.killCam = { t: 0, dur: 1.3, target: enemy.pos.clone() };
+      this.slowmo = 1.1;
+      this.slowmoScale = 0.22;
+      this.hud.vignette.classList.add('slowmo');
+    }
     this.sfx.kill(this.panAt(enemy.pos));
     // Three kills in quick succession earns the announcer.
     this.killTimes = (this.killTimes || []).filter((t) => this.elapsed - t < 1.5);
@@ -524,6 +556,28 @@ export class Game {
     }
   }
 
+  /** A heavy landing: cracked floor, dust ring, a bump of shake if it's close. */
+  onSlam(pos, strength = 1) {
+    this.decals.spawn(pos, 'crack', 2.2 * strength, 10);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      this.particles.spawn(pos.clone().setY(0.1), {
+        count: 1,
+        color: 0x7a6a58,
+        speed: 3 * strength,
+        up: 0.6,
+        life: 0.6,
+        size: 0.18,
+        gravity: 2,
+        drag: 3,
+        dir: new THREE.Vector3(Math.cos(a), 0.1, Math.sin(a)),
+        spread: 0.15,
+      });
+    }
+    const d = pos.distanceTo(this.player.pos);
+    if (d < 8) this.shake.add(0.25 * strength * (1 - d / 8));
+  }
+
   /** Stereo position (-1 left … 1 right) of a world point on screen. */
   panAt(pos) {
     const v = this.tmpPan || (this.tmpPan = new THREE.Vector3());
@@ -541,6 +595,7 @@ export class Game {
     this.stats.perfectDodges++;
     this.player.counterT = d.counterWindow;
     this.slowmo = d.slowmoTime;
+    this.slowmoScale = d.slowmoScale;
     this.sfx.perfectDodge();
     this.numbers.spawn(this.player.pos.clone().setY(2.2), 'PERFECT DODGE', 'callout gold');
     this.particles.spawn(this.player.pos.clone().setY(0.8), { count: 18, color: [2.4, 2.4, 3], speed: 4, up: 1, life: 0.4, size: 0.07, gravity: 0 });
@@ -548,6 +603,8 @@ export class Game {
   }
 
   onPlayerHit(enemy) {
+    this.aberration = Math.min(1, this.aberration + 0.8);
+    this.decals.spawn(this.player.pos, 'blood', 0.8);
     this.sfx.hurt();
     this.waveHurt = true;
     this.shake.add(0.6);
@@ -579,7 +636,7 @@ export class Game {
       dt = realDt;
       if (this.slowmo > 0) {
         this.slowmo -= realDt;
-        dt *= config.dodge.slowmoScale;
+        dt *= this.slowmoScale ?? config.dodge.slowmoScale;
         if (this.slowmo <= 0) this.hud.vignette.classList.remove('slowmo');
       }
       if (this.hitStop > 0) {
@@ -591,6 +648,11 @@ export class Game {
 
     this.particles.update(dt);
     this.updateBolts(realDt);
+    this.decals.update(realDt);
+    this.portals.update(dt, this.particles);
+    this.zoomKick *= Math.exp(-7 * realDt);
+    this.aberration *= Math.exp(-5 * realDt);
+    this.grade.uniforms.uAberration.value = this.aberration * 0.006;
     this.numbers.update(this.state === 'paused' ? 0 : realDt);
     this.shake.update(realDt);
     this.world.update(realDt, this.time);
@@ -687,8 +749,18 @@ export class Game {
     const look = new THREE.Vector3(this.aimPoint.x - this.player.pos.x, 0, this.aimPoint.z - this.player.pos.z);
     if (look.length() > 7) look.setLength(7);
     const target = this.player.pos.clone().addScaledVector(look, 0.2);
+    let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0));
+    if (this.killCam) {
+      // Swing toward the final kill and push in, then ease back out.
+      const k = this.killCam;
+      k.t += dt;
+      const w = Math.sin(Math.min(1, k.t / k.dur) * Math.PI);
+      target.lerp(k.target, 0.6 * w);
+      zoom *= 1 - 0.35 * w;
+      if (k.t >= k.dur) this.killCam = null;
+    }
     this.camTarget.lerp(target, 1 - Math.exp(-6 * dt));
-    this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, config.feel.cameraZoom);
+    this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, zoom);
     this.camera.lookAt(this.camTarget);
     this.camera.position.add(this.shake.offset(this.shakeOffset, config.feel.shake));
     this.camera.updateMatrixWorld();

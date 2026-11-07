@@ -108,6 +108,7 @@ export class Player {
     bow.add(this.string);
 
     this.nocked = makeArrowMesh(false);
+    this.nocked.getObjectByName('trail').visible = false;
     this.nocked.visible = false;
     bow.add(this.nocked);
 
@@ -284,6 +285,7 @@ export class Player {
       if (this.stepDist > 1.6) {
         this.stepDist = 0;
         game.sfx.step();
+        game.particles.spawn(new THREE.Vector3(this.pos.x, 0.08, this.pos.z), { count: 3, color: 0x6a5c4c, speed: 0.8, up: 0.6, life: 0.45, size: 0.12, gravity: 1, drag: 3 });
       }
     }
     this.pos.x += (this.vel.x + this.knock.x) * dt;
