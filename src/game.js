@@ -10,6 +10,7 @@ import { config, saveConfig, resetConfig } from './config.js';
 import { World, ARENA_HALF, pillars } from './world.js';
 import { Environment, spawnGates } from './environment.js';
 import { Decals, Portals } from './juice.js';
+import { Skeleton, EnemyArrows } from './skeleton.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -97,6 +98,7 @@ export class Game {
     this.particles = new Particles(this.scene);
     this.decals = new Decals(this.scene);
     this.portals = new Portals(this.scene);
+    this.enemyArrows = new EnemyArrows(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -244,6 +246,7 @@ export class Game {
     this.numbers.clear();
     this.decals.clear();
     this.portals.clear();
+    this.enemyArrows.clear();
     this.killCam = null;
     this.zoomKick = 0;
     this.aberration = 0;
@@ -340,14 +343,22 @@ export class Game {
     }
   }
 
+  /** Which enemy type to spawn this time. */
+  enemyClass() {
+    const s = config.skeleton;
+    const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
+    return Math.random() < chance ? Skeleton : Grunt;
+  }
+
   spawnEnemy() {
+    const Kind = this.enemyClass();
     const p = new THREE.Vector3();
     // Half the grunts march out of the archway gates (when the dressed arena is loaded).
     const gates = spawnGates.filter((g) => Math.hypot(g.x - this.player.pos.x, g.z - this.player.pos.z) > 7);
     if (gates.length && Math.random() < 0.5) {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
-      this.enemies.push(new Grunt(this, p, this.wave));
+      this.enemies.push(new Kind(this, p, this.wave));
       this.portals.spawn(p);
       return;
     }
@@ -365,8 +376,8 @@ export class Game {
       const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
       if (farFromPlayer && clearOfPillars) break;
     }
-    this.enemies.push(new Grunt(this, p, this.wave));
-    this.portals.spawn(p, 1.2, 2.2, new THREE.Color(3, 0.7, 0.5));
+    this.enemies.push(new Kind(this, p, this.wave));
+    this.portals.spawn(p, 1.2, 2.2, Kind === Skeleton ? new THREE.Color(0.7, 2.2, 2.8) : new THREE.Color(3, 0.7, 0.5));
   }
 
   // ---------------------------------------------------------------- combat events
@@ -602,14 +613,14 @@ export class Game {
     this.hud.vignette.classList.add('slowmo');
   }
 
-  onPlayerHit(enemy) {
+  onPlayerHit(enemy, damage = config.grunt.damage) {
     this.aberration = Math.min(1, this.aberration + 0.8);
     this.decals.spawn(this.player.pos, 'blood', 0.8);
     this.sfx.hurt();
     this.waveHurt = true;
     this.shake.add(0.6);
     this.hitStop = Math.max(this.hitStop, 0.08);
-    this.numbers.spawn(this.player.pos.clone().setY(2), `-${config.grunt.damage}`, 'hurt');
+    this.numbers.spawn(this.player.pos.clone().setY(2), `-${damage}`, 'hurt');
     this.particles.spawn(this.player.pos.clone().setY(1), { count: 14, color: 0xff3b2f, speed: 5, up: 2, life: 0.5, size: 0.1, dir: enemy.lungeDir, spread: 1 });
     this.hud.vignette.classList.remove('flash');
     void this.hud.vignette.offsetWidth; // restart the CSS animation
@@ -695,6 +706,7 @@ export class Game {
     for (const e of this.enemies) e.update(dt, this.player);
     this.separate();
     this.arrows.update(dt, this.enemies, this);
+    this.enemyArrows.update(dt);
     this.enemies = this.enemies.filter((e) => !e.removed);
 
     if (this.player.dead) {
@@ -931,6 +943,15 @@ export class Game {
     dg.add(config.dodge, 'slowmoTime', 0, 2, 0.05).name('Perfect: slow-mo (s)');
     dg.add(config.dodge, 'slowmoScale', 0.05, 1, 0.05).name('Perfect: slow-mo speed');
     dg.add(config.dodge, 'counterWindow', 0, 5, 0.1).name('Perfect: counter window (s)');
+
+    const sk = gui.addFolder('Skeleton Archer');
+    sk.add(config.skeleton, 'baseHp', 5, 100, 1).name('Base HP');
+    sk.add(config.skeleton, 'aimTime', 0.3, 2, 0.05).name('Aim telegraph (s)');
+    sk.add(config.skeleton, 'cooldown', 0.3, 5, 0.1).name('Shot cooldown (s)');
+    sk.add(config.skeleton, 'arrowSpeed', 5, 40, 0.5).name('Arrow speed');
+    sk.add(config.skeleton, 'damage', 1, 60, 1).name('Damage');
+    sk.add(config.skeleton, 'firstWave', 1, 10, 1).name('First wave');
+    sk.close();
 
     const g = gui.addFolder('Grunt');
     g.add(config.grunt, 'baseHp', 5, 200, 1).name('Base HP');

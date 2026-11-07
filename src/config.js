@@ -42,6 +42,17 @@ export const DEFAULTS = {
     damage: 18,
     staggerCharge: 0.9, // a hit at this charge or higher interrupts a windup
   },
+  skeleton: {
+    baseHp: 20,
+    speed: 2.6,
+    minRange: 7, // backs away if you get closer than this
+    maxRange: 12, // walks in if you're farther than this
+    aimTime: 0.95, // telegraph before the shot (the aim locks for the last 25%)
+    cooldown: 1.7,
+    arrowSpeed: 15,
+    damage: 14,
+    firstWave: 3,
+  },
   waves: {
     baseCount: 3,
     countPerWave: 2,

@@ -120,8 +120,25 @@ export class Grunt {
   }
 
   /** Use the Meshy grunt if it's loaded: placeholder meshes hide, the rig group stays for spawn/arrows. */
+  // Subclasses (skeleton archer, boss) override these to use their own model.
+  get modelId() {
+    return 'grunt';
+  }
+  get modelHeight() {
+    return config.models.gruntHeight;
+  }
+  get propId() {
+    return 'club';
+  }
+  get propRightHand() {
+    return true;
+  }
+  get propLength() {
+    return 1.0;
+  }
+
   attachModel(level) {
-    const inst = instantiate('grunt', config.models.gruntHeight);
+    const inst = instantiate(this.modelId, this.modelHeight);
     if (!inst) return;
     this.model = inst;
     this.anim = inst.animator;
@@ -134,8 +151,8 @@ export class Grunt {
     const k = Math.min(0.45, 0.05 * (level - 1));
     const tint = new THREE.Color(1, 1 - k, 1 - k * 1.2);
     for (const m of inst.materials) m.color?.multiply(tint);
-    const hand = findBone(inst.root, [/hand/i, /right|(^|[_.])r([_.]|$)/i]);
-    attachProp('club', hand, 1.0);
+    const side = this.propRightHand ? /right|(^|[_.])r([_.]|$)/i : /left|(^|[_.])l([_.]|$)/i;
+    this.prop = attachProp(this.propId, findBone(inst.root, [/hand/i, side]), this.propLength);
   }
 
   /** Pick the grunt's animation from its state. `dt` is its own (slowed/frozen) clock. */
@@ -351,7 +368,7 @@ export class Grunt {
         if (!this.hasHit && dist < this.radius + PLAYER_RADIUS + 0.25) {
           this.hasHit = true;
           const res = player.takeDamage(g.damage, this.lungeDir, this.game);
-          if (res === true) this.game.onPlayerHit(this);
+          if (res === true) this.game.onPlayerHit(this, g.damage);
           else if (res === 'dodged') this.game.onPerfectDodge(this);
         }
         if (this.t >= g.lungeTime) this.enter('recover');
