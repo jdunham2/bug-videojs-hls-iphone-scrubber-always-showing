@@ -119,6 +119,7 @@ export class Gadgets {
     }
     const { item, s } = sl;
     this.cool[n - 1] = s.cooldown;
+    G.bounty?.('gadget');
     this.max = this.max || [1, 1];
     this.max[n - 1] = s.cooldown;
     const P = G.player;

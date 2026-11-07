@@ -13,6 +13,7 @@ import { Preview } from './preview.js';
 import { interiorHtml } from './interiors.js';
 import { mapArt } from './worldmap-art.js';
 import { Room, ROOM_KINDS } from './rooms.js';
+import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
@@ -407,7 +408,8 @@ export class Camp {
   refreshHud() {
     document.getElementById('camp-gems').textContent = `◆ ${profile.gems}`;
     const r = document.getElementById('camp-records');
-    if (r) r.textContent = `Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses} · Runs ${profile.runs}`;
+    const ready = bountiesReady();
+    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
   }
 
   // ------------------------------------------------------------ panels
@@ -461,7 +463,19 @@ export class Camp {
       html = this.tailorHtml();
     } else if (k === 'shrine') {
       const cp = profile.checkpoint;
-      html = `<h2>Trophy Board</h2><p class="lead">Every victory gets carved into the board. Beat a boss to mark a save point.</p>
+      const lv = levelFor(profile.xp || 0);
+      const list = bounties()
+        .map((b, i) => {
+          const info = bountyInfo(b);
+          return `<div class="bounty ${info.done ? 'done' : ''}"><div class="bt">${info.text}</div><div class="br">Reward: ◆ ${info.gems} · ${info.xp} XP · ${b.progress} / ${b.target}</div>
+            <div class="bbar"><i style="width:${Math.round((b.progress / b.target) * 100)}%"></i></div>
+            <div class="bact">${info.done ? `<button class="gold" data-act="bounty-claim" data-i="${i}">Claim</button>` : '<span class="tag">In progress</span>'}</div></div>`;
+        })
+        .join('');
+      html = `<div class="cp-head"><h2>Trophy Board</h2><p class="lead">Bounties, records and your save. Finished bounties pay out here.</p>
+        <p class="lvline">Hero level <b>${lv.level}</b><span class="lvbar"><i style="width:${Math.round(lv.frac * 100)}%"></i></span>${lv.into} / ${lv.need} XP</p></div>
+        ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+        <h3 class="sub">Bounties</h3><div class="bounties">${list}</div>
         <div class="records">
           <div><b>${profile.best.wave}</b><span>Best wave</span></div>
           <div><b>${profile.bosses}</b><span>Bosses slain</span></div>
@@ -912,6 +926,18 @@ export class Camp {
     const v = b.dataset.v;
     const G = this.game;
     if (act === 'close') return this.close();
+    if (act === 'bounty-claim') {
+      const r = claimBounty(Number(b.dataset.i));
+      if (r) {
+        G.sfx.sample('jingleClear', { vol: 0.55, jitter: 0 });
+        const up = r.xpResult.after.level > r.xpResult.before.level;
+        this.shopNote = `Claimed: ◆ ${r.gems} and ${r.xp} XP.${up ? ` Level up! You're now level ${r.xpResult.after.level} (+◆ ${r.xpResult.rewards.reduce((a, w) => a + w.gems, 0)}${r.xpResult.rewards.some((w) => w.item) ? ' and new gear in your stash' : ''}).` : ''}`;
+        this.particles.spawn(G.player.pos.clone().setY(1.2), { count: 40, color: [3, 2.2, 0.6], speed: 5, up: 4, life: 0.9, size: 0.08, gravity: 3 });
+        if (up) G.banner('Level up!', `Hero level ${r.xpResult.after.level}`, 1.8);
+        this.refreshHud();
+      }
+      return this.render();
+    }
     if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
     if (act.startsWith('shop-') || act.startsWith('smith-')) return this.onShopAct(act, b.dataset);
     if (act === 'focus') {

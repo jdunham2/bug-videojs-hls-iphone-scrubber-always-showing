@@ -380,6 +380,7 @@ export class Game {
     this.dailyResult = this.mission?.daily ? { score: dailyScore(this.stats, { cleared: false, elapsed: this.elapsed, wave: this.wave }) } : null;
     if (this.dailyResult) Object.assign(this.dailyResult, recordDaily(this.dailyResult.score, false));
     this.loot.runGems = 0;
+    this.xpResult = this.awardXp(false);
     this.showOverlay('gameover', newBest);
   }
 

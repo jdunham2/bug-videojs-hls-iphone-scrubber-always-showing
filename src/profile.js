@@ -85,7 +85,7 @@ function merge(a, b) {
   m.outfit = { ...older.outfit, ...newer.outfit };
   m.tips = { ...older.tips, ...newer.tips };
   m.best = better(older.best, newer.best);
-  for (const k of ['totalGems', 'runs', 'bosses']) m[k] = Math.max(older[k] || 0, newer[k] || 0);
+  for (const k of ['totalGems', 'runs', 'bosses', 'xp']) m[k] = Math.max(older[k] || 0, newer[k] || 0);
   return m;
 }
 

@@ -1,6 +1,9 @@
 // Gear in a run: what drops from whom, picking it up, and the pickup card that
 // lets you equip it on the spot (E / gamepad X).
 
+import { noteBounty, runXp, addXp } from './progression.js';
+import { saveProfile } from './profile.js';
+import { gearIcon } from './gear.js';
 import { rollItem, rollRarity, addToStash, equip, equipped, equippedGadget, statLines, perkLines, RARITIES, slotLabel, baseOf, score } from './gear.js';
 
 /** Item power for a drop: grows with the wave and the arena. */
@@ -100,5 +103,42 @@ export class GearMethods {
     if (!found.length) return '';
     const best = [...found].sort((a, b) => score(b) - score(a))[0];
     return `Gear found: ${found.length} · best: <b style="color:${RARITIES[best.rarity].color}">${best.name}</b> (Power ${best.power}). Visit the Armory in camp.`;
+  }
+
+  // ------------------------------------------------------------ bounties & XP
+
+  /** Count a run event toward the Trophy Board bounties; cheer when one finishes. */
+  bounty(key, n = 1) {
+    if (this.state !== 'playing' && this.state !== 'victory') return;
+    const done = noteBounty(key, n);
+    if (!done.length) return;
+    saveProfile();
+    for (const b of done) {
+      setTimeout(() => this.state === 'playing' && this.banner('Bounty complete!', `${b.text} · claim it at the Trophy Board`, 2.2), 900);
+      this.sfx.sample('jingleClear', { vol: 0.35, rate: 1.3, jitter: 0, delay: 0.9 });
+    }
+  }
+
+  /** XP for the run that just ended (also pays level-up rewards). */
+  awardXp(cleared) {
+    const xp = runXp(this.stats, { wave: this.wave, bosses: this.stats.bossesDefeated || 0, cleared, tierMult: this.difficulty?.gems || 1 });
+    return { ...addXp(xp.total), parts: xp.parts };
+  }
+
+  /** The XP bar on the results screens: fills up, and bursts on a level up. */
+  xpHtml() {
+    const r = this.xpResult;
+    if (!r) return '';
+    const up = r.after.level > r.before.level;
+    const parts = r.parts.map(([k, v]) => `<span>${k} <b>+${v}</b></span>`).join('');
+    const rewards = r.rewards
+      .map((w) => `<div class="xp-reward">Level ${w.level}: <b>◆ ${w.gems}</b>${w.item ? ` · <span class="xp-item" style="color:${RARITIES[w.item.rarity].color}">${gearIcon(w.item)}${w.item.name}</span>` : ''}</div>`)
+      .join('');
+    return `<div class="xpbox ${up ? 'up' : ''}" style="--from:${r.before.frac.toFixed(3)};--to:${up ? 1 : r.after.frac.toFixed(3)};--after:${r.after.frac.toFixed(3)}">
+      <div class="xp-head"><span class="xp-lv">Hero level <b>${r.before.level}</b></span><span class="xp-gain">+${r.gained} XP</span></div>
+      <div class="xp-bar"><i></i></div>
+      <div class="xp-parts">${parts}</div>
+      ${up ? `<div class="xp-up"><div class="xp-up-title">Level up! <b>${r.after.level}</b></div>${rewards}</div>` : `<div class="xp-next">${r.after.need - r.after.into} XP to level ${r.after.level + 1}</div>`}
+    </div>`;
   }
 }

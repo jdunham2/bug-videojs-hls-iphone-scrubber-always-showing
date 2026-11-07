@@ -139,6 +139,7 @@ export class FlowMethods {
       }
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
+      this.bounty('wave');
       this.player.cheer();
       this.noteProgress({ wave: this.wave, kills: this.stats.kills });
       if (!this.mission && this.wave % config.boss.every === 0) this.saveCheckpoint();

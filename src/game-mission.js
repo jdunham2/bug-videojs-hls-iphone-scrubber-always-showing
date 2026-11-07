@@ -84,6 +84,7 @@ export class MissionMethods {
     const s = this.secret;
     s.found = true;
     this.stats.secret = true;
+    this.bounty('chest');
     s.glow.material.opacity = 1;
     s.glow.scale.setScalar(4);
     setTimeout(() => s.glow.removeFromParent(), 600);
@@ -138,6 +139,8 @@ export class MissionMethods {
       this.reward = rollItem(slot, this.enemyLevel() + (this.difficulty?.lootPower || 0) + 2, Math.random() < 0.4 ? 'unique' : 'rare');
       addToStash(this.reward);
     }
+    this.bounty('mission');
+    this.xpResult = this.awardXp(true);
     this.victory = { got, fresh, purse };
     this.showOverlay('victory');
   }
@@ -169,6 +172,7 @@ export class MissionMethods {
         <div><b>◆ ${this.gemsThisRun}</b><span>Gems (+${v.purse} reward)</span></div>
       </div>
       ${r ? `<div class="vreward" style="--rar:${RARITIES[r.rarity].color}"><span class="gi">${gearIcon(r)}</span><div><div class="vr-label">${m.daily ? "Today's reward" : 'First clear reward'}</div><div class="vr-name"></div><div class="vr-meta">${RARITIES[r.rarity].name} · Power ${r.power}</div></div></div>` : ''}
+      ${this.xpHtml()}
       ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
       ${this.gearSummary() ? `<p class="gear-found">${this.gearSummary()}</p>` : ''}
       <button>Return to camp</button>`;

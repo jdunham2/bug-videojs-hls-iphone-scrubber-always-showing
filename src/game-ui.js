@@ -224,6 +224,7 @@ export class UiMethods {
           <div><b>◆ ${this.gemsThisRun ?? 0}</b><span>Gems banked</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
+        ${this.xpHtml()}
         ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
         ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
         ${this.gearSummary() ? `<p class="gear-found">${this.gearSummary()}</p>` : ''}

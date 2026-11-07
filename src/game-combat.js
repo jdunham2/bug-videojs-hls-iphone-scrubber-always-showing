@@ -29,6 +29,7 @@ export class CombatMethods {
     this.stats.shots++;
     if (perfect) {
       this.stats.perfects++;
+      this.bounty('perfect');
       this.stats.streak++;
       this.stats.bestStreak = Math.max(this.stats.bestStreak, this.stats.streak);
       if (this.stats.streak % 3 === 0) this.sfx.combo();
@@ -92,6 +93,10 @@ export class CombatMethods {
 
   onKill(enemy) {
     this.stats.kills++;
+    this.bounty('kill');
+    if (enemy.elite) this.bounty('elite');
+    if (enemy.isBoss) this.bounty('boss');
+    else if (enemy.kind === 'archer' || enemy.kind === 'bomber') this.bounty(enemy.kind);
     // Field Dressing (gear): patch yourself up a little on every kill.
     const dressing = gearStats().perk('fieldDressing');
     if (dressing && !this.player.dead) {
@@ -259,6 +264,7 @@ export class CombatMethods {
   onPerfectDodge(enemy) {
     const d = config.dodge;
     this.stats.perfectDodges++;
+    this.bounty('perfectDodge');
     this.ultimate.gain(config.ultimate.perPerfectDodge);
     this.player.counterT = d.counterWindow;
     this.slowmo = d.slowmoTime;
