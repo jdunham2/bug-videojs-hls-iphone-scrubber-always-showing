@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
-import { makeBowParts, orientUpright, holdInHand } from './bow.js';
+import { makeBowParts, holdInHand } from './bow.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME, buffs } from './skills.js';
 import { models, outfits, instantiate, findBone, loadTexture } from './models.js';
@@ -20,12 +20,19 @@ function lerpAngle(a, b, t) {
 }
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const BOW_CARRY_TILT = THREE.MathUtils.degToRad(55);
 const MAX_TWIST = THREE.MathUtils.degToRad(100); // how far the upper body may turn from the legs
 const _q1 = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _v4 = new THREE.Vector3();
+const _v5 = new THREE.Vector3();
+const _m1 = new THREE.Matrix4();
+const _qRelax = new THREE.Quaternion();
+const _qAim = new THREE.Quaternion();
 
 const RING_IDLE = new THREE.Color(0xffffff);
 const RING_PERFECT = new THREE.Color(3, 2.2, 0.6);
@@ -402,6 +409,11 @@ export class Player {
       return Math.hypot(p.x - h.x, p.z - h.z);
     };
     const hand = reach(R) > reach(L) ? R : L;
+    // While aiming, the bow hand's thumb points straight up. Remember that direction
+    // in the hand's own frame: it's the bow's long axis for a relaxed grip.
+    const fore = hand.getWorldPosition(new THREE.Vector3()).sub(hand.parent.getWorldPosition(new THREE.Vector3())).normalize();
+    const thumb = UP.clone().addScaledVector(fore, -UP.dot(fore)).normalize();
+    this.thumbLocal = thumb.applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert());
     a.stop();
     A.mixer.update(0);
     return hand;
@@ -527,19 +539,44 @@ export class Player {
     spine.forEach((b, i) => this.spineBase[i].copy(b.quaternion));
     this.measureArm();
     this.applyTwist(dt);
-    if (this.bowInHand) {
-      // The bow sits in the hand but keeps a clean pose: upright, facing where the
-      // hero faces, turning to the aim line while drawing (the hand's own rotation
-      // in these clips would point it in odd directions).
-      // Its heading eases round by angle (never through zero), so it can't flip or spin.
-      const aiming = this.drawing || this.releaseT > 0;
-      const want = aiming ? Math.atan2(this.aimDir.x, this.aimDir.z) : this.yaw;
-      this.bowYaw = lerpAngle(this.bowYaw ?? want, want, 1 - Math.exp(-(aiming ? 30 : 12) * dt));
-      this.bowFwd ||= new THREE.Vector3();
-      this.bowFwd.set(Math.sin(this.bowYaw), 0, Math.cos(this.bowYaw));
-      this.group.updateMatrixWorld(true);
-      orientUpright(this.bow, this.bowFwd);
-    }
+    if (this.bowInHand) this.poseBow(dt);
+  }
+
+  /**
+   * The bow sits in the palm (not the wrist pivot) and follows the hand: relaxed,
+   * its limbs run along the thumb and its front along the forearm, so it swings and
+   * tilts with the arm. While drawing it eases into an exact upright pose on the aim
+   * line. The two poses blend as rotations, so it never flips or spins.
+   */
+  poseBow(dt) {
+    const hand = this.bow.parent;
+    const aiming = this.drawing || this.releaseT > 0;
+    this.bowAim = (this.bowAim || 0) + ((aiming ? 1 : 0) - (this.bowAim || 0)) * (1 - Math.exp(-(aiming ? 16 : 8) * dt));
+    this.group.updateMatrixWorld(true);
+    const wrist = hand.getWorldPosition(_v1);
+    const fore = _v2.copy(wrist).sub(hand.parent.getWorldPosition(_v3));
+    const foreLen = fore.length();
+    fore.normalize();
+    // Relaxed: limbs along the thumb (kept square to the forearm), front along the forearm.
+    hand.getWorldQuaternion(_q1);
+    const limb = _v3.copy(this.thumbLocal || UP).applyQuaternion(_q1);
+    limb.addScaledVector(fore, -limb.dot(fore)).normalize();
+    // Tip the upper limb back up the arm, so with the arm hanging the bow rests
+    // mostly upright along the leg, upper limb forward, as archers carry one.
+    limb.multiplyScalar(Math.cos(BOW_CARRY_TILT)).addScaledVector(fore, -Math.sin(BOW_CARRY_TILT)).normalize();
+    const front = _v5.copy(fore).addScaledVector(limb, -fore.dot(limb)).normalize();
+    _m1.makeBasis(_v4.crossVectors(limb, front), limb, front);
+    _qRelax.setFromRotationMatrix(_m1);
+    // Aiming: upright, front on the aim line.
+    const aimYaw = Math.atan2(this.aimDir.x, this.aimDir.z);
+    _v5.set(Math.sin(aimYaw), 0, Math.cos(aimYaw));
+    _m1.makeBasis(_v4.crossVectors(UP, _v5), UP, _v5);
+    _qAim.setFromRotationMatrix(_m1);
+    _qRelax.slerp(_qAim, this.bowAim);
+    this.bow.quaternion.copy(hand.getWorldQuaternion(_q2).invert().multiply(_qRelax));
+    // Grip in the palm, a little past the wrist joint.
+    const grip = _v4.copy(wrist).addScaledVector(fore, foreLen * 0.32);
+    this.bow.position.copy(hand.worldToLocal(grip));
   }
 
   /**
