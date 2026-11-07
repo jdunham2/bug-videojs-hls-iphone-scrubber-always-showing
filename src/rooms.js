@@ -607,6 +607,20 @@ const BUILD = {
     R.prop('pillarCarved', 4.4, -W + 0.9, 5.5, 0, 0.6);
     R.prop('pillarCarved', 4.4, 6.5, -D + 0.9, 0, 0.6);
     R.prop('brazier', 1.3, 4.5, 2.5, 0, 0.5);
+    // A lectern with the book of talents.
+    R.box(0.7, 1.1, 0.5, 0x4a2e18, -W + 1.6, 0.55, 1.6, 0.6);
+    const book = R.box(0.8, 0.08, 0.6, 0x7a1e1a, -W + 1.6, 1.16, 1.6);
+    book.rotation.z = -0.25;
+    const page = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.46).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf3e6c4 }));
+    page.position.set(-W + 1.6, 1.215, 1.6);
+    page.rotation.z = -0.25;
+    R.scene.add(page);
+    const tag = label('Hero talents', 'Spend your level points');
+    tag.position.set(-W + 1.6, 2.6, 1.6);
+    tag.scale.multiplyScalar(0.8);
+    R.scene.add(tag);
+    R.stations.push({ act: 'panel', panel: 'talents', label: 'Hero talents', verb: 'Read the', x: -W + 2.7, z: 2.4, r: 1.4 });
+    R.ring(-W + 2.7, 2.4, 0.6, 0x9fe0ff, R.scene);
   },
   wardrobe(R) {
     R.rug(0, 0, 6, 6, '#7a2a24');

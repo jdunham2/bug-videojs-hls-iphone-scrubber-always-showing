@@ -48,6 +48,7 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 
 ### Progression
 - **Skill draft:** after each wave, pick 1 of 3 cards (one reroll per run). Twelve skills stack up to level III, from Heavy Draw and Split Shot to Blasting, Fire and Pinning arrows, Second Wind and the legendary Overdraw.
+- **Hero talents:** one point per hero level, spent at the lectern in the Hall of Heroes: Might, Vigor, Nimble Fingers, Fleet-footed, Thick Hide, Falconer and Fortune. Points can be taken back for free.
 - **The camp grows:** trophies and new structures appear as you progress (Gorvak's hammer on a plinth, a well, relics from each cleared mission, war banners, a ballista, a treasure hoard, a statue at level 10), announced when you come back to camp.
 - **Falcon companion:** at hero level 4 a hunting falcon joins you. It circles overhead and every few seconds dives at the nearest enemy (it practises on the training dummy in camp).
 - **Loot thief:** now and then a bandit with a glowing sack of treasure drops in and runs for it. He never fights back; bring him down within about 14 seconds (an edge-of-screen pointer shows where he is and how long is left) and the sack bursts into gems and a piece of gear.

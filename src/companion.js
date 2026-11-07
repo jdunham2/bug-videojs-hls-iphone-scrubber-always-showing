@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { heroPower } from './gear.js';
 import { levelFor, FALCON_LEVEL } from './progression.js';
 import { profile } from './profile.js';
+import { talent } from './talents.js';
 
 export const falconUnlocked = () => levelFor(profile.xp || 0).level >= FALCON_LEVEL;
 
@@ -107,7 +108,7 @@ export class Falcon {
       flap = 14;
       if (this.pos.y > 3.2) {
         this.state = 'circle';
-        this.cool = 5 + Math.random() * 2;
+        this.cool = (5 + Math.random() * 2) * talent.falconCool();
       }
     }
     if (!target) target = tmp.set(P.x, 4, P.z);
@@ -129,7 +130,7 @@ export class Falcon {
 
   strike(e) {
     const G = this.game;
-    const dmg = Math.round(9 * (1 + 0.12 * heroPower()));
+    const dmg = Math.round(9 * (1 + 0.12 * heroPower()) * talent.falconDmg());
     const dir = this.vel.clone().setY(0).normalize();
     const res = e.hit(dmg, dir, 0.6, false);
     if (res) {

@@ -14,6 +14,7 @@ import { interiorHtml } from './interiors.js';
 import { mapArt } from './worldmap-art.js';
 import { Room, ROOM_KINDS } from './rooms.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
+import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
@@ -304,6 +305,24 @@ export class Camp {
     if (this.game.input.wasPressed('Escape') && this.openKind) this.close();
   }
 
+  /** Spend talent points: one per hero level. */
+  talentsHtml() {
+    const lv = levelFor(profile.xp || 0);
+    const pts = talentPoints(lv.level);
+    const cards = TALENTS.map((t) => {
+      const r = rank(t.id);
+      const pips = Array.from({ length: t.max }, (_, i) => `<i class="${i < r ? 'on' : ''}"></i>`).join('');
+      const can = pts.free > 0 && r < t.max;
+      return `<div class="talent ${r ? 'has' : ''} ${r >= t.max ? 'maxed' : ''}"><div class="tl-icon">${t.icon}</div>
+        <div class="tl-body"><div class="tl-name">${t.name}</div><div class="tl-text">${t.text} per rank</div><div class="tl-pips">${pips}</div></div>
+        <button class="gold" data-act="talent-learn" data-id="${t.id}" ${can ? '' : 'disabled'}>${r >= t.max ? 'Max' : '+'}</button></div>`;
+    }).join('');
+    return `<div class="cp-head"><h2>Hero Talents</h2><p class="lead">One point for every hero level. They stay with you for every hero and every run.</p>
+      <p class="lvline">Hero level <b>${lv.level}</b> · <b class="tl-free">${pts.free}</b> point${pts.free === 1 ? '' : 's'} to spend · ${pts.spent} spent</p></div>
+      <div class="talents">${cards}</div>
+      <div class="actions"><button data-act="talent-reset" ${pts.spent ? '' : 'disabled'}>Take back all points (free)</button></div>`;
+  }
+
   // ------------------------------------------------------------ the camp grows
 
   /** Trophies and new structures that appear as you progress. */
@@ -484,7 +503,8 @@ export class Camp {
     document.getElementById('camp-gems').textContent = `◆ ${profile.gems}`;
     const r = document.getElementById('camp-records');
     const ready = bountiesReady();
-    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
+    const free = talentPoints(levelFor(profile.xp || 0).level).free;
+    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level}${free ? ` (${free} talent point${free > 1 ? 's' : ''} to spend in the Hall)` : ''} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
   }
 
   // ------------------------------------------------------------ panels
@@ -567,8 +587,10 @@ export class Camp {
       html = this.blacksmithHtml();
     } else if (k === 'gate') {
       html = this.worldMapHtml();
+    } else if (k === 'talents') {
+      html = this.talentsHtml();
     }
-    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe');
+    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents');
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
     this.syncPreview();
   }
@@ -1001,6 +1023,20 @@ export class Camp {
     const v = b.dataset.v;
     const G = this.game;
     if (act === 'close') return this.close();
+    if (act === 'talent-learn') {
+      if (learn(b.dataset.id, levelFor(profile.xp || 0).level)) {
+        G.sfx.sample('uiConfirm', { vol: 0.45, rate: 1.2, jitter: 0 });
+        G.player.hp = G.maxHp();
+      } else G.sfx.sample('uiSwitch', { vol: 0.3 });
+      this.refreshHud();
+      return this.render();
+    }
+    if (act === 'talent-reset') {
+      resetTalents();
+      G.sfx.sample('whoosh', { vol: 0.3, rate: 1.2, jitter: 0 });
+      this.refreshHud();
+      return this.render();
+    }
     if (act === 'bounty-claim') {
       const r = claimBounty(Number(b.dataset.i));
       if (r) {
