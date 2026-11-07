@@ -53,6 +53,19 @@ export const DEFAULTS = {
     damage: 14,
     firstWave: 3,
   },
+  ultimate: {
+    gainRate: 1, // multiplier on all meter gains
+    perPerfect: 12,
+    perHit: 3,
+    perKill: 7,
+    perPerfectDodge: 15,
+    radius: 5.5,
+    castTime: 0.6,
+    duration: 2.2,
+    arrows: 70,
+    damage: 24,
+    splash: 1.3,
+  },
   boss: {
     every: 5, // a boss arrives on every Nth wave
     baseHp: 520, // +60% per later boss

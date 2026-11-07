@@ -306,6 +306,19 @@ export class Sfx {
     this.tone('sine', 90, 30, 0.45, 0.35);
   }
 
+  ultimateCast() {
+    this.sample('bell', { vol: 0.7, rate: 1.3, jitter: 0 });
+    this.sample('ding', { vol: 0.6, rate: 0.7, jitter: 0, delay: 0.05 });
+    this.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0, delay: 0.5 });
+    this.tone('sine', 300, 1400, 0.6, 0.1);
+    this.noise(0.8, 0.12, 'highpass', 3000, 0.3);
+  }
+
+  ultimateReady() {
+    this.sample('ding', { vol: 0.5, rate: 1.0, jitter: 0 });
+    this.sample('ding', { vol: 0.4, rate: 1.5, jitter: 0, delay: 0.12 });
+  }
+
   bossRoar() {
     this.tone('sawtooth', 70, 38, 1.2, 0.12);
     this.tone('square', 52, 30, 1.1, 0.06, 0.05);

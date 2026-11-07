@@ -132,6 +132,7 @@ export class Player {
     this.recoil = 0;
     this.walkT = 0;
     this.hitT = 0;
+    this.casting = 0;
     this.releaseT = 0;
     this.cheerT = 0;
     this.rolling = false;
@@ -198,6 +199,7 @@ export class Player {
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
     this.hitT = Math.max(0, this.hitT - dt);
+    this.casting = Math.max(0, this.casting - dt);
     this.releaseT = Math.max(0, this.releaseT - dt);
     this.cheerT = Math.max(0, this.cheerT - dt);
     const maxCharges = stat.dodgeCharges();
@@ -232,7 +234,7 @@ export class Player {
     if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1) this.startRoll(input, game);
 
     // Draw / release
-    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling) {
+    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0) {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
@@ -273,7 +275,7 @@ export class Player {
       }
       if (this.rollT >= d.duration) this.rolling = false;
     } else {
-      const axis = input.axis();
+      const axis = this.casting > 0 ? { x: 0, y: 0 } : input.axis();
       const speed = config.player.moveSpeed * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
       const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
       const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
@@ -351,6 +353,8 @@ export class Player {
 
     if (this.dead) {
       A.set(['death'], { once: true, fade: 0.1 });
+    } else if (this.casting > 0 && A.has('victory')) {
+      A.set(['victory'], { once: true, fade: 0.1, timeScale: 1.6 });
     } else if (this.rolling) {
       const rate = A.duration('roll') / config.dodge.duration;
       A.set(['roll'], { once: true, fade: 0.05, timeScale: rate || 1 });

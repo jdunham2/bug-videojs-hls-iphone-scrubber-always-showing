@@ -12,6 +12,7 @@ import { Environment, spawnGates } from './environment.js';
 import { Decals, Portals } from './juice.js';
 import { Skeleton, EnemyArrows } from './skeleton.js';
 import { Boss, BOSS_NAME } from './boss.js';
+import { ArrowStorm } from './ultimate.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -100,6 +101,7 @@ export class Game {
     this.decals = new Decals(this.scene);
     this.portals = new Portals(this.scene);
     this.enemyArrows = new EnemyArrows(this);
+    this.ultimate = new ArrowStorm(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -119,6 +121,8 @@ export class Game {
       hpText: $('hp-text'),
       dodgeFill: $('dodge-fill'),
       dodgeBox: $('dodge'),
+      ult: $('ult'),
+      ultFill: $('ult-fill'),
       build: $('build'),
       bossBar: $('boss-bar'),
       bossFill: $('boss-fill'),
@@ -253,6 +257,8 @@ export class Game {
     this.decals.clear();
     this.portals.clear();
     this.enemyArrows.clear();
+    this.ultimate.clear();
+    this.zoomPull = 0;
     this.killCam = null;
     this.cinematic = null;
     this.boss = null;
@@ -339,6 +345,15 @@ export class Game {
     this.sfx.wave(n);
     this.sfx.bossRoar();
     this.shake.add(0.4);
+  }
+
+  onUltimateReady() {
+    this.sfx.ultimateReady();
+    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'ARROW STORM READY · Q', 'callout gold');
+  }
+
+  onUltimateEnd() {
+    this.shake.add(0.2);
   }
 
   onBossIntro(boss) {
@@ -487,6 +502,7 @@ export class Game {
       this.stats.streak++;
       this.stats.bestStreak = Math.max(this.stats.bestStreak, this.stats.streak);
       if (this.stats.streak % 3 === 0) this.sfx.combo();
+      this.ultimate.gain(config.ultimate.perPerfect);
       this.particles.spawn(origin, { count: 14, color: [3, 2.2, 0.6], speed: 5, up: 1, life: 0.35, size: 0.08, gravity: 2, dir, spread: 0.9 });
       this.shake.add(0.18);
     } else {
@@ -498,7 +514,10 @@ export class Game {
   onArrowHit(arrow, enemy, point) {
     const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect || arrow.mega);
     if (!result) return;
-    if (arrow.hitCount === 0 && !arrow.extra) this.stats.hits++;
+    if (arrow.hitCount === 0 && !arrow.extra) {
+      this.stats.hits++;
+      this.ultimate.gain(config.ultimate.perHit);
+    }
     const feel = config.feel;
     const full = arrow.charge >= 0.999;
 
@@ -539,6 +558,7 @@ export class Game {
 
   onKill(enemy) {
     this.stats.kills++;
+    this.ultimate.gain(config.ultimate.perKill);
     const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
     this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
     // Last enemy of the wave: slow-motion kill cam.
@@ -692,6 +712,7 @@ export class Game {
   onPerfectDodge(enemy) {
     const d = config.dodge;
     this.stats.perfectDodges++;
+    this.ultimate.gain(config.ultimate.perPerfectDodge);
     this.player.counterT = d.counterWindow;
     this.slowmo = d.slowmoTime;
     this.slowmoScale = d.slowmoScale;
@@ -795,6 +816,12 @@ export class Game {
     this.separate();
     this.arrows.update(dt, this.enemies, this);
     this.enemyArrows.update(dt);
+    this.ultimate.update(dt);
+    if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
+      if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
+        this.numbers.spawn(this.player.pos.clone().setY(2.3), `Storm ${Math.floor(this.ultimate.meter)}%`, 'callout');
+      }
+    }
     this.enemies = this.enemies.filter((e) => !e.removed);
 
     if (this.player.dead) {
@@ -849,7 +876,9 @@ export class Game {
     const look = new THREE.Vector3(this.aimPoint.x - this.player.pos.x, 0, this.aimPoint.z - this.player.pos.z);
     if (look.length() > 7) look.setLength(7);
     const target = this.player.pos.clone().addScaledVector(look, 0.2);
-    let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0));
+    // Pull the camera back while Arrow Storm rains down so the whole area is in view.
+    this.zoomPullAmt = (this.zoomPullAmt || 0) + ((this.ultimate.active ? 1 : 0) - (this.zoomPullAmt || 0)) * (1 - Math.exp(-3 * dt));
+    let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0)) * (1 + 0.22 * this.zoomPullAmt);
     if (this.cinematic) {
       // Boss intro: swing to the boss and push in, letterboxed.
       const c = this.cinematic;
@@ -896,6 +925,9 @@ export class Game {
       h.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
       h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
     }
+    h.ultFill.style.width = `${this.ultimate.meter}%`;
+    h.ult.classList.toggle('ready', this.ultimate.ready);
+    h.ult.classList.toggle('active', !!this.ultimate.active);
     const maxCharges = stat.dodgeCharges();
     h.dodgeFill.style.width = `${(p.dodgeMeter / maxCharges) * 100}%`;
     h.dodgeBox.style.setProperty('--segs', maxCharges);
@@ -945,6 +977,7 @@ export class Game {
         <div><kbd>Hold LMB</kbd><span>Draw the bow (slows you down)</span></div>
         <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
         <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through grunts)</span></div>
+        <div><kbd>Q</kbd><span>Arrow Storm, once the gold meter is full</span></div>
         <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
         <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
       </div>`;
