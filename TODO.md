@@ -10,10 +10,8 @@ yours.
 
 ## Proposed: replayability roadmap (pick order with the user)
 
-1. Merchant and blacksmith in camp: spend gems on gear rolls, salvage gear
-   for upgrades.
-2. Daily/weekly challenge runs with modifiers and a leaderboard.
-3. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
+1. Daily/weekly challenge runs with modifiers and a leaderboard.
+2. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
    music per stage.
 
 ## Next

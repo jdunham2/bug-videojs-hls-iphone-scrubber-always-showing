@@ -62,6 +62,8 @@ A walkable hub before and between runs. Walk up to a building and press E:
 - **Hall of Heroes:** choose Rowan the Ranger, Sylva the Huntress (faster draw) or Brom Ironbeard (more HP and damage). Unlock with gems after milestones.
 - **Tailor's Tent:** outfits (Crimson Hunter, Frost Warden, Shadow Stalker, Golden Champion), retextured on the same rig so every animation carries over.
 - **Trophy Board:** records and your save.
+- **Merchant:** three pieces of gear for sale (new stock after every run), a paid restock, and mystery bundles by slot.
+- **Blacksmith:** temper gear (+1 power) and hone its weakest perk (+1 tier) for gems.
 - **Ruin Gate:** start a new run or continue from the last save.
 
 ### Audio
@@ -94,6 +96,7 @@ Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kill
 | `src/loot.js` | Gems and health orbs |
 | `src/gear.js` | Gear data: bow and armor types, rarities, perks, stash, stats |
 | `src/missions.js`, `src/game-mission.js` | Missions, stars, the secret chest and the Mission Complete screen |
+| `src/shops.js` | Merchant stock and prices, blacksmith tempering and honing |
 | `src/difficulty.js` | Difficulty tiers and unlocks |
 | `src/gadgets.js` | Gadget effects and the gadget HUD |
 | `src/gear-drops.js`, `src/game-gear.js` | Gear drops in the arena, pickup card, equip on pickup |

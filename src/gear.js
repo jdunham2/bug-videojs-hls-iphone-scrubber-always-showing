@@ -169,6 +169,8 @@ let cache = null;
 const listeners = [];
 /** Called whenever the equipped gear changes (the hero's bow look listens). */
 export const onGearChange = (fn) => listeners.push(fn);
+/** Call after changing an item in place (blacksmith). */
+export const gearChanged = () => changed();
 function changed() {
   cache = null;
   saveProfile();

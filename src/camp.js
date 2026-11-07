@@ -10,8 +10,9 @@ import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
 import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
+import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
-import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
+import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon, PERKS, ROMAN_TIER } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
@@ -106,8 +107,8 @@ export class Camp {
     this.building('weaponRack', 1.9, -6, 8.5, 'armory', 'Armory', 0.9);
     this.prop('signpost', 2.2, -5, -5, 0.8, 0.4);
     this.prop('tent', 2.4, -11, -5, 1.0, 1.8);
-    this.prop('tent', 2.4, 6.5, -12, -0.4, 1.8);
-    this.prop('tent', 2.2, 12.5, 1, -1.6, 1.6);
+    this.building('blacksmithForge', 4.2, 6, -12, 'blacksmith', 'Blacksmith', 2.0);
+    this.building('merchantStall', 3.6, 12, 2, 'merchant', 'Merchant', 1.7);
     for (const [x, z] of [
       [-3, -3],
       [3, 3],
@@ -281,6 +282,7 @@ export class Camp {
 
   open(spot) {
     this.openKind = spot.kind;
+    this.shopNote = '';
     this.prompt.classList.remove('show');
     this.game.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
     this.render();
@@ -318,6 +320,10 @@ export class Camp {
         <p class="where">${saveWhere()}</p>`;
     } else if (k === 'armory') {
       html = this.armoryHtml();
+    } else if (k === 'merchant') {
+      html = this.merchantHtml();
+    } else if (k === 'blacksmith') {
+      html = this.blacksmithHtml();
     } else if (k === 'gate') {
       html = this.worldMapHtml();
     }
@@ -400,6 +406,91 @@ export class Camp {
       <div class="mdetail">${detail}</div></div>`;
   }
 
+  // ------------------------------------------------------------ shops
+
+  /** A compact card for one item (used by the shops). */
+  itemCard(item, extra = '') {
+    const R = RARITIES[item.rarity];
+    return `<div class="icard" style="--rar:${R.color}"><div class="ic-head"><span class="gi">${gearIcon(item)}</span><div><div class="gc-rar">${R.name} ${slotLabel(item.slot)}</div><div class="ic-name">${esc(item.name)}</div><div class="ic-meta">Power ${item.power}</div></div></div>
+      <div class="gc-perks">${perkLines(item) || '<div class="pk none">No perks</div>'}</div>${extra}</div>`;
+  }
+
+  merchantHtml() {
+    const stock = merchantStock();
+    const cards = stock
+      .map((item, i) => this.itemCard(item, item.sold ? '<div class="ic-act"><span class="tag">Sold</span></div>' : `<div class="ic-act"><button data-act="shop-buy" data-i="${i}" class="gold" ${profile.gems < price(item) ? 'disabled' : ''}>Buy · ◆ ${price(item)}</button></div>`))
+      .join('');
+    const mystery = ['bow', 'armor', 'gadget'].map((sl) => `<button data-act="shop-mystery" data-slot="${sl}" ${profile.gems < MYSTERY_COST ? 'disabled' : ''}>Mystery ${slotLabel(sl)} · ◆ ${MYSTERY_COST}</button>`).join('');
+    return `<h2>Merchant</h2><p class="lead">“Finest goods this side of the mountains. New stock every time you come back.”</p>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <div class="icards">${cards}</div>
+      <div class="actions">${mystery}<button data-act="shop-restock" ${profile.gems < RESTOCK_COST ? 'disabled' : ''}>Restock · ◆ ${RESTOCK_COST}</button></div>`;
+  }
+
+  blacksmithHtml() {
+    const items = [...stash()];
+    const sel = findItem(this.smithSel) || equipped('bow');
+    this.smithSel = sel?.uid;
+    const tiles = items
+      .sort((a, b) => (isEquipped(b) - isEquipped(a)) || score(b) - score(a))
+      .map((i) => `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="smith-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}"><span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`)
+      .join('');
+    let detail = '';
+    if (sel) {
+      const target = honeTarget(sel);
+      const maxed = sel.power >= MAX_POWER;
+      detail = this.itemCard(
+        sel,
+        `<div class="ic-act col">
+          <button data-act="smith-temper" class="gold" ${maxed || profile.gems < temperCost(sel) ? 'disabled' : ''}>${maxed ? 'Fully tempered' : `Temper: Power ${sel.power} → ${sel.power + 1} · ◆ ${temperCost(sel)}`}</button>
+          <button data-act="smith-hone" ${!target || profile.gems < honeCost(sel) ? 'disabled' : ''}>${target ? `Hone ${PERKS[target[0]].name} → ${ROMAN_TIER[target[1] + 1]} · ◆ ${honeCost(sel)}` : 'No perk to hone'}</button>
+        </div>`,
+      );
+    }
+    return `<h2>Blacksmith</h2><p class="lead">“Bring me your gear. I'll make it hit harder and hold up longer.”</p>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <div class="garmory"><div class="ggrid">${tiles}</div>${detail}</div>`;
+  }
+
+  onShopAct(act, data) {
+    const G = this.game;
+    let ok = false;
+    this.shopNote = '';
+    if (act === 'shop-buy') {
+      const item = buy(Number(data.i));
+      if (item) this.shopNote = `Bought <b style="color:${RARITIES[item.rarity].color}">${esc(item.name)}</b>. It's in your stash at the Armory.`;
+      ok = !!item;
+    } else if (act === 'shop-mystery') {
+      const item = buyMystery(data.slot);
+      if (item) this.shopNote = `The bundle held <b style="color:${RARITIES[item.rarity].color}">${esc(item.name)}</b> (${RARITIES[item.rarity].name}, Power ${item.power}).`;
+      ok = !!item;
+      if (item?.rarity === 'unique') G.sfx.sample('jingleClear', { vol: 0.6, jitter: 0 });
+    } else if (act === 'shop-restock') {
+      ok = payRestock();
+    } else if (act === 'smith-select') {
+      this.smithSel = data.uid;
+      G.sfx.sample('uiSelect', { vol: 0.25, jitter: 0 });
+      return this.render();
+    } else if (act === 'smith-temper') {
+      ok = temper(findItem(this.smithSel));
+      if (ok) {
+        this.shopNote = 'Tempered: +1 power.';
+        G.sfx.sample('clang', { vol: 0.8, rate: 1.1, jitter: 0.1 });
+      }
+    } else if (act === 'smith-hone') {
+      const name = hone(findItem(this.smithSel));
+      ok = !!name;
+      if (ok) {
+        this.shopNote = `${name} honed to the next tier.`;
+        G.sfx.sample('clang', { vol: 0.8, rate: 1.4, jitter: 0.1 });
+      }
+    }
+    G.sfx.sample(ok ? 'ding' : 'uiSwitch', { vol: ok ? 0.45 : 0.3, rate: ok ? 1.5 : 1, jitter: 0 });
+    if (ok) G.player.hp = G.maxHp();
+    this.refreshHud();
+    this.render();
+  }
+
   /** Difficulty cards: pick the tier for the next run. */
   tierPicker() {
     const cur = selectedDifficulty();
@@ -472,6 +563,7 @@ export class Camp {
     const G = this.game;
     if (act === 'close') return this.close();
     if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
+    if (act.startsWith('shop-') || act.startsWith('smith-')) return this.onShopAct(act, b.dataset);
     if (act === 'mission') {
       if (selectMission(v)) G.sfx.sample('uiSelect', { vol: 0.35, jitter: 0 });
       return this.render();
