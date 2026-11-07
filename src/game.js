@@ -19,6 +19,7 @@ import { Camp, portalTexture } from './camp.js';
 import { Hazards } from './hazards.js';
 import { makeElite, AFFIXES } from './elites.js';
 import { Ghoul, Imp, Fireballs } from './variants.js';
+import { settings, applySettings, SettingsPanel } from './settings.js';
 import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
@@ -113,12 +114,15 @@ export class Game {
     this.loot = new Loot(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
+
     this.fireballs = new Fireballs(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
     this.sfx.init(); // decode samples now; playback starts on the first click
     this.music = new Music(this.sfx);
+    this.settingsPanel = new SettingsPanel(this);
+    applySettings(this);
     this.input = new Input(r.domElement);
     this.enemies = [];
 
@@ -171,6 +175,7 @@ export class Game {
       e.preventDefault();
       this.sfx.unlock();
       this.music.start();
+      applySettings(this);
       if (this.state === 'paused') this.setPaused(false);
       else this.enterCamp(); // title and game over both lead to the camp
     });
@@ -999,6 +1004,7 @@ export class Game {
   }
 
   frame(realDt, render = true) {
+    this.input.poll();
     this.time += realDt;
     this.handleKeys();
     this.updateAim();
@@ -1051,6 +1057,7 @@ export class Game {
       this.guiHidden = !this.guiHidden;
       this.gui.show(!this.guiHidden);
     }
+    if (i.wasPressed('KeyO')) this.settingsPanel.toggle();
     if (i.wasPressed('KeyM')) {
       const muted = this.sfx.toggleMute();
       this.banner(muted ? 'Muted' : 'Sound on', '', 0.8);
@@ -1127,6 +1134,14 @@ export class Game {
   }
 
   updateAim() {
+    const pad = this.input.pad;
+    if (pad?.aim) {
+      // Right stick: aim in screen-relative directions, a fixed distance out.
+      const dir = this.camRight.clone().multiplyScalar(pad.aim.x).addScaledVector(this.camForward, pad.aim.y).normalize();
+      this.aimPoint.copy(this.player.pos).addScaledVector(dir, 8).setY(ARROW_HEIGHT);
+      return;
+    }
+    if (pad) return; // gamepad without aim input: keep the last aim
     this.raycaster.setFromCamera(new THREE.Vector2(this.input.mouse.ndcX, this.input.mouse.ndcY), this.camera);
     this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
   }
@@ -1163,7 +1178,7 @@ export class Game {
     this.camTarget.lerp(target, 1 - Math.exp(-6 * dt));
     this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, zoom);
     this.camera.lookAt(this.camTarget);
-    this.camera.position.add(this.shake.offset(this.shakeOffset, config.feel.shake));
+    this.camera.position.add(this.shake.offset(this.shakeOffset, config.feel.shake * settings.shake));
     this.camera.updateMatrixWorld();
   }
 

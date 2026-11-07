@@ -5,9 +5,11 @@ import { build, stat, buffs } from './skills.js';
 import { loadModels, models, modelStatus } from './models.js';
 import { Game } from './game.js';
 import { loadProfile, profile } from './profile.js';
+import { loadSettings } from './settings.js';
 
 loadConfig();
 loadProfile();
+loadSettings();
 const game = new Game(document.getElementById('app'));
 game.run();
 

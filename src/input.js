@@ -37,8 +37,50 @@ export class Input {
     });
   }
 
-  /** Movement in screen space: x = right, y = up. Normalized. */
+  /**
+   * Gamepad (standard mapping): left stick move, right stick aim, RT draw,
+   * A/B dodge, Y/LB Arrow Storm, X use, Start pause. Call once per frame.
+   */
+  poll() {
+    const pads = navigator.getGamepads ? [...navigator.getGamepads()] : [];
+    const gp = pads.find((p) => p && p.connected);
+    if (!gp) {
+      this.pad = null;
+      return;
+    }
+    const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
+    const btn = (i) => !!gp.buttons[i]?.pressed;
+    const prev = this.padPrev || [];
+    const edge = (i) => btn(i) && !prev[i];
+    const rx = dz(gp.axes[2] || 0);
+    const ry = dz(gp.axes[3] || 0);
+    this.pad = {
+      move: { x: dz(gp.axes[0] || 0), y: -dz(gp.axes[1] || 0) },
+      aim: rx || ry ? { x: rx, y: -ry } : null,
+    };
+    if (edge(0) || edge(1)) this.pressed.add('Space');
+    if (edge(3) || edge(4)) this.pressed.add('KeyQ');
+    if (edge(2)) this.pressed.add('KeyE');
+    if (edge(9)) this.pressed.add('KeyP');
+    const draw = btn(7) || (gp.buttons[7]?.value || 0) > 0.3 || btn(5);
+    if (draw) {
+      if (!this.mouse.down) this.mouse.clicked = true;
+      this.mouse.down = true;
+      this.padDrawing = true;
+    } else if (this.padDrawing) {
+      this.mouse.down = false;
+      this.padDrawing = false;
+    }
+    this.padPrev = gp.buttons.map((b) => b.pressed);
+  }
+
+  /** Movement in screen space: x = right, y = up. Normalized (analog on a gamepad). */
   axis() {
+    const m = this.pad?.move;
+    if (m && (m.x || m.y)) {
+      const len = Math.hypot(m.x, m.y);
+      return len > 1 ? { x: m.x / len, y: m.y / len } : m;
+    }
     let x = 0;
     let y = 0;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) x += 1;
