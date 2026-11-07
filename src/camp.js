@@ -9,9 +9,12 @@ import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
+import { stash, findItem, equipped, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
+
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 /** One line on where progress is kept, shown at the trophy board. */
 function saveWhere() {
@@ -78,7 +81,7 @@ export class Camp {
 
     this.prop('campfire', 1.0, 0, 0, 0, 1.0);
     this.addDummy(5, 1.5);
-    this.prop('weaponRack', 1.7, -5, 9.5, 0.6, 0.8);
+    this.building('weaponRack', 1.9, -6, 8.5, 'armory', 'Armory', 0.9);
     this.prop('signpost', 2.2, -5, -5, 0.8, 0.4);
     this.prop('tent', 2.4, -11, -5, 1.0, 1.8);
     this.prop('tent', 2.4, 6.5, -12, -0.4, 1.8);
@@ -249,7 +252,7 @@ export class Camp {
   refreshHud() {
     document.getElementById('camp-gems').textContent = `◆ ${profile.gems}`;
     const r = document.getElementById('camp-records');
-    if (r) r.textContent = `Best wave ${profile.best.wave} · Bosses ${profile.bosses} · Runs ${profile.runs}`;
+    if (r) r.textContent = `Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses} · Runs ${profile.runs}`;
   }
 
   // ------------------------------------------------------------ panels
@@ -291,6 +294,8 @@ export class Camp {
         </div>
         ${cp ? `<p class="save">Saved: after wave ${cp.wave} with ${Object.keys(cp.build).length} skills. Enter the gate to continue from wave ${cp.wave + 1}.</p>` : '<p class="save none">No save yet.</p>'}
         <p class="where">${saveWhere()}</p>`;
+    } else if (k === 'armory') {
+      html = this.armoryHtml();
     } else if (k === 'gate') {
       const cp = profile.checkpoint;
       html = `<h2>Camp Gate</h2><p class="lead">The road to the ruins starts here.</p><div class="actions">
@@ -299,6 +304,69 @@ export class Camp {
       </div>`;
     }
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
+  }
+
+  // ------------------------------------------------------------ armory
+
+  /** Equipped bow and armor, the stash, and a detail view comparing the selected item. */
+  armoryHtml() {
+    const items = stash();
+    const filter = this.gearFilter || 'all';
+    const shown = items.filter((i) => filter === 'all' || i.slot === filter).sort((a, b) => (isEquipped(b) - isEquipped(a)) || score(b) - score(a));
+    const sel = findItem(this.gearSel) || equipped('bow');
+    this.gearSel = sel?.uid;
+    const tile = (i) =>
+      `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="gear-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}">
+        <span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`;
+    const slotCard = (slot) => {
+      const i = equipped(slot);
+      return `<div class="gslot" style="--rar:${RARITIES[i.rarity].color}"><div class="gs-label">${slotLabel(slot)}</div><div class="gs-name">${esc(i.name)}</div><div class="gs-meta">${RARITIES[i.rarity].name} · Power ${i.power}</div></div>`;
+    };
+    let detail = '';
+    if (sel) {
+      const cur = equipped(sel.slot);
+      const R = RARITIES[sel.rarity];
+      detail = `<div class="gear-detail" style="--rar:${R.color}">
+        <div class="gc-top"><span class="gc-rar">${R.name} ${slotLabel(sel.slot)}</span><span class="gc-pow">Power ${sel.power}</span></div>
+        <div class="gc-name">${esc(sel.name)}</div>
+        <div class="gc-base">${baseOf(sel).blurb}${isEquipped(sel) ? '' : ` Compared with ${esc(cur.name)}.`}</div>
+        <div class="gc-stats">${statLines(sel, isEquipped(sel) ? null : cur)}</div>
+        <div class="gc-perks">${perkLines(sel) || '<div class="pk none">No perks</div>'}</div>
+        <div class="actions">${
+          isEquipped(sel)
+            ? '<span class="tag on">Equipped</span>'
+            : `<button data-act="gear-equip" data-uid="${sel.uid}" class="gold">Equip</button><button data-act="gear-salvage" data-uid="${sel.uid}">Salvage · ◆ ${salvageValue(sel)}</button>`
+        }</div></div>`;
+    }
+    const tab = (f, label) => `<button class="gtab ${filter === f ? 'on' : ''}" data-act="gear-filter" data-f="${f}">${label}</button>`;
+    return `<h2>Armory</h2><p class="lead">Hero power <b>${heroPower()}</b>. Gear you find in the ruins ends up here.</p>
+      <div class="gslots">${slotCard('bow')}${slotCard('armor')}</div>
+      <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}<span class="gcount">${items.length} / 40</span></div>
+      <div class="ggrid">${shown.map(tile).join('')}</div></div>${detail}</div>`;
+  }
+
+  onGearAct(act, data) {
+    const G = this.game;
+    if (act === 'gear-select') this.gearSel = data.uid;
+    else if (act === 'gear-filter') this.gearFilter = data.f;
+    else if (act === 'gear-equip') {
+      const item = findItem(data.uid);
+      if (item) {
+        equip(item);
+        G.sfx.sample('clang', { vol: 0.5, rate: 1.3, jitter: 0 });
+        G.player.hp = G.maxHp();
+      }
+    } else if (act === 'gear-salvage') {
+      const item = findItem(data.uid);
+      const gems = item ? salvage(item) : 0;
+      if (gems) {
+        G.sfx.sample('ding', { vol: 0.5, rate: 1.6, jitter: 0 });
+        this.gearSel = null;
+        this.refreshHud();
+      }
+    }
+    G.sfx.sample('uiSelect', { vol: 0.25, jitter: 0 });
+    this.render();
   }
 
   card(key, name, perk, blurb, cost, req, value, selected, available) {
@@ -320,6 +388,7 @@ export class Camp {
     const v = b.dataset.v;
     const G = this.game;
     if (act === 'close') return this.close();
+    if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
     if (act === 'new' || act === 'continue') {
       this.close();
       G.startFromCamp(act === 'continue');

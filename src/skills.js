@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { gearStats } from './gear.js';
 import { currentCharacter } from './profile.js';
 
 // Skill catalogue. `desc(level)` describes the total effect at that level, so a
@@ -158,13 +159,18 @@ const perk = (k) => currentCharacter().stats[k] ?? 1;
 /** Temporary effects from the arena (haste runes, ice patches). */
 export const buffs = { haste: 0, slippery: false, chill: 0 };
 
+/** Final stats: config base × run skills × character perk × equipped gear × arena effects. */
 export const stat = {
-  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime') * (buffs.haste > 0 ? 0.8 : 1),
-  perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')),
-  maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality')) * perk('maxHp')),
+  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime') * gearStats().drawTime * (buffs.haste > 0 ? 0.8 : 1),
+  perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')) * gearStats().window,
+  maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality') + gearStats().hpAdd) * perk('maxHp') * gearStats().hpMult),
   dodgeCharges: () => 1 + lv('secondWind'),
-  damage: () => perk('damage'),
-  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1),
+  damage: () => perk('damage') * gearStats().damage,
+  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * gearStats().speed * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1),
+  arrowSpeed: () => gearStats().arrowSpeed,
+  drawMove: () => config.bow.drawMoveMultiplier * gearStats().drawMove,
+  damageTaken: () => 1 - gearStats().dr,
+  dodgeRecharge: () => gearStats().dodge,
 };
 
 export const OVERDRAW_TIME = 0.9; // extra seconds past the perfect window to reach a mega-shot

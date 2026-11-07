@@ -251,6 +251,7 @@ export class FlowMethods {
     setTimeout(() => {
       // Anything still on the floor is scooped up on the way through.
       this.loot.scoop();
+      this.gearDrops.scoop();
       this.arrows.clear();
       this.enemyArrows.clear();
       this.decals.clear();

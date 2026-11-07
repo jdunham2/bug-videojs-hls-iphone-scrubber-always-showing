@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeBowParts, holdInHand } from './bow.js';
+import { gearStats, equipped, baseOf, onGearChange } from './gear.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME, buffs } from './skills.js';
 import { models, outfits, instantiate, findBone, loadTexture } from './models.js';
@@ -119,6 +120,7 @@ export class Player {
     bow.add(inner);
     const parts = makeBowParts();
     this.bowMat = parts.mat;
+    this.bowGripMat = parts.grip.material = parts.grip.material.clone();
     this.limbs = parts.limbs;
     this.bowTip = parts.tip;
     inner.add(parts.limbs, parts.grip);
@@ -139,6 +141,20 @@ export class Player {
     this.bowInner = inner;
     this.stringKick = 0;
     this.rig.add(bow);
+    this.applyGearLook();
+    onGearChange(() => this.applyGearLook());
+  }
+
+  /** The equipped bow's look: wood colour and size by type, grip wrap by rarity. */
+  applyGearLook() {
+    const item = equipped('bow');
+    if (!item) return;
+    const base = baseOf(item);
+    this.bowMat.color.set(base.color);
+    this.bowInner.scale.setScalar(base.scale);
+    this.bowGripMat.color.set(item.rarity === 'unique' ? 0xd8a23a : item.rarity === 'rare' ? 0x2c5a8a : 0x2e1f14);
+    this.bowGripMat.metalness = item.rarity === 'unique' ? 0.7 : 0;
+    this.bowGripMat.roughness = item.rarity === 'unique' ? 0.35 : 0.9;
   }
 
   /** Move the bow into the model's bow hand (it stays world-upright; see updateModel). */
@@ -188,7 +204,7 @@ export class Player {
   }
 
   get rechargeTime() {
-    return config.dodge.duration + config.dodge.cooldown;
+    return (config.dodge.duration + config.dodge.cooldown) * stat.dodgeRecharge();
   }
 
   /** Dodge charges as a 0..max float, counting the one currently recharging. */
@@ -225,8 +241,8 @@ export class Player {
   }
 
   update(dt, input, aimPoint, game) {
-    const bowCfg = config.bow;
     this.cooldown -= dt;
+    this.momentumT = Math.max(0, (this.momentumT || 0) - dt);
     this.iframes = Math.max(0, this.iframes - dt);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
@@ -308,7 +324,7 @@ export class Player {
       if (this.rollT >= d.duration) this.rolling = false;
     } else {
       const axis = this.casting > 0 ? { x: 0, y: 0 } : input.axis();
-      const speed = stat.moveSpeed() * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
+      const speed = stat.moveSpeed() * (this.drawing ? stat.drawMove() : 1);
       const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
       const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
       const k = 1 - Math.exp(-(buffs.slippery ? 2.2 : 18) * dt); // ice: slow to start and stop
@@ -623,6 +639,7 @@ export class Player {
 
   startRoll(input, game) {
     const d = config.dodge;
+    if (gearStats().perk('momentum')) this.momentumT = 3;
     const axis = input.axis();
     if (axis.x || axis.y) {
       this.rollDir
@@ -656,9 +673,14 @@ export class Player {
     game.sfx.drawStop();
 
     let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge) * stat.damage();
-    if (perfect) damage *= cfg.perfectMultiplier;
+    if (perfect) damage *= cfg.perfectMultiplier * (1 + gearStats().perk('keenEye'));
     if (mega) damage *= 3;
-    const speed = lerp(cfg.minArrowSpeed, cfg.maxArrowSpeed, charge) * (mega ? 1.2 : 1);
+    // Momentum (gear): the first shot after a dodge hits harder.
+    if (this.momentumT > 0) {
+      damage *= 1 + gearStats().perk('momentum');
+      this.momentumT = 0;
+    }
+    const speed = lerp(cfg.minArrowSpeed, cfg.maxArrowSpeed, charge) * (mega ? 1.2 : 1) * stat.arrowSpeed();
     const origin = new THREE.Vector3(this.pos.x, ARROW_HEIGHT, this.pos.z).addScaledVector(this.aimDir, 0.7);
     game.fireArrow(origin, this.aimDir.clone(), speed, damage, charge, perfect, { mega });
 
@@ -683,6 +705,7 @@ export class Player {
     if (this.dead) return false;
     if (this.rollInvuln) return 'dodged';
     if (this.iframes > 0) return false;
+    amount *= stat.damageTaken();
     this.hp = Math.max(0, this.hp - amount);
     this.iframes = config.player.iFrames;
     this.hurtFlash = 0.25;

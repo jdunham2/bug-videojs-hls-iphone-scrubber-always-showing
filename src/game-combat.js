@@ -1,5 +1,6 @@
 // Combat events: firing, hits, kills, elements, lightning, explosions, dodges, damage.
 import * as THREE from 'three';
+import { gearStats } from './gear.js';
 import { config } from './config.js';
 import { lv, buffs } from './skills.js';
 
@@ -41,7 +42,10 @@ export class CombatMethods {
   }
 
   onArrowHit(arrow, enemy, point) {
-    const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect || arrow.mega);
+    // Broadheads (gear): extra damage to elites and bosses.
+    const G = gearStats();
+    const damage = arrow.damage * (enemy.elite || enemy.isBoss ? 1 + G.perk('broadheads') : 1);
+    const result = enemy.hit(damage, arrow.dir, arrow.charge, arrow.perfect || arrow.mega);
     if (!result) return;
     if (arrow.hitCount === 0 && !arrow.extra) {
       this.stats.hits++;
@@ -51,7 +55,8 @@ export class CombatMethods {
     const full = arrow.charge >= 0.999;
 
     const kind = arrow.mega ? 'mega' : arrow.perfect ? 'perfect' : full ? 'crit' : 'normal';
-    this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 0.8, 0)), Math.round(arrow.damage), kind);
+    this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 0.8, 0)), Math.round(damage), kind);
+    if (G.perk('barbed') && result !== 'kill') enemy.applyBleed?.(G.perk('barbed'), 3);
     this.particles.spawn(point, {
       count: arrow.perfect || arrow.mega ? 22 : 8 + Math.round(arrow.charge * 8),
       color: arrow.mega ? [3, 0.6, 2.4] : arrow.perfect ? [3, 2.1, 0.5] : 0xb33a2a,
@@ -87,6 +92,13 @@ export class CombatMethods {
 
   onKill(enemy) {
     this.stats.kills++;
+    // Field Dressing (gear): patch yourself up a little on every kill.
+    const dressing = gearStats().perk('fieldDressing');
+    if (dressing && !this.player.dead) {
+      const heal = Math.min(dressing, this.maxHp() - this.player.hp);
+      if (heal > 0) this.player.hp += heal;
+    }
+    this.dropGear(enemy);
     if (enemy.affix === 'volatile' || enemy.kind === 'bomber') {
       const pos = enemy.pos.clone();
       const big = enemy.affix === 'volatile';

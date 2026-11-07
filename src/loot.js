@@ -2,6 +2,7 @@
 // of defeated enemies, bounce, then get pulled into the hero.
 
 import * as THREE from 'three';
+import { gearStats } from './gear.js';
 
 const gemGeo = new THREE.OctahedronGeometry(0.16, 0);
 const orbGeo = new THREE.SphereGeometry(0.2, 12, 8);
@@ -85,7 +86,8 @@ export class Loot {
   collect(it) {
     const G = this.game;
     if (it.type === 'gem') {
-      this.runGems++;
+      // Scavenger (gear): a chance for an extra gem.
+      this.runGems += 1 + (Math.random() < gearStats().perk('scavenger') ? 1 : 0);
       G.sfx.sample('ding', { vol: 0.18, rate: 2 + Math.random() * 0.3, jitter: 0 });
       G.hud.gems.classList.remove('bump');
       void G.hud.gems.offsetWidth;

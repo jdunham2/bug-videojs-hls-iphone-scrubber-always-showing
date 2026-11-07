@@ -213,6 +213,7 @@ export class UiMethods {
         </div>
         ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
         ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
+        ${this.gearSummary() ? `<p class="gear-found">${this.gearSummary()}</p>` : ''}
         <button>Return to camp</button>
         <p class="tip">Or press R to jump straight back in</p>`;
     }

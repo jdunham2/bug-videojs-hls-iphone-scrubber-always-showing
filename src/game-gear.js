@@ -1,0 +1,83 @@
+// Gear in a run: what drops from whom, picking it up, and the pickup card that
+// lets you equip it on the spot (E / gamepad X).
+
+import { rollItem, rollRarity, addToStash, equip, equipped, statLines, perkLines, RARITIES, slotLabel, baseOf, score } from './gear.js';
+
+/** Item power for a drop: grows with the wave and the arena. */
+function dropPower(game, bonus = 0) {
+  return Math.max(1, Math.round((game.wave || 1) * 0.9 + (game.arena || 0) * 2 + bonus + (Math.random() * 2 - 1)));
+}
+
+export class GearMethods {
+  /** Maybe drop gear from a defeated enemy (bosses always drop two pieces). */
+  dropGear(enemy) {
+    const roll = (source, bonus) => {
+      const slot = Math.random() < 0.55 ? 'bow' : 'armor';
+      return rollItem(slot, dropPower(this, bonus), rollRarity(source));
+    };
+    if (enemy.isBoss) {
+      for (const slot of ['bow', 'armor']) this.gearDrops.spawn(enemy.pos, rollItem(slot, dropPower(this, 2), rollRarity('boss')));
+      return;
+    }
+    const chance = enemy.elite ? 0.35 : enemy.kind === 'archer' || enemy.kind === 'bomber' ? 0.05 : 0.035;
+    if (Math.random() < chance) this.gearDrops.spawn(enemy.pos, roll(enemy.elite ? 'elite' : 'enemy', enemy.elite ? 1 : 0));
+  }
+
+  onGearPickup(item) {
+    addToStash(item);
+    (this.runGear ||= []).push(item);
+    const unique = item.rarity === 'unique';
+    this.sfx.sample(unique ? 'jingleClear' : 'uiConfirm', { vol: unique ? 0.6 : 0.45, jitter: 0 });
+    this.particles.spawn(this.player.pos.clone().setY(1.2), { count: unique ? 30 : 14, color: [2, 1.8, 1.2], speed: 3, up: 3, life: 0.6, size: 0.07 });
+    this.showGearCard(item);
+  }
+
+  /** The pickup card: the new item against what you have equipped. */
+  showGearCard(item) {
+    const el = document.getElementById('gear-card');
+    const cur = equipped(item.slot);
+    const R = RARITIES[item.rarity];
+    const better = cur && score(item) > score(cur);
+    el.style.setProperty('--rar', R.color);
+    el.innerHTML = `
+      <div class="gc-top"><span class="gc-rar">${R.name} ${slotLabel(item.slot)}</span><span class="gc-pow">Power ${item.power}</span></div>
+      <div class="gc-name"></div>
+      <div class="gc-base">${baseOf(item).blurb}</div>
+      <div class="gc-stats">${statLines(item, cur)}</div>
+      <div class="gc-perks">${perkLines(item) || '<div class="pk none">No perks</div>'}</div>
+      <div class="gc-foot"><kbd>E</kbd> Equip now${better ? ' <b class="gc-better">Upgrade</b>' : ''}<span>Saved to your stash</span></div>`;
+    el.querySelector('.gc-name').textContent = item.name;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    this.gearCard = { item, t: 6 };
+  }
+
+  updateGearCard(dt) {
+    const c = this.gearCard;
+    if (!c) return;
+    c.t -= dt;
+    if (this.input.wasPressed('KeyE') && this.state === 'playing') {
+      equip(c.item);
+      this.numbers.spawn(this.player.pos.clone().setY(2.4), `${c.item.name} equipped`, 'callout gold');
+      this.sfx.sample('clang', { vol: 0.4, rate: 1.4, jitter: 0 });
+      // Armor can change max HP: keep the same fraction of health.
+      this.player.hp = Math.min(this.player.hp, this.maxHp());
+      return this.hideGearCard();
+    }
+    if (c.t <= 0) this.hideGearCard();
+  }
+
+  hideGearCard() {
+    this.gearCard = null;
+    document.getElementById('gear-card')?.classList.remove('show');
+  }
+
+  /** One line for the game-over screen. */
+  gearSummary() {
+    const found = this.runGear || [];
+    if (!found.length) return '';
+    const best = [...found].sort((a, b) => score(b) - score(a))[0];
+    return `Gear found: ${found.length} · best: <b style="color:${RARITIES[best.rarity].color}">${best.name}</b> (Power ${best.power}). Visit the Armory in camp.`;
+  }
+}

@@ -6,22 +6,20 @@ yours.
 
 ## Now
 
-- [ ] Waiting on the user to pick from the replayability roadmap below.
+- [ ] Get the user's feedback on gear loot (Build 46+), then start on gadgets (#1 below).
 
 ## Proposed: replayability roadmap (pick order with the user)
 
-1. Gear loot: bows, armor and gadgets drop with rarities (common → unique),
-   power level, and upgrade slots ("craftsmanship"); inventory/equip screen.
-2. Mission map: pick a stage from a world map, each a hand-made layout with
-   objectives, secrets, chests and a boss; stars for clearing.
-3. Difficulty tiers (Adventurer → Veteran → Legend) that raise enemy power
+1. Gadgets on cooldown (bear trap, smoke bomb, war horn, decoy, net, healing
+   flask) as an extra gear slot, no magic.
+2. Difficulty tiers (Adventurer → Veteran → Legend) that raise enemy power
    and loot quality; recommended power per mission.
-4. Gadgets on cooldown (bear trap, smoke bomb, war horn, decoy, net, healing
-   flask) as the "artifact" slot, no magic.
-5. Merchant and blacksmith in camp: spend gems on gear rolls, salvage gear
+3. Mission map: pick a stage from a world map, each a hand-made layout with
+   objectives, secrets, chests and a boss; stars for clearing.
+4. Merchant and blacksmith in camp: spend gems on gear rolls, salvage gear
    for upgrades.
-6. Daily/weekly challenge runs with modifiers and a leaderboard.
-7. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
+5. Daily/weekly challenge runs with modifiers and a leaderboard.
+6. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
    music per stage.
 
 ## Next

@@ -241,6 +241,12 @@ export class Grunt {
     this.wedge.visible = state === 'windup';
   }
 
+  /** Barbed arrowheads: damage over time, no flames. */
+  applyBleed(dps, duration) {
+    this.bleedT = duration;
+    this.bleedDps = Math.max(this.bleedDps || 0, dps);
+  }
+
   applyBurn(dps, duration) {
     this.burnT = duration;
     this.burnDps = Math.max(this.burnDps, dps);
@@ -263,6 +269,23 @@ export class Grunt {
 
   /** Burn damage and effect timers (real time). Returns true if the burn killed it. */
   updateStatus(dt) {
+    if (this.bleedT > 0) {
+      this.bleedT -= dt;
+      const dmg = this.bleedDps * Math.min(dt, this.bleedT + dt);
+      this.hp -= dmg;
+      this.bleedShown = (this.bleedShown || 0) + dmg;
+      if (Math.random() < dt * 8) this.game.particles.spawn(this.pos.clone().setY(0.8 + Math.random() * 0.6), { count: 1, color: 0x8a1a12, speed: 0.4, up: 0.2, life: 0.5, size: 0.07, gravity: 6 });
+      if (this.bleedShown >= 5 || (this.bleedT <= 0 && this.bleedShown >= 1)) {
+        this.game.numbers.spawn(this.pos.clone().setY(2), Math.round(this.bleedShown), 'burn');
+        this.bleedShown = 0;
+      }
+      if (this.bleedT <= 0) this.bleedDps = 0;
+      if (this.hp <= 0) {
+        this.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+        this.game.onKill(this);
+        return true;
+      }
+    }
     if (this.burnT > 0) {
       this.burnT -= dt;
       const dmg = this.burnDps * Math.min(dt, this.burnT + dt);

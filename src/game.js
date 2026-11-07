@@ -13,6 +13,8 @@ import { EnemyArrows } from './archer.js';
 import { ArrowVolley } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
+import { GearDrops } from './gear-drops.js';
+import { GearMethods } from './game-gear.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
@@ -100,6 +102,7 @@ export class Game {
     this.enemyArrows = new EnemyArrows(this);
     this.ultimate = new ArrowVolley(this);
     this.loot = new Loot(this);
+    this.gearDrops = new GearDrops(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
 
@@ -197,6 +200,9 @@ export class Game {
     this.fireballs.clear();
     this.ultimate.clear();
     this.loot.clear();
+    this.gearDrops.clear();
+    this.hideGearCard?.();
+    this.runGear = [];
     this.zoomPull = 0;
     this.killCam = null;
     this.cinematic = null;
@@ -476,6 +482,8 @@ export class Game {
     buffs.chill = Math.max(0, buffs.chill - dt);
     this.ultimate.update(dt);
     this.loot.update(dt);
+    this.gearDrops.update(dt);
+    this.updateGearCard(dt);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
       if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
         this.numbers.spawn(this.player.pos.clone().setY(2.3), `Volley ${Math.floor(this.ultimate.meter)}%`, 'callout');
@@ -586,7 +594,7 @@ export class Game {
 }
 
 // Game's methods live in a few focused modules; mix them in here.
-for (const Mixin of [UiMethods, CombatMethods, FlowMethods, TuningMethods]) {
+for (const Mixin of [UiMethods, CombatMethods, FlowMethods, TuningMethods, GearMethods]) {
   for (const key of Object.getOwnPropertyNames(Mixin.prototype)) {
     if (key !== 'constructor') Game.prototype[key] = Mixin.prototype[key];
   }
