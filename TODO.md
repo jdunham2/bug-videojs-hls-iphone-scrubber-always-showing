@@ -6,8 +6,8 @@ yours.
 
 ## Now
 
-- [ ] Ship: lint, smoke test, commit, push, rebuild preview, republish artifact
-      with `db` + `user` capabilities (account save), check the save works.
+- [ ] Confirm on the live page that the shrine shows Best wave 5 / Bosses 1 after a
+      refresh (account save doc: `data/users/<id>/profile`).
 
 ## Next
 
