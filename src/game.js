@@ -326,10 +326,19 @@ export class Game {
     this.hideOverlay();
     this.resetRun();
     this.state = 'camp';
+    document.body.classList.remove('title-backdrop');
     this.setScene(this.camp.scene);
     this.camp.enter();
     document.body.classList.add('in-camp');
     this.fade();
+  }
+
+  /** Show the camp behind the title screen once models are ready. */
+  showCampBackdrop() {
+    if (this.state !== 'title') return;
+    this.setScene(this.camp.scene);
+    this.camp.enter();
+    document.body.classList.add('in-camp', 'title-backdrop');
   }
 
   leaveCamp() {
@@ -931,7 +940,7 @@ export class Game {
         dt = realDt * 0.03;
       }
       this.simulate(dt);
-    } else if (this.state === 'camp') {
+    } else if (this.state === 'camp' || (this.state === 'title' && this.camp.active)) {
       dt = realDt;
       this.player.update(dt, this.input, this.aimPoint, this);
       this.camp.update(dt, this.time);
@@ -1233,7 +1242,9 @@ export class Game {
 
   setupGui() {
     const gui = (this.gui = new GUI({ title: 'Tuning  ( ` to hide )' }));
-    this.guiHidden = false;
+    // Developer tuning panel starts hidden; ` toggles it.
+    this.guiHidden = true;
+    gui.show(false);
     const b = gui.addFolder('Bow');
     b.add(config.bow, 'drawTime', 0.2, 2, 0.01).name('Draw time (s)');
     b.add(config.bow, 'perfectWindow', 0.03, 0.5, 0.01).name('Perfect window (s)');

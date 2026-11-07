@@ -32,6 +32,8 @@ export class Player {
     this.knock = new THREE.Vector3();
     this.aimDir = new THREE.Vector3(0, 0, -1);
     this.rollDir = new THREE.Vector3(0, 0, 1);
+    this.moveDir = new THREE.Vector3(0, 0, -1);
+    this.bowBlend = 0;
     this.yaw = Math.PI;
 
     this.group = new THREE.Group();
@@ -297,7 +299,10 @@ export class Player {
     (this.collide || resolveCircle)(this.pos, PLAYER_RADIUS);
 
     // Facing follows aim
-    const faceDir = this.rolling ? this.rollDir : this.aimDir;
+    // Face where you're running; turn to the cursor only while drawing, shooting or casting.
+    const aimingNow = this.drawing || this.releaseT > 0 || this.casting > 0;
+    if (Math.hypot(this.vel.x, this.vel.z) > 0.8) this.moveDir.set(this.vel.x, 0, this.vel.z).normalize();
+    const faceDir = this.rolling ? this.rollDir : aimingNow ? this.aimDir : this.moveDir;
     this.yaw = lerpAngle(this.yaw, Math.atan2(faceDir.x, faceDir.z), 1 - Math.exp(-(this.rolling ? 40 : 25) * dt));
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
@@ -422,9 +427,20 @@ export class Player {
     }
     A.update(dt);
     if (this.bowProp) {
-      // Keep the bow upright and facing the aim line, whatever the hand is doing.
-      this.group.updateMatrixWorld(true);
-      orientProp(this.bowProp, UP, this.aimDir);
+      // The bow stays in the hand as animated, and only straightens up along the
+      // aim line while drawing (blended so it never snaps).
+      const aiming = this.drawing || this.releaseT > 0;
+      this.bowBlend += ((aiming ? 1 : 0) - this.bowBlend) * (1 - Math.exp(-14 * dt));
+      const bp = this.bowProp;
+      bp.userData.baseQ ||= bp.quaternion.clone();
+      if (this.bowBlend > 0.001) {
+        this.group.updateMatrixWorld(true);
+        orientProp(bp, UP, this.aimDir);
+        const aimQ = bp.quaternion.clone();
+        bp.quaternion.copy(bp.userData.baseQ).slerp(aimQ, this.bowBlend);
+      } else {
+        bp.quaternion.copy(bp.userData.baseQ);
+      }
     }
   }
 

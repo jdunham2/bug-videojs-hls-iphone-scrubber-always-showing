@@ -16,6 +16,7 @@ game.run();
 loadModels().then(() => {
   game.player.attachModel();
   game.env.build();
+  game.showCampBackdrop();
   const loaded = Object.keys(models);
   if (loaded.length) console.info('Loaded models:', loaded.join(', '));
   game.showModelStatus();
