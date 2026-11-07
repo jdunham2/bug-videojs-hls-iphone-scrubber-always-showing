@@ -6,7 +6,7 @@ yours.
 
 ## Now
 
-- [ ] Waiting on the user (Build 58): build label in the corner, which
+- [ ] Waiting on the user (Build 59): build label in the corner, which
       characters "aren't working" and how, and a Copy diagnostics report if
       walking still stops after wave 4 or the merchant/blacksmith misbehave.
       None of these reproduce here with their real save.
