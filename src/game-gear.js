@@ -1,7 +1,7 @@
 // Gear in a run: what drops from whom, picking it up, and the pickup card that
 // lets you equip it on the spot (E / gamepad X).
 
-import { rollItem, rollRarity, addToStash, equip, equipped, statLines, perkLines, RARITIES, slotLabel, baseOf, score } from './gear.js';
+import { rollItem, rollRarity, addToStash, equip, equipped, equippedGadget, statLines, perkLines, RARITIES, slotLabel, baseOf, score } from './gear.js';
 
 /** Item power for a drop: grows with the wave and the arena. */
 function dropPower(game, bonus = 0) {
@@ -12,11 +12,13 @@ export class GearMethods {
   /** Maybe drop gear from a defeated enemy (bosses always drop two pieces). */
   dropGear(enemy) {
     const roll = (source, bonus) => {
-      const slot = Math.random() < 0.55 ? 'bow' : 'armor';
+      const r = Math.random();
+      const slot = r < 0.42 ? 'bow' : r < 0.75 ? 'armor' : 'gadget';
       return rollItem(slot, dropPower(this, bonus), rollRarity(source));
     };
     if (enemy.isBoss) {
-      for (const slot of ['bow', 'armor']) this.gearDrops.spawn(enemy.pos, rollItem(slot, dropPower(this, 2), rollRarity('boss')));
+      const slots = ['bow', 'armor', 'gadget'].sort(() => Math.random() - 0.5).slice(0, 2);
+      for (const slot of slots) this.gearDrops.spawn(enemy.pos, rollItem(slot, dropPower(this, 2), rollRarity('boss')));
       return;
     }
     const chance = enemy.elite ? 0.35 : enemy.kind === 'archer' || enemy.kind === 'bomber' ? 0.05 : 0.035;
@@ -35,7 +37,7 @@ export class GearMethods {
   /** The pickup card: the new item against what you have equipped. */
   showGearCard(item) {
     const el = document.getElementById('gear-card');
-    const cur = equipped(item.slot);
+    const cur = item.slot === 'gadget' ? equippedGadget(1) : equipped(item.slot);
     const R = RARITIES[item.rarity];
     const better = cur && score(item) > score(cur);
     el.style.setProperty('--rar', R.color);
@@ -45,7 +47,7 @@ export class GearMethods {
       <div class="gc-base">${baseOf(item).blurb}</div>
       <div class="gc-stats">${statLines(item, cur)}</div>
       <div class="gc-perks">${perkLines(item) || '<div class="pk none">No perks</div>'}</div>
-      <div class="gc-foot"><kbd>E</kbd> Equip now${better ? ' <b class="gc-better">Upgrade</b>' : ''}<span>Saved to your stash</span></div>`;
+      <div class="gc-foot"><kbd>E</kbd> ${item.slot === 'gadget' ? 'Equip in slot 1' : 'Equip now'}${better ? ' <b class="gc-better">Upgrade</b>' : ''}<span>Saved to your stash</span></div>`;
     el.querySelector('.gc-name').textContent = item.name;
     el.classList.remove('show');
     void el.offsetWidth;
@@ -58,6 +60,7 @@ export class GearMethods {
     if (!c) return;
     c.t -= dt;
     if (this.input.wasPressed('KeyE') && this.state === 'playing') {
+      this.input.pressed.delete('KeyE'); // E equips here rather than firing the volley
       equip(c.item);
       this.numbers.spawn(this.player.pos.clone().setY(2.4), `${c.item.name} equipped`, 'callout gold');
       this.sfx.sample('clang', { vol: 0.4, rate: 1.4, jitter: 0 });

@@ -15,6 +15,7 @@ import { Music } from './music.js';
 import { Loot } from './loot.js';
 import { GearDrops } from './gear-drops.js';
 import { GearMethods } from './game-gear.js';
+import { Gadgets } from './gadgets.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
@@ -103,6 +104,7 @@ export class Game {
     this.ultimate = new ArrowVolley(this);
     this.loot = new Loot(this);
     this.gearDrops = new GearDrops(this);
+    this.gadgets = new Gadgets(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
 
@@ -201,6 +203,7 @@ export class Game {
     this.ultimate.clear();
     this.loot.clear();
     this.gearDrops.clear();
+    this.gadgets?.clear();
     this.hideGearCard?.();
     this.runGear = [];
     this.zoomPull = 0;
@@ -484,6 +487,8 @@ export class Game {
     this.loot.update(dt);
     this.gearDrops.update(dt);
     this.updateGearCard(dt);
+    this.gadgets.update(dt);
+    for (const n of [1, 2]) if (this.input.wasPressed(`Digit${n}`) && !this.player.dead) this.gadgets.use(n, this.aimPoint);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
       if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
         this.numbers.spawn(this.player.pos.clone().setY(2.3), `Volley ${Math.floor(this.ultimate.meter)}%`, 'callout');

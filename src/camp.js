@@ -9,7 +9,7 @@ import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
-import { stash, findItem, equipped, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
+import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
@@ -318,31 +318,42 @@ export class Camp {
     const tile = (i) =>
       `<button class="gtile ${i.uid === sel?.uid ? 'sel' : ''} ${isEquipped(i) ? 'eq' : ''}" data-act="gear-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}">
         <span class="gi">${gearIcon(i)}</span><span class="gp">${i.power}</span>${isEquipped(i) ? '<span class="ge">E</span>' : ''}</button>`;
-    const slotCard = (slot) => {
-      const i = equipped(slot);
-      return `<div class="gslot" style="--rar:${RARITIES[i.rarity].color}"><div class="gs-label">${slotLabel(slot)}</div><div class="gs-name">${esc(i.name)}</div><div class="gs-meta">${RARITIES[i.rarity].name} · Power ${i.power}</div></div>`;
+    const slotCard = (key, label) => {
+      const i = key.startsWith('gadget') ? equippedGadget(Number(key.slice(-1))) : equipped(key);
+      if (!i) return `<div class="gslot empty"><div class="gs-label">${label}</div><div class="gs-name">Empty</div></div>`;
+      return `<button class="gslot" data-act="gear-select" data-uid="${i.uid}" style="--rar:${RARITIES[i.rarity].color}"><span class="gs-icon">${gearIcon(i)}</span><div class="gs-label">${label}</div><div class="gs-name">${esc(i.name)}</div><div class="gs-meta">${RARITIES[i.rarity].name} · Power ${i.power}</div></button>`;
     };
     let detail = '';
     if (sel) {
-      const cur = equipped(sel.slot);
+      const cur = sel.slot === 'gadget' ? equippedGadget(1) || equippedGadget(2) : equipped(sel.slot);
       const R = RARITIES[sel.rarity];
       detail = `<div class="gear-detail" style="--rar:${R.color}">
         <div class="gc-top"><span class="gc-rar">${R.name} ${slotLabel(sel.slot)}</span><span class="gc-pow">Power ${sel.power}</span></div>
         <div class="gc-name">${esc(sel.name)}</div>
-        <div class="gc-base">${baseOf(sel).blurb}${isEquipped(sel) ? '' : ` Compared with ${esc(cur.name)}.`}</div>
-        <div class="gc-stats">${statLines(sel, isEquipped(sel) ? null : cur)}</div>
+        <div class="gc-base">${baseOf(sel).blurb}${isEquipped(sel) || !cur || cur.base !== sel.base && sel.slot === 'gadget' ? '' : ` Compared with ${esc(cur.name)}.`}</div>
+        <div class="gc-stats">${statLines(sel, isEquipped(sel) || (sel.slot === 'gadget' && cur?.base !== sel.base) ? null : cur)}</div>
         <div class="gc-perks">${perkLines(sel) || '<div class="pk none">No perks</div>'}</div>
-        <div class="actions">${
-          isEquipped(sel)
-            ? '<span class="tag on">Equipped</span>'
-            : `<button data-act="gear-equip" data-uid="${sel.uid}" class="gold">Equip</button><button data-act="gear-salvage" data-uid="${sel.uid}">Salvage · ◆ ${salvageValue(sel)}</button>`
-        }</div></div>`;
+        <div class="actions">${this.gearActions(sel)}</div></div>`;
     }
     const tab = (f, label) => `<button class="gtab ${filter === f ? 'on' : ''}" data-act="gear-filter" data-f="${f}">${label}</button>`;
     return `<h2>Armory</h2><p class="lead">Hero power <b>${heroPower()}</b>. Gear you find in the ruins ends up here.</p>
-      <div class="gslots">${slotCard('bow')}${slotCard('armor')}</div>
-      <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}<span class="gcount">${items.length} / 40</span></div>
+      <div class="gslots">${slotCard('bow', 'Bow')}${slotCard('armor', 'Armor')}${slotCard('gadget1', 'Gadget · 1')}${slotCard('gadget2', 'Gadget · 2')}</div>
+      <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}${tab('gadget', 'Gadgets')}<span class="gcount">${items.length} / 40</span></div>
       <div class="ggrid">${shown.map(tile).join('')}</div></div>${detail}</div>`;
+  }
+
+  /** Equip / salvage buttons for the selected item (gadgets pick a slot). */
+  gearActions(sel) {
+    const key = equipKey(sel);
+    const salvageBtn = key ? '' : `<button data-act="gear-salvage" data-uid="${sel.uid}">Salvage · ◆ ${salvageValue(sel)}</button>`;
+    if (sel.slot === 'gadget') {
+      const slots = [1, 2]
+        .filter((n) => key !== `gadget${n}`)
+        .map((n) => `<button data-act="gear-equip" data-uid="${sel.uid}" data-key="gadget${n}" class="gold">Equip in slot ${n}</button>`)
+        .join('');
+      return (key ? `<span class="tag on">In slot ${key.slice(-1)}</span>` : '') + slots + salvageBtn;
+    }
+    return key ? '<span class="tag on">Equipped</span>' : `<button data-act="gear-equip" data-uid="${sel.uid}" class="gold">Equip</button>${salvageBtn}`;
   }
 
   onGearAct(act, data) {
@@ -352,7 +363,7 @@ export class Camp {
     else if (act === 'gear-equip') {
       const item = findItem(data.uid);
       if (item) {
-        equip(item);
+        equip(item, data.key || undefined);
         G.sfx.sample('clang', { vol: 0.5, rate: 1.3, jitter: 0 });
         G.player.hp = G.maxHp();
       }

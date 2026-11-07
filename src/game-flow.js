@@ -17,6 +17,7 @@ export class FlowMethods {
   startWave(n) {
     this.wave = n;
     if (n === 1) this.tips.show('draw');
+    if (n === 2) this.tips.show('gadget');
     const w = config.waves;
     this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
     if (this.env.active) this.hazards.restock(this.arena);

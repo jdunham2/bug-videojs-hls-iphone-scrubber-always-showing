@@ -111,7 +111,7 @@ export class Archer extends Grunt {
         mz = (tmp.z * want + strafeZ * 0.45) * this.speed;
         this.backing = want < 0;
         if (Math.random() < dt * 0.4) this.strafe *= -1;
-        if (this.cool <= 0 && dist < s.maxRange + 3 && !player.dead && this.frozenT <= 0) this.enter('aim');
+        if (this.cool <= 0 && dist < s.maxRange + 3 && !player.dead && this.frozenT <= 0 && !(this.blindT > 0)) this.enter('aim');
         break;
       }
       case 'aim': {

@@ -179,6 +179,7 @@ export class UiMethods {
         <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
         <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through enemies)</span></div>
         <div><kbd>Q</kbd><span>Arrow Volley, once the gold meter is full</span></div>
+        <div><kbd>1</kbd><kbd>2</kbd><span>Gadgets (trap, smoke, tonic, net, powder keg, war horn)</span></div>
         <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
         <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
       </div>`;

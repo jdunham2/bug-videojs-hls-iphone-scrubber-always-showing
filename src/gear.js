@@ -1,7 +1,7 @@
-// Gear: bows and armor that drop as loot. Each item has a base type (how it
-// plays), a rarity (how many perks it rolls), a power level (raw strength) and
-// perks. Found gear goes straight into the stash in the profile; one bow and
-// one armor are equipped at a time.
+// Gear: bows, armor and gadgets that drop as loot. Each item has a base type
+// (how it plays), a rarity (how many perks it rolls), a power level (raw
+// strength) and perks. Found gear goes straight into the stash in the profile;
+// one bow, one armor and two gadgets are equipped at a time.
 
 import { profile, saveProfile } from './profile.js';
 
@@ -29,6 +29,16 @@ export const ARMORS = {
   plate: { name: 'Plate Armor', blurb: 'Very tough, a little slow.', hp: 1.45, speed: 0.9, dr: 0.12, dodge: 1.1 },
 };
 
+/** Gadgets: used on a cooldown (keys 1 and 2). Effects live in gadgets.js. */
+export const GADGETS = {
+  bearTrap: { name: 'Bear Trap', blurb: 'Set at your feet. Snaps shut on the first enemy, holding it fast.', cooldown: 11 },
+  smokeBomb: { name: 'Smoke Bomb', blurb: 'A thick cloud: enemies inside stumble about and cannot attack.', cooldown: 18 },
+  flask: { name: 'Healing Tonic', blurb: 'Drink to recover a big chunk of health over two seconds.', cooldown: 24 },
+  net: { name: 'Throwing Net', blurb: 'Hurled at the cursor, tangling every enemy it lands on.', cooldown: 14 },
+  powderKeg: { name: 'Powder Keg', blurb: 'Lobbed at the cursor. A short fuse, then a very big bang.', cooldown: 15 },
+  warHorn: { name: 'War Horn', blurb: 'A rallying blast: knocks enemies back and quickens you.', cooldown: 22 },
+};
+
 const per = (values) => (tier) => values[tier - 1];
 
 /** Perks: `slot` says which gear can roll them; `value(tier)` and `text(v)` describe them. */
@@ -47,6 +57,10 @@ export const PERKS = {
   scavenger: { slot: 'armor', name: 'Scavenger', adj: "Scavenger's", value: per([0.2, 0.4, 0.6]), text: (v) => `${pct(v)} chance for an extra gem` },
   fieldDressing: { slot: 'armor', name: 'Field Dressing', adj: "Medic's", value: per([2, 4, 6]), text: (v) => `Heal ${v} HP on each kill` },
   vigor: { slot: 'armor', name: 'Vigor', adj: 'Hardy', value: per([10, 20, 30]), text: (v) => `+${v} max HP` },
+  // Gadget perks
+  quickReload: { slot: 'gadget', name: 'Quick Reload', adj: 'Ready', value: per([0.1, 0.2, 0.3]), text: (v) => `Cooldown ${pct(v)} shorter` },
+  heavyCharge: { slot: 'gadget', name: 'Heavy Charge', adj: 'Potent', value: per([0.15, 0.3, 0.45]), text: (v) => `Effect ${pct(v)} stronger` },
+  lingering: { slot: 'gadget', name: 'Lingering', adj: 'Lasting', value: per([0.2, 0.4, 0.6]), text: (v) => `Lasts ${pct(v)} longer` },
 };
 
 const pct = (v) => `${Math.round(v * 100)}%`;
@@ -62,12 +76,18 @@ const UNIQUE_NAMES = {
   cloak: "Warden's Mantle",
   chainmail: 'Ironbark Hauberk',
   plate: "Gorvak's Bane",
+  bearTrap: 'The Iron Jaw',
+  smokeBomb: "Night's Veil",
+  flask: "Grandmother's Remedy",
+  net: "The Fisher King's Net",
+  powderKeg: 'Thunderbarrel',
+  warHorn: 'Horn of the Wolf Clan',
 };
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const rand = (a, b) => a + Math.random() * (b - a);
 
-export const basesFor = (slot) => (slot === 'bow' ? BOWS : ARMORS);
+export const basesFor = (slot) => (slot === 'bow' ? BOWS : slot === 'gadget' ? GADGETS : ARMORS);
 export const baseOf = (item) => basesFor(item.slot)[item.base];
 
 /** Drop odds by source. */
@@ -96,7 +116,7 @@ export function rollItem(slot, power, rarity = 'common') {
     perks.push([id, Math.round(rand(R.tiers[0], R.tiers[1]))]);
   }
   const item = { uid: newUid(), slot, base, rarity, power: Math.max(1, Math.round(power)), perks };
-  item.name = rarity === 'unique' ? UNIQUE_NAMES[base] : rarity === 'rare' ? `${PERKS[perks[0][0]].adj} ${bases[base].name}` : bases[base].name;
+  item.name = rarity === 'unique' ? UNIQUE_NAMES[base] : rarity === 'rare' && perks.length ? `${PERKS[perks[0][0]].adj} ${bases[base].name}` : bases[base].name;
   return item;
 }
 
@@ -121,13 +141,26 @@ export function gearState() {
     g.stash.push(bow, armor);
     g.equipped = { bow: bow.uid, armor: armor.uid };
   }
+  // Everyone starts with two gadgets (older saves get them too).
+  if (!g.starterGadgets) {
+    g.starterGadgets = true;
+    const flask = { uid: 'starter-flask', slot: 'gadget', base: 'flask', rarity: 'common', power: 1, perks: [], name: 'Healing Tonic' };
+    const trap = { uid: 'starter-trap', slot: 'gadget', base: 'bearTrap', rarity: 'common', power: 1, perks: [], name: 'Bear Trap' };
+    g.stash.push(flask, trap);
+    g.equipped.gadget1 ||= flask.uid;
+    g.equipped.gadget2 ||= trap.uid;
+  }
   return g;
 }
 
 export const stash = () => gearState().stash;
 export const findItem = (uid) => stash().find((i) => i.uid === uid) || null;
 export const equipped = (slot) => findItem(gearState().equipped[slot]) || stash().find((i) => i.slot === slot) || null;
-export const isEquipped = (item) => gearState().equipped[item.slot] === item.uid;
+/** The gadget in slot 1 or 2 (or null if empty). */
+export const equippedGadget = (n) => findItem(gearState().equipped[`gadget${n}`]);
+/** Which equip key holds this item ('bow', 'armor', 'gadget1', 'gadget2'), or null. */
+export const equipKey = (item) => Object.entries(gearState().equipped).find(([, uid]) => uid === item.uid)?.[0] || null;
+export const isEquipped = (item) => !!equipKey(item);
 
 let cache = null;
 const listeners = [];
@@ -150,8 +183,12 @@ export function addToStash(item) {
   saveProfile();
 }
 
-export function equip(item) {
-  gearState().equipped[item.slot] = item.uid;
+/** Equip an item. Gadgets go in slot `key` ('gadget1'/'gadget2'), swapping if it's in the other one. */
+export function equip(item, key = item.slot === 'gadget' ? 'gadget1' : item.slot) {
+  const eq = gearState().equipped;
+  const from = equipKey(item);
+  if (item.slot === 'gadget' && from && from !== key) eq[from] = eq[key] || null;
+  eq[key] = item.uid;
   changed();
 }
 
@@ -190,6 +227,12 @@ export function itemStats(item) {
     s.window = b.window;
     s.arrowSpeed = b.arrowSpeed;
     s.drawMove = b.drawMove;
+  } else if (item.slot === 'gadget') {
+    for (const [id, tier] of item.perks) s.perks[id] = (s.perks[id] || 0) + PERKS[id].value(tier);
+    s.cooldown = b.cooldown * (1 - (s.perks.quickReload || 0));
+    s.potency = (1 + 0.05 * (item.power - 1)) * (1 + (s.perks.heavyCharge || 0));
+    s.duration = 1 + (s.perks.lingering || 0);
+    return s;
   } else {
     s.hpMult = b.hp;
     s.hpAdd = 3 * (item.power - 1);
@@ -234,6 +277,13 @@ export function statLines(item, against = null) {
     return `<div class="st"><span>${label}</span><b>${fmt(v)}${cmp}</b></div>`;
   };
   const x = (v) => `×${v.toFixed(2)}`;
+  if (item.slot === 'gadget') {
+    return [
+      line('Cooldown', s.cooldown, o?.cooldown, (v) => `${v.toFixed(1)}s`, false),
+      line('Strength', s.potency, o?.potency, x),
+      line('Duration', s.duration, o?.duration, x),
+    ].join('');
+  }
   if (item.slot === 'bow') {
     return [
       line('Damage', s.damage, o?.damage, x),
@@ -257,10 +307,22 @@ export function perkLines(item) {
   return item.perks.map(([id, tier]) => `<div class="pk"><b>${PERKS[id].name} ${ROMAN_TIER[tier]}</b> ${PERKS[id].text(PERKS[id].value(tier))}</div>`).join('');
 }
 
-export const slotLabel = (slot) => (slot === 'bow' ? 'Bow' : 'Armor');
+export const slotLabel = (slot) => (slot === 'bow' ? 'Bow' : slot === 'gadget' ? 'Gadget' : 'Armor');
 
 /** Small line-art icons (inline SVG, drawn in the rarity colour). */
+const GADGET_ICONS = {
+  bearTrap: '<path d="M4 20 L 28 20" stroke-width="2.4"/><path d="M6 20 L 8 12 L 11 18 L 14 11 L 16 18 L 18 11 L 21 18 L 24 12 L 26 20" stroke-linejoin="round"/><circle cx="16" cy="24" r="3"/>',
+  smokeBomb: '<circle cx="16" cy="21" r="7" fill="currentColor" fill-opacity=".25"/><path d="M16 14 L 18 9"/><path d="M19 8 C 22 4, 27 7, 25 10 C 29 11, 28 16, 24 15"/>',
+  flask: '<path d="M13 4 L 19 4 M 14 4 L 14 11 L 8 22 C 7 26, 9 28, 12 28 L 20 28 C 23 28, 25 26, 24 22 L 18 11 L 18 4" stroke-linejoin="round"/><path d="M10 20 L 22 20" opacity=".7"/>',
+  net: '<path d="M5 6 L 27 6 L 24 26 L 8 26 Z" stroke-linejoin="round"/><path d="M10 6 L 12 26 M 16 6 L 16 26 M 22 6 L 20 26 M 6 12 L 26 12 M 7 19 L 25 19" opacity=".75"/>',
+  powderKeg: '<rect x="8" y="9" width="16" height="18" rx="5"/><path d="M8 15 L 24 15 M 8 21 L 24 21" opacity=".7"/><path d="M16 9 C 16 6, 19 5, 21 3"/><circle cx="22" cy="3" r="1.5" fill="currentColor"/>',
+  warHorn: '<path d="M5 22 C 10 22, 20 18, 26 8 L 28 12 C 24 20, 14 27, 6 26 Z" stroke-linejoin="round"/><path d="M8 22 L 8 26" />',
+};
+
 export function gearIcon(item) {
+  if (item.slot === 'gadget') {
+    return `<svg viewBox="0 0 32 32" class="gsvg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">${GADGET_ICONS[item.base] || ''}</svg>`;
+  }
   if (item.slot === 'bow') {
     return '<svg viewBox="0 0 32 32" class="gsvg"><path d="M9 3 C 23 9, 23 23, 9 29" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M9 3 L 9 29" stroke="currentColor" stroke-width="1" opacity=".7"/><path d="M5 16 L 27 16 M 23 13 L 27 16 L 23 19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }

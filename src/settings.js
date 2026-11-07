@@ -95,7 +95,7 @@ export class SettingsPanel {
           ${['auto', 'high', 'medium', 'low'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
         </select><b></b></label>
       <label class="row"><span>Damage numbers</span><input type="checkbox" id="set-damageNumbers" data-k="damageNumbers" ${s.damageNumbers ? 'checked' : ''}><b></b></label>
-      <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y/LB Arrow Volley · X use · Start pause</p>
+      <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y Arrow Volley · LT/LB gadgets · X use · Start pause</p>
       <button data-close>Done</button>`;
   }
 

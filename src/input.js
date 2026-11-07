@@ -39,7 +39,7 @@ export class Input {
 
   /**
    * Gamepad (standard mapping): left stick move, right stick aim, RT draw,
-   * A/B dodge, Y/LB Arrow Volley, X use, Start pause. Call once per frame.
+   * A/B dodge, Y Arrow Volley, LT/LB gadgets 1/2, X use, Start pause. Call once per frame.
    */
   poll() {
     const pads = navigator.getGamepads ? [...navigator.getGamepads()] : [];
@@ -59,7 +59,9 @@ export class Input {
       aim: rx || ry ? { x: rx, y: -ry } : null,
     };
     if (edge(0) || edge(1)) this.pressed.add('Space');
-    if (edge(3) || edge(4)) this.pressed.add('KeyQ');
+    if (edge(3)) this.pressed.add('KeyQ');
+    if (edge(6)) this.pressed.add('Digit1');
+    if (edge(4)) this.pressed.add('Digit2');
     if (edge(2)) this.pressed.add('KeyE');
     if (edge(9)) this.pressed.add('KeyP');
     const draw = btn(7) || (gp.buttons[7]?.value || 0) > 0.3 || btn(5);

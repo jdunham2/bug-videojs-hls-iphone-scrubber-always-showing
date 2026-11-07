@@ -10,6 +10,7 @@ export const TIPS = {
   dodge: 'A brute is winding up! Press Space to roll through its leap',
   ult: 'Arrow Volley is ready: press Q to loose a volley onto your cursor',
   draft: 'Pick a skill card to power up (keys 1-3)',
+  gadget: 'Press 1 or 2 to use your gadgets: a Healing Tonic and a Bear Trap to start',
   portal: 'The gate is open: walk through it to march on',
 };
 

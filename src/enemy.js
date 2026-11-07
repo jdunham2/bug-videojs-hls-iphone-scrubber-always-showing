@@ -269,6 +269,7 @@ export class Grunt {
 
   /** Burn damage and effect timers (real time). Returns true if the burn killed it. */
   updateStatus(dt) {
+    if (this.blindT > 0) this.blindT -= dt; // in smoke: can't start an attack
     if (this.bleedT > 0) {
       this.bleedT -= dt;
       const dmg = this.bleedDps * Math.min(dt, this.bleedT + dt);
@@ -366,7 +367,7 @@ export class Grunt {
         mx = tmp.x * this.speed;
         mz = tmp.z * this.speed;
         lean = 0.1;
-        if (dist < g.attackRange && !player.dead && this.frozenT <= 0) this.enter('windup');
+        if (dist < g.attackRange && !player.dead && this.frozenT <= 0 && !(this.blindT > 0)) this.enter('windup');
         break;
       case 'windup': {
         // Tracks you for the first 70% of the windup, then commits.
