@@ -34,8 +34,8 @@ export class Camp {
     if (this.built) return;
     this.built = true;
     const S = this.scene;
-    S.add(new THREE.HemisphereLight(0x9fb4ff, 0x2a2018, 0.7));
-    const moon = new THREE.DirectionalLight(0xbcd0ff, 1.2);
+    S.add(new THREE.HemisphereLight(0x9fb4ff, 0x3a2c20, 1.25));
+    const moon = new THREE.DirectionalLight(0xbcd0ff, 1.8);
     moon.position.set(-8, 18, -6);
     moon.castShadow = true;
     moon.shadow.mapSize.set(2048, 2048);
@@ -54,9 +54,10 @@ export class Camp {
     S.add(ground);
 
     // Buildings, each with an interaction spot in front of it (facing the fire).
-    this.building('heroHall', 6.5, -8, 7, 'hall', 'Hall of Heroes', 3.4);
-    this.building('tailorTent', 5, 8, -7, 'wardrobe', "Tailor's Tent", 3.0);
-    this.building('shrine', 3.6, 3.5, 6.5, 'shrine', 'Rune Shrine', 1.4);
+    // The camera looks from +x,+z, so buildings sit on the far half of the camp.
+    this.building('heroHall', 6.5, -10, 2.5, 'hall', 'Hall of Heroes', 3.4);
+    this.building('tailorTent', 5, 9, -6, 'wardrobe', "Tailor's Tent", 3.0);
+    this.building('shrine', 3.6, 1.5, -10.5, 'shrine', 'Rune Shrine', 1.4);
     this.building('archway', 5.5, -8.5, -8.5, 'gate', 'Ruin Gate', 2.3);
     // A swirling portal inside the gate.
     this.portalMat = new THREE.MeshBasicMaterial({ map: portalTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(1.6, 0.9, 3) });
@@ -70,15 +71,15 @@ export class Camp {
     this.prop('dummy', 2.0, 5, 1.5, -2.2, 0.5);
     this.prop('weaponRack', 1.7, -5, 9.5, 0.6, 0.8);
     this.prop('signpost', 2.2, -5, -5, 0.8, 0.4);
-    this.prop('tent', 2.4, -12, 0, 1.4, 1.8);
-    this.prop('tent', 2.4, 1, 12, -2.8, 1.8);
-    this.prop('tent', 2.2, 11.5, 3, -1.6, 1.6);
+    this.prop('tent', 2.4, -11, -5, 1.0, 1.8);
+    this.prop('tent', 2.4, 6.5, -12, -0.4, 1.8);
+    this.prop('tent', 2.2, 12.5, 1, -1.6, 1.6);
     for (const [x, z] of [
       [-3, -3],
       [3, 3],
-      [-6, 2],
-      [6, -2],
-      [0, -9],
+      [-6, -2],
+      [5, -4],
+      [-3, -9],
     ]) {
       this.prop('lantern', 2.0, x, z, Math.random() * 6, 0.25);
       const l = new THREE.PointLight(0xffb066, 6, 7, 1.8);
