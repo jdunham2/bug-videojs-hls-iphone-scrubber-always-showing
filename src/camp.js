@@ -73,7 +73,7 @@ export class Camp {
     this.built = true;
     const S = this.scene;
     S.add(new THREE.HemisphereLight(0x9fb4ff, 0x3a2c20, 1.25));
-    const moon = new THREE.DirectionalLight(0xbcd0ff, 1.8);
+    const moon = (this.moon = new THREE.DirectionalLight(0xbcd0ff, 1.8));
     moon.position.set(-8, 18, -6);
     moon.castShadow = true;
     moon.shadow.mapSize.set(1024, 1024);

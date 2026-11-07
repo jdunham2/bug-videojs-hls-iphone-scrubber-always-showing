@@ -40,9 +40,20 @@ export function applySettings(game) {
   // Auto starts at medium and steps down if frames are slow (see Game.autoQuality).
   const q = s.quality === 'auto' ? game.perf?.level || 'medium' : s.quality;
   r.setPixelRatio(q === 'high' ? Math.min(window.devicePixelRatio, 2) : q === 'medium' ? Math.min(window.devicePixelRatio, 1.25) : 1);
-  r.shadowMap.enabled = q !== 'low';
-  const shadowSize = q === 'high' ? 2048 : 1024;
-  for (const light of [game.world?.sun]) {
+  // Shadows stay on at every level (low just uses a small, cheap shadow map).
+  // Switching shadows off mid-game needs every shader rebuilt; without that many
+  // GPUs draw the whole scene black.
+  const wantShadows = true;
+  if (r.shadowMap.enabled !== wantShadows) {
+    r.shadowMap.enabled = wantShadows;
+    for (const scene of [game.scene, game.camp?.scene]) {
+      scene?.traverse((o) => {
+        for (const m of [].concat(o.material || [])) m.needsUpdate = true;
+      });
+    }
+  }
+  const shadowSize = q === 'high' ? 2048 : q === 'medium' ? 1024 : 512;
+  for (const light of [game.world?.sun, game.camp?.moon]) {
     if (light && light.shadow.mapSize.x !== shadowSize) {
       light.shadow.mapSize.set(shadowSize, shadowSize);
       light.shadow.map?.dispose();
