@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { doorwayTexture } from './juice.js';
-import { spawnProp, models, modelStatus } from './models.js';
+import { spawnProp, models, modelStatus, disposeTree } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus, currentCharacter } from './profile.js';
@@ -198,7 +198,7 @@ export class Camp {
   collide = (pos, r) => {
     const d = Math.hypot(pos.x, pos.z);
     if (d > RADIUS - r) pos.multiplyScalar((RADIUS - r) / d);
-    for (const c of this.colliders) {
+    for (const c of this.colliders.concat(this.decorColliders || [])) {
       const dx = pos.x - c.x;
       const dz = pos.z - c.z;
       const dd = Math.hypot(dx, dz);
@@ -231,6 +231,7 @@ export class Camp {
     G.camTarget.copy(P.pos);
     this.close();
     this.refreshHud();
+    this.refreshDecor();
   }
 
   leave() {
@@ -246,7 +247,10 @@ export class Camp {
 
   update(dt, time) {
     if (!this.active) return;
-    if (!this.built && modelStatus.state !== 'loading') this.build();
+    if (!this.built && modelStatus.state !== 'loading') {
+      this.build();
+      this.refreshDecor();
+    }
     if (!this.built) return;
     this.time += dt;
     const P = this.game.player;
@@ -298,6 +302,77 @@ export class Camp {
     const use = I.wasPressed('KeyE') || I.wasPressed('Enter') || I.wasPressed('NumpadEnter') || I.wasPressed('KeyF');
     if (use && near && !this.openKind && !this.entering) this.open(near);
     if (this.game.input.wasPressed('Escape') && this.openKind) this.close();
+  }
+
+  // ------------------------------------------------------------ the camp grows
+
+  /** Trophies and new structures that appear as you progress. */
+  refreshDecor() {
+    if (!this.built) return;
+    if (this.decor) {
+      this.decor.removeFromParent();
+      disposeTree(this.decor);
+    }
+    this.decor = new THREE.Group();
+    this.scene.add(this.decor);
+    this.decorColliders = [];
+    const lv = levelFor(profile.xp || 0).level;
+    const m = profile.missions || {};
+    const items = [
+      { id: 'trophy', when: profile.bosses >= 1, name: "Gorvak's hammer on a plinth", build: () => this.trophyHammer(-1.5, -7.2) },
+      { id: 'well', when: lv >= 3, name: 'A stone well', build: () => this.decorProp('springWell', 1.6, -1.5, 11, 0.4, 1.1) },
+      { id: 'ruins', when: m.ruins?.clear, name: 'A relic from the Sunken Ruins', build: () => this.decorProp('pillarBroken', 2.4, 8.2, 8.6, 0.6, 0.7) },
+      { id: 'keep', when: m.keep?.clear, name: 'Ice from Frostpeak Keep', build: () => this.decorProp('iceCrystals', 1.6, 10.6, 6.2, 0.2, 0.8) },
+      { id: 'forge', when: m.forge?.clear, name: 'A brazier from the Molten Forge', build: () => this.decorProp('forgeBrazier', 1.5, 2.2, 10.8, 0, 0.6) },
+      { id: 'banners', when: profile.bosses >= 3, name: 'War banners at the gate', build: () => [this.decorProp('wolfBanner', 3, -11.4, -6.6, 0.6, 0.4), this.decorProp('wolfBanner', 3, -6.6, -11.4, 0.9, 0.4)] },
+      { id: 'drum', when: lv >= 5, name: 'A war drum', build: () => this.decorProp('warDrum', 1.3, -12, 2 - 5.5, 0.4, 0.7) },
+      { id: 'ballista', when: lv >= 7, name: 'A ballista on watch', build: () => this.decorProp('ballista', 2.2, 10.4, -10, -2.3, 1.0) },
+      { id: 'hoard', when: (profile.totalGems || 0) >= 1000, name: 'A treasure hoard', build: () => this.decorProp('treasureChest', 1.1, 8.6, 4.6, -0.6, 0.7) },
+      { id: 'statue', when: lv >= 10, name: 'A statue in your honour', build: () => this.decorProp('kingStatue', 3.6, 12.2, 6.2, -2.0, 1.0) },
+    ];
+    const seen = (profile.campSeen ||= []);
+    const fresh = [];
+    for (const it of items) {
+      if (!it.when) continue;
+      it.build();
+      if (!seen.includes(it.id)) {
+        seen.push(it.id);
+        fresh.push(it.name);
+      }
+    }
+    if (fresh.length) {
+      saveProfile();
+      setTimeout(() => this.active && this.game.banner('Your camp grows', fresh.join(' · '), 2.6), 900);
+    }
+  }
+
+  decorProp(id, size, x, z, rotY, collideR) {
+    const p = spawnProp(id, size);
+    if (!p) return null;
+    p.position.set(x, 0, z);
+    p.rotation.y = rotY;
+    this.decor.add(p);
+    if (collideR > 0) this.decorColliders.push({ x, z, r: collideR });
+    return p;
+  }
+
+  /** The boss's hammer mounted on a stone plinth, lit from below. */
+  trophyHammer(x, z) {
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 1.1), new THREE.MeshStandardMaterial({ color: 0x5a544a, roughness: 0.85 }));
+    plinth.position.set(x, 0.4, z);
+    plinth.castShadow = plinth.receiveShadow = true;
+    this.decor.add(plinth);
+    const h = spawnProp('hammer', 1.8, { axis: 'x' });
+    if (h) {
+      h.position.set(x, 0.85, z);
+      h.rotation.set(0, 0.6, 0.9);
+      this.decor.add(h);
+    }
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffb066, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glow.position.set(x, 1.4, z);
+    glow.scale.setScalar(2.2);
+    this.decor.add(glow);
+    this.decorColliders.push({ x, z, r: 0.8 });
   }
 
   // ------------------------------------------------------------ walkable interiors
