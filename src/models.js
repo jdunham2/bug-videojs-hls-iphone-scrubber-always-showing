@@ -10,6 +10,9 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 /** id → { kind, scene, clips: { logicalName: AnimationClip }, height } */
 export const models = {};
 
+/** id → { base, name, texture } for character outfits (retextures on the same UVs). */
+export const outfits = {};
+
 /** Loading progress, shown on the title screen so problems are visible. */
 export const modelStatus = { state: 'loading', loaded: 0, total: 0, errors: [] };
 
@@ -35,7 +38,14 @@ export async function loadModels() {
     modelStatus.errors.push(String(e.message || e));
     return models;
   }
-  const entries = Object.entries(manifest);
+  // Outfits are textures for an existing character, not models; keep them for the wardrobe.
+  const entries = Object.entries(manifest).filter(([id, e]) => {
+    if (e.kind === 'outfit') {
+      outfits[id] = { ...e, id };
+      return false;
+    }
+    return true;
+  });
   modelStatus.total = entries.length;
   if (!entries.length) {
     modelStatus.state = 'none';
