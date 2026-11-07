@@ -97,8 +97,11 @@ const ODDS = {
   boss: { common: 0, rare: 0.6, unique: 0.4 },
 };
 
-export function rollRarity(source = 'enemy') {
-  const o = ODDS[source];
+/** Pick a rarity; `boost` (harder difficulty) moves odds from Common toward Rare and Unique. */
+export function rollRarity(source = 'enemy', boost = 0) {
+  const base = ODDS[source];
+  const shift = Math.min(base.common, boost);
+  const o = { common: base.common - shift, rare: base.rare + shift * 0.65, unique: base.unique + shift * 0.35 };
   let r = Math.random();
   for (const k of RARITY_ORDER) if ((r -= o[k]) <= 0) return k;
   return 'common';

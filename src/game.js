@@ -16,6 +16,7 @@ import { Loot } from './loot.js';
 import { GearDrops } from './gear-drops.js';
 import { GearMethods } from './game-gear.js';
 import { Gadgets } from './gadgets.js';
+import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
@@ -239,6 +240,7 @@ export class Game {
     if (this.camp.active) this.leaveCamp();
     this.resetRun();
     const cp = profile.checkpoint;
+    this.difficulty = fromCheckpoint && cp?.difficulty ? difficultyById(cp.difficulty) : selectedDifficulty();
     this.setArena(fromCheckpoint && cp ? cp.arena ?? 0 : 0);
     if (fromCheckpoint && cp) {
       // Resume after the last boss beaten, with the skills you had then.

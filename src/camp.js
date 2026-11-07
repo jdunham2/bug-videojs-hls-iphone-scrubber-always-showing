@@ -9,6 +9,7 @@ import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus } from './profile.js';
+import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -298,7 +299,7 @@ export class Camp {
       html = this.armoryHtml();
     } else if (k === 'gate') {
       const cp = profile.checkpoint;
-      html = `<h2>Camp Gate</h2><p class="lead">The road to the ruins starts here.</p><div class="actions">
+      html = `<h2>Camp Gate</h2><p class="lead">The road to the ruins starts here. Hero power <b>${heroPower()}</b>.</p>${this.tierPicker()}<div class="actions">
         <button data-act="new">New run · Wave 1</button>
         ${cp ? `<button data-act="continue" class="gold">Continue · Wave ${cp.wave + 1}</button>` : ''}
       </div>`;
@@ -340,6 +341,20 @@ export class Camp {
       <div class="gslots">${slotCard('bow', 'Bow')}${slotCard('armor', 'Armor')}${slotCard('gadget1', 'Gadget · 1')}${slotCard('gadget2', 'Gadget · 2')}</div>
       <div class="garmory"><div><div class="gtabs">${tab('all', 'All')}${tab('bow', 'Bows')}${tab('armor', 'Armor')}${tab('gadget', 'Gadgets')}<span class="gcount">${items.length} / 40</span></div>
       <div class="ggrid">${shown.map(tile).join('')}</div></div>${detail}</div>`;
+  }
+
+  /** Difficulty cards: pick the tier for the next run. */
+  tierPicker() {
+    const cur = selectedDifficulty();
+    const cards = DIFFICULTIES.map((d) => {
+      const open = isUnlocked(d);
+      const prev = DIFFICULTIES.find((x) => x.id === d.unlock);
+      const warn = open && underPowered(d) ? `<div class="tw">Recommended power ${d.power}</div>` : `<div class="tp">Power ${d.power}+</div>`;
+      return `<button class="tier ${d.id === cur.id ? 'on' : ''} ${open ? '' : 'locked'}" data-act="tier" data-v="${d.id}" style="--tc:${d.color}" ${open ? '' : 'disabled'}>
+        <div class="tn">${d.name}</div><div class="tb">${open ? d.blurb : `🔒 Beat a boss on ${prev.name}`}</div>${open ? warn : ''}
+        ${open && d.id !== 'adventurer' ? `<div class="tl">Loot +${d.lootPower} power · gems ×${d.gems}</div>` : ''}</button>`;
+    }).join('');
+    return `<div class="tiers">${cards}</div>`;
   }
 
   /** Equip / salvage buttons for the selected item (gadgets pick a slot). */
@@ -400,6 +415,10 @@ export class Camp {
     const G = this.game;
     if (act === 'close') return this.close();
     if (act.startsWith('gear-')) return this.onGearAct(act, b.dataset);
+    if (act === 'tier') {
+      if (selectDifficulty(v)) G.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
+      return this.render();
+    }
     if (act === 'new' || act === 'continue') {
       this.close();
       G.startFromCamp(act === 'continue');

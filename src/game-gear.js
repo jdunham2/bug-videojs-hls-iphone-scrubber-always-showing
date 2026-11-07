@@ -5,7 +5,8 @@ import { rollItem, rollRarity, addToStash, equip, equipped, equippedGadget, stat
 
 /** Item power for a drop: grows with the wave and the arena. */
 function dropPower(game, bonus = 0) {
-  return Math.max(1, Math.round((game.wave || 1) * 0.9 + (game.arena || 0) * 2 + bonus + (Math.random() * 2 - 1)));
+  const tier = game.difficulty?.lootPower || 0;
+  return Math.max(1, Math.round((game.wave || 1) * 0.9 + (game.arena || 0) * 2 + tier + bonus + (Math.random() * 2 - 1)));
 }
 
 export class GearMethods {
@@ -14,11 +15,11 @@ export class GearMethods {
     const roll = (source, bonus) => {
       const r = Math.random();
       const slot = r < 0.42 ? 'bow' : r < 0.75 ? 'armor' : 'gadget';
-      return rollItem(slot, dropPower(this, bonus), rollRarity(source));
+      return rollItem(slot, dropPower(this, bonus), rollRarity(source, this.difficulty?.rarityBoost || 0));
     };
     if (enemy.isBoss) {
       const slots = ['bow', 'armor', 'gadget'].sort(() => Math.random() - 0.5).slice(0, 2);
-      for (const slot of slots) this.gearDrops.spawn(enemy.pos, rollItem(slot, dropPower(this, 2), rollRarity('boss')));
+      for (const slot of slots) this.gearDrops.spawn(enemy.pos, rollItem(slot, dropPower(this, 2), rollRarity('boss', this.difficulty?.rarityBoost || 0)));
       return;
     }
     const chance = enemy.elite ? 0.35 : enemy.kind === 'archer' || enemy.kind === 'bomber' ? 0.05 : 0.035;

@@ -104,9 +104,11 @@ export class CombatMethods {
       const big = enemy.affix === 'volatile';
       setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);
     }
-    if (enemy.elite) this.loot.drop(enemy.pos, 5, 1);
-    if (enemy.isBoss) this.loot.drop(enemy.pos, 25, 3);
-    else this.loot.drop(enemy.pos, enemy.kind === 'archer' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
+    const gm = this.difficulty?.gems || 1;
+    const gems = (n) => Math.round(n * gm);
+    if (enemy.elite) this.loot.drop(enemy.pos, gems(5), 1);
+    if (enemy.isBoss) this.loot.drop(enemy.pos, gems(25), 3);
+    else this.loot.drop(enemy.pos, gems(enemy.kind === 'archer' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0)), Math.random() < 0.15 ? 1 : 0);
     this.ultimate.gain(config.ultimate.perKill);
     const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
     this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);

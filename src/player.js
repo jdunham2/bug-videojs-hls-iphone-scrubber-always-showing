@@ -705,7 +705,7 @@ export class Player {
     if (this.dead) return false;
     if (this.rollInvuln) return 'dodged';
     if (this.iframes > 0) return false;
-    amount *= stat.damageTaken();
+    amount *= stat.damageTaken() * (game?.difficulty?.enemyDamage || 1);
     this.hp = Math.max(0, this.hp - amount);
     this.iframes = config.player.iFrames;
     this.hurtFlash = 0.25;

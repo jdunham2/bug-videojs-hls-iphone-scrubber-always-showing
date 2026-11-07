@@ -105,6 +105,13 @@ export class UiMethods {
   // ---------------------------------------------------------------- run state
 
   updateHud() {
+    const dl = this.hud.difficulty || (this.hud.difficulty = document.getElementById('difficulty-label'));
+    const dname = this.difficulty?.id !== 'adventurer' && this.difficulty ? this.difficulty.name : '';
+    if (dl && dl._text !== dname) {
+      dl._text = dname;
+      dl.textContent = dname;
+      dl.style.color = this.difficulty?.color || '';
+    }
     const h = this.hud;
     const p = this.player;
     const s = this.stats;
@@ -200,7 +207,7 @@ export class UiMethods {
       const secs = Math.floor(this.elapsed);
       o.innerHTML = `
         <h1>You fell</h1>
-        <p class="tag">${newBest ? 'New best!' : `Best: wave ${profile.best.wave}, ${profile.best.kills} kills`}</p>
+        <p class="tag">${this.difficulty && this.difficulty.id !== 'adventurer' ? `<b style="color:${this.difficulty.color}">${this.difficulty.name}</b> · ` : ''}${newBest ? 'New best!' : `Best: wave ${profile.best.wave}, ${profile.best.kills} kills`}</p>
         <div class="summary">
           <div><b>${this.wave}</b><span>Wave reached</span></div>
           <div><b>${s.kills}</b><span>Kills</span></div>

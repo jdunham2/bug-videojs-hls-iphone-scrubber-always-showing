@@ -1,5 +1,6 @@
 // Run flow: waves, spawning, elites, bosses, arenas, the exit gate and save points.
 import * as THREE from 'three';
+import { noteBossOnTier } from './difficulty.js';
 import { doorwayTexture } from './juice.js';
 import { config } from './config.js';
 import { ARENA_HALF, pillars } from './world.js';
@@ -37,7 +38,7 @@ export class FlowMethods {
     const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
     const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
     this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
-    this.enemies.push(this.boss);
+    this.enemies.push(this.toughen(this.boss));
     this.banner('A boss approaches', this.boss.displayName, 2.2);
     this.sfx.wave(n);
     this.sfx.bossRoar();
@@ -76,7 +77,7 @@ export class FlowMethods {
     for (let i = 0; i < n; i++) {
       const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
       const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
-      this.enemies.push(new Grunt(this, p, this.wave));
+      this.enemies.push(this.toughen(new Grunt(this, p, this.wave)));
     }
   }
 
@@ -95,6 +96,8 @@ export class FlowMethods {
     // Kill the summoned grunts too, so the wave ends with the boss.
     for (const e of this.enemies) if (e !== boss && e.isHittable()) e.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
     this.stats.bossesDefeated = (this.stats.bossesDefeated || 0) + 1;
+    const next = noteBossOnTier(this.difficulty.id);
+    if (next) setTimeout(() => this.banner(`${next.name} unlocked!`, 'Choose it at the camp gate for better loot', 2.6), 2800);
     this.noteProgress({ bosses: 1, wave: this.wave - 1, kills: this.stats.kills });
   }
 
@@ -145,6 +148,13 @@ export class FlowMethods {
     return ranged ? Archer : Grunt;
   }
 
+  /** Scale a fresh enemy's health for the difficulty tier. */
+  toughen(enemy) {
+    const k = this.difficulty?.enemyHp || 1;
+    enemy.maxHp = enemy.hp = enemy.hp * k;
+    return enemy;
+  }
+
   /** Occasionally promote a fresh spawn to an elite (from wave 4). */
   maybeElite(enemy) {
     const chance = this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0;
@@ -162,7 +172,7 @@ export class FlowMethods {
     if (gates.length && Math.random() < 0.5) {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
-      this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
+      this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.wave))));
       return;
     }
     const H = ARENA_HALF - 1.5;
@@ -179,7 +189,7 @@ export class FlowMethods {
       const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
       if (farFromPlayer && clearOfPillars) break;
     }
-    this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
+    this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.wave))));
   }
 
   /** An enemy dropped into the arena: dust and a thud (a big one for the boss). */
@@ -270,7 +280,7 @@ export class FlowMethods {
 
   /** Save point: after each boss, store the run so it can be resumed from the camp, and bank gems. */
   saveCheckpoint() {
-    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls, arena: this.arena + 1 };
+    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls, arena: this.arena + 1, difficulty: this.difficulty.id };
     this.pendingDescent = true;
     profile.gems += this.loot.runGems;
     profile.totalGems += this.loot.runGems;

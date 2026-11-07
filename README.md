@@ -52,6 +52,7 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 - **Hazards and boons:** powder barrels (shoot them; they chain and hurt you too), spike traps, fresh-water springs, war drums (shoot one for a burst of speed), ballistas you load with an arrow, ice patches (Keep) and lava vents (Forge).
 - **Gear:** bows and armor drop from enemies (more from elites, two pieces from every boss) as beams of light in their rarity colour: Common, Rare or Unique, with a power level and perks (Keen Eye, Broadheads, Barbed Heads, Momentum, Padded, Tumbler, Scavenger and more). Bow types play differently: Longbow, Shortbow, War Bow, Hunting Bow, Horse Bow. Equip on pickup with E, or compare, equip and salvage at the **Armory** in camp.
 - **Gadgets:** two slots on cooldowns (keys 1 and 2, gamepad LT and LB): Bear Trap, Smoke Bomb, Healing Tonic, Throwing Net, Powder Keg and War Horn. They drop as gear too, with perks for cooldown, strength and duration.
+- **Difficulty tiers:** Adventurer, Veteran and Legend, picked at the camp gate. Each unlocks by beating a boss on the tier before; harder tiers mean tougher, harder-hitting enemies, stronger gear, more Rares and Uniques, and more gems.
 - **Loot:** gems and health orbs burst out of enemies and home in on you.
 - **Save points:** beating a boss saves a checkpoint (wave, arena and skills) and banks your gems. Continue from the camp's Ruin Gate.
 
@@ -91,6 +92,7 @@ Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kill
 | `src/juice.js`, `src/fx.js` | Decals, gateway light, particles, damage numbers, screen shake |
 | `src/loot.js` | Gems and health orbs |
 | `src/gear.js` | Gear data: bow and armor types, rarities, perks, stash, stats |
+| `src/difficulty.js` | Difficulty tiers and unlocks |
 | `src/gadgets.js` | Gadget effects and the gadget HUD |
 | `src/gear-drops.js`, `src/game-gear.js` | Gear drops in the arena, pickup card, equip on pickup |
 | `src/audio.js`, `src/music.js` | Sound effects and the adaptive soundtrack |
