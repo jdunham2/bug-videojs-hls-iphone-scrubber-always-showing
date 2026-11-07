@@ -2,15 +2,18 @@
 // Layers fade in and out with "intensity": 0 = calm (title, camp, between
 // waves), ~0.5–0.8 = combat (scales with enemy count), 1 = boss.
 
-const BPM = 96;
-const STEP = 60 / BPM / 2; // eighth notes
-// D minor progression: i – VI – III – VII (Dm, Bb, F, C), two bars each.
-const CHORDS = [
-  [50, 53, 57], // D F A
-  [46, 50, 53], // Bb D F
-  [53, 57, 60], // F A C
-  [48, 52, 55], // C E G
-];
+/**
+ * Each place has its own key, chords and tempo (two bars per chord).
+ *   ruins – D minor, i–VI–III–VII; keep – A minor, slower and higher;
+ *   forge – E phrygian, driving; camp – F major, gentle.
+ */
+const THEMES = {
+  ruins: { bpm: 96, lift: 0, chords: [[50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55]] },
+  keep: { bpm: 84, lift: 12, chords: [[57, 60, 64], [50, 53, 57], [53, 57, 60], [52, 56, 59]] },
+  forge: { bpm: 108, lift: 0, chords: [[52, 55, 59], [53, 57, 60], [55, 59, 62], [53, 57, 60]] },
+  camp: { bpm: 80, lift: 0, chords: [[53, 57, 60], [50, 53, 57], [46, 50, 53], [48, 52, 55]] },
+};
+const THEME_BY_ARENA = ['ruins', 'keep', 'forge'];
 const midi = (n) => 440 * 2 ** ((n - 69) / 12);
 
 export class Music {
@@ -21,6 +24,18 @@ export class Music {
     this.boss = false;
     this.started = false;
     this.step = 0;
+    this.setTheme('camp');
+  }
+
+  /** Switch key, chords and tempo (an arena index or a theme name). Takes effect at the next bar. */
+  setTheme(which) {
+    const name = typeof which === 'number' ? THEME_BY_ARENA[which % THEME_BY_ARENA.length] : which;
+    const th = THEMES[name] || THEMES.ruins;
+    this.theme = name;
+    this.chords = th.chords;
+    this.lift = th.lift;
+    this.stepDur = 60 / th.bpm / 2; // eighth notes
+    if (this.delay) this.delay.delayTime.setTargetAtTime(this.stepDur * 3, this.sfx.ctx.currentTime, 0.5);
   }
 
   /** Call after the audio context exists (first click). */
@@ -40,7 +55,7 @@ export class Music {
     this.layers = { pad: layer(0.5), arp: layer(0), drums: layer(0), bass: layer(0), brass: layer(0) };
     // A soft echo for the arp and brass, so the dungeon feels big.
     this.delay = c.createDelay(1);
-    this.delay.delayTime.value = STEP * 3;
+    this.delay.delayTime.value = this.stepDur * 3;
     const fb = c.createGain();
     fb.gain.value = 0.32;
     const wet = c.createGain();
@@ -105,14 +120,14 @@ export class Music {
 
     while (this.nextTime < c.currentTime + 0.12) {
       this.playStep(this.step, this.nextTime);
-      this.nextTime += STEP * (this.boss ? 0.86 : 1); // the boss pushes the tempo
+      this.nextTime += this.stepDur * (this.boss ? 0.86 : 1); // the boss pushes the tempo
       this.step++;
     }
   }
 
   playStep(step, t) {
     const bar = Math.floor(step / 8);
-    const chord = CHORDS[Math.floor(bar / 2) % CHORDS.length];
+    const chord = this.chords[Math.floor(bar / 2) % this.chords.length];
     const s = step % 8;
     // Chord change: retune the pad.
     if (s === 0 && bar % 2 === 0) {
@@ -123,7 +138,7 @@ export class Music {
     const I = this.intensity;
     const pattern = [0, 1, 2, 1, 0, 2, 1, 2];
     if (I > 0.3 || s % 2 === 0) {
-      if (Math.random() < 0.55 + I * 0.45) this.pluck(midi(chord[pattern[s]] + 12 + (s >= 4 && I > 0.6 ? 12 : 0)), t);
+      if (Math.random() < 0.55 + I * 0.45) this.pluck(midi(chord[pattern[s]] + 12 + this.lift + (s >= 4 && I > 0.6 ? 12 : 0)), t);
     }
     // Drums: taiko on 1 and the "and" of 3, snare on 2 and 4, extra hits when intense.
     if (I > 0.25) {

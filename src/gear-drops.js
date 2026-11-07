@@ -25,6 +25,7 @@ const beamTex = (() => {
   };
 })();
 const beamGeo = new THREE.CylinderGeometry(0.32, 0.42, 4, 16, 1, true).translate(0, 2, 0);
+const tallBeamGeo = new THREE.CylinderGeometry(0.4, 0.55, 9, 16, 1, true).translate(0, 4.5, 0);
 const ringGeo = new THREE.RingGeometry(0.45, 0.6, 32).rotateX(-Math.PI / 2);
 
 // A simple chest piece for armor drops.
@@ -56,7 +57,7 @@ export class GearDrops {
     const group = new THREE.Group();
     group.position.set(pos.x, 0, pos.z);
     const beam = new THREE.Mesh(
-      beamGeo,
+      item.rarity === 'unique' ? tallBeamGeo : beamGeo,
       new THREE.MeshBasicMaterial({ map: beamTex(), color, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
     );
     const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false }));
@@ -71,7 +72,7 @@ export class GearDrops {
     this.list.push({ item, group, beam, ring, icon, t: 0, vel: new THREE.Vector3(Math.cos(a) * 2, 6, Math.sin(a) * 2), y: 1.2, landed: false });
     const G = this.game;
     G.sfx.sample(item.rarity === 'common' ? 'uiSelect' : 'ding', { vol: item.rarity === 'unique' ? 0.8 : 0.5, rate: item.rarity === 'unique' ? 0.7 : 1, jitter: 0, pan: G.panAt(pos) });
-    if (item.rarity === 'unique') G.banner('', 'A Unique item dropped!', 1.4);
+    if (item.rarity === 'unique') G.onUniqueDrop(pos);
   }
 
   update(dt) {

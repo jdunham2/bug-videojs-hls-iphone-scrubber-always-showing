@@ -221,6 +221,7 @@ export class FlowMethods {
   /** Switch the arena dressing (Ruins → Keep → Forge, then around again). */
   setArena(index) {
     this.arena = index;
+    this.music.setTheme(index % THEMES.length);
     if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
     else this.env.themeIndex = index % THEMES.length;
     // Hazards depend on the arena's layout, so lay them out after the dressing.

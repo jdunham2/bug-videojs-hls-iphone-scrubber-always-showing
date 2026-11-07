@@ -26,6 +26,23 @@ export class GearMethods {
     if (Math.random() < chance) this.gearDrops.spawn(enemy.pos, roll(enemy.elite ? 'elite' : 'enemy', enemy.elite ? 1 : 0));
   }
 
+  /** A Unique dropped: a beat of slow motion, a golden flash and a fanfare. */
+  onUniqueDrop(pos) {
+    this.banner('UNIQUE!', 'Something special dropped', 1.6);
+    this.slowmo = Math.max(this.slowmo, 0.6);
+    this.slowmoScale = 0.3;
+    this.zoomKick = Math.min(0.12, this.zoomKick + 0.06);
+    this.sfx.sample('bell', { vol: 0.7, rate: 1.1, jitter: 0 });
+    this.sfx.sample('jingleClear', { vol: 0.45, rate: 1.2, jitter: 0, delay: 0.15 });
+    const f = document.getElementById('flash');
+    if (f) {
+      f.classList.remove('go');
+      void f.offsetWidth;
+      f.classList.add('go');
+    }
+    this.particles.spawn(pos.clone().setY(1.5), { count: 60, color: [3, 2.2, 0.7], speed: 7, up: 6, life: 1.1, size: 0.09, gravity: 4 });
+  }
+
   onGearPickup(item) {
     addToStash(item);
     (this.runGear ||= []).push(item);

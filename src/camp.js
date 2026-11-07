@@ -244,6 +244,12 @@ export class Camp {
     if (Math.random() < dt * 5) {
       this.particles.spawn(new THREE.Vector3(0, 1.2, 0), { count: 1, color: 0x2b2a2a, speed: 0.2, up: 1.2, life: 2, size: 0.3, gravity: -0.5, drag: 0.3 });
     }
+    // Fireflies drifting over the grass around the camp.
+    if (Math.random() < dt * 7) {
+      const a = Math.random() * Math.PI * 2;
+      const r = rand(4, 15);
+      this.particles.spawn(new THREE.Vector3(Math.cos(a) * r, rand(0.4, 2.2), Math.sin(a) * r), { count: 1, color: [2.2, 2.8, 0.7], speed: 0.25, up: 0.15, life: rand(2.5, 4), size: 0.06, gravity: -0.05, drag: 0.4 });
+    }
     this.particles.update(dt);
     if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
     if (this.dummy?.rig) {

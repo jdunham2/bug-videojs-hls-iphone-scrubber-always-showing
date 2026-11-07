@@ -272,6 +272,7 @@ export class Game {
 
   /** The hub between runs. */
   enterCamp() {
+    this.music.setTheme('camp');
     this.hideOverlay();
     this.tips.hide();
     setTimeout(() => this.state === 'camp' && this.tips.show('camp'), 1500);

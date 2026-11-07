@@ -6,12 +6,15 @@ yours.
 
 ## Now
 
-- [ ] Working through the roadmap below in order (user said: do them all, one by one).
+- [ ] Get the user's feedback on Builds 47-52 (gadgets, difficulty tiers, world
+      map and missions, merchant and blacksmith, Daily Trial, polish).
 
-## Proposed: replayability roadmap (pick order with the user)
+## Ideas for later
 
-1. Polish: hit-pause tuning, more death/hit animations, cinematic boss intros,
-   music per stage.
+- More missions per arena (new layouts), mission modifiers, a fourth arena.
+- A second boss type with its own moves.
+- Co-op on the published page (room capability); cosmetic capes.
+- Weekly trial with a bigger reward; a season track.
 
 ## Next
 
