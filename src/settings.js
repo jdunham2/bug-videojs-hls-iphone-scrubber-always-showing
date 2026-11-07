@@ -7,7 +7,7 @@ export const settings = {
   master: 0.8,
   music: 0.6,
   sfx: 0.9,
-  quality: 'high', // high | medium | low
+  quality: 'auto', // auto | high | medium | low
   shake: 1,
   damageNumbers: true,
 };
@@ -37,9 +37,18 @@ export function applySettings(game) {
   if (sfx.voiceBus) sfx.voiceBus.gain.value = 0.85 * s.sfx;
   if (game.music.bus) game.music.bus.gain.value = 0.32 * s.music;
   const r = game.renderer;
-  const q = s.quality;
+  // Auto starts at medium and steps down if frames are slow (see Game.autoQuality).
+  const q = s.quality === 'auto' ? game.perf?.level || 'medium' : s.quality;
   r.setPixelRatio(q === 'high' ? Math.min(window.devicePixelRatio, 2) : q === 'medium' ? Math.min(window.devicePixelRatio, 1.25) : 1);
   r.shadowMap.enabled = q !== 'low';
+  const shadowSize = q === 'high' ? 2048 : 1024;
+  for (const light of [game.world?.sun]) {
+    if (light && light.shadow.mapSize.x !== shadowSize) {
+      light.shadow.mapSize.set(shadowSize, shadowSize);
+      light.shadow.map?.dispose();
+      light.shadow.map = null;
+    }
+  }
   game.ao.enabled = q === 'high';
   game.bloom.enabled = q !== 'low';
   game.onResize();
@@ -83,7 +92,7 @@ export class SettingsPanel {
       ${slider('shake', 'Screen shake')}
       <label class="row"><span>Graphics</span>
         <select id="set-quality" data-k="quality">
-          ${['high', 'medium', 'low'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
+          ${['auto', 'high', 'medium', 'low'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
         </select><b></b></label>
       <label class="row"><span>Damage numbers</span><input type="checkbox" id="set-damageNumbers" data-k="damageNumbers" ${s.damageNumbers ? 'checked' : ''}><b></b></label>
       <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y/LB Arrow Storm · X use · Start pause</p>

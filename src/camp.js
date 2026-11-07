@@ -39,7 +39,7 @@ export class Camp {
     const moon = new THREE.DirectionalLight(0xbcd0ff, 1.8);
     moon.position.set(-8, 18, -6);
     moon.castShadow = true;
-    moon.shadow.mapSize.set(2048, 2048);
+    moon.shadow.mapSize.set(1024, 1024);
     Object.assign(moon.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 });
     moon.shadow.bias = -0.0004;
     moon.shadow.normalBias = 0.03;
@@ -83,9 +83,14 @@ export class Camp {
       [-3, -9],
     ]) {
       this.prop('lantern', 2.0, x, z, Math.random() * 6, 0.25);
-      const l = new THREE.PointLight(0xffb066, 6, 7, 1.8);
-      l.position.set(x, 1.9, z);
-      S.add(l);
+      // A soft glow sprite instead of a real light: point lights cost on every pixel.
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffb066, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+      glow.position.set(x, 1.85, z);
+      glow.scale.setScalar(1.6);
+      S.add(glow);
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(2.2, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0x6a4020, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      pool.position.set(x, 0.03, z);
+      S.add(pool);
     }
     for (let i = 0; i < 14; i++) {
       const a = (i / 14) * Math.PI * 2 + 0.2;
@@ -357,6 +362,21 @@ function groundTexture() {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
+}
+
+let glowTex = null;
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
 }
 
 export function portalTexture() {

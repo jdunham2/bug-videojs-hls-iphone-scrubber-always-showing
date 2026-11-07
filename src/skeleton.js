@@ -204,7 +204,6 @@ export class Skeleton extends Grunt {
   updateModel(dt) {
     const A = this.anim;
     if (!A) return;
-    const mc = config.models;
     switch (this.state) {
       case 'dying':
         A.set(['death'], { once: true, fade: 0.08 });

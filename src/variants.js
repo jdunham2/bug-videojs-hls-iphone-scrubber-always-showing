@@ -4,7 +4,6 @@
 //   burning ground, then bursts into flame when it dies.
 
 import * as THREE from 'three';
-import { config } from './config.js';
 import { Grunt } from './enemy.js';
 import { Skeleton } from './skeleton.js';
 import { arrowBlocked } from './world.js';

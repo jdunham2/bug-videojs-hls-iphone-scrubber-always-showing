@@ -1,0 +1,273 @@
+// Run flow: waves, spawning, elites, bosses, arenas, the descent portal and save points.
+import * as THREE from 'three';
+import { config } from './config.js';
+import { ARENA_HALF, pillars } from './world.js';
+import { spawnGates, THEMES } from './environment.js';
+import { Grunt } from './enemy.js';
+import { Skeleton } from './skeleton.js';
+import { Boss } from './boss.js';
+import { Ghoul, Imp } from './variants.js';
+import { makeElite, AFFIXES } from './elites.js';
+import { build, stat } from './skills.js';
+import { portalTexture } from './camp.js';
+import { profile, saveProfile } from './profile.js';
+
+/** Methods mixed into Game (see game.js). */
+export class FlowMethods {
+  startWave(n) {
+    this.wave = n;
+    if (n === 1) this.tips.show('draw');
+    const w = config.waves;
+    this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
+    if (this.env.active) this.hazards.restock(this.arena);
+    if (n % config.boss.every === 0) return this.startBossWave(n);
+    this.spawnTimer = 0.3;
+    this.waveState = 'active';
+    this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
+    this.sfx.wave(n);
+    this.waveHurt = false;
+  }
+
+  startBossWave(n) {
+    this.toSpawn = 0;
+    this.waveState = 'active';
+    this.waveHurt = false;
+    this.bossIndex = Math.round(n / config.boss.every);
+    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
+    const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
+    this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
+    this.enemies.push(this.boss);
+    this.portals.spawn(p, 2.2, 5, new THREE.Color(3, 0.5, 0.3));
+    this.banner('A boss approaches', this.boss.displayName, 2.2);
+    this.sfx.wave(n);
+    this.sfx.bossRoar();
+    this.shake.add(0.4);
+  }
+
+  onBossIntro(boss) {
+    this.cinematic = { t: 0, dur: config.boss.introTime, target: boss };
+    document.body.classList.add('letterbox');
+    this.sfx.bossRoar();
+    this.shake.add(0.5);
+    this.bossCard(boss.displayName, boss.form.sub);
+  }
+
+  onBossPhase(boss) {
+    this.banner('Enraged!', 'He moves faster and calls for help', 1.8);
+    this.sfx.bossRoar();
+    this.shake.add(0.5);
+    this.aberration = 1;
+    this.particles.spawn(boss.pos.clone().setY(2), { count: 40, color: [3, 0.4, 0.2], speed: 6, up: 3, life: 0.8, size: 0.14 });
+  }
+
+  onBossStunned(boss, broken = false) {
+    this.numbers.spawn(boss.pos.clone().setY(4.6), broken ? 'POISE BROKEN' : 'STUNNED', 'callout gold');
+    this.sfx.stagger(this.panAt(boss.pos));
+    this.sfx.sample('clang', { vol: 0.9, rate: 0.6 });
+    this.shake.add(0.4);
+    this.zoomKick = Math.min(0.12, this.zoomKick + 0.08);
+  }
+
+  onBossSummon(boss) {
+    this.sfx.bossRoar();
+    const n = boss.phase === 2 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
+      const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
+      this.enemies.push(new Grunt(this, p, this.wave));
+      this.portals.spawn(p);
+    }
+  }
+
+  onBossDefeated(boss) {
+    this.boss = null;
+    this.banner('Boss defeated!', boss.displayName, 2.6);
+    this.sfx.cleared(true);
+    this.sfx.bossRoar();
+    this.shake.add(0.8);
+    this.slowmo = 2;
+    this.slowmoScale = 0.18;
+    this.hud.vignette.classList.add('slowmo');
+    this.killCam = { t: 0, dur: 2.4, target: boss.pos.clone() };
+    this.particles.spawn(boss.pos.clone().setY(2.5), { count: 80, color: [3, 1.6, 0.4], speed: 9, up: 5, life: 1.4, size: 0.16 });
+    this.decals.spawn(boss.pos, 'scorch', 5, 30);
+    // Kill the summoned grunts too, so the wave ends with the boss.
+    for (const e of this.enemies) if (e !== boss && e.isHittable()) e.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+    this.stats.bossesDefeated = (this.stats.bossesDefeated || 0) + 1;
+  }
+
+  updateWaves(dt) {
+    if (this.waveState === 'break') {
+      this.breakTimer -= dt;
+      if (this.breakTimer <= 0) this.startWave(this.wave + 1);
+      return;
+    }
+    if (this.waveState === 'cleared') {
+      this.clearTimer -= dt;
+      if (this.clearTimer <= 0) this.openDraft();
+      return;
+    }
+    if (this.waveState === 'portal') {
+      this.updateArenaPortal(dt);
+      return;
+    }
+    this.spawnTimer -= dt;
+    if (this.toSpawn > 0 && this.spawnTimer <= 0) {
+      this.spawnEnemy();
+      this.toSpawn--;
+      this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
+    }
+    if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
+      this.waveState = 'cleared';
+      this.clearTimer = 1.1;
+      this.player.cheer();
+      if (this.wave % config.boss.every === 0) this.saveCheckpoint();
+      const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
+      this.player.hp += heal;
+      this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
+      this.sfx.cleared(!this.waveHurt);
+      this.music.stinger(true);
+    }
+  }
+
+  /** Which enemy type to spawn this time. */
+  enemyClass() {
+    const s = config.skeleton;
+    const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
+    const ranged = Math.random() < chance;
+    // Each arena brings its own enemies: ghouls in the Crypt, imps in the Forge.
+    const theme = (this.arena || 0) % THEMES.length;
+    if (theme === 1) return ranged ? Skeleton : Math.random() < 0.7 ? Ghoul : Grunt;
+    if (theme === 2) return ranged ? Imp : Grunt;
+    return ranged ? Skeleton : Grunt;
+  }
+
+  /** Occasionally promote a fresh spawn to an elite (from wave 4). */
+  maybeElite(enemy) {
+    const chance = this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0;
+    if (Math.random() >= chance) return enemy;
+    const keys = Object.keys(AFFIXES);
+    makeElite(enemy, keys[Math.floor(Math.random() * keys.length)]);
+    return enemy;
+  }
+
+  spawnEnemy() {
+    const Kind = this.enemyClass();
+    const p = new THREE.Vector3();
+    // Half the grunts march out of the archway gates (when the dressed arena is loaded).
+    const gates = spawnGates.filter((g) => Math.hypot(g.x - this.player.pos.x, g.z - this.player.pos.z) > 7);
+    if (gates.length && Math.random() < 0.5) {
+      const g = gates[Math.floor(Math.random() * gates.length)];
+      p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
+      this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
+      this.portals.spawn(p);
+      return;
+    }
+    const H = ARENA_HALF - 1.5;
+    for (let i = 0; i < 40; i++) {
+      // Prefer the arena edges, away from the player and pillars.
+      const edge = Math.floor(Math.random() * 4);
+      const t = (Math.random() * 2 - 1) * H;
+      const inset = H - Math.random() * 4;
+      if (edge === 0) p.set(t, 0, -inset);
+      else if (edge === 1) p.set(t, 0, inset);
+      else if (edge === 2) p.set(inset, 0, t);
+      else p.set(-inset, 0, t);
+      const farFromPlayer = p.distanceTo(this.player.pos) > 9;
+      const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
+      if (farFromPlayer && clearOfPillars) break;
+    }
+    this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
+    this.portals.spawn(p, 1.2, 2.2, Kind === Skeleton ? new THREE.Color(0.7, 2.2, 2.8) : new THREE.Color(3, 0.7, 0.5));
+  }
+
+  // ---------------------------------------------------------------- combat events
+
+  /** Switch the arena dressing (Ruins → Crypt → Forge, then around again). */
+  setArena(index) {
+    this.arena = index;
+    if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
+    else this.env.themeIndex = index % THEMES.length;
+    // Hazards depend on the arena's layout, so lay them out after the dressing.
+    if (this.env.active) this.hazards.setup(index);
+  }
+
+  /** After a boss: a portal opens in the far gate; walking into it descends to the next arena. */
+  openArenaPortal() {
+    this.waveState = 'portal';
+    const next = THEMES[(this.arena + 1) % THEMES.length];
+    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 1.6 };
+    if (!this.arenaPortal) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: portalTexture(),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        color: new THREE.Color(1.6, 0.9, 3),
+      });
+      this.arenaPortal = new THREE.Mesh(new THREE.CircleGeometry(1.5, 48), mat);
+      this.scene.add(this.arenaPortal);
+    }
+    this.arenaPortal.position.set(gate.x, 1.8, gate.z - 1.9);
+    this.arenaPortal.visible = true;
+    this.portalPos = new THREE.Vector3(gate.x, 0, gate.z - 0.6);
+    this.banner('The gate is open', `Walk through to descend into the ${next.name}`, 3);
+    this.tips.show('portal');
+    this.sfx.ultimateReady();
+  }
+
+  updateArenaPortal(dt) {
+    const p = this.arenaPortal;
+    p.rotateZ(dt * 1.5);
+    p.scale.setScalar(1 + 0.05 * Math.sin(this.elapsed * 4));
+    if (Math.random() < dt * 30) {
+      const a = Math.random() * Math.PI * 2;
+      this.particles.spawn(new THREE.Vector3(p.position.x + Math.cos(a) * 1.3, 1.8 + Math.sin(a) * 1.3, p.position.z + 0.3), {
+        count: 1,
+        color: [1.8, 0.9, 3],
+        speed: 0.5,
+        up: 0.5,
+        life: 0.8,
+        size: 0.07,
+        gravity: 0,
+      });
+    }
+    if (this.player.pos.distanceTo(this.portalPos) < 2.2 && !this.descending) this.descend();
+  }
+
+  descend() {
+    this.descending = true;
+    this.tips.done('portal');
+    this.fade();
+    this.sfx.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0 });
+    setTimeout(() => {
+      // Anything still on the floor is scooped up on the way through.
+      this.loot.scoop();
+      this.arrows.clear();
+      this.enemyArrows.clear();
+      this.decals.clear();
+      this.arenaPortal.visible = false;
+      this.setArena(this.arena + 1);
+      this.player.pos.set(0, 0, 4);
+      this.camTarget.copy(this.player.pos);
+      this.waveState = 'break';
+      this.breakTimer = 2.5;
+      this.descending = false;
+      this.bossCard(THEMES[this.arena % THEMES.length].name, `Depth ${this.arena + 1}`);
+      this.sfx.bossRoar();
+    }, 280);
+  }
+
+  /** Save point: after each boss, store the run so it can be resumed from the camp, and bank gems. */
+  saveCheckpoint() {
+    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls, arena: this.arena + 1 };
+    this.pendingDescent = true;
+    profile.gems += this.loot.runGems;
+    profile.totalGems += this.loot.runGems;
+    this.stats.gemsBanked = (this.stats.gemsBanked || 0) + this.loot.runGems;
+    this.loot.runGems = 0;
+    saveProfile();
+    setTimeout(() => this.banner('Progress saved', 'Continue from here at the Rune Shrine', 1.8), 900);
+  }
+}

@@ -4,7 +4,6 @@ import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
 import { instantiate, attachProp, findBone, enableDissolve } from './models.js';
 import { updateElite } from './elites.js';
-import { buffs } from './skills.js';
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);

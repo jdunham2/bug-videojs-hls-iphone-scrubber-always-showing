@@ -1,36 +1,34 @@
 import * as THREE from 'three';
-import GUI from 'lil-gui';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { config, saveConfig, resetConfig } from './config.js';
-import { World, ARENA_HALF, pillars } from './world.js';
-import { Environment, spawnGates, THEMES } from './environment.js';
+import { config } from './config.js';
+import { World } from './world.js';
+import { Environment } from './environment.js';
 import { Decals, Portals } from './juice.js';
-import { Skeleton, EnemyArrows } from './skeleton.js';
-import { Boss, BOSS_NAME } from './boss.js';
+import { EnemyArrows } from './skeleton.js';
 import { ArrowStorm } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
-import { Camp, portalTexture } from './camp.js';
+import { Camp } from './camp.js';
 import { Hazards } from './hazards.js';
-import { makeElite, AFFIXES } from './elites.js';
-import { Ghoul, Imp, Fireballs } from './variants.js';
+import { Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel } from './settings.js';
 import { Tips } from './tips.js';
-import { profile, saveProfile, bankRun } from './profile.js';
+import { profile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
-import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
-import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL, buffs } from './skills.js';
-import { modelStatus } from './models.js';
-import { audioStatus } from './audio.js';
+import { UiMethods } from './game-ui.js';
+import { CombatMethods } from './game-combat.js';
+import { FlowMethods } from './game-flow.js';
+import { TuningMethods } from './game-tuning.js';
+import { build, stat, buffs } from './skills.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -58,16 +56,6 @@ const GradeShader = {
       gl_FragColor = c;
     }`,
 };
-const BEST_KEY = 'draw-release.best.v1';
-
-function loadBest() {
-  try {
-    return JSON.parse(localStorage.getItem(BEST_KEY) || 'null') || { wave: 0, kills: 0 };
-  } catch {
-    return { wave: 0, kills: 0 };
-  }
-}
-
 export class Game {
   constructor(container) {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
@@ -164,7 +152,6 @@ export class Game {
     this.state = 'title';
     this.time = 0;
     this.hitStop = 0;
-    this.best = loadBest();
     this.resetRun();
     this.setupGui();
     this.showOverlay('title');
@@ -199,88 +186,6 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- skill draft
-
-  openDraft() {
-    this.tips.show('draft');
-    this.state = 'choosing';
-    this.player.drawing = false;
-    this.sfx.drawStop();
-    this.draftCards = rollCards(3, this.wave);
-    this.renderDraft();
-  }
-
-  renderDraft() {
-    const cards = this.draftCards
-      .map((c, i) => {
-        const level = c.max === Infinity ? '' : c.max === 1 ? 'Unique' : `Level ${ROMAN[c.next]} / ${ROMAN[c.max]}`;
-        const type = c.rarity === 'legendary' ? 'Legendary' : TYPE_LABEL[c.type];
-        return `
-        <button class="card r-${c.rarity} t-${c.type}" data-pick="${i}">
-          <span class="key">${i + 1}</span>
-          <span class="type">${type}</span>
-          <span class="name"></span>
-          <span class="level">${level}</span>
-          <span class="desc"></span>
-          ${c.note ? '<span class="note"></span>' : ''}
-        </button>`;
-      })
-      .join('');
-    const d = this.hud.draft;
-    d.innerHTML = `
-      <div class="draft-head">
-        <div class="eyebrow">Wave ${this.wave} cleared</div>
-        <h2>Choose a skill</h2>
-      </div>
-      <div class="cards">${cards}</div>
-      <button class="reroll" data-reroll ${build.rerolls > 0 ? '' : 'disabled'}>Reroll (${build.rerolls} left) · F</button>`;
-    // Text set via textContent so names/descriptions can't inject markup.
-    d.querySelectorAll('.card').forEach((el, i) => {
-      const c = this.draftCards[i];
-      el.querySelector('.name').textContent = c.name;
-      el.querySelector('.desc').textContent = c.text;
-      if (c.note) el.querySelector('.note').textContent = c.note;
-    });
-    d.classList.add('visible');
-  }
-
-  hideDraft() {
-    this.hud.draft.classList.remove('visible');
-    this.hud.draft.innerHTML = '';
-  }
-
-  reroll() {
-    if (this.state !== 'choosing' || build.rerolls <= 0) return;
-    build.rerolls--;
-    this.sfx.reroll();
-    this.draftCards = rollCards(3, this.wave);
-    this.renderDraft();
-  }
-
-  pickSkill(i) {
-    if (this.state !== 'choosing') return;
-    this.tips.done('draft');
-    const card = this.draftCards[i];
-    if (!card) return;
-    build.add(card.id);
-    const p = this.player;
-    if (card.id === 'vitality') p.hp = stat.maxHp();
-    if (card.id === 'secondWind') p.charges++;
-    if (card.id === 'patchUp') p.hp = Math.min(stat.maxHp(), p.hp + 40);
-    this.sfx.pick();
-    this.hideDraft();
-    this.state = 'playing';
-    this.waveState = 'break';
-    this.breakTimer = config.waves.breakTime;
-    if (this.pendingDescent) {
-      this.pendingDescent = false;
-      this.openArenaPortal();
-    }
-    const level = card.max > 1 && card.max !== Infinity ? ` ${ROMAN[card.next]}` : '';
-    this.banner(`${card.name}${level}`, card.text, 2);
-    this.particles.spawn(p.pos.clone().setY(1), { count: 24, color: [3, 2.2, 0.6], speed: 4, up: 3, life: 0.7, size: 0.08, gravity: 3 });
-  }
-
-  // ---------------------------------------------------------------- run state
 
   resetRun() {
     for (const e of this.enemies) e.dispose();
@@ -409,568 +314,14 @@ export class Game {
     this.sfx.gameOver();
     this.music.stinger(false);
     this.gemsThisRun = (this.stats.gemsBanked || 0) + this.loot.runGems;
+    const prev = { ...profile.best };
+    const newBest = this.wave > prev.wave || (this.wave === prev.wave && this.stats.kills > prev.kills);
     this.newUnlocks = bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills, bosses: this.stats.bossesDefeated || 0 });
     this.loot.runGems = 0;
-    const newBest = this.wave > this.best.wave || (this.wave === this.best.wave && this.stats.kills > this.best.kills);
-    if (newBest) {
-      this.best = { wave: this.wave, kills: this.stats.kills };
-      try {
-        localStorage.setItem(BEST_KEY, JSON.stringify(this.best));
-      } catch {
-        /* ignore */
-      }
-    }
     this.showOverlay('gameover', newBest);
   }
 
   // ---------------------------------------------------------------- waves
-
-  startWave(n) {
-    this.wave = n;
-    if (n === 1) this.tips.show('draw');
-    const w = config.waves;
-    this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
-    if (this.env.active) this.hazards.restock(this.arena);
-    if (n % config.boss.every === 0) return this.startBossWave(n);
-    this.spawnTimer = 0.3;
-    this.waveState = 'active';
-    this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
-    this.sfx.wave(n);
-    this.waveHurt = false;
-  }
-
-  startBossWave(n) {
-    this.toSpawn = 0;
-    this.waveState = 'active';
-    this.waveHurt = false;
-    this.bossIndex = Math.round(n / config.boss.every);
-    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 2 };
-    const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
-    this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
-    this.enemies.push(this.boss);
-    this.portals.spawn(p, 2.2, 5, new THREE.Color(3, 0.5, 0.3));
-    this.banner('A boss approaches', this.boss.displayName, 2.2);
-    this.sfx.wave(n);
-    this.sfx.bossRoar();
-    this.shake.add(0.4);
-  }
-
-  onUltimateReady() {
-    this.tips.show('ult');
-    this.sfx.ultimateReady();
-    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'ARROW STORM READY · Q', 'callout gold');
-  }
-
-  onUltimateEnd() {
-    this.shake.add(0.2);
-  }
-
-  /** Switch the arena dressing (Ruins → Crypt → Forge, then around again). */
-  setArena(index) {
-    this.arena = index;
-    if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
-    else this.env.themeIndex = index % THEMES.length;
-    // Hazards depend on the arena's layout, so lay them out after the dressing.
-    if (this.env.active) this.hazards.setup(index);
-  }
-
-  /** After a boss: a portal opens in the far gate; walking into it descends to the next arena. */
-  openArenaPortal() {
-    this.waveState = 'portal';
-    const next = THEMES[(this.arena + 1) % THEMES.length];
-    const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 1.6 };
-    if (!this.arenaPortal) {
-      const mat = new THREE.MeshBasicMaterial({
-        map: portalTexture(),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        color: new THREE.Color(1.6, 0.9, 3),
-      });
-      this.arenaPortal = new THREE.Mesh(new THREE.CircleGeometry(1.5, 48), mat);
-      this.scene.add(this.arenaPortal);
-    }
-    this.arenaPortal.position.set(gate.x, 1.8, gate.z - 1.9);
-    this.arenaPortal.visible = true;
-    this.portalPos = new THREE.Vector3(gate.x, 0, gate.z - 0.6);
-    this.banner('The gate is open', `Walk through to descend into the ${next.name}`, 3);
-    this.tips.show('portal');
-    this.sfx.ultimateReady();
-  }
-
-  updateArenaPortal(dt) {
-    const p = this.arenaPortal;
-    p.rotateZ(dt * 1.5);
-    p.scale.setScalar(1 + 0.05 * Math.sin(this.elapsed * 4));
-    if (Math.random() < dt * 30) {
-      const a = Math.random() * Math.PI * 2;
-      this.particles.spawn(new THREE.Vector3(p.position.x + Math.cos(a) * 1.3, 1.8 + Math.sin(a) * 1.3, p.position.z + 0.3), {
-        count: 1,
-        color: [1.8, 0.9, 3],
-        speed: 0.5,
-        up: 0.5,
-        life: 0.8,
-        size: 0.07,
-        gravity: 0,
-      });
-    }
-    if (this.player.pos.distanceTo(this.portalPos) < 2.2 && !this.descending) this.descend();
-  }
-
-  descend() {
-    this.descending = true;
-    this.tips.done('portal');
-    this.fade();
-    this.sfx.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0 });
-    setTimeout(() => {
-      // Anything still on the floor is scooped up on the way through.
-      this.loot.scoop();
-      this.arrows.clear();
-      this.enemyArrows.clear();
-      this.decals.clear();
-      this.arenaPortal.visible = false;
-      this.setArena(this.arena + 1);
-      this.player.pos.set(0, 0, 4);
-      this.camTarget.copy(this.player.pos);
-      this.waveState = 'break';
-      this.breakTimer = 2.5;
-      this.descending = false;
-      this.bossCard(THEMES[this.arena % THEMES.length].name, `Depth ${this.arena + 1}`);
-      this.sfx.bossRoar();
-    }, 280);
-  }
-
-  /** Save point: after each boss, store the run so it can be resumed from the camp, and bank gems. */
-  saveCheckpoint() {
-    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls, arena: this.arena + 1 };
-    this.pendingDescent = true;
-    profile.gems += this.loot.runGems;
-    profile.totalGems += this.loot.runGems;
-    this.stats.gemsBanked = (this.stats.gemsBanked || 0) + this.loot.runGems;
-    this.loot.runGems = 0;
-    saveProfile();
-    setTimeout(() => this.banner('Progress saved', 'Continue from here at the Rune Shrine', 1.8), 900);
-  }
-
-  onBossIntro(boss) {
-    this.cinematic = { t: 0, dur: config.boss.introTime, target: boss };
-    document.body.classList.add('letterbox');
-    this.sfx.bossRoar();
-    this.shake.add(0.5);
-    this.bossCard(boss.displayName, boss.form.sub);
-  }
-
-  onBossPhase(boss) {
-    this.banner('Enraged!', 'He moves faster and calls for help', 1.8);
-    this.sfx.bossRoar();
-    this.shake.add(0.5);
-    this.aberration = 1;
-    this.particles.spawn(boss.pos.clone().setY(2), { count: 40, color: [3, 0.4, 0.2], speed: 6, up: 3, life: 0.8, size: 0.14 });
-  }
-
-  onBossStunned(boss, broken = false) {
-    this.numbers.spawn(boss.pos.clone().setY(4.6), broken ? 'POISE BROKEN' : 'STUNNED', 'callout gold');
-    this.sfx.stagger(this.panAt(boss.pos));
-    this.sfx.sample('clang', { vol: 0.9, rate: 0.6 });
-    this.shake.add(0.4);
-    this.zoomKick = Math.min(0.12, this.zoomKick + 0.08);
-  }
-
-  onBossSummon(boss) {
-    this.sfx.bossRoar();
-    const n = boss.phase === 2 ? 3 : 2;
-    for (let i = 0; i < n; i++) {
-      const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
-      const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
-      this.enemies.push(new Grunt(this, p, this.wave));
-      this.portals.spawn(p);
-    }
-  }
-
-  onBossDefeated(boss) {
-    this.boss = null;
-    this.banner('Boss defeated!', boss.displayName, 2.6);
-    this.sfx.cleared(true);
-    this.sfx.bossRoar();
-    this.shake.add(0.8);
-    this.slowmo = 2;
-    this.slowmoScale = 0.18;
-    this.hud.vignette.classList.add('slowmo');
-    this.killCam = { t: 0, dur: 2.4, target: boss.pos.clone() };
-    this.particles.spawn(boss.pos.clone().setY(2.5), { count: 80, color: [3, 1.6, 0.4], speed: 9, up: 5, life: 1.4, size: 0.16 });
-    this.decals.spawn(boss.pos, 'scorch', 5, 30);
-    // Kill the summoned grunts too, so the wave ends with the boss.
-    for (const e of this.enemies) if (e !== boss && e.isHittable()) e.die(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
-    this.stats.bossesDefeated = (this.stats.bossesDefeated || 0) + 1;
-  }
-
-  bossCard(title, sub) {
-    const el = this.hud.bossCard;
-    el.innerHTML = '<div class="name"></div><div class="sub"></div>';
-    el.querySelector('.name').textContent = title;
-    el.querySelector('.sub').textContent = sub;
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
-  }
-
-  updateWaves(dt) {
-    if (this.waveState === 'break') {
-      this.breakTimer -= dt;
-      if (this.breakTimer <= 0) this.startWave(this.wave + 1);
-      return;
-    }
-    if (this.waveState === 'cleared') {
-      this.clearTimer -= dt;
-      if (this.clearTimer <= 0) this.openDraft();
-      return;
-    }
-    if (this.waveState === 'portal') {
-      this.updateArenaPortal(dt);
-      return;
-    }
-    this.spawnTimer -= dt;
-    if (this.toSpawn > 0 && this.spawnTimer <= 0) {
-      this.spawnEnemy();
-      this.toSpawn--;
-      this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
-    }
-    if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
-      this.waveState = 'cleared';
-      this.clearTimer = 1.1;
-      this.player.cheer();
-      if (this.wave % config.boss.every === 0) this.saveCheckpoint();
-      const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
-      this.player.hp += heal;
-      this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
-      this.sfx.cleared(!this.waveHurt);
-      this.music.stinger(true);
-    }
-  }
-
-  /** Which enemy type to spawn this time. */
-  enemyClass() {
-    const s = config.skeleton;
-    const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
-    const ranged = Math.random() < chance;
-    // Each arena brings its own enemies: ghouls in the Crypt, imps in the Forge.
-    const theme = (this.arena || 0) % THEMES.length;
-    if (theme === 1) return ranged ? Skeleton : Math.random() < 0.7 ? Ghoul : Grunt;
-    if (theme === 2) return ranged ? Imp : Grunt;
-    return ranged ? Skeleton : Grunt;
-  }
-
-  /** Occasionally promote a fresh spawn to an elite (from wave 4). */
-  maybeElite(enemy) {
-    const chance = this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0;
-    if (Math.random() >= chance) return enemy;
-    const keys = Object.keys(AFFIXES);
-    makeElite(enemy, keys[Math.floor(Math.random() * keys.length)]);
-    return enemy;
-  }
-
-  spawnEnemy() {
-    const Kind = this.enemyClass();
-    const p = new THREE.Vector3();
-    // Half the grunts march out of the archway gates (when the dressed arena is loaded).
-    const gates = spawnGates.filter((g) => Math.hypot(g.x - this.player.pos.x, g.z - this.player.pos.z) > 7);
-    if (gates.length && Math.random() < 0.5) {
-      const g = gates[Math.floor(Math.random() * gates.length)];
-      p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
-      this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
-      this.portals.spawn(p);
-      return;
-    }
-    const H = ARENA_HALF - 1.5;
-    for (let i = 0; i < 40; i++) {
-      // Prefer the arena edges, away from the player and pillars.
-      const edge = Math.floor(Math.random() * 4);
-      const t = (Math.random() * 2 - 1) * H;
-      const inset = H - Math.random() * 4;
-      if (edge === 0) p.set(t, 0, -inset);
-      else if (edge === 1) p.set(t, 0, inset);
-      else if (edge === 2) p.set(inset, 0, t);
-      else p.set(-inset, 0, t);
-      const farFromPlayer = p.distanceTo(this.player.pos) > 9;
-      const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
-      if (farFromPlayer && clearOfPillars) break;
-    }
-    this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
-    this.portals.spawn(p, 1.2, 2.2, Kind === Skeleton ? new THREE.Color(0.7, 2.2, 2.8) : new THREE.Color(3, 0.7, 0.5));
-  }
-
-  // ---------------------------------------------------------------- combat events
-
-  /** opts: { mega, extra } */
-  fireArrow(origin, dir, speed, damage, charge, perfect, opts = {}) {
-    const element = lv('fire') ? 'fire' : lv('frost') ? 'frost' : null;
-    // In camp, arrows fly in the camp scene (training dummy practice).
-    const arrows = this.state === 'camp' ? this.camp.arrows : this.arrows;
-    arrows.spawn(origin, dir, speed, damage, charge, perfect, { ...opts, bounces: lv('ricochet'), element });
-    if (this.state === 'camp') {
-      this.sfx.release(charge, perfect, this.panAt(origin));
-      return;
-    }
-    if (opts.extra) return; // Split Shot side arrows share the main shot's sound and stats
-    this.tips.done('draw');
-    if (perfect) this.tips.done('perfect');
-    else this.tips.show('perfect');
-    this.sfx.release(charge, perfect, this.panAt(origin));
-    if (opts.mega) {
-      this.sfx.megaRelease();
-      this.shake.add(0.5);
-      this.particles.spawn(origin, { count: 24, color: [3, 0.6, 2.4], speed: 6, up: 1, life: 0.4, size: 0.1, gravity: 1, dir, spread: 1 });
-    }
-    this.stats.shots++;
-    if (perfect) {
-      this.stats.perfects++;
-      this.stats.streak++;
-      this.stats.bestStreak = Math.max(this.stats.bestStreak, this.stats.streak);
-      if (this.stats.streak % 3 === 0) this.sfx.combo();
-      this.ultimate.gain(config.ultimate.perPerfect);
-      this.particles.spawn(origin, { count: 14, color: [3, 2.2, 0.6], speed: 5, up: 1, life: 0.35, size: 0.08, gravity: 2, dir, spread: 0.9 });
-      this.shake.add(0.18);
-    } else {
-      this.stats.streak = 0;
-      this.particles.spawn(origin, { count: 4, color: 0xd8cfb8, speed: 2, up: 0.5, life: 0.25, size: 0.06, gravity: 0, dir, spread: 1 });
-    }
-  }
-
-  onArrowHit(arrow, enemy, point) {
-    const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect || arrow.mega);
-    if (!result) return;
-    if (arrow.hitCount === 0 && !arrow.extra) {
-      this.stats.hits++;
-      this.ultimate.gain(config.ultimate.perHit);
-    }
-    const feel = config.feel;
-    const full = arrow.charge >= 0.999;
-
-    const kind = arrow.mega ? 'mega' : arrow.perfect ? 'perfect' : full ? 'crit' : 'normal';
-    this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 0.8, 0)), Math.round(arrow.damage), kind);
-    this.particles.spawn(point, {
-      count: arrow.perfect || arrow.mega ? 22 : 8 + Math.round(arrow.charge * 8),
-      color: arrow.mega ? [3, 0.6, 2.4] : arrow.perfect ? [3, 2.1, 0.5] : 0xb33a2a,
-      speed: 3 + arrow.charge * 5,
-      up: 2,
-      life: 0.5,
-      size: 0.1,
-      dir: arrow.dir,
-      spread: 1.1,
-    });
-
-    const big = arrow.perfect || arrow.mega;
-    this.hitStop = Math.max(this.hitStop, big ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
-    this.shake.add(arrow.mega ? 0.6 : arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
-    if (big) {
-      this.zoomKick = Math.min(0.12, this.zoomKick + (arrow.mega ? 0.09 : 0.05));
-      this.aberration = Math.min(1, this.aberration + (arrow.mega ? 1 : 0.6));
-    }
-    if (Math.random() < (big ? 0.9 : 0.35)) {
-      this.decals.spawn(enemy.pos.clone().addScaledVector(arrow.dir, 0.4 + Math.random() * 0.6), 'blood', big ? 1.2 : 0.7);
-    }
-    this.sfx.hit(arrow.perfect, this.panAt(point));
-
-    if (result === 'stagger') {
-      this.stats.staggers++;
-      this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 1.6, 0)), 'STAGGER', 'callout');
-      this.sfx.stagger(this.panAt(point));
-    }
-    if (result === 'kill') this.onKill(enemy);
-    else this.applyElement(enemy, point);
-    if (arrow.perfect) this.chainLightning(enemy, arrow.damage);
-  }
-
-  onKill(enemy) {
-    this.stats.kills++;
-    if (enemy.affix === 'volatile' || enemy.kind === 'imp') {
-      const pos = enemy.pos.clone();
-      const big = enemy.affix === 'volatile';
-      setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);
-    }
-    if (enemy.elite) this.loot.drop(enemy.pos, 5, 1);
-    if (enemy.isBoss) this.loot.drop(enemy.pos, 25, 3);
-    else this.loot.drop(enemy.pos, enemy.kind === 'skeleton' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
-    this.ultimate.gain(config.ultimate.perKill);
-    const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
-    this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
-    // Last enemy of the wave: slow-motion kill cam.
-    const others = this.enemies.some((e) => e !== enemy && e.state !== 'dying' && !e.removed);
-    if (!enemy.isBoss && this.waveState === 'active' && this.toSpawn === 0 && !others && !this.player.dead) {
-      this.killCam = { t: 0, dur: 1.3, target: enemy.pos.clone() };
-      this.slowmo = 1.1;
-      this.slowmoScale = 0.22;
-      this.hud.vignette.classList.add('slowmo');
-    }
-    this.sfx.kill(this.panAt(enemy.pos));
-    // Three kills in quick succession earns the announcer.
-    this.killTimes = (this.killTimes || []).filter((t) => this.elapsed - t < 1.5);
-    this.killTimes.push(this.elapsed);
-    if (this.killTimes.length >= 3 && this.elapsed - (this.lastMultiKill || -9) > 2.5) {
-      this.lastMultiKill = this.elapsed;
-      this.sfx.multiKill();
-    }
-    this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 26, color: 0x7a2a20, speed: 6, up: 4, life: 0.8, size: 0.16 });
-    this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 10, color: 0x2a2420, speed: 3, up: 3, life: 1, size: 0.25 });
-  }
-
-  applyElement(enemy, point) {
-    const fire = lv('fire');
-    const frost = lv('frost');
-    if (fire) enemy.applyBurn(1 + 3 * fire, 3);
-    if (frost && enemy.applyFrost(0.2 + 0.1 * frost, 2, 3, 1.5)) {
-      this.numbers.spawn(point.clone().setY(2.4), 'FROZEN', 'callout');
-      this.sfx.freeze(this.panAt(enemy.pos));
-      this.particles.spawn(enemy.pos.clone().setY(1), { count: 16, color: [1.2, 2.2, 3], speed: 4, up: 2, life: 0.6, size: 0.1 });
-    }
-  }
-
-  /** Thunderstrike: arc from the struck grunt through the nearest others. */
-  chainLightning(source, damage) {
-    const n = lv('thunderstrike');
-    if (!n) return;
-    const targets = this.enemies
-      .filter((e) => e !== source && e.isHittable() && e.pos.distanceTo(source.pos) < 7)
-      .sort((a, b) => a.pos.distanceTo(source.pos) - b.pos.distanceTo(source.pos))
-      .slice(0, n + 1);
-    if (!targets.length) return;
-    this.sfx.zap(this.panAt(source.pos));
-    let from = source.pos;
-    for (const t of targets) {
-      this.bolt(from, t.pos);
-      const dir = new THREE.Vector3().subVectors(t.pos, from).setY(0).normalize();
-      const res = t.hit(damage * 0.6, dir, 0, false);
-      this.numbers.spawn(t.pos.clone().setY(2.1), Math.round(damage * 0.6), 'zap');
-      if (res === 'kill') this.onKill(t);
-      from = t.pos;
-    }
-  }
-
-  bolt(a, b) {
-    // WebGL lines are 1px wide, so draw a few jittered strands for a thicker bolt.
-    for (let k = 0; k < 3; k++) this.boltStrand(a, b);
-    this.particles.spawn(b.clone().setY(1.1), { count: 6, color: [1.5, 2.4, 4], speed: 3, up: 1, life: 0.25, size: 0.06, gravity: 0 });
-  }
-
-  boltStrand(a, b) {
-    const pts = [];
-    const segs = 9;
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const jitter = i === 0 || i === segs ? 0 : 0.35;
-      pts.push(
-        new THREE.Vector3(
-          a.x + (b.x - a.x) * t + (Math.random() - 0.5) * jitter,
-          1.1 + (Math.random() - 0.5) * jitter,
-          a.z + (b.z - a.z) * t + (Math.random() - 0.5) * jitter,
-        ),
-      );
-    }
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: new THREE.Color(1.5, 2.4, 4), transparent: true }),
-    );
-    this.scene.add(line);
-    this.bolts.push({ line, life: 0.2 });
-  }
-
-  updateBolts(dt) {
-    for (let i = this.bolts.length - 1; i >= 0; i--) {
-      const b = this.bolts[i];
-      b.life -= dt;
-      b.line.material.opacity = Math.max(0, b.life / 0.2);
-      if (b.life <= 0) {
-        b.line.removeFromParent();
-        b.line.geometry.dispose();
-        b.line.material.dispose();
-        this.bolts.splice(i, 1);
-      }
-    }
-  }
-
-  onRicochet(point) {
-    this.sfx.thunk(this.panAt(point));
-    this.particles.spawn(point, { count: 6, color: 0xffe9b0, speed: 3, up: 1, life: 0.25, size: 0.05, gravity: 0 });
-  }
-
-  onRefresh() {
-    this.numbers.spawn(this.player.pos.clone().setY(2.2), 'REFRESH', 'callout');
-    this.particles.spawn(this.player.pos.clone().setY(0.8), { count: 10, color: [1.6, 2.2, 3], speed: 3, up: 1, life: 0.35, size: 0.06, gravity: 0 });
-  }
-
-  onArrowStopped(arrow, hitWall) {
-    if (hitWall) {
-      this.sfx.thunk(this.panAt(arrow.pos));
-      this.particles.spawn(arrow.pos, { count: 5, color: 0x8a8070, speed: 2, up: 1, life: 0.35, size: 0.06 });
-    } else {
-      this.particles.spawn(arrow.pos.clone().setY(0.05), { count: 4, color: 0x5a5048, speed: 1.2, up: 1.5, life: 0.3, size: 0.05 });
-      this.sfx.arrowGround(this.panAt(arrow.pos));
-    }
-  }
-
-  /** A heavy landing: cracked floor, dust ring, a bump of shake if it's close. */
-  onSlam(pos, strength = 1) {
-    this.decals.spawn(pos, 'crack', 2.2 * strength, 10);
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2;
-      this.particles.spawn(pos.clone().setY(0.1), {
-        count: 1,
-        color: 0x7a6a58,
-        speed: 3 * strength,
-        up: 0.6,
-        life: 0.6,
-        size: 0.18,
-        gravity: 2,
-        drag: 3,
-        dir: new THREE.Vector3(Math.cos(a), 0.1, Math.sin(a)),
-        spread: 0.15,
-      });
-    }
-    const d = pos.distanceTo(this.player.pos);
-    if (d < 8) this.shake.add(0.25 * strength * (1 - d / 8));
-  }
-
-  onChilled() {
-    buffs.chill = 2;
-    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'CHILLED', 'callout');
-    this.sfx.freeze(0);
-  }
-
-  onShieldBreak(enemy) {
-    this.numbers.spawn(enemy.pos.clone().setY(2.6), 'SHIELD BROKEN', 'callout gold');
-    this.sfx.sample('freeze', { vol: 0.7, rate: 0.8, pan: this.panAt(enemy.pos) });
-    this.particles.spawn(enemy.pos.clone().setY(1.1), { count: 30, color: [0.8, 1.8, 3], speed: 5, up: 2, life: 0.5, size: 0.08 });
-  }
-
-  /** A blast that hurts enemies (and the hero if close). Used by barrels, volatile elites and imps. */
-  explosion(pos, radius, enemyDamage, playerDamage) {
-    this.sfx.sample('boom', { vol: 0.9, rate: 0.9, jitter: 0.1, pan: this.panAt(pos) });
-    this.sfx.sample('slam', { vol: 0.6, rate: 0.7 });
-    this.shake.add(0.5);
-    this.aberration = Math.min(1, this.aberration + 0.6);
-    this.decals.spawn(pos, 'scorch', radius * 1.2, 16);
-    this.particles.spawn(pos.clone().setY(0.8), { count: 40, color: [3, 1.3, 0.3], speed: 8, up: 4, life: 0.6, size: 0.16, gravity: 6 });
-    this.particles.spawn(pos.clone().setY(1), { count: 14, color: 0x2a2420, speed: 2.5, up: 3, life: 1.4, size: 0.35, gravity: -1, drag: 1 });
-    for (const e of this.enemies) {
-      if (!e.isHittable()) continue;
-      const d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z);
-      if (d > radius + e.radius) continue;
-      const dir = new THREE.Vector3(e.pos.x - pos.x, 0, e.pos.z - pos.z).normalize();
-      const dmg = enemyDamage * (1 - 0.5 * (d / radius));
-      const res = e.hit(dmg, dir, 1, false);
-      e.knock?.addScaledVector(dir, 8);
-      this.numbers.spawn(e.pos.clone().setY(2.2), Math.round(dmg), 'crit');
-      if (res === 'kill') this.onKill(e);
-      else e.applyBurn?.(6, 3);
-    }
-    const P = this.player;
-    if (Math.hypot(P.pos.x - pos.x, P.pos.z - pos.z) < radius) {
-      const dir = new THREE.Vector3(P.pos.x - pos.x, 0, P.pos.z - pos.z).normalize();
-      const res = P.takeDamage(playerDamage, dir, this);
-      if (res === true) this.onPlayerHit({ lungeDir: dir }, playerDamage);
-    }
-  }
 
   maxHp() {
     return stat.maxHp();
@@ -983,59 +334,38 @@ export class Game {
     return Math.max(-1, Math.min(1, v.x)) * 0.7;
   }
 
-  onDodge() {
-    this.tips.done('dodge');
-    this.stats.dodges++;
-    this.sfx.dodge();
-  }
-
-  onPerfectDodge(enemy) {
-    const d = config.dodge;
-    this.stats.perfectDodges++;
-    this.ultimate.gain(config.ultimate.perPerfectDodge);
-    this.player.counterT = d.counterWindow;
-    this.slowmo = d.slowmoTime;
-    this.slowmoScale = d.slowmoScale;
-    this.sfx.perfectDodge();
-    this.numbers.spawn(this.player.pos.clone().setY(2.2), 'PERFECT DODGE', 'callout gold');
-    this.particles.spawn(this.player.pos.clone().setY(0.8), { count: 18, color: [2.4, 2.4, 3], speed: 4, up: 1, life: 0.4, size: 0.07, gravity: 0 });
-    this.hud.vignette.classList.add('slowmo');
-  }
-
-  onPlayerHit(enemy, damage = config.grunt.damage) {
-    if (this.player.dead && !this.deathShown) {
-      // Make the death unmissable: slow motion and a banner before the summary.
-      this.deathShown = true;
-      this.slowmo = 1.5;
-      this.slowmoScale = 0.25;
-      this.banner('You fell', `Wave ${this.wave}`, 2.2);
-      this.input.mouse.down = false;
-    }
-    if (enemy?.affix === 'vampiric' && enemy.isHittable?.()) {
-      enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage * 1.5);
-      this.numbers.spawn(enemy.pos.clone().setY(2.4), `+${Math.round(damage * 1.5)}`, 'heal');
-    }
-    this.aberration = Math.min(1, this.aberration + 0.8);
-    this.decals.spawn(this.player.pos, 'blood', 0.8);
-    this.sfx.hurt();
-    this.waveHurt = true;
-    this.shake.add(0.6);
-    this.hitStop = Math.max(this.hitStop, 0.08);
-    this.numbers.spawn(this.player.pos.clone().setY(2), `-${damage}`, 'hurt');
-    this.particles.spawn(this.player.pos.clone().setY(1), { count: 14, color: 0xff3b2f, speed: 5, up: 2, life: 0.5, size: 0.1, dir: enemy.lungeDir, spread: 1 });
-    this.hud.vignette.classList.remove('flash');
-    void this.hud.vignette.offsetWidth; // restart the CSS animation
-    this.hud.vignette.classList.add('flash');
-  }
-
-  // ---------------------------------------------------------------- loop
-
   run() {
-    this.timer = new THREE.Timer();
+    // Cap the frame rate: 60 fps in play (high-refresh laptop screens would otherwise
+    // render 120-144 fps for no visible gain), 30 fps on menus and overlays.
     this.renderer.setAnimationLoop((ts) => {
-      this.timer.update(ts);
-      this.frame(Math.min(this.timer.getDelta(), 1 / 20));
+      const active = this.state === 'playing' || this.state === 'camp';
+      const minGap = active ? 1000 / 62 : 1000 / 31;
+      if (this.lastTs !== undefined && ts - this.lastTs < minGap) return;
+      const delta = this.lastTs === undefined ? 1 / 60 : (ts - this.lastTs) / 1000;
+      this.lastTs = ts;
+      if (active) this.autoQuality(delta);
+      this.frame(Math.min(delta, 1 / 20));
     });
+  }
+
+  /**
+   * "Auto" graphics: watch the frame time and step quality down (high → medium → low)
+   * if this machine can't hold ~48 fps.
+   */
+  autoQuality(delta) {
+    if (settings.quality !== 'auto') return;
+    const p = (this.perf ||= { sum: 0, n: 0, level: 'medium' });
+    p.sum += delta;
+    p.n++;
+    if (p.sum < 3) return;
+    const avg = p.sum / p.n;
+    p.sum = 0;
+    p.n = 0;
+    const next = { high: 'medium', medium: 'low' }[p.level];
+    if (avg > 1 / 48 && next) {
+      p.level = next;
+      applySettings(this);
+    }
   }
 
   frame(realDt, render = true) {
@@ -1072,8 +402,11 @@ export class Game {
     this.grade.uniforms.uAberration.value = this.aberration * 0.006;
     this.numbers.update(this.state === 'paused' ? 0 : realDt);
     this.shake.update(realDt);
-    this.world.update(realDt, this.time);
-    this.env.update(realDt, this.time);
+    // Only animate the scene that's on screen.
+    if (!this.camp.active) {
+      this.world.update(realDt, this.time);
+      this.env.update(realDt, this.time);
+    }
     this.updateCamera(realDt);
     this.updateHud();
     if (render) this.composer.render();
@@ -1219,279 +552,18 @@ export class Game {
 
   // ---------------------------------------------------------------- HUD
 
-  updateHud() {
-    const h = this.hud;
-    const p = this.player;
-    const s = this.stats;
-    const maxHp = stat.maxHp();
-    const pct = Math.max(0, p.hp / maxHp);
-    h.hpFill.style.width = `${pct * 100}%`;
-    h.hpFill.classList.toggle('low', pct < 0.3);
-    h.hpText.textContent = `${Math.ceil(p.hp)} / ${maxHp}`;
-    const boss = this.boss && !this.boss.removed && this.boss.state !== 'spawning' ? this.boss : null;
-    h.bossBar.classList.toggle('show', !!boss);
-    if (boss) {
-      h.bossName.textContent = boss.displayName + (boss.phase === 2 ? ' · Enraged' : '');
-      h.bossFill.style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
-      h.bossPoise.style.width = `${(boss.poise / config.boss.poise) * 100}%`;
-    }
-    h.ultFill.style.width = `${this.ultimate.meter}%`;
-    h.gems.textContent = `◆ ${this.loot.runGems}`;
-    // Music follows the fight: calm between waves, building with enemy count, full on for bosses.
-    const aliveNow = this.enemies.filter((e) => e.state !== 'dying' && !e.removed).length;
-    const fighting = this.state === 'playing' && this.waveState === 'active';
-    this.music.setIntensity(fighting ? 0.45 + Math.min(0.4, aliveNow * 0.06) + (this.boss ? 0.3 : 0) : 0.08, !!this.boss && fighting);
-    h.ult.classList.toggle('ready', this.ultimate.ready);
-    h.ult.classList.toggle('active', !!this.ultimate.active);
-    const maxCharges = stat.dodgeCharges();
-    h.dodgeFill.style.width = `${(p.dodgeMeter / maxCharges) * 100}%`;
-    h.dodgeBox.style.setProperty('--segs', maxCharges);
-    h.dodgeBox.classList.toggle('ready', p.charges >= 1);
-    const buildKey = JSON.stringify(build.levels);
-    if (buildKey !== this.lastBuildKey) {
-      this.lastBuildKey = buildKey;
-      h.build.innerHTML = this.buildChips();
-    }
-    h.dodgeBox.classList.toggle('counter', p.counterT > 0);
-    const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
-    h.stats.textContent = `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`;
-    h.wave.textContent = this.wave ? `Wave ${this.wave}` : '';
-    const alive = this.enemies.filter((e) => e.state !== 'dying').length + this.toSpawn;
-    h.enemies.textContent = this.wave && this.waveState === 'active' ? `${alive} remaining` : '';
-    h.streak.textContent = s.streak >= 2 ? `Perfect ×${s.streak}` : '';
-    h.streak.classList.toggle('show', s.streak >= 2);
-
-    // Reticle follows the mouse and tightens with charge.
-    const r = h.reticle;
-    r.style.transform = `translate(${this.input.mouse.x}px, ${this.input.mouse.y}px)`;
-    r.style.setProperty('--size', `${44 - 26 * p.charge}px`);
-    r.dataset.phase = this.state !== 'playing' ? 'none' : p.drawPhase === 'none' && p.counterT > 0 ? 'perfect' : p.drawPhase;
-    r.style.display = this.state === 'playing' ? 'block' : 'none';
-  }
-
-  banner(title, sub = '', duration = 1.8) {
-    const b = this.hud.banner;
-    b.innerHTML = `<div class="title"></div><div class="sub"></div>`;
-    b.querySelector('.title').textContent = title;
-    b.querySelector('.sub').textContent = sub;
-    b.style.setProperty('--dur', `${duration}s`);
-    b.classList.remove('show');
-    void b.offsetWidth;
-    b.classList.add('show');
-  }
-
-  showOverlay(kind, newBest = false) {
-    this.overlayReadyAt = performance.now() + (kind === 'gameover' ? 1200 : 0);
-    const o = this.hud.overlay;
-    const s = this.stats;
-    const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
-    const perf = s.shots ? Math.round((s.perfects / s.shots) * 100) : 0;
-    const controls = `
-      <div class="controls">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
-        <div><kbd>Mouse</kbd><span>Aim</span></div>
-        <div><kbd>Hold LMB</kbd><span>Draw the bow (slows you down)</span></div>
-        <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
-        <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through grunts)</span></div>
-        <div><kbd>Q</kbd><span>Arrow Storm, once the gold meter is full</span></div>
-        <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
-        <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
-      </div>`;
-    if (kind === 'title') {
-      o.innerHTML = `
-        <h1>Draw &amp; Release</h1>
-        <p class="tag">A bow-combat prototype. Survive the waves.</p>
-        ${controls}
-        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
-        <button>Click to enter the camp</button>
-        ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}
-        <p class="model-status" id="model-status">${this.modelStatusText()}</p>
-        <p class="model-status" id="audio-status">${this.audioStatusText()}</p>`;
-    } else if (kind === 'paused') {
-      o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
-    } else {
-      const secs = Math.floor(this.elapsed);
-      o.innerHTML = `
-        <h1>You fell</h1>
-        <p class="tag">${newBest ? 'New best!' : `Best: wave ${this.best.wave}, ${this.best.kills} kills`}</p>
-        <div class="summary">
-          <div><b>${this.wave}</b><span>Wave reached</span></div>
-          <div><b>${s.kills}</b><span>Kills</span></div>
-          <div><b>${acc}%</b><span>Accuracy</span></div>
-          <div><b>${perf}%</b><span>Perfect shots</span></div>
-          <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
-          <div><b>${s.staggers}</b><span>Staggers</span></div>
-          <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
-          <div><b>◆ ${this.gemsThisRun ?? 0}</b><span>Soul gems banked</span></div>
-          <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
-        </div>
-        ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
-        ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
-        <button>Return to camp</button>
-        <p class="tip">Or press R to jump straight back in</p>`;
-    }
-    o.classList.add('visible');
-  }
-
-  buildChips() {
-    return build
-      .owned()
-      .map((s) => {
-        const level = s.max > 1 ? ` ${ROMAN[s.level]}` : '';
-        return `<span class="chip t-${s.type} r-${s.rarity}">${s.name}${level}</span>`;
-      })
-      .join('');
-  }
-
-  modelStatusText() {
-    const m = modelStatus;
-    if (m.state === 'loading') return '3D models: loading…';
-    if (m.state === 'ready') return `3D models: ${m.loaded}/${m.total} loaded`;
-    if (m.state === 'none') return '3D models: none found (using placeholder shapes)';
-    return `3D models: ${m.loaded}/${m.total} loaded. Problem: ${m.errors.join('; ')}`;
-  }
-
-  audioStatusText() {
-    const a = audioStatus;
-    if (a.state === 'ready') return `Sound: ${a.loaded}/${a.total} samples`;
-    if (a.state === 'loading' || a.state === 'idle') return 'Sound: loading…';
-    if (a.state === 'unsupported') return 'Sound: not supported in this browser';
-    return `Sound: synth only (${a.error || 'samples failed'})`;
-  }
-
-  showModelStatus() {
-    const el = document.getElementById('model-status');
-    if (el) el.textContent = this.modelStatusText();
-  }
-
-  hideOverlay() {
-    this.hud.overlay.classList.remove('visible');
-  }
-
-  // ---------------------------------------------------------------- tuning panel
-
-  setupGui() {
-    const gui = (this.gui = new GUI({ title: 'Tuning  ( ` to hide )' }));
-    // Developer tuning panel starts hidden; ` toggles it.
-    this.guiHidden = true;
-    gui.show(false);
-    const b = gui.addFolder('Bow');
-    b.add(config.bow, 'drawTime', 0.2, 2, 0.01).name('Draw time (s)');
-    b.add(config.bow, 'perfectWindow', 0.03, 0.5, 0.01).name('Perfect window (s)');
-    b.add(config.bow, 'minDamage', 1, 40, 1).name('Min damage');
-    b.add(config.bow, 'maxDamage', 5, 80, 1).name('Max damage');
-    b.add(config.bow, 'perfectMultiplier', 1, 4, 0.1).name('Perfect multiplier');
-    b.add(config.bow, 'minArrowSpeed', 5, 60, 1).name('Min arrow speed');
-    b.add(config.bow, 'maxArrowSpeed', 10, 100, 1).name('Max arrow speed');
-    b.add(config.bow, 'range', 8, 40, 1).name('Range');
-    b.add(config.bow, 'drawMoveMultiplier', 0, 1, 0.05).name('Move speed while drawing');
-    b.add(config.bow, 'fireCooldown', 0, 1, 0.01).name('Fire cooldown (s)');
-
-    const pl = gui.addFolder('Player');
-    pl.add(config.player, 'moveSpeed', 2, 14, 0.1).name('Move speed');
-    pl.add(config.player, 'maxHp', 20, 400, 10).name('Max HP');
-    pl.add(config.player, 'iFrames', 0, 2, 0.05).name('Invuln after hit (s)');
-    pl.add(config.player, 'healPerWave', 0, 100, 5).name('Heal per wave');
-
-    const dg = gui.addFolder('Dodge');
-    dg.add(config.dodge, 'distance', 1, 10, 0.1).name('Distance');
-    dg.add(config.dodge, 'duration', 0.1, 0.8, 0.01).name('Duration (s)');
-    dg.add(config.dodge, 'iFrameStart', 0, 0.5, 0.01).name('Invuln starts (s)');
-    dg.add(config.dodge, 'iFrameEnd', 0, 0.8, 0.01).name('Invuln ends (s)');
-    dg.add(config.dodge, 'cooldown', 0, 3, 0.05).name('Cooldown (s)');
-    dg.add(config.dodge, 'cancelsDraw').name('Rolling cancels draw');
-    dg.add(config.dodge, 'slowmoTime', 0, 2, 0.05).name('Perfect: slow-mo (s)');
-    dg.add(config.dodge, 'slowmoScale', 0.05, 1, 0.05).name('Perfect: slow-mo speed');
-    dg.add(config.dodge, 'counterWindow', 0, 5, 0.1).name('Perfect: counter window (s)');
-
-    const sk = gui.addFolder('Skeleton Archer');
-    sk.add(config.skeleton, 'baseHp', 5, 100, 1).name('Base HP');
-    sk.add(config.skeleton, 'aimTime', 0.3, 2, 0.05).name('Aim telegraph (s)');
-    sk.add(config.skeleton, 'cooldown', 0.3, 5, 0.1).name('Shot cooldown (s)');
-    sk.add(config.skeleton, 'arrowSpeed', 5, 40, 0.5).name('Arrow speed');
-    sk.add(config.skeleton, 'damage', 1, 60, 1).name('Damage');
-    sk.add(config.skeleton, 'firstWave', 1, 10, 1).name('First wave');
-    sk.close();
-
-    const g = gui.addFolder('Grunt');
-    g.add(config.grunt, 'baseHp', 5, 200, 1).name('Base HP');
-    g.add(config.grunt, 'speed', 0.5, 10, 0.1).name('Speed');
-    g.add(config.grunt, 'attackRange', 1, 6, 0.1).name('Attack range');
-    g.add(config.grunt, 'windupTime', 0.1, 1.5, 0.01).name('Windup (s)');
-    g.add(config.grunt, 'lungeSpeed', 4, 30, 0.5).name('Lunge speed');
-    g.add(config.grunt, 'lungeTime', 0.05, 0.6, 0.01).name('Lunge time (s)');
-    g.add(config.grunt, 'recoverTime', 0, 2, 0.05).name('Recover (s)');
-    g.add(config.grunt, 'damage', 1, 100, 1).name('Damage');
-    g.add(config.grunt, 'staggerCharge', 0, 1, 0.05).name('Charge to stagger');
-
-    const w = gui.addFolder('Waves');
-    w.add(config.waves, 'baseCount', 1, 20, 1).name('Wave 1 count');
-    w.add(config.waves, 'countPerWave', 0, 10, 1).name('+ per wave');
-    w.add(config.waves, 'hpGrowth', 0, 1, 0.01).name('HP growth / wave');
-    w.add(config.waves, 'speedGrowth', 0, 0.5, 0.01).name('Speed growth / wave');
-    w.add(config.waves, 'spawnInterval', 0.1, 3, 0.05).name('Spawn interval (s)');
-    w.add(config.waves, 'breakTime', 0.5, 10, 0.5).name('Break between waves');
-
-    const mdl = gui.addFolder('Models (Meshy)');
-    mdl.add(config.models, 'heroHeight', 1, 3, 0.05).name('Hero height (m)');
-    mdl.add(config.models, 'gruntHeight', 1, 3, 0.05).name('Grunt height (m)');
-    mdl.add(config.models, 'heroAimYaw', -180, 180, 1).name('Hero aim turn (°)');
-    mdl.add(config.models, 'shootStartAt', 0, 0.95, 0.01).name('Bow clip: nocked');
-    mdl.add(config.models, 'shootFullAt', 0.05, 0.95, 0.01).name('Bow clip: full draw');
-    mdl.add(config.models, 'shootReleaseAt', 0.05, 0.95, 0.01).name('Bow clip: release');
-    mdl.add(config.models, 'attackWindupEnd', 0, 0.95, 0.01).name('Grunt clip: crouch end');
-    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Grunt clip: landing');
-    mdl.add(config.models, 'runAnimSpeed', 1, 12, 0.1).name('Run anim speed ref');
-    mdl.close();
-
-    const f = gui.addFolder('Feel');
-    f.add(config.feel, 'hitStop', 0, 0.2, 0.005).name('Hit-stop (s)');
-    f.add(config.feel, 'perfectHitStop', 0, 0.3, 0.005).name('Perfect hit-stop (s)');
-    f.add(config.feel, 'shake', 0, 3, 0.05).name('Screen shake');
-    f.add(config.feel, 'knockback', 0, 20, 0.5).name('Knockback');
-    f.add(config.feel, 'cameraZoom', 0.6, 1.6, 0.05).name('Camera distance');
-    f.add(config.feel, 'bloom').name('Bloom').onChange((v) => (this.bloom.enabled = v));
-    f.add(config.feel, 'bloomStrength', 0, 2, 0.05).name('Bloom strength').onChange((v) => (this.bloom.strength = v));
-    f.add(config.feel, 'ambientOcclusion').name('Ambient occlusion').onChange((v) => (this.ao.enabled = v));
-    f.add(config.feel, 'vignette', 0, 1, 0.05).name('Vignette').onChange((v) => (this.grade.uniforms.uVignette.value = v));
-    f.add(config.feel, 'grade', 0, 1, 0.05).name('Color grade').onChange((v) => (this.grade.uniforms.uGrade.value = v));
-
-    const actions = {
-      restart: () => {
-        this.sfx.unlock();
-        this.start();
-      },
-      copy: async () => {
-        const json = JSON.stringify(config, null, 2);
-        console.log(json);
-        try {
-          await navigator.clipboard.writeText(json);
-          this.banner('Settings copied', 'Paste them to share your tuning', 1.2);
-        } catch {
-          this.banner('Copy failed', 'Settings were printed to the console', 1.5);
-        }
-      },
-      reset: () => {
-        resetConfig();
-        gui.controllersRecursive().forEach((c) => c.updateDisplay());
-        this.bloom.enabled = config.feel.bloom;
-        this.bloom.strength = config.feel.bloomStrength;
-      },
-    };
-    gui.add(actions, 'restart').name('↻ Restart run');
-    gui.add(actions, 'copy').name('⧉ Copy settings JSON');
-    gui.add(actions, 'reset').name('⟲ Reset to defaults');
-
-    for (const folder of [pl, g, w, f]) folder.close();
-    dg.open();
-    gui.onFinishChange(() => saveConfig());
-  }
-
   onResize() {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setSize(innerWidth, innerHeight);
     this.ao.setSize(innerWidth, innerHeight);
+  }
+}
+
+// Game's methods live in a few focused modules; mix them in here.
+for (const Mixin of [UiMethods, CombatMethods, FlowMethods, TuningMethods]) {
+  for (const key of Object.getOwnPropertyNames(Mixin.prototype)) {
+    if (key !== 'constructor') Game.prototype[key] = Mixin.prototype[key];
   }
 }

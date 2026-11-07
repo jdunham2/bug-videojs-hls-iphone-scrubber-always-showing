@@ -11,7 +11,6 @@ import * as THREE from 'three';
 import { spawnProp } from './models.js';
 import { pillars, ARENA_HALF } from './world.js';
 import { buffs } from './skills.js';
-import { PLAYER_RADIUS } from './player.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const plane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
