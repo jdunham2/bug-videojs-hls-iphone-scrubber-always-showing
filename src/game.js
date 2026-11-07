@@ -13,6 +13,7 @@ import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
 import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL } from './skills.js';
+import { modelStatus } from './models.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const BEST_KEY = 'draw-release.best.v1';
@@ -695,7 +696,8 @@ export class Game {
         ${controls}
         <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
         <button>Click to start</button>
-        ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}`;
+        ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}
+        <p class="model-status" id="model-status">${this.modelStatusText()}</p>`;
     } else if (kind === 'paused') {
       o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
     } else {
@@ -728,6 +730,19 @@ export class Game {
         return `<span class="chip t-${s.type} r-${s.rarity}">${s.name}${level}</span>`;
       })
       .join('');
+  }
+
+  modelStatusText() {
+    const m = modelStatus;
+    if (m.state === 'loading') return '3D models: loading…';
+    if (m.state === 'ready') return `3D models: ${m.loaded}/${m.total} loaded`;
+    if (m.state === 'none') return '3D models: none found (using placeholder shapes)';
+    return `3D models: ${m.loaded}/${m.total} loaded. Problem: ${m.errors.join('; ')}`;
+  }
+
+  showModelStatus() {
+    const el = document.getElementById('model-status');
+    if (el) el.textContent = this.modelStatusText();
   }
 
   hideOverlay() {

@@ -10,20 +10,43 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 /** id → { kind, scene, clips: { logicalName: AnimationClip }, height } */
 export const models = {};
 
+/** Loading progress, shown on the title screen so problems are visible. */
+export const modelStatus = { state: 'loading', loaded: 0, total: 0, errors: [] };
+
+/**
+ * Models come from one of two places:
+ * - window.__EMBEDDED_MODELS = { manifest, files: { path: base64 GLB } }, baked into the page
+ *   for sandboxed hosts (like the claude.ai preview) that block fetching data:/blob: URLs.
+ * - otherwise public/models/manifest.json and the GLB files next to it.
+ */
 export async function loadModels() {
+  const embedded = window.__EMBEDDED_MODELS;
   let manifest;
   try {
-    const res = await fetch('models/manifest.json', { cache: 'no-cache' });
-    if (!res.ok) return models;
-    manifest = await res.json();
-  } catch {
+    if (embedded) {
+      manifest = embedded.manifest;
+    } else {
+      const res = await fetch('models/manifest.json', { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`manifest ${res.status}`);
+      manifest = await res.json();
+    }
+  } catch (e) {
+    modelStatus.state = 'none';
+    modelStatus.errors.push(String(e.message || e));
     return models;
   }
-  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const entries = Object.entries(manifest);
+  modelStatus.total = entries.length;
+  if (!entries.length) {
+    modelStatus.state = 'none';
+    return models;
+  }
+  const loader = new GLTFLoader();
+  if (!embedded) loader.setMeshoptDecoder(MeshoptDecoder);
   await Promise.all(
-    Object.entries(manifest).map(async ([id, entry]) => {
+    entries.map(async ([id, entry]) => {
       try {
-        const gltf = await loader.loadAsync(entry.file);
+        const gltf = embedded ? await parseEmbedded(loader, embedded.files[entry.file]) : await loader.loadAsync(entry.file);
         gltf.animations.forEach(stripRootMotion);
         const clips = {};
         for (const [logical, ref] of Object.entries(entry.clips || {})) {
@@ -31,12 +54,35 @@ export async function loadModels() {
           clips[logical] = gltf.animations.find((c) => c.name === ref.name) || gltf.animations[ref.index] || null;
         }
         models[id] = { kind: entry.kind, scene: gltf.scene, clips };
+        modelStatus.loaded++;
       } catch (e) {
+        modelStatus.errors.push(`${id}: ${e?.message || e}`);
         console.warn(`Model "${id}" failed to load; using the placeholder.`, e);
       }
     }),
   );
+  modelStatus.state = modelStatus.loaded === modelStatus.total ? 'ready' : modelStatus.loaded ? 'partial' : 'failed';
   return models;
+}
+
+/** Parse a base64 GLB without any network request. */
+function parseEmbedded(loader, b64) {
+  if (!b64) return Promise.reject(new Error('missing embedded file'));
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Promise((resolve, reject) => {
+    // GLTFLoader loads embedded textures with fetch(blob:) via ImageBitmapLoader when
+    // createImageBitmap exists. Sandboxed pages may block that, so hide it while the
+    // parser is created; it then uses <img> with a blob URL, which those pages allow.
+    const cib = window.createImageBitmap;
+    try {
+      window.createImageBitmap = undefined;
+      loader.parse(bytes.buffer, '', resolve, reject);
+    } finally {
+      window.createImageBitmap = cib;
+    }
+  });
 }
 
 /**
