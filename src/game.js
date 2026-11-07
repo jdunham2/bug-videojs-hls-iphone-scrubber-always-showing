@@ -276,6 +276,7 @@ export class Game {
     if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
+      this.player.cheer();
       const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
@@ -785,6 +786,15 @@ export class Game {
     w.add(config.waves, 'speedGrowth', 0, 0.5, 0.01).name('Speed growth / wave');
     w.add(config.waves, 'spawnInterval', 0.1, 3, 0.05).name('Spawn interval (s)');
     w.add(config.waves, 'breakTime', 0.5, 10, 0.5).name('Break between waves');
+
+    const mdl = gui.addFolder('Models (Meshy)');
+    mdl.add(config.models, 'heroHeight', 1, 3, 0.05).name('Hero height (m)');
+    mdl.add(config.models, 'gruntHeight', 1, 3, 0.05).name('Grunt height (m)');
+    mdl.add(config.models, 'heroAimYaw', -180, 180, 1).name('Hero aim turn (°)');
+    mdl.add(config.models, 'shootReleaseAt', 0.05, 0.95, 0.01).name('Bow release point');
+    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Grunt hit point');
+    mdl.add(config.models, 'runAnimSpeed', 1, 12, 0.1).name('Run anim speed ref');
+    mdl.close();
 
     const f = gui.addFolder('Feel');
     f.add(config.feel, 'hitStop', 0, 0.2, 0.005).name('Hit-stop (s)');

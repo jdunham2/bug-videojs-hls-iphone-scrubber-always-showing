@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
+import { instantiate, attachProp, findBone } from './models.js';
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
@@ -86,6 +87,8 @@ export class Grunt {
     });
     this.group.position.copy(this.pos);
     game.scene.add(this.group);
+    this.hitT = 0;
+    this.attachModel(level);
 
     // Spawn telegraph ring + lunge direction wedge (ground decals).
     this.spawnRingMat = new THREE.MeshBasicMaterial({ color: 0xff5533, transparent: true, opacity: 0, depthWrite: false });
@@ -114,6 +117,71 @@ export class Grunt {
     this.hpBar.add(bg, this.hpFg);
     this.hpBar.visible = false;
     game.scene.add(this.hpBar);
+  }
+
+  /** Use the Meshy grunt if it's loaded: placeholder meshes hide, the rig group stays for spawn/arrows. */
+  attachModel(level) {
+    const inst = instantiate('grunt', config.models.gruntHeight);
+    if (!inst) return;
+    this.model = inst;
+    this.anim = inst.animator;
+    for (const c of this.rig.children) c.visible = false;
+    this.rig.add(inst.holder);
+    // Higher levels: darker, redder skin.
+    const k = Math.min(0.45, 0.05 * (level - 1));
+    const tint = new THREE.Color(1, 1 - k, 1 - k * 1.2);
+    for (const m of inst.materials) m.color?.multiply(tint);
+    const hand = findBone(inst.root, [/hand/i, /right|(^|[_.])r([_.]|$)/i]);
+    attachProp('club', hand, 1.0);
+  }
+
+  /** Pick the grunt's animation from its state. `dt` is its own (slowed/frozen) clock. */
+  updateModel(dt) {
+    const A = this.anim;
+    if (!A) return;
+    const g = config.grunt;
+    const atk = A.duration('attack');
+    const hitAt = atk * config.models.attackHitAt;
+    switch (this.state) {
+      case 'dying':
+        A.set(['death'], { once: true, fade: 0.08 });
+        break;
+      case 'spawning':
+        A.set(['idle']);
+        break;
+      case 'chase':
+        if (this.hitT > 0 && A.has('hit')) {
+          A.set(['hit'], { once: true, fade: 0.05 });
+        } else {
+          A.set(['walk']);
+          const a = A.action('walk');
+          if (a) a.timeScale = this.speed / g.speed;
+        }
+        break;
+      case 'windup': {
+        // Anticipation half of the swing follows the windup timer.
+        A.set(['attack'], { once: true, fade: 0.1 });
+        const a = A.action('attack');
+        if (a) a.timeScale = 0;
+        A.scrub('attack', hitAt * 0.8 * Math.min(1, this.t / g.windupTime));
+        break;
+      }
+      case 'lunge': {
+        const a = A.action('attack');
+        if (a) a.timeScale = 0;
+        A.scrub('attack', hitAt * 0.8 + (hitAt * 0.2 + atk * 0.1) * Math.min(1, this.t / g.lungeTime));
+        break;
+      }
+      case 'recover':
+        if (this.staggered && A.has('hit')) {
+          A.set(['hit'], { once: true, fade: 0.05 });
+        } else {
+          const a = A.action('attack');
+          if (a) a.timeScale = 1; // follow-through
+        }
+        break;
+    }
+    A.update(dt);
   }
 
   isHittable() {
@@ -202,9 +270,11 @@ export class Grunt {
     const g = config.grunt;
     this.flash = Math.max(0, this.flash - realDt);
 
+    this.hitT = Math.max(0, this.hitT - realDt);
     if (this.state === 'dying') {
       this.t += realDt;
       this.updateDying(realDt);
+      this.updateModel(realDt);
       return;
     }
     if (this.updateStatus(realDt)) return;
@@ -296,10 +366,12 @@ export class Grunt {
 
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
-    const k = 1 - Math.exp(-14 * dt);
-    this.rig.rotation.x += (lean - this.rig.rotation.x) * k;
-    this.club.rotation.x += (clubAngle - this.club.rotation.x) * k;
-    if (this.state === 'chase') this.rig.position.y = Math.abs(Math.sin(this.t * 9)) * 0.08;
+    if (!this.model) {
+      const k = 1 - Math.exp(-14 * dt);
+      this.rig.rotation.x += (lean - this.rig.rotation.x) * k;
+      this.club.rotation.x += (clubAngle - this.club.rotation.x) * k;
+      if (this.state === 'chase') this.rig.position.y = Math.abs(Math.sin(this.t * 9)) * 0.08;
+    }
 
     const windGlow = this.state === 'windup' ? Math.min(1, this.t / g.windupTime) : 0;
     const f = this.flash > 0 ? 1 : 0;
@@ -320,8 +392,12 @@ export class Grunt {
       gr += fl * 0.3;
     }
     this.bodyMat.emissive.setRGB(r, gr, b);
+    if (this.model) {
+      for (const m of this.model.materials) m.emissive.setRGB(r * 0.6, gr * 0.6, b * 0.6);
+    }
 
     this.updateHpBar();
+    this.updateModel(dt);
   }
 
   updateHpBar() {
@@ -344,6 +420,7 @@ export class Grunt {
       this.die(dir);
       return 'kill';
     }
+    if (this.state === 'chase') this.hitT = 0.3;
     if (this.state === 'windup' && (charge >= config.grunt.staggerCharge || perfect)) {
       this.staggered = true;
       this.enter('recover');
@@ -365,7 +442,7 @@ export class Grunt {
 
   updateDying(dt) {
     const p = Math.min(1, this.t / 0.35);
-    this.rig.rotation.x = -Math.PI * 0.5 * easeOut(p);
+    if (!this.model) this.rig.rotation.x = -Math.PI * 0.5 * easeOut(p);
     this.pos.addScaledVector(this.knock, dt);
     this.knock.multiplyScalar(Math.exp(-6 * dt));
     this.group.position.x = this.pos.x;
@@ -382,6 +459,7 @@ export class Grunt {
     this.wedge.removeFromParent();
     this.hpBar.removeFromParent();
     this.bodyMat.dispose();
+    if (this.model) for (const m of this.model.materials) m.dispose();
     this.spawnRingMat.dispose();
     this.wedgeMat.dispose();
   }

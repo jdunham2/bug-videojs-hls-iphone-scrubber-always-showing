@@ -50,6 +50,14 @@ export const DEFAULTS = {
     spawnInterval: 0.8,
     breakTime: 3,
   },
+  models: {
+    heroHeight: 1.75, // meters; Meshy models are rescaled to this
+    gruntHeight: 1.9,
+    heroAimYaw: 0, // degrees to turn the hero model while aiming (archery clips often stand side-on)
+    shootReleaseAt: 0.5, // fraction of the archery clip where the arrow leaves the bow
+    attackHitAt: 0.45, // fraction of the grunt attack clip where the blow lands
+    runAnimSpeed: 5, // move speed (units/s) at which the run clip plays at 1x
+  },
   feel: {
     hitStop: 0.045,
     perfectHitStop: 0.11,

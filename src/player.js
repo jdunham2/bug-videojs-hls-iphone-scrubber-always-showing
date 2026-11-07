@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME } from './skills.js';
+import { models, instantiate, attachProp, findBone } from './models.js';
 
 export const PLAYER_RADIUS = 0.45;
 export const ARROW_HEIGHT = 1.1;
@@ -129,6 +130,9 @@ export class Player {
     this.hurtFlash = 0;
     this.recoil = 0;
     this.walkT = 0;
+    this.hitT = 0;
+    this.releaseT = 0;
+    this.cheerT = 0;
     this.rolling = false;
     this.rollT = 0;
     this.charges = stat.dodgeCharges();
@@ -140,6 +144,7 @@ export class Player {
     this.rig.position.set(0, 0, 0);
     this.rig.scale.set(1, 1, 1);
     this.group.visible = true;
+    if (this.anim) this.anim.set(['idle'], { fade: 0, restart: true });
   }
 
   /** True during the invulnerable part of a roll. */
@@ -191,6 +196,9 @@ export class Player {
     this.iframes = Math.max(0, this.iframes - dt);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     this.recoil = Math.max(0, this.recoil - dt * 6);
+    this.hitT = Math.max(0, this.hitT - dt);
+    this.releaseT = Math.max(0, this.releaseT - dt);
+    this.cheerT = Math.max(0, this.cheerT - dt);
     const maxCharges = stat.dodgeCharges();
     if (this.charges < maxCharges) {
       this.rechargeT += dt;
@@ -206,9 +214,10 @@ export class Player {
 
     if (this.dead) {
       this.deathT += dt;
-      this.rig.rotation.x = -Math.min(1, this.deathT * 3) * Math.PI * 0.5;
+      if (!this.model) this.rig.rotation.x = -Math.min(1, this.deathT * 3) * Math.PI * 0.5;
       this.hideIndicators();
       this.updateMaterials();
+      this.updateModel(dt);
       return;
     }
 
@@ -302,6 +311,70 @@ export class Player {
     this.updateBow();
     this.updateIndicators();
     this.updateMaterials();
+    this.updateModel(dt);
+  }
+
+  /** Swap the placeholder body for the Meshy hero (called once models finish loading). */
+  attachModel() {
+    if (this.model || !models.hero) return;
+    const inst = instantiate('hero', config.models.heroHeight);
+    if (!inst) return;
+    this.model = inst;
+    this.anim = inst.animator;
+    this.rig.visible = false;
+    this.group.add(inst.holder);
+    const hand = findBone(inst.root, [/hand/i, /left|(^|[_.])l([_.]|$)/i]);
+    this.bowProp = attachProp('bow', hand, 1.1);
+  }
+
+  /** Pick the hero's animation from game state each frame. */
+  updateModel(dt) {
+    const A = this.anim;
+    if (!A) return;
+    const mc = config.models;
+    const speed = Math.hypot(this.vel.x, this.vel.z);
+    const moving = speed > 0.8;
+    const loco = moving && A.has('run') ? 'run' : 'idle';
+    const locoScale = moving ? THREE.MathUtils.clamp(speed / mc.runAnimSpeed, 0.5, 1.6) : 1;
+    // Turn side-on archery poses so the bow arm points down the aim line.
+    const aiming = this.drawing || this.releaseT > 0;
+    const yawTarget = aiming ? THREE.MathUtils.degToRad(mc.heroAimYaw) : 0;
+    this.model.holder.rotation.y += (yawTarget - this.model.holder.rotation.y) * (1 - Math.exp(-20 * dt));
+
+    if (this.dead) {
+      A.set(['death'], { once: true, fade: 0.1 });
+    } else if (this.rolling) {
+      const rate = A.duration('roll') / config.dodge.duration;
+      A.set(['roll'], { once: true, fade: 0.05, timeScale: rate || 1 });
+    } else if (this.drawing || this.releaseT > 0) {
+      const shoot = A.has('shoot:upper') ? 'shoot:upper' : 'shoot';
+      const lowerBase = moving && A.has('aimWalk') ? 'aimWalk' : loco;
+      const lower = shoot === 'shoot:upper' ? `${lowerBase}:lower` : null;
+      A.set(lower ? [shoot, lower] : [shoot], { fade: 0.12 });
+      if (lower) A.action(lower).timeScale = locoScale;
+      const releaseTime = A.duration('shoot') * mc.shootReleaseAt;
+      const a = A.action(shoot);
+      if (a && this.drawing) {
+        // Draw portion of the clip follows charge (holds at full draw).
+        a.timeScale = 0;
+        A.scrub(shoot, releaseTime * Math.min(1, this.charge));
+      } else if (a) {
+        a.timeScale = 1.4; // follow-through after the release
+      }
+    } else if (this.hitT > 0 && A.has('hit')) {
+      A.set(['hit'], { once: true, fade: 0.06 });
+    } else if (this.cheerT > 0 && !moving && A.has('victory')) {
+      A.set(['victory'], { once: true, fade: 0.2 });
+    } else {
+      A.set([loco], { fade: 0.2 });
+      A.action(loco).timeScale = locoScale;
+    }
+    A.update(dt);
+  }
+
+  /** Short celebration after clearing a wave (only plays while standing still). */
+  cheer() {
+    this.cheerT = 2.2;
   }
 
   startRoll(input, game) {
@@ -334,6 +407,7 @@ export class Player {
     this.drawing = false;
     this.cooldown = cfg.fireCooldown;
     this.recoil = mega ? 1.6 : 0.5 + 0.5 * charge;
+    this.releaseT = 0.35;
     game.sfx.drawStop();
 
     let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge);
@@ -367,6 +441,7 @@ export class Player {
     this.hp = Math.max(0, this.hp - amount);
     this.iframes = config.player.iFrames;
     this.hurtFlash = 0.25;
+    this.hitT = 0.35;
     this.knock.addScaledVector(dir, 10);
     if (this.drawing) {
       // Getting hit cancels your draw: protects the "don't get greedy" tension.
@@ -460,7 +535,12 @@ export class Player {
     const f = this.hurtFlash > 0 ? this.hurtFlash / 0.25 : 0;
     const ghost = this.rollInvuln ? 1 : 0; // faint blue tint = can't be hit
     this.bodyMat.emissive.setRGB(f * 1.5 + ghost * 0.04, ghost * 0.08, ghost * 0.22);
+    if (this.model) {
+      for (const m of this.model.materials) m.emissive.setRGB(f * 0.9 + ghost * 0.04, ghost * 0.08, ghost * 0.22);
+    }
     // Blink while invulnerable.
-    this.rig.visible = this.dead || this.iframes <= 0 || Math.floor(this.iframes * 20) % 2 === 0;
+    const shown = this.dead || this.iframes <= 0 || Math.floor(this.iframes * 20) % 2 === 0;
+    if (this.model) this.model.holder.visible = shown;
+    else this.rig.visible = shown;
   }
 }

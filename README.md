@@ -44,6 +44,22 @@ One-time setup: in the repo, go to **Settings → Pages** and set **Source** to 
 - **Feedback:** hit-stop, screen shake, knockback, damage numbers, arrows that stick in enemies, walls and the floor, and synthesized sound.
 - **Tuning panel:** every number lives in `src/config.js` and can be changed live. Changes are saved in your browser. Use *Copy settings JSON* to share a tuning.
 
+## 3D models (Meshy)
+
+Characters and props are generated with the [Meshy API](https://docs.meshy.ai) by `tools/meshy/generate.mjs`, driven by the asset list in `tools/meshy/assets.json` (prompts, shared art style, polycount, and which library animations each character gets).
+
+```bash
+npm run meshy -- --dry-run      # list assets and the credit cost
+npm run meshy -- --balance      # check your Meshy credits
+npm run meshy -- hero grunt     # generate (or resume) specific assets
+npm run meshy                   # everything in assets.json
+```
+
+- **API key:** set `MESHY_API_KEY` in your shell. Never commit it or put it in game code: the game is a public page. (In the Claude Code cloud environment the key is stored as an environment network secret and attached automatically.)
+- **Pipeline per character:** text → low-poly mesh (`smart-topology`, A-pose) → texture → auto-rig → all animations merged into one GLB → optimized with gltf-transform (meshopt + WebP, 1024px textures) → `public/models/<id>.glb`. Props skip rigging.
+- **Resumable:** task IDs are saved to `tools/meshy/state.json` the moment a task is created, so re-running resumes instead of paying again. Raw downloads go to `tools/meshy/raw/` (gitignored). Meshy deletes generated files after 3 days.
+- **In game:** `src/models.js` loads `public/models/manifest.json`. Missing models fall back to the built-in placeholder shapes. The hero's bow draw is scrubbed in sync with your charge, the legs run while the upper body aims, and grunts' attack clips follow their windup and lunge timers. Alignment values (heights, aim turn, release and hit points) are in the tuning panel under **Models (Meshy)**.
+
 ## Skills
 
 | Skill | Type | Rarity | Effect |
@@ -76,6 +92,8 @@ Fire and Frost don't stack: taking one replaces the other. Skill definitions liv
 | --- | --- |
 | `src/config.js` | All tunable numbers and their defaults |
 | `src/skills.js` | Skill catalogue, the current run's build, card rolling |
+| `src/models.js` | Meshy model loading, per-character instances, animation state helper |
+| `tools/meshy/` | Meshy generation pipeline and asset list |
 | `src/game.js` | Main loop, waves, combat events, HUD, tuning panel |
 | `src/player.js` | Movement, draw/release, bow and charge-ring visuals |
 | `src/enemy.js` | Grunt state machine (spawn → chase → windup → lunge → recover) |
