@@ -147,10 +147,161 @@ class Shockwave {
   }
 }
 
+/**
+ * A boss's signature ranged move, one per form: the Ruins warlord hurls
+ * boulders, Gorvak of the North brings icicles down from above, and the
+ * Forgemaster lobs pots of burning oil that leave fire on the ground.
+ * Every impact is telegraphed by a ring that fills as it falls.
+ */
+const BARRAGE = [
+  { kind: 'rock', count: [3, 5], flight: 0.95, stagger: 0.22, r: 1.7, spread: 4.5, from: 'boss' },
+  { kind: 'icicle', count: [6, 9], flight: 1.15, stagger: 0.12, r: 1.3, spread: 7, from: 'sky' },
+  { kind: 'pot', count: [2, 3], flight: 1.0, stagger: 0.3, r: 2.2, spread: 3.5, from: 'boss' },
+];
+
+class Barrage {
+  constructor(game, boss, player) {
+    this.game = game;
+    this.boss = boss;
+    const def = (this.def = BARRAGE[boss.formIndex % BARRAGE.length]);
+    const n = def.count[boss.phase === 2 ? 1 : 0];
+    this.items = [];
+    this.fires = [];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = i === 0 ? 0 : def.spread * (0.45 + Math.random() * 0.55);
+      const lead = i === 0 ? player.vel.clone().multiplyScalar(0.5) : new THREE.Vector3();
+      const at = new THREE.Vector3(player.pos.x + Math.cos(a) * d + lead.x, 0, player.pos.z + Math.sin(a) * d + lead.z);
+      const lim = ARENA_HALF - 1.5;
+      at.x = Math.max(-lim, Math.min(lim, at.x));
+      at.z = Math.max(-lim, Math.min(lim, at.z));
+      this.items.push(this.makeItem(at, -i * def.stagger));
+    }
+  }
+
+  makeItem(at, t) {
+    const def = this.def;
+    const S = this.game.scene;
+    const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.4, 0.2), transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(def.r * 0.9, def.r, 40).rotateX(-Math.PI / 2), ringMat);
+    const fillMat = ringMat.clone();
+    fillMat.opacity = 0.3;
+    const fill = new THREE.Mesh(new THREE.CircleGeometry(def.r, 40).rotateX(-Math.PI / 2), fillMat);
+    ring.position.set(at.x, 0.07, at.z);
+    fill.position.set(at.x, 0.065, at.z);
+    ring.renderOrder = fill.renderOrder = 3;
+    let geo;
+    let mat;
+    if (def.kind === 'rock') {
+      geo = new THREE.IcosahedronGeometry(0.55, 0);
+      mat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 1, flatShading: true });
+    } else if (def.kind === 'icicle') {
+      geo = new THREE.ConeGeometry(0.28, 1.8, 6).rotateX(Math.PI);
+      mat = new THREE.MeshStandardMaterial({ color: 0xbfe4ff, roughness: 0.2, metalness: 0.1, emissive: 0x2a5a8a, emissiveIntensity: 0.6 });
+    } else {
+      geo = new THREE.SphereGeometry(0.38, 12, 10);
+      mat = new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.6, emissive: 0xff6a20, emissiveIntensity: 0.5 });
+    }
+    const proj = new THREE.Mesh(geo, mat);
+    proj.castShadow = true;
+    proj.visible = false;
+    S.add(ring, fill, proj);
+    const from = def.from === 'sky' ? new THREE.Vector3(at.x, 15, at.z) : this.boss.pos.clone().setY(3.4);
+    return { at, t, ring, fill, proj, from, landed: false, spin: new THREE.Vector3(Math.random(), Math.random(), Math.random()) };
+  }
+
+  /** Returns false once everything has landed and burned out. */
+  update(dt) {
+    const def = this.def;
+    const G = this.game;
+    for (const it of this.items) {
+      if (it.landed) continue;
+      it.t += dt;
+      const p = Math.max(0, Math.min(1, it.t / def.flight));
+      it.fill.scale.setScalar(Math.max(0.01, p));
+      it.ring.material.opacity = 0.5 + 0.4 * Math.sin(it.t * 18);
+      if (it.t > 0) {
+        it.proj.visible = true;
+        if (def.from === 'sky') {
+          it.proj.position.set(it.at.x, 15 * (1 - p * p), it.at.z);
+        } else {
+          it.proj.position.lerpVectors(it.from, it.at, p);
+          it.proj.position.y = it.from.y * (1 - p) + 6 * Math.sin(p * Math.PI);
+          it.proj.rotation.x += it.spin.x * dt * 8;
+          it.proj.rotation.z += it.spin.z * dt * 8;
+        }
+      }
+      if (p >= 1) this.land(it);
+    }
+    for (const f of this.fires) {
+      f.t += dt;
+      f.tick -= dt;
+      const life = 1 - f.t / f.dur;
+      f.mesh.material.opacity = Math.max(0, 0.45 * Math.min(1, life * 3) * (0.85 + 0.15 * Math.sin(f.t * 20)));
+      if (Math.random() < dt * 30) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * f.r;
+        G.particles.spawn(new THREE.Vector3(f.pos.x + Math.cos(a) * r, 0.1, f.pos.z + Math.sin(a) * r), { count: 1, color: [3, 1.1, 0.25], speed: 0.4, up: 2.4, life: 0.6, size: 0.12, gravity: -1.5, drag: 0.6 });
+      }
+      const P = G.player;
+      if (f.tick <= 0 && f.t < f.dur && Math.hypot(P.pos.x - f.pos.x, P.pos.z - f.pos.z) < f.r + 0.2) {
+        f.tick = 0.55;
+        this.boss.hurtPlayer(P, Math.round(config.boss.waveDamage * 0.35), new THREE.Vector3(P.pos.x - f.pos.x, 0, P.pos.z - f.pos.z).normalize());
+      }
+      if (f.t >= f.dur) {
+        f.mesh.removeFromParent();
+        f.mesh.material.dispose();
+        f.mesh.geometry.dispose();
+        f.done = true;
+      }
+    }
+    this.fires = this.fires.filter((f) => !f.done);
+    return this.items.some((it) => !it.landed) || this.fires.length > 0;
+  }
+
+  land(it) {
+    const def = this.def;
+    const G = this.game;
+    it.landed = true;
+    for (const m of [it.ring, it.fill, it.proj]) {
+      m.removeFromParent();
+      m.geometry.dispose();
+      m.material.dispose();
+    }
+    const P = G.player;
+    const d = Math.hypot(P.pos.x - it.at.x, P.pos.z - it.at.z);
+    if (d < def.r + PLAYER_RADIUS) this.boss.hurtPlayer(P, Math.round(config.boss.slamDamage * 0.55), new THREE.Vector3(P.pos.x - it.at.x, 0, P.pos.z - it.at.z).normalize());
+    G.onSlam(it.at, def.kind === 'icicle' ? 0.7 : 1);
+    G.sfx.slam(G.panAt(it.at));
+    G.shake.add(0.18);
+    const color = def.kind === 'icicle' ? [1.6, 2.2, 3] : def.kind === 'pot' ? [3, 1.2, 0.3] : 0x8a7458;
+    G.particles.spawn(it.at.clone().setY(0.4), { count: 22, color, speed: 5, up: 4, life: 0.7, size: def.kind === 'rock' ? 0.18 : 0.1, gravity: 9 });
+    if (def.kind === 'pot') {
+      // Burning oil spreads where the pot breaks.
+      const mesh = new THREE.Mesh(
+        new THREE.CircleGeometry(def.r, 40).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 0.45, 0.08), transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }),
+      );
+      mesh.position.set(it.at.x, 0.06, it.at.z);
+      G.scene.add(mesh);
+      this.fires.push({ pos: it.at.clone(), r: def.r, t: 0, dur: 4.5, tick: 0.3, mesh });
+      G.decals?.spawn(it.at, 'scorch', def.r * 1.6, 12);
+    }
+  }
+
+  dispose() {
+    for (const it of this.items) if (!it.landed) for (const m of [it.ring, it.fill, it.proj]) m.removeFromParent();
+    for (const f of this.fires) f.mesh.removeFromParent();
+  }
+}
+
 export class Boss extends Grunt {
   constructor(game, pos, level, index = 1, form = 0) {
     super(game, pos, level);
     this.form = BOSS_FORMS[form % BOSS_FORMS.length];
+    this.formIndex = form % BOSS_FORMS.length;
+    this.barrages = [];
+    this.barrageCool = 4;
     this.displayName = this.form.name;
     const o = outfits[this.form.outfit];
     if (o && this.model) {
@@ -217,6 +368,7 @@ export class Boss extends Grunt {
 
   pickAttack(dist) {
     if (this.phase === 2 && this.summonCool <= 0) return 'roar';
+    if (this.barrageCool <= 0 && dist > 3.5 && Math.random() < 0.55) return 'barrage';
     if (dist < 5 && Math.random() < 0.7) return 'swing';
     if (dist > 8 && Math.random() < 0.6) return 'charge';
     return 'slam';
@@ -237,6 +389,8 @@ export class Boss extends Grunt {
     } else if (kind === 'charge') {
       this.windTime = b.chargeWindup / this.rage;
       this.telegraph.show({ type: 'rect', w: 2.8, len: 16 }, this.pos, yaw);
+    } else if (kind === 'barrage') {
+      this.windTime = 0.85 / this.rage;
     } else {
       this.windTime = 1.4;
     }
@@ -254,6 +408,8 @@ export class Boss extends Grunt {
     this.flash = Math.max(0, this.flash - realDt);
     this.hitT = Math.max(0, this.hitT - realDt);
     this.waves = this.waves.filter((w) => w.update(realDt));
+    this.barrageCool -= realDt;
+    this.barrages = this.barrages.filter((b) => b.update(realDt) || (b.dispose(), false));
     if (this.state === 'dying') {
       this.t += realDt;
       this.telegraph.hide();
@@ -311,7 +467,7 @@ export class Boss extends Grunt {
           this.telegraph.outline.position.set(this.pos.x, 0.06, this.pos.z);
           this.telegraph.fill.position.set(this.pos.x, 0.06, this.pos.z);
         }
-        if (this.attack !== 'roar') this.telegraph.progress(p);
+        if (this.attack !== 'roar' && this.attack !== 'barrage') this.telegraph.progress(p);
         if (p >= 1) this.strike(player);
         break;
       }
@@ -414,6 +570,12 @@ export class Boss extends Grunt {
       this.hasHit = false;
       this.game.sfx.lunge(pan);
       this.enter('charge');
+    } else if (this.attack === 'barrage') {
+      this.barrages.push(new Barrage(this.game, this, player));
+      this.barrageCool = 7 + Math.random() * 3;
+      this.game.sfx.sample('whoosh', { vol: 0.6, rate: 0.6, jitter: 0 });
+      if (this.formIndex === 1) this.game.sfx.bossRoar();
+      this.enter('recover');
     } else {
       this.summonCool = b.summonCooldown;
       this.game.onBossSummon(this);
@@ -474,7 +636,7 @@ export class Boss extends Grunt {
         if (A.action('walk')) A.action('walk').timeScale = 1.1 * this.rage;
         break;
       case 'windup': {
-        const clip = this.attack === 'swing' ? 'swing' : this.attack === 'roar' ? 'roar' : this.attack === 'slam' ? 'slam' : 'charge';
+        const clip = this.attack === 'swing' ? 'swing' : this.attack === 'roar' ? 'roar' : this.attack === 'slam' || this.attack === 'barrage' ? 'slam' : 'charge';
         if (clip === 'roar' || clip === 'charge') {
           A.set([clip === 'charge' ? 'idle' : 'roar'], { once: clip === 'roar', fade: 0.15 });
           break;
@@ -492,7 +654,7 @@ export class Boss extends Grunt {
         break;
       case 'recover': {
         const clip = this.attack === 'swing' ? 'swing' : 'slam';
-        if (this.attack === 'swing' || this.attack === 'slam') {
+        if (this.attack === 'swing' || this.attack === 'slam' || this.attack === 'barrage') {
           const a = A.action(clip);
           if (a) a.timeScale = 1.2;
         } else {
@@ -511,5 +673,6 @@ export class Boss extends Grunt {
     super.dispose();
     this.telegraph.dispose();
     for (const w of this.waves) w.mesh.removeFromParent();
+    for (const b of this.barrages) b.dispose();
   }
 }
