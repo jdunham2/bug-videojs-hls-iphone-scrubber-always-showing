@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { currentCharacter } from './profile.js';
 
 // Skill catalogue. `desc(level)` describes the total effect at that level, so a
 // card can show exactly what you'd have after picking it.
@@ -152,11 +153,15 @@ export const build = {
 export const lv = (id) => build.lv(id);
 
 /** Stats after skills are applied. */
+const perk = (k) => currentCharacter().stats[k] ?? 1;
+
 export const stat = {
-  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands'),
+  drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime'),
   perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')),
-  maxHp: () => config.player.maxHp + 25 * lv('vitality'),
+  maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality')) * perk('maxHp')),
   dodgeCharges: () => 1 + lv('secondWind'),
+  damage: () => perk('damage'),
+  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed'),
 };
 
 export const OVERDRAW_TIME = 0.9; // extra seconds past the perfect window to reach a mega-shot

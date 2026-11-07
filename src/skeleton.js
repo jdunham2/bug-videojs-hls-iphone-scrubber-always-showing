@@ -63,7 +63,7 @@ export class Skeleton extends Grunt {
     this.lastState = this.state;
     this.state = state;
     this.t = 0;
-    if (state === 'aim') this.game.sfx.sample('draw', { vol: 0.4, rate: 1.2, pan: this.game.panAt(this.pos) });
+    if (state === 'aim') this.game.sfx.sample('whoosh', { vol: 0.15, rate: 0.6, pan: this.game.panAt(this.pos) });
     if (state !== 'aim') this.aimLine.visible = false;
     if (state === 'chase') this.staggered = false;
   }

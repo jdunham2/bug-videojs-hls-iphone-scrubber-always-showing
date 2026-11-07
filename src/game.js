@@ -15,6 +15,8 @@ import { Boss, BOSS_NAME } from './boss.js';
 import { ArrowStorm } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
+import { Camp } from './camp.js';
+import { profile, saveProfile, bankRun } from './profile.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -80,7 +82,8 @@ export class Game {
     this.camRight = new THREE.Vector3().crossVectors(this.camForward, UP).normalize();
 
     this.composer = new EffectComposer(r);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.renderPass);
     this.ao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
     this.ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.5, scale: 1.2 });
     this.ao.blendIntensity = 0.85;
@@ -105,6 +108,7 @@ export class Game {
     this.enemyArrows = new EnemyArrows(this);
     this.ultimate = new ArrowStorm(this);
     this.loot = new Loot(this);
+    this.camp = new Camp(this);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
@@ -130,6 +134,7 @@ export class Game {
       ultFill: $('ult-fill'),
       build: $('build'),
       bossBar: $('boss-bar'),
+      fade: $('fade'),
       bossFill: $('boss-fill'),
       bossPoise: $('boss-poise'),
       bossName: $('boss-name'),
@@ -162,7 +167,7 @@ export class Game {
       this.sfx.unlock();
       this.music.start();
       if (this.state === 'paused') this.setPaused(false);
-      else this.start();
+      else this.enterCamp(); // title and game over both lead to the camp
     });
     this.hud.draft.addEventListener('pointerover', (e) => {
       const card = e.target.closest('.card');
@@ -290,11 +295,58 @@ export class Game {
     this.camTarget.copy(this.player.pos);
   }
 
-  start() {
+  start(fromCheckpoint = false) {
+    if (this.camp.active) this.leaveCamp();
     this.resetRun();
+    const cp = profile.checkpoint;
+    if (fromCheckpoint && cp) {
+      // Resume after the last boss beaten, with the skills you had then.
+      Object.assign(build.levels, cp.build);
+      build.rerolls = cp.rerolls ?? 1;
+      this.wave = cp.wave;
+      this.player.hp = stat.maxHp();
+      this.player.refillDodge();
+      this.banner(`Wave ${cp.wave + 1}`, 'Continuing from the shrine', 1.6);
+    }
     this.sfx.runStart();
     this.state = 'playing';
     this.hideOverlay();
+  }
+
+  /** The hub between runs. */
+  enterCamp() {
+    this.hideOverlay();
+    this.resetRun();
+    this.state = 'camp';
+    this.setScene(this.camp.scene);
+    this.camp.enter();
+    document.body.classList.add('in-camp');
+    this.fade();
+  }
+
+  leaveCamp() {
+    this.camp.leave();
+    this.setScene(this.scene);
+    document.body.classList.remove('in-camp');
+  }
+
+  startFromCamp(fromCheckpoint) {
+    this.fade();
+    this.sfx.sample('boom', { vol: 0.4, rate: 0.8, jitter: 0 });
+    setTimeout(() => this.start(fromCheckpoint), 250);
+  }
+
+  setScene(scene) {
+    this.renderPass.scene = scene;
+    this.ao.scene = scene;
+  }
+
+  /** Quick fade through black for scene changes. */
+  fade() {
+    const f = this.hud.fade;
+    f.classList.remove('go');
+    void f.offsetWidth;
+    f.classList.add('go');
   }
 
   setPaused(paused) {
@@ -313,6 +365,9 @@ export class Game {
     this.state = 'gameover';
     this.sfx.gameOver();
     this.music.stinger(false);
+    this.gemsThisRun = (this.stats.gemsBanked || 0) + this.loot.runGems;
+    this.newUnlocks = bankRun({ gems: this.loot.runGems, wave: this.wave, kills: this.stats.kills, bosses: this.stats.bossesDefeated || 0 });
+    this.loot.runGems = 0;
     const newBest = this.wave > this.best.wave || (this.wave === this.best.wave && this.stats.kills > this.best.kills);
     if (newBest) {
       this.best = { wave: this.wave, kills: this.stats.kills };
@@ -362,6 +417,17 @@ export class Game {
 
   onUltimateEnd() {
     this.shake.add(0.2);
+  }
+
+  /** Save point: after each boss, store the run so it can be resumed from the camp, and bank gems. */
+  saveCheckpoint() {
+    profile.checkpoint = { wave: this.wave, build: { ...build.levels }, rerolls: build.rerolls };
+    profile.gems += this.loot.runGems;
+    profile.totalGems += this.loot.runGems;
+    this.stats.gemsBanked = (this.stats.gemsBanked || 0) + this.loot.runGems;
+    this.loot.runGems = 0;
+    saveProfile();
+    setTimeout(() => this.banner('Progress saved', 'Continue from here at the Rune Shrine', 1.8), 900);
   }
 
   onBossIntro(boss) {
@@ -447,6 +513,7 @@ export class Game {
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
       this.player.cheer();
+      if (this.wave % config.boss.every === 0) this.saveCheckpoint();
       const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
@@ -779,6 +846,10 @@ export class Game {
         dt = realDt * 0.03;
       }
       this.simulate(dt);
+    } else if (this.state === 'camp') {
+      dt = realDt;
+      this.player.update(dt, this.input, this.aimPoint, this);
+      this.camp.update(dt, this.time);
     }
 
     this.particles.update(dt);
@@ -1008,7 +1079,7 @@ export class Game {
         <p class="tag">A bow-combat prototype. Survive the waves.</p>
         ${controls}
         <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
-        <button>Click to start</button>
+        <button>Click to enter the camp</button>
         ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}
         <p class="model-status" id="model-status">${this.modelStatusText()}</p>
         <p class="model-status" id="audio-status">${this.audioStatusText()}</p>`;
@@ -1027,12 +1098,13 @@ export class Game {
           <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
           <div><b>${s.staggers}</b><span>Staggers</span></div>
           <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
-          <div><b>◆ ${this.loot.runGems}</b><span>Soul gems</span></div>
+          <div><b>◆ ${this.gemsThisRun ?? 0}</b><span>Soul gems banked</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
         ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}
-        <button>Click to try again</button>
-        <p class="tip">Or press R</p>`;
+        ${this.newUnlocks?.length ? `<p class="unlocks">New in camp: ${this.newUnlocks.join(', ')}</p>` : ''}
+        <button>Return to camp</button>
+        <p class="tip">Or press R to jump straight back in</p>`;
     }
     o.classList.add('visible');
   }

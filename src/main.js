@@ -4,8 +4,10 @@ import { loadConfig } from './config.js';
 import { build, stat } from './skills.js';
 import { loadModels, models, modelStatus } from './models.js';
 import { Game } from './game.js';
+import { loadProfile, profile } from './profile.js';
 
 loadConfig();
+loadProfile();
 const game = new Game(document.getElementById('app'));
 game.run();
 
@@ -31,5 +33,6 @@ window.__build = build;
 window.__stat = stat;
 window.__buildAdd = (id) => build.add(id);
 window.__models = models;
+window.__profile = profile;
 window.__THREE = THREE;
 window.__modelStatus = modelStatus;

@@ -3,7 +3,8 @@ import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME } from './skills.js';
-import { models, instantiate, attachProp, findBone, orientProp } from './models.js';
+import { models, outfits, instantiate, attachProp, findBone, orientProp, loadTexture } from './models.js';
+import { profile } from './profile.js';
 
 export const PLAYER_RADIUS = 0.45;
 export const ARROW_HEIGHT = 1.1;
@@ -234,7 +235,7 @@ export class Player {
     if (this.dodgeBuffer > 0 && !this.rolling && this.charges >= 1) this.startRoll(input, game);
 
     // Draw / release
-    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0) {
+    if ((input.mouse.down || input.mouse.clicked) && !this.drawing && this.cooldown <= 0 && !this.rolling && this.casting <= 0 && game.state !== 'camp') {
       this.drawing = true;
       this.drawT = 0;
       this.perfectCued = false;
@@ -276,7 +277,7 @@ export class Player {
       if (this.rollT >= d.duration) this.rolling = false;
     } else {
       const axis = this.casting > 0 ? { x: 0, y: 0 } : input.axis();
-      const speed = config.player.moveSpeed * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
+      const speed = stat.moveSpeed() * (this.drawing ? bowCfg.drawMoveMultiplier : 1);
       const tx = (game.camRight.x * axis.x + game.camForward.x * axis.y) * speed;
       const tz = (game.camRight.z * axis.x + game.camForward.z * axis.y) * speed;
       const k = 1 - Math.exp(-18 * dt);
@@ -293,7 +294,7 @@ export class Player {
     this.pos.x += (this.vel.x + this.knock.x) * dt;
     this.pos.z += (this.vel.z + this.knock.z) * dt;
     this.knock.multiplyScalar(Math.exp(-10 * dt));
-    resolveCircle(this.pos, PLAYER_RADIUS);
+    (this.collide || resolveCircle)(this.pos, PLAYER_RADIUS);
 
     // Facing follows aim
     const faceDir = this.rolling ? this.rollDir : this.aimDir;
@@ -325,16 +326,48 @@ export class Player {
   }
 
   /** Swap the placeholder body for the Meshy hero (called once models finish loading). */
+  /** Use the selected character and outfit from the profile (called on load and from the camp). */
   attachModel() {
-    if (this.model || !models.hero) return;
-    const inst = instantiate('hero', config.models.heroHeight);
+    const id = models[profile.character] ? profile.character : 'hero';
+    this.setCharacter(id, profile.outfit[id] || 'default');
+  }
+
+  setCharacter(id, outfitId = 'default') {
+    if (!models[id]) return;
+    if (this.model) {
+      this.model.holder.removeFromParent();
+      for (const m of this.model.materials) m.dispose();
+    }
+    const height = id === 'dwarf' ? config.models.heroHeight * 0.82 : config.models.heroHeight;
+    const inst = instantiate(id, height);
     if (!inst) return;
     this.model = inst;
     this.anim = inst.animator;
+    this.characterId = id;
     this.rig.visible = false;
     this.group.add(inst.holder);
     const hand = findBone(inst.root, [/hand/i, /left|(^|[_.])l([_.]|$)/i]);
     this.bowProp = attachProp('bow', hand, 1.1);
+    this.applyOutfit(outfitId);
+  }
+
+  /** Swap the character's texture for an outfit painted on the same UV layout. */
+  applyOutfit(outfitId) {
+    if (!this.model) return;
+    if (!this.baseMaps) this.baseMaps = new Map();
+    const mats = this.model.materials;
+    const o = outfits[outfitId];
+    if (!o || o.base !== this.characterId) {
+      return; // default look: the model's own texture
+    }
+    loadTexture(o.texture, (tex) => {
+      if (this.model?.materials !== mats) return; // character changed meanwhile
+      for (const m of mats) {
+        m.map = tex;
+        m.color.set(0xffffff);
+        m.needsUpdate = true;
+      }
+    });
   }
 
   /** Pick the hero's animation from game state each frame. */
@@ -433,7 +466,7 @@ export class Player {
     this.releaseT = 0.35;
     game.sfx.drawStop();
 
-    let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge);
+    let damage = lerp(cfg.minDamage, cfg.maxDamage, charge) * (1 + 0.2 * lv('heavyDraw') * charge) * stat.damage();
     if (perfect) damage *= cfg.perfectMultiplier;
     if (mega) damage *= 3;
     const speed = lerp(cfg.minArrowSpeed, cfg.maxArrowSpeed, charge) * (mega ? 1.2 : 1);

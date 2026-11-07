@@ -175,23 +175,25 @@ export class Sfx {
   drawStart(drawTime) {
     if (!this.ok) return;
     this.drawStop();
-    // Wooden creak of the bow, plus a soft rising tension tone underneath.
-    this.sample('draw', { vol: 0.55, rate: 0.9 / Math.max(0.4, drawTime), jitter: 0.08 });
+    // A soft leather rustle as the arrow is nocked, then a quiet string-tension
+    // swell (filtered noise, no pitched creak) that rises with the draw.
+    this.sample('whoosh', { vol: 0.12, rate: 0.6, jitter: 0.05 });
     const c = this.ctx;
     const t = c.currentTime;
-    const o = c.createOscillator();
+    const src = c.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
     const f = c.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 1.2;
+    f.frequency.setValueAtTime(500, t);
+    f.frequency.exponentialRampToValueAtTime(900, t + drawTime);
     const g = c.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(70, t);
-    o.frequency.exponentialRampToValueAtTime(150, t + drawTime);
-    f.type = 'lowpass';
-    f.frequency.value = 450;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.03, t + drawTime);
-    o.connect(f).connect(g).connect(this.sfxBus);
-    o.start(t);
-    this.drawNode = { o, g };
+    g.gain.exponentialRampToValueAtTime(0.025, t + drawTime);
+    src.connect(f).connect(g).connect(this.sfxBus);
+    src.start(t);
+    this.drawNode = { o: src, g };
   }
 
   drawStop() {

@@ -112,6 +112,26 @@ function stripRootMotion(clip) {
   }
 }
 
+const textureCache = {};
+
+/**
+ * Load a texture by path (or from the embedded bundle in sandboxed previews),
+ * set up for glTF UVs. Calls back with the same cached texture on repeat calls.
+ */
+export function loadTexture(path, cb) {
+  if (textureCache[path]?.tex) return cb(textureCache[path].tex);
+  if (textureCache[path]) return textureCache[path].waiting.push(cb);
+  textureCache[path] = { waiting: [cb] };
+  const b64 = window.__EMBEDDED_MODELS?.files?.[path];
+  const url = b64 ? `data:image/webp;base64,${b64}` : path;
+  new THREE.TextureLoader().load(url, (tex) => {
+    tex.flipY = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    textureCache[path].tex = tex;
+    for (const fn of textureCache[path].waiting) fn(tex);
+  });
+}
+
 /** Find a bone whose name matches all the given patterns (e.g. [/hand/i, /left|_l\b/i]). */
 export function findBone(root, patterns) {
   let found = null;
