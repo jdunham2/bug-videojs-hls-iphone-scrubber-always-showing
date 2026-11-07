@@ -20,6 +20,12 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
+const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const MAX_TWIST = THREE.MathUtils.degToRad(115); // how far the upper body may turn from the legs
+const _q1 = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
+const _axis = new THREE.Vector3();
+
 const RING_IDLE = new THREE.Color(0xffffff);
 const RING_PERFECT = new THREE.Color(3, 2.2, 0.6);
 const RING_LATE = new THREE.Color(0x777777);
@@ -88,6 +94,7 @@ export class Player {
     this.aimLine = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5), this.aimMat);
     this.aimLine.renderOrder = 1;
     scene.add(this.aimLine);
+    this.indicators = [this.targetRing, this.chargeRing, this.aimLine];
 
     this.reset();
   }
@@ -318,7 +325,21 @@ export class Player {
     if (Math.hypot(this.vel.x, this.vel.z) > 0.8) this.moveDir.set(this.vel.x, 0, this.vel.z).normalize();
     // Standing still, the hero turns to the aim too; running, they face the way they run.
     const still = Math.hypot(this.vel.x, this.vel.z) < 0.8;
-    const faceDir = this.rolling ? this.rollDir : aimingNow || still ? this.aimDir : this.moveDir;
+    // Drawing on the run: the legs keep running their way and the upper body
+    // twists toward the aim (see applyTwist) — unless the aim is too far round,
+    // then the whole body turns.
+    this.twistTarget = 0;
+    let faceAim = aimingNow || still;
+    if (aimingNow && !still && !this.rolling && this.spineBones?.length && this.casting <= 0) {
+      const moveYaw = Math.atan2(this.moveDir.x, this.moveDir.z);
+      const need = wrapAngle(Math.atan2(this.aimDir.x, this.aimDir.z) + THREE.MathUtils.degToRad(config.models.heroAimYaw) - moveYaw);
+      if (Math.abs(need) <= MAX_TWIST) {
+        faceAim = false;
+        this.twistTarget = need;
+      }
+    }
+    this.twisting = this.twistTarget !== 0;
+    const faceDir = this.rolling ? this.rollDir : faceAim ? this.aimDir : this.moveDir;
     this.yaw = lerpAngle(this.yaw, Math.atan2(faceDir.x, faceDir.z), 1 - Math.exp(-(this.rolling ? 40 : 25) * dt));
     this.group.position.copy(this.pos);
     this.group.rotation.y = this.yaw;
@@ -395,6 +416,9 @@ export class Player {
     this.rig.visible = false;
     this.group.add(inst.holder);
     this.holdBow(this.bowHand(inst));
+    // Spine bones (root to chest) for the upper-body twist while aiming on the run.
+    this.spineBones = [];
+    inst.root.traverse((o) => o.isBone && /spine/i.test(o.name) && this.spineBones.push(o));
     this.applyOutfit(outfitId);
   }
 
@@ -428,13 +452,14 @@ export class Player {
     const locoScale = moving ? THREE.MathUtils.clamp(speed / mc.runAnimSpeed, 0.5, 1.6) : 1;
     // Turn side-on archery poses so the bow arm points down the aim line.
     const aiming = this.drawing || this.releaseT > 0;
-    const yawTarget = aiming ? THREE.MathUtils.degToRad(mc.heroAimYaw) : 0;
+    const yawTarget = aiming && !this.twisting ? THREE.MathUtils.degToRad(mc.heroAimYaw) : 0;
     this.model.holder.rotation.y += (yawTarget - this.model.holder.rotation.y) * (1 - Math.exp(-20 * dt));
 
     if (this.dead) {
       A.set(['death'], { once: true, fade: 0.1 });
-    } else if (this.casting > 0 && A.has('victory')) {
-      A.set(['victory'], { once: true, fade: 0.1, timeScale: 1.6 });
+    } else if (this.casting > 0 && A.has('shoot')) {
+      // Loosing the volley: snap through the release of the shoot clip.
+      A.set(['shoot'], { once: true, fade: 0.08, timeScale: 1.4 });
     } else if (this.rolling) {
       const rate = A.duration('roll') / config.dodge.duration;
       A.set(['roll'], { once: true, fade: 0.05, timeScale: rate || 1 });
@@ -442,7 +467,8 @@ export class Player {
       // Moving: arms aim while the legs keep running. Standing still: the whole body
       // takes the archery stance (no idle sway in the legs).
       const shoot = moving && A.has('shoot:upper') ? 'shoot:upper' : 'shoot';
-      const lowerBase = moving && A.has('aimWalk') ? 'aimWalk' : loco;
+      // Twisting: the legs run normally; otherwise a forward aim-walk.
+      const lowerBase = moving && !this.twisting && A.has('aimWalk') ? 'aimWalk' : loco;
       const lower = shoot === 'shoot:upper' ? `${lowerBase}:lower` : null;
       A.set(lower ? [shoot, lower] : [shoot], { fade: 0.12 });
       if (lower) A.action(lower).timeScale = locoScale;
@@ -472,6 +498,7 @@ export class Player {
       A.action(loco).timeScale = locoScale;
     }
     A.update(dt);
+    this.applyTwist(dt);
     if (this.bowInHand) {
       // The bow sits in the hand but keeps a clean pose: upright, facing where the
       // hero faces, turning to the aim line while drawing (the hand's own rotation
@@ -483,6 +510,23 @@ export class Player {
       this.bowFwd.copy(facing).lerp(this.aimDir, this.bowBlend).normalize();
       this.group.updateMatrixWorld(true);
       orientUpright(this.bow, this.bowFwd);
+    }
+  }
+
+  /**
+   * Turn the spine toward the aim, spread over the spine bones, around the world
+   * up axis (on top of whatever the clip is doing). Eases in and out.
+   */
+  applyTwist(dt) {
+    this.twist = lerpAngle(this.twist || 0, this.twistTarget || 0, 1 - Math.exp(-18 * dt));
+    const bones = this.spineBones;
+    if (!bones?.length || Math.abs(this.twist) < 1e-3) return;
+    const per = this.twist / bones.length;
+    for (const b of bones) {
+      b.parent.updateWorldMatrix(true, false);
+      b.parent.getWorldQuaternion(_q1);
+      _axis.copy(UP).applyQuaternion(_q1.invert());
+      b.quaternion.premultiply(_q2.setFromAxisAngle(_axis, per));
     }
   }
 

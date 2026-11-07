@@ -1,4 +1,4 @@
-// Persistent player profile: soul gems, unlocked characters and outfits, the
+// Persistent player profile: gems, unlocked characters and outfits, the
 // current selection, records and the boss checkpoint (save point).
 // Stored in localStorage; every access is guarded so private/blocked storage
 // just means progress lasts for the session.
@@ -61,7 +61,7 @@ const fresh = () => ({
 
 export const profile = fresh();
 
-/** Where progress is being kept, for the shrine to show. */
+/** Where progress is being kept, for the trophy board to show. */
 export const saveStatus = { local: true, cloud: 'off' }; // cloud: off | connecting | on | error
 
 // Records only ever go up, so a merge keeps the best of both copies; spendable

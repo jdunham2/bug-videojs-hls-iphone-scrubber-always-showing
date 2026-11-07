@@ -1,4 +1,4 @@
-// Loot: soul gems (the currency for unlocks) and health orbs. They burst out
+// Loot: gems (the currency for unlocks) and health orbs. They burst out
 // of defeated enemies, bounce, then get pulled into the hero.
 
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ export class Loot {
     this.runGems = 0;
   }
 
-  /** Burst `gems` soul gems (and maybe health orbs) out of a point. */
+  /** Burst `gems` gems (and maybe health orbs) out of a point. */
   drop(pos, gems, orbs = 0) {
     for (let i = 0; i < gems + orbs; i++) {
       const type = i < gems ? 'gem' : 'orb';

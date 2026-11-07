@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { PLAYER_RADIUS } from './player.js';
-import { instantiate, attachProp, findBone, enableDissolve } from './models.js';
+import { instantiate, attachProp, findBone } from './models.js';
 import { makeSimpleBow, holdInHand, orientUpright } from './bow.js';
 import { updateElite } from './elites.js';
 
@@ -10,14 +10,13 @@ const BOW_FWD = new THREE.Vector3();
 
 const bodyGeo = new THREE.CapsuleGeometry(0.45, 0.55, 4, 10);
 const headGeo = new THREE.SphereGeometry(0.32, 10, 8);
-const hornGeo = new THREE.ConeGeometry(0.07, 0.32, 6);
 const eyeGeo = new THREE.SphereGeometry(0.06, 6, 4);
 const clubGeo = new THREE.CylinderGeometry(0.08, 0.17, 0.95, 6);
-const hornMat = new THREE.MeshStandardMaterial({ color: 0xd9ccb0, roughness: 0.6 });
 const clubMat = new THREE.MeshStandardMaterial({ color: 0x5b3a1e, roughness: 0.9, flatShading: true });
-const eyeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.4, 0.4) });
+const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1a1410 });
 
-const spawnRingGeo = new THREE.RingGeometry(0.55, 0.8, 32).rotateX(-Math.PI / 2);
+const spawnRingGeo = new THREE.CircleGeometry(0.75, 24).rotateX(-Math.PI / 2); // landing shadow
+const LEAP_HEIGHT = 5;
 const wedgeGeo = new THREE.BufferGeometry();
 wedgeGeo.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0.2, 0.5, 0, 0.2, 0, 0, 1], 3));
 
@@ -70,12 +69,6 @@ export class Grunt {
     body.position.y = 0.72;
     const head = new THREE.Mesh(headGeo, this.bodyMat);
     head.position.set(0, 1.42, 0.08);
-    const hornL = new THREE.Mesh(hornGeo, hornMat);
-    hornL.position.set(-0.2, 1.68, 0.05);
-    hornL.rotation.z = 0.5;
-    const hornR = hornL.clone();
-    hornR.position.x = 0.2;
-    hornR.rotation.z = -0.5;
     const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
     eyeL.position.set(-0.11, 1.46, 0.36);
     const eyeR = eyeL.clone();
@@ -85,7 +78,7 @@ export class Grunt {
     const clubMesh = new THREE.Mesh(clubGeo, clubMat);
     clubMesh.position.y = 0.4;
     this.club.add(clubMesh);
-    this.rig.add(body, head, hornL, hornR, eyeL, eyeR, this.club);
+    this.rig.add(body, head, eyeL, eyeR, this.club);
     this.rig.traverse((o) => {
       if (o.isMesh) o.castShadow = true;
     });
@@ -95,7 +88,7 @@ export class Grunt {
     this.attachModel(level);
 
     // Spawn telegraph ring + lunge direction wedge (ground decals).
-    this.spawnRingMat = new THREE.MeshBasicMaterial({ color: 0xff5533, transparent: true, opacity: 0, depthWrite: false });
+    this.spawnRingMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false });
     this.spawnRing = new THREE.Mesh(spawnRingGeo, this.spawnRingMat);
     this.spawnRing.position.set(pos.x, 0.04, pos.z);
     game.scene.add(this.spawnRing);
@@ -126,7 +119,7 @@ export class Grunt {
   /** Use the Meshy grunt if it's loaded: placeholder meshes hide, the rig group stays for spawn/arrows. */
   // Subclasses (skeleton archer, boss) override these to use their own model.
   get modelId() {
-    return 'grunt';
+    return 'brute';
   }
   get modelHeight() {
     return config.models.gruntHeight;
@@ -148,9 +141,6 @@ export class Grunt {
     this.anim = inst.animator;
     for (const c of this.rig.children) c.visible = false;
     this.rig.add(inst.holder);
-    this.dissolve = enableDissolve(inst.materials, new THREE.Color(2.2, 0.8, 3)).u;
-    this.dissolveEdge = null;
-    this.dissolve.value = 1; // materializes during the spawn
     // Higher levels: darker, redder skin.
     const k = Math.min(0.45, 0.05 * (level - 1));
     const tint = new THREE.Color(1, 1 - k, 1 - k * 1.2);
@@ -346,19 +336,9 @@ export class Grunt {
     let clubAngle = 0.2;
 
     switch (this.state) {
-      case 'spawning': {
-        const p = Math.min(1, this.t / 0.9);
-        this.rig.position.y = (this.model ? -0.6 : -1.8) * (1 - easeOut(p));
-        if (this.dissolve) this.dissolve.value = 1 - easeOut(p);
-        this.spawnRingMat.opacity = 0.7 * (1 - p * 0.5);
-        this.spawnRing.scale.setScalar(0.6 + p * 0.6);
-        if (p >= 1) {
-          this.rig.position.y = 0;
-          this.spawnRing.visible = false;
-          this.enter('chase');
-        }
+      case 'spawning':
+        if (this.updateLeapIn(0.75)) this.enter('chase');
         break;
-      }
       case 'chase':
         mx = tmp.x * this.speed;
         mz = tmp.z * this.speed;
@@ -394,7 +374,7 @@ export class Grunt {
           const res = player.takeDamage(g.damage, this.lungeDir, this.game);
           if (res === true) {
             this.game.onPlayerHit(this, g.damage);
-            if (this.kind === 'ghoul') this.game.onChilled();
+            if (this.kind === 'raider') this.game.onChilled();
           }
           else if (res === 'dodged') this.game.onPerfectDodge(this);
         }
@@ -435,12 +415,10 @@ export class Grunt {
     let gr = f * 2;
     let b = f * 2;
     if (this.frozenT > 0) {
-      r += 0.35;
-      gr += 0.75;
-      b += 1.4;
-    } else if (this.slowT > 0) {
-      gr += 0.1;
-      b += 0.45;
+      // Pinned: a dull grey cast while it struggles.
+      r += 0.15;
+      gr += 0.15;
+      b += 0.15;
     }
     if (this.burnT > 0) {
       const fl = 0.35 + 0.2 * Math.sin(performance.now() * 0.03 + this.yaw * 10);
@@ -501,6 +479,22 @@ export class Grunt {
     this.bodyMat.emissive.setRGB(0, 0, 0);
   }
 
+  /**
+   * Enemies leap down into the arena from the walls: fall, then land with a
+   * thud and a puff of dust. A shadow on the ground shows where. True once landed.
+   */
+  updateLeapIn(duration) {
+    const p = Math.min(1, this.t / duration);
+    this.rig.position.y = LEAP_HEIGHT * (1 - p * p);
+    this.spawnRingMat.opacity = 0.45 * p;
+    this.spawnRing.scale.setScalar(1.4 - 0.6 * p);
+    if (p < 1) return false;
+    this.rig.position.y = 0;
+    this.spawnRing.visible = false;
+    this.game.onEnemyLanded(this);
+    return true;
+  }
+
   updateDying(dt) {
     const p = Math.min(1, this.t / 0.35);
     if (!this.model) this.rig.rotation.x = -Math.PI * 0.5 * easeOut(p);
@@ -508,30 +502,14 @@ export class Grunt {
     this.knock.multiplyScalar(Math.exp(-6 * dt));
     this.group.position.x = this.pos.x;
     this.group.position.z = this.pos.z;
-    if (this.dissolve) {
-      // Burn away with glowing edges once the death animation has played a little.
-      const k = Math.max(0, (this.t - 0.75) / 0.9);
-      if (k > 0 && !this.dissolveEdge) {
-        this.dissolveEdge = true;
-        for (const m of this.model.materials) m.emissive.setRGB(0, 0, 0);
-      }
-      this.dissolve.value = Math.min(1, k);
-      if (k > 0 && k < 1 && Math.random() < dt * 40) {
-        this.game.particles.spawn(this.pos.clone().setY(0.3 + Math.random() * 1.4), {
-          count: 1,
-          color: [2.2, 0.8, 3],
-          speed: 0.5,
-          up: 2,
-          life: 0.6,
-          size: 0.07,
-          gravity: -2,
-        });
-      }
-      if (this.t > 1.75) this.dispose();
-    } else {
-      if (this.t > 0.9) this.group.position.y -= dt * 1.2;
-      if (this.t > 1.8) this.dispose();
+    // Lie still for a moment, then sink into the ground with a puff of dust.
+    const sinkAt = this.model ? 1.2 : 0.9;
+    if (this.t > sinkAt && !this.sinkDust) {
+      this.sinkDust = true;
+      this.game.particles.spawn(this.pos.clone().setY(0.2), { count: 10, color: 0x7a6a58, speed: 1.2, up: 0.8, life: 0.8, size: 0.28, gravity: 0.5, drag: 2 });
     }
+    if (this.t > sinkAt) this.group.position.y -= dt * 1.1;
+    if (this.t > sinkAt + 1.1) this.dispose();
   }
 
   dispose() {

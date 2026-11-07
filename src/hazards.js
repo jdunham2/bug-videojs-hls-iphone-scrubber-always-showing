@@ -1,10 +1,10 @@
 // Arena hazards and boons: things in the world that help or hurt.
 //   Explosive barrel  – one arrow blows it up; hurts everything nearby (you too) and chains.
-//   Spike trap        – glows, then springs on anyone standing on it, enemies included.
-//   Healing spring    – stand in the glow to heal (limited per wave).
-//   Haste rune        – pickup: faster movement and draw for a few seconds.
-//   Lightning totem   – shoot it to wake it; it zaps nearby enemies for a while.
-//   Ice patch (Crypt) – slippery footing, slows enemies.
+//   Spike trap        – rattles, then springs on anyone standing on it, enemies included.
+//   Fresh spring      – stand in the water to heal (limited per wave).
+//   War drum          – shoot it: the beat speeds up your movement and draw for a few seconds.
+//   Ballista          – shoot it to load it; it fires heavy bolts at nearby enemies for a while.
+//   Ice patch (Keep)  – slippery footing, slows enemies.
 //   Lava vent (Forge) – erupts in flame on a timer.
 
 import * as THREE from 'three';
@@ -42,9 +42,9 @@ function glowDisc(color, r, opacity = 0.4) {
 
 /** What each arena brings (counts per type). */
 const SETS = [
-  { barrel: 3, spikes: 2, spring: 1, rune: 1, totem: 1 },
-  { barrel: 2, spikes: 2, spring: 1, rune: 1, totem: 1, ice: 4 },
-  { barrel: 5, spikes: 1, spring: 1, rune: 1, totem: 1, vent: 4 },
+  { barrel: 3, spikes: 2, spring: 1, drum: 1, ballista: 1 },
+  { barrel: 2, spikes: 2, spring: 1, drum: 1, ballista: 1, ice: 4 },
+  { barrel: 5, spikes: 1, spring: 1, drum: 1, ballista: 1, vent: 4 },
 ];
 
 export class Hazards {
@@ -55,7 +55,7 @@ export class Hazards {
     this.list = [];
   }
 
-  /** Targets arrows can hit (barrels and totems behave like enemies for arrow collision). */
+  /** Targets arrows can hit (barrels, drums and ballistas behave like enemies for arrow collision). */
   get targets() {
     return this.list.filter((h) => h.hittable && !h.removed);
   }
@@ -73,11 +73,11 @@ export class Hazards {
     }
   }
 
-  /** Each new wave restocks barrels and runes and refills springs. */
+  /** Each new wave restocks barrels and refills springs. */
   restock(arenaIndex) {
     const set = SETS[arenaIndex % SETS.length];
     const count = (t) => this.list.filter((h) => h.type === t && !h.removed).length;
-    for (const t of ['barrel', 'rune']) {
+    for (const t of ['barrel']) {
       for (let i = count(t); i < set[t]; i++) {
         const spot = this.findSpot(3);
         if (spot) this.add(t, spot);
@@ -91,7 +91,7 @@ export class Hazards {
     for (let k = 0; k < 60; k++) {
       const x = rand(-ARENA_HALF + 2.5, ARENA_HALF - 2.5);
       const z = rand(-ARENA_HALF + 2.5, ARENA_HALF - 2.5);
-      if (Math.hypot(x, z) < 3.5) continue; // keep the rune circle clear
+      if (Math.hypot(x, z) < 3.5) continue; // keep the centre clear
       if (Math.hypot(x - P.x, z - P.z) < 3) continue;
       if (pillars.some((q) => Math.hypot(x - q.x, z - q.z) < q.r + 1.5)) continue;
       if ((this.taken || []).some((t) => Math.hypot(x - t.x, z - t.z) < spacing)) continue;
@@ -114,7 +114,7 @@ export class Hazards {
       return p;
     };
     if (type === 'barrel') {
-      h.model = model('explosiveBarrel', 1.1) || group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1, 10), new THREE.MeshStandardMaterial({ color: 0xaa2a1a })));
+      h.model = model('powderBarrel', 1.1) || group.add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1, 10), new THREE.MeshStandardMaterial({ color: 0xaa2a1a })));
       h.hittable = true;
       h.radius = 0.5;
       h.collider = { x, z, r: 0.5, h: 1.1, hazardSpot: true };
@@ -127,24 +127,24 @@ export class Hazards {
       h.phase = 'idle';
       h.t = rand(1, 3);
     } else if (type === 'spring') {
-      model('healSpring', 1.1);
-      h.glow = glowDisc(new THREE.Color(0.4, 2.6, 1.2), 2.2, 0.35);
+      model('springWell', 1.1);
+      h.glow = glowDisc(new THREE.Color(0.9, 1.6, 2.2), 2.2, 0.25);
       group.add(h.glow);
       h.charge = 45;
       pillars.push({ x, z, r: 0.7, h: 0.9, hazardSpot: true });
-    } else if (type === 'rune') {
-      h.model = model('hasteRune', 0.25);
-      h.glow = glowDisc(new THREE.Color(3, 2.4, 0.6), 1.0, 0.5);
-      group.add(h.glow);
-    } else if (type === 'totem') {
-      h.model = model('totem', 2.6);
+    } else if (type === 'drum') {
+      h.model = model('warDrum', 1.3);
       h.hittable = true;
-      h.radius = 0.5;
+      h.radius = 0.6;
+      h.cool = 0;
+      pillars.push({ x, z, r: 0.6, h: 1.3, hazardSpot: true });
+    } else if (type === 'ballista') {
+      h.model = model('ballista', 1.8);
+      h.hittable = true;
+      h.radius = 0.7;
       h.active = 0;
       h.cool = 0;
-      h.glow = glowDisc(new THREE.Color(0.8, 1.8, 3), 2.6, 0.1);
-      group.add(h.glow);
-      pillars.push({ x, z, r: 0.5, h: 2.6, hazardSpot: true });
+      pillars.push({ x, z, r: 0.7, h: 1.4, hazardSpot: true });
     } else if (type === 'ice') {
       h.glow = glowDisc(new THREE.Color(1.2, 1.8, 2.4), 2.0, 0.35);
       group.add(h.glow);
@@ -156,10 +156,11 @@ export class Hazards {
       h.t = rand(2, 5);
     }
     // Arrow-collision interface (shared with enemies).
-    h.isHittable = () => !h.removed && h.hittable && !(h.type === 'totem' && (h.active > 0 || h.cool > 0));
+    h.isHittable = () => !h.removed && h.hittable && !(h.active > 0 || h.cool > 0);
     h.hit = () => {
       if (h.type === 'barrel') this.explode(h);
-      if (h.type === 'totem') this.wakeTotem(h);
+      if (h.type === 'ballista') this.loadBallista(h);
+      if (h.type === 'drum') this.beatDrum(h);
       return null; // not an enemy: no damage numbers or kill credit
     };
     this.list.push(h);
@@ -185,11 +186,23 @@ export class Hazards {
     }
   }
 
-  wakeTotem(h) {
+  loadBallista(h) {
     h.active = 8;
-    h.zap = 0;
-    this.game.sfx.zap(this.game.panAt(h.pos));
-    this.game.numbers.spawn(h.pos.clone().setY(3), 'TOTEM AWAKENED', 'callout');
+    h.zap = 0.4;
+    this.game.sfx.sample('thunkWood', { vol: 0.7, rate: 0.6, pan: this.game.panAt(h.pos) });
+    this.game.numbers.spawn(h.pos.clone().setY(2.6), 'BALLISTA LOADED', 'callout');
+  }
+
+  /** A hit on the war drum: one big beat that quickens your step and draw. */
+  beatDrum(h) {
+    const G = this.game;
+    h.cool = 14;
+    buffs.haste = 6;
+    G.numbers.spawn(G.player.pos.clone().setY(2.4), 'HASTE!', 'callout gold');
+    G.sfx.sample('boom', { vol: 0.8, rate: 0.7, jitter: 0, pan: G.panAt(h.pos) });
+    G.sfx.sample('thunkWood', { vol: 0.6, rate: 0.5, jitter: 0, pan: G.panAt(h.pos) });
+    G.shake.add(0.2);
+    if (h.model) h.punch = 1;
   }
 
   update(dt) {
@@ -217,41 +230,37 @@ export class Hazards {
               G.numbers.spawn(P.pos.clone().setY(2.2), `+${Math.round(h.healShown)}`, 'heal');
               h.healShown = 0;
             }
-            if (Math.random() < dt * 20) G.particles.spawn(P.pos.clone().setY(0.3), { count: 1, color: [0.5, 3, 1.2], speed: 0.4, up: 2.5, life: 0.6, size: 0.06, gravity: -1 });
+            if (Math.random() < dt * 20) G.particles.spawn(P.pos.clone().setY(0.2), { count: 1, color: [1.2, 1.8, 2.4], speed: 0.8, up: 1.5, life: 0.5, size: 0.05, gravity: 6 });
           }
           break;
         }
-        case 'rune':
+        case 'drum':
+          h.cool = Math.max(0, h.cool - dt);
           if (h.model) {
-            h.model.position.y = 0.15 + Math.sin(G.elapsed * 3) * 0.08;
-            h.model.rotation.y += dt * 1.5;
-          }
-          if (pd < 1.0 && !P.dead) {
-            h.removed = true;
-            h.group.visible = false;
-            buffs.haste = 6;
-            G.numbers.spawn(P.pos.clone().setY(2.4), 'HASTE!', 'callout gold');
-            G.sfx.ultimateReady();
-            G.particles.spawn(P.pos.clone().setY(1), { count: 24, color: [3, 2.4, 0.6], speed: 4, up: 2, life: 0.6, size: 0.08 });
+            h.punch = (h.punch || 0) * Math.exp(-8 * dt);
+            h.model.scale.setScalar(1 + 0.12 * h.punch);
           }
           break;
-        case 'totem':
+        case 'ballista':
           h.cool = Math.max(0, h.cool - dt);
-          h.glow.material.opacity = h.active > 0 ? 0.45 + 0.2 * Math.sin(G.elapsed * 20) : h.cool > 0 ? 0.05 : 0.12 + 0.06 * Math.sin(G.elapsed * 2);
           if (h.active > 0) {
             h.active -= dt;
             h.zap -= dt;
-            if (h.zap <= 0) {
-              h.zap = 0.55;
-              const target = G.enemies.filter((e) => e.isHittable() && e.pos.distanceTo(h.pos) < 8).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos))[0];
-              if (target) {
-                G.bolt(h.pos.clone().setY(2.4), target.pos);
-                G.sfx.zap(G.panAt(target.pos));
-                const dir = new THREE.Vector3().subVectors(target.pos, h.pos).setY(0).normalize();
-                const res = target.hit(22, dir, 0.3, false);
-                G.numbers.spawn(target.pos.clone().setY(2.1), 22, 'zap');
-                if (res === 'kill') G.onKill(target);
-              }
+            const target = G.enemies.filter((e) => e.isHittable() && e.pos.distanceTo(h.pos) < 11).sort((a, b) => a.pos.distanceTo(h.pos) - b.pos.distanceTo(h.pos))[0];
+            if (target && h.model) {
+              // Swing round to the target, then loose a bolt.
+              const want = Math.atan2(target.pos.x - h.pos.x, target.pos.z - h.pos.z);
+              let d = want - h.model.rotation.y;
+              d = Math.atan2(Math.sin(d), Math.cos(d));
+              h.model.rotation.y += d * (1 - Math.exp(-10 * dt));
+            }
+            if (h.zap <= 0 && target) {
+              h.zap = 0.8;
+              const dir = new THREE.Vector3().subVectors(target.pos, h.pos).setY(0).normalize();
+              const origin = h.pos.clone().setY(1.1).addScaledVector(dir, 0.9);
+              G.arrows.spawn(origin, dir, 42, 26, 1, false, { mega: false, extra: true });
+              G.sfx.sample('thunkWood', { vol: 0.5, rate: 1.3, pan: G.panAt(h.pos) });
+              G.sfx.sample('whoosh', { vol: 0.4, rate: 0.9, pan: G.panAt(h.pos) });
             }
             if (h.active <= 0) h.cool = 10;
           }

@@ -6,13 +6,15 @@ yours.
 
 ## Now
 
-- [ ] Confirm on the live page that the shrine shows Best wave 5 / Bosses 1 after a
-      refresh (account save doc: `data/users/<id>/profile`).
+- [ ] Ask the user: dwarf hero has a horned leather cap (viking style); keep or
+      regenerate? Hero outfit "Shadow Stalker" name okay?
 
 ## Next
 
+- [ ] Confirm on the live page that the trophy board shows Best wave 5 /
+      Bosses 1 after a refresh (account save doc: `data/users/<id>/profile`).
+
 - [ ] Re-run `loot.cjs` with `g.start()` to confirm HUD caching shows gems.
-- [ ] Camp: show the aim reticle so standing-still facing reads clearly.
 - [ ] Bow string hand: line the drawing hand up with the string.
 
 ## Needs the user

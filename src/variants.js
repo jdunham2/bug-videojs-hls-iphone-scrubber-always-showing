@@ -1,41 +1,42 @@
 // Arena-specific enemies.
-//   Frost Ghoul (Frozen Crypt): a fast grunt-style lunger whose hits chill you (slow).
-//   Fire Imp (Infernal Forge): keeps its distance and hurls fireballs that leave
-//   burning ground, then bursts into flame when it dies.
+//   Frost Raider (Frostpeak Keep): a fast northern raider whose blows leave you
+//   numb with cold (slow).
+//   Fire-pot Bomber (Molten Forge): keeps its distance and lobs clay fire pots that
+//   leave burning ground, and his bandolier goes up when he falls.
 
 import * as THREE from 'three';
 import { Grunt } from './enemy.js';
-import { Skeleton } from './skeleton.js';
+import { Archer } from './archer.js';
 import { arrowBlocked } from './world.js';
 import { PLAYER_RADIUS, ARROW_HEIGHT } from './player.js';
 
-export class Ghoul extends Grunt {
+export class Raider extends Grunt {
   constructor(game, pos, level) {
     super(game, pos, level);
-    this.kind = 'ghoul';
+    this.kind = 'raider';
     this.speed *= 1.35;
     this.timeBoost = 1.3; // quicker windup than a grunt
     this.maxHp = this.hp = this.hp * 0.85;
     if (!this.model) this.bodyMat.color.set(0x8fb8d8);
   }
   get modelId() {
-    return 'ghoul';
+    return 'raider';
   }
   get propId() {
-    return 'none';
+    return 'club';
   }
 }
 
-export class Imp extends Skeleton {
+export class Bomber extends Archer {
   constructor(game, pos, level) {
     super(game, pos, level);
-    this.kind = 'imp';
+    this.kind = 'bomber';
     this.maxHp = this.hp = this.hp * 0.9;
     this.aimMat.color.setRGB(3, 1, 0.25);
     if (!this.model) this.bodyMat.color.set(0xd0502a);
   }
   get modelId() {
-    return 'imp';
+    return 'bomber';
   }
   get modelHeight() {
     return 1.5;
@@ -54,10 +55,13 @@ export class Imp extends Skeleton {
   }
 }
 
-const ballGeo = new THREE.SphereGeometry(0.28, 14, 10);
-const ballMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.2, 0.25) });
+// A clay pot with a burning rag stuffed in the neck.
+const potGeo = new THREE.SphereGeometry(0.22, 12, 8).scale(1, 1.15, 1);
+const potMat = new THREE.MeshStandardMaterial({ color: 0xa8582c, roughness: 0.85 });
+const ragGeo = new THREE.ConeGeometry(0.08, 0.2, 6).translate(0, 0.32, 0);
+const ragMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.3, 0.3) });
 
-/** Imp fireballs: slower than arrows, leave a patch of fire where they land. */
+/** Clay fire pots: slower than arrows, they shatter into a patch of fire where they land. */
 export class Fireballs {
   constructor(game) {
     this.game = game;
@@ -66,7 +70,8 @@ export class Fireballs {
   }
 
   spawn(origin, dir, owner) {
-    const mesh = new THREE.Mesh(ballGeo, ballMat);
+    const mesh = new THREE.Group();
+    mesh.add(new THREE.Mesh(potGeo, potMat), new THREE.Mesh(ragGeo, ragMat));
     mesh.position.copy(origin);
     this.game.scene.add(mesh);
     this.list.push({ mesh, pos: origin.clone(), dir, owner, traveled: 0, dodged: false });
@@ -79,8 +84,9 @@ export class Fireballs {
       const b = this.list[i];
       b.pos.addScaledVector(b.dir, 11 * dt);
       b.traveled += 11 * dt;
-      b.mesh.position.copy(b.pos);
-      b.mesh.scale.setScalar(1 + 0.15 * Math.sin(b.traveled * 6));
+      // Lobbed: a shallow arc, tumbling end over end.
+      b.mesh.position.copy(b.pos).setY(b.pos.y + Math.sin(Math.min(1, b.traveled / 16) * Math.PI) * 1.6);
+      b.mesh.rotation.x += dt * 9;
       if (Math.random() < dt * 40) G.particles.spawn(b.pos, { count: 1, color: [3, 1, 0.2], speed: 0.6, up: 0.6, life: 0.4, size: 0.12, gravity: -1 });
       const d = Math.hypot(P.pos.x - b.pos.x, P.pos.z - b.pos.z);
       let land = false;
@@ -125,6 +131,8 @@ export class Fireballs {
   ignite(pos) {
     const G = this.game;
     G.decals.spawn(pos, 'scorch', 2.4, 4);
+    G.particles.spawn(pos.clone().setY(0.3), { count: 8, color: 0x8a4a28, speed: 3.5, up: 2.5, life: 0.5, size: 0.1, gravity: 9 }); // pot shards
+    G.sfx.sample('clang', { vol: 0.2, rate: 1.8, pan: G.panAt(pos) });
     G.particles.spawn(pos.clone().setY(0.3), { count: 18, color: [3, 1.1, 0.25], speed: 3, up: 3, life: 0.5, size: 0.12 });
     G.sfx.sample('thunkGround', { vol: 0.4, rate: 0.7, pan: G.panAt(pos) });
     this.fires.push({ pos: pos.clone().setY(0), t: 2.5 });

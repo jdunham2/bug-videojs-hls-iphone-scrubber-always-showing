@@ -1,9 +1,10 @@
 // The camp: a small walkable hub shown before and between runs. Walk the hero
 // to a building and press E (or click the prompt) to use it:
 //   Hall of Heroes → choose a character   Tailor's Tent → choose an outfit
-//   Rune Shrine    → save point / records  Ruin Gate     → start a run
+//   Trophy Board   → save point / records  Camp Gate     → start a run
 
 import * as THREE from 'three';
+import { doorwayTexture } from './juice.js';
 import { spawnProp, models, modelStatus } from './models.js';
 import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
@@ -12,7 +13,7 @@ import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, ou
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
 
-/** One line on where progress is kept, shown at the shrine. */
+/** One line on where progress is kept, shown at the trophy board. */
 function saveWhere() {
   if (saveStatus.cloud === 'on') return '✓ Progress is saved to your account';
   if (saveStatus.cloud === 'connecting') return 'Connecting to your account save…';
@@ -66,14 +67,13 @@ export class Camp {
     // The camera looks from +x,+z, so buildings sit on the far half of the camp.
     this.building('heroHall', 6.5, -10, 2.5, 'hall', 'Hall of Heroes', 3.4);
     this.building('tailorTent', 5, 9, -6, 'wardrobe', "Tailor's Tent", 3.0);
-    this.building('shrine', 3.6, 1.5, -10.5, 'shrine', 'Rune Shrine', 1.4);
-    this.building('archway', 5.5, -8.5, -8.5, 'gate', 'Ruin Gate', 2.3);
-    // A swirling portal inside the gate.
-    this.portalMat = new THREE.MeshBasicMaterial({ map: portalTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(1.6, 0.9, 3) });
-    this.portal = new THREE.Mesh(new THREE.CircleGeometry(1.35, 48), this.portalMat);
-    this.portal.position.set(-8.5, 1.7, -8.5);
-    this.portal.lookAt(0, 1.7, 0);
-    this.portal.translateZ(0.3);
+    this.building('trophyBoard', 3.6, 1.5, -10.5, 'shrine', 'Trophy Board', 1.4);
+    this.building('archway', 5.5, -8.5, -8.5, 'gate', 'Camp Gate', 2.3);
+    // The road beyond the gate: warm light through the opening.
+    this.portal = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.2), new THREE.MeshBasicMaterial({ map: doorwayTexture(), transparent: true, depthWrite: false, color: new THREE.Color(1.3, 1.15, 0.9) }));
+    this.portal.position.set(-8.5, 1.6, -8.5);
+    this.portal.lookAt(0, 1.6, 0);
+    this.portal.translateZ(-0.2);
     S.add(this.portal);
 
     this.prop('campfire', 1.0, 0, 0, 0, 1.0);
@@ -179,7 +179,8 @@ export class Camp {
     const G = this.game;
     const P = G.player;
     this.active = true;
-    this.scene.add(P.group);
+    // The hero and their draw indicators (charge ring, aim line) come along to camp.
+    this.scene.add(P.group, ...P.indicators);
     P.collide = this.collide;
     P.pos.set(2, 0, 4);
     P.vel.set(0, 0, 0);
@@ -196,7 +197,7 @@ export class Camp {
   leave() {
     const G = this.game;
     this.active = false;
-    G.scene.add(G.player.group);
+    G.scene.add(G.player.group, ...G.player.indicators);
     G.player.collide = null;
     this.close();
     this.prompt.classList.remove('show');
@@ -225,8 +226,6 @@ export class Camp {
       D.rig.rotation.x = D.dir ? sway * D.dir.z : 0;
       D.rig.rotation.z = D.dir ? -sway * D.dir.x : 0;
     }
-    this.portal.rotateZ(dt * 1.5);
-    this.portalMat.opacity = 0.75 + 0.2 * Math.sin(time * 3);
     // Nearest building in reach.
     let near = null;
     let best = 2.6;
@@ -283,7 +282,7 @@ export class Camp {
         : `<p class="empty">The tailor is still working on outfits for this hero. Come back soon.</p>`;
     } else if (k === 'shrine') {
       const cp = profile.checkpoint;
-      html = `<h2>Rune Shrine</h2><p class="lead">The shrine remembers your victories. Beat a boss to save your progress here.</p>
+      html = `<h2>Trophy Board</h2><p class="lead">Every victory gets carved into the board. Beat a boss to mark a save point.</p>
         <div class="records">
           <div><b>${profile.best.wave}</b><span>Best wave</span></div>
           <div><b>${profile.bosses}</b><span>Bosses slain</span></div>
@@ -294,12 +293,12 @@ export class Camp {
         <p class="where">${saveWhere()}</p>`;
     } else if (k === 'gate') {
       const cp = profile.checkpoint;
-      html = `<h2>Ruin Gate</h2><p class="lead">The portal hums. The ruins are waiting.</p><div class="actions">
+      html = `<h2>Camp Gate</h2><p class="lead">The road to the ruins starts here.</p><div class="actions">
         <button data-act="new">New run · Wave 1</button>
         ${cp ? `<button data-act="continue" class="gold">Continue · Wave ${cp.wave + 1}</button>` : ''}
       </div>`;
     }
-    this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} soul gems · Esc to close</p>`;
+    this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
   }
 
   card(key, name, perk, blurb, cost, req, value, selected, available) {
@@ -388,21 +387,4 @@ function glowTexture() {
   g.fillRect(0, 0, 64, 64);
   glowTex = new THREE.CanvasTexture(c);
   return glowTex;
-}
-
-export function portalTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d');
-  g.translate(128, 128);
-  for (let r = 120; r > 4; r -= 3) {
-    g.strokeStyle = `rgba(${150 + r},${80 + r / 2},255,${0.1 + (120 - r) / 180})`;
-    g.lineWidth = 4;
-    g.beginPath();
-    g.arc(0, 0, r, r * 0.07, r * 0.07 + Math.PI * 1.3);
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }

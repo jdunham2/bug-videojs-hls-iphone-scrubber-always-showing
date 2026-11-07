@@ -82,19 +82,19 @@ export class CombatMethods {
     }
     if (result === 'kill') this.onKill(enemy);
     else this.applyElement(enemy, point);
-    if (arrow.perfect) this.chainLightning(enemy, arrow.damage);
+    if (arrow.perfect) this.powderBlast(enemy, arrow.damage);
   }
 
   onKill(enemy) {
     this.stats.kills++;
-    if (enemy.affix === 'volatile' || enemy.kind === 'imp') {
+    if (enemy.affix === 'volatile' || enemy.kind === 'bomber') {
       const pos = enemy.pos.clone();
       const big = enemy.affix === 'volatile';
       setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);
     }
     if (enemy.elite) this.loot.drop(enemy.pos, 5, 1);
     if (enemy.isBoss) this.loot.drop(enemy.pos, 25, 3);
-    else this.loot.drop(enemy.pos, enemy.kind === 'skeleton' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
+    else this.loot.drop(enemy.pos, enemy.kind === 'archer' ? 2 : 1 + (Math.random() < 0.3 ? 1 : 0), Math.random() < 0.15 ? 1 : 0);
     this.ultimate.gain(config.ultimate.perKill);
     const decal = enemy.burnT > 0 ? 'scorch' : enemy.frozenT > 0 || enemy.slowT > 0 ? 'frost' : 'blood';
     this.decals.spawn(enemy.pos, decal, decal === 'blood' ? 1.8 : 2.2, 18);
@@ -122,73 +122,33 @@ export class CombatMethods {
     const fire = lv('fire');
     const frost = lv('frost');
     if (fire) enemy.applyBurn(1 + 3 * fire, 3);
+    // Pinning Arrows: hobble the target; every third hit pins it in place.
     if (frost && enemy.applyFrost(0.2 + 0.1 * frost, 2, 3, 1.5)) {
-      this.numbers.spawn(point.clone().setY(2.4), 'FROZEN', 'callout');
-      this.sfx.freeze(this.panAt(enemy.pos));
-      this.particles.spawn(enemy.pos.clone().setY(1), { count: 16, color: [1.2, 2.2, 3], speed: 4, up: 2, life: 0.6, size: 0.1 });
+      this.numbers.spawn(point.clone().setY(2.4), 'PINNED', 'callout');
+      this.sfx.sample('thunkWood', { vol: 0.7, rate: 0.8, pan: this.panAt(enemy.pos) });
+      this.particles.spawn(enemy.pos.clone().setY(0.2), { count: 12, color: 0x7a6a58, speed: 2, up: 1, life: 0.5, size: 0.14, gravity: 3 });
     }
   }
 
-  /** Thunderstrike: arc from the struck grunt through the nearest others. */
-  chainLightning(source, damage) {
-    const n = lv('thunderstrike');
+  /** Blasting Arrows: a perfect hit sets off the powder charge on the arrowhead. */
+  powderBlast(source, damage) {
+    const n = lv('blasting');
     if (!n) return;
+    const pos = source.pos;
     const targets = this.enemies
-      .filter((e) => e !== source && e.isHittable() && e.pos.distanceTo(source.pos) < 7)
-      .sort((a, b) => a.pos.distanceTo(source.pos) - b.pos.distanceTo(source.pos))
+      .filter((e) => e !== source && e.isHittable() && e.pos.distanceTo(pos) < 3.5)
+      .sort((a, b) => a.pos.distanceTo(pos) - b.pos.distanceTo(pos))
       .slice(0, n + 1);
-    if (!targets.length) return;
-    this.sfx.zap(this.panAt(source.pos));
-    let from = source.pos;
+    this.sfx.sample('boom', { vol: 0.6, rate: 1.3, jitter: 0.1, pan: this.panAt(pos) });
+    this.particles.spawn(pos.clone().setY(1.1), { count: 22, color: [3, 1.4, 0.35], speed: 6, up: 2, life: 0.35, size: 0.12, gravity: 4 });
+    this.particles.spawn(pos.clone().setY(1.1), { count: 8, color: 0x2a2420, speed: 2, up: 2, life: 1, size: 0.3, gravity: -1, drag: 1 });
+    this.decals.spawn(pos, 'scorch', 1.8, 8);
     for (const t of targets) {
-      this.bolt(from, t.pos);
-      const dir = new THREE.Vector3().subVectors(t.pos, from).setY(0).normalize();
-      const res = t.hit(damage * 0.6, dir, 0, false);
-      this.numbers.spawn(t.pos.clone().setY(2.1), Math.round(damage * 0.6), 'zap');
+      const dir = new THREE.Vector3().subVectors(t.pos, pos).setY(0).normalize();
+      const res = t.hit(damage * 0.6, dir, 0.4, false);
+      t.knock?.addScaledVector(dir, 4);
+      this.numbers.spawn(t.pos.clone().setY(2.1), Math.round(damage * 0.6), 'crit');
       if (res === 'kill') this.onKill(t);
-      from = t.pos;
-    }
-  }
-
-  bolt(a, b) {
-    // WebGL lines are 1px wide, so draw a few jittered strands for a thicker bolt.
-    for (let k = 0; k < 3; k++) this.boltStrand(a, b);
-    this.particles.spawn(b.clone().setY(1.1), { count: 6, color: [1.5, 2.4, 4], speed: 3, up: 1, life: 0.25, size: 0.06, gravity: 0 });
-  }
-
-  boltStrand(a, b) {
-    const pts = [];
-    const segs = 9;
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const jitter = i === 0 || i === segs ? 0 : 0.35;
-      pts.push(
-        new THREE.Vector3(
-          a.x + (b.x - a.x) * t + (Math.random() - 0.5) * jitter,
-          1.1 + (Math.random() - 0.5) * jitter,
-          a.z + (b.z - a.z) * t + (Math.random() - 0.5) * jitter,
-        ),
-      );
-    }
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: new THREE.Color(1.5, 2.4, 4), transparent: true }),
-    );
-    this.scene.add(line);
-    this.bolts.push({ line, life: 0.2 });
-  }
-
-  updateBolts(dt) {
-    for (let i = this.bolts.length - 1; i >= 0; i--) {
-      const b = this.bolts[i];
-      b.life -= dt;
-      b.line.material.opacity = Math.max(0, b.life / 0.2);
-      if (b.life <= 0) {
-        b.line.removeFromParent();
-        b.line.geometry.dispose();
-        b.line.material.dispose();
-        this.bolts.splice(i, 1);
-      }
     }
   }
 
@@ -241,12 +201,13 @@ export class CombatMethods {
   }
 
   onShieldBreak(enemy) {
-    this.numbers.spawn(enemy.pos.clone().setY(2.6), 'SHIELD BROKEN', 'callout gold');
-    this.sfx.sample('freeze', { vol: 0.7, rate: 0.8, pan: this.panAt(enemy.pos) });
-    this.particles.spawn(enemy.pos.clone().setY(1.1), { count: 30, color: [0.8, 1.8, 3], speed: 5, up: 2, life: 0.5, size: 0.08 });
+    this.numbers.spawn(enemy.pos.clone().setY(2.6), 'SHIELD SPLIT', 'callout gold');
+    this.sfx.sample('thunkWood', { vol: 0.9, rate: 0.6, pan: this.panAt(enemy.pos) });
+    this.sfx.sample('clang', { vol: 0.5, rate: 0.8, pan: this.panAt(enemy.pos) });
+    this.particles.spawn(enemy.pos.clone().setY(1.1), { count: 18, color: 0x7a5232, speed: 5, up: 2, life: 0.6, size: 0.1, gravity: 9 });
   }
 
-  /** A blast that hurts enemies (and the hero if close). Used by barrels, volatile elites and imps. */
+  /** A blast that hurts enemies (and the hero if close). Used by barrels, powder-keg elites and bombers. */
   explosion(pos, radius, enemyDamage, playerDamage) {
     this.sfx.sample('boom', { vol: 0.9, rate: 0.9, jitter: 0.1, pan: this.panAt(pos) });
     this.sfx.sample('slam', { vol: 0.6, rate: 0.7 });
@@ -303,10 +264,6 @@ export class CombatMethods {
       this.banner('You fell', `Wave ${this.wave}`, 2.2);
       this.input.mouse.down = false;
     }
-    if (enemy?.affix === 'vampiric' && enemy.isHittable?.()) {
-      enemy.hp = Math.min(enemy.maxHp, enemy.hp + damage * 1.5);
-      this.numbers.spawn(enemy.pos.clone().setY(2.4), `+${Math.round(damage * 1.5)}`, 'heal');
-    }
     this.aberration = Math.min(1, this.aberration + 0.8);
     this.decals.spawn(this.player.pos, 'blood', 0.8);
     this.sfx.hurt();
@@ -325,7 +282,7 @@ export class CombatMethods {
   onUltimateReady() {
     this.tips.show('ult');
     this.sfx.ultimateReady();
-    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'ARROW STORM READY · Q', 'callout gold');
+    this.numbers.spawn(this.player.pos.clone().setY(2.4), 'ARROW VOLLEY READY · Q', 'callout gold');
   }
 
   onUltimateEnd() {

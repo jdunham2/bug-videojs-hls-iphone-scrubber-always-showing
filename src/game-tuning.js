@@ -38,16 +38,16 @@ export class TuningMethods {
     dg.add(config.dodge, 'slowmoScale', 0.05, 1, 0.05).name('Perfect: slow-mo speed');
     dg.add(config.dodge, 'counterWindow', 0, 5, 0.1).name('Perfect: counter window (s)');
 
-    const sk = gui.addFolder('Skeleton Archer');
-    sk.add(config.skeleton, 'baseHp', 5, 100, 1).name('Base HP');
-    sk.add(config.skeleton, 'aimTime', 0.3, 2, 0.05).name('Aim telegraph (s)');
-    sk.add(config.skeleton, 'cooldown', 0.3, 5, 0.1).name('Shot cooldown (s)');
-    sk.add(config.skeleton, 'arrowSpeed', 5, 40, 0.5).name('Arrow speed');
-    sk.add(config.skeleton, 'damage', 1, 60, 1).name('Damage');
-    sk.add(config.skeleton, 'firstWave', 1, 10, 1).name('First wave');
+    const sk = gui.addFolder('Bandit Archer');
+    sk.add(config.archer, 'baseHp', 5, 100, 1).name('Base HP');
+    sk.add(config.archer, 'aimTime', 0.3, 2, 0.05).name('Aim telegraph (s)');
+    sk.add(config.archer, 'cooldown', 0.3, 5, 0.1).name('Shot cooldown (s)');
+    sk.add(config.archer, 'arrowSpeed', 5, 40, 0.5).name('Arrow speed');
+    sk.add(config.archer, 'damage', 1, 60, 1).name('Damage');
+    sk.add(config.archer, 'firstWave', 1, 10, 1).name('First wave');
     sk.close();
 
-    const g = gui.addFolder('Grunt');
+    const g = gui.addFolder('Brute');
     g.add(config.grunt, 'baseHp', 5, 200, 1).name('Base HP');
     g.add(config.grunt, 'speed', 0.5, 10, 0.1).name('Speed');
     g.add(config.grunt, 'attackRange', 1, 6, 0.1).name('Attack range');
@@ -68,13 +68,13 @@ export class TuningMethods {
 
     const mdl = gui.addFolder('Models (Meshy)');
     mdl.add(config.models, 'heroHeight', 1, 3, 0.05).name('Hero height (m)');
-    mdl.add(config.models, 'gruntHeight', 1, 3, 0.05).name('Grunt height (m)');
+    mdl.add(config.models, 'gruntHeight', 1, 3, 0.05).name('Brute height (m)');
     mdl.add(config.models, 'heroAimYaw', -180, 180, 1).name('Hero aim turn (°)');
     mdl.add(config.models, 'shootStartAt', 0, 0.95, 0.01).name('Bow clip: nocked');
     mdl.add(config.models, 'shootFullAt', 0.05, 0.95, 0.01).name('Bow clip: full draw');
     mdl.add(config.models, 'shootReleaseAt', 0.05, 0.95, 0.01).name('Bow clip: release');
-    mdl.add(config.models, 'attackWindupEnd', 0, 0.95, 0.01).name('Grunt clip: crouch end');
-    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Grunt clip: landing');
+    mdl.add(config.models, 'attackWindupEnd', 0, 0.95, 0.01).name('Brute clip: crouch end');
+    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Brute clip: landing');
     mdl.add(config.models, 'runAnimSpeed', 1, 12, 0.1).name('Run anim speed ref');
     mdl.close();
 

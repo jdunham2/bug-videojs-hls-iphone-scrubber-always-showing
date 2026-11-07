@@ -331,12 +331,16 @@ export class Sfx {
     this.tone('sine', 90, 30, 0.45, 0.35);
   }
 
+  /** Arrow Volley: a ripple of bowstrings and arrows hissing up into the sky. */
   ultimateCast() {
-    this.sample('bell', { vol: 0.7, rate: 1.3, jitter: 0 });
-    this.sample('ding', { vol: 0.6, rate: 0.7, jitter: 0, delay: 0.05 });
-    this.sample('boom', { vol: 0.5, rate: 0.7, jitter: 0, delay: 0.5 });
-    this.tone('sine', 300, 1400, 0.6, 0.1);
-    this.noise(0.8, 0.12, 'highpass', 3000, 0.3);
+    for (let i = 0; i < 5; i++) {
+      const d = i * 0.045;
+      this.noise(0.03, 0.18, 'lowpass', 1100, d);
+      this.tone('sine', 130, 50, 0.06, 0.12, d);
+    }
+    this.sample('whoosh', { vol: 0.7, rate: 0.8, jitter: 0 });
+    this.sample('whoosh', { vol: 0.5, rate: 1.1, jitter: 0, delay: 0.1 });
+    this.noise(0.9, 0.06, 'highpass', 2500, 0.15);
   }
 
   ultimateReady() {
@@ -349,6 +353,15 @@ export class Sfx {
     this.tone('square', 52, 30, 1.1, 0.06, 0.05);
     this.noise(1.0, 0.18, 'lowpass', 500);
     this.sample('boom', { vol: 0.6, rate: 0.45, jitter: 0 });
+  }
+
+  /** A low two-note war horn (the boss calling reinforcements). */
+  warHorn() {
+    this.tone('sawtooth', 98, 96, 0.55, 0.07);
+    this.tone('triangle', 98, 96, 0.55, 0.12);
+    this.tone('sawtooth', 131, 128, 1.1, 0.07, 0.45);
+    this.tone('triangle', 131, 128, 1.1, 0.12, 0.45);
+    this.noise(1.4, 0.05, 'lowpass', 400);
   }
 
   bossSlam() {

@@ -8,9 +8,9 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { config } from './config.js';
 import { World } from './world.js';
 import { Environment } from './environment.js';
-import { Decals, Portals } from './juice.js';
-import { EnemyArrows } from './skeleton.js';
-import { ArrowStorm } from './ultimate.js';
+import { Decals } from './juice.js';
+import { EnemyArrows } from './archer.js';
+import { ArrowVolley } from './ultimate.js';
 import { Music } from './music.js';
 import { Loot } from './loot.js';
 import { Camp } from './camp.js';
@@ -28,7 +28,7 @@ import { UiMethods } from './game-ui.js';
 import { CombatMethods } from './game-combat.js';
 import { FlowMethods } from './game-flow.js';
 import { TuningMethods } from './game-tuning.js';
-import { build, stat, buffs } from './skills.js';
+import { build, stat, buffs, SKILLS } from './skills.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -97,9 +97,8 @@ export class Game {
     this.arrows = new ArrowSystem(this.scene);
     this.particles = new Particles(this.scene);
     this.decals = new Decals(this.scene);
-    this.portals = new Portals(this.scene);
     this.enemyArrows = new EnemyArrows(this);
-    this.ultimate = new ArrowStorm(this);
+    this.ultimate = new ArrowVolley(this);
     this.loot = new Loot(this);
     this.camp = new Camp(this);
     this.hazards = new Hazards(this);
@@ -194,7 +193,6 @@ export class Game {
     this.particles.clear();
     this.numbers.clear();
     this.decals.clear();
-    this.portals.clear();
     this.enemyArrows.clear();
     this.fireballs.clear();
     this.ultimate.clear();
@@ -212,8 +210,6 @@ export class Game {
     document.body.classList.remove('letterbox');
     this.zoomKick = 0;
     this.aberration = 0;
-    for (const b of this.bolts || []) b.line.removeFromParent();
-    this.bolts = [];
     build.reset();
     this.player.reset();
     this.hideDraft?.();
@@ -237,12 +233,13 @@ export class Game {
     this.setArena(fromCheckpoint && cp ? cp.arena ?? 0 : 0);
     if (fromCheckpoint && cp) {
       // Resume after the last boss beaten, with the skills you had then.
-      Object.assign(build.levels, cp.build);
+      // Skills that no longer exist (renamed or removed) are dropped.
+      for (const [id, l] of Object.entries(cp.build)) if (SKILLS.some((k) => k.id === id)) build.levels[id] = l;
       build.rerolls = cp.rerolls ?? 1;
       this.wave = cp.wave;
       this.player.hp = stat.maxHp();
       this.player.refillDodge();
-      this.banner(`Wave ${cp.wave + 1}`, 'Continuing from the shrine', 1.6);
+      this.banner(`Wave ${cp.wave + 1}`, 'Continuing from your save point', 1.6);
     }
     this.runUnlocks = [];
     this.runStartBest = { ...profile.best };
@@ -423,9 +420,7 @@ export class Game {
     }
 
     this.particles.update(dt);
-    this.updateBolts(realDt);
     this.decals.update(realDt);
-    this.portals.update(dt, this.particles);
     this.zoomKick *= Math.exp(-7 * realDt);
     this.aberration *= Math.exp(-5 * realDt);
     this.grade.uniforms.uAberration.value = this.aberration * 0.006;
@@ -483,7 +478,7 @@ export class Game {
     this.loot.update(dt);
     if ((this.input.wasPressed('KeyQ') || this.input.wasPressed('KeyE')) && !this.player.dead) {
       if (!this.ultimate.activate(this.aimPoint) && !this.ultimate.active) {
-        this.numbers.spawn(this.player.pos.clone().setY(2.3), `Storm ${Math.floor(this.ultimate.meter)}%`, 'callout');
+        this.numbers.spawn(this.player.pos.clone().setY(2.3), `Volley ${Math.floor(this.ultimate.meter)}%`, 'callout');
       }
     }
     this.enemies = this.enemies.filter((e) => !e.removed);
@@ -548,7 +543,7 @@ export class Game {
     const look = new THREE.Vector3(this.aimPoint.x - this.player.pos.x, 0, this.aimPoint.z - this.player.pos.z);
     if (look.length() > 7) look.setLength(7);
     const target = this.player.pos.clone().addScaledVector(look, 0.2);
-    // Pull the camera back while Arrow Storm rains down so the whole area is in view.
+    // Pull the camera back while Arrow Volley rains down so the whole area is in view.
     this.zoomPullAmt = (this.zoomPullAmt || 0) + ((this.ultimate.active ? 1 : 0) - (this.zoomPullAmt || 0)) * (1 - Math.exp(-3 * dt));
     let zoom = config.feel.cameraZoom * (1 - (this.zoomKick || 0)) * (1 + 0.22 * this.zoomPullAmt);
     if (this.cinematic) {

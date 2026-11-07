@@ -39,7 +39,7 @@ export class Input {
 
   /**
    * Gamepad (standard mapping): left stick move, right stick aim, RT draw,
-   * A/B dodge, Y/LB Arrow Storm, X use, Start pause. Call once per frame.
+   * A/B dodge, Y/LB Arrow Volley, X use, Start pause. Call once per frame.
    */
   poll() {
     const pads = navigator.getGamepads ? [...navigator.getGamepads()] : [];

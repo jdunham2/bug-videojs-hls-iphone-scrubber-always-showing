@@ -1,6 +1,6 @@
-// Arrow Storm: the hero's ultimate. Fill the meter with perfect shots, hits,
-// kills and perfect dodges, then press Q to call a rain of golden arrows
-// down on the target area.
+// Arrow Volley: the hero's ultimate. Fill the meter with perfect shots, hits,
+// kills and perfect dodges, then press Q: the hero looses a fan of arrows high
+// into the air and they come down across the target area.
 
 import * as THREE from 'three';
 import { config } from './config.js';
@@ -9,18 +9,18 @@ import { lv } from './skills.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
-export class ArrowStorm {
+export class ArrowVolley {
   constructor(game) {
     this.game = game;
     this.meter = 0;
     this.active = null;
     this.falling = [];
+    // A plain target marker on the ground (where the volley will land).
     const ringMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(3, 2.1, 0.5),
+      color: 0xfff2d8,
       transparent: true,
       opacity: 0,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     });
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 64).rotateX(-Math.PI / 2), ringMat);
@@ -58,9 +58,10 @@ export class ArrowStorm {
     G.slowmoScale = 0.35;
     G.zoomPull = 1;
     G.sfx.ultimateCast();
-    G.shake.add(0.3);
-    G.banner('Arrow Storm!', '', 1.2);
-    G.particles.spawn(G.player.pos.clone().setY(1.2), { count: 40, color: [3, 2.2, 0.6], speed: 5, up: 6, life: 0.9, size: 0.1, gravity: -2 });
+    G.shake.add(0.2);
+    G.banner('Arrow Volley!', '', 1.2);
+    // The volley going up: a fan of arrows leaving the bow, high into the sky.
+    for (let i = 0; i < 9; i++) this.launchArrow(G.player.pos, target, i);
     return true;
   }
 
@@ -70,10 +71,10 @@ export class ArrowStorm {
     if (a) {
       a.t += dt;
       const pulse = 0.5 + 0.5 * Math.sin(a.t * 18);
-      this.ring.material.opacity = 0.6 + 0.3 * pulse;
-      this.ringFill.material.opacity = 0.08 + 0.06 * pulse;
+      this.ring.material.opacity = 0.45 + 0.15 * pulse;
+      this.ringFill.material.opacity = 0.05 + 0.03 * pulse;
       this.ringFill.scale.setScalar(u.radius * Math.min(1, a.t / u.castTime));
-      // After the cast, arrows rain down evenly over the storm's duration.
+      // After the cast, arrows rain down evenly over the volley's duration.
       const rainT = a.t - u.castTime;
       if (rainT > 0) {
         const want = Math.min(u.arrows, Math.floor((rainT / u.duration) * u.arrows));
@@ -86,6 +87,16 @@ export class ArrowStorm {
         this.active = null;
         this.ring.visible = this.ringFill.visible = false;
         this.game.onUltimateEnd();
+      }
+    }
+    for (let i = (this.rising || []).length - 1; i >= 0; i--) {
+      const r = this.rising[i];
+      r.t += dt;
+      r.pos.addScaledVector(r.vel, dt);
+      r.mesh.position.copy(r.pos);
+      if (r.t > 0.6) {
+        r.mesh.removeFromParent();
+        this.rising.splice(i, 1);
       }
     }
     for (let i = this.falling.length - 1; i >= 0; i--) {
@@ -112,14 +123,27 @@ export class ArrowStorm {
     });
   }
 
+  /** One arrow of the volley climbing away from the hero (purely visual). */
+  launchArrow(from, target, i) {
+    const dir = new THREE.Vector3(target.x - from.x, 0, target.z - from.z).normalize();
+    const side = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar((i - 4) * 0.06);
+    const vel = dir.multiplyScalar(6).add(side.multiplyScalar(10)).setY(38);
+    const mesh = makeArrowMesh(false);
+    const pos = from.clone().setY(1.4);
+    mesh.position.copy(pos);
+    mesh.lookAt(pos.clone().add(vel));
+    this.game.scene.add(mesh);
+    (this.rising ||= []).push({ mesh, pos, vel, t: 0 });
+  }
+
   dropArrow(center, radius) {
-    // Uniform over the disc, slightly favouring the edge so it reads as a "storm".
+    // Uniform over the disc, slightly favouring the edge so it reads as a volley.
     const ang = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * radius;
     const land = new THREE.Vector3(center.x + Math.cos(ang) * r, 0, center.z + Math.sin(ang) * r);
     const start = land.clone().add(new THREE.Vector3(rand(-2, 2) - 3, 16, rand(-2, 2) - 3));
     const vel = land.clone().sub(start).normalize().multiplyScalar(rand(34, 42));
-    const mesh = makeArrowMesh(true);
+    const mesh = makeArrowMesh(false);
     mesh.scale.setScalar(1.2);
     mesh.position.copy(start);
     mesh.lookAt(start.clone().add(vel));
@@ -131,7 +155,7 @@ export class ArrowStorm {
     const G = this.game;
     const u = config.ultimate;
     const dmg = u.damage * (1 + 0.2 * lv('heavyDraw'));
-    G.particles.spawn(f.pos.clone().setY(0.2), { count: 5, color: [3, 2, 0.5], speed: 3, up: 2, life: 0.35, size: 0.07 });
+    G.particles.spawn(f.pos.clone().setY(0.2), { count: 4, color: 0x7a6a58, speed: 2, up: 1.5, life: 0.4, size: 0.12, gravity: 4 });
     if (Math.random() < 0.3) G.decals.spawn(f.pos, 'scorch', 0.6, 6);
     if (Math.random() < 0.35) G.sfx.sample(Math.random() < 0.5 ? 'thunkGround' : 'thunkWood', { vol: 0.25, rate: 1.4, pan: G.panAt(f.pos) });
     for (const e of G.enemies) {
@@ -145,7 +169,8 @@ export class ArrowStorm {
   }
 
   clear() {
-    for (const f of [...this.falling, ...(this.stuck || [])]) f.mesh.removeFromParent();
+    for (const f of [...this.falling, ...(this.stuck || []), ...(this.rising || [])]) f.mesh.removeFromParent();
+    this.rising = [];
     this.falling.length = 0;
     this.stuck = [];
     this.active = null;

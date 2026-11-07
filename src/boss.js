@@ -15,8 +15,8 @@ export const BOSS_NAME = 'Gorvak the Ogre Warlord';
 /** Gorvak changes with each arena: a new name and a retextured skin (same rig). */
 export const BOSS_FORMS = [
   { name: 'Gorvak the Ogre Warlord', sub: 'Warlord of the Ruins', outfit: null },
-  { name: 'Gorvak the Frostbound', sub: 'Risen from the ice', outfit: 'bossFrost' },
-  { name: 'Gorvak the Infernal', sub: 'Reforged in fire', outfit: 'bossInferno' },
+  { name: 'Gorvak of the North', sub: 'Back from the frozen wastes', outfit: 'warlordNorth' },
+  { name: 'Gorvak the Forgemaster', sub: 'Clad in fresh-forged steel', outfit: 'warlordForge' },
 ];
 
 /** Ground warning shapes that fill up as an attack charges. */
@@ -186,7 +186,7 @@ export class Boss extends Grunt {
   }
 
   get modelId() {
-    return 'boss';
+    return 'warlord';
   }
   get modelHeight() {
     return config.boss.height;
@@ -282,17 +282,9 @@ export class Boss extends Grunt {
     let turn = 3;
 
     switch (this.state) {
-      case 'spawning': {
-        const p = Math.min(1, this.t / 1.4);
-        this.rig.position.y = -1.2 * (1 - p * (2 - p));
-        if (this.dissolve) this.dissolve.value = 1 - p;
-        if (p >= 1) {
-          this.rig.position.y = 0;
-          this.spawnRing.visible = false;
-          this.startIntro();
-        }
+      case 'spawning':
+        if (this.updateLeapIn(1.0)) this.startIntro();
         break;
-      }
       case 'intro':
         face = tmp;
         if (this.t > b.introTime) this.enter('chase');

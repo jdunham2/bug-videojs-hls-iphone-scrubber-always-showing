@@ -42,7 +42,7 @@ export const DEFAULTS = {
     damage: 18,
     staggerCharge: 0.9, // a hit at this charge or higher interrupts a windup
   },
-  skeleton: {
+  archer: {
     baseHp: 20,
     speed: 2.6,
     minRange: 7, // backs away if you get closer than this

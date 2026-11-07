@@ -177,8 +177,8 @@ export class UiMethods {
         <div><kbd>Mouse</kbd><span>Aim</span></div>
         <div><kbd>Hold LMB</kbd><span>Draw the bow (slows you down)</span></div>
         <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
-        <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through grunts)</span></div>
-        <div><kbd>Q</kbd><span>Arrow Storm, once the gold meter is full</span></div>
+        <div><kbd>Space</kbd><kbd>RMB</kbd><span>Dodge roll (invulnerable, rolls through enemies)</span></div>
+        <div><kbd>Q</kbd><span>Arrow Volley, once the gold meter is full</span></div>
         <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
         <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
       </div>`;
@@ -187,7 +187,7 @@ export class UiMethods {
         <h1>Draw &amp; Release</h1>
         <p class="tag">A bow-combat prototype. Survive the waves.</p>
         ${controls}
-        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
+        <p class="tip">Brutes flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
         <button>Click to enter the camp</button>
         ${profile.best.wave ? `<p class="best">Best: wave ${profile.best.wave}, ${profile.best.kills} kills</p>` : ''}
         <p class="model-status" id="model-status">${this.modelStatusText()}</p>
@@ -208,7 +208,7 @@ export class UiMethods {
           <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
           <div><b>${s.staggers}</b><span>Staggers</span></div>
           <div><b>${s.perfectDodges}</b><span>Perfect dodges</span></div>
-          <div><b>◆ ${this.gemsThisRun ?? 0}</b><span>Soul gems banked</span></div>
+          <div><b>◆ ${this.gemsThisRun ?? 0}</b><span>Gems banked</span></div>
           <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
         </div>
         ${build.owned().length ? `<div class="build-final">${this.buildChips()}</div>` : ''}

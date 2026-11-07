@@ -1,43 +1,26 @@
-// Elite enemies: tougher versions with one affix and a colored aura.
-//   Swift     – much faster, shorter telegraphs.
-//   Shielded  – a barrier soaks most damage until a full-draw or perfect hit shatters it.
-//   Vampiric  – heals when it hurts you.
-//   Volatile  – explodes shortly after it dies.
+// Elite enemies: tougher versions with one trait and a coloured ground marker.
+//   Swift       – much faster, shorter telegraphs.
+//   Armored     – carries a big round shield that soaks most damage until a
+//                 full-draw or perfect hit splits it.
+//   Hardy       – patches itself up when you stop hitting it.
+//   Powder Keg  – carries a keg of black powder that goes off shortly after it falls.
 
 import * as THREE from 'three';
 
 export const AFFIXES = {
-  swift: { name: 'Swift', color: new THREE.Color(3, 2.6, 0.6) },
-  shielded: { name: 'Shielded', color: new THREE.Color(0.8, 1.8, 3) },
-  vampiric: { name: 'Vampiric', color: new THREE.Color(3, 0.3, 0.4) },
-  volatile: { name: 'Volatile', color: new THREE.Color(3, 1.2, 0.2) },
+  swift: { name: 'Swift', color: 0xf2c94c },
+  shielded: { name: 'Armored', color: 0xb8c4cc },
+  hardy: { name: 'Hardy', color: 0x6fcf6f },
+  volatile: { name: 'Powder Keg', color: 0xf2994a },
 };
 
-const auraTex = (() => {
-  let tex = null;
-  return () => {
-    if (tex) return tex;
-    const c = document.createElement('canvas');
-    c.width = c.height = 128;
-    const g = c.getContext('2d');
-    g.translate(64, 64);
-    g.strokeStyle = 'rgba(255,255,255,0.9)';
-    g.lineWidth = 6;
-    g.beginPath();
-    g.arc(0, 0, 54, 0, Math.PI * 2);
-    g.stroke();
-    g.lineWidth = 3;
-    for (let i = 0; i < 8; i++) {
-      g.rotate(Math.PI / 4);
-      g.beginPath();
-      g.moveTo(40, 0);
-      g.lineTo(54, 0);
-      g.stroke();
-    }
-    tex = new THREE.CanvasTexture(c);
-    return tex;
-  };
-})();
+const markerGeo = new THREE.RingGeometry(1.0, 1.15, 40).rotateX(-Math.PI / 2);
+const shieldGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.08, 20).rotateX(Math.PI / 2);
+const shieldMat = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.8 });
+const rimGeo = new THREE.TorusGeometry(0.55, 0.04, 6, 24);
+const ironMat = new THREE.MeshStandardMaterial({ color: 0x5a5e62, roughness: 0.5, metalness: 0.6 });
+const kegGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.45, 12);
+const kegMat = new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.8 });
 
 /** Turn a spawned enemy into an elite with the given affix. */
 export function makeElite(enemy, affix) {
@@ -47,36 +30,35 @@ export function makeElite(enemy, affix) {
   enemy.maxHp = enemy.hp = enemy.hp * 2;
   enemy.group.scale.multiplyScalar(1.18);
   enemy.radius *= 1.18;
-  const mat = new THREE.MeshBasicMaterial({
-    map: auraTex(),
-    color: A.color,
-    transparent: true,
-    opacity: 0.8,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const aura = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4).rotateX(-Math.PI / 2), mat);
-  aura.position.y = 0.06;
-  aura.renderOrder = 2;
-  enemy.group.add(aura);
-  enemy.aura = aura;
+  const marker = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: A.color, transparent: true, opacity: 0.7, depthWrite: false }));
+  marker.position.y = 0.05;
+  marker.renderOrder = 2;
+  enemy.group.add(marker);
+  enemy.aura = marker;
   if (affix === 'swift') {
     enemy.speed *= 1.6;
     enemy.timeBoost = 1.25; // shortens its telegraphs
   }
   if (affix === 'shielded') {
     enemy.shield = 70;
-    const bubble = new THREE.Mesh(
-      new THREE.SphereGeometry(1.1, 20, 14),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.4, 3), transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }),
-    );
-    bubble.position.y = 1.1;
-    enemy.group.add(bubble);
-    enemy.bubble = bubble;
+    const shield = new THREE.Group();
+    shield.add(new THREE.Mesh(shieldGeo, shieldMat), new THREE.Mesh(rimGeo, ironMat));
+    shield.position.set(-0.35, 1.1, 0.55);
+    shield.traverse((o) => (o.castShadow = true));
+    enemy.group.add(shield);
+    enemy.bubble = shield;
   }
+  if (affix === 'volatile') {
+    const keg = new THREE.Mesh(kegGeo, kegMat);
+    keg.position.set(0, 1.25, -0.45);
+    keg.castShadow = true;
+    enemy.group.add(keg);
+  }
+  enemy.sinceHit = 0;
   // Wrap hit() for the shield.
   const baseHit = enemy.hit.bind(enemy);
   enemy.hit = (damage, dir, charge, perfect) => {
+    enemy.sinceHit = 0;
     if (enemy.shield > 0 && enemy.isHittable()) {
       if (perfect || charge >= 0.999) {
         enemy.shield = 0;
@@ -91,13 +73,14 @@ export function makeElite(enemy, affix) {
   };
 }
 
-/** Per-frame elite visuals (aura spin, shield shimmer). */
+/** Per-frame elite upkeep: marker fade, shield, Hardy regeneration. */
 export function updateElite(enemy, dt) {
   if (!enemy.elite) return;
-  enemy.aura.rotation.y += dt * 1.5;
-  enemy.aura.material.opacity = enemy.state === 'dying' ? Math.max(0, enemy.aura.material.opacity - dt * 2) : 0.6 + 0.25 * Math.sin(performance.now() * 0.006);
-  if (enemy.bubble) {
-    enemy.bubble.visible = enemy.shield > 0 && enemy.state !== 'dying';
-    enemy.bubble.material.opacity = 0.14 + 0.06 * Math.sin(performance.now() * 0.01);
+  const dying = enemy.state === 'dying';
+  enemy.aura.material.opacity = dying ? Math.max(0, enemy.aura.material.opacity - dt * 2) : 0.7;
+  if (enemy.bubble) enemy.bubble.visible = enemy.shield > 0 && !dying;
+  if (enemy.affix === 'hardy' && !dying) {
+    enemy.sinceHit += dt;
+    if (enemy.sinceHit > 2 && enemy.hp < enemy.maxHp) enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.05 * dt);
   }
 }

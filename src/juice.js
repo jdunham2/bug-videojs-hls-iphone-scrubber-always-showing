@@ -1,4 +1,4 @@
-// Extra feedback effects: floor decals (blood, scorch, frost, cracks) and spawn portals.
+// Extra feedback effects: floor decals (blood, scorch, frost, cracks).
 
 import * as THREE from 'three';
 
@@ -90,15 +90,6 @@ function textures() {
       g.fillRect(-30, -30, 60, 60);
     }),
   ];
-  TEXTURES.portal = splatTexture((g) => {
-    for (let r = 58; r > 6; r -= 4) {
-      g.strokeStyle = `rgba(${170 + r},${60 + r},255,${0.15 + (58 - r) / 90})`;
-      g.lineWidth = 3;
-      g.beginPath();
-      g.arc(0, 0, r, r * 0.11, r * 0.11 + Math.PI * 1.4);
-      g.stroke();
-    }
-  });
   return TEXTURES;
 }
 
@@ -156,60 +147,32 @@ export class Decals {
   }
 }
 
-/** Swirling ground portal shown where an enemy is summoned. */
-export class Portals {
-  constructor(scene) {
-    this.scene = scene;
-    this.list = [];
-  }
-
-  spawn(pos, duration = 1.3, size = 2.6, color = new THREE.Color(2.2, 0.9, 3)) {
-    const mat = new THREE.MeshBasicMaterial({
-      map: textures().portal,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      color,
-    });
-    const m = new THREE.Mesh(plane, mat);
-    m.position.set(pos.x, 0.06, pos.z);
-    m.renderOrder = 2;
-    this.scene.add(m);
-    this.list.push({ m, mat, t: 0, duration, size });
-  }
-
-  update(dt, particles) {
-    for (let i = this.list.length - 1; i >= 0; i--) {
-      const p = this.list[i];
-      p.t += dt;
-      const k = p.t / p.duration;
-      const open = Math.min(1, k * 4) * Math.min(1, (1 - k) * 3);
-      p.m.scale.setScalar(p.size * (0.3 + 0.7 * open));
-      p.m.rotation.y += dt * 4;
-      p.mat.opacity = open;
-      if (Math.random() < dt * 30) {
-        const a = Math.random() * Math.PI * 2;
-        const r = Math.random() * p.size * 0.4;
-        particles.spawn(new THREE.Vector3(p.m.position.x + Math.cos(a) * r, 0.1, p.m.position.z + Math.sin(a) * r), {
-          count: 1,
-          color: [1.8, 0.7, 3],
-          speed: 0.3,
-          up: 3,
-          life: 0.7,
-          size: 0.07,
-          gravity: -2,
-        });
-      }
-      if (k >= 1) {
-        p.m.removeFromParent();
-        p.mat.dispose();
-        this.list.splice(i, 1);
-      }
-    }
-  }
-
-  clear() {
-    for (const p of this.list) p.m.removeFromParent();
-    this.list.length = 0;
-  }
+let doorTex = null;
+let spillTex = null;
+/** Soft warm light for the open gateway (`floor`: the patch of light on the ground). */
+export function doorwayTexture(floor = false) {
+  if (floor ? spillTex : doorTex) return floor ? spillTex : doorTex;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 128;
+  const g = c.getContext('2d');
+  const grad = floor ? g.createLinearGradient(0, 128, 0, 0) : g.createLinearGradient(0, 0, 0, 128);
+  grad.addColorStop(0, floor ? 'rgba(255,236,190,0.55)' : 'rgba(255,244,214,0.95)');
+  grad.addColorStop(1, floor ? 'rgba(255,236,190,0)' : 'rgba(255,214,150,0.75)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 128);
+  // Fade the sides.
+  const side = g.createLinearGradient(0, 0, 64, 0);
+  side.addColorStop(0, 'rgba(0,0,0,1)');
+  side.addColorStop(0.2, 'rgba(0,0,0,0)');
+  side.addColorStop(0.8, 'rgba(0,0,0,0)');
+  side.addColorStop(1, 'rgba(0,0,0,1)');
+  g.globalCompositeOperation = 'destination-out';
+  g.fillStyle = side;
+  g.fillRect(0, 0, 64, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  if (floor) spillTex = tex;
+  else doorTex = tex;
+  return tex;
 }

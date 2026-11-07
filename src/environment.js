@@ -20,14 +20,14 @@ export const spawnGates = [];
 export const THEMES = [
   {
     name: 'Sunken Ruins',
-    pillar: 'pillar',
+    pillar: 'pillarCarved',
     broken: 'pillarBroken',
     brazier: 'brazier',
     wall: 'wall',
     coverA: 'crates',
     coverB: 'barrel',
-    decor: 'bones',
-    decorSize: 0.45,
+    decor: 'weaponPile',
+    decorSize: 0.9,
     statue: 'statue',
     tree: 'deadTree',
     banners: true,
@@ -43,15 +43,14 @@ export const THEMES = [
     ember: [3, 1.2, 0.25],
     embers: { color: [2.2, 1.0, 0.4], speed: 0.35 },
     mist: 0x9aa6b8,
-    rune: [1.4, 1.4, 1.4],
   },
   {
-    name: 'Frozen Crypt',
+    name: 'Frostpeak Keep',
     pillar: 'icePillar',
     broken: 'iceCrystals',
-    brazier: 'iceBrazier',
+    brazier: 'brazier',
     wall: 'iceWall',
-    coverA: 'sarcophagus',
+    coverA: 'crates',
     coverB: 'iceCrystals',
     decor: 'iceCrystals',
     decorSize: 0.7,
@@ -67,23 +66,22 @@ export const THEMES = [
     rim: 0xb0d8ff,
     hemi: [0xcfe4ff, 0x202838, 1.0],
     sun: [0xd8ecff, 1.9],
-    fireLight: 0x6ec8ff,
-    ember: [1.2, 2.2, 3],
+    fireLight: 0xffa050,
+    ember: [3, 1.3, 0.3],
     embers: { color: [1.6, 1.8, 2.2], speed: -0.6 }, // falling snow
     mist: 0xc8dcf0,
-    rune: [0.9, 1.6, 2.4],
   },
   {
-    name: 'Infernal Forge',
+    name: 'Molten Forge',
     pillar: 'lavaPillar',
     broken: 'anvil',
     brazier: 'forgeBrazier',
     wall: 'forgeWall',
     coverA: 'anvil',
-    coverB: 'explosiveBarrel',
+    coverB: 'powderBarrel',
     decor: 'rocks',
     decorSize: 0.6,
-    statue: 'demonIdol',
+    statue: 'kingStatue',
     tree: 'rocks',
     treeScale: 0.35,
     banners: false,
@@ -99,7 +97,6 @@ export const THEMES = [
     ember: [3, 1.0, 0.2],
     embers: { color: [3, 1.2, 0.3], speed: 0.9 },
     mist: 0x6a3a2a,
-    rune: [2.6, 0.9, 0.4],
   },
 ];
 
@@ -130,7 +127,7 @@ export class Environment {
 
   /** Dress the arena in a theme (clears any previous dressing first). */
   build(themeIndex = this.themeIndex) {
-    if (!models.pillar) return false;
+    if (!models.pillarCarved) return false;
     if (this.basePillars == null) this.basePillars = pillars.length;
     this.clear();
     this.themeIndex = themeIndex;
@@ -141,7 +138,6 @@ export class Environment {
     this.props();
     this.outskirts();
     this.grass();
-    this.runeCircle();
     this.mist();
     this.lightShafts();
     return true;
@@ -154,7 +150,6 @@ export class Environment {
     this.mists = [];
     this.fadeable = [];
     this.windUniform = null;
-    this.runeMat = null;
   }
 
   place(id, size, x, z, rotY = 0, opts = {}) {
@@ -210,7 +205,7 @@ export class Environment {
 
   architecture() {
     const W = this.world;
-    // Swap placeholder pillars for the rune pillars and broken stumps.
+    // Swap placeholder pillars for the carved pillars and broken stumps.
     for (const { group, layout } of W.pillarGroups) {
       group.visible = false;
       if (layout.h > 2) this.place(this.id('pillar'), layout.h + 0.6, layout.x, layout.z, faceCenter(layout.x, layout.z));
@@ -278,8 +273,8 @@ export class Environment {
     }
     // Banners on the far walls, facing the arena.
     for (const s of this.theme.banners ? [-8.5, 8.5] : []) {
-      const a = this.place('banner', 4.4, s, -H + 0.45, 0);
-      const b = this.place('banner', 4.4, -H + 0.45, s, Math.PI / 2);
+      const a = this.place('wolfBanner', 4.4, s, -H + 0.45, 0);
+      const b = this.place('wolfBanner', 4.4, -H + 0.45, s, Math.PI / 2);
       for (const o of [a, b]) {
         o?.traverse((m) => {
           if (m.isMesh) m.material.side = THREE.DoubleSide;
@@ -371,56 +366,6 @@ export class Environment {
     mesh.count = n;
     mesh.receiveShadow = true;
     this.root.add(mesh);
-  }
-
-  runeCircle() {
-    const c = document.createElement('canvas');
-    c.width = c.height = 512;
-    const g = c.getContext('2d');
-    g.translate(256, 256);
-    g.strokeStyle = 'rgba(120,255,230,0.9)';
-    g.lineWidth = 6;
-    for (const r of [240, 200]) {
-      g.beginPath();
-      g.arc(0, 0, r, 0, Math.PI * 2);
-      g.stroke();
-    }
-    g.lineWidth = 3;
-    // Rune glyphs between the rings.
-    for (let i = 0; i < 24; i++) {
-      g.save();
-      g.rotate((i / 24) * Math.PI * 2);
-      g.translate(0, -220);
-      g.beginPath();
-      for (let k = 0; k < 3; k++) {
-        g.moveTo(rand(-9, 9), rand(-12, 12));
-        g.lineTo(rand(-9, 9), rand(-12, 12));
-      }
-      g.stroke();
-      g.restore();
-    }
-    g.lineWidth = 2;
-    g.beginPath();
-    for (let i = 0; i <= 6; i++) {
-      const a = (i / 6) * Math.PI * 2 * 2; // star by skipping points
-      const p = [Math.sin(a) * 190, -Math.cos(a) * 190];
-      i ? g.lineTo(...p) : g.moveTo(...p);
-    }
-    g.stroke();
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    this.runeMat = new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      opacity: 0.35,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      color: new THREE.Color(...this.theme.rune),
-    });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), this.runeMat);
-    m.position.y = 0.025;
-    m.renderOrder = 0;
-    this.root.add(m);
   }
 
   mist() {
@@ -517,7 +462,6 @@ export class Environment {
     this.time += dt;
     this.updateOcclusion(dt);
     if (this.windUniform) this.windUniform.value = time;
-    if (this.runeMat) this.runeMat.opacity = 0.28 + 0.08 * Math.sin(time * 1.3);
     for (const m of this.mists) {
       m.mat.map.offset.x += Math.cos(m.dir) * m.speed * dt;
       m.mat.map.offset.y += Math.sin(m.dir) * m.speed * dt;
@@ -612,25 +556,13 @@ function floorTextures(pal = THEMES[0].floor) {
         const py = y0 + Math.random() * h;
         gc.fillRect(px, py, rand(1, 4), rand(1, 4));
       }
-      if (Math.random() < 0.4) {
-        // Crack (dark in color, a groove in height).
-        let cx = x0 + Math.random() * w;
-        let cy = y0 + Math.random() * h;
-        gc.strokeStyle = 'rgba(15,10,8,0.6)';
+      if (Math.random() < 0.35) {
+        // Crack (dark in color, a groove in height): a wandering line that keeps
+        // its heading, so it reads as a fracture rather than a scribbled mark.
+        gc.strokeStyle = 'rgba(15,10,8,0.55)';
         gh.strokeStyle = 'rgba(40,40,40,1)';
-        gc.lineWidth = gh.lineWidth = 2;
-        gc.beginPath();
-        gh.beginPath();
-        gc.moveTo(cx, cy);
-        gh.moveTo(cx, cy);
-        for (let k = 0; k < 5; k++) {
-          cx += rand(-24, 24);
-          cy += rand(-24, 24);
-          gc.lineTo(cx, cy);
-          gh.lineTo(cx, cy);
-        }
-        gc.stroke();
-        gh.stroke();
+        gc.lineWidth = gh.lineWidth = 1.5;
+        crack([gc, gh], x0 + Math.random() * w, y0 + Math.random() * h, Math.random() * Math.PI * 2, 9, 9);
       }
       if (Math.random() < 0.25) {
         // Moss creeping in from an edge.
@@ -686,24 +618,31 @@ function floorTextures(pal = THEMES[0].floor) {
       }
     }
     ge.lineWidth = 2;
-    for (let k = 0; k < 14; k++) {
-      let cx = Math.random() * size;
-      let cy = Math.random() * size;
-      ge.beginPath();
-      ge.moveTo(cx, cy);
-      for (let j = 0; j < 6; j++) {
-        cx += rand(-30, 30);
-        cy += rand(-30, 30);
-        ge.lineTo(cx, cy);
-      }
-      ge.stroke();
-    }
+    for (let k = 0; k < 10; k++) crack([ge], Math.random() * size, Math.random() * size, Math.random() * Math.PI * 2, 12, 11);
     emissiveMap = new THREE.CanvasTexture(em);
     emissiveMap.colorSpace = THREE.SRGBColorSpace;
     emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
     emissiveMap.repeat.copy(map.repeat);
   }
   return { map, normalMap, emissiveMap };
+}
+
+/** Draw a natural-looking crack on each context: small turns, one heading, a chance to fork. */
+function crack(ctxs, x, y, angle, steps, len) {
+  for (const c of ctxs) {
+    c.beginPath();
+    c.moveTo(x, y);
+  }
+  let fork = null;
+  for (let k = 0; k < steps; k++) {
+    angle += rand(-0.45, 0.45);
+    x += Math.cos(angle) * rand(len * 0.7, len * 1.3);
+    y += Math.sin(angle) * rand(len * 0.7, len * 1.3);
+    for (const c of ctxs) c.lineTo(x, y);
+    if (!fork && k > 2 && Math.random() < 0.2) fork = [x, y, angle + (Math.random() < 0.5 ? 0.8 : -0.8)];
+  }
+  for (const c of ctxs) c.stroke();
+  if (fork) crack(ctxs, fork[0], fork[1], fork[2], Math.max(2, steps >> 1), len * 0.8);
 }
 
 function heightToNormal(ctx, size, strength) {

@@ -1,4 +1,4 @@
-// Skeleton Archer: a ranged enemy that keeps its distance, telegraphs an aim
+// Bandit Archer: a ranged enemy that keeps its distance, telegraphs an aim
 // line, and fires arrows the player has to sidestep or roll through.
 
 import * as THREE from 'three';
@@ -13,12 +13,12 @@ import { updateElite } from './elites.js';
 const tmp = new THREE.Vector3();
 const aimGeo = new THREE.PlaneGeometry(0.12, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5);
 
-export class Skeleton extends Grunt {
+export class Archer extends Grunt {
   constructor(game, pos, level) {
     super(game, pos, level);
-    const s = config.skeleton;
+    const s = config.archer;
     const w = config.waves;
-    this.kind = 'skeleton';
+    this.kind = 'archer';
     this.maxHp = this.hp = s.baseHp * (1 + w.hpGrowth * (level - 1));
     this.speed = s.speed * (1 + w.speedGrowth * 0.5 * (level - 1));
     this.radius = 0.5;
@@ -39,20 +39,20 @@ export class Skeleton extends Grunt {
     this.aimLine.visible = false;
     game.scene.add(this.aimLine);
     if (!this.model) {
-      // Placeholder look: pale bone instead of red skin.
-      this.bodyMat.color.set(0xd8d0bc);
+      // Placeholder look: brown leather instead of red skin.
+      this.bodyMat.color.set(0x7a5a3a);
     }
   }
 
   get modelId() {
-    return 'skeleton';
+    return 'bandit';
   }
   /** Archery clips stand side-on, so the model turns while aiming. */
   get aimYawDeg() {
     return config.models.heroAimYaw;
   }
   get modelHeight() {
-    return 2.0;
+    return 1.9;
   }
   get propId() {
     return 'bow';
@@ -74,7 +74,7 @@ export class Skeleton extends Grunt {
   }
 
   update(realDt, player) {
-    const s = config.skeleton;
+    const s = config.archer;
     this.flash = Math.max(0, this.flash - realDt);
     this.hitT = Math.max(0, this.hitT - realDt);
     if (this.state === 'dying') {
@@ -97,17 +97,9 @@ export class Skeleton extends Grunt {
     let face = tmp;
 
     switch (this.state) {
-      case 'spawning': {
-        const p = Math.min(1, this.t / 0.9);
-        this.rig.position.y = (this.model ? -0.6 : -1.8) * (1 - p * (2 - p));
-        if (this.dissolve) this.dissolve.value = 1 - p * (2 - p);
-        if (p >= 1) {
-          this.rig.position.y = 0;
-          this.spawnRing.visible = false;
-          this.enter('chase');
-        }
+      case 'spawning':
+        if (this.updateLeapIn(0.75)) this.enter('chase');
         break;
-      }
       case 'chase': {
         // Hold a ring around the player: back off, close in, or strafe.
         let want = 0;
@@ -187,7 +179,7 @@ export class Skeleton extends Grunt {
 
   fire() {
     const origin = new THREE.Vector3(this.pos.x, ARROW_HEIGHT, this.pos.z).addScaledVector(this.aimDir, 0.7);
-    this.game.enemyArrows.spawn(origin, this.aimDir.clone(), config.skeleton.arrowSpeed, config.skeleton.damage, this);
+    this.game.enemyArrows.spawn(origin, this.aimDir.clone(), config.archer.arrowSpeed, config.archer.damage, this);
     this.game.sfx.release(0.7, false, this.game.panAt(this.pos));
   }
 
@@ -221,7 +213,7 @@ export class Skeleton extends Grunt {
         const a = A.action('shoot');
         if (a) a.timeScale = 0;
         const dur = A.duration('shoot');
-        const p = Math.min(1, this.t / config.skeleton.aimTime);
+        const p = Math.min(1, this.t / config.archer.aimTime);
         // This clip runs reach → nock (≈45%) → full draw (end); the aim follows nock → full draw.
         A.scrub('shoot', dur * THREE.MathUtils.lerp(0.45, 0.98, p));
         break;

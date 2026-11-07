@@ -1,15 +1,15 @@
-// Run flow: waves, spawning, elites, bosses, arenas, the descent portal and save points.
+// Run flow: waves, spawning, elites, bosses, arenas, the exit gate and save points.
 import * as THREE from 'three';
+import { doorwayTexture } from './juice.js';
 import { config } from './config.js';
 import { ARENA_HALF, pillars } from './world.js';
 import { spawnGates, THEMES } from './environment.js';
 import { Grunt } from './enemy.js';
-import { Skeleton } from './skeleton.js';
+import { Archer } from './archer.js';
 import { Boss } from './boss.js';
-import { Ghoul, Imp } from './variants.js';
+import { Raider, Bomber } from './variants.js';
 import { makeElite, AFFIXES } from './elites.js';
 import { build, stat } from './skills.js';
-import { portalTexture } from './camp.js';
 import { profile, saveProfile } from './profile.js';
 
 /** Methods mixed into Game (see game.js). */
@@ -37,7 +37,6 @@ export class FlowMethods {
     const p = new THREE.Vector3(gate.x, 0, gate.z + 1);
     this.boss = new Boss(this, p, n, this.bossIndex, this.arena || 0);
     this.enemies.push(this.boss);
-    this.portals.spawn(p, 2.2, 5, new THREE.Color(3, 0.5, 0.3));
     this.banner('A boss approaches', this.boss.displayName, 2.2);
     this.sfx.wave(n);
     this.sfx.bossRoar();
@@ -53,7 +52,7 @@ export class FlowMethods {
   }
 
   onBossPhase(boss) {
-    this.banner('Enraged!', 'He moves faster and calls for help', 1.8);
+    this.banner('Enraged!', 'He moves faster and calls for reinforcements', 1.8);
     this.sfx.bossRoar();
     this.shake.add(0.5);
     this.aberration = 1;
@@ -68,14 +67,15 @@ export class FlowMethods {
     this.zoomKick = Math.min(0.12, this.zoomKick + 0.08);
   }
 
+  /** The boss blows his war horn: reinforcements leap down from the walls. */
   onBossSummon(boss) {
-    this.sfx.bossRoar();
+    this.sfx.warHorn();
+    this.banner('', 'He sounds the war horn!', 1.2);
     const n = boss.phase === 2 ? 3 : 2;
     for (let i = 0; i < n; i++) {
       const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
       const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
       this.enemies.push(new Grunt(this, p, this.wave));
-      this.portals.spawn(p);
     }
   }
 
@@ -134,14 +134,14 @@ export class FlowMethods {
 
   /** Which enemy type to spawn this time. */
   enemyClass() {
-    const s = config.skeleton;
+    const s = config.archer;
     const chance = this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
     const ranged = Math.random() < chance;
-    // Each arena brings its own enemies: ghouls in the Crypt, imps in the Forge.
+    // Each arena brings its own enemies: raiders in the Keep, fire-pot bombers in the Forge.
     const theme = (this.arena || 0) % THEMES.length;
-    if (theme === 1) return ranged ? Skeleton : Math.random() < 0.7 ? Ghoul : Grunt;
-    if (theme === 2) return ranged ? Imp : Grunt;
-    return ranged ? Skeleton : Grunt;
+    if (theme === 1) return ranged ? Archer : Math.random() < 0.7 ? Raider : Grunt;
+    if (theme === 2) return ranged ? Bomber : Grunt;
+    return ranged ? Archer : Grunt;
   }
 
   /** Occasionally promote a fresh spawn to an elite (from wave 4). */
@@ -162,7 +162,6 @@ export class FlowMethods {
       const g = gates[Math.floor(Math.random() * gates.length)];
       p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
       this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
-      this.portals.spawn(p);
       return;
     }
     const H = ARENA_HALF - 1.5;
@@ -180,12 +179,20 @@ export class FlowMethods {
       if (farFromPlayer && clearOfPillars) break;
     }
     this.enemies.push(this.maybeElite(new Kind(this, p, this.wave)));
-    this.portals.spawn(p, 1.2, 2.2, Kind === Skeleton ? new THREE.Color(0.7, 2.2, 2.8) : new THREE.Color(3, 0.7, 0.5));
+  }
+
+  /** An enemy dropped into the arena: dust and a thud (a big one for the boss). */
+  onEnemyLanded(enemy) {
+    const big = enemy === this.boss;
+    this.particles.spawn(enemy.pos.clone().setY(0.15), { count: big ? 30 : 12, color: 0x8a7a66, speed: big ? 4 : 2, up: 1, life: 0.7, size: big ? 0.45 : 0.3, gravity: 0.6, drag: 2.5 });
+    this.decals.spawn(enemy.pos, 'scorch', big ? 3.2 : 1.4, big ? 8 : 3);
+    this.sfx.sample(big ? 'slam' : 'thunkGround', { vol: big ? 0.9 : 0.35, rate: big ? 0.8 : 0.9, pan: this.panAt(enemy.pos) });
+    if (big) this.shake.add(0.6);
   }
 
   // ---------------------------------------------------------------- combat events
 
-  /** Switch the arena dressing (Ruins → Crypt → Forge, then around again). */
+  /** Switch the arena dressing (Ruins → Keep → Forge, then around again). */
   setArena(index) {
     this.arena = index;
     if (this.env.active && this.env.themeIndex !== index % THEMES.length) this.env.build(index % THEMES.length);
@@ -194,45 +201,43 @@ export class FlowMethods {
     if (this.env.active) this.hazards.setup(index);
   }
 
-  /** After a boss: a portal opens in the far gate; walking into it descends to the next arena. */
+  /** After a boss: the far gate swings open onto daylight; walking through moves on to the next arena. */
   openArenaPortal() {
     this.waveState = 'portal';
     const next = THEMES[(this.arena + 1) % THEMES.length];
     const gate = spawnGates[0] || { x: 0, z: -ARENA_HALF + 1.6 };
     if (!this.arenaPortal) {
-      const mat = new THREE.MeshBasicMaterial({
-        map: portalTexture(),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        color: new THREE.Color(1.6, 0.9, 3),
-      });
-      this.arenaPortal = new THREE.Mesh(new THREE.CircleGeometry(1.5, 48), mat);
+      // Light spilling through the open gateway (a warm glow, nothing swirling).
+      const mat = new THREE.MeshBasicMaterial({ map: doorwayTexture(), transparent: true, depthWrite: false, color: new THREE.Color(1.6, 1.4, 1.1) });
+      this.arenaPortal = new THREE.Group();
+      const opening = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 3.4), mat);
+      opening.position.y = 1.7;
+      const spill = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: doorwayTexture(true), transparent: true, depthWrite: false, color: new THREE.Color(1.2, 1.05, 0.8) }));
+      spill.position.set(0, 0.05, 2);
+      this.arenaPortal.add(opening, spill);
       this.scene.add(this.arenaPortal);
     }
-    this.arenaPortal.position.set(gate.x, 1.8, gate.z - 1.9);
+    this.arenaPortal.position.set(gate.x, 0, gate.z - 1.9);
     this.arenaPortal.visible = true;
     this.portalPos = new THREE.Vector3(gate.x, 0, gate.z - 0.6);
-    this.banner('The gate is open', `Walk through to descend into the ${next.name}`, 3);
+    this.banner('The gate is open', `Walk through to march on to the ${next.name}`, 3);
     this.tips.show('portal');
-    this.sfx.ultimateReady();
+    this.sfx.sample('thunkWood', { vol: 0.8, rate: 0.5, jitter: 0 });
+    this.sfx.warHorn();
   }
 
   updateArenaPortal(dt) {
     const p = this.arenaPortal;
-    p.rotateZ(dt * 1.5);
-    p.scale.setScalar(1 + 0.05 * Math.sin(this.elapsed * 4));
-    if (Math.random() < dt * 30) {
-      const a = Math.random() * Math.PI * 2;
-      this.particles.spawn(new THREE.Vector3(p.position.x + Math.cos(a) * 1.3, 1.8 + Math.sin(a) * 1.3, p.position.z + 0.3), {
+    // Dust drifting in the light.
+    if (Math.random() < dt * 12) {
+      this.particles.spawn(new THREE.Vector3(p.position.x + (Math.random() - 0.5) * 2.4, 0.3 + Math.random() * 2.8, p.position.z + 0.5 + Math.random() * 2), {
         count: 1,
-        color: [1.8, 0.9, 3],
-        speed: 0.5,
-        up: 0.5,
-        life: 0.8,
-        size: 0.07,
-        gravity: 0,
+        color: [1.6, 1.4, 1.0],
+        speed: 0.15,
+        up: 0.1,
+        life: 1.6,
+        size: 0.04,
+        gravity: -0.05,
       });
     }
     if (this.player.pos.distanceTo(this.portalPos) < 2.2 && !this.descending) this.descend();
@@ -256,8 +261,8 @@ export class FlowMethods {
       this.waveState = 'break';
       this.breakTimer = 2.5;
       this.descending = false;
-      this.bossCard(THEMES[this.arena % THEMES.length].name, `Depth ${this.arena + 1}`);
-      this.sfx.bossRoar();
+      this.bossCard(THEMES[this.arena % THEMES.length].name, `Stage ${this.arena + 1}`);
+      this.sfx.warHorn();
     }, 280);
   }
 
@@ -270,6 +275,7 @@ export class FlowMethods {
     this.stats.gemsBanked = (this.stats.gemsBanked || 0) + this.loot.runGems;
     this.loot.runGems = 0;
     saveProfile();
-    setTimeout(() => this.banner('Progress saved', 'Continue from here at the Rune Shrine', 1.8), 900);
+    setTimeout(() => this.banner('Progress saved', 'Continue from here at the camp gate', 1.8), 900);
   }
 }
+

@@ -34,7 +34,7 @@ export const SKILLS = [
     type: 'bow',
     rarity: 'rare',
     max: 3,
-    desc: (l) => `Arrows bounce to ${l} more ${l > 1 ? 'grunts' : 'grunt'} after a hit.`,
+    desc: (l) => `Arrows bounce to ${l} more ${l > 1 ? 'enemies' : 'enemy'} after a hit.`,
   },
   {
     id: 'splitShot',
@@ -50,12 +50,12 @@ export const SKILLS = [
           : 'Full-draw shots fire 4 extra arrows at full damage.',
   },
   {
-    id: 'thunderstrike',
-    name: 'Thunderstrike',
+    id: 'blasting',
+    name: 'Blasting Arrows',
     type: 'perfect',
     rarity: 'rare',
     max: 3,
-    desc: (l) => `Perfect hits chain lightning to ${l + 1} nearby grunts for 60% damage.`,
+    desc: (l) => `Powder-tipped arrows: perfect hits burst, hitting ${l + 1} nearby enemies for 60% damage.`,
   },
   {
     id: 'refresh',
@@ -71,15 +71,15 @@ export const SKILLS = [
     type: 'element',
     rarity: 'rare',
     max: 3,
-    desc: (l) => `Hits set grunts burning for ${1 + 3 * l} damage per second over 3s.`,
+    desc: (l) => `Pitch-soaked arrows set enemies burning for ${1 + 3 * l} damage per second over 3s.`,
   },
   {
     id: 'frost',
-    name: 'Frost Arrows',
+    name: 'Pinning Arrows',
     type: 'element',
     rarity: 'rare',
     max: 3,
-    desc: (l) => `Hits slow grunts by ${20 + 10 * l}% for 2s. Every 3rd hit freezes them solid for 1.5s.`,
+    desc: (l) => `Barbed heads hobble enemies: ${20 + 10 * l}% slower for 2s. Every 3rd hit pins them in place for 1.5s.`,
   },
   {
     id: 'secondWind',
@@ -120,7 +120,7 @@ const PATCH_UP = {
 export const TYPE_LABEL = {
   bow: 'Bow',
   perfect: 'Perfect shot',
-  element: 'Element',
+  element: 'Arrowheads',
   dodge: 'Dodge',
   survival: 'Survival',
 };

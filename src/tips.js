@@ -7,10 +7,10 @@ export const TIPS = {
   camp: 'Practice on the training dummy: hold left mouse to draw, release to shoot',
   draw: 'Hold left mouse to draw your bow, release to fire',
   perfect: 'Release in the gold flash for a perfect shot: double damage that pierces',
-  dodge: 'A grunt is winding up! Press Space to roll through its leap',
-  ult: 'Arrow Storm is ready: press Q to rain arrows on your cursor',
+  dodge: 'A brute is winding up! Press Space to roll through its leap',
+  ult: 'Arrow Volley is ready: press Q to loose a volley onto your cursor',
   draft: 'Pick a skill card to power up (keys 1-3)',
-  portal: 'The gate is open: walk into the portal to descend',
+  portal: 'The gate is open: walk through it to march on',
 };
 
 export class Tips {
