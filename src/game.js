@@ -236,6 +236,7 @@ export class Game {
   // ---------------------------------------------------------------- skill draft
 
   resetRun() {
+    this.endWaveEvent?.(false);
     for (const e of this.enemies) e.dispose();
     this.enemies.length = 0;
     this.arrows.clear();

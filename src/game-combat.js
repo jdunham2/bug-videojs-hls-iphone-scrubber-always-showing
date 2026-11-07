@@ -110,7 +110,7 @@ export class CombatMethods {
       const big = enemy.affix === 'volatile';
       setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);
     }
-    const gm = (this.difficulty?.gems || 1) * (this.mods?.gems || 1) * talent.gems();
+    const gm = (this.difficulty?.gems || 1) * (this.mods?.gems || 1) * talent.gems() * (this.waveEvent?.id === 'golden' ? 2 : 1);
     const gems = (n) => Math.round(n * gm);
     if (enemy.elite) this.loot.drop(enemy.pos, gems(5), 1);
     if (enemy.isBoss) this.loot.drop(enemy.pos, gems(25), 3);

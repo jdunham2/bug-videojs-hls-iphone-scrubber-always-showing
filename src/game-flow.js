@@ -9,6 +9,14 @@ import { Grunt } from './enemy.js';
 import { Archer } from './archer.js';
 import { Boss } from './boss.js';
 import { Raider, Bomber, Thief } from './variants.js';
+import { rollItem } from './gear.js';
+
+/** Twists a wave can come with (from wave 4). */
+const WAVE_EVENTS = [
+  { id: 'horde', name: 'Horde', text: 'Half again as many, and they keep coming. Break them for a purse of gems.', count: 1.6 },
+  { id: 'elite', name: 'War Party', text: 'Elite warriors lead this wave. Beat it for a Rare piece of gear.', count: 0.75 },
+  { id: 'golden', name: 'Golden Wave', text: 'Every gem dropped this wave is doubled!', count: 1 },
+];
 import { makeElite, AFFIXES } from './elites.js';
 import { build, stat } from './skills.js';
 import { profile, saveProfile } from './profile.js';
@@ -28,7 +36,15 @@ export class FlowMethods {
     this.waveState = 'active';
     // Now and then a loot thief turns up partway through a wave.
     if (n >= 3 && Math.random() < 0.3) setTimeout(() => this.state === 'playing' && this.wave === n && this.waveState === 'active' && this.spawnThief(), 4000 + Math.random() * 5000);
-    this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
+    // From wave 4, some waves come with a twist.
+    this.waveEvent = n >= 4 && Math.random() < 0.28 ? WAVE_EVENTS[Math.floor(Math.random() * WAVE_EVENTS.length)] : null;
+    const ev = this.waveEvent;
+    if (ev) {
+      this.toSpawn = Math.max(1, Math.round(this.toSpawn * ev.count));
+      document.body.classList.add(`wave-${ev.id}`);
+      this.sfx.sample('bell', { vol: 0.6, rate: ev.id === 'golden' ? 1.3 : 0.8, jitter: 0 });
+    }
+    this.banner(ev ? `Wave ${n} · ${ev.name}` : `Wave ${n}`, ev ? ev.text : n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`, ev ? 2.4 : undefined);
     this.sfx.wave(n);
     this.waveHurt = false;
   }
@@ -128,7 +144,7 @@ export class FlowMethods {
     if (this.toSpawn > 0 && this.spawnTimer <= 0) {
       this.spawnEnemy();
       this.toSpawn--;
-      this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
+      this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6) * (this.waveEvent?.id === 'horde' ? 0.5 : 1);
     }
     if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
       if (this.mission && this.wave >= this.mission.waves) {
@@ -142,6 +158,7 @@ export class FlowMethods {
       this.waveState = 'cleared';
       this.clearTimer = 1.1;
       this.bounty('wave');
+      this.endWaveEvent(true);
       this.player.cheer();
       this.noteProgress({ wave: this.wave, kills: this.stats.kills });
       if (!this.mission && this.wave % config.boss.every === 0) this.saveCheckpoint();
@@ -175,7 +192,7 @@ export class FlowMethods {
 
   /** Occasionally promote a fresh spawn to an elite (from wave 4). */
   maybeElite(enemy) {
-    const chance = (this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0) * (this.mods?.elites || 1);
+    const chance = this.waveEvent?.id === 'elite' ? 0.55 : (this.wave >= 4 ? Math.min(0.25, 0.04 * (this.wave - 3)) : 0) * (this.mods?.elites || 1);
     if (Math.random() >= chance) return enemy;
     const keys = Object.keys(AFFIXES);
     makeElite(enemy, keys[Math.floor(Math.random() * keys.length)]);
@@ -208,6 +225,22 @@ export class FlowMethods {
       if (farFromPlayer && clearOfPillars) break;
     }
     this.enemies.push(this.maybeElite(this.toughen(new Kind(this, p, this.enemyLevel()))));
+  }
+
+  /** A wave event is over: pay its bonus (if cleared) and drop the screen tint. */
+  endWaveEvent(cleared) {
+    const ev = this.waveEvent;
+    if (!ev) return;
+    this.waveEvent = null;
+    document.body.classList.remove(`wave-${ev.id}`);
+    if (!cleared) return;
+    if (ev.id === 'horde') {
+      this.loot.drop(this.player.pos, Math.round(12 * (this.difficulty?.gems || 1)), 1);
+      setTimeout(() => this.banner('Horde broken!', 'A purse of gems for your trouble', 1.6), 600);
+    } else if (ev.id === 'elite') {
+      this.gearDrops.spawn(this.player.pos, rollItem(['bow', 'armor', 'gadget'][Math.floor(Math.random() * 3)], this.enemyLevel() + (this.difficulty?.lootPower || 0) + 1, 'rare'));
+      setTimeout(() => this.banner('War party defeated!', 'They left something behind', 1.6), 600);
+    }
   }
 
   /** A loot thief drops in at the far side of the arena and runs. */
