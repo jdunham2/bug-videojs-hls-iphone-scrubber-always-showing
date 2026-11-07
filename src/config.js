@@ -51,11 +51,14 @@ export const DEFAULTS = {
     breakTime: 3,
   },
   models: {
-    heroHeight: 1.75, // meters; Meshy models are rescaled to this
-    gruntHeight: 1.9,
-    heroAimYaw: 0, // degrees to turn the hero model while aiming (archery clips often stand side-on)
-    shootReleaseAt: 0.5, // fraction of the archery clip where the arrow leaves the bow
-    attackHitAt: 0.45, // fraction of the grunt attack clip where the blow lands
+    heroHeight: 2.0, // meters; Meshy models are rescaled to this (a bit larger than life reads better from above)
+    gruntHeight: 2.2,
+    heroAimYaw: -90, // degrees to turn the hero while aiming (the archery clip shoots side-on, to his left)
+    shootStartAt: 0.27, // fraction of the archery clip where the arrow is nocked (draw starts)
+    shootFullAt: 0.6, // ...where the bow is at full draw (held while you hold)
+    shootReleaseAt: 0.78, // ...where the arrow leaves the bow (follow-through plays from here)
+    attackWindupEnd: 0.27, // fraction of the grunt's leap clip at the bottom of the crouch
+    attackHitAt: 0.45, // ...where it lands and the blow hits
     runAnimSpeed: 5, // move speed (units/s) at which the run clip plays at 1x
   },
   feel: {

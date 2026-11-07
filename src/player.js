@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { resolveCircle } from './world.js';
 import { makeArrowMesh } from './arrows.js';
 import { stat, lv, OVERDRAW_TIME } from './skills.js';
-import { models, instantiate, attachProp, findBone } from './models.js';
+import { models, instantiate, attachProp, findBone, orientProp } from './models.js';
 
 export const PLAYER_RADIUS = 0.45;
 export const ARROW_HEIGHT = 1.1;
@@ -352,14 +352,20 @@ export class Player {
       const lower = shoot === 'shoot:upper' ? `${lowerBase}:lower` : null;
       A.set(lower ? [shoot, lower] : [shoot], { fade: 0.12 });
       if (lower) A.action(lower).timeScale = locoScale;
-      const releaseTime = A.duration('shoot') * mc.shootReleaseAt;
+      const dur = A.duration('shoot');
       const a = A.action(shoot);
       if (a && this.drawing) {
-        // Draw portion of the clip follows charge (holds at full draw).
+        // Nock → full draw follows charge, then holds at full draw.
         a.timeScale = 0;
-        A.scrub(shoot, releaseTime * Math.min(1, this.charge));
+        A.scrub(shoot, dur * lerp(mc.shootStartAt, mc.shootFullAt, Math.min(1, this.charge)));
+        this.releasing = false;
       } else if (a) {
-        a.timeScale = 1.4; // follow-through after the release
+        // Snap to the release frame, then play the follow-through.
+        if (!this.releasing) {
+          this.releasing = true;
+          a.time = dur * mc.shootReleaseAt;
+        }
+        a.timeScale = 1.6;
       }
     } else if (this.hitT > 0 && A.has('hit')) {
       A.set(['hit'], { once: true, fade: 0.06 });
@@ -370,6 +376,11 @@ export class Player {
       A.action(loco).timeScale = locoScale;
     }
     A.update(dt);
+    if (this.bowProp) {
+      // Keep the bow upright and facing the aim line, whatever the hand is doing.
+      this.group.updateMatrixWorld(true);
+      orientProp(this.bowProp, UP, this.aimDir);
+    }
   }
 
   /** Short celebration after clearing a wave (only plays while standing still). */

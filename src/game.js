@@ -791,8 +791,11 @@ export class Game {
     mdl.add(config.models, 'heroHeight', 1, 3, 0.05).name('Hero height (m)');
     mdl.add(config.models, 'gruntHeight', 1, 3, 0.05).name('Grunt height (m)');
     mdl.add(config.models, 'heroAimYaw', -180, 180, 1).name('Hero aim turn (°)');
-    mdl.add(config.models, 'shootReleaseAt', 0.05, 0.95, 0.01).name('Bow release point');
-    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Grunt hit point');
+    mdl.add(config.models, 'shootStartAt', 0, 0.95, 0.01).name('Bow clip: nocked');
+    mdl.add(config.models, 'shootFullAt', 0.05, 0.95, 0.01).name('Bow clip: full draw');
+    mdl.add(config.models, 'shootReleaseAt', 0.05, 0.95, 0.01).name('Bow clip: release');
+    mdl.add(config.models, 'attackWindupEnd', 0, 0.95, 0.01).name('Grunt clip: crouch end');
+    mdl.add(config.models, 'attackHitAt', 0.05, 0.95, 0.01).name('Grunt clip: landing');
     mdl.add(config.models, 'runAnimSpeed', 1, 12, 0.1).name('Run anim speed ref');
     mdl.close();
 

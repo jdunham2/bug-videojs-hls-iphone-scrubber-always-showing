@@ -142,6 +142,7 @@ export class Grunt {
     const g = config.grunt;
     const atk = A.duration('attack');
     const hitAt = atk * config.models.attackHitAt;
+    const crouchEnd = atk * config.models.attackWindupEnd;
     switch (this.state) {
       case 'dying':
         A.set(['death'], { once: true, fade: 0.08 });
@@ -159,17 +160,18 @@ export class Grunt {
         }
         break;
       case 'windup': {
-        // Anticipation half of the swing follows the windup timer.
+        // The crouch before the leap follows the windup timer.
         A.set(['attack'], { once: true, fade: 0.1 });
         const a = A.action('attack');
         if (a) a.timeScale = 0;
-        A.scrub('attack', hitAt * 0.8 * Math.min(1, this.t / g.windupTime));
+        A.scrub('attack', crouchEnd * Math.min(1, this.t / g.windupTime));
         break;
       }
       case 'lunge': {
+        // The leap itself is squeezed into the lunge.
         const a = A.action('attack');
         if (a) a.timeScale = 0;
-        A.scrub('attack', hitAt * 0.8 + (hitAt * 0.2 + atk * 0.1) * Math.min(1, this.t / g.lungeTime));
+        A.scrub('attack', crouchEnd + (hitAt - crouchEnd) * Math.min(1, this.t / g.lungeTime));
         break;
       }
       case 'recover':
@@ -177,7 +179,7 @@ export class Grunt {
           A.set(['hit'], { once: true, fade: 0.05 });
         } else {
           const a = A.action('attack');
-          if (a) a.timeScale = 1; // follow-through
+          if (a) a.timeScale = 1.5; // recover from the landing
         }
         break;
     }
@@ -393,7 +395,7 @@ export class Grunt {
     }
     this.bodyMat.emissive.setRGB(r, gr, b);
     if (this.model) {
-      for (const m of this.model.materials) m.emissive.setRGB(r * 0.6, gr * 0.6, b * 0.6);
+      for (const m of this.model.materials) m.emissive.setRGB(r * 0.4, gr * 0.4, b * 0.4);
     }
 
     this.updateHpBar();

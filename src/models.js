@@ -24,6 +24,7 @@ export async function loadModels() {
     Object.entries(manifest).map(async ([id, entry]) => {
       try {
         const gltf = await loader.loadAsync(entry.file);
+        gltf.animations.forEach(stripRootMotion);
         const clips = {};
         for (const [logical, ref] of Object.entries(entry.clips || {})) {
           // Match by the library name first; fall back to position in the file.
@@ -36,6 +37,23 @@ export async function loadModels() {
     }),
   );
   return models;
+}
+
+/**
+ * Keep animations in place: the game moves characters itself, so drop the hips'
+ * horizontal travel (a roll or leap would otherwise slide the body off its spot).
+ * Vertical motion stays, so jumps and crouches still read.
+ */
+function stripRootMotion(clip) {
+  const track = clip.tracks.find((t) => /(^|\W)hips\.position$/i.test(t.name));
+  if (!track) return;
+  const v = track.values;
+  const x0 = v[0];
+  const z0 = v[2];
+  for (let i = 0; i < v.length; i += 3) {
+    v[i] = x0;
+    v[i + 2] = z0;
+  }
 }
 
 /** Find a bone whose name matches all the given patterns (e.g. [/hand/i, /left|_l\b/i]). */
@@ -65,9 +83,12 @@ export function instantiate(id, height) {
       if (m.emissive) materials.push(m);
     }
   });
-  const box = new THREE.Box3().setFromObject(root);
+  // Bones must be posed before measuring, or a skinned mesh measures as near-zero.
+  root.updateMatrixWorld(true);
+  root.traverse((o) => o.isSkinnedMesh && o.skeleton.update());
+  const box = new THREE.Box3().setFromObject(root, true);
   const size = box.getSize(new THREE.Vector3());
-  const scale = size.y > 0 ? height / size.y : 1;
+  const scale = size.y > 0.01 ? height / size.y : 1;
   const holder = new THREE.Group();
   root.scale.setScalar(scale);
   root.position.y = -box.min.y * scale;
@@ -83,7 +104,8 @@ export function attachProp(id, bone, length) {
   prop.traverse((o) => {
     if (o.isMesh) o.castShadow = true;
   });
-  const box = new THREE.Box3().setFromObject(prop);
+  prop.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(prop, true);
   const size = box.getSize(new THREE.Vector3());
   const longest = Math.max(size.x, size.y, size.z) || 1;
   // Bones inherit the character's scale, so undo it to keep the prop at world size.
@@ -94,7 +116,37 @@ export function attachProp(id, bone, length) {
   prop.position.sub(box.getCenter(new THREE.Vector3())); // center on the grip
   holder.add(prop);
   bone.add(holder);
+  // Local axes sorted by extent: [longest, middle, shortest] (0=x, 1=y, 2=z).
+  const ext = [size.x, size.y, size.z];
+  holder.userData.axes = [0, 1, 2].sort((a, b) => ext[b] - ext[a]);
   return holder;
+}
+
+const _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion();
+const _pq = new THREE.Quaternion();
+const _cols = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+
+/**
+ * Point a held prop in world space regardless of the hand's rotation:
+ * its longest side along `up`, its middle side along `forward`.
+ * Used for the bow so it always reads as an upright bow, whatever the clip does.
+ */
+export function orientProp(holder, up, forward) {
+  const [L, M, S] = holder.userData.axes || [1, 2, 0];
+  const side = new THREE.Vector3().crossVectors(up, forward).normalize();
+  // Columns of the rotation: where each local axis should point in the world.
+  _cols[L].copy(up);
+  _cols[M].copy(forward);
+  _cols[S].copy(side);
+  _m.makeBasis(_cols[0], _cols[1], _cols[2]);
+  if (_m.determinant() < 0) {
+    _cols[S].negate();
+    _m.makeBasis(_cols[0], _cols[1], _cols[2]);
+  }
+  _q.setFromRotationMatrix(_m);
+  holder.parent.getWorldQuaternion(_pq);
+  holder.quaternion.copy(_pq.invert().multiply(_q));
 }
 
 /**
