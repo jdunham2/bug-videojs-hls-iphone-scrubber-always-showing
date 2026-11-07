@@ -69,6 +69,9 @@ export const DEFAULTS = {
     cameraZoom: 1,
     bloom: true,
     bloomStrength: 0.55,
+    ambientOcclusion: true, // contact shadows (costs some GPU)
+    vignette: 0.45,
+    grade: 1, // color grade strength (0 = off)
   },
 };
 

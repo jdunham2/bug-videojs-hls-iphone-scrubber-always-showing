@@ -4,8 +4,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { config, saveConfig, resetConfig } from './config.js';
 import { World, ARENA_HALF, pillars } from './world.js';
+import { Environment, spawnGates } from './environment.js';
 import { Player, ARROW_HEIGHT } from './player.js';
 import { Grunt } from './enemy.js';
 import { ArrowSystem } from './arrows.js';
@@ -14,8 +17,29 @@ import { Sfx } from './audio.js';
 import { Input } from './input.js';
 import { build, lv, stat, rollCards, ROMAN, TYPE_LABEL } from './skills.js';
 import { modelStatus } from './models.js';
+import { audioStatus } from './audio.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
+
+// Final look: gentle teal-shadow / warm-highlight split tone, contrast, vignette.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.45 }, uGrade: { value: 1 } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uVignette; uniform float uGrade; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+      vec3 graded = c.rgb;
+      graded = mix(graded, graded * vec3(0.92, 1.0, 1.06), (1.0 - l) * 0.5);   // cool shadows
+      graded = mix(graded, graded * vec3(1.06, 1.0, 0.92), l * 0.4);           // warm highlights
+      graded = (graded - 0.5) * 1.08 + 0.5;                                     // a touch of contrast
+      c.rgb = mix(c.rgb, graded, uGrade);
+      vec2 d = vUv - 0.5;
+      c.rgb *= 1.0 - uVignette * smoothstep(0.35, 0.85, length(d * vec2(1.25, 1.0)));
+      gl_FragColor = c;
+    }`,
+};
 const BEST_KEY = 'draw-release.best.v1';
 
 function loadBest() {
@@ -46,18 +70,29 @@ export class Game {
 
     this.composer = new EffectComposer(r);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.ao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
+    this.ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.5, scale: 1.2 });
+    this.ao.blendIntensity = 0.85;
+    this.ao.enabled = config.feel.ambientOcclusion;
+    this.composer.addPass(this.ao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), config.feel.bloomStrength, 0.5, 0.9);
     this.bloom.enabled = config.feel.bloom;
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+    this.grade = new ShaderPass(GradeShader);
+    this.grade.uniforms.uVignette.value = config.feel.vignette;
+    this.grade.uniforms.uGrade.value = config.feel.grade;
+    this.composer.addPass(this.grade);
 
     this.world = new World(this.scene);
+    this.env = new Environment(this);
     this.player = new Player(this.scene);
     this.arrows = new ArrowSystem(this.scene);
     this.particles = new Particles(this.scene);
     this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
     this.shake = new Shake();
     this.sfx = new Sfx();
+    this.sfx.init(); // decode samples now; playback starts on the first click
     this.input = new Input(r.domElement);
     this.enemies = [];
 
@@ -102,6 +137,11 @@ export class Game {
       this.sfx.unlock();
       if (this.state === 'paused') this.setPaused(false);
       else this.start();
+    });
+    this.hud.draft.addEventListener('pointerover', (e) => {
+      const card = e.target.closest('.card');
+      if (card && card !== this.hoverCard) this.sfx.uiHover();
+      this.hoverCard = card;
     });
     this.hud.draft.addEventListener('pointerdown', (e) => {
       const card = e.target.closest('[data-pick]');
@@ -162,7 +202,7 @@ export class Game {
   reroll() {
     if (this.state !== 'choosing' || build.rerolls <= 0) return;
     build.rerolls--;
-    this.sfx.thunk();
+    this.sfx.reroll();
     this.draftCards = rollCards(3, this.wave);
     this.renderDraft();
   }
@@ -214,6 +254,7 @@ export class Game {
 
   start() {
     this.resetRun();
+    this.sfx.runStart();
     this.state = 'playing';
     this.hideOverlay();
   }
@@ -254,7 +295,8 @@ export class Game {
     this.spawnTimer = 0.3;
     this.waveState = 'active';
     this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
-    this.sfx.wave();
+    this.sfx.wave(n);
+    this.waveHurt = false;
   }
 
   updateWaves(dt) {
@@ -281,12 +323,20 @@ export class Game {
       const heal = Math.min(config.player.healPerWave, stat.maxHp() - this.player.hp);
       this.player.hp += heal;
       this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
-      this.sfx.cleared();
+      this.sfx.cleared(!this.waveHurt);
     }
   }
 
   spawnEnemy() {
     const p = new THREE.Vector3();
+    // Half the grunts march out of the archway gates (when the dressed arena is loaded).
+    const gates = spawnGates.filter((g) => Math.hypot(g.x - this.player.pos.x, g.z - this.player.pos.z) > 7);
+    if (gates.length && Math.random() < 0.5) {
+      const g = gates[Math.floor(Math.random() * gates.length)];
+      p.set(g.x + (Math.random() - 0.5) * 2.4, 0, g.z + (Math.random() - 0.5) * 2.4);
+      this.enemies.push(new Grunt(this, p, this.wave));
+      return;
+    }
     const H = ARENA_HALF - 1.5;
     for (let i = 0; i < 40; i++) {
       // Prefer the arena edges, away from the player and pillars.
@@ -311,7 +361,7 @@ export class Game {
     const element = lv('fire') ? 'fire' : lv('frost') ? 'frost' : null;
     this.arrows.spawn(origin, dir, speed, damage, charge, perfect, { ...opts, bounces: lv('ricochet'), element });
     if (opts.extra) return; // Split Shot side arrows share the main shot's sound and stats
-    this.sfx.release(charge, perfect);
+    this.sfx.release(charge, perfect, this.panAt(origin));
     if (opts.mega) {
       this.sfx.megaRelease();
       this.shake.add(0.5);
@@ -322,6 +372,7 @@ export class Game {
       this.stats.perfects++;
       this.stats.streak++;
       this.stats.bestStreak = Math.max(this.stats.bestStreak, this.stats.streak);
+      if (this.stats.streak % 3 === 0) this.sfx.combo();
       this.particles.spawn(origin, { count: 14, color: [3, 2.2, 0.6], speed: 5, up: 1, life: 0.35, size: 0.08, gravity: 2, dir, spread: 0.9 });
       this.shake.add(0.18);
     } else {
@@ -353,12 +404,12 @@ export class Game {
     const big = arrow.perfect || arrow.mega;
     this.hitStop = Math.max(this.hitStop, big ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
     this.shake.add(arrow.mega ? 0.6 : arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
-    this.sfx.hit(arrow.perfect);
+    this.sfx.hit(arrow.perfect, this.panAt(point));
 
     if (result === 'stagger') {
       this.stats.staggers++;
       this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 1.6, 0)), 'STAGGER', 'callout');
-      this.sfx.stagger();
+      this.sfx.stagger(this.panAt(point));
     }
     if (result === 'kill') this.onKill(enemy);
     else this.applyElement(enemy, point);
@@ -367,7 +418,14 @@ export class Game {
 
   onKill(enemy) {
     this.stats.kills++;
-    this.sfx.kill();
+    this.sfx.kill(this.panAt(enemy.pos));
+    // Three kills in quick succession earns the announcer.
+    this.killTimes = (this.killTimes || []).filter((t) => this.elapsed - t < 1.5);
+    this.killTimes.push(this.elapsed);
+    if (this.killTimes.length >= 3 && this.elapsed - (this.lastMultiKill || -9) > 2.5) {
+      this.lastMultiKill = this.elapsed;
+      this.sfx.multiKill();
+    }
     this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 26, color: 0x7a2a20, speed: 6, up: 4, life: 0.8, size: 0.16 });
     this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 10, color: 0x2a2420, speed: 3, up: 3, life: 1, size: 0.25 });
   }
@@ -378,7 +436,7 @@ export class Game {
     if (fire) enemy.applyBurn(1 + 3 * fire, 3);
     if (frost && enemy.applyFrost(0.2 + 0.1 * frost, 2, 3, 1.5)) {
       this.numbers.spawn(point.clone().setY(2.4), 'FROZEN', 'callout');
-      this.sfx.freeze();
+      this.sfx.freeze(this.panAt(enemy.pos));
       this.particles.spawn(enemy.pos.clone().setY(1), { count: 16, color: [1.2, 2.2, 3], speed: 4, up: 2, life: 0.6, size: 0.1 });
     }
   }
@@ -392,7 +450,7 @@ export class Game {
       .sort((a, b) => a.pos.distanceTo(source.pos) - b.pos.distanceTo(source.pos))
       .slice(0, n + 1);
     if (!targets.length) return;
-    this.sfx.zap();
+    this.sfx.zap(this.panAt(source.pos));
     let from = source.pos;
     for (const t of targets) {
       this.bolt(from, t.pos);
@@ -447,7 +505,7 @@ export class Game {
   }
 
   onRicochet(point) {
-    this.sfx.thunk();
+    this.sfx.thunk(this.panAt(point));
     this.particles.spawn(point, { count: 6, color: 0xffe9b0, speed: 3, up: 1, life: 0.25, size: 0.05, gravity: 0 });
   }
 
@@ -458,11 +516,19 @@ export class Game {
 
   onArrowStopped(arrow, hitWall) {
     if (hitWall) {
-      this.sfx.thunk();
+      this.sfx.thunk(this.panAt(arrow.pos));
       this.particles.spawn(arrow.pos, { count: 5, color: 0x8a8070, speed: 2, up: 1, life: 0.35, size: 0.06 });
     } else {
       this.particles.spawn(arrow.pos.clone().setY(0.05), { count: 4, color: 0x5a5048, speed: 1.2, up: 1.5, life: 0.3, size: 0.05 });
+      this.sfx.arrowGround(this.panAt(arrow.pos));
     }
+  }
+
+  /** Stereo position (-1 left … 1 right) of a world point on screen. */
+  panAt(pos) {
+    const v = this.tmpPan || (this.tmpPan = new THREE.Vector3());
+    v.copy(pos).project(this.camera);
+    return Math.max(-1, Math.min(1, v.x)) * 0.7;
   }
 
   onDodge() {
@@ -483,6 +549,7 @@ export class Game {
 
   onPlayerHit(enemy) {
     this.sfx.hurt();
+    this.waveHurt = true;
     this.shake.add(0.6);
     this.hitStop = Math.max(this.hitStop, 0.08);
     this.numbers.spawn(this.player.pos.clone().setY(2), `-${config.grunt.damage}`, 'hurt');
@@ -527,6 +594,7 @@ export class Game {
     this.numbers.update(this.state === 'paused' ? 0 : realDt);
     this.shake.update(realDt);
     this.world.update(realDt, this.time);
+    this.env.update(realDt, this.time);
     this.updateCamera(realDt);
     this.updateHud();
     if (render) this.composer.render();
@@ -697,7 +765,8 @@ export class Game {
         <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
         <button>Click to start</button>
         ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}
-        <p class="model-status" id="model-status">${this.modelStatusText()}</p>`;
+        <p class="model-status" id="model-status">${this.modelStatusText()}</p>
+        <p class="model-status" id="audio-status">${this.audioStatusText()}</p>`;
     } else if (kind === 'paused') {
       o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
     } else {
@@ -738,6 +807,14 @@ export class Game {
     if (m.state === 'ready') return `3D models: ${m.loaded}/${m.total} loaded`;
     if (m.state === 'none') return '3D models: none found (using placeholder shapes)';
     return `3D models: ${m.loaded}/${m.total} loaded. Problem: ${m.errors.join('; ')}`;
+  }
+
+  audioStatusText() {
+    const a = audioStatus;
+    if (a.state === 'ready') return `Sound: ${a.loaded}/${a.total} samples`;
+    if (a.state === 'loading' || a.state === 'idle') return 'Sound: loading…';
+    if (a.state === 'unsupported') return 'Sound: not supported in this browser';
+    return `Sound: synth only (${a.error || 'samples failed'})`;
   }
 
   showModelStatus() {
@@ -822,6 +899,9 @@ export class Game {
     f.add(config.feel, 'cameraZoom', 0.6, 1.6, 0.05).name('Camera distance');
     f.add(config.feel, 'bloom').name('Bloom').onChange((v) => (this.bloom.enabled = v));
     f.add(config.feel, 'bloomStrength', 0, 2, 0.05).name('Bloom strength').onChange((v) => (this.bloom.strength = v));
+    f.add(config.feel, 'ambientOcclusion').name('Ambient occlusion').onChange((v) => (this.ao.enabled = v));
+    f.add(config.feel, 'vignette', 0, 1, 0.05).name('Vignette').onChange((v) => (this.grade.uniforms.uVignette.value = v));
+    f.add(config.feel, 'grade', 0, 1, 0.05).name('Color grade').onChange((v) => (this.grade.uniforms.uGrade.value = v));
 
     const actions = {
       restart: () => {
@@ -859,5 +939,6 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setSize(innerWidth, innerHeight);
+    this.ao.setSize(innerWidth, innerHeight);
   }
 }

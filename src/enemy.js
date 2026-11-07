@@ -191,13 +191,16 @@ export class Grunt {
   }
 
   enter(state) {
+    this.lastState = this.state;
     this.state = state;
     this.t = 0;
-    if (state === 'windup') this.game.sfx.windup();
+    const pan = this.game.panAt(this.pos);
+    if (state === 'windup') this.game.sfx.windup(pan);
     if (state === 'lunge') {
       this.hasHit = false;
-      this.game.sfx.lunge();
+      this.game.sfx.lunge(pan);
     }
+    if (state === 'recover' && this.lastState === 'lunge' && !this.staggered) this.game.sfx.slam(pan);
     if (state === 'chase') this.staggered = false;
     this.wedge.visible = state === 'windup';
   }

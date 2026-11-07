@@ -279,6 +279,12 @@ export class Player {
       const k = 1 - Math.exp(-18 * dt);
       this.vel.x += (tx - this.vel.x) * k;
       this.vel.z += (tz - this.vel.z) * k;
+      // Footsteps every ~1.6 units travelled.
+      this.stepDist = (this.stepDist || 0) + Math.hypot(this.vel.x, this.vel.z) * dt;
+      if (this.stepDist > 1.6) {
+        this.stepDist = 0;
+        game.sfx.step();
+      }
     }
     this.pos.x += (this.vel.x + this.knock.x) * dt;
     this.pos.z += (this.vel.z + this.knock.z) * dt;

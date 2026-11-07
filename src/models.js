@@ -142,6 +142,33 @@ export function instantiate(id, height) {
   return { holder, root, materials, animator: src.clips ? new Animator(root, src.clips) : null };
 }
 
+/**
+ * Place a copy of a static prop: scaled so its height (or `axis` extent) is `size`,
+ * standing on y=0 and centered on its footprint. Returns null if not loaded.
+ */
+export function spawnProp(id, size, { axis = 'y', shadows = true } = {}) {
+  const src = models[id];
+  if (!src) return null;
+  const obj = src.scene.clone(true);
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(obj, true);
+  const dims = box.getSize(new THREE.Vector3());
+  const s = size / (dims[axis] || 1);
+  const center = box.getCenter(new THREE.Vector3());
+  obj.position.set(-center.x * s, -box.min.y * s, -center.z * s);
+  obj.scale.setScalar(s);
+  obj.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = shadows;
+      o.receiveShadow = true;
+    }
+  });
+  const holder = new THREE.Group();
+  holder.add(obj);
+  holder.userData.size = dims.clone().multiplyScalar(s);
+  return holder;
+}
+
 /** Attach a prop model (bow, club) to a bone, sized to `length` meters along its longest side. */
 export function attachProp(id, bone, length) {
   const src = models[id];

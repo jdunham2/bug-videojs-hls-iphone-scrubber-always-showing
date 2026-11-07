@@ -80,6 +80,8 @@ export class World {
   constructor(scene) {
     this.scene = scene;
     this.torches = [];
+    this.wallMeshes = [];
+    this.pillarGroups = [];
     scene.background = new THREE.Color(0x120f0d);
     scene.fog = new THREE.Fog(0x120f0d, 26, 52);
     this.buildLights();
@@ -114,6 +116,7 @@ export class World {
     );
     floor.receiveShadow = true;
     this.scene.add(floor);
+    this.floor = floor;
 
     const outside = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120).rotateX(-Math.PI / 2),
@@ -122,6 +125,7 @@ export class World {
     outside.position.y = -0.02;
     outside.receiveShadow = true;
     this.scene.add(outside);
+    this.outside = outside;
   }
 
   buildWalls() {
@@ -146,6 +150,7 @@ export class World {
         m.castShadow = !near;
         m.receiveShadow = true;
         this.scene.add(m);
+        this.wallMeshes.push(m);
       }
     }
   }
@@ -184,6 +189,7 @@ export class World {
       });
       this.scene.add(g);
       pillars.push({ x: L.x, z: L.z, r: r + 0.15, h: L.h + 0.2 });
+      this.pillarGroups.push({ group: g, layout: L });
 
       if (L.torch) {
         // Torch on the side of the pillar facing the arena center.
@@ -196,12 +202,13 @@ export class World {
         const light = new THREE.PointLight(0xff8a3c, 18, 11, 1.6);
         light.position.copy(flame.position).addScaledVector(dir, 0.3);
         this.scene.add(holder, flame, light);
-        this.torches.push({ light, flame, seed: Math.random() * 100, base: 18 });
+        this.torches.push({ light, flame, holder, seed: Math.random() * 100, base: 18, dir, pillar: L });
       }
     }
   }
 
   buildDecor() {
+    this.decor = [];
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x4d4840, roughness: 1, flatShading: true });
     const grassMat = new THREE.MeshStandardMaterial({ color: 0x3d5a2a, roughness: 1, flatShading: true });
     for (let i = 0; i < 70; i++) {
@@ -215,10 +222,12 @@ export class World {
         m.rotation.set(Math.random(), Math.random(), Math.random());
         m.castShadow = true;
         this.scene.add(m);
+        this.decor.push(m);
       } else {
         const m = new THREE.Mesh(new THREE.ConeGeometry(rand(0.15, 0.3), rand(0.4, 0.9), 4), grassMat);
         m.position.set(x, 0.2, z);
         this.scene.add(m);
+        this.decor.push(m);
       }
     }
     // Drifting embers for atmosphere.
