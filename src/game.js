@@ -1,0 +1,577 @@
+import * as THREE from 'three';
+import GUI from 'lil-gui';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { config, saveConfig, resetConfig } from './config.js';
+import { World, ARENA_HALF, pillars } from './world.js';
+import { Player, ARROW_HEIGHT } from './player.js';
+import { Grunt } from './enemy.js';
+import { ArrowSystem } from './arrows.js';
+import { Particles, DamageNumbers, Shake } from './fx.js';
+import { Sfx } from './audio.js';
+import { Input } from './input.js';
+
+const UP = new THREE.Vector3(0, 1, 0);
+const BEST_KEY = 'draw-release.best.v1';
+
+function loadBest() {
+  try {
+    return JSON.parse(localStorage.getItem(BEST_KEY) || 'null') || { wave: 0, kills: 0 };
+  } catch {
+    return { wave: 0, kills: 0 };
+  }
+}
+
+export class Game {
+  constructor(container) {
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
+    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    r.setSize(innerWidth, innerHeight);
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFShadowMap;
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.toneMappingExposure = 1.05;
+    container.appendChild(r.domElement);
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 200);
+    this.camOffset = new THREE.Vector3(12, 17, 12);
+    this.camTarget = new THREE.Vector3();
+    this.camForward = new THREE.Vector3(-this.camOffset.x, 0, -this.camOffset.z).normalize();
+    this.camRight = new THREE.Vector3().crossVectors(this.camForward, UP).normalize();
+
+    this.composer = new EffectComposer(r);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), config.feel.bloomStrength, 0.5, 0.9);
+    this.bloom.enabled = config.feel.bloom;
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
+
+    this.world = new World(this.scene);
+    this.player = new Player(this.scene);
+    this.arrows = new ArrowSystem(this.scene);
+    this.particles = new Particles(this.scene);
+    this.numbers = new DamageNumbers(document.getElementById('numbers'), this.camera);
+    this.shake = new Shake();
+    this.sfx = new Sfx();
+    this.input = new Input(r.domElement);
+    this.enemies = [];
+
+    this.raycaster = new THREE.Raycaster();
+    this.aimPlane = new THREE.Plane(UP, -ARROW_HEIGHT);
+    this.aimPoint = new THREE.Vector3(0, ARROW_HEIGHT, 0);
+    this.shakeOffset = new THREE.Vector3();
+
+    const $ = (id) => document.getElementById(id);
+    this.hud = {
+      root: $('hud'),
+      hpFill: $('hp-fill'),
+      hpText: $('hp-text'),
+      stats: $('stats'),
+      wave: $('wave-label'),
+      enemies: $('enemies-label'),
+      streak: $('streak'),
+      banner: $('banner'),
+      reticle: $('reticle'),
+      overlay: $('overlay'),
+      vignette: $('vignette'),
+    };
+
+    this.state = 'title';
+    this.time = 0;
+    this.hitStop = 0;
+    this.best = loadBest();
+    this.resetRun();
+    this.setupGui();
+    this.showOverlay('title');
+
+    window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('blur', () => {
+      if (this.state === 'playing') this.setPaused(true);
+    });
+    this.hud.overlay.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.sfx.unlock();
+      if (this.state === 'paused') this.setPaused(false);
+      else this.start();
+    });
+  }
+
+  // ---------------------------------------------------------------- run state
+
+  resetRun() {
+    for (const e of this.enemies) e.dispose();
+    this.enemies.length = 0;
+    this.arrows.clear();
+    this.particles.clear();
+    this.numbers.clear();
+    this.player.reset();
+    this.stats = { shots: 0, hits: 0, perfects: 0, kills: 0, staggers: 0, streak: 0, bestStreak: 0 };
+    this.wave = 0;
+    this.waveState = 'break';
+    this.breakTimer = 1.2;
+    this.toSpawn = 0;
+    this.elapsed = 0;
+    this.deathTimer = 0;
+    this.hitStop = 0;
+    this.camTarget.copy(this.player.pos);
+  }
+
+  start() {
+    this.resetRun();
+    this.state = 'playing';
+    this.hideOverlay();
+  }
+
+  setPaused(paused) {
+    if (paused && this.state === 'playing') {
+      this.state = 'paused';
+      this.player.drawing = false;
+      this.sfx.drawStop();
+      this.showOverlay('paused');
+    } else if (!paused && this.state === 'paused') {
+      this.state = 'playing';
+      this.hideOverlay();
+    }
+  }
+
+  gameOver() {
+    this.state = 'gameover';
+    this.sfx.gameOver();
+    const newBest = this.wave > this.best.wave || (this.wave === this.best.wave && this.stats.kills > this.best.kills);
+    if (newBest) {
+      this.best = { wave: this.wave, kills: this.stats.kills };
+      try {
+        localStorage.setItem(BEST_KEY, JSON.stringify(this.best));
+      } catch {
+        /* ignore */
+      }
+    }
+    this.showOverlay('gameover', newBest);
+  }
+
+  // ---------------------------------------------------------------- waves
+
+  startWave(n) {
+    this.wave = n;
+    const w = config.waves;
+    this.toSpawn = Math.max(1, Math.round(w.baseCount + w.countPerWave * (n - 1)));
+    this.spawnTimer = 0.3;
+    this.waveState = 'active';
+    this.banner(`Wave ${n}`, n === 1 ? 'Hold to draw. Release in the gold flash.' : `Grunts are level ${n}`);
+    this.sfx.wave();
+  }
+
+  updateWaves(dt) {
+    if (this.waveState === 'break') {
+      this.breakTimer -= dt;
+      if (this.breakTimer <= 0) this.startWave(this.wave + 1);
+      return;
+    }
+    this.spawnTimer -= dt;
+    if (this.toSpawn > 0 && this.spawnTimer <= 0) {
+      this.spawnEnemy();
+      this.toSpawn--;
+      this.spawnTimer = config.waves.spawnInterval * (0.6 + Math.random() * 0.6);
+    }
+    if (this.toSpawn === 0 && this.enemies.every((e) => e.state === 'dying' || e.removed)) {
+      this.waveState = 'break';
+      this.breakTimer = config.waves.breakTime;
+      const heal = Math.min(config.player.healPerWave, config.player.maxHp - this.player.hp);
+      this.player.hp += heal;
+      this.banner(`Wave ${this.wave} cleared`, heal > 0 ? `+${Math.round(heal)} HP` : '');
+      this.sfx.cleared();
+    }
+  }
+
+  spawnEnemy() {
+    const p = new THREE.Vector3();
+    const H = ARENA_HALF - 1.5;
+    for (let i = 0; i < 40; i++) {
+      // Prefer the arena edges, away from the player and pillars.
+      const edge = Math.floor(Math.random() * 4);
+      const t = (Math.random() * 2 - 1) * H;
+      const inset = H - Math.random() * 4;
+      if (edge === 0) p.set(t, 0, -inset);
+      else if (edge === 1) p.set(t, 0, inset);
+      else if (edge === 2) p.set(inset, 0, t);
+      else p.set(-inset, 0, t);
+      const farFromPlayer = p.distanceTo(this.player.pos) > 9;
+      const clearOfPillars = pillars.every((q) => Math.hypot(p.x - q.x, p.z - q.z) > q.r + 1.2);
+      if (farFromPlayer && clearOfPillars) break;
+    }
+    this.enemies.push(new Grunt(this, p, this.wave));
+  }
+
+  // ---------------------------------------------------------------- combat events
+
+  fireArrow(origin, dir, speed, damage, charge, perfect) {
+    this.arrows.spawn(origin, dir, speed, damage, charge, perfect);
+    this.sfx.release(charge, perfect);
+    this.stats.shots++;
+    if (perfect) {
+      this.stats.perfects++;
+      this.stats.streak++;
+      this.stats.bestStreak = Math.max(this.stats.bestStreak, this.stats.streak);
+      this.particles.spawn(origin, { count: 14, color: [3, 2.2, 0.6], speed: 5, up: 1, life: 0.35, size: 0.08, gravity: 2, dir, spread: 0.9 });
+      this.shake.add(0.18);
+    } else {
+      this.stats.streak = 0;
+      this.particles.spawn(origin, { count: 4, color: 0xd8cfb8, speed: 2, up: 0.5, life: 0.25, size: 0.06, gravity: 0, dir, spread: 1 });
+    }
+  }
+
+  onArrowHit(arrow, enemy, point) {
+    const result = enemy.hit(arrow.damage, arrow.dir, arrow.charge, arrow.perfect);
+    if (!result) return;
+    if (arrow.hitCount === 0) this.stats.hits++;
+    const feel = config.feel;
+    const full = arrow.charge >= 0.999;
+
+    const kind = arrow.perfect ? 'perfect' : full ? 'crit' : 'normal';
+    this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 0.8, 0)), Math.round(arrow.damage), kind);
+    this.particles.spawn(point, {
+      count: arrow.perfect ? 22 : 8 + Math.round(arrow.charge * 8),
+      color: arrow.perfect ? [3, 2.1, 0.5] : 0xb33a2a,
+      speed: 3 + arrow.charge * 5,
+      up: 2,
+      life: 0.5,
+      size: 0.1,
+      dir: arrow.dir,
+      spread: 1.1,
+    });
+
+    this.hitStop = Math.max(this.hitStop, arrow.perfect ? feel.perfectHitStop : feel.hitStop * (0.3 + 0.7 * arrow.charge));
+    this.shake.add(arrow.perfect ? 0.45 : 0.12 + 0.2 * arrow.charge);
+    this.sfx.hit(arrow.perfect);
+
+    if (result === 'stagger') {
+      this.stats.staggers++;
+      this.numbers.spawn(point.clone().add(new THREE.Vector3(0, 1.6, 0)), 'STAGGER', 'callout');
+      this.sfx.stagger();
+    }
+    if (result === 'kill') {
+      this.stats.kills++;
+      this.sfx.kill();
+      this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 26, color: 0x7a2a20, speed: 6, up: 4, life: 0.8, size: 0.16 });
+      this.particles.spawn(enemy.pos.clone().setY(0.9), { count: 10, color: 0x2a2420, speed: 3, up: 3, life: 1, size: 0.25 });
+    }
+  }
+
+  onArrowStopped(arrow, hitWall) {
+    if (hitWall) {
+      this.sfx.thunk();
+      this.particles.spawn(arrow.pos, { count: 5, color: 0x8a8070, speed: 2, up: 1, life: 0.35, size: 0.06 });
+    } else {
+      this.particles.spawn(arrow.pos.clone().setY(0.05), { count: 4, color: 0x5a5048, speed: 1.2, up: 1.5, life: 0.3, size: 0.05 });
+    }
+  }
+
+  onPlayerHit(enemy) {
+    this.sfx.hurt();
+    this.shake.add(0.6);
+    this.hitStop = Math.max(this.hitStop, 0.08);
+    this.numbers.spawn(this.player.pos.clone().setY(2), `-${config.grunt.damage}`, 'hurt');
+    this.particles.spawn(this.player.pos.clone().setY(1), { count: 14, color: 0xff3b2f, speed: 5, up: 2, life: 0.5, size: 0.1, dir: enemy.lungeDir, spread: 1 });
+    this.hud.vignette.classList.remove('flash');
+    void this.hud.vignette.offsetWidth; // restart the CSS animation
+    this.hud.vignette.classList.add('flash');
+  }
+
+  // ---------------------------------------------------------------- loop
+
+  run() {
+    this.timer = new THREE.Timer();
+    this.renderer.setAnimationLoop((ts) => {
+      this.timer.update(ts);
+      this.frame(Math.min(this.timer.getDelta(), 1 / 20));
+    });
+  }
+
+  frame(realDt, render = true) {
+    this.time += realDt;
+    this.handleKeys();
+    this.updateAim();
+
+    let dt = 0;
+    if (this.state === 'playing') {
+      dt = realDt;
+      if (this.hitStop > 0) {
+        this.hitStop -= realDt;
+        dt = realDt * 0.03;
+      }
+      this.simulate(dt);
+    }
+
+    this.particles.update(dt);
+    this.numbers.update(this.state === 'paused' ? 0 : realDt);
+    this.shake.update(realDt);
+    this.world.update(realDt, this.time);
+    this.updateCamera(realDt);
+    this.updateHud();
+    if (render) this.composer.render();
+    this.input.endFrame();
+  }
+
+  handleKeys() {
+    const i = this.input;
+    if (i.wasPressed('Backquote')) {
+      this.guiHidden = !this.guiHidden;
+      this.gui.show(!this.guiHidden);
+    }
+    if (i.wasPressed('KeyM')) {
+      const muted = this.sfx.toggleMute();
+      this.banner(muted ? 'Muted' : 'Sound on', '', 0.8);
+    }
+    if (i.wasPressed('KeyP') || i.wasPressed('Escape')) {
+      if (this.state === 'playing') this.setPaused(true);
+      else if (this.state === 'paused') this.setPaused(false);
+    }
+    if (i.wasPressed('KeyR') && (this.state === 'playing' || this.state === 'gameover' || this.state === 'paused')) {
+      this.sfx.unlock();
+      this.start();
+    }
+  }
+
+  simulate(dt) {
+    this.elapsed += dt;
+    this.player.update(dt, this.input, this.aimPoint, this);
+    for (const e of this.enemies) e.update(dt, this.player);
+    this.separate();
+    this.arrows.update(dt, this.enemies, this);
+    this.enemies = this.enemies.filter((e) => !e.removed);
+
+    if (this.player.dead) {
+      this.deathTimer += dt;
+      if (this.deathTimer > 1.3) this.gameOver();
+    } else {
+      this.updateWaves(dt);
+    }
+  }
+
+  /** Keep grunts from stacking on each other or standing inside the player. */
+  separate() {
+    const list = this.enemies;
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (a.state === 'dying') continue;
+      for (let j = i + 1; j < list.length; j++) {
+        const b = list[j];
+        if (b.state === 'dying') continue;
+        const dx = b.pos.x - a.pos.x;
+        const dz = b.pos.z - a.pos.z;
+        const d = Math.hypot(dx, dz);
+        const min = a.radius + b.radius;
+        if (d < min && d > 1e-4) {
+          const push = (min - d) / 2;
+          a.pos.x -= (dx / d) * push;
+          a.pos.z -= (dz / d) * push;
+          b.pos.x += (dx / d) * push;
+          b.pos.z += (dz / d) * push;
+        }
+      }
+      if (a.state !== 'lunge' && !this.player.dead) {
+        const dx = a.pos.x - this.player.pos.x;
+        const dz = a.pos.z - this.player.pos.z;
+        const d = Math.hypot(dx, dz);
+        const min = a.radius + 0.45;
+        if (d < min && d > 1e-4) {
+          a.pos.x = this.player.pos.x + (dx / d) * min;
+          a.pos.z = this.player.pos.z + (dz / d) * min;
+        }
+      }
+    }
+  }
+
+  updateAim() {
+    this.raycaster.setFromCamera(new THREE.Vector2(this.input.mouse.ndcX, this.input.mouse.ndcY), this.camera);
+    this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
+  }
+
+  updateCamera(dt) {
+    // Look slightly toward the cursor so you can see what you're aiming at.
+    const look = new THREE.Vector3(this.aimPoint.x - this.player.pos.x, 0, this.aimPoint.z - this.player.pos.z);
+    if (look.length() > 7) look.setLength(7);
+    const target = this.player.pos.clone().addScaledVector(look, 0.2);
+    this.camTarget.lerp(target, 1 - Math.exp(-6 * dt));
+    this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, config.feel.cameraZoom);
+    this.camera.lookAt(this.camTarget);
+    this.camera.position.add(this.shake.offset(this.shakeOffset, config.feel.shake));
+    this.camera.updateMatrixWorld();
+  }
+
+  // ---------------------------------------------------------------- HUD
+
+  updateHud() {
+    const h = this.hud;
+    const p = this.player;
+    const s = this.stats;
+    const pct = Math.max(0, p.hp / config.player.maxHp);
+    h.hpFill.style.width = `${pct * 100}%`;
+    h.hpFill.classList.toggle('low', pct < 0.3);
+    h.hpText.textContent = `${Math.ceil(p.hp)} / ${config.player.maxHp}`;
+    const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
+    h.stats.textContent = `Kills ${s.kills}  ·  Accuracy ${acc}%  ·  Perfects ${s.perfects}`;
+    h.wave.textContent = this.wave ? `Wave ${this.wave}` : '';
+    const alive = this.enemies.filter((e) => e.state !== 'dying').length + this.toSpawn;
+    h.enemies.textContent = this.wave && this.waveState === 'active' ? `${alive} remaining` : '';
+    h.streak.textContent = s.streak >= 2 ? `Perfect ×${s.streak}` : '';
+    h.streak.classList.toggle('show', s.streak >= 2);
+
+    // Reticle follows the mouse and tightens with charge.
+    const r = h.reticle;
+    r.style.transform = `translate(${this.input.mouse.x}px, ${this.input.mouse.y}px)`;
+    r.style.setProperty('--size', `${44 - 26 * p.charge}px`);
+    r.dataset.phase = this.state === 'playing' ? p.drawPhase : 'none';
+    r.style.display = this.state === 'playing' ? 'block' : 'none';
+  }
+
+  banner(title, sub = '', duration = 1.8) {
+    const b = this.hud.banner;
+    b.innerHTML = `<div class="title"></div><div class="sub"></div>`;
+    b.querySelector('.title').textContent = title;
+    b.querySelector('.sub').textContent = sub;
+    b.style.setProperty('--dur', `${duration}s`);
+    b.classList.remove('show');
+    void b.offsetWidth;
+    b.classList.add('show');
+  }
+
+  showOverlay(kind, newBest = false) {
+    const o = this.hud.overlay;
+    const s = this.stats;
+    const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
+    const perf = s.shots ? Math.round((s.perfects / s.shots) * 100) : 0;
+    const controls = `
+      <div class="controls">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
+        <div><kbd>Mouse</kbd><span>Aim</span></div>
+        <div><kbd>Hold LMB</kbd><span>Draw the bow (slows you down)</span></div>
+        <div><kbd>Release</kbd><span>Fire. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
+        <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
+        <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
+      </div>`;
+    if (kind === 'title') {
+      o.innerHTML = `
+        <h1>Draw &amp; Release</h1>
+        <p class="tag">A bow-combat prototype. Survive the waves.</p>
+        ${controls}
+        <p class="tip">Grunts flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them.</p>
+        <button>Click to start</button>
+        ${this.best.wave ? `<p class="best">Best: wave ${this.best.wave}, ${this.best.kills} kills</p>` : ''}`;
+    } else if (kind === 'paused') {
+      o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
+    } else {
+      const secs = Math.floor(this.elapsed);
+      o.innerHTML = `
+        <h1>You fell</h1>
+        <p class="tag">${newBest ? 'New best!' : `Best: wave ${this.best.wave}, ${this.best.kills} kills`}</p>
+        <div class="summary">
+          <div><b>${this.wave}</b><span>Wave reached</span></div>
+          <div><b>${s.kills}</b><span>Kills</span></div>
+          <div><b>${acc}%</b><span>Accuracy</span></div>
+          <div><b>${perf}%</b><span>Perfect shots</span></div>
+          <div><b>${s.bestStreak}</b><span>Best perfect streak</span></div>
+          <div><b>${s.staggers}</b><span>Staggers</span></div>
+          <div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b><span>Survived</span></div>
+        </div>
+        <button>Click to try again</button>
+        <p class="tip">Or press R</p>`;
+    }
+    o.classList.add('visible');
+  }
+
+  hideOverlay() {
+    this.hud.overlay.classList.remove('visible');
+  }
+
+  // ---------------------------------------------------------------- tuning panel
+
+  setupGui() {
+    const gui = (this.gui = new GUI({ title: 'Tuning  ( ` to hide )' }));
+    this.guiHidden = false;
+    const b = gui.addFolder('Bow');
+    b.add(config.bow, 'drawTime', 0.2, 2, 0.01).name('Draw time (s)');
+    b.add(config.bow, 'perfectWindow', 0.03, 0.5, 0.01).name('Perfect window (s)');
+    b.add(config.bow, 'minDamage', 1, 40, 1).name('Min damage');
+    b.add(config.bow, 'maxDamage', 5, 80, 1).name('Max damage');
+    b.add(config.bow, 'perfectMultiplier', 1, 4, 0.1).name('Perfect multiplier');
+    b.add(config.bow, 'minArrowSpeed', 5, 60, 1).name('Min arrow speed');
+    b.add(config.bow, 'maxArrowSpeed', 10, 100, 1).name('Max arrow speed');
+    b.add(config.bow, 'range', 8, 40, 1).name('Range');
+    b.add(config.bow, 'drawMoveMultiplier', 0, 1, 0.05).name('Move speed while drawing');
+    b.add(config.bow, 'fireCooldown', 0, 1, 0.01).name('Fire cooldown (s)');
+
+    const pl = gui.addFolder('Player');
+    pl.add(config.player, 'moveSpeed', 2, 14, 0.1).name('Move speed');
+    pl.add(config.player, 'maxHp', 20, 400, 10).name('Max HP');
+    pl.add(config.player, 'iFrames', 0, 2, 0.05).name('Invuln after hit (s)');
+    pl.add(config.player, 'healPerWave', 0, 100, 5).name('Heal per wave');
+
+    const g = gui.addFolder('Grunt');
+    g.add(config.grunt, 'baseHp', 5, 200, 1).name('Base HP');
+    g.add(config.grunt, 'speed', 0.5, 10, 0.1).name('Speed');
+    g.add(config.grunt, 'attackRange', 1, 6, 0.1).name('Attack range');
+    g.add(config.grunt, 'windupTime', 0.1, 1.5, 0.01).name('Windup (s)');
+    g.add(config.grunt, 'lungeSpeed', 4, 30, 0.5).name('Lunge speed');
+    g.add(config.grunt, 'lungeTime', 0.05, 0.6, 0.01).name('Lunge time (s)');
+    g.add(config.grunt, 'recoverTime', 0, 2, 0.05).name('Recover (s)');
+    g.add(config.grunt, 'damage', 1, 100, 1).name('Damage');
+    g.add(config.grunt, 'staggerCharge', 0, 1, 0.05).name('Charge to stagger');
+
+    const w = gui.addFolder('Waves');
+    w.add(config.waves, 'baseCount', 1, 20, 1).name('Wave 1 count');
+    w.add(config.waves, 'countPerWave', 0, 10, 1).name('+ per wave');
+    w.add(config.waves, 'hpGrowth', 0, 1, 0.01).name('HP growth / wave');
+    w.add(config.waves, 'speedGrowth', 0, 0.5, 0.01).name('Speed growth / wave');
+    w.add(config.waves, 'spawnInterval', 0.1, 3, 0.05).name('Spawn interval (s)');
+    w.add(config.waves, 'breakTime', 0.5, 10, 0.5).name('Break between waves');
+
+    const f = gui.addFolder('Feel');
+    f.add(config.feel, 'hitStop', 0, 0.2, 0.005).name('Hit-stop (s)');
+    f.add(config.feel, 'perfectHitStop', 0, 0.3, 0.005).name('Perfect hit-stop (s)');
+    f.add(config.feel, 'shake', 0, 3, 0.05).name('Screen shake');
+    f.add(config.feel, 'knockback', 0, 20, 0.5).name('Knockback');
+    f.add(config.feel, 'cameraZoom', 0.6, 1.6, 0.05).name('Camera distance');
+    f.add(config.feel, 'bloom').name('Bloom').onChange((v) => (this.bloom.enabled = v));
+    f.add(config.feel, 'bloomStrength', 0, 2, 0.05).name('Bloom strength').onChange((v) => (this.bloom.strength = v));
+
+    const actions = {
+      restart: () => {
+        this.sfx.unlock();
+        this.start();
+      },
+      copy: async () => {
+        const json = JSON.stringify(config, null, 2);
+        console.log(json);
+        try {
+          await navigator.clipboard.writeText(json);
+          this.banner('Settings copied', 'Paste them to share your tuning', 1.2);
+        } catch {
+          this.banner('Copy failed', 'Settings were printed to the console', 1.5);
+        }
+      },
+      reset: () => {
+        resetConfig();
+        gui.controllersRecursive().forEach((c) => c.updateDisplay());
+        this.bloom.enabled = config.feel.bloom;
+        this.bloom.strength = config.feel.bloomStrength;
+      },
+    };
+    gui.add(actions, 'restart').name('↻ Restart run');
+    gui.add(actions, 'copy').name('⧉ Copy settings JSON');
+    gui.add(actions, 'reset').name('⟲ Reset to defaults');
+
+    for (const folder of [pl, g, w, f]) folder.close();
+    gui.onFinishChange(() => saveConfig());
+  }
+
+  onResize() {
+    this.camera.aspect = innerWidth / innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(innerWidth, innerHeight);
+    this.composer.setSize(innerWidth, innerHeight);
+  }
+}
