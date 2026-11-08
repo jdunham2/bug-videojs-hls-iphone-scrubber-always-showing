@@ -118,7 +118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
       <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
-      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building, then walk to the glowing spots inside to do things. On a phone, drag on the left to move and tap ENTER.</p>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a parked car to drive it (H honks). On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
   </div>
@@ -476,7 +476,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'],
 ];
 let S = null;
 function newLife(name) {
@@ -597,6 +597,7 @@ function fire(why) {
   queueEvent({ kind: 'bad', title: 'You got fired', text: `${why} You were a ${J.title}. The Job Center has openings.` });
 }
 function passOut(why) {
+  if (driving) exitCar();
   S.day++; S.min = 8 * 60; S.energy = 35; S.happy -= 10;
   const lost = S.money > 0 ? Math.round(S.money * rand(0.05, 0.15)) : 0;
   S.money -= lost;
@@ -935,12 +936,13 @@ const sfx = {
   creak: () => tone(140, 1.1, 'sawtooth', 0.04, -70),
   whoosh: () => tone(900, 1.4, 'sawtooth', 0.04, -820),
   roar: () => { tone(90, 0.8, 'sawtooth', 0.13, -40); tone(65, 0.9, 'square', 0.07, -20, 0.05); },
+  honk: () => { tone(392, 0.22, 'square', 0.05); tone(494, 0.22, 'square', 0.04); },
   siren: () => { for (let i = 0; i < 4; i++) { tone(660, 0.18, 'square', 0.04, 0, i * 0.36); tone(880, 0.18, 'square', 0.04, 0, i * 0.36 + 0.18); } },
 };
 
 // ---------- player / world refresh ----------
 let P = { x: 900, y: 1130, vx: 0, vy: 0, face: -Math.PI / 2, t: 0 };
-function teleport(d) { if (inside) { exitBuilding(d); return; } P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
+function teleport(d) { if (driving) exitCar(true); if (inside) { exitBuilding(d); return; } P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
 function refreshHome() {
   for (const key of Object.keys(HOMES)) {
     const owned = S && S.home === key;
@@ -1187,6 +1189,7 @@ const LAYOUTS = {
   home_mansion: homeLayout('mansion', 560, 380, { floor: ['checker', '#f0ece4', '#b9ad98'], wall: '#f6f1e6', trim: '#c9a23a', counter: '#2a2a30', bedFrame: '#c9a23a', blanket: '#3a4a6a', couch: '#5a2c6a', rug: '#a83a3a' }),
 };
 function enterBuilding(id) {
+  if (driving) exitCar(true);
   const R = ROOMS[id] || buildRoom(id);
   if (inside) inside.g.visible = false;
   inside = R; R.g.visible = true; activeSolids = R.solids;
@@ -1286,10 +1289,10 @@ function updateChase(dt) {
   for (const c of chase.cops) {
     const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
     nearest = Math.min(nearest, d);
-    const sp = c.speed * (d > 700 ? 1.15 : 1);
+    const sp = c.speed * (d > 700 ? 1.15 : 1) * (driving ? 1.6 : 1);
     c.x += dx / d * sp * dt; c.y += dy / d * sp * dt; c.face = Math.atan2(dy, dx); c.t += dt * sp / 90;
     collide(c, 9, solids);
-    if (d < 24) { bust('A police dino tackled you mid-sprint.'); return; }
+    if (d < (driving ? 40 : 24)) { if (driving) exitCar(true); bust(driving ? 'Police dinos pulled you out of the car.' : 'A police dino tackled you mid-sprint.'); return; }
   }
   chase.lostT = nearest > 470 ? chase.lostT + dt : 0;
   if (chase.lostT > 5) { escapeChase('You lost them in the back streets.'); return; }
@@ -1308,6 +1311,167 @@ function syncChase() {
   }
 }
 
+// ---------- cars ----------
+// convertibles parked around town that anyone can borrow, plus AI traffic with compy drivers
+const cars = [];
+let driving = null, engine = null;
+const CAR_COLORS = ['#c0392b', '#2e86c1', '#f1c40f', '#27ae60', '#e67e22', '#8e44ad', '#ecf0f1', '#ff6ad5'];
+const COLOR_NAMES = { '#c0392b': 'red', '#2e86c1': 'blue', '#f1c40f': 'yellow', '#27ae60': 'green', '#e67e22': 'orange', '#8e44ad': 'purple', '#ecf0f1': 'white', '#ff6ad5': 'pink' };
+function buildCar(color) {
+  const root = new THREE.Group();
+  add(root, GEO.b, color, 0, 12, 0, 70, 12, 34);
+  add(root, GEO.b, color, 23, 19, 0, 24, 5, 32);
+  add(root, GEO.b, color, -27, 19, 0, 16, 5, 32);
+  add(root, GEO.b, '#2a2a30', -6, 17, 0, 10, 12, 28);
+  add(root, GEO.b, '#3a3a40', -14, 22, 0, 4, 12, 28);
+  const glass = add(root, GEO.b, '#bfe3ff', 10, 25, 0, 2, 12, 30, 0, 0, 0.5); glass.material = new THREE.MeshLambertMaterial({ color: '#bfe3ff', transparent: true, opacity: 0.45 }); glass.castShadow = false;
+  add(root, GEO.y, '#1a1a1a', 4, 22, -8, 5, 2, 5, 0, 0, Math.PI / 2 - 0.5);
+  const heads = [add(root, GEO.s, '!#fff6c8', 35, 15, 11, 3, 3, 3), add(root, GEO.s, '!#fff6c8', 35, 15, -11, 3, 3, 3)];
+  add(root, GEO.b, '!#ff3a2a', -35.5, 15, 11, 1, 3, 6); add(root, GEO.b, '!#ff3a2a', -35.5, 15, -11, 1, 3, 6);
+  const wheels = [];
+  for (const [x, z] of [[22, 17], [22, -17], [-22, 17], [-22, -17]]) {
+    const steer = group(root, x, 7, z), spin = group(steer, 0, 0, 0);
+    add(spin, GEO.y, '#1a1a1a', 0, 0, 0, 7, 6, 7, Math.PI / 2, 0, 0); add(spin, GEO.b, '#c9c9cf', 0, 0, z > 0 ? 3.2 : -3.2, 6, 1.6, 0.5);
+    wheels.push({ steer, spin, front: x > 0 });
+  }
+  return { root, wheels, heads };
+}
+function spawnCar(x, y, a, color, ai) {
+  const c = { x, y, a, v: 0, steer: 0, roll: 0, color, ai, wait: 0, honkT: 0, m: buildCar(color) };
+  scene.add(c.m.root);
+  if (ai) {
+    const pal = PALETTES[cars.length % PALETTES.length];
+    c.driver = makeCompy(pal, { crest: pal.crest, hat: Math.random() < 0.4 ? '#2a2a2a' : null });
+    c.driver.root.scale.setScalar(10 / 1.25); c.driver.root.position.set(-8, 6, 0); c.m.root.add(c.driver.root);
+    const [ix, iy] = pick(INTERSECTIONS); c.fx = ix; c.fy = iy; c.tx = ix; c.ty = iy; aiNext(c); c.x = ix; c.y = iy;
+  }
+  cars.push(c); return c;
+}
+function neighbors(x, y) {
+  const res = [];
+  for (const [sx, sy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    let best = null, bd = Infinity;
+    for (const [ix, iy] of INTERSECTIONS) {
+      const vx = ix - x, vy = iy - y;
+      if (sx ? (iy !== y || Math.sign(vx) !== sx) : (ix !== x || Math.sign(vy) !== sy)) continue;
+      const d = Math.abs(vx) + Math.abs(vy); if (d < bd) { bd = d; best = [ix, iy]; }
+    }
+    if (best) res.push(best);
+  }
+  return res;
+}
+function aiNext(c) {
+  const ns = neighbors(c.tx, c.ty), opts = ns.filter(([x, y]) => !(x === c.fx && y === c.fy));
+  const [x, y] = pick(opts.length ? opts : ns);
+  c.fx = c.tx; c.fy = c.ty; c.tx = x; c.ty = y;
+}
+function placeCars() {
+  for (const [x, y, a] of [[760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]])
+    spawnCar(x, y, a, CAR_COLORS[cars.length % CAR_COLORS.length], false);
+  for (let i = 0; i < 6; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
+}
+function enterCar(c) {
+  driving = c; c.v = 0; P.vx = P.vy = 0; goal('drive'); sfx.door();
+  log(`You hopped into the ${COLOR_NAMES[c.color] || ''} convertible. W to drive, A and D to steer, H to honk, E to get out.`, '');
+  if (actx && !muted) {
+    const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.value = 45; f.type = 'lowpass'; f.frequency.value = 400; g.gain.value = 0.035;
+    o.connect(f).connect(g).connect(actx.destination); o.start(); engine = { o, g };
+  }
+}
+function exitCar(stay) {
+  const c = driving; if (!c) return;
+  driving = null; c.v = 0;
+  if (engine) { engine.o.stop(); engine = null; }
+  if (!stay) {
+    for (const side of [1, -1]) {
+      const px = c.x + Math.cos(c.a + side * Math.PI / 2) * 36, py = c.y + Math.sin(c.a + side * Math.PI / 2) * 36;
+      const o = { x: px, y: py }; collide(o, 9, solids);
+      if (Math.hypot(o.x - px, o.y - py) < 4) { P.x = o.x; P.y = o.y; break; }
+      P.x = o.x; P.y = o.y;
+    }
+  }
+  sfx.door();
+}
+function honk() { sfx.honk(); for (const n of npcs) if (Math.hypot(n.x - P.x, n.y - P.y) < 120) n.wait = 0.8; }
+function driveUpdate(dt) {
+  const c = driving;
+  let thr = 0, st = 0;
+  if (keys.has('w') || keys.has('arrowup')) thr += 1;
+  if (keys.has('s') || keys.has('arrowdown')) thr -= 1;
+  if (keys.has('a') || keys.has('arrowleft')) st -= 1;
+  if (keys.has('d') || keys.has('arrowright')) st += 1;
+  if (joy.active) {
+    const m = Math.min(1, Math.hypot(joy.dx, joy.dy));
+    if (m > 0.2) { const want = Math.atan2(joy.dy, joy.dx), diff = (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); st = clamp(diff * 2, -1, 1); thr = Math.abs(diff) > 2.4 ? -m : m; }
+  }
+  const max = (S.flood ? 220 : 430) * (S.injured ? 0.85 : 1);
+  if (thr > 0) c.v += (c.v < 0 ? 700 : 300) * dt;
+  else if (thr < 0) c.v -= (c.v > 0 ? 700 : 220) * dt;
+  else c.v *= Math.max(0, 1 - 1.6 * dt);
+  c.v = clamp(c.v, -150, max);
+  c.steer += (st - c.steer) * Math.min(1, dt * 10);
+  c.a += c.steer * 2.5 * dt * clamp(c.v / 140, -1, 1);
+  const ox = c.x, oy = c.y;
+  c.x = clamp(c.x + Math.cos(c.a) * c.v * dt, 30, WORLD - 30); c.y = clamp(c.y + Math.sin(c.a) * c.v * dt, 30, WORLD - 30);
+  const before = { x: c.x, y: c.y }; collide(c, 24, solids);
+  let hit = Math.hypot(c.x - before.x, c.y - before.y) > 0.5;
+  for (const o of cars) {
+    if (o === c) continue;
+    const dx = c.x - o.x, dy = c.y - o.y, d = Math.hypot(dx, dy);
+    if (d < 40 && d > 0) { c.x = o.x + dx / d * 40; c.y = o.y + dy / d * 40; hit = true; if (o.ai) { o.wait = 1.5; if (o.honkT <= 0) { o.honkT = 2; sfx.honk(); } } }
+  }
+  if (hit && Math.abs(c.v) > 90) {
+    const hard = Math.abs(c.v) > 300;
+    sfx.crash(); shake = hard ? 14 : 6; burst(c.x, c.y, 16, hard ? 18 : 8, '#c9c9cf', 160, 3);
+    if (hard) { S.happy -= 3; log('CRUNCH. Watch where you are driving!', 'bad'); if (Math.random() < 0.15) { S.injured = true; log('You hurt yourself in the crash.', 'bad'); } }
+    c.v *= -0.25;
+  } else if (hit) c.v *= 0.5;
+  for (const n of npcs) {
+    const dx = n.x - c.x, dy = n.y - c.y, d = Math.hypot(dx, dy);
+    if (d < 40 && Math.abs(c.v) > 40) { n.x += dx / (d || 1) * 30; n.y += dy / (d || 1) * 30; n.wait = 1; }
+  }
+  c.roll += c.v * dt / 7;
+  P.x = c.x; P.y = c.y; P.face = c.a; P.vx = Math.cos(c.a) * c.v; P.vy = Math.sin(c.a) * c.v;
+  if (engine) { engine.o.frequency.value = 45 + Math.abs(c.v) * 0.28; engine.g.gain.value = 0.025 + Math.abs(c.v) / max * 0.03; }
+}
+function trafficUpdate(dt) {
+  for (const c of cars) {
+    if (!c.ai) continue;
+    c.honkT -= dt;
+    if (c.wait > 0) { c.wait -= dt; c.v = 0; continue; }
+    const dx = c.tx - c.fx, dy = c.ty - c.fy, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    const rx = -uy * 22, ry = ux * 22;
+    const gx = c.tx + rx, gy = c.ty + ry, rem = Math.hypot(gx - c.x, gy - c.y);
+    if (rem < 8) { aiNext(c); continue; }
+    let speed = 150;
+    const ahead = (px, py, r) => { const vx = px - c.x, vy = py - c.y, f = vx * ux + vy * uy, side = Math.abs(vx * uy - vy * ux); return f > 0 && f < r && side < 26; };
+    if (state === 'play' && !inside && ahead(P.x, P.y, driving ? 70 : 75)) { speed = 0; if (c.honkT <= 0 && !driving) { c.honkT = 3; sfx.honk(); } }
+    for (const o of cars) if (o !== c && ahead(o.x, o.y, 70)) speed = 0;
+    c.v += (speed - c.v) * Math.min(1, dt * 4);
+    const hx = (gx - c.x) / rem, hy = (gy - c.y) / rem;
+    c.x += hx * c.v * dt; c.y += hy * c.v * dt;
+    const want = Math.atan2(hy, hx); c.a += (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 6);
+    c.roll += c.v * dt / 7;
+  }
+}
+function syncCars() {
+  const night = S ? (S.min % 1440 < 380 || S.min % 1440 > 1150) : false;
+  for (const c of cars) {
+    c.m.root.position.set(c.x, 0, c.y); c.m.root.rotation.y = -c.a;
+    for (const w of c.m.wheels) { w.spin.rotation.z = -c.roll; if (w.front) w.steer.rotation.y = -(c === driving ? c.steer : 0) * 0.45; }
+    for (const h of c.m.heads) h.scale.setScalar(night ? 5 : 3);
+    if (c.driver) animDino(c.driver, gameT + c.x * 0.01, 0);
+  }
+}
+function carPush(o, r) {
+  for (const c of cars) {
+    if (c === driving) continue;
+    const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy);
+    if (d < r + 28 && d > 0) { o.x = c.x + dx / d * (r + 28); o.y = c.y + dy / d * (r + 28); }
+  }
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -1318,6 +1482,7 @@ addEventListener('keydown', e => {
   if (k === 'p') { togglePause(); return; }
   if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
   if (k === 'g' && state === 'play') { showGoals(); return; }
+  if (k === 'h' && state === 'play' && driving) { honk(); return; }
   if (k.startsWith('arrow')) e.preventDefault();
   keys.add(k);
 });
@@ -1328,7 +1493,9 @@ cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.ch
 const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
 function useNear() {
+  if (state === 'play' && driving) { exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
+  if (nearPlace.m) { enterCar(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -1340,6 +1507,8 @@ $('prompt').addEventListener('click', useNear);
 // ---------- loop ----------
 const cam = { x: 900, y: 1130 };
 function update(dt) {
+  trafficUpdate(dt);
+  if (driving) { driveUpdate(dt); P.t += dt; advance(dt * 4); if (state !== 'play') return; nearPlace = null; if (chase) { updateChase(dt); if (state !== 'play') return; } updateTownLife(dt); return; }
   let mx = 0, my = 0;
   if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
   if (keys.has('w') || keys.has('arrowup')) my -= 1; if (keys.has('s') || keys.has('arrowdown')) my += 1;
@@ -1350,6 +1519,7 @@ function update(dt) {
   if (inside) { P.x = clamp(P.x + P.vx * dt, inside.ox + 10, inside.ox + inside.w - 10); P.y = clamp(P.y + P.vy * dt, inside.oy + 10, inside.oy + inside.d - 6); }
   else { P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10); }
   collide(P, 9);
+  if (!inside) carPush(P, 9);
   if (m > 0.15) P.face += (((Math.atan2(my, mx) - P.face + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 14);
   P.t += dt * (0.3 + Math.hypot(P.vx, P.vy) / 120);
   advance(dt * 4);
@@ -1357,12 +1527,16 @@ function update(dt) {
   // nearest door
   nearPlace = null; let best = inside ? 34 : 50;
   for (const p of (inside ? inside.stations : Object.values(PLACES))) { const pt = p.door || p, d = Math.hypot(P.x - pt.x, P.y - pt.y); if (d < best) { best = d; nearPlace = p; } }
+  if (!inside) for (const c of cars) if (!c.ai) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
   if (inside) updateInterior(dt);
   if (chase) { updateChase(dt); if (state !== 'play') return; }
+  updateTownLife(dt);
+}
+function updateTownLife(dt) {
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
-    const dx = P.x - trex.x, dy = P.y - trex.y, d = Math.hypot(dx, dy) || 1, insideNear = !!inside || (nearPlace && best < 30);
+    const dx = P.x - trex.x, dy = P.y - trex.y, d = Math.hypot(dx, dy) || 1, insideNear = !!inside || (!driving && nearPlace && nearPlace.door && Math.hypot(P.x - nearPlace.door.x, P.y - nearPlace.door.y) < 30);
     const chase = d < 520 && !insideNear;
     const tx = chase ? dx / d : (WORLD / 2 - trex.x) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1), ty = chase ? dy / d : (WORLD / 2 - trex.y) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1);
     const ts = chase ? 165 : 90;
@@ -1438,8 +1612,9 @@ function fadeView(dt) {
 }
 function sync3D() {
   const pm = player;
-  pm.root.position.set(P.x, flood ? 2 : 0, P.y); pm.root.rotation.y = -P.face; pm.root.scale.setScalar(14 / 1.25);
-  animDino(pm, P.t, state === 'play' ? Math.min(1, Math.hypot(P.vx, P.vy) / 60) : 0);
+  syncCars();
+  if (driving) { const c = driving; pm.root.position.set(c.x - Math.cos(c.a) * 8, 6, c.y - Math.sin(c.a) * 8); pm.root.rotation.y = -c.a; pm.root.scale.setScalar(11 / 1.25); animDino(pm, P.t, 0); }
+  else { pm.root.position.set(P.x, flood ? 2 : 0, P.y); pm.root.rotation.y = -P.face; pm.root.scale.setScalar(14 / 1.25); animDino(pm, P.t, state === 'play' ? Math.min(1, Math.hypot(P.vx, P.vy) / 60) : 0); }
   pm.root.rotation.z = S && S.injured ? Math.sin(gameT * 6) * 0.05 : 0;
   for (const n of npcs) { const horiz = Math.abs(Math.cos(n.face || 0)) > 0.5; n.m.root.position.set(horiz ? n.x : n.x + n.side, 0, horiz ? n.y + n.side : n.y); n.m.root.rotation.y = -(n.face || 0); animDino(n.m, n.t, n.wait > 0 ? 0 : 1); }
   for (const f of [spouseM, ...kidMs]) if (f) { f.m.root.position.set(f.x, 0, f.y); f.m.root.rotation.y = -(f.face || 0); animDino(f.m, f.t * 2, 1, f === spouseM ? 9 : 14); if (f !== spouseM) f.m.body.position.y = Math.abs(Math.sin(f.t * 8)) * 0.6; }
@@ -1448,9 +1623,9 @@ function sync3D() {
   if (chase) syncChase();
   if (inside) syncInterior();
   const sx = shake ? rand(-shake, shake) * 0.5 : 0, sz = shake ? rand(-shake, shake) * 0.5 : 0;
-  const portrait = H > W ? 1.4 : 1, d = (inside ? 300 : 470) * portrait;
+  const portrait = H > W ? 1.4 : 1, d = (inside ? 300 : driving ? 600 : 470) * portrait;
   if (state === 'title') { const a = gameT * 0.06; camera.position.set(900 + Math.cos(a) * 700, 480, 900 + Math.sin(a) * 700); camera.lookAt(900, 0, 900); }
-  else { const tyc = inside ? Math.min(P.y, inside.oy + inside.d - 130) : P.y + P.vy * 0.3; cam.x += (P.x + P.vx * 0.3 - cam.x) * 0.08; cam.y += (tyc - cam.y) * 0.08; camera.position.set(cam.x + sx, d * 0.95, cam.y + d * 0.7 + sz); camera.lookAt(cam.x + sx, 0, cam.y - 20 + sz); }
+  else { const look = driving ? 0.45 : 0.3, tyc = inside ? Math.min(P.y, inside.oy + inside.d - 130) : P.y + P.vy * look; cam.x += (P.x + P.vx * (driving ? 0.45 : 0.3) - cam.x) * 0.08; cam.y += (tyc - cam.y) * 0.08; camera.position.set(cam.x + sx, d * 0.95, cam.y + d * 0.7 + sz); camera.lookAt(cam.x + sx, 0, cam.y - 20 + sz); }
   scene.fog.near = inside ? 3000 : d * 1.6; scene.fog.far = inside ? 6000 : d * 4.5;
 }
 const _v = new THREE.Vector3();
@@ -1505,6 +1680,7 @@ function drawMini() {
     if (p.h) { g.fillStyle = J && J.place === p.id ? '#ffbe55' : 'rgba(220,220,230,.75)'; g.fillRect(p.x0 * k, p.y0 * k, (p.x1 - p.x0) * k, (p.y1 - p.y0) * k); }
     if (p.home && S.home === p.home) { g.fillStyle = '#8fdc6a'; g.fillRect(p.door.x * k - 4, (p.door.y + 100) * k - 4, 8, 8); }
   }
+  for (const c of cars) { g.fillStyle = c === driving ? '#ffe08a' : c.ai ? 'rgba(30,30,40,.8)' : c.color; g.fillRect(c.x * k - 2, c.y * k - 2, 4, 4); }
   if (trex) { g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(trex.x * k, trex.y * k, 5, 0, 7); g.fill(); }
   g.save(); g.translate(P.x * k, P.y * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
@@ -1524,12 +1700,14 @@ function hud() {
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
   $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
-  const pr = $('prompt'), show = state === 'play' && nearPlace;
+  const pr = $('prompt'), show = state === 'play' && (nearPlace || driving);
   pr.hidden = !show;
   if (show) {
     const np = nearPlace;
     let what;
-    if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
+    if (driving) what = `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
+    else if (np.m) what = `Drive the ${COLOR_NAMES[np.color] || ''} convertible`;
+    else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
     else if (np.id === 'bench') what = 'Use the park bench';
     else if (np.home) what = S.home === np.home ? 'Go inside your home' : `Look at the ${np.name.toLowerCase()} (${np.home === 'burrow' ? 'for rent' : 'for sale'})`;
     else what = closedWhy(np.id) ? `${np.name} (closed)` : `Go into ${np.name}`;
@@ -1573,10 +1751,10 @@ $('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(
 $('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
-$('quitBtn').addEventListener('click', () => { save(); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
+$('quitBtn').addEventListener('click', () => { save(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
-buildTown(); spawnNPCs();
+buildTown(); spawnNPCs(); placeCars();
 player = makeCompy(PALETTES[0], { crest: PALETTES[0].crest }); scene.add(player.root);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => signs.forEach(d => d()));
 { const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; }
@@ -1585,6 +1763,7 @@ function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
   if (state === 'play') update(dt);
   updateFx(dt);
+  if (state !== 'play') { if (state === 'title') trafficUpdate(dt); }
   if (state === 'title') for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } }
   shake = Math.max(0, shake - dt * 30);
   lighting(); fadeView(dt); sync3D();
