@@ -3,9 +3,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
 <style>
-/* Layout: full-bleed jungle arena on canvas; HUD chips float in the corners, modal panels center over the paused world */
+/* Layout: full-bleed 3D jungle valley; HUD chips float in the corners, modal panels center over the paused world */
 :root {
-  --jungle: #13241a;
+  --jungle: #0f2016;
   --panel: rgba(10, 20, 14, 0.82);
   --leaf: #7fd35b;
   --amber: #ffb347;
@@ -21,7 +21,8 @@
 html, body { margin: 0; height: 100%; background: var(--jungle); color: var(--bone); font-family: var(--body); overflow: hidden; }
 body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 #game { position: fixed; inset: 0; }
-#cv { display: block; width: 100%; height: 100%; }
+#cv, #fx { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+#fx { pointer-events: none; }
 
 .hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; }
 .chip { background: var(--panel); border: 2px solid rgba(127, 211, 91, 0.3); border-radius: 12px; padding: 8px 12px; }
@@ -40,16 +41,16 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 .icon-btn { font: 800 13px var(--body); color: var(--bone); background: var(--panel); border: 2px solid rgba(127, 211, 91, 0.3); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
 .icon-btn:focus-visible, .btn:focus-visible, .perk:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
-.boss-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(420px, 70vw); text-align: center; pointer-events: none; }
+.boss-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(420px, 60vw); text-align: center; pointer-events: none; }
 .boss-bar .label { font-family: var(--display); font-size: 18px; color: var(--blood); letter-spacing: 1px; text-shadow: 0 2px 0 #000; }
 .boss-bar .bar { height: 14px; border: 2px solid rgba(0,0,0,.5); }
 
-.toast { position: absolute; top: 28%; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: clamp(28px, 6vw, 54px); color: var(--amber); text-shadow: 0 3px 0 var(--ink), 0 0 24px rgba(0,0,0,.6); pointer-events: none; opacity: 0; transition: opacity 0.25s; padding-inline: 16px; text-wrap: balance; }
+.toast { position: absolute; top: 26%; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: clamp(28px, 6vw, 54px); color: var(--amber); text-shadow: 0 3px 0 var(--ink), 0 0 24px rgba(0,0,0,.6); pointer-events: none; opacity: 0; transition: opacity 0.25s; padding-inline: 16px; text-wrap: balance; }
 .toast small { display: block; font-family: var(--body); font-weight: 800; font-size: clamp(14px, 2.4vw, 18px); color: var(--bone); margin-top: 6px; }
 .toast.show { opacity: 1; }
 
-.screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 16, 11, 0.6); }
-.panel { background: var(--panel); border: 3px solid rgba(127, 211, 91, 0.35); border-radius: 18px; padding: 24px; width: min(520px, 100%); max-height: 100%; overflow: auto; text-align: center; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 16, 11, 0.55); }
+.panel { background: var(--panel); border: 3px solid rgba(127, 211, 91, 0.35); border-radius: 18px; padding: 24px; width: min(540px, 100%); max-height: 100%; overflow: auto; text-align: center; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.5); box-sizing: border-box; }
 .panel h1, .panel h2 { margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: 1px; text-wrap: balance; }
 .panel h1 { font-size: clamp(44px, 11vw, 76px); line-height: 0.95; color: var(--leaf); text-shadow: 0 4px 0 var(--ink); }
 .panel h2 { font-size: clamp(30px, 7vw, 44px); color: var(--amber); }
@@ -61,6 +62,7 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 .keys kbd { font: 800 12px var(--body); background: rgba(255,255,255,.1); border-radius: 5px; padding: 2px 6px; color: var(--bone); }
 .btn { font: 400 22px var(--display); letter-spacing: 1px; color: var(--ink); background: var(--leaf); border: 0; border-radius: 12px; padding: 12px 28px; cursor: pointer; justify-self: center; box-shadow: 0 4px 0 #3f7a2a; }
 .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #3f7a2a; }
+.btn:disabled { opacity: 0.6; cursor: wait; }
 .perks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 520px) { .perks { grid-template-columns: 1fr; } }
 .perk { font-family: var(--body); color: var(--bone); background: rgba(255,255,255,.06); border: 2px solid rgba(255, 179, 71, 0.4); border-radius: 12px; padding: 14px 10px; cursor: pointer; display: grid; gap: 6px; text-align: center; }
@@ -72,6 +74,7 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 .results div { display: grid; gap: 2px; }
 .results b { font-family: var(--display); font-weight: 400; font-size: 28px; color: var(--bone); }
 .results span { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+.err { color: var(--blood); font-weight: 800; }
 
 #biteBtn { position: absolute; right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 92px; height: 92px; border-radius: 50%; border: 4px solid rgba(0,0,0,.35); background: var(--blood); color: var(--bone); font: 400 22px var(--display); letter-spacing: 1px; box-shadow: 0 5px 0 #8a2226; }
 #biteBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #8a2226; }
@@ -79,6 +82,7 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 
 <div id="game">
   <canvas id="cv" aria-label="Dino Chomp game area"></canvas>
+  <canvas id="fx"></canvas>
 
   <div class="hud" id="hud" hidden>
     <div class="chip stat-card">
@@ -106,10 +110,11 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
       <h1>Dino<br>Chomp</h1>
       <p>You hatched at the bottom of the food chain. Eat bugs and mice, grow bigger and stronger, and take the valley from the boar king, Old Tusk.</p>
       <div class="foodchain" aria-label="Food chain from smallest to largest">
-        <span>Beetle</span><span>Mouse</span><span>Rat</span><span>Lizard</span><span>Rabbit</span><span>Snake</span><span>Fox</span><span>Boar</span><span class="top">Old Tusk</span>
+        <span>Beetle</span><span>Cricket</span><span>Mouse</span><span>Rat</span><span>Frog</span><span>Lizard</span><span>Squirrel</span><span>Rabbit</span><span>Duck</span><span>Snake</span><span>Turtle</span><span>Fox</span><span>Raccoon</span><span>Wolf</span><span>Goat</span><span>Boar</span><span>Deer</span><span>Crocodile</span><span>Bear</span><span class="top">Old Tusk</span>
       </div>
       <p class="keys">A <b style="color:var(--leaf)">green ring</b> means you can eat it. A <b style="color:var(--blood)">red ring</b> means it is stronger than you, for now.</p>
       <p class="keys"><kbd>WASD</kbd> / <kbd>Arrows</kbd> move &middot; <kbd>Space</kbd> or click to bite &middot; <kbd>P</kbd> pause<br>On a phone: drag on the left to move, tap BITE.</p>
+      <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
       <button class="btn" id="startBtn" type="button">Hatch</button>
     </div>
   </div>
@@ -139,17 +144,39 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
 'use strict';
-const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
+if (!window.THREE) { $('loadErr').hidden = false; $('startBtn').disabled = true; return; }
+
+const cv = $('cv'), fx = $('fx'), fctx = fx.getContext('2d');
 let W = 0, H = 0, DPR = 1;
+
+// ---------- three.js setup ----------
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#0f2016');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 900, 2400);
+const camera = new THREE.PerspectiveCamera(42, 1, 10, 8000);
+scene.add(new THREE.HemisphereLight('#e4f7d4', '#2b3d1f', 0.8));
+const sun = new THREE.DirectionalLight('#fff0d0', 0.8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -750, right: 750, top: 750, bottom: -750, near: 10, far: 3000 });
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
 function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
+  DPR = Math.min(1.75, window.devicePixelRatio || 1);
   W = cv.clientWidth; H = cv.clientHeight;
-  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  renderer.setPixelRatio(DPR); renderer.setSize(W, H, false);
+  camera.aspect = W / H; camera.updateProjectionMatrix();
+  fx.width = Math.round(W * DPR); fx.height = Math.round(H * DPR);
 }
 addEventListener('resize', resize); resize();
 
@@ -162,24 +189,260 @@ const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d 
 const needXp = L => 5 + L * L * 3;
 const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+// ---------- model kit ----------
+const GEO = {
+  s: new THREE.SphereGeometry(1, 12, 9),
+  b: new THREE.BoxGeometry(1, 1, 1),
+  c: new THREE.ConeGeometry(1, 1, 8),
+  y: new THREE.CylinderGeometry(1, 1, 1, 8),
+  d: new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  ico: new THREE.IcosahedronGeometry(1, 0),
+  dod: new THREE.DodecahedronGeometry(1, 0),
+};
+const MATS = {};
+const mat = c => MATS[c] || (MATS[c] = new THREE.MeshLambertMaterial({ color: c }));
+const WHITE = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+function add(parent, geo, color, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, mat(color));
+  m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz);
+  m.castShadow = true; m.userData.base = m.material;
+  parent.add(m); return m;
+}
+function group(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
+function leg(parent, x, y, z, len, r, color, foot) {
+  const g = group(parent, x, y, z);
+  add(g, GEO.y, color, 0, -len / 2, 0, r, len, r);
+  if (foot) add(g, GEO.s, foot, r * 0.3, -len, 0, r * 1.4, r * 0.7, r * 1.2);
+  return g;
+}
+function eyes(head, x, y, zz, r, white = '#ffffff', pupil = '#111111') {
+  for (const s of [-1, 1]) {
+    add(head, GEO.s, white, x, y, s * zz, r, r, r * 0.8);
+    add(head, GEO.s, pupil, x + r * 0.55, y + r * 0.1, s * (zz + r * 0.25), r * 0.5, r * 0.55, r * 0.5);
+  }
+}
+function setFlash(model, on) {
+  if (model.flashed === on) return;
+  model.flashed = on;
+  model.root.traverse(o => { if (o.isMesh && o.userData.base) o.material = on ? WHITE : o.userData.base; });
+}
+
+// Generic four-legged animal, unit scale, facing +x
+function quad(o) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0);
+  const L = o.leg, bl = o.bl || 1.05, bh = o.bh || 0.62, bw = o.bw || 0.62, by = L + bh * 0.7;
+  add(body, GEO.s, o.color, 0, by, 0, bl, bh, bw);
+  if (o.belly) add(body, GEO.s, o.belly, 0.05, by - bh * 0.3, 0, bl * 0.82, bh * 0.62, bw * 0.84);
+  const legs = [];
+  const lr = o.legR || 0.12, lc = o.legColor || o.color;
+  for (const [sx, sz] of [[1, -1], [1, 1], [-1, -1], [-1, 1]]) legs.push(leg(body, sx * bl * 0.55, L + 0.05, sz * bw * 0.55, L + 0.05, lr, lc, o.foot));
+  const hs = o.hs || 0.48;
+  const head = group(body, bl * 0.92, by + bh * (o.headUp ?? 0.5), 0);
+  const hc = o.headColor || o.color;
+  add(head, GEO.s, hc, 0.05, 0, 0, hs * 1.1, hs, hs * 0.95);
+  if (o.snout) add(head, GEO.s, o.snoutColor || hc, hs * 0.85, -hs * 0.18, 0, hs * o.snout, hs * 0.5, hs * 0.52);
+  add(head, GEO.s, o.nose || '#222222', hs * (0.85 + (o.snout || 0.3) * 0.95), -hs * 0.12, 0, hs * 0.16, hs * 0.14, hs * 0.2);
+  eyes(head, hs * 0.65, hs * 0.28, hs * 0.48, hs * 0.2, '#ffffff', o.eye || '#111111');
+  const ec = o.earColor || hc;
+  if (o.ears === 'round') for (const s of [-1, 1]) add(head, GEO.s, ec, -hs * 0.1, hs * 0.8, s * hs * 0.55, hs * 0.14, hs * 0.38, hs * 0.38);
+  if (o.ears === 'pointy') for (const s of [-1, 1]) add(head, GEO.c, ec, -hs * 0.05, hs * 1.05, s * hs * 0.48, hs * 0.26, hs * 0.65, hs * 0.18, s * 0.2, 0, 0);
+  if (o.ears === 'tall') for (const s of [-1, 1]) {
+    add(head, GEO.s, ec, -hs * 0.35, hs * 1.45, s * hs * 0.32, hs * 0.18, hs * 1.05, hs * 0.28, s * 0.18, 0, 0.35);
+    add(head, GEO.s, '#e7a7b0', -hs * 0.3, hs * 1.45, s * hs * 0.36, hs * 0.08, hs * 0.85, hs * 0.18, s * 0.18, 0, 0.35);
+  }
+  if (o.mask) add(head, GEO.s, o.mask, hs * 0.5, hs * 0.22, 0, hs * 0.35, hs * 0.24, hs * 0.96);
+  if (o.horns) for (const s of [-1, 1]) add(head, GEO.c, o.horns, -hs * 0.25, hs * 1.0, s * hs * 0.32, hs * 0.16, hs * 1.1, hs * 0.16, s * 0.15, 0, 0.9);
+  if (o.antlers) for (const s of [-1, 1]) {
+    const a = group(head, -hs * 0.1, hs * 0.85, s * hs * 0.35); a.rotation.set(s * 0.35, 0, 0.35);
+    add(a, GEO.y, o.antlers, 0, hs * 0.8, 0, 0.035, hs * 1.6, 0.035);
+    add(a, GEO.y, o.antlers, hs * 0.25, hs * 1.0, 0, 0.03, hs * 0.7, 0.03, 0, 0, -0.9);
+    add(a, GEO.y, o.antlers, -hs * 0.2, hs * 1.35, 0, 0.03, hs * 0.6, 0.03, 0, 0, 0.8);
+  }
+  if (o.tusks) for (const s of [-1, 1]) add(head, GEO.c, '#f4ecd8', hs * (0.85 + o.snout * 0.6), -hs * 0.1, s * hs * 0.36, hs * 0.1, hs * o.tusks, hs * 0.1, 0, 0, -0.5);
+  if (o.beard) add(head, GEO.c, o.beard, hs * 0.75, -hs * 0.75, 0, hs * 0.15, hs * 0.5, hs * 0.15, Math.PI, 0, 0);
+  if (o.ridge) for (let i = 0; i < 7; i++) add(body, GEO.c, o.ridge, bl * 0.6 - i * bl * 0.2, by + bh * 0.95, 0, 0.06, 0.25, 0.1);
+  let tail = null;
+  const tc = o.tailColor || o.color, ty = by + bh * 0.15;
+  if (o.tail === 'thin') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.y, tc, -0.55, -0.12, 0, 0.04, 1.1, 0.04, 0, 0, Math.PI / 2 + 0.25); }
+  if (o.tail === 'bushy' || o.tail === 'ringed') {
+    tail = group(body, -bl * 0.9, ty, 0);
+    add(tail, GEO.s, tc, -0.55, 0.05, 0, 0.65, 0.24, 0.24, 0, 0, -0.25);
+    if (o.tip) add(tail, GEO.s, o.tip, -1.08, 0.18, 0, 0.18, 0.15, 0.15);
+    if (o.tail === 'ringed') for (const x of [-0.35, -0.65, -0.95]) add(tail, GEO.s, '#2b2b2b', x, 0.1 - x * 0.12, 0, 0.07, 0.25, 0.25, 0, 0, -0.25);
+  }
+  if (o.tail === 'up') { tail = group(body, -bl * 0.85, ty, 0); add(tail, GEO.s, tc, -0.3, 0.6, 0, 0.32, 0.85, 0.3, 0, 0, 0.35); }
+  if (o.tail === 'puff') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.s, tc, 0, 0, 0, 0.22, 0.22, 0.22); }
+  if (o.tail === 'stub') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.s, tc, 0, 0, 0, 0.14, 0.12, 0.12); }
+  return { root, body, head, legs, tail };
+}
+
+const MODELS = {
+  beetle() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    for (const x of [-0.45, 0, 0.45]) for (const s of [-1, 1]) {
+      const g = group(body, x, 0.25, 0); legs.push(g);
+      add(g, GEO.b, '#1a1c2c', 0, -0.05, s * 0.55, 0.08, 0.08, 0.9, s * 0.35, 0, 0);
+    }
+    add(body, GEO.s, '#3a3f6b', -0.05, 0.42, 0, 1, 0.5, 0.78);
+    add(body, GEO.b, '#1a1c2c', -0.1, 0.9, 0, 1.6, 0.05, 0.05);
+    add(body, GEO.s, '#20233f', 0.85, 0.35, 0, 0.38, 0.3, 0.42);
+    add(body, GEO.s, '#9fb2ff', -0.25, 0.75, -0.3, 0.3, 0.1, 0.15);
+    for (const s of [-1, 1]) add(body, GEO.y, '#1a1c2c', 1.25, 0.5, s * 0.18, 0.03, 0.6, 0.03, s * 0.4, 0, -1.0);
+    return { root, body, legs, legAxis: 'y' };
+  },
+  cricket() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    add(body, GEO.s, '#6f6a2c', 0, 0.45, 0, 1.15, 0.32, 0.34);
+    add(body, GEO.s, '#5b5622', 0.95, 0.5, 0, 0.32, 0.3, 0.3);
+    for (const s of [-1, 1]) {
+      add(body, GEO.y, '#3b3815', 1.6, 0.9, s * 0.2, 0.02, 1.4, 0.02, s * 0.5, 0, -0.9);
+      const g = group(body, -0.2, 0.55, s * 0.28); legs.push(g);
+      add(g, GEO.b, '#57521f', -0.35, 0.25, 0, 0.9, 0.16, 0.12, 0, 0, -0.5);
+      add(g, GEO.b, '#3b3815', -0.6, -0.1, 0, 0.08, 0.7, 0.08, 0, 0, 0.3);
+    }
+    eyes(body, 1.1, 0.62, 0.2, 0.1);
+    return { root, body, legs, hop: 0.9, legAxis: 'none' };
+  },
+  mouse: () => quad({ color: '#a3a3ad', belly: '#d8d6dc', leg: 0.22, legR: 0.08, hs: 0.5, snout: 0.6, nose: '#f1a7b5', ears: 'round', earColor: '#f1a7b5', tail: 'thin', tailColor: '#e48fa0' }),
+  rat: () => quad({ color: '#6e5a4c', belly: '#9b8778', leg: 0.24, legR: 0.09, hs: 0.45, snout: 0.75, nose: '#d48c95', ears: 'round', earColor: '#d48c95', tail: 'thin', tailColor: '#c2808a', bl: 1.15 }),
+  frog() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0);
+    add(body, GEO.s, '#4f9a3a', 0, 0.5, 0, 0.95, 0.55, 0.85);
+    add(body, GEO.s, '#d8e59a', 0.25, 0.35, 0, 0.7, 0.35, 0.65);
+    for (const s of [-1, 1]) {
+      add(body, GEO.s, '#4f9a3a', 0.45, 0.95, s * 0.38, 0.26, 0.26, 0.26);
+      add(body, GEO.s, '#f2e86b', 0.55, 1.02, s * 0.45, 0.16, 0.16, 0.12);
+      add(body, GEO.s, '#111111', 0.62, 1.04, s * 0.5, 0.08, 0.1, 0.07);
+      add(body, GEO.s, '#3c7d2b', -0.55, 0.28, s * 0.62, 0.55, 0.22, 0.28);
+      add(body, GEO.s, '#3c7d2b', 0.6, 0.15, s * 0.45, 0.2, 0.12, 0.25);
+    }
+    add(body, GEO.b, '#2c5c22', 0.85, 0.48, 0, 0.05, 0.04, 0.7);
+    return { root, body, legs: [], hop: 1.2 };
+  },
+  lizard() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    add(body, GEO.s, '#8bbf3a', 0, 0.32, 0, 1.0, 0.26, 0.36);
+    add(body, GEO.s, '#7aa932', 1.05, 0.36, 0, 0.42, 0.22, 0.3);
+    for (const x of [-0.45, 0, 0.35]) add(body, GEO.s, '#e7d24a', x, 0.55, 0, 0.1, 0.05, 0.1);
+    eyes(body, 1.2, 0.48, 0.18, 0.08);
+    for (const [x, s] of [[0.5, -1], [0.5, 1], [-0.5, -1], [-0.5, 1]]) {
+      const g = group(body, x, 0.3, s * 0.3); legs.push(g);
+      add(g, GEO.y, '#6e9a2b', 0, -0.08, s * 0.25, 0.06, 0.5, 0.06, s * 1.2, 0, 0);
+    }
+    const tail = group(body, -0.95, 0.3, 0);
+    add(tail, GEO.c, '#7aa932', -0.8, 0, 0, 0.2, 1.7, 0.2, 0, 0, Math.PI / 2);
+    return { root, body, legs, tail, legAxis: 'y' };
+  },
+  squirrel: () => quad({ color: '#b5652d', belly: '#ecd2a8', leg: 0.25, legR: 0.09, hs: 0.5, snout: 0.45, ears: 'pointy', tail: 'up', tailColor: '#a65a26', bl: 0.95 }),
+  rabbit: () => quad({ color: '#c9b291', belly: '#ede2cf', leg: 0.28, legR: 0.11, hs: 0.5, snout: 0.4, nose: '#e5a3ad', ears: 'tall', tail: 'puff', tailColor: '#f6f1e8', bh: 0.7 }),
+  duck() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    for (const s of [-1, 1]) legs.push(leg(body, 0.1, 0.4, s * 0.25, 0.4, 0.05, '#f08a24', '#f08a24'));
+    add(body, GEO.s, '#8a6a4a', 0, 0.8, 0, 0.9, 0.55, 0.62);
+    add(body, GEO.s, '#efe7d6', 0.25, 0.65, 0, 0.6, 0.35, 0.5);
+    add(body, GEO.c, '#5e4630', -0.95, 0.95, 0, 0.25, 0.5, 0.25, 0, 0, 1.2);
+    for (const s of [-1, 1]) add(body, GEO.s, '#6d5236', -0.1, 0.9, s * 0.5, 0.55, 0.3, 0.12);
+    add(body, GEO.y, '#2f6b3d', 0.7, 1.2, 0, 0.16, 0.6, 0.16, 0, 0, -0.3);
+    const head = group(body, 0.85, 1.55, 0);
+    add(head, GEO.s, '#2f6b3d', 0, 0, 0, 0.36, 0.32, 0.3);
+    add(head, GEO.b, '#f2a52c', 0.38, -0.08, 0, 0.36, 0.1, 0.22);
+    eyes(head, 0.18, 0.08, 0.24, 0.07);
+    add(body, GEO.y, '#ffffff', 0.72, 1.33, 0, 0.17, 0.05, 0.17, 0, 0, -0.3);
+    return { root, body, head, legs, waddle: true };
+  },
+  snake() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), segs = [];
+    for (let i = 0; i < 11; i++) {
+      const r = 0.3 * (1 - i / 14);
+      segs.push(add(body, GEO.s, i % 2 ? '#c7b23a' : '#5f8a28', 0.5 - i * 0.32, r, 0, r * 1.2, r, r));
+    }
+    const head = group(body, 0.85, 0.28, 0);
+    add(head, GEO.s, '#4e7520', 0, 0, 0, 0.38, 0.24, 0.3);
+    eyes(head, 0.15, 0.12, 0.2, 0.08, '#ffda3a');
+    add(head, GEO.b, '#d33333', 0.45, -0.05, 0, 0.3, 0.02, 0.05);
+    return { root, body, head, legs: [], segs };
+  },
+  turtle() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    for (const [x, s] of [[0.55, -1], [0.55, 1], [-0.55, -1], [-0.55, 1]]) {
+      const g = group(body, x, 0.3, s * 0.6); legs.push(g);
+      add(g, GEO.s, '#7c8f4a', 0, -0.12, 0, 0.2, 0.2, 0.25);
+    }
+    add(body, GEO.y, '#4e5a2c', 0, 0.28, 0, 1.0, 0.1, 0.85);
+    add(body, GEO.d, '#5d6e2e', 0, 0.3, 0, 0.98, 0.75, 0.82);
+    for (const [x, z] of [[0, 0], [0.45, 0.3], [0.45, -0.3], [-0.45, 0.3], [-0.45, -0.3]]) add(body, GEO.s, '#3f4d1f', x, 0.3 + 0.7 * Math.sqrt(Math.max(0, 1 - x * x - z * z)), z, 0.24, 0.07, 0.24);
+    const head = group(body, 1.05, 0.38, 0);
+    add(head, GEO.s, '#7c8f4a', 0, 0, 0, 0.3, 0.24, 0.24);
+    eyes(head, 0.15, 0.1, 0.16, 0.06);
+    add(body, GEO.c, '#7c8f4a', -1.0, 0.3, 0, 0.08, 0.3, 0.08, 0, 0, Math.PI / 2);
+    return { root, body, head, legs, legAxis: 'y' };
+  },
+  fox: () => quad({ color: '#e0772e', belly: '#f6efe4', leg: 0.42, legR: 0.08, legColor: '#3a2418', hs: 0.45, snout: 0.75, snoutColor: '#f6efe4', ears: 'pointy', tail: 'bushy', tip: '#f6efe4', bl: 1.05, bh: 0.5 }),
+  raccoon: () => quad({ color: '#8a8a88', belly: '#b9b7b0', leg: 0.32, legR: 0.1, legColor: '#3a3a3a', hs: 0.5, snout: 0.5, snoutColor: '#d9d6cf', ears: 'round', earColor: '#5c5c5a', mask: '#262626', tail: 'ringed', tailColor: '#9d9c96' }),
+  wolf: () => quad({ color: '#7d8187', belly: '#c9ccd0', leg: 0.55, legR: 0.1, hs: 0.45, snout: 0.85, snoutColor: '#b4b8bd', ears: 'pointy', tail: 'bushy', tip: '#4a4d52', bl: 1.1, bh: 0.52, eye: '#d9a400' }),
+  goat: () => quad({ color: '#e8e2d4', belly: '#f6f2ea', leg: 0.55, legR: 0.09, legColor: '#b9b1a0', foot: '#3a3a3a', hs: 0.42, snout: 0.6, ears: 'pointy', horns: '#5c544a', beard: '#cfc6b3', tail: 'stub', bh: 0.58 }),
+  boar: () => quad({ color: '#5a4033', belly: '#6e5243', leg: 0.38, legR: 0.13, legColor: '#2a1d16', hs: 0.52, snout: 0.6, snoutColor: '#6e5243', nose: '#c98e86', ears: 'pointy', tusks: 0.5, ridge: '#3d2b22', tail: 'thin', tailColor: '#3d2b22', bl: 1.1, bh: 0.65 }),
+  deer: () => quad({ color: '#a8743f', belly: '#e9d6b5', leg: 0.85, legR: 0.08, legColor: '#8a5d31', foot: '#2b2b2b', hs: 0.4, snout: 0.7, ears: 'pointy', antlers: '#d9c7a1', tail: 'puff', tailColor: '#f6efe4', bl: 1.0, bh: 0.5 }),
+  crocodile() {
+    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+    add(body, GEO.s, '#4c6b2f', 0, 0.35, 0, 1.25, 0.33, 0.6);
+    add(body, GEO.s, '#b9b98a', 0, 0.22, 0, 1.05, 0.15, 0.5);
+    for (let i = 0; i < 8; i++) for (const s of [-1, 1]) add(body, GEO.c, '#3a5523', 0.9 - i * 0.28, 0.62, s * 0.18, 0.06, 0.16, 0.06);
+    const head = group(body, 1.2, 0.38, 0);
+    add(head, GEO.b, '#4c6b2f', 0.6, 0.05, 0, 1.25, 0.2, 0.46);
+    const jaw = group(head, 0.05, -0.08, 0);
+    add(jaw, GEO.b, '#45632a', 0.6, -0.04, 0, 1.2, 0.12, 0.42);
+    for (let i = 0; i < 5; i++) for (const s of [-1, 1]) add(head, GEO.c, '#f4ecd8', 0.25 + i * 0.22, -0.1, s * 0.2, 0.03, 0.1, 0.03, Math.PI, 0, 0);
+    for (const s of [-1, 1]) { add(head, GEO.s, '#4c6b2f', 0.05, 0.2, s * 0.17, 0.13, 0.12, 0.12); add(head, GEO.s, '#e5c13a', 0.12, 0.25, s * 0.2, 0.06, 0.06, 0.05); }
+    for (const [x, s] of [[0.6, -1], [0.6, 1], [-0.6, -1], [-0.6, 1]]) {
+      const g = group(body, x, 0.3, s * 0.45); legs.push(g);
+      add(g, GEO.y, '#3f5a26', 0, -0.1, s * 0.15, 0.1, 0.4, 0.1, s * 0.9, 0, 0);
+    }
+    const tail = group(body, -1.15, 0.35, 0);
+    add(tail, GEO.c, '#4c6b2f', -0.95, 0, 0, 0.3, 1.9, 0.22, 0, 0, Math.PI / 2);
+    for (let i = 0; i < 5; i++) add(tail, GEO.c, '#3a5523', -0.2 - i * 0.32, 0.2 - i * 0.03, 0, 0.05, 0.15, 0.05);
+    return { root, body, head, jaw, legs, tail, legAxis: 'y' };
+  },
+  bear: () => quad({ color: '#6b4a2e', belly: '#7d5a3a', leg: 0.45, legR: 0.2, legColor: '#5a3d25', hs: 0.5, snout: 0.55, snoutColor: '#b08a62', ears: 'round', tail: 'stub', bl: 1.1, bh: 0.75, bw: 0.75 }),
+  boss() {
+    const m = quad({ color: '#6b5a50', belly: '#7d6a5e', leg: 0.38, legR: 0.14, legColor: '#2a1d16', hs: 0.55, snout: 0.6, snoutColor: '#7d6a5e', nose: '#c98e86', ears: 'pointy', tusks: 0.95, ridge: '#2e241e', tail: 'thin', tailColor: '#2e241e', bl: 1.1, bh: 0.7, eye: '#ff2a2a' });
+    add(m.body, GEO.b, '#d8c7b0', 0.15, 1.15, 0.35, 0.5, 0.04, 0.04, 0, 0.5, 0);
+    add(m.body, GEO.b, '#d8c7b0', 0.3, 1.1, 0.4, 0.45, 0.04, 0.04, 0, 0.5, 0);
+    return m;
+  },
+};
+
+// ---------- data ----------
 const STAGES = [
   { min: 1, name: 'Hatchling', body: '#7fd35b', dark: '#4f9a33', back: '#c6ee8f', spikes: 0 },
   { min: 4, name: 'Raptor', body: '#3fb59a', dark: '#26806c', back: '#a8ecd9', spikes: 4 },
   { min: 7, name: 'Tyrant', body: '#e08a3c', dark: '#a85d1f', back: '#ffd59a', spikes: 6 },
-  { min: 10, name: 'Rex', body: '#c9374a', dark: '#86202f', back: '#ffb0a0', spikes: 8 },
+  { min: 10, name: 'Rex', body: '#c9374a', dark: '#86202f', back: '#ffb0a0', spikes: 9 },
 ];
 const stageFor = L => { let s = STAGES[0]; for (const st of STAGES) if (L >= st.min) s = st; return s; };
 
+// ai: wander | flee | aggro | boss. dmg>0 on a flee animal means it fights back once bitten.
 const TYPES = {
-  beetle: { name: 'Beetle', tier: 1, hp: 1, xp: 1, size: 6, speed: 38, ai: 'wander', dmg: 0, w: 1.4 },
-  mouse:  { name: 'Mouse', tier: 1, hp: 1, xp: 2, size: 8, speed: 92, ai: 'flee', dmg: 0, w: 2 },
-  rat:    { name: 'Rat', tier: 2, hp: 3, xp: 4, size: 11, speed: 102, ai: 'flee', dmg: 2, w: 2 },
-  lizard: { name: 'Lizard', tier: 3, hp: 5, xp: 7, size: 12, speed: 128, ai: 'flee', dmg: 0, w: 1.6 },
-  rabbit: { name: 'Rabbit', tier: 4, hp: 9, xp: 11, size: 14, speed: 150, ai: 'flee', dmg: 0, w: 1.6 },
-  snake:  { name: 'Snake', tier: 5, hp: 14, xp: 16, size: 15, speed: 78, ai: 'aggro', dmg: 5, w: 1.2 },
-  fox:    { name: 'Fox', tier: 6, hp: 22, xp: 24, size: 18, speed: 128, ai: 'aggro', dmg: 7, w: 1.2 },
-  boar:   { name: 'Boar', tier: 8, hp: 40, xp: 42, size: 24, speed: 118, ai: 'aggro', dmg: 11, w: 1 },
-  boss:   { name: 'Old Tusk', tier: 10, hp: 220, xp: 0, size: 46, speed: 112, ai: 'boss', dmg: 15, w: 0 },
+  beetle:    { name: 'Beetle', tier: 1, hp: 1, xp: 1, size: 6, speed: 38, ai: 'wander', dmg: 0, w: 1.2 },
+  cricket:   { name: 'Cricket', tier: 1, hp: 1, xp: 1, size: 6, speed: 88, ai: 'flee', dmg: 0, w: 1.2 },
+  mouse:     { name: 'Mouse', tier: 1, hp: 1, xp: 2, size: 8, speed: 92, ai: 'flee', dmg: 0, w: 2 },
+  rat:       { name: 'Rat', tier: 2, hp: 3, xp: 4, size: 11, speed: 100, ai: 'flee', dmg: 2, w: 1.8 },
+  frog:      { name: 'Frog', tier: 2, hp: 3, xp: 4, size: 10, speed: 90, ai: 'flee', dmg: 0, w: 1.4 },
+  lizard:    { name: 'Lizard', tier: 3, hp: 5, xp: 7, size: 12, speed: 125, ai: 'flee', dmg: 0, w: 1.3 },
+  squirrel:  { name: 'Squirrel', tier: 3, hp: 6, xp: 7, size: 12, speed: 120, ai: 'flee', dmg: 0, w: 1.3 },
+  rabbit:    { name: 'Rabbit', tier: 4, hp: 9, xp: 11, size: 14, speed: 145, ai: 'flee', dmg: 0, w: 1.3 },
+  duck:      { name: 'Duck', tier: 4, hp: 10, xp: 11, size: 14, speed: 118, ai: 'flee', dmg: 3, w: 1.2 },
+  snake:     { name: 'Snake', tier: 5, hp: 14, xp: 16, size: 15, speed: 78, ai: 'aggro', dmg: 5, w: 1.1 },
+  turtle:    { name: 'Turtle', tier: 5, hp: 30, xp: 20, size: 16, speed: 30, ai: 'wander', dmg: 0, w: 0.9 },
+  fox:       { name: 'Fox', tier: 6, hp: 22, xp: 24, size: 18, speed: 128, ai: 'aggro', dmg: 7, w: 1.1 },
+  raccoon:   { name: 'Raccoon', tier: 6, hp: 20, xp: 22, size: 17, speed: 118, ai: 'flee', dmg: 6, w: 1 },
+  wolf:      { name: 'Wolf', tier: 7, hp: 30, xp: 32, size: 21, speed: 150, ai: 'aggro', dmg: 9, w: 1 },
+  goat:      { name: 'Goat', tier: 7, hp: 30, xp: 30, size: 20, speed: 140, ai: 'flee', dmg: 10, w: 1 },
+  boar:      { name: 'Boar', tier: 8, hp: 40, xp: 42, size: 24, speed: 118, ai: 'aggro', dmg: 11, w: 1 },
+  deer:      { name: 'Deer', tier: 8, hp: 36, xp: 40, size: 24, speed: 185, ai: 'flee', dmg: 0, w: 1 },
+  crocodile: { name: 'Crocodile', tier: 9, hp: 55, xp: 55, size: 28, speed: 95, ai: 'aggro', dmg: 14, w: 0.9, sense: 200 },
+  bear:      { name: 'Bear', tier: 9, hp: 65, xp: 60, size: 30, speed: 120, ai: 'aggro', dmg: 15, w: 0.9 },
+  boss:      { name: 'Old Tusk', tier: 10, hp: 260, xp: 0, size: 50, speed: 112, ai: 'boss', dmg: 17, w: 0 },
 };
 for (const k in TYPES) TYPES[k].key = k;
 
@@ -194,30 +457,154 @@ const PERKS = [
   { id: 'tail', name: 'Spiked Tail', desc: 'Attackers take 3 damage', apply: p => { p.thorns += 3; } },
 ];
 
-// ---------- world decoration ----------
+// ---------- world ----------
 let seed = 1337;
 const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-const decor = [];
-for (let i = 0; i < 700; i++) {
-  const r = srand();
-  decor.push({ x: srand() * WORLD, y: srand() * WORLD, rot: srand() * Math.PI * 2, s: 0.6 + srand() * 0.9,
-    type: r < 0.45 ? 'fern' : r < 0.68 ? 'tuft' : r < 0.84 ? 'rock' : r < 0.95 ? 'flower' : 'bone' });
+(function buildWorld() {
+  const tc = document.createElement('canvas'); tc.width = tc.height = 2048;
+  const g = tc.getContext('2d'), k = 2048 / WORLD;
+  g.fillStyle = '#336332'; g.fillRect(0, 0, 2048, 2048);
+  for (let i = 0; i < 110; i++) {
+    g.fillStyle = srand() < 0.5 ? 'rgba(22,58,28,0.45)' : 'rgba(120,160,70,0.18)';
+    g.beginPath(); g.arc(srand() * 2048, srand() * 2048, (80 + srand() * 240) * k, 0, Math.PI * 2); g.fill();
+  }
+  for (let i = 0; i < 9; i++) {
+    g.fillStyle = 'rgba(120,96,60,0.35)';
+    g.beginPath(); g.arc(srand() * 2048, srand() * 2048, (40 + srand() * 90) * k, 0, Math.PI * 2); g.fill();
+  }
+  for (let i = 0; i < 16000; i++) {
+    g.fillStyle = srand() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(200,255,160,0.06)';
+    g.fillRect(srand() * 2048, srand() * 2048, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(tc);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), new THREE.MeshLambertMaterial({ map: tex }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(WORLD / 2, 0, WORLD / 2); ground.receiveShadow = true;
+  scene.add(ground);
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), mat('#18341d'));
+  outer.rotation.x = -Math.PI / 2; outer.position.set(WORLD / 2, -0.5, WORLD / 2); outer.receiveShadow = true;
+  scene.add(outer);
+
+  const lists = { trunk: [], leaf: [], leaf2: [], rock: [], bush: [], fern: [], flower: [], cap: [], stem: [] };
+  const tree = (x, z, s) => {
+    lists.trunk.push({ x, y: 30 * s, z, sx: 7 * s, sy: 60 * s, sz: 7 * s });
+    lists.leaf.push({ x, y: 78 * s, z, sx: 42 * s, sy: 36 * s, sz: 42 * s, ry: srand() * 6 });
+    lists.leaf2.push({ x: x + 8 * s, y: 108 * s, z: z - 4 * s, sx: 26 * s, sy: 24 * s, sz: 26 * s, ry: srand() * 6 });
+  };
+  for (let i = -200; i < WORLD + 200; i += 85) {
+    for (const off of [60, 160]) {
+      const j = () => (srand() - 0.5) * 50, s = 1 + srand() * 0.7;
+      tree(i + j(), -off + j(), s); tree(i + j(), WORLD + off + j(), s);
+      tree(-off + j(), i + j(), s); tree(WORLD + off + j(), i + j(), s);
+    }
+  }
+  const away = (x, z) => Math.hypot(x - WORLD / 2, z - WORLD / 2) > 260;
+  for (let i = 0; i < 26; i++) { const x = 150 + srand() * (WORLD - 300), z = 150 + srand() * (WORLD - 300); if (away(x, z)) tree(x, z, 0.75 + srand() * 0.45); }
+  for (let i = 0; i < 160; i++) { const s = 8 + srand() * 22; lists.rock.push({ x: srand() * WORLD, y: s * 0.25, z: srand() * WORLD, sx: s, sy: s * 0.6, sz: s * 0.85, ry: srand() * 6, rx: srand() }); }
+  for (let i = 0; i < 180; i++) { const s = 12 + srand() * 18; lists.bush.push({ x: srand() * WORLD, y: s * 0.45, z: srand() * WORLD, sx: s, sy: s * 0.8, sz: s, ry: srand() * 6 }); }
+  for (let i = 0; i < 260; i++) {
+    const x = srand() * WORLD, z = srand() * WORLD, s = 0.6 + srand() * 0.8, r0 = srand() * 6;
+    for (let l = 0; l < 5; l++) { const a = r0 + l * 1.2566; lists.fern.push({ x: x + Math.cos(a) * 8 * s, y: 3 * s, z: z + Math.sin(a) * 8 * s, sx: 10 * s, sy: 1.2, sz: 3 * s, ry: -a, rz: 0.35 }); }
+  }
+  for (let i = 0; i < 120; i++) {
+    const x = srand() * WORLD, z = srand() * WORLD;
+    for (let f = 0; f < 4; f++) lists.flower.push({ x: x + (srand() - 0.5) * 24, y: 2.5, z: z + (srand() - 0.5) * 24, sx: 2.6, sy: 2.6, sz: 2.6 });
+  }
+  for (let i = 0; i < 70; i++) {
+    const x = srand() * WORLD, z = srand() * WORLD, s = 0.7 + srand() * 0.8;
+    lists.stem.push({ x, y: 3 * s, z, sx: 1.6 * s, sy: 6 * s, sz: 1.6 * s });
+    lists.cap.push({ x, y: 5.5 * s, z, sx: 5 * s, sy: 4 * s, sz: 5 * s });
+  }
+  const dummy = new THREE.Object3D();
+  const inst = (geo, color, list, cast) => {
+    const m = new THREE.InstancedMesh(geo, mat(color), list.length);
+    list.forEach((o, i) => { dummy.position.set(o.x, o.y, o.z); dummy.rotation.set(o.rx || 0, o.ry || 0, o.rz || 0); dummy.scale.set(o.sx, o.sy, o.sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); });
+    m.castShadow = cast; m.receiveShadow = true; scene.add(m);
+  };
+  inst(GEO.y, '#5a3f28', lists.trunk, true);
+  inst(GEO.ico, '#2e6b34', lists.leaf, true);
+  inst(GEO.ico, '#3c8240', lists.leaf2, true);
+  inst(GEO.dod, '#6f7a6c', lists.rock, true);
+  inst(GEO.ico, '#2a5a2c', lists.bush, true);
+  inst(GEO.s, '#4a8f3c', lists.fern, false);
+  inst(GEO.s, '#f2d36b', lists.flower, false);
+  inst(GEO.y, '#efe6d2', lists.stem, false);
+  inst(GEO.d, '#c43c32', lists.cap, true);
+})();
+
+const RING_GEO = new THREE.RingGeometry(1, 1.14, 40);
+const RING_OK = new THREE.MeshBasicMaterial({ color: '#7fd35b', transparent: true, opacity: 0.65, depthWrite: false });
+const RING_NO = new THREE.MeshBasicMaterial({ color: '#e8484d', transparent: true, opacity: 0.8, depthWrite: false });
+
+// ---------- dino ----------
+function buildDino(st) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0);
+  add(body, GEO.s, st.body, 0, 1.7, 0, 1.25, 0.85, 0.8);
+  add(body, GEO.s, st.back, 0.2, 1.42, 0, 1.0, 0.58, 0.68);
+  add(body, GEO.s, st.body, 1.0, 2.15, 0, 0.45, 0.55, 0.45);
+  const head = group(body, 1.25, 2.55, 0);
+  add(head, GEO.s, st.body, 0.15, 0.05, 0, 0.6, 0.5, 0.5);
+  add(head, GEO.b, st.body, 0.72, 0.02, 0, 0.85, 0.32, 0.62);
+  add(head, GEO.s, st.dark, 1.1, 0.12, 0, 0.1, 0.06, 0.25);
+  const jaw = group(head, 0.25, -0.2, 0);
+  add(jaw, GEO.b, st.dark, 0.48, -0.06, 0, 0.88, 0.16, 0.54);
+  add(jaw, GEO.b, '#6b1d24', 0.45, 0.03, 0, 0.75, 0.04, 0.42);
+  for (let i = 0; i < 4; i++) for (const s of [-1, 1]) {
+    add(head, GEO.c, '#ffffff', 0.45 + i * 0.2, -0.2, s * 0.25, 0.05, 0.14, 0.05, Math.PI, 0, 0);
+    add(jaw, GEO.c, '#ffffff', 0.3 + i * 0.2, 0.06, s * 0.21, 0.04, 0.11, 0.04);
+  }
+  eyes(head, 0.32, 0.28, 0.33, 0.15);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const g = group(body, -0.15, 1.35, s * 0.55); legs.push(g);
+    add(g, GEO.s, st.body, 0, -0.15, 0, 0.45, 0.62, 0.36);
+    add(g, GEO.y, st.dark, 0, -0.75, 0, 0.16, 1.0, 0.16);
+    add(g, GEO.b, st.dark, 0.15, -1.28, 0, 0.6, 0.15, 0.32);
+    const a = group(body, 0.85, 1.75, s * 0.5);
+    add(a, GEO.y, st.dark, 0.12, -0.22, 0, 0.08, 0.5, 0.08, 0, 0, 0.6);
+  }
+  const tailSegs = [];
+  let parent = group(body, -1.05, 1.75, 0); parent.rotation.z = 0.12; tailSegs.push(parent);
+  const radii = [0.55, 0.42, 0.3, 0.18];
+  radii.forEach((r, i) => {
+    add(parent, GEO.c, st.body, -0.45, 0, 0, r, 1.0, r * 0.9, 0, 0, Math.PI / 2);
+    if (i < radii.length - 1) { parent = group(parent, -0.82, 0, 0); tailSegs.push(parent); }
+  });
+  const n = st.spikes;
+  for (let i = 0; i < n; i++) {
+    const t = i / Math.max(1, n - 1), x = 0.75 - t * 2.3;
+    if (x > -1.15) {
+      const y = 1.7 + 0.85 * Math.sqrt(Math.max(0, 1 - (x / 1.3) ** 2));
+      add(body, GEO.c, '#ffb347', x, y + 0.12, 0, 0.13, 0.42, 0.2);
+    } else {
+      const seg = tailSegs[Math.min(tailSegs.length - 1, Math.floor((-x - 1.15) / 0.8))];
+      add(seg, GEO.c, '#ffb347', -0.3, 0.32, 0, 0.1, 0.3, 0.15);
+    }
+  }
+  return { root, body, head, jaw, legs, tailSegs };
 }
-const patches = [];
-for (let i = 0; i < 90; i++) patches.push({ x: srand() * WORLD, y: srand() * WORLD, r: 80 + srand() * 220, c: srand() < 0.5 ? 'rgba(20,50,26,0.55)' : 'rgba(80,120,50,0.18)' });
+let dino = null, dinoStage = null;
+function rebuildDino() {
+  const st = stageFor(P.level);
+  if (dino && dinoStage === st) return;
+  if (dino) scene.remove(dino.root);
+  dino = buildDino(st); dinoStage = st; scene.add(dino.root);
+}
 
 // ---------- state ----------
 let state = 'title';
-let P, creatures, particles, texts, cam, shake, elapsed, pendingLevels, bossSpawned, boss, spawnTimer, gameT = 0;
+let P, creatures = [], particles, texts, cam, shake, elapsed, pendingLevels, bossSpawned, boss, spawnTimer, gameT = 0;
 
 function newGame() {
+  for (const c of creatures) { scene.remove(c.model.root); scene.remove(c.ring); }
   P = { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, face: 0, level: 1, xp: 0, hp: 20, maxHp: 20, str: 1,
     speedMul: 1, biteCd: 0.36, biteT: 0, biteAnim: 0, rangeMul: 1, healMul: 1, regen: 0.4, thorns: 0,
-    eaten: 0, hurtT: 0, moving: false, kills: {} };
+    eaten: 0, hurtT: 0, moving: false, kills: {}, anim: 0 };
   creatures = []; particles = []; texts = [];
-  cam = { x: P.x, y: P.y }; shake = 0; elapsed = 0; pendingLevels = 0;
+  cam = { x: P.x, y: P.y, d: 600 }; shake = 0; elapsed = 0; pendingLevels = 0;
   bossSpawned = false; boss = null; spawnTimer = 0;
-  for (let i = 0; i < 46; i++) spawnCreature(true);
+  rebuildDino();
+  for (let i = 0; i < 50; i++) spawnCreature(true);
   $('bossBar').hidden = true;
 }
 
@@ -235,7 +622,7 @@ function pickType() {
     else if (T.tier <= L) w = 2.4;
     else if (T.tier <= L + 2) w = 0.9;
     else if (T.tier <= L + 4) w = 0.15;
-    w *= T.w; if (T.tier === 1 && L <= 3) w *= 1.6;
+    w *= T.w; if (T.tier === 1 && L <= 3) w *= 1.5;
     if (w > 0) { opts.push([T, w]); total += w; }
   }
   let r = Math.random() * total;
@@ -246,13 +633,23 @@ function pickType() {
 function spawnCreature(initial, forcedType) {
   const T = forcedType || pickType();
   let x, y, tries = 0;
-  const minD = initial ? 260 : Math.max(W, H) / 2 + 80;
+  const minD = initial ? 260 : cam.d * 1.1;
   do { x = rand(40, WORLD - 40); y = rand(40, WORLD - 40); tries++; } while (Math.hypot(x - P.x, y - P.y) < minD && tries < 40);
+  const model = MODELS[T.key]();
+  model.root.scale.setScalar(T.size);
+  scene.add(model.root);
+  const ring = new THREE.Mesh(RING_GEO, RING_OK);
+  ring.rotation.x = -Math.PI / 2; ring.scale.setScalar(T.size * 1.3);
+  scene.add(ring);
   const c = { type: T, x, y, vx: 0, vy: 0, face: rand(0, Math.PI * 2), hp: T.hp, maxHp: T.hp, size: T.size,
     wanderA: rand(0, Math.PI * 2), wanderT: 0, atkCd: 0, flash: 0, provoked: false, anim: rand(0, 10),
-    charge: 0, windup: 0, chargeCd: 3, chargeA: 0 };
+    charge: 0, windup: 0, chargeCd: 3, chargeA: 0, model, ring };
   creatures.push(c);
   return c;
+}
+function removeCreature(c) {
+  const i = creatures.indexOf(c); if (i >= 0) creatures.splice(i, 1);
+  scene.remove(c.model.root); scene.remove(c.ring);
 }
 
 // ---------- audio ----------
@@ -292,10 +689,12 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); if (state === 'play') togglePause(); });
 
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
 cv.addEventListener('mousedown', e => {
   if (state !== 'play' || touchMode) return;
-  const wx = e.clientX - W / 2 + cam.x, wy = e.clientY - H / 2 + cam.y;
-  bite(Math.atan2(wy - P.y, wx - P.x));
+  ndc.set(e.clientX / W * 2 - 1, -(e.clientY / H) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  if (raycaster.ray.intersectPlane(groundPlane, hitPt)) bite(Math.atan2(hitPt.z - P.y, hitPt.x - P.x)); else bite(null);
 });
 cv.addEventListener('touchstart', e => {
   e.preventDefault(); touchMode = true; $('biteBtn').hidden = state !== 'play';
@@ -320,7 +719,7 @@ $('biteBtn').addEventListener('click', () => { if (state === 'play') bite(null);
 // ---------- gameplay ----------
 function bite(aim) {
   if (P.biteT > 0) return;
-  P.biteT = P.biteCd; P.biteAnim = 0.18;
+  P.biteT = P.biteCd; P.biteAnim = 0.2;
   if (aim != null) P.face = aim;
   const range = pRange();
   let hits = creatures.filter(c => {
@@ -334,31 +733,32 @@ function bite(aim) {
   }
   sfx.bite();
   const mx = P.x + Math.cos(P.face) * (pSize() + 10), my = P.y + Math.sin(P.face) * (pSize() + 10);
-  burst(mx, my, 4, '#f4ecd8', 90, 2);
+  burst(mx, my, pSize() * 1.5, 4, '#f4ecd8', 90, 2);
   for (const c of hits) {
     const tooBig = c.type.tier > P.level;
     const dmg = Math.max(1, Math.round(P.str * (tooBig ? 0.55 : 1) * rand(0.9, 1.15)));
     c.hp -= dmg; c.flash = 0.12; c.provoked = true;
     const a = Math.atan2(c.y - P.y, c.x - P.x), kb = c.type.key === 'boss' ? 40 : 170;
     c.vx += Math.cos(a) * kb; c.vy += Math.sin(a) * kb;
-    floatText(c.x, c.y - c.size - 6, `-${dmg}`, tooBig ? '#ff8a8a' : '#ffffff', 14);
-    burst(c.x, c.y, 5, '#d43c3c', 120, 2.5);
+    floatText(c.x, c.size * 2.2, c.y, `-${dmg}`, tooBig ? '#ff8a8a' : '#ffffff', 15);
+    burst(c.x, c.y, c.size, 6, '#d43c3c', 130, 3);
     if (c.hp <= 0) eat(c); else sfx.hit();
   }
 }
 
 function eat(c) {
-  creatures.splice(creatures.indexOf(c), 1);
+  if (!creatures.includes(c)) return;
+  removeCreature(c);
   P.eaten++; P.kills[c.type.key] = (P.kills[c.type.key] || 0) + 1;
   sfx.eat(); shake = Math.max(shake, c.type.key === 'boss' ? 18 : 3);
-  burst(c.x, c.y, 14 + c.size, '#d43c3c', 180, 3);
-  burst(c.x, c.y, 6, '#f4ecd8', 140, 2);
+  burst(c.x, c.y, c.size, 14 + c.size, '#d43c3c', 200, 3.5);
+  burst(c.x, c.y, c.size, 6, '#f4ecd8', 150, 2.5);
   const heal = Math.round(c.type.xp * 0.6 * P.healMul + 1);
   P.hp = Math.min(P.maxHp, P.hp + heal);
   if (c.type.key === 'boss') { boss = null; $('bossBar').hidden = true; setTimeout(() => endGame(true), 900); return; }
   if (P.level < MAX_LEVEL) {
     gainXp(c.type.xp);
-    floatText(c.x, c.y - 10, `+${c.type.xp} XP`, '#ffb347', 16);
+    floatText(c.x, c.size * 2.5, c.y, `+${c.type.xp} XP  ${c.type.name}`, '#ffb347', 16);
   }
 }
 
@@ -374,9 +774,10 @@ function levelUp() {
   const prevStage = stageFor(P.level);
   P.level++; pendingLevels--;
   P.maxHp += 8; P.hp = Math.min(P.maxHp, P.hp + 8); P.str += 1.5;
-  sfx.level(); burst(P.x, P.y, 30, '#ffb347', 220, 3);
+  sfx.level(); burst(P.x, P.y, pSize() * 2, 30, '#ffb347', 220, 3);
   const st = stageFor(P.level);
   const evolved = st !== prevStage;
+  if (evolved) rebuildDino();
   state = 'levelup';
   $('levelTitle').textContent = evolved ? `You evolved into a ${st.name}!` : `Level ${P.level}!`;
   $('levelSub').textContent = P.level === MAX_LEVEL
@@ -403,29 +804,29 @@ function spawnBoss() {
   bossSpawned = true;
   boss = spawnCreature(false, TYPES.boss);
   const a = rand(0, Math.PI * 2);
-  boss.x = clamp(P.x + Math.cos(a) * 700, 80, WORLD - 80); boss.y = clamp(P.y + Math.sin(a) * 700, 80, WORLD - 80);
+  boss.x = clamp(P.x + Math.cos(a) * 750, 80, WORLD - 80); boss.y = clamp(P.y + Math.sin(a) * 750, 80, WORLD - 80);
   boss.provoked = true;
   $('bossBar').hidden = false;
   sfx.roar(); showToast('Old Tusk is coming', 'Follow the red arrow. Bite him until he drops.', 3200);
 }
 
 function hurtPlayer(c) {
-  P.hp -= c.type.dmg; P.hurtT = 0.25; shake = Math.max(shake, c.type.key === 'boss' ? 14 : 6);
+  P.hp -= c.type.dmg; P.hurtT = 0.3; shake = Math.max(shake, c.type.key === 'boss' ? 14 : 6);
   const a = Math.atan2(P.y - c.y, P.x - c.x), kb = c.type.key === 'boss' ? 420 : 260;
   P.vx += Math.cos(a) * kb; P.vy += Math.sin(a) * kb;
-  floatText(P.x, P.y - pSize() - 10, `-${c.type.dmg}`, '#ff5a5f', 18);
+  floatText(P.x, pSize() * 3, P.y, `-${c.type.dmg}`, '#ff5a5f', 19);
   sfx.hurt();
   if (P.thorns) { c.hp -= P.thorns; c.flash = 0.1; if (c.hp <= 0) eat(c); }
   if (P.hp <= 0) { P.hp = 0; endGame(false); }
 }
 
-function burst(x, y, n, color, spd, size) {
+function burst(x, y, h, n, color, spd, size) {
   for (let i = 0; i < n; i++) {
     const a = rand(0, Math.PI * 2), s = rand(0.3, 1) * spd;
-    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.7), max: 0.7, color, size: rand(1, size) });
+    particles.push({ x, y, z: h * rand(0.6, 1.2), vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rand(40, 200), life: rand(0.35, 0.75), max: 0.75, color, size: rand(1.2, size) });
   }
 }
-function floatText(x, y, text, color, size) { texts.push({ x, y, text, color, size, life: 0.9 }); }
+function floatText(x, h, y, text, color, size) { texts.push({ x, y, h, text, color, size, life: 1.0 }); }
 
 let toastTimer = 0;
 function showToast(big, small, ms = 2200) {
@@ -435,7 +836,6 @@ function showToast(big, small, ms = 2200) {
 
 function update(dt) {
   elapsed += dt;
-  // player movement
   let mx = 0, my = 0;
   if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
   if (keys.has('d') || keys.has('arrowright')) mx += 1;
@@ -445,19 +845,20 @@ function update(dt) {
   let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
   const spd = pSpeed();
   P.moving = m > 0.15;
-  const tvx = mx * spd, tvy = my * spd, k = Math.min(1, dt * 12);
-  P.vx += (tvx - P.vx) * k; P.vy += (tvy - P.vy) * k;
+  const k = Math.min(1, dt * 12);
+  P.vx += (mx * spd - P.vx) * k; P.vy += (my * spd - P.vy) * k;
   P.x = clamp(P.x + P.vx * dt, pSize(), WORLD - pSize());
   P.y = clamp(P.y + P.vy * dt, pSize(), WORLD - pSize());
   if (P.moving && P.biteAnim <= 0) P.face += angDiff(P.face, Math.atan2(my, mx)) * Math.min(1, dt * 14);
+  P.anim += dt * (0.4 + Math.hypot(P.vx, P.vy) / spd);
   P.biteT -= dt; P.biteAnim -= dt; P.hurtT -= dt;
   P.hp = Math.min(P.maxHp, P.hp + P.regen * dt);
 
-  // creatures
   const ps = pSize();
   for (const c of creatures.slice()) {
+    if (!creatures.includes(c)) continue;
     const T = c.type;
-    c.anim += dt; c.flash -= dt; c.atkCd -= dt;
+    c.flash -= dt; c.atkCd -= dt;
     const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
     let tx = 0, ty = 0, sp = T.speed;
     const hostile = T.ai === 'aggro' || T.ai === 'boss' || (c.provoked && T.dmg > 0);
@@ -466,10 +867,9 @@ function update(dt) {
       if (c.charge > 0) { c.charge -= dt; tx = Math.cos(c.chargeA); ty = Math.sin(c.chargeA); sp = T.speed * 3; }
       else if (c.windup > 0) { c.windup -= dt; sp = 0; if (c.windup <= 0) { c.charge = 0.7; sfx.roar(); } }
       else { tx = dx / d; ty = dy / d; if (c.chargeCd <= 0 && d < 520) { c.windup = 0.7; c.chargeA = Math.atan2(dy, dx); c.chargeCd = rand(3.5, 5); c.face = c.chargeA; } }
-    } else if (hostile && d < 280) { tx = dx / d; ty = dy / d; }
+    } else if (hostile && d < (c.provoked ? 320 : (T.sense || 280))) { tx = dx / d; ty = dy / d; }
     else if (T.ai === 'flee' && d < 190 + ps) {
       tx = -dx / d; ty = -dy / d;
-      // steer away from walls so prey slides along edges instead of sticking
       const wm = 120;
       if (c.x < wm) tx += (wm - c.x) / wm * 1.5; if (c.x > WORLD - wm) tx -= (c.x - (WORLD - wm)) / wm * 1.5;
       if (c.y < wm) ty += (wm - c.y) / wm * 1.5; if (c.y > WORLD - wm) ty -= (c.y - (WORLD - wm)) / wm * 1.5;
@@ -485,236 +885,149 @@ function update(dt) {
     c.vx += (tx * sp - c.vx) * kk; c.vy += (ty * sp - c.vy) * kk;
     c.x = clamp(c.x + c.vx * dt, c.size, WORLD - c.size);
     c.y = clamp(c.y + c.vy * dt, c.size, WORLD - c.size);
-    if (Math.hypot(c.vx, c.vy) > 8 && c.windup <= 0) c.face += angDiff(c.face, Math.atan2(c.vy, c.vx)) * Math.min(1, dt * 10);
-    // contact with player
+    const cs = Math.hypot(c.vx, c.vy);
+    c.anim += dt * (0.3 + cs / Math.max(40, T.speed));
+    if (cs > 8 && c.windup <= 0) c.face += angDiff(c.face, Math.atan2(c.vy, c.vx)) * Math.min(1, dt * 10);
     const touch = c.size + ps * 0.8;
     if (d < touch) {
-      const push = (touch - d);
+      const push = touch - d;
       c.x -= dx / d * push * 0.7; c.y -= dy / d * push * 0.7;
-      if (hostile && c.atkCd <= 0 && T.dmg > 0) { c.atkCd = T.key === 'boss' ? 0.9 : 1.1; hurtPlayer(c); if (state !== 'play') return; }
+      if (hostile && c.atkCd <= 0 && T.dmg > 0) { c.atkCd = T.key === 'boss' ? 0.9 : 1.1; c.lunge = 0.25; hurtPlayer(c); if (state !== 'play') return; }
     }
-    // despawn far, low-tier creatures to make room
-    if (d > 1500 && T.key !== 'boss' && T.tier < P.level - 3 && Math.random() < dt * 0.5) creatures.splice(creatures.indexOf(c), 1);
+    c.lunge = Math.max(0, (c.lunge || 0) - dt);
+    if (d > 1600 && T.key !== 'boss' && T.tier < P.level - 3 && Math.random() < dt * 0.5) removeCreature(c);
   }
 
   spawnTimer -= dt;
-  const target = 44 + P.level * 2;
-  if (spawnTimer <= 0 && creatures.length < target) { spawnCreature(false); spawnTimer = 0.25; }
+  if (spawnTimer <= 0 && creatures.length < 48 + P.level * 2) { spawnCreature(false); spawnTimer = 0.25; }
 
-  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.9; p.vy *= 0.9; p.life -= dt; }
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= 520 * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
-  for (const t of texts) { t.y -= 34 * dt; t.life -= dt; }
+  for (const t of texts) { t.h += 40 * dt; t.life -= dt; }
   texts = texts.filter(t => t.life > 0);
 
   cam.x += (P.x - cam.x) * Math.min(1, dt * 6); cam.y += (P.y - cam.y) * Math.min(1, dt * 6);
   shake = Math.max(0, shake - dt * 30);
 }
 
-// ---------- drawing ----------
-function ell(x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); }
-function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
-
-function drawGround(x0, y0, x1, y1) {
-  ctx.fillStyle = '#0b1610'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-  ctx.fillStyle = '#2c5a2e'; ctx.fillRect(0, 0, WORLD, WORLD);
-  for (const p of patches) {
-    if (p.x + p.r < x0 || p.x - p.r > x1 || p.y + p.r < y0 || p.y - p.r > y1) continue;
-    ctx.fillStyle = p.c; circ(p.x, p.y, p.r);
-  }
-  // dense jungle border
-  ctx.strokeStyle = '#173a1d'; ctx.lineWidth = 36; ctx.strokeRect(-18, -18, WORLD + 36, WORLD + 36);
-  ctx.fillStyle = '#1d4423';
-  for (let i = 0; i < WORLD; i += 70) {
-    circ(i, -30, 46); circ(i + 35, WORLD + 30, 46); circ(-30, i + 35, 46); circ(WORLD + 30, i, 46);
-  }
-  for (const d of decor) {
-    if (d.x < x0 - 30 || d.x > x1 + 30 || d.y < y0 - 30 || d.y > y1 + 30) continue;
-    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); ctx.scale(d.s, d.s);
-    if (d.type === 'fern') {
-      ctx.fillStyle = '#3f7d34';
-      for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); ell(10, 0, 11, 3.5); }
-    } else if (d.type === 'tuft') {
-      ctx.strokeStyle = '#4c8f3a'; ctx.lineWidth = 2; ctx.beginPath();
-      for (let i = -2; i <= 2; i++) { ctx.moveTo(i * 3, 4); ctx.lineTo(i * 4, -6 - Math.abs(i)); }
-      ctx.stroke();
-    } else if (d.type === 'rock') {
-      ctx.fillStyle = '#5d6b5c'; ell(0, 0, 13, 9); ctx.fillStyle = '#7a8a78'; ell(-3, -3, 7, 4);
-    } else if (d.type === 'flower') {
-      ctx.fillStyle = '#f2d36b'; for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); circ(4, 0, 2.6); }
-      ctx.fillStyle = '#c0582c'; circ(0, 0, 2);
-    } else {
-      ctx.fillStyle = '#d9d2bf'; ctx.fillRect(-9, -1.5, 18, 3); circ(-9, -2, 2.5); circ(-9, 2, 2.5); circ(9, -2, 2.5); circ(9, 2, 2.5);
-    }
-    ctx.restore();
-  }
+// ---------- 3D sync ----------
+function animModel(m, c, moving) {
+  const a = c.anim, mv = moving;
+  const sw = Math.sin(a * 12);
+  m.legs.forEach((l, i) => {
+    const ph = (i % 4 === 0 || i % 4 === 3) ? 1 : -1;
+    if (m.legAxis === 'y') l.rotation.y = sw * ph * 0.5 * mv;
+    else if (m.legAxis !== 'none') l.rotation.z = sw * ph * 0.7 * mv;
+  });
+  if (m.tail) m.tail.rotation.y = Math.sin(a * 6) * 0.4;
+  if (m.hop) m.body.position.y = Math.abs(Math.sin(a * 7)) * m.hop * mv;
+  else m.body.position.y = Math.abs(sw) * 0.05 * mv;
+  if (m.waddle) m.body.rotation.x = sw * 0.12 * mv;
+  if (m.segs) m.segs.forEach((s, i) => { s.position.z = Math.sin(a * 7 - i * 0.8) * 0.35 * (i / 10 + 0.3); });
+  if (m.head && m.segs) m.head.position.z = Math.sin(a * 7 + 0.8) * 0.1;
+  if (m.jaw) m.jaw.rotation.z = -(c.lunge > 0 ? 0.6 : 0.05 + Math.max(0, Math.sin(a * 0.8)) * 0.1);
+  if (m.head && !m.segs) m.head.rotation.z = c.lunge > 0 ? -0.3 : 0;
 }
 
-function drawDino() {
-  const st = stageFor(P.level), s = pSize() / 12, t = gameT;
-  ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.face); ctx.scale(s, s);
-  const hurt = P.hurtT > 0 && Math.floor(P.hurtT * 30) % 2 === 0;
-  const body = hurt ? '#ffffff' : st.body, dark = hurt ? '#ffdddd' : st.dark;
-  const step = P.moving ? Math.sin(t * 16) : 0;
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(2, 5, 20, 12);
-  ctx.fillStyle = dark;
-  ell(5 + step * 3, -9, 4.5, 3); ell(5 - step * 3, 9, 4.5, 3); ell(-6 - step * 3, -9, 5, 3.4); ell(-6 + step * 3, 9, 5, 3.4);
-  const sway = Math.sin(t * 5) * 3 + step * 2;
-  ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-7, -6);
-  ctx.quadraticCurveTo(-20, -3 + sway * 0.5, -32, sway); ctx.quadraticCurveTo(-20, 3 + sway * 0.5, -7, 6); ctx.fill();
-  ell(0, 0, 13, 9);
-  ctx.fillStyle = st.back; ell(-2, 0, 9, 3);
-  if (st.spikes) {
-    ctx.fillStyle = '#ffb347';
-    for (let i = 0; i < st.spikes; i++) {
-      const x = 9 - i * (36 / st.spikes), y = (i / st.spikes) * sway * 0.6;
-      ctx.beginPath(); ctx.moveTo(x + 3, y); ctx.lineTo(x, y - 3.2); ctx.lineTo(x - 3, y); ctx.lineTo(x, y + 3.2); ctx.fill();
-    }
+function sync3D() {
+  const viewR = cam.d * 2.2;
+  for (const c of creatures) {
+    const m = c.model;
+    const vis = Math.abs(c.x - cam.x) < viewR && Math.abs(c.y - cam.y) < viewR;
+    m.root.visible = vis; c.ring.visible = vis && state !== 'title';
+    if (!vis) continue;
+    let ox = 0, oz = 0;
+    if (c.windup > 0) { ox = rand(-2, 2); oz = rand(-2, 2); }
+    m.root.position.set(c.x + ox, 0, c.y + oz);
+    m.root.rotation.y = -c.face;
+    const moving = Math.min(1, Math.hypot(c.vx, c.vy) / 40);
+    animModel(m, c, moving);
+    setFlash(m, c.flash > 0);
+    c.ring.position.set(c.x, 0.6, c.y);
+    c.ring.material = c.type.tier <= P.level ? RING_OK : RING_NO;
+    if (c.windup > 0) c.ring.scale.setScalar(c.size * (1.4 + Math.sin(gameT * 40) * 0.08));
+    else c.ring.scale.setScalar(c.size * 1.3);
   }
-  ctx.fillStyle = body; ell(15, 0, 8.5, 7);
-  const open = P.biteAnim > 0 ? Math.sin((P.biteAnim / 0.18) * Math.PI) : 0;
-  if (open > 0) {
-    ctx.fillStyle = '#5a1a1f'; ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(27, -6 * open - 1); ctx.lineTo(27, 6 * open + 1); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < 3; i++) { const x = 18 + i * 3; ctx.fillRect(x, -3.5 * open - 0.5 - i * open, 1.6, 1.8); ctx.fillRect(x, 3.5 * open - 1.3 + i * open, 1.6, 1.8); }
-  } else { ctx.fillStyle = dark; ell(22, 0, 2.2, 4.5); }
-  ctx.fillStyle = '#ffffff'; circ(16, -4.2, 2.4); circ(16, 4.2, 2.4);
-  ctx.fillStyle = '#111'; circ(17, -4.2, 1.2); circ(17, 4.2, 1.2);
-  ctx.restore();
+  // dino
+  const d = dino, s = pSize() / 1.25;
+  d.root.scale.setScalar(s);
+  d.root.position.set(P.x, 0, P.y);
+  d.root.rotation.y = -P.face;
+  const mv = state === 'play' ? Math.min(1, Math.hypot(P.vx, P.vy) / 60) : 0;
+  const sw = Math.sin(P.anim * 11);
+  d.legs[0].rotation.z = sw * 0.65 * mv; d.legs[1].rotation.z = -sw * 0.65 * mv;
+  d.body.position.y = Math.abs(sw) * 0.08 * mv;
+  d.body.rotation.x = sw * 0.04 * mv;
+  d.tailSegs.forEach((g, i) => { g.rotation.y = Math.sin(gameT * 4 - i * 0.7) * (0.18 + 0.1 * mv); });
+  const open = P.biteAnim > 0 ? Math.sin((P.biteAnim / 0.2) * Math.PI) : 0;
+  d.jaw.rotation.z = -0.05 - open * 0.75;
+  d.head.rotation.z = open * 0.15;
+  d.head.position.x = 1.25 + open * 0.3;
+  setFlash(d, P.hurtT > 0 && Math.floor(P.hurtT * 30) % 2 === 0);
+
+  // camera
+  const portrait = H > W ? 1.35 : 1;
+  const want = (430 + pSize() * 9) * portrait;
+  cam.d += (want - cam.d) * 0.05;
+  const sx = shake ? rand(-shake, shake) * 0.6 : 0, sz = shake ? rand(-shake, shake) * 0.6 : 0;
+  if (state === 'title') {
+    const a = gameT * 0.08;
+    camera.position.set(WORLD / 2 + Math.cos(a) * 520, 380, WORLD / 2 + Math.sin(a) * 520);
+    camera.lookAt(WORLD / 2, 0, WORLD / 2);
+  } else {
+    camera.position.set(cam.x + sx, cam.d * 0.92, cam.y + cam.d * 0.68 + sz);
+    camera.lookAt(cam.x + sx, 0, cam.y - 30 + sz);
+  }
+  scene.fog.near = cam.d * 1.3; scene.fog.far = cam.d * 3.4;
+  const fx_ = state === 'title' ? WORLD / 2 : cam.x, fz = state === 'title' ? WORLD / 2 : cam.y;
+  sun.position.set(fx_ + 350, 900, fz + 250); sun.target.position.set(fx_, 0, fz);
 }
 
-function rodent(r, body, ear, tail) {
-  ctx.strokeStyle = tail; ctx.lineWidth = Math.max(1.2, r * 0.16); ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-r * 0.8, 0); ctx.quadraticCurveTo(-r * 1.6, Math.sin(gameT * 8) * r * 0.5, -r * 2.2, r * 0.2); ctx.stroke();
-  ctx.fillStyle = body; ell(0, 0, r, r * 0.62); ell(r * 0.8, 0, r * 0.5, r * 0.42);
-  ctx.fillStyle = ear; circ(r * 0.62, -r * 0.42, r * 0.26); circ(r * 0.62, r * 0.42, r * 0.26);
-  ctx.fillStyle = '#111'; circ(r * 0.95, -r * 0.2, r * 0.09 + 0.5); circ(r * 0.95, r * 0.2, r * 0.09 + 0.5);
-  ctx.fillStyle = ear; circ(r * 1.28, 0, r * 0.1 + 0.6);
-}
-
-function drawCreature(c) {
-  const T = c.type, r = c.size, edible = T.tier <= P.level;
-  ctx.save(); ctx.translate(c.x, c.y);
-  ctx.strokeStyle = edible ? 'rgba(127,211,91,0.6)' : 'rgba(232,72,77,0.75)';
-  ctx.lineWidth = T.key === 'boss' ? 3 : 2; ctx.beginPath(); ctx.arc(0, 0, r + 5, 0, Math.PI * 2); ctx.stroke();
-  if (c.windup > 0) { ctx.strokeStyle = 'rgba(255,90,95,0.9)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, r + 10 + Math.sin(gameT * 40) * 3, 0, Math.PI * 2); ctx.stroke(); }
-  if (c.windup > 0) ctx.translate(rand(-2, 2), rand(-2, 2));
-  ctx.rotate(c.face);
-  ctx.fillStyle = 'rgba(0,0,0,0.22)'; ell(2, 3, r * 1.15, r * 0.75);
-  const fl = c.flash > 0;
-  const col = (cc) => fl ? '#ffffff' : cc;
-  const step = Math.sin(c.anim * 14);
-  switch (T.key) {
-    case 'beetle':
-      ctx.strokeStyle = '#1a1c2c'; ctx.lineWidth = 1.2;
-      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 3, 0); ctx.lineTo(i * 3 + step, -r * 1.3); ctx.moveTo(i * 3, 0); ctx.lineTo(i * 3 - step, r * 1.3); ctx.stroke(); }
-      ctx.fillStyle = col('#3a3f6b'); ell(0, 0, r, r * 0.8);
-      ctx.fillStyle = col('#20233f'); ell(r * 0.85, 0, r * 0.4, r * 0.45);
-      ctx.strokeStyle = '#1a1c2c'; ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r * 0.5, 0); ctx.stroke();
-      ctx.fillStyle = 'rgba(160,190,255,0.5)'; ell(-r * 0.2, -r * 0.35, r * 0.35, r * 0.15);
-      break;
-    case 'mouse': rodent(r, col('#a3a3ad'), col('#f1a7b5'), '#e48fa0'); break;
-    case 'rat': rodent(r, col(c.provoked ? '#7a5242' : '#6e5a4c'), col('#d48c95'), '#c2808a'); break;
-    case 'lizard':
-      ctx.strokeStyle = col('#6e9a2b'); ctx.lineWidth = r * 0.25; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(-r * 0.6, 0); ctx.quadraticCurveTo(-r * 1.4, Math.sin(c.anim * 10) * r * 0.5, -r * 2.3, 0); ctx.stroke();
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(r * 0.4, 0); ctx.lineTo(r * 0.6 + step * 2, -r * 0.7); ctx.moveTo(r * 0.4, 0); ctx.lineTo(r * 0.6 - step * 2, r * 0.7);
-      ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 0.6 - step * 2, -r * 0.7); ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 0.6 + step * 2, r * 0.7); ctx.stroke();
-      ctx.fillStyle = col('#8bbf3a'); ell(0, 0, r * 0.95, r * 0.38); ell(r * 0.95, 0, r * 0.38, r * 0.3);
-      ctx.fillStyle = '#e7d24a'; circ(-r * 0.3, 0, r * 0.1); circ(r * 0.2, 0, r * 0.1);
-      ctx.fillStyle = '#111'; circ(r * 1.05, -r * 0.16, 1.2); circ(r * 1.05, r * 0.16, 1.2);
-      break;
-    case 'rabbit':
-      ctx.fillStyle = col('#c9b291'); ell(0, 0, r, r * 0.7); ell(r * 0.8, 0, r * 0.45, r * 0.4);
-      ell(r * 0.1, -r * 0.3, r * 0.8, r * 0.16, -0.25); ell(r * 0.1, r * 0.3, r * 0.8, r * 0.16, 0.25);
-      ctx.fillStyle = '#f3ede2'; circ(-r * 0.95, 0, r * 0.28);
-      ctx.fillStyle = '#e5a3ad'; ell(r * 0.1, -r * 0.3, r * 0.6, r * 0.07, -0.25); ell(r * 0.1, r * 0.3, r * 0.6, r * 0.07, 0.25);
-      ctx.fillStyle = '#111'; circ(r * 0.95, -r * 0.2, 1.4); circ(r * 0.95, r * 0.2, 1.4);
-      break;
-    case 'snake': {
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      const seg = 9, len = r * 3.2;
-      ctx.beginPath();
-      for (let i = 0; i <= seg; i++) { const x = r * 0.5 - (i / seg) * len, y = Math.sin(c.anim * 7 - i * 0.8) * r * 0.35 * (i / seg + 0.3); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-      ctx.strokeStyle = col('#5f8a28'); ctx.lineWidth = r * 0.5; ctx.stroke();
-      ctx.strokeStyle = '#c7b23a'; ctx.lineWidth = r * 0.12; ctx.setLineDash([4, 6]); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = col('#4e7520'); ell(r * 0.75, 0, r * 0.45, r * 0.34);
-      ctx.fillStyle = '#ffda3a'; circ(r * 0.9, -r * 0.16, 1.6); circ(r * 0.9, r * 0.16, 1.6);
-      ctx.strokeStyle = '#d33'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(r * 1.15, 0); ctx.lineTo(r * 1.15 + 4 + Math.sin(c.anim * 20) * 2, 0); ctx.stroke();
-      break; }
-    case 'fox':
-      ctx.fillStyle = col('#e0772e'); ell(-r * 1.2, Math.sin(c.anim * 6) * r * 0.2, r * 0.8, r * 0.36);
-      ctx.fillStyle = '#f6efe4'; ell(-r * 1.8, Math.sin(c.anim * 6) * r * 0.25, r * 0.28, r * 0.24);
-      ctx.fillStyle = '#3a2418'; ell(r * 0.5 + step * 3, -r * 0.5, r * 0.22, r * 0.15); ell(r * 0.5 - step * 3, r * 0.5, r * 0.22, r * 0.15);
-      ell(-r * 0.5 - step * 3, -r * 0.5, r * 0.22, r * 0.15); ell(-r * 0.5 + step * 3, r * 0.5, r * 0.22, r * 0.15);
-      ctx.fillStyle = col('#e0772e'); ell(0, 0, r * 0.95, r * 0.5); ell(r * 0.85, 0, r * 0.42, r * 0.38);
-      ctx.beginPath(); ctx.moveTo(r * 0.7, -r * 0.2); ctx.lineTo(r * 0.55, -r * 0.65); ctx.lineTo(r * 0.95, -r * 0.3); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(r * 0.7, r * 0.2); ctx.lineTo(r * 0.55, r * 0.65); ctx.lineTo(r * 0.95, r * 0.3); ctx.fill();
-      ctx.fillStyle = '#f6efe4'; ell(r * 1.12, 0, r * 0.22, r * 0.18);
-      ctx.fillStyle = '#111'; circ(r * 1.3, 0, 1.6); circ(r * 0.95, -r * 0.18, 1.4); circ(r * 0.95, r * 0.18, 1.4);
-      break;
-    case 'boar':
-    case 'boss': {
-      const big = T.key === 'boss';
-      ctx.fillStyle = '#2a1d16';
-      ell(r * 0.5 + step * 3, -r * 0.55, r * 0.2, r * 0.13); ell(r * 0.5 - step * 3, r * 0.55, r * 0.2, r * 0.13);
-      ell(-r * 0.5 - step * 3, -r * 0.55, r * 0.2, r * 0.13); ell(-r * 0.5 + step * 3, r * 0.55, r * 0.2, r * 0.13);
-      ctx.fillStyle = col(big ? '#6b5a50' : '#5a4033'); ell(0, 0, r, r * 0.62); ell(r * 0.85, 0, r * 0.42, r * 0.4);
-      ctx.fillStyle = col(big ? '#3e322b' : '#3d2b22');
-      for (let i = 0; i < 7; i++) ell(r * 0.6 - i * r * 0.22, 0, r * 0.1, r * 0.16);
-      ctx.fillStyle = '#c98e86'; ell(r * 1.22, 0, r * 0.14, r * 0.2);
-      ctx.fillStyle = '#f4ecd8';
-      ctx.beginPath(); ctx.moveTo(r * 1.05, -r * 0.2); ctx.quadraticCurveTo(r * 1.45, -r * 0.3, r * (big ? 1.55 : 1.4), -r * 0.5); ctx.lineTo(r * 1.05, -r * 0.12); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(r * 1.05, r * 0.2); ctx.quadraticCurveTo(r * 1.45, r * 0.3, r * (big ? 1.55 : 1.4), r * 0.5); ctx.lineTo(r * 1.05, r * 0.12); ctx.fill();
-      ctx.fillStyle = big ? '#ff3b3b' : '#111'; circ(r * 0.9, -r * 0.2, big ? 3 : 1.8); circ(r * 0.9, r * 0.2, big ? 3 : 1.8);
-      if (big) { ctx.strokeStyle = '#d8c7b0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.45); ctx.lineTo(r * 0.15, -r * 0.15); ctx.moveTo(-r * 0.05, -r * 0.5); ctx.lineTo(r * 0.3, -r * 0.2); ctx.stroke(); }
-      break; }
+// ---------- overlay ----------
+const _v = new THREE.Vector3();
+function toScreen(x, h, y) { _v.set(x, h, y).project(camera); return { x: (_v.x + 1) / 2 * W, y: (1 - _v.y) / 2 * H, ok: _v.z < 1 && _v.z > -1 }; }
+function drawOverlay() {
+  const g = fctx;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.clearRect(0, 0, W, H);
+  if (state === 'title') return;
+  for (const p of particles) {
+    const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue;
+    g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color;
+    g.beginPath(); g.arc(s.x, s.y, p.size, 0, Math.PI * 2); g.fill();
   }
-  ctx.restore();
-  if (c.hp < c.maxHp && T.key !== 'boss') {
-    const w = Math.max(18, r * 1.8);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(c.x - w / 2, c.y - r - 14, w, 4);
-    ctx.fillStyle = '#e8484d'; ctx.fillRect(c.x - w / 2, c.y - r - 14, w * Math.max(0, c.hp / c.maxHp), 4);
+  g.globalAlpha = 1;
+  for (const c of creatures) {
+    if (c.hp >= c.maxHp || c.type.key === 'boss' || !c.model.root.visible) continue;
+    const s = toScreen(c.x, c.size * 2.3, c.y); if (!s.ok) continue;
+    const w = Math.max(22, c.size * 1.6);
+    g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(s.x - w / 2, s.y, w, 5);
+    g.fillStyle = '#e8484d'; g.fillRect(s.x - w / 2, s.y, w * Math.max(0, c.hp / c.maxHp), 5);
   }
-}
-
-function render() {
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const sx = shake ? rand(-shake, shake) * 0.5 : 0, sy = shake ? rand(-shake, shake) * 0.5 : 0;
-  const ox = Math.round(W / 2 - cam.x + sx), oy = Math.round(H / 2 - cam.y + sy);
-  ctx.save(); ctx.translate(ox, oy);
-  const x0 = cam.x - W / 2 - 40, y0 = cam.y - H / 2 - 40, x1 = cam.x + W / 2 + 40, y1 = cam.y + H / 2 + 40;
-  drawGround(x0, y0, x1, y1);
-  for (const c of creatures) if (c.x > x0 - 60 && c.x < x1 + 60 && c.y > y0 - 60 && c.y < y1 + 60) drawCreature(c);
-  drawDino();
-  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; circ(p.x, p.y, p.size); }
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'center';
+  g.textAlign = 'center';
   for (const t of texts) {
-    ctx.globalAlpha = Math.min(1, t.life * 2); ctx.font = `800 ${t.size}px Nunito, system-ui, sans-serif`;
-    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(t.text, t.x, t.y); ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+    const s = toScreen(t.x, t.h, t.y); if (!s.ok) continue;
+    g.globalAlpha = Math.min(1, t.life * 2); g.font = `800 ${t.size}px Nunito, system-ui, sans-serif`;
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.75)'; g.strokeText(t.text, s.x, s.y); g.fillStyle = t.color; g.fillText(t.text, s.x, s.y);
   }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  // boss pointer
+  g.globalAlpha = 1;
   if (boss && state === 'play') {
-    const bx = boss.x + ox, by = boss.y + oy;
-    if (bx < 0 || bx > W || by < 0 || by > H) {
-      const a = Math.atan2(by - H / 2, bx - W / 2), m = 46;
-      const ax = clamp(W / 2 + Math.cos(a) * W, m, W - m), ay = clamp(H / 2 + Math.sin(a) * H, m + 110, H - m - 40);
-      ctx.save(); ctx.translate(ax, ay); ctx.rotate(a); ctx.fillStyle = '#e8484d';
-      ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -12); ctx.lineTo(-4, 0); ctx.lineTo(-10, 12); ctx.fill(); ctx.restore();
+    const s = toScreen(boss.x, 0, boss.y);
+    if (!s.ok || s.x < 0 || s.x > W || s.y < 0 || s.y > H) {
+      const a = Math.atan2(s.y - H / 2, s.x - W / 2), m = 46;
+      const ax = clamp(W / 2 + Math.cos(a) * W, m, W - m), ay = clamp(H / 2 + Math.sin(a) * H, m + 110, H - m - 50);
+      g.save(); g.translate(ax, ay); g.rotate(a); g.fillStyle = '#e8484d'; g.strokeStyle = '#000'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(20, 0); g.lineTo(-11, -13); g.lineTo(-4, 0); g.lineTo(-11, 13); g.closePath(); g.fill(); g.stroke(); g.restore();
     }
   }
   if (joy.active) {
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; circ(joy.ox, joy.oy, 55);
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; circ(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22);
+    g.fillStyle = 'rgba(255,255,255,0.1)'; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.arc(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22, 0, Math.PI * 2); g.fill();
   }
   if (state === 'play' && P.hp / P.maxHp < 0.3) {
-    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
-    g.addColorStop(0, 'rgba(200,0,0,0)'); g.addColorStop(1, `rgba(200,0,0,${0.25 + Math.sin(gameT * 6) * 0.1})`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    gr.addColorStop(0, 'rgba(200,0,0,0)'); gr.addColorStop(1, `rgba(200,0,0,${0.25 + Math.sin(gameT * 6) * 0.1})`);
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
   }
 }
 
@@ -743,9 +1056,10 @@ function setScreens() {
 }
 function start() {
   initAudio(); newGame(); state = 'play';
+  cam.x = P.x; cam.y = P.y;
   $('titleScreen').hidden = true; $('endScreen').hidden = true; $('levelScreen').hidden = true;
   setScreens();
-  showToast('Eat to grow', 'Start with beetles and mice', 2600);
+  showToast('Eat to grow', 'Start with beetles, crickets and mice', 2600);
 }
 function togglePause() {
   if (state === 'play') state = 'paused'; else if (state === 'paused') state = 'play'; else return;
@@ -763,9 +1077,10 @@ function endGame(won) {
   $('endTitle').textContent = won ? 'King of the Valley' : 'You were eaten';
   $('endTitle').style.color = won ? 'var(--leaf)' : 'var(--blood)';
   $('endSub').textContent = won
-    ? `You hatched as a tiny lizard and ate your way up to Rex. Old Tusk is dinner.`
+    ? 'You hatched as a tiny lizard and ate your way up to Rex. Old Tusk is dinner.'
     : `A ${stageFor(P.level).name} at level ${P.level}. Bite smaller things first and come back bigger.`;
-  const cells = [[fmtTime(elapsed), 'Time'], [P.level, 'Level'], [P.eaten, 'Eaten'], [P.kills.rat || 0, 'Rats'], [P.kills.mouse || 0, 'Mice']];
+  const kinds = Object.keys(P.kills).length;
+  const cells = [[fmtTime(elapsed), 'Time'], [P.level, 'Level'], [P.eaten, 'Eaten'], [`${kinds}/${Object.keys(TYPES).length - 1}`, 'Species'], [P.kills.rat || 0, 'Rats'], [P.kills.mouse || 0, 'Mice']];
   if (best) cells.push([fmtTime(best), 'Best time']);
   $('endResults').innerHTML = cells.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
   setTimeout(() => { $('endScreen').hidden = false; $('againBtn').focus({ preventScroll: true }); }, won ? 200 : 600);
@@ -776,14 +1091,15 @@ $('resumeBtn').addEventListener('click', togglePause);
 $('pauseBtn').addEventListener('click', togglePause);
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
-// title backdrop: a world to look at behind the start panel
 newGame();
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
   if (state === 'play') update(dt);
-  else if (state === 'title') { cam.x = WORLD / 2 + Math.cos(gameT * 0.1) * 300; cam.y = WORLD / 2 + Math.sin(gameT * 0.1) * 200; }
-  render();
+  else if (state === 'title') for (const c of creatures) c.anim += dt * 0.3;
+  sync3D();
+  renderer.render(scene, camera);
+  drawOverlay();
   if (state !== 'title') hud();
   requestAnimationFrame(frame);
 }
