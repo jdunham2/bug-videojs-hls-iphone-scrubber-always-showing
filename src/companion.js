@@ -8,6 +8,7 @@ import { levelFor, FALCON_LEVEL } from './progression.js';
 import { profile } from './profile.js';
 import { talent } from './talents.js';
 import { models } from './models.js';
+import { PLUMAGE, currentPlumage } from './provisions.js';
 
 export const falconUnlocked = () => levelFor(profile.xp || 0).level >= FALCON_LEVEL;
 
@@ -53,6 +54,7 @@ export class Falcon {
   attach(scene, on) {
     this.active = on;
     if (!this.realistic) this.realistic = this.useModel(); // models may have loaded since
+    this.applyPlumage();
     if (on) {
       scene.add(this.group);
       const P = this.game.player.pos;
@@ -142,6 +144,14 @@ export class Falcon {
     this.wingR.rotation.z = -w;
   }
 
+  /** Recolor the falcon with the plumage picked at the Falconer's Mews. */
+  applyPlumage() {
+    if (!this.flapUniforms) return;
+    const p = PLUMAGE[currentPlumage()];
+    if (p?.tint) this.flapUniforms.uTint.value.setRGB(...p.tint);
+    this.flapUniforms.uTintAmt.value = p?.tint ? 0.75 : 0;
+  }
+
   /**
    * Swap the box-built bird for the Meshy falcon (wings spread, gliding). It's one
    * rigid mesh, so the flap is done in the vertex shader: vertices bend up and down
@@ -158,7 +168,7 @@ export class Falcon {
     // Wingspan runs along the longer horizontal axis; turn it to lie along x.
     const spanAxisZ = size.z > size.x;
     const span = Math.max(size.x, size.z);
-    this.flapUniforms = { uPhase: { value: 0 }, uAmp: { value: 0.3 }, uFold: { value: 0 } };
+    this.flapUniforms = { uPhase: { value: 0 }, uAmp: { value: 0.3 }, uFold: { value: 0 }, uTint: { value: new THREE.Color(1, 1, 1) }, uTintAmt: { value: 0 } };
     const U = this.flapUniforms;
     root.traverse((o) => {
       if (!o.isMesh) return;
@@ -180,6 +190,13 @@ export class Falcon {
            transformed.y += sin(uPhase) * uAmp * pow(reach, 1.4) * ${half.toFixed(4)};
            transformed.${axis} = ${mid.toFixed(4)} + (transformed.${axis} - ${mid.toFixed(4)}) * (1.0 - 0.55 * uFold * reach);
            transformed.y -= uFold * reach * 0.25 * ${half.toFixed(4)};`,
+        );
+        // Plumage from the Falconer's Mews: recolor, keeping the feather pattern's light and dark.
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uTint; uniform float uTintAmt;').replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+           float plum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+           diffuseColor.rgb = mix(diffuseColor.rgb, uTint * (0.3 + plum * 1.4), uTintAmt);`,
         );
       };
     });

@@ -329,6 +329,42 @@ const SCENES = {
   },
 };
 
+// The outer-ring shops.
+SCENES.fletcher = SCENES.armory;
+SCENES.apothecary = SCENES.merchant;
+SCENES.tavern = () => {
+  let s = `<rect width="1600" height="640" fill="url(#in-plank)"/><rect width="1600" height="640" fill="#1a0e06" opacity=".2"/>`;
+  s += floor(640, '#4a3424', '#00000044');
+  // A big stone fireplace with a roaring fire.
+  s += `<circle cx="800" cy="420" r="520" fill="url(#in-warm)" class="in-glow"/>`;
+  s += `<path d="M560 640 L 560 300 L 1040 300 L 1040 640 Z" fill="url(#in-brick)" stroke="#1a1612" stroke-width="10"/><rect x="530" y="280" width="540" height="34" fill="#3a2a1a"/>`;
+  s += `<path d="M640 640 L 640 430 Q 800 380 960 430 L 960 640 Z" fill="#120806"/><path d="M660 640 C 700 560, 740 520, 760 470 C 780 520, 820 560, 840 520 C 860 560, 900 590, 940 640 Z" fill="url(#in-flame)" class="in-flame big"/>`;
+  s += `<rect x="600" y="160" width="400" height="110" rx="10" fill="#5a3a20"/><text x="800" y="235" text-anchor="middle" font-family="Cinzel, serif" font-size="56" font-weight="800" fill="#d8a23a">THE TAVERN</text>`;
+  // Long tables with mugs.
+  for (const [x, w] of [[80, 380], [1140, 380]]) {
+    s += `<rect x="${x}" y="660" width="${w}" height="26" fill="#6a4426"/><rect x="${x + 20}" y="686" width="18" height="120" fill="#3a2414"/><rect x="${x + w - 38}" y="686" width="18" height="120" fill="#3a2414"/>`;
+    for (let k = 0; k < 5; k++) s += `<g transform="translate(${x + 40 + k * 70} 660)"><rect x="-14" y="-40" width="28" height="40" rx="4" fill="#c8a050"/><rect x="-12" y="-46" width="24" height="10" rx="5" fill="#f4ecd8"/><path d="M14 -32 q 12 0 12 12 q 0 10 -12 10" fill="none" stroke="#c8a050" stroke-width="5"/></g>`;
+  }
+  s += `<g transform="translate(260 300)"><circle r="70" fill="#5a3a20"/><circle r="56" fill="#7a5230"/><path d="M-30 -20 L 30 20 M 30 -20 L -30 20" stroke="#d8a23a" stroke-width="6"/></g>`;
+  s += lantern(200, 0, 130) + lantern(1400, 0, 130) + torch(1340, 340);
+  return { svg: s, motes: '', tone: 'warm' };
+};
+SCENES.mews = () => {
+  let s = `<rect width="1600" height="640" fill="url(#in-plank)"/><rect width="1600" height="640" fill="#0e0a06" opacity=".25"/>`;
+  s += floor(640, '#5a4a30', '#00000033');
+  s += `<rect x="0" y="0" width="1600" height="900" fill="url(#in-warm)" opacity=".4"/>`;
+  // Perches along the wall with resting falcons in silhouette.
+  for (let i = 0; i < 6; i++) {
+    const x = 160 + i * 260;
+    s += `<rect x="${x - 70}" y="420" width="140" height="14" rx="6" fill="#5a3a20"/><rect x="${x - 6}" y="434" width="12" height="210" fill="#3a2414"/>`;
+    s += `<g transform="translate(${x} 420)"><path d="M-18 0 C -24 -30, -16 -62, 0 -70 C 16 -62, 24 -30, 18 0 Z" fill="#4a4a52"/><circle cx="0" cy="-74" r="12" fill="#4a4a52"/><path d="M8 -76 L 18 -72 L 8 -68 Z" fill="#d8a23a"/><path d="M-8 0 L -14 18 M 8 0 L 14 18" stroke="#d8a23a" stroke-width="3"/></g>`;
+  }
+  // Gloves and hoods hanging on pegs.
+  for (let i = 0; i < 5; i++) s += `<g transform="translate(${260 + i * 260} 200)"><circle r="8" fill="#2a1a10"/><path d="M-20 10 L 20 10 L 24 80 L -24 80 Z" fill="#8a5a30"/><path d="M-24 80 L 24 80 L 18 100 L -18 100 Z" fill="#6a4020"/></g>`;
+  s += lantern(800, 0, 110) + torch(80, 320);
+  return { svg: s, motes: '', tone: 'warm' };
+};
+
 // Each room is painted once into a JPEG: a live full-screen SVG with flickering
 // flames under a camp screen made the browser repaint everything every frame.
 const baked = {};
@@ -365,7 +401,7 @@ export function prepareInteriors() {
   Object.keys(SCENES).forEach((k, i) => setTimeout(() => bake(k), 300 + i * 250));
 }
 
-const TONE = { hall: 'warm', wardrobe: 'warm', armory: 'warm', merchant: 'warm', blacksmith: 'hot', shrine: 'warm', gate: 'warm' };
+const TONE = { tavern: 'warm', mews: 'warm', fletcher: 'warm', apothecary: 'warm', hall: 'warm', wardrobe: 'warm', armory: 'warm', merchant: 'warm', blacksmith: 'hot', shrine: 'warm', gate: 'warm' };
 
 /** Full-screen interior markup for a camp building, or '' for none. */
 export function interiorHtml(kind) {

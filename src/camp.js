@@ -16,14 +16,17 @@ import { Room, ROOM_KINDS } from './rooms.js';
 import { BOSS_FORMS } from './boss.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
+import { PROVISIONS, MAX_PACK, pack, buyProvision, unpack, giftReady, claimGift, RUMORS, PLUMAGE, ownsPlumage, currentPlumage, buyPlumage } from './provisions.js';
+import { falconUnlocked } from './companion.js';
+import { FALCON_LEVEL } from './progression.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionById, missionsIn, farReachesOpen, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
-import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
+import { fletcherStock, buyFletch, payFletchRestock, FLETCH_RESTOCK, restring, restringCost, merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon, PERKS, ROMAN_TIER } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
-const RADIUS = 15;
+const RADIUS = 25; // the camp grew: an outer ring of newer shops
 
 /** The road network on the world map (neighbouring places). */
 const ROADS = [
@@ -181,12 +184,23 @@ export class Camp {
     this.prop('tent', 2.4, -11, -5, 1.0, 1.8);
     this.building('blacksmithForge', 4.2, 6, -12, 'blacksmith', 'Blacksmith', 2.0);
     this.building('merchantStall', 3.6, 12, 2, 'merchant', 'Merchant', 1.7);
+    // The outer ring: newer shops (Meshy buildings; a tent stands in until they're generated).
+    this.building(models.fletcherHut ? 'fletcherHut' : 'tent', 4.2, 16, 12.5, 'fletcher', "Fletcher's Workshop", 2.2);
+    this.building(models.apothecary ? 'apothecary' : 'tent', 4.0, -15.5, 13.5, 'apothecary', 'Apothecary', 2.0);
+    this.building(models.tavern ? 'tavern' : 'tent', 7.0, 2.5, 20, 'tavern', 'The Tavern', 3.6);
+    this.building(models.mews ? 'mews' : 'tent', 4.2, 17.5, -14, 'mews', "Falconer's Mews", 2.2);
     for (const [x, z] of [
       [-3, -3],
       [3, 3],
       [-6, -2],
       [5, -4],
       [-3, -9],
+      [9, 14],
+      [-8, 17],
+      [12, -12],
+      [-13, 8],
+      [14, 4],
+      [-2, 14.5],
     ]) {
       this.prop('lantern', 2.0, x, z, Math.random() * 6, 0.25);
       // A soft glow sprite instead of a real light: point lights cost on every pixel.
@@ -198,8 +212,31 @@ export class Camp {
       pool.position.set(x, 0.03, z);
       S.add(pool);
     }
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2 + 0.2;
+    // Life around the outer ring: barrels and a fire by the tavern, crates by the
+    // apothecary, archery butts by the fletcher, tents and signposts on the paths.
+    for (const [id, size, x, z, rot, col] of [
+      ['barrel', 1.1, 6.6, 18.2, 0.3, 0.5],
+      ['barrel', 1.0, 7.4, 19.4, 1.2, 0.45],
+      ['barrel', 1.1, -1.8, 18.8, 0.7, 0.5],
+      ['campfire', 0.8, 4, 15.2, 0, 0.7],
+      ['crates', 1.2, -12.2, 15.6, 0.4, 0.7],
+      ['crates', 1.0, -18.4, 11.2, 1.1, 0.6],
+      ['dummy', 1.9, 19.6, 8.4, -2.4, 0.5],
+      ['dummy', 1.9, 20.6, 11.2, -2.6, 0.5],
+      ['weaponPile', 1.2, 13.2, 15.4, 0.6, 0.6],
+      ['tent', 2.4, -21, -2, 1.4, 1.8],
+      ['tent', 2.2, 21.5, 2.5, -1.6, 1.7],
+      ['signpost', 2.2, 8.5, 9.5, -0.8, 0.4],
+      ['signpost', 2.2, -9.5, 11.5, 0.8, 0.4],
+      ['crates', 1.1, 20.4, -10.5, 0.2, 0.6],
+      ['lantern', 2.0, 14.5, -17.5, 0, 0.25],
+    ]) this.prop(id, size, x, z, rot, col);
+    const fire2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff9a4a, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+    fire2.position.set(4, 0.9, 15.2);
+    fire2.scale.setScalar(2.6);
+    S.add(fire2);
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * Math.PI * 2 + 0.2;
       if (Math.abs(a - Math.PI * 1.25) < 0.45) continue; // gap toward the gate
       this.prop('fence', 1.0, Math.cos(a) * (RADIUS + 0.6), Math.sin(a) * (RADIUS + 0.6), -a, 0, { axis: 'x', size: 2.6 });
     }
@@ -510,6 +547,76 @@ export class Camp {
     this.portal.material.color.setRGB(1.3, 1.15, 0.9);
     this.game.start(M.fromCheckpoint);
     setTimeout(() => document.body.classList.remove('setting-out'), 1400);
+  }
+
+  // ------------------------------------------------------------ outer-ring shops
+
+  fletcherHtml() {
+    const stock = fletcherStock();
+    const cards = stock
+      .map((item, i) => this.itemCard(item, item.sold ? '<div class="ic-act"><span class="tag">Sold</span></div>' : `<div class="ic-act"><button data-act="fletch-buy" data-i="${i}" class="gold" ${profile.gems < price(item) ? 'disabled' : ''}>Buy · ◆ ${price(item)}</button></div>`))
+      .join('');
+    const bows = stash().filter((it) => it.slot === 'bow' && it.perks?.length);
+    const sel = bows.find((it) => it.uid === this.fletchSel) || bows[0];
+    this.fletchSel = sel?.uid;
+    this.previewItem = sel || stock.find((i) => !i.sold) || stock[0];
+    const picks = bows.map((it) => `<button class="gtile ${it.uid === sel?.uid ? 'sel' : ''}" data-act="fletch-pick" data-uid="${it.uid}" style="--rar:${RARITIES[it.rarity].color}">${gearIcon(it)}<span>${it.power}</span></button>`).join('');
+    const restringBox = sel
+      ? `<div class="restring"><h3 class="sub">Restring a bow</h3><p class="lead">Swaps the bow's weakest perk for a different one at the same tier.</p><div class="gpicks">${picks}</div>
+        ${this.itemCard(sel, `<div class="ic-act"><button data-act="fletch-restring" class="gold" ${profile.gems < restringCost(sel) ? 'disabled' : ''}>Restring · ◆ ${restringCost(sel)}</button></div>`)}</div>`
+      : '<p class="empty">No bows with perks to restring yet.</p>';
+    return `<div class="cp-head"><h2>Fletcher's Workshop</h2><p class="lead">“Bows are all I make, and I make them well. Better odds of something rare than the merchant.”</p></div>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <div class="cp-split shop"><div class="cp-stage small"><canvas id="camp-preview"></canvas><div class="cp-icon" style="display:none"></div></div><div class="icards">${cards}</div></div>
+      <div class="actions"><button data-act="fletch-restock" ${profile.gems < FLETCH_RESTOCK ? 'disabled' : ''}>New bows · ◆ ${FLETCH_RESTOCK}</button></div>
+      ${restringBox}`;
+  }
+
+  /** Apothecary and Tavern: provisions for the next run, plus the tavern's daily gift. */
+  provisionsHtml(shop) {
+    const list = pack();
+    const cards = Object.entries(PROVISIONS)
+      .filter(([, p]) => p.shop === shop)
+      .map(([id, p]) => {
+        const packed = list.includes(id);
+        const can = !packed && list.length < MAX_PACK && profile.gems >= p.cost;
+        return `<div class="prov ${packed ? 'packed' : ''}"><div class="pv-icon">${p.icon}</div><div class="pv-body"><div class="pv-name">${p.name}</div><div class="pv-text">${p.text}</div></div>
+          ${packed ? '<span class="tag on">Packed</span>' : `<button class="gold" data-act="prov-buy" data-id="${id}" ${can ? '' : 'disabled'}>◆ ${p.cost}</button>`}</div>`;
+      })
+      .join('');
+    const packHtml = list.length
+      ? list.map((id) => `<span class="pk-item">${PROVISIONS[id].icon} ${PROVISIONS[id].name} <button data-act="prov-unpack" data-id="${id}" title="Take it back out (refund)">✕</button></span>`).join('')
+      : '<span class="empty">Nothing packed yet.</span>';
+    let extra = '';
+    if (shop === 'tavern') {
+      const ready = giftReady();
+      const rumor = RUMORS[(new Date().getDate() + profile.runs) % RUMORS.length];
+      extra = `<div class="tavern-gift"><div><b>On the house</b><span>Gems every day, and sometimes a piece of gear.</span></div>
+        <button class="gold big" data-act="tavern-gift" ${ready ? '' : 'disabled'}>${ready ? 'Claim today’s gift' : 'Come back tomorrow'}</button></div>
+        <p class="rumor">Overheard at the bar: <i>“${rumor}”</i></p>`;
+    }
+    const title = shop === 'tavern' ? 'The Tavern' : 'Apothecary';
+    const lead = shop === 'tavern' ? 'Warm fire, cold ale, and people who know things. Hire help for your next run.' : '“A good meal and the right tonic, and you’ll fight like two.” Each lasts for one run.';
+    return `<div class="cp-head"><h2>${title}</h2><p class="lead">${lead}</p></div>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      ${extra}
+      <div class="provs">${cards}</div>
+      <div class="pack"><b>Packed for your next run (${list.length}/${MAX_PACK}):</b> ${packHtml}</div>`;
+  }
+
+  mewsHtml() {
+    const cur = currentPlumage();
+    const has = falconUnlocked();
+    const cards = Object.entries(PLUMAGE)
+      .map(([id, p]) => {
+        const owned = ownsPlumage(id);
+        const action = cur === id ? '<span class="tag on">Wearing</span>' : `<button class="gold" data-act="plumage" data-id="${id}" ${owned || profile.gems >= p.cost ? '' : 'disabled'}>${owned ? 'Use' : `◆ ${p.cost}`}</button>`;
+        return `<div class="prov ${cur === id ? 'packed' : ''}"><div class="pv-icon" style="background:${p.swatch};border-color:${p.swatch}"></div><div class="pv-body"><div class="pv-name">${p.name}</div><div class="pv-text">${owned ? 'Owned' : 'Plumage for your falcon'}</div></div>${action}</div>`;
+      })
+      .join('');
+    return `<div class="cp-head"><h2>Falconer's Mews</h2><p class="lead">${has ? 'Your falcon is well. Fancy a new look for it?' : `Your falcon joins you at hero level ${FALCON_LEVEL}. You can pick its colors now.`}</p></div>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <div class="provs">${cards}</div>`;
   }
 
   // ------------------------------------------------------------ the camp grows
@@ -825,8 +932,16 @@ export class Camp {
       html = this.worldMapHtml();
     } else if (k === 'talents') {
       html = this.talentsHtml();
+    } else if (k === 'fletcher') {
+      html = this.fletcherHtml();
+    } else if (k === 'apothecary') {
+      html = this.provisionsHtml('apothecary');
+    } else if (k === 'tavern') {
+      html = this.provisionsHtml('tavern');
+    } else if (k === 'mews') {
+      html = this.mewsHtml();
     }
-    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents');
+    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents' || k === 'fletcher' || k === 'apothecary' || k === 'tavern' || k === 'mews');
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
     this.syncPreview();
   }
@@ -1282,6 +1397,56 @@ export class Camp {
     const v = b.dataset.v;
     const G = this.game;
     if (act === 'close') return this.close();
+    if (act === 'fletch-buy') {
+      const it = buyFletch(Number(b.dataset.i));
+      this.shopNote = it ? `Bought ${it.name}. It's in your stash (Armory).` : 'Not enough gems.';
+      G.sfx.sample(it ? 'jingleClear' : 'uiSwitch', { vol: 0.45, jitter: 0 });
+      return this.render();
+    }
+    if (act === 'fletch-restock') {
+      if (payFletchRestock()) G.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
+      return this.render();
+    }
+    if (act === 'fletch-pick') {
+      this.fletchSel = b.dataset.uid;
+      return this.render();
+    }
+    if (act === 'fletch-restring') {
+      const r = restring(findItem(this.fletchSel));
+      this.shopNote = r ? `Restrung: ${r.was} → ${r.now}.` : 'Not enough gems.';
+      G.sfx.sample(r ? 'clang' : 'uiSwitch', { vol: 0.4, rate: 1.5, jitter: 0 });
+      return this.render();
+    }
+    if (act === 'prov-buy') {
+      const ok = buyProvision(b.dataset.id);
+      this.shopNote = ok ? `${PROVISIONS[b.dataset.id].name} packed for your next run.` : pack().length >= MAX_PACK ? `Your pack is full (${MAX_PACK}).` : 'Not enough gems.';
+      G.sfx.sample(ok ? 'uiConfirm' : 'uiSwitch', { vol: 0.45, jitter: 0 });
+      this.refreshHud();
+      return this.render();
+    }
+    if (act === 'prov-unpack') {
+      unpack(b.dataset.id);
+      this.refreshHud();
+      return this.render();
+    }
+    if (act === 'tavern-gift') {
+      const r = claimGift(levelFor(profile.xp || 0).level);
+      if (r) {
+        this.shopNote = `On the house: ◆ ${r.gems}${r.item ? ` and ${r.item.name} (in your stash)` : ''}.`;
+        G.sfx.sample('jingleClear', { vol: 0.5, jitter: 0 });
+        this.particles.spawn(G.player.pos.clone().setY(1.2), { count: 30, color: [3, 2.2, 0.6], speed: 4, up: 3, life: 0.8, size: 0.08, gravity: 3 });
+      }
+      this.refreshHud();
+      return this.render();
+    }
+    if (act === 'plumage') {
+      if (buyPlumage(b.dataset.id)) {
+        G.sfx.sample('uiConfirm', { vol: 0.45, jitter: 0 });
+        G.falcon.applyPlumage();
+      } else G.sfx.sample('uiSwitch', { vol: 0.3 });
+      this.refreshHud();
+      return this.render();
+    }
     if (act === 'talent-learn') {
       if (learn(b.dataset.id, levelFor(profile.xp || 0).level)) {
         G.sfx.sample('uiConfirm', { vol: 0.45, rate: 1.2, jitter: 0 });
@@ -1371,7 +1536,7 @@ function groundTexture() {
     g.fillRect(Math.random() * 1024, Math.random() * 1024, rand(1, 2), rand(2, 6));
   }
   // Worn dirt clearing in the middle (the texture maps to a 120m disc: center ≈ 512).
-  const grad = g.createRadialGradient(512, 512, 0, 512, 512, 140);
+  const grad = g.createRadialGradient(512, 512, 0, 512, 512, 240);
   grad.addColorStop(0, 'rgba(70,52,36,0.95)');
   grad.addColorStop(0.7, 'rgba(70,52,36,0.6)');
   grad.addColorStop(1, 'rgba(70,52,36,0)');

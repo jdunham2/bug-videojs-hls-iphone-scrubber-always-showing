@@ -2,6 +2,7 @@ import { config } from './config.js';
 import { gearStats } from './gear.js';
 import { currentCharacter } from './profile.js';
 import { talent } from './talents.js';
+import { prov } from './provisions.js';
 
 // Skill catalogue. `desc(level)` describes the total effect at that level, so a
 // card can show exactly what you'd have after picking it.
@@ -163,11 +164,11 @@ export const buffs = { haste: 0, slippery: false, chill: 0, netted: 0 };
 /** Final stats: config base × run skills × character perk × equipped gear × arena effects. */
 export const stat = {
   drawTime: () => config.bow.drawTime * 0.85 ** lv('quickHands') * perk('drawTime') * gearStats().drawTime * talent.drawTime() * (buffs.haste > 0 ? 0.8 : 1),
-  perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')) * gearStats().window,
-  maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality') + gearStats().hpAdd + talent.hpAdd()) * perk('maxHp') * gearStats().hpMult),
+  perfectWindow: () => config.bow.perfectWindow * (1 + 0.4 * lv('steadyAim')) * gearStats().window * prov.window(),
+  maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality') + gearStats().hpAdd + talent.hpAdd() + prov.hpAdd()) * perk('maxHp') * gearStats().hpMult),
   dodgeCharges: () => 1 + lv('secondWind'),
-  damage: () => perk('damage') * gearStats().damage * talent.damage(),
-  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * gearStats().speed * talent.speed() * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1) * (buffs.netted > 0 ? 0.35 : 1),
+  damage: () => perk('damage') * gearStats().damage * talent.damage() * prov.damage(),
+  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * gearStats().speed * talent.speed() * prov.speed() * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1) * (buffs.netted > 0 ? 0.35 : 1),
   arrowSpeed: () => gearStats().arrowSpeed,
   drawMove: () => config.bow.drawMoveMultiplier * gearStats().drawMove,
   damageTaken: () => (1 - gearStats().dr) * talent.taken(),

@@ -22,6 +22,7 @@ import { modEffects, dailyScore, recordDaily } from './daily.js';
 import { difficultyById, selectedDifficulty } from './difficulty.js';
 import { Camp } from './camp.js';
 import { Falcon, falconUnlocked } from './companion.js';
+import { startProvisions, endProvisions, PROVISIONS } from './provisions.js';
 import { Hazards } from './hazards.js';
 import { Fireballs } from './variants.js';
 import { settings, applySettings, SettingsPanel, saveSettingsNow } from './settings.js';
@@ -306,6 +307,11 @@ export class Game {
     this.runUnlocks = [];
     this.runStartBest = { ...profile.best };
     noteRunStart();
+    // Open the pack: provisions bought in camp last for this run.
+    const packed = startProvisions();
+    if (packed.includes('song')) this.ultimate.meter = 100;
+    this.player.hp = this.maxHp();
+    if (packed.length) setTimeout(() => this.state === 'playing' && this.banner('Provisions', packed.map((id) => PROVISIONS[id].name).join(' · '), 2), 3200);
     this.falcon.attach(this.scene, falconUnlocked());
     this.sfx.runStart();
     // After the gate's Setting Out card (if any) has faded, name the mission.
@@ -324,6 +330,7 @@ export class Game {
     this.resetRun();
     this.state = 'camp';
     document.body.classList.remove('title-backdrop');
+    endProvisions();
     this.setScene(this.camp.scene);
     this.camp.enter();
     this.falcon.attach(this.camp.scene, falconUnlocked());

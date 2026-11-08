@@ -95,3 +95,60 @@ export function hone(item) {
   gearChanged();
   return PERKS[target[0]].name;
 }
+
+// ------------------------------------------------------------ fletcher
+
+// The Fletcher only makes bows, and better ones than the merchant usually has.
+const fletch = () => (profile.fletch ||= { stamp: -1, items: [] });
+export const FLETCH_RESTOCK = 15;
+
+export function fletcherStock() {
+  const s = fletch();
+  if (s.stamp !== profile.runs || !s.items.length) restockFletch(false);
+  return s.items;
+}
+
+function restockFletch(paid) {
+  const s = fletch();
+  const power = heroPower();
+  s.items = [0, 1, 2].map(() => {
+    const r = Math.random();
+    return rollItem('bow', power + 1 + Math.floor(Math.random() * 3), r < 0.2 ? 'unique' : r < 0.75 ? 'rare' : 'common');
+  });
+  s.stamp = profile.runs;
+  if (paid) profile.gems -= FLETCH_RESTOCK;
+  saveProfile();
+}
+
+export function payFletchRestock() {
+  if (profile.gems < FLETCH_RESTOCK) return false;
+  restockFletch(true);
+  return true;
+}
+
+export function buyFletch(i) {
+  const item = fletch().items[i];
+  if (!item || item.sold || profile.gems < price(item)) return null;
+  profile.gems -= price(item);
+  const bought = { ...item };
+  delete bought.sold;
+  addToStash(bought);
+  item.sold = true;
+  saveProfile();
+  return bought;
+}
+
+/** Restring: swap a bow's weakest perk for a different bow perk at the same tier. */
+export const restringCost = (item) => 20 + RARITY_ORDER.indexOf(item.rarity) * 20 + item.power * 2;
+export function restring(item) {
+  if (!item || item.slot !== 'bow' || !item.perks?.length || profile.gems < restringCost(item)) return null;
+  const have = new Set(item.perks.map(([k]) => k));
+  const options = Object.keys(PERKS).filter((k) => PERKS[k].slot === 'bow' && !have.has(k));
+  if (!options.length) return null;
+  const target = [...item.perks].sort((a, b) => a[1] - b[1])[0];
+  const was = target[0];
+  target[0] = pick(options);
+  profile.gems -= restringCost(item);
+  gearChanged();
+  return { was: PERKS[was].name, now: PERKS[target[0]].name };
+}

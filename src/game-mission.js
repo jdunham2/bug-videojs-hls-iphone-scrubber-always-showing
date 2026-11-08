@@ -8,6 +8,7 @@ import { recordMission, MISSIONS, fmtTime } from './missions.js';
 import { dailyScore, recordDaily } from './daily.js';
 import { rollItem, addToStash, RARITIES, gearIcon } from './gear.js';
 import { bankRun } from './profile.js';
+import { prov } from './provisions.js';
 
 const glowTex = (() => {
   let tex = null;
@@ -69,6 +70,16 @@ export class MissionMethods {
     this.secret = { group, glow, pos: new THREE.Vector3(x, 0, z), found: false, t: 0 };
     pillars.push((this.secret.collider = { x, z, r: 0.6, h: 0.8, hazardSpot: true }));
     this.sfx.sample('ding', { vol: 0.25, rate: 2.2, jitter: 0, pan: this.panAt(this.secret.pos) });
+    if (prov.has('scout')) {
+      // The hired scout has marked the spot: a tall beam of light over the chest.
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.35, 0.6, 14, 16, 1, true),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.9, 0.8), transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+      );
+      beam.position.y = 7;
+      group.add(beam);
+      this.banner('Your scout found it', 'A beacon marks the hidden chest', 1.8);
+    }
   }
 
   updateSecret(dt) {
