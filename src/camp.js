@@ -12,6 +12,7 @@ import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, ou
 import { Preview } from './preview.js';
 import { interiorHtml, prepareInteriors } from './interiors.js';
 import { mapArt, prepareMapArt } from './worldmap-art.js';
+import { HOMES, ownsHome, buyHome, restingAt, sleepAt } from './homes.js';
 import { Room, ROOM_KINDS } from './rooms.js';
 import { BOSS_FORMS } from './boss.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
@@ -22,14 +23,13 @@ import { Town, VILLAGES, inVillages, villageSnaps, ROAD_ANGLES } from './town.js
 import { villager, questOf, accept, handIn, fetchable } from './quests.js';
 import { FALCON_LEVEL } from './progression.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
-import { MISSIONS, ENDLESS, missionById, missionsIn, farReachesOpen, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
+import { MISSIONS, ENDLESS, missionById, missionsIn, regionOpen, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { fletcherStock, buyFletch, payFletchRestock, FLETCH_RESTOCK, restring, restringCost, merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon, PERKS, ROMAN_TIER } from './gear.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 25; // the camp grew: an outer ring of newer shops
-const HOUSE_COST = 150;
 
 /** The road network on the world map (neighbouring places). */
 const ROADS = [
@@ -60,7 +60,24 @@ const ROADS2 = [
   ['oasis', 'foundry'],
 ];
 
+/** Roads on the Northern Wilds map. */
+const ROADS3 = [
+  ['glacier', 'pines'],
+  ['pines', 'banners'],
+  ['banners', 'caverns'],
+  ['caverns', 'ironhold'],
+  ['ironhold', 'redcliff'],
+  ['glacier', 'banners'],
+  ['banners', 'redcliff'],
+];
+
 const MAP_ICONS = {
+  glacier: '<svg viewBox="0 0 24 24"><path d="M12 2 L 12 22 M 3 7 L 21 17 M 3 17 L 21 7 M 12 5 L 9.5 3 M 12 5 L 14.5 3 M 12 19 L 9.5 21 M 12 19 L 14.5 21" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  pines: '<svg viewBox="0 0 24 24"><path d="M12 2 L 6 10 L 9 10 L 4 16 L 10.5 16 L 10.5 21 L 13.5 21 L 13.5 16 L 20 16 L 15 10 L 18 10 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  banners: '<svg viewBox="0 0 24 24"><path d="M6 21 L 6 3 M 6 4 L 18 4 L 15 8 L 18 12 L 6 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  caverns: '<svg viewBox="0 0 24 24"><path d="M3 20 C 3 10, 8 5, 12 5 C 16 5, 21 10, 21 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20 L 12 13 L 14 20 M 7 11 L 8 14 M 16 10 L 17 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  ironhold: '<svg viewBox="0 0 24 24"><path d="M4 21 L 4 9 L 12 4 L 20 9 L 20 21 Z M 9 21 L 9 14 L 15 14 L 15 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 4 L 8 2 M 16 4 L 16 2" stroke="currentColor" stroke-width="1.5"/></svg>',
+  redcliff: '<svg viewBox="0 0 24 24"><path d="M3 21 L 3 9 L 6 9 L 6 7 L 9 7 L 9 9 L 15 9 L 15 7 L 18 7 L 18 9 L 21 9 L 21 21 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9 L 12 3 L 16 4.5 L 12 6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
   temple: '<svg viewBox="0 0 24 24"><path d="M3 20 L 21 20 L 18 16 L 6 16 Z M 6 16 L 18 16 L 15 12 L 9 12 Z M 9 12 L 15 12 L 13 8 L 11 8 Z M 11 8 L 13 8 L 13 5 L 11 5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
   grove: '<svg viewBox="0 0 24 24"><path d="M4 12 Q 12 1 20 12 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12 L 10 21 L 14 21 L 14 12" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="8.5" r="1" fill="currentColor"/><circle cx="14" cy="7.5" r="1" fill="currentColor"/></svg>',
   oasis: '<svg viewBox="0 0 24 24"><path d="M12 20 Q 13 13 12 7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7 Q 6 6 4 10 M 12 7 Q 18 6 20 10 M 12 7 Q 9 3 6 4 M 12 7 Q 15 3 18 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4 21 Q 12 17 20 21" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
@@ -359,6 +376,7 @@ export class Camp {
     this.close();
     this.refreshHud();
     this.refreshDecor();
+    this.town?.syncHomes();
   }
 
   leave() {
@@ -454,7 +472,7 @@ export class Camp {
     if (near !== this.near) {
       this.near = near;
       this.prompt.classList.toggle('show', !!near && !this.openKind);
-      if (near) this.prompt.innerHTML = `<span class="cp-btn">${near.kind === 'gate' ? 'Enter' : near.kind === 'npc' ? 'Talk to' : near.kind === 'cottage' && !profile.house ? 'Look at' : 'Go inside'}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
+      if (near) this.prompt.innerHTML = `<span class="cp-btn">${near.kind === 'gate' ? 'Enter' : near.kind === 'npc' ? 'Talk to' : HOMES[near.kind] && !ownsHome(near.kind) ? 'Look at' : 'Go inside'}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
       if (near) this.prompt.querySelector('b').textContent = near.label;
     }
     const I = this.game.input;
@@ -644,35 +662,40 @@ export class Camp {
       <div><div class="speech">“${esc(speech)}”</div>${task}</div></div>`;
   }
 
-  cottageHtml() {
-    return `<div class="cp-head"><h2>A Cottage for Sale</h2><p class="lead">Stone walls, a thatched roof, a warm fire and a proper bed. Yours for ◆ ${HOUSE_COST}.</p></div>
+  /** A house for sale: what it is, its rest bonus, the price. */
+  houseHtml(hid) {
+    const h = HOMES[hid];
+    const owned = Object.keys(HOMES).filter(ownsHome).length;
+    return `<div class="cp-head"><h2>${esc(h.name)}</h2><p class="lead">${esc(h.blurb)} Yours for ◆ ${h.cost}.</p></div>
       ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
       <ul class="house-perks">
-        <li><b>Sleep in your own bed</b> before a dungeon and start it <b>Well Rested</b>: +30 max health for that run.</li>
-        <li>Rested again after every run.</li>
+        <li><b>Sleep in the bed</b> before a dungeon and start it <b>${esc(h.rest)}</b>: ${esc(h.bonus).toLowerCase()} for that run.</li>
+        <li>One bonus at a time: the last bed you slept in counts. Own several houses and pick the one that suits the next dungeon.</li>
         <li>A chest by the bed opens your stash (the Armory).</li>
+        ${owned ? `<li>You own ${owned} of ${Object.keys(HOMES).length} houses.</li>` : ''}
       </ul>
-      <div class="actions"><button class="gold big" data-act="house-buy" ${profile.gems >= HOUSE_COST ? '' : 'disabled'}>Buy the cottage · ◆ ${HOUSE_COST}</button></div>`;
+      <div class="actions"><button class="gold big" data-act="house-buy" data-id="${hid}" ${profile.gems >= h.cost ? '' : 'disabled'}>Buy the ${esc(h.name.split(' ').slice(1).join(' ').toLowerCase())} · ◆ ${h.cost}</button></div>`;
   }
 
-  /** Sleep in your own bed: fade out, morning, and you're Well Rested for the next run. */
+  /** Sleep in this house's bed: fade out, morning, and the next run gets its rest bonus. */
   sleep() {
     const G = this.game;
-    if (profile.rested) {
-      G.banner('Already rested', 'Your next dungeon starts Well Rested', 1.6);
+    const hid = HOMES[this.room?.kind] ? this.room.kind : 'cottage';
+    const h = HOMES[hid];
+    if (restingAt() === hid) {
+      G.banner(`Already ${h.rest.toLowerCase()}`, `Your next dungeon starts with ${h.bonus.toLowerCase()}`, 1.6);
       return;
     }
     document.body.classList.add('sleeping');
     G.sfx.sample('bell', { vol: 0.25, rate: 0.6, jitter: 0, delay: 1.4 });
     setTimeout(() => {
-      profile.rested = true;
-      saveProfile();
+      sleepAt(hid);
       G.player.hp = G.maxHp();
       this.refreshHud();
     }, 1200);
     setTimeout(() => {
       document.body.classList.remove('sleeping');
-      G.banner('Well rested', 'Your next dungeon starts with +30 max health', 2.2);
+      G.banner(h.rest, `Your next dungeon starts with ${h.bonus.toLowerCase()}`, 2.2);
     }, 2600);
   }
 
@@ -964,14 +987,14 @@ export class Camp {
     const ready = bountiesReady();
     this.town?.refreshMarkers();
     const free = talentPoints(levelFor(profile.xp || 0).level).free;
-    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level}${free ? ` (${free} talent point${free > 1 ? 's' : ''} to spend in the Hall)` : ''} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${profile.rested ? ' · ☾ Well rested' : ''}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
+    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level}${free ? ` (${free} talent point${free > 1 ? 's' : ''} to spend in the Hall)` : ''} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${restingAt() ? ` · ☾ ${HOMES[restingAt()]?.rest || 'Rested'}` : ''}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
   }
 
   // ------------------------------------------------------------ panels
 
   open(spot) {
     spot = this.spots.find((s) => s.kind === spot.kind && (!spot.npc || s.npc === spot.npc)) || spot;
-    if (spot.kind === 'cottage' && !profile.house) return this.showPanel(spot); // for sale: the sale screen first
+    if (HOMES[spot.kind] && !ownsHome(spot.kind)) return this.showPanel(spot); // for sale: the sale screen first
     if (ROOM_KINDS.includes(spot.kind) && !this.room && !this.noRooms && modelStatus.state !== 'loading') return this.enterRoom(spot);
     this.showPanel(spot);
   }
@@ -1067,8 +1090,8 @@ export class Camp {
       html = this.talentsHtml();
     } else if (k === 'npc') {
       html = this.npcHtml();
-    } else if (k === 'cottage') {
-      html = this.cottageHtml();
+    } else if (HOMES[k]) {
+      html = this.houseHtml(k);
     } else if (k === 'fletcher') {
       html = this.fletcherHtml();
     } else if (k === 'apothecary') {
@@ -1078,7 +1101,7 @@ export class Camp {
     } else if (k === 'mews') {
       html = this.mewsHtml();
     }
-    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents' || k === 'fletcher' || k === 'apothecary' || k === 'tavern' || k === 'mews' || k === 'npc' || k === 'cottage');
+    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents' || k === 'fletcher' || k === 'apothecary' || k === 'tavern' || k === 'mews' || k === 'npc' || !!HOMES[k]);
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
     this.syncPreview();
   }
@@ -1154,9 +1177,9 @@ export class Camp {
     const isOpen = (p) => p === ENDLESS || p === daily || missionUnlocked(p);
     // Which region's map is showing: the one you picked last, else where the selected mission is.
     const selRegion = sel.region || 1;
-    if (!this.mapRegion || (this.mapRegion === 2 && !farReachesOpen())) this.mapRegion = selRegion;
+    if (!this.mapRegion || !regionOpen(this.mapRegion)) this.mapRegion = selRegion;
     const region = this.mapRegion;
-    const roads = (region === 2 ? ROADS2 : ROADS).map(([a, b]) => {
+    const roads = (region === 3 ? ROADS3 : region === 2 ? ROADS2 : ROADS).map(([a, b]) => {
       const A = place(a);
       const B = place(b);
       return A && B ? road(A, B, isOpen(A) && isOpen(B)) : '';
@@ -1206,12 +1229,19 @@ export class Camp {
         </ul>${this.tierPicker()}
         <div class="actions"><button data-act="new" class="gold">Start mission</button></div>`;
     }
-    const far = farReachesOpen();
-    const tabs = `<div class="wtabs"><button class="${region === 1 ? 'on' : ''}" data-act="region" data-v="1">The Borderlands</button><button class="${region === 2 ? 'on' : ''} ${far ? '' : 'locked'}" data-act="region" data-v="2" ${far ? '' : 'disabled'}>${far ? '' : MAP_ICONS.lock}The Far Reaches${far ? '' : ' · clear Emberfall Caldera'}</button></div>`;
+    const REGIONS = [
+      [1, 'The Borderlands', ''],
+      [2, 'The Far Reaches', 'clear Emberfall Caldera'],
+      [3, 'The Northern Wilds', 'clear the Misty Highlands'],
+    ];
+    const tabs = `<div class="wtabs">${REGIONS.map(([n, name, need]) => {
+      const open = regionOpen(n);
+      return `<button class="${region === n ? 'on' : ''} ${open ? '' : 'locked'}" data-act="region" data-v="${n}" ${open ? '' : 'disabled'} title="${open ? '' : need}">${open ? '' : MAP_ICONS.lock}${name}</button>`;
+    }).join('')}</div>`;
     const nodes = missionsIn(region).map((m) => node(m, icons[m.id])).join('') + (region === 1 ? node(ENDLESS, MAP_ICONS.endless) + node(daily, MAP_ICONS.daily) : '');
     return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>${tabs}
       <div class="wmap-wrap"><div class="wmap" data-region="${region}">${mapArt(region)}<svg class="wpaths" viewBox="0 0 500 300" preserveAspectRatio="none">${roads}</svg>
-        ${fog}${clouds}<div class="wcart"><span>${region === 2 ? 'The Far Reaches' : 'The Borderlands'}</span></div>
+        ${fog}${clouds}<div class="wcart"><span>${REGIONS[region - 1][1]}</span></div>
         ${nodes}${heroMarker}</div>
       <div class="mdetail">${detail}</div></div>`;
   }
@@ -1558,16 +1588,15 @@ export class Camp {
       return this.render();
     }
     if (act === 'house-buy') {
-      if (profile.gems >= HOUSE_COST && !profile.house) {
-        profile.gems -= HOUSE_COST;
-        profile.house = true;
-        saveProfile();
+      const hid = b.dataset.id || 'cottage';
+      if (buyHome(hid)) {
+        const h = HOMES[hid];
         G.sfx.sample('jingleClear', { vol: 0.6, jitter: 0 });
-        this.town?.setOwned();
+        this.town?.setOwned(hid);
         this.refreshHud();
-        const spot = this.spots.find((x) => x.kind === 'cottage');
+        const spot = this.spots.find((x) => x.kind === hid);
         this.close();
-        G.banner('Your new home', 'Sleep in the bed before a dungeon to start it Well Rested', 2.2);
+        G.banner(`Your new home: ${h.name}`, `Sleep in the bed before a dungeon to start it ${h.rest}`, 2.4);
         setTimeout(() => this.open(spot), 700);
       }
       return;
@@ -1662,6 +1691,13 @@ export class Camp {
     }
     if (act === 'region') {
       this.mapRegion = Number(v);
+      // Pick the furthest open dungeon in that region so the side panel matches the map.
+      const sel = missionById(profile.mission);
+      if ((sel?.region || 1) !== this.mapRegion) {
+        const open = missionsIn(this.mapRegion).filter((m) => missionUnlocked(m));
+        const next = open.find((m) => !profile.missions?.[m.id]?.clear) || open[open.length - 1];
+        if (next) selectMission(next.id);
+      }
       G.sfx.sample('whoosh', { vol: 0.25, rate: 1.2, jitter: 0 });
       return this.render();
     }

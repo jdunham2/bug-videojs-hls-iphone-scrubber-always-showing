@@ -5,6 +5,7 @@
 // glowing doormat leads back out to camp.
 
 import * as THREE from 'three';
+import { HOMES } from './homes.js';
 import { spawnProp, instantiate, loadTexture, outfits, models, disposeInstance, disposeTree, findBone, attachProp } from './models.js';
 import { Particles } from './fx.js';
 import { CHARACTERS, OUTFITS, profile, outfitKey, requirementMet, currentCharacter } from './profile.js';
@@ -589,20 +590,22 @@ const LOOK = {
   armory: { floor: 'wood', wall: 'planks', sky: 0xd8c8b0, ambient: 1.3, key: 0xffd8a8, keyI: 2.1 },
   merchant: { floor: 'wood', wall: 'planks', sky: 0xffd8a8, ambient: 1.3, key: 0xffe2b8, keyI: 2.1 },
   cottage: { floor: 'wood', wall: 'planks', sky: 0xffd8a8, ambient: 1.25, key: 0xffd8a8, keyI: 1.8 },
+  farmstead: { floor: 'wood', wall: 'planks', sky: 0xffe4b0, ambient: 1.3, key: 0xffe0b0, keyI: 1.9 },
+  lakehouse: { floor: 'wood', wall: 'planks', sky: 0xbfd8f0, ambient: 1.3, key: 0xd8e8ff, keyI: 1.7 },
   blacksmith: { floor: 'stone', wall: 'brick', sky: 0x9a8a80, ambient: 0.95, key: 0xffc890, keyI: 1.5 },
 };
 
-/** Fixed furniture, built once per room. */
-const BUILD = {
-  cottage(R) {
-    R.rug(0, -0.5, 4.5, 6, '#6a2a1e', FACE_CAMERA);
+function homeRoom(R, hid) {
+  const h = HOMES[hid];
+  const st = h.style;
+    R.rug(0, -0.5, 4.5, 6, st.rug, FACE_CAMERA);
     // The bed: frame, mattress, blanket and pillow.
     R.box(2.4, 0.5, 3.6, 0x5a3a20, -5, 0.25, -4.4, 1.6);
     R.box(2.2, 0.3, 3.3, 0xe8dcc0, -5, 0.65, -4.4);
-    R.box(2.26, 0.12, 2.3, 0x7a2a24, -5, 0.84, -3.95);
+    R.box(2.26, 0.12, 2.3, st.blanket, -5, 0.84, -3.95);
     R.box(1.6, 0.22, 0.6, 0xf4ecd8, -5, 0.9, -5.7);
     R.box(2.4, 1.6, 0.2, 0x4a2e18, -5, 0.8, -6.3);
-    const tag = label('Your bed', 'Sleep: +30 health next run');
+    const tag = label('Your bed', `Sleep: ${h.bonus} next run`);
     tag.position.set(-5, 2.6, -4.4);
     tag.scale.multiplyScalar(0.8);
     R.scene.add(tag);
@@ -626,8 +629,29 @@ const BUILD = {
     R.stations.push({ act: 'panel', panel: 'armory', label: 'your stash', verb: 'Open', x: -W + 2.6, z: -2.5, r: 1.3 });
     R.ring(-W + 2.6, -2.5, 0.6, 0xffd27a, R.scene);
     R.prop('lantern', 1.6, 6, -D + 1, 0, 0.3);
-    R.banner(-1.5, -D + 0.02, 0, '#2a5a2a', 2.2);
-  },
+    R.banner(-1.5, -D + 0.02, 0, st.banner, 2.2);
+  // Each house has its own touches.
+  if (hid === 'farmstead') {
+    // A kitchen: a long table with a basket of eggs, a flour sack and a milk churn.
+    R.box(3.6, 0.12, 1.4, 0x7a5430, -1, 0.95, 3.2, 1.2);
+    R.prop('crates', 1.4, W - 1.6, 3.5, 0.3, 0.7);
+    R.prop('barrel', 1.2, W - 1.4, 1.6, 0, 0.5);
+    R.box(0.9, 0.5, 0.9, 0xc8a060, -1.5, 1.25, 3.2);
+    R.box(0.8, 0.9, 0.8, 0xe8e0d0, 0.6, 1.45, 3.2);
+  } else if (hid === 'lakehouse') {
+    // Fishing gear: rods on the wall, a net, a crate of the day's catch.
+    for (let i = 0; i < 3; i++) R.box(0.08, 3.2, 0.08, 0x8a6a40, W - 0.4, 1.8, -1 + i * 0.6);
+    R.box(0.1, 1.8, 2.6, 0x9a8a60, W - 0.25, 2, 2.8);
+    R.prop('crates', 1.1, W - 1.4, 4, 0.4, 0.5);
+    R.prop('lantern', 1.4, -W + 1.2, 4.2, 0, 0.3);
+  }
+}
+
+/** Fixed furniture, built once per room. */
+const BUILD = {
+  cottage: (R) => homeRoom(R, 'cottage'),
+  farmstead: (R) => homeRoom(R, 'farmstead'),
+  lakehouse: (R) => homeRoom(R, 'lakehouse'),
   hall(R) {
     R.rug(-1, -1, 3, 11, '#6a1a16', FACE_CAMERA);
     R.banner(-5, -D + 0.02, 0, '#7a1e1a');

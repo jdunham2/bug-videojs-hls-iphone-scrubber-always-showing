@@ -57,6 +57,12 @@ const SETS = [
   { barrel: 3, spikes: 2, spring: 2, drum: 1, ballista: 1, vent: 2 }, // Sandsea Oasis
   { barrel: 5, spikes: 1, spring: 1, ballista: 1, vent: 6 }, // Clockwork Foundry: steam vents
   { barrel: 3, spikes: 2, spring: 1, drum: 2, ballista: 1, ice: 3 }, // Misty Highlands: frosty stones
+  { barrel: 2, spikes: 1, spring: 1, ballista: 1, ice: 7 }, // Glacier Lake: slick ice everywhere
+  { barrel: 2, spikes: 4, spring: 2, drum: 1 }, // Whisperpine Woods: hunters' traps
+  { barrel: 4, spikes: 2, spring: 1, drum: 2, ballista: 2 }, // Field of Banners
+  { barrel: 3, spikes: 3, spring: 2, ballista: 1, vent: 2 }, // Glimmer Caverns
+  { barrel: 6, spikes: 1, spring: 1, ballista: 1, vent: 5 }, // Ironhold: forge vents and powder
+  { barrel: 5, spikes: 2, spring: 1, drum: 2, ballista: 2 }, // Redcliff Fort
 ];
 
 export class Hazards {

@@ -17,7 +17,9 @@ export const PROVISIONS = {
   focus: { shop: 'apothecary', name: 'Focus Draught', text: 'Perfect window 30% wider', cost: 25, icon: '◎' },
   coin: { shop: 'apothecary', name: 'Lucky Coin', text: '+25% gems', cost: 35, icon: '◆' },
   scout: { shop: 'tavern', name: 'Hire a Scout', text: 'A beacon marks the hidden treasure chest (missions)', cost: 25, icon: '⚑' },
-  rested: { shop: 'home', name: 'Well Rested', text: '+30 max health (slept in your cottage)', cost: 0, icon: '☾' },
+  'rest:cottage': { shop: 'home', name: 'Well Rested', text: '+30 max health', cost: 0, icon: '☾' },
+  'rest:farmstead': { shop: 'home', name: 'Hearty Breakfast', text: '+15% damage', cost: 0, icon: '☾' },
+  'rest:lakehouse': { shop: 'home', name: 'Calm Waters', text: 'Perfect window 35% wider', cost: 0, icon: '☾' },
   song: { shop: 'tavern', name: 'Rallying Song', text: 'Start the run with the Arrow Volley ready', cost: 30, icon: '♪' },
 };
 export const MAX_PACK = 3;
@@ -50,8 +52,10 @@ let active = new Set();
 export function startProvisions() {
   active = new Set(pack());
   profile.pack = [];
-  // A night in your own cottage counts too.
-  if (profile.rested) active.add('rested');
+  // A night in one of your houses counts too.
+  const rest = profile.rest || (profile.rested ? 'cottage' : null);
+  if (rest) active.add(`rest:${rest}`);
+  profile.rest = null;
   profile.rested = false;
   saveProfile();
   return [...active];
@@ -63,10 +67,10 @@ export function endProvisions() {
 /** What the game reads while a run is on. */
 export const prov = {
   has: (id) => active.has(id),
-  hpAdd: () => (active.has('stew') ? 25 : 0) + (active.has('rested') ? 30 : 0),
-  damage: () => (active.has('oil') ? 1.12 : 1),
+  hpAdd: () => (active.has('stew') ? 25 : 0) + (active.has('rest:cottage') ? 30 : 0),
+  damage: () => (active.has('oil') ? 1.12 : 1) * (active.has('rest:farmstead') ? 1.15 : 1),
   speed: () => (active.has('tea') ? 1.1 : 1),
-  window: () => (active.has('focus') ? 1.3 : 1),
+  window: () => (active.has('focus') ? 1.3 : 1) * (active.has('rest:lakehouse') ? 1.35 : 1),
   gems: () => (active.has('coin') ? 1.25 : 1),
 };
 

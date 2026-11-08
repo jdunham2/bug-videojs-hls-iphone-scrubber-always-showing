@@ -14,7 +14,7 @@ export const MODIFIERS = {
   ironWill: { name: 'Iron Will', text: 'No healing between waves, but 50% more gems.', noHeal: true, gems: 1.5 },
 };
 
-const THEME_NAMES = ['Sunken Ruins', 'Frostpeak Keep', 'Molten Forge', 'Whispering Marsh', 'Autumn Hollow', 'Deepdelve Mines', 'Stormwatch Harbor', 'Sunscorch Canyon', 'Emberfall Caldera', 'Verdant Temple', 'Shipwreck Cove', 'Glowcap Grove', 'Sandsea Oasis', 'Clockwork Foundry', 'Misty Highlands'];
+const THEME_NAMES = ['Sunken Ruins', 'Frostpeak Keep', 'Molten Forge', 'Whispering Marsh', 'Autumn Hollow', 'Deepdelve Mines', 'Stormwatch Harbor', 'Sunscorch Canyon', 'Emberfall Caldera', 'Verdant Temple', 'Shipwreck Cove', 'Glowcap Grove', 'Sandsea Oasis', 'Clockwork Foundry', 'Misty Highlands', 'Glacier Lake', 'Whisperpine Woods', 'Field of Banners', 'Glimmer Caverns', 'Ironhold', 'Redcliff Fort'];
 
 /** Today's date as YYYY-MM-DD (local time). */
 export function today() {

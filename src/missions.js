@@ -178,11 +178,86 @@ export const MISSIONS = [
     challenge: { text: 'Reach a perfect-shot streak of 12', check: (g) => g.stats.bestStreak >= 12, progress: (g) => `best ${g.stats.bestStreak}` },
     map: { x: 76, y: 22 },
   },
+  // --- The Northern Wilds: over the high pass ---
+  {
+    id: 'glacier',
+    region: 3,
+    name: 'Glacier Lake',
+    theme: 15,
+    waves: 10,
+    level: 32,
+    blurb: 'A frozen lake under a white sky, slick ice underfoot. Jarl Frostbeard holds the far shore.',
+    requires: 'highlands',
+    challenge: { text: 'Make 15 perfect dodges', check: (g) => g.stats.perfectDodges >= 15, progress: (g) => `${Math.min(15, g.stats.perfectDodges)}/15` },
+    map: { x: 22, y: 30 },
+  },
+  {
+    id: 'pines',
+    region: 3,
+    name: 'Whisperpine Woods',
+    theme: 16,
+    waves: 10,
+    level: 34,
+    blurb: 'Tall pines and hunters’ traps. Something old and gnarled moves between the trees.',
+    requires: 'glacier',
+    challenge: { text: 'Take fewer than 12 hits', check: (g) => (g.stats.hitsTaken || 0) < 12, progress: (g) => `${g.stats.hitsTaken || 0} hits` },
+    map: { x: 16, y: 66 },
+  },
+  {
+    id: 'banners',
+    region: 3,
+    name: 'Field of Banners',
+    theme: 17,
+    waves: 11,
+    level: 36,
+    blurb: 'An old battlefield where the war never ended. The Warchief still calls his host to arms.',
+    requires: 'pines',
+    challenge: { text: 'Defeat 15 elites', check: (g) => (g.stats.elites || 0) >= 15, progress: (g) => `${Math.min(15, g.stats.elites || 0)}/15` },
+    map: { x: 46, y: 52 },
+  },
+  {
+    id: 'caverns',
+    region: 3,
+    name: 'Glimmer Caverns',
+    theme: 18,
+    waves: 11,
+    level: 38,
+    blurb: 'Caves full of glittering crystal and things that tunnel. Mind the ground under your feet.',
+    requires: 'banners',
+    challenge: { text: 'Land 80 perfect shots', check: (g) => g.stats.perfects >= 80, progress: (g) => `${Math.min(80, g.stats.perfects)}/80` },
+    map: { x: 42, y: 84 },
+  },
+  {
+    id: 'ironhold',
+    region: 3,
+    name: 'Ironhold',
+    theme: 19,
+    waves: 12,
+    level: 40,
+    blurb: 'A dwarven hall of forges and machines, taken by Thane Ironhold and his automatons.',
+    requires: 'caverns',
+    challenge: { text: 'Finish in under 10 minutes', check: (g) => g.elapsed < 600, progress: (g) => fmtTime(g.elapsed) },
+    map: { x: 74, y: 70 },
+  },
+  {
+    id: 'redcliff',
+    region: 3,
+    name: 'Redcliff Fort',
+    theme: 20,
+    waves: 12,
+    level: 42,
+    blurb: 'The bandit fortress on the red cliffs, the last stronghold in the north. Redcap Vorn awaits.',
+    requires: 'ironhold',
+    challenge: { text: 'Reach a perfect-shot streak of 15', check: (g) => g.stats.bestStreak >= 15, progress: (g) => `best ${g.stats.bestStreak}` },
+    map: { x: 78, y: 26 },
+  },
 ];
 
 /** Missions on a world-map region (1 = the Borderlands, 2 = the Far Reaches). */
 export const missionsIn = (region) => MISSIONS.filter((m) => (m.region || 1) === region);
 export const farReachesOpen = () => !!missionStars('caldera').clear;
+/** Is a world-map region open? (1 always; 2 after the Caldera; 3 after the Misty Highlands.) */
+export const regionOpen = (region) => region === 1 || (region === 2 ? farReachesOpen() : !!missionStars('highlands').clear);
 
 export const ENDLESS = {
   id: 'endless',

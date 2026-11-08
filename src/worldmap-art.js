@@ -47,6 +47,7 @@ function bakeBitmap(url, region) {
 export function prepareMapArt() {
   mapArt(1);
   setTimeout(() => mapArt(2), 600);
+  setTimeout(() => mapArt(3), 1200);
 }
 
 function seeded(seed) {
@@ -61,7 +62,7 @@ function seeded(seed) {
 export function mapArt(region = 1) {
   if (cached[region] && bitmap[region]) return cached[region].replace(/<img class="wart" alt="" src="[^"]*">/, `<img class="wart" alt="" src="${bitmap[region]}">`);
   if (cached[region]) return cached[region];
-  const { s, anim } = region === 2 ? farReaches() : borderlands();
+  const { s, anim } = region === 3 ? northernWilds() : region === 2 ? farReaches() : borderlands();
   // The painted layers go into an <img>: the browser rasterises it once, so its
   // paper-grain filters never re-run. Only the light animated bits stay live SVG.
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.replace('<svg class="wart"', '<svg xmlns="http://www.w3.org/2000/svg"'))}`;
@@ -324,6 +325,86 @@ function farReaches() {
   </g>`;
   s += `<rect width="500" height="300" filter="url(#fr-paper)"/>
   <rect width="500" height="300" fill="url(#fr-edge)"/>
+  <rect x="4" y="4" width="492" height="292" fill="none" stroke="#5a3a18" stroke-width="1.2" opacity=".6"/><rect x="7" y="7" width="486" height="286" fill="none" stroke="#5a3a18" stroke-width=".5" opacity=".5"/>
+</svg>`;
+  return { s, anim };
+}
+
+/**
+ * The Northern Wilds, over the high pass: the Frozen Sea along the top with ice
+ * floes, Glacier Lake, dark pine woods, an old battlefield, cave mouths in the
+ * southern cliffs, a dwarven hall cut into a mountain, and the red cliffs of
+ * the bandit fort.
+ */
+function northernWilds() {
+  const r = seeded(53);
+  const R = (a, b) => a + r() * (b - a);
+  const label = (x, y, t, size = 9, rot = 0, extra = '') => `<text x="${x}" y="${y}" transform="rotate(${rot} ${x} ${y})" text-anchor="middle" font-size="${size}" ${extra}>${t}</text>`;
+  const pine = (x, y, h, snow) =>
+    `<path d="M${x} ${y - h} L ${x - h * 0.42} ${y} L ${x + h * 0.42} ${y} Z" fill="#2f4a32"/><path d="M${x} ${y - h} L ${x + h * 0.42} ${y} L ${x} ${y} Z" fill="#22382a"/>${snow ? `<path d="M${x} ${y - h} L ${x - h * 0.18} ${y - h * 0.55} L ${x + h * 0.18} ${y - h * 0.55} Z" fill="#f4f6fa"/>` : ''}<rect x="${x - 0.6}" y="${y}" width="1.2" height="${h * 0.18}" fill="#4a3a22"/>`;
+  const peak = (x, base, w, h, tint = '#8a8a86', shade = '#5e5e5a') => {
+    const tx = x + R(-w * 0.08, w * 0.08);
+    return `<path d="M${x - w / 2} ${base} L ${tx} ${base - h} L ${x + w / 2} ${base} Z" fill="${tint}"/><path d="M${tx} ${base - h} L ${x + w / 2} ${base} L ${tx + w * 0.05} ${base} Z" fill="${shade}"/><path d="M${tx} ${base - h} L ${tx - w * 0.17} ${base - h * 0.62} L ${tx + w * 0.17} ${base - h * 0.62} Z" fill="#f4f1e8"/><path d="M${x - w / 2} ${base} L ${tx} ${base - h} L ${x + w / 2} ${base}" fill="none" stroke="#3a3a36" stroke-width=".8"/>`;
+  };
+  const sea = 'M0 0 L 500 0 L 500 34 C 440 46, 380 30, 320 40 S 200 30, 150 42 S 60 36, 0 46 Z';
+  let s = `<svg class="wart" viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <filter id="nw-paper" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" seed="8"/><feColorMatrix values="0 0 0 0 .35  0 0 0 0 .24  0 0 0 0 .12  0 0 0 .22 0"/></filter>
+    <filter id="nw-stain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="3" seed="21"/><feColorMatrix values="0 0 0 0 .42  0 0 0 0 .28  0 0 0 0 .1  0 0 0 -1.6 .9"/></filter>
+    <radialGradient id="nw-edge" cx="50%" cy="50%" r="65%"><stop offset=".62" stop-color="#2a1606" stop-opacity="0"/><stop offset=".9" stop-color="#3a2008" stop-opacity=".45"/><stop offset="1" stop-color="#1a0c02" stop-opacity=".85"/></radialGradient>
+    <radialGradient id="nw-snow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f6f8fc" stop-opacity=".85"/><stop offset="1" stop-color="#f6f8fc" stop-opacity="0"/></radialGradient>
+    <radialGradient id="nw-red" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#b8583a" stop-opacity=".55"/><stop offset="1" stop-color="#b8583a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="nw-pine" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3a5a3a" stop-opacity=".55"/><stop offset="1" stop-color="#3a5a3a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="500" height="300" filter="url(#nw-stain)"/>
+  <ellipse cx="200" cy="70" rx="260" ry="80" fill="url(#nw-snow)"/>
+  <ellipse cx="90" cy="200" rx="110" ry="70" fill="url(#nw-pine)"/>
+  <ellipse cx="400" cy="90" rx="90" ry="60" fill="url(#nw-red)"/>
+  <path d="${sea}" fill="#8fb0c4" stroke="#4a6a7a" stroke-width="1.2"/>`;
+  let anim = `<g class="wm-waves" fill="none" stroke="#f0f6fa" stroke-width=".9" stroke-linecap="round" opacity=".7">`;
+  for (let i = 0; i < 10; i++) anim += `<path d="M${R(10, 480)} ${R(8, 26)} q 3 -3 6 0 q 3 -3 6 0" style="animation-delay:-${R(0, 4).toFixed(1)}s"/>`;
+  anim += `</g>`;
+  // Ice floes on the Frozen Sea.
+  for (let i = 0; i < 9; i++) {
+    const x = R(20, 480);
+    const y = R(6, 28);
+    s += `<path d="M${x} ${y} l ${R(6, 12)} ${R(-2, 2)} l ${R(-2, 3)} ${R(4, 6)} l ${R(-12, -6)} ${R(0, 2)} Z" fill="#f4f8fc" stroke="#9ab4c4" stroke-width=".5"/>`;
+  }
+  // Glacier Lake (110,90): a frozen oval with cracks.
+  s += `<ellipse cx="112" cy="96" rx="34" ry="16" fill="#cfe4ee" stroke="#7a9aaa" stroke-width="1"/><path d="M90 92 l 10 4 l 8 -3 l 12 6 M 118 88 l 4 8 l 10 2" stroke="#9ab8c8" stroke-width=".7" fill="none"/>`;
+  for (let i = 0; i < 9; i++) s += pine(R(60, 170), R(70, 130), R(7, 10), true);
+  // Whisperpine Woods (80,198).
+  const pts = Array.from({ length: 30 }, () => [R(30, 140), R(160, 240)]).sort((a, b) => a[1] - b[1]);
+  for (const [x, y] of pts) s += pine(x, y, R(8, 12), false);
+  // Field of Banners (230,156): pennants, a broken cart, crossed spears.
+  for (let i = 0; i < 6; i++) {
+    const x = R(200, 262);
+    const y = R(140, 178);
+    s += `<path d="M${x} ${y} l 0 -10" stroke="#4a3a22" stroke-width=".9"/><path d="M${x} ${y - 10} l 6 2 l -6 2 Z" fill="${['#9a2a22', '#2a4a8a', '#c8a03a'][i % 3]}"/>`;
+  }
+  s += `<path d="M222 172 l 14 -10 M 224 162 l 12 10" stroke="#5a5a5a" stroke-width="1"/>`;
+  // Glimmer Caverns (210,252): cliffs with glowing cave mouths.
+  s += `<path d="M150 268 Q 200 236 270 262 L 270 280 L 150 280 Z" fill="#8a7a6a" stroke="#4a3e30" stroke-width=".8"/>`;
+  for (const x of [180, 212, 244]) s += `<path d="M${x - 6} 266 Q ${x} 254 ${x + 6} 266 Z" fill="#2a1a3a"/><circle cx="${x}" cy="262" r="2" fill="#b89aff" opacity=".9"/>`;
+  // Ironhold (370,210): a mountain with great doors.
+  s += peak(352, 228, 40, 40) + peak(392, 226, 50, 56) + peak(430, 230, 36, 34);
+  s += `<path d="M384 226 L 384 212 Q 392 204 400 212 L 400 226 Z" fill="#3a2a1a" stroke="#d8a23a" stroke-width="1"/><path d="M392 226 L 392 208" stroke="#d8a23a" stroke-width=".6"/>`;
+  // Redcliff Fort (390,78): red cliffs and a palisade fort.
+  s += `<path d="M340 100 L 360 64 L 400 58 L 440 66 L 460 100 Z" fill="#b8583a" stroke="#6a2a14" stroke-width="1"/><path d="M360 64 L 400 58 L 380 100 Z" fill="#8a3a22" opacity=".7"/>`;
+  s += `<g fill="#6a4a2a" stroke="#3a2410" stroke-width=".5">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<path d="M${376 + i * 4} 60 l 0 -8 l 2 -2 l 2 2 l 0 8 Z"/>`).join('')}</g><path d="M388 50 l 0 -10 l 6 2 l -6 2" stroke="#3a2410" stroke-width=".8" fill="#9a2a22"/>`;
+  // A frozen river from the lake to the sea.
+  s += `<path d="M120 80 C 130 60, 150 54, 160 40" fill="none" stroke="#c4dce8" stroke-width="2.2"/>`;
+  // Compass (bottom-right) and names.
+  s += `<g transform="translate(466 262)"><circle r="20" fill="none" stroke="#5a3a18" stroke-width=".8" opacity=".7"/><path d="M0 -22 L 4 0 L 0 22 L -4 0 Z" fill="#7a1e1a"/><path d="M-22 0 L 0 4 L 22 0 L 0 -4 Z" fill="#3a2410"/><circle r="2.2" fill="#d8a23a"/><text y="-25" text-anchor="middle" font-size="8" fill="#5a3a18" font-family="Cinzel, serif" font-weight="800">N</text></g>`;
+  s += `<g fill="#4a2e14" font-family="'IM Fell English', Georgia, serif" font-style="italic" opacity=".8">
+    ${label(250, 16, 'The Frozen Sea', 10, 0, 'fill="#2e4a5a" letter-spacing="2"')}
+    ${label(70, 252, 'Whisperpine', 9, -6, 'fill="#2e4a2e"')}
+    ${label(232, 132, 'The Old Battlefield', 8, 0)}
+    ${label(410, 116, 'Redcliffs', 9, 0, 'fill="#6a2a14"')}
+    ${label(392, 246, 'Ironhold Peaks', 8, 0)}
+  </g>`;
+  s += `<rect width="500" height="300" filter="url(#nw-paper)"/>
+  <rect width="500" height="300" fill="url(#nw-edge)"/>
   <rect x="4" y="4" width="492" height="292" fill="none" stroke="#5a3a18" stroke-width="1.2" opacity=".6"/><rect x="7" y="7" width="486" height="286" fill="none" stroke="#5a3a18" stroke-width=".5" opacity=".5"/>
 </svg>`;
   return { s, anim };

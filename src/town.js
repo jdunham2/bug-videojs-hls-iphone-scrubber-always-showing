@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { spawnProp, instantiate, models, disposeInstance } from './models.js';
 import { VILLAGERS, markerFor } from './quests.js';
 import { profile } from './profile.js';
+import { HOMES, ownsHome } from './homes.js';
 
 /**
  * The villages down the roads from camp. Each has a square (a circle you can
@@ -22,7 +23,6 @@ export const VILLAGES = [
     z: 70,
     r: 21,
     road: 'z+',
-    cottage: [-13, -3],
     buildings: [
       ['townHouse', 6, 12, -7, 2.6],
       ['townHouse', 6.5, 15, 6, 2.6],
@@ -52,7 +52,6 @@ export const VILLAGES = [
     buildings: [
       ['windmill', 10, 6, -9, 3.2],
       ['barn', 7, -6, -10, 3.6],
-      ['farmhouse', 6.5, 9, 8, 3],
       ['farmhouse', 6, -7, 10, 3],
     ],
     props: [
@@ -76,7 +75,6 @@ export const VILLAGES = [
     lake: { x: -98, z: 0, r: 13 },
     buildings: [
       ['fishingHut', 4.5, -7, -10, 2.3],
-      ['fishingHut', 4.5, -8, 9, 2.3],
       ['fishingHut', 4.2, 5, 11, 2.2],
       ['fishingHut', 4.2, 6, -11, 2.2],
     ],
@@ -240,15 +238,18 @@ export class Town {
       S.add(rim);
       this.water = water;
     }
-    // The cottage for sale (Oakvale).
-    if (v.cottage) {
-      const [x, z] = at(...v.cottage);
-      C.building(models.cottage ? 'cottage' : 'tent', 5.2, x, z, 'cottage', profile.house ? 'Your Cottage' : 'Cottage for Sale', 2.8);
-      this.cottageSpot = C.spots[C.spots.length - 1];
-      this.sign = canvasSprite(() => {}, 256, 128, [1.8, 0.9]);
-      this.sign.position.set(x + 2.6, 2.4, z + 1.2);
-      S.add(this.sign);
-      this.drawSign(profile.house ? 'HOME' : 'FOR SALE');
+    // Houses for sale here (Oakvale's cottage, Millbrook's farmstead, Saltmere's lake house).
+    for (const [hid, h] of Object.entries(HOMES)) {
+      if (h.village !== v.id) continue;
+      const [x, z] = at(...h.at);
+      C.building(models[h.model] ? h.model : 'tent', h.size, x, z, hid, ownsHome(hid) ? `Your ${h.name}` : `${h.name} (for sale)`, h.col);
+      const spot = C.spots[C.spots.length - 1];
+      const sign = canvasSprite(() => {}, 256, 128, [1.8, 0.9]);
+      sign.position.set(x + h.col, 2.4, z + 1.2);
+      S.add(sign);
+      (this.homes ||= {})[hid] = { spot, sign, owned: false };
+      this.drawSign(sign, 'FOR SALE');
+      if (ownsHome(hid)) this.setOwned(hid);
     }
     for (const [id, size, dx, dz, col] of v.buildings) {
       const [x, z] = at(dx, dz);
@@ -334,8 +335,8 @@ export class Town {
     }
   }
 
-  drawSign(text) {
-    const c = this.sign.material.map.image;
+  drawSign(sign, text) {
+    const c = sign.material.map.image;
     const g = c.getContext('2d');
     g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = 'rgba(40,24,10,0.85)';
@@ -347,7 +348,7 @@ export class Town {
     g.textAlign = 'center';
     g.fillStyle = '#ffd27a';
     g.fillText(text, c.width / 2, c.height / 2 + 14);
-    this.sign.material.map.needsUpdate = true;
+    sign.material.map.needsUpdate = true;
   }
 
   spawnVillagers(S) {
@@ -449,10 +450,18 @@ export class Town {
     }
   }
 
-  /** The cottage's sign and label once you own it. */
-  setOwned() {
-    if (this.cottageSpot) this.cottageSpot.label = 'Your Cottage';
-    if (this.sign) this.drawSign('HOME');
+  /** A house's sign and label once you own it. */
+  /** Signs and labels for every house you own (e.g. after a cloud save loads). */
+  syncHomes() {
+    for (const hid of Object.keys(this.homes || {})) if (ownsHome(hid)) this.setOwned(hid);
+  }
+
+  setOwned(hid) {
+    const h = this.homes?.[hid];
+    if (!h || h.owned) return;
+    h.owned = true;
+    h.spot.label = `Your ${HOMES[hid].name}`;
+    this.drawSign(h.sign, 'HOME');
   }
 
   dispose() {

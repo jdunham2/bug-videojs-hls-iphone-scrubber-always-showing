@@ -30,6 +30,12 @@ export const BOSS_FORMS = [
   { name: 'Vulgra the Dune-Breaker', sub: 'Warlord of the oasis road', model: 'duneWarlord', outfit: null, barrage: 'rock' },
   { name: 'Ironjaw the Machinist', sub: 'Master of the clockwork foundry', model: 'ironGiant', outfit: null, barrage: 'cannonball' },
   { name: 'Old Brannoc', sub: 'Keeper of the misty pass', model: 'mountainGiant', outfit: null, barrage: 'icicle' },
+  { name: 'Jarl Frostbeard', sub: 'Lord of the frozen lake', model: 'mountainGiant', outfit: null, tint: 0xc8dcff, barrage: 'icicle' },
+  { name: 'Gnarlbark', sub: 'The pine woods remember him', model: 'templeBrute', outfit: null, tint: 0x9ab88a, barrage: 'stalactite' },
+  { name: 'The Warchief', sub: 'Last of the old war host', model: 'duneWarlord', outfit: null, tint: 0xd8a8a0, barrage: 'cannonball' },
+  { name: 'Grubnak the Elder', sub: 'Deep in the glimmering dark', model: 'sporeTroll', outfit: null, tint: 0xb8a8ff, barrage: 'spores' },
+  { name: 'Thane Ironhold', sub: 'Master of the dwarven hall', model: 'ironGiant', outfit: null, tint: 0xffd8a0, barrage: 'stalactite' },
+  { name: 'Redcap Vorn', sub: 'Warlord of Redcliff Fort', model: 'corsair', outfit: null, tint: 0xffa890, barrage: 'pot' },
 ];
 
 /** Ground warning shapes that fill up as an attack charges. */

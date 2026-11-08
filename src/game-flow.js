@@ -29,6 +29,12 @@ const WARBANDS = {
   12: [[[Archer, 3], [Netcaster, 1]], [[Shieldbearer, 4], [Lancer, 2], [Grunt, 3]]], // Sandsea Oasis
   13: [[[Bomber, 1]], [[Automaton, 4], [Grunt, 3], [Sapper, 2], [Shieldbearer, 1]]], // Clockwork Foundry
   14: [[[Deckhand, 1]], [[Lancer, 4], [Shieldbearer, 2], [Stalker, 2], [Berserker, 1]]], // Misty Highlands
+  15: [[[Archer, 2], [Netcaster, 1]], [[Berserker, 4], [Raider, 4], [Lurker, 1]]], // Glacier Lake
+  16: [[[Archer, 3], [Netcaster, 2]], [[Stalker, 4], [Lurker, 2], [Grunt, 3]]], // Whisperpine Woods
+  17: [[[Archer, 2], [Deckhand, 1]], [[Shieldbearer, 3], [Lancer, 3], [Berserker, 2], [Grunt, 2]]], // Field of Banners
+  18: [[[Bomber, 1], [Netcaster, 1]], [[Lurker, 4], [Stalker, 2], [Automaton, 2]]], // Glimmer Caverns
+  19: [[[Bomber, 1]], [[Automaton, 4], [Sapper, 3], [Shieldbearer, 2]]], // Ironhold
+  20: [[[Deckhand, 2], [Archer, 1]], [[Raider, 3], [Sapper, 2], [Shieldbearer, 2], [Berserker, 2], [Lancer, 1]]], // Redcliff Fort
 };
 const SPECIAL = new Set([Netcaster, Lurker, Berserker, Sapper, Stalker, Shieldbearer, Automaton, Lancer, Deckhand]);
 import { rollItem } from './gear.js';
