@@ -293,7 +293,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
         <b>F / Click</b><span>Attack · <b>G</b> throw a bomb</span>
         <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
         <b>V</b><span>Mount or dismount, once you own a mount</span>
-        <b>Taming</b><span>Carry an animal's favorite food and it will let you near</span>
+        <b>Animals</b><span>Carry an animal's favorite food to tame it (E), or hunt it (F)</span>
         <b>K · Esc</b><span>Skills · Pause menu and settings</span>
         <b>C · I · Q</b><span>Craft · Bag · Eat something</span>
         <b>M · J</b><span>World map · Journal</span>
@@ -596,6 +596,22 @@ const GOODS = {
   truffle_pasta:{name:'Truffle Pasta',base:160,col:'#e8d8a0',kind:'food',heal:24},
   wool_coat:{name:'Wool Coat',base:110,col:'#d9cbb0',kind:'armor',armor:2},
   pet_treat:{name:'Pet Treat',base:12,col:'#c8905a',kind:'mat'},
+  // --- arsenal ---
+  sling:{name:'Sling',base:20,col:'#a77b54',kind:'weapon',dmg:3,cd:.5,ranged:true,ammo:'stone'},
+  whip:{name:'Leather Whip',base:60,col:'#6b4a2c',kind:'weapon',dmg:4,cd:.4,reach:2.6},
+  boomerang:{name:'Boomerang',base:50,col:'#c49a63',kind:'weapon',dmg:5,cd:.7,ranged:true,noAmmo:true,boom:true},
+  rapier:{name:'Rapier',base:180,col:'#eef2f6',kind:'weapon',dmg:6,cd:.25,reach:1.5,crit:.15},
+  morning_star:{name:'Morning Star',base:190,col:'#8d97a0',kind:'weapon',dmg:11,cd:.6,reach:1.4,kb:2.6},
+  battle_axe:{name:'Battle Axe',base:200,col:'#cfd6dc',kind:'weapon',dmg:12,cd:.75,reach:1.6,arc:'spin'},
+  halberd:{name:'Halberd',base:220,col:'#c89040',kind:'weapon',dmg:9,cd:.65,reach:2.4,arc:'wide'},
+  crossbow:{name:'Crossbow',base:200,col:'#7a5532',kind:'weapon',dmg:9,cd:.9,ranged:true,pierce:true},
+  triple_bow:{name:'Triple Bow',base:240,col:'#e6e6ee',kind:'weapon',dmg:5,cd:.6,ranged:true,multi:3},
+  trident:{name:'Trident',base:300,col:'#7fd6d0',kind:'weapon',dmg:9,cd:.5,reach:2.2,arc:'wide'},
+  vampire_fang:{name:'Vampire Fang',base:420,col:'#a0203a',kind:'weapon',dmg:8,cd:.35,reach:1.4,lifesteal:.2},
+  fire_staff:{name:'Fire Staff',base:450,col:'#ff7a2a',kind:'weapon',dmg:7,cd:.55,ranged:true,noAmmo:true,aoe:1.5,pcol:'#ff8a3a'},
+  storm_staff:{name:'Storm Staff',base:520,col:'#9fd0ff',kind:'weapon',dmg:7,cd:.5,ranged:true,noAmmo:true,chain:3,pcol:'#cfe8ff'},
+  moonblade:{name:'Moonblade',base:900,col:'#d8e4ff',kind:'weapon',dmg:13,cd:.38,reach:1.7,crit:.1,silver:true},
+  dragon_lance:{name:'Dragon Lance',base:1600,col:'#c8402a',kind:'weapon',dmg:18,cd:.55,reach:2.6,arc:'wide',kb:1.6},
 };
 const GK = Object.keys(GOODS);
 const FISTS = {name:'Fists',dmg:1,cd:.4,reach:1.1};
@@ -744,6 +760,21 @@ const RECIPES = [
   {id:'truffle_pasta',need:{truffle:1,wheat:2,cheese:1}, at:'bench', known:true},
   {id:'wool_coat',    need:{wool:4,hide:1}, at:'bench', known:true},
   {id:'pet_treat', n:3, need:{meat:1,wheat:1}, at:'hand', known:true},
+  {id:'sling',        need:{sticks:1,hide:1}, at:'hand', known:true},
+  {id:'boomerang',    need:{wood:3,hide:1}, at:'hand', known:true},
+  {id:'whip',         need:{hide:3,rope:1}, at:'bench', known:true},
+  {id:'crossbow',     need:{wood:3,iron:2,rope:1}, at:'bench', known:true},
+  {id:'triple_bow',   need:{wood:2,silk:3,feather:3}, at:'bench', known:true},
+  {id:'fire_staff',   need:{ember:3,wood:2,crystal:1}, at:'bench'},
+  {id:'storm_staff',  need:{feather:3,crystal:2,silver:1,frost_essence:1}, at:'bench'},
+  {id:'rapier',       need:{silver:2,iron:1}, at:'forge', known:true},
+  {id:'morning_star', need:{iron:3,bone:3,wood:1}, at:'forge', known:true},
+  {id:'battle_axe',   need:{iron:4,wood:2}, at:'forge', known:true},
+  {id:'halberd',      need:{bronze:3,wood:3}, at:'forge'},
+  {id:'trident',      need:{pearl:2,bronze:3}, at:'forge', known:true},
+  {id:'vampire_fang', need:{bone:4,venom:2,gem:1}, at:'forge', known:true},
+  {id:'moonblade',    need:{moonflower:3,blacksteel:2,crystal:2}, at:'forge', known:true},
+  {id:'dragon_lance', need:{wyrm_scale:1,abyss_shard:4,blacksteel:3}, at:'forge', known:true},
 ];
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots', lion_mane:'lionheart', fox_tail:'foxfire_lantern'};
@@ -1160,6 +1191,7 @@ NPC_BY.dorrie.teaches = {sushi: 60}; NPC_BY.lio.teaches.coconut_curry = 70; NPC_
 NPC_BY.nell.teaches = {swift_draught: 40, wine: 50};
 NPC_BY.kael.animals = {baby_drake: 900}; NPC_BY.kael.animalReq = {baby_drake: 'wyrm'};
 NPC_BY.tobin.animals = {crystal_beetle: 500};
+NPC_BY.kael.teaches.fire_staff = 120; NPC_BY.brynn.teaches = {storm_staff: 150}; NPC_BY.hask.teaches.halberd = 90;
 Object.assign(NPC_BY.gwen.stock || (NPC_BY.gwen.stock = {}), {}); NPC_BY.ilse.teaches.might_draught = 45; NPC_BY.brannoc.teaches.iron_draught = 45; NPC_BY.cole.teaches.luck_draught = 60;
 const TEACHER = {}; for (const n of NPCS) if (n.teaches) for (const r in n.teaches) TEACHER[r] = n.id;
 
@@ -1788,7 +1820,22 @@ function updateFishing(dt) {
 
 /* ================= combat ================= */
 let enemies = [], arrows = [], eproj = [], hazards = [], bombs = [], spawnT = 3, shake = 0;
-let petE = null;
+let petE = null, zaps = [];
+function aoeHit(x, y, r, dmg, skip) {
+  burst(x, y, '#ff8a3a', 16, 5); burst(x, y, '#ffd060', 8, 3); SFX.boom();
+  for (const e of enemies) { if (e === skip || e.dead || e.hidden > 0) continue; const d = Math.hypot(e.x - x, e.y - .3 - y); if (d < r + ((e.size||1) - 1)*.4) hitEnemy(e, dmg, (e.x - x)/(d || 1), (e.y - y)/(d || 1), 'player'); }
+}
+function chainHit(from, dmg, n) {
+  const done = new Set([from]); let cur = from;
+  for (let k = 0; k < n; k++) {
+    let best = null, bd = 3.5;
+    for (const e of enemies) { if (done.has(e) || e.dead || e.hidden > 0) continue; const d = Math.hypot(e.x - cur.x, e.y - cur.y); if (d < bd) { bd = d; best = e; } }
+    if (!best) break;
+    zaps.push({x1: cur.x, y1: cur.y - .5, x2: best.x, y2: best.y - .5, t: .18});
+    hitEnemy(best, Math.round(dmg*10)/10, (best.x - cur.x)/(bd || 1), (best.y - cur.y)/(bd || 1), 'player');
+    done.add(best); cur = best;
+  }
+}
 const plural = (t, n = 2) => n === 1 ? ENEMIES[t].name : (ENEMIES[t].plural || ENEMIES[t].name + 's');
 const isUndead = e => e.boss ? !!BOSSES[e.boss].undead : !!ENEMIES[e.type].undead;
 function nearestEnemy(range) {
@@ -1808,25 +1855,35 @@ function attack(dirX, dirY) {
   player.facing = Math.abs(dirX) > Math.abs(dirY) ? (dirX < 0 ? 'left' : 'right') : (dirY < 0 ? 'up' : 'down');
   player.atkCd = w.cd;
   if (w.ranged) {
-    let bonus = 0;
-    if (!w.noAmmo) {
+    let bonus = 0, stone = false;
+    if (w.ammo === 'stone') {
+      if (!have('stone')) { floatText(S.x, S.y-1, 'No stones', '#e57a62'); player.atkCd = .3; return; }
+      addItem('stone', -1); renderHUD(); stone = true;
+    } else if (!w.noAmmo) {
       const ammo = have('crystal_arrows') ? 'crystal_arrows' : have('venom_arrows') ? 'venom_arrows' : have('arrows') ? 'arrows' : null;
       if (!ammo) { floatText(S.x, S.y-1, 'No arrows', '#e57a62'); player.atkCd = .3; return; }
       bonus = ammo === 'crystal_arrows' ? 5 : ammo === 'venom_arrows' ? 3 : 0;
       addItem(ammo, -1); renderHUD();
     }
     SFX.arrow();
-    arrows.push({x: S.x, y: S.y - .5, vx: dirX*13, vy: dirY*13, life: .7, dmg: w.dmg + bonus, col: bonus === 5 ? '#9fe8ff' : bonus ? '#7ad04a' : w.pcol, silver: w.silver});
+    const base = Math.atan2(dirY, dirX), n = w.multi || 1;
+    for (let k = 0; k < n; k++) {
+      const a = base + (k - (n - 1)/2) * .2, sp = w.boom ? 10 : 13;
+      arrows.push({x: S.x, y: S.y - .5, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp, life: w.boom ? 1.1 : .7, max: w.boom ? 1.1 : .7, dmg: w.dmg + bonus,
+        col: stone ? '#9a9aa2' : bonus === 5 ? '#9fe8ff' : bonus ? '#7ad04a' : w.pcol, silver: w.silver, pierce: w.pierce || w.boom, boom: w.boom, aoe: w.aoe, chain: w.chain, hit: new Set()});
+    }
     return;
   }
-  player.swing = {t: .18, ang: Math.atan2(dirY, dirX), reach: w.reach}; SFX.swing();
+  player.swing = {t: w.arc === 'spin' ? .26 : .18, ang: Math.atan2(dirY, dirX), reach: w.reach, arc: w.arc}; SFX.swing();
+  const th = w.arc === 'spin' ? -2 : w.arc === 'wide' ? -.35 : .15, kb = w.kb || 1;
   for (const e of enemies) {
     if (e.hidden > 0) continue;
     const sz = e.size || 1;
     const dx = e.x - S.x, dy = (e.y - .3*sz) - (S.y - .4), d = Math.hypot(dx, dy);
     if (d > w.reach + .35 + (sz - 1)*.45) continue;
-    if (d > .4 + (sz-1)*.4 && (dx*dirX + dy*dirY)/d < .15) continue;
-    hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * (w.silver && isUndead(e) ? 2 : 1), dirX, dirY, 'player');
+    if (d > .4 + (sz-1)*.4 && (dx*dirX + dy*dirY)/d < th) continue;
+    const kx = w.arc === 'spin' ? dx/(d || 1) : dirX, ky = w.arc === 'spin' ? dy/(d || 1) : dirY;
+    hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * (w.silver && isUndead(e) ? 2 : 1), kx*kb, ky*kb, 'player');
   }
 }
 function throwBomb(tx, ty) {
@@ -1848,8 +1905,9 @@ function hitEnemy(e, dmg, kx, ky, src) {
   let crit = false;
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0);
-    if (Math.random() < .05 + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0)) { dmg *= 2; crit = true; }
+    if (Math.random() < .05 + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0)) { dmg *= 2; crit = true; }
     dmg = Math.round(dmg*10) / 10;
+    if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
     crit ? SFX.crit() : SFX.hit();
     if (crit) { shake = Math.max(shake, .18); burst(e.x, e.y - .5, '#ffec6a', 10, 5); }
@@ -2140,7 +2198,16 @@ function updateCombat(dt, night) {
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
     { const at = tileAt(Math.floor(a.x), Math.floor(a.y)); if (at === T.DWALL || at === T.DTORCH || at === T.VOID) a.life = 0; }
-    for (const e of enemies) if (!e.dead && !(e.hidden > 0) && Math.hypot(e.x - a.x, e.y - .3*(e.size||1) - a.y) < .55 + ((e.size||1)-1)*.4) { hitEnemy(e, a.dmg * (a.silver && isUndead(e) ? 2 : 1), a.vx/13, a.vy/13, 'player'); a.life = 0; break; }
+    if (a.boom && !a.back && a.life < a.max/2) { a.back = true; a.hit = new Set(); }
+    if (a.back) { const bx = S.x - a.x, by = S.y - .5 - a.y, bd = Math.hypot(bx, by) || 1; a.vx = bx/bd*12; a.vy = by/bd*12; a.life = Math.max(a.life, .05); if (bd < .6) a.life = 0; }
+    for (const e of enemies) {
+      if (e.dead || e.hidden > 0 || (a.hit && a.hit.has(e)) || Math.hypot(e.x - a.x, e.y - .3*(e.size||1) - a.y) >= .55 + ((e.size||1)-1)*.4) continue;
+      hitEnemy(e, a.dmg * (a.silver && isUndead(e) ? 2 : 1), a.vx/13, a.vy/13, 'player');
+      if (a.aoe) { aoeHit(a.x, a.y, a.aoe, Math.round(a.dmg*.6), e); a.life = 0; break; }
+      if (a.chain) chainHit(e, a.dmg*.7, a.chain);
+      if (a.pierce) { a.hit.add(e); continue; }
+      a.life = 0; break;
+    }
   }
   for (const p of eproj) {
     p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
@@ -2160,6 +2227,7 @@ function updateCombat(dt, night) {
       if (Math.hypot(S.x - h.x, S.y - h.y) < h.r*.8 && player.inv <= 0) hurtPlayer(1, null);
     }
   }
+  for (const z of zaps) z.t -= dt; zaps = zaps.filter(z => z.t > 0);
   for (const b of bombs) { b.t += dt; if (b.t >= b.dur) { explode(b.tx, b.ty, b.fire, b.frost); b.done = true; } }
   enemies = enemies.filter(e => !e.dead);
   arrows = arrows.filter(a => a.life > 0);
@@ -2298,7 +2366,15 @@ function drawPerson(g, x, y, c, phase, moving, facing, extra) {
 function drawHeld(g, x, y, facing, id) {
   const s = facing === 'left' ? -1 : 1, hx = facing === 'up' ? x + 3 : x + 4*s, hy = y - 8;
   const col = GOODS[id].col;
-  if (id === 'bow' || id === 'longbow' || id === 'prism_bow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
+  if (id === 'crossbow') { g.fillStyle = '#5a3d27'; g.fillRect(hx - 1, hy - 5, 2, 8); g.strokeStyle = '#8d97a0'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(hx - 4, hy - 4); g.lineTo(hx, hy - 6); g.lineTo(hx + 4, hy - 4); g.stroke(); return; }
+  if (id === 'sling') { g.strokeStyle = '#6b4a2c'; g.lineWidth = 1; g.beginPath(); g.moveTo(hx, hy); g.lineTo(hx + 2*s, hy - 5); g.stroke(); g.fillStyle = '#9a9aa2'; g.fillRect(hx + 2*s - 1, hy - 6, 2, 2); return; }
+  if (id === 'boomerang') { g.fillStyle = col; g.fillRect(hx - 1, hy - 6, 2, 5); g.fillRect(hx - 1, hy - 6, 5*s, 2); return; }
+  if (id === 'whip') { g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo(hx + 6*s, hy - 6, hx + 9*s, hy + 2); g.stroke(); return; }
+  if (id === 'halberd' || id === 'trident' || id === 'dragon_lance') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 12, 1.5, 17); g.fillStyle = col; if (id === 'trident') { g.fillRect(hx - 2, hy - 15, 1, 4); g.fillRect(hx, hy - 16, 1, 5); g.fillRect(hx + 2, hy - 15, 1, 4); g.fillRect(hx - 2, hy - 12, 5, 1); } else { g.fillRect(hx - .5, hy - 16, 1.5, 5); g.fillRect(hx, hy - 14, 3*s, 3); } return; }
+  if (id === 'battle_axe') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 9, 1.5, 12); g.fillStyle = col; g.beginPath(); g.moveTo(hx, hy - 10); g.lineTo(hx + 5*s, hy - 12); g.lineTo(hx + 5*s, hy - 5); g.lineTo(hx, hy - 7); g.fill(); return; }
+  if (id === 'morning_star') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 6, 1.5, 9); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 8, 2.5, 0, 7); g.fill(); g.fillStyle = '#cfd6dc'; g.fillRect(hx - 3, hy - 8.5, 1, 1); g.fillRect(hx + 2.5, hy - 8.5, 1, 1); g.fillRect(hx, hy - 11.5, 1, 1); return; }
+  if (id.endsWith('staff')) { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
+  if (id === 'bow' || id === 'longbow' || id === 'prism_bow' || id === 'triple_bow' || id === 'abyss_bow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
   if (id === 'frost_staff') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
   g.fillStyle = '#5a3d27';
   const len = id.endsWith('spear') ? 12 : (id === 'club' || id === 'bone_club') ? 7 : 9;
@@ -2686,7 +2762,13 @@ function render() {
     ctx.fillStyle = '#e57a62'; ctx.fillRect(bx - 1, by - 1, 2, 2);
   }
   ctx.lineWidth = 1;
+  for (const z of zaps) {
+    ctx.strokeStyle = `rgba(200,230,255,${z.t*5})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(z.x1*TS, z.y1*TS);
+    for (let k = 1; k < 5; k++) { const f = k/5; ctx.lineTo((z.x1 + (z.x2 - z.x1)*f)*TS + (Math.random() - .5)*5, (z.y1 + (z.y2 - z.y1)*f)*TS + (Math.random() - .5)*5); }
+    ctx.lineTo(z.x2*TS, z.y2*TS); ctx.stroke();
+  }
   for (const a of arrows) {
+    if (a.boom) { ctx.save(); ctx.translate(a.x*TS, a.y*TS); ctx.rotate(frameT*20); ctx.fillStyle = '#c49a63'; ctx.fillRect(-4, -1, 8, 2); ctx.fillRect(-1, -4, 2, 5); ctx.restore(); continue; }
     if (a.col) { ctx.fillStyle = a.col; ctx.beginPath(); ctx.arc(a.x*TS, a.y*TS, 2.5, 0, 7); ctx.fill(); continue; }
     ctx.strokeStyle = '#ebe4d3'; ctx.beginPath(); ctx.moveTo(a.x*TS, a.y*TS); ctx.lineTo(a.x*TS - a.vx*.5, a.y*TS - a.vy*.5); ctx.stroke();
   }
@@ -2699,7 +2781,7 @@ function render() {
   if (player.swing) {
     const s = player.swing, k = 1 - s.t/.18, r = s.reach*TS;
     ctx.strokeStyle = `rgba(255,240,200,${.8 - k*.6})`; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 7, r*.85, s.ang - 1 + k*.4, s.ang + .2 + k*.8); ctx.stroke();
+    ctx.beginPath(); if (s.arc === 'spin') ctx.arc(S.x*TS, S.y*TS - 7, r*.85, s.ang + k*6.3 - 2, s.ang + k*6.3); else if (s.arc === 'wide') ctx.arc(S.x*TS, S.y*TS - 7, r*.85, s.ang - 1.6 + k*.6, s.ang + .6 + k*1.2); else ctx.arc(S.x*TS, S.y*TS - 7, r*.85, s.ang - 1 + k*.4, s.ang + .2 + k*.8); ctx.stroke();
   }
   for (const p of particles) { ctx.fillStyle = p.col; ctx.globalAlpha = Math.max(0, 1 - p.t*2); ctx.fillRect(p.x*TS, p.y*TS, 2, 2); }
   ctx.globalAlpha = 1;
@@ -2935,7 +3017,7 @@ function renderHUD() {
   if (S.equip.weapon && !have(S.equip.weapon)) S.equip.weapon = null;
   if (S.equip.armor && !have(S.equip.armor)) S.equip.armor = null;
   const w = weapon(), a = S.equip.armor;
-  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${a ? ` · ${esc(GOODS[a].name)}` : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}`;
+  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && w.ammo === 'stone' ? ` · ${have('stone')} stones` : w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${a ? ` · ${esc(GOODS[a].name)}` : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}`;
   const total = Object.values(S.inv).reduce((s, n) => s + n, 0);
   $('bagN').textContent = total ? `(${total})` : '';
   $('bombBtn').hidden = !isTouch || !(have('bomb') || have('fire_bomb') || have('frost_bomb')) || mode !== 'play';
@@ -3336,7 +3418,13 @@ function propose(isCounter) {
 function itemStat(g) {
   const d = GOODS[g];
   if (d.kind === 'seed') { const C = CROPS[d.crop]; return `Plant on your farm · ready in ${C.grow} day${C.grow === 1 ? '' : 's'}`; }
-  if (d.kind === 'weapon') return d.ranged ? `${d.dmg} damage · ranged${d.noAmmo ? ', no ammo needed' : ', uses arrows'}` : `${d.dmg} damage · reach ${d.reach}${d.silver ? ' · double vs undead' : ''}`;
+  if (d.kind === 'weapon') {
+    const tags = [];
+    if (d.arc === 'spin') tags.push('hits all around you'); if (d.arc === 'wide') tags.push('wide sweep'); if (d.kb) tags.push('heavy knockback');
+    if (d.crit) tags.push(`+${Math.round(d.crit*100)}% crit`); if (d.lifesteal) tags.push(`heals ${Math.round(d.lifesteal*100)}% of damage`); if (d.silver) tags.push('double vs undead');
+    if (d.pierce) tags.push('pierces enemies'); if (d.multi) tags.push(`${d.multi} arrows per shot`); if (d.boom) tags.push('returns to you'); if (d.aoe) tags.push('explodes'); if (d.chain) tags.push(`chains to ${d.chain} more foes`);
+    return d.ranged ? `${d.dmg} damage · ranged · ${d.ammo === 'stone' ? 'fires stones' : d.noAmmo ? 'no ammo needed' : 'uses arrows'}${tags.length ? ' · ' + tags.join(' · ') : ''}` : `${d.dmg} damage · reach ${d.reach}${tags.length ? ' · ' + tags.join(' · ') : ''}`;
+  }
   if (d.kind === 'armor') return `Armor ${d.armor} · blocks ${Math.round(Math.min(.7, d.armor*.12)*100)}% of damage${d.speed ? ` · ${Math.round(d.speed*100)}% faster` : ''}`;
   if (d.kind === 'food') return d.buff ? d.desc : `Heals ${d.heal}`;
   if (g === 'frost_bomb') return 'Thrown before plain bombs · freezes enemies in place';
@@ -3596,13 +3684,14 @@ function drawMount(g, id, x, y, f, phase, moving) {
 
 /* ================= taming ================= */
 function critterTarget() {
+  const F = '<kbd style="margin:0 6px 0 10px">F</kbd>hunt it';
   for (const e of enemies) {
     const def = ENEMIES[e.type];
-    if (!def || !def.passive || !def.tame || e.dead || Math.hypot(e.x - S.x, e.y - S.y) > 1.7) continue;
-    if (S.pets.includes(def.tame.pet)) continue;
+    if (!def || !def.passive || e.dead || Math.hypot(e.x - S.x, e.y - S.y) > 1.7) continue;
+    if (!def.tame || S.pets.includes(def.tame.pet)) return {key: 'hu' + e.type, html: `${def.name}${def.tame ? ' <span style="color:var(--muted)">(you already have one as a pet)</span>' : ''} · <kbd style="margin:0 6px 0 4px">F</kbd>hunt it`, btn: '', fn: () => {}};
     const food = def.tame.food;
-    if (!have(food)) return {key: 'cr' + e.type + 'n', html: `The ${def.name} eyes you warily. It might trust you if you carried <b>${GOODS[food].name}</b>.`, btn: '', fn: () => {}};
-    return {key: 'cr' + e.type, html: `<kbd style="margin:0 6px 0 0">E</kbd>Offer ${GOODS[food].name} to the ${def.name} <span style="color:var(--muted)">(tame it)</span>`, btn: 'Tame', fn: () => tameCritter(e)};
+    if (!have(food)) return {key: 'cr' + e.type + 'n', html: `The ${def.name} needs <b>${GOODS[food].name}</b> to trust you · ${F}`, btn: '', fn: () => {}};
+    return {key: 'cr' + e.type, html: `<kbd style="margin:0 6px 0 0">E</kbd>Offer ${GOODS[food].name} to tame the ${def.name} · ${F}`, btn: 'Tame', fn: () => tameCritter(e)};
   }
   return null;
 }
@@ -4479,6 +4568,8 @@ const ACH = [
   ['master','Master of a Craft','Raise any skill to 20', () => Object.values(S.skills || {}).some(v => v >= 20)],
   ['artisan','Artisan','Craft 150 items', () => S.crafted >= 150],
   ['masterwork','Masterwork','Craft a masterwork (double output)', () => (S.masterworks || 0) >= 1],
+  ['arsenal','Arsenal','Own 10 different weapons', () => GK.filter(g => GOODS[g].kind === 'weapon' && (have(g) || S.home.chest[g])).length >= 10],
+  ['hunter2','Big Game Hunter','Hunt 20 wild animals', () => Object.keys(ENEMIES).filter(k => ENEMIES[k].passive).reduce((n, k) => n + (S.killsBy[k] || 0), 0) >= 20],
   ['whisperer','Animal Whisperer','Tame 3 wild animals', () => (S.tamed || 0) >= 3],
   ['menagerie','Menagerie','Own 10 pets', () => S.pets.length >= 10],
   ['barnyard','Barnyard','Keep a cow, a sheep and a pig', () => S.home.barn && S.home.barn.cow && S.home.barn.sheep && S.home.barn.pig],
