@@ -2078,11 +2078,21 @@ function buildChunk(cx, cy) {
   const x0 = cx*CH - 3, x1 = (cx+1)*CH + 1, y0 = cy*CH - 3, y1 = (cy+1)*CH + 1;
   for (const h of houses) if (h.x >= x0 && h.x <= x1 && h.y >= y0 && h.y <= y1) drawHouse(g, h.x*TS, h.y*TS, h.roof);
   for (const k of FORGE_TOWNS) { const tw = TOWNS[k]; if (tw.x-3 >= x0 && tw.x-3 <= x1 && tw.y >= y0 && tw.y <= y1) drawAnvil(g, (tw.x-3)*TS, tw.y*TS); }
-  chunks[cy][cx] = c; return c;
+  chunks[cy][cx] = c; chunkLive.push([cx, cy]); c.used = frameT;
+  // keep only the most recently seen chunks: each one is a 512x512 canvas (~1 MB of GPU memory)
+  if (chunkLive.length > CHUNK_MAX) {
+    let bi = -1, bu = Infinity;
+    for (let i = 0; i < chunkLive.length; i++) { const [x, y] = chunkLive[i], o = chunks[y][x]; if (o && o !== c && o.used < bu) { bu = o.used; bi = i; } }
+    if (bi >= 0) { const [x, y] = chunkLive[bi], o = chunks[y][x]; o.width = o.height = 0; chunks[y][x] = null; chunkLive.splice(bi, 1); }
+  }
+  return c;
 }
-const getChunk = (cx, cy) => chunks[cy][cx] || buildChunk(cx, cy);
+const CHUNK_MAX = 20;
+let chunkLive = [];
+const getChunk = (cx, cy) => { const c = chunks[cy][cx] || buildChunk(cx, cy); c.used = frameT; return c; };
 function renderTerrain() {
-  chunks = Array.from({length: CHH}, () => Array(CW).fill(null));
+  for (const [x, y] of chunkLive) { const o = chunks[y] && chunks[y][x]; if (o) o.width = o.height = 0; }
+  chunks = Array.from({length: CHH}, () => Array(CW).fill(null)); chunkLive = [];
   mapCanvas = document.createElement('canvas'); mapCanvas.width = W; mapCanvas.height = H;
   mapCtx = mapCanvas.getContext('2d'); mapImg = mapCtx.createImageData(W, H);
   for (let i = 0; i < W*H; i++) { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; mapImg.data[i*4+3] = 255; }
@@ -5281,7 +5291,12 @@ function musicContext() {
 /* ================= boot ================= */
 let last = 0;
 let musT = 0;
+let loopErrs = 0;
 function loop(ts) {
+  requestAnimationFrame(loop);
+  try { step(ts); } catch (e) { if (loopErrs++ < 5) console.error(e); }
+}
+function step(ts) {
   const raw = Math.min(.05, (ts - last) / 1000 || 0); last = ts; frameT += raw;
   let dt = raw; if (hitStop > 0) { hitStop -= raw; dt = 0; }
   if (mode === 'play' && dt > 0) update(dt);
@@ -5296,7 +5311,6 @@ function loop(ts) {
   $('vig').style.opacity = Math.max(hurtFlash, low).toFixed(2);
   if (mode === 'creator' && draft) drawPreview();
   render();
-  requestAnimationFrame(loop);
 }
 function begin(state) {
   S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling');
@@ -5330,7 +5344,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
