@@ -271,12 +271,14 @@ export class EnemyArrows {
       a.pos.addScaledVector(a.dir, a.speed * dt);
       a.traveled += a.speed * dt;
       a.mesh.position.copy(a.pos);
+      if (a.spin) a.mesh.rotation.y += dt * 9;
       const d = Math.hypot(P.pos.x - a.pos.x, P.pos.z - a.pos.z);
       let done = false;
       if (!P.dead && d < PLAYER_RADIUS + 0.2) {
         const res = P.takeDamage(a.damage, a.dir, this.game);
         if (res === true) {
           this.game.onPlayerHit({ lungeDir: a.dir }, a.damage);
+          a.owner?.onArrowHit?.(this.game); // e.g. a net that slows you
           done = true;
         } else if (res === 'dodged' && !a.dodged) {
           a.dodged = true;

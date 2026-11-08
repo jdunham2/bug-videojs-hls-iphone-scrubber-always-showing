@@ -108,7 +108,12 @@ export class CombatMethods {
       if (heal > 0) this.player.hp += heal;
     }
     this.dropGear(enemy);
-    if (enemy.affix === 'volatile' || enemy.kind === 'bomber') {
+    if (enemy.kind === 'sapper' && !enemy.exploded) {
+      // Shot before he lit the fuse: the keg goes off where he fell.
+      enemy.exploded = true;
+      const pos = enemy.pos.clone();
+      setTimeout(() => this.explosion(pos, 3, 45, 22), 200);
+    } else if (enemy.affix === 'volatile' || enemy.kind === 'bomber') {
       const pos = enemy.pos.clone();
       const big = enemy.affix === 'volatile';
       setTimeout(() => this.explosion(pos, big ? 3.2 : 2.2, big ? 45 : 25, big ? 22 : 12), big ? 550 : 250);

@@ -158,7 +158,7 @@ export const lv = (id) => build.lv(id);
 const perk = (k) => currentCharacter().stats[k] ?? 1;
 
 /** Temporary effects from the arena (haste runes, ice patches). */
-export const buffs = { haste: 0, slippery: false, chill: 0 };
+export const buffs = { haste: 0, slippery: false, chill: 0, netted: 0 };
 
 /** Final stats: config base × run skills × character perk × equipped gear × arena effects. */
 export const stat = {
@@ -167,7 +167,7 @@ export const stat = {
   maxHp: () => Math.round((config.player.maxHp + 25 * lv('vitality') + gearStats().hpAdd + talent.hpAdd()) * perk('maxHp') * gearStats().hpMult),
   dodgeCharges: () => 1 + lv('secondWind'),
   damage: () => perk('damage') * gearStats().damage * talent.damage(),
-  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * gearStats().speed * talent.speed() * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1),
+  moveSpeed: () => config.player.moveSpeed * perk('moveSpeed') * gearStats().speed * talent.speed() * (buffs.haste > 0 ? 1.4 : 1) * (buffs.chill > 0 ? 0.6 : 1) * (buffs.netted > 0 ? 0.35 : 1),
   arrowSpeed: () => gearStats().arrowSpeed,
   drawMove: () => config.bow.drawMoveMultiplier * gearStats().drawMove,
   damageTaken: () => (1 - gearStats().dr) * talent.taken(),

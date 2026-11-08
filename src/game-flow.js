@@ -10,6 +10,27 @@ import { Archer } from './archer.js';
 import { Boss } from './boss.js';
 import { Raider, Bomber, Thief } from './variants.js';
 import { Stalker, Shieldbearer, Deckhand, Automaton, Lancer } from './reaches.js';
+import { Sapper, Lurker, Netcaster, Berserker } from './warbands.js';
+
+/** Who you meet in each dungeon (by arena theme): ranged and melee kinds with weights. */
+const WARBANDS = {
+  0: [[[Archer, 4], [Netcaster, 1]], [[Grunt, 7], [Lurker, 1]]], // Sunken Ruins
+  1: [[[Archer, 1]], [[Raider, 6], [Grunt, 3], [Berserker, 2]]], // Frostpeak Keep
+  2: [[[Bomber, 1]], [[Grunt, 6], [Sapper, 2]]], // Molten Forge
+  3: [[[Archer, 1]], [[Grunt, 4], [Raider, 2], [Lurker, 4]]], // Whispering Marsh
+  4: [[[Archer, 3], [Netcaster, 2]], [[Raider, 4], [Grunt, 4]]], // Autumn Hollow
+  5: [[[Bomber, 1]], [[Grunt, 4], [Raider, 1], [Sapper, 4]]], // Deepdelve Mines
+  6: [[[Archer, 2], [Netcaster, 2]], [[Raider, 5], [Grunt, 2]]], // Stormwatch Harbor
+  7: [[[Bomber, 1]], [[Raider, 3], [Grunt, 3], [Berserker, 2]]], // Sunscorch Canyon
+  8: [[[Bomber, 1]], [[Raider, 3], [Grunt, 3], [Sapper, 2], [Berserker, 1]]], // Emberfall Caldera
+  9: [[[Archer, 3], [Netcaster, 1]], [[Stalker, 5], [Grunt, 3], [Shieldbearer, 1]]], // Verdant Temple
+  10: [[[Deckhand, 1]], [[Raider, 4], [Grunt, 3], [Shieldbearer, 1], [Sapper, 1]]], // Shipwreck Cove
+  11: [[[Archer, 1]], [[Stalker, 4], [Lurker, 3], [Grunt, 3]]], // Glowcap Grove
+  12: [[[Archer, 3], [Netcaster, 1]], [[Shieldbearer, 4], [Lancer, 2], [Grunt, 3]]], // Sandsea Oasis
+  13: [[[Bomber, 1]], [[Automaton, 4], [Grunt, 3], [Sapper, 2], [Shieldbearer, 1]]], // Clockwork Foundry
+  14: [[[Deckhand, 1]], [[Lancer, 4], [Shieldbearer, 2], [Stalker, 2], [Berserker, 1]]], // Misty Highlands
+};
+const SPECIAL = new Set([Netcaster, Lurker, Berserker, Sapper, Stalker, Shieldbearer, Automaton, Lancer, Deckhand]);
 import { rollItem } from './gear.js';
 
 /** Twists a wave can come with (from wave 4). */
@@ -180,38 +201,24 @@ export class FlowMethods {
     const s = config.archer;
     const chance = this.mods?.archers ? 0.45 : this.wave >= s.firstWave ? Math.min(0.4, 0.12 * (this.wave - s.firstWave + 1)) : 0;
     const ranged = Math.random() < chance;
-    // Each arena brings its own enemies: raiders in the Keep, fire-pot bombers in the Forge.
+    // Each dungeon has its own warband: [[ranged kind, weight]...], [[melee kind, weight]...].
     const theme = (this.arena || 0) % THEMES.length;
-    if (theme === 1) return ranged ? Archer : Math.random() < 0.7 ? Raider : Grunt;
-    if (theme === 2) return ranged ? Bomber : Grunt;
-    // The newer dungeons mix the warbands: who you meet depends on the place.
-    const mix = {
-      3: [Archer, 0.3], // Marsh: bog-dwellers with bows, grunts in the reeds
-      4: [Archer, 0.6], // Hollow: hunters and raiders
-      5: [Bomber, 0.2], // Mines: powder-pot throwers
-      6: [Archer, 0.75], // Harbor: raiders off the boats
-      7: [Bomber, 0.5], // Canyon
-      8: [Bomber, 0.4], // Caldera
-    }[theme];
-    if (mix) return ranged ? mix[0] : Math.random() < mix[1] ? Raider : Grunt;
-    // The Far Reaches have their own warbands: [ranged, [[melee kind, weight], ...]].
-    const reach = {
-      9: [Archer, [[Stalker, 5], [Grunt, 3], [Shieldbearer, 1]]], // Verdant Temple
-      10: [Deckhand, [[Raider, 4], [Grunt, 3], [Shieldbearer, 1]]], // Shipwreck Cove
-      11: [Archer, [[Stalker, 5], [Grunt, 4]]], // Glowcap Grove
-      12: [Archer, [[Shieldbearer, 4], [Lancer, 2], [Grunt, 3]]], // Sandsea Oasis
-      13: [Bomber, [[Automaton, 4], [Grunt, 4], [Shieldbearer, 1]]], // Clockwork Foundry
-      14: [Deckhand, [[Lancer, 4], [Shieldbearer, 2], [Stalker, 2]]], // Misty Highlands
-    }[theme];
-    if (reach) {
-      if (ranged) return reach[0];
-      const total = reach[1].reduce((a, [, w]) => a + w, 0);
-      let r = Math.random() * total;
-      for (const [K, w] of reach[1]) if ((r -= w) < 0) return K;
-      return Grunt;
+    const band = WARBANDS[theme] || WARBANDS[0];
+    const list = ranged ? band[0] : band[1];
+    const total = list.reduce((a, [, w]) => a + w, 0);
+    let r = Math.random() * total;
+    let K = list[list.length - 1][0];
+    for (const [k, w] of list) {
+      if ((r -= w) < 0) {
+        K = k;
+        break;
+      }
     }
-    return ranged ? Archer : Grunt;
+    // The special kinds hold off for the first couple of waves.
+    if (this.wave < 3 && SPECIAL.has(K)) return ranged ? Archer : Grunt;
+    return K;
   }
+
 
   /** Scale a fresh enemy's health for the difficulty tier. */
   toughen(enemy) {

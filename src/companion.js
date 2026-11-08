@@ -7,6 +7,7 @@ import { heroPower } from './gear.js';
 import { levelFor, FALCON_LEVEL } from './progression.js';
 import { profile } from './profile.js';
 import { talent } from './talents.js';
+import { models } from './models.js';
 
 export const falconUnlocked = () => levelFor(profile.xp || 0).level >= FALCON_LEVEL;
 
@@ -38,6 +39,7 @@ export class Falcon {
     this.bird.traverse((o) => o.isMesh && (o.castShadow = true));
     this.bird.scale.setScalar(1.6);
     this.group.add(this.bird);
+    this.realistic = this.useModel();
     this.trail = [];
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
@@ -50,6 +52,7 @@ export class Falcon {
   /** Put the falcon into a scene next to the hero (or take it out). */
   attach(scene, on) {
     this.active = on;
+    if (!this.realistic) this.realistic = this.useModel(); // models may have loaded since
     if (on) {
       scene.add(this.group);
       const P = this.game.player.pos;
@@ -123,9 +126,74 @@ export class Falcon {
       this.bird.rotation.y = Math.atan2(this.vel.x, this.vel.z);
       this.bird.rotation.x = -Math.atan2(this.vel.y, Math.hypot(this.vel.x, this.vel.z)) * 0.8;
     }
+    if (this.realistic) {
+      // The Meshy falcon: wings bend in the shader; tucked in a dive.
+      const u = this.flapUniforms;
+      const diving = this.state === 'dive';
+      u.uPhase.value += dt * flap * (this.state === 'circle' ? 0.55 : 1);
+      u.uAmp.value += ((diving ? 0.05 : this.state === 'climb' ? 0.55 : 0.32) - u.uAmp.value) * (1 - Math.exp(-6 * dt));
+      u.uFold.value += ((diving ? 1 : 0) - u.uFold.value) * (1 - Math.exp(-8 * dt));
+      // Bank into turns while circling.
+      this.model.rotation.z = this.state === 'circle' ? -0.35 : 0;
+      return;
+    }
     const w = Math.sin(this.t * flap) * (this.state === 'dive' ? 0.15 : 0.7);
     this.wingL.rotation.z = w;
     this.wingR.rotation.z = -w;
+  }
+
+  /**
+   * Swap the box-built bird for the Meshy falcon (wings spread, gliding). It's one
+   * rigid mesh, so the flap is done in the vertex shader: vertices bend up and down
+   * more the further out along the wing they are, and fold inwards for a dive.
+   */
+  useModel() {
+    const src = models.falcon;
+    if (!src) return false;
+    const root = src.scene.clone(true);
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    // Wingspan runs along the longer horizontal axis; turn it to lie along x.
+    const spanAxisZ = size.z > size.x;
+    const span = Math.max(size.x, size.z);
+    this.flapUniforms = { uPhase: { value: 0 }, uAmp: { value: 0.3 }, uFold: { value: 0 } };
+    const U = this.flapUniforms;
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.geometry.computeBoundingBox();
+      const gb = o.geometry.boundingBox;
+      const gsize = gb.getSize(new THREE.Vector3());
+      const axis = gsize.z > gsize.x ? 'z' : 'x';
+      const half = Math.max(gsize.x, gsize.z) / 2;
+      const mid = gb.getCenter(new THREE.Vector3())[axis];
+      o.material = o.material.clone();
+      o.material.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, U);
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uPhase; uniform float uAmp; uniform float uFold;').replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+           float side = (transformed.${axis} - ${mid.toFixed(4)}) / ${half.toFixed(4)};
+           float reach = clamp(abs(side) - 0.12, 0.0, 1.0);
+           transformed.y += sin(uPhase) * uAmp * pow(reach, 1.4) * ${half.toFixed(4)};
+           transformed.${axis} = ${mid.toFixed(4)} + (transformed.${axis} - ${mid.toFixed(4)}) * (1.0 - 0.55 * uFold * reach);
+           transformed.y -= uFold * reach * 0.25 * ${half.toFixed(4)};`,
+        );
+      };
+    });
+    const holder = new THREE.Group();
+    root.position.sub(center);
+    holder.add(root);
+    if (spanAxisZ) holder.rotation.y = Math.PI / 2;
+    holder.scale.setScalar(1.25 / span); // about 1.25 m wingspan
+    this.model = new THREE.Group();
+    this.model.add(holder);
+    this.bird.clear();
+    this.bird.scale.setScalar(1);
+    this.bird.add(this.model);
+    return true;
   }
 
   strike(e) {

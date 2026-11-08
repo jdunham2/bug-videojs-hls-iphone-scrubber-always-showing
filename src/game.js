@@ -260,6 +260,7 @@ export class Game {
     this.deathShown = false;
     buffs.haste = 0;
     buffs.chill = 0;
+    buffs.netted = 0;
     if (this.arenaPortal) this.arenaPortal.visible = false;
     document.body.classList.remove('letterbox');
     this.zoomKick = 0;
@@ -676,6 +677,7 @@ export class Game {
     this.enemyArrows.update(dt);
     this.fireballs.update(dt);
     buffs.chill = Math.max(0, buffs.chill - dt);
+    buffs.netted = Math.max(0, buffs.netted - dt);
     this.ultimate.update(dt);
     this.loot.update(dt);
     this.gearDrops.update(dt);

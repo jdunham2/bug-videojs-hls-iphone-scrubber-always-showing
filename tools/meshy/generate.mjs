@@ -158,7 +158,7 @@ function optimize(input, output) {
 function previewBody(asset) {
   return () => ({
     mode: 'preview',
-    prompt: `${asset.prompt}, ${config.style}`.slice(0, 800),
+    prompt: `${asset.prompt}, ${asset.style ?? config.style}`.slice(0, 800),
     model_type: 'smart-topology',
     ai_model: 'meshy-t2.5',
     target_polycount: asset.polycount,
@@ -172,7 +172,7 @@ function refineBody(asset) {
   return () => ({
     mode: 'refine',
     preview_task_id: state[asset.id].preview.taskId,
-    texture_prompt: `${asset.texturePrompt}, ${config.textureStyle}`.slice(0, 800),
+    texture_prompt: `${asset.texturePrompt}, ${asset.textureStyle ?? config.textureStyle}`.slice(0, 800),
     target_formats: ['glb'],
   });
 }
@@ -191,7 +191,7 @@ async function generateOutfit(asset, manifest) {
   if (!baseRefine) throw new Error(`Generate "${asset.base}" before its outfit "${asset.id}"`);
   const task = await step(asset, 'retexture', '/v1/retexture', () => ({
     input_task_id: baseRefine,
-    text_style_prompt: `${asset.texturePrompt}, ${config.textureStyle}`.slice(0, 600),
+    text_style_prompt: `${asset.texturePrompt}, ${asset.textureStyle ?? config.textureStyle}`.slice(0, 600),
     enable_original_uv: true,
     target_formats: ['glb'],
   }));
