@@ -75,9 +75,9 @@ export function dailyScore(stats, { cleared, elapsed, wave }) {
 
 /** Today's record in the profile. */
 export function dailyRecord() {
-  const d = (profile.daily ||= {});
-  if (d.date !== today()) Object.assign(d, { date: today(), best: 0, cleared: false, rewarded: false });
-  return d;
+  // A new object rather than editing in place, so a read-only record can't break this.
+  if (profile.daily?.date !== today()) profile.daily = { date: today(), best: 0, cleared: false, rewarded: false };
+  return profile.daily;
 }
 
 /** Save a score; returns { best, isBest, firstClear }. */

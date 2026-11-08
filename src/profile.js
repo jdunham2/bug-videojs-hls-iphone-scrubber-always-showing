@@ -90,6 +90,9 @@ function merge(a, b) {
 }
 
 function replaceProfile(next) {
+  // A deep, editable copy: data from the account save arrives read-only (frozen),
+  // and the game edits its records in place (tempering an item, today's trial...).
+  next = JSON.parse(JSON.stringify(next));
   for (const k of Object.keys(profile)) delete profile[k];
   Object.assign(profile, next);
   repairRecords();
@@ -185,7 +188,7 @@ export async function connectCloudSave(onChange) {
     Object.assign(cloudCtx, { db, user, id });
     const ref = db.collection(`data/users/${id}`).doc('profile');
     const snap = await ref.get();
-    const remote = snap.exists ? snap.data() : null;
+    const remote = snap.exists ? JSON.parse(JSON.stringify(snap.data())) : null;
     const before = JSON.stringify(profile);
     if (remote) replaceProfile(merge(profile, remote));
     cloud = ref;
