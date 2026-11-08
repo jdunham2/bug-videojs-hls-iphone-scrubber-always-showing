@@ -41,7 +41,7 @@ kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid
 .hud-tr{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));display:grid;gap:6px;justify-items:end}
 #mini{width:132px;height:132px;border:1px solid var(--line);border-radius:6px;background:var(--ink);image-rendering:pixelated;display:block}
 .hud-btns{display:flex;gap:6px}
-#bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;padding:6px 8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 20px)}
+#bar{position:absolute;left:50%;transform:translateX(-50%);width:max-content;box-sizing:border-box;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;padding:6px 8px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 20px)}
 .hp{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .hpbar{width:110px;height:10px;border-radius:3px;background:var(--ink);overflow:hidden;border:1px solid var(--line)}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,#c9503c,#e57a62);transition:width .15s}
@@ -68,6 +68,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   .coins{font-size:18px}
   .hpbar{width:70px}
   #bar kbd,.hud-btns kbd{display:none}
+  #prompt{bottom:calc(100px + env(safe-area-inset-bottom,0px))}
 }
 
 /* Dialogue */
@@ -165,6 +166,9 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
 .tbtn{position:absolute;border-radius:50%;border:none;font-family:var(--f-display);z-index:4;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 #actBtn{right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));width:70px;height:70px;background:var(--brass);color:#1a1206;font-size:15px}
 #atkBtn{right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(86px + env(safe-area-inset-bottom,0px));width:70px;height:70px;background:#c9503c;color:#fff;font-size:15px}
+#rollBtn{right:calc(96px + env(safe-area-inset-right,0px));bottom:calc(164px + env(safe-area-inset-bottom,0px));width:62px;height:62px;background:#3a6a8a;color:#fff;font-size:14px}
+#rollPip{font-size:13px;padding:5px 9px;background:var(--panel-2);border-radius:4px;color:var(--good);white-space:nowrap}
+#rollPip.cool{color:var(--muted);opacity:.55}
 #bombBtn{right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(228px + env(safe-area-inset-bottom,0px));width:56px;height:56px;background:#4a4446;color:#ffb36b;font-size:13px}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 </style>
@@ -188,6 +192,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   <div id="bar" class="panel">
     <div class="hp"><span>HP</span><div class="hpbar"><i id="hpFill" style="width:100%"></i></div><b id="hpV">10/10</b></div>
     <div id="gear"><b>Fists</b></div>
+    <div id="rollPip">Roll<kbd>Shift</kbd></div>
     <button class="btn" id="btnBag">Bag <span id="bagN"></span><kbd>I</kbd></button>
     <button class="btn" id="btnCraft">Craft<kbd>C</kbd></button>
   </div>
@@ -219,12 +224,13 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   <div id="title" class="modal">
     <div class="titlecard panel">
       <h1>Saltwind<br>Road</h1>
-      <p>You arrive in Port Wren with a pack, a few coins and no name on the road. Nine settlements lie scattered across the coast, the pine woods, the frozen north, the eastern sands, the Gloomwood and the smoking Cinderlands. Gather, craft, take on work, haggle, and face the six great beasts that rule the wild.</p>
+      <p>You arrive in Port Wren with a pack, a few coins and no name on the road. Thirteen settlements lie scattered from the salt coast and pine woods to the jade jungle, the red canyons, the haunted moor and the stormy north-east cliffs. Gather, craft, take on work, haggle, and face the ten great beasts that rule the wild.</p>
       <p>The Guildmistress grants a <b style="color:var(--brass)">Charter of the Free Road</b> to any trader who earns 600 coin and forms pacts with four settlements.</p>
       <div class="controls">
         <b>WASD / Arrows</b><span>Walk (drag anywhere on touch screens)</span>
         <b>E / Space</b><span>Talk, read notice boards, gather, fish</span>
         <b>F / Click</b><span>Attack · <b>G</b> throw a bomb</span>
+        <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
         <b>C · I · Q</b><span>Craft · Bag · Eat something</span>
         <b>M · J</b><span>World map · Journal</span>
       </div>
@@ -241,6 +247,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   <button id="actBtn" class="tbtn" hidden>Talk</button>
   <button id="atkBtn" class="tbtn" hidden>Attack</button>
   <button id="bombBtn" class="tbtn" hidden>Bomb</button>
+  <button id="rollBtn" class="tbtn" hidden>Roll</button>
 </div>
 
 <script>
@@ -248,12 +255,12 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
 'use strict';
 
 /* ================= constants & data ================= */
-const TS = 16, W = 270, H = 200, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
-const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13,ASH:14,LAVA:15,GLOOM:16};
-const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e','#4a4446','#c8461c','#2c4630'];
-const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0,0.9,0,0.7];
-const REGION = ['Open Water','The Shallows','The Strand','The Green Downs','Hollow Woods','The Knolls','The Teeth','Frost Reach','Reedmire','The Free Road','','Amber Sands','The Free Road','','The Cinderlands','Lava Field','Gloomwood'];
-const SAVE_KEY = 'saltwind-road-v2';
+const TS = 16, W = 360, H = 250, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
+const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13,ASH:14,LAVA:15,GLOOM:16,JUNGLE:17,MESA:18,MOOR:19};
+const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e','#4a4446','#c8461c','#2c4630','#3d7a3a','#b8643a','#6a5a6a'];
+const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0,0.9,0,0.7,0.75,0.9,0.95];
+const REGION = ['Open Water','The Shallows','The Strand','The Green Downs','Hollow Woods','The Knolls','The Teeth','Frost Reach','Reedmire','The Free Road','','Amber Sands','The Free Road','','The Cinderlands','Lava Field','Gloomwood','Jade Jungle','Redrock Mesa','Gravenmoor Heath'];
+const SAVE_KEY = 'saltwind-road-v3';
 
 const GOODS = {
   // trade goods
@@ -353,6 +360,38 @@ const GOODS = {
   alpha_cloak:{name:'Alpha Cloak',base:260,col:'#8a8f98',kind:'trinket',desc:'Walk 10% faster, +1 armor'},
   heart_amulet:{name:'Heart Amulet',base:300,col:'#e5484d',kind:'trinket',desc:'+5 max HP'},
   cloak:{name:"Explorer's Cloak",base:150,col:'#2f6b6b',kind:'trinket',desc:'See further, +1 armor'},
+  // --- far east & south ---
+  jade:{name:'Jade',base:40,col:'#4ab08a',kind:'good'},
+  copper_ore:{name:'Copper Ore',base:10,col:'#c87a4a',kind:'mat'},
+  bronze:{name:'Bronze',base:36,col:'#c89040',kind:'mat'},
+  vine:{name:'Vine',base:4,col:'#4a8a3a',kind:'mat'},
+  rope:{name:'Rope',base:14,col:'#b8a070',kind:'mat'},
+  heather:{name:'Heather',base:6,col:'#9a6aaa',kind:'mat'},
+  feather:{name:'Feather',base:10,col:'#e8ecf4',kind:'mat'},
+  venom:{name:'Venom Sac',base:18,col:'#7ad04a',kind:'mat'},
+  pelt:{name:'Jaguar Pelt',base:30,col:'#d8a040',kind:'mat'},
+  wisp_essence:{name:'Wisp Essence',base:32,col:'#7affc8',kind:'mat'},
+  serpent_fang:{name:"Jadefang's Tooth",base:220,col:'#e8f0c0',kind:'trophy'},
+  golem_core:{name:'Colossus Core',base:260,col:'#e0b050',kind:'trophy'},
+  barrow_crown:{name:'Barrow Crown',base:240,col:'#a0a8a0',kind:'trophy'},
+  roc_feather:{name:'Storm Feather',base:240,col:'#c8e0ff',kind:'trophy'},
+  fruit:{name:'Jungle Fruit',base:6,col:'#f08a30',kind:'food',heal:2},
+  jam:{name:'Fruit Jam',base:22,col:'#d04a5a',kind:'food',heal:7},
+  elixir:{name:'Wisp Elixir',base:70,col:'#a0ffe0',kind:'food',heal:25},
+  jade_idol:{name:'Jade Idol',base:200,col:'#4ab08a',kind:'craft'},
+  heather_wine:{name:'Heather Wine',base:65,col:'#8a4a8a',kind:'craft'},
+  venom_arrows:{name:'Venom Arrows',base:6,col:'#7ad04a',kind:'ammo'},
+  fire_bomb:{name:'Fire Bomb',base:45,col:'#c0401a',kind:'ammo'},
+  fishing_net:{name:'Fishing Net',base:40,col:'#b8a070',kind:'tool',tool:'rod',tier:2,desc:'Fish twice as fast, extra catch'},
+  bronze_spear:{name:'Bronze Spear',base:120,col:'#c89040',kind:'weapon',dmg:5,cd:.55,reach:2.1},
+  venom_fang:{name:'Venom Fang',base:400,col:'#7ad04a',kind:'weapon',dmg:9,cd:.28,reach:1.35},
+  bronze_mail:{name:'Bronze Mail',base:150,col:'#c89040',kind:'armor',armor:3},
+  stalker_armor:{name:'Stalker Armor',base:160,col:'#d8a040',kind:'armor',armor:3,speed:.08},
+  feather_charm:{name:'Feather Charm',base:90,col:'#e8ecf4',kind:'trinket',desc:'Roll recovers 25% faster'},
+  wisp_lantern:{name:'Wisp Lantern',base:200,col:'#7affc8',kind:'trinket',desc:'Lights the night, see much further'},
+  golem_fist:{name:'Colossus Gauntlets',base:400,col:'#e0b050',kind:'trinket',desc:'+2 melee damage'},
+  circlet:{name:"Barrow King's Circlet",base:420,col:'#c8d0c8',kind:'trinket',desc:'+3 max HP, +1 armor'},
+  windstep_boots:{name:'Windstep Boots',base:420,col:'#c8e0ff',kind:'trinket',desc:'Walk 25% faster, roll twice as often'},
 };
 const GK = Object.keys(GOODS);
 const FISTS = {name:'Fists',dmg:1,cd:.4,reach:1.1};
@@ -406,9 +445,27 @@ const RECIPES = [
   {id:'stinger_blade',need:{stinger:1,iron:2}, at:'forge'},
   {id:'wyrmscale_mail',need:{wyrm_scale:3,blacksteel:2}, at:'forge'},
   {id:'ember_blade',  need:{ember_core:1,blacksteel:2,ember:2}, at:'forge'},
+  {id:'rope',       need:{vine:3}, at:'hand', known:true},
+  {id:'jam',        need:{fruit:2,honey:1}, at:'hand'},
+  {id:'venom_arrows', n:5, need:{arrows:5,venom:1}, at:'hand'},
+  {id:'fishing_net',need:{rope:2,wood:1}, at:'bench'},
+  {id:'elixir',     need:{wisp_essence:1,fruit:1,glass:1}, at:'bench'},
+  {id:'jade_idol',  need:{jade:2,silver:1}, at:'bench', known:true},
+  {id:'heather_wine',need:{heather:3,honey:1,glass:1}, at:'bench'},
+  {id:'stalker_armor',need:{pelt:3,silk:2}, at:'bench', known:true},
+  {id:'feather_charm',need:{feather:4,silk:1}, at:'bench'},
+  {id:'wisp_lantern',need:{wisp_essence:2,glass:1,silver:1}, at:'bench'},
+  {id:'fire_bomb',  need:{bomb:1,ember:1,sulfur:1}, at:'bench'},
+  {id:'circlet',    need:{barrow_crown:1,silver:2,crystal:1}, at:'bench'},
+  {id:'windstep_boots',need:{roc_feather:1,hide:2,silk:1}, at:'bench'},
+  {id:'smelt_bronze', out:'bronze', need:{copper_ore:2,stone:1}, at:'forge', known:true, label:'Smelt Bronze'},
+  {id:'bronze_spear',need:{bronze:2,wood:2}, at:'forge'},
+  {id:'bronze_mail',need:{bronze:4,hide:1}, at:'forge'},
+  {id:'venom_fang', need:{serpent_fang:1,bronze:2}, at:'forge'},
+  {id:'golem_fist', need:{golem_core:1,bronze:2}, at:'forge'},
 ];
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
-const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade'};
+const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots'};
 const STATION_LABEL = {hand:'Anywhere', bench:'Settlement workbench', forge:'A forge'};
 const CRAFT_GROUPS = [['Tools',['tool']],['Weapons',['weapon','ammo']],['Armor & trinkets',['armor','trinket']],['Food',['food']],['Goods & metals',['craft','good','mat']]];
 
@@ -430,6 +487,11 @@ const NODES = {
   shell:{name:'Shells',verb:'Collect',give:'shells',amt:[1,2],hits:1,regrow:2,curio:'bottle'},
   cactus:{name:'Cactus',verb:'Pick',give:'cactus',amt:[1,2],hits:1,regrow:2},
   fish:{name:'Fishing Spot',verb:'Fish',tool:'rod',give:'fish',amt:[1,2],fishing:true,curio:'scale'},
+  fruit:{name:'Fruit Tree',verb:'Pick',give:'fruit',amt:[2,3],hits:1,regrow:2},
+  vine:{name:'Hanging Vines',verb:'Cut',tool:'sickle',give:'vine',amt:[2,3],hits:1,regrow:2},
+  jade:{name:'Jade Seam',verb:'Mine',tool:'pick',tier:2,give:'jade',amt:[1,2],hits:4,regrow:4,curio:'jadeidol'},
+  copper:{name:'Copper Vein',verb:'Mine',tool:'pick',give:'copper_ore',amt:[1,2],hits:3,regrow:3,curio:'sundisc'},
+  heather:{name:'Heather',verb:'Pick',give:'heather',amt:[2,3],hits:1,regrow:2,boost:'sickle'},
 };
 const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'a sickle'};
 
@@ -445,8 +507,15 @@ const ENEMIES = {
   imp:{name:'Ember Imp',hp:6,dmg:2,speed:3.0,aggro:8,ranged:{range:6,cd:2,speed:7,col:'#ff8a3a'},drops:[['sulfur',1,2,.8],['ember',1,1,.45]]},
   wraith:{name:'Frost Wraith',hp:7,dmg:2,speed:2.8,aggro:8,undead:true,ranged:{range:6,cd:2.2,speed:6,col:'#bfe8ff'},drops:[['frost_essence',1,1,.8]]},
   skeleton:{name:'Skeleton',hp:6,dmg:2,speed:2.6,aggro:7,undead:true,drops:[['bone',1,2,1]],curio:'skull'},
+  snake:{name:'Viper',hp:4,dmg:2,speed:3.8,aggro:6,drops:[['venom',1,1,.7]]},
+  jaguar:{name:'Jaguar',hp:9,dmg:3,speed:3.4,aggro:7,charge:true,drops:[['pelt',1,1,1],['meat',1,2,.5]],curio:'spotfang'},
+  coyote:{name:'Coyote',hp:4,dmg:1,speed:3.9,aggro:7,drops:[['hide',1,1,.6],['meat',1,1,.3]]},
+  dustdevil:{name:'Dust Devil',hp:6,dmg:2,speed:3.0,aggro:8,ranged:{range:6,cd:2,speed:7,col:'#d8a060'},drops:[['copper_ore',1,2,.6],['glass',1,1,.2]]},
+  ghoul:{name:'Ghoul',hp:8,dmg:3,speed:2.9,aggro:7,undead:true,drops:[['bone',1,2,1]],curio:'gravering'},
+  wisp:{name:"Will-o'-Wisp",plural:"Will-o'-Wisps",hp:4,dmg:2,speed:3.2,aggro:9,undead:true,ranged:{range:6,cd:1.8,speed:6,col:'#7affc8'},drops:[['wisp_essence',1,1,.7]]},
+  harpy:{name:'Harpy',plural:'Harpies',hp:6,dmg:2,speed:3.8,aggro:9,ranged:{range:5,cd:2.4,speed:8,col:'#c8d0e0'},drops:[['feather',1,2,1]],curio:'stormegg'},
 };
-const TOWN_ENEMIES = {wren:['bandit','boar','wolf'],hollow:['wolf','boar'],frost:['wolf','wraith'],dun:['scorpion','skeleton'],reed:['lurker','boar'],highcairn:['skeleton','archer','bandit'],thorn:['spider','bat'],ashfall:['imp']};
+const TOWN_ENEMIES = {wren:['bandit','boar','wolf'],hollow:['wolf','boar'],frost:['wolf','wraith'],dun:['scorpion','skeleton'],reed:['lurker','boar'],highcairn:['skeleton','archer','bandit'],thorn:['spider','bat'],ashfall:['imp'],jade:['snake','jaguar'],redrock:['coyote','dustdevil'],graven:['ghoul','wisp'],storm:['harpy','wolf']};
 
 const BOSSES = {
   alpha:{name:'The Grey Alpha',tx:80,ty:38,kind:'wolf',size:2.2,hp:45,dmg:2,speed:3.3,cd:2.6,abilities:['dash','summon','dash'],summon:'wolf',loot:{coins:120,items:{alpha_pelt:1,hide:3}},intro:'A wolf the size of a horse steps out of the pines.'},
@@ -455,6 +524,10 @@ const BOSSES = {
   witch:{name:'The Hollow Witch',tx:28,ty:152,kind:'witch',size:1.6,hp:65,dmg:3,speed:2.3,cd:2.2,abilities:['blink','spray','summon'],summon:'spider',undead:true,pcol:'#c890ff',loot:{coins:220,items:{witchroot:1,silk:4}},intro:'Lanterns gutter out. A thin laugh comes from the trees.'},
   rime:{name:'The Rime Giant',tx:150,ty:18,kind:'giant',size:2.4,hp:100,dmg:4,speed:2.0,cd:2.6,abilities:['slam','spray','slam'],pcol:'#bfe8ff',climb:true,loot:{coins:300,items:{frost_heart:1,crystal:3,frost_essence:2}},intro:'The snowdrift stands up. It has a face.'},
   wyrm:{name:'The Ember Wyrm',tx:220,ty:32,kind:'wyrm',size:2.6,hp:160,dmg:4,speed:2.4,cd:2.1,abilities:['cone','fireball','spray','summon'],summon:'imp',pcol:'#ff8a3a',loot:{coins:500,items:{wyrm_scale:3,ember_core:1,ember:3}},intro:'The mountain breathes out. The air turns to fire.'},
+  serpent:{name:'Jadefang, the Great Serpent',tx:330,ty:132,kind:'serpent',size:2.4,hp:130,dmg:4,speed:3.3,cd:2.1,abilities:['dash','spray','summon','dash'],summon:'snake',pcol:'#7ad04a',loot:{coins:350,items:{serpent_fang:1,venom:3,jade:2}},intro:'The jungle floor ripples. Something long and green uncoils.'},
+  golem:{name:'The Brass Colossus',tx:306,ty:228,kind:'golem',size:2.6,hp:190,dmg:5,speed:1.7,cd:2.3,abilities:['slam','quake','spray'],pcol:'#e0b050',loot:{coins:400,items:{golem_core:1,copper_ore:4,bronze:2}},intro:'Gears grind under the sand. An ancient machine stands up.'},
+  lich:{name:'The Barrow King',tx:168,ty:238,kind:'lich',size:1.9,hp:150,dmg:4,speed:2.4,cd:2.0,abilities:['blink','cone','summon','spray'],summon:'ghoul',undead:true,pcol:'#7affc8',loot:{coins:380,items:{barrow_crown:1,bone:5,silver:2}},intro:'The barrow door grinds open. A crowned corpse rises from its throne.'},
+  roc:{name:'The Storm Roc',tx:318,ty:24,kind:'roc',size:2.4,hp:160,dmg:4,speed:3.6,cd:2.0,abilities:['dash','lightning','spray','dash'],pcol:'#e8f0ff',loot:{coins:400,items:{roc_feather:1,feather:5}},intro:'Thunder cracks overhead. A bird the size of a ship dives from the clouds.'},
 };
 const BK = Object.keys(BOSSES);
 
@@ -474,6 +547,11 @@ const CURIOS = {
   mirror:{name:'Black Mirror',hint:'Mining obsidian',p:.12},
   oldcoin:{name:'Ancient Coin',hint:'Mining silver',p:.12},
   skull:{name:'Crowned Skull',hint:'Skeletons that walk at night',p:.08},
+  jadeidol:{name:'Jade Idol',hint:'Mining jade',p:.12},
+  sundisc:{name:'Copper Sun Disc',hint:'Mining copper',p:.07},
+  gravering:{name:'Grave Ring',hint:'Ghouls of the moor',p:.1},
+  stormegg:{name:'Storm Egg',hint:'Harpies of the north-east cliffs',p:.1},
+  spotfang:{name:'Spotted Fang',hint:'Hunting jaguars',p:.1},
 };
 const CK = Object.keys(CURIOS);
 
@@ -486,10 +564,14 @@ const TOWNS = {
   highcairn:{name:'Highcairn',    x:150,y:95, ground:T.GRASS,roof:'#6a5a8a',produce:['silver','stone'],demand:['wood','planks','wool','roast']},
   thorn:    {name:'Thornwick',    x:42, y:165,ground:T.GRASS,roof:'#4a3a5a',produce:['mushroom','herbs','honey'],demand:['iron','salt','glass']},
   ashfall:  {name:'Ashfall',      x:236,y:56, ground:T.ASH,  roof:'#2a2a30',produce:['obsidian','sulfur'],demand:['fish','tea','wood','silver']},
+  jade:     {name:'Jadewater',    x:312,y:112,ground:T.GRASS,roof:'#2a7a5a',produce:['jade','fruit'],demand:['iron','salt','wool','glass']},
+  redrock:  {name:'Redrock',      x:288,y:208,ground:T.MESA, roof:'#8a3a1a',produce:['copper_ore','salt'],demand:['wood','fish','tea','planks']},
+  graven:   {name:'Gravenmoor',   x:186,y:226,ground:T.GRASS,roof:'#3a3a4a',produce:['wool','heather'],demand:['silver','salt','glass','jade']},
+  storm:    {name:'Stormwatch',   x:328,y:40, ground:T.SNOW, roof:'#3a5a7a',produce:['fish','feather'],demand:['wood','tea','glass','mead']},
   isle:     {name:'Sunken Isle',  x:246,y:178,ground:T.SAND, roof:'#8b6aa8',produce:['pearl'],         demand:['amber','glass','crystal'], small:true},
 };
 const ISLE = {x:246, y:178, land:8, ring:14};
-const FORGE_TOWNS = ['frost','dun','highcairn','ashfall'];
+const FORGE_TOWNS = ['frost','dun','highcairn','ashfall','redrock'];
 
 const NPCS = [
   // Port Wren
@@ -501,7 +583,7 @@ const NPCS = [
    rumors:["Spice? Dunmere has it, far out past the dunes in the east. Costs a small fortune here.","See the ripples on the water? Fish. Make yourself a rod from sticks and herbs and you'll never go hungry.","There's a notice board in every town. Folk pin up odd jobs there each morning."]},
   {id:'hob',town:'wren',dx:2,dy:1,name:'Old Hob',role:'Harbor regular & collector',cols:{cloak:'#5b5243',skin:'#d9a982',hair:'#9a9a9a'},collector:true,contracts:['c_hob'],
    hello:["Eh? You're not from round here.","The young trader! Got a minute for an old man?","Sit down, sit down. I've got stories."],
-   rumors:["I collect curios. Fossils, geodes, odd things you find out there. Show me any you find and I'll pay. Find all fifteen and I've a cloak for you.","Six great beasts rule the wild. A wolf in the north woods, a bandit king in the downs, a queen under the sand, a witch in the Gloomwood, a giant on the peaks, and a wyrm in the burning mountain.","Corvo, the ferryman down in Reedholm, used to row to an island past the deep water. Pearls, they say.","Wolves come out of the woods at night. Carry a club at least. A spear if you've the sense."]},
+   rumors:["I collect curios. Fossils, geodes, odd things you find out there. Show me any you find and I'll pay. Find them all and I've a cloak for you.","Ten great beasts rule the wild. Out west: a wolf in the north woods, a bandit king in the downs, a queen under the sand, a witch in the Gloomwood, a giant on the peaks, and a wyrm in the burning mountain. Travelers speak of four more in the far east and south.","Corvo, the ferryman down in Reedholm, used to row to an island past the deep water. Pearls, they say.","Wolves come out of the woods at night. Carry a club at least. A spear if you've the sense."]},
   {id:'rook',town:'wren',dx:2,dy:-1,name:'Captain Rook',role:'Harbor guard',cols:{cloak:'#4a5a6a',skin:'#c99673',hair:'#2a2420'},contracts:['c_rook1','c_rook2','c_rook3'],
    hello:["Keep your hands where I can see them.","Trader. Got a minute for the guard?","The best blade in Port Wren. Welcome."],
    rumors:["Bandits have a camp in the downs south-east of here. Their king, Varro, takes a cut of every cart on the road.","Bombs work wonders on anything big. The Ashfall smiths know the recipe."]},
@@ -567,6 +649,38 @@ const NPCS = [
   {id:'sera',town:'ashfall',dx:2,dy:-1,name:'Sera',role:'Pilgrim of Ash',cols:{cloak:'#6a2a1a',skin:'#d8a882',hair:'#e8e0d0'},contracts:['c_sera','c_sera2'],
    hello:["The Wyrm sleeps. For now.","You came back.","The Wyrmslayer. Or soon to be."],
    rumors:["The Ember Wyrm lairs on the burning peak north-east of here.","Blacksteel and wyrmscale. Nothing else will stand up to its fire."]},
+  // Jadewater
+  {id:'mako',town:'jade',dx:-2,dy:-1,name:'Chief Mako',role:'Chief of Jadewater',cols:{cloak:'#2a6a4a',skin:'#8a5a3a',hair:'#1a1a1a'},contracts:['c_mako','c_mako2'],
+   hello:["Few walk the jungle road. Fewer arrive.","Welcome back to Jadewater.","Friend of the village. Sit, eat."],
+   rumors:["Jadefang, the great serpent, nests east of here in the deep jungle.","Jade comes from seams in the jungle rock. You'll need iron to cut it."]},
+  {id:'lio',town:'jade',dx:2,dy:1,name:'Lio',role:'Fruit seller',cols:{cloak:'#d08a30',skin:'#a06a4a',hair:'#3a2010'},trader:true,greed:.3,patience:4,purse:170,stock:{fruit:10,jade:3,vine:5,venom:2},contracts:['c_lio','c_lio2'],
+   teaches:{jam:25,venom_arrows:40,elixir:80},
+   hello:["Fruit! Fresh fruit! Oh, a traveler.","The trader is back!","My best customer. Take a mango."],
+   rumors:["Viper venom on an arrowhead stops anything. I know the trick.","Vines make good rope. Cut them with a sickle."]},
+  // Redrock
+  {id:'dara',town:'redrock',dx:-2,dy:-1,name:'Foreman Dara',role:'Mine foreman',cols:{cloak:'#8a4a2a',skin:'#c08a62',hair:'#4a2a1a'},contracts:['c_dara','c_dara2'],
+   hello:["Hard hat zone. Watch yourself.","Back in the canyon?","Our friend from the north! Welcome."],
+   rumors:["Deep in the canyon to the south-east, something old and brass has started moving.","Copper veins streak the red rock. Any pick will do."]},
+  {id:'hask',town:'redrock',dx:2,dy:1,name:'Hask',role:'Bronzesmith',cols:{cloak:'#5a3a2a',skin:'#b07a52',hair:'#2a1a10'},trader:true,greed:.4,patience:4,purse:220,stock:{copper_ore:8,bronze:2,glass:2,salt:4},contracts:['c_hask','c_hask2'],
+   teaches:{bronze_spear:70,bronze_mail:90,fire_bomb:60},
+   hello:["Mind the sparks.","You again. Need bronze?","Ha! Pull up an anvil."],
+   rumors:["Two copper ore and a stone makes a bar of bronze. Lighter than iron, holds an edge.","Pack an ember shard and some sulfur into a bomb and you've got a fire bomb."]},
+  // Gravenmoor
+  {id:'ashby',town:'graven',dx:-2,dy:-1,name:'Mother Ashby',role:'Elder of Gravenmoor',cols:{cloak:'#4a3a4a',skin:'#d8b8a0',hair:'#e8e8e8'},contracts:['c_ashby','c_ashby2','c_ashby3'],
+   hello:["Living visitors. How rare.","You came back. Good.","Child of the moor. Come in from the fog."],
+   rumors:["The Barrow King sleeps in the great mound south-west of here. He does not sleep well.","Silver keeps the dead at bay. We never have enough."]},
+  {id:'cole',town:'graven',dx:2,dy:1,name:'Cole',role:'Gravedigger',cols:{cloak:'#3a3a3a',skin:'#c8a888',hair:'#5a4a3a'},trader:true,greed:.35,patience:4,purse:150,stock:{wool:6,heather:6,bone:4,herbs:3},contracts:['c_cole'],
+   teaches:{wisp_lantern:90,heather_wine:40},
+   hello:["Dig, dig. Oh. Hello.","Not dead yet? Good.","My favorite living person!"],
+   rumors:["Wisps leave a glowing essence behind. Put it in a lantern and it never goes out.","Heather, honey and a glass bottle. Best wine on the moor."]},
+  // Stormwatch
+  {id:'brynn',town:'storm',dx:-2,dy:-1,name:'Keeper Brynn',role:'Lighthouse keeper',cols:{cloak:'#2a4a6a',skin:'#e0c0a0',hair:'#c8c8c8'},contracts:['c_brynn','c_brynn2'],
+   hello:["Storm's coming. Always is.","The southerner returns.","Come in, come in, out of the wind."],
+   rumors:["The Storm Roc nests on the peaks west of here. Every gale is its wingbeat.","Harpies steal shiny things. And fingers."]},
+  {id:'oskar',town:'storm',dx:2,dy:1,name:'Oskar',role:'Fisher',cols:{cloak:'#4a5a3a',skin:'#d8a882',hair:'#8a5a2a'},trader:true,greed:.35,patience:4,purse:180,stock:{fish:12,amber:2,feather:3,smoked:2},contracts:['c_oskar','c_oskar2'],
+   teaches:{fishing_net:50,feather_charm:60},
+   hello:["Fish? Fish.","Back for more fish?","There's my favorite landlubber!"],
+   rumors:["A net catches more than a rod ever will. Rope and a bit of wood.","Light on your feet, that's how you live with harpies about. Roll, don't run."]},
 ];
 const NPC_BY = Object.fromEntries(NPCS.map(n => [n.id, n]));
 const TEACHER = {}; for (const n of NPCS) if (n.teaches) for (const r in n.teaches) TEACHER[r] = n.id;
@@ -609,6 +723,22 @@ const CONTRACTS = {
   c_kael2:{giver:'kael',title:'Imp swarm',ask:"Ember imps keep setting the stores alight. Swat 6 of them.",kill:{imp:6},reward:{coins:140,items:{ember:2},rep:.8},done:"Not a single fire today. Here, take these shards."},
   c_sera:{giver:'sera',title:'An offering of embers',ask:"Before anyone faces the Wyrm, they make an offering. Bring 3 Ember Shards.",need:{ember:3},reward:{coins:60,rep:1,reveal:'wyrm'},done:"The ash accepts you. I've marked the Wyrm's peak on your map."},
   c_sera2:{giver:'sera',title:'Wyrmslayer',ask:"Slay the Ember Wyrm and free the Cinderlands. No one has ever come back from that peak.",boss:'wyrm',reward:{coins:600,rep:3,flag:'wyrmslayer'},done:"Wyrmslayer. The ash will sing of you."},
+  c_mako:{giver:'mako',title:'Tools for the village',ask:"Our tools rust in the wet. Bring 4 Iron and 2 Salt and Jadewater will call you friend.",need:{iron:4,salt:2},reward:{coins:100,rep:1.5},pact:'jade',done:"Good iron. Jadewater stands with you."},
+  c_mako2:{giver:'mako',title:'Jadefang',ask:"Jadefang swallows our hunters. Its nest is east of here, in the deepest jungle. Kill it.",boss:'serpent',reward:{coins:350,items:{jade:3},rep:2},done:"The jungle breathes again. You are a hero of Jadewater."},
+  c_lio:{giver:'lio',title:'Viper nest',ask:"Vipers in my orchard! Kill 5 of them, please.",kill:{snake:5},reward:{coins:90,items:{fruit:4},rep:.8},done:"Safe to pick again. Have some fruit!"},
+  c_lio2:{giver:'lio',title:'The spotted hunters',ask:"Jaguars are stalking the trail. Hunt 3 of them.",kill:{jaguar:3},reward:{coins:130,rep:.8},done:"You're braver than you look."},
+  c_dara:{giver:'dara',title:'Supplies for the mine',ask:"Nothing grows in the canyon. Bring 6 Wood and 3 Tea for my crew.",need:{wood:6,tea:3},reward:{coins:100,rep:1.5},pact:'redrock',done:"Fires lit, kettles on. Redrock is with you."},
+  c_dara2:{giver:'dara',title:'The Brass Colossus',ask:"The old machine in the south-east canyon woke up and flattened my dig site. Put it down.",boss:'golem',reward:{coins:400,items:{bronze:3},rep:2},done:"Scrap metal now. My crew owes you their lives."},
+  c_hask:{giver:'hask',title:'Dust devils',ask:"Dust devils keep sandblasting my forge. Break 4 of them.",kill:{dustdevil:4},reward:{coins:110,rep:.8},done:"Peace and quiet. Well, hammering."},
+  c_hask2:{giver:'hask',title:'Copper run',ask:"I need 6 Copper Ore. I'll pay in bronze.",need:{copper_ore:6},reward:{coins:40,items:{bronze:2},rep:.8},done:"Good ore. Here's your bronze."},
+  c_ashby:{giver:'ashby',title:'Silver for the doors',ask:"Bring 2 Silver and 2 Salt to seal our doors against the dead.",need:{silver:2,salt:2},reward:{coins:90,rep:1.5},pact:'graven',done:"Our doors will hold. Gravenmoor is yours."},
+  c_ashby2:{giver:'ashby',title:'Ghouls in the fog',ask:"Ghouls dig at our graves every night. Destroy 5.",kill:{ghoul:5},reward:{coins:120,items:{silver:2},rep:.8},done:"The dead stay buried. Thank you."},
+  c_ashby3:{giver:'ashby',title:'The Barrow King',ask:"The Barrow King sends them all. His mound lies south-west of here. End his reign.",boss:'lich',reward:{coins:380,rep:2},done:"The fog is lifting. I never thought I'd see the sun here."},
+  c_cole:{giver:'cole',title:'Wisp hunting',ask:"Wisps lure folk into the bog. Snuff out 4.",kill:{wisp:4},reward:{coins:100,items:{wisp_essence:2},rep:.8},done:"Here's some of their glow. Don't drink it."},
+  c_brynn:{giver:'brynn',title:'Light the lamp',ask:"The lighthouse lamp shattered in a gale. Bring 4 Glass and 2 Iron to rebuild it.",need:{glass:4,iron:2},reward:{coins:110,rep:1.5},pact:'storm',done:"She shines again. Stormwatch stands with you."},
+  c_brynn2:{giver:'brynn',title:'The Storm Roc',ask:"The Storm Roc wrecks every ship that passes. Its nest is on the peaks west of here. Bring it down.",boss:'roc',reward:{coins:400,items:{feather:4},rep:2},done:"Calm seas for the first time in years. Thank you."},
+  c_oskar:{giver:'oskar',title:'Harpy trouble',ask:"Harpies steal my catch. Shoot down 5.",kill:{harpy:5},reward:{coins:120,rep:.8},done:"My fish are mine again!"},
+  c_oskar2:{giver:'oskar',title:'Winter stores',ask:"Bring me 4 Smoked Fish for the winter stores.",need:{smoked:4},reward:{coins:120,rep:.8},done:"That'll see us through."},
 };
 
 const LANDMARKS = [
@@ -629,6 +759,12 @@ const LANDMARKS = [
   {id:'glass',  name:'Lightning Glass',tx:232,ty:104, reward:{items:{glass:3}}, lore:"Where lightning struck the dunes, the sand fused into glass."},
   {id:'beacon', name:'Frostwatch Beacon',tx:200,ty:44, reward:{reveal:34}, lore:"You light the old beacon. Its glow shows you the whole north-east."},
   {id:'statue', name:'Weeping Statue', tx:76,ty:178, reward:{coins:80}, lore:"A mossy statue of a woman. Coins fill the basin at her feet. You take a few."},
+  {id:'temple', name:'Jade Temple', tx:324,ty:96, reward:{reveal:34,maxhp:1}, lore:"Vines swallow a green stone temple. At its heart a carved serpent seems to breathe. (+1 max HP)"},
+  {id:'falls', name:'Hidden Waterfall', tx:300,ty:136, reward:{heal:true,maxhp:1,items:{fruit:3}}, lore:"A curtain of water hides a quiet pool. You drink and feel new. (+1 max HP)"},
+  {id:'arch', name:'Sky Arch', tx:270,ty:220, reward:{coins:90}, lore:"A red stone arch spans the canyon. Travelers wedge coins in its cracks for luck."},
+  {id:'crater', name:'Starfall Crater', tx:304,ty:196, reward:{items:{crystal:3,copper_ore:2}}, lore:"A glassy crater where a star once fell. Crystals glitter in the ash."},
+  {id:'cairn', name:'Barrow Cairn', tx:204,ty:238, reward:{items:{silver:1,bone:4}}, lore:"A heap of stones over an old grave. Someone buried silver with their dead."},
+  {id:'leviathan', name:'Leviathan Bones', tx:348,ty:84, reward:{items:{bone:6,pearl:1}}, lore:"The bleached skeleton of a sea beast longer than a village. A pearl rests in its jaw."},
 ];
 
 const GOAL_COIN = 600, GOAL_PACTS = 4;
@@ -678,10 +814,14 @@ function genWorld() {
     e += bump(x,y,240,42,36,.16);                             // the burning mountain
     e += bump(x,y,ISLE.x,ISLE.y,46,-.2);
     e += bump(x,y,40,105,30,.06) + bump(x,y,42,165,30,.08);   // keep the west coast towns dry
+    e += bump(x,y,312,112,40,.05) + bump(x,y,288,210,40,.08) + bump(x,y,186,226,34,.06) + bump(x,y,328,40,26,.12);
     let m = fbm(x/24+40, y/24, SEED+99);
-    m += bump(x,y,118,160,36,.32) + bump(x,y,100,55,36,.24) - bump(x,y,212,125,62,.58) + bump(x,y,42,165,42,.25);
+    m += bump(x,y,118,160,36,.32) + bump(x,y,100,55,36,.24) - bump(x,y,212,125,62,.58) + bump(x,y,42,165,42,.25) + bump(x,y,312,112,50,.35);
     const volc = bump(x,y,228,44,46,1) + (fbm(x/10, y/10, SEED+3) - .5) * .5;
     const gloom = bump(x,y,40,168,44,1) + (fbm(x/12, y/12, SEED+5) - .5) * .4;
+    const jungle = bump(x,y,312,112,52,1) + (fbm(x/12, y/12, SEED+13) - .5) * .4;
+    const mesa = bump(x,y,288,210,46,1) + (fbm(x/12, y/12, SEED+17) - .5) * .4;
+    const moor = bump(x,y,186,226,42,1) + (fbm(x/12, y/12, SEED+19) - .5) * .4;
     const cold = y < 34 + (fbm(x/16, 3, SEED+7) - .5) * 26;
     let t;
     if (e < .40) t = T.DEEP;
@@ -696,6 +836,9 @@ function genWorld() {
     else t = T.GRASS;
     if (volc > .42 && t !== T.DEEP && t !== T.SHAL) t = (volc > .58 && fbm(x/6, y/6, SEED+11) > .56) ? T.LAVA : T.ASH;
     if (gloom > .38 && (t === T.FOREST || t === T.GRASS || t === T.MARSH)) t = T.GLOOM;
+    if (jungle > .36 && (t === T.FOREST || t === T.GRASS || t === T.MARSH || t === T.DUNE)) t = T.JUNGLE;
+    if (mesa > .36 && (t === T.DUNE || t === T.GRASS || t === T.SAND || t === T.HILL || t === T.FOREST)) t = T.MESA;
+    if (moor > .36 && (t === T.GRASS || t === T.FOREST || t === T.MARSH || t === T.HILL || t === T.DUNE)) t = T.MOOR;
     const di = Math.hypot(x-ISLE.x, y-ISLE.y);
     if (di < ISLE.land) t = di > ISLE.land-1.6 ? T.SAND : (hash2(x,y,5) > .7 ? T.FOREST : T.GRASS);
     else if (di < ISLE.ring) t = T.DEEP;
@@ -714,11 +857,11 @@ function genWorld() {
       for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) map[idx(hx+xx, hy+yy)] = T.HOUSE;
     }
   }
-  const COST = [30,6,1,1,2,3,12,1.5,2.5,.4,.4,1.3,.4,Infinity,1.2,25,2];
-  const links = [['wren','hollow'],['hollow','frost'],['wren','thorn'],['thorn','reed'],['wren','reed'],['reed','dun'],['highcairn','hollow'],['highcairn','dun'],['highcairn','reed'],['frost','ashfall'],['ashfall','dun']];
+  const COST = [30,6,1,1,2,3,12,1.5,2.5,.4,.4,1.3,.4,Infinity,1.2,25,2,2,1.2,1.2];
+  const links = [['wren','hollow'],['hollow','frost'],['wren','thorn'],['thorn','reed'],['wren','reed'],['reed','dun'],['highcairn','hollow'],['highcairn','dun'],['highcairn','reed'],['frost','ashfall'],['ashfall','dun'],['dun','jade'],['jade','storm'],['ashfall','storm'],['jade','redrock'],['redrock','graven'],['graven','reed']];
   for (const [a,b] of links) {
     const A = TOWNS[a], B = TOWNS[b];
-    const path = astar(A.x, A.y, B.x, B.y, i => COST[map[i]]);
+    const path = astar(A.x, A.y, B.x, B.y, i => { const x = i % W, y = (i / W) | 0; return Math.hypot(x - ISLE.x, y - ISLE.y) < ISLE.ring + 1 ? Infinity : COST[map[i]]; });
     for (const i of path) {
       const t = map[i];
       if (t === T.FLOOR || t === T.HOUSE) continue;
@@ -770,6 +913,9 @@ function placeNodes() {
       case T.GLOOM:  type = r < .06 ? 'mushroom' : r < .085 ? 'web' : r < .11 ? 'branch' : r < .12 ? 'herb' : null; break;
       case T.ASH:    type = near(x,y,T.LAVA) ? (r < .14 ? 'obsidian' : r < .2 ? 'sulfur' : null) : (r < .045 ? 'sulfur' : r < .065 ? 'obsidian' : r < .085 ? 'rock' : null); break;
       case T.SHAL:   type = landNear(x,y) && r < .07 ? 'fish' : null; break;
+      case T.JUNGLE: type = r < .05 ? 'fruit' : r < .09 ? 'vine' : r < .1 ? 'herb' : r < .115 ? 'branch' : r < .127 ? 'jade' : null; break;
+      case T.MESA:   type = r < .05 ? 'copper' : r < .07 ? 'rock' : r < .085 ? 'cactus' : (nearMt && r < .14) ? 'jade' : null; break;
+      case T.MOOR:   type = r < .06 ? 'heather' : r < .075 ? 'rock' : r < .09 ? 'bush' : null; break;
     }
     if (type) { nodeGrid[i] = nodes.length; nodes.push({x, y, type}); }
   }
@@ -858,6 +1004,9 @@ function drawTile(g, x, y) {
     case T.DUNE: g.fillStyle = '#c99a4c'; g.fillRect(px+2, py+5+(r(4)*6|0), 9, 1); g.fillRect(px+6, py+9+(r(5)*5|0), 8, 1); dot('#efcf88', 2); break;
     case T.ASH: dot('#38333a', 6); dot('#6a6266', 3); if (r(47) > .93) { g.fillStyle = '#ff7a2a'; g.fillRect(px+(r(48)*12|0)+2, py+(r(49)*12|0)+2, 1, 1); } break;
     case T.LAVA: g.fillStyle = '#ff8a2a'; g.beginPath(); g.ellipse(px+4+r(5)*8, py+5+r(6)*6, 4, 2.5, 0, 0, 7); g.fill(); g.fillStyle = '#ffd060'; g.fillRect(px+(r(7)*12|0)+2, py+(r(8)*12|0)+2, 2, 2); g.fillStyle = '#8a2a10'; g.fillRect(px+(r(9)*12|0), py+(r(10)*14|0), 4, 1); break;
+    case T.JUNGLE: dot('#2e6a2e', 4); if (nodeGrid[idx(x,y)] < 0 && r(50) > .35) { const tx = px + 4 + r(51)*8, ty = py + 6 + r(52)*5; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 7); g.fillStyle = '#3a9a3a'; for (let k = 0; k < 5; k++) { const a = k/5*6.28; g.fillRect(tx + Math.cos(a)*4 - 2, ty - 1 + Math.sin(a)*2, 4, 2); } g.fillStyle = '#5ac04a'; g.fillRect(tx-1, ty-2, 2, 2); } break;
+    case T.MESA: g.fillStyle = '#a0522e'; g.fillRect(px, py+4+(r(4)*3|0), TS, 1); g.fillRect(px, py+11+(r(5)*3|0), TS, 1); dot('#d8875a', 3); break;
+    case T.MOOR: dot('#5a4a5a', 5); g.fillStyle = '#9a6aaa'; for (let k = 0; k < 3; k++) g.fillRect(px+(r(60+k)*14|0), py+(r(63+k)*14|0), 2, 2); break;
     case T.BRIDGE: {
       const horiz = isWater(tileAt(x,y-1)) && isWater(tileAt(x,y+1)) && !(isWater(tileAt(x-1,y)) && isWater(tileAt(x+1,y)));
       g.fillStyle = '#8a6440';
@@ -965,9 +1114,10 @@ const itemList = obj => Object.entries(obj).filter(([,n]) => n > 0).map(([g,n]) 
 const isKnown = r => !!(RECIPE_BY[r].known || S.known[r]);
 function toolTier(tool) { let t = 0; for (const g in S.inv) if (GOODS[g].tool === tool && S.inv[g] > 0) t = Math.max(t, GOODS[g].tier); return t; }
 function weapon() { const w = S.equip.weapon; return w && have(w) > 0 ? GOODS[w] : FISTS; }
-function armorVal() { const a = S.equip.armor; return (a && have(a) > 0 ? GOODS[a].armor : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0); }
+function armorVal() { const a = S.equip.armor; return (a && have(a) > 0 ? GOODS[a].armor : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0); }
+const speedMult = () => Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (S.equip.armor && have(S.equip.armor) && GOODS[S.equip.armor].speed ? 1 + GOODS[S.equip.armor].speed : 1);
 const armorCut = () => Math.min(.7, armorVal() * .12);
-const maxHP = () => BASE_HP + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0);
+const maxHP = () => BASE_HP + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; return null; }
 
@@ -998,7 +1148,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => 7.5 + (have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => 7.5 + (have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -1065,7 +1215,7 @@ function gather(i) {
   if (!nodeAvail(i)) return;
   const block = nodeBlocker(i);
   if (block) { floatText(n.x+.5, n.y, block, '#e57a62'); return; }
-  if (d.fishing) { if (!fishing) { fishing = {i, t: 1.2 + Math.random()*2}; floatText(S.x, S.y-1, 'Casting…'); } return; }
+  if (d.fishing) { if (!fishing) { fishing = {i, t: (1.2 + Math.random()*2) * (toolTier('rod') >= 2 ? .5 : 1)}; floatText(S.x, S.y-1, 'Casting…'); } return; }
   if (gatherCd > 0) return;
   gatherCd = .28;
   const tier = d.tool ? toolTier(d.tool) : 0, ptier = d.pick ? toolTier('pick') : 0;
@@ -1090,7 +1240,7 @@ function updateFishing(dt) {
   if (player.moving) { fishing = null; floatText(S.x, S.y-1, 'Line reeled in'); return; }
   fishing.t -= dt;
   if (fishing.t <= 0) {
-    const n = nodes[fishing.i], d = NODES.fish, amt = rint(d.amt[0], d.amt[1]);
+    const n = nodes[fishing.i], d = NODES.fish, amt = rint(d.amt[0], d.amt[1]) + (toolTier('rod') >= 2 ? 1 : 0);
     addItem('fish', amt); S.gathered++;
     floatText(n.x+.5, n.y, `+${amt} Fish`, '#86c98f'); burst(n.x+.5, n.y+.5, '#bfe6f0', 8);
     rollCurio('scale');
@@ -1119,11 +1269,14 @@ function attack(dirX, dirY) {
   player.facing = Math.abs(dirX) > Math.abs(dirY) ? (dirX < 0 ? 'left' : 'right') : (dirY < 0 ? 'up' : 'down');
   player.atkCd = w.cd;
   if (w.ranged) {
+    let bonus = 0;
     if (!w.noAmmo) {
-      if (have('arrows') < 1) { floatText(S.x, S.y-1, 'No arrows', '#e57a62'); player.atkCd = .3; return; }
-      addItem('arrows', -1); renderHUD();
+      const ammo = have('venom_arrows') ? 'venom_arrows' : have('arrows') ? 'arrows' : null;
+      if (!ammo) { floatText(S.x, S.y-1, 'No arrows', '#e57a62'); player.atkCd = .3; return; }
+      if (ammo === 'venom_arrows') bonus = 3;
+      addItem(ammo, -1); renderHUD();
     }
-    arrows.push({x: S.x, y: S.y - .5, vx: dirX*13, vy: dirY*13, life: .7, dmg: w.dmg, col: w.pcol, silver: w.silver});
+    arrows.push({x: S.x, y: S.y - .5, vx: dirX*13, vy: dirY*13, life: .7, dmg: w.dmg + bonus, col: bonus ? '#7ad04a' : w.pcol, silver: w.silver});
     return;
   }
   player.swing = {t: .18, ang: Math.atan2(dirY, dirX), reach: w.reach};
@@ -1133,19 +1286,20 @@ function attack(dirX, dirY) {
     const dx = e.x - S.x, dy = (e.y - .3*sz) - (S.y - .4), d = Math.hypot(dx, dy);
     if (d > w.reach + .35 + (sz - 1)*.45) continue;
     if (d > .4 + (sz-1)*.4 && (dx*dirX + dy*dirY)/d < .15) continue;
-    hitEnemy(e, w.dmg * (w.silver && isUndead(e) ? 2 : 1), dirX, dirY);
+    hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * (w.silver && isUndead(e) ? 2 : 1), dirX, dirY);
   }
 }
 function throwBomb(tx, ty) {
-  if (!have('bomb')) { floatText(S.x, S.y - 1.2, 'No bombs', '#e57a62'); return; }
+  const kind = have('fire_bomb') ? 'fire_bomb' : have('bomb') ? 'bomb' : null;
+  if (!kind) { floatText(S.x, S.y - 1.2, 'No bombs', '#e57a62'); return; }
   if (tx == null) { const e = nearestEnemy(7); if (e) { tx = e.x; ty = e.y; } else { tx = S.x + player.dir.x*4; ty = S.y + player.dir.y*4; } }
   const d = Math.hypot(tx - S.x, ty - S.y); if (d > 6) { tx = S.x + (tx - S.x)/d*6; ty = S.y + (ty - S.y)/d*6; }
-  addItem('bomb', -1); renderHUD();
-  bombs.push({sx: S.x, sy: S.y - .5, tx, ty, t: 0, dur: .55});
+  addItem(kind, -1); renderHUD();
+  bombs.push({sx: S.x, sy: S.y - .5, tx, ty, t: 0, dur: .55, fire: kind === 'fire_bomb'});
 }
-function explode(x, y) {
-  burst(x, y, '#ffb040', 18, 6); burst(x, y, '#3a3437', 10, 4); shake = .35;
-  for (const e of enemies) { if (e.hidden > 0) continue; const d = Math.hypot(e.x - x, e.y - .3 - y); if (d < 2 + ((e.size||1) - 1)*.4) hitEnemy(e, 9, (e.x - x)/(d || 1), (e.y - y)/(d || 1)); }
+function explode(x, y, fire) {
+  burst(x, y, fire ? '#ff5a1a' : '#ffb040', fire ? 30 : 18, fire ? 8 : 6); burst(x, y, '#3a3437', 10, 4); shake = .35;
+  for (const e of enemies) { if (e.hidden > 0) continue; const d = Math.hypot(e.x - x, e.y - .3 - y); if (d < (fire ? 2.6 : 2) + ((e.size||1) - 1)*.4) hitEnemy(e, fire ? 15 : 9, (e.x - x)/(d || 1), (e.y - y)/(d || 1)); }
   if (Math.hypot(S.x - x, S.y - y) < 1.2) hurtPlayer(2, {x, y});
 }
 function hitEnemy(e, dmg, kx, ky) {
@@ -1182,6 +1336,7 @@ function killEnemy(e) {
   renderHUD();
 }
 function hurtPlayer(dmg, from, ignoreInv) {
+  if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; floatText(S.x, S.y - 1.2, 'Dodged!', '#bfe8ff'); } return; }
   if (player.inv > 0 && !ignoreInv) return;
   const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * 2) / 2);
   S.hp -= taken; if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
@@ -1218,7 +1373,10 @@ function spawnTypeFor(t, x, night) {
   const r = Math.random();
   switch (t) {
     case T.FOREST: return night && r < .25 ? 'skeleton' : r < .6 ? 'wolf' : 'boar';
-    case T.SNOW: return night && r < .4 ? 'wraith' : 'wolf';
+    case T.SNOW: return x > 290 ? (r < .6 ? 'harpy' : 'wolf') : night && r < .4 ? 'wraith' : 'wolf';
+    case T.JUNGLE: return r < .5 ? 'snake' : r < .8 ? 'jaguar' : 'spider';
+    case T.MESA: return r < .5 ? 'coyote' : r < .9 ? 'dustdevil' : 'scorpion';
+    case T.MOOR: return night ? (r < .45 ? 'ghoul' : r < .8 ? 'wisp' : 'skeleton') : (r < .3 ? 'ghoul' : r < .5 ? 'wisp' : r < .7 ? 'wolf' : null);
     case T.GRASS: case T.HILL: case T.ROAD:
       return night ? (r < .35 ? 'wolf' : r < .55 ? 'bandit' : r < .7 ? 'archer' : 'skeleton') : (r < .3 ? 'bandit' : r < .45 ? 'archer' : r < .7 ? 'boar' : null);
     case T.DUNE: return night && r < .25 ? 'skeleton' : 'scorpion';
@@ -1238,7 +1396,7 @@ function trySpawn(night) {
     const t = map[idx(x,y)];
     const type = spawnTypeFor(t, x, night);
     if (!type || !enemyWalk(x+.5, y+.5)) continue;
-    const pack = type === 'bat' ? 3 : type === 'wolf' && night ? 2 : 1;
+    const pack = type === 'bat' || type === 'coyote' ? 3 : type === 'wolf' && night ? 2 : 1;
     for (let p = 0; p < pack; p++) enemies.push(makeEnemy(type, x + .5 + p*.6, y + .5, {snow: type === 'wolf' && t === T.SNOW}));
     return;
   }
@@ -1325,6 +1483,8 @@ function bossExecute(e, type) {
       break;
     }
     case 'blinkcast': for (let i = -2; i <= 2; i++) shoot(e.x, e.y - .5, ang + i*.25, 7, pd, B.pcol); break;
+    case 'quake': for (let i = 0; i < 8; i++) { const a = i/8*Math.PI*2; addHazard(e.x + Math.cos(a)*3.2, e.y + Math.sin(a)*3.2, 1.6, .9, B.dmg); } addHazard(S.x, S.y, 1.6, 1.1, B.dmg); break;
+    case 'lightning': for (let i = 0; i < 5; i++) addHazard(S.x + (i ? (Math.random()-.5)*5 : 0), S.y + (i ? (Math.random()-.5)*5 : 0), 1.3, .8 + i*.12, B.dmg + 1); break;
     case 'fireball': for (let i = 0; i < 4; i++) addHazard(S.x + (i ? (Math.random()-.5)*4 : 0), S.y + (i ? (Math.random()-.5)*4 : 0), 1.5, 1 + i*.15, B.dmg, true); break;
   }
 }
@@ -1407,7 +1567,7 @@ function updateCombat(dt, night) {
       if (Math.hypot(S.x - h.x, S.y - h.y) < h.r*.8 && player.inv <= 0) hurtPlayer(1, null);
     }
   }
-  for (const b of bombs) { b.t += dt; if (b.t >= b.dur) { explode(b.tx, b.ty); b.done = true; } }
+  for (const b of bombs) { b.t += dt; if (b.t >= b.dur) { explode(b.tx, b.ty, b.fire); b.done = true; } }
   enemies = enemies.filter(e => !e.dead);
   arrows = arrows.filter(a => a.life > 0);
   eproj = eproj.filter(p => p.life > 0);
@@ -1434,6 +1594,7 @@ addEventListener('keydown', e => {
     if (k === 'e' || k === ' ' || k === 'enter') interact();
     else if (k === 'f') attack();
     else if (k === 'g') throwBomb();
+    else if (k === 'shift' || k === 'r') doRoll();
     else if (k === 'm') openMap();
     else if (k === 'j') openJournal();
     else if (k === 'i') openBag();
@@ -1485,6 +1646,7 @@ view.addEventListener('pointerup', endTouch); view.addEventListener('pointercanc
 $('actBtn').addEventListener('click', interact);
 $('atkBtn').addEventListener('click', () => mode === 'play' && attack());
 $('bombBtn').addEventListener('click', () => mode === 'play' && throwBomb());
+$('rollBtn').addEventListener('click', () => doRoll());
 $('btnMap').addEventListener('click', () => mode === 'play' && openMap());
 $('btnJournal').addEventListener('click', () => mode === 'play' && openJournal());
 $('btnBag').addEventListener('click', () => mode === 'play' && openBag());
@@ -1536,10 +1698,10 @@ function drawHeld(g, x, y, facing, id) {
   if (id === 'bow' || id === 'longbow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
   if (id === 'frost_staff') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
   g.fillStyle = '#5a3d27';
-  const len = id === 'spear' ? 12 : (id === 'club' || id === 'bone_club') ? 7 : 9;
+  const len = id.endsWith('spear') ? 12 : (id === 'club' || id === 'bone_club') ? 7 : 9;
   g.fillRect(hx - .5, hy - len + 3, 1.5, len);
   g.fillStyle = col;
-  if (id === 'spear') g.fillRect(hx - 1, hy - len, 3, 3);
+  if (id.endsWith('spear')) g.fillRect(hx - 1, hy - len, 3, 3);
   else if (id === 'club' || id === 'bone_club') g.fillRect(hx - 1.5, hy - len + 2, 4, 4);
   else { g.fillRect(hx - 1, hy - len + 1, 3, len - 4); if (id === 'crystal_blade' || id === 'ember_blade') { g.fillStyle = id === 'ember_blade' ? 'rgba(255,140,40,.4)' : 'rgba(159,232,255,.35)'; g.fillRect(hx - 2, hy - len, 5, len - 2); } }
 }
@@ -1611,6 +1773,11 @@ function drawNode(g, i, t) {
       shadow(4); g.fillStyle = '#4f8a4a'; g.fillRect(x-2, y-13, 4, 13); g.fillRect(x-6, y-9, 3, 2); g.fillRect(x-6, y-12, 2, 4); g.fillRect(x+3, y-7, 3, 2); g.fillRect(x+4, y-10, 2, 4);
       if (avail) { g.fillStyle = '#e0679a'; g.fillRect(x-1, y-15, 3, 2); g.fillRect(x+4, y-12, 2, 2); }
       break;
+    case 'fruit': shadow(7); g.fillStyle = '#5a4020'; g.fillRect(x-2, y-8, 3, 8); g.fillStyle = '#2e7a2e'; g.beginPath(); g.arc(x, y-13, 8, 0, 7); g.fill(); if (avail) { g.fillStyle = '#f08a30'; [[-4,-14],[3,-16],[2,-10],[-2,-9],[5,-12]].forEach(([a,b]) => g.fillRect(x+a, y+b, 2, 2)); } break;
+    case 'vine': if (!avail) return; g.fillStyle = '#3a7a2a'; for (let k = -4; k <= 4; k += 2) g.fillRect(x+k, y-14 + Math.abs(k), 1, 12 - Math.abs(k)); g.fillStyle = '#5aa03a'; g.fillRect(x-3, y-8, 2, 1); g.fillRect(x+2, y-6, 2, 1); break;
+    case 'jade': if (!avail) return; rock('#5a6a62', '#4ab08a'); g.fillRect(x-4, y-6, 3, 2); g.fillRect(x+2, y-8, 2, 3); break;
+    case 'copper': if (!avail) return; rock('#7a5a4a', '#e08a4a'); g.fillRect(x-4, y-5, 2, 2); g.fillRect(x+1, y-7, 3, 1); g.fillRect(x+2, y-3, 2, 1); break;
+    case 'heather': if (!avail) return; g.fillStyle = '#4a5a3a'; g.fillRect(x-5, y-3, 10, 3); g.fillStyle = '#b87ac8'; [[-4,-5],[-1,-6],[2,-5],[4,-4],[0,-4]].forEach(([a,b]) => g.fillRect(x+a, y+b, 2, 2)); break;
     case 'fish': { const p = (t*1.2 + n.x*.3) % 1; g.strokeStyle = `rgba(220,240,248,${.7 - p*.6})`; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y-5, 2 + p*6, 1 + p*3, 0, 0, 7); g.stroke(); if (hash2(n.x, n.y, Math.floor(t*.7)) > .8) { g.fillStyle = '#bfe6f0'; g.fillRect(x-1, y-6, 2, 1); } break; }
   }
 }
@@ -1627,8 +1794,8 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
   const step = Math.sin(phase)*1.2, snow = extra && extra.snow;
   const shadow = w => { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, w, 2, 0, 0, 7); g.fill(); };
   switch (type) {
-    case 'wolf': {
-      const body = snow ? '#dfe6ea' : extra && extra.boss ? '#8a8f98' : '#6f737a', dark = snow ? '#aeb8bf' : '#4f535a';
+    case 'wolf': case 'coyote': {
+      const body = type === 'coyote' ? '#b08a5a' : snow ? '#dfe6ea' : extra && extra.boss ? '#8a8f98' : '#6f737a', dark = type === 'coyote' ? '#7a5a3a' : snow ? '#aeb8bf' : '#4f535a';
       shadow(7);
       g.fillStyle = dark; g.fillRect(x-5, y-4, 2, 4 + (step > 0 ? 0 : -1)); g.fillRect(x+3, y-4, 2, 4 + (step < 0 ? 0 : -1));
       g.fillStyle = body; g.fillRect(x-6, y-9, 12, 6); g.fillRect(x + f*5 - 2, y-12, 5, 5);
@@ -1685,6 +1852,40 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
     case 'bandit': drawPerson(g, x, y, {cloak:'#6b2a2a', skin:'#c99673', hair:'#1e1a18'}, phase, true, f < 0 ? 'left' : 'right', {mask:true, crown: extra && extra.boss}); g.fillStyle = '#9aa0a8'; g.fillRect(x + f*5, y-14, 1, 7); break;
     case 'archer': drawPerson(g, x, y, {cloak:'#4a5a2a', skin:'#c99673', hair:'#2a2018'}, phase, true, f < 0 ? 'left' : 'right', {mask:true}); g.strokeStyle = '#8a6440'; g.lineWidth = 1; g.beginPath(); g.arc(x + f*4, y-8, 4, f > 0 ? -1.3 : Math.PI - 1.3, f > 0 ? 1.3 : Math.PI + 1.3); g.stroke(); break;
     case 'witch': drawPerson(g, x, y, {cloak:'#3a1a4a', skin:'#a8b8a0', hair:'#1a1a1a'}, phase, true, f < 0 ? 'left' : 'right', {hat:'#2a1236'}); g.fillStyle = `rgba(200,140,255,${.5 + Math.sin(phase*2)*.3})`; g.beginPath(); g.arc(x + f*6, y - 12, 2, 0, 7); g.fill(); break;
+    case 'jaguar':
+      shadow(7); g.fillStyle = '#6a4a20'; g.fillRect(x-5, y-4, 2, 4 + (step > 0 ? 0 : -1)); g.fillRect(x+3, y-4, 2, 4 + (step < 0 ? 0 : -1));
+      g.fillStyle = '#d8a040'; g.fillRect(x-7, y-9, 13, 5); g.fillRect(x + f*5 - 2, y-11, 5, 5); g.fillRect(x - f*8 - 1, y-11, 2, 4);
+      g.fillStyle = '#3a2a1a'; [[-5,-8],[-2,-7],[1,-8],[3,-6],[-3,-5]].forEach(([a,b]) => g.fillRect(x+a, y+b, 1, 1));
+      g.fillStyle = '#80d040'; g.fillRect(x + f*6, y-10, 1, 1);
+      break;
+    case 'snake': case 'serpent': {
+      const c1 = type === 'serpent' ? '#2a8a4a' : '#4a8a2a', c2 = type === 'serpent' ? '#4ac06a' : '#5aa03a';
+      shadow(6); g.fillStyle = c1; for (let k = 0; k < 5; k++) g.fillRect(x - f*(k*2.2) - 2, y - 3 + Math.sin(phase + k)*1.2, 3, 3);
+      g.fillStyle = c2; g.fillRect(x + f*3 - 2, y - 6, 4, 4); g.fillStyle = '#f0e040'; g.fillRect(x + f*4, y - 5, 1, 1); g.fillStyle = '#e04040'; g.fillRect(x + f*6, y - 4, 2, 1);
+      if (type === 'serpent') { g.fillStyle = '#e8f0c0'; g.fillRect(x + f*4, y - 3, 1, 2); }
+      break;
+    }
+    case 'dustdevil': for (let k = 0; k < 4; k++) { g.fillStyle = `rgba(216,160,96,${.35 + k*.1})`; g.beginPath(); g.ellipse(x + Math.sin(phase*2 + k)*2, y - 3 - k*3.5, 5 - k, 2, 0, 0, 7); g.fill(); } break;
+    case 'ghoul': drawPerson(g, x, y + 1, {cloak:'#3a3a32', skin:'#8a9a7a', hair:'#4a4a3a'}, phase, true, f < 0 ? 'left' : 'right', {legs:'#3a3a32'}); g.fillStyle = '#c0e080'; g.fillRect(x + (f < 0 ? -2 : 1), y - 13, 1, 1); break;
+    case 'wisp': { const hy = Math.sin(phase*.7)*2; g.fillStyle = 'rgba(122,255,200,.25)'; g.beginPath(); g.arc(x, y - 10 + hy, 6, 0, 7); g.fill(); g.fillStyle = '#b0ffe0'; g.beginPath(); g.arc(x, y - 10 + hy, 3, 0, 7); g.fill(); g.fillStyle = 'rgba(122,255,200,.5)'; g.fillRect(x - f*4, y - 9 + hy, 2, 1); g.fillRect(x - f*6, y - 8 + hy, 1, 1); break; }
+    case 'harpy': case 'roc': {
+      const wf = Math.sin(phase*1.6)*4, by = y - 10 + Math.sin(phase)*1, roc = type === 'roc';
+      g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(x, y, 5, 1.5, 0, 0, 7); g.fill();
+      g.fillStyle = roc ? '#5a6a8a' : '#8a7a6a'; g.beginPath(); g.moveTo(x-2, by); g.lineTo(x-10, by-4-wf); g.lineTo(x-4, by+3); g.fill(); g.beginPath(); g.moveTo(x+2, by); g.lineTo(x+10, by-4-wf); g.lineTo(x+4, by+3); g.fill();
+      g.fillStyle = roc ? '#8a9ac0' : '#c8b8a0'; g.fillRect(x-3, by-3, 6, 7);
+      g.fillStyle = roc ? '#e8f0ff' : '#d8a882'; g.fillRect(x + f*2 - 2, by-7, 4, 4);
+      g.fillStyle = '#e0b040'; g.fillRect(x + f*4, by-6, 2, 1); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*2, by-6, 1, 1);
+      g.fillStyle = '#e0b040'; g.fillRect(x-2, by+4, 1, 2); g.fillRect(x+1, by+4, 1, 2);
+      break;
+    }
+    case 'golem':
+      shadow(8); g.fillStyle = '#8a6a2a'; g.fillRect(x-5, y-6, 4, 6); g.fillRect(x+1, y-6, 4, 6);
+      g.fillStyle = '#c89040'; g.fillRect(x-7, y-16, 14, 11); g.fillRect(x-11, y-15, 4, 10); g.fillRect(x+7, y-15, 4, 10);
+      g.fillStyle = '#e0b050'; g.fillRect(x-4, y-21, 8, 5); g.fillRect(x-7, y-16, 14, 2);
+      g.fillStyle = '#5a3a1a'; g.fillRect(x-5, y-12, 10, 1); g.fillRect(x-1, y-14, 2, 6);
+      g.fillStyle = `rgba(120,220,255,${.6 + Math.sin(phase*2)*.3})`; g.fillRect(x-3 + f, y-19, 2, 1); g.fillRect(x+1 + f, y-19, 2, 1);
+      break;
+    case 'lich': drawPerson(g, x, y, {cloak:'#1e2a24', skin:'#b8c0b0', hair:'#2a2a2a'}, phase, true, f < 0 ? 'left' : 'right', {crown:true, legs:'#1e2a24'}); g.fillStyle = `rgba(122,255,200,${.6 + Math.sin(phase*2)*.3})`; g.fillRect(x - 2, y - 14, 1, 1); g.fillRect(x + 1, y - 14, 1, 1); g.beginPath(); g.arc(x + f*6, y - 11, 2, 0, 7); g.fill(); break;
     case 'giant':
       shadow(8); g.fillStyle = '#8ab0c8'; g.fillRect(x-5, y-6, 3, 6); g.fillRect(x+2, y-6, 3, 6);
       g.fillStyle = '#c8e0ec'; g.fillRect(x-7, y-16, 14, 11); g.fillRect(x-10, y-15, 3, 9); g.fillRect(x+7, y-15, 3, 9);
@@ -1785,6 +1986,10 @@ function render() {
       drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held});
       ctx.fillStyle = TILE_COL[ptile]; ctx.fillRect(px-6, py-1, 12, 5);
       ctx.fillStyle = 'rgba(210,236,245,.6)'; ctx.fillRect(px-6, py-1, 12, 1);
+    } else if (player.roll > 0) {
+      ctx.save(); ctx.translate(px, py - 7); ctx.rotate((1 - player.roll/.32) * Math.PI * 2 * (player.rdx < 0 ? -1 : 1));
+      drawPerson(ctx, 0, 7, player.cols, 0, false, player.facing, {scarf:true, pack:true});
+      ctx.restore();
     } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held});
     ctx.globalAlpha = 1;
   }});
@@ -1857,7 +2062,7 @@ function render() {
       gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
       lctx.fillStyle = gr; lctx.fillRect(sx-rr, sy-rr, rr*2, rr*2);
     };
-    hole(S.x*TS, S.y*TS - 6, have('lantern') ? 115 : 70, .9);
+    hole(S.x*TS, S.y*TS - 6, have('wisp_lantern') ? 140 : have('lantern') ? 115 : 70, .9);
     for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
     const lan = LANDMARKS.find(l => l.id === 'lantern'); hole(lan.x*TS + 8, lan.y*TS - 4, 40, .8);
@@ -1866,7 +2071,7 @@ function render() {
       if (t === T.LAVA && (x + y) % 2 === 0) hole(x*TS + 8, y*TS + 8, 26, .55);
       const ni = nodeGrid[idx(x,y)]; if (ni >= 0 && (nodes[ni].type === 'crystal' || nodes[ni].type === 'mushroom') && nodeAvail(ni)) hole(x*TS + 8, y*TS + 6, 20, .5);
     }
-    for (const e of enemies) if (e.type === 'imp' || e.boss === 'wyrm') hole(e.x*TS, e.y*TS - 12, 30, .6);
+    for (const e of enemies) if (e.type === 'imp' || e.type === 'wisp' || e.boss === 'wyrm' || e.boss === 'lich') hole(e.x*TS, e.y*TS - 12, 30, .6);
     for (const p of eproj) hole(p.x*TS, p.y*TS, 14, .5);
     for (const h of hazards) if (h.fire && h.wind <= 0) hole(h.x*TS, h.y*TS, 30, .6);
     ctx.setTransform(1,0,0,1,0,0);
@@ -1901,7 +2106,22 @@ function drawMini() {
 }
 
 /* ================= player & update ================= */
-const player = {cols:{cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'}, phase:0, moving:false, facing:'down', dir:{x:0,y:1}, atkCd:0, inv:0, sinceHit:99, swing:null, kx:0, ky:0};
+const player = {cols:{cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'}, phase:0, moving:false, facing:'down', dir:{x:0,y:1}, atkCd:0, inv:0, sinceHit:99, swing:null, kx:0, ky:0, roll:0, rollCd:0, rdx:0, rdy:1, dodgeT:0};
+let lastRollCool = false;
+function doRoll() {
+  if (mode !== 'play' || player.roll > 0 || player.rollCd > 0) return;
+  let dx = 0, dy = 0;
+  if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
+  if (keys.has('arrowright') || keys.has('d')) dx += 1;
+  if (keys.has('arrowup') || keys.has('w')) dy -= 1;
+  if (keys.has('arrowdown') || keys.has('s')) dy += 1;
+  if (touch.active) { dx += touch.vx; dy += touch.vy; }
+  if (Math.hypot(dx, dy) < .15) { dx = player.dir.x; dy = player.dir.y; }
+  const m = Math.hypot(dx, dy) || 1; player.rdx = dx/m; player.rdy = dy/m;
+  player.facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+  player.roll = .32; player.rollCd = .85 * (have('windstep_boots') ? .5 : 1) * (have('feather_charm') ? .75 : 1);
+  fishing = null; burst(S.x, S.y, '#c8b896', 6, 2);
+}
 let nearNPC = null, nearNodeI = -1, nearBoard = null, saveTimer = 0, promptKey = '';
 
 function passable(x, y) {
@@ -1923,6 +2143,17 @@ function update(dt) {
   if (keys.has('arrowup') || keys.has('w')) vy -= 1;
   if (keys.has('arrowdown') || keys.has('s')) vy += 1;
   if (touch.active) { vx += touch.vx; vy += touch.vy; }
+  player.rollCd = Math.max(0, player.rollCd - dt);
+  if (player.roll > 0) {
+    player.roll -= dt;
+    const rs = 4.6 * 2.7 * Math.min(1.2, speedMult());
+    const rx = S.x + player.rdx*rs*dt, ry = S.y + player.rdy*rs*dt;
+    if (passable(rx, S.y)) S.x = rx;
+    if (passable(S.x, ry)) S.y = ry;
+    if (Math.random() < .6) particles.push({x: S.x + (Math.random()-.5)*.4, y: S.y, vx: (Math.random()-.5), vy: -Math.random(), t: 0, col: '#c8b896'});
+    vx = 0; vy = 0;
+  }
+  if ((player.rollCd > 0) !== lastRollCool) { lastRollCool = player.rollCd > 0; $('rollPip').classList.toggle('cool', lastRollCool); }
   const mag = Math.hypot(vx, vy);
   player.moving = mag > .15;
   if (player.moving) {
@@ -1931,7 +2162,7 @@ function update(dt) {
     let sp = SPEED[t];
     if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = 1.15;
     if (t === T.MOUNT) sp = .4;
-    sp = 4.6 * Math.max(.4, sp) * (have('boots') ? 1.15 : 1) * (have('alpha_cloak') ? 1.1 : 1);
+    sp = 4.6 * Math.max(.4, sp) * speedMult();
     const nx = S.x + vx*sp*dt, ny = S.y + vy*sp*dt;
     if (passable(nx, S.y)) S.x = nx;
     if (passable(S.x, ny)) S.y = ny;
@@ -2008,10 +2239,10 @@ function renderHUD() {
   if (S.equip.weapon && !have(S.equip.weapon)) S.equip.weapon = null;
   if (S.equip.armor && !have(S.equip.armor)) S.equip.armor = null;
   const w = weapon(), a = S.equip.armor;
-  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && !w.noAmmo ? ` · ${have('arrows')} arrows` : ''}${a ? ` · ${esc(GOODS[a].name)}` : ''}${have('bomb') ? ` · ${have('bomb')} bombs` : ''}`;
+  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows')} arrows` : ''}${a ? ` · ${esc(GOODS[a].name)}` : ''}${have('bomb') + have('fire_bomb') ? ` · ${have('bomb') + have('fire_bomb')} bombs` : ''}`;
   const total = Object.values(S.inv).reduce((s, n) => s + n, 0);
   $('bagN').textContent = total ? `(${total})` : '';
-  $('bombBtn').hidden = !isTouch || !have('bomb') || mode !== 'play';
+  $('bombBtn').hidden = !isTouch || !(have('bomb') || have('fire_bomb')) || mode !== 'play';
   lastHP = -1; renderHP();
 }
 let lastHP = -1;
@@ -2400,9 +2631,11 @@ function propose(isCounter) {
 function itemStat(g) {
   const d = GOODS[g];
   if (d.kind === 'weapon') return d.ranged ? `${d.dmg} damage · ranged${d.noAmmo ? ', no ammo needed' : ', uses arrows'}` : `${d.dmg} damage · reach ${d.reach}${d.silver ? ' · double vs undead' : ''}`;
-  if (d.kind === 'armor') return `Armor ${d.armor} · blocks ${Math.round(Math.min(.7, d.armor*.12)*100)}% of damage`;
+  if (d.kind === 'armor') return `Armor ${d.armor} · blocks ${Math.round(Math.min(.7, d.armor*.12)*100)}% of damage${d.speed ? ` · ${Math.round(d.speed*100)}% faster` : ''}`;
   if (d.kind === 'food') return `Heals ${d.heal}`;
   if (g === 'bomb') return 'Throw with G or right-click · 9 damage in a blast';
+  if (g === 'fire_bomb') return 'Thrown before plain bombs · 15 damage, wider blast';
+  if (g === 'venom_arrows') return 'Used before plain arrows · +3 damage';
   if (d.kind === 'trophy') return `Boss trophy · worth about ${d.base}◆`;
   if (d.desc) return d.desc;
   return `Worth about ${d.base}◆`;
@@ -2486,7 +2719,7 @@ function renderCraft() {
   const knownN = RECIPES.filter(r => isKnown(r.id)).length;
   $('craftSheet').innerHTML = `
     <div class="sheet-head"><h2>Crafting</h2><button class="btn" data-x="craft">Close<kbd>C</kbd></button></div>
-    <div class="station" style="margin-top:8px"><span class="on">Hands</span><span class="${st.bench ? 'on' : ''}">Workbench${st.bench ? '' : ' · in any settlement'}</span><span class="${st.forge ? 'on' : ''}">Forge${st.forge ? '' : ' · Frostgate, Dunmere, Highcairn, Ashfall'}</span><span>${knownN}/${RECIPES.length} recipes known</span></div>
+    <div class="station" style="margin-top:8px"><span class="on">Hands</span><span class="${st.bench ? 'on' : ''}">Workbench${st.bench ? '' : ' · in any settlement'}</span><span class="${st.forge ? 'on' : ''}">Forge${st.forge ? '' : ' · Frostgate, Dunmere, Highcairn, Ashfall, Redrock'}</span><span>${knownN}/${RECIPES.length} recipes known</span></div>
     <div class="ctabs">${CRAFT_GROUPS.map((cg, i) => `<button class="btn sm" data-tab="${i}" aria-pressed="${i === craftTab}">${cg[0]}</button>`).join('')}</div>
     <h3>${title}</h3>
     <div class="jgrid">${list.map(card).join('')}</div>`;
@@ -2624,7 +2857,7 @@ function begin(state) {
   reveal(S.x, S.y, sightRadius());
   S.towns.wren = true;
   $('title').hidden = true; mode = 'play';
-  $('atkBtn').hidden = !isTouch;
+  $('atkBtn').hidden = !isTouch; $('rollBtn').hidden = !isTouch;
   renderHUD(); renderRegion(); save();
   if (S.day === 1 && S.trades === 0 && !Object.keys(S.contracts).length && !S.gathered) {
     setTimeout(() => toast('<b>Port Wren</b><br>Talk to Odile, the Guildmistress, about the Charter. Check the notice board in the square for odd jobs.', 7000), 400);
