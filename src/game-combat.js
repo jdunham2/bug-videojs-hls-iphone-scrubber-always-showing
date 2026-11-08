@@ -96,6 +96,7 @@ export class CombatMethods {
   onKill(enemy) {
     this.stats.kills++;
     this.bounty('kill');
+    this.bounty(`kill:${enemy.kind || 'grunt'}`);
     if (enemy.elite) {
       this.bounty('elite');
       this.stats.elites = (this.stats.elites || 0) + 1;

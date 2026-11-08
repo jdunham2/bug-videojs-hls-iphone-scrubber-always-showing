@@ -18,6 +18,8 @@ import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './pr
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
 import { PROVISIONS, MAX_PACK, pack, buyProvision, unpack, giftReady, claimGift, RUMORS, PLUMAGE, ownsPlumage, currentPlumage, buyPlumage } from './provisions.js';
 import { falconUnlocked } from './companion.js';
+import { Town, TOWN, ROAD } from './town.js';
+import { villager, questOf, accept, handIn, fetchable } from './quests.js';
 import { FALCON_LEVEL } from './progression.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
 import { MISSIONS, ENDLESS, missionById, missionsIn, farReachesOpen, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
@@ -27,6 +29,7 @@ import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip,
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 25; // the camp grew: an outer ring of newer shops
+const HOUSE_COST = 150;
 
 /** The road network on the world map (neighbouring places). */
 const ROADS = [
@@ -187,7 +190,7 @@ export class Camp {
     // The outer ring: newer shops (Meshy buildings; a tent stands in until they're generated).
     this.building(models.fletcherHut ? 'fletcherHut' : 'tent', 4.2, 16, 12.5, 'fletcher', "Fletcher's Workshop", 2.2);
     this.building(models.apothecary ? 'apothecary' : 'tent', 4.0, -15.5, 13.5, 'apothecary', 'Apothecary', 2.0);
-    this.building(models.tavern ? 'tavern' : 'tent', 7.0, 2.5, 20, 'tavern', 'The Tavern', 3.6);
+    this.building(models.tavern ? 'tavern' : 'tent', 7.0, -9, 19.5, 'tavern', 'The Tavern', 3.6); // beside the road to town
     this.building(models.mews ? 'mews' : 'tent', 4.2, 17.5, -14, 'mews', "Falconer's Mews", 2.2);
     for (const [x, z] of [
       [-3, -3],
@@ -196,7 +199,8 @@ export class Camp {
       [5, -4],
       [-3, -9],
       [9, 14],
-      [-8, 17],
+      [-13, 21],
+      [4.5, 21],
       [12, -12],
       [-13, 8],
       [14, 4],
@@ -215,10 +219,10 @@ export class Camp {
     // Life around the outer ring: barrels and a fire by the tavern, crates by the
     // apothecary, archery butts by the fletcher, tents and signposts on the paths.
     for (const [id, size, x, z, rot, col] of [
-      ['barrel', 1.1, 6.6, 18.2, 0.3, 0.5],
-      ['barrel', 1.0, 7.4, 19.4, 1.2, 0.45],
-      ['barrel', 1.1, -1.8, 18.8, 0.7, 0.5],
-      ['campfire', 0.8, 4, 15.2, 0, 0.7],
+      ['barrel', 1.1, -4.4, 21.8, 0.3, 0.5],
+      ['barrel', 1.0, -5.2, 23, 1.2, 0.45],
+      ['barrel', 1.1, -13.6, 17.4, 0.7, 0.5],
+      ['campfire', 0.8, -5, 15.5, 0, 0.7],
       ['crates', 1.2, -12.2, 15.6, 0.4, 0.7],
       ['crates', 1.0, -18.4, 11.2, 1.1, 0.6],
       ['dummy', 1.9, 19.6, 8.4, -2.4, 0.5],
@@ -232,26 +236,39 @@ export class Camp {
       ['lantern', 2.0, 14.5, -17.5, 0, 0.25],
     ]) this.prop(id, size, x, z, rot, col);
     const fire2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xff9a4a, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
-    fire2.position.set(4, 0.9, 15.2);
+    fire2.position.set(-5, 0.9, 15.5);
     fire2.scale.setScalar(2.6);
     S.add(fire2);
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.2;
       if (Math.abs(a - Math.PI * 1.25) < 0.45) continue; // gap toward the gate
+      if (Math.abs(a - Math.PI / 2) < 0.16) continue; // the road to town
       this.prop('fence', 1.0, Math.cos(a) * (RADIUS + 0.6), Math.sin(a) * (RADIUS + 0.6), -a, 0, { axis: 'x', size: 2.6 });
     }
     for (let i = 0; i < 16; i++) {
       const a = Math.random() * Math.PI * 2;
       const d = rand(RADIUS + 3, RADIUS + 14);
+      if (Math.abs(Math.cos(a) * d) < 8 && Math.sin(a) > 0) continue; // keep the road clear
       this.prop(Math.random() < 0.5 ? 'deadTree' : 'rocks', Math.random() < 0.5 ? rand(4, 7) : rand(1, 2.5), Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6, 0);
     }
+    // Down the road: the town.
+    this.town = new Town(this);
+    this.town.build(S, glowTexture);
+    S.add(moon.target); // the moonlight (and its shadows) follows the hero, out to the town too
+  }
+
+  /** Is (x, z) somewhere the hero can walk: the camp, the road, or the town square? */
+  inArea(x, z, r = 0) {
+    if (Math.hypot(x, z) < RADIUS - r) return true;
+    if (Math.abs(x) < ROAD.halfWidth - r && z > ROAD.from && z < ROAD.to) return true;
+    return Math.hypot(x - TOWN.x, z - TOWN.z) < TOWN.r - r;
   }
 
   /** Training dummy: arrows hit it like an enemy; it wobbles and reports damage. */
   addDummy(x, z) {
     const p = this.prop('dummy', 2.0, x, z, -2.2, 0.5);
     this.arrows = new ArrowSystem(this.scene, (pos) => {
-      if (Math.hypot(pos.x, pos.z) > RADIUS + 1) return true;
+      if (!this.inArea(pos.x, pos.z, -1)) return true;
       return this.colliders.some((c) => c !== dummyCollider && Math.hypot(pos.x - c.x, pos.z - c.z) < c.r);
     });
     const dummyCollider = this.colliders[this.colliders.length - 1];
@@ -296,8 +313,18 @@ export class Camp {
 
   /** Keep the hero inside the camp and out of buildings. */
   collide = (pos, r) => {
-    const d = Math.hypot(pos.x, pos.z);
-    if (d > RADIUS - r) pos.multiplyScalar((RADIUS - r) / d);
+    if (!this.inArea(pos.x, pos.z, r)) {
+      // Step back onto the nearest walkable ground: camp circle, road or town square.
+      const opts = [];
+      const d = Math.hypot(pos.x, pos.z) || 1;
+      opts.push([(pos.x / d) * (RADIUS - r), (pos.z / d) * (RADIUS - r)]);
+      opts.push([Math.max(-ROAD.halfWidth + r, Math.min(ROAD.halfWidth - r, pos.x)), Math.max(ROAD.from, Math.min(ROAD.to, pos.z))]);
+      const dt = Math.hypot(pos.x - TOWN.x, pos.z - TOWN.z) || 1;
+      opts.push([TOWN.x + ((pos.x - TOWN.x) / dt) * (TOWN.r - r), TOWN.z + ((pos.z - TOWN.z) / dt) * (TOWN.r - r)]);
+      opts.sort((a, b) => Math.hypot(a[0] - pos.x, a[1] - pos.z) - Math.hypot(b[0] - pos.x, b[1] - pos.z));
+      pos.x = opts[0][0];
+      pos.z = opts[0][1];
+    }
     for (const c of this.colliders.concat(this.decorColliders || [])) {
       const dx = pos.x - c.x;
       const dz = pos.z - c.z;
@@ -405,6 +432,9 @@ export class Camp {
       D.rig.rotation.x = D.dir ? sway * D.dir.z : 0;
       D.rig.rotation.z = D.dir ? -sway * D.dir.x : 0;
     }
+    this.town?.update(dt, P.pos, this.time);
+    this.moon.position.set(P.pos.x - 8, 18, P.pos.z - 6);
+    this.moon.target.position.set(P.pos.x, 0, P.pos.z);
     // The gate's doorway brightens as you walk up to it, with motes drifting out.
     const gate = this.spots.find((s) => s.kind === 'gate');
     if (gate && this.portal) {
@@ -425,7 +455,7 @@ export class Camp {
     if (near !== this.near) {
       this.near = near;
       this.prompt.classList.toggle('show', !!near && !this.openKind);
-      if (near) this.prompt.innerHTML = `<span class="cp-btn">${near.kind === 'gate' ? 'Enter' : 'Go inside'}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
+      if (near) this.prompt.innerHTML = `<span class="cp-btn">${near.kind === 'gate' ? 'Enter' : near.kind === 'npc' ? 'Talk to' : near.kind === 'cottage' && !profile.house ? 'Look at' : 'Go inside'}</span> <b></b> <span class="cp-keys">click, or press <kbd>E</kbd> / <kbd>Enter</kbd></span>`;
       if (near) this.prompt.querySelector('b').textContent = near.label;
     }
     const I = this.game.input;
@@ -549,6 +579,80 @@ export class Camp {
     setTimeout(() => document.body.classList.remove('setting-out'), 1400);
   }
 
+  // ------------------------------------------------------------ town: villagers, the cottage
+
+  npcHtml() {
+    const v = villager(this.npcFocus);
+    if (!v) return '';
+    const q = questOf(v.id);
+    this.previewWhat = { kind: 'character', id: models[v.id] ? v.id : 'bandit' };
+    this.previewAccent = '#ffd27a';
+    let speech = v.hello;
+    let task = '';
+    if (q.finished) {
+      speech = this.questThanks || 'You have done more for this town than anyone. Come and visit any time.';
+    } else {
+      const t = q.task;
+      speech = this.questThanks && !q.accepted ? `${this.questThanks} …And there is one more thing.` : q.accepted ? (q.ready ? 'You did it? Let me see!' : t.intro) : t.intro;
+      const pct = Math.round((Math.min(q.progress, q.need) / q.need) * 100);
+      const r = t.reward || {};
+      const reward = [r.gems ? `◆ ${r.gems}` : '', r.xp ? `${r.xp} XP` : '', r.item ? `${r.item === 'unique' ? 'Unique' : 'Rare'} gear` : '', t.unlock ? 'a change in town' : ''].filter(Boolean).join(' · ');
+      let action = '';
+      if (!q.accepted) action = '<button class="gold big" data-act="quest-accept">Accept task</button>';
+      else if (t.kind === 'fetch') {
+        const items = fetchable(t);
+        if (!items.length) action = '<span class="tag">You have nothing that fits yet (equipped gear doesn’t count)</span>';
+        else {
+          const pick = items.find((it) => it.uid === this.questPick) || items[0];
+          this.questPick = pick.uid;
+          action = `<div class="gpicks">${items.map((it) => `<button class="gtile ${it.uid === pick.uid ? 'sel' : ''}" data-act="quest-pick" data-uid="${it.uid}" style="--rar:${RARITIES[it.rarity].color}" title="${esc(it.name)}">${gearIcon(it)}<span>${it.power}</span></button>`).join('')}</div>
+            <button class="gold big" data-act="quest-handin">Give ${esc(pick.name)}</button>`;
+        }
+      } else if (t.kind === 'donate') action = `<button class="gold big" data-act="quest-handin" ${profile.gems >= t.gems ? '' : 'disabled'}>Donate ◆ ${t.gems}</button>`;
+      else action = q.ready ? '<button class="gold big" data-act="quest-handin">Hand in</button>' : `<span class="tag">In progress: ${Math.min(q.progress, q.need)} / ${q.need}</span>`;
+      task = `<div class="qtask ${q.ready ? 'ready' : ''}"><div class="qt-top"><span class="qt-step">Task ${q.step + 1} of ${v.tasks.length}</span><b>${t.text}</b></div>
+        ${t.kind === 'event' || t.kind === 'mission' ? `<div class="bbar"><i style="width:${pct}%"></i></div>` : ''}
+        <div class="qt-reward">Reward: ${reward}</div><div class="qt-act">${action}</div></div>`;
+    }
+    this.questThanks = null;
+    return `<div class="cp-head"><h2>${v.name}</h2><p class="lead">${v.title}</p></div>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <div class="cp-split"><div class="cp-stage"><canvas id="camp-preview"></canvas></div>
+      <div><div class="speech">“${esc(speech)}”</div>${task}</div></div>`;
+  }
+
+  cottageHtml() {
+    return `<div class="cp-head"><h2>A Cottage for Sale</h2><p class="lead">Stone walls, a thatched roof, a warm fire and a proper bed. Yours for ◆ ${HOUSE_COST}.</p></div>
+      ${this.shopNote ? `<p class="shop-note">${this.shopNote}</p>` : ''}
+      <ul class="house-perks">
+        <li><b>Sleep in your own bed</b> before a dungeon and start it <b>Well Rested</b>: +30 max health for that run.</li>
+        <li>Rested again after every run.</li>
+        <li>A chest by the bed opens your stash (the Armory).</li>
+      </ul>
+      <div class="actions"><button class="gold big" data-act="house-buy" ${profile.gems >= HOUSE_COST ? '' : 'disabled'}>Buy the cottage · ◆ ${HOUSE_COST}</button></div>`;
+  }
+
+  /** Sleep in your own bed: fade out, morning, and you're Well Rested for the next run. */
+  sleep() {
+    const G = this.game;
+    if (profile.rested) {
+      G.banner('Already rested', 'Your next dungeon starts Well Rested', 1.6);
+      return;
+    }
+    document.body.classList.add('sleeping');
+    G.sfx.sample('bell', { vol: 0.25, rate: 0.6, jitter: 0, delay: 1.4 });
+    setTimeout(() => {
+      profile.rested = true;
+      saveProfile();
+      G.player.hp = G.maxHp();
+      this.refreshHud();
+    }, 1200);
+    setTimeout(() => {
+      document.body.classList.remove('sleeping');
+      G.banner('Well rested', 'Your next dungeon starts with +30 max health', 2.2);
+    }, 2600);
+  }
+
   // ------------------------------------------------------------ outer-ring shops
 
   fletcherHtml() {
@@ -650,7 +754,7 @@ export class Camp {
       { id: 'grove', when: m.grove?.clear, name: 'Glowcaps from the grove', build: () => this.decorProp('mushroomCluster', 1.4, 7.5, -2.5, 0.6, 0.6) },
       { id: 'oasis', when: m.oasis?.clear, name: 'A palm from the oasis', build: () => this.decorProp('palmTree', 5, 10.8, 10, 0.3, 0.5) },
       { id: 'foundry', when: m.foundry?.clear, name: 'Cogs from the Clockwork Foundry', build: () => this.decorProp('cogPile', 1.2, -4, -12.5, 0.5, 0.6) },
-      { id: 'highlands', when: m.highlands?.clear, name: 'A lantern from the high pass', build: () => this.decorProp('stoneLantern', 2, 0, 13.8, 0, 0.5) },
+      { id: 'highlands', when: m.highlands?.clear, name: 'A lantern from the high pass', build: () => this.decorProp('stoneLantern', 2, -4.5, 9, 0, 0.5) },
       { id: 'banners', when: profile.bosses >= 3, name: 'War banners at the gate', build: () => [this.decorProp('wolfBanner', 3, -11.4, -6.6, 0.6, 0.4), this.decorProp('wolfBanner', 3, -6.6, -11.4, 0.9, 0.4)] },
       { id: 'drum', when: lv >= 5, name: 'A war drum', build: () => this.decorProp('warDrum', 1.3, -12, 2 - 5.5, 0.4, 0.7) },
       { id: 'ballista', when: lv >= 7, name: 'A ballista on watch', build: () => this.decorProp('ballista', 2.2, 10.4, -10, -2.3, 1.0) },
@@ -827,6 +931,7 @@ export class Camp {
 
   useStation(s) {
     if (s.act === 'exit') return this.leaveRoom();
+    if (s.act === 'sleep') return this.sleep();
     this.showPanel({ kind: s.panel, label: s.label }, s.focus);
   }
 
@@ -834,14 +939,16 @@ export class Camp {
     document.getElementById('camp-gems').textContent = `◆ ${profile.gems}`;
     const r = document.getElementById('camp-records');
     const ready = bountiesReady();
+    this.town?.refreshMarkers();
     const free = talentPoints(levelFor(profile.xp || 0).level).free;
-    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level}${free ? ` (${free} talent point${free > 1 ? 's' : ''} to spend in the Hall)` : ''} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
+    if (r) r.textContent = `Level ${levelFor(profile.xp || 0).level}${free ? ` (${free} talent point${free > 1 ? 's' : ''} to spend in the Hall)` : ''} · Power ${heroPower()} · Best wave ${profile.best.wave} · Bosses ${profile.bosses}${profile.rested ? ' · ☾ Well rested' : ''}${ready ? ` · ★ ${ready} bounty ready at the Trophy Board` : ''}`;
   }
 
   // ------------------------------------------------------------ panels
 
   open(spot) {
-    spot = this.spots.find((s) => s.kind === spot.kind) || spot;
+    spot = this.spots.find((s) => s.kind === spot.kind && (!spot.npc || s.npc === spot.npc)) || spot;
+    if (spot.kind === 'cottage' && !profile.house) return this.showPanel(spot); // for sale: the sale screen first
     if (ROOM_KINDS.includes(spot.kind) && !this.room && !this.noRooms && modelStatus.state !== 'loading') return this.enterRoom(spot);
     this.showPanel(spot);
   }
@@ -854,14 +961,17 @@ export class Camp {
     this.shopNote = '';
     if (spot.kind === 'hall' && focus) this.hallFocus = focus;
     if (spot.kind === 'wardrobe' && focus) this.tailorFocus = focus;
+    if (spot.kind === 'npc') this.npcFocus = spot.npc;
+    this.questPick = null;
     this.prompt.classList.remove('show');
     this.game.sfx.sample('uiConfirm', { vol: 0.4, jitter: 0 });
     if (!this.room) {
       // Step inside: the camera pushes to the door, then the room fades up behind the screen.
       this.flySpot = spot;
       this.game.sfx.sample('whoosh', { vol: 0.25, rate: 0.7, jitter: 0 });
-      this.interior.innerHTML = interiorHtml(spot.kind);
-      this.interior.className = `show k-${spot.kind}`;
+      const room = interiorHtml(spot.kind);
+      this.interior.innerHTML = room;
+      this.interior.className = room ? `show k-${spot.kind}` : ''; // villagers: the town stays behind the screen
     }
     this.render();
     this.panel.classList.add('show');
@@ -932,6 +1042,10 @@ export class Camp {
       html = this.worldMapHtml();
     } else if (k === 'talents') {
       html = this.talentsHtml();
+    } else if (k === 'npc') {
+      html = this.npcHtml();
+    } else if (k === 'cottage') {
+      html = this.cottageHtml();
     } else if (k === 'fletcher') {
       html = this.fletcherHtml();
     } else if (k === 'apothecary') {
@@ -941,7 +1055,7 @@ export class Camp {
     } else if (k === 'mews') {
       html = this.mewsHtml();
     }
-    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents' || k === 'fletcher' || k === 'apothecary' || k === 'tavern' || k === 'mews');
+    this.panel.classList.toggle('wide', k === 'gate' || k === 'armory' || k === 'merchant' || k === 'blacksmith' || k === 'hall' || k === 'wardrobe' || k === 'talents' || k === 'fletcher' || k === 'apothecary' || k === 'tavern' || k === 'mews' || k === 'npc' || k === 'cottage');
     this.panel.innerHTML = `${html}<button class="close" data-act="close" aria-label="Close">✕</button><p class="foot">◆ ${profile.gems} gems · Esc to close</p>`;
     this.syncPreview();
   }
@@ -1397,6 +1511,44 @@ export class Camp {
     const v = b.dataset.v;
     const G = this.game;
     if (act === 'close') return this.close();
+    if (act === 'quest-accept') {
+      if (accept(this.npcFocus)) G.sfx.sample('uiConfirm', { vol: 0.45, jitter: 0 });
+      this.town?.refreshMarkers();
+      return this.render();
+    }
+    if (act === 'quest-pick') {
+      this.questPick = b.dataset.uid;
+      return this.render();
+    }
+    if (act === 'quest-handin') {
+      const r = handIn(this.npcFocus, this.questPick);
+      if (r) {
+        const up = r.xpResult && r.xpResult.after.level > r.xpResult.before.level;
+        this.questThanks = r.done;
+        this.shopNote = `Reward: ${[r.gems ? `◆ ${r.gems}` : '', r.xp ? `${r.xp} XP` : '', r.item ? r.item.name : ''].filter(Boolean).join(' · ')}${up ? ` · Level up! (${r.xpResult.after.level})` : ''}${r.unlock ? ' · Something new in town!' : ''}`;
+        G.sfx.sample('jingleClear', { vol: 0.55, jitter: 0 });
+        this.particles.spawn(G.player.pos.clone().setY(1.2), { count: 40, color: [3, 2.2, 0.6], speed: 5, up: 4, life: 0.9, size: 0.08, gravity: 3 });
+        if (r.unlock) this.town?.refreshUnlocks();
+        this.town?.refreshMarkers();
+        this.refreshHud();
+      }
+      return this.render();
+    }
+    if (act === 'house-buy') {
+      if (profile.gems >= HOUSE_COST && !profile.house) {
+        profile.gems -= HOUSE_COST;
+        profile.house = true;
+        saveProfile();
+        G.sfx.sample('jingleClear', { vol: 0.6, jitter: 0 });
+        this.town?.setOwned();
+        this.refreshHud();
+        const spot = this.spots.find((x) => x.kind === 'cottage');
+        this.close();
+        G.banner('Your new home', 'Sleep in the bed before a dungeon to start it Well Rested', 2.2);
+        setTimeout(() => this.open(spot), 700);
+      }
+      return;
+    }
     if (act === 'fletch-buy') {
       const it = buyFletch(Number(b.dataset.i));
       this.shopNote = it ? `Bought ${it.name}. It's in your stash (Armory).` : 'Not enough gems.';

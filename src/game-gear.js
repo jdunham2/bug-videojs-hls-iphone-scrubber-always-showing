@@ -2,6 +2,7 @@
 // lets you equip it on the spot (E / gamepad X).
 
 import { noteBounty, runXp, addXp } from './progression.js';
+import { noteQuest } from './quests.js';
 import { saveProfile } from './profile.js';
 import { gearIcon } from './gear.js';
 import { rollItem, rollRarity, addToStash, equip, equipped, equippedGadget, statLines, perkLines, RARITIES, slotLabel, baseOf, score } from './gear.js';
@@ -159,6 +160,7 @@ export class GearMethods {
   /** Count a run event toward the Trophy Board bounties; cheer when one finishes. */
   bounty(key, n = 1) {
     if (this.state !== 'playing' && this.state !== 'victory') return;
+    noteQuest(key, n); // town tasks count the same events
     const done = noteBounty(key, n);
     if (!done.length) return;
     saveProfile();

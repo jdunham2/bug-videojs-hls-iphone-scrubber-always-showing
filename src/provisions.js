@@ -17,6 +17,7 @@ export const PROVISIONS = {
   focus: { shop: 'apothecary', name: 'Focus Draught', text: 'Perfect window 30% wider', cost: 25, icon: '◎' },
   coin: { shop: 'apothecary', name: 'Lucky Coin', text: '+25% gems', cost: 35, icon: '◆' },
   scout: { shop: 'tavern', name: 'Hire a Scout', text: 'A beacon marks the hidden treasure chest (missions)', cost: 25, icon: '⚑' },
+  rested: { shop: 'home', name: 'Well Rested', text: '+30 max health (slept in your cottage)', cost: 0, icon: '☾' },
   song: { shop: 'tavern', name: 'Rallying Song', text: 'Start the run with the Arrow Volley ready', cost: 30, icon: '♪' },
 };
 export const MAX_PACK = 3;
@@ -49,6 +50,9 @@ let active = new Set();
 export function startProvisions() {
   active = new Set(pack());
   profile.pack = [];
+  // A night in your own cottage counts too.
+  if (profile.rested) active.add('rested');
+  profile.rested = false;
   saveProfile();
   return [...active];
 }
@@ -59,7 +63,7 @@ export function endProvisions() {
 /** What the game reads while a run is on. */
 export const prov = {
   has: (id) => active.has(id),
-  hpAdd: () => (active.has('stew') ? 25 : 0),
+  hpAdd: () => (active.has('stew') ? 25 : 0) + (active.has('rested') ? 30 : 0),
   damage: () => (active.has('oil') ? 1.12 : 1),
   speed: () => (active.has('tea') ? 1.1 : 1),
   window: () => (active.has('focus') ? 1.3 : 1),

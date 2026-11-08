@@ -588,11 +588,46 @@ const LOOK = {
   wardrobe: { floor: 'wood', wall: 'canvas', sky: 0xffe0b8, ambient: 1.4, key: 0xffe2b8, keyI: 2.2 },
   armory: { floor: 'wood', wall: 'planks', sky: 0xd8c8b0, ambient: 1.3, key: 0xffd8a8, keyI: 2.1 },
   merchant: { floor: 'wood', wall: 'planks', sky: 0xffd8a8, ambient: 1.3, key: 0xffe2b8, keyI: 2.1 },
+  cottage: { floor: 'wood', wall: 'planks', sky: 0xffd8a8, ambient: 1.25, key: 0xffd8a8, keyI: 1.8 },
   blacksmith: { floor: 'stone', wall: 'brick', sky: 0x9a8a80, ambient: 0.95, key: 0xffc890, keyI: 1.5 },
 };
 
 /** Fixed furniture, built once per room. */
 const BUILD = {
+  cottage(R) {
+    R.rug(0, -0.5, 4.5, 6, '#6a2a1e', FACE_CAMERA);
+    // The bed: frame, mattress, blanket and pillow.
+    R.box(2.4, 0.5, 3.6, 0x5a3a20, -5, 0.25, -4.4, 1.6);
+    R.box(2.2, 0.3, 3.3, 0xe8dcc0, -5, 0.65, -4.4);
+    R.box(2.26, 0.12, 2.3, 0x7a2a24, -5, 0.84, -3.95);
+    R.box(1.6, 0.22, 0.6, 0xf4ecd8, -5, 0.9, -5.7);
+    R.box(2.4, 1.6, 0.2, 0x4a2e18, -5, 0.8, -6.3);
+    const tag = label('Your bed', 'Sleep: +30 health next run');
+    tag.position.set(-5, 2.6, -4.4);
+    tag.scale.multiplyScalar(0.8);
+    R.scene.add(tag);
+    R.stations.push({ act: 'sleep', label: 'your bed', verb: 'Sleep in', x: -3.2, z: -3, r: 1.6 });
+    R.ring(-3.2, -3, 0.7, 0x9fb8ff, R.scene);
+    // A fireplace with a warm fire.
+    R.box(3, 3.2, 0.9, 0x5a544c, 2.5, 1.6, -D + 0.45);
+    R.box(1.6, 1.2, 0.5, 0x120806, 2.5, 0.6, -D + 0.75);
+    R.torch(2.5, 0.4, -D + 1.1);
+    const fire = new THREE.PointLight(0xff8a3c, 14, 10, 1.6);
+    fire.position.set(2.5, 1, -D + 1.6);
+    R.scene.add(fire);
+    R.flames.push({ flame: null, halo: null, light: fire, base: 14, seed: 2 });
+    // Table, chairs, shelves, the chest.
+    R.box(2.2, 0.12, 1.3, 0x6a4426, 3.5, 0.95, 0.5, 1.0);
+    R.box(0.7, 0.6, 0.7, 0x5a3a20, 3.5, 0.3, 1.8);
+    R.box(0.7, 0.6, 0.7, 0x5a3a20, 3.5, 0.3, -0.8);
+    R.box(0.3, 2.6, 2.6, 0x4a2e18, -W + 0.4, 1.3, 1.5);
+    for (let i = 0; i < 3; i++) R.box(0.4, 0.1, 2.4, 0x6a4426, -W + 0.55, 0.7 + i * 0.7, 1.5);
+    R.prop('treasureChest', 1.0, -W + 1.4, -2.5, Math.PI / 2, 0.7);
+    R.stations.push({ act: 'panel', panel: 'armory', label: 'your stash', verb: 'Open', x: -W + 2.6, z: -2.5, r: 1.3 });
+    R.ring(-W + 2.6, -2.5, 0.6, 0xffd27a, R.scene);
+    R.prop('lantern', 1.6, 6, -D + 1, 0, 0.3);
+    R.banner(-1.5, -D + 0.02, 0, '#2a5a2a', 2.2);
+  },
   hall(R) {
     R.rug(-1, -1, 3, 11, '#6a1a16', FACE_CAMERA);
     R.banner(-5, -D + 0.02, 0, '#7a1e1a');
