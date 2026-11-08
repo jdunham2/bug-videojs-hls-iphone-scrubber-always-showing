@@ -193,6 +193,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
     <div class="hp"><span>HP</span><div class="hpbar"><i id="hpFill" style="width:100%"></i></div><b id="hpV">10/10</b></div>
     <div id="gear"><b>Fists</b></div>
     <div id="rollPip">Roll<kbd>Shift</kbd></div>
+    <button class="btn" id="btnRide" hidden>Ride<kbd>V</kbd></button>
     <button class="btn" id="btnBag">Bag <span id="bagN"></span><kbd>I</kbd></button>
     <button class="btn" id="btnCraft">Craft<kbd>C</kbd></button>
   </div>
@@ -213,6 +214,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   <div id="bag" class="modal" hidden><div class="sheet panel" id="bagSheet"></div></div>
   <div id="craft" class="modal" hidden><div class="sheet panel" id="craftSheet"></div></div>
   <div id="board" class="modal" hidden><div class="sheet panel" id="boardSheet"></div></div>
+  <div id="home" class="modal" hidden><div class="sheet panel" id="homeSheet"></div></div>
   <div id="mapView" class="modal" hidden>
     <div class="sheet panel" style="width:min(1100px,100%)">
       <div class="sheet-head"><h2>The Known World</h2><button class="btn" data-close="mapView">Close<kbd>M</kbd></button></div>
@@ -224,13 +226,14 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   <div id="title" class="modal">
     <div class="titlecard panel">
       <h1>Saltwind<br>Road</h1>
-      <p>You arrive in Port Wren with a pack, a few coins and no name on the road. Thirteen settlements lie scattered from the salt coast and pine woods to the jade jungle, the red canyons, the haunted moor and the stormy north-east cliffs. Gather, craft, take on work, haggle, and face the ten great beasts that rule the wild.</p>
+      <p>You arrive in Port Wren with a pack, a few coins and no name on the road. Thirteen settlements lie scattered from the salt coast and pine woods to the jade jungle, the red canyons, the haunted moor and the stormy north-east cliffs. Gather, craft, take on work, haggle, and face the ten great beasts that rule the wild. Buy a homestead, farm the land, and ride out with a pet at your side.</p>
       <p>The Guildmistress grants a <b style="color:var(--brass)">Charter of the Free Road</b> to any trader who earns 600 coin and forms pacts with four settlements.</p>
       <div class="controls">
         <b>WASD / Arrows</b><span>Walk (drag anywhere on touch screens)</span>
         <b>E / Space</b><span>Talk, read notice boards, gather, fish</span>
         <b>F / Click</b><span>Attack · <b>G</b> throw a bomb</span>
         <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
+        <b>V</b><span>Mount or dismount, once you own a mount</span>
         <b>C · I · Q</b><span>Craft · Bag · Eat something</span>
         <b>M · J</b><span>World map · Journal</span>
       </div>
@@ -392,6 +395,25 @@ const GOODS = {
   golem_fist:{name:'Colossus Gauntlets',base:400,col:'#e0b050',kind:'trinket',desc:'+2 melee damage'},
   circlet:{name:"Barrow King's Circlet",base:420,col:'#c8d0c8',kind:'trinket',desc:'+3 max HP, +1 armor'},
   windstep_boots:{name:'Windstep Boots',base:420,col:'#c8e0ff',kind:'trinket',desc:'Walk 25% faster, roll twice as often'},
+  // --- farm ---
+  wheat:{name:'Wheat',base:5,col:'#e0c050',kind:'mat'},
+  flax:{name:'Flax',base:6,col:'#8ab0e0',kind:'mat'},
+  moonflower:{name:'Moonflower',base:45,col:'#c8d8ff',kind:'mat'},
+  pumpkin:{name:'Pumpkin',base:30,col:'#e07a20',kind:'good'},
+  carrot:{name:'Carrot',base:5,col:'#f08a30',kind:'food',heal:2},
+  egg:{name:'Egg',base:6,col:'#f4ecd8',kind:'food',heal:1},
+  bread:{name:'Bread',base:18,col:'#c8964a',kind:'food',heal:4},
+  carrot_soup:{name:'Carrot Soup',base:20,col:'#e0802a',kind:'food',heal:6},
+  omelette:{name:'Omelette',base:16,col:'#f0d060',kind:'food',heal:5},
+  pumpkin_pie:{name:'Pumpkin Pie',base:60,col:'#d8822a',kind:'food',heal:12},
+  moon_tonic:{name:'Moon Tonic',base:90,col:'#d8e4ff',kind:'food',heal:20},
+  linen:{name:'Linen',base:40,col:'#e8e4d8',kind:'craft'},
+  wheat_seed:{name:'Wheat Seeds',base:4,col:'#c8a840',kind:'seed',crop:'wheat'},
+  carrot_seed:{name:'Carrot Seeds',base:4,col:'#d8782a',kind:'seed',crop:'carrot'},
+  flax_seed:{name:'Flax Seeds',base:5,col:'#6a90c0',kind:'seed',crop:'flax'},
+  tea_seed:{name:'Tea Seeds',base:8,col:'#5a8a4a',kind:'seed',crop:'tea'},
+  pumpkin_seed:{name:'Pumpkin Seeds',base:12,col:'#c8681a',kind:'seed',crop:'pumpkin'},
+  moon_seed:{name:'Moonflower Seeds',base:30,col:'#a8b8ff',kind:'seed',crop:'moonflower'},
 };
 const GK = Object.keys(GOODS);
 const FISTS = {name:'Fists',dmg:1,cd:.4,reach:1.1};
@@ -463,10 +485,16 @@ const RECIPES = [
   {id:'bronze_mail',need:{bronze:4,hide:1}, at:'forge'},
   {id:'venom_fang', need:{serpent_fang:1,bronze:2}, at:'forge'},
   {id:'golem_fist', need:{golem_core:1,bronze:2}, at:'forge'},
+  {id:'bread',      need:{wheat:3}, at:'bench', known:true},
+  {id:'carrot_soup',need:{carrot:2,herbs:1}, at:'bench', known:true},
+  {id:'omelette',   need:{egg:2,herbs:1}, at:'hand', known:true},
+  {id:'pumpkin_pie',need:{pumpkin:1,wheat:2,egg:1}, at:'bench', known:true},
+  {id:'linen',      need:{flax:3}, at:'bench', known:true},
+  {id:'moon_tonic', need:{moonflower:2,glass:1}, at:'bench'},
 ];
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots'};
-const STATION_LABEL = {hand:'Anywhere', bench:'Settlement workbench', forge:'A forge'};
+const STATION_LABEL = {hand:'Anywhere', bench:'Workbench (any settlement, or your cottage)', forge:'A forge (or your manor)'};
 const CRAFT_GROUPS = [['Tools',['tool']],['Weapons',['weapon','ammo']],['Armor & trinkets',['armor','trinket']],['Food',['food']],['Goods & metals',['craft','good','mat']]];
 
 const NODES = {
@@ -531,6 +559,39 @@ const BOSSES = {
 };
 const BK = Object.keys(BOSSES);
 
+const CROPS = {
+  wheat:{name:'Wheat',grow:1,yield:[3,5]},
+  carrot:{name:'Carrots',grow:1,yield:[2,4]},
+  flax:{name:'Flax',grow:1,yield:[3,4]},
+  tea:{name:'Tea',grow:1.5,yield:[2,4],give:'tea'},
+  pumpkin:{name:'Pumpkins',grow:2,yield:[1,3]},
+  moonflower:{name:'Moonflowers',grow:3,yield:[1,2]},
+};
+const HOME = {x:54, y:106};
+const COOP = {x: HOME.x - 4, y: HOME.y - .6};
+const plotPos = i => ({x: HOME.x - 2 + (i % 4), y: HOME.y + 1 + Math.floor(i / 4)});
+const HOME_LEVELS = [
+  {name:'Empty plot', plots:0},
+  {name:'Log Cabin', plots:4, cost:{coins:250}, perks:'A bed, a storage chest and 4 crop beds'},
+  {name:'Stone Cottage', plots:8, cost:{coins:400, items:{wood:20, stone:10, planks:6}}, perks:'8 crop beds, a chicken coop and a workbench'},
+  {name:'Manor House', plots:12, cost:{coins:800, items:{planks:10, iron:6, glass:4, silver:2}}, perks:'12 crop beds and your own forge'},
+];
+const PETS = {
+  dog:{name:'Dog', dmg:2, cd:.8, speed:5.2, desc:'A loyal hound that bites anything that comes for you.'},
+  cat:{name:'Cat', dmg:1, cd:.7, speed:5, desc:'Has a nose for oddities: curios turn up twice as often.'},
+  fox:{name:'Fox', dmg:2, cd:.8, speed:5.4, desc:'Sniffs out extra coin from fallen foes (+50%).'},
+  hawk:{name:'Hawk', dmg:2, cd:1, speed:7, fly:true, desc:'Scouts ahead, so you see 2 tiles further.'},
+  monkey:{name:'Monkey', dmg:1, cd:.7, speed:5.2, desc:'Helps you gather: 30% chance of an extra item.'},
+  wolfpup:{name:'Alpha Pup', dmg:4, cd:.6, speed:5.8, desc:"The Grey Alpha's cub. Fierce and fast."},
+  salamander:{name:'Ember Salamander', dmg:5, cd:.7, speed:5, desc:"Hatched in the Wyrm's fire. Its bite burns."},
+};
+const MOUNTS = {
+  horse:{name:'Horse', speed:1.75, desc:'Fast on any open ground.'},
+  camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
+  elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
+  griffon:{name:'Griffon', speed:2.0, fly:true, desc:'Flies over water, mountains and lava.'},
+};
+
 const CURIOS = {
   fossil:{name:'Spiral Fossil',hint:'Breaking boulders',p:.05},
   geode:{name:'Hollow Geode',hint:'Mining iron veins',p:.07},
@@ -558,8 +619,8 @@ const CK = Object.keys(CURIOS);
 const TOWNS = {
   wren:     {name:'Port Wren',    x:40, y:105,ground:T.GRASS,roof:'#3f6f99',produce:['fish','salt'],   demand:['furs','spice','basket','silk_cloth']},
   hollow:   {name:'Hollowpine',   x:100,y:55, ground:T.GRASS,roof:'#7a4a2c',produce:['furs','amber'],  demand:['salt','tea','smoked','mead']},
-  frost:    {name:'Frostgate',    x:178,y:26, ground:T.SNOW, roof:'#55606e',produce:['iron'],          demand:['fish','wool','tea','hide','mead']},
-  dun:      {name:'Dunmere Oasis',x:212,y:118,ground:T.SAND, roof:'#c1612f',produce:['spice','glass'], demand:['iron','wool','planks','wood','frost_essence']},
+  frost:    {name:'Frostgate',    x:178,y:26, ground:T.SNOW, roof:'#55606e',produce:['iron'],          demand:['fish','wool','tea','hide','mead','pumpkin']},
+  dun:      {name:'Dunmere Oasis',x:212,y:118,ground:T.SAND, roof:'#c1612f',produce:['spice','glass'], demand:['iron','wool','planks','wood','frost_essence','linen']},
   reed:     {name:'Reedholm',     x:118,y:160,ground:T.GRASS,roof:'#6d7f3a',produce:['tea','wool'],    demand:['iron','glass','charm']},
   highcairn:{name:'Highcairn',    x:150,y:95, ground:T.GRASS,roof:'#6a5a8a',produce:['silver','stone'],demand:['wood','planks','wool','roast']},
   thorn:    {name:'Thornwick',    x:42, y:165,ground:T.GRASS,roof:'#4a3a5a',produce:['mushroom','herbs','honey'],demand:['iron','salt','glass']},
@@ -681,8 +742,23 @@ const NPCS = [
    teaches:{fishing_net:50,feather_charm:60},
    hello:["Fish? Fish.","Back for more fish?","There's my favorite landlubber!"],
    rumors:["A net catches more than a rod ever will. Rope and a bit of wood.","Light on your feet, that's how you live with harpies about. Roll, don't run."]},
+  // Port Wren: stables and the homestead
+  {id:'gwen',town:'wren',dx:-2,dy:-1,name:'Gwen',role:'Stablemaster',cols:{cloak:'#6a4a2a',skin:'#d8a882',hair:'#c8782a'},animals:{horse:200,dog:80},
+   hello:["Looking for a horse? Everyone is.","Back for another animal?","My favorite rider! How's the beast?"],
+   rumors:["A good horse nearly doubles your speed on open ground. Press V to mount up.","Camels from Dunmere don't mind sand. Elk from Hollowpine don't mind trees. Each to their own.","They say the Storm Roc's mountain is home to griffons. If the Roc ever fell, Keeper Brynn could sell you one."]},
+  {id:'pell',town:'wren',pos:[HOME.x+3,HOME.y-1],name:'Pell',role:'Land agent',cols:{cloak:'#3a5a3a',skin:'#e0b896',hair:'#6a4a2a'},trader:true,greed:.2,patience:5,purse:200,stock:{wheat_seed:10,carrot_seed:10,flax_seed:8,pumpkin_seed:5},homestead:true,
+   hello:["Fine bit of land, isn't it? It could be yours.","Neighbor! Good to see you.","Best farmer on the coast, they say."],
+   rumors:["Wheat and carrots are ready in a day. Pumpkins take two, moonflowers three.","A stone cottage gets you a coop. Chickens lay every morning.","Nell in Reedholm sells tea seeds. The gravedigger in Gravenmoor has moonflower seeds, of all things."]},
 ];
 const NPC_BY = Object.fromEntries(NPCS.map(n => [n.id, n]));
+NPC_BY.saffi.animals = {camel:180};
+NPC_BY.kesh.animals = {elk:220, fox:120};
+NPC_BY.ilse.animals = {cat:100};
+NPC_BY.oskar.animals = {hawk:150};
+NPC_BY.lio.animals = {monkey:140};
+NPC_BY.brynn.animals = {griffon:600}; NPC_BY.brynn.animalReq = {griffon:'roc'};
+Object.assign(NPC_BY.nell.stock, {tea_seed:6});
+Object.assign(NPC_BY.cole.stock, {moon_seed:3}); NPC_BY.cole.teaches.moon_tonic = 60;
 const TEACHER = {}; for (const n of NPCS) if (n.teaches) for (const r in n.teaches) TEACHER[r] = n.id;
 
 const CONTRACTS = {
@@ -696,7 +772,7 @@ const CONTRACTS = {
   c_ruun2:{giver:'ruun',title:'Honey for the feast',ask:"The midwinter feast needs honey. Bring 4 from the wild hives.",need:{honey:4},reward:{coins:30,items:{amber:3},rep:.8},done:"Sweet as summer. Thank you."},
   c_kesh:{giver:'kesh',title:'Wolf trouble',ask:"Wolves have been robbing my traps. Bring me 3 Hides as proof you've thinned them out, and I'll teach you to make a hunting bow.",need:{hide:3},reward:{coins:40,items:{arrows:10},recipe:'bow',rep:.8},done:"Good. Here's how you string a bow."},
   c_kesh2:{giver:'kesh',title:'Boar hunt',ask:"Boars are tearing up the forest floor. Hunt 4 of them.",kill:{boar:4},reward:{coins:70,items:{roast:3},rep:.8},done:"Here, have some of the meat back. Roasted."},
-  c_kesh3:{giver:'kesh',title:'The Grey Alpha',ask:"The Grey Alpha. It leads every wolf in these woods. Its den is west of here, deep in the pines. Kill it and I'll teach you to make a silk longbow.",boss:'alpha',reward:{coins:150,recipe:'longbow',rep:2},done:"You actually did it. The woods will be quiet for a generation."},
+  c_kesh3:{giver:'kesh',title:'The Grey Alpha',ask:"The Grey Alpha. It leads every wolf in these woods. Its den is west of here, deep in the pines. Kill it and I'll teach you to make a silk longbow.",boss:'alpha',reward:{coins:150,recipe:'longbow',pet:'wolfpup',rep:2},done:"You actually did it. And look: its cub followed you here. It's yours now, if you'll have it."},
   c_brannoc:{giver:'brannoc',title:'Feed the forge',ask:"My forge crew eats like wolves. Bring 3 Fish and 2 Tea and I'll pay you in iron.",need:{fish:3,tea:2},reward:{items:{iron:3},coins:20,rep:1.5},pact:'frost',done:"Hot tea and fried fish. You've a friend at Frostgate now."},
   c_brannoc2:{giver:'brannoc',title:'Ore run',ask:"I'm short on ore. Bring me 6 Iron Ore and I'll smelt half of it for you.",need:{ore:6},reward:{items:{iron:3},coins:30,rep:.8},done:"Good rock. Here's your share."},
   c_ysolde:{giver:'ysolde',title:'A taste of the south',ask:"Eleven winters on this wall and I've never tasted spice. Bring me one measure and I'll tell you what glints on the eastern peaks.",need:{spice:1},reward:{coins:30,rep:.8,reveal:'shrine'},done:"Oh, that burns. Wonderful. There's an old shrine on the peaks east of here. I've marked it on your map."},
@@ -722,7 +798,7 @@ const CONTRACTS = {
   c_kael:{giver:'kael',title:'Food for the forge-hall',ask:"Nothing grows in the ash. Bring 6 Fish and 4 Tea to feed my smiths.",need:{fish:6,tea:4},reward:{coins:100,rep:1.5},pact:'ashfall',done:"The hall eats tonight. Ashfall remembers its friends."},
   c_kael2:{giver:'kael',title:'Imp swarm',ask:"Ember imps keep setting the stores alight. Swat 6 of them.",kill:{imp:6},reward:{coins:140,items:{ember:2},rep:.8},done:"Not a single fire today. Here, take these shards."},
   c_sera:{giver:'sera',title:'An offering of embers',ask:"Before anyone faces the Wyrm, they make an offering. Bring 3 Ember Shards.",need:{ember:3},reward:{coins:60,rep:1,reveal:'wyrm'},done:"The ash accepts you. I've marked the Wyrm's peak on your map."},
-  c_sera2:{giver:'sera',title:'Wyrmslayer',ask:"Slay the Ember Wyrm and free the Cinderlands. No one has ever come back from that peak.",boss:'wyrm',reward:{coins:600,rep:3,flag:'wyrmslayer'},done:"Wyrmslayer. The ash will sing of you."},
+  c_sera2:{giver:'sera',title:'Wyrmslayer',ask:"Slay the Ember Wyrm and free the Cinderlands. No one has ever come back from that peak.",boss:'wyrm',reward:{coins:600,rep:3,flag:'wyrmslayer',pet:'salamander'},done:"Wyrmslayer. The ash will sing of you."},
   c_mako:{giver:'mako',title:'Tools for the village',ask:"Our tools rust in the wet. Bring 4 Iron and 2 Salt and Jadewater will call you friend.",need:{iron:4,salt:2},reward:{coins:100,rep:1.5},pact:'jade',done:"Good iron. Jadewater stands with you."},
   c_mako2:{giver:'mako',title:'Jadefang',ask:"Jadefang swallows our hunters. Its nest is east of here, in the deepest jungle. Kill it.",boss:'serpent',reward:{coins:350,items:{jade:3},rep:2},done:"The jungle breathes again. You are a hero of Jadewater."},
   c_lio:{giver:'lio',title:'Viper nest',ask:"Vipers in my orchard! Kill 5 of them, please.",kill:{snake:5},reward:{coins:90,items:{fruit:4},rep:.8},done:"Safe to pick again. Have some fruit!"},
@@ -868,6 +944,9 @@ function genWorld() {
       map[i] = (t === T.DEEP || t === T.SHAL) ? T.BRIDGE : T.ROAD;
     }
   }
+  // the homestead: a cleared plot east of Port Wren with its own lane
+  for (let y = -5; y <= 5; y++) for (let x = -6; x <= 6; x++) { const tx = HOME.x + x, ty = HOME.y + y; if (inB(tx,ty) && map[idx(tx,ty)] !== T.HOUSE) map[idx(tx,ty)] = T.GRASS; }
+  for (const i of astar(TOWNS.wren.x, TOWNS.wren.y, HOME.x - 7, HOME.y, i => COST[map[i]])) { const t = map[i]; if (t !== T.FLOOR && t !== T.HOUSE) map[i] = (t === T.DEEP || t === T.SHAL) ? T.BRIDGE : T.ROAD; }
   spawn = {x: TOWNS.wren.x + .5, y: TOWNS.wren.y + 2.3};
   const reach = flood(Math.floor(spawn.x), Math.floor(spawn.y), false, false);
   const reachC = flood(Math.floor(spawn.x), Math.floor(spawn.y), false, true);
@@ -885,7 +964,7 @@ function genWorld() {
   for (const L of LANDMARKS) place(L, (x,y,t) => L.isle ? (Math.hypot(x-ISLE.x,y-ISLE.y) < ISLE.land-.5 && t !== T.HOUSE && t !== T.FLOOR)
       : (reach[idx(x,y)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL), 7);
   for (const k of BK) { const B = BOSSES[k]; place(B, (x,y,t) => (B.climb ? reachC : reach)[idx(x,y)] && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
-  for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = tw.x + n.dx + .5; n.y = tw.y + n.dy + .8; }
+  for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   placeNodes();
 }
 
@@ -898,6 +977,7 @@ function placeNodes() {
     if (blocked.has(i)) continue;
     let inTownArea = false;
     for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x, y - TOWNS[k].y) < (TOWNS[k].small ? 4.5 : 7)) inTownArea = true;
+    if (Math.hypot(x - HOME.x, y - HOME.y) < 9) inTownArea = true;
     if (inTownArea) continue;
     const r = hash2(x, y, 77), nearMt = near(x,y,T.MOUNT), silverLand = Math.hypot(x-150, y-95) < 34;
     let type = null;
@@ -1067,6 +1147,7 @@ function freshState() {
     explored: new Uint8Array(W*H), steps: 0, rumor: {}, trades: 0,
     hp: BASE_HP, bonusHP: 0, equip: {weapon: null, armor: null}, known: {}, depleted: {}, curios: {}, curiosShown: {},
     gathered: 0, crafted: 0, kills: 0, deaths: 0, killsBy: {}, bosses: {}, board: {}, requestsDone: 0, lairsSeen: {},
+    home: {level:0, plots:[], chest:{}, chickens:0, eggs:0}, pets: [], pet: null, mounts: [], mount: null, riding: false, harvested: 0,
   };
   for (const n of NPCS) if (n.trader) s.npc[n.id] = {stock: {...n.stock}, purse: n.purse, patience: n.patience, flex: rollFlex(n)};
   return s;
@@ -1119,7 +1200,9 @@ const speedMult = () => Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boo
 const armorCut = () => Math.min(.7, armorVal() * .12);
 const maxHP = () => BASE_HP + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
-function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; return null; }
+function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
+const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2);
+const isFlying = () => !!(S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].fly);
 
 function toast(html, ms = 4200) {
   const el = document.createElement('div'); el.className = 'toast panel'; el.innerHTML = html;
@@ -1148,7 +1231,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => 7.5 + (have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => 7.5 + (S.pet === 'hawk' ? 2 : 0) + (have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -1178,7 +1261,7 @@ function checkDiscoveries() {
 }
 function rollCurio(id) {
   if (!id || S.curios[id]) return;
-  if (Math.random() < CURIOS[id].p) {
+  if (Math.random() < CURIOS[id].p * (S.pet === 'cat' ? 2 : 1)) {
     S.curios[id] = true;
     toast(`Curio found: <b>${CURIOS[id].name}</b><br>Old Hob in Port Wren collects these. (${Object.keys(S.curios).length}/${CK.length})`, 6000);
     if (id === 'banditmap') {
@@ -1228,6 +1311,7 @@ function gather(i) {
   if (d.tool && tier > (d.tier || 1)) amt += tier - (d.tier || 1);
   if (d.pick && ptier) amt += ptier;
   if (d.boost && toolTier(d.boost)) amt += 1;
+  if (S.pet === 'monkey' && Math.random() < .3) amt += 1;
   addItem(d.give, amt); S.gathered++;
   floatText(n.x+.5, n.y, `+${amt} ${GOODS[d.give].name}`, '#86c98f');
   if (d.sting && Math.random() < .5) { hurtPlayer(1, null, true); floatText(S.x, S.y - 1.8, 'Stung!', '#f2b632'); }
@@ -1250,6 +1334,7 @@ function updateFishing(dt) {
 
 /* ================= combat ================= */
 let enemies = [], arrows = [], eproj = [], hazards = [], bombs = [], spawnT = 3, shake = 0;
+let petE = null;
 const plural = (t, n = 2) => n === 1 ? ENEMIES[t].name : (ENEMIES[t].plural || ENEMIES[t].name + 's');
 const isUndead = e => e.boss ? !!BOSSES[e.boss].undead : !!ENEMIES[e.type].undead;
 function nearestEnemy(range) {
@@ -1328,7 +1413,7 @@ function killEnemy(e) {
   }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
-  if (def.coins) { const c = rint(def.coins[0], def.coins[1]); S.coins += c; got.push(`+${c} coin`); }
+  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   got.forEach((t, k) => floatText(e.x, e.y - .2 - k*.6, t, '#86c98f'));
   burst(e.x, e.y - .4, '#ebe4d3', 10);
@@ -1350,10 +1435,12 @@ function die() {
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
   const lost = Math.floor(S.coins * .2);
   S.coins -= lost; S.hp = maxHP(); S.deaths++;
-  S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3;
+  const atHome = S.home && S.home.level >= 1;
+  if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
+  S.riding = false; petE = null;
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
   $('bossbar').hidden = true; document.body.classList.remove('boss');
-  toast(`<b>You were knocked out</b><br>Someone carried you to ${TOWNS[best].name}. ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
+  toast(`<b>You were knocked out</b><br>${atHome ? 'You wake up in your own bed.' : `Someone carried you to ${TOWNS[best].name}.`} ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
   renderHUD(); save();
 }
 function enemyWalk(x, y) {
@@ -1595,6 +1682,7 @@ addEventListener('keydown', e => {
     else if (k === 'f') attack();
     else if (k === 'g') throwBomb();
     else if (k === 'shift' || k === 'r') doRoll();
+    else if (k === 'v') toggleRide();
     else if (k === 'm') openMap();
     else if (k === 'j') openJournal();
     else if (k === 'i') openBag();
@@ -1610,6 +1698,7 @@ addEventListener('keydown', e => {
   else if (mode === 'bag') { if (k === 'escape' || k === 'i') closeModal('bag'); }
   else if (mode === 'craft') { if (k === 'escape' || k === 'c') closeModal('craft'); }
   else if (mode === 'board') { if (k === 'escape') closeModal('board'); }
+  else if (mode === 'home') { if (k === 'escape') closeModal('home'); }
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
@@ -1647,6 +1736,7 @@ $('actBtn').addEventListener('click', interact);
 $('atkBtn').addEventListener('click', () => mode === 'play' && attack());
 $('bombBtn').addEventListener('click', () => mode === 'play' && throwBomb());
 $('rollBtn').addEventListener('click', () => doRoll());
+$('btnRide').addEventListener('click', () => toggleRide());
 $('btnMap').addEventListener('click', () => mode === 'play' && openMap());
 $('btnJournal').addEventListener('click', () => mode === 'play' && openJournal());
 $('btnBag').addEventListener('click', () => mode === 'play' && openBag());
@@ -1971,6 +2061,14 @@ function render() {
       }
     }});
   }
+  if (inView(HOME.x, HOME.y)) {
+    sprites.push({y: HOME.y - 1.05, f: () => drawHomestead(ctx, frameT)});
+    for (let i = 0; i < (S.home.level >= 2 ? S.home.chickens : 0); i++) {
+      const cx = HOME.x - 4.5 + Math.sin(frameT*.4 + i*2.1)*1.8, cy = HOME.y + .3 + Math.cos(frameT*.3 + i*1.3)*.7;
+      sprites.push({y: cy, f: () => drawChicken(ctx, cx*TS, cy*TS, Math.cos(frameT*.4 + i*2.1) > 0 ? 1 : -1, frameT + i)});
+    }
+  }
+  if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   for (const e of enemies) if (inView(e.x, e.y)) sprites.push({y: e.y, f: () => drawEnemy(ctx, e)});
   const ptile = tileAt(Math.floor(S.x), Math.floor(S.y));
   const onWater = ptile === T.DEEP || ptile === T.SHAL;
@@ -1978,14 +2076,17 @@ function render() {
   sprites.push({y: S.y, f: () => {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
-    if (onWater && S.flags.raft) {
+    if (onWater && S.flags.raft && !isFlying()) {
       const b = Math.sin(frameT*3)*.8;
       ctx.fillStyle = '#7a5532'; ctx.fillRect(px-8, py-4+b, 16, 7); ctx.fillStyle = '#5c3f24'; for (let i = 0; i < 4; i++) ctx.fillRect(px-8+i*4, py-4+b, 1, 7);
       drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held});
-    } else if (onWater) {
+    } else if (onWater && !isFlying()) {
       drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held});
       ctx.fillStyle = TILE_COL[ptile]; ctx.fillRect(px-6, py-1, 12, 5);
       ctx.fillStyle = 'rgba(210,236,245,.6)'; ctx.fillRect(px-6, py-1, 12, 1);
+    } else if (S.riding && MOUNTS[S.mount]) {
+      drawMount(ctx, S.mount, px, py, player.facing === 'left' ? -1 : 1, player.phase, player.moving || player.roll > 0);
+      drawPerson(ctx, px, py - (isFlying() && (player.moving || player.roll > 0) ? 12 : 8), player.cols, 0, false, player.facing, {scarf:true, pack:true, held});
     } else if (player.roll > 0) {
       ctx.save(); ctx.translate(px, py - 7); ctx.rotate((1 - player.roll/.32) * Math.PI * 2 * (player.rdx < 0 ? -1 : 1));
       drawPerson(ctx, 0, 7, player.cols, 0, false, player.facing, {scarf:true, pack:true});
@@ -1993,6 +2094,7 @@ function render() {
     } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held});
     ctx.globalAlpha = 1;
   }});
+  if (inView(HOME.x, HOME.y)) drawFarm(ctx, frameT);
   // hazards under sprites
   for (const h of hazards) {
     if (h.wind > 0) {
@@ -2064,6 +2166,8 @@ function render() {
     };
     hole(S.x*TS, S.y*TS - 6, have('wisp_lantern') ? 140 : have('lantern') ? 115 : 70, .9);
     for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
+    if (S.home.level) hole(HOME.x*TS + 8, (HOME.y - 2)*TS + 6, 64, .8);
+    for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
     const lan = LANDMARKS.find(l => l.id === 'lantern'); hole(lan.x*TS + 8, lan.y*TS - 4, 40, .8);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -2101,6 +2205,7 @@ function drawMini() {
   for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) { g.fillStyle = '#ebe4d3'; g.fillRect((L.x - sx)*s - 2, (L.y - sy)*s - 2, 4, 4); }
   for (const k of BK) if (S.lairsSeen[k] && !S.bosses[k]) { g.fillStyle = '#e5484d'; const bx = (BOSSES[k].x - sx)*s, by = (BOSSES[k].y - sy)*s; g.fillRect(bx - 3, by - 1, 6, 2); g.fillRect(bx - 1, by - 3, 2, 6); }
   g.fillStyle = '#e57a62'; for (const e of enemies) if (S.explored[idx(Math.floor(e.x), Math.floor(e.y))]) g.fillRect((e.x - sx)*s - 1.5, (e.y - sy)*s - 1.5, e.boss ? 5 : 3, e.boss ? 5 : 3);
+  g.fillStyle = '#86c98f'; g.fillRect((HOME.x - sx)*s - 3, (HOME.y - sy)*s - 3, 6, 6);
   g.fillStyle = '#ffffff'; g.fillRect(m.width/2 - 2, m.height/2 - 2, 4, 4);
   g.strokeStyle = '#0d131b'; g.strokeRect(m.width/2 - 2.5, m.height/2 - 2.5, 5, 5);
 }
@@ -2122,14 +2227,16 @@ function doRoll() {
   player.roll = .32; player.rollCd = .85 * (have('windstep_boots') ? .5 : 1) * (have('feather_charm') ? .75 : 1);
   fishing = null; burst(S.x, S.y, '#c8b896', 6, 2);
 }
-let nearNPC = null, nearNodeI = -1, nearBoard = null, saveTimer = 0, promptKey = '';
+let nearNPC = null, nearNodeI = -1, nearBoard = null, nearHome = null, saveTimer = 0, promptKey = null;
 
 function passable(x, y) {
   const pts = [[x-.28, y-.05], [x+.28, y-.05], [x-.28, y+.2], [x+.28, y+.2]];
-  const raft = !!S.flags.raft, climb = canClimb();
+  const raft = !!S.flags.raft, climb = canClimb(), fly = isFlying();
   for (const [px,py] of pts) {
     const tx = Math.floor(px), ty = Math.floor(py);
     if (!inB(tx,ty)) return false;
+    if (homeBlocked(tx, ty)) return false;
+    if (fly) { if (map[idx(tx,ty)] === T.HOUSE) return false; continue; }
     if (!walkable(map[idx(tx,ty)], raft, climb)) return false;
   }
   return true;
@@ -2162,6 +2269,8 @@ function update(dt) {
     let sp = SPEED[t];
     if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = 1.15;
     if (t === T.MOUNT) sp = .4;
+    const M = S.riding && MOUNTS[S.mount];
+    if (M) sp = M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed;
     sp = 4.6 * Math.max(.4, sp) * speedMult();
     const nx = S.x + vx*sp*dt, ny = S.y + vy*sp*dt;
     if (passable(nx, S.y)) S.x = nx;
@@ -2179,6 +2288,8 @@ function update(dt) {
     if (passable(S.x, ny)) S.y = ny;
     const decay = Math.min(1, dt*9); player.kx -= player.kx*decay; player.ky -= player.ky*decay;
   }
+  if (S.riding && !isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) { S.riding = false; toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't swim, so you climb off.`); renderHUD(); }
+  updatePet(dt);
   const ti = idx(Math.floor(S.x), Math.floor(S.y));
   if (ti !== lastTile) { lastTile = ti; reveal(S.x, S.y, sightRadius()); checkDiscoveries(); renderRegion(); }
 
@@ -2199,10 +2310,12 @@ function update(dt) {
   for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearNodeI = best || nearBoard ? -1 : nearestNode();
+  nearHome = best || nearBoard ? null : homeTarget();
+  nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
   else if (nearBoard) { key = 'b' + nearBoard; html = `<kbd style="margin:0 6px 0 0">E</kbd>Read the notice board`; btn = 'Read'; }
+  else if (nearHome) { key = 'h' + nearHome.key; html = nearHome.html; btn = nearHome.btn; }
   else if (fishing) { key = 'fishing'; html = 'Fishing… stay still'; btn = ''; }
   else if (nearNodeI >= 0) {
     const nd = NODES[nodes[nearNodeI].type], block = nodeBlocker(nearNodeI);
@@ -2229,6 +2342,7 @@ function newDay() {
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
     st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
   }
+  if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.`);
   save();
 }
@@ -2243,6 +2357,7 @@ function renderHUD() {
   const total = Object.values(S.inv).reduce((s, n) => s + n, 0);
   $('bagN').textContent = total ? `(${total})` : '';
   $('bombBtn').hidden = !isTouch || !(have('bomb') || have('fire_bomb')) || mode !== 'play';
+  $('btnRide').hidden = !S.mount; $('btnRide').firstChild.textContent = S.riding ? 'Dismount' : 'Ride';
   lastHP = -1; renderHP();
 }
 let lastHP = -1;
@@ -2261,6 +2376,7 @@ function renderClock() {
 function renderRegion() {
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
+  if (!name && Math.hypot(S.x - HOME.x, S.y - HOME.y) < 8) name = S.home.level ? 'Your Homestead' : 'Homestead (for sale)';
   if (!name) name = REGION[tileAt(Math.floor(S.x), Math.floor(S.y))] || 'The Free Road';
   if ($('region').textContent !== name) $('region').textContent = name;
 }
@@ -2271,6 +2387,7 @@ function interact() {
   if (mode !== 'play') return;
   if (nearNPC) openTalk(nearNPC);
   else if (nearBoard) openBoard(nearBoard);
+  else if (nearHome) nearHome.fn();
   else if (nearNodeI >= 0) gather(nearNodeI);
 }
 function drawPortrait(n) {
@@ -2283,7 +2400,7 @@ function drawPortrait(n) {
 }
 function openTalk(n) {
   talkNPC = n; mode = 'talk'; keys.clear(); fishing = null;
-  $('prompt').hidden = true; $('actBtn').hidden = true; promptKey = '';
+  $('prompt').hidden = true; $('actBtn').hidden = true; promptKey = null;
   drawPortrait(n);
   const tier = tierOf(repOf(n.town));
   $('talkWho').innerHTML = `${esc(n.name)}<small>${esc(n.role)}</small><span class="tier">${TIERS[tier][1]}</span>`;
@@ -2313,6 +2430,8 @@ function mainOptions(n) {
     o.push({label: st === 'active' ? `About "${c.title}"` : 'Any work going?', fn: () => contractTalk(n), primary: st === 'active' && canComplete(c)});
   }
   if (n.teaches && Object.keys(n.teaches).some(r => !isKnown(r))) o.push({label:'Teach me a craft', fn: () => teachTalk(n)});
+  if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
+  if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
@@ -2320,7 +2439,7 @@ function mainOptions(n) {
 }
 const hello = n => n.hello[Math.min(tierOf(repOf(n.town)), 2)];
 const back = n => ({label:'Back', fn: () => say(hello(n), mainOptions(n))});
-function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = ''; renderHUD(); }
+function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); }
 
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -2377,6 +2496,7 @@ function rewardText(c) {
   if (r.items) p.push(itemList(r.items));
   if (r.recipe) p.push(`the ${RECIPE_BY[r.recipe].label || GOODS[RECIPE_BY[r.recipe].out || r.recipe].name} recipe`);
   if (r.flag === 'raft') p.push('a raft');
+  if (r.pet) p.push(`a pet: ${PETS[r.pet].name}`);
   if (c.pact) p.push(`a pact with ${TOWNS[c.pact].name}`);
   return p.join(' · ');
 }
@@ -2418,6 +2538,7 @@ function completeContract(n, id) {
   if (r.items) for (const g in r.items) addItem(g, r.items[g]);
   if (r.recipe) S.known[r.recipe] = true;
   if (r.flag) S.flags[r.flag] = true;
+  if (r.pet) addPet(r.pet);
   if (r.reveal === 'shrine') { const L = LANDMARKS.find(l => l.id === 'shrine'); reveal(L.x+.5, L.y+.5, 4); S.flags.shrineMarked = true; }
   if (r.reveal === 'wyrm') { S.lairsSeen.wyrm = true; reveal(BOSSES.wyrm.x + .5, BOSSES.wyrm.y + .5, 6); }
   addRep(n.town, r.rep || 0);
@@ -2530,7 +2651,7 @@ function tradeVals() {
   for (const g in trade.take) theyGive += trade.take[g] * price(n.town, g) * m.sell;
   return {youGive, theyGive};
 }
-const KIND_ORDER = ['good','craft','trophy','mat','food','ammo','tool','weapon','armor','trinket'];
+const KIND_ORDER = ['good','craft','trophy','mat','seed','food','ammo','tool','weapon','armor','trinket'];
 const byKind = (a, b) => KIND_ORDER.indexOf(GOODS[a].kind) - KIND_ORDER.indexOf(GOODS[b].kind);
 function renderTrade() {
   const n = trade.n, st = S.npc[n.id], m = mults(n), tw = TOWNS[n.town];
@@ -2630,6 +2751,7 @@ function propose(isCounter) {
 /* ================= bag ================= */
 function itemStat(g) {
   const d = GOODS[g];
+  if (d.kind === 'seed') { const C = CROPS[d.crop]; return `Plant on your farm · ready in ${C.grow} day${C.grow === 1 ? '' : 's'}`; }
   if (d.kind === 'weapon') return d.ranged ? `${d.dmg} damage · ranged${d.noAmmo ? ', no ammo needed' : ', uses arrows'}` : `${d.dmg} damage · reach ${d.reach}${d.silver ? ' · double vs undead' : ''}`;
   if (d.kind === 'armor') return `Armor ${d.armor} · blocks ${Math.round(Math.min(.7, d.armor*.12)*100)}% of damage${d.speed ? ` · ${Math.round(d.speed*100)}% faster` : ''}`;
   if (d.kind === 'food') return `Heals ${d.heal}`;
@@ -2663,7 +2785,9 @@ function renderBag() {
     ${sec('Food', ['food'], eatBtn)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
-    ${sec('Materials & ammo', ['mat','ammo'])}`;
+    ${sec('Seeds · plant them on your farm', ['seed'])}
+    ${sec('Materials & ammo', ['mat','ammo'])}
+    ${animalsHTML()}`;
 }
 $('bagSheet').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -2671,6 +2795,8 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.equip) { const g = b.dataset.equip; S.equip[GOODS[g].kind === 'armor' ? 'armor' : 'weapon'] = g; }
   if (b.dataset.unequip) { const g = b.dataset.unequip; S.equip[GOODS[g].kind === 'armor' ? 'armor' : 'weapon'] = null; }
   if (b.dataset.eat) eat(b.dataset.eat);
+  if ('pet' in b.dataset) choosePet(b.dataset.pet);
+  if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderBag(); save();
 });
 function eat(g) {
@@ -2691,8 +2817,8 @@ function quickEat() {
 /* ================= crafting ================= */
 let craftTab = 0;
 function stations() {
-  const t = townAt(S.x, S.y, 8);
-  return {hand: true, bench: !!t, forge: !!t && FORGE_TOWNS.includes(t)};
+  const t = townAt(S.x, S.y, 8), home = t === 'home';
+  return {hand: true, bench: !!t && (!home || S.home.level >= 2), forge: (!!t && FORGE_TOWNS.includes(t)) || (home && S.home.level >= 3)};
 }
 function openCraft() { mode = 'craft'; keys.clear(); renderCraft(); $('craft').hidden = false; }
 function renderCraft() {
@@ -2743,6 +2869,299 @@ function craft(id) {
   renderHUD(); renderCraft(); save();
 }
 
+/* ================= pets & mounts ================= */
+function addPet(id) {
+  if (!S.pets.includes(id)) S.pets.push(id);
+  if (!S.pet) { S.pet = id; petE = null; }
+  toast(`New pet: <b>${esc(PETS[id].name)}</b><br>${esc(PETS[id].desc)} ${S.pet === id ? 'It follows you now.' : 'Choose it from your Bag.'}`, 6500);
+  save();
+}
+function addMount(id) {
+  if (!S.mounts.includes(id)) S.mounts.push(id);
+  if (!S.mount) S.mount = id;
+  toast(`New mount: <b>${esc(MOUNTS[id].name)}</b><br>${esc(MOUNTS[id].desc)} Press V to ride.`, 6500);
+  renderHUD(); save();
+}
+function choosePet(id) { S.pet = id || null; petE = null; save(); }
+function chooseMount(id) { S.mount = id; save(); renderHUD(); }
+function toggleRide() {
+  if (mode !== 'play') return;
+  if (!S.mount) { floatText(S.x, S.y - 1.2, 'No mount yet', '#e57a62'); return; }
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y));
+  if (S.riding) {
+    if (!walkable(t, !!S.flags.raft, canClimb())) { toast('Find solid ground before you land.'); return; }
+    S.riding = false;
+  } else {
+    if (t === T.DEEP && !MOUNTS[S.mount].fly) { toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't go into deep water.`); return; }
+    S.riding = true; fishing = null;
+  }
+  burst(S.x, S.y, '#c8b896', 8, 2); renderHUD(); save();
+}
+function animalsTalk(n) {
+  const list = Object.keys(n.animals);
+  const opts = list.map(id => {
+    const isPet = !!PETS[id], D = isPet ? PETS[id] : MOUNTS[id], owned = (isPet ? S.pets : S.mounts).includes(id);
+    const price = n.animals[id], req = n.animalReq && n.animalReq[id], locked = req && !S.bosses[req];
+    return {label: owned ? `${D.name} (yours)` : locked ? `${D.name} (only after ${BOSSES[req].name} falls)` : `Buy the ${D.name} (${price} coin)`,
+      disabled: owned || locked || S.coins < price,
+      fn: () => { S.coins -= price; isPet ? addPet(id) : addMount(id); renderHUD(); save(); animalsTalk(n); }};
+  });
+  say(`“Good animals, every one.”<div class="req">${list.map(id => { const D = PETS[id] || MOUNTS[id]; return `<span>${PETS[id] ? 'Pet' : 'Mount'} · ${esc(D.name)}: ${esc(D.desc)}</span>`; }).join('')}</div>`, [...opts, back(n)]);
+}
+function animalsHTML() {
+  if (!S.pets.length && !S.mounts.length) return `<h3>Pets & mounts</h3><div class="none">No animals yet. Horses and dogs: Gwen in Port Wren. Camels: Dunmere. Elk and foxes: Hollowpine. Cats: Thornwick. Hawks: Stormwatch. Monkeys: Jadewater.</div>`;
+  const pc = id => `<div class="jcard ${S.pet === id ? 'eq' : ''}"><div class="irow"><span class="nm"><span class="t">${esc(PETS[id].name)}</span></span>${S.pet === id ? '<button class="btn sm" data-pet="">Leave at home</button>' : `<button class="btn sm primary" data-pet="${id}">Bring along</button>`}</div><div class="stat">Pet · ${PETS[id].dmg} damage · ${esc(PETS[id].desc)}</div></div>`;
+  const mc = id => `<div class="jcard ${S.mount === id ? 'eq' : ''}"><div class="irow"><span class="nm"><span class="t">${esc(MOUNTS[id].name)}</span></span>${S.mount === id ? '<span class="s">Saddled · press V</span>' : `<button class="btn sm primary" data-mount="${id}">Saddle up</button>`}</div><div class="stat">Mount · ${Math.round(MOUNTS[id].speed*100 - 100)}% faster · ${esc(MOUNTS[id].desc)}</div></div>`;
+  return `<h3>Pets & mounts</h3><div class="jgrid">${S.pets.map(pc).join('')}${S.mounts.map(mc).join('')}</div>`;
+}
+const petWalk = (x, y) => { const t = tileAt(Math.floor(x), Math.floor(y)); return t !== T.MOUNT && t !== T.HOUSE && t !== T.LAVA && !homeBlocked(Math.floor(x), Math.floor(y)); };
+function updatePet(dt) {
+  if (!S.pet) { petE = null; return; }
+  const P = PETS[S.pet];
+  if (!petE) petE = {x: S.x - .8, y: S.y + .3, cd: 0, face: 1, phase: 0, moving: false};
+  petE.cd -= dt;
+  let target = null;
+  if (!townAt(S.x, S.y, 8)) { let bd = 6; for (const e of enemies) { if (e.hidden > 0) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
+  const tx = target ? target.x : S.x - player.dir.x*1.1, ty = target ? target.y : S.y - player.dir.y*1.1 + .2;
+  const dx = tx - petE.x, dy = ty - petE.y, d = Math.hypot(dx, dy);
+  const stop = target ? .6 + ((target.size || 1) - 1)*.4 : .5;
+  petE.moving = false;
+  if (d > 14) { petE.x = S.x; petE.y = S.y; }
+  else if (d > stop) {
+    const sp = P.speed * (S.riding ? 1.9 : 1) * (d > 4 ? 1.4 : 1);
+    const nx = petE.x + dx/d*sp*dt, ny = petE.y + dy/d*sp*dt;
+    if (P.fly || petWalk(nx, petE.y)) petE.x = nx;
+    if (P.fly || petWalk(petE.x, ny)) petE.y = ny;
+    petE.phase += dt*12; petE.moving = true;
+  }
+  if (Math.abs(dx) > .1) petE.face = dx < 0 ? -1 : 1;
+  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd; hitEnemy(target, P.dmg, dx/(d || 1), dy/(d || 1)); if (S.pet === 'salamander') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
+}
+function drawPet(g, id, x, y, f, phase, moving) {
+  const step = moving ? Math.sin(phase) : 0;
+  const shadow = w => { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, w, 1.4, 0, 0, 7); g.fill(); };
+  if (id === 'dog' || id === 'fox' || id === 'wolfpup') {
+    const body = id === 'dog' ? '#a0703a' : id === 'fox' ? '#d8602a' : '#9aa0a8', dark = id === 'dog' ? '#6a4a2a' : id === 'fox' ? '#8a3a1a' : '#6a7078';
+    shadow(5); g.fillStyle = dark; g.fillRect(x-4, y-3, 1.5, 3 + (step > 0 ? 0 : -1)); g.fillRect(x+2, y-3, 1.5, 3 + (step < 0 ? 0 : -1));
+    g.fillStyle = body; g.fillRect(x-4, y-6, 8, 4); g.fillRect(x + f*3 - 1.5, y-8, 4, 4);
+    g.fillStyle = dark; g.fillRect(x + f*3 - 1.5, y-9, 1.5, 1.5); g.fillRect(x + f*5.5, y-6.5, 1.5, 1);
+    g.fillStyle = id === 'fox' ? '#f4ecd8' : body; g.fillRect(x - f*5 - 1, y-7 + Math.sin(phase*.7)*.5, 2, 2);
+    g.fillStyle = '#1a1a1a'; g.fillRect(x + f*4, y-7, 1, 1);
+  } else if (id === 'cat') {
+    shadow(4); g.fillStyle = '#4a4a50'; g.fillRect(x-3, y-5, 6, 3); g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
+    g.fillRect(x + f*2 - 1, y-7, 3, 3); g.fillRect(x + f*2 - 1, y-8, 1, 1); g.fillRect(x + f*2 + 1, y-8, 1, 1); g.fillRect(x - f*4, y-8 + Math.sin(phase*.5), 1, 4);
+    g.fillStyle = '#c0e040'; g.fillRect(x + f*2 + (f > 0 ? 1 : -1)*.5, y-6, 1, 1);
+  } else if (id === 'hawk') {
+    const wf = Math.sin(phase*1.5 + frameT*6)*2.5, by = y - 16 + Math.sin(frameT*1.6)*1.5;
+    g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(x, y, 3, 1, 0, 0, 7); g.fill();
+    g.fillStyle = '#6a4a2a'; g.beginPath(); g.moveTo(x-1, by); g.lineTo(x-6, by-2-wf); g.lineTo(x-2, by+2); g.fill(); g.beginPath(); g.moveTo(x+1, by); g.lineTo(x+6, by-2-wf); g.lineTo(x+2, by+2); g.fill();
+    g.fillStyle = '#8a6a4a'; g.fillRect(x-1.5, by-2, 3, 5); g.fillStyle = '#f4ecd8'; g.fillRect(x + f - 1, by-4, 2, 2); g.fillStyle = '#e0b040'; g.fillRect(x + f*2, by-3, 1, 1);
+  } else if (id === 'monkey') {
+    const hop = Math.abs(step)*1.5;
+    shadow(4); g.fillStyle = '#7a5032'; g.fillRect(x-2, y-7 - hop, 4, 5); g.fillRect(x-2, y-2, 1, 2); g.fillRect(x+1, y-2, 1, 2); g.fillRect(x-2, y-10 - hop, 4, 3);
+    g.fillStyle = '#d8b090'; g.fillRect(x + f - 1, y-9 - hop, 2, 2);
+    g.strokeStyle = '#7a5032'; g.lineWidth = 1; g.beginPath(); g.moveTo(x - f*2, y-4 - hop); g.quadraticCurveTo(x - f*7, y-6, x - f*5, y-10); g.stroke();
+  } else if (id === 'salamander') {
+    shadow(5); g.fillStyle = '#c03a1a'; g.fillRect(x-5, y-3, 9, 3); g.fillRect(x + f*4 - 1, y-4, 3, 3); g.fillRect(x - f*7, y-2, 3, 1);
+    g.fillStyle = '#8a2a10'; g.fillRect(x-3, y-1, 1, 1 + (step > 0 ? 1 : 0)); g.fillRect(x+2, y-1, 1, 1 + (step < 0 ? 1 : 0));
+    g.fillStyle = `rgba(255,160,40,${.6 + Math.sin(frameT*9)*.3})`; g.fillRect(x-3, y-5, 1, 2); g.fillRect(x, y-6, 1, 3); g.fillRect(x+2, y-5, 1, 2);
+    g.fillStyle = '#ffe060'; g.fillRect(x + f*5, y-3, 1, 1);
+  }
+}
+function drawMount(g, id, x, y, f, phase, moving) {
+  const step = moving ? Math.sin(phase)*1.5 : 0;
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 9, 2.2, 0, 0, 7); g.fill();
+  if (id === 'griffon') {
+    const wf = Math.sin(frameT*(moving ? 10 : 3))*4, hy = moving ? -4 : 0;
+    g.fillStyle = '#a8803a'; g.fillRect(x-5, y-4 + hy, 2, 4); g.fillRect(x+3, y-4 + hy, 2, 4);
+    g.fillStyle = '#e8d8b0'; g.beginPath(); g.moveTo(x-2, y-10+hy); g.lineTo(x-14, y-18-wf+hy); g.lineTo(x-4, y-6+hy); g.fill(); g.beginPath(); g.moveTo(x+2, y-10+hy); g.lineTo(x+14, y-18-wf+hy); g.lineTo(x+4, y-6+hy); g.fill();
+    g.fillStyle = '#c8a040'; g.fillRect(x-7, y-10+hy, 14, 6); g.fillStyle = '#f4f0e8'; g.fillRect(x + f*6 - 2, y-15+hy, 5, 5);
+    g.fillStyle = '#e0b040'; g.fillRect(x + f*9 - (f < 0 ? 1 : 0), y-13+hy, 2, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*7, y-14+hy, 1, 1);
+    g.fillStyle = '#c8a040'; g.fillRect(x - f*9 - 1, y-9+hy, 3, 2);
+    return;
+  }
+  const body = id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
+  g.fillStyle = dark; g.fillRect(x-6, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x-3, y-6, 2, 6 + (step < 0 ? 0 : -1)); g.fillRect(x+2, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x+5, y-6, 2, 6 + (step < 0 ? 0 : -1));
+  g.fillStyle = body; g.fillRect(x-7, y-11, 15, 6);
+  if (id === 'camel') g.fillRect(x-3, y-14, 6, 3);
+  g.fillRect(x + f*7 - 1, y-16, 3, 7); g.fillRect(x + f*8 - 2, y-17, 5, 3);
+  g.fillStyle = dark; g.fillRect(x - f*8 - 1, y-11, 2, 5);
+  if (id === 'horse') g.fillRect(x + f*6 - 1, y-16, 2, 6);
+  if (id === 'elk') { g.fillStyle = '#d8c8a0'; g.fillRect(x + f*8 - 3, y-21, 1, 4); g.fillRect(x + f*8 + 2, y-21, 1, 4); g.fillRect(x + f*8 - 4, y-21, 3, 1); g.fillRect(x + f*8 + 1, y-21, 3, 1); }
+  g.fillStyle = '#1a1a1a'; g.fillRect(x + f*9, y-16, 1, 1);
+}
+
+/* ================= homestead & farm ================= */
+const cropProgress = pl => Math.min(1, (S.day + S.time - pl.at) / CROPS[pl.crop].grow);
+const canAfford = c => S.coins >= (c.coins || 0) && Object.entries(c.items || {}).every(([g, n]) => have(g) >= n);
+function pay(c) { S.coins -= c.coins || 0; for (const g in (c.items || {})) addItem(g, -c.items[g]); }
+const costHTML = c => `<div class="req"><span>${c.coins} coin <b class="${S.coins >= c.coins ? 'ok' : 'no'}">${S.coins}/${c.coins}</b></span>${Object.entries(c.items || {}).map(([g, n]) => `<span>${swatch(g)}${n} ${GOODS[g].name} <b class="${have(g) >= n ? 'ok' : 'no'}">${have(g)}/${n}</b></span>`).join('')}</div>`;
+function homeTarget() {
+  if (Math.hypot(S.x - HOME.x, S.y - HOME.y) > 7) return null;
+  const lvl = S.home.level, K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (Math.hypot(S.x - (HOME.x + .5), S.y - (HOME.y - .4)) < 1.2) {
+    if (!lvl) return {key:'sale', html:'Homestead for sale · ask <b>Pell</b>, the land agent', btn:'', fn: () => toast('Pell, standing beside the plot, sells this homestead.')};
+    return {key:'door', html:`${K}Go inside your ${HOME_LEVELS[lvl].name.toLowerCase()}`, btn:'Enter', fn: openHome};
+  }
+  if (lvl >= 2 && Math.hypot(S.x - COOP.x, S.y - COOP.y) < 1.3) return {key:'coop' + S.home.eggs + S.home.chickens, html:`${K}Chicken coop · ${S.home.chickens} hens · ${S.home.eggs} eggs`, btn:'Coop', fn: coopTalk};
+  const n = HOME_LEVELS[lvl].plots || 0;
+  let bi = -1, bd = 1.0;
+  for (let i = 0; i < n; i++) { const P = plotPos(i); const d = Math.hypot(S.x - P.x - .5, S.y - P.y - .5); if (d < bd) { bd = d; bi = i; } }
+  if (bi < 0) return null;
+  const pl = S.home.plots[bi];
+  if (!pl) return {key:'p' + bi + 'e', html:`${K}Plant something`, btn:'Plant', fn: () => plotTalk(bi)};
+  const C = CROPS[pl.crop], prog = cropProgress(pl);
+  if (prog >= 1) return {key:'p' + bi + 'r', html:`${K}Harvest ${C.name}`, btn:'Harvest', fn: () => harvest(bi)};
+  return {key:'p' + bi + 'g' + Math.floor(prog*20), html:`${C.name} · ${Math.floor(prog*100)}% grown`, btn:'', fn: () => {}};
+}
+function openPanel(title, html, opts) {
+  talkNPC = null; mode = 'talk'; keys.clear(); fishing = null;
+  $('prompt').hidden = true; $('actBtn').hidden = true; promptKey = null;
+  const g = $('portrait').getContext('2d'); g.setTransform(1,0,0,1,0,0);
+  g.fillStyle = '#6e9c4e'; g.fillRect(0, 0, 72, 72); g.fillStyle = '#5a3a20'; g.fillRect(8, 40, 56, 24);
+  g.fillStyle = '#4a9a3a'; g.fillRect(34, 22, 4, 20); g.fillRect(26, 26, 8, 4); g.fillRect(38, 30, 10, 4);
+  $('talkWho').innerHTML = title; $('talk').hidden = false; say(html, opts);
+}
+function plant(i, seed) { addItem(seed, -1); S.home.plots[i] = {crop: GOODS[seed].crop, at: S.day + S.time}; const P = plotPos(i); burst(P.x + .5, P.y + .6, '#7a5a3a', 6, 2); }
+function plotTalk(i) {
+  const seeds = GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0);
+  if (!seeds.length) { openPanel('Crop bed', 'You have no seeds. Pell sells them right here, and harvests often give seeds back.', [{label:'OK', fn: closeTalk}]); return; }
+  const empty = () => Array.from({length: HOME_LEVELS[S.home.level].plots}, (_, k) => k).filter(k => !S.home.plots[k]);
+  const opts = [];
+  for (const g of seeds) {
+    const C = CROPS[GOODS[g].crop];
+    opts.push({label:`Plant ${C.name} (${have(g)} seed${have(g) === 1 ? '' : 's'} · ${C.grow} day${C.grow === 1 ? '' : 's'})`, primary: opts.length === 0, fn: () => { plant(i, g); save(); closeTalk(); }});
+    if (have(g) > 1 && empty().length > 1) opts.push({label:`Fill every empty bed with ${C.name}`, fn: () => { for (const k of empty()) { if (!have(g)) break; plant(k, g); } save(); closeTalk(); }});
+  }
+  opts.push({label:'Cancel', fn: closeTalk});
+  openPanel('Crop bed', 'What will you plant? Crops keep growing while you travel.', opts);
+}
+function harvest(i) {
+  const pl = S.home.plots[i], C = CROPS[pl.crop], give = C.give || pl.crop, P = plotPos(i);
+  const amt = rint(C.yield[0], C.yield[1]); addItem(give, amt);
+  const seed = GK.find(g => GOODS[g].crop === pl.crop), seeds = Math.random() < .65 ? rint(1, 2) : 0;
+  if (seeds) addItem(seed, seeds);
+  floatText(P.x + .5, P.y, `+${amt} ${GOODS[give].name}${seeds ? ` +${seeds} seeds` : ''}`, '#86c98f');
+  burst(P.x + .5, P.y + .5, '#e0c050', 8, 3);
+  S.home.plots[i] = null; S.harvested = (S.harvested || 0) + 1;
+  renderHUD(); save();
+}
+function coopTalk() {
+  const H = S.home, opts = [];
+  if (H.eggs) opts.push({label:`Collect ${H.eggs} eggs`, primary:true, fn: () => { addItem('egg', H.eggs); floatText(COOP.x, COOP.y - 1, `+${H.eggs} Eggs`, '#86c98f'); H.eggs = 0; renderHUD(); save(); coopTalk(); }});
+  if (H.chickens < 4) opts.push({label:'Buy a hen (40 coin)', disabled: S.coins < 40, fn: () => { S.coins -= 40; H.chickens++; renderHUD(); save(); coopTalk(); }});
+  opts.push({label:'Close', fn: closeTalk});
+  openPanel('Chicken coop', `${H.chickens} of 4 hens. Each hen lays one egg every morning (the coop holds up to 12).${H.eggs ? '' : ' No eggs waiting right now.'}`, opts);
+}
+function homesteadTalk(n) {
+  if (!S.home.level) {
+    const c = HOME_LEVELS[1].cost;
+    say(`“That plot by my sign? Good soil, a sound log cabin, a bed, a big chest and four crop beds. ${c.coins} coin and it's yours. You can build it up later.”`, [
+      {label:`Buy it (${c.coins} coin)`, primary:true, disabled: S.coins < c.coins, fn: () => {
+        S.coins -= c.coins; S.home.level = 1; save(); renderHUD();
+        toast('<b>You own a homestead!</b><br>Go inside to sleep, store things and upgrade. Plant seeds in the crop beds out front.', 8000);
+        say('“Congratulations, neighbor. I sell seeds too, whenever you need them.”', [back(n)]);
+      }}, back(n)]);
+  } else say(`“How's the ${HOME_LEVELS[S.home.level].name.toLowerCase()}? You can build it up from inside. And I sell seeds, of course.”`, [back(n)]);
+}
+function sleep() {
+  if (S.time > .27) { S.time = .27; newDay(); } else S.time = .27;
+  S.hp = maxHP(); enemies = []; eproj = []; hazards = [];
+  closeModal('home'); toast('<b>Good morning</b><br>You wake rested in your own bed.'); renderHUD(); save();
+}
+function openHome() { mode = 'home'; keys.clear(); fishing = null; renderHome(); $('home').hidden = false; }
+function renderHome() {
+  const H = S.home, L = HOME_LEVELS[H.level], next = HOME_LEVELS[H.level + 1];
+  const chestKeys = GK.filter(g => (H.chest[g] || 0) > 0).sort(byKind);
+  const mine = GK.filter(g => have(g) > 0).sort(byKind);
+  const row = (g, n, act) => `<div class="trow">${swatch(g)}<span class="nm">${GOODS[g].name} <small>×${n}</small></span><button class="btn sm" data-${act}="${g}" data-n="1">${act === 'store' ? 'Store' : 'Take'} 1</button><button class="btn sm" data-${act}="${g}" data-n="all">All</button></div>`;
+  const up = next ? `<div class="jcard"><div class="t">Build a ${next.name}</div><div class="s">${next.perks}</div>${costHTML(next.cost)}<div style="margin-top:8px"><button class="btn sm ${canAfford(next.cost) ? 'primary' : ''}" data-up="1" ${canAfford(next.cost) ? '' : 'disabled'}>Build it</button></div></div>`
+                  : '<div class="jcard"><div class="t done">Fully built</div><div class="s">The finest house on the coast.</div></div>';
+  $('homeSheet').innerHTML = `
+    <div class="sheet-head"><h2>Your ${L.name}</h2><button class="btn" data-x="1">Close<kbd>Esc</kbd></button></div>
+    <div class="vals" style="margin-top:6px">${L.plots} crop beds${H.level >= 2 ? ` · coop with ${H.chickens} hens · workbench` : ''}${H.level >= 3 ? ' · forge' : ''} · you wake up here if you're knocked out</div>
+    <div class="jgrid" style="margin-top:12px">
+      <div class="jcard"><div class="t">Bed</div><div class="s">Sleep until morning and wake fully healed. Crops keep growing while you sleep.</div><div style="margin-top:8px"><button class="btn sm primary" data-sleep="1">Sleep</button></div></div>
+      ${up}
+    </div>
+    ${animalsHTML()}
+    <h3>Storage chest</h3>
+    <div class="tcols"><div class="tcol"><h3>Your pack</h3>${mine.length ? mine.map(g => row(g, have(g), 'store')).join('') : '<div class="none">Nothing to store.</div>'}</div>
+    <div class="tcol"><h3>In the chest</h3>${chestKeys.length ? chestKeys.map(g => row(g, H.chest[g], 'take')).join('') : '<div class="none">The chest is empty.</div>'}</div></div>`;
+}
+$('homeSheet').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const H = S.home;
+  if (b.dataset.x) { closeModal('home'); return; }
+  if (b.dataset.sleep) { sleep(); return; }
+  if (b.dataset.up) { const next = HOME_LEVELS[H.level + 1]; if (next && canAfford(next.cost)) { pay(next.cost); H.level++; toast(`Built: <b>${next.name}</b><br>${next.perks}.`, 6000); } }
+  if (b.dataset.store) { const g = b.dataset.store, n = b.dataset.n === 'all' ? have(g) : 1; if (have(g) >= n) { addItem(g, -n); H.chest[g] = (H.chest[g] || 0) + n; } }
+  if (b.dataset.take) { const g = b.dataset.take, n = b.dataset.n === 'all' ? H.chest[g] : 1; if ((H.chest[g] || 0) >= n) { H.chest[g] -= n; if (!H.chest[g]) delete H.chest[g]; addItem(g, n); } }
+  if ('pet' in b.dataset) choosePet(b.dataset.pet);
+  if (b.dataset.mount) chooseMount(b.dataset.mount);
+  renderHUD(); renderHome(); save();
+});
+function drawChicken(g, x, y, f, t) {
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(x, y, 3, 1, 0, 0, 7); g.fill();
+  const peck = Math.sin(t*3) > .7 ? 1 : 0;
+  g.fillStyle = '#e8a030'; g.fillRect(x-1, y-1, 1, 1); g.fillRect(x+1, y-1, 1, 1);
+  g.fillStyle = '#f4f0e8'; g.fillRect(x-3, y-5, 5, 4); g.fillRect(x + f*2 - 1, y-7 + peck, 2, 3);
+  g.fillStyle = '#d03030'; g.fillRect(x + f*2 - 1, y-8 + peck, 2, 1); g.fillStyle = '#e8a030'; g.fillRect(x + f*3 + (f < 0 ? -1 : 0), y-6 + peck, 1, 1);
+}
+function drawFarm(g, t) {
+  const n = HOME_LEVELS[S.home.level].plots || 0;
+  for (let i = 0; i < n; i++) {
+    const P = plotPos(i), x = P.x*TS, y = P.y*TS;
+    g.fillStyle = '#5a3a20'; g.fillRect(x+1, y+1, 14, 14); g.fillStyle = '#4a2e18'; g.fillRect(x+1, y+5, 14, 1); g.fillRect(x+1, y+10, 14, 1);
+    const pl = S.home.plots[i]; if (!pl) continue;
+    const prog = cropProgress(pl), cx = x + 8, cy = y + 13;
+    if (prog < .34) { g.fillStyle = '#6ac04a'; g.fillRect(cx-1, cy-3, 1, 3); g.fillRect(cx+1, cy-2, 1, 2); continue; }
+    if (prog < 1) { g.fillStyle = '#4a9a3a'; g.fillRect(cx-3, cy-6, 1, 6); g.fillRect(cx, cy-8, 1, 8); g.fillRect(cx+3, cy-5, 1, 5); g.fillStyle = '#6ac04a'; g.fillRect(cx-2, cy-5, 2, 1); g.fillRect(cx+1, cy-6, 2, 1); continue; }
+    switch (pl.crop) {
+      case 'wheat': g.fillStyle = '#c8a040'; for (let k = -4; k <= 4; k += 2) g.fillRect(cx+k, cy-10, 1, 10); g.fillStyle = '#e8c860'; for (let k = -4; k <= 4; k += 2) g.fillRect(cx+k-.5, cy-12, 2, 3); break;
+      case 'carrot': g.fillStyle = '#4a9a3a'; for (let k = -3; k <= 3; k += 3) { g.fillRect(cx+k, cy-6, 1, 5); g.fillRect(cx+k-1, cy-7, 3, 1); } g.fillStyle = '#f08a30'; for (let k = -3; k <= 3; k += 3) g.fillRect(cx+k-1, cy-1, 3, 2); break;
+      case 'flax': g.fillStyle = '#4a8a3a'; for (let k = -4; k <= 4; k += 2) g.fillRect(cx+k, cy-9, 1, 9); g.fillStyle = '#8ab0e0'; for (let k = -4; k <= 4; k += 2) g.fillRect(cx+k-.5, cy-11, 2, 2); break;
+      case 'tea': g.fillStyle = '#3a7a3a'; g.beginPath(); g.arc(cx, cy-4, 5, 0, 7); g.fill(); g.fillStyle = '#7ac05a'; g.fillRect(cx-2, cy-7, 2, 1); g.fillRect(cx+1, cy-5, 2, 1); break;
+      case 'pumpkin': g.fillStyle = '#3a7a2a'; g.fillRect(cx-6, cy-2, 12, 1); g.fillStyle = '#e07a20'; g.beginPath(); g.ellipse(cx, cy-3, 5, 3.5, 0, 0, 7); g.fill(); g.fillStyle = '#b05a10'; g.fillRect(cx-2, cy-6, 1, 6); g.fillRect(cx+1, cy-6, 1, 6); g.fillStyle = '#4a6a2a'; g.fillRect(cx, cy-8, 1, 2); break;
+      case 'moonflower': { g.fillStyle = '#4a7a5a'; g.fillRect(cx, cy-8, 1, 8); g.fillStyle = `rgba(200,216,255,${.6 + Math.sin(t*2)*.3})`; g.beginPath(); g.arc(cx, cy-9, 3, 0, 7); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(cx, cy-10, 1, 1); break; }
+    }
+    if (Math.sin(t*4 + i) > .85) { g.fillStyle = '#fff6c0'; g.fillRect(cx + 5, cy - 12, 1, 1); }
+  }
+}
+function drawHomestead(g, t) {
+  const lvl = S.home.level, px = (HOME.x - 1)*TS, py = (HOME.y - 3)*TS;
+  if (!lvl) {
+    const sx = HOME.x*TS + 8, sy = (HOME.y - 2)*TS + 14;
+    g.fillStyle = '#5a3d27'; g.fillRect(sx-1, sy-14, 2, 14); g.fillStyle = '#e8dcc0'; g.fillRect(sx-11, sy-19, 22, 9);
+    g.fillStyle = '#8a2a1a'; g.font = '5px "Pixelify Sans", monospace'; g.textAlign = 'center'; g.fillText('FOR SALE', sx, sy-13);
+    return;
+  }
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px+2, py+29, 46, 4);
+  if (lvl === 1) {
+    g.fillStyle = '#7a5532'; g.fillRect(px+4, py+12, 40, 20); g.fillStyle = '#5a3d27'; for (let k = 0; k < 5; k++) g.fillRect(px+4, py+14+k*4, 40, 1);
+    g.fillStyle = '#4a3a2a'; g.beginPath(); g.moveTo(px, py+14); g.lineTo(px+24, py-2); g.lineTo(px+48, py+14); g.fill();
+  } else if (lvl === 2) {
+    g.fillStyle = '#a8a29a'; g.fillRect(px+4, py+10, 40, 22); g.fillStyle = '#8a847c'; for (let k = 0; k < 5; k++) for (let j = 0; j < 5; j++) g.fillRect(px+5 + j*8 + (k%2)*3, py+12+k*4, 6, 1);
+    g.fillStyle = '#6a6460'; g.fillRect(px+34, py-6, 5, 12);
+    g.fillStyle = '#a03a2a'; g.beginPath(); g.moveTo(px, py+12); g.lineTo(px+24, py-6); g.lineTo(px+48, py+12); g.fill();
+    { const k = (t*.6) % 1; g.fillStyle = `rgba(220,220,220,${.5 - k*.5})`; g.beginPath(); g.arc(px+36 + k*4, py-8 - k*12, 2 + k*3, 0, 7); g.fill(); }
+    g.fillStyle = '#d0384e'; g.fillRect(px+6, py+25, 8, 2); g.fillRect(px+34, py+25, 8, 2);
+  } else {
+    g.fillStyle = '#d8ccb0'; g.fillRect(px+2, py-4, 44, 36); g.fillStyle = '#b8ac90'; g.fillRect(px+2, py+12, 44, 2);
+    g.fillStyle = '#3a4a6a'; g.beginPath(); g.moveTo(px-2, py-2); g.lineTo(px+24, py-20); g.lineTo(px+50, py-2); g.fill();
+    g.fillStyle = '#f3d27a'; g.fillRect(px+8, py+2, 6, 6); g.fillRect(px+21, py+2, 6, 6); g.fillRect(px+34, py+2, 6, 6);
+    g.fillStyle = '#5a3d27'; g.fillRect(px+24, py-30, 1, 12); g.fillStyle = '#2f6b6b'; g.fillRect(px+25, py-30, 7, 5); g.fillStyle = '#e3a948'; g.fillRect(px+25, py-28, 7, 1);
+  }
+  g.fillStyle = '#3a2618'; g.fillRect(px+20, py+20, 8, 12);
+  g.fillStyle = '#f3d27a'; g.fillRect(px+8, py+18, 6, 5); g.fillRect(px+34, py+18, 6, 5);
+  if (lvl >= 2) {
+    const cx = (HOME.x - 5)*TS, cy = (HOME.y - 3)*TS;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(cx+2, cy+29, 28, 3);
+    g.fillStyle = '#9a6a3a'; g.fillRect(cx+4, cy+14, 24, 16); g.fillStyle = '#d8b860'; g.beginPath(); g.moveTo(cx+1, cy+16); g.lineTo(cx+16, cy+4); g.lineTo(cx+31, cy+16); g.fill();
+    g.fillStyle = '#2a1a10'; g.fillRect(cx+13, cy+22, 6, 8);
+  }
+}
+
 /* ================= journal & map ================= */
 function openJournal() {
   mode = 'journal'; keys.clear();
@@ -2766,7 +3185,7 @@ function openJournal() {
     <div class="jcard"><div class="t">Your travels</div><div class="s">Day ${S.day}</div>
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
-      Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}</div></div>
+      Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
     <h3>Great beasts · ${BK.filter(k => S.bosses[k]).length}/${BK.length} slain</h3>
     <div class="jgrid">${BK.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
     <h3>Open deals</h3>
@@ -2786,7 +3205,7 @@ function openJournal() {
   $('journalSheet').querySelector('[data-close]').addEventListener('click', () => closeModal('journal'));
   $('journal').hidden = false;
 }
-function closeModal(id) { $(id).hidden = true; if (['journal','map','bag','craft','board'].includes(mode)) mode = 'play'; promptKey = ''; renderHUD(); }
+function closeModal(id) { $(id).hidden = true; if (['journal','map','bag','craft','board','home'].includes(mode)) mode = 'play'; promptKey = null; renderHUD(); }
 
 function openMap() {
   mode = 'map'; keys.clear();
@@ -2816,6 +3235,7 @@ function openMap() {
     g.fillStyle = '#0d131b'; g.fillText(t.name, (t.x+.5)*s + 1, (t.y+.5)*s - 8*dpr + 1);
     g.fillStyle = '#ebe4d3'; g.fillText(t.name, (t.x+.5)*s, (t.y+.5)*s - 8*dpr);
   }
+  g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   g.fillStyle = '#ffffff'; g.beginPath(); g.arc(S.x*s, S.y*s, 4*dpr, 0, 7); g.fill();
   g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke();
   $('mapLegend').textContent = `${exploredPct()}% of the land explored · ${Object.keys(S.towns).length} of ${Object.keys(TOWNS).length} settlements · ${LANDMARKS.filter(L => S.found[L.id]).length} of ${LANDMARKS.length} places · red X marks a beast's lair`;
@@ -2852,7 +3272,7 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 function begin(state) {
-  S = state; lastTile = -1; nearNPC = null; enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; fishing = null; lastHP = -1; promptKey = '';
+  S = state; petE = null; lastTile = -1; nearNPC = null; enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; fishing = null; lastHP = -1; promptKey = null;
   rebuildMapPixels();
   reveal(S.x, S.y, sightRadius());
   S.towns.wren = true;
