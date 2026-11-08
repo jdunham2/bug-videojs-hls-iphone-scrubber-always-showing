@@ -10,8 +10,8 @@ import { Particles } from './fx.js';
 import { ArrowSystem } from './arrows.js';
 import { CHARACTERS, OUTFITS, profile, saveProfile, purchase, requirementMet, outfitKey, saveStatus, currentCharacter } from './profile.js';
 import { Preview } from './preview.js';
-import { interiorHtml } from './interiors.js';
-import { mapArt } from './worldmap-art.js';
+import { interiorHtml, prepareInteriors } from './interiors.js';
+import { mapArt, prepareMapArt } from './worldmap-art.js';
 import { Room, ROOM_KINDS } from './rooms.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
@@ -79,6 +79,8 @@ export class Camp {
   build() {
     if (this.built) return;
     this.built = true;
+    prepareMapArt();
+    prepareInteriors();
     const S = this.scene;
     S.add(new THREE.HemisphereLight(0x9fb4ff, 0x3a2c20, 1.25));
     const moon = (this.moon = new THREE.DirectionalLight(0xbcd0ff, 1.8));
@@ -216,6 +218,7 @@ export class Camp {
     const P = G.player;
     this.active = true;
     this.room = null;
+    this.marching = null;
     document.body.classList.remove('in-room');
     this.flyHold = false;
     this.leaving = this.entering = false;
@@ -256,6 +259,10 @@ export class Camp {
     this.time += dt;
     const P = this.game.player;
     if (this.room) return this.updateRoom(dt);
+    if (this.marching) {
+      this.particles.update(dt);
+      return this.updateMarch(dt);
+    }
     this.fireLight.intensity = 40 * (0.85 + 0.1 * Math.sin(time * 11) + 0.05 * Math.sin(time * 27));
     if (Math.random() < dt * 25) {
       this.particles.spawn(new THREE.Vector3(rand(-0.3, 0.3), 0.5, rand(-0.3, 0.3)), { count: 1, color: [3, 1.2, 0.25], speed: 0.4, up: 3, life: 1, size: 0.07, gravity: -1.5, drag: 0.5 });
@@ -274,6 +281,10 @@ export class Camp {
     const flyTo = this.flyHold || (this.openKind && !this.room) ? 1 : 0;
     this.fly += (flyTo - this.fly) * (1 - Math.exp(-(flyTo ? 5 : 7) * dt));
     if (this.openKind) this.preview?.update(dt);
+    // Real time since the painted room covered the screen (it fades in over ~0.7 s).
+    if (!(this.openKind && this.interior.classList.contains('show'))) this.coveredSince = 0;
+    else this.coveredSince ||= performance.now();
+    this.coveredFor = this.coveredSince ? (performance.now() - this.coveredSince) / 1000 : 0;
     if (this.arrows) this.arrows.update(dt, [this.dummy], { onArrowHit: (a, e, point) => e.hit(a.damage, a.dir, a.charge, a.perfect), onArrowStopped: () => {}, onRicochet: () => {}, particles: this.particles });
     if (this.dummy?.rig) {
       // Springy wobble away from the hit.
@@ -282,6 +293,13 @@ export class Camp {
       const sway = Math.sin(this.time * 14) * D.wobble * 0.25;
       D.rig.rotation.x = D.dir ? sway * D.dir.z : 0;
       D.rig.rotation.z = D.dir ? -sway * D.dir.x : 0;
+    }
+    // The gate's doorway brightens as you walk up to it, with motes drifting out.
+    const gate = this.spots.find((s) => s.kind === 'gate');
+    if (gate && this.portal) {
+      const close = Math.max(0, 1 - Math.hypot(P.pos.x - gate.x, P.pos.z - gate.z) / 6);
+      this.portal.material.color.setScalar(1.25 + close * 1.1 + 0.08 * Math.sin(this.time * 3));
+      if (Math.random() < dt * (3 + close * 14)) this.particles.spawn(new THREE.Vector3(gate.bx + rand(-1, 1), rand(0.4, 2.8), gate.bz + rand(-1, 1)), { count: 1, color: [2.6, 2.1, 1.1], speed: 0.4, up: 0.4, life: 1.6, size: 0.05, gravity: -0.2, drag: 0.5 });
     }
     // Nearest building in reach.
     let near = null;
@@ -321,6 +339,73 @@ export class Camp {
       <p class="lvline">Hero level <b>${lv.level}</b> · <b class="tl-free">${pts.free}</b> point${pts.free === 1 ? '' : 's'} to spend · ${pts.spent} spent</p></div>
       <div class="talents">${cards}</div>
       <div class="actions"><button data-act="talent-reset" ${pts.spent ? '' : 'disabled'}>Take back all points (free)</button></div>`;
+  }
+
+  // ------------------------------------------------------------ setting out
+
+  /**
+   * Leaving through the gate: the hero strides into the glowing archway with
+   * the camera close behind, the light swells to gold, and a title card names
+   * where you're headed before the run begins.
+   */
+  marchOut(fromCheckpoint) {
+    const G = this.game;
+    const gate = this.spots.find((s) => s.kind === 'gate');
+    if (!gate || this.marching) return G.startFromCamp(fromCheckpoint);
+    this.marching = { t: 0, start: performance.now(), from: G.player.pos.clone(), to: new THREE.Vector3(gate.bx, 0, gate.bz), fromCheckpoint, dur: 1.5 };
+    // Real-time safety net: the run starts even if frames are slow or stall.
+    const M = this.marching;
+    setTimeout(() => this.marching === M && this.finishMarch(M), 2600);
+    this.flySpot = gate;
+    this.flyHold = true;
+    this.prompt.classList.remove('show');
+    G.sfx.sample('whoosh', { vol: 0.4, rate: 0.6, jitter: 0 });
+    G.sfx.sample('bell', { vol: 0.35, rate: 0.7, jitter: 0, delay: 0.3 });
+    const m = selectedMission();
+    const card = document.getElementById('setout');
+    if (card) {
+      const cp = profile.checkpoint;
+      card.innerHTML = `<div class="so-eyebrow">Setting out</div><div class="so-title"></div><div class="so-sub"></div>`;
+      card.querySelector('.so-title').textContent = m.name;
+      card.querySelector('.so-sub').textContent = fromCheckpoint && cp ? `Continuing from wave ${cp.wave + 1}` : `${selectedDifficulty().name}${m.challenge ? ` · ${m.challenge.text}` : ''}`;
+    }
+  }
+
+  /** Walk the hero into the gate; at the end, flash and start the run. */
+  updateMarch(dt) {
+    const M = this.marching;
+    const G = this.game;
+    const P = G.player;
+    M.t = (performance.now() - M.start) / 1000; // real time, so slow frames don't drag it out
+    const p = Math.min(1, M.t / M.dur);
+    const e = p * p * (3 - 2 * p);
+    P.pos.lerpVectors(M.from, M.to, e);
+    const dir = new THREE.Vector3().subVectors(M.to, M.from).setY(0);
+    if (dir.lengthSq() > 1e-4) {
+      dir.normalize();
+      P.vel.copy(dir).multiplyScalar(p < 0.95 ? 5 : 0);
+    }
+    this.portal.material.color.setScalar(1.3 + 2.5 * e);
+    if (Math.random() < dt * 40) this.particles.spawn(new THREE.Vector3(M.to.x + rand(-1, 1), rand(0.3, 2.8), M.to.z + rand(-1, 1)), { count: 1, color: [3, 2.4, 1.2], speed: 0.6, up: 1, life: 0.8, size: 0.06, gravity: -0.5 });
+    if (M.t > M.dur * 0.65 && !M.flashed) {
+      M.flashed = true;
+      document.body.classList.add('setting-out');
+    }
+    if (p >= 1 && !M.started) {
+      M.started = true;
+      setTimeout(() => this.finishMarch(M), 450);
+    }
+  }
+
+  finishMarch(M) {
+    if (this.marching !== M || M.done) return;
+    M.done = true;
+    document.body.classList.add('setting-out');
+    this.marching = null;
+    this.flyHold = false;
+    this.portal.material.color.setRGB(1.3, 1.15, 0.9);
+    this.game.start(M.fromCheckpoint);
+    setTimeout(() => document.body.classList.remove('setting-out'), 1400);
   }
 
   // ------------------------------------------------------------ the camp grows
@@ -1067,7 +1152,7 @@ export class Camp {
     }
     if (act === 'new' || act === 'continue') {
       this.close();
-      G.startFromCamp(act === 'continue');
+      this.marchOut(act === 'continue');
       return;
     }
     const isOutfit = this.openKind === 'wardrobe';

@@ -5,6 +5,35 @@
 // redraws) in a 500x300 box that matches the map's 5:3 frame.
 
 let cached = null;
+let bitmap = null;
+
+/**
+ * Turn the painted SVG into a JPEG once. An SVG <img> is vector: the browser
+ * re-rasterises it (paper-grain filters and all) whenever anything near it
+ * animates, which made the map screen crawl. A bitmap never does.
+ */
+function bakeBitmap(url) {
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = 1500;
+      c.height = 900;
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      bitmap = c.toDataURL('image/jpeg', 0.88);
+      const el = document.querySelector('.wmap img.wart');
+      if (el) el.src = bitmap;
+    } catch {
+      // Keep the SVG if the canvas can't be read back.
+    }
+  };
+  img.src = url;
+}
+
+/** Start baking early (camp build) so the map is ready the first time it opens. */
+export function prepareMapArt() {
+  mapArt();
+}
 
 function seeded(seed) {
   let s = seed;
@@ -14,7 +43,9 @@ function seeded(seed) {
   };
 }
 
+/** Map art as an HTML string; once baked, the painted layer is a plain bitmap. */
 export function mapArt() {
+  if (cached && bitmap) return cached.replace(/<img class="wart" alt="" src="[^"]*">/, `<img class="wart" alt="" src="${bitmap}">`);
   if (cached) return cached;
   const r = seeded(7);
   const R = (a, b) => a + r() * (b - a);
@@ -69,16 +100,16 @@ export function mapArt() {
     <path d="${coast.replace(' L 0 300 Z', '')}" transform="translate(18 -18)" stroke-width=".6" opacity=".16"/>
   </g>
   <path d="${coast}" fill="url(#wm-sea)" stroke="#3e5e5c" stroke-width="1.4"/>
-  <g class="wm-waves" fill="none" stroke="#e8f0e8" stroke-width=".9" stroke-linecap="round" opacity=".7">`;
+`;
+  let anim = `<g class="wm-waves" fill="none" stroke="#e8f0e8" stroke-width=".9" stroke-linecap="round" opacity=".7">`;
   for (let i = 0; i < 14; i++) {
     const x = R(6, 120);
     const y = R(Math.max(170, 175 + x * 0.6), 292);
-    s += `<path d="M${x} ${y} q 3 -3 6 0 q 3 -3 6 0" style="animation-delay:-${R(0, 4).toFixed(1)}s"/>`;
+    anim += `<path d="M${x} ${y} q 3 -3 6 0 q 3 -3 6 0" style="animation-delay:-${R(0, 4).toFixed(1)}s"/>`;
   }
-  s += `</g>
-  <g fill="#3e5e5c" opacity=".5"><path d="M40 250 q 6 -10 12 0 q -6 -3 -12 0 Z" /><path d="M30 268 l 10 -4 l -2 8 Z"/></g>
+  anim += `</g>`;
+  s += `<g fill="#3e5e5c" opacity=".5"><path d="M40 250 q 6 -10 12 0 q -6 -3 -12 0 Z" /><path d="M30 268 l 10 -4 l -2 8 Z"/></g>
   <path class="wm-river" d="M232 104 C 222 124, 236 136, 214 150 S 188 160, 178 178 S 150 196, 138 222" fill="none" stroke="#6f97a0" stroke-width="2.6" stroke-linecap="round"/>
-  <path class="wm-river flow" d="M232 104 C 222 124, 236 136, 214 150 S 188 160, 178 178 S 150 196, 138 222" fill="none" stroke="#d8ecef" stroke-width="1" stroke-dasharray="3 9" stroke-linecap="round"/>
   <g>`;
   // The Frostpeaks: a ridge of snowy mountains around the keep (keep sits at 250,90).
   const ridge = [
@@ -96,13 +127,14 @@ export function mapArt() {
   for (const [x, y, w, h] of ridge) s += peak(x, y, w, h, h > 30);
   s += `</g>`;
   // The Ashlands: the smoking mountain north-east of the forge (forge sits at 390,174).
-  s += `<circle cx="438" cy="104" r="40" fill="url(#wm-lava)" class="wm-lavaglow"/>`;
+  anim += `<path class="wm-river flow" d="M232 104 C 222 124, 236 136, 214 150 S 188 160, 178 178 S 150 196, 138 222" fill="none" stroke="#d8ecef" stroke-width="1" stroke-dasharray="3 9" stroke-linecap="round"/>`;
+  anim += `<circle cx="438" cy="104" r="40" fill="url(#wm-lava)" class="wm-lavaglow"/>`;
   s += peak(412, 128, 30, 26, false, '#6e4a38', '#4a2e22') + peak(470, 132, 28, 24, false, '#6e4a38', '#4a2e22');
   s += `<path d="M406 132 L 432 92 L 444 92 L 470 132 Z" fill="#5a3a2c" stroke="#2a160e" stroke-width=".9"/><path d="M438 92 L 444 92 L 470 132 L 446 132 Z" fill="#3e2418"/>`;
   s += `<path d="M432 92 L 444 92 L 441 96 L 435 96 Z" fill="#ffb04a"/><path d="M437 96 C 434 108, 440 116, 432 126" stroke="#ff8a2a" stroke-width="1.6" fill="none" class="wm-lavaflow"/>`;
-  s += `<g class="wm-smoke" fill="#4a3a32">`;
-  for (let i = 0; i < 5; i++) s += `<circle cx="438" cy="86" r="${4 + i}" style="animation-delay:-${(i * 1.2).toFixed(1)}s"/>`;
-  s += `</g>`;
+  anim += `<g class="wm-smoke" fill="#4a3a32">`;
+  for (let i = 0; i < 5; i++) anim += `<circle cx="438" cy="86" r="${4 + i}" style="animation-delay:-${(i * 1.2).toFixed(1)}s"/>`;
+  anim += `</g>`;
   s += `<g stroke="#e0602a" stroke-width="1.1" fill="none" opacity=".65"><path d="M396 196 l 8 6 l 12 -2"/><path d="M360 186 l 6 4"/><path d="M420 200 l 6 -6 l 8 2"/></g>`;
   // Hills and forests.
   s += hills(40, 210, 3) + hills(200, 200, 3) + hills(320, 150, 4) + hills(150, 140, 2) + hills(455, 205, 3);
@@ -127,11 +159,15 @@ export function mapArt() {
     ${label(172, 196, 'River Wend', 7, -38, 'fill="#3e5e64"')}
   </g>`;
   // Sea serpent doodle and a little ship: old-map charm.
-  s += `<g transform="translate(70 276)"><g fill="none" stroke="#2e4a4a" stroke-width="1" opacity=".55" class="wm-ship"><path d="M-10 0 L 10 0 L 7 5 L -7 5 Z" fill="#6a4a2a"/><path d="M0 0 L 0 -14 M 0 -13 L 8 -4 L 0 -4" /><path d="M0 -13 L 8 -4 L 0 -4 Z" fill="#efe2c4"/></g></g>`;
+  anim += `<g transform="translate(70 276)"><g fill="none" stroke="#2e4a4a" stroke-width="1" opacity=".55" class="wm-ship"><path d="M-10 0 L 10 0 L 7 5 L -7 5 Z" fill="#6a4a2a"/><path d="M0 0 L 0 -14 M 0 -13 L 8 -4 L 0 -4" /><path d="M0 -13 L 8 -4 L 0 -4 Z" fill="#efe2c4"/></g></g>`;
   s += `<rect width="500" height="300" filter="url(#wm-paper)"/>
   <rect width="500" height="300" fill="url(#wm-edge)"/>
   <rect x="4" y="4" width="492" height="292" fill="none" stroke="#5a3a18" stroke-width="1.2" opacity=".6"/><rect x="7" y="7" width="486" height="286" fill="none" stroke="#5a3a18" stroke-width=".5" opacity=".5"/>
 </svg>`;
-  cached = s;
-  return s;
+  // The painted layers go into an <img>: the browser rasterises it once, so its
+  // paper-grain filters never re-run. Only the light animated bits stay live SVG.
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.replace('<svg class="wart"', '<svg xmlns="http://www.w3.org/2000/svg"'))}`;
+  bakeBitmap(url);
+  cached = `<img class="wart" alt="" src="${url}"><svg class="wart wanim" viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true"><defs><radialGradient id="wm-lava" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb04a" stop-opacity=".9"/><stop offset=".5" stop-color="#e0501a" stop-opacity=".35"/><stop offset="1" stop-color="#e0501a" stop-opacity="0"/></radialGradient></defs>${anim}</svg>`;
+  return cached;
 }

@@ -307,7 +307,9 @@ export class Game {
     noteRunStart();
     this.falcon.attach(this.scene, falconUnlocked());
     this.sfx.runStart();
-    if (this.mission) setTimeout(() => this.state === 'playing' && this.bossCard(this.mission.name, `${this.difficulty.name} · ${this.mission.challenge.text}`), 300);
+    // After the gate's Setting Out card (if any) has faded, name the mission.
+    const cardDelay = document.body.classList.contains('setting-out') ? 2000 : 300;
+    if (this.mission) setTimeout(() => this.state === 'playing' && this.bossCard(this.mission.name, `${this.difficulty.name} · ${this.mission.challenge.text}`), cardDelay);
     this.state = 'playing';
     this.hideOverlay();
   }
@@ -582,9 +584,13 @@ export class Game {
     this.updateHud();
     if (render) {
       // Compatibility mode 1+: draw the scene directly, skipping post-processing.
-      if (settings.compat >= 1) this.renderer.render(this.renderPass.scene, this.camera);
-      else this.composer.render();
-      this.watchForBlack();
+      // A camp screen with its painted room fully covers the view: skip the 3D frame.
+      const covered = this.state === 'camp' && this.camp.openKind && !this.camp.room && this.camp.coveredFor > 0.9;
+      if (!covered) {
+        if (settings.compat >= 1) this.renderer.render(this.renderPass.scene, this.camera);
+        else this.composer.render();
+        this.watchForBlack();
+      }
     }
     this.input.endFrame();
   }
@@ -684,6 +690,12 @@ export class Game {
   }
 
   updateAim() {
+    // Marching out of camp: look where you're going.
+    const M = this.camp.marching;
+    if (M && this.state === 'camp') {
+      this.aimPoint.copy(M.to).setY(ARROW_HEIGHT);
+      return;
+    }
     const pad = this.input.pad;
     if (pad?.aim) {
       // Right stick: aim in screen-relative directions, a fixed distance out.

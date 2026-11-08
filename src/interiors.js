@@ -329,10 +329,52 @@ const SCENES = {
   },
 };
 
+// Each room is painted once into a JPEG: a live full-screen SVG with flickering
+// flames under a camp screen made the browser repaint everything every frame.
+const baked = {};
+const baking = {};
+
+function sceneSvg(kind) {
+  const { svg } = SCENES[kind]();
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" preserveAspectRatio="xMidYMid slice">${DEFS}${svg}<rect width="1600" height="900" fill="url(#in-vig)"/></svg>`;
+}
+
+function bake(kind) {
+  if (baked[kind] || baking[kind] || !SCENES[kind]) return;
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sceneSvg(kind))}`;
+  baking[kind] = url;
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = 1600;
+      c.height = 900;
+      c.getContext('2d').drawImage(img, 0, 0);
+      baked[kind] = c.toDataURL('image/jpeg', 0.85);
+      const el = document.querySelector(`#camp-interior.k-${kind} img.in-scene`);
+      if (el) el.src = baked[kind];
+    } catch {
+      baked[kind] = url;
+    }
+  };
+  img.src = url;
+}
+
+/** Paint every room ahead of time (a little at a time) so they're ready to show. */
+export function prepareInteriors() {
+  Object.keys(SCENES).forEach((k, i) => setTimeout(() => bake(k), 300 + i * 250));
+}
+
+const TONE = { hall: 'warm', wardrobe: 'warm', armory: 'warm', merchant: 'warm', blacksmith: 'hot', shrine: 'warm', gate: 'warm' };
+
 /** Full-screen interior markup for a camp building, or '' for none. */
 export function interiorHtml(kind) {
-  const make = SCENES[kind];
-  if (!make) return '';
-  const { svg, motes: m, tone } = make();
-  return `<svg class="in-scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${DEFS}${svg}<rect width="1600" height="900" fill="url(#in-vig)"/></svg><div class="in-motes ${tone}">${m}</div>`;
+  if (!SCENES[kind]) return '';
+  bake(kind);
+  const src = baked[kind] || baking[kind];
+  const tone = TONE[kind] || 'warm';
+  const motes = kind === 'blacksmith' ? motesHtml('spark', 22) + motesHtml('dust', 6) : motesHtml('dust', 14);
+  return `<img class="in-scene" alt="" src="${src}"><div class="in-light ${tone}"></div><div class="in-motes ${tone}">${motes}</div>`;
 }
+
+const motesHtml = (kind, n) => motes(kind, n);
