@@ -63,6 +63,10 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
 .btn { font: 400 22px var(--display); letter-spacing: 1px; color: var(--ink); background: var(--leaf); border: 0; border-radius: 12px; padding: 12px 28px; cursor: pointer; justify-self: center; box-shadow: 0 4px 0 #3f7a2a; }
 .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #3f7a2a; }
 .btn:disabled { opacity: 0.6; cursor: wait; }
+.btn.alt { font-size: 16px; padding: 8px 18px; color: var(--bone); background: rgba(255,255,255,.08); box-shadow: 0 3px 0 rgba(0,0,0,.4); }
+.chapter-tag { font: 800 12px var(--body); letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.foodchain.city span { background: rgba(140, 120, 255, 0.14); }
+.foodchain.city span.top { background: rgba(232, 72, 77, 0.25); }
 .perks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 520px) { .perks { grid-template-columns: 1fr; } }
 .perk { font-family: var(--body); color: var(--bone); background: rgba(255,255,255,.06); border: 2px solid rgba(255, 179, 71, 0.4); border-radius: 12px; padding: 14px 10px; cursor: pointer; display: grid; gap: 6px; text-align: center; }
@@ -98,7 +102,7 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
   </div>
 
   <div class="boss-bar" id="bossBar" hidden>
-    <div class="label">OLD TUSK</div>
+    <div class="label" id="bossName">OLD TUSK</div>
     <div class="bar hp"><i id="bossFill"></i></div>
   </div>
 
@@ -108,14 +112,20 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
   <div class="screen" id="titleScreen">
     <div class="panel">
       <h1>Dino<br>Chomp</h1>
-      <p>You hatched at the bottom of the food chain. Eat bugs and mice, grow bigger and stronger, and take the valley from the boar king, Old Tusk.</p>
+      <p>You hatched at the bottom of the food chain. Eat bugs and mice, grow bigger and stronger, take the valley from Old Tusk, then stomp into the city and dethrone the Rat King.</p>
+      <div class="chapter-tag">Chapter 1 &middot; The Valley &middot; Levels 1&ndash;10</div>
       <div class="foodchain" aria-label="Food chain from smallest to largest">
         <span>Beetle</span><span>Cricket</span><span>Mouse</span><span>Rat</span><span>Frog</span><span>Lizard</span><span>Squirrel</span><span>Rabbit</span><span>Duck</span><span>Snake</span><span>Turtle</span><span>Fox</span><span>Raccoon</span><span>Wolf</span><span>Goat</span><span>Boar</span><span>Deer</span><span>Crocodile</span><span>Bear</span><span class="top">Old Tusk</span>
+      </div>
+      <div class="chapter-tag">Chapter 2 &middot; The City &middot; Levels 11&ndash;20</div>
+      <div class="foodchain city" aria-label="City food chain from smallest to largest">
+        <span>Pigeon</span><span>Sewer Rat</span><span>Alley Cat</span><span>Seagull</span><span>Possum</span><span>Stray Dog</span><span>Goose</span><span>Coyote</span><span>Police Horse</span><span>Sewer Gator</span><span>Gorilla</span><span>Lion</span><span>Hippo</span><span>Elephant</span><span class="top">Rat King</span>
       </div>
       <p class="keys">A <b style="color:var(--leaf)">green ring</b> means you can eat it. A <b style="color:var(--blood)">red ring</b> means it is stronger than you, for now.</p>
       <p class="keys"><kbd>WASD</kbd> / <kbd>Arrows</kbd> move &middot; <kbd>Space</kbd> or click to bite &middot; <kbd>P</kbd> pause<br>On a phone: drag on the left to move, tap BITE.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
       <button class="btn" id="startBtn" type="button">Hatch</button>
+      <button class="btn alt" id="cityBtn" type="button">Skip to the city</button>
     </div>
   </div>
 
@@ -124,6 +134,15 @@ body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit
       <h2 id="levelTitle">Level 2!</h2>
       <p id="levelSub">You grew bigger and stronger. Pick one more trait.</p>
       <div class="perks" id="perks"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="chapterScreen" hidden>
+    <div class="panel">
+      <div class="chapter-tag">Chapter 1 complete</div>
+      <h2>Old Tusk is dinner</h2>
+      <p>The valley is yours, but you are still hungry. Past the trees, the city hums with pigeons, sewer rats and stray dogs. Somewhere under the streets, the Rat King is waiting.</p>
+      <button class="btn" id="cityGoBtn" type="button">Stomp into the city</button>
     </div>
   </div>
 
@@ -163,7 +182,8 @@ const SKY = new THREE.Color('#0f2016');
 scene.background = SKY;
 scene.fog = new THREE.Fog(SKY, 900, 2400);
 const camera = new THREE.PerspectiveCamera(42, 1, 10, 8000);
-scene.add(new THREE.HemisphereLight('#e4f7d4', '#2b3d1f', 0.8));
+const hemi = new THREE.HemisphereLight('#e4f7d4', '#2b3d1f', 0.8);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff0d0', 0.8);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -180,8 +200,9 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-const WORLD = 2400;
-const MAX_LEVEL = 10;
+let WORLD = 2400;
+let zone = 'valley';
+const levelCap = () => zone === 'valley' ? 10 : 20;
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -237,8 +258,14 @@ function quad(o) {
   const lr = o.legR || 0.12, lc = o.legColor || o.color;
   for (const [sx, sz] of [[1, -1], [1, 1], [-1, -1], [-1, 1]]) legs.push(leg(body, sx * bl * 0.55, L + 0.05, sz * bw * 0.55, L + 0.05, lr, lc, o.foot));
   const hs = o.hs || 0.48;
-  const head = group(body, bl * 0.92, by + bh * (o.headUp ?? 0.5), 0);
+  const head = o.neck ? group(body, bl * 1.05, by + bh * 1.75, 0) : group(body, bl * 0.92, by + bh * (o.headUp ?? 0.5), 0);
   const hc = o.headColor || o.color;
+  if (o.neck) {
+    add(body, GEO.y, o.color, bl * 0.88, by + bh * 1.05, 0, 0.24, bh * 1.7, 0.22, 0, 0, -0.55);
+    if (o.mane) for (let i = 0; i < 5; i++) add(body, GEO.b, o.mane, bl * 0.62 + i * 0.1, by + bh * (0.95 + i * 0.2), 0, 0.12, 0.2, 0.08, 0, 0, -0.55);
+  }
+  if (o.lionMane) add(head, GEO.s, o.lionMane, -hs * 0.2, hs * 0.05, 0, hs * 0.95, hs * 1.5, hs * 1.55);
+  if (o.cape) add(body, GEO.s, o.cape, -0.35, by + bh * 0.4, 0, bl * 0.62, bh * 0.6, bw * 1.08);
   add(head, GEO.s, hc, 0.05, 0, 0, hs * 1.1, hs, hs * 0.95);
   if (o.snout) add(head, GEO.s, o.snoutColor || hc, hs * 0.85, -hs * 0.18, 0, hs * o.snout, hs * 0.5, hs * 0.52);
   add(head, GEO.s, o.nose || '#222222', hs * (0.85 + (o.snout || 0.3) * 0.95), -hs * 0.12, 0, hs * 0.16, hs * 0.14, hs * 0.2);
@@ -249,6 +276,20 @@ function quad(o) {
   if (o.ears === 'tall') for (const s of [-1, 1]) {
     add(head, GEO.s, ec, -hs * 0.35, hs * 1.45, s * hs * 0.32, hs * 0.18, hs * 1.05, hs * 0.28, s * 0.18, 0, 0.35);
     add(head, GEO.s, '#e7a7b0', -hs * 0.3, hs * 1.45, s * hs * 0.36, hs * 0.08, hs * 0.85, hs * 0.18, s * 0.18, 0, 0.35);
+  }
+  if (o.ears === 'floppy') for (const s of [-1, 1]) add(head, GEO.s, ec, -hs * 0.05, hs * 0.3, s * hs * 0.82, hs * 0.2, hs * 0.55, hs * 0.22, s * 0.3, 0, 0);
+  if (o.bigEars) for (const s of [-1, 1]) add(head, GEO.s, o.bigEars, -hs * 0.25, hs * 0.1, s * hs * 0.95, hs * 0.12, hs * 0.95, hs * 0.75, s * 0.25, 0, 0);
+  if (o.trunk) {
+    const t = group(head, hs * 0.95, -hs * 0.2, 0);
+    add(t, GEO.y, hc, 0.12, -0.25, 0, 0.15, 0.55, 0.15, 0, 0, 0.35);
+    add(t, GEO.y, hc, 0.22, -0.7, 0, 0.12, 0.5, 0.12, 0, 0, 0.1);
+    add(t, GEO.y, hc, 0.3, -1.05, 0, 0.1, 0.3, 0.1, 0, 0, -0.4);
+    for (const s of [-1, 1]) add(head, GEO.c, '#f4ecd8', hs * 0.95, -hs * 0.55, s * hs * 0.38, hs * 0.09, hs * 0.8, hs * 0.09, 0, 0, -1.2);
+  }
+  if (o.crown) {
+    add(head, GEO.y, o.crown, 0, hs * 0.95, 0, hs * 0.42, hs * 0.18, hs * 0.42);
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; add(head, GEO.c, o.crown, Math.cos(a) * hs * 0.36, hs * 1.22, Math.sin(a) * hs * 0.36, hs * 0.1, hs * 0.35, hs * 0.1); }
+    add(head, GEO.s, '#e8484d', hs * 0.4, hs * 0.98, 0, hs * 0.08, hs * 0.08, hs * 0.08);
   }
   if (o.mask) add(head, GEO.s, o.mask, hs * 0.5, hs * 0.22, 0, hs * 0.35, hs * 0.24, hs * 0.96);
   if (o.horns) for (const s of [-1, 1]) add(head, GEO.c, o.horns, -hs * 0.25, hs * 1.0, s * hs * 0.32, hs * 0.16, hs * 1.1, hs * 0.16, s * 0.15, 0, 0.9);
@@ -271,9 +312,80 @@ function quad(o) {
     if (o.tail === 'ringed') for (const x of [-0.35, -0.65, -0.95]) add(tail, GEO.s, '#2b2b2b', x, 0.1 - x * 0.12, 0, 0.07, 0.25, 0.25, 0, 0, -0.25);
   }
   if (o.tail === 'up') { tail = group(body, -bl * 0.85, ty, 0); add(tail, GEO.s, tc, -0.3, 0.6, 0, 0.32, 0.85, 0.3, 0, 0, 0.35); }
+  if (o.tail === 'upthin') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.y, tc, -0.25, 0.45, 0, 0.055, 1.0, 0.055, 0, 0, 0.55); }
+  if (o.tail === 'hang') { tail = group(body, -bl * 0.95, ty + 0.1, 0); add(tail, GEO.s, tc, -0.22, -0.35, 0, 0.16, 0.6, 0.16, 0, 0, -0.35); }
+  if (o.tuft && tail) add(tail, GEO.s, o.tuft, -1.05, -0.35, 0, 0.12, 0.12, 0.12);
   if (o.tail === 'puff') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.s, tc, 0, 0, 0, 0.22, 0.22, 0.22); }
   if (o.tail === 'stub') { tail = group(body, -bl * 0.95, ty, 0); add(tail, GEO.s, tc, 0, 0, 0, 0.14, 0.12, 0.12); }
   return { root, body, head, legs, tail };
+}
+
+function waterfowl(c) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+  for (const s of [-1, 1]) legs.push(leg(body, 0.1, 0.4, s * 0.25, 0.4, 0.05, c.feet || '#f08a24', c.feet || '#f08a24'));
+  add(body, GEO.s, c.body, 0, 0.8, 0, 0.9, 0.55, 0.62);
+  add(body, GEO.s, c.breast, 0.25, 0.65, 0, 0.6, 0.35, 0.5);
+  add(body, GEO.c, c.tail, -0.95, 0.95, 0, 0.25, 0.5, 0.25, 0, 0, 1.2);
+  const wings = [];
+  for (const s of [-1, 1]) { const w = group(body, -0.1, 0.95, s * 0.45); wings.push(w); add(w, GEO.s, c.wing, 0, -0.05, s * 0.08, 0.55, 0.28, 0.14); }
+  const nl = c.neckLen;
+  add(body, GEO.y, c.neck, 0.7, 1.0 + nl * 0.35, 0, 0.14, nl, 0.14, 0, 0, -0.3);
+  const head = group(body, 0.78 + nl * 0.12, 1.05 + nl * 0.85, 0);
+  add(head, GEO.s, c.head, 0, 0, 0, 0.34, 0.3, 0.28);
+  if (c.cheek) for (const s of [-1, 1]) add(head, GEO.s, c.cheek, -0.02, -0.05, s * 0.2, 0.18, 0.14, 0.1);
+  add(head, GEO.b, c.bill, 0.36, -0.07, 0, 0.36, 0.1, 0.2);
+  eyes(head, 0.16, 0.08, 0.22, 0.07);
+  if (c.collar) add(body, GEO.y, c.collar, 0.72, 0.98 + nl * 0.6, 0, 0.16, 0.05, 0.16, 0, 0, -0.3);
+  return { root, body, head, legs, wings, waddle: true };
+}
+function bird(c) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+  for (const s of [-1, 1]) legs.push(leg(body, 0.05, 0.42, s * 0.2, 0.42, 0.04, c.feet, c.feet));
+  add(body, GEO.s, c.body, 0, 0.8, 0, 0.85, 0.5, 0.52);
+  add(body, GEO.s, c.breast, 0.3, 0.72, 0, 0.55, 0.4, 0.45);
+  add(body, GEO.b, c.tail, -0.9, 0.85, 0, 0.5, 0.06, 0.32, 0, 0, 0.15);
+  const wings = [];
+  for (const s of [-1, 1]) { const w = group(body, -0.05, 0.95, s * 0.42); wings.push(w); add(w, GEO.s, c.wing, -0.1, 0, s * 0.35, 0.6, 0.08, 0.42); }
+  const head = group(body, 0.75, 1.2, 0);
+  add(head, GEO.s, c.head, 0, 0, 0, 0.32, 0.3, 0.28);
+  add(head, GEO.c, c.beak, 0.36, -0.05, 0, 0.08, c.beakLen || 0.28, 0.08, 0, 0, -Math.PI / 2);
+  if (c.neckRing) add(head, GEO.y, c.neckRing, -0.1, -0.22, 0, 0.27, 0.08, 0.25);
+  eyes(head, 0.14, 0.08, 0.2, 0.07, c.eyeWhite || '#ffffff');
+  return { root, body, head, legs, wings, hop: 0.5, flap: true };
+}
+function gorilla() {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+  const dark = '#2e2e33', face = '#6d6a66';
+  add(body, GEO.s, dark, 0, 1.45, 0, 0.85, 0.95, 0.8, 0, 0, -0.4);
+  add(body, GEO.s, '#4b4b53', 0.4, 1.35, 0, 0.42, 0.62, 0.62, 0, 0, -0.4);
+  const head = group(body, 0.75, 2.2, 0);
+  add(head, GEO.s, dark, 0, 0.05, 0, 0.42, 0.45, 0.42);
+  add(head, GEO.s, face, 0.25, -0.08, 0, 0.26, 0.28, 0.32);
+  add(head, GEO.b, '#1f1f23', 0.3, 0.14, 0, 0.14, 0.08, 0.5);
+  eyes(head, 0.38, 0.04, 0.13, 0.06, '#6a3b1f');
+  for (const s of [-1, 1]) { const a = group(body, 0.45, 2.0, s * 0.82); legs.push(a); add(a, GEO.y, dark, 0, -0.85, 0, 0.22, 1.7, 0.22); add(a, GEO.s, '#3a3a40', 0.05, -1.75, 0, 0.26, 0.2, 0.26); }
+  for (const s of [-1, 1]) { const l = group(body, -0.45, 0.95, s * 0.42); legs.push(l); add(l, GEO.y, dark, 0, -0.45, 0, 0.22, 0.95, 0.22); add(l, GEO.s, '#3a3a40', 0.1, -0.92, 0, 0.26, 0.12, 0.2); }
+  return { root, body, head, legs: [legs[0], legs[1], legs[3], legs[2]], legRate: 8 };
+}
+function croc(c) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+  add(body, GEO.s, c.body, 0, 0.35, 0, 1.25, 0.33, 0.6);
+  add(body, GEO.s, c.belly, 0, 0.22, 0, 1.05, 0.15, 0.5);
+  for (let i = 0; i < 8; i++) for (const s of [-1, 1]) add(body, GEO.c, c.ridge, 0.9 - i * 0.28, 0.62, s * 0.18, 0.06, 0.16, 0.06);
+  const head = group(body, 1.2, 0.38, 0);
+  add(head, GEO.b, c.body, 0.6, 0.05, 0, 1.25, 0.2, 0.46);
+  const jaw = group(head, 0.05, -0.08, 0);
+  add(jaw, GEO.b, c.jaw, 0.6, -0.04, 0, 1.2, 0.12, 0.42);
+  for (let i = 0; i < 5; i++) for (const s of [-1, 1]) add(head, GEO.c, '#f4ecd8', 0.25 + i * 0.22, -0.1, s * 0.2, 0.03, 0.1, 0.03, Math.PI, 0, 0);
+  for (const s of [-1, 1]) { add(head, GEO.s, c.body, 0.05, 0.2, s * 0.17, 0.13, 0.12, 0.12); add(head, GEO.s, c.eye, 0.12, 0.25, s * 0.2, 0.06, 0.06, 0.05); }
+  for (const [x, s] of [[0.6, -1], [0.6, 1], [-0.6, -1], [-0.6, 1]]) {
+    const g = group(body, x, 0.3, s * 0.45); legs.push(g);
+    add(g, GEO.y, c.leg, 0, -0.1, s * 0.15, 0.1, 0.4, 0.1, s * 0.9, 0, 0);
+  }
+  const tail = group(body, -1.15, 0.35, 0);
+  add(tail, GEO.c, c.body, -0.95, 0, 0, 0.3, 1.9, 0.22, 0, 0, Math.PI / 2);
+  for (let i = 0; i < 5; i++) add(tail, GEO.c, c.ridge, -0.2 - i * 0.32, 0.2 - i * 0.03, 0, 0.05, 0.15, 0.05);
+  return { root, body, head, jaw, legs, tail, legAxis: 'y' };
 }
 
 const MODELS = {
@@ -335,21 +447,7 @@ const MODELS = {
   },
   squirrel: () => quad({ color: '#b5652d', belly: '#ecd2a8', leg: 0.25, legR: 0.09, hs: 0.5, snout: 0.45, ears: 'pointy', tail: 'up', tailColor: '#a65a26', bl: 0.95 }),
   rabbit: () => quad({ color: '#c9b291', belly: '#ede2cf', leg: 0.28, legR: 0.11, hs: 0.5, snout: 0.4, nose: '#e5a3ad', ears: 'tall', tail: 'puff', tailColor: '#f6f1e8', bh: 0.7 }),
-  duck() {
-    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
-    for (const s of [-1, 1]) legs.push(leg(body, 0.1, 0.4, s * 0.25, 0.4, 0.05, '#f08a24', '#f08a24'));
-    add(body, GEO.s, '#8a6a4a', 0, 0.8, 0, 0.9, 0.55, 0.62);
-    add(body, GEO.s, '#efe7d6', 0.25, 0.65, 0, 0.6, 0.35, 0.5);
-    add(body, GEO.c, '#5e4630', -0.95, 0.95, 0, 0.25, 0.5, 0.25, 0, 0, 1.2);
-    for (const s of [-1, 1]) add(body, GEO.s, '#6d5236', -0.1, 0.9, s * 0.5, 0.55, 0.3, 0.12);
-    add(body, GEO.y, '#2f6b3d', 0.7, 1.2, 0, 0.16, 0.6, 0.16, 0, 0, -0.3);
-    const head = group(body, 0.85, 1.55, 0);
-    add(head, GEO.s, '#2f6b3d', 0, 0, 0, 0.36, 0.32, 0.3);
-    add(head, GEO.b, '#f2a52c', 0.38, -0.08, 0, 0.36, 0.1, 0.22);
-    eyes(head, 0.18, 0.08, 0.24, 0.07);
-    add(body, GEO.y, '#ffffff', 0.72, 1.33, 0, 0.17, 0.05, 0.17, 0, 0, -0.3);
-    return { root, body, head, legs, waddle: true };
-  },
+  duck: () => waterfowl({ body: '#8a6a4a', breast: '#efe7d6', wing: '#6d5236', tail: '#5e4630', neck: '#2f6b3d', head: '#2f6b3d', bill: '#f2a52c', collar: '#ffffff', neckLen: 0.6 }),
   snake() {
     const root = new THREE.Group(), body = group(root, 0, 0, 0), segs = [];
     for (let i = 0; i < 11; i++) {
@@ -383,31 +481,37 @@ const MODELS = {
   goat: () => quad({ color: '#e8e2d4', belly: '#f6f2ea', leg: 0.55, legR: 0.09, legColor: '#b9b1a0', foot: '#3a3a3a', hs: 0.42, snout: 0.6, ears: 'pointy', horns: '#5c544a', beard: '#cfc6b3', tail: 'stub', bh: 0.58 }),
   boar: () => quad({ color: '#5a4033', belly: '#6e5243', leg: 0.38, legR: 0.13, legColor: '#2a1d16', hs: 0.52, snout: 0.6, snoutColor: '#6e5243', nose: '#c98e86', ears: 'pointy', tusks: 0.5, ridge: '#3d2b22', tail: 'thin', tailColor: '#3d2b22', bl: 1.1, bh: 0.65 }),
   deer: () => quad({ color: '#a8743f', belly: '#e9d6b5', leg: 0.85, legR: 0.08, legColor: '#8a5d31', foot: '#2b2b2b', hs: 0.4, snout: 0.7, ears: 'pointy', antlers: '#d9c7a1', tail: 'puff', tailColor: '#f6efe4', bl: 1.0, bh: 0.5 }),
-  crocodile() {
-    const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
-    add(body, GEO.s, '#4c6b2f', 0, 0.35, 0, 1.25, 0.33, 0.6);
-    add(body, GEO.s, '#b9b98a', 0, 0.22, 0, 1.05, 0.15, 0.5);
-    for (let i = 0; i < 8; i++) for (const s of [-1, 1]) add(body, GEO.c, '#3a5523', 0.9 - i * 0.28, 0.62, s * 0.18, 0.06, 0.16, 0.06);
-    const head = group(body, 1.2, 0.38, 0);
-    add(head, GEO.b, '#4c6b2f', 0.6, 0.05, 0, 1.25, 0.2, 0.46);
-    const jaw = group(head, 0.05, -0.08, 0);
-    add(jaw, GEO.b, '#45632a', 0.6, -0.04, 0, 1.2, 0.12, 0.42);
-    for (let i = 0; i < 5; i++) for (const s of [-1, 1]) add(head, GEO.c, '#f4ecd8', 0.25 + i * 0.22, -0.1, s * 0.2, 0.03, 0.1, 0.03, Math.PI, 0, 0);
-    for (const s of [-1, 1]) { add(head, GEO.s, '#4c6b2f', 0.05, 0.2, s * 0.17, 0.13, 0.12, 0.12); add(head, GEO.s, '#e5c13a', 0.12, 0.25, s * 0.2, 0.06, 0.06, 0.05); }
-    for (const [x, s] of [[0.6, -1], [0.6, 1], [-0.6, -1], [-0.6, 1]]) {
-      const g = group(body, x, 0.3, s * 0.45); legs.push(g);
-      add(g, GEO.y, '#3f5a26', 0, -0.1, s * 0.15, 0.1, 0.4, 0.1, s * 0.9, 0, 0);
-    }
-    const tail = group(body, -1.15, 0.35, 0);
-    add(tail, GEO.c, '#4c6b2f', -0.95, 0, 0, 0.3, 1.9, 0.22, 0, 0, Math.PI / 2);
-    for (let i = 0; i < 5; i++) add(tail, GEO.c, '#3a5523', -0.2 - i * 0.32, 0.2 - i * 0.03, 0, 0.05, 0.15, 0.05);
-    return { root, body, head, jaw, legs, tail, legAxis: 'y' };
-  },
+  crocodile: () => croc({ body: '#4c6b2f', belly: '#b9b98a', ridge: '#3a5523', jaw: '#45632a', leg: '#3f5a26', eye: '#e5c13a' }),
   bear: () => quad({ color: '#6b4a2e', belly: '#7d5a3a', leg: 0.45, legR: 0.2, legColor: '#5a3d25', hs: 0.5, snout: 0.55, snoutColor: '#b08a62', ears: 'round', tail: 'stub', bl: 1.1, bh: 0.75, bw: 0.75 }),
   boss() {
     const m = quad({ color: '#6b5a50', belly: '#7d6a5e', leg: 0.38, legR: 0.14, legColor: '#2a1d16', hs: 0.55, snout: 0.6, snoutColor: '#7d6a5e', nose: '#c98e86', ears: 'pointy', tusks: 0.95, ridge: '#2e241e', tail: 'thin', tailColor: '#2e241e', bl: 1.1, bh: 0.7, eye: '#ff2a2a' });
     add(m.body, GEO.b, '#d8c7b0', 0.15, 1.15, 0.35, 0.5, 0.04, 0.04, 0, 0.5, 0);
     add(m.body, GEO.b, '#d8c7b0', 0.3, 1.1, 0.4, 0.45, 0.04, 0.04, 0, 0.5, 0);
+    return m;
+  },
+  // ---- city ----
+  pigeon: () => bird({ body: '#8d93a3', breast: '#a7a2b8', wing: '#6f7586', tail: '#4b5060', head: '#5b6175', beak: '#3a3a3a', feet: '#d9776a', neckRing: '#5aa58e', eyeWhite: '#ff9a3c' }),
+  sewerrat: () => quad({ color: '#4a4038', belly: '#6b5e52', leg: 0.24, legR: 0.09, hs: 0.45, snout: 0.8, nose: '#d48c95', ears: 'round', earColor: '#c27d86', tail: 'thin', tailColor: '#b07780', bl: 1.2, eye: '#c33333' }),
+  cat: () => quad({ color: '#e39a4c', belly: '#f6e2c4', leg: 0.4, legR: 0.07, hs: 0.45, snout: 0.35, nose: '#e5a3ad', ears: 'pointy', tail: 'upthin', bl: 1.0, bh: 0.48, eye: '#3fae4a' }),
+  seagull: () => bird({ body: '#f2f2ee', breast: '#ffffff', wing: '#a9b0b8', tail: '#2c2c2c', head: '#ffffff', beak: '#f2c230', beakLen: 0.38, feet: '#f2a24a' }),
+  possum: () => quad({ color: '#8f8a86', belly: '#c9c4bf', leg: 0.25, legR: 0.09, legColor: '#2d2b2a', hs: 0.48, snout: 0.85, headColor: '#efebe5', nose: '#e8a0ab', ears: 'round', earColor: '#2d2b2a', tail: 'thin', tailColor: '#e8b9c0' }),
+  dog: () => quad({ color: '#9a6a3c', belly: '#e8d3b0', leg: 0.5, legR: 0.1, hs: 0.48, snout: 0.75, snoutColor: '#c9a27a', ears: 'floppy', earColor: '#5e3d21', tail: 'upthin', bl: 1.05, bh: 0.55 }),
+  goose: () => waterfowl({ body: '#8f8f88', breast: '#ecebe5', wing: '#6f6f69', tail: '#ecebe5', neck: '#1f1f1f', head: '#1f1f1f', cheek: '#ffffff', bill: '#1f1f1f', feet: '#2a2a2a', neckLen: 1.0 }),
+  coyote: () => quad({ color: '#b08a5c', belly: '#e2d2b6', leg: 0.55, legR: 0.09, hs: 0.44, snout: 0.85, snoutColor: '#d8c3a0', ears: 'pointy', tail: 'bushy', tip: '#3a3a3a', bl: 1.08, bh: 0.5, eye: '#d9a400' }),
+  horse() {
+    const m = quad({ color: '#5a3a24', belly: '#6e4a30', leg: 0.95, legR: 0.11, legColor: '#4a2f1d', foot: '#1e1e1e', hs: 0.36, snout: 1.1, ears: 'pointy', neck: true, mane: '#1e1e1e', tail: 'hang', tailColor: '#1e1e1e', bl: 1.05, bh: 0.5 });
+    add(m.body, GEO.b, '#1f3f8a', 0, 0.95 + 0.5 * 1.5, 0, 0.75, 0.1, 0.62 * 2.1);
+    add(m.body, GEO.b, '#f2d36b', 0, 0.95 + 0.5 * 1.5, 0, 0.77, 0.03, 0.62 * 2.12);
+    return m;
+  },
+  gator: () => croc({ body: '#34432a', belly: '#9a9a78', ridge: '#232f1b', jaw: '#2e3b25', leg: '#2b3822', eye: '#c7e04a' }),
+  gorilla,
+  lion: () => quad({ color: '#d4a457', belly: '#ead1a0', leg: 0.6, legR: 0.13, hs: 0.5, snout: 0.6, snoutColor: '#ead1a0', nose: '#5a3a2a', ears: 'round', lionMane: '#8a5a2b', tail: 'thin', tuft: '#5e3a1c', bl: 1.1, bh: 0.6, eye: '#a8761a' }),
+  elephant: () => quad({ color: '#8d8f94', belly: '#9a9ca1', leg: 0.85, legR: 0.27, hs: 0.62, snout: 0.25, headUp: 0.65, trunk: true, bigEars: '#7f8186', tail: 'thin', bl: 1.1, bh: 0.85, bw: 0.82, nose: '#8d8f94' }),
+  hippo: () => quad({ color: '#857387', belly: '#b195a8', leg: 0.32, legR: 0.24, hs: 0.68, snout: 0.95, snoutColor: '#a08aa0', nose: '#5b4a5e', headUp: 0.15, ears: 'round', tail: 'stub', bl: 1.2, bh: 0.78, bw: 0.85 }),
+  ratking() {
+    const m = quad({ color: '#3d342e', belly: '#5a4d43', leg: 0.28, legR: 0.11, hs: 0.5, snout: 0.85, nose: '#d48c95', ears: 'round', earColor: '#c27d86', tail: 'thin', tailColor: '#b07780', bl: 1.2, bh: 0.68, eye: '#ff2a2a', crown: '#f2c230', cape: '#9a1b2a' });
+    for (const s of [-1, 1]) add(m.head, GEO.b, '#f4ecd8', 0.5 * 1.7, -0.5 * 0.35, s * 0.06, 0.06, 0.16, 0.05);
     return m;
   },
 };
@@ -417,7 +521,10 @@ const STAGES = [
   { min: 1, name: 'Hatchling', body: '#7fd35b', dark: '#4f9a33', back: '#c6ee8f', spikes: 0 },
   { min: 4, name: 'Raptor', body: '#3fb59a', dark: '#26806c', back: '#a8ecd9', spikes: 4 },
   { min: 7, name: 'Tyrant', body: '#e08a3c', dark: '#a85d1f', back: '#ffd59a', spikes: 6 },
-  { min: 10, name: 'Rex', body: '#c9374a', dark: '#86202f', back: '#ffb0a0', spikes: 9 },
+  { min: 10, name: 'Rex', body: '#c9374a', dark: '#86202f', back: '#ffb0a0', spikes: 8 },
+  { min: 13, name: 'Titan', body: '#8a5cf0', dark: '#5a35b0', back: '#d6c4ff', spikes: 9, spike: '#ffd84a' },
+  { min: 16, name: 'Kaiju', body: '#5b82c4', dark: '#2c4570', back: '#b9d4ff', spikes: 11, spike: '#6ff3ff' },
+  { min: 20, name: 'Dino King', body: '#e0b028', dark: '#9a7414', back: '#fff0b0', spikes: 12, spike: '#ff5a3c' },
 ];
 const stageFor = L => { let s = STAGES[0]; for (const st of STAGES) if (L >= st.min) s = st; return s; };
 
@@ -443,8 +550,31 @@ const TYPES = {
   crocodile: { name: 'Crocodile', tier: 9, hp: 55, xp: 55, size: 28, speed: 95, ai: 'aggro', dmg: 14, w: 0.9, sense: 200 },
   bear:      { name: 'Bear', tier: 9, hp: 65, xp: 60, size: 30, speed: 120, ai: 'aggro', dmg: 15, w: 0.9 },
   boss:      { name: 'Old Tusk', tier: 10, hp: 260, xp: 0, size: 50, speed: 112, ai: 'boss', dmg: 17, w: 0 },
+  // city (zone: 'city'); beetles, mice, rats and raccoons also live in the city as snacks
+  pigeon:    { name: 'Pigeon', tier: 10, hp: 25, xp: 35, size: 14, speed: 150, ai: 'flee', dmg: 0, w: 1.6, zone: 'city' },
+  sewerrat:  { name: 'Sewer Rat', tier: 10, hp: 35, xp: 38, size: 20, speed: 160, ai: 'flee', dmg: 10, w: 1.8, zone: 'city' },
+  cat:       { name: 'Alley Cat', tier: 11, hp: 40, xp: 44, size: 20, speed: 190, ai: 'flee', dmg: 12, w: 1.3, zone: 'city' },
+  seagull:   { name: 'Seagull', tier: 11, hp: 35, xp: 42, size: 18, speed: 170, ai: 'flee', dmg: 8, w: 1.2, zone: 'city' },
+  possum:    { name: 'Possum', tier: 12, hp: 55, xp: 50, size: 20, speed: 120, ai: 'flee', dmg: 10, w: 1.2, zone: 'city' },
+  dog:       { name: 'Stray Dog', tier: 12, hp: 60, xp: 55, size: 26, speed: 200, ai: 'aggro', dmg: 14, w: 1.2, zone: 'city' },
+  goose:     { name: 'Goose', tier: 13, hp: 60, xp: 60, size: 24, speed: 170, ai: 'aggro', dmg: 15, w: 1.1, zone: 'city' },
+  coyote:    { name: 'Coyote', tier: 14, hp: 80, xp: 70, size: 30, speed: 215, ai: 'aggro', dmg: 17, w: 1.1, zone: 'city' },
+  horse:     { name: 'Police Horse', tier: 15, hp: 110, xp: 85, size: 40, speed: 245, ai: 'flee', dmg: 0, w: 1, zone: 'city' },
+  gator:     { name: 'Sewer Gator', tier: 16, hp: 140, xp: 100, size: 46, speed: 140, ai: 'aggro', dmg: 24, w: 1, zone: 'city', sense: 260 },
+  gorilla:   { name: 'Gorilla', tier: 17, hp: 170, xp: 115, size: 44, speed: 200, ai: 'aggro', dmg: 27, w: 1, zone: 'city' },
+  lion:      { name: 'Lion', tier: 18, hp: 190, xp: 125, size: 50, speed: 255, ai: 'aggro', dmg: 30, w: 1, zone: 'city' },
+  hippo:     { name: 'Hippo', tier: 19, hp: 260, xp: 140, size: 60, speed: 190, ai: 'aggro', dmg: 33, w: 0.9, zone: 'city' },
+  elephant:  { name: 'Elephant', tier: 19, hp: 320, xp: 150, size: 70, speed: 140, ai: 'wander', dmg: 35, w: 0.8, zone: 'city' },
+  ratking:   { name: 'Rat King', tier: 20, hp: 1100, xp: 0, size: 95, speed: 190, ai: 'boss', dmg: 40, w: 0, zone: 'city', summon: 'sewerrat' },
 };
-for (const k in TYPES) TYPES[k].key = k;
+for (const k in TYPES) { TYPES[k].key = k; TYPES[k].zone = TYPES[k].zone || 'valley'; }
+for (const k of ['beetle', 'mouse', 'rat', 'raccoon']) TYPES[k].zone = 'both';
+const ZONES = {
+  valley: { size: 2400, boss: 'boss', bossLabel: 'OLD TUSK', sky: '#0f2016', hemiSky: '#e4f7d4', hemiGround: '#2b3d1f', hemiI: 0.8, sun: '#fff0d0', sunI: 0.8,
+    bossIntro: ['Old Tusk is coming', 'Follow the red arrow. Bite him until he drops.'] },
+  city: { size: 3200, boss: 'ratking', bossLabel: 'THE RAT KING', sky: '#2a2140', hemiSky: '#cbbcff', hemiGround: '#3a2e2a', hemiI: 0.72, sun: '#ffb47a', sunI: 0.75,
+    bossIntro: ['The Rat King rises', 'He calls sewer rats to fight for him. Eat them to heal.'] },
+};
 
 const PERKS = [
   { id: 'jaws', name: 'Bigger Jaws', desc: '+2 bite damage', apply: p => { p.str += 2; } },
@@ -460,6 +590,8 @@ const PERKS = [
 // ---------- world ----------
 let seed = 1337;
 const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const valleyGroup = new THREE.Group();
+scene.add(valleyGroup);
 (function buildWorld() {
   const tc = document.createElement('canvas'); tc.width = tc.height = 2048;
   const g = tc.getContext('2d'), k = 2048 / WORLD;
@@ -480,10 +612,10 @@ const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 21474836
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), new THREE.MeshLambertMaterial({ map: tex }));
   ground.rotation.x = -Math.PI / 2; ground.position.set(WORLD / 2, 0, WORLD / 2); ground.receiveShadow = true;
-  scene.add(ground);
+  valleyGroup.add(ground);
   const outer = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), mat('#18341d'));
   outer.rotation.x = -Math.PI / 2; outer.position.set(WORLD / 2, -0.5, WORLD / 2); outer.receiveShadow = true;
-  scene.add(outer);
+  valleyGroup.add(outer);
 
   const lists = { trunk: [], leaf: [], leaf2: [], rock: [], bush: [], fern: [], flower: [], cap: [], stem: [] };
   const tree = (x, z, s) => {
@@ -519,7 +651,7 @@ const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 21474836
   const inst = (geo, color, list, cast) => {
     const m = new THREE.InstancedMesh(geo, mat(color), list.length);
     list.forEach((o, i) => { dummy.position.set(o.x, o.y, o.z); dummy.rotation.set(o.rx || 0, o.ry || 0, o.rz || 0); dummy.scale.set(o.sx, o.sy, o.sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); });
-    m.castShadow = cast; m.receiveShadow = true; scene.add(m);
+    m.castShadow = cast; m.receiveShadow = true; valleyGroup.add(m);
   };
   inst(GEO.y, '#5a3f28', lists.trunk, true);
   inst(GEO.ico, '#2e6b34', lists.leaf, true);
@@ -531,6 +663,244 @@ const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 21474836
   inst(GEO.y, '#efe6d2', lists.stem, false);
   inst(GEO.d, '#c43c32', lists.cap, true);
 })();
+
+// ---------- city ----------
+let solids = [], solidGrid = new Map(), buildings = [], cityGroup = null;
+const CELL = 200;
+function buildGrid() {
+  solidGrid = new Map();
+  for (const b of solids) for (let gx = Math.floor(b.x0 / CELL); gx <= Math.floor(b.x1 / CELL); gx++) for (let gy = Math.floor(b.y0 / CELL); gy <= Math.floor(b.y1 / CELL); gy++) {
+    const k = gx * 4096 + gy; let list = solidGrid.get(k); if (!list) solidGrid.set(k, list = []); list.push(b);
+  }
+}
+function forSolids(x, y, r, cb) {
+  if (!solids.length) return;
+  for (let gx = Math.floor((x - r) / CELL); gx <= Math.floor((x + r) / CELL); gx++) for (let gy = Math.floor((y - r) / CELL); gy <= Math.floor((y + r) / CELL); gy++) {
+    const list = solidGrid.get(gx * 4096 + gy); if (list) for (const b of list) cb(b);
+  }
+}
+function collide(o, r) {
+  forSolids(o.x, o.y, r, b => {
+    if (o.x + r < b.x0 || o.x - r > b.x1 || o.y + r < b.y0 || o.y - r > b.y1) return;
+    const cx = clamp(o.x, b.x0, b.x1), cy = clamp(o.y, b.y0, b.y1), dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
+    if (d >= r) return;
+    if (d > 0.001) { o.x = cx + dx / d * r; o.y = cy + dy / d * r; return; }
+    const l = o.x - b.x0, rr = b.x1 - o.x, t = o.y - b.y0, bb = b.y1 - o.y, m = Math.min(l, rr, t, bb);
+    if (m === l) o.x = b.x0 - r; else if (m === rr) o.x = b.x1 + r; else if (m === t) o.y = b.y0 - r; else o.y = b.y1 + r;
+  });
+}
+function blocked(x, y, r) { let hit = false; forSolids(x, y, r, b => { if (x + r > b.x0 && x - r < b.x1 && y + r > b.y0 && y - r < b.y1) hit = true; }); return hit; }
+
+function facadeTextures(wall, win) {
+  const m = document.createElement('canvas'), e = document.createElement('canvas');
+  m.width = e.width = 128; m.height = e.height = 128;
+  const g = m.getContext('2d'), h = e.getContext('2d');
+  g.fillStyle = wall; g.fillRect(0, 0, 128, 128);
+  h.fillStyle = '#000'; h.fillRect(0, 0, 128, 128);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const x = 10 + c * 30, y = 10 + r * 30;
+    g.fillStyle = win; g.fillRect(x, y, 18, 20);
+    if (srand() < 0.38) { h.fillStyle = srand() < 0.8 ? '#ffd98a' : '#bfe3ff'; h.fillRect(x, y, 18, 20); }
+  }
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 124, 128, 4);
+  const mt = new THREE.CanvasTexture(m), et = new THREE.CanvasTexture(e);
+  for (const t of [mt, et]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+  return [mt, et];
+}
+
+function buildCity() {
+  const C = ZONES.city.size, STEP = 640, ROAD = 150, SIDE = 22;
+  cityGroup = new THREE.Group(); scene.add(cityGroup);
+  seed = 4242;
+  const blocks = [];
+  for (let bx = 0; bx < 5; bx++) for (let by = 0; by < 5; by++) {
+    const x0 = bx * STEP + ROAD / 2, y0 = by * STEP + ROAD / 2, x1 = (bx + 1) * STEP - ROAD / 2, y1 = (by + 1) * STEP - ROAD / 2;
+    const r = srand();
+    const type = bx === 2 && by === 2 ? 'central' : r < 0.55 ? 'towers' : r < 0.75 ? 'park' : r < 0.88 ? 'plaza' : 'lot';
+    blocks.push({ x0, y0, x1, y1, type, ix0: x0 + SIDE, iy0: y0 + SIDE, ix1: x1 - SIDE, iy1: y1 - SIDE });
+  }
+  // ground texture
+  const tc = document.createElement('canvas'); tc.width = tc.height = 2048;
+  const g = tc.getContext('2d'), k = 2048 / C, R = (x, y, w, h) => g.fillRect(x * k, y * k, w * k, h * k);
+  g.fillStyle = '#38373d'; g.fillRect(0, 0, 2048, 2048);
+  for (let i = 0; i < 9000; i++) { g.fillStyle = srand() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.05)'; g.fillRect(srand() * 2048, srand() * 2048, 2, 2); }
+  for (const b of blocks) {
+    g.fillStyle = '#8f8a83'; R(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    g.fillStyle = 'rgba(0,0,0,0.15)';
+    for (let x = b.x0; x < b.x1; x += 40) R(x, b.y0, 1.5, b.y1 - b.y0);
+    const iw = b.ix1 - b.ix0, ih = b.iy1 - b.iy0;
+    if (b.type === 'towers') { g.fillStyle = '#6b6862'; R(b.ix0, b.iy0, iw, ih); }
+    if (b.type === 'plaza') { g.fillStyle = '#a99f90'; R(b.ix0, b.iy0, iw, ih); g.fillStyle = '#968c7d'; for (let x = b.ix0; x < b.ix1; x += 50) for (let y = b.iy0; y < b.iy1; y += 50) if (((x + y) / 50) % 2 < 1) R(x, y, 50, 50); }
+    if (b.type === 'lot') { g.fillStyle = '#47474d'; R(b.ix0, b.iy0, iw, ih); g.fillStyle = '#d8d8d8'; for (let x = b.ix0 + 20; x < b.ix1 - 20; x += 40) { R(x, b.iy0 + 20, 2, 80); R(x, b.iy1 - 100, 2, 80); R(x, b.iy0 + ih / 2 - 60, 2, 120); } }
+    if (b.type === 'park' || b.type === 'central') {
+      g.fillStyle = '#3f7a3a'; R(b.ix0, b.iy0, iw, ih);
+      g.fillStyle = 'rgba(30,70,30,0.5)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.arc((b.ix0 + srand() * iw) * k, (b.iy0 + srand() * ih) * k, (30 + srand() * 60) * k, 0, 7); g.fill(); }
+      g.fillStyle = '#b9a988'; R(b.ix0, b.iy0 + ih / 2 - 15, iw, 30); R(b.ix0 + iw / 2 - 15, b.iy0, 30, ih);
+      if (b.type === 'park' && srand() < 0.6) { g.fillStyle = '#3d6f9a'; g.beginPath(); g.ellipse((b.ix0 + iw * 0.27) * k, (b.iy0 + ih * 0.27) * k, 70 * k, 45 * k, 0.3, 0, 7); g.fill(); }
+      if (b.type === 'central') { g.fillStyle = '#b9a988'; g.beginPath(); g.arc((b.ix0 + iw / 2) * k, (b.iy0 + ih / 2) * k, 90 * k, 0, 7); g.fill(); }
+    }
+  }
+  // lane markings and crosswalks
+  for (let i = 0; i <= 5; i++) {
+    const c = i * STEP;
+    for (let t = 0; t < C; t += 60) {
+      const near = Math.abs(((t + 30) % STEP) - STEP / 2) > STEP / 2 - ROAD / 2 - 10;
+      if (near) continue;
+      g.fillStyle = '#e8c547'; R(c - 2, t, 4, 34); R(t, c - 2, 34, 4);
+    }
+    for (let j = 0; j <= 5; j++) {
+      const ix = i * STEP, iy = j * STEP;
+      g.fillStyle = 'rgba(240,240,240,0.85)';
+      for (let s = -ROAD / 2 + 10; s < ROAD / 2 - 10; s += 18) {
+        R(ix + s, iy - ROAD / 2 - 30, 9, 26); R(ix + s, iy + ROAD / 2 + 4, 9, 26);
+        R(ix - ROAD / 2 - 30, iy + s, 26, 9); R(ix + ROAD / 2 + 4, iy + s, 26, 9);
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(tc); tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(C, C), new THREE.MeshLambertMaterial({ map: tex }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(C / 2, 0, C / 2); ground.receiveShadow = true; cityGroup.add(ground);
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000), mat('#2b2a30'));
+  outer.rotation.x = -Math.PI / 2; outer.position.set(C / 2, -0.5, C / 2); outer.receiveShadow = true; cityGroup.add(outer);
+
+  // buildings
+  const facades = [['#8e6f5e', '#2a2f3a'], ['#5f6b7a', '#22324a'], ['#b5ad9c', '#2c3038'], ['#7a5a6e', '#2a2433'], ['#9aa3a8', '#25313a']].map(([w, n]) => facadeTextures(w, n));
+  const building = (x0, y0, x1, y1, h, solid = true) => {
+    const w = x1 - x0, d = y1 - y0, [mt, et] = facades[Math.floor(srand() * facades.length)];
+    const m = mt.clone(), e = et.clone(); m.needsUpdate = e.needsUpdate = true;
+    m.repeat.set(Math.max(1, Math.round(w / 90)), Math.max(1, Math.round(h / 90))); e.repeat.copy(m.repeat);
+    const fac = new THREE.MeshLambertMaterial({ map: m, emissiveMap: e, emissive: '#ffffff', emissiveIntensity: 0.85 });
+    const roof = new THREE.MeshLambertMaterial({ color: '#45434a' });
+    const mesh = new THREE.Mesh(GEO.b, [fac, fac, roof, roof, fac, fac]);
+    mesh.position.set((x0 + x1) / 2, h / 2, (y0 + y1) / 2); mesh.scale.set(w, h, d);
+    mesh.castShadow = true; mesh.receiveShadow = true; cityGroup.add(mesh);
+    buildings.push({ x0, y0, x1, y1, h, mesh, mats: [fac, roof], op: 1 });
+    if (solid) solids.push({ x0, y0, x1, y1 });
+  };
+  const lists = { trunk: [], leaf: [], leaf2: [], bush: [], pole: [], lamp: [], bench: [], hydrant: [], can: [], car: [], cab: [], wheel: [] };
+  const carColors = ['#c0392b', '#2e86c1', '#f1c40f', '#ecf0f1', '#27ae60', '#34495e', '#e67e22', '#8e44ad'];
+  const carCols = [];
+  const car = (x, y, along) => {
+    const L = 50, Wd = 24, ry = along === 'x' ? 0 : Math.PI / 2;
+    lists.car.push({ x, y: 9, z: y, sx: L, sy: 12, sz: Wd, ry }); carCols.push(carColors[Math.floor(srand() * carColors.length)]);
+    lists.cab.push({ x: x + (along === 'x' ? -3 : 0), y: 19, z: y + (along === 'x' ? 0 : -3), sx: along === 'x' ? 28 : 22, sy: 9, sz: along === 'x' ? 22 : 28 });
+    const hx = along === 'x' ? L / 2 : Wd / 2, hy = along === 'x' ? Wd / 2 : L / 2;
+    solids.push({ x0: x - hx, y0: y - hy, x1: x + hx, y1: y + hy });
+  };
+  const tree = (x, z, s) => {
+    lists.trunk.push({ x, y: 30 * s, z, sx: 7 * s, sy: 60 * s, sz: 7 * s });
+    lists.leaf.push({ x, y: 78 * s, z, sx: 42 * s, sy: 36 * s, sz: 42 * s, ry: srand() * 6 });
+    lists.leaf2.push({ x: x + 8 * s, y: 108 * s, z: z - 4 * s, sx: 26 * s, sy: 24 * s, sz: 26 * s, ry: srand() * 6 });
+  };
+  for (const b of blocks) {
+    const iw = b.ix1 - b.ix0, ih = b.iy1 - b.iy0;
+    for (const [cx, cy] of [[b.x0 + 10, b.y0 + 10], [b.x1 - 10, b.y0 + 10], [b.x0 + 10, b.y1 - 10], [b.x1 - 10, b.y1 - 10]]) {
+      lists.pole.push({ x: cx, y: 45, z: cy, sx: 2.5, sy: 90, sz: 2.5 }); lists.lamp.push({ x: cx, y: 92, z: cy, sx: 7, sy: 5, sz: 7 });
+    }
+    for (let i = 0; i < 3; i++) {
+      const side = Math.floor(srand() * 4), t = 40 + srand() * (b.x1 - b.x0 - 80);
+      const [hx, hy] = side === 0 ? [b.x0 + t, b.y0 + 10] : side === 1 ? [b.x0 + t, b.y1 - 10] : side === 2 ? [b.x0 + 10, b.y0 + t] : [b.x1 - 10, b.y0 + t];
+      (srand() < 0.5 ? lists.hydrant : lists.can).push({ x: hx, y: 6, z: hy, sx: 4.5, sy: 12, sz: 4.5 });
+    }
+    if (b.type === 'towers') {
+      if (srand() < 0.3) building(b.ix0 + 25, b.iy0 + 25, b.ix1 - 25, b.iy1 - 25, 220 + srand() * 180);
+      else {
+        const ALLEY = 70, cw = (iw - ALLEY) / 2, ch = (ih - ALLEY) / 2;
+        for (const [ox, oy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+          const x0 = b.ix0 + ox * (cw + ALLEY), y0 = b.iy0 + oy * (ch + ALLEY);
+          if (srand() < 0.82) { const ins = srand() * 18; building(x0 + ins, y0 + ins, x0 + cw - ins, y0 + ch - ins, 90 + srand() * 200); }
+          else { tree(x0 + cw / 2, y0 + ch / 2, 0.8); lists.bench.push({ x: x0 + cw / 2, y: 5, z: y0 + ch / 2 + 50, sx: 34, sy: 4, sz: 10 }); }
+        }
+      }
+    } else if (b.type === 'park' || b.type === 'central') {
+      const n = b.type === 'central' ? 10 : 9;
+      for (let i = 0; i < n; i++) {
+        let x = b.ix0 + 30 + srand() * (iw - 60), y = b.iy0 + 30 + srand() * (ih - 60);
+        if (Math.abs(x - (b.ix0 + iw / 2)) < 50 || Math.abs(y - (b.iy0 + ih / 2)) < 50) continue;
+        if (b.type === 'central' && Math.hypot(x - C / 2, y - C / 2) < 150) continue;
+        tree(x, y, 0.75 + srand() * 0.4);
+      }
+      for (let i = 0; i < 10; i++) { const s = 10 + srand() * 12; lists.bush.push({ x: b.ix0 + srand() * iw, y: s * 0.45, z: b.iy0 + srand() * ih, sx: s, sy: s * 0.8, sz: s, ry: srand() * 6 }); }
+      for (let i = 0; i < 4; i++) lists.bench.push({ x: b.ix0 + iw / 2 + (i < 2 ? -1 : 1) * (60 + srand() * 100), y: 5, z: b.iy0 + ih / 2 + (i % 2 ? 26 : -26), sx: 34, sy: 4, sz: 10 });
+      if (b.type === 'central') {
+        const fx = C / 2, fy = C / 2 - 110;
+        add(cityGroup, GEO.y, '#b6b0a6', fx, 5, fy, 70, 10, 70);
+        add(cityGroup, GEO.y, '#4a90c2', fx, 10.5, fy, 62, 1, 62);
+        add(cityGroup, GEO.y, '#b6b0a6', fx, 22, fy, 10, 34, 10);
+        add(cityGroup, GEO.y, '#b6b0a6', fx, 40, fy, 26, 4, 26);
+        solids.push({ x0: fx - 55, y0: fy - 55, x1: fx + 55, y1: fy + 55 });
+      }
+    } else if (b.type === 'lot') {
+      for (let x = b.ix0 + 40; x < b.ix1 - 30; x += 40) for (const yy of [b.iy0 + 60, b.iy1 - 60]) if (srand() < 0.6) car(x, yy, 'y');
+    } else {
+      for (let i = 0; i < 4; i++) tree(b.ix0 + 70 + (i % 2) * (iw - 140), b.iy0 + 70 + Math.floor(i / 2) * (ih - 140), 0.7);
+      building(b.ix0 + iw / 2 - 35, b.iy0 + ih / 2 - 35, b.ix0 + iw / 2 + 35, b.iy0 + ih / 2 + 35, 40);
+    }
+  }
+  // parked cars along the curbs
+  for (let i = 0; i <= 5; i++) for (let t = 0; t < C; t += 75) {
+    const mid = (t % STEP);
+    if (mid < ROAD / 2 + 40 || mid > STEP - ROAD / 2 - 40) continue;
+    for (const side of [-1, 1]) {
+      const lane = i * STEP + side * (ROAD / 2 - 18);
+      if (lane < 10 || lane > C - 10) continue;
+      if (srand() < 0.3) car(lane, t, 'y');
+      if (srand() < 0.3) car(t, lane, 'x');
+    }
+  }
+  // skyline outside the edges (not solid; the world edge already stops you)
+  for (let t = -300; t < C + 300; t += 170) for (const off of [150, 340]) {
+    const h = () => 160 + srand() * 320, w = 110 + srand() * 40;
+    building(t, -off - w / 2, t + w, -off + w / 2, h(), false);
+    building(t, C + off - w / 2, t + w, C + off + w / 2, h(), false);
+    building(-off - w / 2, t, -off + w / 2, t + w, h(), false);
+    building(C + off - w / 2, t, C + off + w / 2, t + w, h(), false);
+  }
+  const dummy = new THREE.Object3D();
+  const inst = (geo, material, list, cast, colors) => {
+    if (!list.length) return;
+    const m = new THREE.InstancedMesh(geo, material, list.length);
+    list.forEach((o, i) => { dummy.position.set(o.x, o.y, o.z); dummy.rotation.set(o.rx || 0, o.ry || 0, o.rz || 0); dummy.scale.set(o.sx, o.sy, o.sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); if (colors) m.setColorAt(i, new THREE.Color(colors[i])); });
+    m.castShadow = cast; m.receiveShadow = true; cityGroup.add(m);
+  };
+  inst(GEO.y, mat('#5a3f28'), lists.trunk, true);
+  inst(GEO.ico, mat('#2e6b34'), lists.leaf, true);
+  inst(GEO.ico, mat('#3c8240'), lists.leaf2, true);
+  inst(GEO.ico, mat('#2a5a2c'), lists.bush, true);
+  inst(GEO.y, mat('#2f2f35'), lists.pole, true);
+  inst(GEO.s, new THREE.MeshBasicMaterial({ color: '#ffe3a1' }), lists.lamp, false);
+  inst(GEO.b, mat('#7a5534'), lists.bench, true);
+  inst(GEO.y, mat('#c0392b'), lists.hydrant, true);
+  inst(GEO.y, mat('#3f6b4a'), lists.can, true);
+  inst(GEO.b, new THREE.MeshLambertMaterial({ color: '#ffffff' }), lists.car, true, carCols);
+  inst(GEO.b, mat('#1d2633'), lists.cab, true);
+  buildGrid();
+}
+function fadeBuildings(dt) {
+  const r = pSize() * 2 + 60;
+  for (const b of buildings) {
+    const inFront = b.y0 > P.y - 20 && b.y0 < P.y + cam.d * 0.85 && b.x1 > P.x - r && b.x0 < P.x + r;
+    const target = state !== 'title' && inFront ? 0.22 : 1;
+    if (Math.abs(b.op - target) < 0.01 && b.op === target) continue;
+    b.op += (target - b.op) * Math.min(1, dt * 8);
+    if (Math.abs(b.op - target) < 0.01) b.op = target;
+    for (const m of b.mats) { m.opacity = b.op; m.transparent = b.op < 0.99; m.depthWrite = b.op >= 0.99; }
+  }
+}
+function applyZone(z) {
+  zone = z; const Z = ZONES[z];
+  WORLD = Z.size;
+  SKY.set(Z.sky); scene.fog.color.set(Z.sky);
+  hemi.color.set(Z.hemiSky); hemi.groundColor.set(Z.hemiGround); hemi.intensity = Z.hemiI;
+  sun.color.set(Z.sun); sun.intensity = Z.sunI;
+  if (z === 'city' && !cityGroup) buildCity();
+  valleyGroup.visible = z === 'valley';
+  if (cityGroup) cityGroup.visible = z === 'city';
+  if (z === 'valley') { solids = []; solidGrid = new Map(); }
+  else { solids = cityGroup.userData.solids || solids; buildGrid(); cityGroup.userData.solids = solids; }
+  $('bossName').textContent = Z.bossLabel;
+}
+
 
 const RING_GEO = new THREE.RingGeometry(1, 1.14, 40);
 const RING_OK = new THREE.MeshBasicMaterial({ color: '#7fd35b', transparent: true, opacity: 0.65, depthWrite: false });
@@ -554,6 +924,7 @@ function buildDino(st) {
     add(jaw, GEO.c, '#ffffff', 0.3 + i * 0.2, 0.06, s * 0.21, 0.04, 0.11, 0.04);
   }
   eyes(head, 0.32, 0.28, 0.33, 0.15);
+  if (st.min >= 20) { add(head, GEO.y, '#f2c230', 0.05, 0.55, 0, 0.32, 0.12, 0.32); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; add(head, GEO.c, '#f2c230', 0.05 + Math.cos(a) * 0.27, 0.75, Math.sin(a) * 0.27, 0.07, 0.28, 0.07); } }
   const legs = [];
   for (const s of [-1, 1]) {
     const g = group(body, -0.15, 1.35, s * 0.55); legs.push(g);
@@ -575,10 +946,10 @@ function buildDino(st) {
     const t = i / Math.max(1, n - 1), x = 0.75 - t * 2.3;
     if (x > -1.15) {
       const y = 1.7 + 0.85 * Math.sqrt(Math.max(0, 1 - (x / 1.3) ** 2));
-      add(body, GEO.c, '#ffb347', x, y + 0.12, 0, 0.13, 0.42, 0.2);
+      add(body, GEO.c, st.spike || '#ffb347', x, y + 0.12, 0, 0.13, 0.42, 0.2);
     } else {
       const seg = tailSegs[Math.min(tailSegs.length - 1, Math.floor((-x - 1.15) / 0.8))];
-      add(seg, GEO.c, '#ffb347', -0.3, 0.32, 0, 0.1, 0.3, 0.15);
+      add(seg, GEO.c, st.spike || '#ffb347', -0.3, 0.32, 0, 0.1, 0.3, 0.15);
     }
   }
   return { root, body, head, jaw, legs, tailSegs };
@@ -595,8 +966,13 @@ function rebuildDino() {
 let state = 'title';
 let P, creatures = [], particles, texts, cam, shake, elapsed, pendingLevels, bossSpawned, boss, spawnTimer, gameT = 0;
 
-function newGame() {
+function clearCreatures() {
   for (const c of creatures) { scene.remove(c.model.root); scene.remove(c.ring); }
+  creatures = []; boss = null; bossSpawned = false; $('bossBar').hidden = true;
+}
+function newGame() {
+  clearCreatures();
+  applyZone('valley');
   P = { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, face: 0, level: 1, xp: 0, hp: 20, maxHp: 20, str: 1,
     speedMul: 1, biteCd: 0.36, biteT: 0, biteAnim: 0, rangeMul: 1, healMul: 1, regen: 0.4, thorns: 0,
     eaten: 0, hurtT: 0, moving: false, kills: {}, anim: 0 };
@@ -616,7 +992,7 @@ function pickType() {
   const L = P.level, opts = [];
   let total = 0;
   for (const k in TYPES) {
-    const T = TYPES[k]; if (!T.w) continue;
+    const T = TYPES[k]; if (!T.w || (T.zone !== zone && T.zone !== 'both')) continue;
     let w = 0;
     if (T.tier <= L - 4) w = 0.25;
     else if (T.tier <= L) w = 2.4;
@@ -634,7 +1010,7 @@ function spawnCreature(initial, forcedType) {
   const T = forcedType || pickType();
   let x, y, tries = 0;
   const minD = initial ? 260 : cam.d * 1.1;
-  do { x = rand(40, WORLD - 40); y = rand(40, WORLD - 40); tries++; } while (Math.hypot(x - P.x, y - P.y) < minD && tries < 40);
+  do { x = rand(40, WORLD - 40); y = rand(40, WORLD - 40); tries++; } while ((Math.hypot(x - P.x, y - P.y) < minD || blocked(x, y, T.size)) && tries < 60);
   const model = MODELS[T.key]();
   model.root.scale.setScalar(T.size);
   scene.add(model.root);
@@ -643,7 +1019,7 @@ function spawnCreature(initial, forcedType) {
   scene.add(ring);
   const c = { type: T, x, y, vx: 0, vy: 0, face: rand(0, Math.PI * 2), hp: T.hp, maxHp: T.hp, size: T.size,
     wanderA: rand(0, Math.PI * 2), wanderT: 0, atkCd: 0, flash: 0, provoked: false, anim: rand(0, 10),
-    charge: 0, windup: 0, chargeCd: 3, chargeA: 0, model, ring };
+    charge: 0, windup: 0, chargeCd: 3, chargeA: 0, summonCd: 5, model, ring };
   creatures.push(c);
   return c;
 }
@@ -738,7 +1114,7 @@ function bite(aim) {
     const tooBig = c.type.tier > P.level;
     const dmg = Math.max(1, Math.round(P.str * (tooBig ? 0.55 : 1) * rand(0.9, 1.15)));
     c.hp -= dmg; c.flash = 0.12; c.provoked = true;
-    const a = Math.atan2(c.y - P.y, c.x - P.x), kb = c.type.key === 'boss' ? 40 : 170;
+    const a = Math.atan2(c.y - P.y, c.x - P.x), kb = c.type.ai === 'boss' ? 40 : 170;
     c.vx += Math.cos(a) * kb; c.vy += Math.sin(a) * kb;
     floatText(c.x, c.size * 2.2, c.y, `-${dmg}`, tooBig ? '#ff8a8a' : '#ffffff', 15);
     burst(c.x, c.y, c.size, 6, '#d43c3c', 130, 3);
@@ -750,13 +1126,13 @@ function eat(c) {
   if (!creatures.includes(c)) return;
   removeCreature(c);
   P.eaten++; P.kills[c.type.key] = (P.kills[c.type.key] || 0) + 1;
-  sfx.eat(); shake = Math.max(shake, c.type.key === 'boss' ? 18 : 3);
+  sfx.eat(); shake = Math.max(shake, c.type.ai === 'boss' ? 18 : 3);
   burst(c.x, c.y, c.size, 14 + c.size, '#d43c3c', 200, 3.5);
   burst(c.x, c.y, c.size, 6, '#f4ecd8', 150, 2.5);
   const heal = Math.round(c.type.xp * 0.6 * P.healMul + 1);
   P.hp = Math.min(P.maxHp, P.hp + heal);
-  if (c.type.key === 'boss') { boss = null; $('bossBar').hidden = true; setTimeout(() => endGame(true), 900); return; }
-  if (P.level < MAX_LEVEL) {
+  if (c.type.ai === 'boss') { boss = null; $('bossBar').hidden = true; setTimeout(() => zone === 'valley' ? chapterComplete() : endGame(true), 900); return; }
+  if (P.level < levelCap()) {
     gainXp(c.type.xp);
     floatText(c.x, c.size * 2.5, c.y, `+${c.type.xp} XP  ${c.type.name}`, '#ffb347', 16);
   }
@@ -764,7 +1140,7 @@ function eat(c) {
 
 function gainXp(n) {
   P.xp += n;
-  while (P.level + pendingLevels < MAX_LEVEL && P.xp >= needXp(P.level + pendingLevels)) {
+  while (P.level + pendingLevels < levelCap() && P.xp >= needXp(P.level + pendingLevels)) {
     P.xp -= needXp(P.level + pendingLevels); pendingLevels++;
   }
   if (pendingLevels > 0 && state === 'play') levelUp();
@@ -780,8 +1156,8 @@ function levelUp() {
   if (evolved) rebuildDino();
   state = 'levelup';
   $('levelTitle').textContent = evolved ? `You evolved into a ${st.name}!` : `Level ${P.level}!`;
-  $('levelSub').textContent = P.level === MAX_LEVEL
-    ? 'You are as big as you will get. Pick a final trait, then go eat Old Tusk.'
+  $('levelSub').textContent = P.level === levelCap()
+    ? (zone === 'valley' ? 'You are the biggest thing in the valley. Pick a trait, then go eat Old Tusk.' : 'You are as big as you will ever get. Pick a final trait, then go eat the Rat King.')
     : 'You grew bigger and your bite got stronger. Pick one more trait.';
   const pool = PERKS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   const box = $('perks'); box.innerHTML = '';
@@ -792,7 +1168,7 @@ function levelUp() {
     b.addEventListener('click', () => {
       pk.apply(P); $('levelScreen').hidden = true; state = 'play';
       if (pendingLevels > 0) levelUp();
-      else if (P.level >= MAX_LEVEL && !bossSpawned) spawnBoss();
+      else if (P.level >= levelCap() && !bossSpawned) spawnBoss();
     });
     box.appendChild(b);
   });
@@ -802,17 +1178,20 @@ function levelUp() {
 
 function spawnBoss() {
   bossSpawned = true;
-  boss = spawnCreature(false, TYPES.boss);
-  const a = rand(0, Math.PI * 2);
-  boss.x = clamp(P.x + Math.cos(a) * 750, 80, WORLD - 80); boss.y = clamp(P.y + Math.sin(a) * 750, 80, WORLD - 80);
+  const Z = ZONES[zone], T = TYPES[Z.boss];
+  boss = spawnCreature(false, T);
+  for (let i = 0; i < 40; i++) {
+    const a = rand(0, Math.PI * 2), x = clamp(P.x + Math.cos(a) * 800, 120, WORLD - 120), y = clamp(P.y + Math.sin(a) * 800, 120, WORLD - 120);
+    if (!blocked(x, y, T.size)) { boss.x = x; boss.y = y; break; }
+  }
   boss.provoked = true;
   $('bossBar').hidden = false;
-  sfx.roar(); showToast('Old Tusk is coming', 'Follow the red arrow. Bite him until he drops.', 3200);
+  sfx.roar(); showToast(Z.bossIntro[0], Z.bossIntro[1], 3400);
 }
 
 function hurtPlayer(c) {
-  P.hp -= c.type.dmg; P.hurtT = 0.3; shake = Math.max(shake, c.type.key === 'boss' ? 14 : 6);
-  const a = Math.atan2(P.y - c.y, P.x - c.x), kb = c.type.key === 'boss' ? 420 : 260;
+  P.hp -= c.type.dmg; P.hurtT = 0.3; shake = Math.max(shake, c.type.ai === 'boss' ? 14 : 6);
+  const a = Math.atan2(P.y - c.y, P.x - c.x), kb = c.type.ai === 'boss' ? 420 : 260;
   P.vx += Math.cos(a) * kb; P.vy += Math.sin(a) * kb;
   floatText(P.x, pSize() * 3, P.y, `-${c.type.dmg}`, '#ff5a5f', 19);
   sfx.hurt();
@@ -849,6 +1228,7 @@ function update(dt) {
   P.vx += (mx * spd - P.vx) * k; P.vy += (my * spd - P.vy) * k;
   P.x = clamp(P.x + P.vx * dt, pSize(), WORLD - pSize());
   P.y = clamp(P.y + P.vy * dt, pSize(), WORLD - pSize());
+  collide(P, pSize() * 0.7);
   if (P.moving && P.biteAnim <= 0) P.face += angDiff(P.face, Math.atan2(my, mx)) * Math.min(1, dt * 14);
   P.anim += dt * (0.4 + Math.hypot(P.vx, P.vy) / spd);
   P.biteT -= dt; P.biteAnim -= dt; P.hurtT -= dt;
@@ -864,6 +1244,18 @@ function update(dt) {
     const hostile = T.ai === 'aggro' || T.ai === 'boss' || (c.provoked && T.dmg > 0);
     if (T.ai === 'boss') {
       c.chargeCd -= dt;
+      if (T.summon) {
+        c.summonCd -= dt;
+        if (c.summonCd <= 0 && creatures.length < 110) {
+          c.summonCd = rand(6, 8);
+          for (let i = 0; i < 3; i++) {
+            const a = rand(0, Math.PI * 2), m = spawnCreature(false, TYPES[T.summon]);
+            m.x = clamp(c.x + Math.cos(a) * (c.size + 30), 40, WORLD - 40); m.y = clamp(c.y + Math.sin(a) * (c.size + 30), 40, WORLD - 40);
+            m.provoked = true; burst(m.x, m.y, 10, 8, '#6b5e52', 120, 3);
+          }
+          floatText(c.x, c.size * 2.6, c.y, 'Rats, attack!', '#ff8a8a', 18);
+        }
+      }
       if (c.charge > 0) { c.charge -= dt; tx = Math.cos(c.chargeA); ty = Math.sin(c.chargeA); sp = T.speed * 3; }
       else if (c.windup > 0) { c.windup -= dt; sp = 0; if (c.windup <= 0) { c.charge = 0.7; sfx.roar(); } }
       else { tx = dx / d; ty = dy / d; if (c.chargeCd <= 0 && d < 520) { c.windup = 0.7; c.chargeA = Math.atan2(dy, dx); c.chargeCd = rand(3.5, 5); c.face = c.chargeA; } }
@@ -885,6 +1277,7 @@ function update(dt) {
     c.vx += (tx * sp - c.vx) * kk; c.vy += (ty * sp - c.vy) * kk;
     c.x = clamp(c.x + c.vx * dt, c.size, WORLD - c.size);
     c.y = clamp(c.y + c.vy * dt, c.size, WORLD - c.size);
+    if (solids.length) { const ox = c.x, oy = c.y; collide(c, c.size * 0.8); if (c.x !== ox || c.y !== oy) { c.wanderT = Math.min(c.wanderT, 0.2); if (c.charge > 0) c.charge = 0; } }
     const cs = Math.hypot(c.vx, c.vy);
     c.anim += dt * (0.3 + cs / Math.max(40, T.speed));
     if (cs > 8 && c.windup <= 0) c.face += angDiff(c.face, Math.atan2(c.vy, c.vx)) * Math.min(1, dt * 10);
@@ -892,14 +1285,14 @@ function update(dt) {
     if (d < touch) {
       const push = touch - d;
       c.x -= dx / d * push * 0.7; c.y -= dy / d * push * 0.7;
-      if (hostile && c.atkCd <= 0 && T.dmg > 0) { c.atkCd = T.key === 'boss' ? 0.9 : 1.1; c.lunge = 0.25; hurtPlayer(c); if (state !== 'play') return; }
+      if (hostile && c.atkCd <= 0 && T.dmg > 0) { c.atkCd = T.ai === 'boss' ? 0.9 : 1.1; c.lunge = 0.25; hurtPlayer(c); if (state !== 'play') return; }
     }
     c.lunge = Math.max(0, (c.lunge || 0) - dt);
-    if (d > 1600 && T.key !== 'boss' && T.tier < P.level - 3 && Math.random() < dt * 0.5) removeCreature(c);
+    if (d > 1600 && T.ai !== 'boss' && T.tier < P.level - 3 && Math.random() < dt * 0.5) removeCreature(c);
   }
 
   spawnTimer -= dt;
-  if (spawnTimer <= 0 && creatures.length < 48 + P.level * 2) { spawnCreature(false); spawnTimer = 0.25; }
+  if (spawnTimer <= 0 && creatures.length < (zone === 'city' ? 62 : 48 + P.level * 2)) { spawnCreature(false); spawnTimer = 0.25; }
 
   for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= 520 * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
@@ -929,11 +1322,11 @@ function animModel(m, c, moving) {
   if (m.head && !m.segs) m.head.rotation.z = c.lunge > 0 ? -0.3 : 0;
 }
 
-function sync3D() {
-  const viewR = cam.d * 2.2;
+function sync3D(dt) {
+  const vx = cam.d * (W / H) * 0.75 + 150;
   for (const c of creatures) {
     const m = c.model;
-    const vis = Math.abs(c.x - cam.x) < viewR && Math.abs(c.y - cam.y) < viewR;
+    const vis = state === 'title' || (Math.abs(c.x - cam.x) < vx && c.y > cam.y - cam.d * 1.6 && c.y < cam.y + cam.d * 0.9);
     m.root.visible = vis; c.ring.visible = vis && state !== 'title';
     if (!vis) continue;
     let ox = 0, oz = 0;
@@ -978,9 +1371,12 @@ function sync3D() {
     camera.position.set(cam.x + sx, cam.d * 0.92, cam.y + cam.d * 0.68 + sz);
     camera.lookAt(cam.x + sx, 0, cam.y - 30 + sz);
   }
-  scene.fog.near = cam.d * 1.3; scene.fog.far = cam.d * 3.4;
+  scene.fog.near = cam.d * (zone === 'city' ? 1.6 : 1.3); scene.fog.far = cam.d * (zone === 'city' ? 4.2 : 3.4);
+  const sr = Math.max(750, cam.d * 1.4), sc = sun.shadow.camera;
+  if (Math.abs(sc.right - sr) > 20) { sc.left = -sr; sc.right = sr; sc.top = sr; sc.bottom = -sr; sc.updateProjectionMatrix(); }
+  if (zone === 'city') fadeBuildings(dt);
   const fx_ = state === 'title' ? WORLD / 2 : cam.x, fz = state === 'title' ? WORLD / 2 : cam.y;
-  sun.position.set(fx_ + 350, 900, fz + 250); sun.target.position.set(fx_, 0, fz);
+  sun.position.set(fx_ + 350, 900 + cam.d * 0.4, fz + 250); sun.target.position.set(fx_, 0, fz);
 }
 
 // ---------- overlay ----------
@@ -998,7 +1394,7 @@ function drawOverlay() {
   }
   g.globalAlpha = 1;
   for (const c of creatures) {
-    if (c.hp >= c.maxHp || c.type.key === 'boss' || !c.model.root.visible) continue;
+    if (c.hp >= c.maxHp || c.type.ai === 'boss' || !c.model.root.visible) continue;
     const s = toScreen(c.x, c.size * 2.3, c.y); if (!s.ok) continue;
     const w = Math.max(22, c.size * 1.6);
     g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(s.x - w / 2, s.y, w, 5);
@@ -1035,12 +1431,12 @@ function drawOverlay() {
 function hud() {
   const st = stageFor(P.level);
   $('stageName').textContent = st.name; $('stageName').style.color = st.body;
-  $('lvl').textContent = P.level >= MAX_LEVEL ? 'Level 10 · Max' : `Level ${P.level}`;
+  $('lvl').textContent = P.level >= levelCap() ? `Level ${P.level} · Max` : `Level ${P.level}`;
   $('hpFill').style.width = `${(P.hp / P.maxHp) * 100}%`;
   $('hpText').textContent = `${Math.ceil(P.hp)} / ${P.maxHp}`;
   const need = needXp(P.level);
-  $('xpFill').style.width = P.level >= MAX_LEVEL ? '100%' : `${Math.min(100, (P.xp / need) * 100)}%`;
-  $('xpText').textContent = P.level >= MAX_LEVEL ? 'Eat Old Tusk' : `${P.xp} / ${need} XP`;
+  $('xpFill').style.width = P.level >= levelCap() ? '100%' : `${Math.min(100, (P.xp / need) * 100)}%`;
+  $('xpText').textContent = P.level >= levelCap() ? (zone === 'valley' ? 'Eat Old Tusk' : 'Eat the Rat King') : `${P.xp} / ${need} XP`;
   $('strText').textContent = Math.round(P.str * 10) / 10;
   $('spdText').textContent = Math.round(pSpeed());
   $('eatText').textContent = P.eaten;
@@ -1057,9 +1453,32 @@ function setScreens() {
 function start() {
   initAudio(); newGame(); state = 'play';
   cam.x = P.x; cam.y = P.y;
-  $('titleScreen').hidden = true; $('endScreen').hidden = true; $('levelScreen').hidden = true;
+  $('titleScreen').hidden = true; $('endScreen').hidden = true; $('levelScreen').hidden = true; $('chapterScreen').hidden = true;
   setScreens();
   showToast('Eat to grow', 'Start with beetles, crickets and mice', 2600);
+}
+function chapterComplete() {
+  if (state !== 'play') return;
+  state = 'chapter'; setScreens();
+  $('chapterScreen').hidden = false; $('cityGoBtn').focus({ preventScroll: true });
+}
+function enterCity() {
+  $('chapterScreen').hidden = true;
+  clearCreatures(); particles = []; texts = [];
+  applyZone('city');
+  P.xp = Math.min(P.xp, needXp(P.level) - 1);
+  P.x = WORLD / 2; P.y = WORLD / 2 + 120; P.vx = P.vy = 0; P.hp = P.maxHp; P.face = -Math.PI / 2;
+  cam.x = P.x; cam.y = P.y;
+  for (let i = 0; i < 58; i++) spawnCreature(true);
+  state = 'play'; setScreens();
+  showToast('Welcome to the city', 'Pigeons, sewer rats and alley cats first. The Rat King waits at level 20.', 3400);
+  gainXp(0);
+}
+function skipToCity() {
+  start();
+  P.level = 10; P.maxHp = 20 + 8 * 9 + 15; P.hp = P.maxHp; P.str = 1 + 1.5 * 9 + 4; P.biteCd *= 0.85; P.speedMul *= 1.12;
+  rebuildDino(); P.kills = {};
+  enterCity();
 }
 function togglePause() {
   if (state === 'play') state = 'paused'; else if (state === 'paused') state = 'play'; else return;
@@ -1074,18 +1493,20 @@ function endGame(won) {
     sfx.win();
     try { best = +localStorage.getItem('dinoChompBest') || null; if (!best || elapsed < best) { localStorage.setItem('dinoChompBest', String(elapsed)); best = elapsed; } } catch (e) { best = null; }
   }
-  $('endTitle').textContent = won ? 'King of the Valley' : 'You were eaten';
+  $('endTitle').textContent = won ? 'King of the City' : 'You were eaten';
   $('endTitle').style.color = won ? 'var(--leaf)' : 'var(--blood)';
   $('endSub').textContent = won
-    ? 'You hatched as a tiny lizard and ate your way up to Rex. Old Tusk is dinner.'
+    ? 'You hatched as a tiny lizard, ate the valley, then ate the city. The Rat King is dinner and you wear the crown.'
     : `A ${stageFor(P.level).name} at level ${P.level}. Bite smaller things first and come back bigger.`;
-  const kinds = Object.keys(P.kills).length;
-  const cells = [[fmtTime(elapsed), 'Time'], [P.level, 'Level'], [P.eaten, 'Eaten'], [`${kinds}/${Object.keys(TYPES).length - 1}`, 'Species'], [P.kills.rat || 0, 'Rats'], [P.kills.mouse || 0, 'Mice']];
+  const kinds = Object.keys(P.kills).filter(k => TYPES[k].ai !== 'boss').length;
+  const cells = [[fmtTime(elapsed), 'Time'], [P.level, 'Level'], [P.eaten, 'Eaten'], [`${kinds}/${Object.keys(TYPES).filter(k => TYPES[k].ai !== 'boss').length}`, 'Species'], [(P.kills.rat || 0) + (P.kills.sewerrat || 0), 'Rats'], [P.kills.mouse || 0, 'Mice']];
   if (best) cells.push([fmtTime(best), 'Best time']);
   $('endResults').innerHTML = cells.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
   setTimeout(() => { $('endScreen').hidden = false; $('againBtn').focus({ preventScroll: true }); }, won ? 200 : 600);
 }
 $('startBtn').addEventListener('click', start);
+$('cityBtn').addEventListener('click', skipToCity);
+$('cityGoBtn').addEventListener('click', enterCity);
 $('againBtn').addEventListener('click', start);
 $('resumeBtn').addEventListener('click', togglePause);
 $('pauseBtn').addEventListener('click', togglePause);
@@ -1097,7 +1518,7 @@ function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
   if (state === 'play') update(dt);
   else if (state === 'title') for (const c of creatures) c.anim += dt * 0.3;
-  sync3D();
+  sync3D(dt);
   renderer.render(scene, camera);
   drawOverlay();
   if (state !== 'title') hud();
