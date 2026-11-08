@@ -1144,6 +1144,33 @@ const PROPERTIES = {
   ashfall:{name:'Obsidian Hall', price:1100}, petal:{name:'Blossom Pavilion', price:1100}, skyhold:{name:'Mountain Retreat', price:1300},
   maplehold:{name:'Maple Lodge', price:1000}, greenstem:{name:'Bamboo House', price:1100}, sporehaven:{name:'Glowcap Burrow', price:1200}, prismvale:{name:'Crystal House', price:1400}, tallpine:{name:'Redwood Lodge', price:1200}, farhaven:{name:'Captain\'s Cottage', price:1100}, mossbridge:{name:'Flower Cottage', price:900}, driftport:{name:'Beach Shack', price:1000}, tidewatch:{name:'Seaside Cottage', price:1000}, crownfall:{name:'Old Crown Townhouse', price:1400},
 };
+// a second house in every town (the bottom-left one), plus Port Wren and the Sunken Isle
+{
+  const SECOND = {wren:['Harbor Row House',700], hollow:['Woodcutter\'s Cottage',650], reed:['Reed Hut',550], thorn:['Witchwood Cottage',650], highcairn:['Stone Cottage',800],
+    frost:['Ice Fisher\'s Hut',850], graven:['Gravenmoor Hall',950], redrock:['Mesa House',950], storm:['Sea Captain\'s House',1000], dun:['Desert Courtyard House',1100],
+    jade:['Temple Garden House',1100], lantern:['Lantern Loft',1100], sunreach:['Acacia House',1100], ashfall:['Smith\'s Townhouse',1300], petal:['Tea House',1300],
+    skyhold:['Cloud Cottage',1500], maplehold:['Syrup Cottage',1200], greenstem:['Garden Pavilion',1300], sporehaven:['Mushroom Cottage',1400], prismvale:['Prism Tower House',1700],
+    tallpine:['Hunter\'s Lodge',1400], farhaven:['Harbor Master\'s House',1300], mossbridge:['Mill Cottage',1100], driftport:['Pearl Diver\'s House',1200], tidewatch:['Net House',1200], crownfall:['Royal Townhouse',1800]};
+  for (const k in SECOND) PROPERTIES[k + '2'] = {name: SECOND[k][0], price: SECOND[k][1], town: k, hi: 2};
+  PROPERTIES.wren = {name: 'Guildside House', price: 600};
+  PROPERTIES.isle = {name: 'Island Hideaway', price: 2500, hi: 0};
+}
+// one-of-a-kind estates out in the wild
+const ESTATES = {
+  castle:   {name:'Hilltop Castle',     price:6000, tx:126,ty:68,  style:'castle',     where:'the hills near Highcairn'},
+  windmill: {name:'Old Windmill',       price:1500, tx:76, ty:122, style:'windmill',   where:'the fields south of Port Wren'},
+  lakecabin:{name:'Lakeside Cabin',     price:1300, tx:82, ty:40,  style:'cabin',      where:'the pine lakes of the north'},
+  palace:   {name:'Desert Palace',      price:4500, tx:206,ty:160, style:'palace',     where:'the Amber Sands'},
+  lighthouse:{name:'Cliff Lighthouse',  price:2500, tx:356,ty:150, style:'lighthouse', where:'the eastern cliffs'},
+  chalet:   {name:'Snowy Chalet',       price:2000, tx:180,ty:30,  style:'chalet',     where:'the snowfields of Frost Reach'},
+  pagoda:   {name:'Cliffside Pagoda',   price:3000, tx:786,ty:70,  style:'pagoda',     where:'the heights of Bamboo Reach'},
+  treehouse:{name:'Giant Treehouse',    price:3500, tx:920,ty:196, style:'treehouse',  where:'the depths of Giantwood'},
+};
+for (const k in ESTATES) PROPERTIES[k] = {...ESTATES[k], estate: true};
+for (const k in PROPERTIES) if (!PROPERTIES[k].estate && !PROPERTIES[k].town) PROPERTIES[k].town = k;
+const ESTATE_TILES = new Set(), ESTATE_CLEAR = new Set();
+const placeName = k => { const P = PROPERTIES[k]; return P.estate ? P.where : TOWNS[P.town].name; };
+const ownsIn = town => PK.some(p => S.props && S.props[p] && PROPERTIES[p].town === town);
 const PK = Object.keys(PROPERTIES);
 // solid: blocks walking · light: radius at night · use: what E does besides picking up
 const PLACE = {
@@ -1172,6 +1199,7 @@ function placeBlock(x, y) {
   const t = map[idx(x,y)];
   if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.LAVA || t === T.BRIDGE || t === T.VOID) return 'You cannot build there.';
   if (nodeGrid[idx(x,y)] >= 0) return 'Something is already growing there.';
+  if (ESTATE_CLEAR.has(idx(x,y))) return 'Too close to an estate.';
   if (placedAt(x, y)) return 'Something is already there.';
   if (x >= HOME.x - 3 && x <= HOME.x + 6 && y >= HOME.y - 4 && y <= HOME.y + 5) return 'That spot is kept clear for your homestead.';
   if (NPCS.some(n => Math.hypot(n.x - x - .5, n.y - y - .5) < 1.4)) return 'Someone is standing there.';
@@ -2023,7 +2051,17 @@ function genWorld() {
   for (const k of BK) { const B = BOSSES[k]; if (B.dungeon) continue; place(B, (x,y,t) => (B.climb ? reachC : reach)[idx(x,y)] && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
   genDungeons();
   for (const k of DK) place(DUNGEONS[k].entrance = {tx: DUNGEONS[k].near[0], ty: DUNGEONS[k].near[1]}, (x,y,t) => reach[idx(x,y)] && reach[idx(x,y+1)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL && t !== T.HOUSE, 6);
-  for (const k of PK) { const hs = houses.filter(h => h.town === k), h = hs[1] || hs[0]; PROPERTIES[k].door = {x: h.x + 1, y: h.y + 2.35}; PROPERTIES[k].hx = h.x; PROPERTIES[k].hy = h.y; }
+  for (const k in ESTATES) {
+    const E = PROPERTIES[k], bad = t => t === T.ROAD || t === T.FLOOR || t === T.HOUSE || t === T.BRIDGE || t === T.SHAL || t === T.DEEP || t === T.MOUNT || t === T.LAVA || t === T.VOID;
+    place(E, (x, y) => { for (let yy = -1; yy <= 3; yy++) for (let xx = -1; xx <= 2; xx++) { if (!inB(x+xx, y+yy) || bad(map[idx(x+xx, y+yy)])) return false; } return reach[idx(x, y+2)] && reach[idx(x+1, y+2)] && !LANDMARKS.some(L => Math.hypot(L.x - x, L.y - y) < 5) && !BK.some(b => Math.hypot(BOSSES[b].x - x, BOSSES[b].y - y) < 6); }, 10);
+    houses.push({x: E.x, y: E.y, roof: '#7a5a3a', town: null, style: E.style, estate: k});
+    for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) ESTATE_TILES.add(idx(E.x+xx, E.y+yy));
+    for (let yy = -3; yy <= 3; yy++) for (let xx = -3; xx <= 4; xx++) ESTATE_CLEAR.add(idx(E.x+xx, E.y+yy));
+  }
+  for (const k of PK) {
+    const P = PROPERTIES[k], h = P.estate ? houses.find(q => q.estate === k) : (() => { const hs = houses.filter(q => q.town === P.town); return hs[P.hi ?? 1] || hs[0]; })();
+    P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
+  }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
@@ -2038,7 +2076,7 @@ function placeNodes() {
   const blocked = new Set([...LANDMARKS.map(L => idx(L.x, L.y)), ...BK.map(k => idx(BOSSES[k].x, BOSSES[k].y)), ...chests.map(c => idx(c.x, c.y)), ...DK.map(k => idx(DUNGEONS[k].entrance.x, DUNGEONS[k].entrance.y))]);
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
-    if (blocked.has(i)) continue;
+    if (blocked.has(i) || ESTATE_CLEAR.has(i)) continue;
     let inTownArea = false;
     for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x, y - TOWNS[k].y) < (TOWNS[k].small ? 4.5 : 7)) inTownArea = true;
     if (Math.hypot(x - HOME.x, y - HOME.y) < 9) inTownArea = true;
@@ -2221,7 +2259,7 @@ function buildChunk(cx, cy) {
   const g = c.getContext('2d'); g.translate(-cx*CH*TS, -cy*CH*TS);
   for (let y = cy*CH; y < Math.min(H, (cy+1)*CH); y++) for (let x = cx*CH; x < Math.min(W, (cx+1)*CH); x++) drawTile(g, x, y);
   const x0 = cx*CH - 3, x1 = (cx+1)*CH + 1, y0 = cy*CH - 3, y1 = (cy+1)*CH + 1;
-  for (const h of houses) if (h.x >= x0 && h.x <= x1 && h.y >= y0 && h.y <= y1) drawHouse(g, h.x*TS, h.y*TS, h.roof);
+  for (const h of houses) if (!h.style && h.x >= x0 && h.x <= x1 && h.y >= y0 && h.y <= y1) drawHouse(g, h.x*TS, h.y*TS, h.roof);
   for (const k of FORGE_TOWNS) { const tw = TOWNS[k]; if (tw.x-3 >= x0 && tw.x-3 <= x1 && tw.y >= y0 && tw.y <= y1) drawAnvil(g, (tw.x-3)*TS, tw.y*TS); }
   chunks[cy][cx] = c; chunkLive.push([cx, cy]); c.used = frameT;
   // keep only the most recently seen chunks: each one is a 512x512 canvas (~1 MB of GPU memory)
@@ -2250,6 +2288,71 @@ function drawHouse(g, px, py, roof) {
   g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.moveTo(px+16, py+1); g.lineTo(px+32, py+14); g.lineTo(px+16, py+14); g.closePath(); g.fill();
   g.fillStyle = '#5a3d27'; g.fillRect(px+13, py+20, 6, 10);
   g.fillStyle = '#f3d27a'; g.fillRect(px+6, py+17, 4, 4); g.fillRect(px+22, py+17, 4, 4);
+}
+function drawEstate(g, px, py, style, t) {
+  const sh = (w) => { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px + 16 - w/2, py + 28, w, 4); };
+  const door = (x, c) => { g.fillStyle = c || '#5a3d27'; g.fillRect(px + x, py + 21, 6, 9); g.fillStyle = '#e3a948'; g.fillRect(px + x + 4, py + 25, 1, 1); };
+  const win = (x, y) => { g.fillStyle = '#f3d27a'; g.fillRect(px + x, py + y, 4, 4); };
+  switch (style) {
+    case 'castle':
+      sh(40); g.fillStyle = '#8a8890'; g.fillRect(px - 4, py + 4, 40, 26);
+      g.fillStyle = '#9a98a2'; g.fillRect(px - 10, py - 10, 12, 40); g.fillRect(px + 30, py - 10, 12, 40);
+      g.fillStyle = '#6a6870'; for (let i = 0; i < 4; i++) { g.fillRect(px - 10 + i*3, py - 13, 2, 3); g.fillRect(px + 30 + i*3, py - 13, 2, 3); g.fillRect(px - 2 + i*9, py + 1, 4, 3); }
+      g.fillStyle = '#58565e'; g.fillRect(px - 4, py + 15, 40, 1); g.fillRect(px - 10, py + 6, 12, 1); g.fillRect(px + 30, py + 6, 12, 1);
+      g.fillStyle = '#3a2a1a'; g.beginPath(); g.moveTo(px + 9, py + 30); g.lineTo(px + 9, py + 20); g.arc(px + 16, py + 20, 7, Math.PI, 0); g.lineTo(px + 23, py + 30); g.fill();
+      win(-6, -2); win(34, -2); win(-6, 12); win(34, 12);
+      g.fillStyle = '#5a3d27'; g.fillRect(px - 4, py - 26, 1, 16); g.fillStyle = '#c84a3a'; g.fillRect(px - 3, py - 26 + Math.sin(t*3)*.5, 8, 5);
+      break;
+    case 'windmill': {
+      sh(24); g.fillStyle = '#d8c8a8'; g.beginPath(); g.moveTo(px + 6, py + 30); g.lineTo(px + 10, py - 6); g.lineTo(px + 22, py - 6); g.lineTo(px + 26, py + 30); g.fill();
+      g.fillStyle = '#8a3a2a'; g.beginPath(); g.moveTo(px + 7, py - 6); g.lineTo(px + 16, py - 16); g.lineTo(px + 25, py - 6); g.fill();
+      door(13); win(14, 4);
+      const a = t*1.2, cx = px + 16, cy = py - 6;
+      g.strokeStyle = '#5a3d27'; g.lineWidth = 2; g.fillStyle = 'rgba(240,232,210,.92)';
+      for (let i = 0; i < 4; i++) { const b = a + i*Math.PI/2, ex = cx + Math.cos(b)*20, ey = cy + Math.sin(b)*20; g.beginPath(); g.moveTo(cx, cy); g.lineTo(ex, ey); g.stroke();
+        const nx = -Math.sin(b)*4, ny = Math.cos(b)*4; g.beginPath(); g.moveTo(cx + Math.cos(b)*6, cy + Math.sin(b)*6); g.lineTo(ex, ey); g.lineTo(ex + nx, ey + ny); g.lineTo(cx + Math.cos(b)*6 + nx, cy + Math.sin(b)*6 + ny); g.fill(); }
+      g.fillStyle = '#3a2a1a'; g.fillRect(cx - 2, cy - 2, 4, 4); break; }
+    case 'cabin':
+      sh(32); g.fillStyle = '#7a4a2a'; g.fillRect(px + 1, py + 10, 30, 20);
+      g.fillStyle = '#5a3420'; for (let y = 12; y < 30; y += 4) g.fillRect(px + 1, py + y, 30, 1);
+      g.fillStyle = '#3a5a2a'; g.beginPath(); g.moveTo(px - 3, py + 12); g.lineTo(px + 16, py - 4); g.lineTo(px + 35, py + 12); g.fill();
+      g.fillStyle = '#8a8890'; g.fillRect(px + 23, py - 4, 5, 10); door(13); win(4, 16); win(24, 16);
+      g.fillStyle = 'rgba(220,220,230,.5)'; for (let i = 0; i < 3; i++) { const k = (t*.5 + i/3) % 1; g.beginPath(); g.arc(px + 25 + k*4, py - 6 - k*14, 2 + k*2, 0, 7); g.fill(); }
+      break;
+    case 'palace':
+      sh(44); g.fillStyle = '#e8d8b0'; g.fillRect(px - 6, py + 8, 44, 22);
+      g.fillStyle = '#f0e4c4'; g.fillRect(px - 10, py + 2, 8, 28); g.fillRect(px + 34, py + 2, 8, 28);
+      g.fillStyle = '#4a9ab0'; g.beginPath(); g.arc(px + 16, py + 8, 12, Math.PI, 0); g.fill(); g.beginPath(); g.arc(px - 6, py + 2, 4, Math.PI, 0); g.fill(); g.beginPath(); g.arc(px + 38, py + 2, 4, Math.PI, 0); g.fill();
+      g.fillStyle = '#e3a948'; g.fillRect(px + 15, py - 8, 2, 4); g.fillRect(px - 7, py - 5, 2, 3); g.fillRect(px + 37, py - 5, 2, 3);
+      g.fillStyle = '#5a3a2a'; g.beginPath(); g.moveTo(px + 11, py + 30); g.lineTo(px + 11, py + 21); g.arc(px + 16, py + 21, 5, Math.PI, 0); g.lineTo(px + 21, py + 30); g.fill();
+      win(0, 14); win(28, 14); win(-8, 8); win(36, 8); break;
+    case 'lighthouse': {
+      sh(20); g.fillStyle = '#d8d8d8'; g.fillRect(px + 2, py + 16, 28, 14); door(13);
+      for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#c84a3a' : '#f0f0f0'; const w = 12 - i; g.fillRect(px + 16 - w/2, py + 16 - (i + 1)*7, w, 7); }
+      g.fillStyle = '#2a2a30'; g.fillRect(px + 9, py - 34, 14, 2); g.fillRect(px + 10, py - 44, 12, 2);
+      const on = isNightish(); g.fillStyle = on ? '#fff0a0' : '#c8d8e8'; g.fillRect(px + 11, py - 42, 10, 8);
+      g.fillStyle = '#c84a3a'; g.beginPath(); g.moveTo(px + 9, py - 44); g.lineTo(px + 16, py - 50); g.lineTo(px + 23, py - 44); g.fill();
+      if (on) { const a = t*1.5; g.fillStyle = 'rgba(255,240,160,.18)'; g.beginPath(); g.moveTo(px + 16, py - 38); g.lineTo(px + 16 + Math.cos(a)*70, py - 38 + Math.sin(a)*20 - 8); g.lineTo(px + 16 + Math.cos(a)*70, py - 38 + Math.sin(a)*20 + 8); g.fill(); }
+      break; }
+    case 'chalet':
+      sh(32); g.fillStyle = '#a07040'; g.fillRect(px + 1, py + 10, 30, 20);
+      g.fillStyle = '#6a3a1a'; g.beginPath(); g.moveTo(px - 4, py + 13); g.lineTo(px + 16, py - 6); g.lineTo(px + 36, py + 13); g.fill();
+      g.fillStyle = '#f0f4f8'; g.beginPath(); g.moveTo(px - 4, py + 13); g.lineTo(px + 16, py - 6); g.lineTo(px + 36, py + 13); g.lineTo(px + 32, py + 13); g.lineTo(px + 16, py - 1); g.lineTo(px, py + 13); g.fill();
+      g.fillStyle = '#5a3420'; g.fillRect(px + 1, py + 18, 30, 1); door(13); win(4, 13); win(24, 13); win(14, 4); break;
+    case 'pagoda':
+      sh(32); g.fillStyle = '#c84a3a'; g.fillRect(px + 4, py + 14, 24, 16); g.fillRect(px + 8, py - 2, 16, 12); g.fillRect(px + 11, py - 16, 10, 10);
+      g.fillStyle = '#2a3a2a';
+      for (const [y, w] of [[14, 36], [0, 28], [-14, 20]]) { g.beginPath(); g.moveTo(px + 16 - w/2, y + py + 2); g.lineTo(px + 16 - w/2 + 4, py + y - 4); g.lineTo(px + 16 + w/2 - 4, py + y - 4); g.lineTo(px + 16 + w/2, py + y + 2); g.fill(); }
+      g.fillStyle = '#e3a948'; g.fillRect(px + 15, py - 24, 2, 6); door(13, '#3a2a1a'); win(6, 18); win(22, 18); win(14, 2); break;
+    case 'treehouse':
+      sh(30); g.fillStyle = '#6a2e1a'; g.fillRect(px + 10, py - 4, 12, 34); g.fillStyle = '#8a3e22'; g.fillRect(px + 12, py - 4, 3, 34);
+      g.fillStyle = '#1e3e16'; g.beginPath(); g.arc(px + 16, py - 22, 22, 0, 7); g.fill(); g.fillStyle = '#2a5220'; g.beginPath(); g.arc(px + 8, py - 26, 12, 0, 7); g.fill(); g.beginPath(); g.arc(px + 26, py - 18, 11, 0, 7); g.fill();
+      g.fillStyle = '#a07040'; g.fillRect(px + 2, py - 12, 28, 12); g.fillStyle = '#7a4a2a'; g.fillRect(px, py - 1, 32, 3);
+      g.fillStyle = '#8a3a2a'; g.beginPath(); g.moveTo(px, py - 11); g.lineTo(px + 16, py - 22); g.lineTo(px + 32, py - 11); g.fill();
+      win(6, -9); win(22, -9);
+      g.fillStyle = '#c8a060'; for (let y = 2; y < 28; y += 4) g.fillRect(px + 20, py + y, 6, 1); g.fillRect(px + 20, py + 2, 1, 26); g.fillRect(px + 25, py + 2, 1, 26);
+      door(12, '#5a3d27'); break;
+  }
 }
 function drawAnvil(g, px, py) {
   g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px+2, py+12, 12, 3);
@@ -2626,6 +2729,7 @@ function enemyWalk(x, y) {
   const t = tileAt(Math.floor(x), Math.floor(y));
   if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.BRIDGE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) return false;
   if (S.placed.length && placedAt(Math.floor(x), Math.floor(y))) return false;
+  if (ESTATE_TILES.has(idx(Math.floor(x), Math.floor(y)))) return false;
   return !townAt(x, y, 8.5);
 }
 function bossWalk(x, y) {
@@ -3389,6 +3493,7 @@ function render() {
   }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
+  for (const h of houses) if (h.style && inView(h.x, h.y)) sprites.push({y: h.y + 1.9, f: () => drawEstate(ctx, h.x*TS, h.y*TS, h.style, frameT)});
   for (const k of PK) { const P = PROPERTIES[k]; if (P.hx != null && inView(P.hx, P.hy)) sprites.push({y: P.hy + 2.05, f: () => drawPropertySign(ctx, k)}); }
   for (const c of [...chests, ...abyssChests]) if (inView(c.x, c.y)) sprites.push({y: c.y + .8, f: () => drawChest(ctx, c)});
   for (const k of DK) { const E = DUNGEONS[k].entrance; if (inView(E.x, E.y)) sprites.push({y: E.y + .85, f: () => drawEntrance(ctx, k)}); }
@@ -3573,7 +3678,7 @@ function passable(x, y) {
   for (const [px,py] of pts) {
     const tx = Math.floor(px), ty = Math.floor(py);
     if (!inB(tx,ty)) return false;
-    if (homeBlocked(tx, ty)) return false;
+    if (homeBlocked(tx, ty) || ESTATE_TILES.has(idx(tx, ty))) return false;
     const pq = S.placed.length ? placedAt(tx, ty) : null; if (pq && PLACE[pq.t].solid) return false;
     if (fly) { const ft = map[idx(tx,ty)]; if (ft === T.HOUSE || ft === T.VOID || ft === T.DWALL || ft === T.DTORCH) return false; continue; }
     if (!walkable(map[idx(tx,ty)], raft, climb)) return false;
@@ -3585,7 +3690,7 @@ function boardAt(x, y, r) { for (const k in TOWNS) if (!TOWNS[k].small && Math.h
 function npcWalkable(x, y) {
   const tx = Math.floor(x), ty = Math.floor(y); if (!inB(tx, ty)) return false;
   const t = map[idx(tx, ty)];
-  if (t === T.HOUSE || t === T.DEEP || t === T.SHAL || t === T.LAVA || t === T.MOUNT || t === T.VOID) return false;
+  if (t === T.HOUSE || t === T.DEEP || t === T.SHAL || t === T.LAVA || t === T.MOUNT || t === T.VOID || ESTATE_TILES.has(idx(tx, ty))) return false;
   if (S && S.placed && S.placed.length) { const q = placedAt(tx, ty); if (q && PLACE[q.t].solid) return false; }
   return true;
 }
@@ -4525,7 +4630,7 @@ function renderHome() {
                   : '<div class="jcard"><div class="t done">Fully built</div><div class="s">The finest house on the coast.</div></div>';
   $('homeSheet').innerHTML = `
     <div class="sheet-head"><h2>Your ${homeCtx ? PROPERTIES[homeCtx].name : L.name}</h2><button class="btn" data-x="1">Close<kbd>Esc</kbd></button></div>
-    <div class="vals" style="margin-top:6px">${homeCtx ? `A house in ${TOWNS[homeCtx].name} · earns ${rentOf(homeCtx)} coin rent each morning · ${S.respawn === homeCtx ? 'you wake up here if knocked out' : 'not your respawn point'} · the chest is shared with all your homes` : `${L.plots} crop beds`}${homeCtx ? '<!--' : ''}${H.level >= 2 ? ` · coop with ${H.chickens} hens · workbench` : ''}${H.level >= 3 ? ' · forge' : ''} · you wake up here if you're knocked out${homeCtx ? '-->' : ''}</div>
+    <div class="vals" style="margin-top:6px">${homeCtx ? `A house in ${placeName(homeCtx)} · earns ${rentOf(homeCtx)} coin rent each morning · ${S.respawn === homeCtx ? 'you wake up here if knocked out' : 'not your respawn point'} · the chest is shared with all your homes` : `${L.plots} crop beds`}${homeCtx ? '<!--' : ''}${H.level >= 2 ? ` · coop with ${H.chickens} hens · workbench` : ''}${H.level >= 3 ? ' · forge' : ''} · you wake up here if you're knocked out${homeCtx ? '-->' : ''}</div>
     <div class="jgrid" style="margin-top:12px">
       <div class="jcard"><div class="t">Bed</div><div class="s">Sleep until morning and wake fully healed. Crops keep growing while you sleep.</div><div style="margin-top:8px"><button class="btn sm primary" data-sleep="1">Sleep</button></div></div>
       ${homeCtx ? `<div class="jcard"><div class="t">Respawn point</div><div class="s">${S.respawn === homeCtx ? 'You wake up here when knocked out.' : 'Wake up here instead of your homestead when knocked out.'}</div><div style="margin-top:8px"><button class="btn sm ${S.respawn === homeCtx ? '' : 'primary'}" data-resp="1" ${S.respawn === homeCtx ? 'disabled' : ''}>Set as respawn point</button></div></div>` : up}
@@ -4596,7 +4701,7 @@ function propertyTarget() {
 }
 function propertyTalk(k) {
   const P = PROPERTIES[k];
-  openPanel(P.name, `A furnished house in ${TOWNS[k].name}. It has a bed, a door to your shared storage chest, free fast travel, and it earns <b>${rentOf(k)} coin</b> in rent every morning.`, [
+  openPanel(P.name, `${P.estate ? 'A one-of-a-kind estate in ' + P.where + '. It has a bed and a door to your shared storage chest, you can fast travel to it for free, and it earns' : `A furnished house in ${TOWNS[P.town].name}. It has a bed, a door to your shared storage chest, free fast travel, and it earns`} <b>${rentOf(k)} coin</b> in rent every morning.`, [
     {label: `Buy it (${P.price} coin)`, primary: true, disabled: S.coins < P.price, fn: () => { S.coins -= P.price; S.props[k] = true; SFX.victory(); toast(`<b>You bought the ${P.name}!</b><br>It earns ${rentOf(k)} coin each morning. Go inside to sleep, store things or make it your respawn point.`, 7000); renderHUD(); save(); closeTalk(); }},
     {label: 'Not now', fn: closeTalk}]);
 }
@@ -4706,7 +4811,7 @@ function openJournal() {
     <div class="jgrid">${BKM.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
     <h3>Dungeons</h3>
     <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); if (D.endless) return `<div class="jcard boss"><div class="t">The Abyss</div><div class="s">Endless · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · deepest floor ${S.abyssBest || 0} · checkpoint floor ${S.abyssCheckpoint || 1}</div></div>`; return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
-    ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${TOWNS[k].name} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
+    ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
     <h3>Open deals</h3>
     ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c, id)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
     ${jobs.length ? `<h3>Notice board jobs</h3><div class="jgrid">${jobs.map(([k, r]) => `<div class="jcard"><div class="t">${esc(r.title)}</div><div class="s">${TOWNS[k].name} board · ${r.reward} coin</div><div class="req"><span>${reqProgress(r)}/${r.n}</span></div></div>`).join('')}</div>` : ''}
@@ -5333,6 +5438,9 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['tycoon','Real Estate Tycoon','Own 20 houses', () => PK.filter(k => S.props[k]).length >= 20],
+  ['lord','Lord of the Manor','Own an estate out in the wild', () => PK.some(k => PROPERTIES[k].estate && S.props[k])],
+  ['king','King of the Castle','Buy the Hilltop Castle', () => !!S.props.castle],
   ['armored','Fully Armored','Wear body armor, a helmet and a shield at once', () => !!(S.equip.armor && S.equip.head && S.equip.shield)],
   ['whisperer','Animal Whisperer','Tame 3 wild animals', () => (S.tamed || 0) >= 3],
   ['menagerie','Menagerie','Own 10 pets', () => S.pets.length >= 10],
@@ -5362,12 +5470,13 @@ function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() 
 
 /* ================= fast travel ================= */
 const bossActive = () => enemies.some(e => e.boss);
-function travelCost(k) { if (k === 'home' || (S.props && S.props[k])) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
+function travelCost(k) { if (k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
   const blocked = bossActive() || !!inDungeon();
   $('travel').innerHTML = `<span style="width:100%;text-align:center;background:none">${inDungeon() ? 'Climb out of the dungeon before you fast travel.' : blocked ? 'You can’t fast travel during a boss fight.' : 'Fast travel to a place you’ve been'}</span>`
     + (S.home.level ? `<button class="btn sm" data-go="home" ${blocked ? 'disabled' : ''}>Home · free</button>` : '')
+    + PK.filter(k => PROPERTIES[k].estate && S.props[k]).map(k => `<button class="btn sm" data-go="prop:${k}" ${blocked ? 'disabled' : ''}>${PROPERTIES[k].name} · free</button>`).join('')
     + list.map(k => `<button class="btn sm" data-go="${k}" ${blocked || S.coins < travelCost(k) ? 'disabled' : ''}>${TOWNS[k].name} · ${travelCost(k) ? travelCost(k) + '◆' : 'your house'}</button>`).join('');
 }
 $('travel').addEventListener('click', e => {
@@ -5376,7 +5485,7 @@ $('travel').addEventListener('click', e => {
   S.coins -= cost; S.fastTravels = (S.fastTravels || 0) + 1; SFX.travel();
   closeModal('mapView');
   fadeThen(() => {
-    if (k === 'home') { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; }
+    if (k === 'home') { S.x = HOME.x + .5; S.y = HOME.y - .3; } else if (k.startsWith('prop:')) { const P = PROPERTIES[k.slice(5)]; S.x = P.door.x; S.y = P.door.y + .3; } else { S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; }
     enemies = []; eproj = []; hazards = []; petE = null; fishing = null; lastTile = -1;
     if (!isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) S.riding = false;
     renderHUD(); save();
@@ -5536,7 +5645,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {NPCS, DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
