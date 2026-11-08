@@ -431,6 +431,7 @@ export class Game {
   }
 
   run() {
+    this.detectSlowGpu();
     // Cap the frame rate: 60 fps in play (high-refresh laptop screens would otherwise
     // render 120-144 fps for no visible gain), 30 fps on menus and overlays.
     this.renderer.setAnimationLoop((ts) => {
@@ -440,8 +441,50 @@ export class Game {
       const delta = this.lastTs === undefined ? 1 / 60 : (ts - this.lastTs) / 1000;
       this.lastTs = ts;
       if (active) this.autoQuality(delta);
-      this.frame(Math.min(delta, 1 / 20));
+      // An error in one frame mustn't end the loop (three.js stops scheduling
+      // frames if the callback throws, which froze the whole game). Note it and go on.
+      try {
+        this.frame(Math.min(delta, 1 / 20));
+      } catch (err) {
+        this.noteError(err);
+        this.input.endFrame();
+      }
     });
+  }
+
+  /** Software rendering (no usable GPU) can't run the full pipeline: start at minimal. */
+  detectSlowGpu() {
+    try {
+      const gl = this.renderer.getContext();
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      const name = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : '';
+      if (/swiftshader|llvmpipe|software|basic render/i.test(name) && settings.quality === 'auto') {
+        (this.perf ||= { sum: 0, n: 0, level: 'medium' }).level = 'minimal';
+        applySettings(this);
+      }
+    } catch {
+      // The renderer name is hidden on some browsers; frame timing still steps quality down.
+    }
+  }
+
+  /** Keep the latest errors (with where they came from) for Copy diagnostics. */
+  noteError(err) {
+    const where = String(err?.stack || '').split('\n')[1]?.trim().slice(0, 120) || '';
+    const msg = `${String(err?.message || err).slice(0, 140)} ${where}`;
+    (window.__errors ||= []).push(msg);
+    if (window.__errors.length > 30) window.__errors.shift();
+    if ((this.lastErrorMsg || '') !== msg) {
+      console.error(err);
+      // Tell the player, once per kind of error, how to report it.
+      const t = document.getElementById('err-toast');
+      if (t) {
+        t.textContent = `Something went wrong (${String(err?.message || err).slice(0, 80)}). The game keeps going; Settings → Copy diagnostics has the details.`;
+        t.classList.add('show');
+        clearTimeout(this.errToastT);
+        this.errToastT = setTimeout(() => t.classList.remove('show'), 7000);
+      }
+    }
+    this.lastErrorMsg = msg;
   }
 
   /**
@@ -534,8 +577,9 @@ export class Game {
     const avg = p.sum / p.n;
     p.sum = 0;
     p.n = 0;
-    const next = { high: 'medium', medium: 'low' }[p.level];
-    if (avg > 1 / 48 && next) {
+    const next = { high: 'medium', medium: 'low', low: 'minimal' }[p.level];
+    // Step down when frames are slow; drop to minimal only when they're very slow.
+    if (avg > (p.level === 'low' ? 1 / 24 : 1 / 48) && next) {
       p.level = next;
       applySettings(this);
     }
@@ -587,7 +631,7 @@ export class Game {
       // A camp screen with its painted room fully covers the view: skip the 3D frame.
       const covered = this.state === 'camp' && this.camp.openKind && !this.camp.room && this.camp.coveredFor > 0.9;
       if (!covered) {
-        if (settings.compat >= 1) this.renderer.render(this.renderPass.scene, this.camera);
+        if (settings.compat >= 1 || this.minimal) this.renderer.render(this.renderPass.scene, this.camera);
         else this.composer.render();
         this.watchForBlack();
       }

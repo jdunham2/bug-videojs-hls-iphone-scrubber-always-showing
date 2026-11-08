@@ -72,6 +72,24 @@ export class Camp {
     this.prompt.addEventListener('pointerdown', enter);
     this.prompt.addEventListener('click', (e) => e.stopPropagation());
     this.panel.addEventListener('pointerdown', (e) => this.onPanelClick(e));
+    // Places: a click-only list of every building, so screens can always be opened.
+    this.places = document.getElementById('places');
+    document.getElementById('places-btn').addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.togglePlaces();
+    });
+    document.getElementById('places-list').addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const b = e.target.closest('[data-place]');
+      if (b) this.goPlace(b.dataset.place);
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Tab' || !this.active || this.game.state !== 'camp') return;
+      e.preventDefault();
+      this.togglePlaces();
+    });
     this.panel.addEventListener('pointerover', (e) => this.onPanelHover(e));
     this.panel.addEventListener('pointerleave', () => this.syncPreview());
   }
@@ -258,7 +276,21 @@ export class Camp {
     if (!this.built) return;
     this.time += dt;
     const P = this.game.player;
-    if (this.room) return this.updateRoom(dt);
+    if (this.room) {
+      try {
+        return this.updateRoom(dt);
+      } catch (err) {
+        this.game.noteError(err);
+        this.room = null; // something in the room broke: step back out to camp
+        this.noRooms = true;
+        this.leaving = false;
+        document.body.classList.remove('in-room');
+        this.game.setScene(this.scene);
+        this.scene.add(P.group, ...P.indicators);
+        P.collide = this.collide;
+        return;
+      }
+    }
     if (this.marching) {
       this.particles.update(dt);
       return this.updateMarch(dt);
@@ -339,6 +371,36 @@ export class Camp {
       <p class="lvline">Hero level <b>${lv.level}</b> · <b class="tl-free">${pts.free}</b> point${pts.free === 1 ? '' : 's'} to spend · ${pts.spent} spent</p></div>
       <div class="talents">${cards}</div>
       <div class="actions"><button data-act="talent-reset" ${pts.spent ? '' : 'disabled'}>Take back all points (free)</button></div>`;
+  }
+
+  // ------------------------------------------------------------ places menu
+
+  togglePlaces(on = !this.places.classList.contains('open')) {
+    if (on) {
+      const list = document.getElementById('places-list');
+      list.innerHTML = this.spots.map((s) => `<button type="button" data-place="${s.kind}">${s.label}</button>`).join('');
+    }
+    this.places.classList.toggle('open', on);
+  }
+
+  /** Jump straight to a building's screen (from the Places menu). */
+  goPlace(kind) {
+    this.togglePlaces(false);
+    const spot = this.spots.find((s) => s.kind === kind);
+    if (!spot || this.marching) return;
+    if (this.room && !this.leaving) {
+      // Leave the room first, then open the screen out in camp.
+      this.leaveRoom();
+      setTimeout(() => this.goPlace(kind), 400);
+      return;
+    }
+    if (this.openKind) this.close();
+    this.entering = this.flyHold = false;
+    const P = this.game.player;
+    P.pos.set(spot.x, 0, spot.z);
+    P.vel.set(0, 0, 0);
+    this.game.camTarget.copy(P.pos);
+    this.showPanel(spot);
   }
 
   // ------------------------------------------------------------ setting out
@@ -492,8 +554,31 @@ export class Camp {
     setTimeout(() => {
       if (!this.active || !this.entering) return;
       G.fade();
-      setTimeout(() => this.switchToRoom(spot), 240);
+      setTimeout(() => {
+        try {
+          this.switchToRoom(spot);
+        } catch (err) {
+          // The room couldn't be set up: don't leave the camp stuck "entering";
+          // open the building's screen out here instead.
+          G.noteError(err);
+          this.roomFailed(spot);
+        }
+      }, 240);
     }, 330);
+    // Safety net: whatever happens, never stay stuck on the way in.
+    setTimeout(() => this.entering && !this.room && this.roomFailed(spot), 2500);
+  }
+
+  roomFailed(spot) {
+    const G = this.game;
+    this.entering = this.flyHold = false;
+    this.room = null;
+    document.body.classList.remove('in-room');
+    G.setScene(this.scene);
+    this.scene.add(G.player.group, ...G.player.indicators);
+    G.player.collide = this.collide;
+    this.noRooms = true; // use the screens directly from now on
+    this.showPanel(spot);
   }
 
   switchToRoom(spot) {
@@ -596,7 +681,7 @@ export class Camp {
 
   open(spot) {
     spot = this.spots.find((s) => s.kind === spot.kind) || spot;
-    if (ROOM_KINDS.includes(spot.kind) && !this.room && modelStatus.state !== 'loading') return this.enterRoom(spot);
+    if (ROOM_KINDS.includes(spot.kind) && !this.room && !this.noRooms && modelStatus.state !== 'loading') return this.enterRoom(spot);
     this.showPanel(spot);
   }
 
@@ -632,7 +717,19 @@ export class Camp {
     if (this.near) this.prompt.classList.add('show');
   }
 
+  /** Draw the open screen; if building it fails, say so rather than showing nothing. */
   render() {
+    try {
+      this.renderPanel();
+    } catch (err) {
+      this.game.noteError(err);
+      this.panel.innerHTML = `<div class="cp-head"><h2>Something went wrong</h2><p class="lead">This screen couldn't be drawn. Close it and try again; if it keeps happening, open Settings → Copy diagnostics and send the report.</p></div><p class="empty"></p><button class="close" data-act="close" aria-label="Close">✕</button>`;
+      this.panel.querySelector('.empty').textContent = String(err?.message || err);
+      this.panel.classList.add('show');
+    }
+  }
+
+  renderPanel() {
     const k = this.openKind;
     let html = '';
     this.previewWhat = null;

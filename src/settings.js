@@ -49,7 +49,9 @@ export function applySettings(game) {
   const r = game.renderer;
   // Auto starts at medium and steps down if frames are slow (see Game.autoQuality).
   const q = s.quality === 'auto' ? game.perf?.level || 'medium' : s.quality;
-  r.setPixelRatio(q === 'high' ? Math.min(window.devicePixelRatio, 2) : q === 'medium' ? Math.min(window.devicePixelRatio, 1.25) : 1);
+  // 'minimal' is for software rendering or a struggling GPU: fewer pixels, no post-processing.
+  r.setPixelRatio(q === 'high' ? Math.min(window.devicePixelRatio, 2) : q === 'medium' ? Math.min(window.devicePixelRatio, 1.25) : q === 'minimal' ? 0.6 : 1);
+  game.minimal = q === 'minimal';
   // Shadows stay on at every level (low just uses a small, cheap shadow map).
   // Switching shadows off mid-game needs every shader rebuilt; without that many
   // GPUs draw the whole scene black.
@@ -71,7 +73,7 @@ export function applySettings(game) {
     }
   }
   game.ao.enabled = q === 'high';
-  game.bloom.enabled = q !== 'low';
+  game.bloom.enabled = q !== 'low' && q !== 'minimal';
   game.onResize();
   document.body.classList.toggle('no-numbers', !s.damageNumbers);
 }
@@ -132,7 +134,7 @@ export class SettingsPanel {
       ${slider('shake', 'Screen shake')}
       <label class="row"><span>Graphics</span>
         <select id="set-quality" data-k="quality">
-          ${['auto', 'high', 'medium', 'low'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
+          ${['auto', 'high', 'medium', 'low', 'minimal'].map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}
         </select><b></b></label>
       <label class="row"><span>Compatibility</span>
         <select id="set-compat" data-k="compat">
