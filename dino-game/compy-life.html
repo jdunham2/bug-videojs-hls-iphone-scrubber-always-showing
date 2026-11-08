@@ -118,7 +118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
       <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
-      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go in. On a phone, drag on the left to move and tap ENTER.</p>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building, then walk to the glowing spots inside to do things. On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
   </div>
@@ -267,8 +267,8 @@ function facadeTextures(wall, win) {
 
 // ---------- town ----------
 const solids = [], facadeMats = [], lampMats = [], signs = [], fadeables = [];
-function collide(o, r) {
-  for (const b of solids) {
+function collide(o, r, list) {
+  for (const b of (list || activeSolids)) {
     if (o.x + r < b.x0 || o.x - r > b.x1 || o.y + r < b.y0 || o.y - r > b.y1) continue;
     const cx = clamp(o.x, b.x0, b.x1), cy = clamp(o.y, b.y0, b.y1), dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
     if (d >= r) continue;
@@ -476,7 +476,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'],
 ];
 let S = null;
 function newLife(name) {
@@ -532,15 +532,18 @@ function nextEvent() {
   setScreens(); $('eventScreen').hidden = false;
   setTimeout(() => box.firstChild && box.firstChild.focus({ preventScroll: true }), 30);
 }
-let menuPlace = null;
-function openMenu(p) {
-  menuPlace = p; state = 'menu'; renderMenu(); setScreens(); $('menuScreen').hidden = false; sfx.door();
+let menuPlace = null, menuStation = null;
+function openMenu(p, station) {
+  menuPlace = p; menuStation = station || null; state = 'menu'; renderMenu(); setScreens(); $('menuScreen').hidden = false; sfx.door();
 }
-function closeMenu() { $('menuScreen').hidden = true; menuPlace = null; if (state === 'menu') state = 'play'; setScreens(); if (state === 'play') nextEvent(); }
+function closeMenu() { $('menuScreen').hidden = true; menuPlace = null; menuStation = null; if (state === 'menu') state = 'play'; setScreens(); if (state === 'play') nextEvent(); }
 function renderMenu() {
   const p = menuPlace, m = MENUS[p.home ? 'home' : p.id](p);
   $('menuTag').textContent = `${DAYS[weekday()]} · ${clock(S.min)} · ${money$(S.money)}`;
-  $('menuTitle').textContent = m.title || p.name; $('menuSub').textContent = m.sub || '';
+  $('menuTitle').textContent = menuStation ? menuStation.label : (m.title || p.name); $('menuSub').textContent = m.sub || '';
+  if (menuStation) $('menuTag').textContent = `${m.title || p.name} \u00b7 ${clock(S.min)} \u00b7 ${money$(S.money)}`;
+  const filt = menuStation && menuStation.acts;
+  if (filt) { m.acts = m.acts.filter(a => filt.some(f => a.label.startsWith(f))); if (!m.acts.length && filt[0] === 'Work your shift') $('menuSub').textContent = `Staff only. You can get a job here at the Job Center.`; }
   const box = $('menuActs'); box.innerHTML = '';
   for (const a of m.acts) {
     const el = document.createElement('button'); el.type = 'button'; el.className = 'act' + (a.risky ? ' risky' : '');
@@ -602,7 +605,7 @@ function passOut(why) {
 }
 function collapse() {
   const bill = 150; S.money -= bill; S.hunger = 50; S.energy = 50;
-  teleport(PLACES.hospital.door); advance(180, { sleeping: true });
+  toHospital(); advance(180, { sleeping: true });
   queueEvent({ kind: 'bad', title: 'You fainted from hunger', text: `Someone carried you to Tarpit Hospital. The bill was ${money$(bill)}. Eat something!` });
 }
 function sleep(quality) {
@@ -616,6 +619,7 @@ function sleep(quality) {
 function dayRollover(slept) {
   S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false);
   if (trex) { scene.remove(trex.m.root); trex = null; }
+  if (chase) { const l = chase.loot; endChase(); goal('heist'); log(`The police gave up for the night. You keep ${money$(l)}.`, 'good'); }
   if (S.job) S.job.days++;
   if (weekday() === 0) {
     let bills = 0, parts = [];
@@ -708,7 +712,7 @@ function startTrex() {
 function endTrex(caught) {
   scene.remove(trex.m.root); trex = null;
   if (caught) {
-    const bill = 300; S.injured = true; S.money -= bill; teleport(PLACES.hospital.door); advance(240, { sleeping: true });
+    const bill = 300; S.injured = true; S.money -= bill; toHospital(); advance(240, { sleeping: true });
     queueEvent({ kind: 'bad', title: 'Stepped on by a T-rex', text: `It did not even notice you. You woke up at Tarpit Hospital with a ${money$(bill)} bill and a sore everything.` });
   } else { log('The T-rex wandered off into the hills.', 'good'); survived(); }
 }
@@ -730,8 +734,8 @@ function arrest(days, why) {
   const J = jobInfo();
   let extra = '';
   if (J && J.clean) { extra = ` ${PLACES[J.place].name} does not employ criminals. You are fired.`; S.job = null; goal('fired'); }
-  teleport(PLACES.police.door);
-  if (menuPlace) { $('menuScreen').hidden = true; menuPlace = null; }
+  if (menuPlace) { $('menuScreen').hidden = true; menuPlace = null; menuStation = null; }
+  putInCell();
   state = 'play';
   queueEvent({ kind: 'bad', tag: 'Busted', title: `${days} days in jail`, text: `${why}${extra}`, sound: 'siren', buttons: [{ label: 'Go quietly', fn: jailMenu }] });
 }
@@ -820,9 +824,9 @@ const MENUS = {
       acts.push({ label: 'Take a $1,000 loan', detail: `5% interest every Monday. Owed now: ${money$(S.loan)}`, why: S.loan >= 5000 ? 'Loan limit reached.' : '', mins: 20, fn: () => { S.loan += 1000; S.money += 1000; } });
       acts.push({ label: 'Repay the loan', detail: `Owed: ${money$(S.loan)}`, why: S.loan <= 0 ? 'You owe nothing.' : S.money < S.loan ? `You need ${money$(S.loan)}.` : '', mins: 10, fn: () => { S.money -= S.loan; S.loan = 0; log('Loan paid off!', 'good'); } });
     }
-    acts.push({ label: 'Rob the bank', detail: '30% chance of $1,500 to $4,000. Otherwise 7 days in jail.', tag: 'Crime', risky: true, why: open(9, 17) ? '' : 'The vault is sealed at night.', mins: 30, fn: () => {
-      if (Math.random() < 0.3) { const n = Math.round(rand(1500, 4000)); S.money += n; S.record++; queueEvent({ kind: 'good', title: 'You robbed the bank!', text: `You ran out with ${money$(n)} in a sack bigger than you. Nobody caught you, but people talk. Your record is worse.` }); }
-      else arrest(7, 'A compy with a tiny mask is not as scary as you hoped. The guards tackled you at the vault.');
+    acts.push({ label: 'Rob the bank', detail: 'Grab $1,500 to $4,000 and run. The police will chase you through town.', tag: 'Crime', risky: true, why: open(9, 17) ? '' : 'The vault is sealed at night.', mins: 10, fn: () => {
+      const loot = Math.round(rand(1500, 4000)); S.money += loot;
+      closeMenu(); exitBuilding(); startChase(loot);
     } });
     return { sub: 'Stone Bank. Your money is safe here (the vault is a boulder).', acts };
   },
@@ -936,7 +940,7 @@ const sfx = {
 
 // ---------- player / world refresh ----------
 let P = { x: 900, y: 1130, vx: 0, vy: 0, face: -Math.PI / 2, t: 0 };
-function teleport(d) { P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
+function teleport(d) { if (inside) { exitBuilding(d); return; } P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
 function refreshHome() {
   for (const key of Object.keys(HOMES)) {
     const owned = S && S.home === key;
@@ -950,14 +954,358 @@ function refreshFamily() {
   if (spouseM) { scene.remove(spouseM.m.root); spouseM = null; }
   for (const k of kidMs) scene.remove(k.m.root); kidMs = [];
   if (!S || !S.home) return;
-  const cx = PLACES['home_' + S.home].door.x;
-  if (S.partner && S.partner.married) { const pal = PALETTES[S.partner.pal]; const m = makeCompy(pal, { crest: pal.crest, bow: '#ff6ad5' }); m.root.scale.setScalar(13 / 1.25); scene.add(m.root); spouseM = { m, x: cx - 30, y: 1300, t: 0, tx: cx, ty: 1300 }; }
-  S.kids.forEach((k, i) => { const pal = PALETTES[k.pal]; const m = makeCompy(pal, { crest: pal.crest }); m.root.scale.setScalar(7 / 1.25); scene.add(m.root); kidMs.push({ m, x: cx + 20 + i * 14, y: 1305, t: i, tx: cx, ty: 1300 }); });
+  const B = famBounds(), rp = () => ({ x: rand(B[0], B[2]), y: rand(B[1], B[3]) });
+  if (S.partner && S.partner.married) { const pal = PALETTES[S.partner.pal]; const m = makeCompy(pal, { crest: pal.crest, bow: '#ff6ad5' }); m.root.scale.setScalar(13 / 1.25); scene.add(m.root); const q = rp(); spouseM = { m, x: q.x, y: q.y, t: 0, tx: q.x, ty: q.y }; }
+  S.kids.forEach((k, i) => { const pal = PALETTES[k.pal]; const m = makeCompy(pal, { crest: pal.crest }); m.root.scale.setScalar(7 / 1.25); scene.add(m.root); const q = rp(); kidMs.push({ m, x: q.x, y: q.y, t: i, tx: q.x, ty: q.y }); });
+}
+function famBounds() {
+  if (inside && inside.home && inside.home === S.home) return [inside.ox + 40, inside.oy + 120, inside.ox + inside.w - 40, inside.oy + inside.d - 50];
+  const cx = PLACES['home_' + S.home].door.x; return [cx - 60, 1275, cx + 60, 1320];
 }
 function setScreens() {
   const playing = state !== 'title';
   $('hud').hidden = !playing; $('mini').hidden = !playing; $('feed').hidden = !playing;
   $('pauseScreen').hidden = state !== 'paused';
+}
+
+// ---------- interiors ----------
+// every building has a room far from town; you walk around inside and use stations (counters, desks, beds)
+let inside = null, activeSolids = solids, roomN = 0;
+const ROOMS = {};
+const HOURS = { grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
+function closedWhy(id) {
+  const h = HOURS[id]; if (!h) return '';
+  const J = jobInfo(); if (J && J.place === id) return '';
+  return hour() >= h[0] && hour() < h[1] ? '' : `${PLACES[id].name} is closed. It opens at ${clock(h[0] * 60)}.`;
+}
+function floorTex(kind, a, b) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'); g.fillStyle = a; g.fillRect(0, 0, 128, 128);
+  if (kind === 'checker') { g.fillStyle = b; g.fillRect(0, 0, 64, 64); g.fillRect(64, 64, 64, 64); }
+  else if (kind === 'wood') { g.fillStyle = b; for (let i = 0; i < 8; i++) { g.fillRect(0, i * 16, 128, 2); g.fillRect((i * 37) % 128, i * 16, 2, 16); } }
+  else if (kind === 'tile') { g.strokeStyle = b; g.lineWidth = 3; for (let i = 0; i <= 128; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(128, i); g.stroke(); } }
+  else if (kind === 'carpet') { for (let i = 0; i < 700; i++) { g.fillStyle = Math.random() < 0.5 ? b : 'rgba(255,255,255,.05)'; g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2); } }
+  else if (kind === 'dirt') { for (let i = 0; i < 300; i++) { g.fillStyle = b; g.beginPath(); g.arc(Math.random() * 128, Math.random() * 128, Math.random() * 5, 0, 7); g.fill(); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+function buildRoom(id) {
+  const L = LAYOUTS[id];
+  const ox = 6000 + (roomN % 4) * 1300, oy = 6000 + Math.floor(roomN / 4) * 1300; roomN++;
+  const g = group(scene, ox, 0, oy);
+  const R = { id, g, ox, oy, w: L.w, d: L.d, solids: [], stations: [], npcs: [], dyn: [], home: L.home };
+  const ft = floorTex(L.floor[0], L.floor[1], L.floor[2]); ft.repeat.set(L.w / 90, L.d / 90);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(L.w, L.d), new THREE.MeshLambertMaterial({ map: ft }));
+  floor.rotation.x = -Math.PI / 2; floor.position.set(L.w / 2, 0.5, L.d / 2); floor.receiveShadow = true; g.add(floor);
+  const voidP = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), mat('#120e0b')); voidP.rotation.x = -Math.PI / 2; voidP.position.set(L.w / 2, 0.2, L.d / 2); g.add(voidP);
+  const wall = (x, z, w, d, h) => { const m = add(g, GEO.b, L.wall, x, h / 2, z, w, h, d); m.castShadow = false; R.solids.push({ x0: ox + x - w / 2, y0: oy + z - d / 2, x1: ox + x + w / 2, y1: oy + z + d / 2 }); return m; };
+  wall(L.w / 2, -5, L.w + 20, 10, 120); wall(-5, L.d / 2, 10, L.d, 120); wall(L.w + 5, L.d / 2, 10, L.d, 120);
+  wall(L.w / 4 - 20, L.d + 4, L.w / 2 - 40, 8, 12); wall(L.w * 3 / 4 + 20, L.d + 4, L.w / 2 - 40, 8, 12);
+  add(g, GEO.b, L.trim || '#3a2a20', L.w / 2, 4, 1, L.w, 8, 2).castShadow = false;
+  for (let x = 70; x < L.w - 40; x += 130) { const win = add(g, GEO.b, L.night ? '!#2a3a5a' : '!#bfe3ff', x, 70, 1, 50, 36, 2); win.castShadow = false; win.userData.window = true; R.dyn.push({ kind: 'window', obj: win }); }
+  const b = {
+    box(x, z, w, d, h, color, solid = true, y = 0) { const m = add(g, GEO.b, color, x, y + h / 2, z, w, h, d); if (solid) R.solids.push({ x0: ox + x - w / 2, y0: oy + z - d / 2, x1: ox + x + w / 2, y1: oy + z + d / 2 }); return m; },
+    cyl(x, z, r, h, color, solid = true, y = 0) { const m = add(g, GEO.y, color, x, y + h / 2, z, r, h, r); if (solid) R.solids.push({ x0: ox + x - r, y0: oy + z - r, x1: ox + x + r, y1: oy + z + r }); return m; },
+    ball(x, y, z, r, color) { return add(g, GEO.s, color, x, y, z, r, r, r); },
+    sign(text, x, y, z, w, bg, fg, ry = 0) { const h = w * 112 / 512; const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: signTexture(text, bg, fg) })); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); return m; },
+    station(x, z, label, acts) { const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(x, 1.2, z); r.scale.setScalar(16); g.add(r); const st = { x: ox + x, y: oy + z, label, acts, ring: r }; R.stations.push(st); return st; },
+    npc(x, z, pal, o = {}) {
+      const P0 = PALETTES[pal % PALETTES.length], m = makeCompy(P0, { crest: P0.crest, ...o });
+      m.root.scale.setScalar((o.kid ? 8 : 13) / 1.25); g.add(m.root);
+      const n = { m, x, z, face: o.face ?? Math.PI / 2, t: Math.random() * 9, wander: o.wander, tx: x, tz: z, wait: 0 };
+      R.npcs.push(n); return n;
+    },
+    table(x, z, color = '#7a5534') { b.cyl(x, z, 16, 3, color, true, 18); b.cyl(x, z, 3, 18, '#3a2a20', false); },
+    chair(x, z, color = '#5a3f28') { b.box(x, z, 12, 12, 10, color, false); },
+    plant(x, z) { b.cyl(x, z, 8, 14, '#b0473a'); add(g, GEO.ico, '#3c8240', x, 26, z, 13, 15, 13); },
+    lamp(x, z) { add(g, GEO.y, '#2a2a2a', x, 105, z, 0.8, 30, 0.8).castShadow = false; const l = add(g, GEO.s, '!#ffe3a1', x, 88, z, 7, 5, 7); l.castShadow = false; },
+    dyn(kind, obj) { R.dyn.push({ kind, obj }); return obj; },
+    group(x, z) { return group(g, x, 0, z); },
+    g, R,
+  };
+  L.build(b);
+  const mat0 = add(g, GEO.b, '#8a3a2a', L.w / 2, 0.8, L.d - 14, 50, 1, 22); mat0.castShadow = false;
+  R.exit = b.station(L.w / 2, L.d - 18, 'Leave', null); R.exit.exit = true;
+  g.visible = false;
+  ROOMS[id] = R; return R;
+}
+const WORKS = ['Work your shift', 'Slack off'];
+function homeLayout(key, w, d, style) {
+  const s = style;
+  return { w, d, home: key, floor: s.floor, wall: s.wall, trim: s.trim, build(b) {
+    // bed
+    if (key === 'burrow') { b.box(60, 50, 70, 50, 10, '#4a8a3a'); b.ball(40, 12, 50, 10, '#6aa84a'); }
+    else { b.box(70, 55, 70, 90, 14, s.bedFrame); b.box(70, 58, 64, 82, 6, '#f6f0e2', false, 14); b.box(70, 70, 66, 50, 3, s.blanket, false, 20); b.box(70, 25, 50, 16, 6, '#ffffff', false, 20); }
+    b.station(key === 'burrow' ? 60 : 70, key === 'burrow' ? 95 : 120, key === 'mansion' ? 'Grand bed' : 'Bed', ['Go to bed', 'Nap']);
+    // kitchen
+    const kx = w - 90;
+    b.box(kx, 22, 140, 30, 24, s.counter); b.box(kx - 40, 22, 30, 26, 2, '!#ff7a1a', false, 24);
+    if (key !== 'burrow') b.box(kx + 58, 22, 26, 28, 50, '#e6e8ea');
+    else b.ball(kx + 20, 30, 22, 8, '#3a3a3a');
+    if (key === 'mansion') b.box(kx, 95, 110, 40, 24, '#f2ede2');
+    b.station(kx, key === 'mansion' ? 140 : 66, key === 'mansion' ? 'Chef kitchen' : 'Kitchen', ['Cook a meal']);
+    // couch and TV on the left wall
+    const cz = d - 100;
+    b.box(14, cz, 8, 60, 36, '#1a1a1a', true, 10); const scr = b.box(19, cz, 2, 54, 30, '!#7fc8ff', false, 13); scr.castShadow = false;
+    if (key === 'burrow') b.cyl(85, cz, 14, 14, '#7a5a3a');
+    else { b.box(90, cz, 30, 70, 14, s.couch); b.box(104, cz, 8, 70, 26, s.couch); }
+    b.box(55, cz, 70, 90, 1, s.rug, false);
+    b.station(60, cz + 50, key === 'mansion' ? 'Home theater' : 'Couch', ['Watch TV', 'Family time']);
+    // nest for eggs
+    const nx = w - 70, nz = d - 90;
+    b.cyl(nx, nz, 22, 6, key === 'mansion' ? '#f2c230' : '#8a6a3a', false); b.cyl(nx, nz, 15, 1, '#5a3f28', false, 6);
+    b.dyn('egg', b.ball(nx, 12, nz, 8, '#f6f0e2')).scale.set(7, 9, 7);
+    b.station(nx, nz + 34, key === 'mansion' ? 'Golden nest' : 'Nest', ['Try for an egg']);
+    if (key === 'cottage') { b.box(w / 2, 6, 60, 12, 40, '#8a8f96'); b.box(w / 2, 9, 34, 6, 20, '!#ff8a3a', false, 4); }
+    if (key === 'mansion') { b.box(w / 2 - 20, d - 130, 60, 40, 22, '#1a1a1a'); add(b.g, GEO.s, '!#fff3c4', w / 2, 95, d / 2, 14, 8, 14); b.plant(30, 30); b.plant(w - 30, d - 40); }
+    b.plant(key === 'burrow' ? 140 : 160, 20);
+    // storm damage: a trunk through the wall, rubble on the floor
+    const dmg = b.group(0, 0);
+    add(dmg, GEO.y, '#5a3f28', w * 0.6, 60, 40, 9, 160, 9, 0.9, 0, 0.5);
+    add(dmg, GEO.ico, '#3c8240', w * 0.45, 30, 90, 30, 26, 30);
+    for (let i = 0; i < 9; i++) add(dmg, GEO.b, pick(['#7a5a3a', '#b0473a', '#8a8f96']), rand(40, w - 40), 3, rand(60, d - 80), rand(6, 14), rand(3, 6), rand(6, 14), 0, rand(0, 3), 0);
+    b.dyn('damage', dmg);
+  } };
+}
+const LAYOUTS = {
+  burger: { w: 460, d: 320, floor: ['checker', '#f2f0ea', '#c8322a'], wall: '#f2d27a', build(b) {
+    b.box(180, 110, 260, 28, 24, '#c8322a'); b.box(180, 110, 266, 30, 3, '#f6f0e2', false, 24); b.box(110, 110, 18, 14, 10, '#333333', false, 27);
+    b.box(90, 30, 90, 40, 26, '#7a7a80'); b.box(90, 30, 80, 34, 2, '!#ff7a1a', false, 26); b.box(220, 25, 70, 30, 40, '#d9d9de');
+    b.sign('MENU: BRONTO BURGER $12', 180, 85, 3, 200, '#2a2a2a', '#ffd35a');
+    b.station(180, 150, 'Order at the counter', ['Order a Bronto Burger']);
+    b.station(360, 60, 'Kitchen (staff only)', WORKS);
+    b.box(425, 28, 50, 36, 34, '#3f6b4a'); b.station(420, 80, 'Dumpster by the back door', ['Dig through']);
+    for (const [x, z] of [[90, 240], [210, 255], [330, 235]]) { b.table(x, z); b.chair(x - 26, z); b.chair(x + 26, z); }
+    b.npc(180, 80, 4, { hat: '#c8322a' }); b.npc(64, 240, 1); b.npc(236, 255, 2); b.npc(320, 200, 3, { wander: [60, 170, 400, 290] });
+    b.lamp(120, 200); b.lamp(300, 200);
+  } },
+  grocer: { w: 460, d: 340, floor: ['tile', '#eef0ea', '#cfd6cc'], wall: '#e6efe0', build(b) {
+    const goods = ['#c8322a', '#ffd35a', '#3f8a3a', '#2e86c1', '#e67e22'];
+    for (const x of [70, 160, 250]) { b.box(x, 125, 34, 150, 46, '#b9b2a6'); for (let i = 0; i < 6; i++) for (const s of [-1, 1]) b.box(x + s * 14, 60 + i * 26, 6, 18, 12, goods[(i + x) % 5], false, 10 + (i % 2) * 18); }
+    b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
+    b.station(370, 100, 'Produce stand', ['Shoplift']);
+    b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack']);
+    b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
+    b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
+  } },
+  jobs: { w: 380, d: 280, floor: ['carpet', '#3a5a7a', '#2c4a66'], wall: '#dfe6ee', build(b) {
+    b.box(190, 6, 200, 6, 70, '#7a5534', true, 20);
+    for (let i = 0; i < 10; i++) b.box(110 + (i % 5) * 40, 9, 26, 2, 22, '#f6f0e2', false, 32 + Math.floor(i / 5) * 30);
+    b.sign('NOW HIRING', 190, 104, 3, 140, '#2c5a7a', '#ffffff');
+    b.station(190, 52, 'Job board', null);
+    b.box(80, 150, 80, 36, 24, '#6a4a2e'); b.box(70, 150, 20, 14, 14, '#2a2a2a', false, 24);
+    b.npc(80, 125, 1, { tie: '#2c5a7a' }); b.chair(80, 180); b.npc(300, 200, 3, { wander: [220, 120, 350, 240] });
+    b.plant(25, 25); b.plant(355, 25); b.plant(355, 240); b.lamp(190, 140);
+  } },
+  school: { w: 460, d: 340, floor: ['wood', '#c9a26a', '#a8834e'], wall: '#efe2c6', build(b) {
+    b.box(230, 5, 220, 4, 70, '#2f4a3a', false, 25); b.sign('T-REX + TINY ARMS = SAD', 230, 62, 8, 180, '#2f4a3a', '#ffffff');
+    b.box(230, 60, 80, 30, 22, '#6a4a2e'); b.npc(230, 35, 3, { tie: '#7a2e2e' });
+    for (const z of [130, 200, 265]) for (const x of [110, 190, 270, 350]) { b.box(x, z, 30, 18, 16, '#8a6a3a'); if ((x + z) % 3 !== 0 && !(x === 270 && z === 200)) b.npc(x, z + 16, (x + z) % 6, { face: -Math.PI / 2 }); }
+    b.station(230, 232, 'Take a class', null);
+    b.lamp(150, 170); b.lamp(310, 170); b.plant(25, 25);
+  } },
+  office: { w: 480, d: 340, floor: ['carpet', '#7a7f88', '#6a6f78'], wall: '#d6dbe2', build(b) {
+    for (const x of [100, 220, 340]) for (const z of [100, 200]) {
+      b.box(x, z - 30, 80, 4, 40, '#9aa3ad'); b.box(x - 40, z - 5, 4, 50, 40, '#9aa3ad');
+      b.box(x, z - 15, 56, 20, 20, '#c9c3b6'); b.box(x, z - 20, 18, 3, 14, '!#7fc8ff', false, 20);
+      if (!(x === 220 && z === 200)) b.npc(x, z + 8, (x + z) % 6, { face: -Math.PI / 2, tie: pick(['#c8322a', '#24425e', '#3f8a3a']) });
+    }
+    b.station(220, 228, 'Your desk', WORKS);
+    b.cyl(440, 40, 10, 34, '#bfe3ff'); b.plant(440, 290); b.plant(30, 290);
+    b.sign('FOSSIL CORP', 240, 100, 3, 170, '#24425e', '#ffffff'); b.lamp(160, 150); b.lamp(320, 150);
+  } },
+  bank: { w: 460, d: 340, floor: ['checker', '#e6e2da', '#c9c3b6'], wall: '#ddd5c2', build(b) {
+    b.box(180, 130, 260, 26, 26, '#6a4a2e'); for (let x = 70; x < 310; x += 60) b.box(x, 130, 4, 4, 34, '#c9a23a', false, 26);
+    b.box(180, 130, 262, 2, 30, '#bfe3ff', false, 30).material = new THREE.MeshLambertMaterial({ color: '#bfe3ff', transparent: true, opacity: 0.35 });
+    b.npc(110, 105, 0, { tie: '#4b5a3a' }); b.npc(240, 105, 5, { tie: '#4b5a3a' });
+    b.station(180, 172, 'Teller window', ['Take a', 'Repay']);
+    const v = b.cyl(390, 8, 44, 8, '#8a8f96', true); v.rotation.x = Math.PI / 2; v.position.y = 48; b.ball(390, 48, 14, 6, '#c9a23a');
+    b.station(390, 78, 'Vault door', ['Rob the bank']);
+    b.box(80, 40, 70, 30, 22, '#6a4a2e'); b.station(260, 62, 'Staff desk', WORKS);
+    for (const x of [40, 420]) b.cyl(x, 260, 10, 110, '#f2ede2');
+    b.sign('STONE BANK', 180, 100, 3, 160, '#4b5a3a', '#ffffff'); b.lamp(230, 220);
+  } },
+  casino: { w: 480, d: 340, floor: ['carpet', '#5a1a4a', '#7a2a5a'], wall: '#2a1430', night: true, build(b) {
+    b.box(170, 140, 150, 80, 22, '#1f6a3a'); b.box(170, 140, 158, 88, 3, '#6a3a1a', false, 20);
+    for (let i = 0; i < 3; i++) b.box(150 + i * 18, 140, 8, 8, 8, '#ffffff', false, 22);
+    b.npc(170, 92, 4, { tie: '#1a1a1a' }); b.npc(110, 200, 2); b.npc(240, 205, 0);
+    b.station(170, 210, 'Dino Dice table', ['Bet']);
+    for (let z = 50; z <= 260; z += 52) { b.box(448, z, 34, 34, 52, '#c9a23a'); const s2 = b.box(430, z, 2, 24, 18, '!#ffe066', false, 26); s2.castShadow = false; }
+    b.station(395, 155, 'Egg slots', ['Pull']);
+    for (const [x, c] of [[90, '!#ff4aa8'], [250, '!#4ae8ff'], [380, '!#ff4aa8']]) b.box(x, 2, 90, 2, 6, c, false, 100);
+    b.sign('LUCKY EGG', 240, 82, 3, 170, '#d13a7a', '#ffe066'); b.lamp(170, 140); b.lamp(330, 240);
+  } },
+  cafe: { w: 420, d: 320, floor: ['wood', '#b98a5a', '#9a6e42'], wall: '#cfe3c4', build(b) {
+    b.box(300, 70, 180, 26, 24, '#6a4a2e'); b.box(250, 70, 26, 18, 30, '#8a8f96', false, 24); b.box(345, 70, 60, 20, 16, '#bfe3ff', false, 24);
+    b.npc(300, 45, 1, { bow: '#e0866a' });
+    b.station(300, 112, 'Counter', ['Have lunch']);
+    for (const [x, z] of [[80, 120], [80, 240], [210, 250], [330, 240]]) { b.table(x, z); b.chair(x - 24, z); b.chair(x + 24, z); }
+    b.npc(56, 240, 3); b.npc(234, 250, 5); b.npc(354, 240, 0);
+    b.station(150, 175, 'Cozy corner table', ['Meet someone', 'Date with', 'Propose', 'Break up']);
+    b.plant(25, 25); b.plant(395, 290); b.lamp(150, 170); b.lamp(300, 200);
+    b.sign('FERN CAFE', 300, 100, 3, 150, '#6a4a2e', '#ffffff');
+  } },
+  hospital: { w: 480, d: 340, floor: ['tile', '#f4f6f8', '#d6dde4'], wall: '#e8f2f5', build(b) {
+    for (const x of [70, 170, 270]) { b.box(x, 50, 60, 70, 16, '#d6dde4'); b.box(x, 52, 56, 64, 4, '#ffffff', false, 16); b.box(x, 62, 58, 40, 3, '#4a90c2', false, 19); b.box(x, 25, 40, 14, 5, '#ffffff', false, 19); b.box(x + 34, 50, 2, 70, 60, '#bfe3ff', false); }
+    b.npc(270, 60, 2, { face: Math.PI / 2 });
+    b.station(170, 110, 'Exam bed', ['Get treated']);
+    b.box(380, 220, 120, 30, 26, '#d6dde4'); b.npc(380, 195, 3, { bow: '#c8322a' });
+    b.station(420, 75, 'Staff room', WORKS); b.box(440, 25, 40, 30, 50, '#9aa3ad');
+    b.sign('TARPIT HOSPITAL', 170, 104, 3, 160, '#c8322a', '#ffffff'); b.lamp(170, 160); b.lamp(350, 160);
+  } },
+  police: { w: 460, d: 340, floor: ['tile', '#bfc4ca', '#a3a9b0'], wall: '#cfd4da', build(b) {
+    for (const x of [150, 300]) b.box(x, 55, 8, 110, 100, '#9aa3ad');
+    b.box(230, 110, 460, 4, 100, '#000000', true).visible = false;
+    for (let x = 6; x < 456; x += 12) b.cyl(x, 110, 1.6, 100, '#3a3a40', false);
+    b.box(75, 30, 50, 24, 8, '#7a7a80'); b.box(225, 30, 50, 24, 8, '#7a7a80'); b.box(375, 30, 50, 24, 8, '#7a7a80');
+    b.npc(75, 60, 5, { face: Math.PI / 2 });
+    b.R.cell = { x: b.R.ox + 225, y: b.R.oy + 65 };
+    b.box(120, 220, 140, 30, 26, '#3a4a6a'); b.npc(120, 195, 1, { hat: '#1f3f8a' });
+    b.station(120, 265, 'Front desk', ['Clear your record']);
+    b.sign('WANTED: SNACK THIEF', 452, 70, 200, 120, '#f6f0e2', '#7a2e2e', -Math.PI / 2);
+    b.plant(430, 300); b.lamp(230, 220);
+  } },
+  depot: { w: 460, d: 340, floor: ['tile', '#9a9a9a', '#8a8a8a'], wall: '#c9b49a', build(b) {
+    b.box(230, 90, 340, 30, 16, '#3a3a3a'); for (let x = 70; x <= 390; x += 20) b.cyl(x, 90, 2, 1, '#8a8f96', false, 16);
+    for (const [x, z] of [[40, 40], [40, 200], [420, 200], [420, 270], [60, 270]]) { b.box(x, z, 40, 40, 30, '#c9a26a'); for (let i = 0; i < 4; i++) b.ball(x - 10 + (i % 2) * 20, 34, z - 10 + Math.floor(i / 2) * 20, 7, '#f6f0e2'); }
+    for (let i = 0; i < 6; i++) b.ball(110 + i * 50, 22, 90, 7, '#f6f0e2');
+    b.station(230, 140, 'Loading dock', WORKS);
+    b.npc(300, 200, 2, { hat: '#d98a3a', wander: [120, 160, 380, 280] }); b.npc(150, 60, 5, { hat: '#d98a3a' });
+    b.sign('EGG EXPRESS', 230, 100, 3, 160, '#6a3a1a', '#ffffff'); b.lamp(230, 200);
+  } },
+  realty: { w: 380, d: 280, floor: ['carpet', '#6a4a7a', '#5a3a6a'], wall: '#efe6f2', build(b) {
+    b.box(190, 100, 110, 36, 24, '#4a2e3a'); b.npc(190, 75, 3, { tie: '#6a3a7a' });
+    b.station(190, 145, 'Agent desk', null);
+    b.box(300, 220, 80, 50, 18, '#f2ede2');
+    b.box(280, 220, 14, 14, 12, '#e6d6b8', false, 18); add(b.g, GEO.pyr, '#b0473a', 280, 36, 220, 12, 8, 12, 0, Math.PI / 4, 0);
+    b.box(318, 220, 18, 18, 16, '#f2ede2', false, 18); add(b.g, GEO.pyr, '#3a4a6a', 318, 42, 220, 15, 9, 15, 0, Math.PI / 4, 0);
+    b.box(60, 230, 30, 70, 14, '#8a5a7a');
+    b.sign('NEST ESTATES', 190, 100, 3, 160, '#6a3a7a', '#ffffff'); b.plant(25, 25); b.plant(355, 25); b.lamp(190, 150);
+  } },
+  home_burrow: homeLayout('burrow', 300, 240, { floor: ['dirt', '#7a5a3a', '#6a4a2e'], wall: '#5a3f28', trim: '#3a2a1a', counter: '#8a8f96', couch: '#7a5a3a', rug: '#6a4a2e' }),
+  home_cottage: homeLayout('cottage', 400, 300, { floor: ['wood', '#c9a26a', '#a8834e'], wall: '#f2e6cf', counter: '#d6cfc2', bedFrame: '#6a4a2e', blanket: '#b0473a', couch: '#3f6b4a', rug: '#c9b48a' }),
+  home_mansion: homeLayout('mansion', 560, 380, { floor: ['checker', '#f0ece4', '#b9ad98'], wall: '#f6f1e6', trim: '#c9a23a', counter: '#2a2a30', bedFrame: '#c9a23a', blanket: '#3a4a6a', couch: '#5a2c6a', rug: '#a83a3a' }),
+};
+function enterBuilding(id) {
+  const R = ROOMS[id] || buildRoom(id);
+  if (inside) inside.g.visible = false;
+  inside = R; R.g.visible = true; activeSolids = R.solids;
+  P.x = R.exit.x; P.y = R.exit.y - 34; P.vx = P.vy = 0; P.face = -Math.PI / 2; cam.x = P.x; cam.y = P.y;
+  sfx.door(); refreshFamily();
+}
+function exitBuilding(to) {
+  const R = inside; if (!R) return;
+  R.g.visible = false; inside = null; activeSolids = solids;
+  const d = to || PLACES[R.id].door;
+  P.x = d.x; P.y = d.y + 14; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y;
+  sfx.door(); refreshFamily();
+}
+function interact() {
+  const p = nearPlace; if (!p) return;
+  if (inside) { if (p.exit) exitBuilding(); else openMenu(PLACES[inside.id], p); return; }
+  if (p.id === 'bench' || (p.home && S.home !== p.home)) { openMenu(p); return; }
+  const why = closedWhy(p.id); if (why) { log(why, 'warn'); sfx.bad(); return; }
+  enterBuilding(p.home ? 'home_' + p.home : p.id);
+}
+function putInCell() { enterBuilding('police'); const c = ROOMS.police.cell; P.x = c.x; P.y = c.y; cam.x = P.x; cam.y = P.y; }
+function toHospital() { enterBuilding('hospital'); const st = ROOMS.hospital.stations.find(s => s.label === 'Exam bed'); P.x = st.x; P.y = st.y; cam.x = P.x; cam.y = P.y; }
+function updateInterior(dt) {
+  const R = inside;
+  for (const n of R.npcs) {
+    n.t += dt;
+    if (n.wander) {
+      if (n.wait > 0) { n.wait -= dt; }
+      else {
+        const dx = n.tx - n.x, dz = n.tz - n.z, d = Math.hypot(dx, dz);
+        if (d < 3) { n.tx = rand(n.wander[0], n.wander[2]); n.tz = rand(n.wander[1], n.wander[3]); n.wait = rand(0.5, 2.5); }
+        else { n.x += dx / d * 40 * dt; n.z += dz / d * 40 * dt; n.face = Math.atan2(dz, dx); }
+      }
+    }
+  }
+  if (closedWhy(R.id)) { exitBuilding(); log(`Closing time. ${PLACES[R.id].name} shooed you out.`, 'warn'); }
+}
+function syncInterior() {
+  const R = inside;
+  for (const n of R.npcs) { n.m.root.position.set(n.x, 0, n.z); n.m.root.rotation.y = -n.face; animDino(n.m, n.t, n.wander && n.wait <= 0 ? 1 : 0); if (!n.wander) n.m.head.rotation.z = Math.sin(n.t * 1.5) * 0.08; }
+  const night = S.min % 1440 < 360 || S.min % 1440 > 1170;
+  for (const d of R.dyn) {
+    if (d.kind === 'egg') d.obj.visible = !!S.egg;
+    else if (d.kind === 'damage') d.obj.visible = !!(S.damaged && R.home === S.home);
+    else if (d.kind === 'window' && !LAYOUTS[R.id].night) d.obj.material = mat(night ? '!#22305a' : '!#bfe3ff');
+  }
+  for (const st of R.stations) st.ring.scale.setScalar((st === nearPlace ? 20 : 16) + Math.sin(gameT * 4) * 1.2);
+}
+
+// ---------- police chase after a bank robbery ----------
+let chase = null;
+const SIREN_R = new THREE.MeshBasicMaterial({ color: '#ff2a2a' }), SIREN_B = new THREE.MeshBasicMaterial({ color: '#2a6aff' }), SIREN_OFF = new THREE.MeshBasicMaterial({ color: '#3a3a40' });
+function addCop(x, y) {
+  const m = makeCompy({ body: '#3a5a9a', belly: '#c8d6f2', dark: '#1f3060', stripe: '#1f3060' }, { hat: '#1f2f5a', legs: 1.25 });
+  const lr = add(m.head, GEO.s, SIREN_R, 0.05, 1.3, 0.2, 0.22, 0.2, 0.22), lb = add(m.head, GEO.s, SIREN_B, 0.05, 1.3, -0.2, 0.22, 0.2, 0.22);
+  m.root.scale.setScalar(15 / 1.25); scene.add(m.root);
+  chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(176, 194) });
+}
+function startChase(loot) {
+  chase = { cops: [], loot, t: 0, lostT: 0, hideT: 0, seen: false, sirenT: 0, spawnT: 8 };
+  const far = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 260).sort((a, b) => Math.hypot(a[0] - P.x, a[1] - P.y) - Math.hypot(b[0] - P.x, b[1] - P.y));
+  addCop(far[0][0], far[0][1]); addCop(far[1][0], far[1][1]); addCop(PLACES.police.door.x, PLACES.police.door.y - 20);
+  shake = 8;
+  queueEvent({ kind: 'bad', tag: 'Heist', title: 'The alarm is ringing!', sound: 'siren',
+    text: `You grabbed ${money$(loot)} and burst out the door. Police dinos are on their way with lights flashing. Get far away from them, or slip into a building without being seen, and the money is yours. If they catch you, it is jail.`,
+    buttons: [{ label: 'Run!' }] });
+}
+function endChase() { for (const c of chase.cops) scene.remove(c.m.root); chase = null; }
+function bust(why) {
+  const loot = chase.loot; endChase();
+  S.money -= loot;
+  arrest(7, `${why} They took back the ${money$(loot)}.`);
+}
+function escapeChase(why) {
+  const loot = chase.loot; endChase();
+  goal('heist'); S.happy += 10;
+  queueEvent({ kind: 'good', tag: 'Heist', title: 'You got away!', sound: 'goal', text: `${why} You keep all ${money$(loot)}. Maybe lie low for a while.` });
+}
+function chaseEnteredBuilding(id) {
+  if (!chase) return;
+  chase.hideT = 0;
+  chase.seen = id === 'bank' || chase.cops.some(c => Math.hypot(c.x - P.x, c.y - P.y) < 170);
+  chase.door = PLACES[id].door;
+}
+function updateChase(dt) {
+  chase.t += dt; chase.sirenT -= dt;
+  if (chase.sirenT <= 0) { chase.sirenT = 1.5; if (!inside) sfx.siren(); }
+  if (inside) {
+    chase.hideT += dt;
+    for (const c of chase.cops) { const dx = chase.door.x - c.x, dy = chase.door.y + 30 - c.y, d = Math.hypot(dx, dy); if (d > 30) { c.x += dx / d * c.speed * 0.6 * dt; c.y += dy / d * c.speed * 0.6 * dt; c.face = Math.atan2(dy, dx); c.t += dt * 2; } collide(c, 9, solids); }
+    if (chase.seen && chase.hideT > 2.2) { bust('They saw you duck inside and followed you in.'); return; }
+    if (!chase.seen && chase.hideT > 8) { escapeChase('You hid inside until the sirens faded away.'); return; }
+    return;
+  }
+  chase.hideT = 0;
+  let nearest = Infinity;
+  for (const c of chase.cops) {
+    const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
+    nearest = Math.min(nearest, d);
+    const sp = c.speed * (d > 700 ? 1.15 : 1);
+    c.x += dx / d * sp * dt; c.y += dy / d * sp * dt; c.face = Math.atan2(dy, dx); c.t += dt * sp / 90;
+    collide(c, 9, solids);
+    if (d < 24) { bust('A police dino tackled you mid-sprint.'); return; }
+  }
+  chase.lostT = nearest > 470 ? chase.lostT + dt : 0;
+  if (chase.lostT > 5) { escapeChase('You lost them in the back streets.'); return; }
+  chase.spawnT -= dt;
+  if (chase.spawnT <= 0 && chase.cops.length < 5) {
+    chase.spawnT = 10;
+    const spots = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 500);
+    if (spots.length) { const [x, y] = pick(spots); addCop(x, y); log('Backup is on the way!', 'bad'); }
+  }
+}
+function syncChase() {
+  const blink = Math.floor(gameT * 8) % 2;
+  for (const c of chase.cops) {
+    c.m.root.position.set(c.x, 0, c.y); c.m.root.rotation.y = -c.face; animDino(c.m, c.t, 1, 13);
+    c.lr.material = blink ? SIREN_R : SIREN_OFF; c.lb.material = blink ? SIREN_OFF : SIREN_B;
+  }
 }
 
 // ---------- input ----------
@@ -968,7 +1316,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'escape') { if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
   if (k === 'p') { togglePause(); return; }
-  if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); if (nearPlace) openMenu(nearPlace); return; }
+  if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
   if (k === 'g' && state === 'play') { showGoals(); return; }
   if (k.startsWith('arrow')) e.preventDefault();
   keys.add(k);
@@ -979,8 +1327,15 @@ cv.addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; f
 cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joy.id) { let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const m = Math.hypot(dx, dy), R = 55; if (m > R) { joy.ox += dx * (1 - R / m); joy.oy += dy * (1 - R / m); dx = t.clientX - joy.ox; dy = t.clientY - joy.oy; } joy.dx = dx / R; joy.dy = dy / R; } }, { passive: false });
 const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
-$('useBtn').addEventListener('click', () => { if (state === 'play' && nearPlace) openMenu(nearPlace); });
-$('prompt').addEventListener('click', () => { if (state === 'play' && nearPlace) openMenu(nearPlace); });
+function useNear() {
+  if (state !== 'play' || !nearPlace) return;
+  if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
+  if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
+  const wasInside = inside; interact();
+  if (chase && !wasInside && inside) chaseEnteredBuilding(inside.id);
+}
+$('useBtn').addEventListener('click', useNear);
+$('prompt').addEventListener('click', useNear);
 
 // ---------- loop ----------
 const cam = { x: 900, y: 1130 };
@@ -992,19 +1347,22 @@ function update(dt) {
   let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
   const spd = (S.injured ? 110 : 200) * (S.flood ? 0.7 : 1) * (S.energy < 15 ? 0.7 : 1);
   P.vx += (mx * spd - P.vx) * Math.min(1, dt * 12); P.vy += (my * spd - P.vy) * Math.min(1, dt * 12);
-  P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10);
+  if (inside) { P.x = clamp(P.x + P.vx * dt, inside.ox + 10, inside.ox + inside.w - 10); P.y = clamp(P.y + P.vy * dt, inside.oy + 10, inside.oy + inside.d - 6); }
+  else { P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10); }
   collide(P, 9);
   if (m > 0.15) P.face += (((Math.atan2(my, mx) - P.face + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 14);
   P.t += dt * (0.3 + Math.hypot(P.vx, P.vy) / 120);
   advance(dt * 4);
   if (state !== 'play') return;
   // nearest door
-  nearPlace = null; let best = 50;
-  for (const p of Object.values(PLACES)) { const d = Math.hypot(P.x - p.door.x, P.y - p.door.y); if (d < best) { best = d; nearPlace = p; } }
+  nearPlace = null; let best = inside ? 34 : 50;
+  for (const p of (inside ? inside.stations : Object.values(PLACES))) { const pt = p.door || p, d = Math.hypot(P.x - pt.x, P.y - pt.y); if (d < best) { best = d; nearPlace = p; } }
+  if (inside) updateInterior(dt);
+  if (chase) { updateChase(dt); if (state !== 'play') return; }
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
-    const dx = P.x - trex.x, dy = P.y - trex.y, d = Math.hypot(dx, dy) || 1, insideNear = nearPlace && best < 30;
+    const dx = P.x - trex.x, dy = P.y - trex.y, d = Math.hypot(dx, dy) || 1, insideNear = !!inside || (nearPlace && best < 30);
     const chase = d < 520 && !insideNear;
     const tx = chase ? dx / d : (WORLD / 2 - trex.x) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1), ty = chase ? dy / d : (WORLD / 2 - trex.y) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1);
     const ts = chase ? 165 : 90;
@@ -1022,7 +1380,7 @@ function update(dt) {
   }
   for (const f of [spouseM, ...kidMs]) if (f) {
     f.t += dt;
-    if (Math.hypot(f.tx - f.x, f.ty - f.y) < 3) { const cx = PLACES['home_' + S.home].door.x; f.tx = cx + rand(-60, 60); f.ty = rand(1275, 1320); }
+    if (Math.hypot(f.tx - f.x, f.ty - f.y) < 3) { const B = famBounds(); f.tx = rand(B[0], B[2]); f.ty = rand(B[1], B[3]); }
     const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy) || 1, sp = f === spouseM ? 30 : 45;
     f.x += dx / d * sp * dt; f.y += dy / d * sp * dt; f.face = Math.atan2(dy, dx);
   }
@@ -1062,6 +1420,12 @@ function lighting() {
   doorMat.opacity = 0.55 + Math.abs(Math.sin(gameT * 3)) * 0.4;
   const sa = (m - 360) / 1080 * Math.PI;
   sun.position.set(cam.x + Math.cos(sa) * 700, 300 + Math.sin(sa) * 900 + 200, cam.y + 300); sun.target.position.set(cam.x, 0, cam.y);
+  if (inside) {
+    SKY.set(LAYOUTS[inside.id].night ? '#0c0612' : '#15110e'); scene.fog.color.copy(SKY);
+    sun.intensity = 0.42; hemi.intensity = 0.62; sun.color.set('#fff1d8');
+    const cx = inside.ox + inside.w / 2, cz = inside.oy + inside.d / 2;
+    sun.position.set(cx + 150, 900, cz + 350); sun.target.position.set(cx, 0, cz);
+  }
 }
 function fadeView(dt) {
   for (const f of fadeables) {
@@ -1081,11 +1445,13 @@ function sync3D() {
   for (const f of [spouseM, ...kidMs]) if (f) { f.m.root.position.set(f.x, 0, f.y); f.m.root.rotation.y = -(f.face || 0); animDino(f.m, f.t * 2, 1, f === spouseM ? 9 : 14); if (f !== spouseM) f.m.body.position.y = Math.abs(Math.sin(f.t * 8)) * 0.6; }
   if (trex) { trex.m.root.position.set(trex.x, 0, trex.y); trex.m.root.rotation.y = -(trex.face || 0); animDino(trex.m, trex.t * 1.3, 1, 7); trex.m.jaw.rotation.z = -0.1 - Math.max(0, Math.sin(trex.t * 3)) * 0.5; }
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
+  if (chase) syncChase();
+  if (inside) syncInterior();
   const sx = shake ? rand(-shake, shake) * 0.5 : 0, sz = shake ? rand(-shake, shake) * 0.5 : 0;
-  const portrait = H > W ? 1.4 : 1, d = 470 * portrait;
+  const portrait = H > W ? 1.4 : 1, d = (inside ? 300 : 470) * portrait;
   if (state === 'title') { const a = gameT * 0.06; camera.position.set(900 + Math.cos(a) * 700, 480, 900 + Math.sin(a) * 700); camera.lookAt(900, 0, 900); }
-  else { cam.x += (P.x + P.vx * 0.3 - cam.x) * 0.08; cam.y += (P.y + P.vy * 0.3 - cam.y) * 0.08; camera.position.set(cam.x + sx, d * 0.95, cam.y + d * 0.7 + sz); camera.lookAt(cam.x + sx, 0, cam.y - 20 + sz); }
-  scene.fog.near = d * 1.6; scene.fog.far = d * 4.5;
+  else { const tyc = inside ? Math.min(P.y, inside.oy + inside.d - 130) : P.y + P.vy * 0.3; cam.x += (P.x + P.vx * 0.3 - cam.x) * 0.08; cam.y += (tyc - cam.y) * 0.08; camera.position.set(cam.x + sx, d * 0.95, cam.y + d * 0.7 + sz); camera.lookAt(cam.x + sx, 0, cam.y - 20 + sz); }
+  scene.fog.near = inside ? 3000 : d * 1.6; scene.fog.far = inside ? 6000 : d * 4.5;
 }
 const _v = new THREE.Vector3();
 function toScreen(x, h, y) { _v.set(x, h, y).project(camera); return { x: (_v.x + 1) / 2 * W, y: (1 - _v.y) / 2 * H, ok: _v.z < 1 && _v.z > -1 }; }
@@ -1104,7 +1470,7 @@ function drawOverlay() {
   if (state === 'title') return;
   for (const p of particles) { const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue; g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color; g.beginPath(); g.arc(s.x, s.y, p.size, 0, 7); g.fill(); }
   g.globalAlpha = 1; g.textAlign = 'center';
-  for (const p of Object.values(PLACES)) {
+  for (const p of (inside ? [] : Object.values(PLACES))) {
     if (!p.h) continue;
     const s = toScreen((p.x0 + p.x1) / 2, p.h + 18, (p.y0 + p.y1) / 2); if (!s.ok || s.x < -50 || s.x > W + 50 || s.y < -20 || s.y > H + 20) continue;
     g.font = '400 15px "Lilita One", system-ui, sans-serif'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.65)'; g.strokeText(p.name, s.x, s.y); g.fillStyle = '#fff'; g.fillText(p.name, s.x, s.y);
@@ -1113,12 +1479,19 @@ function drawOverlay() {
   lbl(P.x, P.y, 42, S.name, '#ffe08a');
   if (spouseM) lbl(spouseM.x, spouseM.y, 40, S.partner.name, '#ffb3e6');
   kidMs.forEach((k, i) => lbl(k.x, k.y, 26, S.kids[i].name, '#bfe8ff'));
-  if (trex) arrowTo(g, trex.x, trex.y, '#ef5a5f', 'T-REX');
+  if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
+  if (trex && !inside) arrowTo(g, trex.x, trex.y, '#ef5a5f', 'T-REX');
+  if (chase && !inside) { const near = chase.cops.slice().sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 2); for (const c of near) arrowTo(g, c.x, c.y, '#5a8aff', 'COPS'); }
   const J = jobInfo();
-  if (J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
-  if (hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
+  if (!inside && J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
+  if (!inside && hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
   if (joy.active) { g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22, 0, 7); g.fill(); }
-  if (trex) { g.fillStyle = `rgba(200,0,0,${0.08 + Math.sin(gameT * 6) * 0.05})`; g.fillRect(0, 0, W, H); }
+  if (trex && !inside) { g.fillStyle = `rgba(200,0,0,${0.08 + Math.sin(gameT * 6) * 0.05})`; g.fillRect(0, 0, W, H); }
+  if (chase) {
+    const red = Math.floor(gameT * 6) % 2, gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, red ? 'rgba(255,40,40,0.35)' : 'rgba(40,90,255,0.35)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  }
 }
 const mini = $('mini'), mctx = mini.getContext('2d'); let mt = 0;
 function drawMini() {
@@ -1152,16 +1525,27 @@ function hud() {
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
   $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
   const pr = $('prompt'), show = state === 'play' && nearPlace;
-  pr.hidden = !show; if (show) { const t = `<kbd>${touchMode ? 'TAP' : 'E'}</kbd>${nearPlace.home && S.home === nearPlace.home ? 'Go inside your home' : 'Enter ' + nearPlace.name}`; if (pr.innerHTML !== t) pr.innerHTML = t; }
+  pr.hidden = !show;
+  if (show) {
+    const np = nearPlace;
+    let what;
+    if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
+    else if (np.id === 'bench') what = 'Use the park bench';
+    else if (np.home) what = S.home === np.home ? 'Go inside your home' : `Look at the ${np.name.toLowerCase()} (${np.home === 'burrow' ? 'for rent' : 'for sale'})`;
+    else what = closedWhy(np.id) ? `${np.name} (closed)` : `Go into ${np.name}`;
+    const t = `<kbd>${touchMode ? 'TAP' : 'E'}</kbd>${what}`; if (pr.innerHTML !== t) pr.innerHTML = t;
+  }
   $('useBtn').hidden = !(touchMode && show);
   const sh = $('shift');
   let st = '';
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
-  if (trex) st = 'A T-rex is loose! Hide in a doorway or keep away.';
-  if (hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
+  if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
+  if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 5 - chase.lostT))}s out of sight) or hide inside a building`;
+  if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
   sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
   feedItems.forEach((it, i) => { const el = $('feed').children[i]; if (el) el.style.opacity = performance.now() - it.t > 9000 ? '0' : '1'; });
-  drawMini();
+  mini.hidden = !!inside || state === 'title';
+  if (!inside) drawMini();
 }
 function showGoals() {
   const n = Object.keys(S.goals).length;
@@ -1180,7 +1564,7 @@ function beginLife(fromSave) {
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
   $('titleScreen').hidden = true; state = 'play'; setScreens();
   if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
-  else { log(`Welcome back. Day ${S.day}.`, ''); if (S.jail > 0) jailMenu(); }
+  else { log(`Welcome back. Day ${S.day}.`, ''); if (S.jail > 0) { putInCell(); jailMenu(); } }
 }
 $('newBtn').addEventListener('click', () => beginLife(null));
 $('contBtn').addEventListener('click', () => { const s = loadSave(); if (s) beginLife(s); });
@@ -1189,7 +1573,7 @@ $('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(
 $('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
-$('quitBtn').addEventListener('click', () => { save(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
+$('quitBtn').addEventListener('click', () => { save(); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
 buildTown(); spawnNPCs();
