@@ -1,0 +1,1283 @@
+<title>Saltwind Road</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+/* Layout: full-bleed canvas world, HUD pinned to the corners, dialogue docked at the bottom, ledger-style modals. Single dark look on purpose (it's a game screen). */
+:root{
+  --ink:#0d131b;      /* deepest panel / fog */
+  --panel:#16202b;    /* panel fill */
+  --panel-2:#1d2a37;  /* raised rows */
+  --line:#2d3e50;     /* hairlines */
+  --text:#ebe4d3;     /* parchment text */
+  --muted:#93a3b2;    /* secondary text */
+  --brass:#e3a948;    /* accent: coin & highlights */
+  --good:#86c98f;
+  --bad:#e57a62;
+  --f-display:"Pixelify Sans", "Courier New", monospace;
+  --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-family:var(--f-body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+#game{position:relative;height:100%;width:100%;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);margin-left:4px}
+.panel{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:7px 12px;font-size:14px;line-height:1.1}
+.btn:hover{border-color:var(--brass)}
+.btn.primary{background:var(--brass);color:#1a1206;border-color:var(--brass);font-weight:700}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* HUD */
+.hud-tl{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));padding:8px 12px;display:grid;gap:2px;min-width:150px}
+.coins{display:flex;align-items:center;gap:7px;font-family:var(--f-display);font-size:22px;color:var(--brass);font-variant-numeric:tabular-nums}
+.coin-ico{width:12px;height:12px;background:var(--brass);transform:rotate(45deg);box-shadow:inset -3px -3px 0 rgba(0,0,0,.25)}
+#clock{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+#region{font-family:var(--f-display);font-size:15px;letter-spacing:.04em}
+.hud-tr{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));display:grid;gap:6px;justify-items:end}
+#mini{width:132px;height:132px;border:1px solid var(--line);border-radius:6px;background:var(--ink);image-rendering:pixelated;display:block}
+.hud-btns{display:flex;gap:6px}
+#pack{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:4px;padding:6px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 20px)}
+.slot{display:flex;align-items:center;gap:5px;padding:4px 8px;background:var(--panel-2);border-radius:4px;font-size:13px;font-variant-numeric:tabular-nums}
+.sw{width:10px;height:10px;border-radius:2px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.slot.empty{color:var(--muted)}
+#prompt{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom,0px));padding:6px 12px;font-size:14px}
+#toasts{position:absolute;left:50%;transform:translateX(-50%);top:calc(14px + env(safe-area-inset-top,0px));display:grid;gap:6px;justify-items:center;pointer-events:none;width:min(440px,calc(100% - 340px))}
+.toast{padding:8px 14px;font-size:14px;text-align:center;animation:tin .25s ease-out}
+.toast b{font-family:var(--f-display);font-weight:500;color:var(--brass);letter-spacing:.03em}
+@keyframes tin{from{transform:translateY(-6px);opacity:0}}
+@media (max-width:760px){
+  #toasts{top:auto;bottom:calc(150px + env(safe-area-inset-bottom,0px));width:calc(100% - 24px)}
+  #mini{width:96px;height:96px}
+  .hud-tl{min-width:0}
+  .coins{font-size:18px}
+}
+
+/* Dialogue */
+#talk{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));width:min(720px,calc(100% - 20px));padding:14px;display:grid;grid-template-columns:72px 1fr;gap:14px;z-index:5}
+#portrait{width:72px;height:72px;background:var(--ink);border:1px solid var(--line);border-radius:4px;image-rendering:pixelated}
+.who{font-family:var(--f-display);font-size:19px;letter-spacing:.03em}
+.who small{font-family:var(--f-body);font-size:13px;color:var(--muted);margin-left:8px;letter-spacing:0}
+.tier{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass);border:1px solid color-mix(in srgb,var(--brass) 50%,transparent);border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+#talkText{margin:6px 0 10px;font-size:15.5px;line-height:1.5;max-width:62ch;min-width:0}
+#talkOpts{display:flex;flex-wrap:wrap;gap:6px}
+#talkOpts .btn .n{color:var(--brass);font-family:var(--f-display);margin-right:6px}
+.req{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.req span{display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:3px 7px;border-radius:3px;background:var(--panel-2)}
+.req .ok{color:var(--good)} .req .no{color:var(--bad)}
+
+/* Modals */
+.modal{position:absolute;inset:0;display:grid;place-items:center;background:rgba(6,9,14,.6);z-index:10;padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.sheet{width:min(860px,100%);max-height:100%;overflow:auto;padding:18px}
+.sheet h2{font-family:var(--f-display);font-weight:500;font-size:24px;margin:0;letter-spacing:.03em;text-wrap:balance}
+.sheet h3{font-family:var(--f-display);font-weight:500;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+.sheet-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.pips{display:inline-flex;gap:3px;vertical-align:middle}
+.pip{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.pip.on{background:var(--brass)}
+
+/* Trade */
+.tcols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+@media (max-width:640px){.tcols{grid-template-columns:1fr}}
+.tcol{min-width:0}
+.trow{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:var(--panel-2);margin-bottom:4px;font-size:14px}
+.trow .nm{min-width:0}
+.trow .nm small{color:var(--muted);margin-left:4px}
+.trow .pr{color:var(--brass);font-variant-numeric:tabular-nums;font-size:13px}
+.tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:1px 4px;border-radius:2px;margin-left:6px;vertical-align:1px}
+.tag.cheap{color:var(--good);border:1px solid color-mix(in srgb,var(--good) 50%,transparent)}
+.tag.dear{color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 50%,transparent)}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:26px;height:26px;border-radius:4px;border:1px solid var(--line);background:var(--ink);padding:0;font-size:15px}
+.qty b{min-width:20px;text-align:center;font-variant-numeric:tabular-nums}
+.none{color:var(--muted);font-size:14px;padding:8px}
+.tsum{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:6px;display:grid;gap:10px}
+.coinrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.coinrow .lbl{min-width:150px;font-size:14px}
+.coinrow .lbl b{color:var(--brass);font-variant-numeric:tabular-nums}
+.vals{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.npcsay{font-size:15px;line-height:1.45;min-height:22px}
+.npcsay q{quotes:"“" "”"}
+.tacts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+/* Journal */
+.jgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}
+.jcard{background:var(--panel-2);border-radius:5px;padding:10px 12px;font-size:14px;line-height:1.45;min-width:0}
+.jcard .t{font-family:var(--f-display);font-size:15px;letter-spacing:.03em}
+.jcard .s{color:var(--muted);font-size:13px}
+.bar{height:6px;background:var(--ink);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--brass)}
+.done{color:var(--good)}
+.goal{display:grid;gap:8px}
+
+/* Map */
+#mapWrap{display:grid;gap:10px;justify-items:center;width:100%;max-height:100%}
+#bigmap{max-width:100%;border:1px solid var(--line);border-radius:6px;image-rendering:pixelated;background:var(--ink)}
+.maplegend{font-size:13px;color:var(--muted)}
+
+/* Title */
+#title{background:radial-gradient(ellipse at 50% 35%,rgba(13,19,27,.35),rgba(13,19,27,.88) 70%)}
+.titlecard{width:min(560px,100%);padding:26px 24px;text-align:left}
+.titlecard h1{font-family:var(--f-display);font-weight:700;font-size:clamp(40px,9vw,64px);line-height:.95;margin:0;color:var(--brass);letter-spacing:.02em;text-shadow:3px 3px 0 #000}
+.titlecard p{font-size:16px;line-height:1.55;max-width:52ch;margin:14px 0}
+.controls{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.5px;color:var(--muted);margin:14px 0 18px}
+.controls b{color:var(--text);font-weight:400;font-family:var(--f-display)}
+.trow2{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Touch */
+#stick{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(235,228,211,.35);background:rgba(13,19,27,.25);transform:translate(-50%,-50%);pointer-events:none;z-index:4}
+#knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(227,169,72,.75)}
+#actBtn{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));width:76px;height:76px;border-radius:50%;background:var(--brass);color:#1a1206;border:none;font-family:var(--f-display);font-size:17px;z-index:4;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+</style>
+
+<div id="game">
+  <canvas id="view"></canvas>
+
+  <div class="hud-tl panel" id="hudTL">
+    <div class="coins"><span class="coin-ico"></span><b id="coinV">0</b></div>
+    <div id="region">Port Wren</div>
+    <div id="clock">Day 1 · 08:00</div>
+  </div>
+  <div class="hud-tr">
+    <canvas id="mini" width="132" height="132"></canvas>
+    <div class="hud-btns">
+      <button class="btn" id="btnMap">Map<kbd>M</kbd></button>
+      <button class="btn" id="btnJournal">Journal<kbd>J</kbd></button>
+    </div>
+  </div>
+  <div id="pack" class="panel"></div>
+  <div id="prompt" class="panel" hidden></div>
+  <div id="toasts"></div>
+
+  <div id="talk" class="panel" hidden>
+    <canvas id="portrait" width="72" height="72"></canvas>
+    <div style="min-width:0">
+      <div class="who" id="talkWho"></div>
+      <div id="talkText"></div>
+      <div id="talkOpts"></div>
+    </div>
+  </div>
+
+  <div id="trade" class="modal" hidden><div class="sheet panel" id="tradeSheet"></div></div>
+  <div id="journal" class="modal" hidden><div class="sheet panel" id="journalSheet"></div></div>
+  <div id="mapView" class="modal" hidden>
+    <div class="sheet panel" style="width:min(1000px,100%)">
+      <div class="sheet-head"><h2>The Known World</h2><button class="btn" data-close="mapView">Close<kbd>M</kbd></button></div>
+      <div id="mapWrap" style="margin-top:12px"><canvas id="bigmap"></canvas>
+        <div class="maplegend" id="mapLegend"></div></div>
+    </div>
+  </div>
+
+  <div id="title" class="modal">
+    <div class="titlecard panel">
+      <h1>Saltwind<br>Road</h1>
+      <p>You arrive in Port Wren with a pack, a few coins and no name on the road. Walk the coast, the pine woods, the frozen pass and the eastern sands. Buy where things are cheap, sell where they are dear, and make deals with the people you meet.</p>
+      <p>The Guildmistress grants a <b style="color:var(--brass)">Charter of the Free Road</b> to any trader who earns 500 coin and forms pacts with three settlements.</p>
+      <div class="controls">
+        <b>WASD / Arrows</b><span>Walk (drag anywhere on touch screens)</span>
+        <b>E / Space</b><span>Talk to someone nearby</span>
+        <b>M · J</b><span>World map · Journal</span>
+        <b>1–6</b><span>Pick a dialogue option</span>
+      </div>
+      <div class="trow2">
+        <button class="btn primary" id="btnNew">Start a new journey</button>
+        <button class="btn" id="btnCont" hidden>Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ending" class="modal" hidden><div class="sheet panel" id="endSheet" style="width:min(560px,100%)"></div></div>
+
+  <div id="stick" hidden><div id="knob"></div></div>
+  <button id="actBtn" hidden>Talk</button>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & data ================= */
+const TS = 16, W = 150, H = 110, SEED = 7331, DAY_LEN = 210; // seconds per day
+const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13};
+const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e'];
+const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0];
+const REGION = ['Open Water','The Shallows','The Strand','The Green Downs','Hollow Woods','The Knolls','The Teeth','Frost Reach','Reedmire','The Free Road','','Amber Sands','The Free Road',''];
+const SAVE_KEY = 'saltwind-road-v1';
+
+const GOODS = {
+  fish:{name:'Fish',base:8,col:'#8fb8c9'},
+  salt:{name:'Salt',base:10,col:'#f1ede4'},
+  wool:{name:'Wool',base:12,col:'#d9cbb0'},
+  tea:{name:'Tea',base:16,col:'#6f9a5a'},
+  furs:{name:'Furs',base:22,col:'#8a5a3a'},
+  iron:{name:'Iron',base:24,col:'#8d97a0'},
+  glass:{name:'Glass',base:26,col:'#7fd6d0'},
+  spice:{name:'Spice',base:28,col:'#d8642e'},
+  amber:{name:'Amber',base:30,col:'#f0a630'},
+  pearl:{name:'Pearl',base:70,col:'#efe6f5'},
+};
+const GK = Object.keys(GOODS);
+
+const TOWNS = {
+  wren:  {name:'Port Wren',    x:22, y:58, ground:T.GRASS, roof:'#3f6f99', produce:['fish','salt'],  demand:['furs','spice']},
+  hollow:{name:'Hollowpine',   x:60, y:30, ground:T.GRASS, roof:'#7a4a2c', produce:['furs','amber'], demand:['salt','tea']},
+  frost: {name:'Frostgate',    x:100,y:14, ground:T.SNOW,  roof:'#55606e', produce:['iron'],         demand:['fish','wool','tea']},
+  dun:   {name:'Dunmere Oasis',x:116,y:62, ground:T.SAND,  roof:'#c1612f', produce:['spice','glass'],demand:['iron','wool']},
+  reed:  {name:'Reedholm',     x:64, y:84, ground:T.GRASS, roof:'#6d7f3a', produce:['tea','wool'],   demand:['iron','glass']},
+  isle:  {name:'Sunken Isle',  x:134,y:96, ground:T.SAND,  roof:'#8b6aa8', produce:['pearl'],        demand:['amber','glass'], small:true},
+};
+const ISLE = {x:134, y:96, land:7, ring:13};
+
+const NPCS = [
+  {id:'odile',town:'wren',dx:0,dy:-2,name:'Odile Marrow',role:'Guildmistress',cols:{cloak:'#3a3f6b',skin:'#e0b38c',hair:'#d8d3ca'},charter:true,
+   hello:["A new face. Everyone who walks the Free Road starts somewhere. Most start here.","Back again. The road is treating you well, I hope.","Our best trader returns. Sit, if you like."]},
+  {id:'tamsin',town:'wren',dx:-2,dy:1,name:'Tamsin',role:'Fishmonger',cols:{cloak:'#7a3b3b',skin:'#c99673',hair:'#3b2418'},trader:true,greed:.3,patience:4,purse:180,stock:{fish:10,salt:8,wool:1},contract:'c_tamsin',
+   hello:["Fish, salt, sea air. What're you after?","Oh, it's you. Mind the guts on the cobbles.","My favorite customer! Don't tell the others."],
+   rumors:["Spice? Dunmere has it, out past the dunes in the east. Costs a small fortune here.","Furs keep a net from fraying in the cold. Hollowpine trappers have more than they can sell."]},
+  {id:'hob',town:'wren',dx:2,dy:1,name:'Old Hob',role:'Harbor regular',cols:{cloak:'#5b5243',skin:'#d9a982',hair:'#9a9a9a'},
+   hello:["Eh? You're not from round here.","The young trader! Got a minute for an old man?","Sit down, sit down. I've got stories."],
+   rumors:["Salt's worth near double up in Hollowpine, north-east of here. Those pine folk cure everything.","Somewhere on the southern beach lies the wreck of the Gull. Went down full of salt.","Corvo, the ferryman down in Reedholm, used to row to an island past the deep water. Pearls, they say.","Odile hands out Charters to traders who make friends in three towns. Do a town a real favor and they'll pact with you.","An old watchtower stands in the middle of the land. Climb it and you'll see for miles."]},
+
+  {id:'kesh',town:'hollow',dx:-2,dy:1,name:'Kesh',role:'Trapper',cols:{cloak:'#4f5a2e',skin:'#b5835e',hair:'#2a1c12'},trader:true,greed:.5,patience:3,purse:160,stock:{furs:8,amber:3,salt:0},
+   hello:["Hm. Trader.","You again. Fine.","Good to see you, friend."],
+   rumors:["North-west of here there's a pool where amber washes up. Bring a sack.","Frostgate pays well for tea. Cold work makes people thirsty."]},
+  {id:'ruun',town:'hollow',dx:2,dy:-1,name:'Elder Ruun',role:'Elder of Hollowpine',cols:{cloak:'#6b4a2a',skin:'#c58e66',hair:'#e8e2d8'},trader:true,greed:.2,patience:5,purse:140,stock:{amber:4,furs:3},contract:'c_ruun',
+   hello:["The woods let you pass. That is something.","Welcome back under the pines.","Our door is your door."],
+   rumors:["The Nine Stones south-west of here are older than any town. Leave an offering if you pass."]},
+
+  {id:'brannoc',town:'frost',dx:-2,dy:1,name:'Brannoc',role:'Smith',cols:{cloak:'#3d3a3a',skin:'#d2a07a',hair:'#8a3b1e'},trader:true,greed:.4,patience:4,purse:220,stock:{iron:9,furs:1},contract:'c_brannoc',
+   hello:["Close the gate behind you. You're letting the warm out.","Trader. Got anything hot to drink?","Ha! Pull up a stool by the forge."],
+   rumors:["Desert folk need iron for their caravan axles. Haul some south-east and you'll eat well."]},
+  {id:'ysolde',town:'frost',dx:2,dy:-1,name:'Ysolde',role:'Gate watcher',cols:{cloak:'#2f5a6b',skin:'#ecc9a6',hair:'#f2e6b0'},contract:'c_ysolde',
+   hello:["State your business at Frostgate.","The southern trader. Pass.","I saw you coming from a mile off. Welcome back."],
+   rumors:["From the wall I can see far to the east. Something glints on the peaks there at dawn.","Wolves stay out of the pass. It's the cold you need to worry about."]},
+
+  {id:'saffi',town:'dun',dx:-2,dy:-1,name:'Saffi',role:'Caravaneer',cols:{cloak:'#b0742f',skin:'#a8714c',hair:'#1d1410'},trader:true,greed:.6,patience:5,purse:260,stock:{spice:8,glass:2,wool:0},contract:'c_saffi',
+   hello:["Ah, a fresh face to haggle with. Come.","My favorite opponent returns.","For you, friend, I only cheat a little."],
+   rumors:["A caravan went missing south of here last season. Somewhere in the dunes, still loaded."]},
+  {id:'imre',town:'dun',dx:2,dy:1,name:'Imre',role:'Glassblower',cols:{cloak:'#3e6e78',skin:'#c69774',hair:'#4a3628'},trader:true,greed:.2,patience:4,purse:150,stock:{glass:7,spice:2},contract:'c_imre',
+   hello:["Careful where you step. Everything here breaks.","Welcome back. Nothing broken yet today.","Ah! Come see what I made this morning."],
+   rumors:["Reedholm buys glass by the crate. The damp cracks everything they own."]},
+
+  {id:'nell',town:'reed',dx:-2,dy:1,name:'Nell',role:'Herbalist',cols:{cloak:'#4d6b4a',skin:'#e3b896',hair:'#b5653a'},trader:true,greed:.25,patience:4,purse:150,stock:{tea:9,wool:4},contract:'c_nell',
+   hello:["Mind the mud. And the frogs.","Back for more tea?","There you are. I saved you a cup."],
+   rumors:["There's a lantern burning out on the marsh to the east. Nobody lit it.","Hollowpine and Frostgate both drink our tea faster than we can dry it."]},
+  {id:'corvo',town:'reed',dx:2,dy:-1,name:'Corvo',role:'Ferryman',cols:{cloak:'#2e3b45',skin:'#b7865f',hair:'#5a5a5a'},trader:true,greed:.45,patience:3,purse:120,stock:{wool:6,fish:3},contract:'c_corvo',
+   hello:["Ferry's closed. Has been for years.","You again. Still thinking about the isle?","Captain! Ha. Sit."],
+   rumors:["Iron comes from Frostgate. Glass from Dunmere. Get both and come see me about a raft.","The isle lies south-east, past the deep water. You can't wade there."]},
+
+  {id:'vael',town:'isle',dx:1,dy:1,name:'Vael',role:'Hermit of the Isle',cols:{cloak:'#5d4a7a',skin:'#d8b49a',hair:'#cfd6dd'},trader:true,greed:.35,patience:4,purse:200,stock:{pearl:4},contract:'c_vael',
+   hello:["A raft? No one has come here in nine years.","The tide brought you back.","Sit with me and listen to the bell."],
+   rumors:["The bell beneath the water rings when the tide turns. Look along the southern shore.","Pearls are worth little here and a great deal anywhere else."]},
+];
+const NPC_BY = Object.fromEntries(NPCS.map(n => [n.id, n]));
+
+const CONTRACTS = {
+  c_tamsin:{giver:'tamsin',title:'Lining for the nets',ask:"Winter's coming off the sea and my nets need lining. Bring me 3 Furs from the north and I'll pay you properly.",need:{furs:3},reward:{coins:95,rep:1.5},pact:'wren',done:"Lovely thick pelts. Port Wren won't forget this."},
+  c_ruun:{giver:'ruun',title:'Salt for the smokehouse',ask:"Our smokehouse runs out of salt before the thaw every year. Four measures of Salt would keep us fed until spring.",need:{salt:4},reward:{coins:40,items:{amber:2},rep:1.5},pact:'hollow',done:"The children will eat this winter. Hollowpine stands with you."},
+  c_brannoc:{giver:'brannoc',title:'Feed the forge',ask:"My forge crew eats like wolves and drinks like fish. Bring 3 Fish and 2 Tea and I'll pay you in iron.",need:{fish:3,tea:2},reward:{items:{iron:3},coins:20,rep:1.5},pact:'frost',done:"Smell that? Hot tea and fried fish. You've a friend at Frostgate now."},
+  c_ysolde:{giver:'ysolde',title:'A taste of the south',ask:"Eleven winters on this wall and I've never tasted spice. Bring me one measure and I'll tell you what glints on the eastern peaks.",need:{spice:1},reward:{coins:30,rep:.8,reveal:'shrine'},done:"Oh, that burns. Wonderful. There's an old shrine on the peaks east of here. I've marked it on your map."},
+  c_saffi:{giver:'saffi',title:'Caravan refit',ask:"My caravan leaves at the next full moon. I need 2 Iron for the axles and 2 Wool for the tents. I pay well, for once.",need:{iron:2,wool:2},reward:{coins:130,rep:1.5},pact:'dun',done:"Ha! Now she'll roll. Dunmere's gates are always open to you."},
+  c_imre:{giver:'imre',title:'Amber for color',ask:"Northern amber makes the deepest gold glass. Bring me 2 Amber and take 3 of my best panes.",need:{amber:2},reward:{items:{glass:3},rep:.8},done:"Look at that color. Here, take these. Carefully."},
+  c_nell:{giver:'nell',title:'Tincture bottles',ask:"Every bottle I own has cracked in the damp. Bring me 2 Glass and I'll pay in coin and tea.",need:{glass:2},reward:{coins:60,items:{tea:3},rep:1.5},pact:'reed',done:"Clear as morning. Reedholm owes you, and we pay our debts."},
+  c_corvo:{giver:'corvo',title:'A raft of your own',ask:"Nobody rows to the Sunken Isle with me anymore. But I'll build you a raft of your own: 2 Iron for nails, 1 Glass for the lamp, and 40 coin for my time.",need:{iron:2,glass:1},needCoin:40,reward:{flag:'raft',rep:1},done:"She floats. Walk into any water and she'll carry you. The isle lies south-east, past the deep."},
+  c_vael:{giver:'vael',title:'The Tidestone',ask:"I'm carving a tidestone to quiet the bell. I need 2 Amber for its eyes and 1 Glass for its heart.",need:{amber:2,glass:1},reward:{items:{pearl:2},rep:2,flag:'tidestone'},done:"Listen. The bell is quiet. Take these pearls. They were never mine."},
+};
+
+const LANDMARKS = [
+  {id:'stones', name:'The Nine Stones', tx:40,ty:42, reward:{items:{amber:1}}, lore:"Nine standing stones in a ring. Someone left amber at the foot of the tallest. You take one piece and leave a fish."},
+  {id:'wreck',  name:'Wreck of the Gull',tx:14,ty:80, reward:{items:{salt:3},coins:25}, lore:"Half a hull sunk in the sand. The hold still holds salt, and a purse wedged behind a beam."},
+  {id:'tower',  name:'Old Watchtower', tx:84,ty:46, reward:{reveal:30}, lore:"You climb the crumbling stair. From the top, half the land spreads out below you."},
+  {id:'caravan',name:'The Lost Caravan',tx:104,ty:82, reward:{items:{spice:2,glass:1}}, lore:"Three wagons buried to the axles. The drivers are long gone. Their cargo isn't."},
+  {id:'shrine', name:'Sky Shrine',     tx:124,ty:24, reward:{coins:60}, lore:"A tiny shrine of blue tile, older than Frostgate. Coins from a hundred travelers glint in its bowl. You take a share for the road."},
+  {id:'pool',   name:'Amber Pool',     tx:44,ty:18, reward:{items:{amber:2}}, lore:"A still, dark pool ringed with pines. Gold drops of amber wash up on its edge."},
+  {id:'lantern',name:'Marsh Lantern',  tx:86,ty:96, reward:{items:{tea:2}}, lore:"A lantern burns on a post in the reeds with no oil in it. Beneath it, someone left a bundle of tea."},
+  {id:'bell',   name:'The Drowned Bell',tx:137,ty:100, reward:{items:{pearl:1}}, lore:"A bronze bell lies half in the surf. When the tide turns it rings once, low and long. A pearl rests in its mouth.", isle:true},
+];
+
+const GOAL_COIN = 500, GOAL_PACTS = 3;
+const TIERS = [[0,'Stranger'],[1,'Known'],[2.5,'Trusted'],[4,'Kin']];
+const tierOf = r => { let t = 0; TIERS.forEach((x,i) => { if (r >= x[0]) t = i; }); return t; };
+
+/* ================= noise & rng ================= */
+function hash2(x, y, s) {
+  let h = (Math.imul(x|0, 374761393) + Math.imul(y|0, 668265263) + Math.imul(s|0, 982451653)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise(x, y, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);
+  const a = hash2(xi,yi,s), b = hash2(xi+1,yi,s), c = hash2(xi,yi+1,s), d = hash2(xi+1,yi+1,s);
+  return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v;
+}
+function fbm(x, y, s) {
+  let sum = 0, amp = .5, f = 1, norm = 0;
+  for (let o = 0; o < 4; o++) { sum += vnoise(x*f, y*f, s+o*17)*amp; norm += amp; amp *= .5; f *= 2; }
+  return sum / norm;
+}
+const bump = (x,y,cx,cy,r,a) => { const d = Math.hypot(x-cx,y-cy)/r; return d >= 1 ? 0 : a*(1-d*d); };
+
+/* ================= world generation ================= */
+const map = new Uint8Array(W*H);
+const idx = (x,y) => y*W + x;
+const inB = (x,y) => x >= 0 && y >= 0 && x < W && y < H;
+const tileAt = (x,y) => inB(x,y) ? map[idx(x,y)] : T.DEEP;
+const houses = [];
+let spawn = {x:0,y:0};
+
+function genWorld() {
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const nx = x/W*2-1, ny = y/H*2-1;
+    const edge = Math.pow(Math.max(Math.abs(nx), Math.abs(ny)), 3) * .55 + Math.pow(Math.hypot(nx,ny)/1.414, 2) * .35;
+    let e = fbm(x/26, y/26, SEED) + .32 - edge;
+    e += bump(x,y,100,16,30,.22) + bump(x,y,78,22,14,.12);              // northern range
+    e += bump(x,y,ISLE.x,ISLE.y,26,-.18);                               // south-east sea
+    let m = fbm(x/20+40, y/20, SEED+99);
+    m += bump(x,y,64,86,22,.32) + bump(x,y,60,30,20,.22) - bump(x,y,116,66,34,.55);
+    const cold = y < 21 + (fbm(x/14, 3, SEED+7) - .5) * 18;
+    let t;
+    if (e < .40) t = T.DEEP;
+    else if (e < .45) t = T.SHAL;
+    else if (e < .48) t = cold ? T.SNOW : T.SAND;
+    else if (e > .97) t = T.MOUNT;
+    else if (e > .87) t = cold ? T.SNOW : T.HILL;
+    else if (cold) t = T.SNOW;
+    else if (m < .30) t = T.DUNE;
+    else if (m > .74) t = T.MARSH;
+    else if (m > .56) t = T.FOREST;
+    else t = T.GRASS;
+    // the isle: forced land with a moat of deep water
+    const di = Math.hypot(x-ISLE.x, y-ISLE.y);
+    if (di < ISLE.land) t = di > ISLE.land-1.6 ? T.SAND : (hash2(x,y,5) > .7 ? T.FOREST : T.GRASS);
+    else if (di < ISLE.ring) t = T.DEEP;
+    map[idx(x,y)] = t;
+  }
+  // settlements
+  for (const k in TOWNS) {
+    const tw = TOWNS[k], r = tw.small ? 4 : 6;
+    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
+      const d = Math.hypot(x,y); if (d > r + .4 || !inB(tw.x+x,tw.y+y)) continue;
+      map[idx(tw.x+x, tw.y+y)] = d < (tw.small ? 1.6 : 2.6) ? T.FLOOR : tw.ground;
+    }
+    const offs = tw.small ? [[-3,-3]] : [[-4,-4],[3,-4],[-4,3],[3,3]];
+    for (const [ox,oy] of offs) {
+      const hx = tw.x+ox, hy = tw.y+oy;
+      houses.push({x:hx, y:hy, roof:tw.roof});
+      for (let yy = 0; yy < 2; yy++) for (let xx = 0; xx < 2; xx++) map[idx(hx+xx, hy+yy)] = T.HOUSE;
+    }
+  }
+  // roads
+  const COST = [30,6,1,1,2,3,12,1.5,2.5,.4,.4,1.3,.4,Infinity];
+  const links = [['wren','hollow'],['hollow','frost'],['wren','reed'],['reed','dun'],['hollow','dun'],['frost','dun']];
+  for (const [a,b] of links) {
+    const A = TOWNS[a], B = TOWNS[b];
+    const path = astar(A.x, A.y, B.x, B.y, i => COST[map[i]]);
+    for (const i of path) {
+      const t = map[i];
+      if (t === T.FLOOR || t === T.HOUSE) continue;
+      map[i] = (t === T.DEEP || t === T.SHAL) ? T.BRIDGE : T.ROAD;
+    }
+  }
+  spawn = {x: TOWNS.wren.x + .5, y: TOWNS.wren.y + 1.6};
+  // place landmarks on reachable ground
+  const reach = flood(Math.floor(spawn.x), Math.floor(spawn.y), false);
+  for (const L of LANDMARKS) {
+    let best = null, bd = 1e9;
+    for (let y = Math.max(0,L.ty-16); y < Math.min(H,L.ty+16); y++) for (let x = Math.max(0,L.tx-16); x < Math.min(W,L.tx+16); x++) {
+      const t = map[idx(x,y)];
+      const ok = L.isle ? (Math.hypot(x-ISLE.x,y-ISLE.y) < ISLE.land-.5 && t !== T.HOUSE && t !== T.FLOOR)
+                        : (reach[idx(x,y)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL);
+      if (!ok) continue;
+      const d = Math.hypot(x-L.tx, y-L.ty);
+      if (d < bd) { bd = d; best = {x,y}; }
+    }
+    if (!best) best = {x:L.tx, y:L.ty};
+    L.x = best.x; L.y = best.y;
+  }
+  for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = tw.x + n.dx + .5; n.y = tw.y + n.dy + .8; }
+}
+
+function astar(sx, sy, gx, gy, cost) {
+  const N = W*H, g = new Float64Array(N).fill(Infinity), came = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const hf = [], hi = [];
+  const push = (f,i) => { hf.push(f); hi.push(i); let c = hf.length-1; while (c > 0) { const p = (c-1)>>1; if (hf[p] <= hf[c]) break; [hf[p],hf[c]] = [hf[c],hf[p]]; [hi[p],hi[c]] = [hi[c],hi[p]]; c = p; } };
+  const pop = () => { const top = hi[0], lf = hf.pop(), li = hi.pop(); if (hf.length) { hf[0] = lf; hi[0] = li; let c = 0; for (;;) { const l = 2*c+1, r = l+1; let m = c; if (l < hf.length && hf[l] < hf[m]) m = l; if (r < hf.length && hf[r] < hf[m]) m = r; if (m === c) break; [hf[m],hf[c]] = [hf[c],hf[m]]; [hi[m],hi[c]] = [hi[c],hi[m]]; c = m; } } return top; };
+  const s = idx(sx,sy), goal = idx(gx,gy);
+  g[s] = 0; push(0, s);
+  while (hf.length) {
+    const cur = pop();
+    if (cur === goal) break;
+    if (closed[cur]) continue; closed[cur] = 1;
+    const cx = cur % W, cy = (cur / W) | 0;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cx+dx, ny = cy+dy; if (!inB(nx,ny)) continue;
+      const ni = idx(nx,ny); if (closed[ni]) continue;
+      const c = cost(ni); if (!isFinite(c)) continue;
+      const ng = g[cur] + c;
+      if (ng < g[ni]) { g[ni] = ng; came[ni] = cur; push(ng + (Math.abs(nx-gx)+Math.abs(ny-gy))*.45, ni); }
+    }
+  }
+  const out = []; let c = goal; while (c !== -1) { out.push(c); c = came[c]; } return out;
+}
+
+function walkable(t, raft) {
+  if (t === T.HOUSE || t === T.MOUNT) return false;
+  if (t === T.DEEP) return raft;
+  return true;
+}
+function flood(sx, sy, raft) {
+  const seen = new Uint8Array(W*H), q = [idx(sx,sy)]; seen[q[0]] = 1;
+  while (q.length) {
+    const c = q.pop(), x = c % W, y = (c / W) | 0;
+    for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x+dx, ny = y+dy; if (!inB(nx,ny)) continue;
+      const ni = idx(nx,ny); if (seen[ni] || !walkable(map[ni], raft)) continue;
+      seen[ni] = 1; q.push(ni);
+    }
+  }
+  return seen;
+}
+
+/* ================= terrain pre-render ================= */
+let terrain, mapCanvas, mapCtx, mapImg;
+const rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const TILE_RGB = TILE_COL.map(rgb);
+
+function renderTerrain() {
+  terrain = document.createElement('canvas');
+  terrain.width = W*TS; terrain.height = H*TS;
+  const g = terrain.getContext('2d');
+  const isWater = t => t === T.DEEP || t === T.SHAL;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = map[idx(x,y)], px = x*TS, py = y*TS, r = i => hash2(x,y,i);
+    g.fillStyle = TILE_COL[t === T.BRIDGE ? T.SHAL : t]; g.fillRect(px,py,TS,TS);
+    const dot = (c, n, s=1) => { g.fillStyle = c; for (let i = 0; i < n; i++) g.fillRect(px + (r(i*2+1)*TS|0), py + (r(i*2+2)*TS|0), s, s); };
+    switch (t) {
+      case T.DEEP: dot('#1a3552', 4, 2); break;
+      case T.SHAL: dot('#3a7d9c', 3, 2); break;
+      case T.SAND: dot('#c7b179', 5); dot('#e6d6a2', 3); break;
+      case T.GRASS: case T.HOUSE: dot('#5c8a40', 5); dot('#85b263', 3); if (r(40) > .9) { g.fillStyle = r(41) > .5 ? '#e8d36a' : '#e7e1f0'; g.fillRect(px+(r(42)*12|0)+2, py+(r(43)*12|0)+2, 2, 2); } break;
+      case T.FOREST: {
+        dot('#41693a', 4);
+        const n = r(9) > .45 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const tx = px + 4 + r(10+i)*8, ty = py + 5 + r(20+i)*7;
+          g.fillStyle = '#4a3523'; g.fillRect(tx-1, ty+2, 2, 4);
+          g.fillStyle = '#2b5528'; g.beginPath(); g.arc(tx, ty, 5, 0, 7); g.fill();
+          g.fillStyle = '#3c7234'; g.beginPath(); g.arc(tx-1.5, ty-1.5, 2.6, 0, 7); g.fill();
+        }
+        break;
+      }
+      case T.HILL: g.fillStyle = '#74773f'; g.beginPath(); g.arc(px+8, py+12, 6, Math.PI, 0); g.fill(); g.fillStyle = '#9a9c66'; g.fillRect(px+5, py+7, 3, 1); break;
+      case T.MOUNT: {
+        g.fillStyle = '#56525c'; g.beginPath(); g.moveTo(px, py+16); g.lineTo(px+8, py+1 + r(3)*3); g.lineTo(px+16, py+16); g.fill();
+        g.fillStyle = '#d8d4de'; g.beginPath(); g.moveTo(px+5, py+7); g.lineTo(px+8, py+1 + r(3)*3); g.lineTo(px+11, py+7); g.fill();
+        break;
+      }
+      case T.SNOW: dot('#c9d6dd', 5); dot('#ffffff', 2); break;
+      case T.MARSH: g.fillStyle = '#41665a'; g.beginPath(); g.ellipse(px+4+r(5)*8, py+6+r(6)*6, 4, 2, 0, 0, 7); g.fill(); g.fillStyle = '#93a85e'; for (let i = 0; i < 3; i++) g.fillRect(px+(r(30+i)*14|0), py+4+(r(33+i)*8|0), 1, 4); break;
+      case T.ROAD: dot('#9f875a', 6); dot('#c8b182', 3); break;
+      case T.FLOOR: g.fillStyle = '#8f8676'; g.fillRect(px, py+7, TS, 1); g.fillRect(px+((y%2)*8)+3, py, 1, 7); g.fillRect(px+((y%2)*8)+11, py+8, 1, 8); break;
+      case T.DUNE: g.fillStyle = '#c99a4c'; g.fillRect(px+2, py+5+(r(4)*6|0), 9, 1); g.fillRect(px+6, py+9+(r(5)*5|0), 8, 1); dot('#efcf88', 2); break;
+      case T.BRIDGE: {
+        const horiz = isWater(tileAt(x,y-1)) && isWater(tileAt(x,y+1)) && !(isWater(tileAt(x-1,y)) && isWater(tileAt(x+1,y)));
+        g.fillStyle = '#8a6440';
+        if (horiz) { g.fillRect(px, py+3, TS, 10); g.fillStyle = '#6d4c2f'; for (let i = 0; i < 4; i++) g.fillRect(px+i*4, py+3, 1, 10); }
+        else { g.fillRect(px+3, py, 10, TS); g.fillStyle = '#6d4c2f'; for (let i = 0; i < 4; i++) g.fillRect(px+3, py+i*4, 10, 1); }
+        break;
+      }
+    }
+    // foam where shallow water meets land
+    if (t === T.SHAL || t === T.DEEP) {
+      g.fillStyle = 'rgba(200,232,240,.55)';
+      if (!isWater(tileAt(x,y-1)) && tileAt(x,y-1) !== T.BRIDGE) g.fillRect(px, py, TS, 2);
+      if (!isWater(tileAt(x,y+1)) && tileAt(x,y+1) !== T.BRIDGE) g.fillRect(px, py+TS-2, TS, 2);
+      if (!isWater(tileAt(x-1,y)) && tileAt(x-1,y) !== T.BRIDGE) g.fillRect(px, py, 2, TS);
+      if (!isWater(tileAt(x+1,y)) && tileAt(x+1,y) !== T.BRIDGE) g.fillRect(px+TS-2, py, 2, TS);
+    }
+  }
+  for (const h of houses) drawHouse(g, h.x*TS, h.y*TS, h.roof);
+
+  mapCanvas = document.createElement('canvas'); mapCanvas.width = W; mapCanvas.height = H;
+  mapCtx = mapCanvas.getContext('2d'); mapImg = mapCtx.createImageData(W, H);
+  for (let i = 0; i < W*H; i++) { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; mapImg.data[i*4+3] = 255; }
+}
+function drawHouse(g, px, py, roof) {
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px+3, py+28, 28, 4);
+  g.fillStyle = '#cdb994'; g.fillRect(px+3, py+12, 26, 18);
+  g.fillStyle = '#b29d76'; g.fillRect(px+3, py+27, 26, 3);
+  g.fillStyle = roof; g.beginPath(); g.moveTo(px, py+14); g.lineTo(px+16, py+1); g.lineTo(px+32, py+14); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.moveTo(px+16, py+1); g.lineTo(px+32, py+14); g.lineTo(px+16, py+14); g.closePath(); g.fill();
+  g.fillStyle = '#5a3d27'; g.fillRect(px+13, py+20, 6, 10);
+  g.fillStyle = '#f3d27a'; g.fillRect(px+6, py+17, 4, 4); g.fillRect(px+22, py+17, 4, 4);
+}
+function revealMapPixel(i) {
+  const t = map[i], c = t === T.HOUSE ? [120,80,60] : TILE_RGB[t];
+  mapImg.data[i*4] = c[0]; mapImg.data[i*4+1] = c[1]; mapImg.data[i*4+2] = c[2];
+}
+
+/* ================= game state ================= */
+let S = null;
+function freshState() {
+  const s = {
+    x: spawn.x, y: spawn.y, coins: 60, inv: {fish:4, salt:3}, day: 1, time: .3,
+    rep: {}, contracts: {}, pacts: [], flags: {}, found: {}, towns: {}, npc: {}, charter: false,
+    explored: new Uint8Array(W*H), steps: 0, rumor: {}, trades: 0,
+  };
+  for (const n of NPCS) if (n.trader) s.npc[n.id] = {stock: {...n.stock}, purse: n.purse, patience: n.patience, flex: rollFlex(n)};
+  return s;
+}
+function rollFlex(n) { return (.03 + Math.random()*.11) * (1 - n.greed*.5); }
+
+function serialize() {
+  const ex = S.explored; let rle = '', cur = ex[0], run = 0;
+  for (let i = 0; i < ex.length; i++) { if (ex[i] === cur) run++; else { rle += run + ','; cur = ex[i]; run = 1; } }
+  rle += run;
+  return JSON.stringify({...S, explored: undefined, ex0: ex[0], rle});
+}
+function deserialize(str) {
+  const o = JSON.parse(str), base = freshState();
+  const s = Object.assign(base, o);
+  s.explored = new Uint8Array(W*H);
+  let v = o.ex0, p = 0;
+  for (const part of String(o.rle).split(',')) { const n = +part; if (v) s.explored.fill(1, p, p+n); p += n; v = v ? 0 : 1; }
+  for (const n of NPCS) if (n.trader && !s.npc[n.id]) s.npc[n.id] = base.npc[n.id];
+  delete s.rle; delete s.ex0;
+  return s;
+}
+function save() { try { localStorage.setItem(SAVE_KEY, serialize()); } catch (e) {} }
+function loadSaved() { try { const v = localStorage.getItem(SAVE_KEY); return v ? deserialize(v) : null; } catch (e) { return null; } }
+
+/* ================= helpers ================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const have = g => S.inv[g] || 0;
+const addItem = (g, n) => { S.inv[g] = Math.max(0, have(g) + n); if (!S.inv[g]) delete S.inv[g]; };
+function price(town, g) {
+  const t = TOWNS[town], b = GOODS[g].base;
+  return b * (t.produce.includes(g) ? .6 : t.demand.includes(g) ? 1.6 : 1);
+}
+const repOf = town => S.rep[town] || 0;
+function addRep(town, v) { S.rep[town] = Math.min(5, repOf(town) + v); }
+const swatch = g => `<span class="sw" style="background:${GOODS[g].col}"></span>`;
+const itemList = obj => Object.entries(obj).filter(([,n]) => n > 0).map(([g,n]) => `${n} ${GOODS[g].name}`).join(', ');
+
+function toast(html, ms = 4200) {
+  const el = document.createElement('div'); el.className = 'toast panel'; el.innerHTML = html;
+  $('toasts').prepend(el);
+  while ($('toasts').children.length > 4) $('toasts').lastChild.remove();
+  setTimeout(() => el.remove(), ms);
+}
+
+/* ================= exploration ================= */
+let lastTile = -1;
+function reveal(cx, cy, r) {
+  let changed = false;
+  for (let y = Math.max(0, Math.floor(cy-r)); y <= Math.min(H-1, Math.ceil(cy+r)); y++)
+    for (let x = Math.max(0, Math.floor(cx-r)); x <= Math.min(W-1, Math.ceil(cx+r)); x++) {
+      if (Math.hypot(x+.5-cx, y+.5-cy) > r) continue;
+      const i = idx(x,y);
+      if (!S.explored[i]) { S.explored[i] = 1; revealMapPixel(i); changed = true; }
+    }
+  if (changed) mapCtx.putImageData(mapImg, 0, 0);
+}
+function rebuildMapPixels() {
+  for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
+  mapCtx.putImageData(mapImg, 0, 0);
+}
+const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
+
+function checkDiscoveries() {
+  for (const k in TOWNS) {
+    const tw = TOWNS[k];
+    if (!S.towns[k] && Math.hypot(S.x - tw.x - .5, S.y - tw.y - .5) < 8) {
+      S.towns[k] = true;
+      toast(`Discovered <b>${tw.name}</b><br>Sells cheap: ${tw.produce.map(g=>GOODS[g].name).join(', ')} · Pays well for: ${tw.demand.map(g=>GOODS[g].name).join(', ')}`, 6500);
+      save();
+    }
+  }
+  for (const L of LANDMARKS) {
+    if (S.found[L.id] || Math.hypot(S.x - L.x - .5, S.y - L.y - .5) > 1.6) continue;
+    S.found[L.id] = true;
+    const r = L.reward; let gain = [];
+    if (r.coins) { S.coins += r.coins; gain.push(`${r.coins} coin`); }
+    if (r.items) for (const g in r.items) { addItem(g, r.items[g]); gain.push(`${r.items[g]} ${GOODS[g].name}`); }
+    if (r.reveal) reveal(L.x+.5, L.y+.5, r.reveal);
+    toast(`<b>${L.name}</b><br>${esc(L.lore)}${gain.length ? `<br><span style="color:var(--good)">+ ${gain.join(', ')}</span>` : ''}`, 8000);
+    renderHUD(); save();
+  }
+}
+
+/* ================= input ================= */
+const keys = new Set();
+let mode = 'title'; // title | play | talk | trade | journal | map | ending
+const touch = {active:false, id:null, ox:0, oy:0, vx:0, vy:0};
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k) && mode === 'play') e.preventDefault();
+  if (mode === 'play') {
+    keys.add(k);
+    if (k === 'e' || k === ' ' || k === 'enter') interact();
+    else if (k === 'm') openMap();
+    else if (k === 'j') openJournal();
+  } else if (mode === 'talk') {
+    if (k === 'escape') closeTalk();
+    const n = parseInt(k, 10);
+    if (n >= 1) { const b = $('talkOpts').querySelectorAll('button')[n-1]; if (b) b.click(); }
+  } else if (mode === 'trade') { if (k === 'escape') closeTrade(); }
+  else if (mode === 'journal') { if (k === 'escape' || k === 'j') closeModal('journal'); }
+  else if (mode === 'map') { if (k === 'escape' || k === 'm') closeModal('mapView'); }
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+
+const view = $('view');
+view.addEventListener('pointerdown', e => {
+  if (mode !== 'play') return;
+  if (e.pointerType === 'mouse') {
+    // click on a nearby NPC to talk
+    const w = screenToWorld(e.clientX, e.clientY);
+    const n = NPCS.find(n => Math.hypot(n.x - w.x, n.y - .4 - w.y) < .9);
+    if (n && Math.hypot(n.x - S.x, n.y - S.y) < 2.2) { openTalk(n); return; }
+    return;
+  }
+  touch.active = true; touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; touch.vx = touch.vy = 0;
+  const st = $('stick'); st.hidden = false; st.style.left = e.clientX + 'px'; st.style.top = e.clientY + 'px';
+  $('knob').style.transform = '';
+  view.setPointerCapture(e.pointerId);
+});
+view.addEventListener('pointermove', e => {
+  if (!touch.active || e.pointerId !== touch.id) return;
+  let dx = e.clientX - touch.ox, dy = e.clientY - touch.oy; const d = Math.hypot(dx,dy), max = 42;
+  if (d > max) { dx = dx/d*max; dy = dy/d*max; }
+  touch.vx = dx/max; touch.vy = dy/max;
+  $('knob').style.transform = `translate(${dx}px,${dy}px)`;
+});
+const endTouch = e => { if (e.pointerId !== touch.id) return; touch.active = false; touch.vx = touch.vy = 0; $('stick').hidden = true; };
+view.addEventListener('pointerup', endTouch); view.addEventListener('pointercancel', endTouch);
+$('actBtn').addEventListener('click', interact);
+$('btnMap').addEventListener('click', () => mode === 'play' && openMap());
+$('btnJournal').addEventListener('click', () => mode === 'play' && openJournal());
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal(b.dataset.close)));
+
+/* ================= camera & render ================= */
+const ctx = view.getContext('2d');
+const lightC = document.createElement('canvas'), lctx = lightC.getContext('2d');
+let Z = 3, camX = 0, camY = 0, dpr = 1, frameT = 0;
+
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = view.clientWidth, h = view.clientHeight;
+  view.width = Math.round(w*dpr); view.height = Math.round(h*dpr);
+  lightC.width = view.width; lightC.height = view.height;
+  Z = (Math.min(w, h) < 560 ? 2 : 3) * dpr;
+}
+addEventListener('resize', resize);
+function screenToWorld(cx, cy) {
+  const r = view.getBoundingClientRect();
+  return {x: (camX + (cx - r.left)*dpr / Z) / TS, y: (camY + (cy - r.top)*dpr / Z) / TS};
+}
+
+function drawPerson(g, x, y, c, phase, moving, facing, extra) {
+  const bob = moving ? Math.abs(Math.sin(phase))*1 : 0, step = moving ? Math.sin(phase)*1.5 : 0;
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 4.5, 1.6, 0, 0, 7); g.fill();
+  if (extra && extra.pack && facing !== 'down') { g.fillStyle = '#6b4a2c'; g.fillRect(x-4, y-12-bob, 8, 7); }
+  g.fillStyle = '#2a2420'; g.fillRect(x-3, y-4 + (step>0?-1:0), 2, 4); g.fillRect(x+1, y-4 + (step<0?-1:0), 2, 4);
+  g.fillStyle = c.cloak; g.fillRect(x-4, y-11-bob, 8, 8);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x+1, y-11-bob, 3, 8);
+  if (extra && extra.scarf) { g.fillStyle = '#e3a948'; g.fillRect(x-4, y-11-bob, 8, 2); }
+  g.fillStyle = c.skin; g.fillRect(x-3, y-16-bob, 6, 5);
+  g.fillStyle = c.hair; g.fillRect(x-3, y-17-bob, 6, 2);
+  if (facing === 'up') g.fillRect(x-3, y-16-bob, 6, 4);
+  else if (facing === 'left') { g.fillRect(x+1, y-16-bob, 2, 3); g.fillStyle = '#1b1b1b'; g.fillRect(x-2, y-14-bob, 1, 1); }
+  else if (facing === 'right') { g.fillRect(x-3, y-16-bob, 2, 3); g.fillStyle = '#1b1b1b'; g.fillRect(x+1, y-14-bob, 1, 1); }
+  else { g.fillStyle = '#1b1b1b'; g.fillRect(x-2, y-14-bob, 1, 1); g.fillRect(x+1, y-14-bob, 1, 1); }
+  if (extra && extra.pack && facing === 'down') { g.fillStyle = '#6b4a2c'; g.fillRect(x+3, y-10-bob, 2, 6); }
+}
+function drawLandmark(g, L, t) {
+  const x = L.x*TS + 8, y = L.y*TS + 12;
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, 7, 2.5, 0, 0, 7); g.fill();
+  switch (L.id) {
+    case 'stones': g.fillStyle = '#8b8790'; for (let i = 0; i < 5; i++) { const a = i/5*6.28; g.fillRect(x + Math.cos(a)*6 - 1.5, y - 8 + Math.sin(a)*3, 3, 7); } break;
+    case 'wreck': g.fillStyle = '#5e4128'; g.beginPath(); g.moveTo(x-9,y-2); g.lineTo(x+9,y-6); g.lineTo(x+6,y); g.lineTo(x-7,y+1); g.fill(); g.fillStyle = '#3e2a19'; g.fillRect(x-1, y-16, 2, 12); break;
+    case 'tower': g.fillStyle = '#8e8676'; g.fillRect(x-5, y-24, 10, 24); g.fillStyle = '#6f6859'; g.fillRect(x-6, y-26, 12, 3); g.fillStyle = '#2b2622'; g.fillRect(x-1, y-18, 2, 4); break;
+    case 'caravan': g.fillStyle = '#7a5532'; g.fillRect(x-8, y-8, 16, 6); g.fillStyle = '#e6d6b4'; g.beginPath(); g.arc(x, y-8, 7, Math.PI, 0); g.fill(); g.fillStyle = '#2f2420'; g.fillRect(x-6, y-3, 3, 3); g.fillRect(x+3, y-3, 3, 3); break;
+    case 'shrine': g.fillStyle = '#3d6fa8'; g.fillRect(x-6, y-10, 12, 10); g.fillStyle = '#7fb0e0'; g.beginPath(); g.moveTo(x-8,y-10); g.lineTo(x,y-17); g.lineTo(x+8,y-10); g.fill(); g.fillStyle = '#f3d27a'; g.fillRect(x-1, y-6, 2, 3); break;
+    case 'pool': g.fillStyle = '#1f3448'; g.beginPath(); g.ellipse(x, y-3, 8, 4, 0, 0, 7); g.fill(); g.fillStyle = '#f0a630'; g.fillRect(x-6, y-1, 2, 2); g.fillRect(x+5, y-5, 2, 2); break;
+    case 'lantern': { g.fillStyle = '#3e2a19'; g.fillRect(x-1, y-16, 2, 16); const f = .6 + Math.sin(t*6)*.2; g.fillStyle = `rgba(255,214,120,${f})`; g.beginPath(); g.arc(x, y-17, 4, 0, 7); g.fill(); break; }
+    case 'bell': g.fillStyle = '#9c6b2f'; g.beginPath(); g.moveTo(x-6,y-1); g.quadraticCurveTo(x-6,y-12,x,y-12); g.quadraticCurveTo(x+6,y-12,x+6,y-1); g.fill(); g.fillStyle = '#6e4a20'; g.fillRect(x-7, y-2, 14, 2); break;
+  }
+  if (!S.found[L.id]) { // glint to draw the eye
+    const a = (Math.sin(t*3 + L.x) + 1)/2;
+    g.fillStyle = `rgba(255,240,190,${.35 + a*.5})`;
+    g.fillRect(x-1, y-30 - a*2, 2, 6); g.fillRect(x-3, y-28 - a*2, 6, 2);
+  }
+}
+
+function render() {
+  const vw = view.width / Z, vh = view.height / Z;
+  camX = Math.round(Math.max(0, Math.min(W*TS - vw, S.x*TS - vw/2)));
+  camY = Math.round(Math.max(0, Math.min(H*TS - vh, S.y*TS - vh/2)));
+  if (W*TS < vw) camX = -Math.round((vw - W*TS)/2);
+  if (H*TS < vh) camY = -Math.round((vh - H*TS)/2);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle = '#1f3d5c'; ctx.fillRect(0, 0, view.width, view.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(Z,0,0,Z,-camX*Z,-camY*Z);
+  ctx.drawImage(terrain, 0, 0);
+
+  const x0 = Math.max(0, Math.floor(camX/TS)), y0 = Math.max(0, Math.floor(camY/TS));
+  const x1 = Math.min(W-1, Math.ceil((camX+vw)/TS)), y1 = Math.min(H-1, Math.ceil((camY+vh)/TS));
+  // water shimmer
+  const ph = Math.floor(frameT*1.5);
+  ctx.fillStyle = 'rgba(210,236,245,.45)';
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const t = map[idx(x,y)];
+    if ((t === T.DEEP || t === T.SHAL) && hash2(x,y,ph) > .9) ctx.fillRect(x*TS + 3 + (hash2(x,y,ph+1)*8|0), y*TS + 4 + (hash2(x,y,ph+2)*8|0), 4, 1);
+  }
+
+  // sprites, y-sorted
+  const sprites = [];
+  for (const L of LANDMARKS) if (L.x >= x0-1 && L.x <= x1+1 && L.y >= y0-1 && L.y <= y1+2) sprites.push({y: L.y+.9, f: () => drawLandmark(ctx, L, frameT)});
+  for (const n of NPCS) if (n.x >= x0-1 && n.x <= x1+1 && n.y >= y0-1 && n.y <= y1+2) {
+    sprites.push({y: n.y, f: () => {
+      const facing = Math.abs(S.x - n.x) > Math.abs(S.y - n.y) ? (S.x < n.x ? 'left' : 'right') : (S.y < n.y ? 'up' : 'down');
+      const near = Math.hypot(S.x-n.x, S.y-n.y) < 6;
+      drawPerson(ctx, Math.round(n.x*TS), Math.round(n.y*TS + Math.sin(frameT*2 + n.x)*.4), n.cols, 0, false, near ? facing : 'down');
+      const c = n.contract && S.contracts[n.contract];
+      if (n.contract && c !== 'done' || n.charter && !S.charter) {
+        const ready = c === 'active' && canComplete(CONTRACTS[n.contract]) || (n.charter && charterReady());
+        ctx.fillStyle = ready ? '#86c98f' : '#e3a948';
+        const by = n.y*TS - 24 + Math.sin(frameT*4)*1.2;
+        ctx.fillRect(n.x*TS - 1, by, 2, 5); ctx.fillRect(n.x*TS - 1, by + 6, 2, 2);
+      }
+    }});
+  }
+  const ptile = tileAt(Math.floor(S.x), Math.floor(S.y));
+  const onWater = ptile === T.DEEP || ptile === T.SHAL;
+  sprites.push({y: S.y, f: () => {
+    const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
+    if (onWater && S.flags.raft) {
+      const b = Math.sin(frameT*3)*.8;
+      ctx.fillStyle = '#7a5532'; ctx.fillRect(px-8, py-4+b, 16, 7); ctx.fillStyle = '#5c3f24'; for (let i = 0; i < 4; i++) ctx.fillRect(px-8+i*4, py-4+b, 1, 7);
+      drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true});
+    } else if (onWater) {
+      drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true});
+      ctx.fillStyle = TILE_COL[ptile]; ctx.fillRect(px-6, py-1, 12, 5);
+      ctx.fillStyle = 'rgba(210,236,245,.6)'; ctx.fillRect(px-6, py-1, 12, 1);
+    } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true});
+  }});
+  sprites.sort((a,b) => a.y - b.y).forEach(s => s.f());
+
+  // fog of war
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = idx(x,y); if (S.explored[i]) continue;
+    const edge = (x > 0 && S.explored[i-1]) || (x < W-1 && S.explored[i+1]) || (y > 0 && S.explored[i-W]) || (y < H-1 && S.explored[i+W]);
+    ctx.fillStyle = edge ? 'rgba(13,19,27,.72)' : '#0d131b';
+    ctx.fillRect(x*TS, y*TS, TS, TS);
+  }
+  // town name plates
+  ctx.font = '8px "Pixelify Sans", monospace'; ctx.textAlign = 'center';
+  for (const k in TOWNS) {
+    const tw = TOWNS[k]; if (!S.towns[k]) continue;
+    const tx = tw.x*TS + 8, ty = (tw.y - (tw.small ? 5 : 7))*TS;
+    if (tx < camX - 60 || tx > camX + vw + 60 || ty < camY - 20 || ty > camY + vh + 20) continue;
+    const w = ctx.measureText(tw.name).width + 10;
+    ctx.fillStyle = 'rgba(13,19,27,.75)'; ctx.fillRect(tx - w/2, ty - 8, w, 12);
+    ctx.fillStyle = '#e3a948'; ctx.fillText(tw.name, tx, ty + 1);
+  }
+
+  // night lighting
+  const sun = Math.cos((S.time - .5) * Math.PI * 2);
+  const dark = Math.max(0, Math.min(1, -sun*1.3 + .15)) * .72;
+  if (dark > .01) {
+    lctx.globalCompositeOperation = 'source-over';
+    lctx.clearRect(0, 0, lightC.width, lightC.height);
+    lctx.fillStyle = `rgba(8,12,34,${dark})`; lctx.fillRect(0, 0, lightC.width, lightC.height);
+    lctx.globalCompositeOperation = 'destination-out';
+    const hole = (wx, wy, r, a) => {
+      const sx = (wx - camX)*Z, sy = (wy - camY)*Z, rr = r*Z;
+      if (sx < -rr || sy < -rr || sx > lightC.width + rr || sy > lightC.height + rr) return;
+      const gr = lctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
+      gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      lctx.fillStyle = gr; lctx.fillRect(sx-rr, sy-rr, rr*2, rr*2);
+    };
+    hole(S.x*TS, S.y*TS - 6, 70, .9);
+    for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
+    const lan = LANDMARKS.find(l => l.id === 'lantern'); hole(lan.x*TS + 8, lan.y*TS - 4, 40, .8);
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.drawImage(lightC, 0, 0);
+    // warm window glow
+    ctx.setTransform(Z,0,0,Z,-camX*Z,-camY*Z);
+    ctx.fillStyle = `rgba(255,200,110,${dark*.5})`;
+    for (const h of houses) { ctx.fillRect(h.x*TS+5, h.y*TS+16, 6, 6); ctx.fillRect(h.x*TS+21, h.y*TS+16, 6, 6); }
+  }
+  drawMini();
+}
+
+function drawMini() {
+  const m = $('mini'), g = m.getContext('2d'), span = 60;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = '#0d131b'; g.fillRect(0, 0, m.width, m.height);
+  const sx = Math.round(S.x - span/2), sy = Math.round(S.y - span/2), s = m.width/span;
+  g.drawImage(mapCanvas, sx, sy, span, span, 0, 0, m.width, m.height);
+  for (const k in TOWNS) if (S.towns[k]) { const t = TOWNS[k]; g.fillStyle = '#e3a948'; g.fillRect((t.x - sx)*s - 3, (t.y - sy)*s - 3, 6, 6); }
+  for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) { g.fillStyle = '#ebe4d3'; g.fillRect((L.x - sx)*s - 2, (L.y - sy)*s - 2, 4, 4); }
+  g.fillStyle = '#ffffff'; g.fillRect(m.width/2 - 2, m.height/2 - 2, 4, 4);
+  g.strokeStyle = '#0d131b'; g.strokeRect(m.width/2 - 2.5, m.height/2 - 2.5, 5, 5);
+}
+
+/* ================= player & update ================= */
+const player = {cols:{cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'}, phase:0, moving:false, facing:'down'};
+let nearNPC = null, saveTimer = 0;
+
+function passable(x, y) {
+  const pts = [[x-.28, y-.05], [x+.28, y-.05], [x-.28, y+.2], [x+.28, y+.2]];
+  for (const [px,py] of pts) {
+    const tx = Math.floor(px), ty = Math.floor(py);
+    if (!inB(tx,ty)) return false;
+    if (!walkable(map[idx(tx,ty)], !!S.flags.raft)) return false;
+  }
+  return true;
+}
+
+function update(dt) {
+  let vx = 0, vy = 0;
+  if (keys.has('arrowleft') || keys.has('a')) vx -= 1;
+  if (keys.has('arrowright') || keys.has('d')) vx += 1;
+  if (keys.has('arrowup') || keys.has('w')) vy -= 1;
+  if (keys.has('arrowdown') || keys.has('s')) vy += 1;
+  if (touch.active) { vx += touch.vx; vy += touch.vy; }
+  const mag = Math.hypot(vx, vy);
+  player.moving = mag > .15;
+  if (player.moving) {
+    if (mag > 1) { vx /= mag; vy /= mag; }
+    const t = tileAt(Math.floor(S.x), Math.floor(S.y));
+    let sp = SPEED[t];
+    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = 1.15;
+    sp = 4.6 * Math.max(.4, sp);
+    const nx = S.x + vx*sp*dt, ny = S.y + vy*sp*dt;
+    if (passable(nx, S.y)) S.x = nx;
+    if (passable(S.x, ny)) S.y = ny;
+    player.phase += dt * 12;
+    player.facing = Math.abs(vx) > Math.abs(vy) ? (vx < 0 ? 'left' : 'right') : (vy < 0 ? 'up' : 'down');
+    S.steps += sp*dt;
+  }
+  const ti = idx(Math.floor(S.x), Math.floor(S.y));
+  if (ti !== lastTile) { lastTile = ti; reveal(S.x, S.y, 7.5); checkDiscoveries(); renderRegion(); }
+
+  // time
+  S.time += dt / DAY_LEN;
+  if (S.time >= 1) { S.time -= 1; newDay(); }
+
+  // nearest NPC
+  let best = null, bd = 1.7;
+  for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
+  if (best !== nearNPC) {
+    nearNPC = best;
+    const pr = $('prompt'), ab = $('actBtn');
+    if (best) { pr.hidden = false; pr.innerHTML = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; ab.hidden = !isTouch; }
+    else { pr.hidden = true; ab.hidden = true; }
+  }
+  saveTimer += dt; if (saveTimer > 8) { saveTimer = 0; save(); }
+  renderClock();
+}
+const isTouch = matchMedia('(pointer:coarse)').matches;
+
+function newDay() {
+  S.day++;
+  for (const n of NPCS) if (n.trader) {
+    const st = S.npc[n.id];
+    for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
+    st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
+  }
+  toast(`<b>Day ${S.day}</b><br>Merchants have restocked and slept off their grudges.`);
+  save();
+}
+
+/* ================= HUD ================= */
+function renderHUD() {
+  $('coinV').textContent = S.coins;
+  const held = GK.filter(g => have(g) > 0);
+  $('pack').innerHTML = held.length ? held.map(g => `<div class="slot" title="${GOODS[g].name}">${swatch(g)}${GOODS[g].name} <b>${have(g)}</b></div>`).join('')
+                                    : '<div class="slot empty">Your pack is empty</div>';
+}
+function renderClock() {
+  const mins = Math.floor(((S.time*24 + 0) % 24) * 60);
+  const hh = String(Math.floor(mins/60)).padStart(2,'0'), mm = String(Math.floor(mins%60/10)*10).padStart(2,'0');
+  const txt = `Day ${S.day} · ${hh}:${mm}`;
+  if ($('clock').textContent !== txt) $('clock').textContent = txt;
+}
+function renderRegion() {
+  let name = '';
+  for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
+  if (!name) name = REGION[tileAt(Math.floor(S.x), Math.floor(S.y))] || 'The Free Road';
+  if ($('region').textContent !== name) $('region').textContent = name;
+}
+
+/* ================= dialogue ================= */
+let talkNPC = null;
+function interact() { if (mode === 'play' && nearNPC) openTalk(nearNPC); }
+function drawPortrait(n) {
+  const g = $('portrait').getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,72,72);
+  g.fillStyle = TILE_COL[TOWNS[n.town].ground]; g.fillRect(0,0,72,72);
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0,0,72,72);
+  g.imageSmoothingEnabled = false; g.setTransform(4,0,0,4,0,0);
+  drawPerson(g, 9, 20, n.cols, 0, false, 'down');
+}
+function openTalk(n) {
+  talkNPC = n; mode = 'talk'; keys.clear();
+  $('prompt').hidden = true; $('actBtn').hidden = true;
+  drawPortrait(n);
+  const tier = tierOf(repOf(n.town));
+  $('talkWho').innerHTML = `${esc(n.name)}<small>${esc(n.role)}</small><span class="tier">${TIERS[tier][1]}</span>`;
+  $('talk').hidden = false;
+  say(n.hello[Math.min(tier, n.hello.length-1)], mainOptions(n));
+}
+function say(html, opts) {
+  $('talkText').innerHTML = html;
+  const box = $('talkOpts'); box.innerHTML = '';
+  opts.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'btn' + (o.primary ? ' primary' : ''); b.disabled = !!o.disabled;
+    b.innerHTML = `<span class="n">${i+1}</span>${esc(o.label)}`;
+    b.addEventListener('click', o.fn);
+    box.appendChild(b);
+  });
+  const f = box.querySelector('button:not(:disabled)'); if (f && !isTouch) f.focus({preventScroll:true});
+}
+function mainOptions(n) {
+  const o = [];
+  if (n.charter && !S.charter) o.push({label:'About the Charter', fn: () => charterTalk(n), primary: charterReady()});
+  if (n.trader) o.push({label:'Trade', fn: () => openTrade(n)});
+  if (n.contract) {
+    const st = S.contracts[n.contract], c = CONTRACTS[n.contract];
+    if (st !== 'done') o.push({label: st === 'active' ? `About "${c.title}"` : 'Any work going?', fn: () => contractTalk(n), primary: st === 'active' && canComplete(c)});
+  }
+  if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
+  o.push({label:'Goodbye', fn: closeTalk});
+  return o;
+}
+const back = n => ({label:'Back', fn: () => say(n.hello[Math.min(tierOf(repOf(n.town)), 2)], mainOptions(n))});
+function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; renderHUD(); }
+
+function rumorTalk(n) {
+  const i = S.rumor[n.id] || 0;
+  S.rumor[n.id] = (i + 1) % n.rumors.length;
+  say(`“${esc(n.rumors[i])}”`, [{label: n.rumors.length > 1 ? 'Anything else?' : 'Thanks', fn: () => n.rumors.length > 1 ? rumorTalk(n) : say(n.hello[Math.min(tierOf(repOf(n.town)),2)], mainOptions(n))}, back(n)]);
+}
+
+function needHTML(c) {
+  const parts = Object.entries(c.need).map(([g,q]) => `<span>${swatch(g)}${q} ${GOODS[g].name} <b class="${have(g) >= q ? 'ok' : 'no'}">${have(g)}/${q}</b></span>`);
+  if (c.needCoin) parts.push(`<span>${c.needCoin} coin <b class="${S.coins >= c.needCoin ? 'ok' : 'no'}">${S.coins}/${c.needCoin}</b></span>`);
+  return `<div class="req">${parts.join('')}</div>`;
+}
+function rewardText(c) {
+  const r = c.reward, p = [];
+  if (r.coins) p.push(`${r.coins} coin`);
+  if (r.items) p.push(itemList(r.items));
+  if (r.flag === 'raft') p.push('a raft');
+  if (c.pact) p.push(`a pact with ${TOWNS[c.pact].name}`);
+  return p.join(' · ');
+}
+const canComplete = c => Object.entries(c.need).every(([g,q]) => have(g) >= q) && S.coins >= (c.needCoin || 0);
+
+function contractTalk(n) {
+  const id = n.contract, c = CONTRACTS[id], st = S.contracts[id];
+  if (!st) {
+    say(`“${esc(c.ask)}”${needHTML(c)}<div class="req"><span style="color:var(--brass)">Reward: ${esc(rewardText(c))}</span></div>`, [
+      {label:"It's a deal", primary:true, fn: () => { S.contracts[id] = 'active'; save(); toast(`New deal: <b>${esc(c.title)}</b>`); contractTalk(n); }},
+      {label:'Not right now', fn: () => say(n.hello[Math.min(tierOf(repOf(n.town)),2)], mainOptions(n))},
+    ]);
+  } else if (st === 'active') {
+    const ok = canComplete(c);
+    say((ok ? '“You have it? Let me see.”' : '“Still waiting on that. Here’s what I need.”') + needHTML(c), [
+      {label:'Hand it over', primary:true, disabled:!ok, fn: () => completeContract(n)},
+      back(n),
+    ]);
+  }
+}
+function completeContract(n) {
+  const id = n.contract, c = CONTRACTS[id], r = c.reward;
+  for (const g in c.need) addItem(g, -c.need[g]);
+  if (c.needCoin) S.coins -= c.needCoin;
+  if (r.coins) S.coins += r.coins;
+  if (r.items) for (const g in r.items) addItem(g, r.items[g]);
+  if (r.flag) S.flags[r.flag] = true;
+  if (r.reveal === 'shrine') { const L = LANDMARKS.find(l => l.id === 'shrine'); reveal(L.x+.5, L.y+.5, 4); S.flags.shrineMarked = true; }
+  addRep(n.town, r.rep || 0);
+  S.contracts[id] = 'done';
+  let extra = '';
+  if (c.pact && !S.pacts.includes(c.pact)) { S.pacts.push(c.pact); extra = `<br>Pact formed with ${TOWNS[c.pact].name} (${S.pacts.length}/${GOAL_PACTS})`; }
+  toast(`Deal done: <b>${esc(c.title)}</b><br><span style="color:var(--good)">+ ${esc(rewardText(c))}</span>${extra}`, 6000);
+  renderHUD(); save();
+  $('talkWho').querySelector('.tier').textContent = TIERS[tierOf(repOf(n.town))][1];
+  say(`“${esc(c.done)}”`, [back(n)]);
+}
+
+const charterReady = () => S.coins >= GOAL_COIN && S.pacts.length >= GOAL_PACTS;
+function charterTalk(n) {
+  const pc = Math.min(1, S.coins/GOAL_COIN), pp = Math.min(1, S.pacts.length/GOAL_PACTS);
+  const prog = `<div class="req"><span>Coin <b class="${pc>=1?'ok':'no'}">${S.coins}/${GOAL_COIN}</b></span><span>Pacts <b class="${pp>=1?'ok':'no'}">${S.pacts.length}/${GOAL_PACTS}</b></span></div>`;
+  if (charterReady()) {
+    say(`“Five hundred coin and three towns who'll vouch for you. I don't say this often: you've earned it.”${prog}`, [
+      {label:'Accept the Charter', primary:true, fn: () => { S.charter = true; save(); closeTalk(); showEnding(); }},
+      back(n),
+    ]);
+  } else {
+    say(`“The Charter of the Free Road lets its holder trade under guild protection in every town. I grant it to traders who prove two things: that they can make money, and that people trust them. Bring me ${GOAL_COIN} coin in your purse, and form pacts with ${GOAL_PACTS} settlements by doing them a real service. Ask the townsfolk if there's work.”${prog}`, [back(n)]);
+  }
+}
+
+/* ================= trading ================= */
+let trade = null;
+function openTrade(n) {
+  const st = S.npc[n.id];
+  if (st.patience <= 0) { say('“I\'ve had enough haggling for one day. Come back tomorrow.”', [back(n)]); return; }
+  trade = {n, give:{}, take:{}, coin:0, msg:'', counter:null};
+  $('talk').hidden = true; $('trade').hidden = false; mode = 'trade';
+  renderTrade();
+}
+function closeTrade() {
+  $('trade').hidden = true; trade = null;
+  if (talkNPC) { mode = 'talk'; $('talk').hidden = false; say(talkNPC.hello[Math.min(tierOf(repOf(talkNPC.town)),2)], mainOptions(talkNPC)); }
+  else mode = 'play';
+  renderHUD();
+}
+function mults(n) {
+  const rep = repOf(n.town);
+  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03), sell: 1.08 + n.greed*.25 - rep*.03};
+}
+function tradeVals() {
+  const n = trade.n, m = mults(n); let youGive = 0, theyGive = 0;
+  for (const g in trade.give) youGive += trade.give[g] * price(n.town, g) * m.buy;
+  for (const g in trade.take) theyGive += trade.take[g] * price(n.town, g) * m.sell;
+  return {youGive, theyGive};
+}
+function renderTrade() {
+  const n = trade.n, st = S.npc[n.id], m = mults(n), tw = TOWNS[n.town];
+  const tagFor = g => tw.produce.includes(g) ? '<span class="tag cheap">local</span>' : tw.demand.includes(g) ? '<span class="tag dear">wanted</span>' : '';
+  const mine = GK.filter(g => have(g) > 0);
+  const theirs = GK.filter(g => (st.stock[g] || 0) > 0);
+  const row = (g, side, max, unit) => {
+    const q = trade[side][g] || 0;
+    return `<div class="trow">${swatch(g)}<span class="nm">${GOODS[g].name}${tagFor(g)} <small>×${max}</small></span><span class="pr">${unit}◆</span>
+      <span class="qty"><button data-a="dec" data-s="${side}" data-g="${g}" aria-label="Less ${GOODS[g].name}">−</button><b>${q}</b><button data-a="inc" data-s="${side}" data-g="${g}" aria-label="More ${GOODS[g].name}">+</button></span></div>`;
+  };
+  const v = tradeVals();
+  const c = trade.coin;
+  const coinLbl = c > 0 ? `You pay <b>${c}</b> coin` : c < 0 ? `They pay you <b>${-c}</b> coin` : 'No coin changes hands';
+  const pips = Array.from({length:n.patience}, (_,i) => `<span class="pip ${i < st.patience ? 'on' : ''}"></span>`).join('');
+  $('tradeSheet').innerHTML = `
+    <div class="sheet-head"><h2>Trading with ${esc(n.name)}</h2>
+      <div style="font-size:13px;color:var(--muted)">Patience <span class="pips">${pips}</span> · Purse ${st.purse}◆ · ${TIERS[tierOf(repOf(n.town))][1]}</div></div>
+    <div class="tcols">
+      <div class="tcol"><h3>Your pack · they pay</h3>${mine.length ? mine.map(g => row(g,'give',have(g),Math.round(price(n.town,g)*m.buy))).join('') : '<div class="none">You have nothing to sell.</div>'}</div>
+      <div class="tcol"><h3>${esc(n.name)}'s goods · they ask</h3>${theirs.length ? theirs.map(g => row(g,'take',st.stock[g],Math.round(price(n.town,g)*m.sell))).join('') : '<div class="none">Sold out until tomorrow.</div>'}</div>
+    </div>
+    <div class="tsum">
+      <div class="vals">Your goods are worth <b>${Math.round(v.youGive)}</b>◆ to them · their goods are priced at <b>${Math.round(v.theyGive)}</b>◆</div>
+      <div class="coinrow"><span class="lbl">${coinLbl}</span>
+        <button class="btn" data-a="coin" data-v="-10">−10</button><button class="btn" data-a="coin" data-v="-1">−1</button>
+        <button class="btn" data-a="coin" data-v="1">+1</button><button class="btn" data-a="coin" data-v="10">+10</button>
+        <button class="btn" data-a="match" title="Set coin so both sides are equal at listed prices">Match value</button></div>
+      <div class="npcsay" id="npcSay">${trade.msg || `<span style="color:var(--muted)">Pick goods, set the coin, then make your offer. Offer a little less than listed and ${esc(n.name.split(' ').pop())} might still take it, but every refusal costs patience.</span>`}</div>
+      <div class="tacts">
+        ${trade.counter != null ? `<button class="btn primary" data-a="counter">Agree (${trade.counter > 0 ? '+' : ''}${trade.counter} coin)</button>` : ''}
+        <button class="btn" data-a="close">Done</button>
+        <button class="btn ${trade.counter != null ? '' : 'primary'}" data-a="propose">Make offer</button>
+      </div>
+    </div>`;
+}
+$('tradeSheet').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || !trade) return;
+  const a = b.dataset.a, n = trade.n, st = S.npc[n.id];
+  if (a === 'inc' || a === 'dec') {
+    const side = b.dataset.s, g = b.dataset.g, max = side === 'give' ? have(g) : (st.stock[g] || 0);
+    const q = (trade[side][g] || 0) + (a === 'inc' ? 1 : -1);
+    trade[side][g] = Math.max(0, Math.min(max, q)); if (!trade[side][g]) delete trade[side][g];
+    trade.counter = null;
+  } else if (a === 'coin') { trade.coin = Math.max(-st.purse, Math.min(S.coins, trade.coin + (+b.dataset.v))); trade.counter = null; }
+  else if (a === 'match') { const v = tradeVals(); trade.coin = Math.max(-st.purse, Math.min(S.coins, Math.ceil(v.theyGive - v.youGive - 1e-6))); trade.counter = null; }
+  else if (a === 'close') { closeTrade(); return; }
+  else if (a === 'propose') { propose(); return; }
+  else if (a === 'counter') { trade.coin += trade.counter; trade.counter = null; propose(true); return; }
+  renderTrade();
+});
+
+const LINES = {
+  accept: ["Done. Pleasure doing business.","Fair enough. Shake on it.","Deal. Don't spend it all at once.","Agreed."],
+  generous: ["That's more than fair. I'll remember it.","You're too kind. Come back anytime."],
+  reject: ["You must think I was born yesterday.","No. Not even close.","Try again, and try harder.","I'd rather keep it."],
+  counter: n => [`Close. Add ${n} coin and it's yours.`, `Almost. ${n} more coin and we shake.`],
+  counterPay: n => [`Close. I'll pay ${n} coin less and we have a deal.`],
+};
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+function propose(isCounter) {
+  const n = trade.n, st = S.npc[n.id];
+  const v = tradeVals(), c = trade.coin;
+  const empty = !Object.keys(trade.give).length && !Object.keys(trade.take).length;
+  if (empty && c === 0) { trade.msg = '“You\'re offering me nothing for nothing.”'; renderTrade(); return; }
+  if (c > S.coins) { trade.msg = '“You don\'t have that much coin.”'; renderTrade(); return; }
+  if (c < 0 && -c > st.purse) { trade.msg = `“I can't pay that. My purse holds ${st.purse} coin today.”`; renderTrade(); return; }
+  const required = v.theyGive + Math.max(0, -c), received = v.youGive + Math.max(0, c);
+  const threshold = required * (1 - (isCounter ? st.flex + .02 : st.flex));
+  if (received >= threshold - .01) {
+    // accept
+    for (const g in trade.give) { addItem(g, -trade.give[g]); st.stock[g] = (st.stock[g] || 0) + trade.give[g]; }
+    for (const g in trade.take) { addItem(g, trade.take[g]); st.stock[g] -= trade.take[g]; if (st.stock[g] <= 0) delete st.stock[g]; }
+    S.coins -= c; st.purse += c; S.trades++;
+    const size = Math.min(1, (v.youGive + v.theyGive + Math.abs(c)) / 120);
+    let line = pick(LINES.accept);
+    if (required > 0 && received > required * 1.15) { addRep(n.town, .25); line = pick(LINES.generous); }
+    addRep(n.town, .05 + size*.15);
+    trade.give = {}; trade.take = {}; trade.coin = 0; trade.counter = null;
+    trade.msg = `<span style="color:var(--good)">“${line}”</span>`;
+    renderHUD(); save(); renderTrade();
+  } else if (received >= required * .8) {
+    const missing = Math.ceil(threshold - received);
+    st.patience = Math.max(0, st.patience - (isCounter ? 0 : 1));
+    if (st.patience <= 0) { trade.msg = '<span style="color:var(--bad)">“Enough. Come back tomorrow.”</span>'; trade.counter = null; renderTrade(); setTimeout(() => trade && closeTrade(), 1300); return; }
+    if (c >= 0 && S.coins - c >= missing) { trade.counter = missing; trade.msg = `“${pick(LINES.counter(missing))}”`; }
+    else if (c < 0) { const m2 = Math.min(missing, -c); trade.counter = m2; trade.msg = `“${pick(LINES.counterPay(m2))}”`; if (m2 < missing) { trade.counter = null; trade.msg = '“Still not enough, even if I paid you nothing.”'; } }
+    else { trade.counter = null; trade.msg = `“Close. ${missing} more coin, but you don't have it.”`; }
+    renderTrade();
+  } else {
+    st.patience = Math.max(0, st.patience - 1);
+    trade.counter = null;
+    if (st.patience <= 0) { trade.msg = '<span style="color:var(--bad)">“Enough. Come back tomorrow.”</span>'; renderTrade(); setTimeout(() => trade && closeTrade(), 1300); return; }
+    trade.msg = `<span style="color:var(--bad)">“${pick(LINES.reject)}”</span>`;
+    renderTrade();
+  }
+}
+
+/* ================= journal & map ================= */
+function openJournal() {
+  mode = 'journal'; keys.clear();
+  const pc = Math.min(1, S.coins/GOAL_COIN), pp = Math.min(1, S.pacts.length/GOAL_PACTS);
+  const active = Object.entries(S.contracts).filter(([,s]) => s === 'active');
+  const done = Object.entries(S.contracts).filter(([,s]) => s === 'done');
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k]);
+  const found = LANDMARKS.filter(L => S.found[L.id]);
+  $('journalSheet').innerHTML = `
+    <div class="sheet-head"><h2>Trader's Journal</h2><button class="btn" data-close="journal">Close<kbd>J</kbd></button></div>
+    <h3>The Charter</h3>
+    <div class="jgrid"><div class="jcard goal">
+      ${S.charter ? '<div class="t done">Charter of the Free Road granted</div><div class="s">The road is yours. Keep exploring.</div>' : `
+      <div class="t">Earn the Charter of the Free Road</div>
+      <div class="s">Return to Odile Marrow in Port Wren.</div>
+      <div>Coin in purse: <b>${S.coins}</b> / ${GOAL_COIN}<div class="bar"><i style="width:${pc*100}%"></i></div></div>
+      <div>Pacts formed: <b>${S.pacts.length}</b> / ${GOAL_PACTS} ${S.pacts.length ? '· ' + S.pacts.map(k => TOWNS[k].name).join(', ') : ''}<div class="bar"><i style="width:${pp*100}%"></i></div></div>`}
+    </div>
+    <div class="jcard"><div class="t">Your travels</div><div class="s">Day ${S.day}</div>
+      Land explored: <b>${exploredPct()}%</b><br>Distance walked: <b>${(S.steps/10).toFixed(1)}</b> leagues<br>Trades made: <b>${S.trades}</b><br>Places found: <b>${found.length}</b> / ${LANDMARKS.length}${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}</div></div>
+    <h3>Open deals</h3>
+    ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
+    ${done.length ? `<h3>Completed</h3><div class="jgrid">${done.map(([id]) => `<div class="jcard"><span class="done">✓</span> ${esc(CONTRACTS[id].title)} <span class="s">· ${esc(NPC_BY[CONTRACTS[id].giver].name)}</span></div>`).join('')}</div>` : ''}
+    <h3>Market ledger</h3>
+    ${towns.length ? `<div class="jgrid">${towns.map(k => { const t = TOWNS[k], r = repOf(k); return `<div class="jcard"><div class="t">${t.name}${S.pacts.includes(k) ? ' <span class="done" style="font-size:12px">· pact</span>' : ''}</div>
+      <div class="s">${TIERS[tierOf(r)][1]} · standing ${r.toFixed(1)} / 5</div>
+      <div style="margin-top:4px">Cheap here: ${t.produce.map(g => `${swatch(g)} ${GOODS[g].name} ~${Math.round(price(k,g))}`).join(' &nbsp;')}</div>
+      <div>Pays well: ${t.demand.map(g => `${swatch(g)} ${GOODS[g].name} ~${Math.round(price(k,g))}`).join(' &nbsp;')}</div></div>`; }).join('')}</div>` : ''}
+    <h3>Places found</h3>
+    ${found.length ? `<div class="jgrid">${found.map(L => `<div class="jcard"><div class="t">${L.name}</div><div class="s">${esc(L.lore)}</div></div>`).join('')}</div>` : '<div class="none">Nothing yet. Look for glinting markers in the wild.</div>'}
+  `;
+  $('journalSheet').querySelector('[data-close]').addEventListener('click', () => closeModal('journal'));
+  $('journal').hidden = false;
+}
+function closeModal(id) { $(id).hidden = true; if (mode === 'journal' || mode === 'map') mode = 'play'; }
+
+function openMap() {
+  mode = 'map'; keys.clear();
+  $('mapView').hidden = false;
+  const c = $('bigmap'), wrap = $('mapWrap');
+  const availW = Math.min(wrap.clientWidth || 900, 960), availH = Math.max(200, innerHeight - 190);
+  const s = Math.max(2, Math.floor(Math.min(availW / W, availH / H) * dpr));
+  c.width = W*s; c.height = H*s;
+  c.style.width = (W*s/dpr) + 'px';
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.drawImage(mapCanvas, 0, 0, W*s, H*s);
+  g.font = `${Math.round(11*dpr)}px "Pixelify Sans", monospace`; g.textAlign = 'center';
+  for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) {
+    g.fillStyle = S.found[L.id] ? '#ebe4d3' : '#e3a948';
+    g.beginPath(); g.arc((L.x+.5)*s, (L.y+.5)*s, 3*dpr, 0, 7); g.fill();
+    if (!S.found[L.id]) { g.fillText('?', (L.x+.5)*s, (L.y-1)*s); }
+  }
+  for (const k in TOWNS) if (S.towns[k]) {
+    const t = TOWNS[k];
+    g.fillStyle = '#e3a948'; g.fillRect((t.x+.5)*s - 4*dpr, (t.y+.5)*s - 4*dpr, 8*dpr, 8*dpr);
+    g.strokeStyle = '#0d131b'; g.lineWidth = 2; g.strokeRect((t.x+.5)*s - 4*dpr, (t.y+.5)*s - 4*dpr, 8*dpr, 8*dpr);
+    g.fillStyle = '#0d131b'; g.fillText(t.name, (t.x+.5)*s + 1, (t.y+.5)*s - 8*dpr + 1);
+    g.fillStyle = '#ebe4d3'; g.fillText(t.name, (t.x+.5)*s, (t.y+.5)*s - 8*dpr);
+  }
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(S.x*s, S.y*s, 4*dpr, 0, 7); g.fill();
+  g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke();
+  $('mapLegend').textContent = `${exploredPct()}% of the land explored · ${Object.keys(S.towns).length} of ${Object.keys(TOWNS).length} settlements · ${LANDMARKS.filter(L => S.found[L.id]).length} of ${LANDMARKS.length} places found`;
+}
+
+/* ================= ending ================= */
+function showEnding() {
+  mode = 'ending';
+  $('endSheet').innerHTML = `
+    <h2 style="color:var(--brass)">Charter of the Free Road</h2>
+    <p style="font-size:15.5px;line-height:1.55;margin:12px 0">Odile presses the guild seal into warm wax. From today, your name is known in every market from Port Wren to Dunmere, and the towns that trusted you will say so to anyone who asks.</p>
+    <div class="jgrid">
+      <div class="jcard">Days on the road <b>${S.day}</b></div>
+      <div class="jcard">Coin <b>${S.coins}</b></div>
+      <div class="jcard">Land explored <b>${exploredPct()}%</b></div>
+      <div class="jcard">Pacts <b>${S.pacts.map(k => TOWNS[k].name).join(', ')}</b></div>
+      <div class="jcard">Places found <b>${LANDMARKS.filter(L => S.found[L.id]).length} / ${LANDMARKS.length}</b></div>
+      <div class="jcard">Trades <b>${S.trades}</b></div>
+    </div>
+    <p style="font-size:14px;color:var(--muted);margin:14px 0">${S.flags.tidestone ? 'You even quieted the Drowned Bell. Few traders ever reach the Sunken Isle.' : 'Rumor says a hermit waits on an island past the deep water, if you can find a way across.'}</p>
+    <div class="tacts"><button class="btn primary" id="btnKeep">Keep exploring</button></div>`;
+  $('ending').hidden = false;
+  $('btnKeep').addEventListener('click', () => { $('ending').hidden = true; mode = 'play'; });
+}
+
+/* ================= boot ================= */
+let last = 0;
+function loop(ts) {
+  const dt = Math.min(.05, (ts - last) / 1000 || 0); last = ts; frameT += dt;
+  if (mode === 'play') update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+function begin(state) {
+  S = state; lastTile = -1; nearNPC = null;
+  rebuildMapPixels();
+  reveal(S.x, S.y, 7.5);
+  S.towns.wren = true;
+  $('title').hidden = true; mode = 'play';
+  renderHUD(); renderRegion(); save();
+  if (!state.day || (state.day === 1 && state.trades === 0 && !Object.keys(state.contracts).length)) {
+    setTimeout(() => toast('<b>Port Wren</b><br>Talk to Odile, the Guildmistress, about the Charter. Ask around for work.', 7000), 400);
+  }
+}
+
+genWorld();
+renderTerrain();
+resize();
+S = freshState(); // backdrop for the title screen
+reveal(S.x, S.y, 12);
+const saved = loadSaved();
+if (saved) $('btnCont').hidden = false;
+$('btnNew').addEventListener('click', () => begin(freshState()));
+$('btnCont').addEventListener('click', () => begin(loadSaved() || freshState()));
+window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize() : null}));
+const hotData = window.claude?.hot?.data;
+if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
+renderHUD();
+window.__sw = {map, W, H, T, TOWNS, LANDMARKS, get S(){return S;}};
+requestAnimationFrame(loop);
+})();
+</script>
