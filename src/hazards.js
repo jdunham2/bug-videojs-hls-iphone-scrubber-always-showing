@@ -45,6 +45,12 @@ const SETS = [
   { barrel: 3, spikes: 2, spring: 1, drum: 1, ballista: 1 },
   { barrel: 2, spikes: 2, spring: 1, drum: 1, ballista: 1, ice: 4 },
   { barrel: 5, spikes: 1, spring: 1, drum: 1, ballista: 1, vent: 4 },
+  { barrel: 2, spikes: 4, spring: 2, drum: 1 }, // Whispering Marsh: sunken spike traps, fresh springs
+  { barrel: 3, spikes: 2, spring: 1, drum: 2, ballista: 1 }, // Autumn Hollow
+  { barrel: 7, spikes: 2, spring: 1, ballista: 1 }, // Deepdelve Mines: powder everywhere
+  { barrel: 5, spikes: 1, spring: 1, drum: 2, ballista: 2 }, // Stormwatch Harbor
+  { barrel: 2, spikes: 3, spring: 1, drum: 1, ballista: 1, vent: 3 }, // Sunscorch Canyon: hot vents
+  { barrel: 4, spikes: 1, spring: 1, ballista: 1, vent: 7 }, // Emberfall Caldera
 ];
 
 export class Hazards {

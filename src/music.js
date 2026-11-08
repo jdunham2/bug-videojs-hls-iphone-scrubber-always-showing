@@ -12,8 +12,14 @@ const THEMES = {
   keep: { bpm: 84, lift: 12, chords: [[57, 60, 64], [50, 53, 57], [53, 57, 60], [52, 56, 59]] },
   forge: { bpm: 108, lift: 0, chords: [[52, 55, 59], [53, 57, 60], [55, 59, 62], [53, 57, 60]] },
   camp: { bpm: 80, lift: 0, chords: [[53, 57, 60], [50, 53, 57], [46, 50, 53], [48, 52, 55]] },
+  marsh: { bpm: 76, lift: 0, chords: [[45, 48, 52], [41, 45, 48], [43, 47, 50], [40, 43, 47]] },
+  hollow: { bpm: 92, lift: 12, chords: [[55, 59, 62], [52, 55, 59], [48, 52, 55], [50, 54, 57]] },
+  mines: { bpm: 100, lift: -12, chords: [[50, 53, 57], [51, 55, 58], [48, 51, 55], [50, 53, 57]] },
+  harbor: { bpm: 88, lift: 0, chords: [[47, 50, 54], [43, 47, 50], [45, 49, 52], [42, 45, 49]] },
+  canyon: { bpm: 104, lift: 0, chords: [[52, 56, 59], [53, 57, 60], [50, 53, 57], [52, 56, 59]] },
+  caldera: { bpm: 116, lift: -12, chords: [[52, 55, 58], [53, 56, 60], [51, 55, 58], [52, 55, 58]] },
 };
-const THEME_BY_ARENA = ['ruins', 'keep', 'forge'];
+const THEME_BY_ARENA = ['ruins', 'keep', 'forge', 'marsh', 'hollow', 'mines', 'harbor', 'canyon', 'caldera'];
 const midi = (n) => 440 * 2 ** ((n - 69) / 12);
 
 export class Music {

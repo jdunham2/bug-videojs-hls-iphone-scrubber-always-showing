@@ -181,6 +181,16 @@ export class FlowMethods {
     const theme = (this.arena || 0) % THEMES.length;
     if (theme === 1) return ranged ? Archer : Math.random() < 0.7 ? Raider : Grunt;
     if (theme === 2) return ranged ? Bomber : Grunt;
+    // The newer dungeons mix the warbands: who you meet depends on the place.
+    const mix = {
+      3: [Archer, 0.3], // Marsh: bog-dwellers with bows, grunts in the reeds
+      4: [Archer, 0.6], // Hollow: hunters and raiders
+      5: [Bomber, 0.2], // Mines: powder-pot throwers
+      6: [Archer, 0.75], // Harbor: raiders off the boats
+      7: [Bomber, 0.5], // Canyon
+      8: [Bomber, 0.4], // Caldera
+    }[theme];
+    if (mix) return ranged ? mix[0] : Math.random() < mix[1] ? Raider : Grunt;
     return ranged ? Archer : Grunt;
   }
 

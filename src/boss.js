@@ -13,10 +13,17 @@ const tmp = new THREE.Vector3();
 
 export const BOSS_NAME = 'Gorvak the Ogre Warlord';
 /** Gorvak changes with each arena: a new name and a retextured skin (same rig). */
+/** One boss per dungeon (by arena theme): name, look and signature ranged attack. */
 export const BOSS_FORMS = [
-  { name: 'Gorvak the Ogre Warlord', sub: 'Warlord of the Ruins', outfit: null },
-  { name: 'Gorvak of the North', sub: 'Back from the frozen wastes', outfit: 'warlordNorth' },
-  { name: 'Gorvak the Forgemaster', sub: 'Clad in fresh-forged steel', outfit: 'warlordForge' },
+  { name: 'Gorvak the Ogre Warlord', sub: 'Warlord of the Ruins', outfit: null, barrage: 'rock' },
+  { name: 'Gorvak of the North', sub: 'Back from the frozen wastes', outfit: 'warlordNorth', barrage: 'icicle' },
+  { name: 'Gorvak the Forgemaster', sub: 'Clad in fresh-forged steel', outfit: 'warlordForge', barrage: 'pot' },
+  { name: 'Brogg the Bog-Lord', sub: 'King of the drowned reeds', outfit: null, tint: 0x9ab080, barrage: 'rock' },
+  { name: 'Thorne the Huntmaster', sub: 'Master of the autumn hunt', outfit: null, tint: 0xd8a070, barrage: 'stalactite' },
+  { name: 'Grimbold Deepdelve', sub: 'Foreman of the deep tunnels', outfit: 'warlordForge', tint: 0xb0a090, barrage: 'stalactite' },
+  { name: 'Captain Saltjaw', sub: 'Terror of the grey coast', outfit: 'warlordNorth', tint: 0xa8b8c8, barrage: 'pot' },
+  { name: 'Khazrak the Sand-King', sub: 'Lord of the sunscorched cliffs', outfit: null, tint: 0xe8c890, barrage: 'rock' },
+  { name: 'Gorvak Reforged', sub: 'Back for one last fight', outfit: 'warlordForge', tint: 0xff9a80, barrage: 'pot' },
 ];
 
 /** Ground warning shapes that fill up as an attack charges. */
@@ -153,17 +160,19 @@ class Shockwave {
  * Forgemaster lobs pots of burning oil that leave fire on the ground.
  * Every impact is telegraphed by a ring that fills as it falls.
  */
-const BARRAGE = [
-  { kind: 'rock', count: [3, 5], flight: 0.95, stagger: 0.22, r: 1.7, spread: 4.5, from: 'boss' },
-  { kind: 'icicle', count: [6, 9], flight: 1.15, stagger: 0.12, r: 1.3, spread: 7, from: 'sky' },
-  { kind: 'pot', count: [2, 3], flight: 1.0, stagger: 0.3, r: 2.2, spread: 3.5, from: 'boss' },
-];
+const BARRAGE = {
+  rock: { kind: 'rock', count: [3, 5], flight: 0.95, stagger: 0.22, r: 1.7, spread: 4.5, from: 'boss' },
+  icicle: { kind: 'icicle', count: [6, 9], flight: 1.15, stagger: 0.12, r: 1.3, spread: 7, from: 'sky' },
+  pot: { kind: 'pot', count: [2, 3], flight: 1.0, stagger: 0.3, r: 2.2, spread: 3.5, from: 'boss' },
+  // Rocks shaken loose from overhead by his stomp.
+  stalactite: { kind: 'stalactite', count: [5, 8], flight: 1.1, stagger: 0.14, r: 1.4, spread: 6.5, from: 'sky' },
+};
 
 class Barrage {
   constructor(game, boss, player) {
     this.game = game;
     this.boss = boss;
-    const def = (this.def = BARRAGE[boss.formIndex % BARRAGE.length]);
+    const def = (this.def = BARRAGE[boss.form.barrage] || BARRAGE.rock);
     const n = def.count[boss.phase === 2 ? 1 : 0];
     this.items = [];
     this.fires = [];
@@ -194,6 +203,9 @@ class Barrage {
     let mat;
     if (def.kind === 'rock') {
       geo = new THREE.IcosahedronGeometry(0.55, 0);
+      mat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 1, flatShading: true });
+    } else if (def.kind === 'stalactite') {
+      geo = new THREE.ConeGeometry(0.4, 1.4, 6).rotateX(Math.PI);
       mat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 1, flatShading: true });
     } else if (def.kind === 'icicle') {
       geo = new THREE.ConeGeometry(0.28, 1.8, 6).rotateX(Math.PI);
@@ -271,7 +283,7 @@ class Barrage {
     const P = G.player;
     const d = Math.hypot(P.pos.x - it.at.x, P.pos.z - it.at.z);
     if (d < def.r + PLAYER_RADIUS) this.boss.hurtPlayer(P, Math.round(config.boss.slamDamage * 0.55), new THREE.Vector3(P.pos.x - it.at.x, 0, P.pos.z - it.at.z).normalize());
-    G.onSlam(it.at, def.kind === 'icicle' ? 0.7 : 1);
+    G.onSlam(it.at, def.kind === 'icicle' || def.kind === 'stalactite' ? 0.7 : 1);
     G.sfx.slam(G.panAt(it.at));
     G.shake.add(0.18);
     const color = def.kind === 'icicle' ? [1.6, 2.2, 3] : def.kind === 'pot' ? [3, 1.2, 0.3] : 0x8a7458;
@@ -303,6 +315,7 @@ export class Boss extends Grunt {
     this.barrages = [];
     this.barrageCool = 4;
     this.displayName = this.form.name;
+    if (this.form.tint && this.model) for (const m of this.model.materials) m.color.multiply(new THREE.Color(this.form.tint));
     const o = outfits[this.form.outfit];
     if (o && this.model) {
       const mats = this.model.materials;
@@ -574,7 +587,7 @@ export class Boss extends Grunt {
       this.barrages.push(new Barrage(this.game, this, player));
       this.barrageCool = 7 + Math.random() * 3;
       this.game.sfx.sample('whoosh', { vol: 0.6, rate: 0.6, jitter: 0 });
-      if (this.formIndex === 1) this.game.sfx.bossRoar();
+      if (this.form.barrage === 'icicle' || this.form.barrage === 'stalactite') this.game.sfx.bossRoar();
       this.enter('recover');
     } else {
       this.summonCool = b.summonCooldown;

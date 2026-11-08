@@ -13,10 +13,11 @@ import { Preview } from './preview.js';
 import { interiorHtml, prepareInteriors } from './interiors.js';
 import { mapArt, prepareMapArt } from './worldmap-art.js';
 import { Room, ROOM_KINDS } from './rooms.js';
+import { BOSS_FORMS } from './boss.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
-import { MISSIONS, ENDLESS, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
+import { MISSIONS, ENDLESS, missionById, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon, PERKS, ROMAN_TIER } from './gear.js';
@@ -24,7 +25,31 @@ import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip,
 const rand = (a, b) => a + Math.random() * (b - a);
 const RADIUS = 15;
 
+/** The road network on the world map (neighbouring places). */
+const ROADS = [
+  ['ruins', 'keep'],
+  ['keep', 'forge'],
+  ['ruins', 'endless'],
+  ['ruins', 'daily'],
+  ['ruins', 'marsh'],
+  ['marsh', 'hollow'],
+  ['hollow', 'keep'],
+  ['keep', 'mines'],
+  ['mines', 'caldera'],
+  ['forge', 'caldera'],
+  ['forge', 'canyon'],
+  ['canyon', 'endless'],
+  ['endless', 'harbor'],
+  ['harbor', 'ruins'],
+];
+
 const MAP_ICONS = {
+  marsh: '<svg viewBox="0 0 24 24"><path d="M3 18 Q 12 14 21 18 M 3 21 Q 12 17 21 21" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 16 L 8 5 M 12 15 L 12 3 M 16 16 L 16 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="12" cy="4" rx="1.4" ry="2.4" fill="currentColor"/></svg>',
+  hollow: '<svg viewBox="0 0 24 24"><path d="M12 3 C 18 6, 20 12, 12 21 C 4 12, 6 6, 12 3 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 6 L 12 20 M 12 11 L 15 8 M 12 14 L 9 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  mines: '<svg viewBox="0 0 24 24"><path d="M4 9 C 8 4, 16 4, 20 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 6 L 12 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  harbor: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7 L 12 21 M 8 10 L 16 10 M 5 14 C 5 19, 19 19, 19 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  canyon: '<svg viewBox="0 0 24 24"><path d="M2 20 L 5 11 L 10 11 L 12 20 M 12 20 L 14 8 L 20 8 L 22 20 Z M 2 20 L 22 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="18" cy="4" r="1.6" fill="currentColor"/></svg>',
+  caldera: '<svg viewBox="0 0 24 24"><path d="M2 20 L 9 8 L 15 8 L 22 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 8 Q 12 11 14 8 M 12 6 C 11 4, 13 3, 12 1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   lock: '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/><path d="M8 11 V 8 a 4 4 0 0 1 8 0 V 11" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>',
   hero: '<svg viewBox="0 0 24 24"><path d="M8 4 Q 18 12 8 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M8 4 L 8 20 M 5 12 L 19 12 M 16 9.5 L 19 12 L 16 14.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   ruins: '<svg viewBox="0 0 24 24"><path d="M4 20 L 4 9 L 7 9 L 7 20 M 10 20 L 10 6 L 14 6 L 14 20 M 17 20 L 17 11 L 20 11 L 20 20 M 2 20 L 22 20" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
@@ -490,6 +515,12 @@ export class Camp {
       { id: 'ruins', when: m.ruins?.clear, name: 'A relic from the Sunken Ruins', build: () => this.decorProp('pillarBroken', 2.4, 8.2, 8.6, 0.6, 0.7) },
       { id: 'keep', when: m.keep?.clear, name: 'Ice from Frostpeak Keep', build: () => this.decorProp('iceCrystals', 1.6, 10.6, 6.2, 0.2, 0.8) },
       { id: 'forge', when: m.forge?.clear, name: 'A brazier from the Molten Forge', build: () => this.decorProp('forgeBrazier', 1.5, 2.2, 10.8, 0, 0.6) },
+      { id: 'marsh', when: m.marsh?.clear, name: "Brogg's reed banner", build: () => this.decorProp('wolfBanner', 2.6, 13.2, -4.2, -1.9, 0.4) },
+      { id: 'hollow', when: m.hollow?.clear, name: 'A hunting trophy from Autumn Hollow', build: () => this.decorProp('weaponPile', 1.2, -13.4, 4.6, 0.8, 0.6) },
+      { id: 'mines', when: m.mines?.clear, name: 'A mine cart of ore', build: () => this.decorProp('crates', 1.3, -3.4, 12.6, 0.3, 0.7) },
+      { id: 'harbor', when: m.harbor?.clear, name: "Saltjaw's powder kegs", build: () => this.decorProp('powderBarrel', 1.0, 4.6, 12.2, 0.2, 0.5) },
+      { id: 'canyon', when: m.canyon?.clear, name: 'Sandstone from Sunscorch Canyon', build: () => this.decorProp('rocks', 1.6, 12.8, -6.8, 0.4, 0.8) },
+      { id: 'caldera', when: m.caldera?.clear, name: 'A pillar of cooled lava', build: () => this.decorProp('lavaPillar', 3.2, -12.6, -1.4, 0.2, 0.7) },
       { id: 'banners', when: profile.bosses >= 3, name: 'War banners at the gate', build: () => [this.decorProp('wolfBanner', 3, -11.4, -6.6, 0.6, 0.4), this.decorProp('wolfBanner', 3, -6.6, -11.4, 0.9, 0.4)] },
       { id: 'drum', when: lv >= 5, name: 'A war drum', build: () => this.decorProp('warDrum', 1.3, -12, 2 - 5.5, 0.4, 0.7) },
       { id: 'ballista', when: lv >= 7, name: 'A ballista on watch', build: () => this.decorProp('ballista', 2.2, 10.4, -10, -2.3, 1.0) },
@@ -830,16 +861,27 @@ export class Camp {
       return `<button class="mnode ${sel.id === m.id ? 'sel' : ''} ${open ? '' : 'locked'} ${m.daily ? 'daily' : ''}" data-act="mission" data-v="${m.id}" style="left:${m.map.x}%;top:${m.map.y}%" ${open ? '' : 'disabled'}>
         <span class="mi">${open ? icon : MAP_ICONS.lock}</span><span class="mn">${m.name}</span>${badge}</button>`;
     };
-    const icons = { ruins: MAP_ICONS.ruins, keep: MAP_ICONS.keep, forge: MAP_ICONS.forge };
+    const icons = MAP_ICONS;
     // Roads between places, drawn in the art's 500x300 box; roads to locked places fade out.
+    // Roads between neighbouring places (a gentle bend each); a road is faded
+    // until both ends are open.
     const road = (a, b, open) => {
       const [x1, y1, x2, y2] = [a.map.x * 5, a.map.y * 3, b.map.x * 5, b.map.y * 3];
-      const d = `M${x1} ${y1} Q ${(x1 + x2) / 2} ${Math.min(y1, y2) * 1 - 36} ${x2} ${y2}`;
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const bend = len * 0.18;
+      const cx = (x1 + x2) / 2 + ((y2 - y1) / len) * bend;
+      const cy = (y1 + y2) / 2 - ((x2 - x1) / len) * bend;
+      const d = `M${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
       return `<path class="rd-under ${open ? '' : 'off'}" d="${d}"/><path class="rd ${open ? '' : 'off'}" d="${d}"/>`;
     };
     const daily = dailyMission();
-    const roads =
-      MISSIONS.slice(1).map((m, i) => road(MISSIONS[i], m, missionUnlocked(m))).join('') + road(MISSIONS[0], ENDLESS, true) + road(MISSIONS[0], daily, true);
+    const place = (id) => (id === 'endless' ? ENDLESS : id === 'daily' ? daily : missionById(id));
+    const isOpen = (p) => p === ENDLESS || p === daily || missionUnlocked(p);
+    const roads = ROADS.map(([a, b]) => {
+      const A = place(a);
+      const B = place(b);
+      return A && B ? road(A, B, isOpen(A) && isOpen(B)) : '';
+    }).join('');
     // Fog hides the places you haven't reached yet.
     const fog = MISSIONS.filter((m) => !missionUnlocked(m))
       .map((m) => `<div class="wfog" style="left:${m.map.x}%;top:${m.map.y}%"></div>`)
@@ -872,7 +914,8 @@ export class Camp {
         ${cp ? `<button data-act="continue">Continue · Wave ${cp.wave + 1}</button>` : ''}</div>`;
     } else {
       const st = missionStars(sel.id);
-      detail = `<h3>${sel.name}</h3><p>${sel.blurb}</p>
+      const boss = BOSS_FORMS[sel.theme % BOSS_FORMS.length];
+      detail = `<h3>${sel.name}</h3><p>${sel.blurb}</p><p class="mboss">Boss: <b>${boss.name}</b> · ${sel.waves} waves · enemies level ${sel.level + 1}+</p>
         <ul class="mobj">
           <li class="${st.clear ? 'done' : ''}">★ Defeat the boss (${sel.waves} waves)</li>
           <li class="${st.secret ? 'done' : ''}">★ Find the hidden treasure chest</li>

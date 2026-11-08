@@ -14,7 +14,7 @@ export const MODIFIERS = {
   ironWill: { name: 'Iron Will', text: 'No healing between waves, but 50% more gems.', noHeal: true, gems: 1.5 },
 };
 
-const THEME_NAMES = ['Sunken Ruins', 'Frostpeak Keep', 'Molten Forge'];
+const THEME_NAMES = ['Sunken Ruins', 'Frostpeak Keep', 'Molten Forge', 'Whispering Marsh', 'Autumn Hollow', 'Deepdelve Mines', 'Stormwatch Harbor', 'Sunscorch Canyon', 'Emberfall Caldera'];
 
 /** Today's date as YYYY-MM-DD (local time). */
 export function today() {
@@ -40,7 +40,7 @@ export function dailyMission(date = today()) {
   const keys = Object.keys(MODIFIERS);
   const a = keys.splice(Math.floor(rnd() * keys.length), 1)[0];
   const b = keys.splice(Math.floor(rnd() * keys.length), 1)[0];
-  const theme = Math.floor(rnd() * 3);
+  const theme = Math.floor(rnd() * THEME_NAMES.length); // any dungeon can host the trial
   return {
     id: 'daily',
     daily: true,

@@ -95,7 +95,10 @@ export class CombatMethods {
   onKill(enemy) {
     this.stats.kills++;
     this.bounty('kill');
-    if (enemy.elite) this.bounty('elite');
+    if (enemy.elite) {
+      this.bounty('elite');
+      this.stats.elites = (this.stats.elites || 0) + 1;
+    }
     if (enemy.isBoss) this.bounty('boss');
     else if (enemy.kind === 'archer' || enemy.kind === 'bomber') this.bounty(enemy.kind);
     // Field Dressing (gear): patch yourself up a little on every kill.

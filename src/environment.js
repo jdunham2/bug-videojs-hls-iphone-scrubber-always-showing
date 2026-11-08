@@ -97,7 +97,190 @@ export const THEMES = [
     ember: [3, 1.0, 0.2],
     embers: { color: [3, 1.2, 0.3], speed: 0.9 },
     mist: 0x6a3a2a,
+    explosive: true,
   },
+  {
+    name: 'Whispering Marsh',
+    pillar: 'pillarCarved',
+    broken: 'pillarBroken',
+    brazier: 'lantern',
+    wall: 'wall',
+    coverA: 'rocks',
+    coverB: 'barrel',
+    decor: 'rocks',
+    decorSize: 0.7,
+    statue: 'statue',
+    tree: 'deadTree',
+    treeScale: 1.15,
+    banners: false,
+    layout: 1,
+    grass: [0.05, 0.12, 0.06, 0.2, 0.32, 0.12],
+    floor: { hue: [75, 110], sat: [10, 24], light: [16, 28], base: '#121a10', accent: 'moss' },
+    ground: 'mud',
+    fog: 0x13201a,
+    bg: 0x0b130e,
+    rim: 0x9fe0b0,
+    hemi: [0x9fc8a8, 0x1a2414, 0.8],
+    sun: [0xd0e4b8, 1.5],
+    fireLight: 0xffaa50,
+    ember: [3, 1.4, 0.3],
+    embers: { color: [1.8, 2.6, 0.6], speed: 0.12 }, // fireflies
+    mist: 0x8fb89a,
+  },
+  {
+    name: 'Autumn Hollow',
+    pillar: 'pillarCarved',
+    broken: 'pillarBroken',
+    brazier: 'brazier',
+    wall: 'wall',
+    coverA: 'crates',
+    coverB: 'barrel',
+    decor: 'weaponPile',
+    decorSize: 0.9,
+    statue: 'statue',
+    tree: 'deadTree',
+    banners: true,
+    layout: 2,
+    grass: [0.3, 0.16, 0.05, 0.75, 0.42, 0.1],
+    floor: { hue: [24, 40], sat: [18, 32], light: [26, 38], base: '#1e1610', accent: 'leaves' },
+    ground: 'leaves',
+    fog: 0x22160c,
+    bg: 0x170f08,
+    rim: 0xffc890,
+    hemi: [0xffd8a8, 0x2a1a0c, 0.9],
+    sun: [0xffc080, 2.4],
+    fireLight: 0xff9a40,
+    ember: [3, 1.3, 0.25],
+    embers: { color: [3, 1.3, 0.25], speed: -0.35 }, // falling leaves
+    mist: 0xc8a070,
+  },
+  {
+    name: 'Deepdelve Mines',
+    pillar: 'pillarCarved',
+    broken: 'rocks',
+    brazier: 'lantern',
+    wall: 'wall',
+    coverA: 'crates',
+    coverB: 'powderBarrel',
+    decor: 'rocks',
+    decorSize: 0.8,
+    statue: 'kingStatue',
+    tree: 'rocks',
+    treeScale: 0.5,
+    banners: false,
+    explosive: true,
+    layout: 3,
+    grass: null,
+    floor: { hue: [28, 44], sat: [6, 14], light: [14, 24], base: '#100d0b', accent: 'dust' },
+    ground: 'stone',
+    fog: 0x0a0908,
+    bg: 0x060505,
+    rim: 0xffd8a0,
+    hemi: [0xb0a088, 0x100c08, 0.55],
+    sun: [0xffc890, 1.0],
+    fireLight: 0xffb060,
+    ember: [3, 1.5, 0.4],
+    embers: { color: [1.2, 1.1, 0.9], speed: 0.08 }, // drifting dust
+    mist: 0x3a3028,
+  },
+  {
+    name: 'Stormwatch Harbor',
+    pillar: 'pillarCarved',
+    broken: 'pillarBroken',
+    brazier: 'brazier',
+    wall: 'wall',
+    coverA: 'crates',
+    coverB: 'barrel',
+    decor: 'weaponPile',
+    decorSize: 0.9,
+    statue: 'statue',
+    tree: 'deadTree',
+    treeScale: 0.9,
+    banners: true,
+    layout: 4,
+    grass: [0.12, 0.2, 0.18, 0.3, 0.42, 0.36],
+    floor: { hue: [195, 215], sat: [6, 14], light: [22, 34], base: '#141a1e', accent: 'wet' },
+    ground: 'sand',
+    fog: 0x0e1620,
+    bg: 0x0a1018,
+    rim: 0x9fc8ff,
+    hemi: [0x9fb8d8, 0x141c24, 0.85],
+    sun: [0xb8d0ff, 1.5],
+    fireLight: 0xffa050,
+    ember: [3, 1.3, 0.3],
+    embers: { color: [1.3, 1.5, 1.9], speed: -2.6 }, // rain
+    mist: 0x8aa0b8,
+  },
+  {
+    name: 'Sunscorch Canyon',
+    pillar: 'pillarCarved',
+    broken: 'pillarBroken',
+    brazier: 'brazier',
+    wall: 'wall',
+    coverA: 'rocks',
+    coverB: 'barrel',
+    decor: 'weaponPile',
+    decorSize: 0.9,
+    statue: 'kingStatue',
+    tree: 'rocks',
+    treeScale: 0.7,
+    banners: true,
+    layout: 1,
+    grass: [0.45, 0.38, 0.15, 0.85, 0.72, 0.32],
+    floor: { hue: [24, 38], sat: [24, 38], light: [30, 42], base: '#30220f', accent: 'sand' },
+    ground: 'sand',
+    fog: 0x4a3420,
+    bg: 0x3a2818,
+    rim: 0xffe0a0,
+    hemi: [0xffe8c0, 0x5a3a20, 0.95],
+    sun: [0xfff0c8, 2.4],
+    fireLight: 0xffa040,
+    ember: [3, 1.4, 0.3],
+    embers: { color: [2.2, 1.8, 1.1], speed: 0.25 }, // blowing dust
+    mist: 0xd8b080,
+  },
+  {
+    name: 'Emberfall Caldera',
+    pillar: 'lavaPillar',
+    broken: 'rocks',
+    brazier: 'forgeBrazier',
+    wall: 'forgeWall',
+    coverA: 'rocks',
+    coverB: 'powderBarrel',
+    decor: 'rocks',
+    decorSize: 0.7,
+    statue: 'kingStatue',
+    tree: 'rocks',
+    treeScale: 0.4,
+    banners: false,
+    explosive: true,
+    layout: 2,
+    grass: null,
+    floor: { hue: [0, 14], sat: [14, 30], light: [10, 20], base: '#0c0606', accent: 'lava' },
+    ground: 'ash',
+    fog: 0x200806,
+    bg: 0x160404,
+    rim: 0xff7040,
+    hemi: [0xff9070, 0x200404, 0.65],
+    sun: [0xff8050, 1.4],
+    fireLight: 0xff5a18,
+    ember: [3, 0.9, 0.15],
+    embers: { color: [3, 0.9, 0.15], speed: 1.4 },
+    mist: 0x5a2018,
+  },
+];
+
+/**
+ * Pillar layouts: the first four are the tall torch pillars, the last two short
+ * stumps. Different dungeons stand them in different places so each fight plays
+ * a little differently (cover, sight lines, room to roll).
+ */
+const LAYOUTS = [
+  [[-7, -7], [7, -7], [-7, 7], [7, 7], [0, -11], [-11, 1]],
+  [[0, -8.5], [8.5, 0], [0, 8.5], [-8.5, 0], [-9.5, -9.5], [5, -11]],
+  [[-4, -9], [4, -9], [-4, 9], [4, 9], [-11, -3], [11, 3]],
+  [[-10, -4.5], [10, -4.5], [-10, 4.5], [10, 4.5], [0, -10.5], [0, 10.5]],
+  [[-9, -9], [5, -6], [-6, 5], [9, 9], [2, -12], [-12, -2]],
 ];
 
 const floorCache = {};
@@ -135,6 +318,7 @@ export class Environment {
     this.clear();
     this.themeIndex = themeIndex;
     this.active = true;
+    this.applyLayout();
     this.lighting();
     this.floor();
     this.architecture();
@@ -144,6 +328,23 @@ export class Environment {
     this.mist();
     this.lightShafts();
     return true;
+  }
+
+  /** Stand the arena's pillars where this dungeon's layout puts them (collision, torches and all). */
+  applyLayout() {
+    const L = LAYOUTS[(this.theme.layout || 0) % LAYOUTS.length];
+    const W = this.world;
+    W.pillarGroups.forEach(({ group, layout }, i) => {
+      const [x, z] = L[i] || [layout.x, layout.z];
+      layout.x = x;
+      layout.z = z;
+      group.position.set(x, 0, z);
+      if (pillars[i]) {
+        pillars[i].x = x;
+        pillars[i].z = z;
+      }
+    });
+    for (const t of W.torches) t.dir.set(-t.pillar.x, 0, -t.pillar.z).normalize();
   }
 
   clear() {
@@ -234,7 +435,7 @@ export class Environment {
       t.light.distance = 14;
       pillars.push({ x, z, r: 0.6, h: 1.2 });
       this.fires.push({ pos: new THREE.Vector3(x, 1.2, z) });
-      t.base = this.themeIndex === 2 ? 30 : 24;
+      t.base = this.theme.explosive ? 30 : 24;
     }
 
     // Walls: tall ruined walls on the two far sides, gates in the middle.
@@ -268,7 +469,7 @@ export class Environment {
     const H = ARENA_HALF;
     // Cover near the corners (they block arrows like pillars do).
     const A = this.id('coverA');
-    const B = this.themeIndex === 2 ? 'barrel' : this.id('coverB'); // forge barrels explode: those are hazards, not cover
+    const B = this.theme.explosive ? 'barrel' : this.id('coverB'); // powder barrels explode: those are hazards, not cover
     const cover = [
       [A, 1.8, -H + 1.6, -H + 1.6, 0.95],
       [B, 1.1, -H + 3.6, -H + 1.2, 0.5],
@@ -579,7 +780,7 @@ function floorTextures(pal = THEMES[0].floor) {
         const mx = x0 + (Math.random() < 0.5 ? 0 : w);
         const my = y0 + Math.random() * h;
         const grad = gc.createRadialGradient(mx, my, 0, mx, my, rand(20, 50));
-        const tint = pal.accent === 'frost' ? '220,235,255' : pal.accent === 'lava' ? '40,20,14' : '70,95,40';
+        const tint = { frost: '220,235,255', lava: '40,20,14', leaves: '190,90,25', sand: '230,200,140', wet: '120,150,180', dust: '50,42,34' }[pal.accent] || '70,95,40';
         grad.addColorStop(0, `rgba(${tint},0.55)`);
         grad.addColorStop(1, `rgba(${tint},0)`);
         gc.fillStyle = grad;
@@ -686,6 +887,10 @@ function grassTexture(kind = 'grass') {
     grass: { base: '#1f2a17', h: [70, 110], s: [25, 45], l: [10, 24] },
     snow: { base: '#b8c6d4', h: [200, 220], s: [10, 25], l: [70, 92] },
     ash: { base: '#1a1412', h: [10, 30], s: [5, 20], l: [6, 18] },
+    mud: { base: '#161a10', h: [60, 100], s: [15, 35], l: [8, 18] },
+    leaves: { base: '#2a1a0c', h: [15, 40], s: [45, 75], l: [18, 38] },
+    stone: { base: '#14110f', h: [20, 40], s: [5, 12], l: [8, 18] },
+    sand: { base: '#8a6a40', h: [30, 42], s: [30, 50], l: [40, 62] },
   }[kind];
   g.fillStyle = look.base;
   g.fillRect(0, 0, 256, 256);

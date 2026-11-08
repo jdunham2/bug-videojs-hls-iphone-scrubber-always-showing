@@ -19,7 +19,20 @@ function bakeBitmap(url) {
       const c = document.createElement('canvas');
       c.width = 1500;
       c.height = 900;
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const g = c.getContext('2d');
+      // JPEG has no transparency: lay the parchment down first (as the map's CSS does).
+      const grad = g.createLinearGradient(0, 0, c.width, c.height);
+      grad.addColorStop(0, '#ead8a8');
+      grad.addColorStop(0.55, '#d8bf86');
+      grad.addColorStop(1, '#c4a468');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, c.width, c.height);
+      const hl = g.createRadialGradient(c.width * 0.3, c.height * 0.3, 0, c.width * 0.3, c.height * 0.3, c.width * 0.6);
+      hl.addColorStop(0, 'rgba(255,245,210,0.35)');
+      hl.addColorStop(1, 'rgba(255,245,210,0)');
+      g.fillStyle = hl;
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
       bitmap = c.toDataURL('image/jpeg', 0.88);
       const el = document.querySelector('.wmap img.wart');
       if (el) el.src = bitmap;
@@ -139,6 +152,36 @@ export function mapArt() {
   // Hills and forests.
   s += hills(40, 210, 3) + hills(200, 200, 3) + hills(320, 150, 4) + hills(150, 140, 2) + hills(455, 205, 3);
   s += forest(70, 120, 16, 22) + forest(150, 112, 9, 14) + forest(40, 80, 8, 12) + forest(312, 232, 12, 18) + forest(200, 236, 8, 12) + forest(360, 270, 7, 11) + forest(180, 160, 6, 9);
+  // The newer dungeons' lands.
+  // Whispering Marsh (60,132): still pools and reeds.
+  for (const [x, y, rx] of [[52, 128, 14], [72, 140, 10], [44, 146, 8], [80, 124, 7]]) {
+    s += `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${rx * 0.45}" fill="#6f8f80" opacity=".75" stroke="#3e5e50" stroke-width=".6"/>`;
+    for (let k = 0; k < 4; k++) s += `<path d="M${x - rx + R(0, rx * 2)} ${y - rx * 0.2} l ${R(-1, 1)} -5" stroke="#4a5a2a" stroke-width=".7"/>`;
+  }
+  // Autumn Hollow (180,141): woods in red and gold.
+  const autumn = (cx, cy, n, spread) => {
+    let g = '';
+    const pts = Array.from({ length: n }, () => [cx + R(-spread, spread), cy + R(-spread * 0.55, spread * 0.55)]).sort((a, b) => a[1] - b[1]);
+    for (const [x, y] of pts) {
+      const sz = R(3, 4.4);
+      const col = ['#c8602a', '#d8902a', '#a8401e', '#e0a83a'][Math.floor(R(0, 4))];
+      g += `<rect x="${x - 0.5}" y="${y}" width="1" height="${sz * 0.7}" fill="#4a3a22"/><circle cx="${x}" cy="${y}" r="${sz}" fill="${col}"/><path d="M${x} ${y - sz} A ${sz} ${sz} 0 0 1 ${x} ${y + sz} Z" fill="#000" opacity=".15"/>`;
+    }
+    return g;
+  };
+  s += autumn(170, 128, 12, 16) + autumn(204, 150, 7, 10);
+  // Deepdelve Mines (330,39): a timbered entrance in the mountainside, with cart rails.
+  s += peak(338, 50, 34, 26, true) + peak(318, 52, 26, 18, false);
+  s += `<path d="M323 52 L 323 44 Q 330 37 337 44 L 337 52 Z" fill="#1a120a"/><path d="M322 52 L 322 43 L 338 43 L 338 52" fill="none" stroke="#6a4a24" stroke-width="1.6"/>`;
+  s += `<path d="M330 52 L 326 66 M 334 52 L 338 66" stroke="#5a4a3a" stroke-width=".7"/><g stroke="#5a4a3a" stroke-width=".5">${[55, 58, 61, 64].map((y) => `<line x1="${327 - (y - 52) * 0.1}" y1="${y}" x2="${337 + (y - 52) * 0.1}" y2="${y}"/>`).join('')}</g>`;
+  // Stormwatch Harbor (145,264): piers into the bay and a couple of longships.
+  s += `<g stroke="#5a3a1e" stroke-width="2.2" stroke-linecap="square"><line x1="140" y1="258" x2="124" y2="272"/><line x1="152" y1="266" x2="138" y2="282"/></g>`;
+  s += `<g fill="#6a4a2a" stroke="#2e2010" stroke-width=".5"><path d="M110 280 q 8 5 16 0 l -2 3 q -6 3 -12 0 Z"/><path d="M122 290 q 8 5 16 0 l -2 3 q -6 3 -12 0 Z"/></g><g fill="#efe2c4"><path d="M118 279 l 0 -9 l 5 6 Z"/><path d="M130 289 l 0 -9 l 5 6 Z"/></g>`;
+  // Sunscorch Canyon (365,258): flat-topped mesas in red rock.
+  for (const [x, y, w, h] of [[352, 266, 22, 12], [378, 262, 16, 15], [396, 272, 18, 9], [336, 276, 14, 8]]) {
+    s += `<path d="M${x - w / 2} ${y} L ${x - w / 2 + 3} ${y - h} L ${x + w / 2 - 3} ${y - h} L ${x + w / 2} ${y} Z" fill="#c8703a" stroke="#6a3014" stroke-width=".7"/><path d="M${x + w / 2 - 3} ${y - h} L ${x + w / 2} ${y} L ${x + 1} ${y} Z" fill="#8a4422"/><line x1="${x - w / 2 + 2}" y1="${y - h * 0.5}" x2="${x + w / 2 - 2}" y2="${y - h * 0.5}" stroke="#6a3014" stroke-width=".4" opacity=".6"/>`;
+  }
+
   // The siege wall across the southern plain (Endless Siege at 250,246).
   s += `<path d="M196 262 L 304 262" stroke="#6b5434" stroke-width="3"/>`;
   for (const x of [196, 222, 278, 304]) s += `<rect x="${x - 3.5}" y="255" width="7" height="11" fill="#8a7454" stroke="#4a3a22" stroke-width=".7"/><path d="M${x - 4.5} 255 h 9 v -2 h -2 v 1 h -2 v -1 h -1 v 1 h -2 v -1 h -2 Z" fill="#8a7454"/>`;
@@ -152,9 +195,11 @@ export function mapArt() {
   const label = (x, y, t, size = 9, rot = 0, extra = '') => `<text x="${x}" y="${y}" transform="rotate(${rot} ${x} ${y})" text-anchor="middle" font-size="${size}" ${extra}>${t}</text>`;
   s += `<g class="wm-labels" fill="#4a2e14" font-family="'IM Fell English', Georgia, serif" font-style="italic" opacity=".78">
     ${label(52, 248, 'The Grey Sea', 11, -28, 'fill="#2e4a4a" letter-spacing="1.5"')}
-    ${label(356, 66, 'The Frostpeaks', 9, 14, 'letter-spacing="2"')}
+    ${label(196, 52, 'The Frostpeaks', 9, -8, 'letter-spacing="2"')}
     ${label(456, 226, 'The Ashlands', 10, 0, 'letter-spacing="1.5"')}
-    ${label(92, 150, 'Greenwood', 9, -8)}
+    ${label(132, 118, 'Greenwood', 9, -8)}
+    ${label(40, 108, 'The Marshes', 8, -6, 'fill="#3a4a2a"')}
+    ${label(392, 286, 'Sunscorch', 8, 0, 'fill="#7a3a14"')}
     ${label(330, 214, 'Low Meadows', 8, 6)}
     ${label(172, 196, 'River Wend', 7, -38, 'fill="#3e5e64"')}
   </g>`;
