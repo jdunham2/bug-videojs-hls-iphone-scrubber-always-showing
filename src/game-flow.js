@@ -189,6 +189,12 @@ export class FlowMethods {
       6: [Archer, 0.75], // Harbor: raiders off the boats
       7: [Bomber, 0.5], // Canyon
       8: [Bomber, 0.4], // Caldera
+      9: [Archer, 0.4], // Verdant Temple
+      10: [Bomber, 0.7], // Shipwreck Cove: pirates with powder pots
+      11: [Archer, 0.2], // Glowcap Grove
+      12: [Archer, 0.55], // Sandsea Oasis
+      13: [Bomber, 0.3], // Clockwork Foundry
+      14: [Archer, 0.65], // Misty Highlands
     }[theme];
     if (mix) return ranged ? mix[0] : Math.random() < mix[1] ? Raider : Grunt;
     return ranged ? Archer : Grunt;

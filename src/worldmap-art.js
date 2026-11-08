@@ -4,15 +4,15 @@
 // compass rose and region names. Drawn once (seeded, so nothing jumps between
 // redraws) in a 500x300 box that matches the map's 5:3 frame.
 
-let cached = null;
-let bitmap = null;
+const cached = {}; // per region: the map's HTML
+const bitmap = {}; // per region: the baked JPEG
 
 /**
  * Turn the painted SVG into a JPEG once. An SVG <img> is vector: the browser
  * re-rasterises it (paper-grain filters and all) whenever anything near it
  * animates, which made the map screen crawl. A bitmap never does.
  */
-function bakeBitmap(url) {
+function bakeBitmap(url, region) {
   const img = new Image();
   img.onload = () => {
     try {
@@ -33,9 +33,9 @@ function bakeBitmap(url) {
       g.fillStyle = hl;
       g.fillRect(0, 0, c.width, c.height);
       g.drawImage(img, 0, 0, c.width, c.height);
-      bitmap = c.toDataURL('image/jpeg', 0.88);
-      const el = document.querySelector('.wmap img.wart');
-      if (el) el.src = bitmap;
+      bitmap[region] = c.toDataURL('image/jpeg', 0.88);
+      const el = document.querySelector(`.wmap[data-region="${region}"] img.wart`);
+      if (el) el.src = bitmap[region];
     } catch {
       // Keep the SVG if the canvas can't be read back.
     }
@@ -45,7 +45,8 @@ function bakeBitmap(url) {
 
 /** Start baking early (camp build) so the map is ready the first time it opens. */
 export function prepareMapArt() {
-  mapArt();
+  mapArt(1);
+  setTimeout(() => mapArt(2), 600);
 }
 
 function seeded(seed) {
@@ -56,10 +57,20 @@ function seeded(seed) {
   };
 }
 
-/** Map art as an HTML string; once baked, the painted layer is a plain bitmap. */
-export function mapArt() {
-  if (cached && bitmap) return cached.replace(/<img class="wart" alt="" src="[^"]*">/, `<img class="wart" alt="" src="${bitmap}">`);
-  if (cached) return cached;
+/** Map art for a region as an HTML string; once baked, the painted layer is a plain bitmap. */
+export function mapArt(region = 1) {
+  if (cached[region] && bitmap[region]) return cached[region].replace(/<img class="wart" alt="" src="[^"]*">/, `<img class="wart" alt="" src="${bitmap[region]}">`);
+  if (cached[region]) return cached[region];
+  const { s, anim } = region === 2 ? farReaches() : borderlands();
+  // The painted layers go into an <img>: the browser rasterises it once, so its
+  // paper-grain filters never re-run. Only the light animated bits stay live SVG.
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.replace('<svg class="wart"', '<svg xmlns="http://www.w3.org/2000/svg"'))}`;
+  bakeBitmap(url, region);
+  cached[region] = `<img class="wart" alt="" src="${url}"><svg class="wart wanim" viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true"><defs><radialGradient id="wm-lava" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb04a" stop-opacity=".9"/><stop offset=".5" stop-color="#e0501a" stop-opacity=".35"/><stop offset="1" stop-color="#e0501a" stop-opacity="0"/></radialGradient></defs>${anim}</svg>`;
+  return cached[region];
+}
+
+function borderlands() {
   const r = seeded(7);
   const R = (a, b) => a + r() * (b - a);
 
@@ -209,10 +220,111 @@ export function mapArt() {
   <rect width="500" height="300" fill="url(#wm-edge)"/>
   <rect x="4" y="4" width="492" height="292" fill="none" stroke="#5a3a18" stroke-width="1.2" opacity=".6"/><rect x="7" y="7" width="486" height="286" fill="none" stroke="#5a3a18" stroke-width=".5" opacity=".5"/>
 </svg>`;
-  // The painted layers go into an <img>: the browser rasterises it once, so its
-  // paper-grain filters never re-run. Only the light animated bits stay live SVG.
-  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.replace('<svg class="wart"', '<svg xmlns="http://www.w3.org/2000/svg"'))}`;
-  bakeBitmap(url);
-  cached = `<img class="wart" alt="" src="${url}"><svg class="wart wanim" viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true"><defs><radialGradient id="wm-lava" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb04a" stop-opacity=".9"/><stop offset=".5" stop-color="#e0501a" stop-opacity=".35"/><stop offset="1" stop-color="#e0501a" stop-opacity="0"/></radialGradient></defs>${anim}</svg>`;
-  return cached;
+  return { s, anim };
+}
+
+/**
+ * The Far Reaches, over the mountains: the Emerald Jungle and its temple in
+ * the north-west, a mushroom wood in the west, desert dunes and an oasis in
+ * the south, a smoking foundry in the middle, misty peaks in the north-east
+ * and the Shimmering Sea along the east coast with a wreck on the beach.
+ */
+function farReaches() {
+  const r = seeded(31);
+  const R = (a, b) => a + r() * (b - a);
+  const tree = (x, y, sz, col, shade) =>
+    `<rect x="${x - 0.5}" y="${y}" width="1" height="${sz * 0.7}" fill="#4a3a22"/><circle cx="${x}" cy="${y}" r="${sz}" fill="${col}"/><path d="M${x} ${y - sz} A ${sz} ${sz} 0 0 1 ${x} ${y + sz} Z" fill="${shade}"/>`;
+  const wood = (cx, cy, n, spread, cols) => {
+    let g = '';
+    const pts = Array.from({ length: n }, () => [cx + R(-spread, spread), cy + R(-spread * 0.55, spread * 0.55)]).sort((a, b) => a[1] - b[1]);
+    for (const [x, y] of pts) g += tree(x, y, R(3, 4.6), cols[Math.floor(R(0, cols.length))], 'rgba(0,0,0,.18)');
+    return g;
+  };
+  const peak = (x, base, w, h, snow) => {
+    const tx = x + R(-w * 0.08, w * 0.08);
+    let g = `<path d="M${x - w / 2} ${base} L ${tx} ${base - h} L ${x + w / 2} ${base} Z" fill="#8a8a7a"/><path d="M${tx} ${base - h} L ${x + w / 2} ${base} L ${tx + w * 0.05} ${base} Z" fill="#62625a"/>`;
+    if (snow) g += `<path d="M${tx} ${base - h} L ${tx - w * 0.17} ${base - h * 0.66} L ${tx + w * 0.02} ${base - h * 0.62} L ${tx + w * 0.17} ${base - h * 0.66} Z" fill="#f4f1e8"/>`;
+    return g + `<path d="M${x - w / 2} ${base} L ${tx} ${base - h} L ${x + w / 2} ${base}" fill="none" stroke="#3a3a2e" stroke-width=".8" stroke-linejoin="round"/>`;
+  };
+  const label = (x, y, t, size = 9, rot = 0, extra = '') => `<text x="${x}" y="${y}" transform="rotate(${rot} ${x} ${y})" text-anchor="middle" font-size="${size}" ${extra}>${t}</text>`;
+  // The Shimmering Sea along the east and south-east.
+  const coast = 'M500 120 C 470 130, 452 150, 446 172 S 420 206, 404 214 S 372 246, 352 262 S 328 286, 322 300 L 500 300 Z';
+  let s = `<svg class="wart" viewBox="0 0 500 300" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <filter id="fr-paper" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" seed="5"/><feColorMatrix values="0 0 0 0 .35  0 0 0 0 .24  0 0 0 0 .12  0 0 0 .22 0"/></filter>
+    <filter id="fr-stain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="3" seed="17"/><feColorMatrix values="0 0 0 0 .42  0 0 0 0 .28  0 0 0 0 .1  0 0 0 -1.6 .9"/></filter>
+    <radialGradient id="fr-edge" cx="50%" cy="50%" r="65%"><stop offset=".62" stop-color="#2a1606" stop-opacity="0"/><stop offset=".9" stop-color="#3a2008" stop-opacity=".45"/><stop offset="1" stop-color="#1a0c02" stop-opacity=".85"/></radialGradient>
+    <linearGradient id="fr-sea" x1="1" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#8fbcc0"/><stop offset="1" stop-color="#5a90a0"/></linearGradient>
+    <radialGradient id="fr-jungle" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3f7a3a" stop-opacity=".6"/><stop offset="1" stop-color="#3f7a3a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="fr-sand" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#e8c070" stop-opacity=".75"/><stop offset="1" stop-color="#e8c070" stop-opacity="0"/></radialGradient>
+    <radialGradient id="fr-glow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#5a6aa8" stop-opacity=".5"/><stop offset="1" stop-color="#5a6aa8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="fr-mist" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f4f6fa" stop-opacity=".7"/><stop offset="1" stop-color="#f4f6fa" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="500" height="300" filter="url(#fr-stain)"/>
+  <ellipse cx="120" cy="80" rx="140" ry="85" fill="url(#fr-jungle)"/>
+  <ellipse cx="230" cy="240" rx="150" ry="70" fill="url(#fr-sand)"/>
+  <ellipse cx="70" cy="190" rx="80" ry="60" fill="url(#fr-glow)"/>
+  <ellipse cx="380" cy="60" rx="120" ry="60" fill="url(#fr-mist)"/>
+  <g fill="none" stroke="#5a90a0">
+    <path d="${coast.replace(' L 500 300 Z', '')}" transform="translate(-6 -6)" stroke-width="1" opacity=".55"/>
+    <path d="${coast.replace(' L 500 300 Z', '')}" transform="translate(-12 -12)" stroke-width=".8" opacity=".3"/>
+  </g>
+  <path d="${coast}" fill="url(#fr-sea)" stroke="#3e6470" stroke-width="1.4"/>`;
+  let anim = `<g class="wm-waves" fill="none" stroke="#eef6f6" stroke-width=".9" stroke-linecap="round" opacity=".7">`;
+  for (let i = 0; i < 14; i++) {
+    const x = R(380, 492);
+    const y = R(Math.max(150, 330 - (x - 330) * 0.9), 292);
+    if (y < 140 + (500 - x) * 0.3) continue;
+    anim += `<path d="M${x} ${y} q 3 -3 6 0 q 3 -3 6 0" style="animation-delay:-${R(0, 4).toFixed(1)}s"/>`;
+  }
+  anim += `</g>`;
+  // A river from the highlands down through the foundry to the sea.
+  s += `<path d="M352 78 C 330 100, 300 110, 280 132 S 300 180, 340 196 S 380 214, 404 214" fill="none" stroke="#6f97a0" stroke-width="2.4" stroke-linecap="round"/>`;
+  anim += `<path class="wm-river flow" d="M352 78 C 330 100, 300 110, 280 132 S 300 180, 340 196 S 380 214, 404 214" fill="none" stroke="#d8ecef" stroke-width="1" stroke-dasharray="3 9" stroke-linecap="round"/>`;
+  // Emerald Jungle and the Verdant Temple (temple at 120,90): a stepped stone pyramid.
+  s += wood(70, 70, 22, 34, ['#2f6a2a', '#3f7a32', '#4f8a3a']) + wood(170, 60, 12, 22, ['#2f6a2a', '#3f7a32']) + wood(110, 125, 10, 18, ['#3f7a32', '#4f8a3a']);
+  s += `<g transform="translate(120 98)"><path d="M-18 0 L 18 0 L 14 -6 L -14 -6 Z M -14 -6 L 14 -6 L 10 -12 L -10 -12 Z M -10 -12 L 10 -12 L 6 -18 L -6 -18 Z" fill="#a8a48a" stroke="#5a5a44" stroke-width=".7"/><rect x="-3" y="-23" width="6" height="5" fill="#8a8670"/><path d="M-2 0 L 2 0 L 2 -18 L -2 -18 Z" fill="#7a7660" opacity=".6"/><path d="M-16 -2 q 6 -4 10 0 M 6 -8 q 4 -3 8 0" stroke="#3f7a32" stroke-width="1.4" fill="none"/></g>`;
+  // Glowcap Grove (70,186): tall mushrooms with glowing caps.
+  for (let i = 0; i < 12; i++) {
+    const x = R(36, 108);
+    const y = R(164, 214);
+    const h = R(6, 11);
+    const c = ['#c84a3a', '#8a5ab8', '#3aa8a0'][i % 3];
+    s += `<rect x="${x - 0.8}" y="${y - h}" width="1.6" height="${h}" fill="#e8dcc0"/><path d="M${x - h * 0.55} ${y - h} Q ${x} ${y - h * 1.6} ${x + h * 0.55} ${y - h} Z" fill="${c}" stroke="#2e2a3a" stroke-width=".5"/><circle cx="${x - 1.5}" cy="${y - h * 1.2}" r=".8" fill="#fff" opacity=".8"/>`;
+  }
+  // Dunes, the oasis pool and palms (oasis at 220,234).
+  for (let i = 0; i < 7; i++) {
+    const x = R(150, 310);
+    const y = R(250, 290);
+    s += `<path d="M${x - 16} ${y} Q ${x} ${y - 9} ${x + 16} ${y}" fill="#e2b868" stroke="#a87a38" stroke-width=".7"/>`;
+  }
+  s += `<ellipse cx="226" cy="236" rx="14" ry="6" fill="#6fa8b0" stroke="#3e6470" stroke-width=".7"/>`;
+  for (const [x, y] of [[208, 232], [244, 232], [234, 244], [214, 244]]) s += `<path d="M${x} ${y} q 1 -6 0 -11" stroke="#7a5a2a" stroke-width="1.2" fill="none"/><path d="M${x} ${y - 11} q -5 -1 -7 3 M ${x} ${y - 11} q 5 -1 7 3 M ${x} ${y - 11} q -3 -4 -6 -3 M ${x} ${y - 11} q 3 -4 6 -3" stroke="#4f8a3a" stroke-width="1.4" fill="none"/>`;
+  // Clockwork Foundry (260,126): brick halls and chimneys.
+  s += `<g transform="translate(260 132)"><rect x="-20" y="-10" width="16" height="10" fill="#8a5a3a" stroke="#4a2a1a" stroke-width=".7"/><rect x="-2" y="-14" width="22" height="14" fill="#9a6a44" stroke="#4a2a1a" stroke-width=".7"/><path d="M-2 -14 L 9 -20 L 20 -14 Z" fill="#6a3a24"/><rect x="-16" y="-22" width="3" height="12" fill="#5a3a2a"/><rect x="12" y="-28" width="3" height="14" fill="#5a3a2a"/><circle cx="4" cy="-6" r="3" fill="none" stroke="#d8a23a" stroke-width="1"/></g>`;
+  anim += `<g class="wm-smoke" fill="#5a5048">${[0, 1, 2, 3, 4].map((i) => `<circle cx="${i % 2 ? 273 : 246}" cy="${i % 2 ? 104 : 110}" r="${3 + i}" style="animation-delay:-${(i * 1.2).toFixed(1)}s"/>`).join('')}</g>`;
+  // Misty Highlands (380,66): peaks, bamboo, a watchtower.
+  for (const [x, y, w, h, sn] of [[350, 70, 32, 34, true], [384, 62, 40, 44, true], [420, 70, 30, 30, true], [452, 76, 24, 20, false], [330, 80, 22, 16, false]].sort((a, b) => a[1] - b[1])) s += peak(x, y, w, h, sn);
+  for (let i = 0; i < 9; i++) {
+    const x = R(340, 440);
+    const y = R(84, 100);
+    s += `<path d="M${x} ${y} l 0 -9 M ${x + 2} ${y} l 0 -11 M ${x - 2} ${y} l 0 -8" stroke="#5f9a4a" stroke-width=".9"/>`;
+  }
+  // Shipwreck Cove (400,222): a wreck on the beach.
+  s += `<g transform="translate(404 226) rotate(-14)"><path d="M-16 0 Q 0 8 16 0 L 13 -5 L -13 -5 Z" fill="#6a4a2a" stroke="#2e2010" stroke-width=".7"/><path d="M-4 -5 L 2 -22" stroke="#4a3a22" stroke-width="1.4"/><path d="M2 -21 L 10 -12 L 1 -12 Z" fill="#efe2c4" opacity=".8"/></g>`;
+  anim += `<g transform="translate(450 270)"><g fill="none" stroke="#2e4a4a" stroke-width="1" opacity=".55" class="wm-ship"><path d="M-10 0 L 10 0 L 7 5 L -7 5 Z" fill="#6a4a2a"/><path d="M0 0 L 0 -14" /><path d="M0 -13 L 8 -4 L 0 -4 Z" fill="#efe2c4"/></g></g>`;
+  // Compass rose (bottom-left this time) and names.
+  s += `<g transform="translate(36 258)"><circle r="22" fill="none" stroke="#5a3a18" stroke-width=".8" opacity=".7"/><path d="M0 -24 L 5 0 L 0 24 L -5 0 Z" fill="#7a1e1a"/><path d="M0 -24 L 5 0 L -5 0 Z" fill="#b8342a"/><path d="M-24 0 L 0 5 L 24 0 L 0 -5 Z" fill="#3a2410"/><circle r="2.4" fill="#d8a23a"/><text y="-28" text-anchor="middle" font-size="9" fill="#5a3a18" font-family="Cinzel, serif" font-weight="800">N</text></g>`;
+  s += `<g fill="#4a2e14" font-family="'IM Fell English', Georgia, serif" font-style="italic" opacity=".78">
+    ${label(70, 30, 'The Emerald Jungle', 10, -4, 'fill="#2e4a22" letter-spacing="1.5"')}
+    ${label(460, 230, 'The Shimmering Sea', 10, -48, 'fill="#2e4a4a" letter-spacing="1.5"')}
+    ${label(190, 292, 'The Golden Dunes', 9, 0, 'fill="#7a4a14"')}
+    ${label(420, 24, 'Cloudpeak', 9, 0, 'letter-spacing="2"')}
+    ${label(60, 228, 'Glowcap Wood', 8, -6, 'fill="#3a3a6a"')}
+  </g>`;
+  s += `<rect width="500" height="300" filter="url(#fr-paper)"/>
+  <rect width="500" height="300" fill="url(#fr-edge)"/>
+  <rect x="4" y="4" width="492" height="292" fill="none" stroke="#5a3a18" stroke-width="1.2" opacity=".6"/><rect x="7" y="7" width="486" height="286" fill="none" stroke="#5a3a18" stroke-width=".5" opacity=".5"/>
+</svg>`;
+  return { s, anim };
 }

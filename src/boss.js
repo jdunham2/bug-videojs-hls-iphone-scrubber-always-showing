@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { resolveCircle, pillars, ARENA_HALF } from './world.js';
 import { Grunt } from './enemy.js';
 import { PLAYER_RADIUS } from './player.js';
-import { outfits, loadTexture } from './models.js';
+import { outfits, loadTexture, models } from './models.js';
 
 const tmp = new THREE.Vector3();
 
@@ -21,9 +21,15 @@ export const BOSS_FORMS = [
   { name: 'Brogg the Bog-Lord', sub: 'King of the drowned reeds', outfit: null, tint: 0x9ab080, barrage: 'rock' },
   { name: 'Thorne the Huntmaster', sub: 'Master of the autumn hunt', outfit: null, tint: 0xd8a070, barrage: 'stalactite' },
   { name: 'Grimbold Deepdelve', sub: 'Foreman of the deep tunnels', outfit: 'warlordForge', tint: 0xb0a090, barrage: 'stalactite' },
-  { name: 'Captain Saltjaw', sub: 'Terror of the grey coast', outfit: 'warlordNorth', tint: 0xa8b8c8, barrage: 'pot' },
+  { name: 'Captain Saltjaw', sub: 'Terror of the grey coast', model: 'corsair', outfit: null, barrage: 'pot' },
   { name: 'Khazrak the Sand-King', sub: 'Lord of the sunscorched cliffs', outfit: null, tint: 0xe8c890, barrage: 'rock' },
   { name: 'Gorvak Reforged', sub: 'Back for one last fight', outfit: 'warlordForge', tint: 0xff9a80, barrage: 'pot' },
+  { name: 'Ukko the Temple Brute', sub: 'Guardian of the overgrown steps', outfit: null, tint: 0x9ab878, barrage: 'stalactite' },
+  { name: 'Captain Blackhook', sub: 'Scourge of the sunken cove', model: 'corsair', outfit: null, barrage: 'cannonball' },
+  { name: 'Grubnak the Sporeback', sub: 'Lord of the glowing grove', outfit: null, tint: 0x9a8ac0, barrage: 'rock' },
+  { name: 'Vulgra the Dune-Breaker', sub: 'Warlord of the oasis road', outfit: null, tint: 0xe8c088, barrage: 'rock' },
+  { name: 'Ironjaw the Machinist', sub: 'Master of the clockwork foundry', outfit: 'warlordForge', tint: 0xc8b090, barrage: 'cannonball' },
+  { name: 'Old Brannoc', sub: 'Keeper of the misty pass', outfit: 'warlordNorth', tint: 0xd0dcea, barrage: 'stalactite' },
 ];
 
 /** Ground warning shapes that fill up as an attack charges. */
@@ -166,6 +172,8 @@ const BARRAGE = {
   pot: { kind: 'pot', count: [2, 3], flight: 1.0, stagger: 0.3, r: 2.2, spread: 3.5, from: 'boss' },
   // Rocks shaken loose from overhead by his stomp.
   stalactite: { kind: 'stalactite', count: [5, 8], flight: 1.1, stagger: 0.14, r: 1.4, spread: 6.5, from: 'sky' },
+  // Iron shot fired in an arc: big, heavy impacts.
+  cannonball: { kind: 'cannonball', count: [4, 6], flight: 1.05, stagger: 0.28, r: 1.9, spread: 5.5, from: 'boss' },
 };
 
 class Barrage {
@@ -204,6 +212,9 @@ class Barrage {
     if (def.kind === 'rock') {
       geo = new THREE.IcosahedronGeometry(0.55, 0);
       mat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 1, flatShading: true });
+    } else if (def.kind === 'cannonball') {
+      geo = new THREE.SphereGeometry(0.42, 14, 10);
+      mat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.4, metalness: 0.7 });
     } else if (def.kind === 'stalactite') {
       geo = new THREE.ConeGeometry(0.4, 1.4, 6).rotateX(Math.PI);
       mat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 1, flatShading: true });
@@ -286,7 +297,8 @@ class Barrage {
     G.onSlam(it.at, def.kind === 'icicle' || def.kind === 'stalactite' ? 0.7 : 1);
     G.sfx.slam(G.panAt(it.at));
     G.shake.add(0.18);
-    const color = def.kind === 'icicle' ? [1.6, 2.2, 3] : def.kind === 'pot' ? [3, 1.2, 0.3] : 0x8a7458;
+    const color = def.kind === 'icicle' ? [1.6, 2.2, 3] : def.kind === 'pot' ? [3, 1.2, 0.3] : def.kind === 'cannonball' ? [3, 1.8, 0.6] : 0x8a7458;
+    if (def.kind === 'cannonball') G.particles.spawn(it.at.clone().setY(0.6), { count: 14, color: 0x5a5450, speed: 2, up: 2, life: 1.1, size: 0.4, gravity: -0.4, drag: 0.5 });
     G.particles.spawn(it.at.clone().setY(0.4), { count: 22, color, speed: 5, up: 4, life: 0.7, size: def.kind === 'rock' ? 0.18 : 0.1, gravity: 9 });
     if (def.kind === 'pot') {
       // Burning oil spreads where the pot breaks.
@@ -309,6 +321,8 @@ class Barrage {
 
 export class Boss extends Grunt {
   constructor(game, pos, level, index = 1, form = 0) {
+    // The model is picked in Grunt's constructor (via modelId), before this.form exists.
+    Boss.nextModel = BOSS_FORMS[form % BOSS_FORMS.length].model;
     super(game, pos, level);
     this.form = BOSS_FORMS[form % BOSS_FORMS.length];
     this.formIndex = form % BOSS_FORMS.length;
@@ -350,7 +364,8 @@ export class Boss extends Grunt {
   }
 
   get modelId() {
-    return 'warlord';
+    const want = this.form?.model || Boss.nextModel;
+    return want && models[want] ? want : 'warlord'; // the old warlord until a new model is generated
   }
   get modelHeight() {
     return config.boss.height;

@@ -18,8 +18,14 @@ const THEMES = {
   harbor: { bpm: 88, lift: 0, chords: [[47, 50, 54], [43, 47, 50], [45, 49, 52], [42, 45, 49]] },
   canyon: { bpm: 104, lift: 0, chords: [[52, 56, 59], [53, 57, 60], [50, 53, 57], [52, 56, 59]] },
   caldera: { bpm: 116, lift: -12, chords: [[52, 55, 58], [53, 56, 60], [51, 55, 58], [52, 55, 58]] },
+  temple: { bpm: 98, lift: 0, chords: [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]] },
+  cove: { bpm: 112, lift: 0, chords: [[50, 54, 57], [55, 59, 62], [57, 61, 64], [50, 54, 57]] },
+  grove: { bpm: 72, lift: 12, chords: [[52, 56, 59], [49, 52, 56], [45, 49, 52], [47, 51, 54]] },
+  oasis: { bpm: 96, lift: 0, chords: [[50, 51, 55], [48, 51, 55], [46, 50, 53], [48, 51, 55]] },
+  foundry: { bpm: 120, lift: -12, chords: [[45, 48, 52], [46, 49, 53], [43, 46, 50], [45, 48, 52]] },
+  highlands: { bpm: 80, lift: 12, chords: [[50, 55, 57], [48, 52, 57], [45, 50, 52], [47, 50, 55]] },
 };
-const THEME_BY_ARENA = ['ruins', 'keep', 'forge', 'marsh', 'hollow', 'mines', 'harbor', 'canyon', 'caldera'];
+const THEME_BY_ARENA = ['ruins', 'keep', 'forge', 'marsh', 'hollow', 'mines', 'harbor', 'canyon', 'caldera', 'temple', 'cove', 'grove', 'oasis', 'foundry', 'highlands'];
 const midi = (n) => 440 * 2 ** ((n - 69) / 12);
 
 export class Music {

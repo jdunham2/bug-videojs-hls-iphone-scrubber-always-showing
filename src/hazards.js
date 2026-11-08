@@ -51,6 +51,12 @@ const SETS = [
   { barrel: 5, spikes: 1, spring: 1, drum: 2, ballista: 2 }, // Stormwatch Harbor
   { barrel: 2, spikes: 3, spring: 1, drum: 1, ballista: 1, vent: 3 }, // Sunscorch Canyon: hot vents
   { barrel: 4, spikes: 1, spring: 1, ballista: 1, vent: 7 }, // Emberfall Caldera
+  { barrel: 2, spikes: 4, spring: 2, drum: 1, ballista: 1 }, // Verdant Temple: old traps in the steps
+  { barrel: 6, spikes: 1, spring: 1, drum: 1, ballista: 2 }, // Shipwreck Cove: powder from the wreck
+  { barrel: 2, spikes: 3, spring: 3, drum: 1 }, // Glowcap Grove
+  { barrel: 3, spikes: 2, spring: 2, drum: 1, ballista: 1, vent: 2 }, // Sandsea Oasis
+  { barrel: 5, spikes: 1, spring: 1, ballista: 1, vent: 6 }, // Clockwork Foundry: steam vents
+  { barrel: 3, spikes: 2, spring: 1, drum: 2, ballista: 1, ice: 3 }, // Misty Highlands: frosty stones
 ];
 
 export class Hazards {

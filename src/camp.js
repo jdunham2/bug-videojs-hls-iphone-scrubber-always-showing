@@ -17,7 +17,7 @@ import { BOSS_FORMS } from './boss.js';
 import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './progression.js';
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
-import { MISSIONS, ENDLESS, missionById, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
+import { MISSIONS, ENDLESS, missionById, missionsIn, farReachesOpen, missionStars, missionUnlocked, totalStars, selectedMission, selectMission } from './missions.js';
 import { merchantStock, price, buy, buyMystery, payRestock, RESTOCK_COST, MYSTERY_COST, temper, temperCost, hone, honeCost, honeTarget, MAX_POWER } from './shops.js';
 import { DIFFICULTIES, isUnlocked, selectedDifficulty, selectDifficulty, underPowered } from './difficulty.js';
 import { stash, findItem, equipped, equippedGadget, equipKey, isEquipped, equip, salvage, salvageValue, score, heroPower, statLines, perkLines, baseOf, RARITIES, slotLabel, gearIcon, PERKS, ROMAN_TIER } from './gear.js';
@@ -43,7 +43,24 @@ const ROADS = [
   ['harbor', 'ruins'],
 ];
 
+/** Roads on the Far Reaches map. */
+const ROADS2 = [
+  ['temple', 'grove'],
+  ['grove', 'oasis'],
+  ['oasis', 'cove'],
+  ['cove', 'foundry'],
+  ['foundry', 'highlands'],
+  ['temple', 'foundry'],
+  ['oasis', 'foundry'],
+];
+
 const MAP_ICONS = {
+  temple: '<svg viewBox="0 0 24 24"><path d="M3 20 L 21 20 L 18 16 L 6 16 Z M 6 16 L 18 16 L 15 12 L 9 12 Z M 9 12 L 15 12 L 13 8 L 11 8 Z M 11 8 L 13 8 L 13 5 L 11 5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  grove: '<svg viewBox="0 0 24 24"><path d="M4 12 Q 12 1 20 12 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 12 L 10 21 L 14 21 L 14 12" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="8.5" r="1" fill="currentColor"/><circle cx="14" cy="7.5" r="1" fill="currentColor"/></svg>',
+  oasis: '<svg viewBox="0 0 24 24"><path d="M12 20 Q 13 13 12 7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7 Q 6 6 4 10 M 12 7 Q 18 6 20 10 M 12 7 Q 9 3 6 4 M 12 7 Q 15 3 18 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4 21 Q 12 17 20 21" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+  cove: '<svg viewBox="0 0 24 24"><path d="M3 15 Q 12 20 21 15 L 19 12 L 5 12 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M11 12 L 13 3 M 13 4 L 19 10 L 12 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M2 20 Q 6 18 10 20 T 18 20 T 24 20" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',
+  foundry: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3 L 12 6 M 12 18 L 12 21 M 3 12 L 6 12 M 18 12 L 21 12 M 5.6 5.6 L 7.8 7.8 M 16.2 16.2 L 18.4 18.4 M 5.6 18.4 L 7.8 16.2 M 16.2 7.8 L 18.4 5.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
+  highlands: '<svg viewBox="0 0 24 24"><path d="M2 20 L 9 8 L 13 14 L 16 10 L 22 20 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 6 Q 8 4 12 6 M 13 4 Q 17 2 20 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   marsh: '<svg viewBox="0 0 24 24"><path d="M3 18 Q 12 14 21 18 M 3 21 Q 12 17 21 21" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 16 L 8 5 M 12 15 L 12 3 M 16 16 L 16 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="12" cy="4" rx="1.4" ry="2.4" fill="currentColor"/></svg>',
   hollow: '<svg viewBox="0 0 24 24"><path d="M12 3 C 18 6, 20 12, 12 21 C 4 12, 6 6, 12 3 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 6 L 12 20 M 12 11 L 15 8 M 12 14 L 9 11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   mines: '<svg viewBox="0 0 24 24"><path d="M4 9 C 8 4, 16 4, 20 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 6 L 12 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
@@ -521,6 +538,12 @@ export class Camp {
       { id: 'harbor', when: m.harbor?.clear, name: "Saltjaw's powder kegs", build: () => this.decorProp('powderBarrel', 1.0, 4.6, 12.2, 0.2, 0.5) },
       { id: 'canyon', when: m.canyon?.clear, name: 'Sandstone from Sunscorch Canyon', build: () => this.decorProp('rocks', 1.6, 12.8, -6.8, 0.4, 0.8) },
       { id: 'caldera', when: m.caldera?.clear, name: 'A pillar of cooled lava', build: () => this.decorProp('lavaPillar', 3.2, -12.6, -1.4, 0.2, 0.7) },
+      { id: 'temple', when: m.temple?.clear, name: 'A stone head from the Verdant Temple', build: () => this.decorProp('stoneHead', 2.2, -8.5, 11.2, 2.4, 0.9) },
+      { id: 'cove', when: m.cove?.clear, name: "Blackhook's anchor", build: () => this.decorProp('anchor', 1.6, 13.6, -1, -1.2, 0.6) },
+      { id: 'grove', when: m.grove?.clear, name: 'Glowcaps from the grove', build: () => this.decorProp('mushroomCluster', 1.4, 7.5, -2.5, 0.6, 0.6) },
+      { id: 'oasis', when: m.oasis?.clear, name: 'A palm from the oasis', build: () => this.decorProp('palmTree', 5, 10.8, 10, 0.3, 0.5) },
+      { id: 'foundry', when: m.foundry?.clear, name: 'Cogs from the Clockwork Foundry', build: () => this.decorProp('cogPile', 1.2, -4, -12.5, 0.5, 0.6) },
+      { id: 'highlands', when: m.highlands?.clear, name: 'A lantern from the high pass', build: () => this.decorProp('stoneLantern', 2, 0, 13.8, 0, 0.5) },
       { id: 'banners', when: profile.bosses >= 3, name: 'War banners at the gate', build: () => [this.decorProp('wolfBanner', 3, -11.4, -6.6, 0.6, 0.4), this.decorProp('wolfBanner', 3, -6.6, -11.4, 0.9, 0.4)] },
       { id: 'drum', when: lv >= 5, name: 'A war drum', build: () => this.decorProp('warDrum', 1.3, -12, 2 - 5.5, 0.4, 0.7) },
       { id: 'ballista', when: lv >= 7, name: 'A ballista on watch', build: () => this.decorProp('ballista', 2.2, 10.4, -10, -2.3, 1.0) },
@@ -877,13 +900,18 @@ export class Camp {
     const daily = dailyMission();
     const place = (id) => (id === 'endless' ? ENDLESS : id === 'daily' ? daily : missionById(id));
     const isOpen = (p) => p === ENDLESS || p === daily || missionUnlocked(p);
-    const roads = ROADS.map(([a, b]) => {
+    // Which region's map is showing: the one you picked last, else where the selected mission is.
+    const selRegion = sel.region || 1;
+    if (!this.mapRegion || (this.mapRegion === 2 && !farReachesOpen())) this.mapRegion = selRegion;
+    const region = this.mapRegion;
+    const roads = (region === 2 ? ROADS2 : ROADS).map(([a, b]) => {
       const A = place(a);
       const B = place(b);
       return A && B ? road(A, B, isOpen(A) && isOpen(B)) : '';
     }).join('');
     // Fog hides the places you haven't reached yet.
-    const fog = MISSIONS.filter((m) => !missionUnlocked(m))
+    const fog = missionsIn(region)
+      .filter((m) => !missionUnlocked(m))
       .map((m) => `<div class="wfog" style="left:${m.map.x}%;top:${m.map.y}%"></div>`)
       .join('');
     // Clouds keep drifting across redraws: start each one where its loop has got to.
@@ -896,8 +924,11 @@ export class Camp {
     ]
       .map(([top, dur, off, sc]) => `<div class="wcloud" style="top:${top}%;animation-duration:${dur}s;animation-delay:-${((now + off) % dur).toFixed(2)}s;--s:${sc}"></div>`)
       .join('');
+    // The hero marker stands on the selected mission, on its own region's map.
+    if ((this.heroRegion || selRegion) !== selRegion) this.heroAt = null;
+    this.heroRegion = selRegion;
     const hero = this.heroAt || sel.map;
-    const heroMarker = `<div class="whero" style="left:${hero.x}%;top:${hero.y}%"><div class="wh-flag">${MAP_ICONS.hero}</div><div class="wh-shadow"></div></div>`;
+    const heroMarker = selRegion === region ? `<div class="whero" style="left:${hero.x}%;top:${hero.y}%"><div class="wh-flag">${MAP_ICONS.hero}</div><div class="wh-shadow"></div></div>` : '';
     setTimeout(() => this.moveHero(), 0);
     let detail;
     if (sel.daily) {
@@ -923,10 +954,13 @@ export class Camp {
         </ul>${this.tierPicker()}
         <div class="actions"><button data-act="new" class="gold">Start mission</button></div>`;
     }
-    return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>
-      <div class="wmap-wrap"><div class="wmap">${mapArt()}<svg class="wpaths" viewBox="0 0 500 300" preserveAspectRatio="none">${roads}</svg>
-        ${fog}${clouds}<div class="wcart"><span>The Borderlands</span></div>
-        ${MISSIONS.map((m) => node(m, icons[m.id])).join('')}${node(ENDLESS, MAP_ICONS.endless)}${node(daily, MAP_ICONS.daily)}${heroMarker}</div>
+    const far = farReachesOpen();
+    const tabs = `<div class="wtabs"><button class="${region === 1 ? 'on' : ''}" data-act="region" data-v="1">The Borderlands</button><button class="${region === 2 ? 'on' : ''} ${far ? '' : 'locked'}" data-act="region" data-v="2" ${far ? '' : 'disabled'}>${far ? '' : MAP_ICONS.lock}The Far Reaches${far ? '' : ' · clear Emberfall Caldera'}</button></div>`;
+    const nodes = missionsIn(region).map((m) => node(m, icons[m.id])).join('') + (region === 1 ? node(ENDLESS, MAP_ICONS.endless) + node(daily, MAP_ICONS.daily) : '');
+    return `<h2>World Map</h2><p class="lead">Hero power <b>${heroPower()}</b> · ★ ${totalStars()} / ${MISSIONS.length * 3}</p>${tabs}
+      <div class="wmap-wrap"><div class="wmap" data-region="${region}">${mapArt(region)}<svg class="wpaths" viewBox="0 0 500 300" preserveAspectRatio="none">${roads}</svg>
+        ${fog}${clouds}<div class="wcart"><span>${region === 2 ? 'The Far Reaches' : 'The Borderlands'}</span></div>
+        ${nodes}${heroMarker}</div>
       <div class="mdetail">${detail}</div></div>`;
   }
 
@@ -1284,6 +1318,11 @@ export class Camp {
     }
     if (act === 'mission') {
       if (selectMission(v)) G.sfx.sample('uiSelect', { vol: 0.35, jitter: 0 });
+      return this.render();
+    }
+    if (act === 'region') {
+      this.mapRegion = Number(v);
+      G.sfx.sample('whoosh', { vol: 0.25, rate: 1.2, jitter: 0 });
       return this.render();
     }
     if (act === 'tier') {
