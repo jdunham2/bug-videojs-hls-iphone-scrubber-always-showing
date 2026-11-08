@@ -293,6 +293,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
         <b>F / Click</b><span>Attack · <b>G</b> throw a bomb</span>
         <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
         <b>V</b><span>Mount or dismount, once you own a mount</span>
+        <b>Taming</b><span>Carry an animal's favorite food and it will let you near</span>
         <b>K · Esc</b><span>Skills · Pause menu and settings</span>
         <b>C · I · Q</b><span>Craft · Bag · Eat something</span>
         <b>M · J</b><span>World map · Journal</span>
@@ -585,6 +586,16 @@ const GOODS = {
   straw_hat:{name:'Straw Hat',base:40,col:'#e0c070',kind:'trinket',desc:'+1 to every crop harvest'},
   watering_can:{name:'Watering Can',base:60,col:'#8d97a0',kind:'tool',tool:'can',tier:1,desc:'Crops grow 25% faster while you own it'},
   cotton_tunic:{name:'Cotton Tunic',base:120,col:'#e8e8f0',kind:'armor',armor:1,speed:.15},
+  // --- barn & dairy ---
+  milk:{name:'Milk',base:8,col:'#f8f8f0',kind:'food',heal:2},
+  truffle:{name:'Truffle',base:60,col:'#5a4030',kind:'good'},
+  cheese:{name:'Cheese',base:30,col:'#f0c850',kind:'food',heal:5},
+  butter:{name:'Butter',base:18,col:'#f8e080',kind:'mat'},
+  ice_cream:{name:'Ice Cream',base:60,col:'#f8e8f0',kind:'food',heal:14},
+  pancakes:{name:'Pancakes',base:34,col:'#e0b060',kind:'food',heal:10},
+  truffle_pasta:{name:'Truffle Pasta',base:160,col:'#e8d8a0',kind:'food',heal:24},
+  wool_coat:{name:'Wool Coat',base:110,col:'#d9cbb0',kind:'armor',armor:2},
+  pet_treat:{name:'Pet Treat',base:12,col:'#c8905a',kind:'mat'},
 };
 const GK = Object.keys(GOODS);
 const FISTS = {name:'Fists',dmg:1,cd:.4,reach:1.1};
@@ -726,6 +737,13 @@ const RECIPES = [
   {id:'fruit_basket',  need:{apple:2,orange:2,peach:2,basket:1}, at:'bench', known:true},
   {id:'cotton_tunic',  need:{cotton_cloth:3,hide:1}, at:'bench', known:true},
   {id:'watering_can',  need:{iron:2,wood:1}, at:'forge', known:true},
+  {id:'butter',       need:{milk:2}, at:'hand', known:true},
+  {id:'cheese',       need:{milk:3}, at:'bench', known:true},
+  {id:'ice_cream',    need:{milk:2,honey:1,frost_essence:1}, at:'bench', known:true},
+  {id:'pancakes',     need:{milk:1,egg:1,wheat:1,butter:1}, at:'bench', known:true},
+  {id:'truffle_pasta',need:{truffle:1,wheat:2,cheese:1}, at:'bench', known:true},
+  {id:'wool_coat',    need:{wool:4,hide:1}, at:'bench', known:true},
+  {id:'pet_treat', n:3, need:{meat:1,wheat:1}, at:'hand', known:true},
 ];
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots', lion_mane:'lionheart', fox_tail:'foxfire_lantern'};
@@ -786,6 +804,32 @@ const ENEMIES = {
   hyena:{name:'Hyena',hp:5,dmg:2,speed:3.9,aggro:7,drops:[['hide',1,1,.6],['meat',1,1,.4]]},
   lion:{name:'Lion',hp:12,dmg:3,speed:3.4,aggro:7,charge:true,drops:[['pelt',1,1,.5],['meat',1,2,.8]],curio:'lionclaw'},
   sprite:{name:'Petal Sprite',hp:5,dmg:2,speed:3.2,aggro:8,ranged:{range:6,cd:1.9,speed:7,col:'#ff9ac8'},drops:[['blossom',1,2,.8]],curio:'petalpearl'},
+  rabbit:{name:'Rabbit',hp:2,dmg:0,speed:4.2,aggro:0,passive:true,drops:[['meat',1,1,.8],['hide',1,1,.3]],tame:{pet:'bunny',food:'carrot'}},
+  deer:{name:'Deer',hp:5,dmg:0,speed:4.4,aggro:0,passive:true,drops:[['meat',1,2,1],['hide',1,2,.8]],tame:{pet:'fawn',food:'apple'}},
+  frog:{name:'Frog',hp:1,dmg:0,speed:3,aggro:0,passive:true,drops:[['herbs',1,1,.3]],tame:{pet:'frog',food:'herbs'}},
+  turtle:{name:'Sea Turtle',hp:6,dmg:0,speed:1.3,aggro:0,passive:true,drops:[['shells',1,2,1]],tame:{pet:'turtle',food:'berries'}},
+  penguin:{name:'Penguin',hp:3,dmg:0,speed:2.4,aggro:0,passive:true,drops:[['feather',1,1,.6]],tame:{pet:'penguin',food:'fish'}},
+  parrot:{name:'Parrot',hp:2,dmg:0,speed:4,aggro:0,passive:true,drops:[['feather',1,2,1]],tame:{pet:'parrot',food:'fruit'}},
+  owl:{name:'Owl',hp:3,dmg:0,speed:3.6,aggro:0,passive:true,drops:[['feather',1,1,1]],tame:{pet:'owl',food:'meat'}},
+  meerkat:{name:'Meerkat',hp:2,dmg:0,speed:4,aggro:0,passive:true,drops:[['hide',1,1,.4]],tame:{pet:'meerkat',food:'berries'}},
+  crane:{name:'Crane',hp:3,dmg:0,speed:3.4,aggro:0,passive:true,drops:[['feather',1,2,1]],tame:{pet:'crane',food:'rice'}},
+  raccoon:{name:'Raccoon',hp:3,dmg:0,speed:3.6,aggro:0,passive:true,drops:[['hide',1,1,.6]],tame:{pet:'raccoon',food:'bread'}},
+  goat:{name:'Mountain Goat',hp:5,dmg:0,speed:3.8,aggro:0,passive:true,drops:[['meat',1,2,1],['wool',1,1,.6]]},
+};
+const CRITTER_SPAWN = (t, x, night, r) => {
+  switch (t) {
+    case T.GRASS: return night ? (r < .5 ? 'raccoon' : 'rabbit') : 'rabbit';
+    case T.FOREST: return night ? (r < .6 ? 'raccoon' : 'owl') : (r < .6 ? 'deer' : 'rabbit');
+    case T.MARSH: return 'frog';
+    case T.SAND: return x < 340 && r < .7 ? 'turtle' : null;
+    case T.SNOW: return r < .6 ? 'penguin' : 'goat';
+    case T.HILL: return 'goat';
+    case T.JUNGLE: return 'parrot';
+    case T.GLOOM: return night ? 'owl' : 'frog';
+    case T.SAVANNA: return 'meerkat';
+    case T.BLOSSOM: return r < .6 ? 'crane' : 'rabbit';
+  }
+  return null;
 };
 const TOWN_ENEMIES = {wren:['bandit','boar','wolf'],hollow:['wolf','boar'],frost:['wolf','wraith'],dun:['scorpion','skeleton'],reed:['lurker','boar'],highcairn:['skeleton','archer','bandit'],thorn:['spider','bat'],ashfall:['imp'],jade:['snake','jaguar'],redrock:['coyote','dustdevil'],graven:['ghoul','wisp'],storm:['harpy','wolf'],lantern:['hyena','boar'],petal:['sprite','wolf'],sunreach:['hyena','lion'],skyhold:['wolf','wraith']};
 
@@ -868,7 +912,7 @@ const plotPos = i => ({x: HOME.x - 2 + (i % 4), y: HOME.y + 1 + Math.floor(i / 4
 const HOME_LEVELS = [
   {name:'Empty plot', plots:0},
   {name:'Log Cabin', plots:4, cost:{coins:250}, perks:'A bed, a storage chest and 4 crop beds'},
-  {name:'Stone Cottage', plots:8, cost:{coins:400, items:{wood:20, stone:10, planks:6}}, perks:'8 crop beds, a chicken coop and a workbench'},
+  {name:'Stone Cottage', plots:8, cost:{coins:400, items:{wood:20, stone:10, planks:6}}, perks:'8 crop beds, a chicken coop, a barn and a workbench'},
   {name:'Manor House', plots:12, cost:{coins:800, items:{planks:10, iron:6, glass:4, silver:2}}, perks:'12 crop beds and your own forge'},
 ];
 const PETS = {
@@ -879,6 +923,18 @@ const PETS = {
   monkey:{name:'Monkey', dmg:1, cd:.7, speed:5.2, desc:'Helps you gather: 30% chance of an extra item.'},
   wolfpup:{name:'Alpha Pup', dmg:4, cd:.6, speed:5.8, desc:"The Grey Alpha's cub. Fierce and fast."},
   kit:{name:'Blossom Kit', dmg:3, cd:.7, speed:5.6, desc:'A pink fox cub. Each bite heals you a little.'},
+  bunny:{name:'Bunny', dmg:1, cd:.7, speed:5.6, desc:'Tamed from a wild rabbit. You move 8% faster.'},
+  fawn:{name:'Fawn', dmg:1, cd:.8, speed:5.6, desc:'Tamed from a wild deer. You heal much faster out of combat.'},
+  frog:{name:'Frog', dmg:1, cd:.7, speed:5, desc:'Tamed from the marsh. The fishing catch bar is wider.'},
+  turtle:{name:'Turtle', dmg:2, cd:1, speed:4.8, desc:'Tamed on a beach. Slow, steady and gives you +1 armor.'},
+  penguin:{name:'Penguin', dmg:2, cd:.8, speed:5, desc:'Tamed in the snow. Every catch you land gives one extra.'},
+  parrot:{name:'Parrot', dmg:1, cd:.7, speed:6.5, fly:true, desc:'Tamed in the jungle. Its chatter gets you 5% better prices.'},
+  owl:{name:'Owl', dmg:2, cd:.9, speed:6.5, fly:true, desc:'Tamed at night. You see much further in the dark.'},
+  meerkat:{name:'Meerkat', dmg:1, cd:.7, speed:5.6, desc:'Tamed on the savanna. A born lookout: you see 2 tiles further.'},
+  crane:{name:'Crane', dmg:2, cd:.8, speed:5.6, desc:'Tamed in Blossom Vale. A lucky bird: +10% XP.'},
+  raccoon:{name:'Raccoon', dmg:2, cd:.7, speed:5.6, desc:'Tamed at night. Finds 25% more coin on foes and 50% more in chests.'},
+  baby_drake:{name:'Baby Drake', dmg:6, cd:.7, speed:6, fly:true, desc:"A hatchling from the Ember Wyrm's clutch. Breathes fire."},
+  crystal_beetle:{name:'Crystal Beetle', dmg:2, cd:.8, speed:5, desc:'Loves rock. Every rock, vein and seam you mine gives one extra.'},
   salamander:{name:'Ember Salamander', dmg:5, cd:.7, speed:5, desc:"Hatched in the Wyrm's fire. Its bite burns."},
 };
 const MOUNTS = {
@@ -1101,7 +1157,10 @@ Object.assign(NPC_BY.nell.stock, {grape_seed:4});
 Object.assign(NPC_BY.kesh.stock, {apple_seed:3, apple:4});
 Object.assign(NPC_BY.dorrie.stock, {coconut:4, rice:4});
 NPC_BY.dorrie.teaches = {sushi: 60}; NPC_BY.lio.teaches.coconut_curry = 70; NPC_BY.tamsel.teaches = {fine_clothes: 80};
-NPC_BY.nell.teaches = {swift_draught: 40, wine: 50}; NPC_BY.ilse.teaches.might_draught = 45; NPC_BY.brannoc.teaches.iron_draught = 45; NPC_BY.cole.teaches.luck_draught = 60;
+NPC_BY.nell.teaches = {swift_draught: 40, wine: 50};
+NPC_BY.kael.animals = {baby_drake: 900}; NPC_BY.kael.animalReq = {baby_drake: 'wyrm'};
+NPC_BY.tobin.animals = {crystal_beetle: 500};
+Object.assign(NPC_BY.gwen.stock || (NPC_BY.gwen.stock = {}), {}); NPC_BY.ilse.teaches.might_draught = 45; NPC_BY.brannoc.teaches.iron_draught = 45; NPC_BY.cole.teaches.luck_draught = 60;
 const TEACHER = {}; for (const n of NPCS) if (n.teaches) for (const r in n.teaches) TEACHER[r] = n.id;
 
 const CONTRACTS = {
@@ -1541,7 +1600,7 @@ function freshState() {
     explored: new Uint8Array(W*H), steps: 0, rumor: {}, trades: 0,
     hp: BASE_HP, bonusHP: 0, equip: {weapon: null, armor: null}, known: {}, depleted: {}, curios: {}, curiosShown: {},
     gathered: 0, crafted: 0, kills: 0, deaths: 0, killsBy: {}, bosses: {}, board: {}, requestsDone: 0, lairsSeen: {},
-    home: {level:0, plots:[], chest:{}, chickens:0, eggs:0}, xp: 0, level: 1, skillPts: 0, skills: {vit:0, str:0, agi:0, bar:0, gat:0}, achievements: {}, dodges: 0, fastTravels: 0, chests: {}, dungeonsSeen: {}, fishCaught: 0, phoenixDay: 0, name: 'Traveler', look: null, pets: [], pet: null, mounts: [], mount: null, riding: false, harvested: 0,
+    home: {level:0, plots:[], chest:{}, chickens:0, eggs:0, barn:{cow:0, sheep:0, pig:0}, prod:{milk:0, wool:0, truffle:0}}, xp: 0, level: 1, skillPts: 0, skills: {vit:0, str:0, agi:0, bar:0, gat:0}, achievements: {}, dodges: 0, fastTravels: 0, chests: {}, dungeonsSeen: {}, fishCaught: 0, phoenixDay: 0, name: 'Traveler', look: null, pets: [], pet: null, mounts: [], mount: null, riding: false, harvested: 0,
   };
   for (const n of NPCS) if (n.trader) s.npc[n.id] = {stock: {...n.stock}, purse: n.purse, patience: n.patience, flex: rollFlex(n)};
   return s;
@@ -1592,13 +1651,13 @@ const itemList = obj => Object.entries(obj).filter(([,n]) => n > 0).map(([g,n]) 
 const isKnown = r => !!(RECIPE_BY[r].known || S.known[r]);
 function toolTier(tool) { let t = 0; for (const g in S.inv) if (GOODS[g].tool === tool && S.inv[g] > 0) t = Math.max(t, GOODS[g].tier); return t; }
 function weapon() { const w = S.equip.weapon; return w && have(w) > 0 ? GOODS[w] : FISTS; }
-function armorVal() { const a = S.equip.armor; return (a && have(a) > 0 ? GOODS[a].armor : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0); }
-const speedMult = () => (1 + .02*sk('agi')) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (S.equip.armor && have(S.equip.armor) && GOODS[S.equip.armor].speed ? 1 + GOODS[S.equip.armor].speed : 1);
+function armorVal() { const a = S.equip.armor; return (a && have(a) > 0 ? GOODS[a].armor : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (S.equip.armor && have(S.equip.armor) && GOODS[S.equip.armor].speed ? 1 + GOODS[S.equip.armor].speed : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
-const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2);
+const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
 const isFlying = () => !!(S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].fly);
 
 function toast(html, ms = 4200) {
@@ -1628,7 +1687,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.pet === 'hawk' ? 2 : 0) + (have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -1708,6 +1767,7 @@ function gather(i) {
   let amt = rint(d.amt[0], d.amt[1]);
   if (d.tool && tier > (d.tier || 1)) amt += tier - (d.tier || 1);
   if (d.pick && ptier) amt += ptier;
+  if (S.pet === 'crystal_beetle' && (d.tool === 'pick' || d.pick)) amt += 1;
   if (d.boost && toolTier(d.boost)) amt += toolTier(d.boost);
   if (S.pet === 'monkey' && Math.random() < .3) amt += 1;
   if (Math.random() < .08*sk('gat')) amt += 1;
@@ -1819,7 +1879,7 @@ function killEnemy(e) {
   }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1; gainXP(e.max*3); SFX.kill();
-  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : 1)); S.coins += c; got.push(`+${c} coin`); }
+  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
   got.forEach((t, k) => floatText(e.x, e.y - .2 - k*.6, t, '#86c98f'));
@@ -1886,6 +1946,18 @@ function spawnTypeFor(t, x, night) {
     case T.ASH: return r < .85 ? 'imp' : 'skeleton';
   }
   return null;
+}
+function trySpawnCritter(night) {
+  if (S.y >= WORLD_H) return;
+  for (let k = 0; k < 10; k++) {
+    const a = Math.random()*Math.PI*2, r = 9 + Math.random()*9;
+    const x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H || townAt(x + .5, y + .5, 10)) continue;
+    const type = CRITTER_SPAWN(map[idx(x,y)], x, night, Math.random());
+    if (!type || !enemyWalk(x + .5, y + .5)) continue;
+    enemies.push(makeEnemy(type, x + .5, y + .5));
+    return;
+  }
 }
 function trySpawn(night) {
   if (S.y >= WORLD_H) return;
@@ -1998,7 +2070,7 @@ function updateCombat(dt, night) {
   player.sinceHit += dt;
   const safe = !!townAt(S.x, S.y, 8);
   if (S.hp < maxHP()) {
-    const rate = safe ? 1.5 : (player.sinceHit > 6 ? .12 : 0);
+    const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
   }
   if (S.hp > maxHP()) S.hp = maxHP();
@@ -2007,7 +2079,8 @@ function updateCombat(dt, night) {
     spawnT = 1.4;
     bossNear();
     const cap = night ? 8 : 5;
-    if (enemies.filter(e => !e.boss && !e.minion).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
+    if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
+    if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
   }
   let boss = null;
   for (const e of enemies) {
@@ -2015,6 +2088,22 @@ function updateCombat(dt, night) {
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
+    if (def.passive) {
+      const trusts = def.tame && have(def.tame.food) && !e.alert;
+      let px = 0, py = 0;
+      e.calm = Math.max(0, (e.calm || 0) - dt);
+      if ((d < 3.5 && !trusts && !(e.calm > 0)) || (e.alert && d < 10)) { px = -dx/d; py = -dy/d; }
+      else { e.alert = false; e.wt -= dt; if (e.wt <= 0) { e.wt = 1.5 + Math.random()*2.5; const a = Math.random()*6.28, still = Math.random() < .45; e.wx = still ? 0 : Math.cos(a)*.35; e.wy = still ? 0 : Math.sin(a)*.35; } px = e.wx; py = e.wy; }
+      const nx2 = e.x + (px*def.speed + e.kx)*dt, ny2 = e.y + (py*def.speed + e.ky)*dt;
+      if (enemyWalk(nx2, e.y)) e.x = nx2; else e.wt = 0;
+      if (enemyWalk(e.x, ny2)) e.y = ny2; else e.wt = 0;
+      const dec = Math.min(1, dt*8); e.kx -= e.kx*dec; e.ky -= e.ky*dec;
+      if (Math.abs(px) > .05) e.face = px < 0 ? -1 : 1;
+      if (px || py) e.phase += dt*10;
+      e.hurt = Math.max(0, e.hurt - dt);
+      if (d > 30) e.dead = true;
+      continue;
+    }
     let mx = 0, my = 0, sp = def.speed;
     const aggro = (night ? def.aggro + 2 : def.aggro) + (e.alert ? 4 : 0);
     if (!safe && d < aggro) {
@@ -2431,6 +2520,17 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       break;
     }
     case 'sprite': { const hy = Math.sin(phase*.8)*2; g.fillStyle = 'rgba(255,154,200,.3)'; g.beginPath(); g.arc(x, y-10+hy, 6, 0, 7); g.fill(); g.fillStyle = '#ffd0e8'; g.fillRect(x-2, y-12+hy, 4, 4); for (let k = 0; k < 4; k++) { const a = phase + k*1.57; g.fillStyle = '#ff9ac8'; g.fillRect(x + Math.cos(a)*5 - 1, y - 10 + hy + Math.sin(a)*3, 2, 2); } break; }
+    case 'rabbit': { const hop = Math.abs(Math.sin(phase))*2; shadow(3); g.fillStyle = '#c8b8a0'; g.fillRect(x-3, y-4-hop, 6, 4); g.fillRect(x + f*2 - 1, y-6-hop, 3, 3); g.fillRect(x + f*2 - 1, y-9-hop, 1, 3); g.fillRect(x + f*2 + 1, y-9-hop, 1, 3); g.fillStyle = '#ffffff'; g.fillRect(x - f*3 - 1, y-4-hop, 2, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*3, y-5-hop, 1, 1); break; }
+    case 'deer': { shadow(6); g.fillStyle = '#6a4a2a'; for (const lx of [-5,-3,3,5]) g.fillRect(x+lx, y-6, 1, 6 + (Math.sin(phase + lx) > 0 ? 0 : -1)); g.fillStyle = '#a8703a'; g.fillRect(x-6, y-11, 12, 5); g.fillRect(x + f*5 - 1, y-15, 3, 5); g.fillRect(x + f*6 - 1, y-16, 4, 3); g.fillStyle = '#f4ecd8'; g.fillRect(x - f*6 - 1, y-11, 2, 2); g.fillRect(x-4, y-10, 1, 1); g.fillRect(x+1, y-9, 1, 1); if (!(extra && extra.pet)) { g.fillStyle = '#d8c8a0'; g.fillRect(x + f*6, y-19, 1, 3); g.fillRect(x + f*6 + 2, y-19, 1, 3); g.fillRect(x + f*6 - 1, y-19, 1, 1); g.fillRect(x + f*6 + 3, y-19, 1, 1); } g.fillStyle = '#1a1a1a'; g.fillRect(x + f*8, y-15, 1, 1); break; }
+    case 'frog': { const hop = Math.abs(Math.sin(phase*.7))*2; shadow(3); g.fillStyle = '#4a9a3a'; g.beginPath(); g.ellipse(x, y-2-hop, 3.5, 2.5, 0, 0, 7); g.fill(); g.fillStyle = '#6ac04a'; g.fillRect(x-3, y-5-hop, 2, 2); g.fillRect(x+1, y-5-hop, 2, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x-2, y-5-hop, 1, 1); g.fillRect(x+2, y-5-hop, 1, 1); break; }
+    case 'turtle': { shadow(5); g.fillStyle = '#7a9a5a'; g.fillRect(x + f*5 - 1, y-4, 3, 3); g.fillRect(x-4, y-1, 2, 2); g.fillRect(x+3, y-1, 2, 2); g.fillStyle = '#4a6a3a'; g.beginPath(); g.ellipse(x, y-3, 5, 3.5, 0, Math.PI, 0); g.fill(); g.fillRect(x-5, y-3, 10, 1); g.fillStyle = '#6a8a4a'; g.fillRect(x-2, y-5, 2, 1); g.fillRect(x+1, y-4, 2, 1); break; }
+    case 'penguin': { const w = Math.sin(phase)*1; shadow(3); g.fillStyle = '#1a1a24'; g.beginPath(); g.ellipse(x + w*.3, y-5, 3.5, 5, 0, 0, 7); g.fill(); g.fillStyle = '#f4f4f4'; g.beginPath(); g.ellipse(x + f + w*.3, y-4, 2, 3.5, 0, 0, 7); g.fill(); g.fillStyle = '#f0a020'; g.fillRect(x + f*3, y-8, 2, 1); g.fillRect(x-2, y, 2, 1); g.fillRect(x+1, y, 2, 1); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*2, y-9, 1, 1); break; }
+    case 'parrot': { const wf = Math.sin(phase*2)*3, by = y - 12 + Math.sin(phase*.5)*1.5; g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(x, y, 3, 1, 0, 0, 7); g.fill(); g.fillStyle = '#2a7ad8'; g.beginPath(); g.moveTo(x-1, by); g.lineTo(x-6, by-2-wf); g.lineTo(x-2, by+2); g.fill(); g.beginPath(); g.moveTo(x+1, by); g.lineTo(x+6, by-2-wf); g.lineTo(x+2, by+2); g.fill(); g.fillStyle = '#e8302a'; g.fillRect(x-2, by-3, 4, 5); g.fillStyle = '#f0d040'; g.fillRect(x + f*2 - 1, by-4, 2, 1); g.fillStyle = '#1a1a1a'; g.fillRect(x + f, by-2, 1, 1); g.fillStyle = '#e8302a'; g.fillRect(x - f*2, by+2, 1, 3); break; }
+    case 'owl': { const by = y - 4; shadow(3); g.fillStyle = '#7a5a3a'; g.beginPath(); g.ellipse(x, by-2, 4, 5, 0, 0, 7); g.fill(); g.fillStyle = '#c8a878'; g.beginPath(); g.ellipse(x, by-1, 2.5, 3, 0, 0, 7); g.fill(); g.fillStyle = '#f0d040'; g.fillRect(x-3, by-6, 2, 2); g.fillRect(x+1, by-6, 2, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x-2, by-5, 1, 1); g.fillRect(x+2, by-5, 1, 1); g.fillStyle = '#5a3a2a'; g.fillRect(x-4, by-8, 2, 2); g.fillRect(x+2, by-8, 2, 2); break; }
+    case 'meerkat': { const up = Math.sin(phase*.3) > 0 ? 1 : 0; shadow(3); g.fillStyle = '#c8a070'; g.fillRect(x-1.5, y-8 - up, 3, 8 + up); g.fillRect(x - 1, y - 10 - up, 3, 3); g.fillStyle = '#5a3a2a'; g.fillRect(x + f*1, y-9 - up, 1, 1); g.fillStyle = '#8a6a4a'; g.fillRect(x - f*2 - 1, y-3, 1, 3); break; }
+    case 'crane': { shadow(4); g.fillStyle = '#2a2a2a'; g.fillRect(x-1, y-7, 1, 7); g.fillRect(x+1, y-7 + (Math.sin(phase) > 0 ? 1 : 0), 1, 7); g.fillStyle = '#f4f4f4'; g.beginPath(); g.ellipse(x, y-9, 5, 3, 0, 0, 7); g.fill(); g.fillStyle = '#1a1a1a'; g.fillRect(x - f*5, y-10, 2, 2); g.fillStyle = '#f4f4f4'; g.fillRect(x + f*3, y-17, 1, 8); g.fillRect(x + f*3 - (f < 0 ? 2 : 0), y-18, 3, 2); g.fillStyle = '#e02a2a'; g.fillRect(x + f*3, y-19, 2, 1); g.fillStyle = '#c8a040'; g.fillRect(x + f*5 - (f < 0 ? 1 : 0), y-17, 2, 1); break; }
+    case 'raccoon': { shadow(4); g.fillStyle = '#4a4a4a'; g.fillRect(x-4, y-3, 1, 3); g.fillRect(x+3, y-3, 1, 3); g.fillStyle = '#8a8a8a'; g.fillRect(x-4, y-6, 8, 4); g.fillRect(x + f*3 - 1, y-8, 4, 4); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*3 - 1, y-7, 4, 1); g.fillStyle = '#f4f4f4'; g.fillRect(x + f*4, y-7, 1, 1); for (let k = 0; k < 3; k++) { g.fillStyle = k % 2 ? '#3a3a3a' : '#9a9a9a'; g.fillRect(x - f*(5 + k*1.5) - 1, y-6 + k*.5, 2, 2); } break; }
+    case 'goat': { shadow(5); g.fillStyle = '#5a5a5a'; for (const lx of [-4,-2,2,4]) g.fillRect(x+lx, y-5, 1, 5); g.fillStyle = '#f0ece0'; g.fillRect(x-5, y-9, 10, 5); g.fillRect(x + f*4 - 1, y-12, 4, 4); g.fillStyle = '#8a7a5a'; g.fillRect(x + f*4 - 1, y-14, 1, 2); g.fillRect(x + f*4 + 1, y-14, 1, 2); g.fillStyle = '#d8d0c0'; g.fillRect(x + f*6, y-9, 1, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*6, y-11, 1, 1); break; }
     case 'giant':
       shadow(8); g.fillStyle = '#8ab0c8'; g.fillRect(x-5, y-6, 3, 6); g.fillRect(x+2, y-6, 3, 6);
       g.fillStyle = '#c8e0ec'; g.fillRect(x-7, y-16, 14, 11); g.fillRect(x-10, y-15, 3, 9); g.fillRect(x+7, y-15, 3, 9);
@@ -2523,6 +2623,14 @@ function render() {
   }
   if (inView(HOME.x, HOME.y)) {
     sprites.push({y: HOME.y - 1.05, f: () => drawHomestead(ctx, frameT)});
+    if (S.home.level >= 2) {
+      sprites.push({y: HOME.y + 2.95, f: () => drawBarn(ctx)});
+      let n = 0;
+      for (const kind of ['cow', 'sheep', 'pig']) for (let i = 0; i < (S.home.barn[kind] || 0); i++, n++) {
+        const k = n, ax = HOME.x + 3.6 + Math.sin(frameT*.18 + k*2.3)*1.6, ay = HOME.y + 4.1 + Math.cos(frameT*.15 + k*1.7)*.5;
+        sprites.push({y: ay, f: () => drawFarmAnimal(ctx, kind, ax*TS, ay*TS, Math.cos(frameT*.18 + k*2.3) > 0 ? 1 : -1, frameT*6 + k)});
+      }
+    }
     for (let i = 0; i < (S.home.level >= 2 ? S.home.chickens : 0); i++) {
       const cx = HOME.x - 4.5 + Math.sin(frameT*.4 + i*2.1)*1.8, cy = HOME.y + .3 + Math.cos(frameT*.3 + i*1.3)*.7;
       sprites.push({y: cy, f: () => drawChicken(ctx, cx*TS, cy*TS, Math.cos(frameT*.4 + i*2.1) > 0 ? 1 : -1, frameT + i)});
@@ -2780,7 +2888,7 @@ function update(dt) {
   for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -2815,6 +2923,7 @@ function newDay() {
     st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
   }
   if (dayOfSeason() === 1) { const si = seasonIdx(); setTimeout(() => { toast(`<b>${SEASONS[si].name} has come</b><br>${SEASON_TEXT[si]}`, 7500); SFX.chime(); }, 900); }
+  { const B = S.home.barn, P = S.home.prod; if (B) { P.milk = Math.min(6, P.milk + B.cow); P.wool = Math.min(6, P.wool + B.sheep); for (let i = 0; i < B.pig; i++) if (Math.random() < .6) P.truffle = Math.min(4, P.truffle + 1); } }
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.`);
   save();
@@ -3118,7 +3227,7 @@ function closeTrade() {
 }
 function mults(n) {
   const rep = repOf(n.town);
-  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar')), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar'))};
+  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar') + (S.pet === 'parrot' ? .05 : 0)), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar') - (S.pet === 'parrot' ? .05 : 0))};
 }
 function tradeVals() {
   const n = trade.n, m = mults(n); let youGive = 0, theyGive = 0;
@@ -3388,7 +3497,7 @@ function animalsTalk(n) {
   say(`“Good animals, every one.”<div class="req">${list.map(id => { const D = PETS[id] || MOUNTS[id]; return `<span>${PETS[id] ? 'Pet' : 'Mount'} · ${esc(D.name)}: ${esc(D.desc)}</span>`; }).join('')}</div>`, [...opts, back(n)]);
 }
 function animalsHTML() {
-  if (!S.pets.length && !S.mounts.length) return `<h3>Pets & mounts</h3><div class="none">No animals yet. Horses and dogs: Gwen in Port Wren. Camels: Dunmere. Elk and foxes: Hollowpine. Cats: Thornwick. Hawks: Stormwatch. Monkeys: Jadewater.</div>`;
+  if (!S.pets.length && !S.mounts.length) return `<h3>Pets & mounts</h3><div class="none">No animals yet. Tame wild animals by carrying their favorite food (rabbits love carrots, deer love apples, penguins love fish...). Horses and dogs: Gwen in Port Wren. Camels: Dunmere. Elk and foxes: Hollowpine. Cats: Thornwick. Hawks: Stormwatch. Monkeys: Jadewater.</div>`;
   const pc = id => `<div class="jcard ${S.pet === id ? 'eq' : ''}"><div class="irow"><span class="nm"><span class="t">${esc(PETS[id].name)}</span></span>${S.pet === id ? '<button class="btn sm" data-pet="">Leave at home</button>' : `<button class="btn sm primary" data-pet="${id}">Bring along</button>`}</div><div class="stat">Pet · ${PETS[id].dmg} damage · ${esc(PETS[id].desc)}</div></div>`;
   const mc = id => `<div class="jcard ${S.mount === id ? 'eq' : ''}"><div class="irow"><span class="nm"><span class="t">${esc(MOUNTS[id].name)}</span></span>${S.mount === id ? '<span class="s">Saddled · press V</span>' : `<button class="btn sm primary" data-mount="${id}">Saddle up</button>`}</div><div class="stat">Mount · ${Math.round(MOUNTS[id].speed*100 - 100)}% faster · ${esc(MOUNTS[id].desc)}</div></div>`;
   return `<h3>Pets & mounts</h3><div class="jgrid">${S.pets.map(pc).join('')}${S.mounts.map(mc).join('')}</div>`;
@@ -3400,7 +3509,7 @@ function updatePet(dt) {
   if (!petE) petE = {x: S.x - .8, y: S.y + .3, cd: 0, face: 1, phase: 0, moving: false};
   petE.cd -= dt;
   let target = null;
-  if (!townAt(S.x, S.y, 8)) { let bd = 6; for (const e of enemies) { if (e.hidden > 0) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
+  if (!townAt(S.x, S.y, 8)) { let bd = 6; for (const e of enemies) { if (e.hidden > 0 || (ENEMIES[e.type] && ENEMIES[e.type].passive)) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
   const tx = target ? target.x : S.x - player.dir.x*1.1, ty = target ? target.y : S.y - player.dir.y*1.1 + .2;
   const dx = tx - petE.x, dy = ty - petE.y, d = Math.hypot(dx, dy);
   const stop = target ? .6 + ((target.size || 1) - 1)*.4 : .5;
@@ -3414,7 +3523,7 @@ function updatePet(dt) {
     petE.phase += dt*12; petE.moving = true;
   }
   if (Math.abs(dx) > .1) petE.face = dx < 0 ? -1 : 1;
-  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd; hitEnemy(target, P.dmg, dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
+  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd; hitEnemy(target, P.dmg, dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander' || S.pet === 'baby_drake') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
 }
 function drawPet(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase) : 0;
@@ -3445,8 +3554,15 @@ function drawPet(g, id, x, y, f, phase, moving) {
     g.fillStyle = '#8a2a10'; g.fillRect(x-3, y-1, 1, 1 + (step > 0 ? 1 : 0)); g.fillRect(x+2, y-1, 1, 1 + (step < 0 ? 1 : 0));
     g.fillStyle = `rgba(255,160,40,${.6 + Math.sin(frameT*9)*.3})`; g.fillRect(x-3, y-5, 1, 2); g.fillRect(x, y-6, 1, 3); g.fillRect(x+2, y-5, 1, 2);
     g.fillStyle = '#ffe060'; g.fillRect(x + f*5, y-3, 1, 1);
+  } else if (id === 'crystal_beetle') {
+    shadow(4); g.fillStyle = '#2a3a5a'; g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
+    g.fillStyle = '#5fb8d8'; g.beginPath(); g.ellipse(x, y-4, 4, 3, 0, 0, 7); g.fill(); g.fillStyle = '#c9f4ff'; g.fillRect(x-1, y-6, 1, 3); g.fillStyle = '#2a3a5a'; g.fillRect(x + f*3, y-5, 2, 2);
+  } else if (PET_DRAW[id]) {
+    const [k, sc, fl] = PET_DRAW[id];
+    g.save(); g.translate(x, y - (fl ? 6 : 0)); g.scale(sc, sc); drawEnemyAt(g, k, 0, 0, f, phase, {pet: true, boss: k === 'wyrm'}); g.restore();
   }
 }
+const PET_DRAW = {bunny:['rabbit',1], fawn:['deer',.75], frog:['frog',1], turtle:['turtle',.85], penguin:['penguin',1], parrot:['parrot',1], owl:['owl',1,1], meerkat:['meerkat',1], crane:['crane',.8], raccoon:['raccoon',1], baby_drake:['wyrm',.42,1]};
 function drawMount(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase)*1.5 : 0;
   g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 9, 2.2, 0, 0, 7); g.fill();
@@ -3478,6 +3594,31 @@ function drawMount(g, id, x, y, f, phase, moving) {
   g.fillStyle = '#1a1a1a'; g.fillRect(x + f*9, y-16, 1, 1);
 }
 
+/* ================= taming ================= */
+function critterTarget() {
+  for (const e of enemies) {
+    const def = ENEMIES[e.type];
+    if (!def || !def.passive || !def.tame || e.dead || Math.hypot(e.x - S.x, e.y - S.y) > 1.7) continue;
+    if (S.pets.includes(def.tame.pet)) continue;
+    const food = def.tame.food;
+    if (!have(food)) return {key: 'cr' + e.type + 'n', html: `The ${def.name} eyes you warily. It might trust you if you carried <b>${GOODS[food].name}</b>.`, btn: '', fn: () => {}};
+    return {key: 'cr' + e.type, html: `<kbd style="margin:0 6px 0 0">E</kbd>Offer ${GOODS[food].name} to the ${def.name} <span style="color:var(--muted)">(tame it)</span>`, btn: 'Tame', fn: () => tameCritter(e)};
+  }
+  return null;
+}
+function tameCritter(e) {
+  const def = ENEMIES[e.type], food = def.tame.food;
+  if (!have(food) || e.dead) return;
+  addItem(food, -1); SFX.eat();
+  if (Math.random() < .45 + .02*sk('bar') + (have('pet_treat') ? .2 : 0)) {
+    if (have('pet_treat')) addItem('pet_treat', -1);
+    e.dead = true; S.tamed = (S.tamed || 0) + 1; SFX.ach(); gainXP(30);
+    for (let i = 0; i < 14; i++) particles.push({x: e.x, y: e.y - .6, vx: (Math.random() - .5)*3, vy: -Math.random()*3, t: 0, col: i % 2 ? '#ff8ac0' : '#ffd0e8'});
+    addPet(def.tame.pet);
+  } else { floatText(e.x, e.y - 1, 'It sniffs the food, but stays wild…', '#ebe4d3'); e.calm = 3; }
+  renderHUD(); save();
+}
+
 /* ================= homestead & farm ================= */
 const cropProgress = pl => Math.min(1, (S.day + S.time - pl.at) * cropRate(pl.crop) / CROPS[pl.crop].grow);
 const canAfford = c => S.coins >= (c.coins || 0) && Object.entries(c.items || {}).every(([g, n]) => have(g) >= n);
@@ -3490,6 +3631,7 @@ function homeTarget() {
     if (!lvl) return {key:'sale', html:'Homestead for sale · ask <b>Pell</b>, the land agent', btn:'', fn: () => toast('Pell, standing beside the plot, sells this homestead.')};
     return {key:'door', html:`${K}Go inside your ${HOME_LEVELS[lvl].name.toLowerCase()}`, btn:'Enter', fn: openHome};
   }
+  if (lvl >= 2 && Math.hypot(S.x - (HOME.x + 4.5), S.y - (HOME.y + 3.4)) < 1.4) { const P = S.home.prod; return {key:'barn' + P.milk + P.wool + P.truffle, html:`${K}Barn · ${P.milk} milk · ${P.wool} wool · ${P.truffle} truffles`, btn:'Barn', fn: barnTalk}; }
   if (lvl >= 2 && Math.hypot(S.x - COOP.x, S.y - COOP.y) < 1.3) return {key:'coop' + S.home.eggs + S.home.chickens, html:`${K}Chicken coop · ${S.home.chickens} hens · ${S.home.eggs} eggs`, btn:'Coop', fn: coopTalk};
   const n = HOME_LEVELS[lvl].plots || 0;
   let bi = -1, bd = 1.0;
@@ -3589,6 +3731,41 @@ $('homeSheet').addEventListener('click', e => {
   if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderHome(); save();
 });
+function barnTalk() {
+  const B = S.home.barn, P = S.home.prod, opts = [];
+  if (P.milk + P.wool + P.truffle) opts.push({label:`Collect ${[P.milk && P.milk + ' milk', P.wool && P.wool + ' wool', P.truffle && P.truffle + ' truffles'].filter(Boolean).join(', ')}`, primary:true, fn: () => {
+    if (P.milk) addItem('milk', P.milk); if (P.wool) addItem('wool', P.wool); if (P.truffle) addItem('truffle', P.truffle);
+    floatText(HOME.x + 4.5, HOME.y + 2.4, 'Collected', '#86c98f'); P.milk = P.wool = P.truffle = 0; SFX.pickup(); renderHUD(); save(); barnTalk(); }});
+  const buy = (k, name, price) => { if ((B[k] || 0) < 2) opts.push({label:`Buy a ${name} (${price} coin)`, disabled: S.coins < price, fn: () => { S.coins -= price; B[k] = (B[k] || 0) + 1; SFX.coin(); renderHUD(); save(); barnTalk(); }}); };
+  buy('cow', 'cow', 120); buy('sheep', 'sheep', 80); buy('pig', 'pig', 100);
+  opts.push({label:'Close', fn: closeTalk});
+  openPanel('Barn', `${B.cow || 0} cows, ${B.sheep || 0} sheep and ${B.pig || 0} pigs (up to 2 of each). Every morning cows give milk, sheep give wool, and pigs sometimes dig up truffles.`, opts);
+}
+function drawBarn(g) {
+  const px = (HOME.x + 3)*TS, py = (HOME.y + 1)*TS;
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px + 1, py + 30, 46, 3);
+  g.fillStyle = '#9a2a2a'; g.fillRect(px + 2, py + 8, 44, 24);
+  g.fillStyle = '#7a1a1a'; g.beginPath(); g.moveTo(px - 1, py + 10); g.lineTo(px + 24, py - 6); g.lineTo(px + 49, py + 10); g.fill();
+  g.fillStyle = '#f0e8d8'; g.fillRect(px + 17, py + 16, 14, 16); g.fillStyle = '#9a2a2a'; g.fillRect(px + 18, py + 17, 12, 15);
+  g.fillStyle = '#f0e8d8'; g.beginPath(); g.moveTo(px + 18, py + 17); g.lineTo(px + 30, py + 32); g.lineTo(px + 30, py + 30); g.lineTo(px + 20, py + 17); g.fill(); g.beginPath(); g.moveTo(px + 30, py + 17); g.lineTo(px + 18, py + 32); g.lineTo(px + 18, py + 30); g.lineTo(px + 28, py + 17); g.fill();
+  g.fillStyle = '#f3d27a'; g.fillRect(px + 22, py + 4, 4, 4);
+}
+function drawFarmAnimal(g, kind, x, y, f, ph) {
+  const step = Math.sin(ph*.3)*1;
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x, y, 6, 1.6, 0, 0, 7); g.fill();
+  if (kind === 'cow') {
+    g.fillStyle = '#3a3a3a'; for (const lx of [-5,-3,3,5]) g.fillRect(x + lx, y - 4, 1.5, 4 + (step > 0 && lx < 0 ? -1 : 0));
+    g.fillStyle = '#f4f0e8'; g.fillRect(x - 6, y - 9, 12, 5); g.fillStyle = '#2a2a2a'; g.fillRect(x - 4, y - 9, 3, 2); g.fillRect(x + 1, y - 7, 3, 2);
+    g.fillStyle = '#f4f0e8'; g.fillRect(x + f*6 - 2, y - 10, 4, 4); g.fillStyle = '#e8a0a0'; g.fillRect(x + f*7 - 1, y - 8, 2, 2); g.fillStyle = '#d8c8a0'; g.fillRect(x + f*5, y - 11, 1, 1); g.fillRect(x + f*7, y - 11, 1, 1);
+  } else if (kind === 'sheep') {
+    g.fillStyle = '#2a2a2a'; for (const lx of [-3,-1,2,4]) g.fillRect(x + lx, y - 3, 1, 3);
+    g.fillStyle = '#f4f4f0'; g.beginPath(); g.arc(x - 2, y - 6, 3.5, 0, 7); g.arc(x + 2, y - 6, 3.5, 0, 7); g.arc(x, y - 8, 3.5, 0, 7); g.fill();
+    g.fillStyle = '#3a3a3a'; g.fillRect(x + f*5 - 1, y - 8, 3, 3);
+  } else {
+    g.fillStyle = '#d88a90'; for (const lx of [-3,-1,2,4]) g.fillRect(x + lx, y - 3, 1, 3);
+    g.fillStyle = '#f0a8b0'; g.beginPath(); g.ellipse(x, y - 5, 5, 3.5, 0, 0, 7); g.fill(); g.fillStyle = '#e898a0'; g.fillRect(x + f*4 - 1, y - 6, 3, 2); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*3, y - 7, 1, 1);
+  }
+}
 function drawChicken(g, x, y, f, t) {
   g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(x, y, 3, 1, 0, 0, 7); g.fill();
   const peck = Math.sin(t*3) > .7 ? 1 : 0;
@@ -3846,7 +4023,7 @@ function openChest(c) {
     if (!have(tr) && !S.home.chest[tr]) { addItem(tr, 1); got.push(`<b>${GOODS[tr].name}</b>`); }
     const coins = 250*tier; S.coins += coins; got.push(`${coins} coin`); addItem('gem', 2); got.push('2 Cut Gems'); SFX.victory();
   } else {
-    const coins = rint(15, 45)*tier; S.coins += coins; got.push(`${coins} coin`);
+    const coins = Math.round(rint(15, 45)*tier*(S.pet === 'raccoon' ? 1.5 : 1)); S.coins += coins; got.push(`${coins} coin`);
     for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT), n = GOODS[g].kind === 'ammo' ? rint(2, 6) : rint(1, 2); addItem(g, n); got.push(`${n} ${GOODS[g].name}`); }
     SFX.coin();
   }
@@ -3983,7 +4160,7 @@ let FG = null, fishHold = false;
 const CATCH = {fish:{diff:.55, xp:6, col:'#8fb8c9'}, silverfin:{diff:.8, xp:10, col:'#dfe4ea'}, goldcarp:{diff:1.15, xp:25, col:'#f0c040'}, old_boot:{diff:.25, xp:1, col:'#6a4a2a'}};
 function startFishGame() {
   const r = Math.random(), c = r < .07 ? 'old_boot' : r < .13 ? 'goldcarp' : r < .38 ? 'silverfin' : 'fish';
-  FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat'), prog: .3, node: fishing.i};
+  FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat') + (S.pet === 'frog' ? .06 : 0), prog: .3, node: fishing.i};
   fishing = null; mode = 'fish'; keys.clear(); fishHold = false;
   $('fFish').style.background = CATCH[c].col;
   $('fishUI').hidden = false; $('prompt').hidden = true; $('actBtn').hidden = true; SFX.fish();
@@ -4006,7 +4183,7 @@ function endFishGame(win) {
   if (!G) return;
   const n = nodes[G.node];
   if (win) {
-    const amt = G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1;
+    const amt = (G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1) + (S.pet === 'penguin' ? 1 : 0);
     addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1;
     if (G.c === 'goldcarp') S.goldcarps = (S.goldcarps || 0) + 1;
     floatText(n.x + .5, n.y, `+${amt} ${GOODS[G.c].name}`, G.c === 'goldcarp' ? '#ffec6a' : '#86c98f', G.c === 'goldcarp');
@@ -4230,7 +4407,7 @@ const BUFFS = {speed: 0, might: 0, iron: 0, luck: 0};
 const BUFF_NAME = {speed: 'Swift', might: 'Might', iron: 'Ironskin', luck: 'Lucky'};
 function gainXP(n) {
   if (!S || mode === 'title' || n <= 0) return;
-  S.xp = (S.xp || 0) + Math.round(n);
+  S.xp = (S.xp || 0) + Math.round(n * (S.pet === 'crane' ? 1.1 : 1));
   let ups = 0;
   while (S.level < MAX_LEVEL && S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; S.skillPts++; if (S.level % 10 === 0) S.skillPts++; ups++; }
   if (ups) { S.hp = maxHP(); levelUpFX(); }
@@ -4302,6 +4479,9 @@ const ACH = [
   ['master','Master of a Craft','Raise any skill to 20', () => Object.values(S.skills || {}).some(v => v >= 20)],
   ['artisan','Artisan','Craft 150 items', () => S.crafted >= 150],
   ['masterwork','Masterwork','Craft a masterwork (double output)', () => (S.masterworks || 0) >= 1],
+  ['whisperer','Animal Whisperer','Tame 3 wild animals', () => (S.tamed || 0) >= 3],
+  ['menagerie','Menagerie','Own 10 pets', () => S.pets.length >= 10],
+  ['barnyard','Barnyard','Keep a cow, a sheep and a pig', () => S.home.barn && S.home.barn.cow && S.home.barn.sheep && S.home.barn.pig],
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
@@ -4462,6 +4642,8 @@ function loop(ts) {
 }
 function begin(state) {
   S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling');
+  if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
+  if (!S.home.prod) S.home.prod = {milk:0, wool:0, truffle:0};
   if (!S.look) S.look = {cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'};
   player.cols = {...S.look}; nearNPC = null; enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; fishing = null; lastHP = -1; promptKey = null;
   rebuildMapPixels();
