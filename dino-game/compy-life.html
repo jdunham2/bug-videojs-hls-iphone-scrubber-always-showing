@@ -1,0 +1,1214 @@
+<title>Compy Life</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: full-bleed 3D compy town; life stats card top-left, goals and settings top-right, event feed bottom-left, menus as centered panels */
+:root {
+  --panel: rgba(14, 22, 30, 0.86);
+  --line: rgba(255, 255, 255, 0.14);
+  --leaf: #8fdc6a;
+  --amber: #ffbe55;
+  --blood: #ef5a5f;
+  --sky: #7cc4ff;
+  --bone: #f6f0e2;
+  --muted: #a9b6c2;
+  --ink: #0d141b;
+  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: #0f1820; color: var(--bone); font-family: var(--body); overflow: hidden; }
+body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+#game { position: fixed; inset: 0; }
+#cv, #fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fx { pointer-events: none; }
+button { font-family: var(--body); }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; }
+.card { background: var(--panel); border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; width: min(300px, 64vw); display: grid; gap: 6px; box-sizing: border-box; }
+.when { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.when b { font: 400 19px var(--display); letter-spacing: 0.5px; }
+.when span { font: 800 18px var(--body); color: var(--leaf); font-variant-numeric: tabular-nums; }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.bar div { height: 9px; border-radius: 5px; background: rgba(255,255,255,.1); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 5px; transition: width .2s; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips span { font-size: 11px; font-weight: 800; padding: 3px 7px; border-radius: 999px; background: rgba(255,255,255,.08); }
+.chips span.bad { background: rgba(239, 90, 95, .25); }
+.chips span.good { background: rgba(143, 220, 106, .2); }
+.top-btns { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; }
+.ibtn { font-weight: 800; font-size: 13px; color: var(--bone); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+.feed { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(360px, 70vw); display: grid; gap: 4px; pointer-events: none; }
+.feed div { background: var(--panel); border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.35; border-left: 4px solid var(--sky); transition: opacity .5s; }
+.feed div.good { border-left-color: var(--leaf); } .feed div.bad { border-left-color: var(--blood); } .feed div.warn { border-left-color: var(--amber); }
+.prompt { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(26% + env(safe-area-inset-bottom, 0px)); background: var(--panel); border: 2px solid var(--amber); border-radius: 12px; padding: 8px 14px; font-weight: 800; font-size: 15px; pointer-events: auto; cursor: pointer; white-space: nowrap; max-width: calc(100vw - 40px); overflow: hidden; text-overflow: ellipsis; }
+.prompt kbd { font: 800 12px var(--body); background: var(--amber); color: var(--ink); border-radius: 5px; padding: 1px 6px; margin-right: 6px; }
+.shift { position: absolute; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top, 0px)); background: var(--panel); border-radius: 10px; padding: 6px 12px; font-size: 13px; font-weight: 800; color: var(--amber); pointer-events: none; white-space: nowrap; }
+@media (max-width: 760px) { .shift { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+#mini { position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 128px; height: 128px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); pointer-events: none; }
+@media (max-width: 520px) { #mini { width: 92px; height: 92px; } }
+
+.screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 12, 18, 0.5); }
+.panel { background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 22px; width: min(520px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 12px; box-sizing: border-box; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.panel h1, .panel h2 { margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: 1px; text-wrap: balance; }
+.panel h1 { font-size: clamp(46px, 12vw, 78px); line-height: .95; color: var(--leaf); text-align: center; text-shadow: 0 4px 0 var(--ink); }
+.panel h2 { font-size: clamp(26px, 6vw, 36px); color: var(--amber); }
+.panel p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 15px; }
+.panel .tag { font-size: 12px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.btn { font: 400 21px var(--display); letter-spacing: 1px; color: var(--ink); background: var(--leaf); border: 0; border-radius: 12px; padding: 11px 24px; cursor: pointer; box-shadow: 0 4px 0 #4c8a33; }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #4c8a33; }
+.btn.alt { background: rgba(255,255,255,.1); color: var(--bone); box-shadow: 0 4px 0 rgba(0,0,0,.4); font-size: 17px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.field input { font: 800 18px var(--body); padding: 10px 12px; border-radius: 10px; border: 2px solid var(--line); background: rgba(255,255,255,.06); color: var(--bone); }
+.actions { display: grid; gap: 8px; }
+.act { text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: rgba(255,255,255,.05); color: var(--bone); cursor: pointer; }
+.act:hover:not(:disabled) { background: rgba(255,190,85,.12); border-color: rgba(255,190,85,.5); }
+.act b { font-size: 15px; }
+.act span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.act em { grid-row: 1 / span 2; grid-column: 2; font-style: normal; font-weight: 800; font-size: 13px; color: var(--amber); text-align: right; }
+.act.risky em { color: var(--blood); }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.goals { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 480px) { .goals { grid-template-columns: 1fr; } }
+.goals div { font-size: 13px; padding: 7px 9px; border-radius: 10px; background: rgba(255,255,255,.05); color: var(--muted); }
+.goals div.done { background: rgba(143,220,106,.16); color: var(--bone); }
+.goals div.done::before { content: "\2713  "; color: var(--leaf); font-weight: 800; }
+.ev-panel { border-color: var(--amber); }
+.ev-panel.bad { border-color: var(--blood); } .ev-panel.bad h2 { color: var(--blood); }
+.ev-panel.good h2 { color: var(--leaf); }
+.err { color: var(--blood); font-weight: 800; }
+#useBtn { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 88px; height: 88px; border-radius: 50%; border: 4px solid rgba(0,0,0,.35); background: var(--amber); color: var(--ink); font: 400 20px var(--display); box-shadow: 0 5px 0 #9a6420; }
+</style>
+
+<div id="game">
+  <canvas id="cv" aria-label="Compy Life town"></canvas>
+  <canvas id="fx"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <div class="card">
+      <div class="when"><b id="whenDay">Day 1 &middot; Mon</b><span id="money">$0</span></div>
+      <div class="bars">
+        <div class="bar">Energy<div><i id="enBar" style="background:var(--sky)"></i></div></div>
+        <div class="bar">Hunger<div><i id="huBar" style="background:var(--amber)"></i></div></div>
+        <div class="bar">Happy<div><i id="haBar" style="background:var(--leaf)"></i></div></div>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="top-btns">
+      <button class="ibtn" id="goalsBtn" type="button">Goals 0/14</button>
+      <button class="ibtn" id="muteBtn" type="button">Sound on</button>
+      <button class="ibtn" id="pauseBtn" type="button">Pause</button>
+    </div>
+  </div>
+  <canvas id="mini" hidden></canvas>
+  <div class="shift" id="shift" hidden></div>
+  <div class="feed" id="feed" hidden></div>
+  <div class="prompt" id="prompt" hidden></div>
+  <button id="useBtn" type="button" hidden>ENTER</button>
+
+  <div class="screen" id="titleScreen">
+    <div class="panel">
+      <h1>Compy<br>Life</h1>
+      <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
+      <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
+      <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go in. On a phone, drag on the left to move and tap ENTER.</p>
+      <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
+    </div>
+  </div>
+
+  <div class="screen" id="menuScreen" hidden>
+    <div class="panel">
+      <div class="tag" id="menuTag"></div>
+      <h2 id="menuTitle"></h2>
+      <p id="menuSub"></p>
+      <div class="actions" id="menuActs"></div>
+      <div class="row"><button class="btn alt" id="menuClose" type="button">Leave</button></div>
+    </div>
+  </div>
+
+  <div class="screen" id="eventScreen" hidden>
+    <div class="panel ev-panel" id="evPanel">
+      <div class="tag" id="evTag"></div>
+      <h2 id="evTitle"></h2>
+      <p id="evText"></p>
+      <div class="row" id="evBtns"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="goalsScreen" hidden>
+    <div class="panel">
+      <h2>Life goals</h2>
+      <p id="goalsSub"></p>
+      <div class="goals" id="goalsList"></div>
+      <div class="row"><button class="btn alt" id="goalsClose" type="button">Close</button></div>
+    </div>
+  </div>
+
+  <div class="screen" id="pauseScreen" hidden>
+    <div class="panel">
+      <h2>Paused</h2>
+      <p>Your life saves every time you sleep.</p>
+      <div class="row"><button class="btn" id="resumeBtn" type="button">Resume</button><button class="btn alt" id="quitBtn" type="button">Title screen</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+if (!window.THREE) { $('loadErr').hidden = false; $('newBtn').disabled = true; return; }
+
+// ---------- renderer ----------
+const cv = $('cv'), fx = $('fx'), fctx = fx.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#9fd3ff');
+scene.background = SKY; scene.fog = new THREE.Fog(SKY, 900, 2200);
+const camera = new THREE.PerspectiveCamera(42, 1, 5, 8000);
+const hemi = new THREE.HemisphereLight('#e9f4ff', '#3c4a2c', 0.8); scene.add(hemi);
+const sun = new THREE.DirectionalLight('#fff3dc', 0.85);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -700, right: 700, top: 700, bottom: -700, near: 10, far: 3000 });
+sun.shadow.bias = -0.0006; scene.add(sun, sun.target);
+function resize() {
+  DPR = Math.min(1.75, window.devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  renderer.setPixelRatio(DPR); renderer.setSize(W, H, false);
+  camera.aspect = W / H; camera.updateProjectionMatrix();
+  fx.width = Math.round(W * DPR); fx.height = Math.round(H * DPR);
+}
+addEventListener('resize', resize); resize();
+
+const WORLD = 1800;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+let seed = 99;
+const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const money$ = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const clock = m => { m = ((m % 1440) + 1440) % 1440; const h = Math.floor(m / 60), mm = Math.floor(m % 60); return `${(h + 11) % 12 + 1}:${String(mm).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+
+// ---------- model kit ----------
+const GEO = { s: new THREE.SphereGeometry(1, 12, 9), b: new THREE.BoxGeometry(1, 1, 1), c: new THREE.ConeGeometry(1, 1, 8), y: new THREE.CylinderGeometry(1, 1, 1, 8), ico: new THREE.IcosahedronGeometry(1, 0), dod: new THREE.DodecahedronGeometry(1, 0), pyr: new THREE.ConeGeometry(1, 1, 4) };
+const MATS = {};
+const mat = c => MATS[c] || (MATS[c] = c[0] === '!' ? new THREE.MeshBasicMaterial({ color: c.slice(1) }) : new THREE.MeshLambertMaterial({ color: c }));
+function add(parent, geo, color, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, typeof color === 'string' ? mat(color) : color);
+  m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.set(rx, ry, rz);
+  m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+}
+function group(parent, x, y, z) { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; }
+function eyes(head, x, y, zz, r) { for (const s of [-1, 1]) { add(head, GEO.s, '#ffffff', x, y, s * zz, r, r, r * 0.8); add(head, GEO.s, '#111111', x + r * 0.55, y + r * 0.1, s * (zz + r * 0.25), r * 0.5, r * 0.55, r * 0.5); } }
+// small two-legged dinosaur, unit scale, facing +x
+function buildDino(o) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0);
+  const crest = o.crest, LL = o.legs || 1.15, dy = 1.35 * (LL - 1), torso = group(body, 0, dy, 0);
+  add(torso, GEO.s, o.body, 0, 1.7, 0, 1.2, 0.8, 0.72);
+  add(torso, GEO.s, o.belly, 0.2, 1.45, 0, 0.95, 0.55, 0.62);
+  add(torso, GEO.s, o.body, 0.95, 2.2, 0, 0.42, 0.6, 0.42);
+  const head = group(torso, 1.2, 2.65, 0);
+  add(head, GEO.s, o.body, 0.15, 0.05, 0, 0.58, 0.5, 0.48);
+  add(head, GEO.b, o.body, 0.68, -0.02, 0, 0.75, 0.3, 0.56);
+  const jaw = group(head, 0.22, -0.2, 0);
+  add(jaw, GEO.b, o.dark, 0.42, -0.06, 0, 0.78, 0.15, 0.5);
+  eyes(head, 0.3, 0.26, 0.31, 0.17);
+  if (crest) for (let i = 0; i < 4; i++) add(head, GEO.c, crest, -0.05 - i * 0.14, 0.45 - i * 0.04, 0, 0.06, 0.5 - i * 0.05, 0.12, 0, 0, 0.8 + i * 0.12);
+  if (o.tube) add(head, GEO.y, o.tube, -0.4, 0.55, 0, 0.12, 1.4, 0.12, 0, 0, 1.1);
+  if (o.hat) { add(head, GEO.y, o.hat, 0.05, 0.62, 0, 0.42, 0.06, 0.42); add(head, GEO.y, o.hat, 0.05, 0.85, 0, 0.27, 0.45, 0.27); }
+  if (o.bow) { add(head, GEO.c, o.bow, 0.05, 0.6, 0.18, 0.12, 0.25, 0.12, Math.PI / 2, 0, 0); add(head, GEO.c, o.bow, 0.05, 0.6, -0.18, 0.12, 0.25, 0.12, -Math.PI / 2, 0, 0); }
+  if (o.tie) add(torso, GEO.b, o.tie, 1.18, 1.9, 0, 0.06, 0.55, 0.16, 0, 0, -0.35);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const g = group(body, -0.1, 1.35 + dy, s * 0.5); g.scale.y = LL; legs.push(g);
+    add(g, GEO.s, o.body, 0, -0.15, 0, 0.4, 0.58, 0.32);
+    add(g, GEO.y, o.dark, 0, -0.75, 0, 0.13, 1.0, 0.13);
+    add(g, GEO.b, o.dark, 0.15, -1.28, 0, 0.55, 0.14, 0.28);
+    const a = group(torso, 0.85, 1.8, s * 0.45);
+    add(a, GEO.y, o.dark, 0.12, -0.22, 0, 0.07, 0.48, 0.07, 0, 0, 0.6);
+  }
+  const tail = [];
+  let p = group(torso, -1.0, 1.75, 0); p.rotation.z = 0.15; tail.push(p);
+  [0.5, 0.38, 0.27, 0.16].forEach((r, i, a) => { add(p, GEO.c, o.body, -0.48, 0, 0, r, 1.05, r * 0.9, 0, 0, Math.PI / 2); if (i < a.length - 1) { p = group(p, -0.86, 0, 0); tail.push(p); } });
+  for (let i = 0; i < 6; i++) add(torso, GEO.c, o.stripe, 0.6 - i * 0.3, 2.42 - Math.abs(i - 1) * 0.04, 0, 0.08, 0.22, 0.12);
+  return { root, body, head, jaw, legs, tail };
+}
+function animDino(m, t, moving, speedK = 11) {
+  const sw = Math.sin(t * speedK);
+  m.legs[0].rotation.z = sw * 0.7 * moving; m.legs[1].rotation.z = -sw * 0.7 * moving;
+  m.body.position.y = Math.abs(sw) * 0.1 * moving;
+  m.tail.forEach((g, i) => { g.rotation.y = Math.sin(t * 4 - i * 0.7) * (0.2 + 0.1 * moving); });
+}
+function facadeTextures(wall, win) {
+  const m = document.createElement('canvas'), e = document.createElement('canvas');
+  m.width = e.width = 128; m.height = e.height = 128;
+  const g = m.getContext('2d'), h = e.getContext('2d');
+  g.fillStyle = wall; g.fillRect(0, 0, 128, 128); h.fillStyle = '#000'; h.fillRect(0, 0, 128, 128);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const x = 10 + c * 30, y = 10 + r * 30;
+    g.fillStyle = win; g.fillRect(x, y, 18, 20);
+    if (srand() < 0.5) { h.fillStyle = '#ffd98a'; h.fillRect(x, y, 18, 20); }
+  }
+  const mt = new THREE.CanvasTexture(m), et = new THREE.CanvasTexture(e);
+  for (const t of [mt, et]) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return [mt, et];
+}
+
+// ---------- town ----------
+const solids = [], facadeMats = [], lampMats = [], signs = [], fadeables = [];
+function collide(o, r) {
+  for (const b of solids) {
+    if (o.x + r < b.x0 || o.x - r > b.x1 || o.y + r < b.y0 || o.y - r > b.y1) continue;
+    const cx = clamp(o.x, b.x0, b.x1), cy = clamp(o.y, b.y0, b.y1), dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
+    if (d >= r) continue;
+    if (d > 0.001) { o.x = cx + dx / d * r; o.y = cy + dy / d * r; continue; }
+    const l = o.x - b.x0, rr = b.x1 - o.x, t = o.y - b.y0, bb = b.y1 - o.y, m = Math.min(l, rr, t, bb);
+    if (m === l) o.x = b.x0 - r; else if (m === rr) o.x = b.x1 + r; else if (m === t) o.y = b.y0 - r; else o.y = b.y1 + r;
+  }
+}
+function signTexture(text, bg, fg) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 112;
+  const tex = new THREE.CanvasTexture(c);
+  const draw = () => {
+    const g = c.getContext('2d');
+    g.fillStyle = bg; g.fillRect(0, 0, 512, 112);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 8; g.strokeRect(4, 4, 504, 104);
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let size = 62; g.font = `${size}px "Lilita One", "Arial Black", sans-serif`;
+    while (g.measureText(text).width > 470 && size > 20) { size -= 2; g.font = `${size}px "Lilita One", "Arial Black", sans-serif`; }
+    g.fillText(text, 256, 60); tex.needsUpdate = true;
+  };
+  draw(); signs.push(draw);
+  return tex;
+}
+const PLACES = {};
+const doorGeo = new THREE.RingGeometry(0.75, 1, 36);
+const doorMat = new THREE.MeshBasicMaterial({ color: '#ffbe55', transparent: true, opacity: 0.85, depthWrite: false });
+function place(id, name, x0, y0, x1, y1, h, face, look) {
+  const w = x1 - x0, d = y1 - y0;
+  const facade = facadeTextures(look.wall, look.win);
+  const fm = facade[0].clone(), fe = facade[1].clone(); fm.needsUpdate = fe.needsUpdate = true;
+  fm.repeat.set(Math.max(1, Math.round(w / 80)), Math.max(1, Math.round(h / 70))); fe.repeat.copy(fm.repeat);
+  const fac = new THREE.MeshLambertMaterial({ map: fm, emissiveMap: fe, emissive: '#ffffff', emissiveIntensity: 0.2 });
+  facadeMats.push(fac);
+  const roof = mat(look.roof || '#4b4a52').clone();
+  const mesh = new THREE.Mesh(GEO.b, [fac, fac, roof, roof, fac, fac]);
+  fadeables.push({ x0, x1, y0, mats: [fac, roof], op: 1 });
+  mesh.position.set((x0 + x1) / 2, h / 2, (y0 + y1) / 2); mesh.scale.set(w, h, d); mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh); solids.push({ x0, y0, x1, y1 });
+  const dz = face > 0 ? y1 : y0, cx = (x0 + x1) / 2;
+  add(scene, GEO.b, '#2a2420', cx, 22, dz + face * 1, 34, 44, 3);
+  if (look.awning) add(scene, GEO.b, look.awning, cx, 50, dz + face * 14, Math.min(w * 0.7, 140), 4, 28);
+  const sw = Math.min(w * 0.85, 240), sh = sw * 112 / 512;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), new THREE.MeshBasicMaterial({ map: signTexture(name, look.sign, look.signFg || '#ffffff') }));
+  sign.position.set(cx, Math.min(h - sh / 2 - 6, 64 + sh / 2), dz + face * 2.5); if (face < 0) sign.rotation.y = Math.PI;
+  scene.add(sign);
+  const door = { x: cx, y: dz + face * 34 };
+  const ring = new THREE.Mesh(doorGeo, doorMat); ring.rotation.x = -Math.PI / 2; ring.position.set(door.x, 1, door.y); ring.scale.setScalar(20); scene.add(ring);
+  PLACES[id] = { id, name, door, ring, x0, y0, x1, y1, h };
+  return PLACES[id];
+}
+const HOMES = {
+  burrow:  { name: 'Burrow', rent: 120, price: 0, repair: 0, lot: [670, 800] },
+  cottage: { name: 'Cottage', rent: 0, price: 3000, repair: 600, lot: [830, 1000] },
+  mansion: { name: 'Mansion', rent: 0, price: 25000, repair: 2500, lot: [1030, 1160] },
+};
+const homeModels = {}, homeTrees = {};
+function buildTown() {
+  // ground
+  const tc = document.createElement('canvas'); tc.width = tc.height = 2048;
+  const g = tc.getContext('2d'), k = 2048 / WORLD, R = (x, y, w, h) => g.fillRect(x * k, y * k, w * k, h * k);
+  g.fillStyle = '#5c9a48'; g.fillRect(0, 0, 2048, 2048);
+  for (let i = 0; i < 9000; i++) { g.fillStyle = srand() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.05)'; g.fillRect(srand() * 2048, srand() * 2048, 3, 3); }
+  g.fillStyle = '#b9b2a6';
+  for (const c of [600, 1200]) { R(c - 75, 0, 150, WORLD); R(0, c - 75, WORLD, 150); }
+  g.fillStyle = '#4a4950';
+  for (const c of [600, 1200]) { R(c - 50, 0, 100, WORLD); R(0, c - 50, WORLD, 100); }
+  g.fillStyle = '#ecd36a';
+  for (const c of [600, 1200]) for (let t = 0; t < WORLD; t += 50) { if (Math.abs(t + 15 - 600) < 70 || Math.abs(t + 15 - 1200) < 70) continue; R(c - 2, t, 4, 28); R(t, c - 2, 28, 4); }
+  g.fillStyle = 'rgba(240,240,240,.85)';
+  for (const ix of [600, 1200]) for (const iy of [600, 1200]) for (let s = -40; s < 40; s += 14) { R(ix + s, iy - 72, 7, 20); R(ix + s, iy + 52, 7, 20); R(ix - 72, iy + s, 20, 7); R(ix + 52, iy + s, 20, 7); }
+  g.fillStyle = '#c9b48a'; R(640, 1240, 520, 40); // residential front walk
+  g.fillStyle = '#d6c7a0'; g.beginPath(); g.arc(900 * k, 920 * k, 120 * k, 0, 7); g.fill(); R(880, 680, 40, 480); R(680, 900, 440, 40);
+  g.fillStyle = '#8a8f96'; R(1260, 1280, 500, 460);
+  const tex = new THREE.CanvasTexture(tc); tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), new THREE.MeshLambertMaterial({ map: tex }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(WORLD / 2, 0, WORLD / 2); ground.receiveShadow = true; scene.add(ground);
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), mat('#3f6e34')); outer.rotation.x = -Math.PI / 2; outer.position.set(WORLD / 2, -0.5, WORLD / 2); outer.receiveShadow = true; scene.add(outer);
+
+  place('school', 'Dino U', 70, 120, 530, 470, 120, 1, { wall: '#b56a4a', win: '#2c3442', sign: '#7a2e2e', roof: '#5a3a30' });
+  place('office', 'Fossil Corp', 690, 140, 1110, 480, 280, 1, { wall: '#6a7a8c', win: '#1f2c3d', sign: '#24425e' });
+  place('bank', 'Stone Bank', 1270, 230, 1500, 480, 110, 1, { wall: '#cfc6b2', win: '#2a3038', sign: '#4b5a3a', roof: '#8a8272' });
+  place('casino', 'Lucky Egg Casino', 1540, 260, 1770, 480, 90, 1, { wall: '#5a2c6a', win: '#ffd35a', sign: '#d13a7a', awning: '#ffcf3a' });
+  place('grocer', 'Leafy Grocer', 70, 690, 290, 980, 75, 1, { wall: '#d7cfb5', win: '#2b3a2c', sign: '#3f8a3a', awning: '#3f8a3a' });
+  place('burger', 'Bronto Burger', 330, 690, 545, 980, 70, 1, { wall: '#e9b04a', win: '#3a2a1a', sign: '#c8322a', awning: '#c8322a' });
+  place('jobs', 'Job Center', 820, 670, 980, 780, 55, 1, { wall: '#7d9ab0', win: '#22303e', sign: '#2c5a7a' });
+  place('cafe', 'Fern Cafe', 1265, 700, 1480, 980, 65, 1, { wall: '#a8c49a', win: '#2c3a2a', sign: '#6a4a2e', awning: '#e0866a' });
+  place('hospital', 'Tarpit Hospital', 1520, 670, 1770, 980, 140, 1, { wall: '#eef0f2', win: '#2c4256', sign: '#c8322a' });
+  place('police', 'Police and Jail', 70, 1300, 330, 1580, 90, -1, { wall: '#5d6672', win: '#1c242e', sign: '#1f3f8a' });
+  place('depot', 'Egg Express', 370, 1300, 545, 1580, 70, -1, { wall: '#d98a3a', win: '#2c241c', sign: '#6a3a1a' });
+  place('realty', 'Nest Estates', 1280, 1300, 1480, 1500, 70, -1, { wall: '#cdb6d6', win: '#2a2433', sign: '#6a3a7a' });
+  // park bench in town square (a homeless compy's bed)
+  const bx = 900, by = 1080;
+  add(scene, GEO.b, '#7a5534', bx, 7, by, 50, 4, 14); add(scene, GEO.b, '#7a5534', bx, 14, by + 7, 50, 10, 3);
+  for (const s of [-1, 1]) add(scene, GEO.b, '#2a2a2a', bx + s * 20, 3, by, 3, 6, 12);
+  PLACES.bench = { id: 'bench', name: 'Park Bench', door: { x: bx, y: by - 26 } };
+  const br = new THREE.Mesh(doorGeo, doorMat); br.rotation.x = -Math.PI / 2; br.position.set(bx, 1, by - 26); br.scale.setScalar(18); scene.add(br); PLACES.bench.ring = br;
+  // fountain
+  add(scene, GEO.y, '#b6b0a6', 900, 6, 920, 60, 12, 60); add(scene, GEO.y, '#4a90c2', 900, 12.5, 920, 52, 1, 52);
+  add(scene, GEO.y, '#b6b0a6', 900, 24, 920, 8, 30, 8); add(scene, GEO.y, '#b6b0a6', 900, 40, 920, 22, 4, 22);
+  solids.push({ x0: 845, y0: 865, x1: 955, y1: 975 });
+  // home lots with for-sale signs and the trees that might fall on them
+  for (const [key, H0] of Object.entries(HOMES)) {
+    const [x0, x1] = H0.lot, cx = (x0 + x1) / 2;
+    PLACES['home_' + key] = { id: 'home_' + key, name: H0.name, door: { x: cx, y: 1290 }, home: key };
+    const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(cx, 1, 1290); r.scale.setScalar(18); scene.add(r); PLACES['home_' + key].ring = r;
+    const post = group(scene, cx, 0, 1330); add(post, GEO.b, '#6a4a2e', 0, 15, 0, 3, 30, 3);
+    const sg = new THREE.Mesh(new THREE.PlaneGeometry(56, 20), new THREE.MeshBasicMaterial({ map: signTexture(key === 'burrow' ? 'FOR RENT' : 'FOR SALE', '#f6f0e2', '#c8322a') })); sg.position.set(0, 32, -2); sg.rotation.y = Math.PI; post.add(sg);
+    PLACES['home_' + key].saleSign = post;
+    const t = group(scene, cx + (x1 - x0) * 0.32, 0, 1560);
+    add(t, GEO.y, '#5a3f28', 0, 40, 0, 7, 80, 7); add(t, GEO.ico, '#2e6b34', 0, 100, 0, 42, 38, 42); add(t, GEO.ico, '#3c8240', 6, 130, -4, 28, 26, 28);
+    homeTrees[key] = t;
+  }
+  // street trees, lamps and benches
+  const dummy = new THREE.Object3D();
+  const lists = { trunk: [], leaf: [], pole: [], lamp: [], bush: [] };
+  const tree = (x, z, s) => { lists.trunk.push([x, 30 * s, z, 6 * s, 60 * s, 6 * s]); lists.leaf.push([x, 78 * s, z, 36 * s, 32 * s, 36 * s]); };
+  for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; tree(900 + Math.cos(a) * 230, 920 + Math.sin(a) * 200, 0.8 + srand() * 0.3); }
+  for (const [x, z] of [[100, 560], [520, 560], [700, 560], [1100, 560], [1280, 560], [1700, 560], [100, 1040], [520, 1040], [1300, 1040], [1720, 1040], [1550, 1600], [1700, 1450], [1600, 1700], [400, 1680], [150, 1700]]) tree(x, z, 0.85);
+  for (const ix of [600, 1200]) for (const iy of [600, 1200]) for (const [dx, dz] of [[-70, -70], [70, -70], [-70, 70], [70, 70]]) { lists.pole.push([ix + dx, 40, iy + dz, 2.2, 80, 2.2]); lists.lamp.push([ix + dx, 82, iy + dz, 6, 4.5, 6]); }
+  for (let i = 0; i < 40; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
+  lists.bush = lists.bush.filter(([x, , z]) => !solids.some(b => x > b.x0 - 20 && x < b.x1 + 20 && z > b.y0 - 20 && z < b.y1 + 20) && Math.abs(x - 600) > 90 && Math.abs(x - 1200) > 90 && Math.abs(z - 600) > 90 && Math.abs(z - 1200) > 90 && !(z > 1250 && x > 640 && x < 1180));
+  const inst = (geo, m, list, cast) => { const im = new THREE.InstancedMesh(geo, m, list.length); list.forEach(([x, y, z, sx, sy, sz], i) => { dummy.position.set(x, y, z); dummy.rotation.set(0, i, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); }); im.castShadow = cast; im.receiveShadow = true; scene.add(im); return im; };
+  inst(GEO.y, mat('#5a3f28'), lists.trunk, true); inst(GEO.ico, mat('#3a7a3c'), lists.leaf, true);
+  inst(GEO.y, mat('#2f2f35'), lists.pole, true);
+  const lampM = new THREE.MeshBasicMaterial({ color: '#c9c3a8' }); lampMats.push(lampM); inst(GEO.s, lampM, lists.lamp, false);
+  inst(GEO.ico, mat('#356a32'), lists.bush, true);
+  // distant hills
+  for (let i = 0; i < 30; i++) { const a = i / 30 * Math.PI * 2, r = 1700 + srand() * 400; add(scene, GEO.ico, '#4a7a40', 900 + Math.cos(a) * r, 0, 900 + Math.sin(a) * r, 300 + srand() * 200, 160 + srand() * 140, 300 + srand() * 200); }
+}
+
+function buildHomeModel(key) {
+  const [x0, x1] = HOMES[key].lot, cx = (x0 + x1) / 2, g = group(scene, cx, 0, 1430);
+  let box;
+  if (key === 'burrow') {
+    add(g, GEO.s, '#7a5a3a', 0, 0, 0, 60, 45, 60); add(g, GEO.s, '#2a1c12', 0, 12, -52, 18, 20, 10);
+    add(g, GEO.ico, '#4a8a3a', -30, 38, 10, 14, 10, 14); add(g, GEO.ico, '#4a8a3a', 22, 34, 20, 12, 9, 12);
+    box = { x0: cx - 55, y0: 1430 - 50, x1: cx + 55, y1: 1430 + 55 };
+  } else if (key === 'cottage') {
+    add(g, GEO.b, '#e6d6b8', 0, 35, 0, 120, 70, 110); const roof = add(g, GEO.pyr, '#b0473a', 0, 95, 0, 95, 55, 88, 0, Math.PI / 4, 0); roof.name = 'roof';
+    add(g, GEO.b, '#5a3a24', 0, 20, -56, 22, 40, 3); for (const s of [-1, 1]) add(g, GEO.b, '#9fd3ff', s * 36, 42, -56, 22, 18, 2);
+    add(g, GEO.b, '#7a7a80', 30, 110, 20, 12, 30, 12);
+    box = { x0: cx - 62, y0: 1430 - 57, x1: cx + 62, y1: 1430 + 57 };
+  } else {
+    add(g, GEO.b, '#f2ede2', 0, 55, 10, 120, 110, 130); const roof = add(g, GEO.pyr, '#3a4a6a', 0, 140, 10, 100, 60, 105, 0, Math.PI / 4, 0); roof.name = 'roof';
+    for (let i = -2; i <= 2; i++) add(g, GEO.y, '#ffffff', i * 24, 45, -62, 5, 90, 5);
+    add(g, GEO.b, '#f2ede2', 0, 92, -62, 120, 8, 16); add(g, GEO.b, '#4a2e1a', 0, 22, -56, 24, 44, 3);
+    add(g, GEO.y, '#4a90c2', 0, 1, 110, 40, 2, 30);
+    box = { x0: cx - 62, y0: 1430 - 55, x1: cx + 62, y1: 1430 + 75 };
+  }
+  solids.push(box);
+  const mats = [];
+  g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+  const fade = { x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 };
+  fadeables.push(fade);
+  return { g, box, debris: null, fade };
+}
+function setDamaged(key, on) {
+  const hm = homeModels[key]; if (!hm) return;
+  hm.g.rotation.z = on ? 0.06 : 0; hm.g.rotation.x = on ? -0.04 : 0;
+  const roof = hm.g.getObjectByName('roof'); if (roof) { roof.rotation.z = on ? 0.35 : 0; roof.position.x = on ? 20 : 0; }
+  if (on && !hm.debris) { hm.debris = group(scene, hm.g.position.x, 0, 1430); for (let i = 0; i < 8; i++) add(hm.debris, GEO.b, pick(['#7a5a3a', '#b0473a', '#5a3f28']), rand(-60, 60), 3, rand(-70, -40), rand(6, 16), rand(3, 6), rand(6, 16), 0, rand(0, 3), 0); }
+  if (!on && hm.debris) { scene.remove(hm.debris); hm.debris = null; }
+  const t = homeTrees[key]; if (t && !on) { t.rotation.set(0, 0, 0); t.visible = true; }
+}
+
+// ---------- characters ----------
+const PALETTES = [
+  { body: '#6fae3a', belly: '#d9eaa0', dark: '#3f6a22', stripe: '#3f6a22', crest: '#e0763a' },
+  { body: '#3fa5b5', belly: '#c8eef2', dark: '#1f6570', stripe: '#1f6570', crest: '#ffd35a' },
+  { body: '#d98a3a', belly: '#f7dcb0', dark: '#8a4a1a', stripe: '#8a4a1a', crest: '#3a6ab0' },
+  { body: '#9a6ad0', belly: '#e6d8f7', dark: '#5a3a8a', stripe: '#5a3a8a', crest: '#7fe8a0' },
+  { body: '#d0566a', belly: '#f7d0d6', dark: '#7a2a3a', stripe: '#7a2a3a', crest: '#ffe066' },
+  { body: '#8a8f3a', belly: '#e0e2a8', dark: '#4f531f', stripe: '#4f531f', crest: '#c2552e' },
+];
+const NAMES = ['Pip', 'Fern', 'Mossy', 'Taro', 'Juniper', 'Pebble', 'Sage', 'Ziggy', 'Clover', 'Nibs', 'Basil', 'Tansy', 'Rocco', 'Lumi', 'Okra', 'Wren'];
+const TRAITS = ['loves dancing', 'collects shiny rocks', 'is a terrible cook', 'snores like a T-rex', 'writes poetry', 'wants lots of eggs', 'is afraid of pterodactyls', 'runs marathons', 'tells awful jokes', 'grows prize ferns'];
+let player = null, spouseM = null, kidMs = [], npcs = [], trex = null;
+function makeCompy(pal, extra = {}) { return buildDino({ ...pal, ...extra }); }
+const INTERSECTIONS = [];
+for (const x of [600, 1200]) for (const y of [30, 600, 1200, 1770]) INTERSECTIONS.push([x, y]);
+for (const y of [600, 1200]) for (const x of [30, 1770]) INTERSECTIONS.push([x, y]);
+function spawnNPCs() {
+  for (let i = 0; i < 14; i++) {
+    const pal = PALETTES[i % PALETTES.length], big = i % 5 === 4;
+    const m = makeCompy(pal, big ? { tube: pal.dark, legs: 1.3 } : { crest: pal.crest, hat: i % 4 === 1 ? '#2a2a2a' : null, tie: i % 3 === 0 ? '#c8322a' : null });
+    const [x, y] = pick(INTERSECTIONS);
+    m.root.scale.setScalar((big ? 34 : 13) / 1.25); scene.add(m.root);
+    npcs.push({ m, x, y, tx: x, ty: y, t: rand(0, 9), speed: big ? 70 : rand(60, 95), side: (i % 2 ? 1 : -1) * rand(56, 66), wait: rand(0, 3) });
+  }
+}
+function npcNext(n) {
+  const opts = INTERSECTIONS.filter(([x, y]) => (x === n.tx) !== (y === n.ty) && (x === n.tx || y === n.ty) && Math.hypot(x - n.tx, y - n.ty) > 1);
+  const [x, y] = pick(opts.length ? opts : INTERSECTIONS); n.tx = x; n.ty = y;
+}
+
+// ---------- life state ----------
+const CAREERS = {
+  burger:   { place: 'burger', hours: [9, 17], edu: 0, clean: false, levels: [['Fry Cook', 70], ['Shift Manager', 120], ['Restaurant Manager', 200]] },
+  depot:    { place: 'depot', hours: [7, 15], edu: 0, clean: false, levels: [['Egg Courier', 90], ['Route Lead', 150], ['Logistics Boss', 240]] },
+  bank:     { place: 'bank', hours: [9, 17], edu: 1, clean: true, levels: [['Bank Teller', 160], ['Loan Officer', 300], ['Bank President', 650]] },
+  office:   { place: 'office', hours: [9, 17], edu: 1, clean: true, levels: [['Intern', 110], ['Analyst', 220], ['Manager', 380], ['CEO', 800]] },
+  hospital: { place: 'hospital', hours: [8, 18], edu: 2, clean: true, levels: [['Nurse', 250], ['Doctor', 500], ['Chief of Medicine', 900]] },
+};
+const GOALS = [
+  ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
+  ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
+  ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'],
+];
+let S = null;
+function newLife(name) {
+  S = { name: name || 'Chomp', day: 1, min: 7 * 60, money: 150, energy: 90, hunger: 70, happy: 65, pal: 0,
+    job: null, workedToday: false, credits: 0, edu: 0, home: null, damaged: false, insured: false, groceries: 0,
+    record: 0, jail: 0, partner: null, kids: [], egg: null, loan: 0, injured: false, starve: 0, goals: {},
+    pos: { x: 900, y: 1130 }, trexAt: null, flood: false, eggsTried: -1 };
+}
+const SAVE = 'compyLifeSave';
+function save() { try { localStorage.setItem(SAVE, JSON.stringify(S)); } catch (e) { /* storage may be blocked; the life just will not persist */ } }
+function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE) || 'null'); return s && s.day ? s : null; } catch (e) { return null; } }
+const weekday = () => (S.day - 1) % 7;
+const isWorkday = () => weekday() < 5;
+const hour = () => S.min / 60;
+const jobInfo = () => S.job ? { ...CAREERS[S.job.career], title: CAREERS[S.job.career].levels[S.job.level][0], wage: CAREERS[S.job.career].levels[S.job.level][1] } : null;
+
+// ---------- feed, events, menus ----------
+const feedItems = [];
+function log(text, kind = '') {
+  feedItems.unshift({ text, kind, t: performance.now() });
+  feedItems.length = Math.min(feedItems.length, 4);
+  renderFeed();
+}
+function renderFeed() {
+  const f = $('feed'); f.innerHTML = '';
+  for (const it of feedItems) { const d = document.createElement('div'); d.className = it.kind; d.textContent = it.text; f.appendChild(d); }
+}
+function goal(id) {
+  if (S.goals[id]) return;
+  S.goals[id] = true;
+  const g = GOALS.find(x => x[0] === id);
+  log(`Life goal: ${g[1]}`, 'good'); sfx.goal();
+  const n = Object.keys(S.goals).length;
+  if (n === GOALS.length) queueEvent({ kind: 'good', tag: 'All goals done', title: 'A legendary compy life', text: `${S.name} did it all: jobs, jail, love, eggs, disasters and a mansion. You can keep living as long as you like.` });
+}
+let state = 'title';
+const evQueue = [];
+function queueEvent(ev) { evQueue.push(ev); if (state === 'play') nextEvent(); }
+function nextEvent() {
+  const ev = evQueue.shift(); if (!ev) { if (state === 'event') state = 'play'; setScreens(); return; }
+  state = 'event';
+  $('evPanel').className = 'panel ev-panel ' + (ev.kind || '');
+  $('evTag').textContent = ev.tag || `Day ${S.day} · ${clock(S.min)}`;
+  $('evTitle').textContent = ev.title; $('evText').textContent = ev.text;
+  const box = $('evBtns'); box.innerHTML = '';
+  for (const b of ev.buttons || [{ label: 'OK' }]) {
+    const el = document.createElement('button'); el.type = 'button'; el.className = b.alt ? 'btn alt' : 'btn'; el.textContent = b.label;
+    el.disabled = !!b.disabled;
+    el.addEventListener('click', () => { $('eventScreen').hidden = true; state = 'play'; if (b.fn) b.fn(); if (state === 'play') nextEvent(); });
+    box.appendChild(el);
+  }
+  if (ev.sound) sfx[ev.sound](); else sfx[ev.kind === 'bad' ? 'bad' : 'ding']();
+  setScreens(); $('eventScreen').hidden = false;
+  setTimeout(() => box.firstChild && box.firstChild.focus({ preventScroll: true }), 30);
+}
+let menuPlace = null;
+function openMenu(p) {
+  menuPlace = p; state = 'menu'; renderMenu(); setScreens(); $('menuScreen').hidden = false; sfx.door();
+}
+function closeMenu() { $('menuScreen').hidden = true; menuPlace = null; if (state === 'menu') state = 'play'; setScreens(); if (state === 'play') nextEvent(); }
+function renderMenu() {
+  const p = menuPlace, m = MENUS[p.home ? 'home' : p.id](p);
+  $('menuTag').textContent = `${DAYS[weekday()]} · ${clock(S.min)} · ${money$(S.money)}`;
+  $('menuTitle').textContent = m.title || p.name; $('menuSub').textContent = m.sub || '';
+  const box = $('menuActs'); box.innerHTML = '';
+  for (const a of m.acts) {
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'act' + (a.risky ? ' risky' : '');
+    const why = a.why || (a.cost && S.money < a.cost ? `Costs ${money$(a.cost)}` : '');
+    el.disabled = !!why;
+    el.innerHTML = `<b></b><span></span><em></em>`;
+    el.querySelector('b').textContent = a.label; el.querySelector('span').textContent = why || a.detail || ''; el.querySelector('em').textContent = a.tag || (a.cost ? money$(a.cost) : '');
+    el.addEventListener('click', () => {
+      if (a.cost) S.money -= a.cost;
+      if (a.mins) advance(a.mins, a.opts || {});
+      a.fn && a.fn();
+      if (state === 'menu' && menuPlace) renderMenu();
+    });
+    box.appendChild(el);
+  }
+  if (!m.acts.length) { const p2 = document.createElement('p'); p2.textContent = 'Nothing to do here right now.'; box.appendChild(p2); }
+}
+const open = (a, b) => hour() >= a && hour() < b;
+const closedMsg = (a, b) => `Closed. Open ${clock(a * 60)} to ${clock(b * 60)}.`;
+
+// ---------- time ----------
+function advance(mins, opts = {}) {
+  const startDay = S.day;
+  while (mins > 0 && S.day === startDay) {
+    const stepM = Math.min(mins, 15);
+    mins -= stepM; S.min += stepM;
+    const hrs = stepM / 60;
+    if (!opts.sleeping) S.energy -= hrs * (opts.work ? 7 : S.injured ? 6 : 4);
+    S.hunger -= hrs * (opts.sleeping ? 2 : 5);
+    if (S.hunger <= 0) { S.hunger = 0; S.happy -= hrs * 4; S.starve += hrs; } else S.starve = 0;
+    if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
+    S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
+    checkShift();
+    if (S.trexAt != null && S.min >= S.trexAt && !trex) startTrex();
+    if (S.min >= 1440) { if (!opts.sleeping) passOut('midnight'); return; }
+    if (!opts.sleeping && !opts.work && S.energy <= 0 && state !== 'jail') { passOut('tired'); return; }
+    if (S.starve >= 8) { S.starve = 0; collapse(); return; }
+  }
+}
+function checkShift() {
+  const J = jobInfo(); if (!J || S.workedToday || !isWorkday() || S.flood || S.jail > 0) return;
+  if (hour() >= J.hours[1]) {
+    S.workedToday = true; S.job.perf -= 22; S.job.missed++;
+    log(`You missed your shift at ${PLACES[J.place].name}.`, 'bad'); sfx.bad();
+    if (S.job.perf < 15 || S.job.missed >= 3) fire(`You missed too many shifts. ${PLACES[J.place].name} let you go.`);
+  }
+}
+function fire(why) {
+  const J = jobInfo(); if (!J) return;
+  S.job = null; goal('fired'); S.happy -= 15;
+  queueEvent({ kind: 'bad', title: 'You got fired', text: `${why} You were a ${J.title}. The Job Center has openings.` });
+}
+function passOut(why) {
+  S.day++; S.min = 8 * 60; S.energy = 35; S.happy -= 10;
+  const lost = S.money > 0 ? Math.round(S.money * rand(0.05, 0.15)) : 0;
+  S.money -= lost;
+  dayRollover(false);
+  queueEvent({ kind: 'bad', title: why === 'midnight' ? 'You fell asleep on the street' : 'You passed out', text: `${S.name} was too tired to go on and curled up right there. You woke up stiff and sore${lost ? `, and someone helped themselves to ${money$(lost)} from your pouch` : ''}. Get home before midnight next time.` });
+}
+function collapse() {
+  const bill = 150; S.money -= bill; S.hunger = 50; S.energy = 50;
+  teleport(PLACES.hospital.door); advance(180, { sleeping: true });
+  queueEvent({ kind: 'bad', title: 'You fainted from hunger', text: `Someone carried you to Tarpit Hospital. The bill was ${money$(bill)}. Eat something!` });
+}
+function sleep(quality) {
+  const wasDay = S.day;
+  S.day++; S.min = 6 * 60 + 30;
+  S.energy = clamp(quality, 0, 100); S.hunger = Math.max(0, S.hunger - 20);
+  dayRollover(true);
+  if (S.day > wasDay) save();
+}
+// bills, eggs, relationships and random events every morning
+function dayRollover(slept) {
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false);
+  if (trex) { scene.remove(trex.m.root); trex = null; }
+  if (S.job) S.job.days++;
+  if (weekday() === 0) {
+    let bills = 0, parts = [];
+    if (S.home === 'burrow') { bills += HOMES.burrow.rent; parts.push(`rent ${money$(HOMES.burrow.rent)}`); }
+    if (S.insured) { bills += 40; parts.push('insurance $40'); }
+    if (S.loan > 0) { const i = Math.round(S.loan * 0.05); S.loan += i; parts.push(`loan interest ${money$(i)}`); }
+    if (bills) { S.money -= bills; log(`Weekly bills: ${parts.join(', ')}.`, 'warn'); }
+    if (S.home === 'burrow' && S.money < -200) { S.home = null; refreshHome(); queueEvent({ kind: 'bad', title: 'Evicted!', text: 'You fell too far behind on rent. The landlord changed the locks on your burrow. The park bench is free, at least.' }); }
+  }
+  if (S.kids.length) { const c = S.kids.length * 15; S.money -= c; }
+  if (S.partner) {
+    S.partner.rel -= S.partner.married ? 1.5 : 3;
+    if (S.partner.married && S.partner.rel > 40) { S.money += 45; }
+    if (S.partner.rel <= 5) breakup();
+  }
+  if (S.egg && S.day >= S.egg.hatch) hatchEgg();
+  if (S.money >= 10000) goal('rich');
+  if (S.jail <= 0) rollEvents(slept);
+}
+function rollEvents(slept) {
+  const r = Math.random();
+  if (S.home && !S.damaged && r < 0.07) return disasterTree();
+  if (r < 0.1) return disasterMeteor();
+  if (r < 0.15) { S.trexAt = rand(10, 17) * 60; return; }
+  if (r < 0.18) return disasterFlood();
+  if (r < 0.21) return disasterQuake();
+  if (r < 0.46) {
+    const small = [
+      () => { const n = Math.round(rand(20, 80)); S.money += n; log(`You found ${money$(n)} in the gutter.`, 'good'); },
+      () => { if (S.money > 40) { const n = Math.round(Math.min(S.money * 0.15, 200)); S.money -= n; log(`A pickpocket stole ${money$(n)}.`, 'bad'); } },
+      () => { if (S.partner) { S.happy += 12; log(`${S.partner.name} left you a fern bouquet.`, 'good'); } },
+      () => { S.energy -= 20; log('Bad mussels. Food poisoning cost you energy.', 'bad'); },
+      () => { const n = Math.round(rand(50, 150)); S.money += n; log(`Tax refund: ${money$(n)}.`, 'good'); },
+      () => { if (S.job) { S.job.perf += 8; log('Your boss praised your work.', 'good'); } },
+      () => { S.happy += 8; log('Gorgeous sunrise. You feel great.', 'good'); },
+      () => { if (S.job && Math.random() < 0.4) fire('Budget cuts. Your whole team was laid off.'); },
+    ];
+    pick(small)();
+  }
+}
+function survived() { goal('disaster'); }
+function disasterTree() {
+  const key = S.home; animTree(key);
+  const cost = HOMES[key].repair;
+  setTimeout(() => {
+    S.damaged = true; setDamaged(key, true); sfx.crash(); shake = 16;
+    const hurt = Math.random() < 0.4; if (hurt) S.injured = true;
+    queueEvent({ kind: 'bad', tag: 'Disaster', title: 'A tree fell on your house!', sound: 'crash',
+      text: `CRASH. The big tree out back came down right on your ${HOMES[key].name.toLowerCase()}${hurt ? ', and a branch clipped your tail. You are hurt' : ''}. ${S.insured ? 'Good thing you have insurance: repairs are free.' : key === 'burrow' ? 'Your landlord will fix it, but sleeping there is miserable until then.' : `Repairs cost ${money$(cost)}. Sleeping in a broken house is miserable.`}`,
+      buttons: S.insured || key === 'burrow' ? [{ label: 'Fix it', fn: () => repair(true) }] : [{ label: `Pay ${money$(cost)}`, disabled: S.money < cost, fn: () => { S.money -= cost; repair(); } }, { label: 'Deal with it later', alt: true }] });
+    survived();
+  }, 1300);
+}
+function repair(free) { S.damaged = false; setDamaged(S.home, false); log(free ? 'Your house has been repaired.' : 'You paid to repair your house.', 'good'); }
+function disasterMeteor() {
+  const hitHome = S.home && !S.damaged && Math.random() < 0.3;
+  const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, 1600), ty = hitHome ? 1430 : rand(200, 1600);
+  meteorFx(tx, ty);
+  setTimeout(() => {
+    if (hitHome) { S.damaged = true; setDamaged(S.home, true); }
+    const near = Math.hypot(P.x - tx, P.y - ty) < 120;
+    if (near) S.injured = true;
+    queueEvent({ kind: 'bad', tag: 'Disaster', title: hitHome ? 'A meteor hit your house!' : 'Meteor strike!', sound: 'crash',
+      text: hitHome ? `A flaming rock from space landed on your ${HOMES[S.home].name.toLowerCase()}. ${S.insured ? 'Insurance covers it.' : `Repairs cost ${money$(HOMES[S.home].repair)} at Nest Estates.`}` : `A meteor slammed into town${near ? ' right next to you. You got knocked flat and hurt' : '. Everyone is shaken, but you are fine'}. Dinosaurs have a complicated history with these.`,
+      buttons: hitHome && S.insured ? [{ label: 'Fix it', fn: () => repair(true) }] : [{ label: 'Phew' }] });
+    survived();
+  }, 1700);
+}
+function disasterFlood() {
+  S.flood = true; setFlood(true);
+  if (S.home === 'burrow') { S.damaged = true; setDamaged('burrow', true); }
+  queueEvent({ kind: 'bad', tag: 'Disaster', title: 'Flash flood!', text: `The river burst overnight. Streets are under water and every workplace is closed today, so nobody is expected at work.${S.home === 'burrow' ? ' Your burrow flooded. The landlord will fix it soon.' : ''}`, buttons: [{ label: 'Splash', fn: survived }] });
+}
+function disasterQuake() {
+  shake = 30; sfx.crash();
+  const hit = S.home && !S.damaged && Math.random() < 0.45;
+  if (hit) { S.damaged = true; setDamaged(S.home, true); }
+  queueEvent({ kind: 'bad', tag: 'Disaster', title: 'Earthquake!', text: hit ? `The ground rolled and your ${HOMES[S.home].name.toLowerCase()} cracked. ${S.insured ? 'Insurance will pay.' : `Repairs cost ${money$(HOMES[S.home].repair)} at Nest Estates.`}` : 'The whole town shook for ten long seconds. Your stuff is fine.', buttons: hit && S.insured ? [{ label: 'Fix it', fn: () => repair(true) }] : [{ label: 'OK', fn: survived }] });
+  survived();
+}
+function startTrex() {
+  S.trexAt = null;
+  const m = buildDino({ body: '#c9374a', belly: '#f2b8a0', dark: '#86202f', stripe: '#ffb347', legs: 1.2 });
+  m.root.scale.setScalar(70 / 1.25); scene.add(m.root);
+  const side = pick([[-150, rand(300, 1500)], [WORLD + 150, rand(300, 1500)], [rand(300, 1500), -150]]);
+  trex = { m, x: side[0], y: side[1], t: 0, life: 22, roarT: 0 };
+  sfx.roar(); shake = 12;
+  queueEvent({ kind: 'bad', tag: 'Disaster', title: 'T-REX IN TOWN!', text: 'A full-grown T-rex is stomping down Main Street and compies are bite-sized. Stay away from it, or duck into a building, until it wanders off.', sound: 'roar', buttons: [{ label: 'Run!' }] });
+}
+function endTrex(caught) {
+  scene.remove(trex.m.root); trex = null;
+  if (caught) {
+    const bill = 300; S.injured = true; S.money -= bill; teleport(PLACES.hospital.door); advance(240, { sleeping: true });
+    queueEvent({ kind: 'bad', title: 'Stepped on by a T-rex', text: `It did not even notice you. You woke up at Tarpit Hospital with a ${money$(bill)} bill and a sore everything.` });
+  } else { log('The T-rex wandered off into the hills.', 'good'); survived(); }
+}
+function breakup() {
+  const p = S.partner; S.partner = null; S.happy -= 25;
+  let text = `${p.name} said you never spend time together anymore and left.`;
+  if (p.married) { const half = Math.max(0, Math.round(S.money / 2)); S.money -= half; text = `${p.name} filed for divorce. You never made time for family. They took ${money$(half)}, half of everything.`; }
+  refreshFamily();
+  queueEvent({ kind: 'bad', title: p.married ? 'Divorce' : 'Dumped', text });
+}
+function hatchEgg() {
+  const name = pick(NAMES.filter(n => n !== (S.partner && S.partner.name)));
+  S.kids.push({ name, pal: Math.floor(Math.random() * PALETTES.length) }); S.egg = null; S.happy += 25; goal('egg');
+  refreshFamily();
+  queueEvent({ kind: 'good', title: 'Your egg hatched!', text: `Meet little ${name}! A brand new compy, all legs and appetite. Kids cost $15 a day, and they are worth it.`, sound: 'goal' });
+}
+function arrest(days, why) {
+  S.jail = days; S.record++; goal('jail'); S.happy -= 15;
+  const J = jobInfo();
+  let extra = '';
+  if (J && J.clean) { extra = ` ${PLACES[J.place].name} does not employ criminals. You are fired.`; S.job = null; goal('fired'); }
+  teleport(PLACES.police.door);
+  if (menuPlace) { $('menuScreen').hidden = true; menuPlace = null; }
+  state = 'play';
+  queueEvent({ kind: 'bad', tag: 'Busted', title: `${days} days in jail`, text: `${why}${extra}`, sound: 'siren', buttons: [{ label: 'Go quietly', fn: jailMenu }] });
+}
+function jailMenu() {
+  if (S.jail <= 0) return;
+  const bail = S.jail * 150;
+  queueEvent({ kind: 'bad', tag: `Police and Jail · Day ${S.day}`, title: `Jail: ${S.jail} day${S.jail > 1 ? 's' : ''} left`, text: 'A cold stone cell and a bowl of lukewarm bug stew. What now?',
+    buttons: [
+      { label: 'Serve a day', fn: () => { S.jail--; S.day++; S.min = 7 * 60; S.energy = 70; S.hunger = 60; S.happy -= 6; dayRollover(false); if (S.jail > 0) jailMenu(); else release(); } },
+      { label: 'Try to escape', alt: true, fn: () => { if (Math.random() < 0.35) { S.jail = 0; S.record++; goal('escape'); teleport({ x: 220, y: 1200 }); queueEvent({ kind: 'good', title: 'You escaped!', text: 'You squeezed through the bars (compies are skinny) and legged it. Your record got worse, but you are free.' }); } else { S.jail += 3; queueEvent({ kind: 'bad', title: 'Caught!', text: 'A guard grabbed your tail halfway out the window. Three more days.', buttons: [{ label: 'Ugh', fn: jailMenu }] }); } } },
+      { label: `Pay bail ${money$(bail)}`, alt: true, disabled: S.money < bail, fn: () => { S.money -= bail; S.jail = 0; release(); } },
+    ] });
+}
+function release() { save(); teleport(PLACES.police.door); log('You are out of jail. Behave.', 'warn'); }
+
+// ---------- menus for each place ----------
+const MENUS = {
+  bench: () => ({ title: 'Park Bench', sub: S.home ? 'You have a home now, but the bench is still here for you.' : 'Your bed, for now. It is free, hard and not very safe.', acts: [
+    { label: 'Sleep on the bench', detail: 'Wake at 6:30 AM with 60% energy. Someone might rob you.', fn: () => { const robbed = Math.random() < 0.25 && S.money > 20; const n = robbed ? Math.round(S.money * 0.3) : 0; S.money -= n; S.happy -= 5; closeMenu(); sleep(60); if (robbed) log(`Someone went through your pouch while you slept: -${money$(n)}.`, 'bad'); } },
+    { label: 'Nap for 2 hours', detail: '+20 energy', mins: 120, opts: { sleeping: true }, fn: () => { S.energy += 20; } },
+  ] }),
+  home: p => {
+    const key = p.home, mine = S.home === key, H0 = HOMES[key];
+    if (!mine) return { title: H0.name, sub: key === 'burrow' ? `For rent: ${money$(H0.rent)} a week. Ask at Nest Estates.` : `For sale: ${money$(H0.price)}. Buy it at Nest Estates.`, acts: [] };
+    const fam = S.partner && S.partner.married, q = S.damaged ? 55 : key === 'mansion' ? 100 : key === 'cottage' ? 95 : 85;
+    return { title: `Your ${H0.name}${S.damaged ? ' (damaged)' : ''}`, sub: `${fam ? `${S.partner.name} is home. ` : ''}${S.kids.length ? `Kids: ${S.kids.map(k => k.name).join(', ')}. ` : ''}Groceries: ${S.groceries} meal${S.groceries === 1 ? '' : 's'}.`, acts: [
+      { label: 'Go to bed', detail: `Wake at 6:30 AM with ${q}% energy${S.damaged ? '. The broken roof leaks' : ''}.`, fn: () => { closeMenu(); if (S.damaged) S.happy -= 8; else S.happy += 4; sleep(q); } },
+      { label: 'Cook a meal', detail: '+45 hunger, 30 minutes', why: S.groceries ? '' : 'No groceries. Buy some at Leafy Grocer.', mins: 30, fn: () => { S.groceries--; S.hunger = Math.min(100, S.hunger + 45); } },
+      { label: 'Watch TV', detail: '+12 happiness, 2 hours', mins: 120, fn: () => { S.happy += 12; } },
+      { label: 'Nap', detail: '+30 energy, 2 hours', mins: 120, opts: { sleeping: true }, fn: () => { S.energy += 30; } },
+      ...(fam || S.kids.length ? [{ label: 'Family time', detail: '+15 happiness and closer family, 2 hours', mins: 120, fn: () => { S.happy += 15; if (S.partner) S.partner.rel = Math.min(100, S.partner.rel + 10); } }] : []),
+      ...(fam ? [{ label: 'Try for an egg', detail: 'Once a day. It might take a few tries.', why: S.egg ? 'An egg is already in the nest.' : S.eggsTried === S.day ? 'Already tried today.' : hour() < 18 ? 'Try in the evening (after 6 PM).' : '', mins: 60, fn: () => { S.eggsTried = S.day; if (Math.random() < 0.5) { S.egg = { hatch: S.day + 3 }; log('An egg! It will hatch in 3 days.', 'good'); sfx.goal(); } else log('No egg this time.', ''); } }] : []),
+    ] };
+  },
+  jobs: () => {
+    const acts = [];
+    for (const [id, C] of Object.entries(CAREERS)) {
+      const mine = S.job && S.job.career === id, [t, w] = C.levels[0];
+      let why = '';
+      if (mine) why = 'This is your job.';
+      else if (S.edu < C.edu) why = `Needs a ${C.edu === 1 ? 'diploma' : 'degree'} from Dino U.`;
+      else if (C.clean && S.record > 0) why = 'Needs a clean criminal record.';
+      acts.push({ label: `${t} at ${PLACES[C.place].name}`, detail: `${clock(C.hours[0] * 60)} to ${clock(C.hours[1] * 60)} on weekdays`, tag: `${money$(w)}/day`, why, fn: () => {
+        const had = !!S.job; S.job = { career: id, level: 0, perf: 50, days: 0, missed: 0 }; goal('job');
+        log(`Hired as a ${t}! First shift is the next weekday at ${clock(C.hours[0] * 60)}.`, 'good'); sfx.goal();
+        S.workedToday = true; if (had) S.happy -= 2;
+      } });
+    }
+    if (S.job) acts.push({ label: 'Quit your job', detail: `You are a ${jobInfo().title}.`, risky: true, fn: () => { S.job = null; log('You quit. Freedom! Also no income.', 'warn'); } });
+    return { sub: open(7, 19) ? 'Pick a job. Better jobs need education and a clean record.' : closedMsg(7, 19), acts: open(7, 19) ? acts : [] };
+  },
+  school: () => {
+    if (!open(8, 20)) return { sub: closedMsg(8, 20), acts: [] };
+    const next = S.edu === 0 ? 5 : 15, label = S.edu === 0 ? 'diploma' : 'degree';
+    return { sub: S.edu >= 2 ? 'You have a degree. Doctor jobs are open to you.' : `Credits: ${S.credits}/${next} toward a ${label}.`, acts: S.edu >= 2 ? [] : [
+      { label: 'Take a class', detail: '3 hours, -15 energy, +1 credit', cost: 60, mins: 180, why: S.energy < 15 ? 'Too tired to learn.' : '', fn: () => {
+        S.credits++;
+        if (S.edu === 0 && S.credits >= 5) { S.edu = 1; goal('diploma'); queueEvent({ kind: 'good', title: 'You earned a diploma!', text: 'Office and bank jobs at the Job Center are open to you now. Keep studying for a degree to become a doctor.', sound: 'goal' }); }
+        else if (S.edu === 1 && S.credits >= 15) { S.edu = 2; queueEvent({ kind: 'good', title: 'You earned a degree!', text: 'Tarpit Hospital is hiring nurses. Look at you.', sound: 'goal' }); }
+        else log(`Class done. ${S.credits}/${next} credits.`, '');
+      } },
+    ] };
+  },
+  grocer: () => open(7, 22) ? { sub: 'Fresh ferns, beetles and eggs (not those eggs).', acts: [
+    { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
+    { label: 'Grab a snack', detail: '+20 hunger right now', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } },
+    { label: 'Shoplift groceries', detail: 'Free if nobody sees. 35% chance of 2 days in jail.', tag: 'Crime', risky: true, mins: 10, fn: () => { if (Math.random() < 0.35) arrest(2, 'The store guard saw you stuff a melon in your pouch.'); else { S.groceries += 4; log('You walked out with free groceries. Your heart is pounding.', 'warn'); } } },
+  ] } : { sub: closedMsg(7, 22), acts: [] },
+  burger: () => {
+    const acts = [];
+    workAct(acts, 'burger');
+    if (open(7, 24)) acts.push({ label: 'Order a Bronto Burger', detail: '+50 hunger, +5 happiness', cost: 12, mins: 30, fn: () => { S.hunger = Math.min(100, S.hunger + 50); S.happy += 5; } });
+    acts.push({ label: 'Dig through the dumpster', detail: '+20 hunger, -10 happiness. Might make you sick.', tag: 'Free', mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 20); S.happy -= 10; if (Math.random() < 0.25) { S.energy -= 25; log('That was a bad burger. You feel awful.', 'bad'); } } });
+    return { sub: 'Home of the triple-decker Bronto.', acts };
+  },
+  depot: () => { const acts = []; workAct(acts, 'depot'); return { sub: 'Eggs delivered fresh, mostly unbroken.', acts }; },
+  office: () => { const acts = []; workAct(acts, 'office'); return { sub: 'Fossil Corp. Digging up profits since the Jurassic.', acts }; },
+  hospital: () => {
+    const acts = []; workAct(acts, 'hospital');
+    acts.push({ label: 'Get treated', detail: S.injured ? 'Fixes your injury. You move slowly while hurt.' : 'You are healthy.', cost: S.injured ? 250 : 0, why: S.injured ? '' : 'Nothing to treat.', mins: 90, fn: () => { S.injured = false; log('All patched up.', 'good'); } });
+    return { sub: 'Tarpit General. We pull dinosaurs out of everything.', acts };
+  },
+  bank: () => {
+    const acts = []; workAct(acts, 'bank');
+    if (open(9, 17)) {
+      acts.push({ label: 'Take a $1,000 loan', detail: `5% interest every Monday. Owed now: ${money$(S.loan)}`, why: S.loan >= 5000 ? 'Loan limit reached.' : '', mins: 20, fn: () => { S.loan += 1000; S.money += 1000; } });
+      acts.push({ label: 'Repay the loan', detail: `Owed: ${money$(S.loan)}`, why: S.loan <= 0 ? 'You owe nothing.' : S.money < S.loan ? `You need ${money$(S.loan)}.` : '', mins: 10, fn: () => { S.money -= S.loan; S.loan = 0; log('Loan paid off!', 'good'); } });
+    }
+    acts.push({ label: 'Rob the bank', detail: '30% chance of $1,500 to $4,000. Otherwise 7 days in jail.', tag: 'Crime', risky: true, why: open(9, 17) ? '' : 'The vault is sealed at night.', mins: 30, fn: () => {
+      if (Math.random() < 0.3) { const n = Math.round(rand(1500, 4000)); S.money += n; S.record++; queueEvent({ kind: 'good', title: 'You robbed the bank!', text: `You ran out with ${money$(n)} in a sack bigger than you. Nobody caught you, but people talk. Your record is worse.` }); }
+      else arrest(7, 'A compy with a tiny mask is not as scary as you hoped. The guards tackled you at the vault.');
+    } });
+    return { sub: 'Stone Bank. Your money is safe here (the vault is a boulder).', acts };
+  },
+  casino: () => open(12, 24) ? { sub: 'Lucky Egg Casino. The house always wins, mostly.', acts: [
+    { label: 'Bet $50 on Dino Dice', detail: '45% chance to double it', cost: 50, mins: 20, fn: () => { if (Math.random() < 0.45) { S.money += 100; log('You won $100!', 'good'); sfx.coin(); } else { S.happy -= 3; log('Lost $50.', 'bad'); } } },
+    { label: 'Bet $500 on Dino Dice', detail: '45% chance to double it', cost: 500, mins: 20, risky: true, fn: () => { if (Math.random() < 0.45) { S.money += 1000; log('You won $1,000!', 'good'); sfx.coin(); } else { S.happy -= 8; log('Lost $500. Ouch.', 'bad'); } } },
+    { label: 'Pull the Egg Slot', detail: '2% chance of a $2,000 jackpot', cost: 20, mins: 5, fn: () => { if (Math.random() < 0.02) { S.money += 2000; queueEvent({ kind: 'good', title: 'JACKPOT!', text: 'Three golden eggs! $2,000 pours out of the machine.', sound: 'coin' }); } else log('No luck.', ''); } },
+  ] } : { sub: closedMsg(12, 24), acts: [] },
+  cafe: () => {
+    if (!open(8, 23)) return { sub: closedMsg(8, 23), acts: [] };
+    const p = S.partner, acts = [];
+    if (!p) acts.push({ label: 'Meet someone new', detail: 'Buy a coffee and chat with a stranger', cost: 15, mins: 45, fn: () => {
+      const cand = { name: pick(NAMES), trait: pick(TRAITS), pal: Math.floor(Math.random() * PALETTES.length) };
+      queueEvent({ kind: 'good', title: `You met ${cand.name}`, text: `${cand.name} ${cand.trait} and laughed at your joke about pterodactyls. Ask them out?`,
+        buttons: [{ label: 'Ask them out', fn: () => { if (Math.random() < 0.7) { S.partner = { ...cand, rel: 25, married: false }; log(`You and ${cand.name} are dating!`, 'good'); } else log(`${cand.name} said they are not looking for anything right now.`, 'bad'); } }, { label: 'Just friends', alt: true }] });
+      closeMenu();
+    } });
+    if (p) {
+      acts.push({ label: `Date with ${p.name}`, detail: `+10 to 20 closeness, 2 hours. Closeness: ${Math.round(p.rel)}/100`, cost: 40, mins: 120, fn: () => { p.rel = Math.min(100, p.rel + rand(10, 20)); S.happy += 12; goal('date'); log(`Lovely date with ${p.name}.`, 'good'); } });
+      if (!p.married) acts.push({ label: `Propose to ${p.name}`, detail: 'Ring and wedding included', cost: 600, why: p.rel < 75 ? `Get closer first (${Math.round(p.rel)}/75).` : '', mins: 60, fn: () => {
+        if (Math.random() < 0.85) { p.married = true; p.rel = 100; S.happy += 30; goal('married'); refreshFamily(); queueEvent({ kind: 'good', title: 'Just married!', text: `${p.name} said yes! The whole Fern Cafe cheered. ${S.home ? `${p.name} is moving into your ${HOMES[S.home].name.toLowerCase()}.` : `You need a home to live together. Try Nest Estates.`} Married compies can try for eggs at home in the evening.`, sound: 'goal' }); }
+        else { p.rel -= 30; S.happy -= 20; queueEvent({ kind: 'bad', title: `${p.name} said no`, text: 'They said it is too soon. Awkward. The ring is non-refundable.' }); }
+      } });
+      if (!p.married) acts.push({ label: `Break up with ${p.name}`, risky: true, detail: 'End it', fn: () => { S.partner = null; S.happy -= 10; log('You broke up.', 'warn'); } });
+    }
+    acts.push({ label: 'Have lunch', detail: '+35 hunger, +4 happiness', cost: 14, mins: 40, fn: () => { S.hunger = Math.min(100, S.hunger + 35); S.happy += 4; } });
+    return { sub: p ? `${p.married ? 'Married to' : 'Dating'} ${p.name}, who ${p.trait}.` : 'The best place in town to meet someone special.', acts };
+  },
+  realty: () => {
+    if (!open(8, 19)) return { sub: closedMsg(8, 19), acts: [] };
+    const acts = [];
+    const moveIn = key => { if (S.home && S.home !== 'burrow') { const back = Math.round(HOMES[S.home].price * 0.7); S.money += back; log(`Sold your ${HOMES[S.home].name.toLowerCase()} for ${money$(back)}.`, 'warn'); } if (S.home) setDamaged(S.home, false); S.home = key; S.damaged = false; goal('home'); if (key === 'mansion') goal('mansion'); refreshHome(); refreshFamily(); log(`Welcome home to your ${HOMES[key].name.toLowerCase()}!`, 'good'); sfx.goal(); };
+    acts.push({ label: 'Rent the Burrow', detail: `${money$(HOMES.burrow.rent)} every Monday. First week due now.`, cost: HOMES.burrow.rent, why: S.home === 'burrow' ? 'You live here.' : '', mins: 30, fn: () => moveIn('burrow') });
+    acts.push({ label: 'Buy the Cottage', detail: 'Two rooms, a chimney and a big tree out back', cost: HOMES.cottage.price, why: S.home === 'cottage' ? 'You own it.' : S.home === 'mansion' ? 'You already own the mansion.' : '', mins: 60, fn: () => moveIn('cottage') });
+    acts.push({ label: 'Buy the Mansion', detail: 'Columns. A pool. Total luxury.', cost: HOMES.mansion.price, why: S.home === 'mansion' ? 'You own it.' : '', mins: 60, fn: () => moveIn('mansion') });
+    if (S.home) acts.push({ label: S.insured ? 'Cancel home insurance' : 'Buy home insurance', detail: 'Covers trees, meteors and earthquakes. $40 every Monday.', tag: '$40/wk', fn: () => { S.insured = !S.insured; log(S.insured ? 'You are insured.' : 'Insurance cancelled.', ''); } });
+    if (S.home && S.damaged) acts.push({ label: 'Repair your house', detail: 'Good as new', cost: S.insured || S.home === 'burrow' ? 0 : HOMES[S.home].repair, mins: 60, fn: () => repair(S.insured || S.home === 'burrow') });
+    return { sub: S.home ? `You live in the ${HOMES[S.home].name.toLowerCase()}.${S.insured ? ' Insured.' : ' Not insured.'}` : 'Find your forever nest.', acts };
+  },
+  police: () => ({ sub: S.record ? `Your record: ${S.record} offense${S.record > 1 ? 's' : ''}.` : 'Your record is clean.', acts: [
+    { label: 'Clear your record', detail: 'Pay a lawyer to wipe it clean. Clean jobs open up again.', cost: 1500, why: S.record ? '' : 'Nothing to clear.', mins: 60, fn: () => { S.record = 0; log('Your record is spotless again.', 'good'); } },
+  ] }),
+};
+function workAct(acts, placeId) {
+  const J = jobInfo();
+  if (!J || J.place !== placeId) return;
+  const [a, b] = J.hours;
+  let why = '';
+  if (!isWorkday()) why = 'It is the weekend. No shift today.';
+  else if (S.flood) why = 'Closed for the flood. Enjoy the day off.';
+  else if (S.workedToday) why = 'You already handled today.';
+  else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`;
+  else if (hour() > b - 1) why = 'Too late for today.';
+  const late = hour() > a + 0.25, startH = Math.max(hour(), a), mins = Math.round((b - startH) * 60);
+  const pay = Math.round(J.wage * Math.min(1, (b - startH) / (b - a)));
+  acts.unshift({ label: `Work your shift as ${J.title}`, detail: why ? '' : `${late ? 'You are late! ' : ''}Until ${clock(b * 60)}. Performance: ${Math.round(S.job.perf)}/100.`, tag: money$(pay), why, fn: () => {
+    if (hour() < a) S.min = a * 60;
+    S.workedToday = true;
+    advance(mins, { work: true });
+    S.money += pay;
+    let d = rand(3, 9) + (S.happy > 70 ? 2 : 0) - (S.energy < 25 ? 6 : 0) - (S.hunger < 20 ? 3 : 0) - (late ? 9 : 0);
+    S.job.perf = clamp(S.job.perf + d, 0, 100);
+    log(`Shift done: +${money$(pay)}. Performance ${d >= 0 ? 'up' : 'down'} to ${Math.round(S.job.perf)}.`, d >= 0 ? 'good' : 'warn'); sfx.coin();
+    const C = CAREERS[S.job.career];
+    if (S.job.perf >= 85 && S.job.days >= 3 && S.job.level < C.levels.length - 1) {
+      S.job.level++; S.job.perf = 60; S.job.days = 0; S.happy += 15; goal('promo');
+      if (S.job.level === C.levels.length - 1) goal('top');
+      queueEvent({ kind: 'good', title: 'Promoted!', text: `You are now ${C.levels[S.job.level][0]} at ${PLACES[C.place].name}. Pay is up to ${money$(C.levels[S.job.level][1])} a day.`, sound: 'goal' });
+    } else if (S.job.perf < 15) fire('Your work has been terrible lately.');
+  } });
+  acts.push({ label: 'Slack off in the break room', detail: '+10 happiness, -6 performance, 1 hour', why: isWorkday() && !S.workedToday ? '' : 'You are not on shift.', mins: 60, fn: () => { S.happy += 10; S.job.perf -= 6; if (Math.random() < 0.2) fire('Your boss caught you napping in the supply closet.'); } });
+}
+
+// ---------- effects ----------
+let particles = [], shake = 0, flood = null, meteor = null, fallingTree = null;
+function burst(x, y, h, n, color, spd, size) { for (let i = 0; i < n; i++) { const a = rand(0, 6.28), s = rand(0.3, 1) * spd; particles.push({ x, y, z: h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rand(60, 260), life: rand(0.5, 1.1), max: 1.1, color, size: rand(1.5, size) }); } }
+function animTree(key) { const t = homeTrees[key]; fallingTree = { t, k: 0 }; sfx.creak(); }
+function meteorFx(x, y) {
+  const m = add(scene, GEO.s, '!#ffb04a', x + 900, 1600, y - 400, 26, 26, 26);
+  const trail = add(scene, GEO.c, '!#ff6a1a', 0, 0, 0, 18, 140, 18); trail.visible = false;
+  meteor = { m, x, y, k: 0 }; sfx.whoosh();
+}
+function setFlood(on) {
+  if (on && !flood) { flood = new THREE.Mesh(new THREE.PlaneGeometry(WORLD + 400, WORLD + 400), new THREE.MeshLambertMaterial({ color: '#3d7fb0', transparent: true, opacity: 0.55, depthWrite: false })); flood.rotation.x = -Math.PI / 2; flood.position.set(WORLD / 2, 0, WORLD / 2); scene.add(flood); }
+  if (!on && flood) { scene.remove(flood); flood = null; }
+}
+const crater = [];
+
+// ---------- audio ----------
+let actx = null, muted = false;
+function initAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; } }
+function tone(f, dur, type = 'triangle', vol = 0.07, slide = 0, delay = 0) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t0); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+const sfx = {
+  ding: () => { tone(880, 0.12); tone(1320, 0.18, 'triangle', 0.05, 0, 0.08); },
+  bad: () => { tone(220, 0.25, 'sawtooth', 0.06, -80); },
+  goal: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.16, 'triangle', 0.07, 0, i * 0.08)),
+  coin: () => { tone(988, 0.08, 'square', 0.04); tone(1319, 0.14, 'square', 0.04, 0, 0.07); },
+  door: () => tone(330, 0.08, 'sine', 0.06, 120),
+  crash: () => { tone(80, 0.6, 'sawtooth', 0.12, -40); tone(120, 0.3, 'square', 0.06, -60, 0.05); },
+  creak: () => tone(140, 1.1, 'sawtooth', 0.04, -70),
+  whoosh: () => tone(900, 1.4, 'sawtooth', 0.04, -820),
+  roar: () => { tone(90, 0.8, 'sawtooth', 0.13, -40); tone(65, 0.9, 'square', 0.07, -20, 0.05); },
+  siren: () => { for (let i = 0; i < 4; i++) { tone(660, 0.18, 'square', 0.04, 0, i * 0.36); tone(880, 0.18, 'square', 0.04, 0, i * 0.36 + 0.18); } },
+};
+
+// ---------- player / world refresh ----------
+let P = { x: 900, y: 1130, vx: 0, vy: 0, face: -Math.PI / 2, t: 0 };
+function teleport(d) { P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
+function refreshHome() {
+  for (const key of Object.keys(HOMES)) {
+    const owned = S && S.home === key;
+    if (owned && !homeModels[key]) homeModels[key] = buildHomeModel(key);
+    if (!owned && homeModels[key]) { scene.remove(homeModels[key].g); fadeables.splice(fadeables.indexOf(homeModels[key].fade), 1); const i = solids.indexOf(homeModels[key].box); if (i >= 0) solids.splice(i, 1); setDamaged(key, false); delete homeModels[key]; }
+    PLACES['home_' + key].saleSign.visible = !owned;
+  }
+  if (S && S.home && S.damaged) setDamaged(S.home, true);
+}
+function refreshFamily() {
+  if (spouseM) { scene.remove(spouseM.m.root); spouseM = null; }
+  for (const k of kidMs) scene.remove(k.m.root); kidMs = [];
+  if (!S || !S.home) return;
+  const cx = PLACES['home_' + S.home].door.x;
+  if (S.partner && S.partner.married) { const pal = PALETTES[S.partner.pal]; const m = makeCompy(pal, { crest: pal.crest, bow: '#ff6ad5' }); m.root.scale.setScalar(13 / 1.25); scene.add(m.root); spouseM = { m, x: cx - 30, y: 1300, t: 0, tx: cx, ty: 1300 }; }
+  S.kids.forEach((k, i) => { const pal = PALETTES[k.pal]; const m = makeCompy(pal, { crest: pal.crest }); m.root.scale.setScalar(7 / 1.25); scene.add(m.root); kidMs.push({ m, x: cx + 20 + i * 14, y: 1305, t: i, tx: cx, ty: 1300 }); });
+}
+function setScreens() {
+  const playing = state !== 'title';
+  $('hud').hidden = !playing; $('mini').hidden = !playing; $('feed').hidden = !playing;
+  $('pauseScreen').hidden = state !== 'paused';
+}
+
+// ---------- input ----------
+const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
+let nearPlace = null;
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') $('newBtn').click(); return; }
+  const k = e.key.toLowerCase();
+  if (k === 'escape') { if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
+  if (k === 'p') { togglePause(); return; }
+  if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); if (nearPlace) openMenu(nearPlace); return; }
+  if (k === 'g' && state === 'play') { showGoals(); return; }
+  if (k.startsWith('arrow')) e.preventDefault();
+  keys.add(k);
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => { keys.clear(); if (state === 'play') togglePause(); });
+cv.addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; for (const t of e.changedTouches) if (!joy.active) { joy.active = true; joy.id = t.identifier; joy.ox = t.clientX; joy.oy = t.clientY; joy.dx = joy.dy = 0; } }, { passive: false });
+cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joy.id) { let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const m = Math.hypot(dx, dy), R = 55; if (m > R) { joy.ox += dx * (1 - R / m); joy.oy += dy * (1 - R / m); dx = t.clientX - joy.ox; dy = t.clientY - joy.oy; } joy.dx = dx / R; joy.dy = dy / R; } }, { passive: false });
+const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
+cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
+$('useBtn').addEventListener('click', () => { if (state === 'play' && nearPlace) openMenu(nearPlace); });
+$('prompt').addEventListener('click', () => { if (state === 'play' && nearPlace) openMenu(nearPlace); });
+
+// ---------- loop ----------
+const cam = { x: 900, y: 1130 };
+function update(dt) {
+  let mx = 0, my = 0;
+  if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
+  if (keys.has('w') || keys.has('arrowup')) my -= 1; if (keys.has('s') || keys.has('arrowdown')) my += 1;
+  if (joy.active) { mx = joy.dx; my = joy.dy; }
+  let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
+  const spd = (S.injured ? 110 : 200) * (S.flood ? 0.7 : 1) * (S.energy < 15 ? 0.7 : 1);
+  P.vx += (mx * spd - P.vx) * Math.min(1, dt * 12); P.vy += (my * spd - P.vy) * Math.min(1, dt * 12);
+  P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10);
+  collide(P, 9);
+  if (m > 0.15) P.face += (((Math.atan2(my, mx) - P.face + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * Math.min(1, dt * 14);
+  P.t += dt * (0.3 + Math.hypot(P.vx, P.vy) / 120);
+  advance(dt * 4);
+  if (state !== 'play') return;
+  // nearest door
+  nearPlace = null; let best = 50;
+  for (const p of Object.values(PLACES)) { const d = Math.hypot(P.x - p.door.x, P.y - p.door.y); if (d < best) { best = d; nearPlace = p; } }
+  // t-rex
+  if (trex) {
+    trex.life -= dt; trex.t += dt;
+    const dx = P.x - trex.x, dy = P.y - trex.y, d = Math.hypot(dx, dy) || 1, insideNear = nearPlace && best < 30;
+    const chase = d < 520 && !insideNear;
+    const tx = chase ? dx / d : (WORLD / 2 - trex.x) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1), ty = chase ? dy / d : (WORLD / 2 - trex.y) / (Math.hypot(WORLD / 2 - trex.x, WORLD / 2 - trex.y) || 1);
+    const ts = chase ? 165 : 90;
+    trex.x += tx * ts * dt; trex.y += ty * ts * dt; trex.face = Math.atan2(ty, tx);
+    trex.roarT -= dt; if (chase && trex.roarT <= 0) { trex.roarT = 4; sfx.roar(); shake = 8; }
+    if (Math.random() < dt * 4) shake = Math.max(shake, 3);
+    if (d < 55 && !insideNear) { endTrex(true); return; }
+    if (trex.life <= 0) endTrex(false);
+  }
+  for (const n of npcs) {
+    if (n.wait > 0) { n.wait -= dt; continue; }
+    const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy);
+    if (d < 4) { npcNext(n); n.wait = Math.random() < 0.3 ? rand(0.5, 2) : 0; continue; }
+    n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt * n.speed / 90;
+  }
+  for (const f of [spouseM, ...kidMs]) if (f) {
+    f.t += dt;
+    if (Math.hypot(f.tx - f.x, f.ty - f.y) < 3) { const cx = PLACES['home_' + S.home].door.x; f.tx = cx + rand(-60, 60); f.ty = rand(1275, 1320); }
+    const dx = f.tx - f.x, dy = f.ty - f.y, d = Math.hypot(dx, dy) || 1, sp = f === spouseM ? 30 : 45;
+    f.x += dx / d * sp * dt; f.y += dy / d * sp * dt; f.face = Math.atan2(dy, dx);
+  }
+}
+function updateFx(dt) {
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= 500 * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  if (fallingTree) { fallingTree.k = Math.min(1, fallingTree.k + dt * 0.9); const e = fallingTree.k * fallingTree.k; fallingTree.t.rotation.x = e * 1.35; if (fallingTree.k >= 1) { burst(fallingTree.t.position.x, fallingTree.t.position.z - 110, 10, 30, '#3c8240', 200, 4); fallingTree = null; } }
+  if (meteor) {
+    meteor.k = Math.min(1, meteor.k + dt * 0.65);
+    const k = meteor.k;
+    meteor.m.position.set(meteor.x + 900 * (1 - k), 1600 * (1 - k), meteor.y - 400 * (1 - k));
+    if (Math.random() < 0.8) burst(meteor.m.position.x, meteor.m.position.z, meteor.m.position.y, 2, '#ffb04a', 40, 4);
+    if (k >= 1) {
+      scene.remove(meteor.m); sfx.crash(); shake = 26;
+      burst(meteor.x, meteor.y, 10, 70, '#ff7a1a', 360, 5); burst(meteor.x, meteor.y, 10, 30, '#3a2a26', 240, 5);
+      const c = new THREE.Mesh(new THREE.CircleGeometry(60, 20), mat('#2a2220')); c.rotation.x = -Math.PI / 2; c.position.set(meteor.x, 0.6, meteor.y); scene.add(c); crater.push(c);
+      meteor = null;
+    }
+  }
+}
+const SKYKEYS = [[0, '#0d1030'], [300, '#141a40'], [360, '#f6b48a'], [480, '#9fd3ff'], [1020, '#9fd3ff'], [1140, '#ff9a6a'], [1230, '#3a3060'], [1320, '#121638'], [1440, '#0d1030']];
+const _c1 = new THREE.Color(), _c2 = new THREE.Color();
+function lighting() {
+  const m = S ? S.min % 1440 : 600;
+  let i = 0; while (i < SKYKEYS.length - 2 && SKYKEYS[i + 1][0] <= m) i++;
+  const [a, ca] = SKYKEYS[i], [b, cb] = SKYKEYS[i + 1], k = (m - a) / Math.max(1, b - a);
+  _c1.set(ca); _c2.set(cb); SKY.copy(_c1).lerp(_c2, k);
+  if (S && S.flood) SKY.lerp(_c2.set('#6a7a8a'), 0.6);
+  scene.fog.color.copy(SKY);
+  const day = clamp(Math.sin((m - 360) / 1080 * Math.PI), 0, 1);
+  sun.intensity = 0.15 + day * 0.8; hemi.intensity = 0.35 + day * 0.5;
+  sun.color.setHSL(0.09, 0.6, 0.6 + day * 0.3);
+  const night = 1 - clamp(day * 2.2, 0, 1);
+  for (const f of facadeMats) f.emissiveIntensity = 0.15 + night * 0.8;
+  for (const l of lampMats) l.color.setHSL(0.13, 0.4 + night * 0.6, 0.6 + night * 0.25);
+  doorMat.opacity = 0.55 + Math.abs(Math.sin(gameT * 3)) * 0.4;
+  const sa = (m - 360) / 1080 * Math.PI;
+  sun.position.set(cam.x + Math.cos(sa) * 700, 300 + Math.sin(sa) * 900 + 200, cam.y + 300); sun.target.position.set(cam.x, 0, cam.y);
+}
+function fadeView(dt) {
+  for (const f of fadeables) {
+    const inFront = state !== 'title' && f.y0 > P.y - 15 && f.y0 < P.y + 420 && f.x1 > P.x - 40 && f.x0 < P.x + 40;
+    const target = inFront ? 0.25 : 1;
+    if (f.op === target) continue;
+    f.op += (target - f.op) * Math.min(1, dt * 8); if (Math.abs(f.op - target) < 0.01) f.op = target;
+    for (const m of f.mats) { m.transparent = f.op < 0.99; m.opacity = f.op; m.depthWrite = f.op >= 0.99; }
+  }
+}
+function sync3D() {
+  const pm = player;
+  pm.root.position.set(P.x, flood ? 2 : 0, P.y); pm.root.rotation.y = -P.face; pm.root.scale.setScalar(14 / 1.25);
+  animDino(pm, P.t, state === 'play' ? Math.min(1, Math.hypot(P.vx, P.vy) / 60) : 0);
+  pm.root.rotation.z = S && S.injured ? Math.sin(gameT * 6) * 0.05 : 0;
+  for (const n of npcs) { const horiz = Math.abs(Math.cos(n.face || 0)) > 0.5; n.m.root.position.set(horiz ? n.x : n.x + n.side, 0, horiz ? n.y + n.side : n.y); n.m.root.rotation.y = -(n.face || 0); animDino(n.m, n.t, n.wait > 0 ? 0 : 1); }
+  for (const f of [spouseM, ...kidMs]) if (f) { f.m.root.position.set(f.x, 0, f.y); f.m.root.rotation.y = -(f.face || 0); animDino(f.m, f.t * 2, 1, f === spouseM ? 9 : 14); if (f !== spouseM) f.m.body.position.y = Math.abs(Math.sin(f.t * 8)) * 0.6; }
+  if (trex) { trex.m.root.position.set(trex.x, 0, trex.y); trex.m.root.rotation.y = -(trex.face || 0); animDino(trex.m, trex.t * 1.3, 1, 7); trex.m.jaw.rotation.z = -0.1 - Math.max(0, Math.sin(trex.t * 3)) * 0.5; }
+  for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
+  const sx = shake ? rand(-shake, shake) * 0.5 : 0, sz = shake ? rand(-shake, shake) * 0.5 : 0;
+  const portrait = H > W ? 1.4 : 1, d = 470 * portrait;
+  if (state === 'title') { const a = gameT * 0.06; camera.position.set(900 + Math.cos(a) * 700, 480, 900 + Math.sin(a) * 700); camera.lookAt(900, 0, 900); }
+  else { cam.x += (P.x + P.vx * 0.3 - cam.x) * 0.08; cam.y += (P.y + P.vy * 0.3 - cam.y) * 0.08; camera.position.set(cam.x + sx, d * 0.95, cam.y + d * 0.7 + sz); camera.lookAt(cam.x + sx, 0, cam.y - 20 + sz); }
+  scene.fog.near = d * 1.6; scene.fog.far = d * 4.5;
+}
+const _v = new THREE.Vector3();
+function toScreen(x, h, y) { _v.set(x, h, y).project(camera); return { x: (_v.x + 1) / 2 * W, y: (1 - _v.y) / 2 * H, ok: _v.z < 1 && _v.z > -1 }; }
+function arrowTo(g, tx, ty, color, label) {
+  const s = toScreen(tx, 0, ty); if (s.ok && s.x > 0 && s.x < W && s.y > 0 && s.y < H) return;
+  const a = Math.atan2(s.y - H / 2, s.x - W / 2), m = 50;
+  const ax = clamp(W / 2 + Math.cos(a) * W, m, W - m), ay = clamp(H / 2 + Math.sin(a) * H, m + 140, H - m - 60);
+  g.save(); g.translate(ax, ay); g.rotate(a); g.fillStyle = color; g.strokeStyle = '#000'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(18, 0); g.lineTo(-10, -12); g.lineTo(-4, 0); g.lineTo(-10, 12); g.closePath(); g.fill(); g.stroke(); g.restore();
+  g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = color; g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = 3;
+  const lx = clamp(ax - Math.cos(a) * 30, 40, W - 40), ly = ay - Math.sin(a) * 30;
+  g.strokeText(label, lx, ly); g.fillText(label, lx, ly);
+}
+function drawOverlay() {
+  const g = fctx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+  if (state === 'title') return;
+  for (const p of particles) { const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue; g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color; g.beginPath(); g.arc(s.x, s.y, p.size, 0, 7); g.fill(); }
+  g.globalAlpha = 1; g.textAlign = 'center';
+  for (const p of Object.values(PLACES)) {
+    if (!p.h) continue;
+    const s = toScreen((p.x0 + p.x1) / 2, p.h + 18, (p.y0 + p.y1) / 2); if (!s.ok || s.x < -50 || s.x > W + 50 || s.y < -20 || s.y > H + 20) continue;
+    g.font = '400 15px "Lilita One", system-ui, sans-serif'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.65)'; g.strokeText(p.name, s.x, s.y); g.fillStyle = '#fff'; g.fillText(p.name, s.x, s.y);
+  }
+  const lbl = (x, y, h, text, color) => { const s = toScreen(x, h, y); if (!s.ok) return; g.font = '800 12px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.7)'; g.strokeText(text, s.x, s.y); g.fillStyle = color; g.fillText(text, s.x, s.y); };
+  lbl(P.x, P.y, 42, S.name, '#ffe08a');
+  if (spouseM) lbl(spouseM.x, spouseM.y, 40, S.partner.name, '#ffb3e6');
+  kidMs.forEach((k, i) => lbl(k.x, k.y, 26, S.kids[i].name, '#bfe8ff'));
+  if (trex) arrowTo(g, trex.x, trex.y, '#ef5a5f', 'T-REX');
+  const J = jobInfo();
+  if (J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
+  if (hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
+  if (joy.active) { g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22, 0, 7); g.fill(); }
+  if (trex) { g.fillStyle = `rgba(200,0,0,${0.08 + Math.sin(gameT * 6) * 0.05})`; g.fillRect(0, 0, W, H); }
+}
+const mini = $('mini'), mctx = mini.getContext('2d'); let mt = 0;
+function drawMini() {
+  if (++mt % 4) return;
+  const Sz = mini.clientWidth; if (mini.width !== Math.round(Sz * DPR)) mini.width = mini.height = Math.round(Sz * DPR);
+  const g = mctx, k = Sz / WORLD; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, Sz, Sz);
+  g.fillStyle = 'rgba(60,110,60,.7)'; g.fillRect(0, 0, Sz, Sz);
+  g.fillStyle = 'rgba(80,80,90,.9)'; for (const c of [600, 1200]) { g.fillRect((c - 50) * k, 0, 100 * k, Sz); g.fillRect(0, (c - 50) * k, Sz, 100 * k); }
+  const J = jobInfo();
+  for (const p of Object.values(PLACES)) {
+    if (p.h) { g.fillStyle = J && J.place === p.id ? '#ffbe55' : 'rgba(220,220,230,.75)'; g.fillRect(p.x0 * k, p.y0 * k, (p.x1 - p.x0) * k, (p.y1 - p.y0) * k); }
+    if (p.home && S.home === p.home) { g.fillStyle = '#8fdc6a'; g.fillRect(p.door.x * k - 4, (p.door.y + 100) * k - 4, 8, 8); }
+  }
+  if (trex) { g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(trex.x * k, trex.y * k, 5, 0, 7); g.fill(); }
+  g.save(); g.translate(P.x * k, P.y * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
+}
+function hud() {
+  $('whenDay').textContent = `Day ${S.day} · ${DAYS[weekday()]} ${clock(S.min)}`;
+  const mEl = $('money'); mEl.textContent = money$(S.money); mEl.style.color = S.money < 0 ? 'var(--blood)' : 'var(--leaf)';
+  $('enBar').style.width = S.energy + '%'; $('huBar').style.width = S.hunger + '%'; $('haBar').style.width = S.happy + '%';
+  const J = jobInfo(), chips = [];
+  chips.push(J ? [`${J.title} · ${Math.round(S.job.perf)}%`, S.job.perf < 30 ? 'bad' : 'good'] : ['Unemployed', 'bad']);
+  chips.push(S.home ? [`${HOMES[S.home].name}${S.damaged ? ' (broken)' : ''}`, S.damaged ? 'bad' : 'good'] : ['Homeless', 'bad']);
+  if (S.partner) chips.push([`${S.partner.married ? 'Married' : 'Dating'}: ${S.partner.name}`, '']);
+  if (S.kids.length) chips.push([`${S.kids.length} kid${S.kids.length > 1 ? 's' : ''}`, '']);
+  if (S.egg) chips.push(['Egg in nest', 'good']);
+  if (S.record) chips.push([`Record: ${S.record}`, 'bad']);
+  if (S.injured) chips.push(['Injured', 'bad']);
+  if (S.loan) chips.push([`Loan ${money$(S.loan)}`, 'bad']);
+  const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
+  if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
+  $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
+  const pr = $('prompt'), show = state === 'play' && nearPlace;
+  pr.hidden = !show; if (show) { const t = `<kbd>${touchMode ? 'TAP' : 'E'}</kbd>${nearPlace.home && S.home === nearPlace.home ? 'Go inside your home' : 'Enter ' + nearPlace.name}`; if (pr.innerHTML !== t) pr.innerHTML = t; }
+  $('useBtn').hidden = !(touchMode && show);
+  const sh = $('shift');
+  let st = '';
+  if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
+  if (trex) st = 'A T-rex is loose! Hide in a doorway or keep away.';
+  if (hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
+  sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
+  feedItems.forEach((it, i) => { const el = $('feed').children[i]; if (el) el.style.opacity = performance.now() - it.t > 9000 ? '0' : '1'; });
+  drawMini();
+}
+function showGoals() {
+  const n = Object.keys(S.goals).length;
+  $('goalsSub').textContent = `${n} of ${GOALS.length} done. Some are good ideas. Some are not.`;
+  $('goalsList').innerHTML = GOALS.map(([id, t]) => `<div class="${S.goals[id] ? 'done' : ''}">${t}</div>`).join('');
+  $('goalsScreen').hidden = false; if (state === 'play') state = 'goals';
+}
+function togglePause() { if (state === 'play') state = 'paused'; else if (state === 'paused') state = 'play'; else return; keys.clear(); setScreens(); }
+function beginLife(fromSave) {
+  initAudio();
+  if (fromSave) S = fromSave; else { newLife(($('nameIn').value || '').trim().slice(0, 16) || 'Chomp'); }
+  feedItems.length = 0; renderFeed();
+  if (player) scene.remove(player.root);
+  const pal = PALETTES[S.pal]; player = makeCompy(pal, { crest: pal.crest }); scene.add(player.root);
+  refreshHome(); refreshFamily();
+  teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
+  $('titleScreen').hidden = true; state = 'play'; setScreens();
+  if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
+  else { log(`Welcome back. Day ${S.day}.`, ''); if (S.jail > 0) jailMenu(); }
+}
+$('newBtn').addEventListener('click', () => beginLife(null));
+$('contBtn').addEventListener('click', () => { const s = loadSave(); if (s) beginLife(s); });
+$('menuClose').addEventListener('click', closeMenu);
+$('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(); });
+$('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
+$('pauseBtn').addEventListener('click', togglePause);
+$('resumeBtn').addEventListener('click', togglePause);
+$('quitBtn').addEventListener('click', () => { save(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
+$('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
+
+buildTown(); spawnNPCs();
+player = makeCompy(PALETTES[0], { crest: PALETTES[0].crest }); scene.add(player.root);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => signs.forEach(d => d()));
+{ const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; }
+let gameT = 0, last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
+  if (state === 'play') update(dt);
+  updateFx(dt);
+  if (state === 'title') for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } }
+  shake = Math.max(0, shake - dt * 30);
+  lighting(); fadeView(dt); sync3D();
+  renderer.render(scene, camera);
+  drawOverlay();
+  if (S && state !== 'title') { S.pos = { x: P.x, y: P.y }; hud(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
