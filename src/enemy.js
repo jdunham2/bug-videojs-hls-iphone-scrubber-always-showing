@@ -32,7 +32,7 @@ export class Grunt {
   constructor(game, pos, level) {
     this.game = game;
     this.level = level;
-    const g = config.grunt;
+    const g = this.tune || config.grunt; // some enemy types tune their own attack
     const w = config.waves;
     this.maxHp = this.hp = g.baseHp * (1 + w.hpGrowth * (level - 1));
     this.speed = g.speed * (1 + w.speedGrowth * (level - 1));
@@ -161,7 +161,7 @@ export class Grunt {
   updateModel(dt) {
     const A = this.anim;
     if (!A) return;
-    const g = config.grunt;
+    const g = this.tune || config.grunt; // some enemy types tune their own attack
     const atk = A.duration('attack');
     const hitAt = atk * config.models.attackHitAt;
     const crouchEnd = atk * config.models.attackWindupEnd;
@@ -332,7 +332,7 @@ export class Grunt {
   }
 
   update(realDt, player) {
-    const g = config.grunt;
+    const g = this.tune || config.grunt; // some enemy types tune their own attack
     this.flash = Math.max(0, this.flash - realDt);
 
     this.hitT = Math.max(0, this.hitT - realDt);

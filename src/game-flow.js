@@ -9,6 +9,7 @@ import { Grunt } from './enemy.js';
 import { Archer } from './archer.js';
 import { Boss } from './boss.js';
 import { Raider, Bomber, Thief } from './variants.js';
+import { Stalker, Shieldbearer, Deckhand, Automaton, Lancer } from './reaches.js';
 import { rollItem } from './gear.js';
 
 /** Twists a wave can come with (from wave 4). */
@@ -98,7 +99,9 @@ export class FlowMethods {
     for (let i = 0; i < n; i++) {
       const g = spawnGates[i % Math.max(1, spawnGates.length)] || { x: (i - 1) * 4, z: -ARENA_HALF + 2 };
       const p = new THREE.Vector3(g.x + (Math.random() - 0.5) * 3, 0, g.z + (Math.random() - 0.5) * 3);
-      this.enemies.push(this.toughen(new Grunt(this, p, this.enemyLevel())));
+      // Far Reaches bosses call in their own warband; elsewhere, grunts.
+      const Kind = (this.arena || 0) % THEMES.length >= 9 ? this.enemyClass() : Grunt;
+      this.enemies.push(this.toughen(new Kind(this, p, this.enemyLevel())));
     }
   }
 
@@ -189,14 +192,24 @@ export class FlowMethods {
       6: [Archer, 0.75], // Harbor: raiders off the boats
       7: [Bomber, 0.5], // Canyon
       8: [Bomber, 0.4], // Caldera
-      9: [Archer, 0.4], // Verdant Temple
-      10: [Bomber, 0.7], // Shipwreck Cove: pirates with powder pots
-      11: [Archer, 0.2], // Glowcap Grove
-      12: [Archer, 0.55], // Sandsea Oasis
-      13: [Bomber, 0.3], // Clockwork Foundry
-      14: [Archer, 0.65], // Misty Highlands
     }[theme];
     if (mix) return ranged ? mix[0] : Math.random() < mix[1] ? Raider : Grunt;
+    // The Far Reaches have their own warbands: [ranged, [[melee kind, weight], ...]].
+    const reach = {
+      9: [Archer, [[Stalker, 5], [Grunt, 3], [Shieldbearer, 1]]], // Verdant Temple
+      10: [Deckhand, [[Raider, 4], [Grunt, 3], [Shieldbearer, 1]]], // Shipwreck Cove
+      11: [Archer, [[Stalker, 5], [Grunt, 4]]], // Glowcap Grove
+      12: [Archer, [[Shieldbearer, 4], [Lancer, 2], [Grunt, 3]]], // Sandsea Oasis
+      13: [Bomber, [[Automaton, 4], [Grunt, 4], [Shieldbearer, 1]]], // Clockwork Foundry
+      14: [Deckhand, [[Lancer, 4], [Shieldbearer, 2], [Stalker, 2]]], // Misty Highlands
+    }[theme];
+    if (reach) {
+      if (ranged) return reach[0];
+      const total = reach[1].reduce((a, [, w]) => a + w, 0);
+      let r = Math.random() * total;
+      for (const [K, w] of reach[1]) if ((r -= w) < 0) return K;
+      return Grunt;
+    }
     return ranged ? Archer : Grunt;
   }
 
