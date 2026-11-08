@@ -118,7 +118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
       <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
-      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a parked car to drive it (H honks). On a phone, drag on the left to move and tap ENTER.</p>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare. On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
   </div>
@@ -359,6 +359,14 @@ function buildTown() {
   place('police', 'Police and Jail', 70, 1300, 330, 1580, 90, -1, { wall: '#5d6672', win: '#1c242e', sign: '#1f3f8a' });
   place('depot', 'Egg Express', 370, 1300, 545, 1580, 70, -1, { wall: '#d98a3a', win: '#2c241c', sign: '#6a3a1a' });
   place('realty', 'Nest Estates', 1280, 1300, 1480, 1500, 70, -1, { wall: '#cdb6d6', win: '#2a2433', sign: '#6a3a7a' });
+  place('carshop', 'Dino Motors', 1540, 1560, 1770, 1740, 75, -1, { wall: '#d0d6dc', win: '#bfe3ff', sign: '#c0392b', awning: '#c0392b' });
+  // a manhole on a quiet stretch of road: the way down to the black market
+  const mhx = 585, mhy = 1700;
+  add(scene, GEO.y, '#55555c', mhx, 0.7, mhy, 20, 1, 20).castShadow = false;
+  add(scene, GEO.y, '#2a2a2e', mhx, 1.1, mhy, 16, 1, 16).castShadow = false;
+  for (let i = -2; i <= 2; i++) add(scene, GEO.b, '#3a3a40', mhx + i * 5.5, 1.7, mhy, 1.6, 0.4, 24).castShadow = false;
+  PLACES.blackmarket = { id: 'blackmarket', name: 'Manhole', door: { x: mhx, y: mhy } };
+  const mr = new THREE.Mesh(doorGeo, doorMat); mr.rotation.x = -Math.PI / 2; mr.position.set(mhx, 1, mhy); mr.scale.setScalar(26); scene.add(mr); PLACES.blackmarket.ring = mr;
   // park bench in town square (a homeless compy's bed)
   const bx = 900, by = 1080;
   add(scene, GEO.b, '#7a5534', bx, 7, by, 50, 4, 14); add(scene, GEO.b, '#7a5534', bx, 14, by + 7, 50, 10, 3);
@@ -386,7 +394,7 @@ function buildTown() {
   const lists = { trunk: [], leaf: [], pole: [], lamp: [], bush: [] };
   const tree = (x, z, s) => { lists.trunk.push([x, 30 * s, z, 6 * s, 60 * s, 6 * s]); lists.leaf.push([x, 78 * s, z, 36 * s, 32 * s, 36 * s]); };
   for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; tree(900 + Math.cos(a) * 230, 920 + Math.sin(a) * 200, 0.8 + srand() * 0.3); }
-  for (const [x, z] of [[100, 560], [520, 560], [700, 560], [1100, 560], [1280, 560], [1700, 560], [100, 1040], [520, 1040], [1300, 1040], [1720, 1040], [1550, 1600], [1700, 1450], [1600, 1700], [400, 1680], [150, 1700]]) tree(x, z, 0.85);
+  for (const [x, z] of [[100, 560], [520, 560], [700, 560], [1100, 560], [1280, 560], [1700, 560], [100, 1040], [520, 1040], [1300, 1040], [1720, 1040], [1520, 1760], [1500, 1600], [400, 1680], [150, 1700]]) tree(x, z, 0.85);
   for (const ix of [600, 1200]) for (const iy of [600, 1200]) for (const [dx, dz] of [[-70, -70], [70, -70], [-70, 70], [70, 70]]) { lists.pole.push([ix + dx, 40, iy + dz, 2.2, 80, 2.2]); lists.lamp.push([ix + dx, 82, iy + dz, 6, 4.5, 6]); }
   for (let i = 0; i < 40; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
   lists.bush = lists.bush.filter(([x, , z]) => !solids.some(b => x > b.x0 - 20 && x < b.x1 + 20 && z > b.y0 - 20 && z < b.y1 + 20) && Math.abs(x - 600) > 90 && Math.abs(x - 1200) > 90 && Math.abs(z - 600) > 90 && Math.abs(z - 1200) > 90 && !(z > 1250 && x > 640 && x < 1180));
@@ -476,7 +484,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -620,7 +628,8 @@ function sleep(quality) {
 function dayRollover(slept) {
   S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false);
   if (trex) { scene.remove(trex.m.root); trex = null; }
-  if (chase) { const l = chase.loot; endChase(); goal('heist'); log(`The police gave up for the night. You keep ${money$(l)}.`, 'good'); }
+  if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
+  refillParking();
   if (S.job) S.job.days++;
   if (weekday() === 0) {
     let bills = 0, parts = [];
@@ -856,6 +865,28 @@ const MENUS = {
     acts.push({ label: 'Have lunch', detail: '+35 hunger, +4 happiness', cost: 14, mins: 40, fn: () => { S.hunger = Math.min(100, S.hunger + 35); S.happy += 4; } });
     return { sub: p ? `${p.married ? 'Married to' : 'Dating'} ${p.name}, who ${p.trait}.` : 'The best place in town to meet someone special.', acts };
   },
+  carshop: () => {
+    const acts = [];
+    const mine = cars.find(c => c.owned), trade = mine ? Math.round(CAR_MODELS[mine.model].price * 0.5) : 0;
+    for (const [id, M] of Object.entries(CAR_MODELS)) {
+      const cost = Math.max(0, M.price - trade);
+      acts.push({ label: `Buy the ${M.name}`, detail: `${M.blurb} Top speed ${M.max}.${mine ? ` Your ${CAR_MODELS[mine.model].name} is traded in for ${money$(trade)}.` : ''}`, cost, why: mine && mine.model === id ? 'You already own this one.' : '', fn: () => buyCar(id) });
+    }
+    if (mine) acts.push({ label: 'Repaint your car', detail: 'A fresh color, done while you wait', cost: 150, mins: 30, fn: () => { const i = (CAR_COLORS.indexOf(mine.color) + 1) % CAR_COLORS.length; recolorCar(mine, CAR_COLORS[i]); log(`Your car is ${COLOR_NAMES[mine.color]} now.`, 'good'); } });
+    return { sub: mine ? `You drive a ${COLOR_NAMES[mine.color]} ${CAR_MODELS[mine.model].name}. It is parked out front or wherever you left it.` : 'New cars, honest prices, zero theft involved.', acts };
+  },
+  blackmarket: () => {
+    const acts = [], mh = PLACES.blackmarket.door;
+    const hot = cars.filter(c => c.stolen);
+    for (const c of hot) {
+      const near = Math.hypot(c.x - mh.x, c.y - mh.y) < 170, price = c.price || 1200;
+      acts.push({ label: `Sell the stolen ${COLOR_NAMES[c.color] || ''} ${c.model ? CAR_MODELS[c.model].name : 'convertible'}`, detail: 'Cash, no questions', tag: money$(price), why: near ? '' : 'Park it right next to the manhole first.', mins: 20, fn: () => sellStolen(c, price) });
+    }
+    if (!hot.length) acts.push({ label: 'Sell a stolen car', detail: '', why: 'You have no stolen car. Borrow one from the street, lose the cops, and park it next to the manhole.', fn: () => {} });
+    acts.push({ label: 'Buy a lockpick', detail: 'Half the time, nobody sees you take a car.', cost: 300, why: S.lockpick ? 'You already have one.' : '', fn: () => { S.lockpick = true; log('You pocket a lockpick. Very sneaky.', 'warn'); } });
+    acts.push({ label: 'Eat sewer stew', detail: '+30 hunger. Nobody knows what is in it.', cost: 4, mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 30); if (Math.random() < 0.3) { S.energy -= 15; log('The stew fought back.', 'bad'); } } });
+    return { title: 'The Black Market', sub: 'Lanterns, crates and a dealer who never takes off his sunglasses. Nobody asks questions down here.', acts };
+  },
   realty: () => {
     if (!open(8, 19)) return { sub: closedMsg(8, 19), acts: [] };
     const acts = [];
@@ -974,7 +1005,7 @@ function setScreens() {
 // every building has a room far from town; you walk around inside and use stations (counters, desks, beds)
 let inside = null, activeSolids = solids, roomN = 0;
 const ROOMS = {};
-const HOURS = { grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
+const HOURS = { carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
 function closedWhy(id) {
   const h = HOURS[id]; if (!h) return '';
   const J = jobInfo(); if (J && J.place === id) return '';
@@ -1175,6 +1206,33 @@ const LAYOUTS = {
     b.npc(300, 200, 2, { hat: '#d98a3a', wander: [120, 160, 380, 280] }); b.npc(150, 60, 5, { hat: '#d98a3a' });
     b.sign('EGG EXPRESS', 230, 100, 3, 160, '#6a3a1a', '#ffffff'); b.lamp(230, 200);
   } },
+  carshop: { w: 480, d: 340, floor: ['checker', '#f2f4f6', '#c9d1d8'], wall: '#e9eef2', trim: '#c0392b', build(b) {
+    const show = [['hatch', 90, 150], ['cruiser', 240, 120], ['gt', 390, 150]];
+    for (const [id, x, z] of show) {
+      const M = CAR_MODELS[id];
+      b.cyl(x, z, 52, 6, '#3a3a40');
+      const car = buildCar(M.color, id); car.root.position.set(x, 6, z); car.root.rotation.y = -0.6; b.g.add(car.root);
+      b.R.solids.push({ x0: b.R.ox + x - 48, y0: b.R.oy + z - 48, x1: b.R.ox + x + 48, y1: b.R.oy + z + 48 });
+      b.sign(`${M.name} ${money$(M.price)}`, x, 12, z + 56, 90, '#c0392b', '#ffffff', 0).rotation.x = -0.9;
+    }
+    b.box(240, 255, 90, 30, 24, '#2a2a30'); b.npc(240, 232, 2, { tie: '#c0392b' });
+    b.station(240, 290, 'Salesperson', null);
+    b.sign('DINO MOTORS', 240, 100, 3, 170, '#c0392b', '#ffffff'); b.plant(25, 25); b.plant(455, 25); b.lamp(150, 160); b.lamp(330, 160);
+  } },
+  blackmarket: { w: 420, d: 300, floor: ['tile', '#3a3f3a', '#2a2e2a'], wall: '#4a4f48', trim: '#2a2e2a', night: true, build(b) {
+    b.box(210, 30, 400, 26, 3, '#2f6a5a'); b.box(210, 30, 400, 22, 1, '!#3f8a72', false, 3);
+    for (const x of [100, 320]) b.box(x, 48, 30, 10, 8, '#5a5f58');
+    for (const [x, z, h] of [[50, 110, 34], [50, 150, 24], [85, 120, 20], [380, 210, 34], [380, 250, 24]]) b.box(x, z, 32, 32, h, '#7a5a3a');
+    for (const [x, z] of [[130, 230], [160, 245]]) b.cyl(x, z, 12, 28, '#3a5a8a');
+    for (let i = 0; i < 4; i++) { const w = add(b.g, GEO.y, '#1a1a1a', 300 + i * 14, 8, 225, 8, 6, 8, Math.PI / 2, 0, 0); w.castShadow = true; }
+    for (const [x, z] of [[50, 100], [380, 200], [210, 120]]) { add(b.g, GEO.s, '!#ffb347', x, 46, z, 5, 6, 5).castShadow = false; }
+    b.box(290, 120, 90, 30, 22, '#4a3a2a'); add(b.g, GEO.s, '!#ffb347', 260, 30, 120, 4, 5, 4).castShadow = false;
+    b.npc(290, 96, 4, { hat: '#1a1a1a' }); b.npc(350, 100, 5, { tube: '#2a2a2a', legs: 1.3 });
+    b.station(290, 160, 'Shady dealer', null);
+    b.box(210, 296, 24, 6, 50, '#5a5f58', false);
+    for (let i = 0; i < 5; i++) b.box(210, 292, 26, 2, 2, '#8a8f96', false, 8 + i * 9);
+    b.sign('NO QUESTIONS ASKED', 210, 92, 3, 160, '#1a1a1a', '#ffb347');
+  } },
   realty: { w: 380, d: 280, floor: ['carpet', '#6a4a7a', '#5a3a6a'], wall: '#efe6f2', build(b) {
     b.box(190, 100, 110, 36, 24, '#4a2e3a'); b.npc(190, 75, 3, { tie: '#6a3a7a' });
     b.station(190, 145, 'Agent desk', null);
@@ -1248,25 +1306,31 @@ function addCop(x, y) {
   m.root.scale.setScalar(15 / 1.25); scene.add(m.root);
   chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(176, 194) });
 }
-function startChase(loot) {
-  chase = { cops: [], loot, t: 0, lostT: 0, hideT: 0, seen: false, sirenT: 0, spawnT: 8 };
+function startChase(loot, car) {
+  chase = { cops: [], loot, cars: car ? [car] : [], t: 0, lostT: 0, hideT: 0, seen: false, sirenT: 0, spawnT: 8 };
+  if (car) car.stolen = true;
   const far = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 260).sort((a, b) => Math.hypot(a[0] - P.x, a[1] - P.y) - Math.hypot(b[0] - P.x, b[1] - P.y));
   addCop(far[0][0], far[0][1]); addCop(far[1][0], far[1][1]); addCop(PLACES.police.door.x, PLACES.police.door.y - 20);
   shake = 8;
+  if (car) { queueEvent({ kind: 'bad', tag: 'Car theft', title: 'Somebody saw you!', sound: 'siren', text: `A neighbor spotted you hot-wiring the ${COLOR_NAMES[car.color]} car and called the police. Lose the police dinos, or ditch the car and hide in a building. Get away and the car is yours to sell at the black market under the manhole.`, buttons: [{ label: 'Floor it!' }] }); return; }
   queueEvent({ kind: 'bad', tag: 'Heist', title: 'The alarm is ringing!', sound: 'siren',
     text: `You grabbed ${money$(loot)} and burst out the door. Police dinos are on their way with lights flashing. Get far away from them, or slip into a building without being seen, and the money is yours. If they catch you, it is jail.`,
     buttons: [{ label: 'Run!' }] });
 }
 function endChase() { for (const c of chase.cops) scene.remove(c.m.root); chase = null; }
 function bust(why) {
-  const loot = chase.loot; endChase();
+  const loot = chase.loot, stolen = chase.cars || []; endChase();
+  if (driving) exitCar(true);
+  for (const c of stolen) { c.stolen = false; c.x = c.hx; c.y = c.hy; c.a = c.ha; c.v = 0; }
   S.money -= loot;
-  arrest(7, `${why} They took back the ${money$(loot)}.`);
+  const what = [loot ? `the ${money$(loot)}` : '', stolen.length ? `the ${stolen.length > 1 ? 'cars' : 'car'}` : ''].filter(Boolean).join(' and ');
+  arrest(loot ? 7 : 3, `${why} They took back ${what}.`);
 }
 function escapeChase(why) {
-  const loot = chase.loot; endChase();
-  goal('heist'); S.happy += 10;
-  queueEvent({ kind: 'good', tag: 'Heist', title: 'You got away!', sound: 'goal', text: `${why} You keep all ${money$(loot)}. Maybe lie low for a while.` });
+  const loot = chase.loot, stolen = chase.cars || []; endChase();
+  if (loot) goal('heist'); if (stolen.length) goal('carthief'); S.happy += 10;
+  const keep = [loot ? `all ${money$(loot)}` : '', stolen.length ? `the stolen ${stolen.length > 1 ? 'cars' : 'car'}` : ''].filter(Boolean).join(' and ');
+  queueEvent({ kind: 'good', tag: loot ? 'Heist' : 'Car theft', title: 'You got away!', sound: 'goal', text: `${why} You keep ${keep}.${stolen.length ? ' The shady dealer down the manhole on the south road pays cash for hot cars.' : ' Maybe lie low for a while.'}` });
 }
 function chaseEnteredBuilding(id) {
   if (!chase) return;
@@ -1317,11 +1381,23 @@ const cars = [];
 let driving = null, engine = null;
 const CAR_COLORS = ['#c0392b', '#2e86c1', '#f1c40f', '#27ae60', '#e67e22', '#8e44ad', '#ecf0f1', '#ff6ad5'];
 const COLOR_NAMES = { '#c0392b': 'red', '#2e86c1': 'blue', '#f1c40f': 'yellow', '#27ae60': 'green', '#e67e22': 'orange', '#8e44ad': 'purple', '#ecf0f1': 'white', '#ff6ad5': 'pink' };
-function buildCar(color) {
+const CAR_MODELS = {
+  hatch:   { name: 'Pebble Hatchback', price: 1500, max: 340, color: '#2e86c1', blurb: 'Small, cheap and reliable.' },
+  cruiser: { name: 'Fern Cruiser', price: 4000, max: 430, color: '#27ae60', blurb: 'A roomy convertible for sunny days.' },
+  gt:      { name: 'Raptor GT', price: 12000, max: 580, color: '#1a1a1e', blurb: 'Low, loud and very fast.' },
+};
+function buildCar(color, style) {
   const root = new THREE.Group();
-  add(root, GEO.b, color, 0, 12, 0, 70, 12, 34);
-  add(root, GEO.b, color, 23, 19, 0, 24, 5, 32);
-  add(root, GEO.b, color, -27, 19, 0, 16, 5, 32);
+  if (style === 'gt') {
+    add(root, GEO.b, color, 0, 10, 0, 76, 9, 36); add(root, GEO.b, color, 26, 15, 0, 26, 3, 34);
+    add(root, GEO.b, '#ffd35a', 0, 15.2, 6, 76, 0.6, 4); add(root, GEO.b, '#ffd35a', 0, 15.2, -6, 76, 0.6, 4);
+    add(root, GEO.b, color, -36, 24, 0, 6, 2, 36); for (const z of [-14, 14]) add(root, GEO.b, color, -34, 19, z, 3, 9, 2);
+  } else {
+    add(root, GEO.b, color, 0, 12, 0, 70, 12, 34);
+    add(root, GEO.b, color, 23, 19, 0, 24, 5, 32);
+    add(root, GEO.b, color, -27, 19, 0, 16, 5, 32);
+  }
+  if (style === 'hatch') { add(root, GEO.b, color, -10, 30, 0, 30, 3, 30); for (const [x, z] of [[4, 14], [4, -14], [-24, 14], [-24, -14]]) add(root, GEO.b, color, x, 25, z, 2.5, 10, 2.5); }
   add(root, GEO.b, '#2a2a30', -6, 17, 0, 10, 12, 28);
   add(root, GEO.b, '#3a3a40', -14, 22, 0, 4, 12, 28);
   const glass = add(root, GEO.b, '#bfe3ff', 10, 25, 0, 2, 12, 30, 0, 0, 0.5); glass.material = new THREE.MeshLambertMaterial({ color: '#bfe3ff', transparent: true, opacity: 0.45 }); glass.castShadow = false;
@@ -1336,8 +1412,9 @@ function buildCar(color) {
   }
   return { root, wheels, heads };
 }
-function spawnCar(x, y, a, color, ai) {
-  const c = { x, y, a, v: 0, steer: 0, roll: 0, color, ai, wait: 0, honkT: 0, m: buildCar(color) };
+function spawnCar(x, y, a, color, ai, model) {
+  const c = { x, y, a, v: 0, steer: 0, roll: 0, color, ai, wait: 0, honkT: 0, model, m: buildCar(color, model), hx: x, hy: y, ha: a, price: Math.round(rand(900, 1500)) };
+  if (model) { c.max = CAR_MODELS[model].max; c.price = Math.round(CAR_MODELS[model].price * 0.4); }
   scene.add(c.m.root);
   if (ai) {
     const pal = PALETTES[cars.length % PALETTES.length];
@@ -1365,14 +1442,47 @@ function aiNext(c) {
   const [x, y] = pick(opts.length ? opts : ns);
   c.fx = c.tx; c.fy = c.ty; c.tx = x; c.ty = y;
 }
+function recolorCar(c, color) {
+  const pos = c.m.root.position.clone(); scene.remove(c.m.root);
+  c.color = color; c.m = buildCar(color, c.model); scene.add(c.m.root); c.m.root.position.copy(pos);
+  if (c.owned) { S.car.color = color; }
+}
+function buyCar(id) {
+  const old = cars.find(c => c.owned);
+  if (old) { if (driving === old) exitCar(); scene.remove(old.m.root); cars.splice(cars.indexOf(old), 1); }
+  const M = CAR_MODELS[id], c = spawnCar(1655, 1440, Math.PI, M.color, false, id);
+  c.owned = true; S.car = { model: id, color: M.color, x: c.x, y: c.y, a: c.a };
+  goal('owncar'); sfx.goal();
+  queueEvent({ kind: 'good', title: `You bought a ${M.name}!`, text: `It is parked right outside Dino Motors with a big bow on it. It is yours, so the police will not mind when you drive it.`, sound: 'goal' });
+}
+function spawnOwnedCar() {
+  const old = cars.find(c => c.owned); if (old) { scene.remove(old.m.root); cars.splice(cars.indexOf(old), 1); }
+  if (!S.car) return;
+  const c = spawnCar(S.car.x, S.car.y, S.car.a, S.car.color, false, S.car.model); c.owned = true;
+}
+function sellStolen(c, price) {
+  if (driving === c) exitCar(true);
+  scene.remove(c.m.root); cars.splice(cars.indexOf(c), 1);
+  S.money += price; goal('fence'); sfx.coin();
+  log(`The dealer's crew made the car vanish. +${money$(price)}.`, 'good');
+}
+// stolen or sold cars are replaced by new ones at their parking spots each morning
+function refillParking() {
+  PARK_SPOTS.forEach(([x, y, a], i) => { if (!cars.some(c => !c.ai && Math.hypot(c.x - x, c.y - y) < 40)) spawnCar(x, y, a, CAR_COLORS[(i + S.day) % CAR_COLORS.length], false); });
+}
+const PARK_SPOTS = [[760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]];
 function placeCars() {
   for (const [x, y, a] of [[760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]])
     spawnCar(x, y, a, CAR_COLORS[cars.length % CAR_COLORS.length], false);
   for (let i = 0; i < 6; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
 }
+function carName(c) { return c.model ? CAR_MODELS[c.model].name : 'convertible'; }
 function enterCar(c) {
   driving = c; c.v = 0; P.vx = P.vy = 0; goal('drive'); sfx.door();
-  log(`You hopped into the ${COLOR_NAMES[c.color] || ''} convertible. W to drive, A and D to steer, H to honk, E to get out.`, '');
+  if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
+  else if (chase) { c.stolen = true; chase.cars = (chase.cars || []).concat(c); log('You grabbed a car mid-chase. Now they want that too!', 'bad'); }
+  else if (S.lockpick && Math.random() < 0.5) { c.stolen = true; log(`Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.`, 'warn'); }
+  else startChase(0, c);
   if (actx && !muted) {
     const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
     o.type = 'sawtooth'; o.frequency.value = 45; f.type = 'lowpass'; f.frequency.value = 400; g.gain.value = 0.035;
@@ -1382,6 +1492,7 @@ function enterCar(c) {
 function exitCar(stay) {
   const c = driving; if (!c) return;
   driving = null; c.v = 0;
+  if (c.owned && S.car) Object.assign(S.car, { x: c.x, y: c.y, a: c.a });
   if (engine) { engine.o.stop(); engine = null; }
   if (!stay) {
     for (const side of [1, -1]) {
@@ -1405,7 +1516,7 @@ function driveUpdate(dt) {
     const m = Math.min(1, Math.hypot(joy.dx, joy.dy));
     if (m > 0.2) { const want = Math.atan2(joy.dy, joy.dx), diff = (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); st = clamp(diff * 2, -1, 1); thr = Math.abs(diff) > 2.4 ? -m : m; }
   }
-  const max = (S.flood ? 220 : 430) * (S.injured ? 0.85 : 1);
+  const max = (S.flood ? 220 : (c.max || 430)) * (S.injured ? 0.85 : 1);
   if (thr > 0) c.v += (c.v < 0 ? 700 : 300) * dt;
   else if (thr < 0) c.v -= (c.v > 0 ? 700 : 220) * dt;
   else c.v *= Math.max(0, 1 - 1.6 * dt);
@@ -1706,7 +1817,8 @@ function hud() {
     const np = nearPlace;
     let what;
     if (driving) what = `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.m) what = `Drive the ${COLOR_NAMES[np.color] || ''} convertible`;
+    else if (np.m) what = np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
+    else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
     else if (np.id === 'bench') what = 'Use the park bench';
     else if (np.home) what = S.home === np.home ? 'Go inside your home' : `Look at the ${np.name.toLowerCase()} (${np.home === 'burrow' ? 'for rent' : 'for sale'})`;
@@ -1738,7 +1850,8 @@ function beginLife(fromSave) {
   feedItems.length = 0; renderFeed();
   if (player) scene.remove(player.root);
   const pal = PALETTES[S.pal]; player = makeCompy(pal, { crest: pal.crest }); scene.add(player.root);
-  refreshHome(); refreshFamily();
+  for (const c of cars) if (!c.owned) { c.stolen = false; }
+  refreshHome(); refreshFamily(); spawnOwnedCar();
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
   $('titleScreen').hidden = true; state = 'play'; setScreens();
   if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
