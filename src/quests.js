@@ -70,6 +70,91 @@ export const VILLAGERS = [
       { kind: 'event', key: 'kill:automaton', n: 6, text: 'Defeat 6 Clockwork Automatons', intro: 'Somebody built automatons in the Far Reaches. Bring them down and I will study the pieces.', done: 'Gears! Springs! A tiny boiler! This is the best day of my life.', reward: { gems: 140, xp: 220, item: 'unique' } },
     ],
   },
+  {
+    id: 'bard',
+    name: 'Jasper the Bard',
+    title: 'Sings for his supper',
+    home: [-7, -10],
+    hello: 'Ah, a hero! Every song needs one. Mine especially. Mine most of all.',
+    tasks: [
+      { kind: 'event', key: 'champion', n: 2, text: 'Defeat 2 named Champions', intro: 'Give me something to sing about! Two Champions, felled by your bow. Names and all.', done: '“And lo, the archer drew…” Yes. YES. This will be a hit.', reward: { gems: 70, xp: 120 } },
+      { kind: 'event', key: 'perfect', n: 60, text: 'Land 60 perfect shots', intro: 'For the final verse I need precision. Sixty perfect shots. I will count every one. In song.', done: 'Sixty! The chorus writes itself. Here, a share of the takings.', reward: { gems: 110, xp: 180, item: 'unique' } },
+    ],
+  },
+  // --- Millbrook, the farming village to the east ---
+  {
+    id: 'miller',
+    village: 'millbrook',
+    name: 'Bram the Miller',
+    title: 'Grinds the grain',
+    home: [3, -4],
+    hello: 'Mind the flour, friend. It gets everywhere. EVERYWHERE.',
+    tasks: [
+      { kind: 'mission', mission: 'hollow', text: 'Clear Autumn Hollow', intro: 'Raiders from the Hollow steal our grain carts. Clear them out and the mill can turn again.', done: 'The carts made it through! The mill is singing.', reward: { gems: 70, xp: 110 } },
+      { kind: 'donate', gems: 60, text: 'Donate ◆ 60 for a new millstone', intro: 'The old millstone has a crack you could lose a cat in. Sixty gems would buy a new one.', done: 'Hear that? That is a proper grind. Flour for the whole valley.', reward: { xp: 120, item: 'rare' }, unlock: 'mill' },
+    ],
+  },
+  {
+    id: 'shepherdess',
+    village: 'millbrook',
+    name: 'Elsie the Shepherdess',
+    title: 'Counts sheep for a living',
+    home: [-4, 6],
+    hello: 'Oh! Hello. Have you seen a sheep? About so big? Woolly?',
+    tasks: [
+      { kind: 'event', key: 'kill:raider', n: 15, text: 'Defeat 15 frost raiders', intro: 'Raiders from the north took three of my flock last winter. Fifteen of them, and we will call it even.', done: 'My sheep are safe. They do not know it, but they are grateful.', reward: { gems: 75, xp: 120 } },
+      { kind: 'event', key: 'thief', n: 2, text: 'Catch 2 loot thieves', intro: 'Thieves keep snatching wool from the drying racks. Catch two and they will think twice.', done: 'Two thieves! Here, this was my grandmother’s. She would want a hero to have it.', reward: { gems: 90, xp: 150, item: 'unique' } },
+    ],
+  },
+  {
+    id: 'beekeeper',
+    village: 'millbrook',
+    name: 'Wendel the Beekeeper',
+    title: 'Keeper of the hives',
+    home: [8, 3],
+    hello: 'Slowly, slowly… the bees are calm today. Let us keep it that way.',
+    tasks: [
+      { kind: 'fetch', slot: 'gadget', minRarity: 'common', text: 'Bring Wendel a gadget', intro: 'A good smoke bomb would calm the hives better than my old smoker. Any gadget, really. I will figure it out.', done: 'Hmm, yes, this will do nicely. Here, have a jar of honey. And this.', reward: { gems: 45, xp: 80, item: 'rare' } },
+      { kind: 'event', key: 'kill:sapper', n: 6, text: 'Defeat 6 Sappers', intro: 'Those Sappers and their bangs! Every blast for miles and my bees sulk for a week. Six fewer would help.', done: 'Quiet at last. The bees are making the best honey of the year.', reward: { gems: 100, xp: 160 } },
+    ],
+  },
+  // --- Saltmere, the fishing village by the lake to the west ---
+  {
+    id: 'fisherman',
+    village: 'saltmere',
+    name: 'Old Gus',
+    title: 'Fisherman, storyteller',
+    home: [-6, -3],
+    hello: 'Caught a pike this long once. Longer. Sit down, I will tell you about it.',
+    tasks: [
+      { kind: 'mission', mission: 'harbor', text: 'Clear Stormwatch Harbor', intro: 'Raiders hold the harbor down the coast, so nobody buys our fish. Clear it and trade comes back.', done: 'Carts full of fish heading to market. You have saved Saltmere.', reward: { gems: 80, xp: 130 } },
+      { kind: 'event', key: 'kill:deckhand', n: 10, text: 'Defeat 10 pirate Deckhands', intro: 'Pirates raid our boats on the open water. Ten of their deckhands, and the lake is ours again.', done: 'Not a pirate sail in sight. Here, I found this in a net.', reward: { gems: 110, xp: 170, item: 'unique' } },
+    ],
+  },
+  {
+    id: 'netmender',
+    village: 'saltmere',
+    name: 'Granny Wynn',
+    title: 'Mends the nets',
+    home: [3, 5],
+    hello: 'Come closer, dear, my eyes are not what they were. Ah, an archer. Good.',
+    tasks: [
+      { kind: 'event', key: 'kill:netcaster', n: 8, text: 'Defeat 8 Netcasters', intro: 'Those Netcasters steal my nets to throw at people! Eight of them, and bring my nets home.', done: 'My nets, back where they belong. You are a dear.', reward: { gems: 70, xp: 120 } },
+      { kind: 'donate', gems: 50, text: 'Donate ◆ 50 for new boats', intro: 'Half our boats have holes. Fifty gems would buy timber for two new ones.', done: 'Two new boats on the water! The young ones are already racing them.', reward: { xp: 120, item: 'rare' }, unlock: 'boats' },
+    ],
+  },
+  {
+    id: 'sailorBoy',
+    village: 'saltmere',
+    name: 'Finn',
+    title: 'Wants to be a sailor',
+    home: [-12, 4],
+    hello: 'Are you a real hero? Have you seen the sea? The REAL sea?',
+    tasks: [
+      { kind: 'event', key: 'chest', n: 2, text: 'Find 2 hidden treasure chests', intro: 'Every good sailor has a treasure map. I do not have one. Find two hidden chests and tell me everything!', done: 'Two chests! Was there gold? Were there maps? I am going to be a pirate. A good one.', reward: { gems: 60, xp: 100 } },
+      { kind: 'mission', mission: 'cove', text: 'Clear Shipwreck Cove', intro: 'There is a real shipwreck in the Far Reaches with a real pirate captain. Please beat him. Please.', done: 'You beat Blackhook?! I am telling EVERYONE.', reward: { gems: 150, xp: 240, item: 'unique' } },
+    ],
+  },
 ];
 
 const state = () => (profile.quests ||= {});

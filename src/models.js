@@ -199,7 +199,8 @@ export function spawnProp(id, size, { axis = 'y', shadows = true } = {}) {
   obj.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(obj, true);
   const dims = box.getSize(new THREE.Vector3());
-  const s = size / (dims[axis] || 1);
+  // axis 'h': size is the longest horizontal side (for flat things like a dock or a boat).
+  const s = size / ((axis === 'h' ? Math.max(dims.x, dims.z) : dims[axis]) || 1);
   const center = box.getCenter(new THREE.Vector3());
   obj.position.set(-center.x * s, -box.min.y * s, -center.z * s);
   obj.scale.setScalar(s);

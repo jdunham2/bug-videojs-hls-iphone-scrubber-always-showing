@@ -18,7 +18,7 @@ import { bounties, bountyInfo, claimBounty, bountiesReady, levelFor } from './pr
 import { TALENTS, rank, talentPoints, learn, resetTalents } from './talents.js';
 import { PROVISIONS, MAX_PACK, pack, buyProvision, unpack, giftReady, claimGift, RUMORS, PLUMAGE, ownsPlumage, currentPlumage, buyPlumage } from './provisions.js';
 import { falconUnlocked } from './companion.js';
-import { Town, TOWN, ROAD } from './town.js';
+import { Town, VILLAGES, inVillages, villageSnaps, ROAD_ANGLES } from './town.js';
 import { villager, questOf, accept, handIn, fetchable } from './quests.js';
 import { FALCON_LEVEL } from './progression.js';
 import { dailyMission, dailyRecord, MODIFIERS, leaderboard } from './daily.js';
@@ -132,6 +132,8 @@ export class Camp {
       e.preventDefault();
       const b = e.target.closest('[data-place]');
       if (b) this.goPlace(b.dataset.place);
+      const vb = e.target.closest('[data-village]');
+      if (vb) this.goVillage(vb.dataset.village);
     });
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Tab' || !this.active || this.game.state !== 'camp') return;
@@ -228,8 +230,8 @@ export class Camp {
       ['dummy', 1.9, 19.6, 8.4, -2.4, 0.5],
       ['dummy', 1.9, 20.6, 11.2, -2.6, 0.5],
       ['weaponPile', 1.2, 13.2, 15.4, 0.6, 0.6],
-      ['tent', 2.4, -21, -2, 1.4, 1.8],
-      ['tent', 2.2, 21.5, 2.5, -1.6, 1.7],
+      ['tent', 2.4, -20, -9, 1.4, 1.8],
+      ['tent', 2.2, 20.5, -6.5, -1.6, 1.7],
       ['signpost', 2.2, 8.5, 9.5, -0.8, 0.4],
       ['signpost', 2.2, -9.5, 11.5, 0.8, 0.4],
       ['crates', 1.1, 20.4, -10.5, 0.2, 0.6],
@@ -242,16 +244,16 @@ export class Camp {
     for (let i = 0; i < 30; i++) {
       const a = (i / 30) * Math.PI * 2 + 0.2;
       if (Math.abs(a - Math.PI * 1.25) < 0.45) continue; // gap toward the gate
-      if (Math.abs(a - Math.PI / 2) < 0.16) continue; // the road to town
+      if (ROAD_ANGLES.some((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.16)) continue; // roads to the villages
       this.prop('fence', 1.0, Math.cos(a) * (RADIUS + 0.6), Math.sin(a) * (RADIUS + 0.6), -a, 0, { axis: 'x', size: 2.6 });
     }
     for (let i = 0; i < 16; i++) {
       const a = Math.random() * Math.PI * 2;
       const d = rand(RADIUS + 3, RADIUS + 14);
-      if (Math.abs(Math.cos(a) * d) < 8 && Math.sin(a) > 0) continue; // keep the road clear
+      if (ROAD_ANGLES.some((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.4)) continue; // keep the roads clear
       this.prop(Math.random() < 0.5 ? 'deadTree' : 'rocks', Math.random() < 0.5 ? rand(4, 7) : rand(1, 2.5), Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6, 0);
     }
-    // Down the road: the town.
+    // Down the roads: the villages.
     this.town = new Town(this);
     this.town.build(S, glowTexture);
     S.add(moon.target); // the moonlight (and its shadows) follows the hero, out to the town too
@@ -260,8 +262,7 @@ export class Camp {
   /** Is (x, z) somewhere the hero can walk: the camp, the road, or the town square? */
   inArea(x, z, r = 0) {
     if (Math.hypot(x, z) < RADIUS - r) return true;
-    if (Math.abs(x) < ROAD.halfWidth - r && z > ROAD.from && z < ROAD.to) return true;
-    return Math.hypot(x - TOWN.x, z - TOWN.z) < TOWN.r - r;
+    return inVillages(x, z, r);
   }
 
   /** Training dummy: arrows hit it like an enemy; it wobbles and reports damage. */
@@ -318,9 +319,7 @@ export class Camp {
       const opts = [];
       const d = Math.hypot(pos.x, pos.z) || 1;
       opts.push([(pos.x / d) * (RADIUS - r), (pos.z / d) * (RADIUS - r)]);
-      opts.push([Math.max(-ROAD.halfWidth + r, Math.min(ROAD.halfWidth - r, pos.x)), Math.max(ROAD.from, Math.min(ROAD.to, pos.z))]);
-      const dt = Math.hypot(pos.x - TOWN.x, pos.z - TOWN.z) || 1;
-      opts.push([TOWN.x + ((pos.x - TOWN.x) / dt) * (TOWN.r - r), TOWN.z + ((pos.z - TOWN.z) / dt) * (TOWN.r - r)]);
+      opts.push(...villageSnaps(pos.x, pos.z, r));
       opts.sort((a, b) => Math.hypot(a[0] - pos.x, a[1] - pos.z) - Math.hypot(b[0] - pos.x, b[1] - pos.z));
       pos.x = opts[0][0];
       pos.z = opts[0][1];
@@ -487,9 +486,33 @@ export class Camp {
   togglePlaces(on = !this.places.classList.contains('open')) {
     if (on) {
       const list = document.getElementById('places-list');
-      list.innerHTML = this.spots.map((s) => `<button type="button" data-place="${s.kind}">${s.label}</button>`).join('');
+      // Buildings, then each village (villagers are found by walking up to them).
+      list.innerHTML =
+        this.spots
+          .filter((s) => s.kind !== 'npc')
+          .map((s) => `<button type="button" data-place="${s.kind}">${s.label}</button>`)
+          .join('') + VILLAGES.map((v) => `<button type="button" data-village="${v.id}">⌂ ${v.name}</button>`).join('');
     }
     this.places.classList.toggle('open', on);
+  }
+
+  /** Walk... well, jump to a village square (from the Places menu). */
+  goVillage(id) {
+    this.togglePlaces(false);
+    const v = VILLAGES.find((x) => x.id === id);
+    if (!v || this.marching) return;
+    if (this.room && !this.leaving) {
+      this.leaveRoom();
+      setTimeout(() => this.goVillage(id), 400);
+      return;
+    }
+    if (this.openKind) this.close();
+    const P = this.game.player;
+    P.pos.set(v.x + Math.cos(Math.atan2(-v.z, -v.x)) * (v.r - 4), 0, v.z + Math.sin(Math.atan2(-v.z, -v.x)) * (v.r - 4));
+    P.vel.set(0, 0, 0);
+    this.game.camTarget.copy(P.pos);
+    this.game.fade();
+    this.game.banner(v.name, 'Village', 1.4);
   }
 
   /** Jump straight to a building's screen (from the Places menu). */
