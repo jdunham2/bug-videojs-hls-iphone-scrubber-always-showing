@@ -210,6 +210,14 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
 .ach .medal{width:22px;height:22px;flex:none;border-radius:50%;background:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
 .ach.got .medal{background:radial-gradient(circle at 35% 35%,#ffe9a8,#e3a948 55%,#9a6a1a);box-shadow:none}
 body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{display:none!important}
+#fishUI{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(120px + env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 24px));padding:12px 14px;z-index:6;box-sizing:border-box}
+#fishUI .fh{font-family:var(--f-display);font-size:16px;margin-bottom:8px}
+.ftrack{position:relative;height:26px;background:linear-gradient(180deg,#1f3d5c,#2f6c8c);border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+#fZone{position:absolute;top:0;bottom:0;background:rgba(134,201,143,.45);border-left:2px solid var(--good);border-right:2px solid var(--good);box-sizing:border-box}
+#fFish{position:absolute;top:5px;width:16px;height:14px;margin-left:-8px;border-radius:50% 40% 40% 50%;background:#e3a948;box-shadow:0 0 6px rgba(255,220,120,.8)}
+.fprog{height:8px;margin-top:8px;background:var(--ink);border-radius:4px;overflow:hidden}
+.fprog i{display:block;height:100%;background:var(--good);width:30%}
+.fhint{font-size:12.5px;color:var(--muted);margin-top:6px}
 @media (prefers-reduced-motion:reduce){.toast{animation:none}#lvlUp{animation-duration:.01s}.bi-name{transition:none}}
 </style>
 
@@ -264,6 +272,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="vig"></div>
   <div id="bossIntro" hidden><div class="bi-name" id="biName"></div><div class="bi-sub" id="biSub"></div></div>
   <div id="fade"></div>
+  <div id="fishUI" class="panel" hidden><div class="fh">Something’s biting!</div><div class="ftrack"><div id="fZone"></div><div id="fFish"></div></div><div class="fprog"><i id="fProg"></i></div><div class="fhint">Hold E, Space or touch to reel. Keep the fish inside the green bar.</div></div>
   <div id="mapView" class="modal" hidden>
     <div class="sheet panel" style="width:min(1100px,100%)">
       <div class="sheet-head"><h2>The Known World</h2><button class="btn" data-close="mapView">Close<kbd>M</kbd></button></div>
@@ -309,11 +318,12 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
 'use strict';
 
 /* ================= constants & data ================= */
-const TS = 16, W = 360, H = 250, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
-const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13,ASH:14,LAVA:15,GLOOM:16,JUNGLE:17,MESA:18,MOOR:19};
-const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e','#4a4446','#c8461c','#2c4630','#3d7a3a','#b8643a','#6a5a6a'];
-const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0,0.9,0,0.7,0.75,0.9,0.95];
-const REGION = ['Open Water','The Shallows','The Strand','The Green Downs','Hollow Woods','The Knolls','The Teeth','Frost Reach','Reedmire','The Free Road','','Amber Sands','The Free Road','','The Cinderlands','Lava Field','Gloomwood','Jade Jungle','Redrock Mesa','Gravenmoor Heath'];
+const WORLD_H = 250;
+const TS = 16, W = 360, H = 310, CH = 32, SEED = 7331, DAY_LEN = 240, BASE_HP = 10;
+const T = {DEEP:0,SHAL:1,SAND:2,GRASS:3,FOREST:4,HILL:5,MOUNT:6,SNOW:7,MARSH:8,ROAD:9,FLOOR:10,DUNE:11,BRIDGE:12,HOUSE:13,ASH:14,LAVA:15,GLOOM:16,JUNGLE:17,MESA:18,MOOR:19,VOID:20,DFLOOR:21,DWALL:22,DTORCH:23,DSTAIR:24,DSPIKE:25};
+const TILE_COL = ['#1f3d5c','#2f6c8c','#d8c48c','#6e9c4e','#4b7a3b','#8b8d58','#6c6872','#e4ecf0','#5b7853','#b59c6c','#a59b8a','#e0b766','#8a6440','#6e9c4e','#4a4446','#c8461c','#2c4630','#3d7a3a','#b8643a','#6a5a6a','#05070a','#3a3640','#1e1a24','#1e1a24','#4a4452','#3a3640'];
+const SPEED = [0,0.45,0.9,1,0.72,0.62,0,0.8,0.6,1.3,1.2,0.82,1.2,0,0.9,0,0.7,0.75,0.9,0.95,0,1,0,0,1,1];
+const REGION = ['Open Water','The Shallows','The Strand','The Green Downs','Hollow Woods','The Knolls','The Teeth','Frost Reach','Reedmire','The Free Road','','Amber Sands','The Free Road','','The Cinderlands','Lava Field','Gloomwood','Jade Jungle','Redrock Mesa','Gravenmoor Heath','','The Deep','','','The Deep','The Deep'];
 const SAVE_KEY = 'saltwind-road-v3';
 
 const GOODS = {
@@ -465,6 +475,14 @@ const GOODS = {
   tea_seed:{name:'Tea Seeds',base:8,col:'#5a8a4a',kind:'seed',crop:'tea'},
   pumpkin_seed:{name:'Pumpkin Seeds',base:12,col:'#c8681a',kind:'seed',crop:'pumpkin'},
   moon_seed:{name:'Moonflower Seeds',base:30,col:'#a8b8ff',kind:'seed',crop:'moonflower'},
+  // --- dungeons & fishing ---
+  gem:{name:'Cut Gem',base:120,col:'#e04a8a',kind:'good'},
+  silverfin:{name:'Silverfin',base:26,col:'#dfe4ea',kind:'good'},
+  goldcarp:{name:'Golden Carp',base:95,col:'#f0c040',kind:'good'},
+  old_boot:{name:'Old Boot',base:1,col:'#6a4a2a',kind:'good'},
+  dawnbreaker:{name:'Dawnbreaker',base:700,col:'#fff0b0',kind:'weapon',dmg:11,cd:.42,reach:1.65,silver:true},
+  prism_bow:{name:'Prism Bow',base:750,col:'#c8f4ff',kind:'weapon',dmg:8,cd:.4,ranged:true,noAmmo:true,pcol:'#e8c8ff'},
+  phoenix:{name:'Phoenix Feather',base:900,col:'#ff8a3a',kind:'trinket',desc:'Once a day, rise again with half your HP instead of being knocked out'},
 };
 const GK = Object.keys(GOODS);
 const FISTS = {name:'Fists',dmg:1,cd:.4,reach:1.1};
@@ -607,9 +625,37 @@ const BOSSES = {
   golem:{name:'The Brass Colossus',tx:306,ty:228,kind:'golem',size:2.6,hp:190,dmg:5,speed:1.7,cd:2.3,abilities:['slam','quake','spray'],pcol:'#e0b050',loot:{coins:400,items:{golem_core:1,copper_ore:4,bronze:2}},intro:'Gears grind under the sand. An ancient machine stands up.'},
   lich:{name:'The Barrow King',tx:168,ty:238,kind:'lich',size:1.9,hp:150,dmg:4,speed:2.4,cd:2.0,abilities:['blink','cone','summon','spray'],summon:'ghoul',undead:true,pcol:'#7affc8',loot:{coins:380,items:{barrow_crown:1,bone:5,silver:2}},intro:'The barrow door grinds open. A crowned corpse rises from its throne.'},
   roc:{name:'The Storm Roc',tx:318,ty:24,kind:'roc',size:2.4,hp:160,dmg:4,speed:3.6,cd:2.0,abilities:['dash','lightning','spray','dash'],pcol:'#e8f0ff',loot:{coins:400,items:{roc_feather:1,feather:5}},intro:'Thunder cracks overhead. A bird the size of a ship dives from the clouds.'},
+  warden:{name:'The Crypt Warden',tx:0,ty:0,kind:'warden',size:2.2,hp:170,dmg:4,speed:2.3,cd:2.0,abilities:['dash','summon','slam','cone'],summon:'skeleton',undead:true,pcol:'#7affc8',dungeon:'crypt',loot:{coins:450,items:{gem:2,silver:3}},intro:'Armor scrapes on stone. The Warden has guarded this crypt for a thousand years.'},
+  crystalqueen:{name:'The Crystal Queen',tx:0,ty:0,kind:'spider',size:2.8,hp:220,dmg:4,speed:3.0,cd:1.9,abilities:['spray','summon','dash','burrow'],summon:'spider',pcol:'#9fe8ff',dungeon:'caverns',loot:{coins:550,items:{gem:3,crystal:4}},intro:'Crystals chime all around you. The Queen of the caverns descends on a thread of glass.'},
+  magmahound:{name:'The Magma Hound',tx:0,ty:0,kind:'wolf',size:2.6,hp:280,dmg:5,speed:3.6,cd:1.8,abilities:['dash','fireball','dash','summon'],summon:'imp',pcol:'#ff8a3a',dungeon:'depths',loot:{coins:650,items:{gem:4,ember:4}},intro:'The lava parts. A hound of living magma pads out of the dark.'},
 };
 const BK = Object.keys(BOSSES);
 
+const DUNGEONS = {
+  crypt:{name:'The Sunken Crypt', lvl:6, rect:[8,253,76,54], seed:101, near:[200,232], boss:'warden', treasure:'dawnbreaker', enemies:['skeleton','ghoul','bat','wisp'],
+    theme:{floor:'#3a3640', floor2:'#34303a', wall:'#1e1a24', top:'#4a4452', accent:'#7affc8'}},
+  caverns:{name:'The Crystal Caverns', lvl:10, rect:[96,253,76,54], seed:202, near:[166,86], boss:'crystalqueen', treasure:'prism_bow', enemies:['spider','bat','dustdevil'],
+    theme:{floor:'#2a3440', floor2:'#26303a', wall:'#121a24', top:'#3a5a70', accent:'#9fe8ff'}},
+  depths:{name:'The Ember Depths', lvl:15, rect:[184,253,76,54], seed:303, near:[228,44], boss:'magmahound', treasure:'phoenix', enemies:['imp','skeleton','ghoul'],
+    theme:{floor:'#3a2420', floor2:'#34201c', wall:'#180c0a', top:'#5a2a1a', accent:'#ff8a3a'}},
+};
+const DK = Object.keys(DUNGEONS);
+const chests = [];
+const dungeonAtX = x => DK.find(k => x >= DUNGEONS[k].rect[0] && x < DUNGEONS[k].rect[0] + DUNGEONS[k].rect[2]);
+const inDungeon = () => S && S.y >= WORLD_H ? dungeonAtX(S.x) || null : null;
+const themeAt = x => (DUNGEONS[dungeonAtX(x)] || DUNGEONS.crypt).theme;
+const spikeUp = (x, y) => Math.sin(frameT*2.2 + x*.9 + y*.5) > .35;
+const SEASONS = [
+  {name:'Spring', tint:'rgba(255,200,230,.05)', crops:['carrot','flax','wheat'], price:{wheat_seed:.7,carrot_seed:.7,flax_seed:.7,pumpkin_seed:.7,tea_seed:.7,honey:1.3}},
+  {name:'Summer', tint:'rgba(255,220,120,.06)', crops:['wheat','tea','moonflower'], price:{fish:1.2,fruit:1.3,frost_essence:1.4,silverfin:1.2}},
+  {name:'Autumn', tint:'rgba(220,120,40,.12)', crops:['pumpkin','carrot','wheat'], price:{pumpkin:1.5,mead:1.3,bread:1.2,heather_wine:1.3}},
+  {name:'Winter', tint:'rgba(220,235,255,.16)', crops:['moonflower'], price:{furs:1.5,hide:1.4,tea:1.3,wool:1.3,stew:1.3,carrot_soup:1.3}},
+];
+const SEASON_TEXT = ['Seeds are cheap, and carrots, flax and wheat grow quickly.','Long days. Wheat, tea and moonflowers thrive; fish and fruit fetch more.','Harvest season. Pumpkins grow fast and sell for a fortune.','Snow on every road. Crops grow slowly, but furs, hides and tea sell dear.'];
+const seasonIdx = () => Math.floor(((S ? S.day : 1) - 1) / 7) % 4;
+const season = () => SEASONS[seasonIdx()];
+const dayOfSeason = () => ((S.day - 1) % 7) + 1;
+const cropRate = c => season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1;
 const CROPS = {
   wheat:{name:'Wheat',grow:1,yield:[3,5]},
   carrot:{name:'Carrots',grow:1,yield:[2,4]},
@@ -933,7 +979,8 @@ let spawn = {x:0,y:0};
 
 function genWorld() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const nx = x/W*2-1, ny = y/H*2-1;
+    if (y >= WORLD_H) { map[idx(x,y)] = T.VOID; continue; }
+    const nx = x/W*2-1, ny = y/WORLD_H*2-1;
     const edge = Math.pow(Math.max(Math.abs(nx), Math.abs(ny)), 3) * .55 + Math.pow(Math.hypot(nx,ny)/1.414, 2) * .35;
     let e = fbm(x/32, y/32, SEED) + .32 - edge;
     e += bump(x,y,172,24,55,.22) + bump(x,y,135,30,26,.14);    // northern range
@@ -1014,7 +1061,9 @@ function genWorld() {
   };
   for (const L of LANDMARKS) place(L, (x,y,t) => L.isle ? (Math.hypot(x-ISLE.x,y-ISLE.y) < ISLE.land-.5 && t !== T.HOUSE && t !== T.FLOOR)
       : (reach[idx(x,y)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL), 7);
-  for (const k of BK) { const B = BOSSES[k]; place(B, (x,y,t) => (B.climb ? reachC : reach)[idx(x,y)] && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
+  for (const k of BK) { const B = BOSSES[k]; if (B.dungeon) continue; place(B, (x,y,t) => (B.climb ? reachC : reach)[idx(x,y)] && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
+  genDungeons();
+  for (const k of DK) place(DUNGEONS[k].entrance = {tx: DUNGEONS[k].near[0], ty: DUNGEONS[k].near[1]}, (x,y,t) => reach[idx(x,y)] && reach[idx(x,y+1)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL && t !== T.HOUSE, 6);
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   placeNodes();
 }
@@ -1022,7 +1071,7 @@ function genWorld() {
 function placeNodes() {
   const near = (x,y,t) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => tileAt(x+dx,y+dy) === t);
   const landNear = (x,y) => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy]) => { const t = tileAt(x+dx,y+dy); return t !== T.DEEP && t !== T.SHAL; });
-  const blocked = new Set([...LANDMARKS.map(L => idx(L.x, L.y)), ...BK.map(k => idx(BOSSES[k].x, BOSSES[k].y))]);
+  const blocked = new Set([...LANDMARKS.map(L => idx(L.x, L.y)), ...BK.map(k => idx(BOSSES[k].x, BOSSES[k].y)), ...chests.map(c => idx(c.x, c.y)), ...DK.map(k => idx(DUNGEONS[k].entrance.x, DUNGEONS[k].entrance.y))]);
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
     if (blocked.has(i)) continue;
@@ -1044,6 +1093,7 @@ function placeNodes() {
       case T.GLOOM:  type = r < .06 ? 'mushroom' : r < .085 ? 'web' : r < .11 ? 'branch' : r < .12 ? 'herb' : null; break;
       case T.ASH:    type = near(x,y,T.LAVA) ? (r < .14 ? 'obsidian' : r < .2 ? 'sulfur' : null) : (r < .045 ? 'sulfur' : r < .065 ? 'obsidian' : r < .085 ? 'rock' : null); break;
       case T.SHAL:   type = landNear(x,y) && r < .07 ? 'fish' : null; break;
+      case T.DFLOOR: { const dk = dungeonAtX(x); type = dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
       case T.JUNGLE: type = r < .05 ? 'fruit' : r < .09 ? 'vine' : r < .1 ? 'herb' : r < .115 ? 'branch' : r < .127 ? 'jade' : null; break;
       case T.MESA:   type = r < .05 ? 'copper' : r < .07 ? 'rock' : r < .085 ? 'cactus' : (nearMt && r < .14) ? 'jade' : null; break;
       case T.MOOR:   type = r < .06 ? 'heather' : r < .075 ? 'rock' : r < .09 ? 'bush' : null; break;
@@ -1076,7 +1126,7 @@ function astar(sx, sy, gx, gy, cost) {
 }
 
 function walkable(t, raft, climb) {
-  if (t === T.HOUSE || t === T.LAVA) return false;
+  if (t === T.HOUSE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) return false;
   if (t === T.MOUNT) return climb;
   if (t === T.DEEP) return raft;
   return true;
@@ -1138,6 +1188,23 @@ function drawTile(g, x, y) {
     case T.JUNGLE: dot('#2e6a2e', 4); if (nodeGrid[idx(x,y)] < 0 && r(50) > .35) { const tx = px + 4 + r(51)*8, ty = py + 6 + r(52)*5; g.fillStyle = '#5a4020'; g.fillRect(tx-1, ty, 2, 7); g.fillStyle = '#3a9a3a'; for (let k = 0; k < 5; k++) { const a = k/5*6.28; g.fillRect(tx + Math.cos(a)*4 - 2, ty - 1 + Math.sin(a)*2, 4, 2); } g.fillStyle = '#5ac04a'; g.fillRect(tx-1, ty-2, 2, 2); } break;
     case T.MESA: g.fillStyle = '#a0522e'; g.fillRect(px, py+4+(r(4)*3|0), TS, 1); g.fillRect(px, py+11+(r(5)*3|0), TS, 1); dot('#d8875a', 3); break;
     case T.MOOR: dot('#5a4a5a', 5); g.fillStyle = '#9a6aaa'; for (let k = 0; k < 3; k++) g.fillRect(px+(r(60+k)*14|0), py+(r(63+k)*14|0), 2, 2); break;
+    case T.VOID: g.fillStyle = '#05070a'; g.fillRect(px, py, TS, TS); break;
+    case T.DFLOOR: case T.DSTAIR: case T.DSPIKE: {
+      const th = themeAt(x);
+      g.fillStyle = (x + y) % 2 ? th.floor : th.floor2; g.fillRect(px, py, TS, TS);
+      g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(px, py + 15, TS, 1); g.fillRect(px + 15, py, 1, TS);
+      if (r(70) > .82) { g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(px + 3 + (r(71)*6|0), py + 4 + (r(72)*6|0), 4, 2); }
+      if (r(73) > .94) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px + 4, py + 6, 1, 6); g.fillRect(px + 5, py + 9, 4, 1); }
+      if (t === T.DSTAIR) { for (let k = 0; k < 4; k++) { g.fillStyle = k % 2 ? '#6a6472' : '#8a8492'; g.fillRect(px + 1 + k, py + 2 + k*3, TS - 2 - k*2, 3); } g.fillStyle = th.accent; g.globalAlpha = .5; g.fillRect(px + 7, py + 1, 2, 2); g.globalAlpha = 1; }
+      break;
+    }
+    case T.DWALL: case T.DTORCH: {
+      const th = themeAt(x), below = tileAt(x, y + 1), face = below === T.DFLOOR || below === T.DSTAIR || below === T.DSPIKE;
+      g.fillStyle = th.wall; g.fillRect(px, py, TS, TS);
+      if (face) { g.fillStyle = th.top; g.fillRect(px, py + 6, TS, 10); g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px, py + 10, TS, 1); g.fillRect(px + ((y % 2) ? 4 : 10), py + 6, 1, 4); g.fillRect(px + ((y % 2) ? 11 : 3), py + 11, 1, 5); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(px, py + 6, TS, 1); }
+      else if (r(74) > .7) { g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(px + 4, py + 4, 6, 6); }
+      break;
+    }
     case T.BRIDGE: {
       const horiz = isWater(tileAt(x,y-1)) && isWater(tileAt(x,y+1)) && !(isWater(tileAt(x-1,y)) && isWater(tileAt(x+1,y)));
       g.fillStyle = '#8a6440';
@@ -1198,7 +1265,7 @@ function freshState() {
     explored: new Uint8Array(W*H), steps: 0, rumor: {}, trades: 0,
     hp: BASE_HP, bonusHP: 0, equip: {weapon: null, armor: null}, known: {}, depleted: {}, curios: {}, curiosShown: {},
     gathered: 0, crafted: 0, kills: 0, deaths: 0, killsBy: {}, bosses: {}, board: {}, requestsDone: 0, lairsSeen: {},
-    home: {level:0, plots:[], chest:{}, chickens:0, eggs:0}, xp: 0, level: 1, skillPts: 0, skills: {vit:0, str:0, agi:0, bar:0, gat:0}, achievements: {}, dodges: 0, fastTravels: 0, name: 'Traveler', look: null, pets: [], pet: null, mounts: [], mount: null, riding: false, harvested: 0,
+    home: {level:0, plots:[], chest:{}, chickens:0, eggs:0}, xp: 0, level: 1, skillPts: 0, skills: {vit:0, str:0, agi:0, bar:0, gat:0}, achievements: {}, dodges: 0, fastTravels: 0, chests: {}, dungeonsSeen: {}, fishCaught: 0, phoenixDay: 0, name: 'Traveler', look: null, pets: [], pet: null, mounts: [], mount: null, riding: false, harvested: 0,
   };
   for (const n of NPCS) if (n.trader) s.npc[n.id] = {stock: {...n.stock}, purse: n.purse, patience: n.patience, flex: rollFlex(n)};
   return s;
@@ -1237,7 +1304,7 @@ function addItem(g, n) {
 }
 function price(town, g) {
   const t = TOWNS[town], b = GOODS[g].base;
-  return b * (t.produce.includes(g) ? .6 : t.demand.includes(g) ? 1.6 : 1);
+  return b * (t.produce.includes(g) ? .6 : t.demand.includes(g) ? 1.6 : 1) * (S ? (season().price[g] || 1) : 1);
 }
 const repOf = town => S.rep[town] || 0;
 function addRep(town, v) { S.rep[town] = Math.min(5, repOf(town) + v); }
@@ -1281,7 +1348,7 @@ function rebuildMapPixels() {
   for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
   mapCtx.putImageData(mapImg, 0, 0);
 }
-const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
+const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
 const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.pet === 'hawk' ? 2 : 0) + (have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
@@ -1309,6 +1376,7 @@ function checkDiscoveries() {
     const B = BOSSES[k];
     if (!S.lairsSeen[k] && Math.hypot(S.x - B.x, S.y - B.y) < 11) { S.lairsSeen[k] = true; save(); }
   }
+  for (const k of DK) { const E = DUNGEONS[k].entrance; if (!S.dungeonsSeen[k] && Math.hypot(S.x - E.x, S.y - E.y) < 9) { S.dungeonsSeen[k] = true; SFX.chime(); gainXP(25); toast(`Discovered <b>${DUNGEONS[k].name}</b><br>A dungeon. Recommended level ${DUNGEONS[k].lvl}. Treasure and a guardian wait below.`, 6500); save(); } }
 }
 function rollCurio(id) {
   if (!id || S.curios[id]) return;
@@ -1375,13 +1443,7 @@ function updateFishing(dt) {
   if (!fishing) return;
   if (player.moving) { fishing = null; floatText(S.x, S.y-1, 'Line reeled in'); return; }
   fishing.t -= dt;
-  if (fishing.t <= 0) {
-    const n = nodes[fishing.i], d = NODES.fish, amt = rint(d.amt[0], d.amt[1]) + (toolTier('rod') >= 2 ? 1 : 0);
-    addItem('fish', amt); S.gathered++; SFX.fish(); gainXP(3);
-    floatText(n.x+.5, n.y, `+${amt} Fish`, '#86c98f'); burst(n.x+.5, n.y+.5, '#bfe6f0', 8);
-    rollCurio('scale');
-    fishing = null; renderHUD();
-  }
+  if (fishing.t <= 0) startFishGame();
 }
 
 /* ================= combat ================= */
@@ -1475,7 +1537,7 @@ function killEnemy(e) {
     return;
   }
   const def = ENEMIES[e.type];
-  S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1; gainXP(def.hp*3); SFX.kill();
+  S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1; gainXP(e.max*3); SFX.kill();
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   got.forEach((t, k) => floatText(e.x, e.y - .2 - k*.6, t, '#86c98f'));
@@ -1490,7 +1552,10 @@ function hurtPlayer(dmg, from, ignoreInv) {
   S.hp -= taken; SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
   if (from) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
-  if (S.hp <= 0) die();
+  if (S.hp <= 0) {
+    if (have('phoenix') && S.phoenixDay !== S.day) { S.phoenixDay = S.day; S.hp = maxHP()/2; player.inv = 2.5; SFX.level(); burst(S.x, S.y - .5, '#ff8a3a', 30, 6); toast('<b>The Phoenix Feather blazes</b><br>You rise again from the ashes.', 5000); }
+    else die();
+  }
   renderHP();
 }
 function die() {
@@ -1509,12 +1574,12 @@ function die() {
 }
 function enemyWalk(x, y) {
   const t = tileAt(Math.floor(x), Math.floor(y));
-  if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.BRIDGE || t === T.LAVA) return false;
+  if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.BRIDGE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) return false;
   return !townAt(x, y, 8.5);
 }
 function bossWalk(x, y) {
   const t = tileAt(Math.floor(x), Math.floor(y));
-  return !(t === T.DEEP || t === T.HOUSE || t === T.LAVA) && !townAt(x, y, 8);
+  return !(t === T.DEEP || t === T.HOUSE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) && !townAt(x, y, 8);
 }
 function makeEnemy(type, x, y, extra) {
   const def = ENEMIES[type], hp = def.hp + (extra && extra.snow ? 2 : 0);
@@ -1539,6 +1604,7 @@ function spawnTypeFor(t, x, night) {
   return null;
 }
 function trySpawn(night) {
+  if (S.y >= WORLD_H) return;
   for (let k = 0; k < 12; k++) {
     const a = Math.random()*Math.PI*2, r = 14 + Math.random()*8;
     const x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
@@ -1672,7 +1738,7 @@ function updateCombat(dt, night) {
         else if (d < R.range*.4) { mx = -dx/d; my = -dy/d; }
         else { mx = -dy/d*.5; my = dx/d*.5; }
         e.rcd -= dt;
-        if (e.rcd <= 0 && d < R.range) { e.rcd = R.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), R.speed, def.dmg, R.col, .2); }
+        if (e.rcd <= 0 && d < R.range) { e.rcd = R.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), R.speed, def.dmg * (e.dmgMul || 1), R.col, .2); }
       } else { mx = dx/d; my = dy/d; }
       if (def.charge) {
         e.ccd -= dt;
@@ -1693,17 +1759,18 @@ function updateCombat(dt, night) {
     if (Math.abs(mx) > .05) e.face = mx < 0 ? -1 : 1;
     if (mx || my) e.phase += dt*10;
     e.cd -= dt; e.hurt = Math.max(0, e.hurt - dt);
-    if (d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg, e); e.cd = 1.1; }
-    if (d > 34) e.dead = true;
+    if (d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg * (e.dmgMul || 1), e); e.cd = 1.1; }
+    if (d > 34 && !e.dungeon) e.dead = true;
   }
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
+    { const at = tileAt(Math.floor(a.x), Math.floor(a.y)); if (at === T.DWALL || at === T.DTORCH || at === T.VOID) a.life = 0; }
     for (const e of enemies) if (!e.dead && !(e.hidden > 0) && Math.hypot(e.x - a.x, e.y - .3*(e.size||1) - a.y) < .55 + ((e.size||1)-1)*.4) { hitEnemy(e, a.dmg * (a.silver && isUndead(e) ? 2 : 1), a.vx/13, a.vy/13, 'player'); a.life = 0; break; }
   }
   for (const p of eproj) {
     p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
     if (Math.hypot(p.x - S.x, p.y - (S.y - .5)) < p.r + .3) { hurtPlayer(p.dmg, {x: p.x - p.vx, y: p.y - p.vy}); p.life = 0; }
-    const t = tileAt(Math.floor(p.x), Math.floor(p.y)); if (t === T.MOUNT || t === T.HOUSE) p.life = 0;
+    const t = tileAt(Math.floor(p.x), Math.floor(p.y)); if (t === T.MOUNT || t === T.HOUSE || t === T.DWALL || t === T.DTORCH || t === T.VOID) p.life = 0;
   }
   for (const h of hazards) {
     if (h.wind > 0) {
@@ -1758,7 +1825,8 @@ addEventListener('keydown', e => {
     if (k === 'escape') closeTalk();
     const n = parseInt(k, 10);
     if (n >= 1) { const b = $('talkOpts').querySelectorAll('button')[n-1]; if (b) b.click(); }
-  } else if (mode === 'trade') { if (k === 'escape') closeTrade(); }
+  } else if (mode === 'fish') { keys.add(k); if (k === 'escape') endFishGame(false); }
+  else if (mode === 'trade') { if (k === 'escape') closeTrade(); }
   else if (mode === 'journal') { if (k === 'escape' || k === 'j') closeModal('journal'); }
   else if (mode === 'map') { if (k === 'escape' || k === 'm') closeModal('mapView'); }
   else if (mode === 'bag') { if (k === 'escape' || k === 'i') closeModal('bag'); }
@@ -1855,7 +1923,7 @@ function drawPerson(g, x, y, c, phase, moving, facing, extra) {
 function drawHeld(g, x, y, facing, id) {
   const s = facing === 'left' ? -1 : 1, hx = facing === 'up' ? x + 3 : x + 4*s, hy = y - 8;
   const col = GOODS[id].col;
-  if (id === 'bow' || id === 'longbow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
+  if (id === 'bow' || id === 'longbow' || id === 'prism_bow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
   if (id === 'frost_staff') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
   g.fillStyle = '#5a3d27';
   const len = id.endsWith('spear') ? 12 : (id === 'club' || id === 'bone_club') ? 7 : 9;
@@ -1863,7 +1931,7 @@ function drawHeld(g, x, y, facing, id) {
   g.fillStyle = col;
   if (id.endsWith('spear')) g.fillRect(hx - 1, hy - len, 3, 3);
   else if (id === 'club' || id === 'bone_club') g.fillRect(hx - 1.5, hy - len + 2, 4, 4);
-  else { g.fillRect(hx - 1, hy - len + 1, 3, len - 4); if (id === 'crystal_blade' || id === 'ember_blade') { g.fillStyle = id === 'ember_blade' ? 'rgba(255,140,40,.4)' : 'rgba(159,232,255,.35)'; g.fillRect(hx - 2, hy - len, 5, len - 2); } }
+  else { g.fillRect(hx - 1, hy - len + 1, 3, len - 4); if (id === 'crystal_blade' || id === 'ember_blade' || id === 'dawnbreaker') { g.fillStyle = id === 'ember_blade' ? 'rgba(255,140,40,.4)' : id === 'dawnbreaker' ? 'rgba(255,240,170,.45)' : 'rgba(159,232,255,.35)'; g.fillRect(hx - 2, hy - len, 5, len - 2); } }
 }
 function drawLandmark(g, L, t) {
   const x = L.x*TS + 8, y = L.y*TS + 12;
@@ -1955,7 +2023,7 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
   const shadow = w => { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, w, 2, 0, 0, 7); g.fill(); };
   switch (type) {
     case 'wolf': case 'coyote': {
-      const body = type === 'coyote' ? '#b08a5a' : snow ? '#dfe6ea' : extra && extra.boss ? '#8a8f98' : '#6f737a', dark = type === 'coyote' ? '#7a5a3a' : snow ? '#aeb8bf' : '#4f535a';
+      const body = type === 'coyote' ? '#b08a5a' : extra && extra.bossId === 'magmahound' ? '#c8401a' : snow ? '#dfe6ea' : extra && extra.boss ? '#8a8f98' : '#6f737a', dark = type === 'coyote' ? '#7a5a3a' : snow ? '#aeb8bf' : '#4f535a';
       shadow(7);
       g.fillStyle = dark; g.fillRect(x-5, y-4, 2, 4 + (step > 0 ? 0 : -1)); g.fillRect(x+3, y-4, 2, 4 + (step < 0 ? 0 : -1));
       g.fillStyle = body; g.fillRect(x-6, y-9, 12, 6); g.fillRect(x + f*5 - 2, y-12, 5, 5);
@@ -1976,9 +2044,9 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillRect(x - f*6 - 1, y-8, 2, 4); g.fillRect(x - f*5 - 1, y-12, 2, 4); g.fillStyle = '#c04030'; g.fillRect(x - f*3 - 1, y-13, 2, 2);
       break;
     case 'spider':
-      shadow(6); g.strokeStyle = '#1a1418'; g.lineWidth = 1;
+      shadow(6); g.strokeStyle = extra && extra.bossId === 'crystalqueen' ? '#9fe8ff' : '#1a1418'; g.lineWidth = 1;
       for (let k = 0; k < 4; k++) { const o = (k - 1.5)*2, s = Math.sin(phase + k)*1; g.beginPath(); g.moveTo(x + o*.5, y-5); g.lineTo(x - 6 + o*.3, y - 8 + s); g.lineTo(x - 7, y); g.stroke(); g.beginPath(); g.moveTo(x + o*.5, y-5); g.lineTo(x + 6 + o*.3, y - 8 - s); g.lineTo(x + 7, y); g.stroke(); }
-      g.fillStyle = '#241c22'; g.beginPath(); g.ellipse(x - f*2, y-6, 4, 3.5, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + f*3, y-6, 2.5, 0, 7); g.fill();
+      g.fillStyle = extra && extra.bossId === 'crystalqueen' ? '#5fb8d8' : '#241c22'; g.beginPath(); g.ellipse(x - f*2, y-6, 4, 3.5, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + f*3, y-6, 2.5, 0, 7); g.fill();
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
     case 'bat': {
@@ -2046,6 +2114,7 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = `rgba(120,220,255,${.6 + Math.sin(phase*2)*.3})`; g.fillRect(x-3 + f, y-19, 2, 1); g.fillRect(x+1 + f, y-19, 2, 1);
       break;
     case 'lich': drawPerson(g, x, y, {cloak:'#1e2a24', skin:'#b8c0b0', hair:'#2a2a2a'}, phase, true, f < 0 ? 'left' : 'right', {crown:true, legs:'#1e2a24'}); g.fillStyle = `rgba(122,255,200,${.6 + Math.sin(phase*2)*.3})`; g.fillRect(x - 2, y - 14, 1, 1); g.fillRect(x + 1, y - 14, 1, 1); g.beginPath(); g.arc(x + f*6, y - 11, 2, 0, 7); g.fill(); break;
+    case 'warden': drawPerson(g, x, y, {cloak:'#5a5e66', skin:'#e8e4d8', hair:'#7a7e86'}, phase, true, f < 0 ? 'left' : 'right', {ribs:true, legs:'#5a5e66'}); g.fillStyle = '#7a7e86'; g.fillRect(x-4, y-19, 8, 3); g.fillStyle = '#7affc8'; g.fillRect(x-2, y-14, 1, 1); g.fillRect(x+1, y-14, 1, 1); g.fillStyle = '#3a3e46'; g.fillRect(x - f*6 - 2, y-12, 4, 8); g.fillStyle = '#7affc8'; g.fillRect(x - f*6 - 1, y-9, 2, 2); g.fillStyle = '#cfd6dc'; g.fillRect(x + f*5, y-17, 1, 11); break;
     case 'giant':
       shadow(8); g.fillStyle = '#8ab0c8'; g.fillRect(x-5, y-6, 3, 6); g.fillRect(x+2, y-6, 3, 6);
       g.fillStyle = '#c8e0ec'; g.fillRect(x-7, y-16, 14, 11); g.fillRect(x-10, y-15, 3, 9); g.fillRect(x+7, y-15, 3, 9);
@@ -2074,7 +2143,7 @@ function drawEnemy(g, e) {
   if (e.boss) {
     const B = BOSSES[e.boss];
     g.save(); g.translate(x, y); g.scale(B.size, B.size);
-    drawEnemyAt(g, B.kind, 0, 0, e.face, e.phase, {boss:true});
+    drawEnemyAt(g, B.kind, 0, 0, e.face, e.phase, {boss:true, bossId: e.boss});
     g.restore();
     if (flash) { g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x, y - 8*B.size, 9*B.size, 9*B.size, 0, 0, 7); g.fill(); }
   } else {
@@ -2088,8 +2157,9 @@ function drawEnemy(g, e) {
 function render() {
   let vw = view.width / Z, vh = view.height / Z;
   const fx = camF.x ?? S.x, fy = camF.y ?? S.y;
-  camX = Math.round(Math.max(0, Math.min(W*TS - vw, fx*TS - vw/2)));
-  camY = Math.round(Math.max(0, Math.min(H*TS - vh, fy*TS - vh/2)));
+  const dkc = inDungeon(), RC = dkc ? DUNGEONS[dkc].rect : [0, 0, W, WORLD_H];
+  camX = Math.round(Math.max(RC[0]*TS, Math.min((RC[0] + RC[2])*TS - vw, fx*TS - vw/2)));
+  camY = Math.round(Math.max(RC[1]*TS, Math.min((RC[1] + RC[3])*TS - vh, fy*TS - vh/2)));
   if (shake > 0 && SETTINGS.shake) { camX += Math.round((Math.random()-.5)*4); camY += Math.round((Math.random()-.5)*4); }
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle = '#1f3d5c'; ctx.fillRect(0, 0, view.width, view.height);
@@ -2106,6 +2176,8 @@ function render() {
     const t = map[idx(x,y)];
     if ((t === T.DEEP || t === T.SHAL) && hash2(x,y,ph) > .9) { ctx.fillStyle = 'rgba(210,236,245,.45)'; ctx.fillRect(x*TS + 3 + (hash2(x,y,ph+1)*8|0), y*TS + 4 + (hash2(x,y,ph+2)*8|0), 4, 1); }
     else if (t === T.LAVA && hash2(x,y,ph) > .7) { ctx.fillStyle = 'rgba(255,220,100,.6)'; ctx.fillRect(x*TS + 2 + (hash2(x,y,ph+1)*10|0), y*TS + 2 + (hash2(x,y,ph+2)*10|0), 3, 2); }
+    else if (t === T.DTORCH) { const fl = Math.sin(frameT*14 + x*3); ctx.fillStyle = '#5a3d27'; ctx.fillRect(x*TS + 7, y*TS + 9, 2, 5); ctx.fillStyle = '#ff9a3a'; ctx.beginPath(); ctx.ellipse(x*TS + 8, y*TS + 7 + fl*.3, 2.4, 3.4 + fl*.4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.fillRect(x*TS + 7.3, y*TS + 6.5, 1.4, 2); }
+    else if (t === T.DSPIKE) { const up = spikeUp(x, y); ctx.fillStyle = up ? '#cfd6dc' : '#141016'; for (let k = 0; k < 4; k++) { const sx = x*TS + 4 + (k % 2)*8, sy = y*TS + 5 + Math.floor(k/2)*7; if (up) { ctx.beginPath(); ctx.moveTo(sx - 2, sy + 3); ctx.lineTo(sx, sy - 3); ctx.lineTo(sx + 2, sy + 3); ctx.fill(); } else ctx.fillRect(sx - 1, sy + 1, 2, 1); } }
   }
 
   const inView = (x, y) => x >= x0-2 && x <= x1+2 && y >= y0-2 && y <= y1+3;
@@ -2140,6 +2212,8 @@ function render() {
     }
   }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
+  for (const c of chests) if (inView(c.x, c.y)) sprites.push({y: c.y + .8, f: () => drawChest(ctx, c)});
+  for (const k of DK) { const E = DUNGEONS[k].entrance; if (inView(E.x, E.y)) sprites.push({y: E.y + .85, f: () => drawEntrance(ctx, k)}); }
   for (const e of enemies) if (inView(e.x, e.y)) sprites.push({y: e.y, f: () => drawEnemy(ctx, e)});
   const ptile = tileAt(Math.floor(S.x), Math.floor(S.y));
   const onWater = ptile === T.DEEP || ptile === T.SHAL;
@@ -2222,7 +2296,7 @@ function render() {
   }
 
   const sun = Math.cos((S.time - .5) * Math.PI * 2);
-  const dark = Math.max(0, Math.min(1, -sun*1.3 + .15)) * .72;
+  const dark = inDungeon() ? .86 : Math.max(0, Math.min(1, -sun*1.3 + .15)) * .72;
   if (dark > .01) {
     lctx.globalCompositeOperation = 'source-over';
     lctx.clearRect(0, 0, lightC.width, lightC.height);
@@ -2235,7 +2309,7 @@ function render() {
       gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
       lctx.fillStyle = gr; lctx.fillRect(sx-rr, sy-rr, rr*2, rr*2);
     };
-    hole(S.x*TS, S.y*TS - 6, have('wisp_lantern') ? 140 : have('lantern') ? 115 : 70, .9);
+    hole(S.x*TS, S.y*TS - 6, (have('wisp_lantern') ? 140 : have('lantern') ? 115 : 70) + (inDungeon() ? 22 : 0), .9);
     for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
     if (S.home.level) hole(HOME.x*TS + 8, (HOME.y - 2)*TS + 6, 64, .8);
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
@@ -2244,6 +2318,8 @@ function render() {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const t = map[idx(x,y)];
       if (t === T.LAVA && (x + y) % 2 === 0) hole(x*TS + 8, y*TS + 8, 26, .55);
+      if (t === T.DTORCH) hole(x*TS + 8, y*TS + 8, 58, .85);
+      if (t === T.DSTAIR) hole(x*TS + 8, y*TS + 8, 34, .7);
       const ni = nodeGrid[idx(x,y)]; if (ni >= 0 && (nodes[ni].type === 'crystal' || nodes[ni].type === 'mushroom') && nodeAvail(ni)) hole(x*TS + 8, y*TS + 6, 20, .5);
     }
     for (const e of enemies) if (e.type === 'imp' || e.type === 'wisp' || e.boss === 'wyrm' || e.boss === 'lich') hole(e.x*TS, e.y*TS - 12, 30, .6);
@@ -2277,6 +2353,7 @@ function drawMini() {
   g.drawImage(mapCanvas, sx, sy, span, span, 0, 0, m.width, m.height);
   for (const k in TOWNS) if (S.towns[k]) { const t = TOWNS[k]; g.fillStyle = '#e3a948'; g.fillRect((t.x - sx)*s - 3, (t.y - sy)*s - 3, 6, 6); }
   for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) { g.fillStyle = '#ebe4d3'; g.fillRect((L.x - sx)*s - 2, (L.y - sy)*s - 2, 4, 4); }
+  for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = '#b07aff'; g.fillRect((E.x - sx)*s - 3, (E.y - sy)*s - 3, 6, 6); }
   for (const k of BK) if (S.lairsSeen[k] && !S.bosses[k]) { g.fillStyle = '#e5484d'; const bx = (BOSSES[k].x - sx)*s, by = (BOSSES[k].y - sy)*s; g.fillRect(bx - 3, by - 1, 6, 2); g.fillRect(bx - 1, by - 3, 2, 6); }
   g.fillStyle = '#e57a62'; for (const e of enemies) if (S.explored[idx(Math.floor(e.x), Math.floor(e.y))]) g.fillRect((e.x - sx)*s - 1.5, (e.y - sy)*s - 1.5, e.boss ? 5 : 3, e.boss ? 5 : 3);
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x - sx)*s - 3, (HOME.y - sy)*s - 3, 6, 6);
@@ -2310,7 +2387,7 @@ function passable(x, y) {
     const tx = Math.floor(px), ty = Math.floor(py);
     if (!inB(tx,ty)) return false;
     if (homeBlocked(tx, ty)) return false;
-    if (fly) { if (map[idx(tx,ty)] === T.HOUSE) return false; continue; }
+    if (fly) { const ft = map[idx(tx,ty)]; if (ft === T.HOUSE || ft === T.VOID || ft === T.DWALL || ft === T.DTORCH) return false; continue; }
     if (!walkable(map[idx(tx,ty)], raft, climb)) return false;
   }
   return true;
@@ -2363,6 +2440,7 @@ function update(dt) {
     const decay = Math.min(1, dt*9); player.kx -= player.kx*decay; player.ky -= player.ky*decay;
   }
   if (S.riding && !isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) { S.riding = false; toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't swim, so you climb off.`); renderHUD(); }
+  { const ct = tileAt(Math.floor(S.x), Math.floor(S.y)); if (ct === T.DSPIKE && spikeUp(Math.floor(S.x), Math.floor(S.y))) hurtPlayer(2, null); }
   updatePet(dt);
   const ti = idx(Math.floor(S.x), Math.floor(S.y));
   if (ti !== lastTile) { lastTile = ti; reveal(S.x, S.y, sightRadius()); checkDiscoveries(); renderRegion(); }
@@ -2384,7 +2462,7 @@ function update(dt) {
   for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : homeTarget();
+  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -2417,6 +2495,7 @@ function newDay() {
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
     st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
   }
+  if (dayOfSeason() === 1) { const si = seasonIdx(); setTimeout(() => { toast(`<b>${SEASONS[si].name} has come</b><br>${SEASON_TEXT[si]}`, 7500); SFX.chime(); }, 900); }
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.`);
   save();
@@ -2446,10 +2525,11 @@ function renderClock() {
   const mins = Math.floor(((S.time*24) % 24) * 60);
   const hh = String(Math.floor(mins/60)).padStart(2,'0'), mm = String(Math.floor(mins%60/10)*10).padStart(2,'0');
   const wn = WX_NAME[weatherNow()];
-  const txt = `Day ${S.day} · ${hh}:${mm}${wn ? ' · ' + wn : ''}`;
+  const txt = `${season().name} ${dayOfSeason()} · ${hh}:${mm}${wn ? ' · ' + wn : ''}`;
   if ($('clock').textContent !== txt) $('clock').textContent = txt;
 }
 function renderRegion() {
+  const dkr = inDungeon(); if (dkr) { if ($('region').textContent !== DUNGEONS[dkr].name) $('region').textContent = DUNGEONS[dkr].name; return; }
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
   if (!name && Math.hypot(S.x - HOME.x, S.y - HOME.y) < 8) name = S.home.level ? 'Your Homestead' : 'Homestead (for sale)';
@@ -2990,7 +3070,7 @@ function animalsHTML() {
   const mc = id => `<div class="jcard ${S.mount === id ? 'eq' : ''}"><div class="irow"><span class="nm"><span class="t">${esc(MOUNTS[id].name)}</span></span>${S.mount === id ? '<span class="s">Saddled · press V</span>' : `<button class="btn sm primary" data-mount="${id}">Saddle up</button>`}</div><div class="stat">Mount · ${Math.round(MOUNTS[id].speed*100 - 100)}% faster · ${esc(MOUNTS[id].desc)}</div></div>`;
   return `<h3>Pets & mounts</h3><div class="jgrid">${S.pets.map(pc).join('')}${S.mounts.map(mc).join('')}</div>`;
 }
-const petWalk = (x, y) => { const t = tileAt(Math.floor(x), Math.floor(y)); return t !== T.MOUNT && t !== T.HOUSE && t !== T.LAVA && !homeBlocked(Math.floor(x), Math.floor(y)); };
+const petWalk = (x, y) => { const t = tileAt(Math.floor(x), Math.floor(y)); return t !== T.MOUNT && t !== T.HOUSE && t !== T.LAVA && t !== T.DWALL && t !== T.DTORCH && t !== T.VOID && !homeBlocked(Math.floor(x), Math.floor(y)); };
 function updatePet(dt) {
   if (!S.pet) { petE = null; return; }
   const P = PETS[S.pet];
@@ -3068,7 +3148,7 @@ function drawMount(g, id, x, y, f, phase, moving) {
 }
 
 /* ================= homestead & farm ================= */
-const cropProgress = pl => Math.min(1, (S.day + S.time - pl.at) / CROPS[pl.crop].grow);
+const cropProgress = pl => Math.min(1, (S.day + S.time - pl.at) * cropRate(pl.crop) / CROPS[pl.crop].grow);
 const canAfford = c => S.coins >= (c.coins || 0) && Object.entries(c.items || {}).every(([g, n]) => have(g) >= n);
 function pay(c) { S.coins -= c.coins || 0; for (const g in (c.items || {})) addItem(g, -c.items[g]); }
 const costHTML = c => `<div class="req"><span>${c.coins} coin <b class="${S.coins >= c.coins ? 'ok' : 'no'}">${S.coins}/${c.coins}</b></span>${Object.entries(c.items || {}).map(([g, n]) => `<span>${swatch(g)}${n} ${GOODS[g].name} <b class="${have(g) >= n ? 'ok' : 'no'}">${have(g)}/${n}</b></span>`).join('')}</div>`;
@@ -3106,7 +3186,7 @@ function plotTalk(i) {
   const opts = [];
   for (const g of seeds) {
     const C = CROPS[GOODS[g].crop];
-    opts.push({label:`Plant ${C.name} (${have(g)} seed${have(g) === 1 ? '' : 's'} · ${C.grow} day${C.grow === 1 ? '' : 's'})`, primary: opts.length === 0, fn: () => { plant(i, g); save(); closeTalk(); }});
+    opts.push({label:`Plant ${C.name}${season().crops.includes(GOODS[g].crop) ? ' (in season)' : seasonIdx() === 3 && GOODS[g].crop !== 'moonflower' ? ' (slow in winter)' : ''} (${have(g)} seed${have(g) === 1 ? '' : 's'} · ${C.grow} day${C.grow === 1 ? '' : 's'})`, primary: opts.length === 0, fn: () => { plant(i, g); save(); closeTalk(); }});
     if (have(g) > 1 && empty().length > 1) opts.push({label:`Fill every empty bed with ${C.name}`, fn: () => { for (const k of empty()) { if (!have(g)) break; plant(k, g); } save(); closeTalk(); }});
   }
   opts.push({label:'Cancel', fn: closeTalk});
@@ -3258,7 +3338,7 @@ function openJournal() {
       <div>Coin in purse: <b>${S.coins}</b> / ${GOAL_COIN}<div class="bar"><i style="width:${pc*100}%"></i></div></div>
       <div>Pacts formed: <b>${S.pacts.length}</b> / ${GOAL_PACTS} ${S.pacts.length ? '· ' + S.pacts.map(k => TOWNS[k].name).join(', ') : ''}<div class="bar"><i style="width:${pp*100}%"></i></div></div>`}
     </div>
-    <div class="jcard"><div class="t">Your travels</div><div class="s">Day ${S.day}</div>
+    <div class="jcard"><div class="t">Your travels</div><div class="s">Day ${S.day} · ${season().name}, day ${dayOfSeason()} of 7 · fish caught: ${S.fishCaught || 0}</div>
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
       Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
@@ -3266,6 +3346,8 @@ function openJournal() {
     <div class="jgrid">${ACH.map(([id, name, desc]) => `<div class="jcard ach ${S.achievements[id] ? 'got' : 'locked'}"><span class="medal"></span><div style="min-width:0"><div class="t">${esc(name)}</div><div class="s">${esc(desc)}</div></div></div>`).join('')}</div>
     <h3>Great beasts · ${BK.filter(k => S.bosses[k]).length}/${BK.length} slain</h3>
     <div class="jgrid">${BK.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
+    <h3>Dungeons</h3>
+    <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
     <h3>Open deals</h3>
     ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c, id)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
     ${jobs.length ? `<h3>Notice board jobs</h3><div class="jgrid">${jobs.map(([k, r]) => `<div class="jcard"><div class="t">${esc(r.title)}</div><div class="s">${TOWNS[k].name} board · ${r.reward} coin</div><div class="req"><span>${reqProgress(r)}/${r.n}</span></div></div>`).join('')}</div>` : ''}
@@ -3290,11 +3372,11 @@ function openMap() {
   $('mapView').hidden = false;
   const c = $('bigmap'), wrap = $('mapWrap');
   const availW = Math.min(wrap.clientWidth || 900, 1060), availH = Math.max(200, innerHeight - 190);
-  const s = Math.max(1, Math.floor(Math.min(availW / W, availH / H) * dpr));
-  c.width = W*s; c.height = H*s;
+  const s = Math.max(1, Math.floor(Math.min(availW / W, availH / WORLD_H) * dpr));
+  c.width = W*s; c.height = WORLD_H*s;
   c.style.width = (W*s/dpr) + 'px';
   const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-  g.drawImage(mapCanvas, 0, 0, W*s, H*s);
+  g.drawImage(mapCanvas, 0, 0, W, WORLD_H, 0, 0, W*s, WORLD_H*s);
   g.font = `${Math.round(11*dpr)}px "Pixelify Sans", monospace`; g.textAlign = 'center';
   for (const L of LANDMARKS) if (S.found[L.id] || (L.id === 'shrine' && S.flags.shrineMarked)) {
     g.fillStyle = S.found[L.id] ? '#ebe4d3' : '#e3a948';
@@ -3314,7 +3396,9 @@ function openMap() {
     g.fillStyle = '#ebe4d3'; g.fillText(t.name, (t.x+.5)*s, (t.y+.5)*s - 8*dpr);
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
-  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(S.x*s, S.y*s, 4*dpr, 0, 7); g.fill();
+  for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  const dkm = inDungeon(), pm = dkm ? {x: DUNGEONS[dkm].entrance.x + .5, y: DUNGEONS[dkm].entrance.y + .5} : S;
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(pm.x*s, pm.y*s, 4*dpr, 0, 7); g.fill();
   g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke();
   renderTravel();
   $('mapLegend').textContent = `${exploredPct()}% of the land explored · ${Object.keys(S.towns).length} of ${Object.keys(TOWNS).length} settlements · ${LANDMARKS.filter(L => S.found[L.id]).length} of ${LANDMARKS.length} places · red X marks a beast's lair`;
@@ -3341,6 +3425,165 @@ function showEnding() {
   $('ending').hidden = false;
   $('btnKeep').addEventListener('click', () => { $('ending').hidden = true; mode = 'play'; renderHUD(); });
 }
+
+/* ================= dungeons ================= */
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function genDungeons() {
+  for (const k of DK) {
+    const D = DUNGEONS[k], [rx, ry, rw, rh] = D.rect, rnd = mulberry32(D.seed);
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) map[idx(x,y)] = T.DWALL;
+    const rooms = [];
+    for (let tries = 0; tries < 400 && rooms.length < 9; tries++) {
+      const w = 7 + Math.floor(rnd()*7), h = 6 + Math.floor(rnd()*5);
+      const x = rx + 2 + Math.floor(rnd()*(rw - w - 4)), y = ry + 2 + Math.floor(rnd()*(rh - h - 4));
+      if (rooms.some(r => x < r.x + r.w + 3 && x + w + 3 > r.x && y < r.y + r.h + 3 && y + h + 3 > r.y)) continue;
+      rooms.push({x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1)});
+    }
+    for (const r of rooms) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) map[idx(x,y)] = T.DFLOOR;
+    const order = [rooms[0]], left = rooms.slice(1);
+    while (left.length) { const last = order[order.length - 1]; left.sort((a, b) => Math.hypot(a.cx - last.cx, a.cy - last.cy) - Math.hypot(b.cx - last.cx, b.cy - last.cy)); order.push(left.shift()); }
+    const carve = (x, y) => { if (x > rx && y > ry && x < rx + rw - 1 && y < ry + rh - 1 && map[idx(x,y)] === T.DWALL) map[idx(x,y)] = T.DFLOOR; };
+    const corridor = (a, b) => {
+      let x = a.cx, y = a.cy;
+      const hx = () => { while (x !== b.cx) { carve(x, y); carve(x, y + 1); x += Math.sign(b.cx - x); } };
+      const vy = () => { while (y !== b.cy) { carve(x, y); carve(x + 1, y); y += Math.sign(b.cy - y); } };
+      if (rnd() < .5) { hx(); vy(); } else { vy(); hx(); }
+      carve(x, y);
+    };
+    for (let i = 1; i < order.length; i++) corridor(order[i-1], order[i]);
+    if (order.length > 5) corridor(order[1], order[4]);
+    D.rooms = order;
+    const start = order[0], end = order[order.length - 1];
+    map[idx(start.cx, start.cy)] = T.DSTAIR; D.stairs = {x: start.cx, y: start.cy};
+    const B = BOSSES[D.boss]; B.x = B.tx = end.cx; B.y = B.ty = end.cy - 1;
+    chests.push({x: end.cx, y: Math.min(end.y + end.h - 2, end.cy + 2), d: k, big: true, id: k + '_big'});
+    order.slice(1, -1).forEach((r, i) => { if (rnd() < .65) chests.push({x: r.x + 1 + Math.floor(rnd()*(r.w - 2)), y: r.y + 1, d: k, big: false, id: k + '_' + i}); });
+    const inRoom = (x, y) => order.some(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) {
+      const i = idx(x,y);
+      if (map[i] === T.DFLOOR && !inRoom(x, y) && rnd() < .14) map[i] = T.DSPIKE;
+      else if (map[i] === T.DWALL && map[idx(x, y + 1)] === T.DFLOOR && rnd() < .12) map[i] = T.DTORCH;
+    }
+  }
+}
+function populateDungeon(k) {
+  const D = DUNGEONS[k], mul = 1.3 + D.lvl*.06;
+  D.rooms.slice(1, -1).forEach(r => {
+    const n = 2 + Math.floor(Math.random()*2);
+    for (let i = 0; i < n; i++) {
+      const e = makeEnemy(pick(D.enemies), r.x + 1 + Math.random()*(r.w - 2), r.y + 1 + Math.random()*(r.h - 2), {dungeon: true});
+      e.hp = e.max = Math.round(e.max*mul); e.dmgMul = 1 + D.lvl*.04; enemies.push(e);
+    }
+  });
+}
+function enterDungeon(k) {
+  const D = DUNGEONS[k]; SFX.travel();
+  fadeThen(() => {
+    S.x = D.stairs.x + .5; S.y = D.stairs.y + 1.5; S.riding = false; petE = null; fishing = null; lastTile = -1;
+    enemies = []; eproj = []; hazards = []; arrows = []; bombs = []; populateDungeon(k);
+    S.dungeonsSeen[k] = true; renderHUD(); renderRegion(); save();
+    toast(`<b>${D.name}</b><br>${S.bosses[D.boss] ? 'The guardian is gone, but the dark is never empty.' : `Its guardian, ${BOSSES[D.boss].name}, waits in the deepest chamber.`}`, 5500);
+  });
+}
+function exitDungeon(k) {
+  const E = DUNGEONS[k].entrance; SFX.travel();
+  fadeThen(() => { S.x = E.x + .5; S.y = E.y + 1.4; petE = null; lastTile = -1; enemies = []; eproj = []; hazards = []; arrows = []; bombs = []; renderHUD(); renderRegion(); save(); });
+}
+const chestOpen = c => S.chests[c.id] != null && (c.big || S.day - S.chests[c.id] < 7);
+const CHEST_LOOT = ['bomb','arrows','salve','tonic','crystal','silver','obsidian','ember','gem','glow_tonic','venom_arrows','fire_bomb','elixir','frost_essence'];
+function openChest(c) {
+  S.chests[c.id] = S.day; const tier = DK.indexOf(c.d) + 1, got = [];
+  if (c.big) {
+    const tr = DUNGEONS[c.d].treasure;
+    if (!have(tr) && !S.home.chest[tr]) { addItem(tr, 1); got.push(`<b>${GOODS[tr].name}</b>`); }
+    const coins = 250*tier; S.coins += coins; got.push(`${coins} coin`); addItem('gem', 2); got.push('2 Cut Gems'); SFX.victory();
+  } else {
+    const coins = rint(15, 45)*tier; S.coins += coins; got.push(`${coins} coin`);
+    for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT), n = GOODS[g].kind === 'ammo' ? rint(2, 6) : rint(1, 2); addItem(g, n); got.push(`${n} ${GOODS[g].name}`); }
+    SFX.coin();
+  }
+  burst(c.x + .5, c.y + .3, '#ffe9a8', 18, 5); gainXP(c.big ? 150 : 20*tier);
+  toast(`<b>${c.big ? 'Great chest' : 'Chest'} opened</b><br><span style="color:var(--good)">+ ${got.join(', ')}</span>${c.big ? '' : '<br><span style="color:var(--muted)">Dungeon chests refill after a week.</span>'}`, 6500);
+  renderHUD(); save();
+}
+function dungeonTarget() {
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>', dk = inDungeon();
+  if (!dk) {
+    for (const k of DK) {
+      const D = DUNGEONS[k], E = D.entrance;
+      if (Math.hypot(S.x - E.x - .5, S.y - E.y - .8) < 1.4) return {key:'de' + k, html:`${K}Enter ${D.name} · <span class="${S.level < D.lvl ? 'warn' : ''}">recommended level ${D.lvl}</span>`, btn:'Enter', fn: () => enterDungeon(k)};
+    }
+    return null;
+  }
+  const D = DUNGEONS[dk];
+  if (Math.hypot(S.x - D.stairs.x - .5, S.y - D.stairs.y - .5) < 1.3) return {key:'dx', html:`${K}Climb back to the surface`, btn:'Leave', fn: () => exitDungeon(dk)};
+  for (const c of chests) {
+    if (c.d !== dk || chestOpen(c) || Math.hypot(S.x - c.x - .5, S.y - c.y - .6) > 1.25) continue;
+    if (c.big && !S.bosses[D.boss]) return {key:'cs' + c.id, html:`The great chest is sealed until ${BOSSES[D.boss].name} falls`, btn:'', fn: () => {}};
+    return {key:'c' + c.id, html:`${K}Open the ${c.big ? 'great chest' : 'chest'}`, btn:'Open', fn: () => openChest(c)};
+  }
+  return null;
+}
+function drawChest(g, c) {
+  const open = chestOpen(c), x = c.x*TS + 8, y = c.y*TS + 13, w = c.big ? 14 : 10, h = c.big ? 9 : 7;
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x - w/2, y, w, 2);
+  g.fillStyle = c.big ? '#8a5a1a' : '#6a4424'; g.fillRect(x - w/2, y - h, w, h);
+  g.fillStyle = c.big ? '#e3a948' : '#a8a29a'; g.fillRect(x - w/2, y - h + 2, w, 1); g.fillRect(x - 1, y - h + 1, 2, 3);
+  if (open) { g.fillStyle = '#1a1008'; g.fillRect(x - w/2 + 1, y - h - 2, w - 2, 2); g.fillStyle = c.big ? '#a06a20' : '#7a5030'; g.fillRect(x - w/2, y - h - 6, w, 3); }
+  else { g.fillStyle = c.big ? '#a06a20' : '#7a5030'; g.fillRect(x - w/2, y - h - 3, w, 3); g.fillStyle = c.big ? '#e3a948' : '#a8a29a'; g.fillRect(x - w/2, y - h - 3, w, 1);
+    if (Math.sin(frameT*3 + c.x) > .6) { g.fillStyle = '#fff6c0'; g.fillRect(x + w/2 - 2, y - h - 5, 1, 1); } }
+}
+function drawEntrance(g, k) {
+  const D = DUNGEONS[k], E = D.entrance, x = E.x*TS + 8, y = E.y*TS + 14, cleared = S.bosses[D.boss];
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x, y, 13, 3, 0, 0, 7); g.fill();
+  g.fillStyle = '#5a5662'; g.fillRect(x - 12, y - 20, 24, 20); g.fillStyle = '#6e6a76'; g.fillRect(x - 14, y - 23, 28, 4); g.fillStyle = '#48444f'; g.fillRect(x - 12, y - 10, 24, 1);
+  g.fillStyle = '#05070a'; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x - 7, y - 11); g.quadraticCurveTo(x, y - 19, x + 7, y - 11); g.lineTo(x + 7, y); g.fill();
+  g.fillStyle = '#2a2630'; g.fillRect(x - 6, y - 3, 12, 1); g.fillRect(x - 5, y - 6, 10, 1);
+  const a = .5 + Math.sin(frameT*3)*.3; g.fillStyle = cleared ? '#8a8492' : D.theme.accent; g.globalAlpha = a; g.fillRect(x - 2, y - 22, 4, 2); g.globalAlpha = 1;
+  for (const s of [-1, 1]) { g.fillStyle = '#5a3d27'; g.fillRect(x + s*10 - 1, y - 14, 2, 5); g.fillStyle = '#ff9a3a'; g.beginPath(); g.ellipse(x + s*10, y - 16 + Math.sin(frameT*12 + s)*.4, 1.8, 2.6, 0, 0, 7); g.fill(); }
+}
+
+/* ================= fishing minigame ================= */
+let FG = null, fishHold = false;
+const CATCH = {fish:{diff:.55, xp:6, col:'#8fb8c9'}, silverfin:{diff:.8, xp:10, col:'#dfe4ea'}, goldcarp:{diff:1.15, xp:25, col:'#f0c040'}, old_boot:{diff:.25, xp:1, col:'#6a4a2a'}};
+function startFishGame() {
+  const r = Math.random(), c = r < .07 ? 'old_boot' : r < .13 ? 'goldcarp' : r < .38 ? 'silverfin' : 'fish';
+  FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat'), prog: .3, node: fishing.i};
+  fishing = null; mode = 'fish'; keys.clear(); fishHold = false;
+  $('fFish').style.background = CATCH[c].col;
+  $('fishUI').hidden = false; $('prompt').hidden = true; $('actBtn').hidden = true; SFX.fish();
+}
+function updateFishGame(dt) {
+  const G = FG; if (!G) return;
+  const hold = keys.has('e') || keys.has(' ') || fishHold;
+  G.zv += (hold ? 2.9 : -2.5) * dt; G.zv *= Math.pow(.3, dt); G.zone += G.zv * dt;
+  if (G.zone < 0) { G.zone = 0; G.zv = 0; } else if (G.zone > 1 - G.size) { G.zone = 1 - G.size; G.zv = 0; }
+  G.tt -= dt; if (G.tt <= 0) { G.target = Math.random(); G.tt = (.35 + Math.random()*1.1) / G.diff; }
+  G.pos += (G.target - G.pos) * Math.min(1, dt*(1.2 + G.diff*2.6));
+  const inside = G.pos >= G.zone && G.pos <= G.zone + G.size;
+  G.prog += (inside ? .34 : -(.1 + .2*G.diff)) * dt;
+  $('fZone').style.left = (G.zone*100) + '%'; $('fZone').style.width = (G.size*100) + '%';
+  $('fFish').style.left = (G.pos*100) + '%'; $('fProg').style.width = Math.max(0, Math.min(1, G.prog))*100 + '%';
+  if (G.prog >= 1) endFishGame(true); else if (G.prog <= 0) endFishGame(false);
+}
+function endFishGame(win) {
+  const G = FG; FG = null; $('fishUI').hidden = true; mode = 'play'; promptKey = null; keys.clear();
+  if (!G) return;
+  const n = nodes[G.node];
+  if (win) {
+    const amt = G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1;
+    addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1;
+    if (G.c === 'goldcarp') S.goldcarps = (S.goldcarps || 0) + 1;
+    floatText(n.x + .5, n.y, `+${amt} ${GOODS[G.c].name}`, G.c === 'goldcarp' ? '#ffec6a' : '#86c98f', G.c === 'goldcarp');
+    burst(n.x + .5, n.y + .5, '#bfe6f0', 10); SFX.pickup(); gainXP(CATCH[G.c].xp);
+    rollCurio('scale'); if (G.c === 'goldcarp') rollCurio('scale');
+    if (G.c === 'old_boot') toast('You reeled in an old boot. Somebody lost it, at least.');
+  } else floatText(S.x, S.y - 1.2, 'It got away!', '#e57a62');
+  renderHUD();
+}
+addEventListener('pointerdown', () => { if (mode === 'fish') fishHold = true; });
+addEventListener('pointerup', () => { fishHold = false; });
+addEventListener('pointercancel', () => { fishHold = false; });
 
 /* ================= settings & audio ================= */
 const SETTINGS = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem('saltwind-settings') || '{}'); } catch (e) {} return Object.assign({music: .5, sfx: .7, shake: true}, o); })();
@@ -3417,6 +3660,7 @@ const AUD = (() => {
     gloom:{bpm:62, root:45, scale:[0,1,3,6,7], dens:.3, prog:[0,1,4,3]},
     ash:{bpm:100, root:43, scale:[0,1,3,5,6,8,10], dens:.45, prog:[0,5,6,4], perc:.4},
     jungle:{bpm:116, root:52, scale:[0,3,5,7,10], dens:.55, prog:[0,3,4,3], perc:.6},
+    dungeon:{bpm:72, root:45, scale:[0,1,3,5,7,8], dens:.3, prog:[0,5,1,4], perc:.25},
     boss:{bpm:152, root:40, scale:[0,1,3,5,6,8,10], dens:.8, prog:[0,0,5,6], perc:.9, drive:true},
   };
   function schedule() {
@@ -3449,12 +3693,13 @@ const WX = {type: 'clear', t: 50, flash: 0, bolt: 8};
 const WX_NAME = {clear: '', rain: 'Rain', storm: 'Thunderstorm', snow: 'Snow', sandstorm: 'Sandstorm', fog: 'Fog', ash: 'Ashfall'};
 function weatherNow() {
   const g = WX.type; if (!S) return 'clear';
+  if (S.y >= WORLD_H) return 'clear';
   const t = tileAt(Math.floor(S.x), Math.floor(S.y));
   if (t === T.ASH || t === T.LAVA) return 'ash';
   if (g === 'clear') return 'clear';
   if (g === 'fog') return 'fog';
-  if (t === T.SNOW || S.y < 30) return 'snow';
   if (t === T.DUNE || t === T.MESA || (t === T.SAND && S.x > 170)) return g === 'storm' ? 'sandstorm' : 'clear';
+  if (t === T.SNOW || S.y < 30 || seasonIdx() === 3) return 'snow';
   return g;
 }
 const weatherSlow = () => (S && weatherNow() === 'sandstorm' && !townAt(S.x, S.y, 8)) ? .85 : 1;
@@ -3469,6 +3714,7 @@ function updateWeather(dt) {
 function drawWeather() {
   const w = weatherNow(), VW = view.width, VH = view.height, t = frameT, h = hash2;
   ctx.setTransform(1,0,0,1,0,0);
+  if (S.y < WORLD_H) { ctx.fillStyle = season().tint; ctx.fillRect(0, 0, VW, VH); }
   if (w === 'rain' || w === 'storm') {
     ctx.fillStyle = `rgba(18,28,48,${w === 'storm' ? .3 : .16})`; ctx.fillRect(0, 0, VW, VH);
     ctx.strokeStyle = 'rgba(185,205,235,.38)'; ctx.lineWidth = dpr; ctx.beginPath();
@@ -3520,7 +3766,7 @@ function drawAmbient(dark) {
       for (let k = 0; k < 3; k++) { const life = ((ph*.35 + k*.33) % 1), x = (bx + k*.7 + Math.sin(ph + k)*.4)*TS, y = (by + .5)*TS - life*44; ctx.fillStyle = `rgba(255,${140 + k*30},50,${1 - life})`; ctx.fillRect(x, y, 1.5, 1.5); }
     } else if (!night && (t === T.FOREST || t === T.JUNGLE) && r < .35) {
       const life = (ph*.12) % 1, x = (bx + Math.sin(ph*1.3)*.8)*TS, y = (by - 1.5 + life*3)*TS;
-      ctx.globalAlpha = 1 - life; ctx.fillStyle = t === T.JUNGLE ? '#6ac04a' : (r < .15 ? '#d89a3a' : '#8ab04a'); ctx.fillRect(x, y, 2, 1.2); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 1 - life; ctx.fillStyle = t === T.JUNGLE ? '#6ac04a' : seasonIdx() === 2 ? (r < .18 ? '#d8602a' : '#e8a03a') : (r < .15 ? '#d89a3a' : '#8ab04a'); ctx.fillRect(x, y, 2, 1.2); ctx.globalAlpha = 1;
     }
   }
 }
@@ -3579,7 +3825,7 @@ const ACH = [
   ['first_blood','First Blood','Defeat your first enemy', () => S.kills >= 1],
   ['hunter','Hunter','Defeat 100 enemies', () => S.kills >= 100],
   ['slayer','Beast Slayer','Defeat a great beast', () => BK.some(k => S.bosses[k])],
-  ['legend','Legend of the Road','Defeat all ten great beasts', () => BK.every(k => S.bosses[k])],
+  ['legend','Legend of the Road','Defeat every great beast, dungeon guardians included', () => BK.every(k => S.bosses[k])],
   ['explorer','Explorer','Explore half the land', () => exploredPct() >= 50],
   ['cartographer','Cartographer','Explore 90% of the land', () => exploredPct() >= 90],
   ['wanderer','Wanderer','Visit every settlement', () => Object.keys(TOWNS).every(k => S.towns[k])],
@@ -3600,6 +3846,11 @@ const ACH = [
   ['lv25','Veteran','Reach level 25', () => S.level >= 25],
   ['dodger','Untouchable','Dodge 50 attacks', () => (S.dodges || 0) >= 50],
   ['traveler','Frequent Traveler','Fast travel 10 times', () => (S.fastTravels || 0) >= 10],
+  ['delver','Delver','Defeat a dungeon guardian', () => DK.some(k => S.bosses[DUNGEONS[k].boss])],
+  ['deepdelver','Into the Deep','Defeat all three dungeon guardians', () => DK.every(k => S.bosses[DUNGEONS[k].boss])],
+  ['angler','Angler','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
+  ['goldcarp','Golden Hook','Land a Golden Carp', () => (S.goldcarps || 0) >= 1],
+  ['seasons','A Year on the Road','See all four seasons', () => S.day >= 22],
 ];
 function checkAch() {
   for (const [id, name, desc, test] of ACH) {
@@ -3622,13 +3873,13 @@ const bossActive = () => enemies.some(e => e.boss);
 function travelCost(k) { if (k === 'home') return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
-  const blocked = bossActive();
-  $('travel').innerHTML = `<span style="width:100%;text-align:center;background:none">${blocked ? 'You can’t fast travel during a boss fight.' : 'Fast travel to a place you’ve been'}</span>`
+  const blocked = bossActive() || !!inDungeon();
+  $('travel').innerHTML = `<span style="width:100%;text-align:center;background:none">${inDungeon() ? 'Climb out of the dungeon before you fast travel.' : blocked ? 'You can’t fast travel during a boss fight.' : 'Fast travel to a place you’ve been'}</span>`
     + (S.home.level ? `<button class="btn sm" data-go="home" ${blocked ? 'disabled' : ''}>Home · free</button>` : '')
     + list.map(k => `<button class="btn sm" data-go="${k}" ${blocked || S.coins < travelCost(k) ? 'disabled' : ''}>${TOWNS[k].name} · ${travelCost(k)}◆</button>`).join('');
 }
 $('travel').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b || bossActive()) return;
+  const b = e.target.closest('button'); if (!b || bossActive() || inDungeon()) return;
   const k = b.dataset.go, cost = travelCost(k); if (S.coins < cost) return;
   S.coins -= cost; S.fastTravels = (S.fastTravels || 0) + 1; SFX.travel();
   closeModal('mapView');
@@ -3718,6 +3969,7 @@ const camF = {x: null, y: null};
 function musicContext() {
   if (mode === 'title' || mode === 'creator') return 'title';
   if (bossActive()) return 'boss';
+  if (inDungeon()) return 'dungeon';
   if (townAt(S.x, S.y, 9)) return 'town';
   if (Math.cos((S.time - .5) * Math.PI * 2) < -.2) return 'night';
   const t = tileAt(Math.floor(S.x), Math.floor(S.y));
@@ -3736,6 +3988,7 @@ function loop(ts) {
   const raw = Math.min(.05, (ts - last) / 1000 || 0); last = ts; frameT += raw;
   let dt = raw; if (hitStop > 0) { hitStop -= raw; dt = 0; }
   if (mode === 'play' && dt > 0) update(dt);
+  if (mode === 'fish' && dt > 0) updateFishGame(dt);
   if (mode === 'title' || mode === 'creator') titleCam(raw);
   if (mode !== 'ending') updateWeather(raw);
   const far = camF.x == null || Math.hypot(S.x - camF.x, S.y - camF.y) > 14, k = Math.min(1, raw*7);
