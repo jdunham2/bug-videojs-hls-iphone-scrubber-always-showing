@@ -1,0 +1,792 @@
+<title>Dino Chomp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: full-bleed jungle arena on canvas; HUD chips float in the corners, modal panels center over the paused world */
+:root {
+  --jungle: #13241a;
+  --panel: rgba(10, 20, 14, 0.82);
+  --leaf: #7fd35b;
+  --amber: #ffb347;
+  --blood: #e8484d;
+  --bone: #f4ecd8;
+  --muted: #a9c0a4;
+  --ink: #0b1410;
+  --display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--jungle); color: var(--bone); font-family: var(--body); overflow: hidden; }
+body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+#game { position: fixed; inset: 0; }
+#cv { display: block; width: 100%; height: 100%; }
+
+.hud { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; }
+.chip { background: var(--panel); border: 2px solid rgba(127, 211, 91, 0.3); border-radius: 12px; padding: 8px 12px; }
+.stat-card { width: min(270px, 62vw); display: grid; gap: 6px; }
+.who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.who b { font-family: var(--display); font-weight: 400; font-size: 20px; letter-spacing: 0.5px; color: var(--leaf); }
+.who span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+.bar { position: relative; height: 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 50%; border-radius: 6px; transition: width 0.15s; }
+.bar.hp i { background: var(--blood); }
+.bar.xp i { background: var(--amber); }
+.bar em { position: absolute; inset: 0; font-style: normal; font-size: 10px; line-height: 12px; text-align: center; font-weight: 800; color: var(--bone); text-shadow: 0 1px 2px #000; }
+.nums { display: flex; gap: 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.nums b { color: var(--bone); }
+.btns { display: flex; gap: 8px; pointer-events: auto; }
+.icon-btn { font: 800 13px var(--body); color: var(--bone); background: var(--panel); border: 2px solid rgba(127, 211, 91, 0.3); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+.icon-btn:focus-visible, .btn:focus-visible, .perk:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+.boss-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(420px, 70vw); text-align: center; pointer-events: none; }
+.boss-bar .label { font-family: var(--display); font-size: 18px; color: var(--blood); letter-spacing: 1px; text-shadow: 0 2px 0 #000; }
+.boss-bar .bar { height: 14px; border: 2px solid rgba(0,0,0,.5); }
+
+.toast { position: absolute; top: 28%; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: clamp(28px, 6vw, 54px); color: var(--amber); text-shadow: 0 3px 0 var(--ink), 0 0 24px rgba(0,0,0,.6); pointer-events: none; opacity: 0; transition: opacity 0.25s; padding-inline: 16px; text-wrap: balance; }
+.toast small { display: block; font-family: var(--body); font-weight: 800; font-size: clamp(14px, 2.4vw, 18px); color: var(--bone); margin-top: 6px; }
+.toast.show { opacity: 1; }
+
+.screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 16, 11, 0.6); }
+.panel { background: var(--panel); border: 3px solid rgba(127, 211, 91, 0.35); border-radius: 18px; padding: 24px; width: min(520px, 100%); max-height: 100%; overflow: auto; text-align: center; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.panel h1, .panel h2 { margin: 0; font-family: var(--display); font-weight: 400; letter-spacing: 1px; text-wrap: balance; }
+.panel h1 { font-size: clamp(44px, 11vw, 76px); line-height: 0.95; color: var(--leaf); text-shadow: 0 4px 0 var(--ink); }
+.panel h2 { font-size: clamp(30px, 7vw, 44px); color: var(--amber); }
+.panel p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 15px; }
+.foodchain { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; font-size: 12px; font-weight: 800; }
+.foodchain span { padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--bone); }
+.foodchain span.top { background: rgba(232, 72, 77, 0.25); }
+.keys { font-size: 13px; color: var(--muted); }
+.keys kbd { font: 800 12px var(--body); background: rgba(255,255,255,.1); border-radius: 5px; padding: 2px 6px; color: var(--bone); }
+.btn { font: 400 22px var(--display); letter-spacing: 1px; color: var(--ink); background: var(--leaf); border: 0; border-radius: 12px; padding: 12px 28px; cursor: pointer; justify-self: center; box-shadow: 0 4px 0 #3f7a2a; }
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #3f7a2a; }
+.perks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .perks { grid-template-columns: 1fr; } }
+.perk { font-family: var(--body); color: var(--bone); background: rgba(255,255,255,.06); border: 2px solid rgba(255, 179, 71, 0.4); border-radius: 12px; padding: 14px 10px; cursor: pointer; display: grid; gap: 6px; text-align: center; }
+.perk:hover { background: rgba(255, 179, 71, 0.14); }
+.perk b { font-family: var(--display); font-weight: 400; font-size: 19px; color: var(--amber); }
+.perk span { font-size: 13px; color: var(--muted); }
+.perk kbd { font: 800 11px var(--body); color: var(--muted); }
+.results { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.results div { display: grid; gap: 2px; }
+.results b { font-family: var(--display); font-weight: 400; font-size: 28px; color: var(--bone); }
+.results span { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+
+#biteBtn { position: absolute; right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 92px; height: 92px; border-radius: 50%; border: 4px solid rgba(0,0,0,.35); background: var(--blood); color: var(--bone); font: 400 22px var(--display); letter-spacing: 1px; box-shadow: 0 5px 0 #8a2226; }
+#biteBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #8a2226; }
+</style>
+
+<div id="game">
+  <canvas id="cv" aria-label="Dino Chomp game area"></canvas>
+
+  <div class="hud" id="hud" hidden>
+    <div class="chip stat-card">
+      <div class="who"><b id="stageName">Hatchling</b><span id="lvl">Level 1</span></div>
+      <div class="bar hp"><i id="hpFill"></i><em id="hpText">20 / 20</em></div>
+      <div class="bar xp"><i id="xpFill"></i><em id="xpText">0 / 8 XP</em></div>
+      <div class="nums"><span>Bite <b id="strText">1</b></span><span>Speed <b id="spdText">160</b></span><span>Eaten <b id="eatText">0</b></span><span><b id="timeText">0:00</b></span></div>
+    </div>
+    <div class="btns">
+      <button class="icon-btn" id="muteBtn" type="button">Sound on</button>
+      <button class="icon-btn" id="pauseBtn" type="button">Pause</button>
+    </div>
+  </div>
+
+  <div class="boss-bar" id="bossBar" hidden>
+    <div class="label">OLD TUSK</div>
+    <div class="bar hp"><i id="bossFill"></i></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <button id="biteBtn" type="button" hidden>BITE</button>
+
+  <div class="screen" id="titleScreen">
+    <div class="panel">
+      <h1>Dino<br>Chomp</h1>
+      <p>You hatched at the bottom of the food chain. Eat bugs and mice, grow bigger and stronger, and take the valley from the boar king, Old Tusk.</p>
+      <div class="foodchain" aria-label="Food chain from smallest to largest">
+        <span>Beetle</span><span>Mouse</span><span>Rat</span><span>Lizard</span><span>Rabbit</span><span>Snake</span><span>Fox</span><span>Boar</span><span class="top">Old Tusk</span>
+      </div>
+      <p class="keys">A <b style="color:var(--leaf)">green ring</b> means you can eat it. A <b style="color:var(--blood)">red ring</b> means it is stronger than you, for now.</p>
+      <p class="keys"><kbd>WASD</kbd> / <kbd>Arrows</kbd> move &middot; <kbd>Space</kbd> or click to bite &middot; <kbd>P</kbd> pause<br>On a phone: drag on the left to move, tap BITE.</p>
+      <button class="btn" id="startBtn" type="button">Hatch</button>
+    </div>
+  </div>
+
+  <div class="screen" id="levelScreen" hidden>
+    <div class="panel">
+      <h2 id="levelTitle">Level 2!</h2>
+      <p id="levelSub">You grew bigger and stronger. Pick one more trait.</p>
+      <div class="perks" id="perks"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="pauseScreen" hidden>
+    <div class="panel">
+      <h2>Paused</h2>
+      <button class="btn" id="resumeBtn" type="button">Resume</button>
+    </div>
+  </div>
+
+  <div class="screen" id="endScreen" hidden>
+    <div class="panel">
+      <h2 id="endTitle">You were eaten</h2>
+      <p id="endSub"></p>
+      <div class="results" id="endResults"></div>
+      <button class="btn" id="againBtn" type="button">Hatch again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+}
+addEventListener('resize', resize); resize();
+
+const WORLD = 2400;
+const MAX_LEVEL = 10;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
+const needXp = L => 5 + L * L * 3;
+const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+const STAGES = [
+  { min: 1, name: 'Hatchling', body: '#7fd35b', dark: '#4f9a33', back: '#c6ee8f', spikes: 0 },
+  { min: 4, name: 'Raptor', body: '#3fb59a', dark: '#26806c', back: '#a8ecd9', spikes: 4 },
+  { min: 7, name: 'Tyrant', body: '#e08a3c', dark: '#a85d1f', back: '#ffd59a', spikes: 6 },
+  { min: 10, name: 'Rex', body: '#c9374a', dark: '#86202f', back: '#ffb0a0', spikes: 8 },
+];
+const stageFor = L => { let s = STAGES[0]; for (const st of STAGES) if (L >= st.min) s = st; return s; };
+
+const TYPES = {
+  beetle: { name: 'Beetle', tier: 1, hp: 1, xp: 1, size: 6, speed: 38, ai: 'wander', dmg: 0, w: 1.4 },
+  mouse:  { name: 'Mouse', tier: 1, hp: 1, xp: 2, size: 8, speed: 92, ai: 'flee', dmg: 0, w: 2 },
+  rat:    { name: 'Rat', tier: 2, hp: 3, xp: 4, size: 11, speed: 102, ai: 'flee', dmg: 2, w: 2 },
+  lizard: { name: 'Lizard', tier: 3, hp: 5, xp: 7, size: 12, speed: 128, ai: 'flee', dmg: 0, w: 1.6 },
+  rabbit: { name: 'Rabbit', tier: 4, hp: 9, xp: 11, size: 14, speed: 150, ai: 'flee', dmg: 0, w: 1.6 },
+  snake:  { name: 'Snake', tier: 5, hp: 14, xp: 16, size: 15, speed: 78, ai: 'aggro', dmg: 5, w: 1.2 },
+  fox:    { name: 'Fox', tier: 6, hp: 22, xp: 24, size: 18, speed: 128, ai: 'aggro', dmg: 7, w: 1.2 },
+  boar:   { name: 'Boar', tier: 8, hp: 40, xp: 42, size: 24, speed: 118, ai: 'aggro', dmg: 11, w: 1 },
+  boss:   { name: 'Old Tusk', tier: 10, hp: 220, xp: 0, size: 46, speed: 112, ai: 'boss', dmg: 15, w: 0 },
+};
+for (const k in TYPES) TYPES[k].key = k;
+
+const PERKS = [
+  { id: 'jaws', name: 'Bigger Jaws', desc: '+2 bite damage', apply: p => { p.str += 2; } },
+  { id: 'hide', name: 'Thick Hide', desc: '+15 max health, full heal', apply: p => { p.maxHp += 15; p.hp = p.maxHp; } },
+  { id: 'legs', name: 'Quick Legs', desc: '+12% run speed', apply: p => { p.speedMul *= 1.12; } },
+  { id: 'snap', name: 'Fast Snap', desc: 'Bite 15% more often', apply: p => { p.biteCd *= 0.85; } },
+  { id: 'neck', name: 'Long Neck', desc: '+20% bite reach', apply: p => { p.rangeMul *= 1.2; } },
+  { id: 'gut',  name: 'Iron Stomach', desc: 'Eating heals 60% more', apply: p => { p.healMul *= 1.6; } },
+  { id: 'heal', name: 'Regrowth', desc: '+1 health per second', apply: p => { p.regen += 1; } },
+  { id: 'tail', name: 'Spiked Tail', desc: 'Attackers take 3 damage', apply: p => { p.thorns += 3; } },
+];
+
+// ---------- world decoration ----------
+let seed = 1337;
+const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const decor = [];
+for (let i = 0; i < 700; i++) {
+  const r = srand();
+  decor.push({ x: srand() * WORLD, y: srand() * WORLD, rot: srand() * Math.PI * 2, s: 0.6 + srand() * 0.9,
+    type: r < 0.45 ? 'fern' : r < 0.68 ? 'tuft' : r < 0.84 ? 'rock' : r < 0.95 ? 'flower' : 'bone' });
+}
+const patches = [];
+for (let i = 0; i < 90; i++) patches.push({ x: srand() * WORLD, y: srand() * WORLD, r: 80 + srand() * 220, c: srand() < 0.5 ? 'rgba(20,50,26,0.55)' : 'rgba(80,120,50,0.18)' });
+
+// ---------- state ----------
+let state = 'title';
+let P, creatures, particles, texts, cam, shake, elapsed, pendingLevels, bossSpawned, boss, spawnTimer, gameT = 0;
+
+function newGame() {
+  P = { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, face: 0, level: 1, xp: 0, hp: 20, maxHp: 20, str: 1,
+    speedMul: 1, biteCd: 0.36, biteT: 0, biteAnim: 0, rangeMul: 1, healMul: 1, regen: 0.4, thorns: 0,
+    eaten: 0, hurtT: 0, moving: false, kills: {} };
+  creatures = []; particles = []; texts = [];
+  cam = { x: P.x, y: P.y }; shake = 0; elapsed = 0; pendingLevels = 0;
+  bossSpawned = false; boss = null; spawnTimer = 0;
+  for (let i = 0; i < 46; i++) spawnCreature(true);
+  $('bossBar').hidden = true;
+}
+
+const pSize = () => 12 + (P.level - 1) * 2.8;
+const pSpeed = () => (160 + (P.level - 1) * 6) * P.speedMul;
+const pRange = () => (pSize() + 16) * P.rangeMul;
+
+function pickType() {
+  const L = P.level, opts = [];
+  let total = 0;
+  for (const k in TYPES) {
+    const T = TYPES[k]; if (!T.w) continue;
+    let w = 0;
+    if (T.tier <= L - 4) w = 0.25;
+    else if (T.tier <= L) w = 2.4;
+    else if (T.tier <= L + 2) w = 0.9;
+    else if (T.tier <= L + 4) w = 0.15;
+    w *= T.w; if (T.tier === 1 && L <= 3) w *= 1.6;
+    if (w > 0) { opts.push([T, w]); total += w; }
+  }
+  let r = Math.random() * total;
+  for (const [T, w] of opts) { r -= w; if (r <= 0) return T; }
+  return opts[0][0];
+}
+
+function spawnCreature(initial, forcedType) {
+  const T = forcedType || pickType();
+  let x, y, tries = 0;
+  const minD = initial ? 260 : Math.max(W, H) / 2 + 80;
+  do { x = rand(40, WORLD - 40); y = rand(40, WORLD - 40); tries++; } while (Math.hypot(x - P.x, y - P.y) < minD && tries < 40);
+  const c = { type: T, x, y, vx: 0, vy: 0, face: rand(0, Math.PI * 2), hp: T.hp, maxHp: T.hp, size: T.size,
+    wanderA: rand(0, Math.PI * 2), wanderT: 0, atkCd: 0, flash: 0, provoked: false, anim: rand(0, 10),
+    charge: 0, windup: 0, chargeCd: 3, chargeA: 0 };
+  creatures.push(c);
+  return c;
+}
+
+// ---------- audio ----------
+let actx = null, muted = false;
+function initAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; } }
+function tone(freq, dur, type = 'square', vol = 0.08, slide = 0, delay = 0) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + delay;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t0 + dur);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+const sfx = {
+  bite: () => tone(220, 0.08, 'square', 0.05, -120),
+  hit: () => tone(140, 0.07, 'sawtooth', 0.06, -60),
+  eat: () => { tone(520, 0.07, 'triangle', 0.09); tone(780, 0.09, 'triangle', 0.08, 0, 0.06); },
+  hurt: () => tone(110, 0.22, 'sawtooth', 0.09, -60),
+  level: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.14, 'triangle', 0.09, 0, i * 0.08)),
+  roar: () => { tone(90, 0.6, 'sawtooth', 0.12, -40); tone(70, 0.7, 'square', 0.06, -20, 0.05); },
+  win: () => [392, 523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.2, 'triangle', 0.09, 0, i * 0.1)),
+};
+
+// ---------- input ----------
+const keys = new Set();
+const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
+let touchMode = false;
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (state === 'levelup' && ['1', '2', '3'].includes(k)) { const b = $('perks').children[+k - 1]; if (b) b.click(); return; }
+  if (k === 'p' || k === 'escape') { togglePause(); return; }
+  if (k === ' ' || k === 'j' || k === 'k') { e.preventDefault(); if (state === 'play') bite(null); return; }
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
+  keys.add(k);
+});
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => { keys.clear(); if (state === 'play') togglePause(); });
+
+cv.addEventListener('mousedown', e => {
+  if (state !== 'play' || touchMode) return;
+  const wx = e.clientX - W / 2 + cam.x, wy = e.clientY - H / 2 + cam.y;
+  bite(Math.atan2(wy - P.y, wx - P.x));
+});
+cv.addEventListener('touchstart', e => {
+  e.preventDefault(); touchMode = true; $('biteBtn').hidden = state !== 'play';
+  for (const t of e.changedTouches) {
+    if (t.clientX < W * 0.55 && !joy.active) { joy.active = true; joy.id = t.identifier; joy.ox = t.clientX; joy.oy = t.clientY; joy.dx = joy.dy = 0; }
+    else if (state === 'play') bite(null);
+  }
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) if (t.identifier === joy.id) {
+    let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const m = Math.hypot(dx, dy), R = 55;
+    if (m > R) { joy.ox += dx * (1 - R / m); joy.oy += dy * (1 - R / m); dx = t.clientX - joy.ox; dy = t.clientY - joy.oy; }
+    joy.dx = dx / R; joy.dy = dy / R;
+  }
+}, { passive: false });
+const endTouch = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
+cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
+$('biteBtn').addEventListener('touchstart', e => { e.preventDefault(); if (state === 'play') bite(null); }, { passive: false });
+$('biteBtn').addEventListener('click', () => { if (state === 'play') bite(null); });
+
+// ---------- gameplay ----------
+function bite(aim) {
+  if (P.biteT > 0) return;
+  P.biteT = P.biteCd; P.biteAnim = 0.18;
+  if (aim != null) P.face = aim;
+  const range = pRange();
+  let hits = creatures.filter(c => {
+    const d = dist(P, c) - c.size;
+    return d < range && Math.abs(angDiff(P.face, Math.atan2(c.y - P.y, c.x - P.x))) < 1.25;
+  });
+  if (!hits.length) {
+    let best = null, bd = Infinity;
+    for (const c of creatures) { const d = dist(P, c) - c.size; if (d < range && d < bd) { bd = d; best = c; } }
+    if (best) { P.face = Math.atan2(best.y - P.y, best.x - P.x); hits = [best]; }
+  }
+  sfx.bite();
+  const mx = P.x + Math.cos(P.face) * (pSize() + 10), my = P.y + Math.sin(P.face) * (pSize() + 10);
+  burst(mx, my, 4, '#f4ecd8', 90, 2);
+  for (const c of hits) {
+    const tooBig = c.type.tier > P.level;
+    const dmg = Math.max(1, Math.round(P.str * (tooBig ? 0.55 : 1) * rand(0.9, 1.15)));
+    c.hp -= dmg; c.flash = 0.12; c.provoked = true;
+    const a = Math.atan2(c.y - P.y, c.x - P.x), kb = c.type.key === 'boss' ? 40 : 170;
+    c.vx += Math.cos(a) * kb; c.vy += Math.sin(a) * kb;
+    floatText(c.x, c.y - c.size - 6, `-${dmg}`, tooBig ? '#ff8a8a' : '#ffffff', 14);
+    burst(c.x, c.y, 5, '#d43c3c', 120, 2.5);
+    if (c.hp <= 0) eat(c); else sfx.hit();
+  }
+}
+
+function eat(c) {
+  creatures.splice(creatures.indexOf(c), 1);
+  P.eaten++; P.kills[c.type.key] = (P.kills[c.type.key] || 0) + 1;
+  sfx.eat(); shake = Math.max(shake, c.type.key === 'boss' ? 18 : 3);
+  burst(c.x, c.y, 14 + c.size, '#d43c3c', 180, 3);
+  burst(c.x, c.y, 6, '#f4ecd8', 140, 2);
+  const heal = Math.round(c.type.xp * 0.6 * P.healMul + 1);
+  P.hp = Math.min(P.maxHp, P.hp + heal);
+  if (c.type.key === 'boss') { boss = null; $('bossBar').hidden = true; setTimeout(() => endGame(true), 900); return; }
+  if (P.level < MAX_LEVEL) {
+    gainXp(c.type.xp);
+    floatText(c.x, c.y - 10, `+${c.type.xp} XP`, '#ffb347', 16);
+  }
+}
+
+function gainXp(n) {
+  P.xp += n;
+  while (P.level + pendingLevels < MAX_LEVEL && P.xp >= needXp(P.level + pendingLevels)) {
+    P.xp -= needXp(P.level + pendingLevels); pendingLevels++;
+  }
+  if (pendingLevels > 0 && state === 'play') levelUp();
+}
+
+function levelUp() {
+  const prevStage = stageFor(P.level);
+  P.level++; pendingLevels--;
+  P.maxHp += 8; P.hp = Math.min(P.maxHp, P.hp + 8); P.str += 1.5;
+  sfx.level(); burst(P.x, P.y, 30, '#ffb347', 220, 3);
+  const st = stageFor(P.level);
+  const evolved = st !== prevStage;
+  state = 'levelup';
+  $('levelTitle').textContent = evolved ? `You evolved into a ${st.name}!` : `Level ${P.level}!`;
+  $('levelSub').textContent = P.level === MAX_LEVEL
+    ? 'You are as big as you will get. Pick a final trait, then go eat Old Tusk.'
+    : 'You grew bigger and your bite got stronger. Pick one more trait.';
+  const pool = PERKS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  const box = $('perks'); box.innerHTML = '';
+  pool.forEach((pk, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'perk'; b.id = 'perk-' + pk.id;
+    b.innerHTML = `<b>${pk.name}</b><span>${pk.desc}</span><kbd>${i + 1}</kbd>`;
+    b.addEventListener('click', () => {
+      pk.apply(P); $('levelScreen').hidden = true; state = 'play';
+      if (pendingLevels > 0) levelUp();
+      else if (P.level >= MAX_LEVEL && !bossSpawned) spawnBoss();
+    });
+    box.appendChild(b);
+  });
+  $('levelScreen').hidden = false;
+  setTimeout(() => box.firstChild && box.firstChild.focus({ preventScroll: true }), 50);
+}
+
+function spawnBoss() {
+  bossSpawned = true;
+  boss = spawnCreature(false, TYPES.boss);
+  const a = rand(0, Math.PI * 2);
+  boss.x = clamp(P.x + Math.cos(a) * 700, 80, WORLD - 80); boss.y = clamp(P.y + Math.sin(a) * 700, 80, WORLD - 80);
+  boss.provoked = true;
+  $('bossBar').hidden = false;
+  sfx.roar(); showToast('Old Tusk is coming', 'Follow the red arrow. Bite him until he drops.', 3200);
+}
+
+function hurtPlayer(c) {
+  P.hp -= c.type.dmg; P.hurtT = 0.25; shake = Math.max(shake, c.type.key === 'boss' ? 14 : 6);
+  const a = Math.atan2(P.y - c.y, P.x - c.x), kb = c.type.key === 'boss' ? 420 : 260;
+  P.vx += Math.cos(a) * kb; P.vy += Math.sin(a) * kb;
+  floatText(P.x, P.y - pSize() - 10, `-${c.type.dmg}`, '#ff5a5f', 18);
+  sfx.hurt();
+  if (P.thorns) { c.hp -= P.thorns; c.flash = 0.1; if (c.hp <= 0) eat(c); }
+  if (P.hp <= 0) { P.hp = 0; endGame(false); }
+}
+
+function burst(x, y, n, color, spd, size) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), s = rand(0.3, 1) * spd;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.7), max: 0.7, color, size: rand(1, size) });
+  }
+}
+function floatText(x, y, text, color, size) { texts.push({ x, y, text, color, size, life: 0.9 }); }
+
+let toastTimer = 0;
+function showToast(big, small, ms = 2200) {
+  const t = $('toast'); t.innerHTML = big + (small ? `<small>${small}</small>` : '');
+  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function update(dt) {
+  elapsed += dt;
+  // player movement
+  let mx = 0, my = 0;
+  if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+  if (keys.has('d') || keys.has('arrowright')) mx += 1;
+  if (keys.has('w') || keys.has('arrowup')) my -= 1;
+  if (keys.has('s') || keys.has('arrowdown')) my += 1;
+  if (joy.active) { mx = joy.dx; my = joy.dy; }
+  let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
+  const spd = pSpeed();
+  P.moving = m > 0.15;
+  const tvx = mx * spd, tvy = my * spd, k = Math.min(1, dt * 12);
+  P.vx += (tvx - P.vx) * k; P.vy += (tvy - P.vy) * k;
+  P.x = clamp(P.x + P.vx * dt, pSize(), WORLD - pSize());
+  P.y = clamp(P.y + P.vy * dt, pSize(), WORLD - pSize());
+  if (P.moving && P.biteAnim <= 0) P.face += angDiff(P.face, Math.atan2(my, mx)) * Math.min(1, dt * 14);
+  P.biteT -= dt; P.biteAnim -= dt; P.hurtT -= dt;
+  P.hp = Math.min(P.maxHp, P.hp + P.regen * dt);
+
+  // creatures
+  const ps = pSize();
+  for (const c of creatures.slice()) {
+    const T = c.type;
+    c.anim += dt; c.flash -= dt; c.atkCd -= dt;
+    const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
+    let tx = 0, ty = 0, sp = T.speed;
+    const hostile = T.ai === 'aggro' || T.ai === 'boss' || (c.provoked && T.dmg > 0);
+    if (T.ai === 'boss') {
+      c.chargeCd -= dt;
+      if (c.charge > 0) { c.charge -= dt; tx = Math.cos(c.chargeA); ty = Math.sin(c.chargeA); sp = T.speed * 3; }
+      else if (c.windup > 0) { c.windup -= dt; sp = 0; if (c.windup <= 0) { c.charge = 0.7; sfx.roar(); } }
+      else { tx = dx / d; ty = dy / d; if (c.chargeCd <= 0 && d < 520) { c.windup = 0.7; c.chargeA = Math.atan2(dy, dx); c.chargeCd = rand(3.5, 5); c.face = c.chargeA; } }
+    } else if (hostile && d < 280) { tx = dx / d; ty = dy / d; }
+    else if (T.ai === 'flee' && d < 190 + ps) {
+      tx = -dx / d; ty = -dy / d;
+      // steer away from walls so prey slides along edges instead of sticking
+      const wm = 120;
+      if (c.x < wm) tx += (wm - c.x) / wm * 1.5; if (c.x > WORLD - wm) tx -= (c.x - (WORLD - wm)) / wm * 1.5;
+      if (c.y < wm) ty += (wm - c.y) / wm * 1.5; if (c.y > WORLD - wm) ty -= (c.y - (WORLD - wm)) / wm * 1.5;
+      const tm = Math.hypot(tx, ty) || 1; tx /= tm; ty /= tm;
+      tx += Math.sin(c.anim * 3) * 0.35; ty += Math.cos(c.anim * 2.6) * 0.35;
+    } else {
+      c.wanderT -= dt;
+      if (c.wanderT <= 0) { c.wanderA += rand(-1.6, 1.6); c.wanderT = rand(0.8, 2.4); }
+      if (c.x < 60 || c.x > WORLD - 60 || c.y < 60 || c.y > WORLD - 60) c.wanderA = Math.atan2(WORLD / 2 - c.y, WORLD / 2 - c.x);
+      tx = Math.cos(c.wanderA); ty = Math.sin(c.wanderA); sp *= 0.4;
+    }
+    const kk = Math.min(1, dt * (c.charge > 0 ? 10 : 5));
+    c.vx += (tx * sp - c.vx) * kk; c.vy += (ty * sp - c.vy) * kk;
+    c.x = clamp(c.x + c.vx * dt, c.size, WORLD - c.size);
+    c.y = clamp(c.y + c.vy * dt, c.size, WORLD - c.size);
+    if (Math.hypot(c.vx, c.vy) > 8 && c.windup <= 0) c.face += angDiff(c.face, Math.atan2(c.vy, c.vx)) * Math.min(1, dt * 10);
+    // contact with player
+    const touch = c.size + ps * 0.8;
+    if (d < touch) {
+      const push = (touch - d);
+      c.x -= dx / d * push * 0.7; c.y -= dy / d * push * 0.7;
+      if (hostile && c.atkCd <= 0 && T.dmg > 0) { c.atkCd = T.key === 'boss' ? 0.9 : 1.1; hurtPlayer(c); if (state !== 'play') return; }
+    }
+    // despawn far, low-tier creatures to make room
+    if (d > 1500 && T.key !== 'boss' && T.tier < P.level - 3 && Math.random() < dt * 0.5) creatures.splice(creatures.indexOf(c), 1);
+  }
+
+  spawnTimer -= dt;
+  const target = 44 + P.level * 2;
+  if (spawnTimer <= 0 && creatures.length < target) { spawnCreature(false); spawnTimer = 0.25; }
+
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.9; p.vy *= 0.9; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const t of texts) { t.y -= 34 * dt; t.life -= dt; }
+  texts = texts.filter(t => t.life > 0);
+
+  cam.x += (P.x - cam.x) * Math.min(1, dt * 6); cam.y += (P.y - cam.y) * Math.min(1, dt * 6);
+  shake = Math.max(0, shake - dt * 30);
+}
+
+// ---------- drawing ----------
+function ell(x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); }
+function circ(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+function drawGround(x0, y0, x1, y1) {
+  ctx.fillStyle = '#0b1610'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.fillStyle = '#2c5a2e'; ctx.fillRect(0, 0, WORLD, WORLD);
+  for (const p of patches) {
+    if (p.x + p.r < x0 || p.x - p.r > x1 || p.y + p.r < y0 || p.y - p.r > y1) continue;
+    ctx.fillStyle = p.c; circ(p.x, p.y, p.r);
+  }
+  // dense jungle border
+  ctx.strokeStyle = '#173a1d'; ctx.lineWidth = 36; ctx.strokeRect(-18, -18, WORLD + 36, WORLD + 36);
+  ctx.fillStyle = '#1d4423';
+  for (let i = 0; i < WORLD; i += 70) {
+    circ(i, -30, 46); circ(i + 35, WORLD + 30, 46); circ(-30, i + 35, 46); circ(WORLD + 30, i, 46);
+  }
+  for (const d of decor) {
+    if (d.x < x0 - 30 || d.x > x1 + 30 || d.y < y0 - 30 || d.y > y1 + 30) continue;
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); ctx.scale(d.s, d.s);
+    if (d.type === 'fern') {
+      ctx.fillStyle = '#3f7d34';
+      for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); ell(10, 0, 11, 3.5); }
+    } else if (d.type === 'tuft') {
+      ctx.strokeStyle = '#4c8f3a'; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = -2; i <= 2; i++) { ctx.moveTo(i * 3, 4); ctx.lineTo(i * 4, -6 - Math.abs(i)); }
+      ctx.stroke();
+    } else if (d.type === 'rock') {
+      ctx.fillStyle = '#5d6b5c'; ell(0, 0, 13, 9); ctx.fillStyle = '#7a8a78'; ell(-3, -3, 7, 4);
+    } else if (d.type === 'flower') {
+      ctx.fillStyle = '#f2d36b'; for (let i = 0; i < 5; i++) { ctx.rotate(Math.PI * 2 / 5); circ(4, 0, 2.6); }
+      ctx.fillStyle = '#c0582c'; circ(0, 0, 2);
+    } else {
+      ctx.fillStyle = '#d9d2bf'; ctx.fillRect(-9, -1.5, 18, 3); circ(-9, -2, 2.5); circ(-9, 2, 2.5); circ(9, -2, 2.5); circ(9, 2, 2.5);
+    }
+    ctx.restore();
+  }
+}
+
+function drawDino() {
+  const st = stageFor(P.level), s = pSize() / 12, t = gameT;
+  ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.face); ctx.scale(s, s);
+  const hurt = P.hurtT > 0 && Math.floor(P.hurtT * 30) % 2 === 0;
+  const body = hurt ? '#ffffff' : st.body, dark = hurt ? '#ffdddd' : st.dark;
+  const step = P.moving ? Math.sin(t * 16) : 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ell(2, 5, 20, 12);
+  ctx.fillStyle = dark;
+  ell(5 + step * 3, -9, 4.5, 3); ell(5 - step * 3, 9, 4.5, 3); ell(-6 - step * 3, -9, 5, 3.4); ell(-6 + step * 3, 9, 5, 3.4);
+  const sway = Math.sin(t * 5) * 3 + step * 2;
+  ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-7, -6);
+  ctx.quadraticCurveTo(-20, -3 + sway * 0.5, -32, sway); ctx.quadraticCurveTo(-20, 3 + sway * 0.5, -7, 6); ctx.fill();
+  ell(0, 0, 13, 9);
+  ctx.fillStyle = st.back; ell(-2, 0, 9, 3);
+  if (st.spikes) {
+    ctx.fillStyle = '#ffb347';
+    for (let i = 0; i < st.spikes; i++) {
+      const x = 9 - i * (36 / st.spikes), y = (i / st.spikes) * sway * 0.6;
+      ctx.beginPath(); ctx.moveTo(x + 3, y); ctx.lineTo(x, y - 3.2); ctx.lineTo(x - 3, y); ctx.lineTo(x, y + 3.2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = body; ell(15, 0, 8.5, 7);
+  const open = P.biteAnim > 0 ? Math.sin((P.biteAnim / 0.18) * Math.PI) : 0;
+  if (open > 0) {
+    ctx.fillStyle = '#5a1a1f'; ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(27, -6 * open - 1); ctx.lineTo(27, 6 * open + 1); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 3; i++) { const x = 18 + i * 3; ctx.fillRect(x, -3.5 * open - 0.5 - i * open, 1.6, 1.8); ctx.fillRect(x, 3.5 * open - 1.3 + i * open, 1.6, 1.8); }
+  } else { ctx.fillStyle = dark; ell(22, 0, 2.2, 4.5); }
+  ctx.fillStyle = '#ffffff'; circ(16, -4.2, 2.4); circ(16, 4.2, 2.4);
+  ctx.fillStyle = '#111'; circ(17, -4.2, 1.2); circ(17, 4.2, 1.2);
+  ctx.restore();
+}
+
+function rodent(r, body, ear, tail) {
+  ctx.strokeStyle = tail; ctx.lineWidth = Math.max(1.2, r * 0.16); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-r * 0.8, 0); ctx.quadraticCurveTo(-r * 1.6, Math.sin(gameT * 8) * r * 0.5, -r * 2.2, r * 0.2); ctx.stroke();
+  ctx.fillStyle = body; ell(0, 0, r, r * 0.62); ell(r * 0.8, 0, r * 0.5, r * 0.42);
+  ctx.fillStyle = ear; circ(r * 0.62, -r * 0.42, r * 0.26); circ(r * 0.62, r * 0.42, r * 0.26);
+  ctx.fillStyle = '#111'; circ(r * 0.95, -r * 0.2, r * 0.09 + 0.5); circ(r * 0.95, r * 0.2, r * 0.09 + 0.5);
+  ctx.fillStyle = ear; circ(r * 1.28, 0, r * 0.1 + 0.6);
+}
+
+function drawCreature(c) {
+  const T = c.type, r = c.size, edible = T.tier <= P.level;
+  ctx.save(); ctx.translate(c.x, c.y);
+  ctx.strokeStyle = edible ? 'rgba(127,211,91,0.6)' : 'rgba(232,72,77,0.75)';
+  ctx.lineWidth = T.key === 'boss' ? 3 : 2; ctx.beginPath(); ctx.arc(0, 0, r + 5, 0, Math.PI * 2); ctx.stroke();
+  if (c.windup > 0) { ctx.strokeStyle = 'rgba(255,90,95,0.9)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, r + 10 + Math.sin(gameT * 40) * 3, 0, Math.PI * 2); ctx.stroke(); }
+  if (c.windup > 0) ctx.translate(rand(-2, 2), rand(-2, 2));
+  ctx.rotate(c.face);
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; ell(2, 3, r * 1.15, r * 0.75);
+  const fl = c.flash > 0;
+  const col = (cc) => fl ? '#ffffff' : cc;
+  const step = Math.sin(c.anim * 14);
+  switch (T.key) {
+    case 'beetle':
+      ctx.strokeStyle = '#1a1c2c'; ctx.lineWidth = 1.2;
+      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 3, 0); ctx.lineTo(i * 3 + step, -r * 1.3); ctx.moveTo(i * 3, 0); ctx.lineTo(i * 3 - step, r * 1.3); ctx.stroke(); }
+      ctx.fillStyle = col('#3a3f6b'); ell(0, 0, r, r * 0.8);
+      ctx.fillStyle = col('#20233f'); ell(r * 0.85, 0, r * 0.4, r * 0.45);
+      ctx.strokeStyle = '#1a1c2c'; ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r * 0.5, 0); ctx.stroke();
+      ctx.fillStyle = 'rgba(160,190,255,0.5)'; ell(-r * 0.2, -r * 0.35, r * 0.35, r * 0.15);
+      break;
+    case 'mouse': rodent(r, col('#a3a3ad'), col('#f1a7b5'), '#e48fa0'); break;
+    case 'rat': rodent(r, col(c.provoked ? '#7a5242' : '#6e5a4c'), col('#d48c95'), '#c2808a'); break;
+    case 'lizard':
+      ctx.strokeStyle = col('#6e9a2b'); ctx.lineWidth = r * 0.25; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.6, 0); ctx.quadraticCurveTo(-r * 1.4, Math.sin(c.anim * 10) * r * 0.5, -r * 2.3, 0); ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(r * 0.4, 0); ctx.lineTo(r * 0.6 + step * 2, -r * 0.7); ctx.moveTo(r * 0.4, 0); ctx.lineTo(r * 0.6 - step * 2, r * 0.7);
+      ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 0.6 - step * 2, -r * 0.7); ctx.moveTo(-r * 0.4, 0); ctx.lineTo(-r * 0.6 + step * 2, r * 0.7); ctx.stroke();
+      ctx.fillStyle = col('#8bbf3a'); ell(0, 0, r * 0.95, r * 0.38); ell(r * 0.95, 0, r * 0.38, r * 0.3);
+      ctx.fillStyle = '#e7d24a'; circ(-r * 0.3, 0, r * 0.1); circ(r * 0.2, 0, r * 0.1);
+      ctx.fillStyle = '#111'; circ(r * 1.05, -r * 0.16, 1.2); circ(r * 1.05, r * 0.16, 1.2);
+      break;
+    case 'rabbit':
+      ctx.fillStyle = col('#c9b291'); ell(0, 0, r, r * 0.7); ell(r * 0.8, 0, r * 0.45, r * 0.4);
+      ell(r * 0.1, -r * 0.3, r * 0.8, r * 0.16, -0.25); ell(r * 0.1, r * 0.3, r * 0.8, r * 0.16, 0.25);
+      ctx.fillStyle = '#f3ede2'; circ(-r * 0.95, 0, r * 0.28);
+      ctx.fillStyle = '#e5a3ad'; ell(r * 0.1, -r * 0.3, r * 0.6, r * 0.07, -0.25); ell(r * 0.1, r * 0.3, r * 0.6, r * 0.07, 0.25);
+      ctx.fillStyle = '#111'; circ(r * 0.95, -r * 0.2, 1.4); circ(r * 0.95, r * 0.2, 1.4);
+      break;
+    case 'snake': {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const seg = 9, len = r * 3.2;
+      ctx.beginPath();
+      for (let i = 0; i <= seg; i++) { const x = r * 0.5 - (i / seg) * len, y = Math.sin(c.anim * 7 - i * 0.8) * r * 0.35 * (i / seg + 0.3); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.strokeStyle = col('#5f8a28'); ctx.lineWidth = r * 0.5; ctx.stroke();
+      ctx.strokeStyle = '#c7b23a'; ctx.lineWidth = r * 0.12; ctx.setLineDash([4, 6]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = col('#4e7520'); ell(r * 0.75, 0, r * 0.45, r * 0.34);
+      ctx.fillStyle = '#ffda3a'; circ(r * 0.9, -r * 0.16, 1.6); circ(r * 0.9, r * 0.16, 1.6);
+      ctx.strokeStyle = '#d33'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(r * 1.15, 0); ctx.lineTo(r * 1.15 + 4 + Math.sin(c.anim * 20) * 2, 0); ctx.stroke();
+      break; }
+    case 'fox':
+      ctx.fillStyle = col('#e0772e'); ell(-r * 1.2, Math.sin(c.anim * 6) * r * 0.2, r * 0.8, r * 0.36);
+      ctx.fillStyle = '#f6efe4'; ell(-r * 1.8, Math.sin(c.anim * 6) * r * 0.25, r * 0.28, r * 0.24);
+      ctx.fillStyle = '#3a2418'; ell(r * 0.5 + step * 3, -r * 0.5, r * 0.22, r * 0.15); ell(r * 0.5 - step * 3, r * 0.5, r * 0.22, r * 0.15);
+      ell(-r * 0.5 - step * 3, -r * 0.5, r * 0.22, r * 0.15); ell(-r * 0.5 + step * 3, r * 0.5, r * 0.22, r * 0.15);
+      ctx.fillStyle = col('#e0772e'); ell(0, 0, r * 0.95, r * 0.5); ell(r * 0.85, 0, r * 0.42, r * 0.38);
+      ctx.beginPath(); ctx.moveTo(r * 0.7, -r * 0.2); ctx.lineTo(r * 0.55, -r * 0.65); ctx.lineTo(r * 0.95, -r * 0.3); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(r * 0.7, r * 0.2); ctx.lineTo(r * 0.55, r * 0.65); ctx.lineTo(r * 0.95, r * 0.3); ctx.fill();
+      ctx.fillStyle = '#f6efe4'; ell(r * 1.12, 0, r * 0.22, r * 0.18);
+      ctx.fillStyle = '#111'; circ(r * 1.3, 0, 1.6); circ(r * 0.95, -r * 0.18, 1.4); circ(r * 0.95, r * 0.18, 1.4);
+      break;
+    case 'boar':
+    case 'boss': {
+      const big = T.key === 'boss';
+      ctx.fillStyle = '#2a1d16';
+      ell(r * 0.5 + step * 3, -r * 0.55, r * 0.2, r * 0.13); ell(r * 0.5 - step * 3, r * 0.55, r * 0.2, r * 0.13);
+      ell(-r * 0.5 - step * 3, -r * 0.55, r * 0.2, r * 0.13); ell(-r * 0.5 + step * 3, r * 0.55, r * 0.2, r * 0.13);
+      ctx.fillStyle = col(big ? '#6b5a50' : '#5a4033'); ell(0, 0, r, r * 0.62); ell(r * 0.85, 0, r * 0.42, r * 0.4);
+      ctx.fillStyle = col(big ? '#3e322b' : '#3d2b22');
+      for (let i = 0; i < 7; i++) ell(r * 0.6 - i * r * 0.22, 0, r * 0.1, r * 0.16);
+      ctx.fillStyle = '#c98e86'; ell(r * 1.22, 0, r * 0.14, r * 0.2);
+      ctx.fillStyle = '#f4ecd8';
+      ctx.beginPath(); ctx.moveTo(r * 1.05, -r * 0.2); ctx.quadraticCurveTo(r * 1.45, -r * 0.3, r * (big ? 1.55 : 1.4), -r * 0.5); ctx.lineTo(r * 1.05, -r * 0.12); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(r * 1.05, r * 0.2); ctx.quadraticCurveTo(r * 1.45, r * 0.3, r * (big ? 1.55 : 1.4), r * 0.5); ctx.lineTo(r * 1.05, r * 0.12); ctx.fill();
+      ctx.fillStyle = big ? '#ff3b3b' : '#111'; circ(r * 0.9, -r * 0.2, big ? 3 : 1.8); circ(r * 0.9, r * 0.2, big ? 3 : 1.8);
+      if (big) { ctx.strokeStyle = '#d8c7b0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.45); ctx.lineTo(r * 0.15, -r * 0.15); ctx.moveTo(-r * 0.05, -r * 0.5); ctx.lineTo(r * 0.3, -r * 0.2); ctx.stroke(); }
+      break; }
+  }
+  ctx.restore();
+  if (c.hp < c.maxHp && T.key !== 'boss') {
+    const w = Math.max(18, r * 1.8);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(c.x - w / 2, c.y - r - 14, w, 4);
+    ctx.fillStyle = '#e8484d'; ctx.fillRect(c.x - w / 2, c.y - r - 14, w * Math.max(0, c.hp / c.maxHp), 4);
+  }
+}
+
+function render() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sx = shake ? rand(-shake, shake) * 0.5 : 0, sy = shake ? rand(-shake, shake) * 0.5 : 0;
+  const ox = Math.round(W / 2 - cam.x + sx), oy = Math.round(H / 2 - cam.y + sy);
+  ctx.save(); ctx.translate(ox, oy);
+  const x0 = cam.x - W / 2 - 40, y0 = cam.y - H / 2 - 40, x1 = cam.x + W / 2 + 40, y1 = cam.y + H / 2 + 40;
+  drawGround(x0, y0, x1, y1);
+  for (const c of creatures) if (c.x > x0 - 60 && c.x < x1 + 60 && c.y > y0 - 60 && c.y < y1 + 60) drawCreature(c);
+  drawDino();
+  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; circ(p.x, p.y, p.size); }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = Math.min(1, t.life * 2); ctx.font = `800 ${t.size}px Nunito, system-ui, sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(t.text, t.x, t.y); ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // boss pointer
+  if (boss && state === 'play') {
+    const bx = boss.x + ox, by = boss.y + oy;
+    if (bx < 0 || bx > W || by < 0 || by > H) {
+      const a = Math.atan2(by - H / 2, bx - W / 2), m = 46;
+      const ax = clamp(W / 2 + Math.cos(a) * W, m, W - m), ay = clamp(H / 2 + Math.sin(a) * H, m + 110, H - m - 40);
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(a); ctx.fillStyle = '#e8484d';
+      ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -12); ctx.lineTo(-4, 0); ctx.lineTo(-10, 12); ctx.fill(); ctx.restore();
+    }
+  }
+  if (joy.active) {
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; circ(joy.ox, joy.oy, 55);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; circ(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22);
+  }
+  if (state === 'play' && P.hp / P.maxHp < 0.3) {
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(200,0,0,0)'); g.addColorStop(1, `rgba(200,0,0,${0.25 + Math.sin(gameT * 6) * 0.1})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ---------- HUD ----------
+function hud() {
+  const st = stageFor(P.level);
+  $('stageName').textContent = st.name; $('stageName').style.color = st.body;
+  $('lvl').textContent = P.level >= MAX_LEVEL ? 'Level 10 · Max' : `Level ${P.level}`;
+  $('hpFill').style.width = `${(P.hp / P.maxHp) * 100}%`;
+  $('hpText').textContent = `${Math.ceil(P.hp)} / ${P.maxHp}`;
+  const need = needXp(P.level);
+  $('xpFill').style.width = P.level >= MAX_LEVEL ? '100%' : `${Math.min(100, (P.xp / need) * 100)}%`;
+  $('xpText').textContent = P.level >= MAX_LEVEL ? 'Eat Old Tusk' : `${P.xp} / ${need} XP`;
+  $('strText').textContent = Math.round(P.str * 10) / 10;
+  $('spdText').textContent = Math.round(pSpeed());
+  $('eatText').textContent = P.eaten;
+  $('timeText').textContent = fmtTime(elapsed);
+  if (boss) $('bossFill').style.width = `${Math.max(0, boss.hp / boss.maxHp) * 100}%`;
+}
+
+// ---------- flow ----------
+function setScreens() {
+  $('hud').hidden = state === 'title';
+  $('biteBtn').hidden = !(touchMode && state === 'play');
+  $('pauseScreen').hidden = state !== 'paused';
+}
+function start() {
+  initAudio(); newGame(); state = 'play';
+  $('titleScreen').hidden = true; $('endScreen').hidden = true; $('levelScreen').hidden = true;
+  setScreens();
+  showToast('Eat to grow', 'Start with beetles and mice', 2600);
+}
+function togglePause() {
+  if (state === 'play') state = 'paused'; else if (state === 'paused') state = 'play'; else return;
+  keys.clear(); setScreens();
+  if (state === 'paused') $('resumeBtn').focus({ preventScroll: true });
+}
+function endGame(won) {
+  if (state === 'over') return;
+  state = 'over'; setScreens();
+  let best = null;
+  if (won) {
+    sfx.win();
+    try { best = +localStorage.getItem('dinoChompBest') || null; if (!best || elapsed < best) { localStorage.setItem('dinoChompBest', String(elapsed)); best = elapsed; } } catch (e) { best = null; }
+  }
+  $('endTitle').textContent = won ? 'King of the Valley' : 'You were eaten';
+  $('endTitle').style.color = won ? 'var(--leaf)' : 'var(--blood)';
+  $('endSub').textContent = won
+    ? `You hatched as a tiny lizard and ate your way up to Rex. Old Tusk is dinner.`
+    : `A ${stageFor(P.level).name} at level ${P.level}. Bite smaller things first and come back bigger.`;
+  const cells = [[fmtTime(elapsed), 'Time'], [P.level, 'Level'], [P.eaten, 'Eaten'], [P.kills.rat || 0, 'Rats'], [P.kills.mouse || 0, 'Mice']];
+  if (best) cells.push([fmtTime(best), 'Best time']);
+  $('endResults').innerHTML = cells.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+  setTimeout(() => { $('endScreen').hidden = false; $('againBtn').focus({ preventScroll: true }); }, won ? 200 : 600);
+}
+$('startBtn').addEventListener('click', start);
+$('againBtn').addEventListener('click', start);
+$('resumeBtn').addEventListener('click', togglePause);
+$('pauseBtn').addEventListener('click', togglePause);
+$('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
+
+// title backdrop: a world to look at behind the start panel
+newGame();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
+  if (state === 'play') update(dt);
+  else if (state === 'title') { cam.x = WORLD / 2 + Math.cos(gameT * 0.1) * 300; cam.y = WORLD / 2 + Math.sin(gameT * 0.1) * 200; }
+  render();
+  if (state !== 'title') hud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
