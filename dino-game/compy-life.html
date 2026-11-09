@@ -5773,6 +5773,21 @@ function sealAlleys() {
   }
 }
 
+
+// ---------- gentle one-time tips for new players ----------
+function tipOnce(id, msg) { S.tips = S.tips || {}; if (S.tips[id]) return; S.tips[id] = true; log('💡 ' + msg, ''); }
+let tipCheckT = 0;
+function tipsUpdate(dt) {
+  tipCheckT -= dt; if (tipCheckT > 0 || !S) return; tipCheckT = 2;
+  if (!S.job && S.day <= 3 && hour() >= 11 && hour() < 18) tipOnce('job', 'Tip: The Job Center is just north of the fountain. Press M to see the whole town map.');
+  if (S.hunger < 30) tipOnce('food', 'Tip: Getting hungry! Grab a snack at Leafy Grocer or Dino Gas, or get a free hot meal at the Second Chance Shelter.');
+  if (S.energy < 25) tipOnce('tired', 'Tip: Running low on energy. Sleep at home, on the park bench, or in a free shelter bed (from 6 PM).');
+  if (!S.home && hour() >= 20) tipOnce('night', 'Tip: No home yet? The Second Chance Shelter next to the Job Center has safe, free beds.');
+  if (S.money >= 600 && !S.home) tipOnce('save', 'Tip: You have some savings! Rent the burrow at Nest Estates for a home of your own.');
+  if ((S.texts || []).some(t => !t.read)) tipOnce('phone', 'Tip: You have a new text. Press T (or the Phone button) to read it.');
+  if (injOf()) tipOnce('hurt', 'Tip: Hurt or sick? Tarpit Hospital can help: pay for fast treatment, or wait in the ER for free.');
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -5879,7 +5894,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); injuryUpdate(dt); islandUpdate(dt); raceUpdate(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); injuryUpdate(dt); tipsUpdate(dt); islandUpdate(dt); raceUpdate(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -6141,7 +6156,7 @@ function beginLife(fromSave) {
   refreshHome(); refreshFamily(); spawnOwnedCar(); minigame = null; clearGig(); S.ward = null; clearWard(); for (const sh of shots) scene.remove(sh.m); shots = []; refreshTower(); refreshPet(); flight = null; endHeli(); placePlanes();
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
   $('titleScreen').hidden = true; state = 'play'; setScreens();
-  if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
+  if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Tonight you can sleep on the park bench, or in a free bed at the Second Chance Shelter next to the Job Center. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight. Press M for the town map.`, buttons: [{ label: "Let's go" }] });
   else { log(`Welcome back. Day ${S.day}.`, ''); if (S.jail > 0) { putInCell(); jailMenu(); } }
 }
 $('newBtn').addEventListener('click', () => beginLife(null));
