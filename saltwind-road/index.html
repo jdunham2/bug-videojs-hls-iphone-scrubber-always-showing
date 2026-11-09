@@ -1798,6 +1798,9 @@ const NPCS = [
   {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
    hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
    rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
+  {id:'darius',town:'dun',dx:2,dy:3,name:'Merchant Prince Darius',role:'Caravan master',cols:{cloak:'#8a2a5a',skin:'#a8704a',hair:'#1a1a1a'},caravans:true,
+   hello:["Ah, a fellow merchant!","Business is good, yes?","My esteemed partner!"],
+   rumors:["The best routes carry what one town makes to a town that's desperate for it.","Guards cost money. Bandits cost more."]},
   {id:'lou',town:'lantern',dx:2,dy:3,name:'Lucky Lou',role:'Dice player',cols:{cloak:'#3a6a3a',skin:'#e0b896',hair:'#c8782a'},dice:true,maxBet:50,smart:false,diceIntro:"Fancy a game of Bones? Low stakes, high spirits!",taunts:["Ha! Lady Luck loves me.","Better luck next time, friend.","The bones have spoken!"],
    hello:["Feeling lucky?","Back for another round?","My favorite opponent!"], rumors:["Three sixes is the best hand there is. Pays double, too."]},
   {id:'rosa',town:'dun',dx:-2,dy:3,name:'Dice Dame Rosa',role:'Gambler',cols:{cloak:'#a83a5a',skin:'#a8704a',hair:'#1a1a1a'},dice:true,maxBet:100,smart:true,diceIntro:"The desert teaches patience. And how to win at dice.",taunts:["The sands favor me today.","Patience, little one.","Again? I do enjoy your coin."],
@@ -3112,7 +3115,7 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -3126,6 +3129,7 @@ const GUIDE = [
   ['Sailing', 'Corvo in Reedholm builds a raft. Shipwright Bess in Port Wren builds a much faster sailboat. Floating crates drift at sea, and the Pirate Isles lie far south-east.'],
   ['Companions', 'Guildmaster Sten in Port Wren hires out fighters and a healer for a daily wage.'],
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
+  ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
   ['Dice', 'Play Bones with Lucky Lou (Lantern Bay), Dice Dame Rosa (Dunmere) or One-Eyed Finn (Crownfall).'],
   ['Museum', 'Curator Vess in Crownfall collects one of every fish, trophy and rare treasure.'],
   ['Upgrades', 'In the Craft menu (C), the Upgrades tab improves gear to +5 at a forge, trains pets and buys saddles. Furnish houses from inside them.'],
@@ -4465,13 +4469,14 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
+  const carMsg = caravanDay();
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   rollMarket();
-  toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}`);
+  toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}`);
   save();
 }
 
@@ -4569,6 +4574,7 @@ function mainOptions(n) {
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
   if (n.id === 'gwen') o.push({label: 'Race!', fn: () => raceTalk(n)});
   if (n.id === 'vess') o.push({label: 'The museum', primary: museumIds().some(g => !(S.museum || {})[g] && have(g) > 0 && GOODS[g].kind !== 'trophy'), fn: () => museumTalk(n)});
+  if (n.caravans) o.push({label: 'Trade caravans', primary: true, fn: () => caravanTalk(n)});
   if (n.dice) o.push({label: 'Play Bones', primary: true, fn: () => diceTalk(n)});
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
@@ -4672,6 +4678,48 @@ function giftTalk(n) {
       say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${extra}`, [back(n)]);
     }})),
     back(n)]);
+}
+// ===== trade caravans =====
+const CARAVAN_COST = 600, CARAVAN_MAX = 3;
+function routeValue(a, b) {
+  const A = TOWNS[a], B = TOWNS[b]; let best = null;
+  for (const g of A.produce) { if (!GOODS[g]) continue; const m = price(b, g) - price(a, g); if (!best || m > best.m) best = {g, m}; }
+  if (!best || best.m <= 0) return null;
+  const dist = Math.hypot(A.x - B.x, A.y - B.y), days = Math.max(1, Math.ceil(dist/70));
+  return {g: best.g, perDay: Math.max(4, Math.round(best.m*3/days)), days};
+}
+function bestRoutes() {
+  const ks = Object.keys(TOWNS).filter(k => S.towns[k] && TOWNS[k].produce.length && !TOWNS[k].small);
+  const out = [];
+  for (const a of ks) for (const b of ks) { if (a === b) continue; const v = routeValue(a, b); if (v) out.push({a, b, ...v}); }
+  return out.sort((x, y) => y.perDay - x.perDay).slice(0, 6);
+}
+function caravanTalk(n) {
+  S.caravans = S.caravans || [];
+  const list = S.caravans.map((c, i) => `${i + 1}. ${TOWNS[c.a].name} → ${TOWNS[c.b].name} · ${GOODS[c.g].name} · ~${c.perDay}◆/day${c.guard ? ' · guarded' : ''}`).join('<br>');
+  say(`“Why carry goods yourself? Buy a caravan, give it a route, and it earns for you every day. Bandits rob the unguarded ones now and then.”<br><br>${S.caravans.length ? `<b>Your caravans</b><br>${list}<br>Earned so far: <b>${S.caravanEarned || 0} coin</b>` : 'You own no caravans yet.'}`, [
+    {label: `Buy a caravan (${CARAVAN_COST} coin)`, primary: !S.caravans.length, disabled: S.caravans.length >= CARAVAN_MAX || S.coins < CARAVAN_COST, fn: () => caravanRoute(n, -1)},
+    ...S.caravans.map((c, i) => c.guard ? null : {label: `Hire guards for caravan ${i + 1} (150 coin)`, disabled: S.coins < 150, fn: () => { S.coins -= 150; c.guard = true; SFX.coin(); renderHUD(); save(); caravanTalk(n); }}).filter(Boolean),
+    ...S.caravans.map((c, i) => ({label: `Change route of caravan ${i + 1}`, fn: () => caravanRoute(n, i)})),
+    back(n)]);
+}
+function caravanRoute(n, idx2) {
+  const routes = bestRoutes();
+  if (!routes.length) { say('“You need to know more towns first. Explore, then come back.”', [back(n)]); return; }
+  say(`“Here are the best routes I know, from the towns you've visited.”`, [
+    ...routes.map(r => ({label: `${TOWNS[r.a].name} → ${TOWNS[r.b].name} · ${GOODS[r.g].name} · ~${r.perDay}◆/day`, fn: () => {
+      if (idx2 < 0) { if (S.coins < CARAVAN_COST) return; S.coins -= CARAVAN_COST; S.caravans.push({a: r.a, b: r.b, g: r.g, perDay: r.perDay, guard: false}); S.caravansBought = (S.caravansBought || 0) + 1; }
+      else Object.assign(S.caravans[idx2], {a: r.a, b: r.b, g: r.g, perDay: r.perDay});
+      SFX.coin(); renderHUD(); save(); caravanTalk(n);
+    }})),
+    back(n)]);
+}
+function caravanDay() {
+  if (!S.caravans || !S.caravans.length) return '';
+  let total = 0, robbed = 0;
+  for (const c of S.caravans) { if (Math.random() < (c.guard ? .03 : .1)) { robbed++; continue; } total += c.perDay; }
+  S.coins += total; S.caravanEarned = (S.caravanEarned || 0) + total;
+  return ` Your caravans brought in <b>${total} coin</b>${robbed ? ` (${robbed} robbed by bandits!)` : ''}.`;
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -6606,6 +6654,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['tradeboss','Trade Baron','Own 3 trade caravans', () => (S.caravans || []).length >= 3],
   ['enchanter','Enchanter','Enchant a weapon', () => (S.enchanted || 0) >= 1],
   ['generous','Generous Soul','Give 25 gifts', () => (S.giftsGiven || 0) >= 25],
   ['bestfriend','Best Friends','Become close friends with someone (and receive a keepsake)', () => (S.bestFriends || 0) >= 1],
