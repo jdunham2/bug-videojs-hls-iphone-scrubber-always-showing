@@ -2790,6 +2790,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
     if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
@@ -2822,7 +2823,8 @@ function killEnemy(e) {
     return;
   }
   const def = ENEMIES[e.type];
-  S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1; gainXP(e.max*3); SFX.kill();
+  S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
+  if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3); SFX.kill();
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
@@ -2880,6 +2882,8 @@ function bossWalk(x, y) {
   const t = tileAt(Math.floor(x), Math.floor(y));
   return !(t === T.DEEP || t === T.HOUSE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) && !townAt(x, y, 8);
 }
+const MASTERY = 25;
+const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive);
 const ELITE_MODS = [
   {name:'Savage', col:'#e05a2a', hp:3, dmg:1.6, spd:1.1},
   {name:'Ancient', col:'#e3a948', hp:4.5, dmg:1.4, spd:.9},
@@ -5224,6 +5228,7 @@ function openJournal() {
     <div class="jgrid">${BKM.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
     <h3>Dungeons</h3>
     <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); if (D.endless) return `<div class="jcard boss"><div class="t">The Abyss</div><div class="s">Endless · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · deepest floor ${S.abyssBest || 0} · checkpoint floor ${S.abyssCheckpoint || 1}</div></div>`; return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
+    <h3>Bestiary · ${BEAST_IDS.filter(k => S.killsBy[k]).length}/${BEAST_IDS.length} known · ${BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length} mastered</h3><div class="vals" style="margin-bottom:4px">Defeat ${MASTERY} of a kind to master it: +10% damage against them forever.</div><div class="jgrid">${BEAST_IDS.map(k => { const n = S.killsBy[k] || 0; return `<div class="jcard"><div class="t">${n ? esc(ENEMIES[k].name) : '???'}${n >= MASTERY ? ' <span style="color:var(--brass)">★</span>' : ''}</div><div class="s">${n ? `${n} defeated${n < MASTERY ? ` · ${MASTERY - n} to mastery` : ' · mastered'}` : 'Not met yet'}</div></div>`; }).join('')}</div>
     <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
     <h3>Open deals</h3>
@@ -5921,6 +5926,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['naturalist','Monster Scholar','Fill in 20 bestiary entries', () => BEAST_IDS.filter(k => S.killsBy[k]).length >= 20],
+  ['beastmaster','Beast Master','Master 10 kinds of monster', () => BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length >= 10],
   ['dutiful','Dutiful','Finish all daily deeds on 5 days', () => (S.deedsAll || 0) >= 5],
   ['devoted','Devoted','Reach a 7-day deed streak', () => (S.deedStreak || 0) >= 7],
   ['sailor','Sailor','Own a sailboat', () => !!S.flags.boat],
