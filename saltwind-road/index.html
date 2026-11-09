@@ -763,6 +763,7 @@ const GOODS = {
   titan_heart:{name:'Titan Heart',base:500,col:'#ff7a2a',kind:'trophy'},
   titan_plate:{name:'Titan Plate',base:2200,col:'#a89880',kind:'armor',armor:8,speed:-.02},
   titan_maul:{name:'Titan Maul',base:2000,col:'#a89880',kind:'weapon',dmg:20,cd:.7,reach:1.9,kb:2.5},
+  contraband:{name:'Sealed Crate',base:0,col:'#4a3a2a',kind:'good'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1827,6 +1828,8 @@ const NPCS = [
   {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
    hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
    rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
+  {id:'silas',town:'lantern',dx:12,dy:6,cove:true,name:'Silas',role:'Smuggler',cols:{cloak:'#2a2a2a',skin:'#c89870',hair:'#5a2a1a'},
+   hello:["You lost, friend?","Back again?","Partner."], rumors:["What happens at the cove stays at the cove."]},
   {id:'darius',town:'dun',dx:2,dy:3,name:'Merchant Prince Darius',role:'Caravan master',cols:{cloak:'#8a2a5a',skin:'#a8704a',hair:'#1a1a1a'},caravans:true,
    hello:["Ah, a fellow merchant!","Business is good, yes?","My esteemed partner!"],
    rumors:["The best routes carry what one town makes to a town that's desperate for it.","Guards cost money. Bandits cost more."]},
@@ -2303,6 +2306,7 @@ function genWorld() {
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
+    if (n.cove) { const tw = TOWNS[n.town]; let best = null, bd = 1e9; for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = tw.x + dx, y = tw.y + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)], d = Math.hypot(dx, dy); if (t === T.SAND && d > 9 && reach[idx(x, y)] && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => map[idx(x + a, y + b)] === T.SHAL || map[idx(x + a, y + b)] === T.DEEP) && d < bd) { bd = d; best = {x, y}; } } if (best) { n.x = best.x + .5; n.y = best.y + .8; } }
     if (n.travel) { n.path = ROAD_PATHS[n.travel[0] + '_' + n.travel[1]] || []; n.pi = Math.floor(n.path.length * (.2 + hash2(n.path.length, 3, 9)*.6)); n.dir = 1; if (n.path.length) { n.x = n.path[n.pi] % W + .5; n.y = ((n.path[n.pi] / W) | 0) + .8; } }
   }
   placeNodes();
@@ -4278,6 +4282,7 @@ function npcWalkable(x, y) {
   return true;
 }
 function updatePeople(dt) {
+  { const M = S.story && S.story.smug; NPC_BY.silas.away = !!(M && [2,3,5].includes(M.stage)); }
   { const fe = NPC_BY.festa, F = festivalToday(); fe.away = !F; if (F && fe.town !== F.town) { fe.town = F.town; fe.x = TOWNS[F.town].x - .5; fe.y = TOWNS[F.town].y - 1.2; } }
   const nightNow = isNightish();
   for (const n of NPCS) {
@@ -4320,7 +4325,7 @@ function update(dt) {
   if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
-  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds();
+  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); smugCheck();
     if (S.starfall === S.day && S.time > .74 && S.time < .8 && S.sfWarned !== S.day) { S.sfWarned = S.day; toast('<b>A starfall night!</b><br>Shooting stars are streaking across the sky. Where they land, star fragments glow until morning. Go and find them!', 8000); SFX.chime(); }
     if (bloodMoonDay() && S.time > .72 && S.time < .8 && S.bmWarned !== S.day) { S.bmWarned = S.day; toast('<b>The moon is rising red...</b><br>Tonight is a Blood Moon. Monsters will be stronger and far more numerous, and elites will walk the land. Every kill pays double.', 8000); SFX.roar(); }
     if (S.day % 6 === 1 && S.time > .22 && S.time < .32 && S.bmWarned === S.day - 1 && S.bmSurvived !== S.day) { S.bmSurvived = S.day; S.bloodMoons = (S.bloodMoons || 0) + 1; toast('<b>The Blood Moon sets</b><br>You survived the night.', 5000); }
@@ -4454,6 +4459,7 @@ function checkDeeds() {
   }
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
+  { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
@@ -4652,6 +4658,10 @@ function mainOptions(n) {
     if (n.id === 'odile' && (!R0 || R0.stage < 2)) o.push({label: R0 && R0.stage === 1 ? 'About the river dispute' : 'Any trouble in the land?', primary: !!(R0 && R0.h && R0.r), fn: () => riverOdile(n)});
     if (n.id === 'ruun' && R0 && R0.stage === 1 && !R0.h) o.push({label: 'About the dam...', primary: true, fn: () => riverRuun(n)});
     if (n.id === 'corvo' && R0 && R0.stage === 1 && !R0.r) o.push({label: 'About the river...', primary: true, fn: () => riverCorvo(n)}); }
+  { const M = S.story && S.story.smug;
+    if (n.id === 'quill' && (!M || M.stage !== 5)) o.push({label: M && M.stage ? 'About the cove' : 'Strange lights?', primary: !!(M && M.stage === 3), fn: () => smugQuill(n)});
+    if (n.id === 'silas') o.push({label: M && M.stage === 4 ? 'Business' : 'Who are you?', primary: true, fn: () => smugSilas(n)});
+    if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
@@ -4901,6 +4911,35 @@ function riverCorvo(n) {
     {label: 'I\'ll make Hollowpine pay for this', fn: () => { R0.r = 'side'; save(); say('“Ha! Now that\'s what I like to hear.”', [back(n)]); }},
     {label: 'Be patient. It will sort itself out.', fn: () => { R0.r = 'wait'; save(); say('“Patience doesn\'t fill bellies. But... we\'ll wait a little longer.”', [back(n)]); }},
     back(n)]);
+}
+// ===== story: the Lantern Bay smugglers =====
+function smugState() { S.story = S.story || {}; return S.story.smug || (S.story.smug = {stage: 0}); }
+function smugQuill(n) {
+  const M = smugState();
+  if (M.stage === 0) return say('“Lights at the old cove east of town, every night. Cargo coming in that never passes my customs house. I want to know who\'s behind it. Find out for me?”', [
+    {label: 'I\'ll look into it', primary: true, fn: () => { M.stage = 1; save(); say('“The cove is east of here, down on the shore. Be careful.”', [back(n)]); }}, back(n)]);
+  if (M.stage === 3) { M.stage = 5; S.coins += 400; addRep('lantern', 1); S.flags.lawbringer = true; gainXP(250); SFX.victory(); renderHUD(); save(); return say('“The smugglers are gone? Ha! Lantern Bay owes you. Here, 400 coin from the customs house, with my thanks.”<br><br><span style="color:var(--good)">+400 coin</span>', [back(n)]); }
+  if (M.stage === 4) return say('“Still no sign of who\'s running that cove. Odd, how they always seem to know when I\'m coming...”', [back(n)]);
+  return say(M.stage === 5 ? '“The bay is clean, thanks to you.”' : '“Any luck at the cove?”', [back(n)]);
+}
+function smugSilas(n) {
+  const M = smugState();
+  if (M.stage === 4) return say('“Partner! Got a crate that needs to reach Merchant Prince Darius in Dunmere. No questions. Pays well.”', [
+    {label: S.contraband ? 'I already have a crate' : 'Give me a crate', primary: !S.contraband, disabled: !!S.contraband || S.smugDay === S.day, fn: () => { S.contraband = true; S.smugDay = S.day; addItem('contraband', 1); save(); say('“Don\'t open it. Don\'t drop it. Don\'t get caught.”', [back(n)]); }},
+    {label: 'Show me your goods', fn: () => smugShop(n)}, back(n)]);
+  if (M.stage !== 1) return say('“Nothing to see here.”', [back(n)]);
+  say('A man in a dark coat steps out from behind the crates. “Customs sent you, did they? Or are you looking for an opportunity?”', [
+    {label: 'I\'m shutting you down', fn: () => { M.stage = 2; closeTalk(); const lv = 1 + (S.level || 1)*.07; for (let k = 0; k < 5; k++) { const a = k/5*6.283, e = makeEnemy(k < 3 ? 'bandit' : 'archer', n.x + Math.cos(a)*3, n.y + Math.sin(a)*3, {alert: true, smug: true}); e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = lv; if (k === 0) makeElite(e); enemies.push(e); } n.away = true; toast('<b>Smugglers!</b> Silas whistles and his crew draws steel.', 4000); SFX.roar(); }},
+    {label: 'Cut me in', fn: () => { M.stage = 4; S.rep.lantern = Math.max(0, repOf('lantern') - .5); S.flags.smuggler = true; save(); say('Silas grins. “A sensible sort. I\'ll sell you goods at prices the harbor never sees, and I\'ve got runs that pay. Just don\'t tell Quill.”', [back(n)]); }},
+    back(n)]);
+}
+const SMUG_SHOP = [['spice', 18], ['silk', 14], ['gunpowder', 10], ['pearl', 50], ['grog', 10], ['wine', 20]];
+function smugShop(n) {
+  say('“Best prices on the coast. Cash only.”', [...SMUG_SHOP.filter(([g]) => GOODS[g]).map(([g, pr]) => ({label: `${GOODS[g].name} · ${pr} coin`, disabled: S.coins < pr, fn: () => { S.coins -= pr; addItem(g, 1); SFX.coin(); renderHUD(); save(); smugShop(n); }})), back(n)]);
+}
+function smugCheck() {
+  const M = S.story && S.story.smug;
+  if (M && M.stage === 2 && !enemies.some(e => e.smug && !e.dead)) { M.stage = 3; toast('<b>The smugglers are beaten!</b><br>Report back to Harbormaster Quill in Lantern Bay.', 6000); save(); }
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -6837,6 +6876,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['lawbringer','Lawbringer','Shut down the Lantern Bay smugglers', () => !!S.flags.lawbringer],
+  ['smuggler','Smuggler','Complete 3 smuggling runs', () => (S.smugRuns || 0) >= 3],
   ['titanslayer','Titanslayer','Defeat the Earthshaker Titan', () => (S.titansSlain || 0) >= 1],
   ['peacemaker','Peacemaker','Broker the River Accord between Hollowpine and Reedholm', () => !!S.flags.riverAccord],
   ['chef','Chef','Cook a meal at a pot or campfire', () => ['hearty_stew','hunters_feast','seafood_platter','travelers_pie','ironroot_soup','kings_banquet'].some(g => S.cooked && S.cooked[g])],
