@@ -678,6 +678,26 @@ const GOODS = {
   captains_compass:{name:"Captain's Compass",base:500,col:'#e3a948',kind:'trinket',desc:'An arrow on your screen points to your buried treasure'},
   gladiator_helm:{name:'Gladiator Helm',base:700,col:'#c8a040',kind:'armor',slot:'head',armor:3,crit:.06},
   champion_belt:{name:"Arena Champion's Belt",base:1500,col:'#e3a948',kind:'trinket',desc:'+10% damage, and bragging rights'},
+  // --- fish ---
+  trout:{name:"River Trout",base:18,col:'#8ab07a',kind:'good'},
+  pike:{name:"Marsh Pike",base:24,col:'#6a8a4a',kind:'good'},
+  seabass:{name:"Sea Bass",base:22,col:'#5a7a9a',kind:'good'},
+  frostfin:{name:"Frostfin",base:40,col:'#bfe8ff',kind:'good'},
+  catfish:{name:"Mud Catfish",base:30,col:'#7a6a4a',kind:'good'},
+  piranha:{name:"Piranha",base:35,col:'#d84a3a',kind:'good'},
+  koi:{name:"Painted Koi",base:60,col:'#f08a3a',kind:'good'},
+  sunfish:{name:"Sunfish",base:30,col:'#f0c040',kind:'good'},
+  lava_eel:{name:"Lava Eel",base:75,col:'#ff6a2a',kind:'good'},
+  maple_perch:{name:"Maple Perch",base:28,col:'#c8602a',kind:'good'},
+  ghostfish:{name:"Ghostfish",base:80,col:'#c8e8e0',kind:'good'},
+  glowfish:{name:"Glowfish",base:55,col:'#9fe8ff',kind:'good'},
+  jade_shrimp:{name:"Jade Shrimp",base:32,col:'#7ad04a',kind:'good'},
+  prismfish:{name:"Prismfish",base:90,col:'#e8a8ff',kind:'good'},
+  salmon:{name:"Giant Salmon",base:45,col:'#e88a7a',kind:'good'},
+  moonfish:{name:"Moonfish",base:120,col:'#d8e0ff',kind:'good'},
+  pufferfish:{name:"Pufferfish",base:38,col:'#e0d070',kind:'good'},
+  coelacanth:{name:"Ancient Coelacanth",base:320,col:'#5a6a8a',kind:'good'},
+  master_rod:{name:'Master Rod',base:400,col:'#e3a948',kind:'tool',tool:'rod',tier:3,desc:'The widest catch bar, and rare fish bite more often'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1647,6 +1667,9 @@ const NPCS = [
   {id:'brutus',town:'crownfall',dx:-2,dy:3,name:'Arena Master Brutus',role:'Master of the arena',cols:{cloak:'#a8402a',skin:'#a8704a',hair:'#1a1a1a'},arena:true,
    hello:["Looking for glory? You've come to the right place.","Back for more blood and gold?","The champion returns! The crowd loves you."],
    rumors:["Every fifth wave, an elite beast enters the ring. The crowd goes wild.","Reach wave ten and the crowd will throw you a Gladiator Helm. Reach twenty and you're a legend."]},
+  {id:'marlin',town:'wren',dx:1,dy:3,name:'Old Marlin',role:'Master angler',cols:{cloak:'#3a5a6a',skin:'#c89870',hair:'#e0e0e0'},angler:true,
+   hello:["Fish are biting. They always are, if you know where.","Caught anything new?","My fellow angler!"],
+   rumors:["Every river and coast has its own fish. Snowy waters, jungle rivers, lava pools... try them all.","Some fish only bite at night. Moonfish, ghostfish, catfish.","They say an Ancient Coelacanth swims somewhere. I've never seen one. Nobody has."]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -4019,6 +4042,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
@@ -5021,6 +5045,7 @@ function openJournal() {
     <div class="jgrid">${BKM.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
     <h3>Dungeons</h3>
     <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); if (D.endless) return `<div class="jcard boss"><div class="t">The Abyss</div><div class="s">Endless · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · deepest floor ${S.abyssBest || 0} · checkpoint floor ${S.abyssCheckpoint || 1}</div></div>`; return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
+    <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
     <h3>Open deals</h3>
     ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c, id)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
@@ -5317,9 +5342,49 @@ function abyssEnterTalk() {
 /* ================= fishing minigame ================= */
 let FG = null, fishHold = false;
 const CATCH = {fish:{diff:.55, xp:6, col:'#8fb8c9'}, silverfin:{diff:.8, xp:10, col:'#dfe4ea'}, goldcarp:{diff:1.15, xp:25, col:'#f0c040'}, old_boot:{diff:.25, xp:1, col:'#6a4a2a'}};
+const FISH_SPECIES = [
+  {id:'trout', diff:0.6, xp:8, biomes:[T.GRASS,T.FOREST,T.HILL], when:'*', w:4},
+  {id:'pike', diff:0.75, xp:10, biomes:[T.MARSH,T.GLOOM,T.MOOR], when:'*', w:4},
+  {id:'seabass', diff:0.65, xp:9, biomes:[T.SAND,T.DUNE], when:'*', w:4},
+  {id:'frostfin', diff:0.85, xp:14, biomes:[T.SNOW], when:'*', w:4},
+  {id:'catfish', diff:0.7, xp:12, biomes:[T.MARSH,T.GLOOM,T.JUNGLE], when:'night', w:3},
+  {id:'piranha', diff:1.0, xp:16, biomes:[T.JUNGLE], when:'*', w:3},
+  {id:'koi', diff:0.9, xp:20, biomes:[T.BLOSSOM], when:'*', w:3},
+  {id:'sunfish', diff:0.7, xp:12, biomes:[T.SAVANNA,T.MESA], when:'day', w:3},
+  {id:'lava_eel', diff:1.15, xp:26, biomes:[T.ASH,T.LAVA], when:'*', w:3},
+  {id:'maple_perch', diff:0.7, xp:11, biomes:[T.MAPLE], when:'*', w:3},
+  {id:'ghostfish', diff:1.1, xp:28, biomes:[T.RUINS,T.GLOOM,T.MOOR], when:'night', w:2},
+  {id:'glowfish', diff:0.95, xp:20, biomes:[T.SHROOM], when:'*', w:3},
+  {id:'jade_shrimp', diff:0.75, xp:12, biomes:[T.BAMBOO,T.JUNGLE], when:'*', w:3},
+  {id:'prismfish', diff:1.2, xp:30, biomes:[T.SHIMMER], when:'*', w:3},
+  {id:'salmon', diff:0.9, xp:16, biomes:[T.REDWOOD,T.FOREST], when:'*', w:3},
+  {id:'moonfish', diff:1.25, xp:40, biomes:["*"], when:'night', w:1},
+  {id:'pufferfish', diff:0.8, xp:14, biomes:[T.SAND,T.JUNGLE,T.SAVANNA], when:'*', w:2},
+  {id:'coelacanth', diff:1.45, xp:90, biomes:["*"], when:'*', w:0.12},
+];
+for (const f of FISH_SPECIES) CATCH[f.id] = {diff: f.diff, xp: f.xp, col: GOODS[f.id].col};
+const FISH_LOG_IDS = ['fish','silverfin','goldcarp', ...FISH_SPECIES.map(f => f.id)];
+function nodeBiomes(n) {
+  if (n.biomes) return n.biomes;
+  const set = new Set();
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const t = tileAt(n.x + dx, n.y + dy); if (t != null && t !== T.DEEP && t !== T.SHAL) set.add(t); }
+  return (n.biomes = set);
+}
+function rollCatch(n) {
+  const night = isNightish(), b = nodeBiomes(n), rare = toolTier('rod') >= 3 ? 1.6 : 1;
+  const pool = [['fish', 10], ['silverfin', 4], ['goldcarp', 1.2*rare], ['old_boot', 1.4]];
+  for (const f of FISH_SPECIES) {
+    if (f.when === 'night' && !night || f.when === 'day' && night) continue;
+    if (!f.biomes.includes('*') && !f.biomes.some(t => b.has(t))) continue;
+    pool.push([f.id, f.w * (f.w < 2 ? rare : 1)]);
+  }
+  let r = Math.random() * pool.reduce((s, p) => s + p[1], 0);
+  for (const [id, w] of pool) { r -= w; if (r <= 0) return id; }
+  return 'fish';
+}
 function startFishGame() {
-  const r = Math.random(), c = r < .07 ? 'old_boot' : r < .13 ? 'goldcarp' : r < .38 ? 'silverfin' : 'fish';
-  FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat') + (S.pet === 'frog' ? .06 : 0), prog: .3, node: fishing.i};
+  const c = rollCatch(nodes[fishing.i]);
+  FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 3 ? .32 : toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat') + (S.pet === 'frog' ? .06 : 0), prog: .3, node: fishing.i};
   fishing = null; mode = 'fish'; keys.clear(); fishHold = false;
   $('fFish').style.background = CATCH[c].col;
   $('fishUI').hidden = false; $('prompt').hidden = true; $('actBtn').hidden = true; SFX.fish();
@@ -5345,6 +5410,8 @@ function endFishGame(win) {
     const amt = (G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1) + (S.pet === 'penguin' ? 1 : 0);
     addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1;
     if (G.c === 'goldcarp') S.goldcarps = (S.goldcarps || 0) + 1;
+    S.fishLog = S.fishLog || {};
+    if (FISH_LOG_IDS.includes(G.c)) { const first = !S.fishLog[G.c]; S.fishLog[G.c] = (S.fishLog[G.c] || 0) + 1; if (first) setTimeout(() => toast(`<b>New fish: ${GOODS[G.c].name}!</b><br>Fish log ${Object.keys(S.fishLog).length}/${FISH_LOG_IDS.length}. Old Marlin in Port Wren rewards new catches.`, 6000), 400); }
     floatText(n.x + .5, n.y, `+${amt} ${GOODS[G.c].name}`, G.c === 'goldcarp' ? '#ffec6a' : '#86c98f', G.c === 'goldcarp');
     burst(n.x + .5, n.y + .5, '#bfe6f0', 10); SFX.pickup(); gainXP(CATCH[G.c].xp);
     rollCurio('scale'); if (G.c === 'goldcarp') rollCurio('scale');
@@ -5652,6 +5719,8 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['angler','Angler','Catch 10 kinds of fish', () => Object.keys(S.fishLog || {}).length >= 10],
+  ['masterangler','Master Angler','Catch every kind of fish', () => FISH_LOG_IDS.every(id => (S.fishLog || {})[id])],
   ['gladiator','Gladiator','Survive 10 waves in the arena', () => (S.arenaBest || 0) >= 10],
   ['arenachamp','Arena Champion','Survive 20 waves in the arena', () => (S.arenaBest || 0) >= 20],
   ['treasure','X Marks the Spot','Dig up a buried treasure', () => (S.treasures || 0) >= 1],
@@ -5753,6 +5822,19 @@ function arenaTarget() {
   const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (S.arena.live) return {key: 'arL', html: 'The gate is barred until this wave is beaten', btn: '', fn: () => {}};
   return {key: 'arX' + S.arena.pot, html: `${K}Leave the arena · collect ${S.arena.pot} coin`, btn: 'Leave', fn: () => { SFX.travel(); fadeThen(() => leaveArena(false)); }};
+}
+const ANGLER_PRIZES = [[5, 'fishing_net', 'a Fishing Net'], [10, 'master_rod', 'his old Master Rod'], [15, 'gem', '5 Cut Gems', 5], [21, 'captains_compass', "a Captain's Compass"]];
+function anglerReward() { const n = Object.keys(S.fishLog || {}).length, got = S.anglerPaid || 0; return Math.max(0, n - got); }
+function anglerTalk(n) {
+  const log = S.fishLog || {}, count = Object.keys(log).length, fresh = anglerReward();
+  let msg = '';
+  if (fresh) {
+    const pay = fresh*40; S.coins += pay; S.anglerPaid = count; msg = `“${fresh} new kind${fresh > 1 ? 's' : ''}! Here, ${pay} coin for your trouble.”`;
+    for (const [need, g, label, q] of ANGLER_PRIZES) if (count >= need && !(S.anglerPrizes || {})[need]) { S.anglerPrizes = S.anglerPrizes || {}; S.anglerPrizes[need] = true; addItem(g, q || 1); msg += `<br>“${need} species! Take ${label}.”`; }
+    SFX.coin(); renderHUD(); save();
+  } else msg = '“Bring me a fish I haven\'t seen you catch, and I\'ll pay.”';
+  const list = FISH_LOG_IDS.map(id => log[id] ? `<span style="color:${GOODS[id].col}">${GOODS[id].name} ×${log[id]}</span>` : '<span style="color:var(--muted)">???</span>').join(' · ');
+  say(`${msg}<br><br><b>Fish log ${count}/${FISH_LOG_IDS.length}</b><br><span style="font-size:13px">${list}</span>`, [back(n)]);
 }
 function arenaTalk(n) {
   say(`“Step into the ring! Wave after wave of beasts, each tougher than the last. Every wave you beat adds to your winnings. Walk out between waves and the money is yours. Get knocked out and you keep only half.”<br><br>Your best: <b>${S.arenaBest || 0}</b> waves.${S.flags.arena10 ? '' : ' Reach wave 10 for a prize from the crowd.'}`, [
@@ -5937,7 +6019,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
