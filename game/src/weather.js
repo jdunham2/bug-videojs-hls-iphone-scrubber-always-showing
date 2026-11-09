@@ -54,9 +54,9 @@ export class Weather {
 
   set(state) { this.state = state; this.timer = 150 + Math.random() * 180; }
 
-  update(dt, env, camera, playerUnderwater, altitude = 0, ash = 0) {
-    // snow always falls high on the peaks; ash drifts down around the volcano
-    const snow = Math.max(clamp((altitude - 55) / 20, 0, 1) * (1 - ash), ash * 0.85);
+  update(dt, env, camera, playerUnderwater, altitude = 0, ash = 0, frost = 0) {
+    // snow always falls on Frostpeak and the high peaks; ash drifts down around the volcano
+    const snow = Math.max(Math.max(clamp((altitude - 55) / 20, 0, 1), frost * 0.85) * (1 - ash), ash * 0.85);
     this.ash = ash;
     this.snow = snow;
     this.timer -= dt;

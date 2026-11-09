@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, slopeAt, HALF, volcanicAt, VOLCANO } from './terrain.js';
+import { heightAt, slopeAt, HALF, volcanicAt, VOLCANO, swampAt, frostFrom } from './terrain.js';
 import { mergeParts, mtx, lumpify, addWind } from './util.js';
 import { createNoise2D, mulberry32 } from './noise.js';
 
@@ -56,6 +56,40 @@ function broadleafGeo(rand) {
     const a = rand() * Math.PI * 2, d = k === 0 ? 0 : 1.2 + rand() * 1.4;
     parts.push({ geo: lumpify(new THREE.IcosahedronGeometry(r, 1), 0.35, rand), color: greens[k % 4], jitter: 0.12,
       matrix: mtx(Math.cos(a) * d, h + rand() * 2.2 - 0.3, Math.sin(a) * d) });
+  }
+  return mergeParts(parts);
+}
+
+function snowPineGeo(rand) {
+  const parts = [];
+  const h = 8 + rand() * 4;
+  parts.push({ geo: new THREE.CylinderGeometry(0.22, 0.45, h, 7), color: 0x4a3626, matrix: mtx(0, h / 2, 0) });
+  for (let i = 0; i < 5; i++) {
+    const t = i / 5, r = 3.0 * (1 - t * 0.8), ch = 3.2 - t;
+    parts.push({ geo: lumpify(new THREE.ConeGeometry(r, ch, 9, 1), 0.18, rand), color: 0x22442c, jitter: 0.1, matrix: mtx(0, 2.4 + t * (h - 2.4), 0, 0, rand() * 3, 0) });
+    parts.push({ geo: lumpify(new THREE.ConeGeometry(r * 0.82, ch * 0.45, 9, 1), 0.15, rand), color: 0xeef3f8, matrix: mtx(0, 2.4 + t * (h - 2.4) + ch * 0.28, 0, 0, rand() * 3, 0) });
+  }
+  return mergeParts(parts);
+}
+
+function mangroveGeo(rand) {
+  const parts = [];
+  const h = 4 + rand() * 2;
+  // arching stilt roots
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + rand() * 0.4;
+    parts.push({ geo: new THREE.CylinderGeometry(0.08, 0.12, 2.4, 5), color: 0x4a3a2a, matrix: mtx(Math.cos(a) * 0.7, 0.9, Math.sin(a) * 0.7, Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55) });
+  }
+  parts.push({ geo: new THREE.CylinderGeometry(0.2, 0.32, h, 7), color: 0x4a3a2a, matrix: mtx(0, 1.6 + h / 2, 0, 0, 0, 0.08) });
+  for (let k = 0; k < 6; k++) {
+    const a = rand() * Math.PI * 2, d = k ? 1.2 + rand() * 1.4 : 0;
+    parts.push({ geo: lumpify(new THREE.IcosahedronGeometry(1.4 + rand() * 0.8, 1), 0.35, rand), color: k % 2 ? 0x3a5228 : 0x2e4620, jitter: 0.15,
+      matrix: mtx(Math.cos(a) * d, 1.6 + h + rand() * 0.8, Math.sin(a) * d, 0, 0, 0, 1, 0.6, 1) });
+  }
+  // hanging moss strands
+  for (let k = 0; k < 8; k++) {
+    const a = rand() * Math.PI * 2, d = 1 + rand() * 1.8;
+    parts.push({ geo: new THREE.CylinderGeometry(0.03, 0.01, 1.6, 3), color: 0x6a7a48, matrix: mtx(Math.cos(a) * d, 0.8 + h, Math.sin(a) * d) });
   }
   return mergeParts(parts);
 }
@@ -166,6 +200,9 @@ const KINDS = {
   crystal:   { kind: 'rock', hp: 90, yields: [['crystal', 3], ['stone', 1]], radius: 0.9 },
   boulder:   { kind: 'rock', hp: 160, yields: [['stone', 4], ['flint', 2]], radius: 3.2 },
   bush:      { kind: 'bush', hp: 12, yields: [['fiber', 3], ['berries', 2]], radius: 0 },
+  herb:      { kind: 'bush', hp: 10, yields: [['fiber', 2], ['herb', 3]], radius: 0 },
+  mangrove:  { kind: 'tree', hp: 70, yields: [['wood', 4], ['fiber', 1]], radius: 0.6 },
+  snowpine:  { kind: 'tree', hp: 80, yields: [['wood', 4]], radius: 0.6 },
   dozebush:  { kind: 'bush', hp: 12, yields: [['fiber', 2], ['sleepberry', 3]], radius: 0 },
 };
 
@@ -187,9 +224,12 @@ export class World {
     const bushMat = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }), shared, { strength: 0.03, freq: 1.8 });
 
     const defs = [
-      { type: 'palm',      geos: variants(() => palmGeo(rand), 3),      mat: foliageMat, count: high ? 420 : 300, test: (x, z, h, s) => h > 1.4 && h < 6 && s < 0.2 },
-      { type: 'broadleaf', geos: variants(() => broadleafGeo(rand), 3), mat: foliageMat, count: high ? 1300 : 800, test: (x, z, h, s) => h > 5 && h < 30 && s < 0.25 && noise(x * 0.008, z * 0.008) > -0.15 },
-      { type: 'pine',      geos: variants(() => pineGeo(rand), 3),      mat: foliageMat, count: high ? 900 : 600, test: (x, z, h, s) => h > 22 && h < 70 && s < 0.35 },
+      { type: 'palm',      geos: variants(() => palmGeo(rand), 3),      mat: foliageMat, count: high ? 420 : 300, test: (x, z, h, s) => h > 1.4 && h < 6 && s < 0.2 && swampAt(x, z) < 0.4 },
+      { type: 'broadleaf', geos: variants(() => broadleafGeo(rand), 3), mat: foliageMat, count: high ? 1300 : 800, test: (x, z, h, s) => h > 5 && h < 30 && s < 0.25 && noise(x * 0.008, z * 0.008) > -0.15 && swampAt(x, z) < 0.4 },
+      { type: 'pine',      geos: variants(() => pineGeo(rand), 3),      mat: foliageMat, count: high ? 900 : 600, test: (x, z, h, s) => h > 22 && h < 70 && s < 0.35 && frostFrom(h, x, z) < 0.5 },
+      { type: 'snowpine',  geos: variants(() => snowPineGeo(rand), 3),  mat: foliageMat, count: high ? 600 : 380, test: (x, z, h, s) => h > 26 && h < 80 && s < 0.4 && frostFrom(h, x, z) > 0.5 },
+      { type: 'mangrove',  geos: variants(() => mangroveGeo(rand), 3),  mat: foliageMat, count: high ? 380 : 260, test: (x, z, h, s) => h > -0.4 && h < 3 && swampAt(x, z) > 0.5 },
+      { type: 'herb',      geos: variants(() => bushGeo(rand, 0xd8d070), 2), mat: bushMat, count: 160, test: (x, z, h, s) => h > 0.3 && h < 3 && swampAt(x, z) > 0.45 },
       { type: 'rock',      geos: variants(() => rockGeo(rand, false), 4), mat: rockMat, count: 700, test: (x, z, h, s) => h > 1 && h < 80 },
       { type: 'boulder',   geos: variants(() => rockGeo(rand, true), 3),  mat: rockMat, count: 220, test: (x, z, h, s) => h > 3 && s > 0.05 },
       { type: 'metal',     geos: variants(() => oreGeo(rand), 3),      mat: rockMat, count: 260, test: (x, z, h, s) => h > 26 && h < 90 },
@@ -235,7 +275,7 @@ export class World {
     }
 
     // ---------- Grass ----------
-    const gcount = high ? 90000 : 40000;
+    const gcount = high ? 90000 : 28000;
     const grassMat = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), shared, { strength: 0.25, freq: 2.2, heightScale: 1 });
     const grass = new THREE.InstancedMesh(grassBladeGeo(), grassMat, gcount);
     grass.receiveShadow = true;
@@ -258,6 +298,29 @@ export class World {
     grass.computeBoundingSphere();
     scene.add(grass);
     this.grass = grass;
+
+    // ---------- Swamp reeds ----------
+    const rcount = high ? 6000 : 2500;
+    const reedGeo = grassBladeGeo();
+    { const c = reedGeo.attributes.color, pp = reedGeo.attributes.position; for (let i = 0; i < pp.count; i++) { const t = pp.getY(i) / 0.9; c.setXYZ(i, 0.2 + t * 0.25, 0.3 + t * 0.35, 0.1 + t * 0.08); } }
+    const reeds = new THREE.InstancedMesh(reedGeo, grassMat, rcount);
+    reeds.receiveShadow = true;
+    let ri = 0, rt = 0;
+    while (ri < rcount && rt < rcount * 30) {
+      rt++;
+      const a = rand() * Math.PI * 2, d = rand() * 130;
+      const x = -235 + Math.cos(a) * d, z = 175 + Math.sin(a) * d;
+      const h = heightAt(x, z);
+      if (h < -0.7 || h > 1.6 || swampAt(x, z) < 0.45) continue;
+      reeds.setMatrixAt(ri, mtx(x, h - 0.05, z, 0, rand() * 6.28, 0, 0.5 + rand() * 0.4, 0.9 + rand() * 0.9, 0.5 + rand() * 0.4));
+      reeds.setColorAt(ri, gc.setHSL(0.2 + rand() * 0.07, 0.35, 0.45 + rand() * 0.2));
+      ri++;
+    }
+    reeds.count = ri;
+    reeds.instanceMatrix.needsUpdate = true;
+    reeds.computeBoundingSphere();
+    scene.add(reeds);
+    this.reeds = reeds;
 
     this.zero = new THREE.Matrix4().makeScale(0, 0, 0);
   }

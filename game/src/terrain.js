@@ -19,6 +19,20 @@ export function volcanicAt(x, z) {
   return 1 - smoothstep(105, 165, d);
 }
 
+// Murkmire Swamp in the south-west: flat wetland dotted with shallow pools.
+export const SWAMP = { x: -235, z: 175, r: 130 };
+const sn = createNoise2D(4711);
+export function swampAt(x, z) {
+  const d = Math.hypot(x - SWAMP.x, z - SWAMP.z) + sn(x * 0.015, z * 0.015) * 22;
+  return 1 - smoothstep(SWAMP.r * 0.6, SWAMP.r, d);
+}
+
+// Frostpeak: the snowy northern highlands (cheap version when the height is known).
+export function frostFrom(h, x, z) {
+  return smoothstep(30, 44, h) * smoothstep(-30, -100, z) * (1 - volcanicAt(x, z));
+}
+export function frostAt(x, z) { return frostFrom(surfaceHeight(x, z), x, z); }
+
 // Caves (and anything else far outside the island) can supply their own ground.
 let groundProvider = null;
 export function setGroundProvider(fn) { groundProvider = fn; }
@@ -67,6 +81,13 @@ function surfaceHeight(x, z) {
     if (vd < VOLCANO.crater) h -= Math.pow(1 - vd / VOLCANO.crater, 1.2) * 52;
   }
 
+  // the swamp flattens into a low wetland with pools just below sea level
+  const sw = swampAt(x, z);
+  if (sw > 0 && h > -6) {
+    const wet = 0.9 + sn(x * 0.045, z * 0.045) * 1.5 + sn(x * 0.12, z * 0.12) * 0.4;
+    h = lerp(h, wet, sw);
+  }
+
   // Flatten beaches near the waterline
   const b = smoothstep(-1.5, 4.5, h);
   h = lerp(h * 0.55 + 0.3, h, b);
@@ -94,6 +115,9 @@ const C = {
   rock2: new THREE.Color(0x56514b),
   snow: new THREE.Color(0xf2f4f7),
   ash: new THREE.Color(0x3c3836),
+  mud: new THREE.Color(0x4a4628),
+  moss: new THREE.Color(0x3c4a24),
+  ice: new THREE.Color(0xc8d8e8),
   ash2: new THREE.Color(0x2a2624),
   basalt: new THREE.Color(0x5a281c),
 };
@@ -133,6 +157,10 @@ export function buildTerrain(quality) {
         c.lerp(C.basalt, smoothstep(60, 28, vd) * 0.8);
       }
     }
+    const sw = swampAt(x, z);
+    if (sw > 0 && h > -2) { tmp.copy(C.mud).lerp(C.moss, v); c.lerp(tmp, sw * 0.9); }
+    const fr = frostFrom(h, x, z);
+    if (fr > 0) { tmp.copy(C.snow).lerp(C.ice, v * 0.4); c.lerp(tmp, fr * (1 - smoothstep(0.3, 0.55, s) * 0.6)); }
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));

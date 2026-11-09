@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WORLD, buildHeightTexture } from './terrain.js';
+import { WORLD, buildHeightTexture, SWAMP } from './terrain.js';
 import { mergeParts, mtx, lumpify } from './util.js';
 import { smoothstep, lerp } from './noise.js';
 
@@ -82,6 +82,7 @@ export class Environment {
       uHeight: { value: null },
       uWorld: { value: WORLD },
       uLight: { value: 1 },
+      uSwamp: { value: new THREE.Vector3(SWAMP.x, SWAMP.z, SWAMP.r) },
     }]);
     this.waterUniforms.uTime = shared.uTime;
     this.waterUniforms.uHeight.value = heightTex;
@@ -102,7 +103,7 @@ export class Environment {
           #include <fog_vertex>
         }`,
       fragmentShader: `
-        uniform float uTime, uWorld, uLight; uniform vec3 uSunDir, uSunColor, uSky; uniform sampler2D uHeight;
+        uniform float uTime, uWorld, uLight; uniform vec3 uSunDir, uSunColor, uSky, uSwamp; uniform sampler2D uHeight;
         varying vec3 vWPos;
         #include <fog_pars_fragment>
         vec2 wave(vec2 p, vec2 dir, float f, float s, float a){ float ph = dot(p, dir)*f + uTime*s; return dir * cos(ph) * a * f; }
@@ -121,14 +122,16 @@ export class Environment {
           vec3 shallow = vec3(0.10, 0.55, 0.55);
           vec3 deep = vec3(0.01, 0.10, 0.20);
           vec3 water = mix(shallow, deep, smoothstep(0.0, 14.0, depth)) * uLight;
-          vec3 col = mix(water, uSky, fres);
+          float swampF = 1.0 - smoothstep(uSwamp.z * 0.55, uSwamp.z * 0.95, length(p - uSwamp.xy));
+          water = mix(water, vec3(0.13, 0.16, 0.07) * uLight, swampF * 0.85);
+          vec3 col = mix(water, uSky, fres * (1.0 - swampF * 0.6));
           vec3 r = reflect(-v, n);
           float spec = pow(max(dot(r, normalize(uSunDir)), 0.0), 220.0);
           col += uSunColor * spec * 3.0 * step(0.0, uSunDir.y);
           // shoreline foam
           float foamBand = 1.0 - smoothstep(0.0, 1.6, depth);
           float foamN = sin(p.x*1.3 + uTime*1.5)*sin(p.y*1.1 - uTime*1.2)*0.5+0.5;
-          float foam = foamBand * smoothstep(0.35, 0.9, foamN + foamBand*0.6);
+          float foam = foamBand * smoothstep(0.35, 0.9, foamN + foamBand*0.6) * (1.0 - swampF);
           col = mix(col, vec3(0.95) * max(uLight, 0.25), foam * 0.8);
           float alpha = mix(0.55, 0.94, smoothstep(0.0, 4.0, depth));
           alpha = max(alpha, fres);

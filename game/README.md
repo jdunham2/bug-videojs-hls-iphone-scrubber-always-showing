@@ -22,6 +22,12 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Temperature:** it gets colder with altitude, at night and in rain and wind. Fires and
   forges warm you, Hide Armor insulates well (Metal Armor barely). Freezing burns food, stops
   healing and then drains health; snow falls on the peaks. The HUD shows the temperature.
+- **Murkmire Swamp (south-west):** flat, foggy wetland of murky green pools, reeds and
+  mangroves draped in moss. Bogmaws lurk in the water; Reedhorn herds wade the shallows. Pick
+  Marsh Herbs for Healing Salves (heal 45).
+- **Frostpeak (northern highlands):** snow-covered ground, snow-laden pines and constant
+  snowfall; well below freezing at night. Frosthorn herds and Rimeclaw packs live here, and
+  their pelts make Fur Armor (the warmest armor, blocks 30%).
 - **Ashfang Volcano:** a smoking volcano on the east coast with ash-covered slopes, falling
   ash, a lava lake in the crater and intense heat (drains water fast). Lava burns; Ashguard
   Armor blocks most of it and a saddled Cinderback walks through it. Mine black Obsidian here
@@ -101,6 +107,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Thunderneck: giant sauropod
   - Gorgonax: apex predator, found in the north; rideable
   - Cinderback: lava-veined volcano predator, fireproof; rideable
+  - Bogmaw: swamp ambush predator that waits in the pools; rideable
+  - Reedhorn: duck-billed swamp grazer in herds; rideable
+  - Frosthorn: woolly three-horned grazer of Frostpeak, drops pelts; rideable
+  - Rimeclaw: white snow raptor that hunts in packs; rideable
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer

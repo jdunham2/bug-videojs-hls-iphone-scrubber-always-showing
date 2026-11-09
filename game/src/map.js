@@ -1,4 +1,4 @@
-import { heightAt, slopeAt, WORLD, HALF, volcanicAt, VOLCANO } from './terrain.js';
+import { heightAt, slopeAt, WORLD, HALF, volcanicAt, VOLCANO, swampAt, frostFrom, SWAMP } from './terrain.js';
 import { KIND } from './building.js';
 
 // World map: a hill-shaded render of the island, fog of war that lifts as you explore,
@@ -15,6 +15,8 @@ const PLACES = [
   { name: 'Western Woods', x: -250, z: 40 },
   { name: 'Eastern Shore', x: 300, z: 160 },
   { name: 'Ashfang Volcano', x: VOLCANO.x, z: VOLCANO.z + 40 },
+  { name: 'Murkmire Swamp', x: SWAMP.x, z: SWAMP.z },
+  { name: 'Frostpeak', x: -120, z: -175 },
 ];
 
 const toMap = (v) => (v / WORLD + 0.5);
@@ -56,6 +58,10 @@ export class WorldMap {
       const x = (i / (RES - 1) - 0.5) * WORLD, z = (j / (RES - 1) - 0.5) * WORLD;
       const vol = h > 0 ? volcanicAt(x, z) : 0;
       if (vol > 0) { r = r + (60 - r) * vol; g = g + (54 - g) * vol; b = b + (52 - b) * vol; }
+      const sw = swampAt(x, z);
+      if (sw > 0) { if (h < 0) { r = r + (38 - r) * sw; g = g + (48 - g) * sw; b = b + (26 - b) * sw; } else { r = r + (72 - r) * sw; g = g + (78 - g) * sw; b = b + (40 - b) * sw; } }
+      const fr = h > 0 ? frostFrom(h, x, z) : 0;
+      if (fr > 0) { r = r + (232 - r) * fr; g = g + (238 - g) * fr; b = b + (245 - b) * fr; }
       if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < VOLCANO.crater * 0.6) { r = 255; g = 110; b = 30; }
       const k = (j * RES + i) * 4;
       const sh = h < 0 ? 1 : shade;

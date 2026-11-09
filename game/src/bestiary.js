@@ -18,6 +18,10 @@ const LORE = {
   glimmerfin: { icon: '🐟', where: 'Shallow water, in schools', text: 'Silver-sided fish that flash and scatter. A spear catches supper.' },
   cinderback: { icon: '🌋', where: 'Ashfang Volcano and the Ember Depths', text: 'Basalt-plated and veined with living fire. It wades through heat that would cook anything else, and a saddled one carries you across lava.' },
   duskraptor: { icon: '🦇', where: 'Caves, in packs', text: 'Blind pack hunters that glow faintly blue in the dark. They hear you long before you see them.' },
+  bogmaw: { icon: '🐊', where: 'Murkmire Swamp pools', text: 'Lies motionless in the murk with only its eyes above water, then lunges. Most victims never see it.' },
+  reedhorn: { icon: '🦆', where: 'Murkmire Swamp, in herds', text: 'A duck-billed grazer that wades through the marsh tearing up reeds. Herds trumpet and stand together when threatened.' },
+  frosthorn: { icon: '🦬', where: 'Frostpeak, in herds', text: 'A shaggy, three-horned grazer built for the cold. Its thick pelt makes the warmest armor on the island.' },
+  rimeclaw: { icon: '🦖', where: 'Frostpeak, in packs', text: 'White-scaled raptors that vanish against the snow and hunt the Frosthorn herds.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { heightAt, HALF, volcanicAt, blockedAt } from './terrain.js';
-import { mergeParts, mtx, rand, pick, angleLerp } from './util.js';
+import { heightAt, HALF, volcanicAt, blockedAt, swampAt, frostFrom } from './terrain.js';
+import { mergeParts, mtx, rand, pick, angleLerp, lumpify } from './util.js';
 import { clamp, lerp } from './noise.js';
 
 const SPH = new THREE.SphereGeometry(1, 14, 10);
@@ -94,6 +94,26 @@ export const SPECIES = {
     tameFood: 'meat', tameBase: 7, tameLvl: 0.18, rideable: true, radius: 0.9, reach: 2.4, hitR: 1.4, glow: [0.2, 0.6, 1],
     drops: { meat: 3, hide: 3, crystal: 1 }, aggro: 22, lvl: [8, 35], count: 0, zone: () => false,
   },
+  bogmaw: {
+    name: 'Bogmaw', diet: 'carn', temper: 'aggressive', hp: 460, dmg: 24, walk: 1.6, run: 8, torpor: 320,
+    tameFood: 'meat', tameBase: 10, tameLvl: 0.25, rideable: true, radius: 1.4, reach: 3.2, hitR: 1.9, wade: true,
+    drops: { meat: 6, hide: 6 }, aggro: 15, lvl: [5, 35], count: 6, zone: (h, x, z) => swampAt(x, z) > 0.55 && h > -1.5 && h < 2,
+  },
+  reedhorn: {
+    name: 'Reedhorn', diet: 'herb', temper: 'neutral', hp: 360, dmg: 16, walk: 2.4, run: 8.5, torpor: 260,
+    tameFood: 'berries', tameBase: 11, tameLvl: 0.3, rideable: true, radius: 1.7, reach: 3.2, hitR: 2.2, wade: true,
+    drops: { meat: 7, hide: 4 }, aggro: 0, lvl: [1, 30], count: 10, herd: 4, zone: (h, x, z) => swampAt(x, z) > 0.35 && h > -0.5 && h < 4,
+  },
+  frosthorn: {
+    name: 'Frosthorn', diet: 'herb', temper: 'neutral', hp: 420, dmg: 28, walk: 2.2, run: 7, torpor: 300,
+    tameFood: 'berries', tameBase: 12, tameLvl: 0.32, rideable: true, radius: 2.0, reach: 4.0, hitR: 2.6, coldproof: true,
+    drops: { meat: 6, pelt: 4, hide: 3 }, aggro: 0, lvl: [5, 35], count: 8, herd: 3, zone: (h, x, z) => frostFrom(h, x, z) > 0.5 && h < 80,
+  },
+  rimeclaw: {
+    name: 'Rimeclaw', diet: 'carn', temper: 'aggressive', hp: 160, dmg: 10, walk: 3, run: 12, torpor: 130,
+    tameFood: 'meat', tameBase: 7, tameLvl: 0.16, rideable: true, radius: 0.9, reach: 2.4, hitR: 1.4, coldproof: true,
+    drops: { meat: 3, pelt: 2 }, aggro: 26, lvl: [5, 35], count: 9, herd: 3, zone: (h, x, z) => frostFrom(h, x, z) > 0.5 && h < 85, far: 120,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -105,6 +125,8 @@ export const BOSS_TYRANT = { kind: 'tyrant', species: 'gorgonax', name: 'The Pri
 
 const PREY = {
   talonrunner: ['pudgewing', 'dashbeak', 'crestcaller'],
+  bogmaw: ['reedhorn', 'pudgewing', 'dashbeak'],
+  rimeclaw: ['frosthorn', 'pudgewing'],
   dashbeak: ['pudgewing'],
   thunderwing: ['pudgewing', 'dashbeak', 'crestcaller', 'galewing'],
   deepjaw: ['glimmerfin'],
@@ -371,6 +393,62 @@ function buildDeepjaw(mat, col) {
   return { root, body, legs, neck, head, jaw, tail, hipH: 0.6, lie: 0.8, quad: true, swim: true };
 }
 
+function buildBogmaw(mat, col) {
+  const { base, belly, accent, horn } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.55; root.add(body);
+  body.add(meshOf([E(0.85, 0.45, 1.9, base, 0, 0, 0), E(0.7, 0.25, 1.7, belly, 0, -0.22, 0),
+    ...Array.from({ length: 9 }, (_, i) => E(0.12, 0.1, 0.16, accent, (i % 2 ? 1 : -1) * 0.3, 0.42, 1.4 - i * 0.35))], mat));
+  const legs = [];
+  for (const [x, z, ph] of [[-0.75, 1.1, 0], [0.75, 1.1, Math.PI], [-0.75, -1.1, Math.PI], [0.75, -1.1, 0]]) {
+    const g = new THREE.Group(); g.position.set(x, -0.15, z); body.add(g);
+    g.add(meshOf([Cy(0.16, 0.6, base, Math.sign(x) * 0.2, -0.2, 0, 0, 0, Math.sign(x) * 0.7), E(0.2, 0.06, 0.26, horn, Math.sign(x) * 0.42, -0.45, 0.08)], mat));
+    legs.push({ g, ph });
+  }
+  const neck = new THREE.Group(); neck.position.set(0, 0.05, 1.8); body.add(neck);
+  const head = new THREE.Group(); head.position.set(0, 0.02, 0.2); neck.add(head);
+  head.add(meshOf([E(0.42, 0.26, 0.55, base, 0, 0.05, 0.3), E(0.26, 0.16, 0.9, base, 0, 0.02, 1.2),
+    E(0.07, 0.07, 0.07, 0xd8c040, -0.28, 0.24, 0.35), E(0.07, 0.07, 0.07, 0xd8c040, 0.28, 0.24, 0.35),
+    ...Array.from({ length: 10 }, (_, i) => K(0.03, 0.12, 0xf0ead8, (i % 2 ? 1 : -1) * 0.2, -0.1, 0.6 + i * 0.12, Math.PI))], mat));
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.1, 0.25); head.add(jaw);
+  jaw.add(meshOf([E(0.24, 0.1, 0.95, belly, 0, -0.03, 0.9)], mat));
+  const tail = []; let parent = body;
+  for (let i = 0; i < 6; i++) {
+    const t = new THREE.Group(); t.position.set(0, 0, i === 0 ? -1.8 : -0.75); parent.add(t);
+    const r = 0.5 * (1 - i * 0.14);
+    t.add(meshOf([E(r * 0.9, r * 0.6, 0.55, base, 0, 0, -0.4), E(0.05, 0.12, 0.3, accent, 0, r * 0.55, -0.4)], mat));
+    tail.push(t); parent = t;
+  }
+  return { root, body, legs, neck, head, jaw, tail, hipH: 0.55, lie: 0.5, quad: true };
+}
+
+function buildReedhorn(mat, col) {
+  const { base, belly, accent, horn } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 1.9; root.add(body);
+  body.add(meshOf([E(1.1, 1.15, 2.2, base, 0, 0, 0), E(0.95, 0.75, 1.9, belly, 0, -0.5, 0.1),
+    ...Array.from({ length: 5 }, (_, i) => E(1.12, 0.12, 0.18, accent, 0, 0.55, 1.2 - i * 0.55))], mat));
+  const legs = [];
+  for (const [x, z, ph, len] of [[-0.75, 1.3, 0, 1.3], [0.75, 1.3, Math.PI, 1.3], [-0.8, -1.2, Math.PI, 1.9], [0.8, -1.2, 0, 1.9]]) {
+    const g = new THREE.Group(); g.position.set(x, -0.5, z); body.add(g);
+    g.add(meshOf([Cy(len > 1.5 ? 0.42 : 0.24, len, base, 0, -len / 2 + 0.2, 0), E(0.3, 0.1, 0.36, horn, 0, -len + 0.25, 0.08)], mat));
+    legs.push({ g, ph });
+  }
+  const neck = new THREE.Group(); neck.position.set(0, 0.5, 2.0); body.add(neck);
+  neck.add(meshOf([Cy(0.42, 1.4, base, 0, 0.45, 0.35, 0.75, 0, 0)], mat));
+  const head = new THREE.Group(); head.position.set(0, 1.0, 0.9); neck.add(head);
+  head.add(meshOf([E(0.42, 0.45, 0.65, base, 0, 0, 0.2), E(0.38, 0.12, 0.6, horn, 0, -0.18, 0.85),          // flat duck bill
+    K(0.12, 0.9, accent, 0, 0.5, -0.1, -0.5, 0, 0), E(0.07, 0.07, 0.07, 0x111111, -0.36, 0.12, 0.35), E(0.07, 0.07, 0.07, 0x111111, 0.36, 0.12, 0.35)], mat));
+  const tail = []; let parent = body;
+  for (let i = 0; i < 5; i++) {
+    const t = new THREE.Group(); t.position.set(0, i === 0 ? 0.2 : 0, i === 0 ? -2.0 : -1.0); parent.add(t);
+    const r = 0.65 * (1 - i * 0.17);
+    t.add(meshOf([E(r * 0.8, r, 0.75, base, 0, 0, -0.5)], mat));
+    tail.push(t); parent = t;
+  }
+  return { root, body, legs, neck, head, tail, hipH: 1.9, lie: 1.1, quad: true };
+}
+
 function buildSauropod(mat, col) {
   const { base, belly, accent } = col;
   const root = new THREE.Group();
@@ -443,6 +521,10 @@ const PALETTES = {
   deepjaw: [{ base: 0x2e4a5a, belly: 0xb8c4c4, accent: 0x1a2a34, horn: 0xe0e0d0 }, { base: 0x3a4a42, belly: 0xc0c4b0, accent: 0x5a2a2a, horn: 0xe0e0d0 }],
   cinderback: [{ base: 0x24201e, belly: 0x4a3a32, accent: 0xff6a1a, horn: 0x110e0c }, { base: 0x2e2622, belly: 0x5a4034, accent: 0xffa030, horn: 0x110e0c }],
   duskraptor: [{ base: 0x1e2430, belly: 0x5a6070, accent: 0x3ab0ff, horn: 0x101418 }, { base: 0x262030, belly: 0x605a70, accent: 0x9a6aff, horn: 0x101418 }],
+  bogmaw: [{ base: 0x3a4a2a, belly: 0x9a9a6a, accent: 0x2a3420, horn: 0x2a2620 }, { base: 0x4a4a32, belly: 0xa8a070, accent: 0x5a3a20, horn: 0x2a2620 }],
+  reedhorn: [{ base: 0x6a7a4a, belly: 0xc8c090, accent: 0xb85a2a, horn: 0xd8c8a0 }, { base: 0x7a6a50, belly: 0xd0c098, accent: 0x3a6a8a, horn: 0xd8c8a0 }],
+  frosthorn: [{ base: 0x8a7a68, belly: 0xd8d0c0, accent: 0x5a4a3a, horn: 0xf0ecdf }, { base: 0x6a5a4a, belly: 0xc8beb0, accent: 0x3a5a7a, horn: 0xf0ecdf }],
+  rimeclaw: [{ base: 0xd8e0e8, belly: 0xf4f6f8, accent: 0x5a7aa8, horn: 0x2a3038 }, { base: 0xc0ccd8, belly: 0xeef2f6, accent: 0x8a6ab0, horn: 0x2a3038 }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -454,6 +536,10 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'bogmaw': return buildBogmaw(mat, col);
+    case 'reedhorn': return buildReedhorn(mat, col);
+    case 'frosthorn': { const m = buildQuadTrikeros(mat, col); m.body.add(meshOf([E(1.45, 1.2, 2.1, col.base, 0, 0.25, -0.1), E(1.3, 1.0, 1.0, col.base, 0, 0.3, 1.4)].map((p) => ({ ...p, geo: lumpify(new THREE.IcosahedronGeometry(1, 2), 0.25), jitter: 0.2 })), mat)); return m; }
+    case 'rimeclaw': return buildBiped(mat, col, 1.05, { hip: 1.2, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.55, headW: 0.8, tailSeg: 0.6, stripes: 4, crest: true, neckW: 0.9 });
     case 'cinderback': return buildBiped(mat, col, 1.9, { hip: 1.35, bodyLen: 1.15, girth: 1.2, arm: 0.8, headLen: 0.6, headW: 1.15, tailSeg: 0.65, stripes: 6, crest: false, knobs: true, neckW: 1.2 });
     case 'duskraptor': return buildBiped(mat, col, 1.05, { hip: 1.15, bodyLen: 0.95, girth: 0.8, arm: 1.3, headLen: 0.55, headW: 0.8, tailSeg: 0.6, stripes: 3, crest: true, neckW: 0.9 });
     case 'glimmerfin': return buildFish(mat, col);

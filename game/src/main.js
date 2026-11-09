@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildTerrain, heightAt, findSpawn, WATER_LEVEL, HALF, volcanicAt, inVolcanoLava, VOLCANO, blockedAt } from './terrain.js';
+import { buildTerrain, heightAt, findSpawn, WATER_LEVEL, HALF, volcanicAt, inVolcanoLava, VOLCANO, blockedAt, swampAt, frostAt } from './terrain.js';
 import { Volcano } from './volcano.js';
 import { Caves } from './caves.js';
 import { Bosses } from './bosses.js';
@@ -97,7 +97,7 @@ class Game {
       thud: () => { this.audio.tone({ f0: 90, f1: 40, dur: 0.4, vol: 0.5, type: 'triangle' }); this.audio.noiseHit({ freq: 300, dur: 0.3, vol: 0.4, type: 'lowpass' }); },
       flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
-    this.creatures.viewDist = quality === 'high' ? 330 : 220;
+    this.creatures.viewDist = quality === 'high' ? 330 : 180;
     this.creatures.populate(this.spawnPoint);
     this.buildAltar();
     this.volcano = new Volcano(this.scene, this.shared);
@@ -161,6 +161,8 @@ class Game {
       { title: 'Slay the Deep Mother at the Tide Shrine on the western shore', progress: () => 'Offer 20 Raw Meat + 1 Alpha Trophy. Fight from a Deepjaw, a flyer or with a bow — beware the whirlpool', done: () => (this.stats.bossesDefeated || {}).deepmother >= 1 },
       { title: 'Slay the Hollow Queen in the depths of the Glimmer Grotto', progress: () => 'Offer 20 Glimmer Crystals at the crystal throne. She pounces — and her shriek kills your light', done: () => (this.stats.bossesDefeated || {}).hollowqueen >= 1 },
       { title: 'Champion of the Isle: defeat all four bosses', progress: () => `${Object.keys((this.stats.bossesDefeated || {})).length}/4 bosses slain`, done: () => Object.keys((this.stats.bossesDefeated || {})).length >= 4 },
+      { title: 'Explore Murkmire Swamp and brew a Healing Salve from Marsh Herbs', progress: () => `🌱 ${this.inv.count('herb')} herbs · watch the pools for Bogmaws`, done: () => this.inv.count('salve') > 0 || (this.stats.salves || 0) > 0 },
+      { title: 'Brave Frostpeak: craft Fur Armor from Frosthorn or Rimeclaw pelts', progress: () => `🐑 ${Math.min(this.inv.count('pelt'), 10)}/10 pelts`, done: () => this.inv.count('furarmor') > 0 || (this.player.armor && this.player.armor.id === 'furarmor') },
     ];
     this.questIdx = 0;
 
@@ -282,7 +284,7 @@ class Game {
       if (def.sick) { p.hp -= def.sick * 0.3; }
       this.inv.remove(s.id, 1);
       this.audio.eat();
-      this.ui.notify(`Ate ${def.name}`);
+      this.ui.notify(def.heal >= 40 ? `Used ${def.name} (+${def.heal} health)` : `Ate ${def.name}`);
     }
   }
 
@@ -291,6 +293,7 @@ class Game {
     if (r.station && !this.stationNear(r.station)) { this.ui.notify(`Craft this next to a ${ITEMS[r.station].name}`, 'warn'); return; }
     if (['metalpick', 'metalhatchet', 'sword', 'metalarmor'].includes(r.id)) this.stats.metalCrafted++;
     if (r.id === 'primalblade') this.stats.blades = (this.stats.blades || 0) + 1;
+    if (r.id === 'salve') this.stats.salves = (this.stats.salves || 0) + 1;
     this.inv.pay(r.cost);
     const left = this.inv.add(r.id, r.yield || 1);
     if (left) this.ui.notify('Inventory full!', 'warn');
@@ -889,7 +892,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1033,7 +1036,10 @@ class Game {
       this.temperature(dt);
       if (!p.alive && !document.getElementById('death').classList.contains('show')) this.die(null);
       this.env.update(dt, p.pos);
-      this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y, volcanicAt(p.pos.x, p.pos.z) * 0.9);
+      const inCaveNow = Math.abs(p.pos.x) > 1500;
+      this.biome = inCaveNow ? { swamp: 0, frost: 0 } : { swamp: swampAt(p.pos.x, p.pos.z), frost: frostAt(p.pos.x, p.pos.z) };
+      this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y, volcanicAt(p.pos.x, p.pos.z) * 0.9, this.biome.frost);
+      if (this.biome.swamp > 0) { this.scene.fog.density *= 1 + this.biome.swamp * 2.2; this.scene.fog.color.lerp(this._swampFog || (this._swampFog = new THREE.Color(0x56634a)), this.biome.swamp * 0.6); }
       this.volcano.update(dt, p.pos);
       this.caves.update(dt);
       this.bosses.update(dt);
@@ -1106,6 +1112,8 @@ class Game {
       t += volcanicAt(p.pos.x, p.pos.z) * 14 + Math.max(0, p.pos.y - 10) * 0.32 * volcanicAt(p.pos.x, p.pos.z);
       const cd = Math.hypot(p.pos.x - VOLCANO.x, p.pos.z - VOLCANO.z);
       if (cd < VOLCANO.crater + 25) t += 22 * (1 - cd / (VOLCANO.crater + 25));
+      t -= (this.biome ? this.biome.frost : 0) * 12;
+      t += (this.biome ? this.biome.swamp : 0) * 2;
     }
     for (const f of this.building.fires) {
       if (!f.lit) continue;
@@ -1113,7 +1121,7 @@ class Game {
       if (d < 9) t += (f.type === 'forge' ? 22 : 18) * (1 - d / 9);
     }
     this.ambientTemp = t;
-    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : p.armor.id === 'ashguard' || p.armor.id === 'magmaplate' ? 9 : 5) : 0;
+    const insul = p.armor ? (ITEMS[p.armor.id].insul ?? 5) : 0;
     const cold = Math.max(0, (10 - insul) - t);        // degrees below comfort
     const hot = Math.max(0, t - 36);
     p.cold = cold; p.hot = hot;
@@ -1168,6 +1176,8 @@ class Game {
     || tip('cold', () => (p.cold || 0) > 3, 'You are getting cold. Fires, forges and Hide Armor keep you warm.')
     || tip('map', () => this.map.explored() > 0.05, 'Press M (🗺️) to open the map. Fog lifts as you explore.')
     || tip('volcano', () => volcanicAt(p.pos.x, p.pos.z) > 0.5, 'Ashfang Volcano: the heat drains water fast, and lava burns. Mine the black Obsidian here.')
+    || tip('swamp', () => (this.biome?.swamp || 0) > 0.5, 'Murkmire Swamp: thick fog and murky pools. Bogmaws lurk in the water. Pick Marsh Herbs for Healing Salves.')
+    || tip('frost', () => (this.biome?.frost || 0) > 0.5, 'Frostpeak: bitter cold up here. Fur Armor from Frosthorn pelts keeps you alive.')
     || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
   }
 
