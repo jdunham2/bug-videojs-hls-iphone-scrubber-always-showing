@@ -898,6 +898,7 @@ function disasterMeteor() {
   const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, WORLD - 200), ty = hitHome ? 1430 : rand(200, WORLD - 200);
   meteorFx(tx, ty);
   setTimeout(() => {
+    if (hitHome && !S.home) return; // moved out while the meteor was falling
     if (hitHome) { S.damaged = true; setDamaged(S.home, true); }
     const near = Math.hypot(P.x - tx, P.y - ty) < 120;
     if (near) S.injured = true;
@@ -1617,6 +1618,7 @@ const LAYOUTS = {
   home_mansion: homeLayout('mansion', 560, 380, { floor: ['checker', '#f0ece4', '#b9ad98'], wall: '#f6f1e6', trim: '#c9a23a', counter: '#2a2a30', bedFrame: '#c9a23a', blanket: '#3a4a6a', couch: '#5a2c6a', rug: '#a83a3a' }),
 };
 function enterBuilding(id) {
+  if (!ROOMS[id] && !LAYOUTS[id]) { console.warn('Compy Life: no interior for', id); const pl = PLACES[id]; if (pl && MENUS[id]) openMenu(pl); return; }
   if (driving) exitCar(true);
   const R = ROOMS[id] || buildRoom(id);
   if (inside) inside.g.visible = false;
@@ -1823,7 +1825,7 @@ function aiNext(c) {
 function recolorCar(c, color) {
   const pos = c.m.root.position.clone(); scene.remove(c.m.root);
   c.color = color; c.m = buildCar(color, c.model); scene.add(c.m.root); c.m.root.position.copy(pos);
-  if (c.owned) { S.car.color = color; }
+  if (c.owned) { S.car = S.car || {}; S.car.color = color; }
 }
 function buyCar(id) {
   const old = cars.find(c => c.owned);
