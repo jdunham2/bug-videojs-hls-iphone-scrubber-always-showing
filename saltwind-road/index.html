@@ -708,6 +708,9 @@ const GOODS = {
   trout:{name:"River Trout",base:18,col:'#8ab07a',kind:'good'},
   pike:{name:"Marsh Pike",base:24,col:'#6a8a4a',kind:'good'},
   seabass:{name:"Sea Bass",base:22,col:'#5a7a9a',kind:'good'},
+  scarab_amulet:{name:'Scarab Amulet',base:900,col:'#3ab0a0',kind:'trinket',desc:'+5% critical chance'},
+  sun_disc:{name:'Sun Disc',base:260,col:'#f0c040',kind:'good'},
+  desert_rose:{name:'Desert Rose',base:90,col:'#e0a090',kind:'good'},
   blossom_trout:{name:'Blossom Trout',base:45,col:'#f0a0c0',kind:'good'},
   sun_marlin:{name:'Sun Marlin',base:70,col:'#f0b040',kind:'good'},
   harvest_carp:{name:'Harvest Carp',base:50,col:'#d8782a',kind:'good'},
@@ -3139,7 +3142,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
-    else if (Math.random() < .05 + .04*gemSum('sapphire') + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    else if (Math.random() < .05 + .04*gemSum('sapphire') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3317,6 +3320,34 @@ function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
+}
+// ===== sandstorm relics =====
+let relics = [], relicT = 0;
+function updateRelics(dt) {
+  if (weatherNow() !== 'sandstorm') { if (relics.length && WX.type !== 'storm') relics = []; return; }
+  relicT -= dt; if (relicT > 0 || relics.length >= 3) return; relicT = 8;
+  for (let k = 0; k < 20; k++) { const a = Math.random()*6.283, r = 5 + Math.random()*7, x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H) continue; const t = map[idx(x, y)]; if (t !== T.DUNE && t !== T.SAND && t !== T.MESA) continue;
+    relics.push({x: x + .5, y: y + .6}); if (!S.relicHint) { S.relicHint = true; toast('<b>The sandstorm shifts the dunes...</b><br>Buried relics peek out of the sand nearby. Dig them up with a shovel before the storm covers them again!', 6000); } return; }
+}
+function relicTarget() {
+  const r = relics.find(r => Math.hypot(S.x - r.x, S.y - r.y - .2) < 1.2); if (!r) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (!toolTier('shovel')) return {key: 'relicN', html: 'A buried relic. You need a shovel to dig it up.', btn: '', fn: () => {}};
+  return {key: 'relic' + r.x + ',' + r.y, html: `${K}Dig up the buried relic`, btn: 'Dig', fn: () => {
+    relics = relics.filter(q => q !== r); S.relicsDug = (S.relicsDug || 0) + 1; burst(r.x, r.y - .2, '#d8b060', 16, 4); SFX.dig ? SFX.dig() : SFX.pickup();
+    const roll = Math.random(); let g, n = 1;
+    if (roll < .06 && !have('scarab_amulet')) g = 'scarab_amulet'; else if (roll < .25) g = 'sun_disc'; else if (roll < .5) g = 'desert_rose'; else if (roll < .75) { g = 'ancient_coin'; n = rint(1, 3); } else { g = 'pirate_gold'; }
+    addItem(g, n); gainXP(20); floatText(r.x, r.y - 1, `+${n} ${GOODS[g].name}`, '#f0c040'); if (g === 'scarab_amulet') { SFX.victory(); toast('<b>A Scarab Amulet!</b><br>An ancient charm of luck. +5% critical chance.', 5000); } renderHUD(); save();
+  }};
+}
+function drawRelic(r) {
+  const px = r.x*TS, py = r.y*TS;
+  ctx.fillStyle = 'rgba(90,60,30,.35)'; ctx.beginPath(); ctx.ellipse(px, py + 1, 10, 4, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#a07840'; ctx.beginPath(); ctx.ellipse(px, py, 8, 5, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(px - 8, py, 16, 2);
+  ctx.fillStyle = '#c89a58'; ctx.fillRect(px - 4, py - 4, 3, 1);
+  const gl = .5 + Math.sin(frameT*5 + r.x)*.5; ctx.fillStyle = `rgba(255,236,120,${gl})`; ctx.fillRect(px + 1, py - 6, 2, 2); ctx.fillRect(px, py - 5, 4, 1); ctx.fillRect(px + 1.5, py - 7, 1, 4);
+  ctx.fillStyle = '#8a6a3a'; ctx.fillRect(px + 2, py - 2, 3, 2);
 }
 // ===== rival duels =====
 const VEX_LINES = ['“First blood to the winner. Try to keep up.”', '“Lucky last time. Let’s see you do it again.”', '“I’ve been practising. Have you?”', '“No more holding back!”', '“This is it. Winner takes the title.”'];
@@ -3695,6 +3726,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Sandstorms', 'When storms sweep the desert, buried relics peek out of the dunes. Dig them up with a shovel before the storm ends: Sun Discs, Desert Roses, Ancient Coins and the rare Scarab Amulet.'],
   ['Seasonal fish', 'Some fish only bite in one season: Blossom Trout in spring, Sun Marlin on warm summer coasts, Harvest Carp in autumn, and Ice Pike in winter. The rare Aurora Char rises on winter nights in snowy waters.'],
   ['Rival duels', 'Vex the Bold in Crownfall challenges you to a duel once a day. Duels are fought in the arena and losing costs nothing. Climb five ranks to win Vex\u2019s own rapier.'],
   ['Cooking contest', 'Every third day of the week Chef Auguste in Greenstem judges a cooking contest. Match the weekly theme and bring dishes you cooked yourself for the best score.'],
@@ -3945,6 +3977,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
+  updateRelics(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -4668,6 +4701,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
@@ -5055,7 +5089,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -6700,7 +6734,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['sun_disc','desert_rose','scarab_amulet','rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy' && g !== 'challenge_token'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -8007,6 +8041,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['relics','Sand Sifter','Dig up 8 relics in sandstorms', () => (S.relicsDug || 0) >= 8],
   ['seasonfish','Angler for All Seasons','Catch all five seasonal fish', () => ['blossom_trout','sun_marlin','harvest_carp','ice_pike','aurora_char'].every(f => (S.fishLog || {})[f])],
   ['rival','Rivalry','Beat Vex the Bold in a duel', () => (S.vexRank || 0) >= 1],
   ['rivalchamp','Better Than Vex','Reach duel rank 5 against Vex', () => (S.vexRank || 0) >= 5],
@@ -8450,7 +8485,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
