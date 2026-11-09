@@ -391,7 +391,7 @@ function buildDistricts() {
   add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
   add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
   solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
-  buildSite(); buildPlazas(); buildIsland();
+  buildSite(); buildPlazas(); buildIsland(); buildBizProps();
   const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
   for (const { i, j, type } of districtList) {
     const [x0, y0, x1, y1] = blockRect(i, j), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -686,7 +686,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['boss', 'Buy your first business'], ['tycoon', 'Own all three businesses'], ['mogul', 'Earn $5,000 from your businesses'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -828,7 +828,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); seasonDaily(); rollWeather(); farmDaily(); marketDaily(); morningTexts(); if (has('fish')) S.happy += 3;
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); seasonDaily(); rollWeather(); farmDaily(); marketDaily(); bizDaily(); morningTexts(); if (has('fish')) S.happy += 3;
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -3137,6 +3137,7 @@ function drawBigMap() {
   if (trex) { g.font = '16px system-ui'; g.fillText('🦖', trex.x * k, trex.y * k); }
   if (festivalOn()) { g.font = '18px system-ui'; g.fillText('🎡', FEST.x * k, FEST.y * k - 14); }
   if (S.farm) { g.font = '14px system-ui'; g.fillText('🌱', 803 * k, 2930 * k); }
+  for (const bk of Object.keys(S.biz || {})) { g.font = '15px system-ui'; g.fillText({ truck: '🚚', wash: '🧽', taxi: '🚕' }[bk], BIZ[bk].spot[0] * k, BIZ[bk].spot[1] * k); }
   if (waypoint) { const x = waypoint.x * k, y = waypoint.y * k; g.strokeStyle = '#b07aff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 10, 0, 7); g.stroke(); }
   const px = (driving ? driving.x : P.x) * k, py = (driving ? driving.y : P.y) * k;
   g.save(); g.translate(px, py); g.rotate(driving ? driving.a : P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(10, 0); g.lineTo(-7, -7); g.lineTo(-3, 0); g.lineTo(-7, 7); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -3638,6 +3639,7 @@ function renderPhone() {
     const rows = people.map(n => `<button type="button" data-call="${n}" ${called[n] === S.day ? 'disabled' : ''}>📞 Call ${n}${called[n] === S.day ? ' (called today)' : ''}</button>`);
     rows.push(`<button type="button" data-svc="taxi" ${inside ? 'disabled' : ''}>🚕 Call a taxi${inside ? ' (go outside first)' : ' ($10+)'}</button>`);
     rows.push(`<button type="button" data-svc="pizza" ${S.money < 15 ? 'disabled' : ''}>🍕 Order pizza delivery ($15)</button>`);
+    for (const k of Object.keys(S.biz || {})) rows.push(`<button type="button" data-biz="${k}" ${(S.bizCall || {})[k] === S.day ? 'disabled' : ''}>📞 Call the ${BIZ[k].name} manager (${Math.round(S.biz[k].cond)}%)</button>`);
     if (cars.some(c => c.owned)) rows.push(`<button type="button" data-svc="tow" ${S.money < 40 || inside ? 'disabled' : ''}>🛻 Bring my car to me ($40)</button>`);
     box.innerHTML = rows.join('');
   }
@@ -3647,6 +3649,7 @@ function updatePhoneBadge() { const n = (S && S.texts || []).filter(t => !t.read
 function phoneClick(e) {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.dataset.tab) { phoneTab = b.dataset.tab; renderPhone(); return; }
+  if (b.dataset.biz) { const k = b.dataset.biz; S.bizCall = S.bizCall || {}; S.bizCall[k] = S.day; S.biz[k].cond = Math.min(100, S.biz[k].cond + 15); advance(10); log(`You talked the ${BIZ[k].name} manager through a few problems. Condition ${Math.round(S.biz[k].cond)}%.`, 'good'); renderPhone(); return; }
   if (b.dataset.call) {
     const n = b.dataset.call; S.called = S.called || {}; S.called[n] = S.day;
     if (S.partner && S.partner.name === n && !S.partner.roster) S.partner.rel = Math.min(100, S.partner.rel + 4); else addRel(n, 4);
@@ -4202,7 +4205,7 @@ function seasonDaily() { if (season() !== 'winter') S.snowmen = {}; }
 // ---- help ----
 const HELP = [
   ['Controls', 'Move with WASD or the arrow keys (on a phone, drag anywhere). E or Space to use things. M opens the town map, T opens your phone, G shows goals, F uses your gadget and Q switches it, H honks while driving, P or Esc pauses.'],
-  ['Making money', 'Get a job at the Job Center. Show up on weekdays and finish your shift tasks to get paid and promoted. Dino U unlocks better jobs. On the side: fish, farm at Fern Farm, dig for fossils on Volcano Island, trade stocks at Stone Bank, or win the demolition derby.'],
+  ['Making money', 'Get a job at the Job Center. Show up on weekdays and finish your shift tasks to get paid and promoted. Dino U unlocks better jobs. On the side: fish, farm at Fern Farm, dig for fossils on Volcano Island, trade stocks at Stone Bank, busk with a guitar, race at night, win the demolition derby, or buy a business at Nest Estates.'],
   ['Staying alive', 'Watch your energy, hunger and happiness. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. Rent the burrow or buy a house at Nest Estates.'],
   ['People', 'Townsfolk hang out all over the map. Chat every day, give gifts they love (flowers, chocolates, plushies), go on dates, propose, hatch eggs and raise your kids until they leave the nest. Friends text you invites: show up on time!'],
   ['Getting around', 'Buy a car at Dino Motors, steal one (risky), call a taxi from your phone, or take the ferry from the beach dock to Volcano Island. Tap a place on the map to set a waypoint.'],
@@ -4299,6 +4302,70 @@ function autoSave() { if (S && state !== 'title' && !chase && !derby) save(); }
 addEventListener('pagehide', autoSave);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autoSave(); });
 
+// ---------- own a business: food truck, car wash, taxi company ----------
+const BIZ = {
+  truck: { name: 'Fern Food Truck', price: 3000, lo: 70, hi: 150, spot: [3880, 2700], where: 'on the beach', weather: { heat: 1.6, sunny: 1.2, rain: 0.5, storm: 0.3, snow: 0.6, cloudy: 0.9 } },
+  wash:  { name: 'Splash Car Wash', price: 8000, lo: 140, hi: 280, spot: [2290, 900], where: 'next to Dino Gas', weather: { heat: 1.2, sunny: 1.3, rain: 0.25, storm: 0.15, snow: 0.5, cloudy: 1 } },
+  taxi:  { name: 'Ptero Taxi Co.', price: 20000, lo: 380, hi: 650, spot: [2900, 1010], where: 'next to Ptero Pizza', weather: { heat: 1, sunny: 1, rain: 1.4, storm: 1.5, snow: 1.3, cloudy: 1 } },
+};
+let bizG = null, bizKey = '';
+function buildBizProps() {
+  bizG = group(scene, 0, 0, 0);
+  const [tx, ty] = BIZ.truck.spot; const t = group(bizG, tx, 0, ty);
+  add(t, GEO.b, '#7fd8ff', 0, 22, 0, 80, 36, 34); add(t, GEO.b, '#7fd8ff', 50, 16, 0, 24, 24, 32); add(t, GEO.b, '#ffe066', 0, 26, 17.5, 50, 16, 1);
+  add(t, GEO.b, '#ff6ad5', 0, 32, 24, 56, 2, 14); for (const [x, z] of [[-26, -17], [26, -17], [-26, 17], [26, 17], [52, -16], [52, 16]]) add(t, GEO.y, '#1a1a1a', x, 7, z, 7, 4, 7, Math.PI / 2, 0, 0);
+  solids.push({ x0: tx - 44, y0: ty - 20, x1: tx + 64, y1: ty + 20 });
+  const [wx, wy] = BIZ.wash.spot; const w = group(bizG, wx, 0, wy - 110);
+  add(w, GEO.b, '#2e86c1', 0, 30, 0, 140, 60, 120); add(w, GEO.b, '#1a1a1a', 0, 22, 61, 70, 44, 2); add(w, GEO.b, '!#7fd8ff', 0, 52, 61, 120, 10, 2);
+  for (let i = 0; i < 5; i++) add(w, GEO.s, '#bfe8ff', -50 + i * 25, 64, 0, 10, 10, 10);
+  solids.push({ x0: wx - 70, y0: wy - 170, x1: wx + 70, y1: wy - 50 });
+  const [cx, cy] = BIZ.taxi.spot; const c = group(bizG, cx, 0, cy - 20);
+  add(c, GEO.b, '#f1c40f', 0, 20, 0, 60, 40, 40); add(c, GEO.b, '#1a1a1a', 0, 42, 0, 66, 4, 46); add(c, GEO.b, '!#bfe3ff', 0, 24, 20.5, 40, 14, 1);
+  for (const dx of [-80, 80]) { add(c, GEO.b, '#f1c40f', dx, 10, 0, 64, 12, 30); add(c, GEO.b, '#f1c40f', dx, 20, 0, 34, 10, 28); add(c, GEO.b, '#1a1a1a', dx, 27, 0, 14, 4, 8); }
+  solids.push({ x0: cx - 32, y0: cy - 42, x1: cx + 32, y1: cy + 2 });
+  for (const [k, B] of Object.entries(BIZ)) { const s = new THREE.Mesh(new THREE.PlaneGeometry(90, 20), new THREE.MeshBasicMaterial({ map: signTexture(B.name.toUpperCase(), '#1a1a1a', '#ffe066') })); s.position.set(B.spot[0], 64, B.spot[1] - (k === 'wash' ? 48 : k === 'taxi' ? 0 : 26)); s.userData.biz = k; bizG.add(s); B.sign = s; }
+  syncBiz();
+}
+function syncBiz() {
+  if (!bizG) return;
+  const key = Object.keys(S && S.biz || {}).join();
+  if (key === bizKey) return; bizKey = key;
+  for (const [k, B] of Object.entries(BIZ)) B.sign.material.color.set(S && S.biz && S.biz[k] ? '#ffffff' : '#7a7a7a');
+}
+function bizSpots() {
+  if (!S || !S.biz || inside || driving) return [];
+  return Object.entries(S.biz).map(([k, b]) => ({ x: BIZ[k].spot[0], y: BIZ[k].spot[1] + 30, label: `Check on your ${BIZ[k].name} (${Math.round(b.cond)}%)`, biz: k }));
+}
+function checkBiz(k) {
+  const b = S.biz[k];
+  if (b.visitDay === S.day) { log(`You already checked on the ${BIZ[k].name} today. Everything is running smoothly.`, ''); return; }
+  b.visitDay = S.day; b.cond = Math.min(100, b.cond + 40); advance(30); S.happy += 3;
+  const tip = Math.round(rand(10, 40)); S.money += tip;
+  log(`You checked in at the ${BIZ[k].name}: restocked, fixed a squeaky door, cheered up the staff. Condition ${Math.round(b.cond)}%. You pocket ${money$(tip)} from today's till.`, 'good'); sfx.coin();
+}
+function bizDaily() {
+  if (!S.biz) return;
+  let total = 0; const parts = [];
+  for (const [k, b] of Object.entries(S.biz)) {
+    const B = BIZ[k], wf = B.weather[S.weather] || 1, inc = Math.round(rand(B.lo, B.hi) * (0.3 + 0.7 * b.cond / 100) * wf);
+    total += inc; parts.push(`${B.name} ${money$(inc)}`); b.cond = Math.max(0, b.cond - 9); b.earned = (b.earned || 0) + inc;
+    if (b.cond < 25 && Math.random() < 0.5) text(`${B.name} manager`, 'Boss, things are falling apart here. Please come by!');
+  }
+  S.money += total; S.bizEarned = (S.bizEarned || 0) + total;
+  text('Business report', `Yesterday: ${parts.join(', ')}. Total ${money$(total)}.`);
+  if (S.bizEarned >= 5000) goal('mogul');
+}
+function bizActs() {
+  if (!open(8, 19)) return [];
+  return Object.entries(BIZ).map(([k, B]) => {
+    const own = S.biz && S.biz[k];
+    return { label: own ? `${B.name} (yours)` : `Buy the ${B.name}`, detail: own ? `Condition ${Math.round(own.cond)}%. Earned ${money$(own.earned || 0)} so far. Visit it ${B.where} to keep it running.` : `Earns about ${money$(B.lo)} to ${money$(B.hi)} a day ${B.where}. Visit often to keep it in good shape. Weather matters.`, tag: own ? 'Owned' : money$(B.price), cost: own ? 0 : B.price, why: own ? 'You own this business.' : '',
+      fn: () => { S.biz = S.biz || {}; S.biz[k] = { cond: 80, visitDay: 0, earned: 0, bought: S.day }; goal('boss'); if (Object.keys(S.biz).length === 3) goal('tycoon'); sfx.goal(); queueEvent({ kind: 'good', title: `You own the ${B.name}!`, text: `It will pay out every morning. Swing by ${B.where} to check in and keep it running well, or call the manager from your phone.`, sound: 'goal' }); syncBiz(); } };
+  });
+}
+const _realtyM = MENUS.realty;
+MENUS.realty = p => { const m = _realtyM(p); m.acts.push(...bizActs()); return m; };
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -4343,6 +4410,7 @@ function useNear() {
   if ('trick' in nearPlace) { trickOrTreat(nearPlace); return; }
   if ('snow' in nearPlace) { buildSnowman(nearPlace); return; }
   if (nearPlace.busk) { playSong(false); return; }
+  if (nearPlace.biz) { checkBiz(nearPlace.biz); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -4385,6 +4453,7 @@ function update(dt) {
   for (const st of trickSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 12; if (d < best) { best = d; nearPlace = st; } }
   for (const st of snowSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
   for (const st of buskSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of bizSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -4483,7 +4552,7 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
-  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots(); syncDigs(); applySeason(); syncSpooky(); syncSnowmen();
+  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots(); syncDigs(); applySeason(); syncSpooky(); syncSnowmen(); syncBiz();
   if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
   carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
   if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
@@ -4603,7 +4672,7 @@ function hud() {
     if (nearRaceStart()) what = 'Start a street race ($30, nights only)';
     else if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig || 'trick' in np || 'snow' in np || np.busk) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig || 'trick' in np || 'snow' in np || np.busk || np.biz) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
