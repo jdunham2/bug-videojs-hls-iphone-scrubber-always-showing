@@ -2982,7 +2982,8 @@ function updateCombat(dt, night) {
   player.inv = Math.max(0, player.inv - dt);
   if (player.swing) { player.swing.t -= dt; if (player.swing.t <= 0) player.swing = null; }
   player.sinceHit += dt;
-  const safe = !!townAt(S.x, S.y, 8);
+  const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
+  if (S.raid) updateRaid(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -3040,7 +3041,7 @@ function updateCombat(dt, night) {
       if (e.wt <= 0) { e.wt = 1.5 + Math.random()*2; const a = Math.random()*6.28; const still = Math.random() < .35; e.wx = still ? 0 : Math.cos(a)*.4; e.wy = still ? 0 : Math.sin(a)*.4; }
       mx = e.wx; my = e.wy;
     }
-    const walk = e.minion ? bossWalk : enemyWalk;
+    const walk = e.raid ? raidWalk : e.minion ? bossWalk : enemyWalk;
     const nx = e.x + (mx*sp + e.kx)*dt, ny = e.y + (my*sp + e.ky)*dt;
     if (walk(nx, e.y)) e.x = nx; else e.wt = 0;
     if (walk(e.x, ny)) e.y = ny; else e.wt = 0;
@@ -3049,7 +3050,7 @@ function updateCombat(dt, night) {
     if (mx || my) e.phase += dt*10;
     e.cd -= dt; e.hurt = Math.max(0, e.hurt - dt);
     if (d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg * (e.dmgMul || 1), e); e.cd = 1.1; }
-    if (d > 34 && !e.dungeon) e.dead = true;
+    if (d > 34 && !e.dungeon && !e.raid) e.dead = true;
   }
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
@@ -3936,6 +3937,55 @@ function update(dt) {
 }
 const isTouch = matchMedia('(pointer:coarse)').matches;
 
+function raidTown() { return S.raid && S.raid.active ? S.raid.town : null; }
+function maybeStartRaid() {
+  if (S.day < 4 || S.arena || Math.random() > .3) return;
+  const opts = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].small && k !== 'wren');
+  if (!opts.length) return;
+  const k = opts[Math.floor(Math.random()*opts.length)];
+  S.raid = {town: k, day: S.day, wave: 0, active: false, t: 0};
+  setTimeout(() => { toast(`<b>Raiders attack ${TOWNS[k].name}!</b><br>A breathless messenger begs for help. Defend the town before tomorrow. (Marked on your map.)`, 8000); SFX.roar(); }, 1800);
+}
+function raidWave() {
+  const R0 = S.raid, tw = TOWNS[R0.town]; R0.wave++; R0.live = true;
+  const pool = (TOWN_ENEMIES[R0.town] || ['bandit']).filter(t => ENEMIES[t] && !ENEMIES[t].passive), lv = 1 + (S.level || 1)*.08;
+  const n = 2 + R0.wave*2;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random()*6.28, r = 3 + Math.random()*4;
+    let x = tw.x + .5 + Math.cos(a)*r, y = tw.y + 1 + Math.sin(a)*r;
+    if (!raidWalk(x, y)) { x = tw.x + .5; y = tw.y + 3; }
+    const e = makeEnemy(pick(pool), x, y, {raid: true, alert: true});
+    e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = Math.min(2.2, lv);
+    if (R0.wave === 3 && i === 0) { makeElite(e); e.raidBoss = true; }
+    enemies.push(e);
+  }
+  SFX.roar(); shake = .3;
+  toast(`<b>${tw.name} · raid wave ${R0.wave}/3</b>${R0.wave === 3 ? '<br>The raid captain joins the fight!' : ''}`, 3000);
+}
+function updateRaid(dt) {
+  const R0 = S.raid; if (!R0) return;
+  const tw = TOWNS[R0.town], d = Math.hypot(S.x - tw.x, S.y - tw.y);
+  if (!R0.active) { if (d < 12 && !inDungeon() && !inArena()) { R0.active = true; R0.t = 1; } else return; }
+  if (Math.random() < dt*6) { const hs = houses.filter(h => h.town === R0.town), h = hs[Math.floor(Math.random()*hs.length)]; if (h) burst(h.x + .5 + Math.random(), h.y + .2, Math.random() < .5 ? '#ff7a2a' : '#5a5a5a', 2, 2); }
+  if (R0.live) {
+    if (!enemies.some(e => e.raid && !e.dead)) {
+      R0.live = false; R0.t = 3;
+      if (R0.wave >= 3) {
+        const c = 150 + (S.level || 1)*20, g = tw.produce[0]; S.coins += c; addItem(g, 4); addRep(R0.town, .6); S.raidsWon = (S.raidsWon || 0) + 1; gainXP(200);
+        if (Math.random() < .5) addItem('treasure_map', 1);
+        SFX.victory(); burst(S.x, S.y - .6, '#e3a948', 30, 6);
+        toast(`<b>${tw.name} is saved!</b><br>The townsfolk cheer. <span style="color:var(--good)">+${c} coin, +4 ${GOODS[g].name}</span>, and their eternal thanks.`, 8000);
+        S.raid = null; renderHUD(); save(); return;
+      }
+    }
+  } else if (d < 14) { R0.t -= dt; if (R0.t <= 0) raidWave(); }
+}
+function raidWalk(x, y) {
+  const tx = Math.floor(x), ty = Math.floor(y), t = tileAt(tx, ty);
+  if (t == null || t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.LAVA || t === T.VOID) return false;
+  if (S.placed.length) { const q = placedAt(tx, ty); if (q && PLACE[q.t].solid) return false; }
+  return !ESTATE_TILES.has(idx(tx, ty));
+}
 function newDay() {
   S.day++;
   for (const n of NPCS) if (n.trader) {
@@ -3948,6 +3998,8 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
+  if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
+  else maybeStartRaid();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}`);
   save();
 }
@@ -5096,6 +5148,7 @@ function openMap() {
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  if (S.raid) { const t = TOWNS[S.raid.town], rx = (t.x + .5)*s, ry = (t.y + .5)*s; g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(rx, ry, (9 + Math.sin(frameT*6)*2)*dpr, 0, 7); g.globalAlpha = .45; g.fill(); g.globalAlpha = 1; g.fillStyle = '#ff7a4a'; g.fillText('Under attack!', rx, ry + 20*dpr); }
   if (S.tmap) { const tx = (S.tmap.x + .5)*s, ty = (S.tmap.y + .5)*s, r = 6*dpr; g.strokeStyle = '#0d131b'; g.lineWidth = 5*dpr; g.beginPath(); g.moveTo(tx - r, ty - r); g.lineTo(tx + r, ty + r); g.moveTo(tx + r, ty - r); g.lineTo(tx - r, ty + r); g.stroke(); g.strokeStyle = '#ff4a3a'; g.lineWidth = 2.5*dpr; g.stroke(); g.fillStyle = '#ff4a3a'; g.fillText('Treasure', tx, ty - 9*dpr); }
   const dkm = inDungeon(), pm = dkm ? {x: DUNGEONS[dkm].entrance.x + .5, y: DUNGEONS[dkm].entrance.y + .5} : S;
   g.fillStyle = '#ffffff'; g.beginPath(); g.arc(pm.x*s, pm.y*s, 4*dpr, 0, 7); g.fill();
@@ -5719,7 +5772,7 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
-  ['angler','Angler','Catch 10 kinds of fish', () => Object.keys(S.fishLog || {}).length >= 10],
+  ['fishlog','Fish Collector','Catch 10 kinds of fish', () => Object.keys(S.fishLog || {}).length >= 10],
   ['masterangler','Master Angler','Catch every kind of fish', () => FISH_LOG_IDS.every(id => (S.fishLog || {})[id])],
   ['gladiator','Gladiator','Survive 10 waves in the arena', () => (S.arenaBest || 0) >= 10],
   ['arenachamp','Arena Champion','Survive 20 waves in the arena', () => (S.arenaBest || 0) >= 20],
@@ -5740,7 +5793,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
-  ['angler','Angler','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
+  ['defender','Defender','Save a town from a raid', () => (S.raidsWon || 0) >= 1],
+  ['guardian','Guardian of the Realm','Save towns from 10 raids', () => (S.raidsWon || 0) >= 10],
+  ['fishlog','Fish Collector','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
   ['goldcarp','Golden Hook','Land a Golden Carp', () => (S.goldcarps || 0) >= 1],
   ['seasons','A Year on the Road','See all four seasons', () => S.day >= 22],
 ];
