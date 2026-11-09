@@ -644,7 +644,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -740,7 +740,7 @@ function advance(mins, opts = {}) {
     mins -= stepM; S.min += stepM;
     const hrs = stepM / 60;
     if (!opts.sleeping) S.energy -= hrs * (opts.work ? 4 : S.injured ? 3.5 : 2);
-    S.hunger -= hrs * (opts.sleeping ? 1 : 2.5);
+    S.hunger -= hrs * (opts.sleeping ? 1 : 2.5) * (S.weather === 'heat' && !opts.sleeping ? 1.4 : 1);
     if (S.hunger <= 0) { S.hunger = 0; S.happy -= hrs * 4; S.starve += hrs; } else S.starve = 0;
     if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
     S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
@@ -786,7 +786,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1);
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather();
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -982,6 +982,7 @@ const MENUS = {
   },
   grocer: () => open(7, 22) ? { sub: 'Fresh ferns, beetles and eggs (not those eggs).', acts: [
     ...holdUpAct(200, 500),
+    { label: 'Buy an umbrella', detail: S.umbrella ? 'You already have one.' : 'Stay dry on rainy days. Yours forever.', why: S.umbrella ? 'You already have one.' : '', cost: 12, mins: 5, fn: () => { S.umbrella = true; log('You bought a red umbrella. Bring on the rain.', 'good'); } },
     { label: 'Buy flowers (gift)', detail: `A fresh bouquet for someone special. You have ${(S.gifts || {}).flowers || 0}.`, cost: 10, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.flowers = (S.gifts.flowers || 0) + 1; } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
     { label: 'Grab a snack', detail: '+20 hunger right now', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } },
@@ -1365,7 +1366,7 @@ const LAYOUTS = {
     b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
     b.station(370, 100, 'Produce stand', ['Shoplift']);
     b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
-    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Hold up']);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Hold up']);
     b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
     b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
   } },
@@ -3080,6 +3081,7 @@ function drawBigMap() {
   }
   for (const t of gigTargets()) { g.fillStyle = t.color; g.beginPath(); g.arc(t.x * k, t.y * k, 6, 0, 7); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.stroke(); }
   if (trex) { g.font = '16px system-ui'; g.fillText('🦖', trex.x * k, trex.y * k); }
+  if (festivalOn()) { g.font = '18px system-ui'; g.fillText('🎡', FEST.x * k, FEST.y * k - 14); }
   if (waypoint) { const x = waypoint.x * k, y = waypoint.y * k; g.strokeStyle = '#b07aff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 10, 0, 7); g.stroke(); }
   const px = (driving ? driving.x : P.x) * k, py = (driving ? driving.y : P.y) * k;
   g.save(); g.translate(px, py); g.rotate(driving ? driving.a : P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(10, 0); g.lineTo(-7, -7); g.lineTo(-3, 0); g.lineTo(-7, 7); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -3328,6 +3330,149 @@ Object.assign(LAYOUTS, {
   } },
 });
 
+// ---------- weather and the Saturday Fern Festival ----------
+const WEATHER = {
+  sunny:  { name: 'Sunny', icon: '☀️' },
+  cloudy: { name: 'Cloudy', icon: '☁️' },
+  rain:   { name: 'Rainy', icon: '🌧' },
+  storm:  { name: 'Thunderstorm', icon: '⛈' },
+  heat:   { name: 'Heatwave', icon: '🔥' },
+};
+function rollWeather() {
+  const r = Math.random();
+  S.weather = r < 0.42 ? 'sunny' : r < 0.62 ? 'cloudy' : r < 0.82 ? 'rain' : r < 0.9 ? 'storm' : 'heat';
+  S.soak = 0;
+  const w = S.weather;
+  if (w === 'rain') log(`Forecast: rain all day. ${S.umbrella ? 'Good thing you have an umbrella.' : 'An umbrella from the grocer would help.'}`, '');
+  if (w === 'storm') log('Forecast: thunderstorms. Stay inside when the lightning starts.', 'warn');
+  if (w === 'heat') log('Forecast: a heatwave! You will get hungry faster. Perfect day for ice cream.', 'warn');
+}
+const isWet = () => S && (S.weather === 'rain' || S.weather === 'storm');
+let flashT = 0, boltT = 6, umbM = null, rainSeed = [];
+for (let i = 0; i < 170; i++) rainSeed.push([Math.random(), Math.random(), 0.6 + Math.random() * 0.8]);
+function weatherUpdate(dt) {
+  if (!S) return;
+  flashT = Math.max(0, flashT - dt * 3);
+  const outside = !inside && !driving;
+  if (S.weather === 'storm' && !inside) {
+    boltT -= dt;
+    if (boltT <= 0) {
+      boltT = rand(6, 14); flashT = 1; setTimeout(() => sfx.crash(), 350);
+      if (outside && Math.random() < 0.12) { S.energy -= 15; S.happy -= 8; burst(P.x, P.y, 30, 30, '#fff6a8', 140, 4); shake = 10; log('ZAP! Lightning struck right next to you. Your scales are standing on end.', 'bad'); }
+    }
+  }
+  if (isWet() && outside && !S.umbrella && S.soakedDay !== S.day) {
+    S.soak = (S.soak || 0) + dt * 4;
+    if (S.soak > 50) { S.soakedDay = S.day; S.happy -= 6; S.energy -= 5; log('You are soaked to the scales. An umbrella would help (grocer or gas station).', 'warn'); }
+  }
+  festivalUpdate(dt);
+}
+function syncUmbrella() {
+  const show = S && isWet() && S.umbrella && !inside && !driving && state !== 'title';
+  if (!umbM && show) {
+    umbM = group(scene, 0, 0, 0);
+    add(umbM, GEO.y, '#3a2a20', 0, 30, 0, 0.8, 26, 0.8);
+    add(umbM, GEO.c, '#c0392b', 0, 44, 0, 12, 6, 12);
+  }
+  if (umbM) { umbM.visible = !!show; if (show) umbM.position.set(P.x - Math.cos(P.face) * 4, 0, P.y - Math.sin(P.face) * 4); }
+}
+function drawWeather(g) {
+  if (!S || state === 'title') return;
+  if (!inside && isWet()) {
+    g.fillStyle = S.weather === 'storm' ? 'rgba(20,30,50,.22)' : 'rgba(40,55,75,.14)'; g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(200,220,255,.45)'; g.lineWidth = 1.2; g.beginPath();
+    const n = S.weather === 'storm' ? 170 : 110;
+    for (let i = 0; i < n; i++) { const [a, b, s] = rainSeed[i]; const x = (a * W + gameT * 90 * s) % W, y = (b * H + gameT * 900 * s) % H; g.moveTo(x, y); g.lineTo(x - 5, y + 16); }
+    g.stroke();
+  }
+  if (!inside && S.weather === 'heat') { g.fillStyle = 'rgba(255,170,60,.07)'; g.fillRect(0, 0, W, H); }
+  if (flashT > 0) { g.fillStyle = `rgba(255,255,255,${flashT * 0.55})`; g.fillRect(0, 0, W, H); }
+}
+function weatherLight() {
+  if (!S || inside) return;
+  if (isWet() || S.weather === 'cloudy') { SKY.lerp(_c2.set('#7a8696'), S.weather === 'cloudy' ? 0.3 : 0.55); scene.fog.color.copy(SKY); sun.intensity *= S.weather === 'cloudy' ? 0.75 : 0.55; }
+  if (festivalOn() && hour() >= 21) { SKY.lerp(_c2.set('#141838'), 0.6); scene.fog.color.copy(SKY); sun.intensity *= 0.45; hemi.intensity *= 0.7; }
+  if (flashT > 0) hemi.intensity += flashT * 1.5;
+}
+// ---- Saturday Fern Festival in the town square ----
+const festivalOn = () => S && weekday() === 5 && hour() >= 10 && hour() < 23;
+const FEST = { x: 900, y: 920 };
+let festG = null, fwT = 0;
+const FEST_STALLS = [
+  { x: 730, y: 900, label: 'Ring toss ($5)', color: '#e74c3c', fn: () => festRing() },
+  { x: 1070, y: 900, label: 'Pie-eating contest ($10)', color: '#f1c40f', fn: () => festPie() },
+  { x: 760, y: 1040, label: 'Dance floor', color: '#9b59b6', fn: () => festDance() },
+  { x: 1040, y: 1040, label: 'Food truck', color: '#27ae60', fn: () => festFood() },
+  { x: 1090, y: 790, label: 'Raffle booth ($5)', color: '#3498db', fn: () => festRaffle() },
+];
+function buildFestival() {
+  festG = group(scene, 0, 0, 0);
+  for (const s of FEST_STALLS) {
+    const t = group(festG, s.x, 0, s.y);
+    for (const [dx, dz] of [[-22, -16], [22, -16], [-22, 16], [22, 16]]) add(t, GEO.y, '#f6f0e2', dx, 18, dz, 1.5, 36, 1.5);
+    add(t, GEO.pyr, s.color, 0, 46, 0, 40, 18, 32, 0, Math.PI / 4, 0);
+    add(t, GEO.b, '#7a5534', 0, 8, 12, 44, 16, 8);
+  }
+  // string lights around the square
+  for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2; add(festG, GEO.s, ['!#ff6ad5', '!#ffe066', '!#7fd8ff', '!#8fdc6a'][i % 4], FEST.x + Math.cos(a) * 190, 44 + Math.sin(i * 1.7) * 3, FEST.y + Math.sin(a) * 160, 3, 3, 3).castShadow = false; }
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; add(festG, GEO.y, '#5a3a24', FEST.x + Math.cos(a) * 190, 22, FEST.y + Math.sin(a) * 160, 1.5, 44, 1.5); }
+  const sg = new THREE.Mesh(new THREE.PlaneGeometry(130, 26), new THREE.MeshBasicMaterial({ map: signTexture('FERN FESTIVAL', '#ff6ad5', '#ffffff') })); sg.position.set(FEST.x, 70, FEST.y + 170); festG.add(sg);
+  festG.visible = false;
+}
+function festSpot(i) { const a = i / ROSTER.length * Math.PI * 2 + 0.3; return [FEST.x + Math.cos(a) * 165, FEST.y + Math.sin(a) * 135]; }
+function festivalUpdate(dt) {
+  const on = festivalOn();
+  if (!festG) buildFestival();
+  if (festG.visible !== on) { festG.visible = on; if (on && !inside) log('The Fern Festival is on in the town square today! Games, food, dancing and fireworks at 9 PM.', 'good'); }
+  rosterMs.forEach((r, i) => { const [x, y] = on ? festSpot(i) : r.p.spot; r.x = x; r.y = y; });
+  if (on && hour() >= 21 && !inside && Math.hypot(cam.x - FEST.x, cam.y - FEST.y) < 1400) {
+    fwT -= dt;
+    if (fwT <= 0) {
+      fwT = rand(0.4, 0.9); const c = pick(['#ff6ad5', '#ffe066', '#7fd8ff', '#8fdc6a', '#ff7a3a']), x = FEST.x + rand(-220, 220), y = FEST.y + rand(-60, 160), h = rand(110, 190);
+      for (let k = 0; k < 36; k++) { const a = k / 36 * Math.PI * 2; particles.push({ x, y, z: h, vx: Math.cos(a) * 150, vy: Math.sin(a) * 90, vz: Math.sin(a) * 120 + rand(-20, 20), life: 1.4, max: 1.4, color: c, size: 4.5, g: 30 }); }
+      sfx.whoosh();
+      if (!S.fireworksDay || S.fireworksDay !== S.day) { S.fireworksDay = S.day; S.happy += 10; log('Fireworks over the town square! Everyone goes "ooooh".', 'good'); }
+    }
+  }
+}
+function festStalls() { return festivalOn() && !inside && !driving ? FEST_STALLS.map(s => ({ ...s, fest: true })) : []; }
+function festRing() {
+  if (S.money < 5) { log('Ring toss costs $5.', 'warn'); return; }
+  S.money -= 5;
+  minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.5, zone: [0.45, 0.57], hits: 0, misses: 0, need: 3, flash: 0, label: 'RING TOSS', help: 'Press E when the marker is over the bottle', mins: 15, what: 'Three ringers in a row', fail: 'Every ring bounced off.',
+    onDone: (ok, msg) => { if (ok) { S.gifts = S.gifts || {}; S.gifts.plush = (S.gifts.plush || 0) + 1; S.happy += 6; log(`${msg}! You win a plush T-rex (a gift).`, 'good'); sfx.goal(); } else log(msg, 'warn'); } };
+  state = 'mini'; setScreens();
+}
+function festPie() {
+  if (S.festPieDay === S.day) { log('You already entered the pie contest today. Your belly agrees.', 'warn'); return; }
+  if (S.money < 10) { log('The pie contest costs $10.', 'warn'); return; }
+  S.money -= 10; S.festPieDay = S.day;
+  minigame = { kind: 'mash', p: 0, t: 6, label: 'PIE-EATING CONTEST', help: 'Mash E (or tap) to eat faster than everyone else', mins: 20, what: 'You finished first, face covered in fern pie', fail: 'Okra beat you by one bite.',
+    onDone: (ok, msg) => { S.hunger = Math.min(100, S.hunger + 40); if (ok) { S.money += 75; S.happy += 12; goal('festival'); log(`${msg}! You win $75 and a blue ribbon.`, 'good'); sfx.goal(); } else { S.happy += 3; log(msg, 'warn'); } } };
+  state = 'mini'; setScreens();
+}
+function festDance() {
+  minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.7, zone: [0.38, 0.54], hits: 0, misses: 0, need: 5, flash: 0, label: 'DANCE-OFF', help: 'Press E on the beat to bust a move', mins: 30, what: 'The crowd goes wild', fail: 'You tripped over your own tail.',
+    onDone: (ok, msg) => {
+      if (ok) { S.happy += 18; for (const r of rosterMs) if (relOf(r.p.name) > 0) addRel(r.p.name, 3); if (S.partner) partnerRel(8); goal('festival'); log(`${msg}! Everyone you know saw your moves.${S.partner ? ` ${S.partner.name} danced with you.` : ''}`, 'good'); }
+      else { S.happy += 4; log(`${msg} Still fun though.`, ''); }
+    } };
+  state = 'mini'; setScreens();
+}
+function festFood() {
+  queueEvent({ kind: '', tag: 'Fern Festival', title: 'Food truck', text: 'Smells amazing. What will it be?', sound: 'door', buttons: [
+    { label: 'Fried beetles on a stick ($6)', alt: true, disabled: S.money < 6, fn: () => { S.money -= 6; S.hunger = Math.min(100, S.hunger + 30); S.happy += 4; log('Crunchy. Delicious.', 'good'); } },
+    { label: 'Giant fern candy floss ($8)', alt: true, disabled: S.money < 8, fn: () => { S.money -= 8; S.hunger = Math.min(100, S.hunger + 15); S.happy += 10; S.energy = Math.min(100, S.energy + 10); log('Pure sugar. You feel like you could fly.', 'good'); } },
+    { label: 'No thanks' }] });
+}
+function festRaffle() {
+  if (S.festRaffleDay === S.day) { log('One raffle ticket per festival. Good luck!', 'warn'); return; }
+  if (S.money < 5) { log('Raffle tickets cost $5.', 'warn'); return; }
+  S.money -= 5; S.festRaffleDay = S.day;
+  if (Math.random() < 0.1) { S.money += 400; sfx.goal(); queueEvent({ kind: 'good', title: 'You won the raffle!', text: 'Your number was called! The grand prize is $400 and a very large novelty cheque.', sound: 'goal' }); }
+  else log('Your raffle ticket did not win. Maybe next week.', '');
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -3363,6 +3508,7 @@ function useNear() {
   if ('ward' in nearPlace) { treatPatient(nearPlace); return; }
   if (nearPlace.gig) { doGig(nearPlace); return; }
   if (nearPlace.roster) { talkTo(nearPlace.roster); return; }
+  if (nearPlace.fest) { nearPlace.fn(); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -3397,6 +3543,7 @@ function update(dt) {
   for (const p of (inside ? inside.stations : Object.values(PLACES))) { const pt = p.door || p, d = Math.hypot(P.x - pt.x, P.y - pt.y); if (d < best) { best = d; nearPlace = p; } }
   for (const t of gigTargets()) { const d = Math.hypot(P.x - t.x, P.y - t.y) - 10; if (d < best) { best = d; nearPlace = t; } }
   for (const st of wardStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 6; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of festStalls()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 16; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -3405,7 +3552,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate();
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -3433,7 +3580,7 @@ function updateTownLife(dt) {
   }
 }
 function updateFx(dt) {
-  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= 500 * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; }
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= (p.g ?? 500) * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; }
   particles = particles.filter(p => p.life > 0);
   if (fallingTree) { fallingTree.k = Math.min(1, fallingTree.k + dt * 0.9); const e = fallingTree.k * fallingTree.k; fallingTree.t.rotation.x = e * 1.35; if (fallingTree.k >= 1) { burst(fallingTree.t.position.x, fallingTree.t.position.z - 110, 10, 30, '#3c8240', 200, 4); fallingTree = null; } }
   if (meteor) {
@@ -3519,6 +3666,7 @@ function arrowTo(g, tx, ty, color, label) {
 }
 function drawOverlay() {
   const g = fctx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+  drawWeather(g);
   if (state === 'title') return;
   for (const p of particles) { const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue; g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color; g.beginPath(); g.arc(s.x, s.y, p.size, 0, 7); g.fill(); }
   g.globalAlpha = 1; g.textAlign = 'center';
@@ -3536,6 +3684,7 @@ function drawOverlay() {
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
   drawWaypoint(g);
+  for (const t of festStalls()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 700) continue; const l2 = toScreen(t.x, 62, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = '#ffe08a'; g.fillText(t.label, l2.x, l2.y); } }
   if (S.site && !inside) {
     for (const st of siteStations()) { const s2 = toScreen(st.x, 0, st.y); if (s2.ok) { g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); } const l2 = toScreen(st.x, 36, st.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, l2.x, l2.y); g.fillStyle = '#f1c40f'; g.fillText(st.label, l2.x, l2.y); } arrowTo(g, st.x, st.y, '#f1c40f', 'SITE'); }
     if (!siteTask()) { const d = PLACES.builders.door; arrowTo(g, d.x, d.y, '#f1c40f', 'CLOCK OUT'); }
@@ -3574,7 +3723,7 @@ function drawMini() {
   g.save(); g.translate(P.x * k, P.y * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 function hud() {
-  $('whenDay').textContent = `Day ${S.day} · ${DAYS[weekday()]} ${clock(S.min)}`;
+  $('whenDay').textContent = `Day ${S.day} · ${DAYS[weekday()]} ${clock(S.min)} ${WEATHER[S.weather || 'sunny'].icon}`;
   const mEl = $('money'); mEl.textContent = money$(S.money); mEl.style.color = S.money < 0 ? 'var(--blood)' : 'var(--leaf)';
   $('enBar').style.width = S.energy + '%'; $('huBar').style.width = S.hunger + '%'; $('haBar').style.width = S.happy + '%';
   const J = jobInfo(), chips = [];
@@ -3602,7 +3751,7 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
@@ -3676,7 +3825,7 @@ function frame(now) {
   if (state !== 'play') { if (state === 'title') trafficUpdate(dt); }
   if (state === 'title') for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } }
   shake = Math.max(0, shake - dt * 30);
-  lighting(); fadeView(dt); sync3D();
+  lighting(); weatherLight(); fadeView(dt); sync3D(); syncUmbrella();
   renderer.render(scene, camera);
   drawOverlay();
   if (S && state !== 'title') { S.pos = { x: P.x, y: P.y }; hud(); }
