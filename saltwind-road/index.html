@@ -507,6 +507,8 @@ const GOODS = {
   challenge_token:{name:'Challenge Token',base:0,col:'#e85a8a',kind:'trophy'},
   victors_cape:{name:"Victor's Cape",base:2000,col:'#c83a5a',kind:'trinket',desc:'+6% damage and +5% speed'},
   blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
+  spyglass:{name:'Spyglass',base:600,col:'#c8a050',kind:'trinket',desc:'See farther as you explore'},
+  explorers_atlas:{name:"Explorer's Atlas",base:2000,col:'#8a5a3a',kind:'trinket',desc:'+8% speed; a map of everything'},
   phantom_cutlass:{name:'Phantom Cutlass',base:1400,col:'#9af0c0',kind:'weapon',dmg:12,cd:.3,reach:1.6,crit:.1,lifesteal:.1},
   ghost_tricorn:{name:'Ghostly Tricorn',base:1000,col:'#5a8a7a',kind:'armor',slot:'head',armor:4,crit:.08},
   cursed_doubloon:{name:'Cursed Doubloon',base:90,col:'#9ad8b0',kind:'good'},
@@ -2818,7 +2820,7 @@ const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0);
 const canClimb = () => toolTier('climb') > 0;
@@ -2853,7 +2855,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -3281,6 +3283,23 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== cartography =====
+const SURVEY = [[5,150],[10,250],[15,350,'spyglass'],[20,450],[30,700],[40,900],[50,1200],[60,1500],[70,1800,'explorers_atlas'],[80,2500]];
+let landTiles = 0;
+function mapPct() {
+  if (!landTiles) for (let i = 0; i < W*WORLD_H; i++) if (map[i] !== T.DEEP) landTiles++;
+  let n = 0; for (let i = 0; i < W*WORLD_H; i++) if (S.explored[i] && map[i] !== T.DEEP) n++;
+  return Math.floor(n/landTiles*1000)/10;
+}
+const surveyNext = () => { const k = SURVEY.find(([p]) => !(S.surveys || {})[p]); return k ? k[0] : null; };
+function surveyTalk(n) {
+  const pct = mapPct(), due = SURVEY.filter(([p]) => pct >= p && !(S.surveys || {})[p]), nx = surveyNext();
+  if (!due.length) { say(`“Let's see your map... ${pct}% of the land charted. Good work, but come back when you reach <b>${nx ?? 100}%</b>${nx ? '' : '... though I doubt anyone ever will'}.”<br><span style="color:var(--muted)">Wendell buys surveys at ${SURVEY.map(s => s[0] + '%').join(', ')}.</span>`, [back(n)]); return; }
+  S.surveys = S.surveys || {}; let coins = 0; const items = [];
+  for (const [p, c, it] of due) { S.surveys[p] = true; coins += c; if (it && GOODS[it]) { addItem(it, 1); items.push(GOODS[it].name); } }
+  S.coins += coins; gainXP(coins/5); SFX.victory(); renderHUD(); save();
+  say(`Wendell pores over your map, muttering happily. “${pct}%! Marvellous, marvellous. Nobody's charted the ${pct > 40 ? 'far reaches' : 'back country'} this well in years.”<br><br><span style="color:var(--good)">+${coins} coin${items.length ? ', <b>' + items.join('</b>, <b>') + '</b>' : ''}</span>${nx != null && surveyNext() != null ? `<br><span style="color:var(--muted)">Next survey at ${surveyNext()}%.</span>` : ''}`, [back(n)]);
+}
 // ===== Old Peg's cursed doubloons =====
 const DOUBLOON_SHOP = [['phantom_cutlass',1,8],['ghost_tricorn',1,6],['pirate_gold',2,2],['treasure_map',2,2],['black_pearl_ring',1,10],['grog',4,1]];
 function doubloonShop(n) {
@@ -3489,6 +3508,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Cartography', 'Wendell the cartographer in Lantern Bay buys your map survey each time you chart more of the land (5%, 10%, 15% and so on). Big milestones earn a Spyglass and the Explorer\u2019s Atlas.'],
   ['Wishing wells & treasure goblins', 'Wishing wells in Port Wren, Maplehold, Prismvale and Greenstem grant a random blessing once a day for 10 coin. Rare Treasure Goblins flee with sacks of loot: catch one before it escapes through its portal. Old Peg in Blackwater trades Cursed Doubloons from the ghost ship for pirate treasure.'],
   ['Balloon rides', 'Balloonists in Port Wren, Frostgate, Crownfall, Tidewatch, Prismvale and Farhaven fly you between their stations, even to towns you have not found yet, and reveal the land below.'],
   ['Monster dens', 'Dens out in the wild keep spawning monsters while you are near. Smash a den for coin and materials. Destroyed dens rebuild after a week.'],
@@ -5125,6 +5145,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
@@ -7751,6 +7772,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['surveyor','Surveyor','Chart 30% of the land', () => !!(S.surveys || {})[30]],
   ['wisher','Make a Wish','Toss coins into wishing wells on 7 days', () => (S.wishes || 0) >= 7],
   ['goblin','Grabby Hands','Catch a Treasure Goblin', () => (S.killsBy.goblin || 0) >= 1],
   ['aeronaut','Aeronaut','Take 3 balloon rides', () => (S.balloonRides || 0) >= 3],
