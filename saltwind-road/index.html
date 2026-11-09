@@ -1927,6 +1927,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'pennyworth',town:'crownfall',dx:4,dy:2,name:'Banker Pennyworth',role:'Crownfall Bank',cols:{cloak:'#2a2a3a',skin:'#e8d0b8',hair:'#c8c8c8'},banker:true,freeSpot:true,
+   hello:["Your coin is safe with us.","Interest compounds daily, you know.","Ah, a valued customer."], rumors:["Coin in the bank can't be lost if you're knocked out on the road. Just saying."]},
   {id:'mara',town:'tidewatch',dx:4,dy:-2,name:'Old Mara',role:'Lighthouse keeper',cols:{cloak:'#2a4a6a',skin:'#d8b090',hair:'#d0d0d0'},keeper:true,freeSpot:true,
    hello:["Mind the rocks, sailor.","The light's been dark for twenty years.","Every ship deserves a light to come home by."], rumors:["When the Tidewatch light still burned, sailors came from every port. Now they wreck on the rocks instead."]},
   {id:'opaline',town:'prismvale',dx:3,dy:3,name:'Opaline',role:'Gem cutter',cols:{cloak:'#7a4aa0',skin:'#e8c8b0',hair:'#f0f0ff'},gemcutter:true,freeSpot:true,
@@ -3303,6 +3305,42 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== the bank =====
+const bankRate = () => .01 + (facPerk('league') >= 2 ? .005 : 0);
+const loanMax = () => 800 + (S.level || 1)*120;
+function bankTalk(n) {
+  const b = S.bank || 0, L = S.loan;
+  say(`“Welcome to the Crownfall Bank. We pay <b>${(bankRate()*100).toFixed(1)}%</b> interest every morning (up to 400 coin a day), and money in the bank is never lost if you're knocked out.”<br><br>Savings: <b>${b} coin</b> · Purse: <b>${S.coins} coin</b>${L ? `<br><span style="color:#e88a5a">Loan: ${L.owe} coin due by day ${L.due}.</span>` : ''}`, [
+    {label: 'Deposit 100', disabled: S.coins < 100, fn: () => { S.coins -= 100; S.bank = b + 100; renderHUD(); save(); bankTalk(n); }},
+    {label: 'Deposit all', disabled: S.coins < 1, fn: () => { S.bank = b + S.coins; S.coins = 0; SFX.coin(); renderHUD(); save(); bankTalk(n); }},
+    {label: 'Withdraw 100', disabled: b < 100, fn: () => { S.bank = b - 100; S.coins += 100; renderHUD(); save(); bankTalk(n); }},
+    {label: 'Withdraw all', disabled: b < 1, fn: () => { S.coins += b; S.bank = 0; SFX.coin(); renderHUD(); save(); bankTalk(n); }},
+    L ? {label: `Repay loan (${L.owe}◆)`, primary: true, disabled: S.coins < L.owe, fn: () => { S.coins -= L.owe; S.loan = null; S.loansRepaid = (S.loansRepaid || 0) + 1; SFX.victory(); renderHUD(); save(); say('“Paid in full! A pleasure doing business.”', [back(n)]); }}
+      : {label: `Take a loan (${loanMax()}◆, repay ${Math.round(loanMax()*1.15)} within 7 days)`, fn: () => { S.loan = {owe: Math.round(loanMax()*1.15), due: S.day + 7}; S.coins += loanMax(); SFX.coin(); renderHUD(); save(); bankTalk(n); }},
+    back(n)]);
+}
+function bankDay() {
+  let msg = '';
+  if (S.bank > 0) { const i = Math.min(400, Math.floor(S.bank*bankRate())); S.bank += i; S.bankInterest = (S.bankInterest || 0) + i; if (i) msg += ` Bank interest: <b>+${i}</b>.`; }
+  if (S.loan && S.day > S.loan.due) {
+    let owe = S.loan.owe; const fromBank = Math.min(S.bank || 0, owe); S.bank = (S.bank || 0) - fromBank; owe -= fromBank; const fromPurse = Math.min(S.coins, owe); S.coins -= fromPurse; owe -= fromPurse;
+    S.loan = owe > 0 ? {owe: Math.round(owe*1.1), due: S.day + 3} : null; addRep('crownfall', -.4);
+    msg += owe > 0 ? ` <span style="color:#e88a5a">Your loan is overdue! The bank seized what it could; ${Math.round(owe*1.1)} coin is still owed.</span>` : ' <span style="color:#e88a5a">Your overdue loan was collected from your savings.</span>';
+  }
+  return msg;
+}
+// ===== mayors =====
+const canRunMayor = t => ['walls','market','inn'].every(k => improved(t, k)) && repOf(t) >= 4.5 && S.coins >= 1500;
+function mayorTalk(n) {
+  const t = n.town, imp = ['walls','market','inn'].filter(k => improved(t, k)).length;
+  say(`“Mayor? Of ${TOWNS[t].name}? Well... the folk do love you. If you've built up the town and they trust you, I'd back you. A campaign costs 1500 coin for the feast and the posters.”<br><div class="req" style="margin-top:8px"><span>Town improvements <b class="${imp >= 3 ? 'ok' : 'no'}">${imp}/3</b></span><span>Standing <b class="${repOf(t) >= 4.5 ? 'ok' : 'no'}">${repOf(t).toFixed(1)}/4.5</b></span><span>1500◆ <b class="${S.coins >= 1500 ? 'ok' : 'no'}">${S.coins}</b></span></div><span style="color:var(--muted)">A mayor collects town taxes every morning.</span>`, [
+    {label: 'Run for mayor!', primary: canRunMayor(t), disabled: !canRunMayor(t), fn: () => {
+      S.coins -= 1500; S.mayor = S.mayor || {}; S.mayor[t] = S.day; SFX.victory(); for (let i = 0; i < 6; i++) setTimeout(() => burst(S.x, S.y - .5, ['#f0c040','#e04a4a','#4a8ad8'][i % 3], 20, 5), i*220);
+      renderHUD(); save(); say(`The votes are counted... it's a landslide! <b>You are the Mayor of ${TOWNS[t].name}!</b><br>Townsfolk cheer in the square. You'll collect <b>${mayorTax()} coin</b> in taxes every morning.`, [back(n)]);
+    }}, back(n)]);
+}
+const mayorTax = () => 80 + (S.level || 1)*8;
+function mayorDay() { const k = Object.keys(S.mayor || {}).length; if (!k) return ''; const c = k*mayorTax(); S.coins += c; return ` Mayoral taxes: <b>+${c}</b>.`; }
 // ===== Tidewatch lighthouse =====
 const LIGHT_STAGES = [
   {name: 'Rebuild the stairs', cost: {stone: 20, planks: 10}, coins: 150, txt: 'The rotten stair is torn out and new steps spiral up the tower.'},
@@ -3587,6 +3625,7 @@ function legendSpawns() {
   }
 }
 const EARNED_TITLES = [
+  ['mayor', 'Mayor'],
   ['legendary', 'Legend of Saltwind'], ['king', 'King of the Castle'], ['mythslayer', 'Mythslayer'], ['arenachamp', 'Arena Champion'],
   ['masterangler', 'Master Angler'], ['pirate', 'Pirate King'], ['tycoon', 'Real Estate Tycoon'], ['champion', 'Champion'],
   ['guardian', 'Guardian of the Realm'], ['blacksmith', 'Master Smith'], ['digger', 'Deep Digger'], ['gambler', 'High Roller'],
@@ -3594,8 +3633,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Bank & mayors', 'Banker Pennyworth in Crownfall pays daily interest on savings, which are safe when you are knocked out, and lends coin for a week. Fully improve a town and earn top standing, and its elder will back you for mayor: mayors collect taxes every morning.'],
   ['The lighthouse', 'Old Mara in Tidewatch needs help restoring the lighthouse in three steps. Once it is lit again your boat sails 15% faster.'],
   ['The Headless Horseman', 'On autumn nights, beware the roads outside town. The Headless Horseman rides once a night, hurling flaming pumpkins. Defeat him to claim his steed, the Nightmare.'],
   ['Gem sockets', 'Turn Cut Gems into Rubies, Sapphires, Emeralds, Topaz or Amethysts at a workbench. Opaline in Prismvale sets one gem into each piece of gear for lasting bonuses while you wear it.'],
@@ -5138,7 +5178,8 @@ function newDay() {
   else maybeStartRaid();
   rollMarket();
   titanDay(); ghostDay();
-  toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}`);
+  const bankMsg = bankDay() + mayorDay();
+  toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}${bankMsg}`);
   save();
 }
 
@@ -5257,6 +5298,8 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.banker) o.push({label: `The bank (${S.bank || 0}◆ saved)`, primary: !!S.loan, fn: () => bankTalk(n)});
+  if (isElder(n) && !(S.mayor || {})[n.town]) o.push({label: 'Run for mayor', primary: canRunMayor(n.town), fn: () => mayorTalk(n)});
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
@@ -7889,6 +7932,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['banker','Nest Egg','Save 5000 coin in the bank', () => (S.bank || 0) >= 5000],
+  ['mayor','Mayor','Be elected mayor of a town', () => Object.keys(S.mayor || {}).length >= 1],
   ['lighthouse','Keeper of the Light','Restore the Tidewatch lighthouse', () => (S.lighthouse || 0) >= 3],
   ['horseman','Sleepy Hollow','Defeat the Headless Horseman', () => (S.horsemen || 0) >= 1],
   ['jeweled','Bejeweled','Socket gems into 4 pieces of gear', () => Object.keys(S.sockets || {}).length >= 4],
