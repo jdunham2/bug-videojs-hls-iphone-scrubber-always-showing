@@ -118,7 +118,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
       <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
-      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare. On a phone, drag on the left to move and tap ENTER.</p>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare (half the time nobody sees). On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
   </div>
@@ -190,8 +190,8 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-const WORLD = 3060;
-const ROADS = [600, 1200, 1860, 2460];
+const WORLD = 4260;
+const ROADS = [600, 1200, 1860, 2460, 3060, 3660];
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -269,18 +269,35 @@ function facadeTextures(wall, win) {
 // ---------- town ----------
 // the east side and southern suburbs, added when the town grew
 const GAS_PUMPS = [{ x: 1990, y: 1010 }, { x: 2060, y: 1010 }, { x: 2130, y: 1010 }];
-const SUBURB_BLOCKS = [[0, 3], [1, 3], [3, 3], [4, 3], [0, 4], [2, 4], [3, 4]];
-const blockRect = (i, j) => { const e = [0, ...ROADS, WORLD]; return [e[i] + (i ? 75 : 20), e[j] + (j ? 75 : 20), e[i + 1] - (i < 4 ? 75 : 20), e[j + 1] - (j < 4 ? 75 : 20)]; };
+// every block outside the original town and the east side is filled from this map
+const NB = ROADS.length + 1;
+const DISTRICTS = {
+  '4,2': 'lake', '0,3': 'petshop', '1,3': 'suburb', '2,3': 'lake', '3,3': 'suburb', '4,3': 'suburb', '5,3': 'lake',
+  '0,4': 'suburb', '1,4': 'farm', '2,4': 'suburb', '3,4': 'suburb', '4,4': 'forest', '5,4': 'suburb',
+  '5,0': 'suburb', '5,1': 'forest', '5,2': 'suburb',
+  '0,5': 'suburb', '1,5': 'forest', '2,5': 'suburb', '3,5': 'stadium', '4,5': 'suburb', '5,5': 'farm',
+  '0,6': 'farm', '1,6': 'suburb', '2,6': 'lake', '3,6': 'suburb', '4,6': 'forest', '5,6': 'suburb',
+};
+for (let j = 0; j < NB; j++) DISTRICTS[`6,${j}`] = 'beach';
+const districtList = Object.entries(DISTRICTS).map(([k, type]) => { const [i, j] = k.split(',').map(Number); return { i, j, type }; });
+const blockRect = (i, j) => { const e = [0, ...ROADS, WORLD]; return [e[i] + (i ? 75 : 20), e[j] + (j ? 75 : 20), e[i + 1] - (i < NB - 1 ? 75 : 20), e[j + 1] - (j < NB - 1 ? 75 : 20)]; };
+const lakeOf = (i, j) => { const [x0, y0, x1, y1] = blockRect(i, j); return [(x0 + x1) / 2, (y0 + y1) / 2, Math.min(200, (x1 - x0) * 0.36), Math.min(150, (y1 - y0) * 0.28)]; };
 const districtTrees = [];
 function drawDistricts(g, R, k) {
-  for (const [i, j] of SUBURB_BLOCKS) { const [x0, y0, x1, y1] = blockRect(i, j); g.fillStyle = '#69a852'; R(x0, y0, x1 - x0, y1 - y0); g.fillStyle = '#b9b2a6'; R(x0 + 20, (y0 + y1) / 2 - 12, x1 - x0 - 40, 24); }
+  const ell = (cx, cy, rx, ry, c) => { g.fillStyle = c; g.beginPath(); g.ellipse(cx * k, cy * k, rx * k, ry * k, 0, 0, 7); g.fill(); };
+  for (const { i, j, type } of districtList) {
+    const [x0, y0, x1, y1] = blockRect(i, j);
+    if (type === 'suburb') { g.fillStyle = '#69a852'; R(x0, y0, x1 - x0, y1 - y0); g.fillStyle = '#b9b2a6'; R(x0 + 20, (y0 + y1) / 2 - 12, x1 - x0 - 40, 24); }
+    if (type === 'lake') { const [cx, cy, rx, ry] = lakeOf(i, j); ell(cx, cy, rx + 18, ry + 18, '#c9b48a'); ell(cx, cy, rx, ry, '#3d7fb0'); }
+    if (type === 'farm') for (let y = y0; y < y1 - 120; y += 28) { g.fillStyle = Math.floor((y - y0) / 28) % 2 ? '#7aa83a' : '#a8843a'; R(x0 + 20, y, (x1 - x0) * 0.6, 24); }
+    if (type === 'forest') { g.fillStyle = '#4a8a3a'; R(x0, y0, x1 - x0, y1 - y0); }
+    if (type === 'stadium') { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; ell(cx, cy, (x1 - x0) * 0.42, (y1 - y0) * 0.42, '#7a7f88'); ell(cx, cy, (x1 - x0) * 0.3, (y1 - y0) * 0.28, '#4fa04a'); g.fillStyle = '#f2f2f2'; R(cx - 2, cy - (y1 - y0) * 0.26, 4, (y1 - y0) * 0.52); }
+    if (type === 'beach') { g.fillStyle = '#cdb47a'; R(x0 - 20, y0 - 80, x1 - x0 + 60, y1 - y0 + 160); }
+    if (type === 'petshop') { g.fillStyle = '#7ab85a'; R(x0 + 360, y0 + 40, x1 - x0 - 380, 260); }
+  }
   g.fillStyle = '#8a8f96'; R(1940, 870, 260, 270);
   g.fillStyle = '#9a7a52'; R(2150, 1290, 250, 470);
   g.fillStyle = '#c9b48a'; R(1950, 1260, 160, 30);
-  const lake = (cx, cy, rx, ry) => { g.fillStyle = '#c9b48a'; g.beginPath(); g.ellipse(cx * k, cy * k, (rx + 18) * k, (ry + 18) * k, 0, 0, 7); g.fill(); g.fillStyle = '#3d7fb0'; g.beginPath(); g.ellipse(cx * k, cy * k, rx * k, ry * k, 0, 0, 7); g.fill(); };
-  lake(2780, 1520, 190, 150); lake(1530, 2160, 220, 150);
-  const [fx0, fy0, fx1, fy1] = blockRect(1, 4);
-  for (let y = fy0; y < fy1 - 120; y += 28) { g.fillStyle = Math.floor((y - fy0) / 28) % 2 ? '#7aa83a' : '#a8843a'; R(fx0 + 20, y, (fx1 - fx0) * 0.6, 24); }
 }
 function buildDistricts() {
   place('museum', 'Fossil Museum', 1950, 140, 2370, 500, 130, 1, { wall: '#d9cfb8', win: '#2c3038', sign: '#6a5a3a', roof: '#8a7e66' });
@@ -298,46 +315,64 @@ function buildDistricts() {
   add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
   add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
   solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
-  // construction site: fence, crane, girders, cones
-  for (const [x0, z0, x1, z1] of [[2150, 1290, 2190, 1294], [2260, 1290, 2400, 1294], [2150, 1290, 2154, 1760], [2396, 1290, 2400, 1760], [2150, 1756, 2400, 1760]]) { add(scene, GEO.b, '#c9c9cf', (x0 + x1) / 2, 18, (z0 + z1) / 2, x1 - x0, 36, z1 - z0); solids.push({ x0, y0: z0, x1, y1: z1 }); }
-  add(scene, GEO.b, '#f1c40f', 2340, 160, 1650, 18, 320, 18); add(scene, GEO.b, '#f1c40f', 2260, 320, 1650, 260, 10, 10); add(scene, GEO.b, '#555555', 2370, 312, 1650, 30, 20, 20);
-  add(scene, GEO.y, '#2a2a2a', 2180, 250, 1650, 0.8, 140, 0.8); add(scene, GEO.b, '#c0392b', 2180, 176, 1650, 40, 6, 6);
-  solids.push({ x0: 2328, y0: 1638, x1: 2352, y1: 1662 });
-  for (let i = 0; i < 4; i++) { add(scene, GEO.b, '#c0392b', 2230, 6 + i * 8, 1450 + (i % 2) * 6, 120, 6, 10); }
-  solids.push({ x0: 2168, y0: 1440, x1: 2292, y1: 1465 });
-  add(scene, GEO.y, '#9a9aa0', 2240, 22, 1560, 22, 28, 22); solids.push({ x0: 2218, y0: 1538, x1: 2262, y1: 1582 });
-  for (const [x, z] of [[2205, 1310], [2245, 1310], [2185, 1380], [2300, 1520]]) add(scene, GEO.c, '#ff7a1a', x, 7, z, 5, 14, 5);
-  // lakes (you cannot walk on water)
-  for (const [cx, cy, rx, ry] of [[2780, 1520, 190, 150], [1530, 2160, 220, 150]]) {
-    const w = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: '#3d7fb0', transparent: true, opacity: 0.85 }));
-    w.rotation.x = -Math.PI / 2; w.position.set(cx, 1, cy); w.scale.set(rx, ry, 1); scene.add(w);
-    solids.push({ x0: cx - rx * 0.8, y0: cy - ry * 0.75, x1: cx + rx * 0.8, y1: cy + ry * 0.75 });
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; districtTrees.push([cx + Math.cos(a) * (rx + 60), cy + Math.sin(a) * (ry + 55), 0.8 + srand() * 0.3]); }
-    add(scene, GEO.b, '#7a5534', cx, 7, cy + ry + 30, 50, 4, 14);
-  }
-  // suburbs: rows of little houses nobody lets you into
+  buildSite();
   const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
-  for (const [i, j] of SUBURB_BLOCKS) {
-    const [x0, y0, x1, y1] = blockRect(i, j);
-    for (const hx of [x0 + 120, x1 - 120]) for (const hy of [y0 + 110, y1 - 110]) {
-      const w = 110, d = 90, h = 48 + srand() * 20, hg = group(scene, hx, 0, hy);
-      add(hg, GEO.b, houseCols[Math.floor(srand() * houseCols.length)], 0, h / 2, 0, w, h, d);
-      add(hg, GEO.pyr, roofCols[Math.floor(srand() * roofCols.length)], 0, h + 22, 0, 86, 44, 72, 0, Math.PI / 4, 0);
-      add(hg, GEO.b, '#5a3a24', 0, 16, hy < (y0 + y1) / 2 ? d / 2 + 1 : -d / 2 - 1, 18, 32, 2);
-      const box = { x0: hx - w / 2, y0: hy - d / 2, x1: hx + w / 2, y1: hy + d / 2 }; solids.push(box);
-      const mats = []; hg.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
-      fadeables.push({ x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 });
-      districtTrees.push([hx + (srand() < 0.5 ? -1 : 1) * 85, hy + (srand() - 0.5) * 60, 0.7 + srand() * 0.3]);
+  for (const { i, j, type } of districtList) {
+    const [x0, y0, x1, y1] = blockRect(i, j), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    if (type === 'suburb') {
+      // little houses nobody lets you into
+      for (const hx of [x0 + 120, x1 - 120]) for (const hy of [y0 + 110, y1 - 110]) {
+        const w = 110, d = 90, h = 48 + srand() * 20, hg = group(scene, hx, 0, hy);
+        add(hg, GEO.b, houseCols[Math.floor(srand() * houseCols.length)], 0, h / 2, 0, w, h, d);
+        add(hg, GEO.pyr, roofCols[Math.floor(srand() * roofCols.length)], 0, h + 22, 0, 86, 44, 72, 0, Math.PI / 4, 0);
+        add(hg, GEO.b, '#5a3a24', 0, 16, hy < cy ? d / 2 + 1 : -d / 2 - 1, 18, 32, 2);
+        const box = { x0: hx - w / 2, y0: hy - d / 2, x1: hx + w / 2, y1: hy + d / 2 }; solids.push(box);
+        const mats = []; hg.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+        fadeables.push({ x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 });
+        districtTrees.push([hx + (srand() < 0.5 ? -1 : 1) * 85, hy + (srand() - 0.5) * 60, 0.7 + srand() * 0.3]);
+      }
+    } else if (type === 'lake') {
+      const [lx, ly, rx, ry] = lakeOf(i, j);
+      const w = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: '#3d7fb0', transparent: true, opacity: 0.85 }));
+      w.rotation.x = -Math.PI / 2; w.position.set(lx, 1, ly); w.scale.set(rx, ry, 1); scene.add(w);
+      solids.push({ x0: lx - rx * 0.8, y0: ly - ry * 0.75, x1: lx + rx * 0.8, y1: ly + ry * 0.75 });
+      for (let n = 0; n < 12; n++) { const a = n / 12 * Math.PI * 2; districtTrees.push([lx + Math.cos(a) * (rx + 60), ly + Math.sin(a) * (ry + 55), 0.8 + srand() * 0.3]); }
+      add(scene, GEO.b, '#7a5534', lx, 7, ly + ry + 30, 50, 4, 14);
+    } else if (type === 'farm') {
+      add(scene, GEO.b, '#b0473a', x1 - 110, 40, y1 - 110, 120, 80, 100); add(scene, GEO.pyr, '#5a3f28', x1 - 110, 100, y1 - 110, 95, 40, 80, 0, Math.PI / 4, 0);
+      add(scene, GEO.y, '#c9c9cf', x1 - 30, 70, y1 - 200, 26, 140, 26);
+      solids.push({ x0: x1 - 170, y0: y1 - 160, x1: x1 - 50, y1: y1 - 60 }, { x0: x1 - 56, y0: y1 - 226, x1: x1 - 4, y1: y1 - 174 });
+    } else if (type === 'forest') {
+      for (let n = 0; n < 40; n++) districtTrees.push([x0 + 40 + srand() * (x1 - x0 - 80), y0 + 40 + srand() * (y1 - y0 - 80), 0.8 + srand() * 0.6]);
+    } else if (type === 'stadium') {
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.15, 1, 40, 1, true), new THREE.MeshLambertMaterial({ color: '#c9c9cf', side: THREE.DoubleSide }));
+      st.position.set(cx, 30, cy); st.scale.set((x1 - x0) * 0.42, 60, (y1 - y0) * 0.42); st.castShadow = true; scene.add(st);
+      add(scene, GEO.b, '#c0392b', cx, 64, cy - (y1 - y0) * 0.42, 160, 10, 4);
+      solids.push({ x0: x0 + 40, y0: y0 + 40, x1: x1 - 40, y1: y1 - 40 });
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(160, 35), new THREE.MeshBasicMaterial({ map: signTexture('RAPTORS STADIUM', '#c0392b', '#ffffff') })); sg.position.set(cx, 86, cy + (y1 - y0) * 0.43); scene.add(sg);
+    } else if (type === 'beach') {
+      for (let n = 0; n < 7; n++) {
+        const px = x0 + 40 + srand() * (x1 - x0 - 80), pz = y0 + 40 + srand() * (y1 - y0 - 80), lean = (srand() - 0.5) * 0.5;
+        const palm = group(scene, px, 0, pz); add(palm, GEO.y, '#9a7442', 0, 45, 0, 5, 90, 5, 0, 0, lean);
+        for (let l = 0; l < 6; l++) { const a = l / 6 * Math.PI * 2; add(palm, GEO.c, '#3f9a3a', Math.cos(a) * 18 + lean * 40, 88, Math.sin(a) * 18, 6, 40, 3, Math.sin(a) * 1.3, 0, -Math.cos(a) * 1.3); }
+      }
+      for (let n = 0; n < 4; n++) {
+        const ux = x0 + 60 + srand() * (x1 - x0 - 120), uz = y0 + 60 + srand() * (y1 - y0 - 120), col = pick(['#c0392b', '#2e86c1', '#f1c40f', '#ff6ad5']);
+        add(scene, GEO.y, '#f6f0e2', ux, 20, uz, 1.5, 40, 1.5); add(scene, GEO.c, col, ux, 42, uz, 30, 12, 30);
+        add(scene, GEO.b, col, ux + 20, 0.8, uz + 10, 30, 1, 16).castShadow = false;
+      }
+    } else if (type === 'petshop') {
+      place('petshop', 'Pet Nest', x0 + 40, y0 + 70, x0 + 320, y0 + 300, 60, -1, { wall: '#f6c4d6', win: '#2a2433', sign: '#7a3a5a', awning: '#ff6ad5' });
+      // Bark Park: a fenced lawn for pets
+      const px0 = x0 + 360, py0 = y0 + 40, px1 = x1 - 20, py1 = y0 + 300;
+      for (const [a0, b0, a1, b1] of [[px0, py0, px1, py0 + 3], [px0, py1 - 3, px1, py1], [px1 - 3, py0, px1, py1]]) add(scene, GEO.b, '#d6c4a0', (a0 + a1) / 2, 10, (b0 + b1) / 2, a1 - a0, 20, b1 - b0);
+      add(scene, GEO.s, '#f1c40f', (px0 + px1) / 2, 4, (py0 + py1) / 2, 4, 4, 4);
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(70, 16), new THREE.MeshBasicMaterial({ map: signTexture('BARK PARK', '#3f8a3a', '#ffffff') })); sg.position.set(px0 + 50, 26, py1 + 2); scene.add(sg);
     }
   }
-  // Fern Farm
-  const [fx0, fy0, fx1, fy1] = blockRect(1, 4);
-  add(scene, GEO.b, '#b0473a', fx1 - 110, 40, fy1 - 110, 120, 80, 100); add(scene, GEO.pyr, '#5a3f28', fx1 - 110, 100, fy1 - 110, 95, 40, 80, 0, Math.PI / 4, 0);
-  add(scene, GEO.y, '#c9c9cf', fx1 - 30, 70, fy1 - 200, 26, 140, 26);
-  solids.push({ x0: fx1 - 170, y0: fy1 - 160, x1: fx1 - 50, y1: fy1 - 60 }, { x0: fx1 - 56, y0: fy1 - 226, x1: fx1 - 4, y1: fy1 - 174 });
-  // a small forest
-  const [qx0, qy0, qx1, qy1] = blockRect(4, 4);
-  for (let i = 0; i < 40; i++) districtTrees.push([qx0 + 40 + srand() * (qx1 - qx0 - 80), qy0 + 40 + srand() * (qy1 - qy0 - 80), 0.8 + srand() * 0.6]);
+  // the ocean past the beach
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(8000, 14000), new THREE.MeshLambertMaterial({ color: '#3d8fc0' }));
+  sea.rotation.x = -Math.PI / 2; sea.position.set(WORLD + 4000, 0.3, WORLD / 2); scene.add(sea);
 }
 const solids = [], facadeMats = [], lampMats = [], signs = [], fadeables = [];
 function collide(o, r, list) {
@@ -471,7 +506,7 @@ function buildTown() {
   for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; tree(900 + Math.cos(a) * 230, 920 + Math.sin(a) * 200, 0.8 + srand() * 0.3); }
   for (const [x, z] of [[100, 560], [520, 560], [700, 560], [1100, 560], [1280, 560], [1700, 560], [100, 1040], [520, 1040], [1300, 1040], [1720, 1040], [1520, 1760], [1500, 1600], [400, 1680], [150, 1700]]) tree(x, z, 0.85);
   for (const ix of ROADS) for (const iy of ROADS) for (const [dx, dz] of [[-70, -70], [70, -70], [-70, 70], [70, 70]]) { lists.pole.push([ix + dx, 40, iy + dz, 2.2, 80, 2.2]); lists.lamp.push([ix + dx, 82, iy + dz, 6, 4.5, 6]); }
-  for (let i = 0; i < 110; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
+  for (let i = 0; i < 220; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
   lists.bush = lists.bush.filter(([x, , z]) => !solids.some(b => x > b.x0 - 20 && x < b.x1 + 20 && z > b.y0 - 20 && z < b.y1 + 20) && ROADS.every(r => Math.abs(x - r) > 90 && Math.abs(z - r) > 90) && !(z > 1250 && x > 640 && x < 1180) && !(x > 1930 && x < 2420 && z > 860 && z < 1150));
   for (const [x, z, s] of districtTrees) tree(x, z, s);
   const inst = (geo, m, list, cast) => { const im = new THREE.InstancedMesh(geo, m, list.length); list.forEach(([x, y, z, sx, sy, sz], i) => { dummy.position.set(x, y, z); dummy.rotation.set(0, i, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); }); im.castShadow = cast; im.receiveShadow = true; scene.add(im); return im; };
@@ -480,7 +515,7 @@ function buildTown() {
   const lampM = new THREE.MeshBasicMaterial({ color: '#c9c3a8' }); lampMats.push(lampM); inst(GEO.s, lampM, lists.lamp, false);
   inst(GEO.ico, mat('#356a32'), lists.bush, true);
   // distant hills
-  for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2, r = 2500 + srand() * 500; add(scene, GEO.ico, '#4a7a40', WORLD / 2 + Math.cos(a) * r, 0, WORLD / 2 + Math.sin(a) * r, 300 + srand() * 200, 160 + srand() * 140, 300 + srand() * 200); }
+  for (let i = 0; i < 50; i++) { const a = i / 50 * Math.PI * 2, r = WORLD * 0.72 + srand() * 500; if (Math.cos(a) > 0.55) continue; add(scene, GEO.ico, '#4a7a40', WORLD / 2 + Math.cos(a) * r, 0, WORLD / 2 + Math.sin(a) * r, 300 + srand() * 200, 160 + srand() * 140, 300 + srand() * 200); }
 }
 
 function buildHomeModel(key) {
@@ -535,7 +570,7 @@ const INTERSECTIONS = [];
 for (const x of ROADS) for (const y of [30, ...ROADS, WORLD - 30]) INTERSECTIONS.push([x, y]);
 for (const y of ROADS) for (const x of [30, WORLD - 30]) INTERSECTIONS.push([x, y]);
 function spawnNPCs() {
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 34; i++) {
     const pal = PALETTES[i % PALETTES.length], big = i % 5 === 4;
     const m = makeCompy(pal, big ? { tube: pal.dark, legs: 1.3 } : { crest: pal.crest, hat: i % 4 === 1 ? '#2a2a2a' : null, tie: i % 3 === 0 ? '#c8322a' : null });
     const [x, y] = pick(INTERSECTIONS);
@@ -559,13 +594,14 @@ const CAREERS = {
   pizza:    { place: 'pizza', hours: [11, 19], edu: 0, clean: false, car: true, levels: [['Pizza Delivery Driver', 95], ['Head Pizzaiolo', 170], ['Pizza Boss', 280]] },
   builders: { place: 'builders', hours: [7, 15], edu: 0, clean: false, levels: [['Laborer', 110], ['Foreman', 210], ['Site Boss', 360]] },
   fire:     { place: 'fire', hours: [8, 16], edu: 0, clean: true, levels: [['Firefighter Trainee', 140], ['Firefighter', 260], ['Fire Chief', 520]] },
+  petshop:  { place: 'petshop', hours: [9, 17], edu: 0, clean: false, levels: [['Pet Groomer', 100], ['Head Groomer', 180], ['Pet Shop Owner', 320]] },
   museum:   { place: 'museum', hours: [10, 18], edu: 1, clean: false, levels: [['Tour Guide', 130], ['Curator', 300], ['Museum Director', 600]] },
 };
 const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -711,6 +747,7 @@ function dayRollover(slept) {
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
+  petDaily(); if (S.site) S.site = null;
   if (S.job) S.job.days++;
   if (weekday() === 0) {
     let bills = 0, parts = [];
@@ -858,6 +895,12 @@ const MENUS = {
       { label: 'Watch TV', detail: '+12 happiness, 2 hours', mins: 120, fn: () => { S.happy += 12; } },
       { label: 'Nap', detail: '+30 energy, 2 hours', mins: 120, opts: { sleeping: true }, fn: () => { S.energy += 30; } },
       ...(fam || S.kids.length ? [{ label: 'Family time', detail: '+15 happiness and closer family, 2 hours', mins: 120, fn: () => { S.happy += 15; if (S.partner) S.partner.rel = Math.min(100, S.partner.rel + 10); } }] : []),
+      ...(S.pet ? [
+        { label: `Feed ${S.pet.name}`, detail: `Fullness ${Math.round(S.pet.fed)}%. Pet food left: ${S.petFood || 0}.`, why: (S.petFood || 0) ? '' : 'No pet food. Buy some at the Pet Nest.', mins: 10, fn: () => { S.petFood--; S.pet.fed = 100; S.pet.happy = Math.min(100, S.pet.happy + 8); log(`${S.pet.name} gobbled it up.`, 'good'); } },
+        { label: `Play with ${S.pet.name}`, detail: `+12 pet happiness, +6 yours, 30 minutes. ${S.pet.name} is ${Math.round(S.pet.happy)}% happy.`, mins: 30, fn: () => { S.pet.happy = Math.min(100, S.pet.happy + 12); S.happy += 6; } },
+        S.pet.walking ? { label: `Leave ${S.pet.name} at home`, detail: 'Unclip the leash. They will nap here.', fn: () => { S.pet.walking = false; refreshPet(); } }
+          : { label: `Take ${S.pet.name} for a walk`, detail: 'Clip on the leash and head out', fn: () => { S.pet.walking = true; S.pet.walkDist = 0; refreshPet(); } },
+      ] : []),
       ...(fam ? [{ label: 'Try for an egg', detail: 'Once a day. It might take a few tries.', why: S.egg ? 'An egg is already in the nest.' : S.eggsTried === S.day ? 'Already tried today.' : hour() < 18 ? 'Try in the evening (after 6 PM).' : '', mins: 60, fn: () => { S.eggsTried = S.day; if (Math.random() < 0.5) { S.egg = { hatch: S.day + 3 }; log('An egg! It will hatch in 3 days.', 'good'); sfx.goal(); } else log('No egg this time.', ''); } }] : []),
     ] };
   },
@@ -959,7 +1002,28 @@ const MENUS = {
     if (open(10, 24)) acts.push({ label: 'Order a pizza', detail: '+60 hunger, +8 happiness', cost: 15, mins: 45, fn: () => { S.hunger = Math.min(100, S.hunger + 60); S.happy += 8; } });
     return { sub: 'Ptero Pizza. Delivered by air or by car, whichever shows up first.', acts };
   },
-  builders: () => { const acts = []; workAct(acts, 'builders'); return { sub: 'Raptor Builders. Hard hats required, tiny arms optional.', acts }; },
+  builders: () => {
+    const acts = [], J = jobInfo();
+    if (J && J.place === 'builders') {
+      const [a, b] = J.hours;
+      if (S.site) {
+        const left = S.site.tasks.filter(t => !t.done).length;
+        acts.push({ label: 'Clock out', detail: left ? `${left} task${left > 1 ? 's' : ''} unfinished. You only get paid for what you did.` : 'Every task is done. Collect your pay.', tag: 'Payday', fn: () => { closeMenu(); clockOut(); } });
+      } else {
+        let why = '';
+        if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'The site is closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
+        const late = hour() > a + 1;
+        acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}Grab a hard hat. Today's jobs: girders, cement, hammering and the crane.`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startSiteShift(late); } });
+      }
+    }
+    return { sub: `Raptor Builders. Current project: Raptor Tower, ${S.build ? S.build.floors : 0} of 6 floors built.${J && J.place === 'builders' ? '' : ' Staff only. You can get a job here at the Job Center.'}`, acts };
+  },
+  petshop: () => {
+    const acts = []; workAct(acts, 'petshop');
+    for (const [id, T] of Object.entries(PET_TYPES)) acts.push({ label: `Adopt a ${T.name}`, detail: T.blurb, cost: T.price, why: S.pet ? `You already have ${S.pet.name}.` : !S.home ? 'Pets need a home first. Try Nest Estates.' : '', mins: 20, fn: () => { closeMenu(); adoptPet(id); } });
+    acts.push({ label: 'Buy pet food', detail: `5 meals. You have ${S.petFood || 0}.`, cost: 10, mins: 5, fn: () => { S.petFood = (S.petFood || 0) + 5; } });
+    return { sub: S.pet ? `${S.pet.name} is ${S.pet.happy > 60 ? 'happy' : S.pet.happy > 30 ? 'okay' : 'sad'} and ${S.pet.fed > 40 ? 'well fed' : 'hungry'}.` : 'Adopt a little friend. They need walks, food and love.', acts };
+  },
   fire: () => {
     const acts = []; workAct(acts, 'fire');
     acts.push({ label: 'Slide down the fire pole', detail: 'Wheee! +6 happiness', tag: 'Free', mins: 5, fn: () => { S.happy += 6; log('WHEEE!', 'good'); } });
@@ -988,7 +1052,7 @@ const MENUS = {
       acts.push({ label: `Sell the stolen ${COLOR_NAMES[c.color] || ''} ${c.model ? CAR_MODELS[c.model].name : 'convertible'}`, detail: 'Cash, no questions', tag: money$(price), why: near ? '' : 'Park it right next to the manhole first.', mins: 20, fn: () => sellStolen(c, price) });
     }
     if (!hot.length) acts.push({ label: 'Sell a stolen car', detail: '', why: 'You have no stolen car. Borrow one from the street, lose the cops, and park it next to the manhole.', fn: () => {} });
-    acts.push({ label: 'Buy a lockpick', detail: 'Half the time, nobody sees you take a car.', cost: 300, why: S.lockpick ? 'You already have one.' : '', fn: () => { S.lockpick = true; log('You pocket a lockpick. Very sneaky.', 'warn'); } });
+    acts.push({ label: 'Buy a lockpick', detail: 'Raises the odds nobody sees you take a car from 50% to 75%.', cost: 300, why: S.lockpick ? 'You already have one.' : '', fn: () => { S.lockpick = true; log('You pocket a lockpick. Very sneaky.', 'warn'); } });
     acts.push({ label: 'Eat sewer stew', detail: '+30 hunger. Nobody knows what is in it.', cost: 4, mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 30); if (Math.random() < 0.3) { S.energy -= 15; log('The stew fought back.', 'bad'); } } });
     return { title: 'The Black Market', sub: 'Lanterns, crates and a dealer who never takes off his sunglasses. Nobody asks questions down here.', acts };
   },
@@ -1077,6 +1141,7 @@ const sfx = {
 };
 
 // ---------- player / world refresh ----------
+let carryMesh = null;
 let P = { x: 900, y: 1130, vx: 0, vy: 0, face: -Math.PI / 2, t: 0 };
 function teleport(d) { if (driving) exitCar(true); if (inside) { exitBuilding(d); return; } P.x = d.x; P.y = d.y + 10; P.vx = P.vy = 0; cam.x = P.x; cam.y = P.y; }
 function refreshHome() {
@@ -1110,7 +1175,7 @@ function setScreens() {
 // every building has a room far from town; you walk around inside and use stations (counters, desks, beds)
 let inside = null, activeSolids = solids, roomN = 0;
 const ROOMS = {};
-const HOURS = { pizza: [10, 24], museum: [9, 19], carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
+const HOURS = { petshop: [9, 19], pizza: [10, 24], museum: [9, 19], carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
 function closedWhy(id) {
   const h = HOURS[id]; if (!h) return '';
   const J = jobInfo(); if (J && J.place === id) return '';
@@ -1193,6 +1258,8 @@ function homeLayout(key, w, d, style) {
     b.cyl(nx, nz, 22, 6, key === 'mansion' ? '#f2c230' : '#8a6a3a', false); b.cyl(nx, nz, 15, 1, '#5a3f28', false, 6);
     b.dyn('egg', b.ball(nx, 12, nz, 8, '#f6f0e2')).scale.set(7, 9, 7);
     b.station(nx, nz + 34, key === 'mansion' ? 'Golden nest' : 'Nest', ['Try for an egg']);
+    b.cyl(w / 2 - 10, d / 2 + 10, 18, 5, '#c0392b', false); b.cyl(w / 2 - 10, d / 2 + 10, 13, 6, '#e8a0ab', false);
+    b.station(w / 2 - 10, d / 2 + 44, 'Pet bed', ['Feed', 'Play with', 'Leave', 'Take']);
     if (key === 'cottage') { b.box(w / 2, 6, 60, 12, 40, '#8a8f96'); b.box(w / 2, 9, 34, 6, 20, '!#ff8a3a', false, 4); }
     if (key === 'mansion') { b.box(w / 2 - 20, d - 130, 60, 40, 22, '#1a1a1a'); add(b.g, GEO.s, '!#fff3c4', w / 2, 95, d / 2, 14, 8, 14); b.plant(30, 30); b.plant(w - 30, d - 40); }
     b.plant(key === 'burrow' ? 140 : 160, 20);
@@ -1311,6 +1378,23 @@ const LAYOUTS = {
     b.npc(300, 200, 2, { hat: '#d98a3a', wander: [120, 160, 380, 280] }); b.npc(150, 60, 5, { hat: '#d98a3a' });
     b.sign('EGG EXPRESS', 230, 100, 3, 160, '#6a3a1a', '#ffffff'); b.lamp(230, 200);
   } },
+  petshop: { w: 420, d: 300, floor: ['tile', '#f6eef2', '#e2d2da'], wall: '#fbe6ee', trim: '#ff6ad5', build(b) {
+    Object.keys(PET_TYPES).forEach((t, i) => {
+      const x = 65 + i * 97, z = 70;
+      b.box(x, z, 74, 64, 2, '#d6c4a0', false);
+      for (const [px, pz, pw, pd] of [[x, z - 32, 74, 3], [x - 37, z, 3, 64], [x + 37, z, 3, 64], [x, z + 32, 74, 3]]) b.box(px, pz, pw, pd, 16, '#f6f0e2', false);
+      b.R.solids.push({ x0: b.R.ox + x - 38, y0: b.R.oy + z - 34, x1: b.R.ox + x + 38, y1: b.R.oy + z + 34 });
+      const pm = buildPet(t); pm.root.scale.setScalar(PET_TYPES[t].size); pm.root.position.set(x, 2, z); pm.root.rotation.y = -Math.PI / 2; b.g.add(pm.root);
+      b.sign(`${PET_TYPES[t].name} ${money$(PET_TYPES[t].price)}`, x, 10, z + 40, 86, '#7a3a5a', '#ffffff').rotation.x = -0.9;
+    });
+    b.box(200, 160, 60, 34, 22, '#c9c9cf'); b.npc(200, 140, 2, { bow: '#ff6ad5' });
+    b.station(200, 196, 'Grooming table (staff)', WORKS);
+    b.box(320, 225, 90, 30, 24, '#7a3a5a'); b.npc(320, 202, 3, { bow: '#ff6ad5' });
+    b.station(320, 265, 'Adoption desk', ['Adopt']);
+    b.box(40, 215, 30, 90, 40, '#b9b2a6'); for (let i = 0; i < 4; i++) b.box(48, 180 + i * 22, 10, 14, 12, '#c0392b', false, 40);
+    b.station(85, 225, 'Pet food shelf', ['Buy pet food']);
+    b.sign('PET NEST', 210, 104, 3, 140, '#7a3a5a', '#ffffff'); b.lamp(210, 180);
+  } },
   gas: { w: 380, d: 280, floor: ['tile', '#f4f6f4', '#d6ddd6'], wall: '#f2f2ee', trim: '#27ae60', build(b) {
     const goods = ['#c8322a', '#ffd35a', '#3f8a3a', '#2e86c1'];
     for (const x of [80, 170]) { b.box(x, 130, 30, 120, 40, '#b9b2a6'); for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) b.box(x + sd * 13, 80 + i * 24, 5, 16, 10, goods[(i + x) % 4], false, 10 + (i % 2) * 16); }
@@ -1335,7 +1419,7 @@ const LAYOUTS = {
     for (let i = 0; i < 5; i++) add(b.g, GEO.s, '#f1c40f', 40 + i * 22, 44, 12, 8, 6, 8).castShadow = false;
     b.box(80, 12, 130, 14, 36, '#8a8f96');
     b.npc(150, 50, 0, { hat: '#f1c40f' }); b.npc(250, 150, 5, { hat: '#f1c40f', wander: [200, 120, 290, 190] });
-    b.station(150, 150, 'Clock in', WORKS);
+    b.station(150, 150, 'Site office', null);
     b.sign('SAFETY FIRST', 240, 90, 3, 110, '#f1c40f', '#2a2a2a'); b.lamp(150, 120);
   } },
   fire: { w: 480, d: 340, floor: ['tile', '#c9ccd0', '#aeb3b8'], wall: '#e9d7d2', trim: '#b8342c', build(b) {
@@ -1463,13 +1547,13 @@ function addCop(x, y) {
   const m = makeCompy({ body: '#3a5a9a', belly: '#c8d6f2', dark: '#1f3060', stripe: '#1f3060' }, { hat: '#1f2f5a', legs: 1.25 });
   const lr = add(m.head, GEO.s, SIREN_R, 0.05, 1.3, 0.2, 0.22, 0.2, 0.22), lb = add(m.head, GEO.s, SIREN_B, 0.05, 1.3, -0.2, 0.22, 0.2, 0.22);
   m.root.scale.setScalar(15 / 1.25); scene.add(m.root);
-  chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(176, 194) });
+  chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(110, 125) });
 }
 function startChase(loot, car) {
   chase = { cops: [], loot, cars: car ? [car] : [], t: 0, lostT: 0, hideT: 0, seen: false, sirenT: 0, spawnT: 8 };
   if (car) car.stolen = true;
   const far = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 260).sort((a, b) => Math.hypot(a[0] - P.x, a[1] - P.y) - Math.hypot(b[0] - P.x, b[1] - P.y));
-  addCop(far[0][0], far[0][1]); addCop(far[1][0], far[1][1]); addCop(PLACES.police.door.x, PLACES.police.door.y - 20);
+  chase.queue = 3; chase.queueT = 0.6; void far;
   shake = 8;
   if (car) { queueEvent({ kind: 'bad', tag: 'Car theft', title: 'Somebody saw you!', sound: 'siren', text: `A neighbor spotted you hot-wiring the ${COLOR_NAMES[car.color]} car and called the police. Lose the police dinos, or ditch the car and hide in a building. Get away and the car is yours to sell at the black market under the manhole.`, buttons: [{ label: 'Floor it!' }] }); return; }
   queueEvent({ kind: 'bad', tag: 'Heist', title: 'The alarm is ringing!', sound: 'siren',
@@ -1499,6 +1583,7 @@ function chaseEnteredBuilding(id) {
 }
 function updateChase(dt) {
   chase.t += dt; chase.sirenT -= dt;
+  if (chase.queue > 0) { chase.queueT -= dt; if (chase.queueT <= 0) { chase.queue--; chase.queueT = 1.5; addCop(PLACES.police.door.x + rand(-15, 15), PLACES.police.door.y - 12); if (chase.cops.length === 1) log('Police dinos are pouring out of the station!', 'bad'); } }
   if (chase.sirenT <= 0) { chase.sirenT = 1.5; if (!inside) sfx.siren(); }
   if (inside) {
     chase.hideT += dt;
@@ -1512,18 +1597,17 @@ function updateChase(dt) {
   for (const c of chase.cops) {
     const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
     nearest = Math.min(nearest, d);
-    const sp = c.speed * (d > 700 ? 1.15 : 1) * (driving ? 1.6 : 1);
+    const sp = c.speed * (driving ? 1.3 : 1);
     c.x += dx / d * sp * dt; c.y += dy / d * sp * dt; c.face = Math.atan2(dy, dx); c.t += dt * sp / 90;
     collide(c, 9, solids);
     if (d < (driving ? 40 : 24)) { if (driving) exitCar(true); bust(driving ? 'Police dinos pulled you out of the car.' : 'A police dino tackled you mid-sprint.'); return; }
   }
-  chase.lostT = nearest > 470 ? chase.lostT + dt : 0;
-  if (chase.lostT > 5) { escapeChase('You lost them in the back streets.'); return; }
+  chase.lostT = nearest > 500 ? (chase.t > 8 ? chase.lostT + dt : chase.lostT) : 0;
+  if (chase.lostT > 8) { escapeChase('You lost them in the back streets.'); return; }
   chase.spawnT -= dt;
   if (chase.spawnT <= 0 && chase.cops.length < 5) {
     chase.spawnT = 10;
-    const spots = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 500);
-    if (spots.length) { const [x, y] = pick(spots); addCop(x, y); log('Backup is on the way!', 'bad'); }
+    addCop(PLACES.police.door.x, PLACES.police.door.y - 12); log('Backup is leaving the police station!', 'bad');
   }
 }
 function syncChase() {
@@ -1630,18 +1714,18 @@ function sellStolen(c, price) {
 function refillParking() {
   PARK_SPOTS.forEach(([x, y, a], i) => { if (!cars.some(c => !c.ai && Math.hypot(c.x - x, c.y - y) < 40)) spawnCar(x, y, a, CAR_COLORS[(i + S.day) % CAR_COLORS.length], false); });
 }
-const PARK_SPOTS = [[2300, 560, 0], [2250, 1100, 0], [2720, 1100, 0], [1000, 1930, 0], [2100, 1930, 0], [760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]];
+const PARK_SPOTS = [[3200, 1930, 0], [1000, 3125, 0], [2700, 2530, 0], [2300, 560, 0], [2250, 1100, 0], [2720, 1100, 0], [1000, 1930, 0], [2100, 1930, 0], [760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]];
 function placeCars() {
   for (const [x, y, a] of PARK_SPOTS)
     spawnCar(x, y, a, CAR_COLORS[cars.length % CAR_COLORS.length], false);
-  for (let i = 0; i < 10; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
+  for (let i = 0; i < 14; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
 }
 function carName(c) { return c.model ? CAR_MODELS[c.model].name : 'convertible'; }
 function enterCar(c) {
   driving = c; c.v = 0; P.vx = P.vy = 0; goal('drive'); sfx.door();
   if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
   else if (chase) { c.stolen = true; chase.cars = (chase.cars || []).concat(c); log('You grabbed a car mid-chase. Now they want that too!', 'bad'); }
-  else if (S.lockpick && Math.random() < 0.5) { c.stolen = true; log(`Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.`, 'warn'); }
+  else if (Math.random() < (S.lockpick ? 0.75 : 0.5)) { c.stolen = true; log(S.lockpick ? `Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.` : `You slipped into the ${COLOR_NAMES[c.color]} car. Nobody was looking. It is yours now (sort of).`, 'warn'); }
   else startChase(0, c);
   if (actx && !muted) {
     const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
@@ -1753,6 +1837,285 @@ function carPush(o, r) {
   }
 }
 
+// ---------- construction site ----------
+// the Raptor Builders job is played by hand: carry girders, mix cement, hammer beams, run the crane
+const SITE = { pile: { x: 2230, y: 1488 }, mixer: { x: 2240, y: 1604 }, scaffold: { x: 2186, y: 1545 }, crane: { x: 2340, y: 1688 }, pad: { x: 2215, y: 1705 }, drop: { x: 2215, y: 1660 } };
+let siteTower = null, siteHook = null, siteGirders = [];
+function buildSite() {
+  for (const [x0, z0, x1, z1] of [[2150, 1290, 2190, 1294], [2260, 1290, 2400, 1294], [2150, 1290, 2154, 1760], [2396, 1290, 2400, 1760], [2150, 1756, 2400, 1760]]) { add(scene, GEO.b, '#c9c9cf', (x0 + x1) / 2, 18, (z0 + z1) / 2, x1 - x0, 36, z1 - z0); solids.push({ x0, y0: z0, x1, y1: z1 }); }
+  add(scene, GEO.b, '#f1c40f', 2340, 160, 1650, 18, 320, 18); add(scene, GEO.b, '#f1c40f', 2260, 320, 1650, 260, 10, 10); add(scene, GEO.b, '#555555', 2370, 312, 1650, 30, 20, 20);
+  add(scene, GEO.b, '#3a3a40', 2340, 300, 1650, 24, 18, 22);
+  solids.push({ x0: 2328, y0: 1638, x1: 2352, y1: 1662 });
+  for (let i = 0; i < 4; i++) add(scene, GEO.b, '#c0392b', 2230, 6 + i * 8, 1450 + (i % 2) * 6, 120, 6, 10);
+  solids.push({ x0: 2168, y0: 1440, x1: 2292, y1: 1465 });
+  add(scene, GEO.y, '#9a9aa0', 2240, 22, 1560, 22, 28, 22); add(scene, GEO.y, '#6a6f78', 2240, 40, 1560, 12, 10, 12); solids.push({ x0: 2218, y0: 1538, x1: 2262, y1: 1582 });
+  for (const [x, z] of [[2160, 1505], [2210, 1505], [2160, 1535], [2210, 1535]]) add(scene, GEO.y, '#9a9aa0', x, 30, z, 1.5, 60, 1.5);
+  add(scene, GEO.b, '#7a5534', 2185, 30, 1520, 54, 3, 34); add(scene, GEO.b, '#c0392b', 2185, 34, 1520, 50, 4, 6);
+  solids.push({ x0: 2156, y0: 1500, x1: 2214, y1: 1532 });
+  add(scene, GEO.b, '#9a9aa0', SITE.pad.x, 1, SITE.pad.y, 100, 2, 70).castShadow = false;
+  solids.push({ x0: SITE.pad.x - 50, y0: SITE.pad.y - 30, x1: SITE.pad.x + 50, y1: SITE.pad.y + 35 });
+  for (const [x, z] of [[2205, 1310], [2245, 1310], [2185, 1380], [2300, 1520]]) add(scene, GEO.c, '#ff7a1a', x, 7, z, 5, 14, 5);
+  siteTower = group(scene, SITE.pad.x, 0, SITE.pad.y);
+  siteHook = group(scene, 2180, 0, 1650);
+  add(siteHook, GEO.y, '#2a2a2a', 0, 230, 0, 0.8, 160, 0.8); siteHook.cable = siteHook.children[0];
+  add(siteHook, GEO.b, '#c0392b', 0, 146, 0, 46, 6, 8); siteHook.beam = siteHook.children[1];
+}
+function refreshTower() {
+  if (!siteTower) return;
+  while (siteTower.children.length) siteTower.remove(siteTower.children[0]);
+  const n = (S && S.build ? S.build.floors : 0);
+  for (let f = 0; f < n; f++) {
+    add(siteTower, GEO.b, '#b9b2a6', 0, 6 + f * 26 + 12, 0, 90, 24, 60);
+    add(siteTower, GEO.b, '#2c3442', 0, 6 + f * 26 + 14, 30.6, 80, 9, 1);
+    for (const x of [-44, 44]) for (const z of [-29, 29]) add(siteTower, GEO.b, '#c0392b', x, 6 + f * 26 + 12, z, 3, 26, 3);
+  }
+  if (n) add(siteTower, GEO.b, '#f1c40f', 0, 6 + n * 26 + 3, 0, 94, 3, 64);
+}
+const TASK_INFO = {
+  carry: { label: 'Carry girders to the pad', where: 'pile' },
+  cement: { label: 'Mix cement', where: 'mixer' },
+  hammer: { label: 'Hammer the scaffold beams', where: 'scaffold' },
+  crane: { label: 'Drop a beam with the crane', where: 'crane' },
+};
+let minigame = null;
+function startSiteShift(late) {
+  const lvl = S.job.level;
+  const order = ['carry', 'cement', 'hammer'].sort(() => Math.random() - 0.5).concat('crane');
+  S.site = { tasks: order.map(t => ({ t, done: false })), q: 1, late, carried: 0, need: 2 + lvl, carrying: false, startMin: S.min };
+  for (const gm of siteGirders) scene.remove(gm); siteGirders = [];
+  log(`Clocked in! Today: ${order.map(t => TASK_INFO[t].label.toLowerCase()).join(', ')}. Then come back to clock out.`, 'good');
+  sfx.ding();
+}
+const siteTask = () => S.site && S.site.tasks.find(t => !t.done);
+function siteStations() {
+  const t = siteTask(); if (!t) return [];
+  if (t.t === 'carry') return S.site.carrying ? [{ x: SITE.drop.x, y: SITE.drop.y, label: 'Set the girder down on the pad', site: 'drop' }] : [{ x: SITE.pile.x, y: SITE.pile.y, label: `Pick up a girder (${S.site.carried}/${S.site.need})`, site: 'pick' }];
+  return [{ x: SITE[TASK_INFO[t.t].where].x, y: SITE[TASK_INFO[t.t].where].y, label: TASK_INFO[t.t].label, site: t.t }];
+}
+function finishTask(msg, q) {
+  const t = siteTask(); if (!t) return;
+  t.done = true; S.site.q = clamp(S.site.q + (q || 0), 0, 1);
+  log(msg, (q || 0) < 0 ? 'warn' : 'good'); sfx.coin();
+  if (!siteTask()) { log('All site work done! Head back to the Raptor Builders trailer to clock out.', 'good'); sfx.goal(); }
+}
+function doSiteTask(st) {
+  if (st.site === 'pick') { S.site.carrying = true; advance(5); sfx.door(); return; }
+  if (st.site === 'drop') {
+    S.site.carrying = false; S.site.carried++; advance(10); sfx.crash(); shake = 3;
+    const gm = add(scene, GEO.b, '#c0392b', SITE.pad.x - 30 + siteGirders.length * 12, 3 + (siteGirders.length % 2) * 4, SITE.pad.y + 20, 8, 5, 50); siteGirders.push(gm);
+    if (S.site.carried >= S.site.need) finishTask(`Girders delivered (${S.site.need}).`, 0); else log(`Girder ${S.site.carried}/${S.site.need} delivered.`, '');
+    return;
+  }
+  const lvl = S.job.level;
+  if (st.site === 'cement') minigame = { kind: 'mash', p: 0, t: 8, label: 'MIX THE CEMENT', help: 'Mash E (or tap) to fill the bar before time runs out' };
+  if (st.site === 'hammer') minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.1 + lvl * 0.35, zone: [0.42, 0.42 + Math.max(0.1, 0.2 - lvl * 0.04)], hits: 0, misses: 0, need: 3, flash: 0, label: 'HAMMER THE BEAMS', help: 'Press E when the marker is in the green' };
+  if (st.site === 'crane') { minigame = { kind: 'crane', hx: 2180, hy: 1600, t: 15, label: 'RUN THE CRANE', help: 'Move the hook with WASD or the joystick, then press E to drop the beam on the glowing pad' }; }
+  state = 'mini'; setScreens();
+}
+function miniPress() {
+  if (!minigame) return;
+  if (minigame.kind === 'mash') { minigame.p = Math.min(1, minigame.p + 0.085); sfx.door(); if (minigame.p >= 1) endMini(true, 'Cement mixed perfectly.', 0); }
+  else if (minigame.kind === 'rhythm') {
+    const hit = minigame.x >= minigame.zone[0] && minigame.x <= minigame.zone[1];
+    minigame.flash = 0.2; minigame.lastHit = hit;
+    if (hit) { minigame.hits++; sfx.crash(); shake = 2; } else { minigame.misses++; sfx.bad(); }
+    if (minigame.hits >= minigame.need) endMini(true, minigame.misses ? `Beams hammered (${minigame.misses} miss${minigame.misses > 1 ? 'es' : ''}).` : 'Beams hammered. Not a single bent nail.', -minigame.misses * 0.07);
+    else if (minigame.misses >= 5) endMini(false, 'You bent every nail in the box. The foreman sighs.', -0.35);
+  } else if (minigame.kind === 'crane') {
+    const d = Math.hypot(minigame.hx - SITE.pad.x, minigame.hy - SITE.pad.y);
+    if (d < 22) endMini(true, 'Perfect drop! The beam landed dead center.', 0.05);
+    else if (d < 60) endMini(true, 'Good drop. A little off-center, but it fits.', -0.08);
+    else endMini(false, 'The beam crashed into the dirt. That will cost time.', -0.3);
+  }
+}
+function endMini(ok, msg, q) {
+  const kind = minigame.kind; minigame = null; state = 'play'; setScreens();
+  advance(kind === 'mash' ? 30 : kind === 'rhythm' ? 45 : 60, { work: true });
+  finishTask(msg, q);
+  if (state === 'play') nextEvent();
+}
+function updateMini(dt) {
+  if (minigame.kind === 'mash') { minigame.t -= dt; minigame.p = Math.max(0, minigame.p - dt * 0.12); if (minigame.t <= 0) endMini(false, 'The cement came out lumpy.', -0.25); }
+  else if (minigame.kind === 'rhythm') { minigame.x += minigame.dir * minigame.speed * dt; if (minigame.x > 1) { minigame.x = 1; minigame.dir = -1; } if (minigame.x < 0) { minigame.x = 0; minigame.dir = 1; } minigame.flash -= dt; }
+  else if (minigame.kind === 'crane') {
+    let mx = 0, my = 0;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
+    if (keys.has('w') || keys.has('arrowup')) my -= 1; if (keys.has('s') || keys.has('arrowdown')) my += 1;
+    if (joy.active) { mx = joy.dx; my = joy.dy; }
+    minigame.hx = clamp(minigame.hx + mx * 110 * dt + Math.sin(gameT * 1.7) * 10 * dt, 2165, 2380); minigame.hy = clamp(minigame.hy + my * 110 * dt + Math.cos(gameT * 1.3) * 10 * dt, 1310, 1740);
+    minigame.t -= dt; if (minigame.t <= 0) endMini(false, 'You took too long and the foreman dropped it for you. Badly.', -0.3);
+  }
+}
+function syncSite() {
+  if (!siteHook) return;
+  const hx = minigame && minigame.kind === 'crane' ? minigame.hx : 2180, hy = minigame && minigame.kind === 'crane' ? minigame.hy : 1650;
+  siteHook.position.set(hx, 0, hy);
+  siteHook.beam.visible = !!(minigame && minigame.kind === 'crane') || !!(S && S.site && siteTask() && siteTask().t === 'crane');
+}
+function clockOut() {
+  const site = S.site, J = jobInfo(); if (!site || !J) return;
+  const done = site.tasks.filter(t => t.done).length, frac = done / site.tasks.length, q = site.q;
+  const pay = Math.round(J.wage * frac * (0.6 + 0.4 * q));
+  const d = Math.round((frac < 1 ? -6 : 0) + (q - 0.55) * 18 - (site.late ? 4 : 0));
+  S.money += pay; S.job.perf = clamp(S.job.perf + d, 0, 100); S.site = null;
+  for (const gm of siteGirders) scene.remove(gm); siteGirders = [];
+  if (frac >= 1) { S.build = S.build || { floors: 0, done: 0 }; S.build.floors++; refreshTower(); }
+  log(`Clocked out: +${money$(pay)}. Work quality ${Math.round(q * 100)}%. Performance ${d >= 0 ? 'up' : 'down'} to ${Math.round(S.job.perf)}.`, d >= 0 ? 'good' : 'warn'); sfx.coin();
+  if (S.build && S.build.floors >= 6) {
+    const bonus = 250 * (S.job.level + 1); S.money += bonus; S.build.floors = 0; S.build.done++; refreshTower(); goal('tower');
+    queueEvent({ kind: 'good', title: 'Tower finished!', text: `Six floors, every girder in place. Raptor Builders finished the tower and paid you a ${money$(bonus)} bonus. Ground breaks on the next one tomorrow.`, sound: 'goal' });
+  }
+  const C = CAREERS[S.job.career];
+  if (S.job.perf >= 85 && S.job.days >= 3 && S.job.level < C.levels.length - 1) {
+    S.job.level++; S.job.perf = 60; S.job.days = 0; S.happy += 15; goal('promo');
+    if (S.job.level === C.levels.length - 1) goal('top');
+    queueEvent({ kind: 'good', title: 'Promoted!', text: `You are now ${C.levels[S.job.level][0]} at Raptor Builders. Pay is up to ${money$(C.levels[S.job.level][1])} a day, and the work gets harder.`, sound: 'goal' });
+  } else if (S.job.perf < 10) fire('Your site work has been sloppy and slow.');
+}
+function checkSiteEnd() {
+  const J = jobInfo();
+  if (!S.site || !J || J.place !== 'builders') { if (S.site && (!J || J.place !== 'builders')) S.site = null; return; }
+  if (hour() >= J.hours[1] + 1) { log('The shift ended before you clocked out. You get paid for what you finished.', 'warn'); clockOut(); }
+}
+function drawMiniOverlay(g) {
+  if (!minigame) return;
+  const w = Math.min(460, W - 40), x = (W - w) / 2, y = H - 190;
+  g.fillStyle = 'rgba(14,22,30,.9)'; g.fillRect(x, y, w, 130); g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.strokeRect(x, y, w, 130);
+  g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
+  g.fillStyle = '#d6dde4'; g.font = '800 13px Nunito, system-ui, sans-serif'; g.fillText(minigame.help, W / 2, y + 52);
+  const bx = x + 20, bw = w - 40, by = y + 70;
+  if (minigame.kind === 'mash') {
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(bx, by, bw, 22); g.fillStyle = '#9a9aa0'; g.fillRect(bx, by, bw * minigame.p, 22);
+    g.fillStyle = '#ffffff'; g.fillText(`${Math.ceil(minigame.t)}s`, W / 2, by + 50);
+  } else if (minigame.kind === 'rhythm') {
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(bx, by, bw, 22);
+    g.fillStyle = '#4fae4a'; g.fillRect(bx + bw * minigame.zone[0], by, bw * (minigame.zone[1] - minigame.zone[0]), 22);
+    g.fillStyle = minigame.flash > 0 ? (minigame.lastHit ? '#8fdc6a' : '#ef5a5f') : '#ffffff'; g.fillRect(bx + bw * minigame.x - 3, by - 6, 6, 34);
+    g.fillStyle = '#ffffff'; g.fillText(`Hits ${minigame.hits}/${minigame.need}   Misses ${minigame.misses}/5`, W / 2, by + 50);
+  } else if (minigame.kind === 'crane') {
+    const d = Math.hypot(minigame.hx - SITE.pad.x, minigame.hy - SITE.pad.y);
+    g.fillStyle = d < 22 ? '#8fdc6a' : d < 60 ? '#ffbe55' : '#ef5a5f'; g.fillText(d < 22 ? 'RIGHT ON TARGET' : d < 60 ? 'CLOSE' : 'NOT OVER THE PAD', W / 2, by + 10);
+    g.fillStyle = '#ffffff'; g.fillText(`${Math.ceil(minigame.t)}s left`, W / 2, by + 40);
+    const s = toScreen(SITE.pad.x, 4, SITE.pad.y); if (s.ok) { g.strokeStyle = '#8fdc6a'; g.lineWidth = 3; g.beginPath(); g.arc(s.x, s.y, 22, 0, 7); g.stroke(); }
+    const hs = toScreen(minigame.hx, 4, minigame.hy); if (hs.ok) { g.strokeStyle = '#ffffff'; g.setLineDash([5, 5]); g.beginPath(); g.arc(hs.x, hs.y, 14, 0, 7); g.stroke(); g.setLineDash([]); }
+  }
+}
+
+// ---------- pets ----------
+const PET_TYPES = {
+  dodo:   { name: 'Dodo', price: 80, blurb: 'Waddly, loyal and not very bright.', size: 10 },
+  turtle: { name: 'Baby Turtle', price: 60, blurb: 'Slow on walks. Lives forever.', size: 8 },
+  trike:  { name: 'Baby Triceratops', price: 250, blurb: 'A tiny tank with three little horns.', size: 11 },
+  ptero:  { name: 'Mini Pterodactyl', price: 180, blurb: 'Flies beside you on walks.', size: 9 },
+};
+const PET_NAMES = ['Bix', 'Nugget', 'Pebbles', 'Sprout', 'Biscuit', 'Gizmo', 'Mochi', 'Rex Jr.', 'Waffles', 'Tater', 'Pickle', 'Noodle'];
+function buildPet(type) {
+  const root = new THREE.Group(), body = group(root, 0, 0, 0), legs = [];
+  const leg = (x, z, len, r, col) => { const gg = group(body, x, len, z); add(gg, GEO.y, col, 0, -len / 2, 0, r, len, r); legs.push(gg); };
+  if (type === 'dodo') {
+    for (const z of [-0.25, 0.25]) leg(0.1, z, 0.45, 0.06, '#d9c25a');
+    add(body, GEO.s, '#8a8f9c', 0, 0.85, 0, 0.85, 0.6, 0.65); add(body, GEO.s, '#efe9dc', -0.9, 0.95, 0, 0.25, 0.25, 0.25);
+    add(body, GEO.s, '#8a8f9c', 0.75, 1.35, 0, 0.35, 0.32, 0.3); add(body, GEO.b, '#d9c25a', 1.15, 1.3, 0, 0.5, 0.2, 0.24); eyes(body, 0.9, 1.45, 0.22, 0.08);
+  } else if (type === 'turtle') {
+    for (const [x, z] of [[0.5, -0.55], [0.5, 0.55], [-0.5, -0.55], [-0.5, 0.55]]) leg(x, z, 0.3, 0.16, '#7c8f4a');
+    add(body, GEO.s, '#5d6e2e', 0, 0.45, 0, 0.95, 0.55, 0.8); add(body, GEO.s, '#3f4d1f', 0, 0.8, 0, 0.5, 0.15, 0.45);
+    add(body, GEO.s, '#7c8f4a', 1.05, 0.45, 0, 0.3, 0.25, 0.25); eyes(body, 1.2, 0.55, 0.15, 0.07);
+  } else if (type === 'trike') {
+    for (const [x, z] of [[0.55, -0.4], [0.55, 0.4], [-0.55, -0.4], [-0.55, 0.4]]) leg(x, z, 0.4, 0.14, '#5a6f3a');
+    add(body, GEO.s, '#6b8f4a', 0, 0.8, 0, 1.0, 0.55, 0.6); add(body, GEO.s, '#6b8f4a', 1.0, 0.85, 0, 0.45, 0.4, 0.4);
+    add(body, GEO.s, '#e0763a', 0.75, 1.1, 0, 0.12, 0.55, 0.65, 0, 0, 0.4);
+    for (const z of [-0.18, 0.18]) add(body, GEO.c, '#f6f0e2', 1.15, 1.2, z, 0.06, 0.4, 0.06, 0, 0, -1.0);
+    add(body, GEO.c, '#f6f0e2', 1.42, 0.95, 0, 0.05, 0.22, 0.05, 0, 0, -0.7); eyes(body, 1.18, 1.0, 0.24, 0.08);
+    add(body, GEO.c, '#6b8f4a', -1.0, 0.75, 0, 0.2, 0.7, 0.18, 0, 0, Math.PI / 2);
+  } else {
+    for (const z of [-0.2, 0.2]) leg(0, z, 0.3, 0.04, '#5a3a22');
+    add(body, GEO.s, '#8a5a3a', 0, 0.9, 0, 0.6, 0.35, 0.35); add(body, GEO.s, '#8a5a3a', 0.6, 1.1, 0, 0.3, 0.25, 0.25);
+    add(body, GEO.c, '#d9c08a', 1.05, 1.05, 0, 0.07, 0.6, 0.07, 0, 0, -Math.PI / 2); add(body, GEO.c, '#c2552e', 0.35, 1.3, 0, 0.06, 0.45, 0.05, 0, 0, 1.3);
+    eyes(body, 0.72, 1.18, 0.16, 0.07);
+    const wings = [];
+    for (const sd of [-1, 1]) { const w = group(body, 0, 1.0, sd * 0.3); add(w, GEO.s, '#6e4428', -0.1, 0, sd * 0.8, 0.5, 0.06, 0.8); wings.push(w); }
+    return { root, body, legs, wings, fly: true };
+  }
+  return { root, body, legs };
+}
+let petM = null, leash = null;
+function refreshPet() {
+  if (petM) { scene.remove(petM.m.root); petM = null; }
+  if (!S || !S.pet) return;
+  const m = buildPet(S.pet.type); m.root.scale.setScalar(PET_TYPES[S.pet.type].size); scene.add(m.root);
+  const B = S.home ? famBounds() : null;
+  petM = { m, x: P.x + 20, y: P.y + 10, t: 0, face: 0, sniff: 0, tx: 0, ty: 0 };
+  if (!S.pet.walking && B) { petM.x = rand(B[0], B[2]); petM.y = rand(B[1], B[3]); }
+  if (!leash) { leash = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: '#c0392b' })); scene.add(leash); }
+}
+function adoptPet(type) {
+  S.pet = { type, name: pick(PET_NAMES), happy: 85, fed: 80, walking: true, walkDist: 0 };
+  goal('pet'); refreshPet(); sfx.goal();
+  queueEvent({ kind: 'good', title: `Meet ${S.pet.name}!`, text: `Your new ${PET_TYPES[type].name.toLowerCase()} is already on a leash and following you. Walk ${S.pet.name} around town to keep them happy, and feed them at home (the Pet Nest sells food). Inside your home, use the pet bed to drop them off or pick them up for a walk.`, sound: 'goal' });
+}
+function petDaily() {
+  const p = S.pet; if (!p) return;
+  p.fed = Math.max(0, p.fed - 35);
+  p.happy -= p.walkedToday ? 4 : 16;
+  if (p.fed <= 0) p.happy -= 15;
+  p.happy = clamp(p.happy, 0, 100); p.walkedToday = false;
+  if (p.happy > 60) S.happy += 4;
+  if (p.happy <= 0) {
+    const n = p.name; S.pet = null; refreshPet(); S.happy -= 20;
+    queueEvent({ kind: 'bad', title: `${n} ran away`, text: `${n} was hungry and lonely for too long and wandered off to find a family with more time. Pets need walks and food.` });
+  } else if (p.happy < 30) log(`${p.name} looks sad. Feed them and take them for a walk.`, 'warn');
+}
+function updatePet(dt) {
+  if (!petM || !S.pet) return;
+  const p = S.pet, m = petM; m.t += dt;
+  const flying = !!m.m.fly;
+  let tx, ty, follow = p.walking || !S.home;
+  if (follow) {
+    const back = 26, side = flying ? 18 : 0;
+    tx = P.x - Math.cos(P.face) * back + Math.cos(P.face + Math.PI / 2) * side; ty = P.y - Math.sin(P.face) * back + Math.sin(P.face + Math.PI / 2) * side;
+    const d0 = Math.hypot(tx - m.x, ty - m.y);
+    if (d0 > 320) { m.x = tx; m.y = ty; }
+    if (!driving && state === 'play' && !inside) {
+      const sp = Math.hypot(P.vx, P.vy); p.walkDist += sp * dt; p.happy = Math.min(100, p.happy + sp * dt / 120); if (sp > 20) p.walkedToday = true;
+      if (sp * dt > 0 && Math.floor((p.walkDist - sp * dt) / 300) < Math.floor(p.walkDist / 300)) S.happy = Math.min(100, S.happy + 1);
+      if (p.walkDist > 2500 && !S.goals.walk) goal('walk');
+    }
+  } else {
+    const B = famBounds();
+    if (!m.tx || Math.hypot(m.tx - m.x, m.ty - m.y) < 4) { m.tx = rand(B[0], B[2]); m.ty = rand(B[1], B[3]); }
+    tx = m.tx; ty = m.ty;
+    if (Math.hypot(tx - m.x, ty - m.y) > 600) { m.x = tx; m.y = ty; }
+  }
+  if (m.sniff > 0) m.sniff -= dt;
+  else if (follow && Math.random() < dt * 0.15 && Math.hypot(P.vx, P.vy) < 30) m.sniff = rand(0.8, 2);
+  const dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy);
+  const sp = (p.type === 'turtle' ? 160 : 240) * (follow ? 1 : 0.25);
+  if (d > 6 && m.sniff <= 0) { const st = Math.min(d, sp * dt * (d > 80 ? 1.6 : 1)); m.x += dx / d * st; m.y += dy / d * st; m.face = Math.atan2(dy, dx); m.moving = 1; }
+  else m.moving = 0;
+}
+function syncPet() {
+  if (!petM) { if (leash) leash.visible = false; return; }
+  const m = petM, M = m.m;
+  if (driving && S.pet.walking) {
+    const c = driving; M.root.position.set(c.x - Math.cos(c.a) * 6 + Math.cos(c.a + Math.PI / 2) * 10, 10, c.y - Math.sin(c.a) * 6 + Math.sin(c.a + Math.PI / 2) * 10); M.root.rotation.y = -c.a;
+    m.x = c.x; m.y = c.y;
+  } else {
+    M.root.position.set(m.x, M.fly ? 14 + Math.sin(gameT * 4) * 3 : 0, m.y); M.root.rotation.y = -m.face;
+  }
+  const sw = Math.sin(m.t * 14) * (m.moving || 0);
+  M.legs.forEach((l, i) => { l.rotation.z = (i % 2 ? sw : -sw) * 0.6; });
+  if (M.wings) M.wings.forEach((w, i) => { w.rotation.x = (i ? -1 : 1) * (0.3 + Math.abs(Math.sin(gameT * 10)) * 0.7); });
+  if (!M.fly) M.body.position.y = Math.abs(sw) * 0.08 + (m.sniff > 0 ? 0 : 0);
+  M.body.rotation.z = m.sniff > 0 ? -0.25 : 0;
+  const on = S.pet.walking && !driving && state !== 'title';
+  leash.visible = on;
+  if (on) {
+    const pos = leash.geometry.attributes.position;
+    pos.setXYZ(0, P.x + Math.cos(P.face) * 4, 18, P.y + Math.sin(P.face) * 4); pos.setXYZ(1, m.x, M.fly ? 16 : 8, m.y); pos.needsUpdate = true;
+    leash.geometry.computeBoundingSphere();
+  }
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -1764,6 +2127,7 @@ addEventListener('keydown', e => {
   if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
   if (k === 'g' && state === 'play') { showGoals(); return; }
   if (k === 'h' && state === 'play' && driving) { honk(); return; }
+  if (state === 'mini' && (k === 'e' || k === ' ' || k === 'enter')) { e.preventDefault(); miniPress(); return; }
   if (k.startsWith('arrow')) e.preventDefault();
   keys.add(k);
 });
@@ -1777,12 +2141,13 @@ function useNear() {
   if (state === 'play' && driving) { if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
   if (nearPlace.m) { enterCar(nearPlace); return; }
+  if (nearPlace.site) { doSiteTask(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
   if (chase && !wasInside && inside) chaseEnteredBuilding(inside.id);
 }
-$('useBtn').addEventListener('click', useNear);
+$('useBtn').addEventListener('click', () => { if (state === 'mini') miniPress(); else useNear(); });
 $('prompt').addEventListener('click', useNear);
 
 // ---------- loop ----------
@@ -1808,12 +2173,14 @@ function update(dt) {
   // nearest door
   nearPlace = null; let best = inside ? 34 : 50;
   for (const p of (inside ? inside.stations : Object.values(PLACES))) { const pt = p.door || p, d = Math.hypot(P.x - pt.x, P.y - pt.y); if (d < best) { best = d; nearPlace = p; } }
+  if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   if (!inside) for (const c of cars) if (!c.ai) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
   if (inside) updateInterior(dt);
   if (chase) { updateChase(dt); if (state !== 'play') return; }
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
+  updatePet(dt); checkSiteEnd();
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -1903,6 +2270,10 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
+  syncSite(); syncPet();
+  if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
+  carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
+  if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
   const sx = shake ? rand(-shake, shake) * 0.5 : 0, sz = shake ? rand(-shake, shake) * 0.5 : 0;
   const portrait = H > W ? 1.4 : 1, d = (inside ? 300 : driving ? 600 : 470) * portrait;
   if (state === 'title') { const a = gameT * 0.06; camera.position.set(900 + Math.cos(a) * 700, 480, 900 + Math.sin(a) * 700); camera.lookAt(900, 0, 900); }
@@ -1936,11 +2307,17 @@ function drawOverlay() {
   if (spouseM) lbl(spouseM.x, spouseM.y, 40, S.partner.name, '#ffb3e6');
   kidMs.forEach((k, i) => lbl(k.x, k.y, 26, S.kids[i].name, '#bfe8ff'));
   if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
+  if (S.site && !inside) {
+    for (const st of siteStations()) { const s2 = toScreen(st.x, 0, st.y); if (s2.ok) { g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); } const l2 = toScreen(st.x, 36, st.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, l2.x, l2.y); g.fillStyle = '#f1c40f'; g.fillText(st.label, l2.x, l2.y); } arrowTo(g, st.x, st.y, '#f1c40f', 'SITE'); }
+    if (!siteTask()) { const d = PLACES.builders.door; arrowTo(g, d.x, d.y, '#f1c40f', 'CLOCK OUT'); }
+  }
+  if (petM && S.pet && !driving) lbl(petM.x, petM.y, 24, S.pet.name, '#ffd3e6');
   if (trex && !inside) arrowTo(g, trex.x, trex.y, '#ef5a5f', 'T-REX');
   if (chase && !inside) { const near = chase.cops.slice().sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 2); for (const c of near) arrowTo(g, c.x, c.y, '#5a8aff', 'COPS'); }
   const J = jobInfo();
   if (!inside && J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
   if (!inside && hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
+  drawMiniOverlay(g);
   if (joy.active) { g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22, 0, 7); g.fill(); }
   if (trex && !inside) { g.fillStyle = `rgba(200,0,0,${0.08 + Math.sin(gameT * 6) * 0.05})`; g.fillRect(0, 0, W, H); }
   if (chase) {
@@ -1979,6 +2356,7 @@ function hud() {
   if (S.injured) chips.push(['Injured', 'bad']);
   if (S.loan) chips.push([`Loan ${money$(S.loan)}`, 'bad']);
   if (driving) chips.push([`Gas ${Math.round(driving.fuel)}%`, driving.fuel < 20 ? 'bad' : 'good']);
+  if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
   $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
@@ -1988,6 +2366,7 @@ function hud() {
     const np = nearPlace;
     let what;
     if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
+    else if (np.site) what = np.label;
     else if (np.m) what = np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
@@ -1996,12 +2375,13 @@ function hud() {
     else what = closedWhy(np.id) ? `${np.name} (closed)` : `Go into ${np.name}`;
     const t = `<kbd>${touchMode ? 'TAP' : 'E'}</kbd>${what}`; if (pr.innerHTML !== t) pr.innerHTML = t;
   }
-  $('useBtn').hidden = !(touchMode && show);
+  $('useBtn').hidden = !(touchMode && (show || state === 'mini')); $('useBtn').textContent = state === 'mini' ? 'PRESS' : 'ENTER';
   const sh = $('shift');
   let st = '';
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
-  if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 5 - chase.lostT))}s out of sight) or hide inside a building`;
+  if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
+  if (S.site && !chase) { const t = siteTask(), dn = S.site.tasks.filter(x => x.done).length; st = t ? `Site work ${dn + 1}/${S.site.tasks.length}: ${t.t === 'carry' ? `carry girders (${S.site.carried}/${S.site.need})` : TASK_INFO[t.t].label.toLowerCase()}` : 'All site work done. Clock out at the Raptor Builders trailer.'; }
   if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
   sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
   feedItems.forEach((it, i) => { const el = $('feed').children[i]; if (el) el.style.opacity = performance.now() - it.t > 9000 ? '0' : '1'; });
@@ -2022,7 +2402,7 @@ function beginLife(fromSave) {
   if (player) scene.remove(player.root);
   const pal = PALETTES[S.pal]; player = makeCompy(pal, { crest: pal.crest }); scene.add(player.root);
   for (const c of cars) if (!c.owned) { c.stolen = false; }
-  refreshHome(); refreshFamily(); spawnOwnedCar();
+  refreshHome(); refreshFamily(); spawnOwnedCar(); minigame = null; refreshTower(); refreshPet();
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
   $('titleScreen').hidden = true; state = 'play'; setScreens();
   if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
@@ -2046,6 +2426,7 @@ let gameT = 0, last = performance.now();
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
   if (state === 'play') update(dt);
+  else if (state === 'mini') { updateMini(dt); trafficUpdate(dt); }
   updateFx(dt);
   if (state !== 'play') { if (state === 'title') trafficUpdate(dt); }
   if (state === 'title') for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } }
