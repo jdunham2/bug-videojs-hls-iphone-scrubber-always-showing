@@ -752,6 +752,14 @@ const GOODS = {
   black_pearl:{name:'Black Pearl',base:420,col:'#3a3a5a',kind:'good'},
   diving_mask:{name:'Diving Mask',base:80,col:'#9fe8ff',kind:'trinket',desc:'Safer pearl dives: +10% breath at every depth'},
   black_pearl_ring:{name:'Black Pearl Ring',base:1200,col:'#3a3a5a',kind:'craft'},
+  // --- meals (cooked at a pot, campfire or in town) ---
+  cooking_pot:{name:'Cooking Pot',base:60,col:'#3a3a40',kind:'place',desc:'Place with B. Cook hearty meals here.'},
+  hearty_stew:{name:'Hearty Stew',base:70,col:'#a86a3a',kind:'food',heal:20,buff:'regen',buffDur:300},
+  hunters_feast:{name:"Hunter's Feast",base:120,col:'#c8603a',kind:'food',heal:30,buff:'might',buffDur:300},
+  seafood_platter:{name:'Seafood Platter',base:110,col:'#e8a080',kind:'food',heal:26,buff:'luck',buffDur:300},
+  travelers_pie:{name:"Traveler's Pie",base:90,col:'#d8a050',kind:'food',heal:22,buff:'speed',buffDur:300},
+  ironroot_soup:{name:'Ironroot Soup',base:100,col:'#8a7a5a',kind:'food',heal:24,buff:'iron',buffDur:300},
+  kings_banquet:{name:"King's Banquet",base:400,col:'#e3a948',kind:'food',heal:60,buff:'might',buff2:'regen',buffDur:420},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -977,6 +985,13 @@ const RECIPES = [
   {id:'slime_tonic',    need:{slime_gel:3,glass:1}, at:'bench', known:true},
   {id:'diving_mask',    need:{glass:2,hide:1,rope:1}, at:'bench', known:true},
   {id:'black_pearl_ring',need:{black_pearl:2,silver:2}, at:'bench', known:true},
+  {id:'cooking_pot',    need:{iron:3,stone:2}, at:'bench', known:true},
+  {id:'hearty_stew',    need:{meat:2,carrot:1,potato:1}, at:'cook', known:true},
+  {id:'hunters_feast',  need:{meat:3,herbs:1,bread:1}, at:'cook', known:true},
+  {id:'seafood_platter',need:{fish:2,shells:2,salt:1}, at:'cook', known:true},
+  {id:'travelers_pie',  need:{wheat:2,berries:2,egg:1}, at:'cook', known:true},
+  {id:'ironroot_soup',  need:{mushroom:2,potato:1,iron:1}, at:'cook', known:true},
+  {id:'kings_banquet',  need:{truffle:1,maple_syrup:1,meat:2,wine:1}, at:'cook', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1040,7 +1055,7 @@ const RECIPES = [
 ];
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots', lion_mane:'lionheart', fox_tail:'foxfire_lantern', kings_crown:'royal_helm', spore_heart:'sporecap_armor', prism_core:'prism_aegis', ronin_mask:'ronin_helm', treant_heart:'treant_armor', kraken_eye:'kraken_shield', stag_antler:'antler_bow'};
-const STATION_LABEL = {hand:'Anywhere', bench:'Workbench (any settlement, your cottage, or a crafting table you placed)', forge:'A forge (or your manor, or an anvil you placed)'};
+const STATION_LABEL = {cook:'A cooking pot, campfire, or any town', hand:'Anywhere', bench:'Workbench (any settlement, your cottage, or a crafting table you placed)', forge:'A forge (or your manor, or an anvil you placed)'};
 const CRAFT_GROUPS = [['Tools',['tool']],['Weapons',['weapon','ammo']],['Armor & trinkets',['armor','trinket']],['Food',['food']],['Goods & metals',['craft','good','mat']],['Building',['place']],['Upgrades',null]];
 
 const NODES = {
@@ -1308,7 +1323,7 @@ const PK = Object.keys(PROPERTIES);
 const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
-  campfire:{solid:true, light:52, use:'rest'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
+  campfire:{solid:true, light:52, use:'rest'}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
   scarecrow:{solid:true}, flower_pot:{solid:true},
 };
 const PLACE_MAX = 600;
@@ -1369,6 +1384,7 @@ function placedTarget() {
   for (let y = fy - 2; y <= fy + 2; y++) for (let x = fx - 2; x <= fx + 2; x++) { const q = placedAt(x, y); if (!q) continue; const d = Math.hypot(x + .5 - S.x, y + .5 - S.y); if (d < bd) { bd = d; best = q; } }
   if (!best) return null;
   const q = best, P = PLACE[q.t], nm = GOODS[q.t].name;
+  if (P.use === 'cook') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Cook at the pot`, btn: 'Cook', fn: () => openPanel('Cooking Pot', 'A bubbling pot. Cook hearty meals with long-lasting effects (Craft menu, Food tab).', [{label: 'Cook', primary: true, fn: () => { closeTalk(); craftTab = 3; openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
   if (P.use === 'craft') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the ${nm}`, btn: 'Use', fn: () => openPanel(nm, q.t === 'anvil' ? 'A sturdy anvil. You can use forge and workbench recipes here.' : 'Your own crafting table. You can use workbench recipes here.', [
     {label: 'Craft', primary: true, fn: () => { closeTalk(); openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
   if (P.use === 'rest') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Sit by the campfire`, btn: 'Rest', fn: () => openPanel('Campfire', 'The fire crackles. Resting here heals you fully, once a minute.', [
@@ -1470,6 +1486,7 @@ function drawPlaced(g, q, t) {
       g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(x + 4, y + 1, 2, 1); break;
     case 'starlight_lantern': { g.fillRect(x + 5, y + 14, 6, 2); g.fillStyle = '#3a3a4a'; g.fillRect(x + 7, y - 2, 2, 16); g.fillRect(x + 4, y - 3, 8, 1); const pu = .7 + Math.sin(t*3)*.3; g.globalAlpha = pu; g.fillStyle = '#fff4b0'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = i % 2 ? 2.5 : 5.5; g.lineTo(x + 8 + Math.cos(a)*r, y - 9 + Math.sin(a)*r); } g.fill(); g.globalAlpha = 1; break; }
     case 'golden_statue': g.fillRect(x + 2, y + 13, 12, 3); g.fillStyle = '#8a8890'; g.fillRect(x + 2, y + 10, 12, 5); g.fillStyle = '#9a98a2'; g.fillRect(x + 2, y + 10, 12, 1); drawPerson(g, x + 8, y + 10, {cloak: '#e3a948', skin: '#f0c040', hair: '#c8a030'}, 0, false, 'down'); if (Math.random() < .03) burst(q.x + .5, q.y - .6, '#fff4b0', 1, 1); break;
+    case 'cooking_pot': { g.fillRect(x + 2, y + 13, 12, 3); g.fillStyle = '#5a3a20'; g.fillRect(x + 3, y + 12, 3, 2); g.fillRect(x + 10, y + 12, 3, 2); g.fillStyle = '#e05a1a'; g.fillRect(x + 5, y + 11, 6, 2); g.fillStyle = '#2a2a30'; g.beginPath(); g.ellipse(x + 8, y + 7, 7, 5, 0, 0, 7); g.fill(); g.fillStyle = '#a86a3a'; g.beginPath(); g.ellipse(x + 8, y + 4, 5.5, 2, 0, 0, 7); g.fill(); g.fillStyle = '#3a3a40'; g.fillRect(x + 1, y + 3, 14, 1); for (let k = 0; k < 2; k++) { const ph = (t*.6 + k*.5) % 1; g.fillStyle = `rgba(230,230,240,${.5 - ph*.5})`; g.beginPath(); g.arc(x + 6 + k*4 + Math.sin(t*2 + k)*1.5, y + 1 - ph*10, 1.5 + ph*2, 0, 7); g.fill(); } break; }
     case 'flower_pot':
       g.fillRect(x + 3, y + 13, 10, 2);
       g.fillStyle = '#b05a3a'; g.fillRect(x + 4, y + 8, 8, 6); g.fillStyle = '#c86a48'; g.fillRect(x + 3, y + 7, 10, 2);
@@ -4370,6 +4387,7 @@ function update(dt) {
   }
   saveTimer += dt; if (saveTimer > 8) { saveTimer = 0; save(); }
   achT += dt; if (achT > 2) { achT = 0; checkAch(); }
+  if (BUFFS.regen > 0 && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + (.4 + (S.level || 1)*.02)*dt); renderHP(); }
   let bchg = false; for (const b in BUFFS) if (BUFFS[b] > 0) { const before = Math.ceil(BUFFS[b]); BUFFS[b] = Math.max(0, BUFFS[b] - dt); if (Math.ceil(BUFFS[b]) !== before) bchg = true; } if (bchg) renderHUD();
   renderClock();
 }
@@ -5185,7 +5203,7 @@ $('bagSheet').addEventListener('click', e => {
 });
 function eat(g) {
   if (!have(g) || (S.hp >= maxHP() && !GOODS[g].buff)) return;
-  if (GOODS[g].buff) { addItem(g, -1); BUFFS[GOODS[g].buff] = 90; if (GOODS[g].heal) S.hp = Math.min(maxHP(), S.hp + GOODS[g].heal); SFX.level(); floatText(S.x, S.y - 1.2, BUFF_NAME[GOODS[g].buff] + '!', '#bfe8ff'); renderHUD(); return; }
+  if (GOODS[g].buff) { addItem(g, -1); BUFFS[GOODS[g].buff] = GOODS[g].buffDur || 90; if (GOODS[g].buff2) BUFFS[GOODS[g].buff2] = GOODS[g].buffDur || 90; if (GOODS[g].heal) S.hp = Math.min(maxHP(), S.hp + GOODS[g].heal); SFX.level(); floatText(S.x, S.y - 1.2, BUFF_NAME[GOODS[g].buff] + '!', '#bfe8ff'); renderHUD(); return; }
   addItem(g, -1); S.hp = Math.min(maxHP(), S.hp + GOODS[g].heal); SFX.eat();
   floatText(S.x, S.y - 1.2, `+${GOODS[g].heal} HP`, '#86c98f'); renderHUD();
 }
@@ -5204,7 +5222,8 @@ let craftTab = 0;
 function stations() {
   const t = townAt(S.x, S.y, 8), home = t === 'home';
   const anvil = placedNear(['anvil'], 3.5), table = anvil || placedNear(['crafting_table'], 3.5);
-  return {hand: true, bench: table || (!!t && (!home || S.home.level >= 2)), forge: anvil || (!!t && FORGE_TOWNS.includes(t)) || (home && S.home.level >= 3)};
+  const cook = placedNear(['cooking_pot','campfire'], 3) || !!t;
+  return {hand: true, cook, bench: table || (!!t && (!home || S.home.level >= 2)), forge: anvil || (!!t && FORGE_TOWNS.includes(t)) || (home && S.home.level >= 3)};
 }
 function openCraft() { mode = 'craft'; keys.clear(); renderCraft(); $('craft').hidden = false; }
 function renderCraft() {
@@ -5223,7 +5242,7 @@ function renderCraft() {
     }
     const hasAll = Object.entries(r.need).every(([k, q]) => have(k) >= q);
     const atOk = st[r.at];
-    const reason = !atOk ? (r.at === 'forge' ? 'Go to a forge' : 'Go to a settlement') : !hasAll ? 'Missing materials' : '';
+    const reason = !atOk ? (r.at === 'forge' ? 'Go to a forge' : r.at === 'cook' ? 'Find a fire or pot' : 'Go to a settlement') : !hasAll ? 'Missing materials' : '';
     return `<div class="jcard"><div class="irow"><span class="nm">${swatch(out)}<span class="t">${esc(r.label || g.name)}</span>${(r.n || 1) > 1 ? ` ×${r.n}` : ''}${have(out) ? ` <span class="s">(have ${have(out)})</span>` : ''}</span>
       <button class="btn sm ${reason ? '' : 'primary'}" data-craft="${r.id}" ${reason ? 'disabled' : ''} title="${reason}">${reason || 'Craft'}</button></div>
       <div class="stat">${esc(itemStat(out))}</div>
@@ -5313,7 +5332,7 @@ function craft(id) {
   const r = RECIPE_BY[id], out = r.out || r.id, g = GOODS[out];
   if (!isKnown(id) || !stations()[r.at] || !Object.entries(r.need).every(([k, q]) => have(k) >= q)) return;
   for (const k in r.need) addItem(k, -r.need[k]);
-  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5);
+  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5); if (r.at === 'cook') { S.cooked = S.cooked || {}; S.cooked[out] = true; }
   const mw = Math.random() < .04*sk('cra'); if (mw) { addItem(out, r.n || 1); S.masterworks = (S.masterworks || 0) + 1; }
   let note = '';
   if (g.kind === 'weapon' && g.dmg > weapon().dmg) { S.equip.weapon = out; note = ' Equipped.'; }
@@ -6639,8 +6658,8 @@ const SKILLS = {
   cra:{name:'Craftsmanship', desc:'4% chance per point that a craft turns out a masterwork: double output'},
 };
 let hitStop = 0, hurtFlash = 0, achT = 0;
-const BUFFS = {speed: 0, might: 0, iron: 0, luck: 0};
-const BUFF_NAME = {speed: 'Swift', might: 'Might', iron: 'Ironskin', luck: 'Lucky'};
+const BUFFS = {speed: 0, might: 0, iron: 0, luck: 0, regen: 0};
+const BUFF_NAME = {speed: 'Swift', might: 'Might', iron: 'Ironskin', luck: 'Lucky', regen: 'Hearty'};
 function gainXP(n) {
   if (!S || mode === 'title' || n <= 0) return;
   S.xp = (S.xp || 0) + Math.round(n * (S.pet === 'crane' ? 1.1 : 1) * (have('star_pendant') ? 1.15 : 1));
@@ -6746,6 +6765,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['chef','Chef','Cook a meal at a pot or campfire', () => ['hearty_stew','hunters_feast','seafood_platter','travelers_pie','ironroot_soup','kings_banquet'].some(g => S.cooked && S.cooked[g])],
   ['diver','Deep Diver','Reach depth 5 on a pearl dive', () => (S.deepestDive || 0) >= 5],
   ['blackpearl','Black Pearl','Find a black pearl', () => (S.blackPearls || 0) >= 1],
   ['bodyguard','Bodyguard','Complete 3 escort jobs', () => (S.escorts || 0) >= 3],
