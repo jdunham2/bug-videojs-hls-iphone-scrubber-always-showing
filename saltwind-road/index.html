@@ -1141,6 +1141,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  den:{name:'Monster Den',hp:30,dmg:0,speed:0,aggro:0,drops:[],den:true},
   slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
   crab:{name:'Shore Crab',hp:6,dmg:2,speed:2.6,aggro:4,drops:[['shells',1,3,1],['meat',1,1,.3]]},
   sporeling:{name:'Sporeling',hp:7,dmg:2,speed:2.4,aggro:6,drops:[['mushroom',1,2,1],['truffle',1,1,.08]]},
@@ -3146,6 +3147,7 @@ function killEnemy(e) {
     return;
   }
   if (e.ghostCap) ghostLoot(e);
+  if (e.den != null) { denBroken(e); return; }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
   if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
@@ -3250,7 +3252,7 @@ function drawStar(st) {
 }
 const bloodMoonDay = () => S && S.day >= 6 && S.day % 6 === 0;
 const bloodMoon = () => !!S && ((bloodMoonDay() && S.time > .78) || (S.day > 6 && S.day % 6 === 1 && S.time < .22)) && !inDungeon() && !inArena();
-const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && !ENEMIES[k].target);
+const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && !ENEMIES[k].target && !ENEMIES[k].den);
 const LEGENDS = [
   {id:'grizzle',   name:'Old Grizzle',        type:'boar',     tx:112, ty:72,  hp:140, dmg:2.2, col:'#c8803a', drop:'grizzle_hide'},
   {id:'whitefang', name:'Whitefang',          type:'wolf',     tx:150, ty:22,  hp:150, dmg:2.4, col:'#e8f4ff', drop:'whitefang_blade'},
@@ -3268,6 +3270,65 @@ function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
+}
+// ===== monster dens =====
+function ensureDens() {
+  if (S.dens && S.dens.length) return S.dens;
+  S.dens = [];
+  for (let tries = 0; tries < 6000 && S.dens.length < 18; tries++) {
+    const x = rint(10, W - 11), y = rint(10, WORLD_H - 12), t = map[idx(x, y)];
+    if (t === T.ROAD || t === T.BRIDGE || t === T.FLOOR || !enemyWalk(x + .5, y + .5) || townAt(x, y, 22)) continue;
+    if (S.dens.some(d => Math.hypot(d.x - x, d.y - y) < 40)) continue;
+    let ty = null; for (let k = 0; k < 12 && !ty; k++) { const c = spawnTypeFor(t, x, false); if (c && ENEMIES[c] && !ENEMIES[c].passive) ty = c; }
+    if (!ty) continue;
+    S.dens.push({x, y, type: ty, broken: -99});
+  }
+  return S.dens;
+}
+const denUp = d => S.day - d.broken >= 7;
+function denSpawns() {
+  if (inDungeon() || inArena()) return;
+  const dens = ensureDens();
+  for (let i = 0; i < dens.length; i++) {
+    const d = dens[i]; if (!denUp(d) || Math.hypot(S.x - d.x - .5, S.y - d.y - .5) > 15 || enemies.some(e => e.den === i && !e.dead)) continue;
+    const lv = 1 + (S.level || 1)*.06, e = makeEnemy('den', d.x + .5, d.y + .6, {den: i, st: 1.5});
+    e.hp = e.max = Math.round(30*lv); enemies.push(e);
+    if (!S.densSeen || !S.densSeen[i]) { S.densSeen = S.densSeen || {}; S.densSeen[i] = true; toast(`<b>A monster den!</b><br>${ENEMIES[d.type].name}s keep crawling out of it. Smash it to stop them.`, 4500); }
+  }
+}
+function denTick(e, dt) {
+  e.hurt = Math.max(0, e.hurt - dt); e.kx = e.ky = 0;
+  const d = S.dens && S.dens[e.den]; if (!d) { e.dead = true; return; }
+  const far = Math.hypot(S.x - e.x, S.y - e.y);
+  if (far > 22) { e.dead = true; return; }
+  e.st -= dt; if (e.st > 0 || far > 12) return;
+  e.st = 4 + Math.random()*2.5;
+  if (enemies.filter(m => m.fromDen === e.den && !m.dead).length >= 3) return;
+  const a = Math.random()*6.283, x = e.x + Math.cos(a)*1.1, y = e.y + Math.sin(a)*1.1;
+  if (!enemyWalk(x, y)) return;
+  const m = makeEnemy(d.type, x, y, {alert: true, fromDen: e.den}); m.hp = m.max = Math.round(m.max*(1 + (S.level || 1)*.04)); enemies.push(m);
+  burst(e.x, e.y - .3, '#5a3a2a', 8, 2);
+}
+function denBroken(e) {
+  const d = S.dens[e.den]; d.broken = S.day; S.densSmashed = (S.densSmashed || 0) + 1;
+  for (const m of enemies) if (m.fromDen === e.den) m.alert = true;
+  const got = [], c = rint(60, 120) + (S.level || 1)*6; S.coins += c; got.push(`+${c} coin`);
+  const mats = pick([['bone', 3], ['hide', 3], ['iron', 2], ['silk', 3], ['chitin', 2], ['crystal', 2], ['ember', 2]].filter(([g]) => GOODS[g])); addItem(mats[0], mats[1]); got.push(`+${mats[1]} ${GOODS[mats[0]].name}`);
+  if (Math.random() < .25) { addItem('gem', 1); got.push('+1 Cut Gem'); }
+  if (Math.random() < .2) { addItem('treasure_map', 1); got.push('+1 Treasure Map'); }
+  gainXP(40 + (S.level || 1)*4); SFX.victory(); burst(e.x, e.y - .4, '#8a6a4a', 24, 5); shake = .25;
+  toast(`<b>Den destroyed!</b> It will take a week for the monsters to rebuild.<br><span style="color:var(--good)">${got.join(', ')}</span>`, 5500);
+  renderHUD(); save();
+}
+function drawDen(g, e, x, y) {
+  const s = e.hurt > 0 ? 1.06 : 1;
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x, y + 2, 16, 5, 0, 0, 7); g.fill();
+  g.fillStyle = '#5a4a3a'; g.beginPath(); g.ellipse(x, y - 4, 15*s, 10*s, 0, Math.PI, 0); g.fill(); g.fillRect(x - 15*s, y - 4, 30*s, 5);
+  g.fillStyle = '#7a6a54'; for (let i = -2; i <= 2; i++) { g.beginPath(); g.arc(x + i*6, y - 6 - (2 - Math.abs(i))*3, 4, 0, 7); g.fill(); }
+  g.fillStyle = '#1a1410'; g.beginPath(); g.ellipse(x, y - 1, 6, 5, 0, Math.PI, 0); g.fill(); g.fillRect(x - 6, y - 1, 12, 3);
+  const glow = .5 + Math.sin(frameT*4)*.3; g.fillStyle = `rgba(255,90,60,${glow})`; g.fillRect(x - 3, y - 3, 2, 2); g.fillRect(x + 1, y - 3, 2, 2);
+  g.fillStyle = '#e8e0d0'; g.fillRect(x - 13, y - 1, 4, 2); g.fillRect(x + 10, y - 2, 3, 2);
+  if (e.hp < e.max) { g.fillStyle = '#0d131b'; g.fillRect(x - 13, y - 22, 26, 4); g.fillStyle = '#e57a62'; g.fillRect(x - 12, y - 21, 24*Math.max(0, e.hp)/e.max, 2); }
 }
 // ===== the ghost ship =====
 const ghostActive = () => { const G = S.ghost; if (!G || G.cleared) return false; return (G.day === S.day && S.time > .72) || (G.day === S.day - 1 && S.time < .27); };
@@ -3341,6 +3402,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Monster dens', 'Dens out in the wild keep spawning monsters while you are near. Smash a den for coin and materials. Destroyed dens rebuild after a week.'],
   ['Weekly challenges', 'Three bigger challenges appear in your journal each week. Completing one pays coin and Challenge Tokens, which Chronicler Aldous in Port Wren trades for rare goods and the Victor\u2019s Cape.'],
   ['Pet tricks', 'Wilma in Port Wren teaches your pet tricks for Pet Treats (crafted from Raw Meat and Wheat). Tricks make pets attack faster, and every 7th day she holds a pet show with prizes.'],
   ['The ghost ship', 'Every few days sailors whisper of a ghost ship near a town. It runs aground after dark: defeat Captain Mordekai and his crew before dawn for cursed treasure.'],
@@ -3560,7 +3622,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -3577,6 +3639,7 @@ function updateCombat(dt, night) {
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
     if (def.target) { e.hurt = Math.max(0, e.hurt - dt); e.life -= dt; if (e.life <= 0) e.dead = true; continue; }
+    if (def.den) { denTick(e, dt); continue; }
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
@@ -4139,6 +4202,7 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
 function drawEnemy(g, e) {
   const x = Math.round(e.x*TS), y = Math.round(e.y*TS);
   if (e.hidden > 0) { g.fillStyle = '#a08050'; g.beginPath(); g.ellipse(x, y, 10, 3, 0, 0, 7); g.fill(); return; }
+  if (e.den != null) { drawDen(g, e, x, y); return; }
   const flash = e.act && e.act.phase === 'wind' && Math.floor(frameT*16) % 2;
   if (e.hurt > 0) g.globalAlpha = .55;
   if (e.boss) {
@@ -7565,6 +7629,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['denbuster','Den Buster','Destroy 5 monster dens', () => (S.densSmashed || 0) >= 5],
   ['weekly','Weekly Warrior','Complete 3 weekly challenges', () => (S.weeklyDone || 0) >= 3],
   ['trickster','Good Boy!','Teach your pet 4 tricks', () => petTricks().length >= 4],
   ['bestinshow','Best in Show','Win a pet show', () => (S.petShowWins || 0) >= 1],
@@ -7985,7 +8050,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
