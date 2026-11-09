@@ -698,6 +698,7 @@ const GOODS = {
   pufferfish:{name:"Pufferfish",base:38,col:'#e0d070',kind:'good'},
   coelacanth:{name:"Ancient Coelacanth",base:320,col:'#5a6a8a',kind:'good'},
   master_rod:{name:'Master Rod',base:400,col:'#e3a948',kind:'tool',tool:'rod',tier:3,desc:'The widest catch bar, and rare fish bite more often'},
+  crown_of_ages:{name:'Crown of Ages',base:5000,col:'#c8a8ff',kind:'trinket',desc:'+15% damage, +10% critical chance, +2 armor. The crown of the first king.'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1100,6 +1101,7 @@ const BOSSES = {
   lichemperor:{name:'The Lich Emperor',tx:0,ty:0,kind:'lich',size:2.3,hp:400,dmg:7,speed:2.6,cd:1.7,abilities:['blink','cone','summon','spray','blink'],summon:'skeleton',undead:true,pcol:'#e3a948',dungeon:'catacombs',loot:{coins:950,items:{gem:4,ancient_coin:4}},intro:'The emperor of the old kingdom sits up in his tomb. His crown burns with green fire.'},
   rotweaver:{name:'The Rot Weaver',tx:0,ty:0,kind:'spider',size:2.9,hp:420,dmg:7,speed:3.2,cd:1.7,abilities:['spray','summon','burrow','dash'],summon:'spider',pcol:'#b98ad8',dungeon:'myceliumdeep',loot:{coins:1000,items:{gem:4,truffle:4}},intro:'Glowing threads tremble everywhere. Something huge has been weaving down here for centuries.'},
   prismdragon:{name:'Prismscale, the Crystal Dragon',tx:0,ty:0,kind:'wyrm',size:3.0,hp:520,dmg:8,speed:3.1,cd:1.6,abilities:['fireball','dash','spray','quake','fireball'],pcol:'#e8a8ff',dungeon:'prismmine',loot:{coins:1300,items:{gem:6,shimmer_shard:6}},intro:'Every crystal in the mine flares at once. A dragon of living prism wakes on its hoard.'},
+  hollowking:{name:'The Hollow King',tx:0,ty:0,kind:'lich',size:3.2,hp:950,dmg:9,speed:2.8,cd:1.5,abilities:['blink','cone','summon','fireball','spray','lightning','blink'],summon:'wraith',undead:true,pcol:'#c8a8ff',dungeon:'hollowthrone',loot:{coins:3000,items:{gem:8,abyss_shard:6}},intro:'The eight shards blaze. The Hollow King rises from a throne of nothing, and the dark bends toward him.'},
   warden:{name:'The Crypt Warden',tx:0,ty:0,kind:'warden',size:2.2,hp:170,dmg:4,speed:2.3,cd:2.0,abilities:['dash','summon','slam','cone'],summon:'skeleton',undead:true,pcol:'#7affc8',dungeon:'crypt',loot:{coins:450,items:{gem:2,silver:3}},intro:'Armor scrapes on stone. The Warden has guarded this crypt for a thousand years.'},
   crystalqueen:{name:'The Crystal Queen',tx:0,ty:0,kind:'spider',size:2.8,hp:220,dmg:4,speed:3.0,cd:1.9,abilities:['spray','summon','dash','burrow'],summon:'spider',pcol:'#9fe8ff',dungeon:'caverns',loot:{coins:550,items:{gem:3,crystal:4}},intro:'Crystals chime all around you. The Queen of the caverns descends on a thread of glass.'},
   magmahound:{name:'The Magma Hound',tx:0,ty:0,kind:'wolf',size:2.6,hp:280,dmg:5,speed:3.6,cd:1.8,abilities:['dash','fireball','dash','summon'],summon:'imp',pcol:'#ff8a3a',dungeon:'depths',loot:{coins:650,items:{gem:4,ember:4}},intro:'The lava parts. A hound of living magma pads out of the dark.'},
@@ -1125,11 +1127,15 @@ const DUNGEONS = {
     theme:{floor:'#2e2238', floor2:'#2a1e34', wall:'#100a16', top:'#4a3a6a', accent:'#b98ad8'}},
   prismmine:{name:'The Prism Mine', lvl:26, rect:[720,253,76,54], seed:808, near:[892,126], boss:'prismdragon', treasure:'starfall_blade', enemies:['dustdevil','bat','wisp','imp'],
     theme:{floor:'#3a3448', floor2:'#342e42', wall:'#141020', top:'#6a5a8a', accent:'#e8a8ff'}},
+  hollowthrone:{name:'The Hollow Throne', lvl:30, rect:[856,253,76,54], seed:999, near:[598,122], boss:'hollowking', treasure:'crown_of_ages', sealed:6, enemies:['wraith','ghoul','skeleton','imp','dustdevil'],
+    theme:{floor:'#2a2438', floor2:'#262034', wall:'#0c0814', top:'#4a3a6a', accent:'#c8a8ff'}},
   abyss:{name:'The Abyss', lvl:12, rect:[272,253,84,54], seed:9001, near:[134,122], endless:true, enemies:[],
     theme:{floor:'#221a30', floor2:'#1e1629', wall:'#0a0610', top:'#3a2a5a', accent:'#b07aff'}},
 };
 const DK = Object.keys(DUNGEONS);
 const DK_FIXED = DK.filter(k => !DUNGEONS[k].endless);
+const SHARD_DK = DK_FIXED.filter(k => !DUNGEONS[k].sealed);
+const shardCount = () => SHARD_DK.filter(k => S.bosses[DUNGEONS[k].boss]).length;
 const ABYSS = {floor: 1, gen: 0};
 const abyssChests = [];
 const chests = [];
@@ -1670,6 +1676,9 @@ const NPCS = [
   {id:'marlin',town:'wren',dx:1,dy:3,name:'Old Marlin',role:'Master angler',cols:{cloak:'#3a5a6a',skin:'#c89870',hair:'#e0e0e0'},angler:true,
    hello:["Fish are biting. They always are, if you know where.","Caught anything new?","My fellow angler!"],
    rumors:["Every river and coast has its own fish. Snowy waters, jungle rivers, lava pools... try them all.","Some fish only bite at night. Moonfish, ghostfish, catfish.","They say an Ancient Coelacanth swims somewhere. I've never seen one. Nobody has."]},
+  {id:'veyra',town:'skyhold',dx:-1,dy:3,name:'Oracle Veyra',role:'Keeper of the old tales',cols:{cloak:'#4a3a6a',skin:'#e0c8b0',hair:'#f0f0ff'},oracle:true,
+   hello:["The wind told me you'd come.","Ah, the shard-bearer.","Hero. The tales are already being written."],
+   rumors:["Every guardian of the deep places guards a shard of the first king's crown. They did not know it, but they did.","The Hollow King was the first king of all the lands. He gave up his heart for power, and now he is only hunger."]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -2146,7 +2155,7 @@ function placeNodes() {
       case T.GLOOM:  type = r < .06 ? 'mushroom' : r < .085 ? 'web' : r < .11 ? 'branch' : r < .12 ? 'herb' : null; break;
       case T.ASH:    type = near(x,y,T.LAVA) ? (r < .14 ? 'obsidian' : r < .2 ? 'sulfur' : null) : (r < .045 ? 'sulfur' : r < .065 ? 'obsidian' : r < .085 ? 'rock' : null); break;
       case T.SHAL:   type = landNear(x,y) && r < .07 ? 'fish' : null; break;
-      case T.DFLOOR: { const dk = dungeonAtX(x); type = !dk || dk === 'abyss' ? null : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
+      case T.DFLOOR: { const dk = dungeonAtX(x); type = !dk || dk === 'abyss' ? null : dk === 'hollowthrone' ? (r < .02 ? 'crystal' : r < .03 ? 'shard' : null) : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
       case T.JUNGLE: type = r < .05 ? 'fruit' : r < .09 ? 'vine' : r < .1 ? 'herb' : r < .115 ? 'branch' : r < .127 ? 'jade' : r < .14 ? 'orangetree' : null; break;
       case T.MESA:   type = r < .05 ? 'copper' : r < .07 ? 'rock' : r < .085 ? 'cactus' : (nearMt && r < .14) ? 'jade' : null; break;
       case T.MOOR:   type = r < .06 ? 'heather' : r < .075 ? 'rock' : r < .09 ? 'bush' : null; break;
@@ -2496,7 +2505,7 @@ function weapon() {
 const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
-function armorVal() { return eqStat('armor') + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed'));
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
@@ -2726,8 +2735,8 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0);
-    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
+    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
@@ -2748,6 +2757,8 @@ function killEnemy(e) {
     S.bosses[e.boss] = true; gainXP(Math.round(B.hp*1.5)); SFX.victory(); hitStop = .35;
     if (e.boss === 'abyss') { S.abyssCheckpoint = Math.max(S.abyssCheckpoint || 1, ABYSS.floor + 1); setTimeout(() => toast(`<b>Checkpoint reached</b><br>You can now start the Abyss from floor ${ABYSS.floor + 1}. The way down is open.`, 6000), 1200); }
     S.coins += B.loot.coins; got.push(`+${B.loot.coins} coin`);
+    if (B.dungeon && SHARD_DK.includes(B.dungeon)) { const n = shardCount(); got.push(`<b>a Crown Shard</b> (${n}/${SHARD_DK.length})`); if (n === DUNGEONS.hollowthrone.sealed) setTimeout(() => toast('<b>The shards sing</b><br>Far away, beneath the Broken Throne of the Old Kingdom, a seal cracks open. Oracle Veyra in Skyhold will know what it means.', 9000), 2500); }
+    if (e.boss === 'hollowking') setTimeout(() => toast('<b>The Hollow King falls</b><br>The dark lifts from every land at once. Bards will sing of this for a thousand years. You are the Legend of Saltwind Road.', 12000), 2000);
     for (const g in B.loot.items) { addItem(g, B.loot.items[g]); got.push(`+${B.loot.items[g]} ${GOODS[g].name}`); }
     burst(e.x, e.y - 1, '#ffd27a', 40, 8); shake = .6;
     for (const m of enemies) if (m.minion) m.dead = true;
@@ -3508,6 +3519,7 @@ function drawEnemy(g, e) {
   if (e.hurt > 0) g.globalAlpha = .55;
   if (e.boss) {
     const B = BOSSES[e.boss];
+    if (e.boss === 'hollowking') { const pu = .5 + Math.sin(frameT*3)*.2; g.globalAlpha = pu*.5; g.fillStyle = '#8a5aff'; g.beginPath(); g.ellipse(x, y - 9*B.size, 13*B.size, 14*B.size, 0, 0, 7); g.fill(); g.globalAlpha = e.hurt > 0 ? .55 : 1; if (Math.random() < .3) burst(e.x + (Math.random() - .5)*2, e.y - Math.random()*2.5, '#c8a8ff', 1, 1); }
     g.save(); g.translate(x, y); g.scale(B.size, B.size);
     drawEnemyAt(g, B.kind, 0, 0, e.face, e.phase, {boss:true, bossId: e.boss});
     g.restore();
@@ -4094,6 +4106,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
@@ -5273,6 +5286,7 @@ function dungeonTarget() {
   if (!dk) {
     for (const k of DK) {
       const D = DUNGEONS[k], E = D.entrance;
+      if (D.sealed && Math.hypot(S.x - E.x - .5, S.y - E.y - .8) < 1.4 && shardCount() < D.sealed) return {key:'ds' + shardCount(), html:`${D.name} · sealed by old magic · Crown Shards ${shardCount()}/${D.sealed}`, btn:'', fn: () => {}};
       if (Math.hypot(S.x - E.x - .5, S.y - E.y - .8) < 1.4) return {key:'de' + k, html:`${K}Enter ${D.name} · <span class="${S.level < D.lvl ? 'warn' : ''}">recommended level ${D.lvl}</span>`, btn:'Enter', fn: () => enterDungeon(k)};
     }
     return null;
@@ -5793,6 +5807,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['legendary','Legend of Saltwind Road','Defeat the Hollow King', () => !!S.bosses.hollowking],
+  ['shards','Shard Bearer','Gather 6 Crown Shards', () => shardCount() >= 6],
   ['defender','Defender','Save a town from a raid', () => (S.raidsWon || 0) >= 1],
   ['guardian','Guardian of the Realm','Save towns from 10 raids', () => (S.raidsWon || 0) >= 10],
   ['fishlog','Fish Collector','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
@@ -5877,6 +5893,15 @@ function arenaTarget() {
   const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (S.arena.live) return {key: 'arL', html: 'The gate is barred until this wave is beaten', btn: '', fn: () => {}};
   return {key: 'arX' + S.arena.pot, html: `${K}Leave the arena · collect ${S.arena.pot} coin`, btn: 'Leave', fn: () => { SFX.travel(); fadeThen(() => leaveArena(false)); }};
+}
+function oracleTalk(n) {
+  const c = shardCount(), need = DUNGEONS.hollowthrone.sealed;
+  const list = SHARD_DK.map(k => `${S.bosses[DUNGEONS[k].boss] ? '◆' : '◇'} ${DUNGEONS[k].name}`).join('<br>');
+  const txt = S.bosses.hollowking ? '“It is done. The crown is yours, and the dark is gone. Rest, hero. You have earned it.”'
+    : c >= need ? '“The seal beneath the Broken Throne has cracked. The Hollow Throne lies open, deep under the Old Kingdom. The Hollow King waits. Go well-armed, and go ready. He is the oldest evil there is.”'
+    : `“Long ago the first king's crown was shattered, and each shard sank into a deep place, where a guardian grew around it. Gather ${need} shards and the seal on the Hollow Throne will break.”<br><br>You carry <b>${c}/${SHARD_DK.length}</b> shards.`;
+  if (!S.bosses.hollowking && c >= need && !S.flags.throneMarked) { S.flags.throneMarked = true; S.dungeonsSeen.hollowthrone = true; }
+  say(`${txt}<br><br><span style="font-size:13px">${list}</span>`, [back(n)]);
 }
 const ANGLER_PRIZES = [[5, 'fishing_net', 'a Fishing Net'], [10, 'master_rod', 'his old Master Rod'], [15, 'gem', '5 Cut Gems', 5], [21, 'captains_compass', "a Captain's Compass"]];
 function anglerReward() { const n = Object.keys(S.fishLog || {}).length, got = S.anglerPaid || 0; return Math.max(0, n - got); }
