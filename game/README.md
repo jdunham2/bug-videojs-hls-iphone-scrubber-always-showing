@@ -54,4 +54,12 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 | R | Rotate the building piece |
 | V | Zoom the mount camera |
 
+### Touch (phones and tablets)
+
+Touch controls turn on automatically on touch screens, and quality defaults to Performance.
+Drag anywhere on the left side for a joystick and swipe on the right side to look.
+The buttons are Hit (hold to attack), Use, Jump, plus Run and Sneak toggles.
+The 🎒 button opens inventory and crafting, and you tap a hotbar slot to equip or eat.
+Landscape plays best.
+
 Three.js (MIT) is vendored in `vendor/`.

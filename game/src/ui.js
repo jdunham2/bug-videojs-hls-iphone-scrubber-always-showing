@@ -23,20 +23,21 @@ export class UI {
     for (let i = 0; i < 8; i++) {
       const d = document.createElement('div');
       d.className = 'slot'; d.dataset.i = i;
+      d.addEventListener('pointerdown', (e) => { e.stopPropagation(); game.selectHot(i); });
       this.hotbar.appendChild(d);
     }
     for (let i = 0; i < 24; i++) {
       const d = document.createElement('div');
       d.className = 'slot'; d.dataset.i = i;
-      d.addEventListener('mousedown', (e) => { e.preventDefault(); this.drag = i; d.classList.add('drag'); });
-      d.addEventListener('mouseup', () => {
-        if (this.drag !== null && this.drag !== i) game.inv.swap(this.drag, i);
+      d.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (this.drag === null) { if (game.inv.slots[i]) { this.drag = i; d.classList.add('drag'); } return; }
+        if (this.drag !== i) game.inv.swap(this.drag, i);
         this.clearDrag();
       });
       d.addEventListener('dblclick', () => game.useItem(i));
       this.invGrid.appendChild(d);
     }
-    window.addEventListener('mouseup', () => this.clearDrag());
 
     // compass strip
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];

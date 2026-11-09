@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Building } from './building.js';
 import { Inventory, ITEMS, RECIPES } from './items.js';
 import { UI } from './ui.js';
+import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
 import { clamp, lerp } from './noise.js';
@@ -78,6 +79,7 @@ class Game {
     this.paused = false;
 
     this.ui = new UI(this);
+    if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
     this.quests = [
@@ -138,7 +140,7 @@ class Game {
       if (!this.locked) { this.lock(); return; }
       if (e.button === 0) this.input.mouseDown = true;
     });
-    document.addEventListener('mouseup', (e) => { if (e.button === 0) this.input.mouseDown = false; });
+    document.addEventListener('mouseup', (e) => { if (e.button === 0) this.input.mouseDown = false; if (this.touch) this.touch.hold.attack = false; });
     document.addEventListener('wheel', (e) => {
       if (!this.started || this.ui.open || !this.locked) return;
       this.selectHot((this.hotIndex + (e.deltaY > 0 ? 1 : 7)) % 8);
@@ -149,6 +151,7 @@ class Game {
       if (this.locked) this.setPaused(false);
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());
+    document.getElementById('inv-close').addEventListener('click', () => this.toggleInventory(false));
     document.getElementById('respawn').addEventListener('click', () => this.respawn());
   }
 
@@ -164,7 +167,7 @@ class Game {
     const open = force ?? !this.ui.open;
     this.ui.toggleInventory(open);
     this.input.keys = {};
-    this.input.mouseDown = false;
+    this.input.mouseDown = false; if (this.touch) this.touch.hold.attack = false;
     if (open) { if (this.noLock) this.locked = false; else document.exitPointerLock?.(); }
     else this.lock();
   }
@@ -359,12 +362,12 @@ class Game {
         this.player.addXP(3, this.xpHooks);
       } else this.ui.notify('Cannot place here', 'warn');
       this.attackCd = 0.35;
-      this.input.mouseDown = false;
+      this.input.mouseDown = false; if (this.touch) this.touch.hold.attack = false;
       return;
     }
 
     if (def && def.ranged) {
-      if (this.inv.count('arrow') <= 0) { this.ui.notify('No Tranq Arrows', 'warn'); this.attackCd = 0.5; this.input.mouseDown = false; return; }
+      if (this.inv.count('arrow') <= 0) { this.ui.notify('No Tranq Arrows', 'warn'); this.attackCd = 0.5; this.input.mouseDown = false; if (this.touch) this.touch.hold.attack = false; return; }
       this.inv.remove('arrow', 1);
       this.fireArrow();
       p.swing = 0.6;
@@ -600,12 +603,13 @@ class Game {
     if (!m) return;
     if (!m.alive) { this.dismount(); return; }
     const k = this.input.keys;
-    const fwd = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
-    const str = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
+    const joy = this.input.joy || { x: 0, y: 0 };
+    const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
+    const str = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + joy.x, -1, 1);
     const sprint = k.ShiftLeft || k.ShiftRight;
     let target = m.def.walk * 1.6;
     if (sprint) target = m.def.run * 1.15;
-    if (fwd || str) {
+    if (Math.hypot(fwd, str) > 0.08) {
       const mx = -Math.sin(p.yaw) * fwd + Math.cos(p.yaw) * str;
       const mz = -Math.cos(p.yaw) * fwd - Math.sin(p.yaw) * str;
       const desired = Math.atan2(mx, mz);
@@ -643,6 +647,7 @@ class Game {
   step(dt) {
     const p = this.player;
     const running = this.started && !this.paused;
+    if (this.touch) this.touch.apply();
     if (running) {
       this.shared.uTime.value += dt;
       this.feedCd -= dt;
@@ -744,7 +749,7 @@ class Game {
 // ------------------------------------------------ Boot
 const qualityBtns = document.querySelectorAll('[data-q]');
 let quality = 'high';
-try { quality = localStorage.getItem('iotp-quality') || 'high'; } catch (e) { /* ignore */ }
+try { quality = localStorage.getItem('iotp-quality') || (IS_TOUCH ? 'low' : 'high'); } catch (e) { /* ignore */ }
 const qParam = new URLSearchParams(location.search).get('quality');
 if (qParam === 'low' || qParam === 'high') quality = qParam;
 qualityBtns.forEach((b) => {
@@ -764,13 +769,14 @@ setTimeout(() => {
   window.game = game;
   game.loop();
   document.getElementById('title').classList.add('ready');
-  loading.textContent = 'Click to begin';
+  loading.textContent = IS_TOUCH ? 'Tap to begin' : 'Click to begin';
   const begin = () => {
     document.getElementById('title').classList.add('hide');
     document.getElementById('hud').classList.add('show');
     game.started = true;
     game.audio.start();
     game.lock();
+    if (IS_TOUCH) { try { const r = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); r?.catch?.(() => {}); } catch (e) { /* optional */ } }
     game.ui.banner('ISLE OF THE PRIMAL', 'Survive · Gather · Build · Tame');
   };
   document.getElementById('play').addEventListener('click', begin);

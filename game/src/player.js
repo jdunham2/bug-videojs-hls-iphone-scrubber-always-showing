@@ -121,23 +121,25 @@ export class Player {
     if (this.mount) return; // movement handled by mount
 
     const k = input.keys;
-    const fwd = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
-    const str = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
+    const joy = input.joy || { x: 0, y: 0 };
+    const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
+    const str = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + joy.x, -1, 1);
+    const mag = Math.min(1, Math.hypot(fwd, str));
     this.crouch = !!k.KeyC || !!k.ControlLeft;
     const groundH = Math.max(heightAt(this.pos.x, this.pos.z), building.floorAt(this.pos.x, this.pos.z) ?? -Infinity);
     this.swimming = this.pos.y < WATER_LEVEL - 1.1 && groundH < WATER_LEVEL - 1.1;
-    const wantsSprint = (k.ShiftLeft || k.ShiftRight) && fwd > 0 && !this.crouch && this.stam > 1;
+    const wantsSprint = (k.ShiftLeft || k.ShiftRight) && fwd > 0.3 && !this.crouch && this.stam > 1;
     let speed = this.swimming ? 3.2 : this.crouch ? 2.2 : wantsSprint ? 9.5 : 5.2;
     if (this.food <= 0 || this.water <= 0) speed *= 0.8;
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
     const dx = -sinY * fwd + cosY * str, dz = -cosY * fwd - sinY * str;
     const len = Math.hypot(dx, dz) || 1;
-    const tx = (dx / len) * speed * (fwd || str ? 1 : 0), tz = (dz / len) * speed * (fwd || str ? 1 : 0);
+    const tx = (dx / len) * speed * mag, tz = (dz / len) * speed * mag;
     const accel = this.onGround || this.swimming ? 12 : 3;
     this.vel.x = lerp(this.vel.x, tx, Math.min(1, dt * accel));
     this.vel.z = lerp(this.vel.z, tz, Math.min(1, dt * accel));
 
-    const moving = fwd || str;
+    const moving = mag > 0.05;
     if (wantsSprint && moving) this.stam = Math.max(0, this.stam - dt * 14);
     else if (this.swimming && moving) this.stam = Math.max(0, this.stam - dt * 4);
     else this.stam = Math.min(this.maxStam, this.stam + dt * (this.food > 0 && this.water > 0 ? 16 : 4));
