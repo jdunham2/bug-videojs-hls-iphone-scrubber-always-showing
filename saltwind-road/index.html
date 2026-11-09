@@ -5813,9 +5813,34 @@ function render() {
     ctx.fillStyle = f.col; ctx.fillText(f.text, fx, fy);
   }
   ctx.globalAlpha = 1;
+  drawObjective();
   drawMini();
 }
 
+function objective() {
+  if (inDungeon() || S.y >= WORLD_H) return null;
+  if (S.raid && TOWNS[S.raid.town]) return {x: TOWNS[S.raid.town].x + .5, y: TOWNS[S.raid.town].y + .5, label: 'Raid', col: '#ff7a4a'};
+  if (stagTrail && !stagTrail.met) return {x: stagTrail.stag.x, y: stagTrail.stag.y, label: 'White Stag', col: '#e8f4ff'};
+  if (S.outlaw && S.outlaw.taken && !S.outlaw.done) return {x: S.outlaw.x, y: S.outlaw.y, label: 'Wanted', col: '#e85a5a'};
+  if (S.ghost && ghostActive()) return {x: S.ghost.lx, y: S.ghost.ly, label: 'Ghost ship', col: '#9af0c0'};
+  if (S.tmap && S.tmap.x != null) return {x: S.tmap.x + .5, y: S.tmap.y + .5, label: 'Treasure', col: '#f0c040'};
+  if (fairyRing && !fairyRing.done) return {x: fairyRing.x, y: fairyRing.y, label: 'Fairy ring', col: '#ff9ae0'};
+  return null;
+}
+function drawObjective() {
+  const O = objective(); if (!O || S.hideArrow) return;
+  const vw = ctx.canvas.width, vh = ctx.canvas.height, sx = (O.x*TS - camX)*Z, sy = (O.y*TS - camY)*Z, d = Math.round(Math.hypot(O.x - S.x, O.y - S.y));
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const m = 46*dpr, on = sx > m && sx < vw - m && sy > m && sy < vh - m;
+  if (on) { if (d > 2) { const b = Math.sin(frameT*4)*3*dpr; ctx.fillStyle = O.col; ctx.beginPath(); ctx.moveTo(sx, sy - 30*dpr + b); ctx.lineTo(sx - 6*dpr, sy - 40*dpr + b); ctx.lineTo(sx + 6*dpr, sy - 40*dpr + b); ctx.fill(); } ctx.restore(); return; }
+  const cx = vw/2, cy = vh/2, a = Math.atan2(sy - cy, sx - cx), ex = Math.max(m, Math.min(vw - m, cx + Math.cos(a)*vw)), ey = Math.max(m, Math.min(vh - m, cy + Math.sin(a)*vh));
+  const pr = Math.min(vw, vh)*.3, pcx = (S.x*TS - camX)*Z, pcy = (S.y*TS - 8 - camY)*Z, pa = Math.atan2(sy - pcy, sx - pcx), ax = pcx + Math.cos(pa)*pr, ay = pcy + Math.sin(pa)*pr*.8;
+  ctx.translate(ax, ay); ctx.rotate(pa);
+  ctx.fillStyle = 'rgba(13,19,27,.75)'; ctx.beginPath(); ctx.arc(0, 0, 15*dpr, 0, 7); ctx.fill();
+  ctx.fillStyle = O.col; ctx.beginPath(); ctx.moveTo(12*dpr, 0); ctx.lineTo(-6*dpr, -8*dpr); ctx.lineTo(-2*dpr, 0); ctx.lineTo(-6*dpr, 8*dpr); ctx.fill();
+  ctx.rotate(-pa); ctx.font = `${10*dpr}px "Pixelify Sans", monospace`; ctx.textAlign = 'center'; ctx.fillStyle = '#0d131b'; ctx.fillText(`${O.label} ${d}`, 1, 27*dpr + 1); ctx.fillStyle = O.col; ctx.fillText(`${O.label} ${d}`, 0, 27*dpr);
+  ctx.restore();
+}
 function drawMini() {
   const m = $('mini'), g = m.getContext('2d'), span = 64;
   g.imageSmoothingEnabled = false;
