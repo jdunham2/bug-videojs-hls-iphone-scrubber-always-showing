@@ -504,6 +504,8 @@ const GOODS = {
   golden_feast:{name:'Golden Feast',base:260,col:'#f0c040',kind:'food',heal:40},
   spiced_jerky:{name:'Spiced Jerky',base:30,col:'#8a3a1a',kind:'food',heal:6},
   gem_ring:{name:'Gem Ring',base:320,col:'#e04a8a',kind:'craft'},
+  pet_treat:{name:'Pet Treat',base:12,col:'#c8784a',kind:'mat'},
+  blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
   cursed_doubloon:{name:'Cursed Doubloon',base:90,col:'#9ad8b0',kind:'good'},
   ghost_lantern:{name:'Ghost Lantern',base:900,col:'#9af0c0',kind:'trinket',desc:'See much farther in the dark'},
   glider:{name:'Glider',base:220,col:'#e8d8b0',kind:'tool',desc:'Walk off a mountain edge to glide'},
@@ -911,6 +913,7 @@ const RECIPES = [
   {id:'seafood_platter', need:{silverfin:2,carrot:2,bread:1}, at:'bench', known:true},
   {id:'golden_feast',  need:{goldcarp:1,pumpkin_pie:1,mead:1}, at:'bench', known:true},
   {id:'gem_ring',      need:{gem:1,silver:1}, at:'bench', known:true},
+  {id:'pet_treat',     need:{meat:1,wheat:1}, n:3, at:'cook', known:true},
   {id:'glider',        need:{planks:4,silk_cloth:2,rope:2}, at:'bench', known:true},
   {id:'promise_ring',  need:{gem_ring:1,silver:2,pearl:1,star_fragment:1}, at:'forge', known:true},
   {id:'tapestry',      need:{linen:2,silk_cloth:1,heather:2}, at:'bench', known:true},
@@ -1906,6 +1909,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'wilma',town:'wren',dx:3,dy:2,name:'Wilma Barksdale',role:'Pet trainer',cols:{cloak:'#6a8a3a',skin:'#d8a882',hair:'#a05a2a'},trainer:true,
+   hello:["Who's a good adventurer? You are!","Bring your little friend over!","Treats in one hand, patience in the other."], rumors:["Every seventh day I hold a pet show right here. Prizes for the cleverest critter!"]},
   {id:'gilda',town:'crownfall',dx:3,dy:-2,name:'Auctioneer Gilda',role:'Crownfall Auction House',cols:{cloak:'#6a2a3a',skin:'#e0c0a0',hair:'#3a2a2a'},auction:true,
    hello:["Going once, going twice...!","Looking to bid? Fresh lots every week.","Rare goods for discerning buyers."], rumors:["New lots arrive every seven days. The rarest things in the realm pass through my hands."]},
   {id:'lark',town:'wren',dx:0,dy:3,name:'Lark',role:'Traveling bard',cols:{cloak:'#8a3a6a',skin:'#e0b896',hair:'#e0a040'},bard:true,
@@ -3334,8 +3339,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Pet tricks', 'Wilma in Port Wren teaches your pet tricks for Pet Treats (cooked from Raw Meat and Wheat). Tricks make pets attack faster, and every 7th day she holds a pet show with prizes.'],
   ['The ghost ship', 'Every few days sailors whisper of a ghost ship near a town. It runs aground after dark: defeat Captain Mordekai and his crew before dawn for cursed treasure.'],
   ['Gliding', 'Craft a Glider at a workbench (4 Planks, 2 Silk Cloth, 2 Rope). Walk off the edge of any mountain to soar for a few seconds, even out over water. Steer with the movement keys.'],
   ['Auctions & ballads', 'Auctioneer Gilda in Crownfall sells rare lots every week; bid against rivals. Lark the bard in Port Wren writes ballads about your great deeds for +2 max HP each.'],
@@ -4909,6 +4915,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
   if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
   if (n.bard) o.push({label: `Ballads (${(S.ballads ? Object.keys(S.ballads).length : 0)}/${BALLADS.length})`, primary: BALLADS.some(b => !(S.ballads || {})[b.id] && b.ok()), fn: () => balladTalk(n)});
   if (n.hof) o.push({label: 'The Hall of Fame', primary: hofPoints() >= 50, fn: () => hofTalk(n)});
@@ -5021,6 +5028,36 @@ function giftTalk(n) {
       say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${extra}`, [back(n)]);
     }})),
     back(n)]);
+}
+// ===== pet tricks & shows =====
+const TRICKS = [['sit','Sit',1],['paw','Shake paw',1],['roll','Roll over',2],['fetch','Fetch',2],['spin','Spin',2],['dead','Play dead',3],['dance','Dance',3],['backflip','Backflip',4]];
+const petShowDay = () => S.day % 7 === 0;
+const petTricks = () => (S.petTricks && S.pet && S.petTricks[S.pet]) || [];
+function trainerTalk(n) {
+  if (!S.pet) { say('“No pet with you? Adopt a little friend first, then come back and we\'ll teach them a thing or two!”', [back(n)]); return; }
+  const known = petTricks(), P = PETS[S.pet], next = TRICKS.filter(t => !known.includes(t[0]));
+  say(`“What a lovely ${P.name.toLowerCase()}! Bring me Pet Treats (cook Raw Meat and Wheat) and I'll teach them tricks.”<br><span style="color:var(--muted)">Tricks known: ${known.length ? known.map(k => TRICKS.find(t => t[0] === k)[1]).join(', ') : 'none yet'}. Each trick makes your pet a little stronger (+3% attack speed). Fetch makes pet finds more frequent.${petShowDay() ? '<br><b>The pet show is on today!</b>' : ' Next pet show: day ' + (Math.ceil(S.day/7)*7 || 7) + '.'}</span>`, [
+    ...next.slice(0, 3).map(t => ({label: `Teach “${t[1]}” (${t[2]*2} treats)`, disabled: have('pet_treat') < t[2]*2, fn: () => {
+      addItem('pet_treat', -t[2]*2); S.petTricks = S.petTricks || {}; S.petTricks[S.pet] = [...known, t[0]]; S.tricksTaught = (S.tricksTaught || 0) + 1; SFX.victory();
+      if (petE) { burst(petE.x, petE.y - .4, '#f0c040', 14, 3); floatText(petE.x, petE.y - 1, `${t[1]}!`, '#f0c040'); }
+      save(); say(`After a few tries, your ${P.name.toLowerCase()} gets it! <b>“${t[1]}”</b> learned.`, [{label: 'More tricks', fn: () => trainerTalk(n)}, back(n)]);
+    }})),
+    ...(petShowDay() ? [{label: S.petShow === S.day ? 'Pet show (entered today)' : 'Enter the pet show (25 coin)', primary: S.petShow !== S.day, disabled: S.petShow === S.day || S.coins < 25, fn: () => petShow(n)}] : []),
+    back(n)]);
+}
+function petShow(n) {
+  S.coins -= 25; S.petShow = S.day;
+  const known = petTricks(), mine = known.reduce((a, k) => a + TRICKS.find(t => t[0] === k)[2]*6, 0) + petLv()*3 + rint(0, 18);
+  const rivals = [['Mrs. Pennywhistle','poodle'],['young Tobias','tortoise'],['Lord Ashby','peacock'],['the twins','three kittens'],['a sailor','parrot']].sort(() => Math.random() - .5).slice(0, 3).map(([who, pet]) => ({who, pet, sc: rint(14, 52)}));
+  const all = [...rivals, {who: 'You', pet: PETS[S.pet].name.toLowerCase(), sc: mine, me: true}].sort((a, b) => b.sc - a.sc), place = all.findIndex(r => r.me) + 1;
+  let prize = '';
+  if (place === 1) { S.coins += 400; addItem('blue_ribbon', 1); S.petShowWins = (S.petShowWins || 0) + 1; prize = '<b>First place!</b> +400 coin and a <b>Blue Ribbon</b>!'; SFX.victory(); }
+  else if (place === 2) { S.coins += 120; addItem('pet_treat', 4); prize = 'Second place! +120 coin and 4 Pet Treats.'; SFX.coin(); }
+  else if (place === 3) { S.coins += 40; prize = 'Third place. +40 coin.'; SFX.coin(); }
+  else prize = 'No ribbon this time. Teach more tricks and try again next week!';
+  if (petE) for (const k of known.slice(-3)) floatText(petE.x, petE.y - 1 - known.indexOf(k)*.2, TRICKS.find(t => t[0] === k)[1] + '!', '#f0c040');
+  renderHUD(); save();
+  say(`The crowd gathers as each pet performs...<br><br>${all.map((r, i) => `${i + 1}. ${r.me ? '<b>' : ''}${esc(r.who)} & ${esc(r.pet)}: ${r.sc} pts${r.me ? '</b>' : ''}`).join('<br>')}<br><br>${prize}`, [back(n)]);
 }
 // ===== auction house =====
 const AUCTION_POOL = [['sunstone_amulet',1],['wayfarer_boots',1],['merchant_seal',1],['black_pearl_ring',1],['golden_horseshoe',1],['jeweled_goblet',2],['jade_idol',2],['marble_statue',2],['star_fragment',4],['elite_essence',4],['abyss_shard',4],['ancient_coin',4],['treasure_map',3],['luck_draught',4],['elixir',5],['promise_ring',1]];
@@ -6234,7 +6271,7 @@ const PET_FINDS = {dog: [['bone', 1], ['coins', 15], ['meat', 1]], cat: [['fish'
 function updatePet(dt) {
   if (!S.pet) { petE = null; return; }
   petFindT -= dt;
-  if (petFindT <= 0 && petE) { petFindT = 60 + Math.random()*90; if (!townAt(S.x, S.y, 8) && !inDungeon() && !enemies.some(e => !e.dead && Math.hypot(e.x - S.x, e.y - S.y) < 8 && !(ENEMIES[e.type] && ENEMIES[e.type].passive)) && Math.random() < .55) {
+  if (petFindT <= 0 && petE) { petFindT = (60 + Math.random()*90) * (petTricks().includes('fetch') ? .7 : 1); if (!townAt(S.x, S.y, 8) && !inDungeon() && !enemies.some(e => !e.dead && Math.hypot(e.x - S.x, e.y - S.y) < 8 && !(ENEMIES[e.type] && ENEMIES[e.type].passive)) && Math.random() < .55) {
     const pool = (PET_FINDS[S.pet] || [['berries', 2], ['herbs', 1], ['coins', 10], ['sticks', 2]]).filter(([g]) => g === 'coins' || GOODS[g]), [g, n] = pick(pool);
     if (g === 'coins') S.coins += n; else addItem(g, n); S.petFinds = (S.petFinds || 0) + 1;
     floatText(petE.x, petE.y - 1, `${PETS[S.pet].name} found ${n} ${g === 'coins' ? 'coin' : GOODS[g].name}!`, '#e3c068'); burst(petE.x, petE.y - .3, '#e3c068', 6, 2); SFX.pickup(); renderHUD(); } }
@@ -6256,7 +6293,7 @@ function updatePet(dt) {
     petE.phase += dt*12; petE.moving = true;
   }
   if (Math.abs(dx) > .1) petE.face = dx < 0 ? -1 : 1;
-  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd * (1 - .06*petLv()); hitEnemy(target, P.dmg + petLv(), dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander' || S.pet === 'baby_drake') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
+  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd * (1 - .06*petLv()) * (1 - .03*petTricks().length); hitEnemy(target, P.dmg + petLv(), dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander' || S.pet === 'baby_drake') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
 }
 function drawPet(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase) : 0;
@@ -7499,6 +7536,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['trickster','Good Boy!','Teach your pet 4 tricks', () => petTricks().length >= 4],
+  ['bestinshow','Best in Show','Win a pet show', () => (S.petShowWins || 0) >= 1],
   ['ghostship','Here Be Ghosts','Defeat Captain Mordekai of the ghost ship', () => (S.ghostShips || 0) >= 1],
   ['glide','Up and Away','Glide off a mountain', () => (S.glides || 0) >= 1],
   ['skysailor','Sky Sailor','Glide 500 tiles in total', () => (S.glideDist || 0) >= 500],
