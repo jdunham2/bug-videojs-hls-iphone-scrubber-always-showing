@@ -2043,6 +2043,10 @@ for (const [a, b, name, role, cols, stock] of TRAVELERS) {
   if (stock) Object.assign(n, {trader: true, greed: .25, patience: 5, purse: 260, stock});
   NPCS.push(n);
 }
+const BALLOON_TOWNS = ['wren','frost','crownfall','tidewatch','prismvale','farhaven'].filter(k => TOWNS[k]);
+const BALLOONISTS = ['Captain Zephyr','Aeronaut Bree','Old Gusty','Skye Fairweather','Professor Nimbus','Cirrus Vane'];
+BALLOON_TOWNS.forEach((k, i) => NPCS.push({id: 'bln_' + k, town: k, dx: -3, dy: 3, name: BALLOONISTS[i], role: 'Balloon rides', cols: {cloak: ['#c84a3a','#3a7ad8','#d8a83a','#6a3a8a','#3a8a5a','#d86a3a'][i], skin: '#e0b896', hair: '#e8e0d0'}, balloon: true,
+  hello: ['Up, up and away!', 'Fine flying weather today.', 'The world looks different from up there.'], rumors: ['From up high you can see lands you never knew were there.']}));
 const NPC_BY = Object.fromEntries(NPCS.map(n => [n.id, n]));
 NPC_BY.saffi.animals = {camel:180};
 NPC_BY.kesh.animals = {elk:220, fox:120};
@@ -2372,6 +2376,8 @@ function genWorld() {
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
+  for (const n of NPCS) if (n.balloon) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [Math.floor(m.x), Math.floor(m.y)]);
+    for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => a === x && b === y)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
     if (n.cove) { const tw = TOWNS[n.town]; let best = null, bd = 1e9; for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = tw.x + dx, y = tw.y + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)], d = Math.hypot(dx, dy); if (t === T.SAND && d > 9 && reach[idx(x, y)] && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => map[idx(x + a, y + b)] === T.SHAL || map[idx(x + a, y + b)] === T.DEEP) && d < bd) { bd = d; best = {x, y}; } } if (best) { n.x = best.x + .5; n.y = best.y + .8; } }
@@ -3271,6 +3277,37 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== balloon rides =====
+let balloonF = null;
+const balloonCost = (a, b) => Math.round(30 + Math.hypot(TOWNS[a].x - TOWNS[b].x, TOWNS[a].y - TOWNS[b].y)/4);
+function balloonTalk(n) {
+  const dests = BALLOON_TOWNS.filter(k => k !== n.town);
+  say(`“Climb aboard! I fly to every balloon station in the realm, even ones you've never seen. You'll get a fine view of the land below.”`, [
+    ...dests.map(k => ({label: `${S.towns[k] ? TOWNS[k].name : TOWNS[k].name + ' (new!)'} · ${balloonCost(n.town, k)}◆`, disabled: S.coins < balloonCost(n.town, k) || bossActive(), fn: () => {
+      S.coins -= balloonCost(n.town, k); closeTalk(); renderHUD();
+      const D = NPC_BY['bln_' + k]; balloonF = {fx: S.x, fy: S.y, tx: D.x + 1.2, ty: D.y + .4, t: 0, dur: Math.min(14, 5 + Math.hypot(D.x - S.x, D.y - S.y)/40), to: k, rv: 0};
+      S.riding = false; petE = null; compE = null; fishing = null; SFX.travel();
+      toast(`<b>Up, up and away!</b><br>Floating to ${TOWNS[k].name}...`, 3500);
+    }})),
+    back(n)]);
+}
+function updateBalloon(dt) {
+  const B = balloonF; B.t += dt; const u = Math.min(1, B.t/B.dur), e = u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
+  S.x = B.fx + (B.tx - B.fx)*e; S.y = B.fy + (B.ty - B.fy)*e; player.inv = Math.max(player.inv, .4); player.kx = player.ky = 0;
+  B.rv -= dt; if (B.rv <= 0) { B.rv = .15; reveal(S.x, S.y, 11); }
+  enemies = enemies.filter(m => m.boss || Math.hypot(m.x - S.x, m.y - S.y) > 6);
+  if (u >= 1) { balloonF = null; lastTile = -1; S.balloonRides = (S.balloonRides || 0) + 1; burst(S.x, S.y, '#e8d8b0', 12, 3); SFX.coin(); toast(`<b>Touchdown!</b> Welcome to ${TOWNS[B.to].name}.`, 3000); renderRegion(); save(); }
+}
+function drawBalloon(px, py) {
+  const lift = 46 + Math.sin(frameT*1.6)*3, by = py - lift;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 4, 12, 4, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#7a5532'; ctx.fillRect(px - 8, by, 16, 10); ctx.fillStyle = '#5c3f24'; ctx.fillRect(px - 8, by, 16, 2); ctx.fillRect(px - 8, by + 5, 16, 1);
+  drawPerson(ctx, px, by + 2, player.cols, 0, false, 'down', {scarf: true});
+  ctx.fillStyle = '#7a5532'; ctx.fillRect(px - 8, by - 4, 16, 7); ctx.fillStyle = '#5c3f24'; ctx.fillRect(px - 8, by - 4, 16, 2);
+  ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px - 8, by - 4); ctx.lineTo(px - 14, by - 22); ctx.moveTo(px + 8, by - 4); ctx.lineTo(px + 14, by - 22); ctx.stroke();
+  const cols = ['#c84a3a', '#f0c040']; for (let i = 0; i < 6; i++) { ctx.fillStyle = cols[i % 2]; ctx.beginPath(); ctx.moveTo(px, by - 22); ctx.arc(px, by - 40, 20, Math.PI*.85 + i*Math.PI*1.3/6, Math.PI*.85 + (i + 1)*Math.PI*1.3/6); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.ellipse(px - 7, by - 48, 5, 8, -.4, 0, 6.283); ctx.fill();
+}
 // ===== monster dens =====
 function ensureDens() {
   if (S.dens && S.dens.length) return S.dens;
@@ -3400,8 +3437,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Balloon rides', 'Balloonists in Port Wren, Frostgate, Crownfall, Tidewatch, Prismvale and Farhaven fly you between their stations, even to towns you have not found yet, and reveal the land below.'],
   ['Monster dens', 'Dens out in the wild keep spawning monsters while you are near. Smash a den for coin and materials. Destroyed dens rebuild after a week.'],
   ['Weekly challenges', 'Three bigger challenges appear in your journal each week. Completing one pays coin and Challenge Tokens, which Chronicler Aldous in Port Wren trades for rare goods and the Victor\u2019s Cape.'],
   ['Pet tricks', 'Wilma in Port Wren teaches your pet tricks for Pet Treats (crafted from Raw Meat and Wheat). Tricks make pets attack faster, and every 7th day she holds a pet show with prizes.'],
@@ -3613,7 +3651,7 @@ function updateCombat(dt, night) {
   player.sinceHit += dt;
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
-  customsCheck(dt);
+  if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -4351,7 +4389,8 @@ function render() {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
     const swimRide = S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim;
-    if (player.glide) {
+    if (balloonF) drawBalloon(px, py);
+    else if (player.glide) {
       const dir = player.dir && player.dir.x < 0 ? -1 : 1, bob = Math.sin(frameT*3)*1.5;
       ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 6, 9, 3, 0, 0, 6.283); ctx.fill();
       drawPerson(ctx, px, py - 14 + bob, player.cols, 0, false, player.facing, {scarf:true, pack:true});
@@ -5005,6 +5044,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
   if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
   if (n.bard) o.push({label: `Ballads (${(S.ballads ? Object.keys(S.ballads).length : 0)}/${BALLADS.length})`, primary: BALLADS.some(b => !(S.ballads || {})[b.id] && b.ok()), fn: () => balladTalk(n)});
@@ -7629,6 +7669,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['aeronaut','Aeronaut','Take 3 balloon rides', () => (S.balloonRides || 0) >= 3],
   ['denbuster','Den Buster','Destroy 5 monster dens', () => (S.densSmashed || 0) >= 5],
   ['weekly','Weekly Warrior','Complete 3 weekly challenges', () => (S.weeklyDone || 0) >= 3],
   ['trickster','Good Boy!','Teach your pet 4 tricks', () => petTricks().length >= 4],
