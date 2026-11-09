@@ -391,7 +391,7 @@ function buildDistricts() {
   add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
   add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
   solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
-  buildSite(); buildPlazas(); buildIsland(); buildBizProps(); buildZoo(); buildSchoolYard();
+  buildSite(); buildPlazas(); buildIsland(); buildBizProps(); buildZoo(); buildSchoolYard(); buildWaterPlaces();
   const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
   for (const { i, j, type } of districtList) {
     const [x0, y0, x1, y1] = blockRect(i, j), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -686,7 +686,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['boss', 'Buy your first business'], ['tycoon', 'Own all three businesses'], ['mogul', 'Earn $5,000 from your businesses'], ['zoo', 'See every exhibit at the zoo'], ['school', 'Enroll your kids in school'], ['honor', 'Raise an honor-roll student'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['boss', 'Buy your first business'], ['tycoon', 'Own all three businesses'], ['mogul', 'Earn $5,000 from your businesses'], ['zoo', 'See every exhibit at the zoo'], ['school', 'Enroll your kids in school'], ['honor', 'Raise an honor-roll student'], ['aquarium', 'See every aquarium exhibit'], ['splash', 'Grab 15 rings on the Mega Slide'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -781,8 +781,8 @@ function advance(mins, opts = {}) {
     const stepM = Math.min(mins, 15);
     mins -= stepM; S.min += stepM;
     const hrs = stepM / 60;
-    if (!opts.sleeping) S.energy -= hrs * (opts.work ? 4 : S.injured ? 3.5 : 2);
-    S.hunger -= hrs * (opts.sleeping ? 1 : 2.5) * (S.weather === 'heat' && !opts.sleeping ? 1.4 : 1);
+    if (!opts.sleeping) S.energy -= hrs * (opts.work ? 4 : S.injured ? 3.5 : 2) * (S.injury && INJ[S.injury.type] && (INJ[S.injury.type].sick || INJ[S.injury.type].dizzy) ? 1.3 : 1);
+    S.hunger -= hrs * (opts.sleeping ? 1 : 2.5) * (S.injury && S.injury.type === 'tummy' ? 1.5 : 1) * (S.weather === 'heat' && !opts.sleeping ? 1.4 : 1);
     if (S.hunger <= 0) { S.hunger = 0; S.happy -= hrs * 4; S.starve += hrs; } else S.starve = 0;
     if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
     S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
@@ -820,8 +820,9 @@ function collapse() {
   queueEvent({ kind: 'bad', title: 'You fainted from hunger', text: `Someone carried you to Tarpit Hospital. The bill was ${money$(bill)}. Eat something!` });
 }
 function sleep(quality) {
-  const wasDay = S.day;
-  S.day++; S.min = 6 * 60 + 30;
+  const wasDay = S.day, bed = S.min;
+  S.day++; S.min = wakeMinute(bed);
+  if (S.min > 7.25 * 60) log(pick([`You slept in until ${clock(S.min)}!`, `Zzz... you hit snooze and woke at ${clock(S.min)}.`, `Whoops, it is already ${clock(S.min)}. Rise and shine!`]), 'warn'); else log(`You woke up at ${clock(S.min)}. Good morning!`, '');
   S.energy = clamp(quality, 0, 100); S.hunger = Math.max(0, S.hunger - 20);
   dayRollover(true);
   if (S.day > wasDay) save();
@@ -852,7 +853,7 @@ function dayRollover(slept) {
     if (S.partner.rel <= 5) breakup();
   }
   if (S.egg && S.day >= S.egg.hatch) hatchEgg();
-  kidsDaily(); schoolDaily();
+  kidsDaily(); schoolDaily(); injuryDaily();
   if (S.money >= 10000) goal('rich');
   if (S.jail <= 0) rollEvents(slept);
 }
@@ -1029,6 +1030,7 @@ const MENUS = {
     ...cropActsGrocer(),
     { label: 'Buy an umbrella', detail: S.umbrella ? 'You already have one.' : 'Stay dry on rainy days. Yours forever.', why: S.umbrella ? 'You already have one.' : '', cost: 12, mins: 5, fn: () => { S.umbrella = true; log('You bought a red umbrella. Bring on the rain.', 'good'); } },
     { label: 'Buy flowers (gift)', detail: `A fresh bouquet for someone special. You have ${(S.gifts || {}).flowers || 0}.`, cost: 10, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.flowers = (S.gifts.flowers || 0) + 1; } },
+    { label: 'Buy a first aid kit', detail: injOf() ? (injOf().sick ? `Medicine cures your ${injOf().name.toLowerCase()}.` : `Bandages heal your ${injOf().name.toLowerCase()} a day faster.`) : 'For bumps, sniffles and scrapes.', why: injOf() ? '' : 'You are not hurt or sick.', cost: 12, mins: 10, fn: () => { const I = injOf(); if (I.sick || S.injury.days <= 1) healAll(`You feel much better. ${I.name} gone!`); else { S.injury.days--; log(`Bandaged up. ${S.injury.days} more day${S.injury.days > 1 ? 's' : ''} to heal.`, 'good'); } } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
     { label: 'Grab a snack', detail: '+20 hunger right now', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } },
     { label: 'Shoplift groceries', detail: 'Free if nobody sees. 35% chance of 2 days in jail.', tag: 'Crime', risky: true, mins: 10, fn: () => { if (Math.random() < 0.35) arrest(2, 'The store guard saw you stuff a melon in your pouch.'); else { S.groceries += 4; log('You walked out with free groceries. Your heart is pounding.', 'warn'); } } },
@@ -1038,7 +1040,7 @@ const MENUS = {
     acts.unshift(...gigActs('burger'));
     acts.push(...holdUpAct(150, 400));
     if (open(7, 24)) acts.push({ label: 'Order a Bronto Burger', detail: '+50 hunger, +5 happiness', cost: 12, mins: 30, fn: () => { S.hunger = Math.min(100, S.hunger + 50); S.happy += 5; } });
-    acts.push({ label: 'Dig through the dumpster', detail: '+20 hunger, -10 happiness. Might make you sick.', tag: 'Free', mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 20); S.happy -= 10; if (Math.random() < 0.25) { S.energy -= 25; log('That was a bad burger. You feel awful.', 'bad'); } } });
+    acts.push({ label: 'Dig through the dumpster', detail: '+20 hunger, -10 happiness. Might make you sick.', tag: 'Free', mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 20); S.happy -= 10; if (Math.random() < 0.25) { S.energy -= 25; hurt('tummy', true); log('That was a bad burger. You feel awful.', 'bad'); } } });
     return { sub: 'Home of the triple-decker Bronto.', acts };
   },
   depot: () => { const acts = [...gigActs('depot')]; return { sub: 'Eggs delivered fresh, mostly unbroken.', acts }; },
@@ -1057,7 +1059,7 @@ const MENUS = {
         acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}Patients are waiting on the ward beds.`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startWardShift(late); } });
       }
     }
-    acts.push({ label: 'Get treated', detail: S.injured ? 'Fixes your injury. You move slowly while hurt.' : 'You are healthy.', cost: S.injured ? 250 : 0, why: S.injured ? '' : 'Nothing to treat.', mins: 90, fn: () => { S.injured = false; log('All patched up.', 'good'); } });
+    acts.push({ label: 'Get treated', detail: injOf() ? `Cures your ${injOf().name.toLowerCase()} right away.` : 'You are healthy.', cost: injOf() ? (injOf().sick || injOf().days <= 1 ? 90 : 250) : 0, why: injOf() ? '' : 'Nothing to treat.', mins: 90, fn: () => { healAll('All patched up. The doctor gives you a dino sticker.'); } });
     return { sub: 'Tarpit General. We pull dinosaurs out of everything.', acts };
   },
   bank: () => {
@@ -1413,7 +1415,7 @@ const LAYOUTS = {
     b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
     b.station(370, 100, 'Produce stand', ['Shoplift']);
     b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
-    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Sell your fish', 'Sell your crops', 'Hold up']);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Sell your fish', 'Sell your crops', 'Buy a first aid', 'Hold up']);
     b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
     b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
   } },
@@ -1654,6 +1656,7 @@ function updateInterior(dt) {
 }
 function syncInterior() {
   const R = inside;
+  swimTick(R);
   for (const n of R.npcs) { n.m.root.position.set(n.x, 0, n.z); n.m.root.rotation.y = -n.face; animDino(n.m, n.t, n.wander && n.wait <= 0 ? 1 : 0); if (!n.wander) n.m.head.rotation.z = Math.sin(n.t * 1.5) * 0.08; }
   const night = S.min % 1440 < 360 || S.min % 1440 > 1170;
   for (const d of R.dyn) {
@@ -2082,6 +2085,7 @@ function endMini(ok, msg, q) {
 }
 function updateMini(dt) {
   if (minigame.kind === 'dodge') { updateDodge(dt); return; }
+  if (minigame.kind === 'slide') { updateSlide(dt); return; }
   if (minigame.kind === 'fish') { updateFish(dt); return; }
   if (minigame.kind === 'hose') {
     let mx = 0, my = 0;
@@ -2145,6 +2149,7 @@ function checkSiteEnd() {
 function drawMiniOverlay(g) {
   if (!minigame || minigame.kind === 'cook' || minigame.kind === 'panel') return;
   if (minigame.kind === 'dodge') { drawDodge(g); return; }
+  if (minigame.kind === 'slide') { drawSlide(g); return; }
   const w = Math.min(460, W - 40), x = (W - w) / 2, y = H - 190;
   g.fillStyle = 'rgba(14,22,30,.9)'; g.fillRect(x, y, w, 130); g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.strokeRect(x, y, w, 130);
   g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
@@ -2516,13 +2521,13 @@ function gigActs(placeId) {
   let why = '';
   if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'Closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
   if (!why && kind === 'pizza' && !cars.some(c => c.owned)) why = 'Delivery drivers need their own car. Buy one at Dino Motors.';
-  const late = hour() > a + 1, blurb = { keeper: 'The animals are hungry and the visitors are arriving.', teach: 'A room full of tiny compies is waiting for you.', train: 'Clients are warming up on the mats.', usher: 'The lobby is filling up for the next show.', shelve: 'The return cart is overflowing.', scoop: 'There is a line out the door. It is a hot day.', pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
+  const late = hour() > a + 1, blurb = { aquarist: 'The fish are hungry and the octopus is getting ideas.', guard: 'The pools are packed. Keep everyone safe.', keeper: 'The animals are hungry and the visitors are arriving.', teach: 'A room full of tiny compies is waiting for you.', train: 'Clients are warming up on the mats.', usher: 'The lobby is filling up for the next show.', shelve: 'The return cart is overflowing.', scoop: 'There is a line out the door. It is a hot day.', pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
   acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}${blurb}`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startGig(kind, late); } });
   return acts;
 }
 function startGig(kind, late) {
   const lvl = S.job.level;
-  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3, train: 3, usher: 3, shelve: 3, scoop: 4, keeper: 3, teach: 3 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
+  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3, train: 3, usher: 3, shelve: 3, scoop: 4, keeper: 3, teach: 3, aquarist: 3, guard: 3 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
   if (kind === 'fire') { spawnFireTruck(); spawnFire(); log('Clocked in! A fire just broke out. Hop in the fire truck outside and follow the red arrow.', 'bad'); sfx.siren(); }
   if (kind === 'pump') { spawnCustomer(); log('Clocked in! Walk out to the pumps when a car pulls up.', 'good'); }
   if (NEXT_TASK[kind]) log(`Clocked in! Use your work station to start: ${NEXT_TASK[kind][0].toLowerCase()}.`, 'good');
@@ -3239,8 +3244,9 @@ startNextTask = function (kind) { if (kind === 'train') startTrain(); else if (k
 const fitSpeed = () => 1 + (S.fit || 0) / 400;
 function workOut() {
   closeMenu();
+  if (armBlocked('lift weights')) return;
   minigame = { kind: 'mash', p: 0, t: 6.5, label: 'PUMP IRON', help: 'Mash E (or tap) to lift', mins: 60, what: 'You finished the whole set. Feel the burn.', fail: 'You got through half the set.',
-    onDone: (ok, msg) => { const g = ok ? 6 : 3; S.fit = clamp((S.fit || 0) + g, 0, 100); S.energy -= 15; S.happy += 4; log(`${msg} Fitness ${Math.round(S.fit)}/100.`, 'good'); if (S.fit >= 60) goal('buff'); } };
+    onDone: (ok, msg) => { if (!ok && Math.random() < 0.25) hurt('pulled'); const g = ok ? 6 : 3; S.fit = clamp((S.fit || 0) + g, 0, 100); S.energy -= 15; S.happy += 4; log(`${msg} Fitness ${Math.round(S.fit)}/100.`, 'good'); if (S.fit >= 60) goal('buff'); } };
   state = 'mini'; setScreens();
 }
 // ---- arcade ----
@@ -3708,7 +3714,7 @@ Object.assign(LAYOUTS, {
     add(b.g, GEO.y, '#d6dde4', 340, 8, 200, 32, 16, 32); add(b.g, GEO.y, '!#7fe8ff', 340, 16.5, 200, 28, 1, 28);
     b.box(90, 200, 60, 20, 30, '#3a2a20'); b.box(90, 200, 56, 18, 26, '!#7fd8ff', false, 30);
     b.box(220, 250, 110, 30, 26, '#5a3f28'); b.npc(220, 226, 5, { tie: '#3f6b4a' });
-    b.station(220, 290, 'Sales desk', ['Cloud', 'Giant', 'Aquarium', 'Bookshelf', 'Treadmill', 'Arcade', 'Hot tub']);
+    b.station(220, 290, 'Sales desk', ['Cloud', 'Giant', 'Aquarium', 'Bookshelf', 'Treadmill', 'Arcade', 'Hot tub', 'Alarm']);
     b.npc(150, 130, 0); b.npc(300, 120, 4); b.plant(30, 290); b.plant(410, 290);
     b.sign('COMFY CAVE', 220, 100, 3, 160, '#5a3f28', '#ffffff'); b.lamp(120, 150); b.lamp(320, 150);
   } },
@@ -3742,6 +3748,7 @@ function rollFish(where) {
   return pool[0][0];
 }
 function startFishing(spot) {
+  if (armBlocked('cast a fishing line')) return;
   if (S.energy < 8) { log('Too tired to fish.', 'warn'); return; }
   const f = rollFish(spot.fishing);
   minigame = { kind: 'fish', phase: 'wait', t: rand(2, 5.5), bite: 0.9, fish: f, mins: 30, label: 'FISHING', help: 'Wait for a bite... press E the moment the bobber dips!' };
@@ -3753,6 +3760,7 @@ function fishPress() {
   const f = m.fish;
   minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.2 + (0.2 - f.zone) * 6, zone: [0.5 - f.zone / 2, 0.5 + f.zone / 2], hits: 0, misses: 0, need: 3, flash: 0, label: f.price >= 100 ? 'SOMETHING BIG!' : 'REEL IT IN', help: 'Press E when the marker is in the green', mins: 20, what: 'Got it', fail: 'The line snapped!',
     onDone: (ok) => {
+      if (!ok && Math.random() < 0.12) hurt('hook');
       if (!ok) { log(f.price >= 100 ? 'Something huge snapped your line. You will be thinking about that one.' : 'It got away.', 'warn'); return; }
       S.fish = S.fish || {}; S.fish[f.id] = (S.fish[f.id] || 0) + 1; S.caught = S.caught || {}; const first = !S.caught[f.id]; S.caught[f.id] = true; S.happy += f.id === 'boot' ? -2 : 5;
       log(f.id === 'boot' ? 'You caught... an old boot. Classic.' : `You caught a ${f.name}!${first ? ' (new species)' : ''} Worth ${money$(f.price)}.`, f.id === 'boot' ? '' : 'good');
@@ -4022,6 +4030,7 @@ function digSpots() {
 }
 const FOSSILS = { claw: { name: 'Raptor claw', price: 60 }, trilo: { name: 'Trilobite', price: 45 }, ammo: { name: 'Ammonite', price: 55 }, tooth: { name: 'T-rex tooth', price: 130 }, amber: { name: 'Amber with a bug inside', price: 170 } };
 function digUp(spot) {
+  if (armBlocked('dig')) return;
   if (!S.shovel) { log('You need a shovel. The Tiki Bar sells them.', 'warn'); return; }
   if (S.energy < 10) { log('Too tired to dig.', 'warn'); return; }
   minigame = { kind: 'mash', p: 0, t: 5.5, label: 'DIG!', help: 'Mash E (or tap) to dig through the sand', mins: 20, what: 'Your shovel hits something!', fail: 'The hole keeps filling with sand.',
@@ -4057,7 +4066,7 @@ function islandUpdate(dt) {
   if (erupt.bombT <= 0) { erupt.bombT = rand(0.5, 1.0); erupt.bombs.push({ x: P.x + rand(-90, 90) + P.vx * 0.6, y: P.y + rand(-90, 90) + P.vy * 0.6, t: 1.4 }); }
   for (const b of erupt.bombs) {
     b.t -= dt;
-    if (b.t <= 0 && !b.done) { b.done = true; burst(b.x, b.y, 4, 26, '#ff7a2a', 120, 4); shake = Math.max(shake, 6); if (Math.hypot(P.x - b.x, P.y - b.y) < 26) { S.energy -= 18; S.happy -= 6; erupt.hurt = true; sfx.bad(); log('A lava bomb singed your tail! OUCH.', 'bad'); if (Math.random() < 0.3) S.injured = true; } }
+    if (b.t <= 0 && !b.done) { b.done = true; burst(b.x, b.y, 4, 26, '#ff7a2a', 120, 4); shake = Math.max(shake, 6); if (Math.hypot(P.x - b.x, P.y - b.y) < 26) { S.energy -= 18; S.happy -= 6; erupt.hurt = true; sfx.bad(); log('A lava bomb singed your tail! OUCH.', 'bad'); if (Math.random() < 0.3) hurt('burned'); } }
   }
   erupt.bombs = erupt.bombs.filter(b => !b.done);
   if (erupt.t <= 0) { erupt = null; goal('volcano'); survived(); log('The eruption calms down. You survived Volcano Island!', 'good'); }
@@ -4206,7 +4215,7 @@ function seasonDaily() { if (season() !== 'winter') S.snowmen = {}; }
 const HELP = [
   ['Controls', 'Move with WASD or the arrow keys (on a phone, drag anywhere). E or Space to use things. M opens the town map, T opens your phone, G shows goals, F uses your gadget and Q switches it, H honks while driving, P or Esc pauses.'],
   ['Making money', 'Get a job at the Job Center. Show up on weekdays and finish your shift tasks to get paid and promoted. Dino U unlocks better jobs. On the side: fish, farm at Fern Farm, dig for fossils on Volcano Island, trade stocks at Stone Bank, busk with a guitar, race at night, win the demolition derby, or buy a business at Nest Estates.'],
-  ['Staying alive', 'Watch your energy, hunger and happiness. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. Rent the burrow or buy a house at Nest Estates.'],
+  ['Staying alive', 'Watch your energy, hunger and happiness. You can get hurt (sprains, broken bones, burns) or sick (colds, flu, tummy aches): heal at Tarpit Hospital or with a first aid kit from Leafy Grocer. You might sleep in some mornings; an alarm clock from Comfy Cave helps. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. Rent the burrow or buy a house at Nest Estates.'],
   ['People', 'Townsfolk hang out all over the map. Chat every day, give gifts they love (flowers, chocolates, plushies), go on dates, propose, hatch eggs, send your kids to Little Claws School, take them to the Jurassic Zoo, and raise them until they leave the nest. Friends text you invites: show up on time!'],
   ['Getting around', 'Buy a car at Dino Motors, steal one (risky), call a taxi from your phone, or take the ferry from the beach dock to Volcano Island. Tap a place on the map to set a waypoint.'],
   ['Trouble', 'Crimes can get you chased by police dinos who leave from the police station. Lose them or hide in a building. Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
@@ -4260,6 +4269,7 @@ function drawRace(g) {
 const BUSK = { x: 985, y: 1035 };
 function buskSpots() { return S && S.guitar && !inside && !driving && !festivalOn() ? [{ x: BUSK.x, y: BUSK.y, label: 'Busk for tips', busk: true }] : []; }
 function playSong(big) {
+  if (armBlocked('play guitar')) return;
   if (S.energy < 12) { log('Too tired to play.', 'warn'); return; }
   const lvl = S.music || 0;
   minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.1 + Math.min(1.2, lvl * 0.08), zone: [0.42, 0.42 + Math.max(0.1, 0.18 - lvl * 0.006)], hits: 0, misses: 0, need: 5, flash: 0, label: big ? 'OPEN MIC NIGHT' : 'PLAY A SONG', help: 'Press E on the beat', mins: 45, what: 'The crowd loved it', fail: 'Your string snapped mid-song.',
@@ -4500,7 +4510,7 @@ Object.assign(MENUS, {
     if (open(9, 18)) {
       for (const [id, name, food, blurb] of ZOO_PENS) {
         acts.push({ label: `See the ${name.toLowerCase()}`, detail: `${blurb} +5 happiness.`, mins: 20, fn: () => { S.happy += 5; S.zooSeen = S.zooSeen || {}; S.zooSeen[id] = true; if (Object.keys(S.zooSeen).length >= ZOO_PENS.length) goal('zoo'); log(pick([`The ${name.toLowerCase()} look right at you.`, `You spend a while watching the ${name.toLowerCase()}.`, `A zookeeper tells you a fun fact about the ${name.toLowerCase()}.`]), 'good'); } });
-        acts.push({ label: `Feed the ${name.toLowerCase()}`, detail: `A bucket of ${food.toLowerCase()}. +8 happiness.`, cost: 3, mins: 10, fn: () => { S.happy += 8; S.zooSeen = S.zooSeen || {}; S.zooSeen[id] = true; if (Object.keys(S.zooSeen).length >= ZOO_PENS.length) goal('zoo'); log(id === 'petting' ? 'The baby trikes nibble seeds right out of your claw. So cute.' : `The ${name.toLowerCase()} gobble up the ${food.toLowerCase()}.`, 'good'); } });
+        acts.push({ label: `Feed the ${name.toLowerCase()}`, detail: `A bucket of ${food.toLowerCase()}. +8 happiness.`, cost: 3, mins: 10, fn: () => { S.happy += 8; S.zooSeen = S.zooSeen || {}; S.zooSeen[id] = true; if (Object.keys(S.zooSeen).length >= ZOO_PENS.length) goal('zoo'); if (id === 'saber' || id === 'petting') { if (Math.random() < 0.06) hurt('bite'); } log(id === 'petting' ? 'The baby trikes nibble seeds right out of your claw. So cute.' : `The ${name.toLowerCase()} gobble up the ${food.toLowerCase()}.`, 'good'); } });
       }
       if (S.kids.length) acts.push({ label: 'Zoo day with the kids', detail: `+25 kid happiness, +12 yours, 2 hours.`, cost: 6 * S.kids.length, mins: 120, fn: () => { S.happy += 12; treatKids(25, 'The kids want a pet mammoth now. Thanks a lot, zoo.'); } });
       if (S.partner) acts.push({ label: `Zoo date with ${S.partner.name}`, detail: 'Counts as a date. +10 closeness.', cost: 30, mins: 120, fn: () => { partnerRel(10); S.happy += 14; goal('date'); log(`${S.partner.name} loved the pterosaur show.`, 'good'); } });
@@ -4554,6 +4564,270 @@ Object.assign(LAYOUTS, {
     b.plant(420, 300); b.sign('LITTLE CLAWS', 220, 104, 3, 150, '#2e86c1', '#ffffff'); b.lamp(220, 160);
   } },
 });
+
+// ---------- Deep Blue Aquarium and Splash Lagoon water park ----------
+DISTRICTS['4,3'] = 'waterpark';
+for (const d of districtList) if (d.i === 4 && d.j === 3) d.type = 'waterpark';
+Object.assign(HOURS, { aquarium: [9, 19], waterpark: [10, 19] });
+Object.assign(MAP_ICON, { aquarium: '🐠', waterpark: '🌊' });
+Object.assign(GIG_PLACE, { aquarist: 'aquarium', guard: 'waterpark' });
+Object.assign(GIG_KIND, { aquarium: 'aquarist', waterpark: 'guard' });
+Object.assign(NEXT_TASK, { aquarist: ['Feed the next tanks', 'feeding rounds'], guard: ['Watch the next swim session', 'sessions guarded'] });
+WORKS.push('Feed the next tanks', 'Watch the next');
+CAREERS.aquarium = { place: 'aquarium', hours: [9, 17], edu: 0, clean: false, levels: [['Aquarist', 115], ['Marine Biologist', 230], ['Aquarium Director', 420]] };
+CAREERS.waterpark = { place: 'waterpark', hours: [10, 18], edu: 0, clean: false, levels: [['Lifeguard', 95], ['Head Lifeguard', 170], ['Park Manager', 300]] };
+const parkClosed = () => S && season() === 'winter';
+// ---- sea creature models ----
+const SEA = {
+  shark: (g, x, y, z, s = 1) => { const a = group(g, x, y, z); a.scale.setScalar(s); add(a, GEO.s, '#7a8a96', 0, 0, 0, 22, 6, 6); add(a, GEO.s, '#e6eef2', 0, -2, 0, 18, 3, 5); add(a, GEO.c, '#6a7a86', -2, 7, 0, 3, 9, 1.5, 0, 0, 0.3); add(a, GEO.c, '#6a7a86', -24, 0, 0, 2, 12, 5, 0, 0, Math.PI / 2); return a; },
+  fish: (g, x, y, z, c) => { const a = group(g, x, y, z); add(a, GEO.s, c, 0, 0, 0, 4, 3, 1.5); add(a, GEO.c, c, -5, 0, 0, 2, 4, 1, 0, 0, Math.PI / 2); return a; },
+  jelly: (g, x, y, z, c) => { const a = group(g, x, y, z); add(a, GEO.s, c, 0, 0, 0, 7, 5, 7); for (let i = 0; i < 5; i++) { const t = i / 5 * Math.PI * 2; add(a, GEO.y, c, Math.cos(t) * 4, -8, Math.sin(t) * 4, 0.5, 14, 0.5); } return a; },
+  octo: (g, x, y, z) => { const a = group(g, x, y, z); add(a, GEO.s, '#9b3a8a', 0, 8, 0, 9, 10, 9); add(a, GEO.s, '#ffffff', 6, 10, 4, 2, 2, 2); add(a, GEO.s, '#ffffff', 6, 10, -4, 2, 2, 2); for (let i = 0; i < 8; i++) { const t = i / 8 * Math.PI * 2; add(a, GEO.y, '#9b3a8a', Math.cos(t) * 9, 0, Math.sin(t) * 9, 1.5, 14, 1.5, Math.sin(t) * 1.2, 0, -Math.cos(t) * 1.2); } return a; },
+  star: (g, x, y, z, c) => { const a = group(g, x, y, z); for (let i = 0; i < 5; i++) add(a, GEO.c, c, Math.cos(i * 1.257) * 3, 0, Math.sin(i * 1.257) * 3, 1.5, 7, 0.8, 0, -i * 1.257, Math.PI / 2); return a; },
+  plesio: (g, x, y, z, s = 1) => { const a = group(g, x, y, z); a.scale.setScalar(s); add(a, GEO.s, '#3a7a6a', 0, 0, 0, 16, 7, 11); add(a, GEO.y, '#3a7a6a', 14, 14, 0, 2.5, 26, 2.5, 0, 0, -0.6); add(a, GEO.s, '#3a7a6a', 22, 27, 0, 5, 4, 4); for (const sd of [-1, 1]) for (const fx of [-6, 8]) add(a, GEO.b, '#2e6a5a', fx, -2, sd * 12, 9, 1.5, 6); return a; },
+};
+const AQ_TANKS = [
+  ['tunnel', 'Shark tunnel', 'Sharks glide right over your head.'],
+  ['jelly', 'Jellyfish glow room', 'Hundreds of glowing jellies pulse in the dark.'],
+  ['octo', 'Octopus den', 'The octopus waves at you with three arms.'],
+  ['reef', 'Coral reef', 'Rainbow fish dart between the coral.'],
+  ['turtle', 'Sea turtle lagoon', 'The turtles are older than your grandma.'],
+  ['touch', 'Touch pool', 'Starfish and sea urchins you can gently touch.'],
+];
+const AQ_FOOD = ['Krill', 'Squid', 'Small fish', 'Lettuce', 'Plankton', 'Shrimp'];
+const AQ_EAT = { tunnel: 'Small fish', jelly: 'Plankton', octo: 'Shrimp', reef: 'Krill', turtle: 'Lettuce', touch: 'Squid' };
+function buildWaterPlaces() {
+  // aquarium on the south beach
+  place('aquarium', 'Deep Blue Aquarium', 3770, 3170, 4050, 3400, 100, -1, { wall: '#1f5a8a', win: '#7fd8ff', sign: '#0f3a5a', roof: '#2e86c1' });
+  const whale = group(scene, 3910, 104, 3290); add(whale, GEO.s, '#2e86c1', 0, 18, 0, 60, 18, 24); add(whale, GEO.s, '#d6e8f2', 0, 12, 0, 50, 10, 20); add(whale, GEO.c, '#2e86c1', -66, 22, 0, 6, 26, 18, 0, 0, Math.PI / 2); add(whale, GEO.s, '#1a1a1a', 40, 22, 14, 3, 3, 3); add(whale, GEO.y, '!#bfe8ff', 20, 44, 0, 1.5, 18, 1.5);
+  // water park
+  const [x0, y0, x1, y1] = blockRect(4, 3);
+  place('waterpark', 'Splash Lagoon', 2620, 1960, 2900, 2070, 55, -1, { wall: '#7fd8ff', win: '#1f5a8a', sign: '#ff6ad5', roof: '#ffe066', awning: '#ff6ad5' });
+  add(scene, GEO.b, '#e8f4f8', (x0 + x1) / 2, 0.8, 2230, x1 - x0, 1, 300).castShadow = false;
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: '#3fc0e8' })); pool.rotation.x = -Math.PI / 2; pool.position.set(2660, 1.5, 2240); pool.scale.set(95, 75, 1); scene.add(pool);
+  solids.push({ x0: 2575, y0: 2175, x1: 2745, y1: 2305 });
+  // slide tower and twisting tubes
+  add(scene, GEO.b, '#ffe066', 2870, 60, 2170, 40, 120, 40); add(scene, GEO.b, '#ff6ad5', 2870, 122, 2170, 50, 6, 50);
+  const tubes = ['#ff6ad5', '#2ecc71', '#e67e22'];
+  for (let t = 0; t < 3; t++) { const z = 2150 + t * 22, ang = Math.atan2(105, 100); add(scene, GEO.b, tubes[t], 2800, 62, z, 150, 4, 16, 0, 0, ang); for (const sd of [-1, 1]) add(scene, GEO.b, tubes[t], 2800, 66, z + sd * 8, 150, 8, 2, 0, 0, ang); }
+  solids.push({ x0: 2790, y0: 2120, x1: 2960, y1: 2330 });
+  for (const [px, pz] of [[2580, 2120], [2760, 2120], [2560, 2340], [2770, 2340]]) { const palm = group(scene, px, 0, pz); add(palm, GEO.y, '#9a7442', 0, 40, 0, 4, 80, 4); for (let l = 0; l < 6; l++) { const b2 = l / 6 * Math.PI * 2; add(palm, GEO.c, '#3f9a3a', Math.cos(b2) * 16, 78, Math.sin(b2) * 16, 5, 34, 3, Math.sin(b2) * 1.3, 0, -Math.cos(b2) * 1.3); } }
+}
+// ---- swimming animation inside rooms ----
+function swimTick(R) {
+  if (!R.swim) return;
+  for (const f of R.swim) { f.t += 0.016 * f.sp; const a = f.t; f.obj.position.set(f.cx + Math.cos(a) * f.rx, f.y + Math.sin(a * 2.3) * (f.bob || 1.5), f.cz + Math.sin(a) * f.rz); if (!f.fixed) f.obj.rotation.y = -a - Math.PI / 2 * (f.rz > 0 ? 1 : -1); if (f.pulse) f.obj.scale.y = 1 + Math.sin(a * 6) * 0.15; }
+}
+function swimmer(b, obj, cx, cz, rx, rz, y, sp, extra = {}) { b.R.swim = b.R.swim || []; b.R.swim.push({ obj, cx, cz, rx, rz, y, sp, t: Math.random() * 6, ...extra }); }
+// ---- jobs ----
+function startAquarist() {
+  const list = AQ_TANKS.slice().sort(() => Math.random() - 0.5).slice(0, 4 + Math.min(1, S.job.level));
+  seqPanel({ title: 'FEEDING TIME', sub: 'Give every tank the right food. Keys 1 to 6 work too.', labels: AQ_FOOD, seq: list.map(t => AQ_FOOD.indexOf(AQ_EAT[t[0]])), t: lvlT(18, 2.5), mins: 40,
+    show: i => `<span class="next">${list[i][1]}</span><span>${i + 1}/${list.length}</span>`,
+    done: m => m.mistakes ? 'Every tank is fed. The turtles looked confused by the squid.' : 'Perfect feeding round. The octopus high-fives you. Eight times.',
+    fail: 'You dumped lettuce in the shark tunnel. The sharks are insulted.', timeout: 'Visitors watched hungry fish for way too long.' });
+}
+function startGuard() {
+  const n = 4 + Math.min(1, S.job.level), seq = Array.from({ length: n }, () => Math.floor(Math.random() * 5));
+  seqPanel({ title: 'LIFEGUARD DUTY', sub: 'Spot the swimmer who needs help and blow your whistle at the right lane. Keys 1 to 5 work too.', labels: ['Lane 1', 'Lane 2', 'Lane 3', 'Lane 4', 'Lane 5'], seq, t: lvlT(14, 2), mins: 45,
+    show: i => `<span class="next">${pick(['🆘 Waving arms', '🏃 Running on the wet tiles', '🤽 Too far into the deep end', '🛟 Lost their float'])} in lane ${seq[i] + 1}!</span><span>${i + 1}/${n}</span>`,
+    done: m => m.mistakes ? 'Everyone is safe. You blew the whistle at a few innocent swimmers too.' : 'Flawless shift. Not a single soggy emergency.',
+    fail: 'Total chaos in the wave pool. The manager sends you on a break.', timeout: 'You were too slow to react. Another guard had to jump in.' });
+}
+const _snt3 = startNextTask;
+startNextTask = function (kind) { if (kind === 'aquarist') startAquarist(); else if (kind === 'guard') startGuard(); else _snt3(kind); };
+// ---- Mega Slide minigame: steer the tube, grab rings, dodge splash rocks ----
+function startSlide(big) {
+  closeMenu();
+  minigame = { kind: 'slide', px: 0.5, items: [], t: 0, rings: 0, bumps: 0, spawn: 0, dur: big ? 25 : 18, big, mins: 20 };
+  state = 'mini'; setScreens();
+}
+function updateSlide(dt) {
+  const m = minigame; let mx = 0;
+  if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1; if (joy.active) mx = joy.dx;
+  m.px = clamp(m.px + mx * 1.0 * dt, 0.08, 0.92); m.t += dt; m.spawn -= dt;
+  if (m.spawn <= 0) { m.spawn = Math.max(0.22, 0.55 - m.t * 0.012); m.items.push({ x: 0.5 + Math.sin(m.t * 1.3) * 0.32 + rand(-0.12, 0.12), y: -0.05, rock: Math.random() < 0.3, v: 0.55 + m.t * 0.015 }); }
+  for (const it of m.items) { it.y += it.v * dt; if (!it.hit && it.y > 0.82 && it.y < 0.95 && Math.abs(it.x - m.px) < 0.07) { it.hit = true; if (it.rock) { m.bumps++; sfx.bad(); shake = 3; } else { m.rings++; sfx.coin(); } } }
+  m.items = m.items.filter(it => it.y < 1.1 && !it.hit);
+  if (m.t >= m.dur) {
+    const r = m.rings, b = m.bumps, big = m.big; minigame.onDone = () => { S.happy += 10 + Math.min(15, r); S.energy -= 5; S.slideBest = Math.max(S.slideBest || 0, r); if (b >= 3 && Math.random() < 0.4) hurt('head'); if (r >= 15) goal('splash'); log(`SPLASH! You hit the pool with ${r} ring${r === 1 ? '' : 's'}${b ? ` and ${b} bump${b > 1 ? 's' : ''}` : ''}.${r >= (S.slideBest || 0) && r > 0 ? ' A new personal best!' : ''}`, 'good'); if (big && r >= 12) { S.money += 40; log('You won the Mega Slide challenge: $40!', 'good'); } };
+    endMini(true, '', 0);
+  }
+}
+function drawSlide(g) {
+  const m = minigame, w = Math.min(420, W - 30), h = Math.min(320, H - 190), x = (W - w) / 2, y = (H - h) / 2 + 20;
+  g.fillStyle = '#1f7ab0'; g.fillRect(x, y, w, h); g.strokeStyle = '#ff6ad5'; g.lineWidth = 4; g.strokeRect(x, y, w, h);
+  // the slide's curving walls
+  g.fillStyle = '#ffe066'; for (let i = 0; i < 12; i++) { const yy = y + ((i * 32 + m.t * 220) % h); g.fillRect(x + 4, yy, 10, 16); g.fillRect(x + w - 14, yy, 10, 16); }
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; for (let i = 0; i < 8; i++) { const yy = y + ((i * 45 + m.t * 300) % h); g.beginPath(); g.moveTo(x + 30, yy); g.quadraticCurveTo(x + w / 2, yy + 14, x + w - 30, yy); g.stroke(); }
+  g.textAlign = 'center'; g.font = '400 20px "Lilita One", system-ui, sans-serif'; g.fillStyle = '#ffffff'; g.fillText(m.big ? 'MEGA SLIDE CHALLENGE' : 'MEGA SLIDE', W / 2, y + 26);
+  g.font = '800 12px Nunito, system-ui, sans-serif'; g.fillText(`Rings ${m.rings}   Bumps ${m.bumps}   ${Math.max(0, Math.ceil(m.dur - m.t))}s   A/D or joystick to steer`, W / 2, y + 44);
+  for (const it of m.items) { const ix = x + it.x * w, iy = y + it.y * h; if (it.rock) { g.fillStyle = '#6a5a4a'; g.beginPath(); g.arc(ix, iy, 10, 0, 7); g.fill(); } else { g.strokeStyle = '#ffe066'; g.lineWidth = 4; g.beginPath(); g.arc(ix, iy, 9, 0, 7); g.stroke(); } }
+  const px = x + m.px * w, py = y + h * 0.88;
+  g.fillStyle = '#ff6ad5'; g.beginPath(); g.ellipse(px, py, 18, 9, 0, 0, 7); g.fill(); g.fillStyle = '#8fdc6a'; g.beginPath(); g.arc(px, py - 9, 7, 0, 7); g.fill(); g.fillStyle = '#000'; g.fillRect(px + 2, py - 12, 2, 2);
+}
+Object.assign(MENUS, {
+  aquarium: () => {
+    const acts = [...gigActs('aquarium')];
+    if (open(9, 19)) {
+      for (const [id, name, blurb] of AQ_TANKS) acts.push({ label: `Visit the ${name.toLowerCase()}`, detail: `${blurb} +5 happiness.`, mins: 20, fn: () => { S.happy += 5; if ((id === 'touch' || id === 'jelly') && Math.random() < 0.08) hurt('sting'); S.aqSeen = S.aqSeen || {}; S.aqSeen[id] = true; if (Object.keys(S.aqSeen).length >= AQ_TANKS.length) goal('aquarium'); log(blurb, 'good'); } });
+      const show = hour() >= 11 && hour() < 16;
+      acts.push({ label: 'Watch the plesiosaur show', detail: show ? 'Nessie does flips and splashes the front row. +15 happiness.' : 'Shows run from 11 AM to 4 PM.', cost: 8, why: show ? '' : 'No show right now.', mins: 45, fn: () => { S.happy += 15; log(pick(['Nessie splashed the whole front row. You were in the front row.', 'Nessie balanced a beach ball on her nose for a full minute!', 'The crowd cheered as Nessie leapt through a hoop.']), 'good'); } });
+      if (S.kids.length) acts.push({ label: 'Aquarium trip with the kids', detail: '+25 kid happiness, +12 yours, 2 hours.', cost: 7 * S.kids.length, mins: 120, fn: () => { S.happy += 12; treatKids(25, 'The kids pressed their faces against every single tank.'); } });
+      if (S.partner) acts.push({ label: `Aquarium date with ${S.partner.name}`, detail: 'A romantic walk through the glowing jellyfish room. +10 closeness.', cost: 30, mins: 120, fn: () => { partnerRel(10); S.happy += 14; goal('date'); log(`You and ${S.partner.name} held claws in the jellyfish room.`, 'good'); } });
+      acts.push({ label: 'Buy an octopus plushie (gift)', detail: `Eight arms of cuddles. You have ${(S.gifts || {}).plush || 0} plushies.`, cost: 15, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.plush = (S.gifts.plush || 0) + 1; } });
+    }
+    return { sub: open(9, 19) ? `Deep Blue Aquarium. Seen ${Object.keys(S.aqSeen || {}).length} of ${AQ_TANKS.length} exhibits.` : closedMsg(9, 19), acts };
+  },
+  waterpark: () => {
+    const acts = [...gigActs('waterpark')];
+    if (parkClosed()) return { sub: 'Splash Lagoon is closed for the winter. The slides are covered in snow!', acts };
+    if (open(10, 19)) {
+      const hot = S.weather === 'heat';
+      acts.push({ label: 'Ride the Mega Slide', detail: `Steer your tube, grab rings, dodge rocks.${S.slideBest ? ` Best: ${S.slideBest} rings.` : ''}`, cost: 5, why: S.energy < 10 ? 'Too tired.' : '', fn: () => startSlide(false) });
+      acts.push({ label: 'Mega Slide challenge', detail: 'A longer, faster run. 12+ rings wins $40.', cost: 10, why: S.energy < 10 ? 'Too tired.' : '', fn: () => startSlide(true) });
+      acts.push({ label: 'Swim in the wave pool', detail: `+${hot ? 22 : 12} happiness, 1 hour.${hot ? ' Perfect on a heatwave day!' : ''}`, cost: 6, mins: 60, fn: () => { S.happy += hot ? 22 : 12; S.energy -= 6; S.fit = clamp((S.fit || 0) + 1, 0, 100); log(pick(['A big wave knocked you over. You loved it.', 'You floated on your back and watched the clouds.', 'You won a splash fight against three kids.']), 'good'); } });
+      acts.push({ label: 'Float down the lazy river', detail: '+10 happiness, +10 energy, 1 hour. So relaxing.', cost: 6, mins: 60, fn: () => { S.happy += 10; S.energy = Math.min(100, S.energy + 10); } });
+      if (S.kids.length) acts.push({ label: 'Splash day with the kids', detail: '+25 kid happiness, +12 yours, 2 hours.', cost: 6 * S.kids.length, mins: 120, fn: () => { S.happy += 12; treatKids(25, 'The kids went down the slide 47 times. You counted.'); } });
+      if (S.partner) acts.push({ label: `Water park date with ${S.partner.name}`, detail: 'Race down the tubes together. +10 closeness.', cost: 25, mins: 120, fn: () => { partnerRel(10); S.happy += 14; goal('date'); log(`${S.partner.name} beat you down the slide and splashed you.`, 'good'); } });
+      acts.push({ label: 'Snack hut slushie', detail: '+15 hunger, +8 energy, +5 happiness', cost: 5, mins: 10, fn: () => { S.hunger = Math.min(100, S.hunger + 15); S.energy = Math.min(100, S.energy + 8); S.happy += 5; } });
+    }
+    return { sub: open(10, 19) ? 'Splash Lagoon. Slides, waves and a lazy river.' : closedMsg(10, 19), acts };
+  },
+});
+Object.assign(LAYOUTS, {
+  aquarium: { w: 640, d: 440, floor: ['tile', '#1a2a3a', '#24384a'], wall: '#0f2236', trim: '#2e86c1', night: true, build(b) {
+    const g = b.g, glass = (x, z, w, d, h, c = '#3fa0d8') => { const m = b.box(x, z, w, d, h, c, true); m.material = new THREE.MeshLambertMaterial({ color: c, transparent: true, opacity: 0.55, emissive: '#0a3a5a' }); return m; };
+    // shark tunnel along the back wall
+    glass(320, 50, 560, 70, 70); for (let i = 0; i < 3; i++) swimmer(b, SEA.shark(g, 320, 40, 50, 1.2), 320, 50, 230, 18, 30 + i * 12, 0.5 + i * 0.15);
+    for (let i = 0; i < 8; i++) swimmer(b, SEA.fish(g, 0, 0, 0, ['#ffe066', '#ff8a3a', '#7fe8a0'][i % 3]), 320, 50, 120 + i * 20, 22, 20 + (i % 3) * 14, 1 + i * 0.1);
+    b.station(320, 110, 'Shark tunnel', ['Visit the shark']);
+    // jellyfish room
+    const jt = b.box(70, 200, 90, 110, 80, '#1a0a3a', true); jt.material = new THREE.MeshLambertMaterial({ color: '#2a1a5a', transparent: true, opacity: 0.6, emissive: '#1a0a3a' });
+    for (let i = 0; i < 6; i++) swimmer(b, SEA.jelly(g, 0, 0, 0, ['!#ff6ad5', '!#7fd8ff', '!#c9a2ff'][i % 3]), 70, 200, 22, 30, 35 + (i % 3) * 14, 0.25 + i * 0.05, { pulse: true, bob: 6 });
+    b.station(140, 200, 'Jellyfish glow room', ['Visit the jellyfish']);
+    // octopus den
+    glass(200, 330, 90, 70, 50, '#2e7a9a'); swimmer(b, SEA.octo(g, 200, 10, 330), 200, 330, 15, 10, 10, 0.3);
+    b.station(200, 385, 'Octopus den', ['Visit the octopus']);
+    // coral reef
+    glass(560, 210, 100, 120, 60, '#3fc0d8');
+    for (let i = 0; i < 6; i++) b.cyl(530 + (i % 3) * 30, 180 + Math.floor(i / 3) * 50, 6, 14 + i * 3, ['#ff6a8a', '#ffb04a', '#c9a2ff'][i % 3], false);
+    for (let i = 0; i < 10; i++) swimmer(b, SEA.fish(g, 0, 0, 0, ['#ff3a6a', '#ffe066', '#3a8aff', '#7fe8a0'][i % 4]), 560, 210, 30 + (i % 3) * 8, 40, 20 + (i % 4) * 8, 0.8 + i * 0.07);
+    b.station(490, 210, 'Coral reef', ['Visit the coral']);
+    // sea turtle lagoon
+    const lag = b.box(420, 340, 140, 90, 6, '#2e8ab8', true); lag.material = new THREE.MeshLambertMaterial({ color: '#2e8ab8', emissive: '#0a2a4a' });
+    for (let i = 0; i < 2; i++) { const t = buildPet('turtle'); t.root.scale.setScalar(16); g.add(t.root); swimmer(b, t.root, 420, 340, 45, 24, 7, 0.2 + i * 0.08); }
+    b.station(420, 405, 'Sea turtle lagoon', ['Visit the sea turtle', 'Watch the plesiosaur']);
+    swimmer(b, SEA.plesio(g, 420, 8, 340, 1.1), 420, 340, 30, 18, 6, 0.35);
+    // touch pool
+    b.cyl(320, 240, 40, 12, '#5a6a7a'); b.cyl(320, 240, 36, 1, '#3fc0d8', false, 12);
+    for (let i = 0; i < 5; i++) SEA.star(g, 300 + (i % 3) * 18, 13.5, 228 + Math.floor(i / 3) * 22, ['#ff8a3a', '#ff6ad5', '#ffe066'][i % 3]);
+    b.station(320, 300, 'Touch pool', ['Visit the touch', 'Aquarium trip', 'Aquarium date']);
+    b.box(580, 400, 70, 26, 26, '#2e86c1'); b.npc(580, 378, 1, { hat: '#2e86c1' }); b.station(510, 420, 'Gift shop', ['Buy an octopus']);
+    b.station(600, 120, 'Aquarist room (staff)', WORKS);
+    b.npc(250, 150, 4); b.npc(400, 160, 0, { kid: true }); b.npc(110, 300, 3);
+    b.sign('DEEP BLUE AQUARIUM', 320, 104, 3, 180, '#0f3a5a', '#7fd8ff');
+  } },
+  waterpark: { w: 680, d: 480, floor: ['tile', '#f2f6f8', '#bfe0ee'], wall: '#bfe8ff', trim: '#ff6ad5', build(b) {
+    const g = b.g, water = (x, z, w, d, c = '#3fc0e8') => { const m = b.box(x, z, w, d, 3, c, true); m.material = new THREE.MeshLambertMaterial({ color: c, transparent: true, opacity: 0.85 }); m.castShadow = false; return m; };
+    // wave pool
+    water(180, 140, 260, 180); const waves = []; for (let i = 0; i < 4; i++) { const wv = add(g, GEO.b, '#e8f8ff', 180, 4, 70 + i * 45, 250, 1.5, 6); wv.castShadow = false; waves.push(wv); }
+    b.R.swim = b.R.swim || []; waves.forEach((wv, i) => b.R.swim.push({ obj: wv, cx: 180, cz: 140, rx: 0, rz: 70, y: 4, sp: 0.6, t: i * 1.5, bob: 0.5, fixed: true }));
+    for (let i = 0; i < 4; i++) { const s = makeCompy(PALETTES[i], { crest: PALETTES[i].crest }); s.root.scale.setScalar(9 / 1.25); g.add(s.root); swimmer(b, s.root, 180, 140, 80 + i * 10, 50, -6, 0.2 + i * 0.05); }
+    b.station(180, 250, 'Wave pool', ['Swim in the wave', 'Splash day', 'Water park date']);
+    // lazy river loop
+    water(520, 130, 200, 30, '#5ad0f0'); water(520, 290, 200, 30, '#5ad0f0'); water(420, 210, 30, 130, '#5ad0f0'); water(620, 210, 30, 130, '#5ad0f0');
+    for (let i = 0; i < 3; i++) { const tube = group(g, 0, 0, 0); add(tube, GEO.y, ['#ff6ad5', '#ffe066', '#2ecc71'][i], 0, 0, 0, 12, 4, 12); swimmer(b, tube, 520, 210, 100, 80, 5, 0.25, { bob: 0.4 }); }
+    b.station(520, 210, 'Lazy river', ['Float down']);
+    // slide tower
+    b.box(110, 380, 60, 60, 110, '#ffe066'); add(g, GEO.b, '#ff6ad5', 110, 112, 380, 70, 5, 70);
+    for (const [z, c] of [[370, '#ff6ad5'], [392, '#2ecc71']]) { const ang = -Math.atan2(100, 90); add(g, GEO.b, c, 185, 58, z, 135, 4, 16, 0, 0, ang); for (const sd of [-1, 1]) add(g, GEO.b, c, 185, 62, z + sd * 8, 135, 8, 2, 0, 0, ang); }
+    water(250, 400, 90, 60);
+    b.station(200, 330, 'Mega Slide', ['Ride the Mega', 'Mega Slide challenge']);
+    b.box(420, 420, 80, 30, 26, '#ff6ad5'); b.npc(420, 396, 4, { hat: '#ffe066' }); b.station(420, 455, 'Snack hut', ['Snack hut']);
+    b.box(620, 420, 20, 20, 40, '#ffffff'); b.npc(620, 420, 2, { hat: '#c0392b' }); b.station(600, 370, 'Lifeguard chair (staff)', WORKS);
+    b.npc(330, 380, 1, { kid: true }); b.npc(350, 300, 5); b.plant(20, 20); b.plant(660, 20);
+    b.sign('SPLASH LAGOON', 340, 104, 3, 170, '#ff6ad5', '#ffffff');
+  } },
+});
+
+// ---------- injuries, sickness and sleeping in ----------
+const INJ = {
+  sprain:   { name: 'Sprained ankle', days: 3, slow: true, how: 'You twisted your ankle. Walking is slow for a few days.' },
+  leg:      { name: 'Broken leg', days: 5, slow: true, how: 'Your leg is broken! You will be hobbling for a while.' },
+  arm:      { name: 'Broken arm', days: 4, arm: true, how: 'Your arm is in a sling. No lifting, digging, fishing or guitar until it heals.' },
+  head:     { name: 'Bumped head', days: 2, dizzy: true, how: 'You bonked your head. Seeing stars and tiring faster.' },
+  pulled:   { name: 'Pulled muscle', days: 2, arm: true, how: 'You pulled a muscle. Take it easy.' },
+  cold:     { name: 'Common cold', days: 3, sick: true, how: 'Achoo! You caught a cold. Low energy and grumpy until it passes.' },
+  flu:      { name: 'Dino flu', days: 4, sick: true, how: 'You have the dino flu. Rest, or see a doctor.' },
+  sunburn:  { name: 'Sunburn', days: 2, how: 'Your scales are bright red and stinging. Ouch.' },
+  tummy:    { name: 'Tummy ache', days: 1, sick: true, how: 'Your tummy is rumbling in a bad way. You get hungry faster.' },
+  burned:   { name: 'Burned tail', days: 3, slow: true, how: 'Your tail is singed! It hurts to walk.' },
+  sting:    { name: 'Jellyfish sting', days: 1, how: 'A jellyfish stung you. It itches like crazy.' },
+  hook:     { name: 'Hook in the tail', days: 1, how: 'You hooked your own tail. Embarrassing and painful.' },
+  bite:     { name: 'Nibbled toe', days: 1, how: 'Something bit your toe. Nothing serious, just rude.' },
+};
+const injOf = () => S && S.injury && INJ[S.injury.type];
+function hurt(type, quiet) {
+  const I = INJ[type]; if (!I) return;
+  if (S.injury && INJ[S.injury.type] && INJ[S.injury.type].days > I.days) return;
+  S.injury = { type, days: I.days }; S.injured = !!I.slow; S.happy -= 4;
+  if (!quiet) { log(`${I.name}! ${I.how}`, 'bad'); sfx.bad(); }
+}
+function healAll(msg) { S.injury = null; S.injured = false; if (msg) log(msg, 'good'); }
+function injuryTick() {
+  if (!S) return;
+  // older code paths only set S.injured; give those a proper injury
+  if (S.injured && !S.injury) { S.injury = { type: pick(['sprain', 'leg', 'head']), days: 3 }; S.injured = !!INJ[S.injury.type].slow; if (!S.injured) S.injury.days = 2; }
+}
+function injuryDaily() {
+  const lastW = S.lastWeather; S.lastWeather = S.weather;
+  if (S.soakedDay === S.day - 1 && !S.injury && Math.random() < 0.45) hurt('cold');
+  else if (lastW === 'snow' && !S.injury && Math.random() < 0.12) hurt('cold');
+  else if (lastW === 'heat' && !S.injury && S.outsideHeat && Math.random() < 0.4) hurt('sunburn');
+  else if (!S.injury && Math.random() < 0.025) hurt(pick(['cold', 'flu']));
+  S.outsideHeat = false;
+  if (!S.injury) return;
+  const I = INJ[S.injury.type];
+  if (I.sick) { S.energy -= 8; S.happy -= 4; }
+  if (S.injury.type === 'sunburn') S.happy -= 5;
+  S.injury.days--;
+  if (S.injury.days <= 0) { healAll(`Your ${I.name.toLowerCase()} has healed. You feel like yourself again!`); }
+}
+let sneezeT = 20, tripCheck = 0;
+function injuryUpdate(dt) {
+  if (!S) return;
+  injuryTick();
+  const I = injOf();
+  if (I && I.sick) { sneezeT -= dt; if (sneezeT <= 0) { sneezeT = rand(25, 60); log(pick(['ACHOO!', 'Sniff...', '*cough cough*', 'Your nose is running.']), ''); } }
+  if (I && I.dizzy && Math.random() < dt * 0.6) burst(P.x, P.y, 46, 2, '#ffe066', 30, 3);
+  if (S.weather === 'heat' && !inside && !driving) S.outsideHeat = true;
+  // tripping while running around outside, worse when tired or on icy snow days
+  if (inside || driving || state !== 'play') return;
+  const moving = Math.hypot(P.vx, P.vy) > 150;
+  if (!moving) return;
+  tripCheck += dt;
+  if (tripCheck < 1) return; tripCheck = 0;
+  let p = 0.0006; if (S.energy < 20) p *= 4; if (S.weather === 'snow') p *= 5; if (S.weather === 'rain' || S.weather === 'storm') p *= 2;
+  if (!S.injury && Math.random() < p) { const t = Math.random() < 0.7 ? 'sprain' : Math.random() < 0.5 ? 'head' : 'leg'; log(S.weather === 'snow' ? 'You slipped on the ice!' : 'You tripped over your own tail!', 'bad'); hurt(t); shake = 6; }
+}
+const armBlocked = what => { const I = injOf(); if (I && I.arm) { log(`You cannot ${what} with your ${I.name.toLowerCase()}.`, 'warn'); return true; } return false; };
+// ---- waking up ----
+function wakeMinute(bedMin) {
+  const bedH = bedMin / 60;
+  let wake = 6.5;
+  if (has('alarm')) { wake = Math.random() < 0.15 ? 6.75 : 6.5; }
+  else {
+    wake += Math.random() * 1.25;
+    const late = bedH >= 22 ? bedH - 22 : bedH < 5 ? bedH + 2 : 0;
+    wake += late * 0.6;
+    if (injOf() && injOf().sick) wake += 0.75;
+    if (S.energy < 15) wake += 0.5;
+    wake = Math.min(wake, 10.5);
+  }
+  return Math.round(wake * 60);
+}
+FURN.alarm = { name: 'Alarm clock', price: 40, blurb: 'Always wake up at 6:30 AM. No more oversleeping.' };
 
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
@@ -4651,7 +4925,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); islandUpdate(dt); raceUpdate(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); injuryUpdate(dt); islandUpdate(dt); raceUpdate(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -4837,7 +5111,7 @@ function hud() {
   if (S.kids.length) chips.push([`${S.kids.length} kid${S.kids.length > 1 ? 's' : ''}`, '']);
   if (S.egg) chips.push(['Egg in nest', 'good']);
   if (S.record) chips.push([`Record: ${S.record}`, 'bad']);
-  if (S.injured) chips.push(['Injured', 'bad']);
+  if (injOf()) chips.push([`${injOf().name} (${S.injury.days}d)`, 'bad']);
   if (S.loan) chips.push([`Loan ${money$(S.loan)}`, 'bad']);
   if (driving) chips.push([`Gas ${Math.round(driving.fuel)}%`, driving.fuel < 20 ? 'bad' : 'good']);
   if (S.equip) chips.push([`${WEAPONS[S.equip].name}${WEAPONS[S.equip].consumable ? ' x' + S.weapons[S.equip] : ''} (F)`, '']);
