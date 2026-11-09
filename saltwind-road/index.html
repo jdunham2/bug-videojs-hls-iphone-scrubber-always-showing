@@ -749,6 +749,9 @@ const GOODS = {
   powder_keg:{name:'Powder Keg',base:60,col:'#6a4a2a',kind:'ammo',desc:'A huge bomb. Thrown like a bomb with G, much bigger blast.'},
   slime_gel:{name:'Slime Gel',base:6,col:'#86c98f',kind:'mat'},
   slime_tonic:{name:'Bouncy Tonic',base:40,col:'#86e88f',kind:'food',heal:6,buff:'speed'},
+  black_pearl:{name:'Black Pearl',base:420,col:'#3a3a5a',kind:'good'},
+  diving_mask:{name:'Diving Mask',base:80,col:'#9fe8ff',kind:'trinket',desc:'Safer pearl dives: +10% breath at every depth'},
+  black_pearl_ring:{name:'Black Pearl Ring',base:1200,col:'#3a3a5a',kind:'craft'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -972,6 +975,8 @@ const RECIPES = [
   {id:'flintlock',      need:{gunpowder:4,iron:3,wood:2}, at:'forge', known:true},
   {id:'gunpowder_bomb', out:'bomb', n:3, need:{gunpowder:2,iron:1}, at:'bench', known:true, label:'Powder Bombs'},
   {id:'slime_tonic',    need:{slime_gel:3,glass:1}, at:'bench', known:true},
+  {id:'diving_mask',    need:{glass:2,hide:1,rope:1}, at:'bench', known:true},
+  {id:'black_pearl_ring',need:{black_pearl:2,silver:2}, at:'bench', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1060,6 +1065,7 @@ const NODES = {
   redwood:{name:'Giant Redwood',verb:'Chop',tool:'axe',give:'redwood',amt:[2,3],hits:4,regrow:4,seed:'amber',seedP:.12},
   gemvein:{name:'Gem Vein',verb:'Mine',tool:'pick',tier:2,give:'gem',amt:[1,1],hits:5,regrow:99,curio:'geode'},
   mithril:{name:'Mithril Vein',verb:'Mine',tool:'pick',tier:2,give:'mithril_ore',amt:[1,2],hits:5,regrow:99},
+  divespot:{name:'Diving Spot',verb:'Dive at',give:'pearl',amt:[1,1],hits:1,regrow:2,dive:true},
   flotsam:{name:'Floating Crate',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:6,loot:true},
   satchel:{name:'Lost Satchel',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:7,loot:true},
   giantshroom:{name:'Giant Glowcap',verb:'Harvest',give:'mushroom',amt:[2,3],hits:2,regrow:3,seed:'truffle',seedP:.15,curio:'sporeorb'},
@@ -2319,7 +2325,8 @@ function placeNodes() {
     }
     if (!type && y < WORLD_H) {
       const q = hash2(x, y, 191);
-      if (q < .0013) type = 'satchel';
+      if (t === T.SHAL) { if (q > .002 && q < .02 && landNear(x, y)) type = 'divespot'; }
+      else if (q < .0013) type = 'satchel';
       else if (q < .02) switch (t) {
         case T.GRASS: case T.BLOSSOM: case T.MOOR: case T.MAPLE: type = q < .014 ? 'wildflower' : 'feathers'; break;
         case T.FOREST: case T.REDWOOD: case T.JUNGLE: type = 'pinecone'; break;
@@ -2790,6 +2797,7 @@ function gather(i) {
   if (d.fishing) { if (!fishing) { fishing = {i, t: (1.2 + Math.random()*2) * (toolTier('rod') >= 2 ? .5 : 1)}; floatText(S.x, S.y-1, 'Casting…'); } return; }
   if (gatherCd > 0) return;
   gatherCd = .28;
+  if (d.dive) { gatherCd = .5; startDive(i); return; }
   if (d.loot) {
     const c = rint(15, 60) + Math.floor(S.day*.5), pool = ['fish','bread','iron','glass','silk','pearl','spice','honey','tea','salt','rope','herbs','apple','bomb','arrows','amber','crystal','silver'].filter(g => GOODS[g]);
     const g1 = pool[rint(0, pool.length - 1)], n1 = rint(1, 3);
@@ -3129,6 +3137,7 @@ const GUIDE = [
   ['Sailing', 'Corvo in Reedholm builds a raft. Shipwright Bess in Port Wren builds a much faster sailboat. Floating crates drift at sea, and the Pirate Isles lie far south-east.'],
   ['Companions', 'Guildmaster Sten in Port Wren hires out fighters and a healer for a daily wage.'],
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
+  ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
   ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
   ['Dice', 'Play Bones with Lucky Lou (Lantern Bay), Dice Dame Rosa (Dunmere) or One-Eyed Finn (Crownfall).'],
@@ -3647,6 +3656,7 @@ function drawNode(g, i, t) {
     case 'redwood': shadow(9); g.fillStyle = '#6a2e1a'; g.fillRect(x-4, y-14, 8, 14); g.fillStyle = '#8a3e22'; g.fillRect(x-2, y-14, 2, 14); if (!avail) { g.fillStyle = '#d8a070'; g.fillRect(x-4, y-14, 8, 2); return; } g.fillStyle = '#1e3e16'; g.beginPath(); g.moveTo(x-11, y-10); g.lineTo(x, y-36); g.lineTo(x+11, y-10); g.fill(); g.fillStyle = '#2a5220'; g.beginPath(); g.moveTo(x-8, y-20); g.lineTo(x, y-40); g.lineTo(x+8, y-20); g.fill(); break;
     case 'gemvein': rock('#5a5060', '#e04a8a'); if (!avail) return; g.fillRect(x-3, y-6, 2, 2); g.fillRect(x+2, y-4, 2, 2); g.fillStyle = '#4ab0e0'; g.fillRect(x-1, y-3, 2, 2); if (Math.random() < .03) burst(n.x + .5, n.y + .3, '#ff8ac0', 1, 1); break;
     case 'mithril': rock('#4a5058', '#bfe8ff'); if (!avail) return; g.fillRect(x-4, y-5, 3, 1); g.fillRect(x+1, y-3, 3, 1); g.fillRect(x-1, y-7, 2, 1); g.fillStyle = '#ffffff'; if (Math.sin(t*3 + n.x) > .8) g.fillRect(x, y-5, 1, 1); break;
+    case 'divespot': { if (!avail) return; for (let k = 0; k < 3; k++) { const ph = (t*.8 + k*.33 + n.x*.1) % 1; g.fillStyle = `rgba(220,240,255,${.8 - ph*.8})`; g.beginPath(); g.arc(x - 4 + k*4 + Math.sin(t*3 + k)*1, y - 2 - ph*8, 1 + ph*1.2, 0, 7); g.fill(); } g.strokeStyle = 'rgba(220,240,255,.4)'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y - 1, 6 + Math.sin(t*2)*1, 2, 0, 0, 7); g.stroke(); break; }
     case 'flotsam': { if (!avail) return; const b = Math.sin(t*2 + n.x)*1.5; g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x-8, y-1 + b, 16, 1); g.fillStyle = '#8a5a2a'; g.fillRect(x-5, y-8 + b, 10, 8); g.fillStyle = '#6a3a1a'; g.fillRect(x-5, y-5 + b, 10, 1); g.fillRect(x-1, y-8 + b, 2, 8); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5 + b, 2, 1); break; }
     case 'satchel': if (!avail) return; shadow(6); g.fillStyle = '#7a4a22'; g.fillRect(x-5, y-6, 10, 6); g.fillStyle = '#9a6a3a'; g.fillRect(x-5, y-7, 10, 3); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5, 2, 2); if (Math.sin(t*4 + n.x) > .7) { g.fillStyle = 'rgba(255,240,180,.9)'; g.fillRect(x+4, y-9, 1, 1); } break;
     case 'mapletree': shadow(7); g.fillStyle = '#4a3020'; g.fillRect(x-2, y-8, 4, 8); if (!avail) { g.fillStyle = '#c49a63'; g.fillRect(x-2, y-8, 4, 2); return; } g.fillStyle = '#c8401a'; g.beginPath(); g.arc(x, y-14, 9, 0, 7); g.fill(); g.fillStyle = '#e07a20'; g.beginPath(); g.arc(x-3, y-16, 5, 0, 7); g.fill(); g.fillStyle = '#c8c0b0'; g.fillRect(x+2, y-5, 2, 2); g.fillStyle = '#b0601a'; g.fillRect(x+2, y-3, 2, 1); break;
@@ -4657,7 +4667,7 @@ function digTreasure() {
   toast(`<b>You dug up a treasure chest!</b><br><span style="color:var(--good)">+ ${got.join(', ')}</span>`, 8000);
   renderHUD(); save();
 }
-const LOVED_GIFTS = ['bouquet','flower_perfume','perfume','coral_necklace','necklace','jeweled_goblet','gem_ring','silver_ring','jade_idol','maple_candy','candy_apple','marble_statue','redwood_carving','quartz_figurine','truffle_oil'];
+const LOVED_GIFTS = ['black_pearl_ring','bouquet','flower_perfume','perfume','coral_necklace','necklace','jeweled_goblet','gem_ring','silver_ring','jade_idol','maple_candy','candy_apple','marble_statue','redwood_carving','quartz_figurine','truffle_oil'];
 const KEEPSAKES = ['gem','pearl','treasure_map','elixir','luck_draught','amber','star_fragment','golden_horseshoe'];
 function giftReaction(n, g) {
   if (LOVED_GIFTS.includes(g)) return 'love';
@@ -4775,6 +4785,27 @@ function drawEscort() {
   drawPerson(ctx, Math.round(x + f*15), Math.round(y), {cloak: '#8a2a5a', skin: '#a8704a', hair: '#1a1a1a'}, frameT*9, E.moving, f < 0 ? 'left' : 'right');
   ctx.fillStyle = '#0d131b'; ctx.fillRect(x - 12, y - 30, 24, 4); ctx.fillStyle = E.hp/E.max > .4 ? '#86c98f' : '#e5484d'; ctx.fillRect(x - 11, y - 29, 22*Math.max(0, E.hp)/E.max, 2);
 }
+// ===== pearl diving =====
+const DIVE_LOOT = [null,
+  [['shells', 2], ['fish', 1]],
+  [['pearl', 1], ['shells', 2], ['coral', 1]],
+  [['pearl', 2], ['coral', 1], ['amber', 1]],
+  [['black_pearl', 1], ['ancient_coin', 1], ['pearl', 2]],
+  [['black_pearl', 1], ['gem', 2], ['jeweled_goblet', 1]]];
+const DIVE_SAFE = [0, .92, .82, .68, .52, .36];
+let diveState = null;
+function startDive(i) { diveState = {i, depth: 0, bag: {}}; S.dives = (S.dives || 0) + 1; diveStep(); }
+function diveStep() {
+  const D = diveState, bagTxt = Object.entries(D.bag).map(([g, n]) => `${n} ${GOODS[g].name}`).join(', ') || 'nothing yet';
+  const mask = have('diving_mask') ? .1 : 0, nextSafe = Math.min(.98, (DIVE_SAFE[D.depth + 1] || 0) + mask);
+  openPanel('Pearl diving', `${D.depth ? `<b>Depth ${D.depth}</b> · ${['', 'sunlit shallows', 'swaying kelp', 'blue twilight', 'the dark deep', 'the abyssal floor'][D.depth]}` : 'You fill your lungs and look down into the clear water.'}<br>Your catch: <b>${bagTxt}</b>${D.depth < 5 ? `<br><span style="color:var(--muted)">Diving deeper: ${Math.round(nextSafe*100)}% chance your breath holds.${mask ? ' (Your mask helps.)' : ''}</span>` : ''}`, [
+    ...(D.depth < 5 ? [{label: D.depth ? 'Dive deeper' : 'Dive!', primary: true, fn: () => {
+      if (Math.random() > nextSafe) { closeTalk(); diveState = null; nodeAfterDive(D.i); hurtPlayer(2, null, true); toast(`<b>Out of breath!</b><br>You kick for the surface and drop everything you found.`, 4500); return; }
+      D.depth++; const [g, n] = pick(DIVE_LOOT[D.depth]); if (GOODS[g]) D.bag[g] = (D.bag[g] || 0) + n; SFX.fish && SFX.fish(); diveStep(); }}] : []),
+    ...(D.depth ? [{label: 'Surface with your catch', fn: () => { closeTalk(); for (const [g, n] of Object.entries(D.bag)) addItem(g, n); S.deepestDive = Math.max(S.deepestDive || 0, D.depth); if (D.bag.black_pearl) S.blackPearls = (S.blackPearls || 0) + D.bag.black_pearl; gainXP(10*D.depth); SFX.pickup(); toast(`You surface with <b>${Object.entries(D.bag).map(([g, n]) => `${n} ${GOODS[g].name}`).join(', ')}</b>.`, 4500); diveState = null; nodeAfterDive(D.i); renderHUD(); save(); }}] : [{label: 'Not now', fn: () => { closeTalk(); diveState = null; }}]),
+  ]);
+}
+function nodeAfterDive(i) { S.depleted[i] = S.day; const n = nodes[i]; burst(n.x + .5, n.y + .5, '#dff4ff', 10, 3); }
 function caravanDay() {
   if (!S.caravans || !S.caravans.length) return '';
   let total = 0, robbed = 0;
@@ -5478,7 +5509,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -6715,6 +6746,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['diver','Deep Diver','Reach depth 5 on a pearl dive', () => (S.deepestDive || 0) >= 5],
+  ['blackpearl','Black Pearl','Find a black pearl', () => (S.blackPearls || 0) >= 1],
   ['bodyguard','Bodyguard','Complete 3 escort jobs', () => (S.escorts || 0) >= 3],
   ['investor','Investor','Invest in a shop', () => investTotal() > 0],
   ['magnate','Magnate','Invest 10,000 coin across shops', () => investTotal() >= 10000],
