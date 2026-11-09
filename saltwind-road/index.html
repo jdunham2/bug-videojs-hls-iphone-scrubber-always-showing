@@ -767,6 +767,9 @@ const GOODS = {
   rune_shard:{name:'Rune Shard',base:120,col:'#c8a8ff',kind:'good'},
   rune_ward:{name:'Rune Ward',base:2000,col:'#c8a8ff',kind:'trinket',desc:'+2 armor and +8% critical chance. The runes protect you.'},
   royal_favor:{name:'Royal Favor',base:1000,col:'#e3a948',kind:'trinket',desc:'A letter bearing the queen\'s seal: +15% rent from all your houses'},
+  beehive:{name:'Beehive',base:50,col:'#e3a948',kind:'place',desc:'Place with B. Makes honey every day; collect it with E.'},
+  crab_pot:{name:'Crab Pot',base:40,col:'#a0805a',kind:'place',desc:'Place with B next to water. Catches shells and fish every day.'},
+  mushroom_log:{name:'Mushroom Log',base:45,col:'#7a5a3a',kind:'place',desc:'Place with B. Grows mushrooms (and sometimes truffles) every day.'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1001,6 +1004,9 @@ const RECIPES = [
   {id:'kings_banquet',  need:{truffle:1,maple_syrup:1,meat:2,wine:1}, at:'cook', known:true},
   {id:'titan_plate', need:{titan_heart:1,mithril:4,stone:10}, at:'forge'},
   {id:'titan_maul',  need:{titan_heart:1,mithril:3,blacksteel:2}, at:'forge', known:true},
+  {id:'beehive',        need:{wood:6,honey:1,planks:2}, at:'bench', known:true},
+  {id:'crab_pot',       need:{rope:2,wood:3}, at:'bench', known:true},
+  {id:'mushroom_log',   need:{wood:4,mushroom:3}, at:'hand', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1334,7 +1340,7 @@ const PK = Object.keys(PROPERTIES);
 const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
-  campfire:{solid:true, light:52, use:'rest'}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
+  campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
   scarecrow:{solid:true}, flower_pot:{solid:true},
 };
 const PLACE_MAX = 600;
@@ -1357,6 +1363,7 @@ function placeBlock(x, y) {
   const t = map[idx(x,y)];
   if (t === T.DEEP || t === T.SHAL || t === T.MOUNT || t === T.HOUSE || t === T.LAVA || t === T.BRIDGE || t === T.VOID) return 'You cannot build there.';
   if (nodeGrid[idx(x,y)] >= 0) return 'Something is already growing there.';
+  if (placeGood === 'crab_pot' && ![[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => { const tt = map[idx(x + a, y + b)]; return tt === T.SHAL || tt === T.DEEP; })) return 'A crab pot must go right next to water.';
   if (ESTATE_CLEAR.has(idx(x,y))) return 'Too close to an estate.';
   if (placedAt(x, y)) return 'Something is already there.';
   if (x >= HOME.x - 3 && x <= HOME.x + 6 && y >= HOME.y - 4 && y <= HOME.y + 5) return 'That spot is kept clear for your homestead.';
@@ -1367,7 +1374,9 @@ function placeBlock(x, y) {
   if (S.placed.length >= PLACE_MAX) return `You can only build ${PLACE_MAX} things.`;
   return null;
 }
+let placeGood = null;
 function placeItem(g) {
+  placeGood = g;
   if (!g || !have(g) || GOODS[g].kind !== 'place') { floatText(S.x, S.y - 1.2, 'Nothing to place', '#e57a62'); return false; }
   const sp = placeSpot(), why = placeBlock(sp.x, sp.y);
   if (why) { floatText(S.x, S.y - 1.2, why, '#e57a62'); return false; }
@@ -1395,6 +1404,9 @@ function placedTarget() {
   for (let y = fy - 2; y <= fy + 2; y++) for (let x = fx - 2; x <= fx + 2; x++) { const q = placedAt(x, y); if (!q) continue; const d = Math.hypot(x + .5 - S.x, y + .5 - S.y); if (d < bd) { bd = d; best = q; } }
   if (!best) return null;
   const q = best, P = PLACE[q.t], nm = GOODS[q.t].name;
+  if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
+    if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
+    else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
   if (P.use === 'cook') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Cook at the pot`, btn: 'Cook', fn: () => openPanel('Cooking Pot', 'A bubbling pot. Cook hearty meals with long-lasting effects (Craft menu, Food tab).', [{label: 'Cook', primary: true, fn: () => { closeTalk(); craftTab = 3; openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
   if (P.use === 'craft') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the ${nm}`, btn: 'Use', fn: () => openPanel(nm, q.t === 'anvil' ? 'A sturdy anvil. You can use forge and workbench recipes here.' : 'Your own crafting table. You can use workbench recipes here.', [
     {label: 'Craft', primary: true, fn: () => { closeTalk(); openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
@@ -1498,6 +1510,11 @@ function drawPlaced(g, q, t) {
     case 'starlight_lantern': { g.fillRect(x + 5, y + 14, 6, 2); g.fillStyle = '#3a3a4a'; g.fillRect(x + 7, y - 2, 2, 16); g.fillRect(x + 4, y - 3, 8, 1); const pu = .7 + Math.sin(t*3)*.3; g.globalAlpha = pu; g.fillStyle = '#fff4b0'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = i % 2 ? 2.5 : 5.5; g.lineTo(x + 8 + Math.cos(a)*r, y - 9 + Math.sin(a)*r); } g.fill(); g.globalAlpha = 1; break; }
     case 'golden_statue': g.fillRect(x + 2, y + 13, 12, 3); g.fillStyle = '#8a8890'; g.fillRect(x + 2, y + 10, 12, 5); g.fillStyle = '#9a98a2'; g.fillRect(x + 2, y + 10, 12, 1); drawPerson(g, x + 8, y + 10, {cloak: '#e3a948', skin: '#f0c040', hair: '#c8a030'}, 0, false, 'down'); if (Math.random() < .03) burst(q.x + .5, q.y - .6, '#fff4b0', 1, 1); break;
     case 'cooking_pot': { g.fillRect(x + 2, y + 13, 12, 3); g.fillStyle = '#5a3a20'; g.fillRect(x + 3, y + 12, 3, 2); g.fillRect(x + 10, y + 12, 3, 2); g.fillStyle = '#e05a1a'; g.fillRect(x + 5, y + 11, 6, 2); g.fillStyle = '#2a2a30'; g.beginPath(); g.ellipse(x + 8, y + 7, 7, 5, 0, 0, 7); g.fill(); g.fillStyle = '#a86a3a'; g.beginPath(); g.ellipse(x + 8, y + 4, 5.5, 2, 0, 0, 7); g.fill(); g.fillStyle = '#3a3a40'; g.fillRect(x + 1, y + 3, 14, 1); for (let k = 0; k < 2; k++) { const ph = (t*.6 + k*.5) % 1; g.fillStyle = `rgba(230,230,240,${.5 - ph*.5})`; g.beginPath(); g.arc(x + 6 + k*4 + Math.sin(t*2 + k)*1.5, y + 1 - ph*10, 1.5 + ph*2, 0, 7); g.fill(); } break; }
+    case 'beehive': { const st = q.stock || 0; g.fillRect(x + 2, y + 13, 12, 3); g.fillStyle = '#6a4a2a'; g.fillRect(x + 3, y + 11, 2, 4); g.fillRect(x + 11, y + 11, 2, 4); g.fillStyle = '#e8c070'; g.fillRect(x + 2, y + 3, 12, 9); g.fillStyle = '#c89a40'; for (let k = 0; k < 3; k++) g.fillRect(x + 2, y + 5 + k*3, 12, 1); g.fillStyle = '#8a5a2a'; g.fillRect(x + 1, y + 1, 14, 2); g.fillStyle = '#3a2a1a'; g.fillRect(x + 7, y + 9, 2, 2);
+      for (let k = 0; k < 2 + Math.min(3, st); k++) { const a = t*3 + k*2.1; g.fillStyle = '#f0d040'; g.fillRect(x + 8 + Math.cos(a)*7, y + 4 + Math.sin(a*1.3)*4, 2, 1); } break; }
+    case 'crab_pot': { const st = q.stock || 0; g.fillRect(x + 2, y + 13, 12, 2); g.fillStyle = '#a0805a'; g.beginPath(); g.ellipse(x + 8, y + 9, 6, 5, 0, 0, 7); g.fill(); g.strokeStyle = '#6a4a2a'; g.lineWidth = 1; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + 8 + k*3, y + 4); g.lineTo(x + 8 + k*3, y + 14); g.stroke(); } g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y + 2, 2, 3); if (st) { g.fillStyle = '#d8502a'; g.fillRect(x + 5, y + 9, 3, 2); } break; }
+    case 'mushroom_log': { const st = q.stock || 0; g.fillRect(x + 1, y + 13, 14, 2); g.fillStyle = '#6a4a2a'; g.fillRect(x + 1, y + 8, 14, 6); g.fillStyle = '#8a6a3a'; g.beginPath(); g.ellipse(x + 15, y + 11, 2, 3, 0, 0, 7); g.fill(); g.fillStyle = '#4a3020'; g.fillRect(x + 1, y + 10, 14, 1);
+      for (let k = 0; k < Math.min(5, 1 + st); k++) { const mx = x + 3 + k*2.5, my = y + 8 - (k % 2); g.fillStyle = '#e0d8c8'; g.fillRect(mx, my - 1, 1, 2); g.fillStyle = k % 2 ? '#b98ad8' : '#c8603a'; g.fillRect(mx - 1, my - 3, 3, 2); } break; }
     case 'flower_pot':
       g.fillRect(x + 3, y + 13, 10, 2);
       g.fillStyle = '#b05a3a'; g.fillRect(x + 4, y + 8, 8, 6); g.fillStyle = '#c86a48'; g.fillRect(x + 3, y + 7, 10, 2);
@@ -3248,6 +3265,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Producers', 'Craft beehives, crab pots (next to water) and mushroom logs, place them with B, and collect what they make every day.'],
   ['Magic', 'Archmage Ilyra in Skyhold teaches Fireball, Healing Light, Blink and Frost Nova. X casts your spell, Z switches.'],
   ['Archery', 'Range-master Holt in Hollowpine runs a 30-second target challenge with medals.'],
   ['Fishing tournament', 'On the 6th day of every season, the total weight of fish you catch earns a medal from Old Marlin. Every fish has a weight; beat your records!'],
@@ -4633,7 +4651,8 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
-  const carMsg = caravanDay() + investDay();
+  let made = 0; for (const q of (S.placed || [])) { const P = PLACE[q.t]; if (!P || P.use !== 'produce') continue; const n = rint(P.n[0], P.n[1]); const before = q.stock || 0; q.stock = Math.min(P.cap, before + n); made += q.stock - before; if (P.bonus && Math.random() < (P.bonus === 'truffle' ? .15 : .35)) q.bonus = (q.bonus || 0) + 1; }
+  const carMsg = caravanDay() + investDay() + (made ? ` Your hives, pots and logs produced <b>${made}</b> goods.` : '');
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
@@ -7146,6 +7165,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['homesteader','Cottage Industry','Collect 100 goods from hives, crab pots and mushroom logs', () => (S.produced || 0) >= 100],
   ['apprentice','Apprentice Mage','Learn a spell', () => (S.spells || []).length >= 1],
   ['archmage','Archmage','Learn every spell', () => Object.keys(SPELLS).every(k => (S.spells || []).includes(k))],
   ['stable','Stable Master','Own 6 different mounts', () => (S.mounts || []).length >= 6],
