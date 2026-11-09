@@ -826,6 +826,8 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  fire_opal:{name:'Fire Opal',base:140,col:'#ff7a3a',kind:'good',desc:'Thrown from the heart of the volcano'},
+  magma_charm:{name:'Magma Charm',base:1100,col:'#ff5a1a',kind:'trinket',desc:'Immune to lava-bomb fire; +4% damage'},
   bug_net:{name:'Bug Net',base:40,col:'#e8e0c8',kind:'tool',desc:'Catch bugs and butterflies'},
   monarch:{name:'Monarch Butterfly',base:22,col:'#f08a2a',kind:'good',desc:'A bug for your collection'},
   blue_morpho:{name:'Blue Morpho',base:55,col:'#3a8aff',kind:'good',desc:'A bug for your collection'},
@@ -1110,6 +1112,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'magma_charm',    need:{fire_opal:5,obsidian:4,silver:2}, at:'forge', known:true},
   {id:'bug_net',        need:{sticks:3,silk:2}, at:'hand', known:true},
   {id:'cauldron',       need:{iron:4,stone:4}, at:'forge', known:true},
   {id:'tent',           need:{hide:4,sticks:6,rope:2}, at:'bench', known:true},
@@ -3207,7 +3210,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3399,6 +3402,38 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== volcano eruptions =====
+let erupt = null, eruptT = 120, volcRocks = [];
+function updateEruption(dt) {
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y)), inAsh = t === T.ASH || t === T.LAVA || weatherNow() === 'ash';
+  volcRocks = volcRocks.filter(r => Math.hypot(r.x - S.x, r.y - S.y) < 30 && (r.life -= dt) > 0);
+  if (!erupt) {
+    if (!inAsh || inDungeon() || balloonF) return; eruptT -= dt; if (eruptT > 0) return; eruptT = 180 + Math.random()*180;
+    if (Math.random() > .4) return;
+    erupt = {t: 24, spawn: 1.5}; shake = .6; SFX.roar(); toast('<b>The volcano erupts!</b><br>The ground heaves and lava bombs rain from the sky. Watch for their shadows! Glittering fire opals land among them.', 6000); return;
+  }
+  erupt.t -= dt; erupt.spawn -= dt; if (Math.random() < .05) shake = Math.max(shake, .15);
+  if (Math.random() < .5) particles.push({x: S.x + (Math.random() - .5)*16, y: S.y - 6 + Math.random()*3, vx: .3, vy: 1.2, t: 0, col: 'rgba(80,70,70,.6)'});
+  if (erupt.spawn <= 0 && inAsh) {
+    erupt.spawn = .55;
+    const a = Math.random()*6.283, r = Math.random()*5.5, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r;
+    addHazard(x, y, 1.1, 1.3, have('magma_charm') ? 0 : 3, true);
+    if (Math.random() < .28) setTimeout(() => { if (inB(Math.floor(x), Math.floor(y)) && enemyWalk(x, y)) volcRocks.push({x, y, life: 40}); }, 1300);
+  }
+  if (erupt.t <= 0) { erupt = null; if (inAsh && S.hp > 0) { S.eruptions = (S.eruptions || 0) + 1; toast('The eruption subsides. The air is thick with ash... and opportunity.', 4000); } }
+}
+function volcTarget() {
+  const r = volcRocks.find(r => Math.hypot(S.x - r.x, S.y - r.y) < 1.2); if (!r) return null;
+  return {key: 'opal', html: '<kbd style="margin:0 6px 0 0">E</kbd>Pick up the glowing rock', btn: 'Take', fn: () => {
+    volcRocks = volcRocks.filter(q => q !== r); const opal = Math.random() < .6, g = opal ? 'fire_opal' : 'obsidian', n = opal ? 1 : rint(2, 3);
+    addItem(g, n); S.opals = (S.opals || 0) + (opal ? 1 : 0); SFX.pickup(); floatText(r.x, r.y - .6, `+${n} ${GOODS[g].name}`, GOODS[g].col); renderHUD(); save();
+  }};
+}
+function drawVolcRock(r) {
+  const px = r.x*TS, py = r.y*TS, gl = .6 + .3*Math.sin(frameT*4 + r.x);
+  ctx.fillStyle = '#2a2230'; ctx.beginPath(); ctx.ellipse(px, py, 5, 3.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = `rgba(255,120,40,${gl})`; ctx.fillRect(px - 2, py - 2, 2, 2); ctx.fillRect(px + 1, py, 2, 1);
 }
 // ===== fairy rings =====
 let fairyRing = null;
@@ -4230,6 +4265,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Volcano eruptions', 'In the Cinderlands the volcano sometimes erupts. Dodge the lava bombs by watching for their shadows, and grab the glowing rocks they leave: Fire Opals and Obsidian. Five opals forge a Magma Charm that makes you immune to the bombs.'],
   ['Fairy rings', 'On some nights a ring of glowing mushrooms appears in the wilds. Step in and sing the fairies\u2019 tune back to them for blessings. After three songs, a fairy may follow you home.'],
   ['Bug catching', 'Craft a Bug Net (3 Sticks, 2 Spider Silk). Butterflies, beetles and fireflies flit about every land. Each biome and time of day has its own bugs. Calm ones are easy to catch, and skittish ones dart away. Look out for the rare Golden Beetle.'],
   ['Ruin vaults', 'Ancient vaults hide in ruins, moors, mesas and savannas. Read the riddle above the door, then pull the Sun, Moon and Star levers in the right order to open it. A wrong pull resets the levers and stings a little.'],
@@ -4492,7 +4528,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -5224,6 +5260,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const r of volcRocks) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawVolcRock(r)});
   if (fairyRing && inView(fairyRing.x, fairyRing.y)) sprites.push({y: fairyRing.y - .6, f: () => drawFairyRing(fairyRing)});
   for (const b of bugs) if (inView(b.x, b.y)) sprites.push({y: b.y + .3, f: () => drawBug(b)});
   if (S.vaults) for (const v of S.vaults) if (inView(v.x, v.y)) sprites.push({y: v.y + .9, f: () => drawVault(v)});
@@ -5619,7 +5656,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || volcTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -7271,7 +7308,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['monarch','blue_morpho','firefly','stag_beetle','sand_scarab','frost_moth','ember_beetle','glow_moth','dragonfly','cicada','prism_butterfly','golden_beetle','sun_disc','desert_rose','scarab_amulet','rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['fire_opal','monarch','blue_morpho','firefly','stag_beetle','sand_scarab','frost_moth','ember_beetle','glow_moth','dragonfly','cicada','prism_butterfly','golden_beetle','sun_disc','desert_rose','scarab_amulet','rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy' && g !== 'challenge_token'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -8587,6 +8624,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['eruption','Ring of Fire','Survive a volcanic eruption', () => (S.eruptions || 0) >= 1],
+  ['opals','Opal Hunter','Collect 5 Fire Opals', () => (S.opals || 0) >= 5],
   ['fairyring','Fairy Dance','Complete a fairy ring song', () => (S.fairyWins || 0) >= 1],
   ['bugcatcher','Bug Catcher','Catch 10 bugs', () => (S.bugsCaught || 0) >= 10],
   ['entomologist','Entomologist','Fill the bug log', () => BUG_KINDS.every(B => (S.bugLog || {})[B.id])],
@@ -9054,7 +9093,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
