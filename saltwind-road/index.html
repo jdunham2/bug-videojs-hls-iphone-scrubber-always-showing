@@ -826,6 +826,9 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  rainbow_petal:{name:'Rainbow Petal',base:200,col:'#ff9ae0',kind:'mat',desc:'Found at the end of a rainbow.'},
+  golden_apple:{name:'Golden Apple',base:400,col:'#ffd040',kind:'mat',desc:'A treat fit for a unicorn.'},
+  market_stall:{name:'Market Stall',base:200,col:'#c84a3a',kind:'place',desc:'Place with B. Stock it with goods and it sells a few every morning.'},
   wish_lantern:{name:'Wish Lantern',base:15,col:'#ffb060',kind:'lantern',desc:'Release at night from your bag and make a wish.'},
   shell_horn:{name:'Shell Horn',base:800,col:'#f0d090',kind:'trinket',desc:'+5% speed. Sounds like the sea.'},
   golden_conch:{name:'Golden Conch',base:3000,col:'#ffd040',kind:'trinket',desc:'+6 max HP and +5% damage. The prize of a true shell seeker.'},
@@ -1120,6 +1123,8 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'golden_apple',   need:{apple:3,pirate_gold:1,honey:2}, at:'bench', known:true},
+  {id:'market_stall',   need:{planks:8,silk_cloth:2,rope:2}, at:'bench', known:true},
   {id:'wish_lantern',   need:{silk_cloth:1,sticks:2,honey:1}, n:3, at:'hand', known:true},
   {id:'incubator',      need:{planks:4,wool:3,glass:1}, at:'bench', known:true},
   {id:'snowman',        need:{snowball:3,sticks:2,carrot:1}, at:'hand', known:true},
@@ -1441,7 +1446,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30}, snowman:{solid:true}, incubator:{solid:true, use:'incubate', light:24},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30}, snowman:{solid:true}, market_stall:{solid:true, use:'stall'}, incubator:{solid:true, use:'incubate', light:24},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1507,6 +1512,7 @@ function placedTarget() {
   if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
     if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
     else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
+  if (P.use === 'stall') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Tend your market stall`, btn: 'Tend', fn: () => stallTalk(q)};
   if (P.use === 'incubate') return {key: 'pl' + q.x + ',' + q.y + (q.egg || 0), html: `${K}${q.egg ? `Incubator · hatches in ${Math.max(0, q.egg - S.day)} day(s)` : 'Use the incubator'}`, btn: 'Use', fn: () => {
     if (q.egg && S.day >= q.egg) { const pool = ['phoenix_chick', 'shadow_cat', 'storm_pup'].filter(k => !S.pets.includes(k)); q.egg = 0; S.eggsHatched = (S.eggsHatched || 0) + 1; burst(q.x + .5, q.y, '#e8d8f0', 20, 4); SFX.victory();
       if (pool.length) addPet(pick(pool)); else { addItem('pet_treat', 10); addItem('gem', 2); toast('The egg hatches into a tiny bird that flutters away, leaving behind 10 Pet Treats and 2 Gems.'); } save(); return; }
@@ -1583,6 +1589,11 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'market_stall':
+      g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x - 2, y + 14, 20, 2);
+      g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 4, 2, 18); g.fillRect(x + 15, y - 4, 2, 18); g.fillStyle = '#8a5a30'; g.fillRect(x - 2, y + 6, 20, 5);
+      for (let i = 0; i < 5; i++) { g.fillStyle = i % 2 ? '#f4f0e0' : '#c84a3a'; g.fillRect(x - 3 + i*4.4, y - 7, 4.4, 4); }
+      if (q.stock && Object.keys(q.stock).length) { const ks = Object.keys(q.stock); for (let i = 0; i < Math.min(4, ks.length); i++) { g.fillStyle = GOODS[ks[i]].col; g.fillRect(x + 1 + i*4, y + 3, 3, 3); } } break;
     case 'incubator':
       g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 1, y + 14, 14, 2);
       g.fillStyle = '#8a5a30'; g.fillRect(x + 1, y + 6, 14, 9); g.fillStyle = '#a07040'; g.fillRect(x + 1, y + 6, 14, 2);
@@ -1706,6 +1717,7 @@ const PETS = {
 };
 const MOUNTS = {
   horse:{name:'Horse', speed:1.75, desc:'Fast on any open ground.'},
+  unicorn:{name:'Unicorn', speed:1.9, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL,T.DUNE,T.SAND,T.MESA,T.ASH,T.BLOSSOM,T.MAPLE,T.SHROOM,T.BAMBOO,T.REDWOOD,T.MOOR,T.SHIMMER], desc:'Never slowed by any terrain, and slowly heals you while you ride.'},
   nightmare:{name:'Nightmare', speed:1.95, desc:'The Headless Horseman\'s steed. Faster than any horse, with a mane of fire.'},
   camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
   elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
@@ -2042,6 +2054,8 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'fennick',town:'greenstem',dx:-3,dy:3,name:'Fennick the Druid',role:'Keeper of the glade',cols:{cloak:'#3a6a3a',skin:'#d8b090',hair:'#e8e8e0'},druid:true,freeSpot:true,
+   hello:["The trees told me you were coming.","Walk softly, friend.","Have you seen the rainbows lately?"], rumors:["A unicorn grazes in the hidden glades. She only comes for those who bring rainbow petals and a golden apple."]},
   {id:'maude',town:'maplehold',dx:3,dy:-3,name:'Milliner Maude',role:'Hat maker',cols:{cloak:'#a04a6a',skin:'#e8c8a8',hair:'#c8a050'},milliner:true,freeSpot:true,
    hello:["Darling, that head is simply crying out for a hat.","Hats! Hats for every occasion!","A new hat is a new you."], rumors:["Some hats can't be bought. They're earned. I've heard of a halo for true legends, and antlers for friends of the White Stag."]},
   {id:'haywood',town:'wren',dx:4,dy:4,name:'Tobin Haywood',role:'Farmhand for hire',cols:{cloak:'#7a6a3a',skin:'#d8a882',hair:'#c89040'},farmhand:true,freeSpot:true,
@@ -3441,6 +3455,34 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== the unicorn =====
+function druidTalk(n) {
+  if (S.mounts.includes('unicorn')) { say('“She has chosen you. Treat her kindly, and she will carry you anywhere.”', [back(n)]); return; }
+  const ok = have('rainbow_petal') >= 3 && have('golden_apple') >= 1;
+  say(`“There is a unicorn in these woods, pale as moonlight. She will only come for one who carries the colors of the sky and a gift of gold.”<div class="req" style="margin-top:8px">${upCostHTML({rainbow_petal: 3, golden_apple: 1})}</div><span style="color:var(--muted)">Rainbow Petals lie in the pot of gold at a rainbow's end, after the rain. Golden Apples are made at a workbench from 3 Apples, Pirate Gold and 2 Honey.</span>`, [
+    {label: 'Call the unicorn', primary: ok, disabled: !ok, fn: () => {
+      addItem('rainbow_petal', -3); addItem('golden_apple', -1); for (let k = 0; k < 6; k++) setTimeout(() => burst(S.x + (Math.random() - .5)*2, S.y - .5, ['#ff6a6a', '#ffb040', '#ffe060', '#6ae08a', '#6ab0ff', '#b08aff'][k], 18, 4), k*180);
+      SFX.victory(); setTimeout(() => addMount('unicorn'), 1200); save();
+      say('Fennick hums a low, old song. Leaves stir... and out of the trees steps a unicorn, her mane shimmering with every color of the rainbow. She takes the golden apple gently, and bows her head to you.', [back(n)]);
+    }}, back(n)]);
+}
+// ===== market stall =====
+function stallTalk(q) {
+  q.stock = q.stock || {}; const tk = townNear(q.x, q.y), mul = tk ? .9 : .5;
+  const stocked = Object.entries(q.stock).filter(([, n]) => n > 0), sellable = GK.filter(g => have(g) > 0 && ['good', 'craft', 'food', 'mat'].includes(GOODS[g].kind) && GOODS[g].base > 0 && !Object.values(S.equip).includes(g)).sort((a, b) => GOODS[b].base - GOODS[a].base).slice(0, 6);
+  openPanel('Market Stall', `${tk ? `Close to ${TOWNS[tk].name}: goods sell for about 90% of the town price.` : 'Far from any town: buyers are scarce and pay half price.'} Each morning up to 6 items sell.${q.earned ? ` Earned so far: ${q.earned} coin.` : ''}<br><br>On display: ${stocked.length ? stocked.map(([g, n]) => `${n} ${GOODS[g].name}`).join(', ') : 'nothing'}`, [
+    ...sellable.map(g => ({label: `Stock 5 ${GOODS[g].name} (have ${have(g)})`, fn: () => { const n = Math.min(5, have(g)); addItem(g, -n); q.stock[g] = (q.stock[g] || 0) + n; save(); stallTalk(q); }})),
+    ...(stocked.length ? [{label: 'Take everything back', fn: () => { for (const [g, n] of stocked) addItem(g, n); q.stock = {}; save(); stallTalk(q); }}] : []),
+    ...(!stocked.length ? [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}] : []), {label: 'Leave', fn: closeTalk}]);
+}
+const townNear = (x, y) => { let best = null, bd = 16; for (const k in TOWNS) { if (TOWNS[k].pirate) continue; const d = Math.hypot(x - TOWNS[k].x, y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } } return best; };
+function stallDay() {
+  let total = 0;
+  for (const q of S.placed) { if (q.t !== 'market_stall' || !q.stock) continue; const tk = townNear(q.x, q.y), mul = tk ? .9 : .5; let left = 6;
+    for (const g of Object.keys(q.stock)) { while (left > 0 && q.stock[g] > 0 && Math.random() < .85) { q.stock[g]--; left--; const c = Math.max(1, Math.round((tk ? price(tk, g) : GOODS[g].base)*mul)); total += c; q.earned = (q.earned || 0) + c; } if (q.stock[g] <= 0) delete q.stock[g]; } }
+  if (total) { S.coins += total; S.stallEarned = (S.stallEarned || 0) + total; }
+  return total ? ` Your market stall sold goods for <b>${total} coin</b>.` : '';
+}
 // ===== sky lanterns =====
 let skyLanterns = [];
 function releaseLantern() {
@@ -4433,8 +4475,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Unicorn & market stalls', 'Collect 3 Rainbow Petals from pots of gold at rainbow\u2019s end and make a Golden Apple, then visit Fennick the Druid in Greenstem to call the unicorn. Build a Market Stall (8 Planks, 2 Silk Cloth, 2 Rope) near a town and stock it: it sells a few goods every morning.'],
   ['Wish lanterns', 'Craft Wish Lanterns (Silk Cloth, 2 Sticks, Honey: makes 3) and release them from your bag at night to make a wish. On festival nights the whole town joins in, and wishes come true twice over.'],
   ['Golden shells', 'Forty golden shells are hidden across the land, mostly on beaches. Old Hob in Port Wren rewards you every ten, and the last prize is the Golden Conch.'],
   ['Mystery eggs', 'Monster dens and ruin vaults sometimes hold a Mystery Egg. Build an Incubator (4 Planks, 3 Wool, 1 Glass), place the egg inside, and in 3 days it hatches into a rare pet: a Phoenix Chick, Shadow Cat or Storm Pup.'],
@@ -4704,6 +4747,7 @@ function updateCombat(dt, night) {
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
   updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt);
+  if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -6026,7 +6070,7 @@ function newDay() {
   else maybeStartRaid();
   rollMarket();
   titanDay(); ghostDay();
-  const bankMsg = bankDay() + mayorDay() + farmhandDay();
+  const bankMsg = bankDay() + mayorDay() + farmhandDay() + stallDay();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}${bankMsg}`);
   save();
 }
@@ -6150,6 +6194,7 @@ function mainOptions(n) {
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
+  if (n.druid) o.push({label: S.mounts.includes('unicorn') ? 'About the unicorn' : 'The unicorn of the glade', primary: !S.mounts.includes('unicorn') && have('rainbow_petal') >= 3 && have('golden_apple') >= 1, fn: () => druidTalk(n)});
   if (n.milliner) o.push({label: 'Browse hats', primary: true, fn: () => hatTalk(n)});
   if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
   if (n.fortune) o.push({label: S.fortuneDay === S.day ? 'Your fortune (read today)' : 'Read my fortune (25◆)', primary: S.fortuneDay !== S.day, fn: () => fortuneTalk(n)});
@@ -7653,13 +7698,14 @@ function drawMount(g, id, x, y, f, phase, moving) {
     g.fillStyle = id === 'tiger' ? '#8ad040' : '#1a1a1a'; g.fillRect(x + f*8, y - 14, 1, 1);
     return;
   }
-  const body = id === 'nightmare' ? '#1c1a24' : id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'nightmare' ? '#0a0a10' : id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
+  const body = id === 'unicorn' ? '#f8f8ff' : id === 'nightmare' ? '#1c1a24' : id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'unicorn' ? '#c8c8e0' : id === 'nightmare' ? '#0a0a10' : id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
   g.fillStyle = dark; g.fillRect(x-6, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x-3, y-6, 2, 6 + (step < 0 ? 0 : -1)); g.fillRect(x+2, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x+5, y-6, 2, 6 + (step < 0 ? 0 : -1));
   g.fillStyle = body; g.fillRect(x-7, y-11, 15, 6);
   if (id === 'camel') g.fillRect(x-3, y-14, 6, 3);
   g.fillRect(x + f*7 - 1, y-16, 3, 7); g.fillRect(x + f*8 - 2, y-17, 5, 3);
   g.fillStyle = dark; g.fillRect(x - f*8 - 1, y-11, 2, 5);
   if (id === 'horse') g.fillRect(x + f*6 - 1, y-16, 2, 6);
+  if (id === 'unicorn') { const rb = ['#ff6a6a', '#ffb040', '#ffe060', '#6ae08a', '#6ab0ff', '#b08aff']; for (let i = 0; i < 5; i++) { g.fillStyle = rb[i]; g.fillRect(x + f*(6 - i*1.5) - 1, y - 17 + (i % 2), 2, 4); } g.fillStyle = '#ffe080'; g.fillRect(x + f*9, y - 21, 1, 4); g.fillRect(x + f*9 - (f > 0 ? 0 : 0), y - 22, 1, 1); g.fillStyle = rb[(Math.floor(frameT*6)) % 6]; g.fillRect(x - f*9 - 1, y - 12, 2, 5); }
   if (id === 'nightmare') { for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#ff8a2a' : '#ffd040'; g.fillRect(x + f*(6 - i*2) - 1, y - 17 - ((Math.floor(frameT*12) + i) % 3), 2, 3); } g.fillStyle = '#ff5a1a'; g.fillRect(x + f*9, y-16, 1, 1); g.fillStyle = '#ff8a2a'; g.fillRect(x - f*9 - 1, y - 12 - (Math.floor(frameT*10) % 2), 2, 4); }
   if (id === 'elk') { g.fillStyle = '#d8c8a0'; g.fillRect(x + f*8 - 3, y-21, 1, 4); g.fillRect(x + f*8 + 2, y-21, 1, 4); g.fillRect(x + f*8 - 4, y-21, 3, 1); g.fillRect(x + f*8 + 1, y-21, 3, 1); }
   g.fillStyle = '#1a1a1a'; g.fillRect(x + f*9, y-16, 1, 1);
@@ -8601,8 +8647,8 @@ function startRainbow() {
 function weatherTarget() {
   const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (WX.pot && WX.rainbow > 0 && Math.hypot(S.x - WX.pot.x, S.y - WX.pot.y) < 1.2) return {key: 'pot', html: `${K}Take the pot of gold!`, btn: 'Take', fn: () => {
-    const c = 120 + rint(0, 180) + (S.level || 1)*8; S.coins += c; addItem('gem', 1); S.pots = (S.pots || 0) + 1; WX.pot = null; SFX.victory(); burst(S.x, S.y - .5, '#f0c040', 24, 5);
-    toast(`<b>A pot of gold!</b><br><span style="color:var(--good)">+${c} coin, +1 Cut Gem</span>`, 5000); renderHUD(); save(); }};
+    const c = 120 + rint(0, 180) + (S.level || 1)*8; S.coins += c; addItem('gem', 1); addItem('rainbow_petal', 1); S.pots = (S.pots || 0) + 1; WX.pot = null; SFX.victory(); burst(S.x, S.y - .5, '#f0c040', 24, 5);
+    toast(`<b>A pot of gold!</b><br><span style="color:var(--good)">+${c} coin, +1 Cut Gem, +1 Rainbow Petal</span>`, 5000); renderHUD(); save(); }};
   for (const gl of (WX.glass || [])) if (Math.hypot(S.x - gl.x, S.y - gl.y) < 1.1) return {key: 'glass' + gl.x, html: `${K}Pick up storm glass`, btn: 'Pick up', fn: () => { gl.taken = true; addItem('storm_glass', 1); S.stormGlass = (S.stormGlass || 0) + 1; SFX.sparkle(); floatText(gl.x, gl.y - .8, '+1 Storm Glass', '#bfe8ff'); renderHUD(); }};
   return null;
 }
@@ -8821,6 +8867,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['unicorn','Believer','Befriend the unicorn', () => S.mounts.includes('unicorn')],
+  ['stall','Open for Business','Earn 500 coin from market stalls', () => (S.stallEarned || 0) >= 500],
   ['lanterns','Wishes on the Wind','Release 10 wish lanterns', () => (S.lanterns || 0) >= 10],
   ['shells10','Shell Seeker','Find 10 golden shells', () => shellsGot() >= 10],
   ['shells40','Shell Master','Find all 40 golden shells', () => shellsGot() >= SHELL_N],
