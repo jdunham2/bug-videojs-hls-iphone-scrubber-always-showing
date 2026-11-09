@@ -2007,6 +2007,8 @@ const NPCS = [
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
   {id:'vex',town:'crownfall',dx:-4,dy:2,name:'Vex the Bold',role:'Rival adventurer',cols:{cloak:'#8a2a4a',skin:'#e0b896',hair:'#f0e0a0'},rival:true,freeSpot:true,
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
+  {id:'maude',town:'maplehold',dx:3,dy:-3,name:'Milliner Maude',role:'Hat maker',cols:{cloak:'#a04a6a',skin:'#e8c8a8',hair:'#c8a050'},milliner:true,freeSpot:true,
+   hello:["Darling, that head is simply crying out for a hat.","Hats! Hats for every occasion!","A new hat is a new you."], rumors:["Some hats can't be bought. They're earned. I've heard of a halo for true legends, and antlers for friends of the White Stag."]},
   {id:'haywood',town:'wren',dx:4,dy:4,name:'Tobin Haywood',role:'Farmhand for hire',cols:{cloak:'#7a6a3a',skin:'#d8a882',hair:'#c89040'},farmhand:true,freeSpot:true,
    hello:["Need a hand with the fields?","Honest work for honest pay.","Them crops won't harvest themselves!"], rumors:["A homestead with a hired hand runs itself. Crops in, eggs collected, every single morning."]},
   {id:'zora',town:'crownfall',dx:-4,dy:-2,name:'Madame Zora',role:'Fortune teller',cols:{cloak:'#5a2a6a',skin:'#c89870',hair:'#1a1a2a'},fortune:true,freeSpot:true,
@@ -3403,6 +3405,46 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== cosmetic hats =====
+const HATS = {
+  tophat: {name: 'Top Hat', cost: 150}, sunhat: {name: 'Sun Hat', cost: 80}, wizard: {name: 'Wizard Hat', cost: 300}, tricorn: {name: 'Tricorn', cost: 220},
+  flowers: {name: 'Flower Crown', cost: 120}, viking: {name: 'Horned Helm', cost: 260}, beanie: {name: 'Cozy Beanie', cost: 90}, party: {name: 'Party Hat', cost: 60},
+  bunny: {name: 'Bunny Ears', cost: 180}, feather: {name: 'Feathered Cap', cost: 200}, cowboy: {name: 'Wide-brim Hat', cost: 160}, chef: {name: "Chef's Toque", cost: 140},
+  halo: {name: 'Halo', earn: () => Object.keys(S.achievements).length >= 100, how: 'earn 100 achievements'},
+  antlers: {name: 'Stag Antlers', earn: () => (S.stagsMet || 0) >= 1, how: 'meet the White Stag'},
+  gold_crown: {name: 'Golden Crown', earn: () => Object.keys(S.mayor || {}).length >= 1, how: 'become a mayor'},
+  pumpkin: {name: 'Pumpkin Head', earn: () => (S.horsemen || 0) >= 1, how: 'defeat the Headless Horseman'},
+};
+function drawCosHat(g, x, y, id, facing) {
+  const f = facing === 'left' ? -1 : 1;
+  switch (id) {
+    case 'tophat': g.fillStyle = '#1a1a22'; g.fillRect(x - 5, y, 10, 2); g.fillRect(x - 3, y - 7, 6, 7); g.fillStyle = '#a03a3a'; g.fillRect(x - 3, y - 2, 6, 1); break;
+    case 'sunhat': g.fillStyle = '#e8d08a'; g.fillRect(x - 7, y, 14, 2); g.fillRect(x - 3, y - 3, 6, 3); g.fillStyle = '#e06a8a'; g.fillRect(x - 3, y - 1, 6, 1); break;
+    case 'wizard': g.fillStyle = '#4a3aa0'; g.fillRect(x - 5, y, 10, 2); g.beginPath(); g.moveTo(x - 3, y); g.lineTo(x + f*2, y - 11); g.lineTo(x + 3, y); g.fill(); g.fillStyle = '#f0e060'; g.fillRect(x - 1, y - 4, 1, 1); g.fillRect(x + 1, y - 2, 1, 1); break;
+    case 'tricorn': g.fillStyle = '#2a2a2a'; g.beginPath(); g.moveTo(x - 6, y + 1); g.lineTo(x, y - 5); g.lineTo(x + 6, y + 1); g.fill(); g.fillStyle = '#d8b050'; g.fillRect(x - 5, y, 10, 1); break;
+    case 'flowers': for (let i = -3; i <= 3; i += 2) { g.fillStyle = ['#ff8ab0', '#ffe060', '#8ad0ff', '#ff8ab0'][(i + 3)/2]; g.fillRect(x + i - .5, y - 1, 2, 2); } g.fillStyle = '#5a9a4a'; g.fillRect(x - 4, y + 1, 8, 1); break;
+    case 'viking': g.fillStyle = '#8a8a96'; g.fillRect(x - 4, y - 2, 8, 3); g.fillStyle = '#e8e0c8'; g.fillRect(x - 6, y - 5, 2, 4); g.fillRect(x + 4, y - 5, 2, 4); g.fillRect(x - 7, y - 6, 1, 2); g.fillRect(x + 6, y - 6, 1, 2); break;
+    case 'beanie': g.fillStyle = '#c84a3a'; g.fillRect(x - 4, y - 2, 8, 3); g.fillStyle = '#f0f0f0'; g.fillRect(x - 4, y, 8, 1); g.fillRect(x - 1, y - 4, 2, 2); break;
+    case 'party': g.fillStyle = '#4ac8e8'; g.beginPath(); g.moveTo(x - 3, y + 1); g.lineTo(x, y - 8); g.lineTo(x + 3, y + 1); g.fill(); g.fillStyle = '#ffe060'; g.fillRect(x - 1, y - 9, 2, 2); g.fillStyle = '#ff6a9a'; g.fillRect(x - 1, y - 3, 1, 1); g.fillRect(x + 1, y - 1, 1, 1); break;
+    case 'bunny': g.fillStyle = '#f4f0f0'; g.fillRect(x - 3, y - 7, 2, 7); g.fillRect(x + 1, y - 7, 2, 7); g.fillStyle = '#f0a0b8'; g.fillRect(x - 2.5, y - 6, 1, 5); g.fillRect(x + 1.5, y - 6, 1, 5); break;
+    case 'feather': g.fillStyle = '#3a6a3a'; g.fillRect(x - 4, y - 2, 8, 3); g.fillRect(x - 5, y, 10, 1); g.fillStyle = '#e04a3a'; g.save(); g.translate(x - f*3, y - 2); g.rotate(-f*.6); g.fillRect(-1, -7, 2, 7); g.restore(); break;
+    case 'cowboy': g.fillStyle = '#8a5a2a'; g.fillRect(x - 7, y, 14, 2); g.fillRect(x - 4, y - 4, 8, 4); g.fillStyle = '#5a3a1a'; g.fillRect(x - 4, y - 1, 8, 1); break;
+    case 'chef': g.fillStyle = '#f8f8f8'; g.fillRect(x - 4, y - 2, 8, 3); g.beginPath(); g.arc(x - 2, y - 4, 3, 0, 7); g.arc(x + 2, y - 4, 3, 0, 7); g.fill(); break;
+    case 'halo': g.strokeStyle = `rgba(255,236,120,${.7 + .3*Math.sin(frameT*3)})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(x, y - 4, 5, 1.6, 0, 0, 7); g.stroke(); break;
+    case 'antlers': g.fillStyle = '#f0e0b0'; g.fillRect(x - 4, y - 5, 1, 5); g.fillRect(x + 3, y - 5, 1, 5); g.fillRect(x - 6, y - 4, 2, 1); g.fillRect(x + 4, y - 4, 2, 1); g.fillRect(x - 5, y - 7, 1, 2); g.fillRect(x + 4, y - 7, 1, 2); break;
+    case 'gold_crown': g.fillStyle = '#f0c040'; g.fillRect(x - 4, y - 2, 8, 3); g.fillRect(x - 4, y - 4, 1, 2); g.fillRect(x - .5, y - 4, 1, 2); g.fillRect(x + 3, y - 4, 1, 2); g.fillStyle = '#e04a6a'; g.fillRect(x - .5, y - 1, 1, 1); break;
+    case 'pumpkin': g.fillStyle = '#e07a20'; g.beginPath(); g.ellipse(x, y + 2, 5, 5, 0, 0, 7); g.fill(); g.fillStyle = '#3a6a2a'; g.fillRect(x - .5, y - 4, 1, 2); if (facing !== 'up') { g.fillStyle = '#ffd040'; g.fillRect(x - 3, y + 1, 2, 1); g.fillRect(x + 1, y + 1, 2, 1); g.fillRect(x - 2, y + 4, 4, 1); } break;
+  }
+}
+function hatTalk(n) {
+  S.hats = S.hats || {}; for (const k in HATS) if (HATS[k].earn && HATS[k].earn()) S.hats[k] = true;
+  const owned = Object.keys(HATS).filter(k => S.hats[k]), forSale = Object.keys(HATS).filter(k => !S.hats[k] && HATS[k].cost), locked = Object.keys(HATS).filter(k => !S.hats[k] && HATS[k].earn);
+  say(`“Purely for looks, darling, but what looks!”<br><span style="color:var(--muted)">Wearing: <b>${S.hat ? HATS[S.hat].name : 'nothing'}</b>. Your wardrobe: ${owned.length ? owned.map(k => HATS[k].name).join(', ') : 'empty'}.${locked.length ? '<br>Special hats: ' + locked.map(k => `${HATS[k].name} (${HATS[k].how})`).join(', ') : ''}</span>`, [
+    ...owned.filter(k => k !== S.hat).slice(0, 6).map(k => ({label: `Wear: ${HATS[k].name}`, fn: () => { S.hat = k; save(); hatTalk(n); }})),
+    ...(S.hat ? [{label: 'Take off hat', fn: () => { S.hat = null; save(); hatTalk(n); }}] : []),
+    ...forSale.slice(0, 6).map(k => ({label: `Buy ${HATS[k].name} · ${HATS[k].cost}◆`, disabled: S.coins < HATS[k].cost, fn: () => { S.coins -= HATS[k].cost; S.hats[k] = true; S.hat = k; SFX.coin(); renderHUD(); save(); hatTalk(n); }})),
+    back(n)]);
+}
 // ===== volcano eruptions =====
 let erupt = null, eruptT = 120, volcRocks = [];
 function updateEruption(dt) {
@@ -4263,8 +4305,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Hats', 'Milliner Maude in Maplehold sells cosmetic hats you can swap any time. A few special hats (Halo, Stag Antlers, Golden Crown, Pumpkin Head) are earned through great deeds.'],
   ['Volcano eruptions', 'In the Cinderlands the volcano sometimes erupts. Dodge the lava bombs by watching for their shadows, and grab the glowing rocks they leave: Fire Opals and Obsidian. Five opals forge a Magma Charm that makes you immune to the bombs.'],
   ['Fairy rings', 'On some nights a ring of glowing mushrooms appears in the wilds. Step in and sing the fairies\u2019 tune back to them for blessings. After three songs, a fairy may follow you home.'],
   ['Bug catching', 'Craft a Bug Net (3 Sticks, 2 Spider Silk). Butterflies, beetles and fireflies flit about every land. Each biome and time of day has its own bugs. Calm ones are easy to catch, and skittish ones dart away. Look out for the rare Golden Beetle.'],
@@ -4777,7 +4820,8 @@ function drawPerson(g, x, y, c, phase, moving, facing, extra) {
   if (extra && extra.hat) { g.fillStyle = extra.hat; g.fillRect(x-5, y-18-bob, 10, 2); g.beginPath(); g.moveTo(x-3, y-18-bob); g.lineTo(x+1, y-25-bob); g.lineTo(x+3, y-18-bob); g.fill(); }
   if (extra && extra.crown) { g.fillStyle = '#e3a948'; g.fillRect(x-3, y-19-bob, 6, 2); g.fillRect(x-3, y-20-bob, 1, 1); g.fillRect(x, y-20-bob, 1, 1); g.fillRect(x+2, y-20-bob, 1, 1); }
   if (extra && extra.pack && facing === 'down') { g.fillStyle = '#6b4a2c'; g.fillRect(x+3, y-10-bob, 2, 6); }
-  if (extra && extra.helm) { g.fillStyle = extra.helm; g.fillRect(x-4, y-18-bob, 8, 3); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x-4, y-16-bob, 8, 1); }
+  if (extra && extra.cos && HATS[extra.cos]) drawCosHat(g, x, y - 17 - bob, extra.cos, facing);
+  else if (extra && extra.helm) { g.fillStyle = extra.helm; g.fillRect(x-4, y-18-bob, 8, 3); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x-4, y-16-bob, 8, 1); }
   if (extra && extra.shield && facing !== 'up') { const sx = facing === 'left' ? x + 2 : facing === 'right' ? x - 6 : x - 7; g.fillStyle = extra.shield; g.fillRect(sx, y-11-bob, 4, 6); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(sx + 1, y-9-bob, 2, 2); }
   if (extra && extra.held) drawHeld(g, x, y - bob, facing, extra.held);
 }
@@ -5323,23 +5367,23 @@ function render() {
       ctx.fillStyle = '#4a2a10'; ctx.fillRect(px - dir*4, py - 30 + b, 2, 27);
       ctx.fillStyle = '#f0ece0'; ctx.beginPath(); ctx.moveTo(px - dir*3, py - 29 + b); ctx.quadraticCurveTo(px + dir*(12 + (player.moving ? 3 : 0)), py - 18 + b, px - dir*3, py - 7 + b); ctx.fill();
       ctx.fillStyle = '#c84a3a'; ctx.fillRect(px - dir*4, py - 33 + b, dir*6, 3);
-      drawPerson(ctx, px + dir*3, py - 3 + b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
+      drawPerson(ctx, px + dir*3, py - 3 + b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
     } else if (onWater && S.flags.raft && !isFlying() && !swimRide) {
       const b = Math.sin(frameT*3)*.8;
       ctx.fillStyle = '#7a5532'; ctx.fillRect(px-8, py-4+b, 16, 7); ctx.fillStyle = '#5c3f24'; for (let i = 0; i < 4; i++) ctx.fillRect(px-8+i*4, py-4+b, 1, 7);
-      drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
+      drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
     } else if (onWater && !isFlying() && !swimRide) {
-      drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield});
+      drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
       ctx.fillStyle = TILE_COL[ptile]; ctx.fillRect(px-6, py-1, 12, 5);
       ctx.fillStyle = 'rgba(210,236,245,.6)'; ctx.fillRect(px-6, py-1, 12, 1);
     } else if (S.riding && MOUNTS[S.mount]) {
       drawMount(ctx, S.mount, px, py, player.facing === 'left' ? -1 : 1, player.phase, player.moving || player.roll > 0);
-      drawPerson(ctx, px, py - (isFlying() && (player.moving || player.roll > 0) ? 12 : 8), player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
+      drawPerson(ctx, px, py - (isFlying() && (player.moving || player.roll > 0) ? 12 : 8), player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
     } else if (player.roll > 0) {
       ctx.save(); ctx.translate(px, py - 7); ctx.rotate((1 - player.roll/.32) * Math.PI * 2 * (player.rdx < 0 ? -1 : 1));
       drawPerson(ctx, 0, 7, player.cols, 0, false, player.facing, {scarf:true, pack:true});
       ctx.restore();
-    } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield});
+    } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
     ctx.globalAlpha = 1;
   }});
   if (inView(HOME.x, HOME.y)) drawFarm(ctx, frameT);
@@ -5968,6 +6012,7 @@ function mainOptions(n) {
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
   if (n.rival) o.push({label: (S.vexRank || 0) >= 5 ? 'Friendly spar' : `Duel Vex (rank ${(S.vexRank || 0) + 1}/5)`, primary: (S.vexRank || 0) < 5 && S.vexDay !== S.day, fn: () => vexTalk(n)});
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
+  if (n.milliner) o.push({label: 'Browse hats', primary: true, fn: () => hatTalk(n)});
   if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
   if (n.fortune) o.push({label: S.fortuneDay === S.day ? 'Your fortune (read today)' : 'Read my fortune (25◆)', primary: S.fortuneDay !== S.day, fn: () => fortuneTalk(n)});
   if (n.chef) o.push({label: cookDay() ? 'The cooking contest! ★' : 'About the cooking contest', primary: cookDay() && S.cookContest !== S.day, fn: () => chefTalk(n)});
@@ -8624,6 +8669,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['hatter','Mad Hatter','Own 6 hats', () => Object.keys(S.hats || {}).length >= 6],
   ['eruption','Ring of Fire','Survive a volcanic eruption', () => (S.eruptions || 0) >= 1],
   ['opals','Opal Hunter','Collect 5 Fire Opals', () => (S.opals || 0) >= 5],
   ['fairyring','Fairy Dance','Complete a fairy ring song', () => (S.fairyWins || 0) >= 1],
