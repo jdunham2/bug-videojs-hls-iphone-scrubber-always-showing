@@ -1756,6 +1756,12 @@ const NPCS = [
   {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
    hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
    rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
+  {id:'lou',town:'lantern',dx:2,dy:3,name:'Lucky Lou',role:'Dice player',cols:{cloak:'#3a6a3a',skin:'#e0b896',hair:'#c8782a'},dice:true,maxBet:50,smart:false,diceIntro:"Fancy a game of Bones? Low stakes, high spirits!",taunts:["Ha! Lady Luck loves me.","Better luck next time, friend.","The bones have spoken!"],
+   hello:["Feeling lucky?","Back for another round?","My favorite opponent!"], rumors:["Three sixes is the best hand there is. Pays double, too."]},
+  {id:'rosa',town:'dun',dx:-2,dy:3,name:'Dice Dame Rosa',role:'Gambler',cols:{cloak:'#a83a5a',skin:'#a8704a',hair:'#1a1a1a'},dice:true,maxBet:100,smart:true,diceIntro:"The desert teaches patience. And how to win at dice.",taunts:["The sands favor me today.","Patience, little one.","Again? I do enjoy your coin."],
+   hello:["Sit. Roll.","Ah, my favorite pigeon.","A worthy rival returns."], rumors:["Always keep a pair. Always."]},
+  {id:'finn',town:'crownfall',dx:2,dy:3,name:'One-Eyed Finn',role:'High roller',cols:{cloak:'#2a2a3a',skin:'#c89870',hair:'#8a8a8a'},dice:true,maxBet:250,smart:true,diceIntro:"Only big bets at my table. Don't waste my time.",taunts:["Lost an eye at this table. Didn't lose much else.","The house always wins. I'm the house.","Pay up."],
+   hello:["Big money only.","You again.","Hmph. You're good. I'll admit it."], rumors:["I once won a castle in a game of Bones. Lost it the next night."]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -4339,6 +4345,7 @@ function mainOptions(n) {
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
   if (n.id === 'gwen') o.push({label: 'Race!', fn: () => raceTalk(n)});
+  if (n.dice) o.push({label: 'Play Bones', primary: true, fn: () => diceTalk(n)});
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
@@ -5051,6 +5058,55 @@ function updateRace(dt) {
   }
   if (R0.t > R0.bronze*2.5) { S.race = null; toast('Race abandoned. You took too long.', 4000); renderRegion(); }
   if (Math.floor(R0.t*10) !== Math.floor((R0.t - dt)*10)) renderRegion();
+}
+// ===== Bones: a tavern dice game =====
+const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const rollD = () => 1 + Math.floor(Math.random()*6);
+function diceScore(d) {
+  const c = {}; d.forEach(v => c[v] = (c[v] || 0) + 1);
+  const trip = Object.keys(c).find(k => c[k] === 3), pair = Object.keys(c).find(k => c[k] === 2);
+  if (trip) return {v: 300 + +trip, name: `three ${+trip}s`};
+  if (pair) { const kick = d.find(v => v !== +pair); return {v: 200 + +pair*10 + kick, name: `a pair of ${+pair}s`}; }
+  const sorted = d.slice().sort(); if (sorted.join() === '4,5,6') return {v: 260, name: 'a 4-5-6 run'};
+  return {v: 100 + d.reduce((a, b) => a + b, 0), name: `${d.reduce((a, b) => a + b, 0)} points`};
+}
+const diceHTML = d => `<span style="font-size:44px;line-height:1;letter-spacing:4px">${d.map(v => DIE[v]).join('')}</span>`;
+function aiReroll(d, smart) {
+  const c = {}; d.forEach(v => c[v] = (c[v] || 0) + 1);
+  if (Object.values(c).includes(3)) return d;
+  const pair = Object.keys(c).find(k => c[k] === 2);
+  if (pair) return d.map(v => v === +pair ? v : (smart || v < 4 ? rollD() : v));
+  const mx = Math.max(...d); return d.map(v => v === mx && (smart || v >= 5) ? v : rollD());
+}
+function diceTalk(n) {
+  const maxBet = n.maxBet;
+  say(`“${n.diceIntro}”<br><br><b>Bones:</b> we each roll three dice, and you can reroll once. Three of a kind beats a 4-5-6 run, which beats a pair, which beats a plain total. Win and I pay double.${S.diceWins ? `<br>Your record: ${S.diceWins} wins, ${S.diceLosses || 0} losses.` : ''}`, [
+    ...[10, 50, 100, 250].filter(b => b <= maxBet).map(b => ({label: `Bet ${b} coin`, disabled: S.coins < b, fn: () => diceRound(n, b)})),
+    back(n)]);
+}
+function diceRound(n, bet) {
+  S.coins -= bet; renderHUD(); SFX.coin();
+  const d = [rollD(), rollD(), rollD()];
+  const choose = (desc, nd) => ({label: desc, fn: () => diceFinish(n, bet, nd())});
+  const c = {}; d.forEach(v => c[v] = (c[v] || 0) + 1);
+  const pair = Object.keys(c).find(k => c[k] === 2), mx = Math.max(...d);
+  say(`You shake the cup and spill the bones...<br>${diceHTML(d)}<br>You have <b>${diceScore(d).name}</b>. Reroll some?`, [
+    choose('Keep them all', () => d),
+    ...(pair ? [choose(`Keep the pair, reroll the other`, () => d.map(v => v === +pair ? v : rollD()))] : []),
+    choose(`Keep the ${mx}, reroll the rest`, () => { let kept = false; return d.map(v => { if (v === mx && !kept) { kept = true; return v; } return rollD(); }); }),
+    choose('Reroll all three', () => [rollD(), rollD(), rollD()]),
+  ]);
+}
+function diceFinish(n, bet, mine) {
+  let theirs = [rollD(), rollD(), rollD()]; theirs = aiReroll(theirs, n.smart);
+  const a = diceScore(mine), b = diceScore(theirs);
+  let msg, pay = 0;
+  if (a.v > b.v) { pay = bet*2 + (a.v === 306 ? bet*2 : 0); S.diceWins = (S.diceWins || 0) + 1; msg = `<b style="color:var(--good)">You win ${pay} coin!</b>${a.v === 306 ? ' Triple sixes pay double!' : ''}`; SFX.victory(); }
+  else if (a.v === b.v) { pay = bet; msg = '<b>A tie.</b> Your bet comes back.'; SFX.coin(); }
+  else { S.diceLosses = (S.diceLosses || 0) + 1; msg = `<b style="color:var(--bad)">${n.name.split(' ').slice(-1)[0]} wins.</b> “${pick(n.taunts)}”`; SFX.hurt && SFX.hurt(); }
+  S.coins += pay; renderHUD(); save();
+  say(`You: ${diceHTML(mine)} <b>${a.name}</b><br>${n.name}: ${diceHTML(theirs)} <b>${b.name}</b><br><br>${msg}`, [
+    {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 function hireTalk(n) {
   const cur = S.companion && COMPANIONS[S.companion];
@@ -6150,6 +6206,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['gambler','High Roller','Win 10 games of Bones', () => (S.diceWins || 0) >= 10],
   ['racer','Racer','Win a race medal', () => Object.keys(S.raceMedals || {}).length >= 1],
   ['champion_rider','Champion Rider','Win gold on every race track', () => RACES.every(r => (S.raceMedals || {})[r.id] === 3)],
   ['legendhunter','Legend Hunter','Slay a legendary beast', () => Object.keys(S.legends || {}).length >= 1],
