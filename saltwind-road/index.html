@@ -504,6 +504,8 @@ const GOODS = {
   golden_feast:{name:'Golden Feast',base:260,col:'#f0c040',kind:'food',heal:40},
   spiced_jerky:{name:'Spiced Jerky',base:30,col:'#8a3a1a',kind:'food',heal:6},
   gem_ring:{name:'Gem Ring',base:320,col:'#e04a8a',kind:'craft'},
+  cursed_doubloon:{name:'Cursed Doubloon',base:90,col:'#9ad8b0',kind:'good'},
+  ghost_lantern:{name:'Ghost Lantern',base:900,col:'#9af0c0',kind:'trinket',desc:'See much farther in the dark'},
   glider:{name:'Glider',base:220,col:'#e8d8b0',kind:'tool',desc:'Walk off a mountain edge to glide'},
   promise_ring:{name:'Promise Ring',base:600,col:'#f07ab0',kind:'tool'},
   crown_jewel:{name:'Crown Jewel',base:950,col:'#ff6ab0',kind:'craft'},
@@ -2835,7 +2837,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -3138,6 +3140,7 @@ function killEnemy(e) {
     renderHUD(); save();
     return;
   }
+  if (e.ghostCap) ghostLoot(e);
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
   if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
@@ -3261,6 +3264,53 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== the ghost ship =====
+const ghostActive = () => { const G = S.ghost; if (!G || G.cleared) return false; return (G.day === S.day && S.time > .72) || (G.day === S.day - 1 && S.time < .27); };
+function ghostDay() {
+  if (S.day < 6 || S.day % 5 !== 3) return;
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle');
+  for (let tries = 0; tries < 400; tries++) {
+    const tk = pick(towns), a = Math.random()*6.283, r = 14 + Math.random()*22;
+    const x = Math.floor(TOWNS[tk].x + Math.cos(a)*r), y = Math.floor(TOWNS[tk].y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H - 4 || map[idx(x, y)] !== T.DEEP) continue;
+    let land = null;
+    for (let d = 1; d < 6 && !land; d++) for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const lx = x + dx*d, ly = y + dy*d; if (inB(lx, ly) && enemyWalk(lx + .5, ly + .5) && walkable(map[idx(lx, ly)], false, false) && !townAt(lx, ly, 8)) { land = {x: lx + .5, y: ly + .5}; break; } }
+    if (!land) continue;
+    const dx = x - TOWNS[tk].x, dy = y - TOWNS[tk].y, dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north');
+    S.ghost = {x, y, lx: land.x, ly: land.y, day: S.day, town: tk, dir, spawned: false, cleared: false};
+    setTimeout(() => toast(`<b>Sailors are whispering...</b><br>A ghost ship has been sighted ${dir} of ${TOWNS[tk].name}. It comes ashore after dark. (Marked on your map tonight.)`, 7000), 5200);
+    return;
+  }
+}
+function ghostSpawns() {
+  const G = S.ghost; if (!ghostActive() || G.spawned || inDungeon() || Math.hypot(S.x - G.lx, S.y - G.ly) > 14) return;
+  G.spawned = true; const lv = 1 + (S.level || 1)*.06;
+  for (let k = 0; k < 6; k++) { const a = k/6*6.283; let x = G.lx + Math.cos(a)*2.5, y = G.ly + Math.sin(a)*2.5; if (!enemyWalk(x, y)) { x = G.lx; y = G.ly; } const e = makeEnemy('ghostpirate', x, y, {alert: true, ghost: true, dungeon: true}); e.hp = e.max = Math.round(e.max*lv*1.5); e.dmgMul = lv; enemies.push(e); }
+  const c = makeEnemy('ghostpirate', G.lx, G.ly, {alert: true, ghost: true, ghostCap: true, dungeon: true}); c.hp = c.max = Math.round(70*lv); c.dmgMul = 1.6*lv; c.elite = {name: 'Captain Mordekai', col: '#9af0c0'}; c.esize = 1.7; c.labelName = '☠ Captain Mordekai'; c.spd = 1.15; enemies.push(c);
+  toast('<b>The ghost ship runs aground!</b><br>Captain Mordekai and his phantom crew pour onto the beach.', 5000); SFX.roar(); shake = .4;
+}
+function ghostLoot(e) {
+  const G = S.ghost; if (G) G.cleared = true; S.ghostShips = (S.ghostShips || 0) + 1;
+  const got = [], c = 300 + (S.level || 1)*12, n = rint(3, 5); S.coins += c; got.push(`+${c} coin`); addItem('cursed_doubloon', n); got.push(`+${n} Cursed Doubloons`);
+  if (!have('ghost_lantern') && !S.home.chest.ghost_lantern) { addItem('ghost_lantern', 1); got.push('<b>Ghost Lantern</b>'); }
+  else if (Math.random() < .2) { addItem('black_pearl_ring', 1); got.push('<b>Black Pearl Ring</b>'); }
+  if (Math.random() < .5) { addItem('treasure_map', 1); got.push('a Treasure Map'); }
+  for (const m of enemies) if (m.ghost) m.dead = true;
+  burst(e.x, e.y - 1, '#9af0c0', 40, 7); SFX.victory();
+  setTimeout(() => toast(`<b>The ghost ship fades into the mist...</b><br>The captain's cursed hoard is yours: <span style="color:var(--good)">${got.join(', ')}</span>`, 8000), 600);
+}
+function drawGhostShip(G) {
+  const px = (G.x + .5)*TS, py = (G.y + .5)*TS, b = Math.sin(frameT*1.5)*2, a = .55 + Math.sin(frameT*2)*.15;
+  ctx.save(); ctx.globalAlpha = a;
+  ctx.fillStyle = '#4a6a5a'; ctx.beginPath(); ctx.moveTo(px - 40, py - 6 + b); ctx.lineTo(px + 40, py - 6 + b); ctx.lineTo(px + 30, py + 10 + b); ctx.lineTo(px - 30, py + 10 + b); ctx.fill();
+  ctx.fillStyle = '#6a9a80'; ctx.fillRect(px - 40, py - 8 + b, 80, 3);
+  ctx.fillStyle = '#2a3a32'; ctx.fillRect(px - 2, py - 64 + b, 3, 58); ctx.fillRect(px - 24, py - 46 + b, 2, 40);
+  ctx.fillStyle = '#c8f0dc'; ctx.beginPath(); ctx.moveTo(px + 1, py - 60 + b); ctx.lineTo(px + 26, py - 50 + b); ctx.lineTo(px + 20, py - 34 + b); ctx.lineTo(px + 26, py - 22 + b); ctx.lineTo(px + 1, py - 14 + b); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(px - 22, py - 44 + b); ctx.lineTo(px - 6, py - 38 + b); ctx.lineTo(px - 10, py - 28 + b); ctx.lineTo(px - 22, py - 18 + b); ctx.fill();
+  ctx.fillStyle = '#9af0c0'; for (let i = 0; i < 4; i++) ctx.fillRect(px - 26 + i*16, py + 1 + b, 4, 3);
+  ctx.restore();
+  if (Math.random() < .2) particles.push({x: G.x + .5 + (Math.random() - .5)*4, y: G.y + .2, vx: 0, vy: -.6, t: 0, col: 'rgba(170,240,200,.5)'});
+}
 function legendSpawns() {
   if (inDungeon() || inArena()) return;
   for (const L of LEGENDS) {
@@ -3286,6 +3336,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The ghost ship', 'Every few days sailors whisper of a ghost ship near a town. It runs aground after dark: defeat Captain Mordekai and his crew before dawn for cursed treasure.'],
   ['Gliding', 'Craft a Glider at a workbench (4 Planks, 2 Silk Cloth, 2 Rope). Walk off the edge of any mountain to soar for a few seconds, even out over water. Steer with the movement keys.'],
   ['Auctions & ballads', 'Auctioneer Gilda in Crownfall sells rare lots every week; bid against rivals. Lark the bard in Port Wren writes ballads about your great deeds for +2 max HP each.'],
   ['Friends & partners', 'Give gifts to make friends; best friends give you a keepsake. Forge a Promise Ring (Gem Ring, 2 Silver, Pearl, Star Fragment) to propose to a best friend. Partners write daily and give +6 max HP, and spending time together grants +10% damage for the day.'],
@@ -3502,7 +3553,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns();
+    bossNear(); legendSpawns(); ghostSpawns();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -4191,6 +4242,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
@@ -4643,6 +4695,7 @@ function checkDeeds() {
   if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
+  if (S.ghost && ghostActive()) extra.push(`<div class="dd" style="color:#9af0c0"><span>☠ Ghost ship ${S.ghost.dir} of ${TOWNS[S.ghost.town].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
   if (S.escort) extra.push(`<div class="dd" style="color:#86c98f"><span>⛟ Escort to ${TOWNS[S.escort.b].name} · wagon ${Math.max(0, Math.round(S.escort.hp/S.escort.max*100))}%</span></div>`);
@@ -4736,7 +4789,7 @@ function newDay() {
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   rollMarket();
-  titanDay();
+  titanDay(); ghostDay();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}`);
   save();
 }
@@ -6662,6 +6715,7 @@ function openMap() {
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  if (S.ghost && ghostActive()) { const tx = (S.ghost.x + .5)*s, ty = (S.ghost.y + .5)*s; g.fillStyle = '#9af0c0'; g.beginPath(); g.arc(tx, ty, 6*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke(); g.fillText('Ghost ship', tx, ty - 10*dpr); }
   if (S.titanPos && !S.bosses.titan) { const tx = (S.titanPos.x + .5)*s, ty = (S.titanPos.y + .5)*s; g.fillStyle = '#ff9a3a'; g.beginPath(); g.arc(tx, ty, 7*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke(); g.fillStyle = '#ffb060'; g.fillText('Titan', tx, ty - 10*dpr); }
   if (S.legendsKnown) for (const L of LEGENDS) { if (S.legends && S.legends[L.id]) continue; const lx = (L.tx + .5)*s, ly = (L.ty + .5)*s; g.fillStyle = L.col; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = (i % 2 ? 2.5 : 6)*dpr; g.lineTo(lx + Math.cos(a)*r, ly + Math.sin(a)*r); } g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); }
   if (S.raid) { const t = TOWNS[S.raid.town], rx = (t.x + .5)*s, ry = (t.y + .5)*s; g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(rx, ry, (9 + Math.sin(frameT*6)*2)*dpr, 0, 7); g.globalAlpha = .45; g.fill(); g.globalAlpha = 1; g.fillStyle = '#ff7a4a'; g.fillText('Under attack!', rx, ry + 20*dpr); }
@@ -7445,6 +7499,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['ghostship','Here Be Ghosts','Defeat Captain Mordekai of the ghost ship', () => (S.ghostShips || 0) >= 1],
   ['glide','Up and Away','Glide off a mountain', () => (S.glides || 0) >= 1],
   ['skysailor','Sky Sailor','Glide 500 tiles in total', () => (S.glideDist || 0) >= 500],
   ['auction','Going, Going, Gone','Win an auction lot', () => (S.auctionsWon || 0) >= 1],
@@ -7861,7 +7916,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
