@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, setGroundProvider, setBlockProvider, VOLCANO } from './terrain.js';
+import { heightAt, setGroundProvider, setBlockProvider, setCeilingProvider, VOLCANO } from './terrain.js';
 import { createNoise2D, mulberry32, smoothstep, clamp } from './noise.js';
 import { crystalGeo, obsidianGeo } from './world.js';
 import { lavaMaterial } from './volcano.js';
@@ -140,6 +140,7 @@ export class Caves {
       new Cave(2, 'moss', { x: 3100, z: 0 }, 33, this.findEntrance(-250, 40, 8, 26)),
     ];
     setGroundProvider((x, z) => { for (const c of this.list) if (c.contains(x, z)) return c.floor(x, z); return undefined; });
+    setCeilingProvider((x, z) => { for (const c of this.list) if (c.contains(x, z)) return c.floor(x, z) + c.gap(x, z); return undefined; });
     setBlockProvider((x, z) => { for (const c of this.list) if (c.contains(x, z)) return c.gap(x, z) < 2.3; return false; });
     for (const c of this.list) { c.build(scene, this.mats); this.buildEntrance(c); this.decorate(c); }
     this.torch = new THREE.PointLight(0xffd8a0, 0, 26, 1.4);

@@ -218,7 +218,8 @@ class Game {
     });
     document.addEventListener('keyup', (e) => { this.input.keys[e.code] = false; });
     document.addEventListener('mousemove', (e) => {
-      if (this.locked && !this.ui.open) { this.input.mx += e.movementX; this.input.my += e.movementY; }
+      // clamp: some browsers emit occasional huge movement spikes that would snap the view
+      if (this.locked && !this.ui.open) { this.input.mx += clamp(e.movementX, -150, 150); this.input.my += clamp(e.movementY, -150, 150); }
     });
     // Fallback for embedded/sandboxed pages where pointer lock is refused: free mouse-look.
     document.addEventListener('pointerlockerror', () => {
@@ -821,7 +822,7 @@ class Game {
     }
     p.damage(dmg);
     this.audio.hurt();
-    p.yaw += (Math.random() - 0.5) * 0.05;
+    this.shake = Math.max(this.shake || 0, 0.25);
     // knockback
     const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize().multiplyScalar(4);
     p.vel.add(away); p.vel.y += 2;
@@ -1082,7 +1083,7 @@ class Game {
       this.camera.lookAt(-40, 20, -120);
       return;
     }
-    p.updateCamera(dt, this.camera);
+    p.updateCamera(dt, this.camera, this.input);
 
     // equip / placement ghost
     const item = this.activeItem();
@@ -1095,9 +1096,13 @@ class Game {
     this.updateHUD(dt);
     if (this.altar) { this.altar.crystal.rotation.y += dt; this.altar.crystal.position.y = 2.4 + Math.sin(this.shared.uTime.value * 2) * 0.15; }
     if (this.shake > 0) {
+      // smooth layered sine shake (no per-frame random buzz), optional in settings
       this.shake = Math.max(0, this.shake - dt * 1.5);
-      this.camera.position.x += (Math.random() - 0.5) * this.shake * 0.5;
-      this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.5;
+      if (this.settings.v.shake !== false) {
+        const t = this.shared.uTime.value, a = this.shake * 0.35;
+        this.camera.position.x += (Math.sin(t * 37) * 0.6 + Math.sin(t * 61) * 0.4) * a;
+        this.camera.position.y += (Math.sin(t * 43 + 1) * 0.6 + Math.sin(t * 71) * 0.4) * a;
+      }
     }
     const bb = document.getElementById('bossbar');
     const showBoss = this.bosses.nearest(p.pos, 160);

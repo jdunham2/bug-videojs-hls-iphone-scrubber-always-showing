@@ -1,6 +1,6 @@
 // Player settings, kept per viewer in browser storage (a convenience; defaults apply when absent).
 const KEY = 'iotp-settings';
-export const DEFAULTS = { volume: 70, music: 50, sens: 1, invert: false, fov: 72, shadows: true, grass: true, minimap: true, fps: false };
+export const DEFAULTS = { volume: 70, music: 50, sens: 1, invert: false, smooth: null, bob: true, shake: true, fov: 72, shadows: true, grass: true, minimap: true, fps: false };
 
 export function loadSettings() {
   try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY)) || {}) }; } catch (e) { return { ...DEFAULTS }; }
@@ -27,7 +27,7 @@ export class Settings {
   fill() {
     const f = this.form.elements;
     f.volume.value = this.v.volume; f.music.value = this.v.music; f.sens.value = this.v.sens; f.fov.value = this.v.fov;
-    f.invert.checked = this.v.invert; f.shadows.checked = this.v.shadows; f.grass.checked = this.v.grass;
+    f.invert.checked = this.v.invert; f.smooth.checked = this.smoothOn(); f.bob.checked = this.v.bob; f.shake.checked = this.v.shake; f.shadows.checked = this.v.shadows; f.grass.checked = this.v.grass;
     f.minimap.checked = this.v.minimap; f.fps.checked = this.v.fps;
     this.labels();
   }
@@ -43,6 +43,7 @@ export class Settings {
     const f = this.form.elements;
     this.v = {
       volume: +f.volume.value, music: +f.music.value, sens: +f.sens.value, fov: +f.fov.value, invert: f.invert.checked,
+      smooth: f.smooth.checked, bob: f.bob.checked, shake: f.shake.checked,
       shadows: f.shadows.checked, grass: f.grass.checked, minimap: f.minimap.checked, fps: f.fps.checked,
     };
     this.labels();
@@ -50,12 +51,17 @@ export class Settings {
     this.store();
   }
 
+  // smoothing defaults on for touch screens (uneven swipe events), off for mice (no added latency)
+  smoothOn() { return this.v.smooth === null || this.v.smooth === undefined ? document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches : this.v.smooth; }
+
   store() { try { localStorage.setItem(KEY, JSON.stringify(this.v)); } catch (e) { /* storage blocked */ } }
 
   apply() {
     const g = this.game, v = this.v;
     g.input.sens = v.sens;
     g.input.invert = v.invert;
+    g.input.smooth = this.smoothOn();
+    g.input.bob = v.bob;
     g.camera.fov = v.fov; g.camera.updateProjectionMatrix();
     if (g.env.sun.castShadow !== v.shadows) g.env.sun.castShadow = v.shadows;
     if (g.world.grass) g.world.grass.visible = v.grass;

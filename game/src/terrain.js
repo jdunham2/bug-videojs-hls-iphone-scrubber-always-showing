@@ -40,6 +40,10 @@ let blockProvider = null;
 export function setBlockProvider(fn) { blockProvider = fn; }
 // true where a cave wall blocks movement
 export function blockedAt(x, z) { return blockProvider ? blockProvider(x, z) : false; }
+let ceilProvider = null;
+export function setCeilingProvider(fn) { ceilProvider = fn; }
+// cave ceiling height (Infinity in the open)
+export function ceilingAt(x, z) { const c = ceilProvider && (x > 1500 || x < -1500) ? ceilProvider(x, z) : undefined; return c === undefined ? Infinity : c; }
 
 // Analytic height function — used for both mesh and gameplay queries.
 export function heightAt(x, z) {

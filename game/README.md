@@ -187,7 +187,7 @@ percussion during the boss fight. Music has its own volume slider.
 ### Settings
 
 Open ⚙ Settings from the title screen, the pause menu or the touch toolbar to change volume,
-look sensitivity, invert Y, field of view, shadows, grass, the minimap and an FPS counter.
+look sensitivity, invert Y, smooth camera (on by default for touch), head bob, screen shake, field of view, shadows, grass, the minimap and an FPS counter.
 Settings are remembered in your browser.
 
 Three.js (MIT) is vendored in `vendor/`.

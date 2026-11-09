@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, WATER_LEVEL } from './terrain.js';
+import { heightAt, WATER_LEVEL, blockedAt, ceilingAt } from './terrain.js';
 import { mergeParts, mtx } from './util.js';
 import { clamp, lerp } from './noise.js';
 
@@ -101,7 +101,7 @@ export class Player {
     this.equipT = 0.3;
   }
 
-  get eye() { return new THREE.Vector3(this.pos.x, this.pos.y + (this.crouch ? EYE - 0.55 : EYE), this.pos.z); }
+  get eye() { return new THREE.Vector3(this.pos.x, this.pos.y + (this.eyeH ?? EYE), this.pos.z); }
 
   lookDir(out = new THREE.Vector3()) {
     return out.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
@@ -129,9 +129,21 @@ export class Player {
 
   update(dt, input, world, building) {
     if (!this.alive) return;
-    // look
-    this.yaw -= input.mx * 0.0022 * input.sens;
-    this.pitch = clamp(this.pitch - input.my * 0.0022 * input.sens * (input.invert ? -1 : 1), -1.5, 1.5);
+    // look: input moves a target; the camera eases toward it when smoothing is on.
+    // (yaw/pitch set elsewhere — mounting, respawn, cave travel — re-sync the target.)
+    if (this.yawT === undefined || this._yawSet !== this.yaw) this.yawT = this.yaw;
+    if (this.pitchT === undefined || this._pitchSet !== this.pitch) this.pitchT = this.pitch;
+    this.yawT -= input.mx * 0.0022 * input.sens;
+    this.pitchT = clamp(this.pitchT - input.my * 0.0022 * input.sens * (input.invert ? -1 : 1), -1.5, 1.5);
+    if (input.smooth) {
+      const k = 1 - Math.exp(-dt * 26);
+      this.yaw += (this.yawT - this.yaw) * k;
+      this.pitch += (this.pitchT - this.pitch) * k;
+    } else { this.yaw = this.yawT; this.pitch = this.pitchT; }
+    this._yawSet = this.yaw; this._pitchSet = this.pitch;
+    // crouching lowers the eye smoothly instead of snapping
+    const eyeTarget = this.crouch ? EYE - 0.55 : EYE;
+    this.eyeH = (this.eyeH ?? EYE) + (eyeTarget - (this.eyeH ?? EYE)) * (1 - Math.exp(-dt * 12));
 
     if (this.mount) return; // movement handled by mount
 
@@ -203,27 +215,50 @@ export class Player {
     if (this.hp <= 0 && this.alive) { this.hp = 0; this.alive = false; }
   }
 
-  updateCamera(dt, camera) {
+  updateCamera(dt, camera, input = {}) {
     if (this.mount) {
       const m = this.mount;
       const h = (m.model.hipH + 1.6) * m.scale;
-      const pivot = new THREE.Vector3(m.pos.x, m.pos.y + h, m.pos.z);
+      // smoothed follow point: terrain bumps under the mount don't shake the view
+      const target = new THREE.Vector3(m.pos.x, m.pos.y + h, m.pos.z);
+      if (!this.pivot || this.pivot.distanceTo(target) > 40) this.pivot = target.clone();
+      if (Math.abs(m.pos.x) > 1500) target.y = Math.min(target.y, ceilingAt(m.pos.x, m.pos.z) - 0.8);
+      const kxz = 1 - Math.exp(-dt * 18), ky = 1 - Math.exp(-dt * 5);
+      this.pivot.x += (target.x - this.pivot.x) * kxz;
+      this.pivot.z += (target.z - this.pivot.z) * kxz;
+      this.pivot.y += (target.y - this.pivot.y) * ky;
       const back = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), -Math.sin(this.pitch) + 0.25, Math.cos(this.yaw) * Math.cos(this.pitch)).normalize();
-      const dist = this.camDist * Math.max(1, m.scale * (m.radius > 2 ? 1.4 : 0.8));
-      const cp = pivot.clone().addScaledVector(back, dist);
-      const gh = heightAt(cp.x, cp.z) + 0.5;
-      if (cp.y < gh) cp.y = gh;
-      camera.position.lerp(cp, Math.min(1, dt * 10));
-      camera.lookAt(pivot);
+      const want = this.camDist * Math.max(1, m.scale * (m.radius > 2 ? 1.4 : 0.8));
+      // pull the camera in if terrain or a cave wall/ceiling is in the way
+      let dist = want;
+      const inCave = Math.abs(m.pos.x) > 1500;
+      for (let t = 1; t <= want; t += 0.25) {
+        const x = this.pivot.x + back.x * t, y = this.pivot.y + back.y * t, z = this.pivot.z + back.z * t;
+        const ground = heightAt(x, z);
+        const blocked = y < ground + 0.4 || (inCave && (blockedAt(x, z) || y > ceilingAt(x, z) - 0.5));
+        if (blocked) { dist = Math.max(1.5, t - 0.8); break; }
+      }
+      // ease the distance: quick to pull in, slow to push back out
+      this.camLen = this.camLen ?? dist;
+      // ignore tiny changes (grass-height bumps) so the distance doesn't flutter
+      if (Math.abs(dist - this.camLen) > 0.3 || dist < this.camLen - 0.05) this.camLen += (dist - this.camLen) * (1 - Math.exp(-dt * (dist < this.camLen ? 10 : 3)));
+      const cp = this.pivot.clone().addScaledVector(back, this.camLen);
+      if (inCave) cp.y = Math.max(Math.min(cp.y, ceilingAt(cp.x, cp.z) - 0.5), heightAt(cp.x, cp.z) + 0.3);
+      camera.position.copy(cp);
+      camera.lookAt(this.pivot);
       this.vm.visible = false;
       return;
     }
+    this.pivot = null; this.camLen = null;
     this.vm.visible = true;
     const e = this.eye;
-    camera.position.copy(e);
+    // small steps (onto floors, rocks) glide instead of snapping; big drops follow at once
+    if (this.camY === undefined || Math.abs(e.y - this.camY) > 1.2) this.camY = e.y;
+    else this.camY += (e.y - this.camY) * (1 - Math.exp(-dt * 18));
+    camera.position.set(e.x, this.camY, e.z);
     camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    // view bob + swing
-    const bob = this.onGround ? Math.sin(this.bob) * 0.012 * Math.min(1, this.hs / 5) : 0;
+    // view bob (optional) + swing
+    const bob = input.bob !== false && this.onGround ? Math.sin(this.bob) * 0.01 * Math.min(1, this.hs / 5) : 0;
     camera.position.y += bob;
     this.swing = Math.max(0, this.swing - dt * 3.2);
     const s = Math.sin(Math.min(1, this.swing) * Math.PI);
