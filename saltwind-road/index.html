@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  wish_lantern:{name:'Wish Lantern',base:15,col:'#ffb060',kind:'lantern',desc:'Release at night from your bag and make a wish.'},
   shell_horn:{name:'Shell Horn',base:800,col:'#f0d090',kind:'trinket',desc:'+5% speed. Sounds like the sea.'},
   golden_conch:{name:'Golden Conch',base:3000,col:'#ffd040',kind:'trinket',desc:'+6 max HP and +5% damage. The prize of a true shell seeker.'},
   mystery_egg:{name:'Mystery Egg',base:300,col:'#e8d8f0',kind:'mat',desc:'Something moves inside. Hatch it in an incubator.'},
@@ -1119,6 +1120,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'wish_lantern',   need:{silk_cloth:1,sticks:2,honey:1}, n:3, at:'hand', known:true},
   {id:'incubator',      need:{planks:4,wool:3,glass:1}, at:'bench', known:true},
   {id:'snowman',        need:{snowball:3,sticks:2,carrot:1}, at:'hand', known:true},
   {id:'magma_charm',    need:{fire_opal:5,obsidian:4,silver:2}, at:'forge', known:true},
@@ -3439,6 +3441,30 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== sky lanterns =====
+let skyLanterns = [];
+function releaseLantern() {
+  if (!have('wish_lantern')) return;
+  if (!isNightish()) { toast('Wish lanterns are best released after dark.'); return; }
+  if (inDungeon() || S.y >= WORLD_H) { toast('You need open sky for that.'); return; }
+  addItem('wish_lantern', -1); S.lanterns = (S.lanterns || 0) + 1; skyLanterns.push({x: S.x, y: S.y - 1, h: 0, ph: Math.random()*6});
+  const fest = !!festivalToday(), r = Math.random(); let msg;
+  if (r < .08) { addItem('star_fragment', 1); msg = 'A shooting star streaks past, as if in answer! <span style="color:var(--good)">+1 Star Fragment</span>'; }
+  else if (r < .3) { const c = rint(15, 45)*(fest ? 2 : 1); S.coins += c; msg = `A coin glints in the grass where it rose from. <span style="color:var(--good)">+${c} coin</span>`; }
+  else if (r < .6) { BUFFS.luck = 240*(fest ? 2 : 1); msg = 'You feel lucky as it drifts away.'; }
+  else { BUFFS.regen = 240*(fest ? 2 : 1); S.hp = Math.min(maxHP(), S.hp + 3); renderHP(); msg = 'A warm feeling settles over you.'; }
+  if (fest) for (let k = 0; k < 6; k++) skyLanterns.push({x: S.x + (Math.random() - .5)*14, y: S.y + (Math.random() - .5)*8, h: -k*.6, ph: Math.random()*6});
+  SFX.chime(); renderHUD(); save();
+  toast(`<b>You release a wish lantern and make a wish...</b><br>${msg}${fest ? '<br>Townsfolk cheer and release lanterns of their own!' : ''}`, 5500);
+}
+function updateSkyLanterns(dt) { for (const L of skyLanterns) L.h += dt; skyLanterns = skyLanterns.filter(L => L.h < 14); }
+function drawSkyLantern(L) {
+  if (L.h < 0) return;
+  const px = (L.x + Math.sin(L.h*.8 + L.ph)*.6)*TS, py = (L.y - L.h*1.4)*TS, a = Math.max(0, 1 - L.h/14);
+  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(255,170,80,.35)'; ctx.beginPath(); ctx.arc(px, py, 7, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffb060'; ctx.fillRect(px - 3, py - 4, 6, 7); ctx.fillStyle = '#ffe0a0'; ctx.fillRect(px - 1, py - 1, 2, 3); ctx.fillStyle = '#c87a3a'; ctx.fillRect(px - 3, py + 3, 6, 1);
+  ctx.globalAlpha = 1;
+}
 // ===== golden shells =====
 const SHELL_N = 40;
 function ensureShells() {
@@ -4409,6 +4435,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Wish lanterns', 'Craft Wish Lanterns (Silk Cloth, 2 Sticks, Honey: makes 3) and release them from your bag at night to make a wish. On festival nights the whole town joins in, and wishes come true twice over.'],
   ['Golden shells', 'Forty golden shells are hidden across the land, mostly on beaches. Old Hob in Port Wren rewards you every ten, and the last prize is the Golden Conch.'],
   ['Mystery eggs', 'Monster dens and ruin vaults sometimes hold a Mystery Egg. Build an Incubator (4 Planks, 3 Wool, 1 Glass), place the egg inside, and in 3 days it hatches into a rare pet: a Phoenix Chick, Shadow Cat or Storm Pup.'],
   ['Winter & decrees', 'In winter, scoop snowballs from snowy ground and build a Snowman (3 Snowballs, 2 Sticks, a Carrot) for a cheerful buff. Snowmen melt in spring. Each week Herald Bartholomew in Crownfall posts a decree: answer it for coin and royal favor, and reach 5 favor to be knighted.'],
@@ -4676,7 +4703,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -5409,6 +5436,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const L of skyLanterns) sprites.push({y: 1e9, f: () => drawSkyLantern(L)});
   if (S.shells) S.shells.spots.forEach(([x, y], i) => { if (!S.shells.got[i] && inView(x, y)) sprites.push({y: y + .2, f: () => drawShell(x, y, i)}); });
   for (const r of volcRocks) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawVolcRock(r)});
   if (fairyRing && inView(fairyRing.x, fairyRing.y)) sprites.push({y: fairyRing.y - .6, f: () => drawFairyRing(fairyRing)});
@@ -5574,6 +5602,7 @@ function render() {
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
     { const no = NPC_BY.noctis; if (!no.away) hole(no.x*TS, no.y*TS - 10, 40, .85); }
     for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
+    for (const L of skyLanterns) if (L.h >= 0) hole((L.x + Math.sin(L.h*.8 + L.ph)*.6)*TS, (L.y - L.h*1.4)*TS, 16, .6*Math.max(0, 1 - L.h/14));
     if (fairyRing && !fairyRing.done) hole(fairyRing.x*TS, fairyRing.y*TS - 4, 40, .8);
     for (const b of bugs) if (b.id === 'firefly' || b.id === 'glow_moth') hole(b.x*TS, b.y*TS - 10, 12, .5);
     if (S.flags.lighthouse && NPC_BY.mara) { const k = NPC_BY.mara, a = frameT*.8; hole(k.x*TS, (k.y - 1)*TS, 40, .9); for (let i = 1; i <= 4; i++) hole((k.x + Math.cos(a)*i*2.2)*TS, (k.y - 1 + Math.sin(a)*i*2.2)*TS, 26 - i*3, .6); }
@@ -7115,6 +7144,7 @@ function renderBag() {
     ${sec('Food', ['food'], eatBtn)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
+    ${sec('Wish lanterns', ['lantern'], g => `<button class="btn sm primary" data-lantern="1">Release</button>`)}
     ${sec('Treasure maps', ['map'], g => `<button class="btn sm primary" data-readmap="1" ${S.tmap ? 'disabled' : ''}>${S.tmap ? 'Already following one' : 'Read'}</button>`)}
     ${sec('Seeds · plant them on your farm', ['seed'])}
     ${sec('Building · press B to place', ['place'], g => `<button class="btn sm primary" data-place="${g}">Place</button>`)}
@@ -7129,6 +7159,7 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.eat) eat(b.dataset.eat);
   if (b.dataset.place) { closeModal('bag'); placeItem(b.dataset.place); return; }
   if (b.dataset.readmap) { closeModal('bag'); readMap(); return; }
+  if (b.dataset.lantern) { closeModal('bag'); releaseLantern(); return; }
   if ('pet' in b.dataset) choosePet(b.dataset.pet);
   if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderBag(); save();
@@ -8790,6 +8821,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['lanterns','Wishes on the Wind','Release 10 wish lanterns', () => (S.lanterns || 0) >= 10],
   ['shells10','Shell Seeker','Find 10 golden shells', () => shellsGot() >= 10],
   ['shells40','Shell Master','Find all 40 golden shells', () => shellsGot() >= SHELL_N],
   ['hatchling','Hatchling','Hatch a Mystery Egg', () => (S.eggsHatched || 0) >= 1],
