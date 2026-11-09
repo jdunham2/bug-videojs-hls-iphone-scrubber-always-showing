@@ -488,6 +488,7 @@ const GOODS = {
   silverfin:{name:'Silverfin',base:26,col:'#dfe4ea',kind:'good'},
   goldcarp:{name:'Golden Carp',base:95,col:'#f0c040',kind:'good'},
   old_boot:{name:'Old Boot',base:1,col:'#6a4a2a',kind:'good'},
+  sunken_chest:{name:'Sunken Chest',base:0,col:'#5a7a6a',kind:'schest',desc:'Hauled up from the depths. Open it from your bag!'},
   dawnbreaker:{name:'Dawnbreaker',base:700,col:'#fff0b0',kind:'weapon',dmg:11,cd:.42,reach:1.65,silver:true},
   prism_bow:{name:'Prism Bow',base:750,col:'#c8f4ff',kind:'weapon',dmg:8,cd:.4,ranged:true,noAmmo:true,pcol:'#e8c8ff'},
   phoenix:{name:'Phoenix Feather',base:900,col:'#ff8a3a',kind:'trinket',desc:'Once a day, rise again with half your HP instead of being knocked out'},
@@ -3604,6 +3605,14 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== sunken chests =====
+function openSunken() {
+  if (!have('sunken_chest')) return; addItem('sunken_chest', -1); S.sunken = (S.sunken || 0) + 1;
+  const got = [], c = rint(80, 220) + (S.level || 1)*6; S.coins += c; got.push(`${c} coin`);
+  const g = pick(['pearl', 'coral', 'black_pearl', 'pirate_gold', 'gem', 'treasure_map', 'ancient_coin'].filter(x => GOODS[x])); addItem(g, 1); got.push(GOODS[g].name);
+  if (Math.random() < .06) { addItem('legend_map', 1); got.push('<b>a Legendary Map!</b>'); } else if (Math.random() < .15) { addItem('mystery_egg', 1); got.push('<b>a Mystery Egg</b>'); }
+  SFX.victory(); renderHUD(); save(); toast(`<b>You pry open the sunken chest...</b><br><span style="color:var(--good)">+ ${got.join(', ')}</span>`, 6000);
 }
 // ===== legendary maps =====
 function readLegendMap() {
@@ -7557,6 +7566,7 @@ function renderBag() {
     ${sec('Food', ['food'], eatBtn)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
+    ${sec('Sunken chests', ['schest'], g => `<button class="btn sm primary" data-openschest="1">Open</button>`)}
     ${sec('Legendary maps', ['lmap'], g => `<button class="btn sm primary" data-readlmap="1" ${S.lmap ? 'disabled' : ''}>${S.lmap ? 'Already following one' : 'Read'}</button>`)}
     ${sec('Wish lanterns', ['lantern'], g => `<button class="btn sm primary" data-lantern="1">Release</button>`)}
     ${sec('Treasure maps', ['map'], g => `<button class="btn sm primary" data-readmap="1" ${S.tmap ? 'disabled' : ''}>${S.tmap ? 'Already following one' : 'Read'}</button>`)}
@@ -7575,6 +7585,7 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.readmap) { closeModal('bag'); readMap(); return; }
   if (b.dataset.lantern) { closeModal('bag'); releaseLantern(); return; }
   if (b.dataset.readlmap) { closeModal('bag'); readLegendMap(); return; }
+  if (b.dataset.openschest) { openSunken(); renderBag(); return; }
   if ('pet' in b.dataset) choosePet(b.dataset.pet);
   if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderBag(); save();
@@ -8800,7 +8811,7 @@ function abyssEnterTalk() {
 
 /* ================= fishing minigame ================= */
 let FG = null, fishHold = false;
-const CATCH = {fish:{diff:.55, xp:6, col:'#8fb8c9'}, silverfin:{diff:.8, xp:10, col:'#dfe4ea'}, goldcarp:{diff:1.15, xp:25, col:'#f0c040'}, old_boot:{diff:.25, xp:1, col:'#6a4a2a'}};
+const CATCH = {fish:{diff:.55, xp:6, col:'#8fb8c9'}, silverfin:{diff:.8, xp:10, col:'#dfe4ea'}, goldcarp:{diff:1.15, xp:25, col:'#f0c040'}, old_boot:{diff:.25, xp:1, col:'#6a4a2a'}, sunken_chest:{diff:.9, xp:20, col:'#5a7a6a'}};
 const FISH_SPECIES = [
   {id:'trout', diff:0.6, xp:8, biomes:[T.GRASS,T.FOREST,T.HILL], when:'*', w:4},
   {id:'pike', diff:0.75, xp:10, biomes:[T.MARSH,T.GLOOM,T.MOOR], when:'*', w:4},
@@ -8836,7 +8847,7 @@ function nodeBiomes(n) {
 }
 function rollCatch(n) {
   const night = isNightish(), b = nodeBiomes(n), rare = toolTier('rod') >= 3 ? 1.6 : 1;
-  const pool = [['fish', 10], ['silverfin', 4], ['goldcarp', 1.2*rare], ['old_boot', 1.4]];
+  const pool = [['fish', 10], ['silverfin', 4], ['goldcarp', 1.2*rare], ['old_boot', 1.4], ['sunken_chest', .5*rare]];
   for (const f of FISH_SPECIES) {
     if (f.when === 'night' && !night || f.when === 'day' && night) continue;
     if (f.season != null && f.season !== seasonIdx()) continue;
@@ -8878,7 +8889,7 @@ function endFishGame(win) {
     S.fishLog = S.fishLog || {};
     if (FISH_LOG_IDS.includes(G.c)) { const first = !S.fishLog[G.c]; S.fishLog[G.c] = (S.fishLog[G.c] || 0) + 1; if (first) setTimeout(() => toast(`<b>New fish: ${GOODS[G.c].name}!</b><br>Fish log ${Object.keys(S.fishLog).length}/${FISH_LOG_IDS.length}. Old Marlin in Port Wren rewards new catches.`, 6000), 400); }
     let kg = 0;
-    if (G.c !== 'old_boot') {
+    if (G.c !== 'old_boot' && G.c !== 'sunken_chest') {
       const base = G.c === 'fish' ? 1.2 : G.c === 'silverfin' ? 1.6 : Math.max(.4, GOODS[G.c].base/22), roll = .5 + Math.pow(Math.random(), 2.2)*1.6;
       kg = Math.round(base*roll*10)/10; S.fishBest = S.fishBest || {};
       if (!S.fishBest[G.c] || kg > S.fishBest[G.c]) { const had = S.fishBest[G.c]; S.fishBest[G.c] = kg; if (had) setTimeout(() => toast(`<b>New record!</b> ${GOODS[G.c].name}: ${kg} kg (was ${had} kg)`, 4000), 300); }
@@ -9265,6 +9276,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['sunken','Davy Jones','Fish up a sunken chest', () => (S.sunken || 0) >= 1],
   ['hoard','Legendary Hoard','Dig up a legendary hoard', () => (S.hoards || 0) >= 1],
   ['watch','On Watch','Complete a night watch', () => (S.watches || 0) >= 1],
   ['soak','Hot Tub Time','Soak in the hot spring 5 times', () => (S.soaks || 0) >= 5],
