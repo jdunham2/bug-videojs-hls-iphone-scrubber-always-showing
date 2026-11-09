@@ -9,6 +9,7 @@ import { Inventory, ITEMS, RECIPES } from './items.js';
 import { UI } from './ui.js';
 import { SaveSystem, applySave } from './save.js';
 import { WorldMap } from './map.js';
+import { Weather } from './weather.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -85,6 +86,7 @@ class Game {
     this.ui = new UI(this);
     this.saves = new SaveSystem(this);
     this.map = new WorldMap(this);
+    this.weather = new Weather(this.scene, this.shared, this.audio);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -815,6 +817,8 @@ class Game {
       p.survival(dt);
       if (!p.alive && !document.getElementById('death').classList.contains('show')) this.die(null);
       this.env.update(dt, p.pos);
+      this.weather.update(dt, this.env, this.camera, p.underwater);
+      if (this.weather.raining && !p.underwater && p.alive) p.water = Math.min(100, p.water + dt * 0.35 * this.weather.cur.rain);
       this.world.update(dt);
       this.creatures.update(dt, p, this.shared.uTime.value);
       this.building.update(dt, this.shared.uTime.value);

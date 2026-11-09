@@ -28,6 +28,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Map (M, or 🗺️ on touch):** a shaded map of the island with fog of war that lifts as you
   explore, plus place names and markers for you, your tames, buildings and your bed. A
   corner minimap (desktop) shows nearby creatures, with hostile ones in red.
+- **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
+  thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
+  refills your water.
 - **Metal age:** orange-veined metal ore in the northern mountains (use a pick). A Forge
   smelts 2 ore + 1 wood into an ingot while lit, and unlocks the Metal Pick, Metal Hatchet,
   Metal Sword and Metal Armor.

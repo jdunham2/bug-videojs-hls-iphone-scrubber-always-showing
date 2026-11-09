@@ -56,12 +56,37 @@ export class Audio {
     return { src, filter, gain };
   }
 
+  weather(rain, wind) {
+    if (!this.ctx) return;
+    if (!this.rainLoop) {
+      this.rainLoop = this.loopNoise(this.white, 'highpass', 900, 0);
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 6000;
+      this.rainLoop.filter.disconnect(); this.rainLoop.filter.connect(lp); lp.connect(this.rainLoop.gain);
+    }
+    this.windBoost = wind;
+    this.rainLoop.gain.gain.setTargetAtTime(rain * 0.22, this.ctx.currentTime, 0.8);
+  }
+
+  thunder(near) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = this.brown;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 160 + near * 500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9 * near + 0.2, t + 0.05 + (1 - near) * 0.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.5 + (1 - near) * 2);
+    src.connect(f); f.connect(g); g.connect(this.out(1, Math.random() * 1.4 - 0.7, 0.6));
+    src.start(t, Math.random() * 1.5); src.stop(t + 6);
+    if (near > 0.6) this.noiseHit({ freq: 2500, q: 0.4, dur: 0.25, vol: 0.5 * near, type: 'highpass' });
+  }
+
   // shoreDist: distance-ish to ocean; night 0..1; inWater bool
   ambience(dt, { shore, night, height, underwater }) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.ocean.gain.gain.setTargetAtTime(Math.max(0.03, 0.3 - shore * 0.004) * (underwater ? 0.3 : 1), t, 0.5);
-    this.wind.gain.gain.setTargetAtTime(0.025 + Math.max(0, height) * 0.0012, t, 0.5);
+    this.wind.gain.gain.setTargetAtTime((0.025 + Math.max(0, height) * 0.0012) * (this.windBoost || 1), t, 0.5);
     this.cricket.gain.setTargetAtTime(night * 0.012, t, 1);
     this.birdCd -= dt;
     if (this.birdCd <= 0) { this.birdCd = 3 + Math.random() * 8; if (night < 0.5) this.bird(); }

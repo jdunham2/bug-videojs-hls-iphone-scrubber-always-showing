@@ -171,7 +171,7 @@ export class UI {
 
   frame(game) {
     const p = game.player;
-    this.clock.textContent = game.env.clockString();
+    this.clock.textContent = `${game.env.clockString()} · ${game.weather.label}`;
     // compass: 72 ticks per 360deg, each 18px wide
     let deg = ((-p.yaw * 180) / Math.PI) % 360; if (deg < 0) deg += 360;
     this.compass.style.transform = `translateX(${-(deg / 5) * 18 - 72 * 18 + 180}px)`;
