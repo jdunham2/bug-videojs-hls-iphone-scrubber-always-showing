@@ -686,7 +686,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -1467,10 +1467,10 @@ const LAYOUTS = {
   cafe: { w: 420, d: 320, floor: ['wood', '#b98a5a', '#9a6e42'], wall: '#cfe3c4', build(b) {
     b.box(300, 70, 180, 26, 24, '#6a4a2e'); b.box(250, 70, 26, 18, 30, '#8a8f96', false, 24); b.box(345, 70, 60, 20, 16, '#bfe3ff', false, 24);
     b.npc(300, 45, 1, { bow: '#e0866a' });
-    b.station(300, 112, 'Counter', ['Have lunch', 'Hold up']);
+    b.station(300, 112, 'Counter', ['Have lunch', 'Buy a guitar', 'Hold up']);
     for (const [x, z] of [[80, 120], [80, 240], [210, 250], [330, 240]]) { b.table(x, z); b.chair(x - 24, z); b.chair(x + 24, z); }
     b.npc(56, 240, 3); b.npc(234, 250, 5); b.npc(354, 240, 0);
-    b.station(150, 175, 'Cozy corner table', ['Meet someone', 'Date with', 'Propose', 'Break up']);
+    b.station(150, 175, 'Cozy corner table', ['Meet someone', 'Date with', 'Propose', 'Break up', 'Play the open mic']);
     b.plant(25, 25); b.plant(395, 290); b.lamp(150, 170); b.lamp(300, 200);
     b.sign('FERN CAFE', 300, 100, 3, 150, '#6a4a2e', '#ffffff');
   } },
@@ -4211,6 +4211,94 @@ const HELP = [
 ];
 function showHelp() { $('helpList').innerHTML = HELP.map(([h, t]) => `<div><b>${h}</b><span>${t}</span></div>`).join(''); $('helpScreen').hidden = false; }
 
+// ---------- street racing, busking, Raptors games and autosave ----------
+const RACE_START = { x: 1860, y: 1650 };
+const RACE_CP = [[1860, 1860], [2460, 1860], [2460, 2460], [1860, 2460], [1200, 2460], [1200, 1860], [1860, 1860], [1860, 1650]];
+const MEDALS = [['Gold', 20, 260], ['Silver', 26, 130], ['Bronze', 34, 60]];
+let race = null;
+function nearRaceStart() { return driving && !race && !chase && !derby && !driving.service && Math.hypot(driving.x - RACE_START.x, driving.y - RACE_START.y) < 70; }
+function startRace() {
+  if (S.money < 30) { log('The street race entry fee is $30.', 'warn'); return; }
+  if (hour() < 18 && hour() > 3) { log('Street races only happen at night (6 PM to 3 AM).', 'warn'); return; }
+  S.money -= 30; race = { i: 0, t: 0, count: 3 }; driving.v = 0; sfx.honk();
+  log(`Street race! Hit all ${RACE_CP.length} checkpoints. Gold under ${MEDALS[0][1]}s.${S.raceBest ? ` Your best: ${S.raceBest.toFixed(1)}s.` : ''}`, 'good');
+}
+function raceUpdate(dt) {
+  if (!race) return;
+  if (!driving) { log('You left your car. Race over.', 'warn'); race = null; return; }
+  if (chase) { race = null; return; }
+  if (race.count > 0) { const before = Math.ceil(race.count); race.count -= dt; driving.v = 0; if (Math.ceil(race.count) !== before) sfx[race.count > 0 ? 'door' : 'honk'](); return; }
+  race.t += dt;
+  const [cx, cy] = RACE_CP[race.i];
+  if (Math.hypot(driving.x - cx, driving.y - cy) < 75) {
+    race.i++; sfx.coin();
+    if (race.i >= RACE_CP.length) {
+      const t = race.t, m = MEDALS.find(([, lim]) => t <= lim); race = null;
+      const best = !S.raceBest || t < S.raceBest; if (best) S.raceBest = t;
+      if (m) { S.money += m[2]; S.happy += 10; if (m[0] === 'Gold') goal('racer'); queueEvent({ kind: 'good', title: `${m[0]} medal!`, text: `You crossed the line in ${t.toFixed(1)} seconds${best ? ' (a new personal best!)' : ''}. Prize: ${money$(m[2])}.`, sound: 'goal' }); }
+      else log(`Finished in ${t.toFixed(1)}s. Too slow for a medal. Bronze is under ${MEDALS[2][1]}s.`, 'warn');
+      if (Math.random() < 0.2) setTimeout(() => { if (driving && !chase) { log('A police dino saw the street race!', 'bad'); startChase(0, null, 'street racing'); } }, 1200);
+    }
+  }
+  if (race && race.t > 90) { race = null; log('The race timed out.', 'warn'); }
+}
+function drawRace(g) {
+  if (inside) return;
+  if (!race) {
+    if (driving && !chase && !derby && Math.hypot(driving.x - RACE_START.x, driving.y - RACE_START.y) < 900) { const s2 = toScreen(RACE_START.x, 0, RACE_START.y); if (s2.ok) { g.strokeStyle = '#ffffff'; g.setLineDash([6, 6]); g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 40, 22, 0, 0, 7); g.stroke(); g.setLineDash([]); } const l2 = toScreen(RACE_START.x, 40, RACE_START.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText('🏁 Street race (night)', l2.x, l2.y); g.fillStyle = '#ffffff'; g.fillText('🏁 Street race (night)', l2.x, l2.y); } }
+    return;
+  }
+  const [cx, cy] = RACE_CP[race.i], s2 = toScreen(cx, 0, cy);
+  if (s2.ok) { g.strokeStyle = '#ffe066'; g.lineWidth = 4; g.beginPath(); g.ellipse(s2.x, s2.y, 60, 32, 0, 0, 7); g.stroke(); }
+  arrowTo(g, cx, cy, '#ffe066', race.i === RACE_CP.length - 1 ? 'FINISH' : `CP ${race.i + 1}`);
+  if (race.count > 0) { g.font = '400 64px "Lilita One", system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#ffe066'; g.strokeStyle = '#000'; g.lineWidth = 6; const n = String(Math.ceil(race.count)); g.strokeText(n, W / 2, H / 2 - 40); g.fillText(n, W / 2, H / 2 - 40); }
+}
+// ---- busking ----
+const BUSK = { x: 985, y: 1035 };
+function buskSpots() { return S && S.guitar && !inside && !driving && !festivalOn() ? [{ x: BUSK.x, y: BUSK.y, label: 'Busk for tips', busk: true }] : []; }
+function playSong(big) {
+  if (S.energy < 12) { log('Too tired to play.', 'warn'); return; }
+  const lvl = S.music || 0;
+  minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.1 + Math.min(1.2, lvl * 0.08), zone: [0.42, 0.42 + Math.max(0.1, 0.18 - lvl * 0.006)], hits: 0, misses: 0, need: 5, flash: 0, label: big ? 'OPEN MIC NIGHT' : 'PLAY A SONG', help: 'Press E on the beat', mins: 45, what: 'The crowd loved it', fail: 'Your string snapped mid-song.',
+    onDone: (ok, msg, q) => {
+      S.energy -= 8; S.music = lvl + (ok ? 1 : 0.3);
+      if (!ok) { log(msg, 'warn'); return; }
+      const crowd = (weekday() >= 5 ? 1.5 : 1) * (hour() >= 17 ? 1.4 : 1) * (1 + Math.min(lvl, 20) / 10);
+      const tips = Math.round((big ? rand(50, 110) : rand(8, 24)) * crowd * (1 + q));
+      S.money += tips; S.happy += big ? 15 : 6; sfx.coin();
+      log(`${msg}! ${big ? 'The cafe cheers.' : 'People toss coins in your guitar case.'} You made ${money$(tips)} in tips.`, 'good');
+      if (S.music >= 10) goal('rockstar');
+      if (big && S.partner) partnerRel(5);
+    } };
+  state = 'mini'; setScreens();
+}
+const _cafeM = MENUS.cafe;
+MENUS.cafe = p => {
+  const m = _cafeM(p);
+  if (open(8, 23)) {
+    m.acts.push({ label: 'Buy a guitar', detail: S.guitar ? 'You already have one.' : 'Busk by the fountain for tips. Play the open mic on Friday nights.', why: S.guitar ? 'You already have one.' : '', cost: 60, mins: 5, fn: () => { S.guitar = true; log('You bought a guitar! Busk by the fountain in the town square.', 'good'); } });
+    const fri = weekday() === 4 && hour() >= 19;
+    if (S.guitar) m.acts.push({ label: 'Play the open mic', detail: fri ? `Big tips and a big crowd. Music skill ${Math.floor(S.music || 0)}.` : 'Open mic is on Friday nights from 7 PM.', why: fri ? (S.openMicDay === S.day ? 'You already played tonight.' : '') : 'Only on Friday nights.', fn: () => { closeMenu(); S.openMicDay = S.day; playSong(true); } });
+  }
+  return m;
+};
+const _stadiumM = MENUS.stadium;
+MENUS.stadium = p => {
+  const m = _stadiumM(p);
+  m.acts = m.acts.filter(a => a.label !== 'Watch a Raptors game');
+  const game = weekday() >= 5 && hour() >= 12 && hour() < 20;
+  m.acts.push({ label: 'Watch a Raptors game', detail: game ? '+25 happiness, 3 hours. Bring a friend!' : 'Games are on weekends from noon to 8 PM.', cost: 25, why: game ? '' : 'No game right now.', mins: 180, fn: () => {
+    S.happy += 25; if (S.partner) partnerRel(6);
+    const win = Math.random() < 0.55; log(win ? `The Raptors won ${Math.round(rand(2, 5))} to ${Math.round(rand(0, 2))}! The crowd roars.` : 'The Raptors lost. Next season for sure.', win ? 'good' : '');
+    if (Math.random() < 0.15) { S.money += 50; log('You caught a ball in the stands! A collector buys it for $50.', 'good'); }
+  } });
+  return m;
+};
+// ---- autosave when the tab is hidden ----
+function autoSave() { if (S && state !== 'title' && !chase && !derby) save(); }
+addEventListener('pagehide', autoSave);
+document.addEventListener('visibilitychange', () => { if (document.hidden) autoSave(); });
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -4241,7 +4329,7 @@ const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.i
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
 function useNear() {
   if (state === 'play' && driving && derby) { log('No getting out in the middle of a derby!', 'warn'); return; }
-  if (state === 'play' && driving) { const ng = nearGig(); if (ng) { doGig(ng); return; } if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
+  if (state === 'play' && driving) { if (nearRaceStart()) { startRace(); return; } const ng = nearGig(); if (ng) { doGig(ng); return; } if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
   if (nearPlace.m) { enterCar(nearPlace); return; }
   if (nearPlace.site) { doSiteTask(nearPlace); return; }
@@ -4254,6 +4342,7 @@ function useNear() {
   if (nearPlace.dig) { digUp(nearPlace); return; }
   if ('trick' in nearPlace) { trickOrTreat(nearPlace); return; }
   if ('snow' in nearPlace) { buildSnowman(nearPlace); return; }
+  if (nearPlace.busk) { playSong(false); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -4295,6 +4384,7 @@ function update(dt) {
   for (const st of digSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
   for (const st of trickSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 12; if (d < best) { best = d; nearPlace = st; } }
   for (const st of snowSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of buskSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -4303,7 +4393,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); islandUpdate(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); islandUpdate(dt); raceUpdate(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -4434,7 +4524,8 @@ function drawOverlay() {
   if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
-  drawWaypoint(g);
+  drawWaypoint(g); drawRace(g);
+  for (const t of buskSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 450) continue; const l2 = toScreen(t.x, 30, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('🎸 Busking spot', l2.x, l2.y); g.fillStyle = '#ffe08a'; g.fillText('🎸 Busking spot', l2.x, l2.y); } }
   for (const t of snowSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 450) continue; const l2 = toScreen(t.x, 20, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('⛄ Snowman spot', l2.x, l2.y); g.fillStyle = '#ffffff'; g.fillText('⛄ Snowman spot', l2.x, l2.y); } }
   for (const t of farmSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 160) continue; const l2 = toScreen(t.x, 26, t.y); if (l2.ok) { g.font = '800 11px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; const near = nearPlace && nearPlace.farm === t.farm, tx = near ? '' : t.short; if (!tx) continue; g.strokeText(tx, l2.x, l2.y); g.fillStyle = '#d6f5b0'; g.fillText(tx, l2.x, l2.y); } }
   for (const t of fishSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 600) continue; const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = '#7fd8ff'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); g.setLineDash([]); } const l2 = toScreen(t.x, 30, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('🎣 Fishing spot', l2.x, l2.y); g.fillStyle = '#bfe8ff'; g.fillText('🎣 Fishing spot', l2.x, l2.y); } }
@@ -4509,9 +4600,10 @@ function hud() {
   if (show) {
     const np = nearPlace;
     let what;
-    if (driving && nearGig()) what = nearGig().label;
+    if (nearRaceStart()) what = 'Start a street race ($30, nights only)';
+    else if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig || 'trick' in np || 'snow' in np) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig || 'trick' in np || 'snow' in np || np.busk) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
@@ -4530,6 +4622,7 @@ function hud() {
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
   if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
+  if (race) st = race.count > 0 ? 'Get ready...' : `Street race: checkpoint ${race.i + 1} of ${RACE_CP.length} \u00b7 ${race.t.toFixed(1)}s`;
   if (derby) { const al = derby.cars.filter(c => !c.out).length; st = derby.count > 0 ? 'Get ready...' : derby.over ? 'The dust settles...' : `Derby: ${al} cars left \u00b7 your car ${Math.round(derby.me.hp)}% \u00b7 ${Math.max(0, Math.ceil(90 - derby.t))}s`; }
   else if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'patrol' ? (robber ? `Robbery ${G.done + 1}/${G.total}: catch the robber within about ${Math.max(0, Math.ceil(robber.timer))} minutes` : 'Waiting for the next call from dispatch...') : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.kind === 'pump' ? (G.target ? `A customer at the pump wants ${G.target.want} gallons` : 'Waiting for the next customer...') : NEXT_TASK[G.kind] ? `${G.done}/${G.total} ${NEXT_TASK[G.kind][1]}. Use your work station for the next one.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
   if (S.site && !chase) { const t = siteTask(), dn = S.site.tasks.filter(x => x.done).length; st = t ? `Site work ${dn + 1}/${S.site.tasks.length}: ${t.t === 'carry' ? `carry girders (${S.site.carried}/${S.site.need})` : TASK_INFO[t.t].label.toLowerCase()}` : 'All site work done. Clock out at the Raptor Builders trailer.'; }
