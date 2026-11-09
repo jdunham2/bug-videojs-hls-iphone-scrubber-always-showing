@@ -4086,6 +4086,8 @@ function render() {
   for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
   if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
   if (chargeT != null && chargeT > .15) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
+  if (S.lostPet && !S.lostPet.carried && inView(S.lostPet.x, S.lostPet.y)) sprites.push({y: S.lostPet.y, f: () => drawPet(ctx, S.lostPet.kind, Math.round(S.lostPet.x*TS), Math.round(S.lostPet.y*TS), Math.sin(frameT*.7) > 0 ? 1 : -1, frameT*3, false)});
+  if (S.lostPet && S.lostPet.carried) sprites.push({y: S.y + .02, f: () => drawPet(ctx, S.lostPet.kind, Math.round(S.x*TS - 7), Math.round(S.y*TS - 4), player.facing === 'left' ? -1 : 1, frameT*6, player.moving)});
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
@@ -4446,7 +4448,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -4508,6 +4510,7 @@ function checkDeeds() {
   { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
+  if (S.lostPet) { const o = NPC_BY[S.lostPet.owner]; extra.push(`<div class="dd ${S.lostPet.carried ? 'ok' : ''}"><span>${S.lostPet.carried ? `✓ Return ${S.lostPet.name} to ${o ? o.name : 'its owner'} (${TOWNS[S.lostPet.town].name})` : `Find ${S.lostPet.name} the ${S.lostPet.kind}, ${S.lostPet.dir} of ${TOWNS[S.lostPet.town].name}`}</span></div>`); }
   if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
@@ -4717,6 +4720,8 @@ function mainOptions(n) {
     if (n.id === 'quill' && (!M || M.stage !== 5)) o.push({label: M && M.stage ? 'About the cove' : 'Strange lights?', primary: !!(M && M.stage === 3), fn: () => smugQuill(n)});
     if (n.id === 'silas') o.push({label: M && M.stage === 4 ? 'Business' : 'Who are you?', primary: true, fn: () => smugSilas(n)});
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
+  if (S.lostPet && S.lostPet.owner === n.id && S.lostPet.carried) o.push({label: `Return ${S.lostPet.name}`, primary: true, fn: () => returnPet(n)});
+  else if (hasLostPet(n)) o.push({label: 'Is something wrong?', primary: true, fn: () => lostPetTalk(n)});
   if (n.archery) o.push({label: 'Try the archery range', primary: true, disabled: !!archery, fn: () => { closeTalk(); startArchery(); }});
   if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
   { const H = S.story && S.story.heir;
@@ -5108,6 +5113,29 @@ function updateArchery(dt) {
     toast(`<b>Time! ${sc} targets.</b> ${medal ? `<span style="color:${medal === 'gold' ? '#f0c040' : medal === 'silver' ? '#dfe4ea' : '#c8803a'}">${medal.toUpperCase()}</span>` : 'No medal (8 for bronze).'}${prize}<br>Best: ${S.archeryBest}`, 6500);
     renderHUD(); save();
   }
+}
+// ===== lost pet errands =====
+const hasLostPet = n => n.wander && !S.lostPet && hash2(S.day, n.id.length*31 + n.id.charCodeAt(n.id.length - 1), 4401) < .12 && !(S.petHelped || {})[n.id + ':' + S.day];
+function lostPetTalk(n) {
+  const kind = hash2(S.day, n.id.length, 77) < .5 ? 'dog' : 'cat', pname = pick(['Biscuit','Pepper','Muffin','Shadow','Pip','Clover','Sprocket','Bean']);
+  say(`“Oh, please help! My ${kind} ${pname} ran off this morning and hasn't come back. I think ${kind === 'cat' ? 'she' : 'he'} went out of town somewhere.”`, [
+    {label: 'I\'ll find them', primary: true, fn: () => {
+      const tw = TOWNS[n.town]; let spot = null;
+      for (let k = 0; k < 80 && !spot; k++) { const a = Math.random()*6.283, r = 10 + Math.random()*10, x = Math.floor(tw.x + Math.cos(a)*r), y = Math.floor(tw.y + Math.sin(a)*r); if (inB(x, y) && walkable(map[idx(x, y)], false, false) && map[idx(x, y)] !== T.SHAL && !townAt(x, y, 8)) spot = {x: x + .5, y: y + .5, dir: DIRS8[Math.round(((Math.atan2(y - tw.y, x - tw.x) + 6.283) % 6.283) / .785) % 8]}; }
+      if (!spot) return say('“...Actually, I just heard barking. Never mind!”', [back(n)]);
+      S.lostPet = {owner: n.id, town: n.town, kind, name: pname, x: spot.x, y: spot.y, dir: spot.dir, carried: false};
+      save(); say(`“Thank you! Last I saw, ${pname} was heading ${spot.dir}.”`, [back(n)]); }}, back(n)]);
+}
+function lostPetTarget() {
+  const L = S.lostPet; if (!L || L.carried || inDungeon()) return null;
+  if (Math.hypot(S.x - L.x, S.y - L.y) > 1.2) return null;
+  return {key: 'lostpet', html: `<kbd style="margin:0 6px 0 0">E</kbd>Pick up ${L.name}`, btn: 'Pick up', fn: () => { L.carried = true; SFX.chime(); floatText(S.x, S.y - 1.2, `${L.name} is safe!`, '#86c98f'); save(); }};
+}
+function returnPet(n) {
+  const L = S.lostPet, c = rint(40, 90) + (S.level || 1)*3; S.coins += c; addRep(n.town, .25); S.petsReturned = (S.petsReturned || 0) + 1;
+  const g = pick(['bread','honey','apple','berries','candy_apple','flowers'].filter(x => GOODS[x])); addItem(g, 2);
+  S.petHelped = S.petHelped || {}; S.petHelped[n.id + ':' + S.day] = true; S.lostPet = null; SFX.victory(); gainXP(40); renderHUD(); save();
+  say(`“${L.name}! Oh, you found ${L.kind === 'cat' ? 'her' : 'him'}! Thank you, thank you!” <span style="color:var(--good)">+${c} coin, +2 ${GOODS[g].name}</span>`, [back(n)]);
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -7051,6 +7079,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['petfinder','Pet Detective','Return 5 lost pets to their owners', () => (S.petsReturned || 0) >= 5],
   ['marksman','Marksman','Score gold at the archery range', () => !!S.flags.archeryGold],
   ['tourneygold','Tournament Champion','Win gold in a fishing tournament', () => !!(S.tourneyMedals && S.tourneyMedals.gold)],
   ['kingmaker','Kingmaker','Crown the lost heir of the Old Kingdom', () => !!(S.story && S.story.heir && S.story.heir.crowned)],
@@ -7425,7 +7454,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
