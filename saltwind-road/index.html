@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  gear:{name:'Brass Gear',base:20,col:'#d8a848',kind:'mat'},
   painted_egg:{name:'Painted Egg',base:12,col:'#ff9ad0',kind:'good',desc:'A prize from the spring egg hunt.'},
   training_dummy:{name:'Training Dummy',base:60,col:'#c8a060',kind:'place',desc:'Place with B. Hit it to see your damage per second.'},
   aurora_shard:{name:'Aurora Shard',base:180,col:'#7af0c0',kind:'good',desc:'A sliver of the northern lights, cold to the touch.'},
@@ -1126,6 +1127,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'gear',           need:{iron:1,bronze:1}, n:2, at:'forge', known:true},
   {id:'training_dummy', need:{wood:4,wheat:4,rope:1}, at:'bench', known:true},
   {id:'golden_apple',   need:{apple:3,pirate_gold:1,honey:2}, at:'bench', known:true},
   {id:'market_stall',   need:{planks:8,silk_cloth:2,rope:2}, at:'bench', known:true},
@@ -1225,6 +1227,8 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  mimic:{name:'Mimic',hp:25,dmg:3,speed:3.2,aggro:7,drops:[['gem',1,1,.6]],coins:[40,90]},
+  automaton:{name:'Runaway Automaton',hp:120,dmg:4,speed:2.6,aggro:10,drops:[['bronze',2,4,1],['gear',2,4,1]],coins:[100,200],noBest:true},
   pirateship:{name:'Pirate Ship',hp:90,dmg:3,speed:2.5,aggro:30,drops:[['pirate_gold',1,3,1],['treasure_map',1,1,.4],['gunpowder',2,4,.8]],coins:[150,300],shipAI:true},
   dummy:{name:'Training Dummy',hp:99999,dmg:0,speed:0,aggro:0,drops:[],noBest:true,isDummy:true},
   thief:{name:'Pickpocket',hp:4,dmg:0,speed:3.9,aggro:0,drops:[],noBest:true,thief:true},
@@ -1705,6 +1709,7 @@ const PETS = {
   phoenix_chick:{name:'Phoenix Chick', dmg:3, cd:.7, speed:6, fly:true, desc:'Hatched from a mystery egg. Once a day, it saves you from being knocked out.'},
   shadow_cat:{name:'Shadow Cat', dmg:3, cd:.6, speed:5.8, desc:'Hatched from a mystery egg. Its luck rubs off on you: +5% critical chance.'},
   storm_pup:{name:'Storm Pup', dmg:5, cd:.65, speed:6, desc:'Hatched from a mystery egg. Crackles with lightning and bites hard.'},
+  clockwork_owl:{name:'Clockwork Owl', dmg:3, cd:.7, speed:6, fly:true, desc:'A brass owl built by Cogsworth. Its lens eyes let you see much farther.'},
   fairy:{name:'Fairy', dmg:1, cd:.6, speed:6.2, fly:true, desc:'A tiny fairy from the ring. Sprinkles healing dust on you every few seconds.'},
   kit:{name:'Blossom Kit', dmg:3, cd:.7, speed:5.6, desc:'A pink fox cub. Each bite heals you a little.'},
   bunny:{name:'Bunny', dmg:1, cd:.7, speed:5.6, desc:'Tamed from a wild rabbit. You move 8% faster.'},
@@ -2060,6 +2065,10 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'whimsy',town:'lantern',dx:3,dy:3,name:'Mr. Whimsy',role:'Peddler of mysteries',cols:{cloak:'#6a2a8a',skin:'#e0c0a0',hair:'#2a2a2a'},whimsy:true,freeSpot:true,
+   hello:["Step right up! What's in the box? Nobody knows!","Feeling lucky today?","Mysteries, marvels and the occasional sock!"], rumors:["Every box holds a surprise. Most are good. Some are socks."]},
+  {id:'cogsworth',town:'highcairn',dx:-3,dy:3,name:'Inventor Cogsworth',role:'Tinkerer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#f0f0f0'},inventor:true,freeSpot:true,
+   hello:["Gears and springs! Gears and springs!","Mind the steam, it bites.","Have you seen a brass man wandering about?"], rumors:["My finest automaton walked out of my workshop last week. Just... walked. I'd like it back."]},
   {id:'fennick',town:'greenstem',dx:-3,dy:3,name:'Fennick the Druid',role:'Keeper of the glade',cols:{cloak:'#3a6a3a',skin:'#d8b090',hair:'#e8e8e0'},druid:true,freeSpot:true,
    hello:["The trees told me you were coming.","Walk softly, friend.","Have you seen the rainbows lately?"], rumors:["A unicorn grazes in the hidden glades. She only comes for those who bring rainbow petals and a golden apple."]},
   {id:'maude',town:'maplehold',dx:3,dy:-3,name:'Milliner Maude',role:'Hat maker',cols:{cloak:'#a04a6a',skin:'#e8c8a8',hair:'#c8a050'},milliner:true,freeSpot:true,
@@ -3018,7 +3027,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (S.pet === 'clockwork_owl' ? 2.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -3323,6 +3332,8 @@ function killEnemy(e) {
     return;
   }
   if (e.ghostCap) ghostLoot(e);
+  if (e.clock && (S.clock || 0) === 2) { S.clock = 3; setTimeout(() => toast('<b>Brassby powers down with a sad whistle.</b><br>Return to Inventor Cogsworth in Highcairn.', 6000), 400); }
+  if (e.type === 'mimic') { const t = e.mimicTier || 1, c = 60*t; S.coins += c; got.push(`+${c} coin`); for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT.filter(x => GOODS[x])); addItem(g, 2); got.push(`+2 ${GOODS[g].name}`); } S.mimics = (S.mimics || 0) + 1; }
   if (e.outlawBoss) outlawCaught();
   if (e.type === 'thief') { const back = (e.loot || 0) + 25; S.coins += back; S.thievesCaught = (S.thievesCaught || 0) + 1; const tk = townAt(e.x, e.y, 12); if (tk && TOWNS[tk]) addRep(tk, .15); setTimeout(() => toast(`<b>Thief caught!</b> You get your coin back, plus a reward from the watch: <span style="color:var(--good)">+${back} coin</span>`, 4500), 200); }
   if (e.type === 'horseman') { S.horsemen = (S.horsemen || 0) + 1; if (!S.mounts.includes('nightmare')) setTimeout(() => addMount('nightmare'), 1200); else { addItem('pumpkin_pie', 2); } }
@@ -3585,6 +3596,40 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== mystery boxes =====
+const BOXES = [
+  {k: 'small', name: 'Small Box', cost: 100, loot: [['coins', 40, 160, 4], ['berries', 3, 6, 2], ['gem', 1, 1, 2], ['luck_draught', 1, 2, 2], ['pet_treat', 3, 6, 2], ['treasure_map', 1, 1, 1], ['old_boot', 1, 1, 1]]},
+  {k: 'grand', name: 'Grand Box', cost: 400, loot: [['coins', 200, 700, 4], ['gem', 2, 3, 3], ['star_fragment', 1, 2, 2], ['treasure_map', 1, 2, 2], ['elixir', 2, 3, 2], ['mystery_egg', 1, 1, 1], ['ruby', 1, 1, 1], ['sapphire', 1, 1, 1]]},
+  {k: 'legend', name: 'Legendary Box', cost: 1200, loot: [['coins', 800, 2500, 4], ['mystery_egg', 1, 1, 2], ['black_pearl_ring', 1, 1, 2], ['star_fragment', 2, 4, 2], ['golden_horseshoe', 1, 1, 1], ['rainbow_petal', 1, 1, 1], ['scarab_amulet', 1, 1, 1]]},
+];
+function whimsyTalk(n) {
+  if (S.boxDay !== S.day) { S.boxDay = S.day; S.boxesToday = 0; }
+  say(`“Boxes! Beautiful boxes! What's inside? Even I don't know!”<br><span style="color:var(--muted)">Up to 5 boxes a day. Bought today: ${S.boxesToday}/5.</span>`, [
+    ...BOXES.map(B => ({label: `${B.name} · ${B.cost}◆`, disabled: S.coins < B.cost || S.boxesToday >= 5, fn: () => {
+      S.coins -= B.cost; S.boxesToday++; S.boxes = (S.boxes || 0) + 1; const pool = B.loot.filter(([g]) => g === 'coins' || GOODS[g]); let r = Math.random()*pool.reduce((a, l) => a + l[3], 0), L = pool[0]; for (const l of pool) { r -= l[3]; if (r <= 0) { L = l; break; } }
+      const [g, a, b2] = L, q = rint(a, b2); let txt; if (g === 'coins') { S.coins += q; txt = `${q} coin`; } else { addItem(g, q); txt = `${q} ${GOODS[g].name}`; }
+      SFX[g === 'old_boot' ? 'hit' : 'victory'](); burst(S.x, S.y - .8, '#c890ff', 16, 4); renderHUD(); save();
+      say(`You lift the lid... <b>${txt}</b>!${g === 'old_boot' ? ' “Ah. The sock box. Well, boot box. Better luck next time!”' : ''}`, [{label: 'Another!', fn: () => whimsyTalk(n)}, back(n)]);
+    }})), back(n)]);
+}
+// ===== the clockwork inventor =====
+function inventorTalk(n) {
+  const st = S.clock || 0;
+  if (st === 0) { say('“My automaton, Brassby, walked right out of the workshop! I can build a tracker to find him, but I need <b>4 Brass Gears</b>. You can make them at a forge from Iron and Bronze.”', [{label: 'I’ll help', primary: true, fn: () => { S.clock = 1; save(); say('“Splendid! Four gears, and quick as you can!”', [back(n)]); }}, back(n)]); return; }
+  if (st === 1) { const ok = have('gear') >= 4; say(`“Have you got my gears?”<div class="req" style="margin-top:8px">${upCostHTML({gear: 4})}</div>`, [{label: 'Hand over the gears', primary: ok, disabled: !ok, fn: () => {
+    addItem('gear', -4); const T0 = TOWNS.highcairn || TOWNS[n.town]; let spot = null;
+    for (let tries = 0; tries < 400 && !spot; tries++) { const a = Math.random()*6.283, r = 25 + Math.random()*20, x = Math.floor(T0.x + Math.cos(a)*r), y = Math.floor(T0.y + Math.sin(a)*r); if (inB(x, y) && y < WORLD_H - 3 && enemyWalk(x + .5, y + .5) && !townAt(x, y, 10)) { const dx = x - T0.x, dy = y - T0.y; spot = {x: x + .5, y: y + .5, dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north')}; } }
+    S.clock = 2; S.clockSpot = spot || {x: T0.x + 30.5, y: T0.y + .5, dir: 'east'}; save(); SFX.victory();
+    say(`Cogsworth snaps the gears into a whirring brass box. Its needle swings and points. “There! Brassby is ${S.clockSpot.dir} of here. He may be... a bit cross. Do be careful.”`, [back(n)]); }}, back(n)]); return; }
+  if (st === 2) { say(`“The tracker says Brassby is ${S.clockSpot.dir} of Highcairn. Bring him down gently. Or not gently. Just bring him down!”`, [back(n)]); return; }
+  if (st === 3) { say('“You stopped him! Oh, poor Brassby, his mainspring was wound backwards. That explains the punching. Please, take this: I built it from his spare parts.”', [{label: 'Accept', primary: true, fn: () => { S.clock = 4; S.coins += 500; addPet('clockwork_owl'); SFX.victory(); renderHUD(); save(); say('“A Clockwork Owl! Its lens eyes see for miles. Look after it!” <span style="color:var(--good)">+500 coin</span>', [back(n)]); }}]); return; }
+  say('“Brassby is back on his shelf, and behaving. Mostly. Thank you again!”', [back(n)]);
+}
+function clockSpawns() {
+  if ((S.clock || 0) !== 2 || !S.clockSpot || inDungeon() || enemies.some(e => e.type === 'automaton' && !e.dead) || Math.hypot(S.x - S.clockSpot.x, S.y - S.clockSpot.y) > 14) return;
+  const lv = 1 + (S.level || 1)*.06, e = makeEnemy('automaton', S.clockSpot.x, S.clockSpot.y, {alert: true, dungeon: true, clock: true}); e.hp = e.max = Math.round(120*lv); e.dmgMul = lv; e.elite = {name: 'Brassby', col: '#e0c070'}; e.esize = 1.5; e.labelName = '⚙ Brassby the Automaton'; enemies.push(e);
+  toast('<b>CLANK. CLANK. CLANK.</b><br>Brassby the Automaton turns, gears grinding, and raises its fists!', 4500); SFX.roar();
 }
 // ===== the unicorn =====
 function druidTalk(n) {
@@ -4610,8 +4655,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Mimics, boxes & Brassby', 'Careful: a few dungeon chests are Mimics, worth extra loot once defeated. Mr. Whimsy in Lantern Bay sells mystery boxes. Inventor Cogsworth in Highcairn needs help catching his runaway automaton.'],
   ['Spring egg hunt', 'Every spring morning, five painted eggs are hidden around one of the towns you know. The Gazette and your tracker say which. Find all five for a prize.'],
   ['Naval combat', 'Shipwright Bess in Port Wren can fit your sailboat with cannons (800 coin, 6 Iron, 4 Gunpowder). At sea they fire on their own at any nearby foe. Once you have cannons, pirate ships hunt you on deep water: sink them for pirate gold and maps.'],
   ['Amara\u2019s journal', 'The explorer Amara Vell left torn journal pages beside eight famous landmarks. Find them all to follow her story and claim her hidden cache. A placeable Training Dummy shows your damage per second.'],
@@ -4896,7 +4942,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -5348,6 +5394,24 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = '#e07a20'; g.beginPath(); g.arc(x + f*6, y - 18, 3.5, 0, 7); g.fill(); g.fillStyle = '#ffd040'; g.fillRect(x + f*6 - 2, y - 19, 1, 1); g.fillRect(x + f*6 + 1, y - 19, 1, 1); g.fillRect(x + f*6 - 1, y - 17, 3, 1);
       g.fillStyle = '#3a6a2a'; g.fillRect(x + f*6, y - 22, 1, 2);
       g.fillStyle = '#4a1a2a'; g.fillRect(x - f*4 - 2, y - 18 + Math.sin(phase)*1, 3, 6);
+      break;
+    }
+    case 'mimic': {
+      const open = Math.abs(Math.sin(phase*.8))*4, hop = Math.abs(Math.sin(phase*.8))*2;
+      shadow(7); g.fillStyle = '#6a4220'; g.fillRect(x - 7, y - 7 - hop, 14, 7); g.fillStyle = '#d8a848'; g.fillRect(x - 7, y - 5 - hop, 14, 1);
+      g.fillStyle = '#3a0a0a'; g.fillRect(x - 6, y - 8 - hop - open, 12, open + 1);
+      g.fillStyle = '#f0f0e0'; for (let i = 0; i < 5; i++) { g.fillRect(x - 6 + i*2.6, y - 8 - hop - open, 1.5, 2); g.fillRect(x - 5 + i*2.6, y - 8 - hop, 1.5, -2); }
+      g.fillStyle = '#7a4a24'; g.fillRect(x - 7, y - 12 - hop - open, 14, 4); g.fillStyle = '#d8a848'; g.fillRect(x - 1, y - 10 - hop - open, 2, 2);
+      g.fillStyle = '#ff4040'; g.fillRect(x + f*3 - 1, y - 11 - hop - open, 2, 1); g.fillStyle = '#c84a6a'; g.fillRect(x - 2 + f*2, y - 7 - hop, 4, 2);
+      break;
+    }
+    case 'automaton': {
+      shadow(7); g.fillStyle = '#8a6a30'; g.fillRect(x - 4, y - 5 + (step > 0 ? -1 : 0), 3, 5); g.fillRect(x + 1, y - 5 + (step < 0 ? -1 : 0), 3, 5);
+      g.fillStyle = '#c8a050'; g.fillRect(x - 6, y - 15, 12, 10); g.fillStyle = '#e0c070'; g.fillRect(x - 4, y - 21, 8, 6);
+      g.fillStyle = '#5a4020'; g.beginPath(); g.arc(x, y - 10, 3, 0, 7); g.fill(); g.fillStyle = '#e0c070'; g.fillRect(x - .5, y - 13, 1, 6); g.fillRect(x - 3, y - 10.5, 6, 1);
+      g.fillStyle = '#8af0ff'; g.fillRect(x + f - 2, y - 19, 1, 2); g.fillRect(x + f + 1, y - 19, 1, 2);
+      g.fillStyle = '#a08040'; g.fillRect(x - 8, y - 14 + step, 2, 7); g.fillRect(x + 6, y - 14 - step, 2, 7); g.fillStyle = '#5a4020'; g.fillRect(x - .5, y - 24, 1, 3);
+      if (Math.random() < .1) particles.push({x: x/TS, y: (y - 24)/TS, vx: 0, vy: -.6, t: 0, col: 'rgba(200,200,200,.5)'});
       break;
     }
     case 'goblin': {
@@ -5844,6 +5908,7 @@ function render() {
 
 function objective() {
   if (inDungeon() || S.y >= WORLD_H) return null;
+  if ((S.clock || 0) === 2 && S.clockSpot) return {x: S.clockSpot.x, y: S.clockSpot.y, label: 'Brassby', col: '#e0c070'};
   if (S.raid && TOWNS[S.raid.town]) return {x: TOWNS[S.raid.town].x + .5, y: TOWNS[S.raid.town].y + .5, label: 'Raid', col: '#ff7a4a'};
   if (stagTrail && !stagTrail.met) return {x: stagTrail.stag.x, y: stagTrail.stag.y, label: 'White Stag', col: '#e8f4ff'};
   if (S.outlaw && S.outlaw.taken && !S.outlaw.done) return {x: S.outlaw.x, y: S.outlaw.y, label: 'Wanted', col: '#e85a5a'};
@@ -6378,6 +6443,8 @@ function mainOptions(n) {
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
+  if (n.whimsy) o.push({label: 'Buy a mystery box', primary: true, fn: () => whimsyTalk(n)});
+  if (n.inventor) o.push({label: (S.clock || 0) >= 4 ? 'Chat about gears' : 'The runaway automaton', primary: [0, 1, 3].includes(S.clock || 0) && !((S.clock || 0) === 1 && have('gear') < 4), fn: () => inventorTalk(n)});
   if (n.druid) o.push({label: S.mounts.includes('unicorn') ? 'About the unicorn' : 'The unicorn of the glade', primary: !S.mounts.includes('unicorn') && have('rainbow_petal') >= 3 && have('golden_apple') >= 1, fn: () => druidTalk(n)});
   if (n.milliner) o.push({label: 'Browse hats', primary: true, fn: () => hatTalk(n)});
   if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
@@ -7813,6 +7880,10 @@ function drawPet(g, id, x, y, f, phase, moving) {
   } else if (id === 'crystal_beetle') {
     shadow(4); g.fillStyle = '#2a3a5a'; g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
     g.fillStyle = '#5fb8d8'; g.beginPath(); g.ellipse(x, y-4, 4, 3, 0, 0, 7); g.fill(); g.fillStyle = '#c9f4ff'; g.fillRect(x-1, y-6, 1, 3); g.fillStyle = '#2a3a5a'; g.fillRect(x + f*3, y-5, 2, 2);
+  } else if (id === 'clockwork_owl') {
+    const hy = y - 8 + Math.sin(frameT*3)*1, wf = Math.sin(frameT*14)*2;
+    g.fillStyle = '#c8a050'; g.fillRect(x - 3, hy - 3, 6, 6); g.fillStyle = '#a08040'; g.fillRect(x - 5, hy - 1 + wf*.5, 2, 3); g.fillRect(x + 3, hy - 1 - wf*.5, 2, 3);
+    g.fillStyle = '#e0c070'; g.fillRect(x - 3, hy - 5, 2, 2); g.fillRect(x + 1, hy - 5, 2, 2); g.fillStyle = '#8af0ff'; g.fillRect(x - 2, hy - 2, 1, 1); g.fillRect(x + 1, hy - 2, 1, 1); g.fillStyle = '#5a4020'; g.fillRect(x - .5, hy, 1, 1);
   } else if (id === 'phoenix_chick') {
     const hy = y - 7 + Math.sin(frameT*4)*1, wf = Math.sin(frameT*16)*2;
     g.fillStyle = 'rgba(255,140,40,.25)'; g.beginPath(); g.arc(x, hy, 6, 0, 7); g.fill();
@@ -8386,6 +8457,7 @@ function exitDungeon(k) {
 const chestOpen = c => c.abyss ? !!c.opened : (S.chests[c.id] != null && (c.big || S.day - S.chests[c.id] < 7));
 const CHEST_LOOT = ['bomb','arrows','salve','tonic','crystal','silver','obsidian','ember','gem','glow_tonic','venom_arrows','fire_bomb','elixir','frost_essence'];
 function openChest(c) {
+  if (!c.big && !c.abyss && Math.random() < .12) { S.chests[c.id] = S.day; const tier = DK.indexOf(c.d) + 1, e = makeEnemy('mimic', c.x + .5, c.y + .6, {alert: true, dungeon: true, mimicTier: tier}); e.hp = e.max = 20 + tier*12; e.dmgMul = 1 + tier*.15; enemies.push(e); SFX.roar(); shake = .3; toast('<b>The chest has teeth!</b><br>It\'s a Mimic!', 3000); return; }
   if (c.abyss) c.opened = true; else S.chests[c.id] = S.day;
   const tier = c.abyss ? 1 + Math.ceil(ABYSS.floor/2) : DK.indexOf(c.d) + 1, got = [];
   if (c.abyss) { const n = 1 + Math.floor(ABYSS.floor/4); addItem('abyss_shard', n); got.push(`${n} Abyss Shard${n > 1 ? 's' : ''}`); }
@@ -9066,6 +9138,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['mimic','Not a Chest','Defeat a Mimic', () => (S.mimics || 0) >= 1],
+  ['boxes','Box Addict','Open 10 mystery boxes', () => (S.boxes || 0) >= 10],
+  ['clockwork','Gears and Springs','Return Brassby to Inventor Cogsworth', () => (S.clock || 0) >= 4],
   ['egghunt','Egg-cellent','Find all five eggs in a spring egg hunt', () => (S.eggHunts || 0) >= 1],
   ['cannons','Broadside!','Fit your boat with cannons', () => !!S.flags.cannons],
   ['pirates3','Scourge of Pirates','Sink 3 pirate ships', () => (S.killsBy.pirateship || 0) >= 3],
