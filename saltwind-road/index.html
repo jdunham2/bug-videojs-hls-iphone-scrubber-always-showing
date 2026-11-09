@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  telescope:{name:'Telescope',base:220,col:'#c8a050',kind:'place',desc:'Place with B. Chart constellations at night.'},
   flower_pot:{name:'Flower Pot',base:15,col:'#e86a8a',kind:'place',desc:'Place with B. A pretty decoration.'},
   // --- armor: body ---
   leather_armor:{name:'Leather Armor',base:70,col:'#8a5a3a',kind:'armor',armor:2},
@@ -1082,6 +1083,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'telescope',      need:{glass:3,bronze:2,planks:2}, at:'bench', known:true},
   {id:'flower_pot',     need:{stone:2,herbs:2}, at:'bench', known:true},
   {id:'lamp_post',      need:{iron:1,glass:1,wood:2}, at:'bench', known:true},
   {id:'paper_lantern',  need:{bamboo:2,silk_cloth:1,wood:1}, at:'bench', known:true},
@@ -1392,7 +1394,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1458,6 +1460,7 @@ function placedTarget() {
   if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
     if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
     else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
+  if (P.use === 'scope') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Look through the telescope`, btn: 'Look', fn: () => stargaze(q)};
   if (P.use === 'cook') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Cook at the pot`, btn: 'Cook', fn: () => openPanel('Cooking Pot', 'A bubbling pot. Cook hearty meals with long-lasting effects (Craft menu, Food tab).', [{label: 'Cook', primary: true, fn: () => { closeTalk(); craftTab = 3; openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
   if (P.use === 'craft') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the ${nm}`, btn: 'Use', fn: () => openPanel(nm, q.t === 'anvil' ? 'A sturdy anvil. You can use forge and workbench recipes here.' : 'Your own crafting table. You can use workbench recipes here.', [
     {label: 'Craft', primary: true, fn: () => { closeTalk(); openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
@@ -1521,6 +1524,10 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'telescope':
+      g.fillRect(x + 3, y + 14, 10, 2);
+      g.fillStyle = '#5a3a20'; g.fillRect(x + 4, y + 4, 2, 11); g.fillRect(x + 10, y + 4, 2, 11); g.fillRect(x + 7, y + 4, 2, 11);
+      g.fillStyle = '#c8a050'; g.save(); g.translate(x + 8, y + 3); g.rotate(-.6); g.fillRect(-7, -2, 15, 4); g.fillStyle = '#8a6a30'; g.fillRect(-7, -2, 2, 4); g.fillStyle = '#bfe8ff'; g.fillRect(7, -1, 1, 2); g.restore(); break;
     case 'scarecrow':
       g.fillRect(x + 4, y + 14, 8, 2);
       g.fillStyle = '#6a4a2a'; g.fillRect(x + 7, y - 4, 2, 19); g.fillRect(x + 1, y + 1, 14, 2);
@@ -2859,9 +2866,9 @@ const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => {
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald');
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear');
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -2894,7 +2901,7 @@ function rebuildMapPixels() {
   mapCtx.putImageData(mapImg, 0, 0);
 }
 const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
-const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
+const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
   for (const k in TOWNS) {
@@ -3143,9 +3150,9 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
-    else if (Math.random() < .05 + .04*gemSum('sapphire') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3205,7 +3212,7 @@ function killEnemy(e) {
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
   if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
   if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3*(bloodMoon() ? 2 : 1)); SFX.kill(); if (bloodMoon() && !def.passive) { S.bmKills = (S.bmKills || 0) + 1; const bc = rint(4, 12) + (S.level || 1); S.coins += bc; got.push(`+${bc} coin (blood moon)`); }
-  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
+  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1) * (1 + .05*conHas('coin'))); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (def.target && archery) { archery.score++; floatText(e.x, e.y - 1.4, `+1 (${archery.score})`, '#f0c040'); burst(e.x, e.y - .7, '#f0c040', 8, 3); SFX.coin(); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
@@ -3333,6 +3340,29 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== stargazing =====
+const CONSTELLATIONS = [
+  {id:'hunter', name:'The Hunter', bonus:'+4% damage'},
+  {id:'archer', name:'The Archer', bonus:'+3% critical chance'},
+  {id:'stag', name:'The Stag', bonus:'+3% speed'},
+  {id:'bear', name:'The Great Bear', bonus:'+4 max HP'},
+  {id:'owl', name:'The Owl', bonus:'+1 sight radius'},
+  {id:'ship', name:'The Ship', bonus:'+8% boat speed'},
+  {id:'coin', name:'The Coin', bonus:'+5% coin from foes'},
+  {id:'crown', name:'The Crown', bonus:'+1 to every bonus above (chart all seven first)'},
+];
+const conHas = id => !!(S && S.stars && S.stars[id]) ? 1 + (S.stars.crown ? 1 : 0) : 0;
+function stargaze(q) {
+  const night = isNightish(), next = CONSTELLATIONS.find(c => !(S.stars || {})[c.id] && (c.id !== 'crown' || CONSTELLATIONS.filter(x => x.id !== 'crown').every(x => (S.stars || {})[x.id])));
+  const charted = CONSTELLATIONS.filter(c => (S.stars || {})[c.id]);
+  const body = `${charted.length ? 'Charted: ' + charted.map(c => `<b>${c.name}</b> (${c.bonus})`).join(', ') + '<br><br>' : ''}`;
+  if (!night) { openPanel('Telescope', `${body}The sky is too bright. Come back after dark to chart the stars.`, [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); return; }
+  if (!next) { openPanel('Telescope', `${body}You have charted every constellation in the sky. The stars feel like old friends now.`, [{label: 'Leave', fn: closeTalk}]); return; }
+  if (S.starNight === (S.time > .5 ? S.day : S.day - 1)) { openPanel('Telescope', `${body}You've already charted a constellation tonight. Your eyes need rest. Try again tomorrow night.`, [{label: 'Leave', fn: closeTalk}]); return; }
+  openPanel('Telescope', `${body}You peer through the lens. Among the glittering stars, a shape begins to emerge...`, [
+    {label: 'Chart it', primary: true, fn: () => { S.stars = S.stars || {}; S.stars[next.id] = S.day; S.starNight = S.time > .5 ? S.day : S.day - 1; gainXP(60); SFX.victory(); renderHUD(); renderHP(); lastTile = -1; save(); closeTalk(); toast(`<b>Constellation charted: ${next.name}</b><br>${next.bonus}, for good.`, 6000); }},
+    {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]);
 }
 // ===== sandstorm relics =====
 let relics = [], relicT = 0;
@@ -3739,6 +3769,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Stargazing', 'Craft a Telescope at a workbench (3 Glass, 2 Bronze, 2 Planks) and place it with B. Each night you can chart one constellation for a small permanent bonus. Chart all seven to find the Crown.'],
   ['Stone Golem', 'Rock golems sometimes drop Living Stone. Forge a Golem Heartstone (3 Living Stone, 20 Stone, 5 Iron, 2 Crystal) and a loyal Stone Golem follows you as a free companion.'],
   ['Sandstorms', 'When storms sweep the desert, buried relics peek out of the dunes. Dig them up with a shovel before the storm ends: Sun Discs, Desert Roses, Ancient Coins and the rare Scarab Amulet.'],
   ['Seasonal fish', 'Some fish only bite in one season: Blossom Trout in spring, Sun Marlin on warm summer coasts, Harvest Carp in autumn, and Ice Pike in winter. The rare Aurora Char rises on winter nights in snowy waters.'],
@@ -5057,7 +5088,7 @@ function update(dt) {
     if (mag > 1) { vx /= mag; vy /= mag; }
     const t = tileAt(Math.floor(S.x), Math.floor(S.y));
     let sp = SPEED[t];
-    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = (S.flags.boat ? 2.3 : 1.15) * (S.flags.lighthouse ? 1.15 : 1);
+    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = (S.flags.boat ? 2.3 : 1.15) * (S.flags.lighthouse ? 1.15 : 1) * (1 + .08*conHas('ship'));
     if (t === T.MOUNT) sp = .4;
     const M = S.riding && MOUNTS[S.mount];
     if (M && M.swim && (t === T.DEEP || t === T.SHAL)) sp = M.speed; else if (M && M.swim) sp = Math.max(.4, sp) * .8; else if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
@@ -8057,6 +8088,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['stargazer','Stargazer','Chart 4 constellations', () => Object.keys(S.stars || {}).length >= 4],
+  ['astronomer','Astronomer','Chart every constellation', () => !!(S.stars || {}).crown],
   ['golem','Stone Friend','Build a Stone Golem companion', () => !!S.golemOwned],
   ['relics','Sand Sifter','Dig up 8 relics in sandstorms', () => (S.relicsDug || 0) >= 8],
   ['seasonfish','Angler for All Seasons','Catch all five seasonal fish', () => ['blossom_trout','sun_marlin','harvest_carp','ice_pike','aurora_char'].every(f => (S.fishLog || {})[f])],
