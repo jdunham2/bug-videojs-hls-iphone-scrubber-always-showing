@@ -504,6 +504,7 @@ const GOODS = {
   golden_feast:{name:'Golden Feast',base:260,col:'#f0c040',kind:'food',heal:40},
   spiced_jerky:{name:'Spiced Jerky',base:30,col:'#8a3a1a',kind:'food',heal:6},
   gem_ring:{name:'Gem Ring',base:320,col:'#e04a8a',kind:'craft'},
+  glider:{name:'Glider',base:220,col:'#e8d8b0',kind:'tool',desc:'Walk off a mountain edge to glide'},
   promise_ring:{name:'Promise Ring',base:600,col:'#f07ab0',kind:'tool'},
   crown_jewel:{name:'Crown Jewel',base:950,col:'#ff6ab0',kind:'craft'},
   tapestry:{name:'Tapestry',base:200,col:'#8a4a8a',kind:'craft'},
@@ -681,6 +682,10 @@ const GOODS = {
   jeweled_goblet:{name:'Jeweled Goblet',base:280,col:'#e86a8a',kind:'good'},
   captains_compass:{name:"Captain's Compass",base:500,col:'#e3a948',kind:'trinket',desc:'An arrow on your screen points to your buried treasure'},
   gladiator_helm:{name:'Gladiator Helm',base:700,col:'#c8a040',kind:'armor',slot:'head',armor:3,crit:.06},
+  sunstone_amulet:{name:'Sunstone Amulet',base:1400,col:'#ffb040',kind:'trinket',desc:'+6 max HP (auction rarity)'},
+  wayfarer_boots:{name:"Wayfarer's Boots",base:1300,col:'#8a6a4a',kind:'trinket',desc:'+6% speed (auction rarity)'},
+  merchant_seal:{name:"Merchant's Seal",base:1500,col:'#d8b060',kind:'trinket',desc:'+5% selling prices (auction rarity)'},
+  gauntlet_crown:{name:'Crown of the Gauntlet',base:2500,col:'#ffd27a',kind:'trinket',desc:'+12% damage and +5 max HP'},
   champion_belt:{name:"Arena Champion's Belt",base:1500,col:'#e3a948',kind:'trinket',desc:'+10% damage, and bragging rights'},
   // --- fish ---
   trout:{name:"River Trout",base:18,col:'#8ab07a',kind:'good'},
@@ -904,6 +909,7 @@ const RECIPES = [
   {id:'seafood_platter', need:{silverfin:2,carrot:2,bread:1}, at:'bench', known:true},
   {id:'golden_feast',  need:{goldcarp:1,pumpkin_pie:1,mead:1}, at:'bench', known:true},
   {id:'gem_ring',      need:{gem:1,silver:1}, at:'bench', known:true},
+  {id:'glider',        need:{planks:4,silk_cloth:2,rope:2}, at:'bench', known:true},
   {id:'promise_ring',  need:{gem_ring:1,silver:2,pearl:1,star_fragment:1}, at:'forge', known:true},
   {id:'tapestry',      need:{linen:2,silk_cloth:1,heather:2}, at:'bench', known:true},
   {id:'perfume',       need:{moonflower:1,glass:1,honey:1}, at:'bench', known:true},
@@ -1898,7 +1904,9 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
-  {id:'lark',town:'wren',dx:0,dy:3,name:'Lark',role:'Traveling bard',cols:{cloak:'#8a3a6a',skin:'#e0b896',hair:'#e0a040'},
+  {id:'gilda',town:'crownfall',dx:3,dy:-2,name:'Auctioneer Gilda',role:'Crownfall Auction House',cols:{cloak:'#6a2a3a',skin:'#e0c0a0',hair:'#3a2a2a'},auction:true,
+   hello:["Going once, going twice...!","Looking to bid? Fresh lots every week.","Rare goods for discerning buyers."], rumors:["New lots arrive every seven days. The rarest things in the realm pass through my hands."]},
+  {id:'lark',town:'wren',dx:0,dy:3,name:'Lark',role:'Traveling bard',cols:{cloak:'#8a3a6a',skin:'#e0b896',hair:'#e0a040'},bard:true,
    hello:["♪ A traveler, a traveler, come to hear my song! ♪","You again! Got a coin for a song?","My favorite audience!"],
    rumors:["I've sung in every town from here to Farhaven, at the very edge of the east. Took me a year.","Pick up everything you see out there. Lost satchels are full of coin!","The world has five lands now. The Shimmer Coast is the newest the maps know about."]},
   {id:'corin',town:'hollow',dx:0,dy:3,name:'Corin',role:'Forager',cols:{cloak:'#5a6a3a',skin:'#c89870',hair:'#5a3a1a'},trader:true,greed:.25,patience:5,purse:150,stock:{pinecone:10,flowers:6,mushroom:4,berries:4},
@@ -2792,13 +2800,13 @@ const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
-const isFlying = () => !!(S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].fly);
+const isFlying = () => !!(S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].fly) || !!player.glide;
 
 function toast(html, ms = 4200) {
   const el = document.createElement('div'); el.className = 'toast panel'; el.innerHTML = html;
@@ -3076,7 +3084,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3104,6 +3112,14 @@ function hitEnemy(e, dmg, kx, ky, src) {
 function killEnemy(e) {
   e.dead = true; S.kills++;
   const got = [];
+  if (e.echo) {
+    const B = BOSSES[e.boss]; SFX.victory(); hitStop = .3; gainXP(Math.round(B.hp*.8));
+    burst(e.x, e.y - 1, '#b8a8ff', 40, 8); shake = .5;
+    for (const m of enemies) if (m.minion) m.dead = true;
+    eproj = []; hazards = [];
+    $('bossbar').hidden = true; document.body.classList.remove('boss');
+    renderHUD(); return;
+  }
   if (e.boss) {
     const B = BOSSES[e.boss];
     S.bosses[e.boss] = true; gainXP(Math.round(B.hp*1.5)); SFX.victory(); hitStop = .35;
@@ -3268,8 +3284,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Gliding', 'Craft a Glider at a workbench (4 Planks, 2 Silk Cloth, 2 Rope). Walk off the edge of any mountain to soar for a few seconds, even out over water. Steer with the movement keys.'],
+  ['Auctions & ballads', 'Auctioneer Gilda in Crownfall sells rare lots every week; bid against rivals. Lark the bard in Port Wren writes ballads about your great deeds for +2 max HP each.'],
   ['Friends & partners', 'Give gifts to make friends; best friends give you a keepsake. Forge a Promise Ring (Gem Ring, 2 Silver, Pearl, Star Fragment) to propose to a best friend. Partners write daily and give +6 max HP, and spending time together grants +10% damage for the day.'],
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -4210,7 +4228,15 @@ function render() {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
     const swimRide = S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim;
-    if (onWater && S.flags.boat && !isFlying() && !swimRide) {
+    if (player.glide) {
+      const dir = player.dir && player.dir.x < 0 ? -1 : 1, bob = Math.sin(frameT*3)*1.5;
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 6, 9, 3, 0, 0, 6.283); ctx.fill();
+      drawPerson(ctx, px, py - 14 + bob, player.cols, 0, false, player.facing, {scarf:true, pack:true});
+      ctx.fillStyle = '#e8d8b0'; ctx.beginPath(); ctx.moveTo(px - 18, py - 30 + bob); ctx.quadraticCurveTo(px, py - 40 + bob, px + 18, py - 30 + bob); ctx.lineTo(px, py - 34 + bob); ctx.fill();
+      ctx.fillStyle = '#c84a3a'; ctx.fillRect(px - 18, py - 31 + bob, 4, 2); ctx.fillRect(px + 14, py - 31 + bob, 4, 2);
+      ctx.strokeStyle = '#6a5a40'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px - 10, py - 33 + bob); ctx.lineTo(px - 2, py - 24 + bob); ctx.moveTo(px + 10, py - 33 + bob); ctx.lineTo(px + 2, py - 24 + bob); ctx.stroke();
+      if (Math.random() < .3) particles.push({x: S.x - dir*.6, y: S.y - 1.6, vx: -dir*2, vy: 0, t: .4, col: 'rgba(255,255,255,.6)'});
+    } else if (onWater && S.flags.boat && !isFlying() && !swimRide) {
       const b = Math.sin(frameT*2.5)*1, dir = player.facing === 'left' ? -1 : 1;
       ctx.fillStyle = 'rgba(255,255,255,.35)'; if (player.moving) { ctx.fillRect(px - dir*16, py + 3, 6, 1); ctx.fillRect(px - dir*20, py + 1, 4, 1); }
       ctx.fillStyle = '#6a3a1a'; ctx.beginPath(); ctx.moveTo(px - 13, py - 3 + b); ctx.lineTo(px + 13, py - 3 + b); ctx.lineTo(px + 9*dir, py + 4 + b); ctx.lineTo(px - 9*dir, py + 4 + b); ctx.fill();
@@ -4480,6 +4506,22 @@ function update(dt) {
     vx = 0; vy = 0;
   }
   if ((player.rollCd > 0) !== lastRollCool) { lastRollCool = player.rollCd > 0; $('rollPip').classList.toggle('cool', lastRollCool); }
+  if (player.glide) {
+    const G = player.glide; G.t -= dt;
+    if (Math.hypot(vx, vy) > .15) { const m = Math.hypot(vx, vy); G.dx += (vx/m - G.dx)*dt*2.2; G.dy += (vy/m - G.dy)*dt*2.2; const g = Math.hypot(G.dx, G.dy) || 1; G.dx /= g; G.dy /= g; }
+    const gs = 4.6*2.5*Math.min(1.3, speedMult()), nx = S.x + G.dx*gs*dt, ny = S.y + G.dy*gs*dt;
+    if (passable(nx, S.y)) S.x = nx; else G.t = Math.min(G.t, 0);
+    if (passable(S.x, ny)) S.y = ny; else G.t = Math.min(G.t, 0);
+    player.dir = {x: G.dx, y: G.dy}; player.facing = Math.abs(G.dx) > Math.abs(G.dy) ? (G.dx < 0 ? 'left' : 'right') : (G.dy < 0 ? 'up' : 'down');
+    S.glideDist = (S.glideDist || 0) + gs*dt;
+    const gt = tileAt(Math.floor(S.x), Math.floor(S.y)), land = walkable(gt, !!S.flags.raft, canClimb()) && gt !== T.MOUNT;
+    if (land) G.last = {x: S.x, y: S.y};
+    if ((G.t <= 0 && land) || G.t < -10) {
+      if (!land && G.last) { S.x = G.last.x; S.y = G.last.y; }
+      player.glide = null; burst(S.x, S.y, '#c8b896', 10, 3); SFX.click && SFX.click(); lastTile = -1;
+    }
+    vx = 0; vy = 0;
+  }
   const mag = Math.hypot(vx, vy);
   player.moving = mag > .15;
   if (player.moving) {
@@ -4500,6 +4542,7 @@ function update(dt) {
       const m = Math.hypot(vx, vy); player.dir = {x: vx/m, y: vy/m};
     }
     S.steps += sp*dt;
+    if (t === T.MOUNT && have('glider') && !S.riding && !inDungeon() && !player.glide) { const t2 = tileAt(Math.floor(S.x + vx*.6), Math.floor(S.y + vy*.6)); if (t2 !== T.MOUNT && t2 !== T.HOUSE) { player.glide = {t: 3.2, dx: vx, dy: vy, last: null}; S.glides = (S.glides || 0) + 1; SFX.travel(); if (S.glides === 1) toast('<b>Wheee!</b> You leap off the mountainside and catch the wind. Steer with the arrow keys. You can glide over water, too.', 5000); } }
   }
   if (Math.abs(player.kx) + Math.abs(player.ky) > .05) {
     const nx = S.x + player.kx*dt, ny = S.y + player.ky*dt;
@@ -4729,7 +4772,7 @@ function renderClock() {
 function renderRegion() {
   const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].mine ? `The Deep Mine · Floor ${MINE.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   if (S.race) { const nm = S.race.t < 0 ? `Race starts in ${Math.ceil(-S.race.t)}` : `Race · ${S.race.i + 1}/${S.race.cps.length} · ${S.race.t.toFixed(1)}s`; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
-  if (inArena()) { const nm = S.arena ? `Crownfall Arena · Wave ${S.arena.wave}` : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
+  if (inArena()) { const nm = S.arena ? (S.arena.gauntlet ? `Boss Gauntlet · Round ${S.arena.wave}/${S.arena.gauntlet.length}` : `Crownfall Arena · Wave ${S.arena.wave}`) : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
   if (!name && Math.hypot(S.x - HOME.x, S.y - HOME.y) < 8) name = S.home.level ? 'Your Homestead' : 'Homestead (for sale)';
@@ -4813,6 +4856,8 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
+  if (n.bard) o.push({label: `Ballads (${(S.ballads ? Object.keys(S.ballads).length : 0)}/${BALLADS.length})`, primary: BALLADS.some(b => !(S.ballads || {})[b.id] && b.ok()), fn: () => balladTalk(n)});
   if (n.hof) o.push({label: 'The Hall of Fame', primary: hofPoints() >= 50, fn: () => hofTalk(n)});
   if (n.mage) o.push({label: 'The Circle of the Arcane', fn: () => factionTalk(n, 'arcane')});
   if (n.mage) o.push({label: 'Learn spells', primary: true, fn: () => mageTalk(n)});
@@ -4922,6 +4967,68 @@ function giftTalk(n) {
       renderHUD(); save();
       say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${extra}`, [back(n)]);
     }})),
+    back(n)]);
+}
+// ===== auction house =====
+const AUCTION_POOL = [['sunstone_amulet',1],['wayfarer_boots',1],['merchant_seal',1],['black_pearl_ring',1],['golden_horseshoe',1],['jeweled_goblet',2],['jade_idol',2],['marble_statue',2],['star_fragment',4],['elite_essence',4],['abyss_shard',4],['ancient_coin',4],['treasure_map',3],['luck_draught',4],['elixir',5],['promise_ring',1]];
+const RIVALS = ['Lady Ashcombe','a masked stranger','Baron Fenwick','a sweaty merchant','Old Mother Gale','a pirate in a fine hat','the Duke’s steward'];
+function auctionLots() {
+  const wk = Math.floor((S.day - 1)/7);
+  if (!S.auction || S.auction.wk !== wk) {
+    const pool = AUCTION_POOL.filter(([g]) => GOODS[g] && !(['sunstone_amulet','wayfarer_boots','merchant_seal'].includes(g) && have(g)));
+    const lots = []; const used = new Set();
+    while (lots.length < 3 && used.size < pool.length) { const [g, q] = pick(pool); if (used.has(g)) continue; used.add(g); lots.push({g, q, val: Math.round(GOODS[g].base*q*(.9 + Math.random()*.6)), sold: null}); }
+    S.auction = {wk, lots};
+  }
+  return S.auction.lots;
+}
+function auctionTalk(n) {
+  const lots = auctionLots();
+  say(`“Welcome to the Crownfall Auction House! This week's lots:”<br><span style="color:var(--muted)">Bid against rival collectors. Push the price too high and they'll fold, but so will your purse. New lots every 7 days.</span>`, [
+    ...lots.map((L, i) => ({label: L.sold ? `${GOODS[L.g].name} ×${L.q} (sold to ${L.sold})` : `Lot ${i + 1}: ${GOODS[L.g].name} ×${L.q}`, disabled: !!L.sold, fn: () => bidLot(n, L, null)})),
+    back(n)]);
+}
+function bidLot(n, L, st) {
+  if (!st) st = {bid: Math.round(GOODS[L.g].base*L.q*.5/10)*10, rival: pick(RIVALS), mine: false};
+  const step = Math.max(10, Math.round(st.bid*.12/10)*10), next = st.bid + step;
+  const desc = GOODS[L.g].desc ? `<br><span style="color:var(--muted)">${esc(GOODS[L.g].desc)}</span>` : '';
+  say(`<b>${GOODS[L.g].name} ×${L.q}</b>${desc}<br><br>Current bid: <b>${st.bid} coin</b> by ${st.mine ? '<b>you</b>' : esc(st.rival)}.`, [
+    ...(st.mine ? [{label: 'Wait for the hammer...', primary: true, fn: () => {
+      const keen = Math.max(.05, 1 - st.bid/L.val);
+      if (Math.random() < keen*.9) { st.bid = st.bid + step; st.mine = false; SFX.click && SFX.click(); bidLot(n, L, st); toast(`${esc(st.rival)} raises to <b>${st.bid}</b>!`, 2000); return; }
+      L.sold = 'you'; addItem(L.g, L.q); S.coins -= st.bid; S.auctionsWon = (S.auctionsWon || 0) + 1; SFX.victory(); renderHUD(); save();
+      say(`<b>“Sold! To the trader in the back!”</b><br>You win <b>${GOODS[L.g].name} ×${L.q}</b> for ${st.bid} coin.`, [{label: 'More lots', fn: () => auctionTalk(n)}, back(n)]);
+    }}] : [{label: `Bid ${next} coin`, primary: true, disabled: S.coins < next, fn: () => { st.bid = next; st.mine = true; bidLot(n, L, st); }},
+      {label: 'Let it go', fn: () => { L.sold = st.rival; save(); say(`“Sold to ${esc(st.rival)} for ${st.bid} coin!”`, [{label: 'More lots', fn: () => auctionTalk(n)}, back(n)]); }}]),
+    ]);
+}
+// ===== bard ballads =====
+const BALLADS = [
+  {id:'alpha', name:'The Howl in the Pines', ok: () => !!S.bosses.alpha, verse:'Grey as the winter and big as a cart, the Alpha fell to a trader’s heart!'},
+  {id:'varro', name:'The Bandit King’s Last Toll', ok: () => !!S.bosses.varro, verse:'Varro took coin from all on the road, till one trader paid what the bandit was owed!'},
+  {id:'wyrm', name:'Fire on the Mountain', ok: () => !!S.bosses.wyrm, verse:'The mountain breathed fire, the sky turned to flame, and down came the Wyrm, and up rose a name!'},
+  {id:'legends', name:'Hunter of Legends', ok: () => Object.keys(S.legends || {}).length >= 3, verse:'Three beasts of story, three songs of old, now hang as trophies, bright and bold!'},
+  {id:'arena', name:'Roar of the Crowd', ok: () => (S.arenaBest || 0) >= 10, verse:'Ten waves they sent, ten waves they fell, and the Crownfall crowd still rings like a bell!'},
+  {id:'gauntlet', name:'Echoes in the Ring', ok: () => (S.gauntletWins || 0) >= 1, verse:'They summoned the ghosts of the beasts long slain, and the trader just beat them all over again!'},
+  {id:'raids', name:'Shield of the Towns', ok: () => (S.raidsWon || 0) >= 3, verse:'When raiders came howling at gate and at wall, one stood in the square and defended them all!'},
+  {id:'heir', name:'The Crown Returned', ok: () => !!(S.story && S.story.heir && S.story.heir.crowned), verse:'A lost girl, a seal, and a crown in the dark, a queen on the throne, and a trader’s mark!'},
+  {id:'smug', name:'Lanterns of the Cove', ok: () => !!S.flags.lawbringer, verse:'In the cove by the lanterns, the smugglers would hide, till a trader walked in with the law at their side!'},
+  {id:'titan', name:'When the Earth Stood Up', ok: () => (S.titansSlain || 0) >= 1, verse:'The ground rose up with a mountain’s might, and a trader alone put the giant to flight!'},
+  {id:'love', name:'Two Hearts on the Road', ok: () => !!S.partner, verse:'Over hill and through rain, down the long salty way, two hearts walk together, come night or come day.'},
+  {id:'hollow', name:'The Legend of Saltwind Road', ok: () => !!S.bosses.hollowking, verse:'The Crown was broken, the King was gone, but the Legend of Saltwind Road lives on!'},
+];
+const BALLAD_COST = 150;
+function balladTalk(n) {
+  S.ballads = S.ballads || {};
+  const have_ = BALLADS.filter(b => S.ballads[b.id]), ready = BALLADS.filter(b => !S.ballads[b.id] && b.ok());
+  say(`“♪ Every hero needs a song! Tell me of your deeds and, for ${BALLAD_COST} coin, I'll make sure every tavern in the land knows your name. ♪”<br><span style="color:var(--muted)">Each ballad gives <b>+2 max HP</b> for good and a little reputation in every town you've visited. Ballads written: ${have_.length}/${BALLADS.length}.</span>${have_.length ? '<br><br>' + have_.map(b => `♪ <i>${esc(b.name)}</i>`).join('<br>') : ''}`, [
+    ...ready.slice(0, 5).map(b => ({label: `Write “${b.name}” (${BALLAD_COST}◆)`, primary: true, disabled: S.coins < BALLAD_COST, fn: () => {
+      S.coins -= BALLAD_COST; S.ballads[b.id] = S.day; S.bonusHP = (S.bonusHP || 0) + 2; S.hp = Math.min(maxHP(), S.hp + 2);
+      for (const k in TOWNS) if (S.towns[k]) addRep(k, .15);
+      SFX.victory(); renderHUD(); renderHP(); save();
+      say(`Lark tunes her lute and sings:<br><br><i>“♪ ${esc(b.verse)} ♪”</i><br><br><span style="color:var(--good)">+2 max HP · your fame spreads</span>`, [{label: 'More ballads', fn: () => balladTalk(n)}, back(n)]);
+    }})),
+    ...(ready.length ? [] : [{label: 'Nothing new to sing about', disabled: true, fn: () => {}}]),
     back(n)]);
 }
 // ===== partners =====
@@ -5545,7 +5652,7 @@ function closeTrade() {
 }
 function mults(n) {
   const rep = repOf(n.town);
-  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar') + (S.pet === 'parrot' ? .05 : 0)), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar') - (S.pet === 'parrot' ? .05 : 0))};
+  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar') + (S.pet === 'parrot' ? .05 : 0) + (have('merchant_seal') ? .05 : 0)), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar') - (S.pet === 'parrot' ? .05 : 0))};
 }
 function tradeVals() {
   const n = trade.n, m = mults(n); let youGive = 0, theyGive = 0;
@@ -7338,6 +7445,11 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['glide','Up and Away','Glide off a mountain', () => (S.glides || 0) >= 1],
+  ['skysailor','Sky Sailor','Glide 500 tiles in total', () => (S.glideDist || 0) >= 500],
+  ['auction','Going, Going, Gone','Win an auction lot', () => (S.auctionsWon || 0) >= 1],
+  ['balladeer','Sung in Every Tavern','Have Lark write 5 ballads about you', () => Object.keys(S.ballads || {}).length >= 5],
+  ['gauntlet','Gauntlet Runner','Complete the Boss Gauntlet', () => (S.gauntletWins || 0) >= 1],
   ['outlaw','Outlaw','Fight off 6 customs agents', () => (S.agentsBeaten || 0) >= 6],
   ['penpal','Pen Pal','Receive 10 letters', () => (S.lettersRead || 0) >= 10],
   ['goodboy','Good Pet!','Your pets find 20 things', () => (S.petFinds || 0) >= 20],
@@ -7375,7 +7487,7 @@ const ACH = [
   ['enchanter','Enchanter','Enchant a weapon', () => (S.enchanted || 0) >= 1],
   ['generous','Generous Soul','Give 25 gifts', () => (S.giftsGiven || 0) >= 25],
   ['partnered','Two Hearts','Find a partner to share the road with', () => !!S.partner],
-  ['devoted','Devoted','Spend time with your partner on 10 days', () => (S.dates || 0) >= 10],
+  ['lovebirds','Lovebirds','Spend time with your partner on 10 days', () => (S.dates || 0) >= 10],
   ['bestfriend','Best Friends','Become close friends with someone (and receive a keepsake)', () => (S.bestFriends || 0) >= 1],
   ['newfoes','Strange New Foes','Defeat a slime, a crab, a sporeling, a rock golem and a ghost pirate', () => ['slime','crab','sporeling','rockgolem','ghostpirate'].every(k => S.killsBy[k])],
   ['whirlwind','Whirlwind','Hit 3 or more foes with one charged spin (hold F)', () => !!S.whirl3],
@@ -7438,17 +7550,25 @@ function carveArena() {
   for (let a = 0; a < 6.28; a += .5) { const x = Math.round(A.cx + Math.cos(a)*(A.rx + .3)), y = Math.round(A.cy + Math.sin(a)*(A.ry + .3)); if (map[idx(x, y)] === T.DWALL && map[idx(x, y + 1)] === T.DFLOOR) map[idx(x, y)] = T.DTORCH; }
 }
 const ARENA_POOLS = [['wolf','boar','bandit','skeleton'], ['ghoul','jaguar','lion','wraith','harpy','archer'], ['imp','dustdevil','spider','ghoul','lion','wraith']];
-function enterArena() {
+const gauntletList = () => BKM.filter(k => S.bosses[k] && BOSSES[k].kind && k !== 'hollowking').sort((a, b) => BOSSES[a].hp - BOSSES[b].hp).slice(-6);
+function enterArena(gauntlet) {
   SFX.travel();
   fadeThen(() => {
     S.arenaReturn = {x: S.x, y: S.y}; S.x = ARENA.gate.x + .5; S.y = ARENA.gate.y - .6; S.riding = false; petE = null; fishing = null; lastTile = -1;
     enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
     S.arena = {wave: 0, pot: 0, t: 3, live: false}; renderHUD(); renderRegion();
+    if (gauntlet) { S.arena.gauntlet = gauntletList(); S.arena.t = 4; toast(`<b>The Boss Gauntlet</b><br>${S.arena.gauntlet.length} echoes of fallen foes, one after another. You are healed between rounds. Leave between rounds to keep your winnings.`, 6500); return; }
     toast('<b>The Crownfall Arena</b><br>The crowd roars! Survive wave after wave. Leave through the gate between waves to collect your winnings.', 6500);
   });
 }
 function arenaWave() {
   const A = S.arena; A.wave++; A.live = true;
+  if (A.gauntlet) {
+    const k = A.gauntlet[A.wave - 1], B = BOSSES[k], hp = Math.round(B.hp*(1.2 + .15*A.wave));
+    enemies.push({boss: k, echo: true, arena: true, type: k, x: ARENA.cx + .5, y: ARENA.cy - 3, hx: ARENA.cx + .5, hy: ARENA.cy + .5, hp, max: hp, size: B.size, kx:0, ky:0, cd: 1.5, hurt:0, face:-1, phase:0, ab:2, act:null, hidden:0});
+    bossIntroFX({name: 'Echo of ' + B.name, intro: `Round ${A.wave} of ${A.gauntlet.length}`}); SFX.roar(); shake = .4; renderRegion();
+    return;
+  }
   const n = A.wave, pool = ARENA_POOLS[Math.min(2, Math.floor((n - 1)/6))].filter(t => ENEMIES[t]);
   const count = Math.min(14, 2 + Math.ceil(n*.8)), mul = 1 + n*.18, dm = 1 + n*.06;
   for (let i = 0; i < count; i++) {
@@ -7465,6 +7585,15 @@ function updateArena(dt) {
   const A = S.arena; if (!A || !inArena()) return;
   if (A.live) {
     if (!enemies.some(e => e.arena && !e.dead)) {
+      if (A.gauntlet) {
+        A.live = false; A.t = 6; const prize = 150*A.wave; A.pot += prize; S.hp = Math.min(maxHP(), S.hp + maxHP()*.6); renderHP(); SFX.coin();
+        if (A.wave >= A.gauntlet.length) {
+          A.done = true; A.t = 1e9; S.gauntletWins = (S.gauntletWins || 0) + 1; A.pot += 500; let extra = '';
+          if (A.gauntlet.length >= 6 && !S.flags.gauntletCrown) { S.flags.gauntletCrown = true; addItem('gauntlet_crown', 1); extra = '<br>The arena master places the <b>Crown of the Gauntlet</b> on your head!'; }
+          toast(`<b>Gauntlet complete!</b> The crowd goes wild. +500 bonus (${A.pot} total).<br>Walk out through the gate to collect.${extra}`, 7000); SFX.victory();
+        } else toast(`<b>Round ${A.wave} won!</b> +${prize} coin (${A.pot} total). You catch your breath.<br><span style="color:var(--muted)">Next: ${esc(BOSSES[A.gauntlet[A.wave]].name)}. Or leave through the gate.</span>`, 4500);
+        return;
+      }
       A.live = false; A.t = 4; const prize = 25*A.wave + 10; A.pot += prize; S.arenaBest = Math.max(S.arenaBest || 0, A.wave);
       SFX.coin(); gainXP(20*A.wave);
       let extra = '';
@@ -7543,7 +7672,9 @@ function anglerTalk(n) {
 }
 function arenaTalk(n) {
   say(`“Step into the ring! Wave after wave of beasts, each tougher than the last. Every wave you beat adds to your winnings. Walk out between waves and the money is yours. Get knocked out and you keep only half.”<br><br>Your best: <b>${S.arenaBest || 0}</b> waves.${S.flags.arena10 ? '' : ' Reach wave 10 for a prize from the crowd.'}`, [
-    {label: 'Enter the arena', primary: true, fn: () => { closeTalk(); enterArena(); }}, back(n)]);
+    {label: 'Enter the arena', primary: true, fn: () => { closeTalk(); enterArena(); }},
+    {label: gauntletList().length >= 3 ? `Boss Gauntlet (${gauntletList().length} echoes)` : 'Boss Gauntlet (defeat 3 world bosses first)', disabled: gauntletList().length < 3, fn: () => say(`“The Gauntlet! Our mages conjure echoes of the great beasts you've slain, and you face them one after another: ${gauntletList().map(k => esc(BOSSES[k].name)).join(', ')}. 150 coin per round times the round number, a 500 bonus for finishing${S.flags.gauntletCrown ? '' : ', and if you beat six, a crown'}.”<br><br>Gauntlets won: <b>${S.gauntletWins || 0}</b>`, [{label: 'Begin the Gauntlet', primary: true, fn: () => { closeTalk(); enterArena(true); }}, back(n)])},
+    back(n)]);
 }
 function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() => { fn(); f.style.opacity = 0; }, 380); }
 
