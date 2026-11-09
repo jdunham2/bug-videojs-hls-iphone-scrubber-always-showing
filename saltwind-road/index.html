@@ -2625,7 +2625,20 @@ function addItem(g, n) {
 }
 function price(town, g) {
   const t = TOWNS[town], b = GOODS[g].base;
-  return b * (t.produce.includes(g) ? .6 : t.demand.includes(g) ? 1.6 : 1) * (S ? (season().price[g] || 1) : 1);
+  const ev = S && S.market ? S.market.find(m => m.town === town && m.g === g && m.until >= S.day) : null;
+  return b * (t.produce.includes(g) ? .6 : t.demand.includes(g) ? 1.6 : 1) * (S ? (season().price[g] || 1) : 1) * (ev ? ev.mul : 1);
+}
+function rollMarket() {
+  S.market = (S.market || []).filter(m => m.until >= S.day);
+  if (S.market.length >= 3 || Math.random() > .45) return;
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && TOWNS[k].produce.length);
+  if (!towns.length) return;
+  const k = towns[Math.floor(Math.random()*towns.length)], T0 = TOWNS[k], short = Math.random() < .6;
+  const pool = short ? T0.demand : T0.produce, g = pool[Math.floor(Math.random()*pool.length)];
+  if (!GOODS[g] || S.market.some(m => m.town === k && m.g === g)) return;
+  const m = {town: k, g, mul: short ? 1.8 : .5, until: S.day + 2, short};
+  S.market.push(m);
+  setTimeout(() => toast(`<b>Market news: ${short ? 'shortage' : 'glut'} in ${T0.name}</b><br>${short ? `${T0.name} will pay nearly double for <b>${GOODS[g].name}</b>` : `<b>${GOODS[g].name}</b> is selling for half price in ${T0.name}`} for the next three days.`, 7500), 3400);
 }
 const repOf = town => S.rep[town] || 0;
 function addRep(town, v) { S.rep[town] = Math.min(5, repOf(town) + v); }
@@ -4176,7 +4189,10 @@ function npcWalkable(x, y) {
 }
 function updatePeople(dt) {
   { const fe = NPC_BY.festa, F = festivalToday(); fe.away = !F; if (F && fe.town !== F.town) { fe.town = F.town; fe.x = TOWNS[F.town].x - .5; fe.y = TOWNS[F.town].y - 1.2; } }
+  const nightNow = isNightish();
   for (const n of NPCS) {
+    if (n.wander) n.away = nightNow && n.role !== 'Town guard' && n.role !== 'Musician';
+    if (n.away && n.wander) continue;
     if (!n.wander && !n.travel) continue;
     if (Math.abs(n.x - S.x) > 40 || Math.abs(n.y - S.y) > 30) { if (!n.travel) continue; }
     const close = Math.hypot(S.x - n.x, S.y - n.y) < 1.9 || talkNPC === n;
@@ -4427,6 +4443,7 @@ function newDay() {
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
+  rollMarket();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}`);
   save();
 }
@@ -5714,6 +5731,7 @@ function openJournal() {
     <h3>Bestiary · ${BEAST_IDS.filter(k => S.killsBy[k]).length}/${BEAST_IDS.length} known · ${BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length} mastered</h3><div class="vals" style="margin-bottom:4px">Defeat ${MASTERY} of a kind to master it: +10% damage against them forever.</div><div class="jgrid">${BEAST_IDS.map(k => { const n = S.killsBy[k] || 0; return `<div class="jcard"><div class="t">${n ? esc(ENEMIES[k].name) : '???'}${n >= MASTERY ? ' <span style="color:var(--brass)">★</span>' : ''}</div><div class="s">${n ? `${n} defeated${n < MASTERY ? ` · ${MASTERY - n} to mastery` : ' · mastered'}` : 'Not met yet'}</div></div>`; }).join('')}</div>
     <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
+    ${(S.market || []).filter(m => m.until >= S.day).length ? `<h3>Market news</h3><div class="jgrid">${S.market.filter(m => m.until >= S.day).map(m => `<div class="jcard"><div class="t" style="color:${m.short ? 'var(--good)' : 'var(--brass)'}">${m.short ? 'Shortage' : 'Glut'}: ${GOODS[m.g].name}</div><div class="s">${TOWNS[m.town].name} · ${m.short ? 'pays about double' : 'sells at half price'} · ${m.until - S.day + 1} day${m.until > S.day ? 's' : ''} left</div></div>`).join('')}</div>` : ''}
     <h3>Open deals</h3>
     ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c, id)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
     ${jobs.length ? `<h3>Notice board jobs</h3><div class="jgrid">${jobs.map(([k, r]) => `<div class="jcard"><div class="t">${esc(r.title)}</div><div class="s">${TOWNS[k].name} board · ${r.reward} coin</div><div class="req"><span>${reqProgress(r)}/${r.n}</span></div></div>`).join('')}</div>` : ''}
