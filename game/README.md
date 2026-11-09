@@ -19,6 +19,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **World:** a 900 m procedural island with beaches, lowland forest, a lake basin and a
   snow-capped northern peak. It has a day/night cycle with sun, moon and stars, animated
   water with shoreline foam, wind-blown grass and trees, and drifting clouds.
+- **Death bags:** dying drops everything you carry (not your worn armor) in a bag marked by
+  a beam of light and 🎒 on the map. Walk back and press E to recover it. Up to 3 bags are
+  kept, and they're saved.
 - **Survival:** health, stamina, food and water. You can drink from water, eat from the
   hotbar, take fall damage and drown when your stamina runs out.
 - **Gathering:** punch or use tools on trees, rocks and bushes to get wood, stone, flint,

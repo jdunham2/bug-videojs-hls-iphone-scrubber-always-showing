@@ -144,6 +144,7 @@ export class WorldMap {
       ctx.fillRect(x - 2 * dpr, y - 2 * dpr, 4 * dpr, 4 * dpr);
     }
     if (g.bed) { const [x, y] = P(g.bed.pos.x, g.bed.pos.z); this.icon(ctx, x, y, '🛏️', 16 * dpr); }
+    for (const b of g.deathBags || []) { const [x, y] = P(b.pos.x, b.pos.z); this.icon(ctx, x, y, '🎒', 16 * dpr); }
     for (const c of g.creatures.list) {
       if (!c.tamed || !c.alive) continue;
       const [x, y] = P(c.pos.x, c.pos.z);

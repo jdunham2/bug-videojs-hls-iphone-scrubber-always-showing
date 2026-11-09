@@ -311,6 +311,8 @@ class Game {
       }
     }
     if (n && n.dist < 4 && n.node.kind === 'bush') { this.harvestNode(n.node, 1.0, true); return; }
+    const bag = this.bagNear(p.pos);
+    if (bag) { this.collectBag(bag); return; }
     if (fire) { this.useProp(fire); return; }
     if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) { this.summonBoss(); return; }
     if (this.canDrink()) {
@@ -779,10 +781,56 @@ class Game {
   die(c) {
     this.dismount();
     document.getElementById('death').classList.add('show');
-    document.getElementById('death-msg').textContent = c ? `Killed by a Lv ${c.level} ${c.def.name}` : 'You perished';
+    const items = this.inv.slots.filter(Boolean);
+    let msg = c ? `Killed by a ${c.label}` : 'You perished';
+    if (items.length) {
+      this.dropBag(this.player.pos.clone(), this.inv.slots.map((s) => (s ? { ...s } : null)));
+      this.inv.slots = this.inv.slots.map(() => null);
+      this.ui.refresh();
+      msg += '. Your belongings are in a bag where you fell (🎒 on the map).';
+    }
+    document.getElementById('death-msg').textContent = msg;
+    this.saves.markDirty();
     document.exitPointerLock?.();
     for (const o of this.creatures.list) if (o.target === 'player') { o.state = 'wander'; o.target = null; }
   }
+
+  dropBag(pos, items) {
+    pos.y = Math.max(heightAt(pos.x, pos.z), WATER_LEVEL - 0.2);
+    const g = new THREE.Group();
+    const sack = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), new THREE.MeshStandardMaterial({ color: 0x7a5a36, roughness: 0.9 }));
+    sack.scale.set(1, 0.8, 1); sack.position.y = 0.35; sack.castShadow = true; g.add(sack);
+    const tie = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.3, 8), sack.material); tie.position.y = 0.8; g.add(tie);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 60, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    beam.position.y = 30; g.add(beam);
+    g.position.copy(pos);
+    this.scene.add(g);
+    this.deathBags = this.deathBags || [];
+    this.deathBags.push({ pos: pos.clone(), items, mesh: g });
+    while (this.deathBags.length > 3) { const old = this.deathBags.shift(); this.scene.remove(old.mesh); }
+  }
+
+  collectBag(bag) {
+    let left = 0;
+    bag.items = bag.items.map((s) => {
+      if (!s) return null;
+      const def = ITEMS[s.id];
+      if (def.tool || def.armor) { const i = this.inv.freeSlot(); if (i < 0) { left++; return s; } this.inv.slots[i] = s; return null; }
+      const r = this.inv.add(s.id, s.qty);
+      if (r > 0) { left++; return { ...s, qty: r }; }
+      return null;
+    });
+    this.ui.refresh();
+    this.audio.pickup();
+    if (left) { this.ui.notify('Inventory full — some items are still in the bag', 'warn'); return; }
+    this.scene.remove(bag.mesh);
+    this.deathBags.splice(this.deathBags.indexOf(bag), 1);
+    this.ui.notify('Recovered your belongings', 'craft');
+    this.saves.markDirty();
+  }
+
+  bagNear(pos) { return (this.deathBags || []).find((b) => b.pos.distanceTo(pos) < 3); }
 
   respawn() {
     const p = this.player;
@@ -1020,6 +1068,7 @@ class Game {
     if (!prompt && !p.mount) {
       if (n && n.dist < 4 && n.node.kind === 'bush') prompt = `<kbd>E</kbd> Pick ${n.node.type === 'dozebush' ? 'Dozeberries' : 'Wildberries'}`;
       else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> ${n.node.kind === 'tree' ? 'Harvest Tree' : n.node.type === 'metal' ? 'Mine Metal Ore' + (this.activeItem()?.id?.includes('pick') ? '' : ' (use a pick)') : 'Harvest Rock'}`;
+      else if (this.bagNear(p.pos)) prompt = '<kbd>E</kbd> Recover your belongings';
       else if (fire) {
         const k = KIND[fire.type];
         prompt = k === 'fire' ? `<kbd>E</kbd> ${fire.lit ? 'Extinguish' : 'Light'} Campfire`
