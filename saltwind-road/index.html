@@ -3159,6 +3159,7 @@ function killEnemy(e) {
     return;
   }
   if (e.ghostCap) ghostLoot(e);
+  if (e.outlawBoss) outlawCaught();
   if (e.den != null) { denBroken(e); return; }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
@@ -3282,6 +3283,41 @@ function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
+}
+// ===== wanted outlaws =====
+const OUTLAWS = [['"Black" Bart Hollis','A coach robber with a coal-black beard.'],['Mad Meg Crowe','Burns farms for fun. Laughs while she does it.'],['Silent Sven','Never speaks. Never misses.'],['Two-Knives Tilda','Fast hands, faster knives.'],['Rory the Rat','Small, sneaky, and has robbed half the coast.'],['Grim Gareth','Deserted the Wardens and took their armory with him.'],['Scarlet Sal','Leaves a red ribbon at every crime.'],['One-Ear Odo','Lost an ear to a bear. The bear lost more.']];
+function outlawNow() {
+  const wk = Math.floor((S.day - 1)/7);
+  if (S.day < 3) return null;
+  if (!S.outlaw || S.outlaw.wk !== wk) {
+    S.outlaw = null; const towns = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle');
+    for (let tries = 0; tries < 400 && towns.length; tries++) {
+      const tk = pick(towns), a = Math.random()*6.283, r = 22 + Math.random()*20, x = Math.floor(TOWNS[tk].x + Math.cos(a)*r), y = Math.floor(TOWNS[tk].y + Math.sin(a)*r);
+      if (!inB(x, y) || y >= WORLD_H - 3 || !enemyWalk(x + .5, y + .5) || townAt(x, y, 14) || map[idx(x, y)] === T.ROAD) continue;
+      const [name, desc] = OUTLAWS[(wk + S.day*0) % OUTLAWS.length], dx = x - TOWNS[tk].x, dy = y - TOWNS[tk].y;
+      S.outlaw = {wk, name, desc, x: x + .5, y: y + .5, town: tk, dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north'), reward: 400 + (S.level || 1)*30, taken: false, done: false, spawned: false};
+      break;
+    }
+  }
+  return S.outlaw;
+}
+function wantedHTML() {
+  const O = outlawNow(); if (!O) return '';
+  return `<h3 style="margin-top:16px;color:#e85a5a">WANTED</h3><div class="jcard" style="border-color:#a03a2a"><div class="t">${esc(O.name)}${O.done ? ' · <span style="color:var(--good)">captured</span>' : ''}</div><div class="s">${esc(O.desc)} Hiding out ${O.dir} of ${TOWNS[O.town].name}.</div><div class="req" style="margin-top:6px"><span>Bounty: <b>${O.reward} coin</b></span></div><div style="margin-top:6px">${O.done ? '<span class="s">Brought to justice. A new poster goes up next week.</span>' : O.taken ? '<span class="s">Bounty accepted. Hunt them down!</span>' : '<button class="btn sm primary" data-wanted="1">Take the bounty</button>'}</div></div>`;
+}
+function outlawSpawns() {
+  const O = S.outlaw; if (!O || !O.taken || O.done || O.spawned || inDungeon() || Math.hypot(S.x - O.x, S.y - O.y) > 14) return;
+  if (Math.floor((S.day - 1)/7) !== O.wk) return;
+  O.spawned = true; const lv = 1 + (S.level || 1)*.07;
+  for (let k = 0; k < 4; k++) { const a = k/4*6.283; let x = O.x + Math.cos(a)*2.2, y = O.y + Math.sin(a)*2.2; if (!enemyWalk(x, y)) { x = O.x; y = O.y; } const e = makeEnemy(k % 2 ? 'archer' : 'bandit', x, y, {alert: true, outlawGang: true, dungeon: true}); e.hp = e.max = Math.round(e.max*lv*1.4); e.dmgMul = lv; enemies.push(e); }
+  const c = makeEnemy('bandit', O.x, O.y, {alert: true, outlawBoss: true, dungeon: true}); c.hp = c.max = Math.round(55*lv); c.dmgMul = 1.7*lv; c.elite = {name: O.name, col: '#e85a5a'}; c.esize = 1.6; c.labelName = '☠ ' + O.name; c.spd = 1.2; enemies.push(c);
+  toast(`<b>${esc(O.name)}!</b><br>“You'll never take me alive!”`, 4000); SFX.roar();
+}
+function outlawCaught() {
+  const O = S.outlaw; if (!O) return; O.done = true; S.outlawsCaught = (S.outlawsCaught || 0) + 1; S.coins += O.reward; gainXP(120 + (S.level || 1)*5);
+  for (const k in TOWNS) if (S.towns[k] && !TOWNS[k].pirate) addRep(k, .1);
+  SFX.victory(); renderHUD(); save();
+  setTimeout(() => toast(`<b>${esc(O.name)} brought to justice!</b><br>The bounty is yours: <span style="color:var(--good)">+${O.reward} coin</span>. Towns everywhere breathe easier.`, 7000), 500);
 }
 // ===== cartography =====
 const SURVEY = [[5,150],[10,250],[15,350,'spyglass'],[20,450],[30,700],[40,900],[50,1200],[60,1500],[70,1800,'explorers_atlas'],[80,2500]];
@@ -3508,6 +3544,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Wanted outlaws', 'Every week a WANTED poster goes up on the notice boards. Take the bounty and the outlaw\u2019s hideout is marked on your map. Defeat them and their gang for a big reward.'],
   ['Cartography', 'Wendell the cartographer in Lantern Bay buys your map survey each time you chart more of the land (5%, 10%, 15% and so on). Big milestones earn a Spyglass and the Explorer\u2019s Atlas.'],
   ['Wishing wells & treasure goblins', 'Wishing wells in Port Wren, Maplehold, Prismvale and Greenstem grant a random blessing once a day for 10 coin. Rare Treasure Goblins flee with sacks of loot: catch one before it escapes through its portal. Old Peg in Blackwater trades Cursed Doubloons from the ghost ship for pirate treasure.'],
   ['Balloon rides', 'Balloonists in Port Wren, Frostgate, Crownfall, Tidewatch, Prismvale and Farhaven fly you between their stations, even to towns you have not found yet, and reveal the land below.'],
@@ -3749,7 +3786,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -4931,6 +4968,7 @@ function checkDeeds() {
   if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
+  if (S.outlaw && S.outlaw.taken && !S.outlaw.done) extra.push(`<div class="dd" style="color:#e85a5a"><span>☠ Hunt ${esc(S.outlaw.name)} (${S.outlaw.dir} of ${TOWNS[S.outlaw.town].name})</span></div>`);
   if (S.ghost && ghostActive()) extra.push(`<div class="dd" style="color:#9af0c0"><span>☠ Ghost ship ${S.ghost.dir} of ${TOWNS[S.ghost.town].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
@@ -5940,12 +5978,13 @@ function renderBoard() {
         : `<button class="btn sm ${reqReady(r) ? 'primary' : ''}" data-turn="${r.id}" ${reqReady(r) ? '' : 'disabled'}>${r.type === 'hunt' ? 'Claim reward' : 'Hand over'}</button>`;
       return `<div class="note"><div class="t">${esc(r.title)}</div><div>${esc(r.text)}</div><div class="s">Posted by ${esc(r.who)} · Reward ${r.reward} coin</div>
         <div class="req"><span>${goal} ${r.status === 'active' ? `<b class="${prog >= r.n ? 'ok' : 'no'}">${prog}/${r.n}</b>` : ''}</span></div><div>${act}</div></div>`;
-    }).join('')}</div>`;
+    }).join('')}</div>${wantedHTML()}`;
 }
 $('boardSheet').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.x) { closeModal('board'); return; }
   const k = boardTown, bd = boardFor(k);
+  if (b.dataset.wanted) { const O = outlawNow(); if (O) { O.taken = true; toast(`<b>Bounty taken: ${esc(O.name)}</b><br>Their hideout is ${O.dir} of ${TOWNS[O.town].name}. (Marked on your map.)`, 5000); save(); } }
   if (b.dataset.acc) { const r = bd.reqs.find(r => r.id === b.dataset.acc); r.status = 'active'; if (r.type === 'hunt') r.base = S.killsBy[r.enemy] || 0; toast(`Job taken: <b>${esc(r.title)}</b>`); }
   if (b.dataset.turn) {
     const r = bd.reqs.find(r => r.id === b.dataset.turn);
@@ -6988,6 +7027,7 @@ function openMap() {
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  if (S.outlaw && S.outlaw.taken && !S.outlaw.done) { const tx = S.outlaw.x*s, ty = S.outlaw.y*s; g.fillStyle = '#e85a5a'; g.beginPath(); g.arc(tx, ty, 6*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke(); g.fillText('Wanted', tx, ty - 10*dpr); }
   if (S.ghost && ghostActive()) { const tx = (S.ghost.x + .5)*s, ty = (S.ghost.y + .5)*s; g.fillStyle = '#9af0c0'; g.beginPath(); g.arc(tx, ty, 6*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke(); g.fillText('Ghost ship', tx, ty - 10*dpr); }
   if (S.titanPos && !S.bosses.titan) { const tx = (S.titanPos.x + .5)*s, ty = (S.titanPos.y + .5)*s; g.fillStyle = '#ff9a3a'; g.beginPath(); g.arc(tx, ty, 7*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke(); g.fillStyle = '#ffb060'; g.fillText('Titan', tx, ty - 10*dpr); }
   if (S.legendsKnown) for (const L of LEGENDS) { if (S.legends && S.legends[L.id]) continue; const lx = (L.tx + .5)*s, ly = (L.ty + .5)*s; g.fillStyle = L.col; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = (i % 2 ? 2.5 : 6)*dpr; g.lineTo(lx + Math.cos(a)*r, ly + Math.sin(a)*r); } g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); }
@@ -7772,6 +7812,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['sheriff','Sheriff','Bring 3 wanted outlaws to justice', () => (S.outlawsCaught || 0) >= 3],
   ['surveyor','Surveyor','Chart 30% of the land', () => !!(S.surveys || {})[30]],
   ['wisher','Make a Wish','Toss coins into wishing wells on 7 days', () => (S.wishes || 0) >= 7],
   ['goblin','Grabby Hands','Catch a Treasure Goblin', () => (S.killsBy.goblin || 0) >= 1],
