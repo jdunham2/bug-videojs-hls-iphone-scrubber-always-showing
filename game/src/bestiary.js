@@ -26,6 +26,10 @@ const LORE = {
   hornjaw: { icon: '🐂', where: 'Lowlands', text: 'A short-armed, horn-browed sprinter that charges its prey head-on at terrifying speed.' },
   scythehand: { icon: '🦥', where: 'Deep forest', text: 'A towering plant-eater with claws as long as swords. Saddled, it shreds trees for timber in seconds.' },
   skyhorn: { icon: '🦅', where: 'High cliffs and peaks', text: 'The largest pterosaur on the island, crowned with a blazing crest. The fastest thing in the sky.' },
+  dashstrider: { icon: '🐓', where: 'Open grassland, in flocks', text: 'Long legs, a toothless beak and nerves of glass. Nothing on the island outruns a saddled one.' },
+  frillspitter: { icon: '🦎', where: 'Forests, in pairs', text: 'When it flares its yellow frill, step aside: the venom it spits clings and slows its prey.' },
+  nightstalker: { icon: '🌑', where: 'Lowland forests', text: 'Sleeps curled in the undergrowth by day. After dusk its eyes glow green, and it hunts anything it can find.' },
+  longfin: { icon: '🦕', where: 'Coastal waters', text: 'A gentle, long-necked swimmer that grazes on fish. Far calmer to tame than a Deepjaw, and a fine sea mount.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

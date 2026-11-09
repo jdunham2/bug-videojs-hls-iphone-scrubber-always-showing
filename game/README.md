@@ -90,6 +90,13 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
     other boss drops): a colossal Thunderneck with quakes, stomps and eruptions that calls
     raptors, Cinderbacks and a Gorgonax. Its heart forges Primeval Armor, the best armor in
     the game.
+  - **Stormwing, the Tempest** (Storm Spire on the north-eastern heights; 20 Hide + 2
+    Trophies): a giant flying Thunderwing that calls telegraphed lightning strikes and blasts
+    you back with gusts. Its Storm Feather makes **Skyward Wings**: hold them while falling
+    to glide safely.
+  - **The Broodmother** (venom totem in the western woods; 15 Raw Meat + 1 Trophy): a
+    colossal Frillspitter that sprays five-glob venom volleys, pounces and calls her brood.
+    Her gland forges the **Venom Blade** (70 damage plus poison over time).
   - Beat four bosses to become **Champion of the Isle**.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
@@ -125,6 +132,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Hornjaw: horn-browed sprinting predator; rideable
   - Scythehand: towering clawed herbivore, fells trees fast as a mount; rideable
   - Skyhorn: giant crested pterosaur, the fastest flyer; rideable
+  - Dashstrider: ostrich-like sprinter in flocks, the fastest land mount; rideable
+  - Frillspitter: frilled hunter that spits slowing venom from range
+  - Nightstalker: sleeps by day, hunts at night with glowing eyes; rideable
+  - Longfin: gentle long-necked plesiosaur, an easy sea mount; rideable
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer

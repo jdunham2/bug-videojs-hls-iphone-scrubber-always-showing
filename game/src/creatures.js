@@ -134,6 +134,26 @@ export const SPECIES = {
     tameFood: 'meat', tameBase: 9, tameLvl: 0.22, rideable: true, radius: 1.3, reach: 3.2, hitR: 2.3, flyer: true,
     drops: { meat: 4, hide: 3 }, aggro: 0, lvl: [5, 35], count: 4, zone: (h) => h > 15 && h < 60,
   },
+  dashstrider: {
+    name: 'Dashstrider', diet: 'herb', temper: 'skittish', hp: 190, dmg: 8, walk: 3, run: 15.5, torpor: 150,
+    tameFood: 'berries', tameBase: 8, tameLvl: 0.22, rideable: true, radius: 1.0, reach: 2.2, hitR: 1.6,
+    drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 10, herd: 5, zone: (h) => h > 3 && h < 18,
+  },
+  frillspitter: {
+    name: 'Frillspitter', diet: 'carn', temper: 'aggressive', hp: 150, dmg: 10, walk: 2.6, run: 9, torpor: 120, spit: true,
+    tameFood: 'meat', tameBase: 6, tameLvl: 0.15, rideable: false, radius: 0.8, reach: 2.0, hitR: 1.2,
+    drops: { meat: 2, hide: 2 }, aggro: 22, lvl: [3, 30], count: 6, herd: 2, zone: (h) => h > 6 && h < 28, far: 110,
+  },
+  nightstalker: {
+    name: 'Nightstalker', diet: 'carn', temper: 'aggressive', hp: 640, dmg: 30, walk: 3, run: 11, torpor: 440, nocturnal: true, glow: [0.6, 0.9, 0.2],
+    tameFood: 'meat', tameBase: 12, tameLvl: 0.3, rideable: true, radius: 1.6, reach: 3.6, hitR: 2.2,
+    drops: { meat: 8, hide: 6 }, aggro: 36, lvl: [10, 40], count: 3, zone: (h) => h > 5 && h < 30, far: 150,
+  },
+  longfin: {
+    name: 'Longfin', diet: 'carn', temper: 'skittish', hp: 520, dmg: 12, walk: 3, run: 9, swim: 8, torpor: 340,
+    tameFood: 'meat', tameBase: 10, tameLvl: 0.25, rideable: true, radius: 1.8, reach: 3, hitR: 2.4, swimmer: true,
+    drops: { meat: 8, hide: 5 }, aggro: 0, lvl: [1, 30], count: 5, zone: (h) => h < -3 && h > -14,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -147,7 +167,9 @@ const PREY = {
   talonrunner: ['pudgewing', 'dashbeak', 'crestcaller'],
   bogmaw: ['reedhorn', 'pudgewing', 'dashbeak'],
   rimeclaw: ['frosthorn', 'pudgewing'],
-  hornjaw: ['pudgewing', 'crestcaller', 'reedhorn', 'dashbeak'],
+  hornjaw: ['pudgewing', 'crestcaller', 'reedhorn', 'dashbeak', 'dashstrider'],
+  nightstalker: ['dashstrider', 'crestcaller', 'trikeros', 'plateback', 'reedhorn'],
+  frillspitter: ['pudgewing', 'dashbeak'],
   dashbeak: ['pudgewing'],
   thunderwing: ['pudgewing', 'dashbeak', 'crestcaller', 'galewing'],
   deepjaw: ['glimmerfin'],
@@ -249,6 +271,7 @@ function buildBiped(mat, col, s, opts) {
     E(0.1 * s * opts.headW, 0.06 * s, 0.12 * s, accent, 0.2 * s * opts.headW, 0.2 * s, hl * 0.4),
     E(0.12 * s, 0.05 * s, hl * 0.6, accent, 0, 0.27 * s * opts.headW, hl * 0.4),
     ...(opts.crest ? [K(0.08 * s, 0.4 * s, accent, 0, 0.35 * s, hl * 0.2, -0.6, 0, 0)] : []),
+    ...(opts.frill ? [E(0.04 * s, 0.42 * s, 0.38 * s, accent, -0.38 * s, 0.05 * s, hl * 0.1, 0, 0.5, 0.4), E(0.04 * s, 0.42 * s, 0.38 * s, accent, 0.38 * s, 0.05 * s, hl * 0.1, 0, -0.5, -0.4), K(0.05 * s, 0.35 * s, horn, -0.12 * s, 0.32 * s, hl * 0.5, -0.4, 0, 0.2), K(0.05 * s, 0.35 * s, horn, 0.12 * s, 0.32 * s, hl * 0.5, -0.4, 0, -0.2)] : []),
     ...(opts.horns ? [K(0.09 * s, 0.35 * s, horn, -0.2 * s * opts.headW, 0.32 * s, hl * 0.45, -0.2, 0, 0.5), K(0.09 * s, 0.35 * s, horn, 0.2 * s * opts.headW, 0.32 * s, hl * 0.45, -0.2, 0, -0.5)] : []),
     // long crocodile-like snout
     ...(opts.snout ? [E(0.13 * s, 0.11 * s, hl * 0.9, base, 0, -0.04 * s, hl * 1.9), E(0.16 * s, 0.1 * s, 0.14 * s, accent, 0, 0.0, hl * 2.65)] : []),
@@ -504,6 +527,34 @@ function buildPlateback(mat, col) {
   return { root, body, legs, neck, head, tail, hipH: 1.9, lie: 1.1, quad: true };
 }
 
+function buildLongfin(mat, col) {
+  const { base, belly, accent } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.6; root.add(body);
+  body.add(meshOf([E(1.1, 0.75, 1.9, base, 0, 0, 0), E(0.95, 0.45, 1.7, belly, 0, -0.35, 0), ...[0, 1, 2, 3].map((i) => E(0.5, 0.1, 0.3, accent, 0, 0.7, 1 - i * 0.6))], mat));
+  const legs = [];
+  for (const [x, z, ph] of [[-1, 0.9, 0], [1, 0.9, Math.PI], [-0.9, -1.0, Math.PI], [0.9, -1.0, 0]]) {
+    const g = new THREE.Group(); g.position.set(x, -0.2, z); body.add(g);
+    g.add(meshOf([E(0.9, 0.08, 0.35, base, Math.sign(x) * 0.8, -0.05, -0.15, 0, Math.sign(x) * 0.35, Math.sign(x) * -0.2)], mat));
+    legs.push({ g, ph, flipper: Math.sign(x) });
+  }
+  // long neck reaching forward and up
+  const neck = new THREE.Group(); neck.position.set(0, 0.25, 1.7); body.add(neck);
+  const nparts = [];
+  for (let i = 0; i < 7; i++) nparts.push(E(0.32 - i * 0.025, 0.32 - i * 0.025, 0.5, base, 0, i * 0.32, 0.3 + i * 0.42, -0.6, 0, 0));
+  neck.add(meshOf(nparts, mat));
+  const head = new THREE.Group(); head.position.set(0, 2.3, 3.2); neck.add(head);
+  head.add(meshOf([E(0.24, 0.2, 0.42, base, 0, 0, 0.2), E(0.14, 0.1, 0.32, belly, 0, -0.08, 0.5), E(0.05, 0.05, 0.05, 0x111111, -0.18, 0.08, 0.3), E(0.05, 0.05, 0.05, 0x111111, 0.18, 0.08, 0.3)], mat));
+  const tail = []; let parent = body;
+  for (let i = 0; i < 4; i++) {
+    const t = new THREE.Group(); t.position.set(0, 0, i === 0 ? -1.8 : -0.7); parent.add(t);
+    const r = 0.5 * (1 - i * 0.2);
+    t.add(meshOf([E(r, r * 0.7, 0.5, base, 0, 0, -0.4)], mat));
+    tail.push(t); parent = t;
+  }
+  return { root, body, legs, neck, head, tail, hipH: 0.6, lie: 0.8, quad: true, swim: true };
+}
+
 function buildSauropod(mat, col) {
   const { base, belly, accent } = col;
   const root = new THREE.Group();
@@ -584,6 +635,10 @@ const PALETTES = {
   hornjaw: [{ base: 0x8a3a2a, belly: 0xd0b090, accent: 0x2a1a14, horn: 0x1e1a16 }, { base: 0x5a4a3a, belly: 0xc8b090, accent: 0xa82a1a, horn: 0x1e1a16 }],
   scythehand: [{ base: 0x6a5a3a, belly: 0xd8c8a0, accent: 0x3a6a3a, horn: 0x2a2620 }, { base: 0x7a6a5a, belly: 0xe0d0b8, accent: 0xa8502a, horn: 0x2a2620 }],
   skyhorn: [{ base: 0x3a4a6a, belly: 0xd8dce0, accent: 0xe8702a, horn: 0xf0d050 }, { base: 0x5a3a5a, belly: 0xe0d0d8, accent: 0x3ac8a8, horn: 0xf0d050 }],
+  dashstrider: [{ base: 0x9a8a6a, belly: 0xe8dcc0, accent: 0x5a7a3a, horn: 0xd8a040 }, { base: 0x7a8a9a, belly: 0xe0e4e8, accent: 0xc0602a, horn: 0xd8a040 }],
+  frillspitter: [{ base: 0x4a7a4a, belly: 0xc8d0a0, accent: 0xe8c02a, horn: 0x2a2620 }, { base: 0x5a6a3a, belly: 0xd0c8a0, accent: 0xd8402a, horn: 0x2a2620 }],
+  nightstalker: [{ base: 0x1c1e24, belly: 0x3a3c44, accent: 0x5a2a6a, horn: 0x0e0e10 }, { base: 0x22201c, belly: 0x44403a, accent: 0x2a5a3a, horn: 0x0e0e10 }],
+  longfin: [{ base: 0x3a5a6a, belly: 0xc8d4d8, accent: 0x2a3a4a }, { base: 0x4a6a5a, belly: 0xd0d8c8, accent: 0x6a4a2a }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -595,6 +650,10 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'dashstrider': return buildBiped(mat, col, 1.15, { hip: 1.65, bodyLen: 0.85, girth: 0.7, arm: 1.1, headLen: 0.35, headW: 0.7, tailSeg: 0.6, stripes: 2, beak: true, neckW: 0.7 });
+    case 'frillspitter': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.9, girth: 0.8, arm: 1.0, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, frill: true, neckW: 0.85 });
+    case 'nightstalker': return buildBiped(mat, col, 2.0, { hip: 1.45, bodyLen: 1.15, girth: 1.15, arm: 0.7, headLen: 0.7, headW: 1.15, tailSeg: 0.7, stripes: 3, horns: true, neckW: 1.2 });
+    case 'longfin': return buildLongfin(mat, col);
     case 'plateback': return buildPlateback(mat, col);
     case 'hornjaw': return buildBiped(mat, col, 1.6, { hip: 1.35, bodyLen: 1.05, girth: 1.0, arm: 0.45, headLen: 0.55, headW: 1.0, tailSeg: 0.65, stripes: 3, horns: true, neckW: 1.1 });
     case 'scythehand': return buildBiped(mat, col, 1.9, { hip: 1.6, bodyLen: 1.0, girth: 1.3, arm: 1.6, headLen: 0.4, headW: 0.7, tailSeg: 0.5, stripes: 0, beak: true, claws: true, neckW: 0.8 });
@@ -763,6 +822,9 @@ export class CreatureManager {
       if (a === 'eruption') { c.cd[a] = 8 + Math.random() * 3; c.roarT = 0.8; this.hooks.eruption?.(c); }
       if (a === 'whirlpool') { c.cd[a] = 13; this.hooks.whirlpool?.(c); }
       if (a === 'shriek') { c.cd[a] = 15; c.roarT = 1.2; this.hooks.shriek?.(c); }
+      if (a === 'lightning') { c.cd[a] = 6 + Math.random() * 2; this.hooks.lightning?.(c); }
+      if (a === 'gust' && d < 35) { c.cd[a] = 11; this.hooks.gust?.(c, d); }
+      if (a === 'spitvolley' && d < 30) { c.cd[a] = 6.5; c.attackAnim = 1; this.hooks.spitVolley?.(c); }
       if (a === 'icespikes') { c.cd[a] = 8 + Math.random() * 3; c.roarT = 0.8; this.hooks.icespikes?.(c); }
       if (a === 'blizzard') { c.cd[a] = 18; c.roarT = 1.2; this.hooks.blizzard?.(c); }
       if (a === 'poison') { c.cd[a] = 9 + Math.random() * 3; this.hooks.poison?.(c); }
@@ -1025,6 +1087,12 @@ export class CreatureManager {
     const sg = d.glow ? 0.14 + Math.sin(performance.now() / 500 + c.id) * 0.06 : 0;
     c.mat.emissive.setRGB(c.hitFlash * 4 + glow + (d.glow ? d.glow[0] * sg : 0), glow * 0.12 + (d.glow ? d.glow[1] * sg : 0), d.glow ? d.glow[2] * sg : 0);
     if (c.boss) this.updateBoss(c, dt, player);
+    if (c.poisonT > 0 && c.alive) {
+      c.poisonT -= dt;
+      c.hp -= c.poisonDps * dt;
+      c.mat.emissive.setRGB(0.05, 0.35 + Math.sin(performance.now() / 120) * 0.15, 0.02);
+      if (c.hp <= 0) this.kill(c, 'player');
+    }
     c.attackCd -= dt; c.attackAnim = Math.max(0, c.attackAnim - dt * 3);
     c.timer -= dt; c.scanCd -= dt;
 
@@ -1118,7 +1186,9 @@ export class CreatureManager {
       }
     } else {
       // wander / graze
-      if ((d.temper === 'aggressive' || c.alpha) && c.scanCd <= 0 && !far) {
+      const asleep = d.nocturnal && (this.daylight ?? 0) > 0.45;
+      if (asleep) { goal.copy(c.pos); c.timer = Math.max(c.timer, 1); c.lieT = Math.min(0.45, c.lieT + dt * 2); }
+      if ((d.temper === 'aggressive' || c.alpha) && c.scanCd <= 0 && !far && !asleep) {
         c.scanCd = 0.5;
         const t = this.findTarget(c, player);
         if (t) { c.state = 'chase'; c.target = t; c.timer = 25; this.hooks.roar?.(c); }
@@ -1326,6 +1396,13 @@ export class CreatureManager {
     this.moveToward(c, tp, spd, dt);
     // face target when close
     if (dist < reach * 1.2) c.yaw = angleLerp(c.yaw, Math.atan2(tp.x - c.pos.x, tp.z - c.pos.z), Math.min(1, dt * 6));
+    // venom spitters attack from range
+    if (d.spit && dist > reach * 1.6 && dist < 22 && c.attackCd <= 0) {
+      c.attackCd = 2.4; c.attackAnim = 1;
+      c.yaw = Math.atan2(tp.x - c.pos.x, tp.z - c.pos.z);
+      this.hooks.spit?.(c, tp.clone().add(new THREE.Vector3(0, c.target === 'player' ? 1.2 : c.target.model.hipH * c.target.scale, 0)));
+      return spd;
+    }
     if (dist < reach && c.attackCd <= 0) {
       c.attackCd = c.species === 'talonrunner' || c.species === 'dashbeak' ? 1.2 : 1.8;
       c.attackAnim = 1;

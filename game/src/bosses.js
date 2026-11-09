@@ -33,6 +33,16 @@ export const BOSSES = {
     hp: 17000, dmg: 50, scale: 3.0, minions: ['bogmaw', 2, 35], phases: [0.6, 0.3], abilities: ['poison', 'submerge'], arena: 80, leash: 60,
     cost: { herb: 20, trophy: 1 }, reward: [['miretooth', 1], ['herb', 15], ['ingot', 15], ['sigil', 1]], rewardText: 'Its tooth makes Mirehide Armor, which heals you', color: 0x7ad84a,
   },
+  stormwing: {
+    kind: 'stormwing', species: 'thunderwing', name: 'Stormwing, the Tempest', title: 'STORMWING, THE TEMPEST',
+    hp: 16000, dmg: 46, scale: 2.6, minions: ['thunderwing', 2, 35], phases: [0.6, 0.3], abilities: ['lightning', 'gust'], arena: 110, leash: 100,
+    cost: { hide: 20, trophy: 2 }, reward: [['stormfeather', 1], ['hide', 20], ['ingot', 15], ['sigil', 1]], rewardText: 'Its Storm Feather makes Skyward Wings — glide instead of falling', color: 0xd8e8ff,
+  },
+  broodmother: {
+    kind: 'broodmother', species: 'frillspitter', name: 'The Broodmother', title: 'THE BROODMOTHER',
+    hp: 14000, dmg: 40, scale: 4.2, minions: ['frillspitter', 3, 30], phases: [0.66, 0.33], abilities: ['spitvolley', 'pounce'], arena: 70, leash: 50,
+    cost: { meat: 15, trophy: 1 }, reward: [['venomgland', 1], ['meat', 15], ['ingot', 15], ['sigil', 1]], rewardText: 'Her venom gland forges the Venom Blade', color: 0xc8e83a,
+  },
   titan: {
     kind: 'titan', species: 'thunderneck', name: 'The Ancient Titan', title: 'THE ANCIENT TITAN',
     hp: 45000, dmg: 90, scale: 1.9, minions: ['talonrunner', 4, 40], minionsList: [['talonrunner', 4, 40], ['cinderback', 2, 40], ['gorgonax', 1, 45]], phases: [0.75, 0.5, 0.25],
@@ -106,13 +116,19 @@ export class Bosses {
     // The Ancient Titan: a great monolith on the shore of Crescent Lake
     const lPos = spot(120, 30, 90, (x, z, h) => h > 2 && h < 6 && Math.hypot(x - 120, z - 30) > 40 && Math.hypot(x - 120, z - 30) < 80);
     this.shrines.push({ kind: 'titan', pos: lPos, spawn: away(lPos, 26) });
+    // Stormwing: a storm spire on the north-eastern heights
+    const wPos = spot(110, -170, 90, (x, z, h) => h > 30 && frostAt(x, z) < 0.4 && Math.hypot(x - VOLCANO.x, z - VOLCANO.z) > 150);
+    this.shrines.push({ kind: 'stormwing', pos: wPos, spawn: wPos.clone().add(new THREE.Vector3(0, 30, -20)) });
+    // Broodmother: a venom-stained totem in the western woods
+    const bPos = spot(-230, 70, 70, (x, z, h) => h > 8 && h < 24 && swampAt(x, z) < 0.3);
+    this.shrines.push({ kind: 'broodmother', pos: bPos, spawn: away(bPos, 15) });
     for (const s of this.shrines) if (s.kind !== 'tyrant') this.buildShrine(s);
   }
 
   buildShrine(s) {
     const g = this.game, def = BOSSES[s.kind];
     const grp = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: { magmaroth: 0x1a1620, deepmother: 0x4a5a5e, rimefang: 0xc8d8e8, mirelord: 0x3a4a2a, titan: 0x8a7a5a }[s.kind] || 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
+    const stone = new THREE.MeshStandardMaterial({ color: { magmaroth: 0x1a1620, deepmother: 0x4a5a5e, rimefang: 0xc8d8e8, mirelord: 0x3a4a2a, titan: 0x8a7a5a, stormwing: 0x5a6070, broodmother: 0x3a4a2a }[s.kind] || 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 0.8, 6), stone); base.position.y = 0.3; grp.add(base);
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 3.2, 5), stone); pillar.position.y = 2.2; grp.add(pillar);
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 1.6, roughness: 0.3 }));
@@ -180,8 +196,8 @@ export class Bosses {
   // ---- ability effects (hooked from the creature manager) ----
   eruption(c, style = 'fire') {
     const g = this.game, p = g.player;
-    g.ui.notify({ fire: 'The ground splits — move!', ice: 'Ice spikes surge from the ground!', poison: 'Toxic bog gas bubbles up!' }[style], 'warn');
-    const color = { fire: 0xff5a1a, ice: 0x9ae0ff, poison: 0x7ad84a }[style];
+    g.ui.notify({ fire: 'The ground splits — move!', ice: 'Ice spikes surge from the ground!', poison: 'Toxic bog gas bubbles up!', lightning: 'The air crackles — lightning is coming!' }[style], 'warn');
+    const color = { fire: 0xff5a1a, ice: 0x9ae0ff, poison: 0x7ad84a, lightning: 0xfff2a0 }[style];
     for (let i = 0; i < (style === 'poison' ? 3 : 4); i++) {
       const pos = i === 0 ? p.pos.clone() : p.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18));
       pos.y = heightAt(pos.x, pos.z) + 0.15;
@@ -209,6 +225,30 @@ export class Bosses {
     p.hurtT = Math.max(p.hurtT, silent ? 0.2 : 0.4);
     if (!silent) g.audio.hurt();
     if (!p.alive) g.die(null);
+  }
+
+  // a jagged bolt from the sky, plus a flash
+  bolt(pos) {
+    const g = this.game;
+    const pts = []; let x = pos.x, z = pos.z;
+    for (let y = pos.y + 90; y > pos.y; y -= 9) { pts.push(new THREE.Vector3(x, y, z)); x += (Math.random() - 0.5) * 4; z += (Math.random() - 0.5) * 4; }
+    pts.push(pos.clone());
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xfff8d0, fog: false }));
+    g.scene.add(line);
+    setTimeout(() => { g.scene.remove(line); line.geometry.dispose(); }, 180);
+    g.weather.flash = 1;
+    g.audio.thunder?.(0.95);
+    g.shake = Math.max(g.shake || 0, 0.4);
+  }
+
+  gust(c, d) {
+    const g = this.game, p = g.player;
+    g.ui.notify('A howling gust blasts you back!', 'warn');
+    g.audio.noiseHit({ freq: 400, q: 0.3, dur: 1.2, vol: 0.6, type: 'lowpass' });
+    const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize();
+    if (p.mount) { p.mount.pos.addScaledVector(away, 12); if (p.mount.flying) p.mount.vy = (p.mount.vy || 0) - 6; }
+    else { p.vel.addScaledVector(away, 16); p.vel.y += 5; }
+    this.hit(10, true);
   }
 
   blizzard(c) {
@@ -273,9 +313,10 @@ export class Bosses {
               for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const sp = new THREE.Mesh(this.spikeGeo, this.poolMat('ice')); sp.position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0); h.pool.add(sp); }
             }
             g.shake = Math.max(g.shake || 0, 0.5);
-            if (p.pos.distanceTo(h.pos) < h.r + 0.5) { if (h.style === 'fire') this.burn(35); else if (h.style === 'ice') { this.hit(28); p.slowT = 3; } }
+            if (h.style === 'lightning') { this.bolt(h.pos); h.life = Math.min(h.life, 0.4); }
+            if (p.pos.distanceTo(h.pos) < h.r + 0.5) { if (h.style === 'fire') this.burn(35); else if (h.style === 'ice') { this.hit(28); p.slowT = 3; } else if (h.style === 'lightning') this.hit(34); }
           }
-        } else if (p.pos.distanceTo(h.pos) < h.r && Math.abs(p.pos.y - h.pos.y) < 2) {
+        } else if (h.style !== 'lightning' && p.pos.distanceTo(h.pos) < h.r && Math.abs(p.pos.y - h.pos.y) < 2) {
           if (h.style === 'fire') this.burn(20 * dt, true);
           else if (h.style === 'ice') { this.hit(6 * dt, true); p.slowT = Math.max(p.slowT || 0, 0.5); }
           else { this.hit(14 * dt, true); p.poisonT = 0.5; }

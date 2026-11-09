@@ -95,6 +95,10 @@ class Game {
       poison: (c) => this.bosses.eruption(c, 'poison'),
       blizzard: (c) => this.bosses.blizzard(c),
       quake: (c, d) => this.bosses.quake(c, d),
+      lightning: (c) => this.bosses.eruption(c, 'lightning'),
+      gust: (c, d) => this.bosses.gust(c, d),
+      spit: (c, at) => this.spawnSpit(c, at),
+      spitVolley: (c) => { const at = this.player.eye; for (let i = -2; i <= 2; i++) this.spawnSpit(c, at.clone().add(new THREE.Vector3(Math.cos(c.yaw) * i * 2.2, 0, -Math.sin(c.yaw) * i * 2.2))); this.ui.notify('The Broodmother sprays venom!', 'warn'); },
       submerge: (c) => { this.ui.notify(`${c.name} sinks beneath the mire…`, 'warn'); this.audio.splash(); },
       whirlpool: (c) => this.bosses.whirlpool(c),
       shriek: (c) => this.bosses.shriek(c),
@@ -171,6 +175,8 @@ class Game {
       { title: 'Slay Rimefang, the Frozen Alpha, at the ice spire on Frostpeak', progress: () => 'Offer 15 Thick Pelts + 1 Alpha Trophy. Wear Fur Armor: its blizzard freezes', done: () => (this.stats.bossesDefeated || {}).rimefang >= 1 },
       { title: 'Slay Mirelord, the Swamp King, at the mossy totem in Murkmire', progress: () => 'Offer 20 Marsh Herbs + 1 Alpha Trophy. Stay out of the green gas; it hides underwater', done: () => (this.stats.bossesDefeated || {}).mirelord >= 1 },
       { title: 'Gather 6 Boss Sigils and summon the Ancient Titan at Crescent Lake', progress: () => `🔯 ${this.inv.count('sigil')}/6 sigils — every boss drops one`, done: () => (this.stats.bossesDefeated || {}).titan >= 1 },
+      { title: 'Slay Stormwing, the Tempest, at the Storm Spire on the north-eastern heights', progress: () => 'Offer 20 Hide + 2 Alpha Trophies. It flies: bring a bow or a flyer, and dodge the lightning rings', done: () => (this.stats.bossesDefeated || {}).stormwing >= 1 },
+      { title: 'Slay the Broodmother at the venom totem in the western woods', progress: () => 'Offer 15 Raw Meat + 1 Alpha Trophy. Keep moving: her venom volleys slow you', done: () => (this.stats.bossesDefeated || {}).broodmother >= 1 },
     ];
     this.questIdx = 0;
 
@@ -644,6 +650,7 @@ class Game {
       const dmg = def ? def.damage : 5;
       const torpor = def ? (def.torpor || 0) : 4;
       this.creatures.damage(cr, dmg * (0.9 + Math.random() * 0.2), torpor, 'player');
+      if (def && def.poison && cr.alive) { cr.poisonT = 5; cr.poisonDps = def.poison; }
       this.audio.flesh();
       this.hitMarker();
       this.damageNumber(cr.center, Math.round(dmg));
@@ -787,6 +794,37 @@ class Game {
     }
   }
 
+  // Venom spit: an arcing glob that slows and hurts whatever it hits.
+  spawnSpit(c, at) {
+    const from = c.center.clone().add(new THREE.Vector3(Math.sin(c.yaw), 0.4, Math.cos(c.yaw)).multiplyScalar(c.radius + 0.5));
+    const dist = from.distanceTo(at), t = Math.max(0.35, dist / 22);
+    const vel = new THREE.Vector3().subVectors(at, from).divideScalar(t); vel.y += 0.5 * 9.8 * t;
+    const mesh = new THREE.Mesh(this.spitGeo || (this.spitGeo = new THREE.SphereGeometry(0.22, 8, 6)), this.spitMat || (this.spitMat = new THREE.MeshBasicMaterial({ color: 0xa8e83a })));
+    mesh.scale.setScalar(c.boss ? 2.2 : 1);
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    (this.spits || (this.spits = [])).push({ mesh, pos: from, vel, owner: c, life: 4 });
+    this.audio.noiseHit({ freq: 1800, q: 1, dur: 0.15, vol: 0.2 });
+  }
+
+  updateSpits(dt) {
+    const p = this.player;
+    for (let i = (this.spits || []).length - 1; i >= 0; i--) {
+      const s = this.spits[i];
+      s.life -= dt; s.vel.y -= 9.8 * dt; s.pos.addScaledVector(s.vel, dt); s.mesh.position.copy(s.pos);
+      const target = p.mount ? p.mount.center : p.eye.add(new THREE.Vector3(0, -0.4, 0));
+      const hitR = p.mount ? p.mount.hitR : 1.1;
+      let done = s.life <= 0 || s.pos.y < heightAt(s.pos.x, s.pos.z) || blockedAt(s.pos.x, s.pos.z);
+      if (!done && p.alive && s.pos.distanceTo(target) < hitR * (s.owner.boss ? 1.6 : 1)) {
+        done = true;
+        const dmg = s.owner.dmg * (s.owner.boss ? 0.5 : 0.7);
+        if (p.mount) this.creatures.damage(p.mount, dmg, 0, s.owner);
+        else { this.hurtPlayer(dmg, s.owner); p.slowT = Math.max(p.slowT || 0, 1.6); this.ui.notify('Venom! You are slowed', 'warn'); }
+      }
+      if (done) { this.scene.remove(s.mesh); this.spits.splice(i, 1); }
+    }
+  }
+
   hitMarker() {
     const h = document.getElementById('crosshair');
     h.classList.remove('hit'); void h.offsetWidth; h.classList.add('hit');
@@ -901,7 +939,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1056,10 +1094,12 @@ class Game {
       this.lava(dt);
       if (this.weather.raining && !p.underwater && p.alive) p.water = Math.min(100, p.water + dt * 0.35 * this.weather.cur.rain);
       this.world.update(dt);
+      this.creatures.daylight = this.caves.at(p.pos) ? 0 : this.env.daylight;
       this.creatures.update(dt, p, this.shared.uTime.value);
       this.building.update(dt, this.shared.uTime.value);
       this.building.growCrops(dt, this.weather.raining ? 2 : 1);
       this.updateArrows(dt);
+      this.updateSpits(dt);
       this.cooking(dt);
       this.saves.tick(dt);
       let danger = 0;
@@ -1089,6 +1129,7 @@ class Game {
     const item = this.activeItem();
     const def = item ? ITEMS[item.id] : null;
     p.equip(def && def.tool ? item.id : null);
+    this.input.glide = item?.id === 'glider';
     if (def && def.place && !p.mount && running) {
       this.placement = this.building.updateGhost(def.place, p.eye, p.lookDir());
     } else { this.building.setGhost(null); this.placement = null; }
@@ -1193,6 +1234,7 @@ class Game {
     || tip('volcano', () => volcanicAt(p.pos.x, p.pos.z) > 0.5, 'Ashfang Volcano: the heat drains water fast, and lava burns. Mine the black Obsidian here.')
     || tip('swamp', () => (this.biome?.swamp || 0) > 0.5, 'Murkmire Swamp: thick fog and murky pools. Bogmaws lurk in the water. Pick Marsh Herbs for Healing Salves.')
     || tip('frost', () => (this.biome?.frost || 0) > 0.5, 'Frostpeak: bitter cold up here. Fur Armor from Frosthorn pelts keeps you alive.')
+    || tip('night2', () => this.env.daylight < 0.3 && this.creatures.list.some((c) => c.species === 'nightstalker' && c.alive && c.pos.distanceTo(p.pos) < 70), 'Something is hunting in the dark. Nightstalkers sleep by day and hunt at night.')
     || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
   }
 
