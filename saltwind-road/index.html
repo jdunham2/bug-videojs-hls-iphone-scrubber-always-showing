@@ -770,6 +770,8 @@ const GOODS = {
   beehive:{name:'Beehive',base:50,col:'#e3a948',kind:'place',desc:'Place with B. Makes honey every day; collect it with E.'},
   crab_pot:{name:'Crab Pot',base:40,col:'#a0805a',kind:'place',desc:'Place with B next to water. Catches shells and fish every day.'},
   mushroom_log:{name:'Mushroom Log',base:45,col:'#7a5a3a',kind:'place',desc:'Place with B. Grows mushrooms (and sometimes truffles) every day.'},
+  heroic_token:{name:'Heroic Token',base:150,col:'#ff7a4a',kind:'good'},
+  heroic_crest:{name:'Heroic Crest',base:1500,col:'#ff7a4a',kind:'trinket',desc:'+8% damage and +1 armor. Proof of heroic deeds.'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1007,6 +1009,7 @@ const RECIPES = [
   {id:'beehive',        need:{wood:6,honey:1,planks:2}, at:'bench', known:true},
   {id:'crab_pot',       need:{rope:2,wood:3}, at:'bench', known:true},
   {id:'mushroom_log',   need:{wood:4,mushroom:3}, at:'hand', known:true},
+  {id:'heroic_crest',   need:{heroic_token:5,gem:2,silver:2}, at:'forge', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1200,6 +1203,7 @@ const BOSSES = {
   prismgolem:{name:'The Prism Colossus',tx:858,ty:150,kind:'golem',size:2.6,hp:340,dmg:6,speed:1.9,cd:2.1,abilities:['slam','quake','spray'],pcol:'#c8a8ff',loot:{coins:900,items:{prism_core:1,shimmer_shard:4}},intro:'The crystals hum and rise. A giant made of living light stands up.'},
   sporemother:{name:'The Spore Mother',tx:744,ty:198,kind:'witch',size:2.2,hp:300,dmg:5,speed:2.5,cd:1.8,abilities:['blink','spray','summon'],summon:'spider',pcol:'#b98ad8',loot:{coins:800,items:{spore_heart:1,truffle:3}},intro:'The glowcaps pulse. Something vast breathes spores into the dark.'},
   fallenking:{name:'The Fallen King',tx:628,ty:170,kind:'warden',size:2.5,hp:260,dmg:5,speed:2.6,cd:1.9,abilities:['slam','summon','cone','dash'],summon:'skeleton',undead:true,pcol:'#e3a948',loot:{coins:700,items:{kings_crown:1,ancient_coin:3}},intro:'A throne of bones creaks. The last king of the Old Kingdom rises to defend his crown.'},
+  heroic:{name:'Heroic Guardian',tx:-999,ty:-999,x:-999,y:-999,kind:'warden',size:2.4,hp:500,dmg:7,speed:2.6,cd:1.7,abilities:['slam'],dungeon:'heroic',loot:{coins:0,items:{}},intro:''},
   titan:{name:'The Earthshaker Titan',tx:-999,ty:-999,x:-999,y:-999,roaming:true,kind:'giant',size:3.6,hp:1100,dmg:8,speed:1.6,cd:2,abilities:['slam','quake','summon','quake'],summon:'rockgolem',pcol:'#a89880',loot:{coins:1600,items:{titan_heart:1,gem:4}},intro:'The ground heaves. A titan of living stone, taller than a watchtower, turns its eyes on you.'},
   redbeard:{name:'Captain Redbeard',tx:694,ty:234,sea:true,kind:'bandit',size:2.2,hp:360,dmg:6,speed:3.4,cd:1.6,abilities:['dash','spray','summon','dash'],summon:'bandit',pcol:'#c84a3a',loot:{coins:1200,items:{redbeard_cutlass:1,pirate_gold:4}},intro:'A cannon booms. Captain Redbeard leaps from the rocks, cutlass in hand.'},
   ronin:{name:'The Bamboo Ronin',tx:792,ty:100,kind:'bandit',size:1.9,hp:320,dmg:6,speed:3.6,cd:1.6,abilities:['dash','dash','spray','blink'],pcol:'#9ac85a',loot:{coins:850,items:{ronin_mask:1,bamboo:6}},intro:'The bamboo goes still. A masked swordsman steps out without a sound.'},
@@ -1218,7 +1222,7 @@ const BOSSES = {
   abyss:{name:'Abyssal Echo',tx:-999,ty:-999,x:-999,y:-999,kind:'wyrm',size:2.4,hp:200,dmg:5,speed:3,cd:2,abilities:['dash','spray'],dungeon:'abyss',pcol:'#b07aff',loot:{coins:300,items:{abyss_shard:3}},intro:''},
 };
 const BK = Object.keys(BOSSES);
-const BKM = BK.filter(k => k !== 'abyss' && k !== 'titan');
+const BKM = BK.filter(k => k !== 'abyss' && k !== 'titan' && k !== 'heroic');
 
 const DUNGEONS = {
   crypt:{name:'The Sunken Crypt', lvl:6, rect:[8,253,76,54], seed:101, near:[200,232], boss:'warden', treasure:'dawnbreaker', enemies:['skeleton','ghoul','bat','wisp'],
@@ -2776,7 +2780,7 @@ function weapon() {
 const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
-function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
@@ -3061,7 +3065,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3095,6 +3099,7 @@ function killEnemy(e) {
     if (e.boss === 'abyss') { S.abyssCheckpoint = Math.max(S.abyssCheckpoint || 1, ABYSS.floor + 1); setTimeout(() => toast(`<b>Checkpoint reached</b><br>You can now start the Abyss from floor ${ABYSS.floor + 1}. The way down is open.`, 6000), 1200); }
     S.coins += B.loot.coins; got.push(`+${B.loot.coins} coin`);
     if (B.dungeon && SHARD_DK.includes(B.dungeon)) { const n = shardCount(); got.push(`<b>a Crown Shard</b> (${n}/${SHARD_DK.length})`); if (n === DUNGEONS.hollowthrone.sealed) setTimeout(() => toast('<b>The shards sing</b><br>Far away, beneath the Broken Throne of the Old Kingdom, a seal cracks open. Oracle Veyra in Skyhold will know what it means.', 9000), 2500); }
+    if (e.boss === 'heroic' && S.heroicRun) { S.heroicDone = S.heroicDone || {}; S.heroicDone[S.heroicRun] = S.day; S.heroicWins = (S.heroicWins || 0) + 1; }
     if (e.boss === 'titan') { S.titanLast = S.day; S.titanPos = null; S.titansSlain = (S.titansSlain || 0) + 1; }
     if (e.boss === 'hollowking') setTimeout(() => toast('<b>The Hollow King falls</b><br>The dark lifts from every land at once. Bards will sing of this for a thousand years. You are the Legend of Saltwind Road.', 12000), 2000);
     for (const g in B.loot.items) { addItem(g, B.loot.items[g]); got.push(`+${B.loot.items[g]} ${GOODS[g].name}`); }
@@ -3155,7 +3160,7 @@ function die() {
   const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
   const atHome = !rp && S.home && S.home.level >= 1;
   if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
-  S.riding = false; petE = null; compE = null; S.race = null; if (S.escort) { S.escort = null; escortPts = null; setTimeout(() => toast('The wagon you were escorting was lost while you were knocked out.', 5000), 1500); }
+  S.riding = false; petE = null; compE = null; S.race = null; S.heroicRun = null; BOSSES.heroic.x = BOSSES.heroic.y = -999; if (S.escort) { S.escort = null; escortPts = null; setTimeout(() => toast('The wagon you were escorting was lost while you were knocked out.', 5000), 1500); }
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
   $('bossbar').hidden = true; document.body.classList.remove('boss');
   toast(`<b>You were knocked out</b><br>${rp ? `You wake up in your ${rp.name}.` : atHome ? 'You wake up in your own bed.' : `Someone carried you to ${TOWNS[best].name}.`} ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
@@ -3265,6 +3270,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Heroic dungeons', 'Once you beat a dungeon guardian you can return on Heroic once a week: tougher foes, a stronger guardian and Heroic Tokens.'],
   ['Producers', 'Craft beehives, crab pots (next to water) and mushroom logs, place them with B, and collect what they make every day.'],
   ['Magic', 'Archmage Ilyra in Skyhold teaches Fireball, Healing Light, Blink and Frost Nova. X casts your spell, Z switches.'],
   ['Archery', 'Range-master Holt in Hollowpine runs a 30-second target challenge with medals.'],
@@ -6475,6 +6481,10 @@ function genDungeons() {
 }
 function populateDungeon(k) {
   if (DUNGEONS[k].endless) { populateAbyss(); return; }
+  if (S.heroicRun === k) { populateDungeon2(k); for (const e of enemies) { e.hp = e.max = Math.round(e.max*1.8); e.dmgMul = (e.dmgMul || 1)*1.4; if (!e.elite && Math.random() < .2) { const dm = e.dmgMul; makeElite(e); e.dmgMul *= dm; } } return; }
+  populateDungeon2(k);
+}
+function populateDungeon2(k) {
   if (DUNGEONS[k].mine) { populateMine(); return; }
   const D = DUNGEONS[k], mul = 1.3 + D.lvl*.06;
   D.rooms.slice(1, -1).forEach(r => {
@@ -6487,20 +6497,32 @@ function populateDungeon(k) {
     }
   });
 }
-function enterDungeon(k) {
+function enterDungeon(k, mode) {
   const D = DUNGEONS[k];
   if (D.endless) { abyssEnterTalk(); return; }
   if (D.mine) { mineEnterTalk(); return; }
+  if (!mode && S.bosses[D.boss] && D.boss) {
+    S.heroicDone = S.heroicDone || {}; const last = S.heroicDone[k], ready = last == null || S.day - last >= 7;
+    openPanel(D.name, `You have already defeated its guardian. Enter normally, or brave <b style="color:#ff7a4a">Heroic</b> mode: tougher monsters, more elites, and the guardian returns stronger than ever, guarding heroic treasure.${ready ? '' : `<br><span style="color:var(--muted)">Heroic mode is available again in ${7 - (S.day - last)} day(s).</span>`}`, [
+      {label: 'Enter', fn: () => { closeTalk(); enterDungeon(k, 'normal'); }},
+      {label: 'Enter on Heroic', primary: ready, disabled: !ready, fn: () => { closeTalk(); enterDungeon(k, 'heroic'); }},
+      {label: 'Not now', fn: closeTalk}]);
+    return;
+  }
+  S.heroicRun = mode === 'heroic' ? k : null;
+  const HB = BOSSES.heroic;
+  if (S.heroicRun) { const base = BOSSES[D.boss]; Object.assign(HB, {name: `Heroic ${base.name.replace(/^The /, '')}`, kind: base.kind, size: base.size*1.1, abilities: base.abilities, summon: base.summon, undead: base.undead, pcol: base.pcol, speed: base.speed*1.1, cd: Math.max(1.2, base.cd*.85), hp: Math.round(base.hp*2.4), dmg: base.dmg + 3, loot: {coins: 400 + D.lvl*40, items: {heroic_token: 2 + Math.floor(D.lvl/8), gem: 2}}, intro: `${base.name} rises again, wreathed in fury. This time it will not hold back.`, x: base.x, y: base.y, tx: base.x, ty: base.y}); S.bosses.heroic = false; }
+  else { HB.x = HB.y = HB.tx = HB.ty = -999; }
   SFX.travel();
   fadeThen(() => {
     S.x = D.stairs.x + .5; S.y = D.stairs.y + 1.5; S.riding = false; petE = null; fishing = null; lastTile = -1;
     enemies = []; eproj = []; hazards = []; arrows = []; bombs = []; populateDungeon(k);
     S.dungeonsSeen[k] = true; renderHUD(); renderRegion(); save();
-    toast(`<b>${D.name}</b><br>${S.bosses[D.boss] ? 'The guardian is gone, but the dark is never empty.' : `Its guardian, ${BOSSES[D.boss].name}, waits in the deepest chamber.`}`, 5500);
+    toast(`<b>${D.name}${S.heroicRun ? ' · HEROIC' : ''}</b><br>${S.heroicRun ? `${BOSSES.heroic.name} waits in the deepest chamber. Good luck.` : S.bosses[D.boss] ? 'The guardian is gone, but the dark is never empty.' : `Its guardian, ${BOSSES[D.boss].name}, waits in the deepest chamber.`}`, 5500);
   });
 }
 function exitDungeon(k) {
-  const E = DUNGEONS[k].entrance; SFX.travel();
+  const E = DUNGEONS[k].entrance; SFX.travel(); S.heroicRun = null; BOSSES.heroic.x = BOSSES.heroic.y = -999;
   fadeThen(() => { S.x = E.x + .5; S.y = E.y + 1.4; petE = null; lastTile = -1; enemies = []; eproj = []; hazards = []; arrows = []; bombs = []; renderHUD(); renderRegion(); save(); });
 }
 const chestOpen = c => c.abyss ? !!c.opened : (S.chests[c.id] != null && (c.big || S.day - S.chests[c.id] < 7));
@@ -7165,6 +7187,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['heroic','Heroic','Defeat a guardian on Heroic', () => (S.heroicWins || 0) >= 1],
+  ['heroic5','Living Legend','Win 5 Heroic dungeons', () => (S.heroicWins || 0) >= 5],
   ['homesteader','Cottage Industry','Collect 100 goods from hives, crab pots and mushroom logs', () => (S.produced || 0) >= 100],
   ['apprentice','Apprentice Mage','Learn a spell', () => (S.spells || []).length >= 1],
   ['archmage','Archmage','Learn every spell', () => Object.keys(SPELLS).every(k => (S.spells || []).includes(k))],
@@ -7511,6 +7535,7 @@ function step(ts) {
   render();
 }
 function begin(state) {
+  state.heroicRun = null;
   if (state.story && state.story.heir && state.story.heir.crowned) { NPC_BY.elowen.name = 'Queen Elowen'; NPC_BY.elowen.role = 'Queen of the Old Kingdom'; }
   S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan();
   if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
