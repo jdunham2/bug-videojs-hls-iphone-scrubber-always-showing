@@ -14,6 +14,7 @@ import { TameRoster } from './tames.js';
 import { Settings } from './settings.js';
 import { Bestiary } from './bestiary.js';
 import { Music } from './music.js';
+import { Breeding } from './breeding.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -113,6 +114,8 @@ class Game {
     this.roster = new TameRoster(this);
     this.settings = new Settings(this);
     this.bestiary = new Bestiary(this);
+    this.breeding = new Breeding(this);
+    this.randomTameName = () => pick(TAME_NAMES);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -138,6 +141,7 @@ class Game {
       { title: 'Defeat the Primal Tyrant', progress: () => this.boss && this.boss.alive ? `Tyrant health ${Math.round((this.boss.hp / this.boss.maxHp) * 100)}%` : 'Summon it again at the altar if you fled', done: () => (this.stats.bossKills || 0) >= 1 },
       { title: 'Forge the Primal Blade from the Tyrant Fang', progress: () => 'Needs a Forge, 20 Metal Ingots and 10 Hide', done: () => this.inv.count('primalblade') > 0 || (this.stats.blades || 0) > 0 },
       { title: 'Grow food: build a Crop Plot, plant a seed and harvest it', progress: () => 'Seeds drop from berry bushes. Rain doubles growth.', done: () => (this.stats.harvests || 0) >= 1 },
+      { title: 'Breed your tames: two of a kind on Stay, then hatch the egg by a fire', progress: () => 'Set both to Stay (roster: T) within 8 m of each other', done: () => (this.stats.hatched || 0) >= 1 },
     ];
     this.questIdx = 0;
 
@@ -309,6 +313,7 @@ class Game {
       if (!cr.alive) { this.harvestCarcass(cr, 0.6); return; }
       if (cr.ko && !cr.tamed) { this.feed(cr); return; }
       if (cr.tamed) {
+        if (cr.def.rideable && cr.baby) { this.ui.notify(`${cr.name} is too young to ride (${Math.round(cr.growth * 100)}% grown)`, 'warn'); return; }
         if (cr.def.rideable) {
           if (!cr.saddled) {
             if (this.inv.count('saddle') > 0) { this.inv.remove('saddle', 1); cr.saddled = true; this.ui.notify(`Saddled ${cr.name}`); }
@@ -1034,6 +1039,7 @@ class Game {
       this.music.update(dt, { night: 1 - this.env.daylight, danger, boss: this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 120 ? 1 : 0 });
       this.map.update(dt);
       this.bestiary.update(dt);
+      this.breeding.update(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
@@ -1161,6 +1167,7 @@ class Game {
       if (n && n.dist < 4 && n.node.kind === 'bush') prompt = `<kbd>E</kbd> Pick ${n.node.type === 'dozebush' ? 'Dozeberries' : 'Wildberries'}`;
       else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> ${n.node.kind === 'tree' ? 'Harvest Tree' : n.node.type === 'metal' ? 'Mine Metal Ore' + (this.activeItem()?.id?.includes('pick') ? '' : ' (use a pick)') : 'Harvest Rock'}`;
       else if (this.bagNear(p.pos)) prompt = '<kbd>E</kbd> Recover your belongings';
+      else if (this.breeding.eggNear(p.pos)) { const e = this.breeding.eggNear(p.pos); prompt = `${e.species[0].toUpperCase() + e.species.slice(1)} egg · ${Math.round(e.hatch * 100)}% incubated · ${e.warm ? 'warm' : 'cold — light a campfire nearby'}`; }
       else if (fire) {
         const k = KIND[fire.type];
         prompt = k === 'fire' ? `<kbd>E</kbd> ${fire.lit ? 'Extinguish' : 'Light'} Campfire`

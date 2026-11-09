@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    eggs: g.breeding ? g.breeding.serialize() : undefined,
     bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
     bossActive: !!(g.boss && g.boss.alive) || undefined,
@@ -133,6 +134,7 @@ export function serialize(g) {
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
       species: c.species, level: c.level, name: c.name, pos: v3(c.pos), yaw: r2(c.yaw),
       hp: r2(c.hp), maxHp: c.maxHp, dmg: r2(c.dmg), xp: r2(c.xp || 0), saddled: c.saddled, follow: c.follow,
+      baby: c.baby || undefined, growth: c.baby ? r2(c.growth) : undefined, adultScale: c.adultScale, fullHp: c.fullHp, mateCd: c.mateCd > 0 ? Math.round(c.mateCd) : undefined,
     })),
   };
 }
@@ -155,6 +157,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.eggs && g.breeding) g.breeding.load(d.eggs);
   if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
   for (const b of d.bags || []) g.dropBag(new THREE.Vector3().fromArray(b.pos), b.items);
   if (d.bossActive) g.inv.add('trophy', 3); // the fight resets on reload; refund the offering
@@ -177,6 +180,10 @@ export function applySave(g, d) {
     if (t.maxHp) c.maxHp = t.maxHp;
     if (t.dmg) c.dmg = t.dmg;
     c.xp = t.xp || 0;
+    if (t.adultScale) { c.adultScale = t.adultScale; c.scale = t.adultScale; c.obj.scale.setScalar(c.scale); }
+    if (t.fullHp) c.fullHp = t.fullHp;
+    if (t.mateCd) c.mateCd = t.mateCd;
+    if (t.baby) { c.baby = true; c.growth = t.growth || 0; g.breeding?.applyGrowth(c); }
     c.hp = Math.min(c.maxHp, t.hp);
   }
   g.ui.refresh();

@@ -116,7 +116,7 @@ export class TameRoster {
     this.list.innerHTML = tames.map((c) => {
       const hp = Math.max(0, c.hp / c.maxHp) * 100, xp = ((c.xp || 0) / tameXpNeed(c)) * 100;
       const dist = Math.round(c.pos.distanceTo(g.player.pos));
-      const status = c.riddenBy ? 'Riding' : c.follow ? 'Following' : 'Staying';
+      const status = (c.riddenBy ? 'Riding' : c.follow ? 'Following' : 'Staying') + (c.baby ? ` · Baby ${Math.round(c.growth * 100)}%` : '') + (c.mating > 0 ? ` · Courting ${Math.round(c.mating * 100)}%` : '') + (c.mateCd > 0 && !c.baby ? ' · Resting' : '');
       const confirming = this.confirm === c.id;
       return `<div class="tame-row">
         <div class="tame-ic">${ICON[c.species] || '🦖'}</div>

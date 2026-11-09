@@ -39,6 +39,11 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   commands: G all follow, H all stay, Z attack whatever you're aiming at.
 - **Bestiary (J, or 📖 on touch):** each species is recorded the first time you get close,
   with field notes, habitat, taming food, base stats and your kill/tame counts.
+- **Breeding:** set two adult tames of the same species to Stay within 8 m of each other.
+  After a minute of courting they lay an egg. Eggs incubate while warm (next to a lit
+  campfire or forge, or in hot sun) and hatch in about 2 minutes into a tamed baby with a
+  level bonus, which grows to full size over 10 minutes. Tames on Stay now hold position
+  instead of joining fights.
 - **Alphas:** rare, oversized creatures that glow red. They hit much harder, cannot be
   tamed, drop triple loot and an Alpha Trophy. Seven roam the island at the start.
 - **Boss — the Primal Tyrant:** offer 3 Alpha Trophies at the Caldera Altar near the

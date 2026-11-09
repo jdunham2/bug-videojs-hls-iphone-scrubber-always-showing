@@ -861,7 +861,7 @@ export class CreatureManager {
     if (c.tamed) {
       c.hp = Math.min(c.maxHp, c.hp + c.maxHp * 0.003 * dt); // slow natural healing
       // assist: attack anything targeting the player
-      if (c.scanCd <= 0 && c.species !== 'pudgewing') {
+      if (c.scanCd <= 0 && c.species !== 'pudgewing' && c.follow) { // tames on Stay hold position
         c.scanCd = 0.6;
         if (c.state !== 'chase') {
           for (const o of this.list) {
