@@ -4293,6 +4293,20 @@ function checkDeeds() {
     }
     html += `<div class="dd ${d.done ? 'ok' : ''}"><span>${d.done ? '✓ ' : ''}${T0.txt(d.n)}</span><span>${d.done ? '' : `${Math.max(0, prog)}/${d.n}`}</span></div>`;
   }
+  const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
+  const extra = [];
+  if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
+  if (S.tmap) extra.push(`<div class="dd"><span>✕ Treasure ${S.tmap.dir} of ${TOWNS[S.tmap.town].name}</span></div>`);
+  for (const k of act) {
+    const c = CONTRACTS[k], ready = canComplete(c, k), giver = NPC_BY[c.giver];
+    let prog = '';
+    if (c.need) prog = Object.entries(c.need).map(([g, q]) => `${Math.min(q, have(g))}/${q} ${GOODS[g].name}`).join(', ');
+    else if (c.kill) prog = Object.entries(c.kill).map(([t, q]) => `${Math.min(q, killProgress(k, t))}/${q} ${plural(t, q)}`).join(', ');
+    else if (c.boss) prog = `Defeat ${BOSSES[c.boss].name}`;
+    else if (c.visit) prog = `Find ${(LANDMARKS.find(L => L.id === c.visit) || {}).name || 'the place'}`;
+    extra.push(`<div class="dd ${ready ? 'ok' : ''}"><span>${ready ? `✓ Return to ${giver ? giver.name : 'the giver'}` : esc(prog)}</span></div>`);
+  }
+  if (extra.length) html += `<div class="h" style="margin-top:4px">${act.length ? 'JOBS' : 'NOW'}</div>` + extra.join('');
   if ($('deeds').innerHTML !== html) $('deeds').innerHTML = html;
   if (changed) { renderHUD(); save(); }
 }
