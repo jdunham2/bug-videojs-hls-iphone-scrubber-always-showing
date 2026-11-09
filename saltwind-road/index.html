@@ -1927,6 +1927,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'mara',town:'tidewatch',dx:4,dy:-2,name:'Old Mara',role:'Lighthouse keeper',cols:{cloak:'#2a4a6a',skin:'#d8b090',hair:'#d0d0d0'},keeper:true,freeSpot:true,
+   hello:["Mind the rocks, sailor.","The light's been dark for twenty years.","Every ship deserves a light to come home by."], rumors:["When the Tidewatch light still burned, sailors came from every port. Now they wreck on the rocks instead."]},
   {id:'opaline',town:'prismvale',dx:3,dy:3,name:'Opaline',role:'Gem cutter',cols:{cloak:'#7a4aa0',skin:'#e8c8b0',hair:'#f0f0ff'},gemcutter:true,freeSpot:true,
    hello:["Ooh, let me see what you're wearing.","Every blade deserves a jewel.","Light through a sapphire... nothing finer."], rumors:["Cut gems become rubies, sapphires and more at any workbench. Bring them to me and I'll set them in your gear."]},
   {id:'wilma',town:'wren',dx:3,dy:2,name:'Wilma Barksdale',role:'Pet trainer',cols:{cloak:'#6a8a3a',skin:'#d8a882',hair:'#a05a2a'},trainer:true,
@@ -3301,6 +3303,24 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== Tidewatch lighthouse =====
+const LIGHT_STAGES = [
+  {name: 'Rebuild the stairs', cost: {stone: 20, planks: 10}, coins: 150, txt: 'The rotten stair is torn out and new steps spiral up the tower.'},
+  {name: 'Mend the lamp housing', cost: {iron: 6, rope: 4, glass: 4}, coins: 250, txt: 'New iron bands and fresh glass panes ring the lamp room.'},
+  {name: 'Light the great lamp', cost: {ember: 3, star_fragment: 1, coins: 300}, coins: 0, txt: 'The ember catches, the star fragment flares, and a great beam sweeps out across the sea!'},
+];
+function lighthouseTalk(n) {
+  const st = S.lighthouse || 0;
+  if (st >= 3) { say(`“Look at her shine! Ships are coming home safe again, all thanks to you.”<br><span style="color:var(--good)">The lit lighthouse makes your boat 15% faster at sea and floating crates more common.</span>`, [back(n)]); return; }
+  const L = LIGHT_STAGES[st], ok = upCanPay(L.cost);
+  say(`“The Tidewatch light has been dark for twenty years. Help me bring her back, would you?”<br><br><b>Step ${st + 1} of 3: ${L.name}</b><div class="req" style="margin-top:8px">${upCostHTML(L.cost)}</div>`, [
+    {label: L.name, primary: ok, disabled: !ok, fn: () => {
+      upPay(L.cost); S.lighthouse = st + 1; if (L.coins) S.coins += L.coins; addRep('tidewatch', .6); gainXP(80 + st*60); SFX.victory();
+      if (S.lighthouse >= 3) { S.flags.lighthouse = true; for (let i = 0; i < 5; i++) setTimeout(() => burst(n.x, n.y - 1, '#fff4b0', 20, 6), i*200); }
+      renderHUD(); save();
+      say(`${L.txt}${L.coins ? `<br><span style="color:var(--good)">Mara presses ${L.coins} coin into your hand.</span>` : ''}${S.lighthouse >= 3 ? '<br><br><b>The Tidewatch lighthouse burns again!</b> Your boat sails 15% faster and sailors will tell of this for years.' : ''}`, [back(n)]);
+    }}, back(n)]);
+}
 // ===== gem sockets =====
 const SOCKET_FEE = 100;
 function socketTalk(n) {
@@ -3574,8 +3594,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The lighthouse', 'Old Mara in Tidewatch needs help restoring the lighthouse in three steps. Once it is lit again your boat sails 15% faster.'],
   ['The Headless Horseman', 'On autumn nights, beware the roads outside town. The Headless Horseman rides once a night, hurling flaming pumpkins. Defeat him to claim his steed, the Nightmare.'],
   ['Gem sockets', 'Turn Cut Gems into Rubies, Sapphires, Emeralds, Topaz or Amethysts at a workbench. Opaline in Prismvale sets one gem into each piece of gear for lasting bonuses while you wear it.'],
   ['Wanted outlaws', 'Every week a WANTED poster goes up on the notice boards. Take the bounty and the outlaw\u2019s hideout is marked on your map. Defeat them and their gang for a big reward.'],
@@ -4697,6 +4718,7 @@ function render() {
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
     { const no = NPC_BY.noctis; if (!no.away) hole(no.x*TS, no.y*TS - 10, 40, .85); }
     for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
+    if (S.flags.lighthouse && NPC_BY.mara) { const k = NPC_BY.mara, a = frameT*.8; hole(k.x*TS, (k.y - 1)*TS, 40, .9); for (let i = 1; i <= 4; i++) hole((k.x + Math.cos(a)*i*2.2)*TS, (k.y - 1 + Math.sin(a)*i*2.2)*TS, 26 - i*3, .6); }
     for (const q of S.placed) if (PLACE[q.t].light) hole(q.x*TS + 8, q.y*TS + (q.t === 'campfire' ? 8 : -4), PLACE[q.t].light, .85);
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
     const lan = LANDMARKS.find(l => l.id === 'lantern'); hole(lan.x*TS + 8, lan.y*TS - 4, 40, .8);
@@ -4880,7 +4902,7 @@ function update(dt) {
     if (mag > 1) { vx /= mag; vy /= mag; }
     const t = tileAt(Math.floor(S.x), Math.floor(S.y));
     let sp = SPEED[t];
-    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = S.flags.boat ? 2.3 : 1.15;
+    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = (S.flags.boat ? 2.3 : 1.15) * (S.flags.lighthouse ? 1.15 : 1);
     if (t === T.MOUNT) sp = .4;
     const M = S.riding && MOUNTS[S.mount];
     if (M && M.swim && (t === T.DEEP || t === T.SHAL)) sp = M.speed; else if (M && M.swim) sp = Math.max(.4, sp) * .8; else if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
@@ -5235,6 +5257,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
@@ -7866,6 +7889,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['lighthouse','Keeper of the Light','Restore the Tidewatch lighthouse', () => (S.lighthouse || 0) >= 3],
   ['horseman','Sleepy Hollow','Defeat the Headless Horseman', () => (S.horsemen || 0) >= 1],
   ['jeweled','Bejeweled','Socket gems into 4 pieces of gear', () => Object.keys(S.sockets || {}).length >= 4],
   ['sheriff','Sheriff','Bring 3 wanted outlaws to justice', () => (S.outlawsCaught || 0) >= 3],
