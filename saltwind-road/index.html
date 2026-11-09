@@ -733,6 +733,12 @@ const GOODS = {
   storm_glass:{name:'Storm Glass',base:65,col:'#bfe8ff',kind:'mat'},
   storm_spear:{name:'Stormcaller Spear',base:1100,col:'#bfe8ff',kind:'weapon',dmg:12,cd:.42,reach:2.1,crit:.08},
   storm_charm:{name:'Storm Charm',base:400,col:'#bfe8ff',kind:'trinket',desc:'+10% movement speed in rain and storms'},
+  mithril_ore:{name:'Mithril Ore',base:60,col:'#9fc8e0',kind:'mat'},
+  mithril:{name:'Mithril',base:140,col:'#bfe8ff',kind:'mat'},
+  mithril_sword:{name:'Mithril Sword',base:1400,col:'#bfe8ff',kind:'weapon',dmg:13,cd:.28,reach:1.6,crit:.06},
+  mithril_plate:{name:'Mithril Plate',base:1600,col:'#bfe8ff',kind:'armor',armor:7,speed:.03},
+  mithril_helm:{name:'Mithril Helm',base:800,col:'#bfe8ff',kind:'armor',slot:'head',armor:3},
+  mithril_shield:{name:'Mithril Shield',base:900,col:'#bfe8ff',kind:'armor',slot:'shield',armor:3,block:.24},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -948,6 +954,11 @@ const RECIPES = [
   {id:'comet_hammer',  need:{star_fragment:8,blacksteel:2,iron:4}, at:'forge', known:true},
   {id:'storm_spear',    need:{storm_glass:5,iron:4,silver:1}, at:'forge', known:true},
   {id:'storm_charm',    need:{storm_glass:3,silver:1}, at:'bench', known:true},
+  {id:'smelt_mithril', out:'mithril', need:{mithril_ore:2,wood:2}, at:'forge', known:true, label:'Smelt Mithril'},
+  {id:'mithril_sword', need:{mithril:4,blacksteel:1}, at:'forge', known:true},
+  {id:'mithril_plate', need:{mithril:7,silk_cloth:1}, at:'forge', known:true},
+  {id:'mithril_helm',  need:{mithril:3}, at:'forge', known:true},
+  {id:'mithril_shield',need:{mithril:4,wood:2}, at:'forge', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1035,6 +1046,8 @@ const NODES = {
   quartz:{name:'Quartz',verb:'Pick up',give:'quartz',amt:[1,2],hits:1,regrow:3},
   shard:{name:'Shimmer Shards',verb:'Collect',give:'shimmer_shard',amt:[1,2],hits:2,regrow:3,curio:'prism'},
   redwood:{name:'Giant Redwood',verb:'Chop',tool:'axe',give:'redwood',amt:[2,3],hits:4,regrow:4,seed:'amber',seedP:.12},
+  gemvein:{name:'Gem Vein',verb:'Mine',tool:'pick',tier:2,give:'gem',amt:[1,1],hits:5,regrow:99,curio:'geode'},
+  mithril:{name:'Mithril Vein',verb:'Mine',tool:'pick',tier:2,give:'mithril_ore',amt:[1,2],hits:5,regrow:99},
   flotsam:{name:'Floating Crate',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:6,loot:true},
   satchel:{name:'Lost Satchel',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:7,loot:true},
   giantshroom:{name:'Giant Glowcap',verb:'Harvest',give:'mushroom',amt:[2,3],hits:2,regrow:3,seed:'truffle',seedP:.15,curio:'sporeorb'},
@@ -1170,11 +1183,13 @@ const DUNGEONS = {
     theme:{floor:'#3a3448', floor2:'#342e42', wall:'#141020', top:'#6a5a8a', accent:'#e8a8ff'}},
   hollowthrone:{name:'The Hollow Throne', lvl:30, rect:[856,253,76,54], seed:999, near:[598,122], boss:'hollowking', treasure:'crown_of_ages', sealed:6, enemies:['wraith','ghoul','skeleton','imp','dustdevil'],
     theme:{floor:'#2a2438', floor2:'#262034', wall:'#0c0814', top:'#4a3a6a', accent:'#c8a8ff'}},
+  mine:{name:'The Deep Mine', lvl:8, rect:[936,253,60,50], seed:4040, near:[160,100], mine:true, enemies:['bat','skeleton','spider'],
+    theme:{floor:'#4a3a2e', floor2:'#44352a', wall:'#1e1610', top:'#6a5440', accent:'#e3a948'}},
   abyss:{name:'The Abyss', lvl:12, rect:[272,253,84,54], seed:9001, near:[134,122], endless:true, enemies:[],
     theme:{floor:'#221a30', floor2:'#1e1629', wall:'#0a0610', top:'#3a2a5a', accent:'#b07aff'}},
 };
 const DK = Object.keys(DUNGEONS);
-const DK_FIXED = DK.filter(k => !DUNGEONS[k].endless);
+const DK_FIXED = DK.filter(k => !DUNGEONS[k].endless && !DUNGEONS[k].mine);
 const SHARD_DK = DK_FIXED.filter(k => !DUNGEONS[k].sealed);
 const shardCount = () => SHARD_DK.filter(k => S.bosses[DUNGEONS[k].boss]).length;
 const ABYSS = {floor: 1, gen: 0};
@@ -1770,6 +1785,9 @@ const NPCS = [
    hello:["Sit. Roll.","Ah, my favorite pigeon.","A worthy rival returns."], rumors:["Always keep a pair. Always."]},
   {id:'finn',town:'crownfall',dx:2,dy:3,name:'One-Eyed Finn',role:'High roller',cols:{cloak:'#2a2a3a',skin:'#c89870',hair:'#8a8a8a'},dice:true,maxBet:250,smart:true,diceIntro:"Only big bets at my table. Don't waste my time.",taunts:["Lost an eye at this table. Didn't lose much else.","The house always wins. I'm the house.","Pay up."],
    hello:["Big money only.","You again.","Hmph. You're good. I'll admit it."], rumors:["I once won a castle in a game of Bones. Lost it the next night."]},
+  {id:'durn',town:'highcairn',dx:-2,dy:3,name:'Foreman Durn',role:'Mine foreman',cols:{cloak:'#6a5040',skin:'#c89870',hair:'#3a2a1a'},
+   hello:["Mind your head down there.","Back from the deep?","Best digger I've ever seen!"],
+   rumors:["The Deep Mine is just east of town. It goes deeper than anyone's ever been.","Past the fourth floor you'll find gem veins. Past the sixth, mithril. Lighter than steel, stronger than blacksteel.","Every five floors there's a lift. Reach one and you can ride it straight back down next time."]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -2246,7 +2264,7 @@ function placeNodes() {
       case T.GLOOM:  type = r < .06 ? 'mushroom' : r < .085 ? 'web' : r < .11 ? 'branch' : r < .12 ? 'herb' : null; break;
       case T.ASH:    type = near(x,y,T.LAVA) ? (r < .14 ? 'obsidian' : r < .2 ? 'sulfur' : null) : (r < .045 ? 'sulfur' : r < .065 ? 'obsidian' : r < .085 ? 'rock' : null); break;
       case T.SHAL:   type = landNear(x,y) && r < .07 ? 'fish' : null; break;
-      case T.DFLOOR: { const dk = dungeonAtX(x); type = !dk || dk === 'abyss' ? null : dk === 'hollowthrone' ? (r < .02 ? 'crystal' : r < .03 ? 'shard' : null) : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
+      case T.DFLOOR: { const dk = dungeonAtX(x); type = !dk || dk === 'abyss' || dk === 'mine' ? null : dk === 'hollowthrone' ? (r < .02 ? 'crystal' : r < .03 ? 'shard' : null) : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
       case T.JUNGLE: type = r < .05 ? 'fruit' : r < .09 ? 'vine' : r < .1 ? 'herb' : r < .115 ? 'branch' : r < .127 ? 'jade' : r < .14 ? 'orangetree' : null; break;
       case T.MESA:   type = r < .05 ? 'copper' : r < .07 ? 'rock' : r < .085 ? 'cactus' : (nearMt && r < .14) ? 'jade' : null; break;
       case T.MOOR:   type = r < .06 ? 'heather' : r < .075 ? 'rock' : r < .09 ? 'bush' : null; break;
@@ -2275,6 +2293,9 @@ function placeNodes() {
     }
     if (type) { nodeGrid[i] = nodes.length; nodes.push({x, y, type}); }
   }
+  MINE.slot0 = nodes.length;
+  for (let k = 0; k < MINE_SLOTS; k++) nodes.push({x: -1, y: -1, type: 'ore', mine: true});
+  mineNodes();
 }
 
 function astar(sx, sy, gx, gy, cost) {
@@ -3494,6 +3515,8 @@ function drawNode(g, i, t) {
     case 'quartz': if (!avail) return; shadow(5); g.fillStyle = '#e8e8f0'; g.beginPath(); g.moveTo(x-4, y); g.lineTo(x-2, y-8); g.lineTo(x, y); g.fill(); g.beginPath(); g.moveTo(x, y); g.lineTo(x+3, y-6); g.lineTo(x+5, y); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(x-2, y-6, 1, 3); break;
     case 'shard': shadow(6); if (!avail) { g.fillStyle = '#8a9ab0'; g.fillRect(x-3, y-2, 6, 2); return; } for (const [a,h,c] of [[-4,9,'#9fe8ff'],[0,13,'#e8a8ff'],[4,8,'#fff0a0']]) { g.fillStyle = c; g.beginPath(); g.moveTo(x+a-2, y); g.lineTo(x+a, y-h); g.lineTo(x+a+2, y); g.fill(); } g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(x, y-10 + Math.sin(t*3)*1, 1, 2); break;
     case 'redwood': shadow(9); g.fillStyle = '#6a2e1a'; g.fillRect(x-4, y-14, 8, 14); g.fillStyle = '#8a3e22'; g.fillRect(x-2, y-14, 2, 14); if (!avail) { g.fillStyle = '#d8a070'; g.fillRect(x-4, y-14, 8, 2); return; } g.fillStyle = '#1e3e16'; g.beginPath(); g.moveTo(x-11, y-10); g.lineTo(x, y-36); g.lineTo(x+11, y-10); g.fill(); g.fillStyle = '#2a5220'; g.beginPath(); g.moveTo(x-8, y-20); g.lineTo(x, y-40); g.lineTo(x+8, y-20); g.fill(); break;
+    case 'gemvein': rock('#5a5060', '#e04a8a'); if (!avail) return; g.fillRect(x-3, y-6, 2, 2); g.fillRect(x+2, y-4, 2, 2); g.fillStyle = '#4ab0e0'; g.fillRect(x-1, y-3, 2, 2); if (Math.random() < .03) burst(n.x + .5, n.y + .3, '#ff8ac0', 1, 1); break;
+    case 'mithril': rock('#4a5058', '#bfe8ff'); if (!avail) return; g.fillRect(x-4, y-5, 3, 1); g.fillRect(x+1, y-3, 3, 1); g.fillRect(x-1, y-7, 2, 1); g.fillStyle = '#ffffff'; if (Math.sin(t*3 + n.x) > .8) g.fillRect(x, y-5, 1, 1); break;
     case 'flotsam': { if (!avail) return; const b = Math.sin(t*2 + n.x)*1.5; g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x-8, y-1 + b, 16, 1); g.fillStyle = '#8a5a2a'; g.fillRect(x-5, y-8 + b, 10, 8); g.fillStyle = '#6a3a1a'; g.fillRect(x-5, y-5 + b, 10, 1); g.fillRect(x-1, y-8 + b, 2, 8); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5 + b, 2, 1); break; }
     case 'satchel': if (!avail) return; shadow(6); g.fillStyle = '#7a4a22'; g.fillRect(x-5, y-6, 10, 6); g.fillStyle = '#9a6a3a'; g.fillRect(x-5, y-7, 10, 3); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5, 2, 2); if (Math.sin(t*4 + n.x) > .7) { g.fillStyle = 'rgba(255,240,180,.9)'; g.fillRect(x+4, y-9, 1, 1); } break;
     case 'mapletree': shadow(7); g.fillStyle = '#4a3020'; g.fillRect(x-2, y-8, 4, 8); if (!avail) { g.fillStyle = '#c49a63'; g.fillRect(x-2, y-8, 4, 2); return; } g.fillStyle = '#c8401a'; g.beginPath(); g.arc(x, y-14, 9, 0, 7); g.fill(); g.fillStyle = '#e07a20'; g.beginPath(); g.arc(x-3, y-16, 5, 0, 7); g.fill(); g.fillStyle = '#c8c0b0'; g.fillRect(x+2, y-5, 2, 2); g.fillStyle = '#b0601a'; g.fillRect(x+2, y-3, 2, 1); break;
@@ -4294,7 +4317,7 @@ function renderClock() {
   if ($('clock').textContent !== txt) $('clock').textContent = txt;
 }
 function renderRegion() {
-  const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
+  const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].mine ? `The Deep Mine · Floor ${MINE.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   if (S.race) { const nm = S.race.t < 0 ? `Race starts in ${Math.ceil(-S.race.t)}` : `Race · ${S.race.i + 1}/${S.race.cps.length} · ${S.race.t.toFixed(1)}s`; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   if (inArena()) { const nm = S.arena ? `Crownfall Arena · Wave ${S.arena.wave}` : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   let name = '';
@@ -5541,7 +5564,7 @@ function openJournal() {
     <h3>Great beasts · ${BKM.filter(k => S.bosses[k]).length}/${BKM.length} slain</h3>
     <div class="jgrid">${BKM.map(k => { const B = BOSSES[k]; return `<div class="jcard boss"><div class="t ${S.bosses[k] ? 'done' : ''}">${S.bosses[k] ? '✓ ' : ''}${esc(B.name)}</div><div class="s">${S.bosses[k] ? 'Defeated' : S.lairsSeen[k] ? 'Lair marked on your map' : 'Lair unknown. Ask around.'} · ${B.hp} HP</div></div>`; }).join('')}</div>
     <h3>Dungeons</h3>
-    <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); if (D.endless) return `<div class="jcard boss"><div class="t">The Abyss</div><div class="s">Endless · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · deepest floor ${S.abyssBest || 0} · checkpoint floor ${S.abyssCheckpoint || 1}</div></div>`; return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
+    <div class="jgrid">${DK.map(k => { const D = DUNGEONS[k], dn = S.bosses[D.boss], cs = chests.filter(c => c.d === k); if (D.mine) return `<div class="jcard boss"><div class="t">The Deep Mine</div><div class="s">Endless caves · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance near Highcairn'} · deepest floor ${S.mineBest || 0}</div></div>`; if (D.endless) return `<div class="jcard boss"><div class="t">The Abyss</div><div class="s">Endless · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · deepest floor ${S.abyssBest || 0} · checkpoint floor ${S.abyssCheckpoint || 1}</div></div>`; return `<div class="jcard boss"><div class="t ${dn ? 'done' : ''}">${dn ? '✓ ' : ''}${D.name}</div><div class="s">Recommended level ${D.lvl} · ${S.dungeonsSeen[k] ? 'entrance found' : 'entrance not found yet'} · chests opened ${cs.filter(c => S.chests[c.id] != null).length}/${cs.length}</div></div>`; }).join('')}</div>
     <h3>Bestiary · ${BEAST_IDS.filter(k => S.killsBy[k]).length}/${BEAST_IDS.length} known · ${BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length} mastered</h3><div class="vals" style="margin-bottom:4px">Defeat ${MASTERY} of a kind to master it: +10% damage against them forever.</div><div class="jgrid">${BEAST_IDS.map(k => { const n = S.killsBy[k] || 0; return `<div class="jcard"><div class="t">${n ? esc(ENEMIES[k].name) : '???'}${n >= MASTERY ? ' <span style="color:var(--brass)">★</span>' : ''}</div><div class="s">${n ? `${n} defeated${n < MASTERY ? ` · ${MASTERY - n} to mastery` : ' · mastered'}` : 'Not met yet'}</div></div>`; }).join('')}</div>
     <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
@@ -5632,6 +5655,7 @@ function genDungeons() {
   for (const k of DK) {
     const D = DUNGEONS[k], [rx, ry, rw, rh] = D.rect, rnd = mulberry32(D.seed);
     if (D.endless) { carveAbyss(1); continue; }
+    if (D.mine) { carveMine(1); continue; }
     for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) map[idx(x,y)] = T.DWALL;
     const rooms = [];
     for (let tries = 0; tries < 400 && rooms.length < 9; tries++) {
@@ -5669,6 +5693,7 @@ function genDungeons() {
 }
 function populateDungeon(k) {
   if (DUNGEONS[k].endless) { populateAbyss(); return; }
+  if (DUNGEONS[k].mine) { populateMine(); return; }
   const D = DUNGEONS[k], mul = 1.3 + D.lvl*.06;
   D.rooms.slice(1, -1).forEach(r => {
     const n = 2 + Math.floor(Math.random()*2);
@@ -5683,6 +5708,7 @@ function populateDungeon(k) {
 function enterDungeon(k) {
   const D = DUNGEONS[k];
   if (D.endless) { abyssEnterTalk(); return; }
+  if (D.mine) { mineEnterTalk(); return; }
   SFX.travel();
   fadeThen(() => {
     S.x = D.stairs.x + .5; S.y = D.stairs.y + 1.5; S.riding = false; petE = null; fishing = null; lastTile = -1;
@@ -5727,6 +5753,7 @@ function dungeonTarget() {
   }
   const D = DUNGEONS[dk];
   if (Math.hypot(S.x - D.stairs.x - .5, S.y - D.stairs.y - .5) < 1.3) return {key:'dx', html:`${K}Climb back to the surface`, btn:'Leave', fn: () => exitDungeon(dk)};
+  if (D.mine && Math.hypot(S.x - D.down.x - .5, S.y - D.down.y - .5) < 1.3) return {key: 'md' + MINE.floor, html: `${K}Climb down to floor ${MINE.floor + 1}`, btn: 'Descend', fn: () => { SFX.travel(); gainXP(25*MINE.floor); goMineFloor(MINE.floor + 1); }};
   if (D.endless && D.down && Math.hypot(S.x - D.down.x - .5, S.y - D.down.y - .5) < 1.3) {
     if (ABYSS.floor % 5 === 0 && !S.bosses.abyss) return {key:'dds', html:`The way down is sealed until ${BOSSES.abyss.name} falls`, btn:'', fn: () => {}};
     return {key:'dd' + ABYSS.floor, html:`${K}Descend to floor ${ABYSS.floor + 1}`, btn:'Descend', fn: descendAbyss};
@@ -5759,6 +5786,76 @@ function drawEntrance(g, k) {
 
 /* ================= the abyss ================= */
 const ABYSS_POOL = [['wolf','boar','bandit','spider','bat','skeleton'], ['archer','scorpion','lurker','ghoul','snake','coyote'], ['imp','wraith','wisp','harpy','jaguar','dustdevil']];
+const MINE = {floor: 1, gen: 0, slot0: -1, floors: []}, MINE_SLOTS = 90;
+function carveMine(floor) {
+  const D = DUNGEONS.mine, [rx, ry, rw, rh] = D.rect;
+  MINE.floor = floor; MINE.gen++;
+  let best = null;
+  for (let attempt = 0; attempt < 6 && !best; attempt++) {
+    const rnd = mulberry32(4040 + floor*7919 + MINE.gen*131 + attempt*17), g = new Uint8Array(rw*rh);
+    for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) g[y*rw + x] = (x < 2 || y < 2 || x >= rw - 2 || y >= rh - 2 || rnd() < .4) ? 1 : 0;
+    for (let it = 0; it < 5; it++) { const n = g.slice(); for (let y = 1; y < rh - 1; y++) for (let x = 1; x < rw - 1; x++) { let c = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && g[(y + dy)*rw + x + dx]) c++; n[y*rw + x] = c >= 5 ? 1 : c <= 2 ? 0 : g[y*rw + x]; } g.set(n); }
+    const seen = new Int32Array(rw*rh).fill(-1); let bigId = -1, bigN = 0, id = 0;
+    for (let i0 = 0; i0 < rw*rh; i0++) { if (g[i0] || seen[i0] >= 0) continue; const q = [i0]; seen[i0] = id; let n = 0; while (q.length) { const i = q.pop(); n++; const x = i % rw, y = (i / rw) | 0; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const j = (y + dy)*rw + x + dx; if (!g[j] && seen[j] < 0) { seen[j] = id; q.push(j); } } } if (n > bigN) { bigN = n; bigId = id; } id++; }
+    if (bigN < 650 && attempt < 5) continue;
+    best = {g, seen, bigId, rnd};
+  }
+  const {g, seen, bigId, rnd} = best;
+  for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) { const i = y*rw + x; map[idx(rx + x, ry + y)] = (!g[i] && seen[i] === bigId) ? T.DFLOOR : T.DWALL; }
+  const floorTiles = []; for (let y = 1; y < rh - 1; y++) for (let x = 1; x < rw - 1; x++) if (map[idx(rx + x, ry + y)] === T.DFLOOR && map[idx(rx + x, ry + y + 1)] === T.DFLOOR) floorTiles.push([rx + x, ry + y]);
+  floorTiles.sort((a, b) => (a[0] + a[1]*.5) - (b[0] + b[1]*.5));
+  const st = floorTiles[0]; D.stairs = {x: st[0], y: st[1]}; map[idx(st[0], st[1])] = T.DSTAIR;
+  const dist = new Int32Array(rw*rh).fill(-1), q = [(st[1] - ry)*rw + st[0] - rx]; dist[q[0]] = 0; let far = q[0];
+  for (let h = 0; h < q.length; h++) { const i = q[h], x = i % rw, y = (i / rw) | 0; if (dist[i] > dist[far]) far = i; for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const j = (y + dy)*rw + x + dx; if (dist[j] < 0 && map[idx(rx + x + dx, ry + y + dy)] !== T.DWALL) { dist[j] = dist[i] + 1; q.push(j); } } }
+  D.down = {x: rx + far % rw, y: ry + ((far / rw) | 0)}; map[idx(D.down.x, D.down.y)] = T.DDOWN;
+  D.floorTiles = floorTiles.filter(([x, y]) => Math.hypot(x - st[0], y - st[1]) > 6 && Math.hypot(x - D.down.x, y - D.down.y) > 2);
+  for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) if (map[idx(x, y)] === T.DWALL && map[idx(x, y + 1)] === T.DFLOOR && rnd() < .06) map[idx(x, y)] = T.DTORCH;
+  if (MINE.slot0 >= 0) mineNodes();
+  if (S && chunks.length) redrawRect(D.rect);
+}
+function mineNodes() {
+  const D = DUNGEONS.mine, f = MINE.floor, rnd = mulberry32(777 + f*31 + MINE.gen);
+  const tiles = (D.floorTiles || []).slice();
+  for (let k = 0; k < MINE_SLOTS; k++) {
+    const i = MINE.slot0 + k, n = nodes[i];
+    if (n.x >= 0 && nodeGrid[idx(n.x, n.y)] === i) nodeGrid[idx(n.x, n.y)] = -1;
+    if (S) delete S.depleted[i];
+    n.x = n.y = -1;
+    if (k >= Math.min(MINE_SLOTS, 34 + f*3) || !tiles.length) continue;
+    const t = tiles.splice(Math.floor(rnd()*tiles.length), 1)[0], r = rnd();
+    n.type = f >= 6 && r < .12 ? 'mithril' : f >= 4 && r < .22 ? 'gemvein' : f >= 3 && r < .36 ? 'crystal' : f >= 2 && r < .52 ? 'silver' : f >= 8 && r < .6 ? 'obsidian' : r < .8 ? 'ore' : 'rock';
+    n.x = t[0]; n.y = t[1]; nodeGrid[idx(n.x, n.y)] = i;
+  }
+}
+function populateMine() {
+  const D = DUNGEONS.mine, f = MINE.floor, pool = f >= 7 ? ['skeleton','spider','imp','bat','ghoul'] : f >= 4 ? ['skeleton','spider','bat','ghoul'] : ['bat','skeleton','spider'];
+  const n = Math.min(16, 4 + f), mul = 1 + f*.16;
+  for (let i = 0; i < n && D.floorTiles.length; i++) {
+    const t = D.floorTiles[Math.floor(Math.random()*D.floorTiles.length)];
+    const e = makeEnemy(pick(pool.filter(p => ENEMIES[p])), t[0] + .5, t[1] + .5, {dungeon: true});
+    e.hp = e.max = Math.round(e.max*mul); e.dmgMul = 1 + f*.06;
+    if (i === 0 && f % 3 === 0) { const dm = e.dmgMul; makeElite(e); e.dmgMul *= dm; }
+    enemies.push(e);
+  }
+}
+function goMineFloor(f) {
+  fadeThen(() => {
+    carveMine(f); const D = DUNGEONS.mine;
+    S.x = D.stairs.x + .5; S.y = D.stairs.y + 1.5; S.riding = false; petE = null; fishing = null; lastTile = -1;
+    enemies = []; eproj = []; hazards = []; arrows = []; bombs = []; populateMine();
+    S.dungeonsSeen.mine = true; S.mineBest = Math.max(S.mineBest || 0, f);
+    if (f % 5 === 0 && f > (S.mineCheck || 0)) { S.mineCheck = f; setTimeout(() => toast(`<b>Checkpoint: floor ${f}</b><br>You can start the Deep Mine from here next time.`, 5000), 900); }
+    renderHUD(); renderRegion(); save();
+    toast(`<b>The Deep Mine · Floor ${f}</b><br>${f === 1 ? 'Find the ladder down. The deeper you go, the richer the ore.' : f >= 6 ? 'Mithril glints in the walls down here.' : f >= 4 ? 'Gem veins sparkle in the dark.' : 'The air grows warmer.'}`, 4000);
+  });
+}
+function mineEnterTalk() {
+  const cp = S.mineCheck || 0;
+  openPanel('The Deep Mine', `A mine shaft that goes down, and down, and down. Every floor is a fresh cave with richer ore and nastier things in the dark.${S.mineBest ? `<br>Deepest floor: <b>${S.mineBest}</b>.` : ''}`, [
+    {label: 'Climb down to floor 1', primary: true, fn: () => { closeTalk(); SFX.travel(); goMineFloor(1); }},
+    ...(cp ? [{label: `Take the lift to floor ${cp}`, fn: () => { closeTalk(); SFX.travel(); goMineFloor(cp); }}] : []),
+    {label: 'Not now', fn: closeTalk}]);
+}
 function carveAbyss(floor) {
   const D = DUNGEONS.abyss, [rx, ry, rw, rh] = D.rect, rnd = mulberry32(9001 + floor*7919 + ABYSS.gen*131);
   ABYSS.floor = floor; ABYSS.gen++;
@@ -6277,6 +6374,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['digger','Deep Digger','Reach floor 10 of the Deep Mine', () => (S.mineBest || 0) >= 10],
+  ['mithril','Mithril Smith','Craft a piece of mithril gear', () => ['mithril_sword','mithril_plate','mithril_helm','mithril_shield'].some(g => have(g))],
   ['rainbow','Pot of Gold','Find the pot of gold at the end of a rainbow', () => (S.pots || 0) >= 1],
   ['stormchaser','Storm Chaser','Collect 5 storm glass', () => (S.stormGlass || 0) >= 5],
   ['curator','Patron of the Arts','Donate 20 things to the museum', () => Object.keys(S.museum || {}).length >= 20],
@@ -6588,6 +6687,7 @@ function step(ts) {
 }
 function begin(state) {
   S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling');
+  if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
   if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
   if (!S.home.prod) S.home.prod = {milk:0, wool:0, truffle:0};
   if (!S.look) S.look = {cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'};
@@ -6618,7 +6718,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
