@@ -764,6 +764,8 @@ const GOODS = {
   titan_plate:{name:'Titan Plate',base:2200,col:'#a89880',kind:'armor',armor:8,speed:-.02},
   titan_maul:{name:'Titan Maul',base:2000,col:'#a89880',kind:'weapon',dmg:20,cd:.7,reach:1.9,kb:2.5},
   contraband:{name:'Sealed Crate',base:0,col:'#4a3a2a',kind:'good'},
+  rune_shard:{name:'Rune Shard',base:120,col:'#c8a8ff',kind:'good'},
+  rune_ward:{name:'Rune Ward',base:2000,col:'#c8a8ff',kind:'trinket',desc:'+2 armor and +8% critical chance. The runes protect you.'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -2293,6 +2295,7 @@ function genWorld() {
       : (reach[idx(x,y)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL), 7);
   for (const k of BK) { const B = BOSSES[k]; if (B.dungeon) continue; place(B, (x,y,t) => (B.sea ? reachR[idx(x,y)] && onLand(x,y) : (B.climb ? reachC : reach)[idx(x,y)]) && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
   genDungeons();
+  for (const sh of SHRINES) place(sh, (x, y, t) => { if (!reach[idx(x, y)]) return false; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const tt = map[idx(x + dx, y + dy)]; if (!walkable(tt, false, false) || tt === T.SHAL || tt === T.ROAD || tt === T.FLOOR || tt === T.HOUSE || tt === T.BRIDGE) return false; } return true; }, 8);
   carveArena();
   for (const k of DK) place(DUNGEONS[k].entrance = {tx: DUNGEONS[k].near[0], ty: DUNGEONS[k].near[1]}, (x,y,t) => reach[idx(x,y)] && reach[idx(x,y+1)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL && t !== T.HOUSE, 6);
   for (const k in ESTATES) {
@@ -2321,7 +2324,7 @@ function placeNodes() {
   const blocked = new Set([...LANDMARKS.map(L => idx(L.x, L.y)), ...BK.map(k => idx(BOSSES[k].x, BOSSES[k].y)), ...chests.map(c => idx(c.x, c.y)), ...DK.map(k => idx(DUNGEONS[k].entrance.x, DUNGEONS[k].entrance.y))]);
   for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
     const i = idx(x,y), t = map[i];
-    if (blocked.has(i) || ESTATE_CLEAR.has(i)) continue;
+    if (blocked.has(i) || ESTATE_CLEAR.has(i) || SHRINES.some(sh => Math.abs(sh.x - x) <= 3 && Math.abs(sh.y - y) <= 3)) continue;
     let inTownArea = false;
     for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x, y - TOWNS[k].y) < (TOWNS[k].small ? 4.5 : 7)) inTownArea = true;
     if (Math.hypot(x - HOME.x, y - HOME.y) < 9) inTownArea = true;
@@ -2741,7 +2744,7 @@ function weapon() {
 const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
-function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
@@ -2990,7 +2993,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   let crit = false;
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
-    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3191,6 +3194,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Rune shrines', 'Six shrines of standing stones hide across the lands. Read the inscription and touch the runes in the right order.'],
   ['Night market', 'Madame Noctis sets up in a different town each night with rare wares and mystery boxes. The job tracker shows where.'],
   ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
   ['Dice', 'Play Bones with Lucky Lou (Lantern Bay), Dice Dame Rosa (Dunmere) or One-Eyed Finn (Crownfall).'],
@@ -3636,6 +3640,16 @@ function drawHeld(g, x, y, facing, id) {
   else if (id === 'club' || id === 'bone_club') g.fillRect(hx - 1.5, hy - len + 2, 4, 4);
   else { g.fillRect(hx - 1, hy - len + 1, 3, len - 4); if (id === 'crystal_blade' || id === 'ember_blade' || id === 'dawnbreaker') { g.fillStyle = id === 'ember_blade' ? 'rgba(255,140,40,.4)' : id === 'dawnbreaker' ? 'rgba(255,240,170,.45)' : 'rgba(159,232,255,.35)'; g.fillRect(hx - 2, hy - len, 5, len - 2); } }
 }
+const RUNE_COL = {red:'#ff5a3a', blue:'#4a9aff', green:'#5ad05a', gold:'#f0c040'};
+const RUNE_OFF = {red:[-2,0], blue:[2,0], green:[0,-2], gold:[0,2]};
+const SHRINES = [
+  {id:'s1', tx:92,  ty:62,  order:['red','blue','green','gold'], poem:'First the ember wakes, then the tide replies; the forest listens last but one, and the crown closes all.'},
+  {id:'s2', tx:200, ty:100, order:['gold','green','red','blue'], poem:'The sun comes first, then moss beneath it; blood is spilled third, and the sky weeps last.'},
+  {id:'s3', tx:290, ty:176, order:['blue','gold','red','green'], poem:'The sea begins, the coin follows; fire in the middle of the night, and the leaf at the end.'},
+  {id:'s4', tx:420, ty:120, order:['green','red','gold','blue'], poem:'Leaf, then flame. After the flame, the crown. And the ocean takes what is left.'},
+  {id:'s5', tx:604, ty:100, order:['red','gold','blue','green'], poem:'Fire is first, the king second; the tide third, the forest fourth.'},
+  {id:'s6', tx:770, ty:150, order:['blue','red','green','gold'], poem:'Sky above, ember below; then the green things grow, and the sun crowns them.'},
+];
 const LMAP = {skullrock:'bones', crystalspire:'glass', eldest:'grove', shipgrave:'wreck', mossfalls:'falls', shroomking:'grove', bamboogate:'tower', worldsend:'beacon', throne:'tower', redheart:'grove', reef:'glass', vault:'mine', cloudshrine:'shrine', greattree:'grove', bonepit:'bones', eastlight:'tower', spring2:'spring', sleeper:'statue'};
 function drawLandmark(g, L, t) {
   const x = L.x*TS + 8, y = L.y*TS + 12;
@@ -4048,6 +4062,7 @@ function render() {
   for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
   if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
   if (chargeT != null && chargeT > .15 && !weapon().ranged) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
+  for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
@@ -4406,7 +4421,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -4967,6 +4982,46 @@ function noctisTalk(n) {
       else { S.coins += 1500; msg = '<b>1500 coin!</b> Madame Noctis smiles thinly.'; }
       SFX.victory(); renderHUD(); save(); say(`You open the box... ${msg}`, [{label: 'Back', fn: () => noctisTalk(n)}]); }},
     back(n)]);
+}
+// ===== rune shrines =====
+function shrineTarget() {
+  if (inDungeon()) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  for (const sh of SHRINES) {
+    if (sh.x == null || Math.abs(S.x - sh.x) > 4 || Math.abs(S.y - sh.y) > 4) continue;
+    S.shrines = S.shrines || {};
+    if (Math.hypot(S.x - sh.x - .5, S.y - sh.y - .5) < 1) return {key: 'shc' + sh.id, html: `${K}Read the inscription`, btn: 'Read', fn: () => openPanel('Rune shrine', S.shrines[sh.id] ? 'The runes glow softly. This shrine is already awake.' : `Worn letters circle the altar:<br><br><i>“${sh.poem}”</i><br><br><span style="color:var(--muted)">Touch the four rune stones in the right order.</span>`, [{label: 'OK', fn: closeTalk}])};
+    if (S.shrines[sh.id]) continue;
+    for (const c in RUNE_OFF) { const [ox, oy] = RUNE_OFF[c]; if (Math.hypot(S.x - sh.x - ox - .5, S.y - sh.y - oy - .5) < .9) return {key: 'shr' + sh.id + c + (sh.prog || 0), html: `${K}Touch the <span style="color:${RUNE_COL[c]}">${c}</span> rune`, btn: 'Touch', fn: () => touchRune(sh, c)}; }
+  }
+  return null;
+}
+function touchRune(sh, c) {
+  sh.prog = sh.prog || 0; sh.lit = sh.lit || {};
+  const [ox, oy] = RUNE_OFF[c];
+  if (sh.order[sh.prog] === c) {
+    sh.lit[c] = true; sh.prog++; SFX.chime(); burst(sh.x + ox + .5, sh.y + oy - .2, RUNE_COL[c], 10, 3);
+    if (sh.prog >= 4) {
+      S.shrines[sh.id] = true; sh.prog = 0; addItem('rune_shard', 1); const c2 = 150 + (S.level || 1)*10; S.coins += c2; const g = pick(['gem','star_fragment','elixir','shimmer_shard'].filter(x => GOODS[x])); addItem(g, 2);
+      SFX.victory(); gainXP(150); shake = .3; for (const k in RUNE_OFF) burst(sh.x + RUNE_OFF[k][0] + .5, sh.y + RUNE_OFF[k][1], RUNE_COL[k], 12, 4);
+      const n = SHRINES.filter(x => S.shrines[x.id]).length;
+      if (n === SHRINES.length && !have('rune_ward')) addItem('rune_ward', 1);
+      toast(`<b>The shrine awakens!</b><br><span style="color:var(--good)">+1 Rune Shard, +${c2} coin, +2 ${GOODS[g].name}</span><br>Shrines awakened: ${n}/${SHRINES.length}${n === SHRINES.length ? '. The runes grant you the <b>Rune Ward</b>!' : ''}`, 7000);
+      renderHUD(); save();
+    }
+  } else { sh.prog = 0; sh.lit = {}; hurtPlayer(1, null, true); WX.flash = .5; floatText(S.x, S.y - 1.4, 'The runes flicker out...', '#c8a8ff'); }
+}
+function drawShrine(sh) {
+  const solved = S.shrines && S.shrines[sh.id], x = (sh.x + .5)*TS, y = (sh.y + .5)*TS;
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x, y + 3, 9, 4, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8a8890'; ctx.fillRect(x - 7, y - 4, 14, 7); ctx.fillStyle = '#a8a6b0'; ctx.fillRect(x - 7, y - 5, 14, 2);
+  ctx.fillStyle = solved ? '#c8a8ff' : '#5a5860'; ctx.fillRect(x - 3, y - 3, 6, 1); ctx.fillRect(x - 2, y - 1, 4, 1);
+  for (const c in RUNE_OFF) { const [ox, oy] = RUNE_OFF[c], sx = x + ox*TS, sy = y + oy*TS, lit = solved || (sh.lit && sh.lit[c]);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(sx - 5, sy + 3, 10, 3);
+    ctx.fillStyle = '#6a6870'; ctx.fillRect(sx - 4, sy - 12, 8, 15); ctx.fillStyle = '#7a7880'; ctx.fillRect(sx - 4, sy - 13, 8, 2);
+    ctx.globalAlpha = lit ? 1 : .55; ctx.fillStyle = RUNE_COL[c]; ctx.fillRect(sx - 1, sy - 10, 2, 7); ctx.fillRect(sx - 3, sy - 7, 6, 1);
+    if (lit) { ctx.globalAlpha = .25 + Math.sin(frameT*4)*.1; ctx.beginPath(); ctx.arc(sx, sy - 6, 9, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1; }
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -5665,7 +5720,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -6903,6 +6958,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['runereader','Rune Reader','Awaken a rune shrine', () => Object.keys(S.shrines || {}).length >= 1],
+  ['runemaster','Rune Master','Awaken all six rune shrines', () => SHRINES.every(sh => (S.shrines || {})[sh.id])],
   ['nightowl','Night Owl','Buy something from Madame Noctis', () => !!S.noctisBought],
   ['lawbringer','Lawbringer','Shut down the Lantern Bay smugglers', () => !!S.flags.lawbringer],
   ['smuggler','Smuggler','Complete 3 smuggling runs', () => (S.smugRuns || 0) >= 3],
@@ -7269,7 +7326,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
