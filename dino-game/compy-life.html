@@ -83,6 +83,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 .ev-panel.bad { border-color: var(--blood); } .ev-panel.bad h2 { color: var(--blood); }
 .ev-panel.good h2 { color: var(--leaf); }
 .err { color: var(--blood); font-weight: 800; }
+.cook { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(520px, calc(100vw - 32px)); box-sizing: border-box; background: var(--panel); border: 3px solid #f1c40f; border-radius: 16px; padding: 14px; display: grid; gap: 10px; text-align: center; }
+.cook-title { font: 400 22px var(--display); color: #f1c40f; }
+.cook-sub { font-size: 13px; color: var(--muted); font-weight: 800; }
+.cook .order { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.cook .order span { padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.08); font-weight: 800; font-size: 13px; }
+.cook .order span.done { opacity: .4; text-decoration: line-through; }
+.cook .order span.next { background: #f1c40f; color: var(--ink); }
+.cook .ings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cook .ings button { font: 800 14px var(--body); padding: 10px 6px; border-radius: 10px; border: 2px solid var(--line); background: rgba(255,255,255,.06); color: var(--bone); cursor: pointer; }
+.cook .ings button:active { background: rgba(241,196,15,.3); }
 #weaponBtn { position: absolute; right: calc(122px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); width: 70px; height: 70px; border-radius: 50%; border: 4px solid rgba(0,0,0,.35); background: #7fc8ff; color: var(--ink); font: 400 15px var(--display); box-shadow: 0 5px 0 #3a6a9a; }
 #useBtn { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 88px; height: 88px; border-radius: 50%; border: 4px solid rgba(0,0,0,.35); background: var(--amber); color: var(--ink); font: 400 20px var(--display); box-shadow: 0 5px 0 #9a6420; }
 </style>
@@ -113,6 +123,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
   <div class="prompt" id="prompt" hidden></div>
   <button id="useBtn" type="button" hidden>ENTER</button>
   <button id="weaponBtn" type="button" hidden>USE</button>
+  <div class="cook" id="cookPanel" hidden><div class="cook-title">COOK THE ORDER</div><div class="cook-sub">Stack it bottom to top. Tap the ingredients in order, or press 1 to 6.</div><div class="order" id="cookOrder"></div><div class="ings" id="cookIngs"></div><div class="cook-sub" id="cookTime"></div></div>
 
   <div class="screen" id="titleScreen">
     <div class="panel">
@@ -329,6 +340,7 @@ function buildDistricts() {
         add(hg, GEO.pyr, roofCols[Math.floor(srand() * roofCols.length)], 0, h + 22, 0, 86, 44, 72, 0, Math.PI / 4, 0);
         add(hg, GEO.b, '#5a3a24', 0, 16, hy < cy ? d / 2 + 1 : -d / 2 - 1, 18, 32, 2);
         const box = { x0: hx - w / 2, y0: hy - d / 2, x1: hx + w / 2, y1: hy + d / 2 }; solids.push(box);
+        SUBURB_HOUSES.push({ x: hx, y: hy, fy: hy < cy ? hy + d / 2 + 34 : hy - d / 2 - 34 });
         const mats = []; hg.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
         fadeables.push({ x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 });
         districtTrees.push([hx + (srand() < 0.5 ? -1 : 1) * 85, hy + (srand() - 0.5) * 60, 0.7 + srand() * 0.3]);
@@ -603,7 +615,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -703,7 +715,7 @@ function advance(mins, opts = {}) {
     if (S.hunger <= 0) { S.hunger = 0; S.happy -= hrs * 4; S.starve += hrs; } else S.starve = 0;
     if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
     S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
-    checkShift();
+    checkShift(); gigTick(stepM);
     if (S.trexAt != null && S.min >= S.trexAt && !trex) startTrex();
     if (S.min >= 1440) { if (!opts.sleeping) passOut('midnight'); return; }
     if (!opts.sleeping && !opts.work && S.energy <= 0 && state !== 'jail') { passOut('tired'); return; }
@@ -750,6 +762,7 @@ function dayRollover(slept) {
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
   petDaily(); if (S.site) S.site = null; if (S.ward) { S.ward = null; clearWard(); }
+  if (S.gig) clearGig();
   if (S.job) S.job.days++;
   if (weekday() === 0) {
     let bills = 0, parts = [];
@@ -944,13 +957,13 @@ const MENUS = {
   ] } : { sub: closedMsg(7, 22), acts: [] },
   burger: () => {
     const acts = [];
-    workAct(acts, 'burger');
+    acts.unshift(...gigActs('burger'));
     acts.push(...holdUpAct(150, 400));
     if (open(7, 24)) acts.push({ label: 'Order a Bronto Burger', detail: '+50 hunger, +5 happiness', cost: 12, mins: 30, fn: () => { S.hunger = Math.min(100, S.hunger + 50); S.happy += 5; } });
     acts.push({ label: 'Dig through the dumpster', detail: '+20 hunger, -10 happiness. Might make you sick.', tag: 'Free', mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 20); S.happy -= 10; if (Math.random() < 0.25) { S.energy -= 25; log('That was a bad burger. You feel awful.', 'bad'); } } });
     return { sub: 'Home of the triple-decker Bronto.', acts };
   },
-  depot: () => { const acts = []; workAct(acts, 'depot'); return { sub: 'Eggs delivered fresh, mostly unbroken.', acts }; },
+  depot: () => { const acts = [...gigActs('depot')]; return { sub: 'Eggs delivered fresh, mostly unbroken.', acts }; },
   office: () => { const acts = []; workAct(acts, 'office'); return { sub: 'Fossil Corp. Digging up profits since the Jurassic.', acts }; },
   hospital: () => {
     const acts = [], J = jobInfo();
@@ -1018,7 +1031,7 @@ const MENUS = {
     return { sub: 'Dino Gas. Pull up to a pump in a car to fill up. Snacks inside, open all night.', acts };
   },
   pizza: () => {
-    const acts = []; workAct(acts, 'pizza'); acts.push(...holdUpAct(150, 400));
+    const acts = [...gigActs('pizza')]; acts.push(...holdUpAct(150, 400));
     if (open(10, 24)) acts.push({ label: 'Order a pizza', detail: '+60 hunger, +8 happiness', cost: 15, mins: 45, fn: () => { S.hunger = Math.min(100, S.hunger + 60); S.happy += 8; } });
     return { sub: 'Ptero Pizza. Delivered by air or by car, whichever shows up first.', acts };
   },
@@ -1045,7 +1058,7 @@ const MENUS = {
     return { sub: S.pet ? `${S.pet.name} is ${S.pet.happy > 60 ? 'happy' : S.pet.happy > 30 ? 'okay' : 'sad'} and ${S.pet.fed > 40 ? 'well fed' : 'hungry'}.` : 'Adopt a little friend. They need walks, food and love.', acts };
   },
   fire: () => {
-    const acts = []; workAct(acts, 'fire');
+    const acts = [...gigActs('fire')];
     acts.push({ label: 'Slide down the fire pole', detail: 'Wheee! +6 happiness', tag: 'Free', mins: 5, fn: () => { S.happy += 6; log('WHEEE!', 'good'); } });
     return { sub: 'Fire Station. Heroes with very small hoses.', acts };
   },
@@ -1252,7 +1265,7 @@ function buildRoom(id) {
   g.visible = false;
   ROOMS[id] = R; return R;
 }
-const WORKS = ['Work your shift', 'Slack off'];
+const WORKS = ['Work your shift', 'Slack off', 'Clock', 'Pick up the next', 'Cook the next'];
 function homeLayout(key, w, d, style) {
   const s = style;
   return { w, d, home: key, floor: s.floor, wall: s.wall, trim: s.trim, build(b) {
@@ -1664,6 +1677,8 @@ function buildCar(color, style) {
     add(root, GEO.b, color, 23, 19, 0, 24, 5, 32);
     add(root, GEO.b, color, -27, 19, 0, 16, 5, 32);
   }
+  let siren = null;
+  if (style === 'truck') { add(root, GEO.b, color, -14, 26, 0, 44, 20, 34); add(root, GEO.b, '#c9c9cf', -12, 38, 0, 66, 2, 8); for (let x = -40; x <= 16; x += 8) add(root, GEO.b, '#c9c9cf', x, 39, 0, 1.5, 1.5, 8); add(root, GEO.b, '#f2d36b', -14, 20, 17.5, 44, 3, 0.5); add(root, GEO.b, '#f2d36b', -14, 20, -17.5, 44, 3, 0.5); siren = [add(root, GEO.s, '!#ff2a2a', 12, 31, 7, 3, 3, 3), add(root, GEO.s, '!#2a6aff', 12, 31, -7, 3, 3, 3)]; }
   if (style === 'hatch') { add(root, GEO.b, color, -10, 30, 0, 30, 3, 30); for (const [x, z] of [[4, 14], [4, -14], [-24, 14], [-24, -14]]) add(root, GEO.b, color, x, 25, z, 2.5, 10, 2.5); }
   add(root, GEO.b, '#2a2a30', -6, 17, 0, 10, 12, 28);
   add(root, GEO.b, '#3a3a40', -14, 22, 0, 4, 12, 28);
@@ -1677,7 +1692,7 @@ function buildCar(color, style) {
     add(spin, GEO.y, '#1a1a1a', 0, 0, 0, 7, 6, 7, Math.PI / 2, 0, 0); add(spin, GEO.b, '#c9c9cf', 0, 0, z > 0 ? 3.2 : -3.2, 6, 1.6, 0.5);
     wheels.push({ steer, spin, front: x > 0 });
   }
-  return { root, wheels, heads };
+  return { root, wheels, heads, siren };
 }
 function spawnCar(x, y, a, color, ai, model) {
   const c = { x, y, a, v: 0, steer: 0, roll: 0, color, ai, wait: 0, honkT: 0, model, m: buildCar(color, model), hx: x, hy: y, ha: a, price: Math.round(rand(900, 1500)) };
@@ -1744,10 +1759,11 @@ function placeCars() {
     spawnCar(x, y, a, CAR_COLORS[cars.length % CAR_COLORS.length], false);
   for (let i = 0; i < 14; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
 }
-function carName(c) { return c.model ? CAR_MODELS[c.model].name : 'convertible'; }
+function carName(c) { return c.service ? 'fire truck' : c.model ? CAR_MODELS[c.model].name : 'convertible'; }
 function enterCar(c) {
   driving = c; c.v = 0; P.vx = P.vy = 0; goal('drive'); sfx.door();
-  if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
+  if (c.service) log('You climb into the fire truck. Lights on! Press E near the fire to spray it.', 'good');
+  else if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
   else if (chase) { c.stolen = true; chase.cars = (chase.cars || []).concat(c); log('You grabbed a car mid-chase. Now they want that too!', 'bad'); }
   else if (Math.random() < (S.lockpick ? 0.75 : 0.5)) { c.stolen = true; log(S.lockpick ? `Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.` : `You slipped into the ${COLOR_NAMES[c.color]} car. Nobody was looking. It is yours now (sort of).`, 'warn'); }
   else startChase(0, c);
@@ -1811,6 +1827,7 @@ function driveUpdate(dt) {
   if (hit && Math.abs(c.v) > 90) {
     const hard = Math.abs(c.v) > 300;
     sfx.crash(); shake = hard ? 14 : 6; burst(c.x, c.y, 16, hard ? 18 : 8, '#c9c9cf', 160, 3);
+    gigCrash(Math.abs(c.v) > 160);
     if (hard) { S.happy -= 3; log('CRUNCH. Watch where you are driving!', 'bad'); if (Math.random() < 0.15) { S.injured = true; log('You hurt yourself in the crash.', 'bad'); } }
     c.v *= -0.25;
   } else if (hit) c.v *= 0.5;
@@ -1819,7 +1836,7 @@ function driveUpdate(dt) {
     if (d < 40 && Math.abs(c.v) > 40) { n.x += dx / (d || 1) * 30; n.y += dy / (d || 1) * 30; n.wait = 1; }
   }
   c.roll += c.v * dt / 7;
-  c.fuel = Math.max(0, c.fuel - Math.abs(c.v) * dt * 0.006);
+  if (!c.service) c.fuel = Math.max(0, c.fuel - Math.abs(c.v) * dt * 0.006);
   if (c.fuel > 0) c.emptyWarned = false;
   P.x = c.x; P.y = c.y; P.face = c.a; P.vx = Math.cos(c.a) * c.v; P.vy = Math.sin(c.a) * c.v;
   if (engine) { engine.o.frequency.value = 45 + Math.abs(c.v) * 0.28; engine.g.gain.value = 0.025 + Math.abs(c.v) / max * 0.03; }
@@ -1850,6 +1867,7 @@ function syncCars() {
     c.m.root.position.set(c.x, 0, c.y); c.m.root.rotation.y = -c.a;
     for (const w of c.m.wheels) { w.spin.rotation.z = -c.roll; if (w.front) w.steer.rotation.y = -(c === driving ? c.steer : 0) * 0.45; }
     for (const h of c.m.heads) h.scale.setScalar(night ? 5 : 3);
+    if (c.m.siren) { const bl = Math.floor(gameT * 8) % 2; c.m.siren[0].visible = !!bl; c.m.siren[1].visible = !bl; }
     if (c.driver) animDino(c.driver, gameT + c.x * 0.01, 0);
   }
 }
@@ -1966,6 +1984,21 @@ function endMini(ok, msg, q) {
   if (state === 'play') nextEvent();
 }
 function updateMini(dt) {
+  if (minigame.kind === 'hose') {
+    let mx = 0, my = 0;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
+    if (keys.has('w') || keys.has('arrowup')) my -= 1; if (keys.has('s') || keys.has('arrowdown')) my += 1;
+    if (joy.active) { mx = joy.dx; my = joy.dy; }
+    const m = minigame, tt = gameT * m.speed * 3;
+    m.fx = 0.5 + Math.sin(tt * 1.3) * 0.35; m.fy = 0.5 + Math.sin(tt * 0.9 + 1) * 0.3;
+    m.cx = clamp(m.cx + mx * 0.7 * dt, 0.05, 0.95); m.cy = clamp(m.cy + my * 0.9 * dt, 0.05, 0.95);
+    const on = Math.hypot((m.cx - m.fx) * 2, m.cy - m.fy) < 0.22; m.on = on;
+    m.p = clamp(m.p + (on ? 0.2 : -0.04) * dt, 0, 1); m.t -= dt;
+    if (m.p >= 1) endMini(true, 'Fire out! Just a little steam left.', 0);
+    else if (m.t <= 0) endMini(false, 'You got it under control, but the house is badly scorched.', -0.2);
+    return;
+  }
+  if (minigame.kind === 'cook') { minigame.t -= dt; if (Math.floor(minigame.t * 4) !== minigame.lastT) { minigame.lastT = Math.floor(minigame.t * 4); renderCook(); } if (minigame.t <= 0) { $('cookPanel').hidden = true; endMini(false, 'Too slow! The customer walked out hungry.', -0.25); } return; }
   if (minigame.kind === 'mash') { minigame.t -= dt; minigame.p = Math.max(0, minigame.p - dt * 0.12); if (minigame.t <= 0) endMini(false, minigame.fail || 'The cement came out lumpy.', -0.25); }
   else if (minigame.kind === 'dose') { minigame.x += minigame.dir * minigame.speed * dt; if (minigame.x > 1) { minigame.x = 1; minigame.dir = -1; } if (minigame.x < 0) { minigame.x = 0; minigame.dir = 1; } }
   else if (minigame.kind === 'rhythm') { minigame.x += minigame.dir * minigame.speed * dt; if (minigame.x > 1) { minigame.x = 1; minigame.dir = -1; } if (minigame.x < 0) { minigame.x = 0; minigame.dir = 1; } minigame.flash -= dt; }
@@ -2010,7 +2043,7 @@ function checkSiteEnd() {
   if (hour() >= J.hours[1] + 1) { log('The shift ended before you clocked out. You get paid for what you finished.', 'warn'); clockOut(); }
 }
 function drawMiniOverlay(g) {
-  if (!minigame) return;
+  if (!minigame || minigame.kind === 'cook') return;
   const w = Math.min(460, W - 40), x = (W - w) / 2, y = H - 190;
   g.fillStyle = 'rgba(14,22,30,.9)'; g.fillRect(x, y, w, 130); g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.strokeRect(x, y, w, 130);
   g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
@@ -2024,6 +2057,15 @@ function drawMiniOverlay(g) {
     g.fillStyle = '#4fae4a'; g.fillRect(bx + bw * minigame.zone[0], by, bw * (minigame.zone[1] - minigame.zone[0]), 22);
     g.fillStyle = minigame.flash > 0 ? (minigame.lastHit ? '#8fdc6a' : '#ef5a5f') : '#ffffff'; g.fillRect(bx + bw * minigame.x - 3, by - 6, 6, 34);
     g.fillStyle = '#ffffff'; g.fillText(`Hits ${minigame.hits}/${minigame.need}   Misses ${minigame.misses}/5`, W / 2, by + 50);
+  } else if (minigame.kind === 'hose') {
+    const fx0 = bx, fy0 = y + 58, fw = bw, fh = 64;
+    g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(fx0, fy0, fw, fh);
+    g.fillStyle = '#ff7a1a'; g.beginPath(); g.arc(fx0 + fw * minigame.fx, fy0 + fh * minigame.fy, 13 + Math.random() * 3, 0, 7); g.fill();
+    g.fillStyle = '#ffd35a'; g.beginPath(); g.arc(fx0 + fw * minigame.fx, fy0 + fh * minigame.fy, 7, 0, 7); g.fill();
+    g.strokeStyle = minigame.on ? '#7fc8ff' : '#ffffff'; g.lineWidth = 3; g.beginPath(); g.arc(fx0 + fw * minigame.cx, fy0 + fh * minigame.cy, 12, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(fx0 + fw * minigame.cx - 18, fy0 + fh * minigame.cy); g.lineTo(fx0 + fw * minigame.cx + 18, fy0 + fh * minigame.cy); g.moveTo(fx0 + fw * minigame.cx, fy0 + fh * minigame.cy - 18); g.lineTo(fx0 + fw * minigame.cx, fy0 + fh * minigame.cy + 18); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(fx0, fy0 + fh + 4, fw, 6); g.fillStyle = '#7fc8ff'; g.fillRect(fx0, fy0 + fh + 4, fw * minigame.p, 6);
+    g.fillStyle = '#ffffff'; g.fillText(`Fire ${Math.round(minigame.p * 100)}% out \u00b7 ${Math.ceil(minigame.t)}s`, W / 2, y - 8);
   } else if (minigame.kind === 'dose') {
     g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(bx, by, bw, 22);
     g.fillStyle = 'rgba(79,174,74,.45)'; g.fillRect(bx + bw * (minigame.target - minigame.tol * 2.5), by, bw * minigame.tol * 5, 22);
@@ -2349,6 +2391,188 @@ function holdUpAct(min, max) {
   } }];
 }
 
+// ---------- hands-on shift jobs: firefighter, pizza delivery, egg courier, fry cook ----------
+const SUBURB_HOUSES = [];
+const GIG_KIND = { fire: 'fire', pizza: 'pizza', depot: 'eggs', burger: 'cook' };
+const INGREDIENTS = ['Bun', 'Patty', 'Cheese', 'Lettuce', 'Tomato', 'Pickles'];
+let fireTruck = null, fireFx = null;
+function gigKindHere(placeId) { const J = jobInfo(); return J && J.place === placeId ? GIG_KIND[placeId] : null; }
+function gigActs(placeId) {
+  const kind = gigKindHere(placeId), J = jobInfo(), acts = [];
+  if (!kind) return acts;
+  const [a, b] = J.hours;
+  if (S.gig && S.gig.kind === kind) {
+    const G = S.gig;
+    if ((kind === 'pizza' || kind === 'eggs') && !G.carrying && G.done < G.total) acts.push({ label: `Pick up the next ${kind === 'pizza' ? 'pizza' : 'egg crate'}`, detail: `${G.done}/${G.total} delivered so far.`, fn: () => { closeMenu(); pickUpOrder(); } });
+    if (kind === 'cook' && G.done < G.total) acts.push({ label: 'Cook the next order', detail: `${G.done}/${G.total} orders served.`, fn: () => { closeMenu(); startCooking(); } });
+    const left = G.total - G.done;
+    acts.push({ label: 'Clock out', detail: left ? `${left} still to go. You only get paid for what you finished.` : 'Every job is done. Collect your pay.', tag: 'Payday', fn: () => { closeMenu(); gigClockOut(); } });
+    return acts;
+  }
+  let why = '';
+  if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'Closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
+  if (!why && kind === 'pizza' && !cars.some(c => c.owned)) why = 'Delivery drivers need their own car. Buy one at Dino Motors.';
+  const late = hour() > a + 1, blurb = { fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
+  acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}${blurb}`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startGig(kind, late); } });
+  return acts;
+}
+function startGig(kind, late) {
+  const lvl = S.job.level;
+  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
+  if (kind === 'fire') { spawnFireTruck(); spawnFire(); log('Clocked in! A fire just broke out. Hop in the fire truck outside and follow the red arrow.', 'bad'); sfx.siren(); }
+  if (kind === 'pizza') log('Clocked in! Pick up the first pizza in the kitchen.', 'good');
+  if (kind === 'eggs') log('Clocked in! Grab the first egg crate at the loading dock. Drive gently.', 'good');
+  if (kind === 'cook') log('Clocked in! Head to the kitchen and cook the first order.', 'good');
+  sfx.ding();
+}
+// ---- fire ----
+function spawnFireTruck() {
+  if (fireTruck) return;
+  const c = spawnCar(2700, 600, 0, '#c8322a', false, null);
+  scene.remove(c.m.root); c.m = buildCar('#c8322a', 'truck'); scene.add(c.m.root);
+  c.service = true; c.max = 470; c.fuel = 100; fireTruck = c;
+}
+function removeFireTruck() {
+  if (!fireTruck) return;
+  if (driving === fireTruck) exitCar();
+  scene.remove(fireTruck.m.root); cars.splice(cars.indexOf(fireTruck), 1); fireTruck = null;
+}
+function spawnFire() {
+  const G = S.gig, used = new Set((G.burned || []));
+  const options = SUBURB_HOUSES.filter((h, i) => !used.has(i));
+  const i = SUBURB_HOUSES.indexOf(pick(options.length ? options : SUBURB_HOUSES)), h = SUBURB_HOUSES[i];
+  G.target = { x: h.x, y: h.fy, hx: h.x, hy: h.y, idx: i, t: 150 };
+  if (fireFx) scene.remove(fireFx.g);
+  const g = group(scene, h.x, 0, h.y), flames = [];
+  for (let n = 0; n < 12; n++) flames.push(add(g, GEO.c, n % 3 ? '!#ff7a1a' : '!#ffd35a', rand(-40, 40), rand(85, 120), rand(-28, 28), rand(12, 20), rand(34, 60), rand(12, 20)));
+  const fz = h.fy > h.y ? 47 : -47; for (const x of [-30, 30]) flames.push(add(g, GEO.c, '!#ff7a1a', x, 34, fz, 10, 26, 6));
+  for (const f of flames) f.castShadow = false;
+  fireFx = { g, flames };
+  queueEvent({ kind: 'bad', tag: 'Fire alarm', title: 'House fire!', text: 'Smoke is pouring out of a house in the suburbs. Get there fast and spray it before it burns down. The red arrow points the way.', sound: 'siren', buttons: [{ label: 'On my way!' }] });
+}
+function extinguish(ok) {
+  const G = S.gig; if (!G || !G.target) return;
+  const t = G.target;
+  G.done++; G.burned = (G.burned || []).concat(t.idx);
+  if (fireFx) { scene.remove(fireFx.g); fireFx = null; }
+  burst(t.hx, t.hy, 60, 30, '#9a9aa0', 120, 6);
+  G.target = null;
+  if (G.done < G.total) setTimeout(() => { if (S.gig === G) spawnFire(); }, 2500);
+  else { log('All fires are out! Drive the truck back and clock out at the fire station.', 'good'); sfx.goal(); }
+  if (ok) S.saved = (S.saved || 0) + 1; if (S.saved >= 5) goal('hero');
+}
+function updateFire(dt) {
+  if (!fireFx) return;
+  for (const f of fireFx.flames) { const h0 = f.userData.h || (f.userData.h = f.scale.y); f.scale.y = h0 * (0.7 + Math.random() * 0.6); }
+  if (Math.random() < dt * 6 && S.gig && S.gig.target) burst(S.gig.target.hx + rand(-40, 40), S.gig.target.hy + rand(-30, 30), 90, 2, '#5a5a60', 60, 7);
+}
+function fireTick(minutes) {
+  const G = S.gig; if (!G || G.kind !== 'fire' || !G.target) return;
+  G.target.t -= minutes;
+  if (G.target.t <= 0) { G.q = clamp(G.q - 0.3, 0, 1); log('Too late. The house burned down before you got there.', 'bad'); sfx.bad(); extinguish(false); }
+}
+function startHose() {
+  const lvl = S.job.level;
+  minigame = { kind: 'hose', fx: 0.5, fy: 0.5, cx: 0.2, cy: 0.8, p: 0, t: 14, speed: 0.35 + lvl * 0.12, label: 'SPRAY THE FIRE', help: 'Keep the water on the flames with WASD or the joystick', mins: 30,
+    onDone: (ok, msg, q) => { log(msg, ok ? 'good' : 'warn'); S.gig.q = clamp(S.gig.q + q + (S.gig.target ? Math.min(0.05, S.gig.target.t / 3000) : 0), 0, 1); extinguish(ok); } };
+  state = 'mini'; setScreens(); sfx.whoosh();
+}
+// ---- delivery ----
+function pickUpOrder() {
+  const G = S.gig, kind = G.kind;
+  let t;
+  if (kind === 'pizza') { const h = pick(SUBURB_HOUSES); t = { x: h.x, y: h.fy, label: 'Deliver the pizza', t: 75 + S.job.level * -5 }; }
+  else { const ids = Object.keys(PLACES).filter(id => PLACES[id].h && id !== 'depot'); const id = pick(ids); t = { x: PLACES[id].door.x, y: PLACES[id].door.y, label: `Deliver eggs to ${PLACES[id].name}`, t: 140 }; }
+  t.max = t.t; G.target = t; G.carrying = true; G.cracked = false;
+  log(kind === 'pizza' ? 'Pizza is hot! Follow the arrow to the house before it gets cold.' : `Egg crate loaded. Take it to ${t.label.replace('Deliver eggs to ', '')}. No crashing!`, 'good'); sfx.door();
+}
+function deliver() {
+  const G = S.gig, t = G.target; if (!t) return;
+  let q = 0, msg;
+  if (G.kind === 'pizza') {
+    const tip = t.t > 0 ? Math.round(5 + t.t / t.max * 15) : 0; S.money += tip;
+    if (t.t > 0) msg = `Delivered hot! The customer tipped ${money$(tip)}.`; else { msg = 'Delivered cold. No tip, and a grumpy face.'; q = -0.2; }
+  } else {
+    if (G.cracked) { msg = 'Half the eggs are cracked. The customer is not impressed.'; q = -0.25; }
+    else if (t.t <= 0) { msg = 'Delivered late, but every egg is whole.'; q = -0.1; }
+    else msg = 'Every egg delivered without a crack.';
+  }
+  G.q = clamp(G.q + q, 0, 1); G.done++; G.carrying = false; G.target = null;
+  S.delivered = (S.delivered || 0) + 1; if (S.delivered >= 10) goal('courier');
+  log(msg, q < 0 ? 'warn' : 'good'); sfx.coin();
+  if (G.done >= G.total) { log(`All deliveries done! Clock out back at ${G.kind === 'pizza' ? 'Ptero Pizza' : 'Egg Express'}.`, 'good'); sfx.goal(); }
+  else log(`Head back to ${G.kind === 'pizza' ? 'Ptero Pizza' : 'Egg Express'} for the next order.`, '');
+}
+function gigTick(minutes) {
+  const G = S.gig; if (!G) return;
+  if (G.kind === 'fire') fireTick(minutes);
+  if ((G.kind === 'pizza' || G.kind === 'eggs') && G.target) G.target.t -= minutes;
+}
+function gigCrash(hard) {
+  const G = S.gig;
+  if (hard && G && G.kind === 'eggs' && G.carrying && !G.cracked) { G.cracked = true; log('CRACK! You hear eggs breaking in the back.', 'bad'); }
+}
+// ---- cooking ----
+function startCooking() {
+  const lvl = S.job.level, n = 3 + Math.min(3, lvl + Math.floor(Math.random() * 2));
+  const order = ['Bun', ...Array.from({ length: n - 2 }, () => pick(INGREDIENTS.slice(1))), 'Bun'];
+  minigame = { kind: 'cook', order, i: 0, mistakes: 0, t: 10 + n * 2 - lvl * 2, label: 'COOK THE ORDER', mins: 20,
+    onDone: (ok, msg, q) => { log(msg, ok ? 'good' : 'warn'); const G = S.gig; G.q = clamp(G.q + q, 0, 1); G.done++; if (G.done >= G.total) { log('Every order served! Clock out in the kitchen.', 'good'); sfx.goal(); } } };
+  state = 'mini'; setScreens(); renderCook(); $('cookPanel').hidden = false;
+}
+function renderCook() {
+  const m = minigame; if (!m || m.kind !== 'cook') return;
+  $('cookOrder').innerHTML = m.order.map((x, i) => `<span class="${i < m.i ? 'done' : i === m.i ? 'next' : ''}">${x}</span>`).join('');
+  $('cookTime').textContent = `${Math.ceil(m.t)}s left · mistakes ${m.mistakes}`;
+}
+function cookPick(name) {
+  const m = minigame; if (!m || m.kind !== 'cook') return;
+  if (m.order[m.i] === name) { m.i++; sfx.door(); if (m.i >= m.order.length) { $('cookPanel').hidden = true; endMini(true, m.mistakes ? `Order up! (${m.mistakes} mistake${m.mistakes > 1 ? 's' : ''})` : 'Order up! A perfect burger.', -m.mistakes * 0.06); return; } }
+  else { m.mistakes++; sfx.bad(); }
+  renderCook();
+}
+// ---- shared ----
+function gigTargets() {
+  const G = S.gig; if (!G || inside) return [];
+  if (G.kind === 'fire' && G.target) return [{ x: G.target.x, y: G.target.y, label: 'Spray the fire', color: '#ff5a2a', arrow: 'FIRE', gig: 'fire' }];
+  if ((G.kind === 'pizza' || G.kind === 'eggs') && G.target) return [{ x: G.target.x, y: G.target.y, label: G.target.label, color: '#ffbe55', arrow: G.kind === 'pizza' ? 'PIZZA' : 'EGGS', gig: 'deliver' }];
+  return [];
+}
+function nearGig() { const t = gigTargets()[0]; return t && Math.hypot(P.x - t.x, P.y - t.y) < (driving ? 90 : 60) ? t : null; }
+function doGig(t) { if (t.gig === 'fire') { if (driving) { driving.v = 0; } startHose(); } else deliver(); }
+function gigReturnTarget() {
+  const G = S.gig; if (!G || inside) return null;
+  const place = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger' }[G.kind];
+  if (G.done >= G.total || ((G.kind === 'pizza' || G.kind === 'eggs') && !G.carrying) || (G.kind === 'cook')) return { ...PLACES[place].door, label: G.done >= G.total ? 'CLOCK OUT' : 'PICK UP' };
+  return null;
+}
+function gigClockOut() {
+  const G = S.gig, J = jobInfo(); if (!G || !J) return;
+  const frac = G.done / G.total, q = G.q;
+  const pay = Math.round(J.wage * frac * (0.6 + 0.4 * q));
+  const d = Math.round((frac < 1 ? -6 : 0) + (q - 0.55) * 18 - (G.late ? 4 : 0));
+  S.money += pay; S.job.perf = clamp(S.job.perf + d, 0, 100);
+  clearGig();
+  log(`Clocked out: ${Math.round(frac * 100)}% of the work done, +${money$(pay)}. Quality ${Math.round(q * 100)}%.`, d >= 0 ? 'good' : 'warn'); sfx.coin();
+  const C = CAREERS[S.job.career];
+  if (S.job.perf >= 85 && S.job.days >= 3 && S.job.level < C.levels.length - 1) {
+    S.job.level++; S.job.perf = 60; S.job.days = 0; S.happy += 15; goal('promo');
+    if (S.job.level === C.levels.length - 1) goal('top');
+    queueEvent({ kind: 'good', title: 'Promoted!', text: `You are now ${C.levels[S.job.level][0]} at ${PLACES[C.place].name}. Pay is up to ${money$(C.levels[S.job.level][1])} a day, and the work gets harder.`, sound: 'goal' });
+  } else if (S.job.perf < 10) fire('Your work has been sloppy and slow.');
+}
+function clearGig() {
+  S.gig = null; removeFireTruck();
+  if (fireFx) { scene.remove(fireFx.g); fireFx = null; }
+  if (minigame && minigame.kind === 'cook') { minigame = null; $('cookPanel').hidden = true; if (state === 'mini') state = 'play'; }
+}
+function checkGigEnd() {
+  const J = jobInfo(), G = S.gig; if (!G) return;
+  const place = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger' }[G.kind];
+  if (!J || J.place !== place) { clearGig(); return; }
+  if (hour() >= J.hours[1] + 1) { log('Your shift ran out. You get paid for what you finished.', 'warn'); gigClockOut(); }
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -2362,6 +2586,7 @@ addEventListener('keydown', e => {
   if (k === 'h' && state === 'play' && driving) { honk(); return; }
   if (k === 'f' && state === 'play') { useWeapon(); return; }
   if (k === 'q' && state === 'play') { cycleWeapon(); return; }
+  if (state === 'mini' && minigame && minigame.kind === 'cook' && k >= '1' && k <= '6') { cookPick(INGREDIENTS[+k - 1]); return; }
   if (state === 'mini' && (k === 'e' || k === ' ' || k === 'enter')) { e.preventDefault(); miniPress(); return; }
   if (k.startsWith('arrow')) e.preventDefault();
   keys.add(k);
@@ -2373,11 +2598,12 @@ cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.ch
 const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
 function useNear() {
-  if (state === 'play' && driving) { if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
+  if (state === 'play' && driving) { const ng = nearGig(); if (ng) { doGig(ng); return; } if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
   if (nearPlace.m) { enterCar(nearPlace); return; }
   if (nearPlace.site) { doSiteTask(nearPlace); return; }
   if ('ward' in nearPlace) { treatPatient(nearPlace); return; }
+  if (nearPlace.gig) { doGig(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -2410,6 +2636,7 @@ function update(dt) {
   // nearest door
   nearPlace = null; let best = inside ? 34 : 50;
   for (const p of (inside ? inside.stations : Object.values(PLACES))) { const pt = p.door || p, d = Math.hypot(P.x - pt.x, P.y - pt.y); if (d < best) { best = d; nearPlace = p; } }
+  for (const t of gigTargets()) { const d = Math.hypot(P.x - t.x, P.y - t.y) - 10; if (d < best) { best = d; nearPlace = t; } }
   for (const st of wardStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 6; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   if (!inside) for (const c of cars) if (!c.ai) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -2418,7 +2645,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); updateWeapons(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateWeapons(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -2545,6 +2772,8 @@ function drawOverlay() {
   if (spouseM) lbl(spouseM.x, spouseM.y, 40, S.partner.name, '#ffb3e6');
   kidMs.forEach((k, i) => lbl(k.x, k.y, 26, S.kids[i].name, '#bfe8ff'));
   if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
+  for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
+  { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
   if (S.site && !inside) {
     for (const st of siteStations()) { const s2 = toScreen(st.x, 0, st.y); if (s2.ok) { g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); } const l2 = toScreen(st.x, 36, st.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, l2.x, l2.y); g.fillStyle = '#f1c40f'; g.fillText(st.label, l2.x, l2.y); } arrowTo(g, st.x, st.y, '#f1c40f', 'SITE'); }
     if (!siteTask()) { const d = PLACES.builders.door; arrowTo(g, d.x, d.y, '#f1c40f', 'CLOCK OUT'); }
@@ -2576,6 +2805,7 @@ function drawMini() {
     if (p.h) { g.fillStyle = J && J.place === p.id ? '#ffbe55' : 'rgba(220,220,230,.75)'; g.fillRect(p.x0 * k, p.y0 * k, (p.x1 - p.x0) * k, (p.y1 - p.y0) * k); }
     if (p.home && S.home === p.home) { g.fillStyle = '#8fdc6a'; g.fillRect(p.door.x * k - 4, (p.door.y + 100) * k - 4, 8, 8); }
   }
+  for (const t of gigTargets()) { g.fillStyle = t.color; g.beginPath(); g.arc(t.x * k, t.y * k, 4 + Math.sin(gameT * 8), 0, 7); g.fill(); }
   for (const c of cars) { g.fillStyle = c === driving ? '#ffe08a' : c.ai ? 'rgba(30,30,40,.8)' : c.color; g.fillRect(c.x * k - 2, c.y * k - 2, 4, 4); }
   if (trex) { g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(trex.x * k, trex.y * k, 5, 0, 7); g.fill(); }
   g.save(); g.translate(P.x * k, P.y * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -2605,9 +2835,10 @@ function hud() {
   if (show) {
     const np = nearPlace;
     let what;
-    if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np) what = np.label;
-    else if (np.m) what = np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
+    if (driving && nearGig()) what = nearGig().label;
+    else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
+    else if (np.site || 'ward' in np || np.gig) what = np.label;
+    else if (np.m) what = np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
     else if (np.id === 'bench') what = 'Use the park bench';
@@ -2622,6 +2853,7 @@ function hud() {
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
   if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
+  if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
   if (S.site && !chase) { const t = siteTask(), dn = S.site.tasks.filter(x => x.done).length; st = t ? `Site work ${dn + 1}/${S.site.tasks.length}: ${t.t === 'carry' ? `carry girders (${S.site.carried}/${S.site.need})` : TASK_INFO[t.t].label.toLowerCase()}` : 'All site work done. Clock out at the Raptor Builders trailer.'; }
   if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
   sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
@@ -2643,7 +2875,7 @@ function beginLife(fromSave) {
   if (player) scene.remove(player.root);
   const pal = PALETTES[S.pal]; player = makeCompy(pal, { crest: pal.crest }); scene.add(player.root);
   for (const c of cars) if (!c.owned) { c.stolen = false; }
-  refreshHome(); refreshFamily(); spawnOwnedCar(); minigame = null; S.ward = null; clearWard(); for (const sh of shots) scene.remove(sh.m); shots = []; refreshTower(); refreshPet();
+  refreshHome(); refreshFamily(); spawnOwnedCar(); minigame = null; clearGig(); S.ward = null; clearWard(); for (const sh of shots) scene.remove(sh.m); shots = []; refreshTower(); refreshPet();
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
   $('titleScreen').hidden = true; state = 'play'; setScreens();
   if (!fromSave) queueEvent({ kind: 'good', tag: 'Day 1', title: `Welcome to town, ${S.name}`, text: `You have ${money$(S.money)}, no job and no home. Your bed tonight is the park bench. Start at the Job Center up the path, grab food at Bronto Burger, and be in bed before midnight.`, buttons: [{ label: "Let's go" }] });
@@ -2660,6 +2892,7 @@ $('quitBtn').addEventListener('click', () => { save(); if (driving) exitCar(true
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
 buildTown(); spawnNPCs(); placeCars();
+INGREDIENTS.forEach((x, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = `${i + 1} \u00b7 ${x}`; bt.addEventListener('click', () => cookPick(x)); $('cookIngs').appendChild(bt); });
 player = makeCompy(PALETTES[0], { crest: PALETTES[0].crest }); scene.add(player.root);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => signs.forEach(d => d()));
 { const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; }
