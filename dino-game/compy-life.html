@@ -379,7 +379,7 @@ function buildDistricts() {
   add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
   add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
   solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
-  buildSite(); buildPlazas();
+  buildSite(); buildPlazas(); buildIsland();
   const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
   for (const { i, j, type } of districtList) {
     const [x0, y0, x1, y1] = blockRect(i, j), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -674,7 +674,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -775,7 +775,7 @@ function advance(mins, opts = {}) {
     if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
     S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
     checkShift(); gigTick(stepM);
-    if (S.trexAt != null && S.min >= S.trexAt && !trex) startTrex();
+    if (S.trexAt != null && S.min >= S.trexAt && !trex && !onIsland()) startTrex();
     if (S.min >= 1440) { if (!opts.sleeping) passOut('midnight'); return; }
     if (!opts.sleeping && !opts.work && S.energy <= 0 && state !== 'jail') { passOut('tired'); return; }
     if (S.starve >= 8) { S.starve = 0; collapse(); return; }
@@ -1557,7 +1557,7 @@ const LAYOUTS = {
     b.cyl(450, 260, 18, 30, '#d6cbb5'); add(b.g, GEO.s, '#f6f0e2', 450, 44, 260, 10, 13, 10);
     b.box(440, 60, 90, 30, 24, '#6a5a3a'); b.npc(440, 36, 3, { tie: '#6a5a3a' });
     b.npc(150, 270, 0, { wander: [60, 230, 470, 300] }); b.npc(350, 280, 2, { wander: [60, 230, 470, 300] }); b.npc(250, 300, 5, { kid: true, wander: [60, 230, 470, 300] });
-    b.station(440, 102, 'Ticket desk', ['Visit the exhibits']);
+    b.station(440, 102, 'Ticket desk', ['Visit the exhibits', 'Sell fossils']);
     b.station(60, 60, 'Staff office', WORKS);
     b.lamp(180, 200); b.lamp(340, 200);
   } },
@@ -1619,7 +1619,7 @@ function exitBuilding(to) {
 function interact() {
   const p = nearPlace; if (!p) return;
   if (inside) { if (p.exit) exitBuilding(); else openMenu(PLACES[inside.id], p); return; }
-  if (p.id === 'bench' || p.id === 'stadium' || (p.home && S.home !== p.home)) { openMenu(p); return; }
+  if (p.id === 'bench' || p.id === 'stadium' || p.id === 'ferry' || p.id === 'ferryBack' || (p.home && S.home !== p.home)) { openMenu(p); return; }
   const why = closedWhy(p.id); if (why) { log(why, 'warn'); sfx.bad(); return; }
   enterBuilding(p.home ? 'home_' + p.home : p.id);
 }
@@ -3076,6 +3076,7 @@ function buildMapBase() {
 function mapPlaces() {
   const out = [];
   for (const p of Object.values(PLACES)) {
+    if (p.door.x > WORLD) continue;
     if (p.home) { if (S.home === p.home) out.push({ id: p.id, name: 'Your ' + HOMES[p.home].name.toLowerCase(), x: p.door.x, y: p.door.y, icon: '🏡', home: true }); continue; }
     if (p.id === 'bench' && S.home) continue;
     out.push({ id: p.id, name: p.name, x: p.h ? (p.x0 + p.x1) / 2 : p.door.x, y: p.h ? (p.y0 + p.y1) / 2 : p.door.y, door: p.door, icon: MAP_ICON[p.id] || '📍' });
@@ -3084,6 +3085,7 @@ function mapPlaces() {
 }
 function openMap() {
   if (state !== 'play' || inside || derby) { if (inside) log('Step outside to look at the town map.', 'warn'); return; }
+  if (onIsland()) { log('The town map does not cover Volcano Island. Use the minimap.', 'warn'); return; }
   if (!mapBase) buildMapBase();
   state = 'map'; keys.clear(); $('mapScreen').hidden = false;
   const J = jobInfo();
@@ -3640,6 +3642,7 @@ function phoneClick(e) {
   const svc = b.dataset.svc;
   if (svc === 'pizza') { S.money -= 15; S.hunger = Math.min(100, S.hunger + 40); S.happy += 4; advance(30); log('A pterodactyl dropped off a hot Ptero Pizza. Delicious.', 'good'); renderPhone(); }
   if (svc === 'tow') { const c = cars.find(c => c.owned); S.money -= 40; c.x = P.x + 40; c.y = P.y; c.v = 0; advance(20); log(`A tow truck dropped your ${carName(c)} right next to you.`, 'good'); closePhone(); }
+  if ((svc === 'taxi' || svc === 'tow') && onIsland()) { log('No taxis or tow trucks on the island. Take the ferry.', 'warn'); return; }
   if (svc === 'taxi') { closePhone(); taxiMode = true; openMap(); $('mapScreen').classList.add('taxi'); log('Taxi! Tap where you want to go on the map.', ''); }
 }
 function taxiRide(p) {
@@ -3924,6 +3927,171 @@ function stockDetail(s) {
       { label: 'Back', fn: () => stockMenu() }] });
 }
 
+// ---------- Volcano Island: ferry, treasure digging, fossils and eruptions ----------
+const ISL = { x: 5300, y: 2000, rx: 520, ry: 410 };
+const VOLC = { x: 5470, y: 1840 };
+const onIsland = () => !inside && !(typeof derby !== 'undefined' && derby) && P.x > WORLD + 300 && P.x < 6000;
+let digG = null, digKey = '', erupt = null, smokeT = 0;
+Object.assign(MAP_ICON, { ferry: '⛴' });
+Object.assign(HOURS, { tiki: [10, 24] });
+ROSTER.push({ name: 'Coral', pal: 1, trait: 'lives on Volcano Island and paddles a canoe everywhere', likes: 'flowers', spot: [5080, 2330], place: 'on Volcano Island', date: 'a sunset canoe ride' });
+function buildIsland() {
+  const sand = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat('#d9c08a')); sand.rotation.x = -Math.PI / 2; sand.position.set(ISL.x, 0.6, ISL.y); sand.scale.set(ISL.rx + 50, ISL.ry + 50, 1); sand.receiveShadow = true; scene.add(sand);
+  const grass = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat('#5c9a48')); grass.rotation.x = -Math.PI / 2; grass.position.set(ISL.x + 30, 0.9, ISL.y - 20); grass.scale.set(ISL.rx - 80, ISL.ry - 90, 1); grass.receiveShadow = true; scene.add(grass);
+  // the volcano
+  const v = new THREE.Mesh(new THREE.CylinderGeometry(40, 190, 230, 18, 1, false), mat('#5a4a44')); v.position.set(VOLC.x, 115, VOLC.y); v.castShadow = v.receiveShadow = true; scene.add(v);
+  const lava = add(scene, GEO.y, '!#ff5a1a', VOLC.x, 231, VOLC.y, 34, 2, 34); lava.castShadow = false;
+  for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 + 0.3; const s = add(scene, GEO.b, '!#ff7a2a', VOLC.x + Math.cos(a) * 70, 150 - i * 8, VOLC.y + Math.sin(a) * 70, 6, 60, 3, 0, -a, 0.35); s.castShadow = false; }
+  solids.push({ x0: VOLC.x - 150, y0: VOLC.y - 150, x1: VOLC.x + 150, y1: VOLC.y + 150 });
+  const vs = new THREE.Mesh(new THREE.PlaneGeometry(110, 24), new THREE.MeshBasicMaterial({ map: signTexture('DANGER: VOLCANO', '#c0392b', '#ffffff') })); vs.position.set(VOLC.x - 60, 26, VOLC.y + 200); scene.add(vs);
+  add(scene, GEO.y, '#6a4a2e', VOLC.x - 60, 10, VOLC.y + 199, 1.5, 20, 1.5);
+  // palms
+  for (let n = 0; n < 18; n++) {
+    const a = n / 18 * Math.PI * 2 + 0.2, r = 0.78 + (n % 3) * 0.06, px = ISL.x + Math.cos(a) * ISL.rx * r, pz = ISL.y + Math.sin(a) * ISL.ry * r, lean = (n % 2 ? 1 : -1) * 0.2;
+    if (Math.hypot(px - 4830, pz - 2050) < 90 || Math.hypot(px - 5240, pz - 2240) < 140) continue;
+    const palm = group(scene, px, 0, pz); add(palm, GEO.y, '#9a7442', 0, 45, 0, 5, 90, 5, 0, 0, lean);
+    for (let l = 0; l < 6; l++) { const b = l / 6 * Math.PI * 2; add(palm, GEO.c, '#3f9a3a', Math.cos(b) * 18 + lean * 40, 88, Math.sin(b) * 18, 6, 40, 3, Math.sin(b) * 1.3, 0, -Math.cos(b) * 1.3); }
+  }
+  // docks and ferries
+  const dock = (x0, x1, y) => { add(scene, GEO.b, '#8a6a42', (x0 + x1) / 2, 3, y, x1 - x0, 3, 40); for (let x = x0; x <= x1; x += 40) for (const s of [-1, 1]) add(scene, GEO.y, '#5a3f28', x, 2, y + s * 18, 3, 10, 3); };
+  const boat = (x, y) => { const b = group(scene, x, 0, y); add(b, GEO.b, '#f2f2ee', 0, 6, 0, 90, 12, 36); add(b, GEO.b, '#2e86c1', 0, 1, 0, 92, 3, 38); add(b, GEO.b, '#f2f2ee', -8, 22, 0, 40, 20, 28); add(b, GEO.b, '!#bfe3ff', -8, 24, 14.5, 34, 8, 1); add(b, GEO.y, '#c0392b', 10, 38, 0, 4, 16, 4); };
+  dock(4180, 4420, 2150); boat(4380, 2196);
+  dock(4720, 4860, 2050); boat(4760, 2096);
+  PLACES.ferry = { id: 'ferry', name: 'Ferry to Volcano Island', door: { x: 4232, y: 2150 } };
+  PLACES.ferryBack = { id: 'ferryBack', name: 'Ferry to Compyville', door: { x: 4835, y: 2050 } };
+  for (const k of ['ferry', 'ferryBack']) { const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(PLACES[k].door.x, 5, PLACES[k].door.y); r.scale.setScalar(20); scene.add(r); PLACES[k].ring = r; }
+  const fs = new THREE.Mesh(new THREE.PlaneGeometry(80, 18), new THREE.MeshBasicMaterial({ map: signTexture('FERRY $15', '#2e86c1', '#ffffff') })); fs.position.set(4232, 30, 2128); scene.add(fs);
+  add(scene, GEO.y, '#6a4a2e', 4232, 14, 2127, 1.5, 28, 1.5);
+  place('tiki', 'Tiki Bar', 5150, 2130, 5330, 2260, 50, 1, { wall: '#a8783a', win: '#3a2a1a', sign: '#e67e22', roof: '#c9a24a', awning: '#2e8a3a' });
+}
+function islandBound(o) {
+  const dx = (o.x - ISL.x) / (ISL.rx + 30), dy = (o.y - ISL.y) / (ISL.ry + 30), d = Math.hypot(dx, dy);
+  if (d > 1) { o.x = ISL.x + dx / d * (ISL.rx + 30); o.y = ISL.y + dy / d * (ISL.ry + 30); }
+}
+function ferryRide(toIsland) {
+  if (chase) { log('The ferry captain will not take a wanted dino!', 'bad'); return; }
+  if (hour() < 7 || hour() >= 22) { log('The ferry runs from 7:00 AM to 10:00 PM.', 'warn'); return; }
+  if (S.money < 15) { log('The ferry costs $15.', 'warn'); return; }
+  S.money -= 15; advance(30); sfx.honk();
+  teleport(toIsland ? { x: 4880, y: 2050 } : { x: 4170, y: 2150 });
+  if (typeof petM !== 'undefined' && petM && S.pet && S.pet.walking) { petM.x = P.x - 24; petM.y = P.y; }
+  if (toIsland) { goal('island'); log(S.shovel ? 'Welcome to Volcano Island! Look for X marks in the sand to dig.' : 'Welcome to Volcano Island! Grab a shovel at the Tiki Bar and dig for treasure.', 'good'); }
+  else log('Back in Compyville.', '');
+}
+// ---- treasure ----
+function islandDaily() {
+  S.digDay = S.day; S.digs = [];
+  for (let n = 0, tries = 0; n < 6 && tries < 200; tries++) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.82, x = ISL.x + Math.cos(a) * ISL.rx * r, y = ISL.y + Math.sin(a) * ISL.ry * r;
+    if (Math.hypot(x - VOLC.x, y - VOLC.y) < 200 || (x > 5120 && x < 5360 && y > 2100 && y < 2340) || Math.hypot(x - 4835, y - 2050) < 80) continue;
+    S.digs.push({ x: Math.round(x), y: Math.round(y), dug: false }); n++;
+  }
+  S.eruptAt = Math.random() < 0.2 ? Math.round(rand(10, 18)) * 60 : null;
+}
+function syncDigs() {
+  if (!S) return;
+  if (S.digDay !== S.day || !S.digs) islandDaily();
+  const key = S.digs.map(d => d.dug ? 0 : 1).join('') + S.day;
+  if (key === digKey && digG) return; digKey = key;
+  if (digG) scene.remove(digG); digG = group(scene, 0, 0, 0);
+  for (const d of S.digs) {
+    if (d.dug) { add(digG, GEO.y, '#a88a5a', d.x, 1.2, d.y, 14, 1, 14).castShadow = false; continue; }
+    add(digG, GEO.s, '#c9a86a', d.x, 1, d.y, 14, 5, 14).castShadow = false;
+    for (const r of [0.8, -0.8]) add(digG, GEO.b, '#c0392b', d.x, 4.5, d.y, 20, 1.2, 3.5, 0, r, 0).castShadow = false;
+  }
+}
+function digSpots() {
+  if (!S || !onIsland() || !S.digs) return [];
+  return S.digs.filter(d => !d.dug).map(d => ({ x: d.x, y: d.y, dig: d, label: S.shovel ? 'Dig here' : 'Something is buried here (you need a shovel)' }));
+}
+const FOSSILS = { claw: { name: 'Raptor claw', price: 60 }, trilo: { name: 'Trilobite', price: 45 }, ammo: { name: 'Ammonite', price: 55 }, tooth: { name: 'T-rex tooth', price: 130 }, amber: { name: 'Amber with a bug inside', price: 170 } };
+function digUp(spot) {
+  if (!S.shovel) { log('You need a shovel. The Tiki Bar sells them.', 'warn'); return; }
+  if (S.energy < 10) { log('Too tired to dig.', 'warn'); return; }
+  minigame = { kind: 'mash', p: 0, t: 5.5, label: 'DIG!', help: 'Mash E (or tap) to dig through the sand', mins: 20, what: 'Your shovel hits something!', fail: 'The hole keeps filling with sand.',
+    onDone: (ok, msg) => {
+      S.energy -= 6;
+      if (!ok) { log(msg, 'warn'); return; }
+      spot.dig.dug = true; S.digsTotal = (S.digsTotal || 0) + 1;
+      const r = Math.random();
+      if (r < 0.03) { S.money += 1200; S.happy += 30; goal('treasure'); sfx.goal(); queueEvent({ kind: 'good', title: 'The Golden Egg idol!', text: 'Your shovel clangs against something shiny. It is a solid gold egg idol, lost for a million years. A collector pays you $1,200 on the spot.', sound: 'goal' }); }
+      else if (r < 0.41) { const n = Math.round(rand(20, 90)); S.money += n; log(`${msg} A rusty chest with ${money$(n)} inside!`, 'good'); sfx.coin(); }
+      else if (r < 0.78) { const k = Math.random() < 0.15 ? 'amber' : pick(['claw', 'trilo', 'ammo', 'claw', 'trilo', 'ammo', 'tooth']); S.fossils = S.fossils || {}; S.fossils[k] = (S.fossils[k] || 0) + 1; log(`${msg} You found a ${FOSSILS[k].name}! The Fossil Museum will buy it.`, 'good'); sfx.goal(); }
+      else { const j = pick(['a rusty can', 'a very old sandal', 'a crab. It pinched you.', 'a message in a bottle']); log(`${msg} It is just ${j}`, ''); if (j.includes('bottle')) text('A message in a bottle', pick(['If you find this, I am stuck on an island. Oh wait, so are you.', 'Treasure is buried near the volcano. Probably.', 'Remember to drink water. Love, a stranger from the past.'])); }
+    } };
+  state = 'mini'; setScreens();
+}
+function fossilActs() {
+  const f = S.fossils || {}, n = Object.values(f).reduce((a, b) => a + b, 0), worth = Object.entries(f).reduce((a, [k, v]) => a + FOSSILS[k].price * v, 0);
+  return [{ label: 'Sell fossils to the curator', detail: n ? `${n} fossil${n > 1 ? 's' : ''} worth ${money$(worth)}. They go on display!` : 'Dig some up on Volcano Island first.', why: n ? '' : 'No fossils to sell.', mins: 15, fn: () => { S.money += worth; S.fossilsSold = (S.fossilsSold || 0) + n; S.fossils = {}; log(`The curator pays ${money$(worth)} and puts your fossils on display.`, 'good'); sfx.coin(); } }];
+}
+// ---- eruptions ----
+function islandUpdate(dt) {
+  if (!S) return;
+  smokeT -= dt;
+  if (smokeT <= 0 && Math.hypot(cam.x - VOLC.x, cam.y - VOLC.y) < 1500) { smokeT = erupt ? 0.05 : 0.35; particles.push({ x: VOLC.x + rand(-20, 20), y: VOLC.y + rand(-20, 20), z: 240, vx: rand(-15, 15), vy: rand(-15, 15), vz: rand(30, 60), life: 3, max: 3, color: erupt ? (Math.random() < 0.4 ? '#ff7a2a' : '#5a5a5a') : '#9a9a9a', size: rand(5, 9), g: -8 }); }
+  if (!erupt && S.eruptAt != null && S.min >= S.eruptAt) {
+    S.eruptAt = null;
+    if (onIsland()) { erupt = { t: 40, bombT: 1.5, bombs: [], hurt: false }; shake = 18; sfx.crash(); queueEvent({ kind: 'bad', tag: 'Disaster', title: 'The volcano is erupting!', text: 'Lava bombs are raining down! Dodge the glowing circles and get to the ferry dock on the west shore.', sound: 'crash' }); }
+    else log('A deep rumble rolls in from the sea. Volcano Island is erupting! Good thing you are not there.', 'warn');
+  }
+  if (!erupt) return;
+  if (!onIsland()) { erupt = null; goal('volcano'); survived(); log('You made it off the island! Behind you, lava pours into the sea.', 'good'); return; }
+  erupt.t -= dt; erupt.bombT -= dt;
+  if (erupt.bombT <= 0) { erupt.bombT = rand(0.5, 1.0); erupt.bombs.push({ x: P.x + rand(-90, 90) + P.vx * 0.6, y: P.y + rand(-90, 90) + P.vy * 0.6, t: 1.4 }); }
+  for (const b of erupt.bombs) {
+    b.t -= dt;
+    if (b.t <= 0 && !b.done) { b.done = true; burst(b.x, b.y, 4, 26, '#ff7a2a', 120, 4); shake = Math.max(shake, 6); if (Math.hypot(P.x - b.x, P.y - b.y) < 26) { S.energy -= 18; S.happy -= 6; erupt.hurt = true; sfx.bad(); log('A lava bomb singed your tail! OUCH.', 'bad'); if (Math.random() < 0.3) S.injured = true; } }
+  }
+  erupt.bombs = erupt.bombs.filter(b => !b.done);
+  if (erupt.t <= 0) { erupt = null; goal('volcano'); survived(); log('The eruption calms down. You survived Volcano Island!', 'good'); }
+}
+function drawIsland(g) {
+  if (!erupt) return;
+  g.fillStyle = `rgba(255,80,20,${0.08 + Math.sin(gameT * 5) * 0.04})`; g.fillRect(0, 0, W, H);
+  for (const b of erupt.bombs) { const s2 = toScreen(b.x, 0, b.y); if (!s2.ok) continue; const k = 1 - b.t / 1.4; g.strokeStyle = '#ff5a1a'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 28, 15, 0, 0, 7); g.stroke(); g.fillStyle = `rgba(255,90,30,${0.15 + k * 0.4})`; g.beginPath(); g.ellipse(s2.x, s2.y, 28 * k, 15 * k, 0, 0, 7); g.fill(); const s3 = toScreen(b.x, 300 * (1 - k), b.y); if (s3.ok) { g.fillStyle = '#ff7a2a'; g.beginPath(); g.arc(s3.x, s3.y, 7, 0, 7); g.fill(); } }
+}
+function drawIslandMini(g, Sz) {
+  const k = Sz / 1300, ox = ISL.x - 650, oy = ISL.y - 650;
+  g.fillStyle = 'rgba(61,143,192,.85)'; g.fillRect(0, 0, Sz, Sz);
+  g.fillStyle = '#d9c08a'; g.beginPath(); g.ellipse((ISL.x - ox) * k, (ISL.y - oy) * k, (ISL.rx + 50) * k, (ISL.ry + 50) * k, 0, 0, 7); g.fill();
+  g.fillStyle = '#5c9a48'; g.beginPath(); g.ellipse((ISL.x + 30 - ox) * k, (ISL.y - 20 - oy) * k, (ISL.rx - 80) * k, (ISL.ry - 90) * k, 0, 0, 7); g.fill();
+  g.fillStyle = '#5a4a44'; g.beginPath(); g.arc((VOLC.x - ox) * k, (VOLC.y - oy) * k, 150 * k, 0, 7); g.fill(); g.fillStyle = '#ff5a1a'; g.beginPath(); g.arc((VOLC.x - ox) * k, (VOLC.y - oy) * k, 30 * k, 0, 7); g.fill();
+  g.fillStyle = '#c0392b'; for (const d of S.digs || []) if (!d.dug) { g.fillRect((d.x - ox) * k - 2, (d.y - oy) * k - 2, 4, 4); }
+  g.fillStyle = '#ffffff'; g.fillRect((4835 - ox) * k - 3, (2050 - oy) * k - 3, 6, 6);
+  g.save(); g.translate((P.x - ox) * k, (P.y - oy) * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
+}
+Object.assign(MENUS, {
+  ferry: () => ({ title: 'Ferry to Volcano Island', sub: 'Departs every half hour from 7:00 AM to 10:00 PM. Treasure, fossils and a very grumpy volcano.', acts: [{ label: 'Board the ferry', detail: '30 minute ride', cost: 15, why: chase ? 'Not while the police are after you.' : (hour() < 7 || hour() >= 22) ? 'The ferry is not running right now.' : '', fn: () => { closeMenu(); S.money += 15; ferryRide(true); } }] }),
+  ferryBack: () => ({ title: 'Ferry to Compyville', sub: 'Back to town. Departs every half hour until 10:00 PM.', acts: [{ label: 'Board the ferry', detail: '30 minute ride', cost: 15, why: (hour() < 7 || hour() >= 22) ? 'The ferry is not running. Rent a beach hut at the Tiki Bar.' : '', fn: () => { closeMenu(); S.money += 15; ferryRide(false); } }] }),
+  tiki: () => {
+    const acts = [];
+    if (open(10, 24)) {
+      acts.push({ label: 'Buy a shovel', detail: S.shovel ? 'You already have one.' : 'Dig up the X marks around the island. New ones appear every day.', why: S.shovel ? 'You already have one.' : '', cost: 20, mins: 5, fn: () => { S.shovel = true; log('Shovel acquired. Find the red X marks in the sand.', 'good'); } });
+      acts.push({ label: 'Coconut smoothie', detail: '+20 energy, +15 hunger, +6 happiness', cost: 7, mins: 15, fn: () => { S.energy = Math.min(100, S.energy + 20); S.hunger = Math.min(100, S.hunger + 15); S.happy += 6; } });
+      acts.push({ label: 'Watch the sunset', detail: '+18 happiness. Best after 6 PM.', why: hour() < 18 ? 'Come back after 6 PM.' : '', mins: 60, fn: () => { S.happy += 18; if (S.partner) partnerRel(6); log(`The sun melts into the sea behind the volcano.${S.partner ? ` You wish ${S.partner.name} were here.` : ''}`, 'good'); } });
+    }
+    acts.push({ label: 'Rent a beach hut for the night', detail: 'Sleep to the sound of waves. Wake up with full energy and +15 happiness.', cost: 90, why: hour() < 18 ? 'Check-in starts at 6 PM.' : '', fn: () => { closeMenu(); S.happy += 15; sleep(100); } });
+    acts.push(...holdUpAct(60, 180));
+    return { sub: open(10, 24) ? 'Tiki Bar. Coconuts, shovels and sunsets.' : 'The bar is closed, but the beach huts are open all night.', acts };
+  },
+});
+Object.assign(LAYOUTS, {
+  tiki: { w: 360, d: 260, floor: ['wood', '#c9a26a', '#a8834e'], wall: '#d9b47a', trim: '#2e8a3a', build(b) {
+    b.box(180, 60, 200, 30, 26, '#8a5a2a'); for (let i = 0; i < 6; i++) b.box(100 + i * 32, 60, 8, 8, 12, ['!#ff8a3a', '!#ffe066', '!#7fe8a0'][i % 3], false, 26);
+    b.npc(180, 36, 1, { hat: '#2e8a3a' });
+    b.station(180, 102, 'Bar', ['Coconut', 'Watch', 'Hold up']);
+    b.station(70, 200, 'Shop shelf', ['Buy a shovel']); b.box(40, 200, 20, 60, 40, '#6a4a2e');
+    b.station(300, 200, 'Beach hut desk', ['Rent a beach hut']); b.box(320, 170, 50, 26, 22, '#8a5a2a');
+    for (const [x, z] of [[140, 180], [230, 190]]) { b.table(x, z, '#c9a24a'); b.chair(x - 22, z); b.chair(x + 22, z); }
+    b.npc(118, 180, 4); b.npc(252, 190, 0); b.plant(20, 20); b.plant(340, 20);
+    b.sign('TIKI BAR', 180, 100, 3, 130, '#e67e22', '#ffffff'); b.lamp(180, 140);
+  } },
+});
+
+const _museumM = MENUS.museum;
+MENUS.museum = p => { const m = _museumM(p); m.acts.push(...fossilActs()); return m; };
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -3963,6 +4131,7 @@ function useNear() {
   if (nearPlace.fest) { nearPlace.fn(); return; }
   if (nearPlace.fishing) { startFishing(nearPlace); return; }
   if ('farm' in nearPlace) { farmPlot(nearPlace.farm); return; }
+  if (nearPlace.dig) { digUp(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -3985,6 +4154,7 @@ function update(dt) {
   const spd = (S.injured ? 110 : 200) * (S.flood ? 0.7 : 1) * (S.energy < 15 ? 0.7 : 1) * fitSpeed();
   P.vx += (mx * spd - P.vx) * Math.min(1, dt * 12); P.vy += (my * spd - P.vy) * Math.min(1, dt * 12);
   if (inside) { P.x = clamp(P.x + P.vx * dt, inside.ox + 10, inside.ox + inside.w - 10); P.y = clamp(P.y + P.vy * dt, inside.oy + 10, inside.oy + inside.d - 6); }
+  else if (onIsland()) { P.x += P.vx * dt; P.y += P.vy * dt; islandBound(P); }
   else { P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10); }
   collide(P, 9);
   if (!inside) carPush(P, 9);
@@ -4000,6 +4170,7 @@ function update(dt) {
   for (const st of festStalls()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 16; if (d < best) { best = d; nearPlace = st; } }
   for (const st of fishSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 20; if (d < best) { best = d; nearPlace = st; } }
   for (const st of farmSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 8; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of digSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -4008,7 +4179,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck();
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck(); islandUpdate(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -4098,7 +4269,7 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
-  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots();
+  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots(); syncDigs();
   if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
   carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
   if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
@@ -4122,7 +4293,7 @@ function arrowTo(g, tx, ty, color, label) {
 }
 function drawOverlay() {
   const g = fctx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
-  drawWeather(g);
+  drawWeather(g); drawIsland(g);
   if (state === 'title') return;
   for (const p of particles) { const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue; g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color; g.beginPath(); g.arc(s.x, s.y, p.size, 0, 7); g.fill(); }
   g.globalAlpha = 1; g.textAlign = 'center';
@@ -4167,6 +4338,7 @@ function drawMini() {
   if (++mt % 4) return;
   const Sz = mini.clientWidth; if (mini.width !== Math.round(Sz * DPR)) mini.width = mini.height = Math.round(Sz * DPR);
   const g = mctx, k = Sz / WORLD; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, Sz, Sz);
+  if (onIsland()) { drawIslandMini(g, Sz); return; }
   g.fillStyle = 'rgba(60,110,60,.7)'; g.fillRect(0, 0, Sz, Sz);
   g.fillStyle = 'rgba(80,80,90,.9)'; for (const c of ROADS) { g.fillRect((c - 50) * k, 0, 100 * k, Sz); g.fillRect(0, (c - 50) * k, Sz, 100 * k); }
   const J = jobInfo();
@@ -4199,6 +4371,8 @@ function hud() {
   if (S.fit >= 10) chips.push([`Fit ${Math.round(S.fit)}`, 'good']);
   if (S.tickets) chips.push([`${S.tickets} tickets`, '']);
   if (fishCount()) chips.push([`${fishCount()} fish`, '']);
+  { const nf = Object.values(S.fossils || {}).reduce((a, b) => a + b, 0); if (nf) chips.push([`${nf} fossil${nf > 1 ? 's' : ''}`, '']); }
+  if (onIsland()) chips.push(['Volcano Island', 'good']);
   if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
@@ -4210,10 +4384,12 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
+    else if (np.id === 'ferry') what = 'Take the ferry to Volcano Island';
+    else if (np.id === 'ferryBack') what = 'Take the ferry back to town';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
     else if (np.id === 'bench') what = 'Use the park bench';
     else if (np.home) what = S.home === np.home ? 'Go inside your home' : `Look at the ${np.name.toLowerCase()} (${np.home === 'burrow' ? 'for rent' : 'for sale'})`;
