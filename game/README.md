@@ -37,6 +37,8 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Map (M, or 🗺️ on touch):** a shaded map of the island with fog of war that lifts as you
   explore, plus place names and markers for you, your tames, buildings and your bed. A
   corner minimap (desktop) shows nearby creatures, with hostile ones in red.
+- **Name tags & tips:** nearby tames show floating name/level/health tags (⏸ = staying,
+  🍼 = baby). One-time 💡 tips explain new situations the first time you meet them.
 - **Tame roster (T, or 🦖 on touch):** rename tames, feed them to heal, set follow/stay or
   release them. Tames level up from kills (more health and damage) and slowly heal. Whistle
   commands: G all follow, H all stay, Z attack whatever you're aiming at.

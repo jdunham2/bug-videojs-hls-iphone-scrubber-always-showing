@@ -1045,6 +1045,7 @@ class Game {
       this.bestiary.update(dt);
       this.breeding.update(dt);
       this.drops.update(dt);
+      this.tips(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
@@ -1079,6 +1080,7 @@ class Game {
     document.body.classList.toggle('bossfight', !!showBoss);
     if (showBoss) { bb.querySelector('i').style.width = `${(this.boss.hp / this.boss.maxHp) * 100}%`; bb.querySelector('.bname').textContent = `${this.boss.name} — ${Math.ceil(this.boss.hp)} / ${this.boss.maxHp}`; }
     this.updateDamageNums(dt);
+    this.updateTags();
     this.audio.ambience(dt, { shore: Math.max(0, heightAt(p.pos.x, p.pos.z)) * 6, night: 1 - this.env.daylight, height: p.pos.y, underwater: p.underwater });
   }
 
@@ -1105,6 +1107,48 @@ class Game {
     } else this._coldWarned = false;
     if (hot > 0) p.water = Math.max(0, p.water - dt * 0.02 * hot);
     if (p.hp <= 0 && p.alive) { p.hp = 0; p.alive = false; }
+  }
+
+  // Floating name/health tags over nearby tames (pooled DOM nodes).
+  updateTags() {
+    const pool = this._tags || (this._tags = []);
+    const host = document.getElementById('tags');
+    const cam = this.camera, v = new THREE.Vector3();
+    const near = this.creatures.list.filter((c) => c.tamed && c.alive && !c.riddenBy && c.obj.visible && c.pos.distanceTo(this.player.pos) < 45)
+      .sort((a, b) => a.pos.distanceTo(this.player.pos) - b.pos.distanceTo(this.player.pos)).slice(0, 8);
+    while (pool.length < near.length) { const el = document.createElement('div'); el.className = 'tag-float'; el.innerHTML = '<b></b><i><s></s></i>'; host.appendChild(el); pool.push(el); }
+    pool.forEach((el, i) => {
+      const c = near[i];
+      if (!c) { el.style.display = 'none'; return; }
+      v.copy(c.center); v.y += c.model.hipH * c.scale * 0.8 + 1.2;
+      v.project(cam);
+      if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) { el.style.display = 'none'; return; }
+      el.style.display = 'block';
+      el.style.transform = `translate(${(v.x * 0.5 + 0.5) * window.innerWidth}px, ${(-v.y * 0.5 + 0.5) * window.innerHeight}px) translate(-50%, -100%)`;
+      const label = `${c.name} · ${c.level}${c.baby ? ' 🍼' : ''}${c.follow ? '' : ' ⏸'}`;
+      if (el._l !== label) { el.firstChild.textContent = label; el._l = label; }
+      el.querySelector('s').style.width = `${Math.max(0, c.hp / c.maxHp) * 100}%`;
+    });
+  }
+
+  // One-time contextual tips.
+  tips(dt) {
+    this._tipT = (this._tipT || 0) - dt;
+    if (this._tipT > 0) return;
+    this._tipT = 0.5;
+    const seen = this.stats.tips || (this.stats.tips = []);
+    const p = this.player;
+    const tip = (key, cond, text) => { if (!seen.includes(key) && cond()) { seen.push(key); this.ui.notify('💡 ' + text, 'tip'); this.saves.markDirty(); return true; } return false; };
+    tip('night', () => this.env.daylight < 0.3, 'Night falls: it gets cold and dark. Light a campfire, or sleep in a Sleeping Bag to skip to dawn.')
+    || tip('rain', () => this.weather.raining, 'Rain slowly refills your water and doubles crop growth.')
+    || tip('ko', () => this.creatures.list.some((c) => c.ko && !c.tamed && c.pos.distanceTo(p.pos) < 25), 'A creature is knocked out! Look at it and press E to feed it its favourite food.')
+    || tip('tame', () => this.stats.tamed > 0, 'Open your tame roster with T (🦖) to rename, heal and command your tames.')
+    || tip('ore', () => this.world.nodesNear(p.pos.x, p.pos.z, 12).some((n) => n.type === 'metal' && n.alive), 'Orange-veined rock nearby: mine it with a pick for Metal Ore.')
+    || tip('alpha', () => this.creatures.list.some((c) => c.alpha && c.alive && !c.boss && c.pos.distanceTo(p.pos) < 40), 'Alpha spotted! Glowing red beasts are far stronger, but drop trophies.')
+    || tip('swim', () => p.swimming, 'Swimming drains stamina. Deep water is Deepjaw territory.')
+    || tip('lowhp', () => p.hp < p.maxHp * 0.3 && p.alive, 'Low health! Eat Cooked Meat to heal, or back off and rest.')
+    || tip('cold', () => (p.cold || 0) > 3, 'You are getting cold. Fires, forges and Hide Armor keep you warm.')
+    || tip('map', () => this.map.explored() > 0.05, 'Press M (🗺️) to open the map. Fog lifts as you explore.');
   }
 
   cooking(dt) {

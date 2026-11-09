@@ -131,8 +131,9 @@ export class UI {
     d.className = 'note ' + kind;
     d.textContent = text;
     this.feed.prepend(d);
-    setTimeout(() => d.classList.add('fade'), 3200);
-    setTimeout(() => d.remove(), 4000);
+    const life = kind === 'tip' ? 8000 : 3200;
+    setTimeout(() => d.classList.add('fade'), life);
+    setTimeout(() => d.remove(), life + 800);
     while (this.feed.children.length > 7) this.feed.lastChild.remove();
   }
 
