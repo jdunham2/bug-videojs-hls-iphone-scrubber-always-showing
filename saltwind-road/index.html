@@ -3021,7 +3021,7 @@ function die() {
   const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
   const atHome = !rp && S.home && S.home.level >= 1;
   if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
-  S.riding = false; petE = null; compE = null; S.race = null;
+  S.riding = false; petE = null; compE = null; S.race = null; if (S.escort) { S.escort = null; escortPts = null; setTimeout(() => toast('The wagon you were escorting was lost while you were knocked out.', 5000), 1500); }
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
   $('bossbar').hidden = true; document.body.classList.remove('boss');
   toast(`<b>You were knocked out</b><br>${rp ? `You wake up in your ${rp.name}.` : atHome ? 'You wake up in your own bed.' : `Someone carried you to ${TOWNS[best].name}.`} ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
@@ -3983,6 +3983,8 @@ function render() {
   for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
   if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
   if (chargeT != null && chargeT > .15 && !weapon().ranged) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
+  if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
+  if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
@@ -4257,6 +4259,7 @@ function updatePeople(dt) {
 let deedT = 0, lastCoins = null;
 function update(dt) {
   updatePeople(dt);
+  if (S.escort) updateEscort(dt);
   if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
@@ -4394,6 +4397,7 @@ function checkDeeds() {
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
+  if (S.escort) extra.push(`<div class="dd" style="color:#86c98f"><span>⛟ Escort to ${TOWNS[S.escort.b].name} · wagon ${Math.max(0, Math.round(S.escort.hp/S.escort.max*100))}%</span></div>`);
   if (S.tmap) extra.push(`<div class="dd"><span>✕ Treasure ${S.tmap.dir} of ${TOWNS[S.tmap.town].name}</span></div>`);
   for (const k of act) {
     const c = CONTRACTS[k], ready = canComplete(c, k), giver = NPC_BY[c.giver];
@@ -4578,6 +4582,7 @@ function mainOptions(n) {
   if (n.id === 'gwen') o.push({label: 'Race!', fn: () => raceTalk(n)});
   if (n.id === 'vess') o.push({label: 'The museum', primary: museumIds().some(g => !(S.museum || {})[g] && have(g) > 0 && GOODS[g].kind !== 'trophy'), fn: () => museumTalk(n)});
   if (n.caravans) o.push({label: 'Trade caravans', primary: true, fn: () => caravanTalk(n)});
+  if (n.caravans) o.push({label: S.escort ? 'Escort job (in progress)' : 'Any escort work?', disabled: !!S.escort, fn: () => say(`“My wagons need protecting on the roads out of Dunmere. Keep the merchant safe until they arrive and I'll pay well.”`, [...ESCORT_ROUTES.filter(([a, b]) => ROAD_PATHS[a + '_' + b]).map(([a, b]) => ({label: `Escort a wagon to ${TOWNS[b].name}`, fn: () => { closeTalk(); startEscort(a, b); }})), back(n)])});
   if (n.dice) o.push({label: 'Play Bones', primary: true, fn: () => diceTalk(n)});
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
@@ -4727,6 +4732,49 @@ function investTalk(n) {
     back(n)]);
 }
 function investDay() { const d = Math.round(investTotal()*.025); if (d) { S.coins += d; S.dividends = (S.dividends || 0) + d; } return d ? ` Your shop investments paid <b>${d} coin</b>.` : ''; }
+// ===== escort missions =====
+const ESCORT_ROUTES = [['dun','reed'],['dun','highcairn'],['dun','ashfall'],['dun','jade']];
+function startEscort(a, b) {
+  const path = ROAD_PATHS[a + '_' + b]; if (!path) return;
+  const pts = path.map(i => ({x: i % W + .5, y: ((i / W) | 0) + .5}));
+  if (Math.hypot(pts[0].x - TOWNS[a].x, pts[0].y - TOWNS[a].y) > Math.hypot(pts[pts.length - 1].x - TOWNS[a].x, pts[pts.length - 1].y - TOWNS[a].y)) pts.reverse();
+  S.escort = {a, b, pi: 6, x: pts[6].x, y: pts[6].y, hp: 40, max: 40, amb: 8, t: 0, len: pts.length};
+  escortPts = pts;
+  toast(`<b>Escort to ${TOWNS[b].name}</b><br>Stay close to the wagon; it only moves when you're near. Bandits will try to rob it!`, 6000);
+}
+let escortPts = null;
+function updateEscort(dt) {
+  const E = S.escort; if (!E) return;
+  if (!escortPts) { const path = ROAD_PATHS[E.a + '_' + E.b]; if (!path) { S.escort = null; return; } escortPts = path.map(i => ({x: i % W + .5, y: ((i / W) | 0) + .5})); if (Math.hypot(escortPts[0].x - TOWNS[E.a].x, escortPts[0].y - TOWNS[E.a].y) > Math.hypot(escortPts[escortPts.length - 1].x - TOWNS[E.a].x, escortPts[escortPts.length - 1].y - TOWNS[E.a].y)) escortPts.reverse(); }
+  const near = Math.hypot(S.x - E.x, S.y - E.y);
+  const attackers = enemies.filter(e => !e.dead && e.escortAmb && Math.hypot(e.x - E.x, e.y - E.y) < 1.1);
+  for (const e of attackers) { E.hp -= (ENEMIES[e.type].dmg || 1) * .6 * dt * (e.dmgMul || 1); if (Math.random() < dt*3) burst(E.x, E.y - .6, '#c8a060', 2, 2); }
+  if (E.hp <= 0) { S.escort = null; escortPts = null; enemies.forEach(e => { if (e.escortAmb) e.escortAmb = false; }); toast('<b>The wagon was looted!</b><br>The merchant flees back to Dunmere. Escort failed.', 6000); SFX.hurt && SFX.hurt(); return; }
+  if (near < 6.5 && !attackers.length) {
+    const tgt = escortPts[E.pi + 1];
+    if (!tgt) { const rw = 180 + (S.level || 1)*14; S.coins += rw; const g = pick(TOWNS[E.b].produce.filter(x => GOODS[x])); addItem(g, 3); S.escorts = (S.escorts || 0) + 1; addRep(E.b, .3); SFX.victory(); gainXP(120); toast(`<b>Delivered safely to ${TOWNS[E.b].name}!</b><br><span style="color:var(--good)">+${rw} coin, +3 ${GOODS[g].name}</span>`, 7000); S.escort = null; escortPts = null; renderHUD(); save(); return; }
+    const dx = tgt.x - E.x, dy = tgt.y - E.y, d = Math.hypot(dx, dy), sp = 1.7*dt;
+    if (d <= sp) { E.x = tgt.x; E.y = tgt.y; E.pi++; } else { E.x += dx/d*sp; E.y += dy/d*sp; }
+    E.face = dx < 0 ? -1 : 1; E.moving = true;
+  } else E.moving = false;
+  E.amb -= dt;
+  if (E.amb <= 0 && near < 9) {
+    E.amb = 14 + Math.random()*8;
+    const n = 2 + Math.floor(Math.random()*2) + Math.floor((S.level || 1)/10), lv = 1 + (S.level || 1)*.06;
+    for (let k = 0; k < n; k++) { const a = Math.random()*6.283, x = E.x + Math.cos(a)*6, y = E.y + Math.sin(a)*6; const e = makeEnemy(Math.random() < .7 ? 'bandit' : 'archer', x, y, {alert: true, escortAmb: true}); e.hp = e.max = Math.round(e.max*lv); e.dmgMul = lv; enemies.push(e); }
+    toast('<b>Ambush!</b> Bandits are after the wagon!', 2500); SFX.roar();
+  }
+}
+function drawEscort() {
+  const E = S.escort, x = E.x*TS, y = E.y*TS, b = E.moving ? Math.abs(Math.sin(frameT*8)) : 0, f = E.face || 1;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 12, 3, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#5a3a20'; ctx.beginPath(); ctx.arc(x - 7, y - 2, 3.5, 0, 7); ctx.arc(x + 7, y - 2, 3.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8a5a2a'; ctx.fillRect(x - 11, y - 10 - b, 22, 8);
+  ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.moveTo(x - 10, y - 10 - b); ctx.quadraticCurveTo(x, y - 24 - b, x + 10, y - 10 - b); ctx.fill();
+  ctx.fillStyle = '#c84a3a'; ctx.fillRect(x - 10, y - 13 - b, 20, 1);
+  drawPerson(ctx, Math.round(x + f*15), Math.round(y), {cloak: '#8a2a5a', skin: '#a8704a', hair: '#1a1a1a'}, frameT*9, E.moving, f < 0 ? 'left' : 'right');
+  ctx.fillStyle = '#0d131b'; ctx.fillRect(x - 12, y - 30, 24, 4); ctx.fillStyle = E.hp/E.max > .4 ? '#86c98f' : '#e5484d'; ctx.fillRect(x - 11, y - 29, 22*Math.max(0, E.hp)/E.max, 2);
+}
 function caravanDay() {
   if (!S.caravans || !S.caravans.length) return '';
   let total = 0, robbed = 0;
@@ -6667,6 +6715,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['bodyguard','Bodyguard','Complete 3 escort jobs', () => (S.escorts || 0) >= 3],
   ['investor','Investor','Invest in a shop', () => investTotal() > 0],
   ['magnate','Magnate','Invest 10,000 coin across shops', () => investTotal() >= 10000],
   ['tradeboss','Trade Baron','Own 3 trade caravans', () => (S.caravans || []).length >= 3],
@@ -7024,7 +7073,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
