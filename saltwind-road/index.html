@@ -3122,6 +3122,7 @@ function killEnemy(e) {
   }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
+  if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
   if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3*(bloodMoon() ? 2 : 1)); SFX.kill(); if (bloodMoon() && !def.passive) { S.bmKills = (S.bmKills || 0) + 1; const bc = rint(4, 12) + (S.level || 1); S.coins += bc; got.push(`+${bc} coin (blood moon)`); }
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
@@ -4674,7 +4675,7 @@ function newDay() {
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
   let made = 0; for (const q of (S.placed || [])) { const P = PLACE[q.t]; if (!P || P.use !== 'produce') continue; const n = rint(P.n[0], P.n[1]); const before = q.stock || 0; q.stock = Math.min(P.cap, before + n); made += q.stock - before; if (P.bonus && Math.random() < (P.bonus === 'truffle' ? .15 : .35)) q.bonus = (q.bonus || 0) + 1; }
-  const carMsg = caravanDay() + investDay() + (made ? ` Your hives, pots and logs produced <b>${made}</b> goods.` : '');
+  const carMsg = caravanDay() + investDay() + mailDay() + (made ? ` Your hives, pots and logs produced <b>${made}</b> goods.` : '');
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
@@ -5024,6 +5025,18 @@ function diveStep() {
   ]);
 }
 function nodeAfterDive(i) { S.depleted[i] = S.day; const n = nodes[i]; burst(n.x + .5, n.y + .5, '#dff4ff', 10, 3); }
+function mailDay() {
+  S.mail = S.mail || [];
+  const add = (from, text, coins, items) => S.mail.push({id: S.day + ':' + from + ':' + S.mail.length, from, text, coins: coins || 0, items: items || {}, claimed: false, day: S.day});
+  if (S.day % 7 === 0) {
+    if (S.story && S.story.heir && S.story.heir.crowned) add('Queen Elowen', 'The kingdom prospers, thanks in no small part to you. Please accept this small token of the crown\'s gratitude.', 250, {royal_jelly: 0});
+    if (S.faction && facRank() >= 1) add(NPC_BY[FACTIONS[S.faction].leader].name, `Your weekly stipend from the ${FACTIONS[S.faction].name}, as befits a ${FACTION_RANKS[facRank()][1]}. Keep up the good work.`, 100*facRank());
+  }
+  if (S.day % 5 === 0 && S.gifts) { const friends = Object.keys(S.gifts).filter(id => S.gifts[id].keepsake && NPC_BY[id]); if (friends.length) { const f = NPC_BY[pick(friends)], g = pick(['honey','bread','pearl','amber','flowers','candy_apple','jade'].filter(x => GOODS[x])); add(f.name, `Thinking of you, friend! I found this and thought of you. Come visit soon.`, 0, {[g]: 2}); } }
+  if (S.day % 9 === 0 && (S.caravansBought || 0) > 0) add('Merchant Prince Darius', 'Business is booming. A bonus for my favorite partner.', 150);
+  const unread = S.mail.filter(m => !m.claimed).length;
+  return unread ? ` 📜 You have <b>${unread}</b> unread letter${unread > 1 ? 's' : ''} (journal).` : '';
+}
 function caravanDay() {
   if (!S.caravans || !S.caravans.length) return '';
   let total = 0, robbed = 0;
@@ -5857,12 +5870,13 @@ const COMPANIONS = {
   mae:{name:'Sister Mae', role:'healer', cost:500, wage:30, dmg:1.5, cd:1, range:.7, held:'club', cols:{cloak:'#e8e0d0', skin:'#e0c0a0', hair:'#a85a2a'}, desc:'Heals you a little every few seconds, and swats at foes.'},
 };
 let compE = null;
+const compLv = k => Math.min(10, Math.floor(Math.sqrt(((S.compXP || {})[k] || 0)/40)));
 function updateCompanion(dt) {
   if (!S.companion || !COMPANIONS[S.companion]) { compE = null; return; }
-  const C = COMPANIONS[S.companion], lv = 1 + (S.level || 1)*.08;
+  const C = COMPANIONS[S.companion], lv = (1 + (S.level || 1)*.08) * (1 + .12*compLv(S.companion));
   if (!compE) compE = {x: S.x + .9, y: S.y + .3, cd: 0, heal: 4, face: 'down', phase: 0, moving: false};
   compE.cd -= dt;
-  if (C.role === 'healer') { compE.heal -= dt; if (compE.heal <= 0) { compE.heal = 4; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + (S.level || 1)*.08); renderHP(); burst(S.x, S.y - .8, '#86c98f', 5, 2); } } }
+  if (C.role === 'healer') { compE.heal -= dt; if (compE.heal <= 0) { compE.heal = 4; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + (S.level || 1)*.08 + compLv(S.companion)*.15); renderHP(); burst(S.x, S.y - .8, '#86c98f', 5, 2); } } }
   let target = null;
   if (!townAt(S.x, S.y, 8) || raidTown()) { let bd = 7; for (const e of enemies) { if (e.dead || e.hidden > 0 || (ENEMIES[e.type] && ENEMIES[e.type].passive)) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
   const ranged = C.role === 'ranged' || C.role === 'mage';
@@ -6013,13 +6027,20 @@ function museumTalk(n) {
 function hireTalk(n) {
   const cur = S.companion && COMPANIONS[S.companion];
   say(`“Need a sword at your side? My people fight for coin. A one-time fee, then a daily wage. If you can't pay their wage, they'll leave.”${cur ? `<br><br>You have hired <b>${cur.name}</b> (${cur.wage} coin a day).` : ''}`, [
-    ...Object.entries(COMPANIONS).map(([k, C]) => ({label: S.companion === k ? `${C.name} · with you` : `${C.name} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
+    ...Object.entries(COMPANIONS).map(([k, C]) => ({label: S.companion === k ? `${C.name} (Lv ${compLv(k)}) · with you` : `${C.name}${compLv(k) ? ` (Lv ${compLv(k)})` : ''} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
       {label: 'Hire', primary: true, disabled: S.coins < C.cost, fn: () => { S.coins -= C.cost; S.companion = k; compE = null; S.hiredOnce = true; SFX.coin(); renderHUD(); save(); say(`“${C.name} at your service. Lead the way.”`, [back(n)]); }}, back(n)])})),
     ...(cur ? [{label: `Dismiss ${cur.name}`, fn: () => { S.companion = null; compE = null; save(); say('“Farewell. Send for us any time.”', [back(n)]); }}] : []),
     back(n)]);
 }
+let petFindT = 75;
+const PET_FINDS = {dog: [['bone', 1], ['coins', 15], ['meat', 1]], cat: [['fish', 1], ['feather', 1], ['coins', 8]], fox: [['coins', 25], ['amber', 1]], monkey: [['fruit', 2], ['coconut', 1], ['berries', 3]], raccoon: [['coins', 30], ['glass', 1]], crystal_beetle: [['crystal', 1], ['quartz', 1]]};
 function updatePet(dt) {
   if (!S.pet) { petE = null; return; }
+  petFindT -= dt;
+  if (petFindT <= 0 && petE) { petFindT = 60 + Math.random()*90; if (!townAt(S.x, S.y, 8) && !inDungeon() && !enemies.some(e => !e.dead && Math.hypot(e.x - S.x, e.y - S.y) < 8 && !(ENEMIES[e.type] && ENEMIES[e.type].passive)) && Math.random() < .55) {
+    const pool = (PET_FINDS[S.pet] || [['berries', 2], ['herbs', 1], ['coins', 10], ['sticks', 2]]).filter(([g]) => g === 'coins' || GOODS[g]), [g, n] = pick(pool);
+    if (g === 'coins') S.coins += n; else addItem(g, n); S.petFinds = (S.petFinds || 0) + 1;
+    floatText(petE.x, petE.y - 1, `${PETS[S.pet].name} found ${n} ${g === 'coins' ? 'coin' : GOODS[g].name}!`, '#e3c068'); burst(petE.x, petE.y - .3, '#e3c068', 6, 2); SFX.pickup(); renderHUD(); } }
   const P = PETS[S.pet];
   if (!petE) petE = {x: S.x - .8, y: S.y + .3, cd: 0, face: 1, phase: 0, moving: false};
   petE.cd -= dt;
@@ -6442,6 +6463,7 @@ function openJournal() {
     <h3>Bestiary · ${BEAST_IDS.filter(k => S.killsBy[k]).length}/${BEAST_IDS.length} known · ${BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length} mastered</h3><div class="vals" style="margin-bottom:4px">Defeat ${MASTERY} of a kind to master it: +10% damage against them forever.</div><div class="jgrid">${BEAST_IDS.map(k => { const n = S.killsBy[k] || 0; return `<div class="jcard"><div class="t">${n ? esc(ENEMIES[k].name) : '???'}${n >= MASTERY ? ' <span style="color:var(--brass)">★</span>' : ''}</div><div class="s">${n ? `${n} defeated${n < MASTERY ? ` · ${MASTERY - n} to mastery` : ' · mastered'}` : 'Not met yet'}</div></div>`; }).join('')}</div>
     <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
+    ${(S.mail || []).filter(m => !m.claimed).length ? `<h3>Letters</h3><div class="jgrid">${S.mail.filter(m => !m.claimed).map(m => `<div class="jcard"><div class="t">From ${esc(m.from)}</div><div class="s">${esc(m.text)}</div><div class="req" style="margin-top:6px">${m.coins ? `<span>${m.coins} coin</span>` : ''}${Object.entries(m.items).filter(([g, n]) => n > 0 && GOODS[g]).map(([g, n]) => `<span>${n} ${GOODS[g].name}</span>`).join('')}</div><div style="margin-top:6px"><button class="btn sm primary" data-mail="${m.id}">${m.coins || Object.values(m.items).some(n => n > 0) ? 'Claim' : 'Read'}</button></div></div>`).join('')}</div>` : ''}
     ${(S.market || []).filter(m => m.until >= S.day).length ? `<h3>Market news</h3><div class="jgrid">${S.market.filter(m => m.until >= S.day).map(m => `<div class="jcard"><div class="t" style="color:${m.short ? 'var(--good)' : 'var(--brass)'}">${m.short ? 'Shortage' : 'Glut'}: ${GOODS[m.g].name}</div><div class="s">${TOWNS[m.town].name} · ${m.short ? 'pays about double' : 'sells at half price'} · ${m.until - S.day + 1} day${m.until > S.day ? 's' : ''} left</div></div>`).join('')}</div>` : ''}
     <h3>Open deals</h3>
     ${active.length ? `<div class="jgrid">${active.map(([id]) => { const c = CONTRACTS[id], g = NPC_BY[c.giver]; return `<div class="jcard"><div class="t">${esc(c.title)}</div><div class="s">${esc(g.name)}, ${TOWNS[g.town].name}</div>${needHTML(c, id)}<div class="s" style="margin-top:6px">Reward: ${esc(rewardText(c))}</div></div>`; }).join('')}</div>` : '<div class="none">No open deals. Ask people in town if there\'s work going.</div>'}
@@ -6458,6 +6480,7 @@ function openJournal() {
     ${found.length ? `<div class="jgrid">${found.map(L => `<div class="jcard"><div class="t">${L.name}</div><div class="s">${esc(L.lore)}</div></div>`).join('')}</div>` : '<div class="none">Nothing yet. Look for glinting markers in the wild.</div>'}
   `;
   $('journalSheet').querySelector('[data-close]').addEventListener('click', () => closeModal('journal'));
+  $('journalSheet').querySelectorAll('[data-mail]').forEach(b => b.addEventListener('click', () => { const m = (S.mail || []).find(x => x.id === b.dataset.mail); if (!m || m.claimed) return; m.claimed = true; S.coins += m.coins; for (const [g, n] of Object.entries(m.items)) if (n > 0 && GOODS[g]) addItem(g, n); S.lettersRead = (S.lettersRead || 0) + 1; SFX.coin(); renderHUD(); save(); openJournal(); }));
   $('journalSheet').querySelectorAll('[data-title]').forEach(b => b.addEventListener('click', () => { S.title = b.dataset.title; save(); renderHUD(); openJournal(); }));
   $('journal').hidden = false;
 }
@@ -7278,6 +7301,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['penpal','Pen Pal','Receive 10 letters', () => (S.lettersRead || 0) >= 10],
+  ['goodboy','Good Pet!','Your pets find 20 things', () => (S.petFinds || 0) >= 20],
+  ['veteran_comp','Brothers in Arms','Raise a companion to level 5', () => Object.keys(COMPANIONS).some(k => compLv(k) >= 5)],
   ['benefactor','Benefactor','Fund 5 town improvements', () => (S.improvements || 0) >= 5],
   ['saltwind','The Saltwind Blade','Have Hask forge the legendary Saltwind Blade', () => !!(S.blade && S.blade.stage === 2)],
   ['faction','Sworn','Join a faction', () => !!S.faction],
