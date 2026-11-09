@@ -364,6 +364,9 @@ function buildDistricts() {
       add(scene, GEO.b, '#c0392b', cx, 64, cy - (y1 - y0) * 0.42, 160, 10, 4);
       solids.push({ x0: x0 + 40, y0: y0 + 40, x1: x1 - 40, y1: y1 - 40 });
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(160, 35), new THREE.MeshBasicMaterial({ map: signTexture('RAPTORS STADIUM', '#c0392b', '#ffffff') })); sg.position.set(cx, 86, cy + (y1 - y0) * 0.43); scene.add(sg);
+      PLACES.stadium = { id: 'stadium', name: 'Raptors Stadium', door: { x: cx, y: y0 + 16 } };
+      const sr = new THREE.Mesh(doorGeo, doorMat); sr.rotation.x = -Math.PI / 2; sr.position.set(cx, 1, y0 + 16); sr.scale.setScalar(22); scene.add(sr); PLACES.stadium.ring = sr;
+      const gs = new THREE.Mesh(new THREE.PlaneGeometry(120, 26), new THREE.MeshBasicMaterial({ map: signTexture('DEMOLITION DERBY', '#2a2a2a', '#ffd35a') })); gs.position.set(cx, 50, y0 + 38); gs.rotation.y = Math.PI; scene.add(gs);
     } else if (type === 'beach') {
       for (let n = 0; n < 7; n++) {
         const px = x0 + 40 + srand() * (x1 - x0 - 80), pz = y0 + 40 + srand() * (y1 - y0 - 80), lean = (srand() - 0.5) * 0.5;
@@ -616,7 +619,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -764,6 +767,7 @@ function dayRollover(slept) {
   refillParking();
   petDaily(); if (S.site) S.site = null; if (S.ward) { S.ward = null; clearWard(); }
   if (S.gig) clearGig();
+  if (derby) leaveDerby();
   if (S.job) S.job.days++;
   if (weekday() === 0) {
     let bills = 0, parts = [];
@@ -1067,6 +1071,13 @@ const MENUS = {
     const acts = []; workAct(acts, 'museum');
     if (open(9, 19)) acts.push({ label: 'Visit the exhibits', detail: '+15 happiness, 90 minutes. Learn about your ancestors.', cost: 10, mins: 90, fn: () => { S.happy += 15; log('The T-rex skeleton was terrifying. And a little inspiring.', 'good'); } });
     return { sub: 'Fossil Museum. Home of the biggest skeleton in town.', acts };
+  },
+  stadium: () => {
+    const ok = hour() >= 10 && hour() < 23;
+    return { title: 'Raptors Stadium', sub: ok ? 'Tonight: the demolition derby! Six junkers enter, one drives out.' : 'The stadium opens at 10:00 AM.', acts: ok ? [
+      { label: 'Enter the demolition derby', detail: 'Win $400 plus $75 for every car you knock out. Last car running wins.', cost: 50, fn: () => { closeMenu(); startDerby(); } },
+      { label: 'Watch a Raptors game', detail: '+15 happiness, 2 hours', cost: 15, mins: 120, fn: () => { S.happy += 15; log('The Raptors won in overtime! What a game.', 'good'); } },
+    ] : [] };
   },
   carshop: () => {
     const acts = [];
@@ -1543,7 +1554,7 @@ function exitBuilding(to) {
 function interact() {
   const p = nearPlace; if (!p) return;
   if (inside) { if (p.exit) exitBuilding(); else openMenu(PLACES[inside.id], p); return; }
-  if (p.id === 'bench' || (p.home && S.home !== p.home)) { openMenu(p); return; }
+  if (p.id === 'bench' || p.id === 'stadium' || (p.home && S.home !== p.home)) { openMenu(p); return; }
   const why = closedWhy(p.id); if (why) { log(why, 'warn'); sfx.bad(); return; }
   enterBuilding(p.home ? 'home_' + p.home : p.id);
 }
@@ -1765,7 +1776,8 @@ function placeCars() {
 function carName(c) { return c.service === 'police' ? 'police car' : c.service ? 'fire truck' : c.model ? CAR_MODELS[c.model].name : 'convertible'; }
 function enterCar(c) {
   driving = c; c.v = 0; P.vx = P.vy = 0; goal('drive'); sfx.door();
-  if (c.service === 'police') log('You get into the police car. Sirens on! Run into the robber to catch them.', 'good');
+  if (c.derby) log('Your junker rumbles to life. Ram the others once the countdown ends!', 'good');
+  else if (c.service === 'police') log('You get into the police car. Sirens on! Run into the robber to catch them.', 'good');
   else if (c.service) log('You climb into the fire truck. Lights on! Press E near the fire to spray it.', 'good');
   else if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
   else if (chase) { c.stolen = true; chase.cars = (chase.cars || []).concat(c); log('You grabbed a car mid-chase. Now they want that too!', 'bad'); }
@@ -1812,23 +1824,26 @@ function driveUpdate(dt) {
     if (m > 0.2) { const want = Math.atan2(joy.dy, joy.dx), diff = (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); st = clamp(diff * 2, -1, 1); thr = Math.abs(diff) > 2.4 ? -m : m; }
   }
   if (c.fuel <= 0 && !c.emptyWarned) { c.emptyWarned = true; log('Out of gas! The car can only crawl. Push on to Dino Gas on the east side.', 'bad'); sfx.bad(); }
-  const max = c.fuel <= 0 ? 70 : (S.flood ? 220 : (c.max || 430)) * (S.injured ? 0.85 : 1);
+  const frozen = c.derby && (!derby || c.out || derby.count > 0 || derby.over);
+  const max = frozen ? 0 : c.fuel <= 0 ? 70 : (S.flood ? 220 : (c.max || 430)) * (S.injured ? 0.85 : 1);
   if (thr > 0) c.v += (c.v < 0 ? 700 : 300) * dt;
   else if (thr < 0) c.v -= (c.v > 0 ? 700 : 220) * dt;
   else c.v *= Math.max(0, 1 - 1.6 * dt);
-  c.v = clamp(c.v, -150, max);
+  c.v = clamp(c.v, -150, max); if (frozen) c.v = 0;
   c.steer += (st - c.steer) * Math.min(1, dt * 10);
   c.a += c.steer * 2.5 * dt * clamp(c.v / 140, -1, 1);
   const ox = c.x, oy = c.y;
-  c.x = clamp(c.x + Math.cos(c.a) * c.v * dt, 30, WORLD - 30); c.y = clamp(c.y + Math.sin(c.a) * c.v * dt, 30, WORLD - 30);
+  if (c.derby) { c.x += Math.cos(c.a) * c.v * dt; c.y += Math.sin(c.a) * c.v * dt; derbyBounds(c); }
+  else { c.x = clamp(c.x + Math.cos(c.a) * c.v * dt, 30, WORLD - 30); c.y = clamp(c.y + Math.sin(c.a) * c.v * dt, 30, WORLD - 30); }
   const before = { x: c.x, y: c.y }; collide(c, 24, solids);
   let hit = Math.hypot(c.x - before.x, c.y - before.y) > 0.5;
   for (const o of cars) {
     if (o === c) continue;
     const dx = c.x - o.x, dy = c.y - o.y, d = Math.hypot(dx, dy);
-    if (d < 40 && d > 0) { c.x = o.x + dx / d * 40; c.y = o.y + dy / d * 40; hit = true; if (o.ai) { o.wait = 1.5; if (o.honkT <= 0) { o.honkT = 2; sfx.honk(); } } }
+    if (d < 40 && d > 0) { c.x = o.x + dx / d * 40; c.y = o.y + dy / d * 40; hit = true; if (derbyCarHit(c, o)) { o.v = c.v * 0.6; o.backT = 0.6; } if (o.ai) { o.wait = 1.5; if (o.honkT <= 0) { o.honkT = 2; sfx.honk(); } } }
   }
-  if (hit && Math.abs(c.v) > 90) {
+  if (c.derby && hit) { c.v *= -0.35; }
+  else if (hit && Math.abs(c.v) > 90) {
     const hard = Math.abs(c.v) > 300;
     sfx.crash(); shake = hard ? 14 : 6; burst(c.x, c.y, 16, hard ? 18 : 8, '#c9c9cf', 160, 3);
     gigCrash(Math.abs(c.v) > 160);
@@ -1840,10 +1855,10 @@ function driveUpdate(dt) {
     if (d < 40 && Math.abs(c.v) > 40) { n.x += dx / (d || 1) * 30; n.y += dy / (d || 1) * 30; n.wait = 1; }
   }
   c.roll += c.v * dt / 7;
-  if (!c.service) c.fuel = Math.max(0, c.fuel - Math.abs(c.v) * dt * 0.006);
+  if (!c.service && !c.derby) c.fuel = Math.max(0, c.fuel - Math.abs(c.v) * dt * 0.006);
   if (c.fuel > 0) c.emptyWarned = false;
   P.x = c.x; P.y = c.y; P.face = c.a; P.vx = Math.cos(c.a) * c.v; P.vy = Math.sin(c.a) * c.v;
-  if (engine) { engine.o.frequency.value = 45 + Math.abs(c.v) * 0.28; engine.g.gain.value = 0.025 + Math.abs(c.v) / max * 0.03; }
+  if (engine) { engine.o.frequency.value = 45 + Math.abs(c.v) * 0.28; engine.g.gain.value = 0.025 + Math.min(1, Math.abs(c.v) / Math.max(60, max)) * 0.03; }
 }
 function trafficUpdate(dt) {
   for (const c of cars) {
@@ -2540,7 +2555,7 @@ function cookPick(name) {
 }
 // ---- shared ----
 function gigTargets() {
-  const G = S.gig; if (!G || inside) return [];
+  const G = S.gig; if (!G || inside || derby) return [];
   if (G.kind === 'fire' && G.target) return [{ x: G.target.x, y: G.target.y, label: 'Spray the fire', color: '#ff5a2a', arrow: 'FIRE', gig: 'fire' }];
   if (G.kind === 'patrol' && robber) return [{ x: robber.x, y: robber.y, label: 'Robber! Run into them to cuff them', color: '#5a8aff', arrow: 'ROBBER', gig: 'robber' }];
   if ((G.kind === 'pizza' || G.kind === 'eggs') && G.target) return [{ x: G.target.x, y: G.target.y, label: G.target.label, color: '#ffbe55', arrow: G.kind === 'pizza' ? 'PIZZA' : 'EGGS', gig: 'deliver' }];
@@ -2549,7 +2564,7 @@ function gigTargets() {
 function nearGig() { const t = gigTargets()[0]; return t && Math.hypot(P.x - t.x, P.y - t.y) < (driving ? 90 : 60) ? t : null; }
 function doGig(t) { if (t.gig === 'robber') { if (robber && Math.hypot(P.x - robber.x, P.y - robber.y) < 60) catchRobber(); return; } if (t.gig === 'fire') { if (driving) { driving.v = 0; } startHose(); } else deliver(); }
 function gigReturnTarget() {
-  const G = S.gig; if (!G || inside) return null;
+  const G = S.gig; if (!G || inside || derby) return null;
   const place = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger', patrol: 'police' }[G.kind];
   if (G.done >= G.total || ((G.kind === 'pizza' || G.kind === 'eggs') && !G.carrying) || (G.kind === 'cook')) return { ...PLACES[place].door, label: G.done >= G.total ? 'CLOCK OUT' : 'PICK UP' };
   return null;
@@ -2637,6 +2652,135 @@ function syncRobber() {
   animDino(r.m, r.t * 1.6, r.stun > 0 ? 0 : 1, 14);
 }
 
+// ---------- demolition derby at Raptors Stadium ----------
+const ARENA = { x: 9000, y: 2100, w: 1000, h: 760 };
+let derby = null, arenaBuilt = false;
+function numberTexture(n, bg) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.fillStyle = '#f6f0e2'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill();
+  g.fillStyle = '#1a1a1e'; g.font = 'bold 40px "Lilita One", Arial Black, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 32, 35);
+  return new THREE.CanvasTexture(c);
+}
+function buildJunker(color, n) {
+  const m = buildCar(color, null);
+  for (const [x, z, s] of [[18, 17.2, 1], [-20, -17.2, 1], [-30, 10, 0.7], [26, -8, 0.8]]) add(m.root, GEO.b, '#5a4a3a', x, 14, z, 10 * s, 6 * s, 0.6);
+  add(m.root, GEO.b, '#3a3a40', 37, 10, 0, 3, 8, 34);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: numberTexture(n), transparent: true }));
+  plate.rotation.x = -Math.PI / 2; plate.position.set(22, 21.6, 0); m.root.add(plate);
+  return m;
+}
+function buildArena() {
+  if (arenaBuilt) return; arenaBuilt = true;
+  const { x, y, w, h } = ARENA, g = group(scene, x, 0, y);
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), mat('#2a2622')); base.rotation.x = -Math.PI / 2; base.position.set(0, 0.45, 0); g.add(base);
+  const dirt = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat('#8a6a46')); dirt.rotation.x = -Math.PI / 2; dirt.position.set(0, 0.6, 0); dirt.receiveShadow = true; g.add(dirt);
+  for (let i = 0; i < 40; i++) add(g, GEO.y, '#7a5c3c', rand(-w / 2 + 40, w / 2 - 40), 0.8, rand(-h / 2 + 40, h / 2 - 40), rand(20, 60), 0.4, rand(20, 60)).castShadow = false;
+  const wall = (cx, cz, ww, dd) => { add(g, GEO.b, '#c9c9cf', cx, 16, cz, ww, 32, dd); solids.push({ x0: x + cx - ww / 2, y0: y + cz - dd / 2, x1: x + cx + ww / 2, y1: y + cz + dd / 2 }); };
+  wall(0, -h / 2 - 10, w + 40, 20); wall(0, h / 2 + 10, w + 40, 20); wall(-w / 2 - 10, 0, 20, h); wall(w / 2 + 10, 0, 20, h);
+  for (let t = -w / 2; t <= w / 2; t += 26) for (const z of [-h / 2 + 8, h / 2 - 8]) add(g, GEO.y, '#1a1a1a', t, 8, z, 12, 14, 12);
+  for (let t = -h / 2; t <= h / 2; t += 26) for (const xx of [-w / 2 + 8, w / 2 - 8]) add(g, GEO.y, '#1a1a1a', xx, 8, t, 12, 14, 12);
+  for (const [bx, bz] of [[-180, -120], [190, 110], [0, 0], [-220, 160], [230, -150]]) { add(g, GEO.b, '#9a9aa0', bx, 12, bz, 60, 24, 24); solids.push({ x0: x + bx - 30, y0: y + bz - 12, x1: x + bx + 30, y1: y + bz + 12 }); }
+  const crowd = ['#c0392b', '#2e86c1', '#f1c40f', '#27ae60', '#e67e22', '#8e44ad', '#ecf0f1'];
+  for (const side of [-1, 1]) {
+    for (let r = 0; r < 4; r++) { add(g, GEO.b, '#6a6f78', 0, 20 + r * 22, side * (h / 2 + 60 + r * 40), w + 120, 22, 40); for (let i = 0; i < 40; i++) add(g, GEO.b, pick(crowd), -w / 2 + 10 + i * (w / 40), 38 + r * 22, side * (h / 2 + 60 + r * 40), 10, 12, 10).castShadow = false; }
+  }
+  for (const [px, pz] of [[-w / 2 - 60, -h / 2 - 60], [w / 2 + 60, -h / 2 - 60], [-w / 2 - 60, h / 2 + 60], [w / 2 + 60, h / 2 + 60]]) { add(g, GEO.y, '#3a3a40', px, 120, pz, 4, 240, 4); add(g, GEO.b, '!#fff6c8', px, 244, pz, 40, 14, 10).castShadow = false; }
+  const sg = new THREE.Mesh(new THREE.PlaneGeometry(260, 56), new THREE.MeshBasicMaterial({ map: signTexture('DEMOLITION DERBY', '#c0392b', '#ffffff') })); sg.position.set(0, 130, -h / 2 - 150); g.add(sg);
+}
+function startDerby() {
+  buildArena();
+  const { x, y } = ARENA, cols = ['#c0392b', '#2e86c1', '#f1c40f', '#27ae60', '#8e44ad', '#e67e22'];
+  const spots = [[-360, 0, 0], [360, 0, Math.PI], [0, -260, Math.PI / 2], [0, 260, -Math.PI / 2], [-300, -230, 0.7], [300, 230, -2.4]];
+  derby = { cars: [], t: 0, count: 3, ret: { x: P.x, y: P.y }, ko: 0, over: false };
+  spots.forEach(([sx, sz, a], i) => {
+    const c = { x: x + sx, y: y + sz, a, v: 0, steer: 0, roll: 0, color: cols[i], hp: 100, derby: true, fuel: 100, max: 360, m: buildJunker(cols[i], i + 1), wait: 0, honkT: 0, hx: x + sx, hy: y + sz, ha: a };
+    scene.add(c.m.root); cars.push(c); derby.cars.push(c);
+  });
+  derby.me = derby.cars[0];
+  if (driving) exitCar(true);
+  enterCar(derby.me);
+  P.x = derby.me.x; P.y = derby.me.y; cam.x = P.x; cam.y = P.y;
+  log('Welcome to the demolition derby! Ram the other junkers. Last car running wins.', 'good'); sfx.siren();
+}
+function derbyBounds(c) { const { x, y, w, h } = ARENA; c.x = clamp(c.x, x - w / 2 + 24, x + w / 2 - 24); c.y = clamp(c.y, y - h / 2 + 24, y + h / 2 - 24); }
+function derbyHit(a, b) {
+  const rel = Math.abs(a.v) + Math.abs(b.v);
+  if (rel < 60) return;
+  const aFast = Math.abs(a.v) >= Math.abs(b.v);
+  const armor = c => c === derby.me ? 0.6 : 1;
+  const dmgB = (Math.abs(a.v) * 0.06 + 1.5) * armor(b), dmgA = (Math.abs(b.v) * 0.06 + 1.5) * armor(a);
+  b.hp = Math.max(0, b.hp - (aFast ? dmgB : dmgB * 0.5)); a.hp = Math.max(0, a.hp - (aFast ? dmgA * 0.5 : dmgA));
+  a.lastHit = b; b.lastHit = a;
+  burst((a.x + b.x) / 2, (a.y + b.y) / 2, 16, 10, '#c9c9cf', 160, 3); burst((a.x + b.x) / 2, (a.y + b.y) / 2, 16, 4, '#ffd35a', 120, 3);
+  if (a === derby.me || b === derby.me) { sfx.crash(); shake = Math.max(shake, rel > 400 ? 12 : 6); }
+  for (const c of [a, b]) if (c.hp <= 0 && !c.out) { c.out = true; c.v = 0; if (c !== derby.me && (a === derby.me || b === derby.me)) { derby.ko++; log(`You knocked out car #${derby.cars.indexOf(c) + 1}!`, 'good'); } else if (c !== derby.me) log(`Car #${derby.cars.indexOf(c) + 1} is out!`, ''); }
+}
+function updateDerby(dt) {
+  if (!derby) return;
+  const D = derby;
+  if (D.count > 0) { const before = Math.ceil(D.count); D.count -= dt; for (const c of D.cars) c.v = 0; if (Math.ceil(D.count) !== before && D.count > 0) sfx.ding(); if (D.count <= 0) { sfx.siren(); log('GO GO GO!', 'good'); } return; }
+  if (D.over) return;
+  D.t += dt;
+  for (const c of D.cars) {
+    if (c === D.me || c.out) { if (c.out) { c.v *= 0.9; if (Math.random() < dt * 6) burst(c.x, c.y, 20, 1, '#3a3a40', 40, 6); } continue; }
+    let best = null, bd = Infinity;
+    for (const o of D.cars) if (o !== c && !o.out) { const d = Math.hypot(o.x - c.x, o.y - c.y) + (o === D.me ? 120 : 0) + (o === c.lastHit ? 150 : 0); if (d < bd) { bd = d; best = o; } }
+    if (!best) continue;
+    const want = Math.atan2(best.y - c.y, best.x - c.x), diff = (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+    c.a += clamp(diff * 2.4, -2.4, 2.4) * dt;
+    if (c.backT > 0) { c.backT -= dt; c.v += (-140 - c.v) * Math.min(1, dt * 4); }
+    else c.v += ((Math.abs(diff) > 1.6 ? 120 : 300) - c.v) * Math.min(1, dt * 1.6);
+    const ox = c.x, oy = c.y;
+    c.x += Math.cos(c.a) * c.v * dt; c.y += Math.sin(c.a) * c.v * dt;
+    collide(c, 24, solids); derbyBounds(c);
+    if (Math.hypot(c.x - ox - Math.cos(c.a) * c.v * dt, c.y - oy - Math.sin(c.a) * c.v * dt) > 1 && Math.abs(c.v) > 40) { c.v *= -0.3; c.backT = 0.8; }
+    c.roll += c.v * dt / 7;
+  }
+  for (let i = 0; i < D.cars.length; i++) for (let j = i + 1; j < D.cars.length; j++) {
+    const a = D.cars[i], b = D.cars[j]; if (a === D.me || b === D.me) continue;
+    const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy);
+    if (d < 40 && d > 0) { const push = (40 - d) / 2; a.x += dx / d * push; a.y += dy / d * push; b.x -= dx / d * push; b.y -= dy / d * push; derbyHit(a, b); a.v *= -0.3; b.v *= -0.3; a.backT = b.backT = 0.6; }
+  }
+  const alive = D.cars.filter(c => !c.out);
+  if (D.me.out) endDerby(false);
+  else if (alive.length === 1) endDerby(true);
+  else if (D.t > 90) { const top = alive.slice().sort((a, b) => b.hp - a.hp)[0]; endDerby(top === D.me, true); }
+}
+function endDerby(won, timeUp) {
+  const D = derby; D.over = true;
+  const prize = won ? 400 + D.ko * 75 : D.ko * 50;
+  S.money += prize; S.happy += won ? 20 : 5; if (won) goal('derby');
+  setTimeout(() => {
+    queueEvent({ kind: won ? 'good' : 'bad', tag: 'Demolition derby', title: won ? 'You won the derby!' : 'Your junker is toast', sound: won ? 'goal' : 'bad',
+      text: won ? `${timeUp ? 'Time ran out with your car in the best shape. ' : 'Yours is the last car running! '}The crowd goes wild. Prize: ${money$(400)}${D.ko ? ` plus ${money$(D.ko * 75)} for ${D.ko} knockout${D.ko > 1 ? 's' : ''}` : ''}.`
+        : `${timeUp ? 'Time ran out and another car was in better shape.' : 'Your car got smashed to bits.'}${D.ko ? ` You still earned ${money$(prize)} for ${D.ko} knockout${D.ko > 1 ? 's' : ''}.` : ' Better luck next time.'}`,
+      buttons: [{ label: 'Back to town', fn: leaveDerby }] });
+  }, 1200);
+}
+function leaveDerby() {
+  const D = derby; if (!D) return;
+  if (driving) exitCar(true);
+  for (const c of D.cars) { scene.remove(c.m.root); const i = cars.indexOf(c); if (i >= 0) cars.splice(i, 1); }
+  derby = null;
+  teleport(PLACES.stadium.door);
+}
+function derbyCarHit(c, o) { if (derby && c.derby && o.derby && !derby.over && derby.count <= 0) { derbyHit(c, o); return true; } return false; }
+
+function drawDerby(g) {
+  if (!derby) return;
+  const D = derby;
+  g.textAlign = 'center';
+  for (const c of D.cars) {
+    const sc = toScreen(c.x, 52, c.y); if (!sc.ok) continue;
+    if (c.out) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText('WRECKED', sc.x, sc.y); g.fillStyle = '#ef5a5f'; g.fillText('WRECKED', sc.x, sc.y); continue; }
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(sc.x - 22, sc.y, 44, 6);
+    g.fillStyle = c.hp > 60 ? '#8fdc6a' : c.hp > 30 ? '#ffbe55' : '#ef5a5f'; g.fillRect(sc.x - 22, sc.y, 44 * c.hp / 100, 6);
+    if (c === D.me) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText('YOU', sc.x, sc.y - 6); g.fillStyle = '#ffe08a'; g.fillText('YOU', sc.x, sc.y - 6); }
+  }
+  const big = D.count > 0 ? String(Math.ceil(D.count)) : D.t < 1 ? 'GO!' : '';
+  if (big) { g.font = '400 96px "Lilita One", system-ui, sans-serif'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.7)'; g.strokeText(big, W / 2, H / 2); g.fillStyle = '#ffd35a'; g.fillText(big, W / 2, H / 2); }
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -2662,6 +2806,7 @@ cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.ch
 const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
 function useNear() {
+  if (state === 'play' && driving && derby) { log('No getting out in the middle of a derby!', 'warn'); return; }
   if (state === 'play' && driving) { const ng = nearGig(); if (ng) { doGig(ng); return; } if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
   if (nearPlace.m) { enterCar(nearPlace); return; }
@@ -2709,7 +2854,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateWeapons(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateWeapons(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -2846,9 +2991,9 @@ function drawOverlay() {
   if (trex && !inside) arrowTo(g, trex.x, trex.y, '#ef5a5f', 'T-REX');
   if (chase && !inside) { const near = chase.cops.slice().sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y)).slice(0, 2); for (const c of near) arrowTo(g, c.x, c.y, '#5a8aff', 'COPS'); }
   const J = jobInfo();
-  if (!inside && J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
-  if (!inside && hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
-  drawMiniOverlay(g);
+  if (!inside && !derby && J && isWorkday() && !S.workedToday && !S.flood && hour() >= J.hours[0] - 1.5 && hour() < J.hours[1] - 1) { const d = PLACES[J.place].door; arrowTo(g, d.x, d.y, '#ffbe55', 'WORK'); }
+  if (!inside && !derby && hour() >= 21.5 && S.home) { const d = PLACES['home_' + S.home].door; arrowTo(g, d.x, d.y, '#8fdc6a', 'HOME'); }
+  drawMiniOverlay(g); drawDerby(g);
   if (joy.active) { g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(joy.ox + joy.dx * 55, joy.oy + joy.dy * 55, 22, 0, 7); g.fill(); }
   if (trex && !inside) { g.fillStyle = `rgba(200,0,0,${0.08 + Math.sin(gameT * 6) * 0.05})`; g.fillRect(0, 0, W, H); }
   if (chase) {
@@ -2894,7 +3039,7 @@ function hud() {
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
   $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
-  const pr = $('prompt'), show = state === 'play' && (nearPlace || driving);
+  const pr = $('prompt'), show = state === 'play' && (nearPlace || driving) && !derby;
   pr.hidden = !show;
   if (show) {
     const np = nearPlace;
@@ -2904,6 +3049,7 @@ function hud() {
     else if (np.site || 'ward' in np || np.gig) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
+    else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
     else if (np.id === 'bench') what = 'Use the park bench';
     else if (np.home) what = S.home === np.home ? 'Go inside your home' : `Look at the ${np.name.toLowerCase()} (${np.home === 'burrow' ? 'for rent' : 'for sale'})`;
@@ -2917,13 +3063,14 @@ function hud() {
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
   if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
-  if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'patrol' ? (robber ? `Robbery ${G.done + 1}/${G.total}: catch the robber within about ${Math.max(0, Math.ceil(robber.timer))} minutes` : 'Waiting for the next call from dispatch...') : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
+  if (derby) { const al = derby.cars.filter(c => !c.out).length; st = derby.count > 0 ? 'Get ready...' : derby.over ? 'The dust settles...' : `Derby: ${al} cars left \u00b7 your car ${Math.round(derby.me.hp)}% \u00b7 ${Math.max(0, Math.ceil(90 - derby.t))}s`; }
+  else if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'patrol' ? (robber ? `Robbery ${G.done + 1}/${G.total}: catch the robber within about ${Math.max(0, Math.ceil(robber.timer))} minutes` : 'Waiting for the next call from dispatch...') : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
   if (S.site && !chase) { const t = siteTask(), dn = S.site.tasks.filter(x => x.done).length; st = t ? `Site work ${dn + 1}/${S.site.tasks.length}: ${t.t === 'carry' ? `carry girders (${S.site.carried}/${S.site.need})` : TASK_INFO[t.t].label.toLowerCase()}` : 'All site work done. Clock out at the Raptor Builders trailer.'; }
   if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
   sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
   feedItems.forEach((it, i) => { const el = $('feed').children[i]; if (el) el.style.opacity = performance.now() - it.t > 9000 ? '0' : '1'; });
-  mini.hidden = !!inside || state === 'title';
-  if (!inside) drawMini();
+  mini.hidden = !!inside || !!derby || state === 'title';
+  if (!inside && !derby) drawMini();
 }
 function showGoals() {
   const n = Object.keys(S.goals).length;
@@ -2952,7 +3099,7 @@ $('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(
 $('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
-$('quitBtn').addEventListener('click', () => { save(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
+$('quitBtn').addEventListener('click', () => { save(); if (derby) leaveDerby(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
 buildTown(); spawnNPCs(); placeCars();
