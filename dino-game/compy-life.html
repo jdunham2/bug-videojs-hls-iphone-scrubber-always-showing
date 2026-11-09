@@ -123,7 +123,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
   <div class="prompt" id="prompt" hidden></div>
   <button id="useBtn" type="button" hidden>ENTER</button>
   <button id="weaponBtn" type="button" hidden>USE</button>
-  <div class="cook" id="cookPanel" hidden><div class="cook-title">COOK THE ORDER</div><div class="cook-sub">Stack it bottom to top. Tap the ingredients in order, or press 1 to 6.</div><div class="order" id="cookOrder"></div><div class="ings" id="cookIngs"></div><div class="cook-sub" id="cookTime"></div></div>
+  <div class="cook" id="cookPanel" hidden><div class="cook-title" id="cookTitle">COOK THE ORDER</div><div class="cook-sub" id="cookSub">Stack it bottom to top. Tap the ingredients in order, or press 1 to 6.</div><div class="order" id="cookOrder"></div><div class="ings" id="cookIngs"></div><div class="cook-sub" id="cookTime"></div></div>
 
   <div class="screen" id="titleScreen">
     <div class="panel">
@@ -619,7 +619,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -781,6 +781,7 @@ function dayRollover(slept) {
   if (S.partner) {
     S.partner.rel -= S.partner.married ? 1.5 : 3;
     if (S.partner.married && S.partner.rel > 40) { S.money += 45; }
+    if (S.partner.roster) { S.rels = S.rels || {}; S.rels[S.partner.name] = S.partner.rel; }
     if (S.partner.rel <= 5) breakup();
   }
   if (S.egg && S.day >= S.egg.hatch) hatchEgg();
@@ -956,6 +957,7 @@ const MENUS = {
   },
   grocer: () => open(7, 22) ? { sub: 'Fresh ferns, beetles and eggs (not those eggs).', acts: [
     ...holdUpAct(200, 500),
+    { label: 'Buy flowers (gift)', detail: `A fresh bouquet for someone special. You have ${(S.gifts || {}).flowers || 0}.`, cost: 10, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.flowers = (S.gifts.flowers || 0) + 1; } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
     { label: 'Grab a snack', detail: '+20 hunger right now', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } },
     { label: 'Shoplift groceries', detail: 'Free if nobody sees. 35% chance of 2 days in jail.', tag: 'Crime', risky: true, mins: 10, fn: () => { if (Math.random() < 0.35) arrest(2, 'The store guard saw you stuff a melon in your pouch.'); else { S.groceries += 4; log('You walked out with free groceries. Your heart is pounding.', 'warn'); } } },
@@ -969,7 +971,7 @@ const MENUS = {
     return { sub: 'Home of the triple-decker Bronto.', acts };
   },
   depot: () => { const acts = [...gigActs('depot')]; return { sub: 'Eggs delivered fresh, mostly unbroken.', acts }; },
-  office: () => { const acts = []; workAct(acts, 'office'); return { sub: 'Fossil Corp. Digging up profits since the Jurassic.', acts }; },
+  office: () => { const acts = [...gigActs('office')]; return { sub: 'Fossil Corp. Digging up profits since the Jurassic.', acts }; },
   hospital: () => {
     const acts = [], J = jobInfo();
     if (J && J.place === 'hospital') {
@@ -988,7 +990,7 @@ const MENUS = {
     return { sub: 'Tarpit General. We pull dinosaurs out of everything.', acts };
   },
   bank: () => {
-    const acts = []; workAct(acts, 'bank');
+    const acts = [...gigActs('bank')];
     if (open(9, 17)) {
       acts.push({ label: 'Take a $1,000 loan', detail: `5% interest every Monday. Owed now: ${money$(S.loan)}`, why: S.loan >= 5000 ? 'Loan limit reached.' : '', mins: 20, fn: () => { S.loan += 1000; S.money += 1000; } });
       acts.push({ label: 'Repay the loan', detail: `Owed: ${money$(S.loan)}`, why: S.loan <= 0 ? 'You owe nothing.' : S.money < S.loan ? `You need ${money$(S.loan)}.` : '', mins: 10, fn: () => { S.money -= S.loan; S.loan = 0; log('Loan paid off!', 'good'); } });
@@ -1029,7 +1031,8 @@ const MENUS = {
     return { sub: p ? `${p.married ? 'Married to' : 'Dating'} ${p.name}, who ${p.trait}.` : 'The best place in town to meet someone special.', acts };
   },
   gas: () => {
-    const acts = []; workAct(acts, 'gas'); acts.push(...holdUpAct(150, 450));
+    const acts = [...gigActs('gas')]; acts.push(...holdUpAct(150, 450));
+    acts.push({ label: 'Buy chocolates (gift)', detail: `Someone special might love these. You have ${(S.gifts || {}).chocolate || 0}.`, cost: 8, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.chocolate = (S.gifts.chocolate || 0) + 1; } });
     acts.push({ label: 'Buy a snack', detail: '+20 hunger', cost: 5, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } });
     acts.push({ label: 'Energy drink', detail: '+30 energy, a little jittery', cost: 8, mins: 5, fn: () => { S.energy = Math.min(100, S.energy + 30); S.happy -= 2; } });
     acts.push({ label: 'Coffee', detail: '+15 energy, +3 happiness', cost: 4, mins: 10, fn: () => { S.energy = Math.min(100, S.energy + 15); S.happy += 3; } });
@@ -1057,7 +1060,8 @@ const MENUS = {
     return { sub: `Raptor Builders. Current project: Raptor Tower, ${S.build ? S.build.floors : 0} of 6 floors built.${J && J.place === 'builders' ? '' : ' Staff only. You can get a job here at the Job Center.'}`, acts };
   },
   petshop: () => {
-    const acts = []; workAct(acts, 'petshop');
+    const acts = [...gigActs('petshop')];
+    acts.push({ label: 'Buy a plushie (gift)', detail: `A soft little T-rex. You have ${(S.gifts || {}).plush || 0}.`, cost: 15, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.plush = (S.gifts.plush || 0) + 1; } });
     for (const [id, T] of Object.entries(PET_TYPES)) acts.push({ label: `Adopt a ${T.name}`, detail: T.blurb, cost: T.price, why: S.pet ? `You already have ${S.pet.name}.` : !S.home ? 'Pets need a home first. Try Nest Estates.' : '', mins: 20, fn: () => { closeMenu(); adoptPet(id); } });
     acts.push({ label: 'Buy pet food', detail: `5 meals. You have ${S.petFood || 0}.`, cost: 10, mins: 5, fn: () => { S.petFood = (S.petFood || 0) + 5; } });
     return { sub: S.pet ? `${S.pet.name} is ${S.pet.happy > 60 ? 'happy' : S.pet.happy > 30 ? 'okay' : 'sad'} and ${S.pet.fed > 40 ? 'well fed' : 'hungry'}.` : 'Adopt a little friend. They need walks, food and love.', acts };
@@ -1068,7 +1072,7 @@ const MENUS = {
     return { sub: 'Fire Station. Heroes with very small hoses.', acts };
   },
   museum: () => {
-    const acts = []; workAct(acts, 'museum');
+    const acts = [...gigActs('museum')];
     if (open(9, 19)) acts.push({ label: 'Visit the exhibits', detail: '+15 happiness, 90 minutes. Learn about your ancestors.', cost: 10, mins: 90, fn: () => { S.happy += 15; log('The T-rex skeleton was terrifying. And a little inspiring.', 'good'); } });
     return { sub: 'Fossil Museum. Home of the biggest skeleton in town.', acts };
   },
@@ -1278,7 +1282,7 @@ function buildRoom(id) {
   g.visible = false;
   ROOMS[id] = R; return R;
 }
-const WORKS = ['Work your shift', 'Slack off', 'Clock', 'Pick up the next', 'Cook the next'];
+const WORKS = ['Work your shift', 'Slack off', 'Clock', 'Pick up the next', 'Cook the next', 'Serve the next', 'Sort the next', 'Lead the next', 'Groom the next'];
 function homeLayout(key, w, d, style) {
   const s = style;
   return { w, d, home: key, floor: s.floor, wall: s.wall, trim: s.trim, build(b) {
@@ -1336,7 +1340,7 @@ const LAYOUTS = {
     b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
     b.station(370, 100, 'Produce stand', ['Shoplift']);
     b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
-    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Hold up']);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Hold up']);
     b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
     b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
   } },
@@ -1439,7 +1443,7 @@ const LAYOUTS = {
     b.box(320, 225, 90, 30, 24, '#7a3a5a'); b.npc(320, 202, 3, { bow: '#ff6ad5' });
     b.station(320, 265, 'Adoption desk', ['Adopt']);
     b.box(40, 215, 30, 90, 40, '#b9b2a6'); for (let i = 0; i < 4; i++) b.box(48, 180 + i * 22, 10, 14, 12, '#c0392b', false, 40);
-    b.station(85, 225, 'Pet food shelf', ['Buy pet food']);
+    b.station(85, 225, 'Pet food shelf', ['Buy pet food', 'Buy a plushie']);
     b.sign('PET NEST', 210, 104, 3, 140, '#7a3a5a', '#ffffff'); b.lamp(210, 180);
   } },
   gas: { w: 380, d: 280, floor: ['tile', '#f4f6f4', '#d6ddd6'], wall: '#f2f2ee', trim: '#27ae60', build(b) {
@@ -1447,7 +1451,7 @@ const LAYOUTS = {
     for (const x of [80, 170]) { b.box(x, 130, 30, 120, 40, '#b9b2a6'); for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) b.box(x + sd * 13, 80 + i * 24, 5, 16, 10, goods[(i + x) % 4], false, 10 + (i % 2) * 16); }
     b.box(340, 90, 30, 140, 60, '#d6dde4'); for (let i = 0; i < 4; i++) b.box(324, 40 + i * 34, 2, 28, 46, '!#bfe3ff', false, 8);
     b.box(270, 220, 90, 30, 24, '#27ae60'); b.npc(270, 196, 2, { hat: '#27ae60' });
-    b.station(270, 262, 'Register', ['Buy a snack', 'Energy drink', 'Coffee', 'Hold up']);
+    b.station(270, 262, 'Register', ['Buy a snack', 'Energy drink', 'Coffee', 'Buy chocolates', 'Hold up']);
     b.station(250, 50, 'Back room (staff)', WORKS);
     b.sign('DINO GAS', 190, 100, 3, 150, '#27ae60', '#ffffff'); b.lamp(190, 150);
   } },
@@ -2017,6 +2021,7 @@ function updateMini(dt) {
     else if (m.t <= 0) endMini(false, 'You got it under control, but the house is badly scorched.', -0.2);
     return;
   }
+  if (minigame.kind === 'panel') { minigame.t -= dt; if (Math.floor(minigame.t * 4) !== minigame.lastT) { minigame.lastT = Math.floor(minigame.t * 4); minigame.render(); } if (minigame.t <= 0) endPanel(false, minigame.timeout, -0.25); return; }
   if (minigame.kind === 'cook') { minigame.t -= dt; if (Math.floor(minigame.t * 4) !== minigame.lastT) { minigame.lastT = Math.floor(minigame.t * 4); renderCook(); } if (minigame.t <= 0) { $('cookPanel').hidden = true; endMini(false, 'Too slow! The customer walked out hungry.', -0.25); } return; }
   if (minigame.kind === 'mash') { minigame.t -= dt; minigame.p = Math.max(0, minigame.p - dt * 0.12); if (minigame.t <= 0) endMini(false, minigame.fail || 'The cement came out lumpy.', -0.25); }
   else if (minigame.kind === 'dose') { minigame.x += minigame.dir * minigame.speed * dt; if (minigame.x > 1) { minigame.x = 1; minigame.dir = -1; } if (minigame.x < 0) { minigame.x = 0; minigame.dir = 1; } }
@@ -2062,7 +2067,7 @@ function checkSiteEnd() {
   if (hour() >= J.hours[1] + 1) { log('The shift ended before you clocked out. You get paid for what you finished.', 'warn'); clockOut(); }
 }
 function drawMiniOverlay(g) {
-  if (!minigame || minigame.kind === 'cook') return;
+  if (!minigame || minigame.kind === 'cook' || minigame.kind === 'panel') return;
   const w = Math.min(460, W - 40), x = (W - w) / 2, y = H - 190;
   g.fillStyle = 'rgba(14,22,30,.9)'; g.fillRect(x, y, w, 130); g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.strokeRect(x, y, w, 130);
   g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
@@ -2413,7 +2418,7 @@ function holdUpAct(min, max) {
 
 // ---------- hands-on shift jobs: firefighter, pizza delivery, egg courier, fry cook ----------
 const SUBURB_HOUSES = [];
-const GIG_KIND = { fire: 'fire', pizza: 'pizza', depot: 'eggs', burger: 'cook', police: 'patrol' };
+const GIG_KIND = { fire: 'fire', pizza: 'pizza', depot: 'eggs', burger: 'cook', police: 'patrol', gas: 'pump', bank: 'teller', office: 'office', museum: 'tour', petshop: 'groom' };
 const INGREDIENTS = ['Bun', 'Patty', 'Cheese', 'Lettuce', 'Tomato', 'Pickles'];
 let fireTruck = null, fireFx = null;
 function gigKindHere(placeId) { const J = jobInfo(); return J && J.place === placeId ? GIG_KIND[placeId] : null; }
@@ -2424,6 +2429,7 @@ function gigActs(placeId) {
   if (S.gig && S.gig.kind === kind) {
     const G = S.gig;
     if ((kind === 'pizza' || kind === 'eggs') && !G.carrying && G.done < G.total) acts.push({ label: `Pick up the next ${kind === 'pizza' ? 'pizza' : 'egg crate'}`, detail: `${G.done}/${G.total} delivered so far.`, fn: () => { closeMenu(); pickUpOrder(); } });
+    if (NEXT_TASK[kind] && G.done < G.total) acts.push({ label: NEXT_TASK[kind][0], detail: `${G.done}/${G.total} ${NEXT_TASK[kind][1]}.`, fn: () => { closeMenu(); startNextTask(kind); } });
     if (kind === 'cook' && G.done < G.total) acts.push({ label: 'Cook the next order', detail: `${G.done}/${G.total} orders served.`, fn: () => { closeMenu(); startCooking(); } });
     const left = G.total - G.done;
     acts.push({ label: 'Clock out', detail: left ? `${left} still to go. You only get paid for what you finished.` : 'Every job is done. Collect your pay.', tag: 'Payday', fn: () => { closeMenu(); gigClockOut(); } });
@@ -2432,14 +2438,16 @@ function gigActs(placeId) {
   let why = '';
   if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'Closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
   if (!why && kind === 'pizza' && !cars.some(c => c.owned)) why = 'Delivery drivers need their own car. Buy one at Dino Motors.';
-  const late = hour() > a + 1, blurb = { patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
+  const late = hour() > a + 1, blurb = { pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
   acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}${blurb}`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startGig(kind, late); } });
   return acts;
 }
 function startGig(kind, late) {
   const lvl = S.job.level;
-  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
+  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
   if (kind === 'fire') { spawnFireTruck(); spawnFire(); log('Clocked in! A fire just broke out. Hop in the fire truck outside and follow the red arrow.', 'bad'); sfx.siren(); }
+  if (kind === 'pump') { spawnCustomer(); log('Clocked in! Walk out to the pumps when a car pulls up.', 'good'); }
+  if (NEXT_TASK[kind]) log(`Clocked in! Use your work station to start: ${NEXT_TASK[kind][0].toLowerCase()}.`, 'good');
   if (kind === 'patrol') { spawnCopCar(); spawnRobber(); log('Clocked in, officer! Your police car is parked on the road out front.', 'good'); }
   if (kind === 'pizza') log('Clocked in! Pick up the first pizza in the kitchen.', 'good');
   if (kind === 'eggs') log('Clocked in! Grab the first egg crate at the loading dock. Drive gently.', 'good');
@@ -2540,7 +2548,8 @@ function startCooking() {
   const order = ['Bun', ...Array.from({ length: n - 2 }, () => pick(INGREDIENTS.slice(1))), 'Bun'];
   minigame = { kind: 'cook', order, i: 0, mistakes: 0, t: 10 + n * 2 - lvl * 2, label: 'COOK THE ORDER', mins: 20,
     onDone: (ok, msg, q) => { log(msg, ok ? 'good' : 'warn'); const G = S.gig; G.q = clamp(G.q + q, 0, 1); G.done++; if (G.done >= G.total) { log('Every order served! Clock out in the kitchen.', 'good'); sfx.goal(); } } };
-  state = 'mini'; setScreens(); renderCook(); $('cookPanel').hidden = false;
+  setPanel('COOK THE ORDER', 'Stack it bottom to top. Tap the ingredients in order, or press 1 to 6.', INGREDIENTS, i => cookPick(INGREDIENTS[i]));
+  state = 'mini'; setScreens(); renderCook();
 }
 function renderCook() {
   const m = minigame; if (!m || m.kind !== 'cook') return;
@@ -2557,15 +2566,16 @@ function cookPick(name) {
 function gigTargets() {
   const G = S.gig; if (!G || inside || derby) return [];
   if (G.kind === 'fire' && G.target) return [{ x: G.target.x, y: G.target.y, label: 'Spray the fire', color: '#ff5a2a', arrow: 'FIRE', gig: 'fire' }];
+  if (G.kind === 'pump' && G.target) return [{ x: G.target.x, y: G.target.y, label: `Fill the customer's car (${G.target.want} gallons)`, color: '#27ae60', arrow: 'PUMP', gig: 'pump' }];
   if (G.kind === 'patrol' && robber) return [{ x: robber.x, y: robber.y, label: 'Robber! Run into them to cuff them', color: '#5a8aff', arrow: 'ROBBER', gig: 'robber' }];
   if ((G.kind === 'pizza' || G.kind === 'eggs') && G.target) return [{ x: G.target.x, y: G.target.y, label: G.target.label, color: '#ffbe55', arrow: G.kind === 'pizza' ? 'PIZZA' : 'EGGS', gig: 'deliver' }];
   return [];
 }
 function nearGig() { const t = gigTargets()[0]; return t && Math.hypot(P.x - t.x, P.y - t.y) < (driving ? 90 : 60) ? t : null; }
-function doGig(t) { if (t.gig === 'robber') { if (robber && Math.hypot(P.x - robber.x, P.y - robber.y) < 60) catchRobber(); return; } if (t.gig === 'fire') { if (driving) { driving.v = 0; } startHose(); } else deliver(); }
+function doGig(t) { if (t.gig === 'pump') { servePump(); return; } if (t.gig === 'robber') { if (robber && Math.hypot(P.x - robber.x, P.y - robber.y) < 60) catchRobber(); return; } if (t.gig === 'fire') { if (driving) { driving.v = 0; } startHose(); } else deliver(); }
 function gigReturnTarget() {
   const G = S.gig; if (!G || inside || derby) return null;
-  const place = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger', patrol: 'police' }[G.kind];
+  const place = GIG_PLACE[G.kind];
   if (G.done >= G.total || ((G.kind === 'pizza' || G.kind === 'eggs') && !G.carrying) || (G.kind === 'cook')) return { ...PLACES[place].door, label: G.done >= G.total ? 'CLOCK OUT' : 'PICK UP' };
   return null;
 }
@@ -2585,13 +2595,13 @@ function gigClockOut() {
   } else if (S.job.perf < 10) fire('Your work has been sloppy and slow.');
 }
 function clearGig() {
-  S.gig = null; removeFireTruck(); removeCopCar(); if (robber) { scene.remove(robber.m.root); robber = null; }
+  S.gig = null; removeFireTruck(); removeCopCar(); removeCustomer(); if (minigame && minigame.kind === 'panel') { minigame = null; $('cookPanel').hidden = true; if (state === 'mini') state = 'play'; } if (robber) { scene.remove(robber.m.root); robber = null; }
   if (fireFx) { scene.remove(fireFx.g); fireFx = null; }
   if (minigame && minigame.kind === 'cook') { minigame = null; $('cookPanel').hidden = true; if (state === 'mini') state = 'play'; }
 }
 function checkGigEnd() {
   const J = jobInfo(), G = S.gig; if (!G) return;
-  const place = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger', patrol: 'police' }[G.kind];
+  const place = GIG_PLACE[G.kind];
   if (!J || J.place !== place) { clearGig(); return; }
   if (hour() >= J.hours[1] + 1) { log('Your shift ran out. You get paid for what you finished.', 'warn'); gigClockOut(); }
 }
@@ -2781,6 +2791,208 @@ function drawDerby(g) {
   if (big) { g.font = '400 96px "Lilita One", system-ui, sans-serif'; g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.7)'; g.strokeText(big, W / 2, H / 2); g.fillStyle = '#ffd35a'; g.fillText(big, W / 2, H / 2); }
 }
 
+// ---------- more hands-on jobs: pump attendant, bank teller, office, tour guide, pet groomer ----------
+const GIG_PLACE = { fire: 'fire', pizza: 'pizza', eggs: 'depot', cook: 'burger', patrol: 'police', pump: 'gas', teller: 'bank', office: 'office', tour: 'museum', groom: 'petshop' };
+const NEXT_TASK = { teller: ['Serve the next customer', 'served'], office: ['Sort the next inbox', 'inboxes sorted'], tour: ['Lead the next tour', 'tours given'], groom: ['Groom the next pet', 'pets groomed'] };
+let customerCar = null;
+// generic tap-button panel (reuses the cooking panel)
+function setPanel(title, sub, labels, onPick) {
+  $('cookTitle').textContent = title; $('cookSub').textContent = sub;
+  const box = $('cookIngs'); box.innerHTML = '';
+  labels.forEach((x, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = `${i + 1} · ${x}`; bt.addEventListener('click', () => onPick(i)); box.appendChild(bt); });
+  $('cookPanel').hidden = false;
+}
+function panelKey(i) { if (minigame && minigame.pick) minigame.pick(i); }
+function finishGigTask(ok, msg, q) {
+  log(msg, ok ? 'good' : 'warn');
+  const G = S.gig; if (!G) return;
+  G.q = clamp(G.q + q, 0, 1); G.done++;
+  if (G.done >= G.total) { log('All done for today! Clock out at your workplace.', 'good'); sfx.goal(); }
+}
+// ---- pump attendant ----
+function spawnCustomer() {
+  const G = S.gig; if (!G || G.kind !== 'pump') return;
+  const pp = pick(GAS_PUMPS), c = spawnCar(pp.x, pp.y + 28, 0, pick(CAR_COLORS), false, null);
+  c.customer = true; customerCar = c;
+  G.target = { x: pp.x, y: pp.y + 52, want: Math.round(rand(3, 9)) };
+  log(`A customer pulled up at the pump and wants ${G.target.want} gallons.`, '');
+  sfx.honk();
+}
+function removeCustomer() { if (!customerCar) return; scene.remove(customerCar.m.root); const i = cars.indexOf(customerCar); if (i >= 0) cars.splice(i, 1); customerCar = null; }
+function servePump() {
+  const G = S.gig, t = G.target, lvl = S.job.level, target = t.want / 10;
+  minigame = { kind: 'dose', x: 0, dir: 1, speed: 0.7 + lvl * 0.3, target, tol: 0.05, ml: t.want, label: 'FILL THE TANK', help: `Press E to stop the pump at exactly ${t.want} gallons`, mins: 15,
+    onDone: (ok, msg, q) => { finishGigTask(ok, ok && q >= 0 ? `Filled to ${t.want} gallons. The customer gives you a thumbs up.` : 'You spilled a little gas. The customer frowns.', q); G.target = null; removeCustomer(); if (G.done < G.total) setTimeout(() => { if (S.gig === G) spawnCustomer(); }, 3000); } };
+  state = 'mini'; setScreens();
+}
+// ---- bank teller ----
+function startTeller() {
+  const want = 5 * Math.round(rand(3, 19)), bills = [5, 10, 20, 50];
+  minigame = { kind: 'panel', t: 16 - S.job.level * 2, mins: 15, want, have: 0, mistakes: 0, onDone: finishGigTask,
+    render() { $('cookOrder').innerHTML = `<span class="next">Customer wants ${money$(this.want)}</span><span>Counted ${money$(this.have)}</span>`; $('cookTime').textContent = `${Math.ceil(this.t)}s left · mistakes ${this.mistakes}`; },
+    pick(i) {
+      if (i < 4) { this.have += bills[i]; sfx.coin(); }
+      else if (i === 4) { this.have = 0; sfx.door(); }
+      else { if (this.have === this.want) endPanel(true, `Counted out exactly ${money$(this.want)}. Next!`, -this.mistakes * 0.06); else { this.mistakes++; sfx.bad(); log(`That is ${money$(this.have)}, not ${money$(this.want)}. Recount!`, 'warn'); this.have = 0; } }
+      this.render();
+    },
+    timeout: 'The customer got tired of waiting and left.' };
+  setPanel('COUNT THE CASH', 'Tap bills to count out the exact amount, then hand it over. Keys 1 to 6 work too.', ['$5', '$10', '$20', '$50', 'Start over', 'Hand it over'], i => minigame && minigame.pick(i));
+  minigame.render(); state = 'mini'; setScreens();
+}
+// ---- office: sort the inbox ----
+const EMAILS = [
+  ['You won a free volcano! Click here', 0], ['Cheap meteor insurance, act now', 0], ['Hot singles in your swamp', 0], ['Your egg warranty is expiring!!!', 0],
+  ['Meeting moved to 3 PM', 1], ['Where is the fossil report?', 1], ['Great job on the dig yesterday', 1], ['Please stop eating the office plants', 1],
+  ['Order for 50 polished fossils', 2], ['Question about my invoice', 2], ['Can you deliver amber by Friday?', 2], ['Thanks for the quick service!', 2],
+];
+function startOffice() {
+  const list = EMAILS.slice().sort(() => Math.random() - 0.5).slice(0, 5);
+  minigame = { kind: 'panel', t: 22 - S.job.level * 3, mins: 30, list, i: 0, mistakes: 0, onDone: finishGigTask,
+    render() { const e = this.list[this.i]; $('cookOrder').innerHTML = e ? `<span class="next">✉ ${e[0]}</span><span>${this.i + 1}/${this.list.length}</span>` : ''; $('cookTime').textContent = `${Math.ceil(this.t)}s left · mistakes ${this.mistakes}`; },
+    pick(b) {
+      const e = this.list[this.i]; if (!e) return;
+      if (b === e[1]) sfx.door(); else { this.mistakes++; sfx.bad(); }
+      this.i++;
+      if (this.i >= this.list.length) endPanel(true, this.mistakes ? `Inbox sorted with ${this.mistakes} mistake${this.mistakes > 1 ? 's' : ''}.` : 'Inbox zero! Your boss is impressed.', -this.mistakes * 0.08);
+      else this.render();
+    },
+    timeout: 'You ran out of time and the inbox is still a mess.' };
+  setPanel('SORT THE INBOX', 'Send each email to the right folder. Keys 1 to 3 work too.', ['Spam', 'Boss', 'Clients'], i => minigame && minigame.pick(i));
+  minigame.render(); state = 'mini'; setScreens();
+}
+function endPanel(ok, msg, q) { $('cookPanel').hidden = true; endMini(ok, msg, q); }
+// ---- tour guide: dino trivia ----
+const TRIVIA = [
+  ['Which dinosaur had three horns on its face?', 'Triceratops', ['Stegosaurus', 'Velociraptor']],
+  ['What part of the T-rex was famously tiny?', 'Its arms', ['Its teeth', 'Its feet']],
+  ['Which dinosaur had big plates along its back?', 'Stegosaurus', ['Brontosaurus', 'Ankylosaurus']],
+  ['What do you call a scientist who studies fossils?', 'A paleontologist', ['An astronaut', 'A chef']],
+  ['What hit Earth about 66 million years ago?', 'A giant asteroid', ['A comet made of ice cream', 'A very big snowball']],
+  ['Pterodactyls could fly. Were they dinosaurs?', 'No, flying reptiles', ['Yes, flying dinosaurs', 'No, giant bats']],
+  ['A compsognathus was about the size of a...', 'Chicken', ['Horse', 'School bus']],
+  ['Ankylosaurus had a bony club on its...', 'Tail', ['Head', 'Nose']],
+  ['Which of these dinosaurs ate plants?', 'Brontosaurus', ['T-rex', 'Velociraptor']],
+  ['Birds today are related to...', 'Dinosaurs', ['Sharks', 'Frogs']],
+];
+function startTour() {
+  const qs = TRIVIA.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  let right = 0;
+  const ask = i => {
+    if (i >= qs.length) { advance(60, { work: true }); finishGigTask(right >= 2, right === 3 ? 'Perfect tour! The visitors give you a standing ovation.' : right === 2 ? 'Nice tour. Most of the visitors learned something.' : 'Rough tour. A kid corrected you twice.', right === 3 ? 0.03 : right === 2 ? -0.05 : -0.25); return; }
+    const [q, a, wrong] = qs[i], opts = [a, ...wrong].sort(() => Math.random() - 0.5);
+    queueEvent({ kind: '', tag: `Museum tour · question ${i + 1} of 3`, title: 'A visitor asks...', text: q, sound: 'door',
+      buttons: opts.map(o => ({ label: o, alt: true, fn: () => { if (o === a) { right++; log(`Correct: ${a}.`, 'good'); sfx.coin(); } else { log(`Oops. The answer was ${a.toLowerCase()}.`, 'warn'); sfx.bad(); } ask(i + 1); } })) });
+  };
+  log('Your tour group gathers by the T-rex skeleton...', ''); ask(0);
+}
+// ---- pet groomer ----
+function startGroom() {
+  const lvl = S.job.level, pet = pick(Object.values(PET_TYPES)).name.toLowerCase();
+  let q1 = 0;
+  minigame = { kind: 'mash', p: 0, t: 7, label: 'SCRUB THE PET', help: `Mash E (or tap) to scrub the muddy ${pet}`, mins: 15, what: 'Squeaky clean.', fail: 'Still a bit muddy.',
+    onDone: (ok, msg, q) => {
+      q1 = q; log(msg, ok ? 'good' : 'warn');
+      minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.0 + lvl * 0.35, zone: [0.42, 0.42 + Math.max(0.1, 0.2 - lvl * 0.04)], hits: 0, misses: 0, need: 3, flash: 0, label: 'TRIM THE CLAWS', help: 'Press E when the marker is in the green', mins: 15, what: `The ${pet} looks fabulous`, fail: `The ${pet} has a very uneven haircut now.`,
+        onDone: (ok2, msg2, q2) => finishGigTask(ok2, msg2, q1 + q2) };
+      state = 'mini'; setScreens();
+    } };
+  state = 'mini'; setScreens();
+}
+function startNextTask(kind) { if (kind === 'teller') startTeller(); if (kind === 'office') startOffice(); if (kind === 'tour') startTour(); if (kind === 'groom') startGroom(); }
+
+// ---------- people to meet: a roster of compies with hangouts, likes and feelings ----------
+const GIFTS = { flowers: { name: 'flowers', where: 'Leafy Grocer', price: 10 }, chocolate: { name: 'chocolates', where: 'Dino Gas', price: 8 }, plush: { name: 'a plushie', where: 'Pet Nest', price: 15 } };
+const ROSTER = [
+  { name: 'Juniper', pal: 3, trait: 'paints the sunset every evening', likes: 'flowers', spot: [960, 990], place: 'by the fountain', date: 'a picnic in the park' },
+  { name: 'Rocco', pal: 2, trait: 'restores old convertibles', likes: 'chocolate', spot: [2210, 1110], place: 'at Dino Gas', date: 'a long drive along the beach' },
+  { name: 'Lumi', pal: 1, trait: 'knows every fossil in the museum', likes: 'plush', spot: [2230, 560], place: 'outside the Fossil Museum', date: 'a private museum tour' },
+  { name: 'Okra', pal: 5, trait: 'runs marathons before breakfast', likes: 'chocolate', spot: [2250, 3110], place: 'at Raptors Stadium', date: 'a Raptors game' },
+  { name: 'Wren', pal: 4, trait: 'sings at the Fern Cafe on Fridays', likes: 'flowers', spot: [1420, 1040], place: 'outside Fern Cafe', date: 'dinner at Fern Cafe' },
+  { name: 'Ziggy', pal: 0, trait: 'surfs every single morning', likes: 'plush', spot: [3880, 1700], place: 'on the beach', date: 'sunset on the beach' },
+  { name: 'Clover', pal: 3, trait: 'grows giant ferns on the farm', likes: 'flowers', spot: [900, 2700], place: 'at Fern Farm', date: 'a hayride on the farm' },
+  { name: 'Basil', pal: 2, trait: 'is the fastest firefighter in town', likes: 'chocolate', spot: [2790, 610], place: 'by the Fire Station', date: 'a ride on the fire truck' },
+  { name: 'Tansy', pal: 1, trait: 'volunteers at Bark Park', likes: 'plush', spot: [450, 2100], place: 'at Bark Park', date: 'a walk with the puppies' },
+  { name: 'Pebble', pal: 5, trait: 'wins at the casino a little too often', likes: 'chocolate', spot: [1600, 530], place: 'outside the Lucky Egg Casino', date: 'a night at the casino' },
+  { name: 'Mossy', pal: 0, trait: 'writes poems by the lake', likes: 'flowers', spot: [1585, 2345], place: 'at the lake', date: 'a boat ride on the lake' },
+  { name: 'Sage', pal: 4, trait: 'bakes the best pizza in town', likes: 'plush', spot: [2765, 1040], place: 'outside Ptero Pizza', date: 'a pizza night' },
+];
+let rosterMs = [];
+function stageOf(rel) { return rel >= 80 ? 'smitten' : rel >= 50 ? 'close' : rel >= 25 ? 'friends' : 'strangers'; }
+function spawnRoster() {
+  for (const r of rosterMs) scene.remove(r.m.root); rosterMs = [];
+  for (const p of ROSTER) {
+    const pal = PALETTES[p.pal], m = makeCompy(pal, { crest: pal.crest, bow: p.likes === 'flowers' ? '#ff6ad5' : null, hat: p.likes === 'chocolate' ? '#5a3a24' : null });
+    m.root.scale.setScalar(13 / 1.25); scene.add(m.root);
+    rosterMs.push({ p, m, x: p.spot[0], y: p.spot[1], t: Math.random() * 9, face: Math.PI / 2 });
+  }
+}
+function rosterVisible(r) { return !(S && S.partner && S.partner.married && S.partner.name === r.p.name); }
+function rosterNear() {
+  if (!S || inside || driving) return null;
+  let best = null, bd = 46;
+  for (const r of rosterMs) { if (!rosterVisible(r)) continue; const d = Math.hypot(P.x - r.x, P.y - r.y); if (d < bd) { bd = d; best = r; } }
+  return best;
+}
+function relOf(name) { S.rels = S.rels || {}; return S.rels[name] || 0; }
+function addRel(name, n) { S.rels = S.rels || {}; S.rels[name] = clamp((S.rels[name] || 0) + n, 0, 100); if (S.partner && S.partner.name === name) S.partner.rel = S.rels[name]; if (Object.values(S.rels).filter(v => v >= 50).length >= 3) goal('social'); }
+function talkTo(r) {
+  const p = r.p, rel = relOf(p.name), isPartner = S.partner && S.partner.name === p.name, gifts = S.gifts || {};
+  const chatted = (S.chatDay || {})[p.name] === S.day;
+  const hasGift = Object.keys(GIFTS).filter(k => (gifts[k] || 0) > 0);
+  const btns = [];
+  btns.push({ label: chatted ? 'Chat (done today)' : 'Chat', alt: true, disabled: chatted, fn: () => { S.chatDay = S.chatDay || {}; S.chatDay[p.name] = S.day; addRel(p.name, rel < 25 ? 8 : 5); S.happy += 3; advance(20); log(pick([`${p.name} tells you all about how they ${p.trait}.`, `You and ${p.name} laugh about the T-rex that keeps wandering into town.`, `${p.name} asks what you do for fun. You talk for ages.`]), 'good'); } });
+  if (hasGift.length) btns.push({ label: 'Give a gift', alt: true, fn: () => giftMenu(r) });
+  if (!isPartner && rel >= 25) btns.push({ label: 'Ask on a date', alt: true, disabled: !!S.partner, fn: () => askOut(r) });
+  if (isPartner) btns.push({ label: `Go on a date ($40)`, alt: true, disabled: S.money < 40, fn: () => goOnDate(r) });
+  if (isPartner && !S.partner.married) btns.push({ label: 'Propose ($600 ring)', alt: true, disabled: S.money < 600 || rel < 75, fn: () => propose(r) });
+  btns.push({ label: 'Bye', fn: () => {} });
+  const line = isPartner ? (S.partner.married ? `${p.name} is your spouse.` : `You are dating ${p.name}.`) : rel >= 25 ? `You and ${p.name} are ${stageOf(rel)}.` : `You have not really met ${p.name} yet.`;
+  queueEvent({ kind: '', tag: `${p.name} · ${p.place}`, title: p.name, text: `${p.name} ${p.trait}. ${line} Closeness ${Math.round(rel)}/100. Favorite gift: ${rel >= 25 ? GIFTS[p.likes].name : 'you will learn that once you are friends'}.${S.partner && !isPartner ? ` (You are with ${S.partner.name}, so dating is off the table.)` : ''}`, sound: 'ding', buttons: btns });
+}
+function giftMenu(r) {
+  const p = r.p, gifts = S.gifts || {};
+  queueEvent({ kind: '', tag: `Gift for ${p.name}`, title: 'Which gift?', text: `You have ${Object.keys(GIFTS).map(k => `${gifts[k] || 0} ${GIFTS[k].name}`).join(', ')}.`, sound: 'door',
+    buttons: Object.keys(GIFTS).filter(k => (gifts[k] || 0) > 0).map(k => ({ label: `Give ${GIFTS[k].name}`, alt: true, fn: () => { S.gifts[k]--; const loved = k === p.likes; addRel(p.name, loved ? 20 : 8); S.happy += 4; log(loved ? `${p.name} LOVES ${GIFTS[k].name}! Their eyes light up.` : `${p.name} says thanks for the ${GIFTS[k].name}.`, 'good'); sfx.goal(); } })).concat([{ label: 'Never mind' }]) });
+}
+function askOut(r) {
+  const p = r.p, rel = relOf(p.name), yes = Math.random() < 0.4 + rel / 100;
+  if (yes) { S.partner = { name: p.name, trait: p.trait, pal: p.pal, rel, married: false, roster: true }; goal('date'); sfx.goal(); queueEvent({ kind: 'good', title: `${p.name} said yes!`, text: `You and ${p.name} are dating now. Go on dates to grow closer, and when you are smitten, propose. Do not forget about them: partners who feel ignored will leave.`, sound: 'goal' }); }
+  else { addRel(p.name, -5); queueEvent({ kind: 'bad', title: 'Not yet', text: `${p.name} smiles and says they would like to be better friends first.` }); }
+}
+function goOnDate(r) {
+  const p = r.p; S.money -= 40; advance(120); addRel(p.name, rand(12, 20)); S.happy += 14; goal('date');
+  queueEvent({ kind: 'good', title: `Date with ${p.name}`, text: `You spend the evening on ${p.date}. ${pick(['It was perfect.', 'You could not stop smiling.', `${p.name} holds your claw the whole time.`, 'Best day in ages.'])}`, sound: 'goal' });
+}
+function propose(r) {
+  const p = r.p; S.money -= 600;
+  if (Math.random() < 0.9) {
+    S.partner.married = true; S.partner.rel = 100; addRel(p.name, 100); S.happy += 30; goal('married'); refreshFamily();
+    queueEvent({ kind: 'good', title: 'A wedding in the park!', text: `${p.name} said YES! The whole town came to the wedding by the fountain. Juniper painted the sky pink, Sage baked a pizza cake, and Basil hosed down the dance floor. ${S.home ? `${p.name} is moving into your ${HOMES[S.home].name.toLowerCase()}.` : 'Now find a home to live in together.'}`, sound: 'goal' });
+  } else { addRel(p.name, -25); queueEvent({ kind: 'bad', title: `${p.name} needs more time`, text: 'They love you, but they are not ready yet. The ring shop does not do refunds.' }); }
+}
+function updateRoster(dt) {
+  for (const r of rosterMs) {
+    r.t += dt;
+    r.m.root.visible = rosterVisible(r);
+    const d = Math.hypot(P.x - r.x, P.y - r.y);
+    if (d < 140) r.face = Math.atan2(P.y - r.y, P.x - r.x); else r.face += Math.sin(r.t * 0.3) * dt * 0.3;
+  }
+}
+function syncRoster() {
+  for (const r of rosterMs) { r.m.root.position.set(r.x, 0, r.y); r.m.root.rotation.y = -r.face; animDino(r.m, r.t, 0); r.m.head.rotation.z = Math.sin(r.t * 2) * 0.08; }
+}
+function drawRoster(g, lbl) {
+  if (inside || (typeof derby !== 'undefined' && derby)) return;
+  for (const r of rosterMs) {
+    if (!rosterVisible(r) || Math.hypot(r.x - cam.x, r.y - cam.y) > 900) continue;
+    const rel = relOf(r.p.name), dating = S.partner && S.partner.name === r.p.name;
+    lbl(r.x, r.y, 44, `${dating ? '♥ ' : ''}${r.p.name}`, dating ? '#ff8ac8' : '#ffd3e6');
+    const sc = toScreen(r.x, 50, r.y);
+    if (sc.ok) { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(sc.x - 16, sc.y - 2, 32, 4); g.fillStyle = '#ff6ad5'; g.fillRect(sc.x - 16, sc.y - 2, 32 * rel / 100, 4); }
+  }
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -2795,6 +3007,7 @@ addEventListener('keydown', e => {
   if (k === 'f' && state === 'play') { useWeapon(); return; }
   if (k === 'q' && state === 'play') { cycleWeapon(); return; }
   if (state === 'mini' && minigame && minigame.kind === 'cook' && k >= '1' && k <= '6') { cookPick(INGREDIENTS[+k - 1]); return; }
+  if (state === 'mini' && minigame && minigame.kind === 'panel' && k >= '1' && k <= '6') { minigame.pick(+k - 1); return; }
   if (state === 'mini' && (k === 'e' || k === ' ' || k === 'enter')) { e.preventDefault(); miniPress(); return; }
   if (k.startsWith('arrow')) e.preventDefault();
   keys.add(k);
@@ -2813,6 +3026,7 @@ function useNear() {
   if (nearPlace.site) { doSiteTask(nearPlace); return; }
   if ('ward' in nearPlace) { treatPatient(nearPlace); return; }
   if (nearPlace.gig) { doGig(nearPlace); return; }
+  if (nearPlace.roster) { talkTo(nearPlace.roster); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -2848,13 +3062,14 @@ function update(dt) {
   for (const t of gigTargets()) { const d = Math.hypot(P.x - t.x, P.y - t.y) - 10; if (d < best) { best = d; nearPlace = t; } }
   for (const st of wardStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 6; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
-  if (!inside) for (const c of cars) if (!c.ai) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
+  { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
+  if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
   if (inside) updateInterior(dt);
   if (chase) { updateChase(dt); if (state !== 'play') return; }
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateWeapons(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt);
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -2944,7 +3159,7 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
-  syncSite(); syncPet(); syncWeapon(); syncRobber();
+  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster();
   if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
   carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
   if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
@@ -2978,6 +3193,7 @@ function drawOverlay() {
   }
   const lbl = (x, y, h, text, color) => { const s = toScreen(x, h, y); if (!s.ok) return; g.font = '800 12px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.7)'; g.strokeText(text, s.x, s.y); g.fillStyle = color; g.fillText(text, s.x, s.y); };
   lbl(P.x, P.y, 42, S.name, '#ffe08a');
+  drawRoster(g, lbl);
   if (spouseM) lbl(spouseM.x, spouseM.y, 40, S.partner.name, '#ffb3e6');
   kidMs.forEach((k, i) => lbl(k.x, k.y, 26, S.kids[i].name, '#bfe8ff'));
   if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
@@ -3046,7 +3262,7 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
@@ -3064,7 +3280,7 @@ function hud() {
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
   if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
   if (derby) { const al = derby.cars.filter(c => !c.out).length; st = derby.count > 0 ? 'Get ready...' : derby.over ? 'The dust settles...' : `Derby: ${al} cars left \u00b7 your car ${Math.round(derby.me.hp)}% \u00b7 ${Math.max(0, Math.ceil(90 - derby.t))}s`; }
-  else if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'patrol' ? (robber ? `Robbery ${G.done + 1}/${G.total}: catch the robber within about ${Math.max(0, Math.ceil(robber.timer))} minutes` : 'Waiting for the next call from dispatch...') : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
+  else if (S.gig && !chase) { const G = S.gig; st = G.done >= G.total ? 'All done! Clock out at your workplace.' : G.kind === 'patrol' ? (robber ? `Robbery ${G.done + 1}/${G.total}: catch the robber within about ${Math.max(0, Math.ceil(robber.timer))} minutes` : 'Waiting for the next call from dispatch...') : G.kind === 'fire' ? (G.target ? `Fire ${G.done + 1}/${G.total}: about ${Math.max(0, Math.ceil(G.target.t))} minutes before the house burns down` : 'Waiting for the next fire call...') : G.kind === 'cook' ? `Orders served ${G.done}/${G.total}. Cook the next one in the kitchen.` : G.kind === 'pump' ? (G.target ? `A customer at the pump wants ${G.target.want} gallons` : 'Waiting for the next customer...') : NEXT_TASK[G.kind] ? `${G.done}/${G.total} ${NEXT_TASK[G.kind][1]}. Use your work station for the next one.` : G.target ? `${G.target.label}: ${Math.max(0, Math.ceil(G.target.t))} minutes left${G.cracked ? ' (some eggs cracked)' : ''}` : `Delivered ${G.done}/${G.total}. Pick up the next order.`; }
   if (S.site && !chase) { const t = siteTask(), dn = S.site.tasks.filter(x => x.done).length; st = t ? `Site work ${dn + 1}/${S.site.tasks.length}: ${t.t === 'carry' ? `carry girders (${S.site.carried}/${S.site.need})` : TASK_INFO[t.t].label.toLowerCase()}` : 'All site work done. Clock out at the Raptor Builders trailer.'; }
   if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
   sh.hidden = !st || state !== 'play'; if (st) sh.textContent = st;
@@ -3102,7 +3318,7 @@ $('resumeBtn').addEventListener('click', togglePause);
 $('quitBtn').addEventListener('click', () => { save(); if (derby) leaveDerby(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
 
-buildTown(); spawnNPCs(); placeCars();
+buildTown(); spawnNPCs(); placeCars(); spawnRoster();
 INGREDIENTS.forEach((x, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = `${i + 1} \u00b7 ${x}`; bt.addEventListener('click', () => cookPick(x)); $('cookIngs').appendChild(bt); });
 player = makeCompy(PALETTES[0], { crest: PALETTES[0].crest }); scene.add(player.root);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => signs.forEach(d => d()));
