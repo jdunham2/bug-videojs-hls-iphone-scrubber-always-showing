@@ -51,6 +51,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 @media (max-width: 760px) { .shift { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
 #mini { position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 128px; height: 128px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; }
 @media (max-width: 520px) { #mini { width: 92px; height: 92px; } }
+@media (max-width: 560px) {
+  .top-btns { max-width: 128px; gap: 4px; }
+  .ibtn { font-size: 11px; padding: 6px 7px; border-radius: 8px; }
+  #muteBtn { display: none; }
+  #mini { top: calc(84px + env(safe-area-inset-top, 0px)); }
+  .when b { font-size: 15px; } .when span { font-size: 15px; }
+  .card { width: min(300px, 58vw); padding: 8px 10px; }
+}
 
 .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 12, 18, 0.5); }
 .panel { background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 22px; width: min(520px, 100%); max-height: 100%; overflow: auto; display: grid; gap: 12px; box-sizing: border-box; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
@@ -84,6 +92,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 .map-legend button.job { background: rgba(255,190,85,.25); border-color: #ffbe55; }
 .map-legend button.home { background: rgba(143,220,106,.22); border-color: #8fdc6a; }
 .map-legend i { opacity: .6; font-style: normal; font-weight: 600; }
+.phone-panel { width: min(380px, 100%); gap: 10px; }
+.phone-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.phone-tabs button, .phone-body button { font: 800 13px Nunito, system-ui, sans-serif; color: var(--bone); background: rgba(255,255,255,.07); border: 2px solid var(--line); border-radius: 10px; padding: 9px; cursor: pointer; text-align: left; }
+.phone-tabs button { text-align: center; }
+.phone-tabs button.on { background: #f1c40f; color: var(--ink); border-color: #f1c40f; }
+.phone-body { display: grid; gap: 6px; max-height: 52vh; overflow: auto; }
+.phone-body button:disabled { opacity: .45; cursor: default; }
+.txt { display: grid; gap: 2px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.06); border-left: 3px solid transparent; }
+.txt.new { border-left-color: #8fdc6a; background: rgba(143,220,106,.1); }
+.txt b { font-size: 13px; } .txt span { font-size: 13px; } .txt i { font-size: 11px; opacity: .6; font-style: normal; }
+.muted { opacity: .7; margin: 0; }
+.ibtn.alert { border-color: #8fdc6a; color: #8fdc6a; }
+#mapScreen.taxi .map-tip::before { content: '🚕 TAXI: '; color: #f1c40f; }
 .goals { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 480px) { .goals { grid-template-columns: 1fr; } }
 .goals div { font-size: 13px; padding: 7px 9px; border-radius: 10px; background: rgba(255,255,255,.05); color: var(--muted); }
@@ -123,6 +144,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
     </div>
     <div class="top-btns">
       <button class="ibtn" id="mapBtn" type="button">Map</button>
+      <button class="ibtn" id="phoneBtn" type="button">Phone</button>
       <button class="ibtn" id="goalsBtn" type="button">Goals 0/14</button>
       <button class="ibtn" id="muteBtn" type="button">Sound on</button>
       <button class="ibtn" id="pauseBtn" type="button">Pause</button>
@@ -184,11 +206,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
     </div>
   </div>
 
+  <div class="screen" id="phoneScreen" hidden>
+    <div class="panel phone-panel">
+      <div class="map-head"><h2>📱 Phone</h2><button class="btn alt" id="phoneClose" type="button">Close</button></div>
+      <div class="phone-tabs" id="phoneTabs"><button type="button" data-tab="texts">Messages</button><button type="button" data-tab="contacts">Contacts</button></div>
+      <div class="phone-body" id="phoneBody"></div>
+    </div>
+  </div>
+
   <div class="screen" id="pauseScreen" hidden>
     <div class="panel">
       <h2>Paused</h2>
       <p>Your life saves every time you sleep.</p>
-      <div class="row"><button class="btn" id="resumeBtn" type="button">Resume</button><button class="btn alt" id="quitBtn" type="button">Title screen</button></div>
+      <div class="row"><button class="btn" id="resumeBtn" type="button">Resume</button><button class="btn alt" id="muteBtn2" type="button">Sound on</button><button class="btn alt" id="quitBtn" type="button">Title screen</button></div>
     </div>
   </div>
 </div>
@@ -305,7 +335,7 @@ const GAS_PUMPS = [{ x: 1990, y: 1010 }, { x: 2060, y: 1010 }, { x: 2130, y: 101
 // every block outside the original town and the east side is filled from this map
 const NB = ROADS.length + 1;
 const DISTRICTS = {
-  '4,2': 'lake', '0,3': 'petshop', '1,3': 'suburb', '2,3': 'lake', '3,3': 'suburb', '4,3': 'suburb', '5,3': 'lake',
+  '4,2': 'lake', '0,3': 'petshop', '1,3': 'suburb', '2,3': 'lake', '3,3': 'plaza', '4,3': 'suburb', '5,3': 'lake',
   '0,4': 'suburb', '1,4': 'farm', '2,4': 'suburb', '3,4': 'suburb', '4,4': 'forest', '5,4': 'suburb',
   '5,0': 'plaza', '5,1': 'forest', '5,2': 'plaza',
   '0,5': 'suburb', '1,5': 'forest', '2,5': 'suburb', '3,5': 'stadium', '4,5': 'suburb', '5,5': 'farm',
@@ -644,7 +674,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -786,7 +816,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather();
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather(); morningTexts(); if (has('fish')) S.happy += 3;
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -934,11 +964,11 @@ const MENUS = {
   home: p => {
     const key = p.home, mine = S.home === key, H0 = HOMES[key];
     if (!mine) return { title: H0.name, sub: key === 'burrow' ? `For rent: ${money$(H0.rent)} a week. Ask at Nest Estates.` : `For sale: ${money$(H0.price)}. Buy it at Nest Estates.`, acts: [] };
-    const fam = S.partner && S.partner.married, q = S.damaged ? 55 : key === 'mansion' ? 100 : key === 'cottage' ? 95 : 85;
+    const fam = S.partner && S.partner.married, q = Math.min(100, (S.damaged ? 55 : key === 'mansion' ? 100 : key === 'cottage' ? 95 : 85) + (has('bed') && !S.damaged ? 10 : 0));
     return { title: `Your ${H0.name}${S.damaged ? ' (damaged)' : ''}`, sub: `${fam ? `${S.partner.name} is home. ` : ''}${S.kids.length ? `Kids: ${S.kids.map(k => k.name).join(', ')}. ` : ''}Groceries: ${S.groceries} meal${S.groceries === 1 ? '' : 's'}.`, acts: [
       { label: 'Go to bed', detail: `Wake at 6:30 AM with ${q}% energy${S.damaged ? '. The broken roof leaks' : ''}.`, fn: () => { closeMenu(); if (S.damaged) S.happy -= 8; else S.happy += 4; sleep(q); } },
       { label: 'Cook a meal', detail: '+45 hunger, 30 minutes', why: S.groceries ? '' : 'No groceries. Buy some at Leafy Grocer.', mins: 30, fn: () => { S.groceries--; S.hunger = Math.min(100, S.hunger + 45); } },
-      { label: 'Watch TV', detail: '+12 happiness, 2 hours', mins: 120, fn: () => { S.happy += 12; } },
+      { label: 'Watch TV', detail: has('tv') ? '+22 happiness on the giant TV, 2 hours' : '+12 happiness, 2 hours', mins: 120, fn: () => { S.happy += has('tv') ? 22 : 12; } },
       { label: 'Nap', detail: '+30 energy, 2 hours', mins: 120, opts: { sleeping: true }, fn: () => { S.energy += 30; } },
       ...(fam || S.kids.length ? [{ label: 'Family time', detail: '+15 happiness and closer family, 2 hours', mins: 120, fn: () => { S.happy += 15; if (S.partner) S.partner.rel = Math.min(100, S.partner.rel + 10); } }] : []),
       ...(S.pet ? [
@@ -1572,7 +1602,7 @@ function enterBuilding(id) {
   if (inside) inside.g.visible = false;
   inside = R; R.g.visible = true; activeSolids = R.solids;
   P.x = R.exit.x; P.y = R.exit.y - 34; P.vx = P.vy = 0; P.face = -Math.PI / 2; cam.x = P.x; cam.y = P.y;
-  sfx.door(); refreshFamily();
+  sfx.door(); refreshFamily(); if (R.home) furnishRoom(R);
 }
 function exitBuilding(to) {
   const R = inside; if (!R) return;
@@ -2965,6 +2995,7 @@ function rosterNear() {
 function relOf(name) { S.rels = S.rels || {}; return S.rels[name] || 0; }
 function addRel(name, n) { S.rels = S.rels || {}; S.rels[name] = clamp((S.rels[name] || 0) + n, 0, 100); if (S.partner && S.partner.name === name) S.partner.rel = S.rels[name]; if (Object.values(S.rels).filter(v => v >= 50).length >= 3) goal('social'); }
 function talkTo(r) {
+  inviteMet(r.p.name);
   const p = r.p, rel = relOf(p.name), isPartner = S.partner && S.partner.name === p.name, gifts = S.gifts || {};
   const chatted = (S.chatDay || {})[p.name] === S.day;
   const hasGift = Object.keys(GIFTS).filter(k => (gifts[k] || 0) > 0);
@@ -3051,8 +3082,9 @@ function openMap() {
   $('mapLegend').innerHTML = mapPlaces().sort((a, b) => a.name.localeCompare(b.name)).map(p => `<button type="button" data-id="${p.id}" class="${J && J.place === p.id ? 'job' : p.home ? 'home' : ''}">${p.icon} ${p.name}${closedWhy && !p.home && PLACES[p.id].h && closedWhy(p.id) ? ' <i>closed</i>' : ''}</button>`).join('');
   drawBigMap();
 }
-function closeMap() { $('mapScreen').hidden = true; if (state === 'map') state = 'play'; }
+function closeMap() { $('mapScreen').hidden = true; if (state === 'map') state = 'play'; taxiMode = false; $('mapScreen').classList.remove('taxi'); }
 function setWaypoint(p) {
+  if (taxiMode) { taxiRide(p); return; }
   const d = p.door || p;
   waypoint = { x: d.x, y: d.y, label: p.name }; sfx.ding && sfx.ding();
   log(`Waypoint set: ${p.name}. Follow the purple arrow.`, '');
@@ -3473,16 +3505,201 @@ function festRaffle() {
   else log('Your raffle ticket did not win. Maybe next week.', '');
 }
 
+// ---------- phone, salon makeovers and home furniture ----------
+PLAZA['3,3'] = [
+  ['salon', 'Tooth & Claw Salon', 1950, 2000, 2140, 2250, 60, 1, { wall: '#f6d6e6', win: '#2a2433', sign: '#c2185b', awning: '#c2185b' }],
+  ['furniture', 'Comfy Cave Furniture', 2180, 1980, 2370, 2250, 70, 1, { wall: '#c9a26a', win: '#2c2418', sign: '#5a3f28', roof: '#6a4a2e' }],
+];
+Object.assign(HOURS, { salon: [9, 20], furniture: [9, 19] });
+Object.assign(MAP_ICON, { salon: '💇', furniture: '🛋' });
+// ---- your look ----
+const SKINS = [...PALETTES,
+  { name: 'Midnight', body: '#2a2d3a', belly: '#6a6f86', dark: '#14161e', stripe: '#14161e', crest: '#7fd8ff' },
+  { name: 'Snow', body: '#eef0f2', belly: '#ffffff', dark: '#9aa3ad', stripe: '#9aa3ad', crest: '#ff6ad5' },
+  { name: 'Gold', body: '#e6b830', belly: '#fff0b0', dark: '#9a7410', stripe: '#9a7410', crest: '#c0392b' },
+  { name: 'Ocean', body: '#2e6ab0', belly: '#bcd8f7', dark: '#183a6a', stripe: '#183a6a', crest: '#ffe066' },
+];
+const SKIN_NAMES = ['Fern green', 'Lagoon teal', 'Sunset orange', 'Grape purple', 'Rose red', 'Olive', 'Midnight', 'Snow', 'Gold', 'Ocean'];
+const DYES = { Red: '#c0392b', Pink: '#ff6ad5', Yellow: '#ffe066', Mint: '#7fe8a0', Sky: '#7fd8ff', Black: '#1a1a1a' };
+function lookOpts() {
+  const base = SKINS[S.skin ?? S.pal] || SKINS[0], w = S.wear || {};
+  return [base, { crest: w.crest || base.crest, hat: w.hat || null, bow: w.bow || null, tie: w.tie || null }];
+}
+function rebuildPlayer() {
+  if (player) scene.remove(player.root);
+  const [base, extra] = lookOpts(); player = makeCompy(base, extra); scene.add(player.root);
+}
+function colorPick(title, text, cost, apply) {
+  queueEvent({ kind: '', tag: 'Tooth & Claw Salon', title, text: `${text} (${money$(cost)})`, sound: 'door',
+    buttons: Object.entries(DYES).map(([n, c]) => ({ label: n, alt: true, disabled: S.money < cost, fn: () => { S.money -= cost; apply(c); S.happy += 6; goal('makeover'); rebuildPlayer(); log('Looking sharp!', 'good'); sfx.goal(); } })).concat([{ label: 'Never mind' }]) });
+}
+// ---- furniture ----
+const FURN = {
+  bed:     { name: 'Cloud-nine bed', price: 400, blurb: 'Sleep 10% better every night.' },
+  tv:      { name: 'Giant TV', price: 300, blurb: 'Watching TV makes you much happier.' },
+  fish:    { name: 'Aquarium', price: 250, blurb: 'Tiny fish cheer you up every morning.' },
+  books:   { name: 'Bookshelf', price: 150, blurb: 'Read at home and earn study credit.' },
+  tread:   { name: 'Treadmill', price: 350, blurb: 'Work out at home for free.' },
+  cabinet: { name: 'Arcade cabinet', price: 500, blurb: 'Play Meteor Dodge at home. Win real tickets.' },
+  tub:     { name: 'Hot tub', price: 900, blurb: 'Soak away your energy loss. Partners love it.' },
+};
+const has = k => !!(S.furn && S.furn[k]);
+function furnishRoom(R) {
+  if (!R || !R.home) return;
+  if (R.furnG) { R.g.remove(R.furnG); R.stations = R.stations.filter(s => !s.furn); }
+  const fg = new THREE.Group(); R.g.add(fg); R.furnG = fg;
+  const w = R.w, d = R.d, b0 = (x, z, ww, dd, h, c, y = 0) => add(fg, GEO.b, c, x, y + h / 2, z, ww, h, dd);
+  const st = (x, z, label, acts) => { const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(x, 1.2, z); r.scale.setScalar(16); fg.add(r); R.stations.push({ x: R.ox + x, y: R.oy + z, label, acts, ring: r, furn: true }); };
+  if (has('bed')) { b0(70, 8, 76, 6, 46, '#f6f0e2'); add(fg, GEO.s, '!#fff3c4', 70, 50, 8, 6, 6, 3); }
+  if (has('tv')) { const m = b0(18, d - 100, 3, 96, 52, '!#9fdcff', 14); m.castShadow = false; }
+  if (has('fish')) { b0(w / 2 + 70, 18, 60, 20, 16, '#3a2a20'); const t = b0(w / 2 + 70, 18, 56, 18, 30, '#7fd8ff', 16); t.material = new THREE.MeshLambertMaterial({ color: '#7fd8ff', transparent: true, opacity: 0.6 }); for (let i = 0; i < 3; i++) add(fg, GEO.s, ['!#ff8a3a', '!#ffe066', '!#ff6ad5'][i], w / 2 + 52 + i * 16, 30 + i * 4, 18, 3, 2, 1.5); }
+  if (has('books')) { b0(w / 2 - 80, 14, 60, 16, 70, '#6a4a2e'); for (let s = 0; s < 3; s++) for (let i = 0; i < 6; i++) b0(w / 2 - 105 + i * 10, 23, 7, 2, 14, ['#c0392b', '#2e86c1', '#27ae60', '#f1c40f'][(i + s) % 4], 8 + s * 20); st(w / 2 - 80, 48, 'Bookshelf', ['Read at home']); }
+  if (has('tread')) { b0(w - 36, d / 2 - 30, 26, 60, 6, '#2a2a2a'); b0(w - 36, d / 2 - 58, 26, 4, 40, '#4a4a50'); st(w - 70, d / 2 - 30, 'Treadmill', ['Run on the treadmill']); }
+  if (has('cabinet')) { b0(w - 30, d / 2 + 50, 30, 26, 56, '#2a1a4a'); const s2 = b0(w - 44, d / 2 + 50, 2, 18, 16, '!#4ae8ff', 32); s2.castShadow = false; st(w - 66, d / 2 + 50, 'Arcade cabinet', ['Play Meteor Dodge at home']); }
+  if (has('tub')) { add(fg, GEO.y, '#d6dde4', w / 2 + 80, 8, d - 60, 34, 16, 34); add(fg, GEO.y, '!#7fe8ff', w / 2 + 80, 16.5, d - 60, 30, 1, 30).castShadow = false; st(w / 2 + 80, d - 104, 'Hot tub', ['Soak in the hot tub']); }
+}
+function furnActs() {
+  const acts = [];
+  if (has('books')) acts.push({ label: 'Read at home', detail: '+8 happiness and a little study credit, 1 hour', mins: 60, fn: () => { S.happy += 8; if (S.edu < 2) addCredit(0.25); } });
+  if (has('tread')) acts.push({ label: 'Run on the treadmill', detail: `+3 fitness, -12 energy, 45 minutes. Fitness ${Math.round(S.fit || 0)}/100.`, why: S.energy < 20 ? 'Too tired.' : '', mins: 45, fn: () => { S.fit = clamp((S.fit || 0) + 3, 0, 100); S.energy -= 12; if (S.fit >= 60) goal('buff'); } });
+  if (has('cabinet')) acts.push({ label: 'Play Meteor Dodge at home', detail: 'Free play. Tickets count!', fn: startDodge });
+  if (has('tub')) acts.push({ label: 'Soak in the hot tub', detail: `+15 happiness, +15 energy, 1 hour${S.partner && S.partner.married ? `. ${S.partner.name} joins you.` : ''}`, mins: 60, fn: () => { S.happy += 15; S.energy = Math.min(100, S.energy + 15); if (S.partner && S.partner.married) partnerRel(5); } });
+  return acts;
+}
+// ---- phone ----
+const TEXT_SPOTS = ['by the fountain', 'at the lake', 'on the beach', 'outside Fern Cafe', 'at Bark Park'];
+function text(from, body) { S.texts = S.texts || []; S.texts.unshift({ from, body, day: S.day, min: S.min, read: false }); S.texts.length = Math.min(S.texts.length, 30); sfx.ding && sfx.ding(); }
+function morningTexts() {
+  if (!S) return;
+  if (S.invite && S.invite.day < S.day) S.invite = null;
+  const friends = rosterMs.filter(r => relOf(r.p.name) >= 25 && rosterVisible(r));
+  if (friends.length && Math.random() < 0.45) {
+    const r = pick(friends), h = Math.round(rand(11, 18));
+    S.invite = { name: r.p.name, day: S.day, h };
+    text(r.p.name, pick([`Hey! I will be ${r.p.place} around ${clock(h * 60)}. Come say hi?`, `Want to hang out today? Find me ${r.p.place} at ${clock(h * 60)}.`, `I have a story you will not believe. ${r.p.place[0].toUpperCase() + r.p.place.slice(1)}, ${clock(h * 60)}?`]));
+  }
+  if (S.partner && !S.partner.married && Math.random() < 0.5) text(S.partner.name, pick(['Thinking about you 💚', 'Date night soon?', 'I saw a rock that looked like you. It was a very handsome rock.']));
+  if (S.partner && S.partner.married && Math.random() < 0.4) text(S.partner.name, pick(['Can you pick up groceries?', 'Love you! Do not forget to eat lunch.', S.kids.length ? 'The kids drew you a picture!' : 'Dinner at home tonight?']));
+  if (S.job && S.job.perf < 30) text('Your boss', 'We need to talk about your performance. Do not be late again.');
+  if (weekday() === 4) text('Town of Compyville', 'The Fern Festival is tomorrow in the town square! Games, food and fireworks.');
+  if (S.weather === 'storm') text('Weather alert', 'Thunderstorms today. Stay indoors when you can.');
+  if (Math.random() < 0.15) text('Mom', pick(['Are you eating enough beetles?', 'Call me sometime! Love, Mom', 'Your cousin got a job at Fossil Corp. Just saying.']));
+}
+function inviteCheck() {
+  const iv = S.invite; if (!iv || iv.done) return;
+  if (iv.day === S.day && hour() > iv.h + 2) { iv.done = true; addRel(iv.name, -4); text(iv.name, 'I waited for you... maybe next time.'); }
+}
+function inviteMet(name) {
+  const iv = S.invite;
+  if (!iv || iv.done || iv.name !== name || iv.day !== S.day || hour() < iv.h - 0.5 || hour() > iv.h + 2) return false;
+  iv.done = true; addRel(name, 12); S.happy += 10; log(`You showed up for ${name}! They are really happy to see you. (+12 closeness)`, 'good'); sfx.goal(); return true;
+}
+let phoneTab = 'texts', taxiMode = false;
+function openPhone() {
+  if (state !== 'play') return;
+  state = 'phone'; keys.clear(); $('phoneScreen').hidden = false; renderPhone();
+}
+function closePhone() { $('phoneScreen').hidden = true; if (state === 'phone') state = 'play'; }
+function renderPhone() {
+  const T = S.texts || [];
+  document.querySelectorAll('#phoneTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === phoneTab));
+  const box = $('phoneBody');
+  if (phoneTab === 'texts') {
+    box.innerHTML = T.length ? T.map(t => `<div class="txt${t.read ? '' : ' new'}"><b>${t.from}</b><span>${t.body}</span><i>Day ${t.day} · ${clock(t.min)}</i></div>`).join('') : '<p class="muted">No messages yet. Make some friends!</p>';
+    T.forEach(t => t.read = true);
+  } else {
+    const people = rosterMs.filter(r => relOf(r.p.name) > 0 && rosterVisible(r)).map(r => r.p.name);
+    if (S.partner && !people.includes(S.partner.name)) people.unshift(S.partner.name);
+    const called = S.called || {};
+    const rows = people.map(n => `<button type="button" data-call="${n}" ${called[n] === S.day ? 'disabled' : ''}>📞 Call ${n}${called[n] === S.day ? ' (called today)' : ''}</button>`);
+    rows.push(`<button type="button" data-svc="taxi" ${inside ? 'disabled' : ''}>🚕 Call a taxi${inside ? ' (go outside first)' : ' ($10+)'}</button>`);
+    rows.push(`<button type="button" data-svc="pizza" ${S.money < 15 ? 'disabled' : ''}>🍕 Order pizza delivery ($15)</button>`);
+    if (cars.some(c => c.owned)) rows.push(`<button type="button" data-svc="tow" ${S.money < 40 || inside ? 'disabled' : ''}>🛻 Bring my car to me ($40)</button>`);
+    box.innerHTML = rows.join('');
+  }
+  updatePhoneBadge();
+}
+function updatePhoneBadge() { const n = (S && S.texts || []).filter(t => !t.read).length; const b = $('phoneBtn'); const t = n ? `Phone (${n})` : 'Phone'; if (b.textContent !== t) b.textContent = t; b.classList.toggle('alert', n > 0); }
+function phoneClick(e) {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.tab) { phoneTab = b.dataset.tab; renderPhone(); return; }
+  if (b.dataset.call) {
+    const n = b.dataset.call; S.called = S.called || {}; S.called[n] = S.day;
+    if (S.partner && S.partner.name === n && !S.partner.roster) S.partner.rel = Math.min(100, S.partner.rel + 4); else addRel(n, 4);
+    S.happy += 3; advance(15); log(pick([`You and ${n} talked for ages.`, `${n} was so happy you called.`, `${n} told you a terrible joke. You laughed anyway.`]), 'good'); renderPhone(); return;
+  }
+  const svc = b.dataset.svc;
+  if (svc === 'pizza') { S.money -= 15; S.hunger = Math.min(100, S.hunger + 40); S.happy += 4; advance(30); log('A pterodactyl dropped off a hot Ptero Pizza. Delicious.', 'good'); renderPhone(); }
+  if (svc === 'tow') { const c = cars.find(c => c.owned); S.money -= 40; c.x = P.x + 40; c.y = P.y; c.v = 0; advance(20); log(`A tow truck dropped your ${carName(c)} right next to you.`, 'good'); closePhone(); }
+  if (svc === 'taxi') { closePhone(); taxiMode = true; openMap(); $('mapScreen').classList.add('taxi'); log('Taxi! Tap where you want to go on the map.', ''); }
+}
+function taxiRide(p) {
+  const d = p.door || p, dist = Math.hypot(d.x - P.x, d.y - P.y), fare = Math.max(10, Math.round(dist * 0.012));
+  taxiMode = false; $('mapScreen').classList.remove('taxi');
+  if (S.money < fare) { log(`The fare to ${p.name} is ${money$(fare)}. You cannot afford it.`, 'warn'); closeMap(); return; }
+  if (chase) { log('No taxi will pick up a wanted dino!', 'bad'); closeMap(); return; }
+  S.money -= fare; closeMap(); advance(Math.round(10 + dist / 60)); teleport({ x: d.x, y: d.y + 30 });
+  log(`The taxi dropped you at ${p.name}. Fare: ${money$(fare)}.`, 'good');
+}
+Object.assign(MENUS, {
+  salon: () => {
+    if (!open(9, 20)) return { sub: closedMsg(9, 20), acts: [] };
+    const w = S.wear || {};
+    return { sub: 'Tooth & Claw Salon. Be the best-looking compy in town.', acts: [
+      { label: 'Recolor your scales', detail: 'Pick a brand new scale color.', tag: '$40', why: S.money < 40 ? 'Costs $40' : '', fn: () => { closeMenu(); queueEvent({ kind: '', tag: 'Tooth & Claw Salon', title: 'Pick a scale color', text: 'The stylist fans out a book of swatches. ($40)', sound: 'door',
+        buttons: SKIN_NAMES.map((n, i) => ({ label: n, alt: true, disabled: S.money < 40 || (S.skin ?? S.pal) === i, fn: () => { S.money -= 40; S.skin = i; S.happy += 8; goal('makeover'); rebuildPlayer(); log(`Your scales are now ${n.toLowerCase()}. Gorgeous.`, 'good'); sfx.goal(); } })).concat([{ label: 'Never mind' }]) }); } },
+      { label: 'Dye your crest', detail: 'A splash of color on top.', tag: '$15', why: S.money < 15 ? 'Costs $15' : '', fn: () => { closeMenu(); colorPick('Dye your crest', 'Pick a crest color', 15, c => { S.wear = { ...(S.wear || {}), crest: c }; }); } },
+      { label: w.hat ? 'Change your hat' : 'Buy a top hat', detail: 'Very distinguished.', tag: '$25', why: S.money < 25 ? 'Costs $25' : '', fn: () => { closeMenu(); colorPick('Pick a hat color', 'A fine top hat', 25, c => { S.wear = { ...(S.wear || {}), hat: c }; }); } },
+      { label: w.bow ? 'Change your bow' : 'Buy a bow', detail: 'Cute and classy.', tag: '$15', why: S.money < 15 ? 'Costs $15' : '', fn: () => { closeMenu(); colorPick('Pick a bow color', 'A big bow for your head', 15, c => { S.wear = { ...(S.wear || {}), bow: c }; }); } },
+      { label: w.tie ? 'Change your tie' : 'Buy a necktie', detail: 'Dress for the job you want.', tag: '$20', why: S.money < 20 ? 'Costs $20' : '', fn: () => { closeMenu(); colorPick('Pick a tie color', 'A smart necktie', 20, c => { S.wear = { ...(S.wear || {}), tie: c }; if (S.job) S.job.perf = Math.min(100, S.job.perf + 3); }); } },
+      { label: 'Take off your accessories', detail: 'Back to basics. Keeps your colors.', why: w.hat || w.bow || w.tie ? '' : 'You are not wearing any.', fn: () => { S.wear = { crest: w.crest }; rebuildPlayer(); } },
+      { label: 'Get a scale polish', detail: '+12 happiness, 45 minutes', cost: 20, mins: 45, fn: () => { S.happy += 12; log('Your scales are shining. You can see your reflection.', 'good'); } },
+    ] };
+  },
+  furniture: () => {
+    if (!open(9, 19)) return { sub: closedMsg(9, 19), acts: [] };
+    const acts = Object.entries(FURN).map(([k, f]) => ({ label: `${f.name}`, detail: f.blurb, tag: has(k) ? 'Owned' : money$(f.price), cost: has(k) ? 0 : f.price,
+      why: has(k) ? 'Already in your home.' : !S.home ? 'You need a home first.' : (k === 'tub' && S.home === 'burrow') ? 'It will not fit in a burrow.' : '',
+      fn: () => { S.furn = S.furn || {}; S.furn[k] = true; log(`The ${f.name.toLowerCase()} will be delivered to your ${HOMES[S.home].name.toLowerCase()} right away.`, 'good'); sfx.coin(); if (Object.keys(S.furn).length >= 4) goal('cozy'); const R = ROOMS['home_' + S.home]; if (R) furnishRoom(R); } }));
+    return { sub: S.home ? `Comfy Cave Furniture. Make your ${HOMES[S.home].name.toLowerCase()} a home.` : 'Comfy Cave Furniture. Come back when you have a home.', acts };
+  },
+});
+Object.assign(LAYOUTS, {
+  salon: { w: 380, d: 280, floor: ['checker', '#ffffff', '#f6d6e6'], wall: '#fff0f6', trim: '#c2185b', build(b) {
+    for (const x of [70, 160, 250]) { b.box(x, 18, 50, 6, 60, '!#e8f4ff', false, 20); b.box(x, 60, 30, 30, 14, '#c2185b'); b.box(x, 72, 30, 6, 30, '#c2185b', false, 14); }
+    b.npc(70, 60, 3, { bow: '#ff6ad5' }); b.npc(160, 92, 4, { bow: '#c2185b', face: -Math.PI / 2 }); b.npc(250, 60, 1, { hat: '#1a1a1a' });
+    b.station(160, 130, 'Styling chair', ['Recolor', 'Dye', 'Get a scale']);
+    b.box(320, 200, 70, 30, 26, '#c2185b'); b.npc(320, 176, 2, { tie: '#1a1a1a' });
+    b.station(320, 240, 'Accessory counter', ['Buy a', 'Change your', 'Take off']);
+    b.plant(30, 250); b.sign('TOOTH & CLAW', 190, 100, 3, 150, '#c2185b', '#ffffff'); b.lamp(160, 150);
+  } },
+  furniture: { w: 440, d: 320, floor: ['wood', '#c9a26a', '#a8834e'], wall: '#efe2c6', build(b) {
+    b.box(80, 60, 70, 90, 14, '#6a4a2e'); b.box(80, 60, 64, 82, 8, '#f6f0e2', false, 14);
+    b.box(200, 50, 90, 30, 16, '#3f6b4a'); b.box(200, 38, 90, 8, 30, '#3f6b4a');
+    b.box(320, 40, 70, 16, 70, '#6a4a2e');
+    add(b.g, GEO.y, '#d6dde4', 340, 8, 200, 32, 16, 32); add(b.g, GEO.y, '!#7fe8ff', 340, 16.5, 200, 28, 1, 28);
+    b.box(90, 200, 60, 20, 30, '#3a2a20'); b.box(90, 200, 56, 18, 26, '!#7fd8ff', false, 30);
+    b.box(220, 250, 110, 30, 26, '#5a3f28'); b.npc(220, 226, 5, { tie: '#3f6b4a' });
+    b.station(220, 290, 'Sales desk', ['Cloud', 'Giant', 'Aquarium', 'Bookshelf', 'Treadmill', 'Arcade', 'Hot tub']);
+    b.npc(150, 130, 0); b.npc(300, 120, 4); b.plant(30, 290); b.plant(410, 290);
+    b.sign('COMFY CAVE', 220, 100, 3, 160, '#5a3f28', '#ffffff'); b.lamp(120, 150); b.lamp(320, 150);
+  } },
+});
+
+const _homeMenu = MENUS.home;
+MENUS.home = p => { const m = _homeMenu(p); if (S.home === p.home) m.acts.push(...furnActs()); return m; };
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') $('newBtn').click(); return; }
   const k = e.key.toLowerCase();
-  if (k === 'escape') { if (state === 'map') { closeMap(); return; } if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
+  if (k === 'escape') { if (state === 'map') { closeMap(); return; } if (state === 'phone') { closePhone(); return; } if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
   if (k === 'p') { togglePause(); return; }
   if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
   if (k === 'g' && state === 'play') { showGoals(); return; }
+  if (k === 't' && (state === 'play' || state === 'phone')) { if (state === 'phone') closePhone(); else openPhone(); return; }
   if (k === 'm' && (state === 'play' || state === 'map')) { if (state === 'map') closeMap(); else openMap(); return; }
   if (k === 'h' && state === 'play' && driving) { honk(); return; }
   if (k === 'f' && state === 'play') { useWeapon(); return; }
@@ -3552,7 +3769,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate(); weatherUpdate(dt); inviteCheck();
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -3743,7 +3960,7 @@ function hud() {
   if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
-  $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
+  $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`; updatePhoneBadge();
   const pr = $('prompt'), show = state === 'play' && (nearPlace || driving) && !derby;
   pr.hidden = !show;
   if (show) {
@@ -3789,7 +4006,7 @@ function beginLife(fromSave) {
   if (fromSave) S = fromSave; else { newLife(($('nameIn').value || '').trim().slice(0, 16) || 'Chomp'); }
   feedItems.length = 0; renderFeed();
   if (player) scene.remove(player.root);
-  const pal = PALETTES[S.pal]; player = makeCompy(pal, { crest: pal.crest }); scene.add(player.root);
+  rebuildPlayer();
   for (const c of cars) if (!c.owned) { c.stolen = false; }
   refreshHome(); refreshFamily(); spawnOwnedCar(); minigame = null; clearGig(); S.ward = null; clearWard(); for (const sh of shots) scene.remove(sh.m); shots = []; refreshTower(); refreshPet();
   teleport(S.pos && fromSave ? (S.home ? PLACES['home_' + S.home].door : PLACES.bench.door) : PLACES.bench.door);
@@ -3803,13 +4020,15 @@ $('menuClose').addEventListener('click', closeMenu);
 $('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(); });
 $('mapBtn').addEventListener('click', openMap); $('mini').addEventListener('click', openMap); $('mapClose').addEventListener('click', closeMap);
 $('bigMap').addEventListener('click', mapClick);
+$('phoneBtn').addEventListener('click', openPhone); $('phoneClose').addEventListener('click', closePhone); $('phoneScreen').addEventListener('click', phoneClick);
 $('mapLegend').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const mp = mapPlaces().find(m => m.id === b.dataset.id); if (mp) setWaypoint(mp); });
 addEventListener('resize', () => { if (state === 'map') drawBigMap(); });
 $('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
 $('quitBtn').addEventListener('click', () => { save(); if (derby) leaveDerby(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
-$('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? 'Sound off' : 'Sound on'; });
+$('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = $('muteBtn2').textContent = muted ? 'Sound off' : 'Sound on'; });
+$('muteBtn2').addEventListener('click', () => $('muteBtn').click());
 
 buildTown(); spawnNPCs(); placeCars(); spawnRoster();
 INGREDIENTS.forEach((x, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = `${i + 1} \u00b7 ${x}`; bt.addEventListener('click', () => cookPick(x)); $('cookIngs').appendChild(bt); });
