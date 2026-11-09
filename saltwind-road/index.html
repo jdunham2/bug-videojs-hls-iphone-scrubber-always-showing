@@ -1155,6 +1155,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  horseman:{name:'Headless Horseman',hp:70,dmg:4,speed:4.0,aggro:22,undead:true,ranged:{range:6,cd:1.6,speed:8,col:'#ff8a2a'},coins:[200,350],drops:[['pumpkin',3,5,1]]},
   goblin:{name:'Treasure Goblin',hp:14,dmg:0,speed:4.3,aggro:0,drops:[['gem',1,3,1],['pirate_gold',1,2,.5]],coins:[150,300],flee:true},
   den:{name:'Monster Den',hp:30,dmg:0,speed:0,aggro:0,drops:[],den:true},
   slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
@@ -1594,6 +1595,7 @@ const PETS = {
 };
 const MOUNTS = {
   horse:{name:'Horse', speed:1.75, desc:'Fast on any open ground.'},
+  nightmare:{name:'Nightmare', speed:1.95, desc:'The Headless Horseman\'s steed. Faster than any horse, with a mane of fire.'},
   camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
   elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
   griffon:{name:'Griffon', speed:2.0, fly:true, desc:'Flies over water, mountains and lava.'},
@@ -3174,6 +3176,7 @@ function killEnemy(e) {
   }
   if (e.ghostCap) ghostLoot(e);
   if (e.outlawBoss) outlawCaught();
+  if (e.type === 'horseman') { S.horsemen = (S.horsemen || 0) + 1; if (!S.mounts.includes('nightmare')) setTimeout(() => addMount('nightmare'), 1200); else { addItem('pumpkin_pie', 2); } }
   if (e.den != null) { denBroken(e); return; }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
@@ -3573,6 +3576,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The Headless Horseman', 'On autumn nights, beware the roads outside town. The Headless Horseman rides once a night, hurling flaming pumpkins. Defeat him to claim his steed, the Nightmare.'],
   ['Gem sockets', 'Turn Cut Gems into Rubies, Sapphires, Emeralds, Topaz or Amethysts at a workbench. Opaline in Prismvale sets one gem into each piece of gear for lasting bonuses while you wear it.'],
   ['Wanted outlaws', 'Every week a WANTED poster goes up on the notice boards. Take the bounty and the outlaw\u2019s hideout is marked on your map. Defeat them and their gang for a big reward.'],
   ['Cartography', 'Wendell the cartographer in Lantern Bay buys your map survey each time you chart more of the land (5%, 10%, 15% and so on). Big milestones earn a Spyglass and the Explorer\u2019s Atlas.'],
@@ -3687,6 +3691,15 @@ function goblinTick(e, dt) {
   let moved = false; if (enemyWalk(nx, e.y)) { e.x = nx; moved = true; } if (enemyWalk(e.x, ny)) { e.y = ny; moved = true; }
   if (!moved) { e.jx = (Math.random() - .5)*3; e.jy = (Math.random() - .5)*3; }
   e.face = ax < 0 ? -1 : 1;
+}
+function horsemanCheck() {
+  if (seasonIdx() !== 2 || inDungeon() || inArena() || townAt(S.x, S.y, 14)) return;
+  const night = S.time > .76 || S.time < .24; if (!night) return;
+  const nid = S.time > .5 ? S.day : S.day - 1; if (S.horsemanNight === nid || enemies.some(e => e.type === 'horseman' && !e.dead)) return;
+  if (Math.random() > .06) return;
+  for (let k = 0; k < 16; k++) { const a = Math.random()*6.283, x = Math.floor(S.x + Math.cos(a)*11), y = Math.floor(S.y + Math.sin(a)*11); if (!inB(x, y) || !enemyWalk(x + .5, y + .5) || townAt(x, y, 12)) continue;
+    S.horsemanNight = nid; const lv = 1 + (S.level || 1)*.06, e = makeEnemy('horseman', x + .5, y + .5, {alert: true, dungeon: true}); e.hp = e.max = Math.round(70*lv); e.dmgMul = lv; e.elite = {name: 'Headless Horseman', col: '#ff8a2a'}; e.esize = 1.25; e.labelName = '🎃 Headless Horseman'; enemies.push(e);
+    toast('<b>Hoofbeats in the dark...</b><br>The Headless Horseman rides tonight!', 5000); SFX.roar(); shake = .3; return; }
 }
 function trySpawn(night) {
   if (S.y >= WORLD_H) return;
@@ -3816,7 +3829,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -4239,6 +4252,15 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
     case 'target': { const pop = Math.min(1, (extra && extra.age || 1)); g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 8, 2, 8); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 4, y - 1, 8, 2); for (const [r, c] of [[6, '#e8e0d0'], [4.5, '#c83a2a'], [3, '#e8e0d0'], [1.5, '#c83a2a']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y - 12, r, 0, 7); g.fill(); } break; }
+    case 'horseman': {
+      drawMount(g, 'nightmare', x, y, f, phase, true);
+      g.fillStyle = '#2a2a3a'; g.fillRect(x - 3, y - 19, 6, 8); g.fillStyle = '#4a1a2a'; g.fillRect(x - 4 - f, y - 20, 8, 2);
+      g.fillStyle = '#1a1a22'; g.fillRect(x - 1, y - 21, 2, 2);
+      g.fillStyle = '#e07a20'; g.beginPath(); g.arc(x + f*6, y - 18, 3.5, 0, 7); g.fill(); g.fillStyle = '#ffd040'; g.fillRect(x + f*6 - 2, y - 19, 1, 1); g.fillRect(x + f*6 + 1, y - 19, 1, 1); g.fillRect(x + f*6 - 1, y - 17, 3, 1);
+      g.fillStyle = '#3a6a2a'; g.fillRect(x + f*6, y - 22, 1, 2);
+      g.fillStyle = '#4a1a2a'; g.fillRect(x - f*4 - 2, y - 18 + Math.sin(phase)*1, 3, 6);
+      break;
+    }
     case 'goblin': {
       shadow(6);
       g.fillStyle = '#3a6a2a'; g.fillRect(x - 3, y - 4, 2, 4 + (step > 0 ? 0 : -1)); g.fillRect(x + 1, y - 4, 2, 4 + (step < 0 ? 0 : -1));
@@ -6685,13 +6707,14 @@ function drawMount(g, id, x, y, f, phase, moving) {
     g.fillStyle = id === 'tiger' ? '#8ad040' : '#1a1a1a'; g.fillRect(x + f*8, y - 14, 1, 1);
     return;
   }
-  const body = id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
+  const body = id === 'nightmare' ? '#1c1a24' : id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'nightmare' ? '#0a0a10' : id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
   g.fillStyle = dark; g.fillRect(x-6, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x-3, y-6, 2, 6 + (step < 0 ? 0 : -1)); g.fillRect(x+2, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x+5, y-6, 2, 6 + (step < 0 ? 0 : -1));
   g.fillStyle = body; g.fillRect(x-7, y-11, 15, 6);
   if (id === 'camel') g.fillRect(x-3, y-14, 6, 3);
   g.fillRect(x + f*7 - 1, y-16, 3, 7); g.fillRect(x + f*8 - 2, y-17, 5, 3);
   g.fillStyle = dark; g.fillRect(x - f*8 - 1, y-11, 2, 5);
   if (id === 'horse') g.fillRect(x + f*6 - 1, y-16, 2, 6);
+  if (id === 'nightmare') { for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#ff8a2a' : '#ffd040'; g.fillRect(x + f*(6 - i*2) - 1, y - 17 - ((Math.floor(frameT*12) + i) % 3), 2, 3); } g.fillStyle = '#ff5a1a'; g.fillRect(x + f*9, y-16, 1, 1); g.fillStyle = '#ff8a2a'; g.fillRect(x - f*9 - 1, y - 12 - (Math.floor(frameT*10) % 2), 2, 4); }
   if (id === 'elk') { g.fillStyle = '#d8c8a0'; g.fillRect(x + f*8 - 3, y-21, 1, 4); g.fillRect(x + f*8 + 2, y-21, 1, 4); g.fillRect(x + f*8 - 4, y-21, 3, 1); g.fillRect(x + f*8 + 1, y-21, 3, 1); }
   g.fillStyle = '#1a1a1a'; g.fillRect(x + f*9, y-16, 1, 1);
 }
@@ -7843,6 +7866,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['horseman','Sleepy Hollow','Defeat the Headless Horseman', () => (S.horsemen || 0) >= 1],
   ['jeweled','Bejeweled','Socket gems into 4 pieces of gear', () => Object.keys(S.sockets || {}).length >= 4],
   ['sheriff','Sheriff','Bring 3 wanted outlaws to justice', () => (S.outlawsCaught || 0) >= 3],
   ['surveyor','Surveyor','Chart 30% of the land', () => !!(S.surveys || {})[30]],
