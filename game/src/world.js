@@ -86,6 +86,18 @@ function rockGeo(rand, big) {
   return mergeParts(parts);
 }
 
+function oreGeo(rand) {
+  const parts = [];
+  const r = 1.0 + rand() * 0.6;
+  parts.push({ geo: lumpify(new THREE.IcosahedronGeometry(r, 1), 0.45, rand), color: 0x5e5852, jitter: 0.15, matrix: mtx(0, r * 0.35, 0, rand(), rand(), rand(), 1, 0.75, 1) });
+  for (let k = 0; k < 9; k++) {
+    const a = rand() * Math.PI * 2, e = rand() * 1.1;
+    parts.push({ geo: new THREE.OctahedronGeometry(0.16 + rand() * 0.14), color: k % 3 ? 0xc0773a : 0xe0c88a,
+      matrix: mtx(Math.cos(a) * Math.cos(e) * r * 0.9, r * 0.35 + Math.sin(e) * r * 0.65, Math.sin(a) * Math.cos(e) * r * 0.9, rand(), rand(), 0) });
+  }
+  return mergeParts(parts);
+}
+
 function bushGeo(rand, berryColor) {
   const parts = [];
   for (let k = 0; k < 5; k++) {
@@ -129,6 +141,7 @@ const KINDS = {
   broadleaf: { kind: 'tree', hp: 80, yields: [['wood', 4]], radius: 0.7 },
   pine:      { kind: 'tree', hp: 80, yields: [['wood', 4]], radius: 0.6 },
   rock:      { kind: 'rock', hp: 70, yields: [['stone', 3], ['flint', 1]], radius: 1.4 },
+  metal:     { kind: 'rock', hp: 130, yields: [['stone', 2], ['ore', 3]], radius: 1.5 },
   boulder:   { kind: 'rock', hp: 160, yields: [['stone', 4], ['flint', 2]], radius: 3.2 },
   bush:      { kind: 'bush', hp: 12, yields: [['fiber', 3], ['berries', 2]], radius: 0 },
   dozebush:  { kind: 'bush', hp: 12, yields: [['fiber', 2], ['sleepberry', 3]], radius: 0 },
@@ -157,6 +170,7 @@ export class World {
       { type: 'pine',      geos: variants(() => pineGeo(rand), 3),      mat: foliageMat, count: high ? 900 : 600, test: (x, z, h, s) => h > 22 && h < 70 && s < 0.35 },
       { type: 'rock',      geos: variants(() => rockGeo(rand, false), 4), mat: rockMat, count: 700, test: (x, z, h, s) => h > 1 && h < 80 },
       { type: 'boulder',   geos: variants(() => rockGeo(rand, true), 3),  mat: rockMat, count: 220, test: (x, z, h, s) => h > 3 && s > 0.05 },
+      { type: 'metal',     geos: variants(() => oreGeo(rand), 3),      mat: rockMat, count: 260, test: (x, z, h, s) => h > 26 && h < 90 },
       { type: 'bush',      geos: variants(() => bushGeo(rand, 0x7a1f3d), 2), mat: bushMat, count: 700, test: (x, z, h, s) => h > 2.5 && h < 35 && s < 0.25 },
       { type: 'dozebush',  geos: variants(() => bushGeo(rand, 0x6a3aa8), 2), mat: bushMat, count: 260, test: (x, z, h, s) => h > 4 && h < 40 && s < 0.25 && noise(x * 0.02 + 9, z * 0.02) > 0.1 },
     ];

@@ -25,6 +25,13 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   fiber, wildberries and dozeberries. Tools have durability and break.
 - **Crafting (Tab):** hatchet, pick, club, spear, bow, tranq arrows, saddle, campfire and
   timber floor/wall/doorway.
+- **Metal age:** orange-veined metal ore in the northern mountains (use a pick). A Forge
+  smelts 2 ore + 1 wood into an ingot while lit, and unlocks the Metal Pick, Metal Hatchet,
+  Metal Sword and Metal Armor.
+- **Armor:** Hide Armor (blocks 25%) and Metal Armor (blocks 50%). Tap one twice in the
+  inventory to wear it; it wears down as you take hits.
+- **Base items:** Storage Box (24 slots), Sleeping Bag (sets your respawn point and lets you
+  sleep through the night), stone floors, walls and doorways.
 - **Building:** placement ghost with grid snapping, walls that snap to floor edges (rotate
   with R), and wall collision. Campfires give light and cook raw meat.
 - **Creatures:** ten species with herd/pack behaviour and a predator-prey food chain:

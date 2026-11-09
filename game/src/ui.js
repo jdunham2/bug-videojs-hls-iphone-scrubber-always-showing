@@ -31,13 +31,22 @@ export class UI {
       d.className = 'slot'; d.dataset.i = i;
       d.addEventListener('click', (e) => {
         e.preventDefault();
+        if (game.openStorage) { game.storeMove(true, i); return; }
         if (this.drag === null) { if (game.inv.slots[i]) { this.drag = i; d.classList.add('drag'); } return; }
         if (this.drag !== i) game.inv.swap(this.drag, i);
+        else game.useItem(i); // tapping a selected slot again uses it (eat / wear)
         this.clearDrag();
       });
-      d.addEventListener('dblclick', () => game.useItem(i));
       this.invGrid.appendChild(d);
     }
+    this.storeGrid = $('store-grid');
+    for (let i = 0; i < 24; i++) {
+      const d = document.createElement('div');
+      d.className = 'slot';
+      d.addEventListener('click', (e) => { e.preventDefault(); game.storeMove(false, i); });
+      this.storeGrid.appendChild(d);
+    }
+    $('armor-slot').addEventListener('click', () => game.unwearArmor());
 
     // compass strip
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -56,7 +65,7 @@ export class UI {
     if (!s) return '';
     const def = ITEMS[s.id];
     const q = def.tool ? '' : `<b>${s.qty}</b>`;
-    const dur = def.tool && s.dur !== undefined ? `<i style="width:${Math.max(0, (s.dur / def.durability) * 100)}%"></i>` : '';
+    const dur = (def.tool || def.armor) && s.dur !== undefined ? `<i style="width:${Math.max(0, (s.dur / def.durability) * 100)}%"></i>` : '';
     return `<span class="ic">${def.icon}</span>${q}${dur}<em>${def.name}</em>`;
   }
 
@@ -68,7 +77,14 @@ export class UI {
     });
     if (this.open) {
       [...this.invGrid.children].forEach((d, i) => { d.innerHTML = this.slotHTML(g.inv.slots[i]) + (i < 8 ? `<sup>${i + 1}</sup>` : ''); d.classList.toggle('hot', i < 8); });
-      this.renderCraft();
+      const box = g.openStorage;
+      $('storage-panel').hidden = !box;
+      $('craft-panel').hidden = !!box;
+      if (box) [...this.storeGrid.children].forEach((d, i) => { d.innerHTML = this.slotHTML(box.items[i]); });
+      const a = g.player.armor;
+      $('armor-slot').innerHTML = a ? this.slotHTML({ id: a.id, qty: 1, dur: a.dur }) : '<span class="empty">no armor</span>';
+      $('inv-hint').textContent = box ? 'tap an item to move it between your inventory and the box' : 'tap two slots to swap · tap a selected item again to eat or wear it';
+      if (!box) this.renderCraft();
     }
   }
 
@@ -77,10 +93,11 @@ export class UI {
     this.craftList.innerHTML = '';
     for (const r of RECIPES) {
       const def = ITEMS[r.id];
-      const can = g.inv.has(r.cost);
+      const needStation = r.station && !g.stationNear(r.station);
+      const can = g.inv.has(r.cost) && !needStation;
       const el = document.createElement('div');
       el.className = 'recipe' + (can ? ' can' : '');
-      el.innerHTML = `<div class="ric">${def.icon}</div><div class="rbody"><div class="rname">${def.name}${r.yield ? ` ×${r.yield}` : ''}</div><div class="rdesc">${r.desc}</div><div class="rcost">${Object.entries(r.cost).map(([id, q]) => `<span class="${g.inv.count(id) >= q ? 'ok' : 'no'}">${ITEMS[id].icon} ${g.inv.count(id)}/${q}</span>`).join('')}</div></div><button ${can ? '' : 'disabled'}>Craft</button>`;
+      el.innerHTML = `<div class="ric">${def.icon}</div><div class="rbody"><div class="rname">${def.name}${r.yield ? ` ×${r.yield}` : ''}</div><div class="rdesc">${r.desc}${r.station ? ` <b class="${needStation ? 'no' : 'ok'}">${needStation ? 'Needs a Forge nearby' : 'Forge nearby'}</b>` : ''}</div><div class="rcost">${Object.entries(r.cost).map(([id, q]) => `<span class="${g.inv.count(id) >= q ? 'ok' : 'no'}">${ITEMS[id].icon} ${g.inv.count(id)}/${q}</span>`).join('')}</div></div><button ${can ? '' : 'disabled'}>Craft</button>`;
       el.querySelector('button').addEventListener('click', () => g.craft(r));
       this.craftList.appendChild(el);
     }

@@ -11,6 +11,9 @@ function toolGeo(id) {
   switch (id) {
     case 'hatchet': handle(); P.push({ geo: new THREE.DodecahedronGeometry(0.09), color: 0x888078, matrix: mtx(0.06, 0.52, 0, 0, 0, 0, 1.4, 0.9, 0.5) }); P.push({ geo: new THREE.TorusGeometry(0.035, 0.012, 4, 8), color: 0xc8b48a, matrix: mtx(0, 0.5, 0, Math.PI / 2, 0, 0) }); break;
     case 'pick': handle(); P.push({ geo: new THREE.ConeGeometry(0.04, 0.32, 5), color: 0x8a8278, matrix: mtx(0.15, 0.55, 0, 0, 0, -Math.PI / 2) }); P.push({ geo: new THREE.ConeGeometry(0.04, 0.22, 5), color: 0x8a8278, matrix: mtx(-0.1, 0.55, 0, 0, 0, Math.PI / 2) }); break;
+    case 'metalpick': handle(); P.push({ geo: new THREE.ConeGeometry(0.04, 0.36, 5), color: 0xb8bcc4, matrix: mtx(0.16, 0.56, 0, 0, 0, -Math.PI / 2) }); P.push({ geo: new THREE.ConeGeometry(0.04, 0.26, 5), color: 0xb8bcc4, matrix: mtx(-0.12, 0.56, 0, 0, 0, Math.PI / 2) }); break;
+    case 'metalhatchet': handle(); P.push({ geo: new THREE.BoxGeometry(0.2, 0.14, 0.03), color: 0xc0c4cc, matrix: mtx(0.08, 0.52, 0) }); break;
+    case 'sword': P.push({ geo: new THREE.CylinderGeometry(0.025, 0.025, 0.2, 6), color: 0x4a3420, matrix: mtx(0, 0, 0) }); P.push({ geo: new THREE.BoxGeometry(0.2, 0.03, 0.04), color: 0x8a7a50, matrix: mtx(0, 0.11, 0) }); P.push({ geo: new THREE.BoxGeometry(0.05, 0.75, 0.012), color: 0xd0d4dc, matrix: mtx(0, 0.5, 0) }); break;
     case 'club': P.push({ geo: new THREE.CylinderGeometry(0.06, 0.03, 0.75, 7), color: 0x5a3e24, matrix: mtx(0, 0.28, 0) }); break;
     case 'spear': handle(1.5); P.push({ geo: new THREE.ConeGeometry(0.04, 0.25, 4), color: 0xe9e2cf, matrix: mtx(0, 1.5, 0) }); break;
     case 'bow': {

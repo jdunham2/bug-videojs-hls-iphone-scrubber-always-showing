@@ -117,6 +117,7 @@ export function serialize(g) {
     savedAt: Date.now(),
     player: {
       pos: v3(anchor), mounted: !!p.mount, yaw: r2(p.yaw), level: p.level, xp: r2(p.xp),
+      armor: p.armor ? { ...p.armor } : null,
       hp: r2(Math.max(1, p.hp)), maxHp: p.maxHp, stam: r2(p.stam), maxStam: p.maxStam, food: r2(p.food), water: r2(p.water),
     },
     world: { time: r2(g.env.time * 1000) / 1000, day: g.env.day },
@@ -124,7 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
-    buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit })),
+    buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
       species: c.species, level: c.level, name: c.name, pos: v3(c.pos), yaw: r2(c.yaw),
       hp: r2(c.hp), saddled: c.saddled, follow: c.follow,
@@ -139,6 +140,7 @@ export function applySave(g, d) {
     level: d.player.level, xp: d.player.xp, maxHp: d.player.maxHp, hp: d.player.hp,
     maxStam: d.player.maxStam, stam: d.player.stam, food: d.player.food, water: d.player.water, yaw: d.player.yaw, pitch: 0,
   });
+  p.armor = d.player.armor || null;
   p.pos.fromArray(d.player.pos);
   p.pos.y = d.player.mounted ? heightAt(p.pos.x, p.pos.z) : Math.max(p.pos.y, heightAt(p.pos.x, p.pos.z));
   p.vel.set(0, 0, 0);
@@ -151,8 +153,11 @@ export function applySave(g, d) {
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
 
   for (const b of d.buildings || []) {
+    if (!g.building.geos[b.type]) continue;
     const piece = g.building.place(b.type, new THREE.Vector3().fromArray(b.pos), b.rot);
     if (piece.lit !== undefined) piece.lit = b.lit;
+    if (b.items && piece.items) piece.items = b.items.slice(0, 24).map((s) => (s ? { ...s } : null));
+    if (b.bed) g.bed = piece;
   }
   for (const t of d.tames || []) {
     const pos = new THREE.Vector3().fromArray(t.pos);

@@ -4,7 +4,7 @@ import { Environment } from './environment.js';
 import { World } from './world.js';
 import { CreatureManager, SPECIES } from './creatures.js';
 import { Player } from './player.js';
-import { Building } from './building.js';
+import { Building, KIND } from './building.js';
 import { Inventory, ITEMS, RECIPES } from './items.js';
 import { UI } from './ui.js';
 import { SaveSystem, applySave } from './save.js';
@@ -48,7 +48,7 @@ class Game {
 
     this.inv = new Inventory(() => this.ui && this.ui.refresh());
     this.hotIndex = 0;
-    this.stats = { wood: 0, stone: 0, fiber: 0, crafted: 0, cooked: 0, placedFire: 0, floors: 0, walls: 0, tamed: 0, rode: 0, kills: 0 };
+    this.stats = { wood: 0, stone: 0, fiber: 0, ore: 0, ingot: 0, metalCrafted: 0, beds: 0, crafted: 0, cooked: 0, placedFire: 0, floors: 0, walls: 0, tamed: 0, rode: 0, kills: 0 };
 
     this.creatures = new CreatureManager(this.scene, this.world, {
       notify: (t, k) => this.ui.notify(t, k),
@@ -95,6 +95,12 @@ class Game {
       { title: 'Craft a Hunter Bow and Tranq Arrows (needs purple Dozeberries)', progress: () => `Bow ${this.inv.count('bow') ? '✔' : '✘'} · Arrows ${this.inv.count('arrow')}`, done: () => this.inv.count('bow') > 0 && this.inv.count('arrow') > 0 },
       { title: 'Knock out a creature with tranq arrows, then feed it to tame', progress: () => 'Herbivores eat Wildberries · Carnivores eat Raw Meat', done: () => this.stats.tamed >= 1 },
       { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax, and the flying Galewing and Thunderwing', done: () => this.stats.rode >= 1 },
+      { title: 'Place a Sleeping Bag to set your respawn point', progress: () => 'Craft one from Hide and Fiber', done: () => this.stats.beds >= 1 },
+      { title: 'Craft Hide Armor and wear it (tap it twice in the inventory)', progress: () => 'Armor soaks up damage until it breaks', done: () => !!this.player.armor },
+      { title: 'Mine 10 Metal Ore in the northern mountains', progress: () => `🟠 ${Math.min(this.stats.ore, 10)}/10 — orange-veined rocks; use a pick`, done: () => this.stats.ore >= 10 },
+      { title: 'Build a Forge, light it and smelt 8 Metal Ingots', progress: () => `🔩 ${Math.min(this.stats.ingot, 8)}/8 — stand near the lit forge with Ore and Wood`, done: () => this.stats.ingot >= 8 },
+      { title: 'Craft a metal tool, weapon or armor at the Forge', progress: () => 'Metal Pick, Hatchet, Sword or Armor', done: () => this.stats.metalCrafted >= 1 },
+      { title: 'Build a stone shelter: 2 Stone Floors and 4 Stone Walls', progress: () => `Floors ${Math.min(this.stoneCount('floor'), 2)}/2 · Walls ${Math.min(this.stoneCount('wall'), 4)}/4`, done: () => this.stoneCount('floor') >= 2 && this.stoneCount('wall') >= 4 },
     ];
     this.questIdx = 0;
 
@@ -174,6 +180,7 @@ class Game {
 
   toggleInventory(force) {
     const open = force ?? !this.ui.open;
+    if (!open) this.openStorage = null;
     this.ui.toggleInventory(open);
     this.input.keys = {};
     this.input.mouseDown = false; if (this.touch) this.touch.hold.attack = false;
@@ -195,6 +202,7 @@ class Game {
     if (!s) return;
     const def = ITEMS[s.id];
     const p = this.player;
+    if (def.armor) { this.wearArmor(i); return; }
     if (def.food) {
       p.food = Math.min(100, p.food + def.food);
       if (def.water) p.water = Math.min(100, p.water + def.water);
@@ -208,6 +216,8 @@ class Game {
 
   craft(r) {
     if (!this.inv.has(r.cost)) return;
+    if (r.station && !this.stationNear(r.station)) { this.ui.notify(`Craft this next to a ${ITEMS[r.station].name}`, 'warn'); return; }
+    if (['metalpick', 'metalhatchet', 'sword', 'metalarmor'].includes(r.id)) this.stats.metalCrafted++;
     this.inv.pay(r.cost);
     const left = this.inv.add(r.id, r.yield || 1);
     if (left) this.ui.notify('Inventory full!', 'warn');
@@ -235,8 +245,7 @@ class Game {
     const extra = p.mount ? origin.distanceTo(p.mount.center) : 0;
     const c = this.creatures.pick(origin, dir, 40 + extra);
     const n = this.world.pickNode(origin, dir, 6 + extra);
-    let fire = null;
-    for (const f of this.building.fires) { if (f.pos.distanceTo(p.pos) < 3.5) fire = f; }
+    const fire = p.mount ? null : this.building.usableNear(p.pos);
     return { origin, dir, c, n, fire };
   }
 
@@ -261,17 +270,91 @@ class Game {
       }
     }
     if (n && n.dist < 4 && n.node.kind === 'bush') { this.harvestNode(n.node, 1.0, true); return; }
-    if (fire) {
-      fire.lit = !fire.lit;
-      this.audio.noiseHit({ freq: 3000, q: 0.5, dur: 0.4, vol: 0.2, type: 'highpass' });
-      this.ui.notify(fire.lit ? 'Campfire lit — stand nearby to cook Raw Meat' : 'Campfire extinguished');
-      return;
-    }
+    if (fire) { this.useProp(fire); return; }
     if (this.canDrink()) {
       p.water = Math.min(100, p.water + 25);
       this.audio.splash();
       this.ui.notify('You drink fresh water');
     }
+  }
+
+  useProp(piece) {
+    const kind = KIND[piece.type];
+    if (kind === 'fire' || kind === 'forge') {
+      if (!piece.lit && kind === 'forge' && this.inv.count('wood') === 0) { this.ui.notify('The forge needs Wood as fuel', 'warn'); return; }
+      piece.lit = !piece.lit;
+      this.audio.noiseHit({ freq: 3000, q: 0.5, dur: 0.4, vol: 0.2, type: 'highpass' });
+      if (kind === 'fire') this.ui.notify(piece.lit ? 'Campfire lit — stand nearby to cook Raw Meat' : 'Campfire extinguished');
+      else this.ui.notify(piece.lit ? 'Forge lit — stand nearby with Metal Ore and Wood to smelt ingots' : 'Forge put out');
+      this.saves.markDirty();
+    } else if (kind === 'storage') {
+      this.openStorage = piece;
+      this.toggleInventory(true);
+    } else if (kind === 'bed') {
+      this.bed = piece;
+      this.saves.markDirty();
+      if (this.env.daylight < 0.3) this.sleep();
+      else this.ui.notify('Respawn point set. Come back at night to sleep until morning.');
+    }
+  }
+
+  sleep() {
+    const fade = document.getElementById('sleep-fade');
+    fade.classList.add('show');
+    this.input.keys = {};
+    setTimeout(() => {
+      if (this.env.time > 0.27) this.env.day++;
+      this.env.time = 0.27;
+      const p = this.player;
+      p.hp = p.maxHp; p.stam = p.maxStam;
+      p.food = Math.max(0, p.food - 18); p.water = Math.max(0, p.water - 22);
+      this.ui.banner(`DAY ${this.env.day}`, 'You wake rested at dawn');
+      this.saves.markDirty();
+    }, 900);
+    setTimeout(() => fade.classList.remove('show'), 1800);
+  }
+
+  // Equip armor from an inventory slot (swaps with whatever is worn).
+  wearArmor(i) {
+    const s = this.inv.slots[i];
+    const prev = this.player.armor;
+    this.inv.slots[i] = prev ? { id: prev.id, qty: 1, dur: prev.dur } : null;
+    this.player.armor = { id: s.id, dur: s.dur ?? ITEMS[s.id].durability };
+    this.ui.notify(`Wearing ${ITEMS[s.id].name}`, 'craft');
+    this.audio.noiseHit({ freq: 1200, q: 1, dur: 0.2, vol: 0.2 });
+    this.saves.markDirty();
+    this.ui.refresh();
+  }
+
+  unwearArmor() {
+    const a = this.player.armor;
+    if (!a) return;
+    if (this.inv.freeSlot() < 0) { this.ui.notify('Inventory full!', 'warn'); return; }
+    this.inv.slots[this.inv.freeSlot()] = { id: a.id, qty: 1, dur: a.dur };
+    this.player.armor = null;
+    this.ui.refresh();
+  }
+
+  storeMove(fromInv, i) {
+    const box = this.openStorage;
+    if (!box) return;
+    const src = fromInv ? this.inv.slots : box.items, dst = fromInv ? box.items : this.inv.slots;
+    const s = src[i];
+    if (!s) return;
+    const def = ITEMS[s.id];
+    if (!def.tool && !def.armor) {
+      for (const d of dst) { if (d && d.id === s.id && d.qty < def.stack) { const n = Math.min(def.stack - d.qty, s.qty); d.qty += n; s.qty -= n; } if (s.qty <= 0) break; }
+    }
+    if (s.qty > 0) { const j = dst.findIndex((x) => !x); if (j < 0) { this.ui.notify(fromInv ? 'Storage box is full' : 'Inventory full!', 'warn'); this.ui.refresh(); return; } dst[j] = s; }
+    src[i] = null;
+    this.saves.markDirty();
+    this.ui.refresh();
+  }
+
+  stoneCount(kind) { return this.building.pieces.filter((p) => p.type.startsWith('s') && p.type !== 'storage' && (KIND[p.type] === kind || (kind === 'wall' && KIND[p.type] === 'door'))).length; }
+
+  stationNear(station) {
+    return this.building.pieces.some((p) => p.type === station && p.pos.distanceTo(this.player.pos) < 9);
   }
 
   canDrink() {
@@ -370,8 +453,9 @@ class Game {
         this.saves.markDirty();
         this.inv.remove(item.id, 1);
         this.audio.build();
-        if (def.place === 'foundation') this.stats.floors++;
-        if (def.place === 'wall' || def.place === 'doorway') this.stats.walls++;
+        if (KIND[def.place] === 'floor') this.stats.floors++;
+        if (KIND[def.place] === 'wall' || KIND[def.place] === 'door') this.stats.walls++;
+        if (def.place === 'bed') { this.stats.beds++; this.bed = this.building.pieces[this.building.pieces.length - 1]; this.ui.notify('Respawn point set'); }
         if (def.place === 'campfire') this.stats.placedFire++;
         this.player.addXP(3, this.xpHooks);
       } else this.ui.notify('Cannot place here', 'warn');
@@ -430,8 +514,9 @@ class Game {
     const tool = this.activeItem()?.id;
     for (const [id, base] of yields) {
       let mult = power;
-      if (id === 'flint') mult = tool === 'pick' ? 1.6 : tool === 'hatchet' ? 0.15 : 0.25;
-      if (id === 'stone' && tool === 'pick') mult *= 0.8;
+      if (id === 'flint') mult = tool === 'pick' || tool === 'metalpick' ? 1.6 : tool === 'hatchet' ? 0.15 : 0.25;
+      if (id === 'ore') mult = tool === 'metalpick' ? 2.4 : tool === 'pick' ? 1.1 : 0.12;
+      if (id === 'stone' && (tool === 'pick' || tool === 'metalpick')) mult *= 0.8;
       if (id === 'wood' && tool === 'hatchet') mult *= 1.1;
       if (id === 'fiber' && node.kind === 'tree') mult = byHand ? 0 : 0.6;
       const q = base * mult * 0.5;
@@ -578,6 +663,11 @@ class Game {
   hurtPlayer(dmg, c) {
     const p = this.player;
     if (p.mount) { this.creatures.damage(p.mount, dmg, 0, c); return; }
+    if (p.armor) {
+      dmg *= 1 - ITEMS[p.armor.id].armor;
+      p.armor.dur -= 1;
+      if (p.armor.dur <= 0) { this.ui.notify(`Your ${ITEMS[p.armor.id].name} broke!`, 'warn'); p.armor = null; }
+    }
     p.damage(dmg);
     this.audio.hurt();
     p.yaw += (Math.random() - 0.5) * 0.05;
@@ -598,7 +688,11 @@ class Game {
   respawn() {
     const p = this.player;
     p.alive = true; p.hp = p.maxHp; p.stam = p.maxStam; p.food = Math.max(p.food, 60); p.water = Math.max(p.water, 60);
-    p.pos.copy(this.spawnPoint); p.vel.set(0, 0, 0); p.yaw = 0; p.pitch = 0;
+    if (this.bed && this.building.pieces.includes(this.bed)) {
+      p.pos.copy(this.bed.pos).add(new THREE.Vector3(1.2, 0.2, 0));
+      this.ui.notify('You wake up at your Sleeping Bag');
+    } else p.pos.copy(this.spawnPoint);
+    p.vel.set(0, 0, 0); p.yaw = 0; p.pitch = 0;
     document.getElementById('death').classList.remove('show');
     this.lock();
   }
@@ -749,7 +843,22 @@ class Game {
   }
 
   cooking(dt) {
-    const fire = this.building.fires.find((f) => f.lit && f.pos.distanceTo(this.player.pos) < 6);
+    // smelting at a lit forge: 2 ore + 1 wood -> 1 ingot
+    const forge = this.building.fires.find((f) => f.type === 'forge' && f.lit && f.pos.distanceTo(this.player.pos) < 8);
+    if (forge) {
+      this.smeltT = (this.smeltT || 0) + dt;
+      if (this.smeltT > 2.5) {
+        this.smeltT = 0;
+        if (this.inv.count('wood') < 1) { forge.lit = false; this.ui.notify('The forge ran out of Wood', 'warn'); }
+        else if (this.inv.count('ore') >= 2) {
+          this.inv.remove('ore', 2); this.inv.remove('wood', 1); this.inv.add('ingot', 1);
+          this.stats.ingot++; this.saves.markDirty();
+          this.ui.notify('Smelted 1 Metal Ingot', 'craft');
+          this.audio.mine();
+        }
+      }
+    }
+    const fire = this.building.fires.find((f) => f.type === 'campfire' && f.lit && f.pos.distanceTo(this.player.pos) < 6);
     if (!fire || this.inv.count('meat') === 0) { this.cookT = 0; return; }
     this.cookT = (this.cookT || 0) + dt;
     if (this.cookT > 3) {
@@ -796,8 +905,14 @@ class Game {
     }
     if (!prompt && !p.mount) {
       if (n && n.dist < 4 && n.node.kind === 'bush') prompt = `<kbd>E</kbd> Pick ${n.node.type === 'dozebush' ? 'Dozeberries' : 'Wildberries'}`;
-      else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> Harvest ${n.node.kind === 'tree' ? 'Tree' : 'Rock'}`;
-      else if (fire) prompt = `<kbd>E</kbd> ${fire.lit ? 'Extinguish' : 'Light'} Campfire`;
+      else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> ${n.node.kind === 'tree' ? 'Harvest Tree' : n.node.type === 'metal' ? 'Mine Metal Ore' + (this.activeItem()?.id?.includes('pick') ? '' : ' (use a pick)') : 'Harvest Rock'}`;
+      else if (fire) {
+        const k = KIND[fire.type];
+        prompt = k === 'fire' ? `<kbd>E</kbd> ${fire.lit ? 'Extinguish' : 'Light'} Campfire`
+          : k === 'forge' ? `<kbd>E</kbd> ${fire.lit ? 'Put out' : 'Light'} Forge · Ore ${this.inv.count('ore')} · Wood ${this.inv.count('wood')}`
+          : k === 'storage' ? '<kbd>E</kbd> Open Storage Box'
+          : `<kbd>E</kbd> ${this.env.daylight < 0.3 ? 'Sleep until morning' : 'Set respawn point'}`;
+      }
       else if (this.canDrink()) prompt = '<kbd>E</kbd> Drink';
       if (def && def.place) prompt = `<kbd>LMB</kbd> Place ${def.name} · <kbd>R</kbd> Rotate`;
     }
