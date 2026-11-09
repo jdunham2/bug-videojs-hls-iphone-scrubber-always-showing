@@ -64,6 +64,16 @@ export const SPECIES = {
     tameFood: 'berries', tameBase: 8, tameLvl: 0.2, rideable: false, radius: 0.9, reach: 2.2, hitR: 1.3,
     drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 5, herd: 2, zone: (h) => h > 12 && h < 45,
   },
+  galewing: {
+    name: 'Galewing', diet: 'carn', temper: 'skittish', hp: 170, dmg: 10, walk: 1.8, run: 4.5, fly: 21, torpor: 110,
+    tameFood: 'meat', tameBase: 7, tameLvl: 0.2, rideable: true, radius: 1.0, reach: 2.6, hitR: 1.7, flyer: true,
+    drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 6, zone: (h) => h > 2 && h < 45,
+  },
+  thunderwing: {
+    name: 'Thunderwing', diet: 'carn', temper: 'aggressive', hp: 620, dmg: 26, walk: 1.6, run: 4, fly: 17, torpor: 420,
+    tameFood: 'meat', tameBase: 13, tameLvl: 0.3, rideable: true, radius: 1.8, reach: 4.8, hitR: 2.8, flyer: true,
+    drops: { meat: 8, hide: 6 }, aggro: 45, lvl: [10, 40], count: 2, zone: (h, x, z) => z < -60 && h > 20, far: 200,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -74,6 +84,7 @@ export const SPECIES = {
 const PREY = {
   talonrunner: ['pudgewing', 'dashbeak', 'crestcaller'],
   dashbeak: ['pudgewing'],
+  thunderwing: ['pudgewing', 'dashbeak', 'crestcaller', 'galewing'],
   spinesail: ['pudgewing', 'crestcaller', 'dashbeak', 'trikeros'],
   gorgonax: ['pudgewing', 'trikeros', 'talonrunner', 'crestcaller', 'domehead', 'ironhide'],
 };
@@ -233,6 +244,66 @@ function buildIronhide(mat, col) {
   return { root, body, legs, neck, head, tail, hipH: 1.35, lie: 1.0, quad: true };
 }
 
+// Pterosaur: two-segment membrane wings that flap in flight and fold on the ground.
+function wingParts(s, side, col) {
+  const membrane = (len, w0, w1, z0) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, z0, 0, 0, z0 - w0, len, 0, z0 - w1 * 0.4, 0, 0, z0, len, 0, z0 - w1 * 0.4, len, 0, z0 + 0.12], 3));
+    g.computeVertexNormals();
+    return g;
+  };
+  const m = (x) => mtx(0, 0, 0, 0, 0, 0, side, 1, 1).multiply(x || new THREE.Matrix4());
+  const inner = [
+    { geo: membrane(1.5 * s, 0.95 * s, 0.75 * s, 0.25 * s), color: col.accent, matrix: m() },
+    { geo: CYL, color: col.base, matrix: m(mtx(0.75 * s, 0.02, 0.25 * s, 0, 0, Math.PI / 2, 0.06 * s, 1.5 * s, 0.06 * s)) },
+  ];
+  const outer = [
+    { geo: membrane(1.7 * s, 0.75 * s, 0.1 * s, 0.37 * s), color: col.accent, matrix: m() },
+    { geo: CYL, color: col.base, matrix: m(mtx(0.85 * s, 0.02, 0.37 * s, 0, 0, Math.PI / 2, 0.04 * s, 1.7 * s, 0.04 * s)) },
+    { geo: CONE, color: col.horn, matrix: m(mtx(0.05 * s, 0.05 * s, 0.42 * s, Math.PI / 2, 0, 0, 0.04 * s, 0.18 * s, 0.04 * s)) },
+  ];
+  return { inner, outer };
+}
+
+function buildFlyer(mat, col, s, big) {
+  const { base, belly, accent, horn } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.95 * s; root.add(body);
+  body.add(meshOf([E(0.32 * s, 0.3 * s, 0.75 * s, base, 0, 0, 0), E(0.26 * s, 0.22 * s, 0.6 * s, belly, 0, -0.1 * s, 0.05 * s),
+    E(0.2 * s, 0.12 * s, 0.4 * s, accent, 0, 0.22 * s, 0.1 * s)], mat));
+  const wings = [];
+  for (const side of [1, -1]) {
+    const g = new THREE.Group(); g.position.set(side * 0.25 * s, 0.12 * s, 0.25 * s); body.add(g);
+    const parts = wingParts(s, side, col);
+    g.add(meshOf(parts.inner, mat));
+    const outer = new THREE.Group(); outer.position.set(side * 1.5 * s, 0, 0); g.add(outer);
+    outer.add(meshOf(parts.outer, mat));
+    wings.push({ g, outer, side });
+  }
+  const legs = [];
+  for (const [x, ph] of [[-0.15, 0], [0.15, Math.PI]]) {
+    const g = new THREE.Group(); g.position.set(x * s, -0.2 * s, -0.25 * s); body.add(g);
+    g.add(meshOf([Cy(0.05 * s, 0.4 * s, base, 0, -0.2 * s, 0)], mat));
+    const knee = new THREE.Group(); knee.position.set(0, -0.4 * s, 0); g.add(knee);
+    knee.add(meshOf([Cy(0.035 * s, 0.35 * s, base, 0, -0.17 * s, 0), E(0.08 * s, 0.03 * s, 0.12 * s, horn, 0, -0.36 * s, 0.04 * s)], mat));
+    legs.push({ g, knee, ph });
+  }
+  const neck = new THREE.Group(); neck.position.set(0, 0.12 * s, 0.65 * s); body.add(neck);
+  neck.add(meshOf([Cy(0.1 * s, 0.6 * s, base, 0, 0.2 * s, 0.15 * s, 0.7, 0, 0)], mat));
+  const head = new THREE.Group(); head.position.set(0, 0.42 * s, 0.38 * s); neck.add(head);
+  head.add(meshOf([
+    E(0.16 * s, 0.18 * s, 0.3 * s, base, 0, 0, 0.05 * s),
+    K(0.09 * s, 1.0 * s, horn, 0, 0.0, 0.62 * s, Math.PI / 2, 0, 0),
+    K(big ? 0.1 * s : 0.08 * s, big ? 0.6 * s : 1.0 * s, accent, 0, 0.12 * s, -0.4 * s, -Math.PI / 2 - 0.35, 0, 0),
+    E(0.035 * s, 0.035 * s, 0.035 * s, 0x111111, -0.13 * s, 0.06 * s, 0.12 * s), E(0.035 * s, 0.035 * s, 0.035 * s, 0x111111, 0.13 * s, 0.06 * s, 0.12 * s),
+  ], mat));
+  const jaw = new THREE.Group(); jaw.position.set(0, -0.06 * s, 0.1 * s); head.add(jaw);
+  jaw.add(meshOf([K(0.06 * s, 0.85 * s, horn, 0, 0, 0.45 * s, Math.PI / 2, 0, 0)], mat));
+  const t = new THREE.Group(); t.position.set(0, 0, -0.7 * s); body.add(t);
+  t.add(meshOf([E(0.1 * s, 0.08 * s, 0.35 * s, base, 0, 0, -0.25 * s)], mat));
+  return { root, body, legs, neck, head, jaw, tail: [t], wings, hipH: 0.95 * s, lie: 0.35 * s, quad: false };
+}
+
 function buildSauropod(mat, col) {
   const { base, belly, accent } = col;
   const root = new THREE.Group();
@@ -299,6 +370,8 @@ const PALETTES = {
   crestcaller: [{ base: 0x6a7a3a, belly: 0xd0c49a, accent: 0xd88a2a, horn: 0x3a3226 }, { base: 0x5a6a7a, belly: 0xc8c8b8, accent: 0xb83a4a, horn: 0x3a3226 }, { base: 0x8a6a4a, belly: 0xe0cca8, accent: 0x3a7a5a, horn: 0x3a3226 }],
   dashbeak: [{ base: 0x6a8a4a, belly: 0xd8d0a8, accent: 0x3a4a2a, horn: 0x2a2620 }, { base: 0x9a7a4a, belly: 0xe0d0b0, accent: 0x5a3a1a, horn: 0x2a2620 }],
   domehead: [{ base: 0x7a6a5a, belly: 0xc8b89a, accent: 0x5a8aa8, horn: 0xe8dcc0 }, { base: 0x6a7a5a, belly: 0xc0c09a, accent: 0xa8603a, horn: 0xe8dcc0 }],
+  galewing: [{ base: 0x7a6a5a, belly: 0xd8ccb0, accent: 0x8a4a3a, horn: 0xe0b860 }, { base: 0x5a6a7a, belly: 0xd0d4d0, accent: 0x3a5a8a, horn: 0xe0b860 }, { base: 0x6a5a4a, belly: 0xe0d0b0, accent: 0xb0782a, horn: 0xd8c08a }],
+  thunderwing: [{ base: 0x3e3a36, belly: 0x9a9086, accent: 0x6a2a2a, horn: 0xc8b48a }, { base: 0x3a4248, belly: 0x9aa0a4, accent: 0x2a4a6a, horn: 0xc8b48a }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -310,6 +383,8 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'galewing': return buildFlyer(mat, col, 1.0, false);
+    case 'thunderwing': return buildFlyer(mat, col, 1.8, true);
     case 'spinesail': return buildBiped(mat, col, 2.1, { hip: 1.45, bodyLen: 1.35, girth: 1.0, arm: 1.0, headLen: 0.6, headW: 0.85, tailSeg: 0.8, stripes: 0, sail: true, snout: true, neckW: 1.0 });
     case 'crestcaller': return buildBiped(mat, col, 1.7, { hip: 1.3, bodyLen: 1.0, girth: 1.0, arm: 1.1, headLen: 0.45, headW: 0.8, tailSeg: 0.6, stripes: 3, tubeCrest: true, beak: true, neckW: 0.85 });
     case 'dashbeak': return buildBiped(mat, col, 0.42, { hip: 1.2, bodyLen: 0.9, girth: 0.8, arm: 1.0, headLen: 0.55, headW: 0.8, tailSeg: 0.6, stripes: 3, crest: true, neckW: 0.9 });
@@ -358,7 +433,7 @@ export class Creature {
     this.scanCd = Math.random();
     this.lastFeed = 0;
 
-    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.02 });
+    this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.02, side: SPECIES[species].flyer ? THREE.DoubleSide : THREE.FrontSide });
     this.model = buildModel(species, this.mat);
     this.obj = this.model.root;
     const s = species === 'pudgewing' ? 1 : 0.85 + level / 120;
@@ -410,6 +485,7 @@ export class CreatureManager {
     const def = SPECIES[species];
     const lv = level ?? Math.floor(rand(def.lvl[0], def.lvl[1] + 1));
     const c = new Creature(species, pos, lv);
+    if (def.flyer) { c.flying = true; c.home = pos.clone(); c.pos.y += rand(25, 50); c.vy = 0; c.landT = rand(30, 80); c.perchT = rand(15, 30); }
     this.scene.add(c.obj);
     this.list.push(c);
     return c;
@@ -442,7 +518,7 @@ export class CreatureManager {
     if (tp.y > 2) { this.spawn('trikeros', tp, 4); }
 
     // Ambient flyers circling the mountain
-    for (let i = 0; i < 6; i++) this.flyers.push(this.makeFlyer());
+    // decorative fliers replaced by real, tameable pterosaurs
   }
 
   makeFlyer() {
@@ -631,6 +707,12 @@ export class CreatureManager {
 
     if (c.state === 'dead' || c.state === 'ko') {
       c.speed = 0;
+      if (c.flying) {
+        c.vy = (c.vy || 0) - 25 * dt;
+        c.pos.y += c.vy * dt;
+        const g = Math.max(heightAt(c.pos.x, c.pos.z), -0.3);
+        if (c.pos.y <= g) { c.pos.y = g; c.vy = 0; c.flying = false; if (c.pos.distanceTo(player.pos) < 80) this.hooks.thud?.(c); }
+      }
       c.lieT = Math.min(1, c.lieT + dt * 1.5);
       if (c.state === 'ko') {
         c.torpor -= (c.maxTorpor / 100) * dt;
@@ -646,6 +728,18 @@ export class CreatureManager {
     }
     c.lieT = Math.max(0, c.lieT - dt * 1.2);
     if (c.torpor > 0) c.torpor = Math.max(0, c.torpor - dt * c.maxTorpor * 0.03);
+
+    if (d.flyer) {
+      if (c.flying) { this.updateFlight(c, dt, player); this.animate(c, dt); return; }
+      const takeOff = c.tamed
+        ? c.follow && player.alive && Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z) > 40
+        : (c.perchT = (c.perchT ?? 20) - dt) <= 0 || c.state === 'flee' || c.state === 'chase';
+      if (takeOff) {
+        c.flying = true; c.vy = 9; c.landT = rand(40, 90); c.home = c.home || c.pos.clone();
+        if (c.state === 'flee') { c.state = 'wander'; }
+        this.hooks.flap?.(c);
+      }
+    }
 
     let spd = 0;
     const goal = c.goal;
@@ -728,7 +822,7 @@ export class CreatureManager {
     if (c.radius < 2.5) this.world.collide(c.pos, c.radius * 0.6);
     // separation
     if (!far) for (const o of this.list) {
-      if (o === c || o.riddenBy) continue;
+      if (o === c || o.riddenBy || o.flying) continue;
       const dx = c.pos.x - o.pos.x, dz = c.pos.z - o.pos.z;
       const md = (c.radius + o.radius) * 0.8;
       const dd = dx * dx + dz * dz;
@@ -740,6 +834,88 @@ export class CreatureManager {
     }
     c.pos.y = heightAt(c.pos.x, c.pos.z);
     this.animate(c, dt);
+  }
+
+  updateFlight(c, dt, player) {
+    const d = c.def;
+    const ground = Math.max(heightAt(c.pos.x, c.pos.z), 0);
+    const fwd = new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw));
+    let target = c._ft || (c._ft = new THREE.Vector3());
+    let spd = d.fly;
+    let landing = false;
+    c.climbT = Math.max(0, (c.climbT || 0) - dt);
+
+    if (c.tamed) {
+      const behind = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw)).multiplyScalar(6);
+      const fp = c.follow ? player.pos.clone().add(behind) : c.pos.clone();
+      const dd = Math.hypot(fp.x - c.pos.x, fp.z - c.pos.z);
+      target.set(fp.x, Math.max(heightAt(fp.x, fp.z), 0) + (dd > 25 ? 14 : 0), fp.z);
+      spd = dd > 25 ? d.fly : Math.min(d.fly * 0.5, dd + 2);
+      landing = dd <= 25;
+    } else if (c.state === 'chase' && this.targetValid(c.target, player) && c.timer > 0) {
+      const tp = this.targetPos(c.target, player);
+      const center = new THREE.Vector3(tp.x, tp.y + (c.target === 'player' ? 1.0 : c.target.model.hipH * c.target.scale), tp.z);
+      if (c.climbT > 0) target.copy(c.pos).addScaledVector(fwd, 30).setY(ground + 30);
+      else target.copy(center);
+      spd = d.fly * 1.25;
+      const reach = d.reach * c.scale + (c.target === 'player' ? 0.6 : c.target.radius);
+      if (c.climbT <= 0 && c.pos.distanceTo(center) < reach && c.attackCd <= 0) {
+        c.attackCd = 2.2; c.attackAnim = 1; c.climbT = 2.8;
+        if (c.target === 'player') this.hooks.hitPlayer?.(c.dmg, c);
+        else this.damage(c.target, c.dmg, 0, c);
+        this.hooks.bite?.(c);
+      }
+      if (this.targetPos(c.target, player).distanceTo(c.pos) > 220) { c.state = 'wander'; c.target = null; }
+    } else {
+      if (c.state === 'chase') { c.state = 'wander'; c.target = null; }
+      c.landT -= dt;
+      if (d.temper === 'aggressive' && c.scanCd <= 0) {
+        c.scanCd = 0.7;
+        const t = this.findTarget(c, player);
+        if (t) { c.state = 'chase'; c.target = t; c.timer = 30; this.hooks.roar?.(c); }
+      }
+      if (c.landT <= 0) {
+        if (!c.landAt) {
+          for (let i = 0; i < 20 && !c.landAt; i++) {
+            const x = c.home.x + rand(-80, 80), z = c.home.z + rand(-80, 80), h = heightAt(x, z);
+            if (h > 1.5) c.landAt = new THREE.Vector3(x, h, z);
+          }
+          if (!c.landAt) c.landT = 20;
+        }
+        if (c.landAt) {
+          const dd = Math.hypot(c.landAt.x - c.pos.x, c.landAt.z - c.pos.z);
+          target.set(c.landAt.x, dd > 20 ? c.landAt.y + 20 : c.landAt.y, c.landAt.z);
+          spd = Math.min(d.fly, dd * 0.8 + 3);
+          landing = dd < 20;
+        }
+      } else {
+        if (!c.wp || Math.hypot(c.wp.x - c.pos.x, c.wp.z - c.pos.z) < 15) {
+          const x = clamp(c.home.x + rand(-140, 140), -HALF * 0.9, HALF * 0.9), z = clamp(c.home.z + rand(-140, 140), -HALF * 0.9, HALF * 0.9);
+          c.wp = new THREE.Vector3(x, Math.max(heightAt(x, z), 0) + rand(28, 65), z);
+        }
+        target.copy(c.wp);
+      }
+    }
+
+    // steering
+    const dx = target.x - c.pos.x, dz = target.z - c.pos.z;
+    const prevYaw = c.yaw;
+    if (Math.hypot(dx, dz) > 1) c.yaw = angleLerp(c.yaw, Math.atan2(dx, dz), Math.min(1, dt * 1.6));
+    c.speed = lerp(c.speed, spd, Math.min(1, dt * 1.2));
+    const vyT = clamp((target.y - c.pos.y) * 0.9, -14, 10);
+    c.vy = lerp(c.vy || 0, vyT, Math.min(1, dt * 2));
+    c.pos.x += Math.sin(c.yaw) * c.speed * dt;
+    c.pos.z += Math.cos(c.yaw) * c.speed * dt;
+    c.pos.y += c.vy * dt;
+    const g2 = Math.max(heightAt(c.pos.x, c.pos.z), 0);
+    if (!landing && c.pos.y < g2 + 4) { c.pos.y = lerp(c.pos.y, g2 + 4, Math.min(1, dt * 3)); c.vy = Math.max(c.vy, 0); }
+    if (c.pos.y <= g2 + 0.2) {
+      c.pos.y = g2;
+      if (landing && g2 > 0.5) { c.flying = false; c.vy = 0; c.speed = 0; c.landAt = null; c.perchT = rand(15, 35); c.landT = rand(40, 90); c.state = c.tamed ? 'tamed' : 'wander'; c.timer = 2; c.goal.copy(c.pos); }
+    }
+    c.flyPitch = -Math.atan2(c.vy, Math.max(4, c.speed)) * 0.8;
+    const turn = ((c.yaw - prevYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    c.bank = lerp(c.bank || 0, clamp(-turn / Math.max(dt, 1e-3) * 0.35, -0.7, 0.7), Math.min(1, dt * 3));
   }
 
   chase(c, dt, player) {
@@ -809,6 +985,24 @@ export class CreatureManager {
     c.obj.rotation.y = c.yaw;
     c.obj.rotation.x = lerp(pitch, 0, lie) * 0.8;
     c.obj.rotation.z = lie * Math.PI / 2;
+    if (m.wings) {
+      const glide = c.flying && (c.vy || 0) <= 0.5 && c.speed > d.fly * 0.6;
+      if (c.flying && c.state !== 'ko' && c.state !== 'dead') {
+        const freq = glide ? 2 : 7, amp = glide ? 0.12 : 0.75;
+        c.wingPh = (c.wingPh || 0) + dt * freq;
+        for (const w of m.wings) {
+          w.g.rotation.set(0, 0, w.side * Math.sin(c.wingPh) * amp);
+          w.outer.rotation.set(0, 0, w.side * Math.sin(c.wingPh - 0.7) * amp * 0.6);
+        }
+        for (const L of m.legs) { L.g.rotation.x = 1.1; if (L.knee) L.knee.rotation.x = 0.3; }
+        c.obj.rotation.x = c.flyPitch || 0;
+        c.obj.rotation.z = c.bank || 0;
+      } else if (c.flying) {
+        for (const w of m.wings) { w.g.rotation.set(0, 0, w.side * 0.9); w.outer.rotation.set(0, 0, w.side * 0.6); }
+      } else {
+        for (const w of m.wings) { w.g.rotation.set(0, w.side * -0.5, w.side * 1.05); w.outer.rotation.set(0, 0, -w.side * 2.5); }
+      }
+    }
     if (lie > 0) {
       // lower so the body rests on the ground instead of floating at hip height
       c.obj.position.y -= 0; // body already laterally offset by rotation

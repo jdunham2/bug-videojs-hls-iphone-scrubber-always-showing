@@ -116,7 +116,7 @@ export function serialize(g) {
     version: VERSION,
     savedAt: Date.now(),
     player: {
-      pos: v3(anchor), yaw: r2(p.yaw), level: p.level, xp: r2(p.xp),
+      pos: v3(anchor), mounted: !!p.mount, yaw: r2(p.yaw), level: p.level, xp: r2(p.xp),
       hp: r2(Math.max(1, p.hp)), maxHp: p.maxHp, stam: r2(p.stam), maxStam: p.maxStam, food: r2(p.food), water: r2(p.water),
     },
     world: { time: r2(g.env.time * 1000) / 1000, day: g.env.day },
@@ -140,7 +140,7 @@ export function applySave(g, d) {
     maxStam: d.player.maxStam, stam: d.player.stam, food: d.player.food, water: d.player.water, yaw: d.player.yaw, pitch: 0,
   });
   p.pos.fromArray(d.player.pos);
-  p.pos.y = Math.max(p.pos.y, heightAt(p.pos.x, p.pos.z));
+  p.pos.y = d.player.mounted ? heightAt(p.pos.x, p.pos.z) : Math.max(p.pos.y, heightAt(p.pos.x, p.pos.z));
   p.vel.set(0, 0, 0);
   g.env.time = d.world.time; g.env.day = d.world.day;
 
@@ -158,6 +158,7 @@ export function applySave(g, d) {
     const pos = new THREE.Vector3().fromArray(t.pos);
     pos.y = heightAt(pos.x, pos.z);
     const c = g.creatures.spawn(t.species, pos, t.level);
+    c.flying = false; c.pos.y = pos.y;
     Object.assign(c, { tamed: true, state: 'tamed', name: t.name, saddled: t.saddled, follow: t.follow, yaw: t.yaw });
     c.hp = Math.min(c.maxHp, t.hp);
   }

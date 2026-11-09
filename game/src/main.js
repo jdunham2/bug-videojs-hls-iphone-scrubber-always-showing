@@ -62,6 +62,8 @@ class Game {
         if (c.tamed) this.ui.notify(`Your ${c.name} was killed!`, 'warn');
       },
       ko: () => this.audio.tone({ f0: 160, f1: 60, dur: 0.6, vol: 0.3 }),
+      thud: () => { this.audio.tone({ f0: 90, f1: 40, dur: 0.4, vol: 0.5, type: 'triangle' }); this.audio.noiseHit({ freq: 300, dur: 0.3, vol: 0.4, type: 'lowpass' }); },
+      flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
     this.creatures.populate(this.spawnPoint);
 
@@ -92,7 +94,7 @@ class Game {
       { title: 'Shelter: place a Timber Floor and 2 Walls', progress: () => `Floors ${Math.min(this.stats.floors, 1)}/1 · Walls ${Math.min(this.stats.walls, 2)}/2`, done: () => this.stats.floors >= 1 && this.stats.walls >= 2 },
       { title: 'Craft a Hunter Bow and Tranq Arrows (needs purple Dozeberries)', progress: () => `Bow ${this.inv.count('bow') ? '✔' : '✘'} · Arrows ${this.inv.count('arrow')}`, done: () => this.inv.count('bow') > 0 && this.inv.count('arrow') > 0 },
       { title: 'Knock out a creature with tranq arrows, then feed it to tame', progress: () => 'Herbivores eat Wildberries · Carnivores eat Raw Meat', done: () => this.stats.tamed >= 1 },
-      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax', done: () => this.stats.rode >= 1 },
+      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax, and the flying Galewing and Thunderwing', done: () => this.stats.rode >= 1 },
     ];
     this.questIdx = 0;
 
@@ -332,7 +334,7 @@ class Game {
     p.yaw = cr.yaw + Math.PI;
     p.pitch = -0.25;
     this.stats.rode++;
-    this.ui.notify(`Riding ${cr.name} — [LMB] attack · [Shift] sprint · [E] dismount · [V] zoom`);
+    this.ui.notify(cr.def.flyer ? `Riding ${cr.name} — [Space] take off, look where you want to fly, [W] forward, [Shift] boost` : `Riding ${cr.name} — [LMB] attack · [Shift] sprint · [E] dismount · [V] zoom`);
     this.playRoar(cr);
   }
 
@@ -345,7 +347,8 @@ class Game {
     p.mount = null;
     const side = new THREE.Vector3(Math.cos(cr.yaw), 0, -Math.sin(cr.yaw)).multiplyScalar(cr.radius + 1.2);
     p.pos.copy(cr.pos).add(side);
-    p.pos.y = heightAt(p.pos.x, p.pos.z) + 0.2;
+    const g = heightAt(p.pos.x, p.pos.z);
+    p.pos.y = cr.flying ? Math.max(cr.pos.y, g) : g + 0.2;
     p.vel.set(0, 0, 0);
   }
 
@@ -478,6 +481,7 @@ class Game {
     let hit = false;
     for (const o of this.creatures.list) {
       if (o === m || o.tamed || !o.alive) continue;
+      if (Math.abs(o.center.y - m.center.y) > reach + 2) continue;
       const to = new THREE.Vector3().subVectors(o.pos, m.pos).setY(0);
       const d = to.length() - o.radius;
       if (d < reach && to.normalize().dot(fwd) > 0.3) {
@@ -604,15 +608,59 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
-    this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
   // ------------------------------------------------ Riding
+  updateFlight(dt) {
+    const p = this.player, m = p.mount, k = this.input.keys;
+    const joy = this.input.joy || { x: 0, y: 0 };
+    const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
+    const str = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + joy.x, -1, 1);
+    const up = k.Space ? 1 : 0, down = k.KeyC || k.ControlLeft ? 1 : 0;
+    if (!m.flying) {
+      m.flying = true; m.vy = 9; m.pos.y += 0.5;
+      this.audio.noiseHit({ freq: 300, q: 0.6, dur: 0.5, vol: 0.4, type: 'lowpass' });
+    }
+    const sprint = k.ShiftLeft || k.ShiftRight;
+    const mag = Math.min(1, Math.hypot(fwd, str));
+    const maxSp = m.def.fly * (sprint ? 1.6 : 1);
+    const prevYaw = m.yaw;
+    if (mag > 0.08) {
+      const mx = -Math.sin(p.yaw) * fwd + Math.cos(p.yaw) * str;
+      const mz = -Math.cos(p.yaw) * fwd - Math.sin(p.yaw) * str;
+      m.yaw = angleLerp(m.yaw, Math.atan2(mx, mz), Math.min(1, dt * 2.4));
+    }
+    m.speed = lerp(m.speed, mag > 0.08 ? maxSp * mag : 0, Math.min(1, dt * 1.5));
+    // fly where you look: camera pitch steers climb and dive while moving forward
+    let vyT = (fwd > 0.2 ? Math.sin(p.pitch + 0.3) * m.speed * 0.9 : 0) + (up - down) * 11;
+    if (mag <= 0.08 && !up && !down) vyT = Math.sin(this.shared.uTime.value * 2) * 0.5;
+    m.vy = lerp(m.vy || 0, vyT, Math.min(1, dt * 3));
+    m.pos.x = clamp(m.pos.x + Math.sin(m.yaw) * m.speed * dt, -HALF * 1.25, HALF * 1.25);
+    m.pos.z = clamp(m.pos.z + Math.cos(m.yaw) * m.speed * dt, -HALF * 1.25, HALF * 1.25);
+    m.pos.y = Math.min(m.pos.y + m.vy * dt, 190);
+    const land = heightAt(m.pos.x, m.pos.z);
+    const ground = Math.max(land, WATER_LEVEL + 0.6);
+    if (m.pos.y <= ground) {
+      m.pos.y = ground;
+      // touch down on dry land when descending slowly
+      if (land > WATER_LEVEL + 0.3 && vyT <= 0.6 && m.speed < m.def.fly * 0.8) { m.flying = false; m.vy = 0; }
+      else m.vy = Math.max(m.vy, 0);
+    }
+    m.flyPitch = -Math.atan2(m.vy, Math.max(4, m.speed)) * 0.8;
+    const turn = ((m.yaw - prevYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    m.bank = lerp(m.bank || 0, clamp(-turn / Math.max(dt, 1e-3) * 0.35, -0.7, 0.7), Math.min(1, dt * 3));
+    p.pos.set(m.pos.x, m.pos.y + m.model.hipH * m.scale + 0.6, m.pos.z);
+    m.lieT = 0;
+    this.creatures.animate(m, dt);
+  }
+
   updateMount(dt) {
     const p = this.player, m = p.mount;
     if (!m) return;
     if (!m.alive) { this.dismount(); return; }
+    if (m.def.flyer && (m.flying || this.input.keys.Space)) { this.updateFlight(dt); return; }
     const k = this.input.keys;
     const joy = this.input.joy || { x: 0, y: 0 };
     const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
@@ -753,7 +801,13 @@ class Game {
       else if (this.canDrink()) prompt = '<kbd>E</kbd> Drink';
       if (def && def.place) prompt = `<kbd>LMB</kbd> Place ${def.name} · <kbd>R</kbd> Rotate`;
     }
-    if (p.mount) prompt = `Riding <b>${p.mount.name}</b> · HP ${Math.ceil(p.mount.hp)}/${p.mount.maxHp} · <kbd>E</kbd> Dismount`;
+    if (p.mount) {
+      const m = p.mount;
+      const alt = m.pos.y - Math.max(heightAt(m.pos.x, m.pos.z), 0);
+      if (m.def.flyer && m.flying) prompt = `Flying <b>${m.name}</b> · ${Math.round(alt)} m up · look to steer · <kbd>Space</kbd>/<kbd>C</kbd> up/down · <kbd>E</kbd> ${alt > 6 ? 'Jump off (you will fall!)' : 'Dismount'}`;
+      else if (m.def.flyer) prompt = `Riding <b>${m.name}</b> · <kbd>Space</kbd> Take off · <kbd>E</kbd> Dismount`;
+      else prompt = `Riding <b>${m.name}</b> · HP ${Math.ceil(m.hp)}/${m.maxHp} · <kbd>E</kbd> Dismount`;
+    }
     this.ui.setPrompt(prompt);
     this.ui.setTarget(tgt);
   }

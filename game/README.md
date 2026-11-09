@@ -38,9 +38,15 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Spinesail: sail-backed predator that stalks the beaches and wades into water; rideable
   - Thunderneck: giant sauropod
   - Gorgonax: apex predator, found in the north; rideable
+  - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
+  - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer
 - **Taming:** build up torpor with tranq arrows or a club to knock a creature out, then
   feed it its preferred food. Dozeberries keep it asleep. Tamed creatures follow or stay
   (F) and defend you.
+- **Flying:** tranq a pterosaur out of the sky (it falls when knocked out), tame it with
+  meat, saddle it and press Space (Jump on touch) to take off. Fly where you look, hold W
+  to go forward and Shift to boost. Space/C climb and descend, and descending onto dry land
+  lands you. Jumping off high up hurts.
 - **Riding:** saddle a Trikeros, Talonrunner or Gorgonax and press E to ride in third
   person. Mounted creatures attack and gather.
 - **Progression:** XP and levels, plus an 8-step guided objective chain covering the core
