@@ -10,6 +10,7 @@ import { UI } from './ui.js';
 import { SaveSystem, applySave } from './save.js';
 import { WorldMap } from './map.js';
 import { Weather } from './weather.js';
+import { TameRoster } from './tames.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -62,6 +63,7 @@ class Game {
       died: (c, attacker) => {
         const byPlayer = attacker === 'player' || attacker === this.player.mount || (attacker && attacker.tamed);
         if (byPlayer) { this.player.addXP((10 + c.level * 2) * (c.boss ? 20 : c.alpha ? 4 : 1), this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
+        if (attacker && attacker.tamed) this.roster.grantXP(attacker, c);
         if (c.boss) this.bossDefeated(c);
         else if (c.alpha && byPlayer) { this.give('trophy', 1); this.stats.alphaKills = (this.stats.alphaKills || 0) + 1; this.ui.banner('ALPHA SLAIN', `${c.def.name} trophy claimed`); this.saves.markDirty(); }
         if (c.tamed) this.ui.notify(`Your ${c.name} was killed!`, 'warn');
@@ -102,6 +104,7 @@ class Game {
     this.saves = new SaveSystem(this);
     this.map = new WorldMap(this);
     this.weather = new Weather(this.scene, this.shared, this.audio);
+    this.roster = new TameRoster(this);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -149,8 +152,15 @@ class Game {
     const canvas = this.renderer.domElement;
     document.addEventListener('keydown', (e) => {
       if (!this.started) return;
+      if (this.roster.open) { if (e.code === 'Escape' || e.code === 'KeyT') this.roster.toggle(false); return; }
       if (e.code === 'KeyM' && !this.ui.open) { this.map.toggle(); return; }
       if (this.map.open) { if (e.code === 'Escape') this.map.toggle(false); return; }
+      if (e.code === 'KeyT' && !this.ui.open) { this.roster.toggle(); return; }
+      if (!this.ui.open && !this.paused) {
+        if (e.code === 'KeyG') { this.roster.command('follow'); return; }
+        if (e.code === 'KeyH') { this.roster.command('stay'); return; }
+        if (e.code === 'KeyZ') { this.roster.command('attack'); return; }
+      }
       if (e.code === 'Tab' || e.code === 'KeyI') { e.preventDefault(); this.toggleInventory(); return; }
       if (e.code === 'Escape' && this.ui.open) { this.toggleInventory(false); return; }
       if (this.ui.open || this.paused) return;
@@ -184,7 +194,7 @@ class Game {
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (!this.locked && this.started && !this.ui.open && !this.map.open && this.player.alive) this.setPaused(true);
+      if (!this.locked && this.started && !this.ui.open && !this.map.open && !this.roster.open && this.player.alive) this.setPaused(true);
       if (this.locked) this.setPaused(false);
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());

@@ -28,6 +28,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Map (M, or 🗺️ on touch):** a shaded map of the island with fog of war that lifts as you
   explore, plus place names and markers for you, your tames, buildings and your bed. A
   corner minimap (desktop) shows nearby creatures, with hostile ones in red.
+- **Tame roster (T, or 🦖 on touch):** rename tames, feed them to heal, set follow/stay or
+  release them. Tames level up from kills (more health and damage) and slowly heal. Whistle
+  commands: G all follow, H all stay, Z attack whatever you're aiming at.
 - **Alphas:** rare, oversized creatures that glow red. They hit much harder, cannot be
   tamed, drop triple loot and an Alpha Trophy. Seven roam the island at the start.
 - **Boss — the Primal Tyrant:** offer 3 Alpha Trophies at the Caldera Altar near the
@@ -84,6 +87,8 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 | R | Rotate the building piece |
 | V | Zoom the mount camera |
 | M | World map |
+| T | Tame roster |
+| G / H / Z | Whistle: all follow / all stay / attack my target |
 
 ### Saving
 

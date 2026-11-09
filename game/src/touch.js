@@ -35,6 +35,7 @@ export class TouchControls {
         <button class="tbtn sm" data-act="follow" aria-label="Tame follow or stay">🐾</button>
         <button class="tbtn sm" data-act="rotate" aria-label="Rotate building piece">⟳</button>
         <button class="tbtn sm" data-act="map" aria-label="World map">🗺️</button>
+        <button class="tbtn sm" data-act="roster" aria-label="Your tames">🦖</button>
         <button class="tbtn sm" data-act="zoom" aria-label="Mount camera zoom">🔭</button>
       </div>`;
     document.getElementById('hud').appendChild(layer);
@@ -89,6 +90,7 @@ export class TouchControls {
       case 'follow': g.toggleFollow(); break;
       case 'rotate': g.building.rotate(); break;
       case 'map': g.map.toggle(); break;
+      case 'roster': g.roster.toggle(); break;
       case 'zoom': g.player.camDist = g.player.camDist > 10 ? 7 : 13; break;
     }
     this.syncToggles();
@@ -147,8 +149,8 @@ export class TouchControls {
   // Called every frame before the simulation reads input.
   apply() {
     const g = this.game, k = g.input.keys;
-    g.locked = !g.ui.open && !g.map.open;
-    if (g.ui.open || g.map.open || !g.started) { this.joy.x = this.joy.y = 0; this.hold.attack = false; }
+    g.locked = !g.ui.open && !g.map.open && !g.roster.open;
+    if (g.ui.open || g.map.open || g.roster.open || !g.started) { this.joy.x = this.joy.y = 0; this.hold.attack = false; }
     k.ShiftLeft = this.toggles.sprint && this.joy.y > 0.3;
     k.KeyC = this.toggles.crouch;
     k.Space = this.hold.jump;

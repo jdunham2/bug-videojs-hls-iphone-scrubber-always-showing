@@ -130,7 +130,7 @@ export function serialize(g) {
     buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
       species: c.species, level: c.level, name: c.name, pos: v3(c.pos), yaw: r2(c.yaw),
-      hp: r2(c.hp), saddled: c.saddled, follow: c.follow,
+      hp: r2(c.hp), maxHp: c.maxHp, dmg: r2(c.dmg), xp: r2(c.xp || 0), saddled: c.saddled, follow: c.follow,
     })),
   };
 }
@@ -169,6 +169,9 @@ export function applySave(g, d) {
     const c = g.creatures.spawn(t.species, pos, t.level);
     c.flying = false; c.pos.y = pos.y;
     Object.assign(c, { tamed: true, state: 'tamed', name: t.name, saddled: t.saddled, follow: t.follow, yaw: t.yaw });
+    if (t.maxHp) c.maxHp = t.maxHp;
+    if (t.dmg) c.dmg = t.dmg;
+    c.xp = t.xp || 0;
     c.hp = Math.min(c.maxHp, t.hp);
   }
   g.ui.refresh();
