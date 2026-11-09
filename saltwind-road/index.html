@@ -3129,6 +3129,7 @@ const GUIDE = [
   ['Sailing', 'Corvo in Reedholm builds a raft. Shipwright Bess in Port Wren builds a much faster sailboat. Floating crates drift at sea, and the Pirate Isles lie far south-east.'],
   ['Companions', 'Guildmaster Sten in Port Wren hires out fighters and a healer for a daily wage.'],
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
+  ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
   ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
   ['Dice', 'Play Bones with Lucky Lou (Lantern Bay), Dice Dame Rosa (Dunmere) or One-Eyed Finn (Crownfall).'],
   ['Museum', 'Curator Vess in Crownfall collects one of every fish, trophy and rare treasure.'],
@@ -4461,7 +4462,8 @@ function newDay() {
   for (const n of NPCS) if (n.trader) {
     const st = S.npc[n.id];
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
-    st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
+    st.purse = Math.max(st.purse, Math.round(n.purse*(1 + .5*investLv(n.id)))); st.patience = n.patience; st.flex = rollFlex(n);
+    if (investLv(n.id)) for (const g in n.stock) { const max = n.stock[g]*(1 + investLv(n.id)*.5); if ((st.stock[g] || 0) < max) st.stock[g] = Math.min(Math.ceil(max), (st.stock[g] || 0) + 1); }
   }
   if (dayOfSeason() === 1) invalidateChunks();
   if (dayOfSeason() === 1) { const si = seasonIdx(); setTimeout(() => { toast(`<b>${SEASONS[si].name} has come</b><br>${SEASON_TEXT[si]}`, 7500); SFX.chime(); }, 900); }
@@ -4469,7 +4471,7 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
-  const carMsg = caravanDay();
+  const carMsg = caravanDay() + investDay();
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
@@ -4563,6 +4565,7 @@ function mainOptions(n) {
   const o = [];
   if (n.charter && !S.charter) o.push({label:'About the Charter', fn: () => charterTalk(n), primary: charterReady()});
   if (n.trader) o.push({label:'Trade', fn: () => openTrade(n)});
+  if (n.trader) o.push({label: investLv(n.id) ? `Our shop (${INVEST_TIERS[investLv(n.id) - 1][1]})` : 'Invest in the shop', fn: () => investTalk(n)});
   const cid = curContract(n);
   if (cid) {
     const st = S.contracts[cid], c = CONTRACTS[cid];
@@ -4714,6 +4717,16 @@ function caravanRoute(n, idx2) {
     }})),
     back(n)]);
 }
+const INVEST_TIERS = [[300, 'Silent partner'], [800, 'Partner'], [2000, 'Co-owner']];
+const investLv = id => (S.invest && S.invest[id]) || 0;
+const investTotal = () => Object.entries(S.invest || {}).reduce((t, [id, lv]) => t + INVEST_TIERS.slice(0, lv).reduce((a, x) => a + x[0], 0), 0);
+function investTalk(n) {
+  const lv = investLv(n.id), next = INVEST_TIERS[lv];
+  say(`“Put some coin into my shop? I'll pay you a share of the takings every morning, and with more money behind me I can buy more from you and stock more.”<br><br>${lv ? `You are my <b>${INVEST_TIERS[lv - 1][1]}</b>. ` : ''}Across all shops you've invested <b>${investTotal()} coin</b>, paying about <b>${Math.round(investTotal()*.025)} coin</b> a day.`, [
+    ...(next ? [{label: `Invest ${next[0]} coin (become ${next[1]})`, primary: true, disabled: S.coins < next[0], fn: () => { S.coins -= next[0]; S.invest = S.invest || {}; S.invest[n.id] = lv + 1; const st = S.npc[n.id]; if (st) { st.purse = Math.round(n.purse*(1 + .5*(lv + 1))); } SFX.victory(); renderHUD(); save(); say(`“Wonderful! Welcome aboard, ${INVEST_TIERS[lv][1].toLowerCase()}.”`, [back(n)]); }}] : [{label: 'You own as much of this shop as you can', disabled: true, fn: () => {}}]),
+    back(n)]);
+}
+function investDay() { const d = Math.round(investTotal()*.025); if (d) { S.coins += d; S.dividends = (S.dividends || 0) + d; } return d ? ` Your shop investments paid <b>${d} coin</b>.` : ''; }
 function caravanDay() {
   if (!S.caravans || !S.caravans.length) return '';
   let total = 0, robbed = 0;
@@ -6654,6 +6667,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['investor','Investor','Invest in a shop', () => investTotal() > 0],
+  ['magnate','Magnate','Invest 10,000 coin across shops', () => investTotal() >= 10000],
   ['tradeboss','Trade Baron','Own 3 trade caravans', () => (S.caravans || []).length >= 3],
   ['enchanter','Enchanter','Enchant a weapon', () => (S.enchanted || 0) >= 1],
   ['generous','Generous Soul','Give 25 gifts', () => (S.giftsGiven || 0) >= 25],
