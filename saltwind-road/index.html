@@ -708,6 +708,8 @@ const GOODS = {
   trout:{name:"River Trout",base:18,col:'#8ab07a',kind:'good'},
   pike:{name:"Marsh Pike",base:24,col:'#6a8a4a',kind:'good'},
   seabass:{name:"Sea Bass",base:22,col:'#5a7a9a',kind:'good'},
+  living_stone:{name:'Living Stone',base:70,col:'#9a9aa8',kind:'mat',desc:'Hums faintly. Dropped by rock golems.'},
+  stone_golem:{name:'Golem Heartstone',base:900,col:'#8ad0ff',kind:'tool',desc:'Commands your Stone Golem companion'},
   scarab_amulet:{name:'Scarab Amulet',base:900,col:'#3ab0a0',kind:'trinket',desc:'+5% critical chance'},
   sun_disc:{name:'Sun Disc',base:260,col:'#f0c040',kind:'good'},
   desert_rose:{name:'Desert Rose',base:90,col:'#e0a090',kind:'good'},
@@ -939,6 +941,7 @@ const RECIPES = [
   {id:'emerald',       need:{gem:1,herbs:4}, at:'bench', known:true},
   {id:'topaz',         need:{gem:1,amber:2}, at:'bench', known:true},
   {id:'amethyst',      need:{gem:1,crystal:2}, at:'bench', known:true},
+  {id:'stone_golem',   need:{living_stone:3,stone:20,iron:5,crystal:2}, at:'forge', known:true},
   {id:'glider',        need:{planks:4,silk_cloth:2,rope:2}, at:'bench', known:true},
   {id:'promise_ring',  need:{gem_ring:1,silver:2,pearl:1,star_fragment:1}, at:'forge', known:true},
   {id:'tapestry',      need:{linen:2,silk_cloth:1,heather:2}, at:'bench', known:true},
@@ -1173,7 +1176,7 @@ const ENEMIES = {
   slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
   crab:{name:'Shore Crab',hp:6,dmg:2,speed:2.6,aggro:4,drops:[['shells',1,3,1],['meat',1,1,.3]]},
   sporeling:{name:'Sporeling',hp:7,dmg:2,speed:2.4,aggro:6,drops:[['mushroom',1,2,1],['truffle',1,1,.08]]},
-  rockgolem:{name:'Rock Golem',hp:16,dmg:3,speed:1.6,aggro:5,drops:[['stone',2,4,1],['ore',1,2,.6],['crystal',1,1,.15]]},
+  rockgolem:{name:'Rock Golem',hp:16,dmg:3,speed:1.6,aggro:5,drops:[['stone',2,4,1],['ore',1,2,.6],['crystal',1,1,.15],['living_stone',1,1,.25]]},
   ghostpirate:{name:'Ghost Pirate',hp:10,dmg:3,speed:3,aggro:8,undead:true,drops:[['pirate_gold',1,1,.25],['ancient_coin',1,1,.15]],coins:[10,30]},
   wolf:{name:'Wolf',plural:'Wolves',hp:4,dmg:1,speed:3.5,aggro:6,drops:[['hide',1,1,1],['meat',1,1,.4]],curio:'fang'},
   bandit:{name:'Bandit',hp:7,dmg:2,speed:3.0,aggro:7,coins:[6,16],drops:[['ore',1,2,.3],['berries',1,2,.4]],curio:'banditmap'},
@@ -3321,6 +3324,16 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+function drawGolem(x, y, phase, moving, face) {
+  const st = moving ? Math.sin(phase)*1.5 : 0, f = face === 'left' ? -1 : 1, lv = compLv('golem');
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(x, y, 7, 2.2, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#6a6a78'; ctx.fillRect(x - 5, y - 5 + (st > 0 ? -1 : 0), 4, 5); ctx.fillRect(x + 1, y - 5 + (st < 0 ? -1 : 0), 4, 5);
+  ctx.fillStyle = '#8a8a98'; ctx.fillRect(x - 6, y - 15, 12, 10); ctx.fillStyle = '#9a9aa8'; ctx.fillRect(x - 4, y - 20, 8, 6);
+  ctx.fillStyle = '#7a7a88'; ctx.fillRect(x - 9, y - 14 + st*.5, 3, 8); ctx.fillRect(x + 6, y - 14 - st*.5, 3, 8);
+  ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
+  const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
+  if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
 // ===== sandstorm relics =====
 let relics = [], relicT = 0;
 function updateRelics(dt) {
@@ -3726,6 +3739,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Stone Golem', 'Rock golems sometimes drop Living Stone. Forge a Golem Heartstone (3 Living Stone, 20 Stone, 5 Iron, 2 Crystal) and a loyal Stone Golem follows you as a free companion.'],
   ['Sandstorms', 'When storms sweep the desert, buried relics peek out of the dunes. Dig them up with a shovel before the storm ends: Sun Discs, Desert Roses, Ancient Coins and the rare Scarab Amulet.'],
   ['Seasonal fish', 'Some fish only bite in one season: Blossom Trout in spring, Sun Marlin on warm summer coasts, Harvest Carp in autumn, and Ice Pike in winter. The rare Aurora Char rises on winter nights in snowy waters.'],
   ['Rival duels', 'Vex the Bold in Crownfall challenges you to a duel once a day. Duels are fought in the arena and losing costs nothing. Climb five ranks to win Vex\u2019s own rapier.'],
@@ -4705,7 +4719,7 @@ function render() {
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
-  if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
+  if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; if (C.golem) sprites.push({y: compE.y, f: () => drawGolem(Math.round(compE.x*TS), Math.round(compE.y*TS), compE.phase, compE.moving, compE.face) }); else sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
   if (S.tmap && inView(S.tmap.x, S.tmap.y) && Math.hypot(S.x - S.tmap.x, S.y - S.tmap.y) < 9) sprites.push({y: S.tmap.y + .1, f: () => { const x = S.tmap.x*TS + 8, y = S.tmap.y*TS + 9, a = .45 + Math.sin(frameT*4)*.25; ctx.globalAlpha = a; ctx.strokeStyle = '#8a3a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 3); ctx.lineTo(x + 4, y + 3); ctx.moveTo(x + 4, y - 3); ctx.lineTo(x - 4, y + 3); ctx.stroke(); ctx.globalAlpha = 1; if (Math.random() < .05) burst(S.tmap.x + .5, S.tmap.y + .4, '#f0c040', 1, 1); }});
@@ -6537,7 +6551,7 @@ function craft(id) {
   const r = RECIPE_BY[id], out = r.out || r.id, g = GOODS[out];
   if (!isKnown(id) || !stations()[r.at] || !Object.entries(r.need).every(([k, q]) => have(k) >= q)) return;
   for (const k in r.need) addItem(k, -r.need[k]);
-  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5); if (r.at === 'cook') { S.cooked = S.cooked || {}; S.cooked[out] = true; }
+  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5); if (out === 'stone_golem') { S.golemOwned = true; S.companion = 'golem'; compE = null; setTimeout(() => toast('<b>The golem awakens!</b><br>Stone grinds on stone as your Stone Golem rises and follows you. It needs no wages. (Swap companions at any mercenary captain.)', 7000), 400); } if (r.at === 'cook') { S.cooked = S.cooked || {}; S.cooked[out] = true; }
   const mw = Math.random() < .04*sk('cra'); if (mw) { addItem(out, r.n || 1); S.masterworks = (S.masterworks || 0) + 1; }
   let note = '';
   if (g.kind === 'weapon' && g.dmg > weapon().dmg) { S.equip.weapon = out; note = ' Equipped.'; }
@@ -6597,6 +6611,7 @@ const COMPANIONS = {
   brann:{name:'Brann the Shieldbearer', role:'melee', cost:300, wage:20, dmg:3, cd:.8, range:.7, held:'sword', cols:{cloak:'#6a6a7a', skin:'#d8a882', hair:'#8a5a2a'}, desc:'Strong in close combat. Monsters that hit you get hit back.'},
   lyra:{name:'Lyra the Archer', role:'ranged', cost:400, wage:25, dmg:3, cd:1.1, range:6, held:'bow', cols:{cloak:'#3a6a3a', skin:'#e0b896', hair:'#e0c060'}, desc:'Shoots arrows at foes from a safe distance.'},
   orin:{name:'Orin the Pyromancer', role:'mage', cost:650, wage:35, dmg:4, cd:1.8, range:6, held:'fire_staff', cols:{cloak:'#a83a2a', skin:'#c89870', hair:'#2a2a2a'}, desc:'Hurls fireballs that burst on groups of foes.'},
+  golem:{name:'Stone Golem', role:'melee', cost:0, wage:0, dmg:5, cd:1.15, range:.85, held:null, golem:true, cols:{cloak:'#8a8a98', skin:'#8a8a98', hair:'#8a8a98'}, desc:'Built, not hired. Hits hard, never tires, and never asks for wages.'},
   mae:{name:'Sister Mae', role:'healer', cost:500, wage:30, dmg:1.5, cd:1, range:.7, held:'club', cols:{cloak:'#e8e0d0', skin:'#e0c0a0', hair:'#a85a2a'}, desc:'Heals you a little every few seconds, and swats at foes.'},
 };
 let compE = null;
@@ -6757,7 +6772,8 @@ function museumTalk(n) {
 function hireTalk(n) {
   const cur = S.companion && COMPANIONS[S.companion];
   say(`“Need a sword at your side? My people fight for coin. A one-time fee, then a daily wage. If you can't pay their wage, they'll leave.”${cur ? `<br><br>You have hired <b>${cur.name}</b> (${cur.wage} coin a day).` : ''}`, [
-    ...Object.entries(COMPANIONS).map(([k, C]) => ({label: S.companion === k ? `${C.name} (Lv ${compLv(k)}) · with you` : `${C.name}${compLv(k) ? ` (Lv ${compLv(k)})` : ''} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
+    ...(S.golemOwned && S.companion !== 'golem' ? [{label: 'Wake my Stone Golem', primary: true, fn: () => { S.companion = 'golem'; compE = null; save(); say('Your golem rumbles to life and lumbers to your side.', [back(n)]); }}] : []),
+    ...Object.entries(COMPANIONS).filter(([, C]) => !C.golem).map(([k, C]) => ({label: S.companion === k ? `${C.name} (Lv ${compLv(k)}) · with you` : `${C.name}${compLv(k) ? ` (Lv ${compLv(k)})` : ''} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
       {label: 'Hire', primary: true, disabled: S.coins < C.cost, fn: () => { S.coins -= C.cost; S.companion = k; compE = null; S.hiredOnce = true; SFX.coin(); renderHUD(); save(); say(`“${C.name} at your service. Lead the way.”`, [back(n)]); }}, back(n)])})),
     ...(cur ? [{label: `Dismiss ${cur.name}`, fn: () => { S.companion = null; compE = null; save(); say('“Farewell. Send for us any time.”', [back(n)]); }}] : []),
     back(n)]);
@@ -8041,6 +8057,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['golem','Stone Friend','Build a Stone Golem companion', () => !!S.golemOwned],
   ['relics','Sand Sifter','Dig up 8 relics in sandstorms', () => (S.relicsDug || 0) >= 8],
   ['seasonfish','Angler for All Seasons','Catch all five seasonal fish', () => ['blossom_trout','sun_marlin','harvest_carp','ice_pike','aurora_char'].every(f => (S.fishLog || {})[f])],
   ['rival','Rivalry','Beat Vex the Bold in a duel', () => (S.vexRank || 0) >= 1],
