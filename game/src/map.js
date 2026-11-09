@@ -1,4 +1,4 @@
-import { heightAt, slopeAt, WORLD, HALF } from './terrain.js';
+import { heightAt, slopeAt, WORLD, HALF, volcanicAt, VOLCANO } from './terrain.js';
 import { KIND } from './building.js';
 
 // World map: a hill-shaded render of the island, fog of war that lifts as you explore,
@@ -13,7 +13,8 @@ const PLACES = [
   { name: 'Northern Peak', x: -40, z: -230 },
   { name: 'Ironridge', x: -150, z: -160 },
   { name: 'Western Woods', x: -250, z: 40 },
-  { name: 'Eastern Shore', x: 300, z: 120 },
+  { name: 'Eastern Shore', x: 300, z: 160 },
+  { name: 'Ashfang Volcano', x: VOLCANO.x, z: VOLCANO.z + 40 },
 ];
 
 const toMap = (v) => (v / WORLD + 0.5);
@@ -52,6 +53,10 @@ export class WorldMap {
       else if (h < 26) { const t = h / 26; r = 92 - t * 30; g = 140 - t * 40; b = 60 - t * 15; }
       else if (h < 68) { const t = (h - 26) / 42; r = 110 + t * 20; g = 104 + t * 16; b = 92 + t * 18; }
       else { r = 236; g = 238; b = 242; }
+      const x = (i / (RES - 1) - 0.5) * WORLD, z = (j / (RES - 1) - 0.5) * WORLD;
+      const vol = h > 0 ? volcanicAt(x, z) : 0;
+      if (vol > 0) { r = r + (60 - r) * vol; g = g + (54 - g) * vol; b = b + (52 - b) * vol; }
+      if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < VOLCANO.crater * 0.6) { r = 255; g = 110; b = 30; }
       const k = (j * RES + i) * 4;
       const sh = h < 0 ? 1 : shade;
       im.data[k] = r * sh; im.data[k + 1] = g * sh; im.data[k + 2] = b * sh; im.data[k + 3] = 255;
@@ -155,6 +160,18 @@ export class WorldMap {
     }
     if (g.altar && seen(g.altar.pos.x, g.altar.pos.z)) { const [x, y] = P(g.altar.pos.x, g.altar.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
     if (g.boss && g.boss.alive) { const [x, y] = P(g.boss.pos.x, g.boss.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
+    for (const c of g.caves ? g.caves.list : []) {
+      if (!seen(c.entrance.pos.x, c.entrance.pos.z)) continue;
+      const [x, y] = P(c.entrance.pos.x, c.entrance.pos.z); this.icon(ctx, x, y, '🕳️', 16 * dpr);
+      ctx.fillStyle = '#f6ead0'; ctx.font = `${Math.round(10 * dpr)}px Inter, sans-serif`; ctx.fillText(c.name, x, y + 16 * dpr);
+    }
+    const underground = g.caves && g.caves.at(g.player.pos);
+    if (underground) {
+      const [x, y] = P(underground.entrance.pos.x, underground.entrance.pos.z);
+      this.arrow(ctx, x, y, 0, 9 * dpr);
+      document.getElementById('map-info').textContent = `Underground in ${underground.name}`;
+      return;
+    }
     this.arrow(ctx, ...P(g.player.pos.x, g.player.pos.z), -g.player.yaw, 9 * dpr);
     document.getElementById('map-info').textContent = `Explored ${Math.round(this.explored() * 100)}% of the island`;
   }
@@ -183,6 +200,12 @@ export class WorldMap {
     ctx.save();
     ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = '#0b2a36'; ctx.fillRect(0, 0, S, S);
+    if (g.caves && g.caves.at(p.pos)) {
+      ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, S, S);
+      ctx.restore();
+      ctx.fillStyle = '#e8c27a'; ctx.font = '700 11px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('UNDERGROUND', S / 2, S / 2 + 4);
+      return;
+    }
     ctx.drawImage(this.base(), px - w / 2, pz - w / 2, w, w, 0, 0, S, S);
     const sc = S / span;
     const M = (x, z) => [S / 2 + (x - p.pos.x) * sc, S / 2 + (z - p.pos.z) * sc];

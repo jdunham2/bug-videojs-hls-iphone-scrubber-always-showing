@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, slopeAt, HALF } from './terrain.js';
+import { heightAt, slopeAt, HALF, volcanicAt, VOLCANO } from './terrain.js';
 import { mergeParts, mtx, lumpify, addWind } from './util.js';
 import { createNoise2D, mulberry32 } from './noise.js';
 
@@ -86,6 +86,26 @@ function rockGeo(rand, big) {
   return mergeParts(parts);
 }
 
+export function obsidianGeo(rand) {
+  const parts = [];
+  for (let k = 0; k < 4; k++) {
+    const r = 0.5 + rand() * 0.6;
+    parts.push({ geo: new THREE.OctahedronGeometry(r, 0), color: k % 2 ? 0x1a1620 : 0x2a2234, jitter: 0.2,
+      matrix: mtx((rand() - 0.5) * 1.4, r * 0.7, (rand() - 0.5) * 1.4, rand(), rand(), rand(), 0.8, 1.6, 0.8) });
+  }
+  return mergeParts(parts);
+}
+
+export function crystalGeo(rand) {
+  const parts = [];
+  for (let k = 0; k < 7; k++) {
+    const h = 0.7 + rand() * 1.5;
+    parts.push({ geo: new THREE.ConeGeometry(0.16 + rand() * 0.12, h, 5), color: k % 3 ? 0x7ad8ff : 0xb8f0ff,
+      matrix: mtx((rand() - 0.5) * 0.9, h * 0.45, (rand() - 0.5) * 0.9, (rand() - 0.5) * 0.9, rand() * 3, (rand() - 0.5) * 0.9) });
+  }
+  return mergeParts(parts);
+}
+
 function oreGeo(rand) {
   const parts = [];
   const r = 1.0 + rand() * 0.6;
@@ -142,6 +162,8 @@ const KINDS = {
   pine:      { kind: 'tree', hp: 80, yields: [['wood', 4]], radius: 0.6 },
   rock:      { kind: 'rock', hp: 70, yields: [['stone', 3], ['flint', 1]], radius: 1.4 },
   metal:     { kind: 'rock', hp: 130, yields: [['stone', 2], ['ore', 3]], radius: 1.5 },
+  obsidian:  { kind: 'rock', hp: 120, yields: [['obsidian', 3], ['stone', 1]], radius: 1.3 },
+  crystal:   { kind: 'rock', hp: 90, yields: [['crystal', 3], ['stone', 1]], radius: 0.9 },
   boulder:   { kind: 'rock', hp: 160, yields: [['stone', 4], ['flint', 2]], radius: 3.2 },
   bush:      { kind: 'bush', hp: 12, yields: [['fiber', 3], ['berries', 2]], radius: 0 },
   dozebush:  { kind: 'bush', hp: 12, yields: [['fiber', 2], ['sleepberry', 3]], radius: 0 },
@@ -171,6 +193,7 @@ export class World {
       { type: 'rock',      geos: variants(() => rockGeo(rand, false), 4), mat: rockMat, count: 700, test: (x, z, h, s) => h > 1 && h < 80 },
       { type: 'boulder',   geos: variants(() => rockGeo(rand, true), 3),  mat: rockMat, count: 220, test: (x, z, h, s) => h > 3 && s > 0.05 },
       { type: 'metal',     geos: variants(() => oreGeo(rand), 3),      mat: rockMat, count: 260, test: (x, z, h, s) => h > 26 && h < 90 },
+      { type: 'obsidian',  geos: variants(() => obsidianGeo(rand), 3), mat: this.glassMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.18, metalness: 0.35, flatShading: true }), count: 120, volcanic: true, test: (x, z, h, s) => h > 4 },
       { type: 'bush',      geos: variants(() => bushGeo(rand, 0x7a1f3d), 2), mat: bushMat, count: 700, test: (x, z, h, s) => h > 2.5 && h < 35 && s < 0.25 },
       { type: 'dozebush',  geos: variants(() => bushGeo(rand, 0x6a3aa8), 2), mat: bushMat, count: 260, test: (x, z, h, s) => h > 4 && h < 40 && s < 0.25 && noise(x * 0.02 + 9, z * 0.02) > 0.1 },
     ];
@@ -184,6 +207,9 @@ export class World {
         const x = (rand() - 0.5) * HALF * 1.9, z = (rand() - 0.5) * HALF * 1.9;
         const h = heightAt(x, z), s = slopeAt(x, z);
         if (!d.test(x, z, h, s)) continue;
+        const vol = volcanicAt(x, z);
+        if (d.volcanic ? vol < 0.45 : vol > (d.type === 'rock' || d.type === 'boulder' ? 0.9 : 0.3)) continue;
+        if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < VOLCANO.crater + 4) continue;
         // clear area around spawn beach a bit
         if (spawn && Math.hypot(x - spawn.x, z - spawn.z) < 10) continue;
         placements[Math.floor(rand() * d.geos.length)].push({ x, z, h, rot: rand() * Math.PI * 2, scl: 0.8 + rand() * 0.5 });
@@ -219,7 +245,7 @@ export class World {
       gt++;
       const x = (rand() - 0.5) * HALF * 1.8, z = (rand() - 0.5) * HALF * 1.8;
       const h = heightAt(x, z);
-      if (h < 2.8 || h > 32 || slopeAt(x, z) > 0.2) continue;
+      if (h < 2.8 || h > 32 || slopeAt(x, z) > 0.2 || volcanicAt(x, z) > 0.25) continue;
       const dens = noise(x * 0.03, z * 0.03);
       if (dens < -0.2) continue;
       grass.setMatrixAt(gi, mtx(x, h - 0.05, z, 0, rand() * 6.28, 0, 0.8 + rand() * 0.8, 0.45 + rand() * 0.55 + Math.max(0, dens) * 0.6, 0.8 + rand() * 0.8));
@@ -295,6 +321,25 @@ export class World {
   }
 
   static yieldsFor(type) { return KINDS[type].yields; }
+
+  // Add a batch of harvestable nodes after start-up (used by caves). placements: [{x, y, z, rot, scl}]
+  addNodeSet(type, geo, mat, placements) {
+    if (!placements.length) return;
+    const k = KINDS[type];
+    const im = new THREE.InstancedMesh(geo, mat, placements.length);
+    im.castShadow = true; im.receiveShadow = true;
+    placements.forEach((p, i) => {
+      const m = mtx(p.x, p.y - 0.1, p.z, 0, p.rot || 0, 0, p.scl || 1);
+      im.setMatrixAt(i, m);
+      const node = { type, kind: k.kind, x: p.x, z: p.z, y: p.y, hp: k.hp, maxHp: k.hp, mesh: im, index: i, matrix: m, alive: true, respawn: 0, scl: p.scl || 1, r: k.radius };
+      this.nodes.push(node); this.grid.add(node);
+      if (k.radius > 0) { node.collider = { x: p.x, z: p.z, r: k.radius * (p.scl || 1) }; this.colliders.add(node.collider); }
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    this.scene.add(im);
+    this.meshes.push(im);
+  }
 
   // Push a circle (x,z,r) out of static colliders. Returns adjusted position.
   collide(pos, r) {

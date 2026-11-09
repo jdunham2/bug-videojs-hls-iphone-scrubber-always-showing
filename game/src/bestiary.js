@@ -16,6 +16,8 @@ const LORE = {
   galewing: { icon: '🪽', where: 'Skies everywhere, perching to rest', text: 'A skittish pterosaur that rides the sea winds. Bring it down with tranquilizers to tame a flying mount.' },
   thunderwing: { icon: '🦅', where: 'Northern peaks', text: 'A storm-dark pterosaur that dives from the clouds. Few survivors see it coming.' },
   glimmerfin: { icon: '🐟', where: 'Shallow water, in schools', text: 'Silver-sided fish that flash and scatter. A spear catches supper.' },
+  cinderback: { icon: '🌋', where: 'Ashfang Volcano and the Ember Depths', text: 'Basalt-plated and veined with living fire. It wades through heat that would cook anything else, and a saddled one carries you across lava.' },
+  duskraptor: { icon: '🦇', where: 'Caves, in packs', text: 'Blind pack hunters that glow faintly blue in the dark. They hear you long before you see them.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

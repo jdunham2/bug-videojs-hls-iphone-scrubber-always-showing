@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { buildTerrain, heightAt, findSpawn, WATER_LEVEL, HALF } from './terrain.js';
+import { buildTerrain, heightAt, findSpawn, WATER_LEVEL, HALF, volcanicAt, inVolcanoLava, VOLCANO, blockedAt } from './terrain.js';
+import { Volcano } from './volcano.js';
+import { Caves } from './caves.js';
 import { Environment } from './environment.js';
 import { World } from './world.js';
 import { CreatureManager, SPECIES } from './creatures.js';
@@ -93,6 +95,8 @@ class Game {
     this.creatures.viewDist = quality === 'high' ? 330 : 220;
     this.creatures.populate(this.spawnPoint);
     this.buildAltar();
+    this.volcano = new Volcano(this.scene, this.shared);
+    this.caves = new Caves(this);
 
     this.arrows = [];
     this.arrowGeo = (() => {
@@ -144,6 +148,8 @@ class Game {
       { title: 'Forge the Primal Blade from the Tyrant Fang', progress: () => 'Needs a Forge, 20 Metal Ingots and 10 Hide', done: () => this.inv.count('primalblade') > 0 || (this.stats.blades || 0) > 0 },
       { title: 'Grow food: build a Crop Plot, plant a seed and harvest it', progress: () => 'Seeds drop from berry bushes. Rain doubles growth.', done: () => (this.stats.harvests || 0) >= 1 },
       { title: 'Breed your tames: two of a kind on Stay, then hatch the egg by a fire', progress: () => 'Set both to Stay (roster: T) within 8 m of each other', done: () => (this.stats.hatched || 0) >= 1 },
+      { title: 'Find a cave entrance (map: M) and open an Ancient Cache', progress: () => 'Caves: Ember Depths (volcano), Glimmer Grotto (north ridge), Rootway Hollow (west woods)', done: () => (this.stats.caches || 0) >= 1 },
+      { title: 'Mine Obsidian on Ashfang Volcano and forge an Obsidian Spear or Ashguard Armor', progress: () => `🖤 ${this.inv.count('obsidian')} obsidian · the forge needs 8–12`, done: () => this.inv.count('obsidianspear') + this.inv.count('ashguard') > 0 || (this.player.armor && this.player.armor.id === 'ashguard') },
     ];
     this.questIdx = 0;
 
@@ -329,6 +335,12 @@ class Game {
     if (n && n.dist < 4 && n.node.kind === 'bush') { this.harvestNode(n.node, 1.0, true); return; }
     const bag = this.bagNear(p.pos);
     if (bag) { this.collectBag(bag); return; }
+    const cave = this.caves.entranceNear(p.pos);
+    if (cave) { this.caves.travel('in', cave); return; }
+    const exit = this.caves.exitNear(p.pos);
+    if (exit) { this.caves.travel('out', exit); return; }
+    const cache = this.caves.cacheNear(p.pos);
+    if (cache) { this.caves.openCache(cache); return; }
     const drop = this.drops.near(p.pos);
     if (drop) { this.drops.open(drop); return; }
     if (fire) { this.useProp(fire); return; }
@@ -887,7 +899,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -985,7 +997,8 @@ class Game {
     } else m.speed = lerp(m.speed, 0, Math.min(1, dt * 4));
     const nx = m.pos.x + Math.sin(m.yaw) * m.speed * dt, nz = m.pos.z + Math.cos(m.yaw) * m.speed * dt;
     const nh = heightAt(nx, nz);
-    if (nh > -1.0 && Math.abs(nx) < HALF * 0.97 && Math.abs(nz) < HALF * 0.97) { m.pos.x = nx; m.pos.z = nz; }
+    const inCave = Math.abs(nx) > 1500;
+    if (nh > -1.0 && (inCave ? !blockedAt(nx, nz) : Math.abs(nx) < HALF * 0.97 && Math.abs(nz) < HALF * 0.97)) { m.pos.x = nx; m.pos.z = nz; }
     else m.speed = 0;
     this.world.collide(m.pos, m.radius * 0.6);
     m.pos.y = Math.max(heightAt(m.pos.x, m.pos.z), WATER_LEVEL - 1.0);
@@ -1019,7 +1032,10 @@ class Game {
     if (running) {
       this.shared.uTime.value += dt;
       this.feedCd -= dt;
+      const px = p.pos.x, pz = p.pos.z;
       p.update(dt, this.input, this.world, this.building);
+      // cave walls: undo horizontal movement into rock
+      if (!p.mount && blockedAt(p.pos.x, p.pos.z)) { if (!blockedAt(px, p.pos.z)) p.pos.x = px; else if (!blockedAt(p.pos.x, pz)) p.pos.z = pz; else { p.pos.x = px; p.pos.z = pz; } p.pos.y = Math.max(p.pos.y, heightAt(p.pos.x, p.pos.z)); }
       this.input.mx = 0; this.input.my = 0;
       this.updateMount(dt);
       if (!this.ui.open) this.primary(dt);
@@ -1027,7 +1043,10 @@ class Game {
       this.temperature(dt);
       if (!p.alive && !document.getElementById('death').classList.contains('show')) this.die(null);
       this.env.update(dt, p.pos);
-      this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y);
+      this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y, volcanicAt(p.pos.x, p.pos.z) * 0.9);
+      this.volcano.update(dt, p.pos);
+      this.caves.update(dt);
+      this.lava(dt);
       if (this.weather.raining && !p.underwater && p.alive) p.water = Math.min(100, p.water + dt * 0.35 * this.weather.cur.rain);
       this.world.update(dt);
       this.creatures.update(dt, p, this.shared.uTime.value);
@@ -1040,7 +1059,7 @@ class Game {
       for (const c of this.creatures.list) {
         if (c.state === 'chase' && !c.tamed && c.alive && (c.target === 'player' || (c.target && c.target === p.mount)) && c.pos.distanceTo(p.pos) < 70) { danger = 1; break; }
       }
-      this.music.update(dt, { night: 1 - this.env.daylight, danger, boss: this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 120 ? 1 : 0 });
+      this.music.update(dt, { night: this.caves.at(p.pos) ? 1 : 1 - this.env.daylight, danger, boss: this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 120 ? 1 : 0 });
       this.map.update(dt);
       this.bestiary.update(dt);
       this.breeding.update(dt);
@@ -1089,13 +1108,21 @@ class Game {
     const p = this.player, w = this.weather.cur;
     let t = 27 - Math.max(0, p.pos.y - 10) * 0.32 - (1 - this.env.daylight) * 9 - w.rain * 6 - Math.max(0, w.wind - 1) * 1.5;
     if (p.underwater || p.swimming) t -= 5;
+    const cave = this.caves.at(p.pos);
+    if (cave) t = cave.t.temp;
+    else {
+      // the volcano radiates heat; the crater is scorching
+      t += volcanicAt(p.pos.x, p.pos.z) * 14 + Math.max(0, p.pos.y - 10) * 0.32 * volcanicAt(p.pos.x, p.pos.z);
+      const cd = Math.hypot(p.pos.x - VOLCANO.x, p.pos.z - VOLCANO.z);
+      if (cd < VOLCANO.crater + 25) t += 22 * (1 - cd / (VOLCANO.crater + 25));
+    }
     for (const f of this.building.fires) {
       if (!f.lit) continue;
       const d = f.pos.distanceTo(p.pos);
       if (d < 9) t += (f.type === 'forge' ? 22 : 18) * (1 - d / 9);
     }
     this.ambientTemp = t;
-    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : 5) : 0;
+    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : p.armor.id === 'ashguard' ? 9 : 5) : 0;
     const cold = Math.max(0, (10 - insul) - t);        // degrees below comfort
     const hot = Math.max(0, t - 36);
     p.cold = cold; p.hot = hot;
@@ -1148,7 +1175,25 @@ class Game {
     || tip('swim', () => p.swimming, 'Swimming drains stamina. Deep water is Deepjaw territory.')
     || tip('lowhp', () => p.hp < p.maxHp * 0.3 && p.alive, 'Low health! Eat Cooked Meat to heal, or back off and rest.')
     || tip('cold', () => (p.cold || 0) > 3, 'You are getting cold. Fires, forges and Hide Armor keep you warm.')
-    || tip('map', () => this.map.explored() > 0.05, 'Press M (🗺️) to open the map. Fog lifts as you explore.');
+    || tip('map', () => this.map.explored() > 0.05, 'Press M (🗺️) to open the map. Fog lifts as you explore.')
+    || tip('volcano', () => volcanicAt(p.pos.x, p.pos.z) > 0.5, 'Ashfang Volcano: the heat drains water fast, and lava burns. Mine the black Obsidian here.')
+    || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
+  }
+
+  // Lava burns: crater lake and lava-cave pools. Ashguard armor and fireproof mounts protect.
+  lava(dt) {
+    const p = this.player;
+    if (!p.alive) return;
+    const m = p.mount;
+    const pos = m ? m.pos : p.pos;
+    if (!(inVolcanoLava(pos.x, pos.z, pos.y) || this.caves.lavaAt(pos))) { this._burnT = 0; return; }
+    if (m) { if (!m.def.fireproof) this.creatures.damage(m, 40 * dt, 0, null); return; }
+    const fp = p.armor && ITEMS[p.armor.id].fireproof ? ITEMS[p.armor.id].fireproof : 0;
+    p.damage(30 * dt * (1 - fp));
+    p.hurtT = Math.max(p.hurtT, 0.3);
+    this._burnT = (this._burnT || 0) - dt;
+    if (this._burnT <= 0) { this._burnT = 1.2; this.ui.notify(fp ? 'Your Ashguard Armor holds back the lava' : 'You are burning in the lava!', 'warn'); this.audio.noiseHit({ freq: 2500, q: 0.4, dur: 0.6, vol: 0.3, type: 'highpass' }); }
+    if (!p.alive) this.die(null);
   }
 
   cooking(dt) {
@@ -1216,6 +1261,9 @@ class Game {
       if (n && n.dist < 4 && n.node.kind === 'bush') prompt = `<kbd>E</kbd> Pick ${n.node.type === 'dozebush' ? 'Dozeberries' : 'Wildberries'}`;
       else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> ${n.node.kind === 'tree' ? 'Harvest Tree' : n.node.type === 'metal' ? 'Mine Metal Ore' + (this.activeItem()?.id?.includes('pick') ? '' : ' (use a pick)') : 'Harvest Rock'}`;
       else if (this.bagNear(p.pos)) prompt = '<kbd>E</kbd> Recover your belongings';
+      else if (this.caves.entranceNear(p.pos)) prompt = `<kbd>E</kbd> Enter ${this.caves.entranceNear(p.pos).name}`;
+      else if (this.caves.exitNear(p.pos)) prompt = '<kbd>E</kbd> Leave the cave';
+      else if (this.caves.cacheNear(p.pos)) prompt = '<kbd>E</kbd> Open the Ancient Cache';
       else if (this.drops.near(p.pos)) prompt = `<kbd>E</kbd> Open ${this.drops.near(p.pos).tier === 'rare' ? 'rare ' : ''}supply drop`;
       else if (this.breeding.eggNear(p.pos)) { const e = this.breeding.eggNear(p.pos); prompt = `${e.species[0].toUpperCase() + e.species.slice(1)} egg · ${Math.round(e.hatch * 100)}% incubated · ${e.warm ? 'warm' : 'cold — light a campfire nearby'}`; }
       else if (fire) {

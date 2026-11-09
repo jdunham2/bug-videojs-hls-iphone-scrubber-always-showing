@@ -9,8 +9,31 @@ const n1 = createNoise2D(1337);
 const n2 = createNoise2D(4242);
 const n3 = createNoise2D(9001);
 
+// Ashfang Volcano on the east coast.
+export const VOLCANO = { x: 245, z: -105, r: 150, crater: 26 };
+const vn = createNoise2D(777);
+
+// 0..1 how volcanic (ash-covered) a spot is.
+export function volcanicAt(x, z) {
+  const d = Math.hypot(x - VOLCANO.x, z - VOLCANO.z) + vn(x * 0.02, z * 0.02) * 14;
+  return 1 - smoothstep(105, 165, d);
+}
+
+// Caves (and anything else far outside the island) can supply their own ground.
+let groundProvider = null;
+export function setGroundProvider(fn) { groundProvider = fn; }
+let blockProvider = null;
+export function setBlockProvider(fn) { blockProvider = fn; }
+// true where a cave wall blocks movement
+export function blockedAt(x, z) { return blockProvider ? blockProvider(x, z) : false; }
+
 // Analytic height function — used for both mesh and gameplay queries.
 export function heightAt(x, z) {
+  if (groundProvider && (x > 1500 || x < -1500)) { const g = groundProvider(x, z); if (g !== undefined) return g; }
+  return surfaceHeight(x, z);
+}
+
+function surfaceHeight(x, z) {
   // Distorted radial island mask
   const wx = x + n2(x * 0.004, z * 0.004) * 60;
   const wz = z + n2(x * 0.004 + 50, z * 0.004 + 50) * 60;
@@ -34,6 +57,15 @@ export function heightAt(x, z) {
   h -= lake * lake * 22;
 
   h = h * island + (-16) * (1 - island);
+
+  // the volcano cone rises out of the coast, with a crater at the top
+  const vd = Math.hypot(x - VOLCANO.x, z - VOLCANO.z);
+  if (vd < VOLCANO.r) {
+    const k = 1 - vd / VOLCANO.r;
+    const rough = 1 + vn(x * 0.03, z * 0.03) * 0.12 * k;
+    h = Math.max(h, -16) + Math.pow(k, 1.7) * 92 * rough * (h < 0 ? 1.15 : 1);
+    if (vd < VOLCANO.crater) h -= Math.pow(1 - vd / VOLCANO.crater, 1.2) * 52;
+  }
 
   // Flatten beaches near the waterline
   const b = smoothstep(-1.5, 4.5, h);
@@ -61,6 +93,9 @@ const C = {
   rock: new THREE.Color(0x777068),
   rock2: new THREE.Color(0x56514b),
   snow: new THREE.Color(0xf2f4f7),
+  ash: new THREE.Color(0x3c3836),
+  ash2: new THREE.Color(0x2a2624),
+  basalt: new THREE.Color(0x5a281c),
 };
 
 export function buildTerrain(quality) {
@@ -89,7 +124,14 @@ export function buildTerrain(quality) {
       tmp.copy(C.rock).lerp(C.rock2, v);
       c.lerp(tmp, smoothstep(26, 40, h) * 0.85);
       c.lerp(tmp, smoothstep(0.18, 0.32, s));
-      c.lerp(C.snow, smoothstep(70, 85, h + v * 8) * (1 - smoothstep(0.35, 0.5, s)));
+      const vol = volcanicAt(x, z);
+      c.lerp(C.snow, smoothstep(70, 85, h + v * 8) * (1 - smoothstep(0.35, 0.5, s)) * (1 - vol));
+      if (vol > 0) {
+        tmp.copy(C.ash).lerp(C.ash2, v);
+        c.lerp(tmp, vol * 0.92);
+        const vd = Math.hypot(x - VOLCANO.x, z - VOLCANO.z);
+        c.lerp(C.basalt, smoothstep(60, 28, vd) * 0.8);
+      }
     }
     colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
   }
@@ -134,6 +176,12 @@ export function buildHeightTexture(res = 256) {
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
   return tex;
+}
+
+// Lava lake level inside the crater.
+export const LAVA_Y = surfaceHeight(VOLCANO.x, VOLCANO.z) + 14;
+export function inVolcanoLava(x, z, y) {
+  return Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < VOLCANO.crater && y < LAVA_Y + 0.4;
 }
 
 export function findSpawn() {

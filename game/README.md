@@ -22,6 +22,16 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Temperature:** it gets colder with altitude, at night and in rain and wind. Fires and
   forges warm you, Hide Armor insulates well (Metal Armor barely). Freezing burns food, stops
   healing and then drains health; snow falls on the peaks. The HUD shows the temperature.
+- **Ashfang Volcano:** a smoking volcano on the east coast with ash-covered slopes, falling
+  ash, a lava lake in the crater and intense heat (drains water fast). Lava burns; Ashguard
+  Armor blocks most of it and a saddled Cinderback walks through it. Mine black Obsidian here
+  for the Obsidian Spear and Ashguard Armor.
+- **Caves:** three cave systems, each entered through a rock arch on the island (🕳️ on the
+  map): Ember Depths (volcano flank, lava pools, Cinderbacks, obsidian), Glimmer Grotto
+  (northern ridge, glowing crystals, Duskraptor packs) and Rootway Hollow (western woods, rich
+  metal veins, glowing moss). Each ends in an Ancient Cache that refills every two days. Caves
+  are dark: your torch lights the way, and a Crystal Lantern (from Glimmer Crystals) lights
+  caves and nights much better. Following tames come in with you.
 - **Supply drops:** every few minutes a glowing crate parachutes down somewhere 80–350 m
   away (📦 on the map, with a light beam). Blue drops hold supplies; gold drops on high ground
   can contain metal gear, saddles and even Alpha Trophies. They vanish after 6 minutes.
@@ -80,6 +90,8 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Spinesail: sail-backed predator that stalks the beaches and wades into water; rideable
   - Thunderneck: giant sauropod
   - Gorgonax: apex predator, found in the north; rideable
+  - Cinderback: lava-veined volcano predator, fireproof; rideable
+  - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer
 - **Ocean:** schools of Glimmerfin swim the shallows (easy meat with a spear), and the

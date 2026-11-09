@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, HALF } from './terrain.js';
+import { heightAt, HALF, volcanicAt, blockedAt } from './terrain.js';
 import { mergeParts, mtx, rand, pick, angleLerp } from './util.js';
 import { clamp, lerp } from './noise.js';
 
@@ -83,6 +83,16 @@ export const SPECIES = {
     name: 'Deepjaw', diet: 'carn', temper: 'aggressive', hp: 950, dmg: 22, walk: 4, run: 11, swim: 9, torpor: 600,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.2, reach: 4.2, hitR: 2.6, swimmer: true,
     drops: { meat: 12, hide: 6 }, aggro: 32, lvl: [10, 40], count: 3, zone: (h) => h < -8, far: 120,
+  },
+  cinderback: {
+    name: 'Cinderback', diet: 'carn', temper: 'aggressive', hp: 680, dmg: 26, walk: 2.8, run: 8.5, torpor: 460,
+    tameFood: 'meat', tameBase: 12, tameLvl: 0.3, rideable: true, radius: 1.7, reach: 3.8, hitR: 2.2, glow: [1, 0.35, 0.05], fireproof: true,
+    drops: { meat: 7, hide: 5, obsidian: 3 }, aggro: 28, lvl: [12, 40], count: 4, zone: (h, x, z) => volcanicAt(x, z) > 0.55 && h > 6, far: 120,
+  },
+  duskraptor: {
+    name: 'Duskraptor', diet: 'carn', temper: 'aggressive', hp: 170, dmg: 9, walk: 3, run: 10.5, torpor: 140,
+    tameFood: 'meat', tameBase: 7, tameLvl: 0.18, rideable: true, radius: 0.9, reach: 2.4, hitR: 1.4, glow: [0.2, 0.6, 1],
+    drops: { meat: 3, hide: 3, crystal: 1 }, aggro: 22, lvl: [8, 35], count: 0, zone: () => false,
   },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
@@ -429,6 +439,8 @@ const PALETTES = {
   thunderwing: [{ base: 0x3e3a36, belly: 0x9a9086, accent: 0x6a2a2a, horn: 0xc8b48a }, { base: 0x3a4248, belly: 0x9aa0a4, accent: 0x2a4a6a, horn: 0xc8b48a }],
   glimmerfin: [{ base: 0x8ab0c8, belly: 0xe8eef0, accent: 0x3a7ab0 }, { base: 0xe0a040, belly: 0xf0e0c0, accent: 0xc05a2a }, { base: 0x7ac0a0, belly: 0xe0f0e8, accent: 0x2a8a6a }],
   deepjaw: [{ base: 0x2e4a5a, belly: 0xb8c4c4, accent: 0x1a2a34, horn: 0xe0e0d0 }, { base: 0x3a4a42, belly: 0xc0c4b0, accent: 0x5a2a2a, horn: 0xe0e0d0 }],
+  cinderback: [{ base: 0x24201e, belly: 0x4a3a32, accent: 0xff6a1a, horn: 0x110e0c }, { base: 0x2e2622, belly: 0x5a4034, accent: 0xffa030, horn: 0x110e0c }],
+  duskraptor: [{ base: 0x1e2430, belly: 0x5a6070, accent: 0x3ab0ff, horn: 0x101418 }, { base: 0x262030, belly: 0x605a70, accent: 0x9a6aff, horn: 0x101418 }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -440,6 +452,8 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'cinderback': return buildBiped(mat, col, 1.9, { hip: 1.35, bodyLen: 1.15, girth: 1.2, arm: 0.8, headLen: 0.6, headW: 1.15, tailSeg: 0.65, stripes: 6, crest: false, knobs: true, neckW: 1.2 });
+    case 'duskraptor': return buildBiped(mat, col, 1.05, { hip: 1.15, bodyLen: 0.95, girth: 0.8, arm: 1.3, headLen: 0.55, headW: 0.8, tailSeg: 0.6, stripes: 3, crest: true, neckW: 0.9 });
     case 'glimmerfin': return buildFish(mat, col);
     case 'deepjaw': return buildDeepjaw(mat, col);
     case 'galewing': return buildFlyer(mat, col, 1.0, false);
@@ -534,6 +548,7 @@ export class CreatureManager {
       const x = (Math.random() - 0.5) * HALF * 1.7, z = (Math.random() - 0.5) * HALF * 1.7;
       const h = heightAt(x, z);
       if (!def.zone(h, x, z)) continue;
+      if (!def.fireproof && !def.swimmer && !def.flyer && volcanicAt(x, z) > 0.4) continue;
       if (avoid && Math.hypot(x - avoid.x, z - avoid.z) < Math.max(minDist, def.far || 0)) continue;
       return new THREE.Vector3(x, h, z);
     }
@@ -769,7 +784,7 @@ export class CreatureManager {
     if (this.respawnCd <= 0) {
       this.respawnCd = 30;
       for (const [sp, def] of Object.entries(SPECIES)) {
-        const wild = this.list.filter((c) => c.species === sp && !c.tamed && c.alive).length;
+        const wild = this.list.filter((c) => c.species === sp && !c.tamed && c.alive && !c.cave).length;
         if (wild < def.count) {
           const p = this.randomSpot(def, player.pos, 140);
           if (p) { const c = this.spawn(sp, p); if (Math.random() < 0.08) this.makeAlpha(c); }
@@ -805,7 +820,8 @@ export class CreatureManager {
     const m = c.model;
     c.hitFlash = Math.max(0, c.hitFlash - dt);
     const glow = c.alpha ? 0.28 + Math.sin(performance.now() / 300 + c.id) * 0.18 : 0;
-    c.mat.emissive.setRGB(c.hitFlash * 4 + glow, glow * 0.12, 0);
+    const sg = d.glow ? 0.14 + Math.sin(performance.now() / 500 + c.id) * 0.06 : 0;
+    c.mat.emissive.setRGB(c.hitFlash * 4 + glow + (d.glow ? d.glow[0] * sg : 0), glow * 0.12 + (d.glow ? d.glow[1] * sg : 0), d.glow ? d.glow[2] * sg : 0);
     if (c.boss) this.updateBoss(c, dt, player);
     c.attackCd -= dt; c.attackAnim = Math.max(0, c.attackAnim - dt * 3);
     c.timer -= dt; c.scanCd -= dt;
@@ -846,7 +862,7 @@ export class CreatureManager {
     if (d.flyer) {
       if (c.flying) { this.updateFlight(c, dt, player); this.animate(c, dt); return; }
       const takeOff = c.tamed
-        ? c.follow && player.alive && Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z) > 40
+        ? c.follow && player.alive && Math.abs(player.pos.x) < 1500 && Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z) > 40
         : (c.perchT = (c.perchT ?? 20) - dt) <= 0 || c.state === 'flee' || c.state === 'chase';
       if (takeOff) {
         c.flying = true; c.vy = 9; c.landT = rand(40, 90); c.home = c.home || c.pos.clone();
@@ -908,8 +924,8 @@ export class CreatureManager {
       if (c.timer <= 0) {
         if (Math.random() < 0.35) { goal.copy(c.pos); c.graze = rand(2, 5); c.timer = c.graze; }
         else {
-          const lead = c.leader && c.leader.alive && !c.leader.tamed ? c.leader.pos : c.pos;
-          const r = c.leader ? 10 : 30;
+          const lead = c.cave && c.home ? c.home : c.leader && c.leader.alive && !c.leader.tamed ? c.leader.pos : c.pos;
+          const r = c.cave ? c.homeR || 6 : c.leader ? 10 : 30;
           goal.set(lead.x + rand(-r, r), 0, lead.z + rand(-r, r));
           c.timer = rand(5, 11);
         }
@@ -926,7 +942,8 @@ export class CreatureManager {
     const nx = c.pos.x + Math.sin(c.yaw) * step, nz = c.pos.z + Math.cos(c.yaw) * step;
     const nh = heightAt(nx, nz);
     const minH = d.wade ? -2.5 : 0.6;
-    if (nh > minH && Math.abs(nx) < HALF * 0.95 && Math.abs(nz) < HALF * 0.95) {
+    const inBounds = c.cave || Math.abs(c.pos.x) > 1500 ? !blockedAt(nx, nz) : Math.abs(nx) < HALF * 0.95 && Math.abs(nz) < HALF * 0.95;
+    if (nh > minH && inBounds) {
       c.pos.x = nx; c.pos.z = nz;
     } else {
       // blocked by water — turn around

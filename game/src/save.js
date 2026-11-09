@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    caves: g.caves ? g.caves.serialize() : undefined,
     drops: g.drops ? g.drops.serialize() : undefined,
     eggs: g.breeding ? g.breeding.serialize() : undefined,
     bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
@@ -158,6 +159,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.caves && g.caves) g.caves.load(d.caves);
   if (d.drops && g.drops) g.drops.load(d.drops);
   if (d.eggs && g.breeding) g.breeding.load(d.eggs);
   if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
