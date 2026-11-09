@@ -826,6 +826,8 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  giant_pumpkin_seed:{name:'Giant Pumpkin Seed',base:150,col:'#e07a20',kind:'seed',crop:'giant_pumpkin',desc:'Keeps growing heavier for as long as you leave it in the ground.'},
+  giant_pumpkin:{name:'Giant Pumpkin',base:120,col:'#e8801a',kind:'good',desc:'Enter it in the autumn weigh-in!'},
   gear:{name:'Brass Gear',base:20,col:'#d8a848',kind:'mat'},
   painted_egg:{name:'Painted Egg',base:12,col:'#ff9ad0',kind:'good',desc:'A prize from the spring egg hunt.'},
   training_dummy:{name:'Training Dummy',base:60,col:'#c8a060',kind:'place',desc:'Place with B. Hit it to see your damage per second.'},
@@ -1390,13 +1392,14 @@ const FESTIVALS = [
 const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
 const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
 const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1);
-const CROP_LOOK = {strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
+const CROP_LOOK = {giant_pumpkin:'ground', strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
 const CROPS = {
   wheat:{name:'Wheat',grow:1,yield:[3,5]},
   carrot:{name:'Carrots',grow:1,yield:[2,4]},
   flax:{name:'Flax',grow:1,yield:[3,4]},
   tea:{name:'Tea',grow:1.5,yield:[2,4],give:'tea'},
   pumpkin:{name:'Pumpkins',grow:2,yield:[1,3]},
+  giant_pumpkin:{name:'Giant Pumpkin',grow:3,yield:[1,1],give:'giant_pumpkin'},
   moonflower:{name:'Moonflowers',grow:3,yield:[1,2]},
   strawberry:{name:'Strawberries',grow:1,yield:[3,5]},
   tomato:{name:'Tomatoes',grow:1.5,yield:[3,5]},
@@ -2065,6 +2068,8 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'ottoline',town:'crownfall',dx:4,dy:-3,name:'Librarian Ottoline',role:'Keeper of books',cols:{cloak:'#3a3a6a',skin:'#e8d0b8',hair:'#8a6a4a'},librarian:true,freeSpot:true,
+   hello:["Shh! ...oh, it's you. Welcome.","Knowledge is the best treasure.","Mind the dust. It's very old dust."], rumors:["Every tome in my library holds a craft someone forgot. Read them and you'll remember."]},
   {id:'whimsy',town:'lantern',dx:3,dy:3,name:'Mr. Whimsy',role:'Peddler of mysteries',cols:{cloak:'#6a2a8a',skin:'#e0c0a0',hair:'#2a2a2a'},whimsy:true,freeSpot:true,
    hello:["Step right up! What's in the box? Nobody knows!","Feeling lucky today?","Mysteries, marvels and the occasional sock!"], rumors:["Every box holds a surprise. Most are good. Some are socks."]},
   {id:'cogsworth',town:'highcairn',dx:-3,dy:3,name:'Inventor Cogsworth',role:'Tinkerer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#f0f0f0'},inventor:true,freeSpot:true,
@@ -3597,6 +3602,33 @@ function drawAuroraShard(a) {
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
 }
+// ===== giant pumpkins =====
+function pumpkinTalk(n) {
+  const yr = Math.floor((S.day - 1)/28), aut = seasonIdx() === 2;
+  const base = `“Giant pumpkins! Plant one at your homestead and leave it in the ground. The longer you wait after it ripens, the heavier it gets. In autumn, bring it to me for the weigh-in!”<br><span style="color:var(--muted)">Your heaviest pumpkin: <b>${S.pumpkinKg || 0} kg</b>.</span>`;
+  say(base, [
+    {label: 'Buy a Giant Pumpkin Seed (150◆)', disabled: S.coins < 150, fn: () => { S.coins -= 150; addItem('giant_pumpkin_seed', 1); SFX.coin(); renderHUD(); save(); pumpkinTalk(n); }},
+    ...(aut ? [{label: S.weighYear === yr ? 'Weigh-in (entered this year)' : 'Enter the weigh-in', primary: S.weighYear !== yr && have('giant_pumpkin') > 0, disabled: S.weighYear === yr || !have('giant_pumpkin'), fn: () => {
+      S.weighYear = yr; addItem('giant_pumpkin', -1); const mine = S.pumpkinKg || 30;
+      const rivals = [['Farmer Bramble', rint(80, 240)], ['Widow Hartley', rint(60, 260)], ['the Pemberton twins', rint(100, 300)]];
+      const all = [...rivals.map(([w, k]) => ({w, k})), {w: 'You', k: mine, me: true}].sort((a, b) => b.k - a.k), place = all.findIndex(r => r.me) + 1;
+      let prize = place === 1 ? 'First prize! <span style="color:var(--good)">+600 coin and a Blue Ribbon</span>' : place === 2 ? 'Second place! <span style="color:var(--good)">+200 coin</span>' : place === 3 ? 'Third place. <span style="color:var(--good)">+80 coin</span>' : 'No ribbon this year. Grow it longer next time!';
+      if (place === 1) { S.coins += 600; addItem('blue_ribbon', 1); S.pumpkinWins = (S.pumpkinWins || 0) + 1; SFX.victory(); } else if (place === 2) S.coins += 200; else if (place === 3) S.coins += 80;
+      S.pumpkinKg = 0; renderHUD(); save();
+      say(`The scales creak under each pumpkin...<br><br>${all.map((r, i) => `${i + 1}. ${r.me ? '<b>' : ''}${esc(r.w)}: ${r.k} kg${r.me ? '</b>' : ''}`).join('<br>')}<br><br>${prize}`, [back(n)]);
+    }}] : []), back(n)]);
+}
+// ===== library =====
+function libraryTalk(n) {
+  if (S.libDay !== S.day) { S.libDay = S.day; S.libToday = 0; }
+  const unknown = RECIPES.filter(r => !isKnown(r.id) && !Object.values(TROPHY_RECIPE).includes(r.id) && GOODS[r.out || r.id]);
+  say(`“Every tome teaches a forgotten craft. 300 coin to borrow one. I'm afraid you may only read two a day. Eyes need rest!”<br><span style="color:var(--muted)">Recipes still to learn: ${unknown.length}. Tomes read: ${S.tomes || 0}.</span>`, [
+    {label: 'Borrow a tome (300◆)', primary: true, disabled: S.coins < 300 || S.libToday >= 2, fn: () => {
+      S.coins -= 300; S.libToday++; S.tomes = (S.tomes || 0) + 1; gainXP(150 + (S.level || 1)*5);
+      let txt; if (unknown.length) { const r = pick(unknown); S.known[r.id] = true; txt = `You learn to make <b>${esc(r.label || GOODS[r.out || r.id].name)}</b>!`; } else txt = 'You already know every craft in the library, but the story was a good one.';
+      SFX.victory(); renderHUD(); save(); say(`You settle into a dusty armchair and read for hours.<br><br>${txt}<br><span style="color:var(--good)">+XP</span>`, [{label: 'Another', fn: () => libraryTalk(n)}, back(n)]);
+    }}, back(n)]);
+}
 // ===== mystery boxes =====
 const BOXES = [
   {k: 'small', name: 'Small Box', cost: 100, loot: [['coins', 40, 160, 4], ['berries', 3, 6, 2], ['gem', 1, 1, 2], ['luck_draught', 1, 2, 2], ['pet_treat', 3, 6, 2], ['treasure_map', 1, 1, 1], ['old_boot', 1, 1, 1]]},
@@ -4025,7 +4057,7 @@ function farmhandDay() {
   S.coins -= FARM_WAGE; const got = {};
   const add = (g, n) => { if (n > 0 && GOODS[g]) { addItem(g, n); got[g] = (got[g] || 0) + n; } };
   for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) {
-    const pl = S.home.plots[i]; if (!pl || cropProgress(pl) < 1) continue;
+    const pl = S.home.plots[i]; if (!pl || cropProgress(pl) < 1 || pl.crop === 'giant_pumpkin') continue;
     const C = CROPS[pl.crop], give = C.give || pl.crop; add(give, rint(C.yield[0], C.yield[1]) + (have('straw_hat') ? 1 : 0)); S.harvested = (S.harvested || 0) + 1;
     const seed = GK.find(g => GOODS[g].crop === pl.crop); if (Math.random() < .65) add(seed, rint(1, 2));
     if (seed && have(seed) > 0) { addItem(seed, -1); got[seed] = (got[seed] || 0) - 1; S.home.plots[i] = {crop: pl.crop, at: S.day + S.time}; } else S.home.plots[i] = null;
@@ -4655,8 +4687,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Pumpkins & books', 'Pell the land agent sells Giant Pumpkin Seeds: plant one and leave it growing to make it heavier, then enter the autumn weigh-in. Librarian Ottoline in Crownfall lends tomes that teach forgotten recipes.'],
   ['Mimics, boxes & Brassby', 'Careful: a few dungeon chests are Mimics, worth extra loot once defeated. Mr. Whimsy in Lantern Bay sells mystery boxes. Inventor Cogsworth in Highcairn needs help catching his runaway automaton.'],
   ['Spring egg hunt', 'Every spring morning, five painted eggs are hidden around one of the towns you know. The Gazette and your tracker say which. Find all five for a prize.'],
   ['Naval combat', 'Shipwright Bess in Port Wren can fit your sailboat with cannons (800 coin, 6 Iron, 4 Gunpowder). At sea they fire on their own at any nearby foe. Once you have cannons, pirate ships hunt you on deep water: sink them for pirate gold and maps.'],
@@ -6445,6 +6478,8 @@ function mainOptions(n) {
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
   if (n.whimsy) o.push({label: 'Buy a mystery box', primary: true, fn: () => whimsyTalk(n)});
   if (n.inventor) o.push({label: (S.clock || 0) >= 4 ? 'Chat about gears' : 'The runaway automaton', primary: [0, 1, 3].includes(S.clock || 0) && !((S.clock || 0) === 1 && have('gear') < 4), fn: () => inventorTalk(n)});
+  if (n.id === 'pell') o.push({label: seasonIdx() === 2 ? 'Giant pumpkin weigh-in 🎃' : 'Giant pumpkins', primary: seasonIdx() === 2 && have('giant_pumpkin') > 0 && S.weighYear !== Math.floor((S.day - 1)/28), fn: () => pumpkinTalk(n)});
+  if (n.librarian) o.push({label: 'Browse the library', primary: true, fn: () => libraryTalk(n)});
   if (n.druid) o.push({label: S.mounts.includes('unicorn') ? 'About the unicorn' : 'The unicorn of the glade', primary: !S.mounts.includes('unicorn') && have('rainbow_petal') >= 3 && have('golden_apple') >= 1, fn: () => druidTalk(n)});
   if (n.milliner) o.push({label: 'Browse hats', primary: true, fn: () => hatTalk(n)});
   if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
@@ -8040,6 +8075,7 @@ function plotTalk(i) {
 }
 function harvest(i) {
   const pl = S.home.plots[i], C = CROPS[pl.crop], give = C.give || pl.crop, P = plotPos(i);
+  if (pl.crop === 'giant_pumpkin') { const extra = Math.max(0, S.day + S.time - pl.at - C.grow/cropRate(pl.crop)), kg = Math.round(Math.min(420, 30 + extra*14)*(.85 + Math.random()*.3)); addItem('giant_pumpkin', 1); S.pumpkinKg = Math.max(S.pumpkinKg || 0, kg); S.home.plots[i] = null; S.harvested = (S.harvested || 0) + 1; floatText(P.x + .5, P.y, `Giant Pumpkin: ${kg} kg!`, '#e8801a', true); burst(P.x + .5, P.y + .5, '#e8801a', 20, 4); SFX.victory(); gainXP(30); renderHUD(); save(); return; }
   const amt = rint(C.yield[0], C.yield[1]) + (have('straw_hat') ? 1 : 0); addItem(give, amt);
   if (CROP_LOOK[pl.crop] === 'tree') S.orchard = true;
   const seed = GK.find(g => GOODS[g].crop === pl.crop), seeds = Math.random() < .65 ? rint(1, 2) : 0;
@@ -9138,6 +9174,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['pumpkin','Gourd Almighty','Win the giant pumpkin weigh-in', () => (S.pumpkinWins || 0) >= 1],
+  ['bookworm','Bookworm','Read 10 library tomes', () => (S.tomes || 0) >= 10],
   ['mimic','Not a Chest','Defeat a Mimic', () => (S.mimics || 0) >= 1],
   ['boxes','Box Addict','Open 10 mystery boxes', () => (S.boxes || 0) >= 10],
   ['clockwork','Gears and Springs','Return Brassby to Inventor Cogsworth', () => (S.clock || 0) >= 4],
@@ -9627,7 +9665,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
