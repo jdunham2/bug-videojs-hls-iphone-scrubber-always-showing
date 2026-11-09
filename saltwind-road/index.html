@@ -176,6 +176,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
 .xprow{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 #lvV{font-family:var(--f-body);font-weight:700;color:var(--text);font-size:12.5px;min-width:44px;white-space:nowrap}
 #lvV.pts{color:var(--brass)}
+#titleV{font-size:11px;color:var(--brass);letter-spacing:.03em;font-style:italic}#titleV:empty{display:none}
 .xpbar{flex:1;height:5px;background:var(--ink);border-radius:3px;overflow:hidden;min-width:70px}
 .xpbar i{display:block;height:100%;background:linear-gradient(90deg,#6aa8d8,#bfe8ff);width:0;transition:width .3s}
 #vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(190,25,25,.6));opacity:0;z-index:2}
@@ -229,6 +230,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div class="hud-tl panel" id="hudTL">
     <div class="coins"><span class="coin-ico"></span><b id="coinV">0</b></div>
     <div class="xprow"><span id="lvV">Lv 1</span><div class="xpbar"><i id="xpFill"></i></div></div>
+    <div id="titleV"></div>
     <div id="region">Port Wren</div>
     <div id="clock">Day 1 · 08:00</div>
     <div id="deeds"></div>
@@ -3016,6 +3018,14 @@ function legendSpawns() {
     toast(`<b>${L.name}</b><br>A legendary beast prowls nearby!`, 4500); SFX.roar();
   }
 }
+const EARNED_TITLES = [
+  ['legendary', 'Legend of Saltwind'], ['king', 'King of the Castle'], ['mythslayer', 'Mythslayer'], ['arenachamp', 'Arena Champion'],
+  ['masterangler', 'Master Angler'], ['pirate', 'Pirate King'], ['tycoon', 'Real Estate Tycoon'], ['champion', 'Champion'],
+  ['guardian', 'Guardian of the Realm'], ['blacksmith', 'Master Smith'], ['digger', 'Deep Digger'], ['gambler', 'High Roller'],
+  ['champion_rider', 'Champion Rider'], ['beastmaster', 'Beast Master'], ['stargazer', 'Stargazer'], ['moonslayer', 'Moonslayer'],
+  ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
+  ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
+];
 const ELITE_MODS = [
   {name:'Savage', col:'#e05a2a', hp:3, dmg:1.6, spd:1.1},
   {name:'Ancient', col:'#e3a948', hp:4.5, dmg:1.4, spd:.9},
@@ -4291,6 +4301,7 @@ function newDay() {
 
 /* ================= HUD ================= */
 function renderHUD() {
+  $('titleV').textContent = S.title ? `“${S.title}”` : '';
   $('coinV').textContent = S.coins;
   if (S.equip.weapon && !have(S.equip.weapon)) S.equip.weapon = null;
   for (const sl of EQ_SLOTS) if (S.equip[sl] && !have(S.equip[sl])) S.equip[sl] = null;
@@ -5559,6 +5570,8 @@ function openJournal() {
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
       Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
+    <h3>Titles · ${EARNED_TITLES.filter(t => S.achievements[t[0]]).length}/${EARNED_TITLES.length} earned</h3><div class="vals" style="margin-bottom:6px">Earn titles from achievements. Your chosen title shows under your name.</div>
+    <div class="ctabs" style="flex-wrap:wrap">${['', ...EARNED_TITLES.filter(t => S.achievements[t[0]]).map(t => t[1])].map(t => `<button class="btn sm" data-title="${esc(t)}" aria-pressed="${(S.title || '') === t}">${t || 'No title'}</button>`).join('')}${EARNED_TITLES.filter(t => !S.achievements[t[0]]).map(t => `<button class="btn sm" disabled title="Earn the achievement first">🔒 ${esc(t[1])}</button>`).join('')}</div>
     <h3>Achievements · ${ACH.filter(a => S.achievements[a[0]]).length}/${ACH.length}</h3>
     <div class="jgrid">${ACH.map(([id, name, desc]) => `<div class="jcard ach ${S.achievements[id] ? 'got' : 'locked'}"><span class="medal"></span><div style="min-width:0"><div class="t">${esc(name)}</div><div class="s">${esc(desc)}</div></div></div>`).join('')}</div>
     <h3>Great beasts · ${BKM.filter(k => S.bosses[k]).length}/${BKM.length} slain</h3>
@@ -5583,6 +5596,7 @@ function openJournal() {
     ${found.length ? `<div class="jgrid">${found.map(L => `<div class="jcard"><div class="t">${L.name}</div><div class="s">${esc(L.lore)}</div></div>`).join('')}</div>` : '<div class="none">Nothing yet. Look for glinting markers in the wild.</div>'}
   `;
   $('journalSheet').querySelector('[data-close]').addEventListener('click', () => closeModal('journal'));
+  $('journalSheet').querySelectorAll('[data-title]').forEach(b => b.addEventListener('click', () => { S.title = b.dataset.title; save(); renderHUD(); openJournal(); }));
   $('journal').hidden = false;
 }
 function closeModal(id) { $(id).hidden = true; if (['journal','map','bag','craft','board','home','skills','pause'].includes(mode)) mode = 'play'; promptKey = null; renderHUD(); }
@@ -6346,7 +6360,7 @@ const ACH = [
   ['arsenal','Arsenal','Own 10 different weapons', () => GK.filter(g => GOODS[g].kind === 'weapon' && (have(g) || S.home.chest[g])).length >= 10],
   ['hunter2','Big Game Hunter','Hunt 20 wild animals', () => Object.keys(ENEMIES).filter(k => ENEMIES[k].passive).reduce((n, k) => n + (S.killsBy[k] || 0), 0) >= 20],
   ['dungeonmaster','Dungeon Master','Defeat every dungeon guardian', () => DK_FIXED.every(k => S.bosses[DUNGEONS[k].boss])],
-  ['legend','Legend','Defeat 20 bosses', () => BK.filter(k => S.bosses[k]).length >= 20],
+  ['legend20','Boss Hunter','Defeat 20 bosses', () => BK.filter(k => S.bosses[k]).length >= 20],
   ['sociable','Sociable','Talk to 50 different people', () => Object.keys(S.met || {}).length >= 50],
   ['scavenger','Scavenger','Open 10 lost satchels', () => (S.satchels || 0) >= 10],
   ['coastal','Shimmer Coast','Reach Farhaven at the eastern edge of the world', () => !!S.towns.farhaven],
@@ -6365,7 +6379,7 @@ const ACH = [
   ['trainer','Animal Trainer','Train a pet to level 5', () => Object.values(S.petLv || {}).some(v => v >= 5)],
   ['decorator','Interior Decorator','Fully furnish a house', () => Object.values(S.propLv || {}).some(v => v >= 3)],
   ['tycoon','Real Estate Tycoon','Own 20 houses', () => PK.filter(k => S.props[k]).length >= 20],
-  ['lord','Lord of the Manor','Own an estate out in the wild', () => PK.some(k => PROPERTIES[k].estate && S.props[k])],
+  ['lord','Country Squire','Own an estate out in the wild', () => PK.some(k => PROPERTIES[k].estate && S.props[k])],
   ['king','King of the Castle','Buy the Hilltop Castle', () => !!S.props.castle],
   ['armored','Fully Armored','Wear body armor, a helmet and a shield at once', () => !!(S.equip.armor && S.equip.head && S.equip.shield)],
   ['whisperer','Animal Whisperer','Tame 3 wild animals', () => (S.tamed || 0) >= 3],
@@ -6399,7 +6413,7 @@ const ACH = [
   ['shards','Shard Bearer','Gather 6 Crown Shards', () => shardCount() >= 6],
   ['defender','Defender','Save a town from a raid', () => (S.raidsWon || 0) >= 1],
   ['guardian','Guardian of the Realm','Save towns from 10 raids', () => (S.raidsWon || 0) >= 10],
-  ['fishlog','Fish Collector','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
+  ['angler','Angler','Catch 25 fish', () => (S.fishCaught || 0) >= 25],
   ['goldcarp','Golden Hook','Land a Golden Carp', () => (S.goldcarps || 0) >= 1],
   ['seasons','A Year on the Road','See all four seasons', () => S.day >= 22],
 ];
