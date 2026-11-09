@@ -144,6 +144,7 @@ export class WorldMap {
       ctx.fillRect(x - 2 * dpr, y - 2 * dpr, 4 * dpr, 4 * dpr);
     }
     if (g.bed) { const [x, y] = P(g.bed.pos.x, g.bed.pos.z); this.icon(ctx, x, y, '🛏️', 16 * dpr); }
+    for (const d of g.drops ? g.drops.drops : []) { const [x, y] = P(d.pos.x, d.pos.z); this.icon(ctx, x, y, '📦', 16 * dpr); }
     for (const b of g.deathBags || []) { const [x, y] = P(b.pos.x, b.pos.z); this.icon(ctx, x, y, '🎒', 16 * dpr); }
     for (const c of g.creatures.list) {
       if (!c.tamed || !c.alive) continue;
@@ -186,6 +187,7 @@ export class WorldMap {
     const sc = S / span;
     const M = (x, z) => [S / 2 + (x - p.pos.x) * sc, S / 2 + (z - p.pos.z) * sc];
     for (const b of g.building.pieces) { const [x, y] = M(b.pos.x, b.pos.z); ctx.fillStyle = '#c8a878'; ctx.fillRect(x - 2, y - 2, 4, 4); }
+    for (const d of g.drops ? g.drops.drops : []) { const [x, y] = M(d.pos.x, d.pos.z); ctx.fillStyle = d.tier === 'rare' ? '#ffc23a' : '#5ab0ff'; ctx.fillRect(x - 3, y - 3, 6, 6); }
     for (const c of g.creatures.list) {
       if (!c.alive) continue;
       const d = Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z);

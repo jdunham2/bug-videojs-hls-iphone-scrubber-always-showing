@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    drops: g.drops ? g.drops.serialize() : undefined,
     eggs: g.breeding ? g.breeding.serialize() : undefined,
     bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
@@ -157,6 +158,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.drops && g.drops) g.drops.load(d.drops);
   if (d.eggs && g.breeding) g.breeding.load(d.eggs);
   if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
   for (const b of d.bags || []) g.dropBag(new THREE.Vector3().fromArray(b.pos), b.items);

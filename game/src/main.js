@@ -15,6 +15,7 @@ import { Settings } from './settings.js';
 import { Bestiary } from './bestiary.js';
 import { Music } from './music.js';
 import { Breeding } from './breeding.js';
+import { SupplyDrops } from './drops.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -115,6 +116,7 @@ class Game {
     this.settings = new Settings(this);
     this.bestiary = new Bestiary(this);
     this.breeding = new Breeding(this);
+    this.drops = new SupplyDrops(this);
     this.randomTameName = () => pick(TAME_NAMES);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
@@ -327,6 +329,8 @@ class Game {
     if (n && n.dist < 4 && n.node.kind === 'bush') { this.harvestNode(n.node, 1.0, true); return; }
     const bag = this.bagNear(p.pos);
     if (bag) { this.collectBag(bag); return; }
+    const drop = this.drops.near(p.pos);
+    if (drop) { this.drops.open(drop); return; }
     if (fire) { this.useProp(fire); return; }
     if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) { this.summonBoss(); return; }
     if (this.canDrink()) {
@@ -1040,6 +1044,7 @@ class Game {
       this.map.update(dt);
       this.bestiary.update(dt);
       this.breeding.update(dt);
+      this.drops.update(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
@@ -1167,6 +1172,7 @@ class Game {
       if (n && n.dist < 4 && n.node.kind === 'bush') prompt = `<kbd>E</kbd> Pick ${n.node.type === 'dozebush' ? 'Dozeberries' : 'Wildberries'}`;
       else if (n && n.dist < 3.5) prompt = `<kbd>LMB</kbd> ${n.node.kind === 'tree' ? 'Harvest Tree' : n.node.type === 'metal' ? 'Mine Metal Ore' + (this.activeItem()?.id?.includes('pick') ? '' : ' (use a pick)') : 'Harvest Rock'}`;
       else if (this.bagNear(p.pos)) prompt = '<kbd>E</kbd> Recover your belongings';
+      else if (this.drops.near(p.pos)) prompt = `<kbd>E</kbd> Open ${this.drops.near(p.pos).tier === 'rare' ? 'rare ' : ''}supply drop`;
       else if (this.breeding.eggNear(p.pos)) { const e = this.breeding.eggNear(p.pos); prompt = `${e.species[0].toUpperCase() + e.species.slice(1)} egg · ${Math.round(e.hatch * 100)}% incubated · ${e.warm ? 'warm' : 'cold — light a campfire nearby'}`; }
       else if (fire) {
         const k = KIND[fire.type];

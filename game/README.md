@@ -22,6 +22,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Temperature:** it gets colder with altitude, at night and in rain and wind. Fires and
   forges warm you, Hide Armor insulates well (Metal Armor barely). Freezing burns food, stops
   healing and then drains health; snow falls on the peaks. The HUD shows the temperature.
+- **Supply drops:** every few minutes a glowing crate parachutes down somewhere 80–350 m
+  away (📦 on the map, with a light beam). Blue drops hold supplies; gold drops on high ground
+  can contain metal gear, saddles and even Alpha Trophies. They vanish after 6 minutes.
 - **Death bags:** dying drops everything you carry (not your worn armor) in a bag marked by
   a beam of light and 🎒 on the map. Walk back and press E to recover it. Up to 3 bags are
   kept, and they're saved.
