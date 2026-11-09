@@ -507,6 +507,11 @@ const GOODS = {
   challenge_token:{name:'Challenge Token',base:0,col:'#e85a8a',kind:'trophy'},
   victors_cape:{name:"Victor's Cape",base:2000,col:'#c83a5a',kind:'trinket',desc:'+6% damage and +5% speed'},
   blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
+  ruby:{name:'Ruby',base:180,col:'#e0304a',kind:'mat',desc:'Socket: +8% damage'},
+  sapphire:{name:'Sapphire',base:180,col:'#3a6ae0',kind:'mat',desc:'Socket: +4% critical chance'},
+  emerald:{name:'Emerald',base:180,col:'#30c070',kind:'mat',desc:'Socket: +3 max HP'},
+  topaz:{name:'Topaz',base:180,col:'#f0b030',kind:'mat',desc:'Socket: +1 armor'},
+  amethyst:{name:'Amethyst',base:180,col:'#a050e0',kind:'mat',desc:'Socket: +4% speed'},
   spyglass:{name:'Spyglass',base:600,col:'#c8a050',kind:'trinket',desc:'See farther as you explore'},
   explorers_atlas:{name:"Explorer's Atlas",base:2000,col:'#8a5a3a',kind:'trinket',desc:'+8% speed; a map of everything'},
   phantom_cutlass:{name:'Phantom Cutlass',base:1400,col:'#9af0c0',kind:'weapon',dmg:12,cd:.3,reach:1.6,crit:.1,lifesteal:.1},
@@ -918,6 +923,11 @@ const RECIPES = [
   {id:'seafood_platter', need:{silverfin:2,carrot:2,bread:1}, at:'bench', known:true},
   {id:'golden_feast',  need:{goldcarp:1,pumpkin_pie:1,mead:1}, at:'bench', known:true},
   {id:'gem_ring',      need:{gem:1,silver:1}, at:'bench', known:true},
+  {id:'ruby',          need:{gem:1,ember:2}, at:'bench', known:true},
+  {id:'sapphire',      need:{gem:1,frost_essence:2}, at:'bench', known:true},
+  {id:'emerald',       need:{gem:1,herbs:4}, at:'bench', known:true},
+  {id:'topaz',         need:{gem:1,amber:2}, at:'bench', known:true},
+  {id:'amethyst',      need:{gem:1,crystal:2}, at:'bench', known:true},
   {id:'glider',        need:{planks:4,silk_cloth:2,rope:2}, at:'bench', known:true},
   {id:'promise_ring',  need:{gem_ring:1,silver:2,pearl:1,star_fragment:1}, at:'forge', known:true},
   {id:'tapestry',      need:{linen:2,silk_cloth:1,heather:2}, at:'bench', known:true},
@@ -1915,6 +1925,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'opaline',town:'prismvale',dx:3,dy:3,name:'Opaline',role:'Gem cutter',cols:{cloak:'#7a4aa0',skin:'#e8c8b0',hair:'#f0f0ff'},gemcutter:true,freeSpot:true,
+   hello:["Ooh, let me see what you're wearing.","Every blade deserves a jewel.","Light through a sapphire... nothing finer."], rumors:["Cut gems become rubies, sapphires and more at any workbench. Bring them to me and I'll set them in your gear."]},
   {id:'wilma',town:'wren',dx:3,dy:2,name:'Wilma Barksdale',role:'Pet trainer',cols:{cloak:'#6a8a3a',skin:'#d8a882',hair:'#a05a2a'},trainer:true,
    hello:["Who's a good adventurer? You are!","Bring your little friend over!","Treats in one hand, patience in the other."], rumors:["Every seventh day I hold a pet show right here. Prizes for the cleverest critter!"]},
   {id:'gilda',town:'crownfall',dx:3,dy:-2,name:'Auctioneer Gilda',role:'Crownfall Auction House',cols:{cloak:'#6a2a3a',skin:'#e0c0a0',hair:'#3a2a2a'},auction:true,
@@ -2382,7 +2394,7 @@ function genWorld() {
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   setTimeout(placeWells, 0);
-  for (const n of NPCS) if (n.balloon) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [Math.floor(m.x), Math.floor(m.y)]);
+  for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [Math.floor(m.x), Math.floor(m.y)]);
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => a === x && b === y)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
@@ -2817,12 +2829,14 @@ function weapon() {
   const L = enhOf(w), E = enchOf(w) || GOODS[w].ench; return L || E ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: (E ? ENCHANTS[E].name + ' ' : '') + enhName(w), ench: E} : GOODS[w];
 }
 const EQ_SLOTS = ['armor','head','shield'];
+const GEM_KINDS = ['ruby','sapphire','emerald','topaz','amethyst'];
+const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => { const g = S.equip[sl]; return n + (g && have(g) > 0 && S.sockets[g] === k ? 1 : 0); }, 0) : 0;
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
-function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0);
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald');
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3104,9 +3118,9 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
-    else if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    else if (Math.random() < .05 + .04*gemSum('sapphire') + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3283,6 +3297,21 @@ function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
+}
+// ===== gem sockets =====
+const SOCKET_FEE = 100;
+function socketTalk(n) {
+  S.sockets = S.sockets || {};
+  const slots = ['weapon', ...EQ_SLOTS].map(sl => [sl, S.equip[sl]]).filter(([, g]) => g && have(g) > 0 && GOODS[g]);
+  const gems = GEM_KINDS.filter(k => have(k) > 0);
+  say(`“Each piece of gear holds one gem. Socketed gems work while you wear the item. It's ${SOCKET_FEE} coin to set a stone, and I can swap one out, but the old stone shatters.”<br><span style="color:var(--muted)">${GEM_KINDS.map(k => `${GOODS[k].name}: ${GOODS[k].desc.replace('Socket: ', '')}`).join(' · ')}</span><br><br>${slots.length ? slots.map(([sl, g]) => `${esc(GOODS[g].name)}: <b>${S.sockets[g] ? GOODS[S.sockets[g]].name : 'empty socket'}</b>`).join('<br>') : 'You have nothing equipped.'}`, [
+    ...slots.map(([sl, g]) => ({label: `Socket ${GOODS[g].name}`, disabled: !gems.length || S.coins < SOCKET_FEE, fn: () => say(`Which gem for your <b>${esc(GOODS[g].name)}</b>?`, [
+      ...gems.map(k => ({label: `${GOODS[k].name} (×${have(k)})${S.sockets[g] === k ? ' (already set)' : ''}`, disabled: S.sockets[g] === k, fn: () => {
+        addItem(k, -1); S.coins -= SOCKET_FEE; S.sockets[g] = k; S.socketed = (S.socketed || 0) + 1; SFX.victory(); renderHUD(); renderHP(); save();
+        say(`Opaline sets the ${GOODS[k].name} with a delicate click. It catches the light beautifully.<br><span style="color:var(--good)">${esc(GOODS[g].name)}: ${GOODS[k].desc.replace('Socket: ', '')}</span>`, [{label: 'More', fn: () => socketTalk(n)}, back(n)]);
+      }})), {label: 'Back', fn: () => socketTalk(n)}])})),
+    ...(gems.length ? [] : [{label: 'No gems (craft them from Cut Gems at a workbench)', disabled: true, fn: () => {}}]),
+    back(n)]);
 }
 // ===== wanted outlaws =====
 const OUTLAWS = [['"Black" Bart Hollis','A coach robber with a coal-black beard.'],['Mad Meg Crowe','Burns farms for fun. Laughs while she does it.'],['Silent Sven','Never speaks. Never misses.'],['Two-Knives Tilda','Fast hands, faster knives.'],['Rory the Rat','Small, sneaky, and has robbed half the coast.'],['Grim Gareth','Deserted the Wardens and took their armory with him.'],['Scarlet Sal','Leaves a red ribbon at every crime.'],['One-Ear Odo','Lost an ear to a bear. The bear lost more.']];
@@ -3542,8 +3571,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Gem sockets', 'Turn Cut Gems into Rubies, Sapphires, Emeralds, Topaz or Amethysts at a workbench. Opaline in Prismvale sets one gem into each piece of gear for lasting bonuses while you wear it.'],
   ['Wanted outlaws', 'Every week a WANTED poster goes up on the notice boards. Take the bounty and the outlaw\u2019s hideout is marked on your map. Defeat them and their gang for a big reward.'],
   ['Cartography', 'Wendell the cartographer in Lantern Bay buys your map survey each time you chart more of the land (5%, 10%, 15% and so on). Big milestones earn a Spyglass and the Explorer\u2019s Atlas.'],
   ['Wishing wells & treasure goblins', 'Wishing wells in Port Wren, Maplehold, Prismvale and Greenstem grant a random blessing once a day for 10 coin. Rare Treasure Goblins flee with sacks of loot: catch one before it escapes through its portal. Old Peg in Blackwater trades Cursed Doubloons from the ghost ship for pirate treasure.'],
@@ -5183,6 +5213,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
@@ -7812,6 +7843,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['jeweled','Bejeweled','Socket gems into 4 pieces of gear', () => Object.keys(S.sockets || {}).length >= 4],
   ['sheriff','Sheriff','Bring 3 wanted outlaws to justice', () => (S.outlawsCaught || 0) >= 3],
   ['surveyor','Surveyor','Chart 30% of the land', () => !!(S.surveys || {})[30]],
   ['wisher','Make a Wish','Toss coins into wishing wells on 7 days', () => (S.wishes || 0) >= 7],
