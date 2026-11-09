@@ -1725,6 +1725,9 @@ const NPCS = [
   {id:'veyra',town:'skyhold',dx:-1,dy:3,name:'Oracle Veyra',role:'Keeper of the old tales',cols:{cloak:'#4a3a6a',skin:'#e0c8b0',hair:'#f0f0ff'},oracle:true,
    hello:["The wind told me you'd come.","Ah, the shard-bearer.","Hero. The tales are already being written."],
    rumors:["Every guardian of the deep places guards a shard of the first king's crown. They did not know it, but they did.","The Hollow King was the first king of all the lands. He gave up his heart for power, and now he is only hunger."]},
+  {id:'sten',town:'wren',dx:3,dy:0,name:'Guildmaster Sten',role:'Mercenary guild',cols:{cloak:'#5a3a2a',skin:'#a8704a',hair:'#3a2a1a'},hire:true,
+   hello:["Looking for muscle?","Back to hire, or just visiting?","My best client!"],
+   rumors:["An archer keeps you out of trouble. A healer keeps you alive when you're in it.","Mercenaries fight in raids too. Handy, when a town is burning."]},
   {id:'bess',town:'wren',dx:-3,dy:1,name:'Shipwright Bess',role:'Shipwright',cols:{cloak:'#2a4a6a',skin:'#c89870',hair:'#a85a2a'},shipwright:true,
    hello:["Smell that? Tar and sawdust. Best smell in the world.","Back at the docks?","Captain! Good to see you."],
    rumors:["A raft gets you across, a sailboat gets you there before lunch.","Crates float out on the open sea. Cargo from wrecked ships. Finders keepers."]},
@@ -2865,7 +2868,7 @@ function die() {
   const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
   const atHome = !rp && S.home && S.home.level >= 1;
   if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
-  S.riding = false; petE = null;
+  S.riding = false; petE = null; compE = null;
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
   $('bossbar').hidden = true; document.body.classList.remove('boss');
   toast(`<b>You were knocked out</b><br>${rp ? `You wake up in your ${rp.name}.` : atHome ? 'You wake up in your own bed.' : `Someone carried you to ${TOWNS[best].name}.`} ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
@@ -3669,6 +3672,7 @@ function render() {
       sprites.push({y: cy, f: () => drawChicken(ctx, cx*TS, cy*TS, Math.cos(frameT*.4 + i*2.1) > 0 ? 1 : -1, frameT + i)});
     }
   }
+  if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
   if (S.tmap && inView(S.tmap.x, S.tmap.y) && Math.hypot(S.x - S.tmap.x, S.y - S.tmap.y) < 9) sprites.push({y: S.tmap.y + .1, f: () => { const x = S.tmap.x*TS + 8, y = S.tmap.y*TS + 9, a = .45 + Math.sin(frameT*4)*.25; ctx.globalAlpha = a; ctx.strokeStyle = '#8a3a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 3); ctx.lineTo(x + 4, y + 3); ctx.moveTo(x + 4, y - 3); ctx.lineTo(x - 4, y + 3); ctx.stroke(); ctx.globalAlpha = 1; if (Math.random() < .05) burst(S.tmap.x + .5, S.tmap.y + .4, '#f0c040', 1, 1); }});
@@ -3990,6 +3994,7 @@ function update(dt) {
   if (S.riding && !isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) { S.riding = false; toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't swim, so you climb off.`); renderHUD(); }
   { const ct = tileAt(Math.floor(S.x), Math.floor(S.y)); if (ct === T.DSPIKE && spikeUp(Math.floor(S.x), Math.floor(S.y))) hurtPlayer(2, null); }
   updatePet(dt);
+  updateCompanion(dt);
   const ti = idx(Math.floor(S.x), Math.floor(S.y));
   if (ti !== lastTile) { lastTile = ti; reveal(S.x, S.y, sightRadius()); checkDiscoveries(); renderRegion(); }
 
@@ -4130,6 +4135,7 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
+  if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
@@ -4227,6 +4233,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
@@ -4842,6 +4849,52 @@ function animalsHTML() {
   return `<h3>Pets & mounts</h3><div class="jgrid">${S.pets.map(pc).join('')}${S.mounts.map(mc).join('')}</div>`;
 }
 const petWalk = (x, y) => { const t = tileAt(Math.floor(x), Math.floor(y)); return t !== T.MOUNT && t !== T.HOUSE && t !== T.LAVA && t !== T.DWALL && t !== T.DTORCH && t !== T.VOID && !homeBlocked(Math.floor(x), Math.floor(y)); };
+const COMPANIONS = {
+  brann:{name:'Brann the Shieldbearer', role:'melee', cost:300, wage:20, dmg:3, cd:.8, range:.7, held:'sword', cols:{cloak:'#6a6a7a', skin:'#d8a882', hair:'#8a5a2a'}, desc:'Strong in close combat. Monsters that hit you get hit back.'},
+  lyra:{name:'Lyra the Archer', role:'ranged', cost:400, wage:25, dmg:3, cd:1.1, range:6, held:'bow', cols:{cloak:'#3a6a3a', skin:'#e0b896', hair:'#e0c060'}, desc:'Shoots arrows at foes from a safe distance.'},
+  orin:{name:'Orin the Pyromancer', role:'mage', cost:650, wage:35, dmg:4, cd:1.8, range:6, held:'fire_staff', cols:{cloak:'#a83a2a', skin:'#c89870', hair:'#2a2a2a'}, desc:'Hurls fireballs that burst on groups of foes.'},
+  mae:{name:'Sister Mae', role:'healer', cost:500, wage:30, dmg:1.5, cd:1, range:.7, held:'club', cols:{cloak:'#e8e0d0', skin:'#e0c0a0', hair:'#a85a2a'}, desc:'Heals you a little every few seconds, and swats at foes.'},
+};
+let compE = null;
+function updateCompanion(dt) {
+  if (!S.companion || !COMPANIONS[S.companion]) { compE = null; return; }
+  const C = COMPANIONS[S.companion], lv = 1 + (S.level || 1)*.08;
+  if (!compE) compE = {x: S.x + .9, y: S.y + .3, cd: 0, heal: 4, face: 'down', phase: 0, moving: false};
+  compE.cd -= dt;
+  if (C.role === 'healer') { compE.heal -= dt; if (compE.heal <= 0) { compE.heal = 4; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + (S.level || 1)*.08); renderHP(); burst(S.x, S.y - .8, '#86c98f', 5, 2); } } }
+  let target = null;
+  if (!townAt(S.x, S.y, 8) || raidTown()) { let bd = 7; for (const e of enemies) { if (e.dead || e.hidden > 0 || (ENEMIES[e.type] && ENEMIES[e.type].passive)) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
+  const ranged = C.role === 'ranged' || C.role === 'mage';
+  let tx, ty;
+  if (target && !ranged) { tx = target.x; ty = target.y; }
+  else { tx = S.x + player.dir.y*1.1 - player.dir.x*.6; ty = S.y - player.dir.x*1.1 - player.dir.y*.6 + .2; }
+  const dx = tx - compE.x, dy = ty - compE.y, d = Math.hypot(dx, dy), stop = target && !ranged ? .6 + ((target.size || 1) - 1)*.4 : .4;
+  compE.moving = false;
+  if (d > 16) { compE.x = S.x; compE.y = S.y; }
+  else if (d > stop) {
+    const sp = 4.6 * (S.riding ? 1.9 : 1) * (d > 3 ? 1.3 : 1);
+    const nx = compE.x + dx/d*sp*dt, ny = compE.y + dy/d*sp*dt;
+    if (petWalk(nx, compE.y)) compE.x = nx; if (petWalk(compE.x, ny)) compE.y = ny;
+    compE.phase += dt*10; compE.moving = true;
+    compE.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+  }
+  if (!target || compE.cd > 0) return;
+  const ex = target.x - compE.x, ey = target.y - compE.y, ed = Math.hypot(ex, ey) || 1;
+  if (ed > C.range + ((target.size || 1) - 1)*.4 + .35) return;
+  compE.cd = C.cd; compE.face = Math.abs(ex) > Math.abs(ey) ? (ex < 0 ? 'left' : 'right') : (ey < 0 ? 'up' : 'down');
+  const dmg = Math.round(C.dmg*lv*10)/10;
+  if (C.role === 'ranged') arrows.push({x: compE.x, y: compE.y - .5, vx: ex/ed*13, vy: ey/ed*13, life: .7, max: .7, dmg, comp: true});
+  else if (C.role === 'mage') { const tx2 = target.x, ty2 = target.y; burst(compE.x, compE.y - .8, '#ff8a3a', 6, 2); setTimeout(() => { if (!S.companion) return; aoeHit(tx2, ty2 - .3, 1.6, dmg); }, 250); }
+  else hitEnemy(target, dmg, ex/ed, ey/ed);
+}
+function hireTalk(n) {
+  const cur = S.companion && COMPANIONS[S.companion];
+  say(`“Need a sword at your side? My people fight for coin. A one-time fee, then a daily wage. If you can't pay their wage, they'll leave.”${cur ? `<br><br>You have hired <b>${cur.name}</b> (${cur.wage} coin a day).` : ''}`, [
+    ...Object.entries(COMPANIONS).map(([k, C]) => ({label: S.companion === k ? `${C.name} · with you` : `${C.name} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
+      {label: 'Hire', primary: true, disabled: S.coins < C.cost, fn: () => { S.coins -= C.cost; S.companion = k; compE = null; S.hiredOnce = true; SFX.coin(); renderHUD(); save(); say(`“${C.name} at your service. Lead the way.”`, [back(n)]); }}, back(n)])})),
+    ...(cur ? [{label: `Dismiss ${cur.name}`, fn: () => { S.companion = null; compE = null; save(); say('“Farewell. Send for us any time.”', [back(n)]); }}] : []),
+    back(n)]);
+}
 function updatePet(dt) {
   if (!S.pet) { petE = null; return; }
   const P = PETS[S.pet];
@@ -5931,6 +5984,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['party','Strength in Numbers','Hire a companion', () => !!S.hiredOnce],
   ['bloodmoon','Red Night','Survive a Blood Moon', () => (S.bloodMoons || 0) >= 1],
   ['moonslayer','Moonslayer','Defeat 50 monsters under Blood Moons', () => (S.bmKills || 0) >= 50],
   ['naturalist','Monster Scholar','Fill in 20 bestiary entries', () => BEAST_IDS.filter(k => S.killsBy[k]).length >= 20],
