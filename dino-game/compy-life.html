@@ -49,7 +49,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 .prompt kbd { font: 800 12px var(--body); background: var(--amber); color: var(--ink); border-radius: 5px; padding: 1px 6px; margin-right: 6px; }
 .shift { position: absolute; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top, 0px)); background: var(--panel); border-radius: 10px; padding: 6px 12px; font-size: 13px; font-weight: 800; color: var(--amber); pointer-events: none; white-space: nowrap; }
 @media (max-width: 760px) { .shift { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
-#mini { position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 128px; height: 128px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); pointer-events: none; }
+#mini { position: absolute; top: calc(56px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); width: 128px; height: 128px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; }
 @media (max-width: 520px) { #mini { width: 92px; height: 92px; } }
 
 .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 12, 18, 0.5); }
@@ -74,6 +74,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 .act em { grid-row: 1 / span 2; grid-column: 2; font-style: normal; font-weight: 800; font-size: 13px; color: var(--amber); text-align: right; }
 .act.risky em { color: var(--blood); }
 .act:disabled { opacity: .45; cursor: not-allowed; }
+.map-panel { width: min(760px, 100%); gap: 8px; padding: 14px; }
+.map-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.map-head h2 { margin: 0; }
+#bigMap { width: min(100%, calc(100vh - 230px)); min-width: 240px; aspect-ratio: 1; justify-self: center; border-radius: 12px; border: 2px solid var(--line); cursor: crosshair; touch-action: manipulation; }
+.map-tip { margin: 0; font-size: 12px; opacity: .8; text-align: center; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.map-legend button { font: 800 11px Nunito, system-ui, sans-serif; color: var(--bone); background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; cursor: pointer; }
+.map-legend button.job { background: rgba(255,190,85,.25); border-color: #ffbe55; }
+.map-legend button.home { background: rgba(143,220,106,.22); border-color: #8fdc6a; }
+.map-legend i { opacity: .6; font-style: normal; font-weight: 600; }
 .goals { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 480px) { .goals { grid-template-columns: 1fr; } }
 .goals div { font-size: 13px; padding: 7px 9px; border-radius: 10px; background: rgba(255,255,255,.05); color: var(--muted); }
@@ -112,6 +122,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <div class="chips" id="chips"></div>
     </div>
     <div class="top-btns">
+      <button class="ibtn" id="mapBtn" type="button">Map</button>
       <button class="ibtn" id="goalsBtn" type="button">Goals 0/14</button>
       <button class="ibtn" id="muteBtn" type="button">Sound on</button>
       <button class="ibtn" id="pauseBtn" type="button">Pause</button>
@@ -161,6 +172,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p id="goalsSub"></p>
       <div class="goals" id="goalsList"></div>
       <div class="row"><button class="btn alt" id="goalsClose" type="button">Close</button></div>
+    </div>
+  </div>
+
+  <div class="screen" id="mapScreen" hidden>
+    <div class="panel map-panel">
+      <div class="map-head"><h2>Town map</h2><button class="btn alt" id="mapClose" type="button">Close</button></div>
+      <canvas id="bigMap"></canvas>
+      <p class="map-tip">Tap a place or a friend to set a waypoint. Press M to close.</p>
+      <div class="map-legend" id="mapLegend"></div>
     </div>
   </div>
 
@@ -287,7 +307,7 @@ const NB = ROADS.length + 1;
 const DISTRICTS = {
   '4,2': 'lake', '0,3': 'petshop', '1,3': 'suburb', '2,3': 'lake', '3,3': 'suburb', '4,3': 'suburb', '5,3': 'lake',
   '0,4': 'suburb', '1,4': 'farm', '2,4': 'suburb', '3,4': 'suburb', '4,4': 'forest', '5,4': 'suburb',
-  '5,0': 'suburb', '5,1': 'forest', '5,2': 'suburb',
+  '5,0': 'plaza', '5,1': 'forest', '5,2': 'plaza',
   '0,5': 'suburb', '1,5': 'forest', '2,5': 'suburb', '3,5': 'stadium', '4,5': 'suburb', '5,5': 'farm',
   '0,6': 'farm', '1,6': 'suburb', '2,6': 'lake', '3,6': 'suburb', '4,6': 'forest', '5,6': 'suburb',
 };
@@ -306,6 +326,7 @@ function drawDistricts(g, R, k) {
     if (type === 'forest') { g.fillStyle = '#4a8a3a'; R(x0, y0, x1 - x0, y1 - y0); }
     if (type === 'stadium') { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; ell(cx, cy, (x1 - x0) * 0.42, (y1 - y0) * 0.42, '#7a7f88'); ell(cx, cy, (x1 - x0) * 0.3, (y1 - y0) * 0.28, '#4fa04a'); g.fillStyle = '#f2f2f2'; R(cx - 2, cy - (y1 - y0) * 0.26, 4, (y1 - y0) * 0.52); }
     if (type === 'beach') { g.fillStyle = '#cdb47a'; R(x0 - 20, y0 - 80, x1 - x0 + 60, y1 - y0 + 160); }
+    if (type === 'plaza') { g.fillStyle = '#9a9aa2'; R(x0, y0, x1 - x0, y1 - y0); g.fillStyle = '#69a852'; R(x0, y0, x1 - x0, 30); R(x0, y1 - 30, x1 - x0, 30); }
     if (type === 'petshop') { g.fillStyle = '#7ab85a'; R(x0 + 360, y0 + 40, x1 - x0 - 380, 260); }
   }
   g.fillStyle = '#8a8f96'; R(1940, 870, 260, 270);
@@ -328,7 +349,7 @@ function buildDistricts() {
   add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
   add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
   solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
-  buildSite();
+  buildSite(); buildPlazas();
   const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
   for (const { i, j, type } of districtList) {
     const [x0, y0, x1, y1] = blockRect(i, j), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -614,12 +635,16 @@ const CAREERS = {
   petshop:  { place: 'petshop', hours: [9, 17], edu: 0, clean: false, levels: [['Pet Groomer', 100], ['Head Groomer', 180], ['Pet Shop Owner', 320]] },
   police:   { place: 'police', hours: [9, 17], edu: 0, clean: true, levels: [['Police Cadet', 130], ['Officer', 250], ['Detective', 420], ['Police Chief', 700]] },
   museum:   { place: 'museum', hours: [10, 18], edu: 1, clean: false, levels: [['Tour Guide', 130], ['Curator', 300], ['Museum Director', 600]] },
+  gym:      { place: 'gym', hours: [7, 15], edu: 0, clean: false, levels: [['Personal Trainer', 110], ['Head Coach', 200], ['Gym Owner', 340]] },
+  cinema:   { place: 'cinema', hours: [14, 22], edu: 0, clean: false, levels: [['Usher', 85], ['Projectionist', 160], ['Cinema Manager', 260]] },
+  library:  { place: 'library', hours: [9, 17], edu: 1, clean: true, levels: [['Library Assistant', 120], ['Librarian', 220], ['Head Librarian', 380]] },
+  scoops:   { place: 'scoops', hours: [11, 19], edu: 0, clean: false, levels: [['Ice Cream Scooper', 80], ['Shift Lead', 140], ['Scoops Owner', 240]] },
 };
 const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -761,7 +786,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false);
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1);
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -1226,7 +1251,7 @@ function setScreens() {
 // every building has a room far from town; you walk around inside and use stations (counters, desks, beds)
 let inside = null, activeSolids = solids, roomN = 0;
 const ROOMS = {};
-const HOURS = { petshop: [9, 19], pizza: [10, 24], museum: [9, 19], carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
+const HOURS = { petshop: [9, 19], pizza: [10, 24], museum: [9, 19], carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18], gym: [6, 23], arcade: [10, 24], cinema: [12, 24], library: [8, 20], scoops: [10, 22] };
 function closedWhy(id) {
   const h = HOURS[id]; if (!h) return '';
   const J = jobInfo(); if (J && J.place === id) return '';
@@ -1282,7 +1307,7 @@ function buildRoom(id) {
   g.visible = false;
   ROOMS[id] = R; return R;
 }
-const WORKS = ['Work your shift', 'Slack off', 'Clock', 'Pick up the next', 'Cook the next', 'Serve the next', 'Sort the next', 'Lead the next', 'Groom the next'];
+const WORKS = ['Work your shift', 'Slack off', 'Clock', 'Pick up the next', 'Cook the next', 'Serve the next', 'Sort the next', 'Lead the next', 'Groom the next', 'Coach the next', 'Seat the next', 'Shelve the next', 'Scoop the next'];
 function homeLayout(key, w, d, style) {
   const s = style;
   return { w, d, home: key, floor: s.floor, wall: s.wall, trim: s.trim, build(b) {
@@ -2007,6 +2032,7 @@ function endMini(ok, msg, q) {
   if (state === 'play') nextEvent();
 }
 function updateMini(dt) {
+  if (minigame.kind === 'dodge') { updateDodge(dt); return; }
   if (minigame.kind === 'hose') {
     let mx = 0, my = 0;
     if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
@@ -2068,6 +2094,7 @@ function checkSiteEnd() {
 }
 function drawMiniOverlay(g) {
   if (!minigame || minigame.kind === 'cook' || minigame.kind === 'panel') return;
+  if (minigame.kind === 'dodge') { drawDodge(g); return; }
   const w = Math.min(460, W - 40), x = (W - w) / 2, y = H - 190;
   g.fillStyle = 'rgba(14,22,30,.9)'; g.fillRect(x, y, w, 130); g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.strokeRect(x, y, w, 130);
   g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
@@ -2418,7 +2445,7 @@ function holdUpAct(min, max) {
 
 // ---------- hands-on shift jobs: firefighter, pizza delivery, egg courier, fry cook ----------
 const SUBURB_HOUSES = [];
-const GIG_KIND = { fire: 'fire', pizza: 'pizza', depot: 'eggs', burger: 'cook', police: 'patrol', gas: 'pump', bank: 'teller', office: 'office', museum: 'tour', petshop: 'groom' };
+const GIG_KIND = { fire: 'fire', pizza: 'pizza', depot: 'eggs', burger: 'cook', police: 'patrol', gas: 'pump', bank: 'teller', office: 'office', museum: 'tour', petshop: 'groom', gym: 'train', cinema: 'usher', library: 'shelve', scoops: 'scoop' };
 const INGREDIENTS = ['Bun', 'Patty', 'Cheese', 'Lettuce', 'Tomato', 'Pickles'];
 let fireTruck = null, fireFx = null;
 function gigKindHere(placeId) { const J = jobInfo(); return J && J.place === placeId ? GIG_KIND[placeId] : null; }
@@ -2438,13 +2465,13 @@ function gigActs(placeId) {
   let why = '';
   if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'Closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
   if (!why && kind === 'pizza' && !cars.some(c => c.owned)) why = 'Delivery drivers need their own car. Buy one at Dino Motors.';
-  const late = hour() > a + 1, blurb = { pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
+  const late = hour() > a + 1, blurb = { train: 'Clients are warming up on the mats.', usher: 'The lobby is filling up for the next show.', shelve: 'The return cart is overflowing.', scoop: 'There is a line out the door. It is a hot day.', pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
   acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}${blurb}`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startGig(kind, late); } });
   return acts;
 }
 function startGig(kind, late) {
   const lvl = S.job.level;
-  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
+  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3, train: 3, usher: 3, shelve: 3, scoop: 4 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
   if (kind === 'fire') { spawnFireTruck(); spawnFire(); log('Clocked in! A fire just broke out. Hop in the fire truck outside and follow the red arrow.', 'bad'); sfx.siren(); }
   if (kind === 'pump') { spawnCustomer(); log('Clocked in! Walk out to the pumps when a car pulls up.', 'good'); }
   if (NEXT_TASK[kind]) log(`Clocked in! Use your work station to start: ${NEXT_TASK[kind][0].toLowerCase()}.`, 'good');
@@ -2993,16 +3020,325 @@ function drawRoster(g, lbl) {
   }
 }
 
+// ---------- full-screen town map with waypoints ----------
+let waypoint = null, mapBase = null, mapHits = [];
+const MAP_ICON = { school: '🎓', office: '💼', bank: '🏦', casino: '🎰', grocer: '🥬', burger: '🍔', jobs: '📋', cafe: '☕', hospital: '🏥', police: '🚓', depot: '🥚', realty: '🏠', carshop: '🚗', museum: '🦴', fire: '🚒', gas: '⛽', pizza: '🍕', builders: '🏗', petshop: '🐾', stadium: '🏟', blackmarket: '🕳', bench: '🪑', gym: '💪', arcade: '🕹', fair: '🎡', cinema: '🎬', library: '📚', scoops: '🍦' };
+function buildMapBase() {
+  const N = 1024, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), k = N / WORLD, R = (x, y, w, h) => g.fillRect(x * k, y * k, w * k, h * k);
+  g.fillStyle = '#5c9a48'; g.fillRect(0, 0, N, N);
+  drawDistricts(g, R, k);
+  g.fillStyle = '#4a4950'; for (const r of ROADS) { R(r - 50, 0, 100, WORLD); R(0, r - 50, WORLD, 100); }
+  g.fillStyle = '#ecd36a'; for (const r of ROADS) { R(r - 3, 0, 6, WORLD); R(0, r - 3, WORLD, 6); }
+  for (const p of Object.values(PLACES)) if (p.h) { g.fillStyle = '#e8e2d4'; R(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0); g.strokeStyle = '#3a3630'; g.lineWidth = 1.5; g.strokeRect(p.x0 * k, p.y0 * k, (p.x1 - p.x0) * k, (p.y1 - p.y0) * k); }
+  mapBase = c;
+}
+function mapPlaces() {
+  const out = [];
+  for (const p of Object.values(PLACES)) {
+    if (p.home) { if (S.home === p.home) out.push({ id: p.id, name: 'Your ' + HOMES[p.home].name.toLowerCase(), x: p.door.x, y: p.door.y, icon: '🏡', home: true }); continue; }
+    if (p.id === 'bench' && S.home) continue;
+    out.push({ id: p.id, name: p.name, x: p.h ? (p.x0 + p.x1) / 2 : p.door.x, y: p.h ? (p.y0 + p.y1) / 2 : p.door.y, door: p.door, icon: MAP_ICON[p.id] || '📍' });
+  }
+  return out;
+}
+function openMap() {
+  if (state !== 'play' || inside || derby) { if (inside) log('Step outside to look at the town map.', 'warn'); return; }
+  if (!mapBase) buildMapBase();
+  state = 'map'; keys.clear(); $('mapScreen').hidden = false;
+  const J = jobInfo();
+  $('mapLegend').innerHTML = mapPlaces().sort((a, b) => a.name.localeCompare(b.name)).map(p => `<button type="button" data-id="${p.id}" class="${J && J.place === p.id ? 'job' : p.home ? 'home' : ''}">${p.icon} ${p.name}${closedWhy && !p.home && PLACES[p.id].h && closedWhy(p.id) ? ' <i>closed</i>' : ''}</button>`).join('');
+  drawBigMap();
+}
+function closeMap() { $('mapScreen').hidden = true; if (state === 'map') state = 'play'; }
+function setWaypoint(p) {
+  const d = p.door || p;
+  waypoint = { x: d.x, y: d.y, label: p.name }; sfx.ding && sfx.ding();
+  log(`Waypoint set: ${p.name}. Follow the purple arrow.`, '');
+  closeMap();
+}
+function drawBigMap() {
+  const cv = $('bigMap'), sz = cv.clientWidth; if (!sz) return;
+  if (cv.width !== Math.round(sz * DPR)) cv.width = cv.height = Math.round(sz * DPR);
+  const g = cv.getContext('2d'), k = sz / WORLD; g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  g.drawImage(mapBase, 0, 0, sz, sz);
+  const J = jobInfo(); mapHits = [];
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const p of mapPlaces()) {
+    const x = p.x * k, y = p.y * k, hl = (J && J.place === p.id) || p.home;
+    g.font = `${sz < 420 ? 13 : 17}px system-ui, sans-serif`;
+    if (hl) { g.fillStyle = p.home ? 'rgba(143,220,106,.9)' : 'rgba(255,190,85,.95)'; g.beginPath(); g.arc(x, y, sz < 420 ? 11 : 14, 0, 7); g.fill(); }
+    g.fillText(p.icon, x, y);
+    if (sz >= 420) { g.font = '800 10px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(p.name, x, y + 16); g.fillStyle = hl ? '#ffe08a' : '#fff'; g.fillText(p.name, x, y + 16); }
+    mapHits.push({ x, y, p });
+  }
+  // people you know
+  for (const r of rosterMs) {
+    if (!rosterVisible(r) || !relOf(r.p.name)) continue;
+    const x = r.x * k, y = r.y * k; g.fillStyle = S.partner && S.partner.name === r.p.name ? '#ff6ad5' : '#ffc2e2'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1; g.stroke();
+    mapHits.push({ x, y, p: { name: r.p.name, x: r.x, y: r.y + 30 } });
+  }
+  for (const t of gigTargets()) { g.fillStyle = t.color; g.beginPath(); g.arc(t.x * k, t.y * k, 6, 0, 7); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.stroke(); }
+  if (trex) { g.font = '16px system-ui'; g.fillText('🦖', trex.x * k, trex.y * k); }
+  if (waypoint) { const x = waypoint.x * k, y = waypoint.y * k; g.strokeStyle = '#b07aff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 10, 0, 7); g.stroke(); }
+  const px = (driving ? driving.x : P.x) * k, py = (driving ? driving.y : P.y) * k;
+  g.save(); g.translate(px, py); g.rotate(driving ? driving.a : P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(10, 0); g.lineTo(-7, -7); g.lineTo(-3, 0); g.lineTo(-7, 7); g.closePath(); g.fill(); g.stroke(); g.restore();
+  g.font = '800 11px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = '#000'; g.strokeText('YOU', px, py - 15); g.fillStyle = '#ffe08a'; g.fillText('YOU', px, py - 15);
+}
+function mapClick(e) {
+  const cv = $('bigMap'), r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = null, bd = 26;
+  for (const h of mapHits) { const d = Math.hypot(h.x - x, h.y - y); if (d < bd) { bd = d; best = h.p; } }
+  if (best) setWaypoint(best);
+}
+function waypointUpdate() {
+  if (!waypoint) return;
+  const px = driving ? driving.x : P.x, py = driving ? driving.y : P.y;
+  if (!inside && Math.hypot(px - waypoint.x, py - waypoint.y) < 80) { log(`You reached ${waypoint.label}.`, 'good'); waypoint = null; }
+}
+function drawWaypoint(g) {
+  if (!waypoint || inside || derby) return;
+  const s2 = toScreen(waypoint.x, 0, waypoint.y);
+  if (s2.ok) { g.strokeStyle = '#b07aff'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 30, 16, 0, 0, 7); g.stroke(); }
+  arrowTo(g, waypoint.x, waypoint.y, '#c9a2ff', waypoint.label);
+}
+
+// ---------- new hangouts: gym, arcade, cinema, library and an ice cream stand on the beach ----------
+const PLAZA = {
+  '5,0': [['gym', 'Iron Claw Gym', 3150, 110, 3350, 420, 85, 1, { wall: '#3a3f4a', win: '#ff8a4a', sign: '#ff6a3a', signFg: '#1a1a1a' }],
+          ['arcade', 'Pixel Ptero Arcade', 3390, 150, 3570, 420, 70, 1, { wall: '#2a1a4a', win: '#4ae8ff', sign: '#ff4aa8' }]],
+  '5,2': [['cinema', 'Jurassic Cinema', 3150, 1300, 3380, 1560, 100, 1, { wall: '#7a1a24', win: '#ffd35a', sign: '#ffd35a', signFg: '#7a1a24' }],
+          ['library', 'Fern Library', 3410, 1320, 3570, 1560, 80, 1, { wall: '#c9b48a', win: '#2c3038', sign: '#3f5a3a', roof: '#6a5a3a' }]],
+};
+function buildPlazas() {
+  for (const list of Object.values(PLAZA)) for (const a of list) place(...a);
+  place('scoops', 'Scoops', 3790, 1300, 3930, 1420, 45, 1, { wall: '#ffd3e6', win: '#2a2433', sign: '#ff6ad5', awning: '#7fd8ff' });
+  // a giant cone on the roof
+  add(scene, GEO.c, '#d9a35a', 3860, 62, 1360, 14, 30, 14, Math.PI, 0, 0); add(scene, GEO.s, '#ff9ad5', 3860, 82, 1360, 16, 14, 16);
+  // barbell sculpture outside the gym
+  add(scene, GEO.y, '#2a2a2a', 3175, 60, 480, 2, 90, 2, 0, 0, Math.PI / 2); for (const s of [-1, 1]) add(scene, GEO.y, '#c0392b', 3175 + s * 40, 60, 480, 14, 6, 14, 0, 0, Math.PI / 2);
+  add(scene, GEO.y, '#4a4a50', 3175, 30, 480, 2, 60, 2); solids.push({ x0: 3169, y0: 474, x1: 3181, y1: 486 });
+}
+const WORKS2 = ['Coach the next', 'Seat the next', 'Shelve the next', 'Scoop the next'];
+Object.assign(GIG_PLACE, { train: 'gym', usher: 'cinema', shelve: 'library', scoop: 'scoops' });
+Object.assign(NEXT_TASK, { train: ['Coach the next client', 'clients coached'], usher: ['Seat the next group', 'groups seated'], shelve: ['Shelve the next cart', 'carts shelved'], scoop: ['Scoop the next order', 'orders scooped'] });
+ROSTER.push(
+  { name: 'Flex', pal: 2, trait: 'can deadlift a whole car', likes: 'chocolate', spot: [3310, 505], place: 'outside Iron Claw Gym', date: 'a sunrise jog on the beach' },
+  { name: 'Nova', pal: 4, trait: 'holds the Meteor Dodge high score', likes: 'plush', spot: [3545, 495], place: 'outside the arcade', date: 'an arcade night' },
+  { name: 'Quill', pal: 0, trait: 'has read every book in the library twice', likes: 'flowers', spot: [3555, 1625], place: 'outside Fern Library', date: 'a poetry reading' },
+);
+// a tap-the-right-button panel where each step has one correct answer
+function seqPanel(o) {
+  minigame = { kind: 'panel', t: o.t, mins: o.mins, i: 0, mistakes: 0, onDone: o.onDone || finishGigTask,
+    render() { $('cookOrder').innerHTML = o.show(this.i, this); $('cookTime').textContent = `${Math.ceil(this.t)}s left · mistakes ${this.mistakes}`; },
+    pick(b) {
+      if (this.i >= o.seq.length) return;
+      if (b === o.seq[this.i]) { this.i++; sfx.coin(); } else { this.mistakes++; sfx.bad(); }
+      if (this.i >= o.seq.length) endPanel(true, o.done(this), -this.mistakes * 0.08);
+      else if (this.mistakes >= 5) endPanel(false, o.fail, -0.35);
+      else this.render();
+    },
+    timeout: o.timeout };
+  setPanel(o.title, o.sub, o.labels, i => minigame && minigame.pick(i));
+  minigame.render(); state = 'mini'; setScreens();
+}
+const lvlT = (base, step) => Math.max(base * 0.55, base - S.job.level * step);
+function startTrain() {
+  const lvl = S.job.level, client = pick(NAMES), move = pick(['squats', 'tail swings', 'claw curls', 'stomp jumps']);
+  minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.0 + lvl * 0.3, zone: [0.4, 0.4 + Math.max(0.1, 0.2 - lvl * 0.035)], hits: 0, misses: 0, need: 4, flash: 0, label: 'COUNT THE REPS', help: `Press E in the green to coach ${client} through their ${move}`, mins: 40, what: `${client} crushed their ${move}`, fail: `${client} pulled a tail muscle. Oops.`, onDone: finishGigTask };
+  state = 'mini'; setScreens();
+}
+const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'];
+function startUsher() {
+  const seq = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6)), films = ['Meteor Mayhem', 'The Fast and the Feathered', 'Jurassic Bark', 'Love in the Tar Pits'];
+  const film = pick(films);
+  seqPanel({ title: 'SEAT THE GROUP', sub: `Tonight: ${film}. Read each ticket and point to the right row. Keys 1 to 6 work too.`, labels: ROWS.map(r => 'Row ' + r), seq, t: lvlT(14, 2), mins: 30,
+    show: (i) => `<span class="next">🎟 Ticket: Row ${ROWS[seq[i]]}, seat ${1 + ((seq[i] * 7 + i * 3) % 12)}</span><span>Group ${i + 1}/4</span>`,
+    done: m => m.mistakes ? `Everyone found a seat, after ${m.mistakes} mix-up${m.mistakes > 1 ? 's' : ''}.` : 'Every guest seated perfectly before the trailers ended.',
+    fail: 'You sent a whole family to the wrong row. Popcorn everywhere.', timeout: 'The movie started and guests are still wandering in the dark.' });
+}
+const BOOKS = [['The Volcano Cookbook', 1], ['Baking With Ferns', 1], ['101 Egg Recipes', 1], ['Space Rocks and You', 2], ['How Meteors Work', 2], ['Why the Sky Is Blue', 2],
+  ['The Raptor Detective', 0], ['Mystery at the Tar Pit', 0], ['Pterodactyl Pirates', 0], ['The First Compy Kings', 3], ['A History of Eggs', 3], ['The Great Ice Age', 3]];
+function startShelve() {
+  const list = BOOKS.slice().sort(() => Math.random() - 0.5).slice(0, 5);
+  seqPanel({ title: 'SHELVE THE BOOKS', sub: 'Put each book in the right section. Keys 1 to 4 work too.', labels: ['Stories', 'Cooking', 'Science', 'History'], seq: list.map(b => b[1]), t: lvlT(18, 2.5), mins: 30,
+    show: (i) => `<span class="next">📕 ${list[i][0]}</span><span>${i + 1}/${list.length}</span>`,
+    done: m => m.mistakes ? `Cart shelved with ${m.mistakes} book${m.mistakes > 1 ? 's' : ''} in a funny spot.` : 'Cart shelved perfectly. The head librarian nods approvingly.',
+    fail: 'Cookbooks in the science section. Chaos.', timeout: 'The cart is still half full when the next one arrives.' });
+}
+const FLAVORS = ['Cone', 'Fern Mint', 'Lava Berry', 'Amber Caramel', 'Volcano Fudge', 'Sprinkles'];
+function startScoop() {
+  const n = 2 + Math.min(2, S.job.level), seq = [0, ...Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 4))]; if (Math.random() < 0.5) seq.push(5);
+  const cust = pick(NAMES);
+  seqPanel({ title: 'SCOOP THE ORDER', sub: `${cust} wants a cone. Build it bottom to top. Keys 1 to 6 work too.`, labels: FLAVORS, seq, t: lvlT(15, 2), mins: 20,
+    show: (i) => seq.map((f, k) => `<span class="${k === i ? 'next' : k < i ? 'done' : ''}">${k < i ? '✓ ' : ''}${FLAVORS[f]}</span>`).join(''),
+    done: m => m.mistakes ? `${cust} gets their cone. It is a little lopsided.` : `A perfect cone. ${cust} tips you a shiny pebble.`,
+    fail: `The cone fell on the floor. ${cust} is crying.`, timeout: `The ice cream melted all over your claws.` });
+}
+const _snt = startNextTask;
+startNextTask = function (kind) { if (kind === 'train') startTrain(); else if (kind === 'usher') startUsher(); else if (kind === 'shelve') startShelve(); else if (kind === 'scoop') startScoop(); else _snt(kind); };
+// ---- fitness ----
+const fitSpeed = () => 1 + (S.fit || 0) / 400;
+function workOut() {
+  closeMenu();
+  minigame = { kind: 'mash', p: 0, t: 6.5, label: 'PUMP IRON', help: 'Mash E (or tap) to lift', mins: 60, what: 'You finished the whole set. Feel the burn.', fail: 'You got through half the set.',
+    onDone: (ok, msg) => { const g = ok ? 6 : 3; S.fit = clamp((S.fit || 0) + g, 0, 100); S.energy -= 15; S.happy += 4; log(`${msg} Fitness ${Math.round(S.fit)}/100.`, 'good'); if (S.fit >= 60) goal('buff'); } };
+  state = 'mini'; setScreens();
+}
+// ---- arcade ----
+function startDodge() {
+  closeMenu();
+  minigame = { kind: 'dodge', px: 0.5, rocks: [], t: 0, lives: 3, hitT: 0, spawn: 0, mins: 10,
+    onDone: (ok, msg, q) => { const tk = Math.floor(minigame_last.t * 2) + (minigame_last.lives > 0 ? 10 : 0); S.tickets = (S.tickets || 0) + tk; S.happy += 6; log(`${msg} You won ${tk} tickets (${S.tickets} total).`, 'good'); if (minigame_last.t > (S.dodgeBest || 0)) { S.dodgeBest = Math.round(minigame_last.t); log(`New personal best: ${S.dodgeBest} seconds!`, 'good'); } } };
+  state = 'mini'; setScreens();
+}
+let minigame_last = null;
+function updateDodge(dt) {
+  const m = minigame; let mx = 0;
+  if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1; if (joy.active) mx = joy.dx;
+  m.px = clamp(m.px + mx * 0.9 * dt, 0.04, 0.96); m.t += dt; m.hitT -= dt; m.spawn -= dt;
+  if (m.spawn <= 0) { m.spawn = Math.max(0.16, 0.6 - m.t * 0.018); m.rocks.push({ x: Math.random(), y: -0.05, v: 0.45 + Math.random() * 0.3 + m.t * 0.02 }); }
+  for (const r of m.rocks) r.y += r.v * dt;
+  for (const r of m.rocks) if (!r.hit && r.y > 0.84 && r.y < 0.96 && Math.abs(r.x - m.px) < 0.055) { r.hit = true; if (m.hitT <= 0) { m.lives--; m.hitT = 0.8; sfx.crash(); shake = 3; } }
+  m.rocks = m.rocks.filter(r => r.y < 1.1 && !r.hit);
+  if (m.lives <= 0) { minigame_last = { t: m.t, lives: 0 }; endMini(true, `Game over after ${Math.round(m.t)} seconds.`, 0); }
+  else if (m.t >= 30) { minigame_last = { t: m.t, lives: m.lives }; endMini(true, 'You survived the whole meteor shower!', 0); }
+}
+function drawDodge(g) {
+  const m = minigame, w = Math.min(420, W - 30), h = Math.min(300, H - 200), x = (W - w) / 2, y = (H - h) / 2 + 20;
+  g.fillStyle = '#0a0620'; g.fillRect(x, y, w, h); g.strokeStyle = '#ff4aa8'; g.lineWidth = 4; g.strokeRect(x, y, w, h);
+  for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(x + ((i * 97) % w), y + ((i * 53 + gameT * 20 * (1 + i % 3)) % h), 2, 2); }
+  g.textAlign = 'center'; g.font = '400 20px "Lilita One", system-ui, sans-serif'; g.fillStyle = '#4ae8ff'; g.fillText('METEOR DODGE', W / 2, y + 26);
+  g.font = '800 12px Nunito, system-ui, sans-serif'; g.fillStyle = '#ffffff'; g.fillText(`${'♥'.repeat(Math.max(0, m.lives))}   ${Math.floor(m.t)}s / 30s   A/D or joystick to move`, W / 2, y + 44);
+  for (const r of m.rocks) { const rx = x + r.x * w, ry = y + r.y * h; g.fillStyle = '#ff8a3a'; g.beginPath(); g.arc(rx, ry, 9, 0, 7); g.fill(); g.fillStyle = 'rgba(255,200,80,.4)'; g.beginPath(); g.arc(rx, ry - 10, 5, 0, 7); g.fill(); }
+  const px = x + m.px * w, py = y + h * 0.9;
+  if (m.hitT <= 0 || Math.floor(m.hitT * 10) % 2) { g.fillStyle = '#8fdc6a'; g.beginPath(); g.ellipse(px, py, 14, 8, 0, 0, 7); g.fill(); g.fillStyle = '#5a9a3a'; g.beginPath(); g.arc(px + 10, py - 8, 6, 0, 7); g.fill(); g.fillStyle = '#000'; g.fillRect(px + 11, py - 10, 2, 2); }
+}
+const PRIZES = [
+  { label: 'Trade 25 tickets for candy', detail: '+15 hunger, +5 happiness', n: 25, fn: () => { S.hunger = Math.min(100, S.hunger + 15); S.happy += 5; } },
+  { label: 'Trade 40 tickets for a plushie (gift)', detail: 'A plush T-rex someone special might love.', n: 40, fn: () => { S.gifts = S.gifts || {}; S.gifts.plush = (S.gifts.plush || 0) + 1; } },
+  { label: 'Trade 150 tickets for the Golden Egg', detail: 'The legendary trophy on the top shelf.', n: 150, fn: () => { S.trophy = true; goal('arcade'); queueEvent({ kind: 'good', title: 'The Golden Egg is yours!', text: 'The whole arcade cheers as the attendant climbs a ladder to fetch it. It will look great on your shelf.', sound: 'goal' }); } },
+];
+function addCredit(n) {
+  const before = S.credits; S.credits += n;
+  if (S.edu === 0 && S.credits >= 5) { S.edu = 1; goal('diploma'); queueEvent({ kind: 'good', title: 'You earned a diploma!', text: 'Office, bank and library jobs at the Job Center are open to you now. Keep studying for a degree to become a doctor.', sound: 'goal' }); }
+  else if (S.edu === 1 && S.credits >= 15) { S.edu = 2; queueEvent({ kind: 'good', title: 'You earned a degree!', text: 'Tarpit Hospital is hiring nurses. Look at you.', sound: 'goal' }); }
+  else if (Math.floor(S.credits) > Math.floor(before)) log(`That is another credit. ${Math.floor(S.credits)} so far.`, '');
+}
+const FILMS = ['Meteor Mayhem', 'The Fast and the Feathered', 'Jurassic Bark', 'Love in the Tar Pits', 'Attack of the 50-Foot Compy', 'Egg-scape From Volcano Island'];
+function partnerRel(n) { const p = S.partner; if (!p) return; if (p.roster) addRel(p.name, n); else p.rel = Math.min(100, p.rel + n); }
+Object.assign(MENUS, {
+  gym: () => {
+    const acts = [...gigActs('gym')];
+    if (open(6, 23)) {
+      acts.push({ label: 'Work out', detail: `Mash to lift. Builds fitness so you walk faster. Fitness ${Math.round(S.fit || 0)}/100.`, cost: 10, why: S.energy < 20 ? 'Too tired to lift anything.' : '', fn: workOut });
+      acts.push({ label: 'Yoga class', detail: '+12 happiness, +8 energy, 1 hour', cost: 15, mins: 60, fn: () => { S.happy += 12; S.energy = Math.min(100, S.energy + 8); S.fit = clamp((S.fit || 0) + 1, 0, 100); log('Downward-facing dino. Very relaxing.', 'good'); } });
+      acts.push({ label: 'Protein shake', detail: '+25 hunger, +5 energy', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 25); S.energy = Math.min(100, S.energy + 5); } });
+    }
+    return { sub: open(6, 23) ? 'Iron Claw Gym. No tail, no gain.' : closedMsg(6, 23), acts };
+  },
+  arcade: () => {
+    if (!open(10, 24)) return { sub: closedMsg(10, 24), acts: [] };
+    const tk = S.tickets || 0, acts = [
+      { label: 'Play Meteor Dodge', detail: `Dodge falling meteors for 30 seconds. Win tickets.${S.dodgeBest ? ` Your best: ${S.dodgeBest}s.` : ''}`, cost: 2, fn: startDodge },
+      { label: 'Play the claw machine', detail: 'Stop the claw right over the plushie. Win a gift.', cost: 3, fn: () => { closeMenu(); minigame = { kind: 'dose', x: 0, dir: 1, speed: 1.3, target: 0.2 + Math.random() * 0.6, tol: 0.035, ml: 0, label: 'CLAW MACHINE', help: 'Press E to drop the claw over the green prize', mins: 10,
+        onDone: (ok, msg, q) => { if (ok && q > -0.05) { S.gifts = S.gifts || {}; S.gifts.plush = (S.gifts.plush || 0) + 1; log('The claw grabbed a plush T-rex! (a gift)', 'good'); sfx.goal(); } else log('The claw slips. So close!', 'warn'); } }; state = 'mini'; setScreens(); } },
+      ...PRIZES.map(p => ({ label: p.label, detail: `${p.detail} You have ${tk} tickets.`, why: tk < p.n ? `Need ${p.n} tickets.` : '', mins: 5, fn: () => { S.tickets -= p.n; p.fn(); } })),
+    ];
+    acts.push(...holdUpAct(100, 300));
+    return { sub: `Pixel Ptero Arcade. You have ${tk} tickets.`, acts };
+  },
+  cinema: () => {
+    const acts = [...gigActs('cinema')], film = FILMS[(S.day + 2) % FILMS.length];
+    if (open(12, 24)) {
+      acts.push({ label: 'Watch a movie', detail: `Now showing: ${film}. +20 happiness, 2.5 hours.`, cost: 12, mins: 150, fn: () => { S.happy += 20; log(pick([`${film} was amazing.`, `You cried a little at the end of ${film}.`, `${film} was so scary you hid under your tail.`]), 'good'); } });
+      if (S.partner) acts.push({ label: `Take ${S.partner.name} to the movies`, detail: `${film}. Counts as a date. +12 closeness, +20 happiness.`, cost: 24, mins: 150, fn: () => { partnerRel(12); S.happy += 20; goal('date'); goal('movie'); log(`You and ${S.partner.name} shared a giant popcorn during ${film}.`, 'good'); } });
+      acts.push({ label: 'Buy popcorn', detail: '+15 hunger, +4 happiness', cost: 5, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 15); S.happy += 4; } });
+    }
+    acts.push(...holdUpAct(120, 350));
+    return { sub: open(12, 24) ? `Jurassic Cinema. Now showing: ${film}.` : closedMsg(12, 24), acts };
+  },
+  library: () => {
+    const acts = [...gigActs('library')];
+    if (open(8, 20)) {
+      acts.push({ label: 'Read a book', detail: '+10 happiness, 1 hour, free', mins: 60, fn: () => { S.happy += 10; log(pick(['You read a mystery about a missing egg.', 'You read about the stars. Space is big.', 'You read a cookbook and now you are hungry.']), 'good'); } });
+      acts.push({ label: 'Study for Dino U', detail: `Free, 3 hours, -12 energy. Half a credit toward your ${S.edu === 0 ? 'diploma' : 'degree'}.`, mins: 180, why: S.edu >= 2 ? 'You already have a degree.' : S.energy < 15 ? 'Too tired to study.' : '', fn: () => { S.energy -= 12; addCredit(0.5); log('You studied quietly. Nobody shushed you.', ''); } });
+    }
+    return { sub: open(8, 20) ? 'Fern Library. Shhh.' : closedMsg(8, 20), acts };
+  },
+  scoops: () => {
+    const acts = [...gigActs('scoops')];
+    if (open(10, 22)) {
+      acts.push({ label: 'Buy an ice cream cone', detail: '+12 hunger, +8 happiness', cost: 4, mins: 10, fn: () => { S.hunger = Math.min(100, S.hunger + 12); S.happy += 8; } });
+      acts.push({ label: 'Buy a volcano sundae', detail: '+25 hunger, +14 happiness', cost: 9, mins: 20, fn: () => { S.hunger = Math.min(100, S.hunger + 25); S.happy += 14; } });
+      if (S.partner) acts.push({ label: `Share a sundae with ${S.partner.name}`, detail: '+8 closeness, +12 happiness', cost: 14, mins: 30, fn: () => { partnerRel(8); S.happy += 12; S.hunger = Math.min(100, S.hunger + 15); log(`You and ${S.partner.name} fight over the cherry. You let them win.`, 'good'); } });
+    }
+    acts.push(...holdUpAct(80, 220));
+    return { sub: open(10, 22) ? 'Scoops. Cold treats on hot sand.' : closedMsg(10, 22), acts };
+  },
+});
+Object.assign(LAYOUTS, {
+  gym: { w: 440, d: 320, floor: ['tile', '#3a3a40', '#2a2a30'], wall: '#d6d6dc', trim: '#ff6a3a', build(b) {
+    for (const x of [70, 150, 230]) { b.box(x, 60, 40, 80, 10, '#2a2a2a'); b.box(x, 22, 36, 6, 40, '#4a4a50', false, 10); b.box(x, 22, 30, 3, 14, '!#7fe8a0', false, 44); }
+    for (const z of [180, 250]) { b.box(80, z, 70, 4, 4, '#8a8f96', false, 30); for (const s of [-1, 1]) b.cyl(80 + s * 36, z, 9, 4, '#c0392b', false, 26); b.box(80, z, 40, 30, 6, '#3a3a40'); }
+    b.npc(150, 112, 2, { hat: '#ff6a3a' }); b.npc(80, 215, 5); b.npc(230, 100, 1);
+    b.station(80, 135, 'Weight bench', ['Work out']);
+    b.box(340, 220, 120, 30, 26, '#ff6a3a'); b.npc(340, 196, 3, { tie: '#1a1a1a' });
+    b.station(340, 262, 'Front desk', ['Yoga', 'Protein', 'Hold up']);
+    b.station(380, 70, 'Coach office (staff)', WORKS);
+    b.sign('IRON CLAW GYM', 220, 100, 3, 170, '#ff6a3a', '#1a1a1a'); b.lamp(150, 150); b.lamp(330, 150);
+  } },
+  arcade: { w: 420, d: 300, floor: ['carpet', '#1a0a3a', '#4ae8ff'], wall: '#1a1030', night: true, build(b) {
+    const cols = ['!#ff4aa8', '!#4ae8ff', '!#ffe066', '!#8fdc6a'];
+    for (let i = 0; i < 5; i++) { b.box(50 + i * 60, 40, 40, 34, 70, '#2a2a3a'); b.box(50 + i * 60, 58, 32, 2, 26, cols[i % 4], false, 38); }
+    b.station(110, 92, 'Meteor Dodge cabinet', ['Play Meteor']);
+    b.box(350, 60, 60, 60, 80, '#ff4aa8'); b.box(350, 92, 50, 2, 50, '!#bfe3ff', false, 22); b.station(350, 118, 'Claw machine', ['Play the claw']);
+    b.box(120, 230, 160, 30, 30, '#6a3aa8'); for (let i = 0; i < 6; i++) b.ball(60 + i * 24, 40, 240, 6, cols[i % 4]); b.npc(120, 255, 4, { bow: '#ff4aa8', face: -Math.PI / 2 });
+    b.station(120, 200, 'Prize counter', ['Trade']);
+    b.npc(230, 110, 1, { kid: true }); b.npc(290, 130, 5, { kid: true }); b.npc(320, 230, 0);
+    b.station(330, 270, 'Change machine', ['Hold up']);
+    b.sign('PIXEL PTERO', 210, 100, 3, 160, '#ff4aa8', '#4ae8ff');
+  } },
+  cinema: { w: 480, d: 360, floor: ['carpet', '#6a1a24', '#8a2a34'], wall: '#2a1418', night: true, build(b) {
+    b.box(240, 14, 380, 6, 120, '!#e8f0ff', false, 10);
+    for (let r = 0; r < 4; r++) for (let s = 0; s < 8; s++) { if (s === 4) continue; b.box(70 + s * 42, 90 + r * 40, 30, 20, 14, '#a8202c', false); b.box(70 + s * 42, 100 + r * 40, 30, 4, 24, '#a8202c', false); }
+    b.npc(112, 130, 3); b.npc(280, 170, 0); b.npc(322, 170, 2); b.npc(154, 210, 5);
+    b.box(90, 300, 130, 30, 26, '#ffd35a'); b.npc(90, 276, 1, { hat: '#c8322a' }); b.station(90, 336, 'Concessions', ['Buy popcorn', 'Hold up']);
+    b.box(400, 300, 70, 30, 30, '#7a1a24'); b.station(330, 330, 'Ticket booth', ['Watch', 'Take']);
+    b.station(430, 230, 'Usher stand (staff)', WORKS);
+    b.sign('JURASSIC CINEMA', 240, 104, 3, 170, '#ffd35a', '#7a1a24');
+  } },
+  library: { w: 440, d: 320, floor: ['wood', '#a8834e', '#8a6a3e'], wall: '#efe2c6', trim: '#3f5a3a', build(b) {
+    const bk = ['#c0392b', '#2e86c1', '#27ae60', '#f1c40f', '#8e44ad'];
+    for (const x of [60, 150, 240, 330]) { b.box(x, 40, 70, 20, 80, '#6a4a2e'); for (let s = 0; s < 4; s++) for (let i = 0; i < 6; i++) b.box(x - 28 + i * 11, 51, 8, 2, 14, bk[(i + s + x) % 5], false, 6 + s * 19); }
+    for (const [x, z] of [[100, 170], [220, 170]]) { b.box(x, z, 90, 40, 18, '#7a5534'); b.chair(x - 30, z + 30); b.chair(x + 30, z + 30); }
+    b.npc(70, 200, 0); b.npc(250, 200, 4);
+    b.station(160, 220, 'Study tables', ['Study']);
+    b.cyl(360, 220, 30, 10, '#3f5a3a', false); b.cyl(360, 220, 26, 4, '#5a8a4a', false, 10); b.station(360, 270, 'Reading nook', ['Read']);
+    b.station(400, 120, 'Front desk (staff)', WORKS); b.box(400, 90, 60, 26, 24, '#6a4a2e'); b.npc(400, 70, 2, { tie: '#3f5a3a' });
+    b.sign('FERN LIBRARY', 220, 104, 3, 150, '#3f5a3a', '#ffffff'); b.lamp(160, 170); b.lamp(330, 170);
+  } },
+  scoops: { w: 320, d: 240, floor: ['checker', '#ffffff', '#ffd3e6'], wall: '#fff0f6', trim: '#ff6ad5', build(b) {
+    b.box(160, 70, 200, 30, 26, '#7fd8ff'); for (let i = 0; i < 5; i++) b.box(90 + i * 34, 70, 26, 20, 2, ['#bff0c0', '#ff6a8a', '#e0a85a', '#5a3a24', '#ffffff'][i], false, 26);
+    b.npc(160, 44, 4, { bow: '#ff6ad5' });
+    b.station(160, 112, 'Counter', ['Buy', 'Share', 'Hold up']);
+    b.station(280, 60, 'Scoop station (staff)', WORKS);
+    for (const [x, z] of [[70, 180], [230, 185]]) { b.table(x, z, '#ff6ad5'); b.chair(x - 22, z); b.chair(x + 22, z); }
+    b.npc(48, 180, 1, { kid: true }); b.sign('SCOOPS', 160, 100, 3, 120, '#ff6ad5', '#ffffff');
+  } },
+});
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') $('newBtn').click(); return; }
   const k = e.key.toLowerCase();
-  if (k === 'escape') { if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
+  if (k === 'escape') { if (state === 'map') { closeMap(); return; } if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
   if (k === 'p') { togglePause(); return; }
   if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
   if (k === 'g' && state === 'play') { showGoals(); return; }
+  if (k === 'm' && (state === 'play' || state === 'map')) { if (state === 'map') closeMap(); else openMap(); return; }
   if (k === 'h' && state === 'play' && driving) { honk(); return; }
   if (k === 'f' && state === 'play') { useWeapon(); return; }
   if (k === 'q' && state === 'play') { cycleWeapon(); return; }
@@ -3046,7 +3382,7 @@ function update(dt) {
   if (keys.has('w') || keys.has('arrowup')) my -= 1; if (keys.has('s') || keys.has('arrowdown')) my += 1;
   if (joy.active) { mx = joy.dx; my = joy.dy; }
   let m = Math.hypot(mx, my); if (m > 1) { mx /= m; my /= m; m = 1; }
-  const spd = (S.injured ? 110 : 200) * (S.flood ? 0.7 : 1) * (S.energy < 15 ? 0.7 : 1);
+  const spd = (S.injured ? 110 : 200) * (S.flood ? 0.7 : 1) * (S.energy < 15 ? 0.7 : 1) * fitSpeed();
   P.vx += (mx * spd - P.vx) * Math.min(1, dt * 12); P.vy += (my * spd - P.vy) * Math.min(1, dt * 12);
   if (inside) { P.x = clamp(P.x + P.vx * dt, inside.ox + 10, inside.ox + inside.w - 10); P.y = clamp(P.y + P.vy * dt, inside.oy + 10, inside.oy + inside.d - 6); }
   else { P.x = clamp(P.x + P.vx * dt, 10, WORLD - 10); P.y = clamp(P.y + P.vy * dt, 10, WORLD - 10); }
@@ -3069,7 +3405,7 @@ function update(dt) {
   updateTownLife(dt);
 }
 function updateTownLife(dt) {
-  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt);
+  updatePet(dt); checkSiteEnd(); checkWardEnd(); updateWard(dt); checkGigEnd(); updateFire(dt); updateRobber(dt); updateDerby(dt); updateRoster(dt); updateWeapons(dt); waypointUpdate();
   // t-rex
   if (trex) {
     trex.life -= dt; trex.t += dt;
@@ -3199,6 +3535,7 @@ function drawOverlay() {
   if (inside) for (const st of inside.stations) { const s2 = toScreen(st.x, st === nearPlace ? 40 : 34, st.y); if (!s2.ok) continue; g.font = `800 ${st === nearPlace ? 14 : 12}px Nunito, system-ui, sans-serif`; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, s2.x, s2.y); g.fillStyle = st.exit ? '#bfe8ff' : '#ffbe55'; g.fillText(st.label, s2.x, s2.y); }
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
+  drawWaypoint(g);
   if (S.site && !inside) {
     for (const st of siteStations()) { const s2 = toScreen(st.x, 0, st.y); if (s2.ok) { g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); } const l2 = toScreen(st.x, 36, st.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, l2.x, l2.y); g.fillStyle = '#f1c40f'; g.fillText(st.label, l2.x, l2.y); } arrowTo(g, st.x, st.y, '#f1c40f', 'SITE'); }
     if (!siteTask()) { const d = PLACES.builders.door; arrowTo(g, d.x, d.y, '#f1c40f', 'CLOCK OUT'); }
@@ -3233,6 +3570,7 @@ function drawMini() {
   for (const t of gigTargets()) { g.fillStyle = t.color; g.beginPath(); g.arc(t.x * k, t.y * k, 4 + Math.sin(gameT * 8), 0, 7); g.fill(); }
   for (const c of cars) { g.fillStyle = c === driving ? '#ffe08a' : c.ai ? 'rgba(30,30,40,.8)' : c.color; g.fillRect(c.x * k - 2, c.y * k - 2, 4, 4); }
   if (trex) { g.fillStyle = '#ff2a2a'; g.beginPath(); g.arc(trex.x * k, trex.y * k, 5, 0, 7); g.fill(); }
+  if (waypoint) { g.strokeStyle = '#c9a2ff'; g.lineWidth = 2; g.beginPath(); g.arc(waypoint.x * k, waypoint.y * k, 4 + Math.sin(gameT * 6), 0, 7); g.stroke(); }
   g.save(); g.translate(P.x * k, P.y * k); g.rotate(P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 function hud() {
@@ -3251,6 +3589,8 @@ function hud() {
   if (driving) chips.push([`Gas ${Math.round(driving.fuel)}%`, driving.fuel < 20 ? 'bad' : 'good']);
   if (S.equip) chips.push([`${WEAPONS[S.equip].name}${WEAPONS[S.equip].consumable ? ' x' + S.weapons[S.equip] : ''} (F)`, '']);
   if (S.ward && inside && inside.id === 'hospital') chips.push([`Ward: ${S.ward.healed}/${S.ward.total} healed`, 'good']);
+  if (S.fit >= 10) chips.push([`Fit ${Math.round(S.fit)}`, 'good']);
+  if (S.tickets) chips.push([`${S.tickets} tickets`, '']);
   if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
@@ -3312,6 +3652,10 @@ $('newBtn').addEventListener('click', () => beginLife(null));
 $('contBtn').addEventListener('click', () => { const s = loadSave(); if (s) beginLife(s); });
 $('menuClose').addEventListener('click', closeMenu);
 $('goalsBtn').addEventListener('click', () => { if (state === 'play') showGoals(); });
+$('mapBtn').addEventListener('click', openMap); $('mini').addEventListener('click', openMap); $('mapClose').addEventListener('click', closeMap);
+$('bigMap').addEventListener('click', mapClick);
+$('mapLegend').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const mp = mapPlaces().find(m => m.id === b.dataset.id); if (mp) setWaypoint(mp); });
+addEventListener('resize', () => { if (state === 'map') drawBigMap(); });
 $('goalsClose').addEventListener('click', () => { $('goalsScreen').hidden = true; if (state === 'goals') state = 'play'; });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
