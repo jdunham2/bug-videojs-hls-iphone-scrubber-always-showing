@@ -730,6 +730,9 @@ const GOODS = {
   golden_horseshoe:{name:'Golden Horseshoe',base:600,col:'#f0c040',kind:'trinket',desc:'+8% movement speed, mounted or not'},
   curators_monocle:{name:"Curator's Monocle",base:500,col:'#e3a948',kind:'trinket',desc:'+6% critical chance; you notice the details'},
   golden_statue:{name:'Golden Statue',base:900,col:'#f0c040',kind:'place',desc:'Place with B. A golden statue of you, from a grateful museum.'},
+  storm_glass:{name:'Storm Glass',base:65,col:'#bfe8ff',kind:'mat'},
+  storm_spear:{name:'Stormcaller Spear',base:1100,col:'#bfe8ff',kind:'weapon',dmg:12,cd:.42,reach:2.1,crit:.08},
+  storm_charm:{name:'Storm Charm',base:400,col:'#bfe8ff',kind:'trinket',desc:'+10% movement speed in rain and storms'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -943,6 +946,8 @@ const RECIPES = [
   {id:'star_pendant',  need:{star_fragment:5,silver:2}, at:'bench', known:true},
   {id:'stardust_tonic',need:{star_fragment:1,glass:1,honey:1}, at:'bench', known:true},
   {id:'comet_hammer',  need:{star_fragment:8,blacksteel:2,iron:4}, at:'forge', known:true},
+  {id:'storm_spear',    need:{storm_glass:5,iron:4,silver:1}, at:'forge', known:true},
+  {id:'storm_charm',    need:{storm_glass:3,silver:1}, at:'bench', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -2593,7 +2598,7 @@ const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1);
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
 const canClimb = () => toolTier('climb') > 0;
@@ -3778,6 +3783,11 @@ function render() {
       sprites.push({y: cp.y + .5, f: () => { const x = cp.x*TS, y = cp.y*TS, pu = next ? 1 + Math.sin(frameT*6)*.08 : .8; ctx.globalAlpha = next ? 1 : .4; ctx.strokeStyle = last ? '#86c98f' : '#e3a948'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y - 10, 12*pu, 16*pu, 0, 0, 7); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y - 10, 10*pu, 14*pu, 0, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; if (last) { ctx.fillStyle = '#86c98f'; ctx.font = '8px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillText('FINISH', x, y - 30); } }}); }
     const cp = R0.cps[R0.i]; if (cp) { const dx = cp.x - S.x, dy = cp.y - S.y; if (Math.hypot(dx, dy) > 2.5) sprites.push({y: S.y + 60, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*26, cy = (S.y - .4)*TS + Math.sin(an)*26; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#e3a948'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
   }
+  for (const st of (WX.strikes || [])) sprites.push({y: st.y + 30, f: () => { const x = st.x*TS, y = st.y*TS;
+    if (st.t < 1.3) { const u = st.t/1.3; ctx.strokeStyle = `rgba(255,220,120,${.3 + u*.5})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y, 20*(1.2 - u*.3), 10*(1.2 - u*.3), 0, 0, 7); ctx.stroke(); ctx.fillStyle = `rgba(255,220,120,${u*.18})`; ctx.fill(); }
+    else { ctx.strokeStyle = '#f0f6ff'; ctx.lineWidth = 3; ctx.beginPath(); let px = x, py = y - 260; ctx.moveTo(px, py); while (py < y) { py += 22; px = x + (Math.random() - .5)*18*(1 - (py - y + 260)/260 + .2); ctx.lineTo(py >= y ? x : px, Math.min(py, y)); } ctx.stroke(); } }});
+  for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
+  if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
@@ -4127,7 +4137,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -5113,7 +5123,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -6034,10 +6044,45 @@ function weatherNow() {
   return g;
 }
 const weatherSlow = () => (S && weatherNow() === 'sandstorm' && !townAt(S.x, S.y, 8)) ? .85 : 1;
+function startRainbow() {
+  WX.rainbow = 50;
+  for (let k = 0; k < 20; k++) {
+    const a = Math.random()*6.283, r = 7 + Math.random()*8, x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H) continue; const t = map[idx(x, y)];
+    if (!walkable(t, false, false) || t === T.SHAL || townAt(x, y, 6)) continue;
+    WX.pot = {x: x + .5, y: y + .5}; break;
+  }
+  setTimeout(() => toast(`<b>A rainbow!</b><br>${WX.pot ? 'Legend says a pot of gold waits where it touches the ground. It won’t last long!' : 'How lovely.'}`, 6000), 300);
+}
+function weatherTarget() {
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (WX.pot && WX.rainbow > 0 && Math.hypot(S.x - WX.pot.x, S.y - WX.pot.y) < 1.2) return {key: 'pot', html: `${K}Take the pot of gold!`, btn: 'Take', fn: () => {
+    const c = 120 + rint(0, 180) + (S.level || 1)*8; S.coins += c; addItem('gem', 1); S.pots = (S.pots || 0) + 1; WX.pot = null; SFX.victory(); burst(S.x, S.y - .5, '#f0c040', 24, 5);
+    toast(`<b>A pot of gold!</b><br><span style="color:var(--good)">+${c} coin, +1 Cut Gem</span>`, 5000); renderHUD(); save(); }};
+  for (const gl of (WX.glass || [])) if (Math.hypot(S.x - gl.x, S.y - gl.y) < 1.1) return {key: 'glass' + gl.x, html: `${K}Pick up storm glass`, btn: 'Pick up', fn: () => { gl.taken = true; addItem('storm_glass', 1); S.stormGlass = (S.stormGlass || 0) + 1; SFX.sparkle(); floatText(gl.x, gl.y - .8, '+1 Storm Glass', '#bfe8ff'); renderHUD(); }};
+  return null;
+}
 function updateWeather(dt) {
   WX.t -= dt;
-  if (WX.t <= 0) { const r = Math.random(); WX.type = r < .45 ? 'clear' : r < .7 ? 'rain' : r < .84 ? 'storm' : 'fog'; WX.t = 70 + Math.random()*100; }
+  if (WX.t <= 0) { const was = WX.type, r = Math.random(); WX.type = r < .45 ? 'clear' : r < .7 ? 'rain' : r < .84 ? 'storm' : 'fog'; WX.t = 70 + Math.random()*100;
+    if ((was === 'rain' || was === 'storm') && WX.type === 'clear' && S && mode !== 'title' && !inDungeon() && !inArena() && S.time > .3 && S.time < .7) startRainbow(); }
   const w = weatherNow();
+  if (WX.rainbow > 0) { WX.rainbow -= dt; if (WX.rainbow <= 0) WX.pot = null; }
+  if (w === 'storm' && S && mode === 'play' && !inDungeon() && !inArena()) {
+    WX.strikeT = (WX.strikeT ?? 8) - dt;
+    if (WX.strikeT <= 0) { WX.strikeT = 7 + Math.random()*9; const a = Math.random()*6.283, r = Math.random() < .35 ? Math.random()*1.2 : 2 + Math.random()*5; WX.strikes = WX.strikes || []; WX.strikes.push({x: S.x + Math.cos(a)*r, y: S.y + Math.sin(a)*r, t: 0}); }
+  }
+  for (const st of (WX.strikes || [])) {
+    st.t += dt;
+    if (!st.hit && st.t >= 1.3) {
+      st.hit = true; WX.flash = 1; SFX.thunder(); shake = Math.max(shake, .35); burst(st.x, st.y, '#e8f0ff', 18, 6); burst(st.x, st.y, '#ffd060', 8, 3);
+      if (Math.hypot(S.x - st.x, S.y - st.y) < 1.3) { hurtPlayer(3 + (S.level || 1)*.12, {x: st.x, y: st.y}); floatText(S.x, S.y - 1.6, 'Struck by lightning!', '#ffd060'); }
+      for (const e of enemies) if (!e.dead && !e.boss && Math.hypot(e.x - st.x, e.y - st.y) < 1.5) hitEnemy(e, 8, 0, 0);
+      if (Math.random() < .4) { WX.glass = WX.glass || []; WX.glass.push({x: st.x, y: st.y, life: 120}); }
+    }
+  }
+  if (WX.strikes) WX.strikes = WX.strikes.filter(st => st.t < 1.6);
+  if (WX.glass) { for (const gl of WX.glass) gl.life -= dt; WX.glass = WX.glass.filter(gl => gl.life > 0 && !gl.taken); }
   if (w === 'storm') { WX.bolt -= dt; if (WX.bolt <= 0) { WX.bolt = 6 + Math.random()*10; WX.flash = 1; setTimeout(() => SFX.thunder(), 250 + Math.random()*900); } }
   WX.flash = Math.max(0, WX.flash - dt*2.4);
   AUD.setRain(w === 'storm' ? 1 : w === 'rain' ? .6 : w === 'sandstorm' ? .7 : 0);
@@ -6072,6 +6117,7 @@ function drawWeather() {
     ctx.fillStyle = 'rgba(60,28,18,.14)'; ctx.fillRect(0, 0, VW, VH);
     for (let i = 0; i < 90; i++) { const x = (h(i,1,15)*VW + Math.sin(t*.6 + i)*20*dpr + VW) % VW, y = (h(i,3,15)*VH + t*30*dpr*(.5 + h(i,4,15))) % VH; ctx.fillStyle = i % 4 ? 'rgba(120,110,110,.7)' : `rgba(255,${120 + (i*13)%80},40,.9)`; ctx.fillRect(x, y, 2*dpr, 2*dpr); }
   }
+  if (WX.rainbow > 0 && S.y < WORLD_H && w === 'clear') { const a = Math.min(1, WX.rainbow/6, (50 - WX.rainbow)/4)*.38, cx = VW*.5, cy = VH*1.1, R0 = Math.min(VW*.55, VH*.95); ['#ff4a4a','#ff9a3a','#ffe04a','#5ad05a','#4a9aff','#7a5aff'].forEach((c, i) => { ctx.strokeStyle = c; ctx.globalAlpha = a; ctx.lineWidth = 9*dpr; ctx.beginPath(); ctx.arc(cx, cy, R0 - i*9*dpr, Math.PI, 0); ctx.stroke(); }); ctx.globalAlpha = 1; }
   if (WX.flash > 0) { ctx.fillStyle = `rgba(232,240,255,${WX.flash*.65})`; ctx.fillRect(0, 0, VW, VH); }
   ctx.setTransform(Z,0,0,Z,-camX*Z,-camY*Z);
 }
@@ -6231,6 +6277,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['rainbow','Pot of Gold','Find the pot of gold at the end of a rainbow', () => (S.pots || 0) >= 1],
+  ['stormchaser','Storm Chaser','Collect 5 storm glass', () => (S.stormGlass || 0) >= 5],
   ['curator','Patron of the Arts','Donate 20 things to the museum', () => Object.keys(S.museum || {}).length >= 20],
   ['gambler','High Roller','Win 10 games of Bones', () => (S.diceWins || 0) >= 10],
   ['racer','Racer','Win a race medal', () => Object.keys(S.raceMedals || {}).length >= 1],
@@ -6570,7 +6618,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
