@@ -747,6 +747,8 @@ const GOODS = {
   flintlock:{name:'Flintlock Pistol',base:900,col:'#8a6a4a',kind:'weapon',dmg:14,cd:.9,ranged:true,noAmmo:true,pcol:'#ffd060'},
   redbeard_cutlass:{name:"Redbeard's Cutlass",base:1500,col:'#c84a3a',kind:'weapon',dmg:14,cd:.28,reach:1.6,crit:.12},
   powder_keg:{name:'Powder Keg',base:60,col:'#6a4a2a',kind:'ammo',desc:'A huge bomb. Thrown like a bomb with G, much bigger blast.'},
+  slime_gel:{name:'Slime Gel',base:6,col:'#86c98f',kind:'mat'},
+  slime_tonic:{name:'Bouncy Tonic',base:40,col:'#86e88f',kind:'food',heal:6,buff:'speed'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -969,6 +971,7 @@ const RECIPES = [
   {id:'mithril_shield',need:{mithril:4,wood:2}, at:'forge', known:true},
   {id:'flintlock',      need:{gunpowder:4,iron:3,wood:2}, at:'forge', known:true},
   {id:'gunpowder_bomb', out:'bomb', n:3, need:{gunpowder:2,iron:1}, at:'bench', known:true, label:'Powder Bombs'},
+  {id:'slime_tonic',    need:{slime_gel:3,glass:1}, at:'bench', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1083,6 +1086,11 @@ const NODES = {
 const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'a sickle', shovel:'a shovel'};
 
 const ENEMIES = {
+  slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
+  crab:{name:'Shore Crab',hp:6,dmg:2,speed:2.6,aggro:4,drops:[['shells',1,3,1],['meat',1,1,.3]]},
+  sporeling:{name:'Sporeling',hp:7,dmg:2,speed:2.4,aggro:6,drops:[['mushroom',1,2,1],['truffle',1,1,.08]]},
+  rockgolem:{name:'Rock Golem',hp:16,dmg:3,speed:1.6,aggro:5,drops:[['stone',2,4,1],['ore',1,2,.6],['crystal',1,1,.15]]},
+  ghostpirate:{name:'Ghost Pirate',hp:10,dmg:3,speed:3,aggro:8,undead:true,drops:[['pirate_gold',1,1,.25],['ancient_coin',1,1,.15]],coins:[10,30]},
   wolf:{name:'Wolf',plural:'Wolves',hp:4,dmg:1,speed:3.5,aggro:6,drops:[['hide',1,1,1],['meat',1,1,.4]],curio:'fang'},
   bandit:{name:'Bandit',hp:7,dmg:2,speed:3.0,aggro:7,coins:[6,16],drops:[['ore',1,2,.3],['berries',1,2,.4]],curio:'banditmap'},
   archer:{name:'Bandit Archer',hp:5,dmg:2,speed:2.7,aggro:9,ranged:{range:7,cd:1.9,speed:9,col:'#ebe4d3'},coins:[4,10],drops:[['arrows',2,4,.7]]},
@@ -1137,7 +1145,7 @@ const CRITTER_SPAWN = (t, x, night, r) => {
   }
   return null;
 };
-const TOWN_ENEMIES = {wren:['bandit','boar','wolf'],hollow:['wolf','boar'],frost:['wolf','wraith'],dun:['scorpion','skeleton'],reed:['lurker','boar'],highcairn:['skeleton','archer','bandit'],thorn:['spider','bat'],ashfall:['imp'],jade:['snake','jaguar'],redrock:['coyote','dustdevil'],graven:['ghoul','wisp'],storm:['harpy','wolf'],lantern:['hyena','boar'],petal:['sprite','wolf'],sunreach:['hyena','lion'],skyhold:['wolf','wraith'],maplehold:['wolf','boar','bandit'],greenstem:['jaguar','bandit'],blackwater:['bandit','harpy'],prismvale:['wisp','harpy'],tallpine:['wolf','boar'],farhaven:['harpy','boar'],mossbridge:['boar','bandit'],sporehaven:['spider','wisp'],driftport:['harpy','boar'],crownfall:['skeleton','ghoul'],tidewatch:['harpy','boar']};
+const TOWN_ENEMIES = {wren:['bandit','boar','wolf'],hollow:['wolf','boar'],frost:['wolf','wraith'],dun:['scorpion','skeleton'],reed:['lurker','boar'],highcairn:['skeleton','archer','bandit'],thorn:['spider','bat'],ashfall:['imp'],jade:['snake','jaguar'],redrock:['coyote','dustdevil'],graven:['ghoul','wisp'],storm:['harpy','wolf'],lantern:['hyena','boar'],petal:['sprite','wolf'],sunreach:['hyena','lion'],skyhold:['wolf','wraith'],maplehold:['wolf','boar','bandit'],greenstem:['jaguar','bandit'],blackwater:['ghostpirate','crab','bandit'],prismvale:['wisp','harpy'],tallpine:['wolf','boar'],farhaven:['harpy','boar'],mossbridge:['boar','bandit'],sporehaven:['spider','wisp'],driftport:['harpy','boar'],crownfall:['skeleton','ghoul'],tidewatch:['harpy','boar']};
 
 const BOSSES = {
   alpha:{name:'The Grey Alpha',tx:80,ty:38,kind:'wolf',size:2.2,hp:45,dmg:2,speed:3.3,cd:2.6,abilities:['dash','summon','dash'],summon:'wolf',loot:{coins:120,items:{alpha_pelt:1,hide:3}},intro:'A wolf the size of a horse steps out of the pines.'},
@@ -3112,24 +3120,25 @@ function makeEnemy(type, x, y, extra) {
 function spawnTypeFor(t, x, night) {
   const r = Math.random();
   switch (t) {
-    case T.FOREST: return night && r < .25 ? 'skeleton' : r < .6 ? 'wolf' : 'boar';
+    case T.FOREST: return night && r < .25 ? 'skeleton' : r < .6 ? 'wolf' : r < .85 ? 'boar' : 'slime';
     case T.SNOW: return x > 290 ? (r < .6 ? 'harpy' : 'wolf') : night && r < .4 ? 'wraith' : 'wolf';
     case T.JUNGLE: return r < .5 ? 'snake' : r < .8 ? 'jaguar' : 'spider';
     case T.BLOSSOM: return r < .5 ? 'sprite' : r < .75 ? 'boar' : 'wolf';
     case T.SHIMMER: return night ? (r < .6 ? 'wisp' : 'wraith') : (r < .5 ? 'harpy' : null);
     case T.REDWOOD: return r < .5 ? 'wolf' : r < .8 ? 'boar' : 'bandit';
-    case T.SHROOM: return night ? (r < .5 ? 'wisp' : r < .8 ? 'spider' : 'ghoul') : (r < .6 ? 'spider' : null);
+    case T.SHROOM: return night ? (r < .4 ? 'wisp' : r < .7 ? 'sporeling' : 'spider') : (r < .5 ? 'sporeling' : r < .8 ? 'spider' : null);
     case T.BAMBOO: return r < .5 ? 'jaguar' : r < .8 ? 'bandit' : 'boar';
     case T.MAPLE: return r < .45 ? 'wolf' : r < .75 ? 'boar' : 'bandit';
     case T.RUINS: return night ? (r < .5 ? 'skeleton' : r < .8 ? 'wraith' : 'ghoul') : (r < .5 ? 'skeleton' : r < .7 ? 'ghoul' : null);
     case T.SAVANNA: return r < .5 ? 'hyena' : r < .8 ? 'lion' : 'scorpion';
     case T.MESA: return r < .5 ? 'coyote' : r < .9 ? 'dustdevil' : 'scorpion';
     case T.MOOR: return night ? (r < .45 ? 'ghoul' : r < .8 ? 'wisp' : 'skeleton') : (r < .3 ? 'ghoul' : r < .5 ? 'wisp' : r < .7 ? 'wolf' : null);
-    case T.GRASS: case T.HILL: case T.ROAD:
-      return night ? (r < .35 ? 'wolf' : r < .55 ? 'bandit' : r < .7 ? 'archer' : 'skeleton') : (r < .3 ? 'bandit' : r < .45 ? 'archer' : r < .7 ? 'boar' : null);
+    case T.HILL: if (r < .25) return 'rockgolem';
+    case T.GRASS: case T.ROAD:
+      return night ? (r < .35 ? 'wolf' : r < .55 ? 'bandit' : r < .7 ? 'archer' : 'skeleton') : (r < .3 ? 'bandit' : r < .45 ? 'archer' : r < .7 ? 'boar' : r < .85 ? 'slime' : null);
     case T.DUNE: return night && r < .25 ? 'skeleton' : 'scorpion';
-    case T.SAND: return x > 170 ? 'scorpion' : null;
-    case T.MARSH: return night && r < .3 ? 'skeleton' : 'lurker';
+    case T.SAND: if (x > 600 && x < 712 && S.y > 222 && night) return r < .7 ? 'ghostpirate' : 'crab'; return x > 170 && x < 360 ? (r < .6 ? 'scorpion' : 'crab') : (r < .45 ? 'crab' : null);
+    case T.MARSH: return night && r < .3 ? 'skeleton' : r < .75 ? 'lurker' : 'slime';
     case T.GLOOM: return r < .55 ? 'spider' : r < .8 ? 'bat' : 'wolf';
     case T.ASH: return r < .85 ? 'imp' : 'skeleton';
   }
@@ -3667,6 +3676,47 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = extra && extra.bossId === 'crystalqueen' ? '#5fb8d8' : '#241c22'; g.beginPath(); g.ellipse(x - f*2, y-6, 4, 3.5, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + f*3, y-6, 2.5, 0, 7); g.fill();
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
+    case 'slime': {
+      const sq = Math.abs(Math.sin(phase*1.2)), h = 6 + sq*3, w = 7 - sq*1.5;
+      shadow(6); g.fillStyle = 'rgba(110,200,90,.9)'; g.beginPath(); g.ellipse(x, y - h/2, w, h/2 + 1, 0, Math.PI, 0); g.fill(); g.fillRect(x - w, y - h/2, w*2, h/2);
+      g.fillStyle = 'rgba(200,255,180,.7)'; g.fillRect(x - w + 2, y - h + 1, 2, 2);
+      g.fillStyle = '#1a3a1a'; g.fillRect(x + f*2 - 2, y - h/2 - 1, 1, 2); g.fillRect(x + f*2 + 1, y - h/2 - 1, 1, 2);
+      break;
+    }
+    case 'crab': {
+      shadow(7); const cl = Math.sin(phase*2)*1.2;
+      g.fillStyle = '#a83a2a'; for (const k of [-1, 1]) { g.fillRect(x + k*6, y - 3 + (step*k > 0 ? -1 : 0), 2, 3); g.fillRect(x + k*3, y - 2, 1, 2); }
+      g.fillStyle = '#d8502a'; g.beginPath(); g.ellipse(x, y - 5, 6, 4, 0, 0, 7); g.fill();
+      g.fillStyle = '#e8703a'; g.fillRect(x - 9, y - 8 - cl, 3, 3); g.fillRect(x + 6, y - 8 + cl, 3, 3);
+      g.fillStyle = '#1a1a1a'; g.fillRect(x - 2, y - 9, 1, 2); g.fillRect(x + 1, y - 9, 1, 2);
+      break;
+    }
+    case 'sporeling': {
+      shadow(5); g.fillStyle = '#d8d0c0'; g.fillRect(x - 2, y - 7, 4, 7); g.fillRect(x - 3, y - 3 + (step > 0 ? -1 : 0), 1, 3); g.fillRect(x + 2, y - 3 + (step < 0 ? -1 : 0), 1, 3);
+      g.fillStyle = '#9a6ac8'; g.beginPath(); g.ellipse(x, y - 8, 7, 4.5, 0, Math.PI, 0); g.fill(); g.fillRect(x - 7, y - 8, 14, 1);
+      g.fillStyle = '#7ac8d8'; g.fillRect(x - 4, y - 11, 2, 2); g.fillRect(x + 2, y - 10, 2, 2);
+      g.fillStyle = '#2a1a3a'; g.fillRect(x + f - 2, y - 5, 1, 1); g.fillRect(x + f + 1, y - 5, 1, 1);
+      if (Math.random() < .03) burst((x)/TS, (y - 8)/TS, '#d8a8ff', 1, 1);
+      break;
+    }
+    case 'rockgolem': {
+      shadow(8); g.fillStyle = '#5a5860'; g.fillRect(x - 5, y - 4, 3, 4 + (step > 0 ? 0 : -1)); g.fillRect(x + 2, y - 4, 3, 4 + (step < 0 ? 0 : -1));
+      g.fillStyle = '#7a7880'; g.fillRect(x - 7, y - 14, 14, 10); g.fillRect(x - 10, y - 13, 3, 8); g.fillRect(x + 7, y - 13, 3, 8);
+      g.fillStyle = '#8a8890'; g.fillRect(x - 4, y - 19, 8, 6); g.fillStyle = '#5a5860'; g.fillRect(x - 7, y - 10, 14, 1); g.fillRect(x - 2, y - 14, 1, 4);
+      g.fillStyle = '#e3a948'; g.fillRect(x + f*2 - 2, y - 17, 1, 1); g.fillRect(x + f*2 + 1, y - 17, 1, 1);
+      g.fillStyle = '#5a7a4a'; g.fillRect(x - 6, y - 15, 3, 1);
+      break;
+    }
+    case 'ghostpirate': {
+      const fy = Math.sin(phase*.8)*1.5; g.globalAlpha *= .75;
+      g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(x, y, 5, 1.5, 0, 0, 7); g.fill();
+      g.fillStyle = '#9fe8d8'; g.beginPath(); g.moveTo(x - 5, y - 2 + fy); g.lineTo(x - 5, y - 12 + fy); g.lineTo(x + 5, y - 12 + fy); g.lineTo(x + 5, y - 2 + fy); g.lineTo(x + 3, y - 4 + fy); g.lineTo(x + 1, y - 2 + fy); g.lineTo(x - 1, y - 4 + fy); g.lineTo(x - 3, y - 2 + fy); g.fill();
+      g.fillStyle = '#c8f4e8'; g.fillRect(x - 3, y - 17 + fy, 6, 5);
+      g.fillStyle = '#1a2a2a'; g.fillRect(x - 5, y - 19 + fy, 10, 2); g.fillRect(x - 3, y - 21 + fy, 6, 2); g.fillRect(x + f - 2, y - 15 + fy, 1, 1); g.fillRect(x + f + 1, y - 15 + fy, 1, 1);
+      g.fillStyle = '#cfd6dc'; g.fillRect(x + f*6, y - 12 + fy, 1, 7);
+      g.globalAlpha = 1;
+      break;
+    }
     case 'bat': {
       const fl = Math.sin(phase*2)*3, by = y - 10 + Math.sin(phase)*1.5;
       g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(x, y, 3, 1, 0, 0, 7); g.fill();
@@ -5926,7 +5976,7 @@ function mineNodes() {
   }
 }
 function populateMine() {
-  const D = DUNGEONS.mine, f = MINE.floor, pool = f >= 7 ? ['skeleton','spider','imp','bat','ghoul'] : f >= 4 ? ['skeleton','spider','bat','ghoul'] : ['bat','skeleton','spider'];
+  const D = DUNGEONS.mine, f = MINE.floor, pool = f >= 7 ? ['skeleton','rockgolem','imp','bat','ghoul'] : f >= 4 ? ['skeleton','rockgolem','spider','bat','ghoul'] : ['bat','skeleton','spider','rockgolem'];
   const n = Math.min(16, 4 + f), mul = 1 + f*.16;
   for (let i = 0; i < n && D.floorTiles.length; i++) {
     const t = D.floorTiles[Math.floor(Math.random()*D.floorTiles.length)];
@@ -6472,6 +6522,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['newfoes','Strange New Foes','Defeat a slime, a crab, a sporeling, a rock golem and a ghost pirate', () => ['slime','crab','sporeling','rockgolem','ghostpirate'].every(k => S.killsBy[k])],
   ['whirlwind','Whirlwind','Hit 3 or more foes with one charged spin (hold F)', () => !!S.whirl3],
   ['buccaneer','Buccaneer','Reach Blackwater in the Pirate Isles', () => !!S.towns.blackwater],
   ['mutiny','Mutiny Crushed','Defeat Captain Redbeard', () => !!S.bosses.redbeard],
