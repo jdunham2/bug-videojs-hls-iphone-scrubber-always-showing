@@ -711,6 +711,11 @@ const GOODS = {
   party_hat:{name:'Party Hat',base:120,col:'#ff5a8a',kind:'armor',slot:'head',armor:1,crit:.03,speed:.03},
   sun_charm:{name:'Sun Charm',base:200,col:'#f0c040',kind:'trinket',desc:'+5% critical chance'},
   festival_token:{name:'Festival Token',base:50,col:'#e3a948',kind:'good'},
+  star_fragment:{name:'Star Fragment',base:70,col:'#fff4b0',kind:'mat'},
+  starlight_lantern:{name:'Starlight Lantern',base:200,col:'#fff4b0',kind:'place',desc:'Place with B. Glows with captured starlight.'},
+  star_pendant:{name:'Star Pendant',base:450,col:'#fff4b0',kind:'trinket',desc:'+15% experience from everything'},
+  comet_hammer:{name:'Comet Hammer',base:1300,col:'#bfe8ff',kind:'weapon',dmg:15,cd:.55,reach:1.8},
+  stardust_tonic:{name:'Stardust Tonic',base:150,col:'#ffc8f0',kind:'food',heal:40,buff:'luck'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -920,6 +925,10 @@ const RECIPES = [
   {id:'marble_statue',  need:{marble:4}, at:'bench', known:true},
   {id:'coral_necklace', need:{coral:3,silver:1}, at:'bench', known:true},
   {id:'crafting_table', need:{wood:8,stone:2}, at:'hand', known:true},
+  {id:'starlight_lantern', need:{star_fragment:2,glass:1,iron:1}, at:'bench', known:true},
+  {id:'star_pendant',  need:{star_fragment:5,silver:2}, at:'bench', known:true},
+  {id:'stardust_tonic',need:{star_fragment:1,glass:1,honey:1}, at:'bench', known:true},
+  {id:'comet_hammer',  need:{star_fragment:8,blacksteel:2,iron:4}, at:'forge', known:true},
   {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
@@ -1241,7 +1250,7 @@ const PK = Object.keys(PROPERTIES);
 const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
-  campfire:{solid:true, light:52, use:'rest'}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
+  campfire:{solid:true, light:52, use:'rest'}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
   scarecrow:{solid:true}, flower_pot:{solid:true},
 };
 const PLACE_MAX = 600;
@@ -1401,6 +1410,7 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#ffffff'; g.fillRect(x + 3, y + 9, 10, 2); g.fillStyle = '#c84a3a'; g.fillRect(x + 6, y + 6, 4, 3); g.fillStyle = '#2a5a2a'; g.fillRect(x + 10, y + 5, 2, 4);
       for (let k = 0; k < 4; k++) { const sx = x + 3 + ((t*3 + k*2.7) % 10), sy = y + ((t*5 + k*3.1) % 9); g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1); }
       g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(x + 4, y + 1, 2, 1); break;
+    case 'starlight_lantern': { g.fillRect(x + 5, y + 14, 6, 2); g.fillStyle = '#3a3a4a'; g.fillRect(x + 7, y - 2, 2, 16); g.fillRect(x + 4, y - 3, 8, 1); const pu = .7 + Math.sin(t*3)*.3; g.globalAlpha = pu; g.fillStyle = '#fff4b0'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = i % 2 ? 2.5 : 5.5; g.lineTo(x + 8 + Math.cos(a)*r, y - 9 + Math.sin(a)*r); } g.fill(); g.globalAlpha = 1; break; }
     case 'flower_pot':
       g.fillRect(x + 3, y + 13, 10, 2);
       g.fillStyle = '#b05a3a'; g.fillRect(x + 4, y + 8, 8, 6); g.fillStyle = '#c86a48'; g.fillRect(x + 3, y + 7, 10, 2);
@@ -2886,6 +2896,38 @@ function bossWalk(x, y) {
   return !(t === T.DEEP || t === T.HOUSE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) && !townAt(x, y, 8);
 }
 const MASTERY = 25;
+let fallingStars = [], starT = 5;
+const starfallNight = () => !!S && ((S.starfall === S.day && S.time > .78) || (S.starfall === S.day - 1 && S.time < .22)) && !inDungeon() && !inArena();
+function updateStars(dt) {
+  for (const st of fallingStars) st.t += dt;
+  fallingStars = fallingStars.filter(st => !st.taken && st.t < 600);
+  if (!starfallNight()) { if (S.time > .22 && S.time < .7 && fallingStars.length) fallingStars = []; return; }
+  starT -= dt;
+  if (starT <= 0) {
+    starT = 5 + Math.random()*6;
+    for (let k = 0; k < 10; k++) {
+      const a = Math.random()*6.283, r = 4 + Math.random()*6, x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+      if (!inB(x, y) || y >= WORLD_H) continue;
+      const t = map[idx(x, y)]; if (!walkable(t, false, false) || t === T.SHAL || townAt(x, y, 7)) continue;
+      fallingStars.push({x: x + .5, y: y + .5, t: 0, col: ['#fff4b0','#bfe8ff','#ffc8f0'][Math.floor(Math.random()*3)]}); SFX.chime(); break;
+    }
+  }
+}
+function starTarget() {
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  for (const st of fallingStars) if (st.t > 1.2 && Math.hypot(S.x - st.x, S.y - st.y) < 1.2) return {key: 'star' + st.x + st.y, html: `${K}Pick up the fallen star`, btn: 'Pick up', fn: () => {
+    st.taken = true; const n = Math.random() < .25 ? 2 : 1; addItem('star_fragment', n); S.starsFound = (S.starsFound || 0) + n; SFX.sparkle(); gainXP(25);
+    burst(st.x, st.y - .3, st.col, 16, 4); floatText(st.x, st.y - .8, `+${n} Star Fragment${n > 1 ? 's' : ''}`, '#fff4b0'); renderHUD(); }};
+  return null;
+}
+function drawStar(st) {
+  const x = st.x*TS, y = st.y*TS;
+  if (st.t < 1.2) { const u = st.t/1.2, sx = x + 180*(1 - u), sy = y - 260*(1 - u); ctx.strokeStyle = st.col; ctx.lineWidth = 2; ctx.globalAlpha = .9; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 30, sy - 44); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = '#ffffff'; ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3); if (u > .97) { burst(st.x, st.y - .2, st.col, 14, 4); shake = Math.max(shake, .12); } return; }
+  const pu = .6 + Math.sin(frameT*5 + st.x)*.3;
+  ctx.globalAlpha = .35*pu; ctx.fillStyle = st.col; ctx.beginPath(); ctx.arc(x, y - 3, 9, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  ctx.fillStyle = st.col; ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = i % 2 ? 2 : 5; ctx.lineTo(x + Math.cos(a)*r, y - 4 + Math.sin(a)*r); } ctx.fill();
+  if (Math.random() < .06) burst(st.x, st.y - .3, st.col, 1, 1);
+}
 const bloodMoonDay = () => S && S.day >= 6 && S.day % 6 === 0;
 const bloodMoon = () => !!S && ((bloodMoonDay() && S.time > .78) || (S.day > 6 && S.day % 6 === 1 && S.time < .22)) && !inDungeon() && !inArena();
 const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive);
@@ -3672,6 +3714,7 @@ function render() {
       sprites.push({y: cy, f: () => drawChicken(ctx, cx*TS, cy*TS, Math.cos(frameT*.4 + i*2.1) > 0 ? 1 : -1, frameT + i)});
     }
   }
+  for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
@@ -3814,6 +3857,7 @@ function render() {
     for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
     if (S.home.level) hole(HOME.x*TS + 8, (HOME.y - 2)*TS + 6, 64, .8);
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
+    for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
     for (const q of S.placed) if (PLACE[q.t].light) hole(q.x*TS + 8, q.y*TS + (q.t === 'campfire' ? 8 : -4), PLACE[q.t].light, .85);
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
     const lan = LANDMARKS.find(l => l.id === 'lantern'); hole(lan.x*TS + 8, lan.y*TS - 4, 40, .8);
@@ -3941,8 +3985,10 @@ function updatePeople(dt) {
 let deedT = 0, lastCoins = null;
 function update(dt) {
   updatePeople(dt);
+  updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
   deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds();
+    if (S.starfall === S.day && S.time > .74 && S.time < .8 && S.sfWarned !== S.day) { S.sfWarned = S.day; toast('<b>A starfall night!</b><br>Shooting stars are streaking across the sky. Where they land, star fragments glow until morning. Go and find them!', 8000); SFX.chime(); }
     if (bloodMoonDay() && S.time > .72 && S.time < .8 && S.bmWarned !== S.day) { S.bmWarned = S.day; toast('<b>The moon is rising red...</b><br>Tonight is a Blood Moon. Monsters will be stronger and far more numerous, and elites will walk the land. Every kill pays double.', 8000); SFX.roar(); }
     if (S.day % 6 === 1 && S.time > .22 && S.time < .32 && S.bmWarned === S.day - 1 && S.bmSurvived !== S.day) { S.bmSurvived = S.day; S.bloodMoons = (S.bloodMoons || 0) + 1; toast('<b>The Blood Moon sets</b><br>You survived the night.', 5000); }
   }
@@ -4015,7 +4061,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -4136,6 +4182,7 @@ function newDay() {
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
+  if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
@@ -5881,7 +5928,7 @@ const BUFFS = {speed: 0, might: 0, iron: 0, luck: 0};
 const BUFF_NAME = {speed: 'Swift', might: 'Might', iron: 'Ironskin', luck: 'Lucky'};
 function gainXP(n) {
   if (!S || mode === 'title' || n <= 0) return;
-  S.xp = (S.xp || 0) + Math.round(n * (S.pet === 'crane' ? 1.1 : 1));
+  S.xp = (S.xp || 0) + Math.round(n * (S.pet === 'crane' ? 1.1 : 1) * (have('star_pendant') ? 1.15 : 1));
   let ups = 0;
   while (S.level < MAX_LEVEL && S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; S.skillPts++; if (S.level % 10 === 0) S.skillPts++; ups++; }
   if (ups) { S.hp = maxHP(); levelUpFX(); }
@@ -5984,6 +6031,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['stargazer','Stargazer','Collect 10 star fragments', () => (S.starsFound || 0) >= 10],
   ['party','Strength in Numbers','Hire a companion', () => !!S.hiredOnce],
   ['bloodmoon','Red Night','Survive a Blood Moon', () => (S.bloodMoons || 0) >= 1],
   ['moonslayer','Moonslayer','Defeat 50 monsters under Blood Moons', () => (S.bmKills || 0) >= 50],
@@ -6316,7 +6364,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
