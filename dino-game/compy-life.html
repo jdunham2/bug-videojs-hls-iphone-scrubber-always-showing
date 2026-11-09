@@ -674,7 +674,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -840,6 +840,7 @@ function dayRollover(slept) {
     if (S.partner.rel <= 5) breakup();
   }
   if (S.egg && S.day >= S.egg.hatch) hatchEgg();
+  kidsDaily();
   if (S.money >= 10000) goal('rich');
   if (S.jail <= 0) rollEvents(slept);
 }
@@ -929,7 +930,7 @@ function breakup() {
 }
 function hatchEgg() {
   const name = pick(NAMES.filter(n => n !== (S.partner && S.partner.name)));
-  S.kids.push({ name, pal: Math.floor(Math.random() * PALETTES.length) }); S.egg = null; S.happy += 25; goal('egg');
+  S.kids.push({ name, pal: Math.floor(Math.random() * PALETTES.length), born: S.day, happy: 80 }); S.egg = null; S.happy += 25; goal('egg');
   refreshFamily();
   queueEvent({ kind: 'good', title: 'Your egg hatched!', text: `Meet little ${name}! A brand new compy, all legs and appetite. Kids cost $15 a day, and they are worth it.`, sound: 'goal' });
 }
@@ -1012,6 +1013,7 @@ const MENUS = {
   },
   grocer: () => open(7, 22) ? { sub: 'Fresh ferns, beetles and eggs (not those eggs).', acts: [
     ...holdUpAct(200, 500),
+    ...fishActsGrocer(),
     { label: 'Buy an umbrella', detail: S.umbrella ? 'You already have one.' : 'Stay dry on rainy days. Yours forever.', why: S.umbrella ? 'You already have one.' : '', cost: 12, mins: 5, fn: () => { S.umbrella = true; log('You bought a red umbrella. Bring on the rain.', 'good'); } },
     { label: 'Buy flowers (gift)', detail: `A fresh bouquet for someone special. You have ${(S.gifts || {}).flowers || 0}.`, cost: 10, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.flowers = (S.gifts.flowers || 0) + 1; } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
@@ -1088,6 +1090,7 @@ const MENUS = {
   },
   gas: () => {
     const acts = [...gigActs('gas')]; acts.push(...holdUpAct(150, 450));
+    acts.push({ label: 'Buy a fishing rod', detail: S.rod ? 'You already have one.' : 'Cast a line at any lake or off the beach.', why: S.rod ? 'You already have one.' : '', cost: 35, mins: 5, fn: () => { S.rod = true; log('You bought a fishing rod! Find a lake or the ocean and look for the fishing spot.', 'good'); } });
     acts.push({ label: 'Buy chocolates (gift)', detail: `Someone special might love these. You have ${(S.gifts || {}).chocolate || 0}.`, cost: 8, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.chocolate = (S.gifts.chocolate || 0) + 1; } });
     acts.push({ label: 'Buy a snack', detail: '+20 hunger', cost: 5, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } });
     acts.push({ label: 'Energy drink', detail: '+30 energy, a little jittery', cost: 8, mins: 5, fn: () => { S.energy = Math.min(100, S.energy + 30); S.happy -= 2; } });
@@ -1266,7 +1269,7 @@ function refreshFamily() {
   if (!S || !S.home) return;
   const B = famBounds(), rp = () => ({ x: rand(B[0], B[2]), y: rand(B[1], B[3]) });
   if (S.partner && S.partner.married) { const pal = PALETTES[S.partner.pal]; const m = makeCompy(pal, { crest: pal.crest, bow: '#ff6ad5' }); m.root.scale.setScalar(13 / 1.25); scene.add(m.root); const q = rp(); spouseM = { m, x: q.x, y: q.y, t: 0, tx: q.x, ty: q.y }; }
-  S.kids.forEach((k, i) => { const pal = PALETTES[k.pal]; const m = makeCompy(pal, { crest: pal.crest }); m.root.scale.setScalar(7 / 1.25); scene.add(m.root); const q = rp(); kidMs.push({ m, x: q.x, y: q.y, t: i, tx: q.x, ty: q.y }); });
+  S.kids.forEach((k, i) => { const pal = PALETTES[k.pal]; const m = makeCompy(pal, { crest: pal.crest }); m.root.scale.setScalar(KID_SCALE[kidStage(k)] / 1.25); scene.add(m.root); const q = rp(); kidMs.push({ m, x: q.x, y: q.y, t: i, tx: q.x, ty: q.y }); });
 }
 function famBounds() {
   if (inside && inside.home && inside.home === S.home) return [inside.ox + 40, inside.oy + 120, inside.ox + inside.w - 40, inside.oy + inside.d - 50];
@@ -1352,14 +1355,14 @@ function homeLayout(key, w, d, style) {
     if (key !== 'burrow') b.box(kx + 58, 22, 26, 28, 50, '#e6e8ea');
     else b.ball(kx + 20, 30, 22, 8, '#3a3a3a');
     if (key === 'mansion') b.box(kx, 95, 110, 40, 24, '#f2ede2');
-    b.station(kx, key === 'mansion' ? 140 : 66, key === 'mansion' ? 'Chef kitchen' : 'Kitchen', ['Cook a meal']);
+    b.station(kx, key === 'mansion' ? 140 : 66, key === 'mansion' ? 'Chef kitchen' : 'Kitchen', ['Cook a meal', 'Cook a fish']);
     // couch and TV on the left wall
     const cz = d - 100;
     b.box(14, cz, 8, 60, 36, '#1a1a1a', true, 10); const scr = b.box(19, cz, 2, 54, 30, '!#7fc8ff', false, 13); scr.castShadow = false;
     if (key === 'burrow') b.cyl(85, cz, 14, 14, '#7a5a3a');
     else { b.box(90, cz, 30, 70, 14, s.couch); b.box(104, cz, 8, 70, 26, s.couch); }
     b.box(55, cz, 70, 90, 1, s.rug, false);
-    b.station(60, cz + 50, key === 'mansion' ? 'Home theater' : 'Couch', ['Watch TV', 'Family time']);
+    b.station(60, cz + 50, key === 'mansion' ? 'Home theater' : 'Couch', ['Watch TV', 'Family time', 'Kids:']);
     // nest for eggs
     const nx = w - 70, nz = d - 90;
     b.cyl(nx, nz, 22, 6, key === 'mansion' ? '#f2c230' : '#8a6a3a', false); b.cyl(nx, nz, 15, 1, '#5a3f28', false, 6);
@@ -1396,7 +1399,7 @@ const LAYOUTS = {
     b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
     b.station(370, 100, 'Produce stand', ['Shoplift']);
     b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
-    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Hold up']);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Sell your fish', 'Hold up']);
     b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
     b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
   } },
@@ -1507,7 +1510,7 @@ const LAYOUTS = {
     for (const x of [80, 170]) { b.box(x, 130, 30, 120, 40, '#b9b2a6'); for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) b.box(x + sd * 13, 80 + i * 24, 5, 16, 10, goods[(i + x) % 4], false, 10 + (i % 2) * 16); }
     b.box(340, 90, 30, 140, 60, '#d6dde4'); for (let i = 0; i < 4; i++) b.box(324, 40 + i * 34, 2, 28, 46, '!#bfe3ff', false, 8);
     b.box(270, 220, 90, 30, 24, '#27ae60'); b.npc(270, 196, 2, { hat: '#27ae60' });
-    b.station(270, 262, 'Register', ['Buy a snack', 'Energy drink', 'Coffee', 'Buy chocolates', 'Hold up']);
+    b.station(270, 262, 'Register', ['Buy a snack', 'Energy drink', 'Coffee', 'Buy chocolates', 'Buy a fishing rod', 'Hold up']);
     b.station(250, 50, 'Back room (staff)', WORKS);
     b.sign('DINO GAS', 190, 100, 3, 150, '#27ae60', '#ffffff'); b.lamp(190, 150);
   } },
@@ -2035,6 +2038,7 @@ function doSiteTask(st) {
 }
 function miniPress() {
   if (!minigame) return;
+  if (minigame.kind === 'fish') { fishPress(); return; }
   if (minigame.kind === 'mash') { minigame.p = Math.min(1, minigame.p + 0.085); sfx.door(); if (minigame.p >= 1) endMini(true, minigame.what || 'Cement mixed perfectly.', 0); }
   else if (minigame.kind === 'dose') {
     const d = Math.abs(minigame.x - minigame.target), ml = (minigame.x * 10).toFixed(1);
@@ -2064,6 +2068,7 @@ function endMini(ok, msg, q) {
 }
 function updateMini(dt) {
   if (minigame.kind === 'dodge') { updateDodge(dt); return; }
+  if (minigame.kind === 'fish') { updateFish(dt); return; }
   if (minigame.kind === 'hose') {
     let mx = 0, my = 0;
     if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
@@ -2131,7 +2136,8 @@ function drawMiniOverlay(g) {
   g.textAlign = 'center'; g.fillStyle = '#f1c40f'; g.font = '400 22px "Lilita One", system-ui, sans-serif'; g.fillText(minigame.label, W / 2, y + 30);
   g.fillStyle = '#d6dde4'; g.font = '800 13px Nunito, system-ui, sans-serif'; g.fillText(minigame.help, W / 2, y + 52);
   const bx = x + 20, bw = w - 40, by = y + 70;
-  if (minigame.kind === 'mash') {
+  if (minigame.kind === 'fish') drawFish(g, x, y, w);
+  else if (minigame.kind === 'mash') {
     g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(bx, by, bw, 22); g.fillStyle = '#9a9aa0'; g.fillRect(bx, by, bw * minigame.p, 22);
     g.fillStyle = '#ffffff'; g.fillText(`${Math.ceil(minigame.t)}s`, W / 2, by + 50);
   } else if (minigame.kind === 'rhythm') {
@@ -3355,7 +3361,7 @@ Object.assign(LAYOUTS, {
   scoops: { w: 320, d: 240, floor: ['checker', '#ffffff', '#ffd3e6'], wall: '#fff0f6', trim: '#ff6ad5', build(b) {
     b.box(160, 70, 200, 30, 26, '#7fd8ff'); for (let i = 0; i < 5; i++) b.box(90 + i * 34, 70, 26, 20, 2, ['#bff0c0', '#ff6a8a', '#e0a85a', '#5a3a24', '#ffffff'][i], false, 26);
     b.npc(160, 44, 4, { bow: '#ff6ad5' });
-    b.station(160, 112, 'Counter', ['Buy', 'Share', 'Hold up']);
+    b.station(160, 112, 'Counter', ['Buy', 'Share', 'Treat', 'Hold up']);
     b.station(280, 60, 'Scoop station (staff)', WORKS);
     for (const [x, z] of [[70, 180], [230, 185]]) { b.table(x, z, '#ff6ad5'); b.chair(x - 22, z); b.chair(x + 22, z); }
     b.npc(48, 180, 1, { kid: true }); b.sign('SCOOPS', 160, 100, 3, 120, '#ff6ad5', '#ffffff');
@@ -3687,7 +3693,111 @@ Object.assign(LAYOUTS, {
 });
 
 const _homeMenu = MENUS.home;
-MENUS.home = p => { const m = _homeMenu(p); if (S.home === p.home) m.acts.push(...furnActs()); return m; };
+MENUS.home = p => { const m = _homeMenu(p); if (S.home === p.home) { m.acts.push(...furnActs(), ...kidActs()); if (fishCount()) m.acts.push({ label: 'Cook a fish', detail: `+50 hunger. You have ${fishCount()} fish.`, mins: 30, fn: cookFish }); } return m; };
+
+// ---------- fishing and kids who grow up ----------
+const FISH = [
+  { id: 'boot', name: 'Old boot', price: 0, w: 10, zone: 0.2 },
+  { id: 'minnow', name: 'Mud Minnow', price: 6, w: 34, zone: 0.22 },
+  { id: 'perch', name: 'Fern Perch', price: 14, w: 26, zone: 0.18 },
+  { id: 'bass', name: 'Swamp Bass', price: 24, w: 16, zone: 0.15 },
+  { id: 'trout', name: 'Rainbow Trout', price: 36, w: 9, zone: 0.13 },
+  { id: 'koi', name: 'Golden Koi', price: 130, w: 3.5, zone: 0.1 },
+  { id: 'sword', name: 'Swordfish', price: 90, w: 0, ocean: 6, zone: 0.11 },
+  { id: 'coel', name: 'Ancient Coelacanth', price: 450, w: 0.8, ocean: 1.2, zone: 0.08 },
+];
+function fishSpots() {
+  if (!S || !S.rod || inside || driving) return [];
+  const out = [];
+  for (const { i, j, type } of districtList) if (type === 'lake') { const [lx, ly, rx, ry] = lakeOf(i, j); out.push({ x: lx - rx * 0.25, y: ly + ry * 0.75 + 22, label: 'Cast your line', fishing: 'lake' }); }
+  for (const y of [900, 2300, 3500]) out.push({ x: WORLD - 40, y, label: 'Cast into the ocean', fishing: 'ocean' });
+  return out;
+}
+function rollFish(where) {
+  const pool = FISH.map(f => [f, where === 'ocean' ? (f.ocean ?? f.w * 0.7) : f.w]).filter(([, w]) => w > 0);
+  let r = Math.random() * pool.reduce((a, [, w]) => a + w, 0);
+  for (const [f, w] of pool) { r -= w; if (r <= 0) return f; }
+  return pool[0][0];
+}
+function startFishing(spot) {
+  if (S.energy < 8) { log('Too tired to fish.', 'warn'); return; }
+  const f = rollFish(spot.fishing);
+  minigame = { kind: 'fish', phase: 'wait', t: rand(2, 5.5), bite: 0.9, fish: f, mins: 30, label: 'FISHING', help: 'Wait for a bite... press E the moment the bobber dips!' };
+  state = 'mini'; setScreens();
+}
+function fishPress() {
+  const m = minigame;
+  if (m.phase === 'wait') { endMini(false, 'You yanked too early and scared the fish away.', 0); return; }
+  const f = m.fish;
+  minigame = { kind: 'rhythm', x: 0, dir: 1, speed: 1.2 + (0.2 - f.zone) * 6, zone: [0.5 - f.zone / 2, 0.5 + f.zone / 2], hits: 0, misses: 0, need: 3, flash: 0, label: f.price >= 100 ? 'SOMETHING BIG!' : 'REEL IT IN', help: 'Press E when the marker is in the green', mins: 20, what: 'Got it', fail: 'The line snapped!',
+    onDone: (ok) => {
+      if (!ok) { log(f.price >= 100 ? 'Something huge snapped your line. You will be thinking about that one.' : 'It got away.', 'warn'); return; }
+      S.fish = S.fish || {}; S.fish[f.id] = (S.fish[f.id] || 0) + 1; S.caught = S.caught || {}; const first = !S.caught[f.id]; S.caught[f.id] = true; S.happy += f.id === 'boot' ? -2 : 5;
+      log(f.id === 'boot' ? 'You caught... an old boot. Classic.' : `You caught a ${f.name}!${first ? ' (new species)' : ''} Worth ${money$(f.price)}.`, f.id === 'boot' ? '' : 'good');
+      if (f.id === 'coel') { goal('fish'); queueEvent({ kind: 'good', title: 'A living fossil!', text: 'You reeled in an Ancient Coelacanth, a fish older than the dinosaurs. The Fossil Museum will want to hear about this. (Sell it at the grocer for $450, or keep it to show off.)', sound: 'goal' }); }
+      else if (f.price >= 100) sfx.goal();
+    } };
+  state = 'mini'; setScreens();
+}
+function updateFish(dt) {
+  const m = minigame; m.t -= dt;
+  if (m.phase === 'wait' && m.t <= 0) { m.phase = 'bite'; m.t = m.bite; sfx.door(); }
+  else if (m.phase === 'bite' && m.t <= 0) endMini(false, 'The fish stole your bait and swam off.', 0);
+}
+function drawFish(g, x, y, w) {
+  const m = minigame, cx = W / 2, cy = y + 92, dip = m.phase === 'bite';
+  g.fillStyle = 'rgba(61,127,176,.7)'; g.fillRect(x + 20, y + 66, w - 40, 50);
+  g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 1; for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(cx, cy + 4, 20 + i * 14 + Math.sin(gameT * 3) * 3, 5 + i * 3, 0, 0, 7); g.stroke(); }
+  const by = cy - 6 + (dip ? 8 : Math.sin(gameT * 2.5) * 2);
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx, by, 7, 0, Math.PI); g.fill(); g.fillStyle = '#e74c3c'; g.beginPath(); g.arc(cx, by, 7, Math.PI, 7); g.fill();
+  if (dip) { g.fillStyle = '#ffe066'; g.font = '400 26px "Lilita One", system-ui, sans-serif'; g.fillText('!', cx + 22, by - 4); }
+}
+function fishActsGrocer() {
+  const f = S.fish || {}, n = Object.values(f).reduce((a, b) => a + b, 0), worth = FISH.reduce((a, x) => a + (f[x.id] || 0) * x.price, 0);
+  return [
+    { label: 'Sell your fish', detail: n ? `${n} fish worth ${money$(worth)} in total.` : 'Catch some fish at a lake or the ocean first.', why: n ? '' : 'No fish to sell.', mins: 10, fn: () => { S.money += worth; S.fish = {}; log(`Sold your catch for ${money$(worth)}.`, 'good'); sfx.coin(); } },
+  ];
+}
+function fishCount() { return Object.entries(S.fish || {}).filter(([k]) => k !== 'boot').reduce((a, [, b]) => a + b, 0); }
+function cookFish() { const k = FISH.filter(x => x.id !== 'boot').map(x => x.id).find(id => (S.fish || {})[id]); if (!k) return; S.fish[k]--; S.hunger = Math.min(100, S.hunger + 50); S.happy += 6; log(`You grilled a ${FISH.find(x => x.id === k).name}. Fresh and delicious.`, 'good'); }
+// ---- kids ----
+const kidAge = k => S.day - (k.born ?? S.day);
+const kidStage = k => kidAge(k) < 7 ? 'baby' : kidAge(k) < 21 ? 'kid' : 'teen';
+const KID_SCALE = { baby: 6, kid: 8.5, teen: 11 };
+function kidsDaily() {
+  for (const k of S.kids) {
+    if (k.born == null) k.born = S.day - 1;
+    k.happy = clamp((k.happy ?? 70) - 5, 0, 100);
+    const a = kidAge(k);
+    if (a === 7) log(`${k.name} is not a baby anymore! They started at Dino U kindergarten.`, 'good');
+    if (a === 21) { log(`${k.name} is a teenager now. They grew so fast.`, 'good'); text(k.name, 'I am a teenager now. Can I have my own phone? Oh wait.'); }
+    if (kidStage(k) === 'teen' && Math.random() < 0.25) text(k.name, pick(['Can I borrow the car? Kidding. Mostly.', 'I aced my fossil test!', 'Everyone at school thinks you are cool. Do not make it weird.', 'Can we get pizza tonight?']));
+    if (k.happy < 20 && Math.random() < 0.5) log(`${k.name} feels ignored. Spend some time with them.`, 'warn');
+  }
+  const grads = S.kids.filter(k => kidAge(k) >= 32);
+  for (const k of grads) {
+    S.kids = S.kids.filter(x => x !== k); S.grown = (S.grown || []).concat(k.name); goal('nest'); S.happy += 15;
+    const smart = (k.smarts || 0) >= 6;
+    queueEvent({ kind: 'good', title: `${k.name} is leaving the nest!`, text: `${k.name} graduated ${smart ? 'at the top of the class and got a scholarship to Dino U' : 'and found a little burrow across town'}. They hug you goodbye. ${k.happy >= 60 ? '"Thanks for everything. I will visit every week!"' : '"Bye. I guess."'}`, sound: 'goal' });
+    if (k.happy >= 60) S.money += 0;
+  }
+  if (grads.length) refreshFamily();
+}
+function kidActs() {
+  if (!S.kids.length) return [];
+  const acts = [], names = S.kids.map(k => k.name).join(' and ');
+  acts.push({ label: 'Kids: play together', detail: `${names}. +20 kid happiness, +10 yours, 1 hour.`, mins: 60, fn: () => { for (const k of S.kids) k.happy = clamp((k.happy ?? 70) + 20, 0, 100); S.happy += 10; log(pick([`You played tag with ${names}. You lost.`, `You and ${names} built a fort out of couch cushions.`, `${names} taught you a new dance.`]), 'good'); } });
+  const school = S.kids.filter(k => kidStage(k) !== 'baby');
+  if (school.length) acts.push({ label: 'Kids: help with homework', detail: `Makes ${school.map(k => k.name).join(' and ')} smarter. 1 hour.`, why: S.kidHwDay === S.day ? 'Homework is done for today.' : '', mins: 60, fn: () => { S.kidHwDay = S.day; for (const k of school) { k.smarts = (k.smarts || 0) + 1; k.happy = clamp((k.happy ?? 70) + 6, 0, 100); } log('Homework done. Somebody now knows what a Stegosaurus ate.', 'good'); } });
+  acts.push({ label: 'Kids: read a bedtime story', detail: '+10 kid happiness, +6 yours. Evenings only.', why: hour() < 19 ? 'Try after 7 PM.' : S.storyDay === S.day ? 'Story time is over for tonight.' : '', mins: 30, fn: () => { S.storyDay = S.day; for (const k of S.kids) k.happy = clamp((k.happy ?? 70) + 10, 0, 100); S.happy += 6; log(`You read "The Very Hungry Raptor". ${names} fell asleep before the end.`, 'good'); } });
+  return acts;
+}
+function treatKids(n, label) { for (const k of S.kids) k.happy = clamp((k.happy ?? 70) + n, 0, 100); log(label, 'good'); }
+
+const _scoopsM = MENUS.scoops;
+MENUS.scoops = p => { const m = _scoopsM(p); if (S.kids.length && open(10, 22)) m.acts.push({ label: 'Treat the kids to ice cream', detail: `+15 happiness for ${S.kids.map(k => k.name).join(' and ')}`, cost: 4 * S.kids.length, mins: 20, fn: () => { S.happy += 5; treatKids(15, 'The kids got sprinkles everywhere. Worth it.'); } }); return m; };
+const _cinemaM = MENUS.cinema;
+MENUS.cinema = p => { const m = _cinemaM(p); if (S.kids.length && open(12, 24)) m.acts.push({ label: 'Take the kids to a movie', detail: `Family movie night. +20 kid happiness, +12 yours.`, cost: 8 + 6 * S.kids.length, mins: 150, fn: () => { S.happy += 12; treatKids(20, 'The kids talked about the movie the whole way home.'); } }); return m; };
 
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
@@ -3726,6 +3836,7 @@ function useNear() {
   if (nearPlace.gig) { doGig(nearPlace); return; }
   if (nearPlace.roster) { talkTo(nearPlace.roster); return; }
   if (nearPlace.fest) { nearPlace.fn(); return; }
+  if (nearPlace.fishing) { startFishing(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -3761,6 +3872,7 @@ function update(dt) {
   for (const t of gigTargets()) { const d = Math.hypot(P.x - t.x, P.y - t.y) - 10; if (d < best) { best = d; nearPlace = t; } }
   for (const st of wardStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 6; if (d < best) { best = d; nearPlace = st; } }
   for (const st of festStalls()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 16; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of fishSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 20; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -3901,6 +4013,7 @@ function drawOverlay() {
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
   drawWaypoint(g);
+  for (const t of fishSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 600) continue; const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = '#7fd8ff'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); g.setLineDash([]); } const l2 = toScreen(t.x, 30, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('🎣 Fishing spot', l2.x, l2.y); g.fillStyle = '#bfe8ff'; g.fillText('🎣 Fishing spot', l2.x, l2.y); } }
   for (const t of festStalls()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 700) continue; const l2 = toScreen(t.x, 62, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = '#ffe08a'; g.fillText(t.label, l2.x, l2.y); } }
   if (S.site && !inside) {
     for (const st of siteStations()) { const s2 = toScreen(st.x, 0, st.y); if (s2.ok) { g.strokeStyle = '#f1c40f'; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); } const l2 = toScreen(st.x, 36, st.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(st.label, l2.x, l2.y); g.fillStyle = '#f1c40f'; g.fillText(st.label, l2.x, l2.y); } arrowTo(g, st.x, st.y, '#f1c40f', 'SITE'); }
@@ -3957,6 +4070,7 @@ function hud() {
   if (S.ward && inside && inside.id === 'hospital') chips.push([`Ward: ${S.ward.healed}/${S.ward.total} healed`, 'good']);
   if (S.fit >= 10) chips.push([`Fit ${Math.round(S.fit)}`, 'good']);
   if (S.tickets) chips.push([`${S.tickets} tickets`, '']);
+  if (fishCount()) chips.push([`${fishCount()} fish`, '']);
   if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
@@ -3968,7 +4082,7 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
