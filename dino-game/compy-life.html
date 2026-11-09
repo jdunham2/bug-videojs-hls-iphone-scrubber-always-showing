@@ -674,7 +674,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -816,7 +816,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather(); morningTexts(); if (has('fish')) S.happy += 3;
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather(); farmDaily(); marketDaily(); morningTexts(); if (has('fish')) S.happy += 3;
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -1014,6 +1014,7 @@ const MENUS = {
   grocer: () => open(7, 22) ? { sub: 'Fresh ferns, beetles and eggs (not those eggs).', acts: [
     ...holdUpAct(200, 500),
     ...fishActsGrocer(),
+    ...cropActsGrocer(),
     { label: 'Buy an umbrella', detail: S.umbrella ? 'You already have one.' : 'Stay dry on rainy days. Yours forever.', why: S.umbrella ? 'You already have one.' : '', cost: 12, mins: 5, fn: () => { S.umbrella = true; log('You bought a red umbrella. Bring on the rain.', 'good'); } },
     { label: 'Buy flowers (gift)', detail: `A fresh bouquet for someone special. You have ${(S.gifts || {}).flowers || 0}.`, cost: 10, mins: 5, fn: () => { S.gifts = S.gifts || {}; S.gifts.flowers = (S.gifts.flowers || 0) + 1; } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
@@ -1050,6 +1051,7 @@ const MENUS = {
   bank: () => {
     const acts = [...gigActs('bank')];
     if (open(9, 17)) {
+      acts.push({ label: 'Stock market', detail: `Buy and sell shares. Prices change every morning.${S.mkt ? ` Total profit ${money$(S.mkt.gain)}.` : ''}`, fn: () => { closeMenu(); stockMenu(); } });
       acts.push({ label: 'Take a $1,000 loan', detail: `5% interest every Monday. Owed now: ${money$(S.loan)}`, why: S.loan >= 5000 ? 'Loan limit reached.' : '', mins: 20, fn: () => { S.loan += 1000; S.money += 1000; } });
       acts.push({ label: 'Repay the loan', detail: `Owed: ${money$(S.loan)}`, why: S.loan <= 0 ? 'You owe nothing.' : S.money < S.loan ? `You need ${money$(S.loan)}.` : '', mins: 10, fn: () => { S.money -= S.loan; S.loan = 0; log('Loan paid off!', 'good'); } });
     }
@@ -1399,7 +1401,7 @@ const LAYOUTS = {
     b.box(370, 50, 130, 40, 20, '#7a5534'); for (let i = 0; i < 14; i++) b.ball(315 + (i % 7) * 18, 26, 40 + Math.floor(i / 7) * 18, 7, goods[i % 5]);
     b.station(370, 100, 'Produce stand', ['Shoplift']);
     b.box(380, 230, 90, 30, 24, '#5a6a7a'); b.box(380, 230, 70, 20, 2, '#2a2a2a', false, 24);
-    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Sell your fish', 'Hold up']);
+    b.station(380, 278, 'Checkout', ['Buy groceries', 'Grab a snack', 'Buy flowers', 'Buy an umbrella', 'Sell your fish', 'Sell your crops', 'Hold up']);
     b.npc(380, 205, 2, { hat: '#3f8a3a' }); b.npc(110, 250, 0, { wander: [30, 220, 320, 300] }); b.npc(200, 260, 5, { wander: [30, 220, 320, 300] });
     b.sign('LEAFY GROCER', 230, 100, 3, 180, '#3f8a3a', '#ffffff'); b.lamp(160, 150); b.lamp(330, 170);
   } },
@@ -1433,7 +1435,7 @@ const LAYOUTS = {
     b.box(180, 130, 260, 26, 26, '#6a4a2e'); for (let x = 70; x < 310; x += 60) b.box(x, 130, 4, 4, 34, '#c9a23a', false, 26);
     b.box(180, 130, 262, 2, 30, '#bfe3ff', false, 30).material = new THREE.MeshLambertMaterial({ color: '#bfe3ff', transparent: true, opacity: 0.35 });
     b.npc(110, 105, 0, { tie: '#4b5a3a' }); b.npc(240, 105, 5, { tie: '#4b5a3a' });
-    b.station(180, 172, 'Teller window', ['Take a', 'Repay']);
+    b.station(180, 172, 'Teller window', ['Take a', 'Repay', 'Stock market']);
     const v = b.cyl(390, 8, 44, 8, '#8a8f96', true); v.rotation.x = Math.PI / 2; v.position.y = 48; b.ball(390, 48, 14, 6, '#c9a23a');
     b.station(390, 78, 'Vault door', ['Rob the bank']);
     b.box(80, 40, 70, 30, 22, '#6a4a2e'); b.station(260, 62, 'Staff desk', WORKS);
@@ -3120,6 +3122,7 @@ function drawBigMap() {
   for (const t of gigTargets()) { g.fillStyle = t.color; g.beginPath(); g.arc(t.x * k, t.y * k, 6, 0, 7); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 1.5; g.stroke(); }
   if (trex) { g.font = '16px system-ui'; g.fillText('🦖', trex.x * k, trex.y * k); }
   if (festivalOn()) { g.font = '18px system-ui'; g.fillText('🎡', FEST.x * k, FEST.y * k - 14); }
+  if (S.farm) { g.font = '14px system-ui'; g.fillText('🌱', 803 * k, 2930 * k); }
   if (waypoint) { const x = waypoint.x * k, y = waypoint.y * k; g.strokeStyle = '#b07aff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 10, 0, 7); g.stroke(); }
   const px = (driving ? driving.x : P.x) * k, py = (driving ? driving.y : P.y) * k;
   g.save(); g.translate(px, py); g.rotate(driving ? driving.a : P.face); g.fillStyle = '#ffe08a'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.moveTo(10, 0); g.lineTo(-7, -7); g.lineTo(-3, 0); g.lineTo(-7, 7); g.closePath(); g.fill(); g.stroke(); g.restore();
@@ -3799,6 +3802,128 @@ MENUS.scoops = p => { const m = _scoopsM(p); if (S.kids.length && open(10, 22)) 
 const _cinemaM = MENUS.cinema;
 MENUS.cinema = p => { const m = _cinemaM(p); if (S.kids.length && open(12, 24)) m.acts.push({ label: 'Take the kids to a movie', detail: `Family movie night. +20 kid happiness, +12 yours.`, cost: 8 + 6 * S.kids.length, mins: 150, fn: () => { S.happy += 12; treatKids(20, 'The kids talked about the movie the whole way home.'); } }); return m; };
 
+// ---------- Fern Farm plots and the stock market ----------
+const CROPS = {
+  fern:    { name: 'Fern', seed: 5, days: 2, price: 22, color: '#3c8240' },
+  melon:   { name: 'Swamp Melon', seed: 12, days: 3, price: 48, color: '#5aa83a', fruit: '#2e7a2a' },
+  pumpkin: { name: 'Pumpkin', seed: 20, days: 4, price: 85, color: '#4a8a3a', fruit: '#e67e22' },
+  golden:  { name: 'Golden Fern', seed: 60, days: 6, price: 320, color: '#f1c40f' },
+};
+const PLOTS = [[722, 2930], [776, 2930], [830, 2930], [884, 2930]];
+let plotMs = [];
+function buildPlots() {
+  plotMs = PLOTS.map(([x, y]) => {
+    const root = group(scene, x, 0, y);
+    add(root, GEO.b, '#5a3f28', 0, 1.5, 0, 44, 3, 44).castShadow = false;
+    for (const s of [-1, 1]) add(root, GEO.b, '#7a5534', s * 23, 4, 0, 3, 8, 46);
+    const crop = group(root, 0, 3, 0);
+    return { root, crop, key: '' };
+  });
+  const sg = new THREE.Mesh(new THREE.PlaneGeometry(70, 16), new THREE.MeshBasicMaterial({ map: signTexture('FARM PLOTS', '#6a4a2e', '#ffffff') })); sg.position.set(803, 22, 2900); scene.add(sg);
+  add(scene, GEO.y, '#6a4a2e', 803, 8, 2899, 1.5, 16, 1.5);
+}
+function plotVisual(i) {
+  const pm = plotMs[i], pl = (S && S.plots || [])[i], key = pl && pl.crop ? `${pl.crop}:${pl.g}:${pl.dead ? 1 : 0}` : '';
+  if (pm.key === key) return; pm.key = key;
+  while (pm.crop.children.length) pm.crop.remove(pm.crop.children[0]);
+  if (!pl || !pl.crop) return;
+  const C = CROPS[pl.crop], k = Math.min(1, (pl.g + 0.4) / C.days), col = pl.dead ? '#8a6a3a' : C.color;
+  for (const [dx, dz] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) {
+    add(pm.crop, GEO.c, col, dx, 6 * k, dz, 6 * k + 2, 12 * k + 3, 6 * k + 2);
+    if (C.fruit && pl.g >= C.days && !pl.dead) add(pm.crop, GEO.s, C.fruit, dx + 3, 3, dz + 3, 5, 4.5, 5);
+    if (pl.crop === 'golden' && pl.g >= C.days && !pl.dead) add(pm.crop, GEO.s, '!#ffe066', dx, 14, dz, 3, 3, 3);
+  }
+}
+function syncPlots() { if (!plotMs.length) buildPlots(); for (let i = 0; i < PLOTS.length; i++) plotVisual(i); }
+function farmSpots() {
+  if (!S || inside || driving) return [];
+  return PLOTS.map(([x, y], i) => {
+    const pl = (S.plots || [])[i];
+    let label, short;
+    if (!S.farm) { label = 'Rent the farm plots ($250)'; short = i === 1 ? 'For rent' : ''; }
+    else if (!pl || !pl.crop) { label = 'Plant seeds'; short = '+ seeds'; }
+    else if (pl.dead) { label = 'Clear the wilted crop'; short = 'Wilted'; }
+    else if (pl.g >= CROPS[pl.crop].days) { label = `Harvest the ${CROPS[pl.crop].name.toLowerCase()}`; short = 'Ready!'; }
+    else short = pl.watered === S.day ? `${CROPS[pl.crop].days - pl.g}d` : 'Thirsty', label = pl.watered === S.day ? `${CROPS[pl.crop].name}: ${CROPS[pl.crop].days - pl.g} day${CROPS[pl.crop].days - pl.g > 1 ? 's' : ''} to go` : `Water the ${CROPS[pl.crop].name.toLowerCase()}`;
+    return { x, y: y + 6, label, short, farm: i };
+  });
+}
+function farmPlot(i) {
+  if (!S.farm) {
+    if (S.money < 250) { log('Renting the plots costs $250.', 'warn'); return; }
+    S.money -= 250; S.farm = true; S.plots = PLOTS.map(() => ({})); log('The farm plots are yours! Plant seeds, water them every day (rain counts), and harvest.', 'good'); sfx.coin(); return;
+  }
+  const pl = S.plots[i];
+  if (!pl.crop) {
+    queueEvent({ kind: '', tag: 'Fern Farm', title: 'What will you plant?', text: 'Water your crops every day. Rain waters them for you. Skip three days and they wilt.', sound: 'door',
+      buttons: Object.entries(CROPS).map(([k, C]) => ({ label: `${C.name} ($${C.seed}, ${C.days} days, sells $${C.price})`, alt: true, disabled: S.money < C.seed, fn: () => { S.money -= C.seed; S.plots[i] = { crop: k, g: 0, watered: S.day, planted: S.day }; advance(15); log(`Planted ${C.name.toLowerCase()} seeds and gave them a drink.`, 'good'); } })).concat([{ label: 'Not now' }]) });
+    return;
+  }
+  const C = CROPS[pl.crop];
+  if (pl.dead) { S.plots[i] = {}; advance(10); log('You pulled up the wilted plants. Better luck next time.', ''); return; }
+  if (pl.g >= C.days) {
+    S.crops = S.crops || {}; S.crops[pl.crop] = (S.crops[pl.crop] || 0) + 1; S.harvests = (S.harvests || 0) + 1; S.plots[i] = {}; advance(15); S.happy += 5;
+    log(`Harvested a ${C.name.toLowerCase()}! Sell it at Leafy Grocer for ${money$(C.price)}.`, 'good'); sfx.coin();
+    if (S.harvests >= 5) goal('farmer');
+    return;
+  }
+  if (pl.watered === S.day) { log(`Already watered today. ${C.days - pl.g} more day${C.days - pl.g > 1 ? 's' : ''} to go.`, ''); return; }
+  pl.watered = S.day; advance(10); burst(PLOTS[i][0], PLOTS[i][1], 20, 14, '#7fd8ff', 60, 3); log(`You watered the ${C.name.toLowerCase()}.`, 'good');
+}
+function farmDaily() {
+  if (!S.farm) return;
+  for (const pl of S.plots) {
+    if (!pl.crop || pl.dead) continue;
+    if (pl.watered >= S.day - 1) { if (pl.g < CROPS[pl.crop].days) pl.g++; }
+    else if (S.day - pl.watered >= 3) { pl.dead = true; log(`Your ${CROPS[pl.crop].name.toLowerCase()} wilted. Crops need water every day.`, 'bad'); }
+    if (isWet()) pl.watered = S.day;
+  }
+}
+function cropActsGrocer() {
+  const c = S.crops || {}, n = Object.values(c).reduce((a, b) => a + b, 0), worth = Object.entries(c).reduce((a, [k, v]) => a + CROPS[k].price * v, 0);
+  return [{ label: 'Sell your crops', detail: n ? `${n} crop${n > 1 ? 's' : ''} worth ${money$(worth)}.` : 'Grow some at the Fern Farm plots first.', why: n ? '' : 'No crops to sell.', mins: 10, fn: () => { S.money += worth; S.crops = {}; log(`Sold your harvest for ${money$(worth)}.`, 'good'); sfx.coin(); } }];
+}
+// ---- stock market ----
+const usd2 = n => '$' + n.toFixed(2);
+const STOCKS = [
+  { id: 'fossil', name: 'Fossil Corp', base: 50, vol: 0.035, blurb: 'Steady and boring.' },
+  { id: 'motors', name: 'Dino Motors', base: 30, vol: 0.075, blurb: 'Goes up and down with car sales.' },
+  { id: 'meteor', name: 'Meteor Mining', base: 12, vol: 0.17, blurb: 'Wild. Could double. Could crash.' },
+];
+function mkt() {
+  if (!S.mkt) { S.mkt = { p: {}, prev: {}, own: {}, cost: {}, gain: 0 }; for (const s of STOCKS) { S.mkt.p[s.id] = s.base; S.mkt.prev[s.id] = s.base; S.mkt.own[s.id] = 0; S.mkt.cost[s.id] = 0; } }
+  return S.mkt;
+}
+const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+function marketDaily() {
+  const M = mkt();
+  for (const s of STOCKS) {
+    M.prev[s.id] = M.p[s.id];
+    let r = gauss() * s.vol + 0.004 + (s.base - M.p[s.id]) / s.base * 0.06;
+    if (Math.random() < 0.06) { const up = Math.random() < 0.5, big = s.vol * 3.5; r += up ? big : -big; if (Object.values(M.own).some(v => v > 0) || Math.random() < 0.3) text('Market news', up ? `${s.name} shares soar after ${pick(['a record quarter', 'a giant discovery', 'a celebrity endorsement'])}!` : `${s.name} shares tumble after ${pick(['a scandal', 'a recall', 'a very bad quarter'])}.`); }
+    M.p[s.id] = Math.max(1, Math.round(M.p[s.id] * Math.exp(r) * 100) / 100);
+  }
+}
+function stockArrow(s) { const M = mkt(), d = M.p[s.id] - M.prev[s.id]; return d > 0.005 ? '▲' : d < -0.005 ? '▼' : '•'; }
+function stockMenu() {
+  const M = mkt();
+  const worth = STOCKS.reduce((a, s) => a + M.own[s.id] * M.p[s.id], 0);
+  queueEvent({ kind: '', tag: 'Stone Bank · Stock market', title: 'Stock market', text: `${STOCKS.map(s => `${s.name}: ${usd2(M.p[s.id])} ${stockArrow(s)} (you own ${M.own[s.id]})`).join('. ')}. Portfolio ${money$(worth)}. Total profit so far ${money$(M.gain)}.`, sound: 'door',
+    buttons: STOCKS.map(s => ({ label: `${s.name} ${usd2(M.p[s.id])} ${stockArrow(s)}`, alt: true, fn: () => stockDetail(s) })).concat([{ label: 'Done' }]) });
+}
+function stockDetail(s) {
+  const M = mkt(), p = M.p[s.id], own = M.own[s.id], avg = own ? M.cost[s.id] / own : 0;
+  const buy = n => { S.money -= Math.round(p * n * 100) / 100; M.own[s.id] += n; M.cost[s.id] += p * n; S.money = Math.round(S.money * 100) / 100; log(`Bought ${n} share${n > 1 ? 's' : ''} of ${s.name} at ${usd2(p)}.`, 'good'); sfx.coin(); stockDetail(s); };
+  const sell = n => { const basis = M.cost[s.id] / M.own[s.id] * n, got = p * n, g = got - basis; S.money = Math.round((S.money + got) * 100) / 100; M.own[s.id] -= n; M.cost[s.id] -= basis; M.gain += g; log(`Sold ${n} share${n > 1 ? 's' : ''} of ${s.name} for ${money$(got)} (${g >= 0 ? 'profit' : 'loss'} ${money$(Math.abs(g))}).`, g >= 0 ? 'good' : 'warn'); if (M.gain >= 500) goal('investor'); stockDetail(s); };
+  queueEvent({ kind: '', tag: 'Stock market', title: s.name, text: `${s.blurb} Price today ${usd2(p)} ${stockArrow(s)} (yesterday ${usd2(M.prev[s.id])}). You own ${own} share${own === 1 ? '' : 's'}${own ? `, bought at ${usd2(avg)} on average` : ''}. Prices change every morning.`, sound: 'door',
+    buttons: [
+      { label: 'Buy 1', alt: true, disabled: S.money < p, fn: () => buy(1) },
+      { label: 'Buy 10', alt: true, disabled: S.money < p * 10, fn: () => buy(10) },
+      { label: 'Sell 1', alt: true, disabled: own < 1, fn: () => sell(1) },
+      { label: 'Sell all', alt: true, disabled: own < 1, fn: () => sell(own) },
+      { label: 'Back', fn: () => stockMenu() }] });
+}
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
@@ -3837,6 +3962,7 @@ function useNear() {
   if (nearPlace.roster) { talkTo(nearPlace.roster); return; }
   if (nearPlace.fest) { nearPlace.fn(); return; }
   if (nearPlace.fishing) { startFishing(nearPlace); return; }
+  if ('farm' in nearPlace) { farmPlot(nearPlace.farm); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -3873,6 +3999,7 @@ function update(dt) {
   for (const st of wardStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 6; if (d < best) { best = d; nearPlace = st; } }
   for (const st of festStalls()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 16; if (d < best) { best = d; nearPlace = st; } }
   for (const st of fishSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 20; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of farmSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 8; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -3971,7 +4098,7 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
-  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster();
+  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots();
   if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
   carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
   if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
@@ -4013,6 +4140,7 @@ function drawOverlay() {
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
   drawWaypoint(g);
+  for (const t of farmSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 160) continue; const l2 = toScreen(t.x, 26, t.y); if (l2.ok) { g.font = '800 11px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; const near = nearPlace && nearPlace.farm === t.farm, tx = near ? '' : t.short; if (!tx) continue; g.strokeText(tx, l2.x, l2.y); g.fillStyle = '#d6f5b0'; g.fillText(tx, l2.x, l2.y); } }
   for (const t of fishSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 600) continue; const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = '#7fd8ff'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); g.setLineDash([]); } const l2 = toScreen(t.x, 30, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('🎣 Fishing spot', l2.x, l2.y); g.fillStyle = '#bfe8ff'; g.fillText('🎣 Fishing spot', l2.x, l2.y); } }
   for (const t of festStalls()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 700) continue; const l2 = toScreen(t.x, 62, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = '#ffe08a'; g.fillText(t.label, l2.x, l2.y); } }
   if (S.site && !inside) {
@@ -4082,7 +4210,7 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
