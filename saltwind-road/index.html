@@ -295,7 +295,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
       <div class="controls">
         <b>WASD / Arrows</b><span>Walk (drag anywhere on touch screens)</span>
         <b>E / Space</b><span>Talk, read notice boards, gather, fish</span>
-        <b>F / Click</b><span>Attack · <b>G</b> throw a bomb</span>
+        <b>F / Click</b><span>Attack (hold to charge a spin) · <b>G</b> throw a bomb</span>
         <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
         <b>V</b><span>Mount or dismount, once you own a mount</span>
         <b>Animals</b><span>Carry an animal's favorite food to tame it (E), or hunt it (F)</span>
@@ -2859,6 +2859,23 @@ function attack(dirX, dirY) {
     hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * (w.silver && isUndead(e) ? 2 : 1), kx*kb, ky*kb, 'player');
   }
 }
+let chargeT = null, spinCd = 0, mouseHeld = false;
+function spinAttack() {
+  const w = weapon(); if (w.ranged || spinCd > 0) return;
+  spinCd = 1.6; player.atkCd = .35;
+  const reach = (w.reach || 1.2) + .7;
+  player.swing = {t: .32, ang: 0, reach, arc: 'spin'}; SFX.swing(); setTimeout(() => SFX.swing(), 90);
+  burst(S.x, S.y - .4, '#ffe9a8', 16, 5); shake = Math.max(shake, .2);
+  let n = 0;
+  for (const e of enemies) {
+    if (e.hidden > 0 || e.dead || (ENEMIES[e.type] && ENEMIES[e.type].passive && !e.alert)) continue;
+    const sz = e.size || 1, dx = e.x - S.x, dy = (e.y - .3*sz) - (S.y - .4), d = Math.hypot(dx, dy);
+    if (d > reach + .35 + (sz - 1)*.45) continue;
+    hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * 2.2 * (w.silver && isUndead(e) ? 2 : 1), dx/(d || 1)*1.6, dy/(d || 1)*1.6, 'player'); n++;
+  }
+  if (n >= 3) { floatText(S.x, S.y - 1.6, `Whirlwind ×${n}!`, '#ffe9a8'); S.whirl3 = true; }
+  S.spins = (S.spins || 0) + 1;
+}
 function throwBomb(tx, ty) {
   const kind = have('fire_bomb') ? 'fire_bomb' : have('frost_bomb') ? 'frost_bomb' : have('bomb') ? 'bomb' : null;
   if (!kind) { floatText(S.x, S.y - 1.2, 'No bombs', '#e57a62'); return; }
@@ -3239,6 +3256,7 @@ function updateCombat(dt, night) {
   player.atkCd = Math.max(0, player.atkCd - dt);
   player.inv = Math.max(0, player.inv - dt);
   if (player.swing) { player.swing.t -= dt; if (player.swing.t <= 0) player.swing = null; }
+  spinCd = Math.max(0, spinCd - dt); if (chargeT != null) { chargeT += dt; if (!keys.has('f') && !mouseHeld) chargeT = null; }
   player.sinceHit += dt;
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
@@ -3368,7 +3386,7 @@ addEventListener('keydown', e => {
   if (mode === 'play') {
     keys.add(k);
     if (k === 'e' || k === ' ' || k === 'enter') interact();
-    else if (k === 'f') attack();
+    else if (k === 'f') { attack(); if (!e.repeat && chargeT == null) chargeT = 0; }
     else if (k === 'g') throwBomb();
     else if (k === 'shift' || k === 'r') doRoll();
     else if (k === 'v') toggleRide();
@@ -3395,7 +3413,7 @@ addEventListener('keydown', e => {
   else if (mode === 'skills') { if (k === 'escape' || k === 'k') closeModal('skills'); }
   else if (mode === 'pause') { if (k === 'escape') closeModal('pause'); }
 });
-addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 'f') { if (chargeT != null && chargeT >= .55 && mode === 'play') spinAttack(); chargeT = null; } });
 addEventListener('blur', () => keys.clear());
 
 const view = $('view');
@@ -3410,7 +3428,7 @@ view.addEventListener('pointerdown', e => {
     const bt = boardAt(w.x, w.y, 1); if (bt && Math.hypot(TOWNS[bt].x + .5 - S.x, TOWNS[bt].y + .5 - S.y) < 2.2) { openBoard(bt); return; }
     const ni = inB(Math.floor(w.x), Math.floor(w.y)) ? nodeGrid[idx(Math.floor(w.x), Math.floor(w.y))] : -1;
     if (ni >= 0 && nodeAvail(ni) && Math.hypot(nodes[ni].x + .5 - S.x, nodes[ni].y + .5 - S.y) < 1.9 && !enemies.some(en => Math.hypot(en.x - S.x, en.y - S.y) < 3)) { gather(ni); return; }
-    attack(w.x - S.x, w.y - (S.y - .5));
+    attack(w.x - S.x, w.y - (S.y - .5)); mouseHeld = true; chargeT = 0;
     return;
   }
   touch.active = true; touch.id = e.pointerId; touch.ox = e.clientX; touch.oy = e.clientY; touch.vx = touch.vy = 0;
@@ -3869,6 +3887,7 @@ function render() {
     else { ctx.strokeStyle = '#f0f6ff'; ctx.lineWidth = 3; ctx.beginPath(); let px = x, py = y - 260; ctx.moveTo(px, py); while (py < y) { py += 22; px = x + (Math.random() - .5)*18*(1 - (py - y + 260)/260 + .2); ctx.lineTo(py >= y ? x : px, Math.min(py, y)); } ctx.stroke(); } }});
   for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
   if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
+  if (chargeT != null && chargeT > .15 && !weapon().ranged) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
@@ -6083,7 +6102,7 @@ function endFishGame(win) {
   renderHUD();
 }
 addEventListener('pointerdown', () => { if (mode === 'fish') fishHold = true; });
-addEventListener('pointerup', () => { fishHold = false; });
+addEventListener('pointerup', e => { fishHold = false; if (e.pointerType === 'mouse' && mouseHeld) { mouseHeld = false; if (chargeT != null && chargeT >= .55 && mode === 'play') spinAttack(); chargeT = null; } });
 addEventListener('pointercancel', () => { fishHold = false; });
 
 /* ================= settings & audio ================= */
@@ -6439,6 +6458,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['whirlwind','Whirlwind','Hit 3 or more foes with one charged spin (hold F)', () => !!S.whirl3],
   ['buccaneer','Buccaneer','Reach Blackwater in the Pirate Isles', () => !!S.towns.blackwater],
   ['mutiny','Mutiny Crushed','Defeat Captain Redbeard', () => !!S.bosses.redbeard],
   ['digger','Deep Digger','Reach floor 10 of the Deep Mine', () => (S.mineBest || 0) >= 10],
@@ -6643,7 +6663,7 @@ function renderPause() {
     </div>
     <h3>Controls</h3>
     <div class="controls" style="margin:0">
-      <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack</span>
+      <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack · hold to charge a spin</span>
       <b>Shift</b><span>Dodge roll</span><b>G / Right-click</b><span>Throw a bomb</span><b>V</b><span>Mount or dismount</span>
       <b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
     </div>
