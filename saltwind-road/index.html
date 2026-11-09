@@ -676,6 +676,8 @@ const GOODS = {
   pirate_gold:{name:'Pirate Gold',base:160,col:'#f0c040',kind:'good'},
   jeweled_goblet:{name:'Jeweled Goblet',base:280,col:'#e86a8a',kind:'good'},
   captains_compass:{name:"Captain's Compass",base:500,col:'#e3a948',kind:'trinket',desc:'An arrow on your screen points to your buried treasure'},
+  gladiator_helm:{name:'Gladiator Helm',base:700,col:'#c8a040',kind:'armor',slot:'head',armor:3,crit:.06},
+  champion_belt:{name:"Arena Champion's Belt",base:1500,col:'#e3a948',kind:'trinket',desc:'+10% damage, and bragging rights'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1113,7 +1115,8 @@ const abyssChests = [];
 const chests = [];
 const dungeonAtX = x => DK.find(k => x >= DUNGEONS[k].rect[0] && x < DUNGEONS[k].rect[0] + DUNGEONS[k].rect[2]);
 const inDungeon = () => S && S.y >= WORLD_H ? dungeonAtX(S.x) || null : null;
-const themeAt = x => (DUNGEONS[dungeonAtX(x)] || DUNGEONS.crypt).theme;
+const ARENA_THEME = {floor:'#b8a070', floor2:'#ac9464', wall:'#4a3a2a', top:'#8a7050', accent:'#e3a948'};
+const themeAt = x => x >= 812 && x < 848 ? ARENA_THEME : (DUNGEONS[dungeonAtX(x)] || DUNGEONS.crypt).theme;
 const spikeUp = (x, y) => Math.sin(frameT*2.2 + x*.9 + y*.5) > .35;
 const SEASONS = [
   {name:'Spring', tint:'rgba(255,200,230,.05)', crops:['carrot','flax','wheat','strawberry','potato','rice','peach'], price:{wheat_seed:.7,carrot_seed:.7,flax_seed:.7,pumpkin_seed:.7,tea_seed:.7,honey:1.3}},
@@ -1641,6 +1644,9 @@ const NPCS = [
    hello:["Flowers for you?","Hello again!","My dear friend!"],
    rumors:["Flowers and glass make perfume. Ladies in the west pay anything for it."]},
   // new faces in older towns
+  {id:'brutus',town:'crownfall',dx:-2,dy:3,name:'Arena Master Brutus',role:'Master of the arena',cols:{cloak:'#a8402a',skin:'#a8704a',hair:'#1a1a1a'},arena:true,
+   hello:["Looking for glory? You've come to the right place.","Back for more blood and gold?","The champion returns! The crowd loves you."],
+   rumors:["Every fifth wave, an elite beast enters the ring. The crowd goes wild.","Reach wave ten and the crowd will throw you a Gladiator Helm. Reach twenty and you're a legend."]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -2071,6 +2077,7 @@ function genWorld() {
       : (reach[idx(x,y)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL), 7);
   for (const k of BK) { const B = BOSSES[k]; if (B.dungeon) continue; place(B, (x,y,t) => (B.climb ? reachC : reach)[idx(x,y)] && t !== T.ROAD && t !== T.BRIDGE && t !== T.SHAL && t !== T.MOUNT, 14); }
   genDungeons();
+  carveArena();
   for (const k of DK) place(DUNGEONS[k].entrance = {tx: DUNGEONS[k].near[0], ty: DUNGEONS[k].near[1]}, (x,y,t) => reach[idx(x,y)] && reach[idx(x,y+1)] && t !== T.ROAD && t !== T.FLOOR && t !== T.BRIDGE && t !== T.SHAL && t !== T.HOUSE, 6);
   for (const k in ESTATES) {
     const E = PROPERTIES[k], bad = t => t === T.ROAD || t === T.FLOOR || t === T.HOUSE || t === T.BRIDGE || t === T.SHAL || t === T.DEEP || t === T.MOUNT || t === T.LAVA || t === T.VOID;
@@ -2116,7 +2123,7 @@ function placeNodes() {
       case T.GLOOM:  type = r < .06 ? 'mushroom' : r < .085 ? 'web' : r < .11 ? 'branch' : r < .12 ? 'herb' : null; break;
       case T.ASH:    type = near(x,y,T.LAVA) ? (r < .14 ? 'obsidian' : r < .2 ? 'sulfur' : null) : (r < .045 ? 'sulfur' : r < .065 ? 'obsidian' : r < .085 ? 'rock' : null); break;
       case T.SHAL:   type = landNear(x,y) && r < .07 ? 'fish' : null; break;
-      case T.DFLOOR: { const dk = dungeonAtX(x); type = dk === 'abyss' ? null : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
+      case T.DFLOOR: { const dk = dungeonAtX(x); type = !dk || dk === 'abyss' ? null : dk === 'frostvault' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'serpenttemple' ? (r < .025 ? 'jade' : r < .04 ? 'web' : null) : dk === 'catacombs' ? (r < .03 ? 'rubble' : r < .04 ? 'silver' : null) : dk === 'myceliumdeep' ? (r < .03 ? 'giantshroom' : r < .045 ? 'mushroom' : null) : dk === 'prismmine' ? (r < .03 ? 'shard' : r < .045 ? 'crystal' : null) : dk === 'caverns' ? (r < .025 ? 'crystal' : r < .04 ? 'silver' : null) : dk === 'depths' ? (r < .02 ? 'obsidian' : r < .035 ? 'sulfur' : null) : (r < .02 ? 'mushroom' : r < .035 ? 'web' : null); break; }
       case T.JUNGLE: type = r < .05 ? 'fruit' : r < .09 ? 'vine' : r < .1 ? 'herb' : r < .115 ? 'branch' : r < .127 ? 'jade' : r < .14 ? 'orangetree' : null; break;
       case T.MESA:   type = r < .05 ? 'copper' : r < .07 ? 'rock' : r < .085 ? 'cactus' : (nearMt && r < .14) ? 'jade' : null; break;
       case T.MOOR:   type = r < .06 ? 'heather' : r < .075 ? 'rock' : r < .09 ? 'bush' : null; break;
@@ -2696,7 +2703,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0);
     if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
@@ -2760,6 +2767,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   renderHP();
 }
 function die() {
+  if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
   SFX.death();
@@ -3502,7 +3510,7 @@ function drawEnemy(g, e) {
 function render() {
   let vw = view.width / Z, vh = view.height / Z;
   const fx = camF.x ?? S.x, fy = camF.y ?? S.y;
-  const dkc = inDungeon(), RC = dkc ? DUNGEONS[dkc].rect : [0, 0, W, WORLD_H];
+  const dkc = inDungeon(), RC = dkc ? DUNGEONS[dkc].rect : inArena() ? [ARENA.x0, ARENA.y0, ARENA.w, ARENA.h] : [0, 0, W, WORLD_H];
   camX = Math.round(Math.max(RC[0]*TS, Math.min((RC[0] + RC[2])*TS - vw, fx*TS - vw/2)));
   camY = Math.round(Math.max(RC[1]*TS, Math.min((RC[1] + RC[3])*TS - vh, fy*TS - vh/2)));
   if (shake > 0 && SETTINGS.shake) { camX += Math.round((Math.random()-.5)*4); camY += Math.round((Math.random()-.5)*4); }
@@ -3569,6 +3577,12 @@ function render() {
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
   if (S.tmap && inView(S.tmap.x, S.tmap.y) && Math.hypot(S.x - S.tmap.x, S.y - S.tmap.y) < 9) sprites.push({y: S.tmap.y + .1, f: () => { const x = S.tmap.x*TS + 8, y = S.tmap.y*TS + 9, a = .45 + Math.sin(frameT*4)*.25; ctx.globalAlpha = a; ctx.strokeStyle = '#8a3a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 3); ctx.lineTo(x + 4, y + 3); ctx.moveTo(x + 4, y - 3); ctx.lineTo(x - 4, y + 3); ctx.stroke(); ctx.globalAlpha = 1; if (Math.random() < .05) burst(S.tmap.x + .5, S.tmap.y + .4, '#f0c040', 1, 1); }});
   if (S.tmap && have('captains_compass') && !inDungeon()) { const dx = S.tmap.x + .5 - S.x, dy = S.tmap.y + .5 - S.y, d = Math.hypot(dx, dy); if (d > 3) sprites.push({y: S.y + 50, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*30, cy = (S.y - .4)*TS + Math.sin(an)*30; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.globalAlpha = .85; ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-2, 0); ctx.lineTo(-4, 4); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; }}); }
+  if (inArena()) for (let i = 0; i < 46; i++) {
+    const a = i/46*6.283, px = ARENA.cx + .5 + Math.cos(a)*(ARENA.rx + 1.6), py = ARENA.cy + .5 + Math.sin(a)*(ARENA.ry + 1.4);
+    if (py > ARENA.cy + ARENA.ry - 1 && Math.abs(px - ARENA.cx - .5) < 3) continue;
+    const cheer = S.arena && (!S.arena.live || S.arena.t > 0) ? 2.5 : .8;
+    sprites.push({y: py - 2, f: () => drawPerson(ctx, Math.round(px*TS), Math.round(py*TS - Math.abs(Math.sin(frameT*6*cheer/2 + i*1.7))*cheer), {cloak: FOLK_COLS[i % FOLK_COLS.length], skin: FOLK_SKIN[i % FOLK_SKIN.length], hair: FOLK_HAIR[(i*3) % FOLK_HAIR.length]}, 0, false, 'down')});
+  }
   for (const h of houses) if (h.style && inView(h.x, h.y)) sprites.push({y: h.y + 1.9, f: () => drawEstate(ctx, h.x*TS, h.y*TS, h.style, frameT)});
   for (const k of PK) { const P = PROPERTIES[k]; if (P.hx != null && inView(P.hx, P.hy)) sprites.push({y: P.hy + 2.05, f: () => drawPropertySign(ctx, k)}); }
   for (const c of [...chests, ...abyssChests]) if (inView(c.x, c.y)) sprites.push({y: c.y + .8, f: () => drawChest(ctx, c)});
@@ -3804,6 +3818,7 @@ function updatePeople(dt) {
 }
 function update(dt) {
   updatePeople(dt);
+  if (S.arena) updateArena(dt);
   let vx = 0, vy = 0;
   if (keys.has('arrowleft') || keys.has('a')) vx -= 1;
   if (keys.has('arrowright') || keys.has('d')) vx += 1;
@@ -3871,7 +3886,7 @@ function update(dt) {
   for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget() || digTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -3943,6 +3958,7 @@ function renderClock() {
 }
 function renderRegion() {
   const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
+  if (inArena()) { const nm = S.arena ? `Crownfall Arena · Wave ${S.arena.wave}` : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
   if (!name && Math.hypot(S.x - HOME.x, S.y - HOME.y) < 8) name = S.home.level ? 'Your Homestead' : 'Homestead (for sale)';
@@ -4003,6 +4019,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
@@ -5635,6 +5652,8 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['gladiator','Gladiator','Survive 10 waves in the arena', () => (S.arenaBest || 0) >= 10],
+  ['arenachamp','Arena Champion','Survive 20 waves in the arena', () => (S.arenaBest || 0) >= 20],
   ['treasure','X Marks the Spot','Dig up a buried treasure', () => (S.treasures || 0) >= 1],
   ['pirate','Pirate King','Dig up 10 buried treasures', () => (S.treasures || 0) >= 10],
   ['elitehunter','Elite Hunter','Defeat 10 elite monsters', () => (S.eliteKills || 0) >= 10],
@@ -5670,6 +5689,75 @@ function bossIntroFX(B) {
   el.hidden = false; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   clearTimeout(bossIntroFX.t); bossIntroFX.t = setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.hidden = true; }, 500); }, 2900);
 }
+/* ================= the arena ================= */
+const ARENA = {x0: 812, y0: 256, w: 36, h: 28, cx: 830, cy: 269, rx: 15, ry: 10, gate: {x: 830, y: 280}};
+const inArena = () => !!(S && S.y >= WORLD_H && S.x >= ARENA.x0 && S.x < ARENA.x0 + ARENA.w);
+function carveArena() {
+  const A = ARENA;
+  for (let y = A.y0; y < A.y0 + A.h; y++) for (let x = A.x0; x < A.x0 + A.w; x++) {
+    const d = Math.hypot((x - A.cx)/A.rx, (y - A.cy)/A.ry);
+    map[idx(x, y)] = d < 1 ? T.DFLOOR : T.DWALL;
+  }
+  for (let y = A.cy + A.ry - 1; y <= A.gate.y; y++) { map[idx(A.cx, y)] = T.DFLOOR; map[idx(A.cx + 1, y)] = T.DFLOOR; map[idx(A.cx - 1, y)] = T.DFLOOR; }
+  map[idx(A.gate.x, A.gate.y)] = T.DSTAIR;
+  for (let a = 0; a < 6.28; a += .5) { const x = Math.round(A.cx + Math.cos(a)*(A.rx + .3)), y = Math.round(A.cy + Math.sin(a)*(A.ry + .3)); if (map[idx(x, y)] === T.DWALL && map[idx(x, y + 1)] === T.DFLOOR) map[idx(x, y)] = T.DTORCH; }
+}
+const ARENA_POOLS = [['wolf','boar','bandit','skeleton'], ['ghoul','jaguar','lion','wraith','harpy','archer'], ['imp','dustdevil','spider','ghoul','lion','wraith']];
+function enterArena() {
+  SFX.travel();
+  fadeThen(() => {
+    S.arenaReturn = {x: S.x, y: S.y}; S.x = ARENA.gate.x + .5; S.y = ARENA.gate.y - .6; S.riding = false; petE = null; fishing = null; lastTile = -1;
+    enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
+    S.arena = {wave: 0, pot: 0, t: 3, live: false}; renderHUD(); renderRegion();
+    toast('<b>The Crownfall Arena</b><br>The crowd roars! Survive wave after wave. Leave through the gate between waves to collect your winnings.', 6500);
+  });
+}
+function arenaWave() {
+  const A = S.arena; A.wave++; A.live = true;
+  const n = A.wave, pool = ARENA_POOLS[Math.min(2, Math.floor((n - 1)/6))].filter(t => ENEMIES[t]);
+  const count = Math.min(14, 2 + Math.ceil(n*.8)), mul = 1 + n*.18, dm = 1 + n*.06;
+  for (let i = 0; i < count; i++) {
+    const a = Math.random()*6.28, x = ARENA.cx + .5 + Math.cos(a)*ARENA.rx*.7, y = ARENA.cy + .5 + Math.sin(a)*ARENA.ry*.6;
+    const e = makeEnemy(pick(pool), x, y, {dungeon: true, alert: true, arena: true});
+    e.hp = e.max = Math.round(e.max*mul); e.dmgMul = dm;
+    if (n % 5 === 0 && i === 0) { makeElite(e); e.dmgMul *= dm; }
+    enemies.push(e);
+  }
+  SFX.roar(); shake = .3; renderRegion();
+  toast(`<b>Wave ${n}</b>${n % 5 === 0 ? ' · an elite enters the ring!' : ''}`, 2500);
+}
+function updateArena(dt) {
+  const A = S.arena; if (!A || !inArena()) return;
+  if (A.live) {
+    if (!enemies.some(e => e.arena && !e.dead)) {
+      A.live = false; A.t = 4; const prize = 25*A.wave + 10; A.pot += prize; S.arenaBest = Math.max(S.arenaBest || 0, A.wave);
+      SFX.coin(); gainXP(20*A.wave);
+      let extra = '';
+      if (A.wave === 10 && !S.flags.arena10) { S.flags.arena10 = true; addItem('gladiator_helm', 1); extra = '<br>The crowd throws you a <b>Gladiator Helm</b>!'; }
+      if (A.wave === 20 && !S.flags.arena20) { S.flags.arena20 = true; addItem('champion_belt', 1); extra = "<br>You've earned the <b>Arena Champion's Belt</b>!"; }
+      toast(`<b>Wave ${A.wave} cleared!</b> +${prize} coin to your winnings (${A.pot} total).<br><span style="color:var(--muted)">Next wave in a few seconds, or walk out through the gate.</span>${extra}`, 4000);
+    }
+  } else { A.t -= dt; if (A.t <= 0) arenaWave(); }
+}
+function leaveArena(died) {
+  const A = S.arena, pot = A ? (died ? Math.floor(A.pot/2) : A.pot) : 0, best = A ? A.wave - (A.live ? 1 : 0) : 0;
+  S.arena = null; S.coins += pot;
+  enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
+  const T0 = TOWNS.crownfall; S.x = T0.x - 1.5; S.y = T0.y + 3.6; lastTile = -1; petE = null;
+  renderHUD(); renderRegion(); save();
+  toast(died ? `<b>Knocked out in the arena!</b><br>The medics drag you out. You keep half your winnings: <b>${pot} coin</b>.` : `<b>You leave the arena</b><br>Waves survived: ${best}. Winnings: <b>${pot} coin</b>.`, 6000);
+}
+function arenaTarget() {
+  if (!inArena() || !S.arena) return null;
+  if (Math.hypot(S.x - ARENA.gate.x - .5, S.y - ARENA.gate.y - .5) > 1.4) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (S.arena.live) return {key: 'arL', html: 'The gate is barred until this wave is beaten', btn: '', fn: () => {}};
+  return {key: 'arX' + S.arena.pot, html: `${K}Leave the arena · collect ${S.arena.pot} coin`, btn: 'Leave', fn: () => { SFX.travel(); fadeThen(() => leaveArena(false)); }};
+}
+function arenaTalk(n) {
+  say(`“Step into the ring! Wave after wave of beasts, each tougher than the last. Every wave you beat adds to your winnings. Walk out between waves and the money is yours. Get knocked out and you keep only half.”<br><br>Your best: <b>${S.arenaBest || 0}</b> waves.${S.flags.arena10 ? '' : ' Reach wave 10 for a prize from the crowd.'}`, [
+    {label: 'Enter the arena', primary: true, fn: () => { closeTalk(); enterArena(); }}, back(n)]);
+}
 function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() => { fn(); f.style.opacity = 0; }, 380); }
 
 /* ================= fast travel ================= */
@@ -5677,7 +5765,7 @@ const bossActive = () => enemies.some(e => e.boss);
 function travelCost(k) { if (k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
-  const blocked = bossActive() || !!inDungeon();
+  const blocked = bossActive() || !!inDungeon() || inArena();
   $('travel').innerHTML = `<span style="width:100%;text-align:center;background:none">${inDungeon() ? 'Climb out of the dungeon before you fast travel.' : blocked ? 'You can’t fast travel during a boss fight.' : 'Fast travel to a place you’ve been'}</span>`
     + (S.home.level ? `<button class="btn sm" data-go="home" ${blocked ? 'disabled' : ''}>Home · free</button>` : '')
     + PK.filter(k => PROPERTIES[k].estate && S.props[k]).map(k => `<button class="btn sm" data-go="prop:${k}" ${blocked ? 'disabled' : ''}>${PROPERTIES[k].name} · free</button>`).join('')
@@ -5849,7 +5937,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
