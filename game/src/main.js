@@ -13,6 +13,7 @@ import { Weather } from './weather.js';
 import { TameRoster } from './tames.js';
 import { Settings } from './settings.js';
 import { Bestiary } from './bestiary.js';
+import { Music } from './music.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -38,6 +39,7 @@ class Game {
     this.shared = { uTime: { value: 0 }, uWind: { value: 1 } };
     this.clock = new THREE.Clock();
     this.audio = new Audio();
+    this.music = new Music(this.audio);
 
     this.env = new Environment(this.scene, renderer, quality, this.shared);
     this.terrain = buildTerrain(quality);
@@ -1024,6 +1026,11 @@ class Game {
       this.updateArrows(dt);
       this.cooking(dt);
       this.saves.tick(dt);
+      let danger = 0;
+      for (const c of this.creatures.list) {
+        if (c.state === 'chase' && !c.tamed && c.alive && (c.target === 'player' || (c.target && c.target === p.mount)) && c.pos.distanceTo(p.pos) < 70) { danger = 1; break; }
+      }
+      this.music.update(dt, { night: 1 - this.env.daylight, danger, boss: this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 120 ? 1 : 0 });
       this.map.update(dt);
       this.bestiary.update(dt);
     } else if (!this.started) {
@@ -1198,6 +1205,7 @@ setTimeout(() => {
     document.getElementById('hud').classList.add('show');
     game.started = true;
     game.audio.start();
+    game.music.start();
     game.lock();
     if (IS_TOUCH) { try { const r = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); r?.catch?.(() => {}); } catch (e) { /* optional */ } }
     if (loaded) game.ui.banner(`DAY ${game.env.day}`, 'Welcome back, survivor');

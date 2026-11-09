@@ -123,8 +123,16 @@ export class Audio {
     }
   }
 
+  // Cap simultaneous one-shot voices so a big fight can't pile up hundreds of audio nodes.
+  voice(dur) {
+    if ((this.active || 0) > 28) return false;
+    this.active = (this.active || 0) + 1;
+    setTimeout(() => { this.active--; }, (dur + 0.3) * 1000);
+    return true;
+  }
+
   noiseHit({ freq = 800, q = 1, dur = 0.15, vol = 0.4, type = 'bandpass', pan = 0, verb = 0.15 } = {}) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.voice(dur)) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const src = ctx.createBufferSource(); src.buffer = this.white;
     src.playbackRate.value = 0.8 + Math.random() * 0.4;
@@ -135,7 +143,7 @@ export class Audio {
   }
 
   tone({ f0 = 200, f1 = 100, dur = 0.2, vol = 0.3, type = 'sine', pan = 0, verb = 0.1 } = {}) {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.voice(dur)) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const o = ctx.createOscillator(); o.type = type;
     o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
@@ -163,7 +171,7 @@ export class Audio {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const vol = Math.max(0, 0.6 * (1 - dist / 140)) * Math.min(1.4, 0.4 + size * 0.3);
-    if (vol <= 0.01) return;
+    if (vol <= 0.01 || !this.voice(1.5)) return;
     const dur = kind === 'chirp' ? 0.25 : 0.6 + size * 0.35;
     const base = kind === 'chirp' ? 900 / size : 260 / Math.sqrt(size);
     const o = ctx.createOscillator(); o.type = 'sawtooth';

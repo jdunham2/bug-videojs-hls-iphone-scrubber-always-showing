@@ -119,6 +119,12 @@ The buttons are Hit (hold to attack), Use, Jump, plus Run and Sneak toggles.
 The 🎒 button opens inventory and crafting, and you tap a hotbar slot to equip or eat.
 Landscape plays best.
 
+### Music
+
+A procedural score that follows the game: warm pads and sparse melodies by day, darker
+minor chords at night, drums and a driving bass when something hunts you, and heavier
+percussion during the boss fight. Music has its own volume slider.
+
 ### Settings
 
 Open ⚙ Settings from the title screen, the pause menu or the touch toolbar to change volume,

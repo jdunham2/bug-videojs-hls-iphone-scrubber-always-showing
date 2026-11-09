@@ -1,6 +1,6 @@
 // Player settings, kept per viewer in browser storage (a convenience; defaults apply when absent).
 const KEY = 'iotp-settings';
-export const DEFAULTS = { volume: 70, sens: 1, invert: false, fov: 72, shadows: true, grass: true, minimap: true, fps: false };
+export const DEFAULTS = { volume: 70, music: 50, sens: 1, invert: false, fov: 72, shadows: true, grass: true, minimap: true, fps: false };
 
 export function loadSettings() {
   try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY)) || {}) }; } catch (e) { return { ...DEFAULTS }; }
@@ -26,7 +26,7 @@ export class Settings {
 
   fill() {
     const f = this.form.elements;
-    f.volume.value = this.v.volume; f.sens.value = this.v.sens; f.fov.value = this.v.fov;
+    f.volume.value = this.v.volume; f.music.value = this.v.music; f.sens.value = this.v.sens; f.fov.value = this.v.fov;
     f.invert.checked = this.v.invert; f.shadows.checked = this.v.shadows; f.grass.checked = this.v.grass;
     f.minimap.checked = this.v.minimap; f.fps.checked = this.v.fps;
     this.labels();
@@ -34,6 +34,7 @@ export class Settings {
 
   labels() {
     document.getElementById('lbl-volume').textContent = `${this.v.volume}%`;
+    document.getElementById('lbl-music').textContent = `${this.v.music}%`;
     document.getElementById('lbl-sens').textContent = `${Number(this.v.sens).toFixed(1)}×`;
     document.getElementById('lbl-fov').textContent = `${this.v.fov}°`;
   }
@@ -41,7 +42,7 @@ export class Settings {
   read() {
     const f = this.form.elements;
     this.v = {
-      volume: +f.volume.value, sens: +f.sens.value, fov: +f.fov.value, invert: f.invert.checked,
+      volume: +f.volume.value, music: +f.music.value, sens: +f.sens.value, fov: +f.fov.value, invert: f.invert.checked,
       shadows: f.shadows.checked, grass: f.grass.checked, minimap: f.minimap.checked, fps: f.fps.checked,
     };
     this.labels();
@@ -61,6 +62,7 @@ export class Settings {
     document.getElementById('minimap').hidden = !v.minimap;
     this.fpsEl.hidden = !v.fps;
     g.audio.setVolume?.(v.volume / 100);
+    g.music?.setVolume(v.music / 100);
   }
 
   toggle(force) {
