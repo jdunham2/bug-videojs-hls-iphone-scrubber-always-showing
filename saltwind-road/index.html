@@ -708,6 +708,11 @@ const GOODS = {
   trout:{name:"River Trout",base:18,col:'#8ab07a',kind:'good'},
   pike:{name:"Marsh Pike",base:24,col:'#6a8a4a',kind:'good'},
   seabass:{name:"Sea Bass",base:22,col:'#5a7a9a',kind:'good'},
+  blossom_trout:{name:'Blossom Trout',base:45,col:'#f0a0c0',kind:'good'},
+  sun_marlin:{name:'Sun Marlin',base:70,col:'#f0b040',kind:'good'},
+  harvest_carp:{name:'Harvest Carp',base:50,col:'#d8782a',kind:'good'},
+  ice_pike:{name:'Ice Pike',base:60,col:'#a8d8f0',kind:'good'},
+  aurora_char:{name:'Aurora Char',base:120,col:'#7af0c0',kind:'good'},
   frostfin:{name:"Frostfin",base:40,col:'#bfe8ff',kind:'good'},
   catfish:{name:"Mud Catfish",base:30,col:'#7a6a4a',kind:'good'},
   piranha:{name:"Piranha",base:35,col:'#d84a3a',kind:'good'},
@@ -3690,6 +3695,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Seasonal fish', 'Some fish only bite in one season: Blossom Trout in spring, Sun Marlin on warm summer coasts, Harvest Carp in autumn, and Ice Pike in winter. The rare Aurora Char rises on winter nights in snowy waters.'],
   ['Rival duels', 'Vex the Bold in Crownfall challenges you to a duel once a day. Duels are fought in the arena and losing costs nothing. Climb five ranks to win Vex\u2019s own rapier.'],
   ['Cooking contest', 'Every third day of the week Chef Auguste in Greenstem judges a cooking contest. Match the weekly theme and bring dishes you cooked yourself for the best score.'],
   ['Bank & mayors', 'Banker Pennyworth in Crownfall pays daily interest on savings, which are safe when you are knocked out, and lends coin for a week. Fully improve a town and earn top standing, and its elder will back you for mayor: mayors collect taxes every morning.'],
@@ -7571,6 +7577,11 @@ const FISH_SPECIES = [
   {id:'moonfish', diff:1.25, xp:40, biomes:["*"], when:'night', w:1},
   {id:'pufferfish', diff:0.8, xp:14, biomes:[T.SAND,T.JUNGLE,T.SAVANNA], when:'*', w:2},
   {id:'coelacanth', diff:1.45, xp:90, biomes:["*"], when:'*', w:0.12},
+  {id:'blossom_trout', diff:0.85, xp:18, biomes:["*"], when:'*', w:1.6, season:0},
+  {id:'sun_marlin', diff:1.15, xp:30, biomes:[T.SAND,T.DUNE,T.SAVANNA,T.JUNGLE], when:'day', w:1.8, season:1},
+  {id:'harvest_carp', diff:0.9, xp:20, biomes:["*"], when:'*', w:1.6, season:2},
+  {id:'ice_pike', diff:1.05, xp:24, biomes:["*"], when:'*', w:1.6, season:3},
+  {id:'aurora_char', diff:1.3, xp:45, biomes:[T.SNOW], when:'night', w:1.2, season:3},
 ];
 for (const f of FISH_SPECIES) CATCH[f.id] = {diff: f.diff, xp: f.xp, col: GOODS[f.id].col};
 const FISH_LOG_IDS = ['fish','silverfin','goldcarp', ...FISH_SPECIES.map(f => f.id)];
@@ -7585,6 +7596,7 @@ function rollCatch(n) {
   const pool = [['fish', 10], ['silverfin', 4], ['goldcarp', 1.2*rare], ['old_boot', 1.4]];
   for (const f of FISH_SPECIES) {
     if (f.when === 'night' && !night || f.when === 'day' && night) continue;
+    if (f.season != null && f.season !== seasonIdx()) continue;
     if (!f.biomes.includes('*') && !f.biomes.some(t => b.has(t))) continue;
     pool.push([f.id, f.w * (f.w < 2 ? rare : 1)]);
   }
@@ -7995,6 +8007,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['seasonfish','Angler for All Seasons','Catch all five seasonal fish', () => ['blossom_trout','sun_marlin','harvest_carp','ice_pike','aurora_char'].every(f => (S.fishLog || {})[f])],
   ['rival','Rivalry','Beat Vex the Bold in a duel', () => (S.vexRank || 0) >= 1],
   ['rivalchamp','Better Than Vex','Reach duel rank 5 against Vex', () => (S.vexRank || 0) >= 5],
   ['masterchef','Master Chef','Win the cooking contest', () => (S.cookWins || 0) >= 1],
