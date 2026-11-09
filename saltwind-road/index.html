@@ -826,6 +826,9 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  tent:{name:'Tent',base:120,col:'#c8a070',kind:'place',desc:'Place with B. Sleep anywhere, and wake here when knocked out.'},
+  serpent_scale:{name:'Serpent Scale',base:150,col:'#3a9a8a',kind:'mat'},
+  serpent_cloak:{name:'Serpent-scale Cloak',base:1600,col:'#3a9a8a',kind:'armor',armor:5,desc:'Scales of a sea serpent. Light and tough.'},
   telescope:{name:'Telescope',base:220,col:'#c8a050',kind:'place',desc:'Place with B. Chart constellations at night.'},
   flower_pot:{name:'Flower Pot',base:15,col:'#e86a8a',kind:'place',desc:'Place with B. A pretty decoration.'},
   // --- armor: body ---
@@ -1083,6 +1086,8 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'tent',           need:{hide:4,sticks:6,rope:2}, at:'bench', known:true},
+  {id:'serpent_cloak',  need:{serpent_scale:4,silk_cloth:2,hide:2}, at:'bench', known:true},
   {id:'telescope',      need:{glass:3,bronze:2,planks:2}, at:'bench', known:true},
   {id:'flower_pot',     need:{stone:2,herbs:2}, at:'bench', known:true},
   {id:'lamp_post',      need:{iron:1,glass:1,wood:2}, at:'bench', known:true},
@@ -1171,6 +1176,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  serpent:{name:'Sea Serpent',hp:60,dmg:3,speed:3,aggro:30,drops:[['serpent_scale',1,2,1],['pearl',1,2,.5]],coins:[80,160],swim:true},
   duelist:{name:'Vex the Bold',hp:40,dmg:3,speed:3.7,aggro:40,drops:[],noBest:true},
   horseman:{name:'Headless Horseman',hp:70,dmg:4,speed:4.0,aggro:22,undead:true,ranged:{range:6,cd:1.6,speed:8,col:'#ff8a2a'},coins:[200,350],drops:[['pumpkin',3,5,1]]},
   goblin:{name:'Treasure Goblin',hp:14,dmg:0,speed:4.3,aggro:0,drops:[['gem',1,3,1],['pirate_gold',1,2,.5]],coins:[150,300],flee:true},
@@ -1394,7 +1400,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1460,6 +1466,11 @@ function placedTarget() {
   if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
     if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
     else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
+  if (P.use === 'tent') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the tent`, btn: 'Use', fn: () => { const night = S.time > .7 || S.time < .25, here = S.tentPos && S.tentPos.x === q.x && S.tentPos.y === q.y;
+    openPanel('Tent', `A snug little tent.${here ? ' <b>You wake up here when knocked out.</b>' : ''}`, [
+      {label: night ? 'Sleep until morning' : 'Sleep (only at night)', primary: night, disabled: !night || bossActive(), fn: () => { closeTalk(); if (S.time > .27) { S.time = .27; newDay(); } else S.time = .27; S.hp = maxHP(); enemies = enemies.filter(e => e.boss); eproj = []; hazards = []; S.tentNights = (S.tentNights || 0) + 1; SFX.lullaby(); fadeThen(() => {}); toast('<b>Good morning</b><br>You crawl out of your tent, stiff but rested.'); renderHUD(); save(); }},
+      {label: here ? 'This is your respawn point' : 'Set as respawn point', disabled: here, fn: () => { S.tentPos = {x: q.x, y: q.y}; save(); closeTalk(); toast('You will wake up at this tent when knocked out.'); }},
+      {label: 'Pack it up', fn: () => { closeTalk(); if (here) S.tentPos = null; pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }};
   if (P.use === 'scope') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Look through the telescope`, btn: 'Look', fn: () => stargaze(q)};
   if (P.use === 'cook') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Cook at the pot`, btn: 'Cook', fn: () => openPanel('Cooking Pot', 'A bubbling pot. Cook hearty meals with long-lasting effects (Craft menu, Food tab).', [{label: 'Cook', primary: true, fn: () => { closeTalk(); craftTab = 3; openCraft(); }}, {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}])};
   if (P.use === 'craft') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the ${nm}`, btn: 'Use', fn: () => openPanel(nm, q.t === 'anvil' ? 'A sturdy anvil. You can use forge and workbench recipes here.' : 'Your own crafting table. You can use workbench recipes here.', [
@@ -1524,6 +1535,12 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'tent':
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 2, y + 13, 20, 3);
+      g.fillStyle = '#c8a070'; g.beginPath(); g.moveTo(x - 2, y + 15); g.lineTo(x + 8, y - 4); g.lineTo(x + 18, y + 15); g.fill();
+      g.fillStyle = '#a07a4a'; g.beginPath(); g.moveTo(x + 8, y - 4); g.lineTo(x + 18, y + 15); g.lineTo(x + 12, y + 15); g.fill();
+      g.fillStyle = '#3a2a1a'; g.beginPath(); g.moveTo(x + 5, y + 15); g.lineTo(x + 8, y + 5); g.lineTo(x + 11, y + 15); g.fill();
+      g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 7, 2, 4); g.fillStyle = '#d04a3a'; g.fillRect(x + 9, y - 7, 4, 2); break;
     case 'telescope':
       g.fillRect(x + 3, y + 14, 10, 2);
       g.fillStyle = '#5a3a20'; g.fillRect(x + 4, y + 4, 2, 11); g.fillRect(x + 10, y + 4, 2, 11); g.fillRect(x + 7, y + 4, 2, 11);
@@ -3256,9 +3273,10 @@ function die() {
   SFX.death();
   const lost = Math.floor(S.coins * diff().loss);
   S.coins -= lost; S.hp = maxHP(); S.deaths++;
-  const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
-  const atHome = !rp && S.home && S.home.level >= 1;
-  if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
+  const tent = S.tentPos && S.placed.some(q => q.t === 'tent' && q.x === S.tentPos.x && q.y === S.tentPos.y) ? S.tentPos : null;
+  const rp = !tent && S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
+  const atHome = !tent && !rp && S.home && S.home.level >= 1;
+  if (tent) { S.x = tent.x + .5; S.y = tent.y + 1.4; } else if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
   if (S.contraband && have('contraband')) { addItem('contraband', -1); S.contraband = false; S.coins = Math.max(0, S.coins - 200); setTimeout(() => toast('<b>Customs confiscated your crate</b> and fined you 200 coin while you were out cold.', 6000), 1800); }
   S.riding = false; petE = null; compE = null; S.race = null; S.heroicRun = null; BOSSES.heroic.x = BOSSES.heroic.y = -999; if (S.escort) { S.escort = null; escortPts = null; setTimeout(() => toast('The wagon you were escorting was lost while you were knocked out.', 5000), 1500); }
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
@@ -3340,6 +3358,56 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== sea serpents =====
+let serpT = 30;
+function serpentCheck(dt) {
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y));
+  if (t !== T.DEEP || !S.flags.raft || balloonF || inDungeon()) return;
+  serpT -= dt; if (serpT > 0) return; serpT = 50 + Math.random()*50;
+  if (Math.random() > .45 || enemies.some(e => e.type === 'serpent' && !e.dead)) return;
+  const lv = 1 + (S.level || 1)*.06, e = makeEnemy('serpent', S.x + 3, S.y, {alert: true, dungeon: true});
+  e.hp = e.max = Math.round(60*lv); e.dmgMul = lv; e.hidden = 1.5; e.cyc = 0; e.ang = Math.random()*6.283; enemies.push(e);
+  toast('<b>Something huge moves beneath the waves...</b><br>A Sea Serpent! Strike when it surfaces.', 4500); SFX.roar(); shake = .3;
+}
+function serpentTick(e, dt) {
+  e.hurt = Math.max(0, e.hurt - dt); e.kx = e.ky = 0; e.phase += dt*6;
+  const d = Math.hypot(S.x - e.x, S.y - e.y);
+  if (d > 24 || tileAt(Math.floor(S.x), Math.floor(S.y)) !== T.DEEP && d > 10) { e.dead = true; return; }
+  e.cyc -= dt;
+  if (e.hidden > 0) {
+    e.hidden -= dt; e.ang += dt*.9;
+    const tx = S.x + Math.cos(e.ang)*3, ty = S.y + Math.sin(e.ang)*3;
+    if (tileAt(Math.floor(tx), Math.floor(ty)) === T.DEEP) { e.x += (tx - e.x)*Math.min(1, dt*3); e.y += (ty - e.y)*Math.min(1, dt*3); }
+    if (e.hidden <= 0) { e.hidden = 0; e.cyc = 2.6; e.shot = .7; burst(e.x, e.y - .3, '#bfe8ff', 14, 4); }
+  } else {
+    e.shot -= dt; if (e.shot <= 0) { e.shot = 1.1; const a = Math.atan2(S.y - e.y + .3, S.x - e.x); shoot(e.x, e.y - .8, a, 7, Math.round(ENEMIES.serpent.dmg*(e.dmgMul || 1)), '#7af0e0', .3); }
+    if (e.cyc <= 0) { e.hidden = 1.6 + Math.random(); burst(e.x, e.y, '#bfe8ff', 10, 3); }
+  }
+  e.face = S.x < e.x ? -1 : 1;
+}
+function drawSerpent(g, e, x, y) {
+  if (e.hidden > 0) { g.strokeStyle = 'rgba(220,245,255,.6)'; g.lineWidth = 1; for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(x - 8 + i*8, y + Math.sin(e.phase + i)*1, 4, 1.5, 0, 0, 7); g.stroke(); } return; }
+  const f = e.face, w = Math.sin(e.phase)*2;
+  g.fillStyle = 'rgba(0,30,40,.3)'; g.beginPath(); g.ellipse(x, y + 1, 14, 3, 0, 0, 7); g.fill();
+  g.fillStyle = '#2a7a6a'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(x - f*(6 + i*7), y - 2 + (i % 2 ? w : -w)*.5, 4 - i*.6, Math.PI, 0); g.fill(); }
+  g.fillRect(x - 3, y - 20, 6, 20); g.fillStyle = '#3a9a8a'; g.fillRect(x - 2, y - 20, 2, 20);
+  g.fillStyle = '#2a7a6a'; g.fillRect(x - 4 + f*2, y - 26, 9, 7); g.fillStyle = '#e8f0a0'; g.fillRect(x + f*4 - 1, y - 24, 2, 2);
+  g.fillStyle = '#7af0e0'; g.fillRect(x - 5 - f, y - 22, 2, 8); g.fillStyle = '#f0f0f0'; g.fillRect(x + f*5, y - 20, 1, 2);
+  g.fillStyle = 'rgba(220,245,255,.7)'; g.fillRect(x - 6, y, 12, 1);
+  if (e.hurt > 0) { g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(x - 4, y - 26, 9, 26); }
+  if (e.hp < e.max) { g.fillStyle = '#0d131b'; g.fillRect(x - 10, y - 32, 20, 3); g.fillStyle = '#e57a62'; g.fillRect(x - 9, y - 31, 18*Math.max(0, e.hp)/e.max, 1); }
+}
+// ===== merchant guild ranks =====
+const GUILD_RANKS = [[0, 'Peddler'], [1500, 'Trader'], [6000, 'Merchant'], [15000, 'Master Merchant'], [40000, 'Trade Magnate']];
+const guildRank = () => { const v = (S && S.tradeVol) || 0; let r = 0; GUILD_RANKS.forEach(([n], i) => { if (v >= n) r = i; }); return r; };
+function guildGain(v) {
+  const before = guildRank(); S.tradeVol = (S.tradeVol || 0) + v; const after = guildRank();
+  if (after > before) setTimeout(() => { toast(`<b>Guild rank up: ${GUILD_RANKS[after][1]}!</b><br>Merchants everywhere give you slightly better prices (+${after*2}% on every deal).`, 6500); SFX.victory(); }, 600);
+}
+function guildTalk(n) {
+  const r = guildRank(), nx = GUILD_RANKS[r + 1];
+  say(`“The Merchants' Guild keeps a ledger of every deal you make. The more you trade, the more respect you'll get, and the better your prices.”<br><br>Rank: <b>${GUILD_RANKS[r][1]}</b> · trade volume <b>${S.tradeVol || 0} coin</b><br>${nx ? `Next rank, <b>${nx[1]}</b>, at ${nx[0]} coin of trade.` : 'You have reached the top of the guild!'}<br><span style="color:var(--muted)">Each rank improves your buying and selling prices by 2%.</span>`, [back(n)]);
 }
 // ===== the Saltwind Gazette =====
 const GAZ_FLUFF = ['Goat elected to Hollowpine council; "best candidate in years," say locals.', 'Fishermen report a fish that "looked at them funny."', 'Baker’s cat steals entire pie; remains at large.', 'Scholars debate whether slimes have feelings. Slimes decline to comment.', 'Record turnip harvest leaves farmers "frankly overwhelmed."', 'Bard’s new song banned in three taverns for being "too catchy."', 'Mysterious lights over the sea. Experts say: "probably fine."', 'Wizard misplaces hat; hat reportedly happier this way.', 'Local child befriends a crab. Crab unavailable for interview.', 'Tavern brawl ends in group hug, confusing everyone.'];
@@ -3787,6 +3855,7 @@ function legendSpawns() {
   }
 }
 const EARNED_TITLES = [
+  ['magnate', 'Trade Magnate'],
   ['mayor', 'Mayor'],
   ['legendary', 'Legend of Saltwind'], ['king', 'King of the Castle'], ['mythslayer', 'Mythslayer'], ['arenachamp', 'Arena Champion'],
   ['masterangler', 'Master Angler'], ['pirate', 'Pirate King'], ['tycoon', 'Real Estate Tycoon'], ['champion', 'Champion'],
@@ -3797,6 +3866,8 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Tents & sea serpents', 'Craft a Tent (4 Hide, 6 Sticks, 2 Rope) to sleep anywhere at night and set a respawn point in the wild. Out on deep water, Sea Serpents may surface: hit them while they are above the waves. Their scales make a fine cloak.'],
+  ['Merchants\u2019 Guild', 'Every trade adds to your guild ledger. Odile in Port Wren tracks your rank, from Peddler up to Trade Magnate. Each rank gives you 2% better prices.'],
   ['Stargazing', 'Craft a Telescope at a workbench (3 Glass, 2 Bronze, 2 Planks) and place it with B. Each night you can chart one constellation for a small permanent bonus. Chart all seven to find the Crown.'],
   ['Stone Golem', 'Rock golems sometimes drop Living Stone. Forge a Golem Heartstone (3 Living Stone, 20 Stone, 5 Iron, 2 Crystal) and a loyal Stone Golem follows you as a free companion.'],
   ['Sandstorms', 'When storms sweep the desert, buried relics peek out of the dunes. Dig them up with a shovel before the storm ends: Sun Discs, Desert Roses, Ancient Coins and the rare Scarab Amulet.'],
@@ -4050,7 +4121,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt);
+  updateRelics(dt); serpentCheck(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -4078,6 +4149,7 @@ function updateCombat(dt, night) {
     if (def.target) { e.hurt = Math.max(0, e.hurt - dt); e.life -= dt; if (e.life <= 0) e.dead = true; continue; }
     if (def.den) { denTick(e, dt); continue; }
     if (def.flee) { goblinTick(e, dt); continue; }
+    if (def.swim) { serpentTick(e, dt); continue; }
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
@@ -4662,6 +4734,7 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
 }
 function drawEnemy(g, e) {
   const x = Math.round(e.x*TS), y = Math.round(e.y*TS);
+  if (e.type === 'serpent') { drawSerpent(g, e, x, y); return; }
   if (e.hidden > 0) { g.fillStyle = '#a08050'; g.beginPath(); g.ellipse(x, y, 10, 3, 0, 0, 7); g.fill(); return; }
   if (e.den != null) { drawDen(g, e, x, y); return; }
   const flash = e.act && e.act.phase === 'wind' && Math.floor(frameT*16) % 2;
@@ -5473,6 +5546,7 @@ function mainOptions(n) {
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
   if (n.rival) o.push({label: (S.vexRank || 0) >= 5 ? 'Friendly spar' : `Duel Vex (rank ${(S.vexRank || 0) + 1}/5)`, primary: (S.vexRank || 0) < 5 && S.vexDay !== S.day, fn: () => vexTalk(n)});
+  if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.chef) o.push({label: cookDay() ? 'The cooking contest! ★' : 'About the cooking contest', primary: cookDay() && S.cookContest !== S.day, fn: () => chefTalk(n)});
   if (n.banker) o.push({label: `The bank (${S.bank || 0}◆ saved)`, primary: !!S.loan, fn: () => bankTalk(n)});
   if (isElder(n) && !(S.mayor || {})[n.town]) o.push({label: 'Run for mayor', primary: canRunMayor(n.town), fn: () => mayorTalk(n)});
@@ -6310,7 +6384,7 @@ function closeTrade() {
 }
 function mults(n) {
   const rep = repOf(n.town);
-  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar') + (S.pet === 'parrot' ? .05 : 0) + (have('merchant_seal') ? .05 : 0)), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar') - (S.pet === 'parrot' ? .05 : 0))};
+  return {buy: Math.max(.5, .84 - n.greed*.2 + rep*.03 + .025*sk('bar') + (S.pet === 'parrot' ? .05 : 0) + (have('merchant_seal') ? .05 : 0) + .02*guildRank()), sell: Math.max(.9, 1.08 + n.greed*.25 - rep*.03 - .025*sk('bar') - (S.pet === 'parrot' ? .05 : 0) - .02*guildRank())};
 }
 function tradeVals() {
   const n = trade.n, m = mults(n); let youGive = 0, theyGive = 0;
@@ -6390,7 +6464,7 @@ function propose(isCounter) {
   if (received >= threshold - .01) {
     for (const g in trade.give) { addItem(g, -trade.give[g]); st.stock[g] = (st.stock[g] || 0) + trade.give[g]; }
     for (const g in trade.take) { addItem(g, trade.take[g]); st.stock[g] -= trade.take[g]; if (st.stock[g] <= 0) delete st.stock[g]; }
-    S.coins -= c; st.purse += c; S.trades++; SFX.coin(); gainXP(3);
+    S.coins -= c; st.purse += c; S.trades++; SFX.coin(); gainXP(3); guildGain(Math.round(v.youGive + v.theyGive + Math.abs(c)));
     const size = Math.min(1, (v.youGive + v.theyGive + Math.abs(c)) / 120);
     let line = pick(LINES.accept);
     if (required > 0 && received > required * 1.15) { addRep(n.town, .25); line = pick(LINES.generous); }
@@ -8117,6 +8191,10 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['serpent','Serpent Slayer','Defeat a Sea Serpent', () => (S.killsBy.serpent || 0) >= 1],
+  ['camper','Happy Camper','Sleep in a tent 3 times', () => (S.tentNights || 0) >= 3],
+  ['guildmerchant','Guild Merchant','Reach Merchant rank in the guild', () => guildRank() >= 2],
+  ['magnate','Trade Magnate','Reach the top rank of the Merchants\' Guild', () => guildRank() >= 4],
   ['reader','Well Informed','Read the Saltwind Gazette', () => !!S.readGazette],
   ['starchart','Star Charter','Chart 4 constellations', () => Object.keys(S.stars || {}).length >= 4],
   ['astronomer','Astronomer','Chart every constellation', () => !!(S.stars || {}).crown],
