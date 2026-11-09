@@ -716,6 +716,17 @@ const GOODS = {
   star_pendant:{name:'Star Pendant',base:450,col:'#fff4b0',kind:'trinket',desc:'+15% experience from everything'},
   comet_hammer:{name:'Comet Hammer',base:1300,col:'#bfe8ff',kind:'weapon',dmg:15,cd:.55,reach:1.8},
   stardust_tonic:{name:'Stardust Tonic',base:150,col:'#ffc8f0',kind:'food',heal:40,buff:'luck'},
+  // --- legendary beast trophies ---
+  grizzle_hide:{name:"Grizzle's Hide",base:600,col:'#c8803a',kind:'armor',armor:5,speed:.05},
+  whitefang_blade:{name:'Whitefang Blade',base:800,col:'#e8f4ff',kind:'weapon',dmg:10,cd:.3,reach:1.5,crit:.1},
+  sandking_shield:{name:"Sand King's Carapace",base:800,col:'#e0b050',kind:'armor',slot:'shield',armor:3,block:.25},
+  weaver_bow:{name:"Weaver's Bow",base:850,col:'#9a6aff',kind:'weapon',dmg:8,cd:.38,ranged:true,noAmmo:true,pcol:'#c8a8ff'},
+  shadowpaw_helm:{name:'Shadowpaw Mask',base:900,col:'#5a3a8a',kind:'armor',slot:'head',armor:2,crit:.1,speed:.05},
+  duke_blade:{name:"The Duke's Rapier",base:950,col:'#e8e0c8',kind:'weapon',dmg:11,cd:.28,reach:1.6,crit:.12},
+  stormwing_cloak:{name:'Stormwing Cloak',base:950,col:'#9fc8ff',kind:'armor',armor:4,speed:.12},
+  jack_spear:{name:"Jack's Spear",base:1000,col:'#e0a040',kind:'weapon',dmg:12,cd:.45,reach:2.1},
+  ember_crown:{name:'Ember Crown',base:1100,col:'#ff6a2a',kind:'armor',slot:'head',armor:3,crit:.07},
+  mire_mail:{name:'Mire Mail',base:1100,col:'#6a8a4a',kind:'armor',armor:6,speed:-.04},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -2841,6 +2852,11 @@ function killEnemy(e) {
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
+  if (e.legend) {
+    const L = LEGEND_BY[e.legend]; S.legends = S.legends || {}; S.legends[L.id] = true;
+    addItem(L.drop, 1); got.push(`+1 ${GOODS[L.drop].name}`); const lc = 300 + (S.level || 1)*10; S.coins += lc; got.push(`+${lc} coin`);
+    setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
+  }
   if (e.elite) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
     const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
@@ -2931,6 +2947,39 @@ function drawStar(st) {
 const bloodMoonDay = () => S && S.day >= 6 && S.day % 6 === 0;
 const bloodMoon = () => !!S && ((bloodMoonDay() && S.time > .78) || (S.day > 6 && S.day % 6 === 1 && S.time < .22)) && !inDungeon() && !inArena();
 const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive);
+const LEGENDS = [
+  {id:'grizzle',   name:'Old Grizzle',        type:'boar',     tx:112, ty:72,  hp:140, dmg:2.2, col:'#c8803a', drop:'grizzle_hide'},
+  {id:'whitefang', name:'Whitefang',          type:'wolf',     tx:150, ty:22,  hp:150, dmg:2.4, col:'#e8f4ff', drop:'whitefang_blade'},
+  {id:'sandking',  name:'The Sand King',      type:'scorpion', tx:204, ty:150, hp:180, dmg:2.4, col:'#e0b050', drop:'sandking_shield'},
+  {id:'weaver',    name:'Gloomweaver',        type:'spider',   tx:44,  ty:176, hp:170, dmg:2.3, col:'#9a6aff', drop:'weaver_bow'},
+  {id:'shadowpaw', name:'Shadowpaw',          type:'jaguar',   tx:312, ty:124, hp:200, dmg:2.6, col:'#5a3a8a', drop:'shadowpaw_helm'},
+  {id:'boneduke',  name:'The Bone Duke',      type:'skeleton', tx:190, ty:232, hp:210, dmg:2.6, col:'#e8e0c8', drop:'duke_blade'},
+  {id:'stormwing', name:'Stormwing',          type:'harpy',    tx:334, ty:44,  hp:190, dmg:2.5, col:'#9fc8ff', drop:'stormwing_cloak'},
+  {id:'jack',      name:'Laughing Jack',      type:'hyena',    tx:462, ty:194, hp:220, dmg:2.7, col:'#e0a040', drop:'jack_spear'},
+  {id:'implord',   name:'The Imp Lord',       type:'imp',      tx:232, ty:54,  hp:230, dmg:2.8, col:'#ff6a2a', drop:'ember_crown'},
+  {id:'mirelord',  name:'The Mirelord',       type:'lurker',   tx:150, ty:176, hp:240, dmg:2.8, col:'#6a8a4a', drop:'mire_mail'},
+];
+const LEGEND_BY = Object.fromEntries(LEGENDS.map(L => [L.id, L]));
+function legendHint(L) {
+  let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
+  const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
+  return `${dir} of ${TOWNS[best].name}`;
+}
+function legendSpawns() {
+  if (inDungeon() || inArena()) return;
+  for (const L of LEGENDS) {
+    if (S.legends && S.legends[L.id]) continue;
+    if (Math.hypot(S.x - L.tx, S.y - L.ty) > 16 || enemies.some(e => e.legend === L.id && !e.dead)) continue;
+    let spot = null;
+    for (let r = 0; r < 9 && !spot; r++) for (let a = 0; a < 16 && !spot; a++) { const x = Math.floor(L.tx + Math.cos(a/16*6.283)*r), y = Math.floor(L.ty + Math.sin(a/16*6.283)*r); if (inB(x, y) && enemyWalk(x + .5, y + .5)) spot = {x: x + .5, y: y + .5}; }
+    if (!spot) continue;
+    const e = makeEnemy(L.type, spot.x, spot.y), lv = 1 + (S.level || 1)*.04;
+    e.legend = L.id; e.elite = {name: L.name, col: L.col}; e.esize = 1.8; e.hp = e.max = Math.round(L.hp*lv); e.dmgMul = L.dmg*Math.min(1.8, lv); e.spd = 1.15; e.dungeon = true;
+    enemies.push(e);
+    S.legendsSeen = S.legendsSeen || {}; S.legendsSeen[L.id] = true;
+    toast(`<b>${L.name}</b><br>A legendary beast prowls nearby!`, 4500); SFX.roar();
+  }
+}
 const ELITE_MODS = [
   {name:'Savage', col:'#e05a2a', hp:3, dmg:1.6, spd:1.1},
   {name:'Ancient', col:'#e3a948', hp:4.5, dmg:1.4, spd:.9},
@@ -3107,7 +3156,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear();
+    bossNear(); legendSpawns();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -3165,7 +3214,7 @@ function updateCombat(dt, night) {
     if (mx || my) e.phase += dt*10;
     e.cd -= dt; e.hurt = Math.max(0, e.hurt - dt);
     if (d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
-    if (d > 34 && !e.dungeon && !e.raid) e.dead = true;
+    if ((d > 34 && !e.dungeon && !e.raid) || (e.legend && d > 45)) e.dead = true;
   }
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
@@ -3349,7 +3398,7 @@ function drawHeld(g, x, y, facing, id) {
   if (id === 'battle_axe') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 9, 1.5, 12); g.fillStyle = col; g.beginPath(); g.moveTo(hx, hy - 10); g.lineTo(hx + 5*s, hy - 12); g.lineTo(hx + 5*s, hy - 5); g.lineTo(hx, hy - 7); g.fill(); return; }
   if (id === 'morning_star') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 6, 1.5, 9); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 8, 2.5, 0, 7); g.fill(); g.fillStyle = '#cfd6dc'; g.fillRect(hx - 3, hy - 8.5, 1, 1); g.fillRect(hx + 2.5, hy - 8.5, 1, 1); g.fillRect(hx, hy - 11.5, 1, 1); return; }
   if (id.endsWith('staff')) { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
-  if (id === 'bow' || id === 'longbow' || id === 'prism_bow' || id === 'triple_bow' || id === 'abyss_bow' || id === 'serpent_bow' || id === 'antler_bow' || id === 'redwood_bow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
+  if (id === 'bow' || id === 'longbow' || id === 'prism_bow' || id === 'triple_bow' || id === 'abyss_bow' || id === 'serpent_bow' || id === 'antler_bow' || id === 'weaver_bow' || id === 'redwood_bow') { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.arc(hx, hy, 4.5, -1.3, 1.3); g.stroke(); return; }
   if (id === 'frost_staff') { g.fillStyle = '#5a3d27'; g.fillRect(hx - .5, hy - 10, 1.5, 14); g.fillStyle = col; g.beginPath(); g.arc(hx + .2, hy - 11, 2.2, 0, 7); g.fill(); return; }
   g.fillStyle = '#5a3d27';
   const len = id.endsWith('spear') ? 12 : (id === 'club' || id === 'bone_club') ? 7 : 9;
@@ -3641,7 +3690,7 @@ function drawEnemy(g, e) {
   }
   g.globalAlpha = 1;
   if (e.elite) {
-    const s = e.esize, ty = y - 22*s - 4, label = `${e.elite.name} ${ENEMIES[e.type].name}`;
+    const s = e.esize, ty = y - 22*s - 4, label = e.legend ? `★ ${e.elite.name}` : `${e.elite.name} ${ENEMIES[e.type].name}`;
     g.font = '7px "Pixelify Sans", monospace'; g.textAlign = 'center'; const w = g.measureText(label).width + 6;
     g.fillStyle = 'rgba(13,19,27,.8)'; g.fillRect(x - w/2, ty - 7, w, 9); g.fillStyle = e.elite.col; g.fillText(label, x, ty);
     g.fillStyle = '#0d131b'; g.fillRect(x-11, ty + 3, 22, 3); g.fillStyle = e.elite.col; g.fillRect(x-10, ty + 4, 20*Math.max(0, e.hp)/e.max, 1);
@@ -4286,6 +4335,7 @@ function mainOptions(n) {
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
+  if (n.bounty) o.push({label: 'Legendary hunts', fn: () => legendTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
@@ -4295,6 +4345,12 @@ const hello = n => n.hello[Math.min(tierOf(repOf(n.town)), 2)];
 const back = n => ({label:'Back', fn: () => say(hello(n), mainOptions(n))});
 function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); }
 
+function legendTalk(n) {
+  S.legendsKnown = true; S.legends = S.legends || {};
+  const done = LEGENDS.filter(L => S.legends[L.id]).length;
+  const list = LEGENDS.map(L => S.legends[L.id] ? `<span style="color:var(--good)">✓ ${L.name}</span>` : `★ <b>${L.name}</b> · ${legendHint(L)}`).join('<br>');
+  say(`“Ten legendary beasts. Bigger, older and meaner than anything else out there. Each one carries something worth having. I've marked them on your map.”<br><br><b>${done}/${LEGENDS.length} slain</b><br><span style="font-size:13px">${list}</span>`, [back(n)]);
+}
 function bountyTalk(n) {
   const k = S.eliteBounty || 0;
   if (!k) { say(`“Elite monsters wander the wild: glowing, bigger, meaner. Bring one down and come see me. I pay <b>${100 + (S.level || 1)*5} coin</b> a head, and a bonus for every fifth.”<br><br>Elites defeated so far: <b>${S.eliteKills || 0}</b>.`, [back(n)]); return; }
@@ -5385,6 +5441,7 @@ function openMap() {
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  if (S.legendsKnown) for (const L of LEGENDS) { if (S.legends && S.legends[L.id]) continue; const lx = (L.tx + .5)*s, ly = (L.ty + .5)*s; g.fillStyle = L.col; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i/10*6.283 - 1.57, r = (i % 2 ? 2.5 : 6)*dpr; g.lineTo(lx + Math.cos(a)*r, ly + Math.sin(a)*r); } g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); }
   if (S.raid) { const t = TOWNS[S.raid.town], rx = (t.x + .5)*s, ry = (t.y + .5)*s; g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(rx, ry, (9 + Math.sin(frameT*6)*2)*dpr, 0, 7); g.globalAlpha = .45; g.fill(); g.globalAlpha = 1; g.fillStyle = '#ff7a4a'; g.fillText('Under attack!', rx, ry + 20*dpr); }
   if (S.tmap) { const tx = (S.tmap.x + .5)*s, ty = (S.tmap.y + .5)*s, r = 6*dpr; g.strokeStyle = '#0d131b'; g.lineWidth = 5*dpr; g.beginPath(); g.moveTo(tx - r, ty - r); g.lineTo(tx + r, ty + r); g.moveTo(tx + r, ty - r); g.lineTo(tx - r, ty + r); g.stroke(); g.strokeStyle = '#ff4a3a'; g.lineWidth = 2.5*dpr; g.stroke(); g.fillStyle = '#ff4a3a'; g.fillText('Treasure', tx, ty - 9*dpr); }
   const dkm = inDungeon(), pm = dkm ? {x: DUNGEONS[dkm].entrance.x + .5, y: DUNGEONS[dkm].entrance.y + .5} : S;
@@ -6031,6 +6088,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['legendhunter','Legend Hunter','Slay a legendary beast', () => Object.keys(S.legends || {}).length >= 1],
+  ['mythslayer','Myth Slayer','Slay all ten legendary beasts', () => LEGENDS.every(L => (S.legends || {})[L.id])],
   ['stargazer','Stargazer','Collect 10 star fragments', () => (S.starsFound || 0) >= 10],
   ['party','Strength in Numbers','Hire a companion', () => !!S.hiredOnce],
   ['bloodmoon','Red Night','Survive a Blood Moon', () => (S.bloodMoons || 0) >= 1],
@@ -6364,7 +6423,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
