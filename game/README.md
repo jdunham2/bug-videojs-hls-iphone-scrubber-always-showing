@@ -54,6 +54,15 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 | R | Rotate the building piece |
 | V | Zoom the mount camera |
 
+### Saving
+
+Progress saves automatically: after important actions (at most every 20 s), at least once a
+minute, and when you leave the tab. You can also save by hand from the inventory or pause
+menu. The title screen offers **Continue** or **New game** (tap twice to erase).
+When the game runs as a claude.ai artifact it saves to your account, privately. Otherwise it
+saves to browser storage. Saves include your stats, inventory, objectives, buildings, tames
+and the time of day.
+
 ### Touch (phones and tablets)
 
 Touch controls turn on automatically on touch screens, and quality defaults to Performance.

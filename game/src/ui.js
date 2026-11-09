@@ -119,6 +119,13 @@ export class UI {
     b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
   }
 
+  saveIndicator(text, loud) {
+    const el = document.getElementById('saved');
+    el.textContent = '💾 ' + text;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    if (loud) this.notify(text, 'craft');
+  }
+
   setPrompt(text) {
     if (this._p === text) return;
     this._p = text;

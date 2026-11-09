@@ -7,6 +7,7 @@ import { Player } from './player.js';
 import { Building } from './building.js';
 import { Inventory, ITEMS, RECIPES } from './items.js';
 import { UI } from './ui.js';
+import { SaveSystem, applySave } from './save.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -79,6 +80,7 @@ class Game {
     this.paused = false;
 
     this.ui = new UI(this);
+    this.saves = new SaveSystem(this);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -152,6 +154,11 @@ class Game {
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());
     document.getElementById('inv-close').addEventListener('click', () => this.toggleInventory(false));
+    document.getElementById('inv-save').addEventListener('click', () => this.saves.save(true));
+    document.getElementById('pause-save').addEventListener('click', () => this.saves.save(true));
+    const flush = () => { if (this.started && this.player.alive) { this.saves.flushLocal(); this.saves.save(); } };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+    window.addEventListener('pagehide', flush);
     document.getElementById('respawn').addEventListener('click', () => this.respawn());
   }
 
@@ -203,6 +210,7 @@ class Game {
     const left = this.inv.add(r.id, r.yield || 1);
     if (left) this.ui.notify('Inventory full!', 'warn');
     this.stats.crafted++;
+    this.saves.markDirty();
     this.audio.craft();
     this.ui.notify(`Crafted ${ITEMS[r.id].name}${r.yield ? ` ×${r.yield}` : ''}`, 'craft');
     this.player.addXP(4, this.xpHooks);
@@ -212,6 +220,7 @@ class Game {
     if (qty <= 0) return;
     const left = this.inv.add(id, qty);
     if (id in this.stats) this.stats[id] += qty - left;
+    this.saves.markDirty();
     if (!silent) this.ui.notify(`+${qty - left} ${ITEMS[id].name}`, 'loot');
     if (left > 0) this.ui.notify('Inventory full!', 'warn');
   }
@@ -301,6 +310,7 @@ class Game {
   }
 
   completeTame(cr) {
+    this.saves.markDirty();
     cr.tamed = true;
     cr.state = 'tamed';
     cr.lieT = 1;
@@ -354,6 +364,7 @@ class Game {
       const s = this.placement;
       if (s && s.ok) {
         this.building.place(def.place, s.pos, s.rot);
+        this.saves.markDirty();
         this.inv.remove(item.id, 1);
         this.audio.build();
         if (def.place === 'foundation') this.stats.floors++;
@@ -663,6 +674,7 @@ class Game {
       this.building.update(dt, this.shared.uTime.value);
       this.updateArrows(dt);
       this.cooking(dt);
+      this.saves.tick(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
@@ -710,6 +722,7 @@ class Game {
     const q = this.quests[this.questIdx];
     if (q && q.done()) {
       this.questIdx++;
+      this.saves.markDirty();
       this.audio.craft();
       this.player.addXP(15, this.xpHooks);
       this.ui.notify('Objective complete!', 'quest');
@@ -770,14 +783,36 @@ setTimeout(() => {
   game.loop();
   document.getElementById('title').classList.add('ready');
   loading.textContent = IS_TOUCH ? 'Tap to begin' : 'Click to begin';
-  const begin = () => {
+  const playBtn = document.getElementById('play');
+  const newBtn = document.getElementById('newgame');
+  const info = document.getElementById('save-info');
+  let armed = false;
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+  const showSave = () => {
+    const d = game.saves.best();
+    newBtn.hidden = !d;
+    playBtn.textContent = d ? 'CONTINUE' : 'ENTER THE ISLAND';
+    info.textContent = d ? `Day ${d.world.day} · Level ${d.player.level} · ${d.tames.length} tame${d.tames.length === 1 ? '' : 's'} · saved ${ago(d.savedAt)} to ${game.saves.where}` : '';
+  };
+  showSave();
+  game.saves.onChange(showSave);
+  const begin = (load) => {
+    if (game.started) return;
+    const d = load ? game.saves.best() : null;
+    const loaded = d && applySave(game, d);
     document.getElementById('title').classList.add('hide');
     document.getElementById('hud').classList.add('show');
     game.started = true;
     game.audio.start();
     game.lock();
     if (IS_TOUCH) { try { const r = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); r?.catch?.(() => {}); } catch (e) { /* optional */ } }
-    game.ui.banner('ISLE OF THE PRIMAL', 'Survive · Gather · Build · Tame');
+    if (loaded) game.ui.banner(`DAY ${game.env.day}`, 'Welcome back, survivor');
+    else game.ui.banner('ISLE OF THE PRIMAL', 'Survive · Gather · Build · Tame');
   };
-  document.getElementById('play').addEventListener('click', begin);
+  playBtn.addEventListener('click', () => begin(true));
+  newBtn.addEventListener('click', async () => {
+    if (!armed) { armed = true; newBtn.textContent = 'Tap again to erase your save'; newBtn.classList.add('warn'); return; }
+    await game.saves.erase();
+    begin(false);
+  });
 }, 50);
