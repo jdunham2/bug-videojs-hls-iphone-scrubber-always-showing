@@ -1865,6 +1865,10 @@ const NPCS = [
   {id:'ilyra',town:'skyhold',dx:2,dy:3,name:'Archmage Ilyra',role:'Teacher of magic',cols:{cloak:'#3a3a8a',skin:'#e0c8b0',hair:'#f0f0ff'},mage:true,
    hello:["The air up here is thin. Good for thinking.","Back for more lessons?","My most promising student!"],
    rumors:["Blink through danger, freeze a crowd, burn what's left. That's most of combat, really.","Healing Light takes a long time to gather again. Use it wisely."]},
+  {id:'pemberton',town:'lantern',dx:3,dy:-2,name:'Guildmaster Pemberton',role:"Merchants' League",cols:{cloak:'#8a6a2a',skin:'#e0b896',hair:'#5a3a1a'},
+   hello:["Time is money, friend.","Back for business?","My finest associate!"], rumors:["The League looks after its own. Caravans run smoother, investments pay better."]},
+  {id:'thane',town:'frost',dx:-2,dy:-1,name:'Commander Thane',role:'Wardens of the Road',cols:{cloak:'#6a2a2a',skin:'#d8b896',hair:'#3a3a3a'},
+   hello:["Keep your blade sharp.","Back from patrol?","Champion. An honor."], rumors:["The Wardens keep the roads safe. We could use another sword."]},
   {id:'holt',town:'hollow',dx:3,dy:1,name:'Range-master Holt',role:'Archery range',cols:{cloak:'#3a5a2a',skin:'#d8a882',hair:'#8a6a3a'},archery:true,
    hello:["Steady hands, sharp eyes.","Back for another round?","Best shot in the woods!"],
    rumors:["Targets pop up and drop fast. Don't aim too long.","Hold the attack button with a bow for a power shot. It goes straight through."]},
@@ -3033,7 +3037,7 @@ function castSpell() {
   if (!S.spells || !S.spells.length) { floatText(S.x, S.y - 1.2, 'No spells known', '#e57a62'); return; }
   const k = S.spell && S.spells.includes(S.spell) ? S.spell : S.spells[0], sp = SPELLS[k];
   if ((spellCd[k] || 0) > 0) { floatText(S.x, S.y - 1.2, `${sp.name}: ${Math.ceil(spellCd[k])}s`, '#93a3b2'); return; }
-  spellCd[k] = sp.cd; S.casts = (S.casts || 0) + 1; const pw = 1 + (S.level || 1)*.06;
+  spellCd[k] = sp.cd*(1 - .08*facPerk('arcane')); S.casts = (S.casts || 0) + 1; const pw = 1 + (S.level || 1)*.06;
   if (k === 'fireball') { const t = nearestEnemy(8); const tx = t ? t.x : S.x + player.dir.x*4, ty = t ? t.y : S.y + player.dir.y*4; zaps.push({x1: S.x, y1: S.y - .6, x2: tx, y2: ty - .4, t: .25}); setTimeout(() => aoeHit(tx, ty - .3, 1.9, Math.round(7*pw)), 180); }
   else if (k === 'heal') { S.hp = Math.min(maxHP(), S.hp + maxHP()*.4); burst(S.x, S.y - .6, '#86c98f', 20, 4); renderHP(); SFX.level(); }
   else if (k === 'blink') { const dx = player.dir.x, dy = player.dir.y; burst(S.x, S.y - .5, '#c8a8ff', 14, 3); let bx = S.x, by = S.y; for (let d = .25; d <= 4.5; d += .25) { const nx = S.x + dx*d, ny = S.y + dy*d; if (passable(nx, ny)) { bx = nx; by = ny; } else break; } S.x = bx; S.y = by; player.inv = Math.max(player.inv, .35); burst(S.x, S.y - .5, '#c8a8ff', 14, 3); SFX.dodge(); }
@@ -3065,7 +3069,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + .04*facPerk('wardens');
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3126,7 +3130,7 @@ function killEnemy(e) {
   if (e.elite) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
     const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
-    addItem('elite_essence', 1); got.push('+1 Elite Essence');
+    addItem('elite_essence', facPerk('wardens') >= 3 ? 2 : 1); got.push(`+${facPerk('wardens') >= 3 ? 2 : 1} Elite Essence`);
     if (Math.random() < .2) { addItem('treasure_map', 1); got.push('+1 Treasure Map'); }
     S.eliteKills = (S.eliteKills || 0) + 1; S.eliteBounty = (S.eliteBounty || 0) + 1; gainXP(e.max*4);
     burst(e.x, e.y - .6, e.elite.col, 24, 6); shake = Math.max(shake, .3); SFX.victory();
@@ -3254,7 +3258,7 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -3270,6 +3274,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Factions', "Join the Merchants' League (Pemberton, Lantern Bay), the Wardens of the Road (Commander Thane, Frostgate) or the Circle of the Arcane (Archmage Ilyra, Skyhold). Do their tasks to rank up and unlock perks."],
   ['Heroic dungeons', 'Once you beat a dungeon guardian you can return on Heroic once a week: tougher foes, a stronger guardian and Heroic Tokens.'],
   ['Producers', 'Craft beehives, crab pots (next to water) and mushroom logs, place them with B, and collect what they make every day.'],
   ['Magic', 'Archmage Ilyra in Skyhold teaches Fireball, Healing Light, Blink and Frost Nova. X casts your spell, Z switches.'],
@@ -4533,6 +4538,7 @@ function update(dt) {
   }
   saveTimer += dt; if (saveTimer > 8) { saveTimer = 0; save(); }
   achT += dt; if (achT > 2) { achT = 0; checkAch(); }
+  if (facPerk('arcane') >= 3 && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (BUFFS.regen > 0 && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + (.4 + (S.level || 1)*.02)*dt); renderHP(); }
   let bchg = false; for (const b in BUFFS) if (BUFFS[b] > 0) { const before = Math.ceil(BUFFS[b]); BUFFS[b] = Math.max(0, BUFFS[b] - dt); if (Math.ceil(BUFFS[b]) !== before) bchg = true; } if (bchg) renderHUD();
   renderClock();
@@ -4573,6 +4579,7 @@ function checkDeeds() {
   { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
+  if (S.faction && S.facTask) { const F = FACTIONS[S.faction], T0 = S.facTask, d = F.tasks.find(t => t.k === T0.k), pr = Math.min(T0.n, facCount(T0.k) - T0.base); extra.push(`<div class="dd ${pr >= T0.n ? 'ok' : ''}"><span style="color:${F.col}">${pr >= T0.n ? `✓ Report to ${NPC_BY[F.leader].name}` : `${d.txt(T0.n)} ${pr}/${T0.n}`}</span></div>`); }
   if (S.lostPet) { const o = NPC_BY[S.lostPet.owner]; extra.push(`<div class="dd ${S.lostPet.carried ? 'ok' : ''}"><span>${S.lostPet.carried ? `✓ Return ${S.lostPet.name} to ${o ? o.name : 'its owner'} (${TOWNS[S.lostPet.town].name})` : `Find ${S.lostPet.name} the ${S.lostPet.kind}, ${S.lostPet.dir} of ${TOWNS[S.lostPet.town].name}`}</span></div>`); }
   if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
@@ -4786,6 +4793,9 @@ function mainOptions(n) {
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
   if (S.lostPet && S.lostPet.owner === n.id && S.lostPet.carried) o.push({label: `Return ${S.lostPet.name}`, primary: true, fn: () => returnPet(n)});
   else if (hasLostPet(n)) o.push({label: 'Is something wrong?', primary: true, fn: () => lostPetTalk(n)});
+  if (n.id === 'pemberton') o.push({label: "The Merchants' League", primary: true, fn: () => factionTalk(n, 'league')});
+  if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
+  if (n.mage) o.push({label: 'The Circle of the Arcane', fn: () => factionTalk(n, 'arcane')});
   if (n.mage) o.push({label: 'Learn spells', primary: true, fn: () => mageTalk(n)});
   if (n.archery) o.push({label: 'Try the archery range', primary: true, disabled: !!archery, fn: () => { closeTalk(); startArchery(); }});
   if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
@@ -4937,7 +4947,7 @@ function investTalk(n) {
     ...(next ? [{label: `Invest ${next[0]} coin (become ${next[1]})`, primary: true, disabled: S.coins < next[0], fn: () => { S.coins -= next[0]; S.invest = S.invest || {}; S.invest[n.id] = lv + 1; const st = S.npc[n.id]; if (st) { st.purse = Math.round(n.purse*(1 + .5*(lv + 1))); } SFX.victory(); renderHUD(); save(); say(`“Wonderful! Welcome aboard, ${INVEST_TIERS[lv][1].toLowerCase()}.”`, [back(n)]); }}] : [{label: 'You own as much of this shop as you can', disabled: true, fn: () => {}}]),
     back(n)]);
 }
-function investDay() { const d = Math.round(investTotal()*.025); if (d) { S.coins += d; S.dividends = (S.dividends || 0) + d; } return d ? ` Your shop investments paid <b>${d} coin</b>.` : ''; }
+function investDay() { const d = Math.round(investTotal()*.025*(1 + .1*facPerk('league'))); if (d) { S.coins += d; S.dividends = (S.dividends || 0) + d; } return d ? ` Your shop investments paid <b>${d} coin</b>.` : ''; }
 // ===== escort missions =====
 const ESCORT_ROUTES = [['dun','reed'],['dun','highcairn'],['dun','ashfall'],['dun','jade']];
 function startEscort(a, b) {
@@ -5005,7 +5015,7 @@ function nodeAfterDive(i) { S.depleted[i] = S.day; const n = nodes[i]; burst(n.x
 function caravanDay() {
   if (!S.caravans || !S.caravans.length) return '';
   let total = 0, robbed = 0;
-  for (const c of S.caravans) { if (Math.random() < (c.guard ? .03 : .1)) { robbed++; continue; } total += c.perDay; }
+  for (const c of S.caravans) { if (Math.random() < (c.guard ? .03 : .1)) { robbed++; continue; } total += Math.round(c.perDay*(1 + .1*facPerk('league'))); }
   S.coins += total; S.caravanEarned = (S.caravanEarned || 0) + total;
   return ` Your caravans brought in <b>${total} coin</b>${robbed ? ` (${robbed} robbed by bandits!)` : ''}.`;
 }
@@ -5201,6 +5211,30 @@ function returnPet(n) {
   const g = pick(['bread','honey','apple','berries','candy_apple','flowers'].filter(x => GOODS[x])); addItem(g, 2);
   S.petHelped = S.petHelped || {}; S.petHelped[n.id + ':' + S.day] = true; S.lostPet = null; SFX.victory(); gainXP(40); renderHUD(); save();
   say(`“${L.name}! Oh, you found ${L.kind === 'cat' ? 'her' : 'him'}! Thank you, thank you!” <span style="color:var(--good)">+${c} coin, +2 ${GOODS[g].name}</span>`, [back(n)]);
+}
+// ===== factions =====
+const FACTIONS = {
+  league:{name:"Merchants' League", leader:'pemberton', col:'#e3a948', perk: r => `+${r*10}% caravan and investment income${r >= 3 ? ', free fast travel everywhere' : ''}`,
+    tasks:[{k:'earned', n: () => 400 + (S.level || 1)*30, txt: n => `Earn ${n} coin`}, {k:'trades', n: () => 5, txt: n => `Make ${n} trades`}, {k:'sold', n: () => 1, txt: () => 'Run a caravan for a day (own at least one)'}]},
+  wardens:{name:'Wardens of the Road', leader:'thane', col:'#e5484d', perk: r => `+${r*4}% damage${r >= 3 ? ', elites drop double essence' : ''}`,
+    tasks:[{k:'kills', n: () => 15, txt: n => `Defeat ${n} foes`}, {k:'eliteKills', n: () => 2, txt: n => `Defeat ${n} elite monsters`}, {k:'bosses', n: () => 1, txt: () => 'Defeat any boss'}]},
+  arcane:{name:'Circle of the Arcane', leader:'ilyra', col:'#9a8aff', perk: r => `-${r*8}% spell cooldowns${r >= 3 ? ', slowly regenerate health' : ''}`,
+    tasks:[{k:'casts', n: () => 12, txt: n => `Cast ${n} spells`}, {k:'starsFound', n: () => 2, txt: n => `Collect ${n} star fragments`}, {k:'found', n: () => 1, txt: () => 'Discover a new landmark'}]},
+};
+const FACTION_RANKS = [[0, 'Initiate'], [3, 'Member'], [7, 'Veteran'], [12, 'Champion']];
+const facCount = k => k === 'found' ? Object.keys(S.found || {}).length : k === 'bosses' ? Object.keys(S.bosses || {}).filter(b => S.bosses[b]).length : k === 'trades' ? (S.trades || 0) : k === 'sold' ? (S.caravanEarned || 0) : (S[k] || 0);
+const facRank = () => { if (!S.faction) return 0; let r = 0; FACTION_RANKS.forEach(([n], i) => { if ((S.facRep || 0) >= n) r = i; }); return r; };
+const facPerk = f => S.faction === f ? facRank() : 0;
+function factionTalk(n, f) {
+  const F = FACTIONS[f];
+  if (S.faction && S.faction !== f) return say(`“You already march with the ${FACTIONS[S.faction].name}. Loyalty matters.”`, [{label: `Leave the ${FACTIONS[S.faction].name} and join us (lose your rank)`, fn: () => { S.faction = f; S.facRep = 0; S.facTask = null; save(); factionTalk(n, f); }}, back(n)]);
+  if (!S.faction) return say(`“Join the <b style="color:${F.col}">${F.name}</b>? Do work for us, rise through the ranks, and the rewards grow with you.”<br>Perks by rank: ${F.perk(1)} → ${F.perk(3)}.`, [{label: `Join the ${F.name}`, primary: true, fn: () => { S.faction = f; S.facRep = 0; save(); SFX.level(); factionTalk(n, f); }}, back(n)]);
+  const r = facRank(), T0 = S.facTask, def = T0 && F.tasks.find(t => t.k === T0.k), prog = T0 ? facCount(T0.k) - T0.base : 0, done = T0 && prog >= T0.n;
+  const next = FACTION_RANKS[r + 1];
+  say(`<b style="color:${F.col}">${F.name}</b> · ${FACTION_RANKS[r][1]} (${S.facRep || 0} favor${next ? `, ${next[0]} for ${next[1]}` : ''})<br>Your perks: ${r ? F.perk(r) : 'none yet'}${T0 ? `<br><br>Current task: <b>${def.txt(T0.n)}</b> (${Math.min(prog, T0.n)}/${T0.n})` : ''}`, [
+    ...(T0 && done ? [{label: 'Report the task done', primary: true, fn: () => { S.facTask = null; S.facRep = (S.facRep || 0) + 1; const c = 100 + (S.level || 1)*8; S.coins += c; gainXP(80); const r2 = facRank(); SFX.victory(); renderHUD(); save(); say(`“Good work.” <span style="color:var(--good)">+${c} coin, +1 favor</span>${r2 > r ? `<br><b>You are now a ${FACTION_RANKS[r2][1]} of the ${F.name}!</b> New perk: ${F.perk(r2)}.` : ''}`, [back(n)]); }}] : []),
+    ...(!T0 ? [{label: 'Give me a task', primary: true, fn: () => { const t = pick(F.tasks.filter(x => x.k !== 'sold' || (S.caravans || []).length)), nn = t.n(); S.facTask = {k: t.k, n: nn, base: facCount(t.k)}; save(); say(`“${t.txt(nn)}. Report back when it's done.”`, [back(n)]); }}] : []),
+    back(n)]);
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -7187,6 +7221,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['faction','Sworn','Join a faction', () => !!S.faction],
+  ['factionchamp','Faction Champion','Reach Champion rank in a faction', () => facRank() >= 3],
   ['heroic','Heroic','Defeat a guardian on Heroic', () => (S.heroicWins || 0) >= 1],
   ['heroic5','Living Legend','Win 5 Heroic dungeons', () => (S.heroicWins || 0) >= 5],
   ['homesteader','Cottage Industry','Collect 100 goods from hives, crab pots and mushroom logs', () => (S.produced || 0) >= 100],
@@ -7388,7 +7424,7 @@ function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() 
 
 /* ================= fast travel ================= */
 const bossActive = () => enemies.some(e => e.boss);
-function travelCost(k) { if (k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
+function travelCost(k) { if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
   const blocked = bossActive() || !!inDungeon() || inArena();
