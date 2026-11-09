@@ -30,6 +30,10 @@ const LORE = {
   frillspitter: { icon: '🦎', where: 'Forests, in pairs', text: 'When it flares its yellow frill, step aside: the venom it spits clings and slows its prey.' },
   nightstalker: { icon: '🌑', where: 'Lowland forests', text: 'Sleeps curled in the undergrowth by day. After dusk its eyes glow green, and it hunts anything it can find.' },
   longfin: { icon: '🦕', where: 'Coastal waters', text: 'A gentle, long-necked swimmer that grazes on fish. Far calmer to tame than a Deepjaw, and a fine sea mount.' },
+  quillback: { icon: '🦔', where: 'Forests and grasslands, in pairs', text: 'Bristling with long quills. Strike it and you will feel every one of them.' },
+  eggthief: { icon: '🥚', where: 'Lowlands, in pairs', text: 'A quick-fingered little bandit. It darts in, steals whatever it can carry and sprints off. Catch it to get your things back.' },
+  bloodclaw: { icon: '🩸', where: 'Forests and hills, in pairs', text: 'A heavy raptor with hooked claws. Its slashes leave bleeding wounds; carry Healing Salve.' },
+  skyreach: { icon: '🦒', where: 'Lowland plains', text: 'The tallest creature on the island, browsing treetops with its head held high. A saddle on its back is a watchtower that walks.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

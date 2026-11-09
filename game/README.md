@@ -97,6 +97,13 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - **The Broodmother** (venom totem in the western woods; 15 Raw Meat + 1 Trophy): a
     colossal Frillspitter that sprays five-glob venom volleys, pounces and calls her brood.
     Her gland forges the **Venom Blade** (70 damage plus poison over time).
+  - **Gravefang, the Undying** (bone cairn on the central plains, *night only*; 10 Raw Meat
+    + 10 Hide + 1 Trophy): a bone-white Gorgonax whose shadow pulse darkens the screen and
+    hurts everything nearby. It rises again once after falling. Its Bone Heart forges the
+    **Bonecrusher** (a knockout club).
+  - **The Rootwarden** (root-wrapped stone deep in Rootway Hollow; 60 Wood + 10 Marsh Herbs):
+    a moss-grown giant Scythehand whose roots pin you in place. Its Heartwood makes the
+    **Harvester Axe** (gathers wood and stone extremely fast).
   - Beat four bosses to become **Champion of the Isle**.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
@@ -136,6 +143,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Frillspitter: frilled hunter that spits slowing venom from range
   - Nightstalker: sleeps by day, hunts at night with glowing eyes; rideable
   - Longfin: gentle long-necked plesiosaur, an easy sea mount; rideable
+  - Quillback: spiny grazer whose quills hurt you when you hit it; rideable
+  - Eggthief: little bandit that steals from your bag and runs (catch it to get things back)
+  - Bloodclaw: heavy raptor whose slashes make you bleed (Healing Salve stops it); rideable
+  - Skyreach: towering sauropod, the biggest rideable creature
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer

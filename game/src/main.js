@@ -74,6 +74,7 @@ class Game {
         if (byPlayer) { const sk = this.stats.speciesKills || (this.stats.speciesKills = {}); sk[c.species] = (sk[c.species] || 0) + 1; }
         if (byPlayer) { this.player.addXP((10 + c.level * 2) * (c.boss ? 20 : c.alpha ? 4 : 1), this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
         if (attacker && attacker.tamed) this.roster.grantXP(attacker, c);
+        if (c.stolen) { this.give(c.stolen.id, c.stolen.qty, true); this.ui.notify(`Got back your ${ITEMS[c.stolen.id].name} (${c.stolen.qty})`, 'loot'); c.stolen = null; }
         if (c.boss) this.bosses.defeated(c);
         else if (c.alpha && byPlayer) { this.give('trophy', 1); this.stats.alphaKills = (this.stats.alphaKills || 0) + 1; this.ui.banner('ALPHA SLAIN', `${c.def.name} trophy claimed`); this.saves.markDirty(); }
         if (c.tamed) this.ui.notify(`Your ${c.name} was killed!`, 'warn');
@@ -99,6 +100,10 @@ class Game {
       gust: (c, d) => this.bosses.gust(c, d),
       spit: (c, at) => this.spawnSpit(c, at),
       spitVolley: (c) => { const at = this.player.eye; for (let i = -2; i <= 2; i++) this.spawnSpit(c, at.clone().add(new THREE.Vector3(Math.cos(c.yaw) * i * 2.2, 0, -Math.sin(c.yaw) * i * 2.2))); this.ui.notify('The Broodmother sprays venom!', 'warn'); },
+      steal: (c) => this.stealFrom(c),
+      revive: (c) => this.bosses.revive(c),
+      shadow: (c, d) => this.bosses.shadow(c, d),
+      roots: (c) => this.bosses.eruption(c, 'roots'),
       submerge: (c) => { this.ui.notify(`${c.name} sinks beneath the mire…`, 'warn'); this.audio.splash(); },
       whirlpool: (c) => this.bosses.whirlpool(c),
       shriek: (c) => this.bosses.shriek(c),
@@ -177,6 +182,8 @@ class Game {
       { title: 'Gather 6 Boss Sigils and summon the Ancient Titan at Crescent Lake', progress: () => `🔯 ${this.inv.count('sigil')}/6 sigils — every boss drops one`, done: () => (this.stats.bossesDefeated || {}).titan >= 1 },
       { title: 'Slay Stormwing, the Tempest, at the Storm Spire on the north-eastern heights', progress: () => 'Offer 20 Hide + 2 Alpha Trophies. It flies: bring a bow or a flyer, and dodge the lightning rings', done: () => (this.stats.bossesDefeated || {}).stormwing >= 1 },
       { title: 'Slay the Broodmother at the venom totem in the western woods', progress: () => 'Offer 15 Raw Meat + 1 Alpha Trophy. Keep moving: her venom volleys slow you', done: () => (this.stats.bossesDefeated || {}).broodmother >= 1 },
+      { title: 'Slay Gravefang, the Undying, at the bone cairn on the central plains — at night', progress: () => 'Offer 10 Raw Meat + 10 Hide + 1 Alpha Trophy after dark. It rises once after falling', done: () => (this.stats.bossesDefeated || {}).gravefang >= 1 },
+      { title: 'Slay the Rootwarden in the depths of Rootway Hollow', progress: () => 'Offer 60 Wood + 10 Marsh Herbs. Keep moving when the roots writhe', done: () => (this.stats.bossesDefeated || {}).rootwarden >= 1 },
     ];
     this.questIdx = 0;
 
@@ -296,6 +303,7 @@ class Game {
       p.food = Math.min(100, p.food + def.food);
       if (def.water) p.water = Math.min(100, p.water + def.water);
       if (def.heal) p.hp = Math.min(p.maxHp, p.hp + def.heal);
+      if (def.heal >= 40 && p.bleedT > 0) { p.bleedT = 0; this.ui.notify('The bleeding stops'); }
       if (def.sick) { p.hp -= def.sick * 0.3; }
       this.inv.remove(s.id, 1);
       this.audio.eat();
@@ -651,6 +659,7 @@ class Game {
       const torpor = def ? (def.torpor || 0) : 4;
       this.creatures.damage(cr, dmg * (0.9 + Math.random() * 0.2), torpor, 'player');
       if (def && def.poison && cr.alive) { cr.poisonT = 5; cr.poisonDps = def.poison; }
+      if (cr.def.thorns && !p.mount) { this.hurtPlayer(Math.max(2, dmg * cr.def.thorns), cr); this.ui.notify('Its quills stab you back!', 'warn'); }
       this.audio.flesh();
       this.hitMarker();
       this.damageNumber(cr.center, Math.round(dmg));
@@ -825,6 +834,21 @@ class Game {
     }
   }
 
+  // Eggthief: snatch a random non-tool stack and run; killing it returns the loot.
+  stealFrom(c) {
+    if (c.stolen) return;
+    const idx = this.inv.slots.map((s, i) => (s && !ITEMS[s.id].tool && !ITEMS[s.id].armor ? i : -1)).filter((i) => i >= 0);
+    if (!idx.length) return;
+    const i = idx[Math.floor(Math.random() * idx.length)];
+    const s = this.inv.slots[i];
+    const qty = Math.max(1, Math.ceil(s.qty / 2));
+    c.stolen = { id: s.id, qty };
+    this.inv.remove(s.id, qty);
+    this.ui.notify(`An Eggthief snatched ${qty} ${ITEMS[s.id].name}! Catch it!`, 'warn');
+    this.audio.tone({ f0: 1200, f1: 1800, dur: 0.15, vol: 0.2, type: 'square' });
+    this.saves.markDirty();
+  }
+
   hitMarker() {
     const h = document.getElementById('crosshair');
     h.classList.remove('hit'); void h.offsetWidth; h.classList.add('hit');
@@ -861,6 +885,7 @@ class Game {
     p.damage(dmg);
     this.audio.hurt();
     this.shake = Math.max(this.shake || 0, 0.25);
+    if (c && c.def && c.def.bleed && p.alive) { if (!(p.bleedT > 0)) this.ui.notify('You are bleeding! A Healing Salve stops it.', 'warn'); p.bleedT = 6; }
     // knockback
     const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize().multiplyScalar(4);
     p.vel.add(away); p.vel.y += 2;
@@ -939,7 +964,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1235,6 +1260,7 @@ class Game {
     || tip('swamp', () => (this.biome?.swamp || 0) > 0.5, 'Murkmire Swamp: thick fog and murky pools. Bogmaws lurk in the water. Pick Marsh Herbs for Healing Salves.')
     || tip('frost', () => (this.biome?.frost || 0) > 0.5, 'Frostpeak: bitter cold up here. Fur Armor from Frosthorn pelts keeps you alive.')
     || tip('night2', () => this.env.daylight < 0.3 && this.creatures.list.some((c) => c.species === 'nightstalker' && c.alive && c.pos.distanceTo(p.pos) < 70), 'Something is hunting in the dark. Nightstalkers sleep by day and hunt at night.')
+    || tip('thief', () => this.creatures.list.some((c) => c.species === 'eggthief' && c.alive && c.pos.distanceTo(p.pos) < 25), 'Eggthieves snatch items from your bag and run. Catch one to get your things back.')
     || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
   }
 

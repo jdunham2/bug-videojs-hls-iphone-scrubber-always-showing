@@ -154,6 +154,26 @@ export const SPECIES = {
     tameFood: 'meat', tameBase: 10, tameLvl: 0.25, rideable: true, radius: 1.8, reach: 3, hitR: 2.4, swimmer: true,
     drops: { meat: 8, hide: 5 }, aggro: 0, lvl: [1, 30], count: 5, zone: (h) => h < -3 && h > -14,
   },
+  quillback: {
+    name: 'Quillback', diet: 'herb', temper: 'neutral', hp: 480, dmg: 26, walk: 2, run: 6, torpor: 340, thorns: 0.25,
+    tameFood: 'berries', tameBase: 12, tameLvl: 0.3, rideable: true, radius: 1.8, reach: 4, hitR: 2.4,
+    drops: { meat: 6, hide: 5 }, aggro: 0, lvl: [1, 30], count: 6, herd: 2, zone: (h) => h > 5 && h < 26,
+  },
+  eggthief: {
+    name: 'Eggthief', diet: 'herb', temper: 'thief', hp: 70, dmg: 0, walk: 3, run: 12.5, torpor: 50, thief: true,
+    tameFood: 'berries', tameBase: 4, tameLvl: 0.1, rideable: false, radius: 0.5, reach: 1.4, hitR: 0.8,
+    drops: { meat: 1, hide: 1 }, aggro: 16, lvl: [1, 20], count: 8, herd: 2, zone: (h) => h > 3 && h < 25, far: 60,
+  },
+  bloodclaw: {
+    name: 'Bloodclaw', diet: 'carn', temper: 'aggressive', hp: 320, dmg: 14, walk: 3, run: 12, torpor: 220, bleed: true,
+    tameFood: 'meat', tameBase: 9, tameLvl: 0.22, rideable: true, radius: 1.1, reach: 2.8, hitR: 1.7,
+    drops: { meat: 4, hide: 4 }, aggro: 28, lvl: [8, 35], count: 6, herd: 2, zone: (h) => h > 8 && h < 32, far: 140,
+  },
+  skyreach: {
+    name: 'Skyreach', diet: 'herb', temper: 'neutral', hp: 3200, dmg: 55, walk: 2.4, run: 4.5, torpor: 2200,
+    tameFood: 'berries', tameBase: 30, tameLvl: 0.6, rideable: true, radius: 4.2, reach: 7, hitR: 5.5, wade: true,
+    drops: { meat: 16, hide: 12 }, aggro: 0, lvl: [10, 40], count: 3, zone: (h) => h > 3 && h < 18, far: 100,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -168,6 +188,7 @@ const PREY = {
   bogmaw: ['reedhorn', 'pudgewing', 'dashbeak'],
   rimeclaw: ['frosthorn', 'pudgewing'],
   hornjaw: ['pudgewing', 'crestcaller', 'reedhorn', 'dashbeak', 'dashstrider'],
+  bloodclaw: ['dashstrider', 'pudgewing', 'eggthief', 'crestcaller'],
   nightstalker: ['dashstrider', 'crestcaller', 'trikeros', 'plateback', 'reedhorn'],
   frillspitter: ['pudgewing', 'dashbeak'],
   dashbeak: ['pudgewing'],
@@ -495,14 +516,16 @@ function buildReedhorn(mat, col) {
   return { root, body, legs, neck, head, tail, hipH: 1.9, lie: 1.1, quad: true };
 }
 
-function buildPlateback(mat, col) {
+function buildPlateback(mat, col, quills = false) {
   const { base, belly, accent, horn } = col;
   const root = new THREE.Group();
   const body = new THREE.Group(); body.position.y = 1.9; root.add(body);
   const plates = [];
   for (let i = 0; i < 9; i++) {
     const t = i / 8, h = 0.5 + Math.sin(t * Math.PI) * 0.6;
-    for (const x of [-1, 1]) plates.push(E(0.06, h, 0.32, i % 2 ? accent : horn, x * 0.14, 1.0 + h * 0.6 - 0.25 + Math.sin(t * Math.PI) * 0.25, 1.6 - t * 3.4 + (x > 0 ? 0.18 : 0), 0, 0, x * 0.12));
+    for (const x of [-1, 1]) plates.push(quills
+      ? K(0.07, 0.9 + h * 0.6, i % 2 ? accent : horn, x * (0.5 + h * 0.3), 0.9 + h * 0.2, 1.6 - t * 3.4, -0.35, 0, -x * 0.7)
+      : E(0.06, h, 0.32, i % 2 ? accent : horn, x * 0.14, 1.0 + h * 0.6 - 0.25 + Math.sin(t * Math.PI) * 0.25, 1.6 - t * 3.4 + (x > 0 ? 0.18 : 0), 0, 0, x * 0.12));
   }
   body.add(meshOf([E(1.1, 1.15, 2.2, base, 0, 0.1, 0), E(0.95, 0.7, 1.9, belly, 0, -0.5, 0.1), ...plates], mat));
   const legs = [];
@@ -639,6 +662,10 @@ const PALETTES = {
   frillspitter: [{ base: 0x4a7a4a, belly: 0xc8d0a0, accent: 0xe8c02a, horn: 0x2a2620 }, { base: 0x5a6a3a, belly: 0xd0c8a0, accent: 0xd8402a, horn: 0x2a2620 }],
   nightstalker: [{ base: 0x1c1e24, belly: 0x3a3c44, accent: 0x5a2a6a, horn: 0x0e0e10 }, { base: 0x22201c, belly: 0x44403a, accent: 0x2a5a3a, horn: 0x0e0e10 }],
   longfin: [{ base: 0x3a5a6a, belly: 0xc8d4d8, accent: 0x2a3a4a }, { base: 0x4a6a5a, belly: 0xd0d8c8, accent: 0x6a4a2a }],
+  quillback: [{ base: 0x7a6a4a, belly: 0xc8b890, accent: 0x2a2a20, horn: 0xe8dcc0 }, { base: 0x5a6a5a, belly: 0xb8c0b0, accent: 0x8a3a2a, horn: 0xe8dcc0 }],
+  eggthief: [{ base: 0x5a6aa8, belly: 0xe0d8c8, accent: 0xe8a02a, horn: 0x3a3226 }, { base: 0x8a5a8a, belly: 0xe8d8e0, accent: 0x3ac8a8, horn: 0x3a3226 }],
+  bloodclaw: [{ base: 0x6a1e1a, belly: 0xc8a890, accent: 0x1e0e0c, horn: 0x161210 }, { base: 0x4a3a30, belly: 0xc0a888, accent: 0x8a1a14, horn: 0x161210 }],
+  skyreach: [{ base: 0x8a8070, belly: 0xc8bea8, accent: 0x6a5040 }, { base: 0x6a7a80, belly: 0xb8c4c8, accent: 0x3a5a6a }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -650,6 +677,10 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'quillback': return buildPlateback(mat, col, true);
+    case 'eggthief': return buildBiped(mat, col, 0.72, { hip: 1.2, bodyLen: 0.85, girth: 0.8, arm: 1.3, headLen: 0.4, headW: 0.8, tailSeg: 0.55, stripes: 2, beak: true, crest: true, neckW: 0.8 });
+    case 'bloodclaw': return buildBiped(mat, col, 1.45, { hip: 1.2, bodyLen: 1.0, girth: 0.9, arm: 1.3, headLen: 0.55, headW: 0.85, tailSeg: 0.65, stripes: 5, crest: true, claws: true, neckW: 0.95 });
+    case 'skyreach': { const m = buildSauropod(mat, col); m.neck.rotation.x = 0.35; return m; }
     case 'dashstrider': return buildBiped(mat, col, 1.15, { hip: 1.65, bodyLen: 0.85, girth: 0.7, arm: 1.1, headLen: 0.35, headW: 0.7, tailSeg: 0.6, stripes: 2, beak: true, neckW: 0.7 });
     case 'frillspitter': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.9, girth: 0.8, arm: 1.0, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, frill: true, neckW: 0.85 });
     case 'nightstalker': return buildBiped(mat, col, 2.0, { hip: 1.45, bodyLen: 1.15, girth: 1.15, arm: 0.7, headLen: 0.7, headW: 1.15, tailSeg: 0.7, stripes: 3, horns: true, neckW: 1.2 });
@@ -800,6 +831,7 @@ export class CreatureManager {
     c.maxTorpor = Infinity;
     c.scale = cfg.scale; c.obj.scale.setScalar(c.scale);
     c.cfg = cfg;
+    if (cfg.tint) c.mat.color.set(cfg.tint);
     c.cd = {}; for (const a of cfg.abilities) c.cd[a] = 5 + Math.random() * 3;
     c.phasesLeft = [...(cfg.phases || [0.5])];
     c.home = pos.clone();
@@ -822,6 +854,8 @@ export class CreatureManager {
       if (a === 'eruption') { c.cd[a] = 8 + Math.random() * 3; c.roarT = 0.8; this.hooks.eruption?.(c); }
       if (a === 'whirlpool') { c.cd[a] = 13; this.hooks.whirlpool?.(c); }
       if (a === 'shriek') { c.cd[a] = 15; c.roarT = 1.2; this.hooks.shriek?.(c); }
+      if (a === 'shadow' && d < 22) { c.cd[a] = 10; c.roarT = 1; this.hooks.shadow?.(c, d); }
+      if (a === 'roots') { c.cd[a] = 7.5; this.hooks.roots?.(c); }
       if (a === 'lightning') { c.cd[a] = 6 + Math.random() * 2; this.hooks.lightning?.(c); }
       if (a === 'gust' && d < 35) { c.cd[a] = 11; this.hooks.gust?.(c, d); }
       if (a === 'spitvolley' && d < 30) { c.cd[a] = 6.5; c.attackAnim = 1; this.hooks.spitVolley?.(c); }
@@ -955,6 +989,7 @@ export class CreatureManager {
     c.hp -= amount * (1 - (c.def.armor || 0));
     c.hitFlash = 0.18;
     if (torpor && c.def.torpor !== Infinity) c.torpor += torpor;
+    if (c.hp <= 0 && c.boss && c.cfg?.revive && !c.revived) { c.revived = true; c.hp = c.maxHp * 0.5; this.hooks.revive?.(c); return; }
     if (c.hp <= 0) { this.kill(c, attacker); return; }
     if (c.state !== 'ko' && c.torpor >= c.maxTorpor) { this.knockOut(c); return; }
     if (c.state === 'ko' || c.riddenBy) return;
@@ -964,7 +999,7 @@ export class CreatureManager {
       return;
     }
     const t = c.def.temper;
-    if (t === 'skittish' || c.species === 'pudgewing') { c.state = 'flee'; c.threat = attacker; c.timer = 6; }
+    if (t === 'skittish' || c.species === 'pudgewing' || c.def.thief) { c.state = 'flee'; c.threat = attacker; c.timer = 6; }
     else { c.state = 'chase'; c.target = attacker; c.timer = 25; this.hooks.roar?.(c); }
     // herd-mates join in
     for (const o of this.list) {
@@ -1091,7 +1126,7 @@ export class CreatureManager {
       c.poisonT -= dt;
       c.hp -= c.poisonDps * dt;
       c.mat.emissive.setRGB(0.05, 0.35 + Math.sin(performance.now() / 120) * 0.15, 0.02);
-      if (c.hp <= 0) this.kill(c, 'player');
+      if (c.hp <= 0) { if (c.boss && c.cfg?.revive && !c.revived) { c.revived = true; c.hp = c.maxHp * 0.5; this.hooks.revive?.(c); } else this.kill(c, 'player'); }
     }
     c.attackCd -= dt; c.attackAnim = Math.max(0, c.attackAnim - dt * 3);
     c.timer -= dt; c.scanCd -= dt;
@@ -1188,7 +1223,7 @@ export class CreatureManager {
       // wander / graze
       const asleep = d.nocturnal && (this.daylight ?? 0) > 0.45;
       if (asleep) { goal.copy(c.pos); c.timer = Math.max(c.timer, 1); c.lieT = Math.min(0.45, c.lieT + dt * 2); }
-      if ((d.temper === 'aggressive' || c.alpha) && c.scanCd <= 0 && !far && !asleep) {
+      if ((d.temper === 'aggressive' || d.thief || c.alpha) && c.scanCd <= 0 && !far && !asleep && !(d.thief && c.stolen)) {
         c.scanCd = 0.5;
         const t = this.findTarget(c, player);
         if (t) { c.state = 'chase'; c.target = t; c.timer = 25; this.hooks.roar?.(c); }
@@ -1401,6 +1436,11 @@ export class CreatureManager {
       c.attackCd = 2.4; c.attackAnim = 1;
       c.yaw = Math.atan2(tp.x - c.pos.x, tp.z - c.pos.z);
       this.hooks.spit?.(c, tp.clone().add(new THREE.Vector3(0, c.target === 'player' ? 1.2 : c.target.model.hipH * c.target.scale, 0)));
+      return spd;
+    }
+    if (d.thief && dist < reach && c.target === 'player') {
+      this.hooks.steal?.(c);
+      c.state = 'flee'; c.threat = 'player'; c.timer = 14; c.target = null;
       return spd;
     }
     if (dist < reach && c.attackCd <= 0) {
