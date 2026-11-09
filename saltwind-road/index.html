@@ -295,7 +295,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
       <div class="controls">
         <b>WASD / Arrows</b><span>Walk (drag anywhere on touch screens)</span>
         <b>E / Space</b><span>Talk, read notice boards, gather, fish</span>
-        <b>F / Click</b><span>Attack (hold to charge a spin) · <b>G</b> throw a bomb</span>
+        <b>F / Click</b><span>Attack (hold: spin, or power shot with a bow) · <b>G</b> throw a bomb</span>
         <b>Shift</b><span>Dodge roll: nothing can hurt you mid-roll</span>
         <b>V</b><span>Mount or dismount, once you own a mount</span>
         <b>Animals</b><span>Carry an animal's favorite food to tame it (E), or hunt it (F)</span>
@@ -2958,8 +2958,19 @@ function attack(dirX, dirY) {
   }
 }
 let chargeT = null, spinCd = 0, mouseHeld = false;
+function powerShot() {
+  const w = weapon(); if (spinCd > 0) return;
+  if (!w.noAmmo && w.ammo !== 'stone') { const ammo = have('crystal_arrows') ? 'crystal_arrows' : have('venom_arrows') ? 'venom_arrows' : have('arrows') ? 'arrows' : null; if (!ammo) { floatText(S.x, S.y - 1, 'No arrows', '#e57a62'); return; } addItem(ammo, -1); renderHUD(); }
+  if (w.ammo === 'stone') { if (!have('stone')) return; addItem('stone', -1); }
+  spinCd = 1.4; player.atkCd = .4;
+  const t = nearestEnemy(10); let dx = player.dir.x, dy = player.dir.y; if (t) { dx = t.x - S.x; dy = t.y - .3*(t.size || 1) - (S.y - .4); }
+  const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+  arrows.push({x: S.x, y: S.y - .5, vx: dx*17, vy: dy*17, life: .8, max: .8, dmg: w.dmg*2.5, col: '#fff4b0', pierce: true, hit: new Set(), power: true});
+  SFX.arrow(); setTimeout(() => SFX.arrow(), 60); shake = Math.max(shake, .12); burst(S.x + dx*.6, S.y - .5 + dy*.6, '#fff4b0', 8, 3);
+  S.powerShots = (S.powerShots || 0) + 1;
+}
 function spinAttack() {
-  const w = weapon(); if (w.ranged || spinCd > 0) return;
+  const w = weapon(); if (w.ranged) { powerShot(); return; } if (spinCd > 0) return;
   spinCd = 1.6; player.atkCd = .35;
   const reach = (w.reach || 1.2) + .7;
   player.swing = {t: .32, ang: 0, reach, arc: 'spin'}; SFX.swing(); setTimeout(() => SFX.swing(), 90);
@@ -2993,7 +3004,8 @@ function hitEnemy(e, dmg, kx, ky, src) {
   let crit = false;
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
-    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
+    else if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3061,7 +3073,7 @@ function killEnemy(e) {
   renderHUD();
 }
 function hurtPlayer(dmg, from, ignoreInv) {
-  if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; S.dodges = (S.dodges || 0) + 1; SFX.dodge(); floatText(S.x, S.y - 1.2, 'Dodged!', '#bfe8ff'); } return; }
+  if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; S.dodges = (S.dodges || 0) + 1; SFX.dodge(); floatText(S.x, S.y - 1.2, 'Dodged! Counter ready', '#bfe8ff'); player.counter = 2; } return; }
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
   const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * 2) / 2);
@@ -3370,7 +3382,7 @@ function updateCombat(dt, night) {
   player.atkCd = Math.max(0, player.atkCd - dt);
   player.inv = Math.max(0, player.inv - dt);
   if (player.swing) { player.swing.t -= dt; if (player.swing.t <= 0) player.swing = null; }
-  spinCd = Math.max(0, spinCd - dt); if (chargeT != null) { chargeT += dt; if (!keys.has('f') && !mouseHeld) chargeT = null; }
+  spinCd = Math.max(0, spinCd - dt); if (player.counter > 0) player.counter -= dt; if (chargeT != null) { chargeT += dt; if (!keys.has('f') && !mouseHeld) chargeT = null; }
   player.sinceHit += dt;
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
@@ -4061,7 +4073,7 @@ function render() {
     else { ctx.strokeStyle = '#f0f6ff'; ctx.lineWidth = 3; ctx.beginPath(); let px = x, py = y - 260; ctx.moveTo(px, py); while (py < y) { py += 22; px = x + (Math.random() - .5)*18*(1 - (py - y + 260)/260 + .2); ctx.lineTo(py >= y ? x : px, Math.min(py, y)); } ctx.stroke(); } }});
   for (const gl of (WX.glass || [])) if (inView(gl.x, gl.y)) sprites.push({y: gl.y, f: () => { const x = gl.x*TS, y = gl.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x - 5, y - 1, 10, 3); ctx.fillStyle = '#bfe8ff'; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.lineTo(x - 1, y - 8); ctx.lineTo(x + 1, y - 3); ctx.lineTo(x + 4, y - 9); ctx.lineTo(x + 3, y); ctx.fill(); if (Math.random() < .05) burst(gl.x, gl.y - .4, '#e8f6ff', 1, 1); }});
   if (WX.pot && WX.rainbow > 0 && inView(WX.pot.x, WX.pot.y)) sprites.push({y: WX.pot.y, f: () => { const x = WX.pot.x*TS, y = WX.pot.y*TS; ['#ff4a4a','#ffe04a','#5ad05a','#4a9aff'].forEach((c, i) => { ctx.fillStyle = c; ctx.globalAlpha = .35; ctx.fillRect(x - 6 + i*3, y - 60, 3, 56); }); ctx.globalAlpha = 1; ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.ellipse(x, y - 3, 6, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.ellipse(x, y - 7, 5, 2.5, 0, 0, 7); ctx.fill(); if (Math.random() < .1) burst(WX.pot.x, WX.pot.y - .5, '#f0c040', 1, 1); }});
-  if (chargeT != null && chargeT > .15 && !weapon().ranged) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
+  if (chargeT != null && chargeT > .15) sprites.push({y: S.y + .01, f: () => { const u = Math.min(1, (chargeT - .15)/.4), full = u >= 1; ctx.strokeStyle = full ? '#ffe9a8' : 'rgba(255,233,168,.6)'; ctx.lineWidth = full ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(S.x*TS, S.y*TS - 6, 14 + (full ? Math.sin(frameT*20) : 0), -Math.PI/2, -Math.PI/2 + u*6.283); ctx.stroke(); }});
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
@@ -6958,6 +6970,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['counter','Riposte','Land 10 counter-strikes after perfect dodges', () => (S.counters || 0) >= 10],
+  ['sharpshooter','Sharpshooter','Fire 25 power shots (hold attack with a bow)', () => (S.powerShots || 0) >= 25],
   ['runereader','Rune Reader','Awaken a rune shrine', () => Object.keys(S.shrines || {}).length >= 1],
   ['runemaster','Rune Master','Awaken all six rune shrines', () => SHRINES.every(sh => (S.shrines || {})[sh.id])],
   ['nightowl','Night Owl','Buy something from Madame Noctis', () => !!S.noctisBought],
@@ -7183,8 +7197,8 @@ function renderPause() {
     </div>
     <h3>Controls</h3>
     <div class="controls" style="margin:0">
-      <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack · hold to charge a spin</span>
-      <b>Shift</b><span>Dodge roll</span><b>G / Right-click</b><span>Throw a bomb</span><b>V</b><span>Mount or dismount</span>
+      <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack · hold: spin / power shot</span>
+      <b>Shift</b><span>Dodge roll · dodging an attack readies a counter-strike</span><b>G / Right-click</b><span>Throw a bomb</span><b>V</b><span>Mount or dismount</span>
       <b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
     </div>
     <p class="vals" style="margin-top:14px">Your progress saves automatically in this browser.</p>`;
