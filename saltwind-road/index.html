@@ -3359,6 +3359,39 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== messages in bottles =====
+let bottles = [], bottleT = 20;
+const BOTTLE_NOTES = ['“To whoever finds this: the fish in Reedmire are LYING to you.”', '“Day 40 on this island. The coconuts have started talking back.”', '“If found, please return to Granny Plum. It is her secret pie recipe. DO NOT READ.” (You read it. It is mostly butter.)', '“I hid my lunch under the third rock from the lighthouse. It is probably not good anymore.”', '“Roses are red, the sea is quite wet, I threw this in the water, and I’ll regret it yet.”', '“Help! I am trapped in a bottle factory!”'];
+const ELSBETH = ['“Captain Elsbeth’s log, part one: The Gull went down off the Strand. I alone reached the rocks. I have hidden what I saved.”', '“Part two: I counted the stars from the Nine Stones each night. Nine, always nine. A good number for a secret.”', '“Part three: The Teeth guard the north. My treasure is not there. Be patient, reader.”', '“Part four: My hands are tired. I have sealed the last of my fortune in a bottle of its own. Find it.”', '“Part five: You found me. Take my treasure, friend, and sail well.”'];
+function updateBottles(dt) {
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y));
+  bottles = bottles.filter(b => Math.hypot(b.x - S.x, b.y - S.y) < 26);
+  if ((t !== T.DEEP && t !== T.SHAL) || !S.flags.raft || balloonF) return;
+  for (const b of bottles) { b.x += Math.sin(frameT*.3 + b.ph)*dt*.15; b.y += Math.cos(frameT*.25 + b.ph)*dt*.1; }
+  bottleT -= dt*(S.flags.lighthouse ? 1.6 : 1); if (bottleT > 0 || bottles.length >= 2) return; bottleT = 25 + Math.random()*20;
+  for (let k = 0; k < 15; k++) { const a = Math.random()*6.283, r = 6 + Math.random()*5, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r; if (!inB(Math.floor(x), Math.floor(y)) || y >= WORLD_H) continue; const tt = map[idx(Math.floor(x), Math.floor(y))]; if (tt !== T.DEEP && tt !== T.SHAL) continue; bottles.push({x, y, ph: Math.random()*6}); return; }
+}
+function bottleTarget() {
+  const b = bottles.find(b => Math.hypot(S.x - b.x, S.y - b.y) < 1.3); if (!b) return null;
+  return {key: 'bottle', html: '<kbd style="margin:0 6px 0 0">E</kbd>Fish out the bottle', btn: 'Grab', fn: () => {
+    bottles = bottles.filter(q => q !== b); S.bottles = (S.bottles || 0) + 1; SFX.pickup(); burst(b.x, b.y, '#bfe8ff', 10, 3);
+    const n = S.elsbeth || 0, r = Math.random(); let msg;
+    if (n < 5 && (r < .3 || (S.bottles >= 4 && n === 0))) { S.elsbeth = n + 1; msg = ELSBETH[n]; if (n === 4) { const c = 600; S.coins += c; addItem('black_pearl_ring', 1); addItem('pearl', 3); msg += `<br><span style="color:var(--good)">Inside, wrapped in oilcloth: ${c} coin, a Black Pearl Ring and 3 Pearls!</span>`; SFX.victory(); } else msg += `<br><span style="color:var(--muted)">(Captain Elsbeth's letters: ${n + 1}/5)</span>`; }
+    else if (r < .5) { addItem('treasure_map', 1); msg = 'A rolled-up <b>Treasure Map</b>, still dry!'; }
+    else if (r < .7) { const c = rint(25, 90); S.coins += c; msg = `A few soggy coins rattle out. <span style="color:var(--good)">+${c} coin</span>`; }
+    else if (r < .8) { addItem('pearl', 1); msg = 'A single <b>Pearl</b> rolls into your palm.'; }
+    else msg = pick(BOTTLE_NOTES);
+    renderHUD(); save(); toast(`<b>A message in a bottle</b><br>${msg}`, 8000);
+  }};
+}
+function drawBottle(b) {
+  const px = b.x*TS, py = b.y*TS + Math.sin(frameT*2 + b.ph)*1.2;
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(px - 5, py + 2, 10, 1);
+  ctx.save(); ctx.translate(px, py); ctx.rotate(.5 + Math.sin(frameT + b.ph)*.15);
+  ctx.fillStyle = 'rgba(140,220,180,.85)'; ctx.fillRect(-4, -2, 7, 4); ctx.fillRect(3, -1, 2, 2); ctx.fillStyle = '#8a5a2a'; ctx.fillRect(5, -1, 1, 2);
+  ctx.fillStyle = '#f0e8d0'; ctx.fillRect(-3, -1, 4, 2); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-3, -2, 5, 1);
+  ctx.restore();
+}
 // ===== sea serpents =====
 let serpT = 30;
 function serpentCheck(dt) {
@@ -3433,6 +3466,7 @@ function gazette() {
   if (S.mayor && Object.keys(S.mayor).length) H.push(`<b>Politics:</b> Mayor ${esc(S.name || 'the trader')} of ${Object.keys(S.mayor).map(k => TOWNS[k].name).join(' and ')} promises "more festivals."`);
   if (S.partner && NPC_BY[S.partner] && S.day - (S.partnerDay || 0) < 4) H.push(`<b>Romance:</b> ${esc(S.name || 'the trader')} and ${NPC_BY[S.partner].name} seen strolling hand in hand.`);
   const w = weatherNow(); if (w !== 'clear') H.push(`<b>Weather:</b> ${({rain: 'rain showers across the land', storm: 'thunderstorms rolling in', snow: 'snowfall in the north', fog: 'thick fog; travel with care', sandstorm: 'sandstorms in the desert', ash: 'ashfall near the volcano'})[w] || w}.`);
+  { const bd = NPCS.filter(n => isBirthday(n) && S.towns[n.town] && TOWNS[n.town]).slice(0, 3); if (bd.length) H.push(`<b>🎂 Birthdays:</b> ${bd.map(n => `${esc(n.name)} of ${TOWNS[n.town].name}`).join(', ')}. A gift today means three times as much!`); }
   H.push(`<i>${GAZ_FLUFF[(S.day*7) % GAZ_FLUFF.length]}</i>`);
   return H;
 }
@@ -3579,7 +3613,7 @@ const LIGHT_STAGES = [
 ];
 function lighthouseTalk(n) {
   const st = S.lighthouse || 0;
-  if (st >= 3) { say(`“Look at her shine! Ships are coming home safe again, all thanks to you.”<br><span style="color:var(--good)">The lit lighthouse makes your boat 15% faster at sea and floating crates more common.</span>`, [back(n)]); return; }
+  if (st >= 3) { say(`“Look at her shine! Ships are coming home safe again, all thanks to you.”<br><span style="color:var(--good)">The lit lighthouse makes your boat 15% faster at sea, and bottles drift by more often.</span>`, [back(n)]); return; }
   const L = LIGHT_STAGES[st], ok = upCanPay(L.cost);
   say(`“The Tidewatch light has been dark for twenty years. Help me bring her back, would you?”<br><br><b>Step ${st + 1} of 3: ${L.name}</b><div class="req" style="margin-top:8px">${upCostHTML(L.cost)}</div>`, [
     {label: L.name, primary: ok, disabled: !ok, fn: () => {
@@ -3866,6 +3900,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Bottles & birthdays', 'Bottles drift on open water while you sail: fish them out for notes, maps, coins and the lost letters of Captain Elsbeth. Every townsperson has a birthday (the Gazette lists them), and a gift that day counts triple.'],
   ['Tents & sea serpents', 'Craft a Tent (4 Hide, 6 Sticks, 2 Rope) to sleep anywhere at night and set a respawn point in the wild. Out on deep water, Sea Serpents may surface: hit them while they are above the waves. Their scales make a fine cloak.'],
   ['Merchants\u2019 Guild', 'Every trade adds to your guild ledger. Odile in Port Wren tracks your rank, from Peddler up to Trade Magnate. Each rank gives you 2% better prices.'],
   ['Stargazing', 'Craft a Telescope at a workbench (3 Glass, 2 Bronze, 2 Planks) and place it with B. Each night you can chart one constellation for a small permanent bonus. Chart all seven to find the Crown.'],
@@ -4121,7 +4156,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -4847,6 +4882,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
@@ -5235,7 +5271,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -5576,11 +5612,13 @@ function mainOptions(n) {
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   if (S.partner === n.id) o.push({label: S.lovedDay === S.day ? 'Spend time together (done today)' : 'Spend time together ♥', primary: S.lovedDay !== S.day, fn: () => partnerTalk(n)});
   else if (!S.partner && S.gifts && S.gifts[n.id] && S.gifts[n.id].keepsake && !n.festival) o.push({label: have('promise_ring') ? 'Propose (Promise Ring) ♥' : 'Propose... (need a Promise Ring)', disabled: !have('promise_ring'), primary: !!have('promise_ring'), fn: () => proposeTalk(n)});
-  if (!n.festival) o.push({label: (S.gifts && S.gifts[n.id] && S.gifts[n.id].day === S.day) ? 'Give a gift (given today)' : 'Give a gift', fn: () => giftTalk(n)});
+  if (!n.festival) o.push({label: (S.gifts && S.gifts[n.id] && S.gifts[n.id].day === S.day) ? 'Give a gift (given today)' : isBirthday(n) ? 'Give a birthday gift 🎂' : 'Give a gift', primary: isBirthday(n) && !(S.gifts && S.gifts[n.id] && S.gifts[n.id].day === S.day), fn: () => giftTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
   return o;
 }
-const hello = n => n.hello[Math.min(tierOf(repOf(n.town)), 2)];
+const hello = n => (isBirthday(n) ? '<b>🎂 “It’s my birthday today!”</b> ' : '') + n.hello[Math.min(tierOf(repOf(n.town)), 2)];
+const bdayOf = n => { let h = 0; for (const c of n.id) h = (h*31 + c.charCodeAt(0)) >>> 0; return h % 28 + 1; };
+const isBirthday = n => !!n && !n.wander && !n.festival && ((S.day - 1) % 28) + 1 === bdayOf(n);
 const back = n => ({label:'Back', fn: () => say(hello(n), mainOptions(n))});
 function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); }
 
@@ -5658,7 +5696,7 @@ function giftTalk(n) {
   if (!inv.length) { say('You have nothing to give.', [back(n)]); return; }
   say(`What will you give ${esc(n.name)}? <span style="color:var(--muted)">(Friendship: ${'♥'.repeat(Math.min(5, Math.floor(G.pts/3)))}${'♡'.repeat(Math.max(0, 5 - Math.floor(G.pts/3)))})</span>`, [
     ...inv.slice(0, 7).map(g => ({label: `${GOODS[g].name} (×${have(g)})`, fn: () => {
-      const r = giftReaction(n, g), pts = {love: 3, like: 2, ok: 1, meh: 0}[r];
+      const r = giftReaction(n, g), bday = isBirthday(n), pts = {love: 3, like: 2, ok: 1, meh: 0}[r] * (bday ? 3 : 1); if (bday && pts) S.bdayGifts = (S.bdayGifts || 0) + 1;
       addItem(g, -1); G.n++; G.day = S.day; G.pts += pts; S.gifts[n.id] = G; S.giftsGiven = (S.giftsGiven || 0) + 1;
       addRep(n.town, pts*.06); gainXP(5 + pts*5);
       const line = {love: ['Oh! I love it! How did you know?', 'This is wonderful. Thank you, truly.'], like: ['How thoughtful of you!', 'Oh, I can use this. Thank you!'], ok: ['Thank you, that\'s kind.', 'Oh, for me? Thanks.'], meh: ['Um... thanks, I suppose.', 'What... is this for?']}[r];
@@ -5666,7 +5704,7 @@ function giftTalk(n) {
       if (G.pts >= 15 && !G.keepsake) { G.keepsake = true; const k = pick(KEEPSAKES.filter(x => GOODS[x])); addItem(k, 1); S.bestFriends = (S.bestFriends || 0) + 1; extra = `<br><br>“You've been such a good friend. Please, take this.” <b>+1 ${GOODS[k].name}</b>`; SFX.victory(); }
       else SFX.coin();
       renderHUD(); save();
-      say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${extra}`, [back(n)]);
+      say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${bday && pts ? '<br><span style="color:var(--good)">A birthday gift! Friendship ×3.</span>' : ''}${extra}`, [back(n)]);
     }})),
     back(n)]);
 }
@@ -8191,6 +8229,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['bottles','Message Received','Find 10 messages in bottles', () => (S.bottles || 0) >= 10],
+  ['elsbeth','Captain Elsbeth\'s Treasure','Find all five of Captain Elsbeth\'s letters', () => (S.elsbeth || 0) >= 5],
+  ['birthday','Happy Birthday!','Give someone a gift on their birthday', () => (S.bdayGifts || 0) >= 1],
   ['serpent','Serpent Slayer','Defeat a Sea Serpent', () => (S.killsBy.serpent || 0) >= 1],
   ['camper','Happy Camper','Sleep in a tent 3 times', () => (S.tentNights || 0) >= 3],
   ['guildmerchant','Guild Merchant','Reach Merchant rank in the guild', () => guildRank() >= 2],
@@ -8643,7 +8684,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
