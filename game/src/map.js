@@ -151,7 +151,8 @@ export class WorldMap {
       ctx.strokeStyle = '#0a1a2a'; ctx.lineWidth = dpr; ctx.stroke();
       ctx.fillStyle = '#cfe6ff'; ctx.font = `${Math.round(10 * dpr)}px Inter, sans-serif`; ctx.fillText(c.name, x, y - 7 * dpr);
     }
-    if (g.boss && g.boss.alive && seen(g.boss.pos.x, g.boss.pos.z)) { const [x, y] = P(g.boss.pos.x, g.boss.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
+    if (g.altar && seen(g.altar.pos.x, g.altar.pos.z)) { const [x, y] = P(g.altar.pos.x, g.altar.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
+    if (g.boss && g.boss.alive) { const [x, y] = P(g.boss.pos.x, g.boss.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
     this.arrow(ctx, ...P(g.player.pos.x, g.player.pos.z), -g.player.yaw, 9 * dpr);
     document.getElementById('map-info').textContent = `Explored ${Math.round(this.explored() * 100)}% of the island`;
   }

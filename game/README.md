@@ -28,6 +28,12 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Map (M, or 🗺️ on touch):** a shaded map of the island with fog of war that lifts as you
   explore, plus place names and markers for you, your tames, buildings and your bed. A
   corner minimap (desktop) shows nearby creatures, with hostile ones in red.
+- **Alphas:** rare, oversized creatures that glow red. They hit much harder, cannot be
+  tamed, drop triple loot and an Alpha Trophy. Seven roam the island at the start.
+- **Boss — the Primal Tyrant:** offer 3 Alpha Trophies at the Caldera Altar near the
+  Northern Peak (red crystal in a ring of standing stones) to summon it. It stomps the
+  ground, calls a raptor pack at half health, and drops a Tyrant Fang that forges into the
+  Primal Blade.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
   refills your water.

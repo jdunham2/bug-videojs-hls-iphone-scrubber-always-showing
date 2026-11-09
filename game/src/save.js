@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    bossActive: !!(g.boss && g.boss.alive) || undefined,
     fog: g.map ? g.map.serializeFog() : undefined,
     buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
@@ -152,6 +153,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.bossActive) g.inv.add('trophy', 3); // the fight resets on reload; refund the offering
   if (d.fog && g.map) g.map.loadFog(d.fog);
 
   for (const b of d.buildings || []) {

@@ -60,14 +60,29 @@ class Game {
       hitPlayer: (dmg, c) => this.hurtPlayer(dmg, c),
       dismount: () => this.dismount(),
       died: (c, attacker) => {
-        if (attacker === 'player' || attacker === this.player.mount) { this.player.addXP(10 + c.level * 2, this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
+        const byPlayer = attacker === 'player' || attacker === this.player.mount || (attacker && attacker.tamed);
+        if (byPlayer) { this.player.addXP((10 + c.level * 2) * (c.boss ? 20 : c.alpha ? 4 : 1), this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
+        if (c.boss) this.bossDefeated(c);
+        else if (c.alpha && byPlayer) { this.give('trophy', 1); this.stats.alphaKills = (this.stats.alphaKills || 0) + 1; this.ui.banner('ALPHA SLAIN', `${c.def.name} trophy claimed`); this.saves.markDirty(); }
         if (c.tamed) this.ui.notify(`Your ${c.name} was killed!`, 'warn');
       },
       ko: () => this.audio.tone({ f0: 160, f1: 60, dur: 0.6, vol: 0.3 }),
+      stomp: (c, d) => {
+        this.shake = 0.9;
+        this.audio.thunder?.(0.9);
+        if (d < 14 && this.player.alive) {
+          this.hurtPlayer(32 * (1 - d / 18), c);
+          const away = new THREE.Vector3().subVectors(this.player.pos, c.pos).setY(0).normalize().multiplyScalar(14);
+          if (!this.player.mount) { this.player.vel.add(away); this.player.vel.y += 6; }
+        }
+        this.ui.notify('The Tyrant shakes the ground!', 'warn');
+      },
+      bossPhase: (c) => { this.ui.banner('THE TYRANT CALLS ITS PACK', 'Talonrunners are coming'); this.playRoar(c); },
       thud: () => { this.audio.tone({ f0: 90, f1: 40, dur: 0.4, vol: 0.5, type: 'triangle' }); this.audio.noiseHit({ freq: 300, dur: 0.3, vol: 0.4, type: 'lowpass' }); },
       flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
     this.creatures.populate(this.spawnPoint);
+    this.buildAltar();
 
     this.arrows = [];
     this.arrowGeo = (() => {
@@ -105,6 +120,12 @@ class Game {
       { title: 'Build a Forge, light it and smelt 8 Metal Ingots', progress: () => `🔩 ${Math.min(this.stats.ingot, 8)}/8 — stand near the lit forge with Ore and Wood`, done: () => this.stats.ingot >= 8 },
       { title: 'Craft a metal tool, weapon or armor at the Forge', progress: () => 'Metal Pick, Hatchet, Sword or Armor', done: () => this.stats.metalCrafted >= 1 },
       { title: 'Build a stone shelter: 2 Stone Floors and 4 Stone Walls', progress: () => `Floors ${Math.min(this.stoneCount('floor'), 2)}/2 · Walls ${Math.min(this.stoneCount('wall'), 4)}/4`, done: () => this.stoneCount('floor') >= 2 && this.stoneCount('wall') >= 4 },
+      { title: 'Explore a third of the island (open the map with M)', progress: () => `Explored ${Math.round(this.map.explored() * 100)}% / 33%`, done: () => this.map.explored() >= 0.33 },
+      { title: 'Slay an Alpha — a glowing red, oversized beast', progress: () => 'Alphas hit hard and cannot be tamed. Bring armor and a tame.', done: () => (this.stats.alphaKills || 0) >= 1 },
+      { title: 'Collect 3 Alpha Trophies', progress: () => `🏆 ${Math.min(this.inv.count('trophy'), 3)}/3`, done: () => this.inv.count('trophy') >= 3 || (this.stats.bossSummons || 0) >= 1 },
+      { title: 'Offer the trophies at the Caldera Altar near the Northern Peak', progress: () => 'Look for the red glow among standing stones (💀 on the map once found)', done: () => (this.stats.bossSummons || 0) >= 1 },
+      { title: 'Defeat the Primal Tyrant', progress: () => this.boss && this.boss.alive ? `Tyrant health ${Math.round((this.boss.hp / this.boss.maxHp) * 100)}%` : 'Summon it again at the altar if you fled', done: () => (this.stats.bossKills || 0) >= 1 },
+      { title: 'Forge the Primal Blade from the Tyrant Fang', progress: () => 'Needs a Forge, 20 Metal Ingots and 10 Hide', done: () => this.inv.count('primalblade') > 0 || (this.stats.blades || 0) > 0 },
     ];
     this.questIdx = 0;
 
@@ -224,6 +245,7 @@ class Game {
     if (!this.inv.has(r.cost)) return;
     if (r.station && !this.stationNear(r.station)) { this.ui.notify(`Craft this next to a ${ITEMS[r.station].name}`, 'warn'); return; }
     if (['metalpick', 'metalhatchet', 'sword', 'metalarmor'].includes(r.id)) this.stats.metalCrafted++;
+    if (r.id === 'primalblade') this.stats.blades = (this.stats.blades || 0) + 1;
     this.inv.pay(r.cost);
     const left = this.inv.add(r.id, r.yield || 1);
     if (left) this.ui.notify('Inventory full!', 'warn');
@@ -277,11 +299,67 @@ class Game {
     }
     if (n && n.dist < 4 && n.node.kind === 'bush') { this.harvestNode(n.node, 1.0, true); return; }
     if (fire) { this.useProp(fire); return; }
+    if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) { this.summonBoss(); return; }
     if (this.canDrink()) {
       p.water = Math.min(100, p.water + 25);
       this.audio.splash();
       this.ui.notify('You drink fresh water');
     }
+  }
+
+  buildAltar() {
+    let best = null;
+    for (let i = 0; i < 400; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 70;
+      const x = -40 + Math.cos(a) * r, z = -230 + Math.sin(a) * r, h = heightAt(x, z);
+      if (!best || h > best.y) best = new THREE.Vector3(x, h, z);
+    }
+    // step down a little from the very tip so the arena is walkable
+    const c = best.clone().add(new THREE.Vector3(0, 0, 25)); c.y = heightAt(c.x, c.z);
+    this.altar = { pos: c };
+    const stone = new THREE.MeshStandardMaterial({ color: 0x4a4440, roughness: 0.95, flatShading: true });
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.1, 1.4, 8), stone); base.position.y = 0.5; g.add(base);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 1.4), stone); top.position.y = 1.4; g.add(top);
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.55), new THREE.MeshStandardMaterial({ color: 0xff3a1a, emissive: 0xff2a0a, emissiveIntensity: 1.6, roughness: 0.3 }));
+    crystal.position.y = 2.4; g.add(crystal); this.altar.crystal = crystal;
+    const light = new THREE.PointLight(0xff4422, 30, 30, 1.6); light.position.y = 2.6; g.add(light);
+    g.position.copy(c);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.scene.add(g);
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2, x = c.x + Math.cos(a) * 20, z = c.z + Math.sin(a) * 20;
+      const h = 4 + Math.random() * 3;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1.4, h, 0.9), stone);
+      m.position.set(x, heightAt(x, z) + h / 2 - 0.4, z); m.rotation.set((Math.random() - 0.5) * 0.15, -a, (Math.random() - 0.5) * 0.15);
+      m.castShadow = true; m.receiveShadow = true;
+      this.scene.add(m);
+      this.world.colliders.add({ x, z, r: 0.9 });
+    }
+    this.world.colliders.add({ x: c.x, z: c.z, r: 2.1 });
+  }
+
+  summonBoss() {
+    if (this.boss && this.boss.alive) { this.ui.notify('The Tyrant is already here!', 'warn'); return; }
+    if (this.inv.count('trophy') < 3) { this.ui.notify(`The altar demands 3 Alpha Trophies (you have ${this.inv.count('trophy')})`, 'warn'); return; }
+    this.inv.remove('trophy', 3);
+    this.stats.bossSummons = (this.stats.bossSummons || 0) + 1;
+    this.bossActive = true;
+    const p = this.altar.pos.clone().add(new THREE.Vector3(0, 0, -16)); p.y = heightAt(p.x, p.z);
+    this.boss = this.creatures.spawnBoss(p);
+    this.shake = 1.2;
+    this.ui.banner('THE PRIMAL TYRANT AWAKENS', 'Survive. Strike. Endure.');
+    this.audio.thunder?.(1); setTimeout(() => this.playRoar(this.boss), 600);
+    this.saves.markDirty();
+  }
+
+  bossDefeated(c) {
+    this.bossActive = false;
+    this.stats.bossKills = (this.stats.bossKills || 0) + 1;
+    this.give('fang', 1); this.give('ingot', 25); this.give('trophy', 2);
+    this.ui.banner('THE PRIMAL TYRANT HAS FALLEN', 'Its fang can be forged into the Primal Blade');
+    this.audio.tamed();
+    this.saves.markDirty();
   }
 
   useProp(piece) {
@@ -381,6 +459,7 @@ class Game {
 
   feed(cr) {
     if (this.feedCd > 0) return;
+    if (cr.alpha) { this.ui.notify('Alphas cannot be tamed — finish it off for its trophy', 'warn'); this.feedCd = 1; return; }
     const def = cr.def;
     const torporLow = cr.torpor / cr.maxTorpor < 0.35;
     if (torporLow && this.inv.count('sleepberry') > 0) {
@@ -537,6 +616,7 @@ class Game {
 
   harvestCarcass(cr, power) {
     const d = cr.def.drops;
+    power *= cr.boss ? 6 : cr.alpha ? 3 : 1;
     const tool = this.activeItem()?.id;
     for (const [id, base] of Object.entries(d)) {
       let mult = power;
@@ -847,6 +927,17 @@ class Game {
     } else { this.building.setGhost(null); this.placement = null; }
 
     this.updateHUD(dt);
+    if (this.altar) { this.altar.crystal.rotation.y += dt; this.altar.crystal.position.y = 2.4 + Math.sin(this.shared.uTime.value * 2) * 0.15; }
+    if (this.shake > 0) {
+      this.shake = Math.max(0, this.shake - dt * 1.5);
+      this.camera.position.x += (Math.random() - 0.5) * this.shake * 0.5;
+      this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.5;
+    }
+    const bb = document.getElementById('bossbar');
+    const showBoss = this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 160;
+    bb.classList.toggle('show', !!showBoss);
+    document.body.classList.toggle('bossfight', !!showBoss);
+    if (showBoss) { bb.querySelector('i').style.width = `${(this.boss.hp / this.boss.maxHp) * 100}%`; bb.querySelector('.bname').textContent = `${this.boss.name} — ${Math.ceil(this.boss.hp)} / ${this.boss.maxHp}`; }
     this.updateDamageNums(dt);
     this.audio.ambience(dt, { shore: Math.max(0, heightAt(p.pos.x, p.pos.z)) * 6, night: 1 - this.env.daylight, height: p.pos.y, underwater: p.underwater });
   }
@@ -922,6 +1013,7 @@ class Game {
           : k === 'storage' ? '<kbd>E</kbd> Open Storage Box'
           : `<kbd>E</kbd> ${this.env.daylight < 0.3 ? 'Sleep until morning' : 'Set respawn point'}`;
       }
+      else if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) prompt = `<kbd>E</kbd> Offer 3 Alpha Trophies to summon the Primal Tyrant (${this.inv.count('trophy')}/3)`;
       else if (this.canDrink()) prompt = '<kbd>E</kbd> Drink';
       if (def && def.place) prompt = `<kbd>LMB</kbd> Place ${def.name} · <kbd>R</kbd> Rotate`;
     }

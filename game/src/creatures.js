@@ -454,7 +454,7 @@ export class Creature {
     const off = -h * Math.sin(lie * Math.PI / 2);
     return c.set(this.pos.x + Math.cos(this.yaw) * off, this.pos.y + lerp(h, this.model.lie * this.scale, lie), this.pos.z - Math.sin(this.yaw) * off);
   }
-  get label() { return `${this.tamed ? this.name : this.def.name} · Lv ${this.level}`; }
+  get label() { return this.boss ? `${this.name} · Lv ${this.level}` : `${this.tamed ? this.name : (this.alpha ? 'Alpha ' : '') + this.def.name} · Lv ${this.level}`; }
 
   tameCost() { return this.def.tameBase + this.level * this.def.tameLvl; }
 }
@@ -491,6 +491,52 @@ export class CreatureManager {
     return c;
   }
 
+  // Alphas: rare, glowing, much tougher variants that drop trophies. Cannot be tamed.
+  makeAlpha(c) {
+    if (['pudgewing', 'dashbeak', 'galewing'].includes(c.species)) return c;
+    c.alpha = true;
+    c.level = Math.min(c.level + 15, 60);
+    c.maxHp = Math.round(c.def.hp * (1 + c.level * 0.05) * 2.5); c.hp = c.maxHp;
+    c.dmg = c.def.dmg * (1 + c.level * 0.03) * 1.6;
+    c.maxTorpor = c.def.torpor * (1 + c.level * 0.06) * 2;
+    c.scale *= 1.25; c.obj.scale.setScalar(c.scale);
+    return c;
+  }
+
+  // The Primal Tyrant: a colossal Gorgonax summoned at the Caldera Altar.
+  spawnBoss(pos) {
+    const c = this.spawn('gorgonax', pos, 60);
+    this.makeAlpha(c);
+    c.boss = true;
+    c.name = 'The Primal Tyrant';
+    c.maxHp = 16000; c.hp = c.maxHp;
+    c.dmg = 70;
+    c.maxTorpor = Infinity;
+    c.scale = 2.1; c.obj.scale.setScalar(c.scale);
+    c.stompCd = 6; c.summoned = false; c.home = pos.clone();
+    c.state = 'wander'; c.timer = 0.5;
+    return c;
+  }
+
+  updateBoss(c, dt, player) {
+    if (!c.alive) return;
+    c.timer = Math.max(c.timer, 5);       // never gives up the fight
+    c.stompCd -= dt;
+    const d = Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z);
+    if (c.stompCd <= 0 && d < 16 && c.state !== 'ko') { c.stompCd = 7 + Math.random() * 3; c.roarT = 0.8; this.hooks.stomp?.(c, d); }
+    if (!c.summoned && c.hp < c.maxHp * 0.5) {
+      c.summoned = true;
+      this.hooks.bossPhase?.(c);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2, p = c.pos.clone().add(new THREE.Vector3(Math.cos(a) * 12, 0, Math.sin(a) * 12));
+        p.y = heightAt(p.x, p.z);
+        const m = this.spawn('talonrunner', p, 30); m.state = 'chase'; m.target = 'player'; m.timer = 60;
+      }
+    }
+    // leash to the caldera
+    if (c.pos.distanceTo(c.home) > 70) { c.state = 'wander'; c.goal.copy(c.home); c.timer = 3; }
+  }
+
   populate(avoid) {
     for (const [sp, def] of Object.entries(SPECIES)) {
       let n = 0;
@@ -508,6 +554,8 @@ export class CreatureManager {
         }
       }
     }
+    const pool = this.list.filter((c) => !['pudgewing', 'dashbeak', 'galewing', 'thunderneck'].includes(c.species));
+    for (let i = 0; i < 7 && pool.length; i++) this.makeAlpha(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     // Starter-friendly creatures near the beach so the first minutes have life.
     for (let i = 0; i < 4; i++) {
       const p = new THREE.Vector3(avoid.x + rand(-30, 30), 0, avoid.z - rand(15, 50));
@@ -623,7 +671,7 @@ export class CreatureManager {
 
   findTarget(c, player) {
     const d = c.def;
-    let best = null, bestD = d.aggro;
+    let best = null, bestD = c.boss ? 90 : c.alpha ? Math.max(d.aggro, 22) * 1.2 : d.aggro;
     const pd = player.alive ? c.pos.distanceTo(player.pos) : Infinity;
     if (pd < bestD * (player.crouch ? 0.6 : 1)) { best = this.playerEntity(player); bestD = pd; }
     for (const o of this.list) {
@@ -662,7 +710,7 @@ export class CreatureManager {
         const wild = this.list.filter((c) => c.species === sp && !c.tamed && c.alive).length;
         if (wild < def.count) {
           const p = this.randomSpot(def, player.pos, 140);
-          if (p) this.spawn(sp, p);
+          if (p) { const c = this.spawn(sp, p); if (Math.random() < 0.08) this.makeAlpha(c); }
         }
       }
     }
@@ -694,7 +742,9 @@ export class CreatureManager {
     const d = c.def;
     const m = c.model;
     c.hitFlash = Math.max(0, c.hitFlash - dt);
-    c.mat.emissive.setRGB(c.hitFlash * 4, 0, 0);
+    const glow = c.alpha ? 0.28 + Math.sin(performance.now() / 300 + c.id) * 0.18 : 0;
+    c.mat.emissive.setRGB(c.hitFlash * 4 + glow, glow * 0.12, 0);
+    if (c.boss) this.updateBoss(c, dt, player);
     c.attackCd -= dt; c.attackAnim = Math.max(0, c.attackAnim - dt * 3);
     c.timer -= dt; c.scanCd -= dt;
 
@@ -784,7 +834,7 @@ export class CreatureManager {
       }
     } else {
       // wander / graze
-      if (d.temper === 'aggressive' && c.scanCd <= 0 && !far) {
+      if ((d.temper === 'aggressive' || c.alpha) && c.scanCd <= 0 && !far) {
         c.scanCd = 0.5;
         const t = this.findTarget(c, player);
         if (t) { c.state = 'chase'; c.target = t; c.timer = 25; this.hooks.roar?.(c); }

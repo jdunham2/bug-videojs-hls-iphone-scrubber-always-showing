@@ -156,7 +156,7 @@ export class UI {
     const hp = Math.max(0, c.hp / c.maxHp) * 100;
     const tp = c.def.torpor === Infinity ? 0 : Math.min(100, (c.torpor / c.maxTorpor) * 100);
     const name = !c.alive ? `${c.def.name} (Carcass)` : c.label;
-    const tag = c.tamed ? '<span class="tag tame">TAMED</span>' : !c.alive ? '' : c.ko ? '<span class="tag ko">UNCONSCIOUS</span>' : c.def.temper === 'aggressive' ? '<span class="tag hostile">HOSTILE</span>' : c.def.temper === 'neutral' ? '<span class="tag neutral">NEUTRAL</span>' : '<span class="tag passive">PASSIVE</span>';
+    const tag = c.boss ? '<span class="tag hostile">BOSS</span>' : c.alpha && c.alive ? '<span class="tag alpha">ALPHA</span>' : c.tamed ? '<span class="tag tame">TAMED</span>' : !c.alive ? '' : c.ko ? '<span class="tag ko">UNCONSCIOUS</span>' : c.def.temper === 'aggressive' ? '<span class="tag hostile">HOSTILE</span>' : c.def.temper === 'neutral' ? '<span class="tag neutral">NEUTRAL</span>' : '<span class="tag passive">PASSIVE</span>';
     let extra = '';
     if (c.ko && !c.tamed) extra = `<div class="tbar tame"><i style="width:${c.tame}%"></i><span>Taming ${c.tame.toFixed(0)}%</span></div><div class="thint">Prefers ${ITEMS[c.def.tameFood].name}</div>`;
     this.target.innerHTML = `<div class="tname">${name} ${tag}</div>

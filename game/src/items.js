@@ -34,6 +34,9 @@ export const ITEMS = {
   forge:      { name: 'Forge',         icon: '🏭', place: 'forge', stack: 3 },
   storage:    { name: 'Storage Box',   icon: '📦', place: 'storage', stack: 10 },
   bed:        { name: 'Sleeping Bag',  icon: '🛏️', place: 'bed', stack: 5 },
+  trophy:     { name: 'Alpha Trophy',  icon: '🏆', stack: 20, weight: 0.5 },
+  fang:       { name: 'Tyrant Fang',   icon: '🦷', stack: 5, weight: 0.5 },
+  primalblade:{ name: 'Primal Blade',  icon: '🔥', tool: true, damage: 115, reach: 3.8, gather: { tree: 1.5, rock: 1.0, bush: 1.0 }, durability: 900 },
   saddle:     { name: 'Rough Saddle',  icon: '🐎', stack: 3, weight: 2 },
 };
 
@@ -54,6 +57,7 @@ export const RECIPES = [
   { id: 'metalhatchet', cost: { ingot: 4, wood: 4, hide: 2 }, station: 'forge', desc: 'Fells trees far faster.' },
   { id: 'sword',      cost: { ingot: 8, hide: 3 },            station: 'forge', desc: 'Heavy damage with good reach.' },
   { id: 'metalarmor', cost: { ingot: 16, hide: 6 },           station: 'forge', desc: 'Blocks 50% damage. Very durable.' },
+  { id: 'primalblade',cost: { fang: 1, ingot: 20, hide: 10 }, station: 'forge', desc: 'Forged from the Tyrant\'s fang. Devastating.' },
   { id: 'foundation', cost: { wood: 14, fiber: 6 },           desc: 'Base building floor. Snaps to grid.' },
   { id: 'wall',       cost: { wood: 10, fiber: 4 },           desc: 'Snaps to floor edges. [R] to rotate.' },
   { id: 'doorway',    cost: { wood: 9, fiber: 4 },            desc: 'A wall with an opening.' },
