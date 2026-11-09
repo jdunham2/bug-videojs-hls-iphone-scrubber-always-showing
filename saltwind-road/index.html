@@ -1116,6 +1116,7 @@ const NODES = {
 const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'a sickle', shovel:'a shovel'};
 
 const ENEMIES = {
+  target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
   slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
   crab:{name:'Shore Crab',hp:6,dmg:2,speed:2.6,aggro:4,drops:[['shells',1,3,1],['meat',1,1,.3]]},
   sporeling:{name:'Sporeling',hp:7,dmg:2,speed:2.4,aggro:6,drops:[['mushroom',1,2,1],['truffle',1,1,.08]]},
@@ -1836,6 +1837,9 @@ const NPCS = [
    rumors:["I am in a different town every night. Look for the purple lantern.","Mystery boxes hold anything at all. Anything."]},
   {id:'elowen',town:'maplehold',dx:-2,dy:3,name:'Elowen',role:'Shepherd',cols:{cloak:'#7a6a4a',skin:'#e0c0a0',hair:'#e3a948'},
    hello:["The sheep are restless today.","Oh, hello again!","My friend! Come sit."], rumors:["My grandmother used to say we came from somewhere grand. I think she just liked stories."]},
+  {id:'holt',town:'hollow',dx:3,dy:1,name:'Range-master Holt',role:'Archery range',cols:{cloak:'#3a5a2a',skin:'#d8a882',hair:'#8a6a3a'},archery:true,
+   hello:["Steady hands, sharp eyes.","Back for another round?","Best shot in the woods!"],
+   rumors:["Targets pop up and drop fast. Don't aim too long.","Hold the attack button with a bow for a power shot. It goes straight through."]},
   {id:'silas',town:'lantern',dx:12,dy:6,cove:true,name:'Silas',role:'Smuggler',cols:{cloak:'#2a2a2a',skin:'#c89870',hair:'#5a2a1a'},
    hello:["You lost, friend?","Back again?","Partner."], rumors:["What happens at the cove stays at the cove."]},
   {id:'darius',town:'dun',dx:2,dy:3,name:'Merchant Prince Darius',role:'Caravan master',cols:{cloak:'#8a2a5a',skin:'#a8704a',hair:'#1a1a1a'},caravans:true,
@@ -3056,6 +3060,7 @@ function killEnemy(e) {
   if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3*(bloodMoon() ? 2 : 1)); SFX.kill(); if (bloodMoon() && !def.passive) { S.bmKills = (S.bmKills || 0) + 1; const bc = rint(4, 12) + (S.level || 1); S.coins += bc; got.push(`+${bc} coin (blood moon)`); }
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
+  if (def.target && archery) { archery.score++; floatText(e.x, e.y - 1.4, `+1 (${archery.score})`, '#f0c040'); burst(e.x, e.y - .7, '#f0c040', 8, 3); SFX.coin(); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
   if (e.legend) {
     const L = LEGEND_BY[e.legend]; S.legends = S.legends || {}; S.legends[L.id] = true;
@@ -3151,7 +3156,7 @@ function drawStar(st) {
 }
 const bloodMoonDay = () => S && S.day >= 6 && S.day % 6 === 0;
 const bloodMoon = () => !!S && ((bloodMoonDay() && S.time > .78) || (S.day > 6 && S.day % 6 === 1 && S.time < .22)) && !inDungeon() && !inArena();
-const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive);
+const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && !ENEMIES[k].target);
 const LEGENDS = [
   {id:'grizzle',   name:'Old Grizzle',        type:'boar',     tx:112, ty:72,  hp:140, dmg:2.2, col:'#c8803a', drop:'grizzle_hide'},
   {id:'whitefang', name:'Whitefang',          type:'wolf',     tx:150, ty:22,  hp:150, dmg:2.4, col:'#e8f4ff', drop:'whitefang_blade'},
@@ -3193,7 +3198,7 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -3209,6 +3214,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Archery', 'Range-master Holt in Hollowpine runs a 30-second target challenge with medals.'],
   ['Fishing tournament', 'On the 6th day of every season, the total weight of fish you catch earns a medal from Old Marlin. Every fish has a weight; beat your records!'],
   ['Rune shrines', 'Six shrines of standing stones hide across the lands. Read the inscription and touch the runes in the right order.'],
   ['Night market', 'Madame Noctis sets up in a different town each night with rare wares and mystery boxes. The job tracker shows where.'],
@@ -3414,6 +3420,7 @@ function updateCombat(dt, night) {
     if (e.boss) { updateBoss(e, dt); boss = e; continue; }
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
+    if (def.target) { e.hurt = Math.max(0, e.hurt - dt); e.life -= dt; if (e.life <= 0) e.dead = true; continue; }
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
@@ -3815,6 +3822,7 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = extra && extra.bossId === 'crystalqueen' ? '#5fb8d8' : '#241c22'; g.beginPath(); g.ellipse(x - f*2, y-6, 4, 3.5, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x + f*3, y-6, 2.5, 0, 7); g.fill();
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
+    case 'target': { const pop = Math.min(1, (extra && extra.age || 1)); g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 8, 2, 8); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 4, y - 1, 8, 2); for (const [r, c] of [[6, '#e8e0d0'], [4.5, '#c83a2a'], [3, '#e8e0d0'], [1.5, '#c83a2a']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y - 12, r, 0, 7); g.fill(); } break; }
     case 'slime': {
       const sq = Math.abs(Math.sin(phase*1.2)), h = 6 + sq*3, w = 7 - sq*1.5;
       shadow(6); g.fillStyle = 'rgba(110,200,90,.9)'; g.beginPath(); g.ellipse(x, y - h/2, w, h/2 + 1, 0, Math.PI, 0); g.fill(); g.fillRect(x - w, y - h/2, w*2, h/2);
@@ -4358,6 +4366,7 @@ function updatePeople(dt) {
 let deedT = 0, lastCoins = null;
 function update(dt) {
   updatePeople(dt);
+  if (archery) updateArchery(dt);
   if (S.escort) updateEscort(dt);
   if (S.race) updateRace(dt);
   updateStars(dt);
@@ -4499,6 +4508,7 @@ function checkDeeds() {
   { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
+  if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
@@ -4707,6 +4717,7 @@ function mainOptions(n) {
     if (n.id === 'quill' && (!M || M.stage !== 5)) o.push({label: M && M.stage ? 'About the cove' : 'Strange lights?', primary: !!(M && M.stage === 3), fn: () => smugQuill(n)});
     if (n.id === 'silas') o.push({label: M && M.stage === 4 ? 'Business' : 'Who are you?', primary: true, fn: () => smugSilas(n)});
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
+  if (n.archery) o.push({label: 'Try the archery range', primary: true, disabled: !!archery, fn: () => { closeTalk(); startArchery(); }});
   if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
   { const H = S.story && S.story.heir;
     if (n.id === 'v_crownfall' && (!H || H.stage < 3)) o.push({label: H && H.stage ? 'About the royal relics' : 'Tell me about the old king', primary: !!(H && H.stage === 1 && heirRelics().signet && heirRelics().scepter && heirRelics().seal), fn: () => heirBastian(n)});
@@ -5072,6 +5083,31 @@ function heirElowen(n) {
     {label: 'Keep the relics and sell them', fn: () => { H.stage = 3; H.crowned = false; S.coins += 1600; S.rep.crownfall = Math.max(0, repOf('crownfall') - 1); S.flags.relicThief = true; gainXP(200); SFX.coin(); renderHUD(); save();
       say('Elowen\'s face falls. You pocket the relics and sell them to a collector for a fortune.<br><br><span style="color:var(--good)">+1600 coin</span> · Crownfall will not forget this.', [back(n)]); }},
     back(n)]);
+}
+// ===== archery range =====
+let archery = null;
+function startArchery() {
+  const w = weapon();
+  if (!w.ranged) { if (!have('bow')) addItem('bow', 1); S.equip.weapon = 'bow'; if (have('arrows') < 30) addItem('arrows', 30 - have('arrows')); toast('Holt hands you a bow and a quiver. “Keep them.”', 3000); }
+  enemies = enemies.filter(e => e.boss); archery = {t: 30, score: 0, spawn: .3, cx: S.x, cy: S.y}; renderHUD();
+  toast('<b>Archery!</b> Hit as many targets as you can in 30 seconds. They don\'t stay up for long!', 3500); SFX.roar();
+}
+function updateArchery(dt) {
+  const A = archery; if (!A) return;
+  A.t -= dt; A.spawn -= dt;
+  if (A.spawn <= 0 && A.t > 0) {
+    A.spawn = .7 + Math.random()*.6;
+    for (let k = 0; k < 12; k++) { const a = Math.random()*6.283, r = 4 + Math.random()*4, x = A.cx + Math.cos(a)*r, y = A.cy + Math.sin(a)*r; const t = tileAt(Math.floor(x), Math.floor(y)); if (t == null || !walkable(t, false, false) || t === T.HOUSE) continue; enemies.push(makeEnemy('target', x, y, {life: 2.4 + Math.random()*.8})); break; }
+  }
+  if (A.t <= 0) {
+    enemies = enemies.filter(e => !(ENEMIES[e.type] && ENEMIES[e.type].target));
+    const sc = A.score, medal = sc >= 22 ? 'gold' : sc >= 14 ? 'silver' : sc >= 8 ? 'bronze' : null;
+    S.archeryBest = Math.max(S.archeryBest || 0, sc); archery = null;
+    let prize = '';
+    if (medal) { const c = {gold: 300, silver: 150, bronze: 60}[medal]; S.coins += c; prize = ` +${c} coin.`; if (medal === 'gold' && !S.flags.archeryGold) { S.flags.archeryGold = true; addItem('longbow', 1); prize += ' Holt gives you his <b>Silk Longbow</b>!'; } SFX.victory(); }
+    toast(`<b>Time! ${sc} targets.</b> ${medal ? `<span style="color:${medal === 'gold' ? '#f0c040' : medal === 'silver' ? '#dfe4ea' : '#c8803a'}">${medal.toUpperCase()}</span>` : 'No medal (8 for bronze).'}${prize}<br>Best: ${S.archeryBest}`, 6500);
+    renderHUD(); save();
+  }
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -7015,6 +7051,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['marksman','Marksman','Score gold at the archery range', () => !!S.flags.archeryGold],
   ['tourneygold','Tournament Champion','Win gold in a fishing tournament', () => !!(S.tourneyMedals && S.tourneyMedals.gold)],
   ['kingmaker','Kingmaker','Crown the lost heir of the Old Kingdom', () => !!(S.story && S.story.heir && S.story.heir.crowned)],
   ['counter','Riposte','Land 10 counter-strikes after perfect dodges', () => (S.counters || 0) >= 10],
