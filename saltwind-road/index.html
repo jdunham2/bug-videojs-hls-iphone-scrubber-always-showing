@@ -935,7 +935,7 @@ const RECIPES = [
 const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 const TROPHY_RECIPE = {alpha_pelt:'alpha_cloak', witchroot:'heart_amulet', frost_heart:'frost_staff', stinger:'stinger_blade', wyrm_scale:'wyrmscale_mail', ember_core:'ember_blade', serpent_fang:'venom_fang', golem_core:'golem_fist', barrow_crown:'circlet', roc_feather:'windstep_boots', lion_mane:'lionheart', fox_tail:'foxfire_lantern', kings_crown:'royal_helm', spore_heart:'sporecap_armor', prism_core:'prism_aegis', ronin_mask:'ronin_helm', treant_heart:'treant_armor', kraken_eye:'kraken_shield', stag_antler:'antler_bow'};
 const STATION_LABEL = {hand:'Anywhere', bench:'Workbench (any settlement, your cottage, or a crafting table you placed)', forge:'A forge (or your manor, or an anvil you placed)'};
-const CRAFT_GROUPS = [['Tools',['tool']],['Weapons',['weapon','ammo']],['Armor & trinkets',['armor','trinket']],['Food',['food']],['Goods & metals',['craft','good','mat']],['Building',['place']]];
+const CRAFT_GROUPS = [['Tools',['tool']],['Weapons',['weapon','ammo']],['Armor & trinkets',['armor','trinket']],['Food',['food']],['Goods & metals',['craft','good','mat']],['Building',['place']],['Upgrades',null]];
 
 const NODES = {
   branch:{name:'Fallen Branches',verb:'Gather',give:'sticks',amt:[2,3],hits:1,regrow:2},
@@ -1324,7 +1324,7 @@ function drawPlaced(g, q, t) {
   }
 }
 const isNightish = () => { const sun = Math.cos((S.time - .5) * Math.PI * 2); return sun < .1; };
-const rentOf = k => Math.round(PROPERTIES[k].price * .02);
+const rentOf = k => Math.round(PROPERTIES[k].price * .02 * (1 + .5*propLv(k)));
 const HOME_LEVELS = [
   {name:'Empty plot', plots:0},
   {name:'Log Cabin', plots:4, cost:{coins:250}, perks:'A bed, a storage chest and 4 crop beds'},
@@ -2423,9 +2423,27 @@ const swatch = g => `<span class="sw" style="background:${GOODS[g].col}"></span>
 const itemList = obj => Object.entries(obj).filter(([,n]) => n > 0).map(([g,n]) => `${n} ${GOODS[g].name}`).join(', ');
 const isKnown = r => !!(RECIPE_BY[r].known || S.known[r]);
 function toolTier(tool) { let t = 0; for (const g in S.inv) if (GOODS[g].tool === tool && S.inv[g] > 0) t = Math.max(t, GOODS[g].tier); return t; }
-function weapon() { const w = S.equip.weapon; return w && have(w) > 0 ? GOODS[w] : FISTS; }
+const ENH_MAX = 5, PET_MAX = 5, SADDLE_MAX = 4, FURNISH_MAX = 3;
+const enhOf = g => (S && S.enh && S.enh[g]) || 0;
+const petLv = () => (S.petLv && S.pet && S.petLv[S.pet]) || 0;
+const mountLv = () => (S.mountLv && S.mount && S.mountLv[S.mount]) || 0;
+const propLv = k => (S && S.propLv && S.propLv[k]) || 0;
+const ENH_MATS = [null, {iron:2}, {iron:3,silver:1}, {silver:2,crystal:2}, {gem:1,blacksteel:2}, {gem:2,abyss_shard:3}];
+const enhCost = (g, L) => ({coins: Math.round((40 + GOODS[g].base*.25) * L), ...ENH_MATS[L]});
+const petCost = L => ({coins: 80*L, meat: 2*L, ...(L >= 3 ? {herbs: L} : {})});
+const saddleCost = L => ({coins: 150*L, hide: 2*L, ...(L >= 2 ? {iron: L} : {}), ...(L >= 4 ? {silk_cloth: 2} : {})});
+const furnishCost = (k, L) => ({coins: Math.round(PROPERTIES[k].price * .3 * L), planks: 3*L, ...(L >= 2 ? {glass: L} : {}), ...(L >= 3 ? {silk_cloth: 2} : {})});
+const upCanPay = c => Object.entries(c).every(([k, n]) => k === 'coins' ? S.coins >= n : have(k) >= n);
+function upPay(c) { for (const [k, n] of Object.entries(c)) { if (k === 'coins') S.coins -= n; else addItem(k, -n); } }
+const upCostHTML = c => Object.entries(c).map(([k, n]) => k === 'coins' ? `<span>${n}◆ <b class="${S.coins >= n ? 'ok' : 'no'}">${S.coins}</b></span>` : `<span>${swatch(k)}${n} ${GOODS[k].name} <b class="${have(k) >= n ? 'ok' : 'no'}">${have(k)}</b></span>`).join('');
+const stars = (n, max) => '★'.repeat(n) + '☆'.repeat(max - n);
+const enhName = g => GOODS[g].name + (enhOf(g) ? ` +${enhOf(g)}` : '');
+function weapon() {
+  const w = S.equip.weapon; if (!(w && have(w) > 0)) return FISTS;
+  const L = enhOf(w); return L ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: enhName(w)} : GOODS[w];
+}
 const EQ_SLOTS = ['armor','head','shield'];
-const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; return n + (g && have(g) > 0 ? (GOODS[g][k] || 0) : 0); }, 0);
+const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed'));
@@ -3754,7 +3772,7 @@ function update(dt) {
     if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = 1.15;
     if (t === T.MOUNT) sp = .4;
     const M = S.riding && MOUNTS[S.mount];
-    if (M) sp = M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed;
+    if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
     sp = 4.6 * Math.max(.4, sp) * speedMult();
     const nx = S.x + vx*sp*dt, ny = S.y + vy*sp*dt;
     if (passable(nx, S.y)) S.x = nx;
@@ -3844,7 +3862,7 @@ function renderHUD() {
   if (S.equip.weapon && !have(S.equip.weapon)) S.equip.weapon = null;
   for (const sl of EQ_SLOTS) if (S.equip[sl] && !have(S.equip[sl])) S.equip[sl] = null;
   const w = weapon(), a = S.equip.armor;
-  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && w.ammo === 'stone' ? ` · ${have('stone')} stones` : w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).length ? ' · ' + EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).map(g => esc(GOODS[g].name)).join(' + ') : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}`;
+  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && w.ammo === 'stone' ? ` · ${have('stone')} stones` : w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).length ? ' · ' + EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).map(g => esc(enhName(g))).join(' + ') : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}`;
   const total = Object.values(S.inv).reduce((s, n) => s + n, 0);
   $('bagN').textContent = total ? `(${total})` : '';
   $('bombBtn').hidden = !isTouch || !(have('bomb') || have('fire_bomb') || have('frost_bomb')) || mode !== 'play';
@@ -4272,7 +4290,7 @@ function renderBag() {
     if (!list.length) return '';
     return `<h3>${title}</h3><div class="jgrid">${list.map(g => {
       const eq = Object.values(S.equip).includes(g);
-      return `<div class="jcard ${eq ? 'eq' : ''}"><div class="irow"><span class="nm">${swatch(g)}<span class="t">${GOODS[g].name}</span> ×${have(g)}</span>${act ? act(g, eq) : ''}</div><div class="stat">${esc(itemStat(g))}</div></div>`;
+      return `<div class="jcard ${eq ? 'eq' : ''}"><div class="irow"><span class="nm">${swatch(g)}<span class="t">${enhName(g)}</span> ×${have(g)}</span>${act ? act(g, eq) : ''}</div><div class="stat">${esc(itemStat(g))}</div></div>`;
     }).join('')}</div>`;
   };
   const equipBtn = (g, eq) => eq ? `<button class="btn sm" data-unequip="${g}">Unequip</button>` : `<button class="btn sm primary" data-equip="${g}">Equip</button>`;
@@ -4330,6 +4348,7 @@ function openCraft() { mode = 'craft'; keys.clear(); renderCraft(); $('craft').h
 function renderCraft() {
   const st = stations();
   const [title, kinds] = CRAFT_GROUPS[craftTab];
+  if (!kinds) { renderUpgrades(st); return; }
   const list = RECIPES.filter(r => kinds.includes(GOODS[r.out || r.id].kind)).sort((a, b) => isKnown(b.id) - isKnown(a.id));
   const card = r => {
     const out = r.out || r.id, g = GOODS[out], known = isKnown(r.id);
@@ -4360,8 +4379,69 @@ $('craftSheet').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.x) { closeModal('craft'); return; }
   if (b.dataset.tab) { craftTab = +b.dataset.tab; renderCraft(); return; }
+  if (b.dataset.enh) { upgradeGear(b.dataset.enh); renderCraft(); return; }
+  if (b.dataset.trainpet) { trainPet(); renderCraft(); return; }
+  if (b.dataset.saddle) { upgradeSaddle(); renderCraft(); return; }
   if (b.dataset.craft) craft(b.dataset.craft);
 });
+function renderUpgrades(st) {
+  const tabs = `<div class="ctabs">${CRAFT_GROUPS.map((cg, i) => `<button class="btn sm" data-tab="${i}" aria-pressed="${i === craftTab}">${cg[0]}</button>`).join('')}</div>`;
+  const gear = GK.filter(g => have(g) > 0 && (GOODS[g].kind === 'weapon' || GOODS[g].kind === 'armor'))
+    .sort((a, b) => Object.values(S.equip).includes(b) - Object.values(S.equip).includes(a));
+  const gearCard = g => {
+    const L = enhOf(g), d = GOODS[g], eq = Object.values(S.equip).includes(g);
+    const now = d.kind === 'weapon' ? `${Math.round(d.dmg*(1 + .15*L)*10)/10} dmg` : `armor ${d.armor + .5*L}${d.block ? ` · block ${Math.round((d.block + .02*L)*100)}%` : ''}`;
+    const next = L < ENH_MAX ? (d.kind === 'weapon' ? `${Math.round(d.dmg*(1 + .15*(L+1))*10)/10} dmg` : `armor ${d.armor + .5*(L+1)}${d.block ? ` · block ${Math.round((d.block + .02*(L+1))*100)}%` : ''}`) : '';
+    if (L >= ENH_MAX) return `<div class="jcard ${eq ? 'eq' : ''}"><div class="irow"><span class="nm">${swatch(g)}<span class="t">${esc(enhName(g))}</span></span><span class="s" style="color:var(--brass)">${stars(L, ENH_MAX)}</span></div><div class="stat">${now} · fully upgraded</div></div>`;
+    const c = enhCost(g, L + 1), ok = st.forge && upCanPay(c);
+    return `<div class="jcard ${eq ? 'eq' : ''}"><div class="irow"><span class="nm">${swatch(g)}<span class="t">${esc(enhName(g))}</span> <span class="s" style="color:var(--brass)">${stars(L, ENH_MAX)}</span></span>
+      <button class="btn sm ${ok ? 'primary' : ''}" data-enh="${g}" ${ok ? '' : 'disabled'}>${!st.forge ? 'Go to a forge' : ok ? `Upgrade to +${L + 1}` : 'Missing materials'}</button></div>
+      <div class="stat">${now} → <b>${next}</b></div><div class="req">${upCostHTML(c)}</div></div>`;
+  };
+  let animals = '';
+  if (S.pet && PETS[S.pet]) {
+    const L = petLv(), P = PETS[S.pet];
+    animals += L >= PET_MAX ? `<div class="jcard"><div class="irow"><span class="nm"><span class="t">${P.name} (pet)</span></span><span class="s" style="color:var(--brass)">${stars(L, PET_MAX)}</span></div><div class="stat">${P.dmg + L} dmg · fully trained</div></div>`
+      : `<div class="jcard"><div class="irow"><span class="nm"><span class="t">${P.name} (pet)</span> <span class="s" style="color:var(--brass)">${stars(L, PET_MAX)}</span></span><button class="btn sm ${upCanPay(petCost(L+1)) ? 'primary' : ''}" data-trainpet="1" ${upCanPay(petCost(L+1)) ? '' : 'disabled'}>Train</button></div>
+      <div class="stat">${P.dmg + L} dmg, attacks every ${(P.cd*(1 - .06*L)).toFixed(2)}s → <b>${P.dmg + L + 1} dmg, every ${(P.cd*(1 - .06*(L+1))).toFixed(2)}s</b></div><div class="req">${upCostHTML(petCost(L+1))}</div></div>`;
+  }
+  if (S.mount && MOUNTS[S.mount]) {
+    const L = mountLv(), M = MOUNTS[S.mount], c = saddleCost(L + 1), ok = st.bench && upCanPay(c);
+    animals += L >= SADDLE_MAX ? `<div class="jcard"><div class="irow"><span class="nm"><span class="t">${M.name} saddle</span></span><span class="s" style="color:var(--brass)">${stars(L, SADDLE_MAX)}</span></div><div class="stat">+${L*6}% riding speed · best saddle</div></div>`
+      : `<div class="jcard"><div class="irow"><span class="nm"><span class="t">${M.name} saddle</span> <span class="s" style="color:var(--brass)">${stars(L, SADDLE_MAX)}</span></span><button class="btn sm ${ok ? 'primary' : ''}" data-saddle="1" ${ok ? '' : 'disabled'}>${!st.bench ? 'Go to a workbench' : 'Upgrade saddle'}</button></div>
+      <div class="stat">+${L*6}% riding speed → <b>+${(L+1)*6}%</b></div><div class="req">${upCostHTML(c)}</div></div>`;
+  }
+  const owned = PK.filter(k => S.props[k]);
+  $('craftSheet').innerHTML = `
+    <div class="sheet-head"><h2>Upgrades</h2><button class="btn" data-x="craft">Close<kbd>C</kbd></button></div>
+    <div class="station" style="margin-top:8px"><span class="${st.forge ? 'on' : ''}">Forge${st.forge ? '' : ' · needed to upgrade gear'}</span><span class="${st.bench ? 'on' : ''}">Workbench${st.bench ? '' : ' · needed for saddles'}</span><span>${S.coins}◆</span></div>
+    ${tabs}
+    <h3>Weapons & armor · up to +${ENH_MAX}</h3>
+    <div class="vals">Each level adds 15% damage to a weapon, or +0.5 armor (and +2% block for shields).</div>
+    <div class="jgrid">${gear.length ? gear.map(gearCard).join('') : '<div class="none">You have no weapons or armor yet.</div>'}</div>
+    <h3>Pet & mount</h3>
+    <div class="jgrid">${animals || '<div class="none">Tame a pet or buy a mount to train them here.</div>'}</div>
+    <h3>Houses</h3>
+    <div class="vals">${owned.length ? `Go inside one of your houses to furnish it. Each level adds 50% to its rent. ${owned.map(k => `${PROPERTIES[k].name} ${stars(propLv(k), FURNISH_MAX)}`).join(' · ')}` : 'Buy a house, then furnish it from inside to raise its rent.'}</div>`;
+}
+function upgradeGear(g) {
+  const L = enhOf(g); if (L >= ENH_MAX || !stations().forge) return;
+  const c = enhCost(g, L + 1); if (!upCanPay(c)) return;
+  upPay(c); S.enh = S.enh || {}; S.enh[g] = L + 1; SFX.craft(); SFX.level(); gainXP(10*(L + 1));
+  burst(S.x, S.y - .6, '#e3a948', 14, 4); toast(`<b>${esc(enhName(g))}</b><br>Upgraded at the forge.`); renderHUD(); save();
+}
+function trainPet() {
+  const L = petLv(); if (!S.pet || L >= PET_MAX) return;
+  const c = petCost(L + 1); if (!upCanPay(c)) return;
+  upPay(c); S.petLv = S.petLv || {}; S.petLv[S.pet] = L + 1; SFX.level(); gainXP(10*(L + 1));
+  toast(`<b>${PETS[S.pet].name}</b> is now level ${L + 1}!<br>It hits harder and faster.`); renderHUD(); save();
+}
+function upgradeSaddle() {
+  const L = mountLv(); if (!S.mount || L >= SADDLE_MAX || !stations().bench) return;
+  const c = saddleCost(L + 1); if (!upCanPay(c)) return;
+  upPay(c); S.mountLv = S.mountLv || {}; S.mountLv[S.mount] = L + 1; SFX.craft(); gainXP(10*(L + 1));
+  toast(`<b>New saddle!</b><br>Your ${MOUNTS[S.mount].name.toLowerCase()} rides ${(L + 1)*6}% faster.`); renderHUD(); save();
+}
 function craft(id) {
   const r = RECIPE_BY[id], out = r.out || r.id, g = GOODS[out];
   if (!isKnown(id) || !stations()[r.at] || !Object.entries(r.need).every(([k, q]) => have(k) >= q)) return;
@@ -4442,7 +4522,7 @@ function updatePet(dt) {
     petE.phase += dt*12; petE.moving = true;
   }
   if (Math.abs(dx) > .1) petE.face = dx < 0 ? -1 : 1;
-  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd; hitEnemy(target, P.dmg, dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander' || S.pet === 'baby_drake') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
+  if (target && d < stop + .35 && petE.cd <= 0) { petE.cd = P.cd * (1 - .06*petLv()); hitEnemy(target, P.dmg + petLv(), dx/(d || 1), dy/(d || 1)); if (S.pet === 'kit') { S.hp = Math.min(maxHP(), S.hp + .5); renderHP(); } if (S.pet === 'salamander' || S.pet === 'baby_drake') burst(target.x, target.y - .4, '#ff8a2a', 5, 3); }
 }
 function drawPet(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase) : 0;
@@ -4633,6 +4713,7 @@ function renderHome() {
     <div class="vals" style="margin-top:6px">${homeCtx ? `A house in ${placeName(homeCtx)} · earns ${rentOf(homeCtx)} coin rent each morning · ${S.respawn === homeCtx ? 'you wake up here if knocked out' : 'not your respawn point'} · the chest is shared with all your homes` : `${L.plots} crop beds`}${homeCtx ? '<!--' : ''}${H.level >= 2 ? ` · coop with ${H.chickens} hens · workbench` : ''}${H.level >= 3 ? ' · forge' : ''} · you wake up here if you're knocked out${homeCtx ? '-->' : ''}</div>
     <div class="jgrid" style="margin-top:12px">
       <div class="jcard"><div class="t">Bed</div><div class="s">Sleep until morning and wake fully healed. Crops keep growing while you sleep.</div><div style="margin-top:8px"><button class="btn sm primary" data-sleep="1">Sleep</button></div></div>
+      ${homeCtx ? (() => { const L = propLv(homeCtx); if (L >= FURNISH_MAX) return `<div class="jcard"><div class="t">Furnishings <span style="color:var(--brass)">${stars(L, FURNISH_MAX)}</span></div><div class="s">Fully furnished. Rent is ${rentOf(homeCtx)} coin a day.</div></div>`; const c = furnishCost(homeCtx, L + 1), ok = upCanPay(c); return `<div class="jcard"><div class="t">Furnishings <span style="color:var(--brass)">${stars(L, FURNISH_MAX)}</span></div><div class="s">${['Add rugs and a proper table.','Add glass windows and a fireplace.','Add silk curtains and fine furniture.'][L]} Rent goes from ${rentOf(homeCtx)} to <b>${Math.round(PROPERTIES[homeCtx].price*.02*(1 + .5*(L + 1)))}</b> coin a day.</div><div class="req" style="margin-top:6px">${upCostHTML(c)}</div><div style="margin-top:8px"><button class="btn sm ${ok ? 'primary' : ''}" data-hup="1" ${ok ? '' : 'disabled'}>Furnish</button></div></div>`; })() : ''}
       ${homeCtx ? `<div class="jcard"><div class="t">Respawn point</div><div class="s">${S.respawn === homeCtx ? 'You wake up here when knocked out.' : 'Wake up here instead of your homestead when knocked out.'}</div><div style="margin-top:8px"><button class="btn sm ${S.respawn === homeCtx ? '' : 'primary'}" data-resp="1" ${S.respawn === homeCtx ? 'disabled' : ''}>Set as respawn point</button></div></div>` : up}
     </div>
     ${animalsHTML()}
@@ -4645,6 +4726,7 @@ $('homeSheet').addEventListener('click', e => {
   const H = S.home;
   if (b.dataset.x) { closeModal('home'); return; }
   if (b.dataset.sleep) { sleep(); return; }
+  if (b.dataset.hup) { const L = propLv(homeCtx), c = furnishCost(homeCtx, L + 1); if (L < FURNISH_MAX && upCanPay(c)) { upPay(c); S.propLv = S.propLv || {}; S.propLv[homeCtx] = L + 1; SFX.craft(); toast(`Your ${PROPERTIES[homeCtx].name} is more comfortable now. Rent: <b>${rentOf(homeCtx)} coin</b> a day.`); renderHUD(); save(); } }
   if (b.dataset.resp) { S.respawn = homeCtx; toast(`You'll wake up in your ${PROPERTIES[homeCtx].name} from now on.`); }
   if (b.dataset.up) { const next = HOME_LEVELS[H.level + 1]; if (next && canAfford(next.cost)) { pay(next.cost); H.level++; toast(`Built: <b>${next.name}</b><br>${next.perks}.`, 6000); } }
   if (b.dataset.store) { const g = b.dataset.store, n = b.dataset.n === 'all' ? have(g) : 1; if (have(g) >= n) { addItem(g, -n); H.chest[g] = (H.chest[g] || 0) + n; } }
@@ -5438,6 +5520,9 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['blacksmith','Master Smith','Upgrade a piece of gear to +5', () => Object.values(S.enh || {}).some(v => v >= 5)],
+  ['trainer','Animal Trainer','Train a pet to level 5', () => Object.values(S.petLv || {}).some(v => v >= 5)],
+  ['decorator','Interior Decorator','Fully furnish a house', () => Object.values(S.propLv || {}).some(v => v >= 3)],
   ['tycoon','Real Estate Tycoon','Own 20 houses', () => PK.filter(k => S.props[k]).length >= 20],
   ['lord','Lord of the Manor','Own an estate out in the wild', () => PK.some(k => PROPERTIES[k].estate && S.props[k])],
   ['king','King of the Castle','Buy the Hilltop Castle', () => !!S.props.castle],
@@ -5645,7 +5730,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
