@@ -507,6 +507,8 @@ const GOODS = {
   challenge_token:{name:'Challenge Token',base:0,col:'#e85a8a',kind:'trophy'},
   victors_cape:{name:"Victor's Cape",base:2000,col:'#c83a5a',kind:'trinket',desc:'+6% damage and +5% speed'},
   blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
+  phantom_cutlass:{name:'Phantom Cutlass',base:1400,col:'#9af0c0',kind:'weapon',dmg:12,cd:.3,reach:1.6,crit:.1,lifesteal:.1},
+  ghost_tricorn:{name:'Ghostly Tricorn',base:1000,col:'#5a8a7a',kind:'armor',slot:'head',armor:4,crit:.08},
   cursed_doubloon:{name:'Cursed Doubloon',base:90,col:'#9ad8b0',kind:'good'},
   ghost_lantern:{name:'Ghost Lantern',base:900,col:'#9af0c0',kind:'trinket',desc:'See much farther in the dark'},
   glider:{name:'Glider',base:220,col:'#e8d8b0',kind:'tool',desc:'Walk off a mountain edge to glide'},
@@ -2377,6 +2379,7 @@ function genWorld() {
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
+  setTimeout(placeWells, 0);
   for (const n of NPCS) if (n.balloon) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [Math.floor(m.x), Math.floor(m.y)]);
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => a === x && b === y)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
@@ -3278,6 +3281,52 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== Old Peg's cursed doubloons =====
+const DOUBLOON_SHOP = [['phantom_cutlass',1,8],['ghost_tricorn',1,6],['pirate_gold',2,2],['treasure_map',2,2],['black_pearl_ring',1,10],['grog',4,1]];
+function doubloonShop(n) {
+  say(`“Cursed doubloons? Arr, I know a way to lift the curse... for a price. Bring 'em here and I'll trade ye something from me old sea chest.”<br><span style="color:var(--muted)">You have <b>${have('cursed_doubloon')}</b> Cursed Doubloons. The ghost ship carries them.</span>`, [
+    ...DOUBLOON_SHOP.filter(([g]) => GOODS[g] && !((GOODS[g].kind === 'weapon' || GOODS[g].kind === 'armor') && have(g))).map(([g, q, c]) => ({label: `${GOODS[g].name}${q > 1 ? ' ×' + q : ''} · ${c} doubloon${c > 1 ? 's' : ''}`, disabled: have('cursed_doubloon') < c, fn: () => { addItem('cursed_doubloon', -c); addItem(g, q); SFX.coin(); renderHUD(); save(); toast(`+${q} ${GOODS[g].name}`); doubloonShop(n); }})),
+    back(n)]);
+}
+// ===== wishing wells =====
+const WELL_TOWNS = ['wren','maplehold','prismvale','greenstem'].filter(k => TOWNS[k]);
+const WELLS = [];
+function placeWells() {
+  WELLS.length = 0;
+  for (const k of WELL_TOWNS) { const tw = TOWNS[k];
+    for (const [dx, dy] of [[5,-1],[-5,-1],[5,2],[-5,2],[4,-4],[-4,-4],[4,4],[-4,4],[0,-5],[6,0],[-6,0]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)];
+      if (!inB(x, y) || !walkable(t, false, false) || t === T.HOUSE || t === T.DEEP || t === T.SHAL || NPCS.some(n => !n.wander && Math.hypot(n.x - x - .5, n.y - y - .6) < 1.8)) continue;
+      WELLS.push({town: k, x: x + .5, y: y + .6}); break; } }
+}
+function wellTarget() {
+  const w = WELLS.find(w => Math.hypot(S.x - w.x, S.y - w.y - .3) < 1.3); if (!w) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (S.wishDay === S.day) return {key: 'wellX', html: 'You have already made a wish today', btn: '', fn: () => {}};
+  return {key: 'well' + w.town, html: `${K}Toss a coin in the wishing well (10◆)`, btn: 'Wish', fn: () => makeWish(w)};
+}
+function makeWish(w) {
+  if (S.coins < 10) { toast('You need 10 coin to make a wish.'); return; }
+  S.coins -= 10; S.wishDay = S.day; S.wishes = (S.wishes || 0) + 1; burst(w.x, w.y - .4, '#8ad0ff', 14, 3); SFX.chime && SFX.chime();
+  const r = Math.random(); let msg;
+  if (r < .01) { S.coins += 1500; S.wishJackpot = true; msg = '<b>The well erupts with golden light!</b> A fortune in coins bubbles up: <span style="color:var(--good)">+1500 coin!</span>'; SFX.victory(); }
+  else if (r < .12) { const c = rint(40, 120); S.coins += c; msg = `Coins glitter at the bottom... and float back up! <span style="color:var(--good)">+${c} coin</span>`; }
+  else if (r < .3) { BUFFS.luck = 300; msg = 'A warm breeze ruffles your hair. You feel <b>lucky</b> (5 minutes).'; }
+  else if (r < .45) { BUFFS.might = 240; BUFFS.regen = 240; msg = 'The water shines red. You feel <b>mighty</b> and refreshed (4 minutes).'; }
+  else if (r < .6) { BUFFS.speed = 300; msg = 'Your feet feel light as feathers. <b>Swiftness</b> for 5 minutes.'; }
+  else if (r < .75) { const g = pick(['gem','pearl','amber','star_fragment','luck_draught','elixir'].filter(x => GOODS[x])); addItem(g, 1); msg = `Something glints in the water. You fish out <span style="color:var(--good)">1 ${GOODS[g].name}</span>!`; }
+  else msg = pick(['Ripples spread across the water. Nothing happens... but you feel hopeful.', 'A frog croaks at you. Somehow, it feels like good advice.', 'You hear a faint giggle from deep in the well.', 'Your reflection winks at you. Odd.']);
+  S.hp = Math.min(maxHP(), S.hp + 2); renderHP(); renderHUD(); save();
+  toast(`<b>You make a wish...</b><br>${msg}`, 6000);
+}
+function drawWell(w) {
+  const px = w.x*TS, py = w.y*TS;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 2, 10, 3, 0, 0, 6.283); ctx.fill();
+  ctx.fillStyle = '#8a8a90'; ctx.fillRect(px - 9, py - 8, 18, 10); ctx.fillStyle = '#6a6a72'; for (let i = 0; i < 3; i++) ctx.fillRect(px - 9 + i*6, py - 4, 5, 1);
+  ctx.fillStyle = '#3a7ab8'; ctx.fillRect(px - 7, py - 9, 14, 3); ctx.fillStyle = 'rgba(200,240,255,.7)'; ctx.fillRect(px - 5 + Math.sin(frameT*2)*2, py - 9, 3, 1);
+  ctx.fillStyle = '#6a4a2a'; ctx.fillRect(px - 9, py - 22, 2, 14); ctx.fillRect(px + 7, py - 22, 2, 14);
+  ctx.fillStyle = '#a03a2a'; ctx.beginPath(); ctx.moveTo(px - 12, py - 21); ctx.lineTo(px, py - 28); ctx.lineTo(px + 12, py - 21); ctx.fill();
+  ctx.fillStyle = '#4a3a2a'; ctx.fillRect(px - 1, py - 21, 2, 7); ctx.fillStyle = '#8a6a4a'; ctx.fillRect(px - 2, py - 15, 4, 3);
+}
 // ===== balloon rides =====
 let balloonF = null;
 const balloonCost = (a, b) => Math.round(30 + Math.hypot(TOWNS[a].x - TOWNS[b].x, TOWNS[a].y - TOWNS[b].y)/4);
@@ -3440,6 +3489,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Wishing wells & treasure goblins', 'Wishing wells in Port Wren, Maplehold, Prismvale and Greenstem grant a random blessing once a day for 10 coin. Rare Treasure Goblins flee with sacks of loot: catch one before it escapes through its portal. Old Peg in Blackwater trades Cursed Doubloons from the ghost ship for pirate treasure.'],
   ['Balloon rides', 'Balloonists in Port Wren, Frostgate, Crownfall, Tidewatch, Prismvale and Farhaven fly you between their stations, even to towns you have not found yet, and reveal the land below.'],
   ['Monster dens', 'Dens out in the wild keep spawning monsters while you are near. Smash a den for coin and materials. Destroyed dens rebuild after a week.'],
   ['Weekly challenges', 'Three bigger challenges appear in your journal each week. Completing one pays coin and Challenge Tokens, which Chronicler Aldous in Port Wren trades for rare goods and the Victor\u2019s Cape.'],
@@ -4381,6 +4431,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
@@ -4766,7 +4817,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -5074,6 +5125,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
   if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
@@ -7699,6 +7751,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['wisher','Make a Wish','Toss coins into wishing wells on 7 days', () => (S.wishes || 0) >= 7],
   ['goblin','Grabby Hands','Catch a Treasure Goblin', () => (S.killsBy.goblin || 0) >= 1],
   ['aeronaut','Aeronaut','Take 3 balloon rides', () => (S.balloonRides || 0) >= 3],
   ['denbuster','Den Buster','Destroy 5 monster dens', () => (S.densSmashed || 0) >= 5],
@@ -8122,7 +8175,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
