@@ -727,6 +727,7 @@ const GOODS = {
   jack_spear:{name:"Jack's Spear",base:1000,col:'#e0a040',kind:'weapon',dmg:12,cd:.45,reach:2.1},
   ember_crown:{name:'Ember Crown',base:1100,col:'#ff6a2a',kind:'armor',slot:'head',armor:3,crit:.07},
   mire_mail:{name:'Mire Mail',base:1100,col:'#6a8a4a',kind:'armor',armor:6,speed:-.04},
+  golden_horseshoe:{name:'Golden Horseshoe',base:600,col:'#f0c040',kind:'trinket',desc:'+8% movement speed, mounted or not'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -2583,7 +2584,7 @@ const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + (have('crown_of_ages') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed'));
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0);
 const canClimb = () => toolTier('climb') > 0;
@@ -2894,7 +2895,7 @@ function die() {
   const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
   const atHome = !rp && S.home && S.home.level >= 1;
   if (rp) { S.x = rp.door.x; S.y = rp.door.y + .2; } else if (atHome) { S.x = HOME.x + .5; S.y = HOME.y - .3; } else { S.x = TOWNS[best].x + .5; S.y = TOWNS[best].y + 2.3; }
-  S.riding = false; petE = null; compE = null;
+  S.riding = false; petE = null; compE = null; S.race = null;
   enemies = []; arrows = []; eproj = []; hazards = []; bombs = []; player.kx = player.ky = 0;
   $('bossbar').hidden = true; document.body.classList.remove('boss');
   toast(`<b>You were knocked out</b><br>${rp ? `You wake up in your ${rp.name}.` : atHome ? 'You wake up in your own bed.' : `Someone carried you to ${TOWNS[best].name}.`} ${lost ? `${lost} coin went missing on the way.` : ''}`, 6500);
@@ -3763,6 +3764,11 @@ function render() {
       sprites.push({y: cy, f: () => drawChicken(ctx, cx*TS, cy*TS, Math.cos(frameT*.4 + i*2.1) > 0 ? 1 : -1, frameT + i)});
     }
   }
+  if (S.race) { const R0 = S.race;
+    for (let k = R0.i; k < Math.min(R0.cps.length, R0.i + 3); k++) { const cp = R0.cps[k]; if (!inView(cp.x, cp.y)) continue; const next = k === R0.i, last = k === R0.cps.length - 1;
+      sprites.push({y: cp.y + .5, f: () => { const x = cp.x*TS, y = cp.y*TS, pu = next ? 1 + Math.sin(frameT*6)*.08 : .8; ctx.globalAlpha = next ? 1 : .4; ctx.strokeStyle = last ? '#86c98f' : '#e3a948'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, y - 10, 12*pu, 16*pu, 0, 0, 7); ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(x, y - 10, 10*pu, 14*pu, 0, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; if (last) { ctx.fillStyle = '#86c98f'; ctx.font = '8px "Pixelify Sans", monospace'; ctx.textAlign = 'center'; ctx.fillText('FINISH', x, y - 30); } }}); }
+    const cp = R0.cps[R0.i]; if (cp) { const dx = cp.x - S.x, dy = cp.y - S.y; if (Math.hypot(dx, dy) > 2.5) sprites.push({y: S.y + 60, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*26, cy = (S.y - .4)*TS + Math.sin(an)*26; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#e3a948'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  }
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
   if (compE && S.companion && inView(compE.x, compE.y)) { const C = COMPANIONS[S.companion]; sprites.push({y: compE.y, f: () => drawPerson(ctx, Math.round(compE.x*TS), Math.round(compE.y*TS), C.cols, compE.phase, compE.moving, compE.face, {held: C.held, pack: true}) }); }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
@@ -4034,6 +4040,7 @@ function updatePeople(dt) {
 let deedT = 0, lastCoins = null;
 function update(dt) {
   updatePeople(dt);
+  if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
   deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds();
@@ -4043,6 +4050,7 @@ function update(dt) {
   }
   if (S.arena) updateArena(dt);
   let vx = 0, vy = 0;
+  if (S.race && S.race.t < 0) keys.clear();
   if (keys.has('arrowleft') || keys.has('a')) vx -= 1;
   if (keys.has('arrowright') || keys.has('d')) vx += 1;
   if (keys.has('arrowup') || keys.has('w')) vy -= 1;
@@ -4268,6 +4276,7 @@ function renderClock() {
 }
 function renderRegion() {
   const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
+  if (S.race) { const nm = S.race.t < 0 ? `Race starts in ${Math.ceil(-S.race.t)}` : `Race · ${S.race.i + 1}/${S.race.cps.length} · ${S.race.t.toFixed(1)}s`; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   if (inArena()) { const nm = S.arena ? `Crownfall Arena · Wave ${S.arena.wave}` : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
@@ -4329,6 +4338,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.id === 'gwen') o.push({label: 'Race!', fn: () => raceTalk(n)});
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
@@ -4989,6 +4999,58 @@ function updateCompanion(dt) {
   if (C.role === 'ranged') arrows.push({x: compE.x, y: compE.y - .5, vx: ex/ed*13, vy: ey/ed*13, life: .7, max: .7, dmg, comp: true});
   else if (C.role === 'mage') { const tx2 = target.x, ty2 = target.y; burst(compE.x, compE.y - .8, '#ff8a3a', 6, 2); setTimeout(() => { if (!S.companion) return; aoeHit(tx2, ty2 - .3, 1.6, dmg); }, 250); }
   else hitEnemy(target, dmg, ex/ed, ey/ed);
+}
+const RACES = [
+  {id:'harbor', name:'The Harbor Dash', from:'wren', to:'hollow'},
+  {id:'marsh',  name:'The Marsh Run',   from:'wren', to:'reed'},
+  {id:'thorn',  name:'The Gloom Gallop', from:'wren', to:'thorn'},
+];
+function raceTrack(R0) {
+  const path = ROAD_PATHS[R0.from + '_' + R0.to] || [];
+  const pts = path.map(i => ({x: i % W + .5, y: ((i / W) | 0) + .5}));
+  if (pts.length && Math.hypot(pts[0].x - TOWNS[R0.from].x, pts[0].y - TOWNS[R0.from].y) > Math.hypot(pts[pts.length - 1].x - TOWNS[R0.from].x, pts[pts.length - 1].y - TOWNS[R0.from].y)) pts.reverse();
+  const cps = []; for (let i = 8; i < pts.length - 6; i += 14) cps.push(pts[i]); cps.push(pts[pts.length - 7] || pts[pts.length - 1]);
+  const len = pts.length, start = pts[Math.min(5, pts.length - 1)];
+  return {cps, start, gold: Math.round(len/9.5), silver: Math.round(len/7.5), bronze: Math.round(len/5.5)};
+}
+function raceTalk(n) {
+  S.raceBest = S.raceBest || {};
+  say(`“Fancy a race? Ride (or run!) along the road through every checkpoint ring. Beat the clock for a medal. Your first gold on any track wins my lucky Golden Horseshoe.”`, [
+    ...RACES.map(R0 => { const T0 = raceTrack(R0), b = S.raceBest[R0.id]; return {label: `${R0.name} · gold ${T0.gold}s${b ? ` · best ${b.toFixed(1)}s` : ''}`, fn: () => { closeTalk(); startRace(R0); }}; }),
+    back(n)]);
+}
+function startRace(R0) {
+  const T0 = raceTrack(R0); if (!T0.cps.length) return;
+  SFX.travel();
+  fadeThen(() => {
+    S.x = T0.start.x; S.y = T0.start.y; enemies = enemies.filter(e => e.boss); petE = null;
+    S.race = {id: R0.id, name: R0.name, cps: T0.cps, i: 0, t: -3, gold: T0.gold, silver: T0.silver, bronze: T0.bronze};
+    toast(`<b>${R0.name}</b><br>Gold ${T0.gold}s · Silver ${T0.silver}s · Bronze ${T0.bronze}s. Follow the arrow through the rings. Get ready...`, 4000);
+  });
+}
+function updateRace(dt) {
+  const R0 = S.race; if (!R0) return;
+  const prev = R0.t; R0.t += dt;
+  if (prev < 0 && R0.t >= 0) { toast('<b>GO!</b>', 1200); SFX.roar(); }
+  else if (R0.t < 0 && Math.ceil(prev) !== Math.ceil(R0.t)) SFX.coin();
+  if (R0.t < 0) { player.kx = player.ky = 0; return; }
+  const cp = R0.cps[R0.i];
+  if (Math.hypot(S.x - cp.x, S.y - cp.y) < 1.8) {
+    R0.i++; SFX.chime(); burst(cp.x, cp.y - .5, '#e3a948', 10, 3);
+    if (R0.i >= R0.cps.length) {
+      const t = R0.t, medal = t <= R0.gold ? 'gold' : t <= R0.silver ? 'silver' : t <= R0.bronze ? 'bronze' : null;
+      S.raceBest = S.raceBest || {}; if (!S.raceBest[R0.id] || t < S.raceBest[R0.id]) S.raceBest[R0.id] = t;
+      S.raceMedals = S.raceMedals || {}; let prize = '';
+      if (medal) { const rank = {gold: 3, silver: 2, bronze: 1}[medal], had = S.raceMedals[R0.id] || 0;
+        if (rank > had) { S.raceMedals[R0.id] = rank; const c = rank*80; S.coins += c; prize = ` +${c} coin.`; }
+        if (medal === 'gold' && !S.flags.horseshoe) { S.flags.horseshoe = true; addItem('golden_horseshoe', 1); prize += ' Gwen sends you her <b>Golden Horseshoe</b>!'; } }
+      SFX.victory(); gainXP(40); S.race = null; renderHUD(); renderRegion(); save();
+      toast(`<b>Finish! ${t.toFixed(1)} seconds</b><br>${medal ? `<span style="color:${medal === 'gold' ? '#f0c040' : medal === 'silver' ? '#dfe4ea' : '#c8803a'}">${medal.toUpperCase()} medal!</span>` : 'No medal this time. Try again!'}${prize}`, 7000);
+      return;
+    }
+  }
+  if (R0.t > R0.bronze*2.5) { S.race = null; toast('Race abandoned. You took too long.', 4000); renderRegion(); }
+  if (Math.floor(R0.t*10) !== Math.floor((R0.t - dt)*10)) renderRegion();
 }
 function hireTalk(n) {
   const cur = S.companion && COMPANIONS[S.companion];
@@ -6088,6 +6150,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['racer','Racer','Win a race medal', () => Object.keys(S.raceMedals || {}).length >= 1],
+  ['champion_rider','Champion Rider','Win gold on every race track', () => RACES.every(r => (S.raceMedals || {})[r.id] === 3)],
   ['legendhunter','Legend Hunter','Slay a legendary beast', () => Object.keys(S.legends || {}).length >= 1],
   ['mythslayer','Myth Slayer','Slay all ten legendary beasts', () => LEGENDS.every(L => (S.legends || {})[L.id])],
   ['stargazer','Stargazer','Collect 10 star fragments', () => (S.starsFound || 0) >= 10],
@@ -6423,7 +6487,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
