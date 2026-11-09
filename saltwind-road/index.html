@@ -1652,6 +1652,7 @@ const PETS = {
   hawk:{name:'Hawk', dmg:2, cd:1, speed:7, fly:true, desc:'Scouts ahead, so you see 2 tiles further.'},
   monkey:{name:'Monkey', dmg:1, cd:.7, speed:5.2, desc:'Helps you gather: 30% chance of an extra item.'},
   wolfpup:{name:'Alpha Pup', dmg:4, cd:.6, speed:5.8, desc:"The Grey Alpha's cub. Fierce and fast."},
+  fairy:{name:'Fairy', dmg:1, cd:.6, speed:6.2, fly:true, desc:'A tiny fairy from the ring. Sprinkles healing dust on you every few seconds.'},
   kit:{name:'Blossom Kit', dmg:3, cd:.7, speed:5.6, desc:'A pink fox cub. Each bite heals you a little.'},
   bunny:{name:'Bunny', dmg:1, cd:.7, speed:5.6, desc:'Tamed from a wild rabbit. You move 8% faster.'},
   fawn:{name:'Fawn', dmg:1, cd:.8, speed:5.6, desc:'Tamed from a wild deer. You heal much faster out of combat.'},
@@ -3399,6 +3400,44 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== fairy rings =====
+let fairyRing = null;
+const FAIRY_NOTES = [['🌸', 'Rose', '#ff7ab0'], ['💧', 'Sky', '#7ac8ff'], ['🍃', 'Leaf', '#7ae08a'], ['☀️', 'Sun', '#ffd040']];
+function fairyCheck() {
+  if (fairyRing && (fairyRing.day !== (S.time > .5 ? S.day : S.day - 1) || Math.hypot(S.x - fairyRing.x, S.y - fairyRing.y) > 40)) fairyRing = null;
+  const night = S.time > .76 || S.time < .24, nid = S.time > .5 ? S.day : S.day - 1;
+  if (fairyRing || !night || S.fairyNight === nid || inDungeon() || townAt(S.x, S.y, 12) || Math.random() > .12) return;
+  for (let k = 0; k < 14; k++) { const a = Math.random()*6.283, r = 6 + Math.random()*5, x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H) continue; const t = map[idx(x, y)]; if (![T.FOREST, T.BLOSSOM, T.MAPLE, T.SHROOM, T.GRASS, T.REDWOOD].includes(t) || !enemyWalk(x + .5, y + .5)) continue;
+    S.fairyNight = nid; fairyRing = {x: x + .5, y: y + .5, day: nid, done: false};
+    toast('<b>Tinkling laughter in the dark...</b><br>A ring of glowing mushrooms has appeared nearby. Fairies are dancing!', 5000); SFX.chime(); return; }
+}
+function fairyTarget() {
+  const R0 = fairyRing; if (!R0 || R0.done || Math.hypot(S.x - R0.x, S.y - R0.y) > 1.6) return null;
+  return {key: 'fairy', html: '<kbd style="margin:0 6px 0 0">E</kbd>Step into the fairy ring', btn: 'Dance', fn: () => fairyGame()};
+}
+function fairyGame() {
+  const len = Math.min(8, 4 + (S.fairyWins || 0)), seq = Array.from({length: len}, () => rint(0, 3));
+  const show = seq.map(i => `<span style="font-size:22px">${FAIRY_NOTES[i][0]}</span>`).join(' ');
+  openPanel('Fairy Ring', `The fairies hum a little tune and light up in turn. Remember the order!<br><br><div style="text-align:center">${show}</div><br><span style="color:var(--muted)">${seq.map(i => FAIRY_NOTES[i][1]).join(', ')}</span>`, [
+    {label: "I'm ready", primary: true, fn: () => fairyRepeat(seq, 0)}, {label: 'Step away', fn: closeTalk}]);
+}
+function fairyRepeat(seq, pos) {
+  openPanel('Fairy Ring', `Now sing it back! (${pos}/${seq.length})`, FAIRY_NOTES.map(([em, nm], i) => ({label: `${em} ${nm}`, fn: () => {
+    if (i !== seq[pos]) { fairyRing.done = true; SFX.hit(); openPanel('Fairy Ring', 'The fairies burst into giggles and wink out one by one. Wrong note! Maybe another night.', [{label: 'Leave', fn: closeTalk}]); return; }
+    SFX.coin(); if (pos + 1 < seq.length) { fairyRepeat(seq, pos + 1); return; }
+    fairyRing.done = true; S.fairyWins = (S.fairyWins || 0) + 1; BUFFS.luck = 600; BUFFS.regen = 600; S.hp = maxHP(); renderHP(); const c = 60 + seq.length*15; S.coins += c; addItem('flowers', 3); gainXP(50 + seq.length*10);
+    let pet = ''; if (S.fairyWins >= 3 && !S.pets.includes('fairy')) { setTimeout(() => addPet('fairy'), 800); pet = '<br>One tiny fairy refuses to leave your shoulder. <b>You have a new pet!</b>'; }
+    for (let k = 0; k < 4; k++) setTimeout(() => burst(fairyRing ? fairyRing.x : S.x, (fairyRing ? fairyRing.y : S.y) - .5, FAIRY_NOTES[k][2], 14, 4), k*150);
+    SFX.victory(); renderHUD(); save();
+    openPanel('Fairy Ring', `Perfect! The fairies swirl around you in delight and shower you with blessings: <span style="color:var(--good)">luck and healing for 10 minutes, ${c} coin and a bunch of flowers.</span>${pet}`, [{label: 'Thank you!', fn: closeTalk}]);
+  }})));
+}
+function drawFairyRing(R0) {
+  const px = R0.x*TS, py = R0.y*TS;
+  for (let i = 0; i < 10; i++) { const a = i/10*6.283, mx = px + Math.cos(a)*22, my = py + Math.sin(a)*12; ctx.fillStyle = '#e8e0d0'; ctx.fillRect(mx - 1, my - 2, 2, 3); ctx.fillStyle = R0.done ? '#8a6a5a' : `hsl(${(i*36 + frameT*40) % 360},80%,70%)`; ctx.beginPath(); ctx.ellipse(mx, my - 3, 3, 2, 0, Math.PI, 0); ctx.fill(); }
+  if (!R0.done) for (let i = 0; i < 4; i++) { const a = frameT*1.4 + i*1.57, fx = px + Math.cos(a)*14, fy = py - 10 + Math.sin(a*1.3)*6; ctx.fillStyle = FAIRY_NOTES[i][2]; ctx.globalAlpha = .8; ctx.beginPath(); ctx.arc(fx, fy, 2.2, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+}
 // ===== bug catching =====
 const BUG_KINDS = [
   {id:'monarch', biomes:[T.GRASS,T.BLOSSOM,T.MAPLE,T.HILL], when:'day', w:5},
@@ -4191,6 +4230,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Fairy rings', 'On some nights a ring of glowing mushrooms appears in the wilds. Step in and sing the fairies\u2019 tune back to them for blessings. After three songs, a fairy may follow you home.'],
   ['Bug catching', 'Craft a Bug Net (3 Sticks, 2 Spider Silk). Butterflies, beetles and fireflies flit about every land. Each biome and time of day has its own bugs. Calm ones are easy to catch, and skittish ones dart away. Look out for the rare Golden Beetle.'],
   ['Ruin vaults', 'Ancient vaults hide in ruins, moors, mesas and savannas. Read the riddle above the door, then pull the Sun, Moon and Star levers in the right order to open it. A wrong pull resets the levers and stings a little.'],
   ['Brewing & betting', 'Forge a Cauldron (4 Iron, 4 Stone) and place it. Combine two ingredients (herbs, berries, honey, flowers, ember, frost essence, crystal, slime gel, mushrooms) to discover potions. Arena Master Brutus also takes bets on monster bouts, up to five a day.'],
@@ -4461,7 +4501,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults(); fairyCheck();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -5184,6 +5224,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  if (fairyRing && inView(fairyRing.x, fairyRing.y)) sprites.push({y: fairyRing.y - .6, f: () => drawFairyRing(fairyRing)});
   for (const b of bugs) if (inView(b.x, b.y)) sprites.push({y: b.y + .3, f: () => drawBug(b)});
   if (S.vaults) for (const v of S.vaults) if (inView(v.x, v.y)) sprites.push({y: v.y + .9, f: () => drawVault(v)});
   if (stagTrail) { sprites.push({y: -1e9, f: drawStagTrail}); if (!stagTrail.met && inView(stagTrail.stag.x, stagTrail.stag.y)) sprites.push({y: stagTrail.stag.y, f: () => drawStag(stagTrail.stag)}); }
@@ -5346,6 +5387,7 @@ function render() {
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
     { const no = NPC_BY.noctis; if (!no.away) hole(no.x*TS, no.y*TS - 10, 40, .85); }
     for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
+    if (fairyRing && !fairyRing.done) hole(fairyRing.x*TS, fairyRing.y*TS - 4, 40, .8);
     for (const b of bugs) if (b.id === 'firefly' || b.id === 'glow_moth') hole(b.x*TS, b.y*TS - 10, 12, .5);
     if (S.flags.lighthouse && NPC_BY.mara) { const k = NPC_BY.mara, a = frameT*.8; hole(k.x*TS, (k.y - 1)*TS, 40, .9); for (let i = 1; i <= 4; i++) hole((k.x + Math.cos(a)*i*2.2)*TS, (k.y - 1 + Math.sin(a)*i*2.2)*TS, 26 - i*3, .6); }
     for (const q of S.placed) if (PLACE[q.t].light) hole(q.x*TS + 8, q.y*TS + (q.t === 'campfire' ? 8 : -4), PLACE[q.t].light, .85);
@@ -5577,7 +5619,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -7262,6 +7304,7 @@ let petFindT = 75;
 const PET_FINDS = {dog: [['bone', 1], ['coins', 15], ['meat', 1]], cat: [['fish', 1], ['feather', 1], ['coins', 8]], fox: [['coins', 25], ['amber', 1]], monkey: [['fruit', 2], ['coconut', 1], ['berries', 3]], raccoon: [['coins', 30], ['glass', 1]], crystal_beetle: [['crystal', 1], ['quartz', 1]]};
 function updatePet(dt) {
   if (!S.pet) { petE = null; return; }
+  if (S.pet === 'fairy' && petE) { petE.dust = (petE.dust ?? 6) - dt; if (petE.dust <= 0) { petE.dust = 6; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + petLv()*.2); renderHP(); burst(S.x, S.y - .8, '#fff4b0', 6, 2); } } }
   petFindT -= dt;
   if (petFindT <= 0 && petE) { petFindT = (60 + Math.random()*90) * (petTricks().includes('fetch') ? .7 : 1); if (!townAt(S.x, S.y, 8) && !inDungeon() && !enemies.some(e => !e.dead && Math.hypot(e.x - S.x, e.y - S.y) < 8 && !(ENEMIES[e.type] && ENEMIES[e.type].passive)) && Math.random() < .55) {
     const pool = (PET_FINDS[S.pet] || [['berries', 2], ['herbs', 1], ['coins', 10], ['sticks', 2]]).filter(([g]) => g === 'coins' || GOODS[g]), [g, n] = pick(pool);
@@ -7319,6 +7362,11 @@ function drawPet(g, id, x, y, f, phase, moving) {
   } else if (id === 'crystal_beetle') {
     shadow(4); g.fillStyle = '#2a3a5a'; g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
     g.fillStyle = '#5fb8d8'; g.beginPath(); g.ellipse(x, y-4, 4, 3, 0, 0, 7); g.fill(); g.fillStyle = '#c9f4ff'; g.fillRect(x-1, y-6, 1, 3); g.fillStyle = '#2a3a5a'; g.fillRect(x + f*3, y-5, 2, 2);
+  } else if (id === 'fairy') {
+    const hy = y - 9 + Math.sin(phase*.5 + frameT*3)*1.5, wf = Math.abs(Math.sin(frameT*20));
+    g.fillStyle = 'rgba(255,240,150,.3)'; g.beginPath(); g.arc(x, hy, 5, 0, 7); g.fill();
+    g.fillStyle = `rgba(200,240,255,${.5 + wf*.4})`; g.fillRect(x - 4, hy - 3, 3, 3 + wf); g.fillRect(x + 1, hy - 3, 3, 3 + wf);
+    g.fillStyle = '#f8e0c8'; g.fillRect(x - 1, hy - 4, 2, 2); g.fillStyle = '#9af0a0'; g.fillRect(x - 1, hy - 2, 2, 3); g.fillStyle = '#f0d040'; g.fillRect(x - 1, hy - 5, 2, 1);
   } else if (PET_DRAW[id]) {
     const [k, sc, fl] = PET_DRAW[id];
     g.save(); g.translate(x, y - (fl ? 6 : 0)); g.scale(sc, sc); drawEnemyAt(g, k, 0, 0, f, phase, {pet: true, boss: k === 'wyrm'}); g.restore();
@@ -8539,6 +8587,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['fairyring','Fairy Dance','Complete a fairy ring song', () => (S.fairyWins || 0) >= 1],
   ['bugcatcher','Bug Catcher','Catch 10 bugs', () => (S.bugsCaught || 0) >= 10],
   ['entomologist','Entomologist','Fill the bug log', () => BUG_KINDS.every(B => (S.bugLog || {})[B.id])],
   ['vault','Vault Breaker','Solve a lever vault in the ruins', () => (S.vaultsOpened || 0) >= 1],
@@ -9005,7 +9054,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
