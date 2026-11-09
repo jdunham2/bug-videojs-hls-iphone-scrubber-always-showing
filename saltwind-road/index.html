@@ -766,6 +766,7 @@ const GOODS = {
   contraband:{name:'Sealed Crate',base:0,col:'#4a3a2a',kind:'good'},
   rune_shard:{name:'Rune Shard',base:120,col:'#c8a8ff',kind:'good'},
   rune_ward:{name:'Rune Ward',base:2000,col:'#c8a8ff',kind:'trinket',desc:'+2 armor and +8% critical chance. The runes protect you.'},
+  royal_favor:{name:'Royal Favor',base:1000,col:'#e3a948',kind:'trinket',desc:'A letter bearing the queen\'s seal: +15% rent from all your houses'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1509,7 +1510,7 @@ function fireworkBurst(x, y) {
   if (SFX.firework) SFX.firework();
 }
 const isNightish = () => { const sun = Math.cos((S.time - .5) * Math.PI * 2); return sun < .1; };
-const rentOf = k => Math.round(PROPERTIES[k].price * .02 * (1 + .5*propLv(k)));
+const rentOf = k => Math.round(PROPERTIES[k].price * .02 * (1 + .5*propLv(k)) * (S && have('royal_favor') ? 1.15 : 1));
 const HOME_LEVELS = [
   {name:'Empty plot', plots:0},
   {name:'Log Cabin', plots:4, cost:{coins:250}, perks:'A bed, a storage chest and 4 crop beds'},
@@ -1833,6 +1834,8 @@ const NPCS = [
   {id:'noctis',town:'wren',dx:1,dy:-2,name:'Madame Noctis',role:'Night merchant',cols:{cloak:'#3a1a5a',skin:'#e0c8d8',hair:'#c8c8ff'},noctis:true,
    hello:["The night brings such interesting customers...","Ah. You found me again.","My dearest night owl."],
    rumors:["I am in a different town every night. Look for the purple lantern.","Mystery boxes hold anything at all. Anything."]},
+  {id:'elowen',town:'maplehold',dx:-2,dy:3,name:'Elowen',role:'Shepherd',cols:{cloak:'#7a6a4a',skin:'#e0c0a0',hair:'#e3a948'},
+   hello:["The sheep are restless today.","Oh, hello again!","My friend! Come sit."], rumors:["My grandmother used to say we came from somewhere grand. I think she just liked stories."]},
   {id:'silas',town:'lantern',dx:12,dy:6,cove:true,name:'Silas',role:'Smuggler',cols:{cloak:'#2a2a2a',skin:'#c89870',hair:'#5a2a1a'},
    hello:["You lost, friend?","Back again?","Partner."], rumors:["What happens at the cove stays at the cove."]},
   {id:'darius',town:'dun',dx:2,dy:3,name:'Merchant Prince Darius',role:'Caravan master',cols:{cloak:'#8a2a5a',skin:'#a8704a',hair:'#1a1a1a'},caravans:true,
@@ -4492,6 +4495,7 @@ function checkDeeds() {
   }
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
+  { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
@@ -4697,6 +4701,10 @@ function mainOptions(n) {
     if (n.id === 'silas') o.push({label: M && M.stage === 4 ? 'Business' : 'Who are you?', primary: true, fn: () => smugSilas(n)});
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
   if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
+  { const H = S.story && S.story.heir;
+    if (n.id === 'v_crownfall' && (!H || H.stage < 3)) o.push({label: H && H.stage ? 'About the royal relics' : 'Tell me about the old king', primary: !!(H && H.stage === 1 && heirRelics().signet && heirRelics().scepter && heirRelics().seal), fn: () => heirBastian(n)});
+    if (n.id === 'vess' && H && H.stage === 1 && !H.seal) o.push({label: 'The Royal Seal (3 Ancient Coins)', disabled: have('ancient_coin') < 3, fn: () => { addItem('ancient_coin', -3); H.seal = true; save(); say('“Three fine coins! A fair trade. Here is the Royal Seal. Look after it.”', [back(n)]); }});
+    if (n.id === 'elowen' && H && H.stage === 2) o.push({label: 'Show her the relics', primary: true, fn: () => heirElowen(n)}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
@@ -5034,6 +5042,29 @@ function drawShrine(sh) {
     ctx.globalAlpha = lit ? 1 : .55; ctx.fillStyle = RUNE_COL[c]; ctx.fillRect(sx - 1, sy - 10, 2, 7); ctx.fillRect(sx - 3, sy - 7, 6, 1);
     if (lit) { ctx.globalAlpha = .25 + Math.sin(frameT*4)*.1; ctx.beginPath(); ctx.arc(sx, sy - 6, 9, 0, 7); ctx.fill(); }
     ctx.globalAlpha = 1; }
+}
+// ===== story: the lost heir =====
+function heirState() { S.story = S.story || {}; return S.story.heir || (S.story.heir = {stage: 0}); }
+const heirRelics = () => ({signet: !!S.bosses.lichemperor, scepter: !!S.found.throne, seal: !!heirState().seal});
+function heirBastian(n) {
+  const H = heirState(), rel = heirRelics();
+  if (H.stage === 0) return say('“I served the last king, you know. Everyone says the royal line died with him. It didn\'t. His daughter fled with a shepherd family. Her blood lives on somewhere. If you found the three royal relics, the Signet, the Scepter and the Seal, the heir could be proven.”', [
+    {label: 'I\'ll find the relics', primary: true, fn: () => { H.stage = 1; save(); say('“The Signet was buried with the Lich Emperor in the Royal Catacombs. The Scepter fell at the Broken Throne, north of the city. And the Seal... Curator Vess keeps it, and she does love old coins.”', [back(n)]); }}, back(n)]);
+  if (H.stage === 1) { const have3 = rel.signet && rel.scepter && rel.seal;
+    if (have3) { H.stage = 2; save(); return say('“All three! Then the old tale is true. The family fled to the maple woods. Look for a shepherd in Maplehold with hair like gold. Elowen, I think her name was.”', [back(n)]); }
+    return say(`“How goes the search?”<br>${rel.signet ? '◆' : '◇'} Royal Signet (defeat the Lich Emperor)<br>${rel.scepter ? '◆' : '◇'} Royal Scepter (find the Broken Throne)<br>${rel.seal ? '◆' : '◇'} Royal Seal (ask Curator Vess)`, [back(n)]); }
+  if (H.stage === 2) return say('“Go to Maplehold. Find Elowen.”', [back(n)]);
+  return say(H.crowned ? '“Long live Queen Elowen! I can die happy now. Well, not soon, I hope.”' : '“So the relics are gone. Sold, they say. Well. Kings come and go.”', [back(n)]);
+}
+function heirElowen(n) {
+  const H = heirState();
+  say('You show Elowen the Signet, the Scepter and the Seal. Her hand trembles as she touches the Signet, and it glows faintly. “This... this can\'t be. Me? I herd sheep.”', [
+    {label: 'Take your crown, Your Majesty', primary: true, fn: () => { H.stage = 3; H.crowned = true; addRep('crownfall', 2); addRep('maplehold', 1); S.coins += 800; addItem('royal_favor', 1); gainXP(400); SFX.victory(); renderHUD(); save();
+      NPC_BY.elowen.name = 'Queen Elowen'; NPC_BY.elowen.role = 'Queen of the Old Kingdom';
+      say('“Then I\'ll try to be worthy of it.” Word spreads like wildfire: the Old Kingdom has a queen again.<br><br><span style="color:var(--good)">+800 coin, the Royal Favor (+15% house rent)</span>', [back(n)]); }},
+    {label: 'Keep the relics and sell them', fn: () => { H.stage = 3; H.crowned = false; S.coins += 1600; S.rep.crownfall = Math.max(0, repOf('crownfall') - 1); S.flags.relicThief = true; gainXP(200); SFX.coin(); renderHUD(); save();
+      say('Elowen\'s face falls. You pocket the relics and sell them to a collector for a fortune.<br><br><span style="color:var(--good)">+1600 coin</span> · Crownfall will not forget this.', [back(n)]); }},
+    back(n)]);
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -6970,6 +7001,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['kingmaker','Kingmaker','Crown the lost heir of the Old Kingdom', () => !!(S.story && S.story.heir && S.story.heir.crowned)],
   ['counter','Riposte','Land 10 counter-strikes after perfect dodges', () => (S.counters || 0) >= 10],
   ['sharpshooter','Sharpshooter','Fire 25 power shots (hold attack with a bow)', () => (S.powerShots || 0) >= 25],
   ['runereader','Rune Reader','Awaken a rune shrine', () => Object.keys(S.shrines || {}).length >= 1],
@@ -7308,6 +7340,7 @@ function step(ts) {
   render();
 }
 function begin(state) {
+  if (state.story && state.story.heir && state.story.heir.crowned) { NPC_BY.elowen.name = 'Queen Elowen'; NPC_BY.elowen.role = 'Queen of the Old Kingdom'; }
   S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan();
   if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
   if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
