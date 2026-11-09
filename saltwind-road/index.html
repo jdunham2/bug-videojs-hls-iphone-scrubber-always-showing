@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  legend_map:{name:'Legendary Map',base:500,col:'#e8b040',kind:'lmap',desc:'Leads to a legendary hoard, guarded by powerful foes.'},
   giant_pumpkin_seed:{name:'Giant Pumpkin Seed',base:150,col:'#e07a20',kind:'seed',crop:'giant_pumpkin',desc:'Keeps growing heavier for as long as you leave it in the ground.'},
   giant_pumpkin:{name:'Giant Pumpkin',base:120,col:'#e8801a',kind:'good',desc:'Enter it in the autumn weigh-in!'},
   gear:{name:'Brass Gear',base:20,col:'#d8a848',kind:'mat'},
@@ -3337,6 +3338,7 @@ function killEnemy(e) {
     return;
   }
   if (e.ghostCap) ghostLoot(e);
+  if (e.watch && S.watch) S.watch.kills++;
   if (e.clock && (S.clock || 0) === 2) { S.clock = 3; setTimeout(() => toast('<b>Brassby powers down with a sad whistle.</b><br>Return to Inventor Cogsworth in Highcairn.', 6000), 400); }
   if (e.type === 'mimic') { const t = e.mimicTier || 1, c = 60*t; S.coins += c; got.push(`+${c} coin`); for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT.filter(x => GOODS[x])); addItem(g, 2); got.push(`+2 ${GOODS[g].name}`); } S.mimics = (S.mimics || 0) + 1; }
   if (e.outlawBoss) outlawCaught();
@@ -3361,6 +3363,7 @@ function killEnemy(e) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
     const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
     addItem('elite_essence', facPerk('wardens') >= 3 ? 2 : 1); got.push(`+${facPerk('wardens') >= 3 ? 2 : 1} Elite Essence`);
+    if (!e.lmapGuard && Math.random() < .08) { addItem('legend_map', 1); got.push('<b>+1 Legendary Map!</b>'); }
     if (Math.random() < .2) { addItem('treasure_map', 1); got.push('+1 Treasure Map'); }
     S.eliteKills = (S.eliteKills || 0) + 1; S.eliteBounty = (S.eliteBounty || 0) + 1; gainXP(e.max*4);
     burst(e.x, e.y - .6, e.elite.col, 24, 6); shake = Math.max(shake, .3); SFX.victory();
@@ -3601,6 +3604,57 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== legendary maps =====
+function readLegendMap() {
+  if (S.lmap || !have('legend_map')) return;
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle'); let sp = null;
+  for (let tries = 0; tries < 600 && !sp; tries++) { const tk = pick(towns), a = Math.random()*6.283, r = 35 + Math.random()*35, x = Math.floor(TOWNS[tk].x + Math.cos(a)*r), y = Math.floor(TOWNS[tk].y + Math.sin(a)*r); if (!inB(x, y) || y >= WORLD_H - 3 || !enemyWalk(x + .5, y + .5) || townAt(x, y, 14)) continue; const dx = x - TOWNS[tk].x, dy = y - TOWNS[tk].y; sp = {x, y, town: tk, dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : (dy > 0 ? 'south' : 'north'), spawned: false}; }
+  if (!sp) { toast('The map is too old to make sense of. Try again elsewhere.'); return; }
+  addItem('legend_map', -1); S.lmap = sp; SFX.chime();
+  toast(`<b>A legendary map!</b><br>An ornate X marks a hoard far ${sp.dir} of ${TOWNS[sp.town].name}. Something guards it. Bring a shovel, and friends.`, 8000); renderHUD(); save();
+}
+function lmapUpdate() {
+  const L = S.lmap; if (!L || L.spawned || inDungeon() || Math.hypot(S.x - L.x - .5, S.y - L.y - .5) > 12) return;
+  L.spawned = true; const lv = 1 + (S.level || 1)*.07, pool = ['wolf', 'bandit', 'skeleton', 'ghoul', 'lion', 'wraith'].filter(t => ENEMIES[t]);
+  for (let k = 0; k < 3; k++) { const a = k/3*6.283, x = L.x + .5 + Math.cos(a)*2, y = L.y + .5 + Math.sin(a)*2; const e = makeEnemy(pick(pool), enemyWalk(x, y) ? x : L.x + .5, enemyWalk(x, y) ? y : L.y + .5, {alert: true, dungeon: true, lmapGuard: true}); e.hp = e.max = Math.round(e.max*lv*2.2); e.dmgMul = lv*1.4; makeElite(e); enemies.push(e); }
+  toast('<b>Hoard guardians!</b><br>Three elite guardians rise to defend the treasure.', 4500); SFX.roar(); shake = .4;
+}
+function lmapTarget() {
+  const L = S.lmap; if (!L || inDungeon() || Math.hypot(S.x - L.x - .5, S.y - L.y - .5) > 1.3) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (enemies.some(e => e.lmapGuard && !e.dead)) return {key: 'lmapG', html: 'Defeat the guardians first!', btn: '', fn: () => {}};
+  if (!toolTier('shovel')) return {key: 'lmap0', html: 'A legendary hoard lies here · you need a shovel', btn: '', fn: () => {}};
+  return {key: 'lmapdig', html: `${K}Dig up the legendary hoard`, btn: 'Dig', fn: () => {
+    S.lmap = null; S.hoards = (S.hoards || 0) + 1; const got = [], c = 1500 + (S.level || 1)*40; S.coins += c; got.push(`${c} coin`); addItem('gem', 3); got.push('3 Cut Gems'); const sf = rint(1, 3); addItem('star_fragment', sf); got.push(`${sf} Star Fragments`);
+    const rare = pick(['black_pearl_ring', 'golden_horseshoe', 'mystery_egg', 'jeweled_goblet', 'rainbow_petal'].filter(g => GOODS[g])); addItem(rare, 1); got.push(`<b>${GOODS[rare].name}</b>`);
+    for (let k = 0; k < 5; k++) setTimeout(() => burst(L.x + .5, L.y + .5, '#f0c040', 24, 6), k*150); SFX.victory(); shake = .4; gainXP(300 + (S.level || 1)*8); renderHUD(); save();
+    toast(`<b>A legendary hoard!</b><br><span style="color:var(--good)">+ ${got.join(', ')}</span>`, 9000); }};
+}
+// ===== hot spring =====
+function springTarget() {
+  const L = LANDMARKS.find(l => l.id === 'spring'); if (!L || L.x == null || Math.hypot(S.x - L.x - .5, S.y - L.y - .5) > 2.2) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (S.soakDay === S.day) return {key: 'soak0', html: 'You’ve already had a long soak today', btn: '', fn: () => {}};
+  return {key: 'soak', html: `${K}Soak in the hot spring`, btn: 'Soak', fn: () => { S.soakDay = S.day; S.soaks = (S.soaks || 0) + 1; S.hp = maxHP(); BUFFS.regen = 600; BUFFS.iron = 400; renderHP(); burst(S.x, S.y - .5, '#e8f4ff', 20, 3); SFX.lullaby ? SFX.lullaby() : SFX.chime(); toast('<b>Ahhh...</b><br>The warm water melts away every ache. Fully healed, Hearty and Ironskin for a good while.', 5000); save(); }};
+}
+// ===== night watch =====
+function watchTalk(n) {
+  const nid = S.time > .5 ? S.day : S.day - 1;
+  if (S.watch) { say(`“Hold the line! Wave ${S.watch.wave} of 3. Stay near town.”`, [back(n)]); return; }
+  if (!isNightish()) { say('“The night watch starts after dark. Come back when the lamps are lit and I’ll put you on the wall.”', [back(n)]); return; }
+  if (S.watchDay === nid) { say('“You’ve done your shift tonight. Get some rest.”', [back(n)]); return; }
+  say('“Raiders creep up on Port Wren at night. Stand watch for three waves and I’ll pay 25 coin a head, plus a bonus if you see it through.”', [{label: 'Take the watch', primary: true, fn: () => { closeTalk(); S.watchDay = nid; S.watch = {wave: 0, t: 3, kills: 0, town: n.town}; toast('<b>On watch!</b> Raiders approach in a few seconds...', 3000); }}, back(n)]);
+}
+function updateWatch(dt) {
+  const W0 = S.watch; if (!W0) return; const T0 = TOWNS[W0.town];
+  if (Math.hypot(S.x - T0.x, S.y - T0.y) > 26 || inDungeon()) { S.watch = null; enemies.forEach(e => { if (e.watch) e.dead = true; }); toast('You left your post. The watch is over.', 3000); return; }
+  if (enemies.some(e => e.watch && !e.dead)) return;
+  W0.t -= dt; if (W0.t > 0) return;
+  if (W0.wave >= 3) { const pay = W0.kills*25 + 150; S.coins += pay; addRep(W0.town, .3); S.watches = (S.watches || 0) + 1; S.watch = null; SFX.victory(); renderHUD(); save(); toast(`<b>Dawn watch complete!</b><br>Marshal Kade pays you <span style="color:var(--good)">${pay} coin</span>.`, 6000); return; }
+  W0.wave++; W0.t = 4; const lv = 1 + (S.level || 1)*.05, pool = ['bandit', 'archer', 'skeleton', 'wolf'].filter(t => ENEMIES[t]);
+  for (let k = 0; k < 3 + W0.wave*2; k++) { for (let tries = 0; tries < 10; tries++) { const a = Math.random()*6.283, x = T0.x + .5 + Math.cos(a)*11, y = T0.y + .5 + Math.sin(a)*11; if (!enemyWalk(x, y)) continue; const e = makeEnemy(pick(pool), x, y, {alert: true, watch: true}); e.hp = e.max = Math.round(e.max*lv); e.dmgMul = lv; enemies.push(e); break; } }
+  toast(`<b>Wave ${W0.wave} of 3!</b> Raiders on the outskirts!`, 2500); SFX.roar();
 }
 // ===== giant pumpkins =====
 function pumpkinTalk(n) {
@@ -4689,6 +4743,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Hoards, watches & springs', 'Elites sometimes drop a Legendary Map, which leads to a hoard guarded by three elites. Marshal Kade pays for night-watch shifts in Port Wren. And a soak in the Hot Spring heals you fully, once a day.'],
   ['Pumpkins & books', 'Pell the land agent sells Giant Pumpkin Seeds: plant one and leave it growing to make it heavier, then enter the autumn weigh-in. Librarian Ottoline in Crownfall lends tomes that teach forgotten recipes.'],
   ['Mimics, boxes & Brassby', 'Careful: a few dungeon chests are Mimics, worth extra loot once defeated. Mr. Whimsy in Lantern Bay sells mystery boxes. Inventor Cogsworth in Highcairn needs help catching his runaway automaton.'],
   ['Spring egg hunt', 'Every spring morning, five painted eggs are hidden around one of the towns you know. The Gazette and your tracker say which. Find all five for a prize.'],
@@ -4965,7 +5020,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -4975,7 +5030,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns(); lmapUpdate();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -5941,6 +5996,7 @@ function render() {
 
 function objective() {
   if (inDungeon() || S.y >= WORLD_H) return null;
+  if (S.lmap) return {x: S.lmap.x + .5, y: S.lmap.y + .5, label: 'Hoard', col: '#e8b040'};
   if ((S.clock || 0) === 2 && S.clockSpot) return {x: S.clockSpot.x, y: S.clockSpot.y, label: 'Brassby', col: '#e0c070'};
   if (S.raid && TOWNS[S.raid.town]) return {x: TOWNS[S.raid.town].x + .5, y: TOWNS[S.raid.town].y + .5, label: 'Raid', col: '#ff7a4a'};
   if (stagTrail && !stagTrail.met) return {x: stagTrail.stag.x, y: stagTrail.stag.y, label: 'White Stag', col: '#e8f4ff'};
@@ -6159,7 +6215,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -6509,6 +6565,7 @@ function mainOptions(n) {
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
   if (n.arena) o.push({label: 'Bet on a monster bout', fn: () => betTalk(n)});
+  if (n.id === 'kade') o.push({label: S.watch ? 'Night watch (on duty)' : 'Night watch duty', primary: !S.watch && isNightish() && S.watchDay !== (S.time > .5 ? S.day : S.day - 1), fn: () => watchTalk(n)});
   if (n.bounty) o.push({label: 'Legendary hunts', fn: () => legendTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
@@ -7475,6 +7532,7 @@ function renderBag() {
     ${sec('Food', ['food'], eatBtn)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
+    ${sec('Legendary maps', ['lmap'], g => `<button class="btn sm primary" data-readlmap="1" ${S.lmap ? 'disabled' : ''}>${S.lmap ? 'Already following one' : 'Read'}</button>`)}
     ${sec('Wish lanterns', ['lantern'], g => `<button class="btn sm primary" data-lantern="1">Release</button>`)}
     ${sec('Treasure maps', ['map'], g => `<button class="btn sm primary" data-readmap="1" ${S.tmap ? 'disabled' : ''}>${S.tmap ? 'Already following one' : 'Read'}</button>`)}
     ${sec('Seeds · plant them on your farm', ['seed'])}
@@ -7491,6 +7549,7 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.place) { closeModal('bag'); placeItem(b.dataset.place); return; }
   if (b.dataset.readmap) { closeModal('bag'); readMap(); return; }
   if (b.dataset.lantern) { closeModal('bag'); releaseLantern(); return; }
+  if (b.dataset.readlmap) { closeModal('bag'); readLegendMap(); return; }
   if ('pet' in b.dataset) choosePet(b.dataset.pet);
   if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderBag(); save();
@@ -9174,6 +9233,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['hoard','Legendary Hoard','Dig up a legendary hoard', () => (S.hoards || 0) >= 1],
+  ['watch','On Watch','Complete a night watch', () => (S.watches || 0) >= 1],
+  ['soak','Hot Tub Time','Soak in the hot spring 5 times', () => (S.soaks || 0) >= 5],
   ['pumpkin','Gourd Almighty','Win the giant pumpkin weigh-in', () => (S.pumpkinWins || 0) >= 1],
   ['bookworm','Bookworm','Read 10 library tomes', () => (S.tomes || 0) >= 10],
   ['mimic','Not a Chest','Defeat a Mimic', () => (S.mimics || 0) >= 1],
