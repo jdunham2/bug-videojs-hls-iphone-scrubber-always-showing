@@ -507,6 +507,8 @@ const GOODS = {
   challenge_token:{name:'Challenge Token',base:0,col:'#e85a8a',kind:'trophy'},
   victors_cape:{name:"Victor's Cape",base:2000,col:'#c83a5a',kind:'trinket',desc:'+6% damage and +5% speed'},
   blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
+  golden_ladle:{name:'Golden Ladle',base:400,col:'#f0c040',kind:'trophy'},
+  chefs_hat:{name:"Chef's Hat",base:350,col:'#f4f4f4',kind:'armor',slot:'head',armor:1,desc:'Worn by a champion cook'},
   ruby:{name:'Ruby',base:180,col:'#e0304a',kind:'mat',desc:'Socket: +8% damage'},
   sapphire:{name:'Sapphire',base:180,col:'#3a6ae0',kind:'mat',desc:'Socket: +4% critical chance'},
   emerald:{name:'Emerald',base:180,col:'#30c070',kind:'mat',desc:'Socket: +3 max HP'},
@@ -1927,6 +1929,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'auguste',town:'greenstem',dx:3,dy:3,name:'Chef Auguste',role:'Head judge',cols:{cloak:'#f0f0f0',skin:'#e0b896',hair:'#3a2a1a'},chef:true,freeSpot:true,
+   hello:["Magnifique! A fellow food lover?","Taste is everything.","Every third day of the week, the great cooking contest!"], rumors:["The judges change their theme every week. Hearty, seafood, sweet or fancy. Bring something you cooked yourself and they'll be kinder."]},
   {id:'pennyworth',town:'crownfall',dx:4,dy:2,name:'Banker Pennyworth',role:'Crownfall Bank',cols:{cloak:'#2a2a3a',skin:'#e8d0b8',hair:'#c8c8c8'},banker:true,freeSpot:true,
    hello:["Your coin is safe with us.","Interest compounds daily, you know.","Ah, a valued customer."], rumors:["Coin in the bank can't be lost if you're knocked out on the road. Just saying."]},
   {id:'mara',town:'tidewatch',dx:4,dy:-2,name:'Old Mara',role:'Lighthouse keeper',cols:{cloak:'#2a4a6a',skin:'#d8b090',hair:'#d0d0d0'},keeper:true,freeSpot:true,
@@ -3305,6 +3309,38 @@ function legendHint(L) {
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
 }
+// ===== cooking contest =====
+const COOK_THEMES = [
+  {name: 'Hearty', test: g => (GOODS[g].heal || 0) >= 8},
+  {name: 'Seafood', test: g => /fish|crab|shrimp|lobster|oyster|platter|eel|clam|stew|sushi|chowder/.test(g)},
+  {name: 'Sweet', test: g => /pie|tart|cake|candy|honey|jam|cookie|maple|jelly|sweet|syrup|apple/.test(g)},
+  {name: 'Fancy', test: g => GOODS[g].base >= 80},
+];
+const cookDay = () => S.day % 7 === 3;
+const cookTheme = () => COOK_THEMES[Math.floor((S.day - 1)/7) % COOK_THEMES.length];
+function chefTalk(n) {
+  const th = cookTheme();
+  if (!cookDay()) { say(`“The great cooking contest is held here on the third day of every week. Next contest: day ${S.day + ((3 - S.day % 7) + 7) % 7}. This week the judges want something <b>${th.name.toLowerCase()}</b>.”`, [back(n)]); return; }
+  if (S.cookContest === S.day) { say('“You have already entered today. The judges are still raving!”', [back(n)]); return; }
+  const foods = GK.filter(g => have(g) > 0 && GOODS[g].kind === 'food').sort((a, b) => cookScore(b, true) - cookScore(a, true)).slice(0, 7);
+  say(`“Welcome to the great cooking contest! Today's theme is <b>${th.name}</b>. Present your finest dish to the judges. Dishes you cooked yourself earn extra points.”`, [
+    ...foods.map(g => ({label: `${GOODS[g].name}${th.test(g) ? ' ★' : ''}${S.cooked && S.cooked[g] ? ' (home-cooked)' : ''}`, fn: () => cookContest(n, g)})),
+    ...(foods.length ? [] : [{label: 'You have no food to enter', disabled: true, fn: () => {}}]),
+    back(n)]);
+}
+function cookScore(g, est) { const d = GOODS[g]; return Math.min(55, d.base/2) + Math.min(30, (d.heal || 0)*1.5) + (cookTheme().test(g) ? 25 : 0) + (S.cooked && S.cooked[g] ? 12 : 0) + (est ? 0 : rint(0, 15)); }
+function cookContest(n, g) {
+  addItem(g, -1); S.cookContest = S.day;
+  const mine = Math.round(cookScore(g)), rivals = [['Granny Plum','plum dumplings'],['Sir Reginald','roast pheasant'],['the Fennick twins','a towering cake'],['a nervous apprentice','slightly burnt toast'],['Madame Rouge','lobster bisque']].sort(() => Math.random() - .5).slice(0, 3).map(([who, dish]) => ({who, dish, sc: rint(40, 115)}));
+  const all = [...rivals, {who: 'You', dish: GOODS[g].name.toLowerCase(), sc: mine, me: true}].sort((a, b) => b.sc - a.sc), place = all.findIndex(r => r.me) + 1;
+  let prize;
+  if (place === 1) { S.coins += 350; S.cookWins = (S.cookWins || 0) + 1; prize = '<b>First place!</b> +350 coin'; if (!have('golden_ladle')) { addItem('golden_ladle', 1); prize += ' and the <b>Golden Ladle</b>'; } if (S.cookWins === 3 && !have('chefs_hat')) { addItem('chefs_hat', 1); prize += ". Three wins! Chef Auguste gives you his own <b>Chef's Hat</b>"; } SFX.victory(); }
+  else if (place === 2) { S.coins += 120; prize = 'Second place! +120 coin'; SFX.coin(); }
+  else if (place === 3) { S.coins += 50; prize = 'Third place. +50 coin'; SFX.coin(); }
+  else prize = '“Hmm. Perhaps try something more... ' + cookTheme().name.toLowerCase() + ' next time.”';
+  addRep(n.town, place === 1 ? .4 : .1); renderHUD(); save();
+  say(`The judges taste each dish in solemn silence...<br><br>${all.map((r, i) => `${i + 1}. ${r.me ? '<b>' : ''}${esc(r.who)}, ${esc(r.dish)}: ${r.sc}${r.me ? '</b>' : ''}`).join('<br>')}<br><br>${prize}`, [back(n)]);
+}
 // ===== the bank =====
 const bankRate = () => .01 + (facPerk('league') >= 2 ? .005 : 0);
 const loanMax = () => 800 + (S.level || 1)*120;
@@ -3633,8 +3669,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Cooking contest', 'Every third day of the week Chef Auguste in Greenstem judges a cooking contest. Match the weekly theme and bring dishes you cooked yourself for the best score.'],
   ['Bank & mayors', 'Banker Pennyworth in Crownfall pays daily interest on savings, which are safe when you are knocked out, and lends coin for a week. Fully improve a town and earn top standing, and its elder will back you for mayor: mayors collect taxes every morning.'],
   ['The lighthouse', 'Old Mara in Tidewatch needs help restoring the lighthouse in three steps. Once it is lit again your boat sails 15% faster.'],
   ['The Headless Horseman', 'On autumn nights, beware the roads outside town. The Headless Horseman rides once a night, hurling flaming pumpkins. Defeat him to claim his steed, the Nightmare.'],
@@ -5298,6 +5335,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.chef) o.push({label: cookDay() ? 'The cooking contest! ★' : 'About the cooking contest', primary: cookDay() && S.cookContest !== S.day, fn: () => chefTalk(n)});
   if (n.banker) o.push({label: `The bank (${S.bank || 0}◆ saved)`, primary: !!S.loan, fn: () => bankTalk(n)});
   if (isElder(n) && !(S.mayor || {})[n.town]) o.push({label: 'Run for mayor', primary: canRunMayor(n.town), fn: () => mayorTalk(n)});
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
@@ -7932,6 +7970,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['masterchef','Master Chef','Win the cooking contest', () => (S.cookWins || 0) >= 1],
   ['banker','Nest Egg','Save 5000 coin in the bank', () => (S.bank || 0) >= 5000],
   ['mayor','Mayor','Be elected mayor of a town', () => Object.keys(S.mayor || {}).length >= 1],
   ['lighthouse','Keeper of the Light','Restore the Tidewatch lighthouse', () => (S.lighthouse || 0) >= 3],
