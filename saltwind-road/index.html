@@ -826,6 +826,8 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  mystery_egg:{name:'Mystery Egg',base:300,col:'#e8d8f0',kind:'mat',desc:'Something moves inside. Hatch it in an incubator.'},
+  incubator:{name:'Incubator',base:120,col:'#c8a070',kind:'place',desc:'Place with B. Keeps a Mystery Egg warm until it hatches.'},
   snowball:{name:'Snowball',base:1,col:'#f4f8ff',kind:'mat',desc:'Scooped from winter snow. Melts in spring.'},
   snowman:{name:'Snowman',base:20,col:'#f4f8ff',kind:'place',desc:'Place with B. Building one makes you cheerful. Melts in spring.'},
   royal_sash:{name:'Royal Sash',base:1800,col:'#7a3ad8',kind:'trinket',desc:'+3% damage and +3 max HP. Worn by Knights of the Realm.'},
@@ -1115,6 +1117,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'incubator',      need:{planks:4,wool:3,glass:1}, at:'bench', known:true},
   {id:'snowman',        need:{snowball:3,sticks:2,carrot:1}, at:'hand', known:true},
   {id:'magma_charm',    need:{fire_opal:5,obsidian:4,silver:2}, at:'forge', known:true},
   {id:'bug_net',        need:{sticks:3,silk:2}, at:'hand', known:true},
@@ -1434,7 +1437,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30}, snowman:{solid:true},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30}, snowman:{solid:true}, incubator:{solid:true, use:'incubate', light:24},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1500,6 +1503,12 @@ function placedTarget() {
   if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
     if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
     else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
+  if (P.use === 'incubate') return {key: 'pl' + q.x + ',' + q.y + (q.egg || 0), html: `${K}${q.egg ? `Incubator · hatches in ${Math.max(0, q.egg - S.day)} day(s)` : 'Use the incubator'}`, btn: 'Use', fn: () => {
+    if (q.egg && S.day >= q.egg) { const pool = ['phoenix_chick', 'shadow_cat', 'storm_pup'].filter(k => !S.pets.includes(k)); q.egg = 0; S.eggsHatched = (S.eggsHatched || 0) + 1; burst(q.x + .5, q.y, '#e8d8f0', 20, 4); SFX.victory();
+      if (pool.length) addPet(pick(pool)); else { addItem('pet_treat', 10); addItem('gem', 2); toast('The egg hatches into a tiny bird that flutters away, leaving behind 10 Pet Treats and 2 Gems.'); } save(); return; }
+    openPanel('Incubator', q.egg ? `The egg is warm and wobbling. It will hatch on day ${q.egg}.` : `A cosy straw-lined box. Place a Mystery Egg inside and it will hatch in 3 days.`, [
+      ...(!q.egg ? [{label: 'Place a Mystery Egg', primary: true, disabled: !have('mystery_egg'), fn: () => { addItem('mystery_egg', -1); q.egg = S.day + 3; save(); closeTalk(); toast('You settle the egg into the warm straw. It should hatch in 3 days.'); }}] : []),
+      ...(!q.egg ? [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}] : []), {label: 'Leave', fn: closeTalk}]); }};
   if (P.use === 'brew') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Brew at the cauldron`, btn: 'Brew', fn: () => brewTalk(q, null)};
   if (P.use === 'tent') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the tent`, btn: 'Use', fn: () => { const night = S.time > .7 || S.time < .25, here = S.tentPos && S.tentPos.x === q.x && S.tentPos.y === q.y;
     openPanel('Tent', `A snug little tent.${here ? ' <b>You wake up here when knocked out.</b>' : ''}`, [
@@ -1570,6 +1579,12 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'incubator':
+      g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 1, y + 14, 14, 2);
+      g.fillStyle = '#8a5a30'; g.fillRect(x + 1, y + 6, 14, 9); g.fillStyle = '#a07040'; g.fillRect(x + 1, y + 6, 14, 2);
+      g.fillStyle = '#e8c860'; g.fillRect(x + 2, y + 4, 12, 3);
+      if (q.egg) { g.fillStyle = '#e8d8f0'; g.beginPath(); g.ellipse(x + 8 + Math.sin(t*6)*.6, y + 2, 3.5, 4.5, 0, 0, 7); g.fill(); g.fillStyle = '#b08ad0'; g.fillRect(x + 6, y + 1, 1, 1); g.fillRect(x + 9, y + 3, 1, 1); }
+      g.fillStyle = 'rgba(255,200,120,.3)'; g.fillRect(x + 3, y - 3, 10, 3); break;
     case 'snowman':
       g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 2, y + 14, 12, 2);
       g.fillStyle = '#f4f8ff'; g.beginPath(); g.arc(x + 8, y + 9, 6, 0, 7); g.fill(); g.beginPath(); g.arc(x + 8, y + 1, 4.5, 0, 7); g.fill(); g.beginPath(); g.arc(x + 8, y - 5, 3.5, 0, 7); g.fill();
@@ -1666,6 +1681,9 @@ const PETS = {
   hawk:{name:'Hawk', dmg:2, cd:1, speed:7, fly:true, desc:'Scouts ahead, so you see 2 tiles further.'},
   monkey:{name:'Monkey', dmg:1, cd:.7, speed:5.2, desc:'Helps you gather: 30% chance of an extra item.'},
   wolfpup:{name:'Alpha Pup', dmg:4, cd:.6, speed:5.8, desc:"The Grey Alpha's cub. Fierce and fast."},
+  phoenix_chick:{name:'Phoenix Chick', dmg:3, cd:.7, speed:6, fly:true, desc:'Hatched from a mystery egg. Once a day, it saves you from being knocked out.'},
+  shadow_cat:{name:'Shadow Cat', dmg:3, cd:.6, speed:5.8, desc:'Hatched from a mystery egg. Its luck rubs off on you: +5% critical chance.'},
+  storm_pup:{name:'Storm Pup', dmg:5, cd:.65, speed:6, desc:'Hatched from a mystery egg. Crackles with lightning and bites hard.'},
   fairy:{name:'Fairy', dmg:1, cd:.6, speed:6.2, fly:true, desc:'A tiny fairy from the ring. Sprinkles healing dust on you every few seconds.'},
   kit:{name:'Blossom Kit', dmg:3, cd:.7, speed:5.6, desc:'A pink fox cub. Each bite heals you a little.'},
   bunny:{name:'Bunny', dmg:1, cd:.7, speed:5.6, desc:'Tamed from a wild rabbit. You move 8% faster.'},
@@ -3227,7 +3245,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
-    else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
     dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
@@ -3326,6 +3344,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   renderHP();
 }
 function die() {
+  if (S.pet === 'phoenix_chick' && S.phoenixDay !== S.day && !(S.arena && inArena())) { S.phoenixDay = S.day; S.hp = Math.ceil(maxHP()/2); player.inv = 2; renderHP(); burst(S.x, S.y - .5, '#ff8a2a', 30, 6); SFX.victory(); toast('<b>Your Phoenix Chick bursts into flame!</b><br>Warm fire wraps around you and you rise again. (Once per day.)', 5000); return; }
   if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); if (!S.arena.duel) S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
@@ -3657,6 +3676,7 @@ function pullLever(i, L) {
   v.done = true; vaultProg[i] = []; S.vaultsOpened = (S.vaultsOpened || 0) + 1; shake = .3;
   const got = [], c = 250 + (S.level || 1)*20; S.coins += c; got.push(`${c} coin`); addItem('gem', 2); got.push('2 Cut Gems'); const ac = rint(2, 4); addItem('ancient_coin', ac); got.push(`${ac} Ancient Coins`);
   if (Math.random() < .5) { addItem('star_fragment', 1); got.push('a Star Fragment'); }
+  if (Math.random() < .35) { addItem('mystery_egg', 1); got.push('<b>a Mystery Egg</b>'); }
   if (S.vaultsOpened === 3) { addItem('sun_disc', 2); got.push('2 Sun Discs'); }
   gainXP(150 + (S.level || 1)*6); SFX.victory(); for (let k = 0; k < 4; k++) setTimeout(() => burst(v.x + .5, v.y, '#f0c040', 20, 5), k*200); renderHUD(); save();
   toast(`<b>The vault grinds open!</b><br>Dust swirls as the stone door slides aside: <span style="color:var(--good)">${got.join(', ')}</span>`, 8000);
@@ -4263,6 +4283,7 @@ function denBroken(e) {
   const mats = pick([['bone', 3], ['hide', 3], ['iron', 2], ['silk', 3], ['chitin', 2], ['crystal', 2], ['ember', 2]].filter(([g]) => GOODS[g])); addItem(mats[0], mats[1]); got.push(`+${mats[1]} ${GOODS[mats[0]].name}`);
   if (Math.random() < .25) { addItem('gem', 1); got.push('+1 Cut Gem'); }
   if (Math.random() < .2) { addItem('treasure_map', 1); got.push('+1 Treasure Map'); }
+  if (Math.random() < .12) { addItem('mystery_egg', 1); got.push('<b>a Mystery Egg</b>'); }
   gainXP(40 + (S.level || 1)*4); SFX.victory(); burst(e.x, e.y - .4, '#8a6a4a', 24, 5); shake = .25;
   toast(`<b>Den destroyed!</b> It will take a week for the monsters to rebuild.<br><span style="color:var(--good)">${got.join(', ')}</span>`, 5500);
   renderHUD(); save();
@@ -4352,6 +4373,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Mystery eggs', 'Monster dens and ruin vaults sometimes hold a Mystery Egg. Build an Incubator (4 Planks, 3 Wool, 1 Glass), place the egg inside, and in 3 days it hatches into a rare pet: a Phoenix Chick, Shadow Cat or Storm Pup.'],
   ['Winter & decrees', 'In winter, scoop snowballs from snowy ground and build a Snowman (3 Snowballs, 2 Sticks, a Carrot) for a cheerful buff. Snowmen melt in spring. Each week Herald Bartholomew in Crownfall posts a decree: answer it for coin and royal favor, and reach 5 favor to be knighted.'],
   ['Hats', 'Milliner Maude in Maplehold sells cosmetic hats you can swap any time. A few special hats (Halo, Stag Antlers, Golden Crown, Pumpkin Head) are earned through great deeds.'],
   ['Volcano eruptions', 'In the Cinderlands the volcano sometimes erupts. Dodge the lava bombs by watching for their shadows, and grab the glowing rocks they leave: Fire Opals and Obsidian. Five opals forge a Magma Charm that makes you immune to the bombs.'],
@@ -7492,6 +7514,17 @@ function drawPet(g, id, x, y, f, phase, moving) {
   } else if (id === 'crystal_beetle') {
     shadow(4); g.fillStyle = '#2a3a5a'; g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
     g.fillStyle = '#5fb8d8'; g.beginPath(); g.ellipse(x, y-4, 4, 3, 0, 0, 7); g.fill(); g.fillStyle = '#c9f4ff'; g.fillRect(x-1, y-6, 1, 3); g.fillStyle = '#2a3a5a'; g.fillRect(x + f*3, y-5, 2, 2);
+  } else if (id === 'phoenix_chick') {
+    const hy = y - 7 + Math.sin(frameT*4)*1, wf = Math.sin(frameT*16)*2;
+    g.fillStyle = 'rgba(255,140,40,.25)'; g.beginPath(); g.arc(x, hy, 6, 0, 7); g.fill();
+    g.fillStyle = '#ff8a2a'; g.fillRect(x - 3, hy - 2, 6, 4); g.fillStyle = '#ffd040'; g.fillRect(x + f*2 - 1, hy - 5, 3, 3); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*3, hy - 4, 1, 1);
+    g.fillStyle = '#ff5a1a'; g.fillRect(x - 5, hy - 2 + wf*.5, 2, 3); g.fillRect(x + 3, hy - 2 - wf*.5, 2, 3);
+    g.fillStyle = Math.floor(frameT*10) % 2 ? '#ffd040' : '#ff6a1a'; g.fillRect(x - f*4 - 1, hy, 2, 4);
+  } else if (id === 'shadow_cat') {
+    shadow(4); g.fillStyle = '#1a1a24'; g.fillRect(x-3, y-5, 6, 3); g.fillRect(x-3, y-2, 1, 2); g.fillRect(x+2, y-2, 1, 2);
+    g.fillRect(x + f*2 - 1, y-7, 3, 3); g.fillRect(x + f*2 - 1, y-8, 1, 1); g.fillRect(x + f*2 + 1, y-8, 1, 1); g.fillRect(x - f*4, y-8 + Math.sin(phase*.5), 1, 4);
+    g.fillStyle = '#a070ff'; g.fillRect(x + f*2 + (f > 0 ? 1 : -1)*.5, y-6, 1, 1);
+    if (Math.random() < .08) particles.push({x: x/TS, y: y/TS - .3, vx: 0, vy: -.3, t: 0, col: 'rgba(140,90,220,.5)'});
   } else if (id === 'fairy') {
     const hy = y - 9 + Math.sin(phase*.5 + frameT*3)*1.5, wf = Math.abs(Math.sin(frameT*20));
     g.fillStyle = 'rgba(255,240,150,.3)'; g.beginPath(); g.arc(x, hy, 5, 0, 7); g.fill();
@@ -7502,7 +7535,7 @@ function drawPet(g, id, x, y, f, phase, moving) {
     g.save(); g.translate(x, y - (fl ? 6 : 0)); g.scale(sc, sc); drawEnemyAt(g, k, 0, 0, f, phase, {pet: true, boss: k === 'wyrm'}); g.restore();
   }
 }
-const PET_DRAW = {bunny:['rabbit',1], fawn:['deer',.75], frog:['frog',1], turtle:['turtle',.85], penguin:['penguin',1], parrot:['parrot',1], owl:['owl',1,1], meerkat:['meerkat',1], crane:['crane',.8], raccoon:['raccoon',1], baby_drake:['wyrm',.42,1]};
+const PET_DRAW = {bunny:['rabbit',1], fawn:['deer',.75], frog:['frog',1], turtle:['turtle',.85], penguin:['penguin',1], parrot:['parrot',1], owl:['owl',1,1], meerkat:['meerkat',1], crane:['crane',.8], raccoon:['raccoon',1], baby_drake:['wyrm',.42,1], storm_pup:['wolf',.7]};
 function drawMount(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase)*1.5 : 0;
   g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 9, 2.2, 0, 0, 7); g.fill();
@@ -8717,6 +8750,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['hatchling','Hatchling','Hatch a Mystery Egg', () => (S.eggsHatched || 0) >= 1],
   ['snowman','Do You Want to Build a Snowman?','Build a snowman', () => (S.snowmen || 0) >= 1],
   ['decree','Loyal Subject','Answer a royal decree', () => (S.favor || 0) >= 1],
   ['knight','Knight of the Realm','Earn 5 royal favor', () => (S.favor || 0) >= 5],
