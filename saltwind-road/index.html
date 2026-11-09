@@ -1545,6 +1545,10 @@ const MOUNTS = {
   camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
   elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
   griffon:{name:'Griffon', speed:2.0, fly:true, desc:'Flies over water, mountains and lava.'},
+  bear:{name:'Cave Bear', speed:1.6, terrain:[T.FOREST,T.REDWOOD,T.SNOW,T.HILL,T.GLOOM,T.MAPLE], desc:'Big, warm and stubborn. Never slowed by forest, snow or hills.'},
+  tiger:{name:'Striped Tiger', speed:1.85, terrain:[T.JUNGLE,T.BAMBOO,T.GRASS,T.SAVANNA], desc:'Silent and swift through jungle, bamboo and grassland.'},
+  glowmoth:{name:'Glowmoth', speed:1.7, fly:true, desc:'A giant glowing moth. Flies over water and mountains, a little slower than a griffon.'},
+  sea_turtle:{name:'Sea Turtle', speed:1.7, swim:true, desc:'Slow on land, but carries you across any water.'},
   strider:{name:'Sun Strider', speed:1.9, terrain:[T.SAVANNA,T.SAND,T.DUNE,T.GRASS], desc:'A tall running bird. Fastest on grass, savanna and sand.'},
 };
 
@@ -2009,6 +2013,7 @@ NPC_BY.dorrie.teaches = {sushi: 60}; NPC_BY.lio.teaches.coconut_curry = 70; NPC_
 NPC_BY.nell.teaches = {swift_draught: 40, wine: 50};
 NPC_BY.kael.animals = {baby_drake: 900}; NPC_BY.kael.animalReq = {baby_drake: 'wyrm'};
 NPC_BY.tobin.animals = {crystal_beetle: 500};
+NPC_BY.v_tallpine.animals = {bear: 600}; NPC_BY.v_greenstem.animals = {tiger: 750}; NPC_BY.v_sporehaven.animals = {glowmoth: 1600}; NPC_BY.v_driftport.animals = {sea_turtle: 900};
 NPC_BY.linden.contracts.push('c_linden2');
 NPC_BY.lark.rumors.push("Five new dungeons have been found! A frozen vault in the far north, a serpent temple under the Jade Temple, catacombs below Crownfall, a mycelium deep near Sporehaven and a prism mine by Prismvale.");
 NPC_BY.bess.rumors.push("Pirates hide in the Blackwater isles, out in the open sea south of the Old Kingdom. You'll need a boat to reach them.");
@@ -4127,7 +4132,8 @@ function render() {
   sprites.push({y: S.y, f: () => {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
-    if (onWater && S.flags.boat && !isFlying()) {
+    const swimRide = S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim;
+    if (onWater && S.flags.boat && !isFlying() && !swimRide) {
       const b = Math.sin(frameT*2.5)*1, dir = player.facing === 'left' ? -1 : 1;
       ctx.fillStyle = 'rgba(255,255,255,.35)'; if (player.moving) { ctx.fillRect(px - dir*16, py + 3, 6, 1); ctx.fillRect(px - dir*20, py + 1, 4, 1); }
       ctx.fillStyle = '#6a3a1a'; ctx.beginPath(); ctx.moveTo(px - 13, py - 3 + b); ctx.lineTo(px + 13, py - 3 + b); ctx.lineTo(px + 9*dir, py + 4 + b); ctx.lineTo(px - 9*dir, py + 4 + b); ctx.fill();
@@ -4136,11 +4142,11 @@ function render() {
       ctx.fillStyle = '#f0ece0'; ctx.beginPath(); ctx.moveTo(px - dir*3, py - 29 + b); ctx.quadraticCurveTo(px + dir*(12 + (player.moving ? 3 : 0)), py - 18 + b, px - dir*3, py - 7 + b); ctx.fill();
       ctx.fillStyle = '#c84a3a'; ctx.fillRect(px - dir*4, py - 33 + b, dir*6, 3);
       drawPerson(ctx, px + dir*3, py - 3 + b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
-    } else if (onWater && S.flags.raft && !isFlying()) {
+    } else if (onWater && S.flags.raft && !isFlying() && !swimRide) {
       const b = Math.sin(frameT*3)*.8;
       ctx.fillStyle = '#7a5532'; ctx.fillRect(px-8, py-4+b, 16, 7); ctx.fillStyle = '#5c3f24'; for (let i = 0; i < 4; i++) ctx.fillRect(px-8+i*4, py-4+b, 1, 7);
       drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
-    } else if (onWater && !isFlying()) {
+    } else if (onWater && !isFlying() && !swimRide) {
       drawPerson(ctx, px, py+3, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield});
       ctx.fillStyle = TILE_COL[ptile]; ctx.fillRect(px-6, py-1, 12, 5);
       ctx.fillStyle = 'rgba(210,236,245,.6)'; ctx.fillRect(px-6, py-1, 12, 1);
@@ -4307,7 +4313,7 @@ let nearNPC = null, nearNodeI = -1, nearBoard = null, nearHome = null, saveTimer
 
 function passable(x, y) {
   const pts = [[x-.28, y-.05], [x+.28, y-.05], [x-.28, y+.2], [x+.28, y+.2]];
-  const raft = !!S.flags.raft, climb = canClimb(), fly = isFlying();
+  const raft = !!S.flags.raft || !!(S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim), climb = canClimb(), fly = isFlying();
   for (const [px,py] of pts) {
     const tx = Math.floor(px), ty = Math.floor(py);
     if (!inB(tx,ty)) return false;
@@ -4406,7 +4412,7 @@ function update(dt) {
     if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = S.flags.boat ? 2.3 : 1.15;
     if (t === T.MOUNT) sp = .4;
     const M = S.riding && MOUNTS[S.mount];
-    if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
+    if (M && M.swim && (t === T.DEEP || t === T.SHAL)) sp = M.speed; else if (M && M.swim) sp = Math.max(.4, sp) * .8; else if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
     sp = 4.6 * Math.max(.4, sp) * speedMult();
     const nx = S.x + vx*sp*dt, ny = S.y + vy*sp*dt;
     if (passable(nx, S.y)) S.x = nx;
@@ -4424,7 +4430,7 @@ function update(dt) {
     if (passable(S.x, ny)) S.y = ny;
     const decay = Math.min(1, dt*9); player.kx -= player.kx*decay; player.ky -= player.ky*decay;
   }
-  if (S.riding && !isFlying() && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) { S.riding = false; toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't swim, so you climb off.`); renderHUD(); }
+  if (S.riding && !isFlying() && !(MOUNTS[S.mount] && MOUNTS[S.mount].swim) && tileAt(Math.floor(S.x), Math.floor(S.y)) === T.DEEP) { S.riding = false; toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't swim, so you climb off.`); renderHUD(); }
   { const ct = tileAt(Math.floor(S.x), Math.floor(S.y)); if (ct === T.DSPIKE && spikeUp(Math.floor(S.x), Math.floor(S.y))) hurtPlayer(2, null); }
   updatePet(dt);
   updateCompanion(dt);
@@ -5671,7 +5677,7 @@ function toggleRide() {
     if (!walkable(t, !!S.flags.raft, canClimb())) { toast('Find solid ground before you land.'); return; }
     S.riding = false;
   } else {
-    if (t === T.DEEP && !MOUNTS[S.mount].fly) { toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't go into deep water.`); return; }
+    if (t === T.DEEP && !MOUNTS[S.mount].fly && !MOUNTS[S.mount].swim) { toast(`Your ${MOUNTS[S.mount].name.toLowerCase()} won't go into deep water.`); return; }
     S.riding = true; fishing = null;
   }
   burst(S.x, S.y, '#c8b896', 8, 2); SFX.ride(); renderHUD(); save();
@@ -5934,12 +5940,39 @@ function drawMount(g, id, x, y, f, phase, moving) {
     g.fillStyle = '#c8a040'; g.fillRect(x - f*9 - 1, y-9+hy, 3, 2);
     return;
   }
+  if (id === 'glowmoth') {
+    const wf = Math.sin(frameT*(moving ? 12 : 4))*5, hy = moving ? -5 : -2;
+    g.globalAlpha = .85; g.fillStyle = '#b8f0ff'; g.beginPath(); g.ellipse(x - 7, y - 12 + hy - wf*.3, 8, 5 + wf*.4, -.4, 0, 7); g.fill(); g.beginPath(); g.ellipse(x + 7, y - 12 + hy - wf*.3, 8, 5 + wf*.4, .4, 0, 7); g.fill();
+    g.fillStyle = '#7ac8e8'; g.beginPath(); g.arc(x - 8, y - 12 + hy, 2, 0, 7); g.arc(x + 8, y - 12 + hy, 2, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.fillStyle = '#5a4a6a'; g.beginPath(); g.ellipse(x, y - 10 + hy, 3, 6, 0, 0, 7); g.fill(); g.fillStyle = '#e8e0ff'; g.fillRect(x + f*1 - 2, y - 16 + hy, 4, 3); g.fillStyle = '#c8a8ff'; g.fillRect(x + f*1 - 3, y - 19 + hy, 1, 3); g.fillRect(x + f*1 + 2, y - 19 + hy, 1, 3);
+    if (Math.random() < .2) burst((x)/TS, (y - 10)/TS, '#b8f0ff', 1, 1);
+    return;
+  }
+  if (id === 'sea_turtle') {
+    const sw = tileAt(Math.floor(x/TS), Math.floor(y/TS)), wet = sw === T.DEEP || sw === T.SHAL;
+    g.fillStyle = '#6a9a5a'; for (const [a, b] of [[-8,-3],[6,-3],[-7,1],[5,1]]) g.fillRect(x + a + (moving ? Math.sin(phase + a)*1 : 0), y + b - (wet ? 2 : 0), 3, 2);
+    g.fillStyle = '#4a7a3a'; g.beginPath(); g.ellipse(x, y - 5 - (wet ? 1 : 0), 9, 5, 0, Math.PI, 0); g.fill(); g.fillRect(x - 9, y - 5 - (wet ? 1 : 0), 18, 2);
+    g.fillStyle = '#6a9a4a'; g.fillRect(x - 5, y - 8, 3, 2); g.fillRect(x + 1, y - 9, 3, 2); g.fillRect(x - 2, y - 6, 3, 2);
+    g.fillStyle = '#8ab86a'; g.fillRect(x + f*10 - 2, y - 7, 4, 3); g.fillStyle = '#1a1a1a'; g.fillRect(x + f*11, y - 6, 1, 1);
+    if (wet) { g.fillStyle = 'rgba(210,236,245,.5)'; g.fillRect(x - 11, y - 3, 22, 1); }
+    return;
+  }
   if (id === 'strider') {
     const s1 = moving ? Math.sin(phase)*3 : 0;
     g.fillStyle = '#c8902a'; g.fillRect(x-3 + s1*.5, y-9, 1.5, 9); g.fillRect(x+2 - s1*.5, y-9, 1.5, 9);
     g.fillStyle = '#3a2a1a'; g.beginPath(); g.ellipse(x, y-12, 8, 5, 0, 0, 7); g.fill(); g.fillStyle = '#f4ecd8'; g.fillRect(x - f*7 - 2, y-14, 4, 3);
     g.fillStyle = '#d8b090'; g.fillRect(x + f*6 - 1, y-22, 2, 10); g.fillRect(x + f*7 - 2, y-24, 5, 3); g.fillStyle = '#e0a030'; g.fillRect(x + f*10 - (f < 0 ? 1 : 0), y-23, 2, 1);
     g.fillStyle = '#1a1a1a'; g.fillRect(x + f*8, y-23, 1, 1);
+    return;
+  }
+  if (id === 'bear' || id === 'tiger') {
+    const body = id === 'bear' ? '#5a3a24' : '#e08a2a', dark = id === 'bear' ? '#3a2416' : '#2a1a10';
+    g.fillStyle = dark; for (const a of [-6, -3, 2, 5]) g.fillRect(x + a, y - 5, 2.5, 5 + ((a > 0) === (step > 0) ? 0 : -1));
+    g.fillStyle = body; g.fillRect(x - 8, y - 12, 16, 8); if (id === 'bear') g.fillRect(x - 6, y - 14, 10, 2);
+    g.fillRect(x + f*7 - 3, y - 15, 7, 6);
+    if (id === 'tiger') { g.fillStyle = dark; for (const a of [-5, -1, 3]) g.fillRect(x + a, y - 12, 1.5, 8); g.fillRect(x + f*6, y - 14, 1, 3); g.fillStyle = '#f4ecd8'; g.fillRect(x + f*8 - 1, y - 11, 3, 2); g.fillStyle = body; g.fillRect(x - f*9 - 1, y - 12 - Math.sin(frameT*3)*1, 2, 5); }
+    else { g.fillStyle = dark; g.fillRect(x + f*6 - 3, y - 17, 2, 2); g.fillRect(x + f*6 + 2, y - 17, 2, 2); g.fillStyle = '#c8a080'; g.fillRect(x + f*9 - 1, y - 12, 3, 2); }
+    g.fillStyle = id === 'tiger' ? '#8ad040' : '#1a1a1a'; g.fillRect(x + f*8, y - 14, 1, 1);
     return;
   }
   const body = id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
@@ -7079,6 +7112,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['stable','Stable Master','Own 6 different mounts', () => (S.mounts || []).length >= 6],
   ['petfinder','Pet Detective','Return 5 lost pets to their owners', () => (S.petsReturned || 0) >= 5],
   ['marksman','Marksman','Score gold at the archery range', () => !!S.flags.archeryGold],
   ['tourneygold','Tournament Champion','Win gold in a fishing tournament', () => !!(S.tourneyMedals && S.tourneyMedals.gold)],
