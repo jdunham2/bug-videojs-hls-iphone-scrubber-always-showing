@@ -990,6 +990,8 @@ export class CreatureManager {
   }
 
   animate(c, dt) {
+    // far-away creatures are hidden: skip the (heightAt-heavy) pose work
+    if (!c.obj.visible && !c.riddenBy) { c.obj.position.copy(c.pos); return; }
     const m = c.model, d = c.def;
     const runK = clamp(c.speed / d.run, 0, 1);
     const moving = c.speed > 0.2;

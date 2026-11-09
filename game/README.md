@@ -107,4 +107,10 @@ The buttons are Hit (hold to attack), Use, Jump, plus Run and Sneak toggles.
 The 🎒 button opens inventory and crafting, and you tap a hotbar slot to equip or eat.
 Landscape plays best.
 
+### Settings
+
+Open ⚙ Settings from the title screen, the pause menu or the touch toolbar to change volume,
+look sensitivity, invert Y, field of view, shadows, grass, the minimap and an FPS counter.
+Settings are remembered in your browser.
+
 Three.js (MIT) is vendored in `vendor/`.

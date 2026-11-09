@@ -11,6 +11,7 @@ import { SaveSystem, applySave } from './save.js';
 import { WorldMap } from './map.js';
 import { Weather } from './weather.js';
 import { TameRoster } from './tames.js';
+import { Settings } from './settings.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -105,6 +106,7 @@ class Game {
     this.map = new WorldMap(this);
     this.weather = new Weather(this.scene, this.shared, this.audio);
     this.roster = new TameRoster(this);
+    this.settings = new Settings(this);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -152,6 +154,7 @@ class Game {
     const canvas = this.renderer.domElement;
     document.addEventListener('keydown', (e) => {
       if (!this.started) return;
+      if (this.settings.open) { if (e.code === 'Escape') this.settings.toggle(false); return; }
       if (this.roster.open) { if (e.code === 'Escape' || e.code === 'KeyT') this.roster.toggle(false); return; }
       if (e.code === 'KeyM' && !this.ui.open) { this.map.toggle(); return; }
       if (this.map.open) { if (e.code === 'Escape') this.map.toggle(false); return; }
@@ -194,7 +197,7 @@ class Game {
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (!this.locked && this.started && !this.ui.open && !this.map.open && !this.roster.open && this.player.alive) this.setPaused(true);
+      if (!this.locked && this.started && !this.ui.open && !this.map.open && !this.roster.open && !this.settings.open && this.player.alive) this.setPaused(true);
       if (this.locked) this.setPaused(false);
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());
@@ -889,6 +892,7 @@ class Game {
   loop() {
     requestAnimationFrame(() => this.loop());
     const dt = Math.min(this.clock.getDelta(), 0.05);
+    this.settings.tick(dt);
     this.step(dt);
     this.renderer.render(this.scene, this.camera);
   }

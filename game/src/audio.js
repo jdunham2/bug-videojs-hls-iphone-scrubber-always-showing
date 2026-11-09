@@ -2,12 +2,14 @@
 export class Audio {
   constructor() { this.ctx = null; this.enabled = true; }
 
+  setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05); }
+
   start() {
     if (this.ctx) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = this.ctx = new AC();
-    this.master = ctx.createGain(); this.master.gain.value = 0.7;
+    this.master = ctx.createGain(); this.master.gain.value = this.volume ?? 0.7;
     const comp = ctx.createDynamicsCompressor();
     this.master.connect(comp); comp.connect(ctx.destination);
 

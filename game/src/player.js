@@ -120,7 +120,7 @@ export class Player {
     if (!this.alive) return;
     // look
     this.yaw -= input.mx * 0.0022 * input.sens;
-    this.pitch = clamp(this.pitch - input.my * 0.0022 * input.sens, -1.5, 1.5);
+    this.pitch = clamp(this.pitch - input.my * 0.0022 * input.sens * (input.invert ? -1 : 1), -1.5, 1.5);
 
     if (this.mount) return; // movement handled by mount
 
