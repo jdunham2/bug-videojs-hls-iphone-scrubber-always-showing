@@ -4424,6 +4424,7 @@ function checkDeeds() {
   }
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
+  { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
   if (S.escort) extra.push(`<div class="dd" style="color:#86c98f"><span>⛟ Escort to ${TOWNS[S.escort.b].name} · wagon ${Math.max(0, Math.round(S.escort.hp/S.escort.max*100))}%</span></div>`);
   if (S.tmap) extra.push(`<div class="dd"><span>✕ Treasure ${S.tmap.dir} of ${TOWNS[S.tmap.town].name}</span></div>`);
@@ -4615,6 +4616,10 @@ function mainOptions(n) {
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
+  { const R0 = S.story && S.story.river;
+    if (n.id === 'odile' && (!R0 || R0.stage < 2)) o.push({label: R0 && R0.stage === 1 ? 'About the river dispute' : 'Any trouble in the land?', primary: !!(R0 && R0.h && R0.r), fn: () => riverOdile(n)});
+    if (n.id === 'ruun' && R0 && R0.stage === 1 && !R0.h) o.push({label: 'About the dam...', primary: true, fn: () => riverRuun(n)});
+    if (n.id === 'corvo' && R0 && R0.stage === 1 && !R0.r) o.push({label: 'About the river...', primary: true, fn: () => riverCorvo(n)}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
@@ -4830,6 +4835,40 @@ function caravanDay() {
   for (const c of S.caravans) { if (Math.random() < (c.guard ? .03 : .1)) { robbed++; continue; } total += c.perDay; }
   S.coins += total; S.caravanEarned = (S.caravanEarned || 0) + total;
   return ` Your caravans brought in <b>${total} coin</b>${robbed ? ` (${robbed} robbed by bandits!)` : ''}.`;
+}
+// ===== story: The River Dispute =====
+function riverState() { S.story = S.story || {}; return S.story.river || (S.story.river = {stage: 0}); }
+function riverOdile(n) {
+  const R0 = riverState();
+  if (R0.stage === 0) return say(`“Trouble, I'm afraid. Hollowpine's loggers have dammed the river for their sawmill, and Reedholm's fishers are going hungry. Tempers are rising. I need someone both towns will talk to. Will you go and settle it?”`, [
+    {label: 'I\'ll settle it', primary: true, fn: () => { R0.stage = 1; save(); say('“Thank you. Talk to Elder Ruun in Hollowpine and Corvo the ferryman in Reedholm, then come back to me.”', [back(n)]); }}, back(n)]);
+  if (R0.stage === 1 && !(R0.h && R0.r)) return say(`“Have you spoken to both sides? ${R0.h ? '' : 'Elder Ruun in Hollowpine is waiting. '}${R0.r ? '' : 'Corvo in Reedholm is waiting.'}”`, [back(n)]);
+  if (R0.stage === 1) {
+    R0.stage = 2; let txt, coins;
+    if (R0.h === 'listen' && R0.r === 'deal') { addRep('hollow', 1); addRep('reed', 1); coins = 450; S.flags.riverAccord = true; txt = '“The River Accord! Fish and salt flow upriver, timber flows down, and the dam opens every morning. Both towns are singing your name. This is how trade should work.”'; }
+    else if (R0.h === 'threat') { addRep('reed', 1); S.rep.hollow = Math.max(0, repOf('hollow') - 1); coins = 250; txt = '“Well... the dam is open. Hollowpine opened it, but they won\'t forget how you spoke to them. Reedholm is grateful, at least.”'; }
+    else if (R0.h === 'bribe') { addRep('hollow', .5); addRep('reed', .5); coins = 200; txt = '“Coin solves many things. The dam is open for now. Let\'s hope the money lasts longer than the peace.”'; }
+    else { addRep('hollow', .5); addRep('reed', .5); coins = 250; txt = '“You calmed things down. It\'s not a lasting peace, but nobody is starving tonight. Well done.”'; }
+    S.coins += coins; gainXP(250); SFX.victory(); renderHUD(); save();
+    return say(`${txt}<br><br><span style="color:var(--good)">+${coins} coin</span>`, [back(n)]);
+  }
+  return say(R0 && S.flags.riverAccord ? '“The River Accord still holds. You did a fine thing.”' : '“The river flows again. Thank you for your help.”', [back(n)]);
+}
+function riverRuun(n) {
+  const R0 = riverState();
+  say(`“The dam? Our sawmill needs it. Without the mill, Hollowpine has no trade, and no trade means no food. What would you have me do?”`, [
+    {label: 'Tell me your side of it', fn: () => { R0.h = 'listen'; save(); say('“Truth is, we\'d open the dam gladly if we had fish and salt for the winter. We can\'t eat timber. If Reedholm traded with us instead of shouting at us...”', [back(n)]); }},
+    {label: 'Open it, or you\'ll regret it', fn: () => { R0.h = 'threat'; save(); say('Ruun\'s jaw tightens. “...Fine. We\'ll open it. But Hollowpine remembers threats, stranger.”', [back(n)]); }},
+    {label: 'Here\'s 200 coin. Open the dam.', disabled: S.coins < 200, fn: () => { S.coins -= 200; R0.h = 'bribe'; renderHUD(); save(); say('He weighs the purse. “That will keep the mill fed for a while. Very well, the dam opens.”', [back(n)]); }},
+    back(n)]);
+}
+function riverCorvo(n) {
+  const R0 = riverState();
+  say(`“The river's a trickle. My nets come up empty and the children go hungry. What news from Hollowpine?”`, [
+    ...(R0.h === 'listen' ? [{label: 'Propose a deal: your fish and salt for their timber', primary: true, fn: () => { R0.r = 'deal'; save(); say('Corvo blinks. “Trade with them? ...We do need timber for our boats. Alright. If they open the dam, we\'ll send fish and salt every week.”', [back(n)]); }}] : []),
+    {label: 'I\'ll make Hollowpine pay for this', fn: () => { R0.r = 'side'; save(); say('“Ha! Now that\'s what I like to hear.”', [back(n)]); }},
+    {label: 'Be patient. It will sort itself out.', fn: () => { R0.r = 'wait'; save(); say('“Patience doesn\'t fill bellies. But... we\'ll wait a little longer.”', [back(n)]); }},
+    back(n)]);
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -6765,6 +6804,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['peacemaker','Peacemaker','Broker the River Accord between Hollowpine and Reedholm', () => !!S.flags.riverAccord],
   ['chef','Chef','Cook a meal at a pot or campfire', () => ['hearty_stew','hunters_feast','seafood_platter','travelers_pie','ironroot_soup','kings_banquet'].some(g => S.cooked && S.cooked[g])],
   ['diver','Deep Diver','Reach depth 5 on a pearl dive', () => (S.deepestDive || 0) >= 5],
   ['blackpearl','Black Pearl','Find a black pearl', () => (S.blackPearls || 0) >= 1],
