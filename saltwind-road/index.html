@@ -3341,6 +3341,34 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== the Saltwind Gazette =====
+const GAZ_FLUFF = ['Goat elected to Hollowpine council; "best candidate in years," say locals.', 'Fishermen report a fish that "looked at them funny."', 'Baker’s cat steals entire pie; remains at large.', 'Scholars debate whether slimes have feelings. Slimes decline to comment.', 'Record turnip harvest leaves farmers "frankly overwhelmed."', 'Bard’s new song banned in three taverns for being "too catchy."', 'Mysterious lights over the sea. Experts say: "probably fine."', 'Wizard misplaces hat; hat reportedly happier this way.', 'Local child befriends a crab. Crab unavailable for interview.', 'Tavern brawl ends in group hug, confusing everyone.'];
+function gazette() {
+  const H = [];
+  for (const m of (S.market || []).filter(m => m.until >= S.day && GOODS[m.g] && TOWNS[m.town])) H.push(m.short ? `<b>SHORTAGE!</b> ${TOWNS[m.town].name} desperate for ${GOODS[m.g].name}, paying nearly double.` : `<b>GLUT:</b> ${GOODS[m.g].name} going for half price in ${TOWNS[m.town].name}.`);
+  const vis = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle'); let best = null;
+  for (const a of vis) for (const g of TOWNS[a].produce) { if (!GOODS[g]) continue; for (const b of vis) { if (b === a) continue; const m = price(b, g) - price(a, g); if (!best || m > best.m) best = {a, b, g, m}; } }
+  if (best && best.m > 5) H.push(`<b>Trade tip:</b> merchants whisper that ${GOODS[best.g].name} bought in ${TOWNS[best.a].name} sells for about ${Math.round(best.m)} coin more in ${TOWNS[best.b].name}.`);
+  if (festivalToday()) H.push(`<b>FESTIVAL TODAY!</b> ${festivalToday().name} celebrations in every town.`);
+  if (bloodMoonDay()) H.push('<b>WARNING:</b> astronomers predict a <span style="color:#e85a5a">Blood Moon</span> tonight. Stay indoors, or bring a big sword.');
+  if (S.starfall === S.day) H.push('<b>Stargazers rejoice:</b> a starfall is expected tonight. Fallen stars fetch a fine price.');
+  if (dayOfSeason() === 6) H.push('<b>Sport:</b> Old Marlin’s fishing tournament runs all day today.');
+  if (petShowDay()) H.push('<b>Pets:</b> the weekly pet show is on today in Port Wren.');
+  if (cookDay()) H.push(`<b>Food:</b> the great cooking contest in Greenstem today. Theme: ${cookTheme().name}.`);
+  if (S.ghost && S.ghost.day === S.day && !S.ghost.cleared) H.push(`<b>Sailors spooked:</b> a ghost ship was sighted ${S.ghost.dir} of ${TOWNS[S.ghost.town].name}.`);
+  if (S.titanPos && !S.bosses.titan) H.push(`<b>Quake!</b> The Earthshaker Titan stomps ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}.`);
+  if (S.outlaw && !S.outlaw.done) H.push(`<b>WANTED:</b> ${esc(S.outlaw.name)}, bounty ${S.outlaw.reward} coin. Hideout ${S.outlaw.dir} of ${TOWNS[S.outlaw.town].name}.`);
+  else if (S.outlaw && S.outlaw.done) H.push(`<b>Justice served!</b> ${esc(S.outlaw.name)} captured by a daring trader.`);
+  if (S.raid) H.push(`<b>RAID!</b> ${TOWNS[S.raid.town].name} under attack. Heroes urgently needed.`);
+  const ach = Object.keys(S.achievements).length;
+  if ((S.level || 1) >= 5) H.push(`<b>Local hero</b> ${esc(S.name || 'the trader')} reaches level ${S.level}${ach ? `, with ${ach} great deeds to their name` : ''}.`);
+  if (S.mayor && Object.keys(S.mayor).length) H.push(`<b>Politics:</b> Mayor ${esc(S.name || 'the trader')} of ${Object.keys(S.mayor).map(k => TOWNS[k].name).join(' and ')} promises "more festivals."`);
+  if (S.partner && NPC_BY[S.partner] && S.day - (S.partnerDay || 0) < 4) H.push(`<b>Romance:</b> ${esc(S.name || 'the trader')} and ${NPC_BY[S.partner].name} seen strolling hand in hand.`);
+  const w = weatherNow(); if (w !== 'clear') H.push(`<b>Weather:</b> ${({rain: 'rain showers across the land', storm: 'thunderstorms rolling in', snow: 'snowfall in the north', fog: 'thick fog; travel with care', sandstorm: 'sandstorms in the desert', ash: 'ashfall near the volcano'})[w] || w}.`);
+  H.push(`<i>${GAZ_FLUFF[(S.day*7) % GAZ_FLUFF.length]}</i>`);
+  return H;
+}
+function gazetteHTML() { S.readGazette = true; return `<h3>The Saltwind Gazette · Day ${S.day}</h3><div class="jcard" style="background:#f4ecd8;color:#2a2418"><div style="font-family:Georgia,serif;font-size:13px;line-height:1.5">${gazette().map(h => `<div style="padding:3px 0;border-bottom:1px solid #d8ccb0">${h}</div>`).join('')}</div></div>`; }
 // ===== stargazing =====
 const CONSTELLATIONS = [
   {id:'hunter', name:'The Hunter', bonus:'+4% damage'},
@@ -7229,6 +7257,7 @@ function openJournal() {
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
       Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
+    ${gazetteHTML()}
     <h3>Titles · ${EARNED_TITLES.filter(t => S.achievements[t[0]]).length}/${EARNED_TITLES.length} earned</h3><div class="vals" style="margin-bottom:6px">Earn titles from achievements. Your chosen title shows under your name.</div>
     <div class="ctabs" style="flex-wrap:wrap">${['', ...EARNED_TITLES.filter(t => S.achievements[t[0]]).map(t => t[1])].map(t => `<button class="btn sm" data-title="${esc(t)}" aria-pressed="${(S.title || '') === t}">${t || 'No title'}</button>`).join('')}${EARNED_TITLES.filter(t => !S.achievements[t[0]]).map(t => `<button class="btn sm" disabled title="Earn the achievement first">🔒 ${esc(t[1])}</button>`).join('')}</div>
     <h3>Achievements · ${ACH.filter(a => S.achievements[a[0]]).length}/${ACH.length}</h3>
@@ -8088,7 +8117,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
-  ['stargazer','Stargazer','Chart 4 constellations', () => Object.keys(S.stars || {}).length >= 4],
+  ['reader','Well Informed','Read the Saltwind Gazette', () => !!S.readGazette],
+  ['starchart','Star Charter','Chart 4 constellations', () => Object.keys(S.stars || {}).length >= 4],
   ['astronomer','Astronomer','Chart every constellation', () => !!(S.stars || {}).crown],
   ['golem','Stone Friend','Build a Stone Golem companion', () => !!S.golemOwned],
   ['relics','Sand Sifter','Dig up 8 relics in sandstorms', () => (S.relicsDug || 0) >= 8],
