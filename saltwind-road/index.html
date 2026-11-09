@@ -699,6 +699,15 @@ const GOODS = {
   coelacanth:{name:"Ancient Coelacanth",base:320,col:'#5a6a8a',kind:'good'},
   master_rod:{name:'Master Rod',base:400,col:'#e3a948',kind:'tool',tool:'rod',tier:3,desc:'The widest catch bar, and rare fish bite more often'},
   crown_of_ages:{name:'Crown of Ages',base:5000,col:'#c8a8ff',kind:'trinket',desc:'+15% damage, +10% critical chance, +2 armor. The crown of the first king.'},
+  // --- festivals ---
+  fireworks:{name:'Fireworks',base:30,col:'#ff5a8a',kind:'place',desc:'Place with B. Fires off fireworks every night.'},
+  sky_lantern:{name:'Sky Lantern',base:25,col:'#ffd27a',kind:'place',desc:'Place with B. A paper lantern that floats and glows.'},
+  pumpkin_lantern:{name:'Jack-o-Lantern',base:40,col:'#e07a2a',kind:'place',desc:'Place with B. A carved pumpkin with a candle inside.'},
+  snow_globe:{name:'Giant Snow Globe',base:60,col:'#9fe8ff',kind:'place',desc:'Place with B. A tiny snowy village under glass.'},
+  candy_apple:{name:'Candy Apple',base:15,col:'#e0302a',kind:'food',heal:10},
+  party_hat:{name:'Party Hat',base:120,col:'#ff5a8a',kind:'armor',slot:'head',armor:1,crit:.03,speed:.03},
+  sun_charm:{name:'Sun Charm',base:200,col:'#f0c040',kind:'trinket',desc:'+5% critical chance'},
+  festival_token:{name:'Festival Token',base:50,col:'#e3a948',kind:'good'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -1154,6 +1163,14 @@ const SEASON_TEXT = ['Seeds are cheap, and carrots, flax and wheat grow quickly.
 const seasonIdx = () => Math.floor(((S ? S.day : 1) - 1) / 7) % 4;
 const season = () => SEASONS[seasonIdx()];
 const dayOfSeason = () => ((S.day - 1) % 7) + 1;
+const FESTIVALS = [
+  {name:'Spring Fair', town:'hollow', cols:['#ff9ac8','#ffffff','#86c98f','#f0d040'], special:'flower_crown', desc:'flowers, music and dancing under the pines'},
+  {name:'Sun Festival', town:'dun', cols:['#f0c040','#ff7a2a','#ffffff','#4a9ab0'], special:'sun_charm', desc:'drums, spice and lanterns over the oasis'},
+  {name:'Harvest Moon', town:'wren', cols:['#e07a2a','#c8402a','#f0c040','#5a3a1a'], special:'pumpkin_lantern', desc:'pumpkins, pies and fireworks over the harbor'},
+  {name:'Winterlights', town:'frost', cols:['#9fe8ff','#ffffff','#e05a5a','#86c98f'], special:'snow_globe', desc:'candles, carols and sky lanterns on the ice'},
+];
+const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
+const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
 const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1);
 const CROP_LOOK = {strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
 const CROPS = {
@@ -1220,7 +1237,7 @@ const PK = Object.keys(PROPERTIES);
 const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
-  campfire:{solid:true, light:52, use:'rest'}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
+  campfire:{solid:true, light:52, use:'rest'}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
   scarecrow:{solid:true}, flower_pot:{solid:true},
 };
 const PLACE_MAX = 600;
@@ -1360,12 +1377,37 @@ function drawPlaced(g, q, t) {
     case 'driftwood_bench':
       g.fillRect(x, y + 13, 16, 2); g.fillStyle = '#8a7a64'; g.fillRect(x + 1, y + 9, 2, 5); g.fillRect(x + 13, y + 9, 2, 5);
       g.fillStyle = '#b8a890'; g.fillRect(x, y + 7, 16, 3); g.fillRect(x, y + 1, 16, 2); g.fillStyle = '#8a7a64'; g.fillRect(x + 1, y + 3, 2, 4); g.fillRect(x + 13, y + 3, 2, 4); break;
+    case 'fireworks': {
+      g.fillRect(x + 4, y + 13, 8, 2); g.fillStyle = '#5a3a2a'; g.fillRect(x + 4, y + 9, 8, 5);
+      for (const [a, c] of [[5,'#ff5a8a'],[8,'#5ab0ff'],[11,'#f0d040']]) { g.fillStyle = c; g.fillRect(x + a - 1, y + 2, 2, 8); g.fillStyle = '#ffffff'; g.fillRect(x + a - 1, y + 1, 2, 1); }
+      if (isNightish() && Math.random() < .015) fireworkBurst(q.x + .5 + (Math.random() - .5)*2, q.y - 4 - Math.random()*3);
+      break; }
+    case 'sky_lantern': {
+      const fy = Math.sin(t*1.5 + q.x)*2; g.fillStyle = 'rgba(0,0,0,.15)'; g.fillRect(x + 5, y + 14, 6, 2);
+      g.fillStyle = isNightish() ? '#ffe090' : '#e8c070'; g.beginPath(); g.moveTo(x + 4, y - 8 + fy); g.lineTo(x + 12, y - 8 + fy); g.lineTo(x + 11, y + 2 + fy); g.lineTo(x + 5, y + 2 + fy); g.fill();
+      g.fillStyle = '#c8602a'; g.fillRect(x + 5, y + 2 + fy, 6, 1); g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(x + 6, y - 6 + fy, 1, 6); break; }
+    case 'pumpkin_lantern':
+      g.fillRect(x + 2, y + 13, 12, 2); g.fillStyle = '#d8701a'; g.beginPath(); g.ellipse(x + 8, y + 9, 7, 5, 0, 0, 7); g.fill();
+      g.fillStyle = '#b8580a'; g.fillRect(x + 7, y + 4, 1, 10); g.fillRect(x + 4, y + 5, 1, 8); g.fillRect(x + 11, y + 5, 1, 8);
+      g.fillStyle = '#4a7a2a'; g.fillRect(x + 7, y + 2, 2, 3);
+      g.fillStyle = isNightish() ? '#ffe060' : '#3a2010'; g.fillRect(x + 4, y + 7, 2, 2); g.fillRect(x + 10, y + 7, 2, 2); g.fillRect(x + 5, y + 11, 6, 1); g.fillRect(x + 6, y + 10, 1, 1); g.fillRect(x + 9, y + 10, 1, 1); break;
+    case 'snow_globe':
+      g.fillRect(x + 2, y + 13, 12, 2); g.fillStyle = '#5a3a2a'; g.fillRect(x + 3, y + 11, 10, 4);
+      g.fillStyle = 'rgba(200,236,255,.55)'; g.beginPath(); g.arc(x + 8, y + 5, 7, 0, 7); g.fill();
+      g.fillStyle = '#ffffff'; g.fillRect(x + 3, y + 9, 10, 2); g.fillStyle = '#c84a3a'; g.fillRect(x + 6, y + 6, 4, 3); g.fillStyle = '#2a5a2a'; g.fillRect(x + 10, y + 5, 2, 4);
+      for (let k = 0; k < 4; k++) { const sx = x + 3 + ((t*3 + k*2.7) % 10), sy = y + ((t*5 + k*3.1) % 9); g.fillStyle = '#ffffff'; g.fillRect(sx, sy, 1, 1); }
+      g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(x + 4, y + 1, 2, 1); break;
     case 'flower_pot':
       g.fillRect(x + 3, y + 13, 10, 2);
       g.fillStyle = '#b05a3a'; g.fillRect(x + 4, y + 8, 8, 6); g.fillStyle = '#c86a48'; g.fillRect(x + 3, y + 7, 10, 2);
       g.fillStyle = '#4a8a3a'; g.fillRect(x + 7, y + 2, 1, 5); g.fillRect(x + 5, y + 4, 1, 3); g.fillRect(x + 10, y + 3, 1, 4);
       g.fillStyle = '#e86a8a'; g.fillRect(x + 6, y, 3, 3); g.fillStyle = '#f0d040'; g.fillRect(x + 4, y + 2, 3, 2); g.fillStyle = '#a8b8ff'; g.fillRect(x + 9, y + 1, 3, 2); break;
   }
+}
+function fireworkBurst(x, y) {
+  const c = ['#ff5a8a','#5ab0ff','#f0d040','#86c98f','#ffffff','#c8a8ff'][Math.floor(Math.random()*6)];
+  for (let i = 0; i < 18; i++) { const a = i/18*6.283; particles.push({x, y, vx: Math.cos(a)*3.2, vy: Math.sin(a)*3.2 - 2, t: 0, col: c}); }
+  if (SFX.firework) SFX.firework();
 }
 const isNightish = () => { const sun = Math.cos((S.time - .5) * Math.PI * 2); return sun < .1; };
 const rentOf = k => Math.round(PROPERTIES[k].price * .02 * (1 + .5*propLv(k)));
@@ -1679,6 +1721,9 @@ const NPCS = [
   {id:'veyra',town:'skyhold',dx:-1,dy:3,name:'Oracle Veyra',role:'Keeper of the old tales',cols:{cloak:'#4a3a6a',skin:'#e0c8b0',hair:'#f0f0ff'},oracle:true,
    hello:["The wind told me you'd come.","Ah, the shard-bearer.","Hero. The tales are already being written."],
    rumors:["Every guardian of the deep places guards a shard of the first king's crown. They did not know it, but they did.","The Hollow King was the first king of all the lands. He gave up his heart for power, and now he is only hunger."]},
+  {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
+   hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
+   rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
   {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
    hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
    rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
@@ -2736,7 +2781,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   let crit = false;
   if (src === 'player') {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
-    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
@@ -3578,7 +3623,7 @@ function render() {
   for (const L of LANDMARKS) if (inView(L.x, L.y)) sprites.push({y: L.y+.9, f: () => drawLandmark(ctx, L, frameT)});
   for (const k of BK) if (inView(BOSSES[k].x, BOSSES[k].y)) sprites.push({y: BOSSES[k].y + .3, f: () => drawLair(ctx, k, frameT)});
   for (const k in TOWNS) if (!TOWNS[k].small && inView(TOWNS[k].x, TOWNS[k].y)) sprites.push({y: TOWNS[k].y + .75, f: () => drawBoard(ctx, k, frameT)});
-  for (const n of NPCS) if (inView(n.x, n.y)) {
+  for (const n of NPCS) if (!n.away && inView(n.x, n.y)) {
     sprites.push({y: n.y, f: () => {
       const facing = Math.abs(S.x - n.x) > Math.abs(S.y - n.y) ? (S.x < n.x ? 'left' : 'right') : (S.y < n.y ? 'up' : 'down');
       const near = Math.hypot(S.x-n.x, S.y-n.y) < 6;
@@ -3613,6 +3658,18 @@ function render() {
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
   if (S.tmap && inView(S.tmap.x, S.tmap.y) && Math.hypot(S.x - S.tmap.x, S.y - S.tmap.y) < 9) sprites.push({y: S.tmap.y + .1, f: () => { const x = S.tmap.x*TS + 8, y = S.tmap.y*TS + 9, a = .45 + Math.sin(frameT*4)*.25; ctx.globalAlpha = a; ctx.strokeStyle = '#8a3a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 3); ctx.lineTo(x + 4, y + 3); ctx.moveTo(x + 4, y - 3); ctx.lineTo(x - 4, y + 3); ctx.stroke(); ctx.globalAlpha = 1; if (Math.random() < .05) burst(S.tmap.x + .5, S.tmap.y + .4, '#f0c040', 1, 1); }});
   if (S.tmap && have('captains_compass') && !inDungeon()) { const dx = S.tmap.x + .5 - S.x, dy = S.tmap.y + .5 - S.y, d = Math.hypot(dx, dy); if (d > 3) sprites.push({y: S.y + 50, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*30, cy = (S.y - .4)*TS + Math.sin(an)*30; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.globalAlpha = .85; ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-2, 0); ctx.lineTo(-4, 4); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; }}); }
+  { const F = festivalToday(); if (F && inView(TOWNS[F.town].x, TOWNS[F.town].y)) { const tw = TOWNS[F.town];
+    sprites.push({y: tw.y - 6, f: () => {
+      for (let k = 0; k < 4; k++) { const a0 = k/4*6.283 + .4, a1 = a0 + 1.2, r = 4.2;
+        const x0 = (tw.x + .5 + Math.cos(a0)*r)*TS, y0 = (tw.y + .6 + Math.sin(a0)*r*.8)*TS - 14, x1 = (tw.x + .5 + Math.cos(a1)*r)*TS, y1 = (tw.y + .6 + Math.sin(a1)*r*.8)*TS - 14;
+        ctx.strokeStyle = 'rgba(60,40,30,.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo((x0 + x1)/2, (y0 + y1)/2 + 10, x1, y1); ctx.stroke();
+        for (let j = 1; j < 8; j++) { const u = j/8, fx = x0 + (x1 - x0)*u, fy = y0 + (y1 - y0)*u + Math.sin(u*Math.PI)*10; ctx.fillStyle = F.cols[(j + k) % F.cols.length]; ctx.beginPath(); ctx.moveTo(fx - 2, fy); ctx.lineTo(fx + 2, fy); ctx.lineTo(fx, fy + 4 + Math.sin(frameT*4 + j)*.5); ctx.fill(); }
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x0 - 1, y0, 2, 14);
+      }
+    }});
+    if (isNightish() && Math.random() < .03) fireworkBurst(tw.x + .5 + (Math.random() - .5)*10, tw.y - 4 - Math.random()*4);
+    else if (Math.random() < .05) burst(tw.x + .5 + (Math.random() - .5)*8, tw.y - 1 + (Math.random() - .5)*6, F.cols[Math.floor(Math.random()*F.cols.length)], 1, 1);
+  } }
   if (inArena()) for (let i = 0; i < 46; i++) {
     const a = i/46*6.283, px = ARENA.cx + .5 + Math.cos(a)*(ARENA.rx + 1.6), py = ARENA.cy + .5 + Math.sin(a)*(ARENA.ry + 1.4);
     if (py > ARENA.cy + ARENA.ry - 1 && Math.abs(px - ARENA.cx - .5) < 3) continue;
@@ -3821,6 +3878,7 @@ function npcWalkable(x, y) {
   return true;
 }
 function updatePeople(dt) {
+  { const fe = NPC_BY.festa, F = festivalToday(); fe.away = !F; if (F && fe.town !== F.town) { fe.town = F.town; fe.x = TOWNS[F.town].x - .5; fe.y = TOWNS[F.town].y - 1.2; } }
   for (const n of NPCS) {
     if (!n.wander && !n.travel) continue;
     if (Math.abs(n.x - S.x) > 40 || Math.abs(n.y - S.y) > 30) { if (!n.travel) continue; }
@@ -3919,7 +3977,7 @@ function update(dt) {
   for (let i = particles.length - 1; i >= 0; i--) if (particles[i].t > .5) particles.splice(i, 1);
 
   let best = null, bd = 1.7;
-  for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
+  for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
   nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || propertyTarget() || placedTarget() || critterTarget());
@@ -4010,6 +4068,7 @@ function newDay() {
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
   if (rent) S.coins += rent;
+  { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}`);
@@ -4106,6 +4165,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
@@ -5807,6 +5867,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['festive','Festive Spirit','Visit a festival merchant during a festival', () => !!S.festVisited],
+  ['jackpot','Jackpot!','Win the lucky draw jackpot', () => !!S.jackpot],
   ['legendary','Legend of Saltwind Road','Defeat the Hollow King', () => !!S.bosses.hollowking],
   ['shards','Shard Bearer','Gather 6 Crown Shards', () => shardCount() >= 6],
   ['defender','Defender','Save a town from a raid', () => (S.raidsWon || 0) >= 1],
@@ -5893,6 +5955,28 @@ function arenaTarget() {
   const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (S.arena.live) return {key: 'arL', html: 'The gate is barred until this wave is beaten', btn: '', fn: () => {}};
   return {key: 'arX' + S.arena.pot, html: `${K}Leave the arena · collect ${S.arena.pot} coin`, btn: 'Leave', fn: () => { SFX.travel(); fadeThen(() => leaveArena(false)); }};
+}
+function festShop(n) {
+  const F = festivalToday(); if (F) S.festVisited = true; if (!F) { say('“The festival is over! See you next season.”', [back(n)]); return; }
+  const items = [...FEST_SHOP, [F.special, F.special === 'flower_crown' ? 60 : F.special === 'sun_charm' ? 220 : F.special === 'snow_globe' ? 90 : 70]];
+  say(`“Welcome to the <b>${F.name}</b>! Everything's festival-priced. The ${GOODS[F.special].name} is only sold this season!”`, [
+    ...items.map(([g, pr]) => ({label: `${GOODS[g].name} · ${pr} coin`, disabled: S.coins < pr, fn: () => { S.coins -= pr; addItem(g, 1); SFX.coin(); renderHUD(); save(); floatText(S.x, S.y - 1.2, `+1 ${GOODS[g].name}`, '#ffd27a'); festShop(n); }})),
+    back(n)]);
+}
+function luckyDraw(n) {
+  if (S.coins < 50) return;
+  S.coins -= 50; S.luckyDraws = (S.luckyDraws || 0) + 1;
+  const r = Math.random(); let prize;
+  if (r < .3) { addItem('candy_apple', 2); prize = '2 Candy Apples'; }
+  else if (r < .5) { addItem('fireworks', 2); prize = '2 Fireworks'; }
+  else if (r < .65) { S.coins += 100; prize = '100 coin!'; }
+  else if (r < .78) { addItem('festival_token', 2); prize = '2 Festival Tokens (worth 50 each)'; }
+  else if (r < .88) { addItem('gem', 2); prize = '2 Cut Gems!'; }
+  else if (r < .95) { addItem('treasure_map', 1); prize = 'a Treasure Map!'; }
+  else if (r < .99) { addItem('party_hat', 1); prize = 'a Party Hat!'; }
+  else { S.coins += 1000; prize = '<b>THE JACKPOT: 1000 coin!!</b>'; S.jackpot = true; }
+  SFX.coin(); burst(S.x, S.y - .6, '#ffd27a', 14, 4); renderHUD(); save();
+  say(`You pull a ticket from the barrel... <b>${prize}</b>`, [{label: 'Draw again (50 coin)', disabled: S.coins < 50, fn: () => luckyDraw(n)}, back(n)]);
 }
 function oracleTalk(n) {
   const c = shardCount(), need = DUNGEONS.hollowthrone.sealed;
