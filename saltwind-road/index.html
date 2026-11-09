@@ -507,6 +507,7 @@ const GOODS = {
   challenge_token:{name:'Challenge Token',base:0,col:'#e85a8a',kind:'trophy'},
   victors_cape:{name:"Victor's Cape",base:2000,col:'#c83a5a',kind:'trinket',desc:'+6% damage and +5% speed'},
   blue_ribbon:{name:'Blue Ribbon',base:300,col:'#3a7ad8',kind:'trophy'},
+  rivals_rapier:{name:"Rival's Rapier",base:1600,col:'#e04a7a',kind:'weapon',dmg:10,cd:.22,reach:1.6,crit:.2},
   golden_ladle:{name:'Golden Ladle',base:400,col:'#f0c040',kind:'trophy'},
   chefs_hat:{name:"Chef's Hat",base:350,col:'#f4f4f4',kind:'armor',slot:'head',armor:1,desc:'Worn by a champion cook'},
   ruby:{name:'Ruby',base:180,col:'#e0304a',kind:'mat',desc:'Socket: +8% damage'},
@@ -1157,6 +1158,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  duelist:{name:'Vex the Bold',hp:40,dmg:3,speed:3.7,aggro:40,drops:[],noBest:true},
   horseman:{name:'Headless Horseman',hp:70,dmg:4,speed:4.0,aggro:22,undead:true,ranged:{range:6,cd:1.6,speed:8,col:'#ff8a2a'},coins:[200,350],drops:[['pumpkin',3,5,1]]},
   goblin:{name:'Treasure Goblin',hp:14,dmg:0,speed:4.3,aggro:0,drops:[['gem',1,3,1],['pirate_gold',1,2,.5]],coins:[150,300],flee:true},
   den:{name:'Monster Den',hp:30,dmg:0,speed:0,aggro:0,drops:[],den:true},
@@ -1929,6 +1931,8 @@ const NPCS = [
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
+  {id:'vex',town:'crownfall',dx:-4,dy:2,name:'Vex the Bold',role:'Rival adventurer',cols:{cloak:'#8a2a4a',skin:'#e0b896',hair:'#f0e0a0'},rival:true,freeSpot:true,
+   hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'auguste',town:'greenstem',dx:3,dy:3,name:'Chef Auguste',role:'Head judge',cols:{cloak:'#f0f0f0',skin:'#e0b896',hair:'#3a2a1a'},chef:true,freeSpot:true,
    hello:["Magnifique! A fellow food lover?","Taste is everything.","Every third day of the week, the great cooking contest!"], rumors:["The judges change their theme every week. Hearty, seafood, sweet or fancy. Bring something you cooked yourself and they'll be kinder."]},
   {id:'pennyworth',town:'crownfall',dx:4,dy:2,name:'Banker Pennyworth',role:'Crownfall Bank',cols:{cloak:'#2a2a3a',skin:'#e8d0b8',hair:'#c8c8c8'},banker:true,freeSpot:true,
@@ -3228,7 +3232,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   renderHP();
 }
 function die() {
-  if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
+  if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); if (!S.arena.duel) S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
   SFX.death();
@@ -3290,7 +3294,7 @@ function drawStar(st) {
 }
 const bloodMoonDay = () => S && S.day >= 6 && S.day % 6 === 0;
 const bloodMoon = () => !!S && ((bloodMoonDay() && S.time > .78) || (S.day > 6 && S.day % 6 === 1 && S.time < .22)) && !inDungeon() && !inArena();
-const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && !ENEMIES[k].target && !ENEMIES[k].den);
+const BEAST_IDS = Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && !ENEMIES[k].target && !ENEMIES[k].den && !ENEMIES[k].noBest);
 const LEGENDS = [
   {id:'grizzle',   name:'Old Grizzle',        type:'boar',     tx:112, ty:72,  hp:140, dmg:2.2, col:'#c8803a', drop:'grizzle_hide'},
   {id:'whitefang', name:'Whitefang',          type:'wolf',     tx:150, ty:22,  hp:150, dmg:2.4, col:'#e8f4ff', drop:'whitefang_blade'},
@@ -3308,6 +3312,21 @@ function legendHint(L) {
   let best = 'wren', bd = 1e9; for (const k in TOWNS) { if (k === 'isle') continue; const d = Math.hypot(TOWNS[k].x - L.tx, TOWNS[k].y - L.ty); if (d < bd) { bd = d; best = k; } }
   const dir = DIRS8[Math.round(((Math.atan2(L.ty - TOWNS[best].y, L.tx - TOWNS[best].x) + 6.283) % 6.283) / .785) % 8];
   return `${dir} of ${TOWNS[best].name}`;
+}
+// ===== rival duels =====
+const VEX_LINES = ['“First blood to the winner. Try to keep up.”', '“Lucky last time. Let’s see you do it again.”', '“I’ve been practising. Have you?”', '“No more holding back!”', '“This is it. Winner takes the title.”'];
+function vexTalk(n) {
+  const r = S.vexRank || 0;
+  if (S.vexDay === S.day) { say('“Again? Let me catch my breath. Tomorrow, rival.”', [back(n)]); return; }
+  say(`${r >= 5 ? '“You’re the better fighter. I admit it. But I’m always up for a spar!”' : VEX_LINES[r]}<br><span style="color:var(--muted)">Duels take place in the Crownfall Arena. Lose and you just wake up outside, no harm done. Win to climb the ranks${r < 5 ? ` (reward: ${150*(r + 1)} coin${r === 4 ? " and Vex's own rapier" : ''})` : ''}.</span>`, [
+    {label: 'Fight!', primary: true, fn: () => { closeTalk(); S.vexDay = S.day; enterArena({duel: Math.min(5, r + 1)}); }}, back(n)]);
+}
+function duelWon(rank) {
+  const first = (S.vexRank || 0) < rank && rank <= 5; let msg = '“Hah... fine. You win this one.”';
+  if (first) { S.vexRank = rank; const c = 150*rank; S.coins += c; msg += ` <span style="color:var(--good)">+${c} coin</span>`; if (rank === 5) { addItem('rivals_rapier', 1); msg += `<br>Vex hands you their rapier. “You've earned it, champion.” <b>+Rival's Rapier</b>`; } }
+  else { S.coins += 60; msg += ' <span style="color:var(--good)">+60 coin</span>'; }
+  S.duelsWon = (S.duelsWon || 0) + 1; gainXP(60*rank); SFX.victory(); renderHUD(); save();
+  return msg;
 }
 // ===== cooking contest =====
 const COOK_THEMES = [
@@ -3669,8 +3688,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Rival duels', 'Vex the Bold in Crownfall challenges you to a duel once a day. Duels are fought in the arena and losing costs nothing. Climb five ranks to win Vex\u2019s own rapier.'],
   ['Cooking contest', 'Every third day of the week Chef Auguste in Greenstem judges a cooking contest. Match the weekly theme and bring dishes you cooked yourself for the best score.'],
   ['Bank & mayors', 'Banker Pennyworth in Crownfall pays daily interest on savings, which are safe when you are knocked out, and lends coin for a week. Fully improve a town and earn top standing, and its elder will back you for mayor: mayors collect taxes every morning.'],
   ['The lighthouse', 'Old Mara in Tidewatch needs help restoring the lighthouse in three steps. Once it is lit again your boat sails 15% faster.'],
@@ -4350,6 +4370,10 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
     case 'target': { const pop = Math.min(1, (extra && extra.age || 1)); g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 8, 2, 8); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 4, y - 1, 8, 2); for (const [r, c] of [[6, '#e8e0d0'], [4.5, '#c83a2a'], [3, '#e8e0d0'], [1.5, '#c83a2a']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y - 12, r, 0, 7); g.fill(); } break; }
+    case 'duelist': {
+      drawPerson(g, x, y, {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, phase, true, f < 0 ? 'left' : 'right', {held: 'rivals_rapier', scarf: true});
+      break;
+    }
     case 'horseman': {
       drawMount(g, 'nightmare', x, y, f, phase, true);
       g.fillStyle = '#2a2a3a'; g.fillRect(x - 3, y - 19, 6, 8); g.fillStyle = '#4a1a2a'; g.fillRect(x - 4 - f, y - 20, 8, 2);
@@ -5251,7 +5275,7 @@ function renderClock() {
 function renderRegion() {
   const dkr = inDungeon(); if (dkr) { const nm = DUNGEONS[dkr].endless ? `The Abyss · Floor ${ABYSS.floor}` : DUNGEONS[dkr].mine ? `The Deep Mine · Floor ${MINE.floor}` : DUNGEONS[dkr].name; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   if (S.race) { const nm = S.race.t < 0 ? `Race starts in ${Math.ceil(-S.race.t)}` : `Race · ${S.race.i + 1}/${S.race.cps.length} · ${S.race.t.toFixed(1)}s`; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
-  if (inArena()) { const nm = S.arena ? (S.arena.gauntlet ? `Boss Gauntlet · Round ${S.arena.wave}/${S.arena.gauntlet.length}` : `Crownfall Arena · Wave ${S.arena.wave}`) : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
+  if (inArena()) { const nm = S.arena ? (S.arena.duel ? `Crownfall Arena · Duel vs Vex` : S.arena.gauntlet ? `Boss Gauntlet · Round ${S.arena.wave}/${S.arena.gauntlet.length}` : `Crownfall Arena · Wave ${S.arena.wave}`) : 'Crownfall Arena'; if ($('region').textContent !== nm) $('region').textContent = nm; return; }
   let name = '';
   for (const k in TOWNS) { const t = TOWNS[k]; if (Math.hypot(S.x - t.x, S.y - t.y) < 8) name = t.name; }
   if (!name && Math.hypot(S.x - HOME.x, S.y - HOME.y) < 8) name = S.home.level ? 'Your Homestead' : 'Homestead (for sale)';
@@ -5335,6 +5359,7 @@ function mainOptions(n) {
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
   if (isElder(n)) o.push({label: 'Improve the town', fn: () => improveTalk(n)});
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
+  if (n.rival) o.push({label: (S.vexRank || 0) >= 5 ? 'Friendly spar' : `Duel Vex (rank ${(S.vexRank || 0) + 1}/5)`, primary: (S.vexRank || 0) < 5 && S.vexDay !== S.day, fn: () => vexTalk(n)});
   if (n.chef) o.push({label: cookDay() ? 'The cooking contest! ★' : 'About the cooking contest', primary: cookDay() && S.cookContest !== S.day, fn: () => chefTalk(n)});
   if (n.banker) o.push({label: `The bank (${S.bank || 0}◆ saved)`, primary: !!S.loan, fn: () => bankTalk(n)});
   if (isElder(n) && !(S.mayor || {})[n.town]) o.push({label: 'Run for mayor', primary: canRunMayor(n.town), fn: () => mayorTalk(n)});
@@ -7970,6 +7995,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['rival','Rivalry','Beat Vex the Bold in a duel', () => (S.vexRank || 0) >= 1],
+  ['rivalchamp','Better Than Vex','Reach duel rank 5 against Vex', () => (S.vexRank || 0) >= 5],
   ['masterchef','Master Chef','Win the cooking contest', () => (S.cookWins || 0) >= 1],
   ['banker','Nest Egg','Save 5000 coin in the bank', () => (S.bank || 0) >= 5000],
   ['mayor','Mayor','Be elected mayor of a town', () => Object.keys(S.mayor || {}).length >= 1],
@@ -8098,12 +8125,18 @@ function enterArena(gauntlet) {
     S.arenaReturn = {x: S.x, y: S.y}; S.x = ARENA.gate.x + .5; S.y = ARENA.gate.y - .6; S.riding = false; petE = null; fishing = null; lastTile = -1;
     enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
     S.arena = {wave: 0, pot: 0, t: 3, live: false}; renderHUD(); renderRegion();
+    if (gauntlet && gauntlet.duel) { S.arena.duel = gauntlet.duel; S.arena.t = 3; toast(`<b>Duel: rank ${gauntlet.duel}</b><br>Vex steps into the ring, rapier raised. Beat them!`, 4000); return; }
     if (gauntlet) { S.arena.gauntlet = gauntletList(); S.arena.t = 4; toast(`<b>The Boss Gauntlet</b><br>${S.arena.gauntlet.length} echoes of fallen foes, one after another. You are healed between rounds. Leave between rounds to keep your winnings.`, 6500); return; }
     toast('<b>The Crownfall Arena</b><br>The crowd roars! Survive wave after wave. Leave through the gate between waves to collect your winnings.', 6500);
   });
 }
 function arenaWave() {
   const A = S.arena; A.wave++; A.live = true;
+  if (A.duel) {
+    const r = A.duel, e = makeEnemy('duelist', ARENA.cx + .5, ARENA.cy - 3, {dungeon: true, alert: true, arena: true});
+    e.hp = e.max = Math.round(40*(1 + .55*r)*(1 + (S.level || 1)*.03)); e.dmgMul = 1 + .3*r; e.spd = 1 + .05*r; e.elite = {name: 'Vex the Bold', col: '#e04a7a'}; e.esize = 1.15; e.labelName = `Vex the Bold · rank ${r}`;
+    enemies.push(e); SFX.roar(); renderRegion(); return;
+  }
   if (A.gauntlet) {
     const k = A.gauntlet[A.wave - 1], B = BOSSES[k], hp = Math.round(B.hp*(1.2 + .15*A.wave));
     enemies.push({boss: k, echo: true, arena: true, type: k, x: ARENA.cx + .5, y: ARENA.cy - 3, hx: ARENA.cx + .5, hy: ARENA.cy + .5, hp, max: hp, size: B.size, kx:0, ky:0, cd: 1.5, hurt:0, face:-1, phase:0, ab:2, act:null, hidden:0});
@@ -8126,6 +8159,7 @@ function updateArena(dt) {
   const A = S.arena; if (!A || !inArena()) return;
   if (A.live) {
     if (!enemies.some(e => e.arena && !e.dead)) {
+      if (A.duel) { A.live = false; A.t = 1e9; A.done = true; const msg = duelWon(A.duel); setTimeout(() => { if (S.arena) { SFX.travel(); fadeThen(() => leaveArena(false)); } toast(`<b>Vex yields!</b><br>${msg}`, 7000); }, 1800); return; }
       if (A.gauntlet) {
         A.live = false; A.t = 6; const prize = 150*A.wave; A.pot += prize; S.hp = Math.min(maxHP(), S.hp + maxHP()*.6); renderHP(); SFX.coin();
         if (A.wave >= A.gauntlet.length) {
@@ -8146,10 +8180,11 @@ function updateArena(dt) {
 }
 function leaveArena(died) {
   const A = S.arena, pot = A ? (died ? Math.floor(A.pot/2) : A.pot) : 0, best = A ? A.wave - (A.live ? 1 : 0) : 0;
-  S.arena = null; S.coins += pot;
+  const duel = A && A.duel; S.arena = null; S.coins += pot;
   enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
   const T0 = TOWNS.crownfall; S.x = T0.x - 1.5; S.y = T0.y + 3.6; lastTile = -1; petE = null;
   renderHUD(); renderRegion(); save();
+  if (duel) { if (died) toast('<b>Vex wins this round!</b><br>“Better luck next time, rival.” Come back tomorrow for a rematch.', 6000); return; }
   toast(died ? `<b>Knocked out in the arena!</b><br>The medics drag you out. You keep half your winnings: <b>${pot} coin</b>.` : `<b>You leave the arena</b><br>Waves survived: ${best}. Winnings: <b>${pot} coin</b>.`, 6000);
 }
 function arenaTarget() {
