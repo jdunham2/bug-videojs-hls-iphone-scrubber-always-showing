@@ -190,7 +190,8 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-const WORLD = 1800;
+const WORLD = 3060;
+const ROADS = [600, 1200, 1860, 2460];
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = a => a[Math.floor(Math.random() * a.length)];
@@ -266,6 +267,78 @@ function facadeTextures(wall, win) {
 }
 
 // ---------- town ----------
+// the east side and southern suburbs, added when the town grew
+const GAS_PUMPS = [{ x: 1990, y: 1010 }, { x: 2060, y: 1010 }, { x: 2130, y: 1010 }];
+const SUBURB_BLOCKS = [[0, 3], [1, 3], [3, 3], [4, 3], [0, 4], [2, 4], [3, 4]];
+const blockRect = (i, j) => { const e = [0, ...ROADS, WORLD]; return [e[i] + (i ? 75 : 20), e[j] + (j ? 75 : 20), e[i + 1] - (i < 4 ? 75 : 20), e[j + 1] - (j < 4 ? 75 : 20)]; };
+const districtTrees = [];
+function drawDistricts(g, R, k) {
+  for (const [i, j] of SUBURB_BLOCKS) { const [x0, y0, x1, y1] = blockRect(i, j); g.fillStyle = '#69a852'; R(x0, y0, x1 - x0, y1 - y0); g.fillStyle = '#b9b2a6'; R(x0 + 20, (y0 + y1) / 2 - 12, x1 - x0 - 40, 24); }
+  g.fillStyle = '#8a8f96'; R(1940, 870, 260, 270);
+  g.fillStyle = '#9a7a52'; R(2150, 1290, 250, 470);
+  g.fillStyle = '#c9b48a'; R(1950, 1260, 160, 30);
+  const lake = (cx, cy, rx, ry) => { g.fillStyle = '#c9b48a'; g.beginPath(); g.ellipse(cx * k, cy * k, (rx + 18) * k, (ry + 18) * k, 0, 0, 7); g.fill(); g.fillStyle = '#3d7fb0'; g.beginPath(); g.ellipse(cx * k, cy * k, rx * k, ry * k, 0, 0, 7); g.fill(); };
+  lake(2780, 1520, 190, 150); lake(1530, 2160, 220, 150);
+  const [fx0, fy0, fx1, fy1] = blockRect(1, 4);
+  for (let y = fy0; y < fy1 - 120; y += 28) { g.fillStyle = Math.floor((y - fy0) / 28) % 2 ? '#7aa83a' : '#a8843a'; R(fx0 + 20, y, (fx1 - fx0) * 0.6, 24); }
+}
+function buildDistricts() {
+  place('museum', 'Fossil Museum', 1950, 140, 2370, 500, 130, 1, { wall: '#d9cfb8', win: '#2c3038', sign: '#6a5a3a', roof: '#8a7e66' });
+  place('fire', 'Fire Station', 2560, 200, 2860, 500, 100, 1, { wall: '#b8342c', win: '#2a1c1a', sign: '#f2d36b', signFg: '#7a1a14' });
+  place('gas', 'Dino Gas', 1960, 690, 2160, 850, 60, 1, { wall: '#f2f2ee', win: '#22303e', sign: '#27ae60', awning: '#27ae60' });
+  place('pizza', 'Ptero Pizza', 2560, 690, 2820, 980, 70, 1, { wall: '#e8d3a8', win: '#3a2a1a', sign: '#c8322a', awning: '#2e8a3a' });
+  place('builders', 'Raptor Builders', 1950, 1300, 2110, 1410, 45, -1, { wall: '#f1c40f', win: '#2a2a2a', sign: '#2a2a2a', signFg: '#f1c40f' });
+  // gas pumps under a canopy
+  add(scene, GEO.b, '#27ae60', 2060, 62, 1010, 240, 6, 110).castShadow = true;
+  add(scene, GEO.b, '!#f6f0e2', 2060, 58.5, 1010, 220, 1, 90).castShadow = false;
+  for (const [x, z] of [[1950, 965], [2170, 965], [1950, 1055], [2170, 1055]]) add(scene, GEO.y, '#d6d6d6', x, 30, z, 3, 60, 3);
+  for (const pp of GAS_PUMPS) { add(scene, GEO.b, '#e6e6e6', pp.x, 13, pp.y, 12, 26, 10); add(scene, GEO.b, '!#7fe8a0', pp.x, 20, pp.y + 5.5, 8, 6, 1); solids.push({ x0: pp.x - 7, y0: pp.y - 6, x1: pp.x + 7, y1: pp.y + 6 }); }
+  const gsign = new THREE.Mesh(new THREE.PlaneGeometry(70, 16), new THREE.MeshBasicMaterial({ map: signTexture('GAS $0.40', '#27ae60', '#ffffff') })); gsign.position.set(2060, 72, 1066); scene.add(gsign);
+  // fire truck parked out front
+  add(scene, GEO.b, '#c8322a', 2910, 18, 560, 110, 30, 38); add(scene, GEO.b, '#c8322a', 2980, 24, 560, 30, 42, 38);
+  add(scene, GEO.b, '#c9c9cf', 2900, 38, 560, 100, 4, 10); add(scene, GEO.b, '!#ff3a2a', 2980, 48, 560, 8, 4, 30);
+  solids.push({ x0: 2850, y0: 540, x1: 3000, y1: 580 });
+  // construction site: fence, crane, girders, cones
+  for (const [x0, z0, x1, z1] of [[2150, 1290, 2190, 1294], [2260, 1290, 2400, 1294], [2150, 1290, 2154, 1760], [2396, 1290, 2400, 1760], [2150, 1756, 2400, 1760]]) { add(scene, GEO.b, '#c9c9cf', (x0 + x1) / 2, 18, (z0 + z1) / 2, x1 - x0, 36, z1 - z0); solids.push({ x0, y0: z0, x1, y1: z1 }); }
+  add(scene, GEO.b, '#f1c40f', 2340, 160, 1650, 18, 320, 18); add(scene, GEO.b, '#f1c40f', 2260, 320, 1650, 260, 10, 10); add(scene, GEO.b, '#555555', 2370, 312, 1650, 30, 20, 20);
+  add(scene, GEO.y, '#2a2a2a', 2180, 250, 1650, 0.8, 140, 0.8); add(scene, GEO.b, '#c0392b', 2180, 176, 1650, 40, 6, 6);
+  solids.push({ x0: 2328, y0: 1638, x1: 2352, y1: 1662 });
+  for (let i = 0; i < 4; i++) { add(scene, GEO.b, '#c0392b', 2230, 6 + i * 8, 1450 + (i % 2) * 6, 120, 6, 10); }
+  solids.push({ x0: 2168, y0: 1440, x1: 2292, y1: 1465 });
+  add(scene, GEO.y, '#9a9aa0', 2240, 22, 1560, 22, 28, 22); solids.push({ x0: 2218, y0: 1538, x1: 2262, y1: 1582 });
+  for (const [x, z] of [[2205, 1310], [2245, 1310], [2185, 1380], [2300, 1520]]) add(scene, GEO.c, '#ff7a1a', x, 7, z, 5, 14, 5);
+  // lakes (you cannot walk on water)
+  for (const [cx, cy, rx, ry] of [[2780, 1520, 190, 150], [1530, 2160, 220, 150]]) {
+    const w = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: '#3d7fb0', transparent: true, opacity: 0.85 }));
+    w.rotation.x = -Math.PI / 2; w.position.set(cx, 1, cy); w.scale.set(rx, ry, 1); scene.add(w);
+    solids.push({ x0: cx - rx * 0.8, y0: cy - ry * 0.75, x1: cx + rx * 0.8, y1: cy + ry * 0.75 });
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; districtTrees.push([cx + Math.cos(a) * (rx + 60), cy + Math.sin(a) * (ry + 55), 0.8 + srand() * 0.3]); }
+    add(scene, GEO.b, '#7a5534', cx, 7, cy + ry + 30, 50, 4, 14);
+  }
+  // suburbs: rows of little houses nobody lets you into
+  const houseCols = ['#e6d6b8', '#cfe3c4', '#d6c4e6', '#f2d27a', '#bcd4e6', '#efc3b0'], roofCols = ['#b0473a', '#3a4a6a', '#5a3f28', '#3f6b4a'];
+  for (const [i, j] of SUBURB_BLOCKS) {
+    const [x0, y0, x1, y1] = blockRect(i, j);
+    for (const hx of [x0 + 120, x1 - 120]) for (const hy of [y0 + 110, y1 - 110]) {
+      const w = 110, d = 90, h = 48 + srand() * 20, hg = group(scene, hx, 0, hy);
+      add(hg, GEO.b, houseCols[Math.floor(srand() * houseCols.length)], 0, h / 2, 0, w, h, d);
+      add(hg, GEO.pyr, roofCols[Math.floor(srand() * roofCols.length)], 0, h + 22, 0, 86, 44, 72, 0, Math.PI / 4, 0);
+      add(hg, GEO.b, '#5a3a24', 0, 16, hy < (y0 + y1) / 2 ? d / 2 + 1 : -d / 2 - 1, 18, 32, 2);
+      const box = { x0: hx - w / 2, y0: hy - d / 2, x1: hx + w / 2, y1: hy + d / 2 }; solids.push(box);
+      const mats = []; hg.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+      fadeables.push({ x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 });
+      districtTrees.push([hx + (srand() < 0.5 ? -1 : 1) * 85, hy + (srand() - 0.5) * 60, 0.7 + srand() * 0.3]);
+    }
+  }
+  // Fern Farm
+  const [fx0, fy0, fx1, fy1] = blockRect(1, 4);
+  add(scene, GEO.b, '#b0473a', fx1 - 110, 40, fy1 - 110, 120, 80, 100); add(scene, GEO.pyr, '#5a3f28', fx1 - 110, 100, fy1 - 110, 95, 40, 80, 0, Math.PI / 4, 0);
+  add(scene, GEO.y, '#c9c9cf', fx1 - 30, 70, fy1 - 200, 26, 140, 26);
+  solids.push({ x0: fx1 - 170, y0: fy1 - 160, x1: fx1 - 50, y1: fy1 - 60 }, { x0: fx1 - 56, y0: fy1 - 226, x1: fx1 - 4, y1: fy1 - 174 });
+  // a small forest
+  const [qx0, qy0, qx1, qy1] = blockRect(4, 4);
+  for (let i = 0; i < 40; i++) districtTrees.push([qx0 + 40 + srand() * (qx1 - qx0 - 80), qy0 + 40 + srand() * (qy1 - qy0 - 80), 0.8 + srand() * 0.6]);
+}
 const solids = [], facadeMats = [], lampMats = [], signs = [], fadeables = [];
 function collide(o, r, list) {
   for (const b of (list || activeSolids)) {
@@ -327,18 +400,19 @@ const HOMES = {
 const homeModels = {}, homeTrees = {};
 function buildTown() {
   // ground
-  const tc = document.createElement('canvas'); tc.width = tc.height = 2048;
-  const g = tc.getContext('2d'), k = 2048 / WORLD, R = (x, y, w, h) => g.fillRect(x * k, y * k, w * k, h * k);
-  g.fillStyle = '#5c9a48'; g.fillRect(0, 0, 2048, 2048);
-  for (let i = 0; i < 9000; i++) { g.fillStyle = srand() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.05)'; g.fillRect(srand() * 2048, srand() * 2048, 3, 3); }
+  const TS = 3072, tc = document.createElement('canvas'); tc.width = tc.height = TS;
+  const g = tc.getContext('2d'), k = TS / WORLD, R = (x, y, w, h) => g.fillRect(x * k, y * k, w * k, h * k);
+  g.fillStyle = '#5c9a48'; g.fillRect(0, 0, TS, TS);
+  for (let i = 0; i < 20000; i++) { g.fillStyle = srand() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.05)'; g.fillRect(srand() * TS, srand() * TS, 3, 3); }
+  drawDistricts(g, R, k);
   g.fillStyle = '#b9b2a6';
-  for (const c of [600, 1200]) { R(c - 75, 0, 150, WORLD); R(0, c - 75, WORLD, 150); }
+  for (const c of ROADS) { R(c - 75, 0, 150, WORLD); R(0, c - 75, WORLD, 150); }
   g.fillStyle = '#4a4950';
-  for (const c of [600, 1200]) { R(c - 50, 0, 100, WORLD); R(0, c - 50, WORLD, 100); }
+  for (const c of ROADS) { R(c - 50, 0, 100, WORLD); R(0, c - 50, WORLD, 100); }
   g.fillStyle = '#ecd36a';
-  for (const c of [600, 1200]) for (let t = 0; t < WORLD; t += 50) { if (Math.abs(t + 15 - 600) < 70 || Math.abs(t + 15 - 1200) < 70) continue; R(c - 2, t, 4, 28); R(t, c - 2, 28, 4); }
+  for (const c of ROADS) for (let t = 0; t < WORLD; t += 50) { if (ROADS.some(r => Math.abs(t + 15 - r) < 70)) continue; R(c - 2, t, 4, 28); R(t, c - 2, 28, 4); }
   g.fillStyle = 'rgba(240,240,240,.85)';
-  for (const ix of [600, 1200]) for (const iy of [600, 1200]) for (let s = -40; s < 40; s += 14) { R(ix + s, iy - 72, 7, 20); R(ix + s, iy + 52, 7, 20); R(ix - 72, iy + s, 20, 7); R(ix + 52, iy + s, 20, 7); }
+  for (const ix of ROADS) for (const iy of ROADS) for (let s = -40; s < 40; s += 14) { R(ix + s, iy - 72, 7, 20); R(ix + s, iy + 52, 7, 20); R(ix - 72, iy + s, 20, 7); R(ix + 52, iy + s, 20, 7); }
   g.fillStyle = '#c9b48a'; R(640, 1240, 520, 40); // residential front walk
   g.fillStyle = '#d6c7a0'; g.beginPath(); g.arc(900 * k, 920 * k, 120 * k, 0, 7); g.fill(); R(880, 680, 40, 480); R(680, 900, 440, 40);
   g.fillStyle = '#8a8f96'; R(1260, 1280, 500, 460);
@@ -360,6 +434,7 @@ function buildTown() {
   place('depot', 'Egg Express', 370, 1300, 545, 1580, 70, -1, { wall: '#d98a3a', win: '#2c241c', sign: '#6a3a1a' });
   place('realty', 'Nest Estates', 1280, 1300, 1480, 1500, 70, -1, { wall: '#cdb6d6', win: '#2a2433', sign: '#6a3a7a' });
   place('carshop', 'Dino Motors', 1540, 1560, 1770, 1740, 75, -1, { wall: '#d0d6dc', win: '#bfe3ff', sign: '#c0392b', awning: '#c0392b' });
+  buildDistricts();
   // a manhole on a quiet stretch of road: the way down to the black market
   const mhx = 585, mhy = 1700;
   add(scene, GEO.y, '#55555c', mhx, 0.7, mhy, 20, 1, 20).castShadow = false;
@@ -395,16 +470,17 @@ function buildTown() {
   const tree = (x, z, s) => { lists.trunk.push([x, 30 * s, z, 6 * s, 60 * s, 6 * s]); lists.leaf.push([x, 78 * s, z, 36 * s, 32 * s, 36 * s]); };
   for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; tree(900 + Math.cos(a) * 230, 920 + Math.sin(a) * 200, 0.8 + srand() * 0.3); }
   for (const [x, z] of [[100, 560], [520, 560], [700, 560], [1100, 560], [1280, 560], [1700, 560], [100, 1040], [520, 1040], [1300, 1040], [1720, 1040], [1520, 1760], [1500, 1600], [400, 1680], [150, 1700]]) tree(x, z, 0.85);
-  for (const ix of [600, 1200]) for (const iy of [600, 1200]) for (const [dx, dz] of [[-70, -70], [70, -70], [-70, 70], [70, 70]]) { lists.pole.push([ix + dx, 40, iy + dz, 2.2, 80, 2.2]); lists.lamp.push([ix + dx, 82, iy + dz, 6, 4.5, 6]); }
-  for (let i = 0; i < 40; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
-  lists.bush = lists.bush.filter(([x, , z]) => !solids.some(b => x > b.x0 - 20 && x < b.x1 + 20 && z > b.y0 - 20 && z < b.y1 + 20) && Math.abs(x - 600) > 90 && Math.abs(x - 1200) > 90 && Math.abs(z - 600) > 90 && Math.abs(z - 1200) > 90 && !(z > 1250 && x > 640 && x < 1180));
+  for (const ix of ROADS) for (const iy of ROADS) for (const [dx, dz] of [[-70, -70], [70, -70], [-70, 70], [70, 70]]) { lists.pole.push([ix + dx, 40, iy + dz, 2.2, 80, 2.2]); lists.lamp.push([ix + dx, 82, iy + dz, 6, 4.5, 6]); }
+  for (let i = 0; i < 110; i++) lists.bush.push([srand() * WORLD, 8, srand() * WORLD, 12, 10, 12]);
+  lists.bush = lists.bush.filter(([x, , z]) => !solids.some(b => x > b.x0 - 20 && x < b.x1 + 20 && z > b.y0 - 20 && z < b.y1 + 20) && ROADS.every(r => Math.abs(x - r) > 90 && Math.abs(z - r) > 90) && !(z > 1250 && x > 640 && x < 1180) && !(x > 1930 && x < 2420 && z > 860 && z < 1150));
+  for (const [x, z, s] of districtTrees) tree(x, z, s);
   const inst = (geo, m, list, cast) => { const im = new THREE.InstancedMesh(geo, m, list.length); list.forEach(([x, y, z, sx, sy, sz], i) => { dummy.position.set(x, y, z); dummy.rotation.set(0, i, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); }); im.castShadow = cast; im.receiveShadow = true; scene.add(im); return im; };
   inst(GEO.y, mat('#5a3f28'), lists.trunk, true); inst(GEO.ico, mat('#3a7a3c'), lists.leaf, true);
   inst(GEO.y, mat('#2f2f35'), lists.pole, true);
   const lampM = new THREE.MeshBasicMaterial({ color: '#c9c3a8' }); lampMats.push(lampM); inst(GEO.s, lampM, lists.lamp, false);
   inst(GEO.ico, mat('#356a32'), lists.bush, true);
   // distant hills
-  for (let i = 0; i < 30; i++) { const a = i / 30 * Math.PI * 2, r = 1700 + srand() * 400; add(scene, GEO.ico, '#4a7a40', 900 + Math.cos(a) * r, 0, 900 + Math.sin(a) * r, 300 + srand() * 200, 160 + srand() * 140, 300 + srand() * 200); }
+  for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2, r = 2500 + srand() * 500; add(scene, GEO.ico, '#4a7a40', WORLD / 2 + Math.cos(a) * r, 0, WORLD / 2 + Math.sin(a) * r, 300 + srand() * 200, 160 + srand() * 140, 300 + srand() * 200); }
 }
 
 function buildHomeModel(key) {
@@ -456,10 +532,10 @@ const TRAITS = ['loves dancing', 'collects shiny rocks', 'is a terrible cook', '
 let player = null, spouseM = null, kidMs = [], npcs = [], trex = null;
 function makeCompy(pal, extra = {}) { return buildDino({ ...pal, ...extra }); }
 const INTERSECTIONS = [];
-for (const x of [600, 1200]) for (const y of [30, 600, 1200, 1770]) INTERSECTIONS.push([x, y]);
-for (const y of [600, 1200]) for (const x of [30, 1770]) INTERSECTIONS.push([x, y]);
+for (const x of ROADS) for (const y of [30, ...ROADS, WORLD - 30]) INTERSECTIONS.push([x, y]);
+for (const y of ROADS) for (const x of [30, WORLD - 30]) INTERSECTIONS.push([x, y]);
 function spawnNPCs() {
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 24; i++) {
     const pal = PALETTES[i % PALETTES.length], big = i % 5 === 4;
     const m = makeCompy(pal, big ? { tube: pal.dark, legs: 1.3 } : { crest: pal.crest, hat: i % 4 === 1 ? '#2a2a2a' : null, tie: i % 3 === 0 ? '#c8322a' : null });
     const [x, y] = pick(INTERSECTIONS);
@@ -479,6 +555,11 @@ const CAREERS = {
   bank:     { place: 'bank', hours: [9, 17], edu: 1, clean: true, levels: [['Bank Teller', 160], ['Loan Officer', 300], ['Bank President', 650]] },
   office:   { place: 'office', hours: [9, 17], edu: 1, clean: true, levels: [['Intern', 110], ['Analyst', 220], ['Manager', 380], ['CEO', 800]] },
   hospital: { place: 'hospital', hours: [8, 18], edu: 2, clean: true, levels: [['Nurse', 250], ['Doctor', 500], ['Chief of Medicine', 900]] },
+  gas:      { place: 'gas', hours: [6, 14], edu: 0, clean: false, levels: [['Pump Attendant', 80], ['Station Manager', 170]] },
+  pizza:    { place: 'pizza', hours: [11, 19], edu: 0, clean: false, car: true, levels: [['Pizza Delivery Driver', 95], ['Head Pizzaiolo', 170], ['Pizza Boss', 280]] },
+  builders: { place: 'builders', hours: [7, 15], edu: 0, clean: false, levels: [['Laborer', 110], ['Foreman', 210], ['Site Boss', 360]] },
+  fire:     { place: 'fire', hours: [8, 16], edu: 0, clean: true, levels: [['Firefighter Trainee', 140], ['Firefighter', 260], ['Fire Chief', 520]] },
+  museum:   { place: 'museum', hours: [10, 18], edu: 1, clean: false, levels: [['Tour Guide', 130], ['Curator', 300], ['Museum Director', 600]] },
 };
 const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
@@ -579,8 +660,8 @@ function advance(mins, opts = {}) {
     const stepM = Math.min(mins, 15);
     mins -= stepM; S.min += stepM;
     const hrs = stepM / 60;
-    if (!opts.sleeping) S.energy -= hrs * (opts.work ? 7 : S.injured ? 6 : 4);
-    S.hunger -= hrs * (opts.sleeping ? 2 : 5);
+    if (!opts.sleeping) S.energy -= hrs * (opts.work ? 4 : S.injured ? 3.5 : 2);
+    S.hunger -= hrs * (opts.sleeping ? 1 : 2.5);
     if (S.hunger <= 0) { S.hunger = 0; S.happy -= hrs * 4; S.starve += hrs; } else S.starve = 0;
     if (S.happy > 50 && S.partner && S.partner.married) S.happy += hrs * 0.3;
     S.energy = clamp(S.energy, 0, 100); S.happy = clamp(S.happy, 0, 100);
@@ -594,9 +675,9 @@ function advance(mins, opts = {}) {
 function checkShift() {
   const J = jobInfo(); if (!J || S.workedToday || !isWorkday() || S.flood || S.jail > 0) return;
   if (hour() >= J.hours[1]) {
-    S.workedToday = true; S.job.perf -= 22; S.job.missed++;
+    S.workedToday = true; S.job.perf -= 15; S.job.missed++;
     log(`You missed your shift at ${PLACES[J.place].name}.`, 'bad'); sfx.bad();
-    if (S.job.perf < 15 || S.job.missed >= 3) fire(`You missed too many shifts. ${PLACES[J.place].name} let you go.`);
+    if (S.job.perf < 10 || S.job.missed >= 4) fire(`You missed too many shifts. ${PLACES[J.place].name} let you go.`);
   }
 }
 function fire(why) {
@@ -686,7 +767,7 @@ function disasterTree() {
 function repair(free) { S.damaged = false; setDamaged(S.home, false); log(free ? 'Your house has been repaired.' : 'You paid to repair your house.', 'good'); }
 function disasterMeteor() {
   const hitHome = S.home && !S.damaged && Math.random() < 0.3;
-  const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, 1600), ty = hitHome ? 1430 : rand(200, 1600);
+  const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, WORLD - 200), ty = hitHome ? 1430 : rand(200, WORLD - 200);
   meteorFx(tx, ty);
   setTimeout(() => {
     if (hitHome) { S.damaged = true; setDamaged(S.home, true); }
@@ -714,7 +795,7 @@ function startTrex() {
   S.trexAt = null;
   const m = buildDino({ body: '#c9374a', belly: '#f2b8a0', dark: '#86202f', stripe: '#ffb347', legs: 1.2 });
   m.root.scale.setScalar(70 / 1.25); scene.add(m.root);
-  const side = pick([[-150, rand(300, 1500)], [WORLD + 150, rand(300, 1500)], [rand(300, 1500), -150]]);
+  const side = pick([[-150, rand(300, WORLD - 300)], [WORLD + 150, rand(300, WORLD - 300)], [rand(300, WORLD - 300), -150]]);
   trex = { m, x: side[0], y: side[1], t: 0, life: 22, roarT: 0 };
   sfx.roar(); shake = 12;
   queueEvent({ kind: 'bad', tag: 'Disaster', title: 'T-REX IN TOWN!', text: 'A full-grown T-rex is stomping down Main Street and compies are bite-sized. Stay away from it, or duck into a building, until it wanders off.', sound: 'roar', buttons: [{ label: 'Run!' }] });
@@ -788,6 +869,7 @@ const MENUS = {
       if (mine) why = 'This is your job.';
       else if (S.edu < C.edu) why = `Needs a ${C.edu === 1 ? 'diploma' : 'degree'} from Dino U.`;
       else if (C.clean && S.record > 0) why = 'Needs a clean criminal record.';
+      else if (C.car && !cars.some(c => c.owned)) why = 'Needs your own car. Buy one at Dino Motors.';
       acts.push({ label: `${t} at ${PLACES[C.place].name}`, detail: `${clock(C.hours[0] * 60)} to ${clock(C.hours[1] * 60)} on weekdays`, tag: `${money$(w)}/day`, why, fn: () => {
         const had = !!S.job; S.job = { career: id, level: 0, perf: 50, days: 0, missed: 0 }; goal('job');
         log(`Hired as a ${t}! First shift is the next weekday at ${clock(C.hours[0] * 60)}.`, 'good'); sfx.goal();
@@ -865,6 +947,29 @@ const MENUS = {
     acts.push({ label: 'Have lunch', detail: '+35 hunger, +4 happiness', cost: 14, mins: 40, fn: () => { S.hunger = Math.min(100, S.hunger + 35); S.happy += 4; } });
     return { sub: p ? `${p.married ? 'Married to' : 'Dating'} ${p.name}, who ${p.trait}.` : 'The best place in town to meet someone special.', acts };
   },
+  gas: () => {
+    const acts = []; workAct(acts, 'gas');
+    acts.push({ label: 'Buy a snack', detail: '+20 hunger', cost: 5, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } });
+    acts.push({ label: 'Energy drink', detail: '+30 energy, a little jittery', cost: 8, mins: 5, fn: () => { S.energy = Math.min(100, S.energy + 30); S.happy -= 2; } });
+    acts.push({ label: 'Coffee', detail: '+15 energy, +3 happiness', cost: 4, mins: 10, fn: () => { S.energy = Math.min(100, S.energy + 15); S.happy += 3; } });
+    return { sub: 'Dino Gas. Pull up to a pump in a car to fill up. Snacks inside, open all night.', acts };
+  },
+  pizza: () => {
+    const acts = []; workAct(acts, 'pizza');
+    if (open(10, 24)) acts.push({ label: 'Order a pizza', detail: '+60 hunger, +8 happiness', cost: 15, mins: 45, fn: () => { S.hunger = Math.min(100, S.hunger + 60); S.happy += 8; } });
+    return { sub: 'Ptero Pizza. Delivered by air or by car, whichever shows up first.', acts };
+  },
+  builders: () => { const acts = []; workAct(acts, 'builders'); return { sub: 'Raptor Builders. Hard hats required, tiny arms optional.', acts }; },
+  fire: () => {
+    const acts = []; workAct(acts, 'fire');
+    acts.push({ label: 'Slide down the fire pole', detail: 'Wheee! +6 happiness', tag: 'Free', mins: 5, fn: () => { S.happy += 6; log('WHEEE!', 'good'); } });
+    return { sub: 'Fire Station. Heroes with very small hoses.', acts };
+  },
+  museum: () => {
+    const acts = []; workAct(acts, 'museum');
+    if (open(9, 19)) acts.push({ label: 'Visit the exhibits', detail: '+15 happiness, 90 minutes. Learn about your ancestors.', cost: 10, mins: 90, fn: () => { S.happy += 15; log('The T-rex skeleton was terrifying. And a little inspiring.', 'good'); } });
+    return { sub: 'Fossil Museum. Home of the biggest skeleton in town.', acts };
+  },
   carshop: () => {
     const acts = [];
     const mine = cars.find(c => c.owned), trade = mine ? Math.round(CAR_MODELS[mine.model].price * 0.5) : 0;
@@ -912,14 +1017,14 @@ function workAct(acts, placeId) {
   else if (S.workedToday) why = 'You already handled today.';
   else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`;
   else if (hour() > b - 1) why = 'Too late for today.';
-  const late = hour() > a + 0.25, startH = Math.max(hour(), a), mins = Math.round((b - startH) * 60);
+  const late = hour() > a + 1, startH = Math.max(hour(), a), mins = Math.round((b - startH) * 60);
   const pay = Math.round(J.wage * Math.min(1, (b - startH) / (b - a)));
-  acts.unshift({ label: `Work your shift as ${J.title}`, detail: why ? '' : `${late ? 'You are late! ' : ''}Until ${clock(b * 60)}. Performance: ${Math.round(S.job.perf)}/100.`, tag: money$(pay), why, fn: () => {
+  acts.unshift({ label: `Work your shift as ${J.title}`, detail: why ? '' : `${late ? 'You are late (more than an hour). ' : hour() > a ? 'A little late, but within the grace hour. ' : ''}Until ${clock(b * 60)}. Performance: ${Math.round(S.job.perf)}/100.`, tag: money$(pay), why, fn: () => {
     if (hour() < a) S.min = a * 60;
     S.workedToday = true;
     advance(mins, { work: true });
     S.money += pay;
-    let d = rand(3, 9) + (S.happy > 70 ? 2 : 0) - (S.energy < 25 ? 6 : 0) - (S.hunger < 20 ? 3 : 0) - (late ? 9 : 0);
+    let d = rand(3, 9) + (S.happy > 70 ? 2 : 0) - (S.energy < 25 ? 6 : 0) - (S.hunger < 20 ? 3 : 0) - (late ? 4 : 0);
     S.job.perf = clamp(S.job.perf + d, 0, 100);
     log(`Shift done: +${money$(pay)}. Performance ${d >= 0 ? 'up' : 'down'} to ${Math.round(S.job.perf)}.`, d >= 0 ? 'good' : 'warn'); sfx.coin();
     const C = CAREERS[S.job.career];
@@ -1005,7 +1110,7 @@ function setScreens() {
 // every building has a room far from town; you walk around inside and use stations (counters, desks, beds)
 let inside = null, activeSolids = solids, roomN = 0;
 const ROOMS = {};
-const HOURS = { carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
+const HOURS = { pizza: [10, 24], museum: [9, 19], carshop: [8, 20], grocer: [7, 22], burger: [7, 24], jobs: [7, 19], school: [8, 20], cafe: [8, 23], realty: [8, 19], casino: [12, 24], bank: [8, 18] };
 function closedWhy(id) {
   const h = HOURS[id]; if (!h) return '';
   const J = jobInfo(); if (J && J.place === id) return '';
@@ -1205,6 +1310,60 @@ const LAYOUTS = {
     b.station(230, 140, 'Loading dock', WORKS);
     b.npc(300, 200, 2, { hat: '#d98a3a', wander: [120, 160, 380, 280] }); b.npc(150, 60, 5, { hat: '#d98a3a' });
     b.sign('EGG EXPRESS', 230, 100, 3, 160, '#6a3a1a', '#ffffff'); b.lamp(230, 200);
+  } },
+  gas: { w: 380, d: 280, floor: ['tile', '#f4f6f4', '#d6ddd6'], wall: '#f2f2ee', trim: '#27ae60', build(b) {
+    const goods = ['#c8322a', '#ffd35a', '#3f8a3a', '#2e86c1'];
+    for (const x of [80, 170]) { b.box(x, 130, 30, 120, 40, '#b9b2a6'); for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) b.box(x + sd * 13, 80 + i * 24, 5, 16, 10, goods[(i + x) % 4], false, 10 + (i % 2) * 16); }
+    b.box(340, 90, 30, 140, 60, '#d6dde4'); for (let i = 0; i < 4; i++) b.box(324, 40 + i * 34, 2, 28, 46, '!#bfe3ff', false, 8);
+    b.box(270, 220, 90, 30, 24, '#27ae60'); b.npc(270, 196, 2, { hat: '#27ae60' });
+    b.station(270, 262, 'Register', ['Buy a snack', 'Energy drink', 'Coffee']);
+    b.station(250, 50, 'Back room (staff)', WORKS);
+    b.sign('DINO GAS', 190, 100, 3, 150, '#27ae60', '#ffffff'); b.lamp(190, 150);
+  } },
+  pizza: { w: 420, d: 320, floor: ['checker', '#f2f0ea', '#2e8a3a'], wall: '#e8d3a8', build(b) {
+    add(b.g, GEO.s, '#a8583a', 300, 0, 30, 60, 50, 40).castShadow = true; b.R.solids.push({ x0: b.R.ox + 240, y0: b.R.oy, x1: b.R.ox + 360, y1: b.R.oy + 70 });
+    add(b.g, GEO.s, '!#ff8a2a', 300, 14, 66, 16, 12, 6).castShadow = false;
+    b.box(200, 110, 240, 26, 24, '#6a4a2e'); b.npc(170, 85, 4, { hat: '#ffffff' }); b.npc(260, 60, 1, { hat: '#ffffff', wander: [150, 40, 380, 80] });
+    b.station(200, 152, 'Counter', ['Order a pizza']);
+    b.station(380, 120, 'Kitchen (staff)', WORKS);
+    for (const [x, z] of [[80, 220], [200, 250], [320, 230]]) { b.table(x, z, '#c8322a'); b.chair(x - 24, z); b.chair(x + 24, z); }
+    b.npc(56, 220, 3); b.npc(344, 230, 5);
+    b.sign('PTERO PIZZA', 120, 100, 3, 150, '#c8322a', '#ffffff'); b.lamp(140, 200); b.lamp(300, 200);
+  } },
+  builders: { w: 320, d: 240, floor: ['wood', '#b9925a', '#9a7442'], wall: '#e6e2d4', trim: '#f1c40f', build(b) {
+    b.box(150, 90, 110, 60, 22, '#6a4a2e'); b.box(150, 90, 100, 52, 1, '#3a6ab0', false, 22);
+    for (let i = 0; i < 5; i++) add(b.g, GEO.s, '#f1c40f', 40 + i * 22, 44, 12, 8, 6, 8).castShadow = false;
+    b.box(80, 12, 130, 14, 36, '#8a8f96');
+    b.npc(150, 50, 0, { hat: '#f1c40f' }); b.npc(250, 150, 5, { hat: '#f1c40f', wander: [200, 120, 290, 190] });
+    b.station(150, 150, 'Clock in', WORKS);
+    b.sign('SAFETY FIRST', 240, 90, 3, 110, '#f1c40f', '#2a2a2a'); b.lamp(150, 120);
+  } },
+  fire: { w: 480, d: 340, floor: ['tile', '#c9ccd0', '#aeb3b8'], wall: '#e9d7d2', trim: '#b8342c', build(b) {
+    b.box(220, 110, 200, 60, 44, '#c8322a'); b.box(330, 110, 50, 60, 56, '#c8322a'); b.box(210, 110, 180, 10, 4, '#c9c9cf', false, 46);
+    for (const x of [150, 290]) for (const z of [80, 140]) { const w = add(b.g, GEO.y, '#1a1a1a', x, 10, z, 10, 8, 10, Math.PI / 2, 0, 0); w.castShadow = true; }
+    b.cyl(420, 230, 3, 120, '#c9c9cf', false); b.cyl(420, 230, 18, 1, '#3a3a40', false);
+    for (let i = 0; i < 5; i++) b.box(40 + i * 30, 12, 24, 16, 60, '#7a8a9a');
+    b.npc(120, 230, 1, { hat: '#c8322a' }); b.npc(300, 250, 4, { hat: '#c8322a', wander: [100, 200, 380, 300] });
+    b.station(110, 60, 'Locker room', WORKS);
+    b.station(420, 270, 'Fire pole', ['Slide down']);
+    b.sign('ENGINE 1', 240, 104, 3, 120, '#b8342c', '#ffffff'); b.lamp(220, 200);
+  } },
+  museum: { w: 520, d: 360, floor: ['checker', '#efe8da', '#d6cbb5'], wall: '#efe8da', trim: '#8a7e66', build(b) {
+    // the big T-rex skeleton
+    b.box(260, 130, 260, 120, 8, '#8a7e66');
+    const bone = '#f4ecd8', sk = b.group(260, 130);
+    for (let i = 0; i < 14; i++) { const x = -110 + i * 15, y = 70 + Math.sin(i / 13 * Math.PI) * 18 - (i < 3 ? (3 - i) * 8 : 0); add(sk, GEO.s, bone, x, y, 0, 6, 6, 6); if (i > 3 && i < 11) { add(sk, GEO.y, bone, x, y - 16, 10, 1.5, 34, 1.5, 0.35, 0, 0); add(sk, GEO.y, bone, x, y - 16, -10, 1.5, 34, 1.5, -0.35, 0, 0); } }
+    add(sk, GEO.b, bone, 110, 92, 0, 44, 22, 22); add(sk, GEO.b, bone, 116, 76, 0, 38, 7, 18);
+    for (let i = 0; i < 6; i++) add(sk, GEO.c, '#ffffff', 98 + i * 6, 80, 9, 1.5, 6, 1.5, Math.PI, 0, 0);
+    for (const z of [-14, 14]) { add(sk, GEO.y, bone, 0, 48, z, 3, 44, 3, 0, 0, 0.25); add(sk, GEO.y, bone, 8, 18, z, 2.5, 34, 2.5, 0, 0, -0.3); add(sk, GEO.y, bone, 70, 60, z, 1.2, 16, 1.2, 0, 0, 0.8); }
+    b.sign('TYRANNOSAURUS REX: YOUR VERY BIG COUSIN', 260, 14, 196, 170, '#6a5a3a', '#ffffff').rotation.x = -0.9;
+    b.cyl(70, 260, 18, 30, '#d6cbb5'); add(b.g, GEO.dod, '!#ff8a3a', 70, 40, 260, 12, 12, 12).castShadow = false;
+    b.cyl(450, 260, 18, 30, '#d6cbb5'); add(b.g, GEO.s, '#f6f0e2', 450, 44, 260, 10, 13, 10);
+    b.box(440, 60, 90, 30, 24, '#6a5a3a'); b.npc(440, 36, 3, { tie: '#6a5a3a' });
+    b.npc(150, 270, 0, { wander: [60, 230, 470, 300] }); b.npc(350, 280, 2, { wander: [60, 230, 470, 300] }); b.npc(250, 300, 5, { kid: true, wander: [60, 230, 470, 300] });
+    b.station(440, 102, 'Ticket desk', ['Visit the exhibits']);
+    b.station(60, 60, 'Staff office', WORKS);
+    b.lamp(180, 200); b.lamp(340, 200);
   } },
   carshop: { w: 480, d: 340, floor: ['checker', '#f2f4f6', '#c9d1d8'], wall: '#e9eef2', trim: '#c0392b', build(b) {
     const show = [['hatch', 90, 150], ['cruiser', 240, 120], ['gt', 390, 150]];
@@ -1414,7 +1573,8 @@ function buildCar(color, style) {
 }
 function spawnCar(x, y, a, color, ai, model) {
   const c = { x, y, a, v: 0, steer: 0, roll: 0, color, ai, wait: 0, honkT: 0, model, m: buildCar(color, model), hx: x, hy: y, ha: a, price: Math.round(rand(900, 1500)) };
-  if (model) { c.max = CAR_MODELS[model].max; c.price = Math.round(CAR_MODELS[model].price * 0.4); }
+  c.fuel = ai ? 100 : Math.round(rand(35, 100));
+  if (model) { c.max = CAR_MODELS[model].max; c.price = Math.round(CAR_MODELS[model].price * 0.4); c.fuel = 100; }
   scene.add(c.m.root);
   if (ai) {
     const pal = PALETTES[cars.length % PALETTES.length];
@@ -1458,7 +1618,7 @@ function buyCar(id) {
 function spawnOwnedCar() {
   const old = cars.find(c => c.owned); if (old) { scene.remove(old.m.root); cars.splice(cars.indexOf(old), 1); }
   if (!S.car) return;
-  const c = spawnCar(S.car.x, S.car.y, S.car.a, S.car.color, false, S.car.model); c.owned = true;
+  const c = spawnCar(S.car.x, S.car.y, S.car.a, S.car.color, false, S.car.model); c.owned = true; c.fuel = S.car.fuel ?? 100;
 }
 function sellStolen(c, price) {
   if (driving === c) exitCar(true);
@@ -1470,11 +1630,11 @@ function sellStolen(c, price) {
 function refillParking() {
   PARK_SPOTS.forEach(([x, y, a], i) => { if (!cars.some(c => !c.ai && Math.hypot(c.x - x, c.y - y) < 40)) spawnCar(x, y, a, CAR_COLORS[(i + S.day) % CAR_COLORS.length], false); });
 }
-const PARK_SPOTS = [[760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]];
+const PARK_SPOTS = [[2300, 560, 0], [2250, 1100, 0], [2720, 1100, 0], [1000, 1930, 0], [2100, 1930, 0], [760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]];
 function placeCars() {
-  for (const [x, y, a] of [[760, 1128, 0], [1040, 1128, Math.PI], [440, 1068, 0], [1132, 400, Math.PI / 2], [660, 1263, 0], [1560, 1350, Math.PI / 2], [1630, 1350, Math.PI / 2], [1700, 1350, Math.PI / 2]])
+  for (const [x, y, a] of PARK_SPOTS)
     spawnCar(x, y, a, CAR_COLORS[cars.length % CAR_COLORS.length], false);
-  for (let i = 0; i < 6; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
+  for (let i = 0; i < 10; i++) spawnCar(0, 0, 0, CAR_COLORS[(i + 3) % CAR_COLORS.length], true);
 }
 function carName(c) { return c.model ? CAR_MODELS[c.model].name : 'convertible'; }
 function enterCar(c) {
@@ -1492,7 +1652,7 @@ function enterCar(c) {
 function exitCar(stay) {
   const c = driving; if (!c) return;
   driving = null; c.v = 0;
-  if (c.owned && S.car) Object.assign(S.car, { x: c.x, y: c.y, a: c.a });
+  if (c.owned && S.car) Object.assign(S.car, { x: c.x, y: c.y, a: c.a, fuel: c.fuel });
   if (engine) { engine.o.stop(); engine = null; }
   if (!stay) {
     for (const side of [1, -1]) {
@@ -1503,6 +1663,13 @@ function exitCar(stay) {
     }
   }
   sfx.door();
+}
+const nearPump = () => driving && GAS_PUMPS.some(pp => Math.hypot(driving.x - pp.x, driving.y - pp.y) < 75);
+function fillUp() {
+  const c = driving, need = 100 - c.fuel, can = Math.min(need, Math.max(0, S.money) / 0.4);
+  if (can < 1) { log('You cannot afford any gas.', 'bad'); sfx.bad(); return; }
+  c.fuel += can; S.money -= can * 0.4; advance(10); sfx.coin();
+  log(`Filled up: +${Math.round(can)}% gas for ${money$(can * 0.4)}.`, 'good');
 }
 function honk() { sfx.honk(); for (const n of npcs) if (Math.hypot(n.x - P.x, n.y - P.y) < 120) n.wait = 0.8; }
 function driveUpdate(dt) {
@@ -1516,7 +1683,8 @@ function driveUpdate(dt) {
     const m = Math.min(1, Math.hypot(joy.dx, joy.dy));
     if (m > 0.2) { const want = Math.atan2(joy.dy, joy.dx), diff = (((want - c.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); st = clamp(diff * 2, -1, 1); thr = Math.abs(diff) > 2.4 ? -m : m; }
   }
-  const max = (S.flood ? 220 : (c.max || 430)) * (S.injured ? 0.85 : 1);
+  if (c.fuel <= 0 && !c.emptyWarned) { c.emptyWarned = true; log('Out of gas! The car can only crawl. Push on to Dino Gas on the east side.', 'bad'); sfx.bad(); }
+  const max = c.fuel <= 0 ? 70 : (S.flood ? 220 : (c.max || 430)) * (S.injured ? 0.85 : 1);
   if (thr > 0) c.v += (c.v < 0 ? 700 : 300) * dt;
   else if (thr < 0) c.v -= (c.v > 0 ? 700 : 220) * dt;
   else c.v *= Math.max(0, 1 - 1.6 * dt);
@@ -1543,6 +1711,8 @@ function driveUpdate(dt) {
     if (d < 40 && Math.abs(c.v) > 40) { n.x += dx / (d || 1) * 30; n.y += dy / (d || 1) * 30; n.wait = 1; }
   }
   c.roll += c.v * dt / 7;
+  c.fuel = Math.max(0, c.fuel - Math.abs(c.v) * dt * 0.006);
+  if (c.fuel > 0) c.emptyWarned = false;
   P.x = c.x; P.y = c.y; P.face = c.a; P.vx = Math.cos(c.a) * c.v; P.vy = Math.sin(c.a) * c.v;
   if (engine) { engine.o.frequency.value = 45 + Math.abs(c.v) * 0.28; engine.g.gain.value = 0.025 + Math.abs(c.v) / max * 0.03; }
 }
@@ -1604,7 +1774,7 @@ cv.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.ch
 const endT = e => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; } };
 cv.addEventListener('touchend', endT); cv.addEventListener('touchcancel', endT);
 function useNear() {
-  if (state === 'play' && driving) { exitCar(); return; }
+  if (state === 'play' && driving) { if (nearPump() && driving.fuel < 98) fillUp(); else exitCar(); return; }
   if (state !== 'play' || !nearPlace) return;
   if (nearPlace.m) { enterCar(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
@@ -1785,7 +1955,7 @@ function drawMini() {
   const Sz = mini.clientWidth; if (mini.width !== Math.round(Sz * DPR)) mini.width = mini.height = Math.round(Sz * DPR);
   const g = mctx, k = Sz / WORLD; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, Sz, Sz);
   g.fillStyle = 'rgba(60,110,60,.7)'; g.fillRect(0, 0, Sz, Sz);
-  g.fillStyle = 'rgba(80,80,90,.9)'; for (const c of [600, 1200]) { g.fillRect((c - 50) * k, 0, 100 * k, Sz); g.fillRect(0, (c - 50) * k, Sz, 100 * k); }
+  g.fillStyle = 'rgba(80,80,90,.9)'; for (const c of ROADS) { g.fillRect((c - 50) * k, 0, 100 * k, Sz); g.fillRect(0, (c - 50) * k, Sz, 100 * k); }
   const J = jobInfo();
   for (const p of Object.values(PLACES)) {
     if (p.h) { g.fillStyle = J && J.place === p.id ? '#ffbe55' : 'rgba(220,220,230,.75)'; g.fillRect(p.x0 * k, p.y0 * k, (p.x1 - p.x0) * k, (p.y1 - p.y0) * k); }
@@ -1808,6 +1978,7 @@ function hud() {
   if (S.record) chips.push([`Record: ${S.record}`, 'bad']);
   if (S.injured) chips.push(['Injured', 'bad']);
   if (S.loan) chips.push([`Loan ${money$(S.loan)}`, 'bad']);
+  if (driving) chips.push([`Gas ${Math.round(driving.fuel)}%`, driving.fuel < 20 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
   $('goalsBtn').textContent = `Goals ${Object.keys(S.goals).length}/${GOALS.length}`;
@@ -1816,7 +1987,7 @@ function hud() {
   if (show) {
     const np = nearPlace;
     let what;
-    if (driving) what = `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
+    if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
     else if (np.m) what = np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (inside) what = np.exit ? `Leave ${PLACES[inside.id].name}` : np.label;
@@ -1828,7 +1999,7 @@ function hud() {
   $('useBtn').hidden = !(touchMode && show);
   const sh = $('shift');
   let st = '';
-  if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
+  if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
   if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 5 - chase.lostT))}s out of sight) or hide inside a building`;
   if (!chase && hour() >= 22) st = S.home ? 'It is late. Get home to bed before midnight.' : 'It is late. Find the park bench before midnight.';
