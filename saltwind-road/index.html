@@ -1177,6 +1177,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  thief:{name:'Pickpocket',hp:4,dmg:0,speed:3.9,aggro:0,drops:[],noBest:true,thief:true},
   serpent:{name:'Sea Serpent',hp:60,dmg:3,speed:3,aggro:30,drops:[['serpent_scale',1,2,1],['pearl',1,2,.5]],coins:[80,160],swim:true},
   duelist:{name:'Vex the Bold',hp:40,dmg:3,speed:3.7,aggro:40,drops:[],noBest:true},
   horseman:{name:'Headless Horseman',hp:70,dmg:4,speed:4.0,aggro:22,undead:true,ranged:{range:6,cd:1.6,speed:8,col:'#ff8a2a'},coins:[200,350],drops:[['pumpkin',3,5,1]]},
@@ -1969,6 +1970,10 @@ const NPCS = [
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
   {id:'vex',town:'crownfall',dx:-4,dy:2,name:'Vex the Bold',role:'Rival adventurer',cols:{cloak:'#8a2a4a',skin:'#e0b896',hair:'#f0e0a0'},rival:true,freeSpot:true,
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
+  {id:'haywood',town:'wren',dx:4,dy:4,name:'Tobin Haywood',role:'Farmhand for hire',cols:{cloak:'#7a6a3a',skin:'#d8a882',hair:'#c89040'},farmhand:true,freeSpot:true,
+   hello:["Need a hand with the fields?","Honest work for honest pay.","Them crops won't harvest themselves!"], rumors:["A homestead with a hired hand runs itself. Crops in, eggs collected, every single morning."]},
+  {id:'zora',town:'crownfall',dx:-4,dy:-2,name:'Madame Zora',role:'Fortune teller',cols:{cloak:'#5a2a6a',skin:'#c89870',hair:'#1a1a2a'},fortune:true,freeSpot:true,
+   hello:["The cards have been expecting you...","Cross my palm with silver, dearie.","I see... a traveler. Yes. You."], rumors:["The stars whisper of what is to come. For a coin, I'll whisper it to you."]},
   {id:'auguste',town:'greenstem',dx:3,dy:3,name:'Chef Auguste',role:'Head judge',cols:{cloak:'#f0f0f0',skin:'#e0b896',hair:'#3a2a1a'},chef:true,freeSpot:true,
    hello:["Magnifique! A fellow food lover?","Taste is everything.","Every third day of the week, the great cooking contest!"], rumors:["The judges change their theme every week. Hearty, seafood, sweet or fancy. Bring something you cooked yourself and they'll be kinder."]},
   {id:'pennyworth',town:'crownfall',dx:4,dy:2,name:'Banker Pennyworth',role:'Crownfall Bank',cols:{cloak:'#2a2a3a',skin:'#e8d0b8',hair:'#c8c8c8'},banker:true,freeSpot:true,
@@ -2444,8 +2449,8 @@ function genWorld() {
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
   setTimeout(placeWells, 0);
-  for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [Math.floor(m.x), Math.floor(m.y)]);
-    for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => a === x && b === y)) { n.x = x + .5; n.y = y + .8; break; } } }
+  for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [m.x - .5, m.y - .8]);
+    for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => Math.hypot(a - x, b - y) < 1.9)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
     if (n.wander && !npcWalkable(n.x, n.y)) { n.x = TOWNS[n.town].x + .5; n.y = TOWNS[n.town].y + 2.8; }
     if (n.cove) { const tw = TOWNS[n.town]; let best = null, bd = 1e9; for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) { const x = tw.x + dx, y = tw.y + dy; if (!inB(x, y)) continue; const t = map[idx(x, y)], d = Math.hypot(dx, dy); if (t === T.SAND && d > 9 && reach[idx(x, y)] && [[1,0],[-1,0],[0,1],[0,-1]].some(([a, b]) => map[idx(x + a, y + b)] === T.SHAL || map[idx(x + a, y + b)] === T.DEEP) && d < bd) { bd = d; best = {x, y}; } } if (best) { n.x = best.x + .5; n.y = best.y + .8; } }
@@ -3224,6 +3229,7 @@ function killEnemy(e) {
   }
   if (e.ghostCap) ghostLoot(e);
   if (e.outlawBoss) outlawCaught();
+  if (e.type === 'thief') { const back = (e.loot || 0) + 25; S.coins += back; S.thievesCaught = (S.thievesCaught || 0) + 1; const tk = townAt(e.x, e.y, 12); if (tk && TOWNS[tk]) addRep(tk, .15); setTimeout(() => toast(`<b>Thief caught!</b> You get your coin back, plus a reward from the watch: <span style="color:var(--good)">+${back} coin</span>`, 4500), 200); }
   if (e.type === 'horseman') { S.horsemen = (S.horsemen || 0) + 1; if (!S.mounts.includes('nightmare')) setTimeout(() => addMount('nightmare'), 1200); else { addItem('pumpkin_pie', 2); } }
   if (e.den != null) { denBroken(e); return; }
   const def = ENEMIES[e.type];
@@ -3359,6 +3365,67 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== farmhand =====
+const FARM_WAGE = 35;
+function farmhandTalk(n) {
+  if (!S.home || !S.home.level) { say('“You’ll need a homestead before you need a farmhand! Talk to the builders about a place of your own.”', [back(n)]); return; }
+  if (S.farmhand) { say(`“Everything’s in order! Every morning I harvest your ripe crops, replant them if you’ve seeds in your pack, and collect the eggs, milk and wool. My wage is ${FARM_WAGE} coin a day.”`, [{label: 'Let him go', fn: () => { S.farmhand = false; save(); say('“Fair enough. Call on me any time.”', [back(n)]); }}, back(n)]); return; }
+  say(`“I’ll work your homestead for ${FARM_WAGE} coin a day. Every morning I harvest ripe crops, replant with your seeds, and collect from the coop and barn. The goods go straight into your pack.”`, [
+    {label: 'Hire Tobin', primary: true, fn: () => { S.farmhand = true; S.farmhandHired = true; save(); SFX.coin(); say('“Pleasure! I’ll start at dawn.”', [back(n)]); }}, back(n)]);
+}
+function farmhandDay() {
+  if (!S.farmhand || !S.home || !S.home.level) return '';
+  if (S.coins < FARM_WAGE) { S.farmhand = false; return ' <span style="color:#e88a5a">You couldn’t pay Tobin, so he went home.</span>'; }
+  S.coins -= FARM_WAGE; const got = {};
+  const add = (g, n) => { if (n > 0 && GOODS[g]) { addItem(g, n); got[g] = (got[g] || 0) + n; } };
+  for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) {
+    const pl = S.home.plots[i]; if (!pl || cropProgress(pl) < 1) continue;
+    const C = CROPS[pl.crop], give = C.give || pl.crop; add(give, rint(C.yield[0], C.yield[1]) + (have('straw_hat') ? 1 : 0)); S.harvested = (S.harvested || 0) + 1;
+    const seed = GK.find(g => GOODS[g].crop === pl.crop); if (Math.random() < .65) add(seed, rint(1, 2));
+    if (seed && have(seed) > 0) { addItem(seed, -1); got[seed] = (got[seed] || 0) - 1; S.home.plots[i] = {crop: pl.crop, at: S.day + S.time}; } else S.home.plots[i] = null;
+  }
+  if (S.home.eggs) { add('egg', S.home.eggs); S.home.eggs = 0; }
+  const P = S.home.prod; if (P) { add('milk', P.milk); add('wool', P.wool); add('truffle', P.truffle); P.milk = P.wool = P.truffle = 0; }
+  const list = Object.entries(got).filter(([, n]) => n > 0).map(([g, n]) => `${n} ${GOODS[g].name}`);
+  return list.length ? ` Tobin brought in <b>${list.join(', ')}</b>.` : ' Tobin tended the farm.';
+}
+// ===== fortune teller =====
+function fortuneTalk(n) {
+  if (S.fortuneDay === S.day) { say(`“The cards have spoken for today, dearie: <i>${esc(S.fortuneText || '')}</i>”`, [back(n)]); return; }
+  if (S.coins < 25) { say('“No silver, no sight. Come back with 25 coin.”', [back(n)]); return; }
+  S.coins -= 25; S.fortuneDay = S.day;
+  const hints = [];
+  for (let d = 1; d <= 6; d++) { const day = S.day + d; if (day >= 6 && day % 6 === 0) { hints.push(`a red moon rises in ${d} day${d > 1 ? 's' : ''}`); break; } }
+  if (S.day % 5 === 2) hints.push('a white creature walks the morning wilds today'); else { const k = (7 - S.day % 5) % 5 || 5; if (k <= 3) hints.push(`a pale stag appears in ${k} day${k > 1 ? 's' : ''}`); }
+  { const k = (8 - S.day % 5) % 5; if (S.day >= 3 && k <= 2) hints.push(k === 0 ? 'a ghostly ship approaches the shore' : `a ghost ship sails in ${k} day${k > 1 ? 's' : ''}`); }
+  if (seasonIdx() === 2) hints.push('a headless rider gallops through autumn nights');
+  const buffs = [['luck', 'Fortune smiles on you: <b>lucky</b> all day', 'luck'], ['might', 'The Tower card: you will be <b>mighty</b> today', 'might'], ['speed', 'The Chariot: <b>swift</b> feet await you', 'speed'], ['regen', 'The Star: you will <b>heal</b> quickly', 'regen'], ['iron', 'The Emperor: your skin is like <b>iron</b>', 'iron']];
+  const [k, txt] = pick(buffs); BUFFS[k] = 900;
+  const ftxt = `${txt}${hints.length ? '. I also see... ' + pick(hints) + '.' : '.'}`;
+  S.fortuneText = ftxt.replace(/<[^>]+>/g, ''); S.fortunes = (S.fortunes || 0) + 1; SFX.chime(); renderHUD(); save();
+  say(`Madame Zora turns over a card and gasps softly.<br><br>“${ftxt}”`, [back(n)]);
+}
+// ===== pickpockets =====
+let thiefT = 90;
+function thiefCheck(dt) {
+  const tk = townAt(S.x, S.y, 9); if (!tk || tk === 'home' || S.coins < 150 || inDungeon() || balloonF) return;
+  thiefT -= dt; if (thiefT > 0) return; thiefT = 150 + Math.random()*150;
+  if (Math.random() > .35 || enemies.some(e => e.type === 'thief' && !e.dead)) return;
+  const amt = Math.min(Math.round(S.coins*.08), 40 + (S.level || 1)*10); S.coins -= amt; renderHUD();
+  const e = makeEnemy('thief', S.x + .8, S.y, {}); e.loot = amt; e.life = 14; enemies.push(e);
+  floatText(S.x, S.y - 1.2, `-${amt} coin!`, '#e88a5a'); toast(`<b>Stop, thief!</b><br>A pickpocket snatched <b>${amt} coin</b> and is running away! Catch them!`, 4500); SFX.hit();
+}
+function thiefTick(e, dt) {
+  e.hurt = Math.max(0, e.hurt - dt); e.life -= dt; e.phase += dt*14;
+  if (Math.abs(e.kx) + Math.abs(e.ky) > .05) { const nx = e.x + e.kx*dt, ny = e.y + e.ky*dt; if (npcWalkable(nx, e.y)) e.x = nx; if (npcWalkable(e.x, ny)) e.y = ny; const dc = Math.min(1, dt*9); e.kx -= e.kx*dc; e.ky -= e.ky*dc; }
+  if (e.life <= 0) { e.dead = true; burst(e.x, e.y - .4, '#888', 10, 3); toast('The thief ducked into an alley and got away with your coin.', 3500); return; }
+  const dx = e.x - S.x, dy = e.y - S.y, d = Math.hypot(dx, dy) || .001; e.wt = (e.wt || 0) - dt;
+  if (e.wt <= 0) { e.wt = .5 + Math.random()*.6; e.jx = (Math.random() - .5)*1.4; e.jy = (Math.random() - .5)*1.4; }
+  let ax = dx/d + (e.jx || 0), ay = dy/d + (e.jy || 0); const m = Math.hypot(ax, ay) || 1, sp = 3.9*(d < 6 ? 1 : .6);
+  const nx = e.x + ax/m*sp*dt, ny = e.y + ay/m*sp*dt; let moved = false;
+  if (npcWalkable(nx, e.y)) { e.x = nx; moved = true; } if (npcWalkable(e.x, ny)) { e.y = ny; moved = true; } if (!moved) { e.jx = (Math.random() - .5)*3; e.jy = (Math.random() - .5)*3; }
+  e.face = ax < 0 ? -1 : 1;
 }
 // ===== the White Stag =====
 let stagTrail = null;
@@ -3939,8 +4006,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Farmhands, fortunes & thieves', 'Tobin in Port Wren works your homestead for a daily wage: harvesting, replanting and collecting produce each morning. Madame Zora in Crownfall reads your fortune for a daily blessing and hints of what is coming. In towns, watch your purse: catch pickpockets to get your coin back with a reward.'],
   ['The White Stag', 'Every fifth day, glowing hoofprints may appear in the morning wilds. Follow them to the White Stag for a powerful blessing. Meet it twice and it leaves you a White Antler.'],
   ['Bottles & birthdays', 'Bottles drift on open water while you sail: fish them out for notes, maps, coins and the lost letters of Captain Elsbeth. Every townsperson has a birthday (the Gazette lists them), and a gift that day counts triple.'],
   ['Tents & sea serpents', 'Craft a Tent (4 Hide, 6 Sticks, 2 Rope) to sleep anywhere at night and set a respawn point in the wild. Out on deep water, Sea Serpents may surface: hit them while they are above the waves. Their scales make a fine cloak.'],
@@ -4198,7 +4266,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -4227,6 +4295,7 @@ function updateCombat(dt, night) {
     if (def.den) { denTick(e, dt); continue; }
     if (def.flee) { goblinTick(e, dt); continue; }
     if (def.swim) { serpentTick(e, dt); continue; }
+    if (def.thief) { thiefTick(e, dt); continue; }
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
@@ -4631,6 +4700,11 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
     case 'target': { const pop = Math.min(1, (extra && extra.age || 1)); g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 8, 2, 8); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 4, y - 1, 8, 2); for (const [r, c] of [[6, '#e8e0d0'], [4.5, '#c83a2a'], [3, '#e8e0d0'], [1.5, '#c83a2a']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y - 12, r, 0, 7); g.fill(); } break; }
+    case 'thief': {
+      drawPerson(g, x, y, {cloak: '#3a3a42', skin: '#c89870', hair: '#2a2a2a'}, phase, true, f < 0 ? 'left' : 'right', {});
+      g.fillStyle = '#c8a050'; g.beginPath(); g.arc(x - f*4, y - 7, 2.5, 0, 7); g.fill();
+      break;
+    }
     case 'duelist': {
       drawPerson(g, x, y, {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, phase, true, f < 0 ? 'left' : 'right', {held: 'rivals_rapier', scarf: true});
       break;
@@ -5504,7 +5578,7 @@ function newDay() {
   else maybeStartRaid();
   rollMarket();
   titanDay(); ghostDay();
-  const bankMsg = bankDay() + mayorDay();
+  const bankMsg = bankDay() + mayorDay() + farmhandDay();
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}${bankMsg}`);
   save();
 }
@@ -5626,6 +5700,8 @@ function mainOptions(n) {
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
   if (n.rival) o.push({label: (S.vexRank || 0) >= 5 ? 'Friendly spar' : `Duel Vex (rank ${(S.vexRank || 0) + 1}/5)`, primary: (S.vexRank || 0) < 5 && S.vexDay !== S.day, fn: () => vexTalk(n)});
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
+  if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
+  if (n.fortune) o.push({label: S.fortuneDay === S.day ? 'Your fortune (read today)' : 'Read my fortune (25◆)', primary: S.fortuneDay !== S.day, fn: () => fortuneTalk(n)});
   if (n.chef) o.push({label: cookDay() ? 'The cooking contest! ★' : 'About the cooking contest', primary: cookDay() && S.cookContest !== S.day, fn: () => chefTalk(n)});
   if (n.banker) o.push({label: `The bank (${S.bank || 0}◆ saved)`, primary: !!S.loan, fn: () => bankTalk(n)});
   if (isElder(n) && !(S.mayor || {})[n.town]) o.push({label: 'Run for mayor', primary: canRunMayor(n.town), fn: () => mayorTalk(n)});
@@ -8272,6 +8348,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['thiefcatcher','Stop, Thief!','Catch 3 pickpockets', () => (S.thievesCaught || 0) >= 3],
+  ['farmhand','Gentleman Farmer','Hire a farmhand', () => !!S.farmhandHired],
+  ['fortune','Seen the Future','Have your fortune read 5 times', () => (S.fortunes || 0) >= 5],
   ['whitestag','The White Stag','Find the White Stag', () => (S.stagsMet || 0) >= 1],
   ['bottles','Message Received','Find 10 messages in bottles', () => (S.bottles || 0) >= 10],
   ['elsbeth','Captain Elsbeth\'s Treasure','Find all five of Captain Elsbeth\'s letters', () => (S.elsbeth || 0) >= 5],
