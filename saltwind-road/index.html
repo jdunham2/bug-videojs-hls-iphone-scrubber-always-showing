@@ -2402,8 +2402,10 @@ function drawTile(g, x, y) {
     case T.DEEP: dot('#1a3552', 4, 2); break;
     case T.SHAL: dot('#3a7d9c', 3, 2); break;
     case T.SAND: dot('#c7b179', 5); dot('#e6d6a2', 3); break;
-    case T.GRASS: case T.HOUSE: dot('#5c8a40', 5); dot('#85b263', 3); if (r(40) > .9) { g.fillStyle = r(41) > .5 ? '#e8d36a' : '#e7e1f0'; g.fillRect(px+(r(42)*12|0)+2, py+(r(43)*12|0)+2, 2, 2); } break;
-    case T.FOREST: dot('#41693a', 4); trees('#2b5528', '#3c7234', '#4a3523'); break;
+    case T.GRASS: case T.HOUSE: dot('#5c8a40', 5); dot('#85b263', 3); if (r(40) > .9) { g.fillStyle = r(41) > .5 ? '#e8d36a' : '#e7e1f0'; g.fillRect(px+(r(42)*12|0)+2, py+(r(43)*12|0)+2, 2, 2); }
+      if (S && y < WORLD_H) { const si = seasonIdx(); if (si === 3) { g.fillStyle = 'rgba(236,242,248,.6)'; g.fillRect(px, py, TS, TS); dot('#ffffff', 2, 2); dot('#cfdbe6', 2); } else if (si === 2) { dot('#c8702a', 3); dot('#e0a040', 2); } else if (si === 0 && r(44) > .82) { g.fillStyle = r(45) > .5 ? '#ff9ac8' : '#ffffff'; g.fillRect(px+(r(46)*12|0)+2, py+(r(47)*12|0)+2, 2, 2); } }
+      break;
+    case T.FOREST: { const si = S && y < WORLD_H ? seasonIdx() : 0; if (si === 3) { g.fillStyle = 'rgba(236,242,248,.4)'; g.fillRect(px, py, TS, TS); } dot('#41693a', 4); if (si === 2) trees('#8a4a1a', '#c8702a', '#4a3523'); else if (si === 3) trees('#3a5a4a', '#e8eef4', '#4a3523'); else trees('#2b5528', '#3c7234', '#4a3523'); break; }
     case T.GLOOM: dot('#243a28', 4); if (r(44) > .85) { g.fillStyle = '#b98ad8'; g.fillRect(px+(r(45)*12|0)+2, py+(r(46)*12|0)+2, 2, 1); } trees('#162a1c', '#24402a', '#2a2018'); break;
     case T.HILL: g.fillStyle = '#74773f'; g.beginPath(); g.arc(px+8, py+12, 6, Math.PI, 0); g.fill(); g.fillStyle = '#9a9c66'; g.fillRect(px+5, py+7, 3, 1); break;
     case T.MOUNT: {
@@ -2482,6 +2484,7 @@ function buildChunk(cx, cy) {
 }
 const CHUNK_MAX = 20;
 let chunkLive = [];
+function invalidateChunks() { for (const [x, y] of chunkLive) { const o = chunks[y] && chunks[y][x]; if (o) { o.width = o.height = 0; chunks[y][x] = null; } } chunkLive = []; }
 const getChunk = (cx, cy) => { const c = chunks[cy][cx] || buildChunk(cx, cy); c.used = frameT; return c; };
 function renderTerrain() {
   for (const [x, y] of chunkLive) { const o = chunks[y] && chunks[y][x]; if (o) o.width = o.height = 0; }
@@ -4433,6 +4436,7 @@ function newDay() {
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
     st.purse = Math.max(st.purse, n.purse); st.patience = n.patience; st.flex = rollFlex(n);
   }
+  if (dayOfSeason() === 1) invalidateChunks();
   if (dayOfSeason() === 1) { const si = seasonIdx(); setTimeout(() => { toast(`<b>${SEASONS[si].name} has come</b><br>${SEASON_TEXT[si]}`, 7500); SFX.chime(); }, 900); }
   { const B = S.home.barn, P = S.home.prod; if (B) { P.milk = Math.min(6, P.milk + B.cow); P.wool = Math.min(6, P.wool + B.sheep); for (let i = 0; i < B.pig; i++) if (Math.random() < .6) P.truffle = Math.min(4, P.truffle + 1); } }
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
@@ -6895,7 +6899,7 @@ function step(ts) {
   render();
 }
 function begin(state) {
-  S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling');
+  S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks();
   if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
   if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
   if (!S.home.prod) S.home.prod = {milk:0, wool:0, truffle:0};
@@ -6927,7 +6931,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
