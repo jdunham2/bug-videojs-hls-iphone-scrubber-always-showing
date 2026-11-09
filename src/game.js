@@ -33,6 +33,7 @@ import { ArrowSystem } from './arrows.js';
 import { Particles, DamageNumbers, Shake } from './fx.js';
 import { Sfx } from './audio.js';
 import { Input } from './input.js';
+import { TouchControls } from './touch.js';
 import { UiMethods } from './game-ui.js';
 import { CombatMethods } from './game-combat.js';
 import { FlowMethods } from './game-flow.js';
@@ -148,6 +149,7 @@ export class Game {
     this.tips = new Tips();
     applySettings(this);
     this.input = new Input(r.domElement);
+    this.touch = new TouchControls(this);
     this.enemies = [];
 
     this.raycaster = new THREE.Raycaster();
@@ -213,7 +215,18 @@ export class Game {
       e.preventDefault();
       this.sfx.unlock();
       this.music.start();
+      // "How do you play?" buttons on the title screen.
+      const pick = e.target.closest('[data-controls]');
+      if (pick) {
+        this.touch.setMode(pick.dataset.controls);
+        if (this.state === 'title' || this.state === 'paused') this.showOverlay(this.state);
+        return;
+      }
       applySettings(this);
+      // Phones: go full screen on the first tap (where the browser allows it).
+      if (this.touch.active && this.state === 'title' && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+      }
       if (this.state === 'paused') return this.setPaused(false);
       if (this.state === 'gameover' || this.state === 'victory') {
         // Only the button leaves the game-over screen, and not in the first moment, so
@@ -285,6 +298,7 @@ export class Game {
 
   start(fromCheckpoint = false) {
     if (this.camp.active) this.leaveCamp();
+    if (this.tips.current === 'camp') this.tips.hide(); // the dummy tip stays in camp
     this.resetRun();
     const cp = profile.checkpoint;
     this.difficulty = fromCheckpoint && cp?.difficulty ? difficultyById(cp.difficulty) : selectedDifficulty();
@@ -634,6 +648,7 @@ export class Game {
     }
     this.updateCamera(realDt);
     this.updateHud();
+    this.touch.update();
     if (render) {
       // Compatibility mode 1+: draw the scene directly, skipping post-processing.
       // A camp screen with its painted room fully covers the view: skip the 3D frame.
@@ -757,8 +772,63 @@ export class Game {
       return;
     }
     if (pad) return; // gamepad without aim input: keep the last aim
+    if (this.touch.active) return this.updateTouchAim();
     this.raycaster.setFromCamera(new THREE.Vector2(this.input.mouse.ndcX, this.input.mouse.ndcY), this.camera);
     this.raycaster.ray.intersectPlane(this.aimPlane, this.aimPoint);
+  }
+
+  /**
+   * Touch aiming. Dragging the right stick aims in that direction, snapping onto
+   * an enemy within a narrow cone; a tap (no drag) locks onto the nearest enemy.
+   * When not drawing, you face where you walk.
+   */
+  updateTouchAim() {
+    const P = this.player;
+    const T = this.touch;
+    const st = T.aimState();
+    const targets = this.state === 'camp' ? (this.camp.dummy && !this.camp.room ? [this.camp.dummy] : []) : this.enemies.filter((e) => e.state !== 'dying' && !e.removed && e.pos);
+    const toDir = (v) => this.camRight.clone().multiplyScalar(v.x).addScaledVector(this.camForward, v.y).setY(0).normalize();
+    let dir = null;
+    let lock = null;
+    if (st) {
+      if (st.dir) {
+        dir = toDir(st.dir);
+        // Soft lock: the closest enemy within ~20 degrees of where you're aiming.
+        let best = Infinity;
+        for (const e of targets) {
+          const dx = e.pos.x - P.pos.x;
+          const dz = e.pos.z - P.pos.z;
+          const d = Math.hypot(dx, dz);
+          if (d < 0.5 || d > 30) continue;
+          const cos = (dx * dir.x + dz * dir.z) / d;
+          if (cos > 0.94 && d / cos < best) {
+            best = d / cos;
+            lock = e;
+          }
+        }
+      } else {
+        // A tap: the nearest enemy, else keep facing the same way.
+        let best = 26;
+        for (const e of targets) {
+          const d = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z);
+          if (d < best) {
+            best = d;
+            lock = e;
+          }
+        }
+      }
+    } else {
+      const m = T.moveAxis();
+      if (m && (m.x || m.y)) dir = toDir(m);
+    }
+    if (lock) {
+      this.aimPoint.set(lock.pos.x, ARROW_HEIGHT, lock.pos.z);
+      this.touchDir = new THREE.Vector3(lock.pos.x - P.pos.x, 0, lock.pos.z - P.pos.z).normalize();
+      return;
+    }
+    if (dir && dir.lengthSq() > 0.5) this.touchDir = dir;
+    const d = this.touchDir || (this.touchDir = new THREE.Vector3(0, 0, 1));
+    this.aimPoint.copy(P.pos).addScaledVector(d, 8).setY(ARROW_HEIGHT);
   }
 
   /**
@@ -863,6 +933,8 @@ export class Game {
       target.lerp(new THREE.Vector3(C.flySpot.bx * 0.7 + C.flySpot.x * 0.3, 1.2, C.flySpot.bz * 0.7 + C.flySpot.z * 0.3), f * 0.9);
       zoom *= 1 - 0.55 * f;
     }
+    // Tall screens (a phone held upright): pull back so the sides stay in view.
+    if (this.camera.aspect < 1) zoom *= Math.min(1.7, this.camera.aspect ** -0.55);
     this.camTarget.lerp(target, 1 - Math.exp(-6 * dt));
     this.camera.position.copy(this.camTarget).addScaledVector(this.camOffset, zoom);
     this.camera.lookAt(this.camTarget);

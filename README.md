@@ -28,6 +28,15 @@ Open the URL Vite prints (usually http://localhost:5173). `npm run build` produc
 | Mute / restart | M / R | |
 | Developer tuning panel | `` ` `` | |
 
+### Touch screens, touchpads and phones
+
+Pick how you play with the buttons on the title screen (or Settings → Controls):
+
+- **Touch screen** (phones and tablets): the left side of the screen is a floating stick to walk. Touch the right side to start drawing, drag to aim, and lift to shoot (lift in the gold flash for a perfect shot). A quick tap locks onto the nearest enemy, and dragging snaps onto an enemy close to where you aim. Buttons: ROLL, VOLLEY (fills up with the meter), the two gadget slots and pause. In camp, tap the "Go inside" button and ☰ Places. Menus shrink to fit small screens; the game goes full screen on phones that allow it.
+- **Touchpad:** click once to start drawing, click again to shoot (no holding the pad down); two-finger tap or Space to roll.
+- **Mouse:** hold to draw, release to shoot.
+- **Auto** (the default): touch controls appear when you touch the screen and hide when you use the keyboard or mouse.
+
 ## The game
 
 ### Combat
@@ -130,6 +139,7 @@ Recorded CC0 samples (impacts, whooshes, UI, an announcer for combos, multi-kill
 | `src/gear-drops.js`, `src/game-gear.js` | Gear drops in the arena, pickup card, equip on pickup |
 | `src/audio.js`, `src/music.js` | Sound effects and the adaptive soundtrack |
 | `src/input.js`, `src/settings.js` | Keyboard/mouse/gamepad input; settings menu |
+| `src/touch.js` | Touch controls (twin sticks, buttons, aim assist) and the touch screen / touchpad / mouse choice |
 
 ## Asset pipeline (Meshy)
 

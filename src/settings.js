@@ -1,7 +1,16 @@
 // Player settings: volume, graphics quality, screen shake, damage numbers.
 // Saved in localStorage (guarded) and applied live.
 
+import { CONTROL_MODES } from './touch.js';
+
 const KEY = 'draw-release.settings.v1';
+
+const CONTROL_HINTS = {
+  auto: 'Touch controls appear when you touch the screen and hide when you use the keyboard or mouse.',
+  touch: 'Left side: drag to walk. Right side: hold to draw, drag to aim, lift to shoot. Buttons roll, fire the Volley and use gadgets.',
+  touchpad: 'Click once to start drawing, click again to shoot. Two-finger tap (or Space) to roll. Keyboard to walk.',
+  mouse: 'Hold the left button to draw, release to shoot. Right button or Space to roll.',
+};
 
 export const settings = {
   master: 0.8,
@@ -10,6 +19,7 @@ export const settings = {
   quality: 'auto', // auto | high | medium | low
   shake: 1,
   damageNumbers: true,
+  controls: 'auto', // auto | touch | touchpad | mouse
   compatVersion: 2,
   compat: 0, // 0 normal, 1 no post-processing, 2 also no shadows (set by the black-screen guard)
 };
@@ -140,6 +150,11 @@ export class SettingsPanel {
         <select id="set-compat" data-k="compat">
           ${[['0', 'Normal'], ['1', 'Simple (no effects)'], ['2', 'Safe (no shadows)']].map(([v, l]) => `<option value="${v}" ${String(s.compat || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select><b></b></label>
+      <label class="row"><span>Controls</span>
+        <select id="set-controls" data-k="controls">
+          ${CONTROL_MODES.map(([v, l]) => `<option value="${v}" ${(s.controls || 'auto') === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select><b></b></label>
+      <p class="hint controls-hint">${CONTROL_HINTS[s.controls || 'auto']}</p>
       <label class="row"><span>Damage numbers</span><input type="checkbox" id="set-damageNumbers" data-k="damageNumbers" ${s.damageNumbers ? 'checked' : ''}><b></b></label>
       <div class="row diag-row"><button data-diag>Copy diagnostics</button><span class="diag-note">Something wrong? Copy this and paste it to the developer.</span></div>
       <p class="hint">Gamepad: left stick move · right stick aim · RT draw · A/B dodge · Y Arrow Volley · LT/LB gadgets · X use · Start pause</p>
@@ -155,6 +170,12 @@ export class SettingsPanel {
     const b = e.target.parentElement.querySelector('b');
     if (b && e.target.type === 'range') b.textContent = `${Math.round(v * 100)}%`;
     saveSettings();
+    if (k === 'controls') {
+      this.game.touch?.setMode(v);
+      const h = this.el.querySelector('.controls-hint');
+      if (h) h.textContent = CONTROL_HINTS[v];
+      return;
+    }
     applySettings(this.game);
   }
 }

@@ -155,10 +155,25 @@ export class UiMethods {
 
     // Reticle follows the mouse and tightens with charge.
     const r = h.reticle;
-    r.style.transform = `translate(${this.input.mouse.x}px, ${this.input.mouse.y}px)`;
+    let rx = this.input.mouse.x;
+    let ry = this.input.mouse.y;
+    if (this.touch?.active) {
+      // Touch: the reticle sits on what you're aiming at.
+      const v = (this.reticleV ||= this.aimPoint.clone()).copy(this.aimPoint).project(this.camera);
+      rx = (v.x * 0.5 + 0.5) * innerWidth;
+      ry = (-v.y * 0.5 + 0.5) * innerHeight;
+    }
+    r.style.transform = `translate(${rx}px, ${ry}px)`;
     r.style.setProperty('--size', `${44 - 26 * p.charge}px`);
     r.dataset.phase = this.state !== 'playing' ? 'none' : p.drawPhase === 'none' && p.counterT > 0 ? 'perfect' : p.drawPhase;
     r.style.display = this.state === 'playing' ? 'block' : 'none';
+  }
+
+  /** Touch / touchpad / mouse switched: redraw anything that shows controls. */
+  onControlsChanged() {
+    const o = this.hud?.overlay;
+    if (o?.classList.contains('visible') && (this.state === 'title' || this.state === 'paused')) this.showOverlay(this.state);
+    if (this.camp) this.camp.near = undefined; // rebuild the "go inside" prompt
   }
 
   banner(title, sub = '', duration = 1.8) {
@@ -178,7 +193,33 @@ export class UiMethods {
     const s = this.stats;
     const acc = s.shots ? Math.round((s.hits / s.shots) * 100) : 0;
     const perf = s.shots ? Math.round((s.perfects / s.shots) * 100) : 0;
-    const controls = `
+    const mode = this.touch?.mode || 'mouse';
+    const picker = `
+      <div class="ctl-pick"><span>Playing with</span>${[
+        ['touch', 'Touch screen'],
+        ['touchpad', 'Touchpad'],
+        ['mouse', 'Mouse'],
+      ]
+        .map(([v, l]) => `<button type="button" data-controls="${v}" class="${mode === v ? 'on' : ''}">${l}</button>`)
+        .join('')}</div>`;
+    const touchControls = `
+      <div class="controls">
+        <div><kbd>Left side</kbd><span>Drag to walk</span></div>
+        <div><kbd>Right side</kbd><span>Hold to draw, drag to aim, lift to shoot. Lift in the <b class="gold">gold flash</b> = perfect shot. A quick tap locks onto the nearest enemy</span></div>
+        <div><kbd>ROLL</kbd><span>Dodge roll (invulnerable, rolls through enemies)</span></div>
+        <div><kbd>VOLLEY</kbd><span>Arrow Volley, once the button is full</span></div>
+        <div><kbd>1</kbd><kbd>2</kbd><span>Tap a gadget to use it</span></div>
+      </div>`;
+    const touchpadControls = `
+      <div class="controls">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
+        <div><kbd>Click</kbd><span>Start drawing the bow (no need to hold)</span></div>
+        <div><kbd>Click again</kbd><span>Shoot. In the <b class="gold">gold flash</b> = perfect: 2× damage, pierces</span></div>
+        <div><kbd>Space</kbd><kbd>2-finger tap</kbd><span>Dodge roll</span></div>
+        <div><kbd>Q</kbd><span>Arrow Volley</span><kbd>1</kbd><kbd>2</kbd><span>Gadgets</span></div>
+        <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
+      </div>`;
+    const mouseControls = `
       <div class="controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
         <div><kbd>Mouse</kbd><span>Aim</span></div>
@@ -190,13 +231,14 @@ export class UiMethods {
         <div><kbd>\`</kbd><span>Toggle tuning panel</span></div>
         <div><kbd>P</kbd><kbd>M</kbd><kbd>R</kbd><span>Pause · Mute · Restart</span></div>
       </div>`;
+    const controls = picker + (mode === 'touch' ? touchControls : mode === 'touchpad' ? touchpadControls : mouseControls);
     if (kind === 'title') {
       o.innerHTML = `
         <h1>Draw &amp; Release</h1>
         <p class="tag">A bow-combat prototype. Survive the waves.</p>
         ${controls}
         <p class="tip">Brutes flash red and show a wedge before they lunge. A full-draw or perfect hit during that windup staggers them. Roll through a lunge at the last moment for a <b class="gold">perfect dodge</b>: time slows and your next tap is an instant perfect shot. After every wave, pick a skill to power up.</p>
-        <button>Click to enter the camp</button>
+        <button>${mode === 'touch' ? 'Tap' : 'Click'} to enter the camp</button>
         ${profile.best.wave ? `<p class="best">Best: wave ${profile.best.wave}, ${profile.best.kills} kills</p>` : ''}
         <p class="model-status" id="model-status">${this.modelStatusText()}</p>
         <p class="model-status" id="audio-status">${this.audioStatusText()}</p>
@@ -206,7 +248,7 @@ export class UiMethods {
       const n = o.querySelector('.vr-name');
       if (n && this.reward) n.textContent = this.reward.name;
     } else if (kind === 'paused') {
-      o.innerHTML = `<h1>Paused</h1>${controls}<button>Click to resume</button>`;
+      o.innerHTML = `<h1>Paused</h1>${controls}<button>${mode === 'touch' ? 'Tap' : 'Click'} to resume</button>`;
     } else {
       const secs = Math.floor(this.elapsed);
       o.innerHTML = `

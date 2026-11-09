@@ -14,6 +14,27 @@ export const TIPS = {
   portal: 'The gate is open: walk through it to march on',
 };
 
+// The same tips for touch screens and touchpads.
+const TOUCH = {
+  camp: 'Practice on the training dummy: hold the right side of the screen to draw, lift to shoot',
+  draw: 'Hold the right side of the screen to draw, drag to aim, lift to shoot',
+  perfect: 'Lift your finger in the gold flash for a perfect shot: double damage that pierces',
+  dodge: 'A brute is winding up! Tap ROLL to roll through its leap',
+  ult: 'Arrow Volley is ready: tap VOLLEY',
+  draft: 'Tap a skill card to power up',
+  gadget: 'Tap your gadgets (bottom right) to use them: a Healing Tonic and a Bear Trap to start',
+};
+const TOUCHPAD = {
+  camp: 'Practice on the training dummy: click once to draw, click again to shoot',
+  draw: 'Click once to start drawing your bow, click again to shoot',
+  perfect: 'Click in the gold flash for a perfect shot: double damage that pierces',
+  dodge: 'A brute is winding up! Press Space (or two-finger tap) to roll through its leap',
+};
+const tipText = (key) => {
+  const b = document.body.classList;
+  return (b.contains('touch') && TOUCH[key]) || (b.contains('touchpad') && TOUCHPAD[key]) || TIPS[key];
+};
+
 export class Tips {
   constructor() {
     this.el = document.getElementById('tip');
@@ -26,7 +47,7 @@ export class Tips {
     if (profile.tips[key] || this.current === key) return;
     if (this.current && this.current !== key) return;
     this.current = key;
-    this.el.textContent = TIPS[key];
+    this.el.textContent = tipText(key);
     this.el.classList.add('show');
   }
 

@@ -29,11 +29,16 @@ export class Input {
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button === 2) this.mouse.rightClicked = true;
       if (e.button !== 0) return;
+      // Touchpad mode: click once to start drawing, click again to shoot.
+      if (this.touchpadMode?.() && e.pointerType !== 'touch' && this.mouse.down) {
+        this.mouse.down = false;
+        return;
+      }
       this.mouse.down = true;
       this.mouse.clicked = true;
     });
     window.addEventListener('pointerup', (e) => {
-      if (e.button === 0) this.mouse.down = false;
+      if (e.button === 0 && !(this.touchpadMode?.() && e.pointerType !== 'touch')) this.mouse.down = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('blur', () => {
@@ -83,6 +88,8 @@ export class Input {
 
   /** Movement in screen space: x = right, y = up. Normalized (analog on a gamepad). */
   axis() {
+    const t = this.touch?.active ? this.touch.moveAxis() : null;
+    if (t) return t;
     const m = this.pad?.move;
     if (m && (m.x || m.y)) {
       const len = Math.hypot(m.x, m.y);
