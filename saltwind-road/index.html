@@ -670,6 +670,12 @@ const GOODS = {
   treant_armor:{name:'Treant Bark Armor',base:1400,col:'#5a7a3a',kind:'armor',armor:7,speed:-.04},
   kraken_shield:{name:'Kraken Shield',base:1200,col:'#4a9ac8',kind:'armor',slot:'shield',armor:3,block:.28},
   antler_bow:{name:'Antler Bow',base:900,col:'#e05a2a',kind:'weapon',dmg:9,cd:.38,ranged:true,noAmmo:true,pcol:'#ff8a4a'},
+  // --- treasure hunting ---
+  treasure_map:{name:'Treasure Map',base:90,col:'#d8c090',kind:'map'},
+  shovel:{name:'Shovel',base:30,col:'#8a8a96',kind:'tool',tool:'shovel',tier:1},
+  pirate_gold:{name:'Pirate Gold',base:160,col:'#f0c040',kind:'good'},
+  jeweled_goblet:{name:'Jeweled Goblet',base:280,col:'#e86a8a',kind:'good'},
+  captains_compass:{name:"Captain's Compass",base:500,col:'#e3a948',kind:'trinket',desc:'An arrow on your screen points to your buried treasure'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -879,6 +885,7 @@ const RECIPES = [
   {id:'marble_statue',  need:{marble:4}, at:'bench', known:true},
   {id:'coral_necklace', need:{coral:3,silver:1}, at:'bench', known:true},
   {id:'crafting_table', need:{wood:8,stone:2}, at:'hand', known:true},
+  {id:'shovel',         need:{wood:2,iron:2}, at:'bench', known:true},
   {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
   {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
   {id:'essence_tonic',  need:{elite_essence:1,glass:1,herbs:2}, at:'bench', known:true},
@@ -987,7 +994,7 @@ const NODES = {
   blossomtree:{name:'Blossom Tree',verb:'Shake',give:'blossom',amt:[2,3],hits:1,regrow:2,curio:'petalpearl'},
   ochre:{name:'Ochre Deposit',verb:'Dig',tool:'pick',give:'ochre',amt:[1,2],hits:2,regrow:3},
 };
-const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'a sickle'};
+const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'a sickle', shovel:'a shovel'};
 
 const ENEMIES = {
   wolf:{name:'Wolf',plural:'Wolves',hp:4,dmg:1,speed:3.5,aggro:6,drops:[['hide',1,1,1],['meat',1,1,.4]],curio:'fang'},
@@ -1634,6 +1641,9 @@ const NPCS = [
    hello:["Flowers for you?","Hello again!","My dear friend!"],
    rumors:["Flowers and glass make perfume. Ladies in the west pay anything for it."]},
   // new faces in older towns
+  {id:'imre',town:'lantern',dx:-2,dy:3,name:'Imre',role:'Cartographer',cols:{cloak:'#6a5a3a',skin:'#e0c0a0',hair:'#8a8a8a'},trader:true,greed:.3,patience:4,purse:300,stock:{treasure_map:3,shovel:1},
+   hello:["Maps! Maps of everything! Some of them are even accurate.","Back for another map?","My favorite treasure hunter!"],
+   rumors:["Read a treasure map from your pack and an X appears on your world map. Dig there with a shovel.","Lost satchels, dungeon chests and elite monsters all carry maps sometimes.","A Captain's Compass points the way to buried treasure. Pirates buried a few with their gold."]},
   {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
    hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
@@ -2568,7 +2578,9 @@ function gather(i) {
     const g1 = pool[rint(0, pool.length - 1)], n1 = rint(1, 3);
     S.coins += c; addItem(g1, n1); S.depleted[i] = S.day; S.gathered++; SFX.pickup(); gainXP(8); nodeFx[i] = frameT;
     floatText(n.x + .5, n.y, `+${c}◆ · +${n1} ${GOODS[g1].name}`, '#e3c068'); burst(n.x + .5, n.y + .5, '#e3c068', 8, 3);
-    S.satchels = (S.satchels || 0) + 1; renderHUD(); return;
+    S.satchels = (S.satchels || 0) + 1;
+    if (Math.random() < .25) { addItem('treasure_map', 1); floatText(n.x + .5, n.y - .7, '+1 Treasure Map', '#d8c090'); }
+    renderHUD(); return;
   }
   const tier = d.tool ? toolTier(d.tool) : 0, ptier = d.pick ? toolTier('pick') : 0;
   const need = Math.max(1, d.hits - (d.tool ? tier - (d.tier || 1) : ptier));
@@ -2724,6 +2736,7 @@ function killEnemy(e) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
     const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
     addItem('elite_essence', 1); got.push('+1 Elite Essence');
+    if (Math.random() < .2) { addItem('treasure_map', 1); got.push('+1 Treasure Map'); }
     S.eliteKills = (S.eliteKills || 0) + 1; S.eliteBounty = (S.eliteBounty || 0) + 1; gainXP(e.max*4);
     burst(e.x, e.y - .6, e.elite.col, 24, 6); shake = Math.max(shake, .3); SFX.victory();
   }
@@ -3554,6 +3567,8 @@ function render() {
   }
   if (petE && S.pet && inView(petE.x, petE.y)) sprites.push({y: petE.y, f: () => drawPet(ctx, S.pet, Math.round(petE.x*TS), Math.round(petE.y*TS), petE.face, petE.phase, petE.moving)});
   if (S.placed.length) for (let y = Math.floor(y0) - 2; y <= y1 + 3; y++) for (let x = Math.floor(x0) - 2; x <= x1 + 2; x++) { const q = inB(x, y) ? placedAt(x, y) : null; if (q) sprites.push({y: y + .85, f: () => drawPlaced(ctx, q, frameT)}); }
+  if (S.tmap && inView(S.tmap.x, S.tmap.y) && Math.hypot(S.x - S.tmap.x, S.y - S.tmap.y) < 9) sprites.push({y: S.tmap.y + .1, f: () => { const x = S.tmap.x*TS + 8, y = S.tmap.y*TS + 9, a = .45 + Math.sin(frameT*4)*.25; ctx.globalAlpha = a; ctx.strokeStyle = '#8a3a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 3); ctx.lineTo(x + 4, y + 3); ctx.moveTo(x + 4, y - 3); ctx.lineTo(x - 4, y + 3); ctx.stroke(); ctx.globalAlpha = 1; if (Math.random() < .05) burst(S.tmap.x + .5, S.tmap.y + .4, '#f0c040', 1, 1); }});
+  if (S.tmap && have('captains_compass') && !inDungeon()) { const dx = S.tmap.x + .5 - S.x, dy = S.tmap.y + .5 - S.y, d = Math.hypot(dx, dy); if (d > 3) sprites.push({y: S.y + 50, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*30, cy = (S.y - .4)*TS + Math.sin(an)*30; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.globalAlpha = .85; ctx.fillStyle = '#f0c040'; ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-2, 0); ctx.lineTo(-4, 4); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1; }}); }
   for (const h of houses) if (h.style && inView(h.x, h.y)) sprites.push({y: h.y + 1.9, f: () => drawEstate(ctx, h.x*TS, h.y*TS, h.style, frameT)});
   for (const k of PK) { const P = PROPERTIES[k]; if (P.hx != null && inView(P.hx, P.hy)) sprites.push({y: P.hy + 2.05, f: () => drawPropertySign(ctx, k)}); }
   for (const c of [...chests, ...abyssChests]) if (inView(c.x, c.y)) sprites.push({y: c.y + .8, f: () => drawChest(ctx, c)});
@@ -3856,7 +3871,7 @@ function update(dt) {
   for (const n of NPCS) { const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || dungeonTarget() || digTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -4005,6 +4020,47 @@ function bountyTalk(n) {
   S.coins += pay; S.eliteBounty = 0; if (bonus) { addItem('gem', bonus*2); addItem('elite_essence', bonus*2); }
   SFX.coin(); gainXP(30*k); renderHUD(); save();
   say(`“${k} elite${k > 1 ? 's' : ''}? Fine work.” He counts out <b>${pay} coin</b>.${bonus ? `<br>“And a bonus for the milestone: <b>${bonus*2} Cut Gems</b> and <b>${bonus*2} Elite Essence</b>.”` : ''}`, [back(n)]);
+}
+const DIRS8 = ['east','south-east','south','south-west','west','north-west','north','north-east'];
+function treasureSpot() {
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
+  for (let tries = 0; tries < 400; tries++) {
+    const tk = towns[Math.floor(Math.random()*towns.length)], a = Math.random()*6.283, r = 14 + Math.random()*30;
+    const x = Math.floor(TOWNS[tk].x + Math.cos(a)*r), y = Math.floor(TOWNS[tk].y + Math.sin(a)*r);
+    if (!inB(x, y) || y >= WORLD_H - 2 || Math.hypot(x - ISLE.x, y - ISLE.y) < ISLE.ring + 3) continue;
+    const t = map[idx(x, y)];
+    if (!walkable(t, false, false) || t === T.SHAL || t === T.ROAD || t === T.FLOOR || t === T.BRIDGE || townAt(x + .5, y + .5, 9) || ESTATE_TILES.has(idx(x, y)) || nodeGrid[idx(x, y)] >= 0 || (S.placed.length && placedAt(x, y))) continue;
+    if (![[1,0],[-1,0],[0,1],[0,-1]].every(([dx, dy]) => walkable(map[idx(x + dx, y + dy)], false, false))) continue;
+    return {x, y, town: tk, dir: DIRS8[Math.round(((Math.atan2(y - TOWNS[tk].y, x - TOWNS[tk].x) + 6.283) % 6.283) / .785) % 8], dist: Math.round(r)};
+  }
+  return null;
+}
+function readMap() {
+  if (S.tmap || !have('treasure_map')) return;
+  const sp = treasureSpot(); if (!sp) { toast('The map is too faded to read.'); return; }
+  addItem('treasure_map', -1); S.tmap = sp; SFX.page ? SFX.page() : SFX.craft();
+  toast(`<b>Treasure map</b><br>An X is marked about ${sp.dist} paces ${sp.dir} of ${TOWNS[sp.town].name}. It's on your world map (M). Bring a shovel!`, 8000);
+  renderHUD(); save();
+}
+const TREASURE_LOOT = ['gem','silver','pearl','amber','crystal','spice','silk_cloth','glass','bomb','fire_bomb','elixir','ancient_coin','shimmer_shard','blacksteel'];
+function digTarget() {
+  if (!S.tmap || inDungeon() || Math.hypot(S.x - S.tmap.x - .5, S.y - S.tmap.y - .5) > 1.3) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
+  if (!toolTier('shovel')) return {key: 'dig0', html: 'Treasure is buried here · you need a shovel (craft one at a workbench)', btn: '', fn: () => {}};
+  return {key: 'dig', html: `${K}Dig for treasure`, btn: 'Dig', fn: digTreasure};
+}
+function digTreasure() {
+  const sp = S.tmap; if (!sp) return;
+  S.tmap = null; S.treasures = (S.treasures || 0) + 1;
+  const got = [], c = 150 + (S.level || 1)*15 + rint(0, 120); S.coins += c; got.push(`${c} coin`);
+  for (let i = 0; i < 2 + (Math.random() < .5 ? 1 : 0); i++) { const g = pick(TREASURE_LOOT.filter(g => GOODS[g])), n = rint(1, 3); addItem(g, n); got.push(`${n} ${GOODS[g].name}`); }
+  if (Math.random() < .3) { addItem('pirate_gold', 1); got.push('<b>Pirate Gold</b>'); }
+  if (Math.random() < .12) { addItem('jeweled_goblet', 1); got.push('<b>Jeweled Goblet</b>'); }
+  if (!have('captains_compass') && Math.random() < .1) { addItem('captains_compass', 1); got.push("<b>Captain's Compass</b>"); }
+  if (Math.random() < .2) { addItem('treasure_map', 1); got.push('another <b>Treasure Map</b>!'); }
+  SFX.victory(); gainXP(60 + (S.level || 1)*3); burst(sp.x + .5, sp.y + .5, '#f0c040', 30, 6); burst(sp.x + .5, sp.y + .5, '#8a6440', 14, 4); shake = .25;
+  toast(`<b>You dug up a treasure chest!</b><br><span style="color:var(--good)">+ ${got.join(', ')}</span>`, 8000);
+  renderHUD(); save();
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -4358,6 +4414,7 @@ function renderBag() {
     ${sec('Food', ['food'], eatBtn)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
+    ${sec('Treasure maps', ['map'], g => `<button class="btn sm primary" data-readmap="1" ${S.tmap ? 'disabled' : ''}>${S.tmap ? 'Already following one' : 'Read'}</button>`)}
     ${sec('Seeds · plant them on your farm', ['seed'])}
     ${sec('Building · press B to place', ['place'], g => `<button class="btn sm primary" data-place="${g}">Place</button>`)}
     ${sec('Materials & ammo', ['mat','ammo'])}
@@ -4370,6 +4427,7 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.unequip) { const g = b.dataset.unequip; S.equip[slotOf(g)] = null; }
   if (b.dataset.eat) eat(b.dataset.eat);
   if (b.dataset.place) { closeModal('bag'); placeItem(b.dataset.place); return; }
+  if (b.dataset.readmap) { closeModal('bag'); readMap(); return; }
   if ('pet' in b.dataset) choosePet(b.dataset.pet);
   if (b.dataset.mount) chooseMount(b.dataset.mount);
   renderHUD(); renderBag(); save();
@@ -4996,6 +5054,7 @@ function openMap() {
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
+  if (S.tmap) { const tx = (S.tmap.x + .5)*s, ty = (S.tmap.y + .5)*s, r = 6*dpr; g.strokeStyle = '#0d131b'; g.lineWidth = 5*dpr; g.beginPath(); g.moveTo(tx - r, ty - r); g.lineTo(tx + r, ty + r); g.moveTo(tx + r, ty - r); g.lineTo(tx - r, ty + r); g.stroke(); g.strokeStyle = '#ff4a3a'; g.lineWidth = 2.5*dpr; g.stroke(); g.fillStyle = '#ff4a3a'; g.fillText('Treasure', tx, ty - 9*dpr); }
   const dkm = inDungeon(), pm = dkm ? {x: DUNGEONS[dkm].entrance.x + .5, y: DUNGEONS[dkm].entrance.y + .5} : S;
   g.fillStyle = '#ffffff'; g.beginPath(); g.arc(pm.x*s, pm.y*s, 4*dpr, 0, 7); g.fill();
   g.strokeStyle = '#0d131b'; g.lineWidth = 2*dpr; g.stroke();
@@ -5107,6 +5166,7 @@ function openChest(c) {
   } else {
     const coins = Math.round(rint(15, 45)*tier*(S.pet === 'raccoon' ? 1.5 : 1)); S.coins += coins; got.push(`${coins} coin`);
     for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT), n = GOODS[g].kind === 'ammo' ? rint(2, 6) : rint(1, 2); addItem(g, n); got.push(`${n} ${GOODS[g].name}`); }
+    if (Math.random() < .25) { addItem('treasure_map', 1); got.push('a Treasure Map'); }
     SFX.coin();
   }
   burst(c.x + .5, c.y + .3, '#ffe9a8', 18, 5); gainXP(c.big ? 150 : 20*tier);
@@ -5575,6 +5635,8 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['treasure','X Marks the Spot','Dig up a buried treasure', () => (S.treasures || 0) >= 1],
+  ['pirate','Pirate King','Dig up 10 buried treasures', () => (S.treasures || 0) >= 10],
   ['elitehunter','Elite Hunter','Defeat 10 elite monsters', () => (S.eliteKills || 0) >= 10],
   ['champion','Champion','Defeat 50 elite monsters', () => (S.eliteKills || 0) >= 50],
   ['blacksmith','Master Smith','Upgrade a piece of gear to +5', () => Object.values(S.enh || {}).some(v => v >= 5)],
@@ -5787,7 +5849,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
