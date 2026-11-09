@@ -959,9 +959,11 @@ const MENUS = {
       acts.push({ label: 'Take a $1,000 loan', detail: `5% interest every Monday. Owed now: ${money$(S.loan)}`, why: S.loan >= 5000 ? 'Loan limit reached.' : '', mins: 20, fn: () => { S.loan += 1000; S.money += 1000; } });
       acts.push({ label: 'Repay the loan', detail: `Owed: ${money$(S.loan)}`, why: S.loan <= 0 ? 'You owe nothing.' : S.money < S.loan ? `You need ${money$(S.loan)}.` : '', mins: 10, fn: () => { S.money -= S.loan; S.loan = 0; log('Loan paid off!', 'good'); } });
     }
-    acts.push({ label: 'Rob the bank', detail: 'Grab $1,500 to $4,000 and run. The police will chase you through town.', tag: 'Crime', risky: true, why: open(9, 17) ? '' : 'The vault is sealed at night.', mins: 10, fn: () => {
+    acts.push({ label: 'Rob the bank', detail: 'Grab $1,500 to $4,000. Half the time nobody notices. Otherwise the police chase you through town.', tag: 'Crime', risky: true, why: open(9, 17) ? '' : 'The vault is sealed at night.', mins: 10, fn: () => {
       const loot = Math.round(rand(1500, 4000)); S.money += loot;
-      closeMenu(); exitBuilding(); startChase(loot);
+      closeMenu(); exitBuilding();
+      if (Math.random() < 0.5) { goal('heist'); S.happy += 8; sfx.coin(); queueEvent({ kind: 'good', tag: 'Heist', title: 'Nobody noticed!', text: `You strolled out of Stone Bank with ${money$(loot)} stuffed in your pouch and not a single alarm went off. The tellers are still counting coins.` }); }
+      else startChase(loot);
     } });
     return { sub: 'Stone Bank. Your money is safe here (the vault is a boulder).', acts };
   },
