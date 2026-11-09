@@ -670,6 +670,11 @@ const GOODS = {
   treant_armor:{name:'Treant Bark Armor',base:1400,col:'#5a7a3a',kind:'armor',armor:7,speed:-.04},
   kraken_shield:{name:'Kraken Shield',base:1200,col:'#4a9ac8',kind:'armor',slot:'shield',armor:3,block:.28},
   antler_bow:{name:'Antler Bow',base:900,col:'#e05a2a',kind:'weapon',dmg:9,cd:.38,ranged:true,noAmmo:true,pcol:'#ff8a4a'},
+  // --- elites ---
+  elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
+  champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
+  hunters_cloak:{name:"Hunter's Cloak",base:900,col:'#6a3a2a',kind:'armor',armor:5,speed:.08,crit:.04},
+  essence_tonic:{name:'Essence Tonic',base:120,col:'#ffd27a',kind:'food',heal:30},
   // --- things you can build and place ---
   torch:{name:'Torch',base:6,col:'#e0902a',kind:'place',desc:'Place with B. A small light for paths and camps.'},
   quartz_lamp:{name:'Quartz Lamp',base:60,col:'#d8e8ff',kind:'place',desc:'Place with B. A bright, cool light.'},
@@ -874,6 +879,9 @@ const RECIPES = [
   {id:'marble_statue',  need:{marble:4}, at:'bench', known:true},
   {id:'coral_necklace', need:{coral:3,silver:1}, at:'bench', known:true},
   {id:'crafting_table', need:{wood:8,stone:2}, at:'hand', known:true},
+  {id:'champion_medal', need:{elite_essence:5,gem:1,silver:2}, at:'forge', known:true},
+  {id:'hunters_cloak',  need:{elite_essence:6,pelt:3,silk_cloth:2}, at:'bench', known:true},
+  {id:'essence_tonic',  need:{elite_essence:1,glass:1,herbs:2}, at:'bench', known:true},
   {id:'ronin_helm',    need:{ronin_mask:1,iron:3,silk_cloth:2}, at:'forge'},
   {id:'treant_armor',  need:{treant_heart:1,redwood:8,amber:2}, at:'bench'},
   {id:'kraken_shield', need:{kraken_eye:1,iron:4,pearl:2}, at:'forge'},
@@ -1626,6 +1634,9 @@ const NPCS = [
    hello:["Flowers for you?","Hello again!","My dear friend!"],
    rumors:["Flowers and glass make perfume. Ladies in the west pay anything for it."]},
   // new faces in older towns
+  {id:'kade',town:'wren',dx:-1,dy:3,name:'Marshal Kade',role:'Bounty hunter',cols:{cloak:'#4a2a1a',skin:'#c89870',hair:'#2a1a10'},bounty:true,
+   hello:["Hunting something? Or are you the hunted?","Back for your pay?","My best hunter!"],
+   rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
   {id:'lark',town:'wren',dx:0,dy:3,name:'Lark',role:'Traveling bard',cols:{cloak:'#8a3a6a',skin:'#e0b896',hair:'#e0a040'},
    hello:["♪ A traveler, a traveler, come to hear my song! ♪","You again! Got a coin for a song?","My favorite audience!"],
    rumors:["I've sung in every town from here to Farhaven, at the very edge of the east. Took me a year.","Pick up everything you see out there. Lost satchels are full of coin!","The world has five lands now. The Shimmer Coast is the newest the maps know about."]},
@@ -2673,8 +2684,8 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0);
-    if (Math.random() < .05 + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0);
+    if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
@@ -2709,6 +2720,13 @@ function killEnemy(e) {
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
+  if (e.elite) {
+    const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
+    const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
+    addItem('elite_essence', 1); got.push('+1 Elite Essence');
+    S.eliteKills = (S.eliteKills || 0) + 1; S.eliteBounty = (S.eliteBounty || 0) + 1; gainXP(e.max*4);
+    burst(e.x, e.y - .6, e.elite.col, 24, 6); shake = Math.max(shake, .3); SFX.victory();
+  }
   got.forEach((t, k) => floatText(e.x, e.y - .2 - k*.6, t, '#86c98f'));
   burst(e.x, e.y - .4, '#ebe4d3', 10);
   rollCurio(def.curio);
@@ -2753,6 +2771,20 @@ function enemyWalk(x, y) {
 function bossWalk(x, y) {
   const t = tileAt(Math.floor(x), Math.floor(y));
   return !(t === T.DEEP || t === T.HOUSE || t === T.LAVA || t === T.VOID || t === T.DWALL || t === T.DTORCH) && !townAt(x, y, 8);
+}
+const ELITE_MODS = [
+  {name:'Savage', col:'#e05a2a', hp:3, dmg:1.6, spd:1.1},
+  {name:'Ancient', col:'#e3a948', hp:4.5, dmg:1.4, spd:.9},
+  {name:'Frenzied', col:'#ff5a8a', hp:2.5, dmg:1.7, spd:1.4},
+  {name:'Shadow', col:'#9a6aff', hp:3, dmg:1.6, spd:1.15},
+  {name:'Frost-touched', col:'#9fe8ff', hp:3.5, dmg:1.5, spd:1},
+  {name:'Giant', col:'#86c98f', hp:5, dmg:1.8, spd:.8, big:1.6},
+];
+const ELITE_LOOT = ['gem','silver','crystal','blacksteel','pearl','amber','shimmer_shard','ancient_coin','elixir','fire_bomb','might_draught','luck_draught'];
+function makeElite(e) {
+  const m = ELITE_MODS[Math.floor(Math.random()*ELITE_MODS.length)], lv = 1 + (S.level || 1)*.06;
+  e.elite = m; e.hp = e.max = Math.round(e.max * m.hp * lv); e.dmgMul = m.dmg * Math.min(2, lv); e.spd = m.spd; e.esize = m.big || 1.3; e.alert = true;
+  return e;
 }
 function makeEnemy(type, x, y, extra) {
   const def = ENEMIES[type], hp = def.hp + (extra && extra.snow ? 2 : 0);
@@ -2807,7 +2839,8 @@ function trySpawn(night) {
     const type = spawnTypeFor(t, x, night);
     if (!type || !enemyWalk(x+.5, y+.5)) continue;
     const pack = type === 'bat' || type === 'coyote' || type === 'hyena' ? 3 : type === 'wolf' && night ? 2 : 1;
-    for (let p = 0; p < pack; p++) enemies.push(makeEnemy(type, x + .5 + p*.6, y + .5, {snow: type === 'wolf' && t === T.SNOW}));
+    const eliteRoll = !ENEMIES[type].passive && Math.random() < .045 + Math.min(.04, (S.level || 1)*.002);
+    for (let p = 0; p < pack; p++) { const e = makeEnemy(type, x + .5 + p*.6, y + .5, {snow: type === 'wolf' && t === T.SNOW}); enemies.push(eliteRoll && p === 0 ? makeElite(e) : e); }
     return;
   }
 }
@@ -2931,7 +2964,7 @@ function updateCombat(dt, night) {
       e.calm = Math.max(0, (e.calm || 0) - dt);
       if ((d < 3.5 && !trusts && !(e.calm > 0)) || (e.alert && d < 10)) { px = -dx/d; py = -dy/d; }
       else { e.alert = false; e.wt -= dt; if (e.wt <= 0) { e.wt = 1.5 + Math.random()*2.5; const a = Math.random()*6.28, still = Math.random() < .45; e.wx = still ? 0 : Math.cos(a)*.35; e.wy = still ? 0 : Math.sin(a)*.35; } px = e.wx; py = e.wy; }
-      const nx2 = e.x + (px*def.speed + e.kx)*dt, ny2 = e.y + (py*def.speed + e.ky)*dt;
+      const nx2 = e.x + (px*def.speed*(e.spd || 1) + e.kx)*dt, ny2 = e.y + (py*def.speed*(e.spd || 1) + e.ky)*dt;
       if (enemyWalk(nx2, e.y)) e.x = nx2; else e.wt = 0;
       if (enemyWalk(e.x, ny2)) e.y = ny2; else e.wt = 0;
       const dec = Math.min(1, dt*8); e.kx -= e.kx*dec; e.ky -= e.ky*dec;
@@ -2941,7 +2974,7 @@ function updateCombat(dt, night) {
       if (d > 30) e.dead = true;
       continue;
     }
-    let mx = 0, my = 0, sp = def.speed;
+    let mx = 0, my = 0, sp = def.speed * (e.spd || 1);
     const aggro = (night ? def.aggro + 2 : def.aggro) + (e.alert ? 4 : 0);
     if (!safe && d < aggro) {
       if (def.ranged) {
@@ -3435,12 +3468,22 @@ function drawEnemy(g, e) {
     g.restore();
     if (flash) { g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x, y - 8*B.size, 9*B.size, 9*B.size, 0, 0, 7); g.fill(); }
   } else {
-    drawEnemyAt(g, e.type, x, y, e.face, e.phase, {snow: e.snow});
+    if (e.elite) {
+      const s = e.esize, pulse = .5 + Math.sin(frameT*5 + e.phase)*.25;
+      g.globalAlpha = .35*pulse; g.fillStyle = e.elite.col; g.beginPath(); g.ellipse(x, y - 6*s, 11*s, 11*s, 0, 0, 7); g.fill(); g.globalAlpha = e.hurt > 0 ? .55 : 1;
+      g.save(); g.translate(x, y); g.scale(s, s); drawEnemyAt(g, e.type, 0, 0, e.face, e.phase, {snow: e.snow}); g.restore();
+      if (Math.random() < .08) burst(e.x + (Math.random() - .5)*.6, e.y - .4 - Math.random()*.6, e.elite.col, 1, 1);
+    } else drawEnemyAt(g, e.type, x, y, e.face, e.phase, {snow: e.snow});
     if (e.frozen > 0) { g.fillStyle = 'rgba(160,220,255,.45)'; g.beginPath(); g.ellipse(x, y - 6, 8, 8, 0, 0, 7); g.fill(); }
     if (e.charging > 0) { g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(x - e.face*9, y-7, 3, 1); g.fillRect(x - e.face*11, y-5, 3, 1); }
   }
   g.globalAlpha = 1;
-  if (!e.boss && e.hp < e.max) { g.fillStyle = '#0d131b'; g.fillRect(x-7, y-21, 14, 3); g.fillStyle = '#e57a62'; g.fillRect(x-6, y-20, 12*Math.max(0, e.hp)/e.max, 1); }
+  if (e.elite) {
+    const s = e.esize, ty = y - 22*s - 4, label = `${e.elite.name} ${ENEMIES[e.type].name}`;
+    g.font = '7px "Pixelify Sans", monospace'; g.textAlign = 'center'; const w = g.measureText(label).width + 6;
+    g.fillStyle = 'rgba(13,19,27,.8)'; g.fillRect(x - w/2, ty - 7, w, 9); g.fillStyle = e.elite.col; g.fillText(label, x, ty);
+    g.fillStyle = '#0d131b'; g.fillRect(x-11, ty + 3, 22, 3); g.fillStyle = e.elite.col; g.fillRect(x-10, ty + 4, 20*Math.max(0, e.hp)/e.max, 1);
+  } else if (!e.boss && e.hp < e.max) { g.fillStyle = '#0d131b'; g.fillRect(x-7, y-21, 14, 3); g.fillStyle = '#e57a62'; g.fillRect(x-6, y-20, 12*Math.max(0, e.hp)/e.max, 1); }
 }
 
 function render() {
@@ -3945,6 +3988,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
   return o;
@@ -3953,6 +3997,15 @@ const hello = n => n.hello[Math.min(tierOf(repOf(n.town)), 2)];
 const back = n => ({label:'Back', fn: () => say(hello(n), mainOptions(n))});
 function closeTalk() { $('talk').hidden = true; mode = 'play'; talkNPC = null; nearNPC = null; promptKey = null; renderHUD(); }
 
+function bountyTalk(n) {
+  const k = S.eliteBounty || 0;
+  if (!k) { say(`“Elite monsters wander the wild: glowing, bigger, meaner. Bring one down and come see me. I pay <b>${100 + (S.level || 1)*5} coin</b> a head, and a bonus for every fifth.”<br><br>Elites defeated so far: <b>${S.eliteKills || 0}</b>.`, [back(n)]); return; }
+  const before = S.eliteKills - k, each = 100 + (S.level || 1)*5; let pay = k*each, bonus = 0;
+  for (let i = before + 1; i <= S.eliteKills; i++) if (i % 5 === 0) bonus++;
+  S.coins += pay; S.eliteBounty = 0; if (bonus) { addItem('gem', bonus*2); addItem('elite_essence', bonus*2); }
+  SFX.coin(); gainXP(30*k); renderHUD(); save();
+  say(`“${k} elite${k > 1 ? 's' : ''}? Fine work.” He counts out <b>${pay} coin</b>.${bonus ? `<br>“And a bonus for the milestone: <b>${bonus*2} Cut Gems</b> and <b>${bonus*2} Elite Essence</b>.”` : ''}`, [back(n)]);
+}
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
   S.rumor[n.id] = (i + 1) % n.rumors.length;
@@ -5020,7 +5073,9 @@ function populateDungeon(k) {
     const n = 2 + Math.floor(Math.random()*2);
     for (let i = 0; i < n; i++) {
       const e = makeEnemy(pick(D.enemies), r.x + 1 + Math.random()*(r.w - 2), r.y + 1 + Math.random()*(r.h - 2), {dungeon: true});
-      e.hp = e.max = Math.round(e.max*mul); e.dmgMul = 1 + D.lvl*.04; enemies.push(e);
+      e.hp = e.max = Math.round(e.max*mul); e.dmgMul = 1 + D.lvl*.04;
+      if (i === 0 && Math.random() < .2) { const dm = e.dmgMul; makeElite(e); e.dmgMul *= dm; }
+      enemies.push(e);
     }
   });
 }
@@ -5520,6 +5575,8 @@ const ACH = [
   ['builder','Builder','Place 25 things you built', () => S.placed.length >= 25],
   ['farend','Edge of the World',"Find Old World's End in the far east", () => !!S.found.worldsend],
   ['mogul','Property Mogul','Own 5 houses', () => PK.filter(k => S.props[k]).length >= 5],
+  ['elitehunter','Elite Hunter','Defeat 10 elite monsters', () => (S.eliteKills || 0) >= 10],
+  ['champion','Champion','Defeat 50 elite monsters', () => (S.eliteKills || 0) >= 50],
   ['blacksmith','Master Smith','Upgrade a piece of gear to +5', () => Object.values(S.enh || {}).some(v => v >= 5)],
   ['trainer','Animal Trainer','Train a pet to level 5', () => Object.values(S.petLv || {}).some(v => v >= 5)],
   ['decorator','Interior Decorator','Fully furnish a house', () => Object.values(S.propLv || {}).some(v => v >= 3)],
@@ -5730,7 +5787,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
