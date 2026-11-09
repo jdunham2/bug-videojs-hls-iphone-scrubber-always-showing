@@ -4311,6 +4311,31 @@ function gazette() {
   H.push(`<i>${GAZ_FLUFF[(S.day*7) % GAZ_FLUFF.length]}</i>`);
   return H;
 }
+function todoList() {
+  const T = [], tn = k => TOWNS[k] ? TOWNS[k].name : k, safe = f => { try { return f(); } catch (e) { return null; } };
+  safe(() => { if (perksDue() > 0) T.push('★ You have a <b>perk</b> to choose. Sleep, or level up, to pick one.'); });
+  safe(() => { if (S.skillPts) T.push(`★ You have <b>${S.skillPts} skill point${S.skillPts > 1 ? 's' : ''}</b> to spend (press K).`); });
+  safe(() => { const u = (S.mail || []).filter(m => !m.claimed).length; if (u) T.push(`📜 ${u} unread letter${u > 1 ? 's' : ''} below.`); });
+  safe(() => { if (SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f])) T.push('🐚 Old Hob in Port Wren has a reward for your golden shells.'); });
+  safe(() => { if (surveyNext() != null && mapPct() >= surveyNext()) T.push('🗺 Wendell in Lantern Bay will buy your map survey.'); });
+  safe(() => { if (BALLADS.some(b => !(S.ballads || {})[b.id] && b.ok())) T.push('♪ Lark the bard in Port Wren can write a new ballad about you.'); });
+  safe(() => { const D = decreeNow(); if (!D.done) T.push(`👑 Royal decree: ${D.goods ? `deliver ${D.n} ${GOODS[D.k].name}` : `defeat ${D.n} ${ENEMIES[D.k].name}s`} (Herald Bartholomew, Crownfall).`); });
+  safe(() => { const O = outlawNow(); if (O && !O.done) T.push(O.taken ? `☠ Hunt ${esc(O.name)}, ${O.dir} of ${tn(O.town)}.` : `☠ A WANTED poster is up on the notice boards: ${esc(O.name)}.`); });
+  safe(() => { if (S.lmap) T.push(`🗺 Dig up the legendary hoard ${S.lmap.dir} of ${tn(S.lmap.town)}.`); });
+  safe(() => { if (S.tmap) T.push('✕ Dig up the treasure marked on your map.'); else if (have('treasure_map')) T.push('✕ You have an unread Treasure Map in your bag.'); });
+  safe(() => { if ((S.clock || 0) === 1) T.push('⚙ Cogsworth (Highcairn) needs 4 Brass Gears.'); if ((S.clock || 0) === 2) T.push(`⚙ Stop Brassby the Automaton, ${S.clockSpot.dir} of Highcairn.`); if ((S.clock || 0) === 3) T.push('⚙ Return to Inventor Cogsworth in Highcairn.'); });
+  safe(() => { if ((S.lighthouse || 0) < 3 && S.towns.tidewatch) T.push('🗼 Old Mara in Tidewatch needs help restoring the lighthouse.'); });
+  safe(() => { if (petShowDay()) T.push('🐾 Pet show today in Port Wren (Wilma).'); if (cookDay()) T.push(`🍲 Cooking contest today in Greenstem. Theme: ${cookTheme().name}.`); });
+  safe(() => { if (S.eggHunt && S.eggHunt.day === S.day && S.eggHunt.eggs.some(e => !e.got)) T.push(`🥚 Egg hunt around ${tn(S.eggHunt.town)}.`); });
+  safe(() => { if (S.ghost && S.ghost.day === S.day && !S.ghost.cleared) T.push(`👻 Ghost ship ${S.ghost.dir} of ${tn(S.ghost.town)} after dark.`); });
+  safe(() => { if (!S.vexDay || S.vexDay !== S.day) { if ((S.vexRank || 0) < 5 && S.towns.crownfall) T.push(`⚔ Vex the Bold (Crownfall) is ready for a rank ${(S.vexRank || 0) + 1} duel.`); } });
+  safe(() => { if (S.partner && S.lovedDay !== S.day && NPC_BY[S.partner]) T.push(`♥ Spend time with ${NPC_BY[S.partner].name} for a +10% damage boost.`); });
+  safe(() => { if (S.fortuneDay !== S.day && S.towns.crownfall) T.push('🔮 Madame Zora (Crownfall) can read your fortune today.'); });
+  safe(() => { if (S.wishDay !== S.day) T.push('⛲ Toss a coin in a wishing well for a daily blessing.'); });
+  safe(() => { for (const q of S.placed) if (q.t === 'incubator' && q.egg && S.day >= q.egg) { T.push('🥚 An egg in your incubator is ready to hatch!'); break; } });
+  return T.slice(0, 12);
+}
+function todoHTML() { const T = todoList(); return T.length ? `<h3>Things to do</h3><div class="jcard"><div style="font-size:13px;line-height:1.6">${T.map(t => `<div>${t}</div>`).join('')}</div></div>` : ''; }
 function gazetteHTML() { S.readGazette = true; return `<h3>The Saltwind Gazette · Day ${S.day}</h3><div class="jcard" style="background:#f4ecd8;color:#2a2418"><div style="font-family:Georgia,serif;font-size:13px;line-height:1.5">${gazette().map(h => `<div style="padding:3px 0;border-bottom:1px solid #d8ccb0">${h}</div>`).join('')}</div></div>`; }
 // ===== stargazing =====
 const CONSTELLATIONS = [
@@ -8355,6 +8380,7 @@ function openJournal() {
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
       Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
+    ${todoHTML()}
     ${gazetteHTML()}
     <h3>Titles · ${EARNED_TITLES.filter(t => S.achievements[t[0]]).length}/${EARNED_TITLES.length} earned</h3><div class="vals" style="margin-bottom:6px">Earn titles from achievements. Your chosen title shows under your name.</div>
     <div class="ctabs" style="flex-wrap:wrap">${['', ...EARNED_TITLES.filter(t => S.achievements[t[0]]).map(t => t[1])].map(t => `<button class="btn sm" data-title="${esc(t)}" aria-pressed="${(S.title || '') === t}">${t || 'No title'}</button>`).join('')}${EARNED_TITLES.filter(t => !S.achievements[t[0]]).map(t => `<button class="btn sm" disabled title="Earn the achievement first">🔒 ${esc(t[1])}</button>`).join('')}</div>
