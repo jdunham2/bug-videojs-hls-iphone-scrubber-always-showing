@@ -185,7 +185,7 @@ export class Player {
     this.food = Math.max(0, this.food - dt * 0.11 * (this.hs > 6 ? 1.6 : 1));
     this.water = Math.max(0, this.water - dt * 0.16 * (this.hs > 6 ? 1.6 : 1));
     if (this.food <= 0 || this.water <= 0) this.hp -= dt * 1.2;
-    else if (this.food > 30 && this.water > 30) this.hp = Math.min(this.maxHp, this.hp + dt * 0.6);
+    else if (this.food > 30 && this.water > 30 && !(this.cold > 4)) this.hp = Math.min(this.maxHp, this.hp + dt * 0.6);
     this.hurtT = Math.max(0, this.hurtT - dt);
     if (this.hp <= 0 && this.alive) { this.hp = 0; this.alive = false; }
   }

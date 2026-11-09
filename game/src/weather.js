@@ -54,7 +54,10 @@ export class Weather {
 
   set(state) { this.state = state; this.timer = 150 + Math.random() * 180; }
 
-  update(dt, env, camera, playerUnderwater) {
+  update(dt, env, camera, playerUnderwater, altitude = 0) {
+    // snow always falls high on the peaks
+    const snow = clamp((altitude - 55) / 20, 0, 1);
+    this.snow = snow;
     this.timer -= dt;
     if (this.timer <= 0) {
       const opts = NEXT[this.state];
@@ -102,13 +105,15 @@ export class Weather {
     }
 
     // --- rain streaks around the camera
-    this.rainMat.opacity = rain * 0.55 * (playerUnderwater ? 0 : 1);
-    this.rain.visible = rain > 0.02;
+    const precip = Math.max(rain, snow * 0.9);
+    this.rainMat.opacity = precip * (snow > 0.3 ? 0.9 : 0.55) * (playerUnderwater ? 0 : 1);
+    this.rainMat.color.setRGB(0.67 + snow * 0.33, 0.73 + snow * 0.27, 0.82 + snow * 0.18);
+    this.rain.visible = precip > 0.02;
     if (this.rain.visible) {
       const pos = this.rain.geometry.attributes.position.array;
       const t = this.shared.uTime.value;
       const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
-      const fall = 22, len = 0.9 + rain * 0.6;
+      const fall = lerp(22, 2.5, snow), len = lerp(0.9 + rain * 0.6, 0.1, snow);
       const slant = wind * 0.12;
       for (let i = 0; i < RAIN_N; i++) {
         const sx = this.seeds[i * 3], sy = this.seeds[i * 3 + 1], sz = this.seeds[i * 3 + 2];

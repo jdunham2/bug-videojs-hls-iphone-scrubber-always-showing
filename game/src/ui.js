@@ -118,6 +118,12 @@ export class UI {
     set('bar-xp', p.xp, p.xpNeed());
     $('lvl').textContent = p.level;
     $('hp-num').textContent = Math.ceil(p.hp);
+    const t = this.game.ambientTemp;
+    if (t !== undefined) {
+      const el = $('temp');
+      el.textContent = `${Math.round(t)}°C`;
+      el.className = p.cold > 8 ? 'freezing' : p.cold > 0 ? 'cold' : p.hot > 0 ? 'hot' : '';
+    }
   }
 
   notify(text, kind = '') {
@@ -177,5 +183,6 @@ export class UI {
     this.compass.style.transform = `translateX(${-(deg / 5) * 18 - 72 * 18 + 180}px)`;
     this.vignette.style.opacity = Math.min(1, p.hurtT * 2.2 + (p.hp / p.maxHp < 0.3 ? 0.35 + Math.sin(performance.now() / 200) * 0.1 : 0));
     this.water.style.opacity = p.underwater && !p.mount ? 1 : 0;
+    $('frost').style.opacity = Math.min(0.85, Math.max(0, (p.cold || 0) - 4) / 10);
   }
 }

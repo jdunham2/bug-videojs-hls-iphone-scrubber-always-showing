@@ -1015,9 +1015,10 @@ class Game {
       this.updateMount(dt);
       if (!this.ui.open) this.primary(dt);
       p.survival(dt);
+      this.temperature(dt);
       if (!p.alive && !document.getElementById('death').classList.contains('show')) this.die(null);
       this.env.update(dt, p.pos);
-      this.weather.update(dt, this.env, this.camera, p.underwater);
+      this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y);
       if (this.weather.raining && !p.underwater && p.alive) p.water = Math.min(100, p.water + dt * 0.35 * this.weather.cur.rain);
       this.world.update(dt);
       this.creatures.update(dt, p, this.shared.uTime.value);
@@ -1068,6 +1069,31 @@ class Game {
     if (showBoss) { bb.querySelector('i').style.width = `${(this.boss.hp / this.boss.maxHp) * 100}%`; bb.querySelector('.bname').textContent = `${this.boss.name} — ${Math.ceil(this.boss.hp)} / ${this.boss.maxHp}`; }
     this.updateDamageNums(dt);
     this.audio.ambience(dt, { shore: Math.max(0, heightAt(p.pos.x, p.pos.z)) * 6, night: 1 - this.env.daylight, height: p.pos.y, underwater: p.underwater });
+  }
+
+  // Ambient temperature (°C): altitude, night, rain/wind, water and nearby fires.
+  temperature(dt) {
+    const p = this.player, w = this.weather.cur;
+    let t = 27 - Math.max(0, p.pos.y - 10) * 0.32 - (1 - this.env.daylight) * 9 - w.rain * 6 - Math.max(0, w.wind - 1) * 1.5;
+    if (p.underwater || p.swimming) t -= 5;
+    for (const f of this.building.fires) {
+      if (!f.lit) continue;
+      const d = f.pos.distanceTo(p.pos);
+      if (d < 9) t += (f.type === 'forge' ? 22 : 18) * (1 - d / 9);
+    }
+    this.ambientTemp = t;
+    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : 5) : 0;
+    const cold = Math.max(0, (10 - insul) - t);        // degrees below comfort
+    const hot = Math.max(0, t - 36);
+    p.cold = cold; p.hot = hot;
+    if (!p.alive) return;
+    if (cold > 0) {
+      p.food = Math.max(0, p.food - dt * 0.012 * cold);
+      if (cold > 6) p.hp -= dt * 0.22 * (cold - 6);
+      if (cold > 4 && !this._coldWarned) { this._coldWarned = true; this.ui.notify('You are freezing! Stand by a fire or wear Hide Armor.', 'warn'); }
+    } else this._coldWarned = false;
+    if (hot > 0) p.water = Math.max(0, p.water - dt * 0.02 * hot);
+    if (p.hp <= 0 && p.alive) { p.hp = 0; p.alive = false; }
   }
 
   cooking(dt) {

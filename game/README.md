@@ -19,6 +19,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **World:** a 900 m procedural island with beaches, lowland forest, a lake basin and a
   snow-capped northern peak. It has a day/night cycle with sun, moon and stars, animated
   water with shoreline foam, wind-blown grass and trees, and drifting clouds.
+- **Temperature:** it gets colder with altitude, at night and in rain and wind. Fires and
+  forges warm you, Hide Armor insulates well (Metal Armor barely). Freezing burns food, stops
+  healing and then drains health; snow falls on the peaks. The HUD shows the temperature.
 - **Death bags:** dying drops everything you carry (not your worn armor) in a bag marked by
   a beam of light and 🎒 on the map. Walk back and press E to recover it. Up to 3 bags are
   kept, and they're saved.
