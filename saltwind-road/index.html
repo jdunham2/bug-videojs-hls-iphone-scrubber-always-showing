@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  painted_egg:{name:'Painted Egg',base:12,col:'#ff9ad0',kind:'good',desc:'A prize from the spring egg hunt.'},
   training_dummy:{name:'Training Dummy',base:60,col:'#c8a060',kind:'place',desc:'Place with B. Hit it to see your damage per second.'},
   aurora_shard:{name:'Aurora Shard',base:180,col:'#7af0c0',kind:'good',desc:'A sliver of the northern lights, cold to the touch.'},
   rainbow_petal:{name:'Rainbow Petal',base:200,col:'#ff9ae0',kind:'mat',desc:'Found at the end of a rainbow.'},
@@ -3461,6 +3462,27 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== spring egg hunt =====
+const EGG_COLS = ['#ff9ad0', '#9ad8ff', '#ffe070', '#a0f0a0', '#d0a0ff'];
+function eggHuntDay() {
+  if (seasonIdx() !== 0) { S.eggHunt = null; return; }
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle'); if (!towns.length) return;
+  const tk = pick(towns), T0 = TOWNS[tk], eggs = [];
+  for (let tries = 0; tries < 300 && eggs.length < 5; tries++) { const a = Math.random()*6.283, r = 4 + Math.random()*10, x = Math.floor(T0.x + Math.cos(a)*r), y = Math.floor(T0.y + Math.sin(a)*r); if (!inB(x, y) || !walkable(map[idx(x, y)], false, false) || map[idx(x, y)] === T.HOUSE || eggs.some(e => Math.hypot(e.x - x, e.y - y) < 3) || NPCS.some(n => !n.wander && Math.hypot(n.x - x - .5, n.y - y - .6) < 2.2)) continue; eggs.push({x: x + .5, y: y + .6, col: EGG_COLS[eggs.length], got: false}); }
+  S.eggHunt = {day: S.day, town: tk, eggs};
+  setTimeout(() => toast(`<b>Spring egg hunt!</b><br>Five painted eggs are hidden around ${T0.name} today. Find them all for a prize!`, 6000), 6500);
+}
+function eggTarget() {
+  const H = S.eggHunt; if (!H || H.day !== S.day) return null;
+  const e = H.eggs.find(e => !e.got && Math.hypot(S.x - e.x, S.y - e.y) < 1.1); if (!e) return null;
+  return {key: 'egg' + e.x + e.y, html: '<kbd style="margin:0 6px 0 0">E</kbd>Pick up the painted egg', btn: 'Take', fn: () => {
+    e.got = true; addItem('painted_egg', 1); S.eggsFound = (S.eggsFound || 0) + 1; burst(e.x, e.y, e.col, 10, 2); SFX.pickup();
+    const left = H.eggs.filter(q => !q.got).length;
+    if (!left) { const c = 120 + (S.level || 1)*5; S.coins += c; addItem('candy_apple', 2); S.eggHunts = (S.eggHunts || 0) + 1; SFX.victory(); toast(`<b>All five eggs found!</b><br>The children of ${TOWNS[H.town].name} cheer! <span style="color:var(--good)">+${c} coin, 2 Candy Apples</span>`, 6000); }
+    else floatText(e.x, e.y - .6, `${5 - left}/5 eggs`, e.col);
+    renderHUD(); save(); }};
+}
+function drawEgg(e) { const px = e.x*TS, py = e.y*TS; ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(px - 3, py + 2, 6, 1); ctx.fillStyle = e.col; ctx.beginPath(); ctx.ellipse(px, py - 1, 3, 4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillRect(px - 3, py - 1, 6, 1); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(px - 1, py - 4, 1, 1); }
 // ===== naval combat =====
 let pirT = 60, cannonCd = 0;
 function navalUpdate(dt) {
@@ -4139,6 +4161,7 @@ function gazette() {
   if (festivalToday()) H.push(`<b>FESTIVAL TODAY!</b> ${festivalToday().name} celebrations in every town.`);
   if (bloodMoonDay()) H.push('<b>WARNING:</b> astronomers predict a <span style="color:#e85a5a">Blood Moon</span> tonight. Stay indoors, or bring a big sword.');
   if (seasonIdx() === 3 && S.day % 3 === 1) H.push('<b>Sky watch:</b> conditions are perfect for the northern lights tonight.');
+  if (S.eggHunt && S.eggHunt.day === S.day && TOWNS[S.eggHunt.town]) H.push(`<b>Spring fun:</b> five painted eggs are hidden around ${TOWNS[S.eggHunt.town].name} today.`);
   if (S.starfall === S.day) H.push('<b>Stargazers rejoice:</b> a starfall is expected tonight. Fallen stars fetch a fine price.');
   if (dayOfSeason() === 6) H.push('<b>Sport:</b> Old Marlin’s fishing tournament runs all day today.');
   if (petShowDay()) H.push('<b>Pets:</b> the weekly pet show is on today in Port Wren.');
@@ -4589,6 +4612,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Spring egg hunt', 'Every spring morning, five painted eggs are hidden around one of the towns you know. The Gazette and your tracker say which. Find all five for a prize.'],
   ['Naval combat', 'Shipwright Bess in Port Wren can fit your sailboat with cannons (800 coin, 6 Iron, 4 Gunpowder). At sea they fire on their own at any nearby foe. Once you have cannons, pirate ships hunt you on deep water: sink them for pirate gold and maps.'],
   ['Amara\u2019s journal', 'The explorer Amara Vell left torn journal pages beside eight famous landmarks. Find them all to follow her story and claim her hidden cache. A placeable Training Dummy shows your damage per second.'],
   ['Aurora nights', 'On some winter nights the aurora lights up the sky. Spells recharge twice as fast, and glowing Aurora Shards drift down onto the snow for you to gather.'],
@@ -5608,6 +5632,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  if (S.eggHunt && S.eggHunt.day === S.day) for (const e of S.eggHunt.eggs) if (!e.got && inView(e.x, e.y)) sprites.push({y: e.y, f: () => drawEgg(e)});
   for (let i = 0; i < AMARA_LM.length; i++) { if ((S.amara || {})[i]) continue; const p = amaraSpot(i); if (p && inView(p.x, p.y)) sprites.push({y: p.y, f: () => drawAmaraPage(p, i)}); }
   for (const a of auroraShards) if (inView(a.x, a.y)) sprites.push({y: a.y, f: () => drawAuroraShard(a)});
   for (const L of skyLanterns) sprites.push({y: 1e9, f: () => drawSkyLantern(L)});
@@ -6036,7 +6061,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -6130,6 +6155,7 @@ function checkDeeds() {
   if (archery) extra.push(`<div class="dd" style="color:#f0c040"><span>🎯 ${archery.score} targets · ${Math.max(0, Math.ceil(archery.t))}s</span></div>`);
   if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
+  if (S.eggHunt && S.eggHunt.day === S.day && S.eggHunt.eggs.some(e => !e.got) && TOWNS[S.eggHunt.town]) extra.push(`<div class="dd" style="color:#ff9ad0"><span>🥚 Egg hunt in ${TOWNS[S.eggHunt.town].name} (${S.eggHunt.eggs.filter(e => e.got).length}/5)</span></div>`);
   if (S.outlaw && S.outlaw.taken && !S.outlaw.done) extra.push(`<div class="dd" style="color:#e85a5a"><span>☠ Hunt ${esc(S.outlaw.name)} (${S.outlaw.dir} of ${TOWNS[S.outlaw.town].name})</span></div>`);
   if (S.ghost && ghostActive()) extra.push(`<div class="dd" style="color:#9af0c0"><span>☠ Ghost ship ${S.ghost.dir} of ${TOWNS[S.ghost.town].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
@@ -6226,7 +6252,7 @@ function newDay() {
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   rollMarket();
-  titanDay(); ghostDay();
+  titanDay(); ghostDay(); eggHuntDay();
   const bankMsg = bankDay() + mayorDay() + farmhandDay() + stallDay();
   if (perksDue() > 0) setTimeout(offerPerk, 3500);
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}${bankMsg}`);
@@ -9040,6 +9066,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['egghunt','Egg-cellent','Find all five eggs in a spring egg hunt', () => (S.eggHunts || 0) >= 1],
   ['cannons','Broadside!','Fit your boat with cannons', () => !!S.flags.cannons],
   ['pirates3','Scourge of Pirates','Sink 3 pirate ships', () => (S.killsBy.pirateship || 0) >= 3],
   ['amara','In Her Footsteps','Find all of Amara Vell\'s journal pages', () => Object.keys(S.amara || {}).length >= 8],
