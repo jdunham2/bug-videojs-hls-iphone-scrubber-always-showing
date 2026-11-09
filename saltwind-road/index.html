@@ -826,6 +826,16 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  cauldron:{name:'Cauldron',base:150,col:'#3a3a42',kind:'place',desc:'Place with B. Brew potions from two ingredients.'},
+  healing_draught:{name:'Healing Draught',base:30,col:'#e05a6a',kind:'food',heal:9,desc:'Restores 9 HP'},
+  sweet_dream:{name:'Sweet Dream Tonic',base:45,col:'#f0a0d0',kind:'food',heal:2,buff:'regen',buffDur:240,desc:'Hearty for 4 minutes'},
+  fire_tonic:{name:'Fire Tonic',base:50,col:'#ff6a2a',kind:'food',heal:0,buff:'might',buffDur:180,desc:'Might for 3 minutes'},
+  frost_ward:{name:'Frost Ward',base:50,col:'#9ad8ff',kind:'food',heal:0,buff:'iron',buffDur:180,desc:'Ironskin for 3 minutes'},
+  bouncy_brew:{name:'Bouncy Brew',base:40,col:'#8ae05a',kind:'food',heal:0,buff:'speed',buffDur:200,desc:'Swift for 3 minutes'},
+  liquid_luck:{name:'Liquid Luck',base:80,col:'#f0e040',kind:'food',heal:0,buff:'luck',buffDur:300,desc:'Lucky for 5 minutes'},
+  storm_bottle:{name:'Storm in a Bottle',base:110,col:'#8a9aff',kind:'food',heal:0,buff:'might',buff2:'speed',buffDur:150,desc:'Might and Swift for 2½ minutes'},
+  giants_brew:{name:"Giant's Brew",base:90,col:'#a0784a',kind:'food',heal:15,buff:'iron',buffDur:120,desc:'Restores 15 HP and Ironskin for 2 minutes'},
+  murky_sludge:{name:'Murky Sludge',base:1,col:'#5a6a3a',kind:'good',desc:'A failed brew. Smells terrible.'},
   white_antler:{name:'White Antler',base:1200,col:'#f4f8ff',kind:'trinket',desc:'+4% speed and +3 max HP. A gift from the White Stag.'},
   tent:{name:'Tent',base:120,col:'#c8a070',kind:'place',desc:'Place with B. Sleep anywhere, and wake here when knocked out.'},
   serpent_scale:{name:'Serpent Scale',base:150,col:'#3a9a8a',kind:'mat'},
@@ -1087,6 +1097,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'cauldron',       need:{iron:4,stone:4}, at:'forge', known:true},
   {id:'tent',           need:{hide:4,sticks:6,rope:2}, at:'bench', known:true},
   {id:'serpent_cloak',  need:{serpent_scale:4,silk_cloth:2,hide:2}, at:'bench', known:true},
   {id:'telescope',      need:{glass:3,bronze:2,planks:2}, at:'bench', known:true},
@@ -1402,7 +1413,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1468,6 +1479,7 @@ function placedTarget() {
   if (P.use === 'produce') { const st = q.stock || 0; return {key: 'pl' + q.x + ',' + q.y + ':' + st, html: st ? `${K}Collect from the ${nm} (${st})` : `${K}${nm} · nothing ready yet`, btn: st ? 'Collect' : 'Open', fn: () => {
     if (st) { const bon = q.bonus || 0; addItem(P.give, st); if (bon && P.bonus) addItem(P.bonus, bon); q.stock = 0; q.bonus = 0; S.produced = (S.produced || 0) + st; SFX.pickup(); floatText(q.x + .5, q.y - .3, `+${st} ${GOODS[P.give].name}${bon ? `, +${bon} ${GOODS[P.bonus].name}` : ''}`, '#86c98f'); renderHUD(); save(); }
     else openPanel(nm, 'Nothing to collect yet. Check back tomorrow.', [{label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); }}; }
+  if (P.use === 'brew') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Brew at the cauldron`, btn: 'Brew', fn: () => brewTalk(q, null)};
   if (P.use === 'tent') return {key: 'pl' + q.x + ',' + q.y, html: `${K}Use the tent`, btn: 'Use', fn: () => { const night = S.time > .7 || S.time < .25, here = S.tentPos && S.tentPos.x === q.x && S.tentPos.y === q.y;
     openPanel('Tent', `A snug little tent.${here ? ' <b>You wake up here when knocked out.</b>' : ''}`, [
       {label: night ? 'Sleep until morning' : 'Sleep (only at night)', primary: night, disabled: !night || bossActive(), fn: () => { closeTalk(); if (S.time > .27) { S.time = .27; newDay(); } else S.time = .27; S.hp = maxHP(); enemies = enemies.filter(e => e.boss); eproj = []; hazards = []; S.tentNights = (S.tentNights || 0) + 1; SFX.lullaby(); fadeThen(() => {}); toast('<b>Good morning</b><br>You crawl out of your tent, stiff but rested.'); renderHUD(); save(); }},
@@ -1537,6 +1549,13 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'cauldron': {
+      g.fillRect(x + 2, y + 14, 12, 2);
+      g.fillStyle = '#2a2a32'; g.beginPath(); g.ellipse(x + 8, y + 7, 7, 6, 0, 0, 7); g.fill(); g.fillRect(x + 3, y + 11, 2, 4); g.fillRect(x + 11, y + 11, 2, 4);
+      g.fillStyle = '#4a4a52'; g.fillRect(x + 1, y + 1, 14, 2);
+      const bub = Math.sin(t*4 + q.x)*1; g.fillStyle = '#6ae08a'; g.fillRect(x + 3, y + 2, 10, 2); g.fillStyle = '#aaffc0'; g.fillRect(x + 5 + bub, y + 1, 2, 1); g.fillRect(x + 10 - bub, y, 1, 1);
+      g.fillStyle = '#ff7a2a'; g.fillRect(x + 6, y + 13, 4, 2); break;
+    }
     case 'tent':
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 2, y + 13, 20, 3);
       g.fillStyle = '#c8a070'; g.beginPath(); g.moveTo(x - 2, y + 15); g.lineTo(x + 8, y - 4); g.lineTo(x + 18, y + 15); g.fill();
@@ -3366,6 +3385,43 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== cauldron brewing =====
+const BREW_INGR = ['herbs','berries','honey','flowers','ember','frost_essence','crystal','slime_gel','mushroom'];
+const BREWS = {'berries+herbs': 'healing_draught', 'flowers+honey': 'sweet_dream', 'ember+herbs': 'fire_tonic', 'crystal+frost_essence': 'frost_ward', 'mushroom+slime_gel': 'bouncy_brew', 'crystal+honey': 'liquid_luck', 'ember+frost_essence': 'storm_bottle', 'berries+mushroom': 'giants_brew'};
+function brewTalk(q, first) {
+  S.brews = S.brews || {};
+  const known = Object.entries(BREWS).filter(([k]) => S.brews[k]);
+  const book = `<span style="color:var(--muted)">Recipe book (${known.length}/${Object.keys(BREWS).length}): ${known.length ? known.map(([k, g]) => `${GOODS[g].name} = ${k.split('+').map(x => GOODS[x].name).join(' + ')}`).join('; ') : 'empty. Experiment!'}</span>`;
+  const avail = BREW_INGR.filter(g => GOODS[g] && have(g) > 0 && g !== first);
+  if (!first) { openPanel('Cauldron', `The cauldron bubbles. Pick a first ingredient, then a second. Who knows what you'll make?<br><br>${book}`, [...avail.map(g => ({label: `${GOODS[g].name} (×${have(g)})`, fn: () => brewTalk(q, g)})), ...(avail.length ? [] : [{label: 'You have no brewing ingredients', disabled: true, fn: () => {}}]), {label: 'Pick it up', fn: () => { closeTalk(); pickUpPlaced(q); }}, {label: 'Leave', fn: closeTalk}]); return; }
+  openPanel('Cauldron', `${GOODS[first].name} goes into the pot. And now...?<br><br>${book}`, [...avail.map(g => ({label: `${GOODS[g].name} (×${have(g)})`, fn: () => {
+    if (!have(first) || !have(g)) return; addItem(first, -1); addItem(g, -1); const key = [first, g].sort().join('+'), out = BREWS[key]; S.brewed = (S.brewed || 0) + 1;
+    burst(q.x + .5, q.y, out ? GOODS[out].col : '#5a6a3a', 16, 4);
+    if (out) { const isNew = !S.brews[key]; S.brews[key] = true; addItem(out, 2); SFX.victory(); renderHUD(); save(); openPanel('Cauldron', `${isNew ? '<b>A new recipe!</b> ' : ''}The brew shimmers and settles into <b>2 ${GOODS[out].name}</b>.<br><span style="color:var(--muted)">${GOODS[out].desc}</span>`, [{label: 'Brew again', fn: () => brewTalk(q, null)}, {label: 'Leave', fn: closeTalk}]); }
+    else { addItem('murky_sludge', 1); SFX.hit(); renderHUD(); save(); openPanel('Cauldron', 'The pot belches a cloud of green smoke. You get... <b>Murky Sludge</b>. Maybe try a different combination.', [{label: 'Try again', fn: () => brewTalk(q, null)}, {label: 'Leave', fn: closeTalk}]); }
+  }})), {label: 'Back', fn: () => brewTalk(q, null)}]);
+}
+// ===== arena betting =====
+function betTalk(n) {
+  S.betDay = S.betDay === S.day ? S.betDay : S.day; if (S.betsDay !== S.day) { S.betsDay = S.day; S.betsToday = 0; }
+  if (S.betsToday >= 5) { say('“That’s enough bouts for one day! The beasts need their rest. Come back tomorrow.”', [back(n)]); return; }
+  const pool = Object.keys(ENEMIES).filter(k => { const d = ENEMIES[k]; return !d.passive && !d.target && !d.den && !d.noBest && !d.flee && !d.swim && k !== 'horseman' && k !== 'ghostpirate' && d.hp > 3; });
+  const a = pick(pool); let b = pick(pool); while (b === a) b = pick(pool);
+  const pw = k => ENEMIES[k].hp*(ENEMIES[k].dmg || 1)*(ENEMIES[k].speed || 2)*(ENEMIES[k].ranged ? 1.15 : 1), pa = pw(a), pb = pw(b), chA = pa/(pa + pb);
+  const odds = c => Math.max(1.1, Math.round((.92/c)*10)/10);
+  const bout = {a, b, chA, oa: odds(chA), ob: odds(1 - chA)};
+  say(`“Tonight’s bout: <b>${ENEMIES[a].name}</b> versus <b>${ENEMIES[b].name}</b>! Place your bets!”<br><span style="color:var(--muted)">Odds: ${ENEMIES[a].name} pays ×${bout.oa}, ${ENEMIES[b].name} pays ×${bout.ob}. Bets today: ${S.betsToday}/5.</span>`, [
+    ...[[a, bout.oa, true], [b, bout.ob, false]].flatMap(([k, o, isA]) => [50, 200].map(amt => ({label: `${amt}◆ on the ${ENEMIES[k].name} (×${o})`, disabled: S.coins < amt, fn: () => runBout(n, bout, isA, amt)}))),
+    back(n)]);
+}
+function runBout(n, B, onA, amt) {
+  S.coins -= amt; S.betsToday++; S.bets = (S.bets || 0) + 1;
+  const aWins = Math.random() < B.chA, W = aWins ? B.a : B.b, L = aWins ? B.b : B.a, win = aWins === onA;
+  const lines = [`The ${ENEMIES[B.a].name} charges!`, `The ${ENEMIES[B.b].name} snarls and lunges back.`, pick([`The crowd gasps as the ${ENEMIES[L].name} stumbles!`, `A brutal exchange! Dust fills the ring.`, `The ${ENEMIES[W].name} finds an opening...`]), `<b>The ${ENEMIES[W].name} wins!</b>`];
+  let res; if (win) { const pay = Math.round(amt*(onA ? B.oa : B.ob)); S.coins += pay; S.betWins = (S.betWins || 0) + 1; S.betProfit = (S.betProfit || 0) + pay - amt; res = `<span style="color:var(--good)">You win ${pay} coin!</span>`; SFX.coin(); } else { S.betProfit = (S.betProfit || 0) - amt; res = '<span style="color:#e88a5a">You lose your bet.</span>'; SFX.hit(); }
+  renderHUD(); save();
+  say(`${lines.join('<br>')}<br><br>${res}`, [{label: 'Another bout', fn: () => betTalk(n)}, back(n)]);
+}
 // ===== farmhand =====
 const FARM_WAGE = 35;
 function farmhandTalk(n) {
@@ -4008,6 +4064,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Brewing & betting', 'Forge a Cauldron (4 Iron, 4 Stone) and place it. Combine two ingredients (herbs, berries, honey, flowers, ember, frost essence, crystal, slime gel, mushrooms) to discover potions. Arena Master Brutus also takes bets on monster bouts, up to five a day.'],
   ['Farmhands, fortunes & thieves', 'Tobin in Port Wren works your homestead for a daily wage: harvesting, replanting and collecting produce each morning. Madame Zora in Crownfall reads your fortune for a daily blessing and hints of what is coming. In towns, watch your purse: catch pickpockets to get your coin back with a reward.'],
   ['The White Stag', 'Every fifth day, glowing hoofprints may appear in the morning wilds. Follow them to the White Stag for a powerful blessing. Meet it twice and it leaves you a White Antler.'],
   ['Bottles & birthdays', 'Bottles drift on open water while you sail: fish them out for notes, maps, coins and the lost letters of Captain Elsbeth. Every townsperson has a birthday (the Gazette lists them), and a gift that day counts triple.'],
@@ -5726,6 +5783,7 @@ function mainOptions(n) {
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
+  if (n.arena) o.push({label: 'Bet on a monster bout', fn: () => betTalk(n)});
   if (n.bounty) o.push({label: 'Legendary hunts', fn: () => legendTalk(n)});
   if (n.bounty) o.push({label: S.eliteBounty ? `Claim bounty (${S.eliteBounty} elite${S.eliteBounty > 1 ? 's' : ''})` : 'About bounties', primary: !!S.eliteBounty, fn: () => bountyTalk(n)});
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
@@ -8348,6 +8406,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['brewer','Potion Brewer','Discover 4 cauldron recipes', () => Object.keys(S.brews || {}).length >= 4],
+  ['alchemist','Master Alchemist','Discover every cauldron recipe', () => Object.keys(S.brews || {}).length >= 8],
+  ['bookie','Lucky Punter','Win 5 bets on monster bouts', () => (S.betWins || 0) >= 5],
   ['thiefcatcher','Stop, Thief!','Catch 3 pickpockets', () => (S.thievesCaught || 0) >= 3],
   ['farmhand','Gentleman Farmer','Hire a farmhand', () => !!S.farmhandHired],
   ['fortune','Seen the Future','Have your fortune read 5 times', () => (S.fortunes || 0) >= 5],
