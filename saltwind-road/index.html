@@ -772,6 +772,7 @@ const GOODS = {
   mushroom_log:{name:'Mushroom Log',base:45,col:'#7a5a3a',kind:'place',desc:'Place with B. Grows mushrooms (and sometimes truffles) every day.'},
   heroic_token:{name:'Heroic Token',base:150,col:'#ff7a4a',kind:'good'},
   heroic_crest:{name:'Heroic Crest',base:1500,col:'#ff7a4a',kind:'trinket',desc:'+8% damage and +1 armor. Proof of heroic deeds.'},
+  saltwind_blade:{name:'Saltwind Blade',base:8000,col:'#9fe8ff',kind:'weapon',dmg:24,cd:.26,reach:1.9,crit:.15,ench:'storm'},
   // --- elites ---
   elite_essence:{name:'Elite Essence',base:60,col:'#e3a948',kind:'mat'},
   champion_medal:{name:"Champion's Medal",base:600,col:'#e3a948',kind:'trinket',desc:'+6% damage, +4% critical chance'},
@@ -2779,7 +2780,7 @@ const stars = (n, max) => '★'.repeat(n) + '☆'.repeat(max - n);
 const enhName = g => GOODS[g].name + (enhOf(g) ? ` +${enhOf(g)}` : '');
 function weapon() {
   const w = S.equip.weapon; if (!(w && have(w) > 0)) return FISTS;
-  const L = enhOf(w), E = enchOf(w); return L || E ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: (E ? ENCHANTS[E].name + ' ' : '') + enhName(w), ench: E} : GOODS[w];
+  const L = enhOf(w), E = enchOf(w) || GOODS[w].ench; return L || E ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: (E ? ENCHANTS[E].name + ' ' : '') + enhName(w), ench: E} : GOODS[w];
 }
 const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
@@ -3274,6 +3275,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Legendary weapon', 'Ask Hask the smith in Redrock about his greatest work: the Saltwind Blade.'],
   ['Factions', "Join the Merchants' League (Pemberton, Lantern Bay), the Wardens of the Road (Commander Thane, Frostgate) or the Circle of the Arcane (Archmage Ilyra, Skyhold). Do their tasks to rank up and unlock perks."],
   ['Heroic dungeons', 'Once you beat a dungeon guardian you can return on Heroic once a week: tougher foes, a stronger guardian and Heroic Tokens.'],
   ['Producers', 'Craft beehives, crab pots (next to water) and mushroom logs, place them with B, and collect what they make every day.'],
@@ -4576,6 +4578,7 @@ function checkDeeds() {
   }
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
+  if (S.blade && S.blade.stage === 1) { const P = bladeParts(), n0 = Object.values(P).filter(Boolean).length; extra.push(`<div class="dd ${n0 === 5 ? 'ok' : ''}"><span style="color:#9fe8ff">${n0 === 5 ? '✓ Return to Hask (Redrock)' : `Saltwind Blade parts ${n0}/5`}</span></div>`); }
   { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
@@ -4795,6 +4798,7 @@ function mainOptions(n) {
   else if (hasLostPet(n)) o.push({label: 'Is something wrong?', primary: true, fn: () => lostPetTalk(n)});
   if (n.id === 'pemberton') o.push({label: "The Merchants' League", primary: true, fn: () => factionTalk(n, 'league')});
   if (n.id === 'thane') o.push({label: 'The Wardens of the Road', primary: true, fn: () => factionTalk(n, 'wardens')});
+  if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
   if (n.mage) o.push({label: 'The Circle of the Arcane', fn: () => factionTalk(n, 'arcane')});
   if (n.mage) o.push({label: 'Learn spells', primary: true, fn: () => mageTalk(n)});
   if (n.archery) o.push({label: 'Try the archery range', primary: true, disabled: !!archery, fn: () => { closeTalk(); startArchery(); }});
@@ -5234,6 +5238,19 @@ function factionTalk(n, f) {
   say(`<b style="color:${F.col}">${F.name}</b> · ${FACTION_RANKS[r][1]} (${S.facRep || 0} favor${next ? `, ${next[0]} for ${next[1]}` : ''})<br>Your perks: ${r ? F.perk(r) : 'none yet'}${T0 ? `<br><br>Current task: <b>${def.txt(T0.n)}</b> (${Math.min(prog, T0.n)}/${T0.n})` : ''}`, [
     ...(T0 && done ? [{label: 'Report the task done', primary: true, fn: () => { S.facTask = null; S.facRep = (S.facRep || 0) + 1; const c = 100 + (S.level || 1)*8; S.coins += c; gainXP(80); const r2 = facRank(); SFX.victory(); renderHUD(); save(); say(`“Good work.” <span style="color:var(--good)">+${c} coin, +1 favor</span>${r2 > r ? `<br><b>You are now a ${FACTION_RANKS[r2][1]} of the ${F.name}!</b> New perk: ${F.perk(r2)}.` : ''}`, [back(n)]); }}] : []),
     ...(!T0 ? [{label: 'Give me a task', primary: true, fn: () => { const t = pick(F.tasks.filter(x => x.k !== 'sold' || (S.caravans || []).length)), nn = t.n(); S.facTask = {k: t.k, n: nn, base: facCount(t.k)}; save(); say(`“${t.txt(nn)}. Report back when it's done.”`, [back(n)]); }}] : []),
+    back(n)]);
+}
+// ===== legendary: the Saltwind Blade =====
+function bladeParts() { return {heart: (S.titansSlain || 0) >= 1, scale: !!S.bosses.prismdragon, mithril: have('mithril') >= 5, stars: have('star_fragment') >= 4, coin: S.coins >= 3000}; }
+function bladeTalk(n) {
+  S.blade = S.blade || {stage: 0};
+  if (S.blade.stage === 0) return say('“Every smith dreams of one blade. Mine is the Saltwind Blade: steel folded with the heart of a mountain, the breath of a dragon and the light of fallen stars. I know how. I just never had the parts.”', [
+    {label: 'Tell me what you need', primary: true, fn: () => { S.blade.stage = 1; save(); bladeTalk(n); }}, back(n)]);
+  if (S.blade.stage === 2) return say('“The Saltwind Blade. My life\'s work, in the hands of the right person. Don\'t make me regret it.”', [back(n)]);
+  const P = bladeParts(), all = Object.values(P).every(Boolean);
+  say(`“Bring me these and I'll forge it:”<br>${P.heart ? '◆' : '◇'} The heart of a mountain: slay the Earthshaker Titan<br>${P.scale ? '◆' : '◇'} Dragon's breath: slay Prismscale in the Prism Mine<br>${P.mithril ? '◆' : '◇'} 5 Mithril (${have('mithril')}/5)<br>${P.stars ? '◆' : '◇'} 4 Star Fragments (${have('star_fragment')}/4)<br>${P.coin ? '◆' : '◇'} 3000 coin for my fire and my time`, [
+    {label: 'Forge the Saltwind Blade', primary: all, disabled: !all, fn: () => { addItem('mithril', -5); addItem('star_fragment', -4); S.coins -= 3000; addItem('saltwind_blade', 1); S.equip.weapon = 'saltwind_blade'; S.blade.stage = 2; SFX.victory(); shake = .5; burst(S.x, S.y - .6, '#9fe8ff', 40, 7); gainXP(500); renderHUD(); save();
+      say('The forge roars for a day and a night. When Hask finally lifts the blade from the quench, it hums, and tiny sparks of lightning crawl along its edge.<br><br><b style="color:#9fe8ff">You receive the Saltwind Blade!</b>', [back(n)]); }},
     back(n)]);
 }
 function rumorTalk(n) {
@@ -7221,6 +7238,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['saltwind','The Saltwind Blade','Have Hask forge the legendary Saltwind Blade', () => !!(S.blade && S.blade.stage === 2)],
   ['faction','Sworn','Join a faction', () => !!S.faction],
   ['factionchamp','Faction Champion','Reach Champion rank in a faction', () => facRank() >= 3],
   ['heroic','Heroic','Defeat a guardian on Heroic', () => (S.heroicWins || 0) >= 1],
