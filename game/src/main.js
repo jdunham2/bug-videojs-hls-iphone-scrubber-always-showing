@@ -118,7 +118,7 @@ class Game {
       { title: 'Shelter: place a Timber Floor and 2 Walls', progress: () => `Floors ${Math.min(this.stats.floors, 1)}/1 · Walls ${Math.min(this.stats.walls, 2)}/2`, done: () => this.stats.floors >= 1 && this.stats.walls >= 2 },
       { title: 'Craft a Hunter Bow and Tranq Arrows (needs purple Dozeberries)', progress: () => `Bow ${this.inv.count('bow') ? '✔' : '✘'} · Arrows ${this.inv.count('arrow')}`, done: () => this.inv.count('bow') > 0 && this.inv.count('arrow') > 0 },
       { title: 'Knock out a creature with tranq arrows, then feed it to tame', progress: () => 'Herbivores eat Wildberries · Carnivores eat Raw Meat', done: () => this.stats.tamed >= 1 },
-      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax, and the flying Galewing and Thunderwing', done: () => this.stats.rode >= 1 },
+      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax, the flying Galewing and Thunderwing, and the sea-going Deepjaw', done: () => this.stats.rode >= 1 },
       { title: 'Place a Sleeping Bag to set your respawn point', progress: () => 'Craft one from Hide and Fiber', done: () => this.stats.beds >= 1 },
       { title: 'Craft Hide Armor and wear it (tap it twice in the inventory)', progress: () => 'Armor soaks up damage until it breaks', done: () => !!this.player.armor },
       { title: 'Mine 10 Metal Ore in the northern mountains', progress: () => `🟠 ${Math.min(this.stats.ore, 10)}/10 — orange-veined rocks; use a pick`, done: () => this.stats.ore >= 10 },
@@ -531,7 +531,7 @@ class Game {
     const side = new THREE.Vector3(Math.cos(cr.yaw), 0, -Math.sin(cr.yaw)).multiplyScalar(cr.radius + 1.2);
     p.pos.copy(cr.pos).add(side);
     const g = heightAt(p.pos.x, p.pos.z);
-    p.pos.y = cr.flying ? Math.max(cr.pos.y, g) : g + 0.2;
+    p.pos.y = cr.def.swimmer ? cr.pos.y + 0.5 : cr.flying ? Math.max(cr.pos.y, g) : g + 0.2;
     p.vel.set(0, 0, 0);
   }
 
@@ -790,6 +790,7 @@ class Game {
       msg += '. Your belongings are in a bag where you fell (🎒 on the map).';
     }
     document.getElementById('death-msg').textContent = msg;
+    document.getElementById('respawn').textContent = this.bed && this.building.pieces.includes(this.bed) ? 'Respawn at your Sleeping Bag' : 'Respawn on the beach';
     this.saves.markDirty();
     document.exitPointerLock?.();
     for (const o of this.creatures.list) if (o.target === 'player') { o.state = 'wander'; o.target = null; }
@@ -849,11 +850,39 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
   // ------------------------------------------------ Riding
+  updateSwimRide(dt) {
+    const p = this.player, m = p.mount, k = this.input.keys;
+    const joy = this.input.joy || { x: 0, y: 0 };
+    const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
+    const str = clamp((k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + joy.x, -1, 1);
+    const up = k.Space ? 1 : 0, down = k.KeyC || k.ControlLeft ? 1 : 0;
+    const mag = Math.min(1, Math.hypot(fwd, str));
+    const maxSp = m.def.swim * (k.ShiftLeft || k.ShiftRight ? 1.7 : 1.1);
+    const prevYaw = m.yaw;
+    if (mag > 0.08) {
+      const mx = -Math.sin(p.yaw) * fwd + Math.cos(p.yaw) * str, mz = -Math.cos(p.yaw) * fwd - Math.sin(p.yaw) * str;
+      m.yaw = angleLerp(m.yaw, Math.atan2(mx, mz), Math.min(1, dt * 2.6));
+    }
+    m.speed = lerp(m.speed, mag > 0.08 ? maxSp * mag : 0, Math.min(1, dt * 2));
+    const vyT = (fwd > 0.2 ? Math.sin(p.pitch + 0.2) * m.speed * 0.8 : 0) + (up - down) * 5;
+    m.vy = lerp(m.vy || 0, vyT, Math.min(1, dt * 3));
+    const nx = m.pos.x + Math.sin(m.yaw) * m.speed * dt, nz = m.pos.z + Math.cos(m.yaw) * m.speed * dt;
+    if (heightAt(nx, nz) < -1.2) { m.pos.x = nx; m.pos.z = nz; } else m.speed *= 0.3;
+    m.pos.y = clamp(m.pos.y + m.vy * dt, heightAt(m.pos.x, m.pos.z) + 0.4, WATER_LEVEL - 0.3);
+    m.flyPitch = -Math.atan2(m.vy, Math.max(2, m.speed)) * 0.6;
+    const turn = ((m.yaw - prevYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    m.bank = lerp(m.bank || 0, clamp(-turn / Math.max(dt, 1e-3) * 0.2, -0.4, 0.4), Math.min(1, dt * 3));
+    p.pos.set(m.pos.x, m.pos.y + m.model.hipH * m.scale + 0.9, m.pos.z);
+    p.underwater = p.pos.y + 1.6 < WATER_LEVEL;
+    m.lieT = 0;
+    this.creatures.animate(m, dt);
+  }
+
   updateFlight(dt) {
     const p = this.player, m = p.mount, k = this.input.keys;
     const joy = this.input.joy || { x: 0, y: 0 };
@@ -902,6 +931,7 @@ class Game {
     if (!m) return;
     if (!m.alive) { this.dismount(); return; }
     if (m.def.flyer && (m.flying || this.input.keys.Space)) { this.updateFlight(dt); return; }
+    if (m.def.swimmer) { this.updateSwimRide(dt); return; }
     const k = this.input.keys;
     const joy = this.input.joy || { x: 0, y: 0 };
     const fwd = clamp((k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0) + joy.y, -1, 1);
@@ -1085,6 +1115,7 @@ class Game {
       const alt = m.pos.y - Math.max(heightAt(m.pos.x, m.pos.z), 0);
       if (m.def.flyer && m.flying) prompt = `Flying <b>${m.name}</b> · ${Math.round(alt)} m up · look to steer · <kbd>Space</kbd>/<kbd>C</kbd> up/down · <kbd>E</kbd> ${alt > 6 ? 'Jump off (you will fall!)' : 'Dismount'}`;
       else if (m.def.flyer) prompt = `Riding <b>${m.name}</b> · <kbd>Space</kbd> Take off · <kbd>E</kbd> Dismount`;
+      else if (m.def.swimmer) prompt = `Swimming on <b>${m.name}</b> · ${Math.round(-m.pos.y)} m deep · look to steer · <kbd>Space</kbd>/<kbd>C</kbd> up/down · <kbd>E</kbd> Dismount`;
       else prompt = `Riding <b>${m.name}</b> · HP ${Math.ceil(m.hp)}/${m.maxHp} · <kbd>E</kbd> Dismount`;
     }
     this.ui.setPrompt(prompt);

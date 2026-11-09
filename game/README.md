@@ -65,6 +65,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Gorgonax: apex predator, found in the north; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer
+- **Ocean:** schools of Glimmerfin swim the shallows (easy meat with a spear), and the
+  Deepjaw, a huge sea predator, hunts anyone swimming in deep water. Knock a Deepjaw out (it
+  floats to the surface), tame it with meat, saddle it, and ride it underwater: look to steer,
+  Space/C to rise and dive.
 - **Taming:** build up torpor with tranq arrows or a club to knock a creature out, then
   feed it its preferred food. Dozeberries keep it asleep. Tamed creatures follow or stay
   (F) and defend you.
