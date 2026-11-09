@@ -1141,6 +1141,7 @@ const TOOL_NAME = {axe:'an axe', pick:'a pickaxe', rod:'a fishing rod', sickle:'
 
 const ENEMIES = {
   target:{name:'Target',hp:1,dmg:0,speed:0,aggro:0,drops:[],target:true},
+  goblin:{name:'Treasure Goblin',hp:14,dmg:0,speed:4.3,aggro:0,drops:[['gem',1,3,1],['pirate_gold',1,2,.5]],coins:[150,300],flee:true},
   den:{name:'Monster Den',hp:30,dmg:0,speed:0,aggro:0,drops:[],den:true},
   slime:{name:'Slime',hp:5,dmg:1,speed:2.2,aggro:5,drops:[['slime_gel',1,2,1]]},
   crab:{name:'Shore Crab',hp:6,dmg:2,speed:2.6,aggro:4,drops:[['shells',1,3,1],['meat',1,1,.3]]},
@@ -3537,8 +3538,26 @@ function trySpawnCritter(night) {
     return;
   }
 }
+function goblinTick(e, dt) {
+  e.hurt = Math.max(0, e.hurt - dt); e.life = (e.life ?? 16) - dt; e.phase += dt*14;
+  if (Math.abs(e.kx) + Math.abs(e.ky) > .05) { const nx = e.x + e.kx*dt, ny = e.y + e.ky*dt; if (enemyWalk(nx, e.y)) e.x = nx; if (enemyWalk(e.x, ny)) e.y = ny; const dc = Math.min(1, dt*9); e.kx -= e.kx*dc; e.ky -= e.ky*dc; }
+  if (Math.random() < .25) particles.push({x: e.x, y: e.y - .3, vx: 0, vy: -.5, t: 0, col: '#f0d040'});
+  if (e.life <= 0) { e.dead = true; burst(e.x, e.y - .4, '#b070ff', 24, 5); if (Math.hypot(S.x - e.x, S.y - e.y) < 18) toast('The goblin cackles and vanishes through a shimmering portal!', 3000); return; }
+  const dx = e.x - S.x, dy = e.y - S.y, d = Math.hypot(dx, dy) || .001;
+  if (d > 30) { e.dead = true; return; }
+  let ax = dx/d, ay = dy/d; e.wt = (e.wt || 0) - dt; if (e.wt <= 0) { e.wt = .6 + Math.random()*.8; e.jx = (Math.random() - .5)*1.2; e.jy = (Math.random() - .5)*1.2; } ax += e.jx || 0; ay += e.jy || 0; const m = Math.hypot(ax, ay) || 1;
+  const sp = ENEMIES.goblin.speed*(d < 7 ? 1 : .55), nx = e.x + ax/m*sp*dt, ny = e.y + ay/m*sp*dt;
+  let moved = false; if (enemyWalk(nx, e.y)) { e.x = nx; moved = true; } if (enemyWalk(e.x, ny)) { e.y = ny; moved = true; }
+  if (!moved) { e.jx = (Math.random() - .5)*3; e.jy = (Math.random() - .5)*3; }
+  e.face = ax < 0 ? -1 : 1;
+}
 function trySpawn(night) {
   if (S.y >= WORLD_H) return;
+  if (Math.random() < .012 && !enemies.some(e => e.type === 'goblin' && !e.dead)) {
+    for (let k = 0; k < 12; k++) { const a = Math.random()*6.283, x = Math.floor(S.x + Math.cos(a)*9), y = Math.floor(S.y + Math.sin(a)*9); if (!inB(x, y) || townAt(x + .5, y + .5, 13) || !enemyWalk(x + .5, y + .5)) continue;
+      const e = makeEnemy('goblin', x + .5, y + .5); e.hp = e.max = Math.round(14*(1 + (S.level || 1)*.05)); e.life = 16; enemies.push(e); S.goblinsSeen = (S.goblinsSeen || 0) + 1;
+      toast('<b>A Treasure Goblin!</b><br>It’s carrying a sack of loot. Catch it before it escapes!', 3500); SFX.coin(); return; }
+  }
   for (let k = 0; k < 12; k++) {
     const a = Math.random()*Math.PI*2, r = 14 + Math.random()*8;
     const x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
@@ -3678,6 +3697,7 @@ function updateCombat(dt, night) {
     const def = ENEMIES[e.type];
     if (def.target) { e.hurt = Math.max(0, e.hurt - dt); e.life -= dt; if (e.life <= 0) e.dead = true; continue; }
     if (def.den) { denTick(e, dt); continue; }
+    if (def.flee) { goblinTick(e, dt); continue; }
     const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
@@ -4082,6 +4102,16 @@ function drawEnemyAt(g, type, x, y, f, phase, extra) {
       g.fillStyle = '#e04040'; g.fillRect(x + f*3, y-7, 1, 1); g.fillRect(x + f*4, y-6, 1, 1);
       break;
     case 'target': { const pop = Math.min(1, (extra && extra.age || 1)); g.fillStyle = '#6a4a2a'; g.fillRect(x - 1, y - 8, 2, 8); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 4, y - 1, 8, 2); for (const [r, c] of [[6, '#e8e0d0'], [4.5, '#c83a2a'], [3, '#e8e0d0'], [1.5, '#c83a2a']]) { g.fillStyle = c; g.beginPath(); g.arc(x, y - 12, r, 0, 7); g.fill(); } break; }
+    case 'goblin': {
+      shadow(6);
+      g.fillStyle = '#3a6a2a'; g.fillRect(x - 3, y - 4, 2, 4 + (step > 0 ? 0 : -1)); g.fillRect(x + 1, y - 4, 2, 4 + (step < 0 ? 0 : -1));
+      g.fillStyle = '#5a3a2a'; g.fillRect(x - 4, y - 9, 8, 5);
+      g.fillStyle = '#6aa04a'; g.fillRect(x - 3, y - 14, 6, 5); g.fillRect(x - 6, y - 13, 3, 2); g.fillRect(x + 3, y - 13, 3, 2);
+      g.fillStyle = '#ffe040'; g.fillRect(x + f - 2, y - 12, 1, 1); g.fillRect(x + f + 1, y - 12, 1, 1);
+      g.fillStyle = '#c8a050'; g.beginPath(); g.ellipse(x - f*6, y - 10, 5, 6, 0, 0, 7); g.fill(); g.fillStyle = '#8a6a30'; g.fillRect(x - f*6 - 1, y - 16, 2, 2);
+      g.fillStyle = '#f0d040'; if (Math.floor(phase*2) % 3 === 0) g.fillRect(x - f*6 + 2, y - 13, 1, 1);
+      break;
+    }
     case 'slime': {
       const sq = Math.abs(Math.sin(phase*1.2)), h = 6 + sq*3, w = 7 - sq*1.5;
       shadow(6); g.fillStyle = 'rgba(110,200,90,.9)'; g.beginPath(); g.ellipse(x, y - h/2, w, h/2 + 1, 0, Math.PI, 0); g.fill(); g.fillRect(x - w, y - h/2, w*2, h/2);
@@ -7669,6 +7699,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['goblin','Grabby Hands','Catch a Treasure Goblin', () => (S.killsBy.goblin || 0) >= 1],
   ['aeronaut','Aeronaut','Take 3 balloon rides', () => (S.balloonRides || 0) >= 3],
   ['denbuster','Den Buster','Destroy 5 monster dens', () => (S.densSmashed || 0) >= 5],
   ['weekly','Weekly Warrior','Complete 3 weekly challenges', () => (S.weeklyDone || 0) >= 3],
