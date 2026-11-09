@@ -128,7 +128,7 @@ export function serialize(g) {
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
     bossActive: !!(g.boss && g.boss.alive) || undefined,
     fog: g.map ? g.map.serializeFog() : undefined,
-    buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, bed: b === g.bed || undefined })),
+    buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, crop: b.crop ? { ...b.crop } : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
       species: c.species, level: c.level, name: c.name, pos: v3(c.pos), yaw: r2(c.yaw),
       hp: r2(c.hp), maxHp: c.maxHp, dmg: r2(c.dmg), xp: r2(c.xp || 0), saddled: c.saddled, follow: c.follow,
@@ -164,6 +164,7 @@ export function applySave(g, d) {
     if (piece.lit !== undefined) piece.lit = b.lit;
     if (b.items && piece.items) piece.items = b.items.slice(0, 24).map((s) => (s ? { ...s } : null));
     if (b.bed) g.bed = piece;
+    if (b.crop && piece.type === 'plot') piece.crop = { ...b.crop };
   }
   for (const t of d.tames || []) {
     const pos = new THREE.Vector3().fromArray(t.pos);

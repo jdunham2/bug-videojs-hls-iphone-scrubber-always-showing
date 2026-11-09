@@ -48,6 +48,8 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   Metal Sword and Metal Armor.
 - **Armor:** Hide Armor (blocks 25%) and Metal Armor (blocks 50%). Tap one twice in the
   inventory to wear it; it wears down as you take hits.
+- **Farming:** picking berry bushes sometimes drops seeds. Plant them in a Crop Plot; crops
+  ripen in about 5 minutes (twice as fast in rain) and yield 8–13 berries plus more seeds.
 - **Base items:** Storage Box (24 slots), Sleeping Bag (sets your respawn point and lets you
   sleep through the night), stone floors, walls and doorways.
 - **Building:** placement ghost with grid snapping, walls that snap to floor edges (rotate

@@ -19,7 +19,7 @@ function plankGeo(w, h, d, horizontal, color1, color2) {
 // Piece type -> role. Wood and stone tiers share snapping rules.
 export const KIND = {
   foundation: 'floor', sfoundation: 'floor', wall: 'wall', swall: 'wall', doorway: 'door', sdoorway: 'door',
-  campfire: 'fire', forge: 'forge', storage: 'storage', bed: 'bed',
+  campfire: 'fire', forge: 'forge', storage: 'storage', bed: 'bed', plot: 'plot',
 };
 const isWall = (t) => KIND[t] === 'wall' || KIND[t] === 'door';
 
@@ -73,6 +73,23 @@ function storageGeo() {
   return mergeParts(parts);
 }
 
+function plotGeo() {
+  const parts = [{ geo: new THREE.BoxGeometry(2.2, 0.25, 2.2), color: 0x4a3524, jitter: 0.1, matrix: mtx(0, 0.12, 0) }];
+  for (const [x, z, w, d] of [[0, 1.15, 2.4, 0.15], [0, -1.15, 2.4, 0.15], [1.15, 0, 0.15, 2.4], [-1.15, 0, 0.15, 2.4]]) parts.push({ geo: new THREE.BoxGeometry(w, 0.35, d), color: 0x7b5d3b, matrix: mtx(x, 0.17, z) });
+  for (let i = 0; i < 3; i++) parts.push({ geo: new THREE.BoxGeometry(1.9, 0.06, 0.25), color: 0x3a281a, matrix: mtx(0, 0.26, (i - 1) * 0.6) });
+  return mergeParts(parts);
+}
+
+function cropGeo(color) {
+  const parts = [];
+  for (let i = 0; i < 9; i++) {
+    const x = ((i % 3) - 1) * 0.6, z = (Math.floor(i / 3) - 1) * 0.6;
+    parts.push({ geo: new THREE.IcosahedronGeometry(0.28, 0), color: i % 2 ? 0x4c7e30 : 0x3e6d2a, jitter: 0.15, matrix: mtx(x, 0.28, z) });
+    if (color) for (let k = 0; k < 4; k++) parts.push({ geo: new THREE.SphereGeometry(0.06, 5, 4), color, matrix: mtx(x + Math.cos(k * 1.6) * 0.22, 0.38 + (k % 2) * 0.08, z + Math.sin(k * 1.6) * 0.22) });
+  }
+  return mergeParts(parts);
+}
+
 function bedGeo() {
   const parts = [
     { geo: new THREE.BoxGeometry(1.0, 0.15, 2.1), color: 0x7a5a3a, matrix: mtx(0, 0.08, 0) },
@@ -116,7 +133,8 @@ export class Building {
     this.pieces = [];
     this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
     this.geos = { foundation: foundationGeo(false), wall: wallGeo(false), doorway: wallGeo(true), campfire: campfireGeo(),
-      sfoundation: foundationGeo(true), swall: stoneWallGeo(false), sdoorway: stoneWallGeo(true), forge: forgeGeo(), storage: storageGeo(), bed: bedGeo() };
+      sfoundation: foundationGeo(true), swall: stoneWallGeo(false), sdoorway: stoneWallGeo(true), forge: forgeGeo(), storage: storageGeo(), bed: bedGeo(), plot: plotGeo() };
+    this.cropGeos = { green: cropGeo(null), berries: cropGeo(0x7a1f3d), sleepberry: cropGeo(0x6a3aa8) };
     this.ghostMatOk = new THREE.MeshBasicMaterial({ color: 0x66ff99, transparent: true, opacity: 0.38, depthWrite: false });
     this.ghostMatBad = new THREE.MeshBasicMaterial({ color: 0xff5544, transparent: true, opacity: 0.38, depthWrite: false });
     this.ghost = null;
@@ -242,6 +260,7 @@ export class Building {
       this.world.colliders.add(piece.collider);
     }
     if (type === 'storage') piece.items = new Array(24).fill(null);
+    if (type === 'plot') { piece.crop = null; piece.cropMesh = new THREE.Mesh(this.cropGeos.green, this.mat); piece.cropMesh.visible = false; piece.cropMesh.castShadow = true; mesh.add(piece.cropMesh); }
     if (type === 'campfire' || type === 'forge') {
       const light = new THREE.PointLight(0xff8833, 0, 22, 1.6);
       light.position.set(0, 1.0, 0);
@@ -259,6 +278,22 @@ export class Building {
     return piece;
   }
 
+  // Crops: ~5 minutes to ripen, twice as fast in rain.
+  growCrops(dt, mult) {
+    for (const p of this.pieces) {
+      if (p.type !== 'plot') continue;
+      const c = p.crop;
+      p.cropMesh.visible = !!c;
+      if (!c) continue;
+      if (c.growth < 1) c.growth = Math.min(1, c.growth + (dt / 300) * mult);
+      const ripe = c.growth >= 1;
+      const geo = ripe ? this.cropGeos[c.type] : this.cropGeos.green;
+      if (p.cropMesh.geometry !== geo) p.cropMesh.geometry = geo;
+      const s = 0.25 + c.growth * 0.75;
+      p.cropMesh.scale.set(s, s, s);
+    }
+  }
+
   update(dt, t) {
     for (const f of this.fires) {
       f.flames.visible = f.lit;
@@ -272,7 +307,7 @@ export class Building {
   // Nearest usable prop (campfire, forge, storage, bed) within reach.
   usableNear(pos, r = 3.2) {
     let best = null, bd = r;
-    for (const p of this.pieces) { if (!['fire', 'forge', 'storage', 'bed'].includes(KIND[p.type])) continue; const d = Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z); if (d < bd && Math.abs(p.pos.y - pos.y) < 3) { bd = d; best = p; } }
+    for (const p of this.pieces) { if (!['fire', 'forge', 'storage', 'bed', 'plot'].includes(KIND[p.type])) continue; const d = Math.hypot(p.pos.x - pos.x, p.pos.z - pos.z); if (d < bd && Math.abs(p.pos.y - pos.y) < 3) { bd = d; best = p; } }
     return best;
   }
 }

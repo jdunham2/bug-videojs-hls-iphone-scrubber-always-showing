@@ -131,6 +131,7 @@ class Game {
       { title: 'Offer the trophies at the Caldera Altar near the Northern Peak', progress: () => 'Look for the red glow among standing stones (💀 on the map once found)', done: () => (this.stats.bossSummons || 0) >= 1 },
       { title: 'Defeat the Primal Tyrant', progress: () => this.boss && this.boss.alive ? `Tyrant health ${Math.round((this.boss.hp / this.boss.maxHp) * 100)}%` : 'Summon it again at the altar if you fled', done: () => (this.stats.bossKills || 0) >= 1 },
       { title: 'Forge the Primal Blade from the Tyrant Fang', progress: () => 'Needs a Forge, 20 Metal Ingots and 10 Hide', done: () => this.inv.count('primalblade') > 0 || (this.stats.blades || 0) > 0 },
+      { title: 'Grow food: build a Crop Plot, plant a seed and harvest it', progress: () => 'Seeds drop from berry bushes. Rain doubles growth.', done: () => (this.stats.harvests || 0) >= 1 },
     ];
     this.questIdx = 0;
 
@@ -389,6 +390,23 @@ class Game {
     } else if (kind === 'storage') {
       this.openStorage = piece;
       this.toggleInventory(true);
+    } else if (kind === 'plot') {
+      const c = piece.crop;
+      if (!c) {
+        const seed = this.inv.count('seed') ? 'seed' : this.inv.count('dozeseed') ? 'dozeseed' : null;
+        if (!seed) { this.ui.notify('You need seeds — picking berry bushes sometimes drops them', 'warn'); return; }
+        this.inv.remove(seed, 1);
+        piece.crop = { type: ITEMS[seed].crop, growth: 0 };
+        this.ui.notify(`Planted ${ITEMS[seed].name}`);
+        this.audio.rustle();
+      } else if (c.growth >= 1) {
+        const n = 8 + Math.floor(Math.random() * 6);
+        this.give(c.type, n); if (Math.random() < 0.7) this.give(c.type === 'berries' ? 'seed' : 'dozeseed', 1 + Math.floor(Math.random() * 2));
+        piece.crop = null;
+        this.stats.harvests = (this.stats.harvests || 0) + 1;
+        this.audio.rustle(); this.player.addXP(4, this.xpHooks);
+      } else { this.ui.notify(`Still growing: ${Math.round(c.growth * 100)}%${this.weather.raining ? ' (rain is helping)' : ''}`); return; }
+      this.saves.markDirty();
     } else if (kind === 'bed') {
       this.bed = piece;
       this.saves.markDirty();
@@ -623,6 +641,7 @@ class Game {
       const amt = Math.floor(q) + (Math.random() < q % 1 ? 1 : 0);
       this.give(id, amt);
     }
+    if (node.kind === 'bush' && Math.random() < 0.3) this.give(node.type === 'dozebush' ? 'dozeseed' : 'seed', 1);
     const destroyed = this.world.harvest(node, power * 10);
     if (node.kind === 'tree') this.audio.chop(); else if (node.kind === 'rock') this.audio.mine(); else this.audio.rustle();
     if (destroyed && node.kind === 'tree') this.audio.tone({ f0: 90, f1: 40, dur: 0.6, vol: 0.4, type: 'triangle' });
@@ -994,6 +1013,7 @@ class Game {
       this.world.update(dt);
       this.creatures.update(dt, p, this.shared.uTime.value);
       this.building.update(dt, this.shared.uTime.value);
+      this.building.growCrops(dt, this.weather.raining ? 2 : 1);
       this.updateArrows(dt);
       this.cooking(dt);
       this.saves.tick(dt);
@@ -1104,6 +1124,7 @@ class Game {
         prompt = k === 'fire' ? `<kbd>E</kbd> ${fire.lit ? 'Extinguish' : 'Light'} Campfire`
           : k === 'forge' ? `<kbd>E</kbd> ${fire.lit ? 'Put out' : 'Light'} Forge · Ore ${this.inv.count('ore')} · Wood ${this.inv.count('wood')}`
           : k === 'storage' ? '<kbd>E</kbd> Open Storage Box'
+          : k === 'plot' ? (!fire.crop ? `<kbd>E</kbd> Plant a seed (${this.inv.count('seed') + this.inv.count('dozeseed')})` : fire.crop.growth >= 1 ? '<kbd>E</kbd> Harvest crop' : `Growing… ${Math.round(fire.crop.growth * 100)}%`)
           : `<kbd>E</kbd> ${this.env.daylight < 0.3 ? 'Sleep until morning' : 'Set respawn point'}`;
       }
       else if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) prompt = `<kbd>E</kbd> Offer 3 Alpha Trophies to summon the Primal Tyrant (${this.inv.count('trophy')}/3)`;
