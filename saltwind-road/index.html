@@ -1004,6 +1004,7 @@ const NODES = {
   quartz:{name:'Quartz',verb:'Pick up',give:'quartz',amt:[1,2],hits:1,regrow:3},
   shard:{name:'Shimmer Shards',verb:'Collect',give:'shimmer_shard',amt:[1,2],hits:2,regrow:3,curio:'prism'},
   redwood:{name:'Giant Redwood',verb:'Chop',tool:'axe',give:'redwood',amt:[2,3],hits:4,regrow:4,seed:'amber',seedP:.12},
+  flotsam:{name:'Floating Crate',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:6,loot:true},
   satchel:{name:'Lost Satchel',verb:'Open',give:'coins',amt:[1,1],hits:1,regrow:7,loot:true},
   giantshroom:{name:'Giant Glowcap',verb:'Harvest',give:'mushroom',amt:[2,3],hits:2,regrow:3,seed:'truffle',seedP:.15,curio:'sporeorb'},
   bamboo:{name:'Bamboo Grove',verb:'Cut',give:'bamboo',amt:[2,3],hits:2,regrow:2,boost:'sickle',curio:'jadeflute'},
@@ -1721,6 +1722,9 @@ const NPCS = [
   {id:'veyra',town:'skyhold',dx:-1,dy:3,name:'Oracle Veyra',role:'Keeper of the old tales',cols:{cloak:'#4a3a6a',skin:'#e0c8b0',hair:'#f0f0ff'},oracle:true,
    hello:["The wind told me you'd come.","Ah, the shard-bearer.","Hero. The tales are already being written."],
    rumors:["Every guardian of the deep places guards a shard of the first king's crown. They did not know it, but they did.","The Hollow King was the first king of all the lands. He gave up his heart for power, and now he is only hunger."]},
+  {id:'bess',town:'wren',dx:-3,dy:1,name:'Shipwright Bess',role:'Shipwright',cols:{cloak:'#2a4a6a',skin:'#c89870',hair:'#a85a2a'},shipwright:true,
+   hello:["Smell that? Tar and sawdust. Best smell in the world.","Back at the docks?","Captain! Good to see you."],
+   rumors:["A raft gets you across, a sailboat gets you there before lunch.","Crates float out on the open sea. Cargo from wrecked ships. Finders keepers."]},
   {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
    hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
    rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
@@ -2224,6 +2228,7 @@ function placeNodes() {
         case T.SAVANNA: case T.DUNE: type = 'feathers'; break;
         case T.SNOW: type = q < .012 ? 'pinecone' : 'quartz'; break;
         case T.SHIMMER: type = 'wildflower'; break;
+        case T.DEEP: type = q < .0045 ? 'flotsam' : null; break;
       }
     }
     if (type) { nodeGrid[i] = nodes.length; nodes.push({x, y, type}); }
@@ -3371,6 +3376,7 @@ function drawNode(g, i, t) {
     case 'quartz': if (!avail) return; shadow(5); g.fillStyle = '#e8e8f0'; g.beginPath(); g.moveTo(x-4, y); g.lineTo(x-2, y-8); g.lineTo(x, y); g.fill(); g.beginPath(); g.moveTo(x, y); g.lineTo(x+3, y-6); g.lineTo(x+5, y); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(x-2, y-6, 1, 3); break;
     case 'shard': shadow(6); if (!avail) { g.fillStyle = '#8a9ab0'; g.fillRect(x-3, y-2, 6, 2); return; } for (const [a,h,c] of [[-4,9,'#9fe8ff'],[0,13,'#e8a8ff'],[4,8,'#fff0a0']]) { g.fillStyle = c; g.beginPath(); g.moveTo(x+a-2, y); g.lineTo(x+a, y-h); g.lineTo(x+a+2, y); g.fill(); } g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(x, y-10 + Math.sin(t*3)*1, 1, 2); break;
     case 'redwood': shadow(9); g.fillStyle = '#6a2e1a'; g.fillRect(x-4, y-14, 8, 14); g.fillStyle = '#8a3e22'; g.fillRect(x-2, y-14, 2, 14); if (!avail) { g.fillStyle = '#d8a070'; g.fillRect(x-4, y-14, 8, 2); return; } g.fillStyle = '#1e3e16'; g.beginPath(); g.moveTo(x-11, y-10); g.lineTo(x, y-36); g.lineTo(x+11, y-10); g.fill(); g.fillStyle = '#2a5220'; g.beginPath(); g.moveTo(x-8, y-20); g.lineTo(x, y-40); g.lineTo(x+8, y-20); g.fill(); break;
+    case 'flotsam': { if (!avail) return; const b = Math.sin(t*2 + n.x)*1.5; g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x-8, y-1 + b, 16, 1); g.fillStyle = '#8a5a2a'; g.fillRect(x-5, y-8 + b, 10, 8); g.fillStyle = '#6a3a1a'; g.fillRect(x-5, y-5 + b, 10, 1); g.fillRect(x-1, y-8 + b, 2, 8); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5 + b, 2, 1); break; }
     case 'satchel': if (!avail) return; shadow(6); g.fillStyle = '#7a4a22'; g.fillRect(x-5, y-6, 10, 6); g.fillStyle = '#9a6a3a'; g.fillRect(x-5, y-7, 10, 3); g.fillStyle = '#e3a948'; g.fillRect(x-1, y-5, 2, 2); if (Math.sin(t*4 + n.x) > .7) { g.fillStyle = 'rgba(255,240,180,.9)'; g.fillRect(x+4, y-9, 1, 1); } break;
     case 'mapletree': shadow(7); g.fillStyle = '#4a3020'; g.fillRect(x-2, y-8, 4, 8); if (!avail) { g.fillStyle = '#c49a63'; g.fillRect(x-2, y-8, 4, 2); return; } g.fillStyle = '#c8401a'; g.beginPath(); g.arc(x, y-14, 9, 0, 7); g.fill(); g.fillStyle = '#e07a20'; g.beginPath(); g.arc(x-3, y-16, 5, 0, 7); g.fill(); g.fillStyle = '#c8c0b0'; g.fillRect(x+2, y-5, 2, 2); g.fillStyle = '#b0601a'; g.fillRect(x+2, y-3, 2, 1); break;
     case 'rubble': if (!avail) { g.fillStyle = '#8a8890'; g.fillRect(x-4, y-2, 8, 2); return; } shadow(7); g.fillStyle = '#b8b4bc'; g.fillRect(x-7, y-5, 6, 5); g.fillRect(x, y-8, 6, 8); g.fillStyle = '#d8d4dc'; g.fillRect(x-7, y-5, 6, 1); g.fillRect(x, y-8, 6, 1); g.fillStyle = '#5a7a4a'; g.fillRect(x-2, y-2, 3, 2); break;
@@ -3688,7 +3694,16 @@ function render() {
   sprites.push({y: S.y, f: () => {
     const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
-    if (onWater && S.flags.raft && !isFlying()) {
+    if (onWater && S.flags.boat && !isFlying()) {
+      const b = Math.sin(frameT*2.5)*1, dir = player.facing === 'left' ? -1 : 1;
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; if (player.moving) { ctx.fillRect(px - dir*16, py + 3, 6, 1); ctx.fillRect(px - dir*20, py + 1, 4, 1); }
+      ctx.fillStyle = '#6a3a1a'; ctx.beginPath(); ctx.moveTo(px - 13, py - 3 + b); ctx.lineTo(px + 13, py - 3 + b); ctx.lineTo(px + 9*dir, py + 4 + b); ctx.lineTo(px - 9*dir, py + 4 + b); ctx.fill();
+      ctx.fillStyle = '#8a5a2a'; ctx.fillRect(px - 13, py - 4 + b, 26, 2);
+      ctx.fillStyle = '#4a2a10'; ctx.fillRect(px - dir*4, py - 30 + b, 2, 27);
+      ctx.fillStyle = '#f0ece0'; ctx.beginPath(); ctx.moveTo(px - dir*3, py - 29 + b); ctx.quadraticCurveTo(px + dir*(12 + (player.moving ? 3 : 0)), py - 18 + b, px - dir*3, py - 7 + b); ctx.fill();
+      ctx.fillStyle = '#c84a3a'; ctx.fillRect(px - dir*4, py - 33 + b, dir*6, 3);
+      drawPerson(ctx, px + dir*3, py - 3 + b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
+    } else if (onWater && S.flags.raft && !isFlying()) {
       const b = Math.sin(frameT*3)*.8;
       ctx.fillStyle = '#7a5532'; ctx.fillRect(px-8, py-4+b, 16, 7); ctx.fillStyle = '#5c3f24'; for (let i = 0; i < 4; i++) ctx.fillRect(px-8+i*4, py-4+b, 1, 7);
       drawPerson(ctx, px, py-2+b, player.cols, 0, false, player.facing, {scarf:true, pack:true, held, helm, shield});
@@ -3936,7 +3951,7 @@ function update(dt) {
     if (mag > 1) { vx /= mag; vy /= mag; }
     const t = tileAt(Math.floor(S.x), Math.floor(S.y));
     let sp = SPEED[t];
-    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = 1.15;
+    if (S.flags.raft && (t === T.DEEP || t === T.SHAL)) sp = S.flags.boat ? 2.3 : 1.15;
     if (t === T.MOUNT) sp = .4;
     const M = S.riding && MOUNTS[S.mount];
     if (M) sp = (M.fly ? M.speed : (M.terrain && M.terrain.includes(t) ? Math.max(sp, 1) : sp) * M.speed) * (1 + .06*mountLv());
@@ -4165,6 +4180,7 @@ function mainOptions(n) {
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
+  if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
@@ -5867,6 +5883,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['sailor','Sailor','Own a sailboat', () => !!S.flags.boat],
   ['festive','Festive Spirit','Visit a festival merchant during a festival', () => !!S.festVisited],
   ['jackpot','Jackpot!','Win the lucky draw jackpot', () => !!S.jackpot],
   ['legendary','Legend of Saltwind Road','Defeat the Hollow King', () => !!S.bosses.hollowking],
@@ -5955,6 +5972,14 @@ function arenaTarget() {
   const K = '<kbd style="margin:0 6px 0 0">E</kbd>';
   if (S.arena.live) return {key: 'arL', html: 'The gate is barred until this wave is beaten', btn: '', fn: () => {}};
   return {key: 'arX' + S.arena.pot, html: `${K}Leave the arena · collect ${S.arena.pot} coin`, btn: 'Leave', fn: () => { SFX.travel(); fadeThen(() => leaveArena(false)); }};
+}
+const BOAT_COST = {coins: 1200, planks: 10, rope: 4, silk_cloth: 2};
+function boatTalk(n) {
+  if (S.flags.boat) { say('“She\'s the fastest boat on the coast. Walk into any water and she\'ll carry you, twice as fast as a raft. Watch for floating crates out at sea.”', [back(n)]); return; }
+  const ok = upCanPay(BOAT_COST);
+  say(`“A sailboat? I can build you one. Twice as fast as a raft on open water, and she\'ll take you anywhere a raft can.”<div class="req" style="margin-top:8px">${upCostHTML(BOAT_COST)}</div>`, [
+    {label: 'Build it', primary: ok, disabled: !ok, fn: () => { upPay(BOAT_COST); S.flags.raft = true; S.flags.boat = true; SFX.victory(); renderHUD(); save(); say('“There she is! Red sail, oak hull. Walk into the water and she\'s yours.”', [back(n)]); }},
+    back(n)]);
 }
 function festShop(n) {
   const F = festivalToday(); if (F) S.festVisited = true; if (!F) { say('“The festival is over! See you next season.”', [back(n)]); return; }
