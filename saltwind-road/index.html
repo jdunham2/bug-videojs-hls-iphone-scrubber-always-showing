@@ -2905,6 +2905,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
     dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0);
     if (Math.random() < .05 + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
+    dmg *= diff().dealt;
     dmg = Math.round(dmg*10) / 10;
     if (weapon().lifesteal && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*weapon().lifesteal); renderHP(); }
     hitStop = Math.max(hitStop, crit ? .09 : .035);
@@ -2964,7 +2965,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; S.dodges = (S.dodges || 0) + 1; SFX.dodge(); floatText(S.x, S.y - 1.2, 'Dodged!', '#bfe8ff'); } return; }
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
-  const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * 2) / 2);
+  const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * 2) / 2);
   S.hp -= taken; SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
   if (from) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
@@ -2979,7 +2980,7 @@ function die() {
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
   SFX.death();
-  const lost = Math.floor(S.coins * .2);
+  const lost = Math.floor(S.coins * diff().loss);
   S.coins -= lost; S.hp = maxHP(); S.deaths++;
   const rp = S.respawn && S.props && S.props[S.respawn] ? PROPERTIES[S.respawn] : null;
   const atHome = !rp && S.home && S.home.level >= 1;
@@ -6170,7 +6171,9 @@ addEventListener('pointerup', e => { fishHold = false; if (e.pointerType === 'mo
 addEventListener('pointercancel', () => { fishHold = false; });
 
 /* ================= settings & audio ================= */
-const SETTINGS = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem('saltwind-settings') || '{}'); } catch (e) {} return Object.assign({music: .5, sfx: .7, shake: true}, o); })();
+const SETTINGS = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem('saltwind-settings') || '{}'); } catch (e) {} return Object.assign({music: .5, sfx: .7, shake: true, diff: 'normal'}, o); })();
+const DIFF = {relaxed: {taken: .5, dealt: 1.3, loss: 0, name: 'Relaxed'}, normal: {taken: 1, dealt: 1, loss: .2, name: 'Normal'}, hard: {taken: 1.5, dealt: .85, loss: .3, name: 'Hard'}};
+const diff = () => DIFF[SETTINGS.diff] || DIFF.normal;
 const saveSettings = () => { try { localStorage.setItem('saltwind-settings', JSON.stringify(SETTINGS)); } catch (e) {} };
 const AUD = (() => {
   let ac = null, master, sfxG, musG, rainG, noiseBuf, track = null, step = 0, nextT = 0, mel = 0, timer = null;
@@ -6725,6 +6728,8 @@ function renderPause() {
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
       <div class="setrow"><label for="sShake">Screen shake</label><input id="sShake" type="checkbox" ${SETTINGS.shake ? 'checked' : ''}></div>
+      <div class="setrow"><label for="sDiff">Difficulty</label><select id="sDiff" style="background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit">${Object.entries(DIFF).map(([k, d]) => `<option value="${k}" ${SETTINGS.diff === k ? 'selected' : ''}>${d.name}</option>`).join('')}</select></div>
+      <div class="vals" style="margin-top:-2px">Relaxed: take half damage, hit harder, lose no coin when knocked out. Hard: take 50% more damage, hit a little softer, lose 30% of your coin.</div>
     </div>
     <h3>Controls</h3>
     <div class="controls" style="margin:0">
@@ -6736,6 +6741,7 @@ function renderPause() {
   $('sMusic').addEventListener('input', e => { SETTINGS.music = +e.target.value; AUD.apply(); saveSettings(); });
   $('sSfx').addEventListener('input', e => { SETTINGS.sfx = +e.target.value; AUD.apply(); saveSettings(); });
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
+  $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); });
 
