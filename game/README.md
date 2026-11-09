@@ -61,10 +61,20 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   instead of joining fights.
 - **Alphas:** rare, oversized creatures that glow red. They hit much harder, cannot be
   tamed, drop triple loot and an Alpha Trophy. Seven roam the island at the start.
-- **Boss — the Primal Tyrant:** offer 3 Alpha Trophies at the Caldera Altar near the
-  Northern Peak (red crystal in a ring of standing stones) to summon it. It stomps the
-  ground, calls a raptor pack at half health, and drops a Tyrant Fang that forges into the
-  Primal Blade.
+- **Bosses:** four bosses, each summoned at its own shrine (💀 on the map) with an offering
+  and each dropping a unique crafting reward:
+  - **The Primal Tyrant** (Caldera Altar, Northern Peak; 3 Alpha Trophies): stomps and
+    calls a raptor pack. Its Tyrant Fang forges the Primal Blade.
+  - **Magmaroth, the Molten King** (obsidian obelisk on the volcano rim; 15 Obsidian + 1
+    Trophy): glowing rings appear under you and erupt into burning lava pools, and it calls
+    Cinderbacks twice. Its Molten Core forges Magmaplate Armor (60% block, lava-proof).
+  - **The Deep Mother** (Tide Shrine on the western shore; 20 Raw Meat + 1 Trophy): a
+    colossal Deepjaw whose whirlpools drag swimmers in. Its Abyssal Pearl forges the
+    Tidecaller Trident.
+  - **The Hollow Queen** (crystal throne deep in the Glimmer Grotto; 20 Glimmer Crystals):
+    pounces from range, shrieks to kill your light, and calls Duskraptors at 75/50/25%. Her
+    eye makes the Huntress Bow (fast, double-strength tranq shots).
+  - Beat all four to become **Champion of the Isle**.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
   refills your water.

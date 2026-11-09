@@ -130,7 +130,8 @@ export function serialize(g) {
     eggs: g.breeding ? g.breeding.serialize() : undefined,
     bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
-    bossActive: !!(g.boss && g.boss.alive) || undefined,
+    bossesActive: g.bosses ? g.bosses.serialize() : undefined,
+    bossActive: undefined,
     fog: g.map ? g.map.serializeFog() : undefined,
     buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, crop: b.crop ? { ...b.crop } : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
@@ -164,7 +165,8 @@ export function applySave(g, d) {
   if (d.eggs && g.breeding) g.breeding.load(d.eggs);
   if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
   for (const b of d.bags || []) g.dropBag(new THREE.Vector3().fromArray(b.pos), b.items);
-  if (d.bossActive) g.inv.add('trophy', 3); // the fight resets on reload; refund the offering
+  if (d.bossActive) g.inv.add('trophy', 3); // older saves: the Tyrant fight resets; refund
+  if (d.bossesActive && g.bosses) g.bosses.refund(d.bossesActive);
   if (d.fog && g.map) g.map.loadFog(d.fog);
 
   for (const b of d.buildings || []) {

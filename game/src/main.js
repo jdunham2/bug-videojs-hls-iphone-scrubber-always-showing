@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildTerrain, heightAt, findSpawn, WATER_LEVEL, HALF, volcanicAt, inVolcanoLava, VOLCANO, blockedAt } from './terrain.js';
 import { Volcano } from './volcano.js';
 import { Caves } from './caves.js';
+import { Bosses } from './bosses.js';
 import { Environment } from './environment.js';
 import { World } from './world.js';
 import { CreatureManager, SPECIES } from './creatures.js';
@@ -73,7 +74,7 @@ class Game {
         if (byPlayer) { const sk = this.stats.speciesKills || (this.stats.speciesKills = {}); sk[c.species] = (sk[c.species] || 0) + 1; }
         if (byPlayer) { this.player.addXP((10 + c.level * 2) * (c.boss ? 20 : c.alpha ? 4 : 1), this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
         if (attacker && attacker.tamed) this.roster.grantXP(attacker, c);
-        if (c.boss) this.bossDefeated(c);
+        if (c.boss) this.bosses.defeated(c);
         else if (c.alpha && byPlayer) { this.give('trophy', 1); this.stats.alphaKills = (this.stats.alphaKills || 0) + 1; this.ui.banner('ALPHA SLAIN', `${c.def.name} trophy claimed`); this.saves.markDirty(); }
         if (c.tamed) this.ui.notify(`Your ${c.name} was killed!`, 'warn');
       },
@@ -88,7 +89,11 @@ class Game {
         }
         this.ui.notify('The Tyrant shakes the ground!', 'warn');
       },
-      bossPhase: (c) => { this.ui.banner('THE TYRANT CALLS ITS PACK', 'Talonrunners are coming'); this.playRoar(c); },
+      bossPhase: (c) => { this.ui.banner(`${c.name.toUpperCase()} CALLS FOR AID`, `${c.cfg.minions[1]} ${c.cfg.minions[0]}s join the fight`); this.playRoar(c); },
+      eruption: (c) => this.bosses.eruption(c),
+      whirlpool: (c) => this.bosses.whirlpool(c),
+      shriek: (c) => this.bosses.shriek(c),
+      pounce: (c) => this.playRoar(c),
       thud: () => { this.audio.tone({ f0: 90, f1: 40, dur: 0.4, vol: 0.5, type: 'triangle' }); this.audio.noiseHit({ freq: 300, dur: 0.3, vol: 0.4, type: 'lowpass' }); },
       flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
@@ -97,6 +102,8 @@ class Game {
     this.buildAltar();
     this.volcano = new Volcano(this.scene, this.shared);
     this.caves = new Caves(this);
+    this.bosses = new Bosses(this);
+    this.bosses.build();
 
     this.arrows = [];
     this.arrowGeo = (() => {
@@ -150,6 +157,10 @@ class Game {
       { title: 'Breed your tames: two of a kind on Stay, then hatch the egg by a fire', progress: () => 'Set both to Stay (roster: T) within 8 m of each other', done: () => (this.stats.hatched || 0) >= 1 },
       { title: 'Find a cave entrance (map: M) and open an Ancient Cache', progress: () => 'Caves: Ember Depths (volcano), Glimmer Grotto (north ridge), Rootway Hollow (west woods)', done: () => (this.stats.caches || 0) >= 1 },
       { title: 'Mine Obsidian on Ashfang Volcano and forge an Obsidian Spear or Ashguard Armor', progress: () => `🖤 ${this.inv.count('obsidian')} obsidian · the forge needs 8–12`, done: () => this.inv.count('obsidianspear') + this.inv.count('ashguard') > 0 || (this.player.armor && this.player.armor.id === 'ashguard') },
+      { title: 'Slay Magmaroth, the Molten King, at the obelisk on the volcano rim', progress: () => 'Offer 15 Obsidian + 1 Alpha Trophy. Dodge the glowing rings — they erupt!', done: () => (this.stats.bossesDefeated || {}).magmaroth >= 1 },
+      { title: 'Slay the Deep Mother at the Tide Shrine on the western shore', progress: () => 'Offer 20 Raw Meat + 1 Alpha Trophy. Fight from a Deepjaw, a flyer or with a bow — beware the whirlpool', done: () => (this.stats.bossesDefeated || {}).deepmother >= 1 },
+      { title: 'Slay the Hollow Queen in the depths of the Glimmer Grotto', progress: () => 'Offer 20 Glimmer Crystals at the crystal throne. She pounces — and her shriek kills your light', done: () => (this.stats.bossesDefeated || {}).hollowqueen >= 1 },
+      { title: 'Champion of the Isle: defeat all four bosses', progress: () => `${Object.keys((this.stats.bossesDefeated || {})).length}/4 bosses slain`, done: () => Object.keys((this.stats.bossesDefeated || {})).length >= 4 },
     ];
     this.questIdx = 0;
 
@@ -344,7 +355,8 @@ class Game {
     const drop = this.drops.near(p.pos);
     if (drop) { this.drops.open(drop); return; }
     if (fire) { this.useProp(fire); return; }
-    if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) { this.summonBoss(); return; }
+    const shrine = this.bosses.shrineNear(p.pos);
+    if (shrine) { this.bosses.summon(shrine); return; }
     if (this.canDrink()) {
       p.water = Math.min(100, p.water + 25);
       this.audio.splash();
@@ -382,29 +394,6 @@ class Game {
       this.world.colliders.add({ x, z, r: 0.9 });
     }
     this.world.colliders.add({ x: c.x, z: c.z, r: 2.1 });
-  }
-
-  summonBoss() {
-    if (this.boss && this.boss.alive) { this.ui.notify('The Tyrant is already here!', 'warn'); return; }
-    if (this.inv.count('trophy') < 3) { this.ui.notify(`The altar demands 3 Alpha Trophies (you have ${this.inv.count('trophy')})`, 'warn'); return; }
-    this.inv.remove('trophy', 3);
-    this.stats.bossSummons = (this.stats.bossSummons || 0) + 1;
-    this.bossActive = true;
-    const p = this.altar.pos.clone().add(new THREE.Vector3(0, 0, -16)); p.y = heightAt(p.x, p.z);
-    this.boss = this.creatures.spawnBoss(p);
-    this.shake = 1.2;
-    this.ui.banner('THE PRIMAL TYRANT AWAKENS', 'Survive. Strike. Endure.');
-    this.audio.thunder?.(1); setTimeout(() => this.playRoar(this.boss), 600);
-    this.saves.markDirty();
-  }
-
-  bossDefeated(c) {
-    this.bossActive = false;
-    this.stats.bossKills = (this.stats.bossKills || 0) + 1;
-    this.give('fang', 1); this.give('ingot', 25); this.give('trophy', 2);
-    this.ui.banner('THE PRIMAL TYRANT HAS FALLEN', 'Its fang can be forged into the Primal Blade');
-    this.audio.tamed();
-    this.saves.markDirty();
   }
 
   useProp(piece) {
@@ -617,7 +606,7 @@ class Game {
       this.inv.remove('arrow', 1);
       this.fireArrow();
       p.swing = 0.6;
-      this.attackCd = 0.9;
+      this.attackCd = item.id === 'huntressbow' ? 0.55 : 0.9;
       this.wear(item, 1);
       return;
     }
@@ -752,7 +741,8 @@ class Game {
     pos.y -= 0.05;
     mesh.position.copy(pos);
     this.scene.add(mesh);
-    this.arrows.push({ mesh, pos, vel: dir.clone().multiplyScalar(62), life: 12, stuck: false });
+    const strong = this.activeItem()?.id === 'huntressbow';
+    this.arrows.push({ mesh, pos, vel: dir.clone().multiplyScalar(strong ? 88 : 62), life: 12, stuck: false, power: strong ? 2.2 : 1 });
     this.audio.bowShot();
   }
 
@@ -770,7 +760,7 @@ class Game {
       const hit = this.creatures.pick(a.pos, dir, len, false);
       if (hit && !hit.creature.tamed) {
         const cr = hit.creature;
-        this.creatures.damage(cr, 4 + Math.random() * 2, 48 * (1 + this.player.level * 0.02), 'player');
+        this.creatures.damage(cr, (4 + Math.random() * 2) * (a.power || 1) * (a.power > 1 ? 4 : 1), 48 * (1 + this.player.level * 0.02) * (a.power || 1), 'player');
         this.hitMarker();
         this.damageNumber(cr.center, 'zZ');
         this.audio.flesh();
@@ -1046,6 +1036,7 @@ class Game {
       this.weather.update(dt, this.env, this.camera, p.underwater, p.pos.y, volcanicAt(p.pos.x, p.pos.z) * 0.9);
       this.volcano.update(dt, p.pos);
       this.caves.update(dt);
+      this.bosses.update(dt);
       this.lava(dt);
       if (this.weather.raining && !p.underwater && p.alive) p.water = Math.min(100, p.water + dt * 0.35 * this.weather.cur.rain);
       this.world.update(dt);
@@ -1059,7 +1050,7 @@ class Game {
       for (const c of this.creatures.list) {
         if (c.state === 'chase' && !c.tamed && c.alive && (c.target === 'player' || (c.target && c.target === p.mount)) && c.pos.distanceTo(p.pos) < 70) { danger = 1; break; }
       }
-      this.music.update(dt, { night: this.caves.at(p.pos) ? 1 : 1 - this.env.daylight, danger, boss: this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 120 ? 1 : 0 });
+      this.music.update(dt, { night: this.caves.at(p.pos) ? 1 : 1 - this.env.daylight, danger, boss: this.bosses.nearest(p.pos, 120) ? 1 : 0 });
       this.map.update(dt);
       this.bestiary.update(dt);
       this.breeding.update(dt);
@@ -1094,10 +1085,10 @@ class Game {
       this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.5;
     }
     const bb = document.getElementById('bossbar');
-    const showBoss = this.boss && this.boss.alive && this.boss.pos.distanceTo(p.pos) < 160;
+    const showBoss = this.bosses.nearest(p.pos, 160);
     bb.classList.toggle('show', !!showBoss);
     document.body.classList.toggle('bossfight', !!showBoss);
-    if (showBoss) { bb.querySelector('i').style.width = `${(this.boss.hp / this.boss.maxHp) * 100}%`; bb.querySelector('.bname').textContent = `${this.boss.name} — ${Math.ceil(this.boss.hp)} / ${this.boss.maxHp}`; }
+    if (showBoss) { bb.querySelector('i').style.width = `${(showBoss.hp / showBoss.maxHp) * 100}%`; bb.querySelector('.bname').textContent = `${showBoss.name} — ${Math.ceil(showBoss.hp)} / ${showBoss.maxHp}`; }
     this.updateDamageNums(dt);
     this.updateTags();
     this.audio.ambience(dt, { shore: Math.max(0, heightAt(p.pos.x, p.pos.z)) * 6, night: 1 - this.env.daylight, height: p.pos.y, underwater: p.underwater });
@@ -1122,7 +1113,7 @@ class Game {
       if (d < 9) t += (f.type === 'forge' ? 22 : 18) * (1 - d / 9);
     }
     this.ambientTemp = t;
-    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : p.armor.id === 'ashguard' ? 9 : 5) : 0;
+    const insul = p.armor ? (p.armor.id === 'hidearmor' ? 12 : p.armor.id === 'ashguard' || p.armor.id === 'magmaplate' ? 9 : 5) : 0;
     const cold = Math.max(0, (10 - insul) - t);        // degrees below comfort
     const hot = Math.max(0, t - 36);
     p.cold = cold; p.hot = hot;
@@ -1274,7 +1265,7 @@ class Game {
           : k === 'plot' ? (!fire.crop ? `<kbd>E</kbd> Plant a seed (${this.inv.count('seed') + this.inv.count('dozeseed')})` : fire.crop.growth >= 1 ? '<kbd>E</kbd> Harvest crop' : `Growing… ${Math.round(fire.crop.growth * 100)}%`)
           : `<kbd>E</kbd> ${this.env.daylight < 0.3 ? 'Sleep until morning' : 'Set respawn point'}`;
       }
-      else if (this.altar && p.pos.distanceTo(this.altar.pos) < 5) prompt = `<kbd>E</kbd> Offer 3 Alpha Trophies to summon the Primal Tyrant (${this.inv.count('trophy')}/3)`;
+      else if (this.bosses.shrineNear(p.pos)) prompt = this.bosses.prompt(this.bosses.shrineNear(p.pos));
       else if (this.canDrink()) prompt = '<kbd>E</kbd> Drink';
       if (def && def.place) prompt = `<kbd>LMB</kbd> Place ${def.name} · <kbd>R</kbd> Rotate`;
     }

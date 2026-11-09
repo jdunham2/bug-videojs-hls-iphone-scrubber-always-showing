@@ -19,6 +19,14 @@ function toolGeo(id) {
     case 'obsidianspear': handle(1.6); P.push({ geo: new THREE.OctahedronGeometry(0.07), color: 0x1a1620, matrix: mtx(0, 1.62, 0, 0, 0, 0, 1, 3, 1) }); break;
     case 'club': P.push({ geo: new THREE.CylinderGeometry(0.06, 0.03, 0.75, 7), color: 0x5a3e24, matrix: mtx(0, 0.28, 0) }); break;
     case 'spear': handle(1.5); P.push({ geo: new THREE.ConeGeometry(0.04, 0.25, 4), color: 0xe9e2cf, matrix: mtx(0, 1.5, 0) }); break;
+    case 'trident': handle(1.5, 0x3a4a5a); for (const x of [-0.07, 0, 0.07]) P.push({ geo: new THREE.ConeGeometry(0.02, x ? 0.22 : 0.3, 4), color: 0x9ae0ff, matrix: mtx(x, x ? 1.56 : 1.6, 0) }); P.push({ geo: new THREE.BoxGeometry(0.18, 0.03, 0.03), color: 0x9ae0ff, matrix: mtx(0, 1.45, 0) }); break;
+    case 'huntressbow': {
+      const curve = new THREE.TorusGeometry(0.47, 0.022, 5, 16, Math.PI * 0.9);
+      P.push({ geo: curve, color: 0x2a2038, matrix: mtx(0, 0.3, 0, 0, 0, Math.PI * 0.55) });
+      P.push({ geo: new THREE.OctahedronGeometry(0.04), color: 0xb08aff, matrix: mtx(0.33, 0.3, 0) });
+      P.push({ geo: new THREE.CylinderGeometry(0.004, 0.004, 0.9, 3), color: 0xd8c8ff, matrix: mtx(-0.09, 0.3, 0) });
+      break;
+    }
     case 'bow': {
       const curve = new THREE.TorusGeometry(0.45, 0.018, 5, 16, Math.PI * 0.9);
       P.push({ geo: curve, color: 0x7a5530, matrix: mtx(0, 0.3, 0, 0, 0, Math.PI * 0.55) });
@@ -219,7 +227,7 @@ export class Player {
     const sw = this.swing > 0 ? 1 - this.swing : 0;
     this.equipT = Math.max(0, (this.equipT || 0) - dt);
     this.vm.position.set(0.32 + Math.cos(this.bob * 0.5) * 0.01, -0.32 + Math.abs(Math.sin(this.bob * 0.5)) * 0.012 - this.equipT * 0.8, -0.55);
-    if (this.equipped === 'bow') {
+    if (this.equipped === 'bow' || this.equipped === 'huntressbow') {
       this.hand.rotation.set(-1.45 + s * 0.15, 0.25, 0.35 - (this.draw || 0) * 0.15);
       this.vm.position.x = 0.15;
     } else if (this.equipped === 'spear') {

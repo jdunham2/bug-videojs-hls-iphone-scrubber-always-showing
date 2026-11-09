@@ -159,7 +159,8 @@ export class WorldMap {
       ctx.fillStyle = '#cfe6ff'; ctx.font = `${Math.round(10 * dpr)}px Inter, sans-serif`; ctx.fillText(c.name, x, y - 7 * dpr);
     }
     if (g.altar && seen(g.altar.pos.x, g.altar.pos.z)) { const [x, y] = P(g.altar.pos.x, g.altar.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
-    if (g.boss && g.boss.alive) { const [x, y] = P(g.boss.pos.x, g.boss.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
+    for (const s of g.bosses ? g.bosses.shrines : []) { if (s.cave || s.kind === 'tyrant' || !seen(s.pos.x, s.pos.z)) continue; const [x, y] = P(s.pos.x, s.pos.z); this.icon(ctx, x, y, '💀', 18 * dpr); }
+    for (const c of g.bosses ? Object.values(g.bosses.active) : []) { if (!c.alive || c.cave) continue; const [x, y] = P(c.pos.x, c.pos.z); this.icon(ctx, x, y, '👹', 20 * dpr); }
     for (const c of g.caves ? g.caves.list : []) {
       if (!seen(c.entrance.pos.x, c.entrance.pos.z)) continue;
       const [x, y] = P(c.entrance.pos.x, c.entrance.pos.z); this.icon(ctx, x, y, '🕳️', 16 * dpr);

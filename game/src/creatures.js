@@ -101,6 +101,8 @@ export const SPECIES = {
   },
 };
 
+export const BOSS_TYRANT = { kind: 'tyrant', species: 'gorgonax', name: 'The Primal Tyrant', hp: 16000, dmg: 70, scale: 2.1, minions: ['talonrunner', 4, 30], phases: [0.5], abilities: ['stomp'] };
+
 const PREY = {
   talonrunner: ['pudgewing', 'dashbeak', 'crestcaller'],
   dashbeak: ['pudgewing'],
@@ -578,38 +580,69 @@ export class CreatureManager {
     return c;
   }
 
-  // The Primal Tyrant: a colossal Gorgonax summoned at the Caldera Altar.
-  spawnBoss(pos) {
-    const c = this.spawn('gorgonax', pos, 60);
+  // Bosses: an oversized alpha of a species with boss stats and ability timers.
+  // cfg: { species, name, hp, dmg, scale, minions: [species, n, level], phases: [0.5], abilities: [...] }
+  spawnBoss(pos, cfg = BOSS_TYRANT) {
+    const c = this.spawn(cfg.species, pos, 60);
     this.makeAlpha(c);
-    c.boss = true;
-    c.name = 'The Primal Tyrant';
-    c.maxHp = 16000; c.hp = c.maxHp;
-    c.dmg = 70;
+    c.boss = true; c.bossKind = cfg.kind;
+    c.name = cfg.name;
+    c.maxHp = cfg.hp; c.hp = c.maxHp;
+    c.dmg = cfg.dmg;
     c.maxTorpor = Infinity;
-    c.scale = 2.1; c.obj.scale.setScalar(c.scale);
-    c.stompCd = 6; c.summoned = false; c.home = pos.clone();
+    c.scale = cfg.scale; c.obj.scale.setScalar(c.scale);
+    c.cfg = cfg;
+    c.cd = {}; for (const a of cfg.abilities) c.cd[a] = 5 + Math.random() * 3;
+    c.phasesLeft = [...(cfg.phases || [0.5])];
+    c.home = pos.clone();
+    c.flying = false;
     c.state = 'wander'; c.timer = 0.5;
     return c;
   }
 
   updateBoss(c, dt, player) {
-    if (!c.alive) return;
+    if (!c.alive || c.state === 'ko') return;
+    const cfg = c.cfg || BOSS_TYRANT;
     c.timer = Math.max(c.timer, 5);       // never gives up the fight
-    c.stompCd -= dt;
     const d = Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z);
-    if (c.stompCd <= 0 && d < 16 && c.state !== 'ko') { c.stompCd = 7 + Math.random() * 3; c.roarT = 0.8; this.hooks.stomp?.(c, d); }
-    if (!c.summoned && c.hp < c.maxHp * 0.5) {
-      c.summoned = true;
+    const engaged = player.alive && d < (cfg.arena || 80);
+    if (engaged && c.state !== 'chase' && !c.def.swimmer) { c.state = 'chase'; c.target = player.mount || 'player'; }
+    for (const a of cfg.abilities) {
+      c.cd[a] = (c.cd[a] ?? 5) - dt;
+      if (c.cd[a] > 0 || !engaged) continue;
+      if (a === 'stomp' && d < 16) { c.cd[a] = 7 + Math.random() * 3; c.roarT = 0.8; this.hooks.stomp?.(c, d); }
+      if (a === 'eruption') { c.cd[a] = 8 + Math.random() * 3; c.roarT = 0.8; this.hooks.eruption?.(c); }
+      if (a === 'whirlpool') { c.cd[a] = 13; this.hooks.whirlpool?.(c); }
+      if (a === 'shriek') { c.cd[a] = 15; c.roarT = 1.2; this.hooks.shriek?.(c); }
+      if (a === 'pounce' && d > 7 && d < 28) { c.cd[a] = 7; c.pounceT = 0.7; c.pounceHit = false; c.yaw = Math.atan2(player.pos.x - c.pos.x, player.pos.z - c.pos.z); this.hooks.pounce?.(c); }
+    }
+    // leap toward the player
+    if (c.pounceT > 0) {
+      c.pounceT -= dt;
+      const nx = c.pos.x + Math.sin(c.yaw) * 26 * dt, nz = c.pos.z + Math.cos(c.yaw) * 26 * dt;
+      if (!blockedAt(nx, nz)) { c.pos.x = nx; c.pos.z = nz; c.pos.y = heightAt(nx, nz); }
+      c.attackAnim = 1;
+      if (!c.pounceHit && Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z) < 4.5) { c.pounceHit = true; this.hooks.hitPlayer?.(c.dmg * 0.8, c); }
+    }
+    // reinforcement phases
+    while (c.phasesLeft.length && c.hp < c.maxHp * c.phasesLeft[0]) {
+      c.phasesLeft.shift();
       this.hooks.bossPhase?.(c);
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2, p = c.pos.clone().add(new THREE.Vector3(Math.cos(a) * 12, 0, Math.sin(a) * 12));
-        p.y = heightAt(p.x, p.z);
-        const m = this.spawn('talonrunner', p, 30); m.state = 'chase'; m.target = 'player'; m.timer = 60;
+      const [sp, n, lv] = cfg.minions;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const p = c.pos.clone().add(new THREE.Vector3(Math.cos(a) * 10, 0, Math.sin(a) * 10));
+        if (blockedAt(p.x, p.z)) p.copy(c.pos);
+        p.y = c.def.swimmer ? c.pos.y : heightAt(p.x, p.z);
+        const m = this.spawn(sp, p, lv);
+        m.flying = false;
+        if (c.cave) { m.cave = c.cave; m.home = c.home.clone(); m.homeR = 8; }
+        if (m.def.swimmer) { m.home = c.home.clone(); m.pos.y = c.pos.y; }
+        m.state = 'chase'; m.target = player.mount || 'player'; m.timer = 60;
       }
     }
-    // leash to the caldera
-    if (c.pos.distanceTo(c.home) > 70) { c.state = 'wander'; c.goal.copy(c.home); c.timer = 3; }
+    // leash to the arena
+    if (!c.def.swimmer && c.pos.distanceTo(c.home) > (cfg.leash || 70)) { c.state = 'wander'; c.target = null; c.goal.copy(c.home); c.timer = 3; }
   }
 
   populate(avoid) {
