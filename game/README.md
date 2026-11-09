@@ -25,6 +25,9 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   fiber, wildberries and dozeberries. Tools have durability and break.
 - **Crafting (Tab):** hatchet, pick, club, spear, bow, tranq arrows, saddle, campfire and
   timber floor/wall/doorway.
+- **Map (M, or 🗺️ on touch):** a shaded map of the island with fog of war that lifts as you
+  explore, plus place names and markers for you, your tames, buildings and your bed. A
+  corner minimap (desktop) shows nearby creatures, with hostile ones in red.
 - **Metal age:** orange-veined metal ore in the northern mountains (use a pick). A Forge
   smelts 2 ore + 1 wood into an ingot while lit, and unlocks the Metal Pick, Metal Hatchet,
   Metal Sword and Metal Armor.
@@ -71,6 +74,7 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 | 1–8 / wheel | Hotbar; selecting food eats it |
 | R | Rotate the building piece |
 | V | Zoom the mount camera |
+| M | World map |
 
 ### Saving
 

@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    fog: g.map ? g.map.serializeFog() : undefined,
     buildings: g.building.pieces.map((b) => ({ type: b.type, pos: v3(b.pos), rot: r2(b.rot), lit: !!b.lit, items: b.items ? b.items.map((s) => (s ? { ...s } : null)) : undefined, bed: b === g.bed || undefined })),
     tames: g.creatures.list.filter((c) => c.tamed && c.alive).map((c) => ({
       species: c.species, level: c.level, name: c.name, pos: v3(c.pos), yaw: r2(c.yaw),
@@ -151,6 +152,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.fog && g.map) g.map.loadFog(d.fog);
 
   for (const b of d.buildings || []) {
     if (!g.building.geos[b.type]) continue;

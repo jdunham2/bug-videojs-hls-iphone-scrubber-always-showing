@@ -8,6 +8,7 @@ import { Building, KIND } from './building.js';
 import { Inventory, ITEMS, RECIPES } from './items.js';
 import { UI } from './ui.js';
 import { SaveSystem, applySave } from './save.js';
+import { WorldMap } from './map.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -83,6 +84,7 @@ class Game {
 
     this.ui = new UI(this);
     this.saves = new SaveSystem(this);
+    this.map = new WorldMap(this);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -124,6 +126,8 @@ class Game {
     const canvas = this.renderer.domElement;
     document.addEventListener('keydown', (e) => {
       if (!this.started) return;
+      if (e.code === 'KeyM' && !this.ui.open) { this.map.toggle(); return; }
+      if (this.map.open) { if (e.code === 'Escape') this.map.toggle(false); return; }
       if (e.code === 'Tab' || e.code === 'KeyI') { e.preventDefault(); this.toggleInventory(); return; }
       if (e.code === 'Escape' && this.ui.open) { this.toggleInventory(false); return; }
       if (this.ui.open || this.paused) return;
@@ -157,7 +161,7 @@ class Game {
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (!this.locked && this.started && !this.ui.open && this.player.alive) this.setPaused(true);
+      if (!this.locked && this.started && !this.ui.open && !this.map.open && this.player.alive) this.setPaused(true);
       if (this.locked) this.setPaused(false);
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());
@@ -817,6 +821,7 @@ class Game {
       this.updateArrows(dt);
       this.cooking(dt);
       this.saves.tick(dt);
+      this.map.update(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
