@@ -3209,6 +3209,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Fishing tournament', 'On the 6th day of every season, the total weight of fish you catch earns a medal from Old Marlin. Every fish has a weight; beat your records!'],
   ['Rune shrines', 'Six shrines of standing stones hide across the lands. Read the inscription and touch the runes in the right order.'],
   ['Night market', 'Madame Noctis sets up in a different town each night with rare wares and mystery boxes. The job tracker shows where.'],
   ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
@@ -4498,6 +4499,7 @@ function checkDeeds() {
   { const H = S.story && S.story.heir; if (H && (H.stage === 1 || H.stage === 2)) { const rel = heirRelics(), done = rel.signet && rel.scepter && rel.seal; extra.push(`<div class="dd ${done || H.stage === 2 ? 'ok' : ''}"><span>${H.stage === 2 ? 'Find Elowen in Maplehold' : done ? '✓ Return to Old Bastian (Crownfall)' : `Royal relics ${[rel.signet, rel.scepter, rel.seal].filter(Boolean).length}/3`}</span></div>`); } }
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
+  if (dayOfSeason() === 6) extra.push(`<div class="dd" style="color:#9fe8ff"><span>🎣 Tournament: ${S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0} kg${(S.tourney && S.tourney.day === S.day ? S.tourney.kg : 0) >= 25 ? ' (gold!)' : ''}</span></div>`);
   if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
@@ -4583,6 +4585,11 @@ function newDay() {
   if (S.companion && COMPANIONS[S.companion]) { const C = COMPANIONS[S.companion]; if (S.coins >= C.wage) S.coins -= C.wage; else { S.companion = null; compE = null; setTimeout(() => toast(`<b>${C.name} has left</b><br>You couldn't pay their wage.`, 6000), 2000); } }
   if (!bloodMoonDay() && Math.random() < .2) S.starfall = S.day;
   { const F = festivalToday(); if (F) setTimeout(() => { toast(`<b>Today is the ${F.name}!</b><br>${TOWNS[F.town].name} celebrates with ${F.desc}. Visit the festival merchant for seasonal treats.`, 8000); SFX.chime(); }, 2600); }
+  if (S.tourney && S.tourney.day === S.day - 1 && !S.tourney.paid) { const T0 = S.tourney; T0.paid = true; const medal = T0.kg >= 25 ? 'gold' : T0.kg >= 12 ? 'silver' : T0.kg >= 5 ? 'bronze' : null;
+    if (medal) { const c = {gold: 500, silver: 250, bronze: 100}[medal]; S.coins += c; if (medal !== 'bronze') addItem('gem', medal === 'gold' ? 3 : 1); if (medal === 'gold' && !have('master_rod')) addItem('master_rod', 1); S.tourneyMedals = S.tourneyMedals || {}; S.tourneyMedals[medal] = (S.tourneyMedals[medal] || 0) + 1;
+      setTimeout(() => toast(`<b>Fishing tournament results</b><br>You landed ${T0.kg} kg: <b style="color:${medal === 'gold' ? '#f0c040' : medal === 'silver' ? '#dfe4ea' : '#c8803a'}">${medal.toUpperCase()}</b>! Old Marlin sends +${c} coin${medal !== 'bronze' ? ' and gems' : ''}.`, 8000), 3000); }
+    else if (T0.kg > 0) setTimeout(() => toast(`<b>Fishing tournament results</b><br>You landed ${T0.kg} kg. Not enough for a medal this time (5 kg for bronze).`, 6000), 3000); }
+  if (dayOfSeason() === 6) setTimeout(() => toast('<b>Fishing tournament today!</b><br>Old Marlin\'s tournament runs all day: the total weight of every fish you catch counts. 5 kg for bronze, 12 for silver, 25 for gold.', 8000), 3600);
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   rollMarket();
@@ -6635,7 +6642,14 @@ function endFishGame(win) {
     if (G.c === 'goldcarp') S.goldcarps = (S.goldcarps || 0) + 1;
     S.fishLog = S.fishLog || {};
     if (FISH_LOG_IDS.includes(G.c)) { const first = !S.fishLog[G.c]; S.fishLog[G.c] = (S.fishLog[G.c] || 0) + 1; if (first) setTimeout(() => toast(`<b>New fish: ${GOODS[G.c].name}!</b><br>Fish log ${Object.keys(S.fishLog).length}/${FISH_LOG_IDS.length}. Old Marlin in Port Wren rewards new catches.`, 6000), 400); }
-    floatText(n.x + .5, n.y, `+${amt} ${GOODS[G.c].name}`, G.c === 'goldcarp' ? '#ffec6a' : '#86c98f', G.c === 'goldcarp');
+    let kg = 0;
+    if (G.c !== 'old_boot') {
+      const base = G.c === 'fish' ? 1.2 : G.c === 'silverfin' ? 1.6 : Math.max(.4, GOODS[G.c].base/22), roll = .5 + Math.pow(Math.random(), 2.2)*1.6;
+      kg = Math.round(base*roll*10)/10; S.fishBest = S.fishBest || {};
+      if (!S.fishBest[G.c] || kg > S.fishBest[G.c]) { const had = S.fishBest[G.c]; S.fishBest[G.c] = kg; if (had) setTimeout(() => toast(`<b>New record!</b> ${GOODS[G.c].name}: ${kg} kg (was ${had} kg)`, 4000), 300); }
+      if (dayOfSeason() === 6) { S.tourney = S.tourney && S.tourney.day === S.day ? S.tourney : {day: S.day, kg: 0}; S.tourney.kg = Math.round((S.tourney.kg + kg*amt)*10)/10; }
+    }
+    floatText(n.x + .5, n.y, `+${amt} ${GOODS[G.c].name}${kg ? ` (${kg} kg)` : ''}`, G.c === 'goldcarp' ? '#ffec6a' : '#86c98f', G.c === 'goldcarp');
     burst(n.x + .5, n.y + .5, '#bfe6f0', 10); SFX.pickup(); gainXP(CATCH[G.c].xp);
     rollCurio('scale'); if (G.c === 'goldcarp') rollCurio('scale');
     if (G.c === 'old_boot') toast('You reeled in an old boot. Somebody lost it, at least.');
@@ -7001,6 +7015,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['tourneygold','Tournament Champion','Win gold in a fishing tournament', () => !!(S.tourneyMedals && S.tourneyMedals.gold)],
   ['kingmaker','Kingmaker','Crown the lost heir of the Old Kingdom', () => !!(S.story && S.story.heir && S.story.heir.crowned)],
   ['counter','Riposte','Land 10 counter-strikes after perfect dodges', () => (S.counters || 0) >= 10],
   ['sharpshooter','Sharpshooter','Fire 25 power shots (hold attack with a bow)', () => (S.powerShots || 0) >= 25],
@@ -7182,7 +7197,7 @@ function anglerTalk(n) {
     for (const [need, g, label, q] of ANGLER_PRIZES) if (count >= need && !(S.anglerPrizes || {})[need]) { S.anglerPrizes = S.anglerPrizes || {}; S.anglerPrizes[need] = true; addItem(g, q || 1); msg += `<br>“${need} species! Take ${label}.”`; }
     SFX.coin(); renderHUD(); save();
   } else msg = '“Bring me a fish I haven\'t seen you catch, and I\'ll pay.”';
-  const list = FISH_LOG_IDS.map(id => log[id] ? `<span style="color:${GOODS[id].col}">${GOODS[id].name} ×${log[id]}</span>` : '<span style="color:var(--muted)">???</span>').join(' · ');
+  const list = FISH_LOG_IDS.map(id => log[id] ? `<span style="color:${GOODS[id].col}">${GOODS[id].name} ×${log[id]}${(S.fishBest || {})[id] ? ` (best ${S.fishBest[id]} kg)` : ''}</span>` : '<span style="color:var(--muted)">???</span>').join(' · ');
   say(`${msg}<br><br><b>Fish log ${count}/${FISH_LOG_IDS.length}</b><br><span style="font-size:13px">${list}</span>`, [back(n)]);
 }
 function arenaTalk(n) {
