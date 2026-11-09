@@ -826,6 +826,7 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  white_antler:{name:'White Antler',base:1200,col:'#f4f8ff',kind:'trinket',desc:'+4% speed and +3 max HP. A gift from the White Stag.'},
   tent:{name:'Tent',base:120,col:'#c8a070',kind:'place',desc:'Place with B. Sleep anywhere, and wake here when knocked out.'},
   serpent_scale:{name:'Serpent Scale',base:150,col:'#3a9a8a',kind:'mat'},
   serpent_cloak:{name:'Serpent-scale Cloak',base:1600,col:'#3a9a8a',kind:'armor',armor:5,desc:'Scales of a sea serpent. Light and tough.'},
@@ -2883,9 +2884,9 @@ const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => {
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear');
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3358,6 +3359,46 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== the White Stag =====
+let stagTrail = null;
+function stagCheck() {
+  if (stagTrail && (stagTrail.day !== S.day || Math.hypot(S.x - stagTrail.sx, S.y - stagTrail.sy) > 60)) stagTrail = null;
+  if (stagTrail || S.day % 5 !== 2 || S.time < .2 || S.time > .5 || (S.stagDay === S.day) || inDungeon() || inArena() || townAt(S.x, S.y, 12)) return;
+  if (Math.random() > .15) return;
+  const okT = t => [T.FOREST, T.GRASS, T.BLOSSOM, T.MAPLE, T.REDWOOD, T.HILL, T.SNOW, T.MOOR].includes(t);
+  if (!okT(tileAt(Math.floor(S.x), Math.floor(S.y)))) return;
+  let x = S.x, y = S.y, a = Math.random()*6.283; const pts = [];
+  for (let i = 0; i < 60 && pts.length < 34; i++) { a += (Math.random() - .5)*.7; const nx = x + Math.cos(a)*1.1, ny = y + Math.sin(a)*1.1; if (inB(Math.floor(nx), Math.floor(ny)) && ny < WORLD_H - 2 && enemyWalk(nx, ny) && !townAt(nx, ny, 8)) { x = nx; y = ny; pts.push({x, y}); } else a += 1.5; }
+  if (pts.length < 18) return;
+  S.stagDay = S.day; stagTrail = {pts, day: S.day, sx: S.x, sy: S.y, stag: pts[pts.length - 1], met: false};
+  toast('<b>Glowing hoofprints...</b><br>Silver tracks shimmer in the morning dew. Something rare passed this way. Follow them!', 6000); SFX.chime();
+}
+function stagTarget() {
+  const T0 = stagTrail; if (!T0 || T0.met) return null; const st = T0.stag;
+  if (Math.hypot(S.x - st.x, S.y - st.y) > 1.8) return null;
+  return {key: 'stag', html: '<kbd style="margin:0 6px 0 0">E</kbd>Approach the White Stag', btn: 'Approach', fn: () => {
+    T0.met = true; S.stagsMet = (S.stagsMet || 0) + 1; S.hp = maxHP(); renderHP(); BUFFS.luck = 600; BUFFS.regen = 600; BUFFS.might = 600; BUFFS.speed = 300;
+    let gift = ''; if (!have('white_antler') && !S.home.chest.white_antler && S.stagsMet >= 2) { addItem('white_antler', 1); gift = '<br>At your feet lies a shed antler, white as snow. <b>+White Antler</b>'; }
+    for (let i = 0; i < 5; i++) setTimeout(() => burst(st.x, st.y - .8, ['#ffffff', '#cfe8ff', '#fff4b0'][i % 3], 18, 4), i*180);
+    SFX.victory(); gainXP(100 + (S.level || 1)*5); save(); renderHUD();
+    setTimeout(() => { if (stagTrail === T0) stagTrail = null; }, 2500);
+    toast(`<b>The White Stag</b><br>It lowers its great head and touches your brow. Warmth floods through you: <span style="color:var(--good)">fully healed, and blessed with luck, might and swiftness.</span>${gift}`, 9000);
+  }};
+}
+function drawStagTrail() {
+  const T0 = stagTrail; if (!T0) return;
+  T0.pts.forEach((p, i) => { if (i % 2 || Math.abs(p.x - S.x) > 24 || Math.abs(p.y - S.y) > 16) return; const a = .35 + .25*Math.sin(frameT*3 + i*.5); ctx.fillStyle = `rgba(220,240,255,${a})`; const px = p.x*TS, py = p.y*TS, o = i % 4 ? 2 : -2; ctx.fillRect(px + o - 1, py - 1, 2, 3); ctx.fillRect(px + o + 2, py - 1, 2, 3); });
+}
+function drawStag(st) {
+  const x = st.x*TS, y = st.y*TS, b = Math.sin(frameT*2)*.8, gl = .5 + .2*Math.sin(frameT*3);
+  ctx.fillStyle = `rgba(220,240,255,${gl*.4})`; ctx.beginPath(); ctx.ellipse(x, y - 9, 16, 14, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x, y, 9, 2.2, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e8eef8'; ctx.fillRect(x - 6, y - 6, 2, 6); ctx.fillRect(x - 3, y - 6, 2, 6); ctx.fillRect(x + 2, y - 6, 2, 6); ctx.fillRect(x + 5, y - 6, 2, 6);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 7, y - 11 + b, 15, 6); ctx.fillRect(x + 6, y - 17 + b, 3, 7); ctx.fillRect(x + 5, y - 18 + b, 6, 3);
+  ctx.fillStyle = '#f0e0b0'; ctx.fillRect(x + 6, y - 24 + b, 1, 6); ctx.fillRect(x + 9, y - 24 + b, 1, 6); ctx.fillRect(x + 4, y - 23 + b, 3, 1); ctx.fillRect(x + 9, y - 22 + b, 3, 1); ctx.fillRect(x + 5, y - 26 + b, 1, 3); ctx.fillRect(x + 10, y - 26 + b, 1, 3);
+  ctx.fillStyle = '#4a6a9a'; ctx.fillRect(x + 9, y - 17 + b, 1, 1);
+  if (Math.random() < .2) particles.push({x: st.x + (Math.random() - .5)*1.2, y: st.y - .8, vx: 0, vy: -.6, t: 0, col: 'rgba(255,255,255,.8)'});
 }
 // ===== messages in bottles =====
 let bottles = [], bottleT = 20;
@@ -3900,6 +3941,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The White Stag', 'Every fifth day, glowing hoofprints may appear in the morning wilds. Follow them to the White Stag for a powerful blessing. Meet it twice and it leaves you a White Antler.'],
   ['Bottles & birthdays', 'Bottles drift on open water while you sail: fish them out for notes, maps, coins and the lost letters of Captain Elsbeth. Every townsperson has a birthday (the Gazette lists them), and a gift that day counts triple.'],
   ['Tents & sea serpents', 'Craft a Tent (4 Hide, 6 Sticks, 2 Rope) to sleep anywhere at night and set a respawn point in the wild. Out on deep water, Sea Serpents may surface: hit them while they are above the waves. Their scales make a fine cloak.'],
   ['Merchants\u2019 Guild', 'Every trade adds to your guild ledger. Odile in Port Wren tracks your rank, from Peddler up to Trade Magnate. Each rank gives you 2% better prices.'],
@@ -4165,7 +4207,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); stagCheck();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -4882,6 +4924,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  if (stagTrail) { sprites.push({y: -1e9, f: drawStagTrail}); if (!stagTrail.met && inView(stagTrail.stag.x, stagTrail.stag.y)) sprites.push({y: stagTrail.stag.y, f: () => drawStag(stagTrail.stag)}); }
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
@@ -5271,7 +5314,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8229,6 +8272,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['whitestag','The White Stag','Find the White Stag', () => (S.stagsMet || 0) >= 1],
   ['bottles','Message Received','Find 10 messages in bottles', () => (S.bottles || 0) >= 10],
   ['elsbeth','Captain Elsbeth\'s Treasure','Find all five of Captain Elsbeth\'s letters', () => (S.elsbeth || 0) >= 5],
   ['birthday','Happy Birthday!','Give someone a gift on their birthday', () => (S.bdayGifts || 0) >= 1],
@@ -8684,7 +8728,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
