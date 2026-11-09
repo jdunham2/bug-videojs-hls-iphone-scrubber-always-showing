@@ -27,12 +27,17 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   timber floor/wall/doorway.
 - **Building:** placement ghost with grid snapping, walls that snap to floor edges (rotate
   with R), and wall collision. Campfires give light and cook raw meat.
-- **Creatures:** five species with herd/pack behaviour and a predator-prey ecosystem:
+- **Creatures:** ten species with herd/pack behaviour and a predator-prey food chain:
   - Pudgewing: skittish bird
-  - Trikeros: neutral herbivore, rideable
-  - Talonrunner: pack raptor
+  - Dashbeak: tiny pack scavenger that nips at your heels
+  - Crestcaller: fast, skittish crested herbivore that runs in herds; rideable
+  - Trikeros: neutral horned herbivore; rideable
+  - Domehead: neutral, thick-skulled head-butter in the hills
+  - Ironhide: armoured, slow, takes much less damage, club tail; rideable, mines rock fast
+  - Talonrunner: pack raptor; rideable
+  - Spinesail: sail-backed predator that stalks the beaches and wades into water; rideable
   - Thunderneck: giant sauropod
-  - Gorgonax: apex predator, found in the north
+  - Gorgonax: apex predator, found in the north; rideable
 - **Taming:** build up torpor with tranq arrows or a club to knock a creature out, then
   feed it its preferred food. Dozeberries keep it asleep. Tamed creatures follow or stay
   (F) and defend you.

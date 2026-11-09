@@ -39,6 +39,31 @@ export const SPECIES = {
     tameFood: null, rideable: false, radius: 4.5, reach: 7, hitR: 5.5,
     drops: { meat: 14, hide: 10 }, aggro: 0, lvl: [10, 40], count: 4, zone: (h) => h > 3 && h < 20, far: 90, wade: true,
   },
+  ironhide: {
+    name: 'Ironhide', diet: 'herb', temper: 'neutral', hp: 520, dmg: 30, walk: 1.8, run: 4.5, torpor: 320,
+    tameFood: 'berries', tameBase: 14, tameLvl: 0.35, rideable: true, radius: 1.9, reach: 4.0, hitR: 2.3, armor: 0.45,
+    drops: { meat: 6, hide: 6, stone: 4 }, aggro: 0, lvl: [1, 30], count: 5, zone: (h) => h > 5 && h < 40,
+  },
+  spinesail: {
+    name: 'Spinesail', diet: 'carn', temper: 'aggressive', hp: 760, dmg: 36, walk: 2.8, run: 9, torpor: 520,
+    tameFood: 'meat', tameBase: 12, tameLvl: 0.3, rideable: true, radius: 2.0, reach: 4.6, hitR: 2.6,
+    drops: { meat: 10, hide: 6 }, aggro: 32, lvl: [8, 35], count: 3, zone: (h) => h > 0.8 && h < 5, far: 160, wade: true,
+  },
+  crestcaller: {
+    name: 'Crestcaller', diet: 'herb', temper: 'skittish', hp: 200, dmg: 8, walk: 2.4, run: 10.5, torpor: 160,
+    tameFood: 'berries', tameBase: 9, tameLvl: 0.25, rideable: true, radius: 1.3, reach: 2.6, hitR: 1.9,
+    drops: { meat: 4, hide: 3 }, aggro: 0, lvl: [1, 30], count: 8, herd: 4, zone: (h) => h > 3 && h < 24,
+  },
+  dashbeak: {
+    name: 'Dashbeak', diet: 'carn', temper: 'aggressive', hp: 35, dmg: 3, walk: 2.5, run: 9.5, torpor: 30,
+    tameFood: 'meat', tameBase: 3, tameLvl: 0.05, rideable: false, radius: 0.4, reach: 1.0, hitR: 0.6,
+    drops: { meat: 1, hide: 1 }, aggro: 14, lvl: [1, 20], count: 8, herd: 4, zone: (h) => h > 3 && h < 30, far: 80,
+  },
+  domehead: {
+    name: 'Domehead', diet: 'herb', temper: 'neutral', hp: 180, dmg: 18, walk: 2.2, run: 9, torpor: 140,
+    tameFood: 'berries', tameBase: 8, tameLvl: 0.2, rideable: false, radius: 0.9, reach: 2.2, hitR: 1.3,
+    drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 5, herd: 2, zone: (h) => h > 12 && h < 45,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -46,7 +71,12 @@ export const SPECIES = {
   },
 };
 
-const PREY = { talonrunner: ['pudgewing'], gorgonax: ['pudgewing', 'trikeros', 'talonrunner'] };
+const PREY = {
+  talonrunner: ['pudgewing', 'dashbeak', 'crestcaller'],
+  dashbeak: ['pudgewing'],
+  spinesail: ['pudgewing', 'crestcaller', 'dashbeak', 'trikeros'],
+  gorgonax: ['pudgewing', 'trikeros', 'talonrunner', 'crestcaller', 'domehead', 'ironhide'],
+};
 
 // ---------------- Model builders ----------------
 function buildQuadTrikeros(mat, col) {
@@ -98,6 +128,13 @@ function buildBiped(mat, col, s, opts) {
     E(0.55 * s * opts.girth, 0.6 * s * opts.girth, bl, base, 0, 0, 0, -0.08, 0, 0),
     E(0.45 * s * opts.girth, 0.4 * s * opts.girth, bl * 0.85, belly, 0, -0.25 * s, 0.1 * s),
     ...Array.from({ length: opts.stripes }, (_, i) => E(0.57 * s * opts.girth, 0.15 * s, 0.12 * s, accent, 0, 0.12 * s, bl * 0.7 - i * bl * 0.3, -0.08, 0, 0)),
+    // dorsal sail: a membrane braced by spines
+    ...(opts.sail ? [
+      E(0.035 * s, 0.85 * s, bl * 0.85, accent, 0, 0.75 * s, 0),
+      ...Array.from({ length: 7 }, (_, i) => Cy(0.03 * s, (1.5 - Math.abs(i - 3) * 0.28) * s, horn, 0, 0.5 * s + (0.75 - Math.abs(i - 3) * 0.14) * s * 0.5, bl * 0.75 - i * bl * 0.25)),
+    ] : []),
+    // back plates of armoured bipeds
+    ...(opts.knobs ? Array.from({ length: 5 }, (_, i) => K(0.09 * s, 0.22 * s, horn, 0, 0.55 * s * opts.girth, bl * 0.6 - i * bl * 0.3)) : []),
   ], mat));
   // arms
   for (const x of [-1, 1]) {
@@ -134,11 +171,22 @@ function buildBiped(mat, col, s, opts) {
     E(0.1 * s * opts.headW, 0.06 * s, 0.12 * s, accent, 0.2 * s * opts.headW, 0.2 * s, hl * 0.4),
     E(0.12 * s, 0.05 * s, hl * 0.6, accent, 0, 0.27 * s * opts.headW, hl * 0.4),
     ...(opts.crest ? [K(0.08 * s, 0.4 * s, accent, 0, 0.35 * s, hl * 0.2, -0.6, 0, 0)] : []),
+    // long crocodile-like snout
+    ...(opts.snout ? [E(0.13 * s, 0.11 * s, hl * 0.9, base, 0, -0.04 * s, hl * 1.9), E(0.16 * s, 0.1 * s, 0.14 * s, accent, 0, 0.0, hl * 2.65)] : []),
+    // hollow tube crest sweeping back from the head
+    ...(opts.tubeCrest ? [Cy(0.075 * s, 1.15 * s, accent, 0, 0.42 * s, -hl * 0.15, -1.05, 0, 0), E(0.09 * s, 0.09 * s, 0.09 * s, accent, 0, 0.66 * s, -hl * 0.55)] : []),
+    // thick bony dome ringed with knobs
+    ...(opts.dome ? [
+      E(0.27 * s * opts.headW, 0.22 * s, 0.28 * s, accent, 0, 0.24 * s, hl * 0.4),
+      ...Array.from({ length: 7 }, (_, i) => { const a = (i / 6) * Math.PI; return K(0.035 * s, 0.08 * s, horn, Math.cos(a) * 0.27 * s * opts.headW, 0.12 * s + Math.sin(a) * 0.05 * s, hl * 0.1, -0.4, 0, (a - Math.PI / 2) * -1); }),
+    ] : []),
+    ...(opts.beak ? [K(0.12 * s * opts.headW, 0.3 * s, horn, 0, -0.04 * s, hl * 1.6, Math.PI / 2, 0, 0)] : []),
   ], mat));
   const jaw = new THREE.Group(); jaw.position.set(0, -0.12 * s, hl * 0.15); head.add(jaw);
   jaw.add(meshOf([
     E(0.26 * s * opts.headW, 0.12 * s, hl * 0.8, belly, 0, -0.06 * s, hl * 0.55),
-    ...Array.from({ length: 6 }, (_, i) => K(0.025 * s, 0.1 * s, 0xf4eedb, (i % 2 ? 1 : -1) * 0.18 * s * opts.headW, 0.05 * s, hl * (0.4 + i * 0.13), Math.PI)),
+    ...(opts.beak ? [] : Array.from({ length: opts.snout ? 12 : 6 }, (_, i) => K(0.025 * s, 0.1 * s, 0xf4eedb, (i % 2 ? 1 : -1) * 0.18 * s * opts.headW * (opts.snout && i > 5 ? 0.6 : 1), 0.05 * s, hl * (0.4 + i * 0.13), Math.PI))),
+    ...(opts.snout ? [E(0.11 * s, 0.07 * s, hl * 0.9, belly, 0, -0.06 * s, hl * 1.75)] : []),
   ], mat));
   const tail = []; let parent = body;
   for (let i = 0; i < 5; i++) {
@@ -148,6 +196,41 @@ function buildBiped(mat, col, s, opts) {
     tail.push(t); parent = t;
   }
   return { root, body, legs, neck, head, jaw, tail, hipH: opts.hip * s, lie: 0.55 * s * opts.girth, quad: false };
+}
+
+function buildIronhide(mat, col) {
+  const { base, belly, accent, horn } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 1.35; root.add(body);
+  const plates = [];
+  for (let i = 0; i < 6; i++) for (const x of [-1, 0, 1]) {
+    const z = 1.6 - i * 0.62;
+    plates.push(K(0.2 - Math.abs(x) * 0.04, 0.32, i % 2 ? accent : horn, x * 0.6, 0.82 - Math.abs(x) * 0.18, z, 0, 0, -x * 0.5));
+  }
+  for (let i = 0; i < 5; i++) for (const x of [-1, 1]) plates.push(K(0.16, 0.7, horn, x * 1.55, 0.05, 1.3 - i * 0.65, 0, 0, -x * Math.PI / 2));
+  body.add(meshOf([E(1.6, 0.85, 2.2, base, 0, 0, 0), E(1.35, 0.5, 1.9, belly, 0, -0.42, 0), E(1.62, 0.3, 2.1, accent, 0, 0.45, 0), ...plates], mat));
+  const legs = [];
+  for (const [x, z, ph] of [[-1.05, 1.3, 0], [1.05, 1.3, Math.PI], [-1.05, -1.35, Math.PI], [1.05, -1.35, 0]]) {
+    const g = new THREE.Group(); g.position.set(x, -0.45, z); body.add(g);
+    g.add(meshOf([Cy(0.36, 0.9, base, 0, -0.35, 0), Cy(0.4, 0.2, horn, 0, -0.85, 0.05)], mat));
+    legs.push({ g, ph });
+  }
+  const neck = new THREE.Group(); neck.position.set(0, -0.05, 2.0); body.add(neck);
+  const head = new THREE.Group(); head.position.set(0, -0.05, 0.6); neck.add(head);
+  head.add(meshOf([E(0.62, 0.45, 0.75, base, 0, 0, 0.2), E(0.64, 0.12, 0.5, accent, 0, 0.32, 0.1),
+    K(0.12, 0.45, horn, -0.55, 0.25, -0.2, -1.6, 0, 0.6), K(0.12, 0.45, horn, 0.55, 0.25, -0.2, -1.6, 0, -0.6),
+    K(0.25, 0.35, horn, 0, -0.08, 0.95, Math.PI / 2, 0, 0),
+    E(0.07, 0.07, 0.07, 0x111111, -0.45, 0.1, 0.55), E(0.07, 0.07, 0.07, 0x111111, 0.45, 0.1, 0.55)], mat));
+  const tail = []; let parent = body;
+  for (let i = 0; i < 5; i++) {
+    const t = new THREE.Group(); t.position.set(0, 0, i === 0 ? -2.0 : -0.85); parent.add(t);
+    const r = 0.6 * (1 - i * 0.17);
+    const parts = [E(r, r * 0.75, 0.6, base, 0, 0, -0.45), K(0.08, 0.3, horn, -r, 0, -0.4, 0, 0, Math.PI / 2), K(0.08, 0.3, horn, r, 0, -0.4, 0, 0, -Math.PI / 2)];
+    if (i === 4) parts.push(E(0.55, 0.4, 0.5, horn, 0, 0, -0.95), E(0.4, 0.42, 0.35, accent, 0, 0.05, -0.95));
+    t.add(meshOf(parts, mat));
+    tail.push(t); parent = t;
+  }
+  return { root, body, legs, neck, head, tail, hipH: 1.35, lie: 1.0, quad: true };
 }
 
 function buildSauropod(mat, col) {
@@ -211,6 +294,11 @@ const PALETTES = {
   trikeros: [{ base: 0x6d7a4a, belly: 0xb7a77a, accent: 0xb5502d, horn: 0xe8dcc0 }, { base: 0x7a6a52, belly: 0xc2b08a, accent: 0x3b6e8a, horn: 0xe8dcc0 }, { base: 0x5a6a5f, belly: 0xa8a890, accent: 0xc28a2a, horn: 0xefe4cc }],
   talonrunner: [{ base: 0x4e5b3a, belly: 0xb8b090, accent: 0x2a2a22, horn: 0x2b2620 }, { base: 0x8a5a36, belly: 0xd8c09a, accent: 0x3a2516, horn: 0x2b2620 }, { base: 0x3e5a6a, belly: 0xb0b8b0, accent: 0xd06030, horn: 0x2b2620 }],
   thunderneck: [{ base: 0x7d7468, belly: 0xb4a994, accent: 0x5a4d40 }, { base: 0x6a7a6a, belly: 0xa6b0a0, accent: 0x445244 }],
+  ironhide: [{ base: 0x6a6450, belly: 0xa89c7a, accent: 0x4a4436, horn: 0xd8cdb0 }, { base: 0x5a5e52, belly: 0x9aa08a, accent: 0x8a5a2a, horn: 0xe0d6bc }],
+  spinesail: [{ base: 0x4a5a52, belly: 0xb0aa90, accent: 0xb84a2a, horn: 0x2a2620 }, { base: 0x5a4e3e, belly: 0xc0ae8a, accent: 0x2a6a8a, horn: 0x2a2620 }],
+  crestcaller: [{ base: 0x6a7a3a, belly: 0xd0c49a, accent: 0xd88a2a, horn: 0x3a3226 }, { base: 0x5a6a7a, belly: 0xc8c8b8, accent: 0xb83a4a, horn: 0x3a3226 }, { base: 0x8a6a4a, belly: 0xe0cca8, accent: 0x3a7a5a, horn: 0x3a3226 }],
+  dashbeak: [{ base: 0x6a8a4a, belly: 0xd8d0a8, accent: 0x3a4a2a, horn: 0x2a2620 }, { base: 0x9a7a4a, belly: 0xe0d0b0, accent: 0x5a3a1a, horn: 0x2a2620 }],
+  domehead: [{ base: 0x7a6a5a, belly: 0xc8b89a, accent: 0x5a8aa8, horn: 0xe8dcc0 }, { base: 0x6a7a5a, belly: 0xc0c09a, accent: 0xa8603a, horn: 0xe8dcc0 }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -221,6 +309,11 @@ function buildModel(species, mat) {
     case 'trikeros': return buildQuadTrikeros(mat, col);
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
+    case 'ironhide': return buildIronhide(mat, col);
+    case 'spinesail': return buildBiped(mat, col, 2.1, { hip: 1.45, bodyLen: 1.35, girth: 1.0, arm: 1.0, headLen: 0.6, headW: 0.85, tailSeg: 0.8, stripes: 0, sail: true, snout: true, neckW: 1.0 });
+    case 'crestcaller': return buildBiped(mat, col, 1.7, { hip: 1.3, bodyLen: 1.0, girth: 1.0, arm: 1.1, headLen: 0.45, headW: 0.8, tailSeg: 0.6, stripes: 3, tubeCrest: true, beak: true, neckW: 0.85 });
+    case 'dashbeak': return buildBiped(mat, col, 0.42, { hip: 1.2, bodyLen: 0.9, girth: 0.8, arm: 1.0, headLen: 0.55, headW: 0.8, tailSeg: 0.6, stripes: 3, crest: true, neckW: 0.9 });
+    case 'domehead': return buildBiped(mat, col, 1.15, { hip: 1.2, bodyLen: 1.0, girth: 1.1, arm: 0.7, headLen: 0.45, headW: 0.95, tailSeg: 0.6, stripes: 2, dome: true, beak: true, knobs: true, neckW: 1.1 });
     case 'gorgonax': return buildBiped(mat, col, 2.6, { hip: 1.5, bodyLen: 1.2, girth: 1.25, arm: 0.6, headLen: 0.75, headW: 1.3, tailSeg: 0.75, stripes: 5, crest: false, neckW: 1.3 });
   }
 }
@@ -396,7 +489,7 @@ export class CreatureManager {
 
   damage(c, amount, torpor, attacker) {
     if (!c.alive) return;
-    c.hp -= amount;
+    c.hp -= amount * (1 - (c.def.armor || 0));
     c.hitFlash = 0.18;
     if (torpor && c.def.torpor !== Infinity) c.torpor += torpor;
     if (c.hp <= 0) { this.kill(c, attacker); return; }
@@ -660,7 +753,7 @@ export class CreatureManager {
     // face target when close
     if (dist < reach * 1.2) c.yaw = angleLerp(c.yaw, Math.atan2(tp.x - c.pos.x, tp.z - c.pos.z), Math.min(1, dt * 6));
     if (dist < reach && c.attackCd <= 0) {
-      c.attackCd = c.species === 'talonrunner' ? 1.25 : 1.8;
+      c.attackCd = c.species === 'talonrunner' || c.species === 'dashbeak' ? 1.2 : 1.8;
       c.attackAnim = 1;
       if (c.target === 'player') this.hooks.hitPlayer?.(c.dmg, c);
       else this.damage(c.target, c.dmg, 0, c);

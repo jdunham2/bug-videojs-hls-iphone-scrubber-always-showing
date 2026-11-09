@@ -92,7 +92,7 @@ class Game {
       { title: 'Shelter: place a Timber Floor and 2 Walls', progress: () => `Floors ${Math.min(this.stats.floors, 1)}/1 · Walls ${Math.min(this.stats.walls, 2)}/2`, done: () => this.stats.floors >= 1 && this.stats.walls >= 2 },
       { title: 'Craft a Hunter Bow and Tranq Arrows (needs purple Dozeberries)', progress: () => `Bow ${this.inv.count('bow') ? '✔' : '✘'} · Arrows ${this.inv.count('arrow')}`, done: () => this.inv.count('bow') > 0 && this.inv.count('arrow') > 0 },
       { title: 'Knock out a creature with tranq arrows, then feed it to tame', progress: () => 'Herbivores eat Wildberries · Carnivores eat Raw Meat', done: () => this.stats.tamed >= 1 },
-      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Trikeros, Talonrunner and Gorgonax are rideable', done: () => this.stats.rode >= 1 },
+      { title: 'Craft a Rough Saddle and ride a rideable tame [E]', progress: () => 'Rideable: Trikeros, Crestcaller, Ironhide, Talonrunner, Spinesail, Gorgonax', done: () => this.stats.rode >= 1 },
     ];
     this.questIdx = 0;
 
@@ -492,7 +492,7 @@ class Game {
     for (const node of nodes) {
       if (!node.alive) continue;
       const to = new THREE.Vector3(node.x - m.pos.x, 0, node.z - m.pos.z);
-      if (to.length() < reach + 1 && to.normalize().dot(fwd) > 0.4) { this.harvestNode(node, m.species === 'trikeros' ? 2.2 : 1.2); break; }
+      if (to.length() < reach + 1 && to.normalize().dot(fwd) > 0.4) { this.harvestNode(node, m.species === 'ironhide' && node.kind === 'rock' ? 3.2 : m.species === 'trikeros' && node.kind !== 'rock' ? 2.2 : 1.2); break; }
     }
     // carcasses
     for (const o of this.creatures.list) {
@@ -604,8 +604,8 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = { pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4 }[c.species] * c.scale;
-    this.audio.roar(size, quiet ? d * 1.5 : d, pan, c.species === 'pudgewing' || c.species === 'talonrunner' && quiet ? 'chirp' : 'roar');
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
   // ------------------------------------------------ Riding
