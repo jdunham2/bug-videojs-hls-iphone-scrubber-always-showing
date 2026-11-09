@@ -2649,6 +2649,15 @@ const swatch = g => `<span class="sw" style="background:${GOODS[g].col}"></span>
 const itemList = obj => Object.entries(obj).filter(([,n]) => n > 0).map(([g,n]) => `${n} ${GOODS[g].name}`).join(', ');
 const isKnown = r => !!(RECIPE_BY[r].known || S.known[r]);
 function toolTier(tool) { let t = 0; for (const g in S.inv) if (GOODS[g].tool === tool && S.inv[g] > 0) t = Math.max(t, GOODS[g].tier); return t; }
+const ENCHANTS = {
+  fire:    {name:'Flaming',    cost:{ember:3, coins:150},            col:'#ff7a2a', desc:'30% chance to set foes ablaze'},
+  frost:   {name:'Frozen',     cost:{frost_essence:2, coins:150},    col:'#9fe8ff', desc:'20% chance to freeze foes solid for a moment'},
+  venom:   {name:'Venomous',   cost:{venom:3, coins:120},            col:'#7ad04a', desc:'35% chance to poison foes'},
+  vampire: {name:'Vampiric',   cost:{wisp_essence:2, coins:200},     col:'#c8304a', desc:'Heal 8% of the damage you deal'},
+  storm:   {name:'Thundering', cost:{storm_glass:2, coins:200},      col:'#bfe8ff', desc:'20% chance for lightning to leap to 2 nearby foes'},
+  holy:    {name:'Holy',       cost:{silver:3, crystal:1, coins:150}, col:'#fff4b0', desc:'+50% damage against the undead'},
+};
+const enchOf = g => (S && S.ench && S.ench[g]) || null;
 const ENH_MAX = 5, PET_MAX = 5, SADDLE_MAX = 4, FURNISH_MAX = 3;
 const enhOf = g => (S && S.enh && S.enh[g]) || 0;
 const petLv = () => (S.petLv && S.pet && S.petLv[S.pet]) || 0;
@@ -2666,7 +2675,7 @@ const stars = (n, max) => '★'.repeat(n) + '☆'.repeat(max - n);
 const enhName = g => GOODS[g].name + (enhOf(g) ? ` +${enhOf(g)}` : '');
 function weapon() {
   const w = S.equip.weapon; if (!(w && have(w) > 0)) return FISTS;
-  const L = enhOf(w); return L ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: enhName(w)} : GOODS[w];
+  const L = enhOf(w), E = enchOf(w); return L || E ? {...GOODS[w], dmg: Math.round(GOODS[w].dmg * (1 + .15*L) * 10) / 10, name: (E ? ENCHANTS[E].name + ' ' : '') + enhName(w), ench: E} : GOODS[w];
 }
 const EQ_SLOTS = ['armor','head','shield'];
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
@@ -2928,7 +2937,15 @@ function hitEnemy(e, dmg, kx, ky, src) {
     crit ? SFX.crit() : SFX.hit();
     if (crit) { shake = Math.max(shake, .18); burst(e.x, e.y - .5, '#ffec6a', 10, 5); }
   } else SFX.hit();
+  if (src === 'player' && weapon().ench === 'holy' && isUndead(e)) dmg = Math.round(dmg*1.5*10)/10;
   e.hp -= dmg; e.hurt = .15; e.alert = true;
+  if (src === 'player' && e.hp > 0) { const E = weapon().ench;
+    if (E === 'fire' && Math.random() < .3) { e.burn = 3; e.burnT = .5; }
+    else if (E === 'frost' && Math.random() < .2) { e.frozen = e.boss ? .4 : 1.4; burst(e.x, e.y - .5, '#9fe8ff', 6, 2); }
+    else if (E === 'venom' && Math.random() < .35) { e.poison = 4; e.poisonT = .5; }
+    else if (E === 'storm' && Math.random() < .2) chainHit(e, dmg*.6, 2);
+  }
+  if (src === 'player' && weapon().ench === 'vampire' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + dmg*.08); renderHP(); }
   const kb = e.boss ? 1.2 : 7; e.kx = kx*kb; e.ky = ky*kb;
   floatText(e.x, e.y - 1 - (e.size||1)*.4, crit ? `${dmg}!` : String(dmg), crit ? '#ffec6a' : '#ffd27a', crit);
   burst(e.x, e.y - .4, '#e57a62', 4);
@@ -3301,6 +3318,12 @@ function updateCombat(dt, night) {
   }
   let boss = null;
   for (const e of enemies) {
+    if (e.burn > 0 || e.poison > 0) {
+      const lv = 1 + (S.level || 1)*.05;
+      if (e.burn > 0) { e.burn -= dt; e.burnT -= dt; if (Math.random() < .3) burst(e.x, e.y - .6, '#ff7a2a', 1, 1); if (e.burnT <= 0) { e.burnT = .5; hitEnemy(e, Math.round(1.2*lv*10)/10, 0, 0, 'dot'); } }
+      if (e.poison > 0) { e.poison -= dt; e.poisonT -= dt; if (Math.random() < .2) burst(e.x, e.y - .6, '#7ad04a', 1, 1); if (e.poisonT <= 0) { e.poisonT = .5; hitEnemy(e, Math.round(.8*lv*10)/10, 0, 0, 'dot'); } }
+      if (e.dead) continue;
+    }
     if (e.boss) { updateBoss(e, dt); boss = e; continue; }
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
@@ -5079,6 +5102,7 @@ $('craftSheet').addEventListener('click', e => {
   if (b.dataset.x) { closeModal('craft'); return; }
   if (b.dataset.tab) { craftTab = +b.dataset.tab; renderCraft(); return; }
   if (b.dataset.enh) { upgradeGear(b.dataset.enh); renderCraft(); return; }
+  if (b.dataset.ench) { const k = b.dataset.ench, E = ENCHANTS[k], w = S.equip.weapon; if (w && stations().bench && upCanPay(E.cost)) { upPay(E.cost); S.ench = S.ench || {}; S.ench[w] = k; S.enchanted = (S.enchanted || 0) + 1; SFX.level(); burst(S.x, S.y - .6, E.col, 16, 4); toast(`Your ${GOODS[w].name} is now <b style="color:${E.col}">${E.name}</b>!`); renderHUD(); save(); } renderCraft(); return; }
   if (b.dataset.trainpet) { trainPet(); renderCraft(); return; }
   if (b.dataset.saddle) { upgradeSaddle(); renderCraft(); return; }
   if (b.dataset.craft) craft(b.dataset.craft);
@@ -5118,6 +5142,10 @@ function renderUpgrades(st) {
     <h3>Weapons & armor · up to +${ENH_MAX}</h3>
     <div class="vals">Each level adds 15% damage to a weapon, or +0.5 armor (and +2% block for shields).</div>
     <div class="jgrid">${gear.length ? gear.map(gearCard).join('') : '<div class="none">You have no weapons or armor yet.</div>'}</div>
+    <h3>Enchant your weapon</h3>
+    <div class="vals">One enchantment per weapon, applied at a workbench. Enchanting again replaces the old one.</div>
+    ${(() => { const w = S.equip.weapon && have(S.equip.weapon) ? S.equip.weapon : null; if (!w) return '<div class="none">Equip a weapon to enchant it.</div>'; const cur = enchOf(w);
+      return `<div class="vals" style="margin:4px 0">${esc(GOODS[w].name)}: ${cur ? `<b style="color:${ENCHANTS[cur].col}">${ENCHANTS[cur].name}</b>` : 'no enchantment'}</div><div class="jgrid">${Object.entries(ENCHANTS).map(([k, E]) => { const ok = st.bench && upCanPay(E.cost) && cur !== k; return `<div class="jcard"><div class="irow"><span class="nm"><span class="t" style="color:${E.col}">${E.name}</span></span><button class="btn sm ${ok ? 'primary' : ''}" data-ench="${k}" ${ok ? '' : 'disabled'}>${cur === k ? 'Active' : !st.bench ? 'Go to a workbench' : 'Enchant'}</button></div><div class="stat">${E.desc}</div><div class="req">${upCostHTML(E.cost)}</div></div>`; }).join('')}</div>`; })()}
     <h3>Pet & mount</h3>
     <div class="jgrid">${animals || '<div class="none">Tame a pet or buy a mount to train them here.</div>'}</div>
     <h3>Houses</h3>
@@ -6578,6 +6606,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['enchanter','Enchanter','Enchant a weapon', () => (S.enchanted || 0) >= 1],
   ['generous','Generous Soul','Give 25 gifts', () => (S.giftsGiven || 0) >= 25],
   ['bestfriend','Best Friends','Become close friends with someone (and receive a keepsake)', () => (S.bestFriends || 0) >= 1],
   ['newfoes','Strange New Foes','Defeat a slime, a crab, a sporeling, a rock golem and a ghost pirate', () => ['slime','crab','sporeling','rockgolem','ghostpirate'].every(k => S.killsBy[k])],
