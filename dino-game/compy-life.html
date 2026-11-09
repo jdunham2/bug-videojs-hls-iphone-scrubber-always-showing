@@ -105,6 +105,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
 .muted { opacity: .7; margin: 0; }
 .ibtn.alert { border-color: #8fdc6a; color: #8fdc6a; }
 #mapScreen.taxi .map-tip::before { content: '🚕 TAXI: '; color: #f1c40f; }
+.help { display: grid; gap: 10px; }
+.help div { display: grid; gap: 3px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.help b { color: var(--amber); font-size: 14px; } .help span { font-size: 13px; line-height: 1.45; }
+#helpScreen { z-index: 5; }
 .goals { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 480px) { .goals { grid-template-columns: 1fr; } }
 .goals div { font-size: 13px; padding: 7px 9px; border-radius: 10px; background: rgba(255,255,255,.05); color: var(--muted); }
@@ -163,7 +167,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <h1>Compy<br>Life</h1>
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
-      <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button></div>
+      <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button><button class="btn alt" id="helpBtn" type="button">How to play</button></div>
       <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare (half the time nobody sees). Weapons from the black market: F to use, Q to switch. On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
@@ -214,11 +218,19 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
     </div>
   </div>
 
+  <div class="screen" id="helpScreen" hidden>
+    <div class="panel">
+      <h2>How to play</h2>
+      <div class="help" id="helpList"></div>
+      <div class="row"><button class="btn" id="helpClose" type="button">Got it</button></div>
+    </div>
+  </div>
+
   <div class="screen" id="pauseScreen" hidden>
     <div class="panel">
       <h2>Paused</h2>
       <p>Your life saves every time you sleep.</p>
-      <div class="row"><button class="btn" id="resumeBtn" type="button">Resume</button><button class="btn alt" id="muteBtn2" type="button">Sound on</button><button class="btn alt" id="quitBtn" type="button">Title screen</button></div>
+      <div class="row"><button class="btn" id="resumeBtn" type="button">Resume</button><button class="btn alt" id="muteBtn2" type="button">Sound on</button><button class="btn alt" id="helpBtn2" type="button">How to play</button><button class="btn alt" id="quitBtn" type="button">Title screen</button></div>
     </div>
   </div>
 </div>
@@ -399,7 +411,7 @@ function buildDistricts() {
     } else if (type === 'lake') {
       const [lx, ly, rx, ry] = lakeOf(i, j);
       const w = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshLambertMaterial({ color: '#3d7fb0', transparent: true, opacity: 0.85 }));
-      w.rotation.x = -Math.PI / 2; w.position.set(lx, 1, ly); w.scale.set(rx, ry, 1); scene.add(w);
+      w.rotation.x = -Math.PI / 2; w.position.set(lx, 1, ly); w.scale.set(rx, ry, 1); scene.add(w); lakeMeshes.push(w);
       solids.push({ x0: lx - rx * 0.8, y0: ly - ry * 0.75, x1: lx + rx * 0.8, y1: ly + ry * 0.75 });
       for (let n = 0; n < 12; n++) { const a = n / 12 * Math.PI * 2; districtTrees.push([lx + Math.cos(a) * (rx + 60), ly + Math.sin(a) * (ry + 55), 0.8 + srand() * 0.3]); }
       add(scene, GEO.b, '#7a5534', lx, 7, ly + ry + 30, 50, 4, 14);
@@ -521,7 +533,7 @@ function buildTown() {
   g.fillStyle = '#8a8f96'; R(1260, 1280, 500, 460);
   const tex = new THREE.CanvasTexture(tc); tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD, WORLD), new THREE.MeshLambertMaterial({ map: tex }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(WORLD / 2, 0, WORLD / 2); ground.receiveShadow = true; scene.add(ground);
+  ground.rotation.x = -Math.PI / 2; ground.position.set(WORLD / 2, 0, WORLD / 2); ground.receiveShadow = true; scene.add(ground); groundMesh = ground;
   const outer = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), mat('#3f6e34')); outer.rotation.x = -Math.PI / 2; outer.position.set(WORLD / 2, -0.5, WORLD / 2); outer.receiveShadow = true; scene.add(outer);
 
   place('school', 'Dino U', 70, 120, 530, 470, 120, 1, { wall: '#b56a4a', win: '#2c3442', sign: '#7a2e2e', roof: '#5a3a30' });
@@ -674,7 +686,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -816,7 +828,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); rollWeather(); farmDaily(); marketDaily(); morningTexts(); if (has('fish')) S.happy += 3;
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); seasonDaily(); rollWeather(); farmDaily(); marketDaily(); morningTexts(); if (has('fish')) S.happy += 3;
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -3433,7 +3445,8 @@ function drawWeather(g) {
 }
 function weatherLight() {
   if (!S || inside) return;
-  if (isWet() || S.weather === 'cloudy') { SKY.lerp(_c2.set('#7a8696'), S.weather === 'cloudy' ? 0.3 : 0.55); scene.fog.color.copy(SKY); sun.intensity *= S.weather === 'cloudy' ? 0.75 : 0.55; }
+  if (isWet() || S.weather === 'cloudy' || S.weather === 'snow') { SKY.lerp(_c2.set(S.weather === 'snow' ? '#b8c4d0' : '#7a8696'), S.weather === 'cloudy' ? 0.3 : 0.55); scene.fog.color.copy(SKY); sun.intensity *= S.weather === 'cloudy' ? 0.75 : 0.55; }
+  if (spookyOn()) { SKY.lerp(_c2.set('#2a1838'), 0.6); scene.fog.color.copy(SKY); sun.intensity *= 0.4; hemi.intensity *= 0.65; }
   if (festivalOn() && hour() >= 21) { SKY.lerp(_c2.set('#141838'), 0.6); scene.fog.color.copy(SKY); sun.intensity *= 0.45; hemi.intensity *= 0.7; }
   if (flashT > 0) hemi.intensity += flashT * 1.5;
 }
@@ -4092,12 +4105,119 @@ Object.assign(LAYOUTS, {
 const _museumM = MENUS.museum;
 MENUS.museum = p => { const m = _museumM(p); m.acts.push(...fossilActs()); return m; };
 
+// ---------- seasons, snow, Spooky Night, snowmen and the help screen ----------
+let groundMesh = null; const lakeMeshes = [];
+const SEASONS = ['spring', 'summer', 'fall', 'winter'];
+const SEASON_INFO = {
+  spring: { name: 'Spring', icon: '🌸', leaf: '#4a9a3c', bush: '#3f7a34', ground: ['#ffffff', '#000000'], lake: '#3d7fb0' },
+  summer: { name: 'Summer', icon: '🌞', leaf: '#3a7a3c', bush: '#356a32', ground: ['#ffffff', '#000000'], lake: '#3d8fc0' },
+  fall:   { name: 'Fall', icon: '🍂', leaf: '#d0702a', bush: '#a8582a', ground: ['#f2e2c8', '#100800'], lake: '#3a72a0' },
+  winter: { name: 'Winter', icon: '❄️', leaf: '#e6eef2', bush: '#d6e2e8', ground: ['#dfe8ee', '#6a7078'], lake: '#cfe6f2' },
+};
+const season = () => S ? SEASONS[Math.floor((S.day - 1) / 7) % 4] : 'summer';
+WEATHER.snow = { name: 'Snowy', icon: '🌨' };
+let seasonShown = '';
+function applySeason() {
+  const se = season(); if (se === seasonShown && applySeason.life === S) return;
+  const first = seasonShown === '' || applySeason.life !== S; seasonShown = se; applySeason.life = S;
+  const I = SEASON_INFO[se];
+  MATS['#3a7a3c'] && MATS['#3a7a3c'].color.set(I.leaf);
+  MATS['#356a32'] && MATS['#356a32'].color.set(I.bush);
+  if (groundMesh) { groundMesh.material.color.set(I.ground[0]); groundMesh.material.emissive = groundMesh.material.emissive || new THREE.Color(); groundMesh.material.emissive.set(I.ground[1]); }
+  for (const l of lakeMeshes) l.material.color.set(I.lake);
+  if (!first && S && state !== 'title') {
+    log(`${I.icon} ${I.name} has arrived in Compyville!${se === 'fall' ? ' Spooky Night is this Friday evening.' : se === 'winter' ? ' The lakes froze over. Build a snowman in the town square!' : se === 'summer' ? ' Hot days ahead. Ice cream time.' : ' Flowers everywhere.'}`, 'good');
+    text('Town of Compyville', `${I.name} is here! ${se === 'fall' ? 'Trick-or-treat on Friday night.' : se === 'winter' ? 'Snowman contest in the town square.' : 'Enjoy the season.'}`);
+  }
+}
+const _rollWeather = rollWeather;
+rollWeather = function () {
+  _rollWeather();
+  const se = season();
+  if (se === 'winter') { if (S.weather === 'rain' || S.weather === 'storm' || (S.weather === 'cloudy' && Math.random() < 0.5)) S.weather = 'snow'; if (S.weather === 'heat') S.weather = 'sunny'; }
+  if (se === 'summer' && S.weather === 'cloudy' && Math.random() < 0.4) S.weather = 'heat';
+  if (se === 'spring' && S.weather === 'heat') S.weather = 'rain';
+  if (se === 'fall' && S.weather === 'heat') S.weather = 'cloudy';
+  if (S.weather === 'snow') log('Forecast: snow! Bundle up.', '');
+};
+let snowSeed = []; for (let i = 0; i < 140; i++) snowSeed.push([Math.random(), Math.random(), 0.5 + Math.random()]);
+function drawSnow(g) {
+  if (!S || inside || state === 'title' || S.weather !== 'snow') return;
+  g.fillStyle = 'rgba(220,230,245,.12)'; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.85)';
+  for (const [a, b, s] of snowSeed) { const x = (a * W + Math.sin(gameT * s + a * 9) * 30) % W, y = (b * H + gameT * 70 * s) % H; g.beginPath(); g.arc(x, y, 1.5 + s, 0, 7); g.fill(); }
+}
+// ---- Spooky Night (fall Friday evening) ----
+const spookyOn = () => S && season() === 'fall' && weekday() === 4 && hour() >= 18;
+let spookyG = null;
+function syncSpooky() {
+  const on = !!spookyOn() && !inside;
+  if (on && !spookyG) {
+    spookyG = group(scene, 0, 0, 0);
+    SUBURB_HOUSES.forEach((h, i) => { if (i % 2) return; const dz = h.fy > h.y ? 1 : -1; add(spookyG, GEO.s, '#e67e22', h.x + 30, 7, h.fy - dz * 20, 9, 8, 9); add(spookyG, GEO.s, '!#ffcf3a', h.x + 30, 8, h.fy - dz * 11, 3, 2, 1); add(spookyG, GEO.y, '#3f6a22', h.x + 30, 15, h.fy - dz * 20, 1, 3, 1); });
+  }
+  if (spookyG) spookyG.visible = on;
+}
+function trickSpots() {
+  if (!spookyOn() || inside || driving) return [];
+  const done = (S.treat && S.treat.day === S.day) ? S.treat.done : [];
+  const out = [];
+  SUBURB_HOUSES.forEach((h, i) => { if (!done.includes(i) && Math.hypot(P.x - h.x, P.y - h.fy) < 200) out.push({ x: h.x, y: h.fy, label: 'Trick-or-treat!', trick: i }); });
+  return out;
+}
+function trickOrTreat(t) {
+  if (!S.treat || S.treat.day !== S.day) S.treat = { day: S.day, done: [], candy: 0 };
+  S.treat.done.push(t.trick); advance(5);
+  if (Math.random() < 0.12) { S.happy -= 2; log(pick(['TRICK! A raptor in a sheet jumped out and yelled BOO.', 'TRICK! They handed you a toothbrush.', 'TRICK! Silly string all over your crest.']), 'warn'); sfx.bad(); return; }
+  const n = Math.random() < 0.2 ? 3 : 1; S.treat.candy += n; S.candy = (S.candy || 0) + n; S.happy += 2; sfx.coin();
+  log(n > 1 ? `JACKPOT! A whole handful of beetle candy! (${S.treat.candy} tonight)` : `${pick(['Fern fudge!', 'A gummy trilobite!', 'Lava pop!', 'Chocolate eggs!'])} (${S.treat.candy} candy tonight)`, 'good');
+  if (S.treat.candy >= 10) goal('spooky');
+}
+// ---- snowmen in the town square (winter) ----
+const SNOW_SPOTS = [[705, 985], [1095, 985], [900, 1180]];
+let snowG = null, snowKey = '';
+function syncSnowmen() {
+  const key = season() === 'winter' ? JSON.stringify(S && S.snowmen || {}) : '';
+  if (key === snowKey && snowG) return; snowKey = key;
+  if (snowG) scene.remove(snowG); snowG = group(scene, 0, 0, 0);
+  if (!key) return;
+  for (const [i, v] of Object.entries(S.snowmen || {})) {
+    if (!v) continue; const [x, z] = SNOW_SPOTS[i];
+    add(snowG, GEO.s, '#f6f8fa', x, 10, z, 12, 11, 12); add(snowG, GEO.s, '#f6f8fa', x, 26, z, 9, 8, 9); add(snowG, GEO.s, '#f6f8fa', x, 38, z, 6.5, 6, 6.5);
+    add(snowG, GEO.c, '#e67e22', x, 38, z + 7, 1.5, 6, 1.5, Math.PI / 2, 0, 0);
+    add(snowG, GEO.y, '#1a1a1a', x, 45, z, 5, 2, 5); add(snowG, GEO.y, '#1a1a1a', x, 49, z, 3.5, 6, 3.5);
+    add(snowG, GEO.b, '#c0392b', x, 32, z, 14, 2.5, 14);
+  }
+}
+function snowSpots() {
+  if (!S || season() !== 'winter' || inside || driving) return [];
+  return SNOW_SPOTS.map(([x, y], i) => (S.snowmen || {})[i] ? null : { x, y, label: 'Build a snowman', snow: i }).filter(Boolean);
+}
+function buildSnowman(t) {
+  minigame = { kind: 'mash', p: 0, t: 7, label: 'BUILD A SNOWMAN', help: 'Mash E (or tap) to roll the snowballs', mins: 40, what: 'A perfect snowman!', fail: 'It collapsed into a lumpy pile.',
+    onDone: (ok, msg) => { if (!ok) { log(msg, 'warn'); return; } S.snowmen = S.snowmen || {}; S.snowmen[t.snow] = S.day; S.happy += 12; goal('snowman'); log(`${msg} You give it a carrot nose and a little top hat.`, 'good'); sfx.goal(); } };
+  state = 'mini'; setScreens();
+}
+function seasonDaily() { if (season() !== 'winter') S.snowmen = {}; }
+// ---- help ----
+const HELP = [
+  ['Controls', 'Move with WASD or the arrow keys (on a phone, drag anywhere). E or Space to use things. M opens the town map, T opens your phone, G shows goals, F uses your gadget and Q switches it, H honks while driving, P or Esc pauses.'],
+  ['Making money', 'Get a job at the Job Center. Show up on weekdays and finish your shift tasks to get paid and promoted. Dino U unlocks better jobs. On the side: fish, farm at Fern Farm, dig for fossils on Volcano Island, trade stocks at Stone Bank, or win the demolition derby.'],
+  ['Staying alive', 'Watch your energy, hunger and happiness. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. Rent the burrow or buy a house at Nest Estates.'],
+  ['People', 'Townsfolk hang out all over the map. Chat every day, give gifts they love (flowers, chocolates, plushies), go on dates, propose, hatch eggs and raise your kids until they leave the nest. Friends text you invites: show up on time!'],
+  ['Getting around', 'Buy a car at Dino Motors, steal one (risky), call a taxi from your phone, or take the ferry from the beach dock to Volcano Island. Tap a place on the map to set a waypoint.'],
+  ['Trouble', 'Crimes can get you chased by police dinos who leave from the police station. Lose them or hide in a building. Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
+  ['Seasons and events', 'Each week is a season: spring, summer, fall and winter. Every Saturday is the Fern Festival with fireworks. Fall has Spooky Night on Friday evening (trick-or-treat at houses). Winter brings snow and snowmen in the town square.'],
+];
+function showHelp() { $('helpList').innerHTML = HELP.map(([h, t]) => `<div><b>${h}</b><span>${t}</span></div>`).join(''); $('helpScreen').hidden = false; }
+
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
 let nearPlace = null;
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') $('newBtn').click(); return; }
   const k = e.key.toLowerCase();
+  if (k === 'escape' && !$('helpScreen').hidden) { $('helpScreen').hidden = true; return; }
   if (k === 'escape') { if (state === 'map') { closeMap(); return; } if (state === 'phone') { closePhone(); return; } if (state === 'menu') closeMenu(); else if (!$('goalsScreen').hidden) $('goalsScreen').hidden = true; else togglePause(); return; }
   if (k === 'p') { togglePause(); return; }
   if ((k === 'e' || k === 'enter' || k === ' ') && state === 'play') { e.preventDefault(); useNear(); return; }
@@ -4132,6 +4252,8 @@ function useNear() {
   if (nearPlace.fishing) { startFishing(nearPlace); return; }
   if ('farm' in nearPlace) { farmPlot(nearPlace.farm); return; }
   if (nearPlace.dig) { digUp(nearPlace); return; }
+  if ('trick' in nearPlace) { trickOrTreat(nearPlace); return; }
+  if ('snow' in nearPlace) { buildSnowman(nearPlace); return; }
   if (chase && inside && !nearPlace.exit) { log('Not now. The cops are after you!', 'bad'); return; }
   if (chase && !inside && (nearPlace.id === 'bench' || (nearPlace.home && S.home !== nearPlace.home))) { log('No time for that. Run!', 'bad'); return; }
   const wasInside = inside; interact();
@@ -4171,6 +4293,8 @@ function update(dt) {
   for (const st of fishSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 20; if (d < best) { best = d; nearPlace = st; } }
   for (const st of farmSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 8; if (d < best) { best = d; nearPlace = st; } }
   for (const st of digSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of trickSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 12; if (d < best) { best = d; nearPlace = st; } }
+  for (const st of snowSpots()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 14; if (d < best) { best = d; nearPlace = st; } }
   if (!inside && S.site) for (const st of siteStations()) { const d = Math.hypot(P.x - st.x, P.y - st.y) - 10; if (d < best) { best = d; nearPlace = st; } }
   { const rn = rosterNear(); if (rn) { const d = Math.hypot(P.x - rn.x, P.y - rn.y) - 4; if (d < best) { best = d; nearPlace = { roster: rn, label: `Talk to ${rn.p.name}`, x: rn.x, y: rn.y }; } } }
   if (!inside) for (const c of cars) if (!c.ai && !c.customer) { const d = Math.hypot(P.x - c.x, P.y - c.y) - 12; if (d < best) { best = d; nearPlace = c; } }
@@ -4269,7 +4393,7 @@ function sync3D() {
   for (const p of Object.values(PLACES)) if (p.ring) p.ring.scale.setScalar((p === nearPlace ? 24 : 20) + Math.sin(gameT * 4) * 1.5);
   if (chase) syncChase();
   if (inside) syncInterior();
-  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots(); syncDigs();
+  syncSite(); syncPet(); syncWeapon(); syncRobber(); syncRoster(); syncPlots(); syncDigs(); applySeason(); syncSpooky(); syncSnowmen();
   if (!carryMesh) { carryMesh = add(scene, GEO.b, '#c0392b', 0, 0, 0, 44, 5, 6); }
   carryMesh.visible = !!(S && S.site && S.site.carrying && !driving);
   if (carryMesh.visible) { carryMesh.position.set(P.x, 34, P.y); carryMesh.rotation.y = -P.face; }
@@ -4293,7 +4417,7 @@ function arrowTo(g, tx, ty, color, label) {
 }
 function drawOverlay() {
   const g = fctx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
-  drawWeather(g); drawIsland(g);
+  drawWeather(g); drawSnow(g); drawIsland(g);
   if (state === 'title') return;
   for (const p of particles) { const s = toScreen(p.x, p.z, p.y); if (!s.ok) continue; g.globalAlpha = Math.max(0, p.life / p.max); g.fillStyle = p.color; g.beginPath(); g.arc(s.x, s.y, p.size, 0, 7); g.fill(); }
   g.globalAlpha = 1; g.textAlign = 'center';
@@ -4311,6 +4435,7 @@ function drawOverlay() {
   for (const t of gigTargets()) { const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = t.color; g.lineWidth = 3; g.beginPath(); g.ellipse(s2.x, s2.y, 26, 14, 0, 0, 7); g.stroke(); } const l2 = toScreen(t.x, 40, t.y); if (l2.ok) { g.font = '800 13px Nunito, system-ui, sans-serif'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = t.color; g.fillText(t.label, l2.x, l2.y); } arrowTo(g, t.x, t.y, t.color, t.arrow); }
   { const rt = gigReturnTarget(); if (rt && !gigTargets().length) arrowTo(g, rt.x, rt.y, '#ffbe55', rt.label); }
   drawWaypoint(g);
+  for (const t of snowSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 450) continue; const l2 = toScreen(t.x, 20, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('⛄ Snowman spot', l2.x, l2.y); g.fillStyle = '#ffffff'; g.fillText('⛄ Snowman spot', l2.x, l2.y); } }
   for (const t of farmSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 160) continue; const l2 = toScreen(t.x, 26, t.y); if (l2.ok) { g.font = '800 11px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; const near = nearPlace && nearPlace.farm === t.farm, tx = near ? '' : t.short; if (!tx) continue; g.strokeText(tx, l2.x, l2.y); g.fillStyle = '#d6f5b0'; g.fillText(tx, l2.x, l2.y); } }
   for (const t of fishSpots()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 600) continue; const s2 = toScreen(t.x, 0, t.y); if (s2.ok) { g.strokeStyle = '#7fd8ff'; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.ellipse(s2.x, s2.y, 22, 12, 0, 0, 7); g.stroke(); g.setLineDash([]); } const l2 = toScreen(t.x, 30, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText('🎣 Fishing spot', l2.x, l2.y); g.fillStyle = '#bfe8ff'; g.fillText('🎣 Fishing spot', l2.x, l2.y); } }
   for (const t of festStalls()) { if (Math.hypot(t.x - P.x, t.y - P.y) > 700) continue; const l2 = toScreen(t.x, 62, t.y); if (l2.ok) { g.font = '800 12px Nunito, system-ui, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t.label, l2.x, l2.y); g.fillStyle = '#ffe08a'; g.fillText(t.label, l2.x, l2.y); } }
@@ -4373,6 +4498,8 @@ function hud() {
   if (fishCount()) chips.push([`${fishCount()} fish`, '']);
   { const nf = Object.values(S.fossils || {}).reduce((a, b) => a + b, 0); if (nf) chips.push([`${nf} fossil${nf > 1 ? 's' : ''}`, '']); }
   if (onIsland()) chips.push(['Volcano Island', 'good']);
+  chips.push([`${SEASON_INFO[season()].icon} ${SEASON_INFO[season()].name}`, '']);
+  if (spookyOn()) chips.push(['🎃 Spooky Night', 'good']);
   if (S.pet) chips.push([`${S.pet.name} ${Math.round(S.pet.happy)}%${S.pet.fed < 25 ? ' (hungry)' : ''}`, S.pet.happy < 30 ? 'bad' : 'good']);
   const html = chips.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
   if ($('chips').innerHTML !== html) $('chips').innerHTML = html;
@@ -4384,7 +4511,7 @@ function hud() {
     let what;
     if (driving && nearGig()) what = nearGig().label;
     else if (driving) what = nearPump() && driving.fuel < 98 ? `Fill up the tank (${money$((100 - driving.fuel) * 0.4)})` : `Get out of the car${touchMode ? '' : ' (H to honk)'}`;
-    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig) what = np.label;
+    else if (np.site || 'ward' in np || np.gig || np.roster || np.fest || np.fishing || 'farm' in np || np.dig || 'trick' in np || 'snow' in np) what = np.label;
     else if (np.m) what = np.service === 'police' ? 'Drive the police car' : np.service ? 'Drive the fire truck' : np.owned ? `Drive your ${carName(np)}` : np.stolen ? `Drive the stolen ${COLOR_NAMES[np.color] || ''} car` : `Steal the ${COLOR_NAMES[np.color] || ''} ${carName(np)} (crime)`;
     else if (np.id === 'blackmarket') what = 'Climb down the manhole';
     else if (np.id === 'stadium') what = 'Enter Raptors Stadium';
@@ -4447,6 +4574,7 @@ $('resumeBtn').addEventListener('click', togglePause);
 $('quitBtn').addEventListener('click', () => { save(); if (derby) leaveDerby(); if (driving) exitCar(true); if (chase) endChase(); if (inside) exitBuilding(); state = 'title'; setScreens(); $('pauseScreen').hidden = true; const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; $('titleScreen').hidden = false; });
 $('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = $('muteBtn2').textContent = muted ? 'Sound off' : 'Sound on'; });
 $('muteBtn2').addEventListener('click', () => $('muteBtn').click());
+$('helpBtn').addEventListener('click', showHelp); $('helpBtn2').addEventListener('click', showHelp); $('helpClose').addEventListener('click', () => { $('helpScreen').hidden = true; });
 
 buildTown(); spawnNPCs(); placeCars(); spawnRoster();
 INGREDIENTS.forEach((x, i) => { const bt = document.createElement('button'); bt.type = 'button'; bt.textContent = `${i + 1} \u00b7 ${x}`; bt.addEventListener('click', () => cookPick(x)); $('cookIngs').appendChild(bt); });
