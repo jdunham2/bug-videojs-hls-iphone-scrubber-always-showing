@@ -826,6 +826,19 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  bug_net:{name:'Bug Net',base:40,col:'#e8e0c8',kind:'tool',desc:'Catch bugs and butterflies'},
+  monarch:{name:'Monarch Butterfly',base:22,col:'#f08a2a',kind:'good',desc:'A bug for your collection'},
+  blue_morpho:{name:'Blue Morpho',base:55,col:'#3a8aff',kind:'good',desc:'A bug for your collection'},
+  firefly:{name:'Firefly',base:18,col:'#f0f060',kind:'good',desc:'A bug for your collection'},
+  stag_beetle:{name:'Stag Beetle',base:40,col:'#5a3a2a',kind:'good',desc:'A bug for your collection'},
+  sand_scarab:{name:'Sand Scarab',base:35,col:'#3ab0a0',kind:'good',desc:'A bug for your collection'},
+  frost_moth:{name:'Frost Moth',base:60,col:'#d8f0ff',kind:'good',desc:'A bug for your collection'},
+  ember_beetle:{name:'Ember Beetle',base:70,col:'#ff5a1a',kind:'good',desc:'A bug for your collection'},
+  glow_moth:{name:'Glow Moth',base:50,col:'#9aff9a',kind:'good',desc:'A bug for your collection'},
+  dragonfly:{name:'Dragonfly',base:30,col:'#4ad8c8',kind:'good',desc:'A bug for your collection'},
+  cicada:{name:'Cicada',base:25,col:'#8a9a4a',kind:'good',desc:'A bug for your collection'},
+  prism_butterfly:{name:'Prism Butterfly',base:120,col:'#ff9aff',kind:'good',desc:'A bug for your collection'},
+  golden_beetle:{name:'Golden Beetle',base:300,col:'#ffd040',kind:'good',desc:'A bug for your collection'},
   cauldron:{name:'Cauldron',base:150,col:'#3a3a42',kind:'place',desc:'Place with B. Brew potions from two ingredients.'},
   healing_draught:{name:'Healing Draught',base:30,col:'#e05a6a',kind:'food',heal:9,desc:'Restores 9 HP'},
   sweet_dream:{name:'Sweet Dream Tonic',base:45,col:'#f0a0d0',kind:'food',heal:2,buff:'regen',buffDur:240,desc:'Hearty for 4 minutes'},
@@ -1097,6 +1110,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'bug_net',        need:{sticks:3,silk:2}, at:'hand', known:true},
   {id:'cauldron',       need:{iron:4,stone:4}, at:'forge', known:true},
   {id:'tent',           need:{hide:4,sticks:6,rope:2}, at:'bench', known:true},
   {id:'serpent_cloak',  need:{serpent_scale:4,silk_cloth:2,hide:2}, at:'bench', known:true},
@@ -3385,6 +3399,66 @@ function drawGolem(x, y, phase, moving, face) {
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
 }
+// ===== bug catching =====
+const BUG_KINDS = [
+  {id:'monarch', biomes:[T.GRASS,T.BLOSSOM,T.MAPLE,T.HILL], when:'day', w:5},
+  {id:'blue_morpho', biomes:[T.JUNGLE,T.BAMBOO], when:'day', w:3},
+  {id:'firefly', biomes:[T.FOREST,T.MARSH,T.GRASS,T.REDWOOD], when:'night', w:5},
+  {id:'stag_beetle', biomes:[T.FOREST,T.REDWOOD,T.MAPLE], when:'*', w:3},
+  {id:'sand_scarab', biomes:[T.DUNE,T.SAND,T.MESA], when:'day', w:4},
+  {id:'frost_moth', biomes:[T.SNOW], when:'night', w:4},
+  {id:'ember_beetle', biomes:[T.ASH], when:'*', w:4},
+  {id:'glow_moth', biomes:[T.SHROOM,T.GLOOM], when:'night', w:4},
+  {id:'dragonfly', biomes:[T.MARSH,T.SHAL], when:'day', w:4},
+  {id:'cicada', biomes:[T.SAVANNA,T.BAMBOO,T.MOOR], when:'day', w:4},
+  {id:'prism_butterfly', biomes:[T.SHIMMER,T.BLOSSOM], when:'day', w:1.2},
+  {id:'golden_beetle', biomes:['*'], when:'*', w:.15},
+];
+let bugs = [], bugT = 3;
+function updateBugs(dt) {
+  if (inDungeon() || inArena() || balloonF) { bugs = []; return; }
+  bugs = bugs.filter(b => !b.gone && Math.hypot(b.x - S.x, b.y - S.y) < 18);
+  for (const b of bugs) {
+    b.t += dt; const d = Math.hypot(b.x - S.x, b.y - S.y);
+    let vx = Math.cos(b.t*1.3 + b.ph)*.9, vy = Math.sin(b.t*1.7 + b.ph)*.7;
+    if (d < 2.2 && !b.calm) { vx += (b.x - S.x)/d*1.6; vy += (b.y - S.y)/d*1.6; }
+    b.x += vx*dt; b.y += vy*dt;
+  }
+  bugT -= dt; if (bugT > 0 || bugs.length >= 4) return; bugT = 4 + Math.random()*5;
+  const night = isNightish();
+  for (let k = 0; k < 10; k++) {
+    const a = Math.random()*6.283, r = 5 + Math.random()*7, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r;
+    if (!inB(Math.floor(x), Math.floor(y)) || y >= WORLD_H) continue; const t = map[idx(Math.floor(x), Math.floor(y))];
+    const pool = BUG_KINDS.filter(B => GOODS[B.id] && (B.when === '*' || (B.when === 'night') === night) && (B.biomes.includes('*') || B.biomes.includes(t)));
+    if (!pool.length) continue; let rr = Math.random()*pool.reduce((s, B) => s + B.w, 0), kind = pool[0];
+    for (const B of pool) { rr -= B.w; if (rr <= 0) { kind = B; break; } }
+    bugs.push({id: kind.id, x, y, t: 0, ph: Math.random()*6, calm: Math.random() < .35}); return;
+  }
+}
+function bugTarget() {
+  const b = bugs.find(b => Math.hypot(S.x - b.x, S.y - (b.y + .4)) < 1.4); if (!b) return null;
+  const K = '<kbd style="margin:0 6px 0 0">E</kbd>', nm = GOODS[b.id].name;
+  if (!have('bug_net')) return {key: 'bugN' + b.id, html: `A ${nm}! You need a Bug Net to catch it.`, btn: '', fn: () => {}};
+  return {key: 'bug' + b.id, html: `${K}Catch the ${nm}`, btn: 'Catch', fn: () => {
+    if (b.gone) return;
+    const chance = b.calm ? .9 : .6; b.gone = true;
+    if (Math.random() > chance) { floatText(b.x, b.y - .5, 'It got away!', '#e8d8b0'); SFX.swing(); return; }
+    addItem(b.id, 1); S.bugLog = S.bugLog || {}; const first = !S.bugLog[b.id]; S.bugLog[b.id] = (S.bugLog[b.id] || 0) + 1; S.bugsCaught = (S.bugsCaught || 0) + 1;
+    burst(b.x, b.y, GOODS[b.id].col, 10, 2); SFX.pickup(); gainXP(first ? 25 : 6); floatText(b.x, b.y - .5, `+1 ${nm}`, GOODS[b.id].col);
+    if (first) toast(`<b>New bug: ${nm}!</b><br>Bug log ${Object.keys(S.bugLog).length}/${BUG_KINDS.length}. Curator Vess would love one for the museum.`, 4500);
+    renderHUD(); save();
+  }};
+}
+function drawBug(b) {
+  ctx.save(); ctx.translate(b.x*TS, b.y*TS - 10 + Math.sin(b.t*6 + b.ph)*2); ctx.scale(1.7, 1.7); drawBug0(b); ctx.restore();
+}
+function drawBug0(b) {
+  const px = 0, py = 0, c = GOODS[b.id].col, fl = Math.abs(Math.sin(b.t*18 + b.ph));
+  if (b.id === 'firefly' || b.id === 'glow_moth') { ctx.fillStyle = `rgba(240,250,120,${.4 + .4*Math.sin(b.t*5 + b.ph)})`; ctx.beginPath(); ctx.arc(px, py, 3, 0, 7); ctx.fill(); }
+  if (/beetle|scarab|cicada/.test(b.id)) { ctx.fillStyle = c; ctx.fillRect(px - 2, py - 1, 4, 3); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(px - 1, py - 1, 1, 1); if (b.id === 'golden_beetle' && Math.random() < .3) particles.push({x: b.x, y: b.y - .6, vx: 0, vy: -.4, t: 0, col: '#ffe080'}); return; }
+  ctx.fillStyle = c; const w = 1 + fl*2.5; ctx.fillRect(px - w - 1, py - 2, w, 3); ctx.fillRect(px + 1, py - 2, w, 3);
+  ctx.fillStyle = '#2a2420'; ctx.fillRect(px - .5, py - 2, 1, 4);
+}
 // ===== ruin vaults =====
 const VAULT_SYM = [['☀', 'Sun', '#f0c040'], ['☾', 'Moon', '#bfd8ff'], ['★', 'Star', '#ffffff']];
 const VAULT_LEV = [[-2, 1], [0, 2], [2, 1]];
@@ -4117,6 +4191,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Bug catching', 'Craft a Bug Net (3 Sticks, 2 Spider Silk). Butterflies, beetles and fireflies flit about every land. Each biome and time of day has its own bugs. Calm ones are easy to catch, and skittish ones dart away. Look out for the rare Golden Beetle.'],
   ['Ruin vaults', 'Ancient vaults hide in ruins, moors, mesas and savannas. Read the riddle above the door, then pull the Sun, Moon and Star levers in the right order to open it. A wrong pull resets the levers and stings a little.'],
   ['Brewing & betting', 'Forge a Cauldron (4 Iron, 4 Stone) and place it. Combine two ingredients (herbs, berries, honey, flowers, ember, frost essence, crystal, slime gel, mushrooms) to discover potions. Arena Master Brutus also takes bets on monster bouts, up to five a day.'],
   ['Farmhands, fortunes & thieves', 'Tobin in Port Wren works your homestead for a daily wage: harvesting, replanting and collecting produce each morning. Madame Zora in Crownfall reads your fortune for a daily blessing and hints of what is coming. In towns, watch your purse: catch pickpockets to get your coin back with a reward.'],
@@ -4377,7 +4452,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt);
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
     if (rate) { S.hp = Math.min(maxHP(), S.hp + rate*dt); renderHP(); }
@@ -5109,6 +5184,7 @@ function render() {
   for (const sh of SHRINES) if (sh.x != null && inView(sh.x, sh.y)) sprites.push({y: sh.y + 2.6, f: () => drawShrine(sh)});
   if (S.escort && inView(S.escort.x, S.escort.y)) sprites.push({y: S.escort.y, f: drawEscort});
   if (S.escort && !inDungeon()) { const dx = S.escort.x - S.x, dy = S.escort.y - S.y; if (Math.hypot(dx, dy) > 7) sprites.push({y: S.y + 61, f: () => { const an = Math.atan2(dy, dx), cx = S.x*TS + Math.cos(an)*28, cy = (S.y - .4)*TS + Math.sin(an)*28; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillStyle = '#86c98f'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-2, 0); ctx.lineTo(-4, 5); ctx.fill(); ctx.restore(); }}); }
+  for (const b of bugs) if (inView(b.x, b.y)) sprites.push({y: b.y + .3, f: () => drawBug(b)});
   if (S.vaults) for (const v of S.vaults) if (inView(v.x, v.y)) sprites.push({y: v.y + .9, f: () => drawVault(v)});
   if (stagTrail) { sprites.push({y: -1e9, f: drawStagTrail}); if (!stagTrail.met && inView(stagTrail.stag.x, stagTrail.stag.y)) sprites.push({y: stagTrail.stag.y, f: () => drawStag(stagTrail.stag)}); }
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
@@ -5270,6 +5346,7 @@ function render() {
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
     { const no = NPC_BY.noctis; if (!no.away) hole(no.x*TS, no.y*TS - 10, 40, .85); }
     for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
+    for (const b of bugs) if (b.id === 'firefly' || b.id === 'glow_moth') hole(b.x*TS, b.y*TS - 10, 12, .5);
     if (S.flags.lighthouse && NPC_BY.mara) { const k = NPC_BY.mara, a = frameT*.8; hole(k.x*TS, (k.y - 1)*TS, 40, .9); for (let i = 1; i <= 4; i++) hole((k.x + Math.cos(a)*i*2.2)*TS, (k.y - 1 + Math.sin(a)*i*2.2)*TS, 26 - i*3, .6); }
     for (const q of S.placed) if (PLACE[q.t].light) hole(q.x*TS + 8, q.y*TS + (q.t === 'campfire' ? 8 : -4), PLACE[q.t].light, .85);
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
@@ -5500,7 +5577,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -7152,7 +7229,7 @@ function diceFinish(n, bet, mine) {
     {label: `Again (${bet} coin)`, primary: true, disabled: S.coins < bet, fn: () => diceRound(n, bet)}, back(n)]);
 }
 // ===== the Crownfall Museum =====
-const MUSEUM_RARE = ['sun_disc','desert_rose','scarab_amulet','rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
+const MUSEUM_RARE = ['monarch','blue_morpho','firefly','stag_beetle','sand_scarab','frost_moth','ember_beetle','glow_moth','dragonfly','cicada','prism_butterfly','golden_beetle','sun_disc','desert_rose','scarab_amulet','rune_shard','black_pearl','gunpowder','storm_glass','ancient_coin','pirate_gold','jeweled_goblet','coral','pearl','amber','star_fragment','shimmer_shard','gem','crystal','obsidian','jade','marble','truffle','elite_essence','abyss_shard','blacksteel','wisp_essence','frost_essence','ember'];
 let MUSEUM_IDS = null;
 function museumIds() { if (!MUSEUM_IDS) MUSEUM_IDS = [...new Set([...FISH_LOG_IDS, ...GK.filter(g => GOODS[g].kind === 'trophy' && g !== 'challenge_token'), ...MUSEUM_RARE.filter(g => GOODS[g])])]; return MUSEUM_IDS; }
 const MUSEUM_PRIZES = [[10, 'Curator\'s thanks: 300 coin', () => { S.coins += 300; }], [20, "a Curator's Monocle", () => addItem('curators_monocle', 1)], [30, 'a Golden Statue for your home', () => addItem('golden_statue', 1)], [45, '1500 coin and the eternal gratitude of scholars', () => { S.coins += 1500; }]];
@@ -7613,6 +7690,7 @@ function openJournal() {
     <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--brass);font-family:var(--f-pixel, inherit);letter-spacing:.06em">ADVENTURER'S GUIDE · what to do and where</summary><div class="jgrid" style="margin-top:8px">${GUIDE.map(([t, d]) => `<div class="jcard"><div class="t">${t}</div><div class="s">${d}</div></div>`).join('')}</div></details>
     <h3>Bestiary · ${BEAST_IDS.filter(k => S.killsBy[k]).length}/${BEAST_IDS.length} known · ${BEAST_IDS.filter(k => (S.killsBy[k] || 0) >= MASTERY).length} mastered</h3><div class="vals" style="margin-bottom:4px">Defeat ${MASTERY} of a kind to master it: +10% damage against them forever.</div><div class="jgrid">${BEAST_IDS.map(k => { const n = S.killsBy[k] || 0; return `<div class="jcard"><div class="t">${n ? esc(ENEMIES[k].name) : '???'}${n >= MASTERY ? ' <span style="color:var(--brass)">★</span>' : ''}</div><div class="s">${n ? `${n} defeated${n < MASTERY ? ` · ${MASTERY - n} to mastery` : ' · mastered'}` : 'Not met yet'}</div></div>`; }).join('')}</div>
     <h3>Fish log · ${Object.keys(S.fishLog || {}).length}/${FISH_LOG_IDS.length}</h3><div class="vals">${FISH_LOG_IDS.map(id => (S.fishLog || {})[id] ? GOODS[id].name : '???').join(' · ')}</div>
+    <h3>Bug log · ${Object.keys(S.bugLog || {}).length}/${BUG_KINDS.length}</h3><div class="vals">${BUG_KINDS.map(B => (S.bugLog || {})[B.id] ? `<span style="color:${GOODS[B.id].col}">${GOODS[B.id].name} ×${S.bugLog[B.id]}</span>` : '???').join(' · ')}</div>
     ${PK.some(k => S.props[k]) ? `<h3>Your houses · ${rentOf ? PK.filter(k => S.props[k]).reduce((n, k) => n + rentOf(k), 0) : 0} coin rent per day</h3><div class="jgrid">${PK.filter(k => S.props[k]).map(k => `<div class="jcard"><div class="t">${PROPERTIES[k].name}</div><div class="s">${placeName(k)} · ${rentOf(k)} coin/day${S.respawn === k ? ' · respawn point' : ''}</div></div>`).join('')}</div>` : ''}
     ${S.weekly ? `<h3>Weekly challenges · resets on day ${(S.weekly.wk + 1)*7 + 1}</h3><div class="jgrid">${S.weekly.list.map(c => { const t = WEEKLY_TYPES.find(x => x.k === c.k); if (!t) return ''; const pr = Math.min(c.n, t.cur() - c.base); return `<div class="jcard"><div class="t ${c.done ? 'done' : ''}">${c.done ? '✓ ' : ''}${esc(t.txt(c.n))}</div><div class="s">${c.done ? 'Complete!' : `${pr}/${c.n}`} · reward ${t.tok} Challenge Tokens</div></div>`; }).join('')}</div>` : ''}
     ${(S.mail || []).filter(m => !m.claimed).length ? `<h3>Letters</h3><div class="jgrid">${S.mail.filter(m => !m.claimed).map(m => `<div class="jcard"><div class="t">From ${esc(m.from)}</div><div class="s">${esc(m.text)}</div><div class="req" style="margin-top:6px">${m.coins ? `<span>${m.coins} coin</span>` : ''}${Object.entries(m.items).filter(([g, n]) => n > 0 && GOODS[g]).map(([g, n]) => `<span>${n} ${GOODS[g].name}</span>`).join('')}</div><div style="margin-top:6px"><button class="btn sm primary" data-mail="${m.id}">${m.coins || Object.values(m.items).some(n => n > 0) ? 'Claim' : 'Read'}</button></div></div>`).join('')}</div>` : ''}
@@ -8461,6 +8539,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['bugcatcher','Bug Catcher','Catch 10 bugs', () => (S.bugsCaught || 0) >= 10],
+  ['entomologist','Entomologist','Fill the bug log', () => BUG_KINDS.every(B => (S.bugLog || {})[B.id])],
   ['vault','Vault Breaker','Solve a lever vault in the ruins', () => (S.vaultsOpened || 0) >= 1],
   ['vaults','Tomb Raider','Open 5 ruin vaults', () => (S.vaultsOpened || 0) >= 5],
   ['brewer','Potion Brewer','Discover 4 cauldron recipes', () => Object.keys(S.brews || {}).length >= 4],
@@ -8925,7 +9005,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
