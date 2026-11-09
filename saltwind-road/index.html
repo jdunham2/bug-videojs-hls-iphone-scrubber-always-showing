@@ -1828,6 +1828,9 @@ const NPCS = [
   {id:'festa',town:'hollow',dx:-1,dy:-2,name:'Jolly Pip-Pip',role:'Festival merchant',cols:{cloak:'#ff5a8a',skin:'#e0b896',hair:'#f0d040'},festival:true,
    hello:["Happy festival! Come, come, see my wares!","You came! Festivals are better with friends.","My favorite festival-goer!"],
    rumors:["Every season has a festival on its fourth day. Spring Fair in Hollowpine, Sun Festival in Dunmere, Harvest Moon in Port Wren, Winterlights in Frostgate.","Fireworks go off every night once you set them up. Put some by your house!"]},
+  {id:'noctis',town:'wren',dx:1,dy:-2,name:'Madame Noctis',role:'Night merchant',cols:{cloak:'#3a1a5a',skin:'#e0c8d8',hair:'#c8c8ff'},noctis:true,
+   hello:["The night brings such interesting customers...","Ah. You found me again.","My dearest night owl."],
+   rumors:["I am in a different town every night. Look for the purple lantern.","Mystery boxes hold anything at all. Anything."]},
   {id:'silas',town:'lantern',dx:12,dy:6,cove:true,name:'Silas',role:'Smuggler',cols:{cloak:'#2a2a2a',skin:'#c89870',hair:'#5a2a1a'},
    hello:["You lost, friend?","Back again?","Partner."], rumors:["What happens at the cove stays at the cove."]},
   {id:'darius',town:'dun',dx:2,dy:3,name:'Merchant Prince Darius',role:'Caravan master',cols:{cloak:'#8a2a5a',skin:'#a8704a',hair:'#1a1a1a'},caravans:true,
@@ -3172,7 +3175,7 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -3188,6 +3191,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Night market', 'Madame Noctis sets up in a different town each night with rare wares and mystery boxes. The job tracker shows where.'],
   ['Caravans', 'Merchant Prince Darius in Dunmere sells trade caravans that earn coin on a route every morning.'],
   ['Dice', 'Play Bones with Lucky Lou (Lantern Bay), Dice Dame Rosa (Dunmere) or One-Eyed Finn (Crownfall).'],
   ['Museum', 'Curator Vess in Crownfall collects one of every fish, trophy and rare treasure.'],
@@ -4189,6 +4193,7 @@ function render() {
     for (const h of houses) hole(h.x*TS + 16, h.y*TS + 20, 46, .75);
     if (S.home.level) hole(HOME.x*TS + 8, (HOME.y - 2)*TS + 6, 64, .8);
     for (let i = 0; i < (HOME_LEVELS[S.home.level].plots || 0); i++) { const pl = S.home.plots[i]; if (pl && pl.crop === 'moonflower' && cropProgress(pl) >= 1) { const P = plotPos(i); hole(P.x*TS + 8, P.y*TS + 4, 22, .6); } }
+    { const no = NPC_BY.noctis; if (!no.away) hole(no.x*TS, no.y*TS - 10, 40, .85); }
     for (const st of fallingStars) if (st.t > 1.2) hole(st.x*TS, st.y*TS - 4, 34, .8);
     for (const q of S.placed) if (PLACE[q.t].light) hole(q.x*TS + 8, q.y*TS + (q.t === 'campfire' ? 8 : -4), PLACE[q.t].light, .85);
     for (const k of FORGE_TOWNS) hole((TOWNS[k].x-3)*TS + 8, TOWNS[k].y*TS + 8, 30, .8);
@@ -4282,6 +4287,7 @@ function npcWalkable(x, y) {
   return true;
 }
 function updatePeople(dt) {
+  { const no = NPC_BY.noctis, night = isNightish() && !inDungeon(); if (S.noctisTownDay !== S.day) { const ts = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].small && !TOWNS[k].pirate); S.noctisTown = ts.length ? ts[(S.day*7) % ts.length] : 'wren'; S.noctisTownDay = S.day; } if (no.town !== S.noctisTown) { no.town = S.noctisTown; no.x = TOWNS[no.town].x + 1.5; no.y = TOWNS[no.town].y - 1.2; } no.away = !night; }
   { const M = S.story && S.story.smug; NPC_BY.silas.away = !!(M && [2,3,5].includes(M.stage)); }
   { const fe = NPC_BY.festa, F = festivalToday(); fe.away = !F; if (F && fe.town !== F.town) { fe.town = F.town; fe.x = TOWNS[F.town].x - .5; fe.y = TOWNS[F.town].y - 1.2; } }
   const nightNow = isNightish();
@@ -4461,6 +4467,7 @@ function checkDeeds() {
   const extra = [];
   { const M = S.story && S.story.smug; if (M && [1,2,3].includes(M.stage)) extra.push(`<div class="dd ${M.stage === 3 ? 'ok' : ''}"><span>${M.stage === 3 ? '✓ Return to Quill in Lantern Bay' : M.stage === 2 ? 'Defeat the smugglers!' : 'Investigate the cove east of Lantern Bay'}</span></div>`); if (S.contraband) extra.push(`<div class="dd"><span>Deliver the crate to Darius (Dunmere)</span></div>`); }
   { const R0 = S.story && S.story.river; if (R0 && R0.stage === 1) extra.push(`<div class="dd ${R0.h && R0.r ? 'ok' : ''}"><span>${R0.h && R0.r ? '✓ Return to Odile in Port Wren' : `River dispute: talk to ${[R0.h ? '' : 'Ruun (Hollowpine)', R0.r ? '' : 'Corvo (Reedholm)'].filter(Boolean).join(' & ')}`}</span></div>`); }
+  if (isNightish() && S.noctisTown && !inDungeon()) extra.push(`<div class="dd" style="color:#c8a8ff"><span>☾ Night market in ${TOWNS[S.noctisTown].name}</span></div>`);
   if (S.titanPos && !S.bosses.titan) extra.push(`<div class="dd" style="color:#ffb060"><span>⛰ Titan ${S.titanPos.dir} of ${TOWNS[S.titanPos.town].name}</span></div>`);
   if (S.raid) extra.push(`<div class="dd" style="color:#ff7a4a"><span>⚔ Defend ${TOWNS[S.raid.town].name}!</span></div>`);
   if (S.escort) extra.push(`<div class="dd" style="color:#86c98f"><span>⛟ Escort to ${TOWNS[S.escort.b].name} · wagon ${Math.max(0, Math.round(S.escort.hp/S.escort.max*100))}%</span></div>`);
@@ -4662,6 +4669,7 @@ function mainOptions(n) {
     if (n.id === 'quill' && (!M || M.stage !== 5)) o.push({label: M && M.stage ? 'About the cove' : 'Strange lights?', primary: !!(M && M.stage === 3), fn: () => smugQuill(n)});
     if (n.id === 'silas') o.push({label: M && M.stage === 4 ? 'Business' : 'Who are you?', primary: true, fn: () => smugSilas(n)});
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
+  if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
   if (n.oracle) o.push({label: 'The Shattered Crown', primary: shardCount() >= DUNGEONS.hollowthrone.sealed && !S.bosses.hollowking, fn: () => oracleTalk(n)});
   if (n.angler) o.push({label: 'Show my fish log', primary: anglerReward() > 0, fn: () => anglerTalk(n)});
   if (n.arena) o.push({label: 'The arena', primary: true, fn: () => arenaTalk(n)});
@@ -4940,6 +4948,25 @@ function smugShop(n) {
 function smugCheck() {
   const M = S.story && S.story.smug;
   if (M && M.stage === 2 && !enemies.some(e => e.smug && !e.dead)) { M.stage = 3; toast('<b>The smugglers are beaten!</b><br>Report back to Harbormaster Quill in Lantern Bay.', 6000); save(); }
+}
+// ===== the night market =====
+const NOCTIS_POOL = [['elixir',90],['luck_draught',80],['treasure_map',110],['star_fragment',140],['black_pearl',600],['storm_glass',130],['abyss_shard',160],['gem',120],['shimmer_shard',90],['diving_mask',120],['stardust_tonic',200],['mithril',260],['kings_banquet',500]];
+function noctisWares() {
+  if (S.noctisDay !== S.day) { const r = mulberry32(S.day*977 + 5), pool = NOCTIS_POOL.filter(([g]) => GOODS[g]).slice(); S.noctisStock = []; for (let i = 0; i < 4 && pool.length; i++) S.noctisStock.push(pool.splice(Math.floor(r()*pool.length), 1)[0]); S.noctisDay = S.day; S.noctisSold = {}; }
+  return S.noctisStock;
+}
+function noctisTalk(n) {
+  const wares = noctisWares();
+  say('“Rare things, for rare people. Tonight only.”', [
+    ...wares.map(([g, pr]) => ({label: S.noctisSold[g] ? `${GOODS[g].name} · sold` : `${GOODS[g].name} · ${pr} coin`, disabled: !!S.noctisSold[g] || S.coins < pr, fn: () => { S.coins -= pr; addItem(g, 1); S.noctisSold[g] = true; S.noctisBought = true; SFX.coin(); renderHUD(); save(); noctisTalk(n); }})),
+    {label: 'Mystery box · 200 coin', disabled: S.coins < 200, fn: () => { S.coins -= 200; S.boxes = (S.boxes || 0) + 1; const r = Math.random(); let msg;
+      if (r < .3) { const c = rint(60, 180); S.coins += c; msg = `${c} coin`; }
+      else if (r < .6) { const g = pick(['gem','pearl','amber','silver','crystal']); addItem(g, 3); msg = `3 ${GOODS[g].name}`; }
+      else if (r < .8) { const g = pick(['elixir','luck_draught','might_draught','swift_draught'].filter(x => GOODS[x])); addItem(g, 2); msg = `2 ${GOODS[g].name}`; }
+      else if (r < .95) { const g = pick(['black_pearl','captains_compass','golden_horseshoe','star_pendant','storm_charm'].filter(x => GOODS[x])); addItem(g, 1); msg = `<b>${GOODS[g].name}</b>!`; }
+      else { S.coins += 1500; msg = '<b>1500 coin!</b> Madame Noctis smiles thinly.'; }
+      SFX.victory(); renderHUD(); save(); say(`You open the box... ${msg}`, [{label: 'Back', fn: () => noctisTalk(n)}]); }},
+    back(n)]);
 }
 function rumorTalk(n) {
   const i = (S.rumor[n.id] || 0) % n.rumors.length;
@@ -6111,7 +6138,7 @@ function openMap() {
     g.strokeStyle = '#0d131b'; g.lineWidth = 2; g.strokeRect((t.x+.5)*s - 4*dpr, (t.y+.5)*s - 4*dpr, 8*dpr, 8*dpr);
     g.fillStyle = '#0d131b'; g.fillText(t.name, (t.x+.5)*s + 1, (t.y+.5)*s - 8*dpr + 1);
     g.fillStyle = '#ebe4d3'; g.fillText(t.name, (t.x+.5)*s, (t.y+.5)*s - 8*dpr);
-    const sv = [...new Set(SERVICES.filter(([id]) => NPC_BY[id] && NPC_BY[id].town === k && !(id === 'festa' && NPC_BY.festa.away)).map(x => x[1]))];
+    const sv = [...new Set(SERVICES.filter(([id]) => NPC_BY[id] && NPC_BY[id].town === k && !((id === 'festa' || id === 'noctis') && NPC_BY[id].away)).map(x => x[1]))];
     if (sv.length) { g.save(); g.font = `${Math.round(9*dpr)}px "Pixelify Sans", monospace`; for (let li = 0; li*2 < sv.length; li++) { const txt = sv.slice(li*2, li*2 + 2).join(' · '), w2 = g.measureText(txt).width/2 + 2, tx = Math.max(w2, Math.min(c.width - w2, (t.x+.5)*s)), ty = (t.y+.5)*s + (14 + li*10)*dpr; g.fillStyle = '#0d131b'; g.fillText(txt, tx + 1, ty + 1); g.fillStyle = '#e3a948'; g.fillText(txt, tx, ty); } g.restore(); }
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
@@ -6876,6 +6903,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['nightowl','Night Owl','Buy something from Madame Noctis', () => !!S.noctisBought],
   ['lawbringer','Lawbringer','Shut down the Lantern Bay smugglers', () => !!S.flags.lawbringer],
   ['smuggler','Smuggler','Complete 3 smuggling runs', () => (S.smugRuns || 0) >= 3],
   ['titanslayer','Titanslayer','Defeat the Earthshaker Titan', () => (S.titansSlain || 0) >= 1],
