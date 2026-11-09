@@ -14,6 +14,7 @@ function toolGeo(id) {
     case 'metalpick': handle(); P.push({ geo: new THREE.ConeGeometry(0.04, 0.36, 5), color: 0xb8bcc4, matrix: mtx(0.16, 0.56, 0, 0, 0, -Math.PI / 2) }); P.push({ geo: new THREE.ConeGeometry(0.04, 0.26, 5), color: 0xb8bcc4, matrix: mtx(-0.12, 0.56, 0, 0, 0, Math.PI / 2) }); break;
     case 'metalhatchet': handle(); P.push({ geo: new THREE.BoxGeometry(0.2, 0.14, 0.03), color: 0xc0c4cc, matrix: mtx(0.08, 0.52, 0) }); break;
     case 'sword': P.push({ geo: new THREE.CylinderGeometry(0.025, 0.025, 0.2, 6), color: 0x4a3420, matrix: mtx(0, 0, 0) }); P.push({ geo: new THREE.BoxGeometry(0.2, 0.03, 0.04), color: 0x8a7a50, matrix: mtx(0, 0.11, 0) }); P.push({ geo: new THREE.BoxGeometry(0.05, 0.75, 0.012), color: 0xd0d4dc, matrix: mtx(0, 0.5, 0) }); break;
+    case 'frostbrand': P.push({ geo: new THREE.CylinderGeometry(0.028, 0.028, 0.22, 6), color: 0x2a3a4a, matrix: mtx(0, 0, 0) }); P.push({ geo: new THREE.BoxGeometry(0.26, 0.04, 0.05), color: 0x9ae0ff, matrix: mtx(0, 0.12, 0) }); P.push({ geo: new THREE.BoxGeometry(0.07, 0.85, 0.015), color: 0xd8f4ff, matrix: mtx(0, 0.56, 0) }); break;
     case 'primalblade': P.push({ geo: new THREE.CylinderGeometry(0.028, 0.028, 0.22, 6), color: 0x2a1a14, matrix: mtx(0, 0, 0) }); P.push({ geo: new THREE.BoxGeometry(0.24, 0.04, 0.05), color: 0xc8a040, matrix: mtx(0, 0.12, 0) }); P.push({ geo: new THREE.ConeGeometry(0.05, 0.95, 4), color: 0xf0e6d0, matrix: mtx(0, 0.62, 0) }); P.push({ geo: new THREE.BoxGeometry(0.02, 0.7, 0.02), color: 0xff5a2a, matrix: mtx(0, 0.5, 0.03) }); break;
     case 'lantern': P.push({ geo: new THREE.CylinderGeometry(0.015, 0.015, 0.25, 5), color: 0x3a3a3c, matrix: mtx(0, 0.1, 0) }); P.push({ geo: new THREE.CylinderGeometry(0.05, 0.06, 0.03, 8), color: 0x2a2a2c, matrix: mtx(0, 0.24, 0) }); P.push({ geo: new THREE.CylinderGeometry(0.05, 0.06, 0.03, 8), color: 0x2a2a2c, matrix: mtx(0, 0.4, 0) }); P.push({ geo: new THREE.OctahedronGeometry(0.06), color: 0xbff0ff, matrix: mtx(0, 0.32, 0, 0, 0, 0, 1, 1.4, 1) }); break;
     case 'obsidianspear': handle(1.6); P.push({ geo: new THREE.OctahedronGeometry(0.07), color: 0x1a1620, matrix: mtx(0, 1.62, 0, 0, 0, 0, 1, 3, 1) }); break;
@@ -144,6 +145,7 @@ export class Player {
     this.swimming = this.pos.y < WATER_LEVEL - 1.1 && groundH < WATER_LEVEL - 1.1;
     const wantsSprint = (k.ShiftLeft || k.ShiftRight) && fwd > 0.3 && !this.crouch && this.stam > 1;
     let speed = this.swimming ? 3.2 : this.crouch ? 2.2 : wantsSprint ? 9.5 : 5.2;
+    if (this.slowT > 0) { this.slowT -= dt; speed *= 0.5; }
     if (this.food <= 0 || this.water <= 0) speed *= 0.8;
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
     const dx = -sinY * fwd + cosY * str, dz = -cosY * fwd - sinY * str;
@@ -196,6 +198,7 @@ export class Player {
     this.water = Math.max(0, this.water - dt * 0.16 * (this.hs > 6 ? 1.6 : 1));
     if (this.food <= 0 || this.water <= 0) this.hp -= dt * 1.2;
     else if (this.food > 30 && this.water > 30 && !(this.cold > 4)) this.hp = Math.min(this.maxHp, this.hp + dt * 0.6);
+    if (this.armor && this.armorRegen) this.hp = Math.min(this.maxHp, this.hp + dt * this.armorRegen);
     this.hurtT = Math.max(0, this.hurtT - dt);
     if (this.hp <= 0 && this.alive) { this.hp = 0; this.alive = false; }
   }

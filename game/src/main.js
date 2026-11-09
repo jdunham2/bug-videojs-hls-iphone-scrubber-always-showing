@@ -91,6 +91,11 @@ class Game {
       },
       bossPhase: (c) => { this.ui.banner(`${c.name.toUpperCase()} CALLS FOR AID`, `${c.cfg.minions[1]} ${c.cfg.minions[0]}s join the fight`); this.playRoar(c); },
       eruption: (c) => this.bosses.eruption(c),
+      icespikes: (c) => this.bosses.eruption(c, 'ice'),
+      poison: (c) => this.bosses.eruption(c, 'poison'),
+      blizzard: (c) => this.bosses.blizzard(c),
+      quake: (c, d) => this.bosses.quake(c, d),
+      submerge: (c) => { this.ui.notify(`${c.name} sinks beneath the mire…`, 'warn'); this.audio.splash(); },
       whirlpool: (c) => this.bosses.whirlpool(c),
       shriek: (c) => this.bosses.shriek(c),
       pounce: (c) => this.playRoar(c),
@@ -163,6 +168,9 @@ class Game {
       { title: 'Champion of the Isle: defeat all four bosses', progress: () => `${Object.keys((this.stats.bossesDefeated || {})).length}/4 bosses slain`, done: () => Object.keys((this.stats.bossesDefeated || {})).length >= 4 },
       { title: 'Explore Murkmire Swamp and brew a Healing Salve from Marsh Herbs', progress: () => `🌱 ${this.inv.count('herb')} herbs · watch the pools for Bogmaws`, done: () => this.inv.count('salve') > 0 || (this.stats.salves || 0) > 0 },
       { title: 'Brave Frostpeak: craft Fur Armor from Frosthorn or Rimeclaw pelts', progress: () => `🐑 ${Math.min(this.inv.count('pelt'), 10)}/10 pelts`, done: () => this.inv.count('furarmor') > 0 || (this.player.armor && this.player.armor.id === 'furarmor') },
+      { title: 'Slay Rimefang, the Frozen Alpha, at the ice spire on Frostpeak', progress: () => 'Offer 15 Thick Pelts + 1 Alpha Trophy. Wear Fur Armor: its blizzard freezes', done: () => (this.stats.bossesDefeated || {}).rimefang >= 1 },
+      { title: 'Slay Mirelord, the Swamp King, at the mossy totem in Murkmire', progress: () => 'Offer 20 Marsh Herbs + 1 Alpha Trophy. Stay out of the green gas; it hides underwater', done: () => (this.stats.bossesDefeated || {}).mirelord >= 1 },
+      { title: 'Gather 6 Boss Sigils and summon the Ancient Titan at Crescent Lake', progress: () => `🔯 ${this.inv.count('sigil')}/6 sigils — every boss drops one`, done: () => (this.stats.bossesDefeated || {}).titan >= 1 },
     ];
     this.questIdx = 0;
 
@@ -723,7 +731,7 @@ class Game {
     for (const node of nodes) {
       if (!node.alive) continue;
       const to = new THREE.Vector3(node.x - m.pos.x, 0, node.z - m.pos.z);
-      if (to.length() < reach + 1 && to.normalize().dot(fwd) > 0.4) { this.harvestNode(node, m.species === 'ironhide' && node.kind === 'rock' ? 3.2 : m.species === 'trikeros' && node.kind !== 'rock' ? 2.2 : 1.2); break; }
+      if (to.length() < reach + 1 && to.normalize().dot(fwd) > 0.4) { this.harvestNode(node, m.species === 'ironhide' && node.kind === 'rock' ? 3.2 : m.species === 'scythehand' && node.kind === 'tree' ? 3.6 : m.species === 'trikeros' && node.kind !== 'rock' ? 2.2 : 1.2); break; }
     }
     // carcasses
     for (const o of this.creatures.list) {
@@ -892,7 +900,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1032,6 +1040,7 @@ class Game {
       this.input.mx = 0; this.input.my = 0;
       this.updateMount(dt);
       if (!this.ui.open) this.primary(dt);
+      p.armorRegen = p.armor ? ITEMS[p.armor.id].regen || 0 : 0;
       p.survival(dt);
       this.temperature(dt);
       if (!p.alive && !document.getElementById('death').classList.contains('show')) this.die(null);
@@ -1114,6 +1123,7 @@ class Game {
       if (cd < VOLCANO.crater + 25) t += 22 * (1 - cd / (VOLCANO.crater + 25));
       t -= (this.biome ? this.biome.frost : 0) * 12;
       t += (this.biome ? this.biome.swamp : 0) * 2;
+      if (this.bosses.blizzardT > 0) t -= 25;
     }
     for (const f of this.building.fires) {
       if (!f.lit) continue;

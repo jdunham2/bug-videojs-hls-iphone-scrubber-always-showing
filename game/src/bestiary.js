@@ -22,6 +22,10 @@ const LORE = {
   reedhorn: { icon: '🦆', where: 'Murkmire Swamp, in herds', text: 'A duck-billed grazer that wades through the marsh tearing up reeds. Herds trumpet and stand together when threatened.' },
   frosthorn: { icon: '🦬', where: 'Frostpeak, in herds', text: 'A shaggy, three-horned grazer built for the cold. Its thick pelt makes the warmest armor on the island.' },
   rimeclaw: { icon: '🦖', where: 'Frostpeak, in packs', text: 'White-scaled raptors that vanish against the snow and hunt the Frosthorn herds.' },
+  plateback: { icon: '🦕', where: 'Forests and grasslands, in pairs', text: 'Two rows of tall back plates and a tail tipped with four spikes. It turns its back to predators and swings.' },
+  hornjaw: { icon: '🐂', where: 'Lowlands', text: 'A short-armed, horn-browed sprinter that charges its prey head-on at terrifying speed.' },
+  scythehand: { icon: '🦥', where: 'Deep forest', text: 'A towering plant-eater with claws as long as swords. Saddled, it shreds trees for timber in seconds.' },
+  skyhorn: { icon: '🦅', where: 'High cliffs and peaks', text: 'The largest pterosaur on the island, crowned with a blazing crest. The fastest thing in the sky.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

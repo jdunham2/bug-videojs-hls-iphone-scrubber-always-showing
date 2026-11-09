@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, VOLCANO, LAVA_Y, WATER_LEVEL, HALF } from './terrain.js';
+import { heightAt, VOLCANO, LAVA_Y, WATER_LEVEL, HALF, SWAMP, swampAt, frostAt, slopeAt } from './terrain.js';
 import { BOSS_TYRANT } from './creatures.js';
 import { lavaMaterial } from './volcano.js';
 import { ITEMS } from './items.js';
@@ -7,21 +7,37 @@ import { ITEMS } from './items.js';
 // Four bosses, each summoned at its own shrine with an offering and each dropping a unique
 // crafting reward. The Primal Tyrant's altar is built by the game; the others are built here.
 export const BOSSES = {
-  tyrant: { ...BOSS_TYRANT, title: 'THE PRIMAL TYRANT', cost: { trophy: 3 }, reward: [['fang', 1], ['ingot', 25], ['trophy', 2]], rewardText: 'Its fang forges the Primal Blade', color: 0xff3a1a },
+  tyrant: { ...BOSS_TYRANT, title: 'THE PRIMAL TYRANT', cost: { trophy: 3 }, reward: [['fang', 1], ['ingot', 25], ['trophy', 2], ['sigil', 1]], rewardText: 'Its fang forges the Primal Blade', color: 0xff3a1a },
   magmaroth: {
     kind: 'magmaroth', species: 'cinderback', name: 'Magmaroth, the Molten King', title: 'MAGMAROTH, THE MOLTEN KING',
     hp: 20000, dmg: 62, scale: 2.7, minions: ['cinderback', 2, 35], phases: [0.6, 0.3], abilities: ['stomp', 'eruption'], arena: 90, leash: 80,
-    cost: { obsidian: 15, trophy: 1 }, reward: [['core', 1], ['obsidian', 20], ['ingot', 20]], rewardText: 'Its Molten Core forges Magmaplate Armor', color: 0xff7a1a,
+    cost: { obsidian: 15, trophy: 1 }, reward: [['core', 1], ['obsidian', 20], ['ingot', 20], ['sigil', 1]], rewardText: 'Its Molten Core forges Magmaplate Armor', color: 0xff7a1a,
   },
   deepmother: {
     kind: 'deepmother', species: 'deepjaw', name: 'The Deep Mother', title: 'THE DEEP MOTHER',
     hp: 18000, dmg: 48, scale: 3.2, minions: ['deepjaw', 2, 35], phases: [0.5], abilities: ['whirlpool'], arena: 90,
-    cost: { meat: 20, trophy: 1 }, reward: [['pearl', 1], ['ingot', 20], ['hide', 20]], rewardText: 'Its Abyssal Pearl forges the Tidecaller Trident', color: 0x3ac8ff,
+    cost: { meat: 20, trophy: 1 }, reward: [['pearl', 1], ['ingot', 20], ['hide', 20], ['sigil', 1]], rewardText: 'Its Abyssal Pearl forges the Tidecaller Trident', color: 0x3ac8ff,
   },
   hollowqueen: {
     kind: 'hollowqueen', species: 'duskraptor', name: 'The Hollow Queen', title: 'THE HOLLOW QUEEN',
     hp: 12000, dmg: 38, scale: 2.5, minions: ['duskraptor', 3, 30], phases: [0.75, 0.5, 0.25], abilities: ['shriek', 'pounce'], arena: 60, leash: 40,
-    cost: { crystal: 20 }, reward: [['eye', 1], ['crystal', 20], ['ingot', 15]], rewardText: 'Her eye forges the Huntress Bow', color: 0x9a6aff,
+    cost: { crystal: 20 }, reward: [['eye', 1], ['crystal', 20], ['ingot', 15], ['sigil', 1]], rewardText: 'Her eye forges the Huntress Bow', color: 0x9a6aff,
+  },
+  rimefang: {
+    kind: 'rimefang', species: 'rimeclaw', name: 'Rimefang, the Frozen Alpha', title: 'RIMEFANG, THE FROZEN ALPHA',
+    hp: 15000, dmg: 44, scale: 3.3, minions: ['rimeclaw', 3, 35], phases: [0.66, 0.33], abilities: ['icespikes', 'blizzard', 'pounce'], arena: 80, leash: 60,
+    cost: { pelt: 15, trophy: 1 }, reward: [['frostheart', 1], ['pelt', 15], ['ingot', 15], ['sigil', 1]], rewardText: 'Its Frost Heart forges the Frostbrand Sword', color: 0x9ae0ff,
+  },
+  mirelord: {
+    kind: 'mirelord', species: 'bogmaw', name: 'Mirelord, the Swamp King', title: 'MIRELORD, THE SWAMP KING',
+    hp: 17000, dmg: 50, scale: 3.0, minions: ['bogmaw', 2, 35], phases: [0.6, 0.3], abilities: ['poison', 'submerge'], arena: 80, leash: 60,
+    cost: { herb: 20, trophy: 1 }, reward: [['miretooth', 1], ['herb', 15], ['ingot', 15], ['sigil', 1]], rewardText: 'Its tooth makes Mirehide Armor, which heals you', color: 0x7ad84a,
+  },
+  titan: {
+    kind: 'titan', species: 'thunderneck', name: 'The Ancient Titan', title: 'THE ANCIENT TITAN',
+    hp: 45000, dmg: 90, scale: 1.9, minions: ['talonrunner', 4, 40], minionsList: [['talonrunner', 4, 40], ['cinderback', 2, 40], ['gorgonax', 1, 45]], phases: [0.75, 0.5, 0.25],
+    abilities: ['stomp', 'quake', 'eruption'], arena: 120, leash: 90,
+    cost: { sigil: 6 }, reward: [['titanheart', 1], ['ingot', 50], ['trophy', 5]], rewardText: 'Its heart forges Primeval Armor, the finest on the island', color: 0xffe08a,
   },
 };
 
@@ -70,13 +86,33 @@ export class Bosses {
     const qPos = new THREE.Vector3(ch.x, grotto.floor(ch.x, ch.z), ch.z);
     const cc = grotto.cacheChamber;
     this.shrines.push({ kind: 'hollowqueen', pos: qPos, spawn: new THREE.Vector3(cc.x + 3, grotto.floor(cc.x + 3, cc.z), cc.z), cave: grotto });
+    // Rimefang: an ice spire on Frostpeak
+    const spot = (cx, cz, rad, ok) => {
+      let best = null;
+      for (let i = 0; i < 600; i++) {
+        const x = cx + (Math.random() - 0.5) * rad * 2, z = cz + (Math.random() - 0.5) * rad * 2, h = heightAt(x, z);
+        if (!ok(x, z, h)) continue;
+        const sl = slopeAt(x, z);
+        if (!best || sl < best.sl) best = { x, z, h, sl };
+      }
+      return best ? new THREE.Vector3(best.x, best.h, best.z) : new THREE.Vector3(cx, heightAt(cx, cz), cz);
+    };
+    const away = (p, d) => { for (let a = 0; a < 6.28; a += 0.4) { const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d; const h = heightAt(x, z); if (Math.abs(h - p.y) < 6) return new THREE.Vector3(x, h, z); } return p.clone(); };
+    const rPos = spot(-120, -170, 90, (x, z, h) => frostAt(x, z) > 0.75);
+    this.shrines.push({ kind: 'rimefang', pos: rPos, spawn: away(rPos, 16) });
+    // Mirelord: a mossy totem in the heart of the swamp
+    const sPos = spot(SWAMP.x, SWAMP.z, 60, (x, z, h) => swampAt(x, z) > 0.8 && h > 0.4 && h < 2);
+    this.shrines.push({ kind: 'mirelord', pos: sPos, spawn: away(sPos, 16) });
+    // The Ancient Titan: a great monolith on the shore of Crescent Lake
+    const lPos = spot(120, 30, 90, (x, z, h) => h > 2 && h < 6 && Math.hypot(x - 120, z - 30) > 40 && Math.hypot(x - 120, z - 30) < 80);
+    this.shrines.push({ kind: 'titan', pos: lPos, spawn: away(lPos, 26) });
     for (const s of this.shrines) if (s.kind !== 'tyrant') this.buildShrine(s);
   }
 
   buildShrine(s) {
     const g = this.game, def = BOSSES[s.kind];
     const grp = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: s.kind === 'magmaroth' ? 0x1a1620 : s.kind === 'deepmother' ? 0x4a5a5e : 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
+    const stone = new THREE.MeshStandardMaterial({ color: { magmaroth: 0x1a1620, deepmother: 0x4a5a5e, rimefang: 0xc8d8e8, mirelord: 0x3a4a2a, titan: 0x8a7a5a }[s.kind] || 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 0.8, 6), stone); base.position.y = 0.3; grp.add(base);
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 3.2, 5), stone); pillar.position.y = 2.2; grp.add(pillar);
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 1.6, roughness: 0.3 }));
@@ -86,6 +122,7 @@ export class Bosses {
       const st = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2 + (i % 2), 5), stone);
       st.position.set(Math.cos(a) * 3.2, 0.8, Math.sin(a) * 3.2); grp.add(st);
     }
+    if (s.kind === 'titan') grp.scale.setScalar(1.8);
     grp.position.copy(s.pos);
     grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     g.scene.add(grp);
@@ -141,16 +178,53 @@ export class Bosses {
   }
 
   // ---- ability effects (hooked from the creature manager) ----
-  eruption(c) {
+  eruption(c, style = 'fire') {
     const g = this.game, p = g.player;
-    g.ui.notify('The ground splits — move!', 'warn');
-    for (let i = 0; i < 4; i++) {
+    g.ui.notify({ fire: 'The ground splits — move!', ice: 'Ice spikes surge from the ground!', poison: 'Toxic bog gas bubbles up!' }[style], 'warn');
+    const color = { fire: 0xff5a1a, ice: 0x9ae0ff, poison: 0x7ad84a }[style];
+    for (let i = 0; i < (style === 'poison' ? 3 : 4); i++) {
       const pos = i === 0 ? p.pos.clone() : p.pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 18, 0, (Math.random() - 0.5) * 18));
       pos.y = heightAt(pos.x, pos.z) + 0.15;
-      const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xff5a1a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.copy(pos); ring.scale.setScalar(0.3);
       g.scene.add(ring);
-      this.hazards.push({ type: 'eruption', pos, r: 3.6, t: 1.5 + i * 0.15, ring, life: 6 });
+      this.hazards.push({ type: 'eruption', style, pos, r: style === 'poison' ? 4.8 : 3.6, t: (style === 'poison' ? 0.8 : 1.5) + i * 0.15, ring, life: style === 'poison' ? 8 : 6 });
+    }
+  }
+
+  poolMat(style) {
+    if (style === 'fire') return this.lavaMat;
+    this._mats = this._mats || {};
+    return this._mats[style] || (this._mats[style] = new THREE.MeshStandardMaterial(style === 'ice'
+      ? { color: 0xd8f0ff, emissive: 0x5aa8d8, emissiveIntensity: 0.5, roughness: 0.15, transparent: true, opacity: 0.85 }
+      : { color: 0x5aa82a, emissive: 0x3a8a1a, emissiveIntensity: 0.8, roughness: 0.9, transparent: true, opacity: 0.6, depthWrite: false }));
+  }
+
+  // damage that armor reduces (ice, poison, quakes)
+  hit(dmg, silent) {
+    const g = this.game, p = g.player;
+    if (p.mount) { g.creatures.damage(p.mount, dmg, 0, null); return; }
+    const a = p.armor ? ITEMS[p.armor.id].armor || 0 : 0;
+    p.damage(dmg * (1 - a * 0.6));
+    p.hurtT = Math.max(p.hurtT, silent ? 0.2 : 0.4);
+    if (!silent) g.audio.hurt();
+    if (!p.alive) g.die(null);
+  }
+
+  blizzard(c) {
+    this.blizzardT = 6;
+    this.game.ui.notify('Rimefang summons a blizzard — find warmth!', 'warn');
+    this.game.audio.thunder?.(0.4);
+  }
+
+  quake(c, d) {
+    const g = this.game, p = g.player;
+    g.shake = 1.6;
+    g.audio.thunder?.(1);
+    g.ui.notify('The Titan shakes the island!', 'warn');
+    if (d < 40 && p.alive) {
+      this.hit(45 * (1 - d / 42));
+      if (!p.mount) { const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize().multiplyScalar(18); p.vel.add(away); p.vel.y += 7; }
     }
   }
 
@@ -174,6 +248,8 @@ export class Bosses {
     const g = this.game, p = g.player;
     for (const s of this.shrines) if (s.gem) { s.gem.rotation.y += dt; s.gem.position.y = 4.3 + Math.sin(g.shared.uTime.value * 2 + s.pos.x) * 0.15; }
     for (const [k, c] of Object.entries(this.active)) if (!c.alive || !g.creatures.list.includes(c)) delete this.active[k];
+    if (this.blizzardT > 0) { this.blizzardT -= dt; document.getElementById('blizzard').style.opacity = Math.min(0.75, this.blizzardT * 0.4); }
+    else document.getElementById('blizzard').style.opacity = 0;
     if (this.shriekT > 0) {
       this.shriekT -= dt;
       g.caves.torch.intensity *= 0.25;
@@ -189,12 +265,21 @@ export class Bosses {
           if (h.t <= 0) {
             // burst: damage and leave a burning pool
             g.scene.remove(h.ring);
-            h.pool = new THREE.Mesh(this.poolGeo, this.lavaMat); h.pool.rotation.x = -Math.PI / 2; h.pool.position.copy(h.pos); h.pool.scale.setScalar(h.r);
+            h.pool = new THREE.Mesh(this.poolGeo, this.poolMat(h.style)); h.pool.rotation.x = -Math.PI / 2; h.pool.position.copy(h.pos); h.pool.scale.setScalar(h.r);
             g.scene.add(h.pool);
+            if (h.style === 'ice') {
+              // spikes are children of the (rotated, r-scaled) pool: local +z points up
+              this.spikeGeo = this.spikeGeo || new THREE.ConeGeometry(0.1, 0.7, 5).rotateX(Math.PI / 2).translate(0, 0, 0.35);
+              for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const sp = new THREE.Mesh(this.spikeGeo, this.poolMat('ice')); sp.position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0); h.pool.add(sp); }
+            }
             g.shake = Math.max(g.shake || 0, 0.5);
-            if (p.pos.distanceTo(h.pos) < h.r + 0.5) this.burn(35);
+            if (p.pos.distanceTo(h.pos) < h.r + 0.5) { if (h.style === 'fire') this.burn(35); else if (h.style === 'ice') { this.hit(28); p.slowT = 3; } }
           }
-        } else if (p.pos.distanceTo(h.pos) < h.r && Math.abs(p.pos.y - h.pos.y) < 2) this.burn(20 * dt, true);
+        } else if (p.pos.distanceTo(h.pos) < h.r && Math.abs(p.pos.y - h.pos.y) < 2) {
+          if (h.style === 'fire') this.burn(20 * dt, true);
+          else if (h.style === 'ice') { this.hit(6 * dt, true); p.slowT = Math.max(p.slowT || 0, 0.5); }
+          else { this.hit(14 * dt, true); p.poisonT = 0.5; }
+        }
         if (h.life <= 0) { if (h.pool) g.scene.remove(h.pool); else g.scene.remove(h.ring); this.hazards.splice(i, 1); }
       } else if (h.type === 'whirlpool') {
         h.ring.rotation.z += dt * 2;

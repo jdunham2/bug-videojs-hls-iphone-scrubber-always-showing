@@ -80,7 +80,17 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - **The Hollow Queen** (crystal throne deep in the Glimmer Grotto; 20 Glimmer Crystals):
     pounces from range, shrieks to kill your light, and calls Duskraptors at 75/50/25%. Her
     eye makes the Huntress Bow (fast, double-strength tranq shots).
-  - Beat all four to become **Champion of the Isle**.
+  - **Rimefang, the Frozen Alpha** (ice spire on Frostpeak; 15 Thick Pelts + 1 Trophy):
+    ice spikes that slow you, a freezing blizzard whiteout and pounces. Frost Heart forges
+    the Frostbrand Sword.
+  - **Mirelord, the Swamp King** (mossy totem in Murkmire; 20 Marsh Herbs + 1 Trophy):
+    toxic gas clouds, and it sinks out of sight to burst up beside you. Its tooth makes
+    Mirehide Armor, which slowly heals you.
+  - **The Ancient Titan** (monolith on Crescent Lake's shore; 6 Boss Sigils, which every
+    other boss drops): a colossal Thunderneck with quakes, stomps and eruptions that calls
+    raptors, Cinderbacks and a Gorgonax. Its heart forges Primeval Armor, the best armor in
+    the game.
+  - Beat four bosses to become **Champion of the Isle**.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
   refills your water.
@@ -111,6 +121,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Reedhorn: duck-billed swamp grazer in herds; rideable
   - Frosthorn: woolly three-horned grazer of Frostpeak, drops pelts; rideable
   - Rimeclaw: white snow raptor that hunts in packs; rideable
+  - Plateback: plate-backed grazer with a spiked tail; rideable
+  - Hornjaw: horn-browed sprinting predator; rideable
+  - Scythehand: towering clawed herbivore, fells trees fast as a mount; rideable
+  - Skyhorn: giant crested pterosaur, the fastest flyer; rideable
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer
