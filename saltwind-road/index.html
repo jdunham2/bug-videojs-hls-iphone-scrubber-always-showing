@@ -826,6 +826,9 @@ const GOODS = {
   lamp_post:{name:'Lamp Post',base:40,col:'#e3c068',kind:'place',desc:'Place with B. Lights up the night.'},
   paper_lantern:{name:'Paper Lantern',base:30,col:'#e05a3a',kind:'place',desc:'Place with B. A warm red glow.'},
   scarecrow:{name:'Scarecrow',base:25,col:'#c8a040',kind:'place',desc:'Place with B. A friendly decoration.'},
+  snowball:{name:'Snowball',base:1,col:'#f4f8ff',kind:'mat',desc:'Scooped from winter snow. Melts in spring.'},
+  snowman:{name:'Snowman',base:20,col:'#f4f8ff',kind:'place',desc:'Place with B. Building one makes you cheerful. Melts in spring.'},
+  royal_sash:{name:'Royal Sash',base:1800,col:'#7a3ad8',kind:'trinket',desc:'+3% damage and +3 max HP. Worn by Knights of the Realm.'},
   fire_opal:{name:'Fire Opal',base:140,col:'#ff7a3a',kind:'good',desc:'Thrown from the heart of the volcano'},
   magma_charm:{name:'Magma Charm',base:1100,col:'#ff5a1a',kind:'trinket',desc:'Immune to lava-bomb fire; +4% damage'},
   bug_net:{name:'Bug Net',base:40,col:'#e8e0c8',kind:'tool',desc:'Catch bugs and butterflies'},
@@ -1112,6 +1115,7 @@ const RECIPES = [
   {id:'campfire',       need:{wood:3,stone:3}, at:'hand', known:true},
   {id:'bamboo_fence', n:4, need:{bamboo:3}, at:'hand', known:true},
   {id:'scarecrow',      need:{wheat:3,sticks:2,hide:1}, at:'bench', known:true},
+  {id:'snowman',        need:{snowball:3,sticks:2,carrot:1}, at:'hand', known:true},
   {id:'magma_charm',    need:{fire_opal:5,obsidian:4,silver:2}, at:'forge', known:true},
   {id:'bug_net',        need:{sticks:3,silk:2}, at:'hand', known:true},
   {id:'cauldron',       need:{iron:4,stone:4}, at:'forge', known:true},
@@ -1430,7 +1434,7 @@ const PLACE = {
   crafting_table:{solid:true, use:'craft'}, anvil:{solid:true, use:'craft'},
   fence:{solid:true, join:true}, bamboo_fence:{solid:true, join:true}, fence_gate:{solid:false, join:true, gate:true}, stone_wall:{solid:true, join:true},
   campfire:{solid:true, light:52, use:'rest'}, beehive:{solid:true, use:'produce', give:'honey', n:[1,2], cap:6}, crab_pot:{solid:true, use:'produce', give:'shells', bonus:'fish', n:[1,3], cap:8, water:true}, mushroom_log:{solid:true, use:'produce', give:'mushroom', bonus:'truffle', n:[2,3], cap:9}, cooking_pot:{solid:true, light:18, use:'cook'}, golden_statue:{solid:true}, starlight_lantern:{solid:true, light:80}, fireworks:{solid:false, light:20}, sky_lantern:{solid:false, light:50}, pumpkin_lantern:{solid:true, light:44}, snow_globe:{solid:true}, torch:{solid:false, light:36}, quartz_lamp:{solid:true, light:78}, driftwood_bench:{solid:true}, lamp_post:{solid:true, light:66}, paper_lantern:{solid:true, light:46},
-  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30},
+  scarecrow:{solid:true}, flower_pot:{solid:true}, telescope:{solid:true, use:'scope'}, tent:{solid:true, use:'tent'}, cauldron:{solid:true, use:'brew', light:30}, snowman:{solid:true},
 };
 const PLACE_MAX = 600;
 let placedCache = {src: null, n: -1, map: new Map()};
@@ -1469,7 +1473,7 @@ function placeItem(g) {
   if (!g || !have(g) || GOODS[g].kind !== 'place') { floatText(S.x, S.y - 1.2, 'Nothing to place', '#e57a62'); return false; }
   const sp = placeSpot(), why = placeBlock(sp.x, sp.y);
   if (why) { floatText(S.x, S.y - 1.2, why, '#e57a62'); return false; }
-  addItem(g, -1); S.placed.push({t: g, x: sp.x, y: sp.y}); S.lastPlace = g;
+  addItem(g, -1); S.placed.push({t: g, x: sp.x, y: sp.y}); S.lastPlace = g; if (g === 'snowman') { S.snowmen = (S.snowmen || 0) + 1; BUFFS.regen = 300; BUFFS.luck = 300; setTimeout(() => toast('<b>What a fine snowman!</b><br>You feel cheerful: Hearty and Lucky for 5 minutes.', 4000), 100); }
   SFX.craft(); burst(sp.x + .5, sp.y + .6, GOODS[g].col, 6, 2);
   if (!S.flags.placeTip) { S.flags.placeTip = true; toast(`Placed a <b>${GOODS[g].name}</b>.<br>Press <b>B</b> to place another one in the direction you face. Walk up to it and press <b>E</b> to pick it back up.`, 7000); }
   renderHUD(); save(); return true;
@@ -1566,6 +1570,13 @@ function drawPlaced(g, q, t) {
       g.fillStyle = '#5a3a20'; g.fillRect(x + 7, y - 2, 2, 17);
       g.fillStyle = isNightish() ? '#ff7a5a' : '#d0402a'; g.beginPath(); g.ellipse(x + 8, y - 5, 4, 5, 0, 0, 7); g.fill();
       g.fillStyle = '#2a1a1a'; g.fillRect(x + 6, y - 10, 4, 1); g.fillRect(x + 6, y, 4, 1); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 4, y - 5, 8, 1); break;
+    case 'snowman':
+      g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 2, y + 14, 12, 2);
+      g.fillStyle = '#f4f8ff'; g.beginPath(); g.arc(x + 8, y + 9, 6, 0, 7); g.fill(); g.beginPath(); g.arc(x + 8, y + 1, 4.5, 0, 7); g.fill(); g.beginPath(); g.arc(x + 8, y - 5, 3.5, 0, 7); g.fill();
+      g.fillStyle = '#c8d8e8'; g.fillRect(x + 9, y + 3, 4, 8);
+      g.fillStyle = '#1a1a1a'; g.fillRect(x + 6, y - 6, 1, 1); g.fillRect(x + 9, y - 6, 1, 1); g.fillRect(x + 7.5, y, 1, 1); g.fillRect(x + 7.5, y + 3, 1, 1);
+      g.fillStyle = '#f07a2a'; g.fillRect(x + 8, y - 5, 3, 1); g.fillStyle = '#c84a3a'; g.fillRect(x + 4, y - 2, 8, 2);
+      g.fillStyle = '#6a4a2a'; g.fillRect(x + 1, y, 3, 1); g.fillRect(x + 12, y - 1, 3, 1); g.fillStyle = '#2a2a2a'; g.fillRect(x + 5, y - 10, 6, 2); g.fillRect(x + 6, y - 13, 4, 3); break;
     case 'cauldron': {
       g.fillRect(x + 2, y + 14, 12, 2);
       g.fillStyle = '#2a2a32'; g.beginPath(); g.ellipse(x + 8, y + 7, 7, 6, 0, 0, 7); g.fill(); g.fillRect(x + 3, y + 11, 2, 4); g.fillRect(x + 11, y + 11, 2, 4);
@@ -2007,6 +2018,8 @@ const NPCS = [
    rumors:["Elite monsters roam the wild. They glow, they're bigger, and they hit like a falling tree. I pay for every one you bring down.","Elites drop Elite Essence. A smith can turn five of them into a Champion's Medal."]},
   {id:'vex',town:'crownfall',dx:-4,dy:2,name:'Vex the Bold',role:'Rival adventurer',cols:{cloak:'#8a2a4a',skin:'#e0b896',hair:'#f0e0a0'},rival:true,freeSpot:true,
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
+  {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
+   hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
   {id:'maude',town:'maplehold',dx:3,dy:-3,name:'Milliner Maude',role:'Hat maker',cols:{cloak:'#a04a6a',skin:'#e8c8a8',hair:'#c8a050'},milliner:true,freeSpot:true,
    hello:["Darling, that head is simply crying out for a hat.","Hats! Hats for every occasion!","A new hat is a new you."], rumors:["Some hats can't be bought. They're earned. I've heard of a halo for true legends, and antlers for friends of the White Stag."]},
   {id:'haywood',town:'wren',dx:4,dy:4,name:'Tobin Haywood',role:'Farmhand for hire',cols:{cloak:'#7a6a3a',skin:'#d8a882',hair:'#c89040'},farmhand:true,freeSpot:true,
@@ -2930,7 +2943,7 @@ const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0);
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3212,7 +3225,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.dead) return;
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3404,6 +3417,37 @@ function drawGolem(x, y, phase, moving, face) {
   ctx.fillStyle = '#5a5a68'; ctx.fillRect(x - 3, y - 11, 2, 2); ctx.fillRect(x + 2, y - 9, 3, 1);
   const glow = .6 + Math.sin(frameT*3)*.3; ctx.fillStyle = `rgba(138,208,255,${glow})`; ctx.fillRect(x + f - 2, y - 18, 1, 1); ctx.fillRect(x + f + 1, y - 18, 1, 1); ctx.fillRect(x - 1, y - 12, 2, 2);
   if (lv >= 5) { ctx.fillStyle = '#5a9a5a'; ctx.fillRect(x - 4, y - 21, 3, 1); ctx.fillRect(x + 2, y - 20, 2, 1); }
+}
+// ===== winter snow =====
+let snowCd = 0;
+function snowTarget() {
+  if (seasonIdx() !== 3 || inDungeon() || S.y >= WORLD_H || S.riding) return null;
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y)); if (![T.SNOW, T.GRASS, T.HILL, T.FOREST, T.MAPLE, T.MOOR].includes(t) || frameT < snowCd || have('snowball') >= 9) return null;
+  return {key: 'snow' + have('snowball'), html: '<kbd style="margin:0 6px 0 0">E</kbd>Scoop up a snowball', btn: 'Scoop', fn: () => { snowCd = frameT + .6; addItem('snowball', 1); burst(S.x, S.y, '#f4f8ff', 6, 2); SFX.pickup(); renderHUD(); }};
+}
+// ===== royal decrees =====
+const DECREE_GOODS = [['planks', 20], ['fish', 15], ['iron', 10], ['wool', 12], ['honey', 10], ['bread', 10], ['stone', 30], ['rope', 10], ['glass', 8], ['salt', 15]];
+const DECREE_FOES = [['wolf', 15], ['bandit', 12], ['skeleton', 12], ['spider', 12], ['scorpion', 10], ['ghoul', 8], ['slime', 15], ['boar', 12]];
+function decreeNow() {
+  const wk = Math.floor((S.day - 1)/7);
+  if (!S.decree || S.decree.wk !== wk) {
+    const goods = Math.random() < .5, [k, n] = goods ? pick(DECREE_GOODS.filter(([g]) => GOODS[g])) : pick(DECREE_FOES.filter(([e]) => ENEMIES[e]));
+    S.decree = {wk, goods, k, n, base: goods ? 0 : (S.killsBy[k] || 0), done: false};
+  }
+  return S.decree;
+}
+const FAVOR_PERKS = [[2, 'a Royal Seal of thanks (300 coin)'], [5, 'the Royal Sash and the title Knight of the Realm']];
+function heraldTalk(n) {
+  const D = decreeNow(), name = D.goods ? GOODS[D.k].name : ENEMIES[D.k].name, prog = D.goods ? Math.min(D.n, have(D.k)) : Math.min(D.n, (S.killsBy[D.k] || 0) - D.base);
+  const ready = !D.done && prog >= D.n, fav = S.favor || 0;
+  say(`<b>“Hear ye, hear ye!”</b> The herald unrolls a scroll. “By order of the crown: ${D.goods ? `the realm requires <b>${D.n} ${name}</b>` : `the roads must be cleared of <b>${D.n} ${name}s</b>`}! Whosoever answers shall earn royal favor!”<br><span style="color:var(--muted)">${D.done ? 'You have answered this week’s decree. A new one is posted every 7 days.' : `Progress: ${prog}/${D.n}${D.goods ? '' : ' (defeated since the decree went up)'}`}<br>Royal favor: <b>${fav}</b>. ${FAVOR_PERKS.map(([k, t]) => `${k}: ${t}${fav >= k ? ' ✓' : ''}`).join(' · ')}</span>`, [
+    ...(ready ? [{label: D.goods ? `Deliver ${D.n} ${name}` : 'Report the deed', primary: true, fn: () => {
+      if (D.goods) addItem(D.k, -D.n); D.done = true; S.favor = fav + 1; const c = 250 + (S.level || 1)*15; S.coins += c; gainXP(120);
+      let extra = '';
+      if (S.favor === 2) { S.coins += 300; extra = '<br>The herald presses a Royal Seal of thanks into your hand: <b>+300 coin</b>.'; }
+      if (S.favor === 5) { addItem('royal_sash', 1); extra = '<br><b>You are named a Knight of the Realm!</b> The herald drapes the Royal Sash over your shoulders.'; }
+      SFX.victory(); renderHUD(); save(); say(`“The crown thanks you, loyal subject!”<br><span style="color:var(--good)">+${c} coin, +1 royal favor</span>${extra}`, [back(n)]);
+    }}] : []), back(n)]);
 }
 // ===== cosmetic hats =====
 const HATS = {
@@ -4296,6 +4340,7 @@ function legendSpawns() {
   }
 }
 const EARNED_TITLES = [
+  ['knight', 'Knight of the Realm'],
   ['guildmaster', 'Trade Magnate'],
   ['mayor', 'Mayor'],
   ['legendary', 'Legend of Saltwind'], ['king', 'King of the Castle'], ['mythslayer', 'Mythslayer'], ['arenachamp', 'Arena Champion'],
@@ -4305,8 +4350,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Winter & decrees', 'In winter, scoop snowballs from snowy ground and build a Snowman (3 Snowballs, 2 Sticks, a Carrot) for a cheerful buff. Snowmen melt in spring. Each week Herald Bartholomew in Crownfall posts a decree: answer it for coin and royal favor, and reach 5 favor to be knighted.'],
   ['Hats', 'Milliner Maude in Maplehold sells cosmetic hats you can swap any time. A few special hats (Halo, Stag Antlers, Golden Crown, Pumpkin Head) are earned through great deeds.'],
   ['Volcano eruptions', 'In the Cinderlands the volcano sometimes erupts. Dodge the lava bombs by watching for their shadows, and grab the glowing rocks they leave: Fire Opals and Obsidian. Five opals forge a Magma Charm that makes you immune to the bombs.'],
   ['Fairy rings', 'On some nights a ring of glowing mushrooms appears in the wilds. Step in and sing the fairies\u2019 tune back to them for blessings. After three songs, a fairy may follow you home.'],
@@ -5700,7 +5746,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || volcTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -5872,6 +5918,7 @@ function newDay() {
   }
   if (dayOfSeason() === 1) invalidateChunks();
   if (dayOfSeason() === 1) { const si = seasonIdx(); setTimeout(() => { toast(`<b>${SEASONS[si].name} has come</b><br>${SEASON_TEXT[si]}`, 7500); SFX.chime(); }, 900); }
+  if (seasonIdx() !== 3) { if (S.placed.some(q => q.t === 'snowman')) S.placed = S.placed.filter(q => q.t !== 'snowman'); if (have('snowball')) addItem('snowball', -have('snowball')); }
   { const B = S.home.barn, P = S.home.prod; if (B) { P.milk = Math.min(6, P.milk + B.cow); P.wool = Math.min(6, P.wool + B.sheep); for (let i = 0; i < B.pig; i++) if (Math.random() < .6) P.truffle = Math.min(4, P.truffle + 1); } }
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
   const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
@@ -6012,6 +6059,7 @@ function mainOptions(n) {
   if (n.id === 'hask' && (!S.blade || S.blade.stage < 2)) o.push({label: S.blade && S.blade.stage ? 'About the Saltwind Blade' : 'Your greatest work?', fn: () => bladeTalk(n)});
   if (n.rival) o.push({label: (S.vexRank || 0) >= 5 ? 'Friendly spar' : `Duel Vex (rank ${(S.vexRank || 0) + 1}/5)`, primary: (S.vexRank || 0) < 5 && S.vexDay !== S.day, fn: () => vexTalk(n)});
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
+  if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.milliner) o.push({label: 'Browse hats', primary: true, fn: () => hatTalk(n)});
   if (n.farmhand) o.push({label: S.farmhand ? 'About the farm work' : 'Hire a farmhand (35/day)', fn: () => farmhandTalk(n)});
   if (n.fortune) o.push({label: S.fortuneDay === S.day ? 'Your fortune (read today)' : 'Read my fortune (25◆)', primary: S.fortuneDay !== S.day, fn: () => fortuneTalk(n)});
@@ -8669,6 +8717,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['snowman','Do You Want to Build a Snowman?','Build a snowman', () => (S.snowmen || 0) >= 1],
+  ['decree','Loyal Subject','Answer a royal decree', () => (S.favor || 0) >= 1],
+  ['knight','Knight of the Realm','Earn 5 royal favor', () => (S.favor || 0) >= 5],
   ['hatter','Mad Hatter','Own 6 hats', () => Object.keys(S.hats || {}).length >= 6],
   ['eruption','Ring of Fire','Survive a volcanic eruption', () => (S.eruptions || 0) >= 1],
   ['opals','Opal Hunter','Collect 5 Fire Opals', () => (S.opals || 0) >= 5],
