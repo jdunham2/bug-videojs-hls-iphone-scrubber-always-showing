@@ -1841,6 +1841,9 @@ const NPCS = [
    rumors:["I am in a different town every night. Look for the purple lantern.","Mystery boxes hold anything at all. Anything."]},
   {id:'elowen',town:'maplehold',dx:-2,dy:3,name:'Elowen',role:'Shepherd',cols:{cloak:'#7a6a4a',skin:'#e0c0a0',hair:'#e3a948'},
    hello:["The sheep are restless today.","Oh, hello again!","My friend! Come sit."], rumors:["My grandmother used to say we came from somewhere grand. I think she just liked stories."]},
+  {id:'ilyra',town:'skyhold',dx:2,dy:3,name:'Archmage Ilyra',role:'Teacher of magic',cols:{cloak:'#3a3a8a',skin:'#e0c8b0',hair:'#f0f0ff'},mage:true,
+   hello:["The air up here is thin. Good for thinking.","Back for more lessons?","My most promising student!"],
+   rumors:["Blink through danger, freeze a crowd, burn what's left. That's most of combat, really.","Healing Light takes a long time to gather again. Use it wisely."]},
   {id:'holt',town:'hollow',dx:3,dy:1,name:'Range-master Holt',role:'Archery range',cols:{cloak:'#3a5a2a',skin:'#d8a882',hair:'#8a6a3a'},archery:true,
    hello:["Steady hands, sharp eyes.","Back for another round?","Best shot in the woods!"],
    rumors:["Targets pop up and drop fast. Don't aim too long.","Hold the attack button with a bow for a power shot. It goes straight through."]},
@@ -2997,6 +3000,32 @@ function spinAttack() {
   if (n >= 3) { floatText(S.x, S.y - 1.6, `Whirlwind ×${n}!`, '#ffe9a8'); S.whirl3 = true; }
   S.spins = (S.spins || 0) + 1;
 }
+// ===== spells =====
+const SPELLS = {
+  fireball:{name:'Fireball', cd:6, cost:800, col:'#ff7a2a', desc:'Hurl a fireball that explodes on the nearest foe.'},
+  heal:{name:'Healing Light', cd:30, cost:600, col:'#86c98f', desc:'Restore 40% of your health.'},
+  blink:{name:'Blink', cd:7, cost:700, col:'#c8a8ff', desc:'Teleport a short distance in the direction you face.'},
+  nova:{name:'Frost Nova', cd:16, cost:1000, col:'#9fe8ff', desc:'Freeze every foe around you and chill them for damage.'},
+};
+const spellCd = {};
+function castSpell() {
+  if (!S.spells || !S.spells.length) { floatText(S.x, S.y - 1.2, 'No spells known', '#e57a62'); return; }
+  const k = S.spell && S.spells.includes(S.spell) ? S.spell : S.spells[0], sp = SPELLS[k];
+  if ((spellCd[k] || 0) > 0) { floatText(S.x, S.y - 1.2, `${sp.name}: ${Math.ceil(spellCd[k])}s`, '#93a3b2'); return; }
+  spellCd[k] = sp.cd; S.casts = (S.casts || 0) + 1; const pw = 1 + (S.level || 1)*.06;
+  if (k === 'fireball') { const t = nearestEnemy(8); const tx = t ? t.x : S.x + player.dir.x*4, ty = t ? t.y : S.y + player.dir.y*4; zaps.push({x1: S.x, y1: S.y - .6, x2: tx, y2: ty - .4, t: .25}); setTimeout(() => aoeHit(tx, ty - .3, 1.9, Math.round(7*pw)), 180); }
+  else if (k === 'heal') { S.hp = Math.min(maxHP(), S.hp + maxHP()*.4); burst(S.x, S.y - .6, '#86c98f', 20, 4); renderHP(); SFX.level(); }
+  else if (k === 'blink') { const dx = player.dir.x, dy = player.dir.y; burst(S.x, S.y - .5, '#c8a8ff', 14, 3); let bx = S.x, by = S.y; for (let d = .25; d <= 4.5; d += .25) { const nx = S.x + dx*d, ny = S.y + dy*d; if (passable(nx, ny)) { bx = nx; by = ny; } else break; } S.x = bx; S.y = by; player.inv = Math.max(player.inv, .35); burst(S.x, S.y - .5, '#c8a8ff', 14, 3); SFX.dodge(); }
+  else if (k === 'nova') { burst(S.x, S.y - .4, '#9fe8ff', 30, 6); SFX.craft(); for (const e of enemies) { if (e.dead || e.hidden > 0) continue; if (Math.hypot(e.x - S.x, e.y - S.y) < 3.8) { e.frozen = e.boss ? .8 : 2.5; hitEnemy(e, Math.round(3*pw), 0, 0, 'player'); } } shake = Math.max(shake, .2); }
+  floatText(S.x, S.y - 1.6, sp.name + '!', sp.col);
+}
+function cycleSpell() { if (!S.spells || S.spells.length < 2) return; const i = S.spells.indexOf(S.spell); S.spell = S.spells[(i + 1) % S.spells.length]; floatText(S.x, S.y - 1.2, SPELLS[S.spell].name, SPELLS[S.spell].col); renderHUD(); }
+function mageTalk(n) {
+  S.spells = S.spells || [];
+  say('“Magic isn’t a gift. It’s a discipline, and an expensive one. Which tome will you study?” <span style="color:var(--muted)">(X casts, Z switches spells)</span>', [
+    ...Object.entries(SPELLS).map(([k, sp]) => ({label: S.spells.includes(k) ? `${sp.name} · learned` : `${sp.name} · ${sp.cost} coin`, disabled: S.spells.includes(k) || S.coins < sp.cost, fn: () => { S.coins -= sp.cost; S.spells.push(k); S.spell = k; SFX.level(); renderHUD(); save(); say(`You study the tome until the words burn behind your eyes. You know <b style="color:${sp.col}">${sp.name}</b>! ${sp.desc} Press <b>X</b> to cast.`, [back(n)]); }})),
+    back(n)]);
+}
 function throwBomb(tx, ty) {
   const kind = have('fire_bomb') ? 'fire_bomb' : have('frost_bomb') ? 'frost_bomb' : have('bomb') ? 'bomb' : null;
   if (!kind) { floatText(S.x, S.y - 1.2, 'No bombs', '#e57a62'); return; }
@@ -3203,7 +3232,7 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Making money', 'Buy goods cheap where they are produced and sell where they are in demand. Take jobs from townsfolk and notice boards. Houses earn rent every morning.'],
   ['Daily deeds', 'Three small tasks appear under the clock each day. Finish all three for a bonus and a streak.'],
@@ -3219,6 +3248,7 @@ const GUIDE = [
   ['Races', 'Gwen the stablemaster in Port Wren runs three timed races. A mount helps!'],
   ['Pearl diving', 'Look for bubbling spots in shallow water. Dive deeper for better finds, but surface before your breath runs out. A Diving Mask helps.'],
   ['Investing', 'Any trader will take your coin as an investment. Each tier pays a daily share and lets them buy and stock more.'],
+  ['Magic', 'Archmage Ilyra in Skyhold teaches Fireball, Healing Light, Blink and Frost Nova. X casts your spell, Z switches.'],
   ['Archery', 'Range-master Holt in Hollowpine runs a 30-second target challenge with medals.'],
   ['Fishing tournament', 'On the 6th day of every season, the total weight of fish you catch earns a medal from Old Marlin. Every fish has a weight; beat your records!'],
   ['Rune shrines', 'Six shrines of standing stones hide across the lands. Read the inscription and touch the runes in the right order.'],
@@ -3397,7 +3427,8 @@ function updateCombat(dt, night) {
   player.atkCd = Math.max(0, player.atkCd - dt);
   player.inv = Math.max(0, player.inv - dt);
   if (player.swing) { player.swing.t -= dt; if (player.swing.t <= 0) player.swing = null; }
-  spinCd = Math.max(0, spinCd - dt); if (player.counter > 0) player.counter -= dt; if (chargeT != null) { chargeT += dt; if (!keys.has('f') && !mouseHeld) chargeT = null; }
+  spinCd = Math.max(0, spinCd - dt); if (player.counter > 0) player.counter -= dt;
+  let scChg = false; for (const k in spellCd) if (spellCd[k] > 0) { const b0 = Math.ceil(spellCd[k]); spellCd[k] = Math.max(0, spellCd[k] - dt); if (Math.ceil(spellCd[k]) !== b0) scChg = true; } if (scChg) renderHUD(); if (chargeT != null) { chargeT += dt; if (!keys.has('f') && !mouseHeld) chargeT = null; }
   player.sinceHit += dt;
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
@@ -3546,6 +3577,8 @@ addEventListener('keydown', e => {
     else if (k === 'c') openCraft();
     else if (k === 'q') quickEat();
     else if (k === 'b') buildKey();
+    else if (k === 'x') castSpell();
+    else if (k === 'z') cycleSpell();
   } else if (mode === 'talk') {
     if (k === 'escape') closeTalk();
     const n = parseInt(k, 10);
@@ -4624,7 +4657,7 @@ function renderHUD() {
   if (S.equip.weapon && !have(S.equip.weapon)) S.equip.weapon = null;
   for (const sl of EQ_SLOTS) if (S.equip[sl] && !have(S.equip[sl])) S.equip[sl] = null;
   const w = weapon(), a = S.equip.armor;
-  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && w.ammo === 'stone' ? ` · ${have('stone')} stones` : w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).length ? ' · ' + EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).map(g => esc(enhName(g))).join(' + ') : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}`;
+  $('gear').innerHTML = `<b>${esc(w.name)}</b>${w.ranged && w.ammo === 'stone' ? ` · ${have('stone')} stones` : w.ranged && !w.noAmmo ? ` · ${have('arrows') + have('venom_arrows') + have('crystal_arrows')} arrows` : ''}${EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).length ? ' · ' + EQ_SLOTS.map(k => S.equip[k]).filter(Boolean).map(g => esc(enhName(g))).join(' + ') : ''}${have('bomb') + have('fire_bomb') + have('frost_bomb') ? ` · ${have('bomb') + have('fire_bomb') + have('frost_bomb')} bombs` : ''}${Object.keys(BUFFS).filter(b => BUFFS[b] > 0).map(b => ` · <span style="color:var(--good)">${BUFF_NAME[b]} ${Math.ceil(BUFFS[b])}s</span>`).join('')}${S.spells && S.spells.length ? (() => { const k = S.spells.includes(S.spell) ? S.spell : S.spells[0], c = spellCd[k] || 0; return ` · <span style="color:${SPELLS[k].col}">✦ ${SPELLS[k].name} ${c > 0 ? Math.ceil(c) + 's' : '(X)'}</span>`; })() : ''}`;
   const total = Object.values(S.inv).reduce((s, n) => s + n, 0);
   $('bagN').textContent = total ? `(${total})` : '';
   $('bombBtn').hidden = !isTouch || !(have('bomb') || have('fire_bomb') || have('frost_bomb')) || mode !== 'play';
@@ -4728,6 +4761,7 @@ function mainOptions(n) {
     if (n.id === 'darius' && S.contraband && have('contraband')) o.push({label: 'Deliver the crate from Silas', primary: true, fn: () => { addItem('contraband', -1); S.contraband = false; const pay = 250 + (S.level || 1)*30; S.coins += pay; S.smugRuns = (S.smugRuns || 0) + 1; SFX.coin(); renderHUD(); save(); say(`Darius doesn\'t look inside. “Excellent. Tell Silas his payment is... noted.” <b>+${pay} coin</b>`, [back(n)]); }}); }
   if (S.lostPet && S.lostPet.owner === n.id && S.lostPet.carried) o.push({label: `Return ${S.lostPet.name}`, primary: true, fn: () => returnPet(n)});
   else if (hasLostPet(n)) o.push({label: 'Is something wrong?', primary: true, fn: () => lostPetTalk(n)});
+  if (n.mage) o.push({label: 'Learn spells', primary: true, fn: () => mageTalk(n)});
   if (n.archery) o.push({label: 'Try the archery range', primary: true, disabled: !!archery, fn: () => { closeTalk(); startArchery(); }});
   if (n.noctis) o.push({label: 'See tonight\'s wares', primary: true, fn: () => noctisTalk(n)});
   { const H = S.story && S.story.heir;
@@ -7112,6 +7146,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['apprentice','Apprentice Mage','Learn a spell', () => (S.spells || []).length >= 1],
+  ['archmage','Archmage','Learn every spell', () => Object.keys(SPELLS).every(k => (S.spells || []).includes(k))],
   ['stable','Stable Master','Own 6 different mounts', () => (S.mounts || []).length >= 6],
   ['petfinder','Pet Detective','Return 5 lost pets to their owners', () => (S.petsReturned || 0) >= 5],
   ['marksman','Marksman','Score gold at the archery range', () => !!S.flags.archeryGold],
@@ -7346,7 +7382,7 @@ function renderPause() {
     <div class="controls" style="margin:0">
       <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack · hold: spin / power shot</span>
       <b>Shift</b><span>Dodge roll · dodging an attack readies a counter-strike</span><b>G / Right-click</b><span>Throw a bomb</span><b>V</b><span>Mount or dismount</span>
-      <b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
+      <b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>X · Z</b><span>Cast a spell · switch spells</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
     </div>
     <p class="vals" style="margin-top:14px">Your progress saves automatically in this browser.</p>`;
   $('sMusic').addEventListener('input', e => { SETTINGS.music = +e.target.value; AUD.apply(); saveSettings(); });
