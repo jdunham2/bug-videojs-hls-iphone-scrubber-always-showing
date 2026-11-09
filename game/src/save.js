@@ -125,6 +125,7 @@ export function serialize(g) {
     hotIndex: g.hotIndex,
     stats: { ...g.stats },
     questIdx: g.questIdx,
+    bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
     bossActive: !!(g.boss && g.boss.alive) || undefined,
     fog: g.map ? g.map.serializeFog() : undefined,
@@ -154,6 +155,7 @@ export function applySave(g, d) {
   g.hotIndex = d.hotIndex || 0;
   Object.assign(g.stats, d.stats || {});
   g.questIdx = Math.min(d.questIdx || 0, g.quests.length);
+  if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
   for (const b of d.bags || []) g.dropBag(new THREE.Vector3().fromArray(b.pos), b.items);
   if (d.bossActive) g.inv.add('trophy', 3); // the fight resets on reload; refund the offering
   if (d.fog && g.map) g.map.loadFog(d.fog);

@@ -34,6 +34,8 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 - **Tame roster (T, or 🦖 on touch):** rename tames, feed them to heal, set follow/stay or
   release them. Tames level up from kills (more health and damage) and slowly heal. Whistle
   commands: G all follow, H all stay, Z attack whatever you're aiming at.
+- **Bestiary (J, or 📖 on touch):** each species is recorded the first time you get close,
+  with field notes, habitat, taming food, base stats and your kill/tame counts.
 - **Alphas:** rare, oversized creatures that glow red. They hit much harder, cannot be
   tamed, drop triple loot and an Alpha Trophy. Seven roam the island at the start.
 - **Boss — the Primal Tyrant:** offer 3 Alpha Trophies at the Caldera Altar near the
@@ -97,6 +99,7 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
 | V | Zoom the mount camera |
 | M | World map |
 | T | Tame roster |
+| J | Bestiary |
 | G / H / Z | Whistle: all follow / all stay / attack my target |
 
 ### Saving

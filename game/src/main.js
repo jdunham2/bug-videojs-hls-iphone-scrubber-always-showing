@@ -12,6 +12,7 @@ import { WorldMap } from './map.js';
 import { Weather } from './weather.js';
 import { TameRoster } from './tames.js';
 import { Settings } from './settings.js';
+import { Bestiary } from './bestiary.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -63,6 +64,7 @@ class Game {
       dismount: () => this.dismount(),
       died: (c, attacker) => {
         const byPlayer = attacker === 'player' || attacker === this.player.mount || (attacker && attacker.tamed);
+        if (byPlayer) { const sk = this.stats.speciesKills || (this.stats.speciesKills = {}); sk[c.species] = (sk[c.species] || 0) + 1; }
         if (byPlayer) { this.player.addXP((10 + c.level * 2) * (c.boss ? 20 : c.alpha ? 4 : 1), this.xpHooks); this.stats.kills++; this.ui.notify(`Killed ${c.label}`, 'kill'); }
         if (attacker && attacker.tamed) this.roster.grantXP(attacker, c);
         if (c.boss) this.bossDefeated(c);
@@ -107,6 +109,7 @@ class Game {
     this.weather = new Weather(this.scene, this.shared, this.audio);
     this.roster = new TameRoster(this);
     this.settings = new Settings(this);
+    this.bestiary = new Bestiary(this);
     if (IS_TOUCH) { this.noLock = true; this.touch = new TouchControls(this); }
     this.xpHooks = { levelUp: (l) => { this.ui.banner(`LEVEL ${l}`, 'Health and stamina increased'); this.audio.tamed(); } };
 
@@ -156,10 +159,12 @@ class Game {
     document.addEventListener('keydown', (e) => {
       if (!this.started) return;
       if (this.settings.open) { if (e.code === 'Escape') this.settings.toggle(false); return; }
+      if (this.bestiary.open) { if (e.code === 'Escape' || e.code === 'KeyJ') this.bestiary.toggle(false); return; }
       if (this.roster.open) { if (e.code === 'Escape' || e.code === 'KeyT') this.roster.toggle(false); return; }
       if (e.code === 'KeyM' && !this.ui.open) { this.map.toggle(); return; }
       if (this.map.open) { if (e.code === 'Escape') this.map.toggle(false); return; }
       if (e.code === 'KeyT' && !this.ui.open) { this.roster.toggle(); return; }
+      if (e.code === 'KeyJ' && !this.ui.open) { this.bestiary.toggle(); return; }
       if (!this.ui.open && !this.paused) {
         if (e.code === 'KeyG') { this.roster.command('follow'); return; }
         if (e.code === 'KeyH') { this.roster.command('stay'); return; }
@@ -198,7 +203,7 @@ class Game {
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (!this.locked && this.started && !this.ui.open && !this.map.open && !this.roster.open && !this.settings.open && this.player.alive) this.setPaused(true);
+      if (!this.locked && this.started && !this.ui.open && !this.map.open && !this.roster.open && !this.settings.open && !this.bestiary.open && this.player.alive) this.setPaused(true);
       if (this.locked) this.setPaused(false);
     });
     document.getElementById('resume').addEventListener('click', () => this.lock());
@@ -514,6 +519,7 @@ class Game {
 
   completeTame(cr) {
     this.saves.markDirty();
+    const st = this.stats.speciesTames || (this.stats.speciesTames = {}); st[cr.species] = (st[cr.species] || 0) + 1;
     cr.tamed = true;
     cr.state = 'tamed';
     cr.lieT = 1;
@@ -1018,6 +1024,7 @@ class Game {
       this.cooking(dt);
       this.saves.tick(dt);
       this.map.update(dt);
+      this.bestiary.update(dt);
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
