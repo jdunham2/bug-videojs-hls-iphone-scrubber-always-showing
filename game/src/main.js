@@ -86,6 +86,7 @@ class Game {
       thud: () => { this.audio.tone({ f0: 90, f1: 40, dur: 0.4, vol: 0.5, type: 'triangle' }); this.audio.noiseHit({ freq: 300, dur: 0.3, vol: 0.4, type: 'lowpass' }); },
       flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
+    this.creatures.viewDist = quality === 'high' ? 330 : 220;
     this.creatures.populate(this.spawnPoint);
     this.buildAltar();
 
@@ -1029,7 +1030,8 @@ class Game {
       // title-screen flyover
       this.shared.uTime.value += dt;
       this.env.update(dt * 0.3, p.pos);
-      this.creatures.update(dt, { pos: new THREE.Vector3(9999, 0, 9999), alive: false, crouch: false, yaw: 0 }, 0);
+      // the flyover camera stands in for the player so nearby creatures stay visible (nothing can target it)
+      this.creatures.update(dt, { pos: this.camera.position.clone().setY(heightAt(this.camera.position.x, this.camera.position.z)), alive: false, crouch: false, yaw: 0 }, 0);
       const t = this.shared.uTime.value * 0.03;
       this.camera.position.set(Math.cos(t) * 260, 75, Math.sin(t) * 260);
       this.camera.lookAt(-40, 20, -120);

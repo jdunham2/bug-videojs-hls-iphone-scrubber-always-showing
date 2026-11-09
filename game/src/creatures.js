@@ -813,7 +813,7 @@ export class CreatureManager {
     const distP = c.pos.distanceTo(player.pos);
     // LOD: cheap update far away
     const far = distP > 260;
-    c.obj.visible = distP < 330;
+    c.obj.visible = distP < (c.radius < 0.5 ? 90 : (this.viewDist || 330));
 
     if (c.riddenBy) return; // driven + animated by Game.updateMount
 
