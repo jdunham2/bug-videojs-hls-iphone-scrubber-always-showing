@@ -33,6 +33,7 @@ kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid
 .btn:disabled{opacity:.45;cursor:not-allowed}
 
 /* HUD */
+#deeds{font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:4px;max-width:210px}#deeds:empty{display:none}#deeds .dd{display:flex;justify-content:space-between;gap:8px}#deeds .ok{color:var(--good)}#deeds .h{color:var(--brass);font-size:11px;letter-spacing:.04em}
 .hud-tl{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));padding:8px 12px;display:grid;gap:2px;min-width:150px}
 .coins{display:flex;align-items:center;gap:7px;font-family:var(--f-display);font-size:22px;color:var(--brass);font-variant-numeric:tabular-nums}
 .coin-ico{width:12px;height:12px;background:var(--brass);transform:rotate(45deg);box-shadow:inset -3px -3px 0 rgba(0,0,0,.25)}
@@ -65,6 +66,7 @@ body.boss #toasts{top:calc(76px + env(safe-area-inset-top,0px))}
   #bossbar{top:auto;bottom:calc(64px + env(safe-area-inset-bottom,0px));width:calc(100% - 40px)}
   #mini{width:96px;height:96px}
   .hud-tl{min-width:0}
+  #deeds{display:none}
   .coins{font-size:18px}
   .hpbar{width:70px}
   #bar kbd,.hud-btns kbd{display:none}
@@ -229,6 +231,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
     <div class="xprow"><span id="lvV">Lv 1</span><div class="xpbar"><i id="xpFill"></i></div></div>
     <div id="region">Port Wren</div>
     <div id="clock">Day 1 · 08:00</div>
+    <div id="deeds"></div>
   </div>
   <div class="hud-tr">
     <canvas id="mini" width="132" height="132"></canvas>
@@ -3925,8 +3928,11 @@ function updatePeople(dt) {
     n.face = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
   }
 }
+let deedT = 0, lastCoins = null;
 function update(dt) {
   updatePeople(dt);
+  if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
+  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); }
   if (S.arena) updateArena(dt);
   let vx = 0, vy = 0;
   if (keys.has('arrowleft') || keys.has('a')) vx -= 1;
@@ -4022,6 +4028,38 @@ function update(dt) {
 }
 const isTouch = matchMedia('(pointer:coarse)').matches;
 
+const DEED_TYPES = [
+  {k:'kills',  txt: n => `Defeat ${n} foes`,        n: () => rint(8, 15), cur: () => S.kills},
+  {k:'gather', txt: n => `Gather ${n} times`,       n: () => rint(15, 25), cur: () => S.gathered},
+  {k:'fish',   txt: n => `Catch ${n} fish`,          n: () => rint(3, 5), cur: () => S.fishCaught || 0},
+  {k:'craft',  txt: n => `Craft ${n} things`,        n: () => rint(3, 6), cur: () => S.crafted},
+  {k:'elite',  txt: () => 'Defeat an elite monster', n: () => 1, cur: () => S.eliteKills || 0},
+  {k:'loot',   txt: () => 'Open a satchel or crate', n: () => 1, cur: () => S.satchels || 0},
+  {k:'trade',  txt: n => `Earn ${n} coin`,           n: () => 100 + (S.level || 1)*20, cur: () => S.earned || 0},
+];
+function rollDeeds() {
+  const pool = DEED_TYPES.slice().sort(() => Math.random() - .5).slice(0, 3);
+  S.deeds = {day: S.day, list: pool.map(t => { const n = t.n(); return {k: t.k, n, base: t.cur(), done: false, reward: Math.round(({kills: n*6, gather: n*3, fish: n*20, craft: n*12, elite: 130, loot: 60, trade: 70})[t.k] + (S.level || 1)*6)}; })};
+}
+function checkDeeds() {
+  if (!S.deeds || S.deeds.day !== S.day) { if (S.deeds && !S.deeds.list.every(d => d.done)) S.deedStreak = 0; rollDeeds(); }
+  let html = '<div class="h">TODAY\'S DEEDS' + (S.deedStreak ? ` · streak ${S.deedStreak}` : '') + '</div>', changed = false;
+  for (const d of S.deeds.list) {
+    const T0 = DEED_TYPES.find(t => t.k === d.k), prog = Math.min(d.n, T0.cur() - d.base);
+    if (!d.done && prog >= d.n) {
+      d.done = true; changed = true; S.coins += d.reward; gainXP(25); SFX.coin();
+      toast(`<b>Deed done:</b> ${T0.txt(d.n)}<br><span style="color:var(--good)">+${d.reward} coin</span>`, 4000);
+      if (S.deeds.list.every(x => x.done)) {
+        S.deedStreak = (S.deedStreak || 0) + 1; S.deedsAll = (S.deedsAll || 0) + 1;
+        const bonus = 100 + S.deedStreak*25; S.coins += bonus; addItem('gem', 1 + Math.floor(S.deedStreak/3));
+        setTimeout(() => toast(`<b>All of today's deeds are done!</b><br>Streak ${S.deedStreak}: +${bonus} coin and ${1 + Math.floor(S.deedStreak/3)} Cut Gem${S.deedStreak >= 3 ? 's' : ''}. Come back tomorrow for more.`, 6000), 800);
+      }
+    }
+    html += `<div class="dd ${d.done ? 'ok' : ''}"><span>${d.done ? '✓ ' : ''}${T0.txt(d.n)}</span><span>${d.done ? '' : `${Math.max(0, prog)}/${d.n}`}</span></div>`;
+  }
+  if ($('deeds').innerHTML !== html) $('deeds').innerHTML = html;
+  if (changed) { renderHUD(); save(); }
+}
 function raidTown() { return S.raid && S.raid.active ? S.raid.town : null; }
 function maybeStartRaid() {
   if (S.day < 4 || S.arena || Math.random() > .3) return;
@@ -5883,6 +5921,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['dutiful','Dutiful','Finish all daily deeds on 5 days', () => (S.deedsAll || 0) >= 5],
+  ['devoted','Devoted','Reach a 7-day deed streak', () => (S.deedStreak || 0) >= 7],
   ['sailor','Sailor','Own a sailboat', () => !!S.flags.boat],
   ['festive','Festive Spirit','Visit a festival merchant during a festival', () => !!S.festVisited],
   ['jackpot','Jackpot!','Win the lucky draw jackpot', () => !!S.jackpot],
