@@ -5246,7 +5246,7 @@ function syncThemePark() {
   const t = gameT * 0.15; wheelG.rotation.z = t;
   for (const gd of wheelG.userData.gond) { const a = gd.a + t; gd.g.position.set(2640 + Math.cos(a) * 95, 125 + Math.sin(a) * 95, 3426); }
   if (coasterCar && coasterPath.length) {
-    const N = coasterPath.length, f = (gameT * 7) % N, i = Math.floor(f), k = f - i, a = coasterPath[i], b = coasterPath[(i + 1) % N];
+    const N = coasterPath.length, f = (((gameT * 7) % N) + N) % N || 0, i = Math.floor(f), k = f - i, a = coasterPath[i], b = coasterPath[(i + 1) % N];
     coasterCar.position.set(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k + 2, a.z + (b.z - a.z) * k);
     coasterCar.rotation.order = 'YZX'; coasterCar.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x); coasterCar.rotation.z = Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z));
   }
@@ -5801,20 +5801,28 @@ player = makeCompy(PALETTES[0], { crest: PALETTES[0].crest }); scene.add(player.
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => signs.forEach(d => d()));
 { const s = loadSave(); $('contBtn').hidden = !s; if (s) $('contBtn').textContent = `Continue: ${s.name}, day ${s.day}`; }
 let gameT = 0, last = performance.now();
+// every frame is split into guarded steps: a bug in one system is logged once and never freezes or blanks the game
+const frameErrors = {};
+function guard(name, fn) { try { fn(); } catch (e) { if (!frameErrors[name]) { frameErrors[name] = true; console.error(`Compy Life: ${name} step failed, skipping it this frame.`, e); } } }
 function frame(now) {
-  const dt = Math.min(0.033, (now - last) / 1000); last = now; gameT += dt;
-  if (state === 'play') update(dt);
-  else if (state === 'mini') { updateMini(dt); trafficUpdate(dt); }
-  updateFx(dt);
-  if (state !== 'play') { if (state === 'title') trafficUpdate(dt); }
-  if (state === 'title') for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } }
-  shake = Math.max(0, shake - dt * 30);
-  lighting(); weatherLight(); fadeView(dt); sync3D(); syncUmbrella();
-  renderer.render(scene, camera);
-  drawOverlay();
-  if (S && state !== 'title') { S.pos = { x: P.x, y: P.y }; hud(); }
   requestAnimationFrame(frame);
+  const dt = clamp((now - last) / 1000 || 0, 0, 0.033); last = now; gameT += dt;
+  guard('update', () => {
+    if (state === 'play') update(dt);
+    else if (state === 'mini') { updateMini(dt); trafficUpdate(dt); }
+  });
+  guard('effects', () => {
+    updateFx(dt);
+    if (state === 'title') { trafficUpdate(dt); for (const n of npcs) { const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy); if (d < 4) npcNext(n); else { n.x += dx / d * n.speed * dt; n.y += dy / d * n.speed * dt; n.face = Math.atan2(dy, dx); n.t += dt; } } }
+    shake = Math.max(0, shake - dt * 30);
+  });
+  guard('lighting', () => { lighting(); weatherLight(); fadeView(dt); });
+  guard('sync', () => { sync3D(); syncUmbrella(); });
+  guard('render', () => renderer.render(scene, camera));
+  guard('overlay', () => { drawOverlay(); if (S && state !== 'title') { S.pos = { x: P.x, y: P.y }; hud(); } });
 }
+// if the graphics card resets (common on phones when memory runs low), say so instead of showing a black screen
+renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); autoSave(); const d = document.createElement('div'); d.id = 'glLost'; d.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0d1117;color:#fff;font:800 18px Nunito,system-ui,sans-serif;text-align:center;padding:24px;z-index:20;cursor:pointer'; d.textContent = 'Your graphics card took a nap. Your life was saved. Tap to reload.'; d.onclick = () => location.reload(); document.body.appendChild(d); });
 requestAnimationFrame(frame);
 })();
 </script>
