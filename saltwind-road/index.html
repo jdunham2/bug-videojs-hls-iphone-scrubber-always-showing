@@ -488,6 +488,7 @@ const GOODS = {
   silverfin:{name:'Silverfin',base:26,col:'#dfe4ea',kind:'good'},
   goldcarp:{name:'Golden Carp',base:95,col:'#f0c040',kind:'good'},
   old_boot:{name:'Old Boot',base:1,col:'#6a4a2a',kind:'good'},
+  regatta_cup:{name:'Regatta Cup',base:500,col:'#e0e8f0',kind:'trophy'},
   sunken_chest:{name:'Sunken Chest',base:0,col:'#5a7a6a',kind:'schest',desc:'Hauled up from the depths. Open it from your bag!'},
   dawnbreaker:{name:'Dawnbreaker',base:700,col:'#fff0b0',kind:'weapon',dmg:11,cd:.42,reach:1.65,silver:true},
   prism_bow:{name:'Prism Bow',base:750,col:'#c8f4ff',kind:'weapon',dmg:8,cd:.4,ranged:true,noAmmo:true,pcol:'#e8c8ff'},
@@ -2073,6 +2074,8 @@ const NPCS = [
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
   {id:'crusoe',town:'wren',dx:0,dy:0,name:'Castaway Robin',role:'Shipwrecked sailor',cols:{cloak:'#a08a6a',skin:'#c89870',hair:'#6a4a2a'},castaway:true,
    hello:["A ship! Er, a person! Hello!","I've been talking to a coconut for weeks.","Did you bring planks?"], rumors:["I've charted every cove on this coast from my little rock. If I ever get off it, I'll share my secrets."]},
+  {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
+   hello:["Ships waiting, holds empty. Got goods?","Export orders, paid in full on delivery.","Time is money, trader."], rumors:["Foreign buyers pay double for bulk goods, if you can deliver on time."]},
   {id:'ewan',town:'hollow',dx:4,dy:3,name:'Shepherd Ewan',role:'Shepherd',cols:{cloak:'#8a7a5a',skin:'#d8a882',hair:'#c8c8b8'},shepherd:true,freeSpot:true,
    hello:["Baa! Er, I mean, hello.","My flock's gone and scattered again.","Sheep are clever. Too clever."], rumors:["Sheep run from you, so you have to come at them from the far side and drive them home."]},
   {id:'dorran',town:'crownfall',dx:-4,dy:4,name:'Master Mason Dorran',role:'Monument builder',cols:{cloak:'#7a6a5a',skin:'#c89870',hair:'#8a8a8a'},mason:true,freeSpot:true,
@@ -3613,6 +3616,55 @@ function drawAuroraShard(a) {
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
 }
+// ===== export orders =====
+function newExport() {
+  const pool = [...new Set(Object.values(TOWNS).flatMap(t => t.produce || []))].filter(g => GOODS[g] && GOODS[g].base <= 45 && GOODS[g].base >= 6);
+  const g = pick(pool), n = rint(20, 40); return {g, n, pay: Math.round(GOODS[g].base*n*1.7 + 150), due: S.day + 5};
+}
+function exportTalk(n) {
+  if (S.export && S.day > S.export.due) { toast(`The export ship sailed without your ${GOODS[S.export.g].name}. The order lapsed.`, 4000); S.export = null; }
+  const E = S.export;
+  if (!E) { const o = S.exportOffer && S.exportOffer.day === S.day ? S.exportOffer : (S.exportOffer = {...newExport(), day: S.day});
+    say(`“A foreign buyer wants <b>${o.n} ${GOODS[o.g].name}</b> within 5 days. They'll pay <b>${o.pay} coin</b>, far over market price. Interested?”`, [
+      {label: 'Accept the order', primary: true, fn: () => { S.export = {g: o.g, n: o.n, pay: o.pay, due: S.day + 5}; S.exportOffer = null; save(); say(`“Excellent. ${o.n} ${GOODS[o.g].name}, here by day ${S.day + 5}.”`, [back(n)]); }}, back(n)]); return; }
+  const ok = have(E.g) >= E.n;
+  say(`“Your order: <b>${E.n} ${GOODS[E.g].name}</b> by day ${E.due} for <b>${E.pay} coin</b>.”<div class="req" style="margin-top:8px">${upCostHTML({[E.g]: E.n})}</div>`, [
+    {label: 'Deliver', primary: ok, disabled: !ok, fn: () => { addItem(E.g, -E.n); S.coins += E.pay; S.exports = (S.exports || 0) + 1; guildGain(E.pay); S.export = null; addRep('tidewatch', .3); SFX.victory(); renderHUD(); save(); say(`The goods are hoisted aboard. <span style="color:var(--good)">+${E.pay} coin</span>`, [back(n)]); }},
+    {label: 'Cancel the order', fn: () => { S.export = null; save(); say('“Pity. Another time.”', [back(n)]); }}, back(n)]);
+}
+// ===== regatta =====
+let regatta = null;
+function regattaTalk(n) {
+  const best = S.regattaBest ? `${S.regattaBest.toFixed(1)}s` : 'none yet';
+  say(`“The regatta! Sail through all six buoys in order as fast as you can. Under the par time earns a prize, and in summer the winner takes home the Regatta Cup!”<br><span style="color:var(--muted)">Your best time: ${best}.</span>`, [{label: 'Start the regatta', primary: true, fn: () => { closeTalk(); startRegatta(n); }}, back(n)]);
+}
+function startRegatta(n) {
+  let start = null; const T0 = TOWNS[n.town];
+  for (let r = 3; r < 20 && !start; r++) for (let a = 0; a < 16 && !start; a++) { const x = Math.floor(T0.x + Math.cos(a/16*6.283)*r), y = Math.floor(T0.y + Math.sin(a/16*6.283)*r); if (inB(x, y) && map[idx(x, y)] === T.DEEP) start = {x: x + .5, y: y + .5}; }
+  if (!start) { toast('No open water nearby for a regatta.'); return; }
+  const buoys = []; let px = start.x, py = start.y, ang = Math.random()*6.283;
+  for (let k = 0; k < 6; k++) { let ok = false; for (let t = 0; t < 40 && !ok; t++) { const a = ang + (Math.random() - .5)*2.2, d = 7 + Math.random()*4, x = px + Math.cos(a)*d, y = py + Math.sin(a)*d; if (!inB(Math.floor(x), Math.floor(y)) || map[idx(Math.floor(x), Math.floor(y))] !== T.DEEP) continue; buoys.push({x, y}); px = x; py = y; ang = a; ok = true; } if (!ok) break; }
+  if (buoys.length < 4) { toast('The sea is too cramped for a regatta here.'); return; }
+  const dist = buoys.reduce((acc, b, i) => acc + Math.hypot(b.x - (i ? buoys[i - 1].x : start.x), b.y - (i ? buoys[i - 1].y : start.y)), 0);
+  S.x = start.x; S.y = start.y; S.riding = false; lastTile = -1; regatta = {buoys, i: 0, t: -3, par: Math.round(dist/7 + 3)};
+  toast(`<b>Regatta!</b> ${buoys.length} buoys. Par time: ${regatta.par}s. Ready...`, 3000);
+}
+function updateRegatta(dt) {
+  const R0 = regatta; if (!R0) return; R0.t += dt; if (R0.t < 0) return;
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y)); if (t !== T.DEEP && t !== T.SHAL && R0.t > 1) { regatta = null; toast('You ran aground! Regatta abandoned.', 3000); return; }
+  const b = R0.buoys[R0.i]; if (Math.hypot(S.x - b.x, S.y - b.y) < 1.6) { R0.i++; SFX.coin(); burst(b.x, b.y, '#ffd040', 10, 3);
+    if (R0.i >= R0.buoys.length) { const tm = R0.t; regatta = null; S.regattas = (S.regattas || 0) + 1; const beat = tm <= R0.par; if (!S.regattaBest || tm < S.regattaBest) S.regattaBest = tm;
+      let msg = `Finished in <b>${tm.toFixed(1)}s</b> (par ${R0.par}s).`; if (beat) { S.regattaBeat = true; const c = 150 + Math.round((R0.par - tm)*20); S.coins += c; msg += ` <span style="color:var(--good)">Under par! +${c} coin</span>`; if (seasonIdx() === 1 && !have('regatta_cup')) { addItem('regatta_cup', 1); msg += '<br>You win the <b>Regatta Cup</b>!'; } SFX.victory(); } else msg += ' Not quite fast enough for a prize.';
+      renderHUD(); save(); toast(`<b>Regatta complete!</b><br>${msg}`, 6000); } }
+  if (R0.t > R0.par*3) { regatta = null; toast('The regatta judges have gone home. Too slow!', 3000); }
+}
+function drawRegatta() {
+  const R0 = regatta; if (!R0) return;
+  R0.buoys.forEach((b, i) => { if (i < R0.i) return; const px = b.x*TS, py = b.y*TS + Math.sin(frameT*2 + i)*1, cur = i === R0.i;
+    ctx.fillStyle = cur ? '#ff5a3a' : '#e8e0d0'; ctx.fillRect(px - 2, py - 8, 4, 8); ctx.fillStyle = '#f0f0f0'; ctx.fillRect(px - 2, py - 5, 4, 2); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(px - 4, py, 8, 1);
+    if (cur) { ctx.strokeStyle = 'rgba(255,90,58,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py - 2, 8 + Math.sin(frameT*5)*1.5, 0, 7); ctx.stroke(); } });
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const msg = R0.t < 0 ? `Starting in ${Math.ceil(-R0.t)}...` : `Buoy ${R0.i + 1}/${R0.buoys.length} · ${R0.t.toFixed(1)}s (par ${R0.par}s)`; ctx.font = `${14*dpr}px "Pixelify Sans", monospace`; ctx.textAlign = 'center'; const hy = ctx.canvas.height - 130*dpr; ctx.fillStyle = '#0d131b'; ctx.fillText(msg, ctx.canvas.width/2 + 1, hy + 1); ctx.fillStyle = '#ffffff'; ctx.fillText(msg, ctx.canvas.width/2, hy); ctx.restore();
+}
 // ===== treasure race =====
 let vexRun = null;
 function vexRaceOffer() {
@@ -4950,8 +5002,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Exports & regatta', 'Harbormaster Quinn in Tidewatch offers big export orders: deliver bulk goods within 5 days for a fat premium. Bess runs the regatta: sail through six buoys under par time for a prize, and in summer win the Regatta Cup.'],
   ['Snails & dragons', 'The dice players also run snail races: pick a snail and watch it go. Raise a Baby Drake to full level, then bring it and an Ember Core to Kael in Ashfall to grow it into a rideable Dragon.'],
   ['Waystones', 'Ancient waystones stand in the wild across every land. Touch one to awaken it, and you can fast travel there for free from your map.'],
   ['The castaway', 'Somewhere out on the open sea, a shipwrecked sailor named Robin waves from a tiny island. Bring supplies to help, and Robin shares secret treasure charts.'],
@@ -5234,7 +5287,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt); updateVexRun(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -6011,6 +6064,7 @@ function render() {
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
+  if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
   if (vexRun && inView(vexRun.x, vexRun.y)) sprites.push({y: vexRun.y, f: () => drawPerson(ctx, Math.round(vexRun.x*TS), Math.round(vexRun.y*TS), {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, vexRun.phase, true, vexRun.f < 0 ? 'left' : 'right', {scarf: true})});
   if (S.waystones) for (const w of S.waystones) if (inView(w.x, w.y)) sprites.push({y: w.y + .6, f: () => drawWaystone(w)});
   if (ISLET && inView(ISLET.x, ISLET.y)) sprites.push({y: ISLET.y - .2, f: drawIslet});
@@ -6215,6 +6269,7 @@ function render() {
 
 function objective() {
   if (inDungeon() || S.y >= WORLD_H) return null;
+  if (regatta && regatta.buoys[regatta.i]) return {x: regatta.buoys[regatta.i].x, y: regatta.buoys[regatta.i].y, label: `Buoy ${regatta.i + 1}`, col: '#ff5a3a'};
   if (vexRun && S.tmap) return {x: S.tmap.x + .5, y: S.tmap.y + .5, label: `Race! Vex ${Math.round(Math.hypot(vexRun.x - S.tmap.x, vexRun.y - S.tmap.y))}`, col: '#e04a7a'};
   if (S.lmap) return {x: S.lmap.x + .5, y: S.lmap.y + .5, label: 'Hoard', col: '#e8b040'};
   if ((S.clock || 0) === 2 && S.clockSpot) return {x: S.clockSpot.x, y: S.clockSpot.y, label: 'Brassby', col: '#e0c070'};
@@ -6771,6 +6826,8 @@ function mainOptions(n) {
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
+  if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
+  if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
@@ -9524,6 +9581,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['exporter','Export Trader','Fulfil 3 export orders', () => (S.exports || 0) >= 3],
+  ['regatta','Fair Winds','Finish the regatta under par', () => !!S.regattaBeat],
   ['snail','Escargot-a-Go','Win a snail race bet', () => (S.snailWins || 0) >= 1],
   ['dragon','Dragon Rider','Raise your drake into a dragon', () => S.mounts.includes('dragon')],
   ['vexrace','Fastest Shovel','Beat Vex in a treasure race', () => (S.vexRaceWins || 0) >= 1],
@@ -10032,7 +10091,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
