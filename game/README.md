@@ -147,6 +147,11 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Eggthief: little bandit that steals from your bag and runs (catch it to get things back)
   - Bloodclaw: heavy raptor whose slashes make you bleed (Healing Salve stops it); rideable
   - Skyreach: towering sauropod, the biggest rideable creature
+  - Glowtail: glowing lizard; a tamed one lights caves and nights around you
+  - Divebeak: fishing seabird; a tamed one brings you fish
+  - Shieldhorn: shield-nosed grazer that charges and knocks you flying; rideable
+  - Shellback: giant beach turtle that retreats into an invulnerable shell; rideable
+  - Leafshade: camouflaged ambusher, invisible until close, double-damage first strike; rideable
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer

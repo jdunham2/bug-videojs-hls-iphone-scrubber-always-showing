@@ -34,6 +34,11 @@ const LORE = {
   eggthief: { icon: '🥚', where: 'Lowlands, in pairs', text: 'A quick-fingered little bandit. It darts in, steals whatever it can carry and sprints off. Catch it to get your things back.' },
   bloodclaw: { icon: '🩸', where: 'Forests and hills, in pairs', text: 'A heavy raptor with hooked claws. Its slashes leave bleeding wounds; carry Healing Salve.' },
   skyreach: { icon: '🦒', where: 'Lowland plains', text: 'The tallest creature on the island, browsing treetops with its head held high. A saddle on its back is a watchtower that walks.' },
+  glowtail: { icon: '✨', where: 'Forests, in small groups', text: 'A shy little lizard whose tail glows like a lantern. A tamed one lights your way through caves and dark nights.' },
+  divebeak: { icon: '🐦', where: 'Beaches and coasts', text: 'A fishing seabird that folds its wings and plunges into the surf. Tamed, it brings you fish.' },
+  shieldhorn: { icon: '🛡️', where: 'Grasslands, in herds', text: 'Its nose carries a broad bony shield. Provoke it and it lowers its head and charges hard enough to send you flying.' },
+  shellback: { icon: '🐢', where: 'Beaches', text: 'A giant sea turtle that hauls out on the sand. Badly hurt, it pulls into a shell nothing can crack.' },
+  leafshade: { icon: '🍃', where: 'Dense forest', text: 'Patterned like dappled leaves, it is invisible until you are almost on top of it. Its first strike is its deadliest.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

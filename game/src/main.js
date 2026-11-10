@@ -101,6 +101,8 @@ class Game {
       spit: (c, at) => this.spawnSpit(c, at),
       spitVolley: (c) => { const at = this.player.eye; for (let i = -2; i <= 2; i++) this.spawnSpit(c, at.clone().add(new THREE.Vector3(Math.cos(c.yaw) * i * 2.2, 0, -Math.sin(c.yaw) * i * 2.2))); this.ui.notify('The Broodmother sprays venom!', 'warn'); },
       steal: (c) => this.stealFrom(c),
+      knock: (c, f) => { const p = this.player; if (p.mount) return; const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize(); p.vel.addScaledVector(away, f); p.vel.y += 6; this.shake = Math.max(this.shake || 0, 0.5); },
+      shellBlock: (c) => { this.audio.mine(); if (!(this._shellNote > 0)) { this._shellNote = 2; this.ui.notify(`Your blow glances off the ${c.def.name}'s shell`, 'warn'); } },
       revive: (c) => this.bosses.revive(c),
       shadow: (c, d) => this.bosses.shadow(c, d),
       roots: (c) => this.bosses.eruption(c, 'roots'),
@@ -964,7 +966,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, glowtail: 0.3, divebeak: 0.5, shieldhorn: 2, shellback: 1.8, leafshade: 1.3, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1137,6 +1139,13 @@ class Game {
       this.breeding.update(dt);
       this.drops.update(dt);
       this.tips(dt);
+      this._shellNote = (this._shellNote || 0) - dt;
+      // fishing tames bring you a catch now and then
+      for (const t of this.creatures.list) {
+        if (!t.tamed || !t.alive || !t.def.gatherer) continue;
+        t.gatherT = (t.gatherT ?? 40 + Math.random() * 30) - dt;
+        if (t.gatherT <= 0) { t.gatherT = 50 + Math.random() * 30; const n = 1 + Math.floor(Math.random() * 2); this.give('meat', n, true); this.ui.notify(`${t.name} brought you ${n} fish`, 'loot'); }
+      }
     } else if (!this.started) {
       // title-screen flyover
       this.shared.uTime.value += dt;
@@ -1261,6 +1270,7 @@ class Game {
     || tip('frost', () => (this.biome?.frost || 0) > 0.5, 'Frostpeak: bitter cold up here. Fur Armor from Frosthorn pelts keeps you alive.')
     || tip('night2', () => this.env.daylight < 0.3 && this.creatures.list.some((c) => c.species === 'nightstalker' && c.alive && c.pos.distanceTo(p.pos) < 70), 'Something is hunting in the dark. Nightstalkers sleep by day and hunt at night.')
     || tip('thief', () => this.creatures.list.some((c) => c.species === 'eggthief' && c.alive && c.pos.distanceTo(p.pos) < 25), 'Eggthieves snatch items from your bag and run. Catch one to get your things back.')
+    || tip('glow', () => this.creatures.list.some((c) => c.species === 'glowtail' && c.alive && c.pos.distanceTo(p.pos) < 25), 'Glowtails glow in the dark. Tame one and it lights your way through caves and nights.')
     || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
   }
 

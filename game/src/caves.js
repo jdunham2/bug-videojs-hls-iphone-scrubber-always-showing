@@ -315,6 +315,9 @@ export class Caves {
       this.torch.intensity = lantern && g.env.daylight < 0.5 ? 18 : 0;
       this.torch.color.set(0xbfeaff); this.torch.distance = 34;
     }
+    // a tamed Glowtail following you is a living lantern
+    const pet = g.creatures.list.find((t) => t.def.lightPet && t.tamed && t.alive && t.follow && t.pos.distanceTo(p.pos) < 30);
+    if (pet && (c || g.env.daylight < 0.5) && this.torch.intensity < 16) { this.torch.intensity = 16; this.torch.distance = 30; this.torch.color.set(0x8ae8ff); }
     this.torch.position.copy(p.pos).add(new THREE.Vector3(0, 3.2, 0));
   }
 
