@@ -482,6 +482,12 @@ const GOODS = {
   flax_seed:{name:'Flax Seeds',base:5,col:'#6a90c0',kind:'seed',crop:'flax'},
   tea_seed:{name:'Tea Seeds',base:8,col:'#5a8a4a',kind:'seed',crop:'tea'},
   pumpkin_seed:{name:'Pumpkin Seeds',base:12,col:'#c8681a',kind:'seed',crop:'pumpkin'},
+  starfruit_seed:{name:'Starfruit Seeds',base:60,col:'#f0e060',kind:'seed',crop:'starfruit'},
+  dragonfruit_seed:{name:'Dragonfruit Seeds',base:50,col:'#e04a8a',kind:'seed',crop:'dragonfruit'},
+  golden_wheat_seed:{name:'Golden Wheat Seeds',base:40,col:'#f0c040',kind:'seed',crop:'golden_wheat'},
+  starfruit:{name:'Starfruit',base:65,col:'#f8e870',kind:'food',heal:6},
+  dragonfruit:{name:'Dragonfruit',base:55,col:'#e8508a',kind:'food',heal:5},
+  golden_wheat:{name:'Golden Wheat',base:30,col:'#f0c040',kind:'good'},
   moon_seed:{name:'Moonflower Seeds',base:30,col:'#a8b8ff',kind:'seed',crop:'moonflower'},
   // --- dungeons & fishing ---
   gem:{name:'Cut Gem',base:120,col:'#e04a8a',kind:'good'},
@@ -1406,7 +1412,7 @@ const FESTIVALS = [
 const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
 const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
 const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1) * (S && S.monuments && S.monuments.maplehold >= 3 ? 1.15 : 1);
-const CROP_LOOK = {giant_pumpkin:'ground', strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
+const CROP_LOOK = {giant_pumpkin:'ground', starfruit:'tree', dragonfruit:'bush', golden_wheat:'stalk', strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
 const CROPS = {
   wheat:{name:'Wheat',grow:1,yield:[3,5]},
   carrot:{name:'Carrots',grow:1,yield:[2,4]},
@@ -1414,6 +1420,9 @@ const CROPS = {
   tea:{name:'Tea',grow:1.5,yield:[2,4],give:'tea'},
   pumpkin:{name:'Pumpkins',grow:2,yield:[1,3]},
   giant_pumpkin:{name:'Giant Pumpkin',grow:3,yield:[1,1],give:'giant_pumpkin'},
+  starfruit:{name:'Starfruit',grow:4,yield:[2,4]},
+  dragonfruit:{name:'Dragonfruit',grow:3,yield:[2,3]},
+  golden_wheat:{name:'Golden Wheat',grow:2,yield:[3,5]},
   moonflower:{name:'Moonflowers',grow:3,yield:[1,2]},
   strawberry:{name:'Strawberries',grow:1,yield:[3,5]},
   tomato:{name:'Tomatoes',grow:1.5,yield:[3,5]},
@@ -2094,6 +2103,8 @@ const NPCS = [
    hello:["A ship! Er, a person! Hello!","I've been talking to a coconut for weeks.","Did you bring planks?"], rumors:["I've charted every cove on this coast from my little rock. If I ever get off it, I'll share my secrets."]},
   {id:'barnaby',town:'wren',dx:0,dy:0,name:'Ringmaster Barnaby',role:'The Traveling Circus',cols:{cloak:'#c83a3a',skin:'#e8c8a8',hair:'#2a2a2a'},circus:true,
    hello:["Roll up, roll up!","The greatest show in all the land!","Tickets, prizes, wonders!"], rumors:["The circus moves to a new town every week. Come test your strength!"]},
+  {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
+   hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
    hello:["Ships waiting, holds empty. Got goods?","Export orders, paid in full on delivery.","Time is money, trader."], rumors:["Foreign buyers pay double for bulk goods, if you can deliver on time."]},
   {id:'ewan',town:'hollow',dx:4,dy:3,name:'Shepherd Ewan',role:'Shepherd',cols:{cloak:'#8a7a5a',skin:'#d8a882',hair:'#c8c8b8'},shepherd:true,freeSpot:true,
@@ -3686,6 +3697,37 @@ function hwFight() {
   for (let k = 0; k < 3; k++) { const a = k/3*6.283 + Math.random(), x = S.x + Math.cos(a)*3, y = S.y + Math.sin(a)*3; const e = makeEnemy(k ? 'bandit' : 'archer', enemyWalk(x, y) ? x : S.x + 2, enemyWalk(x, y) ? y : S.y, {alert: true, hwGang: true}); e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = lv; if (!k) { makeElite(e); e.elite = {name: 'Masked Highwayman', col: '#8a6a4a'}; e.labelName = 'Masked Highwayman'; e.hwBoss = true; } enemies.push(e); }
   SFX.roar();
 }
+// ===== exotic seeds =====
+function seedTalk(n) {
+  const list = [['golden_wheat_seed', 40], ['dragonfruit_seed', 50], ['starfruit_seed', 60]];
+  say('“Rare seeds, gathered from distant lands! Plant them at your homestead like any other.”<br><span style="color:var(--muted)">Golden Wheat grows in 2 days, Dragonfruit in 3, Starfruit in 4. They sell for a pretty penny.</span>', [
+    ...list.map(([g, c]) => ({label: `${GOODS[g].name} · ${c}◆`, disabled: S.coins < c, fn: () => { S.coins -= c; addItem(g, 1); S.exoticSeeds = (S.exoticSeeds || 0) + 1; SFX.coin(); renderHUD(); save(); seedTalk(n); }})),
+    back(n)]);
+}
+// ===== summit flags =====
+function ensureSummits() {
+  if (S.summits && S.summits.length) return S.summits;
+  const cand = [];
+  for (let y = 6; y < WORLD_H - 6; y += 2) for (let x = 6; x < W - 6; x += 2) { if (map[idx(x, y)] !== T.MOUNT) continue; let c = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (map[idx(x + dx, y + dy)] === T.MOUNT) c++; if (c >= 40) cand.push([c, x, y]); }
+  cand.sort((a, b) => b[0] - a[0]); const out = [];
+  for (const [, x, y] of cand) { if (out.length >= 8) break; if (out.some(q => Math.hypot(q.x - x, q.y - y) < 50)) continue; out.push({x, y, flag: false}); }
+  S.summits = out; return out;
+}
+function summitTarget() {
+  if (!S.summits || S.y >= WORLD_H) return null;
+  for (const q of S.summits) { if (Math.hypot(S.x - q.x - .5, S.y - q.y - .5) > 1.5) continue;
+    if (q.flag) return {key: 'sumOn', html: 'Your flag flutters proudly on this summit.', btn: '', fn: () => {}};
+    return {key: 'sum' + q.x, html: '<kbd style="margin:0 6px 0 0">E</kbd>Plant your flag on the summit', btn: 'Plant', fn: () => {
+      q.flag = true; S.flags_planted = (S.flags_planted || 0) + 1; reveal(q.x + .5, q.y + .5, 32); const c = 150 + (S.level || 1)*8; S.coins += c; gainXP(120); SFX.victory(); burst(q.x + .5, q.y, '#f0c040', 20, 5); renderHUD(); save();
+      toast(`<b>Summit conquered!</b><br>The whole land spreads out below you. You can see for miles. <span style="color:var(--good)">+${c} coin</span><br><span style="color:var(--muted)">Summits climbed: ${S.flags_planted}/${S.summits.length}</span>`, 6000); }}; }
+  return null;
+}
+function drawSummit(q) {
+  const px = (q.x + .5)*TS, py = (q.y + .6)*TS;
+  if (!q.flag) { ctx.fillStyle = '#8a8478'; ctx.beginPath(); ctx.arc(px - 2, py, 3, 0, 7); ctx.arc(px + 2, py, 3, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(px, py - 3, 2.5, 0, 7); ctx.fill(); return; }
+  ctx.fillStyle = '#5a3a20'; ctx.fillRect(px - .5, py - 20, 1.5, 21); const w = Math.sin(frameT*4)*1.5;
+  ctx.fillStyle = '#c84a3a'; ctx.beginPath(); ctx.moveTo(px + 1, py - 20); ctx.lineTo(px + 11, py - 17 + w); ctx.lineTo(px + 1, py - 13); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.fillRect(px + 3, py - 18 + w*.5, 2, 2);
+}
 // ===== display cases & moon rabbit =====
 function displayTalk(q) {
   const cand = GK.filter(g => have(g) > 0 && ['trophy', 'trinket'].includes(GOODS[g].kind) || (have(g) > 0 && MUSEUM_RARE.includes(g))).slice(0, 7);
@@ -5150,8 +5192,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Summits & exotic seeds', 'Climb the highest peaks with climbing gear and plant your flag at each summit (look for a stone cairn) for a wide view and a reward. Sorrel in Greenstem sells exotic seeds: Golden Wheat, Dragonfruit and Starfruit.'],
   ['Moon rabbit & display cases', 'On full-moon nights (every 14 days, as the Gazette will tell you) a glowing moon rabbit comes down to play. Chase it until it tires, then catch it for Moon Mochi and a Moon Charm. Craft a Display Case to show off your trophies at home.'],
   ['Seasonal guardians', 'Each season has a guardian that hunts at night: the Bloom Queen in spring forests and meadows, the Sun Scorpion in summer deserts, the Headless Horseman in autumn, and Frostfang in winter snows. Each drops a unique trophy.'],
   ['Deep-sea fishing', 'Out on deep water in your sailboat, cast a deep-sea line for Bluefin Tuna, Swordfish, Anglerfish and the elusive Giant Squid.'],
@@ -5465,7 +5508,7 @@ function updateCombat(dt, night) {
   spawnT -= dt;
   if (spawnT <= 0) {
     spawnT = bloodMoon() ? .7 : 1.4;
-    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); guardianCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns(); lmapUpdate(); ensureWaystones();
+    bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); guardianCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns(); lmapUpdate(); ensureWaystones(); ensureSummits();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
     if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
@@ -6234,6 +6277,7 @@ function render() {
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
+  if (S.summits) for (const q of S.summits) if (inView(q.x, q.y)) sprites.push({y: q.y + .6, f: () => drawSummit(q)});
   if (moonRabbit && inView(moonRabbit.x, moonRabbit.y)) sprites.push({y: moonRabbit.y, f: drawMoonRabbit});
   if (CIRCUS && inView(CIRCUS.x, CIRCUS.y)) sprites.push({y: CIRCUS.y, f: drawCircus});
   if (vexRun && inView(vexRun.x, vexRun.y)) sprites.push({y: vexRun.y, f: () => drawPerson(ctx, Math.round(vexRun.x*TS), Math.round(vexRun.y*TS), {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, vexRun.phase, true, vexRun.f < 0 ? 'left' : 'right', {scarf: true})});
@@ -6662,7 +6706,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -6998,6 +7042,7 @@ function mainOptions(n) {
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
+  if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
   if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
@@ -8966,6 +9011,7 @@ function openMap() {
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
   { const mk = (x, y, col, txt, r = 4) => { const tx = x*s, ty = y*s; g.fillStyle = col; g.beginPath(); g.arc(tx, ty, r*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); if (txt) { g.fillStyle = col; g.fillText(txt, tx, ty - 8*dpr); } };
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
+    (S.summits || []).forEach(q => { if (q.flag || S.explored[idx(q.x, q.y)]) mk(q.x + .5, q.y + .5, q.flag ? '#c84a3a' : '#8a8478', q.flag ? '⚑' : '', 3); });
     (S.waystones || []).forEach(w => { if (w.on || S.explored[idx(w.x, w.y)]) mk(w.x + .5, w.y + .5, w.on ? '#8ad0ff' : '#5a6a7a', w.on ? '◈' : '', 4); });
     (S.vaults || []).forEach((v, i) => { if ((S.vaultsSeen || {})[i]) mk(v.x + .5, v.y + .5, v.done ? '#6a6a72' : '#e0c070', v.done ? '' : 'Vault'); });
     if (S.lmap) mk(S.lmap.x + .5, S.lmap.y + .5, '#e8b040', 'Hoard', 6);
@@ -9786,6 +9832,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['summit','King of the Hill','Plant your flag on a summit', () => (S.flags_planted || 0) >= 1],
+  ['summits','Mountaineer','Plant your flag on every summit', () => S.summits && S.summits.length && S.summits.every(q => q.flag)],
+  ['exotic','Exotic Gardener','Harvest starfruit', () => (S.harvestLog || {}).starfruit || have('starfruit') > 0],
   ['moonrabbit','Lunar Hop','Catch the moon rabbit', () => (S.moonRabbits || 0) >= 1],
   ['homecurator','Home Curator','Put a treasure in a display case', () => (S.displayed || 0) >= 1],
   ['seasonslayer','Seasonal Slayer','Defeat a seasonal guardian', () => Object.keys(S.guardians || {}).length >= 1],
@@ -10306,7 +10355,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
