@@ -64,8 +64,14 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 
 .res.co .q{color:#7fb6ff}.res.n .q{color:#e6a8ff}.res.r .q{color:#f2e3b5}
 .bar.thin .t{height:3px}
-#upg{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.6);padding-inline:16px}
-#upg .card{max-width:520px;width:100%;pointer-events:auto}
+#upg,#craft{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.6);padding-inline:16px}
+#upg .card,#craft .card{max-width:560px;width:100%;pointer-events:auto;max-height:calc(100% - 32px);overflow:auto}
+.csec{font-family:var(--f-display);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--frost);margin:14px 0 0}
+.urow .acts{grid-row:1/span 2;grid-column:2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.urow .acts button{grid-row:auto;grid-column:auto}
+.urow .cost{grid-column:1;font-size:11px;color:var(--amber-hi)}
+.urow .cost .lack{color:var(--danger)}
+.own{color:var(--ok);font-size:11px}
 .urow{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding-block:10px;border-bottom:1px solid rgba(255,255,255,.08)}
 .urow .nm{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.04em}
 .urow .ds{grid-column:1;color:var(--dim);font-size:11.5px}
@@ -183,6 +189,15 @@ button.go:disabled{opacity:.5;cursor:wait}
   </div>
 </div>
 
+<div id="craft" hidden>
+  <div class="card">
+    <div class="eyebrow">Fabricator</div>
+    <div class="pname">Crafting</div>
+    <div id="craftList"></div>
+    <p style="color:var(--dim);font-size:12px;margin:12px 0 0">G uses a life support gel on foot. In the ship it uses a hull patch kit, or a shield battery if your shield is low during a fight. Press I to close.</p>
+  </div>
+</div>
+
 <div id="help" hidden>
   <div class="card">
     <div class="eyebrow">Controls</div>
@@ -226,7 +241,8 @@ const CONTROLS=[
   ['Board ship / open pod / claim wreck','E'],['Collect ion cells','Walk over them'],
   ['In the ship',null],['Throttle','W / S'],['Pitch & yaw','Mouse'],['Roll','A / D'],['Boost / pulse drive','Shift'],
   ['Fire cannons','Hold left click'],['Take off','Space'],['Land / exit','E'],['Refuel landed (20 Ferrite)','R'],
-  ['Repair hull in flight (15 Ferrite)','R'],['Ship workshop','U'],['Hyperdrive jump (10 Aurium)','H'],
+  ['Repair hull in flight (15 Ferrite)','R'],['Ship workshop','U'],['Hyperdrive jump (10 Aurium or a warp cell)','H'],
+  ['Anywhere',null],['Crafting menu','I'],['Quick-use gel / hull patch','G'],
 ];
 function renderControls(el){
   el.innerHTML=CONTROLS.map(([a,b])=>b===null?`<h3>${a}</h3>`:`<div><span>${a}</span><kbd>${b}</kbd></div>`).join('');
@@ -695,8 +711,9 @@ const inv={carbon:0,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0};
 const player={pos:new V3(),fwd:new V3(0,0,-1),pitch:0,vUp:0,grounded:false,swimming:false,suit:100,health:100,jet:100,jetDelay:0,bob:0};
 let mineTarget=null,lookCreature=null,nearPickup=null,nearWreck=null,pendingClaim=null,pendingT=0;
 let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
+const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -774,7 +791,9 @@ $('help').addEventListener('click',toggleHelp);
 function toggleHelp(){$('help').hidden=!$('help').hidden}
 
 function onPress(code){
-  if(code==='KeyU'){toggleUpg();return}
+  if(code==='KeyU'){$('craft').hidden=true;toggleUpg();return}
+  if(code==='KeyI'){$('upg').hidden=true;toggleCraft();return}
+  if(code==='KeyG'){quickUse();return}
   if(!$('upg').hidden){const m=code.match(/^Digit([1-4])$/);if(m)buyUpg(UPGRADES[+m[1]-1].key);return}
   if(code==='KeyE')interact();
   else if(code==='KeyR')refill();
@@ -787,7 +806,7 @@ function onPress(code){
 /* touch */
 if(TOUCH){
   $('touch').hidden=false;
-  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124]];
+  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208]];
   for(const [label,code,r,b] of btns){
     const el=document.createElement('div');el.className='tbtn';el.textContent=label;
     el.style.right=`calc(${r}px + env(safe-area-inset-right,0px))`;el.style.bottom=`calc(${b}px + env(safe-area-inset-bottom,0px))`;
@@ -863,19 +882,21 @@ function tryTakeoff(){
 }
 function tryWarp(){
   if(st.mode!=='ship'||ship.state!=='flying'){toast('Hyperdrive works only while flying in your ship.');return}
-  if(inv.aurium<10){toast(`Hyperdrive needs 10 Aurium. You have ${inv.aurium}.`,'bad');return}
+  if(inv.aurium<10&&!crafted.warpcell){toast(`Hyperdrive needs 10 Aurium or a warp cell. You have ${inv.aurium} Aurium.`,'bad');return}
   if(current){const alt=ship.group.position.distanceTo(current.center)-current.radius;if(alt<current.radius*.6){toast('Leave the atmosphere before jumping.','bad');return}}
-  inv.aurium-=10;ship.state='warp';ship.t=0;ship.warped=false;Sound.whoosh(2.6);
+  if(crafted.warpcell){crafted.warpcell--;toast('Warp cell consumed.')}else inv.aurium-=10;
+  ship.state='warp';ship.t=0;ship.warped=false;Sound.whoosh(2.6);
 }
 function scanPulse(){
   if(st.scanCD>0){toast(`Scanner recharging · ${Math.ceil(st.scanCD)} s`);return}
   if(!current)return;
-  st.scanCD=6;st.scanUntil=time+16;st.scanT=time;Sound.blip(240,.9,'sine',.2);
+  st.scanCD=tech('scanner')?3:6;st.scanUntil=time+16;st.scanT=time;Sound.blip(240,.9,'sine',.2);
   const ref=st.mode==='foot'?player.pos:ship.group.position;let n=0;
-  for(const it of current.items)if(it.alive&&it.type==='crystal'&&it.wp.distanceTo(ref)<500)n++;
+  for(const it of current.items)if(it.alive&&it.type==='crystal'&&it.wp.distanceTo(ref)<AUR_R())n++;
   let nw=0;for(const w of current.wrecks)if(w.wp.distanceTo(ref)<3000){if(!w.known)nw++;w.known=true}
   if(nw)setTimeout(()=>toast(`Scan: crashed ship detected. It may be repairable.`),400);
-  toast(n?`Scan: ${n} Aurium deposit${n>1?'s':''} within 500 m.`:'Scan: no Aurium within 500 m. Try elsewhere or another world.');
+  toast(n?`Scan: ${n} Aurium deposit${n>1?'s':''} within ${fmtDist(AUR_R())}.`:`Scan: no Aurium within ${fmtDist(AUR_R())}. Try elsewhere or another world.`);
+  if(tech('resonator')){const nr=current.items.filter(it=>it.alive&&it.type==='relic'&&it.wp.distanceTo(ref)<3000).length;if(nr)setTimeout(()=>toast(`Resonator: ${nr} relic${nr>1?'s':''} within 3 km.`),700)}
 }
 function analyze(){
   if(st.mode!=='foot')return;
@@ -912,7 +933,7 @@ function updateFoot(dt){
   const floor=water?P.sea+.9:ground+eye;
   player.vUp-=20*dt;
   if(keys.Space&&(player.grounded||player.swimming)){player.vUp=player.swimming?5:7.5;player.grounded=false;player.jetDelay=.28}
-  else if(keys.Space&&!player.grounded&&player.jet>0&&player.jetDelay<=0){player.vUp+=36*dt;player.jet=Math.max(0,player.jet-30*dt)}
+  else if(keys.Space&&!player.grounded&&player.jet>0&&player.jetDelay<=0){player.vUp+=(tech('jet')?46:36)*dt;player.jet=Math.max(0,player.jet-(tech('jet')?15:30)*dt)}
   player.jetDelay-=dt;
   rad+=player.vUp*dt;
   if(rad<=floor||(player.grounded&&rad-floor<.7&&player.vUp<=0)){
@@ -931,7 +952,7 @@ function updateFoot(dt){
   const sunDir=tV2.copy(sun.position).sub(player.pos).normalize();
   const night=d.dot(sunDir)<-.1;
   const rate=P.biome.hazard*(night&&P.biome.key==='glacial'?1.5:night&&P.biome.key==='scorched'?.5:1)*(player.swimming?1.3:1);
-  player.suit=Math.max(0,player.suit-rate*.55*dt);
+  player.suit=Math.max(0,player.suit-rate*.55*(tech('lining')?.6:1)*dt);
   if(player.suit<=0)player.health-=7*dt;else player.health=Math.min(100,player.health+1.5*dt);
   if(player.health<=0)die();
 }
@@ -969,7 +990,7 @@ function updateMining(dt){
     if(dx*dx+dy*dy+dz*dz-t*t<rr*rr){cT=t;lookCreature=cr}
   }
   if(lookCreature&&cT<bestT)mineTarget=null;
-  const firing=mouseDown&&$('help').hidden;
+  const firing=mouseDown&&$('help').hidden&&$('craft').hidden&&$('upg').hidden;
   if(firing){
     const tip=tool.userData.tip.getWorldPosition(tV2);
     const end=mineTarget?mineTarget.wp:o.clone().addScaledVector(dir,RANGE);
@@ -978,7 +999,7 @@ function updateMining(dt){
     spark.visible=!!mineTarget;if(mineTarget){spark.position.copy(end);spark.scale.setScalar(.6+Math.random()*.8)}
     Sound.ctx&&Sound.set(Sound.lasG.gain,.09,.02);Sound.ctx&&Sound.set(Sound.las.frequency,mineTarget?190+Math.random()*30:150,.02);
     if(mineTarget){
-      mineTarget.hp-=dt;
+      mineTarget.hp-=dt*(tech('beam')?2.2:1);
       if(mineTarget.hp<=0)harvest(mineTarget);
     }
   }else{laser.visible=spark.visible=false;Sound.ctx&&Sound.set(Sound.lasG.gain,0,.03)}
@@ -1065,7 +1086,7 @@ function updateShip(dt){
     g.position.addScaledVector(fwd,ship.speed*dt);
     // cannons
     ship.fireCD-=dt;ship.heat=Math.max(0,ship.heat-(ship.overheat?32:24)*dt);if(ship.overheat&&ship.heat<30)ship.overheat=false;
-    if(mouseDown&&$('help').hidden&&$('upg').hidden&&!ship.overheat&&ship.fireCD<=0){
+    if(mouseDown&&$('help').hidden&&$('upg').hidden&&$('craft').hidden&&!ship.overheat&&ship.fireCD<=0){
       const guns=g.userData.guns,gp=guns[ship.gunI++%guns.length];
       const muzzle=g.localToWorld(tV2.copy(gp));
       fireBolt(muzzle,fwd,tV3.copy(fwd).multiplyScalar(ship.speed),'player',S.dmg);
@@ -1284,7 +1305,8 @@ function updateCombat(dt){
   for(let i=salvage.length-1;i>=0;i--){
     const s=salvage[i];s.life-=dt;s.mesh.position.addScaledVector(s.vel,dt);s.vel.multiplyScalar(Math.exp(-dt*.4));
     s.mesh.rotation.x+=s.spin.x*dt;s.mesh.rotation.y+=s.spin.y*dt;
-    if(flying&&s.mesh.position.distanceTo(ship.group.position)<ship.group.userData.radius+18){
+    if(flying&&s.mesh.position.distanceTo(ship.group.position)<ship.group.userData.radius+(tech('magnet')?70:18)){
+      if(tech('magnet'))for(const k in s.loot)s.loot[k]=Math.round(s.loot[k]*1.25);
       giveLoot(s.loot);toast(`Salvage: ${lootText(s.loot)}`);Sound.blip(700,.15,'triangle',.14);setTimeout(()=>Sound.blip(1050,.2,'triangle',.12),110);
       scene.remove(s.mesh);salvage.splice(i,1);save();continue;
     }
@@ -1330,6 +1352,64 @@ function buyUpg(k){
   Sound.blip(600,.2,'triangle',.15);setTimeout(()=>Sound.blip(900,.25,'triangle',.13),120);
   toast(`${UPGRADES.find(u=>u.key===k).name} upgraded to level ${upg[k]}.`);renderUpg();save();
 }
+
+/* ---------- crafting ---------- */
+const AUR_R=()=>tech('scanner')?1000:500;
+const canWarp=()=>inv.aurium>=10||crafted.warpcell>0;
+const RECIPES=[
+  {id:'gel',kind:'use',name:'Life support gel',desc:'Restores 50 life support.',cost:{carbon:15,cobalt:2},
+    can:()=>st.mode==='foot'?(player.suit<99||'Life support is full.'):'Use it on foot.',use:()=>{player.suit=Math.min(100,player.suit+50);toast('Life support +50.')}},
+  {id:'hullkit',kind:'use',name:'Hull patch kit',desc:'Repairs 50% of your ship hull.',cost:{ferrite:20,carbon:5},
+    can:()=>ship.hull<shipStats().hull-.5||'Hull is intact.',use:()=>{const m=shipStats().hull;ship.hull=Math.min(m,ship.hull+m*.5);toast('Hull patched.')}},
+  {id:'battery',kind:'use',name:'Shield battery',desc:'Instantly refills your ship shield. Best used mid-fight.',cost:{cobalt:10,ferrite:5},
+    can:()=>st.mode==='ship'?(ship.shield<shipStats().shield-.5||'Shield is full.'):'Use it in your ship.',use:()=>{ship.shield=shipStats().shield;ship.shieldDelay=0;toast('Shield restored.')}},
+  {id:'fuelcell',kind:'use',name:'Launch fuel cell',desc:'Adds 40 launch fuel.',cost:{ferrite:15,carbon:5},
+    can:()=>ship.fuel<99||'Launch thrusters are full.',use:()=>{ship.fuel=Math.min(100,ship.fuel+40);toast('Launch fuel +40.')}},
+  {id:'warpcell',kind:'use',name:'Warp cell',desc:'Powers one hyperdrive jump instead of 10 Aurium. Used automatically.',cost:{aurium:6,cobalt:10,ferrite:20},
+    can:()=>'Used automatically when you press H in flight.',use:null},
+  {id:'beam',kind:'tech',name:'Beam overdrive',desc:'Your mining laser cuts 2.2× faster.',cost:{ferrite:40,cobalt:20,aurium:3}},
+  {id:'jet',kind:'tech',name:'Jetpack booster',desc:'Stronger thrust and half the fuel use.',cost:{carbon:30,cobalt:15,nanites:40}},
+  {id:'lining',kind:'tech',name:'Hazard lining',desc:'Planet hazards drain life support 40% slower.',cost:{carbon:40,ferrite:20,cobalt:10}},
+  {id:'scanner',kind:'tech',name:'Wide-band scanner',desc:'Aurium scan range 1 km and half the cooldown.',cost:{ferrite:25,cobalt:12,nanites:60}},
+  {id:'magnet',kind:'tech',name:'Salvage magnet',desc:'Pulls in salvage from much further and adds 25% to its loot.',cost:{ferrite:30,cobalt:15,nanites:80}},
+  {id:'resonator',kind:'tech',name:'Relic resonator',desc:'Scanner finds relics up to 3 km away.',cost:{relics:2,aurium:4,cobalt:10}},
+];
+const RES_LABEL={carbon:'Carbon',ferrite:'Ferrite',cobalt:'Cobalt',aurium:'Aurium',nanites:'Nanites',relics:'Relics'};
+function toggleCraft(){
+  const el=$('craft');
+  if(el.hidden){el.hidden=false;try{document.exitPointerLock()}catch(_){}renderCraft()}else el.hidden=true;
+}
+function affordable(cost){return Object.entries(cost).every(([k,v])=>inv[k]>=v)}
+function renderCraft(){
+  const row=r=>{
+    const owned=r.kind==='tech'?tech(r.id):(crafted[r.id]||0);
+    const cost=Object.entries(r.cost).map(([k,v])=>`<span class="${inv[k]<v?'lack':''}">${v} ${RES_LABEL[k]}</span>`).join(' · ');
+    let acts='';
+    if(r.kind==='tech')acts=owned?'<span class="own">Installed</span>':`<button type="button" data-c="${r.id}" ${affordable(r.cost)?'':'disabled'}>Craft</button>`;
+    else{acts=`<button type="button" data-c="${r.id}" ${affordable(r.cost)?'':'disabled'}>Craft</button>`;
+      if(r.use)acts+=`<button type="button" data-u="${r.id}" ${owned?'':'disabled'}>Use (${owned})</button>`;else acts+=`<span class="own">${owned} held</span>`}
+    return `<div class="urow"><div><span class="nm">${r.name}</span></div><div class="ds">${r.desc}</div><div class="cost">${owned===true?'':cost}</div><div class="acts">${acts}</div></div>`;
+  };
+  $('craftList').innerHTML=`<div class="csec">Consumables</div>${RECIPES.filter(r=>r.kind==='use').map(row).join('')}<div class="csec">Technology · permanent</div>${RECIPES.filter(r=>r.kind==='tech').map(row).join('')}`;
+  for(const b of $('craftList').querySelectorAll('button[data-c]'))b.addEventListener('click',()=>craft(b.dataset.c));
+  for(const b of $('craftList').querySelectorAll('button[data-u]'))b.addEventListener('click',()=>useItem(b.dataset.u));
+}
+function craft(id){
+  const r=RECIPES.find(x=>x.id===id);if(!r)return;
+  if(r.kind==='tech'&&tech(id))return;
+  if(!affordable(r.cost)){const miss=Object.entries(r.cost).filter(([k,v])=>inv[k]<v).map(([k,v])=>`${v-inv[k]} more ${RES_LABEL[k]}`);toast(`Can't craft ${r.name}: need ${miss.join(', ')}.`,'bad');return}
+  for(const k in r.cost)inv[k]-=r.cost[k];
+  if(r.kind==='tech'){crafted[id]=true;toast(`${r.name} installed.`,'big')}else{crafted[id]=(crafted[id]||0)+1;toast(`Crafted ${r.name}.`)}
+  Sound.blip(520,.12,'square',.08);setTimeout(()=>Sound.blip(780,.18,'triangle',.12),100);
+  save();if(!$('craft').hidden)renderCraft();
+}
+function useItem(id){
+  const r=RECIPES.find(x=>x.id===id);if(!r||!r.use)return;
+  if(!crafted[id]){toast(`You have no ${r.name}. Craft one in the menu [I].`,'bad');return}
+  const ok=r.can();if(ok!==true){toast(ok,'bad');return}
+  crafted[id]--;r.use();Sound.blip(700,.25,'sine',.14);save();if(!$('craft').hidden)renderCraft();
+}
+function quickUse(){useItem(st.mode==='foot'?'gel':(crafted.battery&&ship.shield<shipStats().shield*.5&&npcs.some(n=>n.hostile)?'battery':'hullkit'))}
 
 function updateCreatures(dt){
   const P=current;if(!P||!P.species.length)return;
@@ -1474,8 +1554,8 @@ function drawMarkers(){
     const reff=st.mode==='foot'?player.pos:ship.group.position;
     for(const it of current.items){
       if(!it.alive)continue;const dist=it.wp.distanceTo(reff);
-      if(it.type==='crystal'&&dist<500){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#ffcc55','Aurium',fmtDist(dist),'diamond',6)}
-      else if(it.type==='relic'&&dist<800){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#f2e3b5','Relic',fmtDist(dist),'diamond',7)}
+      if(it.type==='crystal'&&dist<AUR_R()){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#ffcc55','Aurium',fmtDist(dist),'diamond',6)}
+      else if(it.type==='relic'&&dist<(tech('resonator')?3000:800)){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#f2e3b5','Relic',fmtDist(dist),'diamond',7)}
       else if(it.type==='pod'&&dist<350){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Pod',fmtDist(dist),'ring',5)}
       else if(it.type==='cobalt'&&dist<250){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'#7fb6ff',null,null,'diamond',4)}
       else if(it.type==='rock'&&dist<70&&st.mode==='foot'){const p=proj(it.wp,false);if(!p.off)marker(p.x,p.y,'rgba(200,210,230,.8)',null,null,'dot',2.5)}
@@ -1491,11 +1571,11 @@ function objective(){
     if(ship.fuel<TO()&&inv.ferrite<20)return `Mine rocks with your laser for Ferrite · ${inv.ferrite}/20 to refuel your ship`;
     if(ship.fuel<TO())return 'Return to your ship, board it [E], and refuel the launch thrusters [R]';
     if(nearWreck)return 'A crashed ship. Inspect it [E] to see its stats and repair cost';
-    if(inv.aurium<10)return `Find glowing Aurium crystals · ${inv.aurium}/10 · press C to scan. Supply pods and relics hold extra loot`;
+    if(!canWarp())return `Find glowing Aurium crystals · ${inv.aurium}/10 · press C to scan. Supply pods and relics hold extra loot`;
     return 'Board your ship and take off. Hyperdrive is charged.';
   }
   if(ship.state==='landed')return ship.fuel<TO()?'Press R to refuel with 20 Ferrite':'Press Space to take off';
-  if(inv.aurium<10)return `Find Aurium · ${inv.aurium}/10 · scan [C] near a planet, then land [E] to mine it`;
+  if(!canWarp())return `Find Aurium · ${inv.aurium}/10 · scan [C] near a planet, then land [E] to mine it. Or craft a warp cell [I]`;
   return 'Climb out of the atmosphere and press H to jump to a new star';
 }
 function updateHUD(){
@@ -1513,7 +1593,7 @@ function updateHUD(){
   const foot=st.mode==='foot';
   const combatView=!foot&&ship.state==='flying';$('footBars').hidden=!foot;$('shipBars').hidden=foot;$('reticle').hidden=!(foot||combatView);
   if(foot){setBar('bSuit',player.suit);setBar('bHp',player.health,100,35);setBar('bJet',player.jet,100,0)}
-  else{const S=shipStats();setHTML('speed',`${Math.round(ship.speed)}<small>m/s · ${SHIP_CLASSES[ship.cls].label}</small>`);setBar('bShield',ship.shield,S.shield,0);setBar('bHull',ship.hull,S.hull,S.hull*.3);setBar('bHeat',ship.heat,100,0);$('bHeat').classList.toggle('warn',ship.overheat);setBar('bFuel',ship.fuel,100,TO());setBar('bWarp',Math.min(10,inv.aurium)*10,100,0);$('bWarp').querySelector('.n').textContent=`${Math.min(10,inv.aurium)}/10`}
+  else{const S=shipStats();setHTML('speed',`${Math.round(ship.speed)}<small>m/s · ${SHIP_CLASSES[ship.cls].label}</small>`);setBar('bShield',ship.shield,S.shield,0);setBar('bHull',ship.hull,S.hull,S.hull*.3);setBar('bHeat',ship.heat,100,0);$('bHeat').classList.toggle('warn',ship.overheat);setBar('bFuel',ship.fuel,100,TO());setBar('bWarp',canWarp()?100:Math.min(10,inv.aurium)*10,100,0);$('bWarp').querySelector('.n').textContent=crafted.warpcell?`${crafted.warpcell} cell${crafted.warpcell>1?'s':''}`:`${Math.min(10,inv.aurium)}/10`}
   // target & prompt
   let tgt='',pr='';const ring=$('ring');let prog=0;
   if(foot){
@@ -1529,7 +1609,7 @@ function updateHUD(){
     const hn=npcs.filter(n=>n.hostile).length;
     if(hn)pr=`<span class="k" style="border-color:var(--danger);color:var(--danger)">${hn}</span>Hostile${hn>1?'s':''} · hold left click to fire`;
     else if(alt<140)pr='<span class="k">E</span>Land';
-    else if(inv.aurium>=10&&r-P.radius>P.radius*.6)pr='<span class="k">H</span>Engage hyperdrive';
+    else if(canWarp()&&r-P.radius>P.radius*.6)pr='<span class="k">H</span>Engage hyperdrive';
     else if(r-P.radius>P.radius*1.4)pr='<span class="k">Shift</span>Pulse drive';
     else pr=`Altitude ${fmtDist(alt)}`;
   }
@@ -1564,7 +1644,7 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
   else{st.seed=(Math.random()*2**31)>>>0;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
