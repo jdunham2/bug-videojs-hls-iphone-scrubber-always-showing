@@ -3354,7 +3354,7 @@ function killEnemy(e) {
   if (e.den != null) { denBroken(e); return; }
   const def = ENEMIES[e.type];
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
-  if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
+  if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; S.compKills = S.compKills || {}; S.compKills[k] = (S.compKills[k] || 0) + 1; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
   if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3*(bloodMoon() ? 2 : 1)); SFX.kill(); if (bloodMoon() && !def.passive) { S.bmKills = (S.bmKills || 0) + 1; const bc = rint(4, 12) + (S.level || 1); S.coins += bc; got.push(`+${bc} coin (blood moon)`); }
   if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1) * (1 + .05*conHas('coin')) * (perk('plunderer') ? 1.15 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
@@ -3384,7 +3384,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; S.dodges = (S.dodges || 0) + 1; SFX.dodge(); floatText(S.x, S.y - 1.2, 'Dodged! Counter ready', '#bfe8ff'); player.counter = 2; } return; }
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
-  const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * 2) / 2);
+  const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * (compAbil('brann') ? .85 : 1) * 2) / 2);
   S.hp -= taken; SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
   if (from) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
@@ -4458,6 +4458,24 @@ function todoList() {
   safe(() => { for (const q of S.placed) if (q.t === 'incubator' && q.egg && S.day >= q.egg) { T.push('🥚 An egg in your incubator is ready to hatch!'); break; } });
   return T.slice(0, 12);
 }
+function completion() {
+  const sf = f => { try { return Math.max(0, Math.min(1, f())); } catch (e) { return 0; } };
+  const parts = [
+    ['Achievements', sf(() => ACH.filter(a => S.achievements[a[0]]).length/ACH.length)],
+    ['Bestiary', sf(() => BEAST_IDS.filter(k => S.killsBy[k]).length/BEAST_IDS.length)],
+    ['Fish log', sf(() => Object.keys(S.fishLog || {}).length/FISH_LOG_IDS.length)],
+    ['Bug log', sf(() => Object.keys(S.bugLog || {}).length/BUG_KINDS.length)],
+    ['Golden shells', sf(() => shellsGot()/SHELL_N)],
+    ['Museum', sf(() => { const ids = museumIds(); return ids.filter(g => (S.museum || {})[g]).length/ids.length; })],
+    ['Map', sf(() => mapPct()/100)],
+    ['Monuments', sf(() => Object.keys(MONUMENTS).filter(k => monDone(k)).length/Object.keys(MONUMENTS).length)],
+    ['Constellations', sf(() => Object.keys(S.stars || {}).length/CONSTELLATIONS.length)],
+    ['Ballads', sf(() => Object.keys(S.ballads || {}).length/BALLADS.length)],
+    ['Great beasts', sf(() => BKM.filter(k => S.bosses[k]).length/BKM.length)],
+  ];
+  return {parts, total: parts.reduce((a, [, v]) => a + v, 0)/parts.length};
+}
+function completionHTML() { const C = completion(); S.complPct = C.total; return `<h3>Completion · ${(C.total*100).toFixed(1)}%</h3><div class="jcard"><div style="height:6px;background:#0d131b;border-radius:3px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${C.total*100}%;background:var(--brass,#e3a948)"></div></div><div class="vals" style="font-size:12px">${C.parts.map(([n, v]) => `${n} <b>${Math.round(v*100)}%</b>`).join(' · ')}</div></div>`; }
 function todoHTML() { const T = todoList(); return T.length ? `<h3>Things to do</h3><div class="jcard"><div style="font-size:13px;line-height:1.6">${T.map(t => `<div>${t}</div>`).join('')}</div></div>` : ''; }
 function gazetteHTML() { S.readGazette = true; return `<h3>The Saltwind Gazette · Day ${S.day}</h3><div class="jcard" style="background:#f4ecd8;color:#2a2418"><div style="font-family:Georgia,serif;font-size:13px;line-height:1.5">${gazette().map(h => `<div style="padding:3px 0;border-bottom:1px solid #d8ccb0">${h}</div>`).join('')}</div></div>`; }
 // ===== stargazing =====
@@ -7844,7 +7862,7 @@ function craft(id) {
   const r = RECIPE_BY[id], out = r.out || r.id, g = GOODS[out];
   if (!isKnown(id) || !stations()[r.at] || !Object.entries(r.need).every(([k, q]) => have(k) >= q)) return;
   for (const k in r.need) addItem(k, -r.need[k]);
-  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5); if (out === 'stone_golem') { S.golemOwned = true; S.companion = 'golem'; compE = null; setTimeout(() => toast('<b>The golem awakens!</b><br>Stone grinds on stone as your Stone Golem rises and follows you. It needs no wages. (Swap companions at any mercenary captain.)', 7000), 400); } if (r.at === 'cook') { S.cooked = S.cooked || {}; S.cooked[out] = true; }
+  addItem(out, r.n || 1); S.crafted++; SFX.craft(); gainXP(5); if (['weapon', 'armor'].includes(g.kind) && enhOf(out) < ENH_MAX && Math.random() < .1 + (perk('forager') ? .03 : 0) + .02*sk('gat')) { S.enh = S.enh || {}; S.enh[out] = enhOf(out) + 1; S.masterworks = (S.masterworks || 0) + 1; setTimeout(() => { toast(`<b>Masterwork!</b><br>Your ${esc(g.name)} came out exceptionally well: <span style="color:var(--good)">+1 enhancement</span>.`, 5000); SFX.victory(); }, 300); } if (out === 'stone_golem') { S.golemOwned = true; S.companion = 'golem'; compE = null; setTimeout(() => toast('<b>The golem awakens!</b><br>Stone grinds on stone as your Stone Golem rises and follows you. It needs no wages. (Swap companions at any mercenary captain.)', 7000), 400); } if (r.at === 'cook') { S.cooked = S.cooked || {}; S.cooked[out] = true; }
   const mw = Math.random() < .04*sk('cra'); if (mw) { addItem(out, r.n || 1); S.masterworks = (S.masterworks || 0) + 1; }
   let note = '';
   if (g.kind === 'weapon' && g.dmg > weapon().dmg) { S.equip.weapon = out; note = ' Equipped.'; }
@@ -7914,7 +7932,7 @@ function updateCompanion(dt) {
   const C = COMPANIONS[S.companion], lv = (1 + (S.level || 1)*.08) * (1 + .12*compLv(S.companion));
   if (!compE) compE = {x: S.x + .9, y: S.y + .3, cd: 0, heal: 4, face: 'down', phase: 0, moving: false};
   compE.cd -= dt;
-  if (C.role === 'healer') { compE.heal -= dt; if (compE.heal <= 0) { compE.heal = 4; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + (S.level || 1)*.08 + compLv(S.companion)*.15); renderHP(); burst(S.x, S.y - .8, '#86c98f', 5, 2); } } }
+  if (C.role === 'healer') { compE.heal -= dt; if (compE.heal <= 0) { compE.heal = compAbil('mae') ? 2 : 4; if (S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + 1 + (S.level || 1)*.08 + compLv(S.companion)*.15); renderHP(); burst(S.x, S.y - .8, '#86c98f', 5, 2); } } }
   let target = null;
   if (!townAt(S.x, S.y, 8) || raidTown()) { let bd = 7; for (const e of enemies) { if (e.dead || e.hidden > 0 || (ENEMIES[e.type] && ENEMIES[e.type].passive)) continue; const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < bd) { bd = d; target = e; } } }
   const ranged = C.role === 'ranged' || C.role === 'mage';
@@ -7936,8 +7954,8 @@ function updateCompanion(dt) {
   if (ed > C.range + ((target.size || 1) - 1)*.4 + .35) return;
   compE.cd = C.cd; compE.face = Math.abs(ex) > Math.abs(ey) ? (ex < 0 ? 'left' : 'right') : (ey < 0 ? 'up' : 'down');
   const dmg = Math.round(C.dmg*lv*10)/10;
-  if (C.role === 'ranged') arrows.push({x: compE.x, y: compE.y - .5, vx: ex/ed*13, vy: ey/ed*13, life: .7, max: .7, dmg, comp: true});
-  else if (C.role === 'mage') { const tx2 = target.x, ty2 = target.y; burst(compE.x, compE.y - .8, '#ff8a3a', 6, 2); setTimeout(() => { if (!S.companion) return; aoeHit(tx2, ty2 - .3, 1.6, dmg); }, 250); }
+  if (C.role === 'ranged') { arrows.push({x: compE.x, y: compE.y - .5, vx: ex/ed*13, vy: ey/ed*13, life: .7, max: .7, dmg, comp: true}); if (compAbil('lyra')) { const a2 = Math.atan2(ey, ex) + .18; arrows.push({x: compE.x, y: compE.y - .5, vx: Math.cos(a2)*13, vy: Math.sin(a2)*13, life: .7, max: .7, dmg, comp: true}); } }
+  else if (C.role === 'mage') { const tx2 = target.x, ty2 = target.y; burst(compE.x, compE.y - .8, '#ff8a3a', 6, 2); setTimeout(() => { if (!S.companion) return; aoeHit(tx2, ty2 - .3, compAbil('orin') ? 2.3 : 1.6, compAbil('orin') ? Math.round(dmg*1.3*10)/10 : dmg); }, 250); }
   else hitEnemy(target, dmg, ex/ed, ey/ed);
 }
 const RACES = [
@@ -8062,12 +8080,27 @@ function museumTalk(n) {
     {label: 'Walk through the halls', fn: () => say(`<span style="font-size:13px">${ids.map(g => S.museum[g] ? `<span style="color:${GOODS[g].col}">${GOODS[g].name}</span>` : '<span style="color:var(--muted)">empty case</span>').join(' · ')}</span>`, [{label: 'Back', fn: () => museumTalk(n)}])},
     back(n)]);
 }
+const COMP_QUESTS = {
+  brann: {ask: 'Fight 25 foes at my side, and I’ll teach you my Shield Wall.', test: () => (S.compKills || {}).brann >= 25, prog: () => `${Math.min(25, (S.compKills || {}).brann || 0)}/25 foes`, ability: 'Shield Wall: you take 15% less damage while Brann is with you'},
+  lyra: {ask: 'Bring me 4 Feathers and 2 Silver for a new bowstring and fletching.', cost: {feather: 4, silver: 2}, ability: 'Twin Shot: Lyra fires two arrows at once'},
+  orin: {ask: 'My fire grows cold. Bring me 6 Ember Shards and 2 Sulfur.', cost: {ember: 6, sulfur: 2}, ability: 'Inferno: bigger, hotter fireballs'},
+  mae: {ask: 'Help me tend the sick: bring 8 Herbs and 3 Honey.', cost: {herbs: 8, honey: 3}, ability: 'Blessing: Mae heals you twice as often'},
+};
+const compAbil = k => S && S.companion === k && !!(S.compQuest || {})[k];
+function compQuestTalk(n) {
+  const k = S.companion, Q = COMP_QUESTS[k], C = COMPANIONS[k]; if (!Q) return;
+  if ((S.compQuest || {})[k]) { say(`${esc(C.name)}: “We make a fine team.”<br><span style="color:var(--good)">${Q.ability}</span>`, [back(n)]); return; }
+  const ok = Q.cost ? upCanPay(Q.cost) : Q.test();
+  say(`${esc(C.name)}: “${Q.ask}”${Q.cost ? `<div class="req" style="margin-top:8px">${upCostHTML(Q.cost)}</div>` : `<br><span style="color:var(--muted)">${Q.prog()}</span>`}<br><span style="color:var(--muted)">Reward: ${Q.ability}.</span>`, [
+    {label: Q.cost ? 'Hand it over' : 'Ready!', primary: ok, disabled: !ok, fn: () => { if (Q.cost) upPay(Q.cost); S.compQuest = S.compQuest || {}; S.compQuest[k] = true; SFX.victory(); renderHUD(); save(); say(`${esc(C.name)} grins. “Thank you, friend.”<br><span style="color:var(--good)">New ability, ${Q.ability}.</span>`, [back(n)]); }}, back(n)]);
+}
 function hireTalk(n) {
   const cur = S.companion && COMPANIONS[S.companion];
   say(`“Need a sword at your side? My people fight for coin. A one-time fee, then a daily wage. If you can't pay their wage, they'll leave.”${cur ? `<br><br>You have hired <b>${cur.name}</b> (${cur.wage} coin a day).` : ''}`, [
     ...(S.golemOwned && S.companion !== 'golem' ? [{label: 'Wake my Stone Golem', primary: true, fn: () => { S.companion = 'golem'; compE = null; save(); say('Your golem rumbles to life and lumbers to your side.', [back(n)]); }}] : []),
     ...Object.entries(COMPANIONS).filter(([, C]) => !C.golem).map(([k, C]) => ({label: S.companion === k ? `${C.name} (Lv ${compLv(k)}) · with you` : `${C.name}${compLv(k) ? ` (Lv ${compLv(k)})` : ''} · ${C.cost} coin, ${C.wage}/day`, disabled: S.companion === k || S.coins < C.cost, fn: () => say(`<b>${C.name}</b><br>${C.desc}<br><br>Hire fee <b>${C.cost} coin</b>, then <b>${C.wage} coin</b> each morning.${cur ? `<br>${cur.name} will go home.` : ''}`, [
       {label: 'Hire', primary: true, disabled: S.coins < C.cost, fn: () => { S.coins -= C.cost; S.companion = k; compE = null; S.hiredOnce = true; SFX.coin(); renderHUD(); save(); say(`“${C.name} at your service. Lead the way.”`, [back(n)]); }}, back(n)])})),
+    ...(cur && COMP_QUESTS[S.companion] ? [{label: `${cur.name}'s request${(S.compQuest || {})[S.companion] ? ' (done)' : ''}`, fn: () => compQuestTalk(n)}] : []),
     ...(cur ? [{label: `Dismiss ${cur.name}`, fn: () => { S.companion = null; compE = null; save(); say('“Farewell. Send for us any time.”', [back(n)]); }}] : []),
     back(n)]);
 }
@@ -8514,6 +8547,7 @@ function openJournal() {
       Land explored: <b>${exploredPct()}%</b> · Places found: <b>${found.length}</b>/${LANDMARKS.length}<br>
       Trades: <b>${S.trades}</b> · Gathered: <b>${S.gathered}</b> · Crafted: <b>${S.crafted}</b><br>
       Foes defeated: <b>${S.kills}</b> · Notices done: <b>${S.requestsDone}</b> · Knocked out: <b>${S.deaths}</b>${S.flags.raft ? '<br><span class="done">You own a raft. Walk into any water.</span>' : ''}${S.home.level ? `<br>Home: <b>${HOME_LEVELS[S.home.level].name}</b> · crops harvested: <b>${S.harvested || 0}</b>` : ''}</div></div>
+    ${completionHTML()}
     ${todoHTML()}
     ${gazetteHTML()}
     <h3>Titles · ${EARNED_TITLES.filter(t => S.achievements[t[0]]).length}/${EARNED_TITLES.length} earned</h3><div class="vals" style="margin-bottom:6px">Earn titles from achievements. Your chosen title shows under your name.</div>
@@ -9399,6 +9433,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['flawless','Flawless Work','Craft a masterwork weapon or armor', () => (S.masterworks || 0) >= 1],
+  ['complete50','Halfway There','Reach 50% overall completion', () => (S.complPct || 0) >= .5],
+  ['compquest','Bonds of Trust','Complete a companion\'s personal request', () => Object.keys(S.compQuest || {}).length >= 1],
   ['castaway','Message Received, Robin','Help the castaway build a shelter', () => (S.castaway || 0) >= 2],
   ['shepherd','Good Shepherd','Pen the whole flock for Shepherd Ewan', () => (S.herds || 0) >= 1],
   ['monument','Built to Last','Complete a town monument', () => Object.values(S.monuments || {}).some(v => v >= 3)],
