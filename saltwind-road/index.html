@@ -1739,6 +1739,7 @@ const MOUNTS = {
   camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
   elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
   griffon:{name:'Griffon', speed:2.0, fly:true, desc:'Flies over water, mountains and lava.'},
+  mustang:{name:'Mustang', speed:1.9, desc:'A wild horse you tamed yourself. Faster than any stable horse.'},
   dragon:{name:'Dragon', speed:2.35, fly:true, desc:'Your Baby Drake, all grown up. The fastest thing in the sky.'},
   bear:{name:'Cave Bear', speed:1.6, terrain:[T.FOREST,T.REDWOOD,T.SNOW,T.HILL,T.GLOOM,T.MAPLE], desc:'Big, warm and stubborn. Never slowed by forest, snow or hills.'},
   tiger:{name:'Striped Tiger', speed:1.85, terrain:[T.JUNGLE,T.BAMBOO,T.GRASS,T.SAVANNA], desc:'Silent and swift through jungle, bamboo and grassland.'},
@@ -3619,6 +3620,37 @@ function drawAuroraShard(a) {
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
 }
+// ===== wild mustangs =====
+let mustangs = null, mustT = 30;
+function updateMustangs(dt) {
+  if (inDungeon() || S.y >= WORLD_H || balloonF) { mustangs = null; return; }
+  if (mustangs) { const M = mustangs; if (Math.hypot(S.x - M.x, S.y - M.y) > 28) { mustangs = null; return; }
+    for (const h of M.herd) { h.t += dt; const dx = h.x - S.x, dy = h.y - S.y, d = Math.hypot(dx, dy) || .01; let vx = Math.cos(h.t*.4 + h.ph)*.4, vy = Math.sin(h.t*.3 + h.ph)*.3;
+      const calm = have('apple') > 0 && !S.riding; if (d < (calm ? 1.2 : 4.5)) { vx += dx/d*4; vy += dy/d*4; }
+      const nx = h.x + vx*dt*1.4, ny = h.y + vy*dt*1.4; if (enemyWalk(nx, h.y)) h.x = nx; if (enemyWalk(h.x, ny)) h.y = ny; h.f = vx < 0 ? -1 : 1; h.mv = Math.hypot(vx, vy) > .5; }
+    return; }
+  mustT -= dt; if (mustT > 0) return; mustT = 40 + Math.random()*40;
+  if (S.mounts.includes('mustang') && Math.random() < .6) return;
+  const t = tileAt(Math.floor(S.x), Math.floor(S.y)); if (![T.GRASS, T.SAVANNA, T.HILL, T.MOOR].includes(t) || townAt(S.x, S.y, 15) || Math.random() > .35) return;
+  for (let k = 0; k < 10; k++) { const a = Math.random()*6.283, x = S.x + Math.cos(a)*11, y = S.y + Math.sin(a)*11; if (!enemyWalk(x, y)) continue;
+    mustangs = {x, y, herd: Array.from({length: 3}, (_, i) => ({x: x + i - 1, y: y + (i % 2), t: 0, ph: i*2}))}; toast('<b>Wild mustangs!</b><br>A small herd grazes nearby. They’re skittish, but they love apples...', 4500); return; }
+}
+function mustangTarget() {
+  if (!mustangs) return null; const h = mustangs.herd.find(h => Math.hypot(S.x - h.x, S.y - h.y) < 1.8); if (!h) return null;
+  if (!have('apple')) return {key: 'mustN', html: 'The mustang shies away. Maybe an apple would help.', btn: '', fn: () => {}};
+  return {key: 'must', html: '<kbd style="margin:0 6px 0 0">E</kbd>Offer an apple and try to tame it', btn: 'Tame', fn: () => tameGame(h)};
+}
+function tameGame(h) {
+  addItem('apple', -1); let pos = 0, dir = 1, done = false, hits = 0, round = 0;
+  const panel = () => openPanel('Taming', `The mustang crunches the apple, then rears! Keep your nerve: press <b>Calm</b> when the marker is in the green. (${hits}/3, try ${round + 1} of 5)<div style="position:relative;height:16px;background:linear-gradient(90deg,#5a2a2a 0%,#5a2a2a 38%,#4aa04a 42%,#4aa04a 58%,#5a2a2a 62%);border-radius:8px;margin-top:10px"><div id="tameMk" style="position:absolute;top:-3px;width:4px;height:22px;background:#fff;left:0"></div></div>`, [{label: 'Calm', primary: true, fn: () => {
+    if (done) return; const good = pos > 40 && pos < 60; if (good) hits++; round++; SFX[good ? 'coin' : 'hit']();
+    if (hits >= 3) { done = true; clearInterval(circusTimer); circusTimer = null; mustangs = null; addMount('mustang'); SFX.victory(); openPanel('Taming', 'The mustang snorts, settles... and nuzzles your shoulder. <b>You tamed a wild Mustang!</b>', [{label: 'Ride on!', fn: closeTalk}]); return; }
+    if (round >= 5) { done = true; clearInterval(circusTimer); circusTimer = null; mustangs.herd = mustangs.herd.filter(q => q !== h); openPanel('Taming', 'The mustang bucks free and gallops away into the distance.', [{label: 'Oh well', fn: closeTalk}]); return; }
+    panel(); }}]);
+  panel(); clearInterval(circusTimer);
+  circusTimer = setInterval(() => { pos += dir*(3 + round*.6); if (pos >= 100 || pos <= 0) dir *= -1; const mk = document.getElementById('tameMk'); if (mk) mk.style.left = `calc(${Math.max(0, Math.min(100, pos))}% - 2px)`; else if (done || mode !== 'talk') { clearInterval(circusTimer); circusTimer = null; } }, 30);
+}
+function drawMustangs() { if (!mustangs) return; for (const h of mustangs.herd) { if (Math.abs(h.x - S.x) > 25 || Math.abs(h.y - S.y) > 16) continue; drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv); } }
 // ===== highwaymen =====
 let hwT = 150;
 function highwayCheck(dt) {
@@ -5074,6 +5106,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Wild mustangs', 'Herds of wild mustangs roam the grasslands and savannas. They flee from you, unless you carry apples. Offer one and keep your nerve in the calming game to tame a Mustang, faster than any stable horse.'],
   ['The circus', 'Ringmaster Barnaby\u2019s Traveling Circus moves to a new town each week (the Gazette says where). Win tickets at the strength tester and ring toss, then trade them for prizes, including a pet monkey.'],
   ['Exports & regatta', 'Harbormaster Quinn in Tidewatch offers big export orders: deliver bulk goods within 5 days for a fat premium. Bess runs the regatta: sail through six buoys under par time for a prize, and in summer win the Regatta Cup.'],
   ['Snails & dragons', 'The dice players also run snail races: pick a snail and watch it go. Raise a Baby Drake to full level, then bring it and an Ember Core to Kael in Ashfall to grow it into a rideable Dragon.'],
@@ -5358,7 +5391,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -6136,6 +6169,7 @@ function render() {
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
+  if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
   if (CIRCUS && inView(CIRCUS.x, CIRCUS.y)) sprites.push({y: CIRCUS.y, f: drawCircus});
   if (vexRun && inView(vexRun.x, vexRun.y)) sprites.push({y: vexRun.y, f: () => drawPerson(ctx, Math.round(vexRun.x*TS), Math.round(vexRun.y*TS), {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, vexRun.phase, true, vexRun.f < 0 ? 'left' : 'right', {scarf: true})});
   if (S.waystones) for (const w of S.waystones) if (inView(w.x, w.y)) sprites.push({y: w.y + .6, f: () => drawWaystone(w)});
@@ -6562,7 +6596,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8459,13 +8493,14 @@ function drawMount(g, id, x, y, f, phase, moving) {
     g.fillStyle = id === 'tiger' ? '#8ad040' : '#1a1a1a'; g.fillRect(x + f*8, y - 14, 1, 1);
     return;
   }
-  const body = id === 'unicorn' ? '#f8f8ff' : id === 'nightmare' ? '#1c1a24' : id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'unicorn' ? '#c8c8e0' : id === 'nightmare' ? '#0a0a10' : id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
+  const body = id === 'mustang' ? '#a0603a' : id === 'unicorn' ? '#f8f8ff' : id === 'nightmare' ? '#1c1a24' : id === 'horse' ? '#7a4a2a' : id === 'camel' ? '#c8a060' : '#6a4a30', dark = id === 'mustang' ? '#f0e8d8' : id === 'unicorn' ? '#c8c8e0' : id === 'nightmare' ? '#0a0a10' : id === 'horse' ? '#3a2418' : id === 'camel' ? '#8a6a3a' : '#3a2a1a';
   g.fillStyle = dark; g.fillRect(x-6, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x-3, y-6, 2, 6 + (step < 0 ? 0 : -1)); g.fillRect(x+2, y-6, 2, 6 + (step > 0 ? 0 : -1)); g.fillRect(x+5, y-6, 2, 6 + (step < 0 ? 0 : -1));
   g.fillStyle = body; g.fillRect(x-7, y-11, 15, 6);
   if (id === 'camel') g.fillRect(x-3, y-14, 6, 3);
   g.fillRect(x + f*7 - 1, y-16, 3, 7); g.fillRect(x + f*8 - 2, y-17, 5, 3);
   g.fillStyle = dark; g.fillRect(x - f*8 - 1, y-11, 2, 5);
   if (id === 'horse') g.fillRect(x + f*6 - 1, y-16, 2, 6);
+  if (id === 'mustang') { g.fillStyle = '#3a2418'; g.fillRect(x + f*6 - 1, y-17, 2, 7); g.fillStyle = '#f0e8d8'; g.fillRect(x + f*8 - 1, y-16, 2, 2); }
   if (id === 'unicorn') { const rb = ['#ff6a6a', '#ffb040', '#ffe060', '#6ae08a', '#6ab0ff', '#b08aff']; for (let i = 0; i < 5; i++) { g.fillStyle = rb[i]; g.fillRect(x + f*(6 - i*1.5) - 1, y - 17 + (i % 2), 2, 4); } g.fillStyle = '#ffe080'; g.fillRect(x + f*9, y - 21, 1, 4); g.fillRect(x + f*9 - (f > 0 ? 0 : 0), y - 22, 1, 1); g.fillStyle = rb[(Math.floor(frameT*6)) % 6]; g.fillRect(x - f*9 - 1, y - 12, 2, 5); }
   if (id === 'nightmare') { for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#ff8a2a' : '#ffd040'; g.fillRect(x + f*(6 - i*2) - 1, y - 17 - ((Math.floor(frameT*12) + i) % 3), 2, 3); } g.fillStyle = '#ff5a1a'; g.fillRect(x + f*9, y-16, 1, 1); g.fillStyle = '#ff8a2a'; g.fillRect(x - f*9 - 1, y - 12 - (Math.floor(frameT*10) % 2), 2, 4); }
   if (id === 'elk') { g.fillStyle = '#d8c8a0'; g.fillRect(x + f*8 - 3, y-21, 1, 4); g.fillRect(x + f*8 + 2, y-21, 1, 4); g.fillRect(x + f*8 - 4, y-21, 3, 1); g.fillRect(x + f*8 + 1, y-21, 3, 1); }
@@ -9654,6 +9689,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['mustang','Horse Whisperer','Tame a wild mustang', () => S.mounts.includes('mustang')],
   ['highwayman','Stand and Deliver','Defeat a masked highwayman', () => (S.highwaymen || 0) >= 1],
   ['silver','Silver Tongue','Talk your way past 3 highwaymen', () => (S.bluffs || 0) >= 3],
   ['bell','Ring the Bell','Ring the bell on the circus strength tester', () => (S.bellRung || 0) >= 1],
@@ -10167,7 +10203,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
