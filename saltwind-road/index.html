@@ -3612,6 +3612,21 @@ function drawAuroraShard(a) {
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
 }
+// ===== treasure race =====
+let vexRun = null;
+function vexRaceOffer() {
+  if (!S.tmap || vexRun || mode !== 'play') return;
+  openPanel('Vex the Bold', '“A treasure map, eh? I saw it too. Race you there! Winner takes 300 coin from the loser.”', [
+    {label: 'You’re on!', primary: true, fn: () => { closeTalk(); const a = Math.random()*6.283; vexRun = {x: S.x + Math.cos(a)*1.5, y: S.y + Math.sin(a)*1.5, phase: 0}; toast('<b>Go!</b> Vex sprints off toward the treasure!', 2500); }},
+    {label: 'Not today', fn: () => { closeTalk(); toast('“Chicken!” Vex laughs and saunters off.', 2500); }}]);
+}
+function updateVexRun(dt) {
+  if (!vexRun) return; if (!S.tmap) { vexRun = null; return; }
+  const tx = S.tmap.x + .5, ty = S.tmap.y + .5, dx = tx - vexRun.x, dy = ty - vexRun.y, d = Math.hypot(dx, dy), sp = 4.6*1.05*Math.min(1.3, 1 + (S.level || 1)*.004);
+  vexRun.phase += dt*12; vexRun.f = dx < 0 ? -1 : 1;
+  if (d < .6) { vexRun = null; S.tmap = null; const loss = Math.min(S.coins, 300); S.coins -= loss; renderHUD(); save(); toast(`<b>Vex got there first!</b><br>“Ha! Better luck next time.” Vex digs up the treasure and takes your ${loss} coin wager.`, 6000); SFX.hit(); return; }
+  vexRun.x += dx/d*sp*dt; vexRun.y += dy/d*sp*dt;
+}
 // ===== waystones =====
 const WS_NAMES = ['Mossy Waystone', 'Sunken Waystone', 'Windswept Waystone', 'Ember Waystone', 'Frost Waystone', 'Dune Waystone', 'Jungle Waystone', 'Twilight Waystone', 'Prism Waystone', 'Redwood Waystone', 'Moor Waystone', 'Cliff Waystone'];
 function ensureWaystones() {
@@ -5216,7 +5231,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt); updateVexRun(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -5993,6 +6008,7 @@ function render() {
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
+  if (vexRun && inView(vexRun.x, vexRun.y)) sprites.push({y: vexRun.y, f: () => drawPerson(ctx, Math.round(vexRun.x*TS), Math.round(vexRun.y*TS), {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, vexRun.phase, true, vexRun.f < 0 ? 'left' : 'right', {scarf: true})});
   if (S.waystones) for (const w of S.waystones) if (inView(w.x, w.y)) sprites.push({y: w.y + .6, f: () => drawWaystone(w)});
   if (ISLET && inView(ISLET.x, ISLET.y)) sprites.push({y: ISLET.y - .2, f: drawIslet});
   for (const k in MON_SPOTS) if (inView(MON_SPOTS[k].x, MON_SPOTS[k].y)) sprites.push({y: MON_SPOTS[k].y, f: () => drawMonument(k, MON_SPOTS[k])});
@@ -6196,6 +6212,7 @@ function render() {
 
 function objective() {
   if (inDungeon() || S.y >= WORLD_H) return null;
+  if (vexRun && S.tmap) return {x: S.tmap.x + .5, y: S.tmap.y + .5, label: `Race! Vex ${Math.round(Math.hypot(vexRun.x - S.tmap.x, vexRun.y - S.tmap.y))}`, col: '#e04a7a'};
   if (S.lmap) return {x: S.lmap.x + .5, y: S.lmap.y + .5, label: 'Hoard', col: '#e8b040'};
   if ((S.clock || 0) === 2 && S.clockSpot) return {x: S.clockSpot.x, y: S.clockSpot.y, label: 'Brassby', col: '#e0c070'};
   if (S.raid && TOWNS[S.raid.town]) return {x: TOWNS[S.raid.town].x + .5, y: TOWNS[S.raid.town].y + .5, label: 'Raid', col: '#ff7a4a'};
@@ -6819,6 +6836,7 @@ function readMap() {
   addItem('treasure_map', -1); S.tmap = sp; SFX.page ? SFX.page() : SFX.craft();
   toast(`<b>Treasure map</b><br>An X is marked about ${sp.dist} paces ${sp.dir} of ${TOWNS[sp.town].name}. It's on your world map (M). Bring a shovel!`, 8000);
   renderHUD(); save();
+  if ((S.vexRank || 0) >= 1 && Math.random() < .3 && !inDungeon()) setTimeout(vexRaceOffer, 1500);
 }
 const TREASURE_LOOT = ['gem','silver','pearl','amber','crystal','spice','silk_cloth','glass','bomb','fire_bomb','elixir','ancient_coin','shimmer_shard','blacksteel'];
 function digTarget() {
@@ -6829,6 +6847,7 @@ function digTarget() {
 }
 function digTreasure() {
   const sp = S.tmap; if (!sp) return;
+  if (vexRun) { vexRun = null; S.coins += 300; S.vexRaceWins = (S.vexRaceWins || 0) + 1; setTimeout(() => toast('<b>You beat Vex to the treasure!</b><br>Vex skids up, panting. “Fine. FINE. Here’s your 300 coin.”', 5000), 600); }
   S.tmap = null; S.treasures = (S.treasures || 0) + 1;
   const got = [], c = 150 + (S.level || 1)*15 + rint(0, 120); S.coins += c; got.push(`${c} coin`);
   for (let i = 0; i < 2 + (Math.random() < .5 ? 1 : 0); i++) { const g = pick(TREASURE_LOOT.filter(g => GOODS[g])), n = rint(1, 3); addItem(g, n); got.push(`${n} ${GOODS[g].name}`); }
@@ -9462,6 +9481,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['vexrace','Fastest Shovel','Beat Vex in a treasure race', () => (S.vexRaceWins || 0) >= 1],
   ['waystone','Ancient Paths','Awaken a waystone', () => (S.wsOn || 0) >= 1],
   ['waystones','Wayfinder','Awaken 8 waystones', () => (S.wsOn || 0) >= 8],
   ['flawless','Flawless Work','Craft a masterwork weapon or armor', () => (S.masterworks || 0) >= 1],
@@ -9967,7 +9987,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
