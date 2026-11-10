@@ -114,7 +114,7 @@ export class Player {
   }
 
   addXP(n, hooks) {
-    this.xp += n;
+    this.xp += n * (this.xpMult || 1);
     const need = () => 40 + this.level * 30;
     while (this.xp >= need()) {
       this.xp -= need();
@@ -166,6 +166,7 @@ export class Player {
     if (this.slowT > 0) { this.slowT -= dt; speed *= 0.5; }
     if (this.rootT > 0) { this.rootT -= dt; speed *= 0.05; }
     if (this.food <= 0 || this.water <= 0) speed *= 0.8;
+    speed *= this.speedMult || 1;
     const sinY = Math.sin(this.yaw), cosY = Math.cos(this.yaw);
     const dx = -sinY * fwd + cosY * str, dz = -cosY * fwd - sinY * str;
     const len = Math.hypot(dx, dz) || 1;
@@ -176,14 +177,14 @@ export class Player {
 
     const moving = mag > 0.05;
     if (wantsSprint && moving) this.stam = Math.max(0, this.stam - dt * 14);
-    else if (this.swimming && moving) this.stam = Math.max(0, this.stam - dt * 4);
+    else if (this.swimming && moving && !this.noDrown) this.stam = Math.max(0, this.stam - dt * 4);
     else this.stam = Math.min(this.maxStam, this.stam + dt * (this.food > 0 && this.water > 0 ? 16 : 4));
 
     if (this.swimming) {
       const up = (k.Space ? 1 : 0) - (this.crouch ? 1 : 0);
       const targetY = up !== 0 ? up * 3 : (WATER_LEVEL - 1.25 - this.pos.y) * 2;
       this.vel.y = lerp(this.vel.y, targetY, Math.min(1, dt * 4));
-      if (this.stam <= 0 && this.pos.y < WATER_LEVEL - 1.5) this.hp -= dt * 4;
+      if (this.stam <= 0 && this.pos.y < WATER_LEVEL - 1.5 && !this.noDrown) this.hp -= dt * 4;
     } else {
       this.vel.y -= 24 * dt;
       if (k.Space && this.onGround && this.stam > 8) { this.vel.y = 8; this.stam -= 8; this.onGround = false; }

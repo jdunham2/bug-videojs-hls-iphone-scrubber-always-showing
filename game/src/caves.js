@@ -233,7 +233,7 @@ export class Caves {
   // Populate cave wildlife (called on entering so the island's population isn't affected).
   populate(c) {
     const g = this.game;
-    const want = { lava: [['cinderback', 2], ['duskraptor', 3]], crystal: [['duskraptor', 6]], moss: [['dashbeak', 6], ['duskraptor', 2]] }[c.theme];
+    const want = { lava: [['cinderback', 2], ['duskraptor', 2], ['echoscreecher', 1]], crystal: [['duskraptor', 4], ['echoscreecher', 2]], moss: [['dashbeak', 5], ['duskraptor', 2], ['echoscreecher', 1]] }[c.theme];
     for (const [sp, n] of want) {
       const have = g.creatures.list.filter((x) => x.cave === c && x.species === sp && x.alive && !x.tamed).length;
       for (let i = have; i < n; i++) {
@@ -318,6 +318,8 @@ export class Caves {
     // a tamed Glowtail following you is a living lantern
     const pet = g.creatures.list.find((t) => t.def.lightPet && t.tamed && t.alive && t.follow && t.pos.distanceTo(p.pos) < 30);
     if (pet && (c || g.env.daylight < 0.5) && this.torch.intensity < 16) { this.torch.intensity = 16; this.torch.distance = 30; this.torch.color.set(0x8ae8ff); }
+    // an Echoscreecher's shriek snuffs the light for a few seconds
+    if (p.screechT > 0) { p.screechT -= dt; this.torch.intensity *= p.screechT > 4 ? 0.05 : 0.05 + (4 - p.screechT) * 0.2; }
     this.torch.position.copy(p.pos).add(new THREE.Vector3(0, 3.2, 0));
   }
 

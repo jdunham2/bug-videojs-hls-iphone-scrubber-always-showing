@@ -393,7 +393,7 @@ export class Bosses {
   burn(dmg, silent) {
     const g = this.game, p = g.player;
     if (p.mount) { if (!p.mount.def.fireproof) g.creatures.damage(p.mount, dmg, 0, null); return; }
-    const fp = p.armor && ITEMS[p.armor.id].fireproof ? ITEMS[p.armor.id].fireproof : 0;
+    const fp = Math.max(p.armor && ITEMS[p.armor.id].fireproof ? ITEMS[p.armor.id].fireproof : 0, g.artifacts?.has('flame') ? 0.5 : 0);
     p.damage(dmg * (1 - fp));
     p.hurtT = Math.max(p.hurtT, 0.35);
     if (!silent) g.audio.hurt();

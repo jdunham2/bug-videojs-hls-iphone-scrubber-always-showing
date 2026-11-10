@@ -129,6 +129,7 @@ export function serialize(g) {
     drops: g.drops ? g.drops.serialize() : undefined,
     eggs: g.breeding ? g.breeding.serialize() : undefined,
     bestiary: g.bestiary ? [...g.bestiary.seen] : undefined,
+    artifacts: g.artifacts ? g.artifacts.serialize() : undefined,
     bags: (g.deathBags || []).map((b) => ({ pos: v3(b.pos), items: b.items.map((s) => (s ? { ...s } : null)) })),
     bossesActive: g.bosses ? g.bosses.serialize() : undefined,
     bossActive: undefined,
@@ -164,6 +165,7 @@ export function applySave(g, d) {
   if (d.drops && g.drops) g.drops.load(d.drops);
   if (d.eggs && g.breeding) g.breeding.load(d.eggs);
   if (d.bestiary && g.bestiary) g.bestiary.seen = new Set(d.bestiary);
+  if (d.artifacts && g.artifacts) g.artifacts.load(d.artifacts);
   for (const b of d.bags || []) g.dropBag(new THREE.Vector3().fromArray(b.pos), b.items);
   if (d.bossActive) g.inv.add('trophy', 3); // older saves: the Tyrant fight resets; refund
   if (d.bossesActive && g.bosses) g.bosses.refund(d.bossesActive);

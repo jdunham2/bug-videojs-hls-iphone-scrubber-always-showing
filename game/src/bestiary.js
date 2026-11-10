@@ -1,5 +1,6 @@
 import { SPECIES } from './creatures.js';
 import { ITEMS } from './items.js';
+import { ARTIFACTS, ARTIFACT_IDS } from './artifacts.js';
 
 // Field journal: species are recorded the first time you get close to one.
 const LORE = {
@@ -43,6 +44,10 @@ const LORE = {
   mossback: { icon: '🌿', where: 'Lowland meadows', text: 'A slow giant overgrown with glowing moss. Creatures near it mend their wounds; a tamed one tends to you and your tames.' },
   sandmaw: { icon: '🏜️', where: 'Beaches and dunes', text: 'It swims through sand like water. The ground shudders, then it erupts right beside you.' },
   howler: { icon: '🐺', where: 'Hills and grasslands, in packs', text: 'When one spots prey it howls, and the whole pack answers — faster and fiercer than before.' },
+  emberwing: { icon: '🔥', where: 'Skies over Ashfang Volcano', text: 'A soot-black pterosaur that nests in the crater’s heat. It circles high and drops gobs of burning pitch before diving in. Saddled, it shrugs off lava.' },
+  echoscreecher: { icon: '🦇', where: 'Caves', text: 'A bat-eared lurker of the deep tunnels. Its shriek is so piercing that torches gutter and lanterns fade. Fight it before it calls again.' },
+  chirpling: { icon: '🐤', where: 'Meadows and forests, in flocks', text: 'A tiny, bright-feathered dinosaur that never stops chattering. A tamed one following you makes every lesson stick: +20% experience.' },
+  nestmother: { icon: '🪺', where: 'Lowlands, in pairs', text: 'A gentle duck-billed giant famous for guarding its nests. A tamed Nestmother keeps eggs warm and makes babies near her grow twice as fast.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 
@@ -89,7 +94,12 @@ export class Bestiary {
     const g = this.game;
     const kills = g.stats.speciesKills || {}, tames = g.stats.speciesTames || {};
     document.getElementById('bestiary-count').textContent = `${this.seen.size} / ${Object.keys(LORE).length} species recorded`;
-    this.grid.innerHTML = Object.keys(LORE).map((sp) => {
+    const arts = g.artifacts;
+    const relics = `<div class="art-head">🏺 Ancient Artifacts · ${arts.count} / ${ARTIFACT_IDS.length} claimed${arts.all ? ' · Primal Ascendant: +50 stamina, +25% XP' : ''}</div>` + ARTIFACT_IDS.map((id) => {
+      const A = ARTIFACTS[id], got = arts.has(id);
+      return `<div class="beast relic ${got ? 'got' : 'unknown'}"><div class="b-ic">${got ? A.icon : '❔'}</div><div class="b-name">${A.name}</div><div class="b-text">${got ? A.bonus : 'Look for a pillar of light. Alpha guardians protect it.'}</div><dl><dt>Location</dt><dd>${A.where}</dd></dl></div>`;
+    }).join('') + '<div class="art-head">🦖 Species</div>';
+    this.grid.innerHTML = relics + Object.keys(LORE).map((sp) => {
       const d = SPECIES[sp], L = LORE[sp];
       if (!this.seen.has(sp)) return `<div class="beast unknown"><div class="b-ic">❔</div><div class="b-name">Unknown species</div><div class="b-text">Get closer to something new to record it.</div></div>`;
       const traits = [d.diet === 'carn' ? 'Carnivore' : 'Herbivore', { aggressive: 'Hostile', neutral: 'Neutral', skittish: 'Skittish', passive: 'Passive' }[d.temper] || d.temper];

@@ -51,12 +51,16 @@ export class Breeding {
       for (const c of g.creatures.list) if (!seen.has(c.id)) c.mating = 0;
     }
 
+    // a tamed Nestmother broods eggs and fusses over babies: both go twice as fast near her
+    const nurses = g.creatures.list.filter((c) => c.def.nurse && c.tamed && c.alive && !c.baby);
+    const nursed = (pos, r) => nurses.some((n) => n.pos.distanceTo(pos) < r);
     // eggs
     for (let i = this.eggs.length - 1; i >= 0; i--) {
       const e = this.eggs[i];
-      const warm = this.isWarm(e.pos);
+      const brood = nursed(e.pos, 15);
+      const warm = brood || this.isWarm(e.pos);
       e.warm = warm;
-      if (warm) e.hatch = Math.min(1, e.hatch + dt / HATCH_TIME);
+      if (warm) e.hatch = Math.min(1, e.hatch + dt / HATCH_TIME * (brood ? 2 : 1));
       const t = performance.now() / 1000;
       e.mesh.rotation.z = e.hatch > 0.85 ? Math.sin(t * 18) * 0.15 : 0;
       e.mesh.material.emissive.setRGB(warm ? 0.25 : 0, warm ? 0.12 : 0, 0);
@@ -66,7 +70,7 @@ export class Breeding {
     // babies grow
     for (const c of g.creatures.list) {
       if (!c.baby) continue;
-      c.growth = Math.min(1, c.growth + dt / GROW_TIME);
+      c.growth = Math.min(1, c.growth + dt / GROW_TIME * (nurses.length && nursed(c.pos, 20) ? 2 : 1));
       this.applyGrowth(c);
       if (c.growth >= 1) {
         c.baby = false;

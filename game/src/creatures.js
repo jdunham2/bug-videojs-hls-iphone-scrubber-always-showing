@@ -219,6 +219,26 @@ export const SPECIES = {
     tameFood: 'meat', tameBase: 8, tameLvl: 0.2, rideable: true, radius: 1.0, reach: 2.6, hitR: 1.5,
     drops: { meat: 3, pelt: 1, hide: 2 }, aggro: 26, lvl: [5, 35], count: 8, herd: 4, zone: (h) => h > 8 && h < 30, far: 130,
   },
+  emberwing: {
+    name: 'Emberwing', diet: 'carn', temper: 'aggressive', hp: 300, dmg: 14, walk: 1.6, run: 4, fly: 19, torpor: 220, flyer: true, fireproof: true, firebomb: true, glow: [1, 0.45, 0.1],
+    tameFood: 'meat', tameBase: 10, tameLvl: 0.24, rideable: true, radius: 1.2, reach: 3.2, hitR: 1.9,
+    drops: { meat: 4, hide: 3, obsidian: 1 }, aggro: 40, lvl: [8, 40], count: 3, zone: (h, x, z) => volcanicAt(x, z) > 0.35 && h > 6, far: 160,
+  },
+  echoscreecher: {
+    name: 'Echoscreecher', diet: 'carn', temper: 'aggressive', hp: 190, dmg: 11, walk: 2.4, run: 10, torpor: 140, screech: true, glow: [0.7, 0.4, 1],
+    tameFood: 'meat', tameBase: 7, tameLvl: 0.18, rideable: false, radius: 0.9, reach: 2.4, hitR: 1.3,
+    drops: { meat: 2, hide: 2, crystal: 1 }, aggro: 24, lvl: [5, 35], count: 0, zone: () => false,
+  },
+  chirpling: {
+    name: 'Chirpling', diet: 'herb', temper: 'skittish', hp: 40, dmg: 1, walk: 2.2, run: 9, torpor: 30, xpPet: true,
+    tameFood: 'berries', tameBase: 3, tameLvl: 0.06, rideable: false, radius: 0.4, reach: 0.9, hitR: 0.7,
+    drops: { meat: 1, hide: 1 }, aggro: 0, lvl: [1, 20], count: 6, herd: 3, zone: (h) => h > 4 && h < 24,
+  },
+  nestmother: {
+    name: 'Nestmother', diet: 'herb', temper: 'neutral', hp: 880, dmg: 22, walk: 2, run: 7, torpor: 600, nurse: true,
+    tameFood: 'berries', tameBase: 14, tameLvl: 0.32, rideable: true, radius: 2.0, reach: 3.8, hitR: 2.5,
+    drops: { meat: 9, hide: 6 }, aggro: 0, lvl: [3, 35], count: 4, herd: 2, zone: (h) => h > 3 && h < 16,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -233,7 +253,8 @@ const PREY = {
   bogmaw: ['reedhorn', 'pudgewing', 'dashbeak'],
   rimeclaw: ['frosthorn', 'pudgewing'],
   hornjaw: ['pudgewing', 'crestcaller', 'reedhorn', 'dashbeak', 'dashstrider'],
-  howler: ['dashstrider', 'pudgewing', 'crestcaller', 'glowtail'],
+  howler: ['dashstrider', 'pudgewing', 'crestcaller', 'glowtail', 'chirpling'],
+  emberwing: ['pudgewing', 'dashbeak', 'chirpling'],
   sandmaw: ['pudgewing', 'divebeak', 'dashstrider'],
   voltfin: ['glimmerfin'],
   leafshade: ['dashstrider', 'pudgewing', 'glowtail', 'eggthief'],
@@ -786,6 +807,10 @@ const PALETTES = {
   mossback: [{ base: 0x5a6a3a, belly: 0xb8b890, accent: 0x6ad84a, horn: 0x4a5a2a }, { base: 0x4a5a40, belly: 0xa8b098, accent: 0x9ae86a, horn: 0x3a4a2a }],
   sandmaw: [{ base: 0xc8a870, belly: 0xe8d8b0, accent: 0x8a6a3a, horn: 0x3a2a1a }, { base: 0xb0905a, belly: 0xe0d0a8, accent: 0x5a4a2a, horn: 0x3a2a1a }],
   howler: [{ base: 0x6a6a70, belly: 0xc8c8c8, accent: 0x2a2a30, horn: 0x1a1a1e }, { base: 0x7a6250, belly: 0xd0c0b0, accent: 0x3a2a20, horn: 0x1a1a1e }],
+  emberwing: [{ base: 0x2a1a16, belly: 0x5a3a2a, accent: 0xff6a1a, horn: 0xffb03a }, { base: 0x3a2018, belly: 0x6a4030, accent: 0xffa030, horn: 0xff5a1a }],
+  echoscreecher: [{ base: 0x2a2234, belly: 0x5a5068, accent: 0xb07aff, horn: 0x141018 }, { base: 0x222a30, belly: 0x506068, accent: 0x6ae0ff, horn: 0x101418 }],
+  chirpling: [{ base: 0xe8b83a, belly: 0xfff0c8, accent: 0xe85a2a, horn: 0x3a2a1a }, { base: 0x6ac8e8, belly: 0xf0f8ff, accent: 0xff7ab0, horn: 0x3a2a1a }, { base: 0x8ad86a, belly: 0xf4ffe8, accent: 0xffd83a, horn: 0x3a2a1a }],
+  nestmother: [{ base: 0x8a6a4a, belly: 0xe0c8a0, accent: 0xc84a6a, horn: 0xe8d8b8 }, { base: 0x6a7a5a, belly: 0xd8d0b0, accent: 0xe8a03a, horn: 0xe8d8b8 }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -797,6 +822,10 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'emberwing': return buildFlyer(mat, col, 1.1, true);
+    case 'echoscreecher': return buildBiped(mat, col, 0.95, { hip: 1.1, bodyLen: 0.85, girth: 0.85, arm: 1.4, headLen: 0.45, headW: 0.9, tailSeg: 0.45, stripes: 2, frill: true, neckW: 0.9 });
+    case 'chirpling': return buildBiped(mat, col, 0.4, { hip: 1.3, bodyLen: 0.8, girth: 0.95, arm: 0.8, headLen: 0.35, headW: 0.95, tailSeg: 0.5, stripes: 1, beak: true, crest: true, neckW: 0.9 });
+    case 'nestmother': { const m = buildReedhorn(mat, col); m.head.add(meshOf([E(0.22, 0.2, 0.3, col.accent, 0.18, 0.3, 0.25), E(0.22, 0.2, 0.3, col.accent, -0.18, 0.3, 0.25)], mat)); m.root.scale.setScalar(1.15); return m; }
     case 'voltfin': return buildEel(mat, col);
     case 'mossback': { const m = buildPlateback(mat, col, false); m.body.add(meshOf([0, 1, 2, 3, 4, 5].map((i) => ({ geo: lumpify(new THREE.IcosahedronGeometry(1, 1), 0.3), color: i % 2 ? col.accent : col.horn, jitter: 0.2, matrix: mtx((i % 3 - 1) * 0.6, 1.0 + (i % 2) * 0.2, 1.2 - Math.floor(i / 2) * 1.0, 0, 0, 0, 0.6, 0.35, 0.6) })), mat)); return m; }
     case 'sandmaw': return buildBogmaw(mat, col);
@@ -1456,6 +1485,12 @@ export class CreatureManager {
       else target.copy(center);
       spd = d.fly * 1.25;
       const reach = d.reach * c.scale + (c.target === 'player' ? 0.6 : c.target.radius);
+      // Emberwing: lobs fireballs while circling between dives
+      if (d.firebomb) {
+        c.bombCd = (c.bombCd ?? 3) - dt;
+        const hd = Math.hypot(center.x - c.pos.x, center.z - c.pos.z);
+        if (c.bombCd <= 0 && hd > 8 && hd < 40) { c.bombCd = 3.5; this.hooks.spit?.(c, center, 'fire'); }
+      }
       if (c.climbT <= 0 && c.pos.distanceTo(center) < reach && c.attackCd <= 0) {
         c.attackCd = 2.2; c.attackAnim = 1; c.climbT = 2.8;
         if (c.target === 'player') this.hooks.hitPlayer?.(c.dmg, c);
@@ -1631,6 +1666,11 @@ export class CreatureManager {
     }
     // face target when close
     if (dist < reach * 1.2) c.yaw = angleLerp(c.yaw, Math.atan2(tp.x - c.pos.x, tp.z - c.pos.z), Math.min(1, dt * 6));
+    // Echoscreecher: a shriek that snuffs out your light
+    if (d.screech && c.target === 'player' && dist < 16) {
+      c.screechCd = (c.screechCd ?? 2) - dt;
+      if (c.screechCd <= 0) { c.screechCd = 9; c.attackAnim = 1; this.hooks.screech?.(c); }
+    }
     // venom spitters attack from range
     if (d.spit && dist > reach * 1.6 && dist < 22 && c.attackCd <= 0) {
       c.attackCd = 2.4; c.attackAnim = 1;

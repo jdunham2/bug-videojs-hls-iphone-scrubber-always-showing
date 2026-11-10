@@ -19,6 +19,7 @@ import { Bestiary } from './bestiary.js';
 import { Music } from './music.js';
 import { Breeding } from './breeding.js';
 import { SupplyDrops } from './drops.js';
+import { Artifacts } from './artifacts.js';
 import { TouchControls, IS_TOUCH } from './touch.js';
 import { Audio } from './audio.js';
 import { pick, angleLerp } from './util.js';
@@ -98,7 +99,8 @@ class Game {
       quake: (c, d) => this.bosses.quake(c, d),
       lightning: (c) => this.bosses.eruption(c, 'lightning'),
       gust: (c, d) => this.bosses.gust(c, d),
-      spit: (c, at) => this.spawnSpit(c, at),
+      spit: (c, at, style) => this.spawnSpit(c, at, style),
+      screech: (c) => this.screech(c),
       spitVolley: (c) => { const at = this.player.eye; for (let i = -2; i <= 2; i++) this.spawnSpit(c, at.clone().add(new THREE.Vector3(Math.cos(c.yaw) * i * 2.2, 0, -Math.sin(c.yaw) * i * 2.2))); this.ui.notify('The Broodmother sprays venom!', 'warn'); },
       steal: (c) => this.stealFrom(c),
       howl: (c, n) => { if (c.pos.distanceTo(this.player.pos) < 90) { this.playRoar(c); if (n > 1) this.ui.notify(`A Howler pack answers the call (${n})`, 'warn'); } },
@@ -126,6 +128,8 @@ class Game {
     this.caves = new Caves(this);
     this.bosses = new Bosses(this);
     this.bosses.build();
+    this.artifacts = new Artifacts(this);
+    this.artifacts.build();
 
     this.arrows = [];
     this.arrowGeo = (() => {
@@ -194,6 +198,8 @@ class Game {
       { title: 'Slay the Rootwarden in the depths of Rootway Hollow', progress: () => 'Offer 60 Wood + 10 Marsh Herbs. Keep moving when the roots writhe', done: () => (this.stats.bossesDefeated || {}).rootwarden >= 1 },
       { title: 'Slay the Dune Devourer at the driftwood totem on the eastern beaches', progress: () => 'Offer 15 Hide + 40 Stone + 1 Alpha Trophy. It burrows — watch for the ground to shake', done: () => (this.stats.bossesDefeated || {}).devourer >= 1 },
       { title: 'Slay the Howling King at the standing stone on the northern grasslands', progress: () => 'Offer 15 Raw Meat + 5 Thick Pelts + 1 Alpha Trophy. Break up its pack before it howls again', done: () => (this.stats.bossesDefeated || {}).howlingking >= 1 },
+      { title: 'Claim an Ancient Artifact — follow a pillar of light and defeat its guardians', progress: () => `🏺 ${this.artifacts.count}/1 · Locations are listed in the Bestiary (J)`, done: () => this.artifacts.count >= 1 },
+      { title: 'Claim all eight Ancient Artifacts', progress: () => `🏺 ${this.artifacts.count}/8 — three lie deep in the caves`, done: () => this.artifacts.all },
     ];
     this.questIdx = 0;
 
@@ -362,6 +368,8 @@ class Game {
     const p = this.player;
     if (!p.alive) return;
     if (p.mount) { this.dismount(); return; }
+    const claimable = this.artifacts.near(p.pos);
+    if (claimable && !this.artifacts.guardsAlive(claimable).length) { this.artifacts.claim(claimable); return; }
     const { c, n, fire } = this.lookTarget();
     if (c && c.dist < 4 + c.creature.hitR) {
       const cr = c.creature;
@@ -391,6 +399,8 @@ class Game {
     const drop = this.drops.near(p.pos);
     if (drop) { this.drops.open(drop); return; }
     if (fire) { this.useProp(fire); return; }
+    const relic = this.artifacts.near(p.pos);
+    if (relic) { this.artifacts.claim(relic); return; }
     const shrine = this.bosses.shrineNear(p.pos);
     if (shrine) { this.bosses.summon(shrine); return; }
     if (this.canDrink()) {
@@ -560,7 +570,7 @@ class Game {
     if (food === 'meat' && this.inv.count('meat') === 0 && this.inv.count('cooked') > 0) { food = 'cooked'; mult = 0.7; }
     if (this.inv.count(food) === 0) { this.ui.notify(`${def.name} needs ${ITEMS[def.tameFood].name} to tame`, 'warn'); return; }
     this.inv.remove(food, 1);
-    cr.tame = Math.min(100, cr.tame + (100 / cr.tameCost()) * mult);
+    cr.tame = Math.min(100, cr.tame + (100 / cr.tameCost()) * mult * this.artifacts.tameMult());
     this.feedCd = 0.35;
     this.audio.eat();
     if (cr.tame >= 100) this.completeTame(cr);
@@ -668,7 +678,7 @@ class Game {
         if (!o.alive || o.tamed || o.riddenBy) continue;
         const to = new THREE.Vector3().subVectors(o.pos, p.pos).setY(0);
         const d = to.length() - o.radius;
-        if (d < reach && to.normalize().dot(fwd) > 0.35) { this.creatures.damage(o, def.damage * (0.9 + Math.random() * 0.2), 0, 'player'); this.damageNumber(o.center, Math.round(def.damage)); hits++; }
+        if (d < reach && to.normalize().dot(fwd) > 0.35) { const dm = def.damage * this.artifacts.dmgMult(); this.creatures.damage(o, dm * (0.9 + Math.random() * 0.2), 0, 'player'); this.damageNumber(o.center, Math.round(dm)); hits++; }
       }
       if (hits) { this.audio.flesh(); this.hitMarker(); this.shake = Math.max(this.shake || 0, 0.35); this.wear(item, 1); return; }
     }
@@ -677,7 +687,7 @@ class Game {
       const cr = c.creature;
       if (!cr.alive) { this.harvestCarcass(cr, def?.gather?.bush ? 1 : 0.6); this.wear(item, 1); return; }
       if (cr.tamed) return;
-      const dmg = def ? def.damage : 5;
+      const dmg = (def ? def.damage : 5) * this.artifacts.dmgMult();
       const torpor = def ? (def.torpor || 0) : 4;
       this.creatures.damage(cr, dmg * (0.9 + Math.random() * 0.2), torpor, 'player');
       if (def && def.poison && cr.alive) { cr.poisonT = 5; cr.poisonDps = def.poison; }
@@ -706,7 +716,7 @@ class Game {
       if (id === 'stone' && (tool === 'pick' || tool === 'metalpick')) mult *= 0.8;
       if (id === 'wood' && tool === 'hatchet') mult *= 1.1;
       if (id === 'fiber' && node.kind === 'tree') mult = byHand ? 0 : 0.6;
-      const q = base * mult * 0.5;
+      const q = base * mult * 0.5 * this.artifacts.gatherMult();
       const amt = Math.floor(q) + (Math.random() < q % 1 ? 1 : 0);
       this.give(id, amt);
     }
@@ -725,7 +735,7 @@ class Game {
       let mult = power;
       if (id === 'hide' && tool === 'hatchet') mult *= 0.6;
       if (id === 'meat' && tool === 'hatchet') mult *= 1.3;
-      const q = (base / 3) * mult;
+      const q = (base / 3) * mult * this.artifacts.gatherMult();
       const amt = Math.floor(q) + (Math.random() < q % 1 ? 1 : 0);
       this.give(id, amt);
     }
@@ -826,15 +836,17 @@ class Game {
   }
 
   // Venom spit: an arcing glob that slows and hurts whatever it hits.
-  spawnSpit(c, at) {
+  spawnSpit(c, at, style) {
     const from = c.center.clone().add(new THREE.Vector3(Math.sin(c.yaw), 0.4, Math.cos(c.yaw)).multiplyScalar(c.radius + 0.5));
     const dist = from.distanceTo(at), t = Math.max(0.35, dist / 22);
     const vel = new THREE.Vector3().subVectors(at, from).divideScalar(t); vel.y += 0.5 * 9.8 * t;
-    const mesh = new THREE.Mesh(this.spitGeo || (this.spitGeo = new THREE.SphereGeometry(0.22, 8, 6)), this.spitMat || (this.spitMat = new THREE.MeshBasicMaterial({ color: 0xa8e83a })));
-    mesh.scale.setScalar(c.boss ? 2.2 : 1);
+    const fire = style === 'fire';
+    const mat = fire ? (this.fireMat || (this.fireMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a }))) : (this.spitMat || (this.spitMat = new THREE.MeshBasicMaterial({ color: 0xa8e83a })));
+    const mesh = new THREE.Mesh(this.spitGeo || (this.spitGeo = new THREE.SphereGeometry(0.22, 8, 6)), mat);
+    mesh.scale.setScalar(c.boss ? 2.2 : fire ? 2 : 1);
     mesh.position.copy(from);
     this.scene.add(mesh);
-    (this.spits || (this.spits = [])).push({ mesh, pos: from, vel, owner: c, life: 4 });
+    (this.spits || (this.spits = [])).push({ mesh, pos: from, vel, owner: c, life: 4, fire });
     this.audio.noiseHit({ freq: 1800, q: 1, dur: 0.15, vol: 0.2 });
   }
 
@@ -849,11 +861,31 @@ class Game {
       if (!done && p.alive && s.pos.distanceTo(target) < hitR * (s.owner.boss ? 1.6 : 1)) {
         done = true;
         const dmg = s.owner.dmg * (s.owner.boss ? 0.5 : 0.7);
-        if (p.mount) this.creatures.damage(p.mount, dmg, 0, s.owner);
+        if (s.fire) { this.bosses.burn(dmg * 1.2); if (!p.mount) this.ui.notify('Fireball! You are scorched', 'warn'); }
+        else if (p.mount) this.creatures.damage(p.mount, dmg, 0, s.owner);
         else { this.hurtPlayer(dmg, s.owner); p.slowT = Math.max(p.slowT || 0, 1.6); this.ui.notify('Venom! You are slowed', 'warn'); }
       }
       if (done) { this.scene.remove(s.mesh); this.spits.splice(i, 1); }
     }
+  }
+
+  // Echoscreecher: a piercing shriek that snuffs out torches and lanterns for a few seconds.
+  screech(c) {
+    const p = this.player;
+    p.screechT = 5;
+    this.ui.notify('An Echoscreecher shrieks — your light gutters out!', 'warn');
+    this.audio.tone({ f0: 3200, f1: 1800, dur: 0.6, vol: 0.22, type: 'sawtooth', verb: 0.5 });
+    this.shake = Math.max(this.shake || 0, 0.2);
+  }
+
+  // Companion bonuses from following pets (rechecked every second).
+  petBonuses(dt) {
+    this._petT = (this._petT || 0) - dt;
+    if (this._petT > 0) return;
+    this._petT = 1;
+    const p = this.player;
+    const chirp = this.creatures.list.some((t) => t.def.xpPet && t.tamed && t.alive && t.follow && t.pos.distanceTo(p.pos) < 30);
+    p.xpMult = this.artifacts.xpMult() * (chirp ? 1.2 : 1);
   }
 
   // Eggthief: snatch a random non-tool stack and run; killing it returns the loot.
@@ -997,7 +1029,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, voltfin: 0.6, mossback: 2.4, sandmaw: 1.6, howler: 1, glowtail: 0.3, divebeak: 0.5, shieldhorn: 2, shellback: 1.8, leafshade: 1.3, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, emberwing: 1.2, echoscreecher: 0.7, chirpling: 0.25, nestmother: 2.4, voltfin: 0.6, mossback: 2.4, sandmaw: 1.6, howler: 1, glowtail: 0.3, divebeak: 0.5, shieldhorn: 2, shellback: 1.8, leafshade: 1.3, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 
@@ -1169,6 +1201,8 @@ class Game {
       this.bestiary.update(dt);
       this.breeding.update(dt);
       this.drops.update(dt);
+      this.artifacts.update(dt);
+      this.petBonuses(dt);
       this.tips(dt);
       this._shellNote = (this._shellNote || 0) - dt;
       // fishing tames bring you a catch now and then
@@ -1243,8 +1277,8 @@ class Game {
     }
     this.ambientTemp = t;
     const insul = p.armor ? (ITEMS[p.armor.id].insul ?? 5) : 0;
-    const cold = Math.max(0, (10 - insul) - t);        // degrees below comfort
-    const hot = Math.max(0, t - 36);
+    const cold = this.artifacts.has('frost') ? 0 : Math.max(0, (10 - insul) - t);   // degrees below comfort
+    const hot = this.artifacts.has('flame') ? 0 : Math.max(0, t - 36);
     p.cold = cold; p.hot = hot;
     if (!p.alive) return;
     if (cold > 0) {
@@ -1302,6 +1336,7 @@ class Game {
     || tip('night2', () => this.env.daylight < 0.3 && this.creatures.list.some((c) => c.species === 'nightstalker' && c.alive && c.pos.distanceTo(p.pos) < 70), 'Something is hunting in the dark. Nightstalkers sleep by day and hunt at night.')
     || tip('thief', () => this.creatures.list.some((c) => c.species === 'eggthief' && c.alive && c.pos.distanceTo(p.pos) < 25), 'Eggthieves snatch items from your bag and run. Catch one to get your things back.')
     || tip('glow', () => this.creatures.list.some((c) => c.species === 'glowtail' && c.alive && c.pos.distanceTo(p.pos) < 25), 'Glowtails glow in the dark. Tame one and it lights your way through caves and nights.')
+    || tip('artifact', () => this.artifacts.sites.some((x) => !this.artifacts.has(x.id) && x.pos.distanceTo(p.pos) < 70), 'An Ancient Artifact glows nearby! Defeat its alpha guardians, then press E at the pedestal to claim a permanent power.')
     || tip('cave', () => !!this.caves.entranceNear(p.pos), 'A cave! Inside it is dark — a Crystal Lantern helps. Find the Ancient Cache in the deepest chamber.');
   }
 
@@ -1313,7 +1348,7 @@ class Game {
     const pos = m ? m.pos : p.pos;
     if (!(inVolcanoLava(pos.x, pos.z, pos.y) || this.caves.lavaAt(pos))) { this._burnT = 0; return; }
     if (m) { if (!m.def.fireproof) this.creatures.damage(m, 40 * dt, 0, null); return; }
-    const fp = p.armor && ITEMS[p.armor.id].fireproof ? ITEMS[p.armor.id].fireproof : 0;
+    const fp = Math.max(p.armor && ITEMS[p.armor.id].fireproof ? ITEMS[p.armor.id].fireproof : 0, this.artifacts.has('flame') ? 0.5 : 0);
     p.damage(30 * dt * (1 - fp));
     p.hurtT = Math.max(p.hurtT, 0.3);
     this._burnT = (this._burnT || 0) - dt;
@@ -1399,6 +1434,7 @@ class Game {
           : k === 'plot' ? (!fire.crop ? `<kbd>E</kbd> Plant a seed (${this.inv.count('seed') + this.inv.count('dozeseed')})` : fire.crop.growth >= 1 ? '<kbd>E</kbd> Harvest crop' : `Growing… ${Math.round(fire.crop.growth * 100)}%`)
           : `<kbd>E</kbd> ${this.env.daylight < 0.3 ? 'Sleep until morning' : 'Set respawn point'}`;
       }
+      else if (this.artifacts.near(p.pos)) prompt = this.artifacts.prompt(this.artifacts.near(p.pos));
       else if (this.bosses.shrineNear(p.pos)) prompt = this.bosses.prompt(this.bosses.shrineNear(p.pos));
       else if (this.canDrink()) prompt = '<kbd>E</kbd> Drink';
       if (def && def.place) prompt = `<kbd>LMB</kbd> Place ${def.name} · <kbd>R</kbd> Rotate`;
@@ -1411,6 +1447,7 @@ class Game {
       else if (m.def.swimmer) prompt = `Swimming on <b>${m.name}</b> · ${Math.round(-m.pos.y)} m deep · look to steer · <kbd>Space</kbd>/<kbd>C</kbd> up/down · <kbd>E</kbd> Dismount`;
       else prompt = `Riding <b>${m.name}</b> · HP ${Math.ceil(m.hp)}/${m.maxHp} · <kbd>E</kbd> Dismount`;
     }
+    if (!p.mount) { const r = this.artifacts.near(p.pos); if (r && !this.artifacts.guardsAlive(r).length) prompt = this.artifacts.prompt(r); }
     this.ui.setPrompt(prompt);
     this.ui.setTarget(tgt);
   }

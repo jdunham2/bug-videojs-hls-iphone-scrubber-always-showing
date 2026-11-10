@@ -111,6 +111,15 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
     Pelts + 1 Trophy): rallies and buffs its Howler pack again and again. Its horn becomes the
     **Packleader Horn**: blow it to empower every tame within 40 m for 20 seconds.
   - Beat four bosses to become **Champion of the Isle**.
+- **Ancient Artifacts:** eight relics on glowing pedestals, each marked by a pillar of light
+  (and 🏺 on the map once explored): three deep in the caves, one on the volcano rim, one on
+  the Frostpeak summit, one in the heart of the swamp, one on the sea floor and one on the
+  northern highlands. Coming close wakes its alpha guardians; the artifact stays sealed until
+  they fall. Press E to claim a permanent power: Might (+15% weapon damage), the Swift (+12%
+  speed), Vigor (+40 max health), the Flame (heat immunity, half lava/fire damage), the Frost
+  (cold immunity), the Beasts (30% faster taming), the Tide (never drown, free swimming) and the
+  Harvest (+25% gathering). Claim all eight to become **Primal Ascendant** (+50 stamina, +25%
+  XP). Your collection and the artifact locations are listed at the top of the Bestiary (J).
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
   refills your water.
@@ -163,6 +172,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Sandmaw: burrows under the sand and erupts beside you; rideable
   - Howler: pack hunter whose howl rallies and buffs the pack; rideable
   - Duskraptor: glowing cave pack hunter; rideable
+  - Echoscreecher: cave lurker whose shriek snuffs out your torch and lantern
+  - Emberwing: fireproof volcano pterosaur that lobs fireballs before diving; rideable flyer
+  - Chirpling: tiny chattering pet; a tamed one following you gives +20% XP
+  - Nestmother: duck-billed guardian; a tamed one keeps eggs warm and doubles hatching and baby growth nearby; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer
 - **Ocean:** schools of Glimmerfin swim the shallows (easy meat with a spear), and the
