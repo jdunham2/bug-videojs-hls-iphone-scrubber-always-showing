@@ -83,6 +83,24 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 .shipstats b{color:var(--text);font-weight:500}
 @media (max-width:640px){ .br{top:calc(14px + env(safe-area-inset-top,0px));bottom:auto} .inv{gap:10px;flex-wrap:wrap;justify-content:flex-end;max-width:46vw} .res .q{font-size:15px} .res .l{font-size:9px} .tc{top:calc(150px + env(safe-area-inset-top,0px))} }
 
+#buildbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(560px,calc(100vw - 32px));display:flex;flex-direction:column;gap:7px;pointer-events:auto}
+.bb-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+#bbName{font-family:var(--f-display);font-weight:600;font-size:15px}
+#bbCost{font-size:11.5px;color:var(--amber-hi)}
+#bbCost .lack{color:var(--danger)}
+#bbStatus{margin-left:auto;font-size:11.5px;color:var(--ok)}
+#bbStatus.bad{color:var(--danger)}
+.bb-tiles{display:flex;gap:4px;overflow-x:auto;padding-bottom:3px}
+.bb-tiles button,.bb-acts button{flex:0 0 auto;font-family:var(--f-data);font-size:10.5px;padding:6px 8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:var(--text);border-radius:2px;cursor:pointer;white-space:nowrap}
+.bb-tiles button.sel{border-color:var(--amber);background:rgba(255,180,94,.2);color:var(--amber-hi)}
+.bb-tiles button i{font-style:normal;color:var(--dim);margin-right:4px}
+.bb-tiles button:focus-visible,.bb-acts button:focus-visible{outline:2px solid var(--frost);outline-offset:1px}
+.bb-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.bb-hint{font-size:10.5px;color:var(--dim)}
+.bb-acts{display:flex;gap:6px}
+@media (max-width:1400px){#buildbar{bottom:calc(150px + env(safe-area-inset-bottom,0px))}}
+@media (pointer:coarse){#buildbar{top:calc(14px + env(safe-area-inset-top,0px));bottom:auto} body.building #hudTL,body.building #hudBR,body.building #hudTC{display:none!important}}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -198,6 +216,13 @@ button.go:disabled{opacity:.5;cursor:wait}
   </div>
 </div>
 
+<div id="buildbar" class="card" hidden>
+  <div class="bb-head"><span class="eyebrow">Build mode</span><span id="bbName">Base computer</span><span id="bbCost"></span><span id="bbStatus"></span></div>
+  <div class="bb-tiles" id="bbTiles"></div>
+  <div class="bb-foot"><span class="bb-hint">Click place · R rotate · X or right-click remove · wheel or 1–0 select · B exit</span>
+    <span class="bb-acts"><button type="button" id="bbRot">Rotate</button><button type="button" id="bbDel">Remove aimed</button><button type="button" id="bbExit">Done</button></span></div>
+</div>
+
 <div id="help" hidden>
   <div class="card">
     <div class="eyebrow">Controls</div>
@@ -243,6 +268,8 @@ const CONTROLS=[
   ['Fire cannons','Hold left click'],['Take off','Space'],['Land / exit','E'],['Refuel landed (20 Ferrite)','R'],
   ['Repair hull in flight (15 Ferrite)','R'],['Ship workshop','U'],['Hyperdrive jump (10 Aurium or a warp cell)','H'],
   ['Anywhere',null],['Crafting menu','I'],['Quick-use gel / hull patch','G'],
+  ['Base building',null],['Build mode (on foot)','B'],['Place part','Left click'],['Rotate','R'],['Remove part (half refund)','X / right click'],
+  ['Choose part','Wheel / 1–0 / [ ]'],['Collect from modules','E'],['Jump to your home base','J'],
 ];
 function renderControls(el){
   el.innerHTML=CONTROLS.map(([a,b])=>b===null?`<h3>${a}</h3>`:`<div><span>${a}</span><kbd>${b}</kbd></div>`).join('');
@@ -711,16 +738,17 @@ const inv={carbon:0,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0};
 const player={pos:new V3(),fwd:new V3(0,0,-1),pitch:0,vUp:0,grounded:false,swimming:false,suit:100,health:100,jet:100,jetDelay:0,bob:0};
 let mineTarget=null,lookCreature=null,nearPickup=null,nearWreck=null,pendingClaim=null,pendingT=0;
 let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
+let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
 function setLoad(t){$('load').textContent=t}
 async function generateSystem(seed,first){
   for(const P of planets){scene.remove(P.group);P.dispose();for(const c of P.creatures)P.group.remove(c.mesh)}
-  planets=[];current=null;
+  planets=[];current=null;baseRT=null;
   clearCombat();
   const rand=mulberry32((seed^0x9e3779b9)>>>0);
   const star=STARS[Math.floor(rand()*STARS.length)];
@@ -744,6 +772,7 @@ async function generateSystem(seed,first){
     const n=spawnNpc('trader',tcls[Math.floor(rand()*tcls.length)],P.center.clone().addScaledVector(randDir(rand,new V3()),P.radius*1.8),rand()<.5?PAINTS.trader:randomPaint(rand));
     n.way=pickWaypoint();}
   pirateTimer=first?110:55;
+  if(base&&base.seed===seed&&planets[base.p])buildBase(planets[base.p]);
 }
 function uprightQuat(up,fwdHint,out){
   const f=new V3().copy(fwdHint).addScaledVector(up,-fwdHint.dot(up));
@@ -779,8 +808,13 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouseDown=false});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{if(buildMode){e.preventDefault();selectPart(buildSel+(e.deltaY>0?1:-1))}},{passive:false});
 canvas.addEventListener('mousedown',e=>{
   if(!ready)return;
+  if(buildMode&&locked){if(e.button===0)placePiece();else if(e.button===2)deconstruct()}
+  else if(buildMode&&e.button===2)deconstruct();
+  else if(buildMode&&e.button===0&&!TOUCH)placePiece();
   if(e.button===0)mouseDown=true;
   if(!locked&&!TOUCH){try{const p=canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(_){}}
 });
@@ -791,6 +825,16 @@ $('help').addEventListener('click',toggleHelp);
 function toggleHelp(){$('help').hidden=!$('help').hidden}
 
 function onPress(code){
+  if(code==='KeyB'){toggleBuild();return}
+  if(code==='KeyJ'){tryWarp(true);return}
+  if(buildMode){
+    const di={Digit1:0,Digit2:1,Digit3:2,Digit4:3,Digit5:4,Digit6:5,Digit7:6,Digit8:7,Digit9:8,Digit0:9,Minus:10,Equal:11}[code];
+    if(di!==undefined){selectPart(di);return}
+    if(code==='BracketRight'){selectPart(buildSel+1);return}
+    if(code==='BracketLeft'){selectPart(buildSel-1);return}
+    if(code==='KeyR'){buildRot=(buildRot+1)%4;return}
+    if(code==='KeyX'){deconstruct();return}
+  }
   if(code==='KeyU'){$('craft').hidden=true;toggleUpg();return}
   if(code==='KeyI'){$('upg').hidden=true;toggleCraft();return}
   if(code==='KeyG'){quickUse();return}
@@ -806,11 +850,11 @@ function onPress(code){
 /* touch */
 if(TOUCH){
   $('touch').hidden=false;
-  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208]];
+  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208],['BUILD','KeyB',264,40]];
   for(const [label,code,r,b] of btns){
     const el=document.createElement('div');el.className='tbtn';el.textContent=label;
     el.style.right=`calc(${r}px + env(safe-area-inset-right,0px))`;el.style.bottom=`calc(${b}px + env(safe-area-inset-bottom,0px))`;
-    const down=e=>{e.preventDefault();el.classList.add('on');if(code==='mine')mouseDown=true;else{if(!keys[code])onPress(code);keys[code]=true;if(code==='Space')keys.ShiftLeft=st.mode==='ship'}};
+    const down=e=>{e.preventDefault();el.classList.add('on');if(code==='mine'&&buildMode)placePiece();else if(code==='mine')mouseDown=true;else{if(!keys[code])onPress(code);keys[code]=true;if(code==='Space')keys.ShiftLeft=st.mode==='ship'}};
     const up=e=>{e.preventDefault();el.classList.remove('on');if(code==='mine')mouseDown=false;else{keys[code]=false;if(code==='Space')keys.ShiftLeft=false}};
     el.addEventListener('touchstart',down,{passive:false});el.addEventListener('touchend',up,{passive:false});el.addEventListener('touchcancel',up,{passive:false});
     $('touch').appendChild(el);
@@ -844,7 +888,8 @@ function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){cons
 function nearShip(){return player.pos.distanceTo(ship.group.position)<ship.group.userData.radius+5}
 function interact(){
   if(st.mode==='foot'){
-    if(nearShip()){st.mode='ship';ship.state='landed';ship.camQ.copy(ship.group.quaternion);Sound.blip(300,.2,'triangle');toast(ship.fuel>=TO()?'Systems green. Space to take off.':'Launch thrusters need fuel. Press R to refuel with 20 Ferrite.')}
+    if(nearShip()){if(buildMode)toggleBuild();st.mode='ship';ship.state='landed';ship.camQ.copy(ship.group.quaternion);Sound.blip(300,.2,'triangle');toast(canLaunch()?'Systems green. Space to take off.':'Launch thrusters need fuel. Press R to refuel with 20 Ferrite.')}
+    else if(nearBase)collectBase(nearBase);
     else if(nearPickup)openPickup(nearPickup);
     else if(nearWreck)claimWreck(nearWreck);
   }else if(ship.state==='landed'){exitToFoot();Sound.blip(260,.2,'triangle')}
@@ -852,6 +897,10 @@ function interact(){
     const P=current,d=ship.group.position.clone().sub(P.center);const r=d.length();d.divideScalar(r);
     const g=P.heightAt(d);
     if(r-g>140){toast('Get within 140 m of the ground to land.');return}
+    const pad=baseRT&&baseRT.P===P?nearestPad(ship.group.position,220):null;
+    if(pad){const up=baseUp();const qTo=uprightQuat(up,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
+      ship.land={from:ship.group.position.clone(),to:pad.w.clone().addScaledVector(up,ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
+      ship.state='landing';ship.t=0;ship.speed=0;Sound.blip(200,.6,'sawtooth',.08);toast('Landing pad locked. Auto-landing.');return}
     if(P.sea!==null&&g<P.sea+.5){toast('Water below. Find dry land to set down.','bad');return}
     const qTo=uprightQuat(d,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
     ship.land={from:ship.group.position.clone(),to:P.center.clone().addScaledVector(d,g+ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
@@ -877,15 +926,19 @@ function refill(){
 }
 function tryTakeoff(){
   if(ship.state!=='landed')return;
-  if(ship.fuel<TO()){toast('Not enough launch fuel. Press R to refuel with 20 Ferrite.','bad');Sound.blip(160,.25,'square',.1);return}
-  ship.fuel-=TO();ship.state='takeoff';ship.t=0;Sound.whoosh(1.4);
+  if(!canLaunch()){toast('Not enough launch fuel. Press R to refuel with 20 Ferrite.','bad');Sound.blip(160,.25,'square',.1);return}
+  if(onPad())toast('Landing pad launch: no fuel used.');else ship.fuel-=TO();ship.state='takeoff';ship.t=0;Sound.whoosh(1.4);
 }
-function tryWarp(){
+function tryWarp(home=false){
+  if(home){
+    if(!base){toast('You have no base yet. Press B on foot and place a base computer.','bad');return}
+    if(base.seed===system.seed){toast(`Your base is in this system, on ${base.pname}.`);return}
+  }
   if(st.mode!=='ship'||ship.state!=='flying'){toast('Hyperdrive works only while flying in your ship.');return}
   if(inv.aurium<10&&!crafted.warpcell){toast(`Hyperdrive needs 10 Aurium or a warp cell. You have ${inv.aurium} Aurium.`,'bad');return}
   if(current){const alt=ship.group.position.distanceTo(current.center)-current.radius;if(alt<current.radius*.6){toast('Leave the atmosphere before jumping.','bad');return}}
   if(crafted.warpcell){crafted.warpcell--;toast('Warp cell consumed.')}else inv.aurium-=10;
-  ship.state='warp';ship.t=0;ship.warped=false;Sound.whoosh(2.6);
+  ship.state='warp';ship.t=0;ship.warped=false;ship.homeJump=home;Sound.whoosh(2.6);
 }
 function scanPulse(){
   if(st.scanCD>0){toast(`Scanner recharging · ${Math.ceil(st.scanCD)} s`);return}
@@ -930,7 +983,8 @@ function updateFoot(dt){
   const d=tV.copy(player.pos).sub(c);let rad=d.length();d.divideScalar(rad);
   player.fwd.addScaledVector(d,-player.fwd.dot(d)).normalize();
   const ground=P.heightAt(d),water=P.sea!==null&&ground<P.sea-1.2,eye=1.7;
-  const floor=water?P.sea+.9:ground+eye;
+  let floor=water?P.sea+.9:ground+eye;
+  const bs=baseSupport(P,player.pos);const onBase=bs!==null&&bs+eye>floor;if(onBase)floor=bs+eye;
   player.vUp-=20*dt;
   if(keys.Space&&(player.grounded||player.swimming)){player.vUp=player.swimming?5:7.5;player.grounded=false;player.jetDelay=.28}
   else if(keys.Space&&!player.grounded&&player.jet>0&&player.jetDelay<=0){player.vUp+=(tech('jet')?46:36)*dt;player.jet=Math.max(0,player.jet-(tech('jet')?15:30)*dt)}
@@ -938,7 +992,7 @@ function updateFoot(dt){
   rad+=player.vUp*dt;
   if(rad<=floor||(player.grounded&&rad-floor<.7&&player.vUp<=0)){
     if(player.vUp<-24&&!water){player.health-=(-player.vUp-24)*3;toast('Hard landing.','bad')}
-    rad=floor;player.vUp=0;player.grounded=!water;player.swimming=water;
+    rad=floor;player.vUp=0;player.grounded=!water||onBase;player.swimming=water&&!onBase;
   }else{player.grounded=false;player.swimming=false}
   if(player.grounded)player.jet=Math.min(100,player.jet+40*dt);
   player.pos.copy(c).addScaledVector(d,rad);
@@ -946,6 +1000,7 @@ function updateFoot(dt){
   player.bob+=moving?dt*speed*1.4:0;
   const bobA=REDUCED?0:(moving?.05:0);
   tV2.copy(player.pos).addScaledVector(d,Math.sin(player.bob)*bobA);
+  if(baseWalls(P)){d.copy(player.pos).sub(c).normalize();tV2.copy(player.pos)}
   setCamFoot(d,player.fwd,player.pitch,tV2);
   tool.position.set(.3+Math.cos(player.bob*.5)*bobA*.3,-.27+Math.abs(Math.sin(player.bob*.5))*bobA*.4,-.62);
   // life support
@@ -970,7 +1025,7 @@ function updateMining(dt){
   tool.visible=true;
   const o=camera.position,dir=camera.getWorldDirection(tV);
   const RANGE=30;let bestT=RANGE;
-  nearPickup=null;nearWreck=null;let pd=4.8;
+  nearPickup=null;nearWreck=null;let pd=4.8;nearBase=nearBasePiece();
   for(const w of P.wrecks)if(w.wp.distanceTo(player.pos)<w.group.userData.radius+9){nearWreck=w;w.known=true}
   for(const it of P.items){
     if(!it.alive)continue;
@@ -990,7 +1045,7 @@ function updateMining(dt){
     if(dx*dx+dy*dy+dz*dz-t*t<rr*rr){cT=t;lookCreature=cr}
   }
   if(lookCreature&&cT<bestT)mineTarget=null;
-  const firing=mouseDown&&$('help').hidden&&$('craft').hidden&&$('upg').hidden;
+  const firing=mouseDown&&!buildMode&&$('help').hidden&&$('craft').hidden&&$('upg').hidden;
   if(firing){
     const tip=tool.userData.tip.getWorldPosition(tV2);
     const end=mineTarget?mineTarget.wp:o.clone().addScaledVector(dir,RANGE);
@@ -1054,7 +1109,7 @@ function harvest(it){
 }
 function updateShip(dt){
   const g=ship.group,P=current;
-  if(ship.state==='landed'){if((keys.KeyW||keys.Space||touchMove.y>.6)&&ship.fuel>=TO())tryTakeoff()}
+  if(ship.state==='landed'){if((keys.KeyW||keys.Space||touchMove.y>.6)&&canLaunch())tryTakeoff()}
   else if(ship.state==='takeoff'){
     ship.t+=dt;const up=tV.copy(g.position).sub(P.center).normalize();
     g.position.addScaledVector(up,(10+50*ship.t)*dt);
@@ -1107,7 +1162,7 @@ function updateShip(dt){
     g.position.addScaledVector(fwd,(400+ship.t*ship.t*4000)*dt);
     camera.fov=70+70*smooth(0,2.3,ship.t);camera.updateProjectionMatrix();
     $('flash').style.transition='none';$('flash').style.background='#fff';$('flash').style.opacity=smooth(1.4,2.4,ship.t);
-    if(ship.t>2.4&&!ship.warped){ship.warped=true;doWarp()}
+    if(ship.t>2.4&&!ship.warped){ship.warped=true;doWarp(ship.homeJump)}
   }
   // chase camera
   const k=ship.state==='warp'?1:1-Math.exp(-dt*7);
@@ -1122,16 +1177,16 @@ function updateShip(dt){
   for(const e of g.userData.engines)e.scale.set(1,1,1+thrust*6);
   if(Sound.ctx){Sound.set(Sound.engG.gain,.05+thrust*.07);Sound.set(Sound.eng.frequency,40+thrust*55);Sound.set(Sound.roarG.gain,thrust*.12);Sound.set(Sound.roarF.frequency,300+thrust*1400)}
 }
-async function doWarp(){
-  st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++;
-  await generateSystem(st.seed,false);
-  const P=planets[0];current=P;
+async function doWarp(home){
+  if(home)st.seed=base.seed;else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
+  await generateSystem(st.seed,st.seed===st.firstSeed);
+  const P=home&&baseRT?baseRT.P:planets[0];current=P;
   const d=new V3().subVectors(new V3(),P.center).normalize();
   ship.group.position.copy(P.center).addScaledVector(d,P.radius*3.2).add(new V3(0,P.radius*.6,0));
   ship.group.lookAt(P.center);ship.group.rotateY(Math.PI);ship.camQ.copy(ship.group.quaternion);
   ship.state='flying';ship.speed=200;camera.fov=70;camera.updateProjectionMatrix();
   $('flash').style.transition='opacity 1.8s';$('flash').style.opacity=0;
-  toast(`Arrived: ${system.name} · ${system.star.name} star · ${planets.length} planets`,'big');
+  toast(home?`Home system: ${system.name}. Your base is on ${P.name}.`:`Arrived: ${system.name} · ${system.star.name} star · ${planets.length} planets`,'big');
   save();
 }
 /* ---------- space combat ---------- */
@@ -1185,8 +1240,8 @@ function shipDestroyed(){
   npcs=npcs.filter(n=>n.faction!=='pirate');for(const n of npcs)n.hostile=false;bolts=[];
   inv.carbon=Math.floor(inv.carbon/2);inv.ferrite=Math.floor(inv.ferrite/2);inv.cobalt=Math.floor(inv.cobalt/2);inv.aurium=Math.floor(inv.aurium/2);inv.nanites=Math.floor(inv.nanites/2);
   const s=shipStats();ship.hull=s.hull*.5;ship.shield=s.shield;ship.heat=0;ship.overheat=false;
-  const P=nearestPlanet(ship.group.position);current=P;
-  landShipAt(P,P.findLand(Math.random,P.center.clone().negate().normalize()));
+  let P=nearestPlanet(ship.group.position);current=P;
+  if(baseRT){landAtBase();P=baseRT.P}else landShipAt(P,P.findLand(Math.random,P.center.clone().negate().normalize()));
   ship.fuel=Math.max(ship.fuel,TO());
   exitToFoot();pirateTimer=90;
   toast('Ship destroyed. An emergency beacon brought you down on '+P.name+'. Half your cargo was lost.','bad');
@@ -1353,6 +1408,249 @@ function buyUpg(k){
   toast(`${UPGRADES.find(u=>u.key===k).name} upgraded to level ${upg[k]}.`);renderUpg();save();
 }
 
+/* ---------- base building ---------- */
+const PARTS=[
+  {t:'computer',name:'Base computer',slot:'prop',cost:{ferrite:20,carbon:10},power:1},
+  {t:'floor',name:'Floor',slot:'cell',cost:{ferrite:6},top:.3,half:2},
+  {t:'wall',name:'Wall',slot:'edge',cost:{ferrite:5,carbon:2},wall:1},
+  {t:'door',name:'Doorway',slot:'edge',cost:{ferrite:5,carbon:2},wall:1,door:1},
+  {t:'window',name:'Window wall',slot:'edge',cost:{ferrite:4,cobalt:1},wall:1},
+  {t:'roof',name:'Roof panel',slot:'cell',cost:{ferrite:6},top:.25,half:2},
+  {t:'lamp',name:'Light post',slot:'prop',cost:{ferrite:3,carbon:3},grid:2},
+  {t:'solar',name:'Solar panel',slot:'prop',cost:{ferrite:12,cobalt:4},power:2},
+  {t:'extractor',name:'Ferrite extractor',slot:'prop',cost:{ferrite:25,cobalt:6},power:-1,prod:{res:'ferrite',rate:.1,cap:60}},
+  {t:'harvester',name:'Carbon bio-dome',slot:'prop',cost:{carbon:25,ferrite:10},power:-1,prod:{res:'carbon',rate:.13,cap:80}},
+  {t:'drill',name:'Cobalt drill',slot:'prop',cost:{ferrite:30,cobalt:10,aurium:1},power:-1,prod:{res:'cobalt',rate:.05,cap:30}},
+  {t:'recharge',name:'Recharge station',slot:'prop',cost:{ferrite:15,cobalt:5,carbon:10},power:-1},
+  {t:'pad',name:'Landing pad',slot:'cell',cost:{ferrite:40,carbon:10},top:.3,half:4.3},
+];
+const PART={};for(const p of PARTS)PART[p.t]=p;
+const ghostOK=new THREE.MeshBasicMaterial({color:'#8af0b4',transparent:true,opacity:.4,depthWrite:false,fog:false});
+const ghostBad=new THREE.MeshBasicMaterial({color:'#ff6274',transparent:true,opacity:.4,depthWrite:false,fog:false});
+let ghost=null,ghostT=null;
+const bRay=new THREE.Raycaster();bRay.far=30;
+function makePart(t){
+  const g=new THREE.Group();
+  const M=(c,o={})=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:30},o));
+  const B=c=>new THREE.MeshBasicMaterial({color:c});
+  const add=(geo,mat,x=0,y=0,z=0)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m};
+  const panel='#c9ccd6',dark='#3a3f50',amber='#e0a24a';
+  const ind=y=>{g.userData.ind=add(new THREE.SphereGeometry(.16,8,6),B('#8af0b4'),0,y,0)};
+  switch(t){
+    case 'floor':add(new THREE.BoxGeometry(4,.3,4),M(panel),0,.15,0);add(new THREE.BoxGeometry(3.8,1.8,3.8),M(dark),0,-.9,0);add(new THREE.BoxGeometry(4.02,.04,.25),M(amber),0,.31,0);break;
+    case 'roof':add(new THREE.BoxGeometry(4,.25,4),M('#8a93a8'),0,.125,0);add(new THREE.BoxGeometry(4.04,.08,4.04),M(dark),0,.02,0);break;
+    case 'wall':add(new THREE.BoxGeometry(4,4,.3),M(panel),0,2,0);add(new THREE.BoxGeometry(4.02,.3,.34),M(dark),0,.15,0);add(new THREE.BoxGeometry(4.02,.12,.34),M(amber),0,3.2,0);break;
+    case 'door':add(new THREE.BoxGeometry(1.2,4,.3),M(panel),-1.4,2,0);add(new THREE.BoxGeometry(1.2,4,.3),M(panel),1.4,2,0);add(new THREE.BoxGeometry(1.6,1,.3),M(panel),0,3.5,0);add(new THREE.BoxGeometry(1.7,.1,.36),M(amber,{emissive:'#6a4010'}),0,3,0);break;
+    case 'window':add(new THREE.BoxGeometry(4,1.3,.3),M(panel),0,.65,0);add(new THREE.BoxGeometry(4,1,.3),M(panel),0,3.5,0);add(new THREE.BoxGeometry(.4,1.7,.3),M(panel),-1.8,2.15,0);add(new THREE.BoxGeometry(.4,1.7,.3),M(panel),1.8,2.15,0);
+      add(new THREE.BoxGeometry(3.2,1.7,.08),new THREE.MeshPhongMaterial({color:'#9fe6ff',transparent:true,opacity:.35,shininess:120}),0,2.15,0);break;
+    case 'computer':add(new THREE.BoxGeometry(1.2,1,.8),M(dark),0,.5,0);add(new THREE.BoxGeometry(1.1,.8,.12),M('#1a3a4a',{emissive:'#2a8ab0'}),0,1.4,-.1).rotation.x=-.3;
+      add(new THREE.CylinderGeometry(.04,.04,1.6,5),M(dark),.5,1.8,.3);add(new THREE.SphereGeometry(.12,8,6),B('#ffb45e'),.5,2.65,.3);break;
+    case 'lamp':add(new THREE.CylinderGeometry(.08,.12,3,6),M(dark),0,1.5,0);add(new THREE.SphereGeometry(.28,10,8),B('#ffe2a8'),0,3.1,0);break;
+    case 'solar':add(new THREE.CylinderGeometry(.12,.12,1.6,6),M(dark),0,.8,0);add(new THREE.BoxGeometry(3,.1,2),M('#20306a',{emissive:'#0a1440',shininess:90}),0,1.7,0).rotation.x=-.5;break;
+    case 'extractor':add(new THREE.BoxGeometry(2.4,1,2.4),M(dark),0,.5,0);add(new THREE.CylinderGeometry(.7,.7,1.8,10),M(amber),0,1.9,0);add(new THREE.CylinderGeometry(.75,.75,.15,10),M(dark),0,2.4,0);ind(3);break;
+    case 'harvester':add(new THREE.CylinderGeometry(1.6,1.7,.4,12),M(dark),0,.2,0);
+      for(let i=0;i<5;i++){const a=i*1.26;add(new THREE.ConeGeometry(.22,.9,5),M('#3a9a3a'),Math.cos(a)*.8,.85,Math.sin(a)*.8)}
+      add(new THREE.SphereGeometry(1.5,14,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshPhongMaterial({color:'#a8ffd0',transparent:true,opacity:.3,shininess:120}),0,.4,0);ind(2.1);break;
+    case 'drill':for(const [x,z] of [[.9,.9],[-.9,.9],[.9,-.9],[-.9,-.9]])add(new THREE.BoxGeometry(.18,3,.18),M(dark),x*.75,1.5,z*.75);
+      add(new THREE.BoxGeometry(1.8,.5,1.8),M(amber),0,3,0);g.userData.spin=add(new THREE.ConeGeometry(.5,1.6,6).rotateX(Math.PI),M('#7fb6ff',{emissive:'#1a3c9a'}),0,.9,0);ind(3.45);break;
+    case 'recharge':add(new THREE.CylinderGeometry(.35,.45,2.2,8),M(dark),0,1.1,0);g.userData.spin=add(new THREE.TorusGeometry(.6,.08,6,20).rotateX(Math.PI/2),B('#9fe6ff'),0,1.6,0);break;
+    case 'pad':add(new THREE.CylinderGeometry(4.3,4.5,.3,16),M('#4a5060'),0,.15,0);add(new THREE.CylinderGeometry(4.2,4.2,1.8,16),M(dark),0,-.9,0);
+      add(new THREE.TorusGeometry(3.2,.1,4,32).rotateX(Math.PI/2),B('#ffb45e'),0,.32,0);add(new THREE.BoxGeometry(.3,.02,3),B('#ffb45e'),0,.32,0);add(new THREE.BoxGeometry(3,.02,.3),B('#ffb45e'),0,.32,0);break;
+  }
+  return g;
+}
+const baseQuat=()=>baseRT.group.getWorldQuaternion(new Q4());
+const baseUp=()=>new V3(0,1,0).applyQuaternion(baseQuat());
+function buildBase(P){
+  const g=new THREE.Group();g.position.fromArray(base.origin);g.quaternion.fromArray(base.quat);P.group.add(g);g.updateMatrixWorld(true);
+  baseRT={P,group:g,lights:0};
+  for(const pc of base.pieces)addPieceMesh(pc);
+  const away=clamp((Date.now()-(base.stamp||Date.now()))/1000,0,7200);produce(away);base.stamp=Date.now();
+  if(away>120){const ready=base.pieces.reduce((a,q)=>a+(PART[q.t].prod?Math.floor(q.stock||0):0),0);if(ready)setTimeout(()=>toast(`Your base produced while you were away: ${ready} resources ready.`),1500)}
+}
+function addPieceMesh(pc){
+  const g=makePart(pc.t);g.position.set(pc.x,pc.y,pc.z);g.rotation.y=pc.r*Math.PI/2;
+  if(pc.t==='lamp'&&baseRT.lights<8){const L=new THREE.PointLight('#ffd9a0',1.4,24,1.5);L.position.set(0,3.1,0);g.add(L);baseRT.lights++;g.userData.light=true}
+  g.userData.pc=pc;Object.defineProperty(pc,'mesh',{value:g,writable:true,enumerable:false,configurable:true});
+  baseRT.group.add(g);g.updateMatrixWorld(true);
+}
+function basePower(){let s=0,d=0;if(base)for(const pc of base.pieces){const p=PART[pc.t].power||0;if(p>0)s+=p;else d-=p}return{s,d,eff:d?Math.min(1,s/d):1}}
+function produce(sec){if(!base)return;const {eff}=basePower();for(const pc of base.pieces){const pr=PART[pc.t].prod;if(pr)pc.stock=Math.min(pr.cap,(pc.stock||0)+pr.rate*eff*sec)}}
+function collectBase(pc){
+  const list=pc.t==='computer'?base.pieces.filter(q=>PART[q.t].prod):[pc];const got={};
+  for(const q of list){const n=Math.floor(q.stock||0);if(n>0){const r=PART[q.t].prod.res;got[r]=(got[r]||0)+n;q.stock-=n}}
+  if(!Object.keys(got).length){toast(pc.t==='computer'?'Nothing ready yet. Build extractors, bio-domes or drills, plus solar panels to power them.':'Nothing ready yet.');return}
+  giveLoot(got);toast(`Collected: ${lootText(got)}`);Sound.blip(600,.15,'triangle',.14);save();
+}
+function nearBasePiece(){
+  if(!base||!baseRT||baseRT.P!==current||st.mode!=='foot')return null;let best=null,bd=4.2;
+  for(const pc of base.pieces){if(!(PART[pc.t].prod||pc.t==='computer'))continue;const dd=pc.mesh.getWorldPosition(tV3).distanceTo(player.pos);if(dd<bd){bd=dd;best=pc}}
+  return best;
+}
+function nearestPad(pos,maxD){
+  if(!base||!baseRT)return null;let best=null,bd=maxD;
+  for(const pc of base.pieces)if(pc.t==='pad'){const w=pc.mesh.localToWorld(new V3(0,.3,0));const d=w.distanceTo(pos);if(d<bd){bd=d;best={pc,w}}}
+  return best;
+}
+const onPad=()=>!!nearestPad(ship.group.position,ship.group.userData.base+3);
+const canLaunch=()=>onPad()||ship.fuel>=TO();
+function landAtBase(){
+  const P=baseRT.P;current=P;
+  const pad=nearestPad(baseRT.group.localToWorld(new V3()),400);
+  if(pad){const up=baseUp();ship.group.position.copy(pad.w).addScaledVector(up,ship.group.userData.base);
+    uprightQuat(up,new V3(1,0,0).applyQuaternion(baseQuat()),ship.group.quaternion);ship.state='landed';ship.speed=0}
+  else{const o=baseRT.group.position.clone().normalize();landShipAt(P,dirNear(o,18,P.radius,Math.random,new V3()))}
+}
+function baseSupport(P,pos){
+  if(!base||!baseRT||baseRT.P!==P)return null;const B=baseRT.group;const L=B.worldToLocal(tV3.copy(pos));
+  if(L.x*L.x+L.z*L.z>8100)return null;const feet=L.y-1.7;let best=null;
+  for(const pc of base.pieces){const d=PART[pc.t];if(d.top==null)continue;
+    if(Math.abs(L.x-pc.x)<d.half&&Math.abs(L.z-pc.z)<d.half){const top=pc.y+d.top;if(feet>=top-1.5&&(best===null||top>best))best=top}}
+  if(best===null)return null;return B.localToWorld(tV3.set(L.x,best,L.z)).distanceTo(P.center);
+}
+function baseWalls(P){
+  if(!base||!baseRT||baseRT.P!==P)return false;const B=baseRT.group;const L=B.worldToLocal(tV3.copy(player.pos));
+  if(L.x*L.x+L.z*L.z>8100)return false;const feet=L.y-1.7,head=L.y+.2;let moved=false;
+  for(const pc of base.pieces){const d=PART[pc.t];if(!d.wall)continue;if(head<pc.y||feet>pc.y+3.95)continue;
+    let along,across;if(pc.r%2===0){along=L.x-pc.x;across=L.z-pc.z}else{along=L.z-pc.z;across=L.x-pc.x}
+    if(Math.abs(along)>2.3||Math.abs(across)>=.55)continue;
+    if(d.door&&Math.abs(along)<.8&&head<pc.y+3)continue;
+    const push=(across>=0?.55:-.55)-across;if(pc.r%2===0)L.z+=push;else L.x+=push;moved=true}
+  // floors and pads are solid blocks (with their foundation skirt) when too tall to step onto
+  for(const pc of base.pieces){const d=PART[pc.t];if(d.top==null||pc.t==='roof')continue;
+    const top=pc.y+d.top,h=d.half+.35;const fe=L.y-1.7;
+    if(fe>=top-1.5||L.y+.2<pc.y-1.8)continue;
+    const dx=L.x-pc.x,dz=L.z-pc.z;if(Math.abs(dx)>=h||Math.abs(dz)>=h)continue;
+    if(h-Math.abs(dx)<h-Math.abs(dz))L.x=pc.x+Math.sign(dx||1)*h;else L.z=pc.z+Math.sign(dz||1)*h;moved=true}
+  if(moved)player.pos.copy(B.localToWorld(L));
+  return moved;
+}
+function updateBase(dt){
+  if(!base||!baseRT)return;
+  produce(dt);base.stamp=Date.now();
+  const pw=basePower();
+  for(const pc of base.pieces){const u=pc.mesh.userData;
+    if(u.spin)u.spin.rotation.y+=dt*(pw.eff>0?3*pw.eff:0);
+    if(u.ind){const pr=PART[pc.t].prod;u.ind.material.color.set(pw.eff<=0?'#ff6274':(pc.stock>=pr.cap?'#ffb45e':'#8af0b4'))}}
+  if(st.mode==='foot'&&baseRT.P===current&&pw.eff>0){
+    for(const pc of base.pieces)if(pc.t==='recharge'&&pc.mesh.getWorldPosition(tV3).distanceTo(player.pos)<5){
+      player.suit=Math.min(100,player.suit+14*pw.eff*dt);player.jet=Math.min(100,player.jet+40*dt);player.health=Math.min(100,player.health+6*dt);break}
+  }
+}
+function toggleBuild(){
+  if(!buildMode&&st.mode!=='foot'){toast('Build mode works on foot. Land and step out first.');return}
+  buildMode=!buildMode;$('buildbar').hidden=!buildMode;document.body.classList.toggle('building',buildMode);
+  if(buildMode){if(base&&baseRT&&baseRT.P===current&&buildSel===0)buildSel=1;renderBuildBar();
+    toast(base&&baseRT&&baseRT.P===current?'Build mode. Your base computer is nearby.':'Build mode. Place a base computer first to claim this spot.')}
+  else if(ghost){ghost.visible=false}
+}
+function selectPart(i){buildSel=(i+PARTS.length)%PARTS.length;buildRot=0;renderBuildBar()}
+function renderBuildBar(){
+  $('bbTiles').innerHTML=PARTS.map((p,i)=>`<button type="button" class="${i===buildSel?'sel':''}" data-i="${i}"><i>${i<9?i+1:i===9?0:i===10?'-':i===11?'=':''}</i>${p.name}</button>`).join('');
+  for(const b of $('bbTiles').querySelectorAll('button'))b.addEventListener('click',()=>selectPart(+b.dataset.i));
+  const sel=$('bbTiles').children[buildSel];if(sel&&sel.scrollIntoView)sel.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+$('bbRot').addEventListener('click',()=>{buildRot=(buildRot+1)%4});
+$('bbDel').addEventListener('click',()=>deconstruct());
+$('bbExit').addEventListener('click',()=>toggleBuild());
+function terrainRay(P,o,dir,maxT=30){
+  let prev=0;const p=new V3(),d=new V3();
+  const below=t=>{p.copy(o).addScaledVector(dir,t);d.copy(p).sub(P.center);const r=d.length();return r<P.heightAt(d.divideScalar(r))};
+  for(let t=.5;t<=maxT;t+=.5){if(below(t)){let a=prev,b=t;for(let i=0;i<7;i++){const m=(a+b)/2;if(below(m))b=m;else a=m}return{t:b,p:o.clone().addScaledVector(dir,b)}}prev=t}
+  return null;
+}
+function groundYLocal(x,z){const B=baseRT.group,P=baseRT.P;const W=B.localToWorld(new V3(x,0,z));const d=W.sub(P.center).normalize();return B.worldToLocal(P.center.clone().addScaledVector(d,P.heightAt(d))).y}
+function aimedPiece(){
+  if(!baseRT||baseRT.P!==current)return null;
+  bRay.set(camera.position,camera.getWorldDirection(new V3()));bRay.far=14;
+  const hs=bRay.intersectObject(baseRT.group,true);bRay.far=30;
+  for(const h of hs){let ob=h.object;while(ob&&!ob.userData.pc)ob=ob.parent;if(ob)return ob.userData.pc}
+  return null;
+}
+function computeCandidate(){
+  const P=current,part=PARTS[buildSel];
+  const o=camera.position,dir=camera.getWorldDirection(new V3());
+  const cand={ok:false,reason:'',part};
+  const sameBase=base&&baseRT&&baseRT.P===P;
+  let hitW=null,hitPc=null,nW=null,hitT=Infinity;
+  if(sameBase){bRay.set(o,dir);const hs=bRay.intersectObject(baseRT.group,true);
+    for(const h of hs){let ob=h.object;while(ob&&!ob.userData.pc)ob=ob.parent;if(!ob)continue;hitW=h.point.clone();hitPc=ob.userData.pc;hitT=h.distance;nW=h.face?h.face.normal.clone().transformDirection(h.object.matrixWorld):new V3(0,1,0);break}}
+  const tr=terrainRay(P,o,dir);
+  if(tr&&tr.t<hitT){hitW=tr.p;hitPc=null}
+  if(!hitW){cand.reason='Aim at the ground nearby';return cand}
+  if(!sameBase){
+    const up=hitW.clone().sub(P.center).normalize();
+    cand.pos=hitW;cand.quat=uprightQuat(up,player.fwd,new Q4()).multiply(new Q4().setFromAxisAngle(Y_AXIS,buildRot*Math.PI/2));
+    if(part.t!=='computer'){cand.reason='Place a base computer first';return cand}
+    if(P.sea!==null&&hitW.distanceTo(P.center)<P.sea+.3){cand.reason="Can't build underwater";return cand}
+    cand.newBase=true;
+  }else{
+    if(part.t==='computer'){cand.reason='This base already has a computer';}
+    const B=baseRT.group;const L=B.worldToLocal(hitW.clone());let y;
+    if(hitPc){const nL=nW.applyQuaternion(baseQuat().invert());if(nL.y>.5)y=L.y;else{L.addScaledVector(nL,.6);y=hitPc.y}}
+    let x,z,r;
+    if(part.slot==='edge'){const cx=Math.round(L.x/4),cz=Math.round(L.z/4),fx=L.x/4-cx,fz=L.z/4-cz;
+      if(Math.abs(fx)>Math.abs(fz)){x=cx*4+Math.sign(fx||1)*2;z=cz*4;r=1}else{x=cx*4;z=cz*4+Math.sign(fz||1)*2;r=0}}
+    else{const gs=part.grid||4;x=Math.round(L.x/gs)*gs;z=Math.round(L.z/gs)*gs;r=buildRot}
+    if(y===undefined){if(part.slot==='cell'){const h=part.half;y=Math.max(groundYLocal(x-h,z-h),groundYLocal(x+h,z-h),groundYLocal(x-h,z+h),groundYLocal(x+h,z+h),groundYLocal(x,z))}else y=groundYLocal(x,z)}
+    y=Math.round(y*20)/20;
+    Object.assign(cand,{x,y,z,r});
+    cand.pos=B.localToWorld(new V3(x,y,z));cand.quat=baseQuat().multiply(new Q4().setFromAxisAngle(Y_AXIS,r*Math.PI/2));
+    if(part.t==='computer')return cand;
+    if(Math.hypot(x,z)>70){cand.reason='Too far from the base computer (70 m limit)';return cand}
+    for(const pc of base.pieces){const q=PART[pc.t];if(q.slot!==part.slot)continue;
+      if(Math.abs(pc.x-x)<.1&&Math.abs(pc.z-z)<.1&&Math.abs(pc.y-y)<1.5&&(part.slot!=='edge'||pc.r%2===r%2)){cand.reason='Something is already built there';return cand}}
+    if(!hitPc&&P.sea!==null&&cand.pos.distanceTo(P.center)<P.sea+.2&&part.t!=='pad'&&part.t!=='floor'){cand.reason="Can't build underwater";return cand}
+  }
+  const miss=Object.entries(part.cost).filter(([k,v])=>inv[k]<v);
+  if(miss.length){cand.reason=`Need ${miss.map(([k,v])=>`${v-inv[k]} more ${RES_LABEL[k]}`).join(', ')}`;return cand}
+  cand.ok=true;cand.reason=cand.newBase&&base?`Ready · this replaces your base on ${base.pname}`:'Ready';return cand;
+}
+function updateBuild(){
+  if(!buildMode||st.mode!=='foot'||!current){if(ghost)ghost.visible=false;if(buildMode&&st.mode!=='foot')toggleBuild();return}
+  const part=PARTS[buildSel];
+  if(ghostT!==part.t){if(ghost){scene.remove(ghost);ghost.traverse(o=>{if(o.geometry)o.geometry.dispose()})}
+    ghost=makePart(part.t);ghost.traverse(o=>{if(o.isMesh)o.material=ghostOK});scene.add(ghost);ghostT=part.t}
+  buildCand=computeCandidate();
+  if(buildCand.pos){ghost.visible=true;ghost.position.copy(buildCand.pos);ghost.quaternion.copy(buildCand.quat);
+    const m=buildCand.ok?ghostOK:ghostBad;ghost.traverse(o=>{if(o.isMesh)o.material=m})}else ghost.visible=false;
+  setText('bbName',part.name);
+  setHTML('bbCost',Object.entries(part.cost).map(([k,v])=>`<span class="${inv[k]<v?'lack':''}">${v} ${RES_LABEL[k]}</span>`).join(' · ')+(part.power?` · power ${part.power>0?'+':''}${part.power}`:''));
+  setText('bbStatus',buildCand.reason);$('bbStatus').classList.toggle('bad',!buildCand.ok);
+}
+function placePiece(){
+  const c=buildCand;if(!buildMode||!c)return;
+  if(!c.ok){toast(c.reason,'bad');Sound.blip(160,.12,'square',.06);return}
+  const P=current,part=c.part;
+  if(c.newBase){
+    if(base){if(time-abandonT>6){abandonT=time;toast(`This abandons your base on ${base.pname} (${base.sname}). Click again to confirm.`,'bad');return}
+      if(baseRT){baseRT.P.group.remove(baseRT.group);baseRT.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}baseRT=null;}
+    for(const k in part.cost)inv[k]-=part.cost[k];
+    base={seed:system.seed,p:P.idx,pname:P.name,sname:system.name,origin:c.pos.clone().sub(P.center).toArray(),quat:c.quat.toArray(),pieces:[],stamp:Date.now()};
+    buildBase(P);addPiece({t:'computer',x:0,y:0,z:0,r:0});
+    toast(`Base claimed on ${P.name}. Press J in your ship to jump home from any system.`,'big');buildSel=1;renderBuildBar();
+  }else{
+    for(const k in part.cost)inv[k]-=part.cost[k];
+    addPiece({t:part.t,x:c.x,y:c.y,z:c.z,r:c.r});
+  }
+  Sound.blip(420,.08,'square',.07);setTimeout(()=>Sound.blip(640,.1,'triangle',.08),60);save();
+}
+function addPiece(pc){if(PART[pc.t].prod)pc.stock=0;base.pieces.push(pc);addPieceMesh(pc)}
+function deconstruct(){
+  const pc=aimedPiece();
+  if(!pc){toast('Aim at one of your base parts within 14 m to remove it.');return}
+  if(pc.t==='computer'&&base.pieces.length>1){toast('Remove every other part before the base computer.','bad');return}
+  const d=PART[pc.t],ref={};for(const k in d.cost)ref[k]=Math.floor(d.cost[k]/2);
+  if(d.prod&&pc.stock>=1)ref[d.prod.res]=(ref[d.prod.res]||0)+Math.floor(pc.stock);
+  giveLoot(ref);
+  if(pc.mesh.userData.light)baseRT.lights--;
+  baseRT.group.remove(pc.mesh);pc.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});
+  base.pieces.splice(base.pieces.indexOf(pc),1);
+  toast(`Removed ${d.name}: ${lootText(ref)||'no refund'}`);Sound.blip(300,.12,'sawtooth',.06);
+  if(pc.t==='computer'){baseRT.P.group.remove(baseRT.group);baseRT=null;base=null;toast('Base dismantled.');buildSel=0;renderBuildBar()}
+  save();
+}
+
 /* ---------- crafting ---------- */
 const AUR_R=()=>tech('scanner')?1000:500;
 const canWarp=()=>inv.aurium>=10||crafted.warpcell>0;
@@ -1512,6 +1810,8 @@ function drawMarkers(){
     }
     const sp=proj(sun.position,false);if(!sp.off)marker(sp.x,sp.y,'#ffd9a3',system.star.name,fmtDist(ref.length()),'ring',12);
   }
+  if(baseRT&&!buildMode){const bw=baseRT.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
+    if(dd>25){const p=proj(bw,st.mode==='foot'&&current===baseRT.P);if(!p.off||st.mode==='foot')marker(p.x,p.y,'#8af0b4','Home base',fmtDist(dd),'diamond',8)}}
   if(st.mode==='foot'){
     const sp=tV.copy(ship.group.position);const p=proj(sp,true);const dd=player.pos.distanceTo(sp);
     if(dd>14)marker(p.x,p.y,'#ffb45e','Ship',fmtDist(dd),'diamond',8);
@@ -1566,6 +1866,7 @@ function drawMarkers(){
   }
 }
 function objective(){
+  if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
   if(st.mode==='ship'&&npcs.some(n=>n.hostile))return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
   if(st.mode==='foot'){
     if(ship.fuel<TO()&&inv.ferrite<20)return `Mine rocks with your laser for Ferrite · ${inv.ferrite}/20 to refuel your ship`;
@@ -1574,7 +1875,7 @@ function objective(){
     if(!canWarp())return `Find glowing Aurium crystals · ${inv.aurium}/10 · press C to scan. Supply pods and relics hold extra loot`;
     return 'Board your ship and take off. Hyperdrive is charged.';
   }
-  if(ship.state==='landed')return ship.fuel<TO()?'Press R to refuel with 20 Ferrite':'Press Space to take off';
+  if(ship.state==='landed')return !canLaunch()?'Press R to refuel with 20 Ferrite':'Press Space to take off';
   if(!canWarp())return `Find Aurium · ${inv.aurium}/10 · scan [C] near a planet, then land [E] to mine it. Or craft a warp cell [I]`;
   return 'Climb out of the atmosphere and press H to jump to a new star';
 }
@@ -1601,9 +1902,13 @@ function updateHUD(){
     else if(lookCreature){const sp=lookCreature.sp,i=P.species.indexOf(sp),k=st.disc.has(`S:${P.sysSeed}:${P.idx}:${i}`);tgt=k?sp.name:'Unknown lifeform';pr='<span class="k">F</span>Analyze'}
     if(nearPickup&&!mineTarget){tgt={pod:'Supply pod',relic:'Ancient relic'}[nearPickup.type];pr=`<span class="k">E</span>${nearPickup.type==='pod'?'Open pod':'Recover relic'}`}
     if(nearWreck&&!nearPickup){const c=SHIP_CLASSES[nearWreck.cls];tgt=`Crashed ${c.label}`;pr=`<span class="k">E</span>${pendingClaim===nearWreck&&time-pendingT<8?'Repair and claim':'Inspect wreck'}`}
+    if(nearBase){const d=PART[nearBase.t];
+      if(nearBase.t==='computer'){const ready=base.pieces.reduce((a,q)=>a+(PART[q.t].prod?Math.floor(q.stock||0):0),0);const pw=basePower();tgt=`Base computer · power ${pw.s}/${pw.d}`;pr=`<span class="k">E</span>Collect from all modules (${ready})`}
+      else{tgt=`${d.name} · ${Math.floor(nearBase.stock||0)}/${d.prod.cap} ${RES_LABEL[d.prod.res]}`;pr=`<span class="k">E</span>Collect`}}
+    if(buildMode){tgt='';pr=''}
     if(nearShip())pr='<span class="k">E</span>Board ship   <span class="k">U</span>Workshop';
     else if(player.suit<30&&inv.carbon>=8)pr='<span class="k">R</span>Recharge life support';
-  }else if(ship.state==='landed')pr=ship.fuel>=TO()?'<span class="k">Space</span>Take off   <span class="k">E</span>Exit':'<span class="k">R</span>Refuel   <span class="k">E</span>Exit';
+  }else if(ship.state==='landed')pr=canLaunch()?'<span class="k">Space</span>Take off   <span class="k">E</span>Exit':'<span class="k">R</span>Refuel   <span class="k">E</span>Exit';
   else if(ship.state==='flying'&&P){
     const d=tV.copy(ship.group.position).sub(P.center);const r=d.length();d.divideScalar(r);const alt=r-P.heightAt(d);
     const hn=npcs.filter(n=>n.hostile).length;
@@ -1631,7 +1936,7 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
@@ -1645,12 +1950,14 @@ async function begin(saved){
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
     Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
+    base=saved.base||null;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
-  await generateSystem(st.seed,st.systems===1);
+  await generateSystem(st.seed,st.seed===st.firstSeed);
   const P=planets[0];current=P;
-  landShipAt(P,P.spawnDir);exitToFoot();
+  if(baseRT)landAtBase();else landShipAt(P,P.spawnDir);
+  exitToFoot();
   // face the ship
   const toShip=ship.group.position.clone().sub(player.pos);const up=player.pos.clone().sub(P.center).normalize();
   player.fwd.copy(toShip).addScaledVector(up,-toShip.dot(up)).normalize();
