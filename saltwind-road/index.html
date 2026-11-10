@@ -2074,6 +2074,8 @@ const NPCS = [
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
   {id:'crusoe',town:'wren',dx:0,dy:0,name:'Castaway Robin',role:'Shipwrecked sailor',cols:{cloak:'#a08a6a',skin:'#c89870',hair:'#6a4a2a'},castaway:true,
    hello:["A ship! Er, a person! Hello!","I've been talking to a coconut for weeks.","Did you bring planks?"], rumors:["I've charted every cove on this coast from my little rock. If I ever get off it, I'll share my secrets."]},
+  {id:'barnaby',town:'wren',dx:0,dy:0,name:'Ringmaster Barnaby',role:'The Traveling Circus',cols:{cloak:'#c83a3a',skin:'#e8c8a8',hair:'#2a2a2a'},circus:true,
+   hello:["Roll up, roll up!","The greatest show in all the land!","Tickets, prizes, wonders!"], rumors:["The circus moves to a new town every week. Come test your strength!"]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
    hello:["Ships waiting, holds empty. Got goods?","Export orders, paid in full on delivery.","Time is money, trader."], rumors:["Foreign buyers pay double for bulk goods, if you can deliver on time."]},
   {id:'ewan',town:'hollow',dx:4,dy:3,name:'Shepherd Ewan',role:'Shepherd',cols:{cloak:'#8a7a5a',skin:'#d8a882',hair:'#c8c8b8'},shepherd:true,freeSpot:true,
@@ -2568,7 +2570,7 @@ function genWorld() {
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
-  setTimeout(placeWells, 0); setTimeout(placeMonuments, 0); setTimeout(placeCastaway, 0);
+  setTimeout(placeWells, 0); setTimeout(placeMonuments, 0); setTimeout(placeCastaway, 0); setTimeout(placeCircus, 50);
   for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [m.x - .5, m.y - .8]);
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => Math.hypot(a - x, b - y) < 1.9)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
@@ -3349,6 +3351,7 @@ function killEnemy(e) {
     return;
   }
   if (e.ghostCap) ghostLoot(e);
+  if (e.hwBoss) { const c = 100 + (S.level || 1)*10; S.coins += c; got.push(`+${c} coin (his ill-gotten loot)`); S.highwaymen = (S.highwaymen || 0) + 1; }
   if (e.watch && S.watch) S.watch.kills++;
   if (e.clock && (S.clock || 0) === 2) { S.clock = 3; setTimeout(() => toast('<b>Brassby powers down with a sad whistle.</b><br>Return to Inventor Cogsworth in Highcairn.', 6000), 400); }
   if (e.type === 'mimic') { const t = e.mimicTier || 1, c = 60*t; S.coins += c; got.push(`+${c} coin`); for (let i = 0; i < 2; i++) { const g = pick(CHEST_LOOT.filter(x => GOODS[x])); addItem(g, 2); got.push(`+2 ${GOODS[g].name}`); } S.mimics = (S.mimics || 0) + 1; }
@@ -3615,6 +3618,72 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== highwaymen =====
+let hwT = 150;
+function highwayCheck(dt) {
+  if (mode !== 'play' || S.riding && isFlying() || inDungeon() || balloonF || S.y >= WORLD_H || townAt(S.x, S.y, 14) || S.day < 3) return;
+  if (tileAt(Math.floor(S.x), Math.floor(S.y)) !== T.ROAD) return;
+  hwT -= dt; if (hwT > 0) return; hwT = 180 + Math.random()*200;
+  if (Math.random() > .3 || enemies.some(e => e.hwGang && !e.dead)) return;
+  const toll = Math.min(Math.max(20, Math.round(S.coins*.1)), 60 + (S.level || 1)*12), bluff = Math.min(.85, .3 + .08*sk('bar') + guildRank()*.04);
+  openPanel('Highwayman', `A masked rider blocks the road, pistol glinting. <b>“Stand and deliver! ${toll} coin, and you may pass.”</b>`, [
+    {label: `Pay the toll (${toll}◆)`, disabled: S.coins < toll, fn: () => { S.coins -= toll; renderHUD(); closeTalk(); toast('The highwayman pockets your coin and gallops off, laughing.', 3500); }},
+    {label: `Talk your way out (${Math.round(bluff*100)}%)`, fn: () => { closeTalk(); if (Math.random() < bluff) { S.bluffs = (S.bluffs || 0) + 1; gainXP(30); toast('<b>“...You know the Marshal personally? Ah. My mistake.”</b><br>The highwayman tips his hat and rides away.', 4500); } else { toast('<b>“Nice try!”</b> He whistles, and his gang rides in!', 3500); hwFight(); } }},
+    {label: 'Fight!', primary: true, fn: () => { closeTalk(); hwFight(); }}]);
+}
+function hwFight() {
+  const lv = 1 + (S.level || 1)*.06;
+  for (let k = 0; k < 3; k++) { const a = k/3*6.283 + Math.random(), x = S.x + Math.cos(a)*3, y = S.y + Math.sin(a)*3; const e = makeEnemy(k ? 'bandit' : 'archer', enemyWalk(x, y) ? x : S.x + 2, enemyWalk(x, y) ? y : S.y, {alert: true, hwGang: true}); e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = lv; if (!k) { makeElite(e); e.elite = {name: 'Masked Highwayman', col: '#8a6a4a'}; e.labelName = 'Masked Highwayman'; e.hwBoss = true; } enemies.push(e); }
+  SFX.roar();
+}
+// ===== traveling circus =====
+let CIRCUS = null;
+function placeCircus() {
+  const n = NPC_BY.barnaby; if (!n || !S) return;
+  const towns = Object.keys(TOWNS).filter(k => !TOWNS[k].pirate && k !== 'isle' && !TOWNS[k].small), wk = Math.floor((S.day - 1)/7), tk = towns[(wk*7 + 3) % towns.length], tw = TOWNS[tk];
+  if (CIRCUS && CIRCUS.town === tk) return;
+  for (const [dx, dy] of [[6, -1], [-6, -1], [6, 2], [-6, 2], [5, 4], [-5, 4], [0, 6], [0, -6], [7, 0], [-7, 0]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)];
+    if (!inB(x, y) || !walkable(t, false, false) || t === T.HOUSE || t === T.SHAL || !walkable(map[idx(x + 1, y - 1)], false, false) || NPCS.some(m => m !== n && !m.wander && Math.hypot(m.x - x - .5, m.y - y - .8) < 2.4)) continue;
+    n.town = tk; n.x = x + .5; n.y = y + .8; CIRCUS = {town: tk, x: x + 2, y: y - .2}; return; }
+  n.town = tk; n.x = tw.x + .5; n.y = tw.y + 4.8; CIRCUS = {town: tk, x: tw.x + 2.5, y: tw.y + 4};
+}
+let circusTimer = null;
+function circusTalk(n) {
+  S.tickets = S.tickets || 0;
+  say(`“Welcome, welcome to the greatest show in all the land! Win tickets at our games and trade them for fabulous prizes!”<br><span style="color:var(--muted)">Tickets: <b>${S.tickets}</b>. The circus is in ${TOWNS[n.town].name} this week.</span>`, [
+    {label: 'Strength tester (20◆)', disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); strengthGame(n); }},
+    {label: 'Ring toss (30◆)', disabled: S.coins < 30, fn: () => { S.coins -= 30; renderHUD(); ringToss(n); }},
+    {label: 'Prize counter', fn: () => prizeCounter(n)}, back(n)]);
+}
+function strengthGame(n) {
+  let pos = 0, dir = 1, done = false;
+  say(`Swing the mallet when the marker is in the middle!<div id="strBar" style="position:relative;height:16px;background:linear-gradient(90deg,#3a2a2a,#c8a040 45%,#ffe060 50%,#c8a040 55%,#3a2a2a);border-radius:8px;margin-top:10px"><div id="strMk" style="position:absolute;top:-3px;width:4px;height:22px;background:#fff;left:0"></div></div>`, [{label: 'SWING!', primary: true, fn: () => {
+    if (done) return; done = true; clearInterval(circusTimer); circusTimer = null;
+    const score = Math.max(0, Math.round(100 - Math.abs(pos - 50)*2.4)), tix = score >= 92 ? 6 : score >= 75 ? 3 : score >= 50 ? 1 : 0; S.tickets = (S.tickets || 0) + tix; if (score >= 92) S.bellRung = (S.bellRung || 0) + 1;
+    SFX[score >= 92 ? 'victory' : 'hit'](); save();
+    say(`<b>${score >= 92 ? 'DING! You ring the bell!' : score >= 75 ? 'So close to the bell!' : score >= 50 ? 'Not bad!' : 'The puck barely moves.'}</b> Power: ${score}.<br><span style="color:var(--good)">+${tix} ticket${tix === 1 ? '' : 's'}</span>`, [{label: 'Again (20◆)', disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); strengthGame(n); }}, {label: 'Back', fn: () => circusTalk(n)}]);
+  }}]);
+  circusTimer = setInterval(() => { pos += dir*3.2; if (pos >= 100 || pos <= 0) dir *= -1; const mk = document.getElementById('strMk'); if (mk) mk.style.left = `calc(${Math.max(0, Math.min(100, pos))}% - 2px)`; else { clearInterval(circusTimer); circusTimer = null; } }, 30);
+}
+function ringToss(n) {
+  let hits = 0; const res = []; for (let i = 0; i < 3; i++) { const h = Math.random() < .35 + (BUFFS.luck > 0 ? .15 : 0) + .02*sk('agi'); if (h) hits++; res.push(h ? '⭕' : '·'); }
+  const tix = hits === 3 ? 8 : hits*2; S.tickets = (S.tickets || 0) + tix; SFX[hits ? 'coin' : 'hit'](); save();
+  say(`You toss three rings at the bottles... ${res.join(' ')}<br>${hits === 3 ? '<b>A perfect toss!</b> ' : ''}<span style="color:var(--good)">+${tix} tickets</span>`, [{label: 'Again (30◆)', disabled: S.coins < 30, fn: () => { S.coins -= 30; renderHUD(); ringToss(n); }}, {label: 'Back', fn: () => circusTalk(n)}]);
+}
+const CIRCUS_PRIZES = [['candy_apple', 2, 3], ['luck_draught', 1, 6], ['party_hat_cos', 1, 12], ['gem', 1, 15], ['monkey_pet', 1, 40]];
+function prizeCounter(n) {
+  say(`“Feast your eyes on our prizes!” <span style="color:var(--muted)">(Tickets: ${S.tickets || 0})</span>`, [
+    ...CIRCUS_PRIZES.filter(([g]) => !(g === 'monkey_pet' && S.pets.includes('monkey')) && !(g === 'party_hat_cos' && (S.hats || {}).party)).map(([g, q, c]) => ({label: `${g === 'monkey_pet' ? 'A pet monkey!' : g === 'party_hat_cos' ? 'Party Hat (cosmetic)' : `${GOODS[g].name}${q > 1 ? ' ×' + q : ''}`} · ${c} tickets`, disabled: (S.tickets || 0) < c, fn: () => {
+      S.tickets -= c; if (g === 'monkey_pet') addPet('monkey'); else if (g === 'party_hat_cos') { S.hats = S.hats || {}; S.hats.party = true; S.hat = 'party'; toast('You put on your Party Hat!'); } else addItem(g, q); SFX.coin(); renderHUD(); save(); prizeCounter(n); }})),
+    {label: 'Back', fn: () => circusTalk(n)}]);
+}
+function drawCircus() {
+  if (!CIRCUS) return; const px = CIRCUS.x*TS, py = CIRCUS.y*TS;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(px - 18, py + 2, 36, 3);
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#f4f0e0' : '#c83a3a'; ctx.beginPath(); ctx.moveTo(px, py - 30); ctx.lineTo(px - 18 + i*6, py + 2); ctx.lineTo(px - 12 + i*6, py + 2); ctx.fill(); }
+  ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.moveTo(px - 4, py + 2); ctx.lineTo(px, py - 8); ctx.lineTo(px + 4, py + 2); ctx.fill();
+  ctx.fillStyle = '#f0c040'; ctx.fillRect(px - .5, py - 36, 1, 7); ctx.fillStyle = Math.floor(frameT*3) % 2 ? '#3a8ad8' : '#f0c040'; ctx.fillRect(px + .5, py - 36, 5, 3);
 }
 // ===== export orders =====
 function newExport() {
@@ -4509,6 +4578,7 @@ function gazette() {
   if (festivalToday()) H.push(`<b>FESTIVAL TODAY!</b> ${festivalToday().name} celebrations in every town.`);
   if (bloodMoonDay()) H.push('<b>WARNING:</b> astronomers predict a <span style="color:#e85a5a">Blood Moon</span> tonight. Stay indoors, or bring a big sword.');
   if (seasonIdx() === 3 && S.day % 3 === 1) H.push('<b>Sky watch:</b> conditions are perfect for the northern lights tonight.');
+  if (CIRCUS && TOWNS[CIRCUS.town]) H.push(`<b>Roll up!</b> The Traveling Circus is in ${TOWNS[CIRCUS.town].name} this week.`);
   if (S.eggHunt && S.eggHunt.day === S.day && TOWNS[S.eggHunt.town]) H.push(`<b>Spring fun:</b> five painted eggs are hidden around ${TOWNS[S.eggHunt.town].name} today.`);
   if (S.starfall === S.day) H.push('<b>Stargazers rejoice:</b> a starfall is expected tonight. Fallen stars fetch a fine price.');
   if (dayOfSeason() === 6) H.push('<b>Sport:</b> Old Marlin’s fishing tournament runs all day today.');
@@ -5002,8 +5072,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The circus', 'Ringmaster Barnaby\u2019s Traveling Circus moves to a new town each week (the Gazette says where). Win tickets at the strength tester and ring toss, then trade them for prizes, including a pet monkey.'],
   ['Exports & regatta', 'Harbormaster Quinn in Tidewatch offers big export orders: deliver bulk goods within 5 days for a fat premium. Bess runs the regatta: sail through six buoys under par time for a prize, and in summer win the Regatta Cup.'],
   ['Snails & dragons', 'The dice players also run snail races: pick a snail and watch it go. Raise a Baby Drake to full level, then bring it and an Ember Core to Kael in Ashfall to grow it into a rideable Dragon.'],
   ['Waystones', 'Ancient waystones stand in the wild across every land. Touch one to awaken it, and you can fast travel there for free from your map.'],
@@ -5287,7 +5358,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -6065,6 +6136,7 @@ function render() {
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
+  if (CIRCUS && inView(CIRCUS.x, CIRCUS.y)) sprites.push({y: CIRCUS.y, f: drawCircus});
   if (vexRun && inView(vexRun.x, vexRun.y)) sprites.push({y: vexRun.y, f: () => drawPerson(ctx, Math.round(vexRun.x*TS), Math.round(vexRun.y*TS), {cloak: '#8a2a4a', skin: '#e0b896', hair: '#f0e0a0'}, vexRun.phase, true, vexRun.f < 0 ? 'left' : 'right', {scarf: true})});
   if (S.waystones) for (const w of S.waystones) if (inView(w.x, w.y)) sprites.push({y: w.y + .6, f: () => drawWaystone(w)});
   if (ISLET && inView(ISLET.x, ISLET.y)) sprites.push({y: ISLET.y - .2, f: drawIslet});
@@ -6681,7 +6753,7 @@ function newDay() {
   if (S.raid) { const tn = TOWNS[S.raid.town].name; S.rep[S.raid.town] = Math.max(0, repOf(S.raid.town) - .3); S.raid = null; enemies = enemies.filter(e => !e.raid); setTimeout(() => toast(`<b>${tn} was looted</b><br>Nobody came to help in time. The townsfolk are shaken.`, 6000), 1600); }
   else maybeStartRaid();
   rollMarket();
-  titanDay(); ghostDay(); eggHuntDay();
+  titanDay(); ghostDay(); eggHuntDay(); placeCircus();
   const bankMsg = bankDay() + mayorDay() + farmhandDay() + stallDay();
   if (perksDue() > 0) setTimeout(offerPerk, 3500);
   toast(`<b>Day ${S.day}</b><br>Merchants have restocked and new notices are up on the boards.${rent ? ` Your houses earned <b>${rent} coin</b> in rent.` : ''}${carMsg}${bankMsg}`);
@@ -6826,6 +6898,7 @@ function mainOptions(n) {
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
+  if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
   if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
@@ -9581,6 +9654,9 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['highwayman','Stand and Deliver','Defeat a masked highwayman', () => (S.highwaymen || 0) >= 1],
+  ['silver','Silver Tongue','Talk your way past 3 highwaymen', () => (S.bluffs || 0) >= 3],
+  ['bell','Ring the Bell','Ring the bell on the circus strength tester', () => (S.bellRung || 0) >= 1],
   ['exporter','Export Trader','Fulfil 3 export orders', () => (S.exports || 0) >= 3],
   ['regatta','Fair Winds','Finish the regatta under par', () => !!S.regattaBeat],
   ['snail','Escargot-a-Go','Win a snail race bet', () => (S.snailWins || 0) >= 1],
@@ -10059,7 +10135,7 @@ function step(ts) {
 function begin(state) {
   state.heroicRun = null;
   if (state.story && state.story.heir && state.story.heir.crowned) { NPC_BY.elowen.name = 'Queen Elowen'; NPC_BY.elowen.role = 'Queen of the Old Kingdom'; }
-  S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan();
+  S = state; petE = null; lastTile = -1; camF.x = null; document.body.classList.remove('titling'); invalidateChunks(); placeTitan(); CIRCUS = null; setTimeout(placeCircus, 60);
   if (S.y >= WORLD_H && (dungeonAtX(S.x) === 'mine' || (S.x >= 812 && S.x < 848))) { const E = S.x >= 812 && S.x < 848 ? {x: TOWNS.crownfall.x - 2, y: TOWNS.crownfall.y + 2} : DUNGEONS.mine.entrance; S.x = E.x + .5; S.y = E.y + 1.4; S.arena = null; }
   if (!S.home.barn) S.home.barn = {cow:0, sheep:0, pig:0};
   if (!S.home.prod) S.home.prod = {milk:0, wool:0, truffle:0};
@@ -10091,7 +10167,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
