@@ -2070,6 +2070,8 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'ewan',town:'hollow',dx:4,dy:3,name:'Shepherd Ewan',role:'Shepherd',cols:{cloak:'#8a7a5a',skin:'#d8a882',hair:'#c8c8b8'},shepherd:true,freeSpot:true,
+   hello:["Baa! Er, I mean, hello.","My flock's gone and scattered again.","Sheep are clever. Too clever."], rumors:["Sheep run from you, so you have to come at them from the far side and drive them home."]},
   {id:'dorran',town:'crownfall',dx:-4,dy:4,name:'Master Mason Dorran',role:'Monument builder',cols:{cloak:'#7a6a5a',skin:'#c89870',hair:'#8a8a8a'},mason:true,freeSpot:true,
    hello:["Stone lasts forever, friend.","Got materials? I've got plans.","Every great town needs a great monument."], rumors:["I've drawn up plans for monuments in four towns. Each one would bless the whole realm, if someone funded the stone."]},
   {id:'ottoline',town:'crownfall',dx:4,dy:-3,name:'Librarian Ottoline',role:'Keeper of books',cols:{cloak:'#3a3a6a',skin:'#e8d0b8',hair:'#8a6a4a'},librarian:true,freeSpot:true,
@@ -3608,6 +3610,45 @@ function drawAuroraShard(a) {
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
 }
+// ===== sheep herding =====
+let herd = null;
+function shepherdTalk(n) {
+  if (herd) { say(`“Drive them into the pen! ${herd.sheep.filter(q => q.in).length}/${herd.sheep.length} in so far.”`, [back(n)]); return; }
+  if (S.herdDay === S.day) { say('“The flock’s safe for today, thanks to you. Come back tomorrow, they always escape again.”', [back(n)]); return; }
+  say('“My sheep have scattered across the meadow! Sheep run away from you, so walk around behind them and drive them into the pen. You’ve got 90 seconds before they wander off for good.”', [{label: 'Start herding', primary: true, fn: () => { closeTalk(); startHerd(n); }}, back(n)]);
+}
+function startHerd(n) {
+  const tw = TOWNS[n.town]; let pen = null;
+  for (let tries = 0; tries < 300 && !pen; tries++) { const a = Math.random()*6.283, r = 13 + Math.random()*5, x = tw.x + Math.cos(a)*r, y = tw.y + Math.sin(a)*r; let ok = true; for (let dy = -6; dy <= 6 && ok; dy += 2) for (let dx = -6; dx <= 6; dx += 2) if (!enemyWalk(x + dx, y + dy)) { ok = false; break; } if (ok) pen = {x, y}; }
+  if (!pen) { toast('The meadow is too rough for herding today.'); return; }
+  const sheep = []; for (let k = 0; k < 5; k++) { for (let tries = 0; tries < 30; tries++) { const a = Math.random()*6.283, r = 6 + Math.random()*4, x = pen.x + Math.cos(a)*r, y = pen.y + Math.sin(a)*r; if (enemyWalk(x, y)) { sheep.push({x, y, vx: 0, vy: 0, t: Math.random()*5, in: false}); break; } } }
+  herd = {pen, sheep, t: 90, town: n.town}; S.x = pen.x; S.y = pen.y + 2.5; lastTile = -1; S.riding = false;
+  toast('<b>Round up the sheep!</b><br>Drive all five into the pen. Sheep flee from you, so get behind them.', 4500);
+}
+function updateHerd(dt) {
+  if (!herd) return; const H = herd; H.t -= dt;
+  for (const q of H.sheep) {
+    q.t += dt; if (q.in) { q.x += (H.pen.x + Math.cos(q.t)*.6 - q.x)*dt; q.y += (H.pen.y + Math.sin(q.t*1.3)*.4 - q.y)*dt; continue; }
+    const dx = q.x - S.x, dy = q.y - S.y, d = Math.hypot(dx, dy) || .01; let ax = Math.cos(q.t*.7)*.25, ay = Math.sin(q.t*.9)*.25;
+    if (d < 3.2) { ax += dx/d*2.8*(1 - d/3.2) + dx/d*.6; ay += dy/d*2.8*(1 - d/3.2) + dy/d*.6; }
+    q.vx += (ax - q.vx)*dt*4; q.vy += (ay - q.vy)*dt*4; const nx = q.x + q.vx*dt*2.2, ny = q.y + q.vy*dt*2.2;
+    if (enemyWalk(nx, q.y)) q.x = nx; else q.vx *= -1; if (enemyWalk(q.x, ny)) q.y = ny; else q.vy *= -1;
+    if (Math.hypot(q.x - H.pen.x, q.y - H.pen.y) < 1.3) { q.in = true; SFX.coin(); floatText(q.x, q.y - 1, 'Baa!', '#ffffff'); }
+  }
+  const n = H.sheep.filter(q => q.in).length;
+  if (n === H.sheep.length) { herd = null; S.herdDay = S.day; S.herds = (S.herds || 0) + 1; const c = 100 + Math.round(H.t)*3; S.coins += c; addItem('wool', 4); addRep(H.town, .3); SFX.victory(); renderHUD(); save(); toast(`<b>All sheep penned!</b><br>Shepherd Ewan is delighted. <span style="color:var(--good)">+${c} coin, 4 Wool</span>`, 5500); return; }
+  if (H.t <= 0 || Math.hypot(S.x - H.pen.x, S.y - H.pen.y) > 25) { herd = null; S.herdDay = S.day; const c = n*20; S.coins += c; renderHUD(); toast(`<b>Time's up!</b> You penned ${n} of 5 sheep. ${c ? `Ewan gives you ${c} coin for your trouble.` : ''}`, 4500); }
+}
+function drawHerd() {
+  const H = herd; if (!H) return; const px = H.pen.x*TS, py = H.pen.y*TS, w = 2*TS;
+  ctx.fillStyle = '#8a5a2a'; for (let i = -w; i <= w; i += 8) { ctx.fillRect(px + i - 1, py - w - 6, 2, 8); ctx.fillRect(px + i - 1, py + w - 6, 2, 8); ctx.fillRect(px - w - 1, py + i - 6, 2, 8); if (i < -6 || i > 6) ctx.fillRect(px + w - 1, py + i - 6, 2, 8); }
+  ctx.fillStyle = '#a07040'; ctx.fillRect(px - w, py - w - 4, w*2, 2); ctx.fillRect(px - w, py + w - 4, w*2, 2); ctx.fillRect(px - w, py - w - 4, 2, w*2);
+  for (const q of H.sheep) { const x = q.x*TS, y = q.y*TS, f = q.vx < 0 ? -1 : 1, st = Math.sin(q.t*10)*(Math.hypot(q.vx, q.vy) > .3 ? 1 : 0);
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y, 5, 1.5, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(x - 3, y - 3 + st, 1, 3); ctx.fillRect(x + 2, y - 3 - st, 1, 3);
+    ctx.fillStyle = '#f4f0e8'; ctx.beginPath(); ctx.ellipse(x, y - 5, 5, 3.5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3a3430'; ctx.fillRect(x + f*4 - 1.5, y - 7, 3, 3); }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.font = `${14*dpr}px "Pixelify Sans", monospace`; ctx.textAlign = 'center'; ctx.fillStyle = '#0d131b'; const msg = `Sheep ${H.sheep.filter(q => q.in).length}/5 · ${Math.ceil(H.t)}s`; const hy = ctx.canvas.height - 130*dpr; ctx.fillText(msg, ctx.canvas.width/2 + 1, hy + 1); ctx.fillStyle = '#ffffff'; ctx.fillText(msg, ctx.canvas.width/2, hy); ctx.restore();
+}
 // ===== town monuments =====
 const MONUMENTS = {
   wren: {name: "The Founder's Statue", perk: 'all your houses earn 10% more rent', stages: [{stone: 30, planks: 10}, {stone: 40, iron: 10, coins: 500}, {marble_statue: 1, gem: 2, coins: 1000}]},
@@ -4816,8 +4857,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Sheep herding', 'Shepherd Ewan in Hollowpine needs his scattered flock rounded up once a day. Sheep flee from you: circle behind them and drive all five into the pen within 90 seconds.'],
   ['Monuments', 'Master Mason Dorran in Crownfall builds monuments in Port Wren, Crownfall, Frostgate and Maplehold. Fund three stages of materials and each finished monument blesses you: more rent, more damage, more HP or faster crops.'],
   ['Hoards, watches & springs', 'Elites sometimes drop a Legendary Map, which leads to a hoard guarded by three elites. Marshal Kade pays for night-watch shifts in Port Wren. And a soak in the Hot Spring heals you fully, once a day.'],
   ['Pumpkins & books', 'Pell the land agent sells Giant Pumpkin Seeds: plant one and leave it growing to make it heavier, then enter the autumn weigh-in. Librarian Ottoline in Crownfall lends tomes that teach forgotten recipes.'],
@@ -5096,7 +5138,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); updateHerd(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) : 0);
@@ -5872,6 +5914,7 @@ function render() {
   if (stagTrail) { sprites.push({y: -1e9, f: drawStagTrail}); if (!stagTrail.met && inView(stagTrail.stag.x, stagTrail.stag.y)) sprites.push({y: stagTrail.stag.y, f: () => drawStag(stagTrail.stag)}); }
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
+  if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   for (const k in MON_SPOTS) if (inView(MON_SPOTS[k].x, MON_SPOTS[k].y)) sprites.push({y: MON_SPOTS[k].y, f: () => drawMonument(k, MON_SPOTS[k])});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
@@ -6609,6 +6652,7 @@ function mainOptions(n) {
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
+  if (n.shepherd) o.push({label: herd ? 'Herding the flock...' : 'Round up the sheep', primary: !herd && S.herdDay !== S.day, fn: () => shepherdTalk(n)});
   if (n.mason) o.push({label: 'Town monuments', primary: true, fn: () => masonTalk(n)});
   if (n.whimsy) o.push({label: 'Buy a mystery box', primary: true, fn: () => whimsyTalk(n)});
   if (n.inventor) o.push({label: (S.clock || 0) >= 4 ? 'Chat about gears' : 'The runaway automaton', primary: [0, 1, 3].includes(S.clock || 0) && !((S.clock || 0) === 1 && have('gear') < 4), fn: () => inventorTalk(n)});
@@ -9320,6 +9364,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['shepherd','Good Shepherd','Pen the whole flock for Shepherd Ewan', () => (S.herds || 0) >= 1],
   ['monument','Built to Last','Complete a town monument', () => Object.values(S.monuments || {}).some(v => v >= 3)],
   ['monuments','Patron of Stone','Complete all four monuments', () => Object.keys(MONUMENTS).every(k => (S.monuments || {})[k] >= 3)],
   ['sunken','Davy Jones','Fish up a sunken chest', () => (S.sunken || 0) >= 1],
@@ -9817,7 +9862,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
