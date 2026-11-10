@@ -2070,6 +2070,8 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'crusoe',town:'wren',dx:0,dy:0,name:'Castaway Robin',role:'Shipwrecked sailor',cols:{cloak:'#a08a6a',skin:'#c89870',hair:'#6a4a2a'},castaway:true,
+   hello:["A ship! Er, a person! Hello!","I've been talking to a coconut for weeks.","Did you bring planks?"], rumors:["I've charted every cove on this coast from my little rock. If I ever get off it, I'll share my secrets."]},
   {id:'ewan',town:'hollow',dx:4,dy:3,name:'Shepherd Ewan',role:'Shepherd',cols:{cloak:'#8a7a5a',skin:'#d8a882',hair:'#c8c8b8'},shepherd:true,freeSpot:true,
    hello:["Baa! Er, I mean, hello.","My flock's gone and scattered again.","Sheep are clever. Too clever."], rumors:["Sheep run from you, so you have to come at them from the far side and drive them home."]},
   {id:'dorran',town:'crownfall',dx:-4,dy:4,name:'Master Mason Dorran',role:'Monument builder',cols:{cloak:'#7a6a5a',skin:'#c89870',hair:'#8a8a8a'},mason:true,freeSpot:true,
@@ -2562,7 +2564,7 @@ function genWorld() {
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
-  setTimeout(placeWells, 0); setTimeout(placeMonuments, 0);
+  setTimeout(placeWells, 0); setTimeout(placeMonuments, 0); setTimeout(placeCastaway, 0);
   for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [m.x - .5, m.y - .8]);
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => Math.hypot(a - x, b - y) < 1.9)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
@@ -3609,6 +3611,36 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== castaway island =====
+let ISLET = null;
+function placeCastaway() {
+  const n = NPC_BY.crusoe; if (!n) return;
+  outer: for (let y = 200; y > 40; y -= 3) for (let x = 120; x < 900; x += 3) {
+    let ok = true; for (let dy = -5; dy <= 5 && ok; dy++) for (let dx = -5; dx <= 5; dx++) if (!inB(x + dx, y + dy) || map[idx(x + dx, y + dy)] !== T.DEEP) { ok = false; break; }
+    if (!ok || townAt(x, y, 30)) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) map[idx(x + dx, y + dy)] = Math.abs(dx) === 2 ? T.SHAL : T.SAND;
+    for (const [dx, dy] of [[-1, -2], [0, -2], [1, -2], [-1, 2], [0, 2], [1, 2], [-3, 0], [3, 0]]) map[idx(x + dx, y + dy)] = T.SHAL;
+    ISLET = {x, y}; n.x = x - .5; n.y = y + .8; break outer;
+  }
+  if (!ISLET) { n.x = n.y = -50; return; }
+  if (typeof invalidateChunks === 'function') invalidateChunks();
+}
+function castawayTalk(n) {
+  const st = S.castaway || 0, need = {planks: 10, rope: 5, fish: 3};
+  if (st === 0) { say('“You found me! My ship, the Wandering Gull, went down a month ago and I’ve lived on this rock ever since. If you could bring <b>10 Planks, 5 Rope and 3 Fish</b>, I could build a proper shelter, and a signal fire!”', [{label: 'I’ll bring them', primary: true, fn: () => { S.castaway = 1; save(); say('“Bless you! I’ll be here. Obviously.”', [back(n)]); }}, back(n)]); return; }
+  if (st === 1) { const ok = upCanPay(need); say(`“Did you bring the supplies?”<div class="req" style="margin-top:8px">${upCostHTML(need)}</div>`, [{label: 'Hand them over', primary: ok, disabled: !ok, fn: () => {
+    upPay(need); S.castaway = 2; S.coins += 300; addItem('treasure_map', 3); addItem('legend_map', 1); gainXP(200); SFX.victory();
+    let pet = ''; if (!S.pets.includes('parrot')) { setTimeout(() => addPet('parrot'), 1000); pet = ' And Captain Squawk here has taken a shine to you. Take him!'; }
+    renderHUD(); save(); say(`Robin builds a sturdy hut in an afternoon and lights a roaring signal fire. “Now I can wait for a ship in comfort! Here: my charts of every secret cove on this coast, and a map I found in the wreck.${pet}” <span style="color:var(--good)">+300 coin, 3 Treasure Maps, a Legendary Map</span>`, [back(n)]); }}, back(n)]); return; }
+  say(pick(['“Still no ship. But the fishing is excellent!”', '“The coconut and I have patched things up.”', '“Every sunset from this rock is a masterpiece.”']), [back(n)]);
+}
+function drawIslet() {
+  if (!ISLET) return; const px = ISLET.x*TS, py = ISLET.y*TS;
+  ctx.fillStyle = '#7a5a30'; ctx.fillRect(px + 12, py - 14, 3, 18); ctx.fillStyle = '#4a9a4a'; for (const [a, l] of [[-.8, 12], [-.2, 14], [.4, 12], [1.2, 10], [2.2, 11]]) { ctx.save(); ctx.translate(px + 13, py - 14); ctx.rotate(a); ctx.fillRect(0, -1.5, l, 3); ctx.restore(); }
+  if ((S.castaway || 0) >= 2) { ctx.fillStyle = '#a07840'; ctx.beginPath(); ctx.moveTo(px - 22, py + 2); ctx.lineTo(px - 14, py - 10); ctx.lineTo(px - 6, py + 2); ctx.fill(); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(px - 16, py - 4, 4, 6);
+    const f = Math.sin(frameT*8); ctx.fillStyle = '#ff7a2a'; ctx.beginPath(); ctx.moveTo(px + 4, py + 6); ctx.lineTo(px + 6 + f, py - 2); ctx.lineTo(px + 8, py + 6); ctx.fill(); if (Math.random() < .3) particles.push({x: ISLET.x + .4, y: ISLET.y - .2, vx: .1, vy: -1, t: 0, col: 'rgba(150,150,150,.5)'}); }
+  else { ctx.fillStyle = '#e8e0d0'; ctx.fillRect(px - 16, py - 6, 1, 8); ctx.fillStyle = '#f0f0f0'; ctx.fillRect(px - 15, py - 6, 5, 3); }
 }
 // ===== sheep herding =====
 let herd = null;
@@ -4859,6 +4891,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The castaway', 'Somewhere out on the open sea, a shipwrecked sailor named Robin waves from a tiny island. Bring supplies to help, and Robin shares secret treasure charts.'],
   ['Sheep herding', 'Shepherd Ewan in Hollowpine needs his scattered flock rounded up once a day. Sheep flee from you: circle behind them and drive all five into the pen within 90 seconds.'],
   ['Monuments', 'Master Mason Dorran in Crownfall builds monuments in Port Wren, Crownfall, Frostgate and Maplehold. Fund three stages of materials and each finished monument blesses you: more rent, more damage, more HP or faster crops.'],
   ['Hoards, watches & springs', 'Elites sometimes drop a Legendary Map, which leads to a hoard guarded by three elites. Marshal Kade pays for night-watch shifts in Port Wren. And a soak in the Hot Spring heals you fully, once a day.'],
@@ -5915,6 +5948,7 @@ function render() {
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
+  if (ISLET && inView(ISLET.x, ISLET.y)) sprites.push({y: ISLET.y - .2, f: drawIslet});
   for (const k in MON_SPOTS) if (inView(MON_SPOTS[k].x, MON_SPOTS[k].y)) sprites.push({y: MON_SPOTS[k].y, f: () => drawMonument(k, MON_SPOTS[k])});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
@@ -6652,6 +6686,7 @@ function mainOptions(n) {
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
+  if (n.castaway) o.push({label: (S.castaway || 0) >= 2 ? 'Visit Robin' : 'Help the castaway', primary: (S.castaway || 0) < 2, fn: () => castawayTalk(n)});
   if (n.shepherd) o.push({label: herd ? 'Herding the flock...' : 'Round up the sheep', primary: !herd && S.herdDay !== S.day, fn: () => shepherdTalk(n)});
   if (n.mason) o.push({label: 'Town monuments', primary: true, fn: () => masonTalk(n)});
   if (n.whimsy) o.push({label: 'Buy a mystery box', primary: true, fn: () => whimsyTalk(n)});
@@ -9364,6 +9399,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['castaway','Message Received, Robin','Help the castaway build a shelter', () => (S.castaway || 0) >= 2],
   ['shepherd','Good Shepherd','Pen the whole flock for Shepherd Ewan', () => (S.herds || 0) >= 1],
   ['monument','Built to Last','Complete a town monument', () => Object.values(S.monuments || {}).some(v => v >= 3)],
   ['monuments','Patron of Stone','Complete all four monuments', () => Object.keys(MONUMENTS).every(k => (S.monuments || {})[k] >= 3)],
@@ -9862,7 +9898,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__sw = {get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
+window.__sw = {get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
 </script>
