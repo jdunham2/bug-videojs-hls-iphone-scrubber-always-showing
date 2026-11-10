@@ -1393,7 +1393,7 @@ const FESTIVALS = [
 ];
 const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
 const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
-const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1);
+const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1) * (S && S.monuments && S.monuments.maplehold >= 3 ? 1.15 : 1);
 const CROP_LOOK = {giant_pumpkin:'ground', strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
 const CROPS = {
   wheat:{name:'Wheat',grow:1,yield:[3,5]},
@@ -2070,6 +2070,8 @@ const NPCS = [
    hello:["Well, well. If it isn't my favorite rival.","Still alive? Impressive.","Ready to lose again?"], rumors:["I've slain more beasts than you've had hot dinners. Probably."]},
   {id:'herald',town:'crownfall',dx:0,dy:-4,name:'Herald Bartholomew',role:'Crier of decrees',cols:{cloak:'#7a3ad8',skin:'#e8c8a8',hair:'#e8d088'},herald:true,freeSpot:true,
    hello:["Hear ye, hear ye!","The crown has need of you!","News from the throne!"], rumors:["A new royal decree goes up every week. Serve the crown and earn its favor."]},
+  {id:'dorran',town:'crownfall',dx:-4,dy:4,name:'Master Mason Dorran',role:'Monument builder',cols:{cloak:'#7a6a5a',skin:'#c89870',hair:'#8a8a8a'},mason:true,freeSpot:true,
+   hello:["Stone lasts forever, friend.","Got materials? I've got plans.","Every great town needs a great monument."], rumors:["I've drawn up plans for monuments in four towns. Each one would bless the whole realm, if someone funded the stone."]},
   {id:'ottoline',town:'crownfall',dx:4,dy:-3,name:'Librarian Ottoline',role:'Keeper of books',cols:{cloak:'#3a3a6a',skin:'#e8d0b8',hair:'#8a6a4a'},librarian:true,freeSpot:true,
    hello:["Shh! ...oh, it's you. Welcome.","Knowledge is the best treasure.","Mind the dust. It's very old dust."], rumors:["Every tome in my library holds a craft someone forgot. Read them and you'll remember."]},
   {id:'whimsy',town:'lantern',dx:3,dy:3,name:'Mr. Whimsy',role:'Peddler of mysteries',cols:{cloak:'#6a2a8a',skin:'#e0c0a0',hair:'#2a2a2a'},whimsy:true,freeSpot:true,
@@ -2558,7 +2560,7 @@ function genWorld() {
     P.door = {x: h.x + 1, y: h.y + 2.35}; P.hx = h.x; P.hy = h.y;
   }
   for (const n of NPCS) { const tw = TOWNS[n.town]; n.x = (n.pos ? n.pos[0] : tw.x + n.dx) + .5; n.y = (n.pos ? n.pos[1] : tw.y + n.dy) + .8; }
-  setTimeout(placeWells, 0);
+  setTimeout(placeWells, 0); setTimeout(placeMonuments, 0);
   for (const n of NPCS) if (n.balloon || n.freeSpot) { const tw = TOWNS[n.town], taken = NPCS.filter(m => m !== n && m.town === n.town && !m.wander).map(m => [m.x - .5, m.y - .8]);
     for (const [dx, dy] of [[-3,3],[3,-3],[-4,1],[4,1],[-4,-1],[4,-1],[1,4],[-1,4],[3,3],[-3,-3],[0,-4],[2,-4]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)]; if (inB(x, y) && walkable(t, false, false) && t !== T.HOUSE && !taken.some(([a, b]) => Math.hypot(a - x, b - y) < 1.9)) { n.x = x + .5; n.y = y + .8; break; } } }
   for (const n of NPCS) {
@@ -3001,7 +3003,7 @@ const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0);
+const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3284,7 +3286,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3605,6 +3607,45 @@ function drawAuroraShard(a) {
   ctx.fillStyle = `rgba(122,240,192,${gl*.4})`; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   ctx.fillStyle = '#1a6a5a'; ctx.beginPath(); ctx.moveTo(px, py - 8); ctx.lineTo(px + 5, py); ctx.lineTo(px, py + 6); ctx.lineTo(px - 5, py); ctx.fill();
   ctx.fillStyle = '#5af0b0'; ctx.beginPath(); ctx.moveTo(px, py - 6.5); ctx.lineTo(px + 3.5, py); ctx.lineTo(px, py + 4.5); ctx.lineTo(px - 3.5, py); ctx.fill(); ctx.fillStyle = '#a080ff'; ctx.fillRect(px - .5, py - 4, 1, 7); ctx.fillStyle = '#e8fff4'; ctx.fillRect(px - 2, py - 2, 1, 2);
+}
+// ===== town monuments =====
+const MONUMENTS = {
+  wren: {name: "The Founder's Statue", perk: 'all your houses earn 10% more rent', stages: [{stone: 30, planks: 10}, {stone: 40, iron: 10, coins: 500}, {marble_statue: 1, gem: 2, coins: 1000}]},
+  crownfall: {name: "The Heroes' Obelisk", perk: '+5% damage', stages: [{stone: 40, obsidian: 6}, {iron: 15, crystal: 6, coins: 800}, {star_fragment: 2, gem: 3, coins: 1500}]},
+  frost: {name: 'The Ice Spire', perk: '+5 max HP', stages: [{stone: 30, crystal: 6}, {frost_essence: 8, iron: 10, coins: 600}, {aurora_shard: 2, gem: 2, coins: 1200}]},
+  maplehold: {name: 'The Harvest Fountain', perk: 'crops grow 15% faster', stages: [{stone: 30, wheat: 20}, {glass: 8, iron: 8, coins: 500}, {honey: 15, gem: 2, coins: 1000}]},
+};
+const monDone = k => !!(S && S.monuments && S.monuments[k] >= 3);
+const MON_SPOTS = {};
+function placeMonuments() {
+  for (const k in MONUMENTS) { const tw = TOWNS[k]; if (!tw) continue;
+    for (const [dx, dy] of [[-5, -2], [5, -3], [-5, 3], [5, 4], [-6, 0], [6, 1], [0, -6], [-3, -5]]) { const x = tw.x + dx, y = tw.y + dy, t = map[idx(x, y)];
+      if (!inB(x, y) || !walkable(t, false, false) || t === T.HOUSE || t === T.SHAL || NPCS.some(n => !n.wander && Math.hypot(n.x - x - .5, n.y - y - .6) < 2) || WELLS.some(w => Math.hypot(w.x - x, w.y - y) < 2.5)) continue;
+      MON_SPOTS[k] = {x: x + .5, y: y + .7}; break; } }
+}
+function masonTalk(n, pickTown) {
+  S.monuments = S.monuments || {};
+  if (!pickTown) { say(`“Four monuments, four towns, and each one blesses the whole realm once it stands. Which shall we work on?”`, [
+    ...Object.keys(MONUMENTS).filter(k => TOWNS[k]).map(k => { const st = S.monuments[k] || 0; return {label: `${MONUMENTS[k].name} (${TOWNS[k].name}) · ${st >= 3 ? 'complete' : `stage ${st + 1}/3`}`, fn: () => masonTalk(n, k)}; }), back(n)]); return; }
+  const M = MONUMENTS[pickTown], st = S.monuments[pickTown] || 0;
+  if (st >= 3) { say(`<b>${M.name}</b> stands proud in ${TOWNS[pickTown].name}. Its blessing: <span style="color:var(--good)">${M.perk}</span>.`, [{label: 'Other monuments', fn: () => masonTalk(n)}, back(n)]); return; }
+  const cost = M.stages[st], ok = upCanPay(cost);
+  say(`<b>${M.name}</b>, ${TOWNS[pickTown].name}. Stage ${st + 1} of 3.<br><span style="color:var(--muted)">When finished: ${M.perk}.</span><div class="req" style="margin-top:8px">${upCostHTML(cost)}</div>`, [
+    {label: st === 2 ? 'Complete the monument' : `Fund stage ${st + 1}`, primary: ok, disabled: !ok, fn: () => {
+      upPay(cost); S.monuments[pickTown] = st + 1; addRep(pickTown, .5); gainXP(100 + st*80); SFX.victory();
+      if (st + 1 >= 3) { for (let i = 0; i < 5; i++) setTimeout(() => burst(S.x, S.y - .5, ['#f0c040', '#ffffff', '#86c98f'][i % 3], 20, 5), i*200); toast(`<b>${M.name} is complete!</b><br>The whole realm is blessed: ${M.perk}.`, 7000); }
+      renderHUD(); renderHP(); save(); masonTalk(n, pickTown);
+    }}, {label: 'Other monuments', fn: () => masonTalk(n)}, back(n)]);
+}
+function drawMonument(k, P) {
+  const st = (S.monuments || {})[k] || 0, px = P.x*TS, py = P.y*TS;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(px - 10, py + 1, 20, 3);
+  if (st < 3) { if (!st) return; ctx.fillStyle = '#8a8478'; ctx.fillRect(px - 8, py - 4*st, 16, 4*st + 2); ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 1; ctx.strokeRect(px - 9, py - 18, 18, 20); ctx.beginPath(); ctx.moveTo(px - 9, py - 18); ctx.lineTo(px + 9, py + 2); ctx.stroke(); return; }
+  ctx.fillStyle = '#9a9488'; ctx.fillRect(px - 8, py - 6, 16, 7); ctx.fillStyle = '#b0aa9c'; ctx.fillRect(px - 9, py - 8, 18, 3);
+  if (k === 'crownfall') { ctx.fillStyle = '#c8c0b0'; ctx.beginPath(); ctx.moveTo(px - 4, py - 8); ctx.lineTo(px, py - 34); ctx.lineTo(px + 4, py - 8); ctx.fill(); ctx.fillStyle = '#f0c040'; ctx.fillRect(px - 1, py - 36, 2, 3); }
+  else if (k === 'frost') { ctx.fillStyle = 'rgba(190,232,255,.9)'; ctx.beginPath(); ctx.moveTo(px - 5, py - 8); ctx.lineTo(px - 1, py - 32); ctx.lineTo(px + 1, py - 20); ctx.lineTo(px + 3, py - 28); ctx.lineTo(px + 5, py - 8); ctx.fill(); }
+  else if (k === 'maplehold') { ctx.fillStyle = '#b0aa9c'; ctx.fillRect(px - 2, py - 18, 4, 10); ctx.fillStyle = '#6ab0e8'; ctx.beginPath(); ctx.ellipse(px, py - 8, 9, 2.5, 0, 0, 7); ctx.fill(); const f = Math.sin(frameT*5)*1.5; ctx.fillStyle = 'rgba(180,225,255,.8)'; ctx.fillRect(px - 3 + f, py - 22, 1, 6); ctx.fillRect(px + 2 - f, py - 22, 1, 6); }
+  else { ctx.fillStyle = '#c8c0b0'; ctx.fillRect(px - 3, py - 22, 6, 14); ctx.fillRect(px - 2, py - 27, 4, 5); ctx.fillRect(px - 6, py - 20, 3, 2); ctx.fillRect(px + 3, py - 24, 2, 6); }
 }
 // ===== sunken chests =====
 function openSunken() {
@@ -4775,8 +4816,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Monuments', 'Master Mason Dorran in Crownfall builds monuments in Port Wren, Crownfall, Frostgate and Maplehold. Fund three stages of materials and each finished monument blesses you: more rent, more damage, more HP or faster crops.'],
   ['Hoards, watches & springs', 'Elites sometimes drop a Legendary Map, which leads to a hoard guarded by three elites. Marshal Kade pays for night-watch shifts in Port Wren. And a soak in the Hot Spring heals you fully, once a day.'],
   ['Pumpkins & books', 'Pell the land agent sells Giant Pumpkin Seeds: plant one and leave it growing to make it heavier, then enter the autumn weigh-in. Librarian Ottoline in Crownfall lends tomes that teach forgotten recipes.'],
   ['Mimics, boxes & Brassby', 'Careful: a few dungeon chests are Mimics, worth extra loot once defeated. Mr. Whimsy in Lantern Bay sells mystery boxes. Inventor Cogsworth in Highcairn needs help catching his runaway automaton.'],
@@ -5830,6 +5872,7 @@ function render() {
   if (stagTrail) { sprites.push({y: -1e9, f: drawStagTrail}); if (!stagTrail.met && inView(stagTrail.stag.x, stagTrail.stag.y)) sprites.push({y: stagTrail.stag.y, f: () => drawStag(stagTrail.stag)}); }
   for (const b of bottles) if (inView(b.x, b.y)) sprites.push({y: b.y - .5, f: () => drawBottle(b)});
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
+  for (const k in MON_SPOTS) if (inView(MON_SPOTS[k].x, MON_SPOTS[k].y)) sprites.push({y: MON_SPOTS[k].y, f: () => drawMonument(k, MON_SPOTS[k])});
   for (const w of WELLS) if (inView(w.x, w.y)) sprites.push({y: w.y, f: () => drawWell(w)});
   if (S.ghost && ghostActive() && inView(S.ghost.x, S.ghost.y - 2)) sprites.push({y: S.ghost.y + .5, f: () => drawGhostShip(S.ghost)});
   for (const st of fallingStars) if (inView(st.x, st.y - 6)) sprites.push({y: st.y + .1, f: () => drawStar(st)});
@@ -6425,7 +6468,7 @@ function newDay() {
   if (seasonIdx() !== 3) { if (S.placed.some(q => q.t === 'snowman')) S.placed = S.placed.filter(q => q.t !== 'snowman'); if (have('snowball')) addItem('snowball', -have('snowball')); }
   { const B = S.home.barn, P = S.home.prod; if (B) { P.milk = Math.min(6, P.milk + B.cow); P.wool = Math.min(6, P.wool + B.sheep); for (let i = 0; i < B.pig; i++) if (Math.random() < .6) P.truffle = Math.min(4, P.truffle + 1); } }
   if (S.home.chickens) S.home.eggs = Math.min(12, (S.home.eggs || 0) + S.home.chickens);
-  const rent = PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0);
+  const rent = Math.round(PK.filter(k => S.props && S.props[k]).reduce((n, k) => n + rentOf(k), 0) * (monDone('wren') ? 1.1 : 1));
   if (rent) S.coins += rent;
   let made = 0; for (const q of (S.placed || [])) { const P = PLACE[q.t]; if (!P || P.use !== 'produce') continue; const n = rint(P.n[0], P.n[1]); const before = q.stock || 0; q.stock = Math.min(P.cap, before + n); made += q.stock - before; if (P.bonus && Math.random() < (P.bonus === 'truffle' ? .15 : .35)) q.bonus = (q.bonus || 0) + 1; }
   const carMsg = caravanDay() + investDay() + mailDay() + (made ? ` Your hives, pots and logs produced <b>${made}</b> goods.` : '');
@@ -6566,6 +6609,7 @@ function mainOptions(n) {
   if (n.id === 'odile') o.push({label: `Guild standing (${GUILD_RANKS[guildRank()][1]})`, fn: () => guildTalk(n)});
   if (n.herald) o.push({label: 'This week’s royal decree', primary: (() => { const D = decreeNow(); return !D.done && (D.goods ? have(D.k) >= D.n : (S.killsBy[D.k] || 0) - D.base >= D.n); })(), fn: () => heraldTalk(n)});
   if (n.id === 'hob') o.push({label: `Golden shells (${shellsGot()}/${SHELL_N})`, primary: SHELL_PRIZES.some(([k, f]) => shellsGot() >= k && !S.flags[f]), fn: () => shellTalk(n)});
+  if (n.mason) o.push({label: 'Town monuments', primary: true, fn: () => masonTalk(n)});
   if (n.whimsy) o.push({label: 'Buy a mystery box', primary: true, fn: () => whimsyTalk(n)});
   if (n.inventor) o.push({label: (S.clock || 0) >= 4 ? 'Chat about gears' : 'The runaway automaton', primary: [0, 1, 3].includes(S.clock || 0) && !((S.clock || 0) === 1 && have('gear') < 4), fn: () => inventorTalk(n)});
   if (n.id === 'pell') o.push({label: seasonIdx() === 2 ? 'Giant pumpkin weigh-in 🎃' : 'Giant pumpkins', primary: seasonIdx() === 2 && have('giant_pumpkin') > 0 && S.weighYear !== Math.floor((S.day - 1)/28), fn: () => pumpkinTalk(n)});
@@ -9276,6 +9320,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['monument','Built to Last','Complete a town monument', () => Object.values(S.monuments || {}).some(v => v >= 3)],
+  ['monuments','Patron of Stone','Complete all four monuments', () => Object.keys(MONUMENTS).every(k => (S.monuments || {})[k] >= 3)],
   ['sunken','Davy Jones','Fish up a sunken chest', () => (S.sunken || 0) >= 1],
   ['hoard','Legendary Hoard','Dig up a legendary hoard', () => (S.hoards || 0) >= 1],
   ['watch','On Watch','Complete a night watch', () => (S.watches || 0) >= 1],
