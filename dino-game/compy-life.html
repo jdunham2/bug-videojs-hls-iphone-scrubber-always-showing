@@ -571,14 +571,16 @@ function buildTown() {
   // home lots with for-sale signs and the trees that might fall on them
   for (const [key, H0] of Object.entries(HOMES)) {
     const [x0, x1] = H0.lot, cx = (x0 + x1) / 2;
-    PLACES['home_' + key] = { id: 'home_' + key, name: H0.name, door: { x: cx, y: 1290 }, home: key };
-    const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(cx, 1, 1290); r.scale.setScalar(18); scene.add(r); PLACES['home_' + key].ring = r;
-    const post = group(scene, cx, 0, 1330); add(post, GEO.b, '#6a4a2e', 0, 15, 0, 3, 30, 3);
+    const dy = (H0.y || 1430) - 140;
+    PLACES['home_' + key] = { id: 'home_' + key, name: H0.name, door: { x: cx, y: dy }, home: key };
+    const r = new THREE.Mesh(doorGeo, doorMat); r.rotation.x = -Math.PI / 2; r.position.set(cx, 1, dy); r.scale.setScalar(18); scene.add(r); PLACES['home_' + key].ring = r;
+    const post = group(scene, cx - (H0.y ? 60 : 0), 0, dy + 40); add(post, GEO.b, '#6a4a2e', 0, 15, 0, 3, 30, 3);
     const sg = new THREE.Mesh(new THREE.PlaneGeometry(56, 20), new THREE.MeshBasicMaterial({ map: signTexture(key === 'burrow' ? 'FOR RENT' : 'FOR SALE', '#f6f0e2', '#c8322a') })); sg.position.set(0, 32, -2); sg.rotation.y = Math.PI; post.add(sg);
     PLACES['home_' + key].saleSign = post;
-    const t = group(scene, cx + (x1 - x0) * 0.32, 0, 1560);
+    const t = group(scene, cx + (x1 - x0) * 0.32, 0, (H0.y || 1430) + 130);
     add(t, GEO.y, '#5a3f28', 0, 40, 0, 7, 80, 7); add(t, GEO.ico, '#2e6b34', 0, 100, 0, 42, 38, 42); add(t, GEO.ico, '#3c8240', 6, 130, -4, 28, 26, 28);
     homeTrees[key] = t;
+    if (H0.y) for (let i = districtTrees.length - 1; i >= 0; i--) { const [tx, tz] = districtTrees[i]; if (Math.abs(tx - cx) < 120 && Math.abs(tz - H0.y) < 120) districtTrees.splice(i, 1); }
   }
   // street trees, lamps and benches
   const dummy = new THREE.Object3D();
@@ -629,7 +631,7 @@ function setDamaged(key, on) {
   const hm = homeModels[key]; if (!hm) return;
   hm.g.rotation.z = on ? 0.06 : 0; hm.g.rotation.x = on ? -0.04 : 0;
   const roof = hm.g.getObjectByName('roof'); if (roof) { roof.rotation.z = on ? 0.35 : 0; roof.position.x = on ? 20 : 0; }
-  if (on && !hm.debris) { hm.debris = group(scene, hm.g.position.x, 0, 1430); for (let i = 0; i < 8; i++) add(hm.debris, GEO.b, pick(['#7a5a3a', '#b0473a', '#5a3f28']), rand(-60, 60), 3, rand(-70, -40), rand(6, 16), rand(3, 6), rand(6, 16), 0, rand(0, 3), 0); }
+  if (on && !hm.debris) { hm.debris = group(scene, hm.g.position.x, 0, hm.g.position.z); for (let i = 0; i < 8; i++) add(hm.debris, GEO.b, pick(['#7a5a3a', '#b0473a', '#5a3f28']), rand(-60, 60), 3, rand(-70, -40), rand(6, 16), rand(3, 6), rand(6, 16), 0, rand(0, 3), 0); }
   if (!on && hm.debris) { scene.remove(hm.debris); hm.debris = null; }
   const t = homeTrees[key]; if (t && !on) { t.rotation.set(0, 0, 0); t.visible = true; }
 }
@@ -687,7 +689,7 @@ const GOALS = [
   ['job', 'Get your first job'], ['promo', 'Get promoted'], ['fired', 'Get fired'], ['jail', 'Go to jail'],
   ['escape', 'Escape from jail'], ['diploma', 'Earn a diploma'], ['home', 'Rent or buy a home'], ['date', 'Go on a date'],
   ['married', 'Get married'], ['egg', 'Hatch an egg'], ['disaster', 'Survive a disaster'], ['top', 'Reach the top of a career'],
-  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['boss', 'Buy your first business'], ['tycoon', 'Own all three businesses'], ['mogul', 'Earn $5,000 from your businesses'], ['zoo', 'See every exhibit at the zoo'], ['school', 'Enroll your kids in school'], ['honor', 'Raise an honor-roll student'], ['aquarium', 'See every aquarium exhibit'], ['shopper', 'Spend $500 at the Mega Mall'], ['pilot', 'Fly a plane'], ['skythief', 'Sell a stolen plane to the smugglers'], ['vacation', 'Take a vacation'], ['themepark', 'Ride every ride at Dino World'], ['dumpster', 'Become a dumpster diving legend'], ['detective', 'Solve a museum mystery'], ['escaperoom', 'Escape the Raptor Room'], ['tomb', 'Find the treasure in the ancient tomb'], ['helper', 'Help out at the homeless shelter'], ['er', 'Work three ER rushes'], ['medic', 'Finish a paramedic shift'], ['hotel', 'Stay in a hotel suite'], ['honeymoon', 'Book the honeymoon suite'], ['splash', 'Grab 15 rings on the Mega Slide'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
+  ['mansion', 'Move into the mansion'], ['rich', 'Have $10,000 at once'], ['heist', 'Get away with a bank robbery'], ['drive', 'Take a car for a spin'], ['owncar', 'Buy your own car'], ['tower', 'Finish building a tower'], ['pet', 'Adopt a pet'], ['walk', 'Take your pet on a long walk'], ['heal', 'Heal 10 patients'], ['trexoff', 'Chase off the T-rex'], ['holdup', 'Hold up a shop and get away'], ['hero', 'Put out 5 fires'], ['copper', 'Catch 5 robbers'], ['derby', 'Win the demolition derby'], ['social', 'Become close with 3 people'], ['buff', 'Get really fit at the gym'], ['arcade', 'Win the Golden Egg at the arcade'], ['movie', 'See a movie with your sweetheart'], ['festival', 'Win a contest at the Fern Festival'], ['makeover', 'Get a makeover at the salon'], ['fish', 'Catch the legendary Coelacanth'], ['farmer', 'Harvest 5 crops at Fern Farm'], ['island', 'Take the ferry to Volcano Island'], ['treasure', 'Dig up the Golden Egg idol'], ['volcano', 'Survive a volcano eruption'], ['spooky', 'Collect 10 candy on Spooky Night'], ['snowman', 'Build a snowman'], ['racer', 'Win gold in a street race'], ['rockstar', 'Reach music skill 10'], ['boss', 'Buy your first business'], ['tycoon', 'Own all three businesses'], ['mogul', 'Earn $5,000 from your businesses'], ['zoo', 'See every exhibit at the zoo'], ['school', 'Enroll your kids in school'], ['honor', 'Raise an honor-roll student'], ['aquarium', 'See every aquarium exhibit'], ['shopper', 'Spend $500 at the Mega Mall'], ['pilot', 'Fly a plane'], ['skythief', 'Sell a stolen plane to the smugglers'], ['vacation', 'Take a vacation'], ['themepark', 'Ride every ride at Dino World'], ['dumpster', 'Become a dumpster diving legend'], ['detective', 'Solve a museum mystery'], ['escaperoom', 'Escape the Raptor Room'], ['tomb', 'Find the treasure in the ancient tomb'], ['helper', 'Help out at the homeless shelter'], ['er', 'Work three ER rushes'], ['castle', 'Move into the castle'], ['medic', 'Finish a paramedic shift'], ['hotel', 'Stay in a hotel suite'], ['honeymoon', 'Book the honeymoon suite'], ['splash', 'Grab 15 rings on the Mega Slide'], ['investor', 'Make $500 profit on the stock market'], ['nest', 'Raise a kid until they leave the nest'], ['cozy', 'Furnish your home with 4 things'], ['courier', 'Make 10 deliveries'], ['carthief', 'Steal a car and get away'], ['fence', 'Sell a car on the black market'],
 ];
 let S = null;
 function newLife(name) {
@@ -895,7 +897,7 @@ function disasterTree() {
 function repair(free) { S.damaged = false; setDamaged(S.home, false); log(free ? 'Your house has been repaired.' : 'You paid to repair your house.', 'good'); }
 function disasterMeteor() {
   const hitHome = S.home && !S.damaged && Math.random() < 0.3;
-  const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, WORLD - 200), ty = hitHome ? 1430 : rand(200, WORLD - 200);
+  const tx = hitHome ? PLACES['home_' + S.home].door.x : rand(200, WORLD - 200), ty = hitHome ? (HOMES[S.home].y || 1430) : rand(200, WORLD - 200);
   meteorFx(tx, ty);
   setTimeout(() => {
     if (hitHome && !S.home) return; // moved out while the meteor was falling
@@ -965,7 +967,7 @@ function jailMenu() {
   queueEvent({ kind: 'bad', tag: `Police and Jail · Day ${S.day}`, title: `Jail: ${S.jail} day${S.jail > 1 ? 's' : ''} left`, text: 'A cold stone cell and a bowl of lukewarm bug stew. What now?',
     buttons: [
       { label: 'Serve a day', fn: () => { S.jail--; S.day++; S.min = 7 * 60; S.energy = 70; S.hunger = 60; S.happy -= 6; dayRollover(false); if (S.jail > 0) jailMenu(); else release(); } },
-      { label: 'Try to escape', alt: true, fn: () => { if (Math.random() < 0.35) { S.jail = 0; S.record++; goal('escape'); teleport({ x: 220, y: 1200 }); queueEvent({ kind: 'good', title: 'You escaped!', text: 'You squeezed through the bars (compies are skinny) and legged it. Your record got worse, but you are free.' }); } else { S.jail += 3; queueEvent({ kind: 'bad', title: 'Caught!', text: 'A guard grabbed your tail halfway out the window. Three more days.', buttons: [{ label: 'Ugh', fn: jailMenu }] }); } } },
+      { label: S.jailTry === S.day ? 'Escape (try again tomorrow)' : 'Try to escape', alt: true, disabled: S.jailTry === S.day, fn: jailEscape },
       { label: `Pay bail ${money$(bail)}`, alt: true, disabled: S.money < bail, fn: () => { S.money -= bail; S.jail = 0; release(); } },
     ] });
 }
@@ -980,7 +982,7 @@ const MENUS = {
   home: p => {
     const key = p.home, mine = S.home === key, H0 = HOMES[key];
     if (!mine) return { title: H0.name, sub: key === 'burrow' ? `For rent: ${money$(H0.rent)} a week. Ask at Nest Estates.` : `For sale: ${money$(H0.price)}. Buy it at Nest Estates.`, acts: [] };
-    const fam = S.partner && S.partner.married, q = Math.min(100, (S.damaged ? 55 : key === 'mansion' ? 100 : key === 'cottage' ? 95 : 85) + (has('bed') && !S.damaged ? 10 : 0));
+    const fam = S.partner && S.partner.married, q = Math.min(100, (S.damaged ? 55 : key === 'mansion' || key === 'castle' ? 100 : key === 'burrow' ? 85 : 95) + (has('bed') && !S.damaged ? 10 : 0));
     return { title: `Your ${H0.name}${S.damaged ? ' (damaged)' : ''}`, sub: `${fam ? `${S.partner.name} is home. ` : ''}${S.kids.length ? `Kids: ${S.kids.map(k => k.name).join(', ')}. ` : ''}Groceries: ${S.groceries} meal${S.groceries === 1 ? '' : 's'}.`, acts: [
       { label: 'Go to bed', detail: `Wake at 6:30 AM with ${q}% energy${S.damaged ? '. The broken roof leaks' : ''}.`, fn: () => { closeMenu(); if (S.damaged) S.happy -= 8; else S.happy += 4; sleep(q); } },
       { label: 'Cook a meal', detail: '+45 hunger, 30 minutes', why: S.groceries ? '' : 'No groceries. Buy some at Leafy Grocer.', mins: 30, fn: () => { S.groceries--; S.hunger = Math.min(100, S.hunger + 45); } },
@@ -1291,7 +1293,7 @@ function refreshFamily() {
 }
 function famBounds() {
   if (inside && inside.home && inside.home === S.home) return [inside.ox + 40, inside.oy + 120, inside.ox + inside.w - 40, inside.oy + inside.d - 50];
-  const cx = PLACES['home_' + S.home].door.x; return [cx - 60, 1275, cx + 60, 1320];
+  const d = PLACES['home_' + S.home].door; return [d.x - 60, d.y - 15, d.x + 60, d.y + 30];
 }
 function setScreens() {
   const playing = state !== 'title';
@@ -2533,13 +2535,13 @@ function gigActs(placeId) {
   let why = '';
   if (!isWorkday()) why = 'It is the weekend. No shift today.'; else if (S.flood) why = 'Closed for the flood.'; else if (S.workedToday) why = 'You already worked today.'; else if (hour() < a - 1) why = `Your shift starts at ${clock(a * 60)}.`; else if (hour() > b - 1) why = 'Too late to start today.';
   if (!why && kind === 'pizza' && !cars.some(c => c.owned)) why = 'Delivery drivers need their own car. Buy one at Dino Motors.';
-  const late = hour() > a + 1, blurb = { medic: 'The radio is crackling. Stay near the ambulance.', secguard: 'The casino floor is packed tonight. Keep an eye out.', atc: 'The radar screen is full of blips.', rideop: 'The lines are long and the riders are excited.', clerk: 'Boxes of new stock just arrived.', bellhop: 'A tour bus just pulled up with a mountain of luggage.', aquarist: 'The fish are hungry and the octopus is getting ideas.', guard: 'The pools are packed. Keep everyone safe.', keeper: 'The animals are hungry and the visitors are arriving.', teach: 'A room full of tiny compies is waiting for you.', train: 'Clients are warming up on the mats.', usher: 'The lobby is filling up for the next show.', shelve: 'The return cart is overflowing.', scoop: 'There is a line out the door. It is a hot day.', pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
+  const late = hour() > a + 1, blurb = { barista: 'The morning coffee rush is starting.', stylist: 'Clients are waiting with very messy crests.', mechanic: 'Three cars are already in the garage.', agent: 'Buyers are lined up to see homes.', cashier: 'The checkout line is getting long.', medic: 'The radio is crackling. Stay near the ambulance.', secguard: 'The casino floor is packed tonight. Keep an eye out.', atc: 'The radar screen is full of blips.', rideop: 'The lines are long and the riders are excited.', clerk: 'Boxes of new stock just arrived.', bellhop: 'A tour bus just pulled up with a mountain of luggage.', aquarist: 'The fish are hungry and the octopus is getting ideas.', guard: 'The pools are packed. Keep everyone safe.', keeper: 'The animals are hungry and the visitors are arriving.', teach: 'A room full of tiny compies is waiting for you.', train: 'Clients are warming up on the mats.', usher: 'The lobby is filling up for the next show.', shelve: 'The return cart is overflowing.', scoop: 'There is a line out the door. It is a hot day.', pump: 'Customers pull up at the pumps. Fill their tanks just right.', teller: 'Customers are lining up at the teller window.', office: 'Your inbox is overflowing.', tour: 'A tour group is waiting by the T-rex skeleton.', groom: 'Muddy pets are waiting for a bath and a trim.', patrol: 'Robberies get called in during your shift. Your police car is parked outside.', fire: 'Fires are waiting. Your fire truck is parked outside.', pizza: 'Pick up pizzas and drive them to hungry customers.', eggs: 'Carry fragile egg crates to businesses around town.', cook: 'Hungry customers are lining up. Cook their burgers.' }[kind];
   acts.push({ label: `Clock in as ${J.title}`, detail: why ? '' : `${late ? 'You are more than an hour late. ' : ''}${blurb}`, tag: money$(J.wage), why, fn: () => { if (hour() < a) S.min = a * 60; S.workedToday = true; closeMenu(); startGig(kind, late); } });
   return acts;
 }
 function startGig(kind, late) {
   const lvl = S.job.level;
-  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3, train: 3, usher: 3, shelve: 3, scoop: 4, keeper: 3, teach: 3, aquarist: 3, guard: 3, clerk: 3, bellhop: 3, atc: 3, rideop: 3, secguard: 3, medic: 2 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
+  S.gig = { kind, total: { fire: 2, pizza: 3, eggs: 3, cook: 4, patrol: 2, pump: 3, teller: 4, office: 3, tour: 2, groom: 3, train: 3, usher: 3, shelve: 3, scoop: 4, keeper: 3, teach: 3, aquarist: 3, guard: 3, clerk: 3, bellhop: 3, atc: 3, rideop: 3, secguard: 3, medic: 2, barista: 4, stylist: 3, mechanic: 3, agent: 3, cashier: 4 }[kind] + lvl, done: 0, q: 1, late, carrying: false, target: null };
   if (kind === 'fire') { spawnFireTruck(); spawnFire(); log('Clocked in! A fire just broke out. Hop in the fire truck outside and follow the red arrow.', 'bad'); sfx.siren(); }
   if (kind === 'pump') { spawnCustomer(); log('Clocked in! Walk out to the pumps when a car pulls up.', 'good'); }
   if (NEXT_TASK[kind]) log(`Clocked in! Use your work station to start: ${NEXT_TASK[kind][0].toLowerCase()}.`, 'good');
@@ -4230,10 +4232,10 @@ function seasonDaily() { if (season() !== 'winter') S.snowmen = {}; }
 const HELP = [
   ['Controls', 'Move with WASD or the arrow keys (on a phone, drag anywhere). E or Space to use things. M opens the town map, T opens your phone, G shows goals, F uses your gadget and Q switches it, H honks while driving, P or Esc pauses.'],
   ['Making money', 'Get a job at the Job Center. Show up on weekdays and finish your shift tasks to get paid and promoted. Dino U unlocks better jobs. On the side: fish, farm at Fern Farm, dig for fossils on Volcano Island, trade stocks at Stone Bank, busk with a guitar, race at night, win the demolition derby, or buy a business at Nest Estates.'],
-  ['Staying alive', 'Watch your energy, hunger and happiness. You can get hurt (sprains, broken bones, burns) or sick (colds, flu, tummy aches): heal at Tarpit Hospital or with a first aid kit from Leafy Grocer. You might sleep in some mornings; an alarm clock from Comfy Cave helps. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. No home yet? The Second Chance Shelter next to the Job Center has free beds, hot meals and a job counselor. Rent the burrow or buy a house at Nest Estates, or check into the Grand Ptero Hotel for a night. Shop at the Mega Mall (Saturday sale!) for sneakers, sunglasses, a game console or a diamond ring.'],
+  ['Staying alive', 'Watch your energy, hunger and happiness. You can get hurt (sprains, broken bones, burns) or sick (colds, flu, tummy aches): heal at Tarpit Hospital or with a first aid kit from Leafy Grocer. You might sleep in some mornings; an alarm clock from Comfy Cave helps. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. No home yet? The Second Chance Shelter next to the Job Center has free beds, hot meals and a job counselor. Rent the burrow or buy a home at Nest Estates (a cottage, mansion, treehouse, beach house, farmhouse, or even a castle), or check into the Grand Ptero Hotel for a night. Shop at the Mega Mall (Saturday sale!) for sneakers, sunglasses, a game console or a diamond ring.'],
   ['People', 'Townsfolk hang out all over the map. Chat every day, give gifts they love (flowers, chocolates, plushies), go on dates, propose, hatch eggs, send your kids to Little Claws School, take them to the Jurassic Zoo, and raise them until they leave the nest. Friends text you invites: show up on time!'],
   ['Getting around', 'Buy a car at Dino Motors, steal one (risky), call a taxi from your phone, take the ferry from the beach dock to Volcano Island, or fly a plane from Pterodactyl Airport (buy one at Sky Hangar, or steal one and sell it to the smugglers on the island airstrip). Tap a place on the map to set a waypoint.'],
-  ['Trouble', 'Crimes can get you chased by police dinos who leave from the police station. Lose them, hide in a building, or dive into a dumpster. Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
+  ['Trouble', 'Crimes can get you chased by police dinos who leave from the police station. Lose them, hide in a building, or dive into a dumpster. Stuck in jail? Serve your time, pay bail, or dig a tunnel with a spoon and sneak past the searchlights (once a day). Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
   ['Seasons and events', 'Each week is a season: spring, summer, fall and winter. Every Saturday is the Fern Festival with fireworks. Take mystery cases from the Fossil Museum curator, try the escape room at Dino World, and explore the ancient tomb on Volcano Island (its traps reset every week). Fall has Spooky Night on Friday evening (trick-or-treat at houses). Winter brings snow and snowmen in the town square.'],
 ];
 function showHelp() { $('helpList').innerHTML = HELP.map(([h, t]) => `<div><b>${h}</b><span>${t}</span></div>`).join(''); $('helpScreen').hidden = false; }
@@ -5531,11 +5533,11 @@ function drawDial(g) {
   g.textAlign = 'right'; g.fillStyle = m.misses ? '#ff6a6a' : '#d6cbb5'; g.fillText(`Cracks ${'■'.repeat(m.misses)}${'□'.repeat(3 - m.misses)}`, x + w - 16, y + h - 16); g.textAlign = 'center';
 }
 // crystal beam corridor: walk to the far end without touching the sweeping light beams
-function startBeams(onDone) {
+function startBeams(onDone, theme) {
   const beams = [];
   for (let i = 0; i < 5; i++) beams.push({ kind: 'h', base: 0.18 + i * 0.15, amp: 0.05 + Math.random() * 0.04, sp: 1 + Math.random() * 1.4, ph: Math.random() * 6, blink: i % 2 ? 2.2 + Math.random() : 0 });
   beams.push({ kind: 'v', base: 0.5, amp: 0.38, sp: 0.9, ph: 0, blink: 0 });
-  minigame = { kind: 'beams', px: 0.5, py: 0.94, beams, hits: 0, hitT: 0, t: 0, mins: 20, onDone };
+  minigame = { kind: 'beams', px: 0.5, py: 0.94, beams, hits: 0, hitT: 0, t: 0, mins: 20, onDone, theme: theme || {} };
   state = 'mini'; setScreens();
 }
 function beamPos(b, t) { return b.base + Math.sin(t * b.sp + b.ph) * b.amp; }
@@ -5550,24 +5552,25 @@ function updateBeams(dt) {
     if (!beamOn(b, m.t)) continue; const p = beamPos(b, m.t);
     if ((b.kind === 'h' && Math.abs(m.py - p) < 0.018) || (b.kind === 'v' && Math.abs(m.px - p) < 0.014 && m.py > 0.1 && m.py < 0.9)) { m.hits++; m.hitT = 1; m.py = Math.min(0.97, m.py + 0.08); sfx.bad(); shake = 5; break; }
   }
-  if (m.hits >= 3) endMini(false, 'ZAP ZAP ZAP. The beams send you tumbling back to the entrance.', -0.3);
-  else if (m.py <= 0.04) endMini(true, 'You tiptoe past the last beam. The crystals go dark.', 0);
-  else if (m.t > 45) endMini(false, 'Your torch burns out in the corridor. You feel your way back out.', -0.2);
+  const th = m.theme || {};
+  if (m.hits >= 3) endMini(false, th.lose || 'ZAP ZAP ZAP. The beams send you tumbling back to the entrance.', -0.3);
+  else if (m.py <= 0.04) endMini(true, th.win || 'You tiptoe past the last beam. The crystals go dark.', 0);
+  else if (m.t > 45) endMini(false, th.time || 'Your torch burns out in the corridor. You feel your way back out.', -0.2);
 }
 function drawBeams(g) {
-  const m = minigame, w = Math.min(380, W - 30), h = Math.min(360, H - 160), x = (W - w) / 2, y = (H - h) / 2 + 10;
-  g.fillStyle = '#16120e'; g.fillRect(x, y, w, h); g.strokeStyle = '#7fe8ff'; g.lineWidth = 3; g.strokeRect(x, y, w, h);
+  const m = minigame, th = m.theme || {}, bc = th.color || '#7fe8ff', w = Math.min(380, W - 30), h = Math.min(360, H - 160), x = (W - w) / 2, y = (H - h) / 2 + 10;
+  g.fillStyle = th.bg || '#16120e'; g.fillRect(x, y, w, h); g.strokeStyle = bc; g.lineWidth = 3; g.strokeRect(x, y, w, h);
   g.fillStyle = 'rgba(201,162,58,.35)'; g.fillRect(x, y, w, h * 0.04); g.fillStyle = 'rgba(255,255,255,.08)'; for (let i = 0; i < 12; i++) g.fillRect(x + (i * 37) % w, y + (i * 61) % h, 18, 10);
   for (const b of m.beams) {
     if (!beamOn(b, m.t)) continue; const p = beamPos(b, m.t);
-    g.strokeStyle = 'rgba(127,232,255,.9)'; g.lineWidth = 3; g.shadowColor = '#7fe8ff'; g.shadowBlur = 10; g.beginPath();
+    g.strokeStyle = bc; g.lineWidth = th.color ? 6 : 3; g.shadowColor = th.glow || '#7fe8ff'; g.shadowBlur = 10; g.beginPath();
     if (b.kind === 'h') { g.moveTo(x, y + p * h); g.lineTo(x + w, y + p * h); } else { g.moveTo(x + p * w, y + h * 0.1); g.lineTo(x + p * w, y + h * 0.9); }
     g.stroke(); g.shadowBlur = 0;
   }
   const px = x + m.px * w, py = y + m.py * h;
   if (m.hitT <= 0 || Math.floor(m.hitT * 10) % 2) { g.fillStyle = '#8fdc6a'; g.beginPath(); g.arc(px, py, 7, 0, 7); g.fill(); g.fillStyle = '#ffe066'; g.beginPath(); g.arc(px + 6, py - 6, 3, 0, 7); g.fill(); }
-  g.textAlign = 'center'; g.font = '400 18px "Lilita One", system-ui, sans-serif'; g.fillStyle = '#7fe8ff'; g.fillText('CRYSTAL BEAM CORRIDOR', W / 2, y - 22);
-  g.font = '800 12px Nunito, system-ui'; g.fillStyle = '#d6cbb5'; g.fillText(`Reach the golden doorway at the top. WASD or joystick. Zaps ${'■'.repeat(m.hits)}${'□'.repeat(3 - m.hits)}`, W / 2, y - 6);
+  g.textAlign = 'center'; g.font = '400 18px "Lilita One", system-ui, sans-serif'; g.fillStyle = bc; g.fillText(th.title || 'CRYSTAL BEAM CORRIDOR', W / 2, y - 22);
+  g.font = '800 12px Nunito, system-ui'; g.fillStyle = '#d6cbb5'; g.fillText(`${th.sub || 'Reach the golden doorway at the top.'} WASD or joystick. Zaps ${'■'.repeat(m.hits)}${'□'.repeat(3 - m.hits)}`, W / 2, y - 6);
 }
 function tombState() { if (!S.tomb || S.tomb.week !== Math.floor((S.day - 1) / 7)) S.tomb = { week: Math.floor((S.day - 1) / 7), beams: false, dial: false, looted: false, glyphs: Array.from({ length: 4 }, () => Math.floor(rand(5, 95))) }; return S.tomb; }
 function buildTombEntrance() {
@@ -5787,6 +5790,147 @@ function tipsUpdate(dt) {
   if ((S.texts || []).some(t => !t.read)) tipOnce('phone', 'Tip: You have a new text. Press T (or the Phone button) to read it.');
   if (injOf()) tipOnce('hurt', 'Tip: Hurt or sick? Tarpit Hospital can help: pay for fast treatment, or wait in the ER for free.');
 }
+
+// ---------- jail escape minigame, five new jobs, four new homes ----------
+// ===== jail escape: dig a tunnel with a spoon, then sneak across the yard past the searchlights =====
+function jailEscape() {
+  if (S.jailTry === S.day) { log('The guards are watching you extra closely today. Try again tomorrow.', 'warn'); jailMenu(); return; }
+  S.jailTry = S.day;
+  const caught = why => { S.jail += 1; queueEvent({ kind: 'bad', title: 'Caught!', text: `${why} One more day in the cell.`, buttons: [{ label: 'Ugh', fn: jailMenu }] }); };
+  minigame = { kind: 'mash', p: 0, t: 7, label: 'DIG WITH A SPOON', help: 'Mash E (or tap) to scrape a tunnel under your bunk', mins: 60, what: 'You break through into the prison yard!', fail: 'The spoon bent. The tunnel is only half done.',
+    onDone: (ok, msg) => {
+      if (!ok) { caught(`${msg} A guard notices the pile of dirt under your bunk.`); return; }
+      log(msg, 'good');
+      startBeams((ok2, msg2) => {
+        if (!ok2) { caught(msg2); return; }
+        S.jail = 0; S.record++; goal('escape'); teleport({ x: 220, y: 1200 });
+        queueEvent({ kind: 'good', title: 'You escaped!', text: 'You slipped past the last searchlight, over the fence and into the bushes. Your record got worse, but you are free!' });
+      }, { title: 'SNEAK ACROSS THE YARD', sub: 'Reach the fence at the top without getting caught in a searchlight.', color: '#ffe066', glow: '#ffd35a', win: 'You slip over the fence!', lose: 'A searchlight catches you three times. The guards walk you back to your cell.', time: 'The sun comes up and the guards spot you in the yard.', bg: '#1a1f16' });
+    } };
+  state = 'mini'; setScreens();
+}
+// ===== new jobs =====
+Object.assign(CAREERS, {
+  cafe:    { place: 'cafe', hours: [7, 15], edu: 0, clean: false, levels: [['Barista', 85], ['Head Barista', 150], ['Cafe Owner', 260]] },
+  salon:   { place: 'salon', hours: [10, 18], edu: 0, clean: false, levels: [['Stylist', 95], ['Senior Stylist', 180], ['Salon Owner', 320]] },
+  carshop: { place: 'carshop', hours: [8, 16], edu: 0, clean: false, levels: [['Mechanic', 120], ['Head Mechanic', 220], ['Garage Owner', 380]] },
+  realty:  { place: 'realty', hours: [9, 17], edu: 1, clean: true, levels: [['Real Estate Agent', 130], ['Senior Agent', 260], ['Broker', 480]] },
+  grocer:  { place: 'grocer', hours: [7, 15], edu: 0, clean: false, levels: [['Cashier', 75], ['Shift Supervisor', 130], ['Store Manager', 230]] },
+});
+Object.assign(GIG_KIND, { cafe: 'barista', salon: 'stylist', carshop: 'mechanic', realty: 'agent', grocer: 'cashier' });
+Object.assign(GIG_PLACE, { barista: 'cafe', stylist: 'salon', mechanic: 'carshop', agent: 'realty', cashier: 'grocer' });
+Object.assign(NEXT_TASK, { barista: ['Make the next drink', 'drinks served'], stylist: ['Style the next client', 'clients styled'], mechanic: ['Fix the next car', 'cars fixed'], agent: ['Help the next buyer', 'buyers helped'], cashier: ['Bag the next order', 'orders bagged'] });
+WORKS.push('Make the next', 'Style the next', 'Fix the next', 'Help the next', 'Bag the next');
+const DRINK_STEPS = ['Espresso', 'Milk', 'Ice', 'Fern syrup', 'Foam', 'Cinnamon'];
+const DRINKS = [['Fern latte', [0, 3, 1, 4]], ['Iced coffee', [2, 0, 1]], ['Spiced cappuccino', [0, 1, 4, 5]], ['Iced fern milk', [2, 1, 3]], ['Double espresso', [0, 0]], ['Cinnamon foam cup', [1, 4, 5]]];
+function startBarista() {
+  const [name, seq] = pick(DRINKS), who = pick(NAMES);
+  seqPanel({ title: 'MAKE THE DRINK', sub: `${who} ordered a ${name}. Add everything in order. Keys 1 to 6 work too.`, labels: DRINK_STEPS, seq, t: lvlT(15, 2), mins: 20,
+    show: i => seq.map((s, k) => `<span class="${k === i ? 'next' : k < i ? 'done' : ''}">${k < i ? '✓ ' : ''}${DRINK_STEPS[s]}</span>`).join(''),
+    done: m => m.mistakes ? `${who} sips it and makes a face. Close enough.` : `${who} says it is the best ${name.toLowerCase()} in town!`,
+    fail: 'You made something... brown. The customer walks out.', timeout: 'The line is out the door and the drink went cold.' });
+}
+const STYLES = [['a spiky crest', 3], ['a tidy trim', 1], ['bright pink scales', 2], ['a fluffy blowout', 4], ['untangled tail fluff', 0], ['a sharp crest cut', 1], ['glittery blue scales', 2], ['a crest that points straight up', 3]];
+function startStylist() {
+  const list = STYLES.slice().sort(() => Math.random() - 0.5).slice(0, 4 + Math.min(1, S.job.level));
+  seqPanel({ title: 'STYLE THE CLIENTS', sub: 'Pick the right tool for what each client asks for. Keys 1 to 5 work too.', labels: ['Comb', 'Scissors', 'Dye', 'Gel', 'Blow dryer'], seq: list.map(s => s[1]), t: lvlT(18, 2.5), mins: 40,
+    show: i => `<span class="next">💇 "I would like ${list[i][0]}, please!"</span><span>${i + 1}/${list.length}</span>`,
+    done: m => m.mistakes ? 'Everyone leaves looking... interesting.' : 'Every client leaves fabulous. Tips all around!',
+    fail: 'You dyed someone green by accident. Twice.', timeout: 'The waiting room is full of grumpy, messy compies.' });
+}
+const CAR_PROBLEMS = [['A flat, wobbly ride', 0], ['A squeal when stopping', 2], ['The car will not start at all', 3], ['Smoke from under the hood', 1], ['Headlights flicker at night', 4], ['A slow leak in one wheel', 0], ['The brakes feel mushy', 2], ['The engine knocks loudly', 1], ['Dashboard is totally dead', 3]];
+function startMechanic() {
+  const list = CAR_PROBLEMS.slice().sort(() => Math.random() - 0.5).slice(0, 4 + Math.min(1, S.job.level));
+  seqPanel({ title: 'FIX THE CARS', sub: 'Listen to each customer and fix the right part. Keys 1 to 5 work too.', labels: ['Tires', 'Engine', 'Brakes', 'Battery', 'Lights'], seq: list.map(c => c[1]), t: lvlT(18, 2.5), mins: 45,
+    show: i => `<span class="next">🔧 "${list[i][0]}."</span><span>${i + 1}/${list.length}</span>`,
+    done: m => m.mistakes ? 'All the cars run. One honks every time it turns left now.' : 'Purring like kittens. The customers are thrilled.',
+    fail: 'You put tires on an engine. Somehow.', timeout: 'The cars are piling up in the lot.' });
+}
+const BUYERS = [['A big family that wants lots of room and has a huge budget', 2], ['A student on a tiny budget', 0], ['A couple who loves the ocean', 3], ['A kid at heart who wants to live in the trees', 4], ['A gardener who wants space for crops', 5], ['A young couple wanting something cozy with a chimney', 1], ['A royal compy with endless money', 6]];
+function startAgent() {
+  const list = BUYERS.slice().sort(() => Math.random() - 0.5).slice(0, 3 + Math.min(1, S.job.level));
+  seqPanel({ title: 'MATCH THE BUYER', sub: 'Show each buyer the home that fits them best. Keys 1 to 6 work too (7 is the castle: tap it).', labels: ['Burrow', 'Cottage', 'Mansion', 'Beach House', 'Treehouse', 'Farmhouse', 'Castle'], seq: list.map(b => b[1]), t: lvlT(20, 3), mins: 50,
+    show: i => `<span class="next">🏠 ${list[i][0]}</span><span>${i + 1}/${list.length}</span>`,
+    done: m => { const comm = m.mistakes ? 30 : 90; S.money += comm; return `${m.mistakes ? 'You closed most of the deals.' : 'Every buyer found their dream home!'} Commission: ${money$(comm)}.`; },
+    fail: 'You tried to sell a burrow to royalty. They were not amused.', timeout: 'The buyers got tired of waiting and left.' });
+}
+const GROCERIES = [['Frozen fern pops', 0], ['Ice cream', 0], ['Cold milk', 0], ['A carton of eggs', 1], ['A glass jar of honey', 1], ['Ripe tomatoes', 1], ['A big bag of birdseed', 2], ['Watermelon', 2], ['A crate of bug juice', 2]];
+function startCashier() {
+  const list = GROCERIES.slice().sort(() => Math.random() - 0.5).slice(0, 5 + Math.min(1, S.job.level));
+  seqPanel({ title: 'BAG THE GROCERIES', sub: 'Cold things, fragile things and heavy things each go in their own bag. Keys 1 to 3 work too.', labels: ['Cold bag', 'Fragile bag', 'Heavy bag'], seq: list.map(g => g[1]), t: lvlT(16, 2), mins: 25,
+    show: i => `<span class="next">🛒 ${list[i][0]}</span><span>${i + 1}/${list.length}</span>`,
+    done: m => m.mistakes ? 'Order bagged. The eggs might be scrambled.' : 'Perfect bagging! The customer gives you a thumbs up.',
+    fail: 'You put the watermelon on top of the eggs.', timeout: 'The checkout line is all the way to the cereal aisle.' });
+}
+const _snt8 = startNextTask;
+startNextTask = function (kind) { const f = { barista: startBarista, stylist: startStylist, mechanic: startMechanic, agent: startAgent, cashier: startCashier }[kind]; if (f) f(); else _snt8(kind); };
+for (const id of ['cafe', 'salon', 'carshop', 'realty', 'grocer']) { const base = MENUS[id]; MENUS[id] = p => { const m = base(p); m.acts = [...gigActs(id), ...(m.acts || [])]; return m; }; }
+{ const add2 = (id, x, z, label) => { const L = LAYOUTS[id], ob = L.build; L.build = function (b) { ob(b); b.station(x, z, label, WORKS); }; };
+  add2('cafe', 40, 40, 'Back room (staff)'); add2('salon', 350, 60, 'Stylist station (staff)'); add2('carshop', 60, 60, 'Garage (staff)'); add2('realty', 340, 60, 'Agent office (staff)'); add2('grocer', 420, 60, 'Stockroom (staff)'); }
+// ===== four new homes in different corners of town =====
+Object.assign(HOMES, {
+  treehouse: { name: 'Treehouse', rent: 0, price: 6000, repair: 700, lot: [3280, 3440], y: 950, where: 'in the east woods', blurb: 'A cozy hut high in a giant tree. Rope ladder included.' },
+  beach:     { name: 'Beach House', rent: 0, price: 9000, repair: 900, lot: [3790, 3960], y: 2170, where: 'on the beach', blurb: 'Wake up to waves. Sand in everything.' },
+  farmhouse: { name: 'Farmhouse', rent: 0, price: 12000, repair: 1100, lot: [3170, 3340], y: 3390, where: 'out on the east farm', blurb: 'Big red house, porch swing and a silo.' },
+  castle:    { name: 'Castle', rent: 0, price: 75000, repair: 6000, lot: [130, 420], y: 3420, where: 'on the south-west hill', blurb: 'Towers, flags and a throne room. Fit for a compy king.' },
+});
+DISTRICTS['0,5'] = 'estate'; for (const d of districtList) if (d.i === 0 && d.j === 5) d.type = 'estate';
+const homeY = key => HOMES[key].y || 1430, homeDoorY = key => homeY(key) - 140;
+function buildNewHomeModel(key) {
+  const [x0, x1] = HOMES[key].lot, cx = (x0 + x1) / 2, cy = homeY(key), g = group(scene, cx, 0, cy);
+  let box;
+  if (key === 'treehouse') {
+    add(g, GEO.y, '#6a4a2e', 0, 50, 0, 16, 100, 16); add(g, GEO.ico, '#2e6b34', 0, 150, 0, 70, 50, 70);
+    add(g, GEO.b, '#8a6a42', 0, 82, 0, 110, 6, 90); add(g, GEO.b, '#b08a5a', 0, 108, 0, 70, 46, 56);
+    const roof = add(g, GEO.pyr, '#5a3f28', 0, 145, 0, 60, 30, 50, 0, Math.PI / 4, 0); roof.name = 'roof';
+    for (let i = 0; i < 8; i++) add(g, GEO.b, '#c9a26a', -20, 10 + i * 10, -46, 14, 1.5, 2);
+    add(g, GEO.b, '#9fd3ff', 0, 110, -28.5, 20, 14, 1);
+    box = { x0: cx - 20, y0: cy - 20, x1: cx + 20, y1: cy + 20 };
+  } else if (key === 'beach') {
+    for (const [sx, sz] of [[-45, -40], [45, -40], [-45, 40], [45, 40]]) add(g, GEO.y, '#d6d0c4', sx, 15, sz, 4, 30, 4);
+    add(g, GEO.b, '#7fd8ff', 0, 60, 0, 110, 60, 100); const roof = add(g, GEO.pyr, '#f6f0e2', 0, 112, 0, 90, 44, 82, 0, Math.PI / 4, 0); roof.name = 'roof';
+    add(g, GEO.b, '#ffffff', 0, 31, -60, 120, 3, 24); add(g, GEO.b, '#5a3a24', 0, 48, -50.5, 20, 34, 1); for (const s of [-1, 1]) add(g, GEO.b, '#ffffff', s * 36, 66, -50.5, 22, 16, 1);
+    for (let i = 0; i < 4; i++) add(g, GEO.b, '#d6d0c4', 0, 6 + i * 7, -76 - i * 6, 26, 2, 7);
+    box = { x0: cx - 58, y0: cy - 52, x1: cx + 58, y1: cy + 52 };
+  } else if (key === 'farmhouse') {
+    add(g, GEO.b, '#b0473a', 0, 40, 0, 130, 80, 110); const roof = add(g, GEO.pyr, '#5a3f28', 0, 108, 0, 100, 56, 86, 0, Math.PI / 4, 0); roof.name = 'roof';
+    add(g, GEO.b, '#f6f0e2', 0, 40, -56, 132, 4, 3); add(g, GEO.b, '#f6f0e2', 0, 20, -56, 24, 40, 2); for (const s of [-1, 1]) add(g, GEO.b, '#9fd3ff', s * 40, 48, -56, 22, 18, 2);
+    add(g, GEO.b, '#8a6a42', 0, 2, -72, 130, 3, 30); for (const s of [-60, 60]) add(g, GEO.y, '#f6f0e2', s, 18, -84, 2.5, 34, 2.5);
+    add(g, GEO.y, '#c9c9cf', 95, 70, 20, 22, 140, 22); add(g, GEO.s, '#c9c9cf', 95, 140, 20, 22, 14, 22);
+    box = { x0: cx - 66, y0: cy - 56, x1: cx + 120, y1: cy + 56 };
+  } else {
+    add(g, GEO.b, '#9a9488', 0, 55, 0, 200, 110, 150); const roof = add(g, GEO.b, '#7a7468', 0, 112, 0, 206, 6, 156); roof.name = 'roof';
+    for (let i = -4; i <= 4; i++) { add(g, GEO.b, '#9a9488', i * 23, 122, -76, 12, 14, 6); add(g, GEO.b, '#9a9488', i * 23, 122, 76, 12, 14, 6); }
+    for (const [tx, tz] of [[-100, -75], [100, -75], [-100, 75], [100, 75]]) { add(g, GEO.y, '#a8a296', tx, 80, tz, 26, 160, 26); add(g, GEO.c, '#2e4a8a', tx, 182, tz, 28, 44, 28); add(g, GEO.y, '#3a3a3a', tx, 210, tz, 1, 20, 1); add(g, GEO.b, '#c0392b', tx + 8, 214, tz, 16, 10, 1); }
+    add(g, GEO.b, '#4a2e1a', 0, 30, -76, 40, 60, 3); add(g, GEO.y, '#4a2e1a', 0, 60, -76, 20, 3, 20, Math.PI / 2, 0, 0);
+    for (const s of [-1, 1]) add(g, GEO.b, '#ffe066', s * 55, 70, -76, 14, 22, 2);
+    box = { x0: cx - 115, y0: cy - 90, x1: cx + 115, y1: cy + 90 };
+  }
+  solids.push(box);
+  const mats = []; g.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+  const fade = { x0: box.x0, x1: box.x1, y0: box.y0, mats, op: 1 }; fadeables.push(fade);
+  return { g, box, debris: null, fade };
+}
+const _buildHomeModel = buildHomeModel;
+buildHomeModel = function (key) { return ['burrow', 'cottage', 'mansion'].includes(key) ? _buildHomeModel(key) : buildNewHomeModel(key); };
+function buyNewHome(key) {
+  if (S.home && S.home !== 'burrow') { const back = Math.round(HOMES[S.home].price * 0.7); S.money += back; log(`Sold your ${HOMES[S.home].name.toLowerCase()} for ${money$(back)}.`, 'warn'); }
+  if (S.home) setDamaged(S.home, false);
+  S.home = key; S.damaged = false; goal('home'); if (key === 'castle') goal('castle');
+  refreshHome(); refreshFamily(); sfx.goal();
+  queueEvent({ kind: 'good', title: `Welcome to your ${HOMES[key].name.toLowerCase()}!`, text: `${HOMES[key].blurb} You will find it ${HOMES[key].where}. Tap Map to see it.`, sound: 'goal' });
+}
+{ const base = MENUS.realty; MENUS.realty = p => { const m = base(p); if (!open(8, 19)) return m;
+  for (const key of ['treehouse', 'beach', 'farmhouse', 'castle']) { const H = HOMES[key]; m.acts.push({ label: `Buy the ${H.name}`, detail: `${H.blurb} Located ${H.where}.`, cost: S.home === key ? 0 : H.price, tag: S.home === key ? 'Yours' : money$(H.price), why: S.home === key ? 'You own it.' : '', mins: 60, fn: () => buyNewHome(key) }); }
+  return m; }; }
+Object.assign(LAYOUTS, {
+  home_treehouse: homeLayout('treehouse', 340, 260, { floor: ['wood', '#c9a26a', '#a8834e'], wall: '#b08a5a', trim: '#5a3f28', counter: '#8a6a42', bedFrame: '#6a4a2e', blanket: '#2e8a3a', couch: '#5a8a3a', rug: '#c9b48a' }),
+  home_beach: homeLayout('beach', 420, 300, { floor: ['wood', '#efe2c6', '#d6c4a0'], wall: '#e8f6fb', trim: '#2e86c1', counter: '#ffffff', bedFrame: '#d6d0c4', blanket: '#2e86c1', couch: '#7fd8ff', rug: '#f2d27a' }),
+  home_farmhouse: homeLayout('farmhouse', 460, 320, { floor: ['wood', '#b98a5a', '#9a6e42'], wall: '#f2e6cf', trim: '#b0473a', counter: '#d6cfc2', bedFrame: '#6a4a2e', blanket: '#c0392b', couch: '#8a6a42', rug: '#e6d6b8' }),
+  home_castle: homeLayout('castle', 600, 420, { floor: ['checker', '#9a9488', '#7a7468'], wall: '#b8b0a2', trim: '#c9a23a', counter: '#5a4a38', bedFrame: '#c9a23a', blanket: '#8e1a3a', couch: '#8e1a3a', rug: '#c0392b' }),
+});
+{ const cb = LAYOUTS.home_castle.build; LAYOUTS.home_castle.build = function (b) { cb(b); b.box(300, 40, 40, 30, 50, '#c9a23a'); b.box(300, 30, 46, 10, 80, '#8e1a3a', false); add(b.g, GEO.c, '#ffe066', 300, 92, 40, 10, 12, 10); b.station(300, 90, 'Throne', ['Sit on the throne']); }; }
+{ const base = MENUS.home; MENUS.home = p => { const m = base(p); if (S.home === 'castle' && S.home === p.home) m.acts.push({ label: 'Sit on the throne', detail: '+15 happiness. Wave at your loyal subjects.', mins: 30, fn: () => { S.happy += 15; log('You sit on the golden throne and declare tomorrow a holiday. Nobody listens.', 'good'); } }); return m; }; }
 
 // ---------- input ----------
 const keys = new Set(); const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 }; let touchMode = false;
