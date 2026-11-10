@@ -1738,6 +1738,7 @@ const MOUNTS = {
   camel:{name:'Camel', speed:1.5, terrain:[T.DUNE,T.SAND,T.MESA,T.ASH], desc:'Never slowed by sand, mesa or ash.'},
   elk:{name:'Elk', speed:1.55, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL], desc:'Never slowed by forest, snow, marsh or hills.'},
   griffon:{name:'Griffon', speed:2.0, fly:true, desc:'Flies over water, mountains and lava.'},
+  dragon:{name:'Dragon', speed:2.35, fly:true, desc:'Your Baby Drake, all grown up. The fastest thing in the sky.'},
   bear:{name:'Cave Bear', speed:1.6, terrain:[T.FOREST,T.REDWOOD,T.SNOW,T.HILL,T.GLOOM,T.MAPLE], desc:'Big, warm and stubborn. Never slowed by forest, snow or hills.'},
   tiger:{name:'Striped Tiger', speed:1.85, terrain:[T.JUNGLE,T.BAMBOO,T.GRASS,T.SAVANNA], desc:'Silent and swift through jungle, bamboo and grassland.'},
   glowmoth:{name:'Glowmoth', speed:1.7, fly:true, desc:'A giant glowing moth. Flies over water and mountains, a little slower than a griffon.'},
@@ -4938,6 +4939,7 @@ function legendSpawns() {
   }
 }
 const EARNED_TITLES = [
+  ['dragon', 'Dragon Rider'],
   ['knight', 'Knight of the Realm'],
   ['guildmaster', 'Trade Magnate'],
   ['mayor', 'Mayor'],
@@ -4950,6 +4952,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Snails & dragons', 'The dice players also run snail races: pick a snail and watch it go. Raise a Baby Drake to full level, then bring it and an Ember Core to Kael in Ashfall to grow it into a rideable Dragon.'],
   ['Waystones', 'Ancient waystones stand in the wild across every land. Touch one to awaken it, and you can fast travel there for free from your map.'],
   ['The castaway', 'Somewhere out on the open sea, a shipwrecked sailor named Robin waves from a tiny island. Bring supplies to help, and Robin shares secret treasure charts.'],
   ['Sheep herding', 'Shepherd Ewan in Hollowpine needs his scattered flock rounded up once a day. Sheep flee from you: circle behind them and drive all five into the pen within 90 seconds.'],
@@ -6728,6 +6731,8 @@ function mainOptions(n) {
   if (n.caravans) o.push({label: 'Trade caravans', primary: true, fn: () => caravanTalk(n)});
   if (n.caravans) o.push({label: S.escort ? 'Escort job (in progress)' : 'Any escort work?', disabled: !!S.escort, fn: () => say(`“My wagons need protecting on the roads out of Dunmere. Keep the merchant safe until they arrive and I'll pay well.”`, [...ESCORT_ROUTES.filter(([a, b]) => ROAD_PATHS[a + '_' + b]).map(([a, b]) => ({label: `Escort a wagon to ${TOWNS[b].name}`, fn: () => { closeTalk(); startEscort(a, b); }})), back(n)])});
   if (n.dice) o.push({label: 'Play Bones', primary: true, fn: () => diceTalk(n)});
+  if (n.dice) o.push({label: 'Snail races', fn: () => snailTalk(n)});
+  if (n.id === 'kael' && S.pets.includes('baby_drake') && !S.mounts.includes('dragon')) o.push({label: 'Raise my drake', primary: (S.petLv || {}).baby_drake >= PET_MAX && have('ember_core') > 0, fn: () => dragonTalk(n)});
   if (n.hire) o.push({label: 'Hire a companion', primary: !S.companion, fn: () => hireTalk(n)});
   if (n.shipwright) o.push({label: S.flags.boat ? 'About my boat' : 'Build me a sailboat', primary: !S.flags.boat, fn: () => boatTalk(n)});
   if (n.festival) { o.push({label: 'Festival shop', primary: true, fn: () => festShop(n)}); o.push({label: 'Lucky draw (50 coin)', fn: () => luckyDraw(n), disabled: S.coins < 50}); }
@@ -8057,6 +8062,33 @@ function updateRace(dt) {
   if (R0.t > R0.bronze*2.5) { S.race = null; toast('Race abandoned. You took too long.', 4000); renderRegion(); }
   if (Math.floor(R0.t*10) !== Math.floor((R0.t - dt)*10)) renderRegion();
 }
+// ===== snail racing =====
+const SNAILS = [['Speedy Gonzo', '#e05a4a'], ['Old Shelly', '#6ab0e8'], ['Slime Dancer', '#8ae05a'], ['Lady Slowpoke', '#e0c040']];
+let snailTimer = null;
+function snailTalk(n) {
+  if (snailTimer) return; const st = SNAILS.map(([nm, col]) => ({nm, col, sp: .7 + Math.random()*.6, pos: 0}));
+  const tot = st.reduce((a, q) => a + q.sp, 0); st.forEach(q => q.odds = Math.max(1.4, Math.round((tot/q.sp)*.85*10)/10));
+  say(`“Snail racing! The most thrilling sport in the realm! Place your bet.”<br><span style="color:var(--muted)">${st.map(q => `<span style="color:${q.col}">●</span> ${q.nm} pays ×${q.odds}`).join('<br>')}</span>`, [
+    ...st.map((q, i) => ({label: `50◆ on ${q.nm} (×${q.odds})`, disabled: S.coins < 50, fn: () => runSnails(n, st, i)})), back(n)]);
+}
+function runSnails(n, st, pickI) {
+  S.coins -= 50; renderHUD(); say('<div id="snailTrack"></div>', []);
+  const draw = () => { const el = document.getElementById('snailTrack'); if (!el) return; el.innerHTML = st.map((q, i) => `<div style="margin:4px 0;font-size:12px">${i === pickI ? '<b>' : ''}${q.nm}${i === pickI ? '</b>' : ''}<div style="height:8px;background:#0d131b;border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.min(100, q.pos)}%;background:${q.col}"></div></div></div>`).join(''); };
+  draw();
+  snailTimer = setInterval(() => {
+    for (const q of st) q.pos += q.sp*(Math.random()*3.2) + (Math.random() < .05 ? 4 : 0);
+    draw(); const win = st.find(q => q.pos >= 100); if (!win) return;
+    clearInterval(snailTimer); snailTimer = null; const wi = st.indexOf(win), mine = wi === pickI;
+    let res; if (mine) { const pay = Math.round(50*win.odds); S.coins += pay; S.snailWins = (S.snailWins || 0) + 1; res = `<span style="color:var(--good)">${win.nm} wins! You collect ${pay} coin!</span>`; SFX.victory(); } else { res = `${win.nm} crosses the line first. Your snail is still thinking about it.`; SFX.hit(); }
+    renderHUD(); save(); setTimeout(() => say(`${document.getElementById('snailTrack') ? document.getElementById('snailTrack').innerHTML : ''}<br>${res}`, [{label: 'Another race', fn: () => snailTalk(n)}, back(n)]), 300);
+  }, 140);
+}
+// ===== dragon =====
+function dragonTalk(n) {
+  const lv = (S.petLv || {}).baby_drake || 0, ok = lv >= PET_MAX && have('ember_core') > 0;
+  say(`“That drake of yours is growing fast. When it is fully grown (level ${PET_MAX}), bring me an Ember Core from the Wyrm's lair and I'll help it through its last molt. It will be big enough to ride.”<div class="req" style="margin-top:8px"><span>Drake level <b class="${lv >= PET_MAX ? 'ok' : 'no'}">${lv}/${PET_MAX}</b></span>${upCostHTML({ember_core: 1})}</div>`, [
+    {label: 'Help it grow', primary: ok, disabled: !ok, fn: () => { addItem('ember_core', -1); for (let k = 0; k < 6; k++) setTimeout(() => burst(S.x, S.y - .5, ['#ff5a1a', '#ffd040'][k % 2], 24, 6), k*200); shake = .5; SFX.roar(); setTimeout(() => addMount('dragon'), 1300); save(); say('Flames roar up around your drake. When the smoke clears, a full-grown dragon stands before you, wings spread wide. It lowers its neck for you to climb on.', [back(n)]); }}, back(n)]);
+}
 // ===== Bones: a tavern dice game =====
 const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const rollD = () => 1 + Math.floor(Math.random()*6);
@@ -8242,6 +8274,17 @@ const PET_DRAW = {bunny:['rabbit',1], fawn:['deer',.75], frog:['frog',1], turtle
 function drawMount(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase)*1.5 : 0;
   g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 9, 2.2, 0, 0, 7); g.fill();
+  if (id === 'dragon') {
+    const wf = Math.sin(frameT*(moving ? 8 : 2.5))*5, hy = moving ? -5 : 0;
+    g.fillStyle = '#8a2a1a'; g.fillRect(x-6, y-4 + hy, 3, 4); g.fillRect(x+3, y-4 + hy, 3, 4);
+    g.fillStyle = '#c84a2a'; g.beginPath(); g.moveTo(x-3, y-11+hy); g.lineTo(x-20, y-22-wf+hy); g.lineTo(x-14, y-12-wf*.5+hy); g.lineTo(x-6, y-6+hy); g.fill(); g.beginPath(); g.moveTo(x+3, y-11+hy); g.lineTo(x+20, y-22-wf+hy); g.lineTo(x+14, y-12-wf*.5+hy); g.lineTo(x+6, y-6+hy); g.fill();
+    g.fillStyle = '#a83a20'; g.fillRect(x-8, y-11+hy, 16, 7); g.fillStyle = '#e8a040'; g.fillRect(x-6, y-6+hy, 12, 2);
+    g.fillStyle = '#a83a20'; g.fillRect(x + f*7 - 2, y-17+hy, 4, 7); g.fillRect(x + f*9 - 3, y-19+hy, 7, 4); g.fillStyle = '#f0e0b0'; g.fillRect(x + f*8 - 1, y-22+hy, 1, 3); g.fillRect(x + f*10, y-22+hy, 1, 3);
+    g.fillStyle = '#ffe040'; g.fillRect(x + f*10, y-18+hy, 1, 1);
+    g.fillStyle = '#a83a20'; g.fillRect(x - f*10 - 2, y-9+hy, 4, 2); g.fillRect(x - f*13 - 1, y-8+hy, 3, 2); g.fillStyle = '#e8a040'; g.fillRect(x - f*15 - 1, y-9+hy, 2, 3);
+    if (moving && Math.random() < .3) particles.push({x: x/TS + f*.8, y: (y - 18 + hy)/TS, vx: f*2, vy: 0, t: .3, col: '#ff8a2a'});
+    return;
+  }
   if (id === 'griffon') {
     const wf = Math.sin(frameT*(moving ? 10 : 3))*4, hy = moving ? -4 : 0;
     g.fillStyle = '#a8803a'; g.fillRect(x-5, y-4 + hy, 2, 4); g.fillRect(x+3, y-4 + hy, 2, 4);
@@ -9481,6 +9524,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['snail','Escargot-a-Go','Win a snail race bet', () => (S.snailWins || 0) >= 1],
+  ['dragon','Dragon Rider','Raise your drake into a dragon', () => S.mounts.includes('dragon')],
   ['vexrace','Fastest Shovel','Beat Vex in a treasure race', () => (S.vexRaceWins || 0) >= 1],
   ['waystone','Ancient Paths','Awaken a waystone', () => (S.wsOn || 0) >= 1],
   ['waystones','Wayfinder','Awaken 8 waystones', () => (S.wsOn || 0) >= 8],
