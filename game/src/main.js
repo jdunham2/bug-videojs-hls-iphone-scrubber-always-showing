@@ -101,6 +101,11 @@ class Game {
       spit: (c, at) => this.spawnSpit(c, at),
       spitVolley: (c) => { const at = this.player.eye; for (let i = -2; i <= 2; i++) this.spawnSpit(c, at.clone().add(new THREE.Vector3(Math.cos(c.yaw) * i * 2.2, 0, -Math.sin(c.yaw) * i * 2.2))); this.ui.notify('The Broodmother sprays venom!', 'warn'); },
       steal: (c) => this.stealFrom(c),
+      howl: (c, n) => { if (c.pos.distanceTo(this.player.pos) < 90) { this.playRoar(c); if (n > 1) this.ui.notify(`A Howler pack answers the call (${n})`, 'warn'); } },
+      bossHowl: (c) => this.ui.notify('The Howling King rallies its pack — they grow faster and fiercer!', 'warn'),
+      burrow: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) { this.audio.noiseHit({ freq: 200, q: 0.5, dur: 0.8, vol: 0.5, type: 'lowpass' }); this.ui.notify(`The ${c.def.name} burrows underground…`, 'warn'); } },
+      emerge: (c) => { this.shake = Math.max(this.shake || 0, 0.6); this.audio.noiseHit({ freq: 300, q: 0.4, dur: 0.5, vol: 0.6, type: 'lowpass' }); },
+      healPlayer: (c) => { const p = this.player; if (p.alive && c.pos.distanceTo(p.pos) < 14) p.hp = Math.min(p.maxHp, p.hp + 3); },
       knock: (c, f) => { const p = this.player; if (p.mount) return; const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize(); p.vel.addScaledVector(away, f); p.vel.y += 6; this.shake = Math.max(this.shake || 0, 0.5); },
       shellBlock: (c) => { this.audio.mine(); if (!(this._shellNote > 0)) { this._shellNote = 2; this.ui.notify(`Your blow glances off the ${c.def.name}'s shell`, 'warn'); } },
       revive: (c) => this.bosses.revive(c),
@@ -114,6 +119,7 @@ class Game {
       flap: (c) => { if (c.pos.distanceTo(this.player.pos) < 60) this.audio.noiseHit({ freq: 250, q: 0.6, dur: 0.5, vol: 0.35, type: 'lowpass' }); },
     });
     this.creatures.viewDist = quality === 'high' ? 330 : 180;
+    this.creatures.density = quality === 'high' ? 1 : 0.8;
     this.creatures.populate(this.spawnPoint);
     this.buildAltar();
     this.volcano = new Volcano(this.scene, this.shared);
@@ -186,6 +192,8 @@ class Game {
       { title: 'Slay the Broodmother at the venom totem in the western woods', progress: () => 'Offer 15 Raw Meat + 1 Alpha Trophy. Keep moving: her venom volleys slow you', done: () => (this.stats.bossesDefeated || {}).broodmother >= 1 },
       { title: 'Slay Gravefang, the Undying, at the bone cairn on the central plains — at night', progress: () => 'Offer 10 Raw Meat + 10 Hide + 1 Alpha Trophy after dark. It rises once after falling', done: () => (this.stats.bossesDefeated || {}).gravefang >= 1 },
       { title: 'Slay the Rootwarden in the depths of Rootway Hollow', progress: () => 'Offer 60 Wood + 10 Marsh Herbs. Keep moving when the roots writhe', done: () => (this.stats.bossesDefeated || {}).rootwarden >= 1 },
+      { title: 'Slay the Dune Devourer at the driftwood totem on the eastern beaches', progress: () => 'Offer 15 Hide + 40 Stone + 1 Alpha Trophy. It burrows — watch for the ground to shake', done: () => (this.stats.bossesDefeated || {}).devourer >= 1 },
+      { title: 'Slay the Howling King at the standing stone on the northern grasslands', progress: () => 'Offer 15 Raw Meat + 5 Thick Pelts + 1 Alpha Trophy. Break up its pack before it howls again', done: () => (this.stats.bossesDefeated || {}).howlingking >= 1 },
     ];
     this.questIdx = 0;
 
@@ -652,6 +660,18 @@ class Game {
     const p = this.player;
     const { origin, dir, c, n } = this.lookTarget();
     const reach = def?.reach || 3.0;
+    if (def && def.horn) { this.blowHorn(item); return; }
+    if (def && def.aoe) {
+      const fwd = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
+      let hits = 0;
+      for (const o of this.creatures.list) {
+        if (!o.alive || o.tamed || o.riddenBy) continue;
+        const to = new THREE.Vector3().subVectors(o.pos, p.pos).setY(0);
+        const d = to.length() - o.radius;
+        if (d < reach && to.normalize().dot(fwd) > 0.35) { this.creatures.damage(o, def.damage * (0.9 + Math.random() * 0.2), 0, 'player'); this.damageNumber(o.center, Math.round(def.damage)); hits++; }
+      }
+      if (hits) { this.audio.flesh(); this.hitMarker(); this.shake = Math.max(this.shake || 0, 0.35); this.wear(item, 1); return; }
+    }
     const cd = c ? c.dist : Infinity, nd = n ? n.dist : Infinity;
     if (c && cd <= reach && cd <= nd) {
       const cr = c.creature;
@@ -851,6 +871,16 @@ class Game {
     this.saves.markDirty();
   }
 
+  blowHorn(item) {
+    if (this.hornCd > this.shared.uTime.value) { this.ui.notify(`The horn needs ${Math.ceil(this.hornCd - this.shared.uTime.value)} s to recover`, 'warn'); return; }
+    this.hornCd = this.shared.uTime.value + 60;
+    let n = 0;
+    for (const t of this.creatures.list) if (t.tamed && t.alive && t.pos.distanceTo(this.player.pos) < 40) { t.buffT = 20; n++; }
+    this.ui.notify(`The Packleader Horn sounds — ${n} tame${n === 1 ? '' : 's'} empowered for 20 s!`, 'quest');
+    this.audio.tone({ f0: 180, f1: 240, dur: 1.4, vol: 0.4, type: 'sawtooth', verb: 0.6 });
+    this.wear(item, 1);
+  }
+
   hitMarker() {
     const h = document.getElementById('crosshair');
     h.classList.remove('hit'); void h.offsetWidth; h.classList.add('hit');
@@ -887,6 +917,7 @@ class Game {
     p.damage(dmg);
     this.audio.hurt();
     this.shake = Math.max(this.shake || 0, 0.25);
+    if (c && c.def && c.def.shock && p.alive) { p.rootT = 1.2; this.ui.notify('Zap! The shock stuns you', 'warn'); }
     if (c && c.def && c.def.bleed && p.alive) { if (!(p.bleedT > 0)) this.ui.notify('You are bleeding! A Healing Salve stops it.', 'warn'); p.bleedT = 6; }
     // knockback
     const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize().multiplyScalar(4);
@@ -966,7 +997,7 @@ class Game {
     const v = new THREE.Vector3().subVectors(c.pos, this.camera.position).normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const pan = clamp(v.dot(right), -1, 1);
-    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, glowtail: 0.3, divebeak: 0.5, shieldhorn: 2, shellback: 1.8, leafshade: 1.3, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
+    const size = ({ pudgewing: 0.4, talonrunner: 0.8, trikeros: 2, thunderneck: 5, gorgonax: 4, ironhide: 2.2, spinesail: 3.5, voltfin: 0.6, mossback: 2.4, sandmaw: 1.6, howler: 1, glowtail: 0.3, divebeak: 0.5, shieldhorn: 2, shellback: 1.8, leafshade: 1.3, quillback: 2, eggthief: 0.4, bloodclaw: 1.2, skyreach: 5.5, dashstrider: 1, frillspitter: 0.6, nightstalker: 2.4, longfin: 2, plateback: 2.2, hornjaw: 1.6, scythehand: 2.4, skyhorn: 1, bogmaw: 2, reedhorn: 2.2, frosthorn: 2.2, rimeclaw: 0.8, cinderback: 2.6, duskraptor: 0.8, deepjaw: 3, glimmerfin: 0.2, galewing: 0.7, thunderwing: 2.2, crestcaller: 1.4, dashbeak: 0.3, domehead: 1.1 }[c.species] || 1) * c.scale;
     this.audio.roar(size, quiet ? d * 1.5 : d, pan, ['pudgewing', 'dashbeak', 'galewing'].includes(c.species) || (c.species === 'talonrunner' || c.species === 'crestcaller') && quiet ? 'chirp' : 'roar');
   }
 

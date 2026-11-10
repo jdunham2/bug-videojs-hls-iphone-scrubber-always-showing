@@ -22,7 +22,7 @@ export const SPECIES = {
   pudgewing: {
     name: 'Pudgewing', diet: 'herb', temper: 'skittish', hp: 40, dmg: 2, walk: 1.6, run: 6.5, torpor: 30,
     tameFood: 'berries', tameBase: 5, tameLvl: 0.05, rideable: false, radius: 0.6, reach: 1.0, hitR: 0.8,
-    drops: { meat: 2, hide: 1, fiber: 1 }, aggro: 0, lvl: [1, 15], count: 16, zone: (h) => h > 1.5 && h < 14,
+    drops: { meat: 2, hide: 1, fiber: 1 }, aggro: 0, lvl: [1, 15], count: 12, zone: (h) => h > 1.5 && h < 14,
   },
   trikeros: {
     name: 'Trikeros', diet: 'herb', temper: 'neutral', hp: 320, dmg: 26, walk: 2.6, run: 7.5, torpor: 240,
@@ -77,7 +77,7 @@ export const SPECIES = {
   glimmerfin: {
     name: 'Glimmerfin', diet: 'herb', temper: 'skittish', hp: 18, dmg: 0, walk: 2, run: 7, swim: 4, torpor: 12,
     tameFood: null, rideable: false, radius: 0.3, reach: 0.5, hitR: 0.45, swimmer: true,
-    drops: { meat: 1 }, aggro: 0, lvl: [1, 10], count: 24, herd: 6, zone: (h) => h < -1.8 && h > -11,
+    drops: { meat: 1 }, aggro: 0, lvl: [1, 10], count: 18, herd: 6, zone: (h) => h < -1.8 && h > -11,
   },
   deepjaw: {
     name: 'Deepjaw', diet: 'carn', temper: 'aggressive', hp: 950, dmg: 22, walk: 4, run: 11, swim: 9, torpor: 600,
@@ -137,7 +137,7 @@ export const SPECIES = {
   dashstrider: {
     name: 'Dashstrider', diet: 'herb', temper: 'skittish', hp: 190, dmg: 8, walk: 3, run: 15.5, torpor: 150,
     tameFood: 'berries', tameBase: 8, tameLvl: 0.22, rideable: true, radius: 1.0, reach: 2.2, hitR: 1.6,
-    drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 10, herd: 5, zone: (h) => h > 3 && h < 18,
+    drops: { meat: 3, hide: 2 }, aggro: 0, lvl: [1, 30], count: 8, herd: 4, zone: (h) => h > 3 && h < 18,
   },
   frillspitter: {
     name: 'Frillspitter', diet: 'carn', temper: 'aggressive', hp: 150, dmg: 10, walk: 2.6, run: 9, torpor: 120, spit: true,
@@ -199,6 +199,26 @@ export const SPECIES = {
     tameFood: 'meat', tameBase: 9, tameLvl: 0.22, rideable: true, radius: 1.1, reach: 2.8, hitR: 1.7,
     drops: { meat: 4, hide: 4 }, aggro: 10, lvl: [5, 35], count: 6, zone: (h) => h > 6 && h < 26, far: 120,
   },
+  voltfin: {
+    name: 'Voltfin', diet: 'carn', temper: 'aggressive', hp: 150, dmg: 9, walk: 3, run: 9, swim: 8, torpor: 110, swimmer: true, shock: true, glow: [1, 0.9, 0.2],
+    tameFood: 'meat', tameBase: 6, tameLvl: 0.15, rideable: false, radius: 0.7, reach: 1.8, hitR: 1.1,
+    drops: { meat: 2, crystal: 1 }, aggro: 18, lvl: [3, 30], count: 6, herd: 2, zone: (h) => h < -2.5 && h > -12,
+  },
+  mossback: {
+    name: 'Mossback', diet: 'herb', temper: 'neutral', hp: 780, dmg: 20, walk: 1.6, run: 4.5, torpor: 520, healer: true, glow: [0.25, 0.8, 0.2],
+    tameFood: 'berries', tameBase: 14, tameLvl: 0.32, rideable: true, radius: 2.0, reach: 3.8, hitR: 2.5,
+    drops: { meat: 8, hide: 5, herb: 4 }, aggro: 0, lvl: [5, 35], count: 4, zone: (h) => h > 3 && h < 20,
+  },
+  sandmaw: {
+    name: 'Sandmaw', diet: 'carn', temper: 'aggressive', hp: 360, dmg: 20, walk: 2, run: 8, torpor: 260, burrow: true,
+    tameFood: 'meat', tameBase: 10, tameLvl: 0.25, rideable: true, radius: 1.3, reach: 3, hitR: 1.8,
+    drops: { meat: 5, hide: 5 }, aggro: 22, lvl: [5, 35], count: 5, zone: (h) => h > 1 && h < 5, far: 120,
+  },
+  howler: {
+    name: 'Howler', diet: 'carn', temper: 'aggressive', hp: 210, dmg: 11, walk: 3, run: 11.5, torpor: 160, howl: true,
+    tameFood: 'meat', tameBase: 8, tameLvl: 0.2, rideable: true, radius: 1.0, reach: 2.6, hitR: 1.5,
+    drops: { meat: 3, pelt: 1, hide: 2 }, aggro: 26, lvl: [5, 35], count: 8, herd: 4, zone: (h) => h > 8 && h < 30, far: 130,
+  },
   gorgonax: {
     name: 'Gorgonax', diet: 'carn', temper: 'aggressive', hp: 1100, dmg: 48, walk: 3.2, run: 10, torpor: 700,
     tameFood: 'meat', tameBase: 14, tameLvl: 0.3, rideable: true, radius: 2.6, reach: 5.5, hitR: 3.2,
@@ -213,6 +233,9 @@ const PREY = {
   bogmaw: ['reedhorn', 'pudgewing', 'dashbeak'],
   rimeclaw: ['frosthorn', 'pudgewing'],
   hornjaw: ['pudgewing', 'crestcaller', 'reedhorn', 'dashbeak', 'dashstrider'],
+  howler: ['dashstrider', 'pudgewing', 'crestcaller', 'glowtail'],
+  sandmaw: ['pudgewing', 'divebeak', 'dashstrider'],
+  voltfin: ['glimmerfin'],
   leafshade: ['dashstrider', 'pudgewing', 'glowtail', 'eggthief'],
   bloodclaw: ['dashstrider', 'pudgewing', 'eggthief', 'crestcaller'],
   nightstalker: ['dashstrider', 'crestcaller', 'trikeros', 'plateback', 'reedhorn'],
@@ -648,6 +671,24 @@ function buildGlowtail(mat, col) {
   return { root, body, legs, neck, head, tail, hipH: 0.32, lie: 0.2, quad: true };
 }
 
+function buildEel(mat, col) {
+  const { base, belly, accent } = col;
+  const root = new THREE.Group();
+  const body = new THREE.Group(); body.position.y = 0.4; root.add(body);
+  body.add(meshOf([E(0.28, 0.32, 0.7, base, 0, 0, 0), E(0.2, 0.18, 0.6, belly, 0, -0.12, 0.05), E(0.04, 0.3, 0.5, accent, 0, 0.32, 0)], mat));
+  const neck = new THREE.Group(); neck.position.set(0, 0, 0.6); body.add(neck);
+  const head = new THREE.Group(); head.position.set(0, 0, 0.1); neck.add(head);
+  head.add(meshOf([E(0.24, 0.22, 0.38, base, 0, 0, 0.2), E(0.05, 0.05, 0.05, 0xffee66, -0.18, 0.1, 0.32), E(0.05, 0.05, 0.05, 0xffee66, 0.18, 0.1, 0.32)], mat));
+  const tail = []; let parent = body;
+  for (let i = 0; i < 7; i++) {
+    const t = new THREE.Group(); t.position.set(0, 0, i === 0 ? -0.6 : -0.42); parent.add(t);
+    const r = 0.26 * (1 - i * 0.11);
+    t.add(meshOf([E(r, r * 1.1, 0.3, i % 2 ? accent : base, 0, 0, -0.2), E(0.03, r * 1.3, 0.25, accent, 0, r * 0.9, -0.2)], mat));
+    tail.push(t); parent = t;
+  }
+  return { root, body, legs: [], neck, head, tail, hipH: 0.4, lie: 0.3, quad: false, swim: true };
+}
+
 function buildSauropod(mat, col) {
   const { base, belly, accent } = col;
   const root = new THREE.Group();
@@ -741,6 +782,10 @@ const PALETTES = {
   shieldhorn: [{ base: 0x8a6a4a, belly: 0xd0b890, accent: 0x5a3a2a, horn: 0xe8dcc0 }, { base: 0x6a6a5a, belly: 0xc0c0a8, accent: 0x2a5a7a, horn: 0xe8dcc0 }],
   shellback: [{ base: 0x5a6a4a, belly: 0xc8c090, accent: 0x6a5a3a, horn: 0x7a6a4a }, { base: 0x4a5a5a, belly: 0xb8c0b0, accent: 0x3a4a3a, horn: 0x5a6a5a }],
   leafshade: [{ base: 0x3e5a2a, belly: 0x8aa060, accent: 0x2a3a1a, horn: 0x1e2a14 }, { base: 0x4a5a30, belly: 0x9aa870, accent: 0x6a4a1a, horn: 0x1e2a14 }],
+  voltfin: [{ base: 0x1e2a3a, belly: 0x8aa0b0, accent: 0xffd83a }, { base: 0x2a1e3a, belly: 0xa090b8, accent: 0x6af0ff }],
+  mossback: [{ base: 0x5a6a3a, belly: 0xb8b890, accent: 0x6ad84a, horn: 0x4a5a2a }, { base: 0x4a5a40, belly: 0xa8b098, accent: 0x9ae86a, horn: 0x3a4a2a }],
+  sandmaw: [{ base: 0xc8a870, belly: 0xe8d8b0, accent: 0x8a6a3a, horn: 0x3a2a1a }, { base: 0xb0905a, belly: 0xe0d0a8, accent: 0x5a4a2a, horn: 0x3a2a1a }],
+  howler: [{ base: 0x6a6a70, belly: 0xc8c8c8, accent: 0x2a2a30, horn: 0x1a1a1e }, { base: 0x7a6250, belly: 0xd0c0b0, accent: 0x3a2a20, horn: 0x1a1a1e }],
   gorgonax: [{ base: 0x5a4a3a, belly: 0xb09a7a, accent: 0x8a2a1a, horn: 0x1e1a16 }, { base: 0x4a5246, belly: 0xa8a28a, accent: 0x2a2620, horn: 0x1e1a16 }],
 };
 
@@ -752,6 +797,10 @@ function buildModel(species, mat) {
     case 'thunderneck': return buildSauropod(mat, col);
     case 'talonrunner': return buildBiped(mat, col, 1.0, { hip: 1.15, bodyLen: 0.95, girth: 0.85, arm: 1.2, headLen: 0.5, headW: 0.8, tailSeg: 0.55, stripes: 4, crest: true, neckW: 0.9 });
     case 'ironhide': return buildIronhide(mat, col);
+    case 'voltfin': return buildEel(mat, col);
+    case 'mossback': { const m = buildPlateback(mat, col, false); m.body.add(meshOf([0, 1, 2, 3, 4, 5].map((i) => ({ geo: lumpify(new THREE.IcosahedronGeometry(1, 1), 0.3), color: i % 2 ? col.accent : col.horn, jitter: 0.2, matrix: mtx((i % 3 - 1) * 0.6, 1.0 + (i % 2) * 0.2, 1.2 - Math.floor(i / 2) * 1.0, 0, 0, 0, 0.6, 0.35, 0.6) })), mat)); return m; }
+    case 'sandmaw': return buildBogmaw(mat, col);
+    case 'howler': return buildBiped(mat, col, 1.1, { hip: 1.25, bodyLen: 1.0, girth: 0.85, arm: 0.9, headLen: 0.6, headW: 0.85, tailSeg: 0.6, stripes: 3, crest: true, neckW: 0.9 });
     case 'glowtail': return buildGlowtail(mat, col);
     case 'divebeak': return buildFlyer(mat, col, 0.75, false);
     case 'shieldhorn': { const m = buildQuadTrikeros(mat, col); m.head.add(meshOf([E(0.75, 0.55, 0.22, col.horn, 0, 0.35, 1.3, -0.3, 0, 0)], mat)); return m; }
@@ -934,6 +983,7 @@ export class CreatureManager {
       if (a === 'eruption') { c.cd[a] = 8 + Math.random() * 3; c.roarT = 0.8; this.hooks.eruption?.(c); }
       if (a === 'whirlpool') { c.cd[a] = 13; this.hooks.whirlpool?.(c); }
       if (a === 'shriek') { c.cd[a] = 15; c.roarT = 1.2; this.hooks.shriek?.(c); }
+      if (a === 'howl') { c.cd[a] = 14; c.roarT = 1.2; this.howl(c, player.mount || 'player'); this.hooks.bossHowl?.(c); }
       if (a === 'shadow' && d < 22) { c.cd[a] = 10; c.roarT = 1; this.hooks.shadow?.(c, d); }
       if (a === 'roots') { c.cd[a] = 7.5; this.hooks.roots?.(c); }
       if (a === 'lightning') { c.cd[a] = 6 + Math.random() * 2; this.hooks.lightning?.(c); }
@@ -992,10 +1042,11 @@ export class CreatureManager {
   populate(avoid) {
     for (const [sp, def] of Object.entries(SPECIES)) {
       let n = 0;
-      while (n < def.count) {
+      const want = Math.max(1, Math.round(def.count * (this.density || 1)));
+      while (n < want) {
         const p = this.randomSpot(def, avoid, 60);
         if (!p) break;
-        const herd = def.herd ? Math.min(def.herd, def.count - n) : 1;
+        const herd = def.herd ? Math.min(def.herd, want - n) : 1;
         for (let k = 0; k < herd; k++) {
           const q = p.clone().add(new THREE.Vector3(rand(-6, 6), 0, rand(-6, 6)));
           q.y = heightAt(q.x, q.z);
@@ -1144,7 +1195,17 @@ export class CreatureManager {
   }
 
   update(dt, player, time) {
-    for (const c of this.list) this.updateOne(c, dt, player, time);
+    // far-away wild creatures think less often (their elapsed time is caught up in one step)
+    this.frame = (this.frame || 0) + 1;
+    for (const c of this.list) {
+      const far = !c.tamed && !c.boss && !c.riddenBy && c.state !== 'chase' && Math.abs(c.pos.x - player.pos.x) + Math.abs(c.pos.z - player.pos.z) > 280;
+      if (far) {
+        c.lodDt = (c.lodDt || 0) + dt;
+        if ((this.frame + c.id) % 4 !== 0) continue;
+        this.updateOne(c, Math.min(c.lodDt, 0.25), player, time);
+        c.lodDt = 0;
+      } else { if (c.lodDt) c.lodDt = 0; this.updateOne(c, dt, player, time); }
+    }
 
     // remove despawned carcasses
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -1166,7 +1227,7 @@ export class CreatureManager {
       this.respawnCd = 30;
       for (const [sp, def] of Object.entries(SPECIES)) {
         const wild = this.list.filter((c) => c.species === sp && !c.tamed && c.alive && !c.cave).length;
-        if (wild < def.count) {
+        if (wild < Math.round(def.count * (this.density || 1))) {
           const p = this.randomSpot(def, player.pos, 140);
           if (p) { const c = this.spawn(sp, p); if (Math.random() < 0.08) this.makeAlpha(c); }
         }
@@ -1204,6 +1265,17 @@ export class CreatureManager {
     const sg = d.glow ? 0.14 + Math.sin(performance.now() / 500 + c.id) * 0.06 : 0;
     c.mat.emissive.setRGB(c.hitFlash * 4 + glow + (d.glow ? d.glow[0] * sg : 0), glow * 0.12 + (d.glow ? d.glow[1] * sg : 0), d.glow ? d.glow[2] * sg : 0);
     if (c.boss) this.updateBoss(c, dt, player);
+    else if (d.burrow && !c.tamed) this.burrowTick(c, dt, player);
+    if (c.buffT > 0) c.buffT -= dt;
+    // healing aura: wild Mossbacks mend their neighbours; a tamed one heals your tames and you
+    if (d.healer && c.alive && c.state !== 'ko') {
+      c.healT = (c.healT || 0) - dt;
+      if (c.healT <= 0) {
+        c.healT = 2;
+        for (const o of this.list) if (o.alive && o !== c && o.tamed === c.tamed && o.pos.distanceTo(c.pos) < 16) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.03);
+        if (c.tamed) this.hooks.healPlayer?.(c);
+      }
+    }
     if (c.shellCd > 0) c.shellCd -= dt;
     if (c.shellT > 0) { c.shellT -= dt; c.speed = 0; c.goal.copy(c.pos); c.model.neck.scale.setScalar(0.3); for (const L of c.model.legs) L.g.scale.setScalar(0.5); if (c.shellT <= 0) { c.model.neck.scale.setScalar(1); for (const L of c.model.legs) L.g.scale.setScalar(1); } }
     if (c.poisonT > 0 && c.alive) {
@@ -1311,7 +1383,7 @@ export class CreatureManager {
       if ((d.temper === 'aggressive' || d.thief || c.alpha) && c.scanCd <= 0 && !far && !asleep && !(d.thief && c.stolen)) {
         c.scanCd = 0.5;
         const t = this.findTarget(c, player);
-        if (t) { c.state = 'chase'; c.target = t; c.timer = 25; this.hooks.roar?.(c); }
+        if (t) { c.state = 'chase'; c.target = t; c.timer = 25; this.hooks.roar?.(c); if (d.howl) this.howl(c, t); }
       }
       if (d.temper === 'skittish' && distP < 9 && !player.crouch) { c.state = 'flee'; c.threat = 'player'; c.timer = 4; }
       if (c.timer <= 0) {
@@ -1506,13 +1578,45 @@ export class CreatureManager {
     c.lieT = Math.max(0, c.lieT - dt);
   }
 
+  // A howl rallies every same-species creature nearby and buffs them for a while.
+  howl(c, target) {
+    let n = 0;
+    for (const o of this.list) {
+      if (o.species !== c.species || o.tamed || !o.alive || o.ko || o.pos.distanceTo(c.pos) > 60) continue;
+      o.buffT = 12; n++;
+      if (o !== c) { o.state = 'chase'; o.target = target; o.timer = 25; }
+    }
+    this.hooks.howl?.(c, n);
+  }
+
+  // Burrowers dig under and erupt beside their target.
+  burrowTick(c, dt, player) {
+    const d = Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z);
+    if (c.state === 'chase' && c.target === 'player' && !(c.hiddenT > 0)) {
+      c.burrowCd = (c.burrowCd ?? 4) - dt;
+      if (c.burrowCd <= 0 && d > 6 && d < 32) { c.burrowCd = 9; c.hiddenT = 1.4; this.hooks.burrow?.(c); }
+    }
+    if (c.hiddenT > 0) {
+      c.hiddenT -= dt; c.speed = 0;
+      if (c.hiddenT <= 0) {
+        const a = Math.random() * Math.PI * 2;
+        const nx = player.pos.x + Math.cos(a) * 3, nz = player.pos.z + Math.sin(a) * 3;
+        if (!blockedAt(nx, nz) && heightAt(nx, nz) > 0) c.pos.set(nx, heightAt(nx, nz), nz);
+        c.yaw = Math.atan2(player.pos.x - c.pos.x, player.pos.z - c.pos.z);
+        c.attackAnim = 1;
+        this.hooks.emerge?.(c);
+        if (Math.hypot(player.pos.x - c.pos.x, player.pos.z - c.pos.z) < 4.5 && player.alive) this.hooks.hitPlayer?.(c.dmg * 1.3, c);
+      }
+    }
+  }
+
   chase(c, dt, player) {
     const d = c.def;
     const tp = this.targetPos(c.target, player);
     const tr = c.target === 'player' ? 0.4 : c.target.radius;
     const dist = Math.hypot(tp.x - c.pos.x, tp.z - c.pos.z);
     const reach = d.reach * c.scale + tr;
-    let spd = dist > reach * 0.8 ? d.run : 0;
+    let spd = dist > reach * 0.8 ? d.run * (c.buffT > 0 ? 1.3 : 1) : 0;
     if (c.shellT > 0) return 0;
     if (d.charge) {
       c.chargeCd = (c.chargeCd || 0) - dt;
@@ -1544,8 +1648,9 @@ export class CreatureManager {
       c.attackAnim = 1;
       const ambush = d.camo && !c.ambushed; c.ambushed = true;
       if (ambush && c.target === 'player') this.hooks.notify?.('Ambush! A Leafshade lunges from the undergrowth!', 'warn');
-      if (c.target === 'player') this.hooks.hitPlayer?.(c.dmg * (ambush ? 2 : 1), c);
-      else this.damage(c.target, c.dmg, 0, c);
+      const buff = c.buffT > 0 ? 1.4 : 1;
+      if (c.target === 'player') this.hooks.hitPlayer?.(c.dmg * (ambush ? 2 : 1) * buff, c);
+      else this.damage(c.target, c.dmg * buff, 0, c);
       this.hooks.bite?.(c);
     }
     return spd;

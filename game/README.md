@@ -104,6 +104,12 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - **The Rootwarden** (root-wrapped stone deep in Rootway Hollow; 60 Wood + 10 Marsh Herbs):
     a moss-grown giant Scythehand whose roots pin you in place. Its Heartwood makes the
     **Harvester Axe** (gathers wood and stone extremely fast).
+  - **The Dune Devourer** (driftwood totem on the eastern beaches; 15 Hide + 40 Stone + 1
+    Trophy): a colossal Sandmaw that burrows, erupts beside you and shakes the ground. Its
+    tooth forges the **Quakehammer**, which hits everything in front of you.
+  - **The Howling King** (standing stone on the northern grasslands; 15 Raw Meat + 5 Thick
+    Pelts + 1 Trophy): rallies and buffs its Howler pack again and again. Its horn becomes the
+    **Packleader Horn**: blow it to empower every tame within 40 m for 20 seconds.
   - Beat four bosses to become **Champion of the Isle**.
 - **Weather:** clear skies drift into overcast, rain and thunderstorms with lightning and
   thunder, plus thick fog banks. Rain darkens the sky, bends the trees in the wind and slowly
@@ -152,6 +158,10 @@ Then open http://localhost:8080. Add `?quality=low` for weaker GPUs.
   - Shieldhorn: shield-nosed grazer that charges and knocks you flying; rideable
   - Shellback: giant beach turtle that retreats into an invulnerable shell; rideable
   - Leafshade: camouflaged ambusher, invisible until close, double-damage first strike; rideable
+  - Voltfin: glowing eel-like sea hunter whose shock stuns swimmers
+  - Mossback: moss-covered giant with a healing aura; a tamed one heals you and your tames; rideable
+  - Sandmaw: burrows under the sand and erupts beside you; rideable
+  - Howler: pack hunter whose howl rallies and buffs the pack; rideable
   - Duskraptor: glowing cave pack hunter; rideable
   - Galewing: skittish pterosaur that circles the island and perches to rest; tame with meat, rideable flyer
   - Thunderwing: huge aggressive pterosaur of the northern peaks that dive-bombs prey; rideable flyer

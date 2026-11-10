@@ -53,6 +53,16 @@ export const BOSSES = {
     hp: 16000, dmg: 48, scale: 2.3, minions: ['dashbeak', 4, 30], phases: [0.66, 0.33], abilities: ['roots', 'pounce'], arena: 60, leash: 40,
     cost: { wood: 60, herb: 10 }, reward: [['heartwood', 1], ['wood', 50], ['ingot', 15], ['sigil', 1]], rewardText: 'Its Heartwood makes the Harvester Axe', color: 0x8ad86a,
   },
+  devourer: {
+    kind: 'devourer', species: 'sandmaw', name: 'The Dune Devourer', title: 'THE DUNE DEVOURER',
+    hp: 15000, dmg: 52, scale: 3.0, minions: ['sandmaw', 3, 32], phases: [0.66, 0.33], abilities: ['submerge', 'quake'], arena: 80, leash: 60,
+    cost: { hide: 15, stone: 40, trophy: 1 }, reward: [['devourertooth', 1], ['hide', 15], ['ingot', 15], ['sigil', 1]], rewardText: 'Its tooth forges the Quakehammer', color: 0xe8c87a,
+  },
+  howlingking: {
+    kind: 'howlingking', species: 'howler', name: 'The Howling King', title: 'THE HOWLING KING',
+    hp: 13000, dmg: 42, scale: 2.6, minions: ['howler', 3, 32], phases: [0.66, 0.33], abilities: ['howl', 'pounce'], arena: 80, leash: 60,
+    cost: { meat: 15, pelt: 5, trophy: 1 }, reward: [['kinghorn', 1], ['pelt', 10], ['ingot', 15], ['sigil', 1]], rewardText: 'Its horn becomes the Packleader Horn', color: 0xb8b8c8,
+  },
   titan: {
     kind: 'titan', species: 'thunderneck', name: 'The Ancient Titan', title: 'THE ANCIENT TITAN',
     hp: 45000, dmg: 90, scale: 1.9, minions: ['talonrunner', 4, 40], minionsList: [['talonrunner', 4, 40], ['cinderback', 2, 40], ['gorgonax', 1, 45]], phases: [0.75, 0.5, 0.25],
@@ -140,13 +150,19 @@ export class Bosses {
     const hch = hollow.chambers[4] || hollow.chambers[hollow.chambers.length - 2];
     const hcc = hollow.cacheChamber;
     this.shrines.push({ kind: 'rootwarden', pos: new THREE.Vector3(hch.x, hollow.floor(hch.x, hch.z), hch.z), spawn: new THREE.Vector3(hcc.x - 3, hollow.floor(hcc.x - 3, hcc.z), hcc.z), cave: hollow });
+    // Dune Devourer: a driftwood totem on the eastern beaches
+    const dPos = spot(300, 150, 90, (x, z, h) => h > 1.2 && h < 4 && swampAt(x, z) < 0.2 && Math.hypot(x - VOLCANO.x, z - VOLCANO.z) > 170);
+    this.shrines.push({ kind: 'devourer', pos: dPos, spawn: away(dPos, 15) });
+    // Howling King: a standing stone on the northern grasslands
+    const hPos = spot(30, -40, 90, (x, z, h) => h > 8 && h < 24 && frostAt(x, z) < 0.3 && Math.hypot(x - VOLCANO.x, z - VOLCANO.z) > 170);
+    this.shrines.push({ kind: 'howlingking', pos: hPos, spawn: away(hPos, 16) });
     for (const s of this.shrines) if (s.kind !== 'tyrant') this.buildShrine(s);
   }
 
   buildShrine(s) {
     const g = this.game, def = BOSSES[s.kind];
     const grp = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: { magmaroth: 0x1a1620, deepmother: 0x4a5a5e, rimefang: 0xc8d8e8, mirelord: 0x3a4a2a, titan: 0x8a7a5a, stormwing: 0x5a6070, broodmother: 0x3a4a2a, gravefang: 0xd8d0c0, rootwarden: 0x4a3a24 }[s.kind] || 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
+    const stone = new THREE.MeshStandardMaterial({ color: { magmaroth: 0x1a1620, deepmother: 0x4a5a5e, rimefang: 0xc8d8e8, mirelord: 0x3a4a2a, titan: 0x8a7a5a, stormwing: 0x5a6070, broodmother: 0x3a4a2a, gravefang: 0xd8d0c0, rootwarden: 0x4a3a24, devourer: 0x8a6a4a, howlingking: 0x5a5a62 }[s.kind] || 0x2a3038, roughness: 0.4, metalness: 0.2, flatShading: true });
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 0.8, 6), stone); base.position.y = 0.3; grp.add(base);
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 3.2, 5), stone); pillar.position.y = 2.2; grp.add(pillar);
     const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 1.6, roughness: 0.3 }));
@@ -298,7 +314,7 @@ export class Bosses {
     const g = this.game, p = g.player;
     g.shake = 1.6;
     g.audio.thunder?.(1);
-    g.ui.notify('The Titan shakes the island!', 'warn');
+    g.ui.notify(`${c.name} shakes the ground!`, 'warn');
     if (d < 40 && p.alive) {
       this.hit(45 * (1 - d / 42));
       if (!p.mount) { const away = new THREE.Vector3().subVectors(p.pos, c.pos).setY(0).normalize().multiplyScalar(18); p.vel.add(away); p.vel.y += 7; }

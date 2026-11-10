@@ -4,7 +4,7 @@ import { ITEMS } from './items.js';
 // plus whistle commands that act on every following tame at once.
 const ICON = {
   pudgewing: '🐦', dashbeak: '🦎', crestcaller: '🦕', trikeros: '🦏', domehead: '🐏', ironhide: '🐢',
-  talonrunner: '🦖', spinesail: '🐊', thunderneck: '🦕', gorgonax: '🦖', galewing: '🪽', thunderwing: '🦅', deepjaw: '🐋', glimmerfin: '🐟', cinderback: '🌋', duskraptor: '🦇', bogmaw: '🐊', reedhorn: '🦆', frosthorn: '🦬', rimeclaw: '❄️', plateback: '🦕', hornjaw: '🐂', scythehand: '🦥', skyhorn: '🦅', dashstrider: '🐓', frillspitter: '🦎', nightstalker: '🌑', longfin: '🦕', quillback: '🦔', eggthief: '🥚', bloodclaw: '🩸', skyreach: '🦒', glowtail: '✨', divebeak: '🐦', shieldhorn: '🛡️', shellback: '🐢', leafshade: '🍃',
+  talonrunner: '🦖', spinesail: '🐊', thunderneck: '🦕', gorgonax: '🦖', galewing: '🪽', thunderwing: '🦅', deepjaw: '🐋', glimmerfin: '🐟', cinderback: '🌋', duskraptor: '🦇', bogmaw: '🐊', reedhorn: '🦆', frosthorn: '🦬', rimeclaw: '❄️', plateback: '🦕', hornjaw: '🐂', scythehand: '🦥', skyhorn: '🦅', dashstrider: '🐓', frillspitter: '🦎', nightstalker: '🌑', longfin: '🦕', quillback: '🦔', eggthief: '🥚', bloodclaw: '🩸', skyreach: '🦒', glowtail: '✨', divebeak: '🐦', shieldhorn: '🛡️', shellback: '🐢', leafshade: '🍃', voltfin: '⚡', mossback: '🌿', sandmaw: '🏜️', howler: '🐺',
 };
 
 export function tameXpNeed(c) { return 30 + c.level * 6; }

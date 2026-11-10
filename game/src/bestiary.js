@@ -39,6 +39,10 @@ const LORE = {
   shieldhorn: { icon: '🛡️', where: 'Grasslands, in herds', text: 'Its nose carries a broad bony shield. Provoke it and it lowers its head and charges hard enough to send you flying.' },
   shellback: { icon: '🐢', where: 'Beaches', text: 'A giant sea turtle that hauls out on the sand. Badly hurt, it pulls into a shell nothing can crack.' },
   leafshade: { icon: '🍃', where: 'Dense forest', text: 'Patterned like dappled leaves, it is invisible until you are almost on top of it. Its first strike is its deadliest.' },
+  voltfin: { icon: '⚡', where: 'Coastal waters, in pairs', text: 'A glowing eel-like hunter. One touch delivers a shock that leaves a swimmer stunned.' },
+  mossback: { icon: '🌿', where: 'Lowland meadows', text: 'A slow giant overgrown with glowing moss. Creatures near it mend their wounds; a tamed one tends to you and your tames.' },
+  sandmaw: { icon: '🏜️', where: 'Beaches and dunes', text: 'It swims through sand like water. The ground shudders, then it erupts right beside you.' },
+  howler: { icon: '🐺', where: 'Hills and grasslands, in packs', text: 'When one spots prey it howls, and the whole pack answers — faster and fiercer than before.' },
   deepjaw: { icon: '🐋', where: 'Deep water offshore', text: 'A sea serpent with a crocodile’s smile. Swimmers in deep water are on its menu.' },
 };
 

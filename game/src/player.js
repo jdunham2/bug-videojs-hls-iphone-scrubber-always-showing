@@ -22,6 +22,8 @@ function toolGeo(id) {
     case 'obsidianspear': handle(1.6); P.push({ geo: new THREE.OctahedronGeometry(0.07), color: 0x1a1620, matrix: mtx(0, 1.62, 0, 0, 0, 0, 1, 3, 1) }); break;
     case 'bonecrusher': P.push({ geo: new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), color: 0xd8d0c0, matrix: mtx(0, 0.2, 0) }); P.push({ geo: new THREE.SphereGeometry(0.12, 8, 6), color: 0xe8e0d0, matrix: mtx(0, 0.55, 0, 0, 0, 0, 1, 1.3, 1) }); break;
     case 'harvester': handle(0.8, 0x4a3420); P.push({ geo: new THREE.BoxGeometry(0.28, 0.18, 0.03), color: 0x8ad86a, matrix: mtx(0.1, 0.62, 0) }); break;
+    case 'quakehammer': handle(0.85, 0x3a2a1a); P.push({ geo: new THREE.BoxGeometry(0.3, 0.18, 0.18), color: 0xc8a870, matrix: mtx(0, 0.72, 0) }); break;
+    case 'packhorn': P.push({ geo: new THREE.ConeGeometry(0.06, 0.45, 8, 1, true), color: 0xd8d0c0, matrix: mtx(0, 0.25, 0, 0.4, 0, 0) }); break;
     case 'club': P.push({ geo: new THREE.CylinderGeometry(0.06, 0.03, 0.75, 7), color: 0x5a3e24, matrix: mtx(0, 0.28, 0) }); break;
     case 'spear': handle(1.5); P.push({ geo: new THREE.ConeGeometry(0.04, 0.25, 4), color: 0xe9e2cf, matrix: mtx(0, 1.5, 0) }); break;
     case 'trident': handle(1.5, 0x3a4a5a); for (const x of [-0.07, 0, 0.07]) P.push({ geo: new THREE.ConeGeometry(0.02, x ? 0.22 : 0.3, 4), color: 0x9ae0ff, matrix: mtx(x, x ? 1.56 : 1.6, 0) }); P.push({ geo: new THREE.BoxGeometry(0.18, 0.03, 0.03), color: 0x9ae0ff, matrix: mtx(0, 1.45, 0) }); break;
