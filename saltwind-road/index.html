@@ -489,6 +489,10 @@ const GOODS = {
   goldcarp:{name:'Golden Carp',base:95,col:'#f0c040',kind:'good'},
   old_boot:{name:'Old Boot',base:1,col:'#6a4a2a',kind:'good'},
   regatta_cup:{name:'Regatta Cup',base:500,col:'#e0e8f0',kind:'trophy'},
+  bluefin:{name:'Bluefin Tuna',base:70,col:'#3a5a8a',kind:'good'},
+  swordfish:{name:'Swordfish',base:95,col:'#5a7aa8',kind:'good'},
+  anglerfish:{name:'Anglerfish',base:115,col:'#5a4a6a',kind:'good'},
+  giant_squid:{name:'Giant Squid',base:160,col:'#c86a8a',kind:'good'},
   sunken_chest:{name:'Sunken Chest',base:0,col:'#5a7a6a',kind:'schest',desc:'Hauled up from the depths. Open it from your bag!'},
   dawnbreaker:{name:'Dawnbreaker',base:700,col:'#fff0b0',kind:'weapon',dmg:11,cd:.42,reach:1.65,silver:true},
   prism_bow:{name:'Prism Bow',base:750,col:'#c8f4ff',kind:'weapon',dmg:8,cd:.4,ranged:true,noAmmo:true,pcol:'#e8c8ff'},
@@ -5106,6 +5110,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Deep-sea fishing', 'Out on deep water in your sailboat, cast a deep-sea line for Bluefin Tuna, Swordfish, Anglerfish and the elusive Giant Squid.'],
   ['Wild mustangs', 'Herds of wild mustangs roam the grasslands and savannas. They flee from you, unless you carry apples. Offer one and keep your nerve in the calming game to tame a Mustang, faster than any stable horse.'],
   ['The circus', 'Ringmaster Barnaby\u2019s Traveling Circus moves to a new town each week (the Gazette says where). Win tickets at the strength tester and ring toss, then trade them for prizes, including a pet monkey.'],
   ['Exports & regatta', 'Harbormaster Quinn in Tidewatch offers big export orders: deliver bulk goods within 5 days for a fat premium. Bess runs the regatta: sail through six buoys under par time for a prize, and in summer win the Regatta Cup.'],
@@ -6267,7 +6272,7 @@ function render() {
   sprites.sort((a,b) => a.y - b.y).forEach(s => s.f());
 
   if (fishing) {
-    const n = nodes[fishing.i], bx = n.x*TS + 8, by = n.y*TS + 8 + Math.sin(frameT*5)*1;
+    const n = fishing.deep ? {x: S.x + (player.dir.x || 1)*2 - .5, y: S.y + (player.dir.y || 0)*2 - .5} : nodes[fishing.i], bx = n.x*TS + 8, by = n.y*TS + 8 + Math.sin(frameT*5)*1;
     ctx.strokeStyle = 'rgba(235,228,211,.8)'; ctx.lineWidth = .6; ctx.beginPath(); ctx.moveTo(S.x*TS + 5, S.y*TS - 14); ctx.quadraticCurveTo((S.x*TS + bx)/2, by - 10, bx, by); ctx.stroke();
     ctx.fillStyle = '#e57a62'; ctx.fillRect(bx - 1, by - 1, 2, 2);
   }
@@ -6596,7 +6601,7 @@ function update(dt) {
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -9251,7 +9256,15 @@ const FISH_SPECIES = [
   {id:'aurora_char', diff:1.3, xp:45, biomes:[T.SNOW], when:'night', w:1.2, season:3},
 ];
 for (const f of FISH_SPECIES) CATCH[f.id] = {diff: f.diff, xp: f.xp, col: GOODS[f.id].col};
+const DEEP_FISH = [['bluefin', 5, .95, 22], ['swordfish', 3, 1.2, 35], ['anglerfish', 2, 1.15, 40], ['giant_squid', 1.1, 1.4, 70]];
+for (const [id, , diff, xp] of DEEP_FISH) CATCH[id] = {diff, xp, col: GOODS[id].col};
+function rollDeep() { const pool = [...DEEP_FISH.map(([id, w]) => [id, w]), ['fish', 3], ['sunken_chest', .9]]; let r = Math.random()*pool.reduce((a, q) => a + q[1], 0); for (const [id, w] of pool) { r -= w; if (r <= 0) return id; } return 'bluefin'; }
+function deepTarget() {
+  if (!S.flags.boat || fishing || inDungeon() || tileAt(Math.floor(S.x), Math.floor(S.y)) !== T.DEEP || !toolTier('rod') || balloonF || regatta) return null;
+  return {key: 'deepfish', html: '<kbd style="margin:0 6px 0 0">E</kbd>Cast a deep-sea line', btn: 'Cast', fn: () => { fishing = {i: -1, deep: true, t: (2 + Math.random()*2.5)*(toolTier('rod') >= 2 ? .6 : 1)}; floatText(S.x, S.y - 1, 'Casting into the deep…'); }};
+}
 const FISH_LOG_IDS = ['fish','silverfin','goldcarp', ...FISH_SPECIES.map(f => f.id)];
+for (const [id] of DEEP_FISH) FISH_LOG_IDS.push(id);
 function nodeBiomes(n) {
   if (n.biomes) return n.biomes;
   const set = new Set();
@@ -9272,7 +9285,7 @@ function rollCatch(n) {
   return 'fish';
 }
 function startFishGame() {
-  const c = rollCatch(nodes[fishing.i]);
+  const c = fishing.deep ? rollDeep() : rollCatch(nodes[fishing.i]); if (fishing.deep) S.deepCasts = (S.deepCasts || 0) + 1;
   FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 3 ? .32 : toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat') + (S.pet === 'frog' ? .06 : 0), prog: .3, node: fishing.i};
   fishing = null; mode = 'fish'; keys.clear(); fishHold = false;
   $('fFish').style.background = CATCH[c].col;
@@ -9294,7 +9307,7 @@ function updateFishGame(dt) {
 function endFishGame(win) {
   const G = FG; FG = null; $('fishUI').hidden = true; mode = 'play'; promptKey = null; keys.clear();
   if (!G) return;
-  const n = nodes[G.node];
+  const n = G.node >= 0 && nodes[G.node] ? nodes[G.node] : {x: S.x - .5, y: S.y - 1};
   if (win) {
     const amt = (G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1) + (S.pet === 'penguin' ? 1 : 0);
     addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1;
@@ -9689,6 +9702,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['squid','Release the Kraken? No, Just a Squid','Catch a Giant Squid at sea', () => (S.fishLog || {}).giant_squid > 0],
   ['mustang','Horse Whisperer','Tame a wild mustang', () => S.mounts.includes('mustang')],
   ['highwayman','Stand and Deliver','Defeat a masked highwayman', () => (S.highwaymen || 0) >= 1],
   ['silver','Silver Tongue','Talk your way past 3 highwaymen', () => (S.bluffs || 0) >= 3],
