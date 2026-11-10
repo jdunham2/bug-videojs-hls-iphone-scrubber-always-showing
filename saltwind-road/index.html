@@ -6942,6 +6942,7 @@ function mainOptions(n) {
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
+  if (n.trainer && S.pet) o.push({label: `Name your ${PETS[S.pet].name.toLowerCase()}`, fn: () => namePetTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
   if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
   if (n.bard) o.push({label: `Ballads (${(S.ballads ? Object.keys(S.ballads).length : 0)}/${BALLADS.length})`, primary: BALLADS.some(b => !(S.ballads || {})[b.id] && b.ok()), fn: () => balladTalk(n)});
@@ -7064,6 +7065,13 @@ function giftTalk(n) {
     back(n)]);
 }
 // ===== pet tricks & shows =====
+const petName = id => { id = id || S.pet; return (S.petNames && S.petNames[id]) || (PETS[id] ? PETS[id].name : 'pet'); };
+function namePetTalk(n) {
+  say(`What would you like to call your ${PETS[S.pet].name.toLowerCase()}?<div style="margin-top:8px"><input id="petNameIn" maxlength="14" value="${esc((S.petNames || {})[S.pet] || '')}" style="font:inherit;padding:4px 8px;border-radius:6px;border:1px solid #444;background:#0d131b;color:#eee;width:180px" placeholder="${PETS[S.pet].name}"></div>`, [
+    {label: 'Save name', primary: true, fn: () => { const el = document.getElementById('petNameIn'); const v = (el ? el.value : '').replace(/[<>"&]/g, '').trim().slice(0, 14); S.petNames = S.petNames || {}; if (v) S.petNames[S.pet] = v; else delete S.petNames[S.pet]; S.petsNamed = Object.keys(S.petNames).length; save(); say(v ? `Your ${PETS[S.pet].name.toLowerCase()} perks up at the name <b>${esc(v)}</b>!` : 'Name cleared.', [back(n)]); }},
+    back(n)]);
+  setTimeout(() => { const el = document.getElementById('petNameIn'); if (el) { el.focus(); el.addEventListener('keydown', e => e.stopPropagation()); } }, 50);
+}
 const TRICKS = [['sit','Sit',1],['paw','Shake paw',1],['roll','Roll over',2],['fetch','Fetch',2],['spin','Spin',2],['dead','Play dead',3],['dance','Dance',3],['backflip','Backflip',4]];
 const petShowDay = () => S.day % 7 === 0;
 const petTricks = () => (S.petTricks && S.pet && S.petTricks[S.pet]) || [];
@@ -7083,7 +7091,7 @@ function petShow(n) {
   S.coins -= 25; S.petShow = S.day;
   const known = petTricks(), mine = known.reduce((a, k) => a + TRICKS.find(t => t[0] === k)[2]*6, 0) + petLv()*3 + rint(0, 18);
   const rivals = [['Mrs. Pennywhistle','poodle'],['young Tobias','tortoise'],['Lord Ashby','peacock'],['the twins','three kittens'],['a sailor','parrot']].sort(() => Math.random() - .5).slice(0, 3).map(([who, pet]) => ({who, pet, sc: rint(14, 52)}));
-  const all = [...rivals, {who: 'You', pet: PETS[S.pet].name.toLowerCase(), sc: mine, me: true}].sort((a, b) => b.sc - a.sc), place = all.findIndex(r => r.me) + 1;
+  const all = [...rivals, {who: 'You', pet: petName(), sc: mine, me: true}].sort((a, b) => b.sc - a.sc), place = all.findIndex(r => r.me) + 1;
   let prize = '';
   if (place === 1) { S.coins += 400; addItem('blue_ribbon', 1); S.petShowWins = (S.petShowWins || 0) + 1; prize = '<b>First place!</b> +400 coin and a <b>Blue Ribbon</b>!'; SFX.victory(); }
   else if (place === 2) { S.coins += 120; addItem('pet_treat', 4); prize = 'Second place! +120 coin and 4 Pet Treats.'; SFX.coin(); }
@@ -8071,7 +8079,7 @@ function trainPet() {
   const L = petLv(); if (!S.pet || L >= PET_MAX) return;
   const c = petCost(L + 1); if (!upCanPay(c)) return;
   upPay(c); S.petLv = S.petLv || {}; S.petLv[S.pet] = L + 1; SFX.level(); gainXP(10*(L + 1));
-  toast(`<b>${PETS[S.pet].name}</b> is now level ${L + 1}!<br>It hits harder and faster.`); renderHUD(); save();
+  toast(`<b>${esc(petName())}</b> is now level ${L + 1}!<br>It hits harder and faster.`); renderHUD(); save();
 }
 function upgradeSaddle() {
   const L = mountLv(); if (!S.mount || L >= SADDLE_MAX || !stations().bench) return;
@@ -8361,7 +8369,7 @@ function updatePet(dt) {
   if (petFindT <= 0 && petE) { petFindT = (60 + Math.random()*90) * (petTricks().includes('fetch') ? .7 : 1); if (!townAt(S.x, S.y, 8) && !inDungeon() && !enemies.some(e => !e.dead && Math.hypot(e.x - S.x, e.y - S.y) < 8 && !(ENEMIES[e.type] && ENEMIES[e.type].passive)) && Math.random() < .55) {
     const pool = (PET_FINDS[S.pet] || [['berries', 2], ['herbs', 1], ['coins', 10], ['sticks', 2]]).filter(([g]) => g === 'coins' || GOODS[g]), [g, n] = pick(pool);
     if (g === 'coins') S.coins += n; else addItem(g, n); S.petFinds = (S.petFinds || 0) + 1;
-    floatText(petE.x, petE.y - 1, `${PETS[S.pet].name} found ${n} ${g === 'coins' ? 'coin' : GOODS[g].name}!`, '#e3c068'); burst(petE.x, petE.y - .3, '#e3c068', 6, 2); SFX.pickup(); renderHUD(); } }
+    floatText(petE.x, petE.y - 1, `${petName()} found ${n} ${g === 'coins' ? 'coin' : GOODS[g].name}!`, '#e3c068'); burst(petE.x, petE.y - .3, '#e3c068', 6, 2); SFX.pickup(); renderHUD(); } }
   const P = PETS[S.pet];
   if (!petE) petE = {x: S.x - .8, y: S.y + .3, cd: 0, face: 1, phase: 0, moving: false};
   petE.cd -= dt;
@@ -9702,6 +9710,7 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['petname','What\'s in a Name?','Give your pet a name', () => (S.petsNamed || 0) >= 1],
   ['squid','Release the Kraken? No, Just a Squid','Catch a Giant Squid at sea', () => (S.fishLog || {}).giant_squid > 0],
   ['mustang','Horse Whisperer','Tame a wild mustang', () => S.mounts.includes('mustang')],
   ['highwayman','Stand and Deliver','Defeat a masked highwayman', () => (S.highwaymen || 0) >= 1],
