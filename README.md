@@ -11,3 +11,7 @@ To test it go to https://bug-videojs-hls-iphone-scrubber-always-showing.stackbli
 This project is meant to run on StackBlitz ⚡️
 
 [Edit on StackBlitz ⚡️](https://stackblitz.com/edit/bug-videojs-hls-iphone-scrubber-always-showing)
+
+## Hide & seek game
+
+The `hide-and-seek/` folder contains an unrelated project: a multiplayer 3D hide-and-seek game. See [hide-and-seek/README.md](hide-and-seek/README.md).
