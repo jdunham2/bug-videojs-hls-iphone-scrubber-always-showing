@@ -769,6 +769,14 @@ const GOODS = {
   pumpkin_lantern:{name:'Jack-o-Lantern',base:40,col:'#e07a2a',kind:'place',desc:'Place with B. A carved pumpkin with a candle inside.'},
   snow_globe:{name:'Giant Snow Globe',base:60,col:'#9fe8ff',kind:'place',desc:'Place with B. A tiny snowy village under glass.'},
   candy_apple:{name:'Candy Apple',base:15,col:'#e0302a',kind:'food',heal:10},
+  dig_idol:{name:'Clay Idol',base:160,col:'#b0703a',kind:'good',desc:'An ancient idol dug from the earth.'},
+  dig_mask:{name:'Bronze Mask',base:240,col:'#c08a3a',kind:'good',desc:'A ceremonial mask of the old desert kings.'},
+  dig_tablet:{name:'Star Map Tablet',base:300,col:'#8a9ab0',kind:'good',desc:'Stars carved in stone, older than any kingdom.'},
+  dig_seal:{name:'Royal Seal',base:280,col:'#d04a3a',kind:'good',desc:'The seal of a forgotten queen.'},
+  dig_scarab:{name:'Jade Scarab',base:220,col:'#3aaa7a',kind:'good',desc:'A lucky charm of polished jade.'},
+  dig_crest:{name:'Old Kingdom Crest',base:350,col:'#e0c050',kind:'good',desc:'A golden crest from the Old Kingdom.'},
+  dig_horn:{name:'Carved Drinking Horn',base:180,col:'#d8c8a0',kind:'good',desc:'Carved with hunting scenes.'},
+  dig_amulet:{name:'Serpent Amulet',base:320,col:'#6a4aaa',kind:'good',desc:'A coiled serpent in dark silver.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2138,6 +2146,10 @@ const NPCS = [
    hello:["The ice is perfect today!","Glide, don't walk!","Mind the cracks!"], rumors:["On ice you can't stop on a coin. Start turning early and let the slide carry you to the stars."]},
   {id:'jasper',town:'ashfall',dx:-3,dy:3,name:'Jasper the Lapidary',role:'Gem cutting',cols:{cloak:'#5a3a6a',skin:'#c8a080',hair:'#2a2a2a'},lapidary:true,freeSpot:true,
    hello:["Every crystal hides a gem.","Steady hands, sharp eyes.","Want to try the wheel?"], rumors:["Cut a crystal on the wheel: stop the marker on the facet three times. Miss and you're left with dust."]},
+  {id:'dunst',town:'dun',dx:3,dy:-3,name:'Professor Dunst',role:'Archaeologist',cols:{cloak:'#a08a5a',skin:'#e0b090',hair:'#a0a0a0'},archaeo:true,freeSpot:true,
+   hello:["History lies just beneath our feet!","Mind where you step, that's a dig site.","Every shard tells a story."], rumors:["Dig sites turn up in ruins, deserts and mesas. The numbers you uncover tell you how far you are from the find."]},
+  {id:'morwen',town:'jade',dx:-3,dy:-3,name:'Old Salt Morwen',role:'Tides card game',cols:{cloak:'#2a4a5a',skin:'#c8a080',hair:'#e8e8e8'},tides:true,freeSpot:true,
+   hello:["Fancy a hand of Tides?","The tide always turns, dearie.","Sit, sit. Cards are dealt."], rumors:["In Tides, the last round is High Tide and counts double. Save a big card for it."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4569,6 +4581,79 @@ addEventListener('keydown', e => {
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
 }, {capture: true});
 addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); }, {capture: true});
+// ===== archaeology =====
+const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
+const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
+function digTalk(n) {
+  if (!S.trowel) { S.trowel = true; S.digDay = -1; save(); say('“An apprentice! Wonderful. Take this trowel. I’ll mark dig sites on your map each day: look in ruins, deserts, savannas and mesas. At a site, dig carefully: each hole tells you how many steps away the find is buried. You get six digs. Bring me every kind of artifact and I’ll make it worth your while!”', [back(n)]); return; }
+  S.digFound = S.digFound || {}; const got = DIG_FINDS.filter(g => S.digFound[g]).length, done = got === DIG_FINDS.length;
+  if (done && !S.digDone) { S.digDone = true; S.coins += 1500; addItem('gem', 3); SFX.victory(); renderHUD(); save(); }
+  say(`<b>Artifact collection: ${got}/${DIG_FINDS.length}</b><br>${DIG_FINDS.map(g => S.digFound[g] ? `<span style="color:${GOODS[g].col}">◆</span> ${GOODS[g].name}` : '<span style="color:var(--muted)">◇ ???</span>').join(' · ')}<br><br>${done ? '“The complete collection! The university will name a wing after you. Please accept 1,500 coin and these gems.”' : `“Keep digging! ${(S.digSites || []).filter(q => !q.done).length} dig site(s) are marked on your map today.”`}<br><span style="color:var(--muted)">Artifacts can be sold, or kept as a record of your finds.</span>`, [back(n)]);
+}
+function ensureDigSites() {
+  if (!S.trowel || S.digDay === S.day || inDungeon() || S.y >= WORLD_H) return;
+  S.digDay = S.day; S.digSites = [];
+  for (let k = 0; k < 400 && S.digSites.length < 3; k++) {
+    const a = Math.random()*6.283, r = 15 + Math.random()*70, x = Math.floor(S.x + Math.cos(a)*r), y = Math.floor(S.y + Math.sin(a)*r);
+    if (!inB(x, y) || !DIG_TILES.includes(map[idx(x, y)]) || !passable(x + .5, y + .5) || townAt(x, y, 10) || S.digSites.some(q => Math.hypot(q.x - x, q.y - y) < 10)) continue;
+    S.digSites.push({x, y});
+  }
+  if (S.digSites.length) setTimeout(() => toast(`<b>New dig sites!</b><br>${S.digSites.length} dig site${S.digSites.length > 1 ? 's are' : ' is'} marked on your map today.`, 4500), 1500);
+}
+function digSiteTarget() {
+  if (!S.trowel || !S.digSites) return null; const q = S.digSites.find(q => !q.done && Math.hypot(q.x + .5 - S.x, q.y + .5 - S.y) < 1.5); if (!q) return null;
+  return {key: 'dig' + q.x + ',' + q.y, html: '<kbd style="margin:0 6px 0 0">E</kbd>Excavate the dig site', btn: 'Dig', fn: () => digStart(q)};
+}
+function digStart(q) {
+  q.done = true; const G = {q, t: Math.floor(Math.random()*25), left: 6, open: {}, found: false};
+  const render = msg => {
+    const tx = G.t % 5, ty = Math.floor(G.t/5);
+    openPanel('Dig site', `${msg}<div style="display:grid;grid-template-columns:repeat(5,44px);gap:4px;justify-content:center;margin:10px 0">${Array.from({length: 25}, (_, i) => { const o = G.open[i]; return `<button class="btn" data-dig="${i}" style="height:44px;padding:0;font-weight:bold;${o === 'X' ? 'background:#e0c050;color:#1a1a1a' : o != null ? `background:#5a4a3a;color:${['#ff6a4a', '#ff9a4a', '#ffd04a', '#9ad04a', '#6ab0ff', '#8a8aa0', '#8a8aa0', '#8a8aa0', '#8a8aa0'][o]}` : 'background:#c8a070'}" ${o != null || G.found || !G.left ? 'disabled' : ''}>${o === 'X' ? '★' : o != null ? o : ''}</button>`; }).join('')}</div><div style="text-align:center;color:var(--muted)">Digs left: ${G.left} · numbers show steps to the find</div>`, G.found || !G.left ? [{label: 'Done', primary: true, fn: closeTalk}] : [{label: 'Stop digging', fn: () => { G.left = 0; digEnd(G); }}]);
+    setTimeout(() => document.querySelectorAll('[data-dig]').forEach(b => b.addEventListener('click', () => digCell(G, +b.dataset.dig, render))), 20);
+  };
+  render('Brush away the earth carefully. Each hole tells you how far the buried artifact is.'); SFX.dig && SFX.dig();
+}
+function digCell(G, i, render) {
+  if (G.open[i] != null || G.found || G.left <= 0) return;
+  G.left--; const tx = G.t % 5, ty = Math.floor(G.t/5), d = Math.abs(i % 5 - tx) + Math.abs(Math.floor(i/5) - ty);
+  if (d === 0) { G.open[i] = 'X'; G.found = true; SFX.victory(); digEnd(G, render); return; }
+  G.open[i] = d; SFX.click(); if (G.left <= 0) { digEnd(G, render); return; } render(d === 1 ? '<b style="color:#ff9a4a">Very close!</b>' : d === 2 ? 'Getting warm...' : 'Just dirt here.');
+}
+function digEnd(G, render) {
+  S.digs = (S.digs || 0) + 1; S.digFound = S.digFound || {};
+  if (G.found) {
+    const missing = DIG_FINDS.filter(g => !S.digFound[g]), g = missing.length && Math.random() < .7 ? pick(missing) : pick(DIG_FINDS), isNew = !S.digFound[g];
+    S.digFound[g] = true; addItem(g, 1); const c = 20 + G.left*15; S.coins += c; renderHUD(); save();
+    (render || (() => {}))(`<b style="color:#e0c050">You found ${/^[AEIOU]/.test(GOODS[g].name) ? 'an' : 'a'} ${GOODS[g].name}!</b>${isNew ? ' A new find for your collection.' : ''} <span style="color:var(--good)">+${c} coin for careful digging</span>`);
+    if (!render) toast(`<b>Found: ${GOODS[g].name}!</b>`, 4000);
+  } else { const c = 10; S.coins += c; renderHUD(); save(); if (render) render(`Out of digs. The artifact stays buried... You find a few old coins in the dirt. <span style="color:var(--good)">+${c} coin</span>`); else closeTalk(); }
+}
+function drawDigSite(q) {
+  const px = q.x*TS, py = q.y*TS; ctx.fillStyle = '#7a5a3a'; ctx.fillRect(px + 2, py + 2, 12, 12); ctx.fillStyle = '#5a3a20'; ctx.fillRect(px + 5, py + 6, 3, 2); ctx.fillRect(px + 9, py + 9, 2, 2);
+  ctx.fillStyle = '#c8a070'; for (const [sx, sy] of [[1, 1], [14, 1], [1, 14], [14, 14]]) ctx.fillRect(px + sx - 1, py + sy - 5, 2, 6);
+  ctx.strokeStyle = '#e8d8a0'; ctx.lineWidth = .7; ctx.strokeRect(px + 1, py - 2, 13, 13);
+}
+// ===== Tides card game =====
+function tidesStart(n) {
+  const deal = () => Array.from({length: 5}, () => 1 + Math.floor(Math.random()*9)).sort((a, b) => a - b);
+  const G = {n, mine: deal(), theirs: deal(), round: 0, me: 0, them: 0, log: []}; tidesTurn(G);
+}
+function tidesTurn(G) {
+  if (G.round >= 5) {
+    const win = G.me > G.them, tie = G.me === G.them; let c = 0; if (win) { c = 50; S.tidesWins = (S.tidesWins || 0) + 1; } else if (tie) c = 20; S.coins += c; S.tidesGames = (S.tidesGames || 0) + 1; SFX[win ? 'victory' : 'coin'](); renderHUD(); save();
+    say(`${G.log.join('<br>')}<br><br><b>Final score: you ${G.me} – ${G.them} Morwen.</b> ${win ? '“Well played! The tide was yours.”' : tie ? '“A draw! Here’s your stake back.”' : '“The sea gives, the sea takes, dearie.”'}${c ? ` <span style="color:var(--good)">+${c} coin</span>` : ''}`, [{label: 'Play again · 20◆', primary: true, disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); tidesStart(G.n); }}, back(G.n)]); return;
+  }
+  const high = G.round === 4;
+  say(`<b>Round ${G.round + 1} of 5${high ? ' · HIGH TIDE (counts double!)' : ''}</b> · You ${G.me} – ${G.them} Morwen<br>${G.log.slice(-2).join('<br>')}<br><span style="color:var(--muted)">Morwen holds ${G.theirs.length} card${G.theirs.length === 1 ? '' : 's'}. Pick a card to play: the higher card wins the round.</span>`,
+    G.mine.map((v, i) => ({label: `\u{1F0A0} ${v}`, fn: () => {
+      const mine = G.mine.splice(i, 1)[0];
+      let j; const T = G.theirs; if (G.round === 4) j = 0; else if (G.round === 3 && T.length > 1) { j = T.indexOf(Math.min(...T)); } else { const r = Math.random(); j = r < .4 ? T.indexOf(Math.max(...T.slice(0, -1).length ? T.slice(0, -1) : T)) : Math.floor(Math.random()*T.length); }
+      const theirs = T.splice(j, 1)[0], pts = high ? 2 : 1;
+      if (mine > theirs) G.me += pts; else if (theirs > mine) G.them += pts;
+      G.log.push(`Round ${G.round + 1}: your <b>${mine}</b> vs Morwen’s <b>${theirs}</b> → ${mine > theirs ? '<span style="color:var(--good)">you win</span>' : mine < theirs ? '<span style="color:#e57a62">Morwen wins</span>' : 'tie'}${high ? ' (double)' : ''}`);
+      SFX.click(); G.round++; tidesTurn(G);
+    }})));
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6116,8 +6201,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Archaeology', 'Professor Dunst in Dunmere Oasis gives you a trowel. Each day, dig sites appear on your map in ruins, deserts, savannas and mesas. Excavating opens a 5\u00d75 grid: each hole shows how many steps away the artifact is buried, and you have six digs. Collect all eight artifacts for a big reward.'],
+  ['Tides', 'Old Salt Morwen in Jadewater plays Tides: each of you gets five cards, and in each of five rounds the higher card wins. The last round is High Tide and counts double. 20 coin to play, 50 for a win.'],
   ['Party races', 'The party leader can start a race from the Party menu when friends are nearby. Everyone within range races to the same town after a countdown, and the standings appear as each racer arrives. First place wins 150 coin.'],
   ['Ice rink and gem cutting', 'Freya runs an ice rink in Frostgate: slide around collecting stars for 45 seconds and dodge the cracks. Jasper in Ashfall cuts gems from 3 Crystal: stop the marker on the facet three times for a flawless cut and two gems.'],
   ['Gifts and spars', 'In a party, open the Party menu to give a friend coins or items from your pack. You can also challenge a party member to a friendly spar: each of you gets an orange spar bar, and hits on each other drain only that, never your real health. First to empty the other\u2019s bar wins.'],
@@ -6434,7 +6521,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); ensureDigSites(); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7329,6 +7416,7 @@ function render() {
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
+  for (const q of (S.digSites || [])) if (!q.done && inView(q.x, q.y)) sprites.push({y: q.y - .3, f: () => drawDigSite(q)});
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
   if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
@@ -7775,7 +7863,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8119,6 +8207,8 @@ function mainOptions(n) {
   if (n.birder) o.push({label: S.birdJournal ? 'Show my bird journal' : 'Ask about birdwatching', primary: true, fn: () => birdTalk(n)});
   if (n.rinker) o.push({label: 'Skate on the rink · 5\u25c6', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); startRink(); }});
   if (n.lapidary) o.push({label: 'Cut a gem (3 Crystal)', primary: true, disabled: have('crystal') < 3, fn: () => { addItem('crystal', -3); startCut(); }});
+  if (n.archaeo) o.push({label: S.trowel ? 'Show my finds' : 'Ask about archaeology', primary: true, fn: () => digTalk(n)});
+  if (n.tides) o.push({label: 'Play Tides · 20\u25c6', primary: true, disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); tidesStart(n); }});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -10095,6 +10185,7 @@ function openMap() {
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
     if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
     for (const q of pings) mk(q.x, q.y, q.col, `Ping (${q.name})`, 4);
+    (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
     (S.summits || []).forEach(q => { if (q.flag || S.explored[idx(q.x, q.y)]) mk(q.x + .5, q.y + .5, q.flag ? '#c84a3a' : '#8a8478', q.flag ? '⚑' : '', 3); });
     (S.waystones || []).forEach(w => { if (w.on || S.explored[idx(w.x, w.y)]) mk(w.x + .5, w.y + .5, w.on ? '#8ad0ff' : '#5a6a7a', w.on ? '◈' : '', 4); });
     (S.vaults || []).forEach((v, i) => { if ((S.vaultsSeen || {})[i]) mk(v.x + .5, v.y + .5, v.done ? '#6a6a72' : '#e0c070', v.done ? '' : 'Vault'); });
@@ -10918,6 +11009,9 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['artidig','Archaeologist','Find 5 artifacts at dig sites', () => Object.keys(S.digFound || {}).length >= 5],
+  ['digall','Curator of the Past','Complete the artifact collection', () => !!S.digDone],
+  ['tides5','Card Shark','Win 5 games of Tides', () => (S.tidesWins || 0) >= 5],
   ['racewin','Fastest in the Party','Win a party race', () => (S.partyRaceWins || 0) >= 1],
   ['rink30','Ice Dancer','Collect 30 stars in one ice rink session', () => (S.rinkBest || 0) >= 30],
   ['gemcut','Lapidary','Make a flawless gem cut', () => (S.flawlessCuts || 0) >= 1],
