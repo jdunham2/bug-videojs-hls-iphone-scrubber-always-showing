@@ -805,6 +805,7 @@ const GOODS = {
   card_lurker:{name:'Bog Lurker Card',base:40,col:'#5a7a4a',kind:'card',desc:'A collectible monster card.'},
   card_bat:{name:'Cave Bat Card',base:40,col:'#5a4a5a',kind:'card',desc:'A collectible monster card.'},
   spirit_charm:{name:'Spirit Charm',base:0,col:'#7ae0a0',kind:'trinket',desc:'A gift from the Spirit of the Wood. +10% XP while carried.'},
+  elspeth_lantern:{name:'Elspeth\u2019s Lantern',base:0,col:'#bfe8ff',kind:'trinket',desc:'A lantern with a soft blue glow. +15% damage at night while carried.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -3428,7 +3429,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (have('elspeth_lantern') && (S.time > .8 || S.time < .22) ? .15 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -5155,6 +5156,51 @@ function drawTotem(q) {
   const glow = q.done ? .2 : .6 + Math.sin(frameT*3 + q.x)*.4; ctx.fillStyle = `rgba(122,224,160,${glow})`; ctx.fillRect(px - 3, py - 22, 2, 2); ctx.fillRect(px + 1, py - 22, 2, 2); ctx.fillRect(px - 2, py - 11, 4, 1);
   if (!q.done && Math.random() < .05) burst(q.x + .5, q.y - .5, '#7ae0a0', 1, 1);
 }
+// ===== story: the Lady of Gravenmoor =====
+let GHOST_SPOT = null;
+function ghostSpot() {
+  if (GHOST_SPOT) return GHOST_SPOT; const G = TOWNS.graven; if (!G) return null;
+  for (let r = 10; r < 20 && !GHOST_SPOT; r++) for (let a = 0; a < 16; a++) { const x = Math.floor(G.x + Math.cos(a/16*6.283)*r) + .5, y = Math.floor(G.y + Math.sin(a/16*6.283)*r) + .5; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && !townAt(x, y, 8)) { GHOST_SPOT = {x, y}; break; } }
+  return GHOST_SPOT;
+}
+const ghostVisible = () => (S.time > .8 || S.time < .22) && !inDungeon() && (!S.gh || S.gh.step < 4);
+function ghostTarget() {
+  const G = ghostSpot(); if (!G) return null;
+  if (S.gh && S.gh.step === 1) { const q = S.gh.items.find(q => !q.got && Math.hypot(q.x - S.x, q.y - S.y) < 1.3); if (q) return {key: 'keep' + q.k, html: `<kbd style="margin:0 6px 0 0">E</kbd>Pick up the ${q.name}`, btn: 'Take', fn: () => { q.got = true; SFX.chime(); burst(q.x, q.y - .4, '#bfe8ff', 14, 3); save(); toast(`<b>Found: Elspeth’s ${q.name}</b><br>${q.desc}`, 5000); }}; }
+  if (S.gh && S.gh.step === 3 && Math.hypot(S.gh.grave.x - S.x, S.gh.grave.y - S.y) < 1.6) return {key: 'grave', html: '<kbd style="margin:0 6px 0 0">E</kbd>Kneel at the grave', btn: 'Kneel', fn: () => ghostFinale()};
+  if (!ghostVisible() || Math.hypot(G.x - S.x, G.y - S.y) > 1.6) return null;
+  return {key: 'ghost', html: '<kbd style="margin:0 6px 0 0">E</kbd>Speak to the ghostly lady', btn: 'Speak', fn: () => ghostTalk()};
+}
+function ghostTalk() {
+  const W = S.gh;
+  if (!W) {
+    const G = ghostSpot(), items = [], defs = [{k: 'locket', name: 'Silver Locket', desc: 'Inside: a tiny painting of a young man with kind eyes.'}, {k: 'letter', name: 'Unsent Letter', desc: '“My dearest Tomas, I will wait by the old oak until you come home...”'}, {k: 'ring', name: 'Wedding Ring', desc: 'A plain gold band, engraved: “E & T, forever.”'}];
+    for (let k = 0; k < 3000 && items.length < 4; k++) { const a = Math.random()*6.283, r = 14 + Math.random()*28, x = Math.floor(G.x + Math.cos(a)*r) + .5, y = Math.floor(G.y + Math.sin(a)*r) + .5;
+      if (!inB(Math.floor(x), Math.floor(y)) || !passable(x, y) || townAt(x, y, 8) || items.some(q => Math.hypot(q.x - x, q.y - y) < 10)) continue; items.push({x, y}); }
+    if (items.length < 4) { openPanel('A ghostly lady', 'The figure flickers and fades before she can speak.', [{label: 'Strange...', fn: closeTalk}]); return; }
+    S.gh = {step: 1, items: items.slice(0, 3).map((q, i) => ({...q, ...defs[i], got: false})), grave: {x: items[3].x, y: items[3].y}}; save();
+    openPanel('Lady Elspeth', 'A pale woman in an old-fashioned dress hovers above the grass, her feet not quite touching the ground.<br><br>“You... you can see me? Oh, please. I lost my things out on the moors, so long ago. My locket, my letter, my ring. I cannot rest without them. Will you find them for me?”<br><span style="color:var(--muted)">Her three keepsakes are marked on your map. She only appears at night.</span>', [{label: 'I’ll find them', primary: true, fn: closeTalk}]); return;
+  }
+  if (W.step === 1) {
+    const got = W.items.filter(q => q.got).length;
+    if (got < 3) { openPanel('Lady Elspeth', `“You have found ${got} of my keepsakes. The others are still out there in the dark...”`, [{label: 'I’ll keep looking', fn: closeTalk}]); return; }
+    W.step = 2; save();
+    openPanel('Lady Elspeth', 'She takes the locket, the letter and the ring, and holds them to her chest. For a moment she looks almost solid.<br><br>“Tomas never came home from the sea. I waited and waited... and then I was waiting forever. Thank you. Now, one last kindness: meet me at my grave, out on the moor. Come at the stroke of midnight.”<br><span style="color:var(--muted)">Her grave is marked on your map. Go there around midnight.</span>', [{label: 'I’ll be there', primary: true, fn: () => { W.step = 3; save(); closeTalk(); }}]); return;
+  }
+  openPanel('Lady Elspeth', '“Midnight, at my grave. Please.”', [{label: 'OK', fn: closeTalk}]);
+}
+function ghostFinale() {
+  if (!(S.time > .94 || S.time < .06)) { openPanel('A weathered grave', 'A mossy stone reads: <i>“Elspeth Marlowe. She waited.”</i><br><br>Nothing happens. Elspeth asked you to come at midnight.', [{label: 'Wait for midnight', fn: closeTalk}]); return; }
+  S.gh.step = 4; addItem('elspeth_lantern', 1); S.coins += 600; gainXP(350); SFX.victory(); burst(S.x, S.y - 1, '#bfe8ff', 40, 6); renderHUD(); save();
+  openPanel('Midnight on the moor', 'At the stroke of midnight, two figures appear beside the grave: Elspeth, and a young man with kind eyes, his clothes still dripping with seawater. He takes her hand. She smiles at you, and as they fade into the mist together, something is left on the gravestone: an old lantern, glowing with a soft blue light.<br><br><span style="color:var(--good)">You receive <b>Elspeth’s Lantern</b> (+15% damage at night while carried), 600 coin and 350 XP.</span>', [{label: 'Rest well, Elspeth', primary: true, fn: closeTalk}]);
+}
+function drawGhostLady() {
+  const G = ghostSpot(), px = G.x*TS, py = G.y*TS - 3 + Math.sin(frameT*2)*2;
+  ctx.globalAlpha = .55 + Math.sin(frameT*3)*.1; ctx.fillStyle = 'rgba(190,230,255,.3)'; ctx.beginPath(); ctx.ellipse(px, py - 8, 10, 14, 0, 0, 7); ctx.fill();
+  drawPerson(ctx, px, py, {cloak: '#d8e8f8', skin: '#e8f0f8', hair: '#a8b8c8'}, 0, false, 'down', {});
+  ctx.globalAlpha = 1; if (Math.random() < .1) burst(G.x + (Math.random() - .5)*.6, G.y - .6, '#bfe8ff', 1, 1);
+}
+function drawKeepsake(q) { const px = q.x*TS, py = q.y*TS - 2 + Math.sin(frameT*3 + q.x)*1.5; ctx.fillStyle = 'rgba(191,232,255,.35)'; ctx.beginPath(); ctx.arc(px, py - 3, 5, 0, 7); ctx.fill(); ctx.fillStyle = q.k === 'letter' ? '#f0ece0' : '#e0d8a0'; ctx.fillRect(px - 2, py - 5, 4, 4); }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6705,6 +6751,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['The Lady of Gravenmoor', 'A story quest: at night, a ghostly lady appears near Gravenmoor. Find her three lost keepsakes on the moors, then meet her at her grave at midnight.'],
   ['The Whispering Woods', 'A story quest: Elder Rowan in Hollowpine says the forest has started whispering. Find the three old totems in the woods around town, then face the Spirit of the Wood in its glade. Bring friends: it is a tough fight.'],
   ['Whack-a-mole and log rolling', 'Farmer Bea in Reedholm needs help with moles: whack them as they pop up (golden ones are worth extra) but leave her cat alone. Bjorn in Tallpine dares you onto a spinning log in the river: lean against every wobble with the arrow keys to stay on as long as you can.'],
   ['Monster cards', 'Monsters sometimes drop a card of themselves (elites much more often). Tobias in Crownfall keeps your album: he pays 25 coin for each new card, buys duplicates, and gives prizes at 10, 20 and a full album. Party members can gift you the cards you\u2019re missing.'],
@@ -7936,6 +7983,8 @@ function render() {
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
+  if (ghostSpot() && ghostVisible() && inView(ghostSpot().x, ghostSpot().y)) sprites.push({y: ghostSpot().y, f: drawGhostLady});
+  if (S.gh && S.gh.step === 1) for (const q of S.gh.items) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawKeepsake(q)});
   if (S.ww && S.ww.step === 1) for (const q of S.ww.spots) if (inView(q.x, q.y)) sprites.push({y: q.y + .2, f: () => drawTotem(q)});
   if (tornado && inView(tornado.x, tornado.y)) sprites.push({y: tornado.y, f: drawTornado});
   for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
@@ -8387,7 +8436,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -10723,6 +10772,9 @@ function openMap() {
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
     if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
     for (const q of pings) mk(q.x, q.y, q.col, `Ping (${q.name})`, 4);
+    if (S.gh && S.gh.step === 1) S.gh.items.forEach(q => { if (!q.got) mk(q.x, q.y, '#bfe8ff', `Elspeth\u2019s ${q.name}`, 4); });
+    if (S.gh && (S.gh.step === 2 || S.gh.step === 3)) mk(S.gh.grave.x, S.gh.grave.y, '#bfe8ff', 'Elspeth\u2019s grave', 5);
+    if (S.towns.graven && (!S.gh || S.gh.step < 4)) { const g0 = ghostSpot(); if (g0) mk(g0.x, g0.y, '#bfe8ff', 'A ghostly figure (at night)', 4); }
     if (S.ww && S.ww.step === 1) S.ww.spots.forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#7ae0a0', 'Old totem (Whispering Woods)', 4); });
     if (S.ww && S.ww.step === 2) mk(S.ww.glade.x + .5, S.ww.glade.y + .5, '#7ae0a0', 'The Spirit\u2019s glade', 6);
     (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
@@ -11549,6 +11601,7 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['ladygraven','Rest in Peace','Help Lady Elspeth find rest', () => !!(S.gh && S.gh.step >= 4)],
   ['whisperwoods','The Whispering Woods','Calm the Spirit of the Wood', () => !!(S.ww && S.ww.step >= 3)],
   ['mole30','Mole Patrol','Score 30 at whack-a-mole', () => (S.moleBest || 0) >= 30],
   ['logroll60','Steady Feet','Stay on the rolling log for 60 seconds', () => (S.logBest || 0) >= 60],
@@ -12140,6 +12193,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
+window.__gs = () => ghostSpot();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
