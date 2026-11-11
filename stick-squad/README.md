@@ -102,7 +102,7 @@ After picking fighters you choose a mode:
 
 - **Story:** an 8-chapter adventure to stop **the Grand Eraser**, who wants to wipe the whole notebook clean. Each chapter has a wave of enemies, a mini-boss and a boss, with comic-style cutscenes before the chapter, before the boss and after you win, plus an ending. Press J / A to advance the text, Enter / + to skip a scene. Progress is saved, and you can replay any chapter you've reached.
 - **Arcade:** endless waves of enemies. Pick a starting stage, or a random one.
-- **Boss Rush:** fight all 33 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Boss Rush:** fight all 41 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 - **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 All modes work online.
