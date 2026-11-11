@@ -133,6 +133,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .toast.good { border-color: var(--good); } .toast.bad { border-color: var(--bad); } .toast.gold { border-color: var(--gold); color: var(--gold); }
 @keyframes tin { from { opacity: 0; transform: translateY(8px); } }
 
+.fade { position: fixed; inset: 0; background: #05070d; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 28; }
+.fade.on { opacity: 1; pointer-events: auto; }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -191,7 +194,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
     </div>
   </div>
   <button class="prompt" id="prompt" hidden></button>
-  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
@@ -202,6 +205,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 <div class="sheet-wrap" id="sheetWrap" hidden><div class="card sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 <div class="skip" id="skip" hidden><div><div class="what" id="skipWhat">Working</div><div class="clk" id="skipClk">9:00 AM</div><div class="bar"><i id="skipBar"></i></div></div></div>
 <div class="toasts" id="toasts"></div>
+<div class="fade" id="fade"></div>
 <div class="modal-wrap" id="modalWrap" hidden><div class="card modal" id="modal"></div></div>
 
 <div class="title" id="title">
@@ -436,7 +440,7 @@ const fresh = (look) => ({
   skills: { smarts: 0, fitness: 0, charm: 0, cooking: 0, creativity: 0 },
   career: null, rank: 0, daysAtRank: 0, warnings: 0, workedDay: -1, hiredDay: -1, promos: 0, careersTried: {},
   meals: 3, owned: {}, todos: [], log: [], goals: {}, over: false, earned: 0, debt: 0, rentMissed: 0,
-  perfectDays: 0, used: {}, rain: false, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
+  perfectDays: 0, used: {}, rain: false, inside: null, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
   name: look.name, look,
 });
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -539,11 +543,11 @@ function crisis() {
   if (S.hunger <= 0) {
     S.money = Math.max(0, S.money - 80); S.hunger = 50; S.energy = clamp(S.energy - 10);
     log("You fainted from hunger! Hospital bill: $80.", "bad"); toast("You fainted from hunger! -$80", "bad");
-    teleport("hospital"); advance(120, true); return true;
+    teleport("hospital", true); advance(120, true); return true;
   }
   if (S.energy <= 0) {
     log("You passed out from exhaustion. Someone drove you home.", "bad"); toast("You passed out!", "bad");
-    teleport("home"); doSleep(true); return true;
+    teleport("home", true); doSleep(true); return true;
   }
   if (S.clean <= 0) { S.social = clamp(S.social - 20); S.clean = 12; log("You smell so bad people are avoiding you.", "bad"); toast("You stink! Take a shower.", "bad"); }
   if (S.fun <= 0 && S.social <= 0) { gameOver("Burnt out", `You got so lonely and bored that you moved back in with your parents. You lasted ${day()} days.`); return true; }
@@ -1028,6 +1032,313 @@ function refreshBeacons() {
   if (!S) return;
   const want = new Set(S.todos.filter((t) => !t.done).map((t) => (t.id === "work" ? S.career : ACT_HOME[t.id])));
   for (const id in beacons) beacons[id].g.visible = want.has(id);
+  refreshInteriorGems();
+}
+
+// ============================================================ INTERIORS
+const OX = 3000, OZ = 3000;
+const BOOKC = [0xc0392b, 0x2d6cdf, 0x27ae60, 0xf39c12, 0x8e44ad, 0x16a085, 0xd35400];
+const SNACKC = [0xe74c3c, 0xf1c40f, 0x3498db, 0x2ecc71, 0xe67e22, 0x9b59b6, 0xffffff];
+const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.28, roughness: 0.1 });
+const glowCache = {};
+const glowMat = (c, i = 0.8) => glowCache[c + "_" + i] || (glowCache[c + "_" + i] = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: i }));
+const inLights = [0, 1].map(() => { const L = new THREE.PointLight(0xfff1d6, 0, 46, 1.2); scene.add(L); return L; });
+let IN = null;
+
+// Each item: [station name or null for decoration, furniture, x, z, facing (0 front, 1 right, -1 left, 2 back), activity ids, special]
+const INTERIORS = {
+  home: { W: 22, D: 16, floor: 0xc9a27a, wall: 0xf3e3c8, rug: 0x2d6cdf, items: [
+    ["Bed", "bed", -8, -5.6, 0, ["sleep", "nap"]],
+    ["Bookshelf", "books", -3.5, -7.25, 0, ["read", "write"]],
+    ["Sink", "sink", 0.5, -7, 0, ["dishes"]],
+    ["Stove", "stove", 3, -7, 0, ["cook", "practicecook", "coffee"]],
+    [null, "fridge", 5, -7, 0],
+    ["Shower", "shower", 8.5, -6.6, 0, ["shower", "bath"]],
+    ["Washing machine", "washer", 10, -2, -1, ["laundry"]],
+    ["Trash can", "trash", 10.2, 1, -1, ["trash"]],
+    ["Cleaning closet", "closet", 10.2, 4.5, -1, ["cleanroom"]],
+    ["Art corner", "easel", -10.1, 0, 1, ["paint", "guitar"]],
+    ["Home gym", "weights", -6, 3.5, 0, ["homegym"]],
+    ["Couch & TV", "tv", 2.5, 0, 0, ["tv", "games"]],
+    ["Plants", "plant", -2.5, 5.2, 0, ["garden"]],
+    [null, "plant", 5, 5.8, 0],
+  ] },
+  grocery: { W: 26, D: 18, floor: 0xe8e8e0, wall: 0xdff0d8, rug: 0x2f9a45, items: [
+    [null, "shelf", -8, -7.9, 0], [null, "shelf", -2, -7.9, 0], [null, "shelf", 4, -7.9, 0],
+    [null, "shelf", -8, -2, 0], [null, "shelf", -2, -2, 0],
+    [null, "fridge", 9.6, -7.9, 0], [null, "fridge", 11.2, -7.9, 0],
+    ["Checkout", "register", 6, 1, 0, ["groceries", "snacks"]],
+    ["Flower stand", "flowers", -9, 4, 0, ["flowers"]],
+  ], people: [[6, -0.5], [-5, -4.6], [1, -4.8]] },
+  burger: { W: 26, D: 18, floor: 0xf2e6c9, wall: 0xffd6c9, rug: 0xe94f37, items: [
+    ["Order counter", "register", 0, -4, 0, ["burger", "combo", "shake"]],
+    [null, "stove", -3, -7.9, 0], [null, "stove", -0.8, -7.9, 0], [null, "fridge", 2.2, -7.9, 0],
+    [null, "table", -8, 2, 0], [null, "table", -8, -3.5, 0], [null, "table", 8, 2, 0], [null, "table", 8, -3.5, 0],
+    ["Employee time clock", "clock", 10.5, -8.4, 0, [], "career"],
+  ], people: [[0, -5.4], [-2, -6.6], [-6.2, 2.2], [8, 0.2]] },
+  restaurant: { W: 26, D: 18, floor: 0x6b4a2f, wall: 0xe9d8c0, rug: 0x8c1d2e, items: [
+    [null, "table", -8, -3, 0], [null, "table", -2, -3, 0], [null, "table", -8, 3, 0],
+    ["Your table", "table", 6, 3, 0, ["dinner", "brunch"]],
+    ["Chef's kitchen", "stove", -3, -7.9, 0, ["cookclass"]], [null, "counter", 1, -7.9, 0], [null, "fridge", 4, -7.9, 0],
+    ["Staff time clock", "clock", 10.5, -8.4, 0, [], "career"],
+    [null, "plant", 11.6, 7, 0], [null, "plant", -11.6, 7, 0],
+  ], people: [[3, 0], [-8, -1.2], [-2, -1.2], [1, -6.6]] },
+  office: { W: 26, D: 18, floor: 0x9aa5b1, wall: 0xe6edf5, rug: 0x1d3354, items: [
+    [null, "desk", -9, -6, 0], [null, "desk", -5, -6, 0], [null, "desk", -9, -1, 0], [null, "desk", -5, -1, 0],
+    ["Your desk", "desk", 1, -6, 0, [], "career"],
+    ["Coffee bar", "coffee", 8, -8, 0, ["espresso"]],
+    ["Hackathon table", "table", 7, 1, 0, ["hackathon"]],
+    [null, "sofa", -7, 5, 0], [null, "plant", -11.6, 7, 0], [null, "plant", 11.6, 7, 0],
+  ], people: [[-5, -4.4], [-9, 0.6], [4, -1], [8, -6.5]] },
+  hospital: { W: 26, D: 18, floor: 0xe9f0f3, wall: 0xffffff, rug: 0x6fc3df, items: [
+    ["Exam bed", "hbed", -9, -6.9, 0, ["checkup"]],
+    ["Blood drive", "hbed", -5, -6.9, 0, ["blood"]],
+    [null, "counter", 3, -2, 0],
+    ["Volunteer desk", "desk", 8, 3, 0, ["volhosp"]],
+    ["Staff lockers", "lockers", 9, -8.25, 0, [], "career"],
+    [null, "sofa", -7, 4, 0], [null, "plant", -11.6, 7, 0],
+  ], people: [[3, -3.4], [-7, -4.6], [-7, 5.4]] },
+  police: { W: 26, D: 18, floor: 0x8b95a5, wall: 0xdbe3f0, rug: 0x1a2c55, items: [
+    [null, "counter", 0, -3, 0],
+    ["Squad car keys", "podium", -9, -8, 0, ["ridealong"]],
+    ["Training mat", "mat", -7, 3, 0, ["selfdef"]],
+    ["Locker room", "lockers", 9, -8.25, 0, [], "career"],
+    [null, "desk", 7, 1, 0], [null, "desk", 10.5, 4, 0],
+  ], people: [[0, -4.4], [-7, 0.8], [7, 2.2]] },
+  school: { W: 26, D: 18, floor: 0xd9b98c, wall: 0xf5e6c8, rug: 0x7a3b17, items: [
+    ["Classroom", "desks", -4, -3, 0, ["nightclass"]],
+    [null, "chalk", -4, -8.65, 0],
+    ["Drama stage", "stage", 7, -7, 0, ["drama"]],
+    ["Tutoring table", "table", 8, 2.5, 0, ["tutor"]],
+    ["Staff room", "desk", -9, 4, 0, [], "career"],
+    [null, "lockers", -12.25, -2, 1],
+  ], people: [[-4, -7.3], [-6.4, -0.6], [8, 4.4]] },
+  library: { W: 26, D: 18, floor: 0x7a5233, wall: 0xeadbc4, rug: 0x3f6b4a, items: [
+    [null, "books", -9, -8.25, 0], [null, "books", -5.5, -8.25, 0], [null, "books", -2, -8.25, 0], [null, "books", 1.5, -8.25, 0], [null, "books", 5, -8.25, 0],
+    [null, "books", -12.25, -3, 1], [null, "books", -12.25, 1, 1],
+    ["Study table", "table", -6, 0.5, 0, ["study"]],
+    ["Book club circle", "table", 0, -3.5, 0, ["bookclub"]],
+    ["Writing desk", "desk", 8, -3, 0, ["writelib"]],
+    ["Front desk", "counter", 7, 3.5, 0, [], "career"],
+  ], people: [[7, 2.1], [-6, -1.3], [1.6, -1.9]] },
+  gym: { W: 26, D: 18, floor: 0x3a3f48, wall: 0x6b7280, rug: 0xe4572e, items: [
+    ["Weights", "weights", -9, -6, 0, ["lift"]],
+    ["Boxing ring", "ring", -2, -5.5, 0, ["boxing"]],
+    ["Pool", "pool", 7, -5.5, 0, ["swim"]],
+    ["Yoga mat", "mat", -9, 2, 0, ["yoga"]],
+    [null, "treadmill", -5.5, 2.5, 0], [null, "treadmill", -3.5, 2.5, 0],
+    ["Locker room", "lockers", 12.25, 4, -1, ["gymshower"]],
+    ["Front desk", "counter", 4, 4, 0, [], "career"],
+  ], people: [[4, 2.6], [-9, -4.2], [-2, -5.5]] },
+  cinema: { W: 26, D: 18, floor: 0x2b1150, wall: 0x3a1f5c, rug: 0xb3202c, items: [
+    [null, "screen", 0, -8.6, 0],
+    [null, "seats", 0, -3.5, 0],
+    ["Ticket booth", "register", -7, 4, 0, ["movie", "date", "marathon"]],
+    ["Snack bar", "counter", 7, 4, 0, ["popcorn"]],
+    ["Projection booth", "desk", -11.6, -1, 1, [], "career"],
+  ], people: [[-7, 2.6], [7, 2.6], [-3, -0.6]] },
+  club: { W: 26, D: 18, floor: 0x15151f, wall: 0x25253a, rug: 0xff3fa4, items: [
+    ["Dance floor", "dance", 0, -1.5, 0, ["dance"]],
+    ["Karaoke stage", "stage", 0, -7.2, 0, ["karaoke", "openmic"]],
+    ["Arcade", "arcade", -10, 3, 0, ["arcade"]], [null, "arcade", -8.4, 3, 0],
+    [null, "bar", 8, 3.5, 0],
+    ["Backstage", "closet", 10.5, -8.2, 0, [], "career"],
+  ], people: [[-2, -2, "d"], [1.5, -0.3, "d"], [2.2, -3, "d"], [-1, 0.5, "d"], [8, 2.1]] },
+  cityhall: { W: 26, D: 18, floor: 0xd8d2c0, wall: 0xf6f2e6, rug: 0x8c1d2e, items: [
+    ["Job board", "board", -6, -8.45, 0, [], "jobs"],
+    ["Volunteer office", "desk", 7, -6.5, 0, ["volunteer"]],
+    ["Rent office", "register", -6, 1, 0, ["payrent"]],
+    ["Clerk desk", "desk", 7, 1, 0, [], "career"],
+    [null, "sofa", 0, -4, 0], [null, "plant", -11.6, -8, 0], [null, "plant", 11.6, -8, 0],
+  ], people: [[-6, -0.4], [7, -5.6], [-3, -6.6]] },
+  mall: { W: 26, D: 18, floor: 0xf0eaf2, wall: 0xf7dbe7, rug: 0x7d3560, items: [
+    ["Shop counter", "register", 0, -5, 0, [], "shop"],
+    ["Window displays", "rack", -8, -7.8, 0, ["window"]],
+    [null, "rack", -8, -2, 0], [null, "rack", -8, 2, 0], [null, "rack", -3, 2, 0],
+    ["Salon chair", "salon", 8, -7, 0, ["haircut"]],
+    ["Food court", "table", 7, 2, 0, ["foodcourt"]],
+    ["Stock room", "closet", 12.2, -2, -1, [], "career"],
+  ], people: [[0, -6.4], [-5, 0], [4, -2], [9, -5.6]] },
+};
+
+function furn(type) {
+  const g = new THREE.Group(); let w = 2, d = 2, h = 3, solid = true, center = false;
+  const B = (a, b, c, m, x, y, z) => box(a, b, c, m, x, y, z, g);
+  const C = (rt, rb, hh, m, x, y, z, seg) => cyl(rt, rb, hh, m, x, y, z, seg || 14, g);
+  const counter = (ww, base, top) => { B(ww, 1.8, 1.4, base, 0, 0.9, 0); B(ww + 0.1, 0.12, 1.5, top, 0, 1.86, 0); };
+  switch (type) {
+    case "bed": w = 2.8; d = 4.2; h = 1.8;
+      B(2.8, 0.6, 4.2, 0x7a5233, 0, 0.3, 0); B(2.6, 0.4, 4, 0xffffff, 0, 0.8, 0); B(2.62, 0.14, 2.6, 0x2d6cdf, 0, 1.05, 0.7);
+      B(1.8, 0.3, 0.8, 0xf4f4f4, 0, 1.15, -1.5); B(2.8, 1.8, 0.25, 0x5e3d22, 0, 0.9, -2.0); break;
+    case "stove": w = 2; d = 1.4; h = 2;
+      B(2, 1.8, 1.4, 0xeeeeee, 0, 0.9, 0); B(2, 0.08, 1.4, 0x222222, 0, 1.84, 0); B(1.4, 0.9, 0.05, 0x333a44, 0, 0.8, 0.71);
+      for (const [x, z] of [[-0.5, -0.3], [0.5, -0.3], [-0.5, 0.3], [0.5, 0.3]]) C(0.25, 0.25, 0.05, 0x555555, x, 1.9, z); break;
+    case "sink": w = 2.4; d = 1.4; h = 2; counter(2.4, 0x9c7b5b, 0xe8e2d6); B(1.2, 0.1, 0.8, 0x7a8a99, 0, 1.93, 0); C(0.06, 0.06, 0.7, 0xcccccc, 0, 2.25, -0.5, 8); break;
+    case "counter": w = 4; d = 1.4; h = 2; counter(4, 0x8a6a4a, 0xe8e2d6); break;
+    case "register": w = 4; d = 1.4; h = 2.6; counter(4, 0x5a6b7d, 0xe8e2d6); B(0.9, 0.5, 0.6, 0x333333, 0.8, 2.15, 0); B(0.7, 0.45, 0.06, glowMat(0x48d597, 0.6), 0.8, 2.6, -0.1); break;
+    case "coffee": w = 3.2; d = 1.4; h = 2.8; counter(3.2, 0x3e2a1e, 0xd8c3a5); B(0.8, 1, 0.7, 0x222222, -0.6, 2.4, -0.2); B(0.3, 0.2, 0.3, glowMat(0xff6b4a, 0.8), -0.6, 2.6, 0.16);
+      for (let i = 0; i < 3; i++) C(0.12, 0.1, 0.25, 0xffffff, 0.5 + i * 0.35, 2.05, 0.2, 8); break;
+    case "fridge": w = 1.5; d = 1.4; h = 3.4; B(1.5, 3.4, 1.4, 0xdfe6ea, 0, 1.7, 0); B(1.52, 0.04, 1.42, 0x9aa5ad, 0, 2.3, 0); B(0.08, 0.9, 0.1, 0x888888, 0.55, 2.8, 0.72); break;
+    case "shower": w = 2.2; d = 2.2; h = 3.4; B(2.2, 0.2, 2.2, 0xffffff, 0, 0.1, 0); B(2.2, 3.4, 0.06, glassMat, 0, 1.9, 1.07); B(0.06, 3.4, 2.2, glassMat, 1.07, 1.9, 0); B(0.06, 3.4, 2.2, glassMat, -1.07, 1.9, 0);
+      B(2.2, 3.6, 0.1, 0xbfe3ef, 0, 1.8, -1.07); C(0.3, 0.3, 0.1, 0xcccccc, 0, 3.4, -0.6); break;
+    case "washer": w = 1.5; d = 1.4; h = 1.9; B(1.5, 1.9, 1.4, 0xf4f4f4, 0, 0.95, 0); { const dr = C(0.45, 0.45, 0.1, 0x3d5a80, 0, 0.9, 0.72, 20); dr.rotation.x = Math.PI / 2; } B(1.3, 0.2, 0.05, 0x333333, 0, 1.7, 0.71); break;
+    case "trash": w = 1; d = 1; h = 1.3; C(0.45, 0.38, 1.2, 0x2f8f4e, 0, 0.6, 0); C(0.48, 0.48, 0.1, 0x236b3a, 0, 1.25, 0); break;
+    case "closet": w = 2; d = 1; h = 3.6; B(2, 3.6, 1, 0xb08a5e, 0, 1.8, 0); B(0.04, 3.4, 0.05, 0x6b4a2f, 0, 1.8, 0.51); B(0.1, 0.4, 0.1, 0x333333, 0.25, 1.9, 0.55); B(0.1, 0.4, 0.1, 0x333333, -0.25, 1.9, 0.55); break;
+    case "books": w = 3.2; d = 0.9; h = 3.6; B(3.2, 3.6, 0.9, 0x6b4a2f, 0, 1.8, 0);
+      for (let r = 0; r < 4; r++) { let x = -1.45; let i = r; while (x < 1.2) { const bw = 0.25 + ((i * 37) % 10) / 50, bh = 0.5 + ((i * 13) % 5) / 20; B(bw, bh, 0.6, BOOKC[i % BOOKC.length], x + bw / 2, 0.35 + r * 0.85 + bh / 2, 0.12); x += bw + 0.04; i++; } } break;
+    case "easel": w = 1.4; d = 1.2; h = 2.8; B(0.1, 2.4, 0.1, 0x8a5a33, -0.5, 1.2, 0); B(0.1, 2.4, 0.1, 0x8a5a33, 0.5, 1.2, 0); B(0.1, 2.2, 0.1, 0x8a5a33, 0, 1.1, -0.5);
+      B(1.3, 1, 0.08, 0xffffff, 0, 1.9, 0.08); B(0.5, 0.4, 0.02, 0xe4572e, -0.2, 2.0, 0.13); B(0.4, 0.3, 0.02, 0x2d6cdf, 0.25, 1.75, 0.13); B(1.4, 0.08, 0.3, 0x8a5a33, 0, 1.35, 0.1); break;
+    case "plant": w = 1; d = 1; h = 2.2; C(0.4, 0.3, 0.7, 0xb5651d, 0, 0.35, 0);
+      { const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 0), new THREE.MeshStandardMaterial({ color: 0x3f9b4a, flatShading: true })); l.position.y = 1.4; l.castShadow = true; g.add(l); } break;
+    case "flowers": w = 2.4; d = 1.2; h = 2; B(2.4, 0.9, 1.2, 0x8a5a33, 0, 0.45, 0);
+      for (let i = 0; i < 4; i++) { C(0.22, 0.18, 0.4, 0xb5651d, -0.9 + i * 0.6, 1.1, 0); const f = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), mat([0xff5c8a, 0xffbe2e, 0xff7b39, 0xb07cff][i])); f.position.set(-0.9 + i * 0.6, 1.5, 0); g.add(f); } break;
+    case "weights": w = 2.6; d = 1.8; h = 2; B(0.8, 0.6, 1.8, 0x222222, 0, 0.3, 0); B(0.12, 1.6, 0.12, 0x666666, -1, 0.8, -0.6); B(0.12, 1.6, 0.12, 0x666666, 1, 0.8, -0.6);
+      { const bar = C(0.06, 0.06, 2.6, 0xaaaaaa, 0, 1.55, -0.6, 8); bar.rotation.z = Math.PI / 2; for (const s of [-1, 1]) { const p = C(0.45, 0.45, 0.15, 0x111111, s * 1.1, 1.55, -0.6, 16); p.rotation.z = Math.PI / 2; } } break;
+    case "desk": w = 2.6; d = 2.2; h = 2.4; B(2.6, 0.12, 1.3, 0xd8c3a5, 0, 1.3, -0.4); B(0.1, 1.25, 1.2, 0x555555, -1.2, 0.62, -0.4); B(0.1, 1.25, 1.2, 0x555555, 1.2, 0.62, -0.4);
+      B(1.3, 0.8, 0.06, glowMat(0x7cc8ff, 0.7), 0, 1.85, -0.8); B(0.2, 0.3, 0.2, 0x333333, 0, 1.45, -0.85);
+      B(0.8, 0.12, 0.8, 0x2d3340, 0, 0.8, 0.6); B(0.8, 0.9, 0.12, 0x2d3340, 0, 1.25, 0.95); C(0.06, 0.06, 0.75, 0x555555, 0, 0.4, 0.6, 6); break;
+    case "table": w = 3.4; d = 3.4; h = 1.8; C(1.1, 1.1, 0.1, 0xf6f2e6, 0, 1.2, 0, 20); C(0.12, 0.12, 1.2, 0x555555, 0, 0.6, 0, 8);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; B(0.6, 0.8, 0.6, 0xc0392b, Math.cos(a) * 1.4, 0.4, Math.sin(a) * 1.4); } break;
+    case "arcade": w = 1.3; d = 1.2; h = 2.9; B(1.3, 2.6, 1.2, 0x2b1150, 0, 1.3, 0); B(1.0, 0.8, 0.06, glowMat(0x3ff0ff, 0.9), 0, 1.9, 0.62); B(1.1, 0.12, 0.5, 0x111111, 0, 1.25, 0.7); B(1.3, 0.3, 1.2, glowMat(0xff3fa4, 0.8), 0, 2.75, 0); break;
+    case "stage": w = 6; d = 3; h = 1.6; B(6, 0.6, 3, 0x2a2a2a, 0, 0.3, 0); C(0.04, 0.04, 1.6, 0x999999, 0, 1.4, 0.4, 6); C(0.12, 0.12, 0.25, 0x222222, 0, 2.25, 0.4, 8);
+      B(0.9, 1.6, 0.8, 0x111111, -2.6, 1.4, -0.8); B(0.9, 1.6, 0.8, 0x111111, 2.6, 1.4, -0.8); B(6, 0.15, 0.15, glowMat(0xffbe2e, 0.8), 0, 0.6, 1.5); break;
+    case "screen": w = 12.6; d = 0.4; h = 6; B(12.6, 5.6, 0.2, 0x111111, 0, 3.6, -0.1); B(12, 5, 0.1, glowMat(0xa8d8ff, 0.8), 0, 3.6, 0.05); break;
+    case "seats": w = 10; d = 4.4; h = 1.4;
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 7; c++) { const x = -4.2 + c * 1.4, z = -1.2 + r * 2.2; B(1.1, 0.5, 1.0, 0xb3202c, x, 0.5, z); B(1.1, 1.0, 0.25, 0xb3202c, x, 1.0, z + 0.45); } break;
+    case "hbed": w = 2; d = 3.6; h = 2.6; B(2, 0.9, 3.6, 0xe8eef2, 0, 0.45, 0); B(1.9, 0.25, 3.4, 0xbfe3ff, 0, 1.0, 0); B(1.2, 0.2, 0.7, 0xffffff, 0, 1.2, -1.2);
+      C(0.05, 0.05, 2.4, 0x999999, 1.2, 1.2, -1.6, 6); B(0.7, 0.5, 0.1, glowMat(0x48d597, 0.8), 1.2, 2.2, -1.6); break;
+    case "shelf": w = 4.4; d = 1.2; h = 2.6; B(4.4, 0.1, 1.2, 0x8a9099, 0, 0.1, 0); B(4.4, 2.6, 0.1, 0x8a9099, 0, 1.3, 0);
+      for (let r = 0; r < 3; r++) { B(4.4, 0.08, 1.2, 0xb0b6be, 0, 0.3 + r * 0.8, 0); for (let i = 0; i < 6; i++) B(0.5, 0.5, 0.42, SNACKC[(i + r * 2) % SNACKC.length], -1.8 + i * 0.72, 0.6 + r * 0.8, i % 2 ? 0.3 : -0.3); } break;
+    case "treadmill": w = 1.4; d = 3; h = 1.9; B(1.2, 0.3, 3, 0x2d3340, 0, 0.15, 0); B(1.0, 0.04, 2.6, 0x111111, 0, 0.32, 0); B(0.08, 1.4, 0.08, 0x777777, -0.55, 1.0, -1.3); B(0.08, 1.4, 0.08, 0x777777, 0.55, 1.0, -1.3); B(1.2, 0.3, 0.4, glowMat(0x48d597, 0.4), 0, 1.7, -1.3); break;
+    case "mat": w = 1.6; d = 3.2; h = 0.4; solid = false; center = true; B(1.6, 0.06, 3.2, 0x9b5de5, 0, 0.03, 0); break;
+    case "pool": w = 9; d = 5.5; h = 1; B(9, 0.4, 0.4, 0xe8eef2, 0, 0.2, -2.55); B(9, 0.4, 0.4, 0xe8eef2, 0, 0.2, 2.55); B(0.4, 0.4, 5.5, 0xe8eef2, -4.3, 0.2, 0); B(0.4, 0.4, 5.5, 0xe8eef2, 4.3, 0.2, 0);
+      { const wtr = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 4.7), new THREE.MeshStandardMaterial({ color: 0x2fa8e0, emissive: 0x1a6fb0, emissiveIntensity: 0.4, roughness: 0.1 })); wtr.rotation.x = -Math.PI / 2; wtr.position.y = 0.12; g.add(wtr); }
+      for (let i = 0; i < 4; i++) B(8.2, 0.05, 0.08, 0xffffff, 0, 0.15, -1.5 + i); break;
+    case "ring": w = 5.5; d = 5.5; h = 2.4; B(5.5, 0.8, 5.5, 0x2d3340, 0, 0.4, 0); B(5.2, 0.05, 5.2, 0x2d6cdf, 0, 0.82, 0);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) C(0.12, 0.12, 1.8, 0xd7263d, sx * 2.6, 1.7, sz * 2.6, 8);
+      for (const y of [1.4, 2.0]) { B(5.2, 0.06, 0.06, 0xffffff, 0, y, 2.6); B(5.2, 0.06, 0.06, 0xffffff, 0, y, -2.6); B(0.06, 0.06, 5.2, 0xffffff, 2.6, y, 0); B(0.06, 0.06, 5.2, 0xffffff, -2.6, y, 0); } break;
+    case "clock": w = 1.6; d = 0.6; h = 2.6; B(1.4, 1.6, 0.4, 0x3a3f48, 0, 1.6, 0); B(0.9, 0.4, 0.05, glowMat(0x48d597, 0.9), 0, 2.0, 0.22); B(0.6, 0.6, 0.05, 0xbfbfbf, 0, 1.3, 0.22); break;
+    case "board": w = 3.6; d = 0.5; h = 3.4; B(3.6, 2.4, 0.15, 0xb5895a, 0, 2.2, 0); B(0.12, 3.4, 0.12, 0x5e3d22, -1.7, 1.7, 0); B(0.12, 3.4, 0.12, 0x5e3d22, 1.7, 1.7, 0);
+      for (let i = 0; i < 8; i++) B(0.55, 0.7, 0.02, i % 3 ? 0xffffff : 0xffe08a, -1.3 + (i % 4) * 0.85, 2.75 - Math.floor(i / 4) * 1.0, 0.09); break;
+    case "podium": w = 1.4; d = 1; h = 2.2; B(1.4, 2, 1, 0x3a3f48, 0, 1, 0); B(0.6, 0.15, 0.4, 0xffbe2e, 0, 2.08, 0); break;
+    case "bar": w = 6; d = 1.4; h = 2.6; counter(6, 0x3a2340, 0x111111); B(6, 0.1, 0.1, glowMat(0xff3fa4, 0.9), 0, 1.0, 0.72);
+      for (let i = 0; i < 6; i++) C(0.12, 0.12, 0.5, glowMat([0x3ff0ff, 0xffbe2e, 0x48d597][i % 3], 0.7), -2.5 + i, 2.2, -0.3, 8); break;
+    case "dance": w = 8; d = 6; h = 0.3; solid = false; center = true;
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { const m = glowMat([0xff3fa4, 0x3ff0ff, 0xffbe2e, 0x9b5de5][(i + j) % 4], 0.5); const t = B(1.95, 0.06, 1.95, m, -3 + i * 2, 0.03, -2 + j * 2); t.castShadow = false; if (IN && !IN.dance.includes(m)) IN.dance.push(m); } break;
+    case "lockers": w = 3.6; d = 0.9; h = 3.4; B(3.6, 3.4, 0.9, 0x5d7ea8, 0, 1.7, 0); for (let i = 1; i < 4; i++) B(0.04, 3.3, 0.05, 0x2d3d55, -1.8 + i * 0.9, 1.7, 0.46);
+      for (let i = 0; i < 4; i++) B(0.4, 0.06, 0.03, 0x2d3d55, -1.35 + i * 0.9, 2.9, 0.47); break;
+    case "chalk": w = 6.2; d = 0.3; h = 3.6; B(6.2, 2.6, 0.15, 0x8a5a33, 0, 2.4, 0); B(6, 2.4, 0.05, 0x2f4f3a, 0, 2.4, 0.08); break;
+    case "desks": w = 7; d = 4.5; h = 1.4;
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const x = -2.4 + c * 2.4, z = -1.2 + r * 2.4; B(1.6, 0.1, 1.0, 0xd8c3a5, x, 1.0, z); B(1.5, 0.95, 0.1, 0x555555, x, 0.5, z - 0.4); B(0.7, 0.8, 0.7, 0x2d6cdf, x, 0.4, z + 0.85); } break;
+    case "rack": w = 3.2; d = 1; h = 2.6; B(0.08, 2.4, 0.08, 0x999999, -1.5, 1.2, 0); B(0.08, 2.4, 0.08, 0x999999, 1.5, 1.2, 0); C(0.04, 0.04, 3.1, 0x999999, 0, 2.3, 0, 6).rotation.z = Math.PI / 2;
+      for (let i = 0; i < 6; i++) B(0.4, 1.2, 0.7, SHIRTS[i % SHIRTS.length], -1.2 + i * 0.48, 1.6, 0); break;
+    case "salon": w = 1.6; d = 1.6; h = 3; B(1.6, 2.6, 0.12, 0xcfd8dc, 0, 1.6, -0.74); B(1.2, 1.4, 0.05, glowMat(0xdfefff, 0.35), 0, 2.0, -0.66);
+      C(0.25, 0.35, 0.6, 0x333333, 0, 0.3, 0.2, 10); B(0.9, 0.3, 0.9, 0xd7263d, 0, 0.75, 0.2); B(0.9, 1.0, 0.2, 0xd7263d, 0, 1.3, -0.2); break;
+    case "sofa": w = 3.6; d = 1.4; h = 1.6; B(3.6, 0.7, 1.3, 0x5c6bc0, 0, 0.35, 0); B(3.6, 1.1, 0.35, 0x5c6bc0, 0, 0.95, -0.5); B(0.35, 0.95, 1.3, 0x4a57a0, -1.65, 0.5, 0); B(0.35, 0.95, 1.3, 0x4a57a0, 1.65, 0.5, 0); break;
+    case "tv": w = 4.4; d = 4; h = 2.8; B(3, 0.8, 0.8, 0x333333, 0, 0.4, -1.6); B(3.4, 1.9, 0.12, 0x111111, 0, 1.8, -1.6); B(3.2, 1.7, 0.05, glowMat(0x4fa8ff, 0.7), 0, 1.8, -1.52);
+      B(1.6, 0.5, 0.8, 0x8a5a33, 0, 0.25, 0);
+      B(3.6, 0.7, 1.3, 0x9b5de5, 0, 0.35, 1.3); B(3.6, 1.1, 0.35, 0x9b5de5, 0, 0.95, 1.85); B(0.35, 0.95, 1.3, 0x7d45c4, -1.8, 0.5, 1.3); B(0.35, 0.95, 1.3, 0x7d45c4, 1.8, 0.5, 1.3); break;
+    case "exitdoor": w = 4; d = 0.4; h = 4; solid = false;
+      B(0.3, 3.8, 0.4, 0x3a3f48, -2, 1.9, 0); B(0.3, 3.8, 0.4, 0x3a3f48, 2, 1.9, 0); B(4.3, 0.4, 0.4, 0x3a3f48, 0, 3.9, 0); B(1.4, 0.5, 0.1, glowMat(0x2ecc71, 1), 0, 4.5, 0); break;
+  }
+  return { g, w, d, h, solid, center };
+}
+
+function buildInterior(bid) {
+  destroyInterior();
+  const spec = INTERIORS[bid], W = spec.W, D = spec.D, g = new THREE.Group(); scene.add(g);
+  IN = { bid, W, D, g, cols: [], stations: [], pick: [], people: [], dance: [] };
+  const { cols, stations, pick, people } = IN;
+  const under = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), mat(0x0e121b, { roughness: 1 })); under.rotation.x = -Math.PI / 2; under.position.set(OX, -0.05, OZ); g.add(under);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat(spec.floor, { roughness: 0.6 })); fl.rotation.x = -Math.PI / 2; fl.position.set(OX, 0, OZ); fl.receiveShadow = true; g.add(fl); pick.push(fl);
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), mat(spec.rug, { roughness: 1 })); rug.rotation.x = -Math.PI / 2; rug.position.set(OX, 0.02, OZ + D / 2 - 2); rug.receiveShadow = true; g.add(rug);
+  const wm = mat(spec.wall), trim = new THREE.Color(spec.wall).multiplyScalar(0.72).getHex();
+  box(W + 0.8, 5, 0.4, wm, OX, 2.5, OZ - D / 2 - 0.2, g); box(W + 0.8, 0.35, 0.5, trim, OX, 5.1, OZ - D / 2 - 0.2, g);
+  for (const s of [-1, 1]) {
+    box(0.4, 5, D + 0.4, wm, OX + s * (W / 2 + 0.2), 2.5, OZ, g); box(0.5, 0.35, D + 0.4, trim, OX + s * (W / 2 + 0.2), 5.1, OZ, g);
+    const fw = W / 2 - 2; box(fw, 1.2, 0.4, wm, OX + s * (2 + fw / 2), 0.6, OZ + D / 2 + 0.2, g);
+  }
+  for (const x of [-W / 4, W / 4]) box(3.2, 2, 0.1, glowMat(0xcfe8ff, 0.45), OX + x, 3, OZ - D / 2 + 0.02, g);
+  inLights.forEach((L, i) => { L.position.set(OX + (i ? W / 4 : -W / 4), 7, OZ); L.intensity = 0.6; });
+  const items = spec.items.concat([["Leave", "exitdoor", 0, D / 2, 2, [], "exit"]]);
+  for (const [name, type, x, z, r, acts, sp] of items) {
+    const f = furn(type); f.g.position.set(OX + x, 0, OZ + z); f.g.rotation.y = r * Math.PI / 2; g.add(f.g);
+    const odd = Math.abs(r) % 2 === 1, hw = (odd ? f.d : f.w) / 2, hd = (odd ? f.w : f.d) / 2;
+    if (f.solid) cols.push({ x: OX + x, z: OZ + z, hw: hw + 0.45, hd: hd + 0.45 });
+    if (!name) continue;
+    const fx = Math.round(Math.sin(r * Math.PI / 2)), fz = Math.round(Math.cos(r * Math.PI / 2)), dep = f.center ? 0 : f.d / 2 + 1.1;
+    const st = { n: sp === "exit" ? `Leave ${BMAP[bid].name}` : name, acts: (acts || []).slice(), sp, sx: OX + x + fx * dep, sz: OZ + z + fz * dep };
+    if (sp !== "exit") { st.gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.45), beaconMat); st.gemY = f.h + 1.3; st.gem.position.set(OX + x, st.gemY, OZ + z); st.gem.visible = false; g.add(st.gem); }
+    const idx = stations.length; stations.push(st);
+    f.g.traverse((o) => { if (o.isMesh) { o.userData.station = idx; pick.push(o); } });
+  }
+  const assigned = new Set(stations.flatMap((s) => s.acts));
+  const missing = ACTS[bid].map((a) => a.id).filter((id) => !assigned.has(id));
+  if (missing.length) (stations.find((s) => s.acts.length) || stations[0]).acts.push(...missing);
+  (spec.people || []).forEach(([x, z, flag], i) => {
+    const c = makeChar({ shirt: SHIRTS[(i * 5 + bid.length) % SHIRTS.length], skin: SKINS[(i * 3 + bid.length) % SKINS.length], hair: HAIRS[(i + bid.length) % HAIRS.length], pants: [0x2e3a59, 0x4a4a4a, 0x7a5c3a][i % 3] });
+    c.position.set(OX + x, 0, OZ + z); g.add(c); people.push({ c, dance: flag === "d", talked: -1, chat: 0 });
+  });
+  IN.spawn = { x: OX, z: OZ + D / 2 - 3.2 };
+  refreshInteriorGems();
+}
+function destroyInterior() {
+  if (!IN) return;
+  scene.remove(IN.g);
+  IN.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  for (const L of inLights) L.intensity = 0;
+  IN = null;
+}
+function refreshInteriorGems() {
+  if (!IN || !S) return;
+  const pend = new Set(S.todos.filter((t) => !t.done).map((t) => t.id));
+  for (const st of IN.stations) if (st.gem) st.gem.visible = st.acts.some((a) => pend.has(a)) || (st.sp === "career" && pend.has("work") && S.career === IN.bid);
+}
+function canEnter(bid) { return bid === "home" || isOpen(BMAP[bid]) || S.career === bid; }
+function fade(fn) {
+  busy = true; const el = document.getElementById("fade"); el.classList.add("on");
+  setTimeout(() => { fn(); el.classList.remove("on"); busy = false; }, 260);
+}
+function enterBuilding(bid, instant) {
+  if (!instant && !canEnter(bid)) { toast(`${BMAP[bid].name} is closed. Open ${openText(BMAP[bid])}`, "bad"); return; }
+  const go = () => {
+    if (!IN) { cam.outDist = cam.dist; cam.outPitch = cam.pitch; cam.outYaw = cam.yaw; }
+    buildInterior(bid); S.inside = bid;
+    player.position.set(IN.spawn.x, 0, IN.spawn.z); player.rotation.y = Math.PI; target = null;
+    cam.x = IN.spawn.x; cam.z = IN.spawn.z; cam.dist = 22; cam.pitch = 1.0; cam.yaw = 0;
+    nearDoor = nearNpc = nearStation = null; save(); renderHUD(true);
+  };
+  if (instant) go(); else fade(go);
+}
+function leaveBuilding(instant) {
+  if (!IN) return;
+  const bid = IN.bid;
+  const go = () => {
+    destroyInterior(); S.inside = null;
+    const d = doors.find((x) => x.b.id === bid), [nx, nz] = FACE[d.b.face];
+    player.position.set(d.x + nx * 0.6, 0, d.z + nz * 0.6); player.rotation.y = Math.atan2(nx, nz); target = null;
+    S.pos.x = player.position.x; S.pos.z = player.position.z;
+    cam.x = player.position.x; cam.z = player.position.z; cam.dist = cam.outDist || 30; cam.pitch = cam.outPitch || 0.95; cam.yaw = cam.outYaw !== undefined ? cam.outYaw : 0.5;
+    nearDoor = nearNpc = nearStation = null; save(); renderHUD(true);
+  };
+  if (instant) go(); else fade(go);
+}
+function openStation(st) {
+  if (st.sp === "exit") { leaveBuilding(); return; }
+  openSheet(stationSheet(IN.bid, st));
+}
+function updateInterior(dt, now) {
+  for (const p of IN.people) {
+    if (p.chat > 0) { p.chat -= dt; animChar(p.c, false, dt); continue; }
+    if (p.dance) { animChar(p.c, true, dt, 0.8); p.c.position.y = Math.abs(Math.sin(now / 250 + p.c.position.x)) * 0.3; p.c.rotation.y += dt * 0.8; continue; }
+    animChar(p.c, false, dt);
+    if (!player) continue;
+    const dx = player.position.x - p.c.position.x, dz = player.position.z - p.c.position.z;
+    const want = Math.hypot(dx, dz) < 6 ? Math.atan2(dx, dz) : 0;
+    let df = want - p.c.rotation.y; df = Math.atan2(Math.sin(df), Math.cos(df)); p.c.rotation.y += df * Math.min(1, dt * 4);
+  }
+  for (const st of IN.stations) if (st.gem && st.gem.visible) { st.gem.rotation.y += dt * 2; st.gem.position.y = st.gemY + Math.sin(now / 400) * 0.25; }
+  IN.dance.forEach((m, i) => { m.emissiveIntensity = 0.25 + 0.75 * Math.max(0, Math.sin(now / 300 + i * 1.7)); });
 }
 
 // ============================================================ INPUT
@@ -1083,21 +1394,75 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function tap(cx, cy) {
   ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
+  if (IN) {
+    const h = ray.intersectObjects(IN.pick, false)[0]; if (!h) return;
+    const si = h.object.userData.station;
+    if (si !== undefined) { const st = IN.stations[si]; target = { x: st.sx, z: st.sz, station: si, stuck: 0 }; }
+    else target = { x: h.point.x, z: h.point.z, stuck: 0 };
+    target.path = findPath(player.position.x, player.position.z, target.x, target.z) || [];
+    tapRing.position.x = target.x; tapRing.position.z = target.z; tapRing.material.opacity = 0.9; tapRing.scale.set(1, 1, 1);
+    return;
+  }
   const hit = ray.intersectObjects(clickables, false)[0];
   if (!hit) return;
   const bid = hit.object.userData.bid;
   if (bid) { const d = doors.find((x) => x.b.id === bid); target = { x: d.x, z: d.z, bid, stuck: 0 }; }
   else { target = { x: hit.point.x, z: hit.point.z, stuck: 0 }; for (const d of doors) if (Math.hypot(d.x - hit.point.x, d.z - hit.point.z) < 2.5) target.bid = d.b.id; }
+  target.path = findPath(player.position.x, player.position.z, target.x, target.z) || [];
   tapRing.position.x = target.x; tapRing.position.z = target.z; tapRing.material.opacity = 0.9; tapRing.scale.set(1, 1, 1);
 }
 
 // ============================================================ PLAYER UPDATE
 function blocked(x, z) {
+  if (IN) {
+    const lx = x - OX, lz = z - OZ;
+    if (Math.abs(lx) > IN.W / 2 - 0.6 || lz < -IN.D / 2 + 0.6 || lz > IN.D / 2 - 0.5) return true;
+    for (const c of IN.cols) if (Math.abs(x - c.x) < c.hw && Math.abs(z - c.z) < c.hd) return true;
+    return false;
+  }
   if (Math.abs(x) > 140 || Math.abs(z) > 140) return true;
   for (const c of colliders) if (Math.abs(x - c.x) < c.hw && Math.abs(z - c.z) < c.hd) return true;
   return false;
 }
-let nearDoor = null, nearNpc = null;
+let nearDoor = null, nearNpc = null, nearStation = null;
+// Grid A* so click-to-walk goes around furniture and buildings
+function findPath(sx, sz, tx, tz) {
+  const cs = IN ? 0.5 : 2;
+  const minX = IN ? OX - IN.W / 2 : -140, minZ = IN ? OZ - IN.D / 2 : -140;
+  const nx = Math.ceil((IN ? IN.W : 280) / cs), nz = Math.ceil((IN ? IN.D : 280) / cs);
+  const wx = (i) => minX + (i + 0.5) * cs, wz = (j) => minZ + (j + 0.5) * cs;
+  const ci = (x) => Math.max(0, Math.min(nx - 1, Math.floor((x - minX) / cs))), cj = (z) => Math.max(0, Math.min(nz - 1, Math.floor((z - minZ) / cs)));
+  const grid = new Int8Array(nx * nz).fill(-1);
+  const free = (i, j) => { if (i < 0 || j < 0 || i >= nx || j >= nz) return false; const k = j * nx + i; if (grid[k] < 0) grid[k] = blocked(wx(i), wz(j)) ? 0 : 1; return grid[k] === 1; };
+  const clear = (ax, az, bx, bz) => { const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / 0.25); for (let k = 1; k <= n; k++) { const t = k / n; if (blocked(ax + (bx - ax) * t, az + (bz - az) * t)) return false; } return true; };
+  if (clear(sx, sz, tx, tz)) return [];
+  let si = ci(sx), sj = cj(sz), gi = ci(tx), gj = cj(tz);
+  if (!free(gi, gj)) { let found = false; for (let r = 1; r < 8 && !found; r++) for (let a = -r; a <= r && !found; a++) for (let b = -r; b <= r && !found; b++) if (free(gi + a, gj + b)) { gi += a; gj += b; found = true; } if (!found) return null; }
+  if (!free(si, sj)) { for (let r = 1; r < 4; r++) { let ok = false; for (let a = -r; a <= r && !ok; a++) for (let b = -r; b <= r && !ok; b++) if (free(si + a, sj + b)) { si += a; sj += b; ok = true; } if (ok) break; } }
+  const N = nx * nz, gS = new Float32Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const heap = []; const push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top[1]; };
+  const h = (i, j) => { const a = Math.abs(i - gi), b = Math.abs(j - gj); return Math.max(a, b) + 0.414 * Math.min(a, b); };
+  const sk = sj * nx + si, gk = gj * nx + gi; gS[sk] = 0; push(sk, h(si, sj));
+  let iter = 0;
+  while (heap.length && iter++ < 40000) {
+    const k = pop(); if (closed[k]) continue; closed[k] = 1; if (k === gk) break;
+    const i = k % nx, j = (k / nx) | 0;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      if (!a && !b) continue; const ni = i + a, nj = j + b; if (!free(ni, nj)) continue;
+      if (a && b && (!free(i + a, j) || !free(i, j + b))) continue;
+      const nk = nj * nx + ni, g = gS[k] + (a && b ? 1.414 : 1);
+      if (g < gS[nk]) { gS[nk] = g; from[nk] = k; push(nk, g + h(ni, nj)); }
+    }
+  }
+  if (from[gk] < 0 && gk !== sk) return null;
+  const pts = []; for (let k = gk; k !== sk && k >= 0; k = from[k]) pts.push({ x: wx(k % nx), z: wz((k / nx) | 0) });
+  pts.reverse();
+  if (!blocked(tx, tz)) pts.push({ x: tx, z: tz });
+  const out = []; let ax = sx, az = sz, idx = 0;
+  while (idx < pts.length) { let best = idx; for (let k = pts.length - 1; k > idx; k--) if (clear(ax, az, pts[k].x, pts[k].z)) { best = k; break; } out.push(pts[best]); ax = pts[best].x; az = pts[best].z; idx = best + 1; }
+  return out;
+}
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
   if (keys.w || keys.arrowup) iz += 1;
@@ -1110,10 +1475,13 @@ function updatePlayer(dt) {
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     dx = rx * ix + fx * iz; dz = rz * ix + fz * iz;
   } else if (target) {
-    dx = target.x - player.position.x; dz = target.z - player.position.z;
-    if (Math.hypot(dx, dz) < 0.35) {
-      const bid = target.bid; target = null; dx = dz = 0;
-      if (bid) { const d = doors.find((x) => x.b.id === bid); if (Math.hypot(d.x - player.position.x, d.z - player.position.z) < 3) openBuilding(bid); }
+    while (target.path && target.path.length && Math.hypot(target.path[0].x - player.position.x, target.path[0].z - player.position.z) < 0.4) target.path.shift();
+    const wp = target.path && target.path.length ? target.path[0] : target;
+    dx = wp.x - player.position.x; dz = wp.z - player.position.z;
+    if (wp === target && Math.hypot(dx, dz) < 0.35) {
+      const bid = target.bid, si = target.station; target = null; dx = dz = 0;
+      if (si !== undefined && IN && IN.stations[si]) openStation(IN.stations[si]);
+      else if (bid && !IN) { const d = doors.find((x) => x.b.id === bid); if (Math.hypot(d.x - player.position.x, d.z - player.position.z) < 3) openBuilding(bid); }
     }
   }
   const len = Math.hypot(dx, dz);
@@ -1123,7 +1491,7 @@ function updatePlayer(dt) {
     dx /= len; dz /= len;
     const sp = 8.5 * (owns("car") ? 2.6 : owns("bike") ? 1.6 : 1) * (sprint ? 1.5 : 1) * (S.energy < 15 ? 0.6 : 1);
     let step = sp * dt;
-    if (target) step = Math.min(step, Math.hypot(target.x - player.position.x, target.z - player.position.z));
+    if (target) { const wp = target.path && target.path.length ? target.path[0] : target; step = Math.min(step, Math.max(0.05, Math.hypot(wp.x - player.position.x, wp.z - player.position.z))); }
     const nx = player.position.x + dx * step, nz = player.position.z + dz * step;
     let moved = false;
     if (!blocked(nx, player.position.z)) { player.position.x = nx; moved = true; }
@@ -1136,14 +1504,21 @@ function updatePlayer(dt) {
   }
   animChar(player, moving && !owns("car"), dt, sprint ? 1.4 : owns("bike") ? 0.6 : 1);
   if (rideBike.visible && moving) for (const w of rideBike.userData.wheels) w.rotation.x += dt * 10;
+  nearDoor = null; nearNpc = null; nearStation = null;
+  if (IN) {
+    let bs = 1.8;
+    for (const st of IN.stations) { const dd = Math.hypot(st.sx - player.position.x, st.sz - player.position.z); if (dd < bs) { bs = dd; nearStation = st; } }
+    if (!nearStation) { let bn = 2.6; for (const n of IN.people) { const dd = Math.hypot(n.c.position.x - player.position.x, n.c.position.z - player.position.z); if (dd < bn) { bn = dd; nearNpc = n; } } }
+    if (moving && Math.abs(player.position.x - OX) < 2 && player.position.z - OZ > IN.D / 2 - 1.1 && !busy) leaveBuilding();
+    return;
+  }
   S.pos.x = player.position.x; S.pos.z = player.position.z;
-
-  nearDoor = null; let best = 3.2;
+  let best = 3.2;
   for (const d of doors) { const dd = Math.hypot(d.x - player.position.x, d.z - player.position.z); if (dd < best) { best = dd; nearDoor = d; } }
-  nearNpc = null;
   if (!nearDoor) { let bn = 3; for (const n of npcs) { const dd = n.c.position.distanceTo(player.position); if (dd < bn) { bn = dd; nearNpc = n; } } }
 }
 function interact() {
+  if (IN) { if (nearStation) openStation(nearStation); else if (nearNpc) talk(nearNpc); return; }
   if (nearDoor) openBuilding(nearDoor.b.id);
   else if (nearNpc) talk(nearNpc);
 }
@@ -1155,9 +1530,11 @@ function talk(n) {
   S.social = clamp(S.social + 6); S.skills.charm = clamp(S.skills.charm + 0.5); advance(10);
   toast(`"${line}" · +Friends`, "good");
 }
-function teleport(bid) {
+function teleport(bid, inside) {
+  if (IN) leaveBuilding(true);
   const d = doors.find((x) => x.b.id === bid);
   if (player && d) { player.position.set(d.x, 0, d.z); target = null; cam.x = d.x; cam.z = d.z; if (S) { S.pos.x = d.x; S.pos.z = d.z; } }
+  if (inside && player && INTERIORS[bid]) enterBuilding(bid, true);
 }
 
 // ============================================================ WORLD UPDATE
@@ -1191,7 +1568,8 @@ function updateSky() {
   bulbMat.emissiveIntensity = 0.1 + night * 1.8;
   for (const c of cars) c.car.userData.hl.emissiveIntensity = 0.3 + night * 1.5;
   if (rideCar) rideCar.userData.hl.emissiveIntensity = 0.3 + night * 1.5;
-  rain.visible = !!raining;
+  rain.visible = !!raining && !IN;
+  if (IN) { scene.background.set(0x141925); scene.fog.color.set(0x141925); sun.intensity *= 0.6; hemi.intensity = Math.max(hemi.intensity * 0.8, 0.45); }
 }
 function updateWorld(dt, now) {
   for (const n of npcs) {
@@ -1222,6 +1600,7 @@ function updateWorld(dt, now) {
   const pl = BMAP.police.lights; if (pl) { const on = Math.floor(now / 350) % 2; pl[0].material.emissiveIntensity = on ? 1.4 : 0.1; pl[1].material.emissiveIntensity = on ? 0.1 : 1.4; }
   if (BMAP.school.flag) BMAP.school.flag.rotation.y = Math.sin(now / 500) * 0.25;
   BMAP.park.ducks.forEach((d, i) => { const a = now / 3000 + i * 1.6, r = 2 + i * 0.6; d.position.x = BMAP.park.x + 5 + Math.cos(a) * r; d.position.z = BMAP.park.z + 4 + Math.sin(a) * r; d.rotation.y = -a; });
+  if (IN) updateInterior(dt, now);
   if (rain.visible) {
     const arr = rainGeo.attributes.position.array, cx = player ? player.position.x : 0, cz = player ? player.position.z : 0;
     for (let i = 0; i < RAIN_N; i++) {
@@ -1251,7 +1630,7 @@ function renderHUD(force) {
   $("hDay").textContent = `${DAYS[weekday()]} · Day ${day()}`;
   $("hTime").textContent = fmt(S.t);
   $("hMoney").textContent = money(S.money);
-  $("hWeather").textContent = S.rain ? "Rainy" : hour() >= 20 || hour() < 6 ? "Clear night" : "Sunny";
+  $("hWeather").textContent = IN ? "Indoors" : S.rain ? "Rainy" : hour() >= 20 || hour() < 6 ? "Clear night" : "Sunny";
   const dr = 7 - ((day() - 1) % 7), owe = RENT + S.debt;
   $("hRent").innerHTML = `<span>Rent</span><b>${money(owe)} ${dr === 1 ? "due tonight" : `in ${dr} days`}</b>`;
   $("hRent").classList.toggle("due", dr <= 2 && S.money < owe);
@@ -1273,7 +1652,8 @@ function renderHUD(force) {
   }
   let p = "";
   if (!sheetOpen() && !busy && $("modalWrap").hidden) {
-    if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
+    if (IN && nearStation) p = `<kbd>E</kbd>${nearStation.sp === "exit" ? nearStation.n : "Use " + nearStation.n}`;
+    else if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
     else if (nearNpc) p = `<kbd>E</kbd>Say hi`;
   }
   const pe = $("prompt");
@@ -1286,6 +1666,7 @@ if (innerWidth < 720) { $("todoList").hidden = true; $("todoToggle").setAttribut
 const mm = $("minimap"), mx = mm.getContext("2d");
 function drawMinimap(now) {
   if (!S || !player) return;
+  if (IN) { drawInteriorMap(now); return; }
   const W = mm.width, sc = W / 200, X = (x) => (x + 100) * sc, Z = (z) => (z + 100) * sc;
   mx.fillStyle = "#3d7a3a"; mx.fillRect(0, 0, W, W);
   mx.fillStyle = "#b8b3a6"; mx.fillRect(X(-86), Z(-86), 172 * sc, 172 * sc);
@@ -1297,9 +1678,27 @@ function drawMinimap(now) {
     if (beacons[b.id] && beacons[b.id].g.visible) { const r = 8 + Math.sin(now / 250) * 2; mx.strokeStyle = "#ffbe2e"; mx.lineWidth = 3; mx.beginPath(); mx.arc(X(b.x), Z(b.z), r, 0, Math.PI * 2); mx.stroke(); }
   }
   const hb = BMAP.home; mx.fillStyle = "#1b1b1b"; mx.font = "900 16px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.fillText("H", X(hb.x), Z(hb.z) + 1);
-  mx.save(); mx.translate(X(player.position.x), Z(player.position.z)); mx.rotate(Math.PI - player.rotation.y);
+  drawArrow(X(player.position.x), Z(player.position.z));
+}
+function drawArrow(x, y) {
+  mx.save(); mx.translate(x, y); mx.rotate(Math.PI - player.rotation.y);
   mx.fillStyle = "#ffbe2e"; mx.strokeStyle = "#1b1b1b"; mx.lineWidth = 2;
   mx.beginPath(); mx.moveTo(0, -9); mx.lineTo(7, 7); mx.lineTo(0, 3); mx.lineTo(-7, 7); mx.closePath(); mx.fill(); mx.stroke(); mx.restore();
+}
+function drawInteriorMap(now) {
+  const W = mm.width; mx.fillStyle = "#141925"; mx.fillRect(0, 0, W, W);
+  const sc = (W - 36) / Math.max(IN.W, IN.D), X = (x) => W / 2 + (x - OX) * sc, Z = (z) => W / 2 + 10 + (z - OZ) * sc;
+  mx.fillStyle = "#" + new THREE.Color(INTERIORS[IN.bid].floor).getHexString(); mx.fillRect(X(OX - IN.W / 2), Z(OZ - IN.D / 2), IN.W * sc, IN.D * sc);
+  mx.strokeStyle = "rgba(255,255,255,.35)"; mx.lineWidth = 2; mx.strokeRect(X(OX - IN.W / 2), Z(OZ - IN.D / 2), IN.W * sc, IN.D * sc);
+  mx.fillStyle = "rgba(10,14,22,.55)";
+  for (const c of IN.cols) mx.fillRect(X(c.x - c.hw + 0.45), Z(c.z - c.hd + 0.45), (c.hw - 0.45) * 2 * sc, (c.hd - 0.45) * 2 * sc);
+  for (const st of IN.stations) {
+    const hot = st.gem && st.gem.visible;
+    mx.fillStyle = st.sp === "exit" ? "#48d597" : hot ? "#ffbe2e" : "#ffffff";
+    mx.beginPath(); mx.arc(X(st.sx), Z(st.sz), hot ? 5 + Math.sin(now / 250) * 1.5 : 3.5, 0, Math.PI * 2); mx.fill();
+  }
+  mx.fillStyle = "#f2f5fb"; mx.font = "900 15px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "top"; mx.fillText(BMAP[IN.bid].name, W / 2, 6);
+  drawArrow(X(player.position.x), Z(player.position.z));
 }
 
 // ============================================================ SHEETS
@@ -1363,30 +1762,39 @@ function careerBlock(bid) {
     ${S.career ? `<div class="req">Taking this job means quitting ${BMAP[S.career].name}.</div>` : ""}
     <div><button class="btn" data-apply="${bid}" ${ok ? "" : "disabled"}>${ok ? "Apply and get hired" : "Not qualified yet"}</button></div></div></div>`;
 }
+function jobBoardHTML() {
+  return `<div class="sec"><h3>Job board · every career in town</h3><div style="display:flex;flex-direction:column;gap:6px">` +
+    Object.entries(CAREERS).map(([k, c]) => {
+      const r = hireRank(k), j = c.ranks[r], ok = meets(j[2]), mine = S.career === k;
+      return `<div class="jobrow"><div><b>${j[0]}</b> · ${money(j[1])}/hr <span class="req">at ${BMAP[k].name} · top job: ${c.ranks[c.ranks.length - 1][0]}</span><div class="req">${reqHTML(j[2])}</div></div>${mine ? `<span class="req ok">Your job</span>` : `<button class="btn" data-apply="${k}" ${ok ? "" : "disabled"}>Apply</button>`}</div>`;
+    }).join("") + `</div></div>`;
+}
+function shopHTML(b) {
+  return `<div class="sec"><h3>Shop</h3><div class="grid">${Object.entries(ITEMS).map(([k, it]) => {
+    const own = owns(k), poor = S.money < it.price;
+    return `<button class="act" data-buy="${k}" ${own || poor || !isOpen(b) ? "disabled" : ""}><span class="t">${it.name}</span><span class="m">${it.desc}</span><span class="${own ? "fx" : "m"}">${own ? "Owned ✓" : money(it.price)}</span></button>`;
+  }).join("")}</div></div>`;
+}
 function buildingSheet(bid) {
   return () => {
     const b = BMAP[bid];
-    const sub = bid === "home" ? `${S.meals} meals in the fridge · Home ${Math.round(S.home)}%` : `${isOpen(b) ? "Open now" : "Closed"} · ${openText(b)}`;
-    let html = header(b.name, sub, b.color) + `<div class="sheet-b">`;
-    if (CAREERS[bid]) html += careerBlock(bid);
-    if (bid === "cityhall") {
-      html += `<div class="sec"><h3>Job board · every career in town</h3><div style="display:flex;flex-direction:column;gap:6px">` +
-        Object.entries(CAREERS).map(([k, c]) => {
-          const r = hireRank(k), j = c.ranks[r], ok = meets(j[2]), mine = S.career === k;
-          return `<div class="jobrow"><div><b>${j[0]}</b> · ${money(j[1])}/hr <span class="req">at ${BMAP[k].name} · top job: ${c.ranks[c.ranks.length - 1][0]}</span><div class="req">${reqHTML(j[2])}</div></div>${mine ? `<span class="req ok">Your job</span>` : `<button class="btn" data-apply="${k}" ${ok ? "" : "disabled"}>Apply</button>`}</div>`;
-        }).join("") + `</div></div>`;
-    }
-    html += `<div class="sec"><h3>Things to do</h3><div class="grid">${ACTS[bid].map((a) => actCard(a, bid)).join("")}</div></div>`;
-    if (bid === "mall") {
-      html += `<div class="sec"><h3>Shop</h3><div class="grid">${Object.entries(ITEMS).map(([k, it]) => {
-        const own = owns(k), poor = S.money < it.price;
-        return `<button class="act" data-buy="${k}" ${own || poor || !isOpen(b) ? "disabled" : ""}><span class="t">${it.name}</span><span class="m">${it.desc}</span><span class="${own ? "fx" : "m"}">${own ? "Owned ✓" : money(it.price)}</span></button>`;
-      }).join("")}</div></div>`;
-    }
+    return header(b.name, `Outdoors · always open`, b.color) + `<div class="sheet-b"><div class="sec"><h3>Things to do</h3><div class="grid">${ACTS[bid].map((a) => actCard(a, bid)).join("")}</div></div></div>`;
+  };
+}
+function stationSheet(bid, st) {
+  return () => {
+    const b = BMAP[bid];
+    const sub = bid === "home" ? `${b.name} · ${S.meals} meals in the fridge · Home ${Math.round(S.home)}%` : `${b.name} · ${isOpen(b) ? "Open now" : "Closed"} · ${openText(b)}`;
+    let html = header(st.n, sub, b.color) + `<div class="sheet-b">`;
+    if (st.sp === "career") html += careerBlock(bid);
+    if (st.sp === "jobs") html += jobBoardHTML();
+    if (st.sp === "shop") html += shopHTML(b);
+    const acts = st.acts.map((id) => ACTS[bid].find((a) => a.id === id)).filter(Boolean);
+    if (acts.length) html += `<div class="sec"><h3>Things to do</h3><div class="grid">${acts.map((a) => actCard(a, bid)).join("")}</div></div>`;
     return html + `</div>`;
   };
 }
-function openBuilding(bid) { openSheet(buildingSheet(bid)); }
+function openBuilding(bid) { if (INTERIORS[bid]) enterBuilding(bid); else openSheet(buildingSheet(bid)); }
 function openPhone() {
   openSheet(() => header("Phone", `${S.name}'s phone · ${money(S.money)} in the bank`, "#2d6cdf") + `<div class="sheet-b">
     <div class="sec"><h3>Apps</h3><div class="grid">${ACTS.phone.map((a) => actCard(a, "phone")).join("")}
@@ -1433,6 +1841,7 @@ function swatches(id, list, key) {
 }
 swatches("swShirt", SHIRTS, "shirt"); swatches("swHair", HAIRS, "hair"); swatches("swSkin", SKINS, "skin");
 function showTitle() {
+  destroyInterior();
   state = "title"; $("title").hidden = false; $("hud").hidden = true;
   if (player) player.visible = false;
   const sv = loadSave(); $("btnContinue").hidden = !(sv && !sv.over);
@@ -1440,8 +1849,11 @@ function showTitle() {
 function begin(data) {
   S = data;
   buildPlayer(S.look);
+  destroyInterior();
+  const inside = S.inside; S.inside = null;
   player.position.set(S.pos.x, 0, S.pos.z);
   if (blocked(S.pos.x, S.pos.z)) teleport("home");
+  if (inside && INTERIORS[inside]) teleport(inside, true);
   cam.x = player.position.x; cam.z = player.position.z;
   state = "play"; $("title").hidden = true; $("hud").hidden = false;
   refreshBeacons(); renderHUD(true); save();
@@ -1468,6 +1880,7 @@ function frame(now) {
       gameAcc += dt * 1.25;
       if (gameAcc >= 1) { const m = Math.floor(gameAcc); gameAcc -= m; advance(m); if (!S.over) evalGoals(); }
       saveAcc += dt; if (saveAcc > 5) { saveAcc = 0; save(); }
+      if (IN && !busy && !canEnter(IN.bid)) { closeSheet(); toast(`${BMAP[IN.bid].name} is closing. Time to head out!`, "bad"); leaveBuilding(); }
     }
     hudAcc += dt; if (hudAcc > 0.2) { hudAcc = 0; renderHUD(); }
   }
