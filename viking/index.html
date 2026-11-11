@@ -935,6 +935,24 @@ function longhouse(len = 14, wid = 6, hgt = 3, roof = M.thatch) {
   g.userData = { w: wid, l: len };
   return shadow(g);
 }
+// a ring of sharpened logs with a gate that faces the pier
+function palisade(p, R) {
+  const gateA = Math.atan2(p.dock.dz, p.dock.dx), gap = 7 / R, step = 1.9 / R, pts = [];
+  for (let a = 0; a < Math.PI * 2; a += step) if (Math.abs(angDiff(a, gateA)) > gap) pts.push(a);
+  const logG = new THREE.CylinderGeometry(.85, .85, 8, 6).translate(0, 4, 0), tipG = new THREE.ConeGeometry(.85, 1.5, 6).translate(0, 8.7, 0);
+  const logs = new THREE.InstancedMesh(logG, M.log, pts.length), tips = new THREE.InstancedMesh(tipG, M.log, pts.length), dmy = new THREE.Object3D();
+  pts.forEach((a, i) => {
+    const x = p.wx + Math.cos(a) * R, z = p.wz + Math.sin(a) * R;
+    dmy.position.set(x, groundY(x, z, 1) - .8, z); dmy.rotation.set(rnd(-.04, .04), rnd(0, 6), rnd(-.04, .04)); dmy.scale.set(1, rnd(.9, 1.1), 1); dmy.updateMatrix();
+    logs.setMatrixAt(i, dmy.matrix); tips.setMatrixAt(i, dmy.matrix); addCircle(p, x, z, 1.05);
+  });
+  [logs, tips].forEach(m => { m.castShadow = m.receiveShadow = true; scene.add(m); });
+  [-1, 1].forEach(sd => { // gate posts
+    const a = gateA + sd * gap * 1.05, x = p.wx + Math.cos(a) * R, z = p.wz + Math.sin(a) * R;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(2.2, 11, 2.2), M.wall); post.position.y = 5.5;
+    const g = new THREE.Group(); g.add(post); place(shadow(g), x, z, a, .8); addCircle(p, x, z, 1.6);
+  });
+}
 function chimneySmoke(x, y, z, big = 1) { smokeEmitters.push({ x, y, z, big, acc: 0 }); }
 
 function pierFor(p) {
@@ -990,6 +1008,7 @@ function buildSettlement(p) {
     chimneySmoke(p.wx, groundY(p.wx, p.wz) + 11, p.wz, 1);
     housesAround(4, .15, .32, [M.thatch, M.turf]);
   } else if (p.type === 'town') {
+    palisade(p, p.R * .47);
     housesAround(p.smith ? 7 : 9, .06, .38, [M.thatch, M.turf, M.thatch]);
     if (p.smith) {
       const fx = p.wx + 12, fz = p.wz - 10;
@@ -1099,6 +1118,7 @@ function scatter(p) {
     const a = rnd(0, Math.PI * 2), t = Math.sqrt(Math.random()) * .95, d = edgeR(p, a) * t;
     const x = p.wx + Math.cos(a) * d, z = p.wz + Math.sin(a) * d;
     if (t < p.clear) continue;
+    if (p.type === 'town' && Math.hypot(x - p.wx, z - p.wz) < p.R * .62) continue;
     const h = islandH(p, x, z); if (h < 2.5) continue;
     if (h > p.H + p.peak * .55 && p.peak > 30) continue;
     const slope = Math.hypot(islandH(p, x + 1.5, z) - h, islandH(p, x, z + 1.5) - h) / 1.5; if (slope > .9) continue;
@@ -1649,6 +1669,95 @@ function landNear(p, x, z) {
   for (let i = 0; i < 12; i++) { const k = i / 12, px = lerp(x, p.wx, k), pz = lerp(z, p.wz, k); if (groundAt(p, px, pz) !== null) return { x: px, z: pz }; }
   return { x: p.wx, z: p.wz };
 }
+// ---- navigation: a walkability grid per island, A* paths and string-pulling ----
+let navBudget = 0;
+function buildNav(p) {
+  const cell = 2, ext = p.R * 1.75, x0 = p.wx - ext, z0 = p.wz - ext, n = Math.ceil(ext * 2 / cell), N = n * n;
+  const g = new Uint8Array(N);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (groundAt(p, x0 + (i + .5) * cell, z0 + (j + .5) * cell) === null) g[j * n + i] = 1;
+  const block = (x, z, r, test) => {
+    const i0 = Math.max(0, Math.floor((x - r - x0) / cell)), i1 = Math.min(n - 1, Math.floor((x + r - x0) / cell));
+    const j0 = Math.max(0, Math.floor((z - r - z0) / cell)), j1 = Math.min(n - 1, Math.floor((z + r - z0) / cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (test(x0 + (i + .5) * cell, z0 + (j + .5) * cell)) g[j * n + i] = 1;
+  };
+  const inflate = .8;
+  for (const c of p.colliders) {
+    if (c.t === 'c') block(c.x, c.z, c.r + inflate, (x, z) => Math.hypot(x - c.x, z - c.z) < c.r + inflate);
+    else block(c.x, c.z, c.r + inflate, (x, z) => { const dx = x - c.x, dz = z - c.z; return Math.abs(dx * c.c - dz * c.s) < c.hw + inflate && Math.abs(dx * c.s + dz * c.c) < c.hl + inflate; });
+  }
+  for (const [tx, tz] of p.treePts) block(tx, tz, 1.3, (x, z) => Math.hypot(x - tx, z - tz) < 1.3);
+  return { p, cell, x0, z0, n, g, gs: new Float32Array(N), from: new Int32Array(N), seen: new Uint32Array(N), closed: new Uint32Array(N), stamp: 0 };
+}
+function navCell(nav, x, z) { return [Math.floor((x - nav.x0) / nav.cell), Math.floor((z - nav.z0) / nav.cell)]; }
+function navBlocked(nav, i, j) { return i < 0 || j < 0 || i >= nav.n || j >= nav.n || nav.g[j * nav.n + i] === 1; }
+function navLOS(nav, ax, az, bx, bz) {
+  const d = Math.hypot(bx - ax, bz - az), steps = Math.ceil(d / (nav.cell * .5));
+  for (let k = 1; k < steps; k++) { const t = k / steps, [i, j] = navCell(nav, ax + (bx - ax) * t, az + (bz - az) * t); if (navBlocked(nav, i, j)) return false; }
+  return true;
+}
+function freeNear(nav, i, j) {
+  if (!navBlocked(nav, i, j)) return [i, j];
+  for (let r = 1; r <= 6; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+    if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue; if (!navBlocked(nav, i + di, j + dj)) return [i + di, j + dj];
+  }
+  return [-1, -1];
+}
+function findPath(nav, sx, sz, tx, tz) {
+  const { n, g, gs, from, seen, closed, cell, x0, z0 } = nav;
+  let [si, sj] = navCell(nav, sx, sz), [ti, tj] = navCell(nav, tx, tz);
+  [si, sj] = freeNear(nav, si, sj); [ti, tj] = freeNear(nav, ti, tj);
+  if (si < 0 || ti < 0) return null;
+  const st = ++nav.stamp, start = sj * n + si, goal = tj * n + ti;
+  const heapI = [], heapF = [];
+  const push = (idx, f) => { let k = heapI.length; heapI.push(idx); heapF.push(f); while (k > 0) { const pk = (k - 1) >> 1; if (heapF[pk] <= f) break; heapI[k] = heapI[pk]; heapF[k] = heapF[pk]; k = pk; } heapI[k] = idx; heapF[k] = f; };
+  const pop = () => { const top = heapI[0], li = heapI.pop(), lf = heapF.pop(); if (heapI.length) { let k = 0; const L = heapI.length; while (true) { let c = 2 * k + 1; if (c >= L) break; if (c + 1 < L && heapF[c + 1] < heapF[c]) c++; if (heapF[c] >= lf) break; heapI[k] = heapI[c]; heapF[k] = heapF[c]; k = c; } heapI[k] = li; heapF[k] = lf; } return top; };
+  const hOf = (i, j) => { const dx = Math.abs(i - ti), dj = Math.abs(j - tj); return Math.max(dx, dj) + .414 * Math.min(dx, dj); };
+  gs[start] = 0; seen[start] = st; from[start] = -1; push(start, hOf(si, sj));
+  let found = false, budget = 9000;
+  while (heapI.length && budget-- > 0) {
+    const cur = pop(); if (closed[cur] === st) continue; closed[cur] = st;
+    if (cur === goal) { found = true; break; }
+    const ci = cur % n, cj = (cur / n) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      const ni = ci + di, nj = cj + dj; if (navBlocked(nav, ni, nj)) continue;
+      if (di && dj && (navBlocked(nav, ci + di, cj) || navBlocked(nav, ci, cj + dj))) continue; // no corner cutting
+      const nidx = nj * n + ni; if (closed[nidx] === st) continue;
+      const ng = gs[cur] + (di && dj ? 1.414 : 1);
+      if (seen[nidx] !== st || ng < gs[nidx]) { seen[nidx] = st; gs[nidx] = ng; from[nidx] = cur; push(nidx, ng + hOf(ni, nj)); }
+    }
+  }
+  if (!found) return null;
+  const raw = []; for (let c = goal; c !== -1; c = from[c]) raw.push({ x: x0 + (c % n + .5) * cell, z: z0 + (((c / n) | 0) + .5) * cell });
+  raw.reverse();
+  // string-pull: keep only the corners we can't see past
+  const out = []; let a = { x: sx, z: sz }, k = 0;
+  while (k < raw.length - 1) {
+    let far = k + 1; while (far + 1 < raw.length && navLOS(nav, a.x, a.z, raw[far + 1].x, raw[far + 1].z)) far++;
+    out.push(raw[far]); a = raw[far]; k = far;
+  }
+  if (!out.length) out.push(raw[raw.length - 1]);
+  out[out.length - 1] = { x: tx, z: tz };
+  return out;
+}
+// direction a unit should walk to reach (tx, tz): straight if the way is clear, otherwise along an A* path
+function steer(u, tx, tz) {
+  const nav = ashore.nav, dx = tx - u.x, dz = tz - u.z, d = Math.hypot(dx, dz) || 1;
+  if (!nav || d < 2.5 || navLOS(nav, u.x, u.z, tx, tz)) { u.path = null; return [dx / d, dz / d]; }
+  const goalMoved = !u.pathGoal || Math.hypot(u.pathGoal.x - tx, u.pathGoal.z - tz) > 5;
+  if ((!u.path || u.pathT <= 0 || goalMoved) && navBudget > 0) {
+    navBudget--; u.path = findPath(nav, u.x, u.z, tx, tz); u.pathGoal = { x: tx, z: tz }; u.pathT = rnd(.7, 1.1); u.pathI = 0;
+  }
+  if (u.path && u.path.length) {
+    while (u.pathI < u.path.length - 1) {
+      const w = u.path[u.pathI], nx = u.path[u.pathI + 1];
+      if (Math.hypot(w.x - u.x, w.z - u.z) < 1.6 || navLOS(nav, u.x, u.z, nx.x, nx.z)) u.pathI++; else break;
+    }
+    const w = u.path[u.pathI], wx = w.x - u.x, wz = w.z - u.z, wd = Math.hypot(wx, wz) || 1;
+    return [wx / wd, wz / wd];
+  }
+  return [dx / d, dz / d];
+}
 const turnTo = (h, target, rate) => h + clamp(angDiff(target, h), -rate, rate);
 
 // ---- figures ----
@@ -1904,6 +2013,7 @@ function goAshore(onReady) {
   const p = P[S.at];
   fadeThen(() => {
     Object.assign(ashore, { on: true, p, battle: null, leaving: false, jarlKilled: false });
+    ashore.nav = p.nav || (p.nav = buildNav(p));
     const lp = p.landPt;
     hero = addUnit('hero', lp.x, lp.z); hero.h = lp.h;
     syncRoster(true);
@@ -1957,14 +2067,14 @@ function startSack(p) {
     const n = clamp(Math.round(defenseOf(p) * .35 / 4) + 2, 3, 14), alert = S.alert[p.id] || 0;
     for (let i = 0; i < n; i++) {
       const a = rnd(0, 6.28), r = rnd(5, p.R * .22), pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r);
-      const u = addUnit('guard', pt.x, pt.z, { aggro: true, battle: true, archer: i % 4 === 3 }); u.hp = u.maxHp = 42 * (1 + alert * .1); setWeapon(u);
+      const u = addUnit('guard', pt.x, pt.z, { aggro: true, battle: true, archer: i % 4 === 3, hold: { x: pt.x, z: pt.z } }); u.hp = u.maxHp = 42 * (1 + alert * .1); setWeapon(u);
     }
     const jarl = p.type === 'fortress' && !S.jarlSlain;
-    if (jarl) addUnit('jarl', p.wx + 3, p.wz + 3, { aggro: true, battle: true });
+    if (jarl) addUnit('jarl', p.wx + 3, p.wz + 3, { aggro: true, battle: true, hold: { x: p.wx + 3, z: p.wz + 3 } });
     units.forEach(u => { if (u.kind === 'villager') u.flee = true; });
     Sound.horn();
-    banner(`The sack of ${p.name}!`, `${n} defenders${jarl ? ' and Jarl Hakon himself' : ''} stand against you`);
-    log(`Your warband storms ashore at ${p.name}. ${n} defenders${jarl ? ', led by Jarl Hakon the Grim,' : ''} form a shield wall to meet you!`, 'bad');
+    banner(`The sack of ${p.name}!`, `${n} defenders${jarl ? ' and Jarl Hakon himself' : ''} hold the walls. Break through the gate`);
+    log(`Your warband storms ashore at ${p.name}. ${n} defenders${jarl ? ', led by Jarl Hakon the Grim,' : ''} hold the walls against you. Find the gate!`, 'bad');
   });
 }
 function sackWon(p) {
@@ -2010,6 +2120,7 @@ function unitDamage(u, amt, from) {
   if (u === hero && hero.blocking && Math.abs(angDiff(Math.atan2(from.x - u.x, -(from.z - u.z)), u.h)) < 1.3) { amt *= .15; Sound.clang(); }
   u.hp -= amt; u.flash = .15;
   if (u.team === 'them' && !u.aggro) wakeGroup(u);
+  if (u.hold) u.charged = true;
   if (u.kind === 'deer') { u.home = { x: u.x, z: u.z, r: 25 }; }
   if (u.hp <= 0) killUnit(u, from);
 }
@@ -2075,11 +2186,11 @@ function fightToward(u, t, dt) {
   const dx = t.x - u.x, dz = t.z - u.z, d = Math.hypot(dx, dz) || 1;
   u.h = turnTo(u.h, Math.atan2(dx, -dz), dt * 8);
   if (u.archer) {
-    if (d > 32) return [dx / d, dz / d];
+    if (d > 32 || (ashore.nav && !navLOS(ashore.nav, u.x, u.z, t.x, t.z))) return steer(u, t.x, t.z);
     if (u.atkCd <= 0) { landArrow(u, { x: t.x, y: aimY(t), z: t.z, vx: t.vx, vz: t.vz }, .8 + d * .03, u.dmg * 1.1, u.team); u.atkCd = u.cd * 1.7; u.draw = .3; if (hero && Math.hypot(u.x - hero.x, u.z - hero.z) < 60) Sound.bow(1, .35); }
     return [0, 0];
   }
-  if (d > u.reach * .85) return [dx / d, dz / d];
+  if (d > u.reach * .85) { const st = steer(u, t.x, t.z); if (u.path) u.h = turnTo(u.h, Math.atan2(st[0], -st[1]), dt * 8); return st; }
   if (u.atkCd <= 0 && u.swing <= 0) { u.swing = .4; u.swingHit = false; u.atkCd = u.cd; u.swingTarget = t; }
   return [0, 0];
 }
@@ -2100,6 +2211,7 @@ function updateUnit(u, dt) {
     u.g.position.set(u.x, u.y, u.z); return;
   }
   if (u.rider) return; // moved and animated by its rider
+  u.pathT = (u.pathT || 0) - dt;
   u.atkCd -= dt; u.flash = Math.max(0, u.flash - dt); u.draw = Math.max(0, (u.draw || 0) - dt);
   const ox = u.x, oz = u.z;
   let mx = 0, mz = 0, speed = u.speed;
@@ -2120,10 +2232,15 @@ function updateUnit(u, dt) {
     if (hero) u.h = turnTo(u.h, Math.atan2(hero.x - u.x, -(hero.z - u.z)), dt * 4);
   } else if (u.team === 'them') {
     const t = u.aggro ? nearestFoe(u, 400) : null;
-    if (t) [mx, mz] = fightToward(u, t, dt);
+    if (t && u.hold && !u.charged && Math.hypot(t.x - u.hold.x, t.z - u.hold.z) > 34) {
+      const td = Math.hypot(t.x - u.x, t.z - u.z);
+      if (u.archer && td < 32 && ashore.nav && navLOS(ashore.nav, u.x, u.z, t.x, t.z)) [mx, mz] = fightToward(u, t, dt);
+      else if (Math.hypot(u.hold.x - u.x, u.hold.z - u.z) > 2) [mx, mz] = steer(u, u.hold.x, u.hold.z);
+      else u.h = turnTo(u.h, Math.atan2(t.x - u.x, -(t.z - u.z)), dt * 4);
+    } else if (t) { if (u.hold && !u.charged) units.forEach(o => { if (o.hold && Math.hypot(o.x - u.x, o.z - u.z) < 25) o.charged = true; }); u.charged = true; [mx, mz] = fightToward(u, t, dt); }
   } else if (u.team === 'us') {
     if (!ashore.foes) u.hp = Math.min(u.maxHp, u.hp + dt * 4);
-    const t = hero && !hero.dead ? nearestFoe(u, 40) : null;
+    const t = hero && !hero.dead ? nearestFoe(u, ashore.battle ? 260 : 40) : null;
     if (t) [mx, mz] = fightToward(u, t, dt);
     else if (hero) {
       const i = u.slot || 0, row = Math.floor(i / 4), col = i % 4;
@@ -2131,12 +2248,12 @@ function updateUnit(u, dt) {
       const tx = hero.x - fx * (3.2 + row * 2.3) + rx * (col - 1.5) * 2.1, tz = hero.z - fz * (3.2 + row * 2.3) + rz * (col - 1.5) * 2.1;
       const dx = tx - u.x, dz = tz - u.z, d = Math.hypot(dx, dz);
       if (d > 70) { u.x = hero.x; u.z = hero.z; }
-      else if (d > 1) { mx = dx / d; mz = dz / d; if (d > 8) speed *= hero.mount ? 2.3 : 1.35; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 8); }
+      else if (d > 1) { [mx, mz] = steer(u, tx, tz); if (d > 8) speed *= hero.mount ? 2.3 : 1.35; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 8); }
       else u.h = turnTo(u.h, hero.h, dt * 4);
     }
   } else if (u.kind === 'horse' && u.called && hero) {
     const dx = hero.x - u.x, dz = hero.z - u.z, d = Math.hypot(dx, dz) || 1;
-    if (d < 3.5) { u.called = false; u.idle = 99; u.home = { x: u.x, z: u.z, r: 4 }; } else { mx = dx / d; mz = dz / d; speed = 15; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 5); }
+    if (d < 3.5) { u.called = false; u.idle = 99; u.home = { x: u.x, z: u.z, r: 4 }; } else { [mx, mz] = steer(u, hero.x, hero.z); speed = 15; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 5); }
   } else if (u.kind === 'deer' && hero && !hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < (hero.mount ? 26 : 20)) {
     const dx = u.x - hero.x, dz = u.z - hero.z, d = Math.hypot(dx, dz) || 1;
     mx = dx / d; mz = dz / d; speed = 13; u.grazing = false; u.idle = 0; u.wt = null; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 6);
@@ -2146,13 +2263,13 @@ function updateUnit(u, dt) {
     if (!u.grazing) {
       if (!u.wt) { const a = rnd(0, 6.28), r = rnd(0, u.home.r); u.wt = { x: u.home.x + Math.cos(a) * r, z: u.home.z + Math.sin(a) * r }; }
       const dx = u.wt.x - u.x, dz = u.wt.z - u.z, d = Math.hypot(dx, dz) || 1;
-      if (d < 1.5) { u.wt = null; u.idle = rnd(4, 10); } else { mx = dx / d; mz = dz / d; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 2); }
+      if (d < 1.5) { u.wt = null; u.idle = rnd(4, 10); } else { [mx, mz] = steer(u, u.wt.x, u.wt.z); u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 2); }
     }
   } else { // villagers
     if (u.flee && hero) { const dx = u.x - hero.x, dz = u.z - hero.z, d = Math.hypot(dx, dz) || 1; if (d < 60) { mx = dx / d; mz = dz / d; speed = 6; } }
     else {
       if (!u.wt || Math.hypot(u.wt.x - u.x, u.wt.z - u.z) < 1.5) { const a = rnd(0, 6.28), r = rnd(0, u.home.r); u.wt = { x: u.home.x + Math.cos(a) * r, z: u.home.z + Math.sin(a) * r }; }
-      const dx = u.wt.x - u.x, dz = u.wt.z - u.z, d = Math.hypot(dx, dz) || 1; mx = dx / d; mz = dz / d; speed = 2.2;
+      [mx, mz] = steer(u, u.wt.x, u.wt.z); speed = 2.2; if (Math.hypot(u.wt.x - u.x, u.wt.z - u.z) < 1.5) u.wt = null;
     }
     if (mx || mz) u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 5);
   }
@@ -2221,6 +2338,7 @@ function animUnit(u, dt) {
   u.g.position.set(u.x, u.y - 2.6 * (1 - u.rise) + seat, u.z); u.g.rotation.y = -u.h;
 }
 function updateAshore(dt) {
+  navBudget = 5;
   if (!hero) return;
   ashore.foes = units.filter(u => u.team === 'them' && u.aggro && !u.dead).length;
   for (const u of units) updateUnit(u, dt);
@@ -2937,7 +3055,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
