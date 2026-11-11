@@ -151,6 +151,16 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 .bbar{height:5px;background:rgba(255,255,255,.1);border-radius:1px;overflow:hidden}.bbar i{display:block;height:100%;width:100%;background:var(--frost);transition:width .2s}
 .bbar.hull{height:8px}.bbar.hull i{background:var(--danger)}
 
+#standing{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.55);padding-inline:16px}
+#standing .card{max-width:560px;width:100%;max-height:calc(100% - 32px);overflow:auto;pointer-events:auto}
+.frow{padding-block:10px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:5px}
+.fhead{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fname{font-family:var(--f-display);font-weight:700;font-size:14.5px;letter-spacing:.04em}
+.ftier{font-size:12px;font-variant-numeric:tabular-nums}
+.fbar{position:relative;height:6px;background:rgba(255,255,255,.08);border-radius:1px}
+.fbar i{position:absolute;top:0;bottom:0}.fbar b{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.35)}
+.envoy{font-style:italic;color:var(--text);margin:10px 0 4px;font-size:13px}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -197,6 +207,7 @@ button.go:disabled{opacity:.5;cursor:wait}
       <span>Hazard</span><b id="pHazard">—</b>
       <span>Flora</span><b id="pFlora">—</b>
       <span>Fauna</span><b id="pFauna">—</b>
+      <span>Territory</span><b id="pFaction">—</b>
       <span>Weather</span><b id="pWeather">Clear</b>
       <span>Discoveries</span><b id="pDisc">0</b>
     </div>
@@ -302,7 +313,17 @@ button.go:disabled{opacity:.5;cursor:wait}
     <div class="csec">Chat</div>
     <div id="crewLog"></div>
     <div class="chatrow"><input id="crewMsg" maxlength="140" placeholder="Say something to everyone online" aria-label="Chat message" autocomplete="off"><button type="button" class="trbtn" id="crewSend">Send</button></div>
+    <button type="button" class="trbtn" id="crewStanding" style="margin-top:12px">Faction standing (P)</button>
     <p class="trnote">Players in the same star system see each other's ships, suits and bases, and fight the same pirates. Mining and trades are your own. Press M to close, Enter to chat.</p>
+  </div>
+</div>
+
+<div id="standing" hidden>
+  <div class="card">
+    <div class="eyebrow">Reputation</div>
+    <div class="pname">Faction standing</div>
+    <div id="standingList"></div>
+    <p class="trnote">Standing changes your prices, whether stations let you dock and whether patrols fight for or against you. Press P to close.</p>
   </div>
 </div>
 
@@ -354,6 +375,7 @@ const CONTROLS=[
   ['Base building',null],['Build mode (on foot)','B'],['Place part','Left click'],['Rotate','R'],['Remove part (half refund)','X / right click'],
   ['Choose part','Wheel / 1–0 / [ ]'],['Collect from modules','E'],['Jump to your home base','J'],
   ['Stations & trading posts',null],['Dock at a space station','E near the bay'],['Undock','E'],['Land at a trading post','E near its pad'],['Trade at a terminal','E'],
+  ['Faction standing','P'],
   ['Multiplayer',null],['Crew panel and chat','M / Enter'],['Join a crewmate','Jump button in the crew panel'],
 ];
 function renderControls(el){
@@ -780,7 +802,7 @@ function buildShip(cls='shuttle',paint=PAINTS.player){
   return g;
 }
 const upg={dmg:0,shield:0,hull:0,pulse:0,cool:0,regen:0,thrust:0,nano:0,rack:0};
-function shipStats(cls=ship.cls){const c=SHIP_CLASSES[cls];return{hull:Math.round(c.hull*(1+.2*upg.hull)),shield:Math.round(c.shield*(1+.2*upg.shield)),dmg:c.dmg*(1+.2*upg.dmg),agility:c.agility*(1+.08*upg.thrust),speed:c.speed*(1+.08*upg.thrust),pulse:c.pulse*(1+.15*upg.pulse),takeoff:c.takeoff}}
+function shipStats(cls=ship.cls){const c=SHIP_CLASSES[cls];return{hull:Math.round(c.hull*(1+.2*upg.hull)),shield:Math.round(c.shield*(1+.2*upg.shield)),dmg:c.dmg*(1+.2*upg.dmg)*(tech('coils')?1.25:1),agility:c.agility*(1+.08*upg.thrust),speed:c.speed*(1+.08*upg.thrust),pulse:c.pulse*(1+.15*upg.pulse),takeoff:c.takeoff}}
 const ship={group:buildShip('shuttle',PAINTS.player),cls:'shuttle',paint:PAINTS.player,state:'landed',speed:0,fuel:0,t:0,land:null,camQ:new Q4(),scrapeCD:0,warped:false,
   hull:100,shield:60,shieldDelay:0,heat:0,overheat:false,fireCD:0,gunI:0,shake:0,jamCD:0};
 scene.add(ship.group);
@@ -845,7 +867,7 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,rep:st.rep,looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -858,7 +880,7 @@ async function generateSystem(seed,first){
   clearCombat();
   const rand=mulberry32((seed^0x9e3779b9)>>>0);
   const star=STARS[Math.floor(rand()*STARS.length)];
-  system={seed,name:makeName(rand,2,2,false).toUpperCase()+'-'+(100+Math.floor(rand()*900)),star};
+  system={seed,name:makeName(rand,2,2,false).toUpperCase()+'-'+(100+Math.floor(rand()*900)),star};system.faction=factionOf(seed);
   sunMat.color.set(star.color);sunGlow.material.color.set(star.color);sunLight.color.set(star.color);
   const n=3+Math.floor(rand()*3);let dist=3800+rand()*1200;const out=[];
   for(let i=0;i<n;i++){
@@ -874,7 +896,7 @@ async function generateSystem(seed,first){
   }
   planets=out;setLoad('');
   {const P0=planets[0];const sd=new V3().crossVectors(P0.center,Y_AXIS).normalize();if(rand()<.5)sd.negate();
-   station=makeStation((seed*7+13)>>>0,P0.center.clone().addScaledVector(sd,P0.radius*4.2).add(new V3(0,P0.radius*.8,0)),P0);}
+   station=makeStation((seed*7+13)>>>0,P0.center.clone().addScaledVector(sd,P0.radius*4.2).add(new V3(0,P0.radius*.8,0)),P0);factionBanner(station.group,system.faction);}
   const nT=3+Math.floor(rand()*3),tcls=['hauler','shuttle','explorer','hauler'];
   for(let i=0;i<nT;i++){const P=planets[Math.floor(rand()*planets.length)];
     const n=spawnNpc('trader',tcls[Math.floor(rand()*tcls.length)],P.center.clone().addScaledVector(randDir(rand,new V3()),P.radius*1.8),rand()<.5?PAINTS.trader:randomPaint(rand));
@@ -883,6 +905,7 @@ async function generateSystem(seed,first){
   joinSystemRoom();
   for(const B of allBaseList())buildBaseFor(B);
   generateSpace(seed);
+  if(system.faction==='korrath')spawnPatrols(mulberry32((seed^0x60A7)>>>0));
 }
 function uprightQuat(up,fwdHint,out){
   const f=new V3().copy(fwdHint).addScaledVector(up,-fwdHint.dot(up));
@@ -938,6 +961,7 @@ function toggleHelp(){$('help').hidden=!$('help').hidden}
 
 function onPress(code){
   if(code==='KeyM'){toggleCrew();return}
+  if(code==='KeyP'){toggleStanding();return}
   if(code==='Enter'||code==='NumpadEnter'){toggleCrew(true);return}
   if(code==='KeyB'){toggleBuild();return}
   if(code==='KeyJ'){tryWarp(true);return}
@@ -995,7 +1019,8 @@ function setText(id,t){if(_txt.get(id)!==t){_txt.set(id,t);$(id).textContent=t}}
 function setHTML(id,t){if(_txt.get(id)!==t){_txt.set(id,t);$(id).innerHTML=t}}
 function setBar(id,v,max=100,warnBelow=25){const el=$(id);el.querySelector('.f').style.width=clamp(v/max*100,0,100)+'%';el.querySelector('.n').textContent=Math.round(v);el.classList.toggle('warn',v<warnBelow)}
 function fmtDist(d){return d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(d<10000?2:1)} km`}
-function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);toast(label,'big');Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
+function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);toast(label,'big');
+  setTimeout(()=>{addRep('lumen',/^(R:|A:)/.test(key)?5:2);if(tech('lens')){inv.nanites+=25}},300);Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
 
 /* ---------- actions ---------- */
 function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){const d=p.distanceTo(P.center)-P.radius;if(d<bd){bd=d;best=P}}return best}
@@ -1325,6 +1350,7 @@ async function doWarp(home){
   ship.state='flying';ship.speed=200;camera.fov=70;camera.updateProjectionMatrix();
   $('flash').style.transition='opacity 1.8s';$('flash').style.opacity=0;
   toast(home?`Home system: ${system.name}. Your base is on ${P.name}.`:`Arrived: ${system.name} · ${system.star.name} star · ${planets.length} planets`,'big');
+  {const F=FACTIONS[system.faction],T=repTier(repOf(system.faction));setTimeout(()=>toast(`${F.name} territory · you are ${T.name}${isHostileTo(system.faction)?'. Their station will refuse you'+(system.faction==='korrath'?' and their patrols will attack.':'.'):'.'}`,isHostileTo(system.faction)?'bad':''),3600)}
   if(station)setTimeout(()=>toast(`${station.name} is in this system (${station.econ.name} economy). Fly to its bay and press E to dock.`),1800);
   save();
 }
@@ -1388,7 +1414,8 @@ function shipDestroyed(){
   toast('Ship destroyed. An emergency beacon brought you down on '+P.name+'. Half your cargo was lost.','bad');
 }
 function damageNpc(n,dmg,at){
-  if(!n.hostile){n.hostile=true;if(n.faction==='trader')toast('You fired on a trader. It is fighting back.','bad')}
+  if(!n.hostile){n.hostile=true;if(n.faction==='trader'){toast('You fired on a trader. It is fighting back.','bad');addRep('vael',-5,'attacked a trader')}
+    else if(n.faction==='korrath'){toast('You fired on a Korrath patrol. They are returning fire.','bad');addRep('korrath',-8,'attacked a patrol')}}
   n.shieldDelay=3;
   if(n.shield>0){const a=Math.min(n.shield,dmg);n.shield-=a;dmg-=a;boom(at,1.6,'#7fd0ff',.25)}else boom(at,1.4,'#ffcf6a',.25);
   n.hull-=dmg;
@@ -1398,12 +1425,12 @@ function damageNpc(n,dmg,at){
 function destroyNpc(n){
   const p=n.group.position;boom(p,n.radius*3,'#ffa050',1.2);boom(p,n.radius*1.6,'#fff2c0',.6);Sound.boom(.6);
   scene.remove(n.group);npcs.splice(npcs.indexOf(n),1);
-  const trader=n.faction==='trader';kills++;
+  const trader=n.faction==='trader'||n.faction==='korrath';kills++;onRepKill(n);
   if(n.boss){bossDown(n);return}
   if(!trader)creditBounty();
   dropSalvage(p,n.vel,trader);
   if(!trader&&MP.sys)MP.sys.emit('kill',{id:n.netId,p:p.toArray().map(v=>Math.round(v*10)/10),h:[...(n.hitters||[])].slice(0,12)}).catch(()=>{});
-  if(!n.boss)toast(`${trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
+  if(!n.boss)toast(`${n.faction==='korrath'?'Korrath':trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
   if(!npcs.some(x=>x.hostile))setTimeout(()=>{if(!npcs.some(x=>x.hostile))toast('Area clear.','big')},600);
 }
 function creditBounty(){
@@ -1463,13 +1490,18 @@ function updateNpcs(dt){
         }else n.fireCD=.08;
       }
       if(dist>7000&&n.faction==='pirate'){scene.remove(g);npcs.splice(i,1);continue}
+    }else if(n.faction==='korrath'&&(n.prey=nearestPirateFor(n))){
+      const to=tV2.copy(n.prey.group.position).sub(g.position),dist=to.length();
+      desired.copy(to).addScaledVector(n.prey.vel,dist/BOLT_SPEED).normalize();if(dist<200)spd*=.7;
+      n.fireCD-=dt;if(n.fireCD<=0&&dist<800){const aim=tV2.copy(n.prey.group.position).addScaledVector(n.prey.vel,dist/BOLT_SPEED).sub(g.position).normalize();
+        if(fwd.dot(aim)>.97){const gp=g.userData.guns[n.gunI++%g.userData.guns.length];fireBolt(g.localToWorld(new V3().copy(gp)),aim,n.vel,'station',9);n.fireCD=.35}else n.fireCD=.08}
     }else if(n.faction==='pirate'){
       n.leave+=dt;desired.copy(fwd);spd*=1.4;
       if(n.leave>10){scene.remove(g);npcs.splice(i,1);continue}
     }else{
       if(!n.way||g.position.distanceTo(n.way)<220)n.way=pickWaypoint();
       desired.copy(n.way).sub(g.position).normalize();
-      if(!flying)n.hostile=false;
+      if(!flying&&n.faction!=='korrath')n.hostile=false;if(n.faction==='korrath')n.hostile=isHostileTo('korrath')||n.hostile&&flying;
     }
     // terrain avoidance
     const P=nearestPlanet(g.position);
@@ -1990,6 +2022,77 @@ function deconstruct(){
   save();
 }
 
+/* ---------- alien factions and reputation ---------- */
+const FACTIONS={
+  vael:{name:'Vael Concord',color:'#ffcf6a',desc:'Merchant houses that run the trade lanes. They prize honest commerce and safe routes.',likes:'Trading at their stations, completing contracts, killing pirates',hates:'Attacking traders',
+    perk:{id:'ledger',name:"Merchant's ledger",desc:'Sell resources for 15% more everywhere',price:3000},
+    lines:{hostile:'"You are not welcome here, raider. Leave our lanes."',low:'"We trade with you. For now. Mind your manners."',mid:'"Fair prices for fair dealers. What do you need?"',high:'"A friend of the Concord! Our best rates, as always."'}},
+  korrath:{name:'Korrath Dominion',color:'#ff7a6a',desc:'A martial people who patrol their systems and hunt pirates without mercy.',likes:'Destroying pirates and dreadnoughts',hates:'Firing on their patrols',
+    perk:{id:'coils',name:'Korrath plasma coils',desc:'+25% cannon damage',price:3500},
+    lines:{hostile:'"Our guns are trained on you, outsider. Turn back."',low:'"Prove your worth. Bring us pirate wrecks."',mid:'"The hunt goes well. Fly with honor."',high:'"Warrior! Our patrols will fight at your side."'}},
+  lumen:{name:'Lumen Archive',color:'#9fe6ff',desc:'Scholars who catalogue every world and relic. Knowledge is their currency.',likes:'Discoveries, relics given to them, echo monoliths',hates:'Selling relics to anyone else',
+    perk:{id:'lens',name:'Archive lens',desc:'Doubles scanner range and adds 25 Nanites to every discovery',price:3000},
+    lines:{hostile:'"The Archive has closed its doors to you."',low:'"Bring us knowledge, and we may talk."',mid:'"Every world you chart adds a page to the Archive."',high:'"Our honored scholar returns! The Archive is yours."'}},
+};
+const FACTION_KEYS=['vael','korrath','lumen'];
+const factionOf=seed=>FACTION_KEYS[Math.floor(mulberry32((seed^0xFAC7104)>>>0)()*3)];
+const repOf=f=>(st.rep&&st.rep[f])||0;
+function repTier(v){
+  if(v<=-40)return{name:'Hostile',color:'#ff6274',key:'hostile'};
+  if(v<-10)return{name:'Unfriendly',color:'#ffa070',key:'low'};
+  if(v<25)return{name:'Neutral',color:'#c9d0e6',key:'mid'};
+  if(v<60)return{name:'Friendly',color:'#8af0b4',key:'high'};
+  if(v<90)return{name:'Honored',color:'#9fe6ff',key:'high'};
+  return{name:'Exalted',color:'#ffd27a',key:'high'};
+}
+const isHostileTo=f=>repOf(f)<=-40;
+function addRep(f,d,why){
+  if(!FACTIONS[f]||!d)return;st.rep=st.rep||{vael:0,korrath:0,lumen:0};
+  const before=repTier(repOf(f)).name;st.rep[f]=clamp(repOf(f)+d,-100,100);const after=repTier(repOf(f)).name;
+  if(before!==after)toast(`${FACTIONS[f].name} now regards you as ${after}.`,d>0?'big':'bad');
+  else if(Math.abs(d)>=3)toast(`${FACTIONS[f].name} ${d>0?'+':''}${Math.round(d)} standing${why?' · '+why:''}`,d>0?'':'bad');
+  save();if(!$('standing').hidden)renderStanding();
+}
+// price modifiers from your standing with the faction that owns the venue
+const venueFaction=()=>system&&system.faction;
+const repBuy=()=>1-repOf(venueFaction())*.002;
+const repSell=()=>(1+repOf(venueFaction())*.0015)*(tech('ledger')?1.15:1);
+function factionBanner(S,f){
+  const col=FACTIONS[f].color,m=new THREE.MeshBasicMaterial({color:col});
+  for(const y of [52,-52]){const r=new THREE.Mesh(new THREE.TorusGeometry(49,1.4,6,40).rotateX(Math.PI/2),m);r.position.y=y;S.add(r)}
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(4,4,10,8),m);b.position.y=170;S.add(b);
+}
+function spawnPatrols(rand){
+  for(let i=0;i<2;i++){const P=planets[Math.floor(rand()*planets.length)];
+    const n=spawnNpc('korrath',i?'interceptor':'fighter',P.center.clone().addScaledVector(randDir(rand,new V3()),P.radius*2.2),{hull:'#6a2a1a',trim:'#1a1010',glow:'#ff7a3a'});
+    n.hostile=isHostileTo('korrath');n.speed=230;n.maxHull*=1.4;n.hull=n.maxHull;n.way=pickWaypoint()}
+}
+function nearestPirateFor(n){let best=null,bd=3500;for(const o of npcs){if(o===n||o.faction!=='pirate')continue;const d=o.group.position.distanceTo(n.group.position);if(d<bd){bd=d;best=o}}return best}
+function onRepKill(n){
+  if(n.faction==='pirate'){addRep('korrath',n.boss?10:2,n.boss?'dreadnought destroyed':'');addRep('vael',n.boss?5:1)}
+  else if(n.faction==='trader')addRep('vael',-10,'trader destroyed');
+  else if(n.faction==='korrath')addRep('korrath',-15,'patrol destroyed');
+}
+function renderStanding(){
+  const box=$('standingList');box.textContent='';
+  const cur=venueFaction();
+  for(const f of FACTION_KEYS){const F=FACTIONS[f],v=repOf(f),T=repTier(v);
+    const row=document.createElement('div');row.className='frow';
+    row.innerHTML=`<div class="fhead"><span class="fname" style="color:${F.color}"></span><span class="ftier" style="color:${T.color}"></span></div>
+      <div class="fbar"><i></i><b></b></div><div class="ds fdesc"></div><div class="ds flikes"></div>`;
+    row.querySelector('.fname').textContent=F.name+(f===cur?' · this system':'');
+    row.querySelector('.ftier').textContent=`${T.name} · ${v>0?'+':''}${Math.round(v)}`;
+    const fill=row.querySelector('.fbar i');fill.style.background=T.color;
+    if(v>=0){fill.style.left='50%';fill.style.width=(v/2)+'%'}else{fill.style.left=(50+v/2)+'%';fill.style.width=(-v/2)+'%'}
+    row.querySelector('.fdesc').textContent=F.desc;
+    row.querySelector('.flikes').textContent=`Likes: ${F.likes}. Hates: ${F.hates}. Honored reward: ${F.perk.name}${tech(F.perk.id)?' (owned)':''}.`;
+    box.append(row)}
+  const p=document.createElement('div');p.className='frow';p.innerHTML='<div class="fhead"><span class="fname" style="color:#ff6274">Hollow Fleet</span><span class="ftier" style="color:#ff6274">Always hostile</span></div><div class="ds fdesc">Pirates and their dreadnoughts. Every kill raises your standing with the Korrath and the Vael.</div>';
+  box.append(p);
+}
+function toggleStanding(){const el=$('standing');if(el.hidden){el.hidden=false;try{document.exitPointerLock()}catch(_){}renderStanding()}else el.hidden=true}
+
+$('crewStanding').addEventListener('click',()=>{$('crew').hidden=true;toggleStanding()});
 /* ---------- space stations & trading posts ---------- */
 let station=null,trade=null,nearPost=null;
 const ECON=[
@@ -2044,6 +2147,7 @@ const stationMouth=()=>station.group.localToWorld(station.group.userData.mouth.c
 const stationInside=()=>station.group.localToWorld(station.group.userData.inside.clone());
 const stationNear=()=>!!station&&ship.group.position.distanceTo(stationMouth())<450;
 function startDock(){
+  if(isHostileTo(system.faction)){toast(`${station.name} denies docking. The ${FACTIONS[system.faction].name} considers you hostile.`,'bad');Sound.blip(160,.3,'square',.1);return}
   const S=station.group,mouth=stationMouth(),inside=stationInside();
   const up=new V3(0,1,0).applyQuaternion(S.quaternion);
   const qIn=new Q4().setFromRotationMatrix(new THREE.Matrix4().lookAt(mouth,inside,up));
@@ -2077,7 +2181,8 @@ function updateStation(dt){
     const u=station.group.userData;u.ring.rotation.y+=dt*.04;u.blink.forEach((b,i)=>b.visible=((time*1.4+i*.25)%2)<1.2);
     station.turretCD-=dt;
     if(station.turretCD<=0){station.turretCD=.35;const sp=station.group.position;
-      const tgt=npcs.find(n=>n.hostile&&n.group.position.distanceTo(sp)<1600);
+      const tgt=npcs.find(n=>n.hostile&&n.faction!=='korrath'&&n.group.position.distanceTo(sp)<1600);
+      if(!tgt&&isHostileTo(system.faction)&&st.mode==='ship'&&ship.state==='flying'&&ship.group.position.distanceTo(sp)<1400){const d=ship.group.position.distanceTo(sp);const v=tV3.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed);const aim=ship.group.position.clone().addScaledVector(v,d/BOLT_SPEED).sub(sp).normalize();fireBolt(sp.clone().addScaledVector(aim,75),aim,new V3(),'enemy',12)}
       if(tgt){const dist=tgt.group.position.distanceTo(sp);const aim=tgt.group.position.clone().addScaledVector(tgt.vel,dist/BOLT_SPEED).sub(sp).normalize();
         fireBolt(sp.clone().addScaledVector(aim,75),aim,new V3(),'station',14)}}
   }
@@ -2137,14 +2242,15 @@ function postWalls(P){
 const RES_TRADE=['carbon','ferrite','cobalt','aurium','relics'];
 const RES_NAME={carbon:'Carbon',ferrite:'Ferrite',cobalt:'Cobalt',aurium:'Aurium',relics:'Relics'};
 function priceMult(r,v){const e=station?station.econ:ECON[0];return e.m[r]*((v.var&&v.var[r])||1)}
-const buyPrice=(r,v)=>Math.max(1,Math.round(BASE_PRICE[r]*priceMult(r,v)));
-const sellPrice=(r,v)=>Math.max(1,Math.round(buyPrice(r,v)*.62));
+const buyPrice=(r,v)=>Math.max(1,Math.round(BASE_PRICE[r]*priceMult(r,v)*repBuy()));
+const sellPrice=(r,v)=>Math.max(1,Math.round(BASE_PRICE[r]*priceMult(r,v)*.62*repSell()));
 function missionDone(){const m=st.mission;if(!m)return false;return m.type==='bounty'||m.type==='boss'?m.have>=m.need:inv[m.res]>=m.qty}
 function missionText(){const m=st.mission;if(!m)return '';
   if(m.type==='boss')return `Boss bounty: destroy a pirate dreadnought${m.have?' · done, dock at a station to collect':''} · ${m.reward} units`;
   return m.type==='bounty'?`Bounty: ${m.have}/${m.need} pirates destroyed${m.have>=m.need?' · dock at a station to collect':''} · ${m.reward} units`
     :`Supply contract: deliver ${m.qty} ${RES_NAME[m.res]} (${Math.min(inv[m.res],m.qty)}/${m.qty}) to any station · ${m.reward} units`}
 function openTrade(venue,tab){
+  if(venue!==station&&isHostileTo(system.faction)){toast(`The terminal locks you out. The ${FACTIONS[system.faction].name} considers you hostile.`,'bad');return}
   trade={venue,kind:venue===station?'station':'post',tab:tab||'market'};
   $('trade').hidden=false;$('upg').hidden=true;$('craft').hidden=true;try{document.exitPointerLock()}catch(_){}
   $('trClose').textContent=trade.kind==='station'?'Undock':'Close';
@@ -2157,7 +2263,7 @@ function renderTrade(){
   $('trKind').textContent=isSt?`Space station · ${station.econ.name} economy`:`Trading post · ${v.planet.name}`;
   $('trName').textContent=v.name;
   $('trInfo').innerHTML=`<span>Ship <b>${SHIP_CLASSES[ship.cls].label}</b></span><span>Hull <b>${Math.round(ship.hull)}/${S.hull}</b></span><span>Launch fuel <b>${Math.round(ship.fuel)}</b></span><span>Nanites <b>${inv.nanites}</b></span>`;
-  const tabs=isSt?[['market','Market'],['outfitter','Outfitter'],['shipyard','Shipyard'],['services','Services'],['missions','Missions']]:[['market','Market'],['services','Services']];
+  const tabs=isSt?[['market','Market'],['outfitter','Outfitter'],['shipyard','Shipyard'],['services','Services'],['missions','Missions'],['faction','Faction']]:[['market','Market'],['services','Services'],['faction','Faction']];
   $('trTabs').innerHTML=tabs.map(([k,l])=>`<button type="button" data-tab="${k}" class="${trade.tab===k?'on':''}">${l}</button>`).join('');
   $('trUnits').textContent=`${inv.units.toLocaleString()} units`;
   let h='';
@@ -2172,7 +2278,7 @@ function renderTrade(){
       <p class="trnote">${isSt?'Stations buy relics from collectors. ':''}Prices follow the system's economy${isSt?'':' and this post\'s local supply'}. Selling pays 62% of the buy price.</p>`;
   }else if(trade.tab==='outfitter'){
     h=`<div class="mktwrap"><table class="mkt"><thead><tr><th>Item</th><th>Effect</th><th>Owned</th><th>Price</th><th></th></tr></thead><tbody>`+RECIPES.map(r=>{
-      const own=r.kind==='tech'?(tech(r.id)?'Installed':'—'):(crafted[r.id]||0),pr=SHOP_PRICE[r.id],dis=inv.units<pr||(r.kind==='tech'&&tech(r.id));
+      const own=r.kind==='tech'?(tech(r.id)?'Installed':'—'):(crafted[r.id]||0),pr=Math.round(SHOP_PRICE[r.id]*repBuy()),dis=inv.units<pr||(r.kind==='tech'&&tech(r.id));
       return `<tr><td>${r.name}</td><td style="white-space:normal;color:var(--dim);font-size:11px;min-width:160px">${r.desc}</td><td>${own}</td><td>${pr.toLocaleString()} u</td><td class="btns"><button type="button" data-act="obuy" data-id="${r.id}" ${dis?'disabled':''}>Buy</button></td></tr>`}).join('')+`</tbody></table></div><p class="trnote">Everything here can also be crafted from resources in the crafting menu [I].</p>`;
   }else if(trade.tab==='shipyard'){
     const tradeIn=Math.round(SHIP_PRICE[ship.cls]*.45);
@@ -2182,11 +2288,19 @@ function renderTrade(){
         <td class="btns"><button type="button" data-act="ship" data-i="${i}" ${inv.units<net?'disabled':''}>Buy</button></td></tr>`}).join('')+`</tbody></table></div>`;
     if(!station.ships.length)h='<p class="trnote">The shipyard is sold out.</p>';
   }else if(trade.tab==='services'){
-    const rc=Math.ceil((S.hull-ship.hull)*1.5),fc=Math.ceil((100-ship.fuel)*2);
+    const rc=Math.ceil((S.hull-ship.hull)*1.5*repBuy()),fc=Math.ceil((100-ship.fuel)*2*repBuy());
     h=`<div class="mktwrap"><table class="mkt"><tbody>
       <tr><td>Hull repair</td><td>${Math.round(ship.hull)}/${S.hull}</td><td>${rc} u</td><td class="btns"><button type="button" data-act="repair" ${rc<=0||inv.units<rc?'disabled':''}>Repair</button></td></tr>
       <tr><td>Launch fuel</td><td>${Math.round(ship.fuel)}/100</td><td>${fc} u</td><td class="btns"><button type="button" data-act="refuel" ${fc<=0||inv.units<fc?'disabled':''}>Refuel</button></td></tr>
       </tbody></table></div><p class="trnote">${isSt?'Shields are recharged for free while docked.':'Repairs here reach your ship on the landing pad.'}</p>`;
+  }else if(trade.tab==='faction'){
+    const f=system.faction,F=FACTIONS[f],val=repOf(f),T=repTier(val),pk=F.perk,owned=tech(pk.id),canPerk=val>=60&&!owned,pkPrice=Math.round(pk.price*repBuy());
+    h=`<div class="csec" style="color:${F.color}">${F.name}</div><p class="envoy">${F.lines[T.key]}</p>
+      <p class="trnote">Your standing: <b style="color:${T.color}">${T.name} (${val>0?'+':''}${Math.round(val)})</b> · prices here ${Math.round((repBuy()-1)*100)>0?'+':''}${Math.round((repBuy()-1)*100)}% to buy, ${Math.round((repSell()-1)*100)>=0?'+':''}${Math.round((repSell()-1)*100)}% when selling. ${F.desc}</p>
+      <div class="urow"><div><span class="nm">Donate 500 units</span></div><div class="ds">A gift to the ${F.name}: +5 standing.</div><div class="acts"><button type="button" data-act="donate" ${inv.units<500?'disabled':''}>Donate</button></div></div>
+      ${f==='lumen'?`<div class="urow"><div><span class="nm">Give a relic to the Archive</span></div><div class="ds">+12 standing and 150 Nanites per relic.</div><div class="acts"><button type="button" data-act="giverelic" ${inv.relics<1?'disabled':''}>Give relic (${inv.relics})</button></div></div>`:''}
+      <div class="urow"><div><span class="nm">${pk.name}</span></div><div class="ds">${pk.desc}. Sold only to those the ${F.name} holds Honored (+60).</div>
+        <div class="acts">${owned?'<span class="own">Installed</span>':`<button type="button" data-act="perk" ${canPerk&&inv.units>=pkPrice?'':'disabled'}>${val>=60?pkPrice.toLocaleString()+' u':'Requires Honored'}</button>`}</div></div>`;
   }else if(trade.tab==='missions'){
     const m=st.mission;
     if(m)h+=`<div class="urow"><div><span class="nm">Active: ${m.type==='boss'?'Boss bounty':m.type==='bounty'?'Pirate bounty':'Supply contract'}</span></div><div class="ds">${missionText()}</div>
@@ -2201,16 +2315,21 @@ function renderTrade(){
 $('trTabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b&&trade){trade.tab=b.dataset.tab;renderTrade()}});
 $('trBody').addEventListener('click',e=>{
   const b=e.target.closest('button[data-act]');if(!b||!trade)return;const v=trade.venue,a=b.dataset.act;let ok=true;
-  if(a==='sell'){const r=b.dataset.r,n=b.dataset.n==='all'?inv[r]:Math.min(+b.dataset.n,inv[r]);if(n>0){inv[r]-=n;inv.units+=n*sellPrice(r,v);toast(`Sold ${n} ${RES_NAME[r]} for ${n*sellPrice(r,v)} units.`)}else ok=false}
+  if(a==='sell'){const r=b.dataset.r,n=b.dataset.n==='all'?inv[r]:Math.min(+b.dataset.n,inv[r]);if(n>0){inv[r]-=n;inv.units+=n*sellPrice(r,v);toast(`Sold ${n} ${RES_NAME[r]} for ${n*sellPrice(r,v)} units.`);
+    if(r==='relics')addRep('lumen',system.faction==='lumen'?4*n:-3*n,system.faction==='lumen'?'relics placed in the Archive':'relics sold to outsiders');
+    else if(n*sellPrice(r,v)>=200)addRep(system.faction,Math.min(2,n*sellPrice(r,v)/400))}else ok=false}
   else if(a==='buy'){const r=b.dataset.r,pr=buyPrice(r,v),n=Math.min(+b.dataset.n,Math.floor(inv.units/pr));if(n>0){inv[r]+=n;inv.units-=n*pr;toast(`Bought ${n} ${RES_NAME[r]} for ${n*pr} units.`)}else ok=false}
-  else if(a==='obuy'){const r=RECIPES.find(x=>x.id===b.dataset.id),pr=SHOP_PRICE[r.id];if(inv.units>=pr&&!(r.kind==='tech'&&tech(r.id))){inv.units-=pr;if(r.kind==='tech'){crafted[r.id]=true;toast(`${r.name} installed.`,'big')}else{crafted[r.id]=(crafted[r.id]||0)+(r.yields||1);toast(`Bought ${r.name}.`)}}else ok=false}
+  else if(a==='obuy'){const r=RECIPES.find(x=>x.id===b.dataset.id),pr=Math.round(SHOP_PRICE[r.id]*repBuy());if(inv.units>=pr&&!(r.kind==='tech'&&tech(r.id))){inv.units-=pr;if(r.kind==='tech'){crafted[r.id]=true;toast(`${r.name} installed.`,'big')}else{crafted[r.id]=(crafted[r.id]||0)+(r.yields||1);toast(`Bought ${r.name}.`)}}else ok=false}
   else if(a==='ship'){const o=station.ships[+b.dataset.i],tradeIn=Math.round(SHIP_PRICE[ship.cls]*.45),net=Math.max(0,o.price-tradeIn);
     if(inv.units>=net){inv.units-=net;const old=SHIP_CLASSES[ship.cls].label;setShipModel(o.cls,o.paint);const s=shipStats();ship.hull=s.hull;ship.shield=s.shield;ship.fuel=Math.max(ship.fuel,60);
       station.ships.splice(+b.dataset.i,1);toast(`New ship: ${SHIP_CLASSES[o.cls].label}. Your ${old} was traded in for ${tradeIn} units.`,'big');Sound.whoosh(1)}else ok=false}
-  else if(a==='repair'){const S=shipStats(),c=Math.ceil((S.hull-ship.hull)*1.5);if(c>0&&inv.units>=c){inv.units-=c;ship.hull=S.hull;toast('Hull fully repaired.')}else ok=false}
-  else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2);if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
+  else if(a==='repair'){const S=shipStats(),c=Math.ceil((S.hull-ship.hull)*1.5*repBuy());if(c>0&&inv.units>=c){inv.units-=c;ship.hull=S.hull;toast('Hull fully repaired.')}else ok=false}
+  else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2*repBuy());if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
   else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25);if(o.type==='boss'){st.bossDue=true;pirateTimer=Math.min(pirateTimer,30);toast('A dreadnought will hunt you once you are in open space, away from the station.')}}else ok=false}
-  else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');st.mission=null}else ok=false}
+  else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');addRep(system.faction,m.type==='boss'?15:8,'contract completed');st.mission=null}else ok=false}
+  else if(a==='donate'){if(inv.units>=500){inv.units-=500;addRep(system.faction,5,'donation')}else ok=false}
+  else if(a==='giverelic'){if(inv.relics>0){inv.relics--;inv.nanites+=150;addRep('lumen',12,'relic given to the Archive')}else ok=false}
+  else if(a==='perk'){const F=FACTIONS[system.faction],pk=F.perk,pr=Math.round(pk.price*repBuy());if(repOf(system.faction)>=60&&!tech(pk.id)&&inv.units>=pr){inv.units-=pr;crafted[pk.id]=true;toast(`${pk.name} installed.`,'big')}else ok=false}
   else if(a==='abandon'){st.mission=null;toast('Mission abandoned.')}
   if(ok){Sound.blip(640,.12,'triangle',.12);save()}else Sound.blip(160,.12,'square',.06);
   renderTrade();
@@ -2253,6 +2372,7 @@ function onKillMsg(m){
   const key=m.peer+':'+d.id,G=ghosts.get(key);if(G){removeGhost(G);ghosts.delete(key)}
   const p=new V3().fromArray(d.p),ref=st.mode==='foot'?player.pos:ship.group.position;
   if(ref.distanceTo(p)<9000){boom(p,18,'#ffa050',1.2);boom(p,10,'#fff2c0',.6);Sound.boom(.4)}
+  if(Array.isArray(d.h)&&d.h.includes(myPeer()))onRepKill({faction:'pirate',boss:!!d.boss});
   if(d.boss&&ref.distanceTo(p)<9000)for(let i=0;i<4;i++)setTimeout(()=>{boom(p.clone().addScaledVector(randDir(Math.random,new V3()),30),35,'#ffa050',1.3);Sound.boom(.4,1)},i*200);
   if(Array.isArray(d.h)&&d.h.includes(myPeer())){if(d.boss){bossLoot(p);creditBoss();toast('Dreadnought destroyed with your crew! Your share of its cargo is drifting nearby.','big')}else{dropSalvage(p,new V3(),false);toast('Shared kill. Salvage dropped for you; fly through it to collect.')}creditBounty();kills++}
 }
@@ -2567,7 +2687,7 @@ async function crewJump(peer){
 })();
 
 /* ---------- crafting ---------- */
-const AUR_R=()=>tech('scanner')?1000:500;
+const AUR_R=()=>(tech('scanner')?1000:500)*(tech('lens')?2:1);
 const canWarp=()=>inv.aurium>=10||crafted.warpcell>0;
 const RECIPES=[
   {id:'gel',kind:'use',name:'Life support gel',desc:'Restores 50 life support.',cost:{carbon:15,cobalt:2},
@@ -3095,7 +3215,7 @@ function drawMarkers(){
         for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){mctx.moveTo(p.x+sx*b,p.y+sy*b*.6);mctx.lineTo(p.x+sx*b,p.y+sy*b);mctx.lineTo(p.x+sx*b*.6,p.y+sy*b)}
         mctx.stroke();
         mctx.font='600 11px Oxanium, system-ui, sans-serif';mctx.textAlign='center';mctx.fillStyle='#ff9aa6';mctx.shadowColor='#000';mctx.shadowBlur=4;
-        mctx.fillText(`${n.boss?(n.name||'Pirate dreadnought'):(n.faction==='pirate'?'Pirate':'Trader')+' '+SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
+        mctx.fillText(`${n.boss?(n.name||'Pirate dreadnought'):({pirate:'Pirate',korrath:'Korrath'}[n.faction]||'Trader')+' '+SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
         const w=Math.max(40,b*2);
         mctx.fillStyle='rgba(255,255,255,.15)';mctx.fillRect(p.x-w/2,p.y-b-11,w,3);mctx.fillRect(p.x-w/2,p.y-b-6,w,3);
         mctx.fillStyle='#9fe6ff';mctx.fillRect(p.x-w/2,p.y-b-11,w*Math.max(0,n.shield/n.maxShield),3);
@@ -3107,7 +3227,7 @@ function drawMarkers(){
           if(!lp.off){mctx.strokeStyle='#ff6274';mctx.lineWidth=1.5;mctx.beginPath();mctx.moveTo(lp.x,lp.y-6);mctx.lineTo(lp.x+6,lp.y);mctx.lineTo(lp.x,lp.y+6);mctx.lineTo(lp.x-6,lp.y);mctx.closePath();mctx.stroke();
             mctx.setLineDash([2,4]);mctx.beginPath();mctx.moveTo(p.x,p.y);mctx.lineTo(lp.x,lp.y);mctx.stroke();mctx.setLineDash([])}
         }
-      }else if(!n.hostile&&dist<3500){const p=proj(n.group.position,false);if(!p.off)marker(p.x,p.y,'rgba(138,240,180,.8)',`Trader ${SHIP_CLASSES[n.cls].label}`,fmtDist(dist),'ring',5)}
+      }else if(!n.hostile&&dist<3500){const p=proj(n.group.position,false);if(!p.off)marker(p.x,p.y,n.faction==='korrath'?'#ff9a8a':'rgba(138,240,180,.8)',n.faction==='korrath'?`Korrath patrol · ${n.prey?'hunting':'allied'}`:`Trader ${SHIP_CLASSES[n.cls].label}`,fmtDist(dist),'ring',5)}
     }
     for(const sv of salvage){const d=sv.mesh.position.distanceTo(sp);if(d<4000){const p=proj(sv.mesh.position,d<1500);marker(p.x,p.y,'#ffcf6a','Salvage',fmtDist(d),'diamond',6)}}
   }
@@ -3159,7 +3279,7 @@ function updateHUD(){
     setText('pFlora',P.floraLevel);
     const known=P.species.filter((s,i)=>st.disc.has(`S:${P.sysSeed}:${P.idx}:${i}`)).length;
     setText('pFauna',P.species.length?`${known}/${P.species.length} catalogued`:'None detected');
-    setText('pDisc',String(st.disc.size));setText('pWeather',weatherText());$('pWeather').style.color=WX.state==='storm'&&WX.I>.05?'var(--danger)':WX.state==='warn'?'var(--amber-hi)':'';
+    setText('pDisc',String(st.disc.size));setText('pWeather',weatherText());if(system&&system.faction){const F=FACTIONS[system.faction],T=repTier(repOf(system.faction));setText('pFaction',`${F.name} · ${T.name}`);$('pFaction').style.color=T.color}$('pWeather').style.color=WX.state==='storm'&&WX.I>.05?'var(--danger)':WX.state==='warn'?'var(--amber-hi)':'';
   }
   setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));setText('iU',inv.units.toLocaleString());
   setText('objective',objective());
@@ -3229,10 +3349,10 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.looted=new Set(saved.looted||[]);
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.looted=new Set(saved.looted||[]);
     myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();st.rep={vael:0,korrath:0,lumen:0};myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
   await generateSystem(st.seed,isFirst(st.seed));
   const P=planets[0];current=P;
