@@ -171,6 +171,8 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 #capPanel{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.55);padding-inline:16px}
 #capPanel .card{max-width:600px;width:100%;max-height:calc(100% - 32px);overflow:auto;pointer-events:auto}
 
+.crewrow{grid-template-columns:1fr}.crewrow .acts{grid-row:auto;grid-column:1;justify-content:flex-start;margin-top:4px}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -1044,7 +1046,7 @@ function setHTML(id,t){if(_txt.get(id)!==t){_txt.set(id,t);$(id).innerHTML=t}}
 function setBar(id,v,max=100,warnBelow=25){const el=$(id);el.querySelector('.f').style.width=clamp(v/max*100,0,100)+'%';el.querySelector('.n').textContent=Math.round(v);el.classList.toggle('warn',v<warnBelow)}
 function fmtDist(d){return d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(d<10000?2:1)} km`}
 function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);toast(label,'big');
-  setTimeout(()=>{addRep('lumen',/^(R:|A:)/.test(key)?5:2);if(tech('lens')){inv.nanites+=25}if(crewB('scientist'))inv.nanites+=crewB('scientist');},300);Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
+  setTimeout(()=>{crewProgress('explore',1);addRep('lumen',/^(R:|A:)/.test(key)?5:2);if(tech('lens')){inv.nanites+=25}if(crewB('scientist'))inv.nanites+=crewB('scientist');},300);Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
 
 /* ---------- actions ---------- */
 function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){const d=p.distanceTo(P.center)-P.radius;if(d<bd){bd=d;best=P}}return best}
@@ -1368,6 +1370,7 @@ function updateShip(dt){
 async function doWarp(home){
   if(home){st.seed=myBase.seed;if(myBase.systems)st.systems=myBase.systems}else if(ship.wormSeed){st.seed=ship.wormSeed;ship.wormSeed=0;st.systems++}else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
   await generateSystem(st.seed,isFirst(st.seed));
+  if(!home)crewProgress('visit',1);
   const myRT=myBase&&baseRTs.get(myBase.id);const P=home&&myRT?myRT.P:planets[0];current=P;
   const d=new V3().subVectors(new V3(),P.center).normalize();
   ship.group.position.copy(P.center).addScaledVector(d,P.radius*3.2).add(new V3(0,P.radius*.6,0));
@@ -2081,7 +2084,7 @@ function repTier(v){
 }
 const isHostileTo=f=>repOf(f)<=-40;
 function addRep(f,d,why){
-  if(!FACTIONS[f]||!d)return;st.rep=st.rep||{vael:0,korrath:0,lumen:0};
+  if(!FACTIONS[f]||!d)return;st.rep=st.rep||{vael:0,korrath:0,lumen:0};if(d>0)crewProgress('favor',d,f);crewRepEvent(f,d);
   const before=repTier(repOf(f)).name;st.rep[f]=clamp(repOf(f)+d,-100,100);const after=repTier(repOf(f)).name;
   if(before!==after)toast(`${FACTIONS[f].name} now regards you as ${after}.`,d>0?'big':'bad');
   else if(Math.abs(d)>=3)toast(`${FACTIONS[f].name} ${d>0?'+':''}${Math.round(d)} standing${why?' · '+why:''}`,d>0?'':'bad');
@@ -2103,7 +2106,7 @@ function spawnPatrols(rand){
 }
 function nearestPirateFor(n){let best=null,bd=3500;for(const o of npcs){if(o===n||o.faction!=='pirate')continue;const d=o.group.position.distanceTo(n.group.position);if(d<bd){bd=d;best=o}}return best}
 function onRepKill(n){
-  if(n.faction==='pirate'){addRep('korrath',n.boss?10:2,n.boss?'dreadnought destroyed':'');addRep('vael',n.boss?5:1)}
+  if(n.faction==='pirate'){crewProgress('hunt',n.boss?3:1);addRep('korrath',n.boss?10:2,n.boss?'dreadnought destroyed':'');addRep('vael',n.boss?5:1)}
   else if(n.faction==='trader')addRep('vael',-10,'trader destroyed');
   else if(n.faction==='korrath')addRep('korrath',-15,'patrol destroyed');
   else if(n.war)warKill(n);
@@ -2338,6 +2341,7 @@ function capDamage(d){
   if(c.hull<=0){const p=CAPR.group.position.clone();for(let i=0;i<5;i++)setTimeout(()=>{boom(p.clone().addScaledVector(randDir(Math.random,new V3()),60),60,'#ffa050',1.4);Sound.boom(.6,1.4)},i*200);
     if(DR.on&&DR.kind==='capital'){DR.on=false;DR.kind=null;st.mode='ship'}
     if(ship.dockCap&&['docking','docked'].includes(ship.state)){ship.state='flying';ship.dockCap=false;closeCap()}
+    for(const m of [...(st.crew||[])])changeLoyalty(m,-10,'the ship was crippled');
     clearCapital();c.hull=Math.round(capMax()*.5);c.repairUntil=Date.now()+10*60000;
     toast(`${c.name} was crippled and jumped away for emergency repairs (10 min).`,'bad');save()}
 }
@@ -2374,6 +2378,7 @@ function updateEscort(n,dt){
 function updateCapital(dt){
   const c=st.capital;if(!c)return;
   if(c.exped&&c.exped.until<=Date.now()&&!c.exped.told){c.exped.told=true;toast(`${c.name} is back from its expedition. Press K to collect the haul.`,'big');Sound.blip(700,.4,'triangle',.15);save()}
+  CAPR.neglectT=(CAPR.neglectT||0)-dt;if(CAPR.neglectT<=0){CAPR.neglectT=60;crewNeglect()}
   if(c.repairUntil&&c.repairUntil<=Date.now()&&!c.repairTold){c.repairTold=true;toast(`${c.name} is repaired and ready to summon (K).`)}
   if(!CAPR.here||!CAPR.group)return;
   if(time-CAPR.lastHit>10)c.hull=Math.min(capMax(),c.hull+6*(1+crewB('engineer'))*dt);
@@ -2463,7 +2468,7 @@ $('capBody').addEventListener('click',e=>{
   else if(a==='craft'){closeCap();toggleCraft()}
   else if(a==='exp'){if(DR.on&&DR.kind==='capital')exitCapInterior(true);sendExpedition(+b.dataset.d)}
   else if(a==='collect')collectExpedition();
-  else if(a==='promote'||a==='fire'){crewAction(a,+b.dataset.i)}
+  else if(a==='promote'||a==='fire'||a==='claim'||a==='pay'){crewAction(a,+b.dataset.i)}
   else if(a==='upg'){const lv=c.upg[b.dataset.k]||0,cost=4000*(lv+1),nan=200*(lv+1);if(lv<3&&inv.units>=cost&&inv.nanites>=nan){inv.units-=cost;inv.nanites-=nan;c.upg[b.dataset.k]=lv+1;if(b.dataset.k==='armor')c.hull=capMax();toast(`${CAP_UPG.find(u=>u.key===b.dataset.k).name} upgraded.`)}}
   Sound.blip(600,.12,'triangle',.1);save();renderCap();
 });
@@ -2499,7 +2504,7 @@ const CREW_SPECIES={human:{label:'Human',color:'#ffb45e'},vael:{label:'Vael',col
 const CREW_TRAITS=['Veteran of the Hollow Fleet wars','Grew up on a mining rig','Former station security','Exiled from a Korrath war clan','Lumen-trained scholar','Ex-smuggler with a clean record','Survived a derelict boarding gone wrong','Never misses a supply count','Hums old star shanties on duty','Collects pressed alien flowers'];
 const CAP_SLOTS={courier:3,carrier:4,dread:6};
 const crewSlots=()=>st.capital?CAP_SLOTS[st.capital.cls]:0;
-function crewB(role){let best=0;for(const m of st.crew||[])if(m.role===role)best=Math.max(best,m.rank);return best?CREW_ROLES[role].vals[best-1]:0}
+function crewB(role){let best=null;for(const m of st.crew||[])if(m.role===role&&(!best||m.rank>best.rank||m.rank===best.rank&&(m.loy||50)>(best.loy||50)))best=m;if(!best)return 0;const v=CREW_ROLES[role].vals[best.rank-1]*loyMul({loy:best.loy==null?50:best.loy});return role==='scientist'?Math.round(v):v}
 const crewKey=()=>(st.crew||[]).map(m=>m.id+m.rank).join('|');
 const crewFee=(role,rank)=>Math.round(CREW_ROLES[role].fee*Math.pow(rank,1.6)/50)*50;
 function crewCandidates(){
@@ -2515,7 +2520,7 @@ function hireCrew(cand){
   if(!st.capital){toast('Crew serve aboard a capital ship. Buy one in the Capital yard first.','bad');return false}
   st.crew=st.crew||[];if(st.crew.length>=crewSlots()){toast(`Your ${CAP_CLASSES[st.capital.cls].label} has room for ${crewSlots()} crew. Dismiss someone or upgrade your capital ship.`,'bad');return false}
   if(inv.units<cand.fee){toast(`Hiring ${cand.name} costs ${cand.fee.toLocaleString()} units.`,'bad');return false}
-  inv.units-=cand.fee;st.crew.push({id:cand.id,name:cand.name,species:cand.species,role:cand.role,rank:cand.rank,trait:cand.trait});
+  inv.units-=cand.fee;const nm={id:cand.id,name:cand.name,species:cand.species,role:cand.role,rank:cand.rank,trait:cand.trait,loy:50,seenAt:Date.now()};nm.mission=genCrewMission(nm);st.crew.push(nm);setTimeout(()=>toast(`${nm.name}'s first request: ${nm.mission.text}`),2400);
   (st.crewHired=st.crewHired||[]).push(cand.id);
   toast(`${cand.name} joins your crew as ${CREW_ROLES[cand.role].label}: ${CREW_ROLES[cand.role].fmt(CREW_ROLES[cand.role].vals[cand.rank-1])}.`,'big');save();return true;
 }
@@ -2528,17 +2533,84 @@ function crewRow(m,actions){
 function renderCrewTab(){
   const list=st.crew||[];let h=`<p class="trnote">${list.length}/${crewSlots()} crew aboard. Each role's best crew member sets its bonus. Hire specialists at station crew boards.</p>`;
   if(!list.length)h+='<p class="trnote">You are flying with a skeleton crew.</p>';
-  h+=list.map((m,i)=>{const cost=2500*m.rank,can=m.rank<3&&inv.units>=cost;return crewRow(m,`${m.rank<3?`<button type="button" data-cact="promote" data-i="${i}" ${can?'':'disabled'}>Promote · ${cost.toLocaleString()} u</button>`:'<span class="own">Top rank</span>'}<button type="button" data-cact="fire" data-i="${i}">Dismiss</button>`)}).join('');
+  ensureCrew();
+  h+=list.map((m,i)=>{const cost=2500*m.rank,can=m.rank<3&&inv.units>=cost,md=moodOf(m.loy),ready=missionReady(m),R=CREW_ROLES[m.role],S=CREW_SPECIES[m.species];
+    const eff=m.loy>=75?' · bonus +25% while Devoted':m.loy<=25?' · bonus halved while unhappy':'';
+    return `<div class="urow crewrow"><div><span class="nm">${clean(m.name,30)}</span> <span class="pips">${crewStars(m.rank)}</span> <span style="color:${md.color};font-size:11px;margin-left:6px">${md.name}</span></div>
+      <div class="ds"><span style="color:${S.color}">${S.label}</span> ${R.label} · ${R.fmt(R.vals[m.rank-1])}${eff}.</div>
+      <div class="fbar" style="grid-column:1;margin:4px 0 2px"><i style="left:0;width:${m.loy}%;background:${md.color}"></i></div>
+      <div class="ds">Loyalty ${Math.round(m.loy)}/100 · Request: ${m.mission.text} <b style="color:${ready?'var(--ok)':'var(--text)'}">${ready?'Ready to report':missionProgress(m)}</b></div>
+      <div class="acts">${ready?`<button type="button" data-cact="claim" data-i="${i}">Report</button>`:''}<button type="button" data-cact="pay" data-i="${i}" ${inv.units>=500?'':'disabled'}>Bonus pay · 500 u</button>${m.rank<3?`<button type="button" data-cact="promote" data-i="${i}" ${can?'':'disabled'}>Promote · ${cost.toLocaleString()} u</button>`:''}<button type="button" data-cact="fire" data-i="${i}">Dismiss</button></div></div>`}).join('');
   return h;
 }
 function crewAction(a,i){
   const m=(st.crew||[])[i];if(!m)return;
   if(a==='promote'){const cost=2500*m.rank;if(m.rank<3&&inv.units>=cost){inv.units-=cost;m.rank++;toast(`${m.name} promoted: ${CREW_ROLES[m.role].fmt(CREW_ROLES[m.role].vals[m.rank-1])}.`)}}
   else if(a==='fire'){if(CAPR.pendingDismiss!==m.id||time-CAPR.pendingT>5){CAPR.pendingDismiss=m.id;CAPR.pendingT=time;toast(`Press Dismiss again to let ${m.name} go. Their hiring fee is not refunded.`,'bad');return}
-    st.crew.splice(i,1);CAPR.pendingDismiss=null;toast(`${m.name} has left your crew.`)}
+    st.crew.splice(i,1);CAPR.pendingDismiss=null;toast(`${m.name} has left your crew.`);for(const o of [...st.crew])changeLoyalty(o,-3,'worried about their own job')}
+  else if(a==='claim')claimCrewMission(m);
+  else if(a==='pay')bonusPay(m);
   save();
 }
 const CREW_SPECIES_LINES={human:['"Good to be aboard, Captain."'],vael:['"Every voyage is a ledger. Let us make ours profitable."'],korrath:['"Point me at the enemy, Captain."'],lumen:['"So much left to record out there."']};
+
+/* ---------- crew loyalty and personal missions ---------- */
+const MOODS=[[75,'Devoted','#ffd27a'],[50,'Loyal','#8af0b4'],[35,'Content','#c9d0e6'],[20,'Restless','#ffa070'],[-1,'Disgruntled','#ff6274']];
+const moodOf=v=>{for(const [t,n,c] of MOODS)if(v>=t)return{name:n,color:c};return{name:'Disgruntled',color:'#ff6274'}};
+const loyMul=m=>m.loy>=75?1.25:m.loy<=25?.5:1;
+function ensureCrew(){for(const m of st.crew||[]){if(m.loy==null)m.loy=50;if(!m.seenAt)m.seenAt=Date.now();if(!m.mission)m.mission=genCrewMission(m)}}
+const MISSION_RES={cobalt:[30,60],aurium:[8,15],ferrite:[80,150]};
+function genCrewMission(m){
+  const r=Math.random,roleTypes={pilot:['visit','explore'],navigator:['visit','explore'],engineer:['hunt','salvage'],gunner:['hunt','hunt','salvage'],quarter:['retrieve','retrieve','salvage'],trader:['retrieve','visit'],scientist:['explore','relic']}[m.role]||['hunt'];
+  let type=roleTypes[Math.floor(r()*roleTypes.length)];if(m.species!=='human'&&r()<.3)type='favor';
+  const M={type,have:0,need:1,done:false};
+  if(type==='hunt'){M.need=3+Math.floor(r()*4);M.text=`"The Hollow Fleet took everything from my old crew. Destroy ${M.need} pirates for me."`}
+  else if(type==='explore'){M.need=3+Math.floor(r()*4);M.text=`"I joined to see the galaxy. Log ${M.need} new discoveries: planets, species or relics."`}
+  else if(type==='visit'){M.need=2+Math.floor(r()*3);M.text=`"Let us fly somewhere new. Take us to ${M.need} star systems we have not seen."`}
+  else if(type==='salvage'){M.need=3+Math.floor(r()*3);M.text=`"Derelicts hold parts I can use. Open ${M.need} salvage crates aboard derelict freighters."`}
+  else if(type==='retrieve'){const res=Object.keys(MISSION_RES)[Math.floor(r()*3)],[a,b]=MISSION_RES[res];M.res=res;M.need=a+Math.floor(r()*(b-a));M.text=`"I have a buyer lined up. Bring me ${M.need} ${RES_NAME[res]}."`}
+  else if(type==='relic'){M.res='relics';M.need=1+Math.floor(r()*2);M.text=`"Ancient relics hold the secrets I study. Bring me ${M.need} relic${M.need>1?'s':''}."`}
+  else{M.fac=m.species;M.need=10;M.text=`"My people, the ${FN(m.species)}, should know your name. Earn ${M.need} standing with them."`}
+  return M;
+}
+const missionReady=m=>{const M=m.mission;if(!M)return false;return M.res?inv[M.res]>=M.need:M.have>=M.need};
+const missionProgress=m=>{const M=m.mission;if(!M)return'';return M.res?`${Math.min(inv[M.res]||0,M.need)}/${M.need} ${RES_NAME[M.res]} in your hold`:`${Math.min(M.have,M.need)}/${M.need}`};
+function crewProgress(type,amount,fac){
+  for(const m of st.crew||[]){const M=m.mission;if(!M||M.type!==type||M.done)continue;if(type==='favor'&&M.fac!==fac)continue;
+    M.have+=amount;if(M.have>=M.need){M.done=true;toast(`${m.name}'s request is complete. Talk to them aboard, or report from the Crew tab.`,'big')}}
+}
+function changeLoyalty(m,d,why){
+  const before=moodOf(m.loy).name;m.loy=clamp(m.loy+d,0,100);const after=moodOf(m.loy).name;
+  if(before!==after)toast(`${m.name} is now ${after}${why?' · '+why:''}.`,d>0?'':'bad');
+  if(m.loy<=15&&!m.warned){m.warned=true;toast(`${m.name} is thinking of leaving the ship. Pay them, talk to them, or finish their request.`,'bad')}
+  if(m.loy>25)m.warned=false;
+  if(m.loy<=0){st.crew.splice(st.crew.indexOf(m),1);toast(`${m.name} has packed their bags and left your crew.`,'bad')}
+}
+function crewRepEvent(f,d){for(const m of [...(st.crew||[])])if(m.species===f)changeLoyalty(m,d<0?d*.5:d*.2,d<0?`you hurt the ${FN(f)}`:'')}
+function claimCrewMission(m){
+  if(!missionReady(m))return false;const M=m.mission;
+  if(M.res)inv[M.res]-=M.need;
+  let reward;if(m.rank<3){m.rank++;reward=`inspired, they rise to ${crewStars(m.rank)}: ${CREW_ROLES[m.role].fmt(CREW_ROLES[m.role].vals[m.rank-1])}`}
+  else{inv.units+=2500;inv.nanites+=150;reward='they share their winnings: +2,500 Units, +150 Nanites'}
+  changeLoyalty(m,25,'request fulfilled');toast(`${m.name}: "Thank you, Captain." ${reward}.`,'big');Sound.whoosh(.8);
+  m.mission=genCrewMission(m);setTimeout(()=>toast(`${m.name} has a new request: ${m.mission.text}`),2200);save();return true;
+}
+function bonusPay(m){
+  if(m.payAt&&Date.now()-m.payAt<30*60000){toast(`${m.name} was paid recently. Try again in ${Math.ceil((30*60000-(Date.now()-m.payAt))/60000)} min.`);return}
+  if(inv.units<500){toast('Bonus pay costs 500 units.','bad');return}
+  inv.units-=500;m.payAt=Date.now();changeLoyalty(m,10,'bonus pay');toast(`${m.name} appreciates the bonus. +10 loyalty.`);save();
+}
+function talkCrew(m){
+  if(missionReady(m)){claimCrewMission(m);return}
+  m.seenAt=Date.now();if(!m.talkAt||Date.now()-m.talkAt>3600000){m.talkAt=Date.now();changeLoyalty(m,2)}
+  const mood=moodOf(m.loy).name,R=CREW_ROLES[m.role];
+  const line=Math.random()<.45?`About my request: ${m.mission.text.replace(/^"|"$/g,'')} (${missionProgress(m)})`:
+    (m.loy<30?'"I am not sure this ship is where I belong anymore."':Math.random()<.3&&CREW_SPECIES_LINES[m.species]?CREW_SPECIES_LINES[m.species][0]:(CREW_LINES[m.role]||CREW_LINES.deck)());
+  toast(`${m.name} · ${R.label} ${crewStars(m.rank)} · ${mood}: ${line}`);save();
+}
+function crewNeglect(){
+  for(const m of [...(st.crew||[])]){if(Date.now()-m.seenAt>3600000){m.seenAt+=3600000;if(m.loy>20)changeLoyalty(m,-1)}}
+}
 
 /* ---------- space stations & trading posts ---------- */
 let station=null,trade=null,nearPost=null;
@@ -3565,7 +3637,7 @@ function derelictInteract(){
   const it=DR.near;if(!it)return;
   if(DR.kind==='capital'){capInteract(it);return}
   if(it.kind==='hatch'){leaveFreighter();return}
-  if(it.kind==='crate'){it.done=true;it.mesh.visible=false;markLooted(it.key);
+  if(it.kind==='crate'){it.done=true;it.mesh.visible=false;markLooted(it.key);crewProgress('salvage',1);
     const l={units:ri(80,220)*(it.rich?2:1),ferrite:ri(5,20),cobalt:ri(2,8),nanites:ri(10,30)*(it.rich?2:1),aurium:Math.random()<(it.rich?.8:.35)?ri(1,3):0};giveLoot(l);
     let extra='';if(Math.random()<.25){crafted.missile=(crafted.missile||0)+2;extra=' · +2 missiles'}toast(`Salvage: ${lootText(l)}${extra}`);Sound.blip(500,.15,'triangle',.14);return}
   if(it.kind==='cell'){it.done=true;it.mesh.visible=false;DR.cells++;toast(`Power cell ${DR.cells}/2 recovered.${DR.cells>=2?' Take them to the vault at the far end of the corridor.':''}`);Sound.blip(900,.25,'sine',.14);return}
@@ -3711,7 +3783,7 @@ function capInteract(it){
   if(it.kind==='expedition'){openCap('expeditions');return}
   if(it.kind==='trophy'){toast(`Trophy log: ${kills} ships destroyed · ${st.disc.size} discoveries · ${inv.relics} relics aboard · ${st.systems} systems visited.`,'big');return}
   if(it.kind==='roster'){openCap('crew');return}
-  if(it.kind==='crew'){it.mesh.lookAt(it.mesh.parent.localToWorld(new V3(DR.pos.x,0,DR.pos.z)));const R=CREW_ROLES[it.crew.role];const line=Math.random()<.25&&CREW_SPECIES_LINES[it.crew.species]?CREW_SPECIES_LINES[it.crew.species][0]:CREW_LINES[it.crew.role]();toast(`${it.crew.name}${R?' · '+R.label+' '+crewStars(it.crew.rank):''}: ${line}`);Sound.blip(420,.1,'sine',.08)}
+  if(it.kind==='crew'){it.mesh.lookAt(it.mesh.parent.localToWorld(new V3(DR.pos.x,0,DR.pos.z)));const real=(st.crew||[]).find(x=>x.id===it.crew.id);if(real){ensureCrew();talkCrew(real);if(!$('capPanel').hidden)renderCap();return}const R=CREW_ROLES[it.crew.role];const line=Math.random()<.25&&CREW_SPECIES_LINES[it.crew.species]?CREW_SPECIES_LINES[it.crew.species][0]:CREW_LINES[it.crew.role]();toast(`${it.crew.name}${R?' · '+R.label+' '+crewStars(it.crew.rank):''}: ${line}`);Sound.blip(420,.1,'sine',.08)}
 }
 const CAP_PROMPTS={roster:['Crew roster','Manage crew'],exitcap:['Hangar terminal','Return to your ship'],helm:['Holo helm','Command the ship'],workshop:['Engineering terminal','Ship workshop'],fab:['Fabricator','Craft'],expedition:['Operations console','Expeditions'],trophy:['Trophy log','Read']};
 
@@ -3930,7 +4002,7 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.territory=saved.territory||{};st.capital=saved.capital||null;st.crew=saved.crew||[];st.crewHired=saved.crewHired||[];st.looted=new Set(saved.looted||[]);
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.territory=saved.territory||{};st.capital=saved.capital||null;st.crew=saved.crew||[];ensureCrew();st.crewHired=saved.crewHired||[];st.looted=new Set(saved.looted||[]);
     myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
   else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();st.rep={vael:0,korrath:0,lumen:0};myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
