@@ -144,6 +144,13 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 #crewMsg{flex:1}
 @media (pointer:coarse){#crewChip{display:none}}
 
+#bossBar{width:min(520px,100%);padding:8px 12px;display:flex;flex-direction:column;gap:5px;border-color:rgba(255,98,116,.5)}
+.bb-top{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+#bossName{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.06em;color:#ffb3bc}
+#bossPhase{color:var(--danger)}
+.bbar{height:5px;background:rgba(255,255,255,.1);border-radius:1px;overflow:hidden}.bbar i{display:block;height:100%;width:100%;background:var(--frost);transition:width .2s}
+.bbar.hull{height:8px}.bbar.hull i{background:var(--danger)}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -197,6 +204,7 @@ button.go:disabled{opacity:.5;cursor:wait}
 
 <div class="hud tc" id="hudTC" hidden>
   <div id="objective"></div>
+  <div id="bossBar" class="card" hidden><div class="bb-top"><span class="eyebrow" id="bossPhase">Dreadnought</span><span id="bossName">—</span></div><div class="bbar"><i id="bossSh"></i></div><div class="bbar hull"><i id="bossHp"></i></div></div>
   <div id="toasts"></div>
 </div>
 
@@ -247,7 +255,7 @@ button.go:disabled{opacity:.5;cursor:wait}
     <div class="pname" id="upgShip">Shuttle</div>
     <div class="shipstats" id="upgStats"></div>
     <div id="upgList"></div>
-    <p style="color:var(--dim);font-size:12px;margin:12px 0 0">Keys 1–4 buy. Press U to close.</p>
+    <p style="color:var(--dim);font-size:12px;margin:12px 0 0">Keys 1–9 buy. Press U to close.</p>
   </div>
 </div>
 
@@ -340,7 +348,7 @@ const CONTROLS=[
   ['Board ship / open pod / claim wreck','E'],['Collect ion cells','Walk over them'],
   ['In the ship',null],['Throttle','W / S'],['Pitch & yaw','Mouse'],['Roll','A / D'],['Boost / pulse drive','Shift'],
   ['Fire cannons','Hold left click'],['Take off','Space'],['Land / exit','E'],['Refuel landed (20 Ferrite)','R'],
-  ['Repair hull in flight (15 Ferrite)','R'],['Ship workshop','U'],['Hyperdrive jump (10 Aurium or a warp cell)','H'],
+  ['Repair hull in flight (15 Ferrite)','R'],['Ship workshop','U'],['Hyperdrive jump (10 Aurium or a warp cell)','H'],['Lock on','Keep a target in the crosshair'],['Fire homing missiles','F / right click'],
   ['Anywhere',null],['Crafting menu','I'],['Quick-use gel / hull patch','G'],
   ['Base building',null],['Build mode (on foot)','B'],['Place part','Left click'],['Rotate','R'],['Remove part (half refund)','X / right click'],
   ['Choose part','Wheel / 1–0 / [ ]'],['Collect from modules','E'],['Jump to your home base','J'],
@@ -770,8 +778,8 @@ function buildShip(cls='shuttle',paint=PAINTS.player){
   g.userData={engines,guns,radius,base};
   return g;
 }
-const upg={dmg:0,shield:0,hull:0,pulse:0};
-function shipStats(cls=ship.cls){const c=SHIP_CLASSES[cls];return{hull:Math.round(c.hull*(1+.2*upg.hull)),shield:Math.round(c.shield*(1+.2*upg.shield)),dmg:c.dmg*(1+.2*upg.dmg),agility:c.agility,speed:c.speed,pulse:c.pulse*(1+.15*upg.pulse),takeoff:c.takeoff}}
+const upg={dmg:0,shield:0,hull:0,pulse:0,cool:0,regen:0,thrust:0,nano:0,rack:0};
+function shipStats(cls=ship.cls){const c=SHIP_CLASSES[cls];return{hull:Math.round(c.hull*(1+.2*upg.hull)),shield:Math.round(c.shield*(1+.2*upg.shield)),dmg:c.dmg*(1+.2*upg.dmg),agility:c.agility*(1+.08*upg.thrust),speed:c.speed*(1+.08*upg.thrust),pulse:c.pulse*(1+.15*upg.pulse),takeoff:c.takeoff}}
 const ship={group:buildShip('shuttle',PAINTS.player),cls:'shuttle',paint:PAINTS.player,state:'landed',speed:0,fuel:0,t:0,land:null,camQ:new Q4(),scrapeCD:0,warped:false,
   hull:100,shield:60,shieldDelay:0,heat:0,overheat:false,fireCD:0,gunI:0,shake:0,jamCD:0};
 scene.add(ship.group);
@@ -916,6 +924,7 @@ canvas.addEventListener('mousedown',e=>{
   if(buildMode&&locked){if(e.button===0)placePiece();else if(e.button===2)deconstruct()}
   else if(buildMode&&e.button===2)deconstruct();
   else if(buildMode&&e.button===0&&!TOUCH)placePiece();
+  if(!buildMode&&e.button===2&&st.mode==='ship')fireMissiles();
   if(e.button===0)mouseDown=true;
   if(!locked&&!TOUCH){try{const p=canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(_){}}
 });
@@ -941,7 +950,7 @@ function onPress(code){
   if(code==='KeyU'){$('craft').hidden=true;toggleUpg();return}
   if(code==='KeyI'){$('upg').hidden=true;toggleCraft();return}
   if(code==='KeyG'){quickUse();return}
-  if(!$('upg').hidden){const m=code.match(/^Digit([1-4])$/);if(m)buyUpg(UPGRADES[+m[1]-1].key);return}
+  if(!$('upg').hidden){const m=code.match(/^Digit([1-9])$/);if(m)buyUpg(UPGRADES[+m[1]-1].key);return}
   if(code==='KeyE')interact();
   else if(code==='KeyR')refill();
   else if(code==='KeyH')tryWarp();
@@ -953,7 +962,7 @@ function onPress(code){
 /* touch */
 if(TOUCH){
   $('touch').hidden=false;
-  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208],['BUILD','KeyB',264,40],['CREW','KeyM',264,124]];
+  const btns=[['MSL','KeyF',264,208],['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208],['BUILD','KeyB',264,40],['CREW','KeyM',264,124]];
   for(const [label,code,r,b] of btns){
     const el=document.createElement('div');el.className='tbtn';el.textContent=label;
     el.style.right=`calc(${r}px + env(safe-area-inset-right,0px))`;el.style.bottom=`calc(${b}px + env(safe-area-inset-bottom,0px))`;
@@ -1063,6 +1072,7 @@ function scanPulse(){
   if(tech('resonator')){const nr=current.items.filter(it=>it.alive&&it.type==='relic'&&it.wp.distanceTo(ref)<3000).length;if(nr)setTimeout(()=>toast(`Resonator: ${nr} relic${nr>1?'s':''} within 3 km.`),700)}
 }
 function analyze(){
+  if(st.mode==='ship'){fireMissiles();return}
   if(st.mode!=='foot')return;
   if(lookCreature){
     const sp=lookCreature.sp,P=current,key=`S:${P.sysSeed}:${P.idx}:${P.species.indexOf(sp)}`;
@@ -1257,7 +1267,7 @@ function updateShip(dt){
       const guns=g.userData.guns,gp=guns[ship.gunI++%guns.length];
       const muzzle=g.localToWorld(tV2.copy(gp));
       fireBolt(muzzle,fwd,tV3.copy(fwd).multiplyScalar(ship.speed),'player',S.dmg);
-      ship.fireCD=.11;ship.heat+=5.5;Sound.pew(1000+Math.random()*120);
+      ship.fireCD=.11;ship.heat+=5.5*(1-.12*upg.cool);Sound.pew(1000+Math.random()*120);
       if(ship.heat>=100){ship.overheat=true;toast('Cannons overheated. Wait for them to cool.','bad')}
     }
     if(pr<P.radius*2){
@@ -1353,7 +1363,7 @@ function boom(pos,size,color='#ffb060',life=.9){
 }
 function damagePlayer(dmg,hullOnly=false){
   if(st.mode!=='ship')return;
-  ship.shieldDelay=3.5;ship.shake=Math.min(1,ship.shake+.25);
+  ship.shieldDelay=3.5-.4*upg.regen;ship.shake=Math.min(1,ship.shake+.25);
   if(!hullOnly&&ship.shield>0){const a=Math.min(ship.shield,dmg);ship.shield-=a;dmg-=a;Sound.blip(300,.08,'sawtooth',.05)}
   if(dmg>0){ship.hull-=dmg;Sound.blip(120,.15,'square',.1);
     $('flash').style.transition='none';$('flash').style.background='#ff2a40';$('flash').style.opacity=.18;
@@ -1377,16 +1387,18 @@ function damageNpc(n,dmg,at){
   n.shieldDelay=3;
   if(n.shield>0){const a=Math.min(n.shield,dmg);n.shield-=a;dmg-=a;boom(at,1.6,'#7fd0ff',.25)}else boom(at,1.4,'#ffcf6a',.25);
   n.hull-=dmg;
+  if(n.boss&&n.hull>0)onBossDamaged(n);
   if(n.hull<=0)destroyNpc(n);
 }
 function destroyNpc(n){
   const p=n.group.position;boom(p,n.radius*3,'#ffa050',1.2);boom(p,n.radius*1.6,'#fff2c0',.6);Sound.boom(.6);
   scene.remove(n.group);npcs.splice(npcs.indexOf(n),1);
   const trader=n.faction==='trader';kills++;
+  if(n.boss){bossDown(n);return}
   if(!trader)creditBounty();
   dropSalvage(p,n.vel,trader);
   if(!trader&&MP.sys)MP.sys.emit('kill',{id:n.netId,p:p.toArray().map(v=>Math.round(v*10)/10),h:[...(n.hitters||[])].slice(0,12)}).catch(()=>{});
-  toast(`${trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
+  if(!n.boss)toast(`${trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
   if(!npcs.some(x=>x.hostile))setTimeout(()=>{if(!npcs.some(x=>x.hostile))toast('Area clear.','big')},600);
 }
 function creditBounty(){
@@ -1423,6 +1435,7 @@ function updateNpcs(dt){
   const flying=st.mode==='ship'&&ship.state==='flying';
   for(let i=npcs.length-1;i>=0;i--){
     const n=npcs[i],g=n.group;
+    if(n.boss){updateBoss(n,dt);continue}
     n.shieldDelay-=dt;if(n.shieldDelay<=0)n.shield=Math.min(n.maxShield,n.shield+8*dt);
     const fwd=tV.set(0,0,-1).applyQuaternion(g.quaternion);
     let spd=n.speed,has=true;
@@ -1474,7 +1487,7 @@ function updateBolts(dt){
     let dead=b.life<=0;
     if(!dead&&b.owner!=='station'&&station&&segHit(b.prev,b.p,station.group.position,50)){dead=true;boom(b.p,1.5,'#9fe6ff',.2)}
     if(!dead&&(b.owner==='player'||b.owner==='station')){
-      for(const n of npcs)if((b.owner==='player'||n.hostile)&&segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}
+      for(const n of npcs){if(!(b.owner==='player'||n.hostile))continue;if(n.boss){if(bossHit(n,b.prev,b.p,b.dmg)){dead=true;break}continue}if(segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}}
       if(!dead&&b.owner==='player')for(const G of ghosts.values())if(segHit(b.prev,b.p,G.group.position,G.radius)){boom(b.p,1.5,G.shield>0?'#7fd0ff':'#ffcf6a',.25);sendHit(G,b.dmg);dead=true;break}
     }else if(!dead&&b.owner==='enemy'&&flying&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}
     if(!dead&&current){const d=bD.copy(b.p).sub(current.center);const r=d.length();if(r<current.radius*1.25){d.divideScalar(r);if(r<current.floorAt(d)){dead=true;boom(b.p,1.2,'#ffcf6a',.2)}}}
@@ -1492,12 +1505,13 @@ function updateCombat(dt){
   const flying=st.mode==='ship'&&ship.state==='flying';
   // shields
   ship.shieldDelay-=dt;const S=shipStats();
-  if(ship.shieldDelay<=0)ship.shield=Math.min(S.shield,ship.shield+18*dt);
+  if(ship.shieldDelay<=0)ship.shield=Math.min(S.shield,ship.shield+18*(1+.25*upg.regen)*dt);
+  if(flying&&upg.nano)ship.hull=Math.min(S.hull,ship.hull+.6*upg.nano*dt);
   if(st.mode==='ship'&&ship.state==='landed')ship.hull=Math.min(S.hull,ship.hull+2*dt);
   // pirate waves
   if(flying&&current){
     const alt=ship.group.position.distanceTo(current.center)-current.radius;
-    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&!ghosts.size&&amHost()&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){spawnPirates();pirateTimer=80+Math.random()*80}}
+    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&!ghosts.size&&amHost()&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){if(st.bossDue||(st.systems>=2&&waveCount%3===2))spawnBoss();else spawnPirates();waveCount++;pirateTimer=80+Math.random()*80}}
   }
   updateNpcs(dt);updateBolts(dt);
   // salvage
@@ -1519,14 +1533,163 @@ function updateCombat(dt){
   }
 }
 
+/* ---------- missiles, lock-on and dreadnought bosses ---------- */
+let missiles=[],waveCount=0;const lockS={tgt:null,t:0};
+const mslGeo=mergeColored([{geo:new THREE.CylinderGeometry(.22,.22,2.2,6).rotateX(Math.PI/2),color:'#c9ccd6'},{geo:new THREE.ConeGeometry(.22,.7,6).rotateX(-Math.PI/2).translate(0,0,-1.45),color:'#ff6274'},{geo:new THREE.SphereGeometry(.32,6,4).translate(0,0,1.2),color:'#ffd27a'}]);
+const mslMatP=new THREE.MeshBasicMaterial({vertexColors:true,fog:false}),mslMatE=new THREE.MeshBasicMaterial({color:'#ff5a4a',fog:false});
+const lockables=()=>npcs.filter(n=>n.hostile).concat([...ghosts.values()]);
+function updateLock(dt){
+  if(!(st.mode==='ship'&&ship.state==='flying')){lockS.tgt=null;lockS.t=0;return}
+  const fwd=tV.set(0,0,-1).applyQuaternion(ship.group.quaternion),sp=ship.group.position;let best=null,bd=Math.cos(20*Math.PI/180);
+  for(const n of lockables()){const d=n.group.position.distanceTo(sp);if(d>2400)continue;const c=tV2.copy(n.group.position).sub(sp).normalize().dot(fwd);if(c>bd){bd=c;best=n}}
+  if(best!==lockS.tgt){lockS.tgt=best;lockS.t=0}else if(best)lockS.t+=dt;
+}
+const isLocked=()=>!!lockS.tgt&&lockS.t>=.6;
+function fireMissiles(){
+  if(st.mode!=='ship'||ship.state!=='flying')return;
+  if(!upg.rack){toast('No missile rack. Buy the Missile rack upgrade in the ship workshop (U).','bad');return}
+  if(!(crafted.missile>0)){toast('Out of missiles. Craft them (I) or buy them at a station outfitter.','bad');return}
+  if(ship.mslCD>time)return;
+  if(!isLocked()){toast(lockS.tgt?'Hold the target in your sights a moment longer to lock.':'No missile lock. Keep an enemy near the crosshair.');return}
+  const salvo=Math.min(crafted.missile,1+Math.floor((upg.rack-1)/2)),tgt=lockS.tgt,g=ship.group;
+  for(let i=0;i<salvo;i++){
+    const off=new V3((i%2?1:-1)*(1.6+i*.6),-1,-2).applyQuaternion(g.quaternion);
+    const m=new THREE.Mesh(mslGeo,mslMatP);m.position.copy(g.position).add(off);scene.add(m);
+    const v=new V3(0,0,-1).applyQuaternion(g.quaternion).multiplyScalar(ship.speed+120).addScaledVector(off.clone().normalize(),40);
+    missiles.push({mesh:m,vel:v,tgt,life:7,dmg:45*(1+.15*(upg.rack-1)),owner:'player',turn:2.6,max:560,delay:i*.12});
+  }
+  crafted.missile-=salvo;ship.mslCD=time+.9;Sound.whoosh(.6);save();
+  toast(`${salvo>1?salvo+' missiles':'Missile'} away · ${crafted.missile} left`);
+}
+function enemyMissile(from,tgtPeer,me){
+  const m=new THREE.Mesh(mslGeo,mslMatE);m.position.copy(from);scene.add(m);
+  missiles.push({mesh:m,vel:randDir(Math.random,new V3()).multiplyScalar(80),tgtPeer,me,life:8,dmg:18,owner:'enemy',turn:1.5,max:330,delay:0});
+}
+function updateMissiles(dt){
+  for(let i=missiles.length-1;i>=0;i--){
+    const M=missiles[i];M.life-=dt;let tp=null,tr=4,tv=null;
+    if(M.owner==='player'){const T=M.tgt;if(T&&(npcs.includes(T)||(T.ghost&&ghosts.get(T.key)===T))){tp=T.group.position;tv=T.vel;tr=T.boss?24:T.radius}}
+    else if(M.me){if(st.mode==='ship'&&ship.state==='flying'){tp=ship.group.position;tr=ship.group.userData.radius;tv=tVelMe.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed)}}
+    else{const a=MP.avatars.get(M.tgtPeer);if(a&&a.flying&&a.ship){tp=a.ship.position;tv=a.vel;tr=6}}
+    const spd=Math.min(M.max,M.vel.length()+380*dt);
+    if(tp&&M.delay<=0){const dist=tp.distanceTo(M.mesh.position);const want=tV.copy(tp).addScaledVector(tv||new V3(),Math.min(2,dist/M.max)).sub(M.mesh.position).normalize();
+      tV2.copy(M.vel).normalize().lerp(want,clamp(M.turn*dt,0,1)).normalize();M.vel.copy(tV2).multiplyScalar(spd)}
+    else M.vel.setLength(spd);
+    M.delay-=dt;const prev=M.mesh.position.clone();M.mesh.position.addScaledVector(M.vel,dt);M.mesh.quaternion.setFromUnitVectors(Z_AXIS,tV.copy(M.vel).normalize().negate());
+    let dead=M.life<=0;
+    if(!dead&&tp){
+      if(M.owner==='player'&&M.tgt.boss&&!M.tgt.ghost){if(bossHit(M.tgt,prev,M.mesh.position,M.dmg))dead=true}
+      else if(M.mesh.position.distanceTo(tp)<tr+4){dead=true;
+        if(M.owner==='player'){if(M.tgt.ghost)sendHit(M.tgt,M.dmg);else damageNpc(M.tgt,M.dmg,M.mesh.position.clone())}
+        else if(M.me)damagePlayer(M.dmg)}
+      if(dead){boom(M.mesh.position,7,'#ffb060',.6);Sound.boom(.25,.5)}}
+    if(!dead&&current){const d=tV.copy(M.mesh.position).sub(current.center);const r=d.length();if(r<current.radius*1.25&&r<current.floorAt(d.divideScalar(r))){dead=true;boom(M.mesh.position,5,'#ffb060',.5)}}
+    if(dead){scene.remove(M.mesh);missiles.splice(i,1)}
+  }
+}
+const BOSS_NAMES=['The Ashen Maw','Gravewake','Iron Sorrow','The Red Tithe',"Vorrak's Fist",'Hollow Crown','The Long Night','Cinderjaw'];
+function buildBoss(){
+  const g=new THREE.Group();
+  const M=(c,o={})=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:40},o));
+  const hull=M('#5a1a24'),dark=M('#1c161c'),plate=M('#3a3440'),glow=new THREE.MeshBasicMaterial({color:'#ff5a4a'}),win=M('#2a0a0a',{emissive:'#ff7a3a'});
+  const add=(geo,mat,x,y,z,par=g)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);par.add(m);return m};
+  add(new THREE.BoxGeometry(28,16,110),hull,0,0,0);
+  add(new THREE.ConeGeometry(20,34,4).rotateX(-Math.PI/2).rotateZ(Math.PI/4),hull,0,0,-72);
+  add(new THREE.BoxGeometry(10,8,62),plate,19,-2,4);add(new THREE.BoxGeometry(10,8,62),plate,-19,-2,4);
+  add(new THREE.BoxGeometry(16,12,30),dark,0,13,22);add(new THREE.BoxGeometry(11,6,9),plate,0,22,16);add(new THREE.BoxGeometry(11.2,1.2,1),win,0,23,11.4);
+  add(new THREE.CylinderGeometry(.4,.4,16,5),dark,3,30,20);add(new THREE.CylinderGeometry(.4,.4,11,5),dark,-3,28,22);
+  for(let z=-40;z<=40;z+=16)add(new THREE.BoxGeometry(29,1,2),dark,0,8.2,z);
+  const engines=[];for(const [x,y] of [[-9,0],[9,0],[0,6]]){add(new THREE.CylinderGeometry(5,6,10,10).rotateX(-Math.PI/2),dark,x,y,58);engines.push(add(new THREE.CylinderGeometry(4.2,4.2,.6,12).rotateX(-Math.PI/2),glow,x,y,63.4))}
+  const turrets=[];
+  for(const [x,y,z] of [[-10,9,-36],[10,9,-36],[-24,3,10],[24,3,10],[0,20,-2]]){
+    const t=new THREE.Group();t.position.set(x,y,z);g.add(t);
+    add(new THREE.CylinderGeometry(2.6,3,2,8),plate,0,0,0,t);add(new THREE.SphereGeometry(2,8,6),dark,0,1,0,t);
+    add(new THREE.CylinderGeometry(.45,.45,7,6).rotateX(Math.PI/2),dark,.8,1.2,3.6,t);add(new THREE.CylinderGeometry(.45,.45,7,6).rotateX(Math.PI/2),dark,-.8,1.2,3.6,t);
+    turrets.push({g:t,hp:140,alive:true,cd:1+Math.random()*2});
+  }
+  g.userData={engines,turrets,spheres:[new V3(0,0,-58),new V3(0,0,-24),new V3(0,2,12),new V3(0,4,46)],guns:[new V3(0,0,-80)],radius:55,base:10};
+  return g;
+}
+function spawnBoss(){
+  st.bossDue=false;
+  const sp=ship.group.position,fwd=tV.set(0,0,-1).applyQuaternion(ship.group.quaternion).clone();
+  const g=buildBoss();g.position.copy(sp).addScaledVector(fwd,1900).addScaledVector(randDir(Math.random,new V3()),300);g.lookAt(sp);g.rotateY(Math.PI);scene.add(g);
+  const lvl=clamp(st.systems-2,0,8);
+  const n={group:g,cls:'boss',boss:true,name:BOSS_NAMES[Math.floor(Math.random()*BOSS_NAMES.length)],faction:'pirate',hostile:true,
+    maxHull:Math.round(1600*(1+.15*lvl)),maxShield:Math.round(700*(1+.1*lvl)),speed:70,turn:.28,dmg:7,radius:55,netId:++netIdSeq,
+    vel:new V3(),curSpeed:40,shieldDelay:0,phase:1,mslCD:6,hitters:new Set(),leave:0,evade:0,fireCD:0,gunI:0};
+  n.hull=n.maxHull;n.shield=n.maxShield;npcs.push(n);
+  toast(`Dreadnought inbound: ${n.name}! Shoot its turrets to silence them. Missiles track it well.`,'bad');Sound.alarm();setTimeout(()=>Sound.alarm(),700);
+  return n;
+}
+function bossHit(n,a,b,dmg){
+  const g=n.group,u=g.userData;
+  for(const t of u.turrets){if(!t.alive)continue;const w=t.g.getWorldPosition(tV3);if(segHit(a,b,w,4.5)){t.hp-=dmg;boom(b,1.6,'#ffcf6a',.25);
+    if(t.hp<=0){t.alive=false;boom(w,9,'#ffa050',.8);Sound.boom(.3,.6);t.g.visible=false;toast(`Turret destroyed · ${u.turrets.filter(x=>x.alive).length} left`)}return true}}
+  for(const c of u.spheres){const w=g.localToWorld(c.clone());if(segHit(a,b,w,21)){damageNpc(n,dmg,b.clone());return true}}
+  return false;
+}
+function onBossDamaged(n){
+  const f=n.hull/n.maxHull;
+  if(f<.6&&n.phase<2){n.phase=2;toast(`${n.name} is launching fighters!`,'bad');Sound.alarm();
+    for(let i=0;i<2;i++){const e=spawnNpc('pirate',i?'interceptor':'fighter',n.group.position.clone().addScaledVector(randDir(Math.random,new V3()),80),PAINTS.pirate);e.group.quaternion.copy(n.group.quaternion)}}
+  if(f<.3&&n.phase<3){n.phase=3;toast(`${n.name} is enraged: missile barrage incoming! Turn hard to shake them.`,'bad');Sound.alarm()}
+}
+function updateBoss(n,dt){
+  const g=n.group,u=g.userData;
+  n.shieldDelay-=dt;if(n.shieldDelay<=0)n.shield=Math.min(n.maxShield,n.shield+5*dt);
+  const T=pickTarget(n);n.tgt=T?T.peer:'';
+  const fwd=tV.set(0,0,-1).applyQuaternion(g.quaternion).clone();
+  if(!T){n.leave+=dt;if(n.leave>20){scene.remove(g);npcs.splice(npcs.indexOf(n),1);return}}
+  else{n.leave=0;const to=tV2.copy(T.pos).sub(g.position),dist=to.length();
+    if(dist>750)desired.copy(to).normalize();else desired.copy(to).cross(new V3(0,1,0).applyQuaternion(g.quaternion)).normalize().addScaledVector(to.normalize(),dist<350?-.6:0).normalize();
+    const P=nearestPlanet(g.position);if(P){const d=tV3.copy(g.position).sub(P.center);const r=d.length();if(r<P.radius*1.6){d.divideScalar(r);if(r<P.floorAt(d)+160)desired.addScaledVector(d,2).normalize()}}
+    upL.set(0,1,0).applyQuaternion(g.quaternion);mL.lookAt(g.position,tV3.copy(g.position).add(desired),upL);qT.setFromRotationMatrix(mL);g.quaternion.rotateTowards(qT,n.turn*dt);
+    const rate=n.phase>=2?.32:.55;
+    for(const t of u.turrets){if(!t.alive)continue;t.cd-=dt;const w=t.g.getWorldPosition(new V3());const dd=w.distanceTo(T.pos);t.g.lookAt(T.pos);
+      if(t.cd<=0&&dd<1500){t.cd=rate+Math.random()*.3;const aim=tV3.copy(T.pos).addScaledVector(T.vel,dd/BOLT_SPEED).sub(w).normalize();
+        aim.add(new V3((Math.random()-.5)*.04,(Math.random()-.5)*.04,(Math.random()-.5)*.04)).normalize();fireBolt(w.addScaledVector(aim,7),aim,n.vel,'enemy',n.dmg);if(T.me&&dd<700)Sound.pew(300,.03)}}
+    if(n.phase>=3){n.mslCD-=dt;if(n.mslCD<=0&&dist<2200){n.mslCD=4.5;const peer=T.peer,me=T.me;for(let i=0;i<3;i++)setTimeout(()=>{if(npcs.includes(n))enemyMissile(g.localToWorld(new V3((i-1)*10,10,-20)),peer,me)},i*250)}}
+  }
+  n.curSpeed=lerp(n.curSpeed,T?n.speed:n.speed*2,1-Math.exp(-dt*.5));n.vel.copy(fwd).multiplyScalar(n.curSpeed);g.position.addScaledVector(n.vel,dt);
+  for(const e of u.engines)e.scale.set(1,1,1+clamp(n.curSpeed/100,.2,1)*3);
+}
+function bossLoot(p){
+  for(let i=0;i<6;i++){const l={units:ri(250,420),aurium:ri(1,3),nanites:ri(25,45),cobalt:ri(3,7),ferrite:ri(5,15)};
+    const m=new THREE.Mesh(salvGeo,salvMat);m.scale.setScalar(1.6);m.position.copy(p).addScaledVector(randDir(Math.random,new V3()),12);scene.add(m);
+    salvage.push({mesh:m,vel:randDir(Math.random,new V3()).multiplyScalar(18),life:180,loot:l,spin:new V3(Math.random(),Math.random(),Math.random())})}
+}
+function creditBoss(){if(st.mission&&st.mission.type==='boss'&&!st.mission.have){st.mission.have=1;setTimeout(()=>toast(`Boss bounty complete. Dock at any station to collect ${st.mission.reward} units.`,'big'),900)}}
+function bossDown(n){
+  const p=n.group.position.clone();
+  for(let i=0;i<6;i++)setTimeout(()=>{boom(p.clone().addScaledVector(randDir(Math.random,new V3()),30),30+Math.random()*25,i%2?'#fff2c0':'#ffa050',1.4);Sound.boom(.5,1.2)},i*180);
+  bossLoot(p);creditBoss();creditBounty();
+  toast(`${n.name} destroyed! Its cargo is spilling into space. Fly through the salvage to collect it.`,'big');
+  if(MP.sys)MP.sys.emit('kill',{id:n.netId,boss:true,p:p.toArray().map(v=>Math.round(v*10)/10),h:[...(n.hitters||[])].slice(0,12)}).catch(()=>{});
+}
+function updateBossBar(){
+  const ref=st.mode==='foot'?player.pos:ship.group.position;let B=null,bd=7000;
+  for(const n of npcs.concat([...ghosts.values()]))if(n.boss){const d=n.group.position.distanceTo(ref);if(d<bd){bd=d;B=n}}
+  $('bossBar').hidden=!B;if(!B)return;
+  const hf=B.hull/B.maxHull,ph=B.ghost?(hf<.3?3:hf<.6?2:1):B.phase;
+  setText('bossName',B.name||'Pirate dreadnought');setText('bossPhase',`Dreadnought · phase ${ph}${B.ghost?' · crew fight':''}`);
+  $('bossSh').style.width=clamp(B.shield/B.maxShield*100,0,100)+'%';$('bossHp').style.width=clamp(hf*100,0,100)+'%';
+}
+
 /* ---------- ship workshop ---------- */
 const UPGRADES=[
   {key:'dmg',name:'Cannon focusing',desc:'+20% cannon damage per level'},
   {key:'shield',name:'Shield lattice',desc:'+20% shield capacity per level'},
   {key:'hull',name:'Hull plating',desc:'+20% hull strength per level'},
   {key:'pulse',name:'Pulse injectors',desc:'+15% pulse drive speed per level'},
+  {key:'cool',name:'Heat sinks',desc:'-12% cannon heat per shot per level, so you fire longer'},
+  {key:'regen',name:'Shield capacitors',desc:'+25% shield recharge and a faster restart after hits'},
+  {key:'thrust',name:'Thruster tuning',desc:'+8% speed and agility per level'},
+  {key:'nano',name:'Hull nanites',desc:'Repairs 0.6 hull per second per level while flying'},
+  {key:'rack',name:'Missile rack',desc:'Level 1 unlocks homing missiles (F). Levels 3 and 5 add a missile per salvo; each level +15% damage'},
 ];
-const upgCost=k=>({nanites:60*(upg[k]+1),cobalt:8*(upg[k]+1)});
+const UPG_MULT={rack:2,nano:1.5,regen:1.2};
+const upgCost=k=>{const m=UPG_MULT[k]||1;return{nanites:Math.round(60*(upg[k]+1)*m),cobalt:Math.round(8*(upg[k]+1)*m)}};
 function toggleUpg(){
   const el=$('upg');
   if(el.hidden){
@@ -1832,7 +1995,7 @@ const ECON=[
   {name:'Scientific',m:{carbon:1,ferrite:.95,cobalt:1,aurium:1.15,relics:1.6}},
 ];
 const BASE_PRICE={carbon:6,ferrite:9,cobalt:24,aurium:75,relics:450};
-const SHOP_PRICE={gel:60,hullkit:90,battery:140,fuelcell:70,warpcell:950,beam:2400,jet:2000,lining:2200,scanner:2600,magnet:3000,resonator:3500};
+const SHOP_PRICE={missile:220,gel:60,hullkit:90,battery:140,fuelcell:70,warpcell:950,beam:2400,jet:2000,lining:2200,scanner:2600,magnet:3000,resonator:3500};
 const SHIP_PRICE={shuttle:2500,explorer:7000,fighter:9500,hauler:11000,interceptor:13000};
 function buildStation(rand){
   const g=new THREE.Group();
@@ -1869,7 +2032,7 @@ function makeStation(seed,pos,P){
   S.ships=cls.map(c=>({cls:c,paint:randomPaint(rand),price:Math.round(SHIP_PRICE[c]*(.9+rand()*.25)/10)*10}));
   const need=3+Math.floor(rand()*3);
   const res=['carbon','ferrite','cobalt'][Math.floor(rand()*3)],qty={carbon:40+Math.floor(rand()*40),ferrite:30+Math.floor(rand()*30),cobalt:10+Math.floor(rand()*15)}[res];
-  S.missions=[{type:'bounty',need,have:0,reward:need*450+Math.round(rand()*20)*10},{type:'supply',res,qty,reward:Math.round(qty*BASE_PRICE[res]*1.8/10)*10}];
+  S.missions=[{type:'boss',need:1,have:0,reward:5000+Math.round(rand()*30)*100},{type:'bounty',need,have:0,reward:need*450+Math.round(rand()*20)*10},{type:'supply',res,qty,reward:Math.round(qty*BASE_PRICE[res]*1.8/10)*10}];
   return S;
 }
 const stationMouth=()=>station.group.localToWorld(station.group.userData.mouth.clone());
@@ -1971,8 +2134,9 @@ const RES_NAME={carbon:'Carbon',ferrite:'Ferrite',cobalt:'Cobalt',aurium:'Aurium
 function priceMult(r,v){const e=station?station.econ:ECON[0];return e.m[r]*((v.var&&v.var[r])||1)}
 const buyPrice=(r,v)=>Math.max(1,Math.round(BASE_PRICE[r]*priceMult(r,v)));
 const sellPrice=(r,v)=>Math.max(1,Math.round(buyPrice(r,v)*.62));
-function missionDone(){const m=st.mission;if(!m)return false;return m.type==='bounty'?m.have>=m.need:inv[m.res]>=m.qty}
+function missionDone(){const m=st.mission;if(!m)return false;return m.type==='bounty'||m.type==='boss'?m.have>=m.need:inv[m.res]>=m.qty}
 function missionText(){const m=st.mission;if(!m)return '';
+  if(m.type==='boss')return `Boss bounty: destroy a pirate dreadnought${m.have?' · done, dock at a station to collect':''} · ${m.reward} units`;
   return m.type==='bounty'?`Bounty: ${m.have}/${m.need} pirates destroyed${m.have>=m.need?' · dock at a station to collect':''} · ${m.reward} units`
     :`Supply contract: deliver ${m.qty} ${RES_NAME[m.res]} (${Math.min(inv[m.res],m.qty)}/${m.qty}) to any station · ${m.reward} units`}
 function openTrade(venue,tab){
@@ -2020,10 +2184,10 @@ function renderTrade(){
       </tbody></table></div><p class="trnote">${isSt?'Shields are recharged for free while docked.':'Repairs here reach your ship on the landing pad.'}</p>`;
   }else if(trade.tab==='missions'){
     const m=st.mission;
-    if(m)h+=`<div class="urow"><div><span class="nm">Active: ${m.type==='bounty'?'Pirate bounty':'Supply contract'}</span></div><div class="ds">${missionText()}</div>
+    if(m)h+=`<div class="urow"><div><span class="nm">Active: ${m.type==='boss'?'Boss bounty':m.type==='bounty'?'Pirate bounty':'Supply contract'}</span></div><div class="ds">${missionText()}</div>
       <div class="acts"><button type="button" data-act="turnin" ${missionDone()?'':'disabled'}>Collect ${m.reward} u</button><button type="button" data-act="abandon">Abandon</button></div></div>`;
-    h+=`<div class="csec">Mission board</div>`+station.missions.map((o,i)=>`<div class="urow"><div><span class="nm">${o.type==='bounty'?`Bounty: destroy ${o.need} pirates`:`Supply: deliver ${o.qty} ${RES_NAME[o.res]}`}</span></div>
-      <div class="ds">${o.type==='bounty'?'Pirates will find you soon after you accept. Station turrets back you up near the station.':'Hand it over at any station.'} Reward ${o.reward.toLocaleString()} units.</div>
+    h+=`<div class="csec">Mission board</div>`+station.missions.map((o,i)=>`<div class="urow"><div><span class="nm">${o.type==='boss'?'Boss bounty: destroy a pirate dreadnought':o.type==='bounty'?`Bounty: destroy ${o.need} pirates`:`Supply: deliver ${o.qty} ${RES_NAME[o.res]}`}</span></div>
+      <div class="ds">${o.type==='boss'?'A capital ship with turrets, fighters and missiles. Bring friends, missiles and upgrades.':o.type==='bounty'?'Pirates will find you soon after you accept. Station turrets back you up near the station.':'Hand it over at any station.'} Reward ${o.reward.toLocaleString()} units.</div>
       <div class="acts"><button type="button" data-act="accept" data-i="${i}" ${m?'disabled':''}>Accept</button></div></div>`).join('');
     if(!station.missions.length)h+='<p class="trnote">No more missions here today.</p>';
   }
@@ -2034,13 +2198,13 @@ $('trBody').addEventListener('click',e=>{
   const b=e.target.closest('button[data-act]');if(!b||!trade)return;const v=trade.venue,a=b.dataset.act;let ok=true;
   if(a==='sell'){const r=b.dataset.r,n=b.dataset.n==='all'?inv[r]:Math.min(+b.dataset.n,inv[r]);if(n>0){inv[r]-=n;inv.units+=n*sellPrice(r,v);toast(`Sold ${n} ${RES_NAME[r]} for ${n*sellPrice(r,v)} units.`)}else ok=false}
   else if(a==='buy'){const r=b.dataset.r,pr=buyPrice(r,v),n=Math.min(+b.dataset.n,Math.floor(inv.units/pr));if(n>0){inv[r]+=n;inv.units-=n*pr;toast(`Bought ${n} ${RES_NAME[r]} for ${n*pr} units.`)}else ok=false}
-  else if(a==='obuy'){const r=RECIPES.find(x=>x.id===b.dataset.id),pr=SHOP_PRICE[r.id];if(inv.units>=pr&&!(r.kind==='tech'&&tech(r.id))){inv.units-=pr;if(r.kind==='tech'){crafted[r.id]=true;toast(`${r.name} installed.`,'big')}else{crafted[r.id]=(crafted[r.id]||0)+1;toast(`Bought ${r.name}.`)}}else ok=false}
+  else if(a==='obuy'){const r=RECIPES.find(x=>x.id===b.dataset.id),pr=SHOP_PRICE[r.id];if(inv.units>=pr&&!(r.kind==='tech'&&tech(r.id))){inv.units-=pr;if(r.kind==='tech'){crafted[r.id]=true;toast(`${r.name} installed.`,'big')}else{crafted[r.id]=(crafted[r.id]||0)+(r.yields||1);toast(`Bought ${r.name}.`)}}else ok=false}
   else if(a==='ship'){const o=station.ships[+b.dataset.i],tradeIn=Math.round(SHIP_PRICE[ship.cls]*.45),net=Math.max(0,o.price-tradeIn);
     if(inv.units>=net){inv.units-=net;const old=SHIP_CLASSES[ship.cls].label;setShipModel(o.cls,o.paint);const s=shipStats();ship.hull=s.hull;ship.shield=s.shield;ship.fuel=Math.max(ship.fuel,60);
       station.ships.splice(+b.dataset.i,1);toast(`New ship: ${SHIP_CLASSES[o.cls].label}. Your ${old} was traded in for ${tradeIn} units.`,'big');Sound.whoosh(1)}else ok=false}
   else if(a==='repair'){const S=shipStats(),c=Math.ceil((S.hull-ship.hull)*1.5);if(c>0&&inv.units>=c){inv.units-=c;ship.hull=S.hull;toast('Hull fully repaired.')}else ok=false}
   else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2);if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
-  else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25)}else ok=false}
+  else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25);if(o.type==='boss'){st.bossDue=true;pirateTimer=Math.min(pirateTimer,30);toast('A dreadnought will hunt you once you are in open space, away from the station.')}}else ok=false}
   else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');st.mission=null}else ok=false}
   else if(a==='abandon'){st.mission=null;toast('Mission abandoned.')}
   if(ok){Sound.blip(640,.12,'triangle',.12);save()}else Sound.blip(160,.12,'square',.06);
@@ -2084,7 +2248,8 @@ function onKillMsg(m){
   const key=m.peer+':'+d.id,G=ghosts.get(key);if(G){removeGhost(G);ghosts.delete(key)}
   const p=new V3().fromArray(d.p),ref=st.mode==='foot'?player.pos:ship.group.position;
   if(ref.distanceTo(p)<9000){boom(p,18,'#ffa050',1.2);boom(p,10,'#fff2c0',.6);Sound.boom(.4)}
-  if(Array.isArray(d.h)&&d.h.includes(myPeer())){dropSalvage(p,new V3(),false);creditBounty();kills++;toast('Shared kill. Salvage dropped for you; fly through it to collect.')}
+  if(d.boss&&ref.distanceTo(p)<9000)for(let i=0;i<4;i++)setTimeout(()=>{boom(p.clone().addScaledVector(randDir(Math.random,new V3()),30),35,'#ffa050',1.3);Sound.boom(.4,1)},i*200);
+  if(Array.isArray(d.h)&&d.h.includes(myPeer())){if(d.boss){bossLoot(p);creditBoss();toast('Dreadnought destroyed with your crew! Your share of its cargo is drifting nearby.','big')}else{dropSalvage(p,new V3(),false);toast('Shared kill. Salvage dropped for you; fly through it to collect.')}creditBounty();kills++}
 }
 function updateGhosts(dt){
   const seen=new Set();
@@ -2094,6 +2259,9 @@ function updateGhosts(dt){
       if(!Array.isArray(e)||e.length<12)continue;const [id,c,x,y,z,qx,qy,qz,qw,h,sh,t]=e;
       if(!Number.isInteger(id)||![x,y,z,qx,qy,qz,qw,h,sh].every(Number.isFinite))continue;
       const key=pr.peer+':'+id;seen.add(key);let G=ghosts.get(key);
+      if(!G&&c===2){const grp=buildBoss();grp.position.set(x,y,z);grp.quaternion.set(qx,qy,qz,qw).normalize();scene.add(grp);
+        G={ghost:true,boss:true,name:clean(e[12],32)||'Pirate dreadnought',key,owner:pr.peer,id,group:grp,cls:'boss',faction:'pirate',hostile:true,radius:45,maxHull:100,maxShield:100,hull:100,shield:100,
+          vel:new V3(),net:new V3(x,y,z),netT:time,q:new Q4(),tgt:'',fireCD:2,gunI:0,dmg:7};ghosts.set(key,G)}
       if(!G){const cls=c===1?'interceptor':'fighter',grp=buildShip(cls,PAINTS.pirate);grp.position.set(x,y,z);grp.quaternion.set(qx,qy,qz,qw).normalize();scene.add(grp);
         G={ghost:true,key,owner:pr.peer,id,group:grp,cls,faction:'pirate',hostile:true,radius:grp.userData.radius,maxHull:100,maxShield:100,hull:100,shield:100,
           vel:new V3(),net:new V3(x,y,z),netT:time,q:new Q4(),tgt:'',fireCD:1+Math.random(),gunI:0,dmg:4+SHIP_CLASSES[cls].dmg*.3};ghosts.set(key,G)}
@@ -2111,7 +2279,9 @@ function updateGhosts(dt){
     if(G.fireCD<=0&&G.tgt){G.fireCD=.1;let tp=null,tv=null,me=false;
       if(G.tgt===myPeer()){if(st.mode==='ship'&&ship.state==='flying'){tp=ship.group.position;tv=tVelMe2.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed);me=true}}
       else{const a=MP.avatars.get(G.tgt);if(a&&a.flying&&a.ship){tp=a.ship.position;tv=a.vel}}
-      if(tp){const dist=tp.distanceTo(G.group.position);
+      if(tp&&G.boss){const dist=tp.distanceTo(G.group.position);if(dist<1500){const tu=G.group.userData.turrets[Math.floor(Math.random()*G.group.userData.turrets.length)];const from=tu.g.getWorldPosition(new V3());
+          const aim=tV3.copy(tp).addScaledVector(tv,dist/BOLT_SPEED).sub(from).normalize();tu.g.lookAt(tp);fireBolt(from.addScaledVector(aim,7),aim,new V3(),me?'enemy':'fx',G.dmg);G.fireCD=G.hull<50?.3:.5}}
+      else if(tp){const dist=tp.distanceTo(G.group.position);
         if(dist<750){const fwd=tV2.set(0,0,-1).applyQuaternion(G.group.quaternion),aim=tV3.copy(tp).addScaledVector(tv,dist/BOLT_SPEED).sub(G.group.position).normalize();
           if(fwd.dot(aim)>.95){const gp=G.group.userData.guns[G.gunI++%G.group.userData.guns.length];
             aim.add(new V3((Math.random()-.5)*.03,(Math.random()-.5)*.03,(Math.random()-.5)*.03)).normalize();
@@ -2253,7 +2423,7 @@ function myPresence(){
   return{n:myName,c:myColor,m:st.mode,st:ship.state,p:foot?player.pos.toArray().map(r2):null,f:foot?player.fwd.toArray().map(r4):null,
     sp:g.position.toArray().map(r2),sq:g.quaternion.toArray().map(r4),cls:ship.cls,paint:ship.paint,th:Math.round(th*100)/100,
     pir:npcs.filter(n=>n.faction==='pirate').slice(0,6).map(n=>{const p=n.group.position,q=n.group.quaternion,r1=v=>Math.round(v*10)/10,r3=v=>Math.round(v*1000)/1000;
-      return[n.netId,n.cls==='interceptor'?1:0,r1(p.x),r1(p.y),r1(p.z),r3(q.x),r3(q.y),r3(q.z),r3(q.w),Math.round(n.hull/n.maxHull*100),Math.round(n.shield/n.maxShield*100),n.tgt||'']})};
+      return[n.netId,n.boss?2:n.cls==='interceptor'?1:0,r1(p.x),r1(p.y),r1(p.z),r3(q.x),r3(q.y),r3(q.z),r3(q.w),Math.round(n.hull/n.maxHull*100),Math.round(n.shield/n.maxShield*100),n.tgt||'',n.boss?n.name:'']})};
 }
 function lobbyPresence(){return{n:myName,c:myColor,sys:system?system.name:'',seed:system?system.seed:null,systems:st.systems,first:system?isFirst(system.seed):false,where:current?current.name:'',m:st.mode}}
 async function joinSystemRoom(){
@@ -2403,6 +2573,8 @@ const RECIPES=[
     can:()=>st.mode==='ship'?(ship.shield<shipStats().shield-.5||'Shield is full.'):'Use it in your ship.',use:()=>{ship.shield=shipStats().shield;ship.shieldDelay=0;toast('Shield restored.')}},
   {id:'fuelcell',kind:'use',name:'Launch fuel cell',desc:'Adds 40 launch fuel.',cost:{ferrite:15,carbon:5},
     can:()=>ship.fuel<99||'Launch thrusters are full.',use:()=>{ship.fuel=Math.min(100,ship.fuel+40);toast('Launch fuel +40.')}},
+  {id:'missile',kind:'use',name:'Homing missiles ×4',desc:'Ammo for the missile rack (workshop). Lock on, then fire with F or right click.',cost:{ferrite:12,cobalt:4,carbon:6},yields:4,
+    can:()=>'Fired from your ship with F or right click.',use:null},
   {id:'warpcell',kind:'use',name:'Warp cell',desc:'Powers one hyperdrive jump instead of 10 Aurium. Used automatically.',cost:{aurium:6,cobalt:10,ferrite:20},
     can:()=>'Used automatically when you press H in flight.',use:null},
   {id:'beam',kind:'tech',name:'Beam overdrive',desc:'Your mining laser cuts 2.2× faster.',cost:{ferrite:40,cobalt:20,aurium:3}},
@@ -2437,7 +2609,7 @@ function craft(id){
   if(r.kind==='tech'&&tech(id))return;
   if(!affordable(r.cost)){const miss=Object.entries(r.cost).filter(([k,v])=>inv[k]<v).map(([k,v])=>`${v-inv[k]} more ${RES_LABEL[k]}`);toast(`Can't craft ${r.name}: need ${miss.join(', ')}.`,'bad');return}
   for(const k in r.cost)inv[k]-=r.cost[k];
-  if(r.kind==='tech'){crafted[id]=true;toast(`${r.name} installed.`,'big')}else{crafted[id]=(crafted[id]||0)+1;toast(`Crafted ${r.name}.`)}
+  if(r.kind==='tech'){crafted[id]=true;toast(`${r.name} installed.`,'big')}else{crafted[id]=(crafted[id]||0)+(r.yields||1);toast(`Crafted ${r.name}.`)}
   Sound.blip(520,.12,'square',.08);setTimeout(()=>Sound.blip(780,.18,'triangle',.12),100);
   save();if(!$('craft').hidden)renderCraft();
 }
@@ -2563,6 +2735,9 @@ function drawMarkers(){
     const sp=tV.copy(ship.group.position);const p=proj(sp,true);const dd=player.pos.distanceTo(sp);
     if(dd>14)marker(p.x,p.y,'#ffb45e','Ship',fmtDist(dd),'diamond',8);
   }
+  if(st.mode==='ship'&&ship.state==='flying'&&lockS.tgt&&upg.rack){const p=proj(lockS.tgt.group.position,false);
+    if(!p.off){const L=isLocked(),k=L?1:clamp(lockS.t/.6,0,1),sz=28-10*k;mctx.strokeStyle=L?'#ff6274':'#ffd9a3';mctx.lineWidth=2;mctx.strokeRect(p.x-sz,p.y-sz,sz*2,sz*2);
+      mctx.font='600 10px Oxanium, system-ui, sans-serif';mctx.textAlign='center';mctx.fillStyle=mctx.strokeStyle;mctx.fillText(L?`LOCKED · F TO FIRE (${crafted.missile||0})`:'LOCKING',p.x,p.y+sz+13)}}
   if(st.mode==='ship'&&ship.state!=='warp'){
     const sp=ship.group.position;
     if(ship.state==='flying'){const aim=tV3.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(600).add(sp);const p=proj(aim,false);
@@ -2576,7 +2751,7 @@ function drawMarkers(){
         for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){mctx.moveTo(p.x+sx*b,p.y+sy*b*.6);mctx.lineTo(p.x+sx*b,p.y+sy*b);mctx.lineTo(p.x+sx*b*.6,p.y+sy*b)}
         mctx.stroke();
         mctx.font='600 11px Oxanium, system-ui, sans-serif';mctx.textAlign='center';mctx.fillStyle='#ff9aa6';mctx.shadowColor='#000';mctx.shadowBlur=4;
-        mctx.fillText(`${n.faction==='pirate'?'Pirate':'Trader'} ${SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
+        mctx.fillText(`${n.boss?(n.name||'Pirate dreadnought'):(n.faction==='pirate'?'Pirate':'Trader')+' '+SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
         const w=Math.max(40,b*2);
         mctx.fillStyle='rgba(255,255,255,.15)';mctx.fillRect(p.x-w/2,p.y-b-11,w,3);mctx.fillRect(p.x-w/2,p.y-b-6,w,3);
         mctx.fillStyle='#9fe6ff';mctx.fillRect(p.x-w/2,p.y-b-11,w*Math.max(0,n.shield/n.maxShield),3);
@@ -2629,6 +2804,7 @@ function objective(){
   return 'Climb out of the atmosphere and press H to jump to a new star';
 }
 function updateHUD(){
+  updateBossBar();
   const P=current;
   if(P){
     setText('sysName',`${system.name} · ${system.star.name}`);setText('pName',P.name);
@@ -2643,7 +2819,7 @@ function updateHUD(){
   const foot=st.mode==='foot';
   const combatView=!foot&&ship.state==='flying';$('footBars').hidden=!foot;$('shipBars').hidden=foot;$('reticle').hidden=!(foot||combatView);
   if(foot){setBar('bSuit',player.suit);setBar('bHp',player.health,100,35);setBar('bJet',player.jet,100,0)}
-  else{const S=shipStats();setHTML('speed',`${Math.round(ship.speed)}<small>m/s · ${SHIP_CLASSES[ship.cls].label}</small>`);setBar('bShield',ship.shield,S.shield,0);setBar('bHull',ship.hull,S.hull,S.hull*.3);setBar('bHeat',ship.heat,100,0);$('bHeat').classList.toggle('warn',ship.overheat);setBar('bFuel',ship.fuel,100,TO());setBar('bWarp',canWarp()?100:Math.min(10,inv.aurium)*10,100,0);$('bWarp').querySelector('.n').textContent=crafted.warpcell?`${crafted.warpcell} cell${crafted.warpcell>1?'s':''}`:`${Math.min(10,inv.aurium)}/10`}
+  else{const S=shipStats();setHTML('speed',`${Math.round(ship.speed)}<small>m/s · ${SHIP_CLASSES[ship.cls].label}${upg.rack?` · ${crafted.missile||0} missiles`:''}</small>`);setBar('bShield',ship.shield,S.shield,0);setBar('bHull',ship.hull,S.hull,S.hull*.3);setBar('bHeat',ship.heat,100,0);$('bHeat').classList.toggle('warn',ship.overheat);setBar('bFuel',ship.fuel,100,TO());setBar('bWarp',canWarp()?100:Math.min(10,inv.aurium)*10,100,0);$('bWarp').querySelector('.n').textContent=crafted.warpcell?`${crafted.warpcell} cell${crafted.warpcell>1?'s':''}`:`${Math.min(10,inv.aurium)}/10`}
   // target & prompt
   let tgt='',pr='';const ring=$('ring');let prog=0;
   if(foot){
@@ -2688,7 +2864,7 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
