@@ -660,6 +660,17 @@ const CHALLENGES = [
   { short: '20 SUPERS', text: ['Use 20 SUPER MOVES', 'to unlock!'], need: () => G.prog.supers >= 20, prog: () => 'Supers used: ' + Math.min(20, G.prog.supers) + ' / 20' },
   { short: 'BEAT STORY', text: ['Beat all 8 chapters', 'of STORY mode!'], need: () => (G.cleared || 0) >= 8, prog: () => 'Chapters beaten: ' + (G.cleared || 0) + ' / 8' },
   { short: 'WAVE 30', text: ['Reach wave 30 in', 'ARCADE mode to unlock!'], need: () => G.prog.wave >= 30, prog: () => 'Best Arcade wave: ' + Math.min(30, G.prog.wave) + ' / 30' },
+  ...Array.from({ length: 10 }, () => ({ short: 'FREE', text: ['', ''], need: () => true, prog: () => '' })),
+  { short: '500 KOS', text: ['Defeat 500 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 500, prog: () => 'Enemies defeated: ' + Math.min(500, G.prog.kos) + ' / 500' },
+  { short: '30 BOSSES', text: ['Defeat 30 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 30, prog: () => 'Bosses beaten: ' + Math.min(30, G.prog.bosses) + ' / 30' },
+  { short: '50 POWER-UPS', text: ['Collect 50 power-ups', 'to unlock!'], need: () => G.prog.pickups >= 50, prog: () => 'Power-ups: ' + Math.min(50, G.prog.pickups) + ' / 50' },
+  { short: '3 VS WINS', text: ['Win 3 VERSUS', 'matches to unlock!'], need: () => G.prog.vs >= 3, prog: () => 'Versus wins: ' + Math.min(3, G.prog.vs) + ' / 3' },
+  { short: '40 SUPERS', text: ['Use 40 SUPER MOVES', 'to unlock!'], need: () => G.prog.supers >= 40, prog: () => 'Supers used: ' + Math.min(40, G.prog.supers) + ' / 40' },
+  { short: 'WAVE 40', text: ['Reach wave 40 in', 'ARCADE mode to unlock!'], need: () => G.prog.wave >= 40, prog: () => 'Best Arcade wave: ' + Math.min(40, G.prog.wave) + ' / 40' },
+  { short: '1000 KOS', text: ['Defeat 1000 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 1000, prog: () => 'Enemies defeated: ' + Math.min(1000, G.prog.kos) + ' / 1000' },
+  { short: '50 BOSSES', text: ['Defeat 50 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 50, prog: () => 'Bosses beaten: ' + Math.min(50, G.prog.bosses) + ' / 50' },
+  { short: '5 VS WINS', text: ['Win 5 VERSUS', 'matches to unlock!'], need: () => G.prog.vs >= 5, prog: () => 'Versus wins: ' + Math.min(5, G.prog.vs) + ' / 5' },
+  { short: 'CLEAR RUSH', text: ['Clear all of', 'BOSS RUSH to unlock!'], need: () => G.prog.rush > 0, prog: () => G.prog.rush > 0 ? 'Cleared!' : 'Not cleared yet' },
 ];
 const fighterUnlocked = i => i < STORY_FIGHTERS ? i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0) : !!(CHALLENGES[i - STORY_FIGHTERS] && CHALLENGES[i - STORY_FIGHTERS].need());
 const fighterCount = () => CHARS.filter((c, i) => fighterUnlocked(i)).length;
@@ -989,15 +1000,127 @@ Object.assign(A, {
     onActive: f => { for (const e of foesOf(f)) if (Math.hypot(e.x - f.x, e.y - f.y) < 260) { if (e.T) { if (!e.T.boss) { e.freeze = Math.max(e.freeze || 0, 70); e.attack = null; } } else e.stun = Math.max(e.stun, 40); floatText(e.x, e.y - 100, 'LAG!', '#2ad0a0', 20, 30); }
       f.ghost(12); f.x = clamp(f.x + rand(-300, 300), 60, W - 60); f.inv = Math.max(f.inv, 16); flashA = 0.2; flashCol = '#2ad0a0'; tone(100, 0.15, 'square', 0.08, 2000); } }),
 });
+// ---------------------------------------------------------- fighter pack 3 (20 fighters, data-driven moves)
+const GEN_SP = {}, GEN_SUPERS = {}, GEN_SKILLS = {}, GEN_HEAVIES = [];
+const mel = o => Object.assign({ startup: 10, active: 6, recovery: 18, dmg: 20, kb: [14, 8], hb: { x: 46, y: 55, w: 70, h: 50 }, stun: 34, hs: 8, heavy: true, meter: 9, sfx: 'heavy', shake: 6, wind: A.HAY.wind, hit: A.HAY.hit }, o);
+const sht = (fn, pose) => ({ startup: 8, active: 1, recovery: 16, hb: null, quiet: true, wind: PO[pose || 'cast'][0], hit: PO[pose || 'cast'][1], onActive: fn });
+const torn = (p, d, o) => G.projs.push(Object.assign({ x: p.x + d * 60, y: p.y - 60, vx: d * 5, vy: 0, g: 0, r: 46, dmg: 10, owner: 'player', by: p, kind: 'tornado', life: 300, col: p.col, pierce: true, hitSet: new Set(), kb: [3, 12], meter: 0, hs: 2, tornado: true }, o));
+const near = (f, r, n) => foesOf(f).filter(e => Math.abs(e.x - f.x) < r).sort((a, b) => Math.abs(a.x - f.x) - Math.abs(b.x - f.x)).slice(0, n);
+const around = (f, r, hit) => { for (const e of foesOf(f)) if (Math.hypot(e.x - f.x, e.y - f.y) < r) doHit(f, e, Object.assign({ stun: 34, hs: 4, heavy: true, sfx: 'heavy', meter: 3 }, hit), sign(e.x - f.x) || 1, true); };
+const barrel = (p, vx, o) => G.projs.push(Object.assign({ x: p.x + sign(vx) * 50, y: p.y - 80, vx, vy: -6, g: 0.5, r: 26, dmg: 11, owner: 'player', by: p, kind: 'spikeball', life: 200, col: '#8a5a2a', pierce: true, hitSet: new Set(), kb: [12, 10], meter: 0, hs: 4, spikeball: true, rot: 0 }, o));
+function addF(c, H, K, S, U) { const id = 'G_' + c.name.replace(/\W/g, ''); A[id] = H; c.heavy = id; GEN_HEAVIES.push(id); A['SK_' + id] = K; GEN_SKILLS[c.name] = 'SK_' + id; c.special = 'g_' + id; c.sname = S[0]; GEN_SP[c.special] = S; GEN_SUPERS[c.name] = U; CHARS.push(c); }
+const F3 = (name, role, desc, col, back, alt, acc, st) => Object.assign({ name, role, desc, col, back, alt, acc, hp: 100, spd: 1, dmg: 1, jumps: 2, size: 1 }, st);
+
+addF(F3('PIRATE PEG', 'PIRATE', ['Heavy is a wide hook swipe.', 'Skill grapples onto enemies.', 'Special: Plank Wave splash.'], '#8a2a2a', '#5a1a1a', '#2a6a8a', 'tricorn', { hp: 105, dmg: 1.05 }),
+  mel({ hb: { x: 40, y: 55, w: 110, h: 60 }, dmg: 18, kb: [13, 9] }),
+  sk('GRAPPLE', 'dash', { startup: 6, active: 8, dmg: 14, kb: [11, 8], hb: { x: 40, y: 50, w: 74, h: 64 }, onActive: f => { const t = nearFoe(f, 700); f.ghost(12); if (t) { const sd = sign(t.x - f.x) || f.facing; f.x = clamp(t.x - sd * 60, 40, W - 40); f.y = Math.min(t.y, FLOOR); f.facing = sd; } SFX.whoosh(); } }),
+  ['PLANK WAVE', p => SUP.waves(p, 'wave', 3, 10, { r: 28, dmg: 16, col: '#2a8ad0' })],
+  ['KRAKEN CALL', (p, f) => { torn(p, -1); torn(p, 1); SUP.radial(p, 'bubble', 10, 5, { trap: true, dmg: 8, r: 18, life: 150 }); }]);
+addF(F3('NINJA NEKO', 'CAT NINJA', ['Triple jump, two air dashes.', 'Heavy throws three shuriken.', 'Special: Smoke Bomb vanish.'], '#3a3a4a', '#1a1a2a', '#d04a8a', 'cat', { hp: 85, spd: 1.2, dmg: 0.95, jumps: 3, size: 0.92, airDashes: 2 }),
+  sht(f => { for (const vy of [-2, 0, 2]) shoot(f, { kind: 'card', vx: f.facing * 18, vy, r: 8, dmg: 7, col: '#bbbbbb', life: 60 }); SFX.throw_(); }, 'throw'),
+  sk('SHADOW CLAW', 'dash', { startup: 4, onActive: f => { SUP.flurry(f, near(f, 420, 2), 2, 7, [10, 8]); f.inv = Math.max(f.inv, 14); } }),
+  ['SMOKE BOMB', (p, f) => { SUP.freeze(f.filter(e => Math.hypot(e.x - p.x, e.y - p.y) < 320), 130); p.invisT = 240; for (let i = 0; i < 20; i++) parts.push({ type: 'dust', x: p.x + rand(-80, 80), y: p.y - rand(0, 120), vx: rand(-2, 2), vy: -rand(0, 2), r: rand(10, 22), life: 40, max: 40 }); }],
+  ['NINE TAILS', (p, f) => SUP.flurry(p, f, 9, 4)]);
+addF(F3('COWGIRL CASSIE', 'COWGIRL', ['Heavy lassos enemies in close.', 'Skill is a lightning quick draw.', 'Special: Stampede waves.'], '#c0702a', '#7a4010', '#d0a050', 'cowboy', { spd: 1.08 }),
+  mel({ startup: 8, hb: { x: 120, y: 60, w: 200, h: 30 }, dmg: 12, kb: [-10, 6], wind: A.YOYO.wind, hit: A.YOYO.hit }),
+  sk('QUICK DRAW', 'punch', { startup: 3, onActive: f => { for (let k = 0; k < 2; k++) shoot(f, { kind: 'laserbolt', vx: f.facing * 28, r: 7, dmg: 9, col: '#ffd23a', life: 60, delayT: k * 5 }); tone(1500, 0.08, 'square', 0.1, 400); } }),
+  ['STAMPEDE', p => SUP.waves(p, 'wave', 4, 8, { r: 30, dmg: 14, col: '#8a5a2a' })],
+  ['HIGH NOON', (p, f) => { flashA = 1; flashCol = '#ffe0a0'; for (const e of f) doHit(p, e, SUP.hit(40, [8, 12]), sign(e.x - p.x) || 1, true); }]);
+addF(F3('ROBO PUP', 'ROBOT DOG', ['Small and speedy.', 'Heavy is a sonic BARK.', 'Special: Fetch! bouncing bones.'], '#8a9aaa', '#5a6a7a', '#c08a3a', 'antenna', { hp: 85, spd: 1.2, dmg: 0.9, size: 0.82 }),
+  sht(f => { shoot(f, { kind: 'sonic', vx: f.facing * 12, r: 18, dmg: 10, pierce: true, hitSet: new Set(), face: f.facing, kb: [12, 5], life: 50 }); tone(260, 0.15, 'square', 0.12, 180); }),
+  sk('ZOOMIES', 'dash', { startup: 3, active: 16, lungeV: 24, dmg: 10, kb: [8, 8], hb: { x: 30, y: 30, w: 70, h: 50 } }),
+  ['FETCH!', p => SUP.radial(p, 'gear', 8, 12, { boom: true, boomDir: 1, pierce: true, dmg: 12, r: 12, life: 100, col: '#e8e0c8' })],
+  ['GOOD BOY', (p, f) => { healTeam(p, 40); SUP.nova(p, f, 300, 28); }]);
+addF(F3('ICE SKATER IVY', 'FIGURE SKATER', ['Fast, and her hits chill foes.', 'Heavy is a spinning ice slash.', 'Special: Frozen Rink freezes all.'], '#5ab0e0', '#2a70a0', '#d0e8ff', 'beanie', { hp: 90, spd: 1.15, frost: true }),
+  mel({ spin: true, startup: 6, active: 14, hb: { x: 0, y: 50, w: 150, h: 80 }, dmg: 14, kb: [10, 8], wind: A.AIRL.wind, hit: A.AIRL.hit }),
+  sk('TRIPLE AXEL', 'spin', { spin: true, startup: 3, active: 16, dmg: 12, kb: [6, 14], hb: { x: 10, y: 40, w: 100, h: 70 }, onActive: f => hop(f, f.facing * 6, -15) }),
+  ['FROZEN RINK', (p, f, bd, SP) => { flashCol = '#bfe9ff'; for (const e of f) { doHit(p, e, SP(14, [0, 0]), 1, true); SUP.freeze([e], 200); } }],
+  ['BLIZZARD BALLET', (p, f) => { SUP.freeze(f, 260); SUP.radial(p, 'ibolt', 20, 12, { col: '#bfefff', dmg: 10 }); SUP.flurry(p, f, 2, 10); }]);
+addF(F3('GLADIATOR GIA', 'GLADIATOR', ['Tough arena champion.', 'Heavy is a long trident thrust.', 'Special: Net Toss traps 3 foes.'], '#b0802a', '#704a10', '#c0392b', 'knighthelm', { hp: 120, spd: 0.95, dmg: 1.1, tough: 0.9 }),
+  mel({ startup: 12, hb: { x: 80, y: 55, w: 140, h: 30 }, dmg: 20, kb: [15, 6], lungeV: 6, wind: A.LANCE.wind, hit: A.LANCE.hit }),
+  sk('SHIELD WALL', 'cast', { startup: 3, onActive: f => { f.shield = Math.max(f.shield, 2); floatText(f.x, f.y - 120, 'SHIELD x2', '#2a9ad0', 22, 30); SFX.reflect(); } }),
+  ['NET TOSS', (p, f, bd, SP) => { for (const e of bd().slice(0, 3)) { trapFoe(e); doHit(p, e, SP(16, [0, 2]), 1, true); trapFoe(e); ring(e.x, e.y - 40, '#c0a060', 60, 3, 18); } }],
+  ['COLOSSEUM', (p, f) => { SUP.flurry(p, f, 3, 12); p.shield = 3; }]);
+addF(F3('ALIEN ZORP', 'ALIEN', ['Floaty low gravity.', 'Heavy fires two homing probes.', 'Special: Abduct lifts every foe.'], '#7ad03a', '#4a8a1a', '#c03ad0', 'orbit', { hp: 90, spd: 1.05, lowgrav: true }),
+  sht(f => { for (const vy of [-3, 3]) shoot(f, { kind: 'ibolt', vx: f.facing * 8, vy, dmg: 9, homing: true, life: 150, col: '#7ad03a' }); tone(1300, 0.2, 'sine', 0.08, 500); }),
+  sk('BEAM ME UP', 'cast', { startup: 4, onActive: f => { f.ghost(14); f.x = clamp(f.x + f.facing * 240, 40, W - 40); f.y = Math.max(220, f.y - 140); f.vy = 0; f.onGround = false; f.plat = null; f.inv = Math.max(f.inv, 18); ring(f.x, f.y - 40, '#7ad03a', 60, 4, 14); SFX.portal(); } }),
+  ['ABDUCT', (p, f, bd, SP) => { for (const e of f) { doHit(p, e, SP(14, [1, 18]), sign(e.x - p.x) || 1, true); parts.push({ type: 'ring', x: e.x, y: e.y - 40, r: 4, r2: 50, col: '#7ad03a', lw: 3, life: 18, max: 18 }); } }],
+  ['MOTHERSHIP', (p, f) => { SUP.strikes(p, f, 10, 26); SUP.radial(p, 'ibolt', 12, 10, { col: '#7ad03a', dmg: 10 }); }]);
+addF(F3('MERMAID MAREN', 'MERMAID', ['Hold JUMP to float.', 'Heavy blows trapping bubbles.', 'Special: Tidal Wave.'], '#2ab0a0', '#16706a', '#d06aa0', 'tiara', { hp: 90, spd: 1.05, float: true }),
+  sht(f => { for (const vy of [-2, 0, 2]) shoot(f, { kind: 'bubble', vx: f.facing * 7, vy, r: 16, dmg: 6, trap: true, life: 120 }); tone(600, 0.15, 'sine', 0.1, 1000); }),
+  sk('SPLASH', 'up', { startup: 5, onActive: f => { hop(f, f.vx, -12); ring(f.x, f.y - 20, '#2a8ad0', 170, 6, 16); splash(f.x, f.y, '#2a8ad0', 14, 6); around(f, 170, { dmg: 10, kb: [10, 10] }); } }),
+  ['TIDAL WAVE', p => SUP.waves(p, 'wave', 3, 12, { r: 34, dmg: 18, col: '#2a8ad0' })],
+  ["OCEAN'S WRATH", (p, f) => { SUP.waves(p, 'wave', 4, 10, { r: 36, dmg: 16, col: '#2a8ad0' }); SUP.radial(p, 'bubble', 14, 6, { trap: true, dmg: 8, r: 18, life: 160 }); }]);
+addF(F3('ROCKSTAR ROXY', 'ROCKSTAR', ['Heavy is a power chord that', 'blasts both ways at once.', 'Special: Encore lightning.'], '#d02a6a', '#8a1a4a', '#2a2a2a', 'spikes', { hp: 95, spd: 1.05, dmg: 1.05 }),
+  sht(f => { for (const d of [-1, 1]) shoot(f, { kind: 'sonic', x: f.x + d * 36, vx: d * 12, r: 22, dmg: 11, pierce: true, hitSet: new Set(), face: d, life: 50, kb: [12, 6] }); tone(110, 0.4, 'sawtooth', 0.12, 220); }),
+  sk('STAGE DIVE', 'up', { startup: 4, active: 14, dmg: 14, kb: [8, 12], hb: { x: 20, y: 30, w: 90, h: 60 }, onActive: f => hop(f, f.facing * 12, -13) }),
+  ['ENCORE', (p, f, bd) => SUP.strikes(p, bd(), 8, 24)],
+  ['SOLD OUT SHOW', (p, f) => { SUP.waves(p, 'sonic', 5, 8, { r: 30, dmg: 14 }); SUP.strikes(p, f, 6, 22); }]);
+addF(F3('ZOMBIE ZED', 'ZOMBIE', ['Slow and tough. Every hit', 'drains a bit of HP back.', 'Special: Grave Rise hands.'], '#6a9a5a', '#3a5a2a', '#8a6a9a', 'backcap', { hp: 130, spd: 0.85, dmg: 1.1, tough: 0.85, vamp: true }),
+  mel({ startup: 10, dmg: 18, kb: [9, 8], hb: { x: 40, y: 60, w: 60, h: 40 } }),
+  sk('SHAMBLE', 'dash', { startup: 6, active: 20, lungeV: 12, dmg: 14, kb: [10, 6], hb: { x: 36, y: 50, w: 70, h: 70 }, onActive: f => { f.inv = Math.max(f.inv, 20); } }),
+  ['GRAVE RISE', (p, f) => vineSpikes(p, f.slice(0, 8).map(e => e.x).concat([p.x + 120 * p.facing]), 20, [3, 16])],
+  ['APOCALYPSE', (p, f) => { vineSpikes(p, Array.from({ length: 12 }, (_, i) => 60 + i * 135), 24, [3, 16]); SUP.nova(p, f, 300, 25); p.hp = Math.min(p.maxHp, p.hp + 30); }]);
+addF(F3('BAKER BENNY', 'BAKER', ['Heavy lobs two fresh pies.', 'Skill: Sugar Rush speed boost.', 'Special: a giant Cake Bomb.'], '#e8b07a', '#a0703a', '#e86a8a', 'chef', {}),
+  sht(f => { for (const sp of [8, 11]) shoot(f, { kind: 'pie', y: f.y - 60 * f.s, vx: f.facing * sp, vy: -8, g: 0.45, r: 12, dmg: 11, rot: 0, life: 160 }); SFX.throw_(); }, 'throw'),
+  sk('SUGAR RUSH', 'cast', { startup: 3, onActive: f => { if (!f.power || f.power === 'haste') { f.power = 'haste'; f.powerT = Math.max(f.powerT || 0, 300); } else f.meter = Math.min(100, f.meter + 20); floatText(f.x, f.y - 120, 'SUGAR RUSH!', '#e86a8a', 24, 30); tone(900, 0.2, 'triangle', 0.1, 1500); } }),
+  ['CAKE BOMB', p => G.projs.push({ x: clamp(p.x + p.facing * 180, 80, W - 80), y: p.y - 80, vx: 0, vy: -4, g: 0.45, r: 22, dmg: 34, owner: 'player', by: p, kind: 'bomb', life: 70, col: '#ff8ad8', bomb: true, blast: 260, kb: [13, 13], meter: 0 })],
+  ['BAKE OFF', (p, f) => { SUP.rain(p, f, 'pie', 22, { r: 12, dmg: 14 }); healTeam(p, 30); }]);
+addF(F3('LUMBERJACK LARS', 'LUMBERJACK', ['Strong! Heavy throws an axe', 'that spins back to him.', 'Special: TIMBER! falling logs.'], '#c0392b', '#7a1f16', '#2a2a2a', 'beanie', { hp: 115, spd: 0.95, dmg: 1.15, size: 1.08 }),
+  sht(f => { shoot(f, { kind: 'slash', vx: f.facing * 14, r: 22, dmg: 13, pierce: true, hitSet: new Set(), boom: true, boomDir: f.facing, face: f.facing, life: 130, col: '#8a6a3a' }); SFX.whoosh(); }, 'throw'),
+  sk('CHOP', 'punch', { startup: 9, active: 6, dmg: 20, kb: [10, 14], hb: { x: 44, y: 70, w: 60, h: 90 } }),
+  ['TIMBER!', (p, f) => SUP.rain(p, f, 'slash', 6, { r: 40, dmg: 26, pierce: true, face: 1, col: '#8a6a3a' })],
+  ['FOREST FURY', (p, f) => { vineSpikes(p, Array.from({ length: 11 }, (_, i) => 70 + i * 146), 20); SUP.rain(p, f, 'slash', 6, { r: 40, dmg: 24, pierce: true, face: 1, col: '#8a6a3a' }); }]);
+addF(F3('FIREFIGHTER FINN', 'FIREFIGHTER', ['Heavy sprays a fire hose that', 'pushes enemies way back.', 'Special: Flood washes foes away.'], '#d02a2a', '#8a1a1a', '#e8c000', 'hardhat', { hp: 110 }),
+  sht(f => { for (let k = 0; k < 4; k++) shoot(f, { kind: 'ibolt', vx: f.facing * 16, vy: rand(-1, 1), r: 10, dmg: 4, kb: [11, 3], col: '#5ac8ff', life: 40, delayT: k * 3 }); noise(0.3, 0.2, 1500, 'highpass', 800); }),
+  sk('AXE CLEAVE', 'punch', { startup: 8, active: 6, dmg: 18, kb: [12, 10], hb: { x: 46, y: 60, w: 70, h: 60 } }),
+  ['FLOOD', (p, f, bd, SP) => { for (const e of f) doHit(p, e, SP(18, [22, 6]), sign(e.x - p.x) || 1, true); SUP.waves(p, 'wave', 2, 10, { col: '#5ac8ff', dmg: 10 }); }],
+  ['RESCUE', (p, f) => { if (G.mode !== 'versus') for (const q of G.players) if (q.joined && q.downed && !q.dead) { q.downed = false; q.hp = 45; q.inv = 100; floatText(q.x, q.y - 130, 'RESCUED!', q.col, 30, 50); } healTeam(p, 50); SUP.waves(p, 'wave', 3, 10, { col: '#5ac8ff', dmg: 14, r: 32 }); }]);
+addF(F3('DETECTIVE DOT', 'DETECTIVE', ['Lucky: 25% crit chance.', 'Heavy is a magnifying beam.', 'Special: Case Closed combo.'], '#7a5a3a', '#4a3420', '#c0a060', 'tophat', { hp: 95, spd: 1.05, lucky: true }),
+  sht(f => { shoot(f, { kind: 'laserbolt', vx: f.facing * 26, r: 9, dmg: 13, col: '#ffe066', pierce: true, hitSet: new Set(), life: 60 }); tone(1700, 0.12, 'sine', 0.07, 900); }),
+  sk('CLUE', 'cast', { startup: 3, onActive: f => { f.luckyT = Math.max(f.luckyT || 0, 360); floatText(f.x, f.y - 120, 'CLUE FOUND! LUCKY!', '#21a35a', 22, 34); tone(1000, 0.2, 'triangle', 0.08, 1500); } }),
+  ['CASE CLOSED', (p, f, bd) => SUP.flurry(p, bd().slice(0, 4), 2, 10)],
+  ['ELEMENTARY', (p, f) => { SUP.flurry(p, f, 3, 12); p.luckyT = 600; }]);
+addF(F3('MECHA MIKA', 'MECH PILOT', ['Sturdy: heavy can\'t be stopped.', 'Heavy fires a rocket fist.', 'Special: Missile Swarm.'], '#a0a0b8', '#6a6a7a', '#d02a2a', 'helmet', { hp: 115, spd: 0.95, dmg: 1.1, armorHeavy: true }),
+  sht(f => { shoot(f, { kind: 'rocket', vx: f.facing * 15, r: 12, dmg: 18, kb: [12, 6], life: 90 }); SFX.dash(); }, 'punch'),
+  sk('BOOSTER', 'dash', { startup: 3, active: 12, lungeV: 26, dmg: 12, kb: [10, 8], hb: { x: 34, y: 45, w: 80, h: 64 }, onActive: f => { for (let i = 0; i < 6; i++) parts.push({ type: 'flame', x: f.x - f.facing * 20, y: f.y - 40, vx: -f.facing * rand(2, 5), vy: rand(-1, 1), r: rand(5, 9), life: 16, max: 16 }); } }),
+  ['MISSILE SWARM', p => SUP.radial(p, 'rocket', 8, 6, { homing: true, dmg: 14, life: 200, r: 10 })],
+  ['MECHA MODE', (p, f) => { setPower(p, 'giant'); SUP.radial(p, 'rocket', 12, 6, { homing: true, dmg: 14, life: 220, r: 10 }); }]);
+addF(F3('GENIE GEO', 'GENIE', ['Floats: hold JUMP to drift.', 'Heavy fires a homing wish orb.', 'Special: Three Wishes (prizes!).'], '#5a5ae0', '#3a3a9a', '#e8c000', 'wisp', { hp: 90, spd: 1.05, float: true }),
+  sht(f => { shoot(f, { kind: 'ibolt', vx: f.facing * 8, r: 14, dmg: 14, homing: true, life: 160, col: '#e8c000' }); tone(800, 0.3, 'sine', 0.08, 1600); }),
+  sk('LAMP DASH', 'dash', { startup: 3, onActive: f => { f.ghost(12); for (let i = 0; i < 10; i++) parts.push({ type: 'dust', x: f.x + rand(-30, 30), y: f.y - rand(0, 80), vx: 0, vy: -1, r: rand(8, 14), life: 26, max: 26 }); f.x = clamp(f.x + f.facing * 210, 40, W - 40); f.inv = Math.max(f.inv, 20); SFX.portal(); } }),
+  ['THREE WISHES', p => { const L = ['heart', 'shield', 'pencil', 'star', 'bomb', 'meteors', 'aura', 'drone']; for (let i = 0; i < 3; i++) applyPickup(p, L.splice(randi(0, L.length - 1), 1)[0]); }],
+  ['GRAND WISH', (p, f) => { healTeam(p, 50); applyPickup(p, 'star'); applyPickup(p, 'meteors'); applyPickup(p, 'bomb'); }]);
+addF(F3('SUMO SATO', 'SUMO', ['Huge, heavy and very tough.', 'Heavy is a mighty palm slap.', 'Special: Sumo Stomp quake.'], '#e0a07a', '#a0603a', '#2a2a6a', 'topknot', { hp: 150, spd: 0.8, dmg: 1.25, size: 1.3, armorHeavy: true, tough: 0.85 }),
+  mel({ startup: 8, active: 5, dmg: 22, kb: [20, 6], hb: { x: 50, y: 60, w: 70, h: 60 } }),
+  sk('BELLY BUMP', 'dash', { startup: 5, active: 12, lungeV: 16, dmg: 16, kb: [18, 6], hb: { x: 40, y: 50, w: 80, h: 80 } }),
+  ['SUMO STOMP', (p, f, bd, SP) => { addShake(20); for (const e of f) if (e.onGround) doHit(p, e, SP(30, [4, 16]), sign(e.x - p.x) || 1, true); SUP.waves(p, 'wave', 1, 0, { dmg: 14 }); }],
+  ['YOKOZUNA', (p, f) => { setPower(p, 'giant'); SUP.quake(p, f, 30); SUP.flurry(p, f, 1, 20, [22, 12]); }]);
+addF(F3('MIME MIMI', 'MIME', ['Heavy pushes an invisible wall', 'that shoves foes far away.', 'Special: Invisible Box traps all.'], '#2a2a2a', '#111111', '#d02a2a', 'beret', { hp: 90, spd: 1.1 }),
+  sht(f => { shoot(f, { kind: 'sonic', vx: f.facing * 9, r: 26, dmg: 10, pierce: true, hitSet: new Set(), face: f.facing, kb: [16, 4], life: 45, col: '#ffffff' }); tone(500, 0.1, 'sine', 0.04, 500); }),
+  sk('TUG OF WAR', 'cast', { startup: 6, onActive: f => { const t = nearFoe(f, 650); if (t) doHit(f, t, { dmg: 10, kb: [Math.min(16, Math.abs(t.x - f.x) / 18), 6], stun: 40, hs: 4, heavy: true, sfx: 'heavy', meter: 4 }, sign(f.x - t.x) || 1, true); } }),
+  ['INVISIBLE BOX', (p, f, bd, SP) => { for (const e of f) { trapFoe(e); doHit(p, e, SP(14, [0, 0]), 1, true); trapFoe(e); ring(e.x, e.y - 40, '#ffffff', 60, 3, 20); } }],
+  ['SILENT SHOW', (p, f) => { for (const e of f) trapFoe(e); SUP.flurry(p, f, 3, 11); }]);
+addF(F3('BUTTERFLY BELLA', 'BUTTERFLY', ['Triple jump + float.', 'Heavy scatters pollen bolts.', 'Special: Butterfly Effect twisters.'], '#c05ae0', '#7a2a9a', '#ffd23a', 'bow', { hp: 85, spd: 1.08, jumps: 3, float: true, size: 0.92 }),
+  sht(f => { for (const vy of [-2, -0.7, 0.7, 2]) shoot(f, { kind: 'ibolt', vx: f.facing * 11, vy, r: 9, dmg: 6, life: 45, col: pick(['#ffd23a', '#ff8ad8', '#7ae05a']) }); tone(1400, 0.15, 'sine', 0.06, 1900); }),
+  sk('FLUTTER', 'up', { startup: 3, onActive: f => { hop(f, f.facing * 5, -14); for (let i = 0; i < 8; i++) parts.push({ type: 'spark', x: f.x + rand(-40, 40), y: f.y - rand(0, 60), vx: 0, vy: -1, life: 20, max: 20, col: '#ffd23a' }); around(f, 140, { dmg: 8, kb: [6, 10] }); } }),
+  ['BUTTERFLY EFFECT', p => { torn(p, -1); torn(p, 1); }],
+  ['METAMORPHOSIS', (p, f) => { p.power = 'star'; p.powerT = 360; SUP.radial(p, 'ibolt', 24, 10, { dmg: 10, col: '#c05ae0' }); healTeam(p, 30); }]);
+addF(F3('KING KONGO', 'GORILLA', ['Huge and strong. Heavy is a', 'ground pound with shockwaves.', 'Special: Barrel Roll.'], '#5a4030', '#3a2a1a', '#8a6a4a', 'crown', { hp: 145, spd: 0.9, dmg: 1.2, size: 1.25, armorHeavy: true }),
+  mel({ startup: 12, dmg: 24, kb: [10, 14], hb: { x: 30, y: 40, w: 120, h: 60 }, wind: A.EB.wind, hit: A.EB.hit, onActive: f => { for (const d of [-1, 1]) shoot(f, { kind: 'wave', x: f.x + d * 30, y: FLOOR - 18, vx: d * 10, r: 20, dmg: 10, pierce: true, hitSet: new Set(), kb: [6, 11], life: 60 }); addShake(8); SFX.shock(); } }),
+  sk('CHEST BEAT', 'cast', { startup: 6, onActive: f => { SFX.roar(); addShake(6); if (!f.power || f.power === 'double') { f.power = 'double'; f.powerT = Math.max(f.powerT || 0, 240); } around(f, 200, { dmg: 8, kb: [12, 6] }); } }),
+  ['BARREL ROLL', p => { for (let k = 0; k < 3; k++) barrel(p, p.facing * (6 + k * 2.5)); }],
+  ['JUNGLE KING', (p, f) => { SUP.quake(p, f, 28); for (let k = 0; k < 4; k++) barrel(p, (k % 2 ? 1 : -1) * (6 + k * 2)); }]);
 const SKILL_OF = { 'SCRIBBLE': 'SK_UPPER', 'BOLT': 'SK_BOLTDASH', 'BOULDER': 'SK_ROCK', 'INKBLADE': 'SK_RISE', 'DOODLE WITCH': 'SK_HEX', 'SHADE': 'SK_STEP', 'ROBO': 'SK_RPUNCH', 'HALO': 'SK_HALO',
   'SLUGGER': 'SK_LINE', 'HOPPER': 'SK_TONGUE', 'WHISKERS': 'SK_POUNCE', 'CHEF': 'SK_PIES', 'FROSTY': 'SK_ICICLE', 'GHOSTLY': 'SK_SPOOK', 'DJ BEATS': 'SK_DROP', 'SIR DOODLE': 'SK_BASH',
   'BUBBLES': 'SK_BHOP', 'JETPACK JO': 'SK_BURNER', 'PRESTO': 'SK_VANISH', 'EL DOODLO': 'SK_SUPLEX', 'MIMIC': 'SK_COPY', 'BLAZE': 'SK_FWALL', 'CAPTAIN INK': 'SK_RECOIL', 'GRAVITY GUS': 'SK_PULL',
-  'GEMMA': 'SK_ARMOR', 'KICKFLIP KAI': 'SK_FLIP', 'BUZZY BEA': 'SK_STING', 'SAMURAI SAM': 'SK_IAI', 'ECHO': 'SK_MIRROR', 'DYNAMITE DAN': 'SK_MINE', 'PICASSO PIP': 'SK_WHEEL', 'YOYO YUKI': 'SK_ATW', 'CACTUS CARL': 'SK_TUMBLE', 'FAIRY FERN': 'SK_DUST', 'VIKING VERA': 'SK_CRY', 'DR. GOO': 'SK_ACID', 'DIGGER DAX': 'SK_POPUP', 'ASTRO ACE': 'SK_GFLIP', 'CHRONO CLAIRE': 'SK_REWIND', 'LUCKY LOU': 'SK_COIN', 'MAGNET MAX': 'SK_SNAP', 'BOXER BRUNO': 'SK_COUNTER', 'ARCHER ANNA': 'SK_PIERCE', 'DRAGON DREW': 'SK_WINGS', 'BALLOON BILLIE': 'SK_POP', 'ROBO REX': 'SK_ROAR', 'PAPER PIA': 'SK_FOLD', 'NOVA NICK': 'SK_HYPER', 'GARDENER GIL': 'SK_BLOOM', 'BUILDER BOB': 'SK_TOOLS', 'WIZARD WALLY': 'SK_BLINK', 'VAMPIRE VLAD': 'SK_BATDASH', 'CLOWN CLEO': 'SK_PIE', 'WEBBY': 'SK_SWING', 'TANK TINA': 'SK_TREAD', 'LUNA': 'SK_MOONBEAM', 'MAGMA MARV': 'SK_STOMP', 'GLITCH GABE': 'SK_LAG' };
+  'GEMMA': 'SK_ARMOR', 'KICKFLIP KAI': 'SK_FLIP', 'BUZZY BEA': 'SK_STING', 'SAMURAI SAM': 'SK_IAI', 'ECHO': 'SK_MIRROR', 'DYNAMITE DAN': 'SK_MINE', 'PICASSO PIP': 'SK_WHEEL', 'YOYO YUKI': 'SK_ATW', 'CACTUS CARL': 'SK_TUMBLE', 'FAIRY FERN': 'SK_DUST', 'VIKING VERA': 'SK_CRY', 'DR. GOO': 'SK_ACID', 'DIGGER DAX': 'SK_POPUP', 'ASTRO ACE': 'SK_GFLIP', 'CHRONO CLAIRE': 'SK_REWIND', 'LUCKY LOU': 'SK_COIN', 'MAGNET MAX': 'SK_SNAP', 'BOXER BRUNO': 'SK_COUNTER', 'ARCHER ANNA': 'SK_PIERCE', 'DRAGON DREW': 'SK_WINGS', 'BALLOON BILLIE': 'SK_POP', 'ROBO REX': 'SK_ROAR', 'PAPER PIA': 'SK_FOLD', 'NOVA NICK': 'SK_HYPER', 'GARDENER GIL': 'SK_BLOOM', 'BUILDER BOB': 'SK_TOOLS', 'WIZARD WALLY': 'SK_BLINK', 'VAMPIRE VLAD': 'SK_BATDASH', 'CLOWN CLEO': 'SK_PIE', 'WEBBY': 'SK_SWING', 'TANK TINA': 'SK_TREAD', 'LUNA': 'SK_MOONBEAM', 'MAGMA MARV': 'SK_STOMP', 'GLITCH GABE': 'SK_LAG', ...GEN_SKILLS };
 for (const c of CHARS) { c.skill = SKILL_OF[c.name] || 'SK_UPPER'; c.kname = A[c.skill].kname; }
 const SKILL_IDS = Object.values(SKILL_OF).filter(k => k !== 'SK_COPY');
 const SKILL_CD = 150;
-const HEAVIES = ['HAY', 'WBOLT', 'ZAP', 'PAN', 'SONIC', 'LANCE', 'BUBBLE', 'ROCKETSHOT', 'CARDS', 'GRAB', 'FIREBALL', 'CANNON', 'WELL', 'SPIKES', 'RAM', 'BEES', 'BOMB', 'PAINT', 'YOYO', 'NEEDLES', 'SPARKLE', 'AXE', 'FLASK', 'DRILL', 'RAYGUN', 'GEAR', 'DICE', 'MAGNET', 'HAYMAKER', 'ARROWS', 'FIREBREATH', 'WATERBALLOON', 'CHOMP', 'PLANES', 'LASEREYES', 'SEEDS', 'NAILGUN', 'MISSILES', 'BATS', 'HONK', 'WEBSHOT', 'SHELL', 'MOONDISC', 'LAVABALL', 'PIXELS'];
+const HEAVIES = ['HAY', 'WBOLT', 'ZAP', 'PAN', 'SONIC', 'LANCE', 'BUBBLE', 'ROCKETSHOT', 'CARDS', 'GRAB', 'FIREBALL', 'CANNON', 'WELL', 'SPIKES', 'RAM', 'BEES', 'BOMB', 'PAINT', 'YOYO', 'NEEDLES', 'SPARKLE', 'AXE', 'FLASK', 'DRILL', 'RAYGUN', 'GEAR', 'DICE', 'MAGNET', 'HAYMAKER', 'ARROWS', 'FIREBREATH', 'WATERBALLOON', 'CHOMP', 'PLANES', 'LASEREYES', 'SEEDS', 'NAILGUN', 'MISSILES', 'BATS', 'HONK', 'WEBSHOT', 'SHELL', 'MOONDISC', 'LAVABALL', 'PIXELS', ...GEN_HEAVIES];
 const MIMIC_SPECIALS = ['overgrowth', 'wreckingball', 'polymorph', 'bloodmoon', 'confetti', 'webnet', 'artillery', 'moonbeams', 'eruption', 'systemcrash', 'balloonparade', 'tailsweep', 'paperstorm', 'superpunch', 'polarity', 'kocombo', 'arrowrain', 'dragonroar', 'cavein', 'satellite', 'timestop', 'jackpot', 'cactusfield', 'wish', 'ragnarok', 'mutate', 'burst', 'thunder', 'quake', 'slash', 'rain', 'shadow', 'laser', 'heal', 'fastball', 'megastomp', 'claws', 'pies', 'blizzard', 'haunt', 'bass', 'royal', 'bubbles', 'airstrike', 'abracadabra', 'inferno', 'broadside', 'zerog', 'prison', 'grind', 'hive', 'cuts', 'phantoms', 'megablast', 'masterpiece', 'walkdog'];
+MIMIC_SPECIALS.push(...Object.keys(GEN_SP));
 const heavyAtk = p => A[p.char.heavy === 'random' ? pick(HEAVIES) : (p.char.heavy || 'HAY')];
 const SPECIAL = { dmg: 38, kb: [14, 12], stun: 40, hs: 8, heavy: true, sfx: 'heavy', shake: 6, meter: 0 };
 const POUNDW = { dmg: 15, kb: [7, 13], stun: 34, hs: 6, heavy: true, sfx: 'heavy', meter: 8, shake: 3 };
@@ -1514,12 +1637,13 @@ function trapFoe(e) {
   else { e.stun = Math.max(e.stun, 60); }
 }
 // ---------------------------------------------------------- super moves (Up + Special)
+const pushP = pr => { if (pr.pierce) pr.hitSet = new Set(); G.projs.push(pr); };
 const SUP = {
   hit: (dmg, kb) => ({ dmg, kb: kb || [12, 12], stun: 50, hs: 7, heavy: true, sfx: 'heavy', meter: 0, shake: 5 }),
-  rain(p, foes, kind, n, o) { for (let i = 0; i < n; i++) { const tx = foes.length ? foes[i % foes.length].x + rand(-60, 60) : rand(100, W - 100); G.projs.push(Object.assign({ x: clamp(tx, 40, W - 40), y: -40 - i * 45, vx: rand(-0.6, 0.6), vy: 8, g: 0.35, r: 15, dmg: 20, owner: 'player', by: p, kind, life: 500, col: p.col, kb: [6, 10], meter: 0, hs: 4, rot: 0 }, o)); } },
-  radial(p, kind, n, spd, o) { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; G.projs.push(Object.assign({ x: p.x, y: p.y - 56 * p.s, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, g: 0, r: 10, dmg: 10, owner: 'player', by: p, kind, life: 80, col: p.col, kb: [7, 6], meter: 0, hs: 3, face: Math.cos(a) >= 0 ? 1 : -1, rot: 0 }, o)); } },
-  fan(p, kind, n, spd, spread, o) { for (let i = 0; i < n; i++) G.projs.push(Object.assign({ x: p.x + p.facing * 30, y: p.y - 56 * p.s, vx: p.facing * spd, vy: (i - (n - 1) / 2) * spread, g: 0, r: 10, dmg: 14, owner: 'player', by: p, kind, life: 90, col: p.col, kb: [9, 6], meter: 0, hs: 4, rot: 0, face: p.facing }, o)); },
-  waves(p, kind, n, gap, o) { for (let k = 0; k < n; k++) for (const d of [-1, 1]) G.projs.push(Object.assign({ x: p.x + d * 40, y: kind === 'wave' ? FLOOR - 18 : p.y - 50 * p.s, vx: d * 12, vy: 0, g: 0, r: 26, dmg: 16, owner: 'player', by: p, kind, life: 90, col: p.col, pierce: true, hitSet: new Set(), kb: [9, 10], meter: 0, hs: 4, face: d, delayT: k * gap }, o)); },
+  rain(p, foes, kind, n, o) { for (let i = 0; i < n; i++) { const tx = foes.length ? foes[i % foes.length].x + rand(-60, 60) : rand(100, W - 100); pushP(Object.assign({ x: clamp(tx, 40, W - 40), y: -40 - i * 45, vx: rand(-0.6, 0.6), vy: 8, g: 0.35, r: 15, dmg: 20, owner: 'player', by: p, kind, life: 500, col: p.col, kb: [6, 10], meter: 0, hs: 4, rot: 0 }, o)); } },
+  radial(p, kind, n, spd, o) { for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pushP(Object.assign({ x: p.x, y: p.y - 56 * p.s, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, g: 0, r: 10, dmg: 10, owner: 'player', by: p, kind, life: 80, col: p.col, kb: [7, 6], meter: 0, hs: 3, face: Math.cos(a) >= 0 ? 1 : -1, rot: 0 }, o)); } },
+  fan(p, kind, n, spd, spread, o) { for (let i = 0; i < n; i++) pushP(Object.assign({ x: p.x + p.facing * 30, y: p.y - 56 * p.s, vx: p.facing * spd, vy: (i - (n - 1) / 2) * spread, g: 0, r: 10, dmg: 14, owner: 'player', by: p, kind, life: 90, col: p.col, kb: [9, 6], meter: 0, hs: 4, rot: 0, face: p.facing }, o)); },
+  waves(p, kind, n, gap, o) { for (let k = 0; k < n; k++) for (const d of [-1, 1]) pushP(Object.assign({ x: p.x + d * 40, y: kind === 'wave' ? FLOOR - 18 : p.y - 50 * p.s, vx: d * 12, vy: 0, g: 0, r: 26, dmg: 16, owner: 'player', by: p, kind, life: 90, col: p.col, pierce: true, hitSet: new Set(), kb: [9, 10], meter: 0, hs: 4, face: d, delayT: k * gap }, o)); },
   nova(p, foes, r, dmg, fx) { ring(p.x, p.y - 40, p.col, r, 14, 26); ring(p.x, p.y - 40, '#fff', r * 0.7, 6, 22); for (const e of foes) if (Math.hypot(e.x - p.x, e.y - p.y) < r) { doHit(p, e, SUP.hit(dmg), sign(e.x - p.x) || 1, true); if (fx) fx(e); } },
   flurry(p, foes, hits, dmg, kb) {
     const list = foes.slice(0, 8);
@@ -1589,6 +1713,7 @@ const SUPERS = {
   'LUNA': ['FULL MOON', (p, f) => { SUP.strikes(p, f, 12, 28); healTeam(p, 30); }],
   'MAGMA MARV': ['VOLCANO', (p, f) => { SUP.nova(p, f, 360, 30, e => { if (e.T) { e.burn = 240; e.burnBy = p; } }); SUP.rain(p, f, 'fireball', 14, { r: 14, dmg: 16, burn: true, col: '#ff6a1a' }); }],
   'GLITCH GABE': ['BLUE SCREEN', (p, f) => { flashA = 1; flashCol = '#2a5ad8'; SUP.freeze(f, 300); SUP.flurry(p, f, 2, 14); }],
+  ...GEN_SUPERS,
   'MIMIC': ['COPYCAT CHAOS', (p, f) => { }],
 };
 const SUPER_IDS = Object.keys(SUPERS).filter(k => k !== 'MIMIC');
@@ -1623,6 +1748,7 @@ function doSpecial(p) {
   SFX.special(); addShake(14); flashA = 0.5; flashCol = '#fff'; rumble(p.idx, 1, 1, 350);
   ring(p.x, p.y - 40, p.col, 300, 14, 26);
   const SP = (dmg, kb) => ({ dmg, kb, stun: 45, hs: 7, heavy: true, sfx: 'heavy', meter: 0, shake: 4 });
+  if (GEN_SP[sp]) { floatText(p.x, p.y - 140, GEN_SP[sp][0] + (GEN_SP[sp][0].endsWith('!') ? '' : '!'), p.col, 34, 50); GEN_SP[sp][1](p, foes, byDist, SP); return; }
   if (sp === 'burst') {
     ring(p.x, p.y - 40, '#fff', 220, 6, 20); splash(p.x, p.y - 40, p.col, 60, 14);
     for (const e of foes) if (Math.hypot(e.x - p.x, (e.y - e.hh / 2) - (p.y - 40)) < 290) doHit(p, e, SPECIAL, sign(e.x - p.x), true);
@@ -2764,7 +2890,7 @@ function stepLocal() {
       if (!p.joined) { if (p.idx ? c.anyFace() : (c.pressed('light') || c.pressed('start'))) { p.joined = true; p.ready = false; SFX.join(); rumble(p.idx, 0.5, 0.5, 150); } continue; }
       if (!p.ready) {
         const d = menuDir(c, 12);
-        if (d) { p.ci = (p.ci + d + CHARS.length) % CHARS.length; G.players.forEach(q => q.applyChar()); SFX.menu(); }
+        if (d) { p.ci = (p.ci + d + CHARS.length) % CHARS.length; p.mvT = G.titleT; G.players.forEach(q => q.applyChar()); SFX.menu(); }
         if (confirmPressed(p)) { if (fighterUnlocked(p.ci)) { p.ready = true; SFX.join(); rumble(p.idx, 0.4, 0.4, 120); } else { SFX.hurt(); p.lockMsg = 70; } }
         else if (backPressed(p) && p.idx === 1) { p.joined = false; SFX.menu(); }
       } else if (backPressed(p)) { p.ready = false; SFX.menu(); }
@@ -4244,8 +4370,14 @@ function drawLock(x, y) {
 function drawSelect() {
   const ink = THEMES[0].ink, t = G.titleT;
   menuBackdrop('CHOOSE YOUR FIGHTER');
+  const maxScroll = Math.max(0, Math.ceil(CHARS.length / 12) - 5);
+  for (const p of G.players.filter(q => q.joined).sort((a, b) => (a.mvT || 0) - (b.mvT || 0))) { const r = (p.ci / 12) | 0; if (r < (G.selScroll || 0)) G.selScroll = r; if (r > (G.selScroll || 0) + 4) G.selScroll = r - 4; }
+  G.selScroll = clamp(G.selScroll || 0, 0, maxScroll);
+  if (G.selScroll > 0) txt('▲  MORE FIGHTERS  ▲', 800, 116, 12, '#7b3fd0', 'center', F1);
+  if (G.selScroll < maxScroll) txt('▼  MORE FIGHTERS  ▼', 800, 642, 15, '#7b3fd0', 'center', F1);
   CHARS.forEach((c, i) => {
-    const col = i % 12, row = (i / 12) | 0, x = 344 + col * 76.3, y = 122 + row * 102, w = 72, h = 96;
+    const col = i % 12, row = ((i / 12) | 0) - (G.selScroll || 0), x = 344 + col * 76.3, y = 122 + row * 102, w = 72, h = 96;
+    if (row < 0 || row > 4) return;
     const picked = G.players.filter(p => p.joined && p.ci === i);
     ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = c.col; ctx.globalAlpha = 0.14; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
@@ -4669,7 +4801,7 @@ function applySnapshot(s) {
   let ciChanged = false;
   s.P.forEach((a, i) => {
     const p = G.players[i];
-    if (p.ci !== a[1]) { p.ci = a[1]; ciChanged = true; }
+    if (p.ci !== a[1]) { p.ci = a[1]; p.mvT = G.titleT; ciChanged = true; }
     p.joined = !!a[0];
     const far = p.tx === undefined || Math.abs(a[2] - p.x) > 250 || Math.abs(a[3] - p.y) > 250;
     p.tx = a[2]; p.ty = a[3]; if (far) { p.x = a[2]; p.y = a[3]; }
