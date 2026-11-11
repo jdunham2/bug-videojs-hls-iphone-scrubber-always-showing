@@ -11,3 +11,7 @@ To test it go to https://bug-videojs-hls-iphone-scrubber-always-showing.stackbli
 This project is meant to run on StackBlitz ⚡️
 
 [Edit on StackBlitz ⚡️](https://stackblitz.com/edit/bug-videojs-hls-iphone-scrubber-always-showing)
+
+### Saga of the North Sea (Viking game)
+
+An open-ended Viking sandbox in `viking/index.html`. Open the file in a browser (no build step needed). Sail between islands, trade, raid, hunt, explore ruins, make offerings, and build up your hall and ship. Progress saves automatically in the browser.
