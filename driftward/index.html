@@ -1764,7 +1764,7 @@ const upgCost=k=>{const m=UPG_MULT[k]||1;return{nanites:Math.round(60*(upg[k]+1)
 function toggleUpg(){
   const el=$('upg');
   if(el.hidden){
-    if(!(st.mode==='ship'||(st.mode==='foot'&&nearShip()))){toast('The workshop is on your ship. Board it or stand next to it, then press U.');return}
+    if(!(st.mode==='ship'||(st.mode==='foot'&&nearShip())||(st.mode==='derelict'&&DR.kind==='capital'))){toast('The workshop is on your ship. Board it or stand next to it, then press U.');return}
     el.hidden=false;try{document.exitPointerLock()}catch(_){}renderUpg();
   }else el.hidden=true;
 }
@@ -2251,7 +2251,7 @@ function updateWar(dt){
   else if(WAR.control<=-100||(warActive(WAR.chal)===0&&WAR.res[WAR.chal]<=0))endBattle(WAR.owner);
 }
 function updateWarBar(){
-  const show=WAR.on&&WAR.point&&(st.mode==='foot'?false:ship.group.position.distanceTo(WAR.point)<25000);
+  const show=WAR.on&&WAR.point&&(st.mode!=='ship'?false:ship.group.position.distanceTo(WAR.point)<25000);
   $('warBar').hidden=!show;if(!show)return;
   const O=FACTIONS[WAR.owner],C=FACTIONS[WAR.chal];
   setText('warTitle',`Battle for ${system.name}`);
@@ -2313,7 +2313,7 @@ function buildCapital(cls,paint){
 const capMouth=()=>CAPR.group.localToWorld(CAPR.group.userData.mouth.clone());
 const capInside=()=>CAPR.group.localToWorld(CAPR.group.userData.inside.clone());
 const capNear=()=>CAPR.here&&st.mode==='ship'&&ship.state==='flying'&&ship.group.position.distanceTo(capMouth())<260;
-function clearCapital(){if(CAPR.group){scene.remove(CAPR.group);CAPR.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}CAPR.group=null;CAPR.here=false}
+function clearCapital(){if(CAPR.int){CAPR.int=null;CAPR.intCls=null}if(DR.on&&DR.kind==='capital'){DR.on=false;DR.kind=null;if(st.mode==='derelict')st.mode='ship'}if(CAPR.group){scene.remove(CAPR.group);CAPR.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}CAPR.group=null;CAPR.here=false}
 function placeCapital(near){
   clearCapital();const c=st.capital;const g=buildCapital(c.cls,c.paint);
   const q=near.quaternion||ship.group.quaternion,fwd=new V3(0,0,-1).applyQuaternion(q),right=new V3(1,0,0).applyQuaternion(q);
@@ -2336,6 +2336,7 @@ function summonCapital(force){
 function capDamage(d){
   const c=st.capital;if(!c||!CAPR.here)return;c.hull-=d;CAPR.lastHit=time;
   if(c.hull<=0){const p=CAPR.group.position.clone();for(let i=0;i<5;i++)setTimeout(()=>{boom(p.clone().addScaledVector(randDir(Math.random,new V3()),60),60,'#ffa050',1.4);Sound.boom(.6,1.4)},i*200);
+    if(DR.on&&DR.kind==='capital'){DR.on=false;DR.kind=null;st.mode='ship'}
     if(ship.dockCap&&['docking','docked'].includes(ship.state)){ship.state='flying';ship.dockCap=false;closeCap()}
     clearCapital();c.hull=Math.round(capMax()*.5);c.repairUntil=Date.now()+10*60000;
     toast(`${c.name} was crippled and jumped away for emergency repairs (10 min).`,'bad');save()}
@@ -2420,10 +2421,10 @@ function capKey(){
 function openCap(tab){if(tab)CAPR.tab=tab;$('capPanel').hidden=false;try{document.exitPointerLock()}catch(_){}renderCap()}
 function closeCap(){$('capPanel').hidden=true}
 function renderCap(){
-  if($('capPanel').hidden||!st.capital)return;const c=st.capital,C=CAP_CLASSES[c.cls],docked=ship.dockCap&&ship.state==='docked';
+  if($('capPanel').hidden||!st.capital)return;const c=st.capital,C=CAP_CLASSES[c.cls],docked=ship.dockCap&&ship.state==='docked'||(DR.on&&DR.kind==='capital');
   $('capTitle').textContent=c.name;$('capClass').textContent=`${C.label} · hull ${Math.round(c.hull)}/${capMax()} · ${C.turrets} turrets${C.escorts?' · '+C.escorts+' escorts':''}`;
   $('capTabs').innerHTML=[['bridge','Bridge'],['hangar','Hangar'],['expeditions','Expeditions'],['upgrades','Upgrades']].map(([k,l])=>`<button type="button" data-ctab="${k}" class="${CAPR.tab===k?'on':''}">${l}</button>`).join('');
-  $('capClose').textContent=docked?'Undock':'Close';$('capUnits').textContent=`${inv.units.toLocaleString()} units`;
+  $('capClose').textContent=DR.on&&DR.kind==='capital'?'Close':docked?'Undock':'Close';$('capUnits').textContent=`${inv.units.toLocaleString()} units`;
   let h='';
   if(CAPR.tab==='bridge'){
     const jr=c.jumpAt>Date.now()?Math.ceil((c.jumpAt-Date.now())/1000)+' s':'Ready';
@@ -2433,6 +2434,7 @@ function renderCap(){
       <div class="urow"><div><span class="nm">Dismiss</span></div><div class="ds">Send the ship away until you summon it again with K.</div><div class="acts"><button type="button" data-cact="dismiss" ${CAPR.here&&!docked?'':'disabled'}>Dismiss</button></div></div>`;
   }else if(CAPR.tab==='hangar'){
     h=`<p class="trnote">${docked?'Your ship has been repaired, refueled and recharged for free.':'Land in the hangar for free repairs and refueling.'}</p>
+      <div class="urow"><div><span class="nm">Walk aboard</span></div><div class="ds">Step off your ship and explore the ${st.capital.name}: bridge, engineering, operations, crew quarters and trophy hall.</div><div class="acts"><button type="button" data-cact="walk" ${docked?'':'disabled'}>Walk aboard</button></div></div>
       <div class="urow"><div><span class="nm">Ship workshop</span></div><div class="ds">Upgrade your starship.</div><div class="acts"><button type="button" data-cact="workshop" ${docked?'':'disabled'}>Open</button></div></div>
       <div class="urow"><div><span class="nm">Fabricator</span></div><div class="ds">Craft consumables and technology.</div><div class="acts"><button type="button" data-cact="craft">Open</button></div></div>`;
   }else if(CAPR.tab==='expeditions'){
@@ -2448,16 +2450,17 @@ function renderCap(){
   $('capBody').innerHTML=h;const ni=$('capNameIn');if(ni)ni.value=c.name;
 }
 $('capTabs').addEventListener('click',e=>{const b=e.target.closest('button[data-ctab]');if(b){CAPR.tab=b.dataset.ctab;renderCap()}});
-$('capClose').addEventListener('click',()=>{if(ship.dockCap&&ship.state==='docked')capUndock();else closeCap()});
+$('capClose').addEventListener('click',()=>{if(DR.on&&DR.kind==='capital')closeCap();else if(ship.dockCap&&ship.state==='docked')capUndock();else closeCap()});
 $('capBody').addEventListener('click',e=>{
   const b=e.target.closest('button[data-cact]');if(!b)return;const c=st.capital,a=b.dataset.cact;
   if(a==='rename'){c.name=clean($('capNameIn').value,24)||c.name;toast(`Capital ship renamed: ${c.name}.`)}
   else if(a==='paint'){c.paint=CAP_PAINTS[+b.dataset.i];if(CAPR.here){const p=CAPR.group.position.clone(),q=CAPR.group.quaternion.clone();clearCapital();const g=buildCapital(c.cls,c.paint);g.position.copy(p);g.quaternion.copy(q);scene.add(g);g.updateMatrixWorld(true);CAPR.group=g;CAPR.here=true}}
-  else if(a==='jump')capJump();
+  else if(a==='walk')walkAboardCapital();
+  else if(a==='jump'){if(DR.on&&DR.kind==='capital')exitCapInterior(true);capJump()}
   else if(a==='dismiss'){for(const n of npcs.filter(n=>n.escort))scene.remove(n.group);npcs=npcs.filter(n=>!n.escort);boom(CAPR.group.position,90,'#bfe6ff',.9);clearCapital();closeCap();toast(`${c.name} jumped away. Press K to summon it.`)}
   else if(a==='workshop'){closeCap();toggleUpg()}
   else if(a==='craft'){closeCap();toggleCraft()}
-  else if(a==='exp')sendExpedition(+b.dataset.d);
+  else if(a==='exp'){if(DR.on&&DR.kind==='capital')exitCapInterior(true);sendExpedition(+b.dataset.d)}
   else if(a==='collect')collectExpedition();
   else if(a==='upg'){const lv=c.upg[b.dataset.k]||0,cost=4000*(lv+1),nan=200*(lv+1);if(lv<3&&inv.units>=cost&&inv.nanites>=nan){inv.units-=cost;inv.nanites-=nan;c.upg[b.dataset.k]=lv+1;if(b.dataset.k==='armor')c.hull=capMax();toast(`${CAP_UPG.find(u=>u.key===b.dataset.k).name} upgraded.`)}}
   Sound.blip(600,.12,'triangle',.1);save();renderCap();
@@ -3199,7 +3202,7 @@ function updateEnv(){
   if(Sound.ctx){Sound.set(Sound.windG.gain,(st.mode==='foot'?.05+a2*.05:a2*.06*(ship.speed/300))+WX.I*a2*.24,.4);if(WX.I<.02)Sound.set(Sound.windF.frequency,300+Math.sin(time*.3)*120,.5)}
   if(!P.discovered&&alt<P.radius*.35){P.discovered=true;const key=`P:${P.sysSeed}:${P.idx}`;
     if(!discover(key,`Planet discovered: ${P.name} · ${P.biome.label}`))toast(`Entering ${P.name}`)}
-  if(st.mode==='derelict'){sunLight.intensity=.1;hemi.intensity=.14}
+  if(st.mode==='derelict'){sunLight.intensity=DR.kind==='capital'?.25:.1;hemi.intensity=DR.kind==='capital'?.42:.14}
   // pain vignette
   const danger=st.mode==='foot'&&(player.suit<15||player.health<40);
   $('vignette').style.boxShadow=`inset 0 0 160px rgba(255,40,70,${danger?.45+Math.sin(time*5)*.15:0})`;
@@ -3369,8 +3372,8 @@ function buildFreighter(rand){
 // interior layout, in the interior group's frame (floor at y=0)
 const DR={on:false,pos:new V3(),yaw:0,pitch:0,ig:null,rects:[],items:[],cells:0,vaultOpen:false,door:null,lights:[],rad:null,prompt:'',tgt:'',near:null,inRad:false,seed:0};
 function interiorRects(vaultOpen){
-  const r=[{x:0,z:-96,hx:6,hz:6,name:'Airlock'},{x:0,z:0,hx:2,hz:90.5,name:'Corridor'}];
-  const zs=[-70,-35,0,35,70];for(const z of zs)for(const s of [-1,1]){r.push({x:s*11,z,hx:6,hz:6,room:true,side:s});r.push({x:s*3.5,z,hx:1.6,hz:1.8})}
+  const r=[{x:0,z:-96,hx:6,hz:6,name:'Airlock'},{x:0,z:0,hx:2,hz:91.5,name:'Corridor'}];
+  const zs=[-70,-35,0,35,70];for(const z of zs)for(const s of [-1,1]){r.push({x:s*11,z,hx:6,hz:6,room:true,side:s});r.push({x:s*3.5,z,hx:2.5,hz:1.8})}
   if(vaultOpen)r.push({x:0,z:96,hx:6,hz:6,name:'Vault'});
   return r;
 }
@@ -3440,6 +3443,7 @@ const freighterAirlock=()=>freighter.group.localToWorld(freighter.group.userData
 const freighterNear=()=>!!freighter&&st.mode==='ship'&&ship.state==='flying'&&ship.group.position.distanceTo(freighterAirlock())<160;
 function anomalyNear(){if(st.mode!=='ship'||ship.state!=='flying')return null;for(const a of anomalies)if(a.kind==='monolith'&&ship.group.position.distanceTo(a.group.position)<160&&!looted(a.key))return a;return null}
 function boardFreighter(){
+  DR.kind='derelict';
   if(!freighter)return;
   if(!freighter.int){freighter.int=buildInterior(freighter.seed);freighter.group.add(freighter.int.ig)}
   const I=freighter.int;DR.on=true;DR.items=I.items;DR.lights=I.lights;DR.ig=I.ig;DR.vaultOpen=looted(`V:${freighter.seed}:door`);DR.rects=interiorRects(DR.vaultOpen);DR.cells=0;DR.inRad=false;
@@ -3457,7 +3461,8 @@ function leaveFreighter(){
 }
 function drInside(x,z,m=.35){return DR.rects.some(r=>Math.abs(x-r.x)<r.hx-m&&Math.abs(z-r.z)<r.hz-m)}
 function updateDerelict(dt){
-  if(!freighter||!DR.on){leaveFreighter();return}
+  const capInt=DR.kind==='capital';
+  if(!DR.on||!DR.ig||(!capInt&&!freighter)||(capInt&&!CAPR.group)){if(capInt)exitCapInterior(true);else leaveFreighter();return}
   const sens=.0022;DR.yaw-=mouseDX*sens;DR.pitch=clamp(DR.pitch-mouseDY*sens,-1.4,1.4);
   let mf=((keys.KeyW||keys.ArrowUp)?1:0)-((keys.KeyS||keys.ArrowDown)?1:0)+touchMove.y,ms=((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0)+touchMove.x;
   const len=Math.hypot(mf,ms);if(len>1){mf/=len;ms/=len}
@@ -3472,24 +3477,30 @@ function updateDerelict(dt){
   const up=new V3(0,1,0).applyQuaternion(qf);player.fwd.set(fx,0,fz).applyQuaternion(qf);DR.up=up;
   // emergency lights follow the nearest rooms, flickering
   const near=DR.rects.filter(r=>r.room||r.name).sort((a,b)=>Math.hypot(a.x-DR.pos.x,a.z-DR.pos.z)-Math.hypot(b.x-DR.pos.x,b.z-DR.pos.z));
-  DR.lights.forEach((L,i)=>{const r=near[i];if(!r){L.visible=false;return}L.visible=true;L.position.set(r.x,4.2,r.z);L.intensity=(r===DR.rad?.9:1.1)*(Math.random()<.04?.2:1);L.color.set(r===DR.rad?'#7aff5a':'#ff8a5a')});
+  if(capInt)DR.lights.forEach((L,i)=>{const r=near[i];if(!r){L.visible=false;return}L.visible=true;L.position.set(r.x,4.2,r.z);L.intensity=.85});
+  else DR.lights.forEach((L,i)=>{const r=near[i];if(!r){L.visible=false;return}L.visible=true;L.position.set(r.x,4.2,r.z);L.intensity=(r===DR.rad?.9:1.1)*(Math.random()<.04?.2:1);L.color.set(r===DR.rad?'#7aff5a':'#ff8a5a')});
   // radiation, life support
-  const R=DR.rad,inRad=R&&Math.abs(DR.pos.x-R.x)<R.hx&&Math.abs(DR.pos.z-R.z)<R.hz;
+  const R=DR.rad,inRad=!capInt&&R&&Math.abs(DR.pos.x-R.x)<R.hx&&Math.abs(DR.pos.z-R.z)<R.hz;
   if(inRad&&!DR.inRad)toast('Radiation leak! Grab what you can and get out.','bad');DR.inRad=inRad;
-  player.suit=Math.max(0,player.suit-(inRad?3:.45)*(tech('lining')?.6:1)*dt);if(inRad)player.health-=2.5*dt;
-  if(player.suit<=0)player.health-=7*dt;if(player.health<=0){player.health=60;player.suit=50;leaveFreighter();toast('You blacked out and your suit dragged you back to the ship.','bad')}
+  if(capInt){player.suit=Math.min(100,player.suit+5*dt);player.health=Math.min(100,player.health+4*dt)}
+  else player.suit=Math.max(0,player.suit-(inRad?3:.45)*(tech('lining')?.6:1)*dt);if(inRad)player.health-=2.5*dt;
+  if(!capInt&&player.suit<=0)player.health-=7*dt;if(!capInt&&player.health<=0){player.health=60;player.suit=50;leaveFreighter();toast('You blacked out and your suit dragged you back to the ship.','bad')}
   // nearest interactable
   DR.near=null;DR.prompt='';DR.tgt='';let bd=2.8;
   for(const it of DR.items){if(it.done&&it.kind!=='hatch'&&it.kind!=='vaultdoor')continue;if(it.kind==='vaultdoor'&&DR.vaultOpen)continue;if(it.kind==='vault'&&!DR.vaultOpen)continue;
     const d=Math.hypot(it.pos.x-DR.pos.x,it.pos.z-DR.pos.z);if(d<bd){bd=d;DR.near=it}}
   const it=DR.near;
-  if(it){const k={crate:['Salvage crate','Open'],cell:['Power cell','Take'],log:['Captain\'s log','Read'],vaultdoor:['Vault door',DR.cells>=2?'Insert power cells':`Needs 2 power cells (${DR.cells}/2)`],vault:['Captain\'s vault','Open'],hatch:['Airlock hatch','Leave the freighter']}[it.kind];
+  if(it&&capInt){const k=it.kind==='crew'?[it.crew.name,'Talk']:CAP_PROMPTS[it.kind];DR.tgt=k[0];DR.prompt=`<span class="k">E</span>${k[1]}`}
+  else if(it){const k={crate:['Salvage crate','Open'],cell:['Power cell','Take'],log:['Captain\'s log','Read'],vaultdoor:['Vault door',DR.cells>=2?'Insert power cells':`Needs 2 power cells (${DR.cells}/2)`],vault:['Captain\'s vault','Open'],hatch:['Airlock hatch','Leave the freighter']}[it.kind];
     DR.tgt=k[0];DR.prompt=`<span class="k">E</span>${k[1]}`}
   for(const x of DR.items)if(x.kind==='cell'&&!x.done)x.mesh.rotation.y+=dt*1.5;
+  if(capInt&&CAPR.int){CAPR.int.globe.rotation.y+=dt*.6;for(const x of DR.items)if(x.kind==='crew')x.mesh.position.y=Math.sin(time*1.3+x.pos.x)*.03;
+    const rm=CAP_ROOMS.find(r=>r.name&&Math.abs(DR.pos.x-r.x)<r.hx&&Math.abs(DR.pos.z-r.z)<r.hz&&r.room);if(rm&&rm!==DR.lastRoom){DR.lastRoom=rm;toast(rm.name)}}
 }
 const LOG_LINES=['Day 41. The jump drive failed again. The crew blames the cargo.','We should never have taken the contract from the Vael Syndicate.','Reactor shielding is cracking in bay 4. I sealed it, but the readings keep climbing.','Pirates have been shadowing us for three systems. We go dark tonight.','Whoever finds this: the vault code is wired to the power cells. Take what you need.','The navigator swears the stars outside moved on their own last night.'];
 function derelictInteract(){
   const it=DR.near;if(!it)return;
+  if(DR.kind==='capital'){capInteract(it);return}
   if(it.kind==='hatch'){leaveFreighter();return}
   if(it.kind==='crate'){it.done=true;it.mesh.visible=false;markLooted(it.key);
     const l={units:ri(80,220)*(it.rich?2:1),ferrite:ri(5,20),cobalt:ri(2,8),nanites:ri(10,30)*(it.rich?2:1),aurium:Math.random()<(it.rich?.8:.35)?ri(1,3):0};giveLoot(l);
@@ -3538,6 +3549,101 @@ function communeMonolith(a){
   toast(`The monolith hums. Images of ${words[Math.floor(rand()*words.length)]} flood your visor.`,'big');
   setTimeout(()=>discover(a.key+':d','Echo monolith deciphered · +1 relic · +200 Nanites'),1200);
 }
+
+/* ---------- walking around inside your capital ship ---------- */
+const CAP_INT_H={courier:28,carrier:18,dread:36};
+const CAP_ROOMS=[
+  {x:-10,z:0,hx:6,hz:8,room:true,name:'Hangar deck'},{x:0,z:0,hx:2,hz:74,name:'Main corridor'},
+  {x:0,z:-80,hx:8,hz:8,room:true,name:'Bridge'},{x:0,z:80,hx:8,hz:7,room:true,name:'Trophy hall'},
+  {x:10,z:-36,hx:6,hz:6,room:true,name:'Engineering'},{x:3.5,z:-36,hx:2.5,hz:1.8},
+  {x:-10,z:-36,hx:6,hz:6,room:true,name:'Fabrication bay'},{x:-3.5,z:-36,hx:2.5,hz:1.8},
+  {x:-10,z:36,hx:6,hz:6,room:true,name:'Operations'},{x:-3.5,z:36,hx:2.5,hz:1.8},
+  {x:10,z:36,hx:6,hz:6,room:true,name:'Crew quarters'},{x:3.5,z:36,hx:2.5,hz:1.8},
+  {x:-3.5,z:0,hx:2.5,hz:2.4},
+];
+function buildRectRooms(ig,rects,mats,H){
+  for(const R of rects){
+    const fl=new THREE.Mesh(new THREE.BoxGeometry(R.hx*2,.2,R.hz*2),mats.floor);fl.position.set(R.x,-.1,R.z);ig.add(fl);
+    const ce=new THREE.Mesh(new THREE.BoxGeometry(R.hx*2,.2,R.hz*2),mats.ceil);ce.position.set(R.x,H+.1,R.z);ig.add(ce);
+    if(R.room||R.name){const l=new THREE.Mesh(new THREE.BoxGeometry(Math.min(4,R.hx*1.2),.08,.4),mats.strip);l.position.set(R.x,H-.05,R.z);ig.add(l)}
+    for(const side of ['x+','x-','z+','z-']){
+      const alongX=side[0]==='z',line=side==='x+'?R.x+R.hx:side==='x-'?R.x-R.hx:side==='z+'?R.z+R.hz:R.z-R.hz;
+      const lo=alongX?R.x-R.hx:R.z-R.hz,hi=alongX?R.x+R.hx:R.z+R.hz;let segs=[[lo,hi]];
+      for(const O of rects){if(O===R)continue;
+        const crosses=alongX?(O.z-O.hz<line-.01&&O.z+O.hz>line+.01):(O.x-O.hx<line-.01&&O.x+O.hx>line+.01);if(!crosses)continue;
+        const a=alongX?O.x-O.hx:O.z-O.hz,b=alongX?O.x+O.hx:O.z+O.hz;
+        segs=segs.flatMap(([s0,s1])=>{const out=[];if(a>s0)out.push([s0,Math.min(a,s1)]);if(b<s1)out.push([Math.max(b,s0),s1]);return out.filter(([u,v])=>v-u>.05)})}
+      for(const [s0,s1] of segs){const len=s1-s0,mid=(s0+s1)/2;const w=new THREE.Mesh(new THREE.BoxGeometry(alongX?len:.3,H,alongX?.3:len),mats.panel);w.position.set(alongX?mid:line,H/2,alongX?line:mid);ig.add(w);
+        const tr=new THREE.Mesh(new THREE.BoxGeometry(alongX?len:.32,.12,alongX?.32:len),mats.trim);tr.position.set(alongX?mid:line,1.1,alongX?line:mid);ig.add(tr)}
+    }
+  }
+}
+function buildCapInterior(cls){
+  const H=5,ig=new THREE.Group();ig.position.set(0,-CAP_INT_H[cls]/2+3,0);
+  const mats={panel:new THREE.MeshPhongMaterial({color:'#c9cfdc',flatShading:true,shininess:40}),floor:new THREE.MeshPhongMaterial({color:'#5a6070',flatShading:true}),
+    ceil:new THREE.MeshPhongMaterial({color:'#8a92a4',flatShading:true}),strip:new THREE.MeshBasicMaterial({color:'#bfe6ff'}),trim:new THREE.MeshBasicMaterial({color:st.capital.paint.hull})};
+  buildRectRooms(ig,CAP_ROOMS,mats,H);
+  const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);ig.add(m);return m};
+  const dark=new THREE.MeshPhongMaterial({color:'#2a2d3e',flatShading:true}),holo=new THREE.MeshBasicMaterial({color:'#7fe0ff',transparent:true,opacity:.55}),screen=new THREE.MeshPhongMaterial({color:'#10202a',emissive:'#2a8ab0'});
+  const term=(x,z,rot=0)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;ig.add(g);const a=new THREE.Mesh(new THREE.BoxGeometry(1,1.1,.6),dark);a.position.y=.55;g.add(a);const s=new THREE.Mesh(new THREE.BoxGeometry(.9,.6,.08),screen);s.position.set(0,1.35,-.15);s.rotation.x=-.4;g.add(s);return g};
+  // bridge: viewport, helm, chair
+  const stars=document.createElement('canvas');stars.width=512;stars.height=128;const sg=stars.getContext('2d');sg.fillStyle='#03040b';sg.fillRect(0,0,512,128);for(let i=0;i<260;i++){sg.fillStyle=`rgba(255,255,255,${Math.random()})`;sg.fillRect(Math.random()*512,Math.random()*128,1.4,1.4)}
+  add(new THREE.PlaneGeometry(15,3.4),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(stars)}),0,2.8,-87.8);
+  add(new THREE.CylinderGeometry(1.6,1.8,1,16),dark,0,.5,-80);const globe=add(new THREE.SphereGeometry(1.1,16,10),holo,0,2.2,-80);
+  add(new THREE.BoxGeometry(1.2,1.2,1.2),dark,0,.6,-74);add(new THREE.BoxGeometry(1.2,1.4,.25),dark,0,1.3,-73.4);
+  term(-5,-84,0);term(5,-84,0);
+  // engineering, fabrication, operations
+  term(14,-36,-Math.PI/2);add(new THREE.CylinderGeometry(1.4,1.4,4,12),new THREE.MeshPhongMaterial({color:'#3a3f50',emissive:'#1a4a7a'}),12,2,-40);
+  term(-14,-36,Math.PI/2);add(new THREE.BoxGeometry(2.4,1.2,1.6),dark,-11,.6,-40);add(new THREE.BoxGeometry(2,.1,1.2),holo,-11,1.3,-40);
+  term(-14,36,Math.PI/2);add(new THREE.BoxGeometry(4,.9,2.4),dark,-9,.45,36);add(new THREE.BoxGeometry(3.6,.05,2),holo,-9,.95,36);
+  // quarters: bunks
+  for(const z of [32,40])add(new THREE.BoxGeometry(2.2,.5,1),new THREE.MeshPhongMaterial({color:'#4a5a7a'}),14,.6,z);
+  // hangar: exit terminal
+  term(-14.5,0,Math.PI/2);add(new THREE.BoxGeometry(.1,3,6),new THREE.MeshBasicMaterial({color:'#ffb45e'}),-15.9,1.8,0);
+  // trophy hall: relic pedestals lit by how many relics you hold
+  const relicMat=new THREE.MeshPhongMaterial({color:'#f0dca8',emissive:'#6a4a10'});const relics=[];
+  for(let i=0;i<6;i++){const x=-5+i*2;add(new THREE.CylinderGeometry(.4,.5,1,8),dark,x,.5,84);const r=add(new THREE.TorusGeometry(.35,.1,6,14),relicMat,x,1.5,84);r.visible=i<(inv.relics||0);relics.push(r)}
+  term(0,76.5,Math.PI);
+  // crew members
+  const crew=[{name:'Pilot Ines Varro',role:'pilot',x:-3,z:-77,c:'#9fe6ff'},{name:'Chief Engineer Dax Oru',role:'engineer',x:8,z:-33,c:'#ffb45e'},{name:'Quartermaster Lio Senn',role:'quarter',x:-8,z:39,c:'#8af0b4'},{name:'Navigator Teo Ashby',role:'navigator',x:9,z:38,c:'#d7b6ff'}];
+  const items=[
+    {kind:'helm',pos:new V3(0,1,-80),key:''},{kind:'workshop',pos:new V3(14,1,-36),key:''},{kind:'fab',pos:new V3(-14,1,-36),key:''},
+    {kind:'expedition',pos:new V3(-14,1,36),key:''},{kind:'trophy',pos:new V3(0,1,76.5),key:''},{kind:'exitcap',pos:new V3(-14.5,1,0),key:''},
+  ];
+  for(const m of crew){const a=buildAstro(m.c);a.position.set(m.x,0,m.z);a.rotation.y=Math.random()*6.28;ig.add(a);items.push({kind:'crew',pos:new V3(m.x,1,m.z),mesh:a,crew:m,key:''})}
+  const lights=[0,1,2].map(()=>{const L=new THREE.PointLight('#dff2ff',1.3,26,1.4);ig.add(L);return L});
+  return{ig,items,rects:CAP_ROOMS,lights,globe,relics};
+}
+function walkAboardCapital(){
+  if(!CAPR.group||!(ship.dockCap&&ship.state==='docked'))return;
+  if(!CAPR.int||CAPR.intCls!==st.capital.cls){if(CAPR.int)CAPR.group.remove(CAPR.int.ig);CAPR.int=buildCapInterior(st.capital.cls);CAPR.intCls=st.capital.cls;CAPR.group.add(CAPR.int.ig)}
+  const I=CAPR.int;I.relics.forEach((r,i)=>r.visible=i<(inv.relics||0));
+  Object.assign(DR,{on:true,kind:'capital',items:I.items,lights:I.lights,ig:I.ig,rects:I.rects,rad:null,inRad:false,cells:0});
+  DR.pos.set(-10,1.7,2);DR.yaw=-Math.PI/2;DR.pitch=0;
+  closeCap();st.mode='derelict';flashlight.visible=false;tool.visible=false;
+  toast(`You step off your ship onto the ${st.capital.name}'s hangar deck.`,'big');
+  setTimeout(()=>toast('The bridge is forward, the trophy hall aft. Talk to your crew with E.'),2200);
+}
+function exitCapInterior(silent){
+  DR.on=false;DR.kind=null;st.mode='ship';flashlight.visible=false;
+  if(CAPR.group&&ship.dockCap){ship.state='docked';if(!silent)openCap('hangar')}else{ship.state='flying';ship.dockCap=false}
+}
+const CREW_LINES={
+  pilot:()=>{const c=st.capital;return c.jumpAt>Date.now()?`"The capital drive needs ${Math.ceil((c.jumpAt-Date.now())/1000)} more seconds, Captain."`:'"Drive is charged. Say the word at the helm and we jump."'},
+  engineer:()=>{const c=st.capital,next=CAP_UPG.find(u=>(c.upg[u.key]||0)<3);return next?`"Give me ${(4000*((c.upg[next.key]||0)+1)).toLocaleString()} units and I can refit the ${next.name.toLowerCase()}."`:'"Every system aboard is maxed out. She is a beauty."'},
+  quarter:()=>{const e=st.capital.exped;return e?(e.until>Date.now()?`"The expedition team is still out there."`:'"The haul is in! Collect it at the operations console."'):`"The holds are empty, Captain. Send us out on an expedition."`},
+  navigator:()=>{const w=warNow();return w.ceasefire?'"Quiet out there. A ceasefire holds between the factions."':`"Reports say the ${FN(w.a)} and the ${FN(w.b)} are at war. Mind which systems we jump into."`},
+};
+function capInteract(it){
+  if(it.kind==='exitcap'){exitCapInterior();return}
+  if(it.kind==='helm'){openCap('bridge');return}
+  if(it.kind==='workshop'){toggleUpg();return}
+  if(it.kind==='fab'){toggleCraft();return}
+  if(it.kind==='expedition'){openCap('expeditions');return}
+  if(it.kind==='trophy'){toast(`Trophy log: ${kills} ships destroyed · ${st.disc.size} discoveries · ${inv.relics} relics aboard · ${st.systems} systems visited.`,'big');return}
+  if(it.kind==='crew'){it.mesh.lookAt(it.mesh.parent.localToWorld(new V3(DR.pos.x,0,DR.pos.z)));toast(`${it.crew.name}: ${CREW_LINES[it.crew.role]()}`);Sound.blip(420,.1,'sine',.08)}
+}
+const CAP_PROMPTS={exitcap:['Hangar terminal','Return to your ship'],helm:['Holo helm','Command the ship'],workshop:['Engineering terminal','Ship workshop'],fab:['Fabricator','Craft'],expedition:['Operations console','Expeditions'],trophy:['Trophy log','Read']};
 
 /* ---------- HUD ---------- */
 const mk=$('marks'),mctx=mk.getContext('2d');
@@ -3653,6 +3759,7 @@ function drawMarkers(){
   }
 }
 function objective(){
+  if(st.mode==='derelict'&&DR.kind==='capital')return `Aboard the ${st.capital.name} · bridge forward, trophy hall aft · talk to your crew · the hangar terminal takes you back to your ship`;
   if(st.mode==='derelict')return DR.vaultOpen?(looted(`V:${freighter.seed}`)?'Vault looted. Head back to the airlock hatch to leave':'The vault is open. Claim its contents at the far end'):`Derelict ${freighter?freighter.name:''} · power cells ${DR.cells}/2 for the captain's vault · life support drains here`;
   if(st.mode==='foot'&&WX.state==='storm'&&WX.I>.3&&!WX.shelter)return `${WX.W.name}! Life support drains ${WX.drainMul.toFixed(1)}× faster. Shelter under a roof or in your ship${WX.crystals.length?' · storm crystals glow nearby':''}`;
   if(WX.state==='warn'&&WX.I<.05&&st.mode==='foot')return `${WX.W.name} in ${Math.ceil(WX.inSec)} s · head for shelter`;
