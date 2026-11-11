@@ -170,7 +170,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--amber); out
       <p>You are a compy, a dinosaur about the size of a chicken, trying to make it in the big town. Get a job, try not to get fired, stay out of jail, find a home, fall in love, hatch some eggs, and pray no tree lands on your roof.</p>
       <div class="field"><label for="nameIn">Your compy's name</label><input id="nameIn" maxlength="16" value="Chomp" autocomplete="off"></div>
       <div class="row"><button class="btn" id="newBtn" type="button">Start a new life</button><button class="btn alt" id="contBtn" type="button" hidden>Continue</button><button class="btn alt" id="helpBtn" type="button">How to play</button></div>
-      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare (half the time nobody sees). Weapons from the black market: F to use, Q to switch. On a phone, drag on the left to move and tap ENTER.</p>
+      <p style="font-size:13px"><b style="color:var(--bone)">Move</b> with WASD or arrows. Walk up to a glowing door and press <b style="color:var(--bone)">E</b> to go inside any building. Press <b style="color:var(--bone)">E</b> next to a car to drive it (H honks). Buy your own at Dino Motors, or steal one if you dare (you usually get spotted, and the police are fast). Weapons from the black market: F to use, Q to switch. On a phone, drag on the left to move and tap ENTER.</p>
       <p class="err" id="loadErr" hidden>The 3D engine did not load. Check your connection and reload the page.</p>
     </div>
   </div>
@@ -843,7 +843,7 @@ function sleep(quality) {
 }
 // bills, eggs, relationships and random events every morning
 function dayRollover(slept) {
-  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); seasonDaily(); rollWeather(); farmDaily(); marketDaily(); bizDaily(); morningTexts(); if (has('fish')) S.happy += 3;
+  S.workedToday = false; S.flood = false; S.trexAt = null; setFlood(false); if (S.fit) S.fit = Math.max(0, S.fit - 1); seasonDaily(); heatDaily(); rollWeather(); farmDaily(); marketDaily(); bizDaily(); morningTexts(); if (has('fish')) S.happy += 3;
   if (trex) { scene.remove(trex.m.root); trex = null; }
   if (chase) { const l = chase.loot, st = chase.cars || []; endChase(); if (l) goal('heist'); if (st.length) goal('carthief'); log(`The police gave up for the night. You keep ${l ? money$(l) : 'the car'}.`, 'good'); }
   refillParking();
@@ -1048,7 +1048,7 @@ const MENUS = {
     { label: 'Buy a first aid kit', detail: injOf() ? (injOf().sick ? `Medicine cures your ${injOf().name.toLowerCase()}.` : `Bandages heal your ${injOf().name.toLowerCase()} a day faster.`) : 'For bumps, sniffles and scrapes.', why: injOf() ? '' : 'You are not hurt or sick.', cost: 12, mins: 10, fn: () => { const I = injOf(); if (I.sick || S.injury.days <= 1) healAll(`You feel much better. ${I.name} gone!`); else { S.injury.days--; log(`Bandaged up. ${S.injury.days} more day${S.injury.days > 1 ? 's' : ''} to heal.`, 'good'); } } },
     { label: 'Buy groceries', detail: '4 home-cooked meals', cost: 25, mins: 20, fn: () => { S.groceries += 4; } },
     { label: 'Grab a snack', detail: '+20 hunger right now', cost: 6, mins: 5, fn: () => { S.hunger = Math.min(100, S.hunger + 20); } },
-    { label: 'Shoplift groceries', detail: 'Free if nobody sees. 35% chance of 2 days in jail.', tag: 'Crime', risky: true, mins: 10, fn: () => { if (Math.random() < 0.35) arrest(2, 'The store guard saw you stuff a melon in your pouch.'); else { S.groceries += 4; log('You walked out with free groceries. Your heart is pounding.', 'warn'); } } },
+    { label: 'Shoplift groceries', detail: 'Free if nobody sees. 65% chance of 3 days in jail.', tag: 'Crime', risky: true, mins: 10, fn: () => { if (Math.random() < 0.65) arrest(3, 'The store guard saw you stuff a melon in your pouch.'); else { S.groceries += 4; log('You walked out with free groceries. Your heart is pounding.', 'warn'); } } },
   ] } : { sub: closedMsg(7, 22), acts: [] },
   burger: () => {
     const acts = [];
@@ -1192,7 +1192,7 @@ const MENUS = {
     }
     if (!hot.length) acts.push({ label: 'Sell a stolen car', detail: '', why: 'You have no stolen car. Borrow one from the street, lose the cops, and park it next to the manhole.', fn: () => {} });
     for (const [k, W0] of Object.entries(WEAPONS)) acts.push({ label: W0.consumable ? `Buy 3 ${W0.name.toLowerCase()}s` : `Buy a ${W0.name}${W0.elite ? ' (top grade)' : ''}`, detail: W0.blurb, cost: W0.consumable ? W0.price * 3 : W0.price, why: !W0.consumable && S.weapons && S.weapons[k] ? 'You already own one.' : '', fn: () => buyWeapon(k) });
-    acts.push({ label: 'Buy a lockpick', detail: 'Raises the odds nobody sees you take a car from 50% to 75%.', cost: 300, why: S.lockpick ? 'You already have one.' : '', fn: () => { S.lockpick = true; log('You pocket a lockpick. Very sneaky.', 'warn'); } });
+    acts.push({ label: 'Buy a lockpick', detail: 'Raises the odds nobody sees you take a car from 20% to 40%.', cost: 300, why: S.lockpick ? 'You already have one.' : '', fn: () => { S.lockpick = true; log('You pocket a lockpick. Very sneaky.', 'warn'); } });
     acts.push({ label: 'Eat sewer stew', detail: '+30 hunger. Nobody knows what is in it.', cost: 4, mins: 15, fn: () => { S.hunger = Math.min(100, S.hunger + 30); if (Math.random() < 0.3) { S.energy -= 15; log('The stew fought back.', 'bad'); } } });
     return { title: 'The Black Market', sub: 'Lanterns, crates and a dealer who never takes off his sunglasses. Nobody asks questions down here.', acts };
   },
@@ -1691,13 +1691,13 @@ function addCop(x, y) {
   const m = makeCompy({ body: '#3a5a9a', belly: '#c8d6f2', dark: '#1f3060', stripe: '#1f3060' }, { hat: '#1f2f5a', legs: 1.25 });
   const lr = add(m.head, GEO.s, SIREN_R, 0.05, 1.3, 0.2, 0.22, 0.2, 0.22), lb = add(m.head, GEO.s, SIREN_B, 0.05, 1.3, -0.2, 0.22, 0.2, 0.22);
   m.root.scale.setScalar(15 / 1.25); scene.add(m.root);
-  chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(110, 125) });
+  chase.cops.push({ m, lr, lb, x, y, face: 0, t: Math.random() * 9, speed: rand(150, 172) + (chase.heat || 1) * 5 });
 }
 function startChase(loot, car, reason) {
   chase = { cops: [], loot, reason, cars: car ? [car] : [], t: 0, lostT: 0, hideT: 0, seen: false, sirenT: 0, spawnT: 8 };
   if (car) car.stolen = true;
   const far = INTERSECTIONS.filter(([x, y]) => Math.hypot(x - P.x, y - P.y) > 260).sort((a, b) => Math.hypot(a[0] - P.x, a[1] - P.y) - Math.hypot(b[0] - P.x, b[1] - P.y));
-  chase.queue = 3; chase.queueT = 0.6; void far;
+  chase.heat = Math.min(4, 1 + (loot >= 1000 ? 1 : 0) + (loot >= 10000 ? 1 : 0) + (loot >= 100000 ? 1 : 0)); chase.queue = 3 + chase.heat; chase.queueT = 0.6; chase.blockT = 5; void far;
   shake = 8;
   if (car) { queueEvent({ kind: 'bad', tag: 'Car theft', title: 'Somebody saw you!', sound: 'siren', text: `A neighbor spotted you hot-wiring the ${COLOR_NAMES[car.color]} car and called the police. Lose the police dinos, or ditch the car and hide in a building. Get away and the car is yours to sell at the black market under the manhole.`, buttons: [{ label: 'Floor it!' }] }); return; }
   if (reason === 'assault') { queueEvent({ kind: 'bad', tag: 'Wanted', title: 'Somebody called the police!', sound: 'siren', text: 'A passer-by did not appreciate being pelted. Police dinos are on the way. Lose them or hide inside a building.', buttons: [{ label: 'Run!' }] }); return; }
@@ -1717,6 +1717,7 @@ function bust(why) {
 }
 function escapeChase(why) {
   const loot = chase.loot, stolen = chase.cars || [], reasonOf = chase.reason; endChase();
+  addHeat(loot, stolen.length);
   if (loot) goal(reasonOf === 'holdup' ? 'holdup' : 'heist'); if (stolen.length) goal('carthief'); S.happy += 10;
   const keep = [loot ? `all ${money$(loot)}` : '', stolen.length ? `the stolen ${stolen.length > 1 ? 'cars' : 'car'}` : ''].filter(Boolean).join(' and ');
   queueEvent({ kind: 'good', tag: reasonOf === 'holdup' ? 'Hold-up' : reasonOf === 'assault' ? 'Wanted' : loot ? 'Heist' : 'Car theft', title: 'You got away!', sound: 'goal', text: `${why}${keep ? ` You keep ${keep}.` : ' The police lost your trail.'}${stolen.length ? ' The shady dealer down the manhole on the south road pays cash for hot cars.' : ' Maybe lie low for a while.'}` });
@@ -1724,18 +1725,21 @@ function escapeChase(why) {
 function chaseEnteredBuilding(id) {
   if (!chase) return;
   chase.hideT = 0;
-  chase.seen = id === 'bank' || chase.cops.some(c => Math.hypot(c.x - P.x, c.y - P.y) < 170);
+  chase.seen = id === 'bank' || chase.cops.some(c => Math.hypot(c.x - P.x, c.y - P.y) < 320);
+  chase.searched = false;
   chase.door = PLACES[id].door;
 }
+const LOSE_T = 15, HIDE_T = 20;
 function updateChase(dt) {
   chase.t += dt; chase.sirenT -= dt;
-  if (chase.queue > 0) { chase.queueT -= dt; if (chase.queueT <= 0) { chase.queue--; chase.queueT = 1.5; addCop(PLACES.police.door.x + rand(-15, 15), PLACES.police.door.y - 12); if (chase.cops.length === 1) log('Police dinos are pouring out of the station!', 'bad'); } }
+  if (chase.queue > 0) { chase.queueT -= dt; if (chase.queueT <= 0) { chase.queue--; chase.queueT = 0.8; addCop(PLACES.police.door.x + rand(-15, 15), PLACES.police.door.y - 12); if (chase.cops.length === 1) log('Police dinos are pouring out of the station!', 'bad'); } }
   if (chase.sirenT <= 0) { chase.sirenT = 1.5; if (!inside) sfx.siren(); }
   if (inside) {
     chase.hideT += dt;
     for (const c of chase.cops) { if (c.stun > 0) { c.stun -= dt; continue; } const dx = chase.door.x - c.x, dy = chase.door.y + 30 - c.y, d = Math.hypot(dx, dy); if (d > 30) { c.x += dx / d * c.speed * 0.6 * dt; c.y += dy / d * c.speed * 0.6 * dt; c.face = Math.atan2(dy, dx); c.t += dt * 2; } collide(c, 9, solids); }
     if (chase.seen && chase.hideT > 2.2) { bust('They saw you duck inside and followed you in.'); return; }
-    if (!chase.seen && chase.hideT > 8) { escapeChase('You hid inside until the sirens faded away.'); return; }
+    if (!chase.searched && chase.cops.some(c => Math.hypot(chase.door.x - c.x, chase.door.y + 30 - c.y) < 40)) { chase.searched = true; if (Math.random() < 0.45) { bust('Police dinos searched the building room by room and found you behind a plant.'); return; } log('Police dinos are searching the building... they walked right past you. Stay still!', 'warn'); }
+    if (!chase.seen && chase.hideT > HIDE_T) { escapeChase('You hid inside until the sirens faded away.'); return; }
     return;
   }
   chase.hideT = 0;
@@ -1744,17 +1748,25 @@ function updateChase(dt) {
     const dx = P.x - c.x, dy = P.y - c.y, d = Math.hypot(dx, dy) || 1;
     if (c.stun > 0) { c.stun -= dt; nearest = Math.min(nearest, d); continue; }
     nearest = Math.min(nearest, d);
-    const sp = c.speed * (driving ? 1.3 : 1);
+    const sp = c.speed * (driving ? 1.75 : 1);
     c.x += dx / d * sp * dt; c.y += dy / d * sp * dt; c.face = Math.atan2(dy, dx); c.t += dt * sp / 90;
     collide(c, 9, solids);
     if (d < (driving ? 40 : 24)) { if (driving) exitCar(true); bust(driving ? 'Police dinos pulled you out of the car.' : 'A police dino tackled you mid-sprint.'); return; }
   }
-  chase.lostT = nearest > 500 ? (chase.t > 8 ? chase.lostT + dt : chase.lostT) : 0;
-  if (chase.lostT > 8) { escapeChase('You lost them in the back streets.'); return; }
+  chase.lostT = nearest > 650 ? (chase.t > 10 ? chase.lostT + dt : chase.lostT) : 0;
+  if (chase.lostT > LOSE_T) { escapeChase('You lost them in the back streets.'); return; }
   chase.spawnT -= dt;
-  if (chase.spawnT <= 0 && chase.cops.length < 5) {
-    chase.spawnT = 10;
+  if (chase.spawnT <= 0 && chase.cops.length < 6 + chase.heat * 2) {
+    chase.spawnT = 6;
     addCop(PLACES.police.door.x, PLACES.police.door.y - 12); log('Backup is leaving the police station!', 'bad');
+  }
+  // roadblocks: police dinos show up at a crossing ahead of you
+  chase.blockT -= dt;
+  if (chase.blockT <= 0 && chase.cops.length < 8 + chase.heat * 2 && !onIsland()) {
+    chase.blockT = Math.max(5, 11 - chase.heat * 1.5);
+    const hx = Math.cos(P.face), hy = Math.sin(P.face);
+    const spots = INTERSECTIONS.filter(([x, y]) => { const d = Math.hypot(x - P.x, y - P.y); return d > 280 && d < 650 && ((x - P.x) * hx + (y - P.y) * hy) / d > 0.3; });
+    if (spots.length) { const [x, y] = pick(spots); addCop(x + rand(-12, 12), y + rand(-12, 12)); addCop(x + rand(-12, 12), y + rand(-12, 12)); log('🚨 Roadblock ahead! Police dinos are cutting you off.', 'bad'); }
   }
 }
 function syncChase() {
@@ -1879,7 +1891,7 @@ function enterCar(c) {
   else if (c.service) log('You climb into the fire truck. Lights on! Press E near the fire to spray it.', 'good');
   else if (c.owned || c.stolen) log(`You get into ${c.owned ? 'your' : 'the stolen'} ${COLOR_NAMES[c.color] || ''} ${carName(c)}. W to drive, A and D to steer, H to honk, E to get out.`, '');
   else if (chase) { c.stolen = true; chase.cars = (chase.cars || []).concat(c); log('You grabbed a car mid-chase. Now they want that too!', 'bad'); }
-  else if (Math.random() < (S.lockpick ? 0.75 : 0.5)) { c.stolen = true; log(S.lockpick ? `Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.` : `You slipped into the ${COLOR_NAMES[c.color]} car. Nobody was looking. It is yours now (sort of).`, 'warn'); }
+  else if (Math.random() < (S.lockpick ? 0.4 : 0.2)) { c.stolen = true; addHeat(0, 1); log(S.lockpick ? `Click. The lockpick opened the ${COLOR_NAMES[c.color]} car and nobody saw a thing.` : `You slipped into the ${COLOR_NAMES[c.color]} car. Nobody was looking. It is yours now (sort of).`, 'warn'); }
   else startChase(0, c);
   if (actx && !muted) {
     const o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
@@ -4246,6 +4258,25 @@ function buildSnowman(t) {
     onDone: (ok, msg) => { if (!ok) { log(msg, 'warn'); return; } S.snowmen = S.snowmen || {}; S.snowmen[t.snow] = S.day; S.happy += 12; goal('snowman'); log(`${msg} You give it a carrot nose and a little top hat.`, 'good'); sfx.goal(); } };
   state = 'mini'; setScreens();
 }
+// detectives: every getaway leaves clues. For a few days you might get tracked down and lose the loot.
+function addHeat(loot, cars) {
+  const h = S.heat || { loot: 0, cars: 0, days: 0 };
+  h.loot += loot || 0; h.cars += cars || 0; h.days = Math.max(h.days, 3 + (loot >= 10000 ? 2 : 0) + (loot >= 250000 ? 2 : 0));
+  S.heat = h;
+}
+function heatDaily() {
+  const h = S.heat; if (!h) return;
+  if (h.days <= 0) { S.heat = null; log('🕵 The detectives closed your case. You are in the clear... for now.', 'good'); return; }
+  const chance = Math.min(0.6, 0.18 + h.cars * 0.05 + Math.log10(1 + h.loot) * 0.06);
+  h.days--;
+  if (Math.random() < chance) {
+    const back = Math.min(Math.max(0, S.money), h.loot), car = h.cars ? cars.find(c => c.stolen && !c.owned) : null;
+    S.money -= back; if (car) { car.stolen = false; car.x = car.hx; car.y = car.hy; car.a = car.ha; car.v = 0; }
+    const days = h.loot >= 100000 ? 10 : h.loot >= 5000 ? 7 : 4;
+    S.heat = null;
+    setTimeout(() => arrest(days, `Detectives followed the clues straight to your door.${back ? ` They took back ${money$(back)}.` : ''}${car ? ' They towed the stolen car back to its owner.' : ''}`), 0);
+  } else if (Math.random() < 0.5) log(pick(['🕵 You spot a detective in a trench coat taking notes across the street...', '🕵 WANTED posters with a blurry compy on them are going up around town.', '🕵 A police dino asks your neighbor some questions about you.']), 'warn');
+}
 function seasonDaily() { if (season() !== 'winter') S.snowmen = {}; }
 // ---- help ----
 const HELP = [
@@ -4256,7 +4287,7 @@ const HELP = [
   ['Staying alive', 'Watch your energy, hunger and happiness. You can get hurt (sprains, broken bones, burns) or sick (colds, flu, tummy aches): heal at Tarpit Hospital or with a first aid kit from Leafy Grocer. You might sleep in some mornings; an alarm clock from Comfy Cave helps. Sleep at home (or the park bench), eat at restaurants or cook groceries, and have fun to stay happy. No home yet? The Second Chance Shelter next to the Job Center has free beds, hot meals and a job counselor. Rent the burrow or buy a home at Nest Estates (a cottage, mansion, treehouse, beach house, farmhouse, or even a castle), or check into the Grand Ptero Hotel for a night. Shop at the Mega Mall (Saturday sale!) for sneakers, sunglasses, a game console or a diamond ring.'],
   ['People', 'Townsfolk hang out all over the map. Chat every day, give gifts they love (flowers, chocolates, plushies), go on dates, propose, hatch eggs, send your kids to Little Claws School, take them to the Jurassic Zoo, and raise them until they leave the nest. Friends text you invites: show up on time!'],
   ['Getting around', 'Buy a car at Dino Motors, steal one (risky), call a taxi from your phone, take the ferry from the beach dock to Volcano Island, or fly a plane from Pterodactyl Airport (buy one at Sky Hangar, or steal one and sell it to the smugglers on the island airstrip). Tap a place on the map to set a waypoint.'],
-  ['Trouble', 'Crimes can get you chased by police dinos who leave from the police station. Lose them, hide in a building, or dive into a dumpster. Stuck in jail? Serve your time, pay bail, or dig a tunnel with a spoon and sneak past the searchlights (once a day). Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
+  ['Trouble', 'Crimes can get you chased by police dinos, and getting away is hard. They are fast, more come the more you steal, and they set up roadblocks ahead of you. Stay 15 seconds out of sight, hide in a building for 20 seconds (they may search it), or dive into a dumpster. Even after you escape, detectives hunt you for a few days and may take the loot back. Stuck in jail? Serve your time, pay bail, or dig a tunnel with a spoon and sneak past the searchlights (once a day). Disasters happen: falling trees, meteors, floods, quakes, T-rex attacks and volcano eruptions.'],
   ['Seasons and events', 'Each week is a season: spring, summer, fall and winter. Every Saturday is the Fern Festival with fireworks. Try bowling at Bone Bowl, skating at the Roller Rink, stargazing at the observatory after dark, or write to friends from Pterodactyl Post. Take mystery cases from the Fossil Museum curator, try the escape room at Dino World, and explore the ancient tomb on Volcano Island (its traps reset every week). Fall has Spooky Night on Friday evening (trick-or-treat at houses). Winter brings snow and snowmen in the town square.'],
 ];
 function showHelp() { $('helpList').innerHTML = HELP.map(([h, t]) => `<div><b>${h}</b><span>${t}</span></div>`).join(''); $('helpScreen').hidden = false; }
@@ -5080,7 +5111,7 @@ function boardPlane(p) {
   if (chase) { log('Not with the police on your tail!', 'bad'); return; }
   if (!p.owned && !p.stolen) {
     p.stolen = true;
-    if (Math.random() < 0.5) { log(`An air traffic controller spotted you climbing into the ${PLANE_MODELS[p.model].name}! A police helicopter is taking off.`, 'bad'); setTimeout(() => { if (flight && flight.p === p) startHeli(); }, 2500); }
+    if (Math.random() < 0.85) { log(`An air traffic controller spotted you climbing into the ${PLANE_MODELS[p.model].name}! A police helicopter is taking off.`, 'bad'); setTimeout(() => { if (flight && flight.p === p) startHeli(); }, 2500); }
     else log('Nobody saw a thing. Time to get this bird in the air.', 'good');
   }
   if (S.pet && S.pet.walking) { S.pet.walking = false; refreshPet(); log(`${S.pet.name} trots home on their own.`, ''); }
@@ -5422,7 +5453,7 @@ function digDumpster(d) {
 }
 function hideInDumpster(d) {
   const nearCop = chase.cops.some(c => Math.hypot(c.x - P.x, c.y - P.y) < 260);
-  dumpHide = { d, t: 0, seen: nearCop && Math.random() < 0.6 };
+  dumpHide = { d, t: 0, seen: Math.random() < (nearCop ? 0.85 : 0.35) };
   P.x = d.x; P.y = d.y; P.vx = P.vy = 0;
   log('You dive into the dumpster and pull the lid shut. Pee-yew. Stay quiet...', 'warn'); sfx.door();
 }
@@ -5431,7 +5462,7 @@ function dumpHideUpdate(dt) {
   P.vx = P.vy = 0; P.x = dumpHide.d.x; P.y = dumpHide.d.y;
   dumpHide.t += dt;
   if (!chase) { dumpHide = null; leaveDumpster(); return true; }
-  if (dumpHide.t > 5) {
+  if (dumpHide.t > 10) {
     const seen = dumpHide.seen; dumpHide = null; leaveDumpster();
     if (seen) arrest(2, 'A police dino lifted the dumpster lid. "Nice try."');
     else { S.happy -= 4; goal('dumpster'); escapeChase('You hid in a dumpster until the sirens faded. You smell terrible, but you are free.'); }
@@ -6379,24 +6410,24 @@ Object.assign(LAYOUTS, {
 // ===== choose your loot: more money, more risk =====
 function lootChoice(place, tiers, onPick) {
   closeMenu();
-  queueEvent({ kind: '', tag: `${place} · how greedy are you?`, title: 'How much will you grab?', text: 'The more you take, the longer it takes, and the more likely someone calls the police.', sound: 'door',
+  queueEvent({ kind: '', tag: `${place} · how greedy are you?`, title: 'How much will you grab?', text: 'The more you take, the longer it takes, and the more likely someone calls the police. The police in this town are fast, and detectives keep hunting thieves for days.', sound: 'door',
     buttons: tiers.map(([amt, safe]) => ({ label: `${money$(amt)} · ${Math.round(safe * 100)}% clean getaway`, alt: true, fn: () => onPick(amt, safe) })).concat([{ label: 'Never mind' }]) });
 }
 holdUpAct = function (min, max) {
   if (!S.equip) return [];
   const mid = Math.round((min + max) / 2 / 10) * 10;
   return [{ label: 'Hold up the register', detail: `Wave your ${WEAPONS[S.equip].name.toLowerCase()} and choose how much to grab: ${money$(min)} up to ${money$(max * 2)}. Grabbing more is riskier.`, tag: 'Crime', risky: true, fn: () => {
-    lootChoice('Hold-up', [[min, 0.75], [mid, 0.55], [max, 0.4], [max * 2, 0.2]], (loot, safe) => {
+    lootChoice('Hold-up', [[min, 0.35], [mid, 0.2], [max, 0.1], [max * 2, 0.04]], (loot, safe) => {
       advance(5); S.money += loot; exitBuilding();
-      if (Math.random() < safe) { goal('holdup'); sfx.coin(); queueEvent({ kind: 'good', tag: 'Hold-up', title: 'Clean getaway!', text: `The clerk handed over ${money$(loot)} and nobody called the police. You strolled off like nothing happened.` }); }
+      if (Math.random() < safe) { goal('holdup'); addHeat(loot, 0); sfx.coin(); queueEvent({ kind: 'good', tag: 'Hold-up', title: 'Clean getaway!', text: `The clerk handed over ${money$(loot)} and nobody called the police. You strolled off like nothing happened.` }); }
       else startChase(loot, null, 'holdup');
     });
   } }];
 };
 function bankRobbery() {
-  lootChoice('Stone Bank vault', [[1000, 0.7], [3000, 0.5], [6000, 0.3], [10000, 0.15], [50000, 0.08], [250000, 0.04], [1000000, 0.01]], (loot, safe) => {
+  lootChoice('Stone Bank vault', [[1000, 0.25], [3000, 0.15], [6000, 0.08], [10000, 0.04], [50000, 0.02], [250000, 0.01], [1000000, 0.003]], (loot, safe) => {
     advance(10); S.money += loot; exitBuilding();
-    if (Math.random() < safe) { goal('heist'); if (loot >= 1000000) goal('millionheist'); S.happy += 8; sfx.coin(); queueEvent({ kind: 'good', tag: 'Heist', title: loot >= 1000000 ? 'THE HEIST OF THE CENTURY!' : 'Nobody noticed!', text: loot >= 1000000 ? 'You wheeled ONE MILLION DOLLARS out of Stone Bank in a wheelbarrow, and somehow nobody noticed. The whole town will be talking about this for years.' : `You strolled out of Stone Bank with ${money$(loot)} stuffed in your pouch and not a single alarm went off.` }); }
+    if (Math.random() < safe) { goal('heist'); addHeat(loot, 0); if (loot >= 1000000) goal('millionheist'); S.happy += 8; sfx.coin(); queueEvent({ kind: 'good', tag: 'Heist', title: loot >= 1000000 ? 'THE HEIST OF THE CENTURY!' : 'Nobody noticed!', text: loot >= 1000000 ? 'You wheeled ONE MILLION DOLLARS out of Stone Bank in a wheelbarrow, and somehow nobody noticed. The whole town will be talking about this for years.' : `You strolled out of Stone Bank with ${money$(loot)} stuffed in your pouch and not a single alarm went off.` }); }
     else startChase(loot);
   });
 }
@@ -7648,7 +7679,7 @@ function hud() {
   let st = '';
   if (J && isWorkday() && !S.workedToday && !S.flood) { if (hour() < J.hours[0]) st = `Shift at ${PLACES[J.place].name} starts ${clock(J.hours[0] * 60)}`; else if (hour() < J.hours[0] + 1) st = `Shift at ${PLACES[J.place].name} started. You have until ${clock((J.hours[0] + 1) * 60)} before you count as late.`; else if (hour() < J.hours[1] - 1) st = `You are late for work at ${PLACES[J.place].name}!`; }
   if (trex && !inside) st = 'A T-rex is loose! Hide in a building or keep away.';
-  if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(8 - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, 8 - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
+  if (chase) st = inside ? (chase.seen ? 'They saw you come in...' : `Hiding... ${Math.max(0, Math.ceil(HIDE_T - chase.hideT))}s until the cops give up`) : (chase.cops.length ? `WANTED! Lose the police dinos (${Math.ceil(Math.max(0, LOSE_T - chase.lostT))}s out of sight) or hide inside a building` : 'WANTED! Police dinos are leaving the station. Get moving!');
   if (flight) st = flightStatus();
   if (race) st = race.count > 0 ? 'Get ready...' : `Street race: checkpoint ${race.i + 1} of ${RACE_CP.length} \u00b7 ${race.t.toFixed(1)}s`;
   if (derby) { const al = derby.cars.filter(c => !c.out).length; st = derby.count > 0 ? 'Get ready...' : derby.over ? 'The dust settles...' : `Derby: ${al} cars left \u00b7 your car ${Math.round(derby.me.hp)}% \u00b7 ${Math.max(0, Math.ceil(90 - derby.t))}s`; }
