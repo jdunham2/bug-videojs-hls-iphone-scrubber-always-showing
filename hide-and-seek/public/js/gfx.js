@@ -1,6 +1,6 @@
 // Everything visual: the town at dusk, characters, and effects.
 import * as THREE from '../vendor/three.module.js';
-import { HALF } from '../shared/world.js';
+import { HALF, FLOOR_H } from '../shared/world.js';
 
 export const COLORS = [0xff5d5d, 0x4da3ff, 0xffc93c, 0x5fd17a, 0xc77dff, 0xff8fc7, 0x3de0d0, 0xff9248,
   0xa3e635, 0x8d99ff, 0xf5f5f5, 0xb08968, 0x6ee7b7, 0xfca5a5, 0x93c5fd, 0xfde68a];
@@ -37,6 +37,9 @@ export class Gfx {
     this.printI = 0;
 
     this.buildSky();
+    // A fixed pool of point lights that follows the player around: each map has far more lamps than a phone can shade at once
+    this.pool = [];
+    for (let i = 0; i < 8; i++) { const l = new THREE.PointLight(0xffffff, 0, 20, 1.8); this.scene.add(l); this.pool.push(l); }
     this.setWorld(W);
     this.buildViewModel();
     this.buildPools();
@@ -61,7 +64,7 @@ export class Gfx {
     this.root = new THREE.Group();
     this.scene.add(this.root);
     this.lever = this.water = this.flame = this.blink = null;
-    this.coins = []; this.items = []; this.beacons = [];
+    this.coins = []; this.items = []; this.beacons = []; this.sites = []; this.siteT = 0;
     const T = W.theme, u = this.sky.material.uniforms;
     u.uTop.value.set(...T.sky[0]); u.uMid.value.set(...T.sky[1]); u.uHor.value.set(...T.sky[2]); u.uGlow.value = T.glow;
     this.scene.fog.color.set(T.fog[0]); this.scene.fog.density = T.fog[1];
@@ -191,17 +194,18 @@ export class Gfx {
     // distant hills so the world doesn't end at the wall
     const hill = std(T.hills);
     for (let i = 0; i < 26; i++) {
-      const a = (i / 26) * Math.PI * 2, rr = 95 + Math.random() * 30, s = 18 + Math.random() * 22;
+      const a = (i / 26) * Math.PI * 2, rr = HALF * 1.6 + Math.random() * 45, s = 26 + Math.random() * 30;
       const m = new THREE.Mesh(new THREE.ConeGeometry(s, s * (0.5 + Math.random() * 0.6), 6), hill);
       m.position.set(Math.cos(a) * rr, s * 0.2, Math.sin(a) * rr);
       this.root.add(m);
     }
-    const outer = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), std(T.outer));
+    const outer = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), std(T.outer));
     outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05;
     this.root.add(outer);
   }
 
-  mesh(geo, mat, x, y, z, parent = this.root, shadow = true) {
+  site(x, y, z, color, intensity, dist) { this.sites.push({ x, y, z, color, intensity, dist }); }
+  mesh(geo, mat, x, y, z, parent = this.cur || this.root, shadow = true) {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.castShadow = shadow; m.receiveShadow = true;
@@ -243,8 +247,13 @@ export class Gfx {
     const cone = new THREE.ConeGeometry(1, 1, 7), ico = new THREE.IcosahedronGeometry(1, 0), cyl = new THREE.CylinderGeometry(1, 1, 1, 10);
     const win = new THREE.PlaneGeometry(1.3, 1.0);
 
+    const upperG = new THREE.Group(); // everything that stands on an upstairs floor
+    upperG.position.y = FLOOR_H;
+    this.root.add(upperG);
     for (const b of W.boxes) {
+      const par = (this.cur = b.lv === 1 ? upperG : this.root);
       switch (b.kind) {
+        case 'rail': box(b, M.dark, 0.08, 0.92); { const long = b.w > b.d, len = Math.max(b.w, b.d); for (let i = -len / 2; i <= len / 2 + 0.01; i += 0.5) { const q = this.mesh(unit, M.dark, b.x + (long ? i : 0), 0.46, b.z + (long ? 0 : i)); q.scale.set(0.06, 0.92, 0.06); } } break;
         case 'wall': box(b, M.wall); break;
         case 'hwall': {
           box(b, wallMat(b.color));
@@ -253,7 +262,7 @@ export class Gfx {
             const n = Math.max(1, Math.floor(len / 4.5));
             for (let i = 0; i < n; i++) for (const s of [-1, 1]) {
               const off = ((i + 0.5) / n - 0.5) * len;
-              const m = this.mesh(win, M.glass, b.x, 1.75, b.z, this.root, false);
+              const m = this.mesh(win, M.glass, b.x, 1.75, b.z, par, false);
               if (b.w > b.d) { m.position.x += off; m.position.z += s * (b.d / 2 + 0.012); m.rotation.y = s > 0 ? 0 : Math.PI; }
               else { m.position.z += off; m.position.x += s * (b.w / 2 + 0.012); m.rotation.y = (s * Math.PI) / 2; }
             }
@@ -283,11 +292,11 @@ export class Gfx {
         case 'bench': box(b, M.bench, 0.12, 0.38); for (const s of [-0.8, 0.8]) { const l = this.mesh(unit, M.dark, b.x + s, 0.19, b.z); l.scale.set(0.12, 0.38, 0.5); } break;
         case 'bed': { box(b, M.bed); const long = b.d > b.w; const p = this.mesh(unit, M.pillow, b.x - (long ? 0 : b.w / 2 - 0.35), 0.68, b.z - (long ? b.d / 2 - 0.35 : 0)); p.scale.set(long ? b.w * 0.8 : 0.5, 0.16, long ? 0.5 : b.d * 0.8); break; }
         case 'table': box(b, M.table, 0.1, 0.7); for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const l = this.mesh(unit, M.table, b.x + sx * (b.w / 2 - 0.1), 0.35, b.z + sz * (b.d / 2 - 0.1)); l.scale.set(0.1, 0.7, 0.1); } break;
-        case 'sofa': box(b, M.sofa, 0.45); { const bk = this.mesh(unit, M.sofa, b.x + 0.35, 0.6, b.z); bk.scale.set(0.3, 0.9, b.d); } break;
+        case 'sofa': box(b, M.sofa, 0.45); { const bk = this.mesh(unit, M.sofa, b.x + (b.flip ? -0.35 : 0.35), 0.6, b.z); bk.scale.set(0.3, 0.9, b.d); } break;
         case 'shelf': box(b, M.shelf); break;
         case 'locker': {
           box(b, M.locker);
-          for (let i = 0; i < 4; i++) for (const [dx, dz] of [[0.41, 0], [-0.41, 0], [0, 0.41], [0, -0.41]]) { const v = this.mesh(unit, M.dark, b.x + dx, 1.45 + i * 0.1, b.z + dz, this.root, false); v.scale.set(dx ? 0.02 : 0.5, 0.04, dz ? 0.02 : 0.5); }
+          for (let i = 0; i < 4; i++) for (const [dx, dz] of [[0.41, 0], [-0.41, 0], [0, 0.41], [0, -0.41]]) { const v = this.mesh(unit, M.dark, b.x + dx, 1.45 + i * 0.1, b.z + dz, par, false); v.scale.set(dx ? 0.02 : 0.5, 0.04, dz ? 0.02 : 0.5); }
           break;
         }
         case 'dumpster': { box(b, M.dumpster, 1.15); const lid = this.mesh(unit, M.dark, b.x, 1.22, b.z); lid.scale.set(b.w + 0.1, 0.14, b.d + 0.1); lid.rotation.z = 0.06; break; }
@@ -300,15 +309,13 @@ export class Gfx {
           this.mesh(unit, M.dark, 0.1, 1.2, 0, g).scale.set(2.3, 0.6, 1.7);
           for (const sx of [-1.4, 1.4]) for (const sz of [-0.95, 0.95]) { const w = this.mesh(cyl, M.tire, sx, 0.36, sz, g); w.scale.set(0.36, 0.25, 0.36); w.rotation.x = Math.PI / 2; }
           for (const sz of [-0.6, 0.6]) { this.mesh(unit, M.bulb, -2.21, 0.65, sz, g, false).scale.set(0.05, 0.18, 0.35); this.mesh(unit, M.red, 2.21, 0.65, sz, g, false).scale.set(0.05, 0.18, 0.35); }
-          this.root.add(g);
+          par.add(g);
           break;
         }
         case 'lamp': {
           const p = this.mesh(cyl, M.dark, b.x, 2.1, b.z); p.scale.set(0.08, 4.2, 0.08);
-          this.mesh(new THREE.SphereGeometry(0.28, 10, 8), M.bulb, b.x, 4.3, b.z, this.root, false);
-          const l = new THREE.PointLight(0xffc477, 55, 20, 1.8);
-          l.position.set(b.x, 4.1, b.z);
-          this.root.add(l);
+          this.mesh(new THREE.SphereGeometry(0.28, 10, 8), M.bulb, b.x, 4.3, b.z, par, false);
+          this.site(b.x, 4.1, b.z, 0xffc477, 55, 20);
           break;
         }
         case 'cage': {
@@ -324,7 +331,7 @@ export class Gfx {
           this.mesh(unit, M.metal, 0, 0.35, 0, pivot).scale.set(0.08, 0.7, 0.08);
           this.knobMat = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xff2222, emissiveIntensity: 0.4 });
           this.mesh(new THREE.SphereGeometry(0.15, 10, 8), this.knobMat, 0, 0.72, 0, pivot);
-          this.root.add(pivot);
+          par.add(pivot);
           this.lever = pivot;
           break;
         }
@@ -334,7 +341,7 @@ export class Gfx {
         }
         case 'hidebox': {
           box(b, boxMat(b.color));
-          const door = this.mesh(unit, M.dark, b.x + b.w / 2 + 0.01, 1.1, b.z, this.root, false); door.scale.set(0.04, 2.1, 1.5);
+          const door = this.mesh(unit, M.dark, b.x + b.w / 2 + 0.01, 1.1, b.z, par, false); door.scale.set(0.04, 2.1, 1.5);
           break;
         }
         case 'logs': {
@@ -344,35 +351,31 @@ export class Gfx {
         }
         case 'snowman': {
           [[0.45, 0.42], [0.33, 1.05], [0.23, 1.5]].forEach(([r, y]) => this.mesh(ball, M.snow, b.x, y, b.z).scale.setScalar(r));
-          const a = b.v * 6.28, nose = this.mesh(cone, M.flame, b.x + Math.sin(a) * 0.3, 1.5, b.z + Math.cos(a) * 0.3, this.root, false);
+          const a = b.v * 6.28, nose = this.mesh(cone, M.flame, b.x + Math.sin(a) * 0.3, 1.5, b.z + Math.cos(a) * 0.3, par, false);
           nose.scale.set(0.05, 0.25, 0.05); nose.rotation.order = 'YXZ'; nose.rotation.set(Math.PI / 2, a, 0);
           break;
         }
         case 'campfire': {
           for (let i = 0; i < 9; i++) { const r = this.mesh(ico, M.rock, Math.cos(i * 0.7) * 1.5, 0.2, Math.sin(i * 0.7) * 1.5); r.scale.set(0.38, 0.3, 0.38); r.rotation.y = i; }
           for (let i = 0; i < 4; i++) { const l = this.mesh(cyl, M.trunk, 0, 0.45, 0); l.scale.set(0.14, 2.2, 0.14); l.rotation.set(0.95, i * 0.785, 0, 'YXZ'); }
-          this.flame = this.mesh(cone, M.flame, 0, 1.1, 0, this.root, false);
+          this.flame = this.mesh(cone, M.flame, 0, 1.1, 0, par, false);
           this.flame.scale.set(0.7, 1.9, 0.7);
-          const l = new THREE.PointLight(0xff8a3c, 60, 22, 1.8);
-          l.position.set(0, 1.8, 0);
-          this.root.add(l);
+          this.site(0, 1.8, 0, 0xff8a3c, 60, 22);
           break;
         }
         case 'tower': {
           for (let i = 0; i < 5; i++) { const m = this.mesh(cyl, i % 2 ? M.pillow : M.barrel, 0, 0.7 + i * 1.4, 0); m.scale.set(1.2 - i * 0.12, 1.4, 1.2 - i * 0.12); }
-          this.blink = this.mesh(ball, new THREE.MeshBasicMaterial({ color: 0xff4040 }), 0, 7.5, 0, this.root, false);
+          this.blink = this.mesh(ball, new THREE.MeshBasicMaterial({ color: 0xff4040 }), 0, 7.5, 0, par, false);
           this.blink.scale.setScalar(0.5);
-          const l = new THREE.PointLight(0xff5040, 40, 26, 1.8);
-          l.position.set(0, 7.2, 0);
-          this.root.add(l);
+          this.site(0, 7.2, 0, 0xff5040, 40, 26);
           break;
         }
         case 'beacon': {
           box(b, M.stone, 1.0);
           const bowl = this.mesh(cyl, M.dark, b.x, 1.2, b.z); bowl.scale.set(0.5, 0.4, 0.5);
           const mat = new THREE.MeshBasicMaterial({ color: 0x66e0ff });
-          const flame = this.mesh(cone, mat, b.x, 1.9, b.z, this.root, false);
-          const beam = this.mesh(cyl, new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), b.x, 30, b.z, this.root, false);
+          const flame = this.mesh(cone, mat, b.x, 1.9, b.z, par, false);
+          const beam = this.mesh(cyl, new THREE.MeshBasicMaterial({ color: 0x66e0ff, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), b.x, 30, b.z, par, false);
           beam.scale.set(0.3, 60, 0.3);
           this.beacons[b.bi] = { flame, beam, mat };
           break;
@@ -380,19 +383,19 @@ export class Gfx {
         case 'fountain': {
           const base = this.mesh(new THREE.CylinderGeometry(1.8, 1.9, 0.9, 16, 1), M.stone, 0, 0.45, 0);
           base.material = M.stone;
-          const wtr = this.mesh(new THREE.CylinderGeometry(1.55, 1.55, 0.05, 16), M.water, 0, 0.9, 0, this.root, false);
+          const wtr = this.mesh(new THREE.CylinderGeometry(1.55, 1.55, 0.05, 16), M.water, 0, 0.9, 0, par, false);
           this.water = wtr;
           this.mesh(cyl, M.stone, 0, 1.3, 0).scale.set(0.25, 1.6, 0.25);
-          this.mesh(new THREE.SphereGeometry(0.4, 10, 8), M.water, 0, 2.25, 0, this.root, false);
-          const l = new THREE.PointLight(0x55ccff, 14, 12, 1.8);
-          l.position.set(0, 1.6, 0);
-          this.root.add(l);
+          this.mesh(new THREE.SphereGeometry(0.4, 10, 8), M.water, 0, 2.25, 0, par, false);
+          this.site(0, 1.6, 0, 0x55ccff, 14, 12);
           break;
         }
       }
     }
 
-    // Houses: floor, ceiling, pitched roof, warm interior light
+    this.cur = null;
+
+    // Houses: floor, ceiling, pitched roof, warm interior light; two-storey ones also get an upper floor and stairs
     for (const h of W.houses) {
       const f = this.mesh(unit, M.floor, h.x, 0.02, h.z, this.root, false); f.scale.set(h.w, 0.04, h.d);
       const c = this.mesh(unit, M.roof, h.x, h.h + 0.12, h.z); c.scale.set(h.w + 0.9, 0.25, h.d + 0.9);
@@ -401,9 +404,21 @@ export class Gfx {
       const g = new THREE.Group(); // scale along world axes after the 45° turn
       g.position.copy(p.position); p.position.set(0, 0, 0); g.add(p); g.scale.set(h.w + 0.9, 2.4, h.d + 0.9);
       this.root.add(g);
-      const l = new THREE.PointLight(0xffb060, 30, 15, 1.8);
-      l.position.set(h.x, h.h - 0.6, h.z);
-      this.root.add(l);
+      this.site(h.x, Math.min(h.h, FLOOR_H) - 0.5, h.z, 0xffb060, h.floors === 2 ? 42 : 30, h.floors === 2 ? 19 : 15);
+      if (h.floors !== 2) continue;
+      this.site(h.x, FLOOR_H * 2 - 0.5, h.z, 0xffb060, 34, 16);
+      const st = h.stair, x0 = h.x - h.w / 2, x1 = h.x + h.w / 2, z0 = h.z - h.d / 2, z1 = h.z + h.d / 2;
+      // upper floor, with a hole where the stairs come up
+      for (const [ax, az, bx, bz] of [[x0, z0, st.x0, z1], [st.x1, z0, x1, z1], [st.x0, st.z1, st.x1, z1], [st.x0, z0, st.x1, st.z0]]) {
+        const sl = this.mesh(unit, M.floor, (ax + bx) / 2, FLOOR_H - 0.1, (az + bz) / 2);
+        sl.scale.set(bx - ax, 0.2, bz - az);
+      }
+      const steps = 12, run = (st.xb - st.xa) / steps;
+      for (let i = 0; i < steps; i++) {
+        const hh = ((i + 1) * FLOOR_H) / steps;
+        const sp = this.mesh(unit, i % 2 ? M.table : M.shelf, st.xa + (i + 0.5) * run, hh / 2 - 0.1, (st.z0 + st.z1) / 2);
+        sp.scale.set(Math.abs(run), hh, st.z1 - st.z0);
+      }
     }
 
     // Hiding bushes
@@ -429,7 +444,7 @@ export class Gfx {
     const cg = new THREE.CylinderGeometry(0.3, 0.3, 0.07, 14);
     cg.rotateX(Math.PI / 2);
     const cm = new THREE.MeshStandardMaterial({ color: 0xffd447, emissive: 0xffa800, emissiveIntensity: 0.9, metalness: 0.8, roughness: 0.3 });
-    for (const c of W.coins) this.coins.push(this.mesh(cg, cm, c.x, 0.9, c.z));
+    for (const c of W.coins) { const m = this.mesh(cg, cm, c.x, 0.9 + c.lv * FLOOR_H, c.z); m.userData.y0 = m.position.y; this.coins.push(m); }
     // Power-up boxes
     const qm = new THREE.MeshBasicMaterial({ map: canvasTex(64, 64, (g) => { g.fillStyle = '#7a3cff'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#d9c2ff'; g.lineWidth = 6; g.strokeRect(3, 3, 58, 58); g.fillStyle = '#fff'; g.font = 'bold 48px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 32, 35); }) });
     for (const it of W.items) { const m = this.mesh(unit, qm, it.x, 1, it.z, this.root, false); m.scale.setScalar(0.62); this.items.push(m); }
@@ -489,57 +504,28 @@ export class Gfx {
   }
 
   // ---------- characters ----------
-  addAvatar(id, colorIdx, name) {
-    const col = COLORS[colorIdx % COLORS.length];
+  addAvatar(id, look, name) {
+    const ch = makeCharacter(look);
     const g = new THREE.Group();
-    const inner = new THREE.Group();
-    g.add(inner);
-    const mat = std(col, { flatShading: false, roughness: 0.6 });
-    const body = this.mesh(new THREE.CapsuleGeometry(0.34, 0.55, 4, 12), mat, 0, 0.92, 0, inner);
-    const head = this.mesh(new THREE.SphereGeometry(0.3, 14, 10), mat, 0, 1.58, 0, inner);
-    const eyeM = new THREE.MeshBasicMaterial({ color: 0xffffff }), pupM = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    for (const sx of [-0.11, 0.11]) {
-      this.mesh(new THREE.SphereGeometry(0.075, 8, 6), eyeM, sx, 1.62, -0.25, inner, false);
-      this.mesh(new THREE.SphereGeometry(0.036, 6, 5), pupM, sx, 1.62, -0.315, inner, false);
-    }
-    const legG = new THREE.BoxGeometry(0.17, 0.46, 0.2);
-    legG.translate(0, -0.23, 0);
-    const dark = std(0x23202e);
-    const legs = [-0.15, 0.15].map((sx) => this.mesh(legG, dark, sx, 0.46, 0, inner));
-    const armG = new THREE.SphereGeometry(0.11, 8, 6);
-    const arms = [-0.42, 0.42].map((sx) => this.mesh(armG, mat, sx, 0.95, 0, inner));
-    // hider kit: backpack + beanie
-    const hider = new THREE.Group();
-    this.mesh(new THREE.BoxGeometry(0.4, 0.45, 0.2), std(0x4a3f66), 0, 1.0, 0.33, hider);
-    const beanie = this.mesh(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(0xf1f1f1), 0, 1.62, 0, hider);
-    beanie.scale.y = 0.8;
-    // seeker kit: glowing visor, cap, flashlight beam
-    const seeker = new THREE.Group();
-    this.mesh(new THREE.BoxGeometry(0.5, 0.11, 0.12), new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 1.63, -0.24, seeker, false);
-    this.mesh(new THREE.CylinderGeometry(0.31, 0.33, 0.16, 12), std(0x1c1c26), 0, 1.84, 0, seeker);
-    this.mesh(new THREE.BoxGeometry(0.4, 0.04, 0.3), std(0x1c1c26), 0, 1.78, -0.36, seeker);
-    const bg = new THREE.ConeGeometry(2.2, 9, 18, 1, true);
-    bg.translate(0, -4.5, 0); bg.rotateX(Math.PI / 2);
-    const beam = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-    beam.position.set(0.3, 1.25, -0.3);
-    seeker.add(beam);
-    inner.add(hider, seeker);
-    // name tag
+    g.add(ch.inner);
+    const col = COLORS[look[1] % COLORS.length];
     const tex = canvasTex(256, 64, (c) => {
       c.font = 'bold 34px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.lineWidth = 7; c.strokeStyle = 'rgba(0,0,0,0.75)'; c.strokeText(name, 128, 34);
       c.fillStyle = '#' + col.toString(16).padStart(6, '0'); c.fillText(name, 128, 34);
     });
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-    tag.scale.set(1.9, 0.48, 1); tag.position.y = 2.3;
+    tag.scale.set(1.9, 0.48, 1);
     g.add(tag);
     // "dazed" stars
     const stun = new THREE.Group();
-    for (let i = 0; i < 3; i++) { const s = this.mesh(new THREE.OctahedronGeometry(0.09), new THREE.MeshBasicMaterial({ color: 0xffe14d }), Math.cos(i * 2.09) * 0.4, 2.05, Math.sin(i * 2.09) * 0.4, stun, false); s.userData.a = i * 2.09; }
+    for (let i = 0; i < 3; i++) put(new THREE.OctahedronGeometry(0.09), new THREE.MeshBasicMaterial({ color: 0xffe14d }), Math.cos(i * 2.09) * 0.4, ch.top + 0.2, Math.sin(i * 2.09) * 0.4, stun, false);
     g.add(stun);
     g.visible = false;
     this.scene.add(g);
-    const a = { g, inner, legs, arms, hider, seeker, tag, stun, body, head, phase: Math.random() * 6, x: 0, z: 0, r: 0, init: false };
+    const old = this.avatars.get(id);
+    const a = { ...ch, g, tag, stun, phase: Math.random() * 6, x: 0, y: 0, z: 0, r: 0, init: false };
+    if (old) { a.x = old.x; a.y = old.y; a.z = old.z; a.r = old.r; a.init = old.init; this.removeAvatar(id); }
     this.avatars.set(id, a);
     return a;
   }
@@ -547,35 +533,35 @@ export class Gfx {
     const a = this.avatars.get(id);
     if (!a) return;
     this.scene.remove(a.g);
-    a.g.traverse((o) => { if (o.material && o.material.map) o.material.map.dispose(); });
+    a.tag.material.map.dispose();
     this.avatars.delete(id);
   }
-  // s: {x,z,r,visible,moving,sprint,crouch,seeker,showTag,stunned,immune}
+  // s: {x,y,z,r,visible,moving,sprint,crouch,jump,seeker,showTag,stunned,immune}
   updateAvatar(id, s, dt) {
     const a = this.avatars.get(id);
     if (!a) return;
     a.g.visible = s.visible;
-    if (!a.init || Math.hypot(s.x - a.x, s.z - a.z) > 6) { a.x = s.x; a.z = s.z; a.r = s.r; a.init = true; }
+    if (!a.init || Math.hypot(s.x - a.x, s.z - a.z) > 6) { a.x = s.x; a.y = s.y; a.z = s.z; a.r = s.r; a.init = true; }
     const k = Math.min(1, dt * 12);
-    a.x += (s.x - a.x) * k; a.z += (s.z - a.z) * k;
+    a.x += (s.x - a.x) * k; a.y += (s.y - a.y) * k; a.z += (s.z - a.z) * k;
     let dr = s.r - a.r;
     dr = Math.atan2(Math.sin(dr), Math.cos(dr));
     a.r += dr * k;
-    a.g.position.set(a.x, 0, a.z);
+    a.g.position.set(a.x, a.y, a.z);
     a.g.rotation.y = a.r;
     if (!s.visible) return;
     a.phase += dt * (s.sprint ? 15 : s.crouch ? 6 : 10) * (s.moving ? 1 : 0);
     const sw = s.moving ? Math.sin(a.phase) * (s.sprint ? 0.9 : 0.55) : 0;
-    a.legs[0].rotation.x = sw; a.legs[1].rotation.x = -sw;
-    a.arms[0].position.z = -sw * 0.25; a.arms[1].position.z = sw * 0.25;
+    a.legs.forEach((l, i) => { l.rotation.x = i % 2 ? -sw : sw; });
+    a.arms.forEach((m, i) => { m.position.z = m.userData.z0 + (i % 2 ? sw : -sw) * 0.25; });
     const sy = s.crouch ? 0.62 : 1;
     a.inner.scale.y += (sy - a.inner.scale.y) * Math.min(1, dt * 14);
     a.jt = s.jump ? (a.jt || 0) + dt : 0;
-    a.inner.position.y = (s.moving ? Math.abs(Math.sin(a.phase)) * 0.06 : Math.sin(this.time * 2 + a.phase) * 0.012) + Math.sin(Math.min(1, a.jt / 0.72) * Math.PI) * 0.95;
+    a.inner.position.y = a.float + (s.moving ? Math.abs(Math.sin(a.phase)) * 0.06 : Math.sin(this.time * 2 + a.phase) * (a.float ? 0.06 : 0.012)) + Math.sin(Math.min(1, a.jt / 0.72) * Math.PI) * 0.95;
     a.inner.rotation.x = s.sprint ? -0.18 : 0;
     a.hider.visible = !s.seeker; a.seeker.visible = s.seeker;
     a.tag.visible = s.showTag;
-    a.tag.position.y = 2.3 * a.inner.scale.y + 0.1;
+    a.tag.position.y = (a.top + 0.5) * a.inner.scale.y + a.float + 0.1;
     a.stun.visible = s.stunned;
     if (s.stunned) a.stun.rotation.y = this.time * 5;
     const blink = s.immune && Math.sin(this.time * 20) > 0;
@@ -625,7 +611,7 @@ export class Gfx {
     this.torch.position.set(0.3 + Math.sin(cam.bob) * 0.012, -0.26 + Math.abs(Math.cos(cam.bob)) * 0.014, -0.5 - jab * 0.28);
     this.torch.rotation.x = jab * 0.5;
 
-    for (let i = 0; i < this.coins.length; i++) { const m = this.coins[i]; m.rotation.y = t * 2.4 + i; m.position.y = 0.9 + Math.sin(t * 2 + i) * 0.12; }
+    for (let i = 0; i < this.coins.length; i++) { const m = this.coins[i]; m.rotation.y = t * 2.4 + i; m.position.y = m.userData.y0 + Math.sin(t * 2 + i) * 0.12; }
     if (this.water) this.water.material.emissiveIntensity = 0.8 + Math.sin(t * 3) * 0.2;
     for (let i = 0; i < this.items.length; i++) { const m = this.items[i]; m.rotation.set(t * 0.9, t * 1.6 + i, 0); m.position.y = 1 + Math.sin(t * 2.4 + i * 2) * 0.15; }
     if (this.flame) this.flame.scale.set(0.7 + Math.sin(t * 13) * 0.08, 1.9 + Math.sin(t * 9) * 0.25, 0.7 + Math.cos(t * 11) * 0.08);
@@ -672,6 +658,180 @@ export class Gfx {
       o.m.position.set(o.fx + (o.x - o.fx) * o.t, 1.4 * (1 - o.t) + Math.sin(o.t * Math.PI) * 3.2, o.fz + (o.z - o.fz) * o.t);
       o.m.rotation.x += dt * 12;
     }
+    // hand the pooled lights to the nearest lamps and windows
+    if ((this.siteT -= dt) <= 0) {
+      this.siteT = 0.3;
+      const near = this.sites.map((o) => [(o.x - cam.x) ** 2 + (o.z - cam.z) ** 2, o]).sort((p, q) => p[0] - q[0]);
+      this.pool.forEach((l, i) => {
+        const o = near[i] && near[i][1];
+        l.visible = true;
+        if (!o) { l.intensity = 0; return; }
+        l.position.set(o.x, o.y, o.z); l.color.set(o.color); l.intensity = o.intensity; l.distance = o.dist;
+      });
+    }
     this.renderer.render(this.scene, c);
+  }
+}
+
+// ---------- character factory ----------
+function put(geo, mat, x, y, z, parent, shadow = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = shadow; m.receiveShadow = shadow;
+  parent.add(m);
+  return m;
+}
+const patTex = [null];
+function pattern(i) {
+  if (patTex[i] !== undefined) return patTex[i];
+  return (patTex[i] = canvasTex(128, 128, (g) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128);
+    g.fillStyle = '#9a9a9a';
+    if (i === 1) for (let y = 8; y < 128; y += 32) g.fillRect(0, y, 128, 14);
+    else if (i === 2) for (let y = 0; y < 5; y++) for (let x = 0; x < 6; x++) { g.beginPath(); g.arc(x * 22 + (y % 2 ? 11 : 0), y * 28 + 10, 6.5, 0, 7); g.fill(); }
+    else { g.fillStyle = '#8a8a8a'; g.fillRect(0, 60, 128, 68); }
+  }));
+}
+const S = (r, w = 14, h = 10) => new THREE.SphereGeometry(r, w, h);
+
+// look = [character, colour, hat, pattern]. Builds a model facing -z with its feet at y = 0.
+export function makeCharacter(look) {
+  const [kind, ci, hatI, pat] = look;
+  const col = COLORS[ci % COLORS.length];
+  const inner = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: col, roughness: 0.6, map: pattern(pat) });
+  const plain = new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 });
+  const dark = std(0x23202e), white = new THREE.MeshBasicMaterial({ color: 0xffffff }), black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const pale = new THREE.MeshStandardMaterial({ color: new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.65), roughness: 0.7 });
+  const orange = std(0xff9a2e, { flatShading: false });
+  const legG = new THREE.BoxGeometry(0.17, 0.46, 0.2);
+  legG.translate(0, -0.23, 0);
+  const legs = [], arms = [];
+  const leg = (sx, y = 0.46, mat = dark, sc = 1) => { const l = put(legG, mat, sx, y, 0, inner); l.scale.set(sc, y / 0.46, sc); legs.push(l); };
+  const arm = (sx, y, z = 0, geo = S(0.11, 8, 6), mat = plain) => { const m = put(geo, mat, sx, y, z, inner); m.userData.z0 = z; arms.push(m); return m; };
+  const eyes = (y, z, sx = 0.11, r = 0.075) => { for (const s of [-sx, sx]) { put(S(r, 8, 6), white, s, y, z, inner, false); put(S(r * 0.5, 6, 5), black, s, y, z - r * 0.85, inner, false); } };
+  // head: centre height, radius, how far the face sticks out, body centre height and depth (for the backpack)
+  let hy = 1.58, hr = 0.3, face = 0.25, by = 1.0, bz = 0.33, float = 0;
+
+  if (kind === 1) { // Robot
+    put(new THREE.BoxGeometry(0.62, 0.7, 0.42), skin, 0, 0.95, 0, inner);
+    put(new THREE.BoxGeometry(0.5, 0.42, 0.44), plain, 0, 1.56, 0, inner);
+    const glow = new THREE.MeshBasicMaterial({ color: 0x7df9ff });
+    for (const s of [-0.12, 0.12]) put(new THREE.BoxGeometry(0.12, 0.09, 0.03), glow, s, 1.6, -0.23, inner, false);
+    put(new THREE.BoxGeometry(0.22, 0.03, 0.03), dark, 0, 1.45, -0.23, inner, false);
+    for (const s of [-1, 1]) { put(new THREE.CylinderGeometry(0.015, 0.015, 0.2, 5), dark, s * 0.27, 1.72, 0, inner).rotation.z = s * -0.6; put(S(0.045, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff5050 }), s * 0.33, 1.8, 0, inner, false); }
+    for (const s of [-0.4, 0.4]) arm(s, 0.95, 0, new THREE.BoxGeometry(0.14, 0.4, 0.16));
+    leg(-0.16); leg(0.16);
+    hy = 1.56; hr = 0.25; face = 0.23; by = 0.98; bz = 0.3;
+  } else if (kind === 3) { // Bear
+    put(new THREE.CapsuleGeometry(0.4, 0.5, 4, 12), skin, 0, 0.94, 0, inner);
+    put(S(0.34), plain, 0, 1.62, 0, inner);
+    for (const s of [-0.25, 0.25]) { put(S(0.12, 8, 6), plain, s, 1.9, 0, inner); put(S(0.065, 6, 5), pale, s, 1.9, -0.08, inner, false); }
+    put(S(0.14, 8, 6), pale, 0, 1.55, -0.28, inner);
+    put(S(0.05, 6, 5), black, 0, 1.59, -0.41, inner, false);
+    eyes(1.7, -0.29, 0.13, 0.06);
+    for (const s of [-0.48, 0.48]) arm(s, 0.98, 0, S(0.13, 8, 6));
+    leg(-0.17, 0.46, dark, 1.15); leg(0.17, 0.46, dark, 1.15);
+    hy = 1.62; hr = 0.34; face = 0.3; bz = 0.4;
+  } else if (kind === 4) { // Penguin
+    put(S(1), skin, 0, 0.88, 0, inner).scale.set(0.42, 0.6, 0.4);
+    put(S(1), new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.7 }), 0, 0.85, -0.12, inner).scale.set(0.32, 0.48, 0.32);
+    put(S(0.28), plain, 0, 1.55, 0, inner);
+    const beak = put(new THREE.ConeGeometry(0.07, 0.2, 8), orange, 0, 1.5, -0.32, inner); beak.rotation.x = -Math.PI / 2;
+    eyes(1.6, -0.22, 0.1, 0.06);
+    for (const s of [-0.42, 0.42]) arm(s, 0.95, 0, S(1, 8, 6)).scale.set(0.07, 0.3, 0.16);
+    leg(-0.14, 0.3, orange, 1.1); leg(0.14, 0.3, orange, 1.1);
+    hy = 1.55; hr = 0.28; face = 0.24; by = 0.9; bz = 0.36;
+  } else if (kind === 5) { // Ghost
+    put(new THREE.CapsuleGeometry(0.36, 0.6, 4, 12), skin, 0, 1.0, 0, inner);
+    for (let i = 0; i < 6; i++) put(S(0.13, 8, 6), plain, Math.cos(i * 1.047) * 0.27, 0.42, Math.sin(i * 1.047) * 0.27, inner);
+    for (const s of [-0.12, 0.12]) put(S(1, 8, 6), black, s, 1.38, -0.31, inner, false).scale.set(0.06, 0.1, 0.04);
+    put(S(1, 8, 6), black, 0, 1.2, -0.34, inner, false).scale.set(0.05, 0.07, 0.03);
+    for (const s of [-0.42, 0.42]) arm(s, 1.05, -0.05);
+    hy = 1.36; hr = 0.36; face = 0.32; by = 0.95; bz = 0.36; float = 0.18;
+  } else if (kind === 6) { // Frog
+    put(S(0.42), skin, 0, 0.72, 0, inner).scale.set(1, 0.95, 0.95);
+    put(S(1), plain, 0, 1.28, -0.02, inner).scale.set(0.38, 0.27, 0.34);
+    for (const s of [-0.19, 0.19]) { put(S(0.13, 8, 6), plain, s, 1.5, -0.06, inner); put(S(0.085, 8, 6), white, s, 1.52, -0.15, inner, false); put(S(0.045, 6, 5), black, s, 1.52, -0.225, inner, false); }
+    put(new THREE.BoxGeometry(0.36, 0.025, 0.03), black, 0, 1.22, -0.335, inner, false);
+    for (const s of [-0.46, 0.46]) arm(s, 0.75);
+    leg(-0.22, 0.34, plain, 1.3); leg(0.22, 0.34, plain, 1.3);
+    hy = 1.28; hr = 0.3; face = 0.3; by = 0.75; bz = 0.4;
+  } else if (kind === 7) { // Alien
+    put(new THREE.CapsuleGeometry(0.26, 0.6, 4, 12), skin, 0, 0.92, 0, inner);
+    put(S(1), plain, 0, 1.72, 0, inner).scale.set(0.36, 0.44, 0.36);
+    for (const s of [-1, 1]) { const e = put(S(1, 10, 8), black, s * 0.15, 1.72, -0.29, inner, false); e.scale.set(0.1, 0.15, 0.05); e.rotation.z = s * 0.5; }
+    for (const s of [-1, 1]) { put(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 5), plain, s * 0.16, 2.2, 0, inner).rotation.z = s * -0.35; put(S(0.045, 6, 5), new THREE.MeshBasicMaterial({ color: 0x9dff7a }), s * 0.205, 2.33, 0, inner, false); }
+    for (const s of [-0.34, 0.34]) arm(s, 0.98, 0, S(0.09, 8, 6));
+    leg(-0.12); leg(0.12);
+    hy = 1.72; hr = 0.36; face = 0.32; bz = 0.26;
+  } else { // Blob and Cat share a body
+    put(new THREE.CapsuleGeometry(0.34, 0.55, 4, 12), skin, 0, 0.92, 0, inner);
+    put(S(0.3), plain, 0, 1.58, 0, inner);
+    eyes(1.62, -0.25);
+    for (const s of [-0.42, 0.42]) arm(s, 0.95);
+    leg(-0.15); leg(0.15);
+    if (kind === 2) {
+      for (const s of [-0.17, 0.17]) { put(new THREE.ConeGeometry(0.1, 0.2, 4), plain, s, 1.9, 0, inner); put(new THREE.ConeGeometry(0.055, 0.12, 4), pale, s, 1.88, -0.03, inner, false); }
+      put(S(0.04, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8fa8 }), 0, 1.54, -0.3, inner, false);
+      for (const s of [-1, 1]) for (const a of [-0.15, 0.15]) { const w = put(new THREE.BoxGeometry(0.22, 0.008, 0.008), black, s * 0.2, 1.52 + a * 0.2, -0.27, inner, false); w.rotation.z = s * a; }
+      const tail = put(new THREE.CylinderGeometry(0.045, 0.06, 0.6, 6), plain, 0, 0.82, 0.45, inner); tail.rotation.x = -0.9;
+    }
+  }
+  const top = hy + hr * (kind === 7 ? 1.22 : kind === 6 ? 1.05 : 1);
+
+  // hat
+  const hat = new THREE.Group(), hs = hr / 0.3;
+  hat.position.y = top - 0.02; hat.scale.setScalar(hs);
+  if (kind === 6) hat.position.y -= 0.12;
+  if (hatI === 1) { put(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), std(0xf1f1f1, { flatShading: false }), 0, -0.24, 0, hat).scale.y = 0.85; put(S(0.07, 8, 6), std(0xff5d5d), 0, 0.04, 0, hat); }
+  else if (hatI === 2) { put(new THREE.CylinderGeometry(0.29, 0.31, 0.15, 14), std(0x2a4a8a), 0, 0.0, 0, hat); put(new THREE.BoxGeometry(0.4, 0.035, 0.28), std(0x2a4a8a), 0, -0.05, -0.36, hat); }
+  else if (hatI === 3) { put(new THREE.CylinderGeometry(0.38, 0.38, 0.03, 16), std(0x16161c), 0, -0.04, 0, hat); put(new THREE.CylinderGeometry(0.23, 0.24, 0.4, 14), std(0x16161c), 0, 0.17, 0, hat); put(new THREE.CylinderGeometry(0.245, 0.245, 0.07, 14), std(0xc8324a), 0, 0.03, 0, hat); }
+  else if (hatI === 4) { const gold = new THREE.MeshStandardMaterial({ color: 0xffd447, metalness: 0.8, roughness: 0.3, emissive: 0x6b4a00 }); put(new THREE.CylinderGeometry(0.24, 0.22, 0.14, 12, 1, true), gold, 0, 0.02, 0, hat).material.side = THREE.DoubleSide; for (let i = 0; i < 6; i++) put(new THREE.ConeGeometry(0.05, 0.14, 4), gold, Math.cos(i * 1.047) * 0.23, 0.16, Math.sin(i * 1.047) * 0.23, hat); }
+  else if (hatI === 5) { put(new THREE.ConeGeometry(0.2, 0.46, 12), new THREE.MeshStandardMaterial({ color: 0xff5fc8, map: pattern(1), roughness: 0.6 }), 0, 0.18, 0, hat); put(S(0.06, 8, 6), std(0xffe14d), 0, 0.43, 0, hat); }
+  else if (hatI === 6) { const band = put(new THREE.TorusGeometry(0.32, 0.03, 6, 16, Math.PI), std(0x23202e, { flatShading: false }), 0, -0.3, 0, hat); for (const s of [-0.33, 0.33]) { const c = put(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 12), std(0xff5d5d), s, -0.32, 0, hat); c.rotation.z = Math.PI / 2; } band.rotation.y = 0; }
+  else if (hatI === 7) { const halo = put(new THREE.TorusGeometry(0.22, 0.03, 6, 20), new THREE.MeshBasicMaterial({ color: 0xffe98a }), 0, 0.2, 0, hat, false); halo.rotation.x = Math.PI / 2; }
+  inner.add(hat);
+
+  // hider kit: a backpack. seeker kit: glowing red visor and a flashlight beam
+  const hider = new THREE.Group(), seeker = new THREE.Group();
+  put(new THREE.BoxGeometry(0.4, 0.45, 0.2), std(0x4a3f66), 0, by, bz, hider);
+  put(new THREE.BoxGeometry(hr * 1.75, 0.11, 0.1), new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, kind === 6 ? 1.34 : hy + 0.04, -face - 0.02, seeker, false);
+  const bg = new THREE.ConeGeometry(2.2, 9, 18, 1, true);
+  bg.translate(0, -4.5, 0); bg.rotateX(Math.PI / 2);
+  const beam = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  beam.position.set(0.3, 1.2, -0.3);
+  seeker.add(beam);
+  inner.add(hider, seeker);
+  inner.position.y = float;
+  return { inner, legs, arms, hider, seeker, top, float };
+}
+
+// A small turntable view of one character, for the look picker.
+export class Preview {
+  constructor(canvas) {
+    this.r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.scene = new THREE.Scene();
+    this.cam = new THREE.PerspectiveCamera(30, canvas.width / canvas.height, 0.1, 30);
+    this.cam.position.set(0, 1.5, 5.4);
+    this.cam.lookAt(0, 1.08, 0);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x554466, 1.9));
+    const d = new THREE.DirectionalLight(0xfff0dd, 2.2);
+    d.position.set(2, 4, 3);
+    this.scene.add(d);
+    this.ch = null;
+  }
+  set(look) {
+    if (this.ch) this.scene.remove(this.ch.inner);
+    this.ch = makeCharacter(look);
+    this.ch.seeker.visible = false;
+    this.scene.add(this.ch.inner);
+  }
+  render(t) {
+    if (!this.ch) return;
+    this.ch.inner.rotation.y = Math.PI + t * 0.9;
+    this.ch.inner.position.y = this.ch.float + Math.sin(t * 2.2) * 0.03;
+    this.r.render(this.scene, this.cam);
   }
 }

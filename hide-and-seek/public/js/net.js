@@ -4,13 +4,13 @@
 //  - connectRoom:  one tab hosts the game and shares it through a realtime "room" (used when published as an artifact)
 import { makeRoom, joinRoom, leaveRoom, handleMessage, tickRoom, addBot, TICK } from '../shared/game.js';
 
-export function connectWs(name, code, h) {
+export function connectWs(name, code, h, look) {
   return new Promise((resolve, reject) => {
     let open = false;
     const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     ws.onopen = () => {
       open = true;
-      ws.send(JSON.stringify({ t: 'join', name, room: code }));
+      ws.send(JSON.stringify({ t: 'join', name, room: code, look }));
       resolve({ send: (m) => ws.readyState === 1 && ws.send(JSON.stringify(m)), close: () => ws.close() });
     };
     ws.onmessage = (e) => h.onmsg(JSON.parse(e.data));
@@ -19,9 +19,9 @@ export function connectWs(name, code, h) {
   });
 }
 
-function hostGame(name, code, h, bots, onTick) {
+function hostGame(name, code, h, bots, onTick, look) {
   const room = makeRoom(code);
-  const me = joinRoom(room, name, (m) => h.onmsg(m));
+  const me = joinRoom(room, name, (m) => h.onmsg(m), look);
   for (let i = 0; i < bots; i++) addBot(room);
   let last = performance.now();
   const iv = setInterval(() => {
@@ -33,8 +33,8 @@ function hostGame(name, code, h, bots, onTick) {
   return { room, me, send: (m) => handleMessage(room, me, m), close: () => clearInterval(iv) };
 }
 
-export function connectLocal(name, h, bots = 5) {
-  return hostGame(name, 'SOLO', h, bots);
+export function connectLocal(name, h, look, bots = 7) {
+  return hostGame(name, 'SOLO', h, bots, null, look);
 }
 
 // ---------- realtime room ----------
@@ -43,7 +43,7 @@ export function connectLocal(name, h, bots = 5) {
 // position plus their recent actions. Presence is latest-value-wins, so a dropped update is simply replaced.
 const isHost = (p) => !p.sameTab && p.presence && p.presence.hs === 1 && p.presence.host === 1;
 
-export async function connectRoom(api, name, code, h) {
+export async function connectRoom(api, name, code, h, look) {
   code = String(code || 'PLAY').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'PLAY';
   const nr = await api.join('dh-' + code.toLowerCase());
   const found = await new Promise((res) => {
@@ -56,10 +56,10 @@ export async function connectRoom(api, name, code, h) {
       res(true);
     }, () => { clearTimeout(t); res(false); });
   });
-  return found ? roomGuest(nr, name, code, h) : roomHost(nr, name, code, h);
+  return found ? roomGuest(nr, name, code, h, look) : roomHost(nr, name, code, h, look);
 }
 
-function roomHost(nr, name, code, h) {
+function roomHost(nr, name, code, h, look) {
   const peers = new Map(); // peer label -> { pl, ac, ch, ls }
   let evs = [], seq = 0, roster = [], k = 0, dead = false, un = null;
   const pushEv = (to, m) => evs.push({ i: ++seq, to, m, at: Date.now() });
@@ -70,13 +70,13 @@ function roomHost(nr, name, code, h) {
     let out = evs.map((e) => ({ i: e.i, to: e.to, m: e.m }));
     while (out.length > 40 || JSON.stringify(out).length > 1700) out.shift();
     nr.presence({ hs: 1, host: 1, st: { ...snap, k: ++k }, ev: out, ro: roster, pm: [...peers].map(([peer, v]) => [peer, v.pl.id]) }).catch(() => {});
-  });
+  }, look);
   g.room.tap = (m) => {
     if (m.t === 'st') return;
     if (m.t === 'ro') roster = m.p;
     else pushEv(0, m);
   };
-  roster = [...g.room.players.values()].map((p) => ({ id: p.id, n: p.name, c: p.color, bot: p.bot }));
+  roster = [...g.room.players.values()].map((p) => ({ id: p.id, n: p.name, c: p.color, bot: p.bot, lk: p.look }));
 
   const stop = (reason) => {
     if (dead) return;
@@ -107,13 +107,14 @@ function roomHost(nr, name, code, h) {
       if (!v) {
         if (typeof pr.n !== 'string') continue;
         const hold = {};
-        const pl = joinRoom(g.room, pr.n, (m, bc) => { if (!bc && m.t !== 'welcome' && hold.id) pushEv(hold.id, m); });
+        const pl = joinRoom(g.room, pr.n, (m, bc) => { if (!bc && m.t !== 'welcome' && hold.id) pushEv(hold.id, m); }, pr.lk);
         if (!pl) continue;
         hold.id = pl.id;
-        peers.set(p.peer, (v = { pl, ac: 0, ch: 0, ls: null }));
+        peers.set(p.peer, (v = { pl, ac: 0, ch: 0, ls: null, lk: pr.lk }));
       }
       const s = pr.s;
-      if (s && typeof s === 'object' && s !== v.ls) { v.ls = s; handleMessage(g.room, v.pl, { t: 's', x: s.x, z: s.z, r: s.r, f: s.f, q: s.q }); }
+      if (s && typeof s === 'object' && s !== v.ls) { v.ls = s; handleMessage(g.room, v.pl, { t: 's', x: s.x, z: s.z, r: s.r, f: s.f, q: s.q, l: s.l }); }
+      if (pr.lk !== v.lk) { v.lk = pr.lk; handleMessage(g.room, v.pl, { t: 'look', lk: pr.lk }); }
       if (Array.isArray(pr.ac)) for (const a of pr.ac) {
         if (!Array.isArray(a) || !(a[0] > v.ac)) continue;
         v.ac = a[0];
@@ -126,8 +127,8 @@ function roomHost(nr, name, code, h) {
   return { send: g.send, close: () => stop() };
 }
 
-function roomGuest(nr, name, code, h) {
-  const mine = { hs: 1, n: name, s: null, ac: [], ch: null };
+function roomGuest(nr, name, code, h, look) {
+  const mine = { hs: 1, n: name, lk: look, s: null, ac: [], ch: null };
   let aseq = 0, myPid = null, welcomed = false, lastK = -1, lastEv = 0, roStr = '', lost = null, dead = false, un = null;
   const publish = () => nr.presence(mine).catch(() => {});
   const stop = (reason) => {
@@ -176,7 +177,8 @@ function roomGuest(nr, name, code, h) {
 
   return {
     send(m) {
-      if (m.t === 's') mine.s = { x: m.x, z: m.z, r: m.r, f: m.f, q: m.q };
+      if (m.t === 's') mine.s = { x: m.x, z: m.z, r: m.r, f: m.f, q: m.q, l: m.l };
+      else if (m.t === 'look') mine.lk = m.lk;
       else if (m.t === 'a') mine.ac = [...mine.ac.slice(-5), [++aseq, m.a, m.x || 0, m.z || 0]];
       else if (m.t === 'chat') mine.ch = [++aseq, String(m.m).slice(0, 120)];
       else return;

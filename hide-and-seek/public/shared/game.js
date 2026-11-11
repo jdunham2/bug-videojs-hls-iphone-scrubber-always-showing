@@ -2,6 +2,7 @@
 // Transport-agnostic so it runs on the Node server and inside a browser tab (solo play or a tab hosting friends).
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
+  levelAt, validLevel, cleanLook,
   PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
@@ -21,7 +22,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export function makeRoom(code, cfg = {}) {
   const room = {
-    cfg: { hide: cfg.hide || 25, seek: cfg.seek || 180 },
+    cfg: { hide: cfg.hide || 30, seek: cfg.seek || 210 },
     code, players: new Map(), phase: 'lobby', tEnd: 0, host: null,
     coins: new Set(), spotOcc: new Map(), resc: 0, scoreT: 0, winner: null,
     map: 0, W: getWorld(0), items: new Map(), bc: [0, 0, 0],
@@ -30,14 +31,13 @@ export function makeRoom(code, cfg = {}) {
   return room;
 }
 
-function makePlayer(room, name, out) {
-  const used = new Set([...room.players.values()].map((p) => p.color));
-  let color = 0;
-  while (used.has(color)) color++;
+function makePlayer(room, name, out, look) {
+  look = cleanLook(look);
+  const color = look[1];
   const a = Math.random() * Math.PI * 2;
   const [x, z] = collide(W, Math.cos(a) * 6, Math.sin(a) * 6);
   const p = {
-    id: nextId++, out, bot: !out, name, color, role: HIDER, st: 0, hid: -1,
+    id: nextId++, out, bot: !out, name, color, look, lv: 0, role: HIDER, st: 0, hid: -1,
     x, z, r: 0, f: 0, sc: 0, q: 0, stunUntil: 0, immUntil: 0, tagCd: 0, tauntCd: 0, rocks: 3,
     seekCount: 0, noiseT: 0, ai: { stam: 100, wind: 0 },
     item: 0, cloakUntil: 0, silentUntil: 0, boostUntil: 0, cnt: {}, ch: null, seen: new Set(),
@@ -54,11 +54,11 @@ function broadcast(room, msg) {
 }
 const feed = (room, m, k = '') => broadcast(room, { t: 'feed', m, k });
 function sendRoster(room) {
-  broadcast(room, { t: 'ro', p: [...room.players.values()].map((p) => ({ id: p.id, n: p.name, c: p.color, bot: p.bot })) });
+  broadcast(room, { t: 'ro', p: [...room.players.values()].map((p) => ({ id: p.id, n: p.name, c: p.color, bot: p.bot, lk: p.look })) });
 }
-function teleport(p, x, z) {
-  p.x = x; p.z = z; p.q++;
-  send(p, { t: 'tp', x, z, q: p.q });
+function teleport(p, x, z, lv = 0) {
+  p.x = x; p.z = z; p.lv = lv; p.q++;
+  send(p, { t: 'tp', x, z, lv, q: p.q });
 }
 const hiders = (room) => [...room.players.values()].filter((p) => p.role === HIDER);
 const seekers = (room) => [...room.players.values()].filter((p) => p.role === SEEKER);
@@ -81,7 +81,7 @@ function leaveSpot(room, p, tp = true) {
   const s = W.spots[p.hid];
   room.spotOcc.delete(p.hid);
   p.hid = -1;
-  if (tp) teleport(p, s.ex, s.ez);
+  if (tp) teleport(p, s.ex, s.ez, s.lv);
 }
 
 function startRound(room) {
@@ -157,7 +157,7 @@ function tryTag(room, s, t) {
   const fx = -Math.sin(s.r), fz = -Math.cos(s.r);
   let best = null, bd = 2.7;
   for (const h of room.players.values()) {
-    if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil) continue;
+    if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || h.lv !== s.lv) continue;
     const dx = h.x - s.x, dz = h.z - s.z, d = Math.hypot(dx, dz);
     if (d >= bd) continue;
     if (d > 1 && (dx * fx + dz * fz) / d < 0.3) continue;
@@ -181,6 +181,7 @@ function useAction(room, p, t) {
   if (p.hid >= 0) return leaveSpot(room, p);
   let best = null, bd = 2.3;
   for (const s of W.spots) {
+    if (s.lv !== p.lv) continue;
     const d = Math.min(Math.hypot(s.x - p.x, s.z - p.z), Math.hypot(s.ex - p.x, s.ez - p.z));
     if (d < bd) { bd = d; best = s; }
   }
@@ -189,7 +190,7 @@ function useAction(room, p, t) {
   if (room.phase === 'end') return;
   if (room.spotOcc.has(best.id)) return send(p, { t: 'feed', m: 'Someone is already hiding in there!', k: '' });
   room.spotOcc.set(best.id, p.id);
-  p.hid = best.id; p.x = best.x; p.z = best.z; p.f = 0;
+  p.hid = best.id; p.x = best.x; p.z = best.z; p.lv = best.lv; p.f = 0;
   if (!p.seen.has(best.id)) { p.seen.add(best.id); bump(room, p, 'hide'); }
 }
 
@@ -257,8 +258,8 @@ function setMap(room, i) {
 }
 
 // ---------- bots ----------
-function setGoal(b, x, z) {
-  b.ai.path = findPath(W, b.x, b.z, x, z) || [];
+function setGoal(b, x, z, lv = 0) {
+  b.ai.path = findPath(W, b.x, b.z, b.lv, x, z, lv) || [];
   b.ai.pi = 0;
   return b.ai.path.length > 0;
 }
@@ -280,12 +281,13 @@ function botMove(b, wantSprint, dt, t) {
     ai.stam = Math.min(100, ai.stam + STAM.regenMove * dt);
   }
   const speed = (ai.spr ? S.sprint : winded ? SPEED.winded : S.walk * (ai.slow || 1)) * (t < b.boostUntil ? 1.35 : 1);
-  while (ai.pi + 1 < ai.path.length && walkable(W, b.x, b.z, ai.path[ai.pi + 1][0], ai.path[ai.pi + 1][1])) ai.pi++;
+  while (ai.pi + 1 < ai.path.length && ai.path[ai.pi][2] === b.lv && ai.path[ai.pi + 1][2] === b.lv && walkable(W, b.x, b.z, ai.path[ai.pi + 1][0], ai.path[ai.pi + 1][1], b.lv)) ai.pi++;
   const [tx, tz] = ai.path[ai.pi];
   const dx = tx - b.x, dz = tz - b.z, d = Math.hypot(dx, dz);
   if (d < 0.25) { ai.pi++; return ai.pi >= ai.path.length; }
   const m = Math.min(d, speed * dt);
-  [b.x, b.z] = collide(W, b.x + (dx / d) * m, b.z + (dz / d) * m);
+  [b.x, b.z] = collide(W, b.x + (dx / d) * m, b.z + (dz / d) * m, PR, b.lv);
+  b.lv = levelAt(W, b.x, b.z, b.lv)[0];
   b.r = Math.atan2(-dx, -dz);
   b.f = F_MOVE | (ai.spr ? F_SPRINT : 0) | (winded ? F_WIND : 0);
   // stuck detection
@@ -303,7 +305,7 @@ function nearestSeeker(room, b) {
     const d = dist(s, b);
     if (d < bd) { bd = d; best = s; }
   }
-  return best && { p: best, d: bd, los: bd < 14 && hasLOS(W, b.x, b.z, best.x, best.z) };
+  return best && { p: best, d: bd, los: bd < 14 && best.lv === b.lv && hasLOS(W, b.x, b.z, best.x, best.z, b.lv) };
 }
 
 function pickHiderPlan(room, b, t) {
@@ -326,7 +328,7 @@ function pickHiderPlan(room, b, t) {
     if (free.length) {
       const s = free[(Math.random() * free.length) | 0];
       ai.state = 'spot'; ai.spot = s.id;
-      if (setGoal(b, s.ex, s.ez)) return;
+      if (setGoal(b, s.ex, s.ez, s.lv)) return;
     }
   }
   if (seek && roll < 0.85) {
@@ -334,14 +336,14 @@ function pickHiderPlan(room, b, t) {
     if (open.length) {
       const c = open[(Math.random() * Math.min(3, open.length)) | 0];
       ai.state = 'coin';
-      if (setGoal(b, c.x, c.z)) return;
+      if (setGoal(b, c.x, c.z, c.lv)) return;
     }
   }
   for (let i = 0; i < 8; i++) {
-    const [x, z] = randomPoint(W);
+    const [x, z, lv] = randomPoint(W);
     if (Math.hypot(x, z) < 16) continue;
     ai.state = 'point';
-    if (setGoal(b, x, z)) return;
+    if (setGoal(b, x, z, lv)) return;
   }
   ai.state = 'camp'; ai.until = t + 10;
 }
@@ -349,7 +351,7 @@ function pickHiderPlan(room, b, t) {
 function startFlee(room, b, s, t) {
   let best = null, bs = -1e9;
   for (let i = 0; i < 12; i++) {
-    const [x, z] = randomPoint(W);
+    const [x, z] = randomPoint(W, true);
     const ds = Math.hypot(x - s.x, z - s.z);
     if (ds < 15) continue;
     // prefer points away from the seeker, not too far from us, and not on the far side of the seeker
@@ -388,7 +390,7 @@ function hiderAI(room, b, dt, t) {
     const s = W.spots[ai.spot];
     if (!room.spotOcc.has(s.id) && Math.hypot(s.ex - b.x, s.ez - b.z) < 1.5) {
       room.spotOcc.set(s.id, b.id);
-      b.hid = s.id; b.x = s.x; b.z = s.z; b.f = 0;
+      b.hid = s.id; b.x = s.x; b.z = s.z; b.lv = s.lv; b.f = 0;
       ai.until = t + rand(30, 80);
     } else pickHiderPlan(room, b, t);
   } else if (ai.state === 'rescue' && Math.hypot(W.lever.x - b.x, W.lever.z - b.z) < 2.3) {
@@ -406,12 +408,12 @@ function patrol(room, b) {
   if (Math.random() < 0.45) {
     const s = W.spots[(Math.random() * W.spots.length) | 0];
     ai.state = 'spot'; ai.spot = s.id;
-    if (setGoal(b, s.ex, s.ez)) return;
+    if (setGoal(b, s.ex, s.ez, s.lv)) return;
   }
   ai.state = 'point';
   if (jailed(room).length && Math.random() < 0.25) { if (setGoal(b, rand(-6, 6), W.jail.z + rand(5, 8))) return; }
-  const [x, z] = randomPoint(W);
-  setGoal(b, x, z);
+  const [x, z, lv] = randomPoint(W);
+  setGoal(b, x, z, lv);
 }
 
 function seekerAI(room, b, dt, t) {
@@ -421,21 +423,21 @@ function seekerAI(room, b, dt, t) {
   let best = null, bd = 1e9;
   const fx = -Math.sin(b.r), fz = -Math.cos(b.r);
   for (const h of room.players.values()) {
-    if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || t < h.cloakUntil) continue;
+    if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || t < h.cloakUntil || h.lv !== b.lv) continue;
     const dx = h.x - b.x, dz = h.z - b.z, d = Math.hypot(dx, dz);
     if (d > 18 || d >= bd) continue;
     const sneaky = (h.f & F_CROUCH) && d > 9; // crouching makes you much harder to spot
     if (d > 3 && ((dx * fx + dz * fz) / d < 0.35 || sneaky)) continue;
-    if (!hasLOS(W, b.x, b.z, h.x, h.z)) continue;
+    if (!hasLOS(W, b.x, b.z, h.x, h.z, b.lv)) continue;
     best = h; bd = d;
   }
   if (best) {
-    ai.state = 'chase'; ai.lsx = best.x; ai.lsz = best.z; ai.lost = false;
-    if (t > (ai.repath || 0)) { setGoal(b, best.x, best.z); ai.repath = t + 0.35; }
+    ai.state = 'chase'; ai.lsx = best.x; ai.lsz = best.z; ai.lsl = best.lv; ai.lost = false;
+    if (t > (ai.repath || 0)) { setGoal(b, best.x, best.z, best.lv); ai.repath = t + 0.35; }
     if (bd < 2.0) { b.r = Math.atan2(-(best.x - b.x), -(best.z - b.z)); tryTag(room, b, t); }
   } else if (ai.state === 'chase' && !ai.lost) {
     ai.lost = true;
-    setGoal(b, ai.lsx, ai.lsz);
+    setGoal(b, ai.lsx, ai.lsz, ai.lsl);
   }
   const arrived = botMove(b, ai.state === 'chase' || ai.state === 'noise', dt, t);
   if (!arrived || best) return;
@@ -444,7 +446,7 @@ function seekerAI(room, b, dt, t) {
     const ox = ai.state === 'chase' ? ai.lsx : b.x, oz = ai.state === 'chase' ? ai.lsz : b.z;
     let near = null, nd = 7;
     for (const s of W.spots) { const d = Math.hypot(s.x - ox, s.z - oz); if (d < nd) { nd = d; near = s; } }
-    if (near && Math.random() < 0.8) { ai.state = 'spot'; ai.spot = near.id; ai.sure = ai.lost; if (setGoal(b, near.ex, near.ez)) return; }
+    if (near && Math.random() < 0.8) { ai.state = 'spot'; ai.spot = near.id; ai.sure = ai.lost; if (setGoal(b, near.ex, near.ez, near.lv)) return; }
     patrol(room, b);
   } else if (ai.state === 'spot') {
     const s = W.spots[ai.spot];
@@ -459,7 +461,7 @@ function botUpdate(room, b, dt, t) {
     ai.slow = 0.6;
     if (botMove(b, false, dt, t) && t > (ai.idle || 0)) {
       ai.idle = t + rand(2, 7);
-      const [x, z] = randomPoint(W);
+      const [x, z] = randomPoint(W, true);
       if (Math.hypot(x, z) < 22) setGoal(b, x, z);
     }
     return;
@@ -491,7 +493,7 @@ function update(room, dt) {
     let rescuer = null;
     // power-up boxes: anyone can grab one, and they come back after 30 seconds
     for (const p of room.players.values()) {
-      if (p.st === 1 || p.hid >= 0 || p.item) continue;
+      if (p.st === 1 || p.hid >= 0 || p.item || p.lv) continue;
       for (const it of W.items) {
         if ((room.items.get(it.id) || 0) > t || Math.abs(it.x - p.x) > 1.3 || Math.abs(it.z - p.z) > 1.3) continue;
         room.items.set(it.id, t + 30);
@@ -514,7 +516,7 @@ function update(room, dt) {
         else if (p.f & F_WIND) { emitNoise(room, p.x, p.z, 'breath', p.id); p.noiseT = t + 1.2; }
       }
       for (const c of W.coins) {
-        if (room.coins.has(c.id) || Math.abs(c.x - p.x) > 1.2 || Math.abs(c.z - p.z) > 1.2) continue;
+        if (c.lv !== p.lv || room.coins.has(c.id) || Math.abs(c.x - p.x) > 1.2 || Math.abs(c.z - p.z) > 1.2) continue;
         room.coins.add(c.id);
         p.sc += 10;
         bump(room, p, 'coin');
@@ -556,7 +558,7 @@ function snapshot(room) {
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
       p.id, +p.x.toFixed(2), +p.z.toFixed(2), +p.r.toFixed(2), p.f, p.role, p.st, p.hid, p.sc,
-      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item,
+      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv,
     ]),
   });
 }
@@ -576,11 +578,11 @@ const cleanName = (s) => String(s || '').replace(/[^\w \-!?.']/g, '').trim().sli
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 
 // `out(msg, isBroadcast)` delivers a message object to this player. Returns the player, or null if full.
-export function joinRoom(room, name, out) {
+export function joinRoom(room, name, out, look) {
   W = room.W;
   if (room.players.size >= MAX_PLAYERS) return null;
   const t = now();
-  const me = makePlayer(room, cleanName(name), out);
+  const me = makePlayer(room, cleanName(name), out, look);
   if (!room.players.has(room.host) || room.players.get(room.host).bot) room.host = me.id;
   if (room.phase === 'seek' || room.phase === 'hide') me.immUntil = t + 5;
   send(me, { t: 'welcome', id: me.id, room: room.code, x: me.x, z: me.z });
@@ -606,7 +608,7 @@ export function addBot(room) {
   W = room.W;
   if (room.players.size >= MAX_PLAYERS) return;
   const used = new Set([...room.players.values()].map((p) => p.name));
-  makePlayer(room, BOT_NAMES.find((n) => !used.has(n)) || 'Bot' + nextId, null);
+  makePlayer(room, BOT_NAMES.find((n) => !used.has(n)) || 'Bot' + nextId, null, null);
   sendRoster(room);
 }
 
@@ -614,6 +616,12 @@ export function handleMessage(room, me, m) {
   if (!m || typeof m !== 'object' || !room.players.has(me.id)) return;
   W = room.W;
   const t = now();
+  if (m.t === 'look') {
+    if (t < (me.lookCd || 0)) return;
+    me.lookCd = t + 0.3;
+    me.look = cleanLook(m.lk); me.color = me.look[1];
+    return sendRoster(room);
+  }
   if (m.t === 's') {
     if (m.q !== me.q || !num(m.x) || !num(m.z) || !num(m.r)) return;
     me.r = m.r;
@@ -622,6 +630,7 @@ export function handleMessage(room, me, m) {
     const x = Math.max(-HALF + PR, Math.min(HALF - PR, m.x)), z = Math.max(-HALF + PR, Math.min(HALF - PR, m.z));
     if (Math.hypot(x - me.x, z - me.z) > 6) return teleport(me, me.x, me.z); // no teleport hacks
     me.x = x; me.z = z; me.f = m.f & 63;
+    me.lv = validLevel(W, x, z, m.l === 1 ? 1 : 0);
   } else if (m.t === 'a') {
     if (m.a === 'use') useAction(room, me, t);
     else if (m.a === 'tag') tryTag(room, me, t);

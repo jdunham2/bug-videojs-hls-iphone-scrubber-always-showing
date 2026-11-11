@@ -9,7 +9,7 @@ import { makeRoom, joinRoom, leaveRoom, handleMessage, tickRoom, TICK } from './
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const CFG = { hide: +process.env.HIDE_T || 25, seek: +process.env.SEEK_T || 180, map: +process.env.MAP || 0 };
+const CFG = { hide: +process.env.HIDE_T || 30, seek: +process.env.SEEK_T || 210, map: +process.env.MAP || 0 };
 
 // ---------- static files ----------
 const ROOTS = [
@@ -52,7 +52,7 @@ wss.on('connection', (ws) => {
       if (!code) do { code = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[(Math.random() * 24) | 0]).join(''); } while (rooms.has(code));
       room = rooms.get(code);
       if (!room) rooms.set(code, (room = makeRoom(code, CFG)));
-      me = joinRoom(room, m.name, (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); });
+      me = joinRoom(room, m.name, (msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }, m.look);
       if (!me) { ws.send(JSON.stringify({ t: 'err', m: 'That room is full.' })); room = null; }
       return;
     }

@@ -1,7 +1,8 @@
 # Dusk Hollow — multiplayer hide & seek
 
 A 3D first-person hide-and-seek game for the browser, set in a small town at sunset.
-Up to 16 players per room, with bots to fill empty seats (or to play solo).
+Up to 16 players per room, with bots to fill empty seats (or to play solo). Pick your own character, colour, hat
+and pattern before you play.
 
 ## Run it
 
@@ -18,7 +19,7 @@ and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), or `MAP` (0-2, 
 ## How it plays
 
 One in four players is a **seeker**; everyone else hides. Seekers count with their eyes
-closed for 25 seconds, then have 3 minutes to catch everybody. Roles rotate each round and
+closed for 30 seconds, then have 3½ minutes to catch everybody. Roles rotate each round and
 scores carry over.
 
 ### Every action has a consequence
@@ -35,15 +36,23 @@ scores carry over.
 | Throw a rock (**Q**, 3 per round) | A loud noise where it lands — a decoy |
 | A seeker gets close | Your heartbeat pounds and the screen edges pulse red |
 
+### Characters
+
+Eight characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien), 16 colours, seven hats and four patterns.
+Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
+
 ### Maps
+
+Each map is 150 m across and has two-storey houses. Walk up the staircase inside to reach the upper floor,
+which has its own locker, furniture and coins, but only one way back down. Bots use the stairs too.
 
 The host picks the map in the lobby with **Next map**.
 
 | Map | Setting | Hiding spots |
 | --- | --- | --- |
-| **Dusk Hollow** | A town at sunset with houses, a warehouse and a hedge maze | Bushes, lockers, dumpsters |
-| **Frostpine Camp** | A snowy campground in daylight with cabins, a lodge and a frozen pond | Tents, snowdrifts, lockers |
-| **Midnight Docks** | A container yard at night with tight alleys and a warehouse | Open containers, lockers, dumpsters |
+| **Dusk Hollow** | A town at sunset with eleven houses (three of them two-storey), a warehouse and a hedge maze | Bushes, lockers, dumpsters |
+| **Frostpine Camp** | A snowy campground in daylight with cabins, three two-storey chalets, a lodge and a frozen pond | Tents, snowdrifts, lockers |
+| **Midnight Docks** | A container yard at night with tight alleys, a warehouse and two two-storey offices | Open containers, lockers, dumpsters |
 
 ### Things to do
 
@@ -54,7 +63,7 @@ The host picks the map in the lobby with **Next map**.
   seekers get radar (pings every hider in the open) or rocket boots (7 s of extra speed).
 - **Finish your challenge.** Everyone gets a personal goal each round, such as "Collect 4 coins" or
   "Find someone inside a hiding spot", worth +75.
-- Collect 30 coins scattered around the map (+10 each).
+- Collect around 50 coins scattered around the map, some of them upstairs (+10 each).
 - Stage a jailbreak, or guard the cage.
 - Jump with **Space**, and chat with **Enter**.
 
@@ -71,7 +80,7 @@ else to look, and use the on-screen **USE**, **TAG**, **CROUCH**, **JUMP**, rock
 | Mode | Where the game runs | Who can join |
 | --- | --- | --- |
 | **Play online** on the Node server | `server.js` | Anyone who can reach the server, by room code or invite link |
-| **Play solo with bots** | In your own browser tab | Just you and five bots |
+| **Play solo with bots** | In your own browser tab | Just you and seven bots |
 | **Claude artifact** (`npm run build:artifact`) | The first tab to open a room code hosts the game | Signed-in people with access to the artifact who enter the same room code |
 
 In the artifact there is no server, so the hosting tab runs the rules and shares state through the artifact's
@@ -89,7 +98,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | `public/shared/world.js` | The three maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
-| `public/js/gfx.js` | Three.js scene, characters, effects |
+| `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |
 | `public/js/audio.js` | Synthesised sound effects |
 | `test/` | `npm test`: checks every map is fully reachable, plays a full round on the server, and runs a hosted game through a fake realtime room |
 
