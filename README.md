@@ -25,6 +25,7 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 - Buy a horse of your own: it sails aboard your longship and comes when you call (C) on any island.
 - Swear oaths (quests) for townsfolk and villagers: deliveries, wolf and deer hunts, sinking raiders, slaying the serpent, cleansing the barrow and sacking rival towns.
 - Hunt deer that bolt when you approach, and talk to villagers for rumours and work.
+- Four seasons of 10 days: green spring, long calm summer days, golden autumn storms, and snowbound winters with blizzards, short days, drift ice in the north, hungrier crews, seasonal prices and a Yule feast at Ravenholm.
 - Switch between axe and bow on foot (Q). Arrows lead moving targets and work from horseback; some of your warband and some town defenders fight as archers.
 - Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, R ride/dismount, C call your horse, Q axe/bow, E land/set sail/interact, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
 

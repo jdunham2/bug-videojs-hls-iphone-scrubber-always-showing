@@ -296,7 +296,7 @@ const cargoCount = () => Object.values(S.cargo).reduce((a, b) => a + b, 0);
 const title = () => TITLES.filter(t => S.glory >= t[0]).pop()[1];
 function price(placeId, g) {
   const p = P[placeId]; const mod = (p.prices && p.prices[g]) || 1;
-  const w = .9 + ((Math.sin(S.day * 1.7 + placeId.length * 3.1 + g.length) + 1) / 2) * .2;
+  const w = (.9 + ((Math.sin(S.day * 1.7 + placeId.length * 3.1 + g.length) + 1) / 2) * .2) * (SEASON_PRICE[seasonOf(S.day)][g] || 1);
   return Math.max(2, Math.round(GOODS[g].base * mod * w));
 }
 const power = () => S.crew * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
@@ -320,7 +320,10 @@ let dayTimer = 0;
 function passDays(n, atSea) {
   for (let i = 0; i < n; i++) {
     S.day++;
-    const eat = Math.ceil(S.crew * .5);
+    const sn = seasonOf(S.day);
+    if (dayInSeason(S.day) === 0) seasonChanged(sn);
+    if (atSea && sn === 3 && chance(.5)) S.morale = clamp(S.morale - 3, 0, 100);
+    const eat = Math.ceil(S.crew * .5 * (atSea && sn === 3 ? 1.5 : 1));
     if (S.food >= eat) S.food -= eat;
     else {
       S.food = 0; S.morale = clamp(S.morale - 12, 0, 100);
@@ -339,9 +342,31 @@ function passDays(n, atSea) {
   if (!atSea && n > 0) dayTimer = 0;
   S.usedToday = {};
 }
-function todNow() { // 0 = midnight, .5 = noon; daylight takes 70% of a game day
-  const f = dayTimer / DAY_SECONDS;
-  return (f < .7 ? .26 + f / .7 * .5 : .76 + (f - .7) / .3 * .5) % 1;
+// seasons: four seasons of SEASON_DAYS days each; day 1 is the first day of spring
+const SEASON_DAYS = 10, SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'], DAYLIGHT = [.7, .8, .62, .45];
+const seasonOf = day => Math.floor((day - 1) / SEASON_DAYS) % 4;
+const dayInSeason = day => (day - 1) % SEASON_DAYS;
+const yearOf = day => Math.floor((day - 1) / (SEASON_DAYS * 4)) + 1;
+function snowCover(day) {
+  const s = seasonOf(day), d = dayInSeason(day);
+  if (s === 3) return 1;
+  if (s === 2 && d >= SEASON_DAYS - 2) return (d - SEASON_DAYS + 3) * .3;
+  if (s === 0 && d <= 1) return d === 0 ? .6 : .25;
+  return 0;
+}
+const SEASON_PRICE = [{}, { mead: .9 }, { furs: 1.25, salt: 1.25 }, { furs: 1.4, mead: 1.35, wool: 1.25, salt: 1.1 }];
+function seasonChanged(sn) {
+  const m = [
+    ['Spring returns', 'The ice breaks up. Raiding season begins', 'Spring returns. The ice breaks up and the whale-road opens once more.'],
+    ['Summer', 'Long days and calm seas', 'Summer comes: long bright days and gentle seas.'],
+    ['Autumn', 'Storms gather. Furs and salt fetch more', 'Autumn. The nights draw in, storms gather, and traders pay more for furs and salt.'],
+    ['Winter has come', 'Cold seas, short days, drift ice in the north', 'Winter has come. Snow blankets the islands and drift ice clogs the northern sea. Your crew eats more to stay warm at sea. Hold a Yule feast at Ravenholm.'],
+  ][sn];
+  setTimeout(() => banner(m[0], m[1]), 500); log(m[2], 'gold');
+}
+function todNow() { // 0 = midnight, .5 = noon; the share of daylight depends on the season
+  const dl = DAYLIGHT[S ? seasonOf(S.day) : 0], f = dayTimer / DAY_SECONDS;
+  return (f < dl ? .26 + f / dl * .5 : .76 + (f - dl) / (1 - dl) * .5) % 1;
 }
 function todName(t) { return t < .23 || t > .8 ? 'Night' : t < .32 ? 'Dawn' : t < .7 ? 'Day' : 'Dusk'; }
 
@@ -744,33 +769,71 @@ const sandC = new THREE.Color('#d6c48e'), wetC = new THREE.Color('#8f845e'), gra
   mossC = new THREE.Color('#4a5a3a'), darkRock = new THREE.Color('#3f3e3c'), fieldC = new THREE.Color('#9a9a48');
 const tmpC = new THREE.Color();
 
+const SEASON_GRASS = [['#6a9e3c', '#4c7c2c'], ['#5d8a3a', '#477030'], ['#a08c3a', '#8a5426'], ['#5d7a4a', '#4a6040']].map(a => a.map(c => new THREE.Color(c)));
+const SEASON_FIELD = ['#6a9a40', '#b0a040', '#8a6a34', '#7a7a5a'].map(c => new THREE.Color(c));
+const snowC2 = new THREE.Color('#dfe8ec');
 function buildTerrain(p) {
   const size = p.R * 3.6, seg = 120;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
+  const pos = geo.attributes.position, N = pos.count;
+  const tv = { geo, h: new Float32Array(N), slope: new Float32Array(N), n: new Float32Array(N), field: new Uint8Array(N) };
+  for (let i = 0; i < N; i++) {
     const x = pos.getX(i) + p.wx, z = pos.getZ(i) + p.wz;
     const h = islandH(p, x, z); pos.setY(i, h);
-    const slope = Math.hypot(islandH(p, x + 1.5, z) - h, islandH(p, x, z + 1.5) - h) / 1.5;
-    const n = fbm(x * .05, z * .05);
-    if (h < -1) tmpC.copy(wetC);
-    else if (h < 1.6) tmpC.copy(sandC).lerp(wetC, clamp(-h, 0, 1) * .5);
-    else if (p.snowy) tmpC.copy(snowC).lerp(rockC, slope > .9 ? .65 : n * .18);
-    else if (p.volcano) tmpC.copy(ashC).lerp(ash2, n);
-    else if (p.type === 'ruins') tmpC.copy(darkRock).lerp(mossC, smooth(.3, .7, n) * (slope < .7 ? 1 : .2));
-    else if (h > p.H + p.peak * .55 && p.peak > 30) tmpC.copy(snowC).lerp(rockC, slope > 1.2 ? .6 : 0);
-    else if (slope > .85) tmpC.copy(rockC).lerp(darkRock, n * .5);
-    else {
-      tmpC.copy(grassC).lerp(grass2, n);
-      if ((p.type === 'village' || p.type === 'home') && islandT(p, x, z) < .6 && vnoise(x * .03, z * .03) > .6) tmpC.lerp(fieldC, .55);
-    }
-    cols[i * 3] = tmpC.r; cols[i * 3 + 1] = tmpC.g; cols[i * 3 + 2] = tmpC.b;
+    tv.h[i] = h;
+    tv.slope[i] = Math.hypot(islandH(p, x + 1.5, z) - h, islandH(p, x, z + 1.5) - h) / 1.5;
+    tv.n[i] = fbm(x * .05, z * .05);
+    tv.field[i] = (p.type === 'village' || p.type === 'home') && islandT(p, x, z) < .6 && vnoise(x * .03, z * .03) > .6 ? 1 : 0;
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  p.tv = tv; colorTerrain(p, 0, 0);
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 }));
   mesh.position.set(p.wx, 0, p.wz); mesh.receiveShadow = true; mesh.castShadow = true;
   scene.add(mesh);
+}
+function colorTerrain(p, sn, snow) {
+  const t = p.tv, cols = t.geo.attributes.color.array, [g1, g2] = SEASON_GRASS[sn];
+  for (let i = 0; i < t.h.length; i++) {
+    const h = t.h[i], slope = t.slope[i], n = t.n[i];
+    let snowable = 0;
+    if (h < -1) tmpC.copy(wetC);
+    else if (h < 1.6) { tmpC.copy(sandC).lerp(wetC, clamp(-h, 0, 1) * .5); snowable = h > .5 ? .55 : 0; }
+    else if (p.snowy) tmpC.copy(snowC).lerp(rockC, slope > .9 ? .65 : n * .18);
+    else if (p.volcano) { tmpC.copy(ashC).lerp(ash2, n); snowable = h > p.peak * .5 ? .8 : .2; }
+    else if (p.type === 'ruins') { tmpC.copy(darkRock).lerp(mossC, smooth(.3, .7, n) * (slope < .7 ? 1 : .2)); snowable = slope < .8 ? .9 : .3; }
+    else if (h > p.H + p.peak * .55 && p.peak > 30) tmpC.copy(snowC).lerp(rockC, slope > 1.2 ? .6 : 0);
+    else if (slope > .85) { tmpC.copy(rockC).lerp(darkRock, n * .5); snowable = .35; }
+    else { tmpC.copy(g1).lerp(g2, n); if (t.field[i]) tmpC.lerp(SEASON_FIELD[sn], .55); snowable = 1; }
+    if (snow > 0 && snowable > 0) tmpC.lerp(snowC, clamp(snow * snowable * (.75 + n * .4), 0, 1));
+    cols[i * 3] = tmpC.r; cols[i * 3 + 1] = tmpC.g; cols[i * 3 + 2] = tmpC.b;
+  }
+  t.geo.attributes.color.needsUpdate = true;
+}
+let seasonKey = '', winterness = 0;
+function applySeason(force) {
+  const day = S ? S.day : 1, sn = seasonOf(day), snow = snowCover(day), key = sn + '|' + snow.toFixed(2);
+  winterness = snow;
+  if (!force && key === seasonKey) return;
+  seasonKey = key;
+  PLACES.forEach(p => colorTerrain(p, sn, snow));
+  M.pine.color.set(['#33612e', '#2f5a2c', '#3a4f26', '#2f5a2c'][sn]).lerp(snowC2, snow * .55);
+  M.pine2.color.set(['#4a7d38', '#3c6b33', '#5a5a2a', '#3c6b33'][sn]).lerp(snowC2, snow * .7);
+  M.thatch.color.set('#8d7542').lerp(snowC2, snow * .8); M.turf.color.set('#55703a').lerp(snowC2, snow * .85);
+  floes.forEach(fl => fl.m.visible = snow > .5);
+}
+
+// drift ice in the northern sea during winter
+const floes = [];
+function buildFloes() {
+  const r = seeded(4242), mat = new THREE.MeshStandardMaterial({ color: 0xe8f0f4, roughness: .55, flatShading: true });
+  for (let i = 0; i < 90; i++) {
+    const x = WORLD.minX + r() * (WORLD.maxX - WORLD.minX), z = WORLD.minZ + r() * 1350;
+    if (terrainH(x, z) > -15) continue;
+    const rad = 5 + r() * 12, m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * .85, 1.6, 5 + Math.floor(r() * 3)), mat);
+    m.position.set(x, .2, z); m.rotation.y = r() * 6; m.visible = false; m.receiveShadow = true; scene.add(m);
+    floes.push({ m, x, z, r: rad });
+  }
 }
 
 function groundY(x, z, r = 3) {
@@ -1445,6 +1508,11 @@ const RAIN_N = 2600;
 const rainGeo = new THREE.BufferGeometry(); const rainArr = new Float32Array(RAIN_N * 6);
 for (let i = 0; i < RAIN_N; i++) { const x = rnd(-120, 120), y = rnd(0, 90), z = rnd(-120, 120); rainArr.set([x, y, z, x - .4, y - 2.4, z], i * 6); }
 rainGeo.setAttribute('position', new THREE.BufferAttribute(rainArr, 3));
+const SNOW_N = 3500, snowArr = new Float32Array(SNOW_N * 3), snowSeed = new Float32Array(SNOW_N);
+for (let i = 0; i < SNOW_N; i++) { snowArr[i * 3] = rnd(-130, 130); snowArr[i * 3 + 1] = rnd(0, 80); snowArr[i * 3 + 2] = rnd(-130, 130); snowSeed[i] = rnd(0, 6.28); }
+const snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowArr, 3));
+const snowfall = new THREE.Points(snowGeo, new THREE.PointsMaterial({ map: SOFT, color: 0xffffff, size: .8, transparent: true, opacity: 0, depthWrite: false }));
+snowfall.frustumCulled = false; scene.add(snowfall);
 const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xaab8c8, transparent: true, opacity: 0 }));
 rain.frustumCulled = false; scene.add(rain);
 let flash = 0;
@@ -2134,8 +2202,15 @@ function updateUnitLabels() {
 // =====================================================================
 // sea events (each new day at sea)
 // =====================================================================
+function pickSeaEvent() {
+  const sn = seasonOf(S.day);
+  if ((sn === 2 && chance(.3)) || (sn === 3 && chance(.4))) return SEA_EVENTS[0];
+  let e = pick(SEA_EVENTS);
+  if (sn === 1 && e === SEA_EVENTS[0] && chance(.6)) e = pick(SEA_EVENTS);
+  return e;
+}
 const SEA_EVENTS = [
-  () => { weather.target = 1; weather.timer = 45; banner('A storm rises', 'Thor rides the clouds');
+  () => { weather.target = 1; weather.timer = 45; banner(winterness > .5 ? 'A blizzard rises' : 'A storm rises', winterness > .5 ? 'Snow and ice on the wind' : 'Thor rides the clouds');
     setTimeout(() => { if (!S.docked) { const dmg = ri(8, 22); S.hull = Math.max(5, S.hull - dmg); S.morale = clamp(S.morale - 5, 0, 100); log(`The storm batters your longship. Hull -${dmg}.`, 'bad'); render(); } }, 9000); },
   () => { spawnWhales(); const f = ri(10, 25); S.food += f; log(`Whales breach beside the ship — a good omen. The crew hauls in fish (+${f} food).`, 'good'); banner('The whale-road', 'Whales swim alongside'); },
   () => { const s = ri(5, 25); S.silver += s; Sound.coins(); log(`Flotsam from a wreck: a small sea-chest holding ${s} silver.`, 'good'); },
@@ -2156,7 +2231,7 @@ const ACT = {
   hunt() {
     passDays(1, false);
     if (chance(.15)) { S.crew = Math.max(1, S.crew - 1); log('Wolves fell upon the hunting party. One warrior did not return.', 'bad'); return; }
-    const f = ri(12, 32) + (S.at === 'wolf' ? 8 : 0); S.food += f;
+    const f = Math.round((ri(12, 32) + (S.at === 'wolf' ? 8 : 0)) * (seasonOf(S.day) === 3 ? .6 : 1)); S.food += f;
     const fur = chance(.45) ? Math.min(ri(1, 2), S.cargoMax - cargoCount()) : 0; S.cargo.furs += fur;
     log(`The hunt went well: +${f} food${fur ? `, +${fur} furs` : ''}.`, 'good');
   },
@@ -2227,6 +2302,12 @@ const ACT = {
     S.silver -= cost; S.speed = +(S.speed + .15).toFixed(2); S.maxHull += 25; S.hull = S.maxHull; S.cargoMax += 8;
     log('Your shipwrights lengthen the longship: faster, sturdier, and more cargo room.', 'good');
   },
+  yule() {
+    const cost = 30 + S.crew * 3; if (S.silver < cost || S.yule === yearOf(S.day)) return;
+    S.silver -= cost; S.yule = yearOf(S.day); S.morale = 100; S.luck = Math.min(5, S.luck + 2); S.glory += 15;
+    log('You hold the Yule feast. The Yule log burns all night, the boar is roasted whole, and oaths are sworn over the bragging cup. (+15 glory)', 'gold');
+    banner('Yule!', 'The longest night is past · +15 glory'); Sound.horn();
+  },
   sagas() { passDays(1, false); S.morale = clamp(S.morale + 10, 0, 100); log(`Around the fire you tell the saga of ${title()}. The crew listens wide-eyed.`); },
 };
 function buy(g) { const pr = price(S.at, g); if (S.silver < pr || cargoCount() >= S.cargoMax) return; S.silver -= pr; S.cargo[g]++; Sound.coins(); save(); render(); }
@@ -2244,7 +2325,7 @@ function renderHUD() {
   const st = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
   const cargo = Object.entries(S.cargo).filter(([, q]) => q > 0).map(([g, q]) => `${GOODS[g].name} ${q}`).join(', ') || 'empty';
   $('hud').innerHTML = `
-    <div class="day">Day ${S.day} <small>${todName(todNow())}${weather.storm > .4 ? ' · storm' : ''}</small></div>
+    <div class="day">${SEASONS[seasonOf(S.day)]}, day ${dayInSeason(S.day) + 1} <small>Year ${yearOf(S.day)} · ${todName(todNow())}${weather.storm > .4 ? ' · storm' : ''}</small></div>
     <div class="stats">${st(S.silver, 'Silver')}${st(S.food, 'Food')}${st(`${S.crew}/${S.maxCrew}`, 'Crew')}${st(S.glory, 'Glory')}</div>
     <div class="stats">
       <div class="stat"><span>Morale</span><div class="bar"><i style="width:${S.morale}%;background:${S.morale < 30 ? 'var(--red)' : 'var(--green)'}"></i></div></div>
@@ -2273,6 +2354,7 @@ function renderPanel() {
     add('Recruit (15)', ACT.recruit, { disabled: S.silver < 15 || S.crew >= S.maxCrew });
     add(`Feast (${10 + S.crew * 2})`, ACT.feast, { disabled: S.silver < 10 + S.crew * 2 });
     add('Tell sagas', ACT.sagas);
+    if (seasonOf(S.day) === 3) { const yc = 30 + S.crew * 3, held = S.yule === yearOf(S.day); add(held ? 'Yule feast held' : `Hold the Yule feast (${yc})`, ACT.yule, { disabled: held || S.silver < yc, title: 'Full morale, +2 luck, +15 glory' }); }
     add(`Repair ship (${repairCost})`, ACT.repair, { disabled: S.hull >= S.maxHull || S.silver < repairCost });
     const hc = 100 + S.hall * 120, sc = 90 + Math.round((S.speed - 1) * 600);
     add(S.hall >= 4 ? 'Hall complete' : `Expand hall (${hc})`, ACT.upgradeHall, { disabled: S.hall >= 4 || S.silver < hc, title: '+4 max crew, +food while resting at home' });
@@ -2371,6 +2453,7 @@ function help() {
   • Press <b>G</b> while docked to <b>walk ashore</b> with your warband. Move with <b>WASD</b>, strike with <b>Space</b>, block with <b>Shift</b>. Search islands for treasure chests, beware the wolves of Wolfden and the draugr of the Dragon's Teeth. Beat a town's warships and your warband storms the shore to fight its defenders hand to hand. Walk back to the pier and press <b>E</b> to board.<br>
   • Horses graze on the farmland and town islands. Walk up to one and press <b>R</b> to ride. Galloping is more than twice as fast as walking, and a strike at full gallop is a charge that hits much harder. Press <b>R</b> again to dismount. Buy a horse of your own and it sails with you: press <b>C</b> on any island to call it.<br>
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
+  • <b>Seasons:</b> a year has four seasons of 10 days. Summer days are long and calm. Autumn brings storms and better prices for furs and salt. In winter snow covers the islands, days are short, blizzards blow, drift ice fills the northern sea, your crew eats more at sea and hunting is poor. Hold a Yule feast at Ravenholm in winter.<br>
   • <b>The wider sea:</b> beyond the home waters lie Skarholt, Ulfsborg, Bjornstad, the glacier of Frostfang, the Isle of Graves, Seal Rocks and Odin's Eyrie.<br>
   • <b>Oaths:</b> ask for work in towns or talk to villagers (<b>E</b>) to swear oaths: deliveries, hunts, sea battles, raids. Active oaths show under your stats and in the journal (<b>J</b>).<br>
   • <b>Hunting:</b> deer graze on Wolfden, Greenhollow and Ravenholm. They bolt when you come near, so run them down on horseback.<br>
@@ -2528,7 +2611,8 @@ if ('ontouchstart' in window) {
 const C = {
   dayZen: new THREE.Color('#2a63a6'), nightZen: new THREE.Color('#03060f'), stormZen: new THREE.Color('#2e343c'),
   dayHor: new THREE.Color('#b4d1e4'), nightHor: new THREE.Color('#0a1222'), stormHor: new THREE.Color('#5a626b'),
-  sunset: new THREE.Color('#f08850'), sunLow: new THREE.Color('#ffae6a'), sunHigh: new THREE.Color('#fff3df'),
+  sunset: new THREE.Color('#f08850'), winterZen: new THREE.Color('#6a7f96'), winterHor: new THREE.Color('#c8d4dc'),
+  deep: new THREE.Color('#0b3550'), deepWinter: new THREE.Color('#17303c'), shallow: new THREE.Color('#1f6f82'), shallowWinter: new THREE.Color('#3a6670'), sunLow: new THREE.Color('#ffae6a'), sunHigh: new THREE.Color('#fff3df'),
 };
 const zen = new THREE.Color(), hor = new THREE.Color(), sunCol = new THREE.Color(), sunDir = new THREE.Vector3();
 function updateSky(t) {
@@ -2539,6 +2623,8 @@ function updateSky(t) {
   const night = 1 - smooth(-.25, .05, elev), sunset = Math.exp(-Math.pow(elev * 5, 2));
   zen.copy(C.nightZen).lerp(C.dayZen, dayLight).lerp(C.stormZen, storm * (.4 + .6 * dayLight));
   hor.copy(C.nightHor).lerp(C.dayHor, dayLight).lerp(C.sunset, sunset * .55 * (1 - storm)).lerp(C.stormHor, storm * (.3 + .6 * dayLight));
+  zen.lerp(C.winterZen, winterness * .35 * dayLight); hor.lerp(C.winterHor, winterness * .4 * dayLight);
+  waterU.uDeep.value.copy(C.deep).lerp(C.deepWinter, winterness); waterU.uShallow.value.copy(C.shallow).lerp(C.shallowWinter, winterness);
   sunCol.copy(C.sunLow).lerp(C.sunHigh, smooth(0, .4, elev));
   skyU.uZenith.value.copy(zen); skyU.uHorizon.value.copy(hor); skyU.uSunDir.value.copy(sunDir); skyU.uSunCol.value.copy(sunCol);
   skyU.uNight.value = night; skyU.uCloud.value = storm; skyU.uTime.value = t;
@@ -2547,7 +2633,7 @@ function updateSky(t) {
   moon.intensity = .7 * night * (1 - storm * .6);
   lantern.intensity = 220 * (night + storm * .5);
   hemi.color.copy(zen).lerp(hor, .5); hemi.intensity = .25 + .55 * dayLight + .22 * night + fl * 3;
-  scene.fog.color.copy(hor); scene.fog.density = .00042 + storm * .0011 + night * .00015;
+  scene.fog.color.copy(hor); scene.fog.density = .00042 + storm * .0011 + night * .00015 + winterness * .00018;
   waterU.uSunDir.value.copy(elev > -.05 ? sunDir : sunDir.clone().negate()); waterU.uSunCol.value.copy(sunCol).multiplyScalar(dayLight * (1 - storm * .8) + night * .25);
   waterU.uSky.value.copy(hor).lerp(zen, .3).addScalar(fl * .5); waterU.uFogCol.value.copy(hor); waterU.uFogDen.value = scene.fog.density; waterU.uDay.value = dayLight * (1 - storm * .4) + .1 + fl;
   renderer.toneMappingExposure = 1 + night * .25;
@@ -2588,7 +2674,7 @@ function tick() {
   weather.timer -= dt; if (weather.timer <= 0) weather.target = 0;
   weather.storm = lerp(weather.storm, weather.target, dt * .25);
   waveAmp = 1 + weather.storm * 1.6; waterU.uAmp.value = waveAmp;
-  wind.dir += (vnoise(t * .02, 3) - .5) * dt * .1; wind.str = .7 + .3 * vnoise(t * .05, 7) + weather.storm * .3;
+  wind.dir += (vnoise(t * .02, 3) - .5) * dt * .1; wind.str = .7 + .3 * vnoise(t * .05, 7) + weather.storm * .3 + winterness * .15;
   if (wind.calm > 0) wind.calm -= dt;
   flash = Math.max(0, flash - dt * 3);
   if (weather.storm > .5 && chance(dt * .25)) { flash = 1; setTimeout(() => Sound.thunder(), rnd(200, 1500)); }
@@ -2617,12 +2703,19 @@ function tick() {
       if (ship.speed > 9 && groundCooldown <= 0) { const dmg = ri(4, 9); S.hull = Math.max(5, S.hull - dmg); log(`You ran aground! Hull -${dmg}.`, 'bad'); banner('Aground!', 'Mind the shallows'); renderHUD(); groundCooldown = 3; Sound.splash(); }
       ship.speed = -1.5;
     }
+    if (winterness > .5) for (const fl of floes) {
+      const dx = ship.pos.x - fl.x, dz = ship.pos.y - fl.z, d = Math.hypot(dx, dz), m = fl.r + 7;
+      if (d >= m || d < .01) continue;
+      ship.pos.x = fl.x + dx / d * m; ship.pos.y = fl.z + dz / d * m;
+      if (ship.speed > 9 && groundCooldown <= 0) { const dmg = ri(2, 6); S.hull = Math.max(5, S.hull - dmg); log(`The hull grinds against drift ice. Hull -${dmg}.`, 'bad'); banner('Drift ice!', 'Steer clear of the floes'); Sound.crash(); groundCooldown = 3; renderHUD(); }
+      ship.speed *= .4;
+    }
     // time passes at sea
     dayTimer += dt;
     if (dayTimer >= DAY_SECONDS) {
       dayTimer -= DAY_SECONDS; passDays(1, true);
       eventCooldown--;
-      if (eventCooldown <= 0 && chance(.45)) { eventCooldown = 1; pick(SEA_EVENTS)(); }
+      if (eventCooldown <= 0 && chance(.45)) { eventCooldown = 1; pickSeaEvent()(); }
       save(); render();
     }
   } else if (S.docked) { ship.speed = 0; }
@@ -2670,7 +2763,7 @@ function tick() {
   water.position.set(Math.round(camera.position.x / 50) * 50, 0, Math.round(camera.position.z / 50) * 50);
   sky.position.copy(camera.position);
   rain.position.set(camera.position.x, camera.position.y - 30, camera.position.z);
-  rain.material.opacity = weather.storm * .45;
+  rain.material.opacity = weather.storm * .45 * (1 - winterness);
   if (weather.storm > .02) {
     for (let i = 0; i < RAIN_N; i++) {
       const o = i * 6; let y = rainArr[o + 1] - dt * 110;
@@ -2680,6 +2773,20 @@ function tick() {
     rainGeo.attributes.position.needsUpdate = true;
   }
 
+  snowfall.material.opacity = winterness * (.45 + weather.storm * .55);
+  if (snowfall.material.opacity > .01) {
+    const fall = 4 + weather.storm * 7, gust = weather.storm * 9;
+    for (let i = 0; i < SNOW_N; i++) {
+      const o = i * 3; let y = snowArr[o + 1] - dt * fall;
+      if (y < 0) y += 80;
+      snowArr[o + 1] = y; snowArr[o] += (Math.sin(t * .8 + snowSeed[i]) * .9 + gust) * dt;
+      if (snowArr[o] > 130) snowArr[o] -= 260;
+    }
+    snowGeo.attributes.position.needsUpdate = true;
+    snowfall.position.set(camera.position.x, camera.position.y - 35, camera.position.z);
+  }
+  if (frame % 30 === 0) applySeason(false);
+  floes.forEach(fl => { if (fl.m.visible) fl.m.position.y = waveH(fl.x, fl.z, t) * .8 + .1; });
   updateSky(t);
   Sound.update(ship.speed, weather.storm, t);
   if (frame % 6 === 0) { drawMini(); hudTick(); }
@@ -2696,6 +2803,7 @@ function buildWorld() {
   PLACES.forEach(p => { buildSettlement(p); scatter(p); });
   buildInstances();
   buildCaches();
+  buildFloes();
 }
 
 function startGame(fresh) {
@@ -2704,7 +2812,7 @@ function startGame(fresh) {
   S.log = S.log || [];
   if (saved && S.ship && !S.docked) { ship.pos.set(S.ship.x, S.ship.z); ship.h = S.ship.h; }
   else dockAt(P[S.at] || P.home);
-  dayTimer = S.dayTimer || 0; camSnap = true; syncCaches();
+  dayTimer = S.dayTimer || 0; camSnap = true; syncCaches(); applySeason(true);
   $('feed').innerHTML = '';
   Sound.init();
   titleOn = false; $('title').classList.add('hide');
@@ -2720,7 +2828,7 @@ try {
   buildWorld();
   for (let i = 0; i < 8; i++) spawnNPC('merchant');
   for (let i = 0; i < 5; i++) spawnNPC('raider');
-  S = newState(); dockAt(P.home); renderHUD();
+  S = newState(); dockAt(P.home); applySeason(true); renderHUD();
   const has = !!loadSave();
   const tb = $('titleBtns');
   if (has) tb.appendChild(Object.assign(document.createElement('button'), { textContent: 'Continue saga', className: 'primary', onclick: () => startGame(false) }));
@@ -2734,7 +2842,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
