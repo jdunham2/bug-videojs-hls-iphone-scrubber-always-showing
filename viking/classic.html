@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saga of the North Sea</title>
+<style>
+  :root {
+    --bg: #14171c; --panel: #1e232b; --panel2: #262c36; --ink: #e9e2d0; --muted: #a59d8a;
+    --gold: #d9a441; --red: #c4553f; --green: #6fae5b; --blue: #5b8fbf; --line: #3a414d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Georgia, "Times New Roman", serif; }
+  header { padding: 10px 16px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; color: var(--gold); }
+  header .sub { color: var(--muted); font-style: italic; }
+  header .spacer { flex: 1; }
+  .game { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; padding: 12px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 900px) { .game { grid-template-columns: 1fr; } }
+  .mapwrap { position: relative; background: #0e2a3d; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: auto; cursor: pointer; }
+  .hint { position: absolute; left: 10px; bottom: 8px; font-size: 13px; color: #cfe3f0; background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 4px; pointer-events: none; }
+  .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .card h2 { margin: 0 0 6px; font-size: 18px; color: var(--gold); }
+  .card h3 { margin: 10px 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .stat { background: var(--panel2); border-radius: 6px; padding: 5px 6px; text-align: center; }
+  .stat b { display: block; font-size: 17px; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .bar { height: 6px; background: #111; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: var(--green); }
+  .cargo { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .title { color: var(--gold); font-style: italic; font-size: 13px; margin-top: 6px; }
+  .desc { color: var(--muted); font-style: italic; margin: 0 0 8px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { font: inherit; font-size: 14px; background: #3b3226; color: var(--ink); border: 1px solid #6b5a3e; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  button:hover:not(:disabled) { background: #4d4130; border-color: var(--gold); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.red { background: #4a2620; border-color: #8c3d2e; }
+  button.ghost { background: transparent; border-color: var(--line); color: var(--muted); }
+  table.trade { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.trade td, table.trade th { padding: 3px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+  table.trade th { color: var(--muted); font-weight: normal; }
+  table.trade button { padding: 2px 7px; font-size: 12px; }
+  .log { max-height: 260px; overflow-y: auto; font-size: 13.5px; }
+  .log p { margin: 0 0 6px; padding-left: 8px; border-left: 2px solid var(--line); }
+  .log p.good { border-color: var(--green); }
+  .log p.bad { border-color: var(--red); }
+  .log p.gold { border-color: var(--gold); }
+  .log .day { color: var(--muted); font-size: 11px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .modal.on { display: flex; }
+  .modal .box { background: var(--panel); border: 1px solid var(--gold); border-radius: 10px; max-width: 460px; width: 100%; padding: 18px; }
+  .modal h2 { margin: 0 0 8px; color: var(--gold); }
+  .modal .actions { margin-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Saga of the North Sea</h1>
+  <span class="sub">Sail where you will. Trade, raid, feast, explore — your saga, your choices.</span>
+  <span class="spacer"></span>
+  <button class="ghost" id="helpBtn">How to play</button>
+  <button class="ghost" id="newBtn">New saga</button>
+</header>
+
+<div class="game">
+  <div class="mapwrap">
+    <canvas id="map" width="1000" height="680"></canvas>
+    <div class="hint" id="hint">Click a place on the map to set sail.</div>
+  </div>
+  <div class="side">
+    <div class="card" id="statsCard"></div>
+    <div class="card" id="placeCard"></div>
+    <div class="card"><h2>The Saga So Far</h2><div class="log" id="log"></div></div>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- helpers ----------
+const rnd = (a, b) => a + Math.random() * (b - a);
+const ri = (a, b) => Math.floor(rnd(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const chance = p => Math.random() < p;
+const $ = id => document.getElementById(id);
+
+// ---------- world ----------
+const GOODS = {
+  furs:  { name: 'Furs',  base: 30 },
+  amber: { name: 'Amber', base: 55 },
+  iron:  { name: 'Iron',  base: 25 },
+  mead:  { name: 'Mead',  base: 15 },
+  salt:  { name: 'Salt',  base: 12 },
+  wool:  { name: 'Wool',  base: 18 },
+};
+
+// price modifiers: <1 cheap (they produce it), >1 dear (they want it)
+const PLACES = [
+  { id: 'home', name: 'Ravenholm', type: 'home', x: 230, y: 170, r: 60,
+    desc: 'Your home steading on the fjord. Smoke rises from the longhouse.' },
+  { id: 'frost', name: 'Frostvik', type: 'town', x: 470, y: 90, r: 46, def: 40,
+    desc: 'A bustling northern market town. Furs pile high on the docks.',
+    prices: { furs: .6, amber: 1.2, iron: 1.1, mead: 1.3, salt: 1.4, wool: 1.2 } },
+  { id: 'iron', name: 'Ironmoor', type: 'town', x: 790, y: 140, r: 52, def: 55, smith: true,
+    desc: 'Forges glow day and night. The best blades in the north are made here.',
+    prices: { furs: 1.3, amber: 1.1, iron: .55, mead: 1.2, salt: 1.2, wool: 1.4 } },
+  { id: 'salt', name: 'Saltmere', type: 'village', x: 610, y: 330, r: 40, def: 14,
+    desc: 'A sleepy fishing village of salt pans and drying racks.',
+    prices: { furs: 1.3, amber: 1.4, iron: 1.3, mead: 1.1, salt: .5, wool: .9 } },
+  { id: 'wolf', name: 'Wolfden Woods', type: 'wild', x: 120, y: 420, r: 62,
+    desc: 'Dark pine forest teeming with game — and wolves.' },
+  { id: 'mist', name: 'Mistfjord Shrine', type: 'shrine', x: 400, y: 300, r: 32,
+    desc: 'A standing-stone circle wrapped in fog. The gods listen here.' },
+  { id: 'teeth', name: 'The Dragon\'s Teeth', type: 'ruins', x: 880, y: 430, r: 44,
+    desc: 'Jagged black rocks and the bones of an ancient hall. Treasure, they say.' },
+  { id: 'ember', name: 'Ember Isle', type: 'wild', x: 520, y: 560, r: 48,
+    desc: 'A smoking volcanic island. Seabirds, hot springs and strange stones.' },
+  { id: 'green', name: 'Greenhollow', type: 'village', x: 250, y: 590, r: 46, def: 18,
+    desc: 'Rich farmland and fat sheep. The folk here are peaceful — and unprepared.',
+    prices: { furs: 1.2, amber: 1.5, iron: 1.4, mead: .7, salt: 1.2, wool: .5 } },
+  { id: 'jarl', name: 'Stonegard', type: 'fortress', x: 760, y: 590, r: 50, def: 120,
+    desc: 'The walled seat of Jarl Hakon the Grim. Gold behind every wall.',
+    prices: { furs: 1.4, amber: .7, iron: 1.2, mead: 1.5, salt: 1.3, wool: 1.3 } },
+];
+const P = Object.fromEntries(PLACES.map(p => [p.id, p]));
+
+// island shapes, generated once with a fixed seed so they stay stable
+function seeded(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+PLACES.forEach((p, i) => {
+  const r = seeded(1234 + i * 977);
+  const n = 22, pts = [];
+  for (let k = 0; k < n; k++) {
+    const a = k / n * Math.PI * 2;
+    const rad = p.r * (0.75 + r() * 0.5);
+    pts.push([p.x + Math.cos(a) * rad * 1.15, p.y + Math.sin(a) * rad * 0.9]);
+  }
+  p.shape = pts;
+  p.trees = Array.from({ length: Math.floor(p.r / 6) }, () => {
+    const a = r() * Math.PI * 2, d = r() * p.r * 0.55;
+    return [p.x + Math.cos(a) * d, p.y + Math.sin(a) * d * 0.8];
+  });
+});
+
+const TITLES = [
+  [0, 'a farmer with a boat'], [40, 'a bold sea-rover'], [120, 'a feared raider'],
+  [250, 'a famed sea-king'], [450, 'a living legend'], [800, 'one whose name the skalds will sing forever'],
+];
+
+// ---------- state ----------
+let S;
+function newState() {
+  return {
+    day: 1, at: 'home', silver: 60, food: 50, crew: 8, maxCrew: 14, morale: 70,
+    glory: 0, hull: 100, maxHull: 100, speed: 1, weapons: 0, luck: 0, hall: 0,
+    cargo: { furs: 0, amber: 0, iron: 0, mead: 0, salt: 0, wool: 0 }, cargoMax: 20,
+    hostile: {}, alert: {}, visited: { home: true }, raids: 0, jarlSlain: false,
+    log: [], usedToday: {},
+  };
+}
+function save() { try { localStorage.setItem('northsea-saga', JSON.stringify(S)); } catch (e) {} }
+function load() {
+  try { const s = JSON.parse(localStorage.getItem('northsea-saga')); if (s && s.day) return s; } catch (e) {}
+  return null;
+}
+
+function log(text, cls = '') {
+  S.log.unshift({ d: S.day, t: text, c: cls });
+  S.log.length = Math.min(S.log.length, 80);
+}
+const cargoCount = () => Object.values(S.cargo).reduce((a, b) => a + b, 0);
+const title = () => TITLES.filter(t => S.glory >= t[0]).pop()[1];
+function price(placeId, g) {
+  const p = P[placeId];
+  const mod = (p.prices && p.prices[g]) || 1;
+  // a little daily wobble, deterministic per day & place
+  const w = 0.9 + ((Math.sin(S.day * 1.7 + placeId.length * 3.1 + g.length) + 1) / 2) * 0.2;
+  return Math.max(2, Math.round(GOODS[g].base * mod * w));
+}
+function power() {
+  return S.crew * (1 + S.weapons * 0.3) * (0.6 + S.morale / 250) * (1 + S.luck * 0.1);
+}
+function defenseOf(p) { return p.def * (1 + (S.alert[p.id] || 0) * 0.5); }
+
+// ---------- time ----------
+function passDays(n, atSea) {
+  for (let i = 0; i < n; i++) {
+    S.day++;
+    const eat = Math.ceil(S.crew * 0.5);
+    if (S.food >= eat) S.food -= eat;
+    else {
+      S.food = 0; S.morale = clamp(S.morale - 12, 0, 100);
+      log('The crew goes hungry. Grumbling spreads through the benches.', 'bad');
+      if (S.morale < 25 && S.crew > 1 && chance(.5)) {
+        const lost = ri(1, Math.min(3, S.crew - 1));
+        S.crew -= lost; log(`${lost} warrior${lost > 1 ? 's' : ''} desert${lost > 1 ? '' : 's'} in the night.`, 'bad');
+      }
+    }
+    if (!atSea) S.morale = clamp(S.morale + 1, 0, 100);
+    if (S.hall > 0 && S.at === 'home') S.food += S.hall * 4;
+    for (const k in S.hostile) if (S.hostile[k] > 0) S.hostile[k]--;
+    for (const k in S.alert) if (S.alert[k] > 0 && chance(.1)) S.alert[k]--;
+    if (S.luck > 0 && chance(.08)) S.luck--;
+  }
+  S.usedToday = {};
+}
+
+// ---------- travel ----------
+let voyage = null; // {from:{x,y}, to:place, t:0, days, pathT}
+function travelDays(a, b) {
+  const d = Math.hypot(a.x - b.x, a.y - b.y);
+  return Math.max(1, Math.round(d / (170 * S.speed)));
+}
+function setSail(id) {
+  if (voyage || id === S.at) return;
+  const from = P[S.at], to = P[id];
+  const days = travelDays(from, to);
+  if (S.crew < 2) { toast('Too few hands', 'You need at least 2 crew to row the longship.'); return; }
+  voyage = { from, to, t: 0, days };
+  $('hint').textContent = `Sailing to ${to.name}… (${days} day${days > 1 ? 's' : ''})`;
+  render();
+}
+function arrive() {
+  const v = voyage; voyage = null;
+  passDays(v.days, true);
+  S.at = v.to.id;
+  const first = !S.visited[v.to.id];
+  S.visited[v.to.id] = true;
+  log(`After ${v.days} day${v.days > 1 ? 's' : ''} at sea you make landfall at ${v.to.name}.`);
+  if (first) { S.glory += 3; log(`You are the first of your kin to see ${v.to.name}. (+3 glory)`, 'gold'); }
+  $('hint').textContent = 'Click a place on the map to set sail.';
+  const ev = chance(.45) ? pick(SEA_EVENTS) : null;
+  save(); render();
+  if (ev) ev();
+}
+
+// ---------- sea events ----------
+const SEA_EVENTS = [
+  () => { const dmg = ri(10, 30); S.hull = Math.max(5, S.hull - dmg); S.morale = clamp(S.morale - 5, 0, 100);
+    log(`A storm battered the ship on the way. Hull -${dmg}.`, 'bad');
+    toast('Storm!', `Thor's anger lashed your sails. The hull is damaged (-${dmg}). Repair at home or in a town.`); },
+  () => { const f = ri(10, 25); S.food += f; log(`Whales breached beside the ship — good omen. The crew caught fish (+${f} food).`, 'good');
+    toast('Whale-road', `A pod of whales escorted you. Your crew hauled in fish: +${f} food.`); },
+  () => choice('A merchant knarr', 'A fat merchant ship wallows in the swell ahead. Her crew looks nervous.', [
+      ['Board her!', () => { if (power() * rnd(.6, 1.4) > 10) { const s = ri(30, 80); S.silver += s; S.glory += 4; const g = pick(Object.keys(GOODS)); const q = Math.min(ri(2, 5), S.cargoMax - cargoCount()); S.cargo[g] += q;
+          log(`You seized a merchant ship: +${s} silver${q > 0 ? `, ${q} ${GOODS[g].name}` : ''}. (+4 glory)`, 'gold'); }
+        else { const l = ri(1, 2); S.crew = Math.max(1, S.crew - l); log(`The merchants had hired guards. You lost ${l} crew and fled.`, 'bad'); } }],
+      ['Hail them and trade news', () => { S.luck++; log('The merchants share news and a skin of wine. The crew\'s spirits lift.', 'good'); S.morale = clamp(S.morale + 6, 0, 100); }],
+      ['Leave them be', () => log('You let the merchant ship sail on.')],
+    ]),
+  () => choice('Sea serpent!', 'A vast coiled shape rises from the grey waves, eyes like lanterns.', [
+      ['Fight it!', () => { if (power() * rnd(.5, 1.5) > 22) { S.glory += 25; S.morale = clamp(S.morale + 15, 0, 100);
+          log('You drove off the sea serpent with spear and axe! The skalds will sing of this. (+25 glory)', 'gold'); }
+        else { const l = ri(1, 3); S.crew = Math.max(1, S.crew - l); S.hull = Math.max(5, S.hull - 25); log(`The serpent smashed your oars and took ${l} crew into the deep.`, 'bad'); } }],
+      ['Row for your lives', () => { if (chance(.7)) log('Your rowers strained every muscle and escaped the serpent.'); else { S.hull = Math.max(5, S.hull - 15); log('The serpent\'s tail clipped the stern as you fled. Hull -15.', 'bad'); } }],
+      ['Throw silver to Njord', () => { const s = Math.min(S.silver, 20); S.silver -= s; S.luck++; log(`You cast ${s} silver into the sea. The serpent sinks away.`, 'good'); }],
+    ]),
+  () => { const s = ri(5, 25); S.silver += s; log(`Flotsam from a wreck: a small chest holding ${s} silver.`, 'good');
+    toast('Driftwood treasure', `You fished a sea-chest out of the waves: +${s} silver.`); },
+  () => { S.morale = clamp(S.morale - 8, 0, 100); const f = Math.min(S.food, ri(5, 12)); S.food -= f;
+    log(`Becalmed for a day. Food spoiled (-${f}) and tempers frayed.`, 'bad');
+    toast('Becalmed', `The wind died. You drifted, rations spoiled (-${f} food) and morale fell.`); },
+  () => choice('Castaways', 'Three ragged warriors wave from a rock. They beg to join your crew.', [
+      ['Take them aboard', () => { const n = Math.min(3, S.maxCrew - S.crew); S.crew += n; log(n > 0 ? `${n} castaway${n > 1 ? 's' : ''} joined your crew.` : 'No room on the benches, but you gave them food and a heading home.', 'good'); if (n === 0) { S.food = Math.max(0, S.food - 5); S.glory += 2; } }],
+      ['Sail past', () => { S.morale = clamp(S.morale - 3, 0, 100); log('You left the castaways to their fate. Some of the crew mutter.'); }],
+    ]),
+];
+
+// ---------- actions per place ----------
+function once(key) { if (S.usedToday[key]) return false; S.usedToday[key] = true; return true; }
+
+const ACT = {
+  rest(days = 1) {
+    passDays(days, false); S.morale = clamp(S.morale + 6 * days, 0, 100);
+    log(`You rest ${days > 1 ? days + ' days' : 'a day'} at ${P[S.at].name}.`);
+  },
+  hunt() {
+    passDays(1, false);
+    if (chance(.15)) { const l = 1; S.crew = Math.max(1, S.crew - l); log('Wolves fell upon the hunting party. One warrior did not return.', 'bad'); return; }
+    const f = ri(12, 32) + (P[S.at].id === 'wolf' ? 8 : 0); S.food += f;
+    const fur = chance(.4) && cargoCount() < S.cargoMax ? ri(1, 2) : 0; S.cargo.furs += Math.min(fur, S.cargoMax - cargoCount() + fur);
+    log(`The hunt went well: +${f} food${fur ? `, +${fur} furs` : ''}.`, 'good');
+  },
+  fish() { passDays(1, false); const f = ri(8, 22); S.food += f; log(`You fished the shallows: +${f} food.`, 'good'); },
+  explore() {
+    passDays(1, false);
+    const p = P[S.at];
+    const r = Math.random();
+    if (p.type === 'ruins') {
+      if (r < .3) { const s = ri(60, 160); S.silver += s; S.glory += 8; log(`Beneath a fallen hearthstone you find a hoard: +${s} silver! (+8 glory)`, 'gold'); }
+      else if (r < .5) { S.weapons++; S.glory += 5; log('You pull an ancient rune-sword from a barrow. Your crew\'s arms improve! (+5 glory)', 'gold'); }
+      else if (r < .75) { const l = ri(1, 2); S.crew = Math.max(1, S.crew - l); S.morale = clamp(S.morale - 10, 0, 100); log(`A draugr stirs in the barrow! You flee, losing ${l} crew.`, 'bad'); }
+      else { const a = Math.min(ri(2, 4), S.cargoMax - cargoCount()); S.cargo.amber += a; log(`Only scattered bones — and ${a} lumps of amber.`, a ? 'good' : ''); }
+    } else if (p.id === 'ember') {
+      if (r < .35) { S.morale = clamp(S.morale + 20, 0, 100); log('The crew bathes in hot springs. Aches melt away. (+20 morale)', 'good'); }
+      else if (r < .6) { const a = Math.min(ri(2, 5), S.cargoMax - cargoCount()); S.cargo.amber += a; log(`Strange glowing stones on the beach: +${a} amber.`, 'good'); }
+      else if (r < .8) { const f = ri(15, 30); S.food += f; log(`Thousands of seabird eggs: +${f} food.`, 'good'); }
+      else { S.hull = Math.max(5, S.hull - 10); log('The mountain rumbles and spits rock onto the beach. Hull -10.', 'bad'); }
+    } else {
+      if (r < .4) { const f = ri(10, 20); S.food += f; log(`Berries, mushrooms and a fat elk: +${f} food.`, 'good'); }
+      else if (r < .6) { const n = Math.min(ri(1, 2), S.maxCrew - S.crew); S.crew += n; log(n ? `You meet an outlaw in the woods who swears to your service (+${n} crew).` : 'You meet an outlaw, but have no bench for him.', 'good'); }
+      else if (r < .8) { S.glory += 6; log('You slay a great bear with a single spear-thrust. Its skin will hang in your hall. (+6 glory)', 'gold'); }
+      else { const l = 1; S.crew = Math.max(1, S.crew - l); log('A rockslide in a ravine. One of your crew is lost.', 'bad'); }
+    }
+  },
+  timber() {
+    passDays(1, false); const h = Math.min(S.maxHull - S.hull, ri(10, 20));
+    S.hull += h; log(`You fell fresh timber and patch the ship (+${h} hull).`, 'good');
+  },
+  recruit() {
+    const cost = 15; const n = Math.min(ri(1, 3), S.maxCrew - S.crew);
+    if (S.silver < cost || n <= 0) return;
+    S.silver -= cost; S.crew += n; log(`You spend ${cost} silver on drink and boasts. ${n} warrior${n > 1 ? 's' : ''} join${n > 1 ? '' : 's'} your crew.`, 'good');
+  },
+  feast() {
+    const cost = 10 + S.crew * 2; if (S.silver < cost) return;
+    S.silver -= cost; S.morale = clamp(S.morale + 25, 0, 100); S.glory += 2;
+    const story = pick(['Toasts are drunk to Odin and to absent friends.', 'A skald sings of your deeds — embellishing generously.', 'Someone challenges a bear to a drinking contest. The bear wins.', 'There is wrestling, boasting and at least one broken table.']);
+    log(`You throw a feast (${cost} silver). ${story} (+2 glory)`, 'good');
+  },
+  buyFood() { if (S.silver < 10) return; S.silver -= 10; S.food += 20; log('You buy 20 food for 10 silver.'); },
+  repair() {
+    const need = S.maxHull - S.hull; const cost = Math.ceil(need * 0.6);
+    if (need <= 0 || S.silver < cost) return; S.silver -= cost; S.hull = S.maxHull; log(`Shipwrights repair the hull for ${cost} silver.`, 'good');
+  },
+  offering() {
+    const cost = 20; if (S.silver < cost) return; S.silver -= cost;
+    S.luck = Math.min(S.luck + 2, 5); S.morale = clamp(S.morale + 8, 0, 100);
+    log(pick(['A raven circles three times overhead. The gods have noticed you.', 'The sacrificial fire burns blue. A good sign.', 'The seeress smiles knowingly. Fortune favours you.']), 'good');
+  },
+  omen() {
+    passDays(1, false);
+    const tips = [
+      `The runes whisper: furs fetch the most at ${bestSell('furs')}.`,
+      `The runes whisper: amber is dearest in ${bestSell('amber')}.`,
+      `A vision: Stonegard's walls guard ${P.jarl.def}+ spears. Come with a great host, or not at all.`,
+      `A vision: the barrows of the Dragon's Teeth hold more than bones.`,
+      `The seeress says: "Iron is cheap where the forges glow."`,
+      `The seeress says: "Sheep and mead are plentiful in Greenhollow."`,
+    ];
+    log(pick(tips), 'gold');
+  },
+  duel() {
+    passDays(0, false);
+    const skill = (1 + S.weapons * 0.4) * (1 + S.luck * 0.15) * rnd(.4, 1.6);
+    if (skill > 1.05) { const s = ri(40, 90); S.silver += s; S.glory += 15; log(`You defeat the town's champion in single combat! +${s} silver. (+15 glory)`, 'gold'); }
+    else { S.morale = clamp(S.morale - 15, 0, 100); S.glory = Math.max(0, S.glory - 3); S.silver = Math.max(0, S.silver - 20); log('The champion knocks you flat into the mud. You pay 20 silver and your pride. (-3 glory)', 'bad'); }
+  },
+  weapons() {
+    const cost = 80 + S.weapons * 60; if (S.silver < cost || S.weapons >= 5) return;
+    S.silver -= cost; S.weapons++; log(`The smiths forge new axes and mail for your crew (arms level ${S.weapons}).`, 'good');
+  },
+  raid() {
+    const p = P[S.at]; passDays(1, false);
+    const atk = power() * rnd(.7, 1.3), def = defenseOf(p) * rnd(.7, 1.3);
+    S.raids++;
+    S.hostile[p.id] = 30; S.alert[p.id] = (S.alert[p.id] || 0) + 1;
+    if (atk > def) {
+      const mult = p.type === 'fortress' ? 5 : p.type === 'town' ? 2.5 : 1;
+      const s = Math.round(ri(30, 70) * mult); const lost = chance(.5) ? ri(0, Math.ceil(def / 25)) : 0;
+      S.silver += s; S.crew = Math.max(1, S.crew - lost);
+      const glory = Math.round(10 * mult); S.glory += glory;
+      const goods = Object.keys(GOODS).sort(() => Math.random() - .5).slice(0, 2);
+      const got = [];
+      goods.forEach(g => { const q = Math.min(ri(1, 4), S.cargoMax - cargoCount()); if (q > 0) { S.cargo[g] += q; got.push(`${q} ${GOODS[g].name}`); } });
+      S.food += ri(10, 25); S.morale = clamp(S.morale + 10, 0, 100);
+      log(`You storm ${p.name}! Plunder: ${s} silver${got.length ? ', ' + got.join(', ') : ''}, and their stores.${lost ? ` ${lost} crew fell.` : ''} (+${glory} glory)`, 'gold');
+      if (p.type === 'fortress' && !S.jarlSlain) {
+        S.jarlSlain = true; S.glory += 100;
+        log('Jarl Hakon the Grim lies dead! All the north speaks your name. (+100 glory)', 'gold');
+        toast('The Jarl has fallen!', 'You have taken Stonegard and slain Jarl Hakon the Grim. Your saga will be sung for generations. Keep playing — the sea is still yours.');
+      }
+    } else {
+      const lost = ri(1, Math.max(2, Math.ceil(S.crew / 3)));
+      S.crew = Math.max(1, S.crew - lost); S.morale = clamp(S.morale - 20, 0, 100);
+      log(`The defenders of ${p.name} drive you back to the ships. ${lost} crew lost.`, 'bad');
+    }
+  },
+  upgradeHall() {
+    const cost = 100 + S.hall * 120; if (S.silver < cost || S.hall >= 4) return;
+    S.silver -= cost; S.hall++; S.maxCrew += 4; S.glory += 10;
+    log(`You expand your longhouse (hall level ${S.hall}). More benches, more farmland. (+10 glory)`, 'gold');
+  },
+  upgradeShip() {
+    const cost = 90 + Math.round((S.speed - 1) * 600); if (S.silver < cost || S.speed >= 1.6) return;
+    S.silver -= cost; S.speed = +(S.speed + 0.15).toFixed(2); S.maxHull += 25; S.hull = S.maxHull; S.cargoMax += 8;
+    log(`Your shipwrights lengthen the longship: faster, sturdier, and more cargo room.`, 'good');
+  },
+  sagas() { passDays(1, false); S.morale = clamp(S.morale + 10, 0, 100); log(`Around the fire you tell the saga of ${title()}. The crew listens wide-eyed.`); },
+};
+function bestSell(g) { return PLACES.filter(p => p.prices).sort((a, b) => b.prices[g] - a.prices[g])[0].name; }
+
+function buy(g) {
+  const pr = price(S.at, g); if (S.silver < pr || cargoCount() >= S.cargoMax) return;
+  S.silver -= pr; S.cargo[g]++; render(); save();
+}
+function sell(g) {
+  if (S.cargo[g] <= 0) return; const pr = price(S.at, g);
+  S.silver += pr; S.cargo[g]--; render(); save();
+}
+
+// ---------- UI ----------
+function btn(label, fn, opts = {}) {
+  const b = document.createElement('button');
+  b.textContent = label; if (opts.cls) b.className = opts.cls;
+  if (opts.disabled) b.disabled = true; if (opts.title) b.title = opts.title;
+  b.onclick = () => { fn(); save(); render(); };
+  return b;
+}
+
+function renderStats() {
+  const c = $('statsCard');
+  const st = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
+  const cargo = Object.entries(S.cargo).filter(([, q]) => q > 0).map(([g, q]) => `${GOODS[g].name} ${q}`).join(', ') || 'empty';
+  c.innerHTML = `
+    <h2>Day ${S.day}</h2>
+    <div class="stats">
+      ${st(S.silver, 'Silver')}${st(S.food, 'Food')}${st(`${S.crew}/${S.maxCrew}`, 'Crew')}${st(S.glory, 'Glory')}
+    </div>
+    <div class="stats" style="margin-top:6px">
+      <div class="stat"><span>Morale</span><div class="bar"><i style="width:${S.morale}%;background:${S.morale < 30 ? 'var(--red)' : 'var(--green)'}"></i></div></div>
+      <div class="stat"><span>Hull</span><div class="bar"><i style="width:${S.hull / S.maxHull * 100}%;background:${S.hull < 35 ? 'var(--red)' : 'var(--blue)'}"></i></div></div>
+      ${st(S.weapons, 'Arms')}${st(S.luck ? '✦'.repeat(S.luck) : '–', 'Luck')}
+    </div>
+    <div class="cargo">Cargo (${cargoCount()}/${S.cargoMax}): ${cargo}</div>
+    <div class="title">You are known as ${title()}.</div>`;
+}
+
+function renderPlace() {
+  const c = $('placeCard'); const p = P[S.at];
+  c.innerHTML = `<h2>${p.name}</h2><p class="desc">${p.desc}</p>`;
+  if (voyage) { c.innerHTML += `<p>You are at sea, bound for <b>${voyage.to.name}</b>.</p>`; return; }
+  const a = document.createElement('div'); a.className = 'actions';
+  const hostile = (S.hostile[p.id] || 0) > 0;
+  const add = (...x) => a.appendChild(btn(...x));
+
+  if (p.type === 'home') {
+    add('Rest a day', () => ACT.rest(1));
+    add('Rest a week', () => ACT.rest(7));
+    add(`Recruit (15)`, ACT.recruit, { disabled: S.silver < 15 || S.crew >= S.maxCrew });
+    add(`Feast (${10 + S.crew * 2})`, ACT.feast, { disabled: S.silver < 10 + S.crew * 2 });
+    add('Tell sagas', ACT.sagas);
+    add(`Repair ship (${Math.ceil((S.maxHull - S.hull) * .6)})`, ACT.repair, { disabled: S.hull >= S.maxHull || S.silver < Math.ceil((S.maxHull - S.hull) * .6) });
+    const hc = 100 + S.hall * 120, sc = 90 + Math.round((S.speed - 1) * 600);
+    add(S.hall >= 4 ? 'Hall complete' : `Expand hall (${hc})`, ACT.upgradeHall, { disabled: S.hall >= 4 || S.silver < hc, title: '+4 max crew, +food while resting at home' });
+    add(S.speed >= 1.6 ? 'Ship perfected' : `Improve ship (${sc})`, ACT.upgradeShip, { disabled: S.speed >= 1.6 || S.silver < sc, title: 'Faster travel, more hull and cargo' });
+  }
+  if (p.type === 'town' || p.type === 'village' || p.type === 'fortress') {
+    if (hostile) {
+      c.innerHTML += `<p style="color:var(--red)">The people here remember your raid. They will not trade for ${S.hostile[p.id]} more days.</p>`;
+    } else {
+      if (p.type !== 'fortress') {
+        add('Recruit (15)', ACT.recruit, { disabled: S.silver < 15 || S.crew >= S.maxCrew });
+        add('Buy food (10 → 20)', ACT.buyFood, { disabled: S.silver < 10 });
+      }
+      if (p.type === 'town') {
+        add(`Feast at the mead-hall (${10 + S.crew * 2})`, ACT.feast, { disabled: S.silver < 10 + S.crew * 2 });
+        add(`Repair ship (${Math.ceil((S.maxHull - S.hull) * .6)})`, ACT.repair, { disabled: S.hull >= S.maxHull || S.silver < Math.ceil((S.maxHull - S.hull) * .6) });
+        add('Challenge the champion', () => { if (once('duel')) ACT.duel(); }, { disabled: !!S.usedToday.duel });
+      }
+      if (p.smith) {
+        const wc = 80 + S.weapons * 60;
+        add(S.weapons >= 5 ? 'Finest arms owned' : `Buy arms (${wc})`, ACT.weapons, { disabled: S.weapons >= 5 || S.silver < wc });
+      }
+    }
+    const odds = power() / defenseOf(p);
+    const odd = odds > 1.6 ? 'easy' : odds > 1.1 ? 'favourable' : odds > .8 ? 'risky' : 'suicidal';
+    add(`Raid! (${odd})`, () => {
+      choice(`Raid ${p.name}?`, `Your strength: ${Math.round(power())}. Their defences: ~${Math.round(defenseOf(p))}. The odds look ${odd}. Raiding makes them hostile for 30 days.`, [
+        ['To battle!', ACT.raid], ['Not today', () => {}],
+      ]);
+    }, { cls: 'red' });
+  }
+  if (p.type === 'wild') {
+    add('Hunt', ACT.hunt); add('Fish', ACT.fish); add('Explore', ACT.explore);
+    add('Cut timber & patch hull', ACT.timber, { disabled: S.hull >= S.maxHull });
+    add('Make camp (rest)', () => ACT.rest(1));
+  }
+  if (p.type === 'ruins') { add('Explore the barrows', ACT.explore, { cls: 'red' }); add('Fish', ACT.fish); add('Make camp (rest)', () => ACT.rest(1)); }
+  if (p.type === 'shrine') {
+    add('Make an offering (20)', ACT.offering, { disabled: S.silver < 20 });
+    add('Seek an omen', ACT.omen); add('Fish', ACT.fish); add('Rest', () => ACT.rest(1));
+  }
+  c.appendChild(a);
+
+  if (p.prices && !hostile) {
+    const h = document.createElement('h3'); h.textContent = 'Market'; c.appendChild(h);
+    const t = document.createElement('table'); t.className = 'trade';
+    t.innerHTML = '<tr><th>Good</th><th>Price</th><th>Held</th><th></th></tr>';
+    Object.keys(GOODS).forEach(g => {
+      const pr = price(S.at, g); const tr = document.createElement('tr');
+      const tag = pr < GOODS[g].base * .8 ? ' <span style="color:var(--green)">cheap</span>' : pr > GOODS[g].base * 1.2 ? ' <span style="color:var(--gold)">wanted</span>' : '';
+      tr.innerHTML = `<td>${GOODS[g].name}${tag}</td><td>${pr}</td><td>${S.cargo[g]}</td><td></td>`;
+      const td = tr.lastChild;
+      const b1 = document.createElement('button'); b1.textContent = 'Buy'; b1.disabled = S.silver < pr || cargoCount() >= S.cargoMax; b1.onclick = () => buy(g);
+      const b2 = document.createElement('button'); b2.textContent = 'Sell'; b2.disabled = S.cargo[g] <= 0; b2.onclick = () => sell(g);
+      td.append(b1, ' ', b2); t.appendChild(tr);
+    });
+    c.appendChild(t);
+  }
+}
+
+function renderLog() {
+  $('log').innerHTML = S.log.map(l => `<p class="${l.c}"><span class="day">Day ${l.d}</span><br>${l.t}</p>`).join('');
+}
+
+function render() { renderStats(); renderPlace(); renderLog(); }
+
+// ---------- modals ----------
+function openModal(html, buttons) {
+  const box = $('modalBox'); box.innerHTML = html;
+  const a = document.createElement('div'); a.className = 'actions';
+  buttons.forEach(([label, fn]) => {
+    const b = document.createElement('button'); b.textContent = label;
+    b.onclick = () => { $('modal').classList.remove('on'); fn(); save(); render(); };
+    a.appendChild(b);
+  });
+  box.appendChild(a); $('modal').classList.add('on');
+}
+function toast(t, body) { openModal(`<h2>${t}</h2><p>${body}</p>`, [['Onward', () => {}]]); }
+function choice(t, body, opts) { openModal(`<h2>${t}</h2><p>${body}</p>`, opts); }
+function help() {
+  toast('How to play', `You are a Norse chieftain with a longship and a handful of warriors. There is no single goal — carve whatever saga you like.<br><br>
+  • <b>Click any place</b> on the map to sail there. Voyages take days and your crew eats food each day. Strange things happen at sea.<br>
+  • <b>Trade</b>: buy goods cheap where they're made, sell where they're wanted.<br>
+  • <b>Raid</b> villages, towns — even the Jarl's fortress — for silver and glory. Raided places stay hostile for a while.<br>
+  • <b>Hunt, fish and explore</b> wild lands and ruins. <b>Make offerings</b> for luck.<br>
+  • <b>Back home</b>, expand your hall and improve your ship.<br>
+  • Gain <b>glory</b> to rise from farmer to legend. Your saga saves automatically.`);
+}
+
+// ---------- map drawing ----------
+const cv = $('map'), ctx = cv.getContext('2d');
+let hover = null, tick = 0;
+
+function shipPos() {
+  if (!voyage) { const p = P[S.at]; return { x: p.x + p.r * 0.9, y: p.y + p.r * 0.6, a: 0 }; }
+  const a = voyage.from, b = voyage.to;
+  const ax = a.x + a.r * 0.9, ay = a.y + a.r * 0.6, bx = b.x + b.r * 0.9, by = b.y + b.r * 0.6;
+  const t = voyage.t, e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  // curve the route a little
+  const mx = (ax + bx) / 2 + (by - ay) * 0.15, my = (ay + by) / 2 - (bx - ax) * 0.15;
+  const x = (1 - e) ** 2 * ax + 2 * (1 - e) * e * mx + e * e * bx;
+  const y = (1 - e) ** 2 * ay + 2 * (1 - e) * e * my + e * e * by;
+  const dx = 2 * (1 - e) * (mx - ax) + 2 * e * (bx - mx);
+  return { x, y, a: dx < 0 ? -1 : 1 };
+}
+
+function drawShip(x, y, dir) {
+  ctx.save(); ctx.translate(x, y + Math.sin(tick / 15) * 1.5); ctx.scale(dir < 0 ? -1 : 1, 1);
+  // hull
+  ctx.fillStyle = '#6b4423'; ctx.strokeStyle = '#2b1a0c'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-22, -4); ctx.quadraticCurveTo(-24, -14, -18, -16);
+  ctx.lineTo(-17, -12); ctx.quadraticCurveTo(-19, -6, -16, 0); ctx.lineTo(16, 0);
+  ctx.quadraticCurveTo(20, -6, 18, -12); ctx.lineTo(20, -17); ctx.quadraticCurveTo(26, -12, 22, -4);
+  ctx.quadraticCurveTo(0, 8, -22, -4); ctx.fill(); ctx.stroke();
+  // shields
+  for (let i = -12; i <= 12; i += 6) { ctx.fillStyle = i % 12 === 0 ? '#c4553f' : '#d9a441'; ctx.beginPath(); ctx.arc(i, -1, 2.4, 0, 7); ctx.fill(); }
+  // mast & sail
+  ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, -34); ctx.stroke();
+  ctx.fillStyle = '#e9e2d0'; ctx.beginPath(); ctx.moveTo(-13, -31); ctx.lineTo(13, -31); ctx.lineTo(12, -9); ctx.lineTo(-12, -9); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#c4553f'; for (let i = -13; i < 13; i += 8.6) ctx.fillRect(i, -31, 4.3, 22);
+  ctx.restore();
+}
+
+function drawIcon(p) {
+  const x = p.x, y = p.y;
+  ctx.save(); ctx.translate(x, y);
+  ctx.lineWidth = 1.5; ctx.strokeStyle = '#2b1a0c';
+  const house = (dx, dy, s, roof = '#7a4a26') => {
+    ctx.fillStyle = '#9a7a54'; ctx.fillRect(dx - 8 * s, dy - 6 * s, 16 * s, 10 * s); ctx.strokeRect(dx - 8 * s, dy - 6 * s, 16 * s, 10 * s);
+    ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(dx - 10 * s, dy - 6 * s); ctx.lineTo(dx, dy - 14 * s); ctx.lineTo(dx + 10 * s, dy - 6 * s); ctx.closePath(); ctx.fill(); ctx.stroke();
+  };
+  if (p.type === 'home') { house(-10, 4, 1.4, '#5a3a1e'); house(14, 8, .9); ctx.fillStyle = 'rgba(200,200,200,.5)'; ctx.beginPath(); ctx.arc(-10 + Math.sin(tick / 30) * 2, -24 - (tick % 60) / 6, 4, 0, 7); ctx.fill(); }
+  else if (p.type === 'town') { house(-14, 2, 1); house(4, -4, 1.1); house(14, 10, .9); house(-4, 12, .8); }
+  else if (p.type === 'village') { house(-8, 2, .9); house(8, 6, .8); }
+  else if (p.type === 'fortress') {
+    ctx.fillStyle = '#7d7d7d'; ctx.fillRect(-22, -14, 44, 24); ctx.strokeRect(-22, -14, 44, 24);
+    for (let i = -22; i < 22; i += 8) { ctx.fillRect(i, -19, 5, 5); }
+    ctx.fillStyle = '#5a5a5a'; ctx.fillRect(-6, -28, 12, 38); ctx.strokeRect(-6, -28, 12, 38);
+    ctx.fillStyle = '#c4553f'; ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(0, -40); ctx.lineTo(10 + Math.sin(tick / 10) * 2, -36); ctx.lineTo(0, -32); ctx.fill();
+  }
+  else if (p.type === 'shrine') {
+    ctx.fillStyle = '#8a8f96';
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; ctx.fillRect(Math.cos(a) * 14 - 2.5, Math.sin(a) * 9 - 10, 5, 12); }
+    ctx.fillStyle = `rgba(217,164,65,${.5 + Math.sin(tick / 20) * .3})`; ctx.beginPath(); ctx.arc(0, -2, 4, 0, 7); ctx.fill();
+  }
+  else if (p.type === 'ruins') {
+    ctx.fillStyle = '#2a2a2e';
+    [[-16, 4, 18], [-4, -2, 26], [10, 2, 20], [20, 8, 12]].forEach(([dx, dy, h]) => { ctx.beginPath(); ctx.moveTo(dx - 5, dy + 6); ctx.lineTo(dx, dy + 6 - h); ctx.lineTo(dx + 5, dy + 6); ctx.fill(); });
+  }
+  else if (p.id === 'ember') {
+    ctx.fillStyle = '#4a3a33'; ctx.beginPath(); ctx.moveTo(-22, 10); ctx.lineTo(-5, -18); ctx.lineTo(5, -18); ctx.lineTo(22, 10); ctx.fill();
+    ctx.fillStyle = '#e8622c'; ctx.beginPath(); ctx.arc(0, -18, 4, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(120,120,120,.45)'; ctx.beginPath(); ctx.arc(Math.sin(tick / 25) * 3, -26 - (tick % 80) / 8, 5, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function draw() {
+  tick++;
+  const W = cv.width, H = cv.height;
+  // sea
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#16405a'); g.addColorStop(1, '#0d2b40');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(180,220,240,.12)'; ctx.lineWidth = 1.2;
+  for (let y = 20; y < H; y += 34) for (let x = (y / 34 % 2) * 40; x < W; x += 80) {
+    const o = Math.sin((tick + x + y) / 40) * 4;
+    ctx.beginPath(); ctx.moveTo(x + o, y); ctx.quadraticCurveTo(x + 8 + o, y - 5, x + 16 + o, y); ctx.stroke();
+  }
+  // route preview
+  if (!voyage && hover && hover.id !== S.at) {
+    const a = P[S.at];
+    ctx.setLineDash([6, 8]); ctx.strokeStyle = 'rgba(233,226,208,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(hover.x, hover.y); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // islands
+  PLACES.forEach(p => {
+    ctx.beginPath(); p.shape.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
+    ctx.fillStyle = 'rgba(200,230,240,.18)'; ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(200,230,240,.12)'; ctx.stroke();
+    const land = p.id === 'ember' ? '#5d4a3c' : p.type === 'ruins' ? '#4a4a44' : p.type === 'fortress' ? '#6b7350' : '#5c7a45';
+    ctx.fillStyle = land; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#c9b98a'; ctx.stroke();
+    if (p.type !== 'ruins' && p.id !== 'ember') {
+      ctx.fillStyle = '#2f4d2a';
+      p.trees.forEach(([x, y]) => { if (Math.hypot(x - p.x, y - p.y) > 22) { ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x - 5, y + 3); ctx.lineTo(x + 5, y + 3); ctx.fill(); } });
+    }
+    drawIcon(p);
+    // label
+    const isHover = hover === p;
+    ctx.font = `${isHover ? 'bold ' : ''}16px Georgia`; ctx.textAlign = 'center';
+    const label = S.visited[p.id] ? p.name : p.name + ' ?';
+    const ly = p.y + p.r * 0.9 + 18;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.strokeText(label, p.x, ly);
+    ctx.fillStyle = (S.hostile[p.id] || 0) > 0 ? '#ff8f7a' : isHover ? '#ffd27a' : '#f2ead5'; ctx.fillText(label, p.x, ly);
+    if (isHover && p.id !== S.at && !voyage) {
+      const d = travelDays(P[S.at], p);
+      ctx.font = '13px Georgia'; const t = `${d} day${d > 1 ? 's' : ''} · ~${Math.ceil(S.crew * .5) * d} food`;
+      ctx.strokeText(t, p.x, ly + 16); ctx.fillStyle = '#cfe3f0'; ctx.fillText(t, p.x, ly + 16);
+    }
+  });
+  // compass
+  ctx.save(); ctx.translate(W - 50, H - 50); ctx.strokeStyle = 'rgba(233,226,208,.5)'; ctx.fillStyle = 'rgba(233,226,208,.5)';
+  ctx.beginPath(); ctx.arc(0, 0, 26, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(5, 0); ctx.lineTo(0, 24); ctx.lineTo(-5, 0); ctx.closePath(); ctx.fill();
+  ctx.font = '12px Georgia'; ctx.textAlign = 'center'; ctx.fillText('N', 0, -30); ctx.restore();
+
+  // ship
+  if (voyage) { voyage.t += 0.012 / Math.sqrt(voyage.days); if (voyage.t >= 1) { voyage.t = 1; const sp = shipPos(); drawShip(sp.x, sp.y, sp.a); arrive(); requestAnimationFrame(draw); return; } }
+  const sp = shipPos(); drawShip(sp.x, sp.y, sp.a);
+  requestAnimationFrame(draw);
+}
+
+function placeAt(ev) {
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left) * cv.width / r.width, y = (ev.clientY - r.top) * cv.height / r.height;
+  return PLACES.find(p => Math.hypot((x - p.x) / 1.15, (y - p.y) / 0.9) < p.r + 10) || null;
+}
+cv.addEventListener('mousemove', e => { hover = placeAt(e); cv.style.cursor = hover && hover.id !== S.at ? 'pointer' : 'default'; });
+cv.addEventListener('mouseleave', () => hover = null);
+cv.addEventListener('click', e => {
+  const p = placeAt(e); if (!p || voyage) return;
+  if (p.id === S.at) return;
+  const d = travelDays(P[S.at], p), need = Math.ceil(S.crew * .5) * d;
+  if (S.food < need) choice('Short on food', `The voyage to ${p.name} takes ${d} days and needs about ${need} food. You have ${S.food}. Sail anyway?`, [['Sail anyway', () => setSail(p.id)], ['Stay', () => {}]]);
+  else setSail(p.id);
+});
+
+$('helpBtn').onclick = help;
+$('newBtn').onclick = () => choice('Begin a new saga?', 'Your current saga will be forgotten.', [['Yes, begin anew', () => { start(true); }], ['No', () => {}]]);
+
+function start(fresh) {
+  S = (!fresh && load()) || null;
+  if (!S) {
+    S = newState();
+    log('Spring has come to Ravenholm. The ice has left the fjord, your longship is tarred and your warriors are restless. Where will the whale-road take you?', 'gold');
+    save(); render(); help(); return;
+  }
+  render();
+}
+
+start(false);
+requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
