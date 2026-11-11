@@ -232,6 +232,19 @@ MINIBOSSES.push(
   { name: 'GARGOYLE GUS', acc: 'horns', cape: '#5a5a5a', col: '#6a6a72', hp: 1.5, spd: 1.2, s: 1.85, moves: ['leap', 'burrow', 'quake3'] },
   { name: 'HIGH SCORE HANK', acc: 'cap', cape: '#2affc6', col: '#ff2ad4', hp: 1.45, spd: 1.4, s: 1.7, moves: ['laserwall', 'barrage'] },
 );
+// wild bosses: can crash Arcade boss waves, and all join Boss Rush
+const WILD_BOSSES = [
+  { name: 'TWISTER TOM', acc: 'cowboy', cape: '#6a8f4a', col: '#8a9a7a', hp: 1.8, spd: 1.3, s: 2.45, home: 11, moves: ['tornado', 'charge3', 'leap', 'spin'] },
+  { name: 'THE COMET QUEEN', acc: 'tiara', cape: '#3a2a8a', col: '#ff9a3a', hp: 1.85, spd: 1.25, s: 2.4, home: 10, moves: ['meteors', 'teleport', 'beam', 'lightning'] },
+  { name: 'BUBBLE BARON', acc: 'tophat', cape: '#2a8ac0', col: '#7ad0f0', hp: 1.85, spd: 1.1, s: 2.55, home: 17, moves: ['bubbles', 'barrage', 'vortex', 'clones'] },
+  { name: 'CACTUS COLOSSUS', acc: 'spikes', cape: '#4f9a2a', col: '#6aa83a', hp: 2, spd: 0.95, s: 2.85, home: 6, moves: ['spikeline', 'quake3', 'stomp3', 'charge3'] },
+  { name: 'RHINO RAMPAGE', acc: 'horns', cape: '#5a5a6a', col: '#8a8a9a', hp: 1.95, spd: 1.35, s: 2.7, home: 13, moves: ['charge3', 'sweep', 'leap', 'spikeline'] },
+  { name: 'THE OMEGA ERASER', acc: 'crown', cape: '#111111', col: '#e8798f', hp: 2.5, spd: 1.3, s: 3, home: 12, moves: ['tornado', 'meteors', 'spikeline', 'charge3', 'blackhole', 'laserwall', 'lightning', 'bubbles'] },
+];
+EXTRA_BOSSES.push(...WILD_BOSSES);
+BOSSES[3].moves.push('charge3'); BOSSES[6].moves.push('spikeline'); BOSSES[10].moves.push('meteors'); BOSSES[11].moves.push('tornado');
+BOSSES[12].moves.push('meteors', 'spikeline'); BOSSES[17].moves.push('bubbles'); BOSSES[18].moves.push('spikeline');
+MINIBOSSES[11].moves.push('tornado'); MINIBOSSES[17].moves.push('bubbles'); MINIBOSSES[1].moves.push('charge3');
 const miniInfo = () => G.miniOv || MINIBOSSES[stageIdx()];
 // ---------------------------------------------------------------- story
 const GRAND = BOSSES[12];
@@ -1568,7 +1581,8 @@ class Enemy extends Fighter {
           this.lastMove = c;
           this.stomps = 0;
           if (c === 'stomp3') { c = 'leap'; this.stomps = 3; }
-          this.bstate = c; this.bt = { charge: 42, leap: 20, barrage: 56, summon: 60, beam: 75, inkrain: 80, clones: 50, teleport: 64, spin: 100, vortex: 100, sweep: 38, blackhole: 130, boomerang: 60, quake3: 70, burrow: 92, lightning: 100, laserwall: 120 }[c];
+          this.charges = 0; if (c === 'charge3') { c = 'charge'; this.charges = 3; }
+          this.bstate = c; this.bt = { charge: 42, leap: 20, barrage: 56, summon: 60, beam: 75, inkrain: 80, clones: 50, teleport: 64, spin: 100, vortex: 100, sweep: 38, blackhole: 130, boomerang: 60, quake3: 70, burrow: 92, lightning: 100, laserwall: 120, tornado: 50, meteors: 70, bubbles: 60, spikeline: 54 }[c];
           if (c === 'sweep') SFX.roar();
           if (c === 'burrow') SFX.dash();
           if (c === 'blackhole') { this.bhX = clamp(t.x, 220, W - 220); this.bhY = 430; SFX.portal(); }
@@ -1579,6 +1593,8 @@ class Enemy extends Fighter {
           if (c === 'laserwall') { G.lasers.push({ y: FLOOR - 24, t: 0, boss: true }); G.lasers.push({ y: pick([440, 300]), t: -40, boss: true }); if (ph2) G.lasers.push({ y: FLOOR - 24, t: -75, boss: true }); SFX.charge(); }
           if (c === 'spin' || c === 'vortex') { SFX.charge(); this.spinHit = {}; this.spinDir = this.facing; }
           if (c === 'charge') SFX.roar();
+          if (c === 'tornado' || c === 'meteors') SFX.roar();
+          if (c === 'spikeline') { SFX.charge(); this.spikeDir = this.facing; }
           if (c === 'summon') { SFX.roar(); for (let i = 0; i < 2; i++) addPortal(spawnPos(), 'grunt'); }
           this.hitSet = new Set();
         }
@@ -1591,7 +1607,9 @@ class Enemy extends Fighter {
           if (this.bt % 3 === 0) dustBurst(this.x, this.y, 2);
           const box = atkBox(this, { hb: { x: 18, y: 40, w: 46, h: 70 } });
           for (const p of ps) if (!this.hitSet.has(p.id) && overlap(box, p.hurtbox())) { this.hitSet.add(p.id); doHit(this, p, { dmg: 18, kb: [15, 11], stun: 30, hs: 8, heavy: true, sfx: 'heavy', shake: 10 }, this.facing); }
-          if (this.hitWall) {
+          if ((this.hitWall || this.bt < -110) && this.charges > 1) {
+            this.charges--; this.facing = -this.facing; this.vx = 0; this.bt = 16; this.hitSet = new Set(); SFX.roar(); addShake(8); dustBurst(this.x, this.y, 8);
+          } else if (this.hitWall) {
             this.bstate = 'dazed'; this.bt = ph2 ? 90 : 120; this.vx = -this.facing * 6; this.vy = -8; this.onGround = false;
             SFX.shock(); addShake(18); splash(this.x + this.facing * 30, this.y - 120, theme().enemy, 30, 9); floatText(this.x, this.y - 220, 'DAZED! ATTACK!', '#e8a800', 40, 80);
           }
@@ -1627,6 +1645,22 @@ class Enemy extends Fighter {
         fric(); this.physics();
         if (this.bt === 34) for (const x of this.rainX) G.projs.push({ x, y: -30 - rand(0, 30), vx: 0, vy: 16, g: 0.5, r: 16, dmg: 12, owner: 'enemy', kind: 'blob', life: 200, rot: 0, col: theme().enemy });
         if (this.bt <= -20) { this.bstate = 'idle'; this.bt = 45; this.rainX = null; } break;
+      case 'tornado':
+        fric(); this.physics();
+        if (this.bt === 20) { G.projs.push({ x: this.x + this.facing * 70, y: this.y - 60, vx: this.facing * (ph2 ? 6 : 4.5), vy: 0, g: 0, r: 40, dmg: 12, owner: 'enemy', kind: 'tornado', life: ph2 ? 320 : 260, col: theme().enemy, tornado: true, pierceP: true }); SFX.whoosh(); }
+        if (this.bt <= 0) { this.bstate = 'idle'; this.bt = 45; } break;
+      case 'meteors':
+        fric(); this.physics();
+        if (this.bt === 40) { const d = Math.random() < 0.5 ? 1 : -1; for (let i = 0; i < (ph2 ? 10 : 7); i++) G.projs.push({ x: d > 0 ? rand(-250, W - 450) : rand(450, W + 250), y: -40 - i * 75, vx: d * 3.5, vy: 6, g: 0.25, r: 18, dmg: 13, owner: 'enemy', kind: 'meteor', life: 400, col: theme().enemy }); }
+        if (this.bt <= -10) { this.bstate = 'idle'; this.bt = 45; } break;
+      case 'bubbles':
+        fric(); this.physics(); if (t) this.facing = sign(t.x - this.x) || this.facing;
+        if (t && this.bt > 0 && this.bt < 52 && this.bt % 16 === 0) { const y0 = this.y - 70 * this.s * 0.6; G.projs.push({ x: this.x + this.facing * 50, y: y0, vx: this.facing * 4, vy: clamp((t.y - 50 - y0) / 90, -3, 3), g: 0, r: 22, dmg: 6, owner: 'enemy', kind: 'bubble', life: 220, col: theme().enemy, trapP: true }); tone(500, 0.15, 'sine', 0.1, 800); }
+        if (this.bt <= 0) { this.bstate = 'idle'; this.bt = 40; } break;
+      case 'spikeline':
+        fric(); this.physics();
+        if (this.bt === 30) for (let k = 0; k < (ph2 ? 9 : 7); k++) { const x = this.x + this.spikeDir * (90 + k * 120); if (x < 30 || x > W - 30) break; G.projs.push({ x, y: FLOOR - 30, vx: 0, vy: 0, g: 0, r: 26, dmg: 14, owner: 'enemy', kind: 'spike', spike: true, delayT: 18 + k * 6, life: 36, col: theme().enemy, pierceP: true }); dustBurst(x, FLOOR, 3); }
+        if (this.bt <= -20) { this.bstate = 'idle'; this.bt = 40; } break;
       case 'lightning': case 'laserwall':
         fric(); this.physics(); if (this.bt <= 0) { this.bstate = 'idle'; this.bt = 40; } break;
       case 'clones':
@@ -1874,6 +1908,7 @@ function updatePickups() {
 function updateProjs() {
   for (const pr of G.projs) {
     pr.life--; pr.vy += pr.g; pr.x += pr.vx; pr.y += pr.vy; pr.rot = (pr.rot || 0) + 0.25;
+    if (pr.kind === 'meteor' && pr.owner === 'enemy' && G.frame % 2 === 0) parts.push({ type: 'flame', x: pr.x + rand(-6, 6), y: pr.y - 6, vx: -pr.vx * 0.2, vy: -1, r: rand(6, 11), life: 16, max: 16 });
     if (pr.delayT > 0) { pr.delayT--; pr.life++; continue; }
     if (pr.bomb) {
       if (pr.y >= FLOOR - pr.r) { pr.y = FLOOR - pr.r; pr.vy = -Math.abs(pr.vy) * 0.45; pr.vx *= 0.75; if (pr.goo) pr.life = Math.min(pr.life, 1); }
@@ -1942,7 +1977,7 @@ function updateProjs() {
       pr.life = 0; splash(pr.x, FLOOR - 4, pr.col, 6, 4); stampSplat(pr.x, FLOOR, 12, pr.col);
       if (pr.kind === 'meteor' || pr.kind === 'rocket' || pr.kind === 'cannonball') {
         ring(pr.x, FLOOR - 10, pr.col, 80, 6, 16); addShake(4); SFX.land();
-        for (const e of foesOf(pr.by)) if (Math.abs(e.x - pr.x) < 70 && Math.abs(e.y - FLOOR) < 60) doHit(pr.by, e, { dmg: 10, kb: [4, 8], stun: 25, hs: 3, heavy: true, sfx: 'light', meter: 0 }, sign(e.x - pr.x), true);
+        if (pr.by) for (const e of foesOf(pr.by)) if (Math.abs(e.x - pr.x) < 70 && Math.abs(e.y - FLOOR) < 60) doHit(pr.by, e, { dmg: 10, kb: [4, 8], stun: 25, hs: 3, heavy: true, sfx: 'light', meter: 0 }, sign(e.x - pr.x), true);
       }
       continue;
     }
@@ -1953,7 +1988,12 @@ function updateProjs() {
         if (p.inv > 0) continue;
         if (pr.kind === 'wave' && !p.onGround) continue;
         if (overlap(box, p.hurtbox()) && p.mirrorT > 0 && pr.kind !== 'wave') { pr.owner = 'player'; pr.by = p; pr.dmg *= 2; pr.vx = -(pr.vx || p.facing) * 1.3; pr.vy = Math.min(pr.vy, -2); pr.g = Math.min(pr.g || 0, 0.15); pr.life = 120; pr.col = p.col; SFX.reflect(); ring(pr.x, pr.y, '#5ac8ff', 50, 4); floatText(pr.x, pr.y - 30, 'MIRROR!', '#5ac8ff', 24); break; }
-        if (overlap(box, p.hurtbox())) { doHit(null, p, Object.assign({}, PROJHIT, { dmg: pr.dmg, kb: pr.kind === 'wave' ? [6, 10] : [6, 5] }), sign(pr.vx)); if (pr.kind !== 'wave') pr.life = 0; break; }
+        if (overlap(box, p.hurtbox())) {
+          if (pr.pierceP) { pr.hitP = pr.hitP || new Set(); if (pr.hitP.has(p.id)) continue; pr.hitP.add(p.id); }
+          doHit(null, p, Object.assign({}, PROJHIT, { dmg: pr.dmg, kb: pr.trapP ? [1, 3] : pr.kind === 'wave' || pr.kind === 'spike' ? [6, 10] : pr.kind === 'tornado' ? [4, 14] : [6, 5], stun: pr.trapP ? 75 : 18 }), sign(pr.vx) || sign(p.x - pr.x) || 1);
+          if (pr.trapP) { floatText(p.x, p.y - 110, 'BUBBLED!', '#5ac8ff', 24, 30); ring(p.x, p.y - 40, '#5ac8ff', 50, 4, 16); }
+          if (pr.kind !== 'wave' && !pr.pierceP) pr.life = 0; if (!pr.pierceP) break;
+        }
       }
     } else {
       for (const e of (pr.by instanceof Player ? foesOf(pr.by) : G.enemies.filter(q => !q.dead && q.spawnT <= 0))) {
@@ -2000,6 +2040,7 @@ for (let st = 0; st < NSTAGES; st++) {
   RUSH_LIST.push({ st, mini: true, B: MINIBOSSES[st] }, { st, mini: false, B: BOSSES[st] });
   if (st === 5) RUSH_LIST.push({ st, mini: false, B: HYDRA });
 }
+for (const B of WILD_BOSSES) RUSH_LIST.push({ st: B.home, mini: false, B });
 const RUSH_LEN = RUSH_LIST.length;
 function nextRush() {
   G.rushIdx++;
@@ -2031,6 +2072,7 @@ function nextWave() {
   G.stage = newStage;
   if (stageChanged) { sctx.clearRect(0, 0, W, H); buildBG(); }
   G.queue = buildWave(G.wave); G.spawnT = 40;
+  G.bossOv = G.queue[0] === 'boss' && G.wave >= 10 && Math.random() < 0.3 ? pick(WILD_BOSSES.slice(0, G.wave >= 30 ? 6 : 5)) : null;
   G.phase = 'intro'; G.phaseT = stageChanged ? 170 : 110;
   for (const p of G.players) {
     if (!p.joined) continue;
@@ -2043,7 +2085,7 @@ function nextWave() {
   if (stageChanged && G.wave > 1) banner('STAGE ' + (Math.floor((G.wave - 1) / 5) + 1), theme().name, theme().text, 160);
   else if (stageChanged) banner(theme().name, 'WAVE 1 — FIGHT!', theme().text, 150);
   else if (isMini) banner('MINI-BOSS WAVE', miniInfo().name + ' BLOCKS THE WAY', '#d22', 100);
-  else banner(isBoss ? 'BOSS WAVE' : 'WAVE ' + G.wave, isBoss ? bossInfo().name + ' APPROACHES' : 'FIGHT!', isBoss ? '#d22' : theme().text, 100);
+  else banner(isBoss ? (G.bossOv ? 'WILD BOSS!' : 'BOSS WAVE') : 'WAVE ' + G.wave, isBoss ? bossInfo().name + ' APPROACHES' : 'FIGHT!', isBoss ? '#d22' : theme().text, 100);
 }
 function updateWaves() {
   if (G.phase === 'intro') { if (--G.phaseT <= 0) G.phase = 'fight'; return; }
@@ -2847,7 +2889,8 @@ function poseFor(f) {
     if (b === 'barrage') return (f.bt % 9) < 4 ? mk(Object.assign({}, A.ET.hit)) : mk(Object.assign({}, A.ET.wind));
     if (b === 'leap' && f.bt > 0) return P.crouch;
     if (b === 'beam') return f.bt > 20 ? P.specialWind : mk({ aFu: 1.57, aFl: 1.57, aBu: 1.4, aBl: 1.5, lean: -0.1, lFu: 0.5, lBu: -0.5 });
-    if (b === 'inkrain' || b === 'clones' || b === 'vortex' || b === 'lightning' || b === 'laserwall') return P.roar;
+    if (b === 'inkrain' || b === 'clones' || b === 'vortex' || b === 'lightning' || b === 'laserwall' || b === 'meteors') return P.roar;
+    if (b === 'tornado' || b === 'bubbles' || b === 'spikeline') return f.bt > 22 ? mk(Object.assign({}, A.ET.wind)) : mk(Object.assign({}, A.ET.hit));
     if (b === 'teleport') return f.bt > 26 ? P.poundHang : P.pound;
     if (b === 'sweep') return f.bt > 0 ? P.crouch : mk({ lean: 0.9, hip: 26, aFu: 1.6, aFl: 1.6, aBu: 1.4, aBl: 1.5, lFu: 1.2, lFl: 0.2, lBu: -1.0, lBl: -1.4 });
     if (b === 'blackhole') return P.roar;
@@ -3946,7 +3989,7 @@ const NET = { role: null, connected: false, via: null, code: '', transport: null
 const IN_ARTIFACT = !!(window.claude && window.claude.use);
 for (const k of Object.keys(SFX)) { const f = SFX[k]; SFX[k] = () => { if (NET.role === 'host' && NET.connected) { NET.ev.push([++NET.evSeq, k]); if (NET.ev.length > 14) NET.ev.shift(); } f(); }; }
 const ETN = Object.keys(ETYPES), ATK = Object.keys(A), PWN = Object.keys(POWER_INFO);
-const BST = ['intro', 'roar', 'idle', 'charge', 'dazed', 'leap', 'barrage', 'summon', 'beam', 'inkrain', 'clones', 'teleport', 'spin', 'vortex', 'sweep', 'blackhole', 'boomerang', 'quake3', 'burrow', 'lightning', 'laserwall'];
+const BST = ['intro', 'roar', 'idle', 'charge', 'dazed', 'leap', 'barrage', 'summon', 'beam', 'inkrain', 'clones', 'teleport', 'spin', 'vortex', 'sweep', 'blackhole', 'boomerang', 'quake3', 'burrow', 'lightning', 'laserwall', 'tornado', 'meteors', 'bubbles', 'spikeline'];
 const ALLB = [...BOSSES, ...MINIBOSSES, ...EXTRA_BOSSES];
 const PJK = ['eraser', 'blob', 'wave', 'ibolt', 'meteor', 'slash', 'laserbolt', 'pan', 'ball', 'pie', 'tornado', 'mine', 'sonic', 'bubble', 'rocket', 'card', 'turret', 'fireball', 'flamewall', 'cannonball', 'well', 'pbh', 'spike', 'bee', 'bomb', 'paint', 'yoyo'];
 const PKK = ['heart', 'ink', 'pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'mystery', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible'];

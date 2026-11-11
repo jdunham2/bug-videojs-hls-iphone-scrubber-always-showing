@@ -106,7 +106,7 @@ After picking fighters you choose a mode:
 
 - **Story:** an 8-chapter adventure to stop **the Grand Eraser**, who wants to wipe the whole notebook clean. Each chapter has a wave of enemies, a mini-boss and a boss, with comic-style cutscenes before the chapter, before the boss and after you win, plus an ending. Press J / A to advance the text, Enter / + to skip a scene. Progress is saved, and you can replay any chapter you've reached.
 - **Arcade:** endless waves of enemies. Pick a starting stage, or a random one.
-- **Boss Rush:** fight all 41 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Boss Rush:** fight all 47 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 - **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 All modes work online.
@@ -144,7 +144,18 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 
 Plus **Ink Hydra**, a three-headed boss you meet in Story mode and Boss Rush.
 
-Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it), **triple stomp**, **boomerangs** (they come back!), **triple quake** (three floor shockwaves to jump) **burrow** (digs underground and bursts up under you: watch the dirt mound), **lightning call** (bolts strike the flashing lines) and **laser wall** (laser beams sweep across the arena: jump or get off the platform).
+**Wild bosses:** from stage 3 on, about 1 in 3 Arcade boss waves is crashed by a wild boss instead (the banner says **WILD BOSS!**). All of them are in Boss Rush too:
+
+| Wild boss | Signature moves |
+|---|---|
+| Twister Tom | Tornadoes, triple charge |
+| The Comet Queen | Meteor shower, lightning |
+| Bubble Baron | Trapping bubbles, vortex |
+| Cactus Colossus | Spike lines, triple quake |
+| Rhino Rampage | Triple charge, spike lines, eraser sweep |
+| The Omega Eraser | Almost every move in the game (shows up from stage 7, and is the final Boss Rush fight) |
+
+Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it), **triple stomp**, **boomerangs** (they come back!), **triple quake** (three floor shockwaves to jump) **burrow** (digs underground and bursts up under you: watch the dirt mound), **lightning call** (bolts strike the flashing lines), **laser wall** (laser beams sweep across the arena: jump or get off the platform), **tornado** (a twister that bounces between the walls), **meteor shower** (flaming meteors fall at an angle), **trapping bubbles** (get caught and you are stuck for a moment), **spike line** (crystal spikes erupt along the floor toward you: watch the dust) and **triple charge** (charges, turns around at the wall and charges again, three times, then gets dazed).
 
 ## Power-ups
 
