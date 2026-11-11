@@ -2153,6 +2153,10 @@ const NPCS = [
    hello:["Fancy a hand of Tides?","The tide always turns, dearie.","Sit, sit. Cards are dealt."], rumors:["In Tides, the last round is High Tide and counts double. Save a big card for it."]},
   {id:'enigma',town:'highcairn',dx:4,dy:4,name:'Enigma the Wanderer',role:'Riddles',cols:{cloak:'#4a2a6a',skin:'#d8b8a0',hair:'#1a1a2a'},riddler:true,freeSpot:true,
    hello:["What walks the road but never tires?","A riddle for a traveler?","Answers are found by those who wander."], rumors:["My riddles always point to a town. Go there, and the answer reveals itself."]},
+  {id:'brawn',town:'redrock',dx:3,dy:3,name:'Brawny Buck',role:'Arm wrestling',cols:{cloak:'#8a3a2a',skin:'#b07a50',hair:'#3a2010'},wrestler:true,freeSpot:true,
+   hello:["Think you're strong? Prove it!","Elbows on the table!","Nobody's beaten me this week."], rumors:["Arm wrestling is all about rhythm. Mash steady and fast, and don't let up when I push back."]},
+  {id:'sandy',town:'wren',dx:6,dy:5,name:'Sandy',role:'Sandcastle contest',cols:{cloak:'#e0c060',skin:'#e8c098',hair:'#d06a2a'},sandcastle:true,freeSpot:true,
+   hello:["Build it tall! Build it proud!","The tide waits for no castle.","Bucket and spade, ready?"], rumors:["Drop each layer right on top of the last. Any overhang crumbles away, so the tower gets thinner and thinner."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4584,6 +4588,8 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
+  else if (wrestle && wrestle.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) wrestleMash(); } }
+  else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
 addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); }, {capture: true});
@@ -4728,6 +4734,70 @@ function lockOpen() {
   if (Math.random() < .15) { addItem('treasure_map', 1); got.push('a Treasure Map'); }
   S.locksPicked = (S.locksPicked || 0) + 1; SFX.victory(); renderHUD(); save();
   openPanel('Locked strongbox', `<b>Click!</b> The lid springs open. Inside you find: <span style="color:var(--good)">${got.join(', ')}</span>.`, [{label: have('strongbox') ? `Open another (${have('strongbox')} left)` : 'Close', primary: true, fn: () => { if (have('strongbox')) { addItem('strongbox', -1); lockStart(); } else closeTalk(); }}]);
+}
+// ===== arm wrestling =====
+let wrestle = null;
+function wrestleStart() {
+  const str = 1 + (S.wrestleWins || 0)*.12;
+  wrestle = {on: true, pos: 0, t: 0, str, surge: 0, last: performance.now(), mash: 0, max: 20};
+  openPanel('Arm wrestling', '<div style="text-align:center">Mash <b>Space</b> (or A, or click) to push Buck’s arm down!</div><canvas id="wrC" width="300" height="150" style="display:block;margin:10px auto;border-radius:6px;cursor:pointer;max-width:100%"></canvas>', [{label: 'PUSH!', primary: true, fn: () => wrestleMash()}]);
+  setTimeout(() => { const c = document.getElementById('wrC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); wrestleMash(); }); }, 30);
+  requestAnimationFrame(wrestleLoop);
+}
+function wrestleMash() { const W = wrestle; if (!W || !W.on) return; W.pos += 2.6 + sk('str')*.15; W.mash++; if (W.mash % 4 === 0) AUD.tone(180 + W.pos*3, .05, 'square', .05); }
+function wrestleLoop() {
+  const W = wrestle; if (!W || !W.on) return; const c = document.getElementById('wrC'); if (!c || mode !== 'talk') { wrestle = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - W.last)/1000); W.last = now; W.t += dt;
+  W.surge -= dt; if (W.surge <= 0 && Math.random() < dt*.6) W.surge = .6 + Math.random()*.5;
+  W.pos -= dt*(9 + W.t)*W.str*(W.surge > 0 ? 1.7 : 1);
+  const g = c.getContext('2d'); g.fillStyle = '#5a3a20'; g.fillRect(0, 0, 300, 150); g.fillStyle = '#7a5030'; g.fillRect(0, 100, 300, 50);
+  const ang = -W.pos/W.max*1.1, cx = 150, cy = 110;
+  g.save(); g.translate(cx, cy); g.rotate(ang); g.fillStyle = player.cols.skin; g.fillRect(-6, -70, 12, 70); g.fillStyle = '#b07a50'; g.beginPath(); g.arc(0, -72, 10, 0, 7); g.fill(); g.restore();
+  g.fillStyle = player.cols.cloak; g.fillRect(20, 60, 60, 50); g.fillStyle = '#8a3a2a'; g.fillRect(220, 60, 60, 50);
+  g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillText('You', 30, 55); g.textAlign = 'right'; g.fillText('Buck', 270, 55);
+  if (W.surge > 0) { g.fillStyle = '#ff6a4a'; g.textAlign = 'center'; g.fillText('Buck pushes back!', 150, 20); }
+  g.fillStyle = '#0d131b'; g.fillRect(50, 135, 200, 8); g.fillStyle = W.pos > 0 ? '#7ae08a' : '#ff7a5a'; const f = Math.max(-1, Math.min(1, W.pos/W.max)); g.fillRect(150, 136, f*99, 6);
+  if (W.pos >= W.max || W.pos <= -W.max) { W.on = false; wrestle = null; const win = W.pos > 0;
+    if (win) { S.wrestleWins = (S.wrestleWins || 0) + 1; S.coins += 40; SFX.victory(); } else SFX.hurt(); renderHUD(); save();
+    setTimeout(() => openPanel('Arm wrestling', win ? `<b>Slam!</b> Buck’s hand hits the table. “Ha! Good arm, friend.” <span style="color:var(--good)">+40 coin</span><br><span style="color:var(--muted)">Buck gets stronger every time you beat him. Wins: ${S.wrestleWins}</span>` : '“Better luck next time, twig arms!” Buck flexes for the crowd.', [{label: 'Again · 15◆', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); wrestleStart(); }}, {label: 'Close', fn: closeTalk}]), 300); return; }
+  requestAnimationFrame(wrestleLoop);
+}
+// ===== sandcastle stacker =====
+let castle = null;
+function castleStart() {
+  castle = {on: true, layers: [{x: 90, w: 120}], cur: {x: 0, w: 120, dir: 1}, speed: 110, last: performance.now(), drop: null, crumbs: []};
+  openPanel('Sandcastle contest', '<canvas id="castleC" width="300" height="300" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">Space / A / click to drop each layer</div>', [{label: 'Drop!', primary: true, fn: () => castleDrop()}]);
+  setTimeout(() => { const c = document.getElementById('castleC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); castleDrop(); }); }, 30);
+  requestAnimationFrame(castleLoop);
+}
+function castleDrop() {
+  const C = castle; if (!C || !C.on) return; const top = C.layers[C.layers.length - 1], cu = C.cur;
+  const l = Math.max(top.x, cu.x), r = Math.min(top.x + top.w, cu.x + cu.w);
+  if (r - l <= 2) { C.crumbs.push({x: cu.x, w: cu.w, y: 0, vy: 0}); castleEnd(); return; }
+  if (cu.x < l) C.crumbs.push({x: cu.x, w: l - cu.x, layer: C.layers.length, vy: 0, dy: 0}); if (cu.x + cu.w > r) C.crumbs.push({x: r, w: cu.x + cu.w - r, layer: C.layers.length, vy: 0, dy: 0});
+  const perfect = Math.abs(cu.x - top.x) < 3; const nw = perfect ? top.w : r - l, nx = perfect ? top.x : l;
+  C.layers.push({x: nx, w: nw, perfect}); AUD.tone(300 + C.layers.length*25, .1, 'triangle', .08);
+  C.cur = {x: C.layers.length % 2 ? 300 - nw : 0, w: nw, dir: C.layers.length % 2 ? -1 : 1}; C.speed += 9;
+  if (C.layers.length >= 26) castleEnd();
+}
+function castleLoop() {
+  const C = castle; if (!C || !C.on) return; const c = document.getElementById('castleC'); if (!c || mode !== 'talk') { castle = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - C.last)/1000); C.last = now;
+  C.cur.x += C.cur.dir*C.speed*dt; if (C.cur.x < -C.cur.w*.3 || C.cur.x + C.cur.w > 300 + C.cur.w*.3) { C.cur.dir *= -1; C.cur.x = Math.max(-C.cur.w*.3, Math.min(300 + C.cur.w*.3 - C.cur.w, C.cur.x)); }
+  const LH = 12, base = 280, off = Math.max(0, C.layers.length - 16)*LH;
+  const g = c.getContext('2d'); const sky = g.createLinearGradient(0, 0, 0, 300); sky.addColorStop(0, '#8ac8f0'); sky.addColorStop(1, '#d8ecf8'); g.fillStyle = sky; g.fillRect(0, 0, 300, 300);
+  g.fillStyle = '#3a8ac0'; g.fillRect(0, 250 + off*0, 300, 14); g.fillStyle = '#e8d098'; g.fillRect(0, base + off, 300, 30);
+  C.layers.forEach((L, i) => { const y = base + off - (i + 1)*LH; g.fillStyle = i % 2 ? '#d8b878' : '#e0c488'; g.fillRect(L.x, y, L.w, LH); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(L.x, y + LH - 2, L.w, 2); if (i === C.layers.length - 1 && i > 0) { g.fillStyle = '#c8a060'; for (let x = L.x; x < L.x + L.w - 4; x += 8) g.fillRect(x, y - 3, 4, 3); } });
+  for (const cr of C.crumbs) { cr.vy += 400*dt; cr.dy = (cr.dy || 0) + cr.vy*dt; g.fillStyle = 'rgba(200,170,110,.8)'; g.fillRect(cr.x, base + off - (cr.layer || C.layers.length + 1)*LH + cr.dy, cr.w, LH); }
+  C.crumbs = C.crumbs.filter(cr => (cr.dy || 0) < 400);
+  const cy = base + off - (C.layers.length + 1)*LH; g.fillStyle = '#f0d898'; g.fillRect(C.cur.x, cy, C.cur.w, LH);
+  g.fillStyle = '#1a2a3a'; g.font = 'bold 14px sans-serif'; g.textAlign = 'left'; g.fillText(`Height: ${C.layers.length - 1}`, 10, 22);
+  requestAnimationFrame(castleLoop);
+}
+function castleEnd() {
+  const C = castle; C.on = false; castle = null; const h = C.layers.length - 1, perf = C.layers.filter(L => L.perfect).length;
+  const c = h*4 + perf*3; S.coins += c; S.castleBest = Math.max(S.castleBest || 0, h); S.castles = (S.castles || 0) + 1; SFX[h >= 15 ? 'victory' : 'coin'](); renderHUD(); save();
+  setTimeout(() => openPanel('Sandcastle contest', `Your sandcastle stands <b>${h}</b> layers tall${perf ? ` with ${perf} perfect layer${perf > 1 ? 's' : ''}` : ''}!${h >= (S.castleBest || 0) && h ? ' A new personal best!' : ''}<br>“${h >= 20 ? 'Magnificent! A royal palace of sand!' : h >= 12 ? 'Now that’s a castle!' : 'Cute! Try again before the tide comes in.'}” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Build another', primary: true, fn: () => castleStart()}, {label: 'Close', fn: closeTalk}]), 500);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -6276,8 +6346,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Arm wrestling and sandcastles', 'Brawny Buck in Redrock takes on challengers at arm wrestling: mash Space or A to push his arm down, and hold on when he pushes back. He gets tougher every time you win. Sandy in Port Wren runs a sandcastle contest: drop each layer on top of the last, since any overhang crumbles away.'],
   ['Riddles and strongboxes', 'Enigma the Wanderer in Highcairn gives one riddle a day. Each one describes a town: travel there to solve it, and the farther it is, the bigger the reward. Bandits sometimes drop Locked Strongboxes: use one from your bag to pick the lock by setting four pins before your lockpicks run out.'],
   ['Archaeology', 'Professor Dunst in Dunmere Oasis gives you a trowel. Each day, dig sites appear on your map in ruins, deserts, savannas and mesas. Excavating opens a 5\u00d75 grid: each hole shows how many steps away the artifact is buried, and you have six digs. Collect all eight artifacts for a big reward.'],
   ['Tides', 'Old Salt Morwen in Jadewater plays Tides: each of you gets five cards, and in each of five rounds the higher card wins. The last round is High Tide and counts double. 20 coin to play, 50 for a win.'],
@@ -6887,6 +6958,8 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (wrestle && wrestle.on) { [OK, BACK, 2, 3].forEach(i => { if (down(i)) wrestleMash(); }); PAD.prev = B; return; }
+  if (castle && castle.on) { if (down(OK) || down(BACK) || down(2) || down(3)) castleDrop(); PAD.prev = B; return; }
   if (lock && lock.on) { if (down(OK) || down(BACK) || down(2) || down(3)) lockPress(); PAD.prev = B; return; }
   if (cut && cut.on) { if (down(OK) || down(BACK) || down(2) || down(3)) cutPress(); PAD.prev = B; return; }
   if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
@@ -8287,6 +8360,8 @@ function mainOptions(n) {
   if (n.archaeo) o.push({label: S.trowel ? 'Show my finds' : 'Ask about archaeology', primary: true, fn: () => digTalk(n)});
   if (n.tides) o.push({label: 'Play Tides · 20\u25c6', primary: true, disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); tidesStart(n); }});
   if (n.riddler) o.push({label: S.riddle ? 'Repeat the riddle' : 'Ask for a riddle', primary: true, fn: () => riddleTalk(n)});
+  if (n.wrestler) o.push({label: 'Arm wrestle · 15\u25c6', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); wrestleStart(); }});
+  if (n.sandcastle) o.push({label: 'Build a sandcastle', primary: true, fn: () => castleStart()});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11087,6 +11162,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['armwrestle','Iron Grip','Win 3 arm-wrestling matches', () => (S.wrestleWins || 0) >= 3],
+  ['castle20','Master Builder','Build a sandcastle 20 layers tall', () => (S.castleBest || 0) >= 20],
   ['riddle5','Riddle Solver','Solve 5 of Enigma\u2019s riddles', () => (S.riddles || 0) >= 5],
   ['lockpick5','Light Fingers','Pick 5 strongbox locks', () => (S.locksPicked || 0) >= 5],
   ['artidig','Archaeologist','Find 5 artifacts at dig sites', () => Object.keys(S.digFound || {}).length >= 5],
@@ -11648,7 +11725,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
