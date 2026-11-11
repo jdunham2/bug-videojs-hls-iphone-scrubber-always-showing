@@ -13,7 +13,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), or `MAP` (0-2, the starting map) to change the defaults.
 
 ## How it plays
 
@@ -35,21 +35,36 @@ scores carry over.
 | Throw a rock (**Q**, 3 per round) | A loud noise where it lands — a decoy |
 | A seeker gets close | Your heartbeat pounds and the screen edges pulse red |
 
+### Maps
+
+The host picks the map in the lobby with **Next map**.
+
+| Map | Setting | Hiding spots |
+| --- | --- | --- |
+| **Dusk Hollow** | A town at sunset with houses, a warehouse and a hedge maze | Bushes, lockers, dumpsters |
+| **Frostpine Camp** | A snowy campground in daylight with cabins, a lodge and a frozen pond | Tents, snowdrifts, lockers |
+| **Midnight Docks** | A container yard at night with tight alleys and a warehouse | Open containers, lockers, dumpsters |
+
 ### Things to do
 
-- Hide inside bushes, lockers and dumpsters (**E**), or behind cars, crates and hedges.
-- Explore five buildings, a hedge maze, and the central plaza.
-- Collect 30 coins scattered around town (+10 each).
+- Hide inside the map's hiding spots (**E**), or behind cars, crates, containers and hedges.
+- **Light the beacons.** Each map has three. A hider who holds **E** at one for 4 seconds lights it (+40), but it hums while charging and announces itself when lit. Light all three and the hiders win on the spot.
+- **Grab power-ups** from the purple **?** boxes (they return after 30 seconds) and use them with **G**:
+  hiders get an energy drink (8 s of endless, silent sprinting) or a shadow cloak (6 s invisible to seekers);
+  seekers get radar (pings every hider in the open) or rocket boots (7 s of extra speed).
+- **Finish your challenge.** Everyone gets a personal goal each round, such as "Collect 4 coins" or
+  "Find someone inside a hiding spot", worth +75.
+- Collect 30 coins scattered around the map (+10 each).
 - Stage a jailbreak, or guard the cage.
-- Chat with **Enter**.
+- Jump with **Space**, and chat with **Enter**.
 
 ### Controls
 
-Keyboard and mouse: `WASD` move · `Shift` sprint · `C` crouch · `E` use / hide / search · `Click` or `F` tag ·
-`Q` rock · `T` taunt · `Enter` chat · `Esc` menu
+Keyboard and mouse: `WASD` move · `Shift` sprint · `Space` jump · `C` crouch · `E` use / hide / search · `Click` or `F` tag ·
+`Q` rock · `T` taunt · `G` power-up · `Enter` chat · `Esc` menu
 
 Phone or tablet: drag the left side of the screen to move (push the stick to its edge to sprint), drag anywhere
-else to look, and use the on-screen **USE**, **TAG**, **CROUCH**, rock and taunt buttons. Landscape works best.
+else to look, and use the on-screen **USE**, **TAG**, **CROUCH**, **JUMP**, rock, taunt and power-up buttons. Landscape works best.
 
 ## Three ways to play
 
@@ -71,12 +86,12 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The map (generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The three maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, characters, effects |
 | `public/js/audio.js` | Synthesised sound effects |
-| `test/` | `npm test`: plays a full round on the server, and a hosted game through a fake realtime room |
+| `test/` | `npm test`: checks every map is fully reachable, plays a full round on the server, and runs a hosted game through a fake realtime room |
 
 The game module referees tags, hiding spots, coins, jail and rescues. Player movement is
 client-side with a loose sanity check, so this is fine for playing with friends but is

@@ -1,11 +1,11 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND } from '../shared/world.js';
+import { getWorld, collide, MAPS, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
 import { Gfx, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
 import { connectWs, connectLocal, connectRoom } from './net.js';
 
 const $ = (id) => document.getElementById(id);
-const W = getWorld();
+let W = getWorld(0), curMap = 0;
 const canvas = $('c');
 const gfx = new Gfx(canvas, W);
 const sfx = new Sfx();
@@ -20,8 +20,8 @@ const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
-const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0 };
-const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0 };
+const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0] };
+const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0, y: 0, vy: 0, freeUntil: 0, boostUntil: 0, chal: '', chalDone: false };
 const keys = {};
 let playing = false, chatOpen = false, lastSend = 0, lastHud = 0, heartT = 0, tauntCd = 0, bannerT = 0;
 window.__g = { me, players, G, gfx };
@@ -109,7 +109,29 @@ function onMsg(m) {
     case 'freed': sfx.freed(); break;
     case 'search': if (m.id === myId) { sfx.stun(); banner('Empty! You are dazed…'); } break;
     case 'rock': gfx.throwRock(m.fx, m.fz, m.x, m.z); break;
-    case 'round': me.stam = 100; me.wind = 0; break;
+    case 'round': me.stam = 100; me.wind = 0; me.freeUntil = me.boostUntil = 0; me.chal = ''; break;
+    case 'chal':
+      me.chal = m.text; me.chalDone = !!m.done;
+      if (m.done) { sfx.win(); banner('Challenge complete! +75'); }
+      break;
+    case 'item':
+      if (m.w === myId) { sfx.coin(); banner(`${ITEMS[m.k].icon} ${ITEMS[m.k].name}! ${TOUCH ? 'Tap its button' : 'Press G'} to use it`); }
+      break;
+    case 'used': {
+      if (m.w !== myId) break;
+      const t = performance.now() / 1000;
+      sfx.freed();
+      if (m.k === 1) { me.stam = 100; me.wind = 0; me.freeUntil = t + 8; feed('Energy drink: 8 seconds of endless, silent sprinting.', 'good'); }
+      else if (m.k === 2) feed('Shadow cloak: seekers cannot see you for 6 seconds.', 'good');
+      else if (m.k === 4) { me.boostUntil = t + 7; feed('Rocket boots: 7 seconds of extra speed.', 'good'); }
+      break;
+    }
+    case 'radar':
+      for (const [x, z] of m.pts) { gfx.ping(x, z); gfx.ring(x, z, 4, 0xff5555, 1.6); }
+      sfx.ping(1);
+      feed(m.pts.length ? `Radar found ${m.pts.length} hider${m.pts.length > 1 ? 's' : ''} in the open.` : 'Radar found nobody in the open. They must be hiding.', 'good');
+      break;
+    case 'beacon': { const b = W.beacons[m.id]; if (b) gfx.ring(b.x, b.z, 9, 0x6dff8a, 2); sfx.freed(); break; }
     case 'end': onEnd(m.w); break;
   }
 }
@@ -117,12 +139,20 @@ function onMsg(m) {
 function onState(m) {
   const prev = G.ph, prevHost = G.host;
   G.ph = m.ph; G.tl = m.tl; G.host = m.host; G.res = m.res; G.w = m.w; G.at = performance.now();
+  if (m.mp !== undefined && m.mp !== curMap) {
+    curMap = m.mp;
+    W = getWorld(curMap);
+    gfx.setWorld(W);
+    if (!playing) renderLobby();
+  }
+  G.bc = m.bc || G.bc;
+  gfx.setItems(new Set(m.it || []));
   G.ct = new Set(m.ct);
   gfx.setCoins(G.ct);
   for (const a of m.p) {
     let p = players.get(a[0]);
     if (!p) players.set(a[0], (p = { id: a[0], fd: 0, side: 1 }));
-    p.x = a[1]; p.z = a[2]; p.r = a[3]; p.f = a[4]; p.role = a[5]; p.st = a[6]; p.hid = a[7]; p.sc = a[8]; p.fx = a[9]; p.rocks = a[10];
+    p.x = a[1]; p.z = a[2]; p.r = a[3]; p.f = a[4]; p.role = a[5]; p.st = a[6]; p.hid = a[7]; p.sc = a[8]; p.fx = a[9]; p.rocks = a[10]; p.item = a[11] || 0;
   }
   if (prev !== G.ph) onPhase(prev);
   else if (prevHost !== G.host && !playing) renderLobby();
@@ -140,7 +170,7 @@ function onEnd(w) {
   const p = players.get(myId), won = p && (p.role === 1) === (w === 'seekers');
   won ? sfx.win() : sfx.lose();
   $('resTitle').textContent = w === 'seekers' ? 'SEEKERS WIN' : 'HIDERS WIN';
-  $('resSub').textContent = w === 'seekers' ? 'Everyone was caught.' : 'Somebody survived until the bell.';
+  $('resSub').textContent = w === 'seekers' ? 'Everyone was caught.' : G.bc.every((v) => v >= 1) ? 'All three beacons were lit.' : 'Somebody survived until the bell.';
   setTimeout(() => {
     const ul = $('resList');
     ul.textContent = '';
@@ -158,7 +188,7 @@ function onNoise(m) {
   if (m.k === 'taunt') sfx.taunt();
   if (d > range) return;
   const p = players.get(myId), seeker = p && p.role === 1;
-  const col = { run: 0xffffff, breath: 0x9fd8ff, taunt: 0xff66cc, rock: 0xffd27a }[m.k];
+  const col = { run: 0xffffff, breath: 0x9fd8ff, taunt: 0xff66cc, rock: 0xffd27a, beacon: 0x6dff8a }[m.k];
   gfx.ring(m.x, m.z, m.k === 'run' ? 2.2 : m.k === 'breath' ? 1.4 : 5, col, m.k === 'run' ? 0.8 : 1.4);
   if (m.k === 'rock') sfx.thud();
   if (seeker && m.id !== myId) { gfx.ping(m.x, m.z); sfx.ping(Math.max(0.25, 1 - d / range)); }
@@ -198,6 +228,8 @@ function renderLobby() {
   const host = G.host === myId, lobby = G.ph === 'lobby';
   $('lobbyTitle').textContent = lobby ? 'Lobby' : 'Paused — the round is still running!';
   $('hostRow').classList.toggle('hidden', !(host && lobby));
+  $('mapName').textContent = MAPS[curMap].name;
+  $('mapBlurb').textContent = MAPS[curMap].blurb;
   $('waitMsg').textContent = lobby && !host ? 'Waiting for the host to start the round…' : '';
   $('resume').textContent = lobby ? 'Explore the map' : 'Back to the game';
 }
@@ -213,6 +245,7 @@ $('copy').onclick = () => {
   const done = (ok) => { $('copy').textContent = ok ? 'Copied!' : 'Code: ' + roomCode; setTimeout(() => ($('copy').textContent = label), 1500); };
   try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch { done(false); }
 };
+$('mapBtn').onclick = () => { sfx.click(); send({ t: 'lobby', a: 'map' }); };
 $('addBot').onclick = () => { sfx.click(); send({ t: 'lobby', a: 'addBot' }); };
 $('delBot').onclick = () => { sfx.click(); send({ t: 'lobby', a: 'delBot' }); };
 $('start').onclick = () => { send({ t: 'lobby', a: 'start' }); lock(); };
@@ -267,6 +300,8 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Enter' && playing) { chatOpen = true; chat.classList.add('open'); chat.focus(); for (const k in keys) keys[k] = false; e.preventDefault(); return; }
   if (!playing) return;
   if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
+  if (e.code === 'Space') jump();
+  if (e.code === 'KeyG') send({ t: 'a', a: 'item' });
   if (e.repeat) return;
   keys[e.code] = true;
   if (e.code === 'Escape' && softLook) setPlaying(false);
@@ -339,6 +374,14 @@ press('tAct', () => { const p = players.get(myId); if (p && p.role === 1) tag();
 press('tTaunt', taunt);
 press('tCrouch', () => { keys.KeyC = !keys.KeyC; $('tCrouch').classList.toggle('on', !!keys.KeyC); });
 press('tPause', () => setPlaying(false));
+press('tItem', () => send({ t: 'a', a: 'item' }));
+press('tJump', jump);
+function jump() {
+  const p = players.get(myId);
+  if (!p || !playing || me.y > 0 || me.stam < 6 || p.hid >= 0 || (p.fx & 1) || (p.role === 1 && G.ph === 'hide')) return;
+  me.vy = 5.4; me.y = 0.001; me.stam -= 6;
+  sfx.swing();
+}
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
@@ -361,12 +404,13 @@ function update(dt, now) {
   me.crouch = !!keys.KeyC && !hidden && !frozen;
   let sprint = (keys.ShiftLeft || keys.ShiftRight || pushed) && moving && !me.crouch && t > me.wind && me.stam > 0;
   if (sprint) {
-    me.stam -= STAM.drain * dt;
+    if (t > me.freeUntil) me.stam -= STAM.drain * dt;
     if (me.stam <= 0) { me.stam = 0; me.wind = t + STAM.windedFor; sprint = false; feed(seeker ? 'Out of breath!' : 'Out of breath — seekers can hear you gasping!', 'bad'); }
   } else me.stam = Math.min(100, me.stam + (moving ? STAM.regenMove : STAM.regenIdle) * dt);
   const winded = t < me.wind;
   const base = seeker ? SPEED.seeker : SPEED.hider;
-  const sp = me.crouch ? SPEED.crouch : sprint ? base.sprint : winded ? SPEED.winded : base.walk;
+  const sp = (me.crouch ? SPEED.crouch : sprint ? base.sprint : winded ? SPEED.winded : base.walk) * (t < me.boostUntil ? 1.35 : 1);
+  if (me.y > 0) { me.y += me.vy * dt; me.vy -= 15 * dt; if (me.y <= 0) { me.y = 0; me.vy = 0; sfx.step(true); } }
   if (hidden) { const s = W.spots[p.hid]; me.x = s.x; me.z = s.z; }
   else if (moving) {
     const l = Math.hypot(mx, mz), s = Math.sin(me.yaw), c = Math.cos(me.yaw);
@@ -379,7 +423,7 @@ function update(dt, now) {
     me.stepD += moved;
     if (me.stepD > (sprint ? 2.1 : 1.6)) { me.stepD = 0; if (!me.crouch) sfx.step(sprint); }
   }
-  me.flags = (sprint ? F_SPRINT : 0) | (me.crouch ? F_CROUCH : 0) | (moving ? F_MOVE : 0) | (keys.KeyE && !frozen ? F_USE : 0) | (winded ? F_WIND : 0);
+  me.flags = (sprint ? F_SPRINT : 0) | (me.crouch ? F_CROUCH : 0) | (moving ? F_MOVE : 0) | (keys.KeyE && !frozen ? F_USE : 0) | (winded ? F_WIND : 0) | (me.y > 0 ? F_JUMP : 0);
   if (now - lastSend > 66) {
     lastSend = now;
     send({ t: 's', x: +me.x.toFixed(2), z: +me.z.toFixed(2), r: +me.yaw.toFixed(3), f: me.flags, q: me.q });
@@ -400,7 +444,7 @@ function update(dt, now) {
     if (id === myId) continue;
     if (o.role === 1) nearSeeker = Math.min(nearSeeker, Math.hypot(o.x - me.x, o.z - me.z));
     gfx.updateAvatar(id, {
-      x: o.x, z: o.z, r: o.r, visible: o.hid < 0 && !blind, moving: !!(o.f & F_MOVE), sprint: !!sprinting, crouch: !!(o.f & F_CROUCH),
+      x: o.x, z: o.z, r: o.r, visible: o.hid < 0 && !blind && !((o.fx & 4) && o.role !== p.role), jump: !!(o.f & F_JUMP), moving: !!(o.f & F_MOVE), sprint: !!sprinting, crouch: !!(o.f & F_CROUCH),
       seeker: o.role === 1 && G.ph !== 'lobby', showTag: G.ph === 'lobby' || G.ph === 'end' || o.role === p.role, stunned: !!(o.fx & 1), immune: !!(o.fx & 2),
     }, dt);
   }
@@ -414,7 +458,7 @@ function update(dt, now) {
   const eyeT = hidden ? 1.15 : me.crouch ? 1.0 : 1.6;
   me.eye += (eyeT - me.eye) * Math.min(1, dt * 12);
   gfx.setSeekerView(seeker && G.ph !== 'lobby');
-  gfx.frame(dt, { x: me.x, y: me.eye + (moving && !hidden ? Math.abs(Math.sin(me.bob)) * 0.05 : 0), z: me.z, yaw: me.yaw, pitch: me.pitch, bob: me.bob }, { res: G.res, jailed: jailedN > 0 });
+  gfx.frame(dt, { x: me.x, y: me.eye + me.y + (moving && !hidden ? Math.abs(Math.sin(me.bob)) * 0.05 : 0), z: me.z, yaw: me.yaw, pitch: me.pitch, bob: me.bob }, { res: G.res, jailed: jailedN > 0, bc: G.bc });
 
   if (now - lastHud > 120) { lastHud = now; hud(p, now, { seeker, hidden, stunned, blind, winded, jailedN }); }
 }
@@ -426,18 +470,24 @@ function hud(p, now, s) {
   $('timer').textContent = G.ph === 'lobby' ? '—' : `${(tl / 60) | 0}:${String(Math.ceil(tl) % 60).padStart(2, '0')}`;
   $('timer').classList.toggle('low', G.ph === 'seek' && tl < 20);
   const hs = [...players.values()].filter((q) => q.role === 0);
-  $('left').textContent = G.ph === 'seek' || G.ph === 'hide' ? `${hs.length - s.jailedN} of ${hs.length} hiders free` : `Room ${roomCode}`;
+  $('left').textContent = G.ph === 'seek' || G.ph === 'hide' ? `${hs.length - s.jailedN} of ${hs.length} hiders free · beacons ${G.bc.filter((v) => v >= 1).length}/3` : `Room ${roomCode}`;
 
   const role = $('role');
-  const set = (cls, title, sub) => { role.className = cls; role.textContent = title; const sm = document.createElement('small'); sm.textContent = sub; role.append(sm); };
-  if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the town and learn the hiding spots.');
+  const set = (cls, title, sub) => {
+    role.className = cls; role.textContent = title;
+    const sm = document.createElement('small');
+    sm.textContent = sub;
+    role.append(sm);
+    if (me.chal && G.ph !== 'lobby') { const c = document.createElement('em'); c.textContent = (me.chalDone ? '✔ ' : '★ ') + me.chal; if (me.chalDone) c.className = 'done'; role.append(c); }
+  };
+  if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the map and learn the hiding spots.');
   else if (s.seeker) set('seeker', '🔦 SEEKER', TOUCH ? 'Tap TAG next to a hider. Search spots with USE, carefully.' : 'Tag hiders (click). Search spots with E — carefully.');
   else if (p.st === 1) set('jail', '⛓ JAILED', `A free teammate must hold ${USE} at the lever.`);
   else set('hider', '🙈 HIDER', s.hidden ? `Shh… ${USE} to climb out.` : 'Hide, grab coins, free your friends.');
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? W.spots[p.hid].kind : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';
@@ -446,7 +496,11 @@ function hud(p, now, s) {
   $('tTaunt').hidden = !canAct || s.seeker;
   $('tUse').hidden = s.blind || p.st === 1;
   $('tCrouch').hidden = s.blind || s.hidden || p.st === 1;
-  $('items').textContent = TOUCH ? '' : !s.seeker && G.ph === 'seek' && p.st === 0 ? `🪨 ×${p.rocks}  [Q] throw   📣 [T] taunt${now < tauntCd ? ' (' + Math.ceil((tauntCd - now) / 1000) + 's)' : ''}` : '';
+  $('tItem').hidden = !p.item || G.ph !== 'seek';
+  $('tItem').textContent = p.item ? ITEMS[p.item].icon : '';
+  $('tJump').hidden = s.blind || s.hidden || s.stunned;
+  const itemTxt = p.item && G.ph === 'seek' ? `${ITEMS[p.item].icon} [G] ${ITEMS[p.item].name}   ` : '';
+  $('items').textContent = TOUCH ? '' : itemTxt + (!s.seeker && G.ph === 'seek' && p.st === 0 ? `🪨 ×${p.rocks}  [Q] throw   📣 [T] taunt${now < tauntCd ? ' (' + Math.ceil((tauntCd - now) / 1000) + 's)' : ''}` : '');
   if (now > bannerT) $('banner').classList.remove('show');
 
   // scoreboard
@@ -466,6 +520,16 @@ function hud(p, now, s) {
   if (s.stunned) { pr.textContent = '💫 Dazed…'; return; }
   if (s.hidden) { pr.textContent = `${USE}: leave hiding spot`; return; }
   if (p.st === 1) return;
+  const progress = (text, v) => {
+    pr.textContent = text;
+    const bar = document.createElement('span'), i = document.createElement('i');
+    bar.className = 'bar'; i.style.width = v * 100 + '%';
+    bar.append(i); pr.append(bar);
+  };
+  if (!s.seeker && G.ph === 'seek') for (const b of W.beacons) {
+    if (G.bc[b.id] >= 1 || Math.hypot(b.x - me.x, b.z - me.z) > 2.4) continue;
+    return progress(`Hold ${USE} to light the beacon (it hums!)`, G.bc[b.id]);
+  }
   if (!s.seeker && G.ph === 'seek' && s.jailedN && Math.hypot(W.lever.x - me.x, W.lever.z - me.z) < 2.4) {
     pr.textContent = `Hold ${USE} to free your teammates`;
     const bar = document.createElement('span'), i = document.createElement('i');
