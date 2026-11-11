@@ -3494,7 +3494,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
 function die() {
   if (S.pet === 'phoenix_chick' && S.phoenixDay !== S.day && !(S.arena && inArena())) { S.phoenixDay = S.day; S.hp = Math.ceil(maxHP()/2); player.inv = 2; renderHP(); burst(S.x, S.y - .5, '#ff8a2a', 30, 6); SFX.victory(); toast('<b>Your Phoenix Chick bursts into flame!</b><br>Warm fire wraps around you and you rise again. (Once per day.)', 5000); return; }
   if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); if (!S.arena.duel) S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
-  if (!downed && party && !inDungeon() && !bossActive() && Object.values(remote).some(r => !r.p.dn && Math.hypot(r.x - S.x, r.y - S.y) < 20)) { downed = {t: 25}; S.hp = 0; player.kx = player.ky = 0; S.riding = false; fishing = null; SFX.death(); shake = .4; toast('<b>You are down!</b><br>A party member can revive you: they stand next to you and press E. If nobody comes within 25 seconds, you\u2019ll be carried to town.', 7000); renderHUD(); renderHP(); return; }
+  if (!downed && party && !inDungeon() && !ownBoss() && Object.values(remote).some(r => !r.p.dn && Math.hypot(r.x - S.x, r.y - S.y) < 20)) { downed = {t: 25}; S.hp = 0; player.kx = player.ky = 0; S.riding = false; fishing = null; SFX.death(); shake = .4; toast('<b>You are down!</b><br>A party member can revive you: they stand next to you and press E. If nobody comes within 25 seconds, you\u2019ll be carried to town.', 7000); renderHUD(); renderHP(); return; }
   downed = null;
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
@@ -3885,7 +3885,7 @@ function drawRemote(r) {
   if (p.dn) { const rv = reviving && reviving.peer === r.peer ? Math.min(1, reviving.t/REVIVE_T) : Math.max(0, Math.min(1, +p.rp || 0)); drawDownTag(px, top - 8, +p.dn, rv); }
 }
 // shared monsters: the leader's game runs them, guests mirror them and send their damage
-let netOn = false, netSeq = 0, netKilled = [], netMirror = {}, netDmg = {}, netHostSid = null, netToastDone = false;
+let netBossToast = false, netOn = false, netSeq = 0, netKilled = [], netMirror = {}, netDmg = {}, netHostSid = null, netToastDone = false;
 const NET_SID = Math.random().toString(36).slice(2, 8);
 function netZone() { if (inArena()) return 'arena'; const k = inDungeon(); if (k) return DUNGEONS[k] && !DUNGEONS[k].endless && !DUNGEONS[k].mine ? 'd:' + k : 'solo'; return S.y >= WORLD_H ? 'solo' : 'world'; }
 const netZoneShared = z => z === 'world' || (typeof z === 'string' && z.startsWith('d:'));
@@ -3899,12 +3899,13 @@ function netList() {
   const out = []; if (!netZoneShared(netZone())) return out;
   const c = [];
   for (const e of enemies) {
-    if (e.dead || e.boss || e.minion || e.net || e.hidden > 0 || e.den != null) continue;
+    if (e.dead || e.minion || e.net || e.hidden > 0 || e.den != null || e.echo) continue;
+    if (e.boss) { if (BOSSES[e.boss] && Math.hypot(e.x - S.x, e.y - S.y) < 26) c.push([-1, e]); continue; }
     const def = ENEMIES[e.type]; if (!def || def.passive || def.target || def.den || def.swim || def.shipAI || def.isDummy || def.thief || def.flee) continue;
     const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < 26) c.push([d, e]);
   }
   c.sort((a, b) => a[0] - b[0]);
-  for (const [, e] of c.slice(0, 24)) { if (!e.nid) e.nid = ++netSeq; out.push([e.nid, e.type, Math.round(e.x*10), Math.round(e.y*10), Math.max(0, Math.round(e.hp*10)), Math.round(e.max), e.face < 0 ? -1 : 1, e.elite ? e.elite.col : 0, e.esize || 1, Math.round((e.dmgMul || 1)*10)/10, e.hurt > 0 ? 1 : 0]); }
+  for (const [, e] of c.slice(0, 24)) { if (!e.nid) e.nid = ++netSeq; out.push([e.nid, e.boss ? 'B:' + e.boss : e.type, Math.round(e.x*10), Math.round(e.y*10), Math.max(0, Math.round(e.hp*10)), Math.round(e.max), e.face < 0 ? -1 : 1, e.elite ? e.elite.col : 0, e.esize || 1, Math.round((e.dmgMul || 1)*10)/10, e.hurt > 0 ? 1 : 0]); }
   return out;
 }
 function netApply(peer, r, dm) {
@@ -3919,7 +3920,7 @@ function netApply(peer, r, dm) {
 }
 function netDmgOut() { const o = {}; let n = 0; for (const k in netMirror) if (netDmg[k] > 0 && n++ < 30) o[k] = Math.round(netDmg[k]*10)/10; return o; }
 function netSync(L, dt) {
-  const z = netZone(), on = !!L && L.p.dk === z && netZoneShared(z) && !bossActive() && Math.hypot(L.x - S.x, L.y - S.y) < 30;
+  const z = netZone(), on = !!L && L.p.dk === z && netZoneShared(z) && !ownBoss() && Math.hypot(L.x - S.x, L.y - S.y) < 30;
   if (on !== netOn) { netOn = on; if (on) { const dgn = !!inDungeon(); enemies = enemies.filter(e => !e.wild && !(dgn && e.dungeon && !e.boss)); if (!netToastDone) { netToastDone = true; toast(`<b>Fighting together!</b><br>You're near ${esc(L.name)}, so you now see and fight the same monsters. Everyone who lands a hit shares the rewards.`, 5000); } } }
   if (!on) { if (enemies.some(e => e.net)) enemies = enemies.filter(e => !e.net); netMirror = {}; return; }
   const p = L.p;
@@ -3927,11 +3928,13 @@ function netSync(L, dt) {
   const list = Array.isArray(p.en) ? p.en.slice(0, 40) : [], kd = new Set(Array.isArray(p.kd) ? p.kd.slice(0, 40).map(Number) : []), seen = {};
   for (const a of list) {
     if (!Array.isArray(a)) continue; const [nid, type, x10, y10, hp10, max, face, ecol, esz, dmul, hurt] = a;
-    if (typeof nid !== 'number' || typeof type !== 'string' || !ENEMIES.hasOwnProperty(type) || !isFinite(x10) || !isFinite(y10)) continue;
+    const bk = typeof type === 'string' && type.startsWith('B:') ? type.slice(2) : null;
+    if (typeof nid !== 'number' || typeof type !== 'string' || (bk ? !BOSSES.hasOwnProperty(bk) : !ENEMIES.hasOwnProperty(type)) || !isFinite(x10) || !isFinite(y10)) continue;
     seen[nid] = true; const tx = x10/10, ty = y10/10, hp = Math.max(0, (+hp10 || 0)/10);
     let m = netMirror[nid];
     if (!m || m.dead) {
-      m = netMirror[nid] = makeEnemy(type, tx, ty, {net: nid, tx, ty, alert: true}); m.max = Math.max(1, +max || m.max); m.hp = hp;
+      m = netMirror[nid] = bk ? {boss: bk, x: tx, y: ty, hp, max: Math.max(1, +max || 1), kx: 0, ky: 0, cd: 1, rcd: 2, ccd: 2, hurt: 0, wt: 0, face: 1, phase: 0, net: nid, tx, ty, alert: true, size: BOSSES[bk].size || 1} : makeEnemy(type, tx, ty, {net: nid, tx, ty, alert: true}); m.max = Math.max(1, +max || m.max); m.hp = hp;
+      if (bk && !netBossToast) { netBossToast = true; toast(`<b>${esc(L.name)} is fighting ${esc(BOSSES[bk].name)}!</b><br>Jump in: everyone who lands a hit gets credit for the victory.`, 5000); SFX.roar(); }
       if (typeof ecol === 'string' && ecol) { m.elite = {name: 'Elite', col: ecol.slice(0, 9)}; m.esize = Math.min(2.5, Math.max(1, +esz || 1.3)); }
       m.dmgMul = Math.min(5, Math.max(.2, +dmul || 1)); enemies.push(m);
     } else if (!enemies.includes(m)) enemies.push(m);
@@ -3942,7 +3945,7 @@ function netSync(L, dt) {
   for (const k in netMirror) if (!seen[k]) {
     const m = netMirror[k]; delete netMirror[k];
     if (m.dead) continue;
-    if (kd.has(+k) && (netDmg[k] || 0) > 0) { delete netDmg[k]; m.netDying = false; killEnemy(m); S.sharedKills = (S.sharedKills || 0) + 1; pchalAdd('shared'); floatText(S.x, S.y - 1.9, 'Shared victory!', L.col); }
+    if (kd.has(+k) && (netDmg[k] || 0) > 0) { delete netDmg[k]; m.netDying = false; if (m.boss) { S.coopBosses = (S.coopBosses || 0) + 1; netBossToast = false; } killEnemy(m); S.sharedKills = (S.sharedKills || 0) + 1; pchalAdd('shared'); floatText(S.x, S.y - 1.9, 'Shared victory!', L.col); }
     else { m.dead = true; if (kd.has(+k)) burst(m.x, m.y - .4, '#ebe4d3', 10); }
   }
 }
@@ -3952,6 +3955,10 @@ function netEnemyTick(e, dt, safe) {
   e.face = e.hface || e.face; if (dd > .03) e.phase += dt*10;
   e.hurt = Math.max(0, e.hurt - dt); e.cd -= dt;
   if (e.netDying) return;
+  if (e.boss) { const B = BOSSES[e.boss], sz = B.size || 1, d = Math.hypot(S.x - e.x, S.y - e.y);
+    if (d < .9 + sz*.35 && e.cd <= 0) { hurtPlayer(B.dmg, e); e.cd = 1.2; }
+    e.rcd -= dt; if (e.rcd <= 0) { e.rcd = 3.5 + Math.random()*2; if (d < 3.2 + sz*.4) { burst(e.x, e.y - .5, B.pcol || '#ffd27a', 20, 6); shake = Math.max(shake, .25); SFX.boom(); if (d < 2.6 + sz*.4) hurtPlayer(B.dmg*.8, e); } else if (d < 9) shoot(e.x, e.y - .8, Math.atan2(S.y - .4 - (e.y - .8), S.x - e.x), 7, B.dmg*.6, B.pcol || '#ffd27a', .3); }
+    return; }
   const def = ENEMIES[e.type], dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
   if (!safe && d < .8 && e.cd <= 0) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
   if (def.ranged && !safe && d < def.ranged.range && d < def.aggro + 4) { e.rcd -= dt; if (e.rcd <= 0) { e.rcd = def.ranged.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), def.ranged.speed, def.dmg * (e.dmgMul || 1), def.ranged.col, .2); } }
@@ -6362,7 +6369,7 @@ const GUIDE = [
   ['Photo mode', 'Press H to freeze the moment and hide the screen clutter. Pan the camera with the movement keys or stick, press F to try filters (sepia, black and white, warm, dreamy), and press Space to snap. You can download every picture.'],
   ['Emotes and pings', 'Press Y to pick an emote that pops up above your head, and N to drop a ping marker where you stand. In a party, friends see your emotes, and your pings show up on their screen, minimap and world map. If you fall near a party member, you go down for 25 seconds instead of being knocked out: a friend can stand next to you and press E to revive you. Every party also gets a daily party challenge for bonus coin and XP.'],
   ['Game controllers', 'Connect a Nintendo Switch Pro Controller, an Xbox or a PlayStation controller and press any button. Move with the left stick. On a Pro Controller: A talks and picks things up, B rolls, Y or ZR attacks (hold for a spin attack), X throws a bomb, L and R switch and cast spells, ZL rides, \u2212 opens the map, + pauses, and the D-pad opens your bag (\u2191), crafting (\u2193), journal (\u2190) and skills (\u2192). Home opens the party menu. In menus, use the D-pad or stick to move, A to choose and B to go back.'],
-  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, in the open world or inside the same dungeon, you all see and fight the same monsters (bosses stay separate), and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
+  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, in the open world or inside the same dungeon, you all see and fight the same monsters including the leader\u2019s boss fights, and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
   ['Sky whale & meteors', 'At dusk, keep an eye on the sky: a great whale sometimes swims overhead and drops a Cloud Pearl. On some nights meteors crash nearby. Mine the crater with a pickaxe for Meteorite Ore to forge the Meteor Blade.'],
   ['Summits & exotic seeds', 'Climb the highest peaks with climbing gear and plant your flag at each summit (look for a stone cairn) for a wide view and a reward. Sorrel in Greenstem sells exotic seeds: Golden Wheat, Dragonfruit and Starfruit.'],
   ['Moon rabbit & display cases', 'On full-moon nights (every 14 days, as the Gazette will tell you) a glowing moon rabbit comes down to play. Chase it until it tires, then catch it for Moon Mochi and a Moon Charm. Craft a Display Case to show off your trophies at home.'],
@@ -6577,6 +6584,7 @@ function bossNear() {
     const B = BOSSES[k];
     const d = Math.hypot(S.x - B.x - .5, S.y - B.y - .5);
     const present = enemies.find(e => e.boss === k);
+    if (!present && netOn && Object.values(remote).some(r => r.p.host && Math.hypot(r.x - B.x, r.y - B.y) < 16)) continue;
     if (!present && d < 13) {
       enemies.push({boss:k, type:k, x:B.x+.5, y:B.y+.5, hx:B.x+.5, hy:B.y+.5, hp:B.hp, max:B.hp, size:B.size, kx:0, ky:0, cd:1, hurt:0, face:-1, phase:0, ab:1.5, act:null, hidden:0});
       bossIntroFX(B); SFX.roar();
@@ -6691,7 +6699,7 @@ function updateCombat(dt, night) {
       if (e.poison > 0) { e.poison -= dt; e.poisonT -= dt; if (Math.random() < .2) burst(e.x, e.y - .6, '#7ad04a', 1, 1); if (e.poisonT <= 0) { e.poisonT = .5; hitEnemy(e, Math.round(.8*lv*10)/10, 0, 0, 'dot'); } }
       if (e.dead) continue;
     }
-    if (e.net) { netEnemyTick(e, dt, safe); continue; }
+    if (e.net) { netEnemyTick(e, dt, safe); if (e.boss) boss = e; continue; }
     if (e.boss) { updateBoss(e, dt); boss = e; continue; }
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
@@ -11162,6 +11170,7 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['coopboss','Raid Party','Defeat a boss together with your party', () => (S.coopBosses || 0) >= 1],
   ['armwrestle','Iron Grip','Win 3 arm-wrestling matches', () => (S.wrestleWins || 0) >= 3],
   ['castle20','Master Builder','Build a sandcastle 20 layers tall', () => (S.castleBest || 0) >= 20],
   ['riddle5','Riddle Solver','Solve 5 of Enigma\u2019s riddles', () => (S.riddles || 0) >= 5],
@@ -11540,6 +11549,7 @@ function fadeThen(fn) { const f = $('fade'); f.style.opacity = 1; setTimeout(() 
 
 /* ================= fast travel ================= */
 const bossActive = () => enemies.some(e => e.boss);
+const ownBoss = () => enemies.some(e => e.boss && !e.net);
 function travelCost(k) { if (k.startsWith('ws:')) return 0; if (facPerk('league') >= 3 || k === 'home' || k.startsWith('prop:') || ownsIn(k)) return 0; const t = TOWNS[k]; return Math.max(5, Math.ceil(Math.hypot(S.x - t.x, S.y - t.y) / 6)); }
 function renderTravel() {
   const list = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle');
@@ -11725,7 +11735,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
