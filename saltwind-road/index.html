@@ -26,6 +26,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#courierUI{position:absolute;left:50%;top:96px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #photoUI{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 14px;font-size:13px;text-align:center;z-index:30;max-width:calc(100% - 32px)}
 .padfocus{outline:3px solid #ffd040!important;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,208,64,.25)!important}
 kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);margin-left:4px}
@@ -260,6 +261,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   </div>
   <div id="prompt" class="panel" hidden></div>
   <div id="photoUI" class="panel" hidden></div>
+  <div id="courierUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -2124,6 +2126,10 @@ const NPCS = [
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
    hello:["The wilds breed champions. Want to meet one?","A good hunt needs good friends.","Blow the horn and they come running."], rumors:["Champions are four times as tough as an ordinary beast. Bring a party. Everyone who fights one shares the spoils."]},
+  {id:'quizzy',town:'thorn',dx:3,dy:-3,name:'Professor Quill',role:'Quiz night',cols:{cloak:'#3a3a6a',skin:'#e0b8a0',hair:'#d0d0d0'},quizmaster:true,freeSpot:true,
+   hello:["Knowledge is the finest treasure!","Care to test your wits?","Ahem. Question one..."], rumors:["Every town sells some goods cheap and pays well for others. A traveler who remembers which is never poor. Nor bad at quizzes."]},
+  {id:'postpell',town:'hollow',dx:-3,dy:-3,name:'Postmaster Pell',role:'Express post',cols:{cloak:'#a03a2a',skin:'#d8b090',hair:'#3a2a1a'},postmaster:true,freeSpot:true,
+   hello:["Express post! Fast feet wanted!","Parcels don't deliver themselves.","Speed is everything in this business."], rumors:["Ride your fastest mount for express deliveries. Arrive with time to spare and the bonus is generous."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4251,6 +4257,67 @@ function drawPicnic(q) {
   ctx.fillStyle = '#f4efe2'; for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) if ((i + j) % 2) ctx.fillRect(px - 10 + i*5, py - 6 + j*4, 5, 4);
   ctx.fillStyle = '#a06a30'; ctx.fillRect(px - 3, py - 7, 7, 5); ctx.fillStyle = '#7a4a20'; ctx.fillRect(px - 2, py - 9, 5, 2); ctx.fillStyle = '#e0302a'; ctx.beginPath(); ctx.arc(px + 7, py + 2, 1.5, 0, 7); ctx.fill();
 }
+// ===== quiz night =====
+function quizQuestion(used) {
+  const towns = Object.keys(TOWNS).filter(k => k !== 'isle' && TOWNS[k].produce && TOWNS[k].demand), known = towns.filter(k => S.towns[k]), pool = known.length >= 5 ? known : towns;
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  for (let tries = 0; tries < 40; tries++) {
+    const kind = Math.floor(Math.random()*4); let q, right, wrong;
+    if (kind === 0 || kind === 1) {
+      const t = pick(pool), list = kind === 0 ? TOWNS[t].produce : TOWNS[t].demand, g = pick(list); if (!GOODS[g]) continue;
+      q = kind === 0 ? `Which town sells <b>${GOODS[g].name}</b> cheaply?` : `Which town pays well for <b>${GOODS[g].name}</b>?`; right = TOWNS[t].name;
+      wrong = shuffle(pool.filter(k => !(kind === 0 ? TOWNS[k].produce : TOWNS[k].demand).includes(g))).slice(0, 3).map(k => TOWNS[k].name);
+    } else if (kind === 2) {
+      const ek = pick(Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && ENEMIES[k].drops && ENEMIES[k].drops.length && !ENEMIES[k].isDummy && !ENEMIES[k].target)), d = pick(ENEMIES[ek].drops), g = d[0]; if (!GOODS[g]) continue;
+      q = `Which creature can drop <b>${GOODS[g].name}</b>?`; right = ENEMIES[ek].name;
+      wrong = shuffle(Object.keys(ENEMIES).filter(k => !ENEMIES[k].passive && ENEMIES[k].drops && !ENEMIES[k].drops.some(x => x[0] === g) && ENEMIES[k].name !== right)).slice(0, 3).map(k => ENEMIES[k].name);
+    } else {
+      const dk = pick(Object.keys(DUNGEONS).filter(k => DUNGEONS[k].boss && BOSSES[DUNGEONS[k].boss])); q = `Who guards <b>${DUNGEONS[dk].name}</b>?`; right = BOSSES[DUNGEONS[dk].boss].name;
+      wrong = shuffle(Object.keys(BOSSES).filter(b => BOSSES[b].name !== right && BOSSES[b].name && !/heroic|echo/i.test(b))).slice(0, 3).map(b => BOSSES[b].name);
+    }
+    if (wrong.length < 3 || used.has(q)) continue; used.add(q);
+    return {q, right, opts: shuffle([right, ...wrong])};
+  }
+  return null;
+}
+function quizTalk(n) {
+  const played = S.quizDay === S.day;
+  say(`“Welcome to quiz night! Five questions about the lands of Saltwind Road: towns, trade, beasts and dungeons. Ten coin a ticket, and I pay 30 coin for every right answer, plus a bonus for a perfect round.”${S.quizBest != null ? `<br><span style="color:var(--muted)">Your best round: ${S.quizBest}/5.</span>` : ''}`, [
+    {label: played ? 'Come back tomorrow for a new round' : 'Buy a ticket · 10◆', primary: !played, disabled: played || S.coins < 10, fn: () => { S.coins -= 10; S.quizDay = S.day; renderHUD(); quizAsk(n, {i: 0, score: 0, used: new Set()}); }}, back(n)]);
+}
+function quizAsk(n, Q) {
+  if (Q.i >= 5) {
+    const perfect = Q.score === 5, c = Q.score*30 + (perfect ? 100 : 0); S.coins += c; S.quizBest = Math.max(S.quizBest || 0, Q.score); S.quizRounds = (S.quizRounds || 0) + 1; if (perfect) S.quizPerfect = (S.quizPerfect || 0) + 1;
+    SFX[perfect ? 'victory' : 'coin'](); renderHUD(); save();
+    say(`“${perfect ? 'Flawless! A true scholar of the road!' : Q.score >= 3 ? 'Well done, well done!' : 'Hmm. Perhaps travel a little more.'}” <br><br>You answered <b>${Q.score}/5</b> correctly. <span style="color:var(--good)">+${c} coin</span>`, [back(n)]); return;
+  }
+  const qq = quizQuestion(Q.used); if (!qq) { Q.i = 5; quizAsk(n, Q); return; }
+  say(`<b>Question ${Q.i + 1} of 5</b><br>${qq.q}`, qq.opts.map(o => ({label: o, fn: () => { const ok = o === qq.right; if (ok) { Q.score++; SFX.coin(); } else SFX.hurt();
+    Q.i++; say(`${ok ? '<b style="color:var(--good)">Correct!</b>' : `<b style="color:#e57a62">Not quite.</b> The answer was <b>${esc(qq.right)}</b>.`}`, [{label: Q.i >= 5 ? 'See my score' : 'Next question', primary: true, fn: () => quizAsk(n, Q)}]); }})));
+}
+// ===== express post (courier) =====
+let courier = null;
+function courierTalk(n) {
+  if (courier) { say(`“Your parcel for <b>${TOWNS[courier.to].name}</b> is ticking! ${Math.ceil(courier.t)} seconds left. Go, go!”`, [{label: 'Give up the delivery', fn: () => { courier = null; $('courierUI').hidden = true; S.courierFails = (S.courierFails || 0) + 1; say('“A shame. I’ll find another runner.”', [back(n)]); }}, back(n)]); return; }
+  const T0 = TOWNS[n.town], opts = Object.keys(TOWNS).filter(k => k !== n.town && k !== 'isle' && S.towns[k]).map(k => [k, Math.hypot(TOWNS[k].x - T0.x, TOWNS[k].y - T0.y)]).filter(([, d]) => d > 35 && d < 170).sort((a, b) => a[1] - b[1]);
+  if (!opts.length) { say('“I’ve no parcels for towns you know. Explore a bit more and come back!”', [back(n)]); return; }
+  const choices = [opts[0], opts[Math.floor(opts.length/2)], opts[opts.length - 1]].filter((v, i, a) => a.indexOf(v) === i);
+  say(`“Express parcels, paid by speed! Pick a destination. The clock starts the moment you leave. The faster you arrive, the bigger the tip.”${S.couriers ? `<br><span style="color:var(--muted)">Deliveries made: ${S.couriers}</span>` : ''}`, [
+    ...choices.map(([k, d]) => { const t = Math.round(d/3.6 + 25), pay = Math.round(30 + d*1.6); return {label: `${TOWNS[k].name} · ${t}s · up to ${Math.round(pay*1.5)}◆`, fn: () => { courier = {to: k, from: n.town, t, max: t, pay}; $('courierUI').hidden = false; closeTalk(); SFX.chime(); toast(`<b>Express parcel for ${TOWNS[k].name}!</b><br>${t} seconds on the clock. Ride hard!`, 4000); }}; }), back(n)]);
+}
+function updateCourier(dt) {
+  const C = courier; if (!C) return;
+  C.t -= dt; const ui = $('courierUI');
+  if (C.t <= 0) { courier = null; ui.hidden = true; S.courierFails = (S.courierFails || 0) + 1; toast(`<b>Too late!</b><br>The parcel for ${TOWNS[C.to].name} is overdue. Postmaster Pell will be disappointed.`, 5000); SFX.hurt(); return; }
+  const T1 = TOWNS[C.to], d = Math.hypot(T1.x - S.x, T1.y - S.y);
+  const txt = `\u{1F4E6} ${T1.name} · ${Math.ceil(C.t)}s · ${Math.round(d)} steps`; if (ui.textContent !== txt) ui.textContent = txt;
+  ui.style.color = C.t < 15 ? '#ff8a6a' : '';
+  if (d < 7) {
+    const frac = C.t/C.max, pay = Math.round(C.pay*(1 + frac)); courier = null; ui.hidden = true; S.coins += pay; S.couriers = (S.couriers || 0) + 1; if (frac > .5) S.courierFast = (S.courierFast || 0) + 1;
+    gainXP(20 + Math.round(C.max/4)); SFX.victory(); renderHUD(); save();
+    toast(`<b>Delivered to ${T1.name}!</b><br>${Math.ceil(C.t)} seconds to spare. <span style="color:var(--good)">+${pay} coin</span>`, 5000);
+  }
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -5798,8 +5865,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Quiz night and express post', 'Professor Quill in Thornwick runs a daily quiz about towns, trade, beasts and dungeons: 30 coin for each right answer and a bonus for a perfect round. Postmaster Pell in Hollowpine hands out timed express deliveries to towns you know. The faster you arrive, the bigger the pay.'],
   ['Usable items', 'Some items have a Use button in your bag. Rocket Packs (from Melody in Lantern Bay) light up the sky for everyone in your party. A Picnic Basket (from Big Bertha in Highcairn) heals you and nearby party members over 3 minutes. A War Horn (from Huntmaster Garrick in Hollowpine) calls a Champion monster when you blow it out in the wild: four times as tough, and in a party everyone can fight it and share the spoils.'],
   ['Village games', 'Tib, a kid in Reedholm, plays hide and seek: find the rustling bush within 60 seconds. Melody in Lantern Bay lends you her lute to busk, a rhythm game played with the arrow keys or D-pad (three shows a day). Big Bertha runs a skittles alley in Highcairn: aim, pick your power and knock down the nine pins.'],
   ['Photo mode', 'Press H to freeze the moment and hide the screen clutter. Pan the camera with the movement keys or stick, press F to try filters (sepia, black and white, warm, dreamy), and press Space to snap. You can download every picture.'],
@@ -6111,7 +6179,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7788,6 +7856,8 @@ function mainOptions(n) {
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
   if (n.busker) o.push({label: 'Buy rocket packs', fn: () => shopTalk(n, [['rocket_pack', 30]], '“Every good show ends with a bang!”')});
   if (n.skittles) o.push({label: 'Buy a picnic basket', fn: () => shopTalk(n, [['picnic_basket', 45]], '“Bread, cheese, pie and a flask of cider. Share it with friends!”')});
+  if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
+  if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
@@ -10585,6 +10655,9 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['quiz1','Know-It-All','Score 5/5 at quiz night', () => (S.quizPerfect || 0) >= 1],
+  ['courier5','Express Rider','Make 5 express deliveries', () => (S.couriers || 0) >= 5],
+  ['courierfast','Like the Wind','Deliver a parcel with more than half the time left', () => (S.courierFast || 0) >= 1],
   ['champion1','Champion Hunter','Defeat a Champion called by a War Horn', () => (S.champions || 0) >= 1],
   ['champion10','Legend of the Hunt','Defeat 10 Champions', () => (S.champions || 0) >= 10],
   ['pyro','Pyrotechnician','Launch 10 fireworks', () => (S.fireworks || 0) >= 10],
