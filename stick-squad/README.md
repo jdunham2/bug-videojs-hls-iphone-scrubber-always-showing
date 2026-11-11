@@ -26,7 +26,7 @@ P1's action keys sit together in one cluster under the right hand:
 ```
 
 | Action | P1 Keyboard | P2 Switch controller |
-|---|---|---|
+|---|---|---|---|
 | Move | W A S D | Left stick / D-pad |
 | Jump (double jump) | L (or Space) | B |
 | Light attack (3-hit chain) | J | Y |
@@ -34,6 +34,7 @@ P1's action keys sit together in one cluster under the right hand:
 | Launcher | W + K | Up + X |
 | Meteor slam | K in the air | X in the air |
 | Dash (invincible) | U (or Shift) | ZR / R / ZL / L |
+| Unique skill (2.5 s cooldown) | S + J | Down + Y |
 | Special (full ink meter) | I | A |
 | Pause | Esc / P | + (or −) |
 | Music on/off | M | (none) |
@@ -56,42 +57,42 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Thirty-two fighters, each with their own stats, look and special move:
+Thirty-two fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
 
-| Fighter | Style | Special |
-|---|---|---|
-| Scribble | All-rounder | Ink Burst: blasts everything around you |
-| Bolt | Speedster, triple jump, fragile | Thunderclap: lightning hits 8 foes |
-| Boulder | Tank, heavy attacks can't be interrupted | Earthquake: hits every grounded foe |
-| Inkblade | Always holds the Pencil Blade | Crescent Slash: giant piercing slashes |
-| Doodle Witch | Ranged, heavy attack fires ink bolts | Meteor Rain |
-| Shade | Ninja, 2 air dashes, 1.5x crits from behind | Shadow Strike: teleports through 6 foes |
-| Robo | Robot, heavy attack fires piercing lasers, takes 20% less damage | Mega Laser across the screen |
-| Halo | Healer, slowly regenerates health | Healing Light: heals the team and revives a downed partner |
-| Slugger | Swings a bat, heavy hits send foes flying, wall splats hurt extra | Fastball Fury |
-| Hopper | Four jumps, huge leap, extra-wide Meteor Slam | Mega Stomp shakes the whole floor |
-| Whiskers | Cat-quick, attacks 30% faster | Claw Storm shreds everything in front |
-| Chef | Heavy attack throws a boomerang frying pan | Food Fight: a barrage of pies |
-| Frosty | Every hit briefly freezes enemies | Blizzard freezes everyone on screen |
-| Ghostly | Hold jump to float down slowly; dashes pass through attacks | Haunt: untouchable for 4 seconds, and touching enemies hurts them |
-| DJ Beats | Heavy attack fires growing sound waves that push enemies away | Drop the Bass: three screen-wide shockwaves |
-| Bubbles | Heavy attack blows bubbles that trap enemies | Bubble Storm fills the air with trapping bubbles |
-| Jetpack Jo | Hold jump in the air to fly; heavy attack fires a homing rocket | Air Strike: rockets rain from the sky |
-| Presto | Magician: dash is a short teleport; heavy attack throws three cards | Abracadabra turns every regular enemy into loot (bosses take damage) |
-| El Doodlo | Wrestler: heavy attack grabs an enemy and throws it into others | Doodlo Drop: a screen-shaking body slam |
-| Mimic | Heavy attack is a random move borrowed from other fighters | Mimic: a random special every time |
-| Blaze | Every hit sets enemies on fire; heavy attack throws a fireball | Inferno: walls of flame roll out both ways |
-| Captain Ink | Pirate: heavy attack fires an arcing, exploding cannonball | Broadside: a cannonball barrage |
-| Gravity Gus | Heavy attack makes a gravity well that pulls enemies in | Zero-G: enemies float helplessly, then slam down |
-| Gemma | Heavy attack makes crystal spikes burst out of the floor ahead | Crystal Prison freezes every enemy |
-| Kickflip Kai | Rides a skateboard (very fast); heavy attack is a board-slam ram | Grind Rush: zooms back and forth across the screen |
-| Buzzy Bea | Heavy attack releases bees that chase the nearest enemy | Hive Mind: a giant swarm of bees |
-| Samurai Sam | Heavy attack is a parry stance: block a hit and counter for big damage | Thousand Cuts: a flurry that hits every enemy |
-| Echo | A shadow twin behind you copies every attack | Phantoms: ghost copies strike every enemy at once |
-| Dynamite Dan | Heavy attack lobs a bouncing bomb that explodes after a fuse | Mega Blast: one giant bomb with a huge explosion |
-| Picasso Pip | Heavy attack splats sticky paint that slows and hurts enemies standing in it | Masterpiece: paints the whole floor |
-| Yoyo Yuki | Heavy attack flings a long-range yo-yo that zips back | Walk the Dog: the yo-yo orbits you, hitting everything nearby |
-| Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
+| Fighter | Style | Special | Skill (Down + Light) |
+|---|---|---|---|
+| Scribble | All-rounder | Ink Burst: blasts everything around you | Ink Uppercut: rising launcher |
+| Bolt | Speedster, triple jump, fragile | Thunderclap: lightning hits 8 foes | Lightning Dash: invincible zap-through dash |
+| Boulder | Tank, heavy attacks can't be interrupted | Earthquake: hits every grounded foe | Rock Toss: lobs a huge boulder |
+| Inkblade | Always holds the Pencil Blade | Crescent Slash: giant piercing slashes | Rising Crescent: an upward flying slash |
+| Doodle Witch | Ranged, heavy attack fires ink bolts | Meteor Rain | Hex Bolts: two homing bolts |
+| Shade | Ninja, 2 air dashes, 1.5x crits from behind | Shadow Strike: teleports through 6 foes | Shadow Step: teleports behind the nearest foe and strikes |
+| Robo | Robot, heavy attack fires piercing lasers, takes 20% less damage | Mega Laser across the screen | Rocket Punch: fires his fist |
+| Halo | Healer, slowly regenerates health | Healing Light: heals the team and revives a downed partner | Halo Ring: a holy ring that heals you a little |
+| Slugger | Swings a bat, heavy hits send foes flying, wall splats hurt extra | Fastball Fury | Line Drive: a screaming fast baseball |
+| Hopper | Four jumps, huge leap, extra-wide Meteor Slam | Mega Stomp shakes the whole floor | Tongue Lash: long-reach tongue that pulls foes in |
+| Whiskers | Cat-quick, attacks 30% faster | Claw Storm shreds everything in front | Pounce: leaping claw dive |
+| Chef | Heavy attack throws a boomerang frying pan | Food Fight: a barrage of pies | Pie Toss: three pies in an arc |
+| Frosty | Every hit briefly freezes enemies | Blizzard freezes everyone on screen | Icicle Fan: three freezing icicles |
+| Ghostly | Hold jump to float down slowly; dashes pass through attacks | Haunt: untouchable for 4 seconds, and touching enemies hurts them | Spook Dash: phase through foes and scare them stiff |
+| DJ Beats | Heavy attack fires growing sound waves that push enemies away | Drop the Bass: three screen-wide shockwaves | Beat Drop: shockwaves both ways |
+| Bubbles | Heavy attack blows bubbles that trap enemies | Bubble Storm fills the air with trapping bubbles | Bubble Hop: jumps and leaves trapping bubbles |
+| Jetpack Jo | Hold jump in the air to fly; heavy attack fires a homing rocket | Air Strike: rockets rain from the sky | Afterburner: boost forward, flames out the back |
+| Presto | Magician: dash is a short teleport; heavy attack throws three cards | Abracadabra turns every regular enemy into loot (bosses take damage) | Vanish: card burst, then teleport forward |
+| El Doodlo | Wrestler: heavy attack grabs an enemy and throws it into others | Doodlo Drop: a screen-shaking body slam | Suplex: throws a foe over his head behind him |
+| Mimic | Heavy attack is a random move borrowed from other fighters | Mimic: a random special every time | Copycat: a random other fighter's skill |
+| Blaze | Every hit sets enemies on fire; heavy attack throws a fireball | Inferno: walls of flame roll out both ways | Flame Wall: a rolling wall of fire |
+| Captain Ink | Pirate: heavy attack fires an arcing, exploding cannonball | Broadside: a cannonball barrage | Recoil Blast: cannon fires backward and rockets him forward |
+| Gravity Gus | Heavy attack makes a gravity well that pulls enemies in | Zero-G: enemies float helplessly, then slam down | Gravity Pull: yanks nearby foes toward him |
+| Gemma | Heavy attack makes crystal spikes burst out of the floor ahead | Crystal Prison freezes every enemy | Crystal Armor: blocks the next 2 hits |
+| Kickflip Kai | Rides a skateboard (very fast); heavy attack is a board-slam ram | Grind Rush: zooms back and forth across the screen | Kickflip: flipping launcher kick |
+| Buzzy Bea | Heavy attack releases bees that chase the nearest enemy | Hive Mind: a giant swarm of bees | Stinger Dive: poison sting lunge |
+| Samurai Sam | Heavy attack is a parry stance: block a hit and counter for big damage | Thousand Cuts: a flurry that hits every enemy | Iai Draw: dashes through and slices everything in the path |
+| Echo | A shadow twin behind you copies every attack | Phantoms: ghost copies strike every enemy at once | Mirror Wave: slashes fly both ways |
+| Dynamite Dan | Heavy attack lobs a bouncing bomb that explodes after a fuse | Mega Blast: one giant bomb with a huge explosion | Mine Drop: plants a proximity mine |
+| Picasso Pip | Heavy attack splats sticky paint that slows and hurts enemies standing in it | Masterpiece: paints the whole floor | Color Wheel: six paint bolts in every direction |
+| Yoyo Yuki | Heavy attack flings a long-range yo-yo that zips back | Walk the Dog: the yo-yo orbits you, hitting everything nearby | Around the World: a wide yo-yo circle |
+| Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack | Shield Bash: charging bash that raises a 1-hit guard |
 
 ## Modes
 
@@ -113,7 +114,7 @@ Sixteen stages of five waves each: Notebook Heights, Graph City, Chalkboard Aren
 Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its own set of moves:
 
 | Stage | Mini-boss | Boss |
-|---|---|---|
+|---|---|---|---|
 | Notebook Heights | Eraser Knight | The Scribble King |
 | Graph City | Compass Captain | Graphzilla |
 | Chalkboard Arena | The Chalk Duster | Professor Chalk |

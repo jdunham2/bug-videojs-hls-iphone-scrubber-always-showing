@@ -615,6 +615,91 @@ const A = {
     onActive: f => throwAt(f, f.target, 'eraser', 9) },
 };
 const hasSword = p => p.power === 'sword' || !!(p.char && p.char.sword);
+// ---------------------------------------------------------- unique skills (Down + Light)
+const PO = { punch: [A.HAY.wind, A.HAY.hit], up: [A.UP.wind, A.UP.hit], throw: [A.BOMB.wind, A.BOMB.hit], cast: [A.FIREBALL.wind, A.FIREBALL.hit], spin: [A.AIRL.wind, A.AIRL.hit], dash: [A.RAM.wind, A.RAM.hit], slam: [A.EB.wind, A.EB.hit], kick: [A.L3.wind, A.L3.hit] };
+const sk = (kname, pose, o) => Object.assign({ startup: 6, active: 6, recovery: 16, dmg: 14, kb: [10, 7], hb: null, stun: 30, hs: 6, heavy: true, meter: 6, sfx: 'heavy', shake: 4, wind: PO[pose][0], hit: PO[pose][1], skill: true, kname }, o);
+const shoot = (f, o) => G.projs.push(Object.assign({ x: f.x + f.facing * 36 * f.s, y: f.y - 56 * f.s, vx: f.facing * 14, vy: 0, g: 0, r: 12, dmg: 10, owner: 'player', by: f, kind: 'ibolt', life: 80, col: f.col, kb: [7, 4], meter: 3, hs: 3 }, o));
+const nearFoe = (f, range) => { let best = null, bd = range; for (const e of foesOf(f)) { const d = Math.hypot(e.x - f.x, e.y - f.y); if (d < bd) { bd = d; best = e; } } return best; };
+const hop = (f, vx, vy) => { f.vx = vx; f.vy = vy; f.onGround = false; f.plat = null; };
+Object.assign(A, {
+  SK_UPPER: sk('INK UPPERCUT', 'up', { startup: 5, active: 10, dmg: 16, kb: [3, 19], hb: { x: 30, y: 80, w: 64, h: 100 }, stun: 44,
+    onActive: f => { hop(f, f.facing * 3, -13); ring(f.x, f.y - 40, f.col, 60, 4); splash(f.x, f.y - 10, f.col, 8, 4); } }),
+  SK_BOLTDASH: sk('LIGHTNING DASH', 'dash', { startup: 4, active: 10, recovery: 14, dmg: 13, kb: [12, 6], hb: { x: 30, y: 45, w: 84, h: 64 }, lungeV: 28,
+    onActive: f => { f.inv = Math.max(f.inv, 16); f.ghost(12); tone(1600, 0.15, 'sawtooth', 0.08, 400); sparks(f.x, f.y - 50, f.facing, 10, '#ffe066'); } }),
+  SK_ROCK: sk('ROCK TOSS', 'throw', { startup: 12, recovery: 20,
+    onActive: f => { shoot(f, { kind: 'cannonball', vx: f.facing * 9, vy: -10, g: 0.45, r: 18, dmg: 24, kb: [12, 9], life: 200, hs: 5, meter: 5 }); tone(80, 0.3, 'sine', 0.35, 40); dustBurst(f.x, f.y, 6); } }),
+  SK_RISE: sk('RISING CRESCENT', 'up', { startup: 7,
+    onActive: f => { shoot(f, { kind: 'slash', vx: f.facing * 13, vy: -6, r: 30, dmg: 15, pierce: true, hitSet: new Set(), kb: [6, 14], face: f.facing, life: 60, hs: 4 }); SFX.whoosh(); } }),
+  SK_HEX: sk('HEX BOLTS', 'cast', { startup: 8,
+    onActive: f => { for (const vy of [-4, 4]) shoot(f, { kind: 'ibolt', vx: f.facing * 8, vy, dmg: 10, homing: true, life: 150, col: '#9b45e0' }); tone(700, 0.25, 'triangle', 0.1, 1400); } }),
+  SK_STEP: sk('SHADOW STEP', 'punch', { startup: 8, active: 6, dmg: 20, kb: [12, 8], hb: { x: 40, y: 50, w: 74, h: 64 }, stun: 36,
+    onActive: f => { const t = nearFoe(f, 750); ring(f.x, f.y - 40, '#333', 50, 5, 12); f.ghost(16);
+      if (t) { const side = sign(t.x - f.x) || f.facing; f.x = clamp(t.x + side * 70, 40, W - 40); f.y = Math.min(t.y, FLOOR); f.facing = -side; f.vx = 0; }
+      else f.x = clamp(f.x + f.facing * 200, 40, W - 40);
+      f.inv = Math.max(f.inv, 14); ring(f.x, f.y - 40, '#333', 60, 5, 14); SFX.portal(); } }),
+  SK_RPUNCH: sk('ROCKET PUNCH', 'punch', { startup: 9,
+    onActive: f => { shoot(f, { kind: 'rocket', vx: f.facing * 16, r: 12, dmg: 18, kb: [13, 6], life: 90, hs: 5, meter: 5 }); SFX.dash(); } }),
+  SK_HALO: sk('HALO RING', 'cast', { startup: 8, dmg: 10, kb: [9, 9], hb: { x: 0, y: 55, w: 230, h: 130 },
+    onActive: f => { const h = Math.min(8, f.maxHp - f.hp); f.hp += h; if (h > 0) floatText(f.x, f.y - 120, '+' + Math.round(h), '#21a35a', 24, 30); ring(f.x, f.y - 50, '#ffd23a', 120, 6, 18); tone(900, 0.3, 'sine', 0.12, 1300); } }),
+  SK_LINE: sk('LINE DRIVE', 'punch', { startup: 8,
+    onActive: f => { shoot(f, { kind: 'ball', vx: f.facing * 25, r: 9, dmg: 17, kb: [13, 5], life: 70, rot: 0, hs: 5 }); tone(1000, 0.08, 'square', 0.15, 300); } }),
+  SK_TONGUE: sk('TONGUE LASH', 'kick', { startup: 7, active: 5, dmg: 11, kb: [-9, 5], hb: { x: 120, y: 64, w: 200, h: 26 }, stun: 34,
+    onActive: f => { parts.push({ type: 'ring', x: f.x + f.facing * 120, y: f.y - 64 * f.s, r: 4, r2: 26, col: '#e2607a', lw: 5, life: 10, max: 10 }); tone(300, 0.12, 'sine', 0.15, 900); } }),
+  SK_POUNCE: sk('POUNCE', 'dash', { startup: 6, active: 14, dmg: 15, kb: [9, 10], hb: { x: 36, y: 40, w: 80, h: 64 },
+    onActive: f => { hop(f, f.facing * 17, -9); tone(500, 0.1, 'sawtooth', 0.08, 900); } }),
+  SK_PIES: sk('PIE TOSS', 'throw', { startup: 9,
+    onActive: f => { for (const sp of [7, 10, 13]) shoot(f, { kind: 'pie', y: f.y - 60 * f.s, vx: f.facing * sp, vy: -9, g: 0.45, r: 12, dmg: 10, kb: [7, 7], life: 160, rot: 0 }); SFX.throw_(); } }),
+  SK_ICICLE: sk('ICICLE FAN', 'cast', { startup: 8,
+    onActive: f => { for (const vy of [-2.6, 0, 2.6]) shoot(f, { kind: 'ibolt', vx: f.facing * 15, vy, dmg: 9, col: '#9fe6ff', life: 60 }); tone(1800, 0.2, 'triangle', 0.08, 2400); } }),
+  SK_SPOOK: sk('SPOOK DASH', 'dash', { startup: 3, active: 14, recovery: 14, dmg: 12, kb: [4, 6], stun: 75, hb: { x: 30, y: 50, w: 80, h: 80 }, lungeV: 22,
+    onActive: f => { f.inv = Math.max(f.inv, 26); f.ghost(16); tone(220, 0.4, 'sine', 0.12, 110); } }),
+  SK_DROP: sk('BEAT DROP', 'slam', { startup: 10, recovery: 20,
+    onActive: f => { for (const d of [-1, 1]) G.projs.push({ x: f.x + d * 30, y: f.y - 18, vx: d * 11, vy: 0, g: 0, r: 22, dmg: 12, owner: 'player', by: f, kind: 'wave', life: 60, col: f.col, pierce: true, hitSet: new Set(), kb: [7, 11], meter: 3, hs: 3 });
+      SFX.shock(); addShake(7); ring(f.x, f.y - 10, f.col, 110, 7, 16); } }),
+  SK_BASH: sk('SHIELD BASH', 'dash', { startup: 5, active: 10, dmg: 12, kb: [15, 5], hb: { x: 36, y: 50, w: 70, h: 80 }, lungeV: 14,
+    onActive: f => { if (f.shield < 1) { f.shield = 1; floatText(f.x, f.y - 120, 'GUARD UP', '#2a9ad0', 22, 30); } SFX.reflect(); } }),
+  SK_BHOP: sk('BUBBLE HOP', 'up', { startup: 4,
+    onActive: f => { hop(f, f.vx, -17); for (const k of [-1, 0, 1]) shoot(f, { kind: 'bubble', x: f.x + k * 34, y: f.y - 20, vx: k * 2.5, vy: -0.5, r: 18, dmg: 6, trap: true, life: 150, kb: [2, 2], hs: 2 }); tone(600, 0.15, 'sine', 0.12, 1000); } }),
+  SK_BURNER: sk('AFTERBURNER', 'dash', { startup: 4, active: 14, dmg: 14, kb: [11, 8], hb: { x: 34, y: 50, w: 80, h: 70 },
+    onActive: f => { hop(f, f.facing * 20, -6); shoot(f, { kind: 'fireball', x: f.x - f.facing * 30, vx: -f.facing * 10, dmg: 10, burn: true, life: 60 }); noise(0.3, 0.3, 900, 'lowpass', 200); } }),
+  SK_VANISH: sk('VANISH', 'cast', { startup: 6,
+    onActive: f => { for (let k = 0; k < 8; k++) { const a = k / 8 * 6.28; shoot(f, { kind: 'card', x: f.x, y: f.y - 56 * f.s, vx: Math.cos(a) * 11, vy: Math.sin(a) * 11, r: 9, dmg: 7, life: 40, kb: [5, 4] }); }
+      ring(f.x, f.y - 40, f.col, 80, 5, 14); f.ghost(14); f.x = clamp(f.x + f.facing * 230, 40, W - 40); f.inv = Math.max(f.inv, 20); ring(f.x, f.y - 40, f.col, 60, 4, 14); SFX.portal(); } }),
+  SK_SUPLEX: sk('SUPLEX', 'up', { startup: 6, active: 6, recovery: 20, dmg: 22, kb: [-11, 15], hb: { x: 32, y: 50, w: 60, h: 80 }, stun: 46, shake: 9 }),
+  SK_COPY: sk('COPYCAT', 'cast', {}),
+  SK_FWALL: sk('FLAME WALL', 'cast', { startup: 9,
+    onActive: f => { shoot(f, { kind: 'flamewall', y: f.y - 50, vx: f.facing * 7, r: 46, dmg: 14, pierce: true, hitSet: new Set(), burn: true, face: f.facing, life: 80, kb: [8, 9] }); noise(0.3, 0.3, 700, 'lowpass', 150); } }),
+  SK_RECOIL: sk('RECOIL BLAST', 'dash', { startup: 8, active: 10, dmg: 12, kb: [12, 7], hb: { x: 36, y: 45, w: 80, h: 64 },
+    onActive: f => { shoot(f, { kind: 'cannonball', x: f.x - f.facing * 30, vx: -f.facing * 12, vy: -5, g: 0.45, r: 13, dmg: 18, kb: [10, 8], life: 200, hs: 4 }); hop(f, f.facing * 18, f.onGround ? -4 : -7); tone(90, 0.3, 'sine', 0.4, 40); addShake(5); } }),
+  SK_PULL: sk('GRAVITY PULL', 'cast', { startup: 10,
+    onActive: f => { ring(f.x, f.y - 50, '#7b3fd0', 380, 8, 22); SFX.portal();
+      for (const e of foesOf(f)) if (Math.hypot(e.x - f.x, e.y - f.y) < 380) doHit(f, e, { dmg: 8, kb: [Math.min(12, Math.abs(e.x - f.x) / 22), 9], stun: 36, hs: 3, heavy: true, sfx: 'heavy', meter: 3 }, sign(f.x - e.x) || 1, true); } }),
+  SK_ARMOR: sk('CRYSTAL ARMOR', 'slam', { startup: 8, dmg: 8, kb: [8, 10], hb: { x: 0, y: 45, w: 160, h: 90 },
+    onActive: f => { if (f.shield < 2) f.shield = 2; floatText(f.x, f.y - 120, 'ARMOR x' + f.shield, '#2a9ad0', 22, 30); ring(f.x, f.y - 50, '#7fe0ff', 90, 6, 16); tone(1300, 0.25, 'triangle', 0.1, 1900); } }),
+  SK_FLIP: sk('KICKFLIP', 'spin', { startup: 4, active: 14, dmg: 14, kb: [6, 15], hb: { x: 14, y: 40, w: 100, h: 74 }, spin: true,
+    onActive: f => { hop(f, f.facing * 8, -14); tone(400, 0.1, 'square', 0.08, 800); } }),
+  SK_STING: sk('STINGER DIVE', 'dash', { startup: 5, active: 12, dmg: 17, kb: [10, 7], hb: { x: 40, y: 40, w: 70, h: 50 }, lungeV: 20, burnHit: true,
+    onActive: f => { if (!f.onGround) f.vy = 12; tone(260, 0.25, 'sawtooth', 0.06, 200); } }),
+  SK_IAI: sk('IAI DRAW', 'punch', { startup: 10, recovery: 18,
+    onActive: f => { const x0 = f.x, nx = clamp(x0 + f.facing * 250, 40, W - 40); f.ghost(16);
+      for (const e of foesOf(f)) if ((e.x - x0) * f.facing > -20 && (e.x - nx) * f.facing < 30 && Math.abs((e.y - e.hh / 2) - (f.y - 50)) < 90) doHit(f, e, { dmg: 24, kb: [6, 11], stun: 44, hs: 8, heavy: true, sfx: 'heavy', meter: 8, shake: 6 }, f.facing, true);
+      parts.push({ type: 'ring', x: (x0 + nx) / 2, y: f.y - 50, r: 4, r2: Math.abs(nx - x0) / 2, col: '#fff', lw: 3, life: 10, max: 10 }); f.x = nx; f.inv = Math.max(f.inv, 18); tone(2000, 0.15, 'sawtooth', 0.08, 600); } }),
+  SK_MIRROR: sk('MIRROR WAVE', 'spin', { startup: 7,
+    onActive: f => { for (const d of [-1, 1]) G.projs.push({ x: f.x + d * 40, y: f.y - 50 * f.s, vx: d * 15, vy: 0, g: 0, r: 26, dmg: 11, owner: 'player', by: f, kind: 'slash', life: 50, col: f.col, pierce: true, hitSet: new Set(), kb: [8, 6], meter: 3, hs: 3, face: d }); SFX.whoosh(); } }),
+  SK_MINE: sk('MINE DROP', 'throw', { startup: 6,
+    onActive: f => { G.projs.push({ x: f.x, y: (f.onGround ? f.y : FLOOR) - 8, vx: 0, vy: 0, g: 0, r: 12, dmg: 26, owner: 'player', by: f, kind: 'mine', life: 600, col: f.col, mine: true, armT: 30 }); tone(500, 0.1, 'square', 0.1, 300); } }),
+  SK_WHEEL: sk('COLOR WHEEL', 'cast', { startup: 8,
+    onActive: f => { const cols = ['#e2342c', '#f28c28', '#f2c230', '#21a35a', '#2a6ae6', '#9b45e0']; for (let k = 0; k < 6; k++) { const a = k / 6 * 6.28; shoot(f, { x: f.x, y: f.y - 56 * f.s, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, dmg: 8, col: cols[k], life: 55 }); } tone(800, 0.2, 'triangle', 0.1, 1600); } }),
+  SK_ATW: sk('AROUND THE WORLD', 'spin', { startup: 4, active: 20, recovery: 14, dmg: 12, kb: [9, 9], hb: { x: 0, y: 55, w: 240, h: 120 }, spin: true,
+    onActive: f => { ring(f.x, f.y - 55, f.col, 120, 4, 20); SFX.whoosh(); } }),
+});
+const SKILL_OF = { 'SCRIBBLE': 'SK_UPPER', 'BOLT': 'SK_BOLTDASH', 'BOULDER': 'SK_ROCK', 'INKBLADE': 'SK_RISE', 'DOODLE WITCH': 'SK_HEX', 'SHADE': 'SK_STEP', 'ROBO': 'SK_RPUNCH', 'HALO': 'SK_HALO',
+  'SLUGGER': 'SK_LINE', 'HOPPER': 'SK_TONGUE', 'WHISKERS': 'SK_POUNCE', 'CHEF': 'SK_PIES', 'FROSTY': 'SK_ICICLE', 'GHOSTLY': 'SK_SPOOK', 'DJ BEATS': 'SK_DROP', 'SIR DOODLE': 'SK_BASH',
+  'BUBBLES': 'SK_BHOP', 'JETPACK JO': 'SK_BURNER', 'PRESTO': 'SK_VANISH', 'EL DOODLO': 'SK_SUPLEX', 'MIMIC': 'SK_COPY', 'BLAZE': 'SK_FWALL', 'CAPTAIN INK': 'SK_RECOIL', 'GRAVITY GUS': 'SK_PULL',
+  'GEMMA': 'SK_ARMOR', 'KICKFLIP KAI': 'SK_FLIP', 'BUZZY BEA': 'SK_STING', 'SAMURAI SAM': 'SK_IAI', 'ECHO': 'SK_MIRROR', 'DYNAMITE DAN': 'SK_MINE', 'PICASSO PIP': 'SK_WHEEL', 'YOYO YUKI': 'SK_ATW' };
+for (const c of CHARS) { c.skill = SKILL_OF[c.name] || 'SK_UPPER'; c.kname = A[c.skill].kname; }
+const SKILL_IDS = Object.values(SKILL_OF).filter(k => k !== 'SK_COPY');
+const SKILL_CD = 150;
 const HEAVIES = ['HAY', 'WBOLT', 'ZAP', 'PAN', 'SONIC', 'LANCE', 'BUBBLE', 'ROCKETSHOT', 'CARDS', 'GRAB', 'FIREBALL', 'CANNON', 'WELL', 'SPIKES', 'RAM', 'BEES', 'BOMB', 'PAINT', 'YOYO'];
 const MIMIC_SPECIALS = ['burst', 'thunder', 'quake', 'slash', 'rain', 'shadow', 'laser', 'heal', 'fastball', 'megastomp', 'claws', 'pies', 'blizzard', 'haunt', 'bass', 'royal', 'bubbles', 'airstrike', 'abracadabra', 'inferno', 'broadside', 'zerog', 'prison', 'grind', 'hive', 'cuts', 'phantoms', 'megablast', 'masterpiece', 'walkdog'];
 const heavyAtk = p => A[p.char.heavy === 'random' ? pick(HEAVIES) : (p.char.heavy || 'HAY')];
@@ -785,7 +870,7 @@ function doHit(att, vic, a, dir, noAttHs) {
     if (att.char.frost && vic.T && !vic.T.boss) vic.freeze = Math.max(vic.freeze || 0, 22);
     if (att.luckyT > 0 && Math.random() < 0.4) { dmg *= 1.5; crit = true; }
     if (att.char.burn && vic.T) { vic.burn = 150; vic.burnBy = att; }
-    if (att.power === 'fire') { vic.burn = 150; vic.burnBy = att; }
+    if (att.power === 'fire' || (a.burnHit && vic.T)) { vic.burn = 150; vic.burnBy = att; }
     if (att.char.backstab && vic.facing === sign(vic.x - att.x)) { dmg *= 1.5; crit = true; }
   }
   const boss = vic.T && vic.T.boss;
@@ -852,7 +937,7 @@ class Player extends Fighter {
   reset(full) {
     this.x = this.idx ? 1000 : 600; this.y = FLOOR; this.vx = this.vy = 0; this.facing = this.idx ? -1 : 1;
     this.applyChar(); this.hp = this.maxHp = this.char.hp; this.hpGhost = this.maxHp; this.attack = null; this.shadowQ = null; this.plat = null; this.stun = 0; this.inv = 60; this.dead = false; this.downed = false;
-    this.dashT = 0; this.dashCd = 0; this.pounding = 0; this.specialT = 0; this.flipT = 0; this.spin = 0; this.jumps = 0; this.coyote = 0; this.airDash = this.char.airDashes || 1;
+    this.dashT = 0; this.dashCd = 0; this.skillCd = 0; this.pounding = 0; this.specialT = 0; this.flipT = 0; this.spin = 0; this.jumps = 0; this.coyote = 0; this.airDash = this.char.airDashes || 1;
     if (full) { this.meter = 0; this.score = 0; this.combo = 0; this.comboT = 0; this.maxCombo = 0; this.hits = 0; this.power = null; this.powerT = 0; this.shield = 0; this.droneT = 0; this.cloudT = 0; this.regenT = 0; this.magnetT = 0; this.thornT = 0; this.hauntT = 0; this.luckyT = 0; this.vampT = 0; this.invisT = 0; this.shrinkT = 0; this.fuel = 80; this.auraT = 0; this.yoyoT = 0; }
   }
   get ctrl() { return ctrls[this.idx]; }
@@ -861,6 +946,7 @@ class Player extends Fighter {
     this.anim++; if (this.inv > 0) this.inv--; if (this.flash > 0) this.flash--; if (this.dropT > 0) this.dropT--;
     if (this.comboT > 0 && --this.comboT === 0) this.combo = 0;
     if (this.dashCd > 0) this.dashCd--;
+    if (this.skillCd > 0) this.skillCd--;
     if (this.powerT > 0 && --this.powerT === 0) this.power = null;
     const ts = this.char.size * (this.power === 'giant' ? 1.5 : 1) * (this.shrinkT > 0 ? 0.6 : 1); this.s += (ts - this.s) * 0.15;
     if (this.droneT > 0) { this.droneT--; this.updateDrone(); }
@@ -968,7 +1054,7 @@ class Player extends Fighter {
     if (c.down('down') && !this.onGround && this.vy > 0) this.vy += 0.5;
     if (c.take('dash') && this.dashCd <= 0 && (this.onGround || this.airDash > 0)) this.startDash(dir);
     else if (c.take('special')) { if (this.meter >= 100) this.startSpecial(); else floatText(this.x, this.y - 110, 'INK LOW', '#999', 22, 30); }
-    else if (c.take('light')) { this.flipT = 0; this.spin = 0; startAttack(this, this.onGround ? A.L1 : A.AIRL); }
+    else if (c.take('light')) { this.flipT = 0; this.spin = 0; if (c.down('down') && this.skillCd <= 0) this.startSkill(); else startAttack(this, this.onGround ? A.L1 : A.AIRL); }
     else if (c.take('heavy')) { this.flipT = 0; this.spin = 0; if (!this.onGround) this.startPound(); else startAttack(this, c.down('up') ? A.UP : (heavyAtk(this))); }
     this.physics({ gMul: 1 });
     if (this.onGround && !dir) this.vx *= ice ? 0.985 : 0.75;
@@ -986,6 +1072,11 @@ class Player extends Fighter {
     SFX.dash(); dustBurst(this.x, this.y, 4);
   }
   startPound() { this.pounding = 1; SFX.charge(); }
+  startSkill() {
+    let id = this.char.skill || 'SK_UPPER'; if (id === 'SK_COPY') id = pick(SKILL_IDS);
+    const a = A[id]; this.skillCd = SKILL_CD; this.dropT = 0; startAttack(this, a);
+    floatText(this.x, this.y - 130 * this.s, a.kname, this.col, 24, 34); tone(520, 0.08, 'triangle', 0.1, 1040);
+  }
   updateDrone() {
     const t = G.frame * 0.06 + this.idx * 3;
     this.droneX = lerp(this.droneX ?? this.x, this.x + Math.cos(t) * 46, 0.2);
@@ -3116,6 +3207,7 @@ function drawHUD() {
     ctx.fillStyle = p.col; ctx.fillRect(left ? bx - 12 : bx + 336, 14, 6, 132);
     txt((p.idx ? 'P2 · ' : 'P1 · ') + p.char.name, x, 34, 22, p.col, al, F1);
     txt(p.score.toLocaleString(), x, 132, 22, th.text, al, F1);
+    if (!p.dead) { const rdy = !(p.skillCd > 0); txt(rdy ? p.char.kname + (p.idx ? ' [↓+Y]' : ' [S+J]') : p.char.kname + ' ' + Math.ceil(p.skillCd / 60) + 's', left ? bx + 330 : bx, 132, 15, rdy ? '#21a35a' : '#999', left ? 'right' : 'left', F1); }
     sketchBar(bx, 52, 330, 20, p.hp / p.maxHp, p.hp < 30 ? (G.frame % 20 < 10 ? '#ff4040' : '#b01010') : p.col, p.hpGhost / p.maxHp);
     const full = p.meter >= 100;
     sketchBar(bx, 82, 330, 12, p.meter / 100, full ? (G.frame % 16 < 8 ? '#a040e0' : '#e0a0ff') : '#7b3fd0');
@@ -3192,7 +3284,7 @@ function drawTitle(now) {
     ctx.strokeStyle = p.col; ctx.lineWidth = p.joined ? 6 : 3; ctx.strokeRect(-250, -150, 500, 300);
     txt(i ? 'PLAYER 2 · SWITCH CONTROLLER' : 'PLAYER 1 · KEYBOARD', 0, -118, 28, p.col, 'center', F1);
     const lines = i
-      ? ['MOVE  Left Stick / D-Pad', 'JUMP  B   (double jump)', 'LIGHT  Y    HEAVY  X  (+Up = launcher)', 'DASH  ZR / R    SPECIAL  A    PAUSE  +', 'No controller? Arrows move · / jump', ', light · . heavy · ; special · R-Shift dash']
+      ? ['MOVE  Left Stick / D-Pad', 'JUMP  B   (double jump)', 'LIGHT  Y    HEAVY  X  (+Up = launcher)', 'DASH  ZR / R    SPECIAL  A    PAUSE  +', 'SKILL  Down + Y  (unique move!)', 'No controller? Arrows · / jump · , light', '. heavy · ; special · R-Shift dash']
       : null;
     if (lines) lines.forEach((l, k) => txt(l, -225, -82 + k * 31, 24, th.ink, 'left', F2));
     else {
@@ -3204,7 +3296,8 @@ function drawTitle(now) {
       };
       keyCap(-98, -26, 'U', 'DASH', '#2ab0e0'); keyCap(-18, -26, 'I', 'SPECIAL', '#7b3fd0');
       keyCap(-80, 32, 'J', 'LIGHT', '#e2342c'); keyCap(0, 32, 'K', 'HEAVY', '#e8a800'); keyCap(80, 32, 'L', 'JUMP', '#21a35a');
-      txt('Also: SPACE jump · SHIFT dash · ESC pause', -225, 84, 21, th.ink, 'left', F2);
+      txt('SKILL: S + J (unique move!)', -225, 78, 21, '#21a35a', 'left', F1);
+      txt('Also: SPACE jump · SHIFT dash · ESC pause', -225, 106, 21, th.ink, 'left', F2);
     }
     const has = getPads().length > 0;
     const status = i === 0 ? 'PRESS ENTER' : (has ? padKind(padFor(1)).toUpperCase() + ' — PRESS A BUTTON' : padsBlocked ? 'CONTROLLER BLOCKED HERE — PRESS  ,' : 'PRESS + ON CONTROLLER  OR  ,');
@@ -3293,9 +3386,10 @@ function drawSelect() {
       statBar('SPEED', c.spd / 1.32, 26, 316, '#2ab0e0');
       statBar('POWER', c.dmg / 1.3, 26, 346, '#e8a800');
       statBar('JUMPS', c.jumps / 4, 26, 376, '#21a35a');
-      txt('SPECIAL: ' + c.sname, 26, 410, 22, '#7b3fd0', 'left', F1);
-      if (p.ready) txt('READY!', w / 2, 452, 44, p.col, 'center', F1, '#fff', 6);
-      else txt(p.idx ? 'A = CONFIRM  ·  B = LEAVE' : 'J = CONFIRM', w / 2, 452, 20, ink, 'center', F1);
+      txt('SPECIAL: ' + c.sname, 26, 404, 19, '#7b3fd0', 'left', F1);
+      txt('SKILL: ' + c.kname + (p.idx ? '  (↓+Y)' : '  (S+J)'), 26, 428, c.kname.length > 13 ? 15 : 17, '#21a35a', 'left', F1);
+      if (p.ready) txt('READY!', w / 2, 460, 40, p.col, 'center', F1, '#fff', 6);
+      else txt(p.idx ? 'A = CONFIRM  ·  B = LEAVE' : 'J = CONFIRM', w / 2, 460, 20, ink, 'center', F1);
     }
     ctx.restore();
   }
@@ -3607,7 +3701,7 @@ function buildSnapshot() {
     P: G.players.map(p => [p.joined ? 1 : 0, p.ci, ri(p.x), ri(p.y), p.facing, poseArr(p.pose), ri(p.hp), p.maxHp, ri(p.meter), p.score, p.combo, p.comboT,
       (p.dead ? 1 : 0) | (p.downed ? 2 : 0) | (p.ready ? 4 : 0) | (p.flash > 0 ? 8 : 0), PWN.indexOf(p.power), p.powerT, p.shield || 0, p.droneT || 0, p.cloudT || 0, p.regenT || 0,
       ri((p.spin || 0) * 100), ri(p.revive || 0), ri(Math.min(p.bleed || 0, 99999)), p.hits, p.maxCombo, ri(p.s * 100), ri(p.inv), p.specialT || 0,
-      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0]),
+      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0, p.skillCd || 0]),
     E: G.enemies.slice(0, 16).map(e => [e.id, ETN.indexOf(e.type), ri(e.x), ri(e.y), e.facing, poseArr(e.pose), ri(e.hp), e.maxHp, e.flash, e.dying, e.spawnT, e.freeze || 0,
       e.attack ? ATK.indexOf(Object.keys(A).find(k => A[k] === e.attack)) : -1, ri(e.at || 0), BST.indexOf(e.bstate), e.bt, ri((e.fade ?? 1) * 100), e.ph2 ? 1 : 0, ri((e.spin || 0) * 100),
       e.T.boss ? [ri(e.beamY || 0), e.beamDir || 0, (e.rainX || []).map(ri), ri(e.warnY || 0), ri(e.bhX || 0), ri(e.bhY || 0)] : 0, e.bubbled > 0 ? 1 : 0, e.shrinkT > 0 ? 1 : 0]),
@@ -3656,7 +3750,7 @@ function applySnapshot(s) {
     p.dead = !!(a[12] & 1); p.downed = !!(a[12] & 2); p.ready = !!(a[12] & 4); p.flash = a[12] & 8 ? 2 : 0;
     p.power = a[13] >= 0 ? PWN[a[13]] : null; p.powerT = a[14]; p.shield = a[15]; p.droneT = a[16]; p.cloudT = a[17]; p.regenT = a[18];
     p.spin = a[19] / 100; p.revive = a[20]; p.bleed = a[21]; p.hits = a[22]; p.maxCombo = a[23]; p._s = a[24] / 100; p.inv = a[25]; p.specialT = a[26];
-    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39];
+    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39]; p.skillCd = a[40] || 0;
   });
   if (ciChanged) G.players.forEach(p => p.applyChar());
   G.players.forEach(p => { if (p._s) p.s = p._s; });
