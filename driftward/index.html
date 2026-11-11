@@ -845,7 +845,7 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -882,6 +882,7 @@ async function generateSystem(seed,first){
   pirateTimer=first?110:55;
   joinSystemRoom();
   for(const B of allBaseList())buildBaseFor(B);
+  generateSpace(seed);
 }
 function uprightQuat(up,fwdHint,out){
   const f=new V3().copy(fwdHint).addScaledVector(up,-fwdHint.dot(up));
@@ -1000,6 +1001,7 @@ function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);t
 function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){const d=p.distanceTo(P.center)-P.radius;if(d<bd){bd=d;best=P}}return best}
 function nearShip(){return player.pos.distanceTo(ship.group.position)<ship.group.userData.radius+5}
 function interact(){
+  if(st.mode==='derelict'){derelictInteract();return}
   if(trade&&trade.kind==='post'){closeTrade();return}
   if(st.mode==='foot'){
     if(nearPost&&!buildMode)openTrade(nearPost);
@@ -1009,6 +1011,8 @@ function interact(){
     else if(nearWreck)claimWreck(nearWreck);
   }else if(ship.state==='landed'){exitToFoot();Sound.blip(260,.2,'triangle')}
   else if(ship.state==='docked')undock();
+  else if(ship.state==='flying'&&freighterNear())boardFreighter();
+  else if(ship.state==='flying'&&anomalyNear())communeMonolith(anomalyNear());
   else if(ship.state==='flying'&&stationNear())startDock();
   else if(ship.state==='flying'&&current){
     const P=current,d=ship.group.position.clone().sub(P.center);const r=d.length();d.divideScalar(r);
@@ -1312,7 +1316,7 @@ function updateShip(dt){
   if(Sound.ctx){Sound.set(Sound.engG.gain,.05+thrust*.07);Sound.set(Sound.eng.frequency,40+thrust*55);Sound.set(Sound.roarG.gain,thrust*.12);Sound.set(Sound.roarF.frequency,300+thrust*1400)}
 }
 async function doWarp(home){
-  if(home){st.seed=myBase.seed;if(myBase.systems)st.systems=myBase.systems}else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
+  if(home){st.seed=myBase.seed;if(myBase.systems)st.systems=myBase.systems}else if(ship.wormSeed){st.seed=ship.wormSeed;ship.wormSeed=0;st.systems++}else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
   await generateSystem(st.seed,isFirst(st.seed));
   const myRT=myBase&&baseRTs.get(myBase.id);const P=home&&myRT?myRT.P:planets[0];current=P;
   const d=new V3().subVectors(new V3(),P.center).normalize();
@@ -2407,11 +2411,11 @@ function updateAvatar(a,s,dt){
     else{a.ship.position.lerp(tAV,k);a.ship.quaternion.slerp(tAQ,k)}
     const th=Number.isFinite(s.th)?clamp(s.th,0,1):.1;for(const e of a.ship.userData.engines)e.scale.set(1,1,1+th*6);
   }
-  const onFoot=s.m==='foot'&&okVec(s.p,3)&&okVec(s.f,3);
+  const onFoot=(s.m==='foot'||s.m==='derelict')&&okVec(s.p,3)&&okVec(s.f,3);
   a.astro.visible=onFoot;
   if(onFoot){
     tAV.fromArray(s.p);const P=nearestPlanet(tAV);if(!P){a.astro.visible=false;a.fresh=false;return}
-    const up=tAV.clone().sub(P.center).normalize();const feet=tAV.clone().addScaledVector(up,-1.7);
+    const up=s.m==='derelict'&&okVec(s.u,3)?new V3().fromArray(s.u).normalize():tAV.clone().sub(P.center).normalize();const feet=tAV.clone().addScaledVector(up,-1.7);
     if(a.fresh||a.astro.position.distanceTo(feet)>60)a.astro.position.copy(feet);else a.astro.position.lerp(feet,k);
     const f=new V3().fromArray(s.f);f.addScaledVector(up,-f.dot(up));if(f.lengthSq()<1e-6)f.crossVectors(up,X_AXIS);f.normalize();
     const back=f.clone().negate(),right=new V3().crossVectors(up,back);tAM.makeBasis(right,up,back);a.astro.quaternion.setFromRotationMatrix(tAM);
@@ -2421,7 +2425,7 @@ function updateAvatar(a,s,dt){
 function myPresence(){
   const g=ship.group,r2=v=>Math.round(v*100)/100,r4=v=>Math.round(v*1e4)/1e4,foot=st.mode==='foot';
   const th=st.mode==='ship'?(ship.state==='flying'?clamp(ship.speed/500,.15,1):ship.state==='takeoff'||ship.state==='warp'?1:.05):.05;
-  return{n:myName,c:myColor,m:st.mode,st:ship.state,p:foot?player.pos.toArray().map(r2):null,f:foot?player.fwd.toArray().map(r4):null,
+  return{n:myName,c:myColor,m:st.mode,st:ship.state,p:foot||st.mode==='derelict'?player.pos.toArray().map(r2):null,f:foot||st.mode==='derelict'?player.fwd.toArray().map(r4):null,u:st.mode==='derelict'&&DR.up?DR.up.toArray().map(r4):null,
     sp:g.position.toArray().map(r2),sq:g.quaternion.toArray().map(r4),cls:ship.cls,paint:ship.paint,th:Math.round(th*100)/100,
     pir:npcs.filter(n=>n.faction==='pirate').slice(0,6).map(n=>{const p=n.group.position,q=n.group.quaternion,r1=v=>Math.round(v*10)/10,r3=v=>Math.round(v*1000)/1000;
       return[n.netId,n.boss?2:n.cls==='interceptor'?1:0,r1(p.x),r1(p.y),r1(p.z),r3(q.x),r3(q.y),r3(q.z),r3(q.w),Math.round(n.hull/n.maxHull*100),Math.round(n.shield/n.maxShield*100),n.tgt||'',n.boss?n.name:'']})};
@@ -2678,6 +2682,7 @@ function updateEnv(){
   if(Sound.ctx){Sound.set(Sound.windG.gain,(st.mode==='foot'?.05+a2*.05:a2*.06*(ship.speed/300))+WX.I*a2*.24,.4);if(WX.I<.02)Sound.set(Sound.windF.frequency,300+Math.sin(time*.3)*120,.5)}
   if(!P.discovered&&alt<P.radius*.35){P.discovered=true;const key=`P:${P.sysSeed}:${P.idx}`;
     if(!discover(key,`Planet discovered: ${P.name} · ${P.biome.label}`))toast(`Entering ${P.name}`)}
+  if(st.mode==='derelict'){sunLight.intensity=.1;hemi.intensity=.14}
   // pain vignette
   const danger=st.mode==='foot'&&(player.suit<15||player.health<40);
   $('vignette').style.boxShadow=`inset 0 0 160px rgba(255,40,70,${danger?.45+Math.sin(time*5)*.15:0})`;
@@ -2797,6 +2802,226 @@ function weatherText(){
   return 'Clear';
 }
 
+/* ---------- space anomalies and derelict freighters ---------- */
+// Both are generated from the system seed, so every player in a system finds the same ones.
+let anomalies=[],freighter=null;
+const flashlight=new THREE.SpotLight('#fff1dc',1.9,48,.55,.45,1.2);flashlight.position.set(.3,-.2,0);flashlight.target.position.set(0,0,-1);camera.add(flashlight);camera.add(flashlight.target);flashlight.visible=false;
+const ANOM_INFO={wormhole:{label:'Wormhole',color:'#c58aff'},singularity:{label:'Singularity',color:'#ffb45e'},ion:{label:'Ion cloud',color:'#7fe0ff'},monolith:{label:'Echo monolith',color:'#d7f0ff'}};
+const radTex=(stops)=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');const gr=g.createRadialGradient(64,64,0,64,64,64);for(const [o,col] of stops)gr.addColorStop(o,col);g.fillStyle=gr;g.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)};
+function buildAnomaly(kind,rand){
+  const g=new THREE.Group();const spin=[];
+  if(kind==='wormhole'){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(60,5,10,48),new THREE.MeshBasicMaterial({color:'#c58aff',fog:false}));g.add(ring);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(58,48),new THREE.MeshBasicMaterial({map:radTex([[0,'rgba(255,255,255,1)'],[.25,'rgba(200,140,255,.9)'],[.7,'rgba(80,30,160,.6)'],[1,'rgba(20,0,60,.2)']]),transparent:true,side:THREE.DoubleSide,fog:false,depthWrite:false}));g.add(disc);spin.push([disc,1.2]);
+    for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(70+i*14,.8,4,40),new THREE.MeshBasicMaterial({color:'#e8c8ff',transparent:true,opacity:.5,fog:false}));r.rotation.x=rand()*.6;g.add(r);spin.push([r,(i%2?-1:1)*.3])}
+  }else if(kind==='singularity'){
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(40,24,16),new THREE.MeshBasicMaterial({color:'#000000',fog:false})));
+    const disk=new THREE.Mesh(new THREE.RingGeometry(48,190,64),new THREE.MeshBasicMaterial({map:radTex([[0,'rgba(0,0,0,0)'],[.3,'rgba(255,240,200,1)'],[.5,'rgba(255,150,60,.85)'],[.8,'rgba(160,40,20,.35)'],[1,'rgba(0,0,0,0)']]),transparent:true,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,fog:false,depthWrite:false}));
+    disk.rotation.x=Math.PI/2+.25;g.add(disk);spin.push([disk,.4,'z']);
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:radTex([[0,'rgba(255,200,140,.0)'],[.3,'rgba(255,200,140,.5)'],[1,'rgba(255,120,60,0)']]),blending:THREE.AdditiveBlending,fog:false,depthWrite:false}));halo.scale.setScalar(520);g.add(halo);
+  }else if(kind==='ion'){
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(500,32,20),new THREE.MeshBasicMaterial({color:'#2a90c0',transparent:true,opacity:.12,side:THREE.BackSide,blending:THREE.AdditiveBlending,fog:false,depthWrite:false})));
+    const n=900,pos=new Float32Array(n*3);for(let i=0;i<n;i++){const d=randDir(rand,new V3()).multiplyScalar(Math.cbrt(rand())*480);pos.set([d.x,d.y,d.z],i*3)}
+    const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:'#9fe6ff',size:6,map:wpDot,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));g.add(pts);spin.push([pts,.03]);
+  }else{
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(10,46,3),new THREE.MeshPhongMaterial({color:'#08080c',shininess:120,specular:0x6688aa,flatShading:true}));g.add(slab);
+    const glyph=new THREE.MeshBasicMaterial({color:'#bfe6ff',fog:false});
+    for(let i=0;i<9;i++){const w=1+rand()*4;const m=new THREE.Mesh(new THREE.BoxGeometry(w,.5,.2),glyph);m.position.set((rand()-.5)*(8-w),-18+i*4.4,1.62);g.add(m)}
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:radTex([[0,'rgba(190,230,255,.35)'],[1,'rgba(190,230,255,0)']]),blending:THREE.AdditiveBlending,fog:false,depthWrite:false}));halo.scale.setScalar(130);g.add(halo);spin.push([g,.15]);
+  }
+  g.userData.spin=spin;return g;
+}
+function buildFreighter(rand){
+  const g=new THREE.Group();
+  const M=(c,o={})=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:20},o));
+  const hull=M('#4a4e5a'),rust=M('#6a4a3a'),dark=M('#22252e'),amber=new THREE.MeshBasicMaterial({color:'#ffb45e'});
+  const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m};
+  add(new THREE.BoxGeometry(40,30,220),hull,0,0,0);
+  add(new THREE.BoxGeometry(30,22,24),hull,0,0,-122).rotation.x=.05;
+  add(new THREE.BoxGeometry(24,20,28),dark,0,25,62);add(new THREE.BoxGeometry(16,6,10),hull,0,38,56);
+  add(new THREE.BoxGeometry(16.4,1.4,1),new THREE.MeshPhongMaterial({color:'#1a1010',emissive:'#4a1a10'}),0,38,50.6);
+  for(let z=-80;z<=80;z+=30)for(const s of [-1,1])if(rand()<.78){const c=add(new THREE.BoxGeometry(14,14,24),rand()<.5?rust:dark,s*27,(rand()-.5)*8,z);c.rotation.set((rand()-.5)*.2,(rand()-.5)*.2,(rand()-.5)*.3)}
+  for(const [x,y] of [[-11,0],[11,0],[0,10]])add(new THREE.CylinderGeometry(7,9,16,10).rotateX(Math.PI/2),dark,x,y,118);
+  add(new THREE.BoxGeometry(2,60,2),dark,8,40,40).rotation.z=.4;
+  add(new THREE.BoxGeometry(12,.6,.6),amber,0,1,-134.4);add(new THREE.BoxGeometry(12,.6,.6),amber,0,-8,-134.4);add(new THREE.BoxGeometry(.6,9,.6),amber,-6,-3.5,-134.4);add(new THREE.BoxGeometry(.6,9,.6),amber,6,-3.5,-134.4);
+  const beacon=add(new THREE.SphereGeometry(1.2,8,6),new THREE.MeshBasicMaterial({color:'#ff3a3a',fog:false}),0,44,56);
+  g.userData={beacon,airlock:new V3(0,-3.5,-150)};
+  return g;
+}
+// interior layout, in the interior group's frame (floor at y=0)
+const DR={on:false,pos:new V3(),yaw:0,pitch:0,ig:null,rects:[],items:[],cells:0,vaultOpen:false,door:null,lights:[],rad:null,prompt:'',tgt:'',near:null,inRad:false,seed:0};
+function interiorRects(vaultOpen){
+  const r=[{x:0,z:-96,hx:6,hz:6,name:'Airlock'},{x:0,z:0,hx:2,hz:90.5,name:'Corridor'}];
+  const zs=[-70,-35,0,35,70];for(const z of zs)for(const s of [-1,1]){r.push({x:s*11,z,hx:6,hz:6,room:true,side:s});r.push({x:s*3.5,z,hx:1.6,hz:1.8})}
+  if(vaultOpen)r.push({x:0,z:96,hx:6,hz:6,name:'Vault'});
+  return r;
+}
+function buildInterior(seed){
+  const ig=new THREE.Group();ig.position.set(0,-9,0);
+  const panel=new THREE.MeshPhongMaterial({color:'#5a5f6c',flatShading:true,shininess:30}),floorM=new THREE.MeshPhongMaterial({color:'#3a3d46',flatShading:true}),ceil=new THREE.MeshPhongMaterial({color:'#2a2c34',flatShading:true});
+  const strip=new THREE.MeshBasicMaterial({color:'#ff7a3a'}),H=5;
+  const rects=interiorRects(true);
+  for(const R of rects){
+    const fl=new THREE.Mesh(new THREE.BoxGeometry(R.hx*2,.2,R.hz*2),floorM);fl.position.set(R.x,-.1,R.z);ig.add(fl);
+    const ce=new THREE.Mesh(new THREE.BoxGeometry(R.hx*2,.2,R.hz*2),ceil);ce.position.set(R.x,H+.1,R.z);ig.add(ce);
+    if(R.room||R.name){const l=new THREE.Mesh(new THREE.BoxGeometry(Math.min(3,R.hx),.08,.3),strip);l.position.set(R.x,H-.05,R.z);ig.add(l)}
+    // walls with openings where another rectangle crosses the edge
+    for(const side of ['x+','x-','z+','z-']){
+      const alongX=side[0]==='z',line=side==='x+'?R.x+R.hx:side==='x-'?R.x-R.hx:side==='z+'?R.z+R.hz:R.z-R.hz;
+      const lo=alongX?R.x-R.hx:R.z-R.hz,hi=alongX?R.x+R.hx:R.z+R.hz;let segs=[[lo,hi]];
+      for(const O of rects){if(O===R)continue;
+        const crosses=alongX?(O.z-O.hz<line-.01&&O.z+O.hz>line+.01):(O.x-O.hx<line-.01&&O.x+O.hx>line+.01);if(!crosses)continue;
+        const a=alongX?O.x-O.hx:O.z-O.hz,b=alongX?O.x+O.hx:O.z+O.hz;
+        segs=segs.flatMap(([s0,s1])=>{const out=[];if(a>s0)out.push([s0,Math.min(a,s1)]);if(b<s1)out.push([Math.max(b,s0),s1]);return out.filter(([u,v])=>v-u>.05)})}
+      for(const [s0,s1] of segs){const len=s1-s0,mid=(s0+s1)/2;const w=new THREE.Mesh(new THREE.BoxGeometry(alongX?len:.3,H,alongX?.3:len),panel);
+        w.position.set(alongX?mid:line,H/2,alongX?line:mid);ig.add(w)}
+    }
+  }
+  // corridor ribs and pipes
+  for(let z=-88;z<=88;z+=8){const rib=new THREE.Mesh(new THREE.BoxGeometry(4.2,.3,.4),ceil);rib.position.set(0,H-.2,z);ig.add(rib)}
+  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,180,6).rotateX(Math.PI/2),new THREE.MeshPhongMaterial({color:'#6a4a3a'}));pipe.position.set(1.7,H-.6,0);ig.add(pipe);
+  // vault door
+  const door=new THREE.Mesh(new THREE.BoxGeometry(4,H,.6),new THREE.MeshPhongMaterial({color:'#7a5a2a',emissive:'#2a1a08',flatShading:true}));door.position.set(0,H/2,90.2);ig.add(door);
+  const lamp=new THREE.Mesh(new THREE.BoxGeometry(1.2,.3,.1),new THREE.MeshBasicMaterial({color:'#ff3a3a'}));lamp.position.set(0,H-.8,89.8);ig.add(lamp);
+  // contents, seeded
+  const rand=mulberry32((seed^0xF00D)>>>0);const rooms=rects.filter(R=>R.room);
+  const order=rooms.map((R,i)=>i).sort(()=>rand()-.5);const items=[];
+  const crateG=mergeColored([{geo:new THREE.BoxGeometry(1.4,1,1),color:'#5a6272'},{geo:new THREE.BoxGeometry(1.44,.16,1.04).translate(0,.15,0),color:'#ffb45e'}]);
+  const cellG=mergeColored([{geo:new THREE.CylinderGeometry(.25,.25,.8,10),color:'#9fe6ff'},{geo:new THREE.CylinderGeometry(.3,.3,.12,10).translate(0,.42,0),color:'#445'}]);
+  const mk=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);ig.add(m);return m};
+  rooms.forEach((R,i)=>{
+    const role=order.indexOf(i);R.role=role===0||role===1?'cell':role===2?'rad':role===3?'log':'crates';
+    if(R.role==='cell')items.push({kind:'cell',pos:new V3(R.x+R.side*3,1,R.z),mesh:mk(cellG,new THREE.MeshPhongMaterial({vertexColors:true,emissive:'#2a8ab0'}),R.x+R.side*3,.4,R.z),key:`C:${seed}:${i}`});
+    if(R.role==='rad'){const g=mk(new THREE.BoxGeometry(11,.05,11),new THREE.MeshBasicMaterial({color:'#2a5a10',transparent:true,opacity:.6}),R.x,.02,R.z);DR.rad=R;
+      items.push({kind:'crate',pos:new V3(R.x+R.side*4,.5,R.z+3),mesh:mk(crateG,new THREE.MeshPhongMaterial({vertexColors:true,flatShading:true}),R.x+R.side*4,.5,R.z+3),key:`F:${seed}:${i}:r`,rich:true})}
+    if(R.role==='log')items.push({kind:'log',pos:new V3(R.x+R.side*4.5,1.2,R.z),mesh:mk(new THREE.BoxGeometry(.9,1.4,.6),new THREE.MeshPhongMaterial({color:'#2a2d3e',emissive:'#1a4a6a'}),R.x+R.side*4.5,.7,R.z),key:`L:${seed}`});
+    if(R.role==='crates'){const n=1+Math.floor(rand()*2);for(let k=0;k<n;k++){const x=R.x+(rand()-.5)*7,z=R.z+(rand()-.5)*7;items.push({kind:'crate',pos:new V3(x,.5,z),mesh:mk(crateG,new THREE.MeshPhongMaterial({vertexColors:true,flatShading:true}),x,.5,z),key:`F:${seed}:${i}:${k}`})}}
+  });
+  items.push({kind:'vaultdoor',pos:new V3(0,1.5,89),mesh:door,key:`V:${seed}:door`});
+  items.push({kind:'vault',pos:new V3(0,.6,98),mesh:mk(mergeColored([{geo:new THREE.BoxGeometry(2.4,1.2,1.4),color:'#7a5a2a'},{geo:new THREE.BoxGeometry(2.5,.2,1.5).translate(0,.4,0),color:'#ffd27a'}]),new THREE.MeshPhongMaterial({vertexColors:true,flatShading:true,emissive:'#2a1a04'}),0,.6,98),key:`V:${seed}`});
+  items.push({kind:'hatch',pos:new V3(0,1.5,-101.5),mesh:mk(new THREE.BoxGeometry(4,4,.3),new THREE.MeshPhongMaterial({color:'#3a3f50',emissive:'#3a2a10'}),0,2,-101.9),key:''});
+  for(const it of items){if(it.key&&st.looted&&st.looted.has(it.key)&&it.kind!=='hatch'){it.done=true;if(it.kind!=='vaultdoor')it.mesh.visible=false}}
+  const lights=[0,1,2].map(()=>{const L=new THREE.PointLight('#ff8a5a',1.2,22,1.6);ig.add(L);return L});
+  return{ig,items,rects,lights};
+}
+function generateSpace(seed){
+  for(const a of anomalies)scene.remove(a.group);anomalies=[];
+  if(freighter){scene.remove(freighter.group);freighter=null}
+  if(DR.on){DR.on=false;flashlight.visible=false}
+  const rand=mulberry32((seed^0xA5A5F00D)>>>0);
+  const kinds=['wormhole','singularity','ion','monolith'].sort(()=>rand()-.5).slice(0,2);
+  const place=(minD,maxD,clear)=>{for(let k=0;k<40;k++){const d=minD+rand()*(maxD-minD),a=rand()*6.28;const p=new V3(Math.cos(a)*d,(rand()-.5)*d*.2,Math.sin(a)*d);
+    if(planets.every(P=>P.center.distanceTo(p)>P.radius*3+clear)&&(!station||station.group.position.distanceTo(p)>2500))return p}return new V3(minD,0,0)};
+  kinds.forEach((kind,i)=>{const g=buildAnomaly(kind,rand);g.position.copy(place(5000,14000,600));g.rotation.set(rand()*6.28,rand()*6.28,0);scene.add(g);anomalies.push({kind,group:g,i,key:`A:${seed}:${i}`,t:0})});
+  if(rand()<.8){const g=buildFreighter(rand);g.position.copy(place(4500,12000,400));g.rotation.set((rand()-.5)*.4,rand()*6.28,(rand()-.5)*.6);scene.add(g);g.updateMatrixWorld(true);
+    freighter={group:g,seed,name:makeName(rand,2,2,false)+' '+['Wayfarer','Burden','Promise','Lantern','Covenant'][Math.floor(rand()*5)]}}
+}
+const looted=k=>!!(st.looted&&st.looted.has(k));
+function markLooted(k){(st.looted=st.looted||new Set()).add(k);save()}
+const freighterAirlock=()=>freighter.group.localToWorld(freighter.group.userData.airlock.clone());
+const freighterNear=()=>!!freighter&&st.mode==='ship'&&ship.state==='flying'&&ship.group.position.distanceTo(freighterAirlock())<160;
+function anomalyNear(){if(st.mode!=='ship'||ship.state!=='flying')return null;for(const a of anomalies)if(a.kind==='monolith'&&ship.group.position.distanceTo(a.group.position)<160&&!looted(a.key))return a;return null}
+function boardFreighter(){
+  if(!freighter)return;
+  if(!freighter.int){freighter.int=buildInterior(freighter.seed);freighter.group.add(freighter.int.ig)}
+  const I=freighter.int;DR.on=true;DR.items=I.items;DR.lights=I.lights;DR.ig=I.ig;DR.vaultOpen=looted(`V:${freighter.seed}:door`);DR.rects=interiorRects(DR.vaultOpen);DR.cells=0;DR.inRad=false;
+  const door=I.items.find(x=>x.kind==='vaultdoor');door.mesh.visible=!DR.vaultOpen;
+  DR.pos.set(0,1.7,-96);DR.yaw=Math.PI;DR.pitch=0;
+  const fwd=new V3(0,0,1).applyQuaternion(freighter.group.quaternion);
+  ship.group.position.copy(freighterAirlock()).addScaledVector(fwd,-30);ship.group.lookAt(freighterAirlock());ship.group.rotateY(Math.PI);ship.state='landed';ship.speed=0;
+  st.mode='derelict';flashlight.visible=true;tool.visible=false;
+  toast(`Boarded the derelict freighter ${freighter.name}. It is dark and the air is thin: life support drains while you explore.`,'big');
+  toast('Find two power cells to open the captain\'s vault. Press E at the hatch to leave.');Sound.blip(200,.6,'sawtooth',.08);
+}
+function leaveFreighter(){
+  DR.on=false;st.mode='ship';flashlight.visible=false;ship.state='flying';ship.speed=0;ship.camQ.copy(ship.group.quaternion);
+  toast('Back aboard your ship.');save();
+}
+function drInside(x,z,m=.35){return DR.rects.some(r=>Math.abs(x-r.x)<r.hx-m&&Math.abs(z-r.z)<r.hz-m)}
+function updateDerelict(dt){
+  if(!freighter||!DR.on){leaveFreighter();return}
+  const sens=.0022;DR.yaw-=mouseDX*sens;DR.pitch=clamp(DR.pitch-mouseDY*sens,-1.4,1.4);
+  let mf=((keys.KeyW||keys.ArrowUp)?1:0)-((keys.KeyS||keys.ArrowDown)?1:0)+touchMove.y,ms=((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0)+touchMove.x;
+  const len=Math.hypot(mf,ms);if(len>1){mf/=len;ms/=len}
+  const spd=(keys.ShiftLeft||keys.ShiftRight)?7.5:4.5,fx=-Math.sin(DR.yaw),fz=-Math.cos(DR.yaw),rx=Math.cos(DR.yaw),rz=-Math.sin(DR.yaw);
+  const dx=(fx*mf+rx*ms)*spd*dt,dz=(fz*mf+rz*ms)*spd*dt;
+  if(drInside(DR.pos.x+dx,DR.pos.z))DR.pos.x+=dx;if(drInside(DR.pos.x,DR.pos.z+dz))DR.pos.z+=dz;
+  player.bob+=(mf||ms)?dt*spd*1.4:0;
+  const eye=tV.set(DR.pos.x,1.7+Math.sin(player.bob)*(REDUCED?0:.04),DR.pos.z);
+  DR.ig.updateMatrixWorld(true);camera.position.copy(DR.ig.localToWorld(eye.clone()));
+  const qf=DR.ig.getWorldQuaternion(new Q4());camera.quaternion.copy(qf).multiply(tQ.setFromAxisAngle(Y_AXIS,DR.yaw)).multiply(new Q4().setFromAxisAngle(X_AXIS,DR.pitch));
+  player.pos.copy(camera.position);
+  const up=new V3(0,1,0).applyQuaternion(qf);player.fwd.set(fx,0,fz).applyQuaternion(qf);DR.up=up;
+  // emergency lights follow the nearest rooms, flickering
+  const near=DR.rects.filter(r=>r.room||r.name).sort((a,b)=>Math.hypot(a.x-DR.pos.x,a.z-DR.pos.z)-Math.hypot(b.x-DR.pos.x,b.z-DR.pos.z));
+  DR.lights.forEach((L,i)=>{const r=near[i];if(!r){L.visible=false;return}L.visible=true;L.position.set(r.x,4.2,r.z);L.intensity=(r===DR.rad?.9:1.1)*(Math.random()<.04?.2:1);L.color.set(r===DR.rad?'#7aff5a':'#ff8a5a')});
+  // radiation, life support
+  const R=DR.rad,inRad=R&&Math.abs(DR.pos.x-R.x)<R.hx&&Math.abs(DR.pos.z-R.z)<R.hz;
+  if(inRad&&!DR.inRad)toast('Radiation leak! Grab what you can and get out.','bad');DR.inRad=inRad;
+  player.suit=Math.max(0,player.suit-(inRad?3:.45)*(tech('lining')?.6:1)*dt);if(inRad)player.health-=2.5*dt;
+  if(player.suit<=0)player.health-=7*dt;if(player.health<=0){player.health=60;player.suit=50;leaveFreighter();toast('You blacked out and your suit dragged you back to the ship.','bad')}
+  // nearest interactable
+  DR.near=null;DR.prompt='';DR.tgt='';let bd=2.8;
+  for(const it of DR.items){if(it.done&&it.kind!=='hatch'&&it.kind!=='vaultdoor')continue;if(it.kind==='vaultdoor'&&DR.vaultOpen)continue;if(it.kind==='vault'&&!DR.vaultOpen)continue;
+    const d=Math.hypot(it.pos.x-DR.pos.x,it.pos.z-DR.pos.z);if(d<bd){bd=d;DR.near=it}}
+  const it=DR.near;
+  if(it){const k={crate:['Salvage crate','Open'],cell:['Power cell','Take'],log:['Captain\'s log','Read'],vaultdoor:['Vault door',DR.cells>=2?'Insert power cells':`Needs 2 power cells (${DR.cells}/2)`],vault:['Captain\'s vault','Open'],hatch:['Airlock hatch','Leave the freighter']}[it.kind];
+    DR.tgt=k[0];DR.prompt=`<span class="k">E</span>${k[1]}`}
+  for(const x of DR.items)if(x.kind==='cell'&&!x.done)x.mesh.rotation.y+=dt*1.5;
+}
+const LOG_LINES=['Day 41. The jump drive failed again. The crew blames the cargo.','We should never have taken the contract from the Vael Syndicate.','Reactor shielding is cracking in bay 4. I sealed it, but the readings keep climbing.','Pirates have been shadowing us for three systems. We go dark tonight.','Whoever finds this: the vault code is wired to the power cells. Take what you need.','The navigator swears the stars outside moved on their own last night.'];
+function derelictInteract(){
+  const it=DR.near;if(!it)return;
+  if(it.kind==='hatch'){leaveFreighter();return}
+  if(it.kind==='crate'){it.done=true;it.mesh.visible=false;markLooted(it.key);
+    const l={units:ri(80,220)*(it.rich?2:1),ferrite:ri(5,20),cobalt:ri(2,8),nanites:ri(10,30)*(it.rich?2:1),aurium:Math.random()<(it.rich?.8:.35)?ri(1,3):0};giveLoot(l);
+    let extra='';if(Math.random()<.25){crafted.missile=(crafted.missile||0)+2;extra=' · +2 missiles'}toast(`Salvage: ${lootText(l)}${extra}`);Sound.blip(500,.15,'triangle',.14);return}
+  if(it.kind==='cell'){it.done=true;it.mesh.visible=false;DR.cells++;toast(`Power cell ${DR.cells}/2 recovered.${DR.cells>=2?' Take them to the vault at the far end of the corridor.':''}`);Sound.blip(900,.25,'sine',.14);return}
+  if(it.kind==='log'){const rand=mulberry32(freighter.seed);const lines=[...LOG_LINES].sort(()=>rand()-.5).slice(0,2);toast(`Captain's log, ${freighter.name}: "${lines[0]}"`,'big');setTimeout(()=>toast(`"${lines[1]}"`),2500);if(!it.done){it.done=true;markLooted(it.key);inv.nanites+=40;toast('+40 Nanites for recovering the log.')}return}
+  if(it.kind==='vaultdoor'){if(DR.cells<2){toast(`The vault needs two power cells. You have ${DR.cells}.`,'bad');return}
+    DR.vaultOpen=true;DR.rects=interiorRects(true);it.mesh.visible=false;markLooted(it.key);toast('The vault door grinds open.','big');Sound.boom(.4,1.4);return}
+  if(it.kind==='vault'){it.done=true;it.mesh.visible=false;markLooted(it.key);
+    const l={units:ri(1500,2500),aurium:ri(5,8),nanites:ri(120,180),relics:1};giveLoot(l);toast(`Captain's vault: ${lootText(l)}`,'big');
+    const missing=RECIPES.filter(r=>r.kind==='tech'&&!tech(r.id));
+    if(missing.length){const r=missing[Math.floor(Math.random()*missing.length)];crafted[r.id]=true;setTimeout(()=>toast(`You also found a ${r.name} module and installed it.`,'big'),1500)}
+    else{inv.units+=2000;setTimeout(()=>toast('+2,000 Units in prototype parts.','big'),1500)}
+    Sound.whoosh(1);save();
+  }
+}
+function updateAnomalies(dt){
+  const flying=st.mode==='ship'&&ship.state==='flying',sp=ship.group.position;
+  for(const a of anomalies){for(const [o,r,ax] of a.group.userData.spin){if(ax==='z')o.rotation.z+=r*dt;else o.rotation.y+=r*dt}
+    if(!flying)continue;const d=sp.distanceTo(a.group.position);
+    if(a.kind==='wormhole'&&d<52){
+      ship.wormSeed=(Math.random()*2**31)>>>0;ship.state='warp';ship.t=1.2;ship.warped=false;ship.homeJump=false;Sound.whoosh(2);toast('The wormhole seizes your ship!','big');
+    }else if(a.kind==='singularity'&&d<1100){
+      const pull=tV.copy(a.group.position).sub(sp).normalize();sp.addScaledVector(pull,170*Math.pow(1-d/1100,2)*dt);ship.shake=Math.min(.8,ship.shake+dt*(1-d/1100));
+      if(d<85){damagePlayer(40*dt,true);if(!a.warnT||time-a.warnT>3){a.warnT=time;toast('Hull shearing apart! Burn away from the singularity!','bad')}}
+      if(d>110&&d<420&&!looted(a.key)){a.t+=dt;if(a.t>=8){markLooted(a.key);const l={aurium:ri(4,7),nanites:ri(60,90),units:ri(250,400)};giveLoot(l);toast(`Exotic matter harvested: ${lootText(l)}`,'big');Sound.blip(1200,.5,'triangle',.18)}}
+    }else if(a.kind==='ion'&&d<500){
+      ship.shield=Math.max(0,ship.shield-9*dt);ship.shieldDelay=Math.max(ship.shieldDelay,1);
+      if(Math.random()<dt*1.2){WX.flash=Math.max(WX.flash,.25);Sound.blip(2400,.05,'square',.03)}
+      if(!looted(a.key)){a.t+=dt;if(a.t>=15){markLooted(a.key);crafted.warpcell=(crafted.warpcell||0)+1;toast('The ion charge condensed into a warp cell.','big');Sound.blip(900,.5,'sine',.18)}}
+    }
+  }
+  if(freighter){const b=freighter.group.userData.beacon;b.visible=(time*1.2)%2<1}
+}
+function anomalyStatus(){
+  if(st.mode!=='ship'||ship.state!=='flying')return '';const sp=ship.group.position;
+  for(const a of anomalies){const d=sp.distanceTo(a.group.position);
+    if(a.kind==='singularity'&&d<1100)return d<85?'Singularity core: hull failing':(d>110&&d<420&&!looted(a.key))?`Harvesting exotic matter ${Math.min(100,Math.round(a.t/8*100))}%`:'Gravity well: hold an orbit 110–420 m out to harvest';
+    if(a.kind==='ion'&&d<500)return looted(a.key)?'Ion cloud: shields draining':`Ion cloud: shields draining · warp cell charge ${Math.min(100,Math.round(a.t/15*100))}%`;
+    if(a.kind==='wormhole'&&d<600)return 'Wormhole: fly through the ring for a free jump to an unknown system'}
+  return '';
+}
+function communeMonolith(a){
+  markLooted(a.key);inv.relics++;inv.nanites+=200;
+  const rand=mulberry32(a.key.length*977+a.i);const words=['the Ninth Choir','those who left','the long silence','the first light','the drifting gardens'];
+  toast(`The monolith hums. Images of ${words[Math.floor(rand()*words.length)]} flood your visor.`,'big');
+  setTimeout(()=>discover(a.key+':d','Echo monolith deciphered · +1 relic · +200 Nanites'),1200);
+}
+
 /* ---------- HUD ---------- */
 const mk=$('marks'),mctx=mk.getContext('2d');
 function resize(){
@@ -2842,7 +3067,10 @@ function drawMarkers(){
   for(const a of MP.avatars.values()){const onFoot=a.astro.visible,obj=onFoot?a.astro:a.ship;const w=obj.localToWorld(new V3(0,onFoot?2.4:4.5,0));
     const ref5=st.mode==='foot'?player.pos:ship.group.position;const dd=w.distanceTo(ref5);const p=proj(w,true);marker(p.x,p.y,a.color,a.name,fmtDist(dd),'ring',onFoot?4:6)}
   for(const c of WX.crystals){const ref6=st.mode==='foot'?player.pos:ship.group.position;const dd=c.wp.distanceTo(ref6);if(dd<350&&dd>3){const p=proj(c.wp,false);if(!p.off)marker(p.x,p.y,WX.W?WX.W.color:'#fff','Storm crystal',fmtDist(dd),'diamond',6)}}
-  for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
+  if(st.mode==='ship'&&ship.state!=='warp'&&ship.state!=='docked'){const sp=ship.group.position;
+    for(const a of anomalies){const dd=a.group.position.distanceTo(sp);if(dd<22000&&dd>80){const p=proj(a.group.position,false);if(!p.off)marker(p.x,p.y,ANOM_INFO[a.kind].color,ANOM_INFO[a.kind].label,fmtDist(dd)+(looted(a.key)?' · spent':''),'ring',8)}}
+    if(freighter){const w=freighterAirlock(),dd=w.distanceTo(sp);if(dd<22000&&dd>60){const p=proj(dd<3000?w:freighter.group.position,false);if(!p.off)marker(p.x,p.y,'#ff8a6a','Derelict freighter',fmtDist(dd)+(dd<3000?' · airlock':''),'diamond',8)}}}
+  if(st.mode!=='derelict')for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
     if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
   if(!buildMode)for(const B of allBaseList()){const rt=baseRTs.get(B.id);if(!rt)continue;const mine=B===myBase;
     const bw=rt.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
@@ -2904,6 +3132,7 @@ function drawMarkers(){
   }
 }
 function objective(){
+  if(st.mode==='derelict')return DR.vaultOpen?(looted(`V:${freighter.seed}`)?'Vault looted. Head back to the airlock hatch to leave':'The vault is open. Claim its contents at the far end'):`Derelict ${freighter?freighter.name:''} · power cells ${DR.cells}/2 for the captain's vault · life support drains here`;
   if(st.mode==='foot'&&WX.state==='storm'&&WX.I>.3&&!WX.shelter)return `${WX.W.name}! Life support drains ${WX.drainMul.toFixed(1)}× faster. Shelter under a roof or in your ship${WX.crystals.length?' · storm crystals glow nearby':''}`;
   if(WX.state==='warn'&&WX.I<.05&&st.mode==='foot')return `${WX.W.name} in ${Math.ceil(WX.inSec)} s · head for shelter`;
   if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
@@ -2934,7 +3163,7 @@ function updateHUD(){
   }
   setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));setText('iU',inv.units.toLocaleString());
   setText('objective',objective());
-  const foot=st.mode==='foot';
+  const foot=st.mode==='foot'||st.mode==='derelict';
   const combatView=!foot&&ship.state==='flying';$('footBars').hidden=!foot;$('shipBars').hidden=foot;$('reticle').hidden=!(foot||combatView);
   if(foot){setBar('bSuit',player.suit);setBar('bHp',player.health,100,35);setBar('bJet',player.jet,100,0)}
   else{const S=shipStats();setHTML('speed',`${Math.round(ship.speed)}<small>m/s · ${SHIP_CLASSES[ship.cls].label}${upg.rack?` · ${crafted.missile||0} missiles`:''}</small>`);setBar('bShield',ship.shield,S.shield,0);setBar('bHull',ship.hull,S.hull,S.hull*.3);setBar('bHeat',ship.heat,100,0);$('bHeat').classList.toggle('warn',ship.overheat);setBar('bFuel',ship.fuel,100,TO());setBar('bWarp',canWarp()?100:Math.min(10,inv.aurium)*10,100,0);$('bWarp').querySelector('.n').textContent=crafted.warpcell?`${crafted.warpcell} cell${crafted.warpcell>1?'s':''}`:`${Math.min(10,inv.aurium)}/10`}
@@ -2958,12 +3187,16 @@ function updateHUD(){
     const d=tV.copy(ship.group.position).sub(P.center);const r=d.length();d.divideScalar(r);const alt=r-P.heightAt(d);
     const hn=allHostiles().length;
     if(hn)pr=`<span class="k" style="border-color:var(--danger);color:var(--danger)">${hn}</span>Hostile${hn>1?'s':''} · hold left click to fire`;
+    else if(freighterNear())pr=`<span class="k">E</span>Board the derelict freighter ${freighter.name}`;
+    else if(anomalyNear())pr='<span class="k">E</span>Commune with the echo monolith';
+    else if(anomalyStatus())pr=anomalyStatus();
     else if(stationNear())pr=`<span class="k">E</span>Dock at ${station.name}`;
     else if(alt<140)pr=nearestPostPad(P,ship.group.position,250)?'<span class="k">E</span>Land at trading post':'<span class="k">E</span>Land';
     else if(canWarp()&&r-P.radius>P.radius*.6)pr='<span class="k">H</span>Engage hyperdrive';
     else if(r-P.radius>P.radius*1.4)pr='<span class="k">Shift</span>Pulse drive';
     else pr=`Altitude ${fmtDist(alt)}`;
   }
+  if(st.mode==='derelict'){tgt=DR.tgt;pr=DR.prompt}
   setText('target',tgt);setHTML('prompt',pr);
   if(combatView)prog=ship.heat/100;ring.setAttribute('stroke',combatView&&ship.overheat?'#ff6274':'#ffb45e');ring.setAttribute('stroke-dashoffset',String(106.8*(1-prog)));
 }
@@ -2982,7 +3215,8 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateWeather(dt);updateEnv();
+  else if(st.mode==='derelict')updateDerelict(dt);
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateAnomalies(dt);updateWeather(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
@@ -2995,10 +3229,10 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.looted=new Set(saved.looted||[]);
     myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
   await generateSystem(st.seed,isFirst(st.seed));
   const P=planets[0];current=P;
