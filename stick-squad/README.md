@@ -56,7 +56,7 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Twelve fighters, each with their own stats, look and special move:
+Sixteen fighters, each with their own stats, look and special move:
 
 | Fighter | Style | Special |
 |---|---|---|
@@ -72,18 +72,22 @@ Twelve fighters, each with their own stats, look and special move:
 | Hopper | Four jumps, huge leap, extra-wide Meteor Slam | Mega Stomp shakes the whole floor |
 | Whiskers | Cat-quick, attacks 30% faster | Claw Storm shreds everything in front |
 | Chef | Heavy attack throws a boomerang frying pan | Food Fight: a barrage of pies |
+| Frosty | Every hit briefly freezes enemies | Blizzard freezes everyone on screen |
+| Ghostly | Hold jump to float down slowly; dashes pass through attacks | Haunt: untouchable for 4 seconds, and touching enemies hurts them |
+| DJ Beats | Heavy attack fires growing sound waves that push enemies away | Drop the Bass: three screen-wide shockwaves |
+| Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
 
 ## Modes
 
 After picking fighters you choose a mode:
 
 - **Story:** team up against waves of enemies. Pick a starting stage, or a random one.
-- **Boss Rush:** fight all 18 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Boss Rush:** fight all 24 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 - **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 ## Stages
 
-Nine stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels and Lava Doodle, where lava geysers erupt from the floor. Watch for the glowing warning circles; geysers hurt enemies too.
+Twelve stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity) and Windy Worksheet (wind gusts push everyone sideways after a warning).
 
 ## Bosses
 
@@ -100,6 +104,9 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 | Crayon Canyon | Crayon Cowpoke | The Wax Titan |
 | Comic Panels | Captain Kapow | Doctor Inkspot |
 | Lava Doodle | Magma Imp | The Eruptor |
+| Ice Rink | Snow Goon | The Abominable Scribble |
+| Space Doodle | Comet Kid | Galaxy Gobbler |
+| Windy Worksheet | Kite Bandit | The Tempest |
 
 Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes) and **shadow clones**.
 
@@ -126,6 +133,11 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 | Regeneration | Steadily heals you for 10 seconds |
 | Double Damage | Your hits deal 2x damage |
 | Rocket Boots | Unlimited jumps and air dashes |
+| Ink Magnet | Pulls every power-up on screen toward you |
+| Ink Mines | Drops 3 mines that blow up when enemies step near |
+| Thorn Armor | Enemies that hit you take damage back |
+| Mega Hammer | Heavy attacks send shockwaves along the floor |
+| Slow-Mo Clock | Enemies move at half speed for 8 seconds (in Versus it slows your opponent) |
 | Mystery box | A random power-up |
 
 ## Features
@@ -133,6 +145,6 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 - **Co-op mechanics:** hit an enemy your partner just hit for a **TEAM COMBO x2**. Stand next to a downed partner to **revive** them. When both ink meters are full and you're standing close, press Special to fire the **DOUBLE INK** screen-clearing team super.
 - **Combat:** combo chains, juggles, launcher into jump-cancel into air attacks, dash cancels, wall splats, and **projectile reflects**. Hit-stop, screen shake, slow-mo finishers and controller rumble give every hit weight.
 - **Enemies:** Grunts, Ninjas, Eraser-Throwers, armored Brutes with shockwave slams, and a two-phase boss, **The Scribble King**, every 5th wave.
-- **Endless:** after stage 9 the stages loop and the waves keep getting harder.
+- **Endless:** after stage 12 the stages loop and the waves keep getting harder.
 - **Audio:** procedural soundtrack and sound effects, all synthesized live with Web Audio.
 - **Saved high score:** your best team score is kept between sessions.
