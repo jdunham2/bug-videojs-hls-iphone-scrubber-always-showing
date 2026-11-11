@@ -11,3 +11,11 @@ To test it go to https://bug-videojs-hls-iphone-scrubber-always-showing.stackbli
 This project is meant to run on StackBlitz ⚡️
 
 [Edit on StackBlitz ⚡️](https://stackblitz.com/edit/bug-videojs-hls-iphone-scrubber-always-showing)
+
+---
+
+## Pip vs. Kai (game)
+
+A small 2D platformer lives in [`game/index.html`](game/index.html). Open the file in any browser; it needs no build step.
+
+Explore Brightwater Village, collect and sell treasure, upgrade your gear, decorate your home and grow Sunfruit, recover three Star Shards and defeat Kai in his tower.
