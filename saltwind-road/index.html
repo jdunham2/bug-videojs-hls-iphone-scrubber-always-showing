@@ -3746,7 +3746,7 @@ function partyPanel() {
   const list = Object.values(remote);
   const leader = list.find(r => r.p.host);
   openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Near the leader, everyone fights the <b>same monsters</b>: hit them together, and everyone who helped gets the rewards. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat, Y to emote and N to ping your spot on everyone\u2019s map. If you fall near a friend, they can revive you.</span><br><br>${pchalHTML()}<br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
-    ...(leader && !party.host ? [{label: `Travel to ${leader.name}`, disabled: inDungeon() || inArena() || leader.p.dg || bossActive(), fn: () => { closeTalk(); SFX.travel(); fadeThen(() => { const spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]].map(([dx, dy]) => [leader.x + dx, leader.y + dy]).find(([x, y]) => passable(x, y)) || [leader.x, leader.y]; S.x = spot[0]; S.y = spot[1]; S.riding = !!S.riding && !!leader.p.mt; enemies = enemies.filter(e => e.boss); petE = null; compE = null; lastTile = -1; renderHUD(); }); }}] : []),
+    ...list.filter(r => !r.p.dg).slice(0, 4).map(r => ({label: `Travel to ${r.name}${r.p.host ? ' (leader)' : ''}`, disabled: inDungeon() || inArena() || bossActive() || !!downed, fn: () => { closeTalk(); SFX.travel(); fadeThen(() => travelToPeer(r)); }})),
     {label: 'Chat', fn: () => chatPanel()},
     {label: 'Emote (Y)', fn: () => emotePanel()},
     {label: 'Ping my spot (N)', fn: () => { closeTalk(); sendPing(); }},
@@ -3785,7 +3785,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3841,6 +3841,8 @@ function drawRemote(r) {
 // shared monsters: the leader's game runs them, guests mirror them and send their damage
 let netOn = false, netSeq = 0, netKilled = [], netMirror = {}, netDmg = {}, netHostSid = null, netToastDone = false;
 const NET_SID = Math.random().toString(36).slice(2, 8);
+function netZone() { if (inArena()) return 'arena'; const k = inDungeon(); if (k) return DUNGEONS[k] && !DUNGEONS[k].endless && !DUNGEONS[k].mine ? 'd:' + k : 'solo'; return S.y >= WORLD_H ? 'solo' : 'world'; }
+const netZoneShared = z => z === 'world' || (typeof z === 'string' && z.startsWith('d:'));
 function netReset() { netOn = false; netMirror = {}; if (enemies.some(e => e.net)) enemies = enemies.filter(e => !e.net); }
 function netTarget(e, dSelf) {
   let best = null, bd = dSelf;
@@ -3848,7 +3850,7 @@ function netTarget(e, dSelf) {
   return best;
 }
 function netList() {
-  const out = []; if (inDungeon() || inArena()) return out;
+  const out = []; if (!netZoneShared(netZone())) return out;
   const c = [];
   for (const e of enemies) {
     if (e.dead || e.boss || e.minion || e.net || e.hidden > 0 || e.den != null) continue;
@@ -3871,8 +3873,8 @@ function netApply(peer, r, dm) {
 }
 function netDmgOut() { const o = {}; let n = 0; for (const k in netMirror) if (netDmg[k] > 0 && n++ < 30) o[k] = Math.round(netDmg[k]*10)/10; return o; }
 function netSync(L, dt) {
-  const on = !!L && !L.p.dg && !inDungeon() && !inArena() && S.y < WORLD_H && !bossActive() && Math.hypot(L.x - S.x, L.y - S.y) < 30;
-  if (on !== netOn) { netOn = on; if (on) { enemies = enemies.filter(e => !e.wild); if (!netToastDone) { netToastDone = true; toast(`<b>Fighting together!</b><br>You're near ${esc(L.name)}, so you now see and fight the same monsters. Everyone who lands a hit shares the rewards.`, 5000); } } }
+  const z = netZone(), on = !!L && L.p.dk === z && netZoneShared(z) && !bossActive() && Math.hypot(L.x - S.x, L.y - S.y) < 30;
+  if (on !== netOn) { netOn = on; if (on) { const dgn = !!inDungeon(); enemies = enemies.filter(e => !e.wild && !(dgn && e.dungeon && !e.boss)); if (!netToastDone) { netToastDone = true; toast(`<b>Fighting together!</b><br>You're near ${esc(L.name)}, so you now see and fight the same monsters. Everyone who lands a hit shares the rewards.`, 5000); } } }
   if (!on) { if (enemies.some(e => e.net)) enemies = enemies.filter(e => !e.net); netMirror = {}; return; }
   const p = L.p;
   if (p.sid !== netHostSid) { netHostSid = p.sid; netDmg = {}; netMirror = {}; enemies = enemies.filter(e => !e.net); }
@@ -3908,6 +3910,7 @@ function netEnemyTick(e, dt, safe) {
   if (!safe && d < .8 && e.cd <= 0) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
   if (def.ranged && !safe && d < def.ranged.range && d < def.aggro + 4) { e.rcd -= dt; if (e.rcd <= 0) { e.rcd = def.ranged.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), def.ranged.speed, def.dmg * (e.dmgMul || 1), def.ranged.col, .2); } }
 }
+function travelToPeer(leader) { const spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]].map(([dx, dy]) => [leader.x + dx, leader.y + dy]).find(([x, y]) => passable(x, y)) || [leader.x, leader.y]; S.x = spot[0]; S.y = spot[1]; S.riding = !!S.riding && !!leader.p.mt; enemies = enemies.filter(e => e.boss); petE = null; compE = null; lastTile = -1; renderHUD();  S.partyTravels = (S.partyTravels || 0) + 1; }
 // ===== party extras: revive, emotes, pings, party challenges =====
 let downed = null, reviving = null, myEmote = null, myEmoteShow = null, emoteSeq = 0, myPing = null, pingSeq = 0, pings = [];
 const REVIVE_T = 2.5;
@@ -3947,6 +3950,18 @@ function drawPings(vw, vh) {
       ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); ctx.fillStyle = q.col; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-4, 5); ctx.fill(); ctx.strokeStyle = '#0d131b'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
     }
     ctx.globalAlpha = 1;
+  }
+}
+function drawPartyArrows(vw, vh) {
+  const z = netZone();
+  for (const r of Object.values(remote)) {
+    if (r.p.dk !== z) continue; const px = r.x*TS, py = (r.y - .5)*TS;
+    if (px > camX + 4 && px < camX + vw - 4 && py > camY + 4 && py < camY + vh - 4) continue;
+    const cx = camX + vw/2, cy = camY + vh/2, a = Math.atan2(py - cy, px - cx), ex = Math.max(camX + 18, Math.min(camX + vw - 18, px)), ey = Math.max(camY + 18, Math.min(camY + vh - 18, py));
+    ctx.save(); ctx.translate(ex, ey); ctx.fillStyle = r.col; ctx.strokeStyle = '#0d131b'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, 7); ctx.fill(); ctx.stroke(); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(6, -4); ctx.lineTo(6, 4); ctx.fill(); ctx.restore();
+    ctx.fillStyle = '#0d131b'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText((r.name[0] || '?').toUpperCase(), ex, ey + 2.5);
+    if (r.p.dn) { ctx.fillStyle = Math.floor(frameT*4) % 2 ? '#ff6a5a' : '#ffffff'; ctx.fillText('!', ex + 9, ey - 6); }
   }
 }
 const PCHAL = [
@@ -5790,7 +5805,7 @@ const GUIDE = [
   ['Photo mode', 'Press H to freeze the moment and hide the screen clutter. Pan the camera with the movement keys or stick, press F to try filters (sepia, black and white, warm, dreamy), and press Space to snap. You can download every picture.'],
   ['Emotes and pings', 'Press Y to pick an emote that pops up above your head, and N to drop a ping marker where you stand. In a party, friends see your emotes, and your pings show up on their screen, minimap and world map. If you fall near a party member, you go down for 25 seconds instead of being knocked out: a friend can stand next to you and press E to revive you. Every party also gets a daily party challenge for bonus coin and XP.'],
   ['Game controllers', 'Connect a Nintendo Switch Pro Controller, an Xbox or a PlayStation controller and press any button. Move with the left stick. On a Pro Controller: A talks and picks things up, B rolls, Y or ZR attacks (hold for a spin attack), X throws a bomb, L and R switch and cast spells, ZL rides, \u2212 opens the map, + pauses, and the D-pad opens your bag (\u2191), crafting (\u2193), journal (\u2190) and skills (\u2192). Home opens the party menu. In menus, use the D-pad or stick to move, A to choose and B to go back.'],
-  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, you all see and fight the same monsters, and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
+  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, in the open world or inside the same dungeon, you all see and fight the same monsters (bosses stay separate), and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
   ['Sky whale & meteors', 'At dusk, keep an eye on the sky: a great whale sometimes swims overhead and drops a Cloud Pearl. On some nights meteors crash nearby. Mine the crater with a pickaxe for Meteorite Ore to forge the Meteor Blade.'],
   ['Summits & exotic seeds', 'Climb the highest peaks with climbing gear and plant your flag at each summit (look for a stone cairn) for a wide view and a reward. Sorrel in Greenstem sells exotic seeds: Golden Wheat, Dragonfruit and Starfruit.'],
   ['Moon rabbit & display cases', 'On full-moon nights (every 14 days, as the Gazette will tell you) a glowing moon rabbit comes down to play. Chase it until it tires, then catch it for Moon Mochi and a Moon Charm. Craft a Display Case to show off your trophies at home.'],
@@ -7121,6 +7136,7 @@ function render() {
   for (const p of particles) { ctx.fillStyle = p.col; ctx.globalAlpha = Math.max(0, 1 - p.t*2); ctx.fillRect(p.x*TS, p.y*TS, 2, 2); }
   ctx.globalAlpha = 1;
   if (pings.length) drawPings(vw, vh);
+  if (party) drawPartyArrows(vw, vh);
 
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const i = idx(x,y); if (S.explored[i]) continue;
@@ -10578,6 +10594,7 @@ const ACH = [
   ['buskstar','Virtuoso','Earn an S grade while busking', () => (S.buskS || 0) >= 1],
   ['skittle','Strike!','Bowl a strike at skittles', () => (S.skitStrikes || 0) >= 1],
   ['skitperfect','Perfect Game','Knock down all 27 pins in one skittles game', () => !!S.skitPerfect],
+  ['partytravel','Never Far Apart','Travel to a party member 5 times', () => (S.partyTravels || 0) >= 5],
   ['reviver','Lifesaver','Revive a party member', () => (S.revives || 0) >= 1],
   ['partychal','Party Animals','Complete 5 daily party challenges', () => (S.partyChals || 0) >= 5],
   ['shutterbug','Shutterbug','Take 5 photos in photo mode (H)', () => (S.photos || 0) >= 5],
