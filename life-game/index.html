@@ -205,6 +205,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .attackbtn { position: fixed; left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 6; width: 84px; height: 84px; border-radius: 50%; font-family: var(--display); font-size: 18px; cursor: pointer; border-color: #ff3fa4; background: rgba(255,63,164,.25); touch-action: none; }
 @media (max-width: 720px) { .bossbar { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); } }
 
+.weaponbar { position: fixed; left: calc(110px + env(safe-area-inset-left, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 6; padding: 6px; display: flex; gap: 4px; flex-wrap: wrap; max-width: min(560px, calc(100% - 130px)); }
+.weaponbar button { border: 1px solid var(--edge); background: rgba(255,255,255,.06); border-radius: 10px; padding: 6px 9px; font-size: 11.5px; font-weight: 900; cursor: pointer; white-space: nowrap; }
+.weaponbar button.on { border-color: #ff3fa4; background: rgba(255,63,164,.25); }
+.weaponbar kbd { font-family: var(--body); font-size: 10px; opacity: .7; margin-right: 4px; }
+@media (hover: none) { .weaponbar kbd { display: none; } }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -285,6 +291,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 <div class="card bossbar" id="bossBar" hidden><div class="bn" id="bossName">Boss</div><div class="bar"><i id="bossFill"></i></div></div>
 <div class="hurt" id="hurt"></div>
 <button class="card attackbtn" id="btnAttack" hidden>Attack</button>
+<div class="card weaponbar" id="weaponBar" hidden></div>
 <div class="card gamebar" id="gameBar" hidden></div>
 <div class="countdown" id="countdown" hidden>3</div>
 <div class="card quiz" id="quiz" hidden><div class="qq" id="quizQ"></div><div class="qopts" id="quizOpts"></div><div class="qbar"><i id="quizBar"></i></div></div>
@@ -736,6 +743,8 @@ const GOALS = [
   { id: "games10", text: "Play 10 minigames", test: () => (S.gamesPlayed || 0) >= 10 },
   { id: "boss1", text: "Defeat a boss in Shadow Woods", test: () => Object.keys(S.bosses || {}).length >= 1 },
   { id: "bossall", text: "Defeat all 3 bosses", test: () => Object.keys(S.bosses || {}).length >= 3 },
+  { id: "weapons4", text: "Own 4 different weapons", test: () => WEAPON_ORDER.filter(ownsWeapon).length >= 4 },
+  { id: "bestiary", text: "Fill in the whole Monster Book", test: () => Object.keys(MONSTERS).every((k) => (S.kills || {})[k]) },
   { id: "kill50", text: "Pop 50 monsters", test: () => (S.killTotal || 0) >= 50 },
   { id: "quests5", text: "Complete 5 quests or missions", test: () => (S.questCount || 0) >= 5 },
   { id: "questsall", text: "Finish every story quest", test: () => QUESTS.every((q) => S.questsDone && S.questsDone[q.id]) },
@@ -3740,6 +3749,10 @@ const QUESTS = [
     steps: [{ t: "kill", kind: "moth", n: 1, text: "Defeat the Thunder Moth Queen" }], done: "The skies are clear! Incredible.", reward: { money: 400, good: "blaster2" } },
   { id: "v6", giver: "ivy", title: "The Last Guardian", intro: "One guardian remains: Boulderbash, made of living stone. This is the biggest fight yet. Are you ready?",
     steps: [{ t: "kill", kind: "golem", n: 1, text: "Defeat Boulderbash" }], done: "You did it! You're the hero of Shadow Woods!", reward: { money: 600, skills: { fitness: 5, charm: 3 } } },
+  { id: "v7", giver: "ivy", title: "Spooky Spores", intro: "Fungoos keep spitting spores at my campers! They like to keep their distance, so chase them down. Pop 3.",
+    steps: [{ t: "kill", kind: "fungoo", n: 3, text: "Pop 3 Fungoos" }], done: "No more spore showers. Thanks!", reward: { money: 250 } },
+  { id: "v8", giver: "ivy", title: "Night Watch", intro: "At night, Shadow Pups run through the woods in packs. Come back after dark and pop 4 of them.",
+    steps: [{ t: "kill", kind: "pup", n: 4, text: "Pop 4 Shadow Pups (night only)" }], done: "You're braver than most rangers I know!", reward: { money: 350, skills: { fitness: 3 } } },
 ];
 const QMAP = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
 const QTESTS = { pettrick: () => hasPet() && learnedTricks().length > 0 };
@@ -4048,6 +4061,7 @@ function eyes(g, y, z, spread, size, color = 0xffffff, pupil = 0x111111) {
 }
 function makeMonster(kind, scale = 1) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body); g.userData.body = body;
+  if (EXTRA_MODELS[kind]) EXTRA_MODELS[kind](g, body);
   if (kind === "gloom" || kind === "slime") {
     const c = kind === "slime" ? 0x6fdc4a : 0x9b5de5;
     const b = new THREE.Mesh(new THREE.SphereGeometry(0.8, 18, 14), new THREE.MeshStandardMaterial({ color: c, roughness: 0.25, metalness: 0.1, emissive: c, emissiveIntensity: 0.15 })); b.scale.y = 0.8; b.position.y = 0.65; b.castShadow = true; body.add(b);
@@ -4086,7 +4100,7 @@ function makeMonster(kind, scale = 1) {
   }
   g.scale.setScalar(scale);
   const bg = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x111111, depthWrite: false })), fg = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff3fa4, depthWrite: false }));
-  const barY = kind === "golem" ? 5.6 : kind === "moth" ? 1.8 : kind === "bat" ? 1 : 2.1;
+  const barY = kind === "golem" ? 5.6 : kind === "moth" ? 1.8 : kind === "bat" ? 1 : kind === "ghost" ? 2.6 : kind === "pup" ? 1.6 : 2.2;
   bg.scale.set(1.3, 0.16, 1); fg.scale.set(1.2, 0.1, 1); bg.position.y = fg.position.y = barY; g.add(bg); g.add(fg); g.userData.bar = fg;
   return g;
 }
@@ -4119,6 +4133,7 @@ function defeatMonster(m) {
   const M = MONSTERS[m.kind];
   popAt(m.g.position.x, 1, m.g.position.z, m.kind === "gloom" ? 0x9b5de5 : m.kind === "bat" ? 0xffd23f : 0xc9a27a);
   scene.remove(m.g); monsters.splice(monsters.indexOf(m), 1);
+  if (m.kind === "jelly") for (let i = 0; i < 2; i++) spawnMonster("gloom", m.g.position.x + (i ? 1.2 : -1.2), m.g.position.z);
   const c = M.coins[0] + Math.floor(Math.random() * (M.coins[1] - M.coins[0] + 1)); S.money += c; S.earned += c;
   S.kills = S.kills || {}; S.kills[m.kind] = (S.kills[m.kind] || 0) + 1; S.killTotal = (S.killTotal || 0) + 1;
   toast(`${M.name} popped! +${money(c)}`, "good"); beep(660, 0.1, 0.05, "triangle");
@@ -4130,12 +4145,12 @@ function nearestTarget(range) {
   for (const m of monsters) { const d = Math.hypot(m.g.position.x - px, m.g.position.z - pz); if (d < bd) { bd = d; best = m; } }
   return best;
 }
-function shoot() {
+function shootBubble() {
   if (shootCd > 0 || !player || drive || IN || !S || state !== "play" || sheetOpen() || busy) return;
   const B = blaster(); shootCd = B.cd;
   const t = nearestTarget(24), from = new THREE.Vector3(player.position.x, 2.3, player.position.z);
   let dir;
-  if (t) { const ty = t === boss ? boss.aimY : t.kind === "bat" ? 2.3 : 0.9; dir = new THREE.Vector3(t.g.position.x - from.x, t.g.position.y + ty - from.y, t.g.position.z - from.z).normalize(); player.rotation.y = Math.atan2(dir.x, dir.z); }
+  if (t) { const ty = t === boss ? boss.aimY : MONSTERS[t.kind].fly ? (t.kind === "ghost" ? 1.5 : 2.3) : 0.9; dir = new THREE.Vector3(t.g.position.x - from.x, t.g.position.y + ty - from.y, t.g.position.z - from.z).normalize(); player.rotation.y = Math.atan2(dir.x, dir.z); }
   else dir = new THREE.Vector3(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
   const m = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshStandardMaterial({ color: B.color, emissive: B.color, emissiveIntensity: 0.7, transparent: true, opacity: 0.85 }));
   m.position.copy(from).addScaledVector(dir, 0.8); scene.add(m);
@@ -4149,6 +4164,7 @@ function damageTarget(t, dmg, at) {
     if (boss.hp <= 0) endBoss(true);
     return;
   }
+  if (t.phased) { popAt(at.x, at.y, at.z, 0xffffff, 2); return; }
   t.hp -= dmg; t.flash = 0.12;
   if (t.hp <= 0) defeatMonster(t);
 }
@@ -4185,7 +4201,7 @@ function addHazard(type, x, z, opts = {}) {
   let m;
   if (type === "warn") { m = new THREE.Mesh(new THREE.CircleGeometry(opts.r || 2, 32), new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0.25, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.12, z); }
   if (type === "wave") { m = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.2, 48), new THREE.MeshBasicMaterial({ color: 0xffbe2e, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.15, z); }
-  if (type === "orb") { m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), new THREE.MeshStandardMaterial({ color: 0x3ff0ff, emissive: 0x3ff0ff, emissiveIntensity: 1.2 })); m.position.set(x, opts.y || 4, z); }
+  if (type === "orb") { const oc = opts.color || 0x3ff0ff; m = new THREE.Mesh(new THREE.SphereGeometry(opts.r || 0.5, 12, 10), new THREE.MeshStandardMaterial({ color: oc, emissive: oc, emissiveIntensity: 1.2 })); m.position.set(x, opts.y || 4, z); }
   if (type === "boulder") { m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 0), new THREE.MeshStandardMaterial({ color: 0x7a7a8a, flatShading: true })); m.position.set(x, opts.y || 4, z); m.castShadow = true; }
   scene.add(m); const h = Object.assign({ type, m, x, z, t: 0 }, opts); hazards.push(h); return h;
 }
@@ -4241,7 +4257,7 @@ function hazardsTick(dt) {
     const h = hazards[i]; h.t += dt;
     if (h.type === "warn") h.m.material.opacity = 0.2 + Math.abs(Math.sin(h.t * 10)) * 0.25;
     if (h.type === "wave") { const r = 1 + (h.t / h.life) * h.maxR; h.m.scale.setScalar(r); h.m.material.opacity = 0.8 * (1 - h.t / h.life); if (!h.hit && Math.abs(Math.hypot(px - h.x, pz - h.z) - r * 0.9) < 0.8) { h.hit = true; hurtPlayer(h.dmg, "a shockwave"); } }
-    if (h.type === "orb") { h.m.position.addScaledVector(h.v, dt); if (h.m.position.distanceTo(new THREE.Vector3(px, 1.6, pz)) < 1.1) { hurtPlayer(h.dmg, "a moth orb"); h.t = h.life; } }
+    if (h.type === "orb") { h.m.position.addScaledVector(h.v, dt); if (h.m.position.distanceTo(new THREE.Vector3(px, 1.6, pz)) < 1.1) { hurtPlayer(h.dmg, h.src || "a moth orb"); if (h.slow) { playerSlowT = 2.5; toast("Brrr! A snowball slowed you down."); } h.t = h.life; } }
     if (h.type === "boulder") { const k = Math.min(1, h.t / h.life); h.m.position.set(h.sx + (h.tx - h.sx) * k, 5 + Math.sin(k * Math.PI) * 6 - k * 5, h.sz + (h.tz - h.sz) * k); h.m.rotation.x += dt * 5; if (k >= 1) { if (Math.hypot(px - h.tx, pz - h.tz) < 2.2) hurtPlayer(h.dmg, "a boulder"); popAt(h.tx, 0.5, h.tz, 0x7a7a8a, 6); h.t = h.life; } }
     if (h.t >= h.life) { scene.remove(h.m); h.m.geometry.dispose(); hazards.splice(i, 1); }
   }
@@ -4259,6 +4275,7 @@ function combatTick(dt, now) {
   $("hpCard").hidden = !(here || S.hp < maxHp());
   $("hpFill").style.width = `${(S.hp / maxHp()) * 100}%`; $("hpNum").textContent = Math.ceil(S.hp);
   $("btnAttack").hidden = !(here && !drive);
+  const wb = $("weaponBar"); wb.hidden = !(here && !drive); if (!wb.hidden && !wb.innerHTML) refreshWeaponBar();
   if (!here && !boss) { if (monsters.length) clearMonsters(); if (S.hp < maxHp()) S.hp = Math.min(maxHp(), S.hp + dt * 20); return; }
   if (cam.pitch < 1.12) cam.pitch += (1.12 - cam.pitch) * Math.min(1, dt * 2);
   if (paused) return;
@@ -4267,16 +4284,18 @@ function combatTick(dt, now) {
   // ambient spawns
   if (!boss && !gameActive() && monsters.length < 4 && Math.random() < dt * 0.6) {
     const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 10, x = player.position.x + Math.cos(a) * d, z = player.position.z + Math.sin(a) * d;
-    if (Math.hypot(x - WOODS.x, z - WOODS.z) < WOODS.r - 2 && Math.hypot(x - ALTAR.x, z - ALTAR.z) > ARENA_R) { const r = Math.random(); spawnMonster(r < 0.5 ? "gloom" : r < 0.8 ? "bat" : "rock", x, z); }
+    if (Math.hypot(x - WOODS.x, z - WOODS.z) < WOODS.r - 2 && Math.hypot(x - ALTAR.x, z - ALTAR.z) > ARENA_R) spawnPicked(x, z);
   }
   // monster AI
   const px = player.position.x, pz = player.position.z;
   for (const m of monsters) {
     const M = MONSTERS[m.kind], g = m.g; m.t += dt; m.hitCd -= dt;
     const dx = px - g.position.x, dz = pz - g.position.z, d = Math.hypot(dx, dz) || 1;
-    let sp = M.speed;
-    if (m.kind === "rock") { m.charge -= dt; if (m.charge <= -3 && d < 12) m.charge = 0.8; if (m.charge > 0) sp *= 3.2; }
-    if (d > 1.1) { const zig = m.kind === "bat" ? Math.sin(m.t * 5) * 0.8 : 0; g.position.x += (dx / d + (-dz / d) * zig) * sp * dt; g.position.z += (dz / d + (dx / d) * zig) * sp * dt; }
+    let sp = M.speed * (m.slow > 0 ? 0.35 : 1); if (m.slow > 0) m.slow -= dt;
+    if (!(MONSTER_AI[m.kind] && MONSTER_AI[m.kind](m, dt, d, dx, dz, now, sp))) {
+      if (m.kind === "rock") { m.charge -= dt; if (m.charge <= -3 && d < 12) m.charge = 0.8; if (m.charge > 0) sp *= 3.2; }
+      if (d > 1.1) { const zig = m.kind === "bat" ? Math.sin(m.t * 5) * 0.8 : 0; g.position.x += (dx / d + (-dz / d) * zig) * sp * dt; g.position.z += (dz / d + (dx / d) * zig) * sp * dt; }
+    }
     g.rotation.y = Math.atan2(dx, dz);
     if (m.kind === "gloom") { g.userData.body.position.y = Math.abs(Math.sin(m.t * 6)) * 0.6; g.userData.body.scale.y = 0.9 + Math.abs(Math.cos(m.t * 6)) * 0.15; }
     if (m.kind === "bat") { g.userData.body.position.y = 2.2 + Math.sin(m.t * 3) * 0.4; const f = Math.sin(m.t * 22) * 0.6; g.userData.wings[0].rotation.z = f; g.userData.wings[1].rotation.z = -f; }
@@ -4289,10 +4308,11 @@ function combatTick(dt, now) {
     const s = shots[i]; s.life -= dt; s.m.position.addScaledVector(s.dir, 32 * dt);
     let hit = null;
     if (boss && boss.hp > 0) { const bp = boss.g.position, c = new THREE.Vector3(bp.x, bp.y + boss.aimY + (boss.B.id === "slime" ? 0 : 0.5), bp.z); if (s.m.position.distanceTo(c) < (boss.B.id === "slime" ? 3 : 2.6)) hit = boss; }
-    if (!hit) for (const m of monsters) { const c = new THREE.Vector3(m.g.position.x, m.kind === "bat" ? m.g.userData.body.position.y : 0.8, m.g.position.z); if (s.m.position.distanceTo(c) < 1 + MONSTERS[m.kind].size * 0.4) { hit = m; break; } }
+    if (!hit) for (const m of monsters) { const c = new THREE.Vector3(m.g.position.x, MONSTERS[m.kind].fly ? m.g.userData.body.position.y : 0.8, m.g.position.z); if (s.m.position.distanceTo(c) < 1 + MONSTERS[m.kind].size * 0.4) { hit = m; break; } }
     if (hit) { damageTarget(hit, s.dmg, s.m.position); s.life = 0; }
     if (s.life <= 0) { scene.remove(s.m); s.m.geometry.dispose(); shots.splice(i, 1); }
   }
+  updateWeapons(dt); playerSlowT -= dt;
   if (boss) bossTick(dt, now);
   hazardsTick(dt);
 }
@@ -4302,7 +4322,7 @@ function altarSheet() {
     const unlocked = i === 0 || S.bosses[BOSSES[i - 1].id], beaten = S.bosses[B.id];
     const prize = [money(beaten ? Math.round(B.reward / 4) : B.reward), !beaten && B.wear ? WEAR[B.wear[0]][B.wear[1]][0] : "", !beaten && B.good ? GOODS[B.good].name : ""].filter(Boolean).join(" · ");
     return `<div class="career"><div><b>${B.name}</b> · ${B.hp * 10} HP${beaten ? ` <span class="req ok">Beaten ×${beaten}</span>` : ""}</div><div class="req">${B.desc}</div><div class="req">Reward: <b>${prize}</b></div><div><button class="btn" data-boss="${i}" ${unlocked ? "" : "disabled"}>${unlocked ? "Summon!" : `Beat ${BOSSES[i - 1].name} first`}</button></div></div>`;
-  }).join("")}</div></div><p class="req">Your blaster: <b>${blaster().name}</b>${owns("vest") ? " · Ranger Vest" : ""}. Hold <b>Space</b> (or Attack) to fire. Watch the red circles and run!</p></div>`;
+  }).join("")}</div></div>${bestiaryHTML()}<p class="req">Your blaster: <b>${blaster().name}</b>${owns("vest") ? " · Ranger Vest" : ""}. Hold <b>Space</b> (or Attack) to fire. Watch the red circles and run!</p></div>`;
 }
 function drawWoodsMap(now) {
   const W = mm.width; mx.fillStyle = "#14101f"; mx.fillRect(0, 0, W, W);
@@ -4315,6 +4335,249 @@ function drawWoodsMap(now) {
   if (boss) { mx.fillStyle = "#ff3fa4"; mx.beginPath(); mx.arc(X(boss.g.position.x), Z(boss.g.position.z), 7, 0, Math.PI * 2); mx.fill(); }
   mx.fillStyle = "#f2f5fb"; mx.font = "900 15px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "top"; mx.fillText("Shadow Woods", W / 2, 6);
   drawArrow(X(player.position.x), Z(player.position.z));
+}
+
+
+// ============================================================ MORE WEAPONS & MONSTERS
+Object.assign(MONSTERS, {
+  fungoo: { name: "Fungoo", hp: 4, speed: 2, dmg: 4, size: 0.9, coins: [3, 7], tip: "Keeps its distance and spits spores. Close in fast!" },
+  ghost:  { name: "Wisp", hp: 3, speed: 4, dmg: 6, size: 0.8, coins: [3, 8], fly: true, tip: "Fades out and can't be hit while faded. Wait for it to glow." },
+  thorn:  { name: "Thornbush", hp: 5, speed: 0.5, dmg: 7, size: 1, coins: [4, 8], tip: "Shoots thorns in every direction. Hit it between volleys." },
+  jelly:  { name: "Jellysplit", hp: 5, speed: 2.4, dmg: 7, size: 1.2, coins: [4, 9], tip: "Splits into two Gloomlings when popped." },
+  imp:    { name: "Frost Imp", hp: 3, speed: 3, dmg: 4, size: 0.7, coins: [3, 7], tip: "Its snowballs slow you down. Keep moving sideways." },
+  pup:    { name: "Shadow Pup", hp: 2, speed: 6.2, dmg: 4, size: 0.7, coins: [2, 5], tip: "Only comes out at night, in packs of three." },
+});
+MONSTERS.gloom.tip = "Hops right at you. Easy to pop."; MONSTERS.bat.tip = "Zig-zags through the air."; MONSTERS.rock.tip = "Tough shell. Charges when close.";
+const WEAPONS = {
+  bubble:    { name: "Bubble Blaster", price: 0, desc: "Auto-aims at the nearest monster." },
+  scatter:   { name: "Splash Scatter", price: 600, cd: 0.6, desc: "Five water droplets at close range." },
+  hammer:    { name: "Pillow Hammer", price: 500, cd: 0.65, desc: "Big close-up swing that knocks monsters back." },
+  glitter:   { name: "Glitter Wand", price: 750, cd: 0.17, desc: "Rapid homing sparkles." },
+  frost:     { name: "Frost Lobber", price: 900, cd: 1.1, desc: "Lobbed snowball: splash damage and freezes monsters." },
+  boomerang: { name: "Rainbow Boomerang", price: 1100, cd: 0.4, desc: "Flies out and back, hitting everything on its path." },
+  zap:       { name: "Zap Staff", price: 1500, cd: 0.9, desc: "Lightning that jumps between up to three monsters." },
+};
+const WEAPON_ORDER = ["bubble", "scatter", "hammer", "glitter", "frost", "boomerang", "zap"];
+let wshots = [], playerSlowT = 0, zapLines = [];
+const ownsWeapon = (w) => w === "bubble" || !!(S && S.weapons && S.weapons[w]);
+function selectWeapon(w) { if (!ownsWeapon(w)) return; S.weapon = w; toast(`Weapon: ${WEAPONS[w].name}`); refreshWeaponBar(); save(); }
+function buyWeapon(w) { S.weapons = S.weapons || {}; S.weapons[w] = true; S.weapon = w; refreshWeaponBar(); toast(`${WEAPONS[w].name} ready! Press ${WEAPON_ORDER.indexOf(w) + 1} to switch to it.`, "gold"); }
+function refreshWeaponBar() {
+  const el = document.getElementById("weaponBar"); if (!el || !S) return;
+  const cur = S.weapon && ownsWeapon(S.weapon) ? S.weapon : "bubble";
+  el.innerHTML = WEAPON_ORDER.filter(ownsWeapon).map((w) => `<button class="${w === cur ? "on" : ""}" data-weapon="${w}"><kbd>${WEAPON_ORDER.indexOf(w) + 1}</kbd>${WEAPONS[w].name}</button>`).join("");
+}
+function targetCenter(t) {
+  if (t === boss) { const bp = boss.g.position; return new THREE.Vector3(bp.x, bp.y + boss.aimY + 0.5, bp.z); }
+  return new THREE.Vector3(t.g.position.x, MONSTERS[t.kind].fly ? t.g.userData.body.position.y : 0.8, t.g.position.z);
+}
+function allTargets() { const out = monsters.slice(); if (boss && boss.hp > 0) out.push(boss); return out; }
+function targetsNear(pos, r) { return allTargets().filter((t) => targetCenter(t).distanceTo(pos) < r + (t === boss ? 2 : 0)); }
+function faceTarget(t) { if (t) { const c = targetCenter(t); player.rotation.y = Math.atan2(c.x - player.position.x, c.z - player.position.z); } }
+function shoot() {
+  if (!S) return;
+  const w = S.weapon && ownsWeapon(S.weapon) ? S.weapon : "bubble";
+  if (w === "bubble") return shootBubble();
+  if (shootCd > 0 || !player || drive || IN || state !== "play" || sheetOpen() || busy) return;
+  const W = WEAPONS[w]; shootCd = W.cd;
+  const from = new THREE.Vector3(player.position.x, 2.2, player.position.z), t = nearestTarget(w === "hammer" ? 6 : 24);
+  faceTarget(t);
+  const fwd = new THREE.Vector3(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
+  playerEmote = { k: "wave", t: 0.25 };
+  if (w === "scatter") {
+    for (let i = -2; i <= 2; i++) {
+      const a = player.rotation.y + i * 0.22, dir = new THREE.Vector3(Math.sin(a), t ? (targetCenter(t).y - 2.2) / 10 : 0, Math.cos(a)).normalize();
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), new THREE.MeshStandardMaterial({ color: 0x3fa8ff, emissive: 0x3fa8ff, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }));
+      m.position.copy(from); scene.add(m); wshots.push({ kind: "drop", m, dir, speed: 26, life: 0.38, dmg: 1 });
+    }
+    beep(300, 0.08, 0.05, "square");
+  } else if (w === "glitter") {
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), new THREE.MeshStandardMaterial({ color: 0xff8fe0, emissive: 0xff3fa4, emissiveIntensity: 1 }));
+    m.position.copy(from); scene.add(m); wshots.push({ kind: "homing", m, dir: fwd.clone(), speed: 19, life: 1.5, dmg: 1, target: t });
+    beep(1400 + Math.random() * 300, 0.04, 0.03, "sine");
+  } else if (w === "frost") {
+    const tp = t ? targetCenter(t) : from.clone().addScaledVector(fwd, 10);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 10), mat(0xffffff, { roughness: 0.6 }));
+    m.position.copy(from); scene.add(m); wshots.push({ kind: "lob", m, from: from.clone(), to: new THREE.Vector3(tp.x, 0.5, tp.z), t: 0, dur: 0.7, dmg: 3 });
+    beep(220, 0.1, 0.05, "triangle");
+  } else if (w === "boomerang") {
+    if (wshots.some((s) => s.kind === "boom")) { shootCd = 0.1; return; }
+    const g = new THREE.Group(); [0xff3b3b, 0xffbe2e, 0x48d597, 0x2e86de].forEach((c, i) => { const b = box(1.1 - i * 0.18, 0.1, 0.25, c, 0.3, 0.02 * i, 0, g); }); const b2 = box(0.25, 0.1, 1.1, 0x9b5de5, 0, 0, 0.3, g);
+    g.position.copy(from); scene.add(g); wshots.push({ kind: "boom", m: g, dir: fwd.clone().setY(t ? (targetCenter(t).y - 2.2) / 14 : 0).normalize(), out: 0, back: false, dmg: 2, hit: new Set(), life: 4 });
+    beep(500, 0.15, 0.04, "sawtooth");
+  } else if (w === "zap") {
+    let cur = t, pos = from.clone(); const hitSet = new Set(), pts = [pos.clone()];
+    for (let k = 0; k < 3 && cur; k++) {
+      const c = targetCenter(cur); pts.push(c.clone()); hitSet.add(cur); damageTarget(cur, 2, c);
+      if (cur !== boss && cur.hp > 0) cur.slow = 0.6;
+      let next = null, bd = 7; for (const o of allTargets()) { if (hitSet.has(o)) continue; const d = targetCenter(o).distanceTo(c); if (d < bd) { bd = d; next = o; } }
+      cur = next;
+    }
+    if (pts.length === 1) pts.push(from.clone().addScaledVector(fwd, 12));
+    const jag = []; for (let i = 0; i < pts.length - 1; i++) for (let j = 0; j <= 6; j++) { const p = pts[i].clone().lerp(pts[i + 1], j / 6); if (j && j < 6) p.add(new THREE.Vector3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8)); jag.push(p); }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(jag), new THREE.LineBasicMaterial({ color: 0xfff27a })); scene.add(line); zapLines.push({ m: line, t: 0.18 });
+    beep(1800, 0.12, 0.05, "sawtooth");
+  } else if (w === "hammer") {
+    const g = new THREE.Group(); box(1.3, 0.7, 0.9, 0xffd1dc, 0, 0, 1.6, g); box(0.12, 0.12, 1.2, 0x8a5a33, 0, 0, 0.6, g);
+    g.position.set(player.position.x, 2.2, player.position.z); g.rotation.y = player.rotation.y + 1.2; scene.add(g); wshots.push({ kind: "swing", m: g, t: 0, base: player.rotation.y });
+    for (const o of targetsNear(new THREE.Vector3(player.position.x, 1, player.position.z), 3.6)) {
+      const c = targetCenter(o), ang = Math.atan2(c.x - player.position.x, c.z - player.position.z); let da = ang - player.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) > 1.3 && o !== boss) continue;
+      damageTarget(o, 4, c);
+      if (o !== boss && o.hp > 0) { o.g.position.x += Math.sin(ang) * 3; o.g.position.z += Math.cos(ang) * 3; }
+    }
+    beep(140, 0.12, 0.07, "triangle");
+  }
+}
+function updateWeapons(dt) {
+  for (let i = zapLines.length - 1; i >= 0; i--) { const z = zapLines[i]; z.t -= dt; if (z.t <= 0) { scene.remove(z.m); z.m.geometry.dispose(); zapLines.splice(i, 1); } }
+  for (let i = wshots.length - 1; i >= 0; i--) {
+    const s = wshots[i]; let done = false;
+    if (s.kind === "drop" || s.kind === "homing") {
+      if (s.kind === "homing") { if (!s.target || (s.target !== boss && !monsters.includes(s.target)) || (s.target === boss && !boss)) s.target = nearestTarget(18); if (s.target) { const want = targetCenter(s.target).sub(s.m.position).normalize(); s.dir.lerp(want, Math.min(1, dt * 7)).normalize(); } s.m.rotation.y += dt * 12; }
+      s.m.position.addScaledVector(s.dir, s.speed * dt); s.life -= dt;
+      const hit = targetsNear(s.m.position, 1.1)[0];
+      if (hit) { damageTarget(hit, s.dmg, s.m.position); done = true; }
+      if (s.life <= 0) done = true;
+    } else if (s.kind === "lob") {
+      s.t += dt / s.dur; const k = Math.min(1, s.t);
+      s.m.position.lerpVectors(s.from, s.to, k); s.m.position.y += Math.sin(k * Math.PI) * 4;
+      if (k >= 1) {
+        popAt(s.to.x, 0.6, s.to.z, 0xbfe9ff, 14);
+        for (const o of targetsNear(new THREE.Vector3(s.to.x, 0.8, s.to.z), 3)) { damageTarget(o, s.dmg, s.to); if (o !== boss && o.hp > 0) o.slow = 2.5; }
+        beep(160, 0.15, 0.05, "triangle"); done = true;
+      }
+    } else if (s.kind === "boom") {
+      s.m.rotation.y += dt * 20; s.life -= dt;
+      if (!s.back) { s.m.position.addScaledVector(s.dir, 22 * dt); s.out += 22 * dt; if (s.out > 14) { s.back = true; s.hit.clear(); } }
+      else { const to = new THREE.Vector3(player.position.x, 2.2, player.position.z).sub(s.m.position); if (to.length() < 1.2) done = true; else s.m.position.addScaledVector(to.normalize(), 24 * dt); }
+      for (const o of targetsNear(s.m.position, 1.4)) if (!s.hit.has(o)) { s.hit.add(o); damageTarget(o, s.dmg, s.m.position); }
+      if (s.life <= 0) done = true;
+    } else if (s.kind === "swing") {
+      s.t += dt; s.m.position.set(player.position.x, 2.2, player.position.z); s.m.rotation.y = s.base + 1.2 - (s.t / 0.25) * 2.4; if (s.t > 0.25) done = true;
+    }
+    if (done) { scene.remove(s.m); s.m.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); wshots.splice(i, 1); }
+  }
+}
+// ---- monster models
+const EXTRA_MODELS = {
+  fungoo(g, body) {
+    cyl(0.35, 0.45, 0.9, 0xf3e7cf, 0, 0.45, 0, 12, body);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xb03a8a)); cap.position.y = 0.85; cap.castShadow = true; body.add(cap);
+    for (let i = 0; i < 6; i++) { const a = i * 1.05, sp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), mat(0xffffff)); sp.position.set(Math.cos(a) * 0.55, 1.25, Math.sin(a) * 0.55); body.add(sp); }
+    eyes(body, 0.55, 0.38, 0.13, 0.11);
+  },
+  ghost(g, body) {
+    const gm = new THREE.MeshStandardMaterial({ color: 0xf2f0ff, emissive: 0xb07cff, emissiveIntensity: 0.25, transparent: true, opacity: 0.85 });
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), gm); body.add(top);
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1, 16, 1, true), gm); skirt.rotation.x = Math.PI; skirt.position.y = -0.5; body.add(skirt);
+    for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), mat(0x222233)); e.scale.y = 1.6; e.position.set(s * 0.2, 0.1, 0.52); body.add(e); }
+    g.userData.ghostMat = gm;
+  },
+  thorn(g, body) {
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), new THREE.MeshStandardMaterial({ color: 0x2f8f4e, flatShading: true })); core.position.y = 0.8; core.castShadow = true; body.add(core);
+    const sp = mat(0xc8e6a0);
+    for (let i = 0; i < 14; i++) { const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize(); const c = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 5), sp); c.position.copy(v.clone().multiplyScalar(0.85)).add(new THREE.Vector3(0, 0.8, 0)); c.lookAt(c.position.clone().add(v)); c.rotateX(Math.PI / 2); body.add(c); }
+    const fl = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff3fa4, emissive: 0xff3fa4, emissiveIntensity: 0.6 })); fl.position.y = 1.7; body.add(fl);
+    eyes(body, 0.95, 0.7, 0.22, 0.13, 0xffffff, 0x8c1d0e);
+  },
+  jelly(g, body) {
+    const jm = new THREE.MeshStandardMaterial({ color: 0x3fd0c0, roughness: 0.15, transparent: true, opacity: 0.75, emissive: 0x3fd0c0, emissiveIntensity: 0.15 });
+    const b = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), jm); b.scale.set(1.15, 0.85, 1.15); b.position.y = 0.85; b.castShadow = true; body.add(b);
+    const inner = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), mat(0x9b5de5)); inner.position.set(0.3, 0.7, -0.2); body.add(inner);
+    const inner2 = inner.clone(); inner2.position.set(-0.35, 0.8, 0.1); body.add(inner2);
+    eyes(body, 1.05, 0.85, 0.3, 0.18);
+  },
+  imp(g, body) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 10), mat(0x7fb6ff)); b.position.y = 0.75; b.castShadow = true; body.add(b);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 10), mat(0x9fc8ff)); head.position.y = 1.35; body.add(head);
+    const ice = new THREE.MeshStandardMaterial({ color: 0xdff6ff, emissive: 0x9fe8ff, emissiveIntensity: 0.6 });
+    for (const s of [-1, 1]) { const h = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.4, 6), ice); h.position.set(s * 0.22, 1.72, 0); h.rotation.z = -s * 0.4; body.add(h); box(0.14, 0.4, 0.14, 0x7fb6ff, s * 0.18, 0.2, 0, body); }
+    eyes(body, 1.4, 0.32, 0.13, 0.09, 0xffffff, 0x1b3a6a);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), mat(0xffffff)); ball.position.set(0.48, 0.95, 0.15); body.add(ball);
+  },
+  pup(g, body) {
+    const sm = new THREE.MeshStandardMaterial({ color: 0x2a1f3d, emissive: 0x3a1f5c, emissiveIntensity: 0.4 });
+    box(0.5, 0.45, 1, sm, 0, 0.6, 0, body); box(0.42, 0.4, 0.45, sm, 0, 0.9, 0.6, body);
+    for (const s of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.25, 4), sm); ear.position.set(s * 0.14, 1.2, 0.55); body.add(ear); for (const z of [-0.35, 0.35]) box(0.13, 0.4, 0.13, sm, s * 0.17, 0.2, z, body); }
+    const glow = new THREE.MeshStandardMaterial({ color: 0xff3fa4, emissive: 0xff3fa4, emissiveIntensity: 1.5 });
+    for (const s of [-1, 1]) box(0.08, 0.06, 0.04, glow, s * 0.11, 0.95, 0.83, body);
+    const tail = box(0.1, 0.1, 0.5, sm, 0, 0.8, -0.65, body); tail.rotation.x = -0.7;
+  },
+};
+// ---- monster brains: return true when the monster moved itself this frame
+function monsterShot(m, color, dmg, speed, opts = {}) {
+  const g = m.g, h = addHazard("orb", g.position.x, g.position.z, Object.assign({ y: opts.y || 1.1, life: opts.life || 3, dmg, color, r: opts.r || 0.32, src: `a ${MONSTERS[m.kind].name}` }, opts));
+  const dir = opts.dir || new THREE.Vector3(player.position.x - g.position.x, 0, player.position.z - g.position.z).normalize();
+  h.v = dir.multiplyScalar(speed); return h;
+}
+const MONSTER_AI = {
+  fungoo(m, dt, d, dx, dz, now, sp) {
+    const g = m.g; m.shotT = (m.shotT ?? 1.5) - dt;
+    const away = d < 7 ? -1 : d > 10 ? 1 : 0;
+    g.position.x += (dx / d) * sp * dt * away; g.position.z += (dz / d) * sp * dt * away;
+    g.userData.body.scale.y = 1 + Math.sin(m.t * 4) * 0.05;
+    if (m.shotT <= 0 && d < 16) { m.shotT = 2.2; monsterShot(m, 0xb07cff, 6, 8); }
+    return true;
+  },
+  ghost(m, dt, d, dx, dz, now, sp) {
+    const g = m.g, cyc = m.t % 4; m.phased = cyc > 2.8;
+    g.userData.ghostMat.opacity = m.phased ? 0.18 : 0.85;
+    g.userData.body.position.y = 1.5 + Math.sin(m.t * 3) * 0.3;
+    const weave = Math.sin(m.t * 2.5);
+    g.position.x += (dx / d + (-dz / d) * weave) * sp * dt; g.position.z += (dz / d + (dx / d) * weave) * sp * dt;
+    return true;
+  },
+  thorn(m, dt, d, dx, dz, now, sp) {
+    const g = m.g; m.shotT = (m.shotT ?? 2) - dt;
+    if (d > 4) { g.position.x += (dx / d) * sp * dt; g.position.z += (dz / d) * sp * dt; }
+    g.userData.body.rotation.y += dt * 0.5;
+    const swell = m.shotT < 0.6 ? 1 + (0.6 - m.shotT) * 0.4 : 1; g.userData.body.scale.setScalar(swell);
+    if (m.shotT <= 0 && d < 18) { m.shotT = 3.2; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; monsterShot(m, 0xc8e6a0, 5, 7, { r: 0.22, dir: new THREE.Vector3(Math.sin(a), 0, Math.cos(a)) }); } beep(400, 0.08, 0.04, "square"); }
+    return true;
+  },
+  jelly(m, dt, d, dx, dz, now, sp) {
+    const g = m.g; g.userData.body.position.y = Math.abs(Math.sin(m.t * 3.5)) * 0.9; g.userData.body.scale.set(1 + Math.abs(Math.cos(m.t * 3.5)) * 0.12, 1 - Math.abs(Math.cos(m.t * 3.5)) * 0.1, 1 + Math.abs(Math.cos(m.t * 3.5)) * 0.12);
+    if (d > 1.4) { g.position.x += (dx / d) * sp * dt; g.position.z += (dz / d) * sp * dt; }
+    return true;
+  },
+  imp(m, dt, d, dx, dz, now, sp) {
+    const g = m.g; m.shotT = (m.shotT ?? 1.8) - dt;
+    const side = Math.sin(m.t * 1.3), away = d < 6 ? -1 : d > 9 ? 1 : 0;
+    g.position.x += ((dx / d) * away + (-dz / d) * side * 0.7) * sp * dt; g.position.z += ((dz / d) * away + (dx / d) * side * 0.7) * sp * dt;
+    g.userData.body.position.y = Math.abs(Math.sin(m.t * 7)) * 0.2;
+    if (m.shotT <= 0 && d < 14) { m.shotT = 2.6; monsterShot(m, 0xffffff, 4, 10, { slow: true, y: 1.3, r: 0.28 }); }
+    return true;
+  },
+  pup(m, dt, d, dx, dz, now, sp) {
+    const g = m.g; const zig = Math.sin(m.t * 6) * 0.3;
+    if (d > 1.1) { g.position.x += (dx / d + (-dz / d) * zig) * sp * dt; g.position.z += (dz / d + (dx / d) * zig) * sp * dt; }
+    g.userData.body.position.y = Math.abs(Math.sin(m.t * 14)) * 0.15;
+    return true;
+  },
+};
+function pickMonsterKind() {
+  const night = hour() >= 20 || hour() < 6;
+  if (night && Math.random() < 0.3) return "pup-pack";
+  const table = [["gloom", 24], ["bat", 14], ["rock", 9], ["fungoo", 12], ["ghost", 10], ["thorn", 8], ["jelly", 11], ["imp", 12]];
+  let r = Math.random() * table.reduce((a, b) => a + b[1], 0);
+  for (const [k, w] of table) { r -= w; if (r <= 0) return k; }
+  return "gloom";
+}
+function spawnPicked(x, z) {
+  const k = pickMonsterKind();
+  if (k === "pup-pack") { for (let i = 0; i < 3; i++) spawnMonster("pup", x + (Math.random() - 0.5) * 3, z + (Math.random() - 0.5) * 3); toast("A pack of Shadow Pups is coming!", "bad"); }
+  else spawnMonster(k, x, z);
+}
+function bestiaryHTML() {
+  const kills = S.kills || {};
+  return `<div class="sec"><h3>Monster Book · ${Object.keys(MONSTERS).filter((k) => kills[k]).length}/${Object.keys(MONSTERS).length} found</h3><div class="grid">${Object.entries(MONSTERS).map(([k, M]) => `<div class="act" style="cursor:default"><span class="t">${kills[k] ? M.name : "???"}</span><span class="m">${kills[k] ? `${M.tip} · ${M.hp * 10} HP` : "Not found yet"}</span><span class="${kills[k] ? "fx" : "m"}">Popped: ${kills[k] || 0}</span></div>`).join("")}</div></div>`;
+}
+function weaponShopHTML() {
+  return `<div class="sec"><h3>Weapons · press 1–7 to switch</h3><div class="grid">${WEAPON_ORDER.map((w, i) => {
+    const W = WEAPONS[w], own = ownsWeapon(w), on = (S.weapon || "bubble") === w;
+    return `<button class="act ${on ? "primary" : ""}" data-wbuy="${w}" ${!own && S.money < W.price ? "disabled" : ""}><span class="t">${i + 1}. ${W.name}</span><span class="m">${W.desc}</span><span class="${own ? "fx" : "m"}">${on ? "Equipped ✓" : own ? "Owned · tap to equip" : money(W.price)}</span></button>`;
+  }).join("")}</div></div>`;
 }
 
 // ============================================================ INPUT
@@ -4343,6 +4606,7 @@ addEventListener("keydown", (e) => {
   if (k === "g") openGames();
   if (k === "l") openQuests();
   if (k === " " && !drive && inWoods()) { e.preventDefault(); shoot(); }
+  if (inWoods() && /^[1-7]$/.test(k)) { const w = WEAPON_ORDER[Number(k) - 1]; if (ownsWeapon(w)) selectWeapon(w); else toast(`Buy the ${WEAPONS[w].name} from Ranger Ivy first.`); }
   if (k === "t" && room) { e.preventDefault(); openFriends(true); }
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
@@ -4478,7 +4742,7 @@ function updatePlayer(dt) {
   const sprint = !!keys.shift && moving;
   if (moving) {
     dx /= len; dz /= len;
-    const sp = 9.5 * RIDES[rideMode()].speed * (sprint ? 1.5 : 1) * (S.energy < 15 ? 0.6 : 1);
+    const sp = 9.5 * RIDES[rideMode()].speed * (sprint ? 1.5 : 1) * (S.energy < 15 ? 0.6 : 1) * (playerSlowT > 0 ? 0.55 : 1);
     let step = sp * dt;
     if (target) { const wp = target.path && target.path.length ? target.path[0] : target; step = Math.min(step, Math.max(0.05, Math.hypot(wp.x - player.position.x, wp.z - player.position.z))); }
     const nx = player.position.x + dx * step, nz = player.position.z + dz * step;
@@ -4769,6 +5033,8 @@ $("sheetWrap").addEventListener("click", (e) => {
   if (e.target.closest("[data-repair]")) { repairCar(); return; }
   const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
   const bs = e.target.closest("[data-boss]"); if (bs) { startBoss(Number(bs.dataset.boss)); return; }
+  const wbuy = e.target.closest("[data-wbuy]");
+  if (wbuy) { const w = wbuy.dataset.wbuy; if (ownsWeapon(w)) selectWeapon(w); else if (S.money >= WEAPONS[w].price) { S.money -= WEAPONS[w].price; buyWeapon(w); log(`Bought the ${WEAPONS[w].name}!`, "good"); questEvent("buy", w, "weapon"); evalGoals(); save(); } renderSheet(); renderHUD(true); return; }
   const qa = e.target.closest("[data-qaccept]"); if (qa) { acceptQuest(qa.dataset.qaccept); return; }
   const qt = e.target.closest("[data-qturn]"); if (qt) { turnIn(qt.dataset.qturn); return; }
   const qk = e.target.closest("[data-qtrack]"); if (qk) { S.trackQ = qk.dataset.qtrack; save(); renderSheet(); renderHUD(true); return; }
@@ -4861,7 +5127,7 @@ function shopHTML(b) {
 function buildingSheet(bid) {
   return () => {
     const b = BMAP[bid];
-    return header(b.name, b.open ? `${isOpen(b) ? "Open now" : "Closed"} · ${openText(b)}` : `Outdoors · always open`, b.color) + `<div class="sheet-b">${CAREERS[bid] ? careerBlock(bid) : ""}<div class="sec"><h3>Things to do</h3><div class="grid">${ACTS[bid].map((a) => actCard(a, bid)).join("")}</div></div></div>`;
+    return header(b.name, b.open ? `${isOpen(b) ? "Open now" : "Closed"} · ${openText(b)}` : `Outdoors · always open`, b.color) + `<div class="sheet-b">${CAREERS[bid] ? careerBlock(bid) : ""}${bid === "woods" ? weaponShopHTML() + bestiaryHTML() : ""}<div class="sec"><h3>Things to do</h3><div class="grid">${ACTS[bid].map((a) => actCard(a, bid)).join("")}</div></div></div>`;
   };
 }
 function stationSheet(bid, st) {
@@ -4914,6 +5180,7 @@ $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
 $("btnGames").addEventListener("click", openGames);
 $("btnQuests").addEventListener("click", openQuests);
+$("weaponBar").addEventListener("click", (e) => { const b = e.target.closest("[data-weapon]"); if (b) selectWeapon(b.dataset.weapon); });
 { const ab = $("btnAttack"); ab.addEventListener("pointerdown", (e) => { e.preventDefault(); attackHeld = true; shoot(); }); for (const ev of ["pointerup", "pointerleave", "pointercancel"]) ab.addEventListener(ev, () => { attackHeld = false; }); }
 $("qTrack").addEventListener("click", openQuests);
 $("quiz").addEventListener("click", (e) => { const b = e.target.closest("[data-quiz]"); if (b) quizPick(Number(b.dataset.quiz)); });
