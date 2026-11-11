@@ -5201,6 +5201,47 @@ function drawGhostLady() {
   ctx.globalAlpha = 1; if (Math.random() < .1) burst(G.x + (Math.random() - .5)*.6, G.y - .6, '#bfe8ff', 1, 1);
 }
 function drawKeepsake(q) { const px = q.x*TS, py = q.y*TS - 2 + Math.sin(frameT*3 + q.x)*1.5; ctx.fillStyle = 'rgba(191,232,255,.35)'; ctx.beginPath(); ctx.arc(px, py - 3, 5, 0, 7); ctx.fill(); ctx.fillStyle = q.k === 'letter' ? '#f0ece0' : '#e0d8a0'; ctx.fillRect(px - 2, py - 5, 4, 4); }
+// ===== twin plate vaults (co-op puzzle) =====
+let TWIN = null;
+function twinSites() {
+  if (TWIN) return TWIN; TWIN = [];
+  for (const k of ['wren', 'highcairn', 'jade', 'crownfall', 'greenstem', 'redrock']) {
+    const T0 = TOWNS[k]; if (!T0) continue; let h = 0; for (const c of k) h = (h*31 + c.charCodeAt(0)) >>> 0;
+    outer: for (let r = 16; r < 34; r++) for (let a = 0; a < 24; a++) {
+      const ang = (h % 24 + a)/24*6.283, x = Math.floor(T0.x + Math.cos(ang)*r), y = Math.floor(T0.y + Math.sin(ang)*r);
+      const ok = (cx, cy) => inB(cx, cy) && passable(cx + .5, cy + .5) && !townAt(cx, cy, 9);
+      if (ok(x, y) && ok(x + 6, y) && ok(x + 3, y - 2) && ok(x + 3, y) && ok(x + 1, y) && ok(x + 5, y)) { TWIN.push({k, ax: x + .5, ay: y + .5, bx: x + 6.5, by: y + .5, vx: x + 3.5, vy: y - 1.5, hold: 0}); break outer; }
+    }
+  }
+  return TWIN;
+}
+const onPlate = (px, py, T0) => Math.hypot(px - T0.ax, py - T0.ay) < .8 ? 'a' : Math.hypot(px - T0.bx, py - T0.by) < .8 ? 'b' : null;
+function twinTick(dt) {
+  if (inDungeon() || S.y >= WORLD_H) return; S.twinDone = S.twinDone || {};
+  for (const T0 of twinSites()) {
+    T0.me = onPlate(S.x, S.y, T0); T0.friend = null;
+    if (party) for (const r of Object.values(remote)) { const o = onPlate(r.x, r.y, T0); if (o && o !== T0.me) T0.friend = o; }
+    if (!T0.me) { T0.hold = 0; continue; }
+    if (S.twinDone[T0.k] === S.day) { if (!T0.saidDone) { T0.saidDone = true; floatText(S.x, S.y - 1.4, 'Already opened today', '#cfd6dc'); } continue; } T0.saidDone = false;
+    if (!T0.friend) { T0.hold = 0; if (!T0.hinted || frameT - T0.hinted > 6) { T0.hinted = frameT; floatText(S.x, S.y - 1.4, party ? 'Someone must stand on the other plate!' : 'This needs two people: one on each plate', '#e0c050'); } continue; }
+    T0.hold += dt; if (Math.random() < .3) burst(T0.vx, T0.vy - .3, '#e0c050', 1, 2);
+    if (T0.hold >= 1.5) {
+      T0.hold = 0; S.twinDone[T0.k] = S.day; S.twinVaults = (S.twinVaults || 0) + 1;
+      const lv = S.level || 1, c = 200 + lv*10, g = pick(['gem', 'silver', 'pearl', 'amber', 'crystal'].filter(z => GOODS[z])), n = g === 'gem' ? 2 : rint(3, 5); S.coins += c; addItem(g, n);
+      const extra = Math.random() < .3 ? pick(CARD_KEYS) : null; if (extra) addItem(extra, 1);
+      SFX.victory(); shake = .3; burst(T0.vx, T0.vy - .5, '#ffd040', 40, 6); renderHUD(); save();
+      toast(`<b>The twin vault grinds open!</b><br>Inside, for each of you: <span style="color:var(--good)">${c} coin, ${n} ${GOODS[g].name}${extra ? `, ${GOODS[extra].name}` : ''}</span>. It reseals at dawn.`, 6000);
+    }
+  }
+}
+function drawTwin(T0) {
+  const opened = S.twinDone && S.twinDone[T0.k] === S.day;
+  for (const [x, y, side] of [[T0.ax, T0.ay, 'a'], [T0.bx, T0.by, 'b']]) { const lit = T0.me === side || T0.friend === side; const px = x*TS, py = y*TS; ctx.fillStyle = '#6a6a72'; ctx.fillRect(px - 7, py - 5, 14, 10); ctx.fillStyle = lit ? '#e0c050' : '#8a8a94'; ctx.fillRect(px - 5, py - 3, 10, 6); ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(px - 7, py + 4, 14, 1); }
+  ctx.strokeStyle = `rgba(224,192,80,${T0.hold > 0 ? .9 : .25})`; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(T0.ax*TS, T0.ay*TS); ctx.lineTo(T0.vx*TS, T0.vy*TS + 4); ctx.lineTo(T0.bx*TS, T0.by*TS); ctx.stroke(); ctx.setLineDash([]);
+  const px = T0.vx*TS, py = T0.vy*TS; ctx.fillStyle = '#5a5a62'; ctx.fillRect(px - 10, py - 10, 20, 14); ctx.fillStyle = opened ? '#2a2a2a' : '#7a7a84'; ctx.fillRect(px - 9, py - 12, 18, 4);
+  ctx.fillStyle = opened ? '#ffd040' : '#e0c050'; ctx.fillRect(px - 5, py - 5, 2, 4); ctx.fillRect(px + 3, py - 5, 2, 4);
+  if (T0.hold > 0) { ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 10, py - 18, 20, 3); ctx.fillStyle = '#ffd040'; ctx.fillRect(px - 9, py - 17, 18*Math.min(1, T0.hold/1.5), 1); }
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6751,6 +6792,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
   ['The Lady of Gravenmoor', 'A story quest: at night, a ghostly lady appears near Gravenmoor. Find her three lost keepsakes on the moors, then meet her at her grave at midnight.'],
   ['The Whispering Woods', 'A story quest: Elder Rowan in Hollowpine says the forest has started whispering. Find the three old totems in the woods around town, then face the Spirit of the Wood in its glade. Bring friends: it is a tough fight.'],
   ['Whack-a-mole and log rolling', 'Farmer Bea in Reedholm needs help with moles: whack them as they pop up (golden ones are worth extra) but leave her cat alone. Bjorn in Tallpine dares you onto a spinning log in the river: lean against every wobble with the arrow keys to stay on as long as you can.'],
@@ -7081,7 +7123,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7985,6 +8027,7 @@ function render() {
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
   if (ghostSpot() && ghostVisible() && inView(ghostSpot().x, ghostSpot().y)) sprites.push({y: ghostSpot().y, f: drawGhostLady});
   if (S.gh && S.gh.step === 1) for (const q of S.gh.items) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawKeepsake(q)});
+  for (const T0 of twinSites()) if (inView(T0.ax, T0.ay)) sprites.push({y: T0.vy - .4, f: () => drawTwin(T0)});
   if (S.ww && S.ww.step === 1) for (const q of S.ww.spots) if (inView(q.x, q.y)) sprites.push({y: q.y + .2, f: () => drawTotem(q)});
   if (tornado && inView(tornado.x, tornado.y)) sprites.push({y: tornado.y, f: drawTornado});
   for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
@@ -10775,6 +10818,7 @@ function openMap() {
     if (S.gh && S.gh.step === 1) S.gh.items.forEach(q => { if (!q.got) mk(q.x, q.y, '#bfe8ff', `Elspeth\u2019s ${q.name}`, 4); });
     if (S.gh && (S.gh.step === 2 || S.gh.step === 3)) mk(S.gh.grave.x, S.gh.grave.y, '#bfe8ff', 'Elspeth\u2019s grave', 5);
     if (S.towns.graven && (!S.gh || S.gh.step < 4)) { const g0 = ghostSpot(); if (g0) mk(g0.x, g0.y, '#bfe8ff', 'A ghostly figure (at night)', 4); }
+    twinSites().forEach(T0 => { if (S.explored[idx(Math.floor(T0.vx), Math.floor(T0.vy))]) mk(T0.vx, T0.vy, '#e0c050', 'Twin Plate vault (needs 2 players)', 4); });
     if (S.ww && S.ww.step === 1) S.ww.spots.forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#7ae0a0', 'Old totem (Whispering Woods)', 4); });
     if (S.ww && S.ww.step === 2) mk(S.ww.glade.x + .5, S.ww.glade.y + .5, '#7ae0a0', 'The Spirit\u2019s glade', 6);
     (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
@@ -11601,6 +11645,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['twinvault','Better Together, Literally','Open a Twin Plate vault with a friend', () => (S.twinVaults || 0) >= 1],
+  ['twinvault5','Partners in Crime','Open 5 Twin Plate vaults', () => (S.twinVaults || 0) >= 5],
   ['ladygraven','Rest in Peace','Help Lady Elspeth find rest', () => !!(S.gh && S.gh.step >= 4)],
   ['whisperwoods','The Whispering Woods','Calm the Spirit of the Wood', () => !!(S.ww && S.ww.step >= 3)],
   ['mole30','Mole Patrol','Score 30 at whack-a-mole', () => (S.moleBest || 0) >= 30],
@@ -12193,7 +12239,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot();
+window.__gs = () => ghostSpot(); window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
