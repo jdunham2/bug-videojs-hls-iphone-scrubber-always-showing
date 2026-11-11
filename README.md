@@ -18,7 +18,8 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 
 - Steer your longship across an open sea with waves, wind, a day/night cycle, storms with rain and lightning, and procedural sound.
 - Ten islands to discover: towns, villages, a volcano, haunted ruins, a shrine, and the Jarl's walled fortress.
-- Go ashore to trade, raid, hunt, explore, feast and upgrade your hall and ship. Hail merchant ships, fight off black-sailed raiders, and face sea serpents.
-- Controls: W/S sails, A/D steer, E land/set sail, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
+- Go ashore to trade, hunt, explore, feast and upgrade your hall and ship.
+- Real-time sea battles: loose arrow volleys, raise a shield wall, ram at full sail, or come alongside and board. Black-sailed raiders hunt you, merchant ships can be attacked, sea serpents circle and strike, and raiding a town makes its warships sail out to fight before you can sack it.
+- Controls: W/S sails, A/D steer, Space arrows, Shift shield wall, B board, E land/set sail, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
 
 The original 2D map version is still available at `viking/classic.html`.

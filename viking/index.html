@@ -10,6 +10,7 @@
     --glass: rgba(16, 19, 24, .72); --glass2: rgba(38, 33, 26, .85); --line: rgba(224, 173, 74, .35);
   }
   * { box-sizing: border-box; }
+  :root { color-scheme: dark; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #05080e; color: var(--ink); font: 15px/1.45 Georgia, "Times New Roman", serif; }
   canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   .ui { position: fixed; z-index: 2; pointer-events: none; }
@@ -37,6 +38,15 @@
   #sail .lvl { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 8px; }
   #sail .lvl i { width: 14px; height: 10px; border-radius: 2px; background: rgba(255,255,255,.15); }
   #sail .lvl i.on { background: var(--gold); }
+  #combat { bottom: 118px; left: 50%; transform: translateX(-50%); padding: 7px 14px; font-size: 14px; display: none; white-space: nowrap; border-color: rgba(208,87,63,.65); }
+  #combat kbd { display: inline-block; background: #d0573f; color: #1a0a06; border-radius: 4px; padding: 0 6px; font: bold 12px/19px system-ui, sans-serif; margin-right: 5px; }
+  .foe { position: fixed; z-index: 1; transform: translate(-50%, -100%); pointer-events: none; text-align: center; }
+  .foe .nm { font-size: 13px; color: #ffd9cf; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+  .foe .hb { width: 110px; height: 6px; margin: 3px auto 1px; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.25); border-radius: 3px; overflow: hidden; }
+  .foe .hb i { display: block; height: 100%; background: linear-gradient(90deg, #a5301f, #e0573f); }
+  .foe .cr { font-size: 11px; color: #e8dcc0; text-shadow: 0 1px 3px #000; }
+  .foe.target .nm::before { content: '◆ '; color: var(--gold); }
+  .foe.target .hb { border-color: var(--gold); }
   #prompt { bottom: 24px; left: 50%; transform: translateX(-50%); padding: 8px 16px; font-size: 16px; display: none; white-space: nowrap; }
   #prompt kbd, .keys kbd { display: inline-block; background: var(--gold); color: #1a1408; border-radius: 4px; padding: 0 6px; font: bold 13px/20px system-ui, sans-serif; margin-right: 6px; }
 
@@ -99,7 +109,7 @@
   @media (max-width: 820px) {
     #hud { width: calc(100vw - 196px); padding: 7px 8px; } #hud .cargo, #hud .title { display: none; }
     .stat b { font-size: 13px; } .stat span { font-size: 9px; }
-    #compass { display: none; } .keys { display: none; } #feed { bottom: 190px; width: 300px; }
+    #compass { display: none; } .keys { display: none; } #combat { white-space: normal; width: calc(100vw - 32px); bottom: 186px; font-size: 13px; text-align: center; } #feed { bottom: 190px; width: 300px; }
     #panel { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52vh; }
     #banner h1 { font-size: 30px; }
   }
@@ -114,11 +124,13 @@
 <div class="ui glass" id="compass"><canvas id="compassCv" width="360" height="40"></canvas></div>
 <div class="ui glass" id="mini"><canvas id="miniCv" width="200" height="140"></canvas></div>
 <div class="ui glass" id="sail"></div>
+<div class="ui glass" id="combat"></div>
 <div class="ui glass" id="prompt"></div>
 <div class="ui" id="feed"></div>
 <div class="ui glass keys">
   <kbd>W</kbd><kbd>S</kbd>sails &nbsp; <kbd>A</kbd><kbd>D</kbd>steer<br>
   <kbd>E</kbd>land / set sail &nbsp; <kbd>F</kbd>hail ship<br>
+  <kbd>Space</kbd>arrows &nbsp; <kbd>Shift</kbd>shields &nbsp; <kbd>B</kbd>board<br>
   <kbd>J</kbd>journal &nbsp; <kbd>M</kbd>sound &nbsp; <kbd>H</kbd>help<br>
   Drag to look · scroll to zoom
 </div>
@@ -126,6 +138,7 @@
 <div class="ui" id="banner"><h1></h1><p></p></div>
 <div class="ui" id="touch">
   <div class="grp"><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div class="grp"><button data-k="shoot" aria-label="Loose arrows">🏹</button><button data-k="shield" aria-label="Shield wall">🛡</button><button data-k="b">B</button></div>
   <div class="grp"><button data-k="up">▲</button><button data-k="down">▼</button><button data-k="e">E</button><button data-k="f">F</button></div>
 </div>
 <div class="ui" id="fade"></div>
@@ -134,7 +147,7 @@
   <h1>SAGA OF THE<br>NORTH SEA</h1>
   <div class="tag">The whale-road is yours. Trade, raid, explore — write your own saga.</div>
   <div class="actions" id="titleBtns"></div>
-  <div class="ctl">W / S — raise &amp; lower sail · A / D — steer · E — go ashore · F — hail ships<br>Drag the mouse to look around · scroll to zoom</div>
+  <div class="ctl">W / S — raise &amp; lower sail · A / D — steer · E — go ashore · F — hail ships<br>Space — loose arrows · Shift — shield wall · B — board · ram at full sail<br>Drag the mouse to look around · scroll to zoom</div>
 </div>
 
 <script type="module">
@@ -374,6 +387,10 @@ const Sound = {
   thunder() { this.noiseBurst('lowpass', 180, .9, 3.5, .05); this.noiseBurst('lowpass', 600, .3, .8); },
   coins() { if (!this.ctx) return; [0, 70, 150].forEach(d => setTimeout(() => this.pluck(1800 + Math.random() * 600, .05, .25), d)); },
   clash() { for (let i = 0; i < 5; i++) setTimeout(() => { this.noiseBurst('highpass', 3000, .25, .15); this.noiseBurst('lowpass', 300, .3, .2); }, i * 140 + Math.random() * 60); },
+  bow(n = 3, vol = 1) { if (!this.ctx) return; for (let i = 0; i < Math.min(n, 5); i++) setTimeout(() => { this.noiseBurst('highpass', 2500, .12 * vol, .18); this.pluck(90 + Math.random() * 25, .06 * vol, .15); }, i * 70); },
+  thunk() { this.noiseBurst('lowpass', 500, .35, .12); },
+  crash() { this.noiseBurst('lowpass', 220, .9, 1.4, .01); this.noiseBurst('bandpass', 900, .4, .5); },
+  clash1() { this.noiseBurst('highpass', 3200, .2, .12); this.noiseBurst('lowpass', 300, .25, .15); },
   splash() { this.noiseBurst('bandpass', 700, .25, .9, .05); },
   toggle() { if (!this.ctx) return; this.muted = !this.muted; this.master.gain.setTargetAtTime(this.muted ? 0 : .7, this.ctx.currentTime, .1); },
 };
@@ -922,16 +939,19 @@ function buildInstances() {
 // smoke
 const smokeEmitters = [], smokePuffs = [];
 const smokeMat = new THREE.SpriteMaterial({ map: SOFT, color: 0x9a9a9a, transparent: true, depthWrite: false, opacity: .5 });
+function puff(x, y, z, big = 1, color = 0x9a9a9a, max = rnd(5, 8), rise = 1) {
+  if (smokePuffs.length > 450) return;
+  const sp = new THREE.Sprite(smokeMat.clone()); sp.position.set(x, y, z); sp.material.color.setHex(color);
+  sp.userData = { life: 0, max, big, vx: rnd(-.5, .5), vz: rnd(-.5, .5), rise };
+  scene.add(sp); smokePuffs.push(sp);
+}
 function updateSmoke(dt) {
   for (const e of smokeEmitters) {
     if (Math.abs(e.x - camera.position.x) > 1400 || Math.abs(e.z - camera.position.z) > 1400) continue;
     e.acc += dt * (2 + e.big);
     while (e.acc > 1) {
       e.acc--;
-      const s = new THREE.Sprite(smokeMat.clone()); s.position.set(e.x + rnd(-1, 1) * e.big, e.y, e.z + rnd(-1, 1) * e.big);
-      s.userData = { life: 0, max: rnd(5, 8) * (e.big > 2 ? 1.6 : 1), big: e.big, vx: rnd(-.5, .5), vz: rnd(-.5, .5) };
-      if (e.big > 2) s.material.color.setHex(0x55504c);
-      scene.add(s); smokePuffs.push(s);
+      puff(e.x + rnd(-1, 1) * e.big, e.y, e.z + rnd(-1, 1) * e.big, e.big, e.big > 2 ? 0x55504c : 0x9a9a9a, rnd(5, 8) * (e.big > 2 ? 1.6 : 1));
     }
   }
   for (let i = smokePuffs.length - 1; i >= 0; i--) {
@@ -939,7 +959,7 @@ function updateSmoke(dt) {
     const k = u.life / u.max;
     if (k >= 1) { scene.remove(s); s.material.dispose(); smokePuffs.splice(i, 1); continue; }
     s.position.x += (u.vx + Math.cos(wind.dir - Math.PI / 2) * 2) * dt; s.position.z += (u.vz + Math.sin(wind.dir - Math.PI / 2) * 2) * dt;
-    s.position.y += dt * (2 + u.big * 1.5);
+    s.position.y += dt * (2 + u.big * 1.5) * u.rise;
     const sc = (2 + k * 9) * u.big; s.scale.set(sc, sc, 1);
     s.material.opacity = Math.sin(k * Math.PI) * .45 * (.4 + .6 * dayLight);
   }
@@ -959,72 +979,321 @@ function oceanPoint(minFromPlayer = 0, near = null, nearR = 0) {
   }
   return { x: 0, z: 0 };
 }
-function spawnNPC(kind) {
-  const g = kind === 'merchant'
-    ? makeShip({ L: 18, W: 4.2, hull: 0x7d5a35, stripes: ['#d8c79d', '#8a6d3a'], dragon: false, shieldsOn: false, oars: false, mastH: 14, sailW: 11, sailH: 9, crew: false })
-    : makeShip({ hull: 0x3a2618, stripes: ['#1a1a1a', '#7a1a1a'], shields: [0x222222, 0x7a1a1a], crew: true, trim: 0x111111 });
-  const pt = oceanPoint(500);
-  const n = { kind, g, pos: new THREE.Vector2(pt.x, pt.z), h: rnd(0, 6.28), speed: 0, target: oceanPoint(), cooldown: 0 };
-  scene.add(g); npcs.push(n); return n;
+const NPC_LOOKS = {
+  merchant: { L: 18, W: 4.2, hull: 0x7d5a35, stripes: ['#d8c79d', '#8a6d3a'], dragon: false, shieldsOn: false, oars: false, mastH: 14, sailW: 11, sailH: 9, crew: false },
+  raider: { hull: 0x3a2618, stripes: ['#1a1a1a', '#7a1a1a'], shields: [0x222222, 0x7a1a1a], trim: 0x111111 },
+  defender: { hull: 0x5a4028, stripes: ['#2f5d8a', '#efe4c8'], shields: [0x2f5d8a, 0xefe4c8, 0xd9a441] },
+};
+const cap = str => str.charAt(0).toUpperCase() + str.slice(1);
+function resetNPC(n) {
+  const day = S ? S.day : 1;
+  const crew = n.kind === 'merchant' ? ri(5, 8) : n.kind === 'raider' ? ri(6, 11) + Math.floor(day / 8) : n.crewBase;
+  Object.assign(n, { maxCrew: crew, crewF: crew, maxHp: n.kind === 'merchant' ? 60 : 100, hostile: false, dead: false, sinkT: 0, reload: rnd(1, 3), side: chance(.5) ? 1 : -1, boardCd: 0, speed: 0, leaveT: 0 });
+  n.hp = n.maxHp; n.g.rotation.set(0, 0, 0);
 }
+function spawnNPC(kind, opts = {}) {
+  const g = makeShip(NPC_LOOKS[kind]);
+  const pt = oceanPoint(500);
+  const n = { kind, g, pos: new THREE.Vector2(pt.x, pt.z), h: rnd(0, 6.28), target: oceanPoint(), cooldown: 0, crewBase: opts.crew || 10,
+    name: opts.name || (kind === 'merchant' ? 'merchant knarr' : 'raider longship') };
+  resetNPC(n); scene.add(g); npcs.push(n); return n;
+}
+function removeNPC(i) { const n = npcs[i]; scene.remove(n.g); npcs.splice(i, 1); const el = foeLabels.get(n); if (el) { el.remove(); foeLabels.delete(n); } }
+function respawnNPC(n) { resetNPC(n); const pt = oceanPoint(700); n.pos.set(pt.x, pt.z); n.target = oceanPoint(); n.cooldown = 45; }
+function makeHostile(n) { if (n.hostile || n.dead) return; n.hostile = true; if (n.kind === 'merchant') log('The merchant crew panics and turns to flee!'); }
+function disengage(n, cd = 60) { n.hostile = false; n.cooldown = cd; n.target = oceanPoint(); }
+
 function updateNPCs(dt, t) {
-  for (const n of npcs) {
-    n.cooldown = Math.max(0, n.cooldown - dt);
-    const dp = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y);
-    let tx = n.target.x, tz = n.target.z, want = n.kind === 'merchant' ? 9 : 12;
-    const hunting = n.kind === 'raider' && !S.docked && n.cooldown <= 0 && dp < 320 && !modalOpen;
-    if (hunting) { tx = ship.pos.x; tz = ship.pos.y; want = 19 + S.weapons; }
-    if (Math.hypot(tx - n.pos.x, tz - n.pos.y) < 50 && !hunting) n.target = oceanPoint();
-    let desired = Math.atan2(tx - n.pos.x, -(tz - n.pos.y));
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const n = npcs[i];
+    if (n.dead) {
+      n.sinkT += dt;
+      n.g.position.y -= dt * (.4 + n.sinkT * .45);
+      n.g.rotation.z += dt * .07 * n.side; n.g.rotation.x += dt * .04;
+      if (n.sinkT < 3 && chance(dt * 5)) puff(n.pos.x + rnd(-4, 4), 2, n.pos.y + rnd(-4, 4), .8, 0x6a6a6a);
+      if (n.sinkT > 7) { if (n.kind === 'defender') removeNPC(i); else respawnNPC(n); }
+      continue;
+    }
+    checkNPCDeath(n); if (n.dead) continue;
+    n.cooldown = Math.max(0, n.cooldown - dt); n.boardCd = Math.max(0, n.boardCd - dt);
+    const dx = ship.pos.x - n.pos.x, dz = ship.pos.y - n.pos.y, dp = Math.hypot(dx, dz), toP = Math.atan2(dx, -dz);
+    if (boarding && boarding.n === n) { floatShip(n.g, n.pos.x, n.pos.y, n.h, t); animateShip(n.g, t, 0, 0, .3); continue; }
+    let desired, want;
+    if (n.hostile) {
+      if (dp > (n.kind === 'defender' ? 1100 : 500)) { disengage(n, 60); if (n.kind !== 'defender') log(`You lose the ${n.name} in the swell.`); }
+      if (n.kind === 'merchant') { desired = toP + Math.PI; want = 14; }
+      else {
+        const wantBoard = n.boardCd <= 0 && (n.crewF >= S.crew * 1.5 || S.hull < 25 || S.crew <= 3);
+        if (wantBoard) { desired = toP; want = 21; if (dp < 26 && !boarding && !S.docked) startBoarding(n, true); }
+        else if (dp > 120) { desired = toP; want = 19; }
+        else { desired = toP + n.side * (dp < 60 ? 2.1 : 1.45); want = 15; }
+        n.reload -= dt;
+        if (n.reload <= 0 && dp < 175 && !boarding && !S.docked) { npcVolley(n, dp); n.reload = rnd(2.6, 3.8); }
+      }
+    } else if (n.kind === 'defender') {
+      desired = Math.atan2(n.home.x - n.pos.x, -(n.home.z - n.pos.y)); want = 10; n.leaveT += dt;
+      if (n.leaveT > 30 || Math.hypot(n.home.x - n.pos.x, n.home.z - n.pos.y) < 40) { removeNPC(i); continue; }
+    } else {
+      if (Math.hypot(n.target.x - n.pos.x, n.target.z - n.pos.y) < 50) n.target = oceanPoint();
+      desired = Math.atan2(n.target.x - n.pos.x, -(n.target.z - n.pos.y)); want = n.kind === 'merchant' ? 9 : 12;
+      if (n.kind === 'raider' && !S.docked && n.cooldown <= 0 && !modalOpen && !titleOn && dp < 330) {
+        desired = toP; want = 19;
+        if (dp < 210) { makeHostile(n); Sound.horn(); banner('Raiders!', 'SPACE loose arrows · SHIFT shield wall · ram or board'); log('A black-sailed raider ship comes at you!', 'bad'); }
+      }
+    }
     const fx = Math.sin(n.h), fz = -Math.cos(n.h);
     if (terrainH(n.pos.x + fx * 60, n.pos.y + fz * 60) > -5) desired = n.h + 1.2;
-    n.h += clamp(angDiff(desired, n.h), -.5 * dt, .5 * dt);
+    n.h += clamp(angDiff(desired, n.h), -.6 * dt, .6 * dt);
     n.speed = lerp(n.speed, want, dt * .5);
     n.pos.x += Math.sin(n.h) * n.speed * dt; n.pos.y += -Math.cos(n.h) * n.speed * dt;
     if (terrainH(n.pos.x, n.pos.y) > -2) { n.pos.x -= Math.sin(n.h) * n.speed * dt * 2; n.pos.y += Math.cos(n.h) * n.speed * dt * 2; n.h += 1; }
+    if (n.hp < n.maxHp * .5 && chance(dt * 5)) puff(n.pos.x + rnd(-3, 3), 3, n.pos.y + rnd(-3, 3), .6, 0x3a3a3a);
     floatShip(n.g, n.pos.x, n.pos.y, n.h, t);
     animateShip(n.g, t, n.speed, n.kind === 'merchant' ? 3 : 2, .7);
-    if (hunting && dp < 34) raiderAttack(n);
   }
 }
-function relocate(n) { const pt = oceanPoint(700); n.pos.set(pt.x, pt.z); n.target = oceanPoint(); n.cooldown = 40; }
 
-function raiderAttack(n) {
-  n.cooldown = 30; throttle = 0; Sound.horn();
-  const str = ri(8, 16) + Math.floor(S.day / 10);
-  choice('Raiders!', `A black-sailed longship bears down on you, ${str} warriors howling at the rail. Their chieftain demands your silver.`, [
-    ['Fight!', () => {
-      Sound.clash();
-      if (power() * rnd(.7, 1.3) > str * rnd(.7, 1.3)) {
-        const s = ri(30, 90); S.silver += s; S.glory += 12; S.morale = clamp(S.morale + 10, 0, 100);
-        log(`You crushed the sea-raiders! +${s} silver from their sea-chests. (+12 glory)`, 'gold'); banner('Victory', 'The raiders are beaten');
-        relocate(n);
-      } else {
-        const l = ri(1, 3); S.crew = Math.max(1, S.crew - l); S.hull = Math.max(5, S.hull - 15); const s = Math.min(S.silver, ri(15, 40)); S.silver -= s;
-        log(`The raiders overwhelmed you. ${l} crew lost, ${s} silver taken.`, 'bad'); n.cooldown = 90;
-      }
-    }],
-    ['Flee!', () => {
-      if (chance(.35 + (S.speed - 1) * 1.2)) { throttle = 3; log('You crowd on sail and outrun the raiders.'); n.cooldown = 25; }
-      else { Sound.clash(); const l = ri(1, 2); S.crew = Math.max(1, S.crew - l); S.hull = Math.max(5, S.hull - 10); log(`The raiders caught you as you ran. ${l} crew fell.`, 'bad'); n.cooldown = 60; }
-    }],
-    [`Pay tribute (${Math.min(S.silver, 30)})`, () => { S.silver -= Math.min(S.silver, 30); S.glory = Math.max(0, S.glory - 2); log('You paid the raiders off. Your crew will not meet your eye.', 'bad'); n.cooldown = 120; }],
-  ]);
+// ---------- real-time combat ----------
+const arrows = [], foeLabels = new Map();
+const arrowGeo = new THREE.CylinderGeometry(.07, .07, 2.4, 4), arrowMat = new THREE.MeshBasicMaterial({ color: 0x24180c });
+const UP = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
+const GRAV = 30;
+let shootCd = 0, shieldUp = false, touchShield = false, pCrewDmg = 0, boarding = null, combatOn = false, ramCd = 0, shake = 0, raid = null, hitSoundCd = 0;
+
+const velOf = (h, speed) => ({ x: Math.sin(h) * speed, z: -Math.cos(h) * speed });
+function fireVolley(from, target, tv, count, spread, owner) {
+  const d = Math.hypot(target.x - from.x, target.z - from.z), T = clamp(d / 85, .45, 2.6);
+  for (let i = 0; i < count; i++) {
+    const ox = from.x + rnd(-2, 2), oz = from.z + rnd(-2, 2), oy = from.y + 3.5;
+    const ax = target.x + tv.x * T + rnd(-spread, spread), az = target.z + tv.z * T + rnd(-spread, spread), ay = target.y + 2.5 + rnd(-1, 1);
+    const v = new THREE.Vector3((ax - ox) / T, (ay - oy + .5 * GRAV * T * T) / T, (az - oz) / T);
+    const mesh = new THREE.Mesh(arrowGeo, arrowMat); mesh.visible = false; scene.add(mesh);
+    arrows.push({ mesh, p: new THREE.Vector3(ox, oy, oz), v, owner, wait: i * .07, life: 0 });
+  }
 }
+function currentTarget() {
+  let best = null, bd = 260;
+  for (const n of npcs) { if (!n.hostile || n.dead) continue; const d = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y); if (d < bd) { bd = d; best = n; } }
+  if (serpent && !serpent.sinking) { const d = Math.hypot(serpent.g.position.x - ship.pos.x, serpent.g.position.z - ship.pos.y); if (d < bd) best = serpent; }
+  return best;
+}
+function playerShoot() {
+  if (S.docked || titleOn || modalOpen || shootCd > 0 || shieldUp || boarding) return;
+  let tgt = currentTarget();
+  if (!tgt) { // a ship in front of the camera, if any
+    camera.getWorldDirection(tmpV); let bd = 170;
+    for (const n of npcs) { if (n.dead) continue; const dx = n.pos.x - ship.pos.x, dz = n.pos.y - ship.pos.y, d = Math.hypot(dx, dz); if (d < bd && (dx * tmpV.x + dz * tmpV.z) / d > .8) { bd = d; tgt = n; } }
+  }
+  const from = ship.g.position, count = clamp(Math.ceil(S.crew / 2), 2, 8);
+  if (tgt) {
+    const isS = tgt === serpent, tp = isS ? tgt.head.getWorldPosition(tmpV2) : tgt.g.position;
+    fireVolley(from, tp, isS ? { x: 0, z: 0 } : velOf(tgt.h, tgt.speed), count, 1.2 + Math.hypot(tp.x - from.x, tp.z - from.z) * .03, 'player');
+  } else {
+    camera.getWorldDirection(tmpV); tmpV.y = 0; tmpV.normalize();
+    fireVolley(from, { x: from.x + tmpV.x * 110, y: 0, z: from.z + tmpV.z * 110 }, { x: 0, z: 0 }, count, 4, 'player');
+  }
+  shootCd = Math.max(1, 2.2 - S.weapons * .2);
+  Sound.bow(count);
+}
+function npcVolley(n, d) {
+  fireVolley(n.g.position, ship.g.position, velOf(ship.h, ship.speed), clamp(Math.ceil(n.crewF / 2), 1, 7), 2 + d * .045, n);
+  if (d < 220) Sound.bow(2, .5);
+}
+function inShip(p, g, x, z, h) {
+  const L = g.userData.L, W = g.userData.W, y0 = g.position.y;
+  if (p.y > y0 + 7.5 || p.y < y0 - 1.5) return false;
+  const dx = p.x - x, dz = p.z - z;
+  return Math.abs(dx * Math.sin(h) - dz * Math.cos(h)) < L / 2 + .8 && Math.abs(dx * Math.cos(h) + dz * Math.sin(h)) < W + 1;
+}
+function serpentHitTest(p) {
+  if (serpent.head.getWorldPosition(tmpV2).distanceTo(p) < 5) return true;
+  return serpent.segs.some(sg => sg.getWorldPosition(tmpV2).distanceTo(p) < 3.6);
+}
+function updateArrows(dt) {
+  const steps = Math.ceil(dt / .015), h = dt / steps;
+  for (let k = 0; k < steps; k++) stepArrows(h);
+}
+function stepArrows(dt) {
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const a = arrows[i];
+    if (a.wait > 0) { a.wait -= dt; continue; }
+    a.mesh.visible = true; a.life += dt;
+    a.v.y -= GRAV * dt; a.p.addScaledVector(a.v, dt);
+    a.mesh.position.copy(a.p); a.mesh.quaternion.setFromUnitVectors(UP, tmpV.copy(a.v).normalize());
+    let hit = false;
+    if (a.owner === 'player') {
+      for (const n of npcs) if (!n.dead && inShip(a.p, n.g, n.pos.x, n.pos.y, n.h)) { hitNPC(n, a.p); hit = true; break; }
+      if (!hit && serpent && !serpent.sinking && serpentHitTest(a.p)) { hitSerpent(a.p); hit = true; }
+    } else if (!S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
+    const wh = waveH(a.p.x, a.p.z, elapsed);
+    if (hit || a.p.y < wh - .3 || a.life > 6) {
+      if (!hit && a.p.y < wh + .5) puff(a.p.x, wh + .2, a.p.z, .35, 0xe8f0f4, .9, .3);
+      scene.remove(a.mesh); arrows.splice(i, 1);
+    }
+  }
+}
+function hitFx(p, color) { puff(p.x, p.y, p.z, .3, color, .6, .2); if (hitSoundCd <= 0) { Sound.thunk(); hitSoundCd = .08; } }
+function hitNPC(n, p) {
+  makeHostile(n);
+  n.hp -= 2.5 * (1 + S.weapons * .15);
+  n.crewF -= .34 * (1 + S.weapons * .25) * (1 + S.luck * .05);
+  hitFx(p, 0x8a6a40); checkNPCDeath(n);
+}
+function checkNPCDeath(n) { if (n.dead) return; if (n.hp <= 0) victory(n, 'sunk'); else if (n.crewF <= .4) victory(n, 'slain'); }
+function hitPlayer(p) {
+  const m = shieldUp ? .25 : 1;
+  S.hull = Math.max(5, S.hull - 1.2 * m); pCrewDmg += .2 * m; applyCrewDmg(); hitFx(p, 0x8a6a40);
+}
+function applyCrewDmg() {
+  while (pCrewDmg >= 1) {
+    pCrewDmg -= 1;
+    if (S.crew > 1) { S.crew--; log(pick(['A warrior falls, pierced by an arrow.', 'A shield-bearer topples over the side.', 'You lose a rower to the enemy.']), 'bad'); }
+  }
+}
+function victory(n, how) {
+  n.dead = true; n.hostile = false; n.sinkT = 0; if (boarding && boarding.n === n) boarding = null;
+  const base = n.kind === 'merchant' ? [30, 80, 3] : n.kind === 'raider' ? [40, 100, 12] : [20, 50, 8];
+  let sv = ri(base[0], base[1]); const glory = base[2], got = [];
+  if (how === 'sunk') sv = Math.round(sv * .4);
+  else Object.keys(GOODS).sort(() => Math.random() - .5).slice(0, n.kind === 'merchant' ? 2 : 1).forEach(g => { const q = Math.min(ri(1, 4), S.cargoMax - cargoCount()); if (q > 0) { S.cargo[g] += q; got.push(`${q} ${GOODS[g].name}`); } });
+  S.silver += sv; S.glory += glory; S.morale = clamp(S.morale + 8, 0, 100);
+  const loot = `${sv} silver${got.length ? ', ' + got.join(', ') : ''}`;
+  log(how === 'sunk' ? `The ${n.name} goes down! You fish ${sv} silver from the wreckage. (+${glory} glory)`
+    : how === 'boarded' ? `You take the ${n.name} by boarding! Plunder: ${loot}. (+${glory} glory)`
+    : `Every warrior aboard the ${n.name} lies dead. You strip the ship: ${loot}. (+${glory} glory)`, 'gold');
+  banner(how === 'sunk' ? 'Sunk!' : 'Victory!', `+${sv} silver · +${glory} glory`);
+  Sound.coins(); renderHUD();
+}
+function startBoarding(n, byEnemy) {
+  if (boarding || n.dead) return;
+  makeHostile(n);
+  const side = Math.sign((n.pos.x - ship.pos.x) * Math.cos(ship.h) + (n.pos.y - ship.pos.y) * Math.sin(ship.h)) || 1;
+  boarding = { n, tick: .3, side }; throttle = 0; ship.speed = 0; n.speed = 0;
+  banner(byEnemy ? 'They board you!' : 'Boarding!', 'Axes out! Press B to cut loose');
+  log(byEnemy ? `The ${n.name} grapples your ship. Their warriors pour over the rail!` : `You throw grappling hooks onto the ${n.name}. Over the rail!`, byEnemy ? 'bad' : '');
+  Sound.horn(); Sound.clash();
+}
+function updateBoarding(dt) {
+  if (!boarding) return;
+  const b = boarding, n = b.n, rx = Math.cos(ship.h), rz = Math.sin(ship.h);
+  n.pos.x = lerp(n.pos.x, ship.pos.x + rx * 9.5 * b.side, clamp(dt * 2, 0, 1)); n.pos.y = lerp(n.pos.y, ship.pos.y + rz * 9.5 * b.side, clamp(dt * 2, 0, 1));
+  n.h += angDiff(ship.h, n.h) * clamp(dt * 2, 0, 1);
+  b.tick -= dt;
+  if (b.tick <= 0) {
+    b.tick = .5;
+    const enemyPow = n.crewF * (n.kind === 'merchant' ? .45 : 1 + S.day / 40);
+    n.crewF -= power() * rnd(.035, .08);
+    pCrewDmg += enemyPow * rnd(.035, .08) * (shieldUp ? .8 : 1);
+    applyCrewDmg(); Sound.clash1(); shake = Math.max(shake, .25);
+    if (n.crewF <= .4) victory(n, 'boarded');
+  }
+}
+function cutLoose() { if (!boarding) return; boarding.n.boardCd = 8; log('You hack through the grappling lines and pull away.'); boarding = null; }
+function tryBoard() {
+  if (S.docked || modalOpen || titleOn) return;
+  if (boarding) { cutLoose(); return; }
+  let best = null, bd = 32;
+  for (const n of npcs) { if (n.dead) continue; const d = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y); if (d < bd) { bd = d; best = n; } }
+  if (!best) { banner('Too far to board', 'Come alongside a ship first'); return; }
+  if (ship.speed > 14) { banner('Too fast to board', 'Slow down to throw the grappling hooks'); return; }
+  startBoarding(best, false);
+}
+function updateCollisions(dt) {
+  ramCd -= dt;
+  if (S.docked) return;
+  for (const n of npcs) {
+    if (n.dead || (boarding && boarding.n === n)) continue;
+    const dx = n.pos.x - ship.pos.x, dz = n.pos.y - ship.pos.y, d = Math.hypot(dx, dz);
+    if (d > 15 || d < .01) continue;
+    const push = (15 - d) / 2, ux = dx / d, uz = dz / d;
+    n.pos.x += ux * push; n.pos.y += uz * push; ship.pos.x -= ux * push; ship.pos.y -= uz * push;
+    const facing = Math.sin(ship.h) * ux - Math.cos(ship.h) * uz;
+    if (ramCd <= 0 && ship.speed > 11 && facing > .55) {
+      const sp = ship.speed, dmg = Math.round(sp * 2.4);
+      n.hp -= dmg; n.crewF -= sp * .1; S.hull = Math.max(5, S.hull - sp * .35);
+      ship.speed *= .3; n.speed *= .3; ramCd = 1.5; shake = 1;
+      makeHostile(n); banner('Rammed!', `${cap(n.name)} takes ${dmg} damage`); Sound.crash();
+      log(`You ram the ${n.name} at full speed!`, 'gold'); checkNPCDeath(n); renderHUD();
+    } else ship.speed *= .9;
+  }
+}
+function defeat() {
+  const lost = Math.floor(S.silver / 2); S.silver -= lost; S.morale = clamp(S.morale - 20, 0, 100); S.hull = Math.max(S.hull, 15);
+  log(`Defeated! Your foes strip ${lost} silver from your ship and leave you drifting.`, 'bad'); banner('Defeated', `-${lost} silver`);
+  npcs.forEach(n => { if (n.hostile && !n.dead) { disengage(n, 150); n.boardCd = 30; } });
+  if (serpent) serpent.sinking = true;
+  boarding = null; abortRaid(); renderHUD(); save();
+}
+function startRaid() {
+  const p = P[S.at];
+  if (S.crew < 2) { toast('Too few hands', 'You need at least 2 crew to sail into battle.'); return; }
+  S.hostile[p.id] = 30; S.alert[p.id] = (S.alert[p.id] || 0) + 1; S.raids++;
+  S.docked = false; throttle = 1; ship.speed = 3;
+  const count = p.type === 'fortress' ? 4 : p.type === 'town' ? 2 : 1, crew = Math.round(defenseOf(p) / count * .45) + 3;
+  raid = { p, cleared: false };
+  for (let i = 0; i < count; i++) {
+    const n = spawnNPC('defender', { crew, name: `${p.name} warship` }), lat = -30 - i * 28;
+    n.pos.set(p.wx + p.dock.dx * (p.dock.shore + 12) - p.dock.dz * lat, p.wz + p.dock.dz * (p.dock.shore + 12) + p.dock.dx * lat);
+    n.h = Math.atan2(p.dock.dx, -p.dock.dz); n.raid = raid; n.home = { x: p.dock.x, z: p.dock.z }; n.reload = rnd(2, 4);
+    makeHostile(n);
+  }
+  Sound.horn();
+  banner(`${p.name} sounds the alarm!`, `${count > 1 ? count + ' warships sail' : 'A warship sails'} out. Sink or board ${count > 1 ? 'them' : 'it'}, then land to sack the town`);
+  render();
+  log(`You raise the raven banner. ${p.name}'s war horns answer and ${count > 1 ? count + ' warships put' : 'a warship puts'} out to meet you!`, 'bad');
+}
+function updateRaid() {
+  if (!raid) return;
+  if (!raid.cleared && !npcs.some(n => n.raid === raid && !n.dead)) {
+    raid.cleared = true; banner('The harbor is yours', `Land at ${raid.p.name} (E) to sack it`);
+    log(`${raid.p.name}'s warships are beaten. Land to sack the town!`, 'gold');
+  }
+  if (raid && !S.docked && Math.hypot(ship.pos.x - raid.p.wx, ship.pos.y - raid.p.wz) > 900) abortRaid(`You sail away and the raid on ${raid.p.name} is abandoned.`);
+}
+function abortRaid(msg) { if (!raid) return; npcs.forEach(n => { if (n.raid === raid && !n.dead) disengage(n, 0); }); if (msg) log(msg); raid = null; }
 function hailMerchant(n) {
   n.cooldown = 60;
   choice('A merchant knarr', 'A fat merchant ship wallows in the swell. Her crew eyes your shields nervously.', [
-    ['Board her!', () => {
-      if (power() * rnd(.6, 1.4) > 10) {
-        Sound.clash(); const s = ri(30, 80); S.silver += s; S.glory += 4; const g = pick(Object.keys(GOODS)); const q = Math.min(ri(2, 5), S.cargoMax - cargoCount()); S.cargo[g] += q;
-        log(`You seized the merchant ship: +${s} silver${q > 0 ? `, ${q} ${GOODS[g].name}` : ''}. (+4 glory)`, 'gold');
-      } else { const l = ri(1, 2); S.crew = Math.max(1, S.crew - l); log(`The merchants had hired guards. You lost ${l} crew and broke off.`, 'bad'); }
-      relocate(n);
-    }],
+    ['Attack her!', () => { makeHostile(n); banner('Attack!', 'SPACE loose arrows · ram at speed · B to board alongside'); }],
     ['Trade news & wine', () => { S.luck = Math.min(5, S.luck + 1); S.morale = clamp(S.morale + 6, 0, 100); log(`The merchants share wine and gossip: "${pick(rumours())}"`, 'good'); }],
     ['Sail on', () => {}],
   ]);
 }
+
+// foe health bars
+const serpentLabel = document.createElement('div'); serpentLabel.className = 'foe'; serpentLabel.style.display = 'none'; document.body.appendChild(serpentLabel);
+function foeHTML(name, hp, maxHp, crew) {
+  return `<div class="nm">${cap(name)}</div><div class="hb"><i style="width:${clamp(hp / maxHp, 0, 1) * 100}%"></i></div>${crew != null ? `<div class="cr">${crew} warrior${crew === 1 ? '' : 's'}</div>` : ''}`;
+}
+const fv = new THREE.Vector3();
+function placeLabel(el, pos, yOff) {
+  fv.set(pos.x, pos.y + yOff, pos.z).project(camera);
+  if (fv.z > 1) { el.style.display = 'none'; return false; }
+  el.style.display = 'block'; el.style.left = ((fv.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - fv.y) / 2 * innerHeight) + 'px';
+  return true;
+}
+function updateFoeLabels() {
+  const tgt = combatOn ? currentTarget() : null;
+  for (const n of npcs) {
+    let el = foeLabels.get(n);
+    const show = !titleOn && !n.dead && n.hostile && Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) < 600;
+    if (!show) { if (el) el.style.display = 'none'; continue; }
+    if (!el) { el = document.createElement('div'); el.className = 'foe'; document.body.appendChild(el); foeLabels.set(n, el); }
+    if (placeLabel(el, n.g.position, 22)) { el.innerHTML = foeHTML(n.name, n.hp, n.maxHp, Math.max(0, Math.ceil(n.crewF))); el.classList.toggle('target', n === tgt); }
+  }
+  if (serpent && !serpent.sinking && !titleOn) {
+    if (placeLabel(serpentLabel, serpent.head.getWorldPosition(tmpV2), 9)) { serpentLabel.innerHTML = foeHTML('sea serpent', serpent.hp, serpent.maxHp, null); serpentLabel.classList.toggle('target', serpent === tgt); }
+  } else serpentLabel.style.display = 'none';
+}
+function renderCombatHint() {
+  const el = $('combat');
+  if (!combatOn || S.docked || titleOn) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = boarding
+    ? `⚔ Boarding! Your crew <b>${S.crew}</b> vs theirs <b>${Math.max(0, Math.ceil(boarding.n.crewF))}</b> &nbsp; <kbd>B</kbd>cut loose`
+    : `<kbd>Space</kbd>${shootCd > 0 ? `reloading ${shootCd.toFixed(1)}s` : 'loose arrows'} &nbsp; <kbd>Shift</kbd>${shieldUp ? '<b>shield wall up</b>' : 'shield wall'} &nbsp; <kbd>B</kbd>board alongside &nbsp; · ram at speed`;
+}
+
 function rumours() {
   return [`Furs fetch the best price in ${bestSell('furs')}.`, `Amber is dearest in ${bestSell('amber')}.`, 'Jarl Hakon keeps more than a hundred spears in Stonegard.',
     'Something stirs in the barrows of the Dragon\'s Teeth.', 'The hot springs on Ember Isle heal any ache.', 'Black-sailed raiders prowl the open sea. Keep your shields close.'];
@@ -1036,7 +1305,7 @@ let serpent = null;
 function spawnSerpent() {
   const g = new THREE.Group(), segs = [];
   const sm = new THREE.MeshStandardMaterial({ color: 0x1f4a3a, roughness: .5, metalness: .2, flatShading: true });
-  for (let i = 0; i < 16; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(2.6 - i * .1, 10, 8), sm); g.add(s); segs.push(s); }
+  for (let i = 0; i < 16; i++) { const sg = new THREE.Mesh(new THREE.SphereGeometry(2.6 - i * .1, 10, 8), sm); g.add(sg); segs.push(sg); }
   const head = new THREE.Group();
   const hd = new THREE.Mesh(new THREE.SphereGeometry(3, 10, 8), sm); hd.scale.set(1, .8, 1.8); head.add(hd);
   const em = new THREE.MeshStandardMaterial({ color: 0x332200, emissive: 0xffd000, emissiveIntensity: 3 });
@@ -1044,19 +1313,46 @@ function spawnSerpent() {
   [-1, 1].forEach(x => { const h = new THREE.Mesh(new THREE.ConeGeometry(.5, 3.5, 5), M.bone); h.position.set(x, 2.4, 0); h.rotation.x = .9; head.add(h); });
   g.add(head);
   const fx = Math.sin(ship.h), fz = -Math.cos(ship.h);
-  g.position.set(ship.pos.x + fx * 75, -20, ship.pos.y + fz * 75);
-  g.rotation.y = -ship.h + Math.PI / 2;
+  g.position.set(ship.pos.x + fx * 75, -22, ship.pos.y + fz * 75);
   scene.add(shadow(g));
-  serpent = { g, segs, head, rise: 0, sinking: false };
-  Sound.splash();
+  serpent = { g, segs, head, rise: 0, sinking: false, hp: 150, maxHp: 150, ang: Math.atan2(fz, fx), R: 75, lunge: 6, struck: false };
+  Sound.splash(); throttle = Math.min(throttle, 2);
+  banner('Sea serpent!', 'SPACE loose arrows · SHIFT shield wall');
+  log('A sea serpent rises from the deep and circles your ship!', 'bad');
 }
-function updateSerpent(dt, t) {
+function hitSerpent(p) {
+  serpent.hp -= 3 * (1 + S.weapons * .2); hitFx(p, 0x2a6a4a);
+  if (serpent.hp <= 0 && !serpent.sinking) {
+    serpent.sinking = true; S.glory += 25; S.morale = clamp(S.morale + 15, 0, 100);
+    log("Your arrows find the serpent's eye. It thrashes and sinks into the black water! (+25 glory)", 'gold');
+    banner('Serpent-slayer!', '+25 glory'); renderHUD();
+  }
+}
+function updateSerpent(dt, t, paused) {
   if (!serpent) return;
   const s = serpent;
-  s.rise = clamp(s.rise + dt * (s.sinking ? -.4 : .5), 0, 1);
+  if (!paused) {
+    s.rise = clamp(s.rise + dt * (s.sinking ? -.35 : .45), 0, 1);
+    if (!s.sinking) {
+      s.ang += dt * .32; s.lunge -= dt;
+      const lunging = s.lunge < 0;
+      s.R = lerp(s.R, lunging ? 12 : 62, clamp(dt * (lunging ? 2.5 : .8), 0, 1));
+      if (lunging && s.R < 22 && !s.struck) {
+        s.struck = true; shake = 1; Sound.crash();
+        const m = shieldUp ? .5 : 1;
+        S.hull = Math.max(5, S.hull - 12 * m); if (chance(.6)) { pCrewDmg += m; applyCrewDmg(); }
+        banner('The serpent strikes!', shieldUp ? 'Your shield wall holds' : 'Raise the shield wall with SHIFT'); renderHUD();
+      }
+      if (s.lunge < -2.2) { s.lunge = rnd(5, 8); s.struck = false; }
+      if (S.docked || Math.hypot(s.g.position.x - ship.pos.x, s.g.position.z - ship.pos.y) > 380) { s.sinking = true; log('You leave the serpent behind in your wake.'); }
+    }
+    const k = clamp(dt * 3, 0, 1);
+    s.g.position.x = lerp(s.g.position.x, ship.pos.x + Math.cos(s.ang) * s.R, k);
+    s.g.position.z = lerp(s.g.position.z, ship.pos.y + Math.sin(s.ang) * s.R, k);
+  }
   s.g.position.y = lerp(-22, 0, s.rise);
   s.segs.forEach((m, i) => m.position.set(i * 4.2 - 30, Math.sin(i * .6 - t * 2) * 5 - 1.5, Math.cos(i * .4 + t) * 2));
-  s.head.position.set(-35, 7 + Math.sin(t * 1.5) * 1.5, 0); s.head.rotation.y = Math.PI * .8;
+  s.head.position.set(-35, 7 + Math.sin(t * 1.5) * 1.5, s.lunge < 0 ? 6 : 0); s.head.rotation.y = Math.PI * .8;
   s.g.lookAt(ship.g.position.x, s.g.position.y, ship.g.position.z);
   if (s.sinking && s.rise <= 0) { scene.remove(s.g); serpent = null; }
 }
@@ -1126,15 +1422,7 @@ const SEA_EVENTS = [
     ['Take them aboard', () => { const n = Math.min(3, S.maxCrew - S.crew); S.crew += n; if (n === 0) { S.food = Math.max(0, S.food - 5); S.glory += 2; } log(n > 0 ? `${n} castaway${n > 1 ? 's' : ''} joined your crew.` : 'No room on the benches, but you gave them food and a heading home. (+2 glory)', 'good'); }],
     ['Sail past', () => { S.morale = clamp(S.morale - 3, 0, 100); log('You left the castaways to their fate. Some of the crew mutter.'); }],
   ]),
-  () => {
-    spawnSerpent(); throttle = Math.min(throttle, 1);
-    setTimeout(() => choice('Sea serpent!', 'A vast coiled shape rises from the grey waves, eyes like lanterns. The crew grips their spears.', [
-      ['Fight it!', () => { Sound.clash(); if (power() * rnd(.5, 1.5) > 22) { S.glory += 25; S.morale = clamp(S.morale + 15, 0, 100); log('You drove off the sea serpent with spear and axe! The skalds will sing of this. (+25 glory)', 'gold'); banner('Serpent-slayer', '+25 glory'); }
-        else { const l = ri(1, 3); S.crew = Math.max(1, S.crew - l); S.hull = Math.max(5, S.hull - 25); log(`The serpent smashed your oars and dragged ${l} crew into the deep.`, 'bad'); } if (serpent) serpent.sinking = true; }],
-      ['Row for your lives', () => { throttle = 3; if (chance(.7)) log('Your rowers strain every muscle and escape the serpent.'); else { S.hull = Math.max(5, S.hull - 15); log("The serpent's tail clips the stern as you flee. Hull -15.", 'bad'); } if (serpent) serpent.sinking = true; }],
-      ['Throw silver to Njord', () => { const s = Math.min(S.silver, 20); S.silver -= s; S.luck = Math.min(5, S.luck + 1); log(`You cast ${s} silver into the sea. The serpent sinks away.`, 'good'); if (serpent) serpent.sinking = true; }],
-    ]), 2600);
-  },
+  () => { if (!serpent) spawnSerpent(); },
 ];
 
 // =====================================================================
@@ -1188,10 +1476,10 @@ const ACT = {
     else { Sound.clash(); S.morale = clamp(S.morale - 15, 0, 100); S.glory = Math.max(0, S.glory - 3); S.silver = Math.max(0, S.silver - 20); log('The champion knocks you flat into the mud. You pay 20 silver and your pride. (-3 glory)', 'bad'); }
   },
   weapons() { const cost = 80 + S.weapons * 60; if (S.silver < cost || S.weapons >= 5) return; S.silver -= cost; S.weapons++; log(`The smiths forge new axes and mail for your crew (arms level ${S.weapons}).`, 'good'); },
-  raid() {
+  raid(f = 1) {
     const p = P[S.at]; passDays(1, false); Sound.clash();
-    const atk = power() * rnd(.7, 1.3), def = defenseOf(p) * rnd(.7, 1.3);
-    S.raids++; S.hostile[p.id] = 30; S.alert[p.id] = (S.alert[p.id] || 0) + 1;
+    const atk = power() * rnd(.7, 1.3), def = defenseOf(p) * f * rnd(.7, 1.3);
+    S.hostile[p.id] = 30;
     if (atk > def) {
       const mult = p.type === 'fortress' ? 5 : p.type === 'town' ? 2.5 : 1;
       const s = Math.round(ri(30, 70) * mult), lost = chance(.5) ? ri(0, Math.ceil(def / 25)) : 0;
@@ -1245,7 +1533,7 @@ function renderHUD() {
     <div class="title">You are known as ${title()}.</div>`;
 }
 let lastHudKey = '';
-function hudTick() { const k = `${S.day}|${todName(todNow())}|${weather.storm > .4}`; if (k !== lastHudKey) { lastHudKey = k; renderHUD(); } }
+function hudTick() { const k = `${S.day}|${todName(todNow())}|${weather.storm > .4}|${S.crew}|${Math.round(S.hull)}|${S.silver}|${S.glory}|${S.morale}`; if (k !== lastHudKey) { lastHudKey = k; renderHUD(); } }
 
 function renderPanel() {
   const c = $('panel');
@@ -1279,8 +1567,8 @@ function renderPanel() {
       }
       if (p.smith) { const wc = 80 + S.weapons * 60; add(S.weapons >= 5 ? 'Finest arms owned' : `Buy arms (${wc})`, ACT.weapons, { disabled: S.weapons >= 5 || S.silver < wc }); }
     }
-    const odds = power() / defenseOf(p), odd = odds > 1.6 ? 'easy' : odds > 1.1 ? 'favourable' : odds > .8 ? 'risky' : 'suicidal';
-    add(`Raid! (${odd})`, () => choice(`Raid ${p.name}?`, `Your strength: ${Math.round(power())}. Their defences: ~${Math.round(defenseOf(p))}. The odds look ${odd}. Raiding makes them hostile for 30 days.`, [['To battle!', ACT.raid], ['Not today', () => {}]]), { cls: 'red' });
+    const ships = p.type === 'fortress' ? 4 : p.type === 'town' ? 2 : 1;
+    add('Raid!', () => choice(`Raid ${p.name}?`, `War horns will sound and ${ships} warship${ships > 1 ? 's' : ''} will sail out to meet you. Sink or board them in battle, then land again to sack the town. ${p.name} will stay hostile for 30 days.`, [['Sound the war horn!', startRaid], ['Not today', () => {}]]), { cls: 'red' });
   }
   if (p.type === 'wild') {
     add('Hunt', ACT.hunt); add('Fish', ACT.fish); add('Explore', ACT.explore);
@@ -1318,7 +1606,7 @@ function renderSailInfo() {
   if (modalOpen || titleOn) { pr.style.display = 'none'; return; }
   if (S.docked) { pr.style.display = 'none'; return; }
   if (nearShip) { pr.innerHTML = `<kbd>F</kbd>Hail the merchant ship`; pr.style.display = 'block'; }
-  else if (nearPlace) { pr.innerHTML = `<kbd>E</kbd>Go ashore at ${nearPlace.name}`; pr.style.display = 'block'; }
+  else if (nearPlace) { pr.innerHTML = combatOn ? `Enemies near: you cannot land at ${nearPlace.name}` : `<kbd>E</kbd>Go ashore at ${nearPlace.name}`; pr.style.display = 'block'; }
   else pr.style.display = 'none';
 }
 
@@ -1343,6 +1631,7 @@ function help() {
   • <b>W / S</b> raise and lower the sail (or row). <b>A / D</b> steer. Sailing with the wind is fastest.<br>
   • Sail close to an island and press <b>E</b> to go ashore. Trade, raid, hunt, explore, feast.<br>
   • Merchant ships can be hailed with <b>F</b>. Black-sailed raiders will hunt <i>you</i>.<br>
+  • <b>Battle is real-time.</b> <b>Space</b> (or tap the sea) looses a volley of arrows at the nearest foe. Hold <b>Shift</b> to raise the shield wall. Ram at full sail, or come alongside and press <b>B</b> to board. Raiding a town makes its warships sail out to fight you.<br>
   • Each day at sea your crew eats. Storms, whales, castaways — and worse — await on the whale-road.<br>
   • Back home, expand your hall and improve your ship. Gain glory to rise from farmer to legend.<br>
   • <b>J</b> opens your saga journal, <b>M</b> toggles sound. Progress saves automatically.`);
@@ -1360,7 +1649,14 @@ function dock(p) {
     if (first) { S.glory += 3; log(`You are the first of your kin to set foot on ${p.name}. (+3 glory)`, 'gold'); }
     banner(p.name, first ? 'A new land discovered · +3 glory' : '');
     save(); render();
+    if (raid && raid.cleared && raid.p === p) setTimeout(() => { ACT.raid(.35); raid = null; save(); render(); }, 900);
   });
+}
+function tryLand() {
+  if (S.docked) { undock(); return; }
+  if (!nearPlace) return;
+  if (combatOn) { banner('Enemies near!', 'Win the fight or escape before landing'); return; }
+  dock(nearPlace);
 }
 function undock() {
   if (!S.docked || modalOpen) return;
@@ -1415,8 +1711,8 @@ function drawMini() {
     mcx.strokeStyle = (S.hostile[p.id] || 0) > 0 ? '#d0573f' : S.visited[p.id] ? '#e0ad4a' : 'rgba(255,255,255,.25)'; mcx.lineWidth = 1; mcx.stroke();
   });
   npcs.forEach(n => {
-    if (Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) > 600) return;
-    mcx.fillStyle = n.kind === 'raider' ? '#ff5a3a' : '#f0d890'; mcx.beginPath(); mcx.arc(mx(n.pos.x), mz(n.pos.y), 2.4, 0, 7); mcx.fill();
+    if (n.dead || Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) > 600) return;
+    mcx.fillStyle = n.hostile ? '#ff5a3a' : n.kind === 'raider' ? '#ff9a6a' : n.kind === 'defender' ? '#9fc8ff' : '#f0d890'; mcx.beginPath(); mcx.arc(mx(n.pos.x), mz(n.pos.y), 2.4, 0, 7); mcx.fill();
   });
   mcx.save(); mcx.translate(mx(ship.pos.x), mz(ship.pos.y)); mcx.rotate(ship.h);
   mcx.fillStyle = '#fff'; mcx.beginPath(); mcx.moveTo(0, -6); mcx.lineTo(4, 4); mcx.lineTo(0, 2); mcx.lineTo(-4, 4); mcx.closePath(); mcx.fill(); mcx.restore();
@@ -1428,6 +1724,7 @@ function drawMini() {
 const keys = {};
 let camYaw = 0, camPitch = .32, camDist = 62, dragging = false, lastX = 0, lastY = 0;
 addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); if (!titleOn && !modalOpen) playerShoot(); return; }
   if (e.repeat) return;
   const k = e.key.toLowerCase();
   if (titleOn) return;
@@ -1436,14 +1733,16 @@ addEventListener('keydown', e => {
   keys[k] = true;
   if (k === 'h') help();
   if (k === 'j') journal();
-  if (k === 'e') S.docked ? undock() : nearPlace && dock(nearPlace);
+  if (k === 'e') tryLand();
+  if (k === 'b') tryBoard();
   if (k === 'f' && nearShip) hailMerchant(nearShip);
   if (!S.docked && (k === 'w' || k === 'arrowup')) throttle = Math.min(3, throttle + 1);
   if (!S.docked && (k === 's' || k === 'arrowdown')) throttle = Math.max(0, throttle - 1);
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-canvas.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener('pointerup', () => dragging = false);
+let downAt = 0, downX = 0, downY = 0;
+canvas.addEventListener('pointerdown', e => { dragging = true; lastX = downX = e.clientX; lastY = downY = e.clientY; downAt = performance.now(); canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerup', e => { dragging = false; if (performance.now() - downAt < 280 && Math.hypot(e.clientX - downX, e.clientY - downY) < 8 && combatOn) playerShoot(); });
 canvas.addEventListener('pointermove', e => {
   if (!dragging) return;
   camYaw -= (e.clientX - lastX) * .006; camPitch = clamp(camPitch + (e.clientY - lastY) * .004, .06, 1.25);
@@ -1460,10 +1759,13 @@ if ('ontouchstart' in window) {
       if (k === 'left') keys.a = true; if (k === 'right') keys.d = true;
       if (k === 'up' && !S.docked) throttle = Math.min(3, throttle + 1);
       if (k === 'down' && !S.docked) throttle = Math.max(0, throttle - 1);
-      if (k === 'e') S.docked ? undock() : nearPlace && dock(nearPlace);
+      if (k === 'e') tryLand();
       if (k === 'f' && nearShip) hailMerchant(nearShip);
+      if (k === 'shoot') playerShoot();
+      if (k === 'b') tryBoard();
+      if (k === 'shield') touchShield = true;
     });
-    const up = () => { if (k === 'left') keys.a = false; if (k === 'right') keys.d = false; };
+    const up = () => { if (k === 'left') keys.a = false; if (k === 'right') keys.d = false; if (k === 'shield') touchShield = false; };
     b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up);
   });
 }
@@ -1512,11 +1814,11 @@ function windFactor() {
 // =====================================================================
 // main loop
 // =====================================================================
-let titleOn = true, camSnap = true, dockBlend = 1;
+let titleOn = true, camSnap = true, dockBlend = 1, camExtra = 0;
 const clock = new THREE.Clock();
-let elapsed = 0, frame = 0;
+let elapsed = 0, frame = 0, timeScale = 1;
 function tick() {
-  const dt = Math.min(clock.getDelta(), .05); elapsed += dt; frame++;
+  const dt = Math.min(clock.getDelta(), .05) * timeScale; elapsed += dt; frame++;
   const t = elapsed;
   waterU.uTime.value = t;
 
@@ -1539,6 +1841,8 @@ function tick() {
     if (throttle >= 2 && wind.calm > 0) target = 3;
     if (S.hull < 25) target *= .7;
     if (S.crew < 4 && throttle === 1) target *= .6;
+    if (shieldUp) target *= .6;
+    if (boarding) { target = 0; throttle = 0; }
     ship.speed = lerp(ship.speed, target, dt * (target > ship.speed ? .35 : .6));
     const fx = Math.sin(ship.h), fz = -Math.cos(ship.h);
     ship.pos.x += fx * ship.speed * dt; ship.pos.y += fz * ship.speed * dt;
@@ -1565,13 +1869,21 @@ function tick() {
   nearPlace = null; nearShip = null;
   if (!S.docked) {
     for (const p of PLACES) if (islandT(p, ship.pos.x, ship.pos.y) < 1.45) { nearPlace = p; break; }
-    for (const n of npcs) if (n.kind === 'merchant' && n.cooldown <= 0 && Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) < 55) { nearShip = n; break; }
+    for (const n of npcs) if (n.kind === 'merchant' && !n.hostile && !n.dead && n.cooldown <= 0 && Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) < 55) { nearShip = n; break; }
   }
 
   floatShip(ship.g, ship.pos.x, ship.pos.y, ship.h, t);
   animateShip(ship.g, t, ship.speed, S.docked ? 0 : throttle, windFactor());
-  if (!paused || titleOn) updateNPCs(paused ? 0 : dt, t);
-  updateSerpent(dt, t); updateWhales(dt); updateSmoke(dt);
+  if (!paused) {
+    shootCd = Math.max(0, shootCd - dt); hitSoundCd -= dt;
+    shieldUp = !!(keys.shift || touchShield) && !S.docked;
+    updateArrows(dt); updateBoarding(dt); updateCollisions(dt); updateRaid();
+  }
+  updateNPCs(paused ? 0 : dt, t);
+  updateSerpent(dt, t, paused);
+  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking);
+  if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
+  if (combatOn && !paused && !S.docked && (S.crew <= 1 || S.hull <= 6)) defeat(); updateWhales(dt); updateSmoke(dt);
   flags.forEach(f => { const a = f.geometry.attributes.position.array, b = f.userData.base; for (let i = 0; i < a.length; i += 3) a[i + 2] = Math.sin(b[i] * .9 - t * 5) * b[i] * .12; f.geometry.attributes.position.needsUpdate = true; });
   if (shrineOrb) { shrineOrb.position.y += Math.sin(t * 1.5) * .01; shrineOrb.rotation.y += dt; shrineLight.intensity = 500 + Math.sin(t * 3) * 120; }
   if (volcanoLight) volcanoLight.intensity = 3500 + Math.sin(t * 7) * 600 + Math.sin(t * 13) * 300;
@@ -1579,13 +1891,15 @@ function tick() {
   // camera
   dockBlend = lerp(dockBlend, S.docked || titleOn ? 1 : 0, 1 - Math.exp(-dt * 1.5));
   const ang = ship.h + camYaw + dockBlend * Math.PI * .8 + (titleOn ? Math.sin(t * .06) * .5 : 0);
-  const dist = titleOn ? 85 : camDist, pitch = titleOn ? .22 : camPitch;
+  camExtra = lerp(camExtra, combatOn ? 25 : 0, clamp(dt, 0, 1));
+  const dist = titleOn ? 85 : camDist + camExtra, pitch = titleOn ? .22 : camPitch;
   const cx = ship.g.position.x - Math.sin(ang) * Math.cos(pitch) * dist, cz = ship.g.position.z + Math.cos(ang) * Math.cos(pitch) * dist;
   let cy = ship.g.position.y + 6 + Math.sin(pitch) * dist;
   cy = Math.max(cy, waveH(cx, cz, t) + 3, terrainH(cx, cz) + 22);
   const k = camSnap ? 1 : 1 - Math.exp(-dt * 5); camSnap = false;
   camera.position.x = lerp(camera.position.x, cx, k); camera.position.y = lerp(camera.position.y, cy, k); camera.position.z = lerp(camera.position.z, cz, k);
   camera.lookAt(ship.g.position.x, ship.g.position.y + 7, ship.g.position.z);
+  if (shake > 0) { camera.position.x += rnd(-1, 1) * shake; camera.position.y += rnd(-1, 1) * shake * .6; shake = Math.max(0, shake - dt * 2.5); }
   water.position.set(Math.round(camera.position.x / 50) * 50, 0, Math.round(camera.position.z / 50) * 50);
   sky.position.copy(camera.position);
   rain.position.set(camera.position.x, camera.position.y - 30, camera.position.z);
@@ -1602,7 +1916,7 @@ function tick() {
   updateSky(t);
   Sound.update(ship.speed, weather.storm, t);
   if (frame % 6 === 0) { drawMini(); hudTick(); }
-  drawCompass(); renderSailInfo(); updateLabels();
+  drawCompass(); renderSailInfo(); renderCombatHint(); updateLabels(); updateFoeLabels();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
@@ -1652,7 +1966,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
