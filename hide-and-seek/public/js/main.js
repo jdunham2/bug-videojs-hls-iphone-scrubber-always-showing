@@ -1,7 +1,8 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND } from '/shared/world.js';
+import { getWorld, collide, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND } from '../shared/world.js';
 import { Gfx, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
+import { connectWs, connectLocal, connectRoom } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const W = getWorld();
@@ -10,41 +11,71 @@ const gfx = new Gfx(canvas, W);
 const sfx = new Sfx();
 const css = (i) => '#' + COLORS[i % COLORS.length].toString(16).padStart(6, '0');
 
-let ws = null, myId = null, roomCode = '';
+const IN_ARTIFACT = !!window.claude; // published as a claude.ai artifact: no game server, use the realtime room
+const TOUCH = navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches;
+const USE = TOUCH ? 'USE' : '[E]';
+document.body.classList.toggle('touch', TOUCH);
+let net = null, joining = false, softLook = false, myId = null, roomCode = '', solo = false;
+const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
 const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0 };
 const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0 };
 const keys = {};
-let locked = false, chatOpen = false, lastSend = 0, lastHud = 0, heartT = 0, tauntCd = 0, bannerT = 0;
+let playing = false, chatOpen = false, lastSend = 0, lastHud = 0, heartT = 0, tauntCd = 0, bannerT = 0;
 window.__g = { me, players, G, gfx };
 
 // ---------- menu ----------
 const params = new URLSearchParams(location.search);
 $('room').value = (params.get('room') || '').toUpperCase();
-$('name').value = localStorage.getItem('dh_name') || '';
-$('join').onclick = join;
-for (const id of ['name', 'room']) $(id).addEventListener('keydown', (e) => e.key === 'Enter' && join());
+try { $('name').value = localStorage.getItem('dh_name') || ''; } catch {}
+if (IN_ARTIFACT) {
+  $('join').textContent = 'Play with others here';
+  $('roomHint').textContent = '(same code = same game; empty joins the main one)';
+  $('copy').textContent = 'Copy room code';
+}
+$('join').onclick = () => join('online');
+$('solo').onclick = () => join('solo');
+for (const id of ['name', 'room']) $(id).addEventListener('keydown', (e) => e.key === 'Enter' && join('online'));
 
-function join() {
-  if (ws) return;
+async function join(mode) {
+  if (net || joining) return;
+  joining = true;
   sfx.init();
   const name = $('name').value.trim() || 'Player' + ((Math.random() * 90 + 10) | 0);
   try { localStorage.setItem('dh_name', name); } catch {}
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', name, room: $('room').value }));
-  ws.onmessage = (e) => onMsg(JSON.parse(e.data));
-  ws.onclose = () => {
-    ws = null;
-    if (document.pointerLockElement) document.exitPointerLock();
-    for (const id of ['lobby', 'results', 'hud']) $(id).classList.add('hidden');
-    $('menu').classList.remove('hidden');
-    $('err').textContent = myId ? 'Disconnected from the server.' : $('err').textContent || 'Could not connect.';
-    for (const id of players.keys()) gfx.removeAvatar(id);
-    players.clear(); roster.clear(); myId = null;
-  };
+  const h = { onmsg: onMsg, onclose: onClose };
+  $('err').textContent = mode === 'solo' ? '' : 'Connecting…';
+  solo = mode === 'solo';
+  try {
+    if (solo) net = connectLocal(name, h);
+    else if (IN_ARTIFACT) {
+      const api = await window.claude.use('room');
+      if (!api) throw new Error('no room');
+      net = await connectRoom(api, name, $('room').value, h);
+    } else net = await connectWs(name, $('room').value, h);
+    $('err').textContent = '';
+  } catch {
+    solo = true;
+    net = connectLocal(name, h);
+    $('err').textContent = '';
+    feed('Multiplayer is not available in this view, so you are playing solo with bots.', 'bad');
+  }
+  joining = false;
 }
-const send = (m) => ws && ws.readyState === 1 && ws.send(JSON.stringify(m));
+function onClose(reason) {
+  if (net) net.close();
+  net = null;
+  if (document.pointerLockElement) document.exitPointerLock();
+  playing = false; softLook = false;
+  for (const id of ['lobby', 'results', 'hud']) $(id).classList.add('hidden');
+  $('menu').classList.remove('hidden');
+  $('err').textContent = reason || 'Disconnected.';
+  for (const id of players.keys()) gfx.removeAvatar(id);
+  players.clear(); roster.clear(); myId = null;
+}
+const send = (m) => net && net.send(m);
 
 // ---------- network ----------
 function onMsg(m) {
@@ -55,7 +86,7 @@ function onMsg(m) {
       $('menu').classList.add('hidden');
       $('hud').classList.remove('hidden');
       $('code').textContent = roomCode;
-      history.replaceState(null, '', '?room=' + roomCode);
+      if (!IN_ARTIFACT && !solo) try { history.replaceState(null, '', '?room=' + roomCode); } catch {}
       refreshOverlays();
       break;
     case 'err': $('err').textContent = m.m; break;
@@ -94,7 +125,7 @@ function onState(m) {
     p.x = a[1]; p.z = a[2]; p.r = a[3]; p.f = a[4]; p.role = a[5]; p.st = a[6]; p.hid = a[7]; p.sc = a[8]; p.fx = a[9]; p.rocks = a[10];
   }
   if (prev !== G.ph) onPhase(prev);
-  else if (prevHost !== G.host && !locked) renderLobby();
+  else if (prevHost !== G.host && !playing) renderLobby();
 }
 
 function onPhase(prev) {
@@ -172,34 +203,53 @@ function renderLobby() {
 }
 function refreshOverlays() {
   if (!myId) return;
-  $('lobby').classList.toggle('hidden', locked);
-  if (!locked) renderLobby();
+  $('lobby').classList.toggle('hidden', playing);
+  if (!playing) renderLobby();
 }
 
 $('copy').onclick = () => {
-  const url = location.origin + location.pathname + '?room=' + roomCode;
-  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => ($('copy').textContent = 'Copied!'), () => prompt('Invite link', url));
-  setTimeout(() => ($('copy').textContent = 'Copy invite link'), 1500);
+  const label = $('copy').textContent;
+  const text = IN_ARTIFACT ? roomCode : location.origin + location.pathname + '?room=' + roomCode;
+  const done = (ok) => { $('copy').textContent = ok ? 'Copied!' : 'Code: ' + roomCode; setTimeout(() => ($('copy').textContent = label), 1500); };
+  try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch { done(false); }
 };
 $('addBot').onclick = () => { sfx.click(); send({ t: 'lobby', a: 'addBot' }); };
 $('delBot').onclick = () => { sfx.click(); send({ t: 'lobby', a: 'delBot' }); };
 $('start').onclick = () => { send({ t: 'lobby', a: 'start' }); lock(); };
 $('resume').onclick = lock;
-function lock() { sfx.init(); const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); }
-canvas.addEventListener('click', () => { if (myId && !locked) lock(); });
-document.addEventListener('pointerlockchange', () => {
-  locked = document.pointerLockElement === canvas;
+// "Playing" means the game has your input. With a mouse that is pointer lock; on touch screens, or where
+// pointer lock is refused, it is "soft" mode: drag to look, with on-screen controls on touch.
+function setPlaying(v, soft) {
+  playing = v;
+  softLook = v && !!soft;
   for (const k in keys) keys[k] = false;
+  stick.id = null; looks.clear();
+  $('stick').hidden = true;
+  document.body.classList.toggle('soft', softLook);
   refreshOverlays();
+}
+function lock() {
+  sfx.init();
+  if (TOUCH) return setPlaying(true, true);
+  let r;
+  try { r = canvas.requestPointerLock(); } catch { return setPlaying(true, true); }
+  if (r && r.catch) r.catch(() => { if (!document.pointerLockElement) setPlaying(true, true); });
+  setTimeout(() => { if (!document.pointerLockElement && !playing) setPlaying(true, true); }, 400);
+}
+canvas.addEventListener('click', () => { if (myId && !playing) lock(); });
+document.addEventListener('pointerlockchange', () => {
+  const on = document.pointerLockElement === canvas;
+  if (!on && softLook) return;
+  setPlaying(on, false);
 });
 
 // ---------- input ----------
 document.addEventListener('mousemove', (e) => {
-  if (!locked) return;
+  if (!playing || softLook) return;
   me.yaw -= e.movementX * 0.0023;
   me.pitch = Math.max(-1.45, Math.min(1.45, me.pitch - e.movementY * 0.0023));
 });
-document.addEventListener('mousedown', (e) => { if (locked && e.button === 0) tag(); });
+document.addEventListener('mousedown', (e) => { if (playing && !softLook && e.button === 0) tag(); });
 function tag() {
   const p = players.get(myId);
   if (!p || p.role !== 1 || G.ph !== 'seek') return;
@@ -214,21 +264,81 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === 'Escape') { chatOpen = false; chat.classList.remove('open'); chat.blur(); e.preventDefault(); }
     return;
   }
-  if (e.code === 'Enter' && locked) { chatOpen = true; chat.classList.add('open'); chat.focus(); for (const k in keys) keys[k] = false; e.preventDefault(); return; }
-  if (!locked) return;
+  if (e.code === 'Enter' && playing) { chatOpen = true; chat.classList.add('open'); chat.focus(); for (const k in keys) keys[k] = false; e.preventDefault(); return; }
+  if (!playing) return;
   if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
   if (e.repeat) return;
   keys[e.code] = true;
-  const p = players.get(myId);
-  if (!p) return;
-  if (e.code === 'KeyE') send({ t: 'a', a: 'use' });
+  if (e.code === 'Escape' && softLook) setPlaying(false);
+  else if (e.code === 'KeyE') send({ t: 'a', a: 'use' });
   else if (e.code === 'KeyF') tag();
-  else if (e.code === 'KeyT' && p.role === 0 && G.ph === 'seek' && !p.st && performance.now() > tauntCd) { tauntCd = performance.now() + 10000; send({ t: 'a', a: 'taunt' }); }
-  else if (e.code === 'KeyQ' && p.role === 0 && G.ph === 'seek' && !p.st && p.hid < 0 && p.rocks > 0) {
-    const d = 13 * Math.max(0.35, Math.cos(me.pitch) + Math.max(0, me.pitch) * 0.3);
-    send({ t: 'a', a: 'rock', x: me.x - Math.sin(me.yaw) * d, z: me.z - Math.cos(me.yaw) * d });
-  }
+  else if (e.code === 'KeyT') taunt();
+  else if (e.code === 'KeyQ') rock();
 });
+function taunt() {
+  const p = players.get(myId);
+  if (!p || p.role !== 0 || G.ph !== 'seek' || p.st || performance.now() < tauntCd) return;
+  tauntCd = performance.now() + 10000;
+  send({ t: 'a', a: 'taunt' });
+}
+function rock() {
+  const p = players.get(myId);
+  if (!p || p.role !== 0 || G.ph !== 'seek' || p.st || p.hid >= 0 || p.rocks <= 0) return;
+  const d = 13 * Math.max(0.35, Math.cos(me.pitch) + Math.max(0, me.pitch) * 0.3);
+  send({ t: 'a', a: 'rock', x: me.x - Math.sin(me.yaw) * d, z: me.z - Math.cos(me.yaw) * d });
+}
+
+// ---------- touch + drag controls ----------
+// Left part of the screen is a floating joystick (push it to the edge to sprint); dragging anywhere else looks around.
+const STICK_R = 56;
+canvas.addEventListener('pointerdown', (e) => {
+  if (!playing || !softLook) return;
+  e.preventDefault();
+  if (TOUCH && stick.id === null && e.clientX < window.innerWidth * 0.42 && e.clientY > window.innerHeight * 0.3) {
+    stick.id = e.pointerId; stick.ox = e.clientX; stick.oy = e.clientY; stick.x = stick.y = 0;
+    const el = $('stick');
+    el.hidden = false;
+    el.style.left = e.clientX + 'px'; el.style.top = e.clientY + 'px';
+    $('knob').style.transform = 'translate(-50%, -50%)';
+  } else looks.set(e.pointerId, [e.clientX, e.clientY]);
+  try { canvas.setPointerCapture(e.pointerId); } catch {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId === stick.id) {
+    let dx = e.clientX - stick.ox, dy = e.clientY - stick.oy;
+    const d = Math.hypot(dx, dy);
+    if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+    stick.x = dx / STICK_R; stick.y = dy / STICK_R;
+    $('knob').style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    $('knob').classList.toggle('run', d > STICK_R * 0.92);
+    return;
+  }
+  const l = looks.get(e.pointerId);
+  if (!l) return;
+  const k = e.pointerType === 'mouse' ? 0.004 : 0.0055;
+  me.yaw -= (e.clientX - l[0]) * k;
+  me.pitch = Math.max(-1.45, Math.min(1.45, me.pitch - (e.clientY - l[1]) * k));
+  l[0] = e.clientX; l[1] = e.clientY;
+});
+const pointerEnd = (e) => {
+  if (e.pointerId === stick.id) { stick.id = null; stick.x = stick.y = 0; $('stick').hidden = true; }
+  looks.delete(e.pointerId);
+};
+canvas.addEventListener('pointerup', pointerEnd);
+canvas.addEventListener('pointercancel', pointerEnd);
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+const press = (id, down, up) => {
+  const el = $(id);
+  el.addEventListener('pointerdown', (e) => { e.preventDefault(); sfx.init(); down(); });
+  if (up) for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, up);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+};
+press('tUse', () => { keys.KeyE = true; send({ t: 'a', a: 'use' }); }, () => { keys.KeyE = false; });
+press('tAct', () => { const p = players.get(myId); if (p && p.role === 1) tag(); else rock(); });
+press('tTaunt', taunt);
+press('tCrouch', () => { keys.KeyC = !keys.KeyC; $('tCrouch').classList.toggle('on', !!keys.KeyC); });
+press('tPause', () => setPlaying(false));
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
@@ -238,17 +348,18 @@ function update(dt, now) {
   if (!p) return;
   const t = now / 1000, seeker = p.role === 1, hidden = p.hid >= 0, stunned = !!(p.fx & 1);
   const blind = seeker && G.ph === 'hide';
-  const frozen = hidden || stunned || blind || chatOpen || !locked;
+  const frozen = hidden || stunned || blind || chatOpen || !playing;
   let mx = 0, mz = 0;
   if (!frozen) {
     if (keys.KeyW || keys.ArrowUp) mz -= 1;
     if (keys.KeyS || keys.ArrowDown) mz += 1;
     if (keys.KeyA || keys.ArrowLeft) mx -= 1;
     if (keys.KeyD || keys.ArrowRight) mx += 1;
+    if (stick.id !== null && Math.hypot(stick.x, stick.y) > 0.18) { mx = stick.x; mz = stick.y; }
   }
-  const moving = !!(mx || mz);
+  const moving = !!(mx || mz), pushed = stick.id !== null && Math.hypot(stick.x, stick.y) > 0.92;
   me.crouch = !!keys.KeyC && !hidden && !frozen;
-  let sprint = (keys.ShiftLeft || keys.ShiftRight) && moving && !me.crouch && t > me.wind && me.stam > 0;
+  let sprint = (keys.ShiftLeft || keys.ShiftRight || pushed) && moving && !me.crouch && t > me.wind && me.stam > 0;
   if (sprint) {
     me.stam -= STAM.drain * dt;
     if (me.stam <= 0) { me.stam = 0; me.wind = t + STAM.windedFor; sprint = false; feed(seeker ? 'Out of breath!' : 'Out of breath — seekers can hear you gasping!', 'bad'); }
@@ -320,16 +431,22 @@ function hud(p, now, s) {
   const role = $('role');
   const set = (cls, title, sub) => { role.className = cls; role.textContent = title; const sm = document.createElement('small'); sm.textContent = sub; role.append(sm); };
   if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the town and learn the hiding spots.');
-  else if (s.seeker) set('seeker', '🔦 SEEKER', 'Tag hiders (click). Search spots with E — carefully.');
-  else if (p.st === 1) set('jail', '⛓ JAILED', 'A free teammate must hold E at the lever.');
-  else set('hider', '🙈 HIDER', s.hidden ? 'Shh… E to climb out.' : 'Hide, grab coins, free your friends.');
+  else if (s.seeker) set('seeker', '🔦 SEEKER', TOUCH ? 'Tap TAG next to a hider. Search spots with USE, carefully.' : 'Tag hiders (click). Search spots with E — carefully.');
+  else if (p.st === 1) set('jail', '⛓ JAILED', `A free teammate must hold ${USE} at the lever.`);
+  else set('hider', '🙈 HIDER', s.hidden ? `Shh… ${USE} to climb out.` : 'Hide, grab coins, free your friends.');
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
   $('hideview').className = s.hidden ? W.spots[p.hid].kind : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
-  $('items').textContent = !s.seeker && G.ph === 'seek' && p.st === 0 ? `🪨 ×${p.rocks}  [Q] throw   📣 [T] taunt${now < tauntCd ? ' (' + Math.ceil((tauntCd - now) / 1000) + 's)' : ''}` : '';
+  const canAct = !s.blind && p.st === 0 && G.ph === 'seek';
+  $('tAct').hidden = !canAct || (!s.seeker && (s.hidden || p.rocks <= 0));
+  $('tAct').textContent = s.seeker ? 'TAG' : '🪨 ' + p.rocks;
+  $('tTaunt').hidden = !canAct || s.seeker;
+  $('tUse').hidden = s.blind || p.st === 1;
+  $('tCrouch').hidden = s.blind || s.hidden || p.st === 1;
+  $('items').textContent = TOUCH ? '' : !s.seeker && G.ph === 'seek' && p.st === 0 ? `🪨 ×${p.rocks}  [Q] throw   📣 [T] taunt${now < tauntCd ? ' (' + Math.ceil((tauntCd - now) / 1000) + 's)' : ''}` : '';
   if (now > bannerT) $('banner').classList.remove('show');
 
   // scoreboard
@@ -345,12 +462,12 @@ function hud(p, now, s) {
   // context prompt
   const pr = $('prompt');
   pr.textContent = '';
-  if (!locked || s.blind) return;
+  if (!playing || s.blind) return;
   if (s.stunned) { pr.textContent = '💫 Dazed…'; return; }
-  if (s.hidden) { pr.textContent = '[E] Leave hiding spot'; return; }
+  if (s.hidden) { pr.textContent = `${USE}: leave hiding spot`; return; }
   if (p.st === 1) return;
   if (!s.seeker && G.ph === 'seek' && s.jailedN && Math.hypot(W.lever.x - me.x, W.lever.z - me.z) < 2.4) {
-    pr.textContent = 'Hold [E] to free your teammates';
+    pr.textContent = `Hold ${USE} to free your teammates`;
     const bar = document.createElement('span'), i = document.createElement('i');
     bar.className = 'bar'; i.style.width = G.res * 100 + '%';
     bar.append(i); pr.append(bar);
@@ -358,8 +475,8 @@ function hud(p, now, s) {
   }
   for (const sp of W.spots) {
     if (Math.min(Math.hypot(sp.x - me.x, sp.z - me.z), Math.hypot(sp.ex - me.x, sp.ez - me.z)) > 2.3) continue;
-    if (s.seeker) { if (G.ph === 'seek') pr.textContent = `[E] Search the ${sp.kind} (empty = dazed!)`; }
-    else if (G.ph !== 'end') pr.textContent = `[E] Hide in the ${sp.kind}`;
+    if (s.seeker) { if (G.ph === 'seek') pr.textContent = `${USE}: search the ${sp.kind} (empty = dazed!)`; }
+    else if (G.ph !== 'end') pr.textContent = `${USE}: hide in the ${sp.kind}`;
     return;
   }
 }

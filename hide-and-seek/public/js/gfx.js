@@ -1,6 +1,6 @@
 // Everything visual: the town at dusk, characters, and effects.
-import * as THREE from '/vendor/three.module.js';
-import { HALF } from '/shared/world.js';
+import * as THREE from '../vendor/three.module.js';
+import { HALF } from '../shared/world.js';
 
 export const COLORS = [0xff5d5d, 0x4da3ff, 0xffc93c, 0x5fd17a, 0xc77dff, 0xff8fc7, 0x3de0d0, 0xff9248,
   0xa3e635, 0x8d99ff, 0xf5f5f5, 0xb08968, 0x6ee7b7, 0xfca5a5, 0x93c5fd, 0xfde68a];

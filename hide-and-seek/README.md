@@ -45,20 +45,39 @@ scores carry over.
 
 ### Controls
 
-`WASD` move · `Shift` sprint · `C` crouch · `E` use / hide / search · `Click` or `F` tag ·
+Keyboard and mouse: `WASD` move · `Shift` sprint · `C` crouch · `E` use / hide / search · `Click` or `F` tag ·
 `Q` rock · `T` taunt · `Enter` chat · `Esc` menu
+
+Phone or tablet: drag the left side of the screen to move (push the stick to its edge to sprint), drag anywhere
+else to look, and use the on-screen **USE**, **TAG**, **CROUCH**, rock and taunt buttons. Landscape works best.
+
+## Three ways to play
+
+| Mode | Where the game runs | Who can join |
+| --- | --- | --- |
+| **Play online** on the Node server | `server.js` | Anyone who can reach the server, by room code or invite link |
+| **Play solo with bots** | In your own browser tab | Just you and five bots |
+| **Claude artifact** (`npm run build:artifact`) | The first tab to open a room code hosts the game | Signed-in people with access to the artifact who enter the same room code |
+
+In the artifact there is no server, so the hosting tab runs the rules and shares state through the artifact's
+realtime room. If the host closes or backgrounds their tab the game pauses or ends for everyone. To republish,
+run `npm run build:artifact` and publish `artifact/index.html` with `public/style.css`, `public/js/*`,
+`public/shared/*` and `node_modules/three/build/three.module.js` as its files (served as `style.css`, `js/`,
+`shared/` and `vendor/three.module.js`).
 
 ## Code map
 
 | File | What it does |
 | --- | --- |
-| `server.js` | HTTP + WebSocket server, rooms, rules, scoring, bot AI |
-| `shared/world.js` | The map (generated from a fixed seed), collision, line of sight, pathfinding — used by both sides |
-| `public/js/main.js` | Client: networking, input, movement, HUD |
+| `server.js` | HTTP + WebSocket server: one game room per code |
+| `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
+| `public/shared/world.js` | The map (generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/js/net.js` | The three connection modes above |
+| `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, characters, effects |
 | `public/js/audio.js` | Synthesised sound effects |
-| `test/smoke.js` | `npm test`: boots the server and plays a full round with bots |
+| `test/` | `npm test`: plays a full round on the server, and a hosted game through a fake realtime room |
 
-The server referees tags, hiding spots, coins, jail and rescues. Player movement is
+The game module referees tags, hiding spots, coins, jail and rescues. Player movement is
 client-side with a loose sanity check, so this is fine for playing with friends but is
 not hardened against cheating.
