@@ -156,6 +156,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 @media (hover: hover) and (pointer: fine) { .drive-l, .drive-r { display: none; } }
 @media (max-width: 720px) { .wanted { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); min-width: 0; } .exitcar { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); } }
 
+.placebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 8; padding: 10px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; font-weight: 800; font-size: 13px; max-width: calc(100% - 24px); border-color: var(--good); }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -218,6 +220,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
+    <button class="card" id="btnDecor" aria-label="Decorate" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h16"/><path d="M6 20v-7a6 6 0 0 1 12 0v7"/><path d="M12 7V3"/></svg>Decorate</button>
     <button class="card" id="btnLog" aria-label="Diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 3.5h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h6"/></svg>Diary</button>
   </div>
 </div>
@@ -226,6 +229,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 <div class="skip" id="skip" hidden><div><div class="what" id="skipWhat">Working</div><div class="clk" id="skipClk">9:00 AM</div><div class="bar"><i id="skipBar"></i></div></div></div>
 <div class="toasts" id="toasts"></div>
 <div class="fade" id="fade"></div>
+<div class="card placebar" id="placebar" hidden><span id="placeTxt"></span><div class="row"><button class="btn ghost" id="btnRot">Rotate (R)</button><button class="btn ghost" id="btnCancelPlace">Cancel (Esc)</button></div></div>
 <div class="card wanted" id="wanted" hidden><div class="stars" id="wStars"></div><div class="wtxt" id="wTxt">Lose the cops!</div><div class="bar"><i id="wBar"></i></div></div>
 <div id="driveUI" hidden>
   <div class="drive-l"><button class="card dbtn" data-k="left" aria-label="Steer left">&#9664;</button><button class="card dbtn" data-k="right" aria-label="Steer right">&#9654;</button></div>
@@ -291,17 +295,53 @@ const BUILDINGS = [
   { id: "pizza", name: "Pizza Palace", x: 20, z: 100, w: 14, d: 12, h: 6, color: "#f39c12", sign: "#b03a2e", face: "n", open: [11, 24] },
   { id: "beach", name: "Lakeside Beach", x: -20, z: 100, w: 0, d: 0, h: 0, color: "#f2d49b", sign: "#c98a2c", face: "n", kind: "zone" },
   { id: "gas", name: "Fuel Stop", x: 60, z: 108, w: 14, d: 8, h: 5, color: "#f4f4f4", sign: "#d7263d", face: "n" },
-  { id: "h2", name: "", x: -60, z: 100, w: 12, d: 10, h: 6, color: "#f7d6cf", sign: "#555", face: "n", kind: "decohouse" },
-  { id: "h3", name: "", x: 100, z: 100, w: 14, d: 10, h: 7, color: "#e3f7cf", sign: "#555", face: "n", kind: "decohouse" },
-  { id: "h4", name: "", x: -100, z: 100, w: 12, d: 12, h: 6, color: "#f7efcf", sign: "#555", face: "n", kind: "decohouse" },
-  { id: "h5", name: "", x: 100, z: -100, w: 12, d: 10, h: 6, color: "#d9cff7", sign: "#555", face: "s", kind: "decohouse" },
-  { id: "h6", name: "", x: -100, z: -100, w: 14, d: 10, h: 6, color: "#cff7ea", sign: "#555", face: "s", kind: "decohouse" },
+  { id: "h2", name: "Cozy Cottage", x: -60, z: 100, w: 12, d: 10, h: 6, color: "#f7d6cf", sign: "#8c4a3a", face: "n", kind: "decohouse", sale: true },
+  { id: "h3", name: "Garden Villa", x: 100, z: 100, w: 14, d: 10, h: 7, color: "#e3f7cf", sign: "#3f7a2a", face: "n", kind: "decohouse", sale: true },
+  { id: "h4", name: "Lakeview House", x: -100, z: 100, w: 12, d: 12, h: 6, color: "#f7efcf", sign: "#8a6a2a", face: "n", kind: "decohouse", sale: true },
+  { id: "h5", name: "Hilltop Home", x: 100, z: -100, w: 12, d: 10, h: 6, color: "#d9cff7", sign: "#5a3f8a", face: "s", kind: "decohouse", sale: true },
+  { id: "h6", name: "Big Family House", x: -100, z: -100, w: 14, d: 10, h: 6, color: "#cff7ea", sign: "#2a7a6a", face: "s", kind: "decohouse", sale: true },
   { id: "apts2", name: "", x: 20, z: -100, w: 16, d: 16, h: 30, color: "#a7b4c2", sign: "#555", face: "s", kind: "deco" },
   { id: "apts3", name: "", x: -20, z: -100, w: 18, d: 14, h: 22, color: "#c2a7a7", sign: "#555", face: "s", kind: "deco" },
   { id: "cardealer", name: "Speedy Motors", x: 60, z: -102, w: 24, d: 14, h: 9, color: "#e8eef5", sign: "#d7263d", face: "s", open: [9, 20] },
   { id: "apts5", name: "", x: -60, z: -100, w: 18, d: 16, h: 18, color: "#b9a98f", sign: "#555", face: "s", kind: "deco" },
 ];
-const isDeco = (b) => b.kind === "deco" || b.kind === "decohouse";
+const isDeco = (b) => b.kind === "deco" || (b.kind === "decohouse" && !b.sale);
+const HOUSES = {
+  h2: { price: 3000, W: 20, D: 14, desc: "A small, sweet starter home." },
+  h5: { price: 4500, W: 22, D: 15, desc: "Quiet street with a great view." },
+  h4: { price: 6000, W: 24, D: 16, desc: "Steps from Lakeside Beach." },
+  h3: { price: 8500, W: 26, D: 17, desc: "Lots of room and a big yard." },
+  h6: { price: 12000, W: 30, D: 19, desc: "The biggest house in town." },
+};
+const FURN_SHOP = {
+  bed:      { name: "Bed", price: 300, cozy: 2, acts: ["sleep", "nap"] },
+  sofa:     { name: "Sofa", price: 350, cozy: 3, acts: ["nap"] },
+  tv:       { name: "TV & couch", price: 500, cozy: 3, acts: ["tv", "games"] },
+  stove:    { name: "Stove", price: 250, cozy: 1, acts: ["cook", "practicecook", "coffee"] },
+  fridge:   { name: "Fridge", price: 200, cozy: 0, acts: [] },
+  sink:     { name: "Kitchen sink", price: 150, cozy: 0, acts: ["dishes"] },
+  shower:   { name: "Shower", price: 300, cozy: 1, acts: ["shower", "bath"] },
+  washer:   { name: "Washing machine", price: 200, cozy: 0, acts: ["laundry"] },
+  trash:    { name: "Trash can", price: 20, cozy: 0, acts: ["trash"] },
+  closet:   { name: "Closet", price: 120, cozy: 1, acts: ["cleanroom"] },
+  table:    { name: "Dining table", price: 180, cozy: 2, acts: [] },
+  desk:     { name: "Desk & computer", price: 220, cozy: 1, acts: ["write", "freelancehome"] },
+  books:    { name: "Bookshelf", price: 150, cozy: 2, acts: ["read"] },
+  easel:    { name: "Art easel", price: 100, cozy: 1, acts: ["paint", "guitar"] },
+  weights:  { name: "Weight bench", price: 250, cozy: 0, acts: ["homegym"] },
+  arcade:   { name: "Arcade machine", price: 600, cozy: 2, acts: ["arcadehome"] },
+  piano:    { name: "Piano", price: 900, cozy: 3, acts: ["piano"] },
+  aquarium: { name: "Fish tank", price: 450, cozy: 4, acts: ["fishwatch"] },
+  hottub:   { name: "Hot tub", price: 1200, cozy: 5, acts: ["hottub"] },
+  plant:    { name: "House plant", price: 40, cozy: 2, acts: ["garden"] },
+  flowers:  { name: "Flower stand", price: 60, cozy: 2, acts: [] },
+  lamp:     { name: "Floor lamp", price: 80, cozy: 2, acts: [] },
+  rug:      { name: "Rug", price: 90, cozy: 2, acts: [] },
+  painting: { name: "Painting", price: 120, cozy: 2, acts: [] },
+  statue:   { name: "Gold statue", price: 400, cozy: 3, acts: [] },
+};
+const WALL_COLORS = [0xf3e3c8, 0xdff0d8, 0xd6e6f5, 0xf7d6e0, 0xfff3c4, 0xe8e0f5, 0xffffff, 0x3a3f48];
+const FLOOR_COLORS = [0xc9a27a, 0x8a6a4a, 0xe8e2d6, 0x6b4a2f, 0x9aa5b1, 0x2d3340, 0xd9b98c, 0x7d3560];
 const BMAP = Object.fromEntries(BUILDINGS.map((b) => [b.id, b]));
 
 const CAREERS = {
@@ -559,6 +599,14 @@ const TODO_POOL = [
 
 const ACT_HOME = {};
 for (const bid in ACTS) for (const a of ACTS[bid]) ACT_HOME[a.id] = bid;
+const HOUSE_ACTS = ACTS.home.map((a) => (a.id === "homegym" || a.id === "guitar" ? Object.assign({}, a, { can: () => true }) : a)).concat([
+  { id: "arcadehome", name: "Play arcade games", mins: 60, fx: { fun: 25 } },
+  { id: "piano", name: "Play the piano", mins: 60, fx: { fun: 12 }, skill: { creativity: 3, charm: 1 } },
+  { id: "fishwatch", name: "Watch the fish", mins: 30, fx: { fun: 10, energy: 4 } },
+  { id: "hottub", name: "Soak in the hot tub", mins: 60, fx: { fun: 20, energy: 10, clean: 10 } },
+  { id: "freelancehome", name: "Freelance from home", mins: 120, fx: { energy: -10, fun: -5 }, note: "Pays Smarts x2", can: () => S.skills.smarts >= 15 || "Need Smarts 15", run: () => earn(S.skills.smarts * 2, "Freelance gig") },
+]);
+for (const id in HOUSES) ACTS[id] = HOUSE_ACTS;
 
 const GOALS = [
   { id: "week", text: "Survive your first week", test: () => day() >= 8 },
@@ -573,7 +621,9 @@ const GOALS = [
   { id: "sports", text: "Own the Lightning GT", test: () => S.carModel === "sports" },
   { id: "three", text: "Work 3 different careers", test: () => Object.keys(S.careersTried).length >= 3 },
   { id: "k10", text: "Have $10,000", test: () => S.money >= 10000 },
-  { id: "explorer", text: "Visit every building in town", test: () => Object.keys(S.visited || {}).length >= Object.keys(INTERIORS).length },
+  { id: "explorer", text: "Visit every building in town", test: () => Object.keys(S.visited || {}).filter((k) => !HOUSES[k]).length >= Object.keys(INTERIORS).filter((k) => !HOUSES[k]).length },
+  { id: "house", text: "Buy a house", test: () => Object.keys(S.houses || {}).length > 0 },
+  { id: "cozy", text: "Decorate a house to 30 coziness", test: () => Object.keys(S.houses || {}).some((k) => houseCozy(k) >= 30) },
   { id: "saver", text: "Save $5,000 in the bank", test: () => (S.savings || 0) >= 5000 },
   { id: "getaway", text: "Escape a police chase", test: () => (S.escapes || 0) >= 1 },
   { id: "top", text: "Reach the top of a career", test: () => S.career && S.rank === CAREERS[S.career].ranks.length - 1 },
@@ -588,7 +638,7 @@ const fresh = (look) => ({
   skills: { smarts: 0, fitness: 0, charm: 0, cooking: 0, creativity: 0 },
   career: null, rank: 0, daysAtRank: 0, warnings: 0, workedDay: -1, hiredDay: -1, promos: 0, careersTried: {},
   meals: 3, owned: {}, todos: [], log: [], goals: {}, over: false, earned: 0, debt: 0, rentMissed: 0,
-  perfectDays: 0, used: {}, rain: false, inside: null, savings: 0, visited: {}, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
+  perfectDays: 0, used: {}, rain: false, inside: null, savings: 0, visited: {}, houses: {}, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
   name: look.name, look,
 });
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -637,6 +687,7 @@ function decay(hrs, asleep) {
     S.fun = clamp(S.fun - 2 * hrs * dog); S.social = clamp(S.social - 1.2 * hrs * dog);
   }
   S.home = clamp(S.home - (owns("robovac") ? 0.5 : 1) * hrs);
+  if (typeof IN !== "undefined" && IN && S.houses && S.houses[IN.bid]) S.fun = clamp(S.fun + Math.min(4, houseCozy(IN.bid) * 0.12) * hrs);
 }
 
 function advance(mins, asleep = false) {
@@ -658,7 +709,8 @@ function endOfDay() {
   else if (missed.length) { S.fun = clamp(S.fun - 7 * missed.length); log(`You skipped ${missed.length} chore${missed.length > 1 ? "s" : ""} on Day ${d}. You feel guilty.`, "bad"); }
   if (S.career && missed.find((x) => x.id === "work") && S.hiredDay < d) addWarning("You didn't show up to work!");
   if (owns("dog") && missed.find((x) => x.id === "walkdog")) { S.home = clamp(S.home - 25); log("Nobody walked the dog, so it chewed up your shoes.", "bad"); }
-  if (d % 7 === 0) {
+  if (d % 7 === 0 && Object.keys(S.houses || {}).length) log("No rent this week. You own your house!", "good");
+  else if (d % 7 === 0) {
     if (S.money >= RENT) { S.money -= RENT; log(`Paid ${money(RENT)} rent.`); toast(`Rent paid: -${money(RENT)}`); }
     else {
       S.rentMissed++; S.debt += RENT;
@@ -718,7 +770,7 @@ function doSleep(passedOut) {
   const before = day();
   advance(mins, true);
   if (S.over) return;
-  const per = owns("bed") ? 13 : 10;
+  const per = (owns("bed") ? 13 : 10) + (IN && S.houses && S.houses[IN.bid] ? Math.min(5, houseCozy(IN.bid) * 0.12) : 0);
   S.energy = clamp(S.energy + (mins / 60) * per * (passedOut ? 0.6 : 1));
   if (mins < 360) log(`Only ${Math.round(mins / 60)} hours of sleep. Ugh.`, "bad");
   else if (!passedOut) log(`Slept ${Math.round(mins / 60)} hours. Good morning!`, "good");
@@ -983,7 +1035,7 @@ for (const b of BUILDINGS) {
       roof.position.y = b.h + 2.25; roof.castShadow = true; g.add(roof);
       box(1.2, 3, 1.2, 0x8d4a3a, b.w * 0.25, b.h + 3.2, 0, g);
       if (b.kind === "house") { box(0.25, 1.2, 0.25, 0x555555, -b.w / 2 + 1, 0.6, -b.d / 2 - 3, g); box(0.8, 0.55, 0.5, 0x2d6cdf, -b.w / 2 + 1, 1.4, -b.d / 2 - 3, g); }
-      else { const [fx, fz] = FACE[b.face]; box(fx ? 0.3 : 2.4, 3.4, fz ? 0.3 : 2.4, 0x6b4a2f, fx * (b.w / 2 + 0.05), 1.7, fz * (b.d / 2 + 0.05), g); }
+      else if (!b.sale) { const [fx, fz] = FACE[b.face]; box(fx ? 0.3 : 2.4, 3.4, fz ? 0.3 : 2.4, 0x6b4a2f, fx * (b.w / 2 + 0.05), 1.7, fz * (b.d / 2 + 0.05), g); }
     } else {
       box(b.w + 0.6, 0.6, b.d + 0.6, new THREE.Color(b.color).multiplyScalar(0.7).getHex(), 0, b.h + 0.3, 0, g);
     }
@@ -1091,6 +1143,22 @@ for (const b of BUILDINGS) {
     cyl(0.08, 0.08, 2.6, 0xdddddd, b.x - 12, 1.3, b.z - 3, 6); cyl(0.08, 0.08, 2.6, 0xdddddd, b.x - 12, 1.3, b.z + 3, 6); box(0.05, 0.9, 6, 0xffffff, b.x - 12, 2.1, b.z);
     const sc = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.4, 4), mat(0xe2c27a)); sc.position.set(b.x - 3, 0.7, b.z - 2); scene.add(sc); box(1.6, 0.7, 1.6, 0xe2c27a, b.x - 3, 0.35, b.z - 2);
     const pier = box(3, 0.3, 9, 0x8a5a33, b.x + 6, 0.35, b.z + 4.5); }
+}
+
+// For Sale signs
+for (const id in HOUSES) {
+  const b = BMAP[id], [fx, fz] = FACE[b.face], g = new THREE.Group();
+  const c = document.createElement("canvas"); c.width = 256; c.height = 160; const x = c.getContext("2d");
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 256, 160); x.strokeStyle = "#d7263d"; x.lineWidth = 10; x.strokeRect(5, 5, 246, 150);
+  x.fillStyle = "#d7263d"; x.textAlign = "center"; x.font = '900 46px "Arial Black", sans-serif'; x.fillText("FOR SALE", 128, 70);
+  x.fillStyle = "#222"; x.font = '900 38px "Arial Black", sans-serif'; x.fillText("$" + HOUSES[id].price.toLocaleString(), 128, 125);
+  const m = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c) });
+  box(0.15, 2.4, 0.15, 0x6b4a2f, 0, 1.2, 0, g); box(2.2, 0.1, 0.1, 0x6b4a2f, 0.9, 2.3, 0, g);
+  for (const ry of [0, Math.PI]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), m); pl.position.set(0.9, 1.6, ry ? -0.03 : 0.03); pl.rotation.y = ry; g.add(pl); }
+  const side = fz ? [1, 0] : [0, 1];
+  g.position.set(b.x + fx * (b.w / 2 + 3) + side[0] * 4, 0, b.z + fz * (b.d / 2 + 3) + side[1] * 4);
+  g.rotation.y = Math.atan2(fx, fz) + Math.PI / 2;
+  scene.add(g); b.saleSign = g;
 }
 
 // Fuel Stop forecourt and Speedy Motors lot
@@ -1480,6 +1548,7 @@ const INTERIORS = {
     ["Manager's office", "desk", 13.6, 1, -1, [], "career"],
   ], people: [[-8, 3.3], [-1, 1], [8, 4.6]] },
 };
+for (const id in HOUSES) INTERIORS[id] = { W: HOUSES[id].W, D: HOUSES[id].D, floor: 0xc9a27a, wall: 0xf3e3c8, rug: 0x2d6cdf, items: [] };
 
 function furn(type) {
   if (type.startsWith("show:")) {
@@ -1593,6 +1662,16 @@ function furn(type) {
     case "labbench": w = 3.2; d = 1.4; h = 2.6; B(3.2, 1.7, 1.4, 0xf4f4f4, 0, 0.85, 0); B(3.3, 0.1, 1.5, 0x222222, 0, 1.75, 0);
       [[-1.1, 0x48d597], [-0.6, 0x3ff0ff], [-0.1, 0xff3fa4]].forEach(([x, c]) => C(0.15, 0.2, 0.5, glowMat(c, 0.7), x, 2.05, 0, 10));
       B(0.4, 0.15, 0.5, 0x333333, 0.9, 1.88, 0); B(0.12, 0.6, 0.12, 0x333333, 0.9, 2.2, -0.1); C(0.08, 0.08, 0.4, 0x111111, 0.9, 2.55, 0.05, 8); break;
+    case "lamp": w = 0.9; d = 0.9; h = 3; C(0.35, 0.4, 0.1, 0x333333, 0, 0.05, 0, 12); C(0.05, 0.05, 2.4, 0x333333, 0, 1.25, 0, 6);
+      C(0.35, 0.5, 0.6, glowMat(0xfff1c4, 0.9), 0, 2.6, 0, 14); break;
+    case "rug": w = 3.6; d = 2.6; h = 0.2; solid = false; B(3.6, 0.04, 2.6, 0x9b5de5, 0, 0.02, 0); B(3.0, 0.045, 2.0, 0xffbe2e, 0, 0.025, 0); B(2.4, 0.05, 1.4, 0x9b5de5, 0, 0.03, 0); break;
+    case "aquarium": w = 2.6; d = 1; h = 2.4; B(2.6, 0.9, 1, 0x3e2a1e, 0, 0.45, 0); B(2.5, 1.2, 0.9, glassMat, 0, 1.5, 0);
+      B(2.4, 1.0, 0.8, new THREE.MeshStandardMaterial({ color: 0x2fa8e0, emissive: 0x1a6fb0, emissiveIntensity: 0.5, transparent: true, opacity: 0.6 }), 0, 1.45, 0);
+      [[-0.6, 1.6, 0xff7b39], [0.4, 1.3, 0xffbe2e], [0.8, 1.7, 0xff5c8a]].forEach(([x, y, c]) => B(0.3, 0.16, 0.08, glowMat(c, 0.6), x, y, 0.1)); break;
+    case "piano": w = 3; d = 2; h = 2.2; B(3, 1.2, 1.4, 0x111111, 0, 1.2, -0.3); B(3, 0.1, 0.5, 0xffffff, 0, 1.85, 0.6); B(3, 0.12, 0.2, 0x111111, 0, 1.9, 0.65);
+      for (const x of [-1.3, 1.3]) B(0.15, 1.0, 0.15, 0x111111, x, 0.5, -0.3); B(1.4, 0.5, 0.6, 0x222222, 0, 0.25, 0.9); break;
+    case "hottub": w = 3.6; d = 3.6; h = 1.2; C(1.8, 1.8, 1, 0x8a5a33, 0, 0.5, 0, 24);
+      { const wt = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshStandardMaterial({ color: 0x3fd0f0, emissive: 0x1a8fb0, emissiveIntensity: 0.6 })); wt.rotation.x = -Math.PI / 2; wt.position.y = 1.02; g.add(wt); } break;
     case "toolbox": w = 2.6; d = 1; h = 2.2; B(2.6, 2, 1, 0xd7263d, 0, 1, 0); for (let i = 0; i < 4; i++) B(2.4, 0.06, 0.05, 0x8c1d0e, 0, 0.45 + i * 0.45, 0.51);
       B(0.8, 0.5, 0.6, 0x555555, 0.7, 2.25, 0); B(0.5, 0.08, 0.08, 0xbfbfbf, -0.6, 2.05, 0.1); break;
     case "exitdoor": w = 4; d = 0.4; h = 4; solid = false;
@@ -1607,9 +1686,11 @@ function buildInterior(bid) {
   IN = { bid, W, D, g, cols: [], stations: [], pick: [], people: [], dance: [] };
   const { cols, stations, pick, people } = IN;
   const under = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), mat(0x0e121b, { roughness: 1 })); under.rotation.x = -Math.PI / 2; under.position.set(OX, -0.05, OZ); g.add(under);
-  const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat(spec.floor, { roughness: 0.6 })); fl.rotation.x = -Math.PI / 2; fl.position.set(OX, 0, OZ); fl.receiveShadow = true; g.add(fl); pick.push(fl);
+  const hs = HOUSES[bid] && S && S.houses ? S.houses[bid] : null;
+  const floorC = hs ? hs.floor : spec.floor, wallC = hs ? hs.wall : spec.wall;
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat(floorC, { roughness: 0.6 })); fl.rotation.x = -Math.PI / 2; fl.position.set(OX, 0, OZ); fl.receiveShadow = true; g.add(fl); pick.push(fl);
   const rug = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), mat(spec.rug, { roughness: 1 })); rug.rotation.x = -Math.PI / 2; rug.position.set(OX, 0.02, OZ + D / 2 - 2); rug.receiveShadow = true; g.add(rug);
-  const wm = mat(spec.wall), trim = new THREE.Color(spec.wall).multiplyScalar(0.72).getHex();
+  const wm = mat(wallC), trim = new THREE.Color(wallC).multiplyScalar(0.72).getHex();
   box(W + 0.8, 5, 0.4, wm, OX, 2.5, OZ - D / 2 - 0.2, g); box(W + 0.8, 0.35, 0.5, trim, OX, 5.1, OZ - D / 2 - 0.2, g);
   for (const s of [-1, 1]) {
     box(0.4, 5, D + 0.4, wm, OX + s * (W / 2 + 0.2), 2.5, OZ, g); box(0.5, 0.35, D + 0.4, trim, OX + s * (W / 2 + 0.2), 5.1, OZ, g);
@@ -1617,21 +1698,26 @@ function buildInterior(bid) {
   }
   for (const x of [-W / 4, W / 4]) box(3.2, 2, 0.1, glowMat(0xcfe8ff, 0.45), OX + x, 3, OZ - D / 2 + 0.02, g);
   inLights.forEach((L, i) => { L.position.set(OX + (i ? W / 4 : -W / 4), 7, OZ); L.intensity = 0.6; });
-  const items = spec.items.concat([["Leave", "exitdoor", 0, D / 2, 2, [], "exit"]]);
+  const base = hs ? hs.items.map((it) => { const f = FURN_SHOP[it.type]; return [f.acts.length ? f.name : null, it.type, it.x, it.z, it.r, f.acts]; }) : spec.items;
+  const items = base.concat([["Leave", "exitdoor", 0, D / 2, 2, [], "exit"]]);
   for (const [name, type, x, z, r, acts, sp] of items) {
     const f = furn(type); f.g.position.set(OX + x, 0, OZ + z); f.g.rotation.y = r * Math.PI / 2; g.add(f.g);
     const odd = Math.abs(r) % 2 === 1, hw = (odd ? f.d : f.w) / 2, hd = (odd ? f.w : f.d) / 2;
     if (f.solid) cols.push({ x: OX + x, z: OZ + z, hw: hw + 0.45, hd: hd + 0.45 });
     if (!name) continue;
     const fx = Math.round(Math.sin(r * Math.PI / 2)), fz = Math.round(Math.cos(r * Math.PI / 2)), dep = f.center ? 0 : f.d / 2 + 1.1;
-    const st = { n: sp === "exit" ? `Leave ${BMAP[bid].name}` : name, acts: (acts || []).slice(), sp, sx: OX + x + fx * dep, sz: OZ + z + fz * dep };
+    const st = { n: sp === "exit" ? `Leave ${BMAP[bid].name}` : name, acts: (acts || []).slice(), sp, sx: OX + x + fx * dep, sz: OZ + z + fz * dep, cx: OX + x, cz: OZ + z, reach: f.center ? 0 : Math.max(f.w, f.d) / 2 + 1.1 };
     if (sp !== "exit") { st.gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.45), beaconMat); st.gemY = f.h + 1.3; st.gem.position.set(OX + x, st.gemY, OZ + z); st.gem.visible = false; g.add(st.gem); }
     const idx = stations.length; stations.push(st);
     f.g.traverse((o) => { if (o.isMesh) { o.userData.station = idx; pick.push(o); } });
   }
   const assigned = new Set(stations.flatMap((s) => s.acts));
   const missing = ACTS[bid].map((a) => a.id).filter((id) => !assigned.has(id));
-  if (missing.length) (stations.find((s) => s.acts.length) || stations[0]).acts.push(...missing);
+  if (missing.length && !HOUSES[bid]) (stations.find((s) => s.acts.length) || stations[0]).acts.push(...missing);
+  // If furniture faces a wall, stand on whichever side is free
+  for (const st of stations) if (st.sp !== "exit" && blocked(st.sx, st.sz)) {
+    for (const [ax, az] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) { const x = st.cx + ax * st.reach, z = st.cz + az * st.reach; if (!blocked(x, z)) { st.sx = x; st.sz = z; break; } }
+  }
   (spec.people || []).forEach(([x, z, flag], i) => {
     const c = makeChar({ shirt: SHIRTS[(i * 5 + bid.length) % SHIRTS.length], skin: SKINS[(i * 3 + bid.length) % SKINS.length], hair: HAIRS[(i + bid.length) % HAIRS.length], pants: [0x2e3a59, 0x4a4a4a, 0x7a5c3a][i % 3] });
     c.position.set(OX + x, 0, OZ + z); g.add(c); people.push({ c, dance: flag === "d", talked: -1, chat: 0 });
@@ -1641,6 +1727,7 @@ function buildInterior(bid) {
 }
 function destroyInterior() {
   if (!IN) return;
+  if (typeof placing !== "undefined" && placing && !placing.keep) cancelPlacing();
   scene.remove(IN.g);
   IN.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
   for (const L of inLights) L.intensity = 0;
@@ -1651,7 +1738,107 @@ function refreshInteriorGems() {
   const pend = new Set(S.todos.filter((t) => !t.done).map((t) => t.id));
   for (const st of IN.stations) if (st.gem) st.gem.visible = st.acts.some((a) => pend.has(a)) || (st.sp === "career" && pend.has("work") && S.career === IN.bid);
 }
-function canEnter(bid) { return bid === "home" || isOpen(BMAP[bid]) || S.career === bid; }
+function canEnter(bid) { if (HOUSES[bid]) return !!(S.houses && S.houses[bid]); return bid === "home" || isOpen(BMAP[bid]) || S.career === bid; }
+function houseCozy(bid) { const h = S && S.houses && S.houses[bid]; return h ? h.items.reduce((t, it) => t + (FURN_SHOP[it.type] ? FURN_SHOP[it.type].cozy : 0), 0) : 0; }
+function ownsHouse() { return Object.keys(S.houses || {}).length > 0; }
+function refreshSaleSigns() { for (const id in HOUSES) { const b = BMAP[id]; if (b.saleSign) b.saleSign.visible = !(S && S.houses && S.houses[id]); } }
+function buyHouse(bid) {
+  const H = HOUSES[bid]; if (S.houses[bid] || S.money < H.price) return;
+  S.money -= H.price;
+  S.houses[bid] = { items: [{ type: "bed", x: -H.W / 2 + 2, z: -H.D / 2 + 2.6, r: 0 }, { type: "plant", x: H.W / 2 - 1.2, z: -H.D / 2 + 1.2, r: 0 }], wall: 0xf3e3c8, floor: 0xc9a27a };
+  log(`You bought ${BMAP[bid].name} for ${money(H.price)}!`, "good");
+  refreshSaleSigns(); closeSheet(); evalGoals(); save(); renderHUD(true);
+  showModal(`<h3>You own a house!</h3><p><b>${BMAP[bid].name}</b> is yours. You'll never pay rent again.</p><p>It comes with a bed and a plant. Go inside and press <b>Decorate</b> to buy furniture and make it cozy.</p><div class="row"><button class="big" data-close>Let's go home</button></div>`);
+}
+function houseSaleSheet(bid) {
+  return () => {
+    const b = BMAP[bid], H = HOUSES[bid];
+    return header(b.name, "For sale", b.color) + `<div class="sheet-b"><div class="sec"><div class="career">
+      <div><b>${money(H.price)}</b> · ${H.W} × ${H.D} rooms worth of space</div>
+      <div class="req">${H.desc} It comes with a bed and a plant, and you can decorate it however you like.</div>
+      <div class="req ok">Owning any house means no more rent.</div>
+      <div><button class="btn" data-buyhouse="${bid}" ${S.money < H.price ? "disabled" : ""}>${S.money < H.price ? `You need ${money(H.price - S.money)} more` : "Buy this house"}</button></div>
+    </div></div></div>`;
+  };
+}
+
+// ---------------- decorating
+let placing = null;
+const ghostOK = new THREE.MeshBasicMaterial({ color: 0x48d597, transparent: true, opacity: 0.55, depthWrite: false });
+const ghostBad = new THREE.MeshBasicMaterial({ color: 0xff5c6c, transparent: true, opacity: 0.55, depthWrite: false });
+const furnDims = {};
+function furnDim(type) { if (!furnDims[type]) { const f = furn(type); furnDims[type] = { w: f.w, d: f.d, solid: f.solid }; f.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); } return furnDims[type]; }
+function footprint(type, r) { const d = furnDim(type), odd = r % 2 === 1; return { hw: (odd ? d.d : d.w) / 2, hd: (odd ? d.w : d.d) / 2, solid: d.solid }; }
+function placeOK(type, x, z, r, skip) {
+  const f = footprint(type, r), W = IN.W, D = IN.D;
+  if (Math.abs(x) + f.hw > W / 2 - 0.15 || z - f.hd < -D / 2 + 0.15 || z + f.hd > D / 2 - 0.15) return false;
+  if (f.solid && Math.abs(x) < 2.6 + f.hw && z + f.hd > D / 2 - 3.6) return false;
+  if (!f.solid) return true;
+  const items = S.houses[IN.bid].items;
+  for (let i = 0; i < items.length; i++) {
+    if (i === skip) continue;
+    const o = footprint(items[i].type, items[i].r); if (!o.solid) continue;
+    if (Math.abs(items[i].x - x) < f.hw + o.hw + 0.1 && Math.abs(items[i].z - z) < f.hd + o.hd + 0.1) return false;
+  }
+  return true;
+}
+function startPlacing(type, moveIdx) {
+  closeSheet(); cancelPlacing();
+  const g = furn(type).g; g.traverse((o) => { if (o.isMesh) { o.material = ghostOK; o.castShadow = false; } }); scene.add(g);
+  const it = moveIdx !== undefined ? S.houses[IN.bid].items[moveIdx] : null;
+  placing = { type, g, r: it ? it.r : 0, x: it ? it.x : 0, z: it ? it.z : 0, moveIdx, hovered: false };
+  updateGhost();
+  $("placebar").hidden = false;
+  $("placeTxt").innerHTML = `${moveIdx !== undefined ? "Moving" : "Placing"} <b>${FURN_SHOP[type].name}</b>${moveIdx !== undefined ? "" : ` (${money(FURN_SHOP[type].price)})`} · click the floor to put it down`;
+}
+function updateGhost() {
+  if (!placing) return;
+  const ok = placeOK(placing.type, placing.x, placing.z, placing.r, placing.moveIdx);
+  placing.ok = ok;
+  placing.g.position.set(OX + placing.x, 0.02, OZ + placing.z); placing.g.rotation.y = placing.r * Math.PI / 2;
+  placing.g.traverse((o) => { if (o.isMesh) o.material = ok ? ghostOK : ghostBad; });
+}
+function cancelPlacing() {
+  if (!placing) return;
+  scene.remove(placing.g); placing.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  placing = null; $("placebar").hidden = true;
+}
+function rotatePlacing() { if (!placing) return; placing.r = (placing.r + 1) % 4; updateGhost(); }
+function floorPoint(cx, cy) {
+  ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
+  const t = -ray.ray.origin.y / ray.ray.direction.y; if (!(t > 0)) return null;
+  return { x: Math.round((ray.ray.origin.x + ray.ray.direction.x * t - OX) * 2) / 2, z: Math.round((ray.ray.origin.z + ray.ray.direction.z * t - OZ) * 2) / 2 };
+}
+function hoverPlace(cx, cy) { const p = floorPoint(cx, cy); if (!p) return; placing.x = p.x; placing.z = p.z; placing.hovered = true; updateGhost(); }
+function tapPlace(cx, cy) {
+  const p = floorPoint(cx, cy); if (!p) return;
+  if (!placing.hovered && Math.hypot(p.x - placing.x, p.z - placing.z) > 0.8) { placing.x = p.x; placing.z = p.z; updateGhost(); toast("Tap the same spot again to place it here"); return; }
+  placing.x = p.x; placing.z = p.z; updateGhost();
+  if (!placing.ok) { toast("It doesn't fit there", "bad"); return; }
+  const h = S.houses[IN.bid], f = FURN_SHOP[placing.type];
+  if (placing.moveIdx !== undefined) { const it = h.items[placing.moveIdx]; it.x = placing.x; it.z = placing.z; it.r = placing.r; }
+  else { if (S.money < f.price) { toast(`Need ${money(f.price)}`, "bad"); return; } S.money -= f.price; h.items.push({ type: placing.type, x: placing.x, z: placing.z, r: placing.r }); toast(`Placed: ${f.name}${f.cozy ? ` · +${f.cozy} coziness` : ""}`, "good"); }
+  cancelPlacing(); rebuildHouse(); evalGoals(); save(); renderHUD(true);
+}
+function rebuildHouse() {
+  const px = player.position.x, pz = player.position.z;
+  buildInterior(IN.bid);
+  if (!blocked(px, pz)) player.position.set(px, 0, pz); else player.position.set(IN.spawn.x, 0, IN.spawn.z);
+}
+function swatchRow(list, attr, cur) { return `<div class="sw">${list.map((c) => `<button style="background:#${new THREE.Color(c).getHexString()}" ${attr}="${c}" aria-label="Color" aria-pressed="${cur === c}" ${S.money < 50 ? "disabled" : ""}></button>`).join("")}</div>`; }
+function decorSheet() {
+  const bid = IN.bid, h = S.houses[bid];
+  return header("Decorate", `${BMAP[bid].name} · Coziness ${houseCozy(bid)} · ${money(S.money)}`, "#9b5de5") + `<div class="sheet-b">
+    <div class="sec"><h3>Wall color · $50</h3>${swatchRow(WALL_COLORS, "data-wall", h.wall)}</div>
+    <div class="sec"><h3>Floor color · $50</h3>${swatchRow(FLOOR_COLORS, "data-floor", h.floor)}</div>
+    <div class="sec"><h3>Buy furniture</h3><div class="grid">${Object.entries(FURN_SHOP).map(([k, f]) => {
+      const uses = f.acts.map((id) => (HOUSE_ACTS.find((a) => a.id === id) || {}).name).filter(Boolean);
+      return `<button class="act" data-place="${k}" ${S.money < f.price ? "disabled" : ""}><span class="t">${f.name}</span><span class="m">${money(f.price)}${f.cozy ? ` · +${f.cozy} coziness` : ""}</span>${uses.length ? `<span class="fx">${uses.join(" · ")}</span>` : `<span class="m">Decoration</span>`}</button>`;
+    }).join("")}</div></div>
+    <div class="sec"><h3>Your furniture</h3><div style="display:flex;flex-direction:column;gap:6px">${h.items.map((it, i) => `<div class="jobrow"><div><b>${FURN_SHOP[it.type].name}</b></div><div class="row"><button class="btn ghost" data-move="${i}">Move</button><button class="btn ghost" data-sell="${i}">Sell +${money(Math.round(FURN_SHOP[it.type].price / 2))}</button></div></div>`).join("") || `<p class="req">Nothing here yet.</p>`}</div></div>
+  </div>`;
+}
+function openDecor() { if (IN && S.houses && S.houses[IN.bid]) { cancelPlacing(); openSheet(decorSheet); } }
 function fade(fn) {
   busy = true; const el = document.getElementById("fade"); el.classList.add("on");
   setTimeout(() => { fn(); el.classList.remove("on"); busy = false; }, 260);
@@ -2028,6 +2215,8 @@ addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (state !== "play") return;
+  if (k === "escape" && placing) { cancelPlacing(); return; }
+  if (k === "r" && placing) { rotatePlacing(); return; }
   if (k === "escape") { if (!$("modalWrap").hidden) closeModal(); else closeSheet(); return; }
   if (sheetOpen() || busy || !$("modalWrap").hidden) return;
   if (k === "e" || k === "enter") interact();
@@ -2047,6 +2236,7 @@ cv.addEventListener("pointerdown", (e) => {
   if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
   if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); drag = null; }
 });
+cv.addEventListener("pointermove", (e) => { if (placing && e.pointerType === "mouse" && pointers.size === 0) hoverPlace(e.clientX, e.clientY); });
 cv.addEventListener("pointermove", (e) => {
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2069,6 +2259,7 @@ cv.addEventListener("wheel", (e) => { e.preventDefault(); cam.dist = clamp(cam.d
 
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function tap(cx, cy) {
+  if (placing) { tapPlace(cx, cy); return; }
   ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   if (IN) {
@@ -2325,7 +2516,8 @@ function renderHUD(force) {
   $("hMoney").textContent = money(S.money);
   $("hWeather").textContent = IN ? "Indoors" : S.rain ? "Rainy" : hour() >= 20 || hour() < 6 ? "Clear night" : "Sunny";
   const dr = 7 - ((day() - 1) % 7), owe = RENT + S.debt;
-  $("hRent").innerHTML = `<span>Rent</span><b>${money(owe)} ${dr === 1 ? "due tonight" : `in ${dr} days`}</b>`;
+  $("hRent").innerHTML = ownsHouse() ? `<span>Rent</span><b style="color:var(--good)">None · you own a house</b>` : `<span>Rent</span><b>${money(owe)} ${dr === 1 ? "due tonight" : `in ${dr} days`}</b>`;
+  $("btnDecor").hidden = !(IN && S.houses && S.houses[IN.bid]) || !!drive;
   $("hRent").classList.toggle("due", dr <= 2 && S.money < owe);
   for (const [k] of NEEDS) {
     const v = Math.round(S[k]), e = needEls[k];
@@ -2346,6 +2538,7 @@ function renderHUD(force) {
   let p = "";
   if (!sheetOpen() && !busy && $("modalWrap").hidden) {
     if (IN && nearStation) p = `<kbd>E</kbd>${nearStation.sp === "exit" ? nearStation.n : "Use " + nearStation.n}`;
+    else if (nearDoor && HOUSES[nearDoor.b.id] && !(S.houses && S.houses[nearDoor.b.id])) p = `<kbd>E</kbd>For sale: ${nearDoor.b.name} (${money(HOUSES[nearDoor.b.id].price)})`;
     else if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
     else if (nearVehicle && !IN) p = `<kbd>F</kbd>${vehicleLabel(nearVehicle)}`;
     else if (nearNpc) p = `<kbd>E</kbd>Say hi`;
@@ -2384,6 +2577,7 @@ function drawMinimap(now) {
     else { mx.fillStyle = b.color; mx.fillRect(X(b.x - b.w / 2), Z(b.z - b.d / 2), b.w * sc, b.d * sc); }
     if (beacons[b.id] && beacons[b.id].g.visible) { const r = 6 + Math.sin(now / 250) * 1.5; mx.strokeStyle = "#ffbe2e"; mx.lineWidth = 3; mx.beginPath(); mx.arc(X(b.x), Z(b.z), r, 0, Math.PI * 2); mx.stroke(); }
   }
+  for (const id in HOUSES) { const b = BMAP[id], own = S.houses && S.houses[id]; mx.fillStyle = own ? "#ffbe2e" : "#1b1b1b"; mx.font = "900 14px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.fillText(own ? "★" : "$", X(b.x), Z(b.z) + 1); }
   const hb = BMAP.home; mx.fillStyle = "#1b1b1b"; mx.font = "900 16px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.fillText("H", X(hb.x), Z(hb.z) + 1);
   for (const v of vehicles) if (v.kind === "own" && v !== drive) { mx.fillStyle = "#ffbe2e"; mx.fillRect(X(v.car.position.x) - 3, Z(v.car.position.z) - 3, 6, 6); }
   const blink = Math.floor(now / 180) % 2;
@@ -2433,6 +2627,13 @@ $("sheetWrap").addEventListener("click", (e) => {
   const bc = e.target.closest("[data-buycar]"); if (bc) { buyCar(bc.dataset.buycar); return; }
   if (e.target.closest("[data-repair]")) { repairCar(); return; }
   const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
+  const bh = e.target.closest("[data-buyhouse]"); if (bh) { buyHouse(bh.dataset.buyhouse); return; }
+  const pl = e.target.closest("[data-place]"); if (pl) { startPlacing(pl.dataset.place); return; }
+  const mv = e.target.closest("[data-move]"); if (mv) { startPlacing(S.houses[IN.bid].items[Number(mv.dataset.move)].type, Number(mv.dataset.move)); return; }
+  const sl = e.target.closest("[data-sell]");
+  if (sl) { const h = S.houses[IN.bid], it = h.items.splice(Number(sl.dataset.sell), 1)[0]; S.money += Math.round(FURN_SHOP[it.type].price / 2); toast(`Sold: ${FURN_SHOP[it.type].name}`); rebuildHouse(); save(); renderSheet(); renderHUD(true); return; }
+  const wc = e.target.closest("[data-wall]"); if (wc && S.money >= 50) { S.money -= 50; S.houses[IN.bid].wall = Number(wc.dataset.wall); rebuildHouse(); save(); renderSheet(); renderHUD(true); return; }
+  const fc = e.target.closest("[data-floor]"); if (fc && S.money >= 50) { S.money -= 50; S.houses[IN.bid].floor = Number(fc.dataset.floor); rebuildHouse(); save(); renderSheet(); renderHUD(true); return; }
   const tx = e.target.closest("[data-taxi]");
   if (tx) {
     const bid = tx.dataset.taxi; if (S.money < 12) return toast("Need $12", "bad");
@@ -2511,7 +2712,10 @@ function stationSheet(bid, st) {
     return html + `</div>`;
   };
 }
-function openBuilding(bid) { if (INTERIORS[bid]) enterBuilding(bid); else openSheet(buildingSheet(bid)); }
+function openBuilding(bid) {
+  if (HOUSES[bid] && !(S.houses && S.houses[bid])) { openSheet(houseSaleSheet(bid)); return; }
+  if (INTERIORS[bid]) enterBuilding(bid); else openSheet(buildingSheet(bid));
+}
 function openPhone() {
   openSheet(() => header("Phone", `${S.name}'s phone · ${money(S.money)} in the bank`, "#2d6cdf") + `<div class="sheet-b">
     <div class="sec"><h3>Apps</h3><div class="grid">${ACTS.phone.map((a) => actCard(a, "phone")).join("")}
@@ -2519,7 +2723,7 @@ function openPhone() {
     ${S.career ? `<button class="act" data-quit><span class="t">Quit your job</span><span class="m">${CAREERS[S.career].ranks[S.rank][0]} at ${BMAP[S.career].name}</span></button>` : ""}</div></div></div>`);
 }
 function taxiSheet() {
-  return header("Taxi", "Where to? Every ride costs $12.", "#ffbe2e") + `<div class="sheet-b"><div class="grid">${BUILDINGS.filter((b) => !isDeco(b)).map((b) => `<button class="act" data-taxi="${b.id}" ${S.money < 12 ? "disabled" : ""}><span class="t">${b.name}</span><span class="m">${b.kind === "zone" || b.kind === "house" ? "Always open" : openText(b)}</span></button>`).join("")}</div><div><button class="btn ghost" data-phone>Back to phone</button></div></div>`;
+  return header("Taxi", "Where to? Every ride costs $12.", "#ffbe2e") + `<div class="sheet-b"><div class="grid">${BUILDINGS.filter((b) => !isDeco(b)).map((b) => `<button class="act" data-taxi="${b.id}" ${S.money < 12 ? "disabled" : ""}><span class="t">${b.name}</span><span class="m">${HOUSES[b.id] ? (S.houses && S.houses[b.id] ? "Your house" : `For sale · ${money(HOUSES[b.id].price)}`) : b.kind === "zone" || b.kind === "house" ? "Always open" : openText(b)}</span></button>`).join("")}</div><div><button class="btn ghost" data-phone>Back to phone</button></div></div>`;
 }
 function openMe() {
   openSheet(() => {
@@ -2537,6 +2741,9 @@ function openLog() {
 }
 $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
+$("btnDecor").addEventListener("click", () => { if (!busy) openDecor(); });
+$("btnRot").addEventListener("click", rotatePlacing);
+$("btnCancelPlace").addEventListener("click", cancelPlacing);
 $("btnLog").addEventListener("click", () => { if (!busy) openLog(); });
 
 function showModal(html) { $("modal").innerHTML = html; $("modalWrap").hidden = false; setTimeout(() => { const b = $("modal").querySelector("button"); if (b) b.focus(); }, 30); }
@@ -2575,6 +2782,7 @@ function begin(data) {
   if (inside && INTERIORS[inside]) teleport(inside, true);
   if (drive) { setDriver(drive.car, false); drive = null; }
   clearWanted(); removeOwnCar(); spawnOwnCar(); updateDriveUI();
+  S.houses = S.houses || {}; refreshSaleSigns(); cancelPlacing();
   cam.x = player.position.x; cam.z = player.position.z;
   state = "play"; $("title").hidden = true; $("hud").hidden = false;
   refreshBeacons(); renderHUD(true); save();
