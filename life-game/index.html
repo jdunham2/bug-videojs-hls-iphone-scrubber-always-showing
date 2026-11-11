@@ -158,6 +158,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 
 .placebar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 8; padding: 10px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; font-weight: 800; font-size: 13px; max-width: calc(100% - 24px); border-color: var(--good); }
 
+.badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--good); color: #052; font-size: 11px; font-weight: 900; display: grid; place-items: center; }
+@media (max-width: 720px) { .dock { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); } }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -216,10 +219,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
     </div>
   </div>
   <button class="prompt" id="prompt" hidden></button>
-  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
+    <button class="card" id="btnFriends" aria-label="Friends" hidden style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="8.5" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M2.5 20c.8-3.4 3.2-5.2 6-5.2s5.2 1.8 6 5.2"/><path d="M15 14.6c2.6-.3 5 1.2 6 4.4"/></svg>Friends<span class="badge" id="friendsCount" hidden>0</span></button>
     <button class="card" id="btnPet" aria-label="Pet" hidden><svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="4.5" ry="3.8"/><circle cx="6.5" cy="10.5" r="2"/><circle cx="17.5" cy="10.5" r="2"/><circle cx="9.5" cy="6.5" r="2"/><circle cx="14.5" cy="6.5" r="2"/></svg>Pet</button>
     <button class="card" id="btnDecor" aria-label="Decorate" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h16"/><path d="M6 20v-7a6 6 0 0 1 12 0v7"/><path d="M12 7V3"/></svg>Decorate</button>
     <button class="card" id="btnLog" aria-label="Diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 3.5h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h6"/></svg>Diary</button>
@@ -696,6 +700,7 @@ function decay(hrs, asleep) {
     S.fun = clamp(S.fun - 2 * hrs * dog); S.social = clamp(S.social - 1.2 * hrs * dog);
   }
   S.home = clamp(S.home - (owns("robovac") ? 0.5 : 1) * hrs);
+  if (!asleep && typeof friendsNearby === "function" && friendsNearby() > 0) S.social = clamp(S.social + 3 * hrs);
   if (typeof IN !== "undefined" && IN && S.houses && S.houses[IN.bid]) S.fun = clamp(S.fun + Math.min(4, houseCozy(IN.bid) * 0.12) * hrs);
 }
 
@@ -1273,7 +1278,7 @@ function makeCar(color, driverLook) {
   box(0.45, 0.3, 0.1, hl, -0.7, 1.0, 2.21, g); box(0.45, 0.3, 0.1, hl, 0.7, 1.0, 2.21, g);
   const tl = mat(0xff3030, { emissive: 0xaa0000, emissiveIntensity: 0.5 });
   box(0.45, 0.25, 0.1, tl, -0.7, 1.0, -2.21, g); box(0.45, 0.25, 0.1, tl, 0.7, 1.0, -2.21, g);
-  g.userData = { hl, driver, dShirt, dSkin, dHair };
+  g.userData = { hl, driver, dShirt, dSkin, dHair, color };
   return g;
 }
 
@@ -2210,7 +2215,7 @@ function updateDriveUI() {
   document.querySelector(".dock").hidden = d;
   document.getElementById("help").innerHTML = d
     ? "<b>W/S</b> gas &amp; brake · <b>A/D</b> steer · <b>Space</b> handbrake · <b>F</b> get out"
-    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
+    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
 }
 
 
@@ -2484,6 +2489,264 @@ function petSheet() {
 }
 function openPet() { if (hasPet() && !drive) openSheet(petSheet); }
 
+
+// ============================================================ MULTIPLAYER (room presence)
+// Every player shares one presence object (where they are, how they look, chat, emotes).
+// Nothing here is trusted: everything read from other players is validated and escaped.
+let room = null, myPeer = null, mpLast = "", mpAcc = 0, mpLastPos = null, mpMoving = false;
+const remotes = new Map();
+const chatLog = [];
+let myMsg = null, myEmote = null, myHi = null, nearFriend = null, playerEmote = null, playerBubble = null;
+const EMOTES = [["wave", "Wave"], ["dance", "Dance"], ["cheer", "Cheer"]];
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const cleanText = (t, n) => (typeof t === "string" ? t.replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁯]/g, "").trim().slice(0, n) : "");
+const num = (v, lo, hi, d = 0) => (typeof v === "number" && isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+(async () => {
+  try {
+    if (!window.claude || typeof window.claude.use !== "function") return;
+    const r = await window.claude.use("room");
+    if (!r) return;
+    room = r;
+    room.onPeers(() => refreshFriendsUI(), () => { room = null; refreshFriendsUI(); });
+    refreshFriendsUI();
+  } catch (e) { room = null; }
+})();
+function cleanPresence(p) {
+  if (!p || p.v !== 1) return null;
+  const look = p.look || {};
+  const out = {
+    name: cleanText(p.name, 16) || "Player",
+    look: { shirt: num(look.s, 0, 0xffffff, 0x2d6cdf), hair: num(look.h, 0, 0xffffff, 0x2b1b10), skin: num(look.k, 0, 0xffffff, 0xe0ac86) },
+    x: num(p.x, -4000, 4000), z: num(p.z, -4000, 4000), r: num(p.r, -100, 100), mv: !!p.mv,
+    loc: p.loc === "out" || p.loc === "menu" || (typeof p.loc === "string" && INTERIORS[p.loc]) ? p.loc : "menu",
+    car: p.car && CAR_MODELS[p.car.m] ? { m: p.car.m, c: num(p.car.c, 0, 0xffffff, 0xffbe2e) } : null,
+    pet: p.pet && PET_TYPES[p.pet.t] ? { t: p.pet.t, c: num(p.pet.c, 0, 0xffffff, 0xb5651d), n: cleanText(p.pet.n, 14) } : null,
+    msg: p.msg && typeof p.msg.at === "number" ? { t: cleanText(p.msg.t, 120), at: p.msg.at } : null,
+    emo: p.emo && typeof p.emo.at === "number" && EMOTES.some((e) => e[0] === p.emo.k) ? { k: p.emo.k, at: p.emo.at } : null,
+    hi: p.hi && typeof p.hi.at === "number" && typeof p.hi.to === "string" ? { to: p.hi.to, at: p.hi.at } : null,
+    star: Math.round(num(p.star, 0, 5)),
+  };
+  return out;
+}
+function textSprite(text, opts = {}) {
+  const c = document.createElement("canvas"), x = c.getContext("2d");
+  const W = opts.w || 512, H = opts.h || 112; c.width = W; c.height = H;
+  x.font = `800 ${opts.size || 40}px Nunito, "Segoe UI", sans-serif`;
+  const lines = [];
+  if (opts.wrap) { let line = ""; for (const w of text.split(" ")) { const t = line ? line + " " + w : w; if (x.measureText(t).width > W - 40 && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); }
+  else lines.push(text);
+  const shown = lines.slice(0, 3), lh = (opts.size || 40) * 1.15, bh = shown.length * lh + 22;
+  const bw = Math.min(W - 4, Math.max(...shown.map((l) => x.measureText(l).width)) + 36);
+  x.fillStyle = opts.bg || "rgba(13,19,33,.82)";
+  const rx = (W - bw) / 2, ry = (H - bh) / 2, rr = 18;
+  x.beginPath(); x.moveTo(rx + rr, ry); x.arcTo(rx + bw, ry, rx + bw, ry + bh, rr); x.arcTo(rx + bw, ry + bh, rx, ry + bh, rr); x.arcTo(rx, ry + bh, rx, ry, rr); x.arcTo(rx, ry, rx + bw, ry, rr); x.fill();
+  x.fillStyle = opts.fg || "#ffffff"; x.textAlign = "center"; x.textBaseline = "middle";
+  shown.forEach((l, i) => x.fillText(l, W / 2, ry + 11 + lh * (i + 0.5)));
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sp.scale.set((W / H) * (opts.scale || 0.8), opts.scale || 0.8, 1);
+  return sp;
+}
+function disposeSprite(sp) { if (!sp) return; if (sp.parent) sp.parent.remove(sp); sp.material.map.dispose(); sp.material.dispose(); }
+function makeRemote(peer, pr) {
+  const g = new THREE.Group(); scene.add(g);
+  const R = { peer, g, name: pr.name, x: pr.x, z: pr.z, r: pr.r, msgAt: pr.msg ? pr.msg.at : 0, emoAt: pr.emo ? pr.emo.at : 0, hiAt: pr.hi ? pr.hi.at : 0, emote: null, bubbleT: 0, loc: pr.loc, pr };
+  buildRemoteChar(R, pr);
+  if (pr.loc !== "menu") toast(`${pr.name} joined the town!`, "gold");
+  return R;
+}
+function buildRemoteChar(R, pr) {
+  if (R.char) { R.g.remove(R.char); R.char.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+  R.char = makeChar({ shirt: pr.look.shirt, hair: pr.look.hair, skin: pr.look.skin }); R.g.add(R.char);
+  R.lookKey = JSON.stringify(pr.look);
+  setRemoteTag(R, pr);
+}
+function setRemoteTag(R, pr) {
+  const label = pr.name + (pr.star ? " " + "★".repeat(pr.star) : "");
+  if (R.tagLabel === label) return;
+  disposeSprite(R.tag); R.tag = textSprite(label, { size: 44, fg: pr.star ? "#ffbe2e" : "#ffffff" }); R.tag.position.y = 4.4; R.g.add(R.tag); R.tagLabel = label;
+}
+function disposeRemote(R) {
+  disposeSprite(R.tag); disposeSprite(R.bubble);
+  if (R.car) scene.remove(R.car); if (R.pet) scene.remove(R.pet);
+  scene.remove(R.g);
+  R.g.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+}
+function clearRemotes() { for (const R of remotes.values()) disposeRemote(R); remotes.clear(); nearFriend = null; }
+function applyEmote(char, em, dt, now) {
+  if (!em) return false;
+  em.t -= dt;
+  const u = char.userData;
+  if (em.k === "wave") { u.armR.rotation.x = 0; u.armR.rotation.z = 2.6 + Math.sin(now / 90) * 0.35; }
+  if (em.k === "cheer") { u.armR.rotation.z = 2.8; u.armL.rotation.z = -2.8; char.position.y = Math.abs(Math.sin(now / 130)) * 0.7; }
+  if (em.k === "dance") { char.rotation.y += dt * 7; char.position.y = Math.abs(Math.sin(now / 110)) * 0.4; u.armR.rotation.z = 1.6 + Math.sin(now / 100); u.armL.rotation.z = -1.6 - Math.sin(now / 100); }
+  if (em.t <= 0) { u.armR.rotation.z = 0; u.armL.rotation.z = 0; char.position.y = 0; char.rotation.y = 0; return false; }
+  return true;
+}
+function showBubble(holder, text, y) {
+  disposeSprite(holder.bubble);
+  holder.bubble = textSprite(text, { wrap: true, size: 34, w: 640, h: 170, bg: "rgba(255,255,255,.95)", fg: "#1b2333", scale: 1.25 });
+  holder.bubbleT = 7;
+  return holder.bubble;
+}
+function mpTick(dt) {
+  if (!room || state !== "play" || !S || !player) return;
+  mpAcc += dt; if (mpAcc < 0.1) return;
+  const pos = player.position, moved = mpLastPos ? Math.hypot(pos.x - mpLastPos.x, pos.z - mpLastPos.z) : 0;
+  mpMoving = moved > 0.03; mpLastPos = { x: pos.x, z: pos.z }; mpAcc = 0;
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const pres = {
+    v: 1, name: S.name.slice(0, 16), look: { s: S.look.shirt, h: S.look.hair, k: S.look.skin },
+    x: r2(pos.x), z: r2(pos.z), r: r2(player.rotation.y), mv: mpMoving ? 1 : 0,
+    loc: IN ? IN.bid : "out",
+    car: drive ? { m: drive.model || "sedan", c: drive.car.userData.color !== undefined ? drive.car.userData.color : 0xffbe2e } : null,
+    pet: S.pet ? { t: S.pet.type, c: S.pet.color, n: S.pet.name.slice(0, 14) } : null,
+    msg: myMsg, emo: myEmote, hi: myHi, star: wanted,
+  };
+  const js = JSON.stringify(pres); if (js === mpLast) return; mpLast = js;
+  room.presence(pres).catch(() => {});
+}
+function mpRender(dt, now) {
+  // local emote and bubble
+  if (player && playerEmote && !applyEmote(player, playerEmote, dt, now)) playerEmote = null;
+  if (playerBubble.bubble) { playerBubble.bubble.position.set(player.position.x, 5.6, player.position.z); playerBubble.bubbleT -= dt; playerBubble.bubble.visible = !drive || true; if (playerBubble.bubbleT <= 0) { disposeSprite(playerBubble.bubble); playerBubble.bubble = null; } }
+  if (!room) { if (remotes.size) clearRemotes(); return; }
+  const peers = room.peers(), seen = new Set();
+  const myLoc = state === "play" && S ? (IN ? IN.bid : "out") : null;
+  let best = 3, nf = null;
+  for (const p of peers) {
+    if (p.sameTab) { myPeer = p.peer; continue; }
+    if (p.isMe || p.kind !== "viewer") continue;
+    const pr = cleanPresence(p.presence); if (!pr) continue;
+    seen.add(p.peer);
+    let R = remotes.get(p.peer);
+    if (!R) { R = makeRemote(p.peer, pr); remotes.set(p.peer, R); }
+    R.pr = pr; R.name = pr.name; R.loc = pr.loc; R.guest = p.guest;
+    if (JSON.stringify(pr.look) !== R.lookKey) buildRemoteChar(R, pr);
+    setRemoteTag(R, pr);
+    const vis = !!myLoc && pr.loc === myLoc;
+    if (Math.hypot(pr.x - R.x, pr.z - R.z) > 15) { R.x = pr.x; R.z = pr.z; }
+    const k = Math.min(1, dt * 10); R.x += (pr.x - R.x) * k; R.z += (pr.z - R.z) * k;
+    let dr = pr.r - R.r; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); R.r += dr * k;
+    R.g.position.set(R.x, 0, R.z); R.g.visible = vis;
+    R.char.rotation.y = R.emote && R.emote.k === "dance" ? R.char.rotation.y : 0; R.g.rotation.y = 0;
+    R.char.rotation.y = R.emote && R.emote.k === "dance" ? R.char.rotation.y : R.r;
+    // car
+    if (pr.car) {
+      const key = pr.car.m + ":" + pr.car.c;
+      if (R.carKey !== key) { if (R.car) scene.remove(R.car); R.car = makeCarModel(pr.car.m, pr.car.c, { shirt: pr.look.shirt, skin: pr.look.skin, hair: pr.look.hair }); scene.add(R.car); R.carKey = key; }
+      R.car.position.set(R.x, 0, R.z); R.car.rotation.y = R.r; R.car.visible = vis; R.char.visible = false;
+    } else { if (R.car) { scene.remove(R.car); R.car = null; R.carKey = null; } R.char.visible = true; }
+    // pet
+    if (pr.pet) {
+      const key = pr.pet.t + ":" + pr.pet.c;
+      if (R.petKey !== key) { if (R.pet) scene.remove(R.pet); R.pet = makePet(pr.pet.t, pr.pet.c); R.pet.position.set(R.x, 0, R.z); scene.add(R.pet); R.petKey = key; }
+      const pu = R.pet.userData, behind = pu.type === "parrot" ? { x: R.x + Math.cos(R.r) * 0.9, z: R.z - Math.sin(R.r) * 0.9 } : { x: R.x - Math.sin(R.r) * 1.8, z: R.z - Math.cos(R.r) * 1.8 };
+      const dx = behind.x - R.pet.position.x, dz = behind.z - R.pet.position.z, d = Math.hypot(dx, dz);
+      if (d > 20) R.pet.position.set(behind.x, 0, behind.z); else if (d > 0.3) { R.pet.position.x += dx * Math.min(1, dt * 4); R.pet.position.z += dz * Math.min(1, dt * 4); R.pet.rotation.y = Math.atan2(dx, dz); }
+      const walk = d > 0.4; R.petPhase = (R.petPhase || 0) + dt * (walk ? 14 : 0);
+      pu.legs.forEach((l, i) => { l.rotation.x = walk ? ((i === 0 || i === 3) ? 1 : -1) * Math.sin(R.petPhase) * 0.7 : 0; });
+      if (pu.tail) pu.tail.rotation.y = Math.sin(now / 100) * 0.7;
+      if (pu.wings) { const f = Math.sin(now / 45) * 0.9; pu.wings[0].rotation.z = f; pu.wings[1].rotation.z = -f; pu.rig.position.y = pu.base + Math.sin(now / 260) * 0.12; }
+      R.pet.visible = vis && !pr.car;
+    } else if (R.pet) { scene.remove(R.pet); R.pet = null; R.petKey = null; }
+    // emote / chat / high five (each fires once per new timestamp)
+    if (pr.emo && pr.emo.at !== R.emoAt) { R.emoAt = pr.emo.at; R.emote = { k: pr.emo.k, t: 2.6 }; }
+    if (R.emote && !applyEmote(R.char, R.emote, dt, now)) R.emote = null;
+    if (!R.emote && !pr.car) animChar(R.char, pr.mv, dt);
+    if (pr.msg && pr.msg.at !== R.msgAt) {
+      R.msgAt = pr.msg.at;
+      if (pr.msg.t) {
+        const b = showBubble(R, pr.msg.t); b.position.y = 5.6; R.g.add(b);
+        chatLog.push({ name: pr.name, text: pr.msg.t }); if (chatLog.length > 60) chatLog.shift();
+        if (!vis) toast(`${pr.name}: ${pr.msg.t}`); refreshChatList();
+      }
+    }
+    if (R.bubble) { R.bubbleT -= dt; if (R.bubbleT <= 0) { disposeSprite(R.bubble); R.bubble = null; } }
+    if (pr.hi && pr.hi.at !== R.hiAt) {
+      R.hiAt = pr.hi.at;
+      if (myPeer && pr.hi.to === myPeer && state === "play" && S) { S.social = clamp(S.social + 8); playerEmote = { k: "cheer", t: 2 }; toast(`${pr.name} high-fived you! +Friends`, "good"); }
+    }
+    if (vis && !pr.car && player && !drive) { const d = Math.hypot(R.x - player.position.x, R.z - player.position.z); if (d < best) { best = d; nf = R; } }
+  }
+  nearFriend = nf;
+  for (const [k, R] of remotes) if (!seen.has(k)) { if (R.loc !== "menu") toast(`${R.name} left the town`); disposeRemote(R); remotes.delete(k); }
+  if (seen.size !== mpRender.count) { mpRender.count = seen.size; refreshFriendsUI(); }
+}
+function friendsNearby() {
+  if (!S || !player || !remotes.size) return 0;
+  const myLoc = IN ? IN.bid : "out"; let n = 0;
+  for (const R of remotes.values()) if (R.loc === myLoc && Math.hypot(R.x - player.position.x, R.z - player.position.z) < 14) n++;
+  return n;
+}
+function highFive() {
+  if (!nearFriend || !room) return;
+  myHi = { to: nearFriend.peer, at: Date.now() }; myEmote = { k: "cheer", at: Date.now() };
+  playerEmote = { k: "cheer", t: 2 }; S.social = clamp(S.social + 5);
+  if (player) player.rotation.y = Math.atan2(nearFriend.x - player.position.x, nearFriend.z - player.position.z);
+  toast(`High five, ${nearFriend.name}!`, "good");
+}
+function doEmote(k) { myEmote = { k, at: Date.now() }; playerEmote = { k, t: 2.6 }; closeSheet(); }
+function sendChat() {
+  const inp = document.getElementById("chatInput"); if (!inp) return;
+  const t = cleanText(inp.value, 120); if (!t) return;
+  myMsg = { t, at: Date.now() }; inp.value = "";
+  chatLog.push({ name: S.name, text: t, mine: true }); if (chatLog.length > 60) chatLog.shift();
+  const b = showBubble(playerBubble, t); scene.add(b);
+  refreshChatList();
+}
+function where(R) {
+  if (R.loc === "menu") return "On the title screen";
+  let s = R.loc === "out" ? "Walking around town" : `At ${BMAP[R.loc] ? BMAP[R.loc].name : "a building"}`;
+  if (R.pr && R.pr.car) s = "Driving around town";
+  if (R.pr && R.pr.star) s += " · running from the police!";
+  return s;
+}
+function goToFriend(peer) {
+  const R = remotes.get(peer); if (!R || R.loc === "menu") return;
+  if (wanted) { toast("You can't go anywhere while the police are after you!", "bad"); return; }
+  closeSheet();
+  timeSkip(`Heading to ${R.name}`, 10, () => {
+    advance(10);
+    if (R.loc === "out") {
+      if (drive) exitVehicle();
+      if (IN) leaveBuilding(true);
+      let spot = null;
+      for (const [ox, oz] of [[2, 0], [-2, 0], [0, 2], [0, -2], [3, 3], [-3, -3]]) if (!blocked(R.x + ox, R.z + oz)) { spot = { x: R.x + ox, z: R.z + oz }; break; }
+      if (spot) { player.position.set(spot.x, 0, spot.z); S.pos.x = spot.x; S.pos.z = spot.z; cam.x = spot.x; cam.z = spot.z; snapPet(); }
+    } else teleport(R.loc, canEnter(R.loc));
+    toast(`You met up with ${R.name}!`, "good"); renderHUD(true); save();
+  });
+}
+function friendsSheet() {
+  const list = [...remotes.values()];
+  const rows = list.length ? list.map((R) => `<div class="jobrow"><div><b>${esc(R.name)}</b>${R.guest ? ' <span class="req">guest</span>' : ""}<div class="req">${esc(where(R))}</div></div>${R.loc === "menu" ? "" : `<button class="btn ghost" data-goto="${esc(R.peer)}">Go there</button>`}</div>`).join("")
+    : `<p class="req">Nobody else is playing right now. Share this game with your friends and ask them to open it. Everyone who has it open at the same time plays in the same town.</p>`;
+  return header("Friends", room ? `${list.length} other player${list.length === 1 ? "" : "s"} online · press T to chat` : "Multiplayer isn't available in this view", "#00bbf9") + `<div class="sheet-b">
+    <div class="sec"><h3>Online now</h3><div style="display:flex;flex-direction:column;gap:6px">${rows}</div></div>
+    <div class="sec"><h3>Emotes</h3><div class="row">${EMOTES.map(([k, n]) => `<button class="btn ghost" data-emote="${k}">${n}</button>`).join("")}</div><p class="req" style="margin:6px 0 0">Walk up to a friend and press E to high-five them. Hanging out near friends raises your Friends need.</p></div>
+    <div class="sec"><h3>Chat</h3><ul class="log" id="chatList"></ul>
+      <div class="row" style="margin-top:8px"><input id="chatInput" maxlength="120" placeholder="Say something nice..." autocomplete="off" style="flex:1;min-width:0;font:700 15px var(--body);padding:10px 12px;border-radius:10px;border:1px solid var(--edge);background:rgba(255,255,255,.07);color:var(--ink);-webkit-user-select:text;user-select:text"><button class="btn" data-chat>Send</button></div></div>
+  </div>`;
+}
+function refreshChatList() {
+  const ul = document.getElementById("chatList"); if (!ul) return;
+  ul.innerHTML = chatLog.slice(-30).map((m) => `<li class="${m.mine ? "good" : ""}"><small>${esc(m.name)}</small>${esc(m.text)}</li>`).join("") || "<li>No messages yet. Say hi!</li>";
+  ul.scrollTop = ul.scrollHeight;
+}
+function openFriends(focusChat) {
+  openSheet(friendsSheet); refreshChatList();
+  if (focusChat) setTimeout(() => { const i = document.getElementById("chatInput"); if (i) i.focus(); }, 50);
+}
+function refreshFriendsUI() {
+  const b = document.getElementById("btnFriends"); if (!b) return;
+  b.hidden = !room;
+  const n = remotes.size, badge = document.getElementById("friendsCount");
+  if (badge) { badge.textContent = n; badge.hidden = n === 0; }
+  if (sheetFn === friendsSheet && sheetOpen() && !document.activeElement?.closest?.(".sheet-b")) { renderSheet(); refreshChatList(); }
+}
+playerBubble = { bubble: null, bubbleT: 0 };
+
 // ============================================================ INPUT
 const keys = {};
 let state = "title";
@@ -2505,6 +2768,7 @@ addEventListener("keydown", (e) => {
   if (k === "m") openMe();
   if (k === "j") openLog();
   if (k === "q") openPet();
+  if (k === "t" && room) { e.preventDefault(); openFriends(true); }
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
@@ -2671,10 +2935,11 @@ function updatePlayer(dt) {
 }
 function interact(pref) {
   if (drive) { if (pref !== "car" && nearPump) refuel(); else exitVehicle(); return; }
-  if (IN) { if (nearStation) openStation(nearStation); else if (nearNpc) talk(nearNpc); return; }
+  if (IN) { if (nearStation) openStation(nearStation); else if (nearFriend) highFive(); else if (nearNpc) talk(nearNpc); return; }
   if (pref === "car" && !nearVehicle) return;
   if (nearVehicle && (pref === "car" || !nearDoor)) enterVehicle(nearVehicle);
   else if (nearDoor) openBuilding(nearDoor.b.id);
+  else if (nearFriend) highFive();
   else if (nearNpc) talk(nearNpc);
 }
 function talk(n) {
@@ -2823,6 +3088,7 @@ function renderHUD(force) {
     else if (nearDoor && HOUSES[nearDoor.b.id] && !(S.houses && S.houses[nearDoor.b.id])) p = `<kbd>E</kbd>For sale: ${nearDoor.b.name} (${money(HOUSES[nearDoor.b.id].price)})`;
     else if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
     else if (nearVehicle && !IN) p = `<kbd>F</kbd>${vehicleLabel(nearVehicle)}`;
+    else if (nearFriend && !(IN && nearStation)) p = `<kbd>E</kbd>High five ${esc(nearFriend.name)}`;
     else if (nearNpc) p = `<kbd>E</kbd>Say hi`;
   }
   if (drive) {
@@ -2863,6 +3129,7 @@ function drawMinimap(now) {
   const hb = BMAP.home; mx.fillStyle = "#1b1b1b"; mx.font = "900 16px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.fillText("H", X(hb.x), Z(hb.z) + 1);
   for (const v of vehicles) if (v.kind === "own" && v !== drive) { mx.fillStyle = "#ffbe2e"; mx.fillRect(X(v.car.position.x) - 3, Z(v.car.position.z) - 3, 6, 6); }
   const blink = Math.floor(now / 180) % 2;
+  for (const R of remotes.values()) if (R.loc === "out") { mx.fillStyle = "#00e5ff"; mx.strokeStyle = "#0b1330"; mx.lineWidth = 2; mx.beginPath(); mx.arc(X(R.x), Z(R.z), 5, 0, Math.PI * 2); mx.fill(); mx.stroke(); }
   for (const pc of police) { mx.fillStyle = blink ? "#ff3b3b" : "#3b7bff"; mx.beginPath(); mx.arc(X(pc.car.position.x), Z(pc.car.position.z), 4.5, 0, Math.PI * 2); mx.fill(); }
   if (wanted) { mx.strokeStyle = "rgba(72,213,151,.5)"; mx.lineWidth = 1.5; mx.beginPath(); mx.arc(X(player.position.x), Z(player.position.z), EVADE_DIST * sc, 0, Math.PI * 2); mx.stroke(); }
   drawArrow(X(player.position.x), Z(player.position.z));
@@ -2884,6 +3151,7 @@ function drawInteriorMap(now) {
     mx.fillStyle = st.sp === "exit" ? "#48d597" : hot ? "#ffbe2e" : "#ffffff";
     mx.beginPath(); mx.arc(X(st.sx), Z(st.sz), hot ? 5 + Math.sin(now / 250) * 1.5 : 3.5, 0, Math.PI * 2); mx.fill();
   }
+  for (const R of remotes.values()) if (R.loc === IN.bid) { mx.fillStyle = "#00e5ff"; mx.beginPath(); mx.arc(X(R.x), Z(R.z), 5, 0, Math.PI * 2); mx.fill(); }
   mx.fillStyle = "#f2f5fb"; mx.font = "900 15px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "top"; mx.fillText(BMAP[IN.bid].name, W / 2, 6);
   drawArrow(X(player.position.x), Z(player.position.z));
 }
@@ -2899,6 +3167,7 @@ function renderSheet() {
   $("sheet").innerHTML = sheetFn();
   const b = $("sheet").querySelector(".sheet-b"); if (b) b.scrollTop = sc;
 }
+$("sheetWrap").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "chatInput") { e.preventDefault(); sendChat(); } });
 $("sheetWrap").addEventListener("click", (e) => {
   if (busy) return;
   if (e.target === $("sheetWrap") || e.target.closest("[data-x]")) return closeSheet();
@@ -2909,6 +3178,9 @@ $("sheetWrap").addEventListener("click", (e) => {
   const bc = e.target.closest("[data-buycar]"); if (bc) { buyCar(bc.dataset.buycar); return; }
   if (e.target.closest("[data-repair]")) { repairCar(); return; }
   const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
+  if (e.target.closest("[data-chat]")) { sendChat(); return; }
+  const em = e.target.closest("[data-emote]"); if (em) { doEmote(em.dataset.emote); return; }
+  const gt = e.target.closest("[data-goto]"); if (gt) { goToFriend(gt.dataset.goto); return; }
   const pa = e.target.closest("[data-pet]"); if (pa) { petAction(pa.dataset.pet); return; }
   const at = e.target.closest("[data-adopttype]"); if (at) { adoptSel = { type: at.dataset.adopttype, color: 0 }; renderSheet(); return; }
   const ac = e.target.closest("[data-adoptcolor]"); if (ac) { const nm = ($("adoptName") || {}).value; adoptSel.color = Number(ac.dataset.adoptcolor); renderSheet(); if (nm && $("adoptName")) $("adoptName").value = nm; return; }
@@ -3028,6 +3300,7 @@ function openLog() {
 }
 $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
+$("btnFriends").addEventListener("click", () => { if (!busy) openFriends(false); });
 $("btnPet").addEventListener("click", () => { if (!busy) openPet(); });
 $("btnDecor").addEventListener("click", () => { if (!busy) openDecor(); });
 $("btnRot").addEventListener("click", rotatePlacing);
@@ -3057,6 +3330,7 @@ function showTitle() {
   if (drive) { setDriver(drive.car, false); drive = null; updateDriveUI(); }
   clearWanted();
   if (petObj) { scene.remove(petObj.g); petObj = null; }
+  if (room) { mpLast = ""; room.presence({ v: 1, name: (S && S.name) || "Player", loc: "menu" }).catch(() => {}); }
   state = "title"; $("title").hidden = false; $("hud").hidden = true;
   if (player) player.visible = false;
   const sv = loadSave(); $("btnContinue").hidden = !(sv && !sv.over);
@@ -3107,6 +3381,7 @@ function frame(now) {
   }
   updateWorld(dt, now);
   if (state === "play") updatePet(dt, now);
+  mpTick(dt); mpRender(dt, now);
   updateSky();
   updateCamera(dt, now);
   renderer.render(scene, camera);
