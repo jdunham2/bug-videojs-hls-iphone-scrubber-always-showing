@@ -11,3 +11,7 @@ To test it go to https://bug-videojs-hls-iphone-scrubber-always-showing.stackbli
 This project is meant to run on StackBlitz ⚡️
 
 [Edit on StackBlitz ⚡️](https://stackblitz.com/edit/bug-videojs-hls-iphone-scrubber-always-showing)
+
+## Emberfall Engine Deck
+
+`emberfall/index.html` is a self-contained browser game (no build step): open the file in a browser. You play a warship engineer keeping the reactor, shields, weapons and engines running through a three-act blockade run.
