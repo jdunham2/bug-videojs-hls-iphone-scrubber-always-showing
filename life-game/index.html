@@ -32,7 +32,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .hud-tl { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; width: 236px; z-index: 5; }
 .hud-tr { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; width: 210px; z-index: 5; align-items: stretch; }
 .clock { padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
-.clock .time { font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.clock .time { font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .clock .day { color: var(--muted); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; grid-column: 1 / -1; }
 .clock .money { font-family: var(--display); font-size: 22px; color: var(--good); text-align: right; font-variant-numeric: tabular-nums; }
 .clock .rent { grid-column: 1 / -1; font-size: 12px; font-weight: 800; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
@@ -150,6 +150,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .dbtn { width: 70px; height: 70px; border-radius: 18px; font-family: var(--display); font-size: 18px; cursor: pointer; touch-action: none; }
 .dbtn.gas { background: rgba(72,213,151,.35); } .dbtn.brake { background: rgba(255,92,108,.3); }
 .exitcar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 6; padding: 10px 18px; font-weight: 900; cursor: pointer; display: flex; gap: 10px; align-items: center; }
+.exitcar .fuel { font-size: 12px; font-weight: 900; color: var(--muted); white-space: nowrap; }
+.exitcar .fuel.low { color: var(--bad); }
 .exitcar .spd { font-family: var(--display); font-size: 20px; color: var(--gold); font-variant-numeric: tabular-nums; min-width: 70px; }
 @media (hover: hover) and (pointer: fine) { .drive-l, .drive-r { display: none; } }
 @media (max-width: 720px) { .wanted { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); min-width: 0; } .exitcar { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); } }
@@ -228,7 +230,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 <div id="driveUI" hidden>
   <div class="drive-l"><button class="card dbtn" data-k="left" aria-label="Steer left">&#9664;</button><button class="card dbtn" data-k="right" aria-label="Steer right">&#9654;</button></div>
   <div class="drive-r"><button class="card dbtn brake" data-k="brake">Brake</button><button class="card dbtn gas" data-k="gas">Gas</button></div>
-  <button class="card exitcar" id="btnExitCar"><span class="spd" id="speedo">0 mph</span><span>Get out (F)</span></button>
+  <button class="card exitcar" id="btnExitCar"><span class="spd" id="speedo">0 mph</span><span class="fuel" id="fuelo">Gas 100%</span><span class="fuel" id="healtho">Car 100%</span><span>Get out (F)</span></button>
 </div>
 <div class="modal-wrap" id="modalWrap" hidden><div class="card modal" id="modal"></div></div>
 
@@ -288,7 +290,7 @@ const BUILDINGS = [
   { id: "bowling", name: "Strike Zone Bowling", x: -100, z: 60, w: 20, d: 16, h: 9, color: "#2e86de", sign: "#c0392b", face: "e", open: [12, 25] },
   { id: "pizza", name: "Pizza Palace", x: 20, z: 100, w: 14, d: 12, h: 6, color: "#f39c12", sign: "#b03a2e", face: "n", open: [11, 24] },
   { id: "beach", name: "Lakeside Beach", x: -20, z: 100, w: 0, d: 0, h: 0, color: "#f2d49b", sign: "#c98a2c", face: "n", kind: "zone" },
-  { id: "h1", name: "", x: 60, z: 100, w: 12, d: 10, h: 6, color: "#cfe3f7", sign: "#555", face: "n", kind: "decohouse" },
+  { id: "gas", name: "Fuel Stop", x: 60, z: 108, w: 14, d: 8, h: 5, color: "#f4f4f4", sign: "#d7263d", face: "n" },
   { id: "h2", name: "", x: -60, z: 100, w: 12, d: 10, h: 6, color: "#f7d6cf", sign: "#555", face: "n", kind: "decohouse" },
   { id: "h3", name: "", x: 100, z: 100, w: 14, d: 10, h: 7, color: "#e3f7cf", sign: "#555", face: "n", kind: "decohouse" },
   { id: "h4", name: "", x: -100, z: 100, w: 12, d: 12, h: 6, color: "#f7efcf", sign: "#555", face: "n", kind: "decohouse" },
@@ -296,7 +298,7 @@ const BUILDINGS = [
   { id: "h6", name: "", x: -100, z: -100, w: 14, d: 10, h: 6, color: "#cff7ea", sign: "#555", face: "s", kind: "decohouse" },
   { id: "apts2", name: "", x: 20, z: -100, w: 16, d: 16, h: 30, color: "#a7b4c2", sign: "#555", face: "s", kind: "deco" },
   { id: "apts3", name: "", x: -20, z: -100, w: 18, d: 14, h: 22, color: "#c2a7a7", sign: "#555", face: "s", kind: "deco" },
-  { id: "apts4", name: "", x: 60, z: -100, w: 14, d: 14, h: 36, color: "#9fb0a0", sign: "#555", face: "s", kind: "deco" },
+  { id: "cardealer", name: "Speedy Motors", x: 60, z: -102, w: 24, d: 14, h: 9, color: "#e8eef5", sign: "#d7263d", face: "s", open: [9, 20] },
   { id: "apts5", name: "", x: -60, z: -100, w: 18, d: 16, h: 18, color: "#b9a98f", sign: "#555", face: "s", kind: "deco" },
 ];
 const isDeco = (b) => b.kind === "deco" || b.kind === "decohouse";
@@ -341,6 +343,10 @@ const CAREERS = {
     ["Lab Assistant", 16, { smarts: 15 }], ["Researcher", 32, { smarts: 35 }], ["Scientist", 60, { smarts: 60 }], ["Nobel Prize Winner", 150, { smarts: 90, creativity: 40 }]] },
   bowling: { name: "Entertainment", days: [4,5,6,0], start: [16, 19], gain: { charm: 2, fitness: 1 }, ranks: [
     ["Shoe Rental", 10, {}], ["Lane Manager", 18, { charm: 15 }], ["Bowling Alley Owner", 40, { charm: 35, smarts: 25 }]] },
+  gas: { name: "Gas Station", days: [0,1,2,3,4,5,6], start: [6, 14], gain: { charm: 1, smarts: 1 }, ranks: [
+    ["Pump Attendant", 11, {}], ["Shift Supervisor", 15, { charm: 10 }], ["Station Manager", 24, { smarts: 15, charm: 20 }], ["Gas Chain Owner", 70, { smarts: 40, charm: 40 }]] },
+  cardealer: { name: "Car Sales", days: [1,2,3,4,5,6], start: [9, 12], gain: { charm: 3 }, ranks: [
+    ["Lot Attendant", 11, {}], ["Car Salesperson", 20, { charm: 20 }], ["Sales Manager", 38, { charm: 35, smarts: 20 }], ["Dealership Owner", 90, { charm: 60, smarts: 45 }]] },
   cityhall: { name: "Politics", days: WEEK, start: [8, 10], gain: { charm: 2, smarts: 1 }, ranks: [
     ["Office Clerk", 13, { smarts: 5 }], ["City Councilor", 30, { charm: 30, smarts: 25 }], ["Deputy Mayor", 55, { charm: 50, smarts: 40 }], ["Mayor", 110, { charm: 75, smarts: 60 }]] },
 };
@@ -349,7 +355,6 @@ const ITEMS = {
   bed:      { name: "Comfy Bed", price: 200, desc: "Sleep restores 30% more energy." },
   coffee:   { name: "Coffee Maker", price: 60, desc: "Make coffee at home once a day." },
   bike:     { name: "Bike", price: 150, desc: "Get around town 60% faster." },
-  car:      { name: "Car", price: 1500, desc: "Your own car to drive. Parks outside your apartment." },
   console:  { name: "Game Console", price: 250, desc: "Video games are way more fun." },
   bigtv:    { name: "Big Screen TV", price: 400, desc: "TV is twice as fun." },
   sofa:     { name: "Comfy Sofa", price: 180, desc: "Watching TV also restores energy." },
@@ -360,6 +365,15 @@ const ITEMS = {
   dog:      { name: "Adopt a Dog", price: 250, desc: "Fun and Friends drop slower. Walk it every day." },
 };
 
+const CAR_MODELS = {
+  compact:  { name: "Pocket Hatch", price: 900, max: 28, acc: 15, tank: 10, color: 0x48d597, desc: "Small, cheap and easy to park." },
+  sedan:    { name: "Family Sedan", price: 1500, max: 34, acc: 18, tank: 12, color: 0xffbe2e, desc: "A solid everyday car." },
+  pickup:   { name: "Big Pickup", price: 2200, max: 32, acc: 17, tank: 18, color: 0x2e86de, desc: "Huge gas tank. Goes a long way." },
+  electric: { name: "Electric Zip", price: 4000, max: 38, acc: 26, tank: 0, electric: true, color: 0xffffff, desc: "Never needs gas. Super quick off the line." },
+  sports:   { name: "Lightning GT", price: 6000, max: 50, acc: 30, tank: 12, color: 0xd7263d, desc: "The fastest car in town. Outruns any police car." },
+};
+const GAS_PRICE = 3.5;
+const PAINTS = [0xd7263d, 0xffbe2e, 0x48d597, 0x2e86de, 0x9b5de5, 0xf15bb5, 0xffffff, 0x222222, 0xff7b39];
 const between = (a, b) => hour() >= a && hour() < b;
 const owns = (k) => !!(S && S.owned[k]);
 const ACTS = {
@@ -513,12 +527,22 @@ const ACTS = {
     { id: "fish", name: "Go fishing", mins: 120, fx: { fun: 10 }, note: "Sell your catch", run: () => earn(10 + Math.floor(Math.random() * 25), "Sold your fish") },
     { id: "volley", name: "Beach volleyball", mins: 120, fx: { fun: 15, social: 15, energy: -12 }, skill: { fitness: 3 } },
   ],
+  gas: [
+    { id: "energydrink", name: "Energy drink", mins: 10, cost: 4, fx: { energy: 20, fun: 2 } },
+    { id: "hotdog", name: "Gas station hot dog", mins: 15, cost: 5, fx: { hunger: 30 } },
+    { id: "scratch", name: "Scratch-off ticket", mins: 5, cost: 5, fx: { fun: 3 }, note: "Win up to $500!", run: () => { const r = Math.random(); if (r < 0.02) { earn(500, "JACKPOT on a scratch-off"); toast("JACKPOT! You won $500!", "gold"); } else if (r < 0.15) { earn(20, "Scratch-off winner"); toast("Winner! +$20", "good"); } else toast("No luck this time."); } },
+  ],
+  cardealer: [
+    { id: "testdrive", name: "Take a test drive", mins: 30, fx: { fun: 15 } },
+    { id: "carshow", name: "Browse the showroom", mins: 30, fx: { fun: 6 } },
+  ],
   phone: [
     { id: "callmom", name: "Call Mom", mins: 30, fx: { social: 20, fun: 5 } },
     { id: "text", name: "Text your friends", mins: 10, fx: { social: 8 } },
     { id: "scroll", name: "Scroll social media", mins: 30, fx: { fun: 6, social: 3, energy: -2 } },
     { id: "pizza", name: "Order pizza delivery", mins: 30, cost: 18, fx: { hunger: 50, fun: 5 } },
     { id: "delivery", name: "Order grocery delivery", mins: 30, cost: 35, note: "+5 meals", run: () => { S.meals += 5; } },
+    { id: "roadside", name: "Roadside assistance", mins: 30, cost: 35, note: "+5 gallons of gas", can: () => !drive ? "Only while you're in a car" : carModel(drive).electric ? "Electric cars don't use gas" : drive.fuel >= carModel(drive).tank - 0.5 ? "Your tank is full" : true, run: () => { drive.fuel = Math.min(carModel(drive).tank, drive.fuel + 5); } },
     { id: "freelance", name: "Freelance gig", mins: 120, fx: { energy: -10, fun: -5 }, note: "Pays Smarts x2", can: () => S.skills.smarts >= 15 || "Need Smarts 15", run: () => earn(S.skills.smarts * 2, "Freelance gig") },
   ],
 };
@@ -530,7 +554,7 @@ const TODO_POOL = [
   ["study", "Study at the library"], ["lift", "Work out at the gym"], ["yoga", "Go to yoga"], ["volunteer", "Volunteer at City Hall"],
   ["haircut", "Get a haircut"], ["callmom", "Call Mom"], ["text", "Text your friends"], ["movie", "See a movie"], ["burger", "Grab a burger"],
   ["latte", "Grab a coffee at Bean There"], ["bowl", "Go bowling"], ["puppies", "Pet the puppies at the vet"], ["sunbathe", "Relax at the beach"],
-  ["tour", "Visit the art museum"], ["deposit", "Put money in the bank"], ["slice", "Grab a pizza slice"], ["firetour", "Tour the fire station"],
+  ["tour", "Visit the art museum"], ["deposit", "Put money in the bank"], ["slice", "Grab a pizza slice"], ["firetour", "Tour the fire station"], ["scratch", "Buy a scratch-off at Fuel Stop"], ["carshow", "Check out the cars at Speedy Motors"],
 ];
 
 const ACT_HOME = {};
@@ -546,6 +570,7 @@ const GOALS = [
   { id: "skill50", text: "Get any skill to 50", test: () => SKILLS.some(([k]) => S.skills[k] >= 50) },
   { id: "dog", text: "Adopt a dog", test: () => owns("dog") },
   { id: "car", text: "Buy a car", test: () => owns("car") },
+  { id: "sports", text: "Own the Lightning GT", test: () => S.carModel === "sports" },
   { id: "three", text: "Work 3 different careers", test: () => Object.keys(S.careersTried).length >= 3 },
   { id: "k10", text: "Have $10,000", test: () => S.money >= 10000 },
   { id: "explorer", text: "Visit every building in town", test: () => Object.keys(S.visited || {}).length >= Object.keys(INTERIORS).length },
@@ -1068,6 +1093,42 @@ for (const b of BUILDINGS) {
     const pier = box(3, 0.3, 9, 0x8a5a33, b.x + 6, 0.35, b.z + 4.5); }
 }
 
+// Fuel Stop forecourt and Speedy Motors lot
+const PUMPS = [];
+{
+  const b = BMAP.gas, cz = 93;
+  box(20, 0.5, 10, 0xd7263d, b.x, 5.8, cz); box(20.2, 0.2, 10.2, 0xffffff, b.x, 5.5, cz);
+  for (const [dx, dz] of [[-9, -4], [9, -4], [-9, 4], [9, 4]]) { cyl(0.3, 0.3, 5.5, 0xdddddd, b.x + dx, 2.75, cz + dz, 10); colliders.push({ x: b.x + dx, z: cz + dz, hw: 0.6, hd: 0.6 }); }
+  for (const dx of [-5, 5]) {
+    box(1.6, 0.3, 4.2, 0xbfbfbf, b.x + dx, 0.15, cz);
+    for (const pz of [-1, 1]) {
+      box(0.9, 2, 0.8, 0xf4f4f4, b.x + dx, 1.3, cz + pz); box(0.92, 0.5, 0.82, 0xd7263d, b.x + dx, 2.2, cz + pz);
+      box(0.6, 0.35, 0.05, new THREE.MeshStandardMaterial({ color: 0x48d597, emissive: 0x48d597, emissiveIntensity: 0.8 }), b.x + dx, 1.7, cz + pz - 0.42);
+    }
+    colliders.push({ x: b.x + dx, z: cz, hw: 0.9, hd: 2.2 });
+    PUMPS.push({ x: b.x + dx - 2.6, z: cz }, { x: b.x + dx + 2.6, z: cz });
+  }
+  const c = document.createElement("canvas"); c.width = 256; c.height = 320; const x = c.getContext("2d");
+  x.fillStyle = "#d7263d"; x.fillRect(0, 0, 256, 320); x.fillStyle = "#fff"; x.textAlign = "center";
+  x.font = '900 46px "Arial Black", sans-serif'; x.fillText("FUEL", 128, 70); x.fillText("STOP", 128, 120);
+  x.fillStyle = "#111"; x.fillRect(20, 150, 216, 140); x.fillStyle = "#ffbe2e"; x.font = '900 34px "Arial Black", sans-serif'; x.fillText("GAS", 128, 200); x.fillText("$" + GAS_PRICE.toFixed(2), 128, 260);
+  const signMat = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), emissive: 0xffffff, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0.25 });
+  signMats.push(signMat);
+  cyl(0.3, 0.3, 10, 0x777777, b.x - 12, 5, 87.5, 8); colliders.push({ x: b.x - 12, z: 87.5, hw: 0.5, hd: 0.5 });
+  for (const ry of [0, Math.PI]) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 4), signMat); sg.position.set(b.x - 12, 10.5, 87.5); sg.rotation.y = ry; scene.add(sg); }
+}
+{
+  const b = BMAP.cardealer;
+  box(b.w - 2, b.h - 2.4, 0.15, new THREE.MeshStandardMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.45, roughness: 0.1 }), b.x, (b.h - 2.4) / 2 + 0.4, b.z + b.d / 2 + 0.1);
+  [["compact", 0x48d597, 47.5], ["pickup", 0x2e86de, 72.5]].forEach(([m, col, x]) => {
+    const car = makeCarModel(m, col); car.position.set(x, 0, -89.5); car.rotation.y = 0.35 * (x < 60 ? 1 : -1); scene.add(car);
+    colliders.push({ x, z: -89.5, hw: 2, hd: 2.8 });
+  });
+  const flagCols = [0xd7263d, 0xffbe2e, 0x2e86de, 0x48d597];
+  for (let i = 0; i < 12; i++) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.8, 3), mat(flagCols[i % 4])); f.rotation.x = Math.PI; f.position.set(b.x - 11 + i * 2, 7.2, b.z + b.d / 2 + 1.5); scene.add(f); }
+  box(23, 0.06, 0.06, 0xffffff, b.x, 7.6, b.z + b.d / 2 + 1.5);
+}
+
 // Trees (instanced)
 {
   const spots = [];
@@ -1139,6 +1200,15 @@ function makeCar(color, driverLook) {
   return g;
 }
 
+function makeCarModel(id, color, driverLook) {
+  const g = makeCar(color, driverLook);
+  if (id === "compact") g.scale.set(0.9, 0.95, 0.8);
+  if (id === "pickup") { g.scale.set(1.05, 1.08, 1.12); box(2.3, 0.7, 0.12, color, 0, 1.75, -2.15, g); box(0.12, 0.7, 1.9, color, -1.1, 1.75, -1.2, g); box(0.12, 0.7, 1.9, color, 1.1, 1.75, -1.2, g); }
+  if (id === "sports") { g.scale.set(1.08, 0.78, 1.1); box(2.4, 0.12, 0.6, 0x222222, 0, 2.0, -2.0, g); box(0.15, 0.6, 0.15, 0x222222, -0.9, 1.65, -2.0, g); box(0.15, 0.6, 0.15, 0x222222, 0.9, 1.65, -2.0, g); box(0.4, 0.04, 4.42, 0xffffff, 0, 1.41, 0, g); }
+  if (id === "electric") { const glow = new THREE.MeshStandardMaterial({ color: 0x3ff0ff, emissive: 0x3ff0ff, emissiveIntensity: 0.9 }); box(0.06, 0.12, 4.0, glow, -1.16, 0.9, 0, g); box(0.06, 0.12, 4.0, glow, 1.16, 0.9, 0, g); }
+  g.userData.model = id;
+  return g;
+}
 let player = null, rideBike = null, rideCar = null;
 function buildPlayer(look) {
   if (player) scene.remove(player);
@@ -1397,9 +1467,27 @@ const INTERIORS = {
     [null, "books", 12.25, 1, -1],
     ["Lab office", "desk", 5, 2, 0, [], "career"],
   ], people: [[-7, -6.4], [2, -6.4], [8, -4.6], [-7, 2.6]] },
+  gas: { W: 20, D: 14, floor: 0xe8e8e8, wall: 0xf7f7f7, rug: 0xd7263d, items: [
+    ["Snack shelf", "shelf", -4, -5.6, 0, ["energydrink"]], [null, "shelf", 2, -5.6, 0], [null, "fridge", 7.5, -5.9, 0],
+    ["Checkout", "register", 3, 0.5, 0, ["scratch", "hotdog"]],
+    ["Staff room", "closet", -9.2, 2, 1, [], "career"],
+  ], people: [[3, -0.9], [-1, -3.4]] },
+  cardealer: { W: 30, D: 20, floor: 0xeceff1, wall: 0xdfe6ee, rug: 0xd7263d, items: [
+    ["Pocket Hatch", "show:compact", -11, -5, 0, [], "cars"], ["Family Sedan", "show:sedan", -5.5, -5, 0, [], "cars"],
+    ["Big Pickup", "show:pickup", 0, -5, 0, [], "cars"], ["Electric Zip", "show:electric", 5.5, -5, 0, [], "cars"], ["Lightning GT", "show:sports", 11, -5, 0, [], "cars"],
+    ["Sales desk", "desk", -8, 5, 0, ["testdrive", "carshow"], "cars"],
+    ["Service garage", "toolbox", 8, 6, 0, [], "garage"],
+    ["Manager's office", "desk", 13.6, 1, -1, [], "career"],
+  ], people: [[-8, 3.3], [-1, 1], [8, 4.6]] },
 };
 
 function furn(type) {
+  if (type.startsWith("show:")) {
+    const m = type.slice(5), g = new THREE.Group();
+    cyl(2.8, 2.8, 0.2, 0xbfc5cc, 0, 0.1, 0, 32, g);
+    const car = makeCarModel(m, CAR_MODELS[m].color); car.position.y = 0.2; car.rotation.y = 0.5; g.add(car);
+    return { g, w: 4.2, d: 5.4, h: 2.6, solid: true, center: false };
+  }
   const g = new THREE.Group(); let w = 2, d = 2, h = 3, solid = true, center = false;
   const B = (a, b, c, m, x, y, z) => box(a, b, c, m, x, y, z, g);
   const C = (rt, rb, hh, m, x, y, z, seg) => cyl(rt, rb, hh, m, x, y, z, seg || 14, g);
@@ -1505,6 +1593,8 @@ function furn(type) {
     case "labbench": w = 3.2; d = 1.4; h = 2.6; B(3.2, 1.7, 1.4, 0xf4f4f4, 0, 0.85, 0); B(3.3, 0.1, 1.5, 0x222222, 0, 1.75, 0);
       [[-1.1, 0x48d597], [-0.6, 0x3ff0ff], [-0.1, 0xff3fa4]].forEach(([x, c]) => C(0.15, 0.2, 0.5, glowMat(c, 0.7), x, 2.05, 0, 10));
       B(0.4, 0.15, 0.5, 0x333333, 0.9, 1.88, 0); B(0.12, 0.6, 0.12, 0x333333, 0.9, 2.2, -0.1); C(0.08, 0.08, 0.4, 0x111111, 0.9, 2.55, 0.05, 8); break;
+    case "toolbox": w = 2.6; d = 1; h = 2.2; B(2.6, 2, 1, 0xd7263d, 0, 1, 0); for (let i = 0; i < 4; i++) B(2.4, 0.06, 0.05, 0x8c1d0e, 0, 0.45 + i * 0.45, 0.51);
+      B(0.8, 0.5, 0.6, 0x555555, 0.7, 2.25, 0); B(0.5, 0.08, 0.08, 0xbfbfbf, -0.6, 2.05, 0.1); break;
     case "exitdoor": w = 4; d = 0.4; h = 4; solid = false;
       B(0.3, 3.8, 0.4, 0x3a3f48, -2, 1.9, 0); B(0.3, 3.8, 0.4, 0x3a3f48, 2, 1.9, 0); B(4.3, 0.4, 0.4, 0x3a3f48, 0, 3.9, 0); B(1.4, 0.5, 0.1, glowMat(0x2ecc71, 1), 0, 4.5, 0); break;
   }
@@ -1615,13 +1705,72 @@ let drive = null;            // the vehicle the player is driving
 const vehicles = [];         // parked, abandoned, stolen and owned cars
 const police = [];
 let wanted = 0, evade = 0, catchT = 0, spawnT = 0, honkT = 0;
-let nearVehicle = null;
+let nearVehicle = null, nearPump = false;
+const carModel = (veh) => CAR_MODELS[(veh && veh.model) || "sedan"];
+function refuel() {
+  const md = carModel(drive);
+  if (md.electric) { toast("Electric cars don't need gas!"); return; }
+  const need = md.tank - drive.fuel;
+  if (need < 0.2) { toast("Your tank is already full."); return; }
+  const gallons = Math.min(need, S.money / GAS_PRICE);
+  if (gallons < 0.2) { toast(`Gas costs ${money(GAS_PRICE)} a gallon. You're broke!`, "bad"); return; }
+  const cost = Math.round(gallons * GAS_PRICE * 100) / 100;
+  S.money = Math.round((S.money - cost) * 100) / 100; drive.fuel += gallons; advance(10);
+  toast(`Filled up ${gallons.toFixed(1)} gallons: -$${cost.toFixed(2)}`, "good"); log(`Bought ${gallons.toFixed(1)} gallons of gas for $${cost.toFixed(2)}.`);
+  if (drive.kind === "own") S.ownCar.fuel = drive.fuel;
+  save(); renderHUD(true);
+}
+function tradeIn() { return owns("car") ? Math.round(CAR_MODELS[S.carModel || "sedan"].price * 0.5) : 0; }
+function buyCar(id) {
+  const m = CAR_MODELS[id], cost = Math.max(0, m.price - tradeIn());
+  if (S.carModel === id && owns("car")) return;
+  if (S.money < cost) return;
+  if (drive && drive.kind === "own") exitVehicle();
+  S.money -= cost; S.owned.car = true; S.carModel = id; S.carColor = m.color;
+  removeOwnCar(); S.ownCar = { x: 54, z: -88, h: Math.PI / 2, fuel: m.tank, health: 100 }; spawnOwnCar();
+  log(`Bought a ${m.name} for ${money(cost)}!`, "good");
+  showModal(`<h3>New car!</h3><p>Your <b>${m.name}</b> is parked right outside Speedy Motors. ${m.electric ? "It never needs gas." : "It comes with a full tank."}</p><div class="row"><button class="big" data-close>Let's drive</button></div>`);
+  evalGoals(); save(); renderSheet(); renderHUD(true);
+}
+function ownVeh() { return vehicles.find((v) => v.kind === "own"); }
+function repairCar() {
+  const v = ownVeh(); if (!v) return;
+  const cost = Math.ceil((100 - v.health) * 3); if (cost <= 0 || S.money < cost) return;
+  S.money -= cost; v.health = 100; S.ownCar.health = 100; advance(60);
+  toast(`Car repaired: -${money(cost)}`, "good"); save(); renderSheet(); renderHUD(true);
+}
+function paintCar(color) {
+  const v = ownVeh(); if (!v || S.money < 100) return;
+  S.money -= 100; S.carColor = color;
+  const pos = { x: v.car.position.x, z: v.car.position.z, h: v.h, fuel: v.fuel, health: v.health };
+  removeOwnCar(); S.ownCar = pos; spawnOwnCar(); advance(60);
+  toast("Fresh paint job!", "gold"); save(); renderSheet(); renderHUD(true);
+}
+function carShopHTML() {
+  const ti = tradeIn();
+  return `<div class="sec"><h3>Cars for sale${ti ? ` · trade-in credit ${money(ti)}` : ""}</h3><div class="grid">${Object.entries(CAR_MODELS).map(([id, m]) => {
+    const mine = owns("car") && (S.carModel || "sedan") === id, cost = Math.max(0, m.price - ti);
+    return `<button class="act ${mine ? "" : "primary"}" data-buycar="${id}" ${mine || S.money < cost || !isOpen(BMAP.cardealer) ? "disabled" : ""}><span class="t">${m.name}</span><span class="m">${m.desc}</span><span class="m">Top speed ${Math.round(m.max * 2.2)} mph · ${m.electric ? "electric" : m.tank + " gallon tank"}</span><span class="${mine ? "fx" : "m"}">${mine ? "Your car ✓" : ti ? `${money(m.price)} − trade-in = ${money(cost)}` : money(m.price)}</span></button>`;
+  }).join("")}</div></div>`;
+}
+function garageHTML() {
+  const v = ownVeh();
+  if (!v) return `<div class="sec"><h3>Service garage</h3><p class="req">You don't own a car yet. Buy one at the sales desk.</p></div>`;
+  const md = carModel(v), cost = Math.ceil((100 - v.health) * 3);
+  return `<div class="sec"><h3>Your ${md.name}</h3><div class="career">
+    <div class="req">Condition: <b class="${v.health < 30 ? "no" : "ok"}">${Math.round(v.health)}%</b> · Gas: ${md.electric ? "electric" : `${v.fuel.toFixed(1)} / ${md.tank} gallons`}${v.health < 30 ? " · Badly damaged cars drive slower" : ""}</div>
+    <div><button class="btn" data-repair ${cost <= 0 || S.money < cost ? "disabled" : ""}>${cost <= 0 ? "No repairs needed" : `Repair for ${money(cost)} (1h)`}</button></div>
+    <div class="req">New paint job: $100 (1h)</div>
+    <div class="sw">${PAINTS.map((c) => `<button style="background:#${new THREE.Color(c).getHexString()}" data-paint="${c}" aria-label="Paint color" ${S.money < 100 ? "disabled" : ""} aria-pressed="${S.carColor === c}"></button>`).join("")}</div>
+  </div></div>`;
+}
 const driveKeys = {};
 const EVADE_DIST = 55;
 
 function addVehicle(car, x, z, h, kind) {
   car.position.set(x, 0, z); car.rotation.y = h; scene.add(car);
-  const v = { car, h, v: 0, kind, taken: kind !== "parked" };
+  const m = car.userData.model || "sedan";
+  const v = { car, h, v: 0, kind, taken: kind !== "parked", model: m, fuel: CAR_MODELS[m].tank * (0.3 + Math.random() * 0.7), health: 100 };
   vehicles.push(v); return v;
 }
 // Parked cars along the curbs
@@ -1646,7 +1795,9 @@ function addVehicle(car, x, z, h, kind) {
 function spawnOwnCar() {
   if (!owns("car") || vehicles.some((v) => v.kind === "own")) return;
   const o = S.ownCar || { x: -30, z: 9.5, h: Math.PI / 2 };
-  addVehicle(makeCar(0xffbe2e), o.x, o.z, o.h, "own");
+  const id = S.carModel || "sedan", m = CAR_MODELS[id];
+  const v = addVehicle(makeCarModel(id, S.carColor !== undefined ? S.carColor : m.color), o.x, o.z, o.h, "own");
+  v.fuel = o.fuel !== undefined ? o.fuel : m.tank; v.health = o.health !== undefined ? o.health : 100;
 }
 function removeOwnCar() {
   for (let i = vehicles.length - 1; i >= 0; i--) if (vehicles[i].kind === "own") { scene.remove(vehicles[i].car); vehicles.splice(i, 1); }
@@ -1693,7 +1844,7 @@ function enterVehicle(nv) {
   let veh = nv.veh, crime = 0, why = "";
   if (nv.traffic) {
     const t = nv.traffic; cars.splice(cars.indexOf(t), 1);
-    veh = { car: t.car, h: t.car.rotation.y, v: 0, kind: "stolen", taken: true }; vehicles.push(veh);
+    veh = { car: t.car, h: t.car.rotation.y, v: 0, kind: "stolen", taken: true, model: "sedan", fuel: 4 + Math.random() * 8, health: 100 }; vehicles.push(veh);
     // the driver jumps out and runs off
     const look = { shirt: t.car.userData.dShirt.color.getHex(), skin: t.car.userData.dSkin.color.getHex(), hair: t.car.userData.dHair.color.getHex() };
     const c = makeChar(look); const h = veh.h; c.position.set(t.car.position.x + Math.cos(h) * 2.6, 0, t.car.position.z - Math.sin(h) * 2.6); scene.add(c);
@@ -1723,7 +1874,7 @@ function exitVehicle() {
   if (!spot) spot = { x: c.position.x + Math.sin(h) * 3.5, z: c.position.z + Math.cos(h) * 3.5 };
   player.position.set(spot.x, 0, spot.z); player.rotation.y = h; player.visible = true;
   setDriver(c, false); veh.v = 0; drive = null;
-  if (veh.kind === "own") S.ownCar = { x: c.position.x, z: c.position.z, h };
+  if (veh.kind === "own") S.ownCar = { x: c.position.x, z: c.position.z, h, fuel: veh.fuel, health: veh.health };
   S.pos.x = spot.x; S.pos.z = spot.z;
   cam.dist = cam.outDist || 30; cam.pitch = cam.outPitch || 0.95;
   updateDriveUI(); save();
@@ -1732,8 +1883,10 @@ function updateDriving(dt) {
   const veh = drive, c = veh.car;
   const gas = keys.w || keys.arrowup || driveKeys.gas, brake = keys.s || keys.arrowdown || driveKeys.brake;
   const left = keys.a || keys.arrowleft || driveKeys.left, right = keys.d || keys.arrowright || driveKeys.right, hand = keys[" "];
-  const MAX = 34, REV = 10;
-  if (gas) veh.v += (veh.v < 0 ? 40 : 18) * dt;
+  const md = carModel(veh), REV = 10, empty = !md.electric && veh.fuel <= 0;
+  const MAX = md.max * (veh.health < 30 ? 0.6 : 1);
+  if (gas && empty) { if (honkT <= 0) { toast("Out of gas! Use Roadside assistance on your phone, or walk to Fuel Stop.", "bad"); honkT = 5; } }
+  else if (gas) veh.v += (veh.v < 0 ? 40 : md.acc) * dt;
   else if (brake) veh.v -= (veh.v > 0 ? 34 : 12) * dt;
   else veh.v -= Math.sign(veh.v) * Math.min(Math.abs(veh.v), 7 * dt);
   if (hand) veh.v -= Math.sign(veh.v) * Math.min(Math.abs(veh.v), 28 * dt);
@@ -1744,10 +1897,13 @@ function updateDriving(dt) {
   const nx = c.position.x + fx * veh.v * dt, nz = c.position.z + fz * veh.v * dt;
   const hit = carHit(nx, nz, veh.h, c);
   if (hit) {
-    if (Math.abs(veh.v) > 12) toast(hit.what === "car" ? "Crash!" : "Bonk!", "bad");
+    if (Math.abs(veh.v) > 12) { toast(hit.what === "car" ? "Crash!" : "Bonk!", "bad"); veh.health = Math.max(0, veh.health - Math.abs(veh.v) * 0.6); }
     if (hit.what === "car" && police.some((p) => p.car === hit.car) && wanted === 0) addWanted(1, "You crashed into a police car!");
     veh.v *= -0.3;
   } else { c.position.x = nx; c.position.z = nz; }
+  if (!md.electric) { const before = veh.fuel; veh.fuel = Math.max(0, veh.fuel - Math.abs(veh.v) * dt / 110); if (before > md.tank * 0.15 && veh.fuel <= md.tank * 0.15) toast("Low on gas! Find a Fuel Stop.", "bad"); }
+  if (veh.kind === "own") S.ownCar = { x: c.position.x, z: c.position.z, h: veh.h, fuel: veh.fuel, health: veh.health };
+  nearPump = Math.abs(veh.v) < 2 && PUMPS.some((pp) => Math.hypot(pp.x - c.position.x, pp.z - c.position.z) < 4.5);
   c.rotation.y = veh.h;
   c.rotation.z = -steer * Math.min(1, Math.abs(veh.v) / MAX) * 0.06;
   player.position.set(c.position.x, 0, c.position.z); player.rotation.y = veh.h;
@@ -2042,7 +2198,7 @@ function updatePlayer(dt) {
   if (!nearDoor) { let bn = 3; for (const n of npcs) { const dd = n.c.position.distanceTo(player.position); if (dd < bn) { bn = dd; nearNpc = n; } } }
 }
 function interact(pref) {
-  if (drive) { exitVehicle(); return; }
+  if (drive) { if (pref !== "car" && nearPump) refuel(); else exitVehicle(); return; }
   if (IN) { if (nearStation) openStation(nearStation); else if (nearNpc) talk(nearNpc); return; }
   if (pref === "car" && !nearVehicle) return;
   if (nearVehicle && (pref === "car" || !nearDoor)) enterVehicle(nearVehicle);
@@ -2194,7 +2350,14 @@ function renderHUD(force) {
     else if (nearVehicle && !IN) p = `<kbd>F</kbd>${vehicleLabel(nearVehicle)}`;
     else if (nearNpc) p = `<kbd>E</kbd>Say hi`;
   }
-  if (drive) { p = ""; $("speedo").textContent = `${Math.round(Math.abs(drive.v) * 2.2)} mph`; }
+  if (drive) {
+    const md = carModel(drive);
+    p = nearPump ? (md.electric ? `<kbd>E</kbd>Electric cars don't need gas` : md.tank - drive.fuel < 0.2 ? "Tank is full" : `<kbd>E</kbd>Fill up the tank ($${((md.tank - drive.fuel) * GAS_PRICE).toFixed(2)})`) : "";
+    $("speedo").textContent = `${Math.round(Math.abs(drive.v) * 2.2)} mph`;
+    const pct = md.electric ? 100 : Math.round((drive.fuel / md.tank) * 100);
+    $("fuelo").textContent = md.electric ? "Electric" : `Gas ${pct}%`; $("fuelo").className = `fuel ${!md.electric && pct <= 15 ? "low" : ""}`;
+    $("healtho").textContent = `Car ${Math.round(drive.health)}%`; $("healtho").className = `fuel ${drive.health < 30 ? "low" : ""}`;
+  }
   const pe = $("prompt");
   if (p !== pe.dataset.p) { pe.dataset.p = p; pe.innerHTML = p; pe.hidden = !p; }
 }
@@ -2267,6 +2430,9 @@ $("sheetWrap").addEventListener("click", (e) => {
   if (a) { const [bid, id] = a.dataset.act.split(":"); const act = id === "work" ? WORK : ACTS[bid].find((x) => x.id === id); doActivity(act, bid); return; }
   const ap = e.target.closest("[data-apply]"); if (ap) { apply(ap.dataset.apply); renderSheet(); renderHUD(true); return; }
   const by = e.target.closest("[data-buy]"); if (by) { buy(by.dataset.buy); return; }
+  const bc = e.target.closest("[data-buycar]"); if (bc) { buyCar(bc.dataset.buycar); return; }
+  if (e.target.closest("[data-repair]")) { repairCar(); return; }
+  const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
   const tx = e.target.closest("[data-taxi]");
   if (tx) {
     const bid = tx.dataset.taxi; if (S.money < 12) return toast("Need $12", "bad");
@@ -2338,6 +2504,8 @@ function stationSheet(bid, st) {
     if (st.sp === "career") html += careerBlock(bid);
     if (st.sp === "jobs") html += jobBoardHTML();
     if (st.sp === "shop") html += shopHTML(b);
+    if (st.sp === "cars") html += carShopHTML();
+    if (st.sp === "garage") html += garageHTML();
     const acts = st.acts.map((id) => ACTS[bid].find((a) => a.id === id)).filter(Boolean);
     if (acts.length) html += `<div class="sec"><h3>Things to do</h3><div class="grid">${acts.map((a) => actCard(a, bid)).join("")}</div></div>`;
     return html + `</div>`;
