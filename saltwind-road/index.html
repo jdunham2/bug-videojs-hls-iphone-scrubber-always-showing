@@ -806,6 +806,7 @@ const GOODS = {
   card_bat:{name:'Cave Bat Card',base:40,col:'#5a4a5a',kind:'card',desc:'A collectible monster card.'},
   spirit_charm:{name:'Spirit Charm',base:0,col:'#7ae0a0',kind:'trinket',desc:'A gift from the Spirit of the Wood. +10% XP while carried.'},
   elspeth_lantern:{name:'Elspeth\u2019s Lantern',base:0,col:'#bfe8ff',kind:'trinket',desc:'A lantern with a soft blue glow. +15% damage at night while carried.'},
+  tide_bell:{name:'Tidecaller\u2019s Bell',base:0,col:'#6ac0d8',kind:'trinket',desc:'A small bronze bell from the deep. +25% speed on water while carried.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2205,6 +2206,8 @@ const NPCS = [
    hello:["Step on the log, if you dare!","Feet quick, knees loose!","Nobody stays on longer than me."], rumors:["When the log tips one way, lean the other. It spins faster the longer you stay on."]},
   {id:'rowan',town:'hollow',dx:-4,dy:4,name:'Elder Rowan',role:'Village elder',cols:{cloak:'#3a5a3a',skin:'#d8b898',hair:'#e8e8e8'},whisper:true,freeSpot:true,
    hello:["The woods have been whispering lately.","Hollowpine has stood beside the forest for a thousand years.","Sit, child. Listen to the trees."], rumors:["Old totems stand hidden in the forests around Hollowpine. My grandmother said they were carved by the Spirit of the Wood itself."]},
+  {id:'bellmari',town:'tidewatch',dx:3,dy:4,name:'Old Marisol',role:'Bell-keeper',cols:{cloak:'#2a4a6a',skin:'#c89878',hair:'#d8d8d8'},bellkeeper:true,freeSpot:true,
+   hello:["Do you hear the sea singing?","The bell rang every dawn, once.","Sailors lost at sea never truly leave."], rumors:["When the great storm sank the Tidewatch bell, its pieces washed up on the beaches. Find them, and the drowned might finally rest."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3142,7 +3145,7 @@ const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => {
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (have('tide_bell') && S && [T.DEEP, T.SHAL].includes(tileAt(Math.floor(S.x), Math.floor(S.y))) ? 1.25 : 1) * (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
@@ -5242,6 +5245,39 @@ function drawTwin(T0) {
   ctx.fillStyle = opened ? '#ffd040' : '#e0c050'; ctx.fillRect(px - 5, py - 5, 2, 4); ctx.fillRect(px + 3, py - 5, 2, 4);
   if (T0.hold > 0) { ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 10, py - 18, 20, 3); ctx.fillStyle = '#ffd040'; ctx.fillRect(px - 9, py - 17, 18*Math.min(1, T0.hold/1.5), 1); }
 }
+// ===== story: the Sunken Bell =====
+const coastal = (x, y) => { const t = map[idx(x, y)]; if (t !== T.SAND) return false; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { if (!inB(x + dx, y + dy)) continue; const u = map[idx(x + dx, y + dy)]; if (u === T.SHAL || u === T.DEEP) return true; } return false; };
+function bellTalk(n) {
+  const W = S.sb, H = TOWNS.tidewatch;
+  if (!W) {
+    const pieces = []; let pier = null;
+    for (let k = 0; k < 6000 && pieces.length < 3; k++) { const a = Math.random()*6.283, r = 15 + Math.random()*40, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
+      if (!inB(x, y) || !coastal(x, y) || !passable(x + .5, y + .5) || townAt(x, y, 8) || pieces.some(q => Math.hypot(q.x - x, q.y - y) < 10)) continue; pieces.push({x: x + .5, y: y + .5}); }
+    for (let r = 6; r < 25 && !pier; r++) for (let a = 0; a < 24; a++) { const x = Math.floor(H.x + Math.cos(a/24*6.283)*r), y = Math.floor(H.y + Math.sin(a/24*6.283)*r); if (inB(x, y) && coastal(x, y) && passable(x + .5, y + .5)) { pier = {x: x + .5, y: y + .5}; break; } }
+    if (pieces.length < 3 || !pier) { say('“The tide is high today. Come back another time, dear.”', [back(n)]); return; }
+    const names = [['crown', 'Bell Crown', 'The top of the bell, crusted with barnacles.'], ['lip', 'Bell Lip', 'A curved bronze rim, still faintly ringing.'], ['clapper', 'Bell Clapper', 'The heavy iron tongue of the bell.']];
+    S.sb = {step: 1, pieces: pieces.map((q, i) => ({...q, k: names[i][0], name: names[i][1], desc: names[i][2], got: false})), pier}; save();
+    say('“Forty years ago, the great storm sank the Tidewatch bell, and the ship that carried it. Every dawn since, I hear the drowned sailors calling for it. The sea has been returning the pieces to the beaches, bit by bit. Find all three and bring them to me, and perhaps those poor souls can finally rest.”<br><span style="color:var(--muted)">The three fragments are marked on your map, along the coast.</span>', [back(n)]); return;
+  }
+  if (W.step === 1) { const g = W.pieces.filter(q => q.got).length; if (g < 3) { say(`“You have found ${g} of the three pieces. Search the beaches; the sea hides them in the sand.”`, [back(n)]); return; }
+    W.step = 3; save(); say('Marisol fits the pieces together with shaking hands, and the bell is whole again, small and bronze and gleaming.<br><br>“Take it to the water’s edge at dawn and ring it, just as the bell-keepers did. The spot is marked on your map. Go, go!”', [back(n)]); return; }
+  if (W.step === 3) { say('“Ring it at dawn, at the water’s edge. They are waiting.”', [back(n)]); return; }
+  say('“Every morning now, the sea is quiet. Thank you, dear. Thank you.”', [back(n)]);
+}
+function bellTarget() {
+  const W = S.sb; if (!W) return null;
+  if (W.step === 1) { const q = W.pieces.find(q => !q.got && Math.hypot(q.x - S.x, q.y - S.y) < 1.3); if (!q) return null;
+    return {key: 'bellp' + q.k, html: `<kbd style="margin:0 6px 0 0">E</kbd>Dig up the ${q.name}`, btn: 'Dig', fn: () => { q.got = true; SFX.chime(); burst(q.x, q.y - .3, '#d8b070', 14, 3); save(); toast(`<b>Found: ${q.name}</b><br>${q.desc} (${W.pieces.filter(z => z.got).length}/3)`, 4500); }}; }
+  if (W.step === 3 && Math.hypot(W.pier.x - S.x, W.pier.y - S.y) < 1.8) return {key: 'ringbell', html: '<kbd style="margin:0 6px 0 0">E</kbd>Ring the bell', btn: 'Ring', fn: () => bellRing()};
+  return null;
+}
+function bellRing() {
+  AUD.tone(523, 1.2, 'sine', .15); setTimeout(() => AUD.tone(659, 1.2, 'sine', .12), 300); setTimeout(() => AUD.tone(784, 1.6, 'sine', .12), 600);
+  if (!(S.time > .2 && S.time < .34)) { openPanel('The bell', 'The bell rings out across the water... but nothing answers. Marisol said to ring it <b>at dawn</b>.', [{label: 'Wait for dawn', fn: closeTalk}]); return; }
+  S.sb.step = 4; addItem('tide_bell', 1); S.coins += 550; gainXP(320); SFX.victory(); burst(S.x, S.y - 1, '#6ac0d8', 40, 6); renderHUD(); save();
+  openPanel('Dawn at Tidewatch', 'The bell’s voice rolls out over the waves. Out on the water, pale lights rise one by one: dozens of them, the shapes of sailors in old coats, lifting their caps to you. Then the sun breaks the horizon, and they are gone, and the sea is calm and golden.<br><br>When you look down, the bell in your hand has become a tiny bronze charm, humming with the song of the sea.<br><br><span style="color:var(--good)">You receive the <b>Tidecaller’s Bell</b> (+25% speed on water while carried), 550 coin and 320 XP.</span>', [{label: 'Farewell, sailors', primary: true, fn: closeTalk}]);
+}
+function drawBellPiece(q) { const px = q.x*TS, py = q.y*TS; if (Math.floor(frameT*2 + q.x) % 3 === 0) { ctx.fillStyle = 'rgba(255,240,180,.6)'; ctx.fillRect(px - 1, py - 4, 2, 2); } ctx.fillStyle = '#b08a4a'; ctx.fillRect(px - 3, py - 1, 6, 3); ctx.fillStyle = '#d8b070'; ctx.fillRect(px - 2, py - 1, 3, 1); }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6790,9 +6826,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['The Sunken Bell', 'A story quest: Old Marisol in Tidewatch tells of a bell lost in a great storm. Dig up its three fragments on the beaches nearby, then ring the bell at the water\u2019s edge at dawn.'],
   ['The Lady of Gravenmoor', 'A story quest: at night, a ghostly lady appears near Gravenmoor. Find her three lost keepsakes on the moors, then meet her at her grave at midnight.'],
   ['The Whispering Woods', 'A story quest: Elder Rowan in Hollowpine says the forest has started whispering. Find the three old totems in the woods around town, then face the Spirit of the Wood in its glade. Bring friends: it is a tough fight.'],
   ['Whack-a-mole and log rolling', 'Farmer Bea in Reedholm needs help with moles: whack them as they pop up (golden ones are worth extra) but leave her cat alone. Bjorn in Tallpine dares you onto a spinning log in the river: lean against every wobble with the arrow keys to stay on as long as you can.'],
@@ -8026,6 +8063,7 @@ function render() {
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
   if (ghostSpot() && ghostVisible() && inView(ghostSpot().x, ghostSpot().y)) sprites.push({y: ghostSpot().y, f: drawGhostLady});
+  if (S.sb && S.sb.step === 1) for (const q of S.sb.pieces) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawBellPiece(q)});
   if (S.gh && S.gh.step === 1) for (const q of S.gh.items) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawKeepsake(q)});
   for (const T0 of twinSites()) if (inView(T0.ax, T0.ay)) sprites.push({y: T0.vy - .4, f: () => drawTwin(T0)});
   if (S.ww && S.ww.step === 1) for (const q of S.ww.spots) if (inView(q.x, q.y)) sprites.push({y: q.y + .2, f: () => drawTotem(q)});
@@ -8479,7 +8517,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8838,6 +8876,7 @@ function mainOptions(n) {
   if (n.molefarm) o.push({label: 'Whack the moles', primary: true, fn: () => moleStart()});
   if (n.logroll) o.push({label: 'Try log rolling · 10\u25c6', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); logStart(); }});
   if (n.whisper) o.push({label: wwLabel(), primary: !S.ww || S.ww.step < 4, fn: () => wwTalk(n)});
+  if (n.bellkeeper) o.push({label: !S.sb ? 'Ask about the bell' : S.sb.step >= 4 ? 'Talk about the bell' : 'About the sunken bell', primary: !S.sb || S.sb.step < 4, fn: () => bellTalk(n)});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -10815,6 +10854,8 @@ function openMap() {
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
     if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
     for (const q of pings) mk(q.x, q.y, q.col, `Ping (${q.name})`, 4);
+    if (S.sb && S.sb.step === 1) S.sb.pieces.forEach(q => { if (!q.got) mk(q.x, q.y, '#6ac0d8', 'Bell fragment', 4); });
+    if (S.sb && S.sb.step === 3) mk(S.sb.pier.x, S.sb.pier.y, '#6ac0d8', 'Ring the bell here at dawn', 5);
     if (S.gh && S.gh.step === 1) S.gh.items.forEach(q => { if (!q.got) mk(q.x, q.y, '#bfe8ff', `Elspeth\u2019s ${q.name}`, 4); });
     if (S.gh && (S.gh.step === 2 || S.gh.step === 3)) mk(S.gh.grave.x, S.gh.grave.y, '#bfe8ff', 'Elspeth\u2019s grave', 5);
     if (S.towns.graven && (!S.gh || S.gh.step < 4)) { const g0 = ghostSpot(); if (g0) mk(g0.x, g0.y, '#bfe8ff', 'A ghostly figure (at night)', 4); }
@@ -11647,6 +11688,7 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['twinvault','Better Together, Literally','Open a Twin Plate vault with a friend', () => (S.twinVaults || 0) >= 1],
   ['twinvault5','Partners in Crime','Open 5 Twin Plate vaults', () => (S.twinVaults || 0) >= 5],
+  ['sunkenbell','The Bell Tolls Again','Ring the Tidewatch bell at dawn', () => !!(S.sb && S.sb.step >= 4)],
   ['ladygraven','Rest in Peace','Help Lady Elspeth find rest', () => !!(S.gh && S.gh.step >= 4)],
   ['whisperwoods','The Whispering Woods','Calm the Spirit of the Wood', () => !!(S.ww && S.ww.step >= 3)],
   ['mole30','Mole Patrol','Score 30 at whack-a-mole', () => (S.moleBest || 0) >= 30],
@@ -12088,8 +12130,11 @@ function renderPause() {
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } });
-const WN_VER = 3;
+const WN_VER = 4;
 const WHATS_NEW = [
+  ['New stories', 'The Whispering Woods (Elder Rowan, Hollowpine), The Lady of Gravenmoor (a ghost near Gravenmoor at night) and The Sunken Bell (Old Marisol, Tidewatch). Each ends with a unique charm.'],
+  ['Co-op vaults', 'Twin Plate vaults near six towns open only when two party members stand on both plates at once.'],
+  ['More to do', 'Tornadoes to chase, monster cards to collect (Tobias, Crownfall), photo requests (Iris, Maplehold), mine cart rides (Redrock), snowball fights (Stormwatch), whack-a-mole (Reedholm) and log rolling (Tallpine).'],
   ['Play together', 'Press P to make a party and share the code. Fight the same monsters and bosses, revive fallen friends, race, spar, send gifts, emote (Y) and ping (N).'],
   ['Controllers', 'Plug in a Pro Controller, Xbox or PlayStation pad and press any button.'],
   ['Photo mode', 'Press H, pan around, pick a filter and snap.'],
