@@ -241,6 +241,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
       <button class="btn" id="btnMap">Map<kbd>M</kbd></button>
       <button class="btn" id="btnJournal">Journal<kbd>J</kbd></button>
       <button class="btn" id="btnSkills">Skills<kbd>K</kbd></button>
+      <button class="btn" id="btnParty">Party<kbd>P</kbd></button>
       <button class="btn" id="btnMenu" aria-label="Menu">☰</button>
     </div>
   </div>
@@ -3329,7 +3330,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3700,6 +3701,105 @@ function hwFight() {
   const lv = 1 + (S.level || 1)*.06;
   for (let k = 0; k < 3; k++) { const a = k/3*6.283 + Math.random(), x = S.x + Math.cos(a)*3, y = S.y + Math.sin(a)*3; const e = makeEnemy(k ? 'bandit' : 'archer', enemyWalk(x, y) ? x : S.x + 2, enemyWalk(x, y) ? y : S.y, {alert: true, hwGang: true}); e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = lv; if (!k) { makeElite(e); e.elite = {name: 'Masked Highwayman', col: '#8a6a4a'}; e.labelName = 'Masked Highwayman'; e.hwBoss = true; } enemies.push(e); }
   SFX.roar();
+}
+// ===== online party (co-op) =====
+let ROOM = null, party = null, remote = {}, partyT = 0, chatSeq = 0, myChat = null, myBubble = null;
+const chatLog = [];
+try { if (window.claude && typeof window.claude.use === 'function') window.claude.use('room').then(r => { ROOM = r || null; }).catch(() => { ROOM = null; }); } catch (e) {}
+const CODE_CH = 'abcdefghjkmnpqrstuvwxyz23456789', PARTY_COLS = ['#6ab0ff', '#ff7ab0', '#7ae08a', '#ffd040', '#c890ff', '#ff9a4a', '#5ae0e0'];
+const netName = () => (S.netName || S.name || 'Traveler').slice(0, 16);
+const partyNear = () => !!party && Object.values(remote).some(r => Math.hypot(r.x - S.x, r.y - S.y) < 15);
+function colFor(peer) { let h = 0; for (const c of peer) h = (h*31 + c.charCodeAt(0)) >>> 0; return PARTY_COLS[h % PARTY_COLS.length]; }
+function cleanText(t, n) { return String(t || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, n); }
+function partyPanel() {
+  if (!S) return;
+  if (!ROOM) { openPanel('Party', 'Online party play needs the game to be opened from its claude.ai link while you are signed in. It is not available in this view.', [{label: 'OK', fn: closeTalk}]); return; }
+  if (!party) {
+    openPanel('Party', `Play together! <b>Create a party</b> to get a code, then give the code to your friends. When they join with it, they appear in your world and you can explore, fight and chat together.<div style="margin-top:10px">Join with a code: <input id="partyCodeIn" maxlength="5" placeholder="CODE" style="font:inherit;text-transform:uppercase;letter-spacing:.2em;width:110px;padding:4px 8px;border-radius:6px;border:1px solid #444;background:#0d131b;color:#eee"></div><div style="margin-top:6px">Your name: <input id="partyNameIn" maxlength="16" value="${esc(netName())}" style="font:inherit;width:150px;padding:4px 8px;border-radius:6px;border:1px solid #444;background:#0d131b;color:#eee"></div>`, [
+      {label: 'Create a party', primary: true, fn: () => { saveNetName(); createParty(); }},
+      {label: 'Join with code', fn: () => { saveNetName(); const el = document.getElementById('partyCodeIn'); const c = cleanText(el ? el.value : '', 5).toLowerCase().replace(/[^a-z0-9]/g, ''); if (c.length !== 5) { toast('Party codes have 5 letters and numbers.'); return; } enterParty(c, false); }},
+      {label: 'Close', fn: closeTalk}]);
+    guardInputs(); return;
+  }
+  const list = Object.values(remote);
+  const leader = list.find(r => r.p.host);
+  openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat.</span><br><br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
+    ...(leader && !party.host ? [{label: `Travel to ${leader.name}`, disabled: inDungeon() || inArena() || leader.p.dg || bossActive(), fn: () => { closeTalk(); SFX.travel(); fadeThen(() => { const spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]].map(([dx, dy]) => [leader.x + dx, leader.y + dy]).find(([x, y]) => passable(x, y)) || [leader.x, leader.y]; S.x = spot[0]; S.y = spot[1]; S.riding = !!S.riding && !!leader.p.mt; enemies = enemies.filter(e => e.boss); petE = null; compE = null; lastTile = -1; renderHUD(); }); }}] : []),
+    {label: 'Chat', fn: () => chatPanel()},
+    {label: 'Leave party', fn: () => { leaveParty(); closeTalk(); }},
+    {label: 'Close', fn: closeTalk}]);
+}
+function guardInputs() { setTimeout(() => { for (const id of ['partyCodeIn', 'partyNameIn', 'chatIn']) { const el = document.getElementById(id); if (el && !el._g) { el._g = true; el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' && id === 'chatIn') sendChat(); if (e.key === 'Escape') closeTalk(); }); } } const c = document.getElementById('chatIn') || document.getElementById('partyCodeIn'); if (c) c.focus(); }, 30); }
+function saveNetName() { const el = document.getElementById('partyNameIn'); const v = cleanText(el ? el.value : '', 16); if (v) S.netName = v; save(); }
+async function createParty() {
+  const code = Array.from({length: 5}, () => CODE_CH[Math.floor(Math.random()*CODE_CH.length)]).join('');
+  await enterParty(code, true);
+}
+async function enterParty(code, host) {
+  if (party) await leaveParty(true);
+  let rm; try { rm = await ROOM.join('party-' + code); } catch (e) { toast(`Couldn't connect to the party (${esc((e && e.code) || 'error')}). Try again in a moment.`, 4500); return; }
+  party = {code, host, room: rm, unsubs: []}; remote = {}; partyT = 0;
+  party.unsubs.push(rm.onPeers(ch => { for (const pr of ch.left) { const r = remote[pr.peer]; if (r) { toast(`<b>${esc(r.name)}</b> left the party.`, 3500); delete remote[pr.peer]; } } }, err => { if (party && party.room === rm) { toast('The party connection was lost.', 4000); party = null; remote = {}; } }));
+  sendPresence(); SFX.chime(); S.partiesJoined = (S.partiesJoined || 0) + 1;
+  openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
+}
+async function leaveParty(quiet) {
+  const P = party; if (!P) return; party = null; remote = {};
+  for (const u of P.unsubs) { try { u(); } catch (e) {} }
+  try { await P.room.leave(); } catch (e) {}
+  if (!quiet) toast('You left the party.', 3000);
+}
+function chatPanel() {
+  if (!party) return;
+  openPanel('Party chat', `${chatLog.slice(-8).map(c => `<div><b style="color:${c.col}">${esc(c.name)}:</b> ${esc(c.m)}</div>`).join('') || '<span style="color:var(--muted)">No messages yet.</span>'}<div style="margin-top:10px"><input id="chatIn" maxlength="100" placeholder="Say something..." style="font:inherit;width:100%;max-width:340px;padding:4px 8px;border-radius:6px;border:1px solid #444;background:#0d131b;color:#eee"></div>`, [
+    {label: 'Send', primary: true, fn: () => sendChat()}, {label: 'Close', fn: closeTalk}]);
+  guardInputs();
+}
+function sendChat() {
+  const el = document.getElementById('chatIn'); const m = cleanText(el ? el.value : '', 100); if (!m || !party) { closeTalk(); return; }
+  myChat = {i: ++chatSeq, m}; myBubble = {m, t: 5}; chatLog.push({name: netName(), m, col: '#ffffff'}); if (chatLog.length > 30) chatLog.shift(); partyT = 0; closeTalk();
+}
+function sendPresence() {
+  if (!party) return;
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat};
+  party.room.presence(pz).catch(() => {});
+}
+function partyTick(dt) {
+  if (!party) return;
+  for (const r of Object.values(remote)) if (r.bubble) { r.bubble.t -= dt; if (r.bubble.t <= 0) r.bubble = null; }
+  if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
+  partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
+  let peers; try { peers = party.room.peers(); } catch (e) { return; }
+  const seen = {};
+  for (const pr of peers) {
+    if (pr.sameTab || pr.kind !== 'viewer') continue; const p = pr.presence || {}; if (typeof p.x !== 'number' || typeof p.y !== 'number' || !isFinite(p.x) || !isFinite(p.y)) continue;
+    seen[pr.peer] = true; let r = remote[pr.peer];
+    if (!r) { r = remote[pr.peer] = {peer: pr.peer, x: p.x, y: p.y, phase: 0, kills: +p.k || 0, chatI: p.ch && p.ch.i, col: colFor(pr.peer), name: cleanText(p.n, 16) || 'Friend', p}; toast(`<b>${esc(r.name)}</b> ${p.host ? 'is leading' : 'joined'} the party!`, 3500); SFX.chime(); }
+    r.p = p; r.name = cleanText(p.n, 16) || 'Friend';
+    const d = Math.hypot(p.x - r.x, p.y - r.y); if (d > 6) { r.x = p.x; r.y = p.y; } else { const k = Math.min(1, dt*12); r.x += (p.x - r.x)*k; r.y += (p.y - r.y)*k; }
+    if (p.mv) r.phase += dt*12;
+    if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
+    const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
+    if (!party.host && p.host && typeof p.t === 'number' && isFinite(p.t)) { let dtm = Math.abs(S.time - p.t); dtm = Math.min(dtm, 1 - dtm); if (dtm > .02) S.time = Math.max(0, Math.min(.999, p.t)); }
+  }
+  for (const k in remote) if (!seen[k]) delete remote[k];
+}
+function drawBubble(px, py, m) {
+  ctx.font = '7px "Pixelify Sans", monospace'; const w = Math.min(130, ctx.measureText(m).width + 8);
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fillRect(px - w/2, py - 12, w, 11); ctx.beginPath(); ctx.moveTo(px - 3, py - 1); ctx.lineTo(px, py + 3); ctx.lineTo(px + 3, py - 1); ctx.fill();
+  ctx.fillStyle = '#1a1a22'; ctx.textAlign = 'center'; ctx.fillText(m.length > 26 ? m.slice(0, 25) + '…' : m, px, py - 4);
+}
+function drawRemote(r) {
+  const p = r.p, px = Math.round(r.x*TS), py = Math.round(r.y*TS), c = (p.c && typeof p.c === 'object') ? {cloak: String(p.c.cloak || '#2f6b6b').slice(0, 9), skin: String(p.c.skin || '#e0b18a').slice(0, 9), hair: String(p.c.hair || '#3a2a1d').slice(0, 9)} : player.cols;
+  const facing = ['up', 'down', 'left', 'right'].includes(p.f) ? p.f : 'down', hat = HATS[p.hat] ? p.hat : null, mt = MOUNTS[p.mt] ? p.mt : null;
+  ctx.fillStyle = r.col; ctx.globalAlpha = .35; ctx.beginPath(); ctx.ellipse(px, py + 1, 7, 2.5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  if (mt) { drawMount(ctx, mt, px, py, facing === 'left' ? -1 : 1, r.phase, !!p.mv); drawPerson(ctx, px, py - (MOUNTS[mt].fly && p.mv ? 12 : 8), c, 0, false, facing, {scarf: true, pack: true, cos: hat}); }
+  else drawPerson(ctx, px, py, c, r.phase, !!p.mv, facing, {scarf: true, pack: true, cos: hat});
+  if (p.sw) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); const a = {up: -1.57, down: 1.57, left: 3.14, right: 0}[facing]; ctx.arc(px, py - 7, 10, a - .8, a + .8); ctx.stroke(); }
+  const top = py - (mt ? 34 : 28); ctx.font = '7px "Pixelify Sans", monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#0d131b'; ctx.fillText(r.name, px + .7, top + .7); ctx.fillStyle = r.col; ctx.fillText(r.name, px, top);
+  const hp = +p.hp || 0, mh = Math.max(1, +p.mh || 1); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 8, top + 2, 16, 3); ctx.fillStyle = '#e57a62'; ctx.fillRect(px - 7, top + 3, 14*Math.max(0, Math.min(1, hp/mh)), 1);
+  if (r.bubble) drawBubble(px, top - 4, r.bubble.m);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -5250,6 +5350,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. Each player keeps their own save.'],
   ['Sky whale & meteors', 'At dusk, keep an eye on the sky: a great whale sometimes swims overhead and drops a Cloud Pearl. On some nights meteors crash nearby. Mine the crater with a pickaxe for Meteorite Ore to forge the Meteor Blade.'],
   ['Summits & exotic seeds', 'Climb the highest peaks with climbing gear and plant your flag at each summit (look for a stone cairn) for a wide view and a reward. Sorrel in Greenstem sells exotic seeds: Golden Wheat, Dragonfruit and Starfruit.'],
   ['Moon rabbit & display cases', 'On full-moon nights (every 14 days, as the Gazette will tell you) a glowing moon rabbit comes down to play. Chase it until it tires, then catch it for Moon Mochi and a Moon Charm. Craft a Display Case to show off your trophies at home.'],
@@ -5555,7 +5656,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -5710,6 +5811,8 @@ addEventListener('keydown', e => {
     else if (k === 'b') buildKey();
     else if (k === 'x') castSpell();
     else if (k === 'z') cycleSpell();
+    else if (k === 'p') partyPanel();
+    else if (k === 't' && party) { e.preventDefault(); chatPanel(); }
   } else if (mode === 'talk') {
     if (k === 'escape') closeTalk();
     const n = parseInt(k, 10);
@@ -5763,6 +5866,7 @@ $('bombBtn').addEventListener('click', () => mode === 'play' && throwBomb());
 $('rollBtn').addEventListener('click', () => doRoll());
 $('btnRide').addEventListener('click', () => toggleRide());
 $('btnSkills').addEventListener('click', () => mode === 'play' && openSkills());
+$('btnParty').addEventListener('click', () => mode === 'play' && partyPanel());
 $('btnMenu').addEventListener('click', () => mode === 'play' && openPause());
 $('btnMap').addEventListener('click', () => mode === 'play' && openMap());
 $('btnJournal').addEventListener('click', () => mode === 'play' && openJournal());
@@ -6333,6 +6437,7 @@ function render() {
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
+  if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
   if (meteor && inView(meteor.x, meteor.y - 4)) sprites.push({y: meteor.y, f: drawMeteor});
   for (const q of cloudPearls) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawCloudPearl(q)});
@@ -6586,6 +6691,7 @@ function drawMini() {
   for (const k of BK) if (S.lairsSeen[k] && !S.bosses[k]) { g.fillStyle = '#e5484d'; const bx = (BOSSES[k].x - sx)*s, by = (BOSSES[k].y - sy)*s; g.fillRect(bx - 3, by - 1, 6, 2); g.fillRect(bx - 1, by - 3, 2, 6); }
   g.fillStyle = '#e57a62'; for (const e of enemies) if (S.explored[idx(Math.floor(e.x), Math.floor(e.y))]) g.fillRect((e.x - sx)*s - 1.5, (e.y - sy)*s - 1.5, e.boss ? 5 : 3, e.boss ? 5 : 3);
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x - sx)*s - 3, (HOME.y - sy)*s - 3, 6, 6);
+  if (party) for (const r of Object.values(remote)) { g.fillStyle = r.col || '#6ab0ff'; g.beginPath(); g.arc((r.x - sx)*s, (r.y - sy)*s, 3.5, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1; g.stroke(); }
   g.fillStyle = '#ffffff'; g.fillRect(m.width/2 - 2, m.height/2 - 2, 4, 4);
   g.strokeStyle = '#0d131b'; g.strokeRect(m.width/2 - 2.5, m.height/2 - 2.5, 5, 5);
 }
@@ -9074,6 +9180,7 @@ function openMap() {
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
   { const mk = (x, y, col, txt, r = 4) => { const tx = x*s, ty = y*s; g.fillStyle = col; g.beginPath(); g.arc(tx, ty, r*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); if (txt) { g.fillStyle = col; g.fillText(txt, tx, ty - 8*dpr); } };
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
+    if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
     (S.summits || []).forEach(q => { if (q.flag || S.explored[idx(q.x, q.y)]) mk(q.x + .5, q.y + .5, q.flag ? '#c84a3a' : '#8a8478', q.flag ? '⚑' : '', 3); });
     (S.waystones || []).forEach(w => { if (w.on || S.explored[idx(w.x, w.y)]) mk(w.x + .5, w.y + .5, w.on ? '#8ad0ff' : '#5a6a7a', w.on ? '◈' : '', 4); });
     (S.vaults || []).forEach((v, i) => { if ((S.vaultsSeen || {})[i]) mk(v.x + .5, v.y + .5, v.done ? '#6a6a72' : '#e0c070', v.done ? '' : 'Vault'); });
@@ -9895,6 +10002,8 @@ const ACH = [
   ['orchard','Orchard Keeper','Harvest fruit from a tree you planted', () => !!S.orchard],
   ['seedkeeper','Seed Keeper','Carry 10 kinds of seeds at once', () => GK.filter(g => GOODS[g].kind === 'seed' && have(g) > 0).length >= 10],
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
+  ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
+  ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['skywhale','Song of the Sky','See the sky whale', () => (S.whales || 0) >= 1],
   ['cloudpearl','Pearl from the Clouds','Catch a cloud pearl', () => (S.cloudPearls || 0) >= 1],
   ['meteor','Star Struck','Mine meteorite ore from a crater', () => (S.meteorites || 0) >= 1],
@@ -10421,6 +10530,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
+window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
 window.__sw = {get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
 })();
