@@ -216,10 +216,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
     </div>
   </div>
   <button class="prompt" id="prompt" hidden></button>
-  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
+    <button class="card" id="btnPet" aria-label="Pet" hidden><svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="4.5" ry="3.8"/><circle cx="6.5" cy="10.5" r="2"/><circle cx="17.5" cy="10.5" r="2"/><circle cx="9.5" cy="6.5" r="2"/><circle cx="14.5" cy="6.5" r="2"/></svg>Pet</button>
     <button class="card" id="btnDecor" aria-label="Decorate" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 20h16"/><path d="M6 20v-7a6 6 0 0 1 12 0v7"/><path d="M12 7V3"/></svg>Decorate</button>
     <button class="card" id="btnLog" aria-label="Diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 3.5h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h6"/></svg>Diary</button>
   </div>
@@ -402,7 +403,6 @@ const ITEMS = {
   homegym:  { name: "Home Gym", price: 300, desc: "Work out at home for Fitness." },
   robovac:  { name: "Robot Vacuum", price: 350, desc: "Your home gets messy half as fast." },
   outfit:   { name: "Designer Outfit", price: 120, desc: "+10 Charm the moment you wear it." },
-  dog:      { name: "Adopt a Dog", price: 250, desc: "Fun and Friends drop slower. Walk it every day." },
 };
 
 const CAR_MODELS = {
@@ -441,6 +441,7 @@ const ACTS = {
   grocery: [
     { id: "groceries", name: "Buy groceries", mins: 30, cost: 25, note: "+5 meals", run: () => { S.meals += 5; } },
     { id: "snacks", name: "Grab snacks", mins: 10, cost: 6, fx: { hunger: 15, fun: 5 } },
+    { id: "petfood2", name: "Pet food", mins: 10, cost: 12, note: "+5 servings", run: () => { S.petFood = (S.petFood || 0) + 5; } },
     { id: "flowers", name: "Buy flowers for a friend", mins: 15, cost: 12, fx: { social: 12, fun: 4 } },
   ],
   burger: [
@@ -490,7 +491,7 @@ const ACTS = {
     { id: "meet", name: "Meet new people", mins: 120, fx: { social: 30 }, skill: { charm: 2 } },
     { id: "ducks", name: "Feed the ducks", mins: 30, fx: { fun: 10 } },
     { id: "parkpaint", name: "Paint the scenery", mins: 120, fx: { fun: 10 }, skill: { creativity: 4 } },
-    { id: "walkdog", name: "Walk the dog", mins: 60, fx: { fun: 12, social: 8, energy: -5 }, can: () => owns("dog") || "You don't have a dog" },
+    { id: "walkdog", name: "Walk the dog", mins: 60, fx: { fun: 12, social: 8, energy: -5 }, run: () => petHappy(15), can: () => owns("dog") || "You don't have a dog" },
   ],
   cinema: [
     { id: "movie", name: "Watch a movie", mins: 180, cost: 15, fx: { fun: 35, social: 5 } },
@@ -546,8 +547,9 @@ const ACTS = {
   vet: [
     { id: "puppies", name: "Pet the puppies", mins: 30, fx: { fun: 15, social: 5 } },
     { id: "shelter", name: "Volunteer at the shelter", mins: 180, fx: { social: 15, fun: 10, energy: -10 }, skill: { charm: 1, smarts: 1 } },
-    { id: "treats", name: "Buy dog treats", mins: 10, cost: 8, fx: { fun: 10 }, can: () => owns("dog") || "You don't have a dog" },
-    { id: "groom", name: "Get your dog groomed", mins: 60, cost: 20, fx: { fun: 10, home: 10 }, can: () => owns("dog") || "You don't have a dog" },
+    { id: "treats", name: "Buy pet treats", mins: 10, cost: 8, fx: { fun: 6 }, note: "+15 pet happiness", can: () => hasPet() || "You don't have a pet", run: () => petHappy(15) },
+    { id: "petfood", name: "Buy pet food", mins: 10, cost: 10, note: "+5 servings", run: () => { S.petFood = (S.petFood || 0) + 5; } },
+    { id: "groom", name: "Get your dog groomed", mins: 60, cost: 20, fx: { fun: 10, home: 10 }, can: () => hasPet() || "You don't have a pet", run: () => petHappy(20) },
   ],
   cafe: [
     { id: "latte", name: "Latte", mins: 10, cost: 5, fx: { energy: 18, fun: 3 } },
@@ -616,7 +618,8 @@ const GOALS = [
   { id: "chores", text: "Finish every chore 5 days", test: () => S.perfectDays >= 5 },
   { id: "k1", text: "Have $1,000", test: () => S.money >= 1000 },
   { id: "skill50", text: "Get any skill to 50", test: () => SKILLS.some(([k]) => S.skills[k] >= 50) },
-  { id: "dog", text: "Adopt a dog", test: () => owns("dog") },
+  { id: "dog", text: "Adopt a pet", test: () => hasPet() },
+  { id: "tricks", text: "Teach your pet 4 tricks", test: () => learnedTricks().length >= 4 },
   { id: "car", text: "Buy a car", test: () => owns("car") },
   { id: "sports", text: "Own the Lightning GT", test: () => S.carModel === "sports" },
   { id: "three", text: "Work 3 different careers", test: () => Object.keys(S.careersTried).length >= 3 },
@@ -638,7 +641,7 @@ const fresh = (look) => ({
   skills: { smarts: 0, fitness: 0, charm: 0, cooking: 0, creativity: 0 },
   career: null, rank: 0, daysAtRank: 0, warnings: 0, workedDay: -1, hiredDay: -1, promos: 0, careersTried: {},
   meals: 3, owned: {}, todos: [], log: [], goals: {}, over: false, earned: 0, debt: 0, rentMissed: 0,
-  perfectDays: 0, used: {}, rain: false, inside: null, savings: 0, visited: {}, houses: {}, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
+  perfectDays: 0, used: {}, rain: false, inside: null, savings: 0, visited: {}, houses: {}, pet: null, petFood: 0, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
   name: look.name, look,
 });
 const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -674,13 +677,19 @@ function newTodos() {
   const c = S.career && CAREERS[S.career];
   if (c && c.days.includes(weekday())) S.todos.unshift({ id: "work", text: `Go to work at ${BMAP[S.career].name}`, sub: `Start ${fmtH(c.start[0])}–${fmtH(c.start[1])}`, done: false, must: true });
   if (owns("dog")) S.todos.push({ id: "walkdog", text: "Walk the dog in the park", done: false, must: true });
+  if (S.pet) S.todos.push({ id: "petplay", text: `Play with ${S.pet.name}`, done: false });
   refreshBeacons();
 }
 function tick(id) { const td = S.todos.find((x) => x.id === id && !x.done); if (td) { td.done = true; log(`Checked off: ${td.text}`, "good"); toast(`✓ ${td.text}`, "good"); refreshBeacons(); } }
 
 function decay(hrs, asleep) {
   const late = !asleep && (hour() >= 1 && hour() < 6) ? 1.6 : 1;
-  const dog = owns("dog") ? 0.5 : 1;
+  const dog = S.pet && S.pet.happy > 40 ? 0.6 : 1;
+  if (S.pet) {
+    S.pet.full = clamp(S.pet.full - (asleep ? 1.5 : 3) * hrs);
+    S.pet.happy = clamp(S.pet.happy - (S.pet.full < 25 ? 4 : 1.5) * hrs);
+    if (S.pet.full < 15 && !S.used.petHungry) { S.used.petHungry = 1; toast(`${S.pet.name} is hungry! Feed them from the Pet menu.`, "bad"); }
+  }
   if (asleep) { S.hunger = clamp(S.hunger - 2 * hrs); S.clean = clamp(S.clean - 1 * hrs); }
   else {
     S.energy = clamp(S.energy - 3 * hrs * late); S.hunger = clamp(S.hunger - 4 * hrs); S.clean = clamp(S.clean - 2 * hrs);
@@ -1516,7 +1525,7 @@ const INTERIORS = {
   vet: { W: 24, D: 16, floor: 0xe6f4f1, wall: 0xd7f0ea, rug: 0x1b7a6a, items: [
     [null, "kennel", -8, -6.5, 0], [null, "kennel", -4.5, -6.5, 0],
     ["Pet supplies", "shelf", 2, -7, 0, ["treats"]],
-    ["Puppy play pen", "pen", -6, 1, 0, ["puppies"]],
+    ["Adoption center", "pen", -6, 1, 0, ["puppies"], "adopt"],
     ["Grooming table", "labbench", 7, -6.6, 0, ["groom"]],
     ["Shelter desk", "desk", 7, 1.5, 0, ["shelter"]],
     ["Staff room", "lockers", 11.25, -2, -1, [], "career"],
@@ -1849,7 +1858,7 @@ function enterBuilding(bid, instant) {
   const go = () => {
     if (!IN) { cam.outDist = cam.dist; cam.outPitch = cam.pitch; cam.outYaw = cam.yaw; }
     buildInterior(bid); S.inside = bid; S.visited = S.visited || {}; if (!S.visited[bid]) { S.visited[bid] = 1; evalGoals(); }
-    player.position.set(IN.spawn.x, 0, IN.spawn.z); player.rotation.y = Math.PI; target = null;
+    player.position.set(IN.spawn.x, 0, IN.spawn.z); player.rotation.y = Math.PI; target = null; snapPet();
     cam.x = IN.spawn.x; cam.z = IN.spawn.z; cam.dist = 22; cam.pitch = 1.0; cam.yaw = 0;
     nearDoor = nearNpc = nearStation = null; save(); renderHUD(true);
   };
@@ -1861,7 +1870,7 @@ function leaveBuilding(instant) {
   const go = () => {
     destroyInterior(); S.inside = null;
     const d = doors.find((x) => x.b.id === bid), [nx, nz] = FACE[d.b.face];
-    player.position.set(d.x + nx * 0.6, 0, d.z + nz * 0.6); player.rotation.y = Math.atan2(nx, nz); target = null;
+    player.position.set(d.x + nx * 0.6, 0, d.z + nz * 0.6); player.rotation.y = Math.atan2(nx, nz); target = null; snapPet();
     S.pos.x = player.position.x; S.pos.z = player.position.z;
     cam.x = player.position.x; cam.z = player.position.z; cam.dist = cam.outDist || 30; cam.pitch = cam.outPitch || 0.95; cam.yaw = cam.outYaw !== undefined ? cam.outYaw : 0.5;
     nearDoor = nearNpc = nearStation = null; save(); renderHUD(true);
@@ -2059,7 +2068,7 @@ function exitVehicle() {
   let spot = null;
   for (const s of [2.6, -2.6, 4, -4]) { const x = c.position.x + lx * s, z = c.position.z + lz * s; if (!blocked(x, z) && !allCars().some((o) => inCar(o, x, z, 0.3))) { spot = { x, z }; break; } }
   if (!spot) spot = { x: c.position.x + Math.sin(h) * 3.5, z: c.position.z + Math.cos(h) * 3.5 };
-  player.position.set(spot.x, 0, spot.z); player.rotation.y = h; player.visible = true;
+  player.position.set(spot.x, 0, spot.z); player.rotation.y = h; player.visible = true; snapPet();
   setDriver(c, false); veh.v = 0; drive = null;
   if (veh.kind === "own") S.ownCar = { x: c.position.x, z: c.position.z, h, fuel: veh.fuel, health: veh.health };
   S.pos.x = spot.x; S.pos.z = spot.z;
@@ -2201,8 +2210,279 @@ function updateDriveUI() {
   document.querySelector(".dock").hidden = d;
   document.getElementById("help").innerHTML = d
     ? "<b>W/S</b> gas &amp; brake · <b>A/D</b> steer · <b>Space</b> handbrake · <b>F</b> get out"
-    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
+    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
 }
+
+
+// ============================================================ PETS
+const PET_TYPES = {
+  dog:    { name: "Dog", price: 250, colors: [0xb5651d, 0xf1d6a0, 0x333333, 0xffffff], play: "Play fetch", desc: "Loyal and loves fetch. Needs a daily walk in the park." },
+  cat:    { name: "Cat", price: 200, colors: [0xff9a3c, 0x666666, 0xf4f4f4, 0x2b2b2b], play: "Chase the yarn", desc: "Independent, curious and super cuddly." },
+  bunny:  { name: "Bunny", price: 120, colors: [0xffffff, 0xc8a27a, 0x9a9a9a, 0x5a4030], play: "Hop around together", desc: "Small, soft and very bouncy." },
+  parrot: { name: "Parrot", price: 350, colors: [0x2ecc71, 0xe74c3c, 0x3498db, 0xf1c40f], play: "Fly laps", desc: "Flies right beside you wherever you go." },
+};
+const TRICKS = [["Sit", 2, "sit"], ["Spin", 4, "spin"], ["Jump", 6, "jump"], ["Roll over", 9, "roll"], ["Dance", 13, "dance"], ["High five", 18, "five"]];
+let petObj = null, adoptSel = { type: "dog", color: 0 };
+const hearts = [];
+const heartGeo = (() => {
+  const h = new THREE.Shape();
+  h.moveTo(0, 0.25); h.bezierCurveTo(0, 0.3, -0.05, 0.4, -0.2, 0.4); h.bezierCurveTo(-0.45, 0.4, -0.45, 0.1, -0.45, 0.1);
+  h.bezierCurveTo(-0.45, -0.05, -0.3, -0.2, 0, -0.35); h.bezierCurveTo(0.3, -0.2, 0.45, -0.05, 0.45, 0.1);
+  h.bezierCurveTo(0.45, 0.1, 0.45, 0.4, 0.2, 0.4); h.bezierCurveTo(0.05, 0.4, 0, 0.3, 0, 0.25);
+  return new THREE.ShapeGeometry(h);
+})();
+const hasPet = () => !!(S && S.pet);
+const learnedTricks = () => (S && S.pet ? TRICKS.filter((t) => S.pet.skill >= t[1]) : []);
+function petHappy(n) { if (S.pet) S.pet.happy = clamp(S.pet.happy + n); }
+
+function makePet(type, color) {
+  const g = new THREE.Group(), rig = new THREE.Group(); g.add(rig);
+  const c = mat(color), dark = mat(new THREE.Color(color).multiplyScalar(0.65).getHex()), eye = mat(0x111111), pink = mat(0xff8fa3);
+  const B = (w, h, d, m, x, y, z, parent) => box(w, h, d, m, x, y, z, parent || rig);
+  const u = { rig, legs: [], type, base: 0 };
+  const leg = (x, z, h, w) => { const p = new THREE.Group(); p.position.set(x, h, z); rig.add(p); B(w, h, w, c, 0, -h / 2, 0, p); u.legs.push(p); };
+  const head = new THREE.Group(); rig.add(head); u.head = head;
+  if (type === "dog") {
+    B(0.6, 0.5, 1.0, c, 0, 0.65, 0);
+    head.position.set(0, 0.98, 0.55);
+    B(0.5, 0.45, 0.45, c, 0, 0, 0, head); B(0.3, 0.22, 0.26, dark, 0, -0.08, 0.3, head); B(0.12, 0.09, 0.06, eye, 0, -0.01, 0.44, head);
+    B(0.07, 0.08, 0.03, eye, -0.13, 0.08, 0.23, head); B(0.07, 0.08, 0.03, eye, 0.13, 0.08, 0.23, head);
+    B(0.12, 0.32, 0.22, dark, -0.29, -0.04, -0.02, head); B(0.12, 0.32, 0.22, dark, 0.29, -0.04, -0.02, head); B(0.12, 0.04, 0.12, pink, 0, -0.2, 0.36, head);
+    for (const [x, z] of [[-0.2, 0.35], [0.2, 0.35], [-0.2, -0.35], [0.2, -0.35]]) leg(x, z, 0.42, 0.16);
+    const t = new THREE.Group(); t.position.set(0, 0.82, -0.5); rig.add(t); const tb = B(0.1, 0.1, 0.42, dark, 0, 0.12, -0.15, t); tb.rotation.x = -0.6; u.tail = t;
+  } else if (type === "cat") {
+    B(0.42, 0.38, 0.85, c, 0, 0.52, 0);
+    head.position.set(0, 0.82, 0.45);
+    B(0.42, 0.38, 0.38, c, 0, 0, 0, head);
+    const em = new THREE.MeshStandardMaterial({ color: 0x9be15d, emissive: 0x6fbf3a, emissiveIntensity: 0.5 });
+    B(0.08, 0.08, 0.03, em, -0.1, 0.05, 0.2, head); B(0.08, 0.08, 0.03, em, 0.1, 0.05, 0.2, head); B(0.07, 0.05, 0.03, pink, 0, -0.05, 0.2, head);
+    for (const s of [-1, 1]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 4), c); ear.position.set(s * 0.13, 0.27, 0); ear.rotation.y = Math.PI / 4; ear.castShadow = true; head.add(ear); }
+    for (const [x, z] of [[-0.14, 0.3], [0.14, 0.3], [-0.14, -0.3], [0.14, -0.3]]) leg(x, z, 0.34, 0.12);
+    const t = new THREE.Group(); t.position.set(0, 0.62, -0.42); rig.add(t); B(0.08, 0.6, 0.08, dark, 0, 0.28, -0.08, t).rotation.x = -0.35; u.tail = t;
+  } else if (type === "bunny") {
+    B(0.5, 0.45, 0.6, c, 0, 0.36, 0);
+    head.position.set(0, 0.66, 0.3);
+    B(0.38, 0.34, 0.34, c, 0, 0, 0, head); B(0.06, 0.06, 0.03, eye, -0.1, 0.04, 0.18, head); B(0.06, 0.06, 0.03, eye, 0.1, 0.04, 0.18, head); B(0.06, 0.05, 0.03, pink, 0, -0.06, 0.18, head);
+    for (const s of [-1, 1]) { B(0.1, 0.45, 0.06, c, s * 0.09, 0.38, -0.02, head); B(0.05, 0.36, 0.02, pink, s * 0.09, 0.38, 0.02, head); }
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), mat(0xffffff)); puff.position.set(0, 0.42, -0.32); rig.add(puff);
+    leg(-0.12, 0.2, 0.16, 0.1); leg(0.12, 0.2, 0.16, 0.1); B(0.14, 0.1, 0.3, c, -0.17, 0.05, -0.15); B(0.14, 0.1, 0.3, c, 0.17, 0.05, -0.15);
+  } else {
+    B(0.3, 0.42, 0.3, c, 0, 0, 0);
+    head.position.set(0, 0.32, 0.04);
+    B(0.26, 0.24, 0.26, c, 0, 0, 0, head); B(0.05, 0.05, 0.03, eye, -0.09, 0.03, 0.13, head); B(0.05, 0.05, 0.03, eye, 0.09, 0.03, 0.13, head);
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 6), mat(0xffa726)); beak.rotation.x = Math.PI / 2; beak.position.set(0, -0.02, 0.2); head.add(beak);
+    u.wings = [-1, 1].map((s) => { const w = new THREE.Group(); w.position.set(s * 0.16, 0.08, 0); rig.add(w); B(0.05, 0.3, 0.26, dark, s * 0.03, -0.12, 0, w); return w; });
+    B(0.12, 0.3, 0.06, dark, 0, -0.3, -0.15).rotation.x = 0.5;
+    u.base = 2.5;
+  }
+  g.userData = u;
+  return g;
+}
+function spawnPet() {
+  if (petObj) { scene.remove(petObj.g); petObj = null; }
+  if (!hasPet() || !player) return;
+  const g = makePet(S.pet.type, S.pet.color); scene.add(g);
+  petObj = { g, trail: [], anim: null, phase: 0 };
+  snapPet();
+}
+function snapPet() {
+  if (!petObj || !player) return;
+  const h = player.rotation.y;
+  let x = player.position.x - Math.sin(h) * 1.8, z = player.position.z - Math.cos(h) * 1.8;
+  if (blocked(x, z)) { x = player.position.x; z = player.position.z; }
+  petObj.g.position.set(x, 0, z); petObj.g.rotation.y = h; petObj.trail = []; petObj.anim = null;
+}
+function spawnHearts(pos, n = 4) {
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(heartGeo, new THREE.MeshBasicMaterial({ color: 0xff4d79, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set(pos.x + (Math.random() - 0.5) * 0.8, pos.y + 1 + Math.random() * 0.4, pos.z + (Math.random() - 0.5) * 0.8);
+    m.scale.setScalar(0.6 + Math.random() * 0.4); scene.add(m);
+    hearts.push({ m, t: 0, delay: i * 0.15 });
+  }
+}
+function petName() { return S.pet ? S.pet.name : ""; }
+function startPetAnim(kind, done) {
+  if (!petObj) return;
+  const g = petObj.g, a = { kind, t: 0, done };
+  if (kind === "fetch") {
+    // Throw toward whichever direction has the most open space (try facing first)
+    const clearDist = (h) => { for (let dist = 10; dist > 2; dist -= 1) { let ok = true; for (let k = 1; k <= 10; k++) if (blocked(player.position.x + Math.sin(h) * dist * k / 10, player.position.z + Math.cos(h) * dist * k / 10)) { ok = false; break; } if (ok) return dist; } return 2; };
+    let bestH = player.rotation.y, bestD = clearDist(bestH);
+    for (let i = 1; i < 8 && bestD < 10; i++) { const h = player.rotation.y + i * Math.PI / 4, d = clearDist(h); if (d > bestD) { bestD = d; bestH = h; } }
+    player.rotation.y = bestH;
+    const tx = player.position.x + Math.sin(bestH) * bestD, tz = player.position.z + Math.cos(bestH) * bestD;
+    a.tx = tx; a.tz = tz; a.sx = player.position.x; a.sz = player.position.z; a.phase = "throw";
+    a.ball = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), mat(0xc6ff3d)); a.ball.castShadow = true; scene.add(a.ball);
+  }
+  a.dur = { fetch: 99, zoomies: 3.5, cuddle: 1.2, eat: 1.4, sit: 1.6, spin: 1.2, jump: 1.2, roll: 1.4, dance: 2.4, five: 1.6 }[kind] || 1.5;
+  petObj.anim = a;
+}
+function runPetAnim(dt, now) {
+  const a = petObj.anim, g = petObj.g, u = g.userData, rig = u.rig;
+  a.t += dt;
+  const px = player.position.x, pz = player.position.z;
+  const moveTo = (x, z, sp) => { const dx = x - g.position.x, dz = z - g.position.z, d = Math.hypot(dx, dz); if (d < 0.05) return d; const st = Math.min(d, sp * dt); g.position.x += (dx / d) * st; g.position.z += (dz / d) * st; g.rotation.y = Math.atan2(dx, dz); return d - st; };
+  let moving = false;
+  if (a.kind === "fetch") {
+    if (a.phase === "throw") {
+      const p = Math.min(1, a.t / 0.8);
+      a.ball.position.set(a.sx + (a.tx - a.sx) * p, 1.6 + Math.sin(p * Math.PI) * 3 - p * 1.4, a.sz + (a.tz - a.sz) * p);
+      const left = moveTo(a.tx, a.tz, 12); moving = true;
+      if (p >= 1 && left < 0.6) a.phase = "return";
+    } else {
+      a.ball.position.set(g.position.x + Math.sin(g.rotation.y) * 0.6, (u.base || 0) + 0.85, g.position.z + Math.cos(g.rotation.y) * 0.6);
+      const left = moveTo(px, pz, 11); moving = true;
+      if (left < 1.5) { scene.remove(a.ball); return finishAnim(); }
+    }
+  } else if (a.kind === "zoomies") {
+    const ang = a.t * 3.2, r = 2.8;
+    moveTo(px + Math.cos(ang) * r, pz + Math.sin(ang) * r, 14); moving = true;
+    if (u.type === "parrot") rig.position.y = u.base + 1 + Math.sin(a.t * 6) * 0.3;
+  } else {
+    const k = a.t / a.dur, sm = Math.sin(Math.min(1, k) * Math.PI);
+    if (a.kind === "sit" || a.kind === "eat") rig.rotation.x = -0.45 * sm;
+    if (a.kind === "spin") rig.rotation.y = k * Math.PI * 2;
+    if (a.kind === "jump" || a.kind === "cuddle") rig.position.y = u.base + sm * (a.kind === "jump" ? 1.4 : 0.4);
+    if (a.kind === "roll") rig.rotation.z = k * Math.PI * 2;
+    if (a.kind === "dance") { rig.position.y = u.base + Math.abs(Math.sin(a.t * 10)) * 0.35; rig.rotation.y = Math.sin(a.t * 6) * 0.8; }
+    if (a.kind === "five") rig.rotation.x = -0.9 * sm;
+    g.rotation.y = Math.atan2(px - g.position.x, pz - g.position.z);
+  }
+  if (a.t >= a.dur) return finishAnim();
+  return moving;
+}
+function finishAnim() {
+  const a = petObj.anim, rig = petObj.g.userData.rig;
+  rig.rotation.set(0, 0, 0); rig.position.y = petObj.g.userData.base || 0;
+  petObj.anim = null; petObj.trail = [];
+  spawnHearts(petObj.g.position, a.kind === "eat" ? 2 : 4);
+  if (a.done) a.done();
+  return false;
+}
+function updatePet(dt, now) {
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i]; h.t += dt; if (h.t < h.delay) { h.m.visible = false; continue; }
+    h.m.visible = true; const k = (h.t - h.delay) / 1.3; h.m.position.y += dt * 1.1; h.m.quaternion.copy(camera.quaternion); h.m.material.opacity = 1 - k;
+    if (k >= 1) { scene.remove(h.m); h.m.material.dispose(); hearts.splice(i, 1); }
+  }
+  if (!petObj || !hasPet()) return;
+  const g = petObj.g, u = g.userData, P = S.pet;
+  g.visible = !drive;
+  if (drive) return;
+  const px = player.position.x, pz = player.position.z, dP = Math.hypot(px - g.position.x, pz - g.position.z);
+  if (dP > 30) snapPet();
+  let moving = false;
+  if (petObj.anim) moving = runPetAnim(dt, now);
+  else if (u.type === "parrot") {
+    const h = player.rotation.y, tx = px + Math.cos(h) * 0.9, tz = pz - Math.sin(h) * 0.9;
+    const dx = tx - g.position.x, dz = tz - g.position.z, d = Math.hypot(dx, dz);
+    if (d > 0.05) { const st = Math.min(d, Math.max(4, d * 6) * dt); g.position.x += (dx / d) * st; g.position.z += (dz / d) * st; }
+    let df = h - g.rotation.y; df = Math.atan2(Math.sin(df), Math.cos(df)); g.rotation.y += df * Math.min(1, dt * 6);
+  } else {
+    const last = petObj.trail[petObj.trail.length - 1];
+    if (!last || Math.hypot(last.x - px, last.z - pz) > 0.5) { petObj.trail.push({ x: px, z: pz }); if (petObj.trail.length > 80) petObj.trail.shift(); }
+    if (dP > 2.2 && P.full > 0) {
+      while (petObj.trail.length > 1 && Math.hypot(petObj.trail[0].x - g.position.x, petObj.trail[0].z - g.position.z) < 0.6) petObj.trail.shift();
+      const t = petObj.trail[0] || { x: px, z: pz };
+      const dx = t.x - g.position.x, dz = t.z - g.position.z, d = Math.hypot(dx, dz) || 1;
+      const sp = Math.min(16, 3 + dP * 1.7);
+      g.position.x += (dx / d) * Math.min(d, sp * dt); g.position.z += (dz / d) * Math.min(d, sp * dt);
+      let df = Math.atan2(dx, dz) - g.rotation.y; df = Math.atan2(Math.sin(df), Math.cos(df)); g.rotation.y += df * Math.min(1, dt * 10);
+      moving = true;
+    } else {
+      petObj.trail = [];
+      let df = Math.atan2(px - g.position.x, pz - g.position.z) - g.rotation.y; df = Math.atan2(Math.sin(df), Math.cos(df)); g.rotation.y += df * Math.min(1, dt * 3);
+    }
+  }
+  petObj.phase += dt * (moving ? 14 : 0);
+  const sw = moving ? Math.sin(petObj.phase) * 0.7 : 0;
+  u.legs.forEach((l, i) => { l.rotation.x = (i === 0 || i === 3) ? sw : -sw; });
+  if (u.tail) { if (P.happy > 30) { u.tail.rotation.y = Math.sin(now / (moving ? 70 : 110)) * 0.7; u.tail.rotation.x = 0; } else { u.tail.rotation.y = 0; u.tail.rotation.x = 0.8; } }
+  if (u.head && !petObj.anim) u.head.rotation.x = P.happy < 30 ? 0.35 : 0;
+  if (!petObj.anim) {
+    if (u.type === "bunny") u.rig.position.y = moving ? Math.abs(Math.sin(petObj.phase * 0.6)) * 0.4 : 0;
+    if (u.type === "parrot") u.rig.position.y = u.base + Math.sin(now / 260) * 0.12;
+  }
+  if (u.wings) { const f = Math.sin(now / 45) * 0.9; u.wings[0].rotation.z = f; u.wings[1].rotation.z = -f; }
+}
+function petAction(kind) {
+  const P = S.pet; if (!P || busy) return;
+  const nm = P.name;
+  if (kind !== "rename" && petObj && petObj.anim) { toast(`${nm} is still busy. Give them a second!`); return; }
+  if (kind === "cuddle") { closeSheet(); startPetAnim("cuddle", () => { petHappy(15); S.fun = clamp(S.fun + 5); advance(10); toast(`You cuddled ${nm}. So soft!`, "good"); save(); renderHUD(true); }); return; }
+  if (kind === "play") {
+    if (P.full < 10) { toast(`${nm} is too hungry to play. Feed them first!`, "bad"); return; }
+    closeSheet();
+    startPetAnim(P.type === "dog" ? "fetch" : "zoomies", () => { petHappy(25); P.full = clamp(P.full - 5); S.fun = clamp(S.fun + 12); S.social = clamp(S.social + 3); S.energy = clamp(S.energy - 3); advance(30); tick("petplay"); evalGoals(); toast(`${nm} had a blast!`, "good"); save(); renderHUD(true); });
+    return;
+  }
+  if (kind === "feed") {
+    if (!(S.petFood > 0)) { toast("You're out of pet food. Buy some at Happy Paws Vet or FreshMart.", "bad"); return; }
+    S.petFood--; closeSheet();
+    startPetAnim("eat", () => { P.full = clamp(P.full + 40); petHappy(5); advance(5); toast(`${nm} gobbled it up!`, "good"); save(); renderHUD(true); });
+    return;
+  }
+  if (kind === "train") {
+    if (P.full < 10) { toast(`${nm} is too hungry to learn. Feed them first!`, "bad"); return; }
+    const before = learnedTricks().length;
+    P.skill += P.happy > 60 ? 2 : 1; S.energy = clamp(S.energy - 3); P.full = clamp(P.full - 4);
+    timeSkip(`Training ${nm}`, 30, () => {
+      advance(30);
+      const now = learnedTricks();
+      if (now.length > before) { toast(`${nm} learned a new trick: ${now[now.length - 1][0]}!`, "gold"); log(`${nm} learned to ${now[now.length - 1][0].toLowerCase()}!`, "good"); }
+      else toast(`${nm} is getting better. Keep practicing!`);
+      evalGoals(); save(); renderSheet(); renderHUD(true);
+    });
+    return;
+  }
+  if (kind.startsWith("trick:")) {
+    const t = TRICKS.find((x) => x[2] === kind.slice(6)); if (!t || P.skill < t[1]) return;
+    closeSheet(); startPetAnim(t[2], () => { S.fun = clamp(S.fun + 2); petHappy(2); toast(`${nm}: ${t[0]}! Good job!`, "good"); });
+    return;
+  }
+  if (kind === "rename") {
+    const v = (document.getElementById("petNameInput").value || "").trim().slice(0, 14);
+    if (v) { P.name = v; toast(`Your pet is now called ${v}.`); save(); renderSheet(); }
+  }
+}
+function adopt() {
+  const t = PET_TYPES[adoptSel.type];
+  if (S.pet) { toast(`You already have ${S.pet.name}!`); return; }
+  if (S.money < t.price) return;
+  const name = ((document.getElementById("adoptName") || {}).value || "").trim().slice(0, 14) || ({ dog: "Buddy", cat: "Whiskers", bunny: "Clover", parrot: "Kiwi" })[adoptSel.type];
+  S.money -= t.price; S.petFood = (S.petFood || 0) + 3;
+  S.pet = { type: adoptSel.type, name, color: t.colors[adoptSel.color], happy: 85, full: 80, skill: 0, since: day() };
+  if (adoptSel.type === "dog") { S.owned.dog = true; S.todos.push({ id: "walkdog", text: "Walk the dog in the park", done: false, must: true }); }
+  S.todos.push({ id: "petplay", text: `Play with ${name}`, done: false });
+  log(`You adopted ${name} the ${t.name.toLowerCase()}!`, "good");
+  closeSheet(); spawnPet(); spawnHearts(petObj.g.position, 6); evalGoals(); save(); renderHUD(true);
+  showModal(`<h3>Meet ${name}!</h3><p>${name} will follow you everywhere, even into buildings. Tap the <b>Pet</b> button (or press <b>Q</b>) to play, feed and teach tricks.</p><p>You got 3 servings of pet food to start.</p><div class="row"><button class="big" data-close>Hi, ${name}!</button></div>`);
+}
+function adoptHTML() {
+  if (S.pet) return `<div class="sec"><h3>Adoption center</h3><p class="req">${S.pet.name} is waiting for you. One pet at a time!</p></div>`;
+  const t = PET_TYPES[adoptSel.type];
+  return `<div class="sec"><h3>Adopt a pet</h3><div class="grid">${Object.entries(PET_TYPES).map(([k, p]) => `<button class="act ${adoptSel.type === k ? "primary" : ""}" data-adopttype="${k}"><span class="t">${p.name}</span><span class="m">${money(p.price)} · ${p.desc}</span></button>`).join("")}</div></div>
+    <div class="sec"><h3>Color</h3><div class="sw">${t.colors.map((c, i) => `<button style="background:#${new THREE.Color(c).getHexString()}" data-adoptcolor="${i}" aria-label="Color ${i + 1}" aria-pressed="${adoptSel.color === i}"></button>`).join("")}</div></div>
+    <div class="sec create" style="padding:0"><label for="adoptName">Name your ${t.name.toLowerCase()}</label><input id="adoptName" maxlength="14" placeholder="${({ dog: "Buddy", cat: "Whiskers", bunny: "Clover", parrot: "Kiwi" })[adoptSel.type]}"></div>
+    <div><button class="btn" data-adopt ${S.money < t.price ? "disabled" : ""}>${S.money < t.price ? `You need ${money(t.price - S.money)} more` : `Adopt for ${money(t.price)}`}</button></div>`;
+}
+function petSheet() {
+  const P = S.pet, t = PET_TYPES[P.type], learned = learnedTricks(), next = TRICKS.find((x) => P.skill < x[1]);
+  const bar = (label, v) => `<div class="skill"><div class="top"><span>${label}</span><span>${Math.round(v)}</span></div><div class="bar"><i style="width:${v}%;background:${v < 25 ? "var(--bad)" : v < 50 ? "var(--warn)" : "var(--good)"}"></i></div></div>`;
+  const card = (k, name, meta, fx, why) => `<button class="act" data-pet="${k}" ${why ? "disabled" : ""}><span class="t">${name}</span><span class="m">${meta}</span>${fx ? `<span class="fx">${fx}</span>` : ""}${why ? `<span class="why">${why}</span>` : ""}</button>`;
+  return header(P.name, `Your ${t.name.toLowerCase()} · ${learned.length}/${TRICKS.length} tricks · together ${day() - (P.since || day()) + 1} days`, "#" + new THREE.Color(P.color).getHexString()) + `<div class="sheet-b">
+    <div class="skills">${bar("Happiness", P.happy)}${bar("Food", P.full)}</div>
+    <div class="sec"><h3>Things to do</h3><div class="grid">
+      ${card("cuddle", "Cuddle", "10 min", "+Happiness · +Fun")}
+      ${card("play", t.play, "30 min", "+Happiness · +Fun · +Friends", P.full < 10 ? "Too hungry" : "")}
+      ${card("feed", "Feed", `5 min · ${S.petFood || 0} servings left`, "+Food", S.petFood > 0 ? "" : "Buy pet food at the vet or FreshMart")}
+      ${card("train", "Teach a trick", next ? `30 min · practice ${P.skill}/${next[1]} for ${next[0]}` : "30 min · knows every trick!", "Happy pets learn twice as fast", P.full < 10 ? "Too hungry" : "")}
+    </div></div>
+    <div class="sec"><h3>Tricks</h3><div class="grid">${TRICKS.map(([n, need, k]) => P.skill >= need ? card("trick:" + k, n, "Show off", "+Fun") : `<button class="act" disabled><span class="t">${n}</span><span class="m">Practice ${need} times to learn</span></button>`).join("")}</div></div>
+    <div class="sec create" style="padding:0"><label for="petNameInput">Rename</label><div class="row"><input id="petNameInput" maxlength="14" value="${P.name}" style="flex:1;min-width:0"><button class="btn" data-pet="rename">Save</button></div></div>
+  </div>`;
+}
+function openPet() { if (hasPet() && !drive) openSheet(petSheet); }
 
 // ============================================================ INPUT
 const keys = {};
@@ -2224,6 +2504,7 @@ addEventListener("keydown", (e) => {
   if (k === "p") openPhone();
   if (k === "m") openMe();
   if (k === "j") openLog();
+  if (k === "q") openPet();
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
@@ -2409,7 +2690,7 @@ function teleport(bid, inside) {
   if (wanted) clearWanted();
   if (IN) leaveBuilding(true);
   const d = doors.find((x) => x.b.id === bid);
-  if (player && d) { player.position.set(d.x, 0, d.z); target = null; cam.x = d.x; cam.z = d.z; if (S) { S.pos.x = d.x; S.pos.z = d.z; } }
+  if (player && d) { player.position.set(d.x, 0, d.z); target = null; snapPet(); cam.x = d.x; cam.z = d.z; if (S) { S.pos.x = d.x; S.pos.z = d.z; } }
   if (inside && player && INTERIORS[bid]) enterBuilding(bid, true);
 }
 
@@ -2517,6 +2798,7 @@ function renderHUD(force) {
   $("hWeather").textContent = IN ? "Indoors" : S.rain ? "Rainy" : hour() >= 20 || hour() < 6 ? "Clear night" : "Sunny";
   const dr = 7 - ((day() - 1) % 7), owe = RENT + S.debt;
   $("hRent").innerHTML = ownsHouse() ? `<span>Rent</span><b style="color:var(--good)">None · you own a house</b>` : `<span>Rent</span><b>${money(owe)} ${dr === 1 ? "due tonight" : `in ${dr} days`}</b>`;
+  $("btnPet").hidden = !hasPet() || !!drive;
   $("btnDecor").hidden = !(IN && S.houses && S.houses[IN.bid]) || !!drive;
   $("hRent").classList.toggle("due", dr <= 2 && S.money < owe);
   for (const [k] of NEEDS) {
@@ -2627,6 +2909,10 @@ $("sheetWrap").addEventListener("click", (e) => {
   const bc = e.target.closest("[data-buycar]"); if (bc) { buyCar(bc.dataset.buycar); return; }
   if (e.target.closest("[data-repair]")) { repairCar(); return; }
   const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
+  const pa = e.target.closest("[data-pet]"); if (pa) { petAction(pa.dataset.pet); return; }
+  const at = e.target.closest("[data-adopttype]"); if (at) { adoptSel = { type: at.dataset.adopttype, color: 0 }; renderSheet(); return; }
+  const ac = e.target.closest("[data-adoptcolor]"); if (ac) { const nm = ($("adoptName") || {}).value; adoptSel.color = Number(ac.dataset.adoptcolor); renderSheet(); if (nm && $("adoptName")) $("adoptName").value = nm; return; }
+  if (e.target.closest("[data-adopt]")) { adopt(); return; }
   const bh = e.target.closest("[data-buyhouse]"); if (bh) { buyHouse(bh.dataset.buyhouse); return; }
   const pl = e.target.closest("[data-place]"); if (pl) { startPlacing(pl.dataset.place); return; }
   const mv = e.target.closest("[data-move]"); if (mv) { startPlacing(S.houses[IN.bid].items[Number(mv.dataset.move)].type, Number(mv.dataset.move)); return; }
@@ -2706,6 +2992,7 @@ function stationSheet(bid, st) {
     if (st.sp === "jobs") html += jobBoardHTML();
     if (st.sp === "shop") html += shopHTML(b);
     if (st.sp === "cars") html += carShopHTML();
+    if (st.sp === "adopt") html += adoptHTML();
     if (st.sp === "garage") html += garageHTML();
     const acts = st.acts.map((id) => ACTS[bid].find((a) => a.id === id)).filter(Boolean);
     if (acts.length) html += `<div class="sec"><h3>Things to do</h3><div class="grid">${acts.map((a) => actCard(a, bid)).join("")}</div></div>`;
@@ -2741,6 +3028,7 @@ function openLog() {
 }
 $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
+$("btnPet").addEventListener("click", () => { if (!busy) openPet(); });
 $("btnDecor").addEventListener("click", () => { if (!busy) openDecor(); });
 $("btnRot").addEventListener("click", rotatePlacing);
 $("btnCancelPlace").addEventListener("click", cancelPlacing);
@@ -2768,6 +3056,7 @@ function showTitle() {
   destroyInterior();
   if (drive) { setDriver(drive.car, false); drive = null; updateDriveUI(); }
   clearWanted();
+  if (petObj) { scene.remove(petObj.g); petObj = null; }
   state = "title"; $("title").hidden = false; $("hud").hidden = true;
   if (player) player.visible = false;
   const sv = loadSave(); $("btnContinue").hidden = !(sv && !sv.over);
@@ -2783,6 +3072,8 @@ function begin(data) {
   if (drive) { setDriver(drive.car, false); drive = null; }
   clearWanted(); removeOwnCar(); spawnOwnCar(); updateDriveUI();
   S.houses = S.houses || {}; refreshSaleSigns(); cancelPlacing();
+  if (!S.pet && owns("dog")) S.pet = { type: "dog", name: "Buddy", color: 0xb5651d, happy: 80, full: 80, skill: 0, since: day() };
+  spawnPet();
   cam.x = player.position.x; cam.z = player.position.z;
   state = "play"; $("title").hidden = true; $("hud").hidden = false;
   refreshBeacons(); renderHUD(true); save();
@@ -2815,6 +3106,7 @@ function frame(now) {
     hudAcc += dt; if (hudAcc > 0.2) { hudAcc = 0; renderHUD(); }
   }
   updateWorld(dt, now);
+  if (state === "play") updatePet(dt, now);
   updateSky();
   updateCamera(dt, now);
   renderer.render(scene, camera);
