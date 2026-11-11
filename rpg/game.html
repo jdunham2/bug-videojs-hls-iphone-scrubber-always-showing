@@ -83,6 +83,12 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .beast .unk b{color:var(--muted)}
 .speaker{display:flex;gap:14px;align-items:center}
 .speaker canvas{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#2d3a66,#121831);border:2px solid var(--gold);flex:none}
+.art{width:100%;height:auto;border-radius:12px;display:block;border:1px solid var(--line);margin-bottom:14px}
+.cine-t{margin-top:4px!important}
+.cine-p{font-size:18px;line-height:1.55}
+.say.narr{font-style:italic;font-family:Georgia,'Palatino Linotype',serif;border-left-color:#ffd27a}
+.wsi{width:28px;height:44px;margin:0 8px;border-radius:6px 6px 3px 3px;background:#59616b;clip-path:polygon(50% 0,100% 18%,100% 100%,0 100%,0 18%)}
+.wsi.on{background:#7fd6ff;box-shadow:0 0 16px #7fd6ff}
 .say{font-size:17px;line-height:1.5;margin:14px 0;padding:14px 16px;border-left:3px solid var(--gold);background:rgba(240,185,74,.06);border-radius:0 10px 10px 0}
 .reward{color:var(--gold);font-weight:800}
 #mapc{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);background:#0a0e1a;display:block}
@@ -273,6 +279,7 @@ function genDungeon(id){
   for(let i=1;i<N-1;i++){const m=rooms[i];for(let k=0;k<ri(2,4);k++){const[x,y]=inner(m);if(!free(x,y)||Math.abs(x-m.cx)<2&&Math.abs(y-m.cy)<2)continue;const t=pick2(r,decoT);if(t==='rock')addObj('rock',x,y,{ore:'crystal'});else addObj(t,x,y,t==='bones'?{solid:false}:{})}
     const n=ri(2,3)+(i>N/2?1:0);for(let k=0;k<n;k++){const[x,y]=inner(m);if(free(x,y))L.packs.push({t:pick2(r,D.mobs),x:(x+.5)*T,y:(y+.5)*T})}}
   const cr=[2,4,6,8].sort(()=>r()-.5).slice(0,3);cr.forEach((ri2,k)=>{const m=rooms[ri2];for(let tries=0;tries<20;tries++){const[x,y]=inner(m);if(free(x,y)&&free(x,y+1)){L.chests.push(addObj('chest',x,y,{id:'dg:'+id+':'+k,dg:1,lv:D.chestLv}));break}}});
+  {const pi=PAGES.findIndex(p=>p.lv===id),m=rooms[5];for(let t2=0;t2<20&&pi>=0;t2++){const[x,y]=inner(m);if(free(x,y)){addObj('page',x,y,{solid:false,pid:pi});break}}}
   const b=rooms[N-1];BOSSES[D.boss].ax=b.cx+.5;BOSSES[D.boss].ay=b.cy+.5;L.boss=b;
   [[b.x+1,b.y+1],[b.x+b.w-2,b.y+1],[b.x+1,b.y+b.h-2],[b.x+b.w-2,b.y+b.h-2]].forEach(([x,y])=>{if(free(x,y))addObj('brazier',x,y,{blue:D.deco!=='crypt'})});
   buildMinimap();useLevel(WORLD);
@@ -281,14 +288,25 @@ function resetEntities(){enemies=[];projectiles=[];pickups=[];teles=[];clouds=[]
 function enterLevel(id){
   const L=LEVELS[id],D=DUNGEONS[id];if(P.riding)P.riding=false;P.rx=P.x;P.ry=P.y+34;
   L.objs=L.objs.filter(o=>{if(o.type==='portal'){L.grid[o.ty*W+o.tx]=null;return false}return true});
-  useLevel(L);resetEntities();L.chests.forEach(c=>c.open=(P.dch||[]).includes(c.id));
+  useLevel(L);resetEntities();syncPages();L.chests.forEach(c=>c.open=(P.dch||[]).includes(c.id));
   P.x=L.sx;P.y=L.sy;cam.x=P.x;cam.y=P.y;if(pet){pet.x=P.x-20;pet.y=P.y}
   for(const pk of L.packs){const e=spawnEnemy(pk.t,pk.x,pk.y,id);e.hp=e.max=Math.round(e.max*D.f);e.atk=Math.round(e.atk*D.fa);e.def+=2;e.rew=1.6}
   fadeT=.7;lastRegion=id;P.seen[id]=1;banner={title:D.n,sub:'Dungeon · recommended level '+D.lv+'+',t:0,col:'#c8b4ff'};noiseS(.6,.25,300,.5);tone(110,1,'sine',.08,.7);save();
   if(P.lvl<D.lv)setTimeout(()=>toast('Danger: this dungeon is level '+D.lv+'+','Monsters here hit hard. Leave by the stairs anytime.','#ff6b6b'),900);
 }
+function useWaystone(o){const w=WAYSTONES.find(w=>w.id===o.wid);
+  if(!P.ways.includes(w.id)){P.ways.push(w.id);toast('Waystone awakened: '+w.n,'Touch any waystone to travel here','#7fd6ff');[523,784,1047].forEach((f,i)=>tone(f,.5,'sine',.08,0,i*.1));effects.push({k:'ring',x:o.x,y:o.y,t:0,max:.7,r0:10,r1:110,col:'#7fd6ff'});spark(o.x,o.y-30,'#bfeeff',24,160);if(P.ways.length>=WAYSTONES.length)unlock('traveler');checkQuests();save();return}
+  openTravel(w.id)}
+function openTravel(from){
+  const rows=WAYSTONES.map(w=>{const on=P.ways.includes(w.id);return`<div class="item"><div class="wsi ${on?'on':''}"></div><div><div class="nm">${on?w.n:'Unknown waystone'}</div><div class="ds">${on?(w.id===from?'You are here':'Awake'):'Not yet awakened'}</div></div>${on&&w.id!==from?`<button class="btn sm" data-act="travel" data-id="${w.id}">Travel</button>`:''}</div>`}).join('');
+  openPanel('travel',`<h2>Waystones</h2><p class="sub">${P.ways.length} of ${WAYSTONES.length} awake. Step to any awakened stone.</p><div class="list">${rows}</div>`,true)}
+function travelTo(id){const w=WAYSTONES.find(w=>w.id===id);if(P.riding)P.riding=false;closePanel();P.x=(w.tx+.5)*T;P.y=(w.ty+1.9)*T;cam.x=P.x;cam.y=P.y;enemies=enemies.filter(e=>!e.boss);bossActive={};projectiles=[];if(pet){pet.x=P.x-20;pet.y=P.y}fadeT=.7;tone(1047,.6,'sine',.08,.5);puff(P.x,P.y,'#7fd6ff',16);save()}
+function readPage(o){o.gone=true;if(!P.pages.includes(o.pid))P.pages.push(o.pid);SFX.chest();spark(o.x,o.y-8,'#ffd27a',18,120);checkQuests();if(P.pages.length>=PAGES.length)unlock('pages');save();
+  playScene([['seraphine',PAGES[o.pid].t,'Journal page '+(o.pid+1)+' of '+PAGES.length+' · found '+P.pages.length]],()=>toast('Journal page found ('+P.pages.length+'/'+PAGES.length+')','Read it again in the Journal (L) under Lore','#ffd27a'))}
 function leaveLevel(){if(curLevel==='world')return;useLevel(WORLD);resetEntities();P.x=P.rx||(VX+.5)*T;P.y=P.ry||(VY+1.6)*T;cam.x=P.x;cam.y=P.y;if(pet){pet.x=P.x-20;pet.y=P.y}fadeT=.7;lastRegion=null;save()}
 function openPortal(e){let tx=Math.floor(e.ax),ty=Math.floor(e.ay);for(let k=0;k<12&&!free(tx,ty);k++){tx+=k%2?1:-1;ty+=k%3?0:1}if(free(tx,ty)){addObj('portal',tx,ty);toast('A portal opens','Step through it to return to the surface','#c8b4ff')}}
+function findFree(x,y){for(let r=0;r<10;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const tx=x+dx,ty=y+dy;if(tx>4&&ty>4&&tx<W-5&&ty<H-5&&free(tx,ty))return[tx,ty]}return null}
+function syncPages(){for(const o of objs)if(o.type==='page')o.gone=P.pages.includes(o.pid)}
 function placeObjects(){
   // village
   const house=(tx,ty,w,h,roof,wall,sign)=>{const o=addObj('house',tx,ty,{w,h,roof,wall,sign});o.x=(tx+w/2)*T;o.y=(ty+h)*T-4;return o};
@@ -304,6 +322,7 @@ function placeObjects(){
   addObj('well',VX+3,VY+2); addObj('board',VX-2,VY+3);
   [[VX-1,VY-5],[VX+2,VY-5],[VX-1,VY+6],[VX+2,VY+6],[VX-5,VY-1],[VX-5,VY+2],[VX+6,VY-1],[VX+6,VY+2]].forEach(([x,y])=>{if(free(x,y))addObj('lamp',x,y)});
   for(const[id,D]of Object.entries(DUNGEONS)){for(let y=D.ey-2;y<=D.ey+2;y++)for(let x=D.ex-2;x<=D.ex+2;x++){if(tileAt(x,y)!==DEEP)tiles[y*W+x]=D.etile||PATH;const o=grid[y*W+x];if(o)grid[y*W+x]=null}addObj('dungeon',D.ex,D.ey,{id})}
+  for(const w of WAYSTONES){for(let y=w.y-1;y<=w.y+2;y++)for(let x=w.x-1;x<=w.x+1;x++){if(tileAt(x,y)!==DEEP&&!grid[y*W+x])tiles[y*W+x]=PATH}w.tx=w.x;w.ty=w.y;if(!grid[w.y*W+w.x])addObj('waystone',w.x,w.y,{wid:w.id})}
   [[-4,-3],[3,-4],[-5,2],[4,3]].forEach(([dx,dy])=>addObj('tent',VGX+dx,VGY+dy));[[-1,-5],[6,-1],[-6,-1],[1,5]].forEach(([dx,dy])=>{if(free(VGX+dx,VGY+dy))addObj('crate',VGX+dx,VGY+dy)});addObj('campfire',VGX,VGY+3);
   // arena braziers
   for(let k=0;k<8;k++){const a=k/8*Math.PI*2;const x=Math.round(BX+Math.cos(a)*6.5),y=Math.round(BY+Math.sin(a)*6.5);if(free(x,y))addObj('brazier',x,y)}
@@ -311,6 +330,7 @@ function placeObjects(){
   for(let y=4;y<H-4;y++)for(let x=4;x<W-4;x++){
     const t=tileAt(x,y), r=regAt(x,y);
     if(t===DEEP||t===WATER||t===LAVA||t===PATH||t===FLOOR||grid[y*W+x])continue;
+    if(WAYSTONES.some(w=>dist(x,y,w.x,w.y)<2.5)||PAGES.some(p=>p.lv==='world'&&dist(x,y,p.x,p.y)<2))continue;
     if(dist(x,y,VX+.5,VY+.5)<11||dist(x,y,BX,BY)<8||dist(x,y,HX,HY)<8||dist(x,y,VGX,VGY)<8||Object.values(DUNGEONS).some(D=>dist(x,y,D.ex,D.ey)<3.5))continue;
     const h=hash(x,y,3), h2=hash(x,y,4);
     if(r==='meadow'){ if(h<.035)addObj('tree',x,y,{kind:h2<.15?'autumn':'oak'}); else if(h<.046)addObj('herb',x,y,{solid:false}); else if(h<.052)addObj('rock',x,y,{ore:'iron'}); }
@@ -321,6 +341,7 @@ function placeObjects(){
     else if(r==='ruins'){ if(h<.03)addObj('pillar',x,y); else if(h<.045)addObj('ruinwall',x,y); else if(h<.055)addObj('glowcap',x,y,{solid:false}); else if(h<.065&&t===GRASS)addObj('tree',x,y,{kind:'dead'}); else if(h<.07)addObj('rock',x,y,{ore:'iron'}); }
     else if(r==='ash'){ if(h<.025)addObj('rock',x,y,{ore:'crystal',obs:true}); else if(h<.04)addObj('tree',x,y,{kind:'dead'}); }
   }
+  PAGES.forEach((p,i)=>{if(p.lv!=='world')return;const c=findFree(p.x,p.y);if(c)addObj('page',c[0],c[1],{solid:false,pid:i})});
   // chests: two per region
   ['meadow','coast','lake','forest','ruins','hills','ash'].forEach((r,ri)=>{
     const cands=[];for(let y=5;y<H-5;y++)for(let x=5;x<W-5;x++)if(regAt(x,y)===r&&free(x,y)&&tileAt(x,y)!==PATH&&free(x,y+1))cands.push([x,y]);
@@ -341,6 +362,7 @@ const ITEMS={
   bone:{n:'Old Bone',v:6,ic:'bone',c:'#ece5d0'},
   ember:{n:'Ember Core',v:60,ic:'orb',c:'#ff7a29'},
   scale:{n:'Wyrm Scale',v:500,ic:'scale',c:'#ff4d3d'},
+  shard:{n:'Emberstone Shard',v:0,ic:'orb',c:'#ffb347',quest:1},
   shell:{n:'Crab Shell',v:12,ic:'shell',c:'#f08a5b'},
   silk:{n:'Spider Silk',v:11,ic:'silk',c:'#eef0f8'},
   crown:{n:'Hollow Crown',v:450,ic:'crown',c:'#ffd23f'},
@@ -399,40 +421,118 @@ const BOSSES={
 const SLIMECOL={meadow:'#5fd35f',coast:'#38d0b9',lake:'#4aa3ff',forest:'#9be15d',hills:'#c9a23f',ruins:'#a77ad8',ash:'#ff8a3d'};
 const SKILLS={fishing:'Fishing',mining:'Mining',woodcutting:'Woodcutting',foraging:'Foraging'};
 const QUESTS=[
-  {id:'m1',npc:'elder',name:'Slime Trouble',type:'kill',t:'slime',n:6,desc:'Slimes are creeping out of the meadows and eating the cabbages. Squash six of them.',rw:{gold:60,xp:40,items:{hpot:3}}},
-  {id:'m2',npc:'elder',name:'Wolves of Whisperwood',type:'kill',t:'wolf',n:5,desc:'Grey wolves prowl the forest to the north. Thin the pack by five.',rw:{gold:120,xp:90,items:{mpot:2}}},
-  {id:'m3',npc:'elder',name:'Arm Yourself',type:'craft',n:1,desc:'Worse things wait beyond the meadows. Have Borin forge you an Iron weapon at his anvil.',rw:{gold:100,xp:80}},
-  {id:'m4',npc:'elder',name:'Bones in the Ruins',type:'kill',t:'skeleton',n:8,desc:'The Sunken Ruins to the south have woken. Put eight skeletons back to rest.',rw:{gold:250,xp:220,items:{hpot:3}}},
-  {id:'m4b',npc:'elder',name:'The Hollow King',type:'kill',t:'hollow',n:1,desc:'An undead king holds court on a ruined throne in the southwest of the Sunken Ruins, ringed by blue flames. Break his reign.',rw:{gold:800,xp:700,items:{hpot:3,mpot:3}}},
-  {id:'m5',npc:'elder',name:'Stone Giants',type:'kill',t:'golem',n:3,desc:'Golems roam the Ironcrag Hills to the east. Break three of them.',rw:{gold:400,xp:380}},
-  {id:'m6',npc:'elder',name:'Embers on the Wind',type:'kill',t:'imp',n:6,desc:'Fire imps pour out of the Ashen Wastes in the southeast. Drive back six of them.',rw:{gold:600,xp:600,items:{hpot:4,mpot:4}}},
-  {id:'m7',npc:'elder',name:'The Ashen Wyrm',type:'kill',t:'wyrm',n:1,desc:'The Wyrm sleeps in a ring of braziers deep in the Ashen Wastes. Wake it, and end this.',rw:{gold:2000,xp:1500}},
+  {id:'m1',npc:'elder',name:'Slime Trouble',type:'kill',t:'slime',n:6,desc:'Slimes are creeping out of the meadows and eating the cabbages. Squash six of them.',rw:{gold:60,xp:40,items:{hpot:3}},
+    intro:[['elder','A traveler! You picked a poor season to visit Emberfall, {class}.'],['elder','The ground has been warm for weeks, and ash falls with the rain. The old ones whisper that the Wyrm is waking.'],['you','The Wyrm?'],['elder','A story for another day. Right now slimes are eating our cabbages and the Watch is stretched thin. Will you help?']],
+    outro:[['elder','Well fought. You have a hunter\'s instincts.'],['elder','Stay a while. Emberfall could use someone like you.']]},
+  {id:'m2',npc:'elder',name:'Wolves of Whisperwood',type:'kill',t:'wolf',n:5,at:[56,18],desc:'Grey wolves prowl the forest to the north. Thin the pack by five.',rw:{gold:120,xp:90,items:{mpot:2}},
+    intro:[['elder','The wolves of the Whisperwood have gone mad with the heat. They hunt right up to our fences now.']],
+    outro:[['elder','The forest is quieter. But wolves do not go mad without a reason.']]},
+  {id:'m3',npc:'elder',name:'Arm Yourself',type:'craft',n:1,at:[VX+6,VY-3],desc:'Worse things wait beyond the meadows. Have Borin forge you an Iron weapon at his anvil.',rw:{gold:100,xp:80},
+    intro:[['elder','What waits beyond the forest is worse than wolves. Go to Borin at the forge and tell him I sent you.'],['borin','Mira sent you? Then bring me logs and iron ore, and I\'ll put a proper edge on your gear.']],
+    outro:[['elder','A proper weapon. Good. Then it is time you heard the truth.'],['elder','Three hundred years ago the Ashen Wyrm burned this kingdom to cinders. The archmage Seraphine bound it with a gem that drinks fire: the Emberstone.'],['elder','The stone was set on the throne of King Aldric, in the old capital we now call the Sunken Ruins. If the Wyrm is stirring, something has happened to it.']]},
+  {id:'m4',npc:'elder',name:'Bones in the Ruins',type:'kill',t:'skeleton',n:8,at:[60,66],desc:'The Sunken Ruins to the south have woken. Put eight skeletons back to rest.',rw:{gold:250,xp:220,items:{hpot:3}},
+    intro:[['elder','The dead walk in the Sunken Ruins. Clear a path so we can learn what became of the stone.']],
+    outro:[['you','They wore royal armor. Old, rusted, but royal.'],['elder','Aldric\'s own guard. The old court has risen. Find the throne, and you will find the king.']]},
+  {id:'m4b',npc:'elder',name:'The Hollow King',type:'kill',t:'hollow',n:1,at:[HX,HY,'The Hollow Throne'],desc:'An undead king holds court on a ruined throne in the southwest of the Sunken Ruins, ringed by blue flames. Break his reign.',rw:{gold:800,xp:700,items:{hpot:3,mpot:3}},
+    intro:[['elder','The songs say Aldric loved the Emberstone more than his own people. If he has risen, he will not give it up.']],
+    outro:[['you','The Hollow King is dust. There was no stone on his throne, only scorch marks.'],['elder','Then it is worse than I feared. When Aldric tried to take its power, the stone cracked, and its shards fled.'],['elder','Seraphine drew a map of where they fell. But bandits stole my copy of it last spring.']]},
+  {id:'m5',npc:'elder',name:'Stone Giants',type:'kill',t:'golem',n:3,at:[90,30],desc:'Golems roam the Ironcrag Hills to the east. Break three of them.',rw:{gold:400,xp:380},
+    intro:[['elder','The bandits camp in the Ironcrag Hills, and the golems there have woken too, drawn by the shards\' heat. Toughen up on them first.']],
+    outro:[['elder','Strong work. Now, about that map.']]},
+  {id:'mv',npc:'elder',name:'The Stolen Map',type:'flag',t:'varg',n:1,at:[VGX,VGY,"Varg's camp"],desc:'Varg the Bandit King camps in the north of the Ironcrag Hills. He has Seraphine\'s map. Take it back.',rw:{gold:500,xp:450,items:{hpot:3}},
+    intro:[['elder','Varg calls himself the Bandit King. He has a camp of tents in the northern hills, and he has Seraphine\'s map.'],['elder','He will not hand it over politely.']],
+    outro:[['you','Varg ran for it. He left this behind.'],['elder','Seraphine\'s own hand... Three marks. A crypt beneath the Whisperwood. A temple the sea swallowed off the west coast. And caverns of ice in the eastern hills.'],['elder','The shards are down there. Bring them home, {class}.']]},
+  {id:'mc',npc:'elder',name:'The First Shard',type:'flag',t:'arachne',n:1,at:'crypt',desc:'The Mossy Crypt lies in the northern Whisperwood. Something has nested around the first shard. Defeat it.',rw:{gold:700,xp:600,items:{shard:1}},
+    intro:[['elder','The Mossy Crypt is in the north of the Whisperwood. The map shows a nest drawn around the first shard. I do not like that word.']],
+    outro:[['you','A giant spider queen was guarding it.'],['narrator','The shard is warm in your hand. It pulses like a slow heartbeat.'],['elder','One of three. Keep it close.']]},
+  {id:'mt',npc:'elder',name:'The Second Shard',type:'flag',t:'nerith',n:1,at:'temple',desc:'The Drowned Temple waits on the western shore. Find the second shard in its depths.',rw:{gold:900,xp:800,items:{shard:1}},
+    intro:[['elder','The Drowned Temple stands half in the sea on the western shore. Old Ned says even the fish have fled from it.'],['ned','Somethin\' big lives in there. Somethin\' with a lot of teeth.']],
+    outro:[['elder','Two shards. The Wyrm will feel them coming together. It will not sit still.']]},
+  {id:'m6',npc:'elder',name:'Embers on the Wind',type:'kill',t:'imp',n:6,at:[92,64],desc:'Fire imps pour out of the Ashen Wastes in the southeast. Drive back six of them.',rw:{gold:600,xp:600,items:{hpot:4,mpot:4}},
+    intro:[['elder','Fire imps are pouring out of the Ashen Wastes. The Wyrm knows what we are doing. Push them back.']],
+    outro:[['elder','The wastes burn hotter by the day. We are running out of time.']]},
+  {id:'mg',npc:'elder',name:'The Third Shard',type:'flag',t:'glacius',n:1,at:'caverns',desc:'The last shard lies frozen in the Frostfang Caverns in the eastern hills.',rw:{gold:1200,xp:1100,items:{shard:1}},
+    intro:[['elder','The last shard lies in the Frostfang Caverns in the eastern hills. Fire sealed in ice. Seraphine had a sense of humor.']],
+    outro:[['elder','All three. Seraphine, we did it.']]},
+  {id:'me',npc:'elder',name:'Reforge the Emberstone',type:'bring',t:'shard',n:3,desc:'Bring the three Emberstone shards to Elder Mira so she and Borin can make the stone whole.',rw:{gold:300,xp:500,flag:'emberstone',items:{hpot:5,mpot:5}},
+    intro:[['elder','Bring the three shards to me. Borin\'s forge and what is left of my magic should be enough to make the stone whole.']],
+    outro:[['borin','Never thought I\'d forge with starlight and fire. Hold still, Mira.'],['narrator','The shards fuse in a flash of white heat. The Emberstone glows in your hands, whole for the first time in centuries.'],['elder','Carry it into the wastes. Where you strike, the Wyrm\'s scales will crack.'],['elder','Wake the beast. And end it.']]},
+  {id:'m7',npc:'elder',name:'The Ashen Wyrm',type:'kill',t:'wyrm',n:1,at:[BX,BY,"The Wyrm's arena"],desc:'The Wyrm sleeps in a ring of braziers deep in the Ashen Wastes. Wake it, and end this.',rw:{gold:2000,xp:1500},
+    intro:[['elder','There is nothing more I can teach you. Go, {class}. The dawn of Emberfall rests on you.']],
+    outro:[['elder','You did it. You truly did it.'],['elder','For three hundred years we lived in its shadow. Tonight, we celebrate. Tomorrow, the world is yours to explore.']]},
+  {id:'r1',npc:'rhea',name:'Night Watch',type:'kill',t:'bat',n:8,desc:'Bats swarm out at night and bite anyone on the roads. Bring down eight.',rw:{gold:150,xp:120,items:{hpot:2}},
+    intro:[['rhea','Captain Rhea, Emberfall Watch. The roads are crawling with monsters and I have six guards.'],['rhea','So I pay bounties. You hunt, I pay. Simple.']]},
+  {id:'r2',npc:'rhea',name:'Spider Season',type:'kill',t:'spider',n:10,at:[56,16],desc:'Thicket spiders are spreading through the Whisperwood. Cull ten.',rw:{gold:260,xp:220}},
+  {id:'r3',npc:'rhea',name:'Bandit Bounty',type:'kill',t:'bandit',n:8,at:[90,30],desc:'Bandits are still robbing travelers in the Ironcrag Hills. Eight of them, please.',rw:{gold:380,xp:320,items:{hpot:2}}},
+  {id:'r4',npc:'rhea',name:'Restless Spirits',type:'kill',t:'wisp',n:8,at:[60,68],desc:'Grave wisps drift out of the Sunken Ruins after dark. Put eight to rest.',rw:{gold:450,xp:380}},
+  {id:'r5',npc:'rhea',name:'Magma Menace',type:'kill',t:'magma',n:8,at:[92,64],desc:'Magma slimes are oozing toward the hills from the Ashen Wastes. Stop eight.',rw:{gold:600,xp:520,items:{hpot:3}}},
+  {id:'r6',npc:'rhea',name:'Champion of Emberfall',type:'cond',n:250,cond:()=>P.st.kills,label:'Defeat monsters',desc:'Prove yourself the greatest hunter Emberfall has ever seen: defeat 250 monsters in total.',rw:{gold:1000,xp:800,mount:'warhorse'},
+    outro:[['rhea','Two hundred and fifty. You are a one-person army.'],['rhea','Valor was my father\'s warhorse. He would want her ridden by a champion. Take good care of her.']]},
+  {id:'o1',npc:'orrin',name:'The Waystones',type:'cond',n:5,cond:()=>P.ways.length-1,at:'way',label:'Activate waystones',desc:'Seraphine raised waystones across the land. Touch the five beyond the village to wake them. Then you can travel between them.',rw:{gold:300,xp:250},
+    intro:[['orrin','Ah, a visitor! Orrin, scholar of the old kingdom. I study Seraphine, the archmage.'],['orrin','She raised waystones all across the land. Touch one and it remembers you. Touch another, and you can step between them in a heartbeat.'],['orrin','There is one here in the village square. Five more wait out in the wild.']]},
+  {id:'o2',npc:'orrin',name:'Pages of the Past',type:'cond',n:4,cond:()=>P.pages.length,label:'Find journal pages',desc:'Seraphine\'s journal scattered when her tower fell. The pages glow gold. Find four.',rw:{gold:400,xp:350},
+    intro:[['orrin','Seraphine kept a journal. When her tower fell, the pages scattered on the wind.'],['orrin','They shimmer gold. Some fell in the wild, and some, I fear, in deeper places. Read every one you find!']]},
+  {id:'o3',npc:'orrin',name:'The Complete Journal',type:'cond',n:8,cond:()=>P.pages.length,label:'Find journal pages',desc:'Find all eight pages of Seraphine\'s journal. Three of them lie at the bottom of the dungeons.',rw:{gold:1200,xp:900,weapon:'seraphstaff'},
+    outro:[['orrin','The whole journal. She knew someone would come after her. She wrote it for you.'],['orrin','Take her staff. I dug it out of the ruins years ago and never dared to use it. It belongs with you.']]},
+  {id:'o4',npc:'orrin',name:'Treasures of the Deep',type:'cond',n:6,cond:()=>(P.dch||[]).length,label:'Open dungeon chests',desc:'The old kingdom hid its treasures below ground. Open six chests in the dungeons.',rw:{gold:700,xp:600}},
   {id:'n1',npc:'ned',name:'Catch of the Day',type:'catch',n:5,desc:'Face the water and press E to cast. When the bobber dips, strike, then stop the needle in the green.',rw:{gold:40,xp:30,items:{grilled:2}}},
   {id:'n2',npc:'ned',name:'The Golden Koi',type:'bring',t:'koi',n:1,desc:'A golden koi lives in Mirror Lake. Rain and a good lure both help.',rw:{gold:250,xp:150}},
   {id:'n3',npc:'ned',name:'Legend of the Moonfin',type:'bring',t:'moonfin',n:1,desc:'They say the Moonfin only bites in Mirror Lake, and only at night.',rw:{gold:800,xp:500}},
+  {id:'n4',npc:'ned',name:'Coastal Pests',type:'kill',t:'crab',n:6,desc:'Rock crabs keep snipping my nets on the Saltwind Coast. Crack six shells for me.',rw:{gold:150,xp:120,items:{grilled:3}}},
+  {id:'n6',npc:'ned',name:'Master Angler',type:'cond',n:7,cond:()=>Object.keys(P.st.fk||{}).length,label:'Kinds of fish caught',desc:'Catch every kind of fish at least once: lake, sea, day and night.',rw:{gold:900,xp:600}},
   {id:'b1',npc:'borin',name:'Ore for the Forge',type:'bring',t:'iron',n:10,desc:'Mine iron ore from rocks in the meadows and hills. Bring me ten.',rw:{gold:120,xp:90}},
   {id:'b2',npc:'borin',name:'Crystal Clear',type:'bring',t:'crystal',n:4,desc:'Starcrystal grows in the far east of the Ironcrag Hills. You need Mining level 5 to cut it.',rw:{gold:500,xp:300}},
+  {id:'b3',npc:'borin',name:'Shells for Rivets',type:'bring',t:'shell',n:6,desc:'Crab shell makes tough rivets. Bring me six from the coast.',rw:{gold:200,xp:140}},
+  {id:'b5',npc:'borin',name:'A Fine Collection',type:'cond',n:8,cond:()=>P.weapons.length,label:'Weapons owned',desc:'A true warrior knows many weapons. Own eight of them.',rw:{gold:600,xp:500}},
   {id:'l1',npc:'lin',name:'Redleaf Remedy',type:'bring',t:'herb',n:6,desc:'Redleaf herbs grow in the meadows and forest. I need six for my remedies.',rw:{gold:60,xp:50,items:{hpot:3}}},
   {id:'l2',npc:'lin',name:'Glow in the Dark',type:'bring',t:'glowcap',n:5,desc:'Glowcaps light up the Whisperwood and the ruins. Bring me five.',rw:{gold:150,xp:120,items:{mpot:4}}},
+  {id:'l3',npc:'lin',name:'Toad Trouble',type:'kill',t:'toad',n:5,desc:'Bog toads around Mirror Lake are spitting at my herb pickers. Deal with five.',rw:{gold:120,xp:100,items:{hpot:2}}},
+  {id:'l4',npc:'lin',name:'A Very Large Toad',type:'kill',t:'toad',n:10,desc:'The bog toads have a queen-sized cousin who wants a rider. Clear ten toads and she\'s yours.',rw:{gold:200,xp:200,mount:'hopper'}},
+  {id:'l6',npc:'lin',name:'Apprentice Brewer',type:'cond',n:5,cond:()=>P.st.brews||0,label:'Potions brewed',desc:'Learn the craft! Brew five potions at my cauldron.',rw:{gold:200,xp:180,items:{elixir:1}}},
   {id:'t1',npc:'tess',name:'Pelts Wanted',type:'bring',t:'pelt',n:6,desc:'Wolf pelts sell well in the capital. Six, please.',rw:{gold:180,xp:110}},
-  {id:'t5',npc:'tess',name:"A King's Bounty",type:'kill',t:'varg',n:1,desc:'Varg the Bandit King runs a camp in the north of the Ironcrag Hills. Put an end to his gang.',rw:{gold:600,xp:450}},
-  {id:'b4',npc:'borin',name:'The Brood Queen',type:'kill',t:'arachne',n:1,desc:'There is a crypt in the Whisperwood, and something with too many legs lives at the bottom. Slay it.',rw:{gold:700,xp:600}},
-  {id:'n5',npc:'ned',name:'The Tide Serpent',type:'kill',t:'nerith',n:1,desc:'An old temple sank off the west coast. A serpent guards its heart and scares off every fish. Defeat it.',rw:{gold:900,xp:800}},
-  {id:'l5',npc:'lin',name:'Heart of Winter',type:'kill',t:'glacius',n:1,desc:'The Frostfang Caverns in the eastern hills are freezing my mountain herbs. Something huge is in there.',rw:{gold:1400,xp:1200}},
   {id:'t2',npc:'tess',name:'Treasure Hunter',type:'chests',n:5,desc:'Old chests are hidden all over the land, two in every region. Open five.',rw:{gold:400,xp:250}},
   {id:'t3',npc:'tess',name:'Silk Road',type:'bring',t:'silk',n:6,desc:'Thicket spiders in the Whisperwood spin the finest silk. Bring me six bundles.',rw:{gold:260,xp:160}},
   {id:'t4',npc:'tess',name:'Highway Robbers',type:'kill',t:'bandit',n:6,desc:'Bandits keep robbing my caravans near the Ironcrag Hills. Teach six of them a lesson.',rw:{gold:380,xp:300,items:{hpot:2}}},
-  {id:'n4',npc:'ned',name:'Coastal Pests',type:'kill',t:'crab',n:6,desc:'Rock crabs keep snipping my nets on the Saltwind Coast. Crack six shells for me.',rw:{gold:150,xp:120,items:{grilled:3}}},
-  {id:'l4',npc:'lin',name:'A Very Large Toad',type:'kill',t:'toad',n:10,desc:'The bog toads have a queen-sized cousin who wants a rider. Clear ten toads and she\'s yours.',rw:{gold:200,xp:200,mount:'hopper'}},
-  {id:'l3',npc:'lin',name:'Toad Trouble',type:'kill',t:'toad',n:5,desc:'Bog toads around Mirror Lake are spitting at my herb pickers. Deal with five.',rw:{gold:120,xp:100,items:{hpot:2}}},
-  {id:'b3',npc:'borin',name:'Shells for Rivets',type:'bring',t:'shell',n:6,desc:'Crab shell makes tough rivets. Bring me six from the coast.',rw:{gold:200,xp:140}},
+  {id:'t6',npc:'tess',name:'Merchant Prince',type:'cond',n:5000,cond:()=>P.gold,label:'Gold in your purse',desc:'A true trader keeps a full purse. Hold 5,000 gold at once.',rw:{gold:500,xp:400}},
+];
+const CHAPTERS=[
+  {n:'I',t:'A Stranger in Emberfall',q:['m1','m2','m3'],sum:'You arrived in Emberfall as ash began to fall with the rain. Elder Mira tested your mettle, and Borin armed you. Then Mira told you of the Wyrm and the Emberstone.'},
+  {n:'II',t:'The Hollow Crown',q:['m4','m4b'],sum:'In the Sunken Ruins you faced King Aldric, now the Hollow King. The Emberstone was gone from his throne. It had cracked, and its shards had fled.'},
+  {n:'III',t:'Shards of the Emberstone',q:['m5','mv','mc','mt'],sum:'You took back Seraphine\'s map from Varg the Bandit King, then descended into the Mossy Crypt and the Drowned Temple to recover two of the shards.'},
+  {n:'IV',t:'Fire and Ice',q:['m6','mg','me'],sum:'You pushed back the Wyrm\'s fire imps, claimed the last shard from the Frost Titan, and Mira and Borin forged the Emberstone whole.'},
+  {n:'V',t:'The Ashen Wyrm',q:['m7'],sum:'You carried the Emberstone into the Ashen Wastes and woke the Wyrm, to end three hundred years of fear.'},
+];
+const PROLOGUE=[
+  {art:'wyrm',title:'The Burning',text:'Three hundred years ago, the Ashen Wyrm rose from beneath the earth and set the kingdom of Emberfall ablaze.'},
+  {art:'seraphine',title:'The Binding',text:'The archmage Seraphine forged the Emberstone, a gem that drinks fire, and with it bound the Wyrm in a deep sleep beneath the Ashen Wastes.'},
+  {art:'hollow',title:'The Hollow Crown',text:'The stone was set upon the throne of King Aldric. In time the king came to covet its power, and his capital fell silent.'},
+  {art:'village',title:'Ash on the Wind',text:'Now the ground grows warm, ash falls with the rain, and monsters stir. A lone {class} arrives at the village of Emberfall...'},
+];
+const EPILOGUE=[
+  {art:'stone',title:'The Wyrm Falls',text:'With the Emberstone whole once more, the Ashen Wyrm fell, and its fire went out for good.'},
+  {art:'dawn',title:'A New Dawn',text:'For the first time in three hundred years, the sky over the Ashen Wastes turned blue. Emberfall celebrated for seven days and seven nights.'},
+  {art:'village',title:'Your Story Continues',text:'The dungeons still hold treasure, Captain Rhea still pays her bounties, and Seraphine\'s lost pages still wait to be found. Thank you for playing.'},
+];
+const WAYSTONES=[
+  {id:'village',n:'Emberfall Square',x:VX+8,y:VY+1},{id:'glade',n:'Whisperwood Glade',x:30,y:18},{id:'point',n:'Saltwind Point',x:20,y:76},
+  {id:'ridge',n:'Ironcrag Ridge',x:96,y:44},{id:'steps',n:'Sunken Steps',x:70,y:72},{id:'watch',n:'Ashen Watch',x:88,y:62},
+];
+const PAGES=[
+  {lv:'world',x:60,y:9,hint:'Northern Whisperwood',t:'The Wyrm came up from beneath the wastes today. Three villages are gone. King Aldric has asked me to stop it, whatever the cost.'},
+  {lv:'world',x:9,y:50,hint:'The western coast',t:'I have made the Emberstone. It drinks fire the way sand drinks water. If it can hold even a fraction of the beast\'s flame, it will be enough.'},
+  {lv:'world',x:104,y:12,hint:'The far north-east hills',t:'It is done. The Wyrm sleeps beneath the Ashen Wastes, and the stone keeps it dreaming. Aldric has set the stone upon his throne for all to see.'},
+  {lv:'world',x:56,y:78,hint:'The southern ruins',t:'Aldric looks at the stone the way a starving man looks at bread. He asks me how long its power would let a man live. I did not answer him.'},
+  {lv:'world',x:30,y:66,hint:'South of Mirror Lake',t:'I am old now. I have raised waystones across the land so that whoever comes after me may travel swiftly. They will remember anyone who touches them.'},
+  {lv:'crypt',hint:'The Mossy Crypt',t:'Aldric took the stone into himself. It burned him hollow. The stone cracked into three, and the shards fled to the deep places, as fire seeks the dark.'},
+  {lv:'temple',hint:'The Drowned Temple',t:'One shard went to the crypt beneath the forest, one to the temple the sea swallowed, and one into the frozen roots of the eastern hills. I drew a map.'},
+  {lv:'caverns',hint:'The Frostfang Caverns',t:'To whoever reads this: the Wyrm cannot be slain while it sleeps. Reforge the stone, wake the beast, and end it. I am sorry I could not. — Seraphine'},
 ];
 const ACH={
   first:['First Blood','Defeat your first monster'],slayer:['Monster Hunter','Defeat 100 monsters'],angler:['Angler','Catch 10 fish'],
   legend:['Legend of the Lake','Catch the Moonfin'],lumber:['Lumberjack','Chop 25 trees'],miner:['Prospector','Mine 25 rocks'],
   chef:['Camp Cook','Cook 5 meals'],rich:['Deep Pockets','Hold 1,000 gold'],lv5:['Seasoned','Reach level 5'],lv10:['Hero of Emberfall','Reach level 10'],
   explorer:['Cartographer','Discover all 8 regions'],chests:['Treasure Hunter','Open 10 chests'],smith:['Master Smith','Forge an Emberbrand weapon'],
-  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],pet:['Best Friend','Adopt your first pet'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
+  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
 };
 const WEAPONS={
   sword:{n:'Training Sword',kind:'melee',draw:'sword',style:'arc',r:66,arc:1.2,mult:1.1,cd:.36,d:'Balanced sword arcs.'},
@@ -447,6 +547,7 @@ const WEAPONS={
   dragonfang:{n:'Dragonfang',kind:'melee',draw:'sword',style:'arc',r:72,arc:1.3,mult:1.5,cd:.4,col:'#ff4d3d',fx:{burn:4},wave:1,d:'Each slash burns and launches a wave of fire. Taken from the Ashen Wyrm.'},
   wand:{n:'Spark Wand',kind:'magic',draw:'wand',style:'shoot',pk:'spark',spd:640,mult:.85,cd:.34,life:.6,r:6,chain:3,col:'#ffe066',d:'Lightning that jumps between up to 4 enemies.'},
   rimewood:{n:'Rimewood Staff',kind:'magic',draw:'staff',style:'shoot',pk:'ice',spd:520,mult:1.15,cd:.42,life:.8,r:7,col:'#8fe3ff',fx:{slow:2.5},pierce:1,d:'Piercing ice shards that slow enemies.'},
+  seraphstaff:{n:"Seraphine's Staff",kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:420,mult:1.5,cd:.38,life:1.3,r:9,col:'#ffd27a',seek:1,chain:2,d:'The archmage\'s own staff. Seeking orbs that arc lightning to nearby enemies. A gift from Orrin.'},
   hollowstaff:{n:'Staff of the Hollow',kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:360,mult:1.35,cd:.4,life:1.4,r:9,col:'#a98cff',seek:1,pierce:1,d:'Seeking void orbs that pass through enemies. Taken from the Hollow King.'},
   crossbow:{n:'Heavy Crossbow',kind:'ranged',draw:'crossbow',style:'shoot',pk:'arrow',heavy:1,spd:840,mult:2,cd:.68,life:.7,r:6,pierce:1,col:'#c9cfd6',d:'Slow to reload. Bolts punch through every enemy.'},
   longbow:{n:'Galeshot Longbow',kind:'ranged',draw:'bow',style:'shoot',pk:'arrow',spd:700,mult:.8,cd:.45,life:.75,r:5,count:3,spread:.16,col:'#b8f0c8',d:'Looses three arrows at once.'},
@@ -488,6 +589,7 @@ const MOUNTS={
   hopper:{n:'Bog Hopper',kind:'Giant Toad',spd:1.5,hop:1,d:'Bounces happily along and can hop across shallow water.',src:'Reward from Lin for "A Very Large Toad"',draw:'toad'},
   stag:{n:'Silverhorn',kind:'Stag',spd:1.8,d:'Very fast and graceful.',src:'Sold by Tess for 2,000 gold',draw:'stag',body:'#c9a173',dark:'#8a6640',mane:'#f2e6d0'},
   rimewolf:{n:'Rime',kind:'Frost Wolf',spd:1.7,frost:1,lv:8,d:'Leaves a trail of frost that slows nearby enemies.',src:'Sold by Tess for 2,500 gold (level 8)',draw:'wolf',body:'#e4edf7',dark:'#8fa6c2',mane:'#ffffff'},
+  warhorse:{n:'Valor',kind:'Warhorse',spd:1.75,trample:1,d:'An armored warhorse that tramples enemies in its path.',src:'Reward from Captain Rhea',draw:'horse',body:'#e8e4dc',dark:'#9a948a',mane:'#c0392b'},
   shadow:{n:'Nightmare',kind:'Shadow Steed',spd:1.9,stealth:1,d:'A ghostly horse. Monsters only notice you when you ride right up to them.',src:"Claimed from the Hollow King's stable",draw:'horse',body:'#231d36',dark:'#0e0b18',mane:'#a98cff',glow:'#a98cff'},
   drake:{n:'Cinder',kind:'Ashen Drake',spd:2.05,fly:1,d:'The fastest mount. Flies over water, lava and walls.',src:'Tamed after you defeat the Ashen Wyrm',draw:'drake'},
 };
@@ -921,6 +1023,9 @@ function drawObj(g,o){
     case'exit':{glow(g,x,y-10,54,'#fff2c0',.28);for(let i=0;i<5;i++){g.fillStyle=shade('#8a8578',-.1*i);g.fillRect(x-20+i*2,y+8-i*7,40-i*4,7)}g.fillStyle='rgba(255,240,190,.22)';g.beginPath();g.moveTo(x-14,y-34);g.lineTo(x+14,y-34);g.lineTo(x+24,y+14);g.lineTo(x-24,y+14);g.fill();break}
     case'portal':{const k=time*3;glow(g,x,y-14,50,'#c8b4ff',.5);g.strokeStyle='#e6dcff';g.lineWidth=3;for(let i=0;i<3;i++){g.beginPath();g.ellipse(x,y-14,22-i*5,30-i*7,0,k+i,k+i+4);g.stroke()}ell(g,x,y-14,10,15,'rgba(40,20,80,.7)');if(Math.random()<.2)spark(x+rnd(-14,14),y-14+rnd(-20,20),'#c8b4ff',1,30);break}
     case'dungeon':drawEntrance(g,o);break;
+    case'waystone':{const on=P&&P.ways.includes(o.wid);ell(g,x+3,y+14,16,5,'rgba(0,0,0,.3)');g.fillStyle='#6f7680';g.fillRect(x-14,y+4,28,10);const gr=g.createLinearGradient(x-10,0,x+10,0);gr.addColorStop(0,'#a9b2bc');gr.addColorStop(1,'#59616b');g.fillStyle=gr;g.beginPath();g.moveTo(x-10,y+6);g.lineTo(x-7,y-44);g.lineTo(x,y-54);g.lineTo(x+7,y-44);g.lineTo(x+10,y+6);g.closePath();g.fill();
+      const c=on?'#7fd6ff':'#4a525c';if(on)glow(g,x,y-24,34+Math.sin(time*3)*4,'#7fd6ff',.45);g.strokeStyle=c;g.lineWidth=2.5;g.beginPath();g.moveTo(x,y-40);g.lineTo(x,y-10);g.moveTo(x-5,y-30);g.lineTo(x+5,y-24);g.moveTo(x+5,y-34);g.lineTo(x-5,y-18);g.stroke();if(on&&Math.random()<.08)spark(x+rnd(-8,8),y-30,'#bfeeff',1,30);break}
+    case'page':{if(o.gone)break;const b=Math.sin(time*2.5+s*9)*3;glow(g,x,y-10+b,26,'#ffd27a',.45);g.save();g.translate(x,y-10+b);g.rotate(Math.sin(time*1.5)*.15);g.fillStyle='#f3e6c4';g.fillRect(-8,-10,16,20);g.fillStyle='#c9b48a';g.fillRect(-8,-10,16,3);g.fillStyle='rgba(90,70,40,.6)';for(let i=0;i<4;i++)g.fillRect(-5,-4+i*4,10-(i%2)*3,1.4);g.restore();if(Math.random()<.06)spark(x,y-16,'#ffd27a',1,30);break}
     case'tent':{ell(g,x+4,y+14,26,7,'rgba(0,0,0,.3)');g.fillStyle=s<.5?'#8a3a2a':'#5a4a3a';g.beginPath();g.moveTo(x-26,y+12);g.lineTo(x,y-28);g.lineTo(x+26,y+12);g.closePath();g.fill();g.fillStyle='rgba(255,255,255,.15)';g.beginPath();g.moveTo(x,y-28);g.lineTo(x+26,y+12);g.lineTo(x+12,y+12);g.closePath();g.fill();g.fillStyle='#1a120c';g.beginPath();g.moveTo(x-7,y+12);g.lineTo(x,y-8);g.lineTo(x+7,y+12);g.fill();g.strokeStyle='#4a3626';g.lineWidth=2;g.beginPath();g.moveTo(x,y-28);g.lineTo(x,y-36);g.stroke();break}
     case'crate':{ell(g,x+2,y+12,15,4,'rgba(0,0,0,.3)');rr(g,x-13,y-12,26,24,2,'#8a5a32');g.strokeStyle='#5a3a1a';g.lineWidth=2;g.strokeRect(x-12,y-11,24,22);g.beginPath();g.moveTo(x-12,y-11);g.lineTo(x+12,y+11);g.stroke();break}
     case'coffin':{ell(g,x+2,y+12,16,5,'rgba(0,0,0,.3)');g.fillStyle='#4a3428';g.beginPath();g.moveTo(x-8,y-20);g.lineTo(x+8,y-20);g.lineTo(x+12,y-8);g.lineTo(x+8,y+12);g.lineTo(x-8,y+12);g.lineTo(x-12,y-8);g.closePath();g.fill();g.fillStyle='#8a7a6a';g.fillRect(x-1.5,y-14,3,16);g.fillRect(x-6,y-9,12,3);break}
@@ -970,6 +1075,8 @@ function makeNPCs(){
     {id:'borin',name:'Borin',role:'Blacksmith',x:(VX+4.5)*T,y:(VY-2.4)*T,look:{body:'#5a3d2b',trim:'#c0c0c0',hair:'#b5562d',skin:'#e6b48f',beard:true,weapon:'hammer'}},
     {id:'lin',name:'Lin',role:'Herbalist',x:(VX-5.5)*T,y:(VY+3)*T,look:{body:'#3f8f6b',trim:'#f4d06f',hair:'#2b1b17',skin:'#e9c09a'}},
     {id:'tess',name:'Tess',role:'Merchant',x:(VX+5.5)*T,y:(VY+6.9)*T,look:{body:'#b5523b',trim:'#f0b94a',hair:'#e2b05a',skin:'#f3cfae',hat:'cap'}},
+    {id:'rhea',name:'Captain Rhea',role:'Captain of the Watch',x:(VX+2.6)*T,y:(VY-7.4)*T,look:{body:'#46597e',trim:'#cfd6e2',hair:'#2a1a12',skin:'#c99a76',hat:'helm',cape:'#2c3a5a',weapon:'sword',tier:2}},
+    {id:'orrin',name:'Orrin',role:'Scholar of the Old Kingdom',x:(VX+2.6)*T,y:(VY+12)*T,look:{body:'#6b5a3a',trim:'#e8c76a',hair:'#e9e4da',skin:'#e6c09c',hat:'wizard',beard:true,weapon:'staff'}},
     {id:'ned',name:'Old Ned',role:'Fisherman',x:37.5*T,y:48.4*T,look:{body:'#3c5a7a',trim:'#e0c58a',hair:'#d0d0d0',skin:'#e0b08b',hat:'straw',beard:true,weapon:'rod'}},
   ];
   npcs.forEach(n=>{n.hx=n.x;n.hy=n.y;n.fx=0;n.fy=1;n.anim=0;n.t=rnd(1,4);n.tx=n.x;n.ty=n.y});
@@ -981,7 +1088,7 @@ function newPlayer(cls){
     inv:{hpot:3,mpot:2},atkCd:0,skillCd:0,dashCd:0,dashT:0,iT:0,anim:0,moving:false,atkAnim:0,lastHit:99,
     sk:{fishing:{l:1,x:0},mining:{l:1,x:0},woodcutting:{l:1,x:0},foraging:{l:1,x:0}},
     buffs:{},own:{},q:{},ach:{},st:{kills:0,fish:0,trees:0,rocks:0,herbs:0,chests:0,meals:0},
-    seen:{},time:.08,flags:{},opened:[],tracked:[],weapon:STARTER[cls],weapons:[STARTER[cls]],spells:['mend'],slots:['mend',null,null],spCd:{},dch:[],pets:[],petId:null,mounts:[],mountId:null,riding:false};
+    seen:{},time:.08,flags:{},opened:[],tracked:[],weapon:STARTER[cls],weapons:[STARTER[cls]],spells:['mend'],slots:['mend',null,null],spCd:{},dch:[],ways:['village'],pages:[],track:null,seenIntro:{},pets:[],petId:null,mounts:[],mountId:null,riding:false};
 }
 function stats(){
   const c=CLASSES[P.cls],L=P.lvl-1;let atk=c.atk+L*2+WT[P.wT]+P.elixir*3;const def=c.def+L+AT[P.aT]+(P.petId==='pinch'?5:0);
@@ -998,7 +1105,7 @@ function serialize(){if(!P)return null;const p=Object.assign({},P);p.opened=ches
 function save(){const d=serialize();if(!d)return;try{localStorage.setItem(SAVE_KEY,JSON.stringify(d))}catch(e){}}
 function loadData(d){
   const base=newPlayer(d.P.cls);P=Object.assign(base,d.P);P.sk=Object.assign(base.sk,d.P.sk||{});
-  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];
+  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];P.st.fk=P.st.fk||{};if(P.q.m1)P.flags.prologue=1;
   explored.fill(0);try{unpackBits(d.ex,explored)}catch(e){}resetFog();
   chests.forEach(c=>c.open=(P.opened||[]).includes(c.id));
   if(P.own.pet&&!P.pets.includes('fox')){P.pets.push('fox');if(!P.petId)P.petId='fox'}P.riding=false;spawnPet();
@@ -1024,10 +1131,19 @@ function gainXP(n){if(P.petId==='owl')n=Math.round(n*1.1);P.xp+=n;while(P.xp>=xp
 function gainSkill(k,x){const s=P.sk[k];s.x+=x;const need=30*s.l;if(s.x>=need){s.x-=need;s.l++;toast(SKILLS[k]+' level '+s.l,k==='mining'&&s.l===3?'You can now mine gold ore':k==='mining'&&s.l===5?'You can now cut starcrystal':'You gather faster and find more','#6fdc8c');SFX.level()}}
 
 /* ---------- quests ---------- */
-function qProg(q){const s=P.q[q.id];if(!s)return 0;if(q.type==='bring')return Math.min(q.n,P.inv[q.t]||0);if(q.type==='craft')return P.wT>=1?1:0;return Math.min(q.n,s.c||0)}
+function qProg(q){const s=P.q[q.id];if(!s)return 0;if(q.type==='bring')return Math.min(q.n,P.inv[q.t]||0);if(q.type==='craft')return P.wT>=1?1:0;if(q.type==='flag')return P.flags[q.t]?1:0;if(q.type==='cond')return Math.min(q.n,q.cond()||0);return Math.min(q.n,s.c||0)}
 function qEvent(type,t){QUESTS.forEach(q=>{const s=P.q[q.id];if(s&&s.s==='active'&&q.type===type&&(!q.t||q.t===t)){s.c=(s.c||0)+1;if(s.c===q.n)toast('Objective complete: '+q.name,'Return to '+npcName(q.npc),'#6fdc8c')}})}
 function npcName(id){const n=npcs.find(n=>n.id===id);return n?n.name:id}
 function nextQuest(id){return QUESTS.find(q=>q.npc===id&&(!P.q[q.id]||P.q[q.id].s!=='done'))}
+function checkQuests(){for(const q of activeQuests()){const s=P.q[q.id];if((q.type==='cond'||q.type==='flag'||q.type==='bring'||q.type==='craft')&&!s.note&&qProg(q)>=q.n){s.note=1;toast('Objective complete: '+q.name,'Return to '+npcName(q.npc),'#6fdc8c');SFX.quest()}}}
+function nearestWay(){let b=null,bd=1e9;for(const w of WAYSTONES){if(P.ways.includes(w.id))continue;const d=dist(P.x,P.y,(w.tx+.5)*T,(w.ty+.5)*T);if(d<bd){bd=d;b=w}}return b?[b.tx,b.ty,b.n]:null}
+function trackedQuest(){const aq=activeQuests();return aq.find(q=>q.id===P.track)||aq.find(q=>q.npc==='elder')||aq.find(q=>q.at)||aq[0]||null}
+function qTarget(q){
+  if(!q)return null;const s=P.q[q.id];if(!s||s.s!=='active')return null;
+  if(qProg(q)>=q.n){if(LVD){const L=LEVELS[curLevel];return{x:L.sx,y:L.sy-T,label:'Exit stairs'}}const n=npcs.find(n=>n.id===q.npc);return n?{x:n.x,y:n.y,label:'Return to '+n.name}:null}
+  const a=q.at==='way'?nearestWay():q.at;if(!a)return null;
+  if(typeof a==='string'){if(curLevel===a){const b=LEVELS[a].boss;return{x:(b.cx+.5)*T,y:(b.cy+.5)*T,label:'Boss chamber'}}if(LVD)return null;const D=DUNGEONS[a];return{x:(D.ex+.5)*T,y:(D.ey+.5)*T,label:D.n}}
+  if(LVD)return null;return{x:(a[0]+.5)*T,y:(a[1]+.5)*T,label:a[2]||q.name}}
 function activeQuests(){return QUESTS.filter(q=>P.q[q.id]&&P.q[q.id].s==='active')}
 
 /* ---------- spawn & enemies ---------- */
@@ -1191,6 +1307,7 @@ function checkBoss(){
       banner={title:B.title,sub:B.sub,t:0,col:B.col};shake=1;if(k==='wyrm')SFX.roar();else{tone(70,1.4,'sawtooth',.12,.6);[220,207,196,185].forEach((f,i)=>tone(f,.5,'triangle',.08,0,i*.25))}puff(b.x,b.y,k==='wyrm'?'#3a2a28':'#5a5f8a',40)}}
 }
 function hurtEnemy(e,mult,ax,ay,critBonus=0,fx=null){
+  if(e.type==='wyrm'&&P.flags.emberstone)mult*=1.35;
   if(e.dead||e.spawnT>.2||e.under)return;
   const S=stats();let crit=Math.random()<.12+critBonus;let dmg=Math.max(1,Math.round(S.atk*mult*rnd(.9,1.1)-e.def*.5));if(crit)dmg=Math.round(dmg*1.8);
   if(fx){if(fx.burn){e.burn=fx.burn;e.burnD=Math.max(1,S.atk*.2)}if(fx.poison){e.poison=fx.poison;e.poisD=Math.max(1,S.atk*.15)}if(fx.slow)e.slow=Math.max(e.slow||0,fx.slow);
@@ -1340,7 +1457,7 @@ function updatePlayer(dt){
   if(P.fish)updateFish(dt);
   exploreT-=dt;if(exploreT<=0){exploreT=.3;explore();
     const r=regAt(Math.floor(P.x/T),Math.floor(P.y/T));if(r!==lastRegion){lastRegion=r;if(!P.seen[r]){P.seen[r]=1;banner={title:REGIONS[r].name,sub:REGIONS[r].lv,t:0};if(OVER.every(k=>P.seen[k]))unlock('explorer');gainXP(15)}}
-    checkBoss()}
+    checkBoss();checkQuests()}
   if(P.gold>=1000)unlock('rich');
 }
 
@@ -1368,6 +1485,8 @@ function findTarget(){
     else if(o.type==='dungeon')label='Enter '+DUNGEONS[o.id].n+' (Lv '+DUNGEONS[o.id].lv+'+)';
     else if(o.type==='exit')label='Climb back to the surface';
     else if(o.type==='portal')label='Step through the portal';
+    else if(o.type==='waystone')label=P.ways.includes(o.wid)?'Travel by waystone':'Wake the waystone';
+    else if(o.type==='page'&&!o.gone)label='Read the journal page';
     else if(o.type==='stall')label='Browse the stall';
     if(label){bd=d;best={k:'obj',o,x:ox,y:oy-(o.type==='tree'?70:40),label}}
   }
@@ -1394,6 +1513,8 @@ function interact(){
   else if(o.type==='board')openHelp(true);
   else if(o.type==='dungeon')enterLevel(o.id);
   else if(o.type==='exit'||o.type==='portal')leaveLevel();
+  else if(o.type==='waystone')useWaystone(o);
+  else if(o.type==='page'&&!o.gone)readPage(o);
 }
 function updateGather(dt){
   const g=P.gather,o=g.o;g.t+=dt;g.tick-=dt;
@@ -1437,7 +1558,7 @@ function fishPress(){
   if(f.ph==='wait'||f.ph==='cast'){P.fish=null;toast('Too early!','Wait for the bobber to dip','#9ba4c2');return}
   if(f.ph==='bite'){const d=FISHDIFF[f.fish];const bonus=P.sk.fishing.l*.008;f.ph='reel';f.t=0;f.zw=d[0]+bonus;f.zc=rnd(.15+f.zw/2,.85-f.zw/2);f.sp=d[1];f.cur=0;return}
   if(f.ph==='reel'){
-    if(Math.abs(f.cur-f.zc)<=f.zw/2){const id=f.fish;addItem(id);P.st.fish++;qEvent('catch');gainSkill('fishing',{minnow:8,trout:11,bass:11,salmon:15,koi:30,angler:35,moonfin:60}[id]);
+    if(Math.abs(f.cur-f.zc)<=f.zw/2){const id=f.fish;addItem(id);P.st.fish++;P.st.fk=P.st.fk||{};P.st.fk[id]=1;qEvent('catch');gainSkill('fishing',{minnow:8,trout:11,bass:11,salmon:15,koi:30,angler:35,moonfin:60}[id]);
       toast('Caught a '+ITEMS[id].n+'!',id==='moonfin'?'A legend of the lake!':id==='koi'||id==='angler'?'A rare catch!':'+'+ITEMS[id].v+' gold value',id==='moonfin'||id==='koi'?'#ffd23f':'#7fd6ff');SFX.catch();
       for(let i=0;i<16;i++)particles.push({x:f.bx,y:f.by,vx:rnd(-60,60),vy:rnd(-160,-60),life:.8,max:.8,size:3,col:'#cfe9ff',k:'spark',grav:300});
       if(P.st.fish>=10)unlock('angler');if(id==='moonfin')unlock('legend')}
@@ -1730,7 +1851,7 @@ function render(){
     const L=[];const add=(x,y,rad,col,i=1)=>{if(x>x0-rad&&x<x1+rad&&y>y0-rad&&y<y1+rad)L.push([x,y,rad,col,i])};
     if(P&&state!=='title')add(P.x,P.y-10,P.own.lantern?300:190,'#ffcf8a',1);
     for(const o of objs){if(o.x<x0-200||o.x>x1+200||o.y<y0-200||o.y>y1+200)continue;
-      if(o.type==='lamp')add(o.x,o.y-36,190,'#ffcf6b');else if(o.type==='torch')add(o.x,o.y+14,210,(LVD&&LVD.torch)||'#ff9a3d');else if(o.type==='exit')add(o.x,o.y-10,240,'#fff2c0');else if(o.type==='portal')add(o.x,o.y-14,200,'#c8b4ff');else if(o.type==='dungeon')add(o.x,o.y-6,90,o.id==='temple'?'#5fe0d0':o.id==='caverns'?'#9fe8ff':'#c8b4ff',.6);else if(o.type==='campfire')add(o.x,o.y-6,240+Math.sin(time*13)*10,'#ff9a3d');else if(o.type==='brazier')add(o.x,o.y-20,170+Math.sin(time*11+o.seed)*8,o.blue?'#7f9cff':'#ff8a3d');
+      if(o.type==='lamp')add(o.x,o.y-36,190,'#ffcf6b');else if(o.type==='torch')add(o.x,o.y+14,210,(LVD&&LVD.torch)||'#ff9a3d');else if(o.type==='exit')add(o.x,o.y-10,240,'#fff2c0');else if(o.type==='portal')add(o.x,o.y-14,200,'#c8b4ff');else if(o.type==='waystone'&&P&&P.ways.includes(o.wid))add(o.x,o.y-24,150,'#7fd6ff',.8);else if(o.type==='page'&&!o.gone)add(o.x,o.y-10,90,'#ffd27a',.7);else if(o.type==='dungeon')add(o.x,o.y-6,90,o.id==='temple'?'#5fe0d0':o.id==='caverns'?'#9fe8ff':'#c8b4ff',.6);else if(o.type==='campfire')add(o.x,o.y-6,240+Math.sin(time*13)*10,'#ff9a3d');else if(o.type==='brazier')add(o.x,o.y-20,170+Math.sin(time*11+o.seed)*8,o.blue?'#7f9cff':'#ff8a3d');
       else if(o.type==='cauldron')add(o.x,o.y,110,'#7dff9a',.7);else if(o.type==='house'){add(o.tx*T+34,o.ty*T+o.h*T*.42+24,80,'#ffd77a',.8);add(o.tx*T+o.w*T-34,o.ty*T+o.h*T*.42+24,80,'#ffd77a',.8)}
       else if(o.type==='glowcap'&&!o.gone)add(o.x,o.y,80,'#a493ff',.7);else if(o.type==='rock'&&o.ore==='crystal'&&!o.gone)add(o.x,o.y-14,90,'#72e9ff',.6)}
     for(const p of projectiles){const cool=p.k==='bolt'||p.k==='wisp'||p.k==='spark'||p.k==='ice'||p.k==='void';add(p.x,p.y,p.k==='arrow'||p.k==='bone'||p.k==='spit'||p.k==='boomerang'?0:cool?90:150,cool?(p.col||'#7fb6ff'):'#ff7a1f',.9)}for(const w of allies)add(w.x,w.y,80,'#9fd6ff',.6);if(pet&&pet.type==='lumen')add(pet.x,pet.y-20,240,'#7fd6ff',.9);if(pet&&pet.type==='whelp')add(pet.x,pet.y-24,90,'#ff7a1f',.7);if(P&&P.riding&&P.mountId==='shadow')add(P.x,P.y-20,90,'#a98cff',.6);for(const t of teles)if(t.p&&!t.done)add(t.x,t.y,160,'#ff7a1f',.8);
@@ -1825,6 +1946,13 @@ function drawHUD(tg){
       g.font=`800 ${sw<50?9:10}px ${FONT_UI}`;g.textAlign='center';g.fillStyle='#9ba4c2';g.fillText(o.n,cx,sy+sw-5);
       g.textAlign='left';g.fillStyle=o.ic==='spell'?'#c8b4ff':'#f0b94a';g.fillText(o.k,sx+5,sy+12);if(o.cnt!=null){g.textAlign='right';g.fillStyle='#fff';g.font=`900 12px ${FONT_UI}`;g.fillText(o.cnt,sx+sw-5,sy+13)}
       sx+=sw+6})}
+  { let tq=trackedQuest(),tgt=qTarget(tq);if(!tgt&&!LVD&&!activeQuests().some(q=>q.npc==='elder')){const q=nextQuest('elder');if(q&&!P.q[q.id])tgt={x:npcs[0].x,y:npcs[0].y,label:'Talk to Elder Mira'}}
+    if(tgt&&!P.dead){const[sx2,sy2]=worldToScreen(tgt.x,tgt.y),m=56,dd=Math.round(dist(P.x,P.y,tgt.x,tgt.y)/T);
+      if(dd>=2){const inside=sx2>m&&sx2<cw-m&&sy2>m+90&&sy2<ch-m-80;g.font=`800 12px ${FONT_UI}`;g.textAlign='center';
+        if(inside){const by=sy2-70+Math.sin(time*4)*5;glow(g,sx2,by,18,'#ffd23f',.5);g.fillStyle='#ffd23f';g.beginPath();g.moveTo(sx2,by-9);g.lineTo(sx2+7,by);g.lineTo(sx2,by+9);g.lineTo(sx2-7,by);g.closePath();g.fill();g.strokeStyle='#3a2a05';g.lineWidth=1.5;g.stroke()}
+        else{const a=Math.atan2(sy2-ch/2,sx2-cw/2),ca=Math.cos(a),sa=Math.sin(a),k=Math.min((cw/2-m)/Math.max(.001,Math.abs(ca)),(ch/2-m-50)/Math.max(.001,Math.abs(sa))),px=cw/2+ca*k,py=ch/2+sa*k;
+          g.save();g.translate(px,py);g.rotate(a);glow(g,0,0,22,'#ffd23f',.35);g.fillStyle='#ffd23f';g.beginPath();g.moveTo(16,0);g.lineTo(-8,-11);g.lineTo(-3,0);g.lineTo(-8,11);g.closePath();g.fill();g.strokeStyle='#3a2a05';g.lineWidth=1.5;g.stroke();g.restore();
+          const lt=tgt.label+' · '+dd+'m',lw=g.measureText(lt).width+14,lx=clamp(px-ca*34,lw/2+6,cw-lw/2-6),ly=clamp(py-sa*34,20,ch-20);rr(g,lx-lw/2,ly-11,lw,20,10,'rgba(8,11,24,.8)');g.fillStyle='#ffe08a';g.fillText(lt,lx,ly+4)}}}}
   // prompt
   if(tg&&!P.gather&&!P.fish){const[sx2,sy2]=worldToScreen(tg.x,tg.y);const txt=(touchMode?'Use: ':'[E] ')+tg.label;g.font=`800 13px ${FONT_UI}`;const w=g.measureText(txt).width+20;rr(g,sx2-w/2,sy2-22,w,24,12,'rgba(8,11,24,.85)');g.strokeStyle='rgba(240,185,74,.7)';g.lineWidth=1;rr(g,sx2-w/2+.5,sy2-21.5,w-1,23,12);g.stroke();g.textAlign='center';g.fillStyle='#ffe08a';g.fillText(txt,sx2,sy2-5)}
   // fishing reel
@@ -1846,12 +1974,12 @@ function drawHUD(tg){
   if(touchMode){document.getElementById('tPotN').textContent=P.inv.hpot||0;{const rb=document.getElementById('tRide'),l=P.riding?'Get off':'Ride';if(rb.textContent!==l)rb.textContent=l}document.getElementById('tMpN').textContent=P.inv.mpot||0;for(let i=0;i<3;i++){const id=P.slots[i],el=document.getElementById('tS'+i),cd=id?Math.ceil(P.spCd[id]||0):0,lab=id?(cd?cd+'s':SPELLS[id].n.split(' ')[0]):'—';if(el.textContent!==lab)el.textContent=lab}}
   if(joy.on){g.globalAlpha=.6;circ(g,joy.sx,joy.sy,50,'rgba(20,26,44,.6)');g.strokeStyle='rgba(240,185,74,.5)';g.lineWidth=2;g.beginPath();g.arc(joy.sx,joy.sy,50,0,7);g.stroke();const dx=joy.x-joy.sx,dy=joy.y-joy.sy,d=Math.hypot(dx,dy),k=Math.min(1,50/(d||1));circ(g,joy.sx+dx*k,joy.sy+dy*k,22,'rgba(240,185,74,.8)');g.globalAlpha=1}
 }
-function qLabel(q){return q.type==='kill'?'Defeat '+ENEMY[q.t].n+(q.n>1?'s':''):q.type==='bring'?'Collect '+ITEMS[q.t].n:q.type==='catch'?'Catch fish':q.type==='chests'?'Open chests':'Forge an Iron weapon'}
+function qLabel(q){return q.label?q.label:q.type==='flag'?'Defeat '+ENEMY[q.t].n:q.type==='kill'?'Defeat '+ENEMY[q.t].n+(q.n>1?'s':''):q.type==='bring'?'Collect '+ITEMS[q.t].n:q.type==='catch'?'Catch fish':q.type==='chests'?'Open chests':'Forge an Iron weapon'}
 
 /* ---------- panels ---------- */
 const overlay=document.getElementById('overlay');
 function openPanel(name,html,narrow){panel=name;overlay.innerHTML=`<div class="panel${narrow?' narrow':''}" role="dialog" aria-modal="true">${html}<button class="x" data-act="close" aria-label="Close">×</button></div>`;overlay.hidden=false;keys.Space=false;mouseHeld=false;P&&(P.gather=null)}
-function closePanel(){if(panel==='dead')return;panel=null;overlay.hidden=true;overlay.innerHTML='';cv.focus()}
+function closePanel(){if(panel==='dead')return;if(panel==='scene'||panel==='cine'){endScene();return}panel=null;overlay.hidden=true;overlay.innerHTML='';cv.focus()}
 function chip(id,need){const have=P.inv[id]||0;return`<span class="chip ${have>=need?'ok':'no'}"><img src="${itemIcon(id)}" alt="">${ITEMS[id].n} ${have}/${need}</span>`}
 function goldChip(n){return`<span class="chip ${P.gold>=n?'ok':'no'}"><img src="${iconURL('coin','#ffd23f')}" alt="">${n.toLocaleString()} gold</span>`}
 function openBag(){
@@ -1907,13 +2035,17 @@ function openStable(tab='pets'){
 function addWeapon(id){if(P.weapons.includes(id))return;P.weapons.push(id);toast('New weapon: '+WEAPONS[id].n,'Equip it from your bag (I)','#ffd23f');if(P.weapons.length>=8)unlock('arsenal')}
 function openQuests(tab='active'){
   let body='';
-  if(tab==='active'){const aq=activeQuests();body=aq.length?aq.map(q=>{const p=qProg(q);return`<div class="q"><div class="row" style="justify-content:space-between"><span class="nm">${q.name}</span><span class="pg">${p>=q.n?'Ready to turn in':p+' / '+q.n}</span></div><p class="sub">${q.desc}</p><p class="sub">From ${npcName(q.npc)} · Reward <span class="reward">${q.rw.gold} gold, ${q.rw.xp} XP</span></p><div class="bar"><i style="width:${p/q.n*100}%"></i></div></div>`}).join(''):'<p class="sub">No active quests. Look for a gold ! above villagers\' heads.</p>'}
+  if(tab==='active'){const aq=activeQuests();body=aq.length?aq.map(q=>{const p=qProg(q);return`<div class="q"><div class="row" style="justify-content:space-between"><span class="nm">${q.name}</span><span class="pg">${p>=q.n?'Ready to turn in':p+' / '+q.n}</span></div><p class="sub">${q.desc}</p><button class="btn ghost sm" data-act="track" data-id="${q.id}" ${trackedQuest()===q?'disabled':''}>${trackedQuest()===q?'Tracking':'Track'}</button><p class="sub">From ${npcName(q.npc)} · Reward <span class="reward">${q.rw.gold} gold, ${q.rw.xp} XP</span></p><div class="bar"><i style="width:${p/q.n*100}%"></i></div></div>`}).join(''):'<p class="sub">No active quests. Look for a gold ! above villagers\' heads.</p>'}
   else if(tab==='all'){body=QUESTS.map(q=>{const s=P.q[q.id];return`<div class="q ${s&&s.s==='done'?'done':''}"><div class="row" style="justify-content:space-between"><span class="nm">${s?q.name:'Unknown quest'}</span><span class="pg">${!s?'Not started':s.s==='done'?'Complete':'Active'}</span></div><p class="sub">${npcName(q.npc)} · ${q.npc==='elder'?'Main story':'Side quest'}</p></div>`}).join('')}
+  else if(tab==='story'){body=CHAPTERS.map(c=>{const qs=c.q.map(id=>QUESTS.find(q=>q.id===id)),done=qs.every(q=>P.q[q.id]&&P.q[q.id].s==='done'),started=qs.some(q=>P.q[q.id]);
+      return`<div class="q ${started?'':'done'}"><div class="row" style="justify-content:space-between"><span class="nm">Chapter ${c.n}: ${started?c.t:'???'}</span><span class="pg">${done?'Complete':started?'In progress':'Locked'}</span></div><p class="sub">${done?c.sum:started?'Your story is still being written.':'Follow the main story to unlock this chapter.'}</p></div>`}).join('')+
+      `<div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="replay" data-id="pro">Watch the prologue</button>${P.flags.wyrm&&P.q.m7&&P.q.m7.s==='done'?'<button class="btn ghost sm" data-act="replay" data-id="epi">Watch the epilogue</button>':''}</div>`}
+  else if(tab==='lore'){body=`<p class="sub">${P.pages.length} of ${PAGES.length} pages of Seraphine's journal found.</p>`+PAGES.map((p,i)=>P.pages.includes(i)?`<div class="q"><div class="nm">Page ${i+1}</div><p class="say narr" style="margin:8px 0 0">${p.t}</p></div>`:`<div class="q done"><div class="nm">Page ${i+1}: missing</div><p class="sub">Somewhere in ${p.hint}.</p></div>`).join('')}
   else if(tab==='beast'){const kt=P.st.kt||{};body=`<div class="beast">${Object.keys(ENEMY).map(k=>{const n=kt[k]||0,d=ENEMY[k];return`<div class="${n?'':'unk'}"><img src="${enemyPortrait(k,!n)}" alt=""><b>${n?d.n:'Unknown'}</b><span>${WHERE[k]}</span>${n?`<span>HP ${d.hp} · ATK ${d.atk} · DEF ${d.def}</span><em>${n} defeated</em>`:'<em>Not yet defeated</em>'}</div>`}).join('')}</div>`}
   else{body=`<div class="ach">${Object.entries(ACH).map(([k,[n,d]])=>`<div class="${P.ach[k]?'on':''}"><b>${n}</b>${d}</div>`).join('')}</div>`}
   const done=Object.keys(P.ach).length;
   openPanel('quests',`<h2>Journal</h2><p class="sub">${QUESTS.filter(q=>P.q[q.id]&&P.q[q.id].s==='done').length} of ${QUESTS.length} quests complete · ${done} of ${Object.keys(ACH).length} achievements</p>
-   <div class="tabs"><button class="tab ${tab==='active'?'on':''}" data-act="qtab" data-id="active">Active</button><button class="tab ${tab==='all'?'on':''}" data-act="qtab" data-id="all">All quests</button><button class="tab ${tab==='ach'?'on':''}" data-act="qtab" data-id="ach">Achievements</button><button class="tab ${tab==='beast'?'on':''}" data-act="qtab" data-id="beast">Bestiary</button></div>${body}`);
+   <div class="tabs"><button class="tab ${tab==='active'?'on':''}" data-act="qtab" data-id="active">Active</button><button class="tab ${tab==='all'?'on':''}" data-act="qtab" data-id="all">All quests</button><button class="tab ${tab==='story'?'on':''}" data-act="qtab" data-id="story">Story</button><button class="tab ${tab==='lore'?'on':''}" data-act="qtab" data-id="lore">Lore</button><button class="tab ${tab==='ach'?'on':''}" data-act="qtab" data-id="ach">Achievements</button><button class="tab ${tab==='beast'?'on':''}" data-act="qtab" data-id="beast">Bestiary</button></div>${body}`);
 }
 const portraitCache={};
 function enemyPortrait(type,unknown){const key=type+(unknown?'?':'');if(portraitCache[key])return portraitCache[key];const c=document.createElement('canvas');c.width=c.height=160;const g=c.getContext('2d');
@@ -1923,12 +2055,14 @@ function enemyPortrait(type,unknown){const key=type+(unknown?'?':'');if(portrait
   return portraitCache[key]=c.toDataURL()
 }
 function openMap(){
-  openPanel('map',`<h2>Map of Emberfall</h2><p class="sub">${LVD?LVD.n+'. The red box is the boss chamber.':'Gold dots are villagers, purple diamonds are dungeons. Orange marks the bandit camp, blue the Hollow King, red the Wyrm.'}</p><canvas id="mapc" width="${W*8}" height="${H*8}"></canvas>`);
+  openPanel('map',`<h2>Map of Emberfall</h2><p class="sub">${LVD?LVD.n+'. The red box is the boss chamber.':'Gold star is your tracked quest, gold dots are villagers, blue pillars are waystones, purple diamonds are dungeons. Orange marks the bandit camp, blue the Hollow King, red the Wyrm.'}</p><canvas id="mapc" width="${W*8}" height="${H*8}"></canvas>`);
   const c=document.getElementById('mapc'),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(mm,0,0,W*8,H*8);g.drawImage(fog,0,0,W*8,H*8);
   g.font=`900 22px ${FONT_D}`;g.textAlign='center';const lab={village:[VX,VY-9],forest:[56,14],lake:[LX,LY],hills:[90,30],ruins:[60,70],ash:[96,62],meadow:[38,32],coast:[14,12]};
   if(LVD){circ(g,P.x/T*8,P.y/T*8,9,'#fff');circ(g,P.x/T*8,P.y/T*8,5,'#3a7bff');const b=LEVELS[curLevel].boss;g.strokeStyle='#ff6b6b';g.lineWidth=3;g.strokeRect(b.x*8,b.y*8,b.w*8,b.h*8);return}
   for(const D of Object.values(DUNGEONS))if(WORLD.explored[D.ey*W+D.ex]){g.fillStyle='#c8b4ff';g.save();g.translate((D.ex+.5)*8,(D.ey+.5)*8);g.rotate(.785);g.fillRect(-7,-7,14,14);g.restore();g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.7)';g.font=`800 16px ${FONT_UI}`;g.strokeText(D.n,(D.ex+.5)*8,(D.ey-1)*8);g.fillStyle='#e6dcff';g.fillText(D.n,(D.ex+.5)*8,(D.ey-1)*8);g.font=`900 22px ${FONT_D}`}
   if(!P.flags.varg&&P.seen.hills)circ(g,VGX*8,VGY*8,10,'#ffb36b');
+  WAYSTONES.forEach(w=>{if(!WORLD.explored[w.ty*W+w.tx])return;g.fillStyle=P.ways.includes(w.id)?'#7fd6ff':'#59616b';g.fillRect(w.tx*8-4,w.ty*8-10,8,16)});
+  {const tq=qTarget(trackedQuest());if(tq){const x=tq.x/T*8,y=tq.y/T*8;g.fillStyle='#ffd23f';g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2-Math.PI/2,r2=i%2?6:14;g.lineTo(x+Math.cos(a)*r2,y+Math.sin(a)*r2)}g.closePath();g.fill();g.strokeStyle='#3a2a05';g.lineWidth=2;g.stroke()}}
   for(const[k,[x,y]]of Object.entries(lab)){if(!P.seen[k])continue;g.lineWidth=5;g.strokeStyle='rgba(0,0,0,.7)';g.strokeText(REGIONS[k].name,x*8,y*8);g.fillStyle='#ffe08a';g.fillText(REGIONS[k].name,x*8,y*8)}
   npcs.forEach(n=>circ(g,n.x/T*8,n.y/T*8,6,'#ffd23f'));if(!P.flags.wyrm&&P.seen.ash){circ(g,BX*8,BY*8,10,'#ff3b3b')}if(!P.flags.hollow&&P.seen.ruins){circ(g,HX*8,HY*8,10,'#8f9cff')}
   chests.forEach(o=>{if(explored[o.ty*W+o.tx]){g.fillStyle=o.open?'#6b5338':'#ffd23f';g.fillRect(o.tx*8-4,o.ty*8-4,8,8)}});
@@ -1945,7 +2079,7 @@ function openHelp(board){
    <div><span>Main story</span><span>${QUESTS.filter(q=>q.npc==='elder').length} quests, 2 bosses</span></div><div><span>Side quests</span><span>${QUESTS.filter(q=>q.npc!=='elder').length} from villagers</span></div><div><span>Monsters</span><span>${Object.keys(ENEMY).length} kinds in the Bestiary</span></div>
    <div><span>Fishing</span><span>7 fish, some only at night</span></div><div><span>Mining</span><span>Iron, gold, starcrystal</span></div>
    <div><span>Woodcutting and foraging</span><span>Logs, herbs, glowcaps</span></div><div><span>Weapons</span><span>${Object.keys(WEAPONS).length} to collect, any class</span></div><div><span>Spells</span><span>${Object.keys(SPELLS).length} taught by Elder Mira</span></div><div><span>Pets</span><span>${Object.keys(PETS).length} companions with abilities</span></div><div><span>Mounts</span><span>${Object.keys(MOUNTS).length} to ride, one flies</span></div><div><span>Forge</span><span>5 forging and 5 armor tiers</span></div>
-   <div><span>Cauldron and campfire</span><span>Potions, elixirs, meals</span></div><div><span>Dungeons</span><span>3, each with a boss</span></div><div><span>Bosses</span><span>${Object.keys(BOSSES).length} in all</span></div><div><span>Treasure</span><span>14 chests outside, more below</span></div>
+   <div><span>Cauldron and campfire</span><span>Potions, elixirs, meals</span></div><div><span>Story</span><span>5 chapters, prologue and epilogue</span></div><div><span>Quests</span><span>${QUESTS.length} from 7 villagers</span></div><div><span>Waystones</span><span>${WAYSTONES.length}, for fast travel</span></div><div><span>Journal pages</span><span>${PAGES.length} to find</span></div><div><span>Dungeons</span><span>3, each with a boss</span></div><div><span>Bosses</span><span>${Object.keys(BOSSES).length} in all</span></div><div><span>Treasure</span><span>14 chests outside, more below</span></div>
    <div><span>Shop</span><span>Lure, lantern, boots, a fox</span></div><div><span>Achievements</span><span>${Object.keys(ACH).length} to unlock</span></div></div>
   <p class="sub" style="margin-top:14px">Your game saves automatically in this browser. Night falls every few minutes: bats come out, glowcaps shine and the Moonfin bites.</p>
   <div class="row" style="margin-top:10px"><button class="btn ghost sm" data-act="reset">Start a new game</button></div>`);
@@ -1994,7 +2128,7 @@ function craft(id){
   if(r.wpn){addWeapon(r.id)}
   else if(r.kind==='w'){P.wT=r.tier;toast(TIERN[r.tier]+' forging complete!','Every weapon hits harder','#ffd23f');qEvent('craft');if(r.tier===5)unlock('smith')}
   else if(r.kind==='a'){P.aT=r.tier;toast(TIERN[r.tier]+' Armor forged!','Defense and health increased','#ffd23f');P.hp=stats().maxHp}
-  else{addItem(r.id);toast(ITEMS[r.id].n+' made',r.st==='fire'?'Find it in your bag':'','#6fdc8c');if(r.st==='fire'){P.st.meals++;if(P.st.meals>=5)unlock('chef')}}
+  else{if(r.st==='cauldron')P.st.brews=(P.st.brews||0)+1;addItem(r.id);toast(ITEMS[r.id].n+' made',r.st==='fire'?'Find it in your bag':'','#6fdc8c');if(r.st==='fire'){P.st.meals++;if(P.st.meals>=5)unlock('chef')}}
   r.st==='forge'?(SFX.mine(),setTimeout(SFX.mine,150),setTimeout(SFX.level,300)):SFX.pick();
   openCraft(r.st);save();
 }
@@ -2010,39 +2144,83 @@ function openShop(tab='buy'){
   let body='';
   const pickT=s=>tab==='buy'?(s.id||s.sp):tab==='arms'?s.wpn:(s.pet||s.mount);
   if(tab!=='sell'){body=SHOP.map((s,i)=>pickT(s)?shopRow(s,i):'').join('')}
-  else{const inv=Object.keys(P.inv).filter(k=>P.inv[k]>0);body=inv.length?inv.map(k=>`<div class="item"><img src="${itemIcon(k)}" alt=""><div><div class="nm">${ITEMS[k].n} ×${P.inv[k]}</div><div class="ds">${ITEMS[k].v} gold each</div></div><div class="row"><button class="btn ghost sm" data-act="sell" data-id="${k}">Sell 1</button><button class="btn sm" data-act="sellall" data-id="${k}">Sell all</button></div></div>`).join(''):'<p class="sub">Your bag is empty.</p>'}
+  else{const inv=Object.keys(P.inv).filter(k=>P.inv[k]>0&&!ITEMS[k].quest);body=inv.length?inv.map(k=>`<div class="item"><img src="${itemIcon(k)}" alt=""><div><div class="nm">${ITEMS[k].n} ×${P.inv[k]}</div><div class="ds">${ITEMS[k].v} gold each</div></div><div class="row"><button class="btn ghost sm" data-act="sell" data-id="${k}">Sell 1</button><button class="btn sm" data-act="sellall" data-id="${k}">Sell all</button></div></div>`).join(''):'<p class="sub">Your bag is empty.</p>'}
   const T2=(id,l)=>`<button class="tab ${tab===id?'on':''}" data-act="stab" data-id="${id}">${l}</button>`;
   openPanel('shop',`<h2>Tess's Trading Stall</h2><p class="sub">You have <b class="reward">${P.gold.toLocaleString()} gold</b>.</p><div class="tabs">${T2('buy','Goods')}${T2('arms','Weapons')}${T2('comp','Pets and mounts')}${T2('sell','Sell')}</div><div class="list">${body}</div>`);
   panel='shop:'+tab;
 }
 const LINES={
+  rhea:['Stay off the roads at night unless you can handle bats.','The Watch is six people and a dog. The dog is the best of us.','Bounties are paid in gold, on the spot, no questions.'],
+  orrin:['Seraphine wrote in a hand so neat it could cut glass.','The waystones hum if you stand very still. Try it.','Every ruin is a book, if you know how to read stone.'],
   elder:['The Wyrm\'s ash darkens our sky more each year.','Every hero began with slimes, child. Do not be ashamed.','Rest at the well in the square. Its water restores body and mind.'],
   borin:['Bring me ore and I\'ll make you something worth swinging.','Iron first. Gold once your pick arm is stronger. Starcrystal last.','That Wyrm\'s scale would make armor fit for a king.'],
   lin:['Redleaf for health, glowcaps for mana. Simple as that.','A golden koi, a few crystals and glowcaps make an Elixir of Might.','Glowcaps shine brightest at night.'],
   tess:['Coin for goods, goods for coin. Everyone wins!','Tired of walking? I have horses, a boar and a stag out back.','Pip the fox has been eyeing you. He\'d make a fine companion.','A lantern makes nights much less frightening.'],
   ned:['Rain makes the fish hungry. Fact.','The Moonfin only rises at night, in Mirror Lake.','Sea fish bite out on the coast. Anglerfish come out after dark.'],
 };
-let talkNPC=null;
+let talkNPC=null,scene=null;
+function sceneText(t){return t.replace(/\{class\}/g,P?CLASSES[P.cls].n:'traveler')}
+function speaker(id){if(id==='you')return{name:'You',look:Object.assign(playerLook(),{weapon:null})};if(id==='narrator')return{name:'',look:null};if(id==='seraphine')return{name:'Seraphine',look:{body:'#e9e4f5',trim:'#ffd27a',hat:'wizard',hair:'#f2f2f2',skin:'#f1d0b5',cape:'#8a7ab8'}};const n=npcs.find(n=>n.id===id);return n?{name:n.name,look:n.look}:{name:id,look:null}}
+function playScene(lines,cb){scene={kind:'scene',lines,i:0,cb};renderScene()}
+function playCine(cards,cb){scene={kind:'cine',lines:cards,i:0,cb};renderScene()}
+function endScene(){const cb=scene&&scene.cb;scene=null;panel=null;overlay.hidden=true;overlay.innerHTML='';cv.focus();cb&&cb()}
+function renderScene(){const sc=scene,L=sc.lines[sc.i],last=sc.i===sc.lines.length-1;
+  if(sc.kind==='cine'){openPanel('cine',`<canvas id="art" class="art" width="960" height="400"></canvas><h2 class="cine-t">${L.title}</h2><p class="cine-p">${sceneText(L.text)}</p><div class="row" style="justify-content:space-between;margin-top:12px"><span class="sub">${sc.i+1} / ${sc.lines.length} · Space to continue</span><div class="row"><button class="btn ghost sm" data-act="skip">Skip</button><button class="btn" data-act="next">${last?'Continue':'Next'}</button></div></div>`);
+    drawArt(document.getElementById('art').getContext('2d'),L.art,960,400);return}
+  const[spk,text,head]=L,sp=speaker(spk);
+  openPanel('scene',`${head?`<h3 style="margin-top:0">${head}</h3>`:''}<div class="speaker">${sp.look?'<canvas id="face" width="144" height="144"></canvas>':''}<div><h2>${sp.name||'&nbsp;'}</h2></div></div><p class="say ${spk==='narrator'||spk==='seraphine'?'narr':''}">${sceneText(text)}</p><div class="row" style="justify-content:space-between"><span class="sub">${sc.i+1} / ${sc.lines.length} · Space to continue</span><div class="row">${sc.lines.length>2?'<button class="btn ghost sm" data-act="skip">Skip</button>':''}<button class="btn" data-act="next">${last?'Continue':'Next'}</button></div></div>`,true);
+  if(sp.look){const fc=document.getElementById('face').getContext('2d');fc.scale(3.4,3.4);drawHumanoid(fc,21,44,Object.assign({anim:0,moving:false,fx:0,fy:1},sp.look,{weapon:null}))}}
+function drawArt(g,id,w,h){
+  const sky=(a,b)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,a);gr.addColorStop(1,b);g.fillStyle=gr;g.fillRect(0,0,w,h)};
+  const ridge=(col,y0,amp,f,sd)=>{g.fillStyle=col;g.beginPath();g.moveTo(0,h);for(let x=0;x<=w;x+=6)g.lineTo(x,y0+Math.sin(x*f+sd)*amp+Math.sin(x*f*2.3+sd*3)*amp*.4);g.lineTo(w,h);g.closePath();g.fill()};
+  const stars=n=>{for(let i=0;i<n;i++){g.fillStyle=`rgba(255,255,255,${.3+hash(i,5,9)*.7})`;const z=hash(i,6,9)*1.8+.4;g.fillRect(hash(i,1,9)*w,hash(i,2,9)*h*.55,z,z)}};
+  const castle=(x,y,k,col)=>{g.fillStyle=col;g.fillRect(x-60*k,y-60*k,120*k,60*k);[-60,-20,20,46].forEach(o=>{g.fillRect(x+o*k,y-100*k,14*k,40*k);g.beginPath();g.moveTo(x+o*k-3*k,y-100*k);g.lineTo(x+o*k+7*k,y-122*k);g.lineTo(x+o*k+17*k,y-100*k);g.fill()});g.fillRect(x-14*k,y-130*k,28*k,70*k)};
+  const houses=(y,col,n,lit)=>{for(let i=0;i<n;i++){const x=80+i*(w-160)/(n-1),k=.8+hash(i,3,4)*.5;g.fillStyle=col;g.fillRect(x-30*k,y-36*k,60*k,36*k);g.beginPath();g.moveTo(x-38*k,y-36*k);g.lineTo(x,y-66*k);g.lineTo(x+38*k,y-36*k);g.fill();if(lit){g.fillStyle='#ffd77a';g.fillRect(x-16*k,y-26*k,9*k,9*k)}}};
+  g.save();
+  if(id==='wyrm'){sky('#1a0505','#c2401a');ridge('#3a0d08',h*.72,14,.012,1);castle(w*.24,h*.8,1.1,'#160504');glow(g,w*.24,h*.62,170,'#ff7a1f',.45);
+    for(let i=0;i<50;i++){g.fillStyle=`rgba(255,${(120+hash(i,1,3)*100)|0},40,${.5+hash(i,2,3)*.5})`;g.beginPath();g.arc(hash(i,3,3)*w,h*.35+hash(i,4,3)*h*.65,1+hash(i,5,3)*3,0,7);g.fill()}
+    g.translate(w*.66,h*.48);g.scale(1.9,1.9);drawWyrm(g,{face:Math.PI*.82,state:'breath',enraged:false})}
+  else if(id==='seraphine'){sky('#070d24','#26407e');stars(90);ridge('#0d1838',h*.8,10,.01,2);glow(g,w*.5,h*.55,230,'#7fb6ff',.35);
+    g.strokeStyle='rgba(180,210,255,.6)';g.lineWidth=2;for(const r2 of[120,95]){g.beginPath();g.ellipse(w*.5,h*.84,r2*1.6,r2*.32,0,0,7);g.stroke()}
+    for(let i=0;i<14;i++){const a=i/14*Math.PI*2;g.save();g.translate(w*.5+Math.cos(a)*172,h*.84+Math.sin(a)*35);g.rotate(.785);g.fillStyle='#cfe2ff';g.fillRect(-3,-3,6,6);g.restore()}
+    g.translate(w*.5,h*.82);g.scale(3.2,3.2);drawHumanoid(g,0,0,{body:'#e9e4f5',trim:'#ffd27a',hat:'wizard',hair:'#f2f2f2',skin:'#f1d0b5',weapon:'staff',wcol:'#9fd0ff',fx:0,fy:1,cape:'#8a7ab8',attack:.6})}
+  else if(id==='hollow'){sky('#07081a','#2a2650');stars(40);g.fillStyle='#14122a';g.fillRect(w*.5-90,h*.36,180,h*.64);g.beginPath();g.moveTo(w*.5-112,h*.36);g.lineTo(w*.5,h*.1);g.lineTo(w*.5+112,h*.36);g.fill();glow(g,w*.5,h*.55,190,'#7f8cff',.25);
+    g.translate(w*.5,h*.84);g.scale(1.6,1.6);drawHollow(g,{face:Math.PI/2,state:'move'})}
+  else if(id==='village'){sky('#f4a35a','#5b3c70');glow(g,w*.76,h*.6,150,'#ffd27a',.6);ridge('#4a3060',h*.6,20,.008,4);ridge('#2e1f45',h*.72,12,.012,5);houses(h*.86,'#1e1430',5,true);g.fillStyle='#1a1028';g.fillRect(0,h*.86,w,h*.14);
+    if(P){g.translate(w*.5,h*.88);g.scale(2.3,2.3);drawHumanoid(g,0,0,Object.assign(playerLook(),{fx:1,fy:0,moving:true,anim:.3}))}}
+  else if(id==='stone'){sky('#0d0716','#3a1430');stars(50);glow(g,w*.5,h*.5,230,'#ff9a3d',.55);const cx=w*.5,cy=h*.5;g.fillStyle=rgrad(g,cx,cy,64,'#fff3c4','#ff6a1f');g.beginPath();for(let i=0;i<6;i++){const a=i/6*Math.PI*2+.3;g.lineTo(cx+Math.cos(a)*62,cy+Math.sin(a)*72)}g.closePath();g.fill();
+    g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=2;g.beginPath();g.moveTo(cx-20,cy-60);g.lineTo(cx+14,cy+58);g.stroke();for(let i=0;i<10;i++){const a=i/10*Math.PI*2;g.strokeStyle='rgba(255,210,140,.35)';g.lineWidth=3;g.beginPath();g.moveTo(cx+Math.cos(a)*90,cy+Math.sin(a)*90);g.lineTo(cx+Math.cos(a)*170,cy+Math.sin(a)*170);g.stroke()}}
+  else if(id==='dawn'){sky('#ffcf8f','#8fc4e8');glow(g,w*.5,h*.62,270,'#fff2c0',.8);circ(g,w*.5,h*.62,60,'#fff6d8');ridge('#7fb46a',h*.66,18,.009,6);ridge('#5a9a4a',h*.76,12,.013,7);houses(h*.9,'#7a5a40',5,false);g.fillStyle='#4a8a3a';g.fillRect(0,h*.9,w,h*.1);
+    if(P){g.translate(w*.5,h*.93);g.scale(2.2,2.2);drawHumanoid(g,0,0,Object.assign(playerLook(),{fx:0,fy:1}));drawHumanoid(g,-34,2,Object.assign({fx:.5,fy:1},npcs[0].look));drawHumanoid(g,34,2,Object.assign({fx:-.5,fy:1},npcs[1].look,{weapon:null}))}}
+  g.restore();const vg=g.createRadialGradient(w/2,h/2,h*.3,w/2,h/2,w*.62);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=vg;g.fillRect(0,0,w,h)}
 function talk(n){
   talkNPC=n;SFX.click();const q=nextQuest(n.id);let qb='';
+  if(q&&!P.q[q.id]&&q.intro&&!P.seenIntro[q.id]){P.seenIntro[q.id]=1;playScene(q.intro,()=>talk(n));return}
   if(q){const s=P.q[q.id],items=Object.entries(q.rw.items||{}).map(([k,v])=>v+' '+ITEMS[k].n).join(', ');
-    const rw=`<p class="sub">Reward <span class="reward">${q.rw.gold} gold · ${q.rw.xp} XP${items?' · '+items:''}${q.rw.mount?' · the mount '+MOUNTS[q.rw.mount].n:''}</span></p>`;
+    const rw=`<p class="sub">Reward <span class="reward">${q.rw.gold} gold · ${q.rw.xp} XP${items?' · '+items:''}${q.rw.mount?' · the mount '+MOUNTS[q.rw.mount].n:''}${q.rw.weapon?' · '+WEAPONS[q.rw.weapon].n:''}</span></p>`;
     if(!s)qb=`<div class="q"><div class="nm">${q.name}</div><p>${q.desc}</p>${rw}<button class="btn" data-act="accept" data-id="${q.id}">Accept quest</button></div>`;
     else{const p=qProg(q);qb=p>=q.n?`<div class="q"><div class="nm">${q.name}</div><p>You did it! Here is what I promised.</p>${rw}<button class="btn" data-act="turnin" data-id="${q.id}">Complete quest</button></div>`
       :`<div class="q"><div class="row" style="justify-content:space-between"><span class="nm">${q.name}</span><span class="pg">${p} / ${q.n}</span></div><p class="sub">${q.desc}</p><div class="bar"><i style="width:${p/q.n*100}%"></i></div></div>`}}
   else qb=`<p class="sub">${n.id==='elder'&&P.flags.wyrm?'You saved us all. Emberfall will sing of you for a hundred years.':'No more tasks for now. Thank you, friend.'}</p>`;
-  const svc={borin:['forge','Open the forge'],lin:['cauldron','Use the cauldron'],tess:['shop','Browse wares'],ned:['tip','Ask for a fishing tip'],elder:['magic','Study magic']}[n.id];
+  const svc={rhea:['tip','Ask about the roads'],orrin:['lore','Read the journal'],borin:['forge','Open the forge'],lin:['cauldron','Use the cauldron'],tess:['shop','Browse wares'],ned:['tip','Ask for a fishing tip'],elder:['magic','Study magic']}[n.id];
   openPanel('talk',`<div class="speaker"><canvas id="face" width="144" height="144"></canvas><div><h2>${n.name}</h2><div class="sub">${n.role}</div></div></div>
    <p class="say" id="say">${pick(LINES[n.id])}</p>${qb}<div class="row" style="margin-top:12px"><button class="btn ghost" data-act="svc" data-id="${svc[0]}">${svc[1]}</button><button class="btn ghost" data-act="close">Goodbye</button></div>`,true);
-  const fc=document.getElementById('face').getContext('2d');fc.scale(2,2);drawHumanoid(fc,36,78,Object.assign({anim:0,moving:false,fx:0,fy:1},n.look,{weapon:null}));
+  const fc=document.getElementById('face').getContext('2d');fc.scale(3.4,3.4);drawHumanoid(fc,21,44,Object.assign({anim:0,moving:false,fx:0,fy:1},n.look,{weapon:null}));
 }
-function acceptQ(id){P.q[id]={s:'active',c:0};const q=QUESTS.find(q=>q.id===id);toast('New quest: '+q.name,qLabel(q)+(q.n>1?' ×'+q.n:''),'#f0b94a');SFX.quest();talk(talkNPC)}
-function turnIn(id){const q=QUESTS.find(q=>q.id===id);if(qProg(q)<q.n)return;if(q.type==='bring')takeItems({[q.t]:q.n});P.q[id].s='done';P.gold+=q.rw.gold;Object.entries(q.rw.items||{}).forEach(([k,v])=>addItem(k,v));if(q.rw.mount)addMount(q.rw.mount);if(q.rw.pet)addPet(q.rw.pet);
-  toast('Quest complete: '+q.name,'+'+q.rw.gold+' gold · +'+q.rw.xp+' XP','#6fdc8c');SFX.quest();gainXP(q.rw.xp);save();talk(talkNPC)}
+function acceptQ(id){P.q[id]={s:'active',c:0};P.track=id;const q=QUESTS.find(q=>q.id===id);const ch=CHAPTERS.find(c=>c.q[0]===id);if(ch)setTimeout(()=>{banner={title:'Chapter '+ch.n,sub:ch.t,t:0,col:'#f6d27a'}},200);toast('New quest: '+q.name,qLabel(q)+(q.n>1?' ×'+q.n:''),'#f0b94a');SFX.quest();talk(talkNPC)}
+function turnIn(id){const q=QUESTS.find(q=>q.id===id);if(qProg(q)<q.n)return;if(q.type==='bring')takeItems({[q.t]:q.n});P.q[id].s='done';P.gold+=q.rw.gold;Object.entries(q.rw.items||{}).forEach(([k,v])=>addItem(k,v));if(q.rw.mount)addMount(q.rw.mount);if(q.rw.pet)addPet(q.rw.pet);if(q.rw.weapon)addWeapon(q.rw.weapon);if(q.rw.flag)P.flags[q.rw.flag]=1;
+  toast('Quest complete: '+q.name,'+'+q.rw.gold+' gold · +'+q.rw.xp+' XP','#6fdc8c');SFX.quest();gainXP(q.rw.xp);if(id==='m7')unlock('story');save();
+  const ch=CHAPTERS.find(c=>c.q[c.q.length-1]===id);const after=()=>{if(id==='m7'){playCine(EPILOGUE,()=>{});return}if(ch)banner={title:'Chapter '+ch.n+' complete',sub:ch.t,t:0,col:'#f6d27a'};talk(talkNPC)};
+  if(q.outro)playScene(q.outro,after);else after()}
 function handleAct(act,id){
   SFX.click();
   switch(act){
     case'close':closePanel();break;
+    case'next':if(!scene)return;if(scene.i<scene.lines.length-1){scene.i++;renderScene()}else endScene();break;
+    case'skip':endScene();break;
+    case'travel':travelTo(id);break;
+    case'track':P.track=id;openQuests('active');break;
+    case'replay':playCine(id==='epi'?EPILOGUE:PROLOGUE,()=>openQuests('story'));break;
     case'sttab':openStable(id);break;
     case'petsel':if(P.petId===id){if(pet)puff(pet.x,pet.y,'#d8cbb0',10);P.petId=null;pet=null}else{P.petId=id;spawnPet();puff(pet.x,pet.y,'#ffd23f',12)}openStable('pets');save();break;
     case'mountsel':{if(P.riding&&!dismount(true))return;P.mountId=id;toast(MOUNTS[id].n+' is saddled','Press X to ride','#f0b94a');openStable('mounts');save();break}
@@ -2059,7 +2237,7 @@ function handleAct(act,id){
     case'sellall':P.gold+=ITEMS[id].v*P.inv[id];delete P.inv[id];SFX.coin();openShop('sell');break;
     case'accept':acceptQ(id);break;
     case'turnin':turnIn(id);break;
-    case'svc':if(id==='forge')openCraft('forge');else if(id==='cauldron')openCraft('cauldron');else if(id==='shop')openShop('buy');else if(id==='magic')openSpells(true);else{const el=document.getElementById('say');if(el)el.textContent=pick(LINES[talkNPC.id])}break;
+    case'svc':if(id==='forge')openCraft('forge');else if(id==='cauldron')openCraft('cauldron');else if(id==='shop')openShop('buy');else if(id==='magic')openSpells(true);else if(id==='lore')openQuests('lore');else{const el=document.getElementById('say');if(el)el.textContent=pick(LINES[talkNPC.id])}break;
     case'respawn':respawn();break;
     case'reset':if(overlay.querySelector('[data-act="reset2"]'))return;overlay.querySelector('[data-act="reset"]').insertAdjacentHTML('afterend','<span class="sub">This erases your save.</span><button class="btn sm" data-act="reset2">Yes, start over</button>');break;
     case'reset2':try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload();break;
@@ -2076,6 +2254,7 @@ addEventListener('keydown',e=>{
   initAudio();
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
   if(state!=='play')return;
+  if(panel==='scene'||panel==='cine'){if(!e.repeat&&['Space','Enter','KeyE'].includes(e.code))handleAct('next');else if(e.code==='Escape')endScene();return}
   if(e.code==='Escape'){if(panel)closePanel();else openHelp();return}
   if(panel){if((e.code==='KeyI'&&panel==='bag')||(e.code==='KeyL'&&panel==='quests')||(e.code==='KeyM'&&panel==='map')||(e.code==='KeyH'&&panel==='help')||(e.code==='KeyB'&&panel&&panel.startsWith('spells'))||(e.code==='KeyP'&&panel&&panel.startsWith('stable')))closePanel();return}
   if(e.repeat&&e.code!=='Space'){keys[e.code]=true;return}
@@ -2121,7 +2300,8 @@ function startGame(cls,data){
   if(data){loadData(data)}else{P=newPlayer(cls);explored.fill(0);resetFog();chests.forEach(c=>c.open=false);try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
   state='play';document.getElementById('title').hidden=true;document.getElementById('menu').hidden=false;if(touchMode)document.getElementById('touch').hidden=false;
   cam.x=P.x;cam.y=P.y;lastRegion=null;
-  if(!data){setTimeout(()=>{banner={title:'Emberfall',sub:'Talk to Elder Mira, the villager with the gold !',t:0}},400)}
+  syncPages();
+  if(!data||!P.flags.prologue){P.flags.prologue=1;setTimeout(()=>playCine(PROLOGUE,()=>{banner={title:'Chapter I',sub:'A Stranger in Emberfall',t:0,col:'#f6d27a'};toast('Talk to Elder Mira','Follow the gold arrow to find her','#f0b94a')}),300)}
   cv.focus();save();
 }
 
