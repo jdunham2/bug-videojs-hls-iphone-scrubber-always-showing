@@ -781,6 +781,7 @@ const GOODS = {
   giant_draught:{name:'Giant Draught',base:60,col:'#d84a3a',kind:'usable',desc:'Grow huge for 60 seconds: +25% damage and no knockback, but a little slower.'},
   swift_tonic:{name:'Swiftness Tonic',base:45,col:'#4ad0e0',kind:'usable',desc:'Run 40% faster for 60 seconds.'},
   shrink_elixir:{name:'Shrinking Elixir',base:45,col:'#9a7aff',kind:'usable',desc:'Shrink for 60 seconds: monsters notice you from half as far away.'},
+  storm_essence:{name:'Storm Essence',base:120,col:'#a0c8ff',kind:'good',desc:'Crackling wind caught in a jar, left behind by a tornado.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2166,6 +2167,10 @@ const NPCS = [
    hello:["Extra! Extra! Read all about it!","Papers! Fresh papers!","My legs are tired. Want to do my route?"], rumors:["Just run past the houses with a paper over them. I throw 'em from the path, easy."]},
   {id:'lotto',town:'highcairn',dx:-4,dy:-4,name:'Lottie Luckpenny',role:'Saltwind Lottery',cols:{cloak:'#2a8a4a',skin:'#d8b090',hair:'#2a2a2a'},lottery:true,freeSpot:true,
    hello:["Feeling lucky?","Three numbers, one dream!","Tomorrow's draw could be yours!"], rumors:["The draw happens every morning. Match all three numbers and you win the jackpot!"]},
+  {id:'dusty',town:'redrock',dx:-4,dy:-3,name:'Dusty the Miner',role:'Mine cart rides',cols:{cloak:'#7a5a3a',skin:'#c89070',hair:'#5a5a5a'},cartride:true,freeSpot:true,
+   hello:["All aboard the ore express!","Mind the gaps, kid.","Fastest cart in the west!"], rumors:["The cart picks up speed the longer you ride. Jump early over the gaps, and grab every nugget you can."]},
+  {id:'sven',town:'storm',dx:3,dy:3,name:'Sven',role:'Snowball fights',cols:{cloak:'#3a6aa0',skin:'#f0d0b8',hair:'#e8d090'},snowfight:true,freeSpot:true,
+   hello:["Snowball fight! Snowball fight!","You can't hit me!","My friends are hiding in the forts."], rumors:["Hit my friends when they pop up from the snow forts. If one stays up too long, splat! You get hit."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4607,11 +4612,13 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
+  else if (cart && cart.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'arrowup' || k === 'w') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cartJump(); } }
+  else if (snow && snow.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); snow.keys.add(k); } else if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) snowThrow(); } }
   else if (wrestle && wrestle.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) wrestleMash(); } }
   else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
-addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); }, {capture: true});
+addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
 const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
 const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
@@ -4870,6 +4877,111 @@ function lottoDraw() {
   const d = []; while (d.length < 3) { const v = 1 + Math.floor(Math.random()*9); if (!d.includes(v)) d.push(v); } d.sort((a, b) => a - b); S.lottoLast = d;
   const m = T.nums.filter(v => d.includes(v)).length, prize = [0, 30, 250, 2500][m]; S.coins += prize; if (m === 3) S.lottoJackpot = (S.lottoJackpot || 0) + 1;
   setTimeout(() => toast(`<b>Saltwind Lottery draw: ${d.join(' · ')}</b><br>Your numbers: ${T.nums.join(' · ')} → ${m} match${m === 1 ? '' : 'es'}${prize ? `. <span style="color:var(--good)">You win ${prize} coin!</span>` : '. Better luck next time.'}`, 7000), 2500);
+}
+// ===== tornadoes =====
+let tornado = null, tornadoT = 240, essences = [];
+function updateTornado(dt) {
+  for (const q of essences) q.t -= dt; if (essences.length) essences = essences.filter(q => q.t > 0);
+  const Tn = tornado;
+  if (Tn) {
+    Tn.t -= dt; Tn.ph += dt*8; Tn.wt -= dt; if (Tn.wt <= 0) { Tn.wt = 2 + Math.random()*2; const a = Math.random()*6.283; Tn.vx = Math.cos(a)*2.2; Tn.vy = Math.sin(a)*2.2; }
+    const nx = Tn.x + Tn.vx*dt, ny = Tn.y + Tn.vy*dt; if (inB(Math.floor(nx), Math.floor(ny)) && enemyWalk(nx, ny)) { Tn.x = nx; Tn.y = ny; } else Tn.wt = 0;
+    Tn.drop -= dt; if (Tn.drop <= 0) { Tn.drop = 3 + Math.random()*2; const a = Math.random()*6.283, ex = Tn.x + Math.cos(a)*2, ey = Tn.y + Math.sin(a)*2; if (passable(ex, ey)) { essences.push({x: ex, y: ey, t: 50, ph: Math.random()*6}); burst(ex, ey - .4, '#a0c8ff', 8, 3); } }
+    if (Math.random() < dt*12) burst(Tn.x + (Math.random() - .5)*1.5, Tn.y - Math.random()*3, '#c8c0b0', 1, 2);
+    const d = Math.hypot(S.x - Tn.x, S.y - Tn.y);
+    if (d < 4.5 && mode === 'play' && !inDungeon()) { const pull = (4.5 - d)/4.5; player.kx += (Tn.x - S.x)/(d || 1)*pull*14*dt*6; player.ky += (Tn.y - S.y)/(d || 1)*pull*14*dt*6; shake = Math.max(shake, pull*.3); }
+    if (d < 1 && (Tn.hitCd = (Tn.hitCd || 0) - dt) <= 0) { Tn.hitCd = 1.5; hurtPlayer(1 + (S.level || 1)*.05, null); const a = Math.random()*6.283; player.kx = Math.cos(a)*14; player.ky = Math.sin(a)*14; floatText(S.x, S.y - 1.6, 'Whoosh!', '#c8d8ff'); S.tornadoTossed = (S.tornadoTossed || 0) + 1; }
+    if (Tn.t <= 0 || d > 60) { tornado = null; toast('The tornado spins itself out and fades away.', 3500); }
+    return;
+  }
+  if (inDungeon() || S.y >= WORLD_H || townAt(S.x, S.y, 12) || S.time < .3 || S.time > .75) return;
+  tornadoT -= dt; if (tornadoT > 0) return; tornadoT = 360 + Math.random()*360;
+  const t = map[idx(Math.floor(S.x), Math.floor(S.y))]; if (![T.GRASS, T.SAVANNA, T.SAND, T.DUNE, T.MESA, T.HILL, T.ROAD].includes(t) || Math.random() > .5) return;
+  for (let k = 0; k < 20; k++) { const a = Math.random()*6.283, x = S.x + Math.cos(a)*14, y = S.y + Math.sin(a)*14; if (inB(Math.floor(x), Math.floor(y)) && enemyWalk(x, y)) { tornado = {x, y, vx: 0, vy: 0, wt: 0, t: 75, ph: 0, drop: 2}; S.tornadoes = (S.tornadoes || 0) + 1; SFX.roar(); toast('<b>A tornado touches down!</b><br>It drops jars of crackling Storm Essence as it goes. Chase it, but don’t get caught in the funnel!', 6000); return; } }
+}
+function essenceTarget() {
+  const q = essences.find(q => Math.hypot(q.x - S.x, q.y - S.y) < 1.2); if (!q) return null;
+  return {key: 'ess' + q.x.toFixed(1), html: '<kbd style="margin:0 6px 0 0">E</kbd>Grab the Storm Essence', btn: 'Grab', fn: () => { essences = essences.filter(z => z !== q); addItem('storm_essence', 1); S.essences = (S.essences || 0) + 1; SFX.chime(); burst(q.x, q.y - .4, '#a0c8ff', 10, 3); renderHUD(); }};
+}
+function drawTornado() {
+  const Tn = tornado, px = Tn.x*TS, py = Tn.y*TS;
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(px, py, 18, 6, 0, 0, 7); ctx.fill();
+  for (let i = 0; i < 14; i++) { const f = i/14, w = 6 + f*f*30, y = py - f*70, sw = Math.sin(Tn.ph + f*6)*f*8; ctx.globalAlpha = .35 + (1 - f)*.3; ctx.fillStyle = i % 2 ? '#a8a8b0' : '#c8c8cc'; ctx.beginPath(); ctx.ellipse(px + sw, y, w, 4 + f*3, 0, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+}
+function drawEssence(q) { q.ph += .05; const px = q.x*TS, py = q.y*TS - 3 + Math.sin(q.ph)*1.5; ctx.fillStyle = 'rgba(160,200,255,.3)'; ctx.beginPath(); ctx.arc(px, py - 3, 6, 0, 7); ctx.fill(); ctx.fillStyle = '#d8e8f8'; ctx.fillRect(px - 3, py - 7, 6, 8); ctx.fillStyle = '#a0c8ff'; ctx.fillRect(px - 2, py - 5, 4, 5); ctx.fillStyle = '#8a6a3a'; ctx.fillRect(px - 2, py - 9, 4, 2); }
+// ===== mine cart runner =====
+let cart = null;
+function cartStart() {
+  cart = {on: true, y: 0, vy: 0, dist: 0, speed: 140, gaps: [], nuggets: [], ore: 0, last: performance.now(), next: 220, dead: false, deadT: 0};
+  openPanel('Mine cart', '<canvas id="cartC" width="320" height="180" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">Space / A / click to jump the gaps · grab the gold nuggets</div>', [{label: 'Jump!', primary: true, fn: () => cartJump()}]);
+  setTimeout(() => { const c = document.getElementById('cartC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); cartJump(); }); }, 30);
+  requestAnimationFrame(cartLoop);
+}
+function cartJump() { const C = cart; if (!C || !C.on || C.dead) return; if (C.y === 0) { C.vy = 330; AUD.tone(260, .08, 'square', .05); } }
+function cartLoop() {
+  const C = cart; if (!C || !C.on) return; const c = document.getElementById('cartC'); if (!c || mode !== 'talk') { cart = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - C.last)/1000); C.last = now;
+  const CX = 70, GY = 140;
+  if (!C.dead) {
+    C.speed += dt*6; const mv = C.speed*dt; C.dist += mv;
+    for (const g of C.gaps) g.x -= mv; for (const n of C.nuggets) n.x -= mv;
+    C.gaps = C.gaps.filter(g => g.x + g.w > -10); C.nuggets = C.nuggets.filter(n => n.x > -10 && !n.got);
+    C.next -= mv; if (C.next <= 0) { const w = 34 + Math.random()*Math.min(40, C.speed*.18); C.gaps.push({x: 340, w}); if (Math.random() < .7) C.nuggets.push({x: 340 + w/2, y: 40 + Math.random()*30}); C.next = 120 + Math.random()*140 + w; if (Math.random() < .5) C.nuggets.push({x: 340 + w + 40 + Math.random()*40, y: 8}); }
+    C.vy -= 900*dt; C.y = Math.max(0, C.y + C.vy*dt); if (C.y === 0) C.vy = 0;
+    const over = C.gaps.find(g => CX > g.x + 6 && CX < g.x + g.w - 6);
+    if (over && C.y < 4) { C.dead = true; SFX.hurt(); }
+    for (const n of C.nuggets) if (!n.got && Math.abs(n.x - CX) < 14 && Math.abs(n.y - (C.y + 10)) < 18) { n.got = true; C.ore++; AUD.tone(880, .08, 'triangle', .08); }
+  } else { C.deadT += dt; C.y -= dt*200; if (C.deadT > 1) { cartEnd(); return; } }
+  const g = c.getContext('2d'); g.fillStyle = '#1a1410'; g.fillRect(0, 0, 320, 180);
+  g.fillStyle = '#2a2018'; for (let x = -((C.dist*.3) % 60); x < 330; x += 60) { g.fillRect(x, 20, 8, 120); }
+  g.fillStyle = '#3a2a1a'; g.fillRect(0, GY + 10, 320, 40);
+  let x0 = 0; const segs = []; for (const gp of C.gaps.slice().sort((a, b) => a.x - b.x)) { segs.push([x0, gp.x]); x0 = gp.x + gp.w; } segs.push([x0, 320]);
+  for (const [a, b] of segs) { if (b <= a) continue; g.fillStyle = '#6a5a4a'; g.fillRect(a, GY + 4, b - a, 3); g.fillStyle = '#5a3a20'; for (let x = a - ((C.dist) % 16); x < b; x += 16) if (x >= a) g.fillRect(x, GY + 7, 8, 4); }
+  for (const gp of C.gaps) { g.fillStyle = '#000'; g.fillRect(gp.x, GY + 4, gp.w, 50); }
+  for (const n of C.nuggets) { g.fillStyle = '#ffd040'; g.beginPath(); g.arc(n.x, GY - n.y, 5, 0, 7); g.fill(); g.fillStyle = '#fff6b0'; g.fillRect(n.x - 2, GY - n.y - 2, 2, 2); }
+  const cy = GY - C.y; g.fillStyle = '#7a7a8a'; g.fillRect(CX - 14, cy - 12, 28, 12); g.fillStyle = '#4a4a5a'; g.fillRect(CX - 14, cy - 12, 28, 3);
+  g.fillStyle = '#2a2a2a'; g.beginPath(); g.arc(CX - 8, cy + 2, 4, 0, 7); g.arc(CX + 8, cy + 2, 4, 0, 7); g.fill();
+  g.fillStyle = player.cols.cloak; g.fillRect(CX - 4, cy - 22, 8, 10); g.fillStyle = player.cols.skin; g.fillRect(CX - 3, cy - 28, 6, 6);
+  g.fillStyle = '#ffd27a'; g.font = 'bold 13px sans-serif'; g.textAlign = 'left'; g.fillText(`● ${C.ore}`, 10, 18); g.textAlign = 'right'; g.fillText(`${Math.floor(C.dist/10)} m`, 310, 18);
+  requestAnimationFrame(cartLoop);
+}
+function cartEnd() {
+  const C = cart; cart = null; const m = Math.floor(C.dist/10), c = C.ore*3 + Math.floor(m/10); S.coins += c; S.cartBest = Math.max(S.cartBest || 0, m); S.carts = (S.carts || 0) + 1; renderHUD(); save(); SFX.coin();
+  openPanel('Mine cart', `Crash! The cart tumbles into the dark after <b>${m} m</b>${m >= (S.cartBest || 0) ? ' (personal best!)' : ''}. You grabbed <b>${C.ore}</b> nugget${C.ore === 1 ? '' : 's'}.<br><span style="color:var(--good)">+${c} coin</span>`, [{label: 'Ride again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); cartStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== snowball fight =====
+let snow = null;
+const SNOW_FORTS = [[50, 70], [130, 55], [210, 70], [90, 130], [170, 130]];
+function snowStart() {
+  snow = {on: true, t: 40, cx: 150, cy: 100, cvx: 0, cvy: 0, keys: new Set(), kids: SNOW_FORTS.map(([x, y]) => ({x, y, up: 0, wait: 1 + Math.random()*2})), balls: [], hits: 0, lives: 3, last: performance.now(), splat: 0};
+  openPanel('Snowball fight', '<canvas id="snowC" width="260" height="180" style="display:block;margin:0 auto;border-radius:6px;cursor:crosshair;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">Aim with arrows / stick / mouse · Space / A / click to throw</div>', [{label: 'Throw!', primary: true, fn: () => snowThrow()}]);
+  setTimeout(() => { const c = document.getElementById('snowC'); if (!c) return; const pos = e => { const r = c.getBoundingClientRect(); snow && (snow.cx = (e.clientX - r.left)/r.width*260, snow.cy = (e.clientY - r.top)/r.height*180); }; c.addEventListener('pointermove', pos); c.addEventListener('pointerdown', e => { e.preventDefault(); pos(e); snowThrow(); }); }, 30);
+  requestAnimationFrame(snowLoop);
+}
+function snowThrow() { const W = snow; if (!W || !W.on || (W.cd || 0) > 0) return; W.cd = .3; W.balls.push({x: 130, y: 190, tx: W.cx, ty: W.cy, t: 0}); SFX.throw(); }
+function snowLoop() {
+  const W = snow; if (!W || !W.on) return; const c = document.getElementById('snowC'); if (!c || mode !== 'talk') { snow = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - W.last)/1000); W.last = now; W.t -= dt; W.cd = (W.cd || 0) - dt; W.splat -= dt;
+  let ax = W.cvx, ay = W.cvy; if (W.keys.has('arrowleft') || W.keys.has('a')) ax -= 1; if (W.keys.has('arrowright') || W.keys.has('d')) ax += 1; if (W.keys.has('arrowup') || W.keys.has('w')) ay -= 1; if (W.keys.has('arrowdown') || W.keys.has('s')) ay += 1;
+  W.cx = Math.max(0, Math.min(260, W.cx + ax*dt*220)); W.cy = Math.max(0, Math.min(180, W.cy + ay*dt*220));
+  const upTime = Math.max(.9, 1.6 - (40 - W.t)*.015);
+  for (const k of W.kids) { if (k.up > 0) { k.up -= dt; if (k.up <= 0) { if (!k.hit) { W.lives--; W.splat = .6; SFX.hurt(); } k.hit = false; k.wait = .6 + Math.random()*2; } } else { k.wait -= dt; if (k.wait <= 0) { k.up = upTime; k.hit = false; } } }
+  for (const b of W.balls) { b.t += dt*3.2; if (b.t >= 1 && !b.done) { b.done = true; const k = W.kids.find(k => k.up > 0 && !k.hit && Math.hypot(k.x - b.tx, k.y - 14 - b.ty) < 16); if (k) { k.hit = true; k.up = Math.min(k.up, .25); W.hits++; AUD.tone(700, .08, 'triangle', .08); } } }
+  W.balls = W.balls.filter(b => b.t < 1.3);
+  const g = c.getContext('2d'); g.fillStyle = '#e8f0f8'; g.fillRect(0, 0, 260, 180); g.fillStyle = '#c8d8e8'; for (let i = 0; i < 30; i++) g.fillRect((i*53) % 260, (i*37) % 180, 2, 2);
+  for (const k of W.kids) { if (k.up > 0) { const rise = Math.min(1, (upTime - k.up)*6, k.up*6); g.fillStyle = k.hit ? '#9ab0c8' : '#d84a3a'; g.fillRect(k.x - 6, k.y - 10 - rise*12, 12, 12); g.fillStyle = '#f0d0b8'; g.beginPath(); g.arc(k.x, k.y - 16 - rise*12, 6, 0, 7); g.fill(); if (k.hit) { g.fillStyle = '#fff'; g.beginPath(); g.arc(k.x, k.y - 18 - rise*12, 5, 0, 7); g.fill(); } }
+    g.fillStyle = '#fafcff'; g.beginPath(); g.ellipse(k.x, k.y, 22, 10, 0, Math.PI, 0); g.fill(); g.strokeStyle = '#b8c8d8'; g.stroke(); }
+  for (const b of W.balls) { const f = Math.min(1, b.t), x = b.x + (b.tx - b.x)*f, y = b.y + (b.ty - b.y)*f - Math.sin(f*Math.PI)*30; g.fillStyle = '#fff'; g.strokeStyle = '#aab'; g.beginPath(); g.arc(x, y, 4 - f*1.5, 0, 7); g.fill(); g.stroke(); }
+  g.strokeStyle = '#d84a3a'; g.lineWidth = 2; g.beginPath(); g.arc(W.cx, W.cy, 8, 0, 7); g.moveTo(W.cx - 12, W.cy); g.lineTo(W.cx + 12, W.cy); g.moveTo(W.cx, W.cy - 12); g.lineTo(W.cx, W.cy + 12); g.stroke(); g.lineWidth = 1;
+  if (W.splat > 0) { g.globalAlpha = W.splat; g.fillStyle = '#fff'; g.beginPath(); g.arc(130, 90, 70, 0, 7); g.fill(); g.globalAlpha = 1; }
+  g.fillStyle = '#1a2a3a'; g.font = 'bold 13px sans-serif'; g.textAlign = 'left'; g.fillText(`Hits ${W.hits}`, 8, 16); g.textAlign = 'right'; g.fillText(`${'❤'.repeat(Math.max(0, W.lives))} ${Math.ceil(W.t)}s`, 252, 16);
+  if (W.t <= 0 || W.lives <= 0) { snowEnd(); return; }
+  requestAnimationFrame(snowLoop);
+}
+function snowEnd() {
+  const W = snow; snow = null; const c = Math.min(60, W.hits) + (W.lives > 0 ? 15 : 0); S.coins += c; S.snowBest = Math.max(S.snowBest || 0, W.hits); S.snowFights = (S.snowFights || 0) + 1; renderHUD(); save(); SFX[W.lives > 0 ? 'victory' : 'coin']();
+  openPanel('Snowball fight', `${W.lives > 0 ? 'Time! You survived the snowball fight' : 'Splat! You’re buried in snow'} with <b>${W.hits}</b> hits.${W.hits >= (S.snowBest || 0) && W.hits ? ' A new best!' : ''}<br>“${W.hits >= 25 ? 'No fair, you’re a pro!' : 'Again! Again!'}” Sven gives you his pocket money. <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Play again', primary: true, fn: () => snowStart()}, {label: 'Close', fn: closeTalk}]);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -6419,8 +6531,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
+  ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
   ['Paper route and lottery', 'Ned the Newsboy in Port Wren hands over his paper route once a day: run past every marked house within 75 seconds. Lottie Luckpenny in Highcairn sells Saltwind Lottery tickets: pick three numbers, and the draw happens the next morning. Match all three for the 2,500 coin jackpot.'],
   ['Strange potions', 'Fizzwick in Thornwick sells three odd potions you drink from your bag. Each lasts a minute. A Giant Draught makes you huge: +25% damage and no knockback, but a bit slower. A Swiftness Tonic makes you run 40% faster. A Shrinking Elixir makes you tiny, so monsters notice you from half as far away. Party members see you grow and shrink!'],
   ['Arm wrestling and sandcastles', 'Brawny Buck in Redrock takes on challengers at arm wrestling: mash Space or A to push his arm down, and hold on when he pushes back. He gets tougher every time you win. Sandy in Port Wren runs a sandcastle contest: drop each layer on top of the last, since any overhang crumbles away.'],
@@ -6744,7 +6858,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7034,6 +7148,8 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (cart && cart.on) { if (down(OK) || down(BACK) || down(2) || down(3) || down(12)) cartJump(); PAD.prev = B; return; }
+  if (snow && snow.on) { snow.cvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); snow.cvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK) || down(2) || down(7)) snowThrow(); PAD.prev = B; return; }
   if (wrestle && wrestle.on) { [OK, BACK, 2, 3].forEach(i => { if (down(i)) wrestleMash(); }); PAD.prev = B; return; }
   if (castle && castle.on) { if (down(OK) || down(BACK) || down(2) || down(3)) castleDrop(); PAD.prev = B; return; }
   if (lock && lock.on) { if (down(OK) || down(BACK) || down(2) || down(3)) lockPress(); PAD.prev = B; return; }
@@ -7642,6 +7758,8 @@ function render() {
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
+  if (tornado && inView(tornado.x, tornado.y)) sprites.push({y: tornado.y, f: drawTornado});
+  for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
   if (paper) for (const h of paper.houses) if (!h.done && inView(h.x, h.y)) sprites.push({y: 1e9 - 4, f: () => drawPaperMark(h)});
   for (const q of (S.digSites || [])) if (!q.done && inView(q.x, q.y)) sprites.push({y: q.y - .3, f: () => drawDigSite(q)});
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
@@ -8090,7 +8208,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8442,6 +8560,8 @@ function mainOptions(n) {
   if (n.alchemist2) o.push({label: 'Buy strange potions', primary: true, fn: () => shopTalk(n, [['giant_draught', 70], ['swift_tonic', 50], ['shrink_elixir', 50]], '“Fresh from the cauldron! Each one lasts a full minute. Drink from your bag.”')});
   if (n.newsboy) o.push({label: paper ? 'About the paper route' : 'Do the paper route', primary: true, fn: () => paperTalk(n)});
   if (n.lottery) o.push({label: 'Saltwind Lottery', primary: true, fn: () => lottoTalk(n)});
+  if (n.cartride) o.push({label: 'Ride the mine cart · 10\u25c6', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); cartStart(); }});
+  if (n.snowfight) o.push({label: 'Have a snowball fight', primary: true, fn: () => snowStart()});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11242,6 +11362,9 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['tornadochase','Eye of the Storm','Collect 5 Storm Essences from tornadoes', () => (S.essences || 0) >= 5],
+  ['cart500','Ore Express','Ride the mine cart 500 meters', () => (S.cartBest || 0) >= 500],
+  ['snow25','Snowball Ace','Land 25 hits in one snowball fight', () => (S.snowBest || 0) >= 25],
   ['paperboy','Paper Route','Complete 5 paper routes', () => (S.papers || 0) >= 5],
   ['lottojack','Lottery Winner','Win the Saltwind Lottery jackpot', () => (S.lottoJackpot || 0) >= 1],
   ['potions','Mad Alchemist','Try all three of Fizzwick\u2019s strange potions', () => Object.keys(S.potionKinds || {}).length >= 3],
@@ -11824,7 +11947,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
