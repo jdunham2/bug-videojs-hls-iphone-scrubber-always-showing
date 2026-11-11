@@ -11652,7 +11652,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -11664,7 +11664,7 @@ function renderPause() {
     <div class="controls" style="margin:0">
       <b>WASD / Arrows</b><span>Walk</span><b>E / Space</b><span>Talk, read, gather, enter</span><b>F / Click</b><span>Attack · hold: spin / power shot</span>
       <b>Shift</b><span>Dodge roll · dodging an attack readies a counter-strike</span><b>G / Right-click</b><span>Throw a bomb</span><b>V</b><span>Mount or dismount</span>
-      <b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>X · Z</b><span>Cast a spell · switch spells</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
+      <b>P · T</b><span>Party menu · party chat</span><b>Y · N · H</b><span>Emote · ping your spot · photo mode</span><b>Q</b><span>Eat something</span><b>B</b><span>Place a fence, table or other build</span><b>X · Z</b><span>Cast a spell · switch spells</span><b>C · I · K</b><span>Craft · Bag · Skills</span><b>M · J</b><span>Map and fast travel · Journal</span>
     </div>
     <p class="vals" style="margin-top:14px">Your progress saves automatically in this browser.</p>`;
   $('sMusic').addEventListener('input', e => { SETTINGS.music = +e.target.value; AUD.apply(); saveSettings(); });
@@ -11672,7 +11672,21 @@ function renderPause() {
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); });
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } });
+const WN_VER = 3;
+const WHATS_NEW = [
+  ['Play together', 'Press P to make a party and share the code. Fight the same monsters and bosses, revive fallen friends, race, spar, send gifts, emote (Y) and ping (N).'],
+  ['Controllers', 'Plug in a Pro Controller, Xbox or PlayStation pad and press any button.'],
+  ['Photo mode', 'Press H, pan around, pick a filter and snap.'],
+  ['Village games', 'Hide and seek (Reedholm), busking (Lantern Bay), skittles (Highcairn), ice rink (Frostgate), arm wrestling (Redrock), sandcastles (Port Wren), Tides cards (Jadewater), quiz night (Thornwick).'],
+  ['Jobs and hobbies', 'Express post (Hollowpine), paper route (Port Wren), birdwatching (Petalfall), archaeology (Dunmere Oasis), gem cutting (Ashfall), daily riddles and the lottery (Highcairn).'],
+  ['Items to use', 'War Horns call Champions, Rocket Packs light the sky, Picnic Baskets heal your party, strange potions make you giant, swift or tiny, and bandits drop Locked Strongboxes to pick.'],
+];
+function whatsNew() {
+  try { localStorage.setItem('saltwind-whatsnew', String(WN_VER)); } catch (e) {}
+  openPanel('What’s new', WHATS_NEW.map(([h, t]) => `<b>${h}</b><br><span style="color:var(--muted)">${t}</span>`).join('<br><br>') + '<br><br><span style="color:var(--muted)">The map marks every new service, and the Adventurer’s Guide in your journal explains each one.</span>', [{label: 'Let’s go!', primary: true, fn: closeTalk}]);
+}
+function whatsNewHint() { let seen = 0; try { seen = +localStorage.getItem('saltwind-whatsnew') || 0; } catch (e) {} if (seen < WN_VER && S && S.day > 1) setTimeout(() => { if (mode === 'play') toast('<b>New things to do!</b><br>Open the menu (Esc) and choose <b>What’s new</b>.', 7000); }, 9000); }
 
 /* ================= character creator ================= */
 const LOOKS = {
@@ -11789,7 +11803,7 @@ function begin(state) {
   S.towns.wren = true;
   $('title').hidden = true; mode = 'play';
   $('atkBtn').hidden = !isTouch; $('rollBtn').hidden = !isTouch;
-  renderHUD(); renderRegion(); renderXP(); save();
+  renderHUD(); renderRegion(); renderXP(); save(); whatsNewHint();
   if (S.day === 1 && S.trades === 0 && !Object.keys(S.contracts).length && !S.gathered) {
     setTimeout(() => toast(`<b>Welcome to Port Wren, ${esc(S.name || 'traveler')}</b><br>Talk to Odile, the Guildmistress, about the Charter. Check the notice board in the square for odd jobs.`, 7000), 400);
     setTimeout(() => toast('<b>Tip</b><br>Out in the wild, press E to pick up branches and break boulders. Then press C to craft a Stone Axe and a Club.', 8000), 7800);
