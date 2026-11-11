@@ -27,9 +27,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #clock .t{font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
 #clock .g{font-size:17px;color:var(--gold);font-variant-numeric:tabular-nums}
 #side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0}
-#energy{padding:5px 8px;display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:14px}
-#ebar{width:96px;height:10px;background:var(--ink);border:1px solid var(--line)}
+#energy,#health{padding:5px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--display);font-size:14px}
+#ebar,#hbar{width:96px;height:10px;background:var(--ink);border:1px solid var(--line)}
 #efill{height:100%;background:var(--leaf);width:100%}
+#hfill{height:100%;background:var(--rose);width:100%}
 #menu{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 #menu button{background:rgba(30,44,63,.93);border:2px solid var(--line);border-radius:4px;padding:4px 9px;font-family:var(--display);font-size:15px;pointer-events:auto}
 #menu button:hover{border-color:var(--gold)}
@@ -92,7 +93,7 @@ dl.keys dd{margin:0;color:var(--muted)}
 #title p{max-width:44ch;font-size:17px;margin:14px 0 18px;color:var(--text)}
 #title .acts{display:flex;gap:10px;flex-wrap:wrap}
 #title small{display:block;margin-top:16px;color:var(--muted);font-size:13px}
-@media (max-width:520px){#clock .t{font-size:18px}#menu button{padding:3px 6px;font-size:13px}#ebar{width:64px}.slot .k{display:none}#hotbar{gap:3px}}
+@media (max-width:520px){#clock .t{font-size:18px}#menu button{padding:3px 6px;font-size:13px}#ebar,#hbar{width:64px}.slot .k{display:none}#hotbar{gap:3px}}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
 
@@ -103,6 +104,7 @@ dl.keys dd{margin:0;color:var(--muted)}
       <div id="clock" class="card"><div class="d" id="hdate"></div><div class="t" id="htime"></div><div class="g" id="hgold"></div></div>
       <div id="side">
         <div id="energy" class="card"><span>Energy</span><div id="ebar"><div id="efill"></div></div></div>
+        <div id="health" class="card" hidden><span>Health</span><div id="hbar"><div id="hfill"></div></div></div>
         <div id="menu">
           <button id="mbag" type="button">Bag</button>
           <button id="mjournal" type="button">Journal</button>
@@ -194,12 +196,20 @@ def('egg','Egg',{price:50,food:15,desc:'Laid this morning.'});
 def('bigegg','Double-yolk egg',{price:110,food:25,desc:'From a hen that trusts you.'});
 def('milk','Milk',{price:120,food:30,desc:'Still warm.'});
 def('cream','Thick cream',{price:220,food:45,desc:'From a cow that trusts you.'});
+def('sword','Old sword',{tool:1,weapon:10,desc:'Your aunt kept it by the door. Swing it at whatever lives in the mine.'});
+def('blade2','Tempered blade',{tool:1,weapon:20,desc:'Forged from mine iron. Hits twice as hard.'});
+def('copper','Copper ore',{price:25,desc:'Dug from the upper mine.'});
+def('iron','Iron ore',{price:50,desc:'Dug from the middle floors.'});
+def('goldore','Gold ore',{price:120,desc:'Dug from the deep floors.'});
+def('gel','Moss gel',{price:15,desc:'Left behind by a mossling.'});
+def('wing','Dust wing',{price:25,desc:'Left behind by a cave moth.'});
+const MOB={moss:{name:'Mossling',hp:20,dmg:8,sp:22,drop:'gel'},moth:{name:'Cave moth',hp:12,dmg:6,sp:44,fly:1,drop:'wing'},grav:{name:'Gravelback',hp:48,dmg:15,sp:15,drop:'iron'}};
 const ANIM={hen:{name:'Hen',cost:300,desc:'Lays an egg in the paddock each morning when fed.',names:['Pip','Mabel','Dot','Clover','Nettle','Pudding']},cow:{name:'Cow',cost:1200,desc:'Gives milk once a day when fed.',names:['Juniper','Bramble','Hazel','Marigold','Tansy','Olive']}};
 def('sprinkler','Sprinkler',{place:1,price:80,desc:'Waters the eight soil tiles around it every morning.'});
 def('fence','Fence',{place:1,price:2,desc:'Keeps things tidy.'});
 def('cobble','Stepping stones',{place:1,price:2,desc:'A path that stops weeds.'});
 def('lantern','Lantern',{place:1,price:60,desc:'Lights the dark.'});
-const RECIPES=[['sprinkler',1,{stone:10,wood:5,quartz:1}],['fence',2,{wood:2}],['cobble',2,{stone:1}],['lantern',1,{wood:5,amber:1}]];
+const RECIPES=[['sprinkler',1,{stone:10,wood:5,quartz:1}],['fence',2,{wood:2}],['cobble',2,{stone:1}],['lantern',1,{wood:5,amber:1}],['blade2',1,{iron:8,wood:5}]];
 const FORAGE=['daffodil','brambleberry','chanterelle','holly'];
 
 /* ---------- sprites ---------- */
@@ -248,6 +258,7 @@ const SPR={
 function drawIcon(g,id){const it=I[id];
  if(it.tool){
   if(id==='can'){R(g,'#4e8fb5',4,6,8,8);R(g,'#62b8ea',5,7,6,6);R(g,'#4e8fb5',12,7,3,2);R(g,'#4e8fb5',14,5,1,2);R(g,'#4e8fb5',2,7,2,1);R(g,'#4e8fb5',2,7,1,5);R(g,'#4e8fb5',2,11,2,1);R(g,'#9ad6f5',6,8,1,3);return}
+  if(it.weapon){const b=id==='blade2'?'#bfe0f2':'#c5ced4';for(let i=0;i<8;i++){R(g,b,6+i,9-i,2,2);R(g,'#fff',6+i,9-i,1,1)}R(g,'#f2b63d',4,8,2,2);R(g,'#f2b63d',6,10,2,2);R(g,'#f2b63d',5,9,2,2);for(let i=0;i<3;i++)R(g,'#8a5a34',2+i,12-i,2,2);return}
   if(id==='rod'){for(let i=0;i<12;i++)R(g,'#b98548',2+i,14-i,2,1);R(g,'#e8f0f2',13,3,1,8);R(g,'#d8323f',12,11,3,2);R(g,'#fff',12,10,3,1);return}
   for(let i=0;i<9;i++)R(g,'#8a5a34',3+i,12-i,2,2);const c='#c5ced4',l='#eef3f5';
   if(id==='hoe'){R(g,c,8,2,6,2);R(g,c,8,2,2,5);R(g,l,8,2,6,1)}
@@ -281,6 +292,9 @@ function drawIcon(g,id){const it=I[id];
   case'bigegg':disc(g,8,10,5,'#f6d98a');disc(g,8,6,4,'#f6d98a');R(g,'#fff3c8',5,5,2,3);R(g,'#d1ab52',5,14,7,1);break;
   case'milk':R(g,'#e8eef0',5,5,6,10);R(g,'#e8eef0',6,2,4,3);R(g,'#3f78b8',6,1,4,2);R(g,'#62b8ea',5,8,6,3);R(g,'#fff',6,5,1,3);break;
   case'cream':R(g,'#f6f1dc',4,6,8,9);R(g,'#b5483c',3,4,10,2);R(g,'#f2b63d',4,9,8,3);R(g,'#fff',5,7,1,2);break;
+  case'copper':case'iron':case'goldore':{const c={copper:'#e0812f',iron:'#e8eef0',goldore:'#f6d743'}[id];disc(g,8,9,5,'#6f6a66');disc(g,7,8,4,'#8d8782');for(const[x,y]of[[5,7],[9,6],[10,10],[6,11],[8,9]])R(g,c,x,y,2,2);break}
+  case'gel':disc(g,8,10,4,'#5fae4d');R(g,'#5fae4d',6,5,4,2);R(g,'#b4ec9a',6,8,2,2);break;
+  case'wing':for(let i=0;i<7;i++)R(g,i%2?'#a9a3c4':'#8f89ad',3+i,4+i,9-i,2);R(g,'#6d6a7c',3,3,2,10);break;
   default:g.drawImage(SPR.forage(it.forage),0,1)}
 }
 const icon=id=>sprite('i_'+id,16,16,g=>drawIcon(g,id));
@@ -295,6 +309,14 @@ function charSprite(key,c,dir,f){return sprite('ch'+key+dir+f,16,22,g=>{const ol
  if(c.hat){R(g,c.hat,2,2,12,1);R(g,c.hat,4,0,8,2);R(g,'#b5483c',4,1,8,1)}
 })}
 const PCOL={skin:'#e8b88f',hair:'#5a3a22',shirt:'#3f78b8',pants:'#4a4f63',hat:'#e6c35c'};
+SPR.cave=()=>simple('cave',32,30,g=>{disc(g,16,20,14,'#6f6a66');disc(g,10,22,9,'#7d7772');disc(g,22,22,9,'#646060');R(g,'#6f6a66',1,22,30,8);disc(g,13,12,5,'#8d8782');R(g,'#0a0a0f',9,13,14,17);disc(g,16,14,7,'#0a0a0f');R(g,'#8a5a34',7,12,2,18);R(g,'#8a5a34',23,12,2,18);R(g,'#a87a45',6,9,20,3);R(g,'#5a3d25',6,12,20,1);R(g,'#a87a45',13,24,1,6);R(g,'#a87a45',18,24,1,6);R(g,'#a87a45',13,26,6,1)});
+function mobSprite(k,fl,f){return sprite('mob'+k+fl+f,k==='grav'?18:14,k==='grav'?16:11,g=>{flip(g,k==='grav'?18:14,fl);
+ if(k==='moss'){if(f){R(g,'#5fae4d',1,5,12,5);R(g,'#5fae4d',0,7,14,3);R(g,'#5fae4d',3,4,8,1);R(g,'#16212e',4,7,1,2);R(g,'#16212e',9,7,1,2)}else{R(g,'#5fae4d',2,3,10,7);R(g,'#5fae4d',1,5,12,5);R(g,'#5fae4d',4,2,6,1);R(g,'#16212e',4,6,1,2);R(g,'#16212e',9,6,1,2)}R(g,'#3f8638',1,10,12,1);R(g,'#b4ec9a',4,4,2,1)}
+ else if(k==='moth'){R(g,'#6d6a7c',6,3,2,6);const y=f?4:0;R(g,'#a9a3c4',1,y+1,5,4);R(g,'#a9a3c4',8,y+1,5,4);R(g,'#8f89ad',2,y+2,3,2);R(g,'#8f89ad',9,y+2,3,2);R(g,'#f07a93',6,3,1,1);R(g,'#f07a93',7,3,1,1)}
+ else{disc(g,9,9,6,'#6f6a66');disc(g,8,8,4,'#8d8782');R(g,'#8d8782',4,2,3,3);R(g,'#8d8782',9,1,3,3);R(g,'#8d8782',13,3,2,3);R(g,'#f2b63d',5,9,2,2);R(g,'#f2b63d',11,9,2,2);R(g,'#4a4542',f?4:5,15,3,1);R(g,'#4a4542',f?11:10,15,3,1)}})}
+const oreSprite=k=>sprite('ore'+k,16,14,g=>{disc(g,8,8,6,'#5f5a57');disc(g,8,7,5,'#7d7772');const c={copper:'#e0812f',iron:'#e8eef0',goldore:'#f6d743'}[k];for(const[x,y]of[[4,6],[8,4],[11,8],[6,10],[9,8]])R(g,c,x,y,2,2);R(g,'#3f3b39',3,13,10,1)});
+const ladDown=()=>sprite('ladd',16,16,g=>{R(g,'#07080d',2,3,12,11);R(g,'#2a2420',2,3,12,1);R(g,'#a87a45',5,1,1,11);R(g,'#a87a45',10,1,1,11);for(const y of[3,6,9])R(g,'#a87a45',5,y,6,1)});
+const ladUp=()=>sprite('ladu',16,30,g=>{R(g,'#a87a45',4,0,2,30);R(g,'#a87a45',10,0,2,30);for(let y=3;y<30;y+=5)R(g,'#c99b60',4,y,8,2)});
 const flip=(g,w,fl)=>{if(fl){g.translate(w,0);g.scale(-1,1)}};
 function henSprite(fl,f){return sprite('hen'+fl+f,12,12,g=>{flip(g,12,fl);disc(g,7,7,3,'#f6f1dc');R(g,'#f6f1dc',9,4,2,3);R(g,'#e3dcc4',5,9,5,1);disc(g,3,4,2,'#f6f1dc');R(g,'#d8323f',2,1,3,1);R(g,'#f2b63d',0,4,1,1);R(g,'#16212e',2,3,1,1);R(g,'#e08a1e',f?5:6,11,1,1);R(g,'#e08a1e',f?8:7,11,1,1)})}
 function cowSprite(fl,f){return sprite('cow'+fl+f,24,18,g=>{flip(g,24,fl);R(g,'#f6f1dc',6,5,16,8);R(g,'#e3dcc4',6,12,16,1);R(g,'#3b2a20',10,5,4,4);R(g,'#3b2a20',17,8,4,4);R(g,'#3b2a20',13,10,2,2);
@@ -330,12 +352,12 @@ const BLD=[
  {k:'cotB',x:39,y:14,w:4,h:3,roof:'#c98a2b',wall:'#e9dcc0'},
  {k:'barn',x:20,y:5,w:4,h:3,roof:'#6e4a3a',wall:'#c96a4a',door:[22,7]}];
 const MILL={x:55,y:15,w:3,h:3};
-const FIX=[{k:'bin',x:16,y:8},{k:'board',x:53,y:17},{k:'well',x:50,y:11}];
+const FIX=[{k:'bin',x:16,y:8},{k:'board',x:53,y:17},{k:'well',x:50,y:11},{k:'cave',x:46,y:16}];
 const solid=new Uint8Array(N),inter=new Array(N).fill(null);
 for(const b of BLD){for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)solid[idx(x,y)]=1;if(b.door)inter[idx(b.door[0],b.door[1])]=b.k;
  b.wins=[];for(let tx=0;tx<b.w;tx++)if(!(b.door&&tx===b.door[0]-b.x))b.wins.push([tx*T+4,b.h*T+18-17])}
 for(let y=MILL.y;y<MILL.y+3;y++)for(let x=MILL.x;x<MILL.x+3;x++)solid[idx(x,y)]=1;
-for(const f of FIX){solid[idx(f.x,f.y)]=1;if(f.k!=='well')inter[idx(f.x,f.y)]=f.k}
+for(const f of FIX){solid[idx(f.x,f.y)]=1;if(f.k!=='well')inter[idx(f.x,f.y)]=f.k}solid[idx(47,16)]=1;inter[idx(47,16)]='cave';
 function bSprite(b){const w=b.w*T,h=b.h*T+18;return sprite('b_'+b.k,w,h,g=>{
  R(g,b.wall,1,30,w-2,h-30);for(let x=5;x<w-2;x+=6)R(g,'rgba(0,0,0,.07)',x,30,1,h-33);R(g,'#8d8478',1,h-3,w-2,3);
  if(b.k==='home')R(g,'#8d8478',w-15,0,6,12);
@@ -369,7 +391,8 @@ function genMap(){const r=mkrng(7);ground=new Uint8Array(N);objs=new Array(N).fi
   if(x>=5&&x<=31&&y>=13&&y<=30){if(x>=9&&x<=15&&y<=17)continue;if(q<.10)objs[i]={t:'weed'};else if(q<.15)objs[i]={t:'rock'};else if(q<.18)objs[i]={t:'tree',v:0,g:3,hp:5}}
   else if(x>=38&&y>=20){if(q<.22)objs[i]={t:'tree',v:r()<.45?1:0,g:3,hp:5};else if(q<.28)objs[i]={t:'rock'};else if(q<.32)objs[i]={t:'weed'}}
   else if(q<.06)objs[i]={t:'tree',v:r()<.3?1:0,g:3,hp:5}}
- setupPen()}
+ setupPen();setupCave()}
+function setupCave(){for(let y=14;y<=17;y++)for(let x=46;x<=47;x++){const i=idx(x,y);objs[i]=null;wet[i]=0;ground[i]=y<16?1:0}}
 function setupPen(){for(let y=3;y<=9;y++)for(let x=19;x<=31;x++){const i=idx(x,y);if(ground[i]===3||ground[i]===6){ground[i]=0;wet[i]=0}objs[i]=null;
   if(x>=24&&(x===24||x===31||y===3||y===9)&&!(y===9&&(x===27||x===28)))objs[i]={t:'fence'}}
  ground[idx(22,8)]=1;ground[idx(22,9)]=1}
@@ -419,17 +442,20 @@ const NPCS=[
   gift:{text:'Captain Ilse tied a lucky lure to your door. The green zone is wider when you reel.',items:[],flag:'lure'}}
 ];
 NPCS[0].loves.push('cream');NPCS[1].likes.push('milk','egg');NPCS[2].likes.push('egg','bigegg');NPCS[3].likes.push('milk');
+NPCS[1].lines.push('The quarry shaft south of the plaza goes down fifteen floors. Take a sword, and bring me back some iron.');NPCS[1].likes.push('iron','copper');NPCS[1].loves.push('goldore');NPCS[2].hates.push('gel');
 function npcSpot(n){let s=n.spots[0];for(const q of n.spots)if(S.time>=q[0]+360||q[0]===0)s=S.time>=q[0]?q:s;return s}
 function placeNPCs(){for(const n of NPCS){const s=npcSpot(n);n.x=s[1]*T+8;n.y=s[2]*T+12;n.dir=0;n.walk=0}}
 
 /* ---------- state ---------- */
 const P={x:0,y:0,dir:0,walk:0,busy:0,moving:false};
-function newGame(){S={v:1,day:1,time:360,gold:500,energy:100,maxE:100,sel:0,inv:new Array(30).fill(null),water:20,weather:'sun',bin:[],shipped:0,fish:0,harvested:0,npc:{},flags:{},mill:{wood:0,stone:0,gold:0,done:false},mail:[],animals:[],hay:0,chest:new Array(20).fill(null),scene:'farm'};
- genMap();['hoe','can','axe','pick','scythe','rod'].forEach((t,i)=>S.inv[i]={id:t,n:1});S.inv[6]={id:'radish_seed',n:15};
+function newGame(){S={v:1,day:1,time:360,gold:500,energy:100,maxE:100,sel:0,inv:new Array(30).fill(null),water:20,weather:'sun',bin:[],shipped:0,fish:0,harvested:0,npc:{},flags:{},mill:{wood:0,stone:0,gold:0,done:false},mail:[],animals:[],hay:0,chest:new Array(20).fill(null),scene:'farm',hp:100,maxHp:100,kills:0,mineBest:1};
+ genMap();['hoe','can','axe','pick','scythe','rod'].forEach((t,i)=>S.inv[i]={id:t,n:1});S.inv[6]={id:'radish_seed',n:15};S.inv[7]={id:'sword',n:1};
  for(const n of NPCS)S.npc[n.id]={f:0,talk:0,gift:0,met:0,rew:0};
  P.x=12*T+8;P.y=9*T+13;P.dir=0;spawn(4);placeNPCs();resetDog();renderGround()}
 function serialize(){return{S:Object.assign({},S,{px:P.x,py:P.y,dir:P.dir}),ground:Array.from(ground),wet:Array.from(wet),objs}}
 function restore(d){S=d.S;ground=Uint8Array.from(d.ground);wet=Uint8Array.from(d.wet);objs=d.objs;P.x=S.px;P.y=S.py;P.dir=S.dir||0;
+ if(S.maxHp==null){S.maxHp=100;S.hp=100;S.kills=0;S.mineBest=1;setupCave();const k=S.inv.indexOf(null);if(k>=0)S.inv[k]={id:'sword',n:1}}
+ if(S.scene==='mine'){S.scene='farm';P.x=47*T;P.y=17*T+12}
  if(!S.animals){S.animals=[];S.hay=0;S.chest=new Array(20).fill(null);S.scene='farm';setupPen()}
  for(const n of NPCS)if(!S.npc[n.id])S.npc[n.id]={f:0,talk:0,gift:0,met:0,rew:0};placeNPCs();resetDog();renderGround()}
 const KEY='fernhollow-save-v1';
@@ -468,9 +494,10 @@ let toastT=0;function toast(m){const t=$('#toast');t.textContent=m;t.classList.a
 function fmtTime(){const h=Math.floor(S.time/60)%24,m=Math.floor(S.time%60/10)*10;return((h+11)%12+1)+':'+(m<10?'0':'')+m+(h<12?' am':' pm')}
 const dateStr=()=>SEASONS[season()]+' '+((S.day-1)%14+1)+', Year '+(Math.floor((S.day-1)/56)+1);
 let lastHud='';
-function renderHud(){const k=dateStr()+fmtTime()+S.gold+S.weather+Math.round(S.energy);if(k===lastHud)return;lastHud=k;
- $('#hdate').textContent=dateStr()+' · '+({sun:'Clear',rain:'Rain',snow:'Snow'})[S.weather];$('#htime').textContent=fmtTime();$('#hgold').textContent=S.gold.toLocaleString()+'g';
- const e=$('#efill');e.style.width=clamp(S.energy/S.maxE*100,0,100)+'%';e.style.background=S.energy<25?'var(--rose)':'var(--leaf)'}
+function renderHud(){const inMine=S.scene==='mine'&&M,k=dateStr()+fmtTime()+S.gold+S.weather+Math.round(S.energy)+'|'+S.hp+S.scene+(inMine?M.f:'');if(k===lastHud)return;lastHud=k;
+ $('#hdate').textContent=dateStr()+' · '+(inMine?'Mine floor '+M.f:({sun:'Clear',rain:'Rain',snow:'Snow'})[S.weather]);$('#htime').textContent=fmtTime();$('#hgold').textContent=S.gold.toLocaleString()+'g';
+ const e=$('#efill');e.style.width=clamp(S.energy/S.maxE*100,0,100)+'%';e.style.background=S.energy<25?'var(--gold)':'var(--leaf)';
+ $('#health').hidden=!(inMine||S.hp<S.maxHp);$('#hfill').style.width=clamp(S.hp/S.maxHp*100,0,100)+'%'}
 function slotHTML(s,i,cls){const k=i<10?'<span class="k">'+((i+1)%10)+'</span>':'';if(!s)return'<button type="button" class="slot '+cls+'" data-slot="'+i+'" aria-label="Empty slot">'+k+'</button>';
  const n=s.id==='can'?S.water:s.n>1?s.n:'';return'<button type="button" class="slot '+cls+'" data-slot="'+i+'" title="'+I[s.id].name+'" aria-label="'+I[s.id].name+'">'+k+'<img src="'+iconURL(s.id)+'" alt=""><span class="n">'+n+'</span></button>'}
 function renderHot(){let h='';for(let i=0;i<10;i++)h+=slotHTML(S.inv[i],i,i===S.sel?'sel':'');$('#hotbar').innerHTML=h;if(ui==='sheet')renderSheet()}
@@ -488,7 +515,7 @@ $('#pclose').onclick=closeSheet;
 const hearts=f=>{const n=Math.floor(f/100);return'<span class="hearts">'+'♥'.repeat(n)+'<i>'+'♥'.repeat(10-n)+'</i></span>'};
 function goals(){const best=Math.max(...NPCS.map(n=>S.npc[n.id].f));return[
  ['Till a patch and plant your seeds',!!S.flags.planted],['Harvest your first crop',S.harvested>0],['Ship 1,000g of goods ('+Math.min(S.shipped,1000)+'/1,000)',S.shipped>=1000],
- ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Restore the windmill',S.mill.done]]}
+ ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Reach floor 5 of the mine ('+Math.min(S.mineBest||1,5)+'/5)',(S.mineBest||1)>=5],['Find what is at the bottom of the mine',!!S.flags.heart],['Restore the windmill',S.mill.done]]}
 function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerHTML='';
  if(sheetKind==='bag'){$('#ptitle').textContent='Bag';
   h+='<div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,i===bagSel?'sel':'');h+='</div></div>';
@@ -508,11 +535,11 @@ function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerH
  else if(sheetKind==='journal'){$('#ptitle').textContent='Journal';
   h+='<div><h3>To do</h3>'+goals().map(g=>'<div class="goal'+(g[1]?' done':'')+'"><span class="bx">'+(g[1]?'✓':'·')+'</span><span>'+g[0]+'</span></div>').join('')+'</div>';
   h+='<div><h3>Neighbours</h3>'+NPCS.map(n=>{const s=S.npc[n.id];return'<div class="row"><div class="nm"><b>'+(s.met?n.name:'Someone in the village')+'</b><span>'+(s.met?n.role:'You have not met yet.')+'</span></div>'+hearts(s.f)+'</div>'}).join('')+'</div>';
-  h+='<div><h3>Ledger</h3><p style="margin:0">Shipped and sold: '+S.shipped.toLocaleString()+'g. Crops harvested: '+S.harvested+'. Fish landed: '+S.fish+'.</p></div>'}
+  h+='<div><h3>Ledger</h3><p style="margin:0">Shipped and sold: '+S.shipped.toLocaleString()+'g. Crops harvested: '+S.harvested+'. Fish landed: '+S.fish+'. Mine creatures driven off: '+(S.kills||0)+'. Deepest floor: '+(S.mineBest||1)+'.</p></div>'}
  else if(sheetKind==='help'){$('#ptitle').textContent='How to play';
   h+='<dl class="keys"><dt><kbd>WASD</kbd> <kbd>Arrows</kbd></dt><dd>Walk. On a phone, drag the pad.</dd><dt><kbd>Space</kbd> <kbd>E</kbd> or click</dt><dd>Use what you hold on the outlined tile, or talk, harvest and open doors.</dd><dt><kbd>1</kbd>–<kbd>0</kbd>, wheel</dt><dd>Pick a hotbar slot.</dd><dt><kbd>I</kbd> <kbd>J</kbd></dt><dd>Bag and workbench, journal.</dd><dt><kbd>F</kbd></dt><dd>Eat the food you are holding.</dd></dl>';
   h+='<div><h3>A farming day</h3><p style="margin:0">Hoe grass into soil, plant seeds in season, water every morning. Ripe crops go in the bin beside your door and pay out overnight, or sell them at the store between 8 am and 6 pm. Go inside your house and sleep in the bed before 2 am. Rain waters for you.</p></div>';
-  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div>'}
+  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div><div><h3>The mine</h3><p style="margin:0">The quarry shaft is just south of the village plaza. Break rocks with the pickaxe for stone and ore, and swing your sword with Space at anything that comes for you. Ladders lead down fifteen floors; every fifth floor becomes a shortcut from the entrance. Food restores health as well as energy. If your health runs out you are dragged back to the surface and lose a tenth of your coin.</p></div>'}
  else if(sheetKind==='chest'){$('#ptitle').textContent='Storage chest';
   h+='<div><h3>In the chest</h3><div class="grid">';for(let i=0;i<20;i++)h+=slotHTML(S.chest[i],10+i,'').replace('data-slot="'+(10+i)+'"','data-cs="'+i+'"');h+='</div></div><div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,'');h+='</div></div><div class="info"><p>Pick a stack to move it across. The chest keeps things safe between seasons.</p></div>'}
  else if(sheetKind==='barn'){$('#ptitle').textContent='Barn';const fb=count('fiber');
@@ -535,7 +562,7 @@ $('#pbody').addEventListener('click',e=>{const sl=e.target.closest('[data-slot]'
  else if(act==='animal'){const k=a.dataset.k,A=ANIM[k];if(S.gold<A.cost||S.animals.length>=6)return;S.gold-=A.cost;const used=S.animals.map(q=>q.name),name=A.names.find(q=>!used.includes(q))||A.name;S.animals.push({k,name,f:0,pet:0,milk:0,fed:1,x:27.5*T,y:6.5*T});sfx('coin');toast(name+' the '+A.name.toLowerCase()+' is waiting in the paddock by your barn.');renderSheet()}
  else if(act==='hay'){const n=Math.min(count('fiber'),a.dataset.n==='all'?999:5);if(n>0){removeItem('fiber',n);S.hay+=n;sfx('cut');renderSheet()}}
  else if(act==='wake')closeSheet()});
-function eat(i){const s=S.inv[i];if(!s||!I[s.id].food)return;if(S.energy>=S.maxE){toast('You are not hungry.');return}S.energy=Math.min(S.maxE,S.energy+I[s.id].food);s.n--;if(!s.n)S.inv[i]=null;sfx('pop');toast('Ate '+I[s.id===undefined?'':s.id].name+'.');renderHot()}
+function eat(i){const s=S.inv[i];if(!s||!I[s.id].food)return;if(S.energy>=S.maxE&&S.hp>=S.maxHp){toast('You are not hungry.');return}S.energy=Math.min(S.maxE,S.energy+I[s.id].food);S.hp=Math.min(S.maxHp,S.hp+Math.round(I[s.id].food/2));s.n--;if(!s.n)S.inv[i]=null;sfx('pop');toast('Ate '+I[s.id===undefined?'':s.id].name+'.');renderHot()}
 $('#mbag').onclick=()=>openSheet('bag');$('#mjournal').onclick=()=>openSheet('journal');$('#mhelp').onclick=()=>openSheet('help');
 $('#msound').onclick=()=>{muted=!muted;$('#msound').textContent=muted?'Sound off':'Sound on'};
 
@@ -549,11 +576,12 @@ function nearNPC(tx,ty){let best=null,bd=22;for(const n of NPCS){const d=Math.mi
 function act(cx,cy){
  if(ui==='dialog'){advanceDialog();return}if(ui==='fish'){fishPress();return}if(ui!=='play'||P.busy>0)return;
  let t=null;if(cx!=null){const dx=cx*T+8-P.x,dy=cy*T+8-(P.y-4);if(Math.hypot(dx,dy)<=T*1.9){t=[cx,cy];if(Math.abs(dx)>4||Math.abs(dy)>4)P.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0)}}
- if(!t)t=facing();const[tx,ty]=t;if(S.scene==='home'){actHome(tx,ty);return}if(!inb(tx,ty))return;const i=idx(tx,ty),o=objs[i],g=ground[i],held=S.inv[S.sel],it=held&&I[held.id];
+ if(!t)t=facing();const[tx,ty]=t;if(S.scene==='home'){actHome(tx,ty);return}if(S.scene==='mine'){actMine(tx,ty);return}if(!inb(tx,ty))return;const i=idx(tx,ty),o=objs[i],g=ground[i],held=S.inv[S.sel],it=held&&I[held.id];
  const n=nearNPC(tx,ty);if(n){talk(n);return}
  const an=nearAnimal(tx,ty);if(an){tend(an);return}
  if(inter[i]==='home'){enterHome();return}
  if(inter[i]==='barn'){openSheet('barn');return}
+ if(inter[i]==='cave'){const cps=[1,6,11].filter(c=>c<=(S.mineBest||1));say('The old quarry shaft',['Cold air comes up from below. Something down there is moving.'],cps.map(c=>['Go to floor '+c,()=>enterMine(c)]).concat([['Stay out']]));return}
  if(inter[i]==='shop'){const h=S.time/60;if(h>=8&&h<18){shopTab='buy';sfx('coin');openSheet('shop')}else say('General Store',['The sign says: open 8 am to 6 pm.']);return}
  if(inter[i]==='bin'){if(held&&!it.tool&&it.price){const b=S.bin.find(q=>q.id===held.id);if(b)b.n+=held.n;else S.bin.push({id:held.id,n:held.n});toast('Shipped '+held.n+' '+it.name+'. Pays '+price(held.id)*held.n+'g overnight.');S.inv[S.sel]=null;sfx('pop');renderHot()}
   else toast('Hold something to sell, then use the bin. Inside so far: '+S.bin.reduce((a,b)=>a+price(b.id)*b.n,0)+'g.');return}
@@ -562,7 +590,7 @@ function act(cx,cy){
  if(o&&o.t==='forage'){if(addItem(FORAGE[o.k],1)){objs[i]=null;pop(FORAGE[o.k],tx,ty);sfx('pop')}return}
  if(o&&o.t==='drop'){if(addItem(o.id,1)){objs[i]=null;pop(o.id,tx,ty);sfx('pop')}return}
  if(o&&o.t==='weed'&&(!held||held.id==='scythe'||held.id==='hoe'||!it.tool&&!it.seed&&!it.place)){if(!spend(1))return;objs[i]=null;addItem('fiber',1);pop('fiber',tx,ty);sfx('cut');P.busy=.2;if(rnd()<.06){const ks=Object.keys(CROPS).filter(k=>CROPS[k].season.includes(season()));addItem(ks[ri(0,ks.length-1)]+'_seed',1);toast('Found a seed packet in the weeds.')}return}
- if(!held)return;P.busy=.25;
+ if(!held)return;if(it.weapon){swing();return}P.busy=.25;
  switch(held.id){
  case'hoe':if(g===0&&!o&&!solid[i]){if(!spend(2))return;ground[i]=3;wet[i]=S.weather!=='sun'?1:0;retile(tx,ty);sfx('hoe')}else if(o)toast('Clear that first.');break;
  case'can':if(g===2){S.water=20;sfx('water');toast('Watering can filled.');renderHot()}else if(g===3){if(S.water<=0){toast('The can is empty. Fill it at the pond or stream.');break}if(!spend(1))return;S.water--;wet[i]=1;retile(tx,ty);sfx('water');renderHot()}break;
@@ -600,6 +628,59 @@ function updAnimals(dt){for(const a of S.animals){if(!a.tx){a.mv=false;a.wait=(a
  const dx=a.tx-a.x,dy=a.ty-a.y,d=Math.hypot(dx,dy);if(d<2){a.tx=0;a.wait=1+rnd()*5;continue}const sp=(a.k==='hen'?16:9)*dt;a.x+=dx/d*sp;a.y+=dy/d*sp;a.fl=dx>0?1:0;a.mv=true;a.w=(a.w||0)+dt*6}}
 function updDog(dt){DOG.mv=false;if(S.scene!=='farm')return;const dx=P.x-DOG.x,dy=P.y-DOG.y,d=Math.hypot(dx,dy);if(d<30||d>260)return;const sp=62*dt,nx=DOG.x+dx/d*sp,ny=DOG.y+dy/d*sp;
  if(!blocked(nx,DOG.y-2))DOG.x=nx;if(!blocked(DOG.x,ny-2))DOG.y=ny;DOG.fl=dx>0?1:0;DOG.mv=true;DOG.w+=dt*10}
+/* ---------- mine ---------- */
+const MW=24,MH=16;let M=null;
+function genMine(f){const r=mkrng(S.day*131+f*977+5),n=MW*MH,t=new Uint8Array(n),o=new Array(n).fill(null),sx=2,sy=2;
+ for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)if(x===0||y===0||x===MW-1||y===MH-1)t[y*MW+x]=1;
+ for(let k=0;k<10;k++){const bx=2+Math.floor(r()*(MW-6)),by=2+Math.floor(r()*(MH-5)),bw=1+Math.floor(r()*3),bh=1+Math.floor(r()*2);for(let y=by;y<by+bh;y++)for(let x=bx;x<bx+bw;x++)if(Math.abs(x-sx)>2||Math.abs(y-sy)>2)t[y*MW+x]=1}
+ const dist=new Int16Array(n).fill(-1),q=[sy*MW+sx];dist[q[0]]=0;for(let h=0;h<q.length;h++){const c=q[h],x=c%MW,y=(c-x)/MW;for(const[a,b]of DV){const j=(y+b)*MW+x+a;if(!t[j]&&dist[j]<0){dist[j]=dist[c]+1;q.push(j)}}}
+ for(let i=0;i<n;i++)if(dist[i]<0)t[i]=1;
+ const far=q.filter(i=>dist[i]>=14),lad=far.length?far[Math.floor(r()*far.length)]:q[q.length-1];o[sy*MW+sx]={t:'up'};
+ if(f<15)o[lad]={t:'down'};else if(!S.flags.heart)o[lad]={t:'treasure'};
+ const cu=f<5?.08:f<10?.06:.03,fe=f<5?.01:f<10?.06:.07,au=f<5?0:f<10?.012:.04;
+ for(const i of q){if(o[i]||dist[i]<3)continue;const v=r();if(v<.2)o[i]={t:'rock',hp:1};else if(v<.2+cu)o[i]={t:'ore',k:'copper',hp:2};else if(v<.2+cu+fe)o[i]={t:'ore',k:'iron',hp:2};else if(v<.2+cu+fe+au)o[i]={t:'ore',k:'goldore',hp:3}}
+ const mobs=[],free=q.filter(i=>!o[i]&&dist[i]>=7),cnt=Math.min(9,2+Math.floor(f/2));
+ for(let k=0;k<cnt&&free.length;k++){const i=free.splice(Math.floor(r()*free.length),1)[0],v=r(),kind=f>=6&&v<.25?'grav':f>=3&&v<.6?'moth':'moss',hp=Math.round(MOB[kind].hp*(1+f*.06));mobs.push({k:kind,x:(i%MW)*T+8,y:Math.floor(i/MW)*T+12,hp,max:hp,t:r()*6,hit:0,kx:0,ky:0,fl:0})}
+ M={f,t,o,mobs,sx,sy};const c=document.createElement('canvas');c.width=MW*T;c.height=MH*T;const g=c.getContext('2d'),base=f>=10?['#3a3f4a','#444a56','#30343e']:f>=5?['#45403f','#504a48','#3a3534']:['#4c4238','#584d41','#40372f'];
+ for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const X=x*T,Y=y*T;if(t[y*MW+x]){R(g,'#15110f',X,Y,T,T);if(y<MH-1&&!t[(y+1)*MW+x]){R(g,'#6a5a4c',X,Y+4,T,12);R(g,'#7d6b5a',X,Y+4,T,2);R(g,'#4f4339',X+Math.floor(hash(x,y,61)*10),Y+8,5,1);R(g,'#4f4339',X+Math.floor(hash(x,y,62)*10),Y+12,4,1);R(g,'#2a221d',X,Y+15,T,1)}}
+  else{R(g,base[0],X,Y,T,T);for(let k=0;k<4;k++)R(g,base[1+k%2],X+Math.floor(hash(x,y,k+70)*14),Y+Math.floor(hash(y,x,k+80)*14),2,1)}}
+ M.cv=c}
+function enterMine(f){f=Math.min(15,f);S.mineBest=Math.max(S.mineBest||1,f);genMine(f);S.scene='mine';P.x=M.sx*T+8;P.y=M.sy*T+13;P.dir=0;P.inv=0;sfx('tick');toast(f===15?'Floor 15. The shaft ends here.':'Mine floor '+f+'.');lastHud=''}
+function exitMine(){S.scene='farm';M=null;P.x=47*T;P.y=17*T+12;P.dir=0;lastHud=''}
+function knockOut(){const lost=Math.round(S.gold*.1);S.gold-=lost;exitMine();S.hp=Math.round(S.maxHp/2);S.time=Math.min(1500,S.time+120);sfx('fail');say('The mine',['Everything goes dark. You come round on the grass outside the shaft, two hours later'+(lost?' and '+lost+'g lighter.':'.')])}
+function hurt(n,dx,dy){S.hp=Math.max(0,S.hp-n);P.inv=.9;sfx('fail');const d=Math.hypot(dx,dy)||1,nx=P.x+dx/d*8,ny=P.y+dy/d*8;if(!hit(nx,P.y))P.x=nx;if(!hit(P.x,ny))P.y=ny;if(S.hp<=0)knockOut()}
+function mbl(px,py,fly){const x=Math.floor(px/T),y=Math.floor((py-3)/T);if(x<0||y<0||x>=MW||y>=MH||M.t[y*MW+x])return true;const o=M.o[y*MW+x];return!fly&&!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}
+function updMine(dt){if(P.inv>0)P.inv-=dt;for(let k=M.mobs.length-1;k>=0;k--){const m=M.mobs[k],d=MOB[m.k];m.t+=dt;if(m.hit>0)m.hit-=dt;
+  const dx=P.x-m.x,dy=P.y-m.y,dist=Math.hypot(dx,dy)||1;let vx,vy;
+  if(dist<120){let sp=d.sp;if(m.k==='moss')sp*=Math.max(0,Math.sin(m.t*5))*2;vx=dx/dist*sp;vy=dy/dist*sp;if(m.k==='moth'){const w=Math.sin(m.t*6+k)*30;vx-=dy/dist*w;vy+=dx/dist*w}}else{vx=Math.cos(m.t*.7+k*2)*8;vy=Math.sin(m.t*.9+k)*8}
+  vx+=m.kx;vy+=m.ky;const dec=Math.pow(.003,dt);m.kx*=dec;m.ky*=dec;const nx=m.x+vx*dt,ny=m.y+vy*dt;if(!mbl(nx,m.y,d.fly))m.x=nx;if(!mbl(m.x,ny,d.fly))m.y=ny;m.fl=dx>0?1:0;
+  if(dist<11&&P.inv<=0&&m.hit<=0){hurt(Math.round(d.dmg*(1+M.f*.04)),-dx,-dy);if(!M)return}}}
+function swing(){const held=S.inv[S.sel],w=I[held.id].weapon;P.busy=.26;P.atk=.14;sfx('cut');if(S.scene!=='mine'||!M)return;const d=DV[P.dir],hx=P.x+d[0]*13,hy=P.y+d[1]*13;
+ for(let k=M.mobs.length-1;k>=0;k--){const m=M.mobs[k];if(Math.hypot(m.x-hx,m.y-hy)<18){m.hp-=w;m.hit=.25;const a=Math.atan2(m.y-P.y,m.x-P.x);m.kx=Math.cos(a)*160;m.ky=Math.sin(a)*160;sfx('chop');
+  if(m.hp<=0){M.mobs.splice(k,1);S.kills=(S.kills||0)+1;const dr=MOB[m.k].drop;if(rnd()<.7&&addItem(dr,1))pop(dr,Math.floor(m.x/T),Math.floor(m.y/T)-1);sfx('pop')}}}}
+function actMine(tx,ty){if(tx<0||ty<0||tx>=MW||ty>=MH)return;let i=ty*MW+tx,o=M.o[i];const held=S.inv[S.sel],it=held&&I[held.id],pi=Math.floor((P.y-3)/T)*MW+Math.floor(P.x/T),po=M.o[pi];
+ if(!(held&&it.weapon&&M.mobs.some(m=>Math.hypot(m.x-P.x,m.y-P.y)<34))){if(po&&(po.t==='up'||po.t==='down')&&!(o&&o.t==='treasure')&&!(o&&held&&held.id==='pick')){o=po;i=pi}
+  if(o&&o.t==='down'){enterMine(M.f+1);return}
+  if(o&&o.t==='up'){say('Ladder',['Climb back up to daylight?'],[['Climb out',exitMine],['Stay down here']]);return}
+  if(o&&o.t==='treasure'){M.o[i]=null;S.flags.heart=1;S.maxHp+=50;S.hp=S.maxHp;addItem('goldore',5);addItem('amber',3);sfx('win');lastHud='';say('The bottom of the shaft',['An iron-bound chest, older than the village. Inside, wrapped in oilcloth: gold ore, amber, and a warm red stone that hums when you hold it.','Your health rises by 50 for good. Bram will not believe a word of this.']);return}}
+ if(!held)return;if(it.weapon){swing();return}
+ if(held.id==='pick'&&o&&(o.t==='rock'||o.t==='ore')){if(!spend(1))return;P.busy=.22;sfx('pick');if(--o.hp>0)return;M.o[i]=null;
+  if(o.t==='ore'){addItem(o.k,ri(1,2));pop(o.k,tx,ty)}else{addItem('stone',ri(1,2));pop('stone',tx,ty);const q=rnd();if(q<.06){addItem('quartz',1);toast('Quartz!')}else if(q<.09){addItem('amber',1);toast('Amber!')}}}
+ else if(it.food)eat(S.sel)}
+function drawMine(){const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.round(cam.y);R(ctx,'#07080d',0,0,vw,vh);ctx.drawImage(M.cv,-cx,-cy);
+ if(ui==='play'){let t=facing();if(hover){const dx=hover[0]*T+8-P.x,dy=hover[1]*T+8-(P.y-4);if(Math.hypot(dx,dy)<=T*1.9)t=hover}ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;ctx.strokeRect(t[0]*T-cx+.5,t[1]*T-cy+.5,T-1,T-1)}
+ const L=[],lights=[];for(let i=0;i<MW*MH;i++){const o=M.o[i];if(o){const x=i%MW,ty=(i-x)/MW;L.push({y:(ty+1)*T-(o.t==='down'?15:1),o,x,ty});if(o.t==='up'||o.t==='down'||o.t==='treasure')lights.push([x*T+8,ty*T+8])}}
+ for(const m of M.mobs)L.push({y:m.y,m});L.push({y:P.y,p:1});L.sort((a,b)=>a.y-b.y);
+ for(const e of L){
+  if(e.o){const o=e.o,s=o.t==='rock'?SPR.rock():o.t==='ore'?oreSprite(o.k):o.t==='down'?ladDown():o.t==='up'?ladUp():sprite('f_chest',16,16,FURN[1].fn);ctx.drawImage(s,e.x*T+8-(s.width>>1)-cx,(e.ty+1)*T-s.height-cy)}
+  else if(e.m){const m=e.m,s=mobSprite(m.k,m.fl,Math.floor(m.t*(m.k==='moth'?10:5))%2),mx=Math.round(m.x)-(s.width>>1)-cx,my=Math.round(m.y)-s.height-cy-(m.k==='moth'?6:0);R(ctx,'rgba(0,0,0,.3)',mx+2,Math.round(m.y)-cy-1,s.width-4,2);
+   if(!(m.hit>0&&Math.floor(animT*30)%2))ctx.drawImage(s,mx,my);if(m.hp<m.max){R(ctx,'#07080d',mx,my-4,s.width,3);R(ctx,'#f07a93',mx+1,my-3,Math.max(1,Math.round((s.width-2)*m.hp/m.max)),1)}}
+  else{const px=Math.round(P.x)-8-cx,py=Math.round(P.y)-22-cy,held=S.inv[S.sel],d=DV[P.dir],sw=P.busy>0&&held;R(ctx,'rgba(0,0,0,.3)',px+3,py+20,10,3);
+   if(!(P.inv>0&&Math.floor(animT*16)%2)){const dh=()=>{if(sw)ctx.drawImage(icon(held.id),px+d[0]*10,py+5+d[1]*8)};if(P.dir===3)dh();ctx.drawImage(charSprite('p',PCOL,P.dir,P.moving?1+Math.floor(P.walk)%2:0),px,py);if(P.dir!==3)dh()}
+   if(P.atk>0){const sx=px+8+d[0]*15,sy=py+13+d[1]*13;ctx.fillStyle='rgba(255,255,255,.9)';if(d[0]){ctx.fillRect(sx-1,sy-8,3,16);ctx.fillRect(sx-d[0]*3-1,sy-10,2,3);ctx.fillRect(sx-d[0]*3-1,sy+7,2,3)}else{ctx.fillRect(sx-8,sy-1,16,3);ctx.fillRect(sx-10,sy-d[1]*3-1,3,2);ctx.fillRect(sx+7,sy-d[1]*3-1,3,2)}}}}
+ for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
+ if(lcv.width!==vw||lcv.height!==vh){lcv.width=vw;lcv.height=vh}lctx.globalCompositeOperation='source-over';lctx.fillStyle='#04050a';lctx.fillRect(0,0,vw,vh);lctx.globalCompositeOperation='destination-out';glow(Math.round(P.x)-cx,Math.round(P.y)-10-cy,84);for(const[x,y]of lights)glow(x-cx,y-cy,30);
+ ctx.globalAlpha=Math.min(.92,.74+M.f*.012);ctx.drawImage(lcv,0,0);ctx.globalAlpha=1}
 function talk(n){const s=S.npc[n.id],held=S.inv[S.sel],it=held&&I[held.id];P.dir=Math.abs(n.x-P.x)>Math.abs(n.y-P.y)?(n.x<P.x?1:2):(n.y<P.y?3:0);n.dir=[3,2,1,0][P.dir];sfx('talk');
  const chat=()=>{let line;if(!s.met){s.met=1;line=n.intro}else if(S.weather==='rain'&&hash(S.day,3,1)<.5)line=n.rain;else{const pool=s.f>=300?n.lines.concat(n.warm):n.lines;line=pool[Math.floor(hash(S.day,n.id.length,S.npc[n.id].f)*pool.length)]}
   if(s.talk!==S.day){s.talk=S.day;bump(n,20)}say(n.name,[line])};
@@ -642,7 +723,7 @@ function spawn(mult=1){const se=season();const tryAt=(x0,x1,y0,y1,fn)=>{const x=
 function endDay(passed){let total=0,rows='';for(const b of S.bin){const v=price(b.id)*b.n;total+=v;rows+='<div class="row"><img src="'+iconURL(b.id)+'" alt=""><div class="nm"><b>'+I[b.id].name+' ×'+b.n+'</b></div><span class="pr">+'+v+'g</span></div>'}
  S.bin=[];S.gold+=total;S.shipped+=total;let lost=0;if(passed){lost=Math.round(S.gold*.1);S.gold-=lost}
  const old=season();for(let i=0;i<N;i++){const o=objs[i];if(!o)continue;if(o.t==='crop'){if(wet[i]&&o.age<CROPS[o.k].days)o.age++}else if(o.t==='tree'&&o.g<3&&rnd()<.4)o.g++;else if(o.t==='forage'&&o.k!==old)objs[i]=null}
- S.day++;S.time=360;S.energy=passed?S.maxE/2:S.maxE;const se=season();let died=0;
+ S.day++;S.time=360;S.energy=passed?S.maxE/2:S.maxE;S.hp=S.maxHp;M=null;const se=season();let died=0;
  if(se!==old)for(let i=0;i<N;i++){const o=objs[i];if(o&&o.t==='crop'&&!CROPS[o.k].season.includes(se)){objs[i]=null;died++}else if(o&&o.t==='forage')objs[i]=null}
  const q=rnd();S.weather=se===3?(q<.35?'snow':'sun'):q<[.25,.12,.3][se]?'rain':'sun';
  wet.fill(0);if(S.weather!=='sun')for(let i=0;i<N;i++)if(ground[i]===3)wet[i]=1;
@@ -677,7 +758,7 @@ $('#actbtn').addEventListener('pointerdown',e=>{e.preventDefault();act()});
 
 /* ---------- update ---------- */
 const cam={x:0,y:0};let clockT=0,animT=0;
-function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x];if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i])return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
+function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x];if(S.scene==='mine'){if(x<0||y<0||x>=MW||y>=MH)return true;const o=M.o[y*MW+x];return!!M.t[y*MW+x]||!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i])return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
 const hit=(x,y)=>blocked(x-4,y-5)||blocked(x+4,y-5)||blocked(x-4,y-1)||blocked(x+4,y-1);
 function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').classList.remove('on')}
  for(let k=parts.length-1;k>=0;k--){const p=parts[k];p.l-=dt;p.y-=dt*22;if(p.l<=0)parts.splice(k,1)}
@@ -688,13 +769,13 @@ function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').c
   let vx=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0)+joy.x,vy=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0)+joy.y;const m=Math.hypot(vx,vy);P.moving=m>.1&&P.busy<=0;
   if(P.moving){if(m>1){vx/=m;vy/=m}const sp=(S.energy<=0?42:74)*dt;P.dir=Math.abs(vx)>Math.abs(vy)?(vx<0?1:2):(vy<0?3:0);
    const nx=P.x+vx*sp;if(!hit(nx,P.y))P.x=nx;const ny=P.y+vy*sp;if(!hit(P.x,ny))P.y=ny;P.walk+=dt*9}else P.walk=0;
-  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);
+  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);if(P.atk>0)P.atk-=dt;if(S.scene==='mine'&&M)updMine(dt);
   for(const n of NPCS){const s=npcSpot(n),tx=s[1]*T+8,ty=s[2]*T+12,dx=tx-n.x,dy=ty-n.y,sp=26*dt;n.mv=false;
    if(Math.hypot(n.x-P.x,n.y-P.y)<20)continue;
    if(Math.abs(dx)>1){const band=n.y>=10*T+6&&n.y<=11*T+14,inPl=n.x>=42*T&&tx>=42*T;if(!band&&!inPl){const by=11*T+4;n.y+=Math.sign(by-n.y)*Math.min(sp,Math.abs(by-n.y));n.dir=by>n.y?0:3}else{n.x+=Math.sign(dx)*Math.min(sp,Math.abs(dx));n.dir=dx<0?1:2}n.mv=true}
    else if(Math.abs(dy)>1){n.y+=Math.sign(dy)*Math.min(sp,Math.abs(dy));n.dir=dy<0?3:0;n.mv=true}else n.dir=0;
    n.walk=n.mv?n.walk+dt*7:0}}
- const vw=cv.width,vh=cv.height,mw=W*T,mh=H*T;cam.x=mw<=vw?(mw-vw)/2:clamp(P.x-vw/2,0,mw-vw);cam.y=mh<=vh?(mh-vh)/2:clamp(P.y-10-vh/2,0,mh-vh);
+ const vw=cv.width,vh=cv.height,inM=S.scene==='mine',mw=(inM?MW:W)*T,mh=(inM?MH:H)*T;cam.x=mw<=vw?(mw-vw)/2:clamp(P.x-vw/2,0,mw-vw);cam.y=mh<=vh?(mh-vh)/2:clamp(P.y-10-vh/2,0,mh-vh);
  if(S.scene==='home'){cam.x=(IW*T-vw)/2;cam.y=(IH*T-vh)/2}
  clockT+=dt;if(clockT>.3){clockT=0;if(ui!=='title')renderHud()}music()}
 
@@ -712,7 +793,7 @@ function drawHome(){const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.
   else{const px=Math.round(P.x)-8-cx,py=Math.round(P.y)-22-cy;R(ctx,'rgba(0,0,0,.22)',px+3,py+20,10,3);ctx.drawImage(charSprite('p',PCOL,P.dir,P.moving?1+Math.floor(P.walk)%2:0),px,py)}}
  for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
  if(dk>.2){ctx.fillStyle='rgba(28,14,48,'+(dk*.45).toFixed(2)+')';ctx.fillRect(0,0,vw,vh);const g=ctx.createRadialGradient(96-cx,40-cy,4,96-cx,40-cy,70);g.addColorStop(0,'rgba(255,170,70,.28)');g.addColorStop(1,'rgba(255,170,70,0)');ctx.fillStyle=g;ctx.fillRect(16-cx,16-cy,144,120)}}
-function draw(){if(S.scene==='home'){drawHome();return}const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.round(cam.y),se=season();
+function draw(){if(S.scene==='home'){drawHome();return}if(S.scene==='mine'&&M){drawMine();return}const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.round(cam.y),se=season();
  R(ctx,'#141d2b',0,0,vw,vh);ctx.drawImage(gcv,-cx,-cy);
  const x0=Math.max(0,Math.floor(cx/T)-2),x1=Math.min(W-1,Math.floor((cx+vw)/T)+2),y0=Math.max(0,Math.floor(cy/T)-1),y1=Math.min(H-1,Math.floor((cy+vh)/T)+4);
  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(ground[idx(x,y)]===2){const ph=Math.floor(animT*1.5+hash(x,y,3)*4)%4;if(ph<2)R(ctx,PAL[se].w2,x*T-cx+3+ph*5,y*T-cy+6+Math.floor(hash(x,y,8)*6),4,1)}
