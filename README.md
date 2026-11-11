@@ -14,4 +14,4 @@ This project is meant to run on StackBlitz ⚡️
 
 ## Emberfall Engine Deck
 
-`emberfall/index.html` is a first-person 3D browser game in one file (no build step; loads three.js from a CDN): open the file in a browser. You play a warship engineer keeping the reactor, shields, weapons and engines running through a three-act blockade run.
+`emberfall/index.html` is a first-person 3D browser game in one file (no build step; loads three.js from a CDN): open the file in a browser. You play the engineer of the stranded ship Emberflight, restoring its systems one at a time and reporting each to the Captain before its orbit decays.

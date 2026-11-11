@@ -76,6 +76,11 @@ button.ghost:hover { color: var(--ink); background: var(--steel); }
 }
 #mute:hover { color: var(--ink); background: var(--steel); }
 .note { font-size: 11px; color: var(--dim); }
+blockquote { margin: 0; padding-left: 14px; border-left: 2px solid var(--amber); color: var(--ink); font-size: 14px; line-height: 1.5; max-width: 58ch; }
+blockquote cite { display: block; font-style: normal; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); padding-top: 6px; }
+.protocol { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 11px; color: var(--ink); }
+.protocol li { counter-increment: step; box-shadow: inset 0 0 0 1px var(--plate); background: rgba(26,35,48,.6); padding: 4px 9px; }
+.protocol li::before { content: counter(step) " "; color: var(--amber); font-weight: 600; }
 </style>
 
 <div id="app">
@@ -85,21 +90,27 @@ button.ghost:hover { color: var(--ink); background: var(--steel); }
 
   <section id="title" class="overlay">
     <div class="sheet">
-      <div class="eyebrow">FFG-71 Kestrel Ardent · Deck 4 · Engineering</div>
+      <div class="eyebrow">Emberflight · Coalight system · Engineering deck</div>
       <h1>DEAD ORBIT <span>PROTOCOL</span></h1>
-      <p><strong>You are Petty Officer Rook, engineer's mate.</strong> The frigate <em>Kestrel Ardent</em> is about to jump through the Cinder Gate blockade to land a strike team on an orbital fortress. The bridge fights the battle. You keep the ship able to fight it: put out fires, seal breaches, repair what gets shot, vent the reactor, reset tripped breakers, recalibrate drifting systems, and send power where the Captain calls for it.</p>
+      <blockquote>"We have lost everything and Coalight has hold of us. I am declaring Dead Orbit Protocol."<cite>Captain Hale, to all hands</cite></blockquote>
+      <p><strong>Six hours into the Coalight system, the <em>Emberflight</em> goes dark.</strong> Reactor, air, shields, sensors and drive all shut down at once, and the ship is left stranded in a decaying orbit. You are Rook, engineer's mate, and the engineering deck is yours.</p>
+      <p>Bring her back one system at a time. <strong>Each time something comes back, report it to the Captain</strong>: a repaired system stays off the board until the bridge has heard it from you.</p>
+      <ol class="protocol">
+        <li>Bus breakers</li><li>Reactor</li><li>Life support</li><li>Shields</li><li>Sensors</li><li>Main drive, then burn clear</li>
+      </ol>
       <div class="keys">
         <div><kbd>WASD</kbd> move · <kbd>MOUSE</kbd> look</div>
         <div><kbd>E</kbd> or left mouse: hold to work</div>
         <div><kbd>SPACE</kbd> or right mouse: tune in the green band</div>
-        <div><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> power to shields, weapons, engines</div>
+        <div><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> power to shields, sensors, engines</div>
+        <div><kbd>R</kbd> report to the Captain</div>
         <div><kbd>4</kbd> overclock the reactor</div>
         <div><kbd>P</kbd> pause</div>
       </div>
-      <p class="note">On a phone: drag on the left to move, drag on the right to look, hold USE, tap the power bars to route. No mouse lock? Drag to look, or turn with the arrow keys.</p>
+      <p class="note">On a phone: drag on the left to move, drag on the right to look, hold USE, tap REPORT, tap the power bars to route. No mouse lock? Drag to look, or turn with the arrow keys.</p>
       <div class="row">
-        <button id="start" type="button">Report to engineering</button>
-        <span class="note">One mission · about 6 minutes</span>
+        <button id="start" type="button">Begin the watch</button>
+        <span class="note">One mission · about 7 minutes</span>
       </div>
     </div>
   </section>
@@ -127,6 +138,12 @@ button.ghost:hover { color: var(--ink); background: var(--steel); }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (() => {
 'use strict';
@@ -165,7 +182,7 @@ const F_DISP = '"Big Shoulders Display", "Arial Narrow", Impact, sans-serif';
 const ROOMS = {
   shields: { name:'SHIELD GENERATOR', x0:3,  y0:2,  x1:11, y1:7,  edge:'top' },
   reactor: { name:'REACTOR',          x0:13, y0:2,  x1:26, y1:7,  edge:'top' },
-  weapons: { name:'WEAPONS CAPACITOR',x0:28, y0:2,  x1:36, y1:7,  edge:'top' },
+  weapons: { name:'SENSOR ARRAY',     x0:28, y0:2,  x1:36, y1:7,  edge:'top' },
   spine:   { name:'SPINE CORRIDOR',   x0:3,  y0:9,  x1:36, y1:11, edge:null },
   drive:   { name:'MAIN DRIVE',       x0:3,  y0:13, x1:11, y1:16, edge:'bottom' },
   life:    { name:'LIFE SUPPORT',     x0:13, y0:13, x1:19, y1:16, edge:'bottom' },
@@ -175,14 +192,14 @@ const ROOMS = {
 const SYSDEF = {
   R: { name:'REACTOR',      short:'RCT', room:'reactor', ch:'r', color:C.amber },
   S: { name:'SHIELDS',      short:'SHD', room:'shields', ch:'s', color:C.cyan },
-  W: { name:'WEAPONS',      short:'WPN', room:'weapons', ch:'w', color:C.red },
+  W: { name:'SENSORS',      short:'SNS', room:'weapons', ch:'w', color:C.red },
   E: { name:'ENGINES',      short:'ENG', room:'drive',   ch:'e', color:C.green },
   L: { name:'LIFE SUPPORT', short:'LIF', room:'life',    ch:'l', color:'#b7a6ff' },
 };
 const WHO = {
   HALE:    { name:'CAPT. HALE',  color:C.cyan },
   VOSS:    { name:'CHIEF VOSS',  color:C.amber },
-  TAC:     { name:'TACTICAL',    color:'#ff8f7a' },
+  ROOK:    { name:'ROOK · YOU',  color:'#ffffff' },
   LANTERN: { name:'LANTERN ACTUAL', color:C.green },
   SHIP:    { name:'SHIP',        color:C.dim },
 };
@@ -206,7 +223,7 @@ function resize() {
   W = Math.max(280, r.width); H = Math.max(280, r.height);
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-  if (R3) { R3.renderer.setPixelRatio(Math.min(DPR, 1.5)); R3.renderer.setSize(W, H, false); R3.camera.aspect = W / H; R3.camera.fov = W < H ? 88 : 76; R3.camera.updateProjectionMatrix(); }
+  if (R3) { const pr = touchUI ? Math.min(DPR, 1.5) : DPR; R3.renderer.setPixelRatio(pr); R3.renderer.setSize(W, H, false); if (R3.composer) { R3.composer.setPixelRatio(touchUI ? 1 : pr); R3.composer.setSize(W, H); } R3.camera.aspect = W / H; R3.camera.fov = W < H ? 88 : 76; R3.camera.updateProjectionMatrix(); }
   layout(); buildSpace();
 }
 function layout() {
@@ -226,6 +243,7 @@ function layout() {
   L.comms = { x:(W - Math.min(W - m * 2, 560)) / 2, w:Math.min(W - m * 2, 560), bottom:py - 10 };
   L.act = { x:W - m - 46, y:H - m - 52, r:44 };
   L.tune = { x:W - m - 46 - 92, y:H - m - 40, r:32 };
+  L.report = { x:W - m - 46 - 70, y:H - m - 108, r:30 };
 }
 addEventListener('resize', resize);
 
@@ -389,18 +407,19 @@ function newGame() {
     voss:{ x:22.5 * TS, y:3.4 * TS, state:'up' },
     valve:{ ...findCh('v')[0], prog:0, cd:0, spin:0 }, breakers:findCh('b').map(o => ({ ...o, tripped:false, prog:0 })), jobT:14, bolts:[],
     comms:[], commT:0, order:null,
-    m:{ phase:0, t:0, f:{}, progress:0, timer:0, title:'PRE-JUMP CHECKS', obj:'Stand by', hint:'' },
+    m:{ phase:0, t:0, f:{}, progress:0, timer:0, step:0, pending:false, pendT:0, late:false, title:'COALIGHT TRANSIT', obj:'Stand your watch', hint:'' },
+    lights:true, debrisT:null, reportCd:0,
     shake:0, flash:0, hitFlash:0, shieldFlash:0, target:null, acting:false, tune:null,
-    stats:{ jobs:0, repairs:0, fires:0, breaches:0, kills:0, orders:0, ordersTotal:0 },
+    stats:{ reports:0, late:0, strikes:0, jobs:0, repairs:0, fires:0, breaches:0, kills:0, orders:0, ordersTotal:0 },
     over:null, overT:0, weaponT:0, banner:{ text:'', t:0 },
   };
-  for (const k in SYSDEF) { const p = findCh(SYSDEF[k].ch)[0]; S.sys[k] = { k, ...SYSDEF[k], x:p.x, y:p.y, hp:100, blown:false, prog:0, spark:0, fault:null, cal:0 }; }
+  for (const k in SYSDEF) { const p = findCh(SYSDEF[k].ch)[0]; S.sys[k] = { k, ...SYSDEF[k], x:p.x, y:p.y, hp:100, blown:false, prog:0, spark:0, fault:null, cal:0, reported:true }; }
 }
-const online = s => !s.blown && s.hp >= 25;
-const maxPips = () => S.scram > 0 ? 2 : Math.max(2, Math.max(3, Math.round(8 * S.sys.R.hp / 100)) + (S.oc ? 3 : 0) - 2 * S.breakers.filter(b => b.tripped).length);
+const online = s => !s.blown && s.hp >= 25 && s.reported;
+const maxPips = () => !S.sys.R.reported ? 0 : S.scram > 0 ? 2 : Math.max(2, Math.max(3, Math.round(8 * S.sys.R.hp / 100)) + (S.oc ? 3 : 0) - 2 * S.breakers.filter(b => b.tripped).length);
 const usedPips = () => S.alloc.S + S.alloc.W + S.alloc.E;
 const effBars = k => online(S.sys[k]) ? S.alloc[k] : 0;
-const FAULTS = { S:['HARMONIC DRIFT', .4, 'Shield harmonics are drifting. Recalibrate at the generator.'], W:['FEED JAM', .3, 'Weapons feed is jammed. Clear it at the capacitor.'], E:['INJECTOR FOULED', .5, 'Drive injectors are fouling. Flush them at the main drive.'], L:['SCRUBBER SATURATED', 1, 'Scrubbers are saturated. Cycle them in life support.'] };
+const FAULTS = { S:['HARMONIC DRIFT', .4, 'Shield harmonics are drifting. Recalibrate at the generator.'], W:['ARRAY MISALIGNED', .3, 'Sensor array has drifted out of alignment. Realign it at the array.'], E:['INJECTOR FOULED', .5, 'Drive injectors are fouling. Flush them at the main drive.'], L:['SCRUBBER SATURATED', 1, 'Scrubbers are saturated. Cycle them in life support.'] };
 const eff = k => effBars(k) * (.5 + S.sys[k].hp / 200) * (S.sys[k].fault ? FAULTS[k][1] : 1);
 
 function say(who, text) { S.comms.push({ who, text }); }
@@ -502,91 +521,82 @@ function gotoPhase(n) { const m = S.m; m.phase = n; m.t = 0; m.progress = 0; }
 function giveOrder(text, sys, need, time, pass, fail) {
   S.order = { text, sys, need, time, max:time, pass, fail }; S.stats.ordersTotal++; sfx.order();
 }
+const STEPS = [
+  { obj:'Reset both bus breakers in the spine corridor', hint:'They are the wall boxes marked BUS BREAKER, on the north wall of the spine. Hold E at each.',
+    done:() => S.breakers.every(b => !b.tripped), rook:'Bridge, Engineering. Both main bus breakers are reset.',
+    hale:'Copy, Rook. Emergency lighting is back. Reactor next, we are living on batteries.', after:() => { S.lights = true; } },
+  { obj:'Vent the coolant, then restart the reactor', hint:'The coolant vent and the reactor console are both in the REACTOR bay.',
+    done:() => S.sys.R.hp >= 99 && S.heat < 50, rook:'Reactor is restarted and holding steady.',
+    hale:"I have power on the board. Life support before we run out of air. And Rook, lookouts say we are drifting into Coalight's debris belt.", sys:'R', after:() => { S.debrisT = 9; } },
+  { obj:'Restore life support', hint:'Cycle the saturated scrubbers, then repair the unit in LIFE SUPPORT.',
+    done:() => S.sys.L.hp >= 99 && !S.sys.L.fault, rook:'Life support is cycling. Air is coming back.',
+    hale:'I can feel it up here. Now get me shields before that debris opens us up.', sys:'L' },
+  { obj:'Bring the shield generator back', hint:'It needs a spare coupling carried from STORES, then a repair.',
+    done:() => !S.sys.S.blown && S.sys.S.hp >= 99, rook:'Shield generator has a new coupling and is tuned.',
+    hale:'Shields are answering. Put four bars into them.', sys:'S',
+    after:() => giveOrder('DEBRIS BELT  ·  SHIELDS TO 4 BARS', 'S', 4, 16, () => say('HALE', 'Shields are holding the belt off. Good work.'), () => say('HALE', 'Rook, those shields are no use to me unpowered. Four bars.')) },
+  { obj:'Realign the sensor array', hint:'Realign it, then repair it, in the SENSOR ARRAY bay.',
+    done:() => S.sys.W.hp >= 99 && !S.sys.W.fault, rook:'Sensor array is realigned and reading clean.',
+    hale:'Now I can see. Coalight has us deeper than I thought. I need the main drive, Rook.', sys:'W' },
+  { obj:'Flush and restart the main drive', hint:'Flush the fouled injectors, then repair the drive in MAIN DRIVE.',
+    done:() => S.sys.E.hp >= 99 && !S.sys.E.fault, rook:'Main drive is flushed and ready to light.',
+    hale:'All hands, stand by to burn. Engineering, everything you have into the engines.', sys:'E',
+    after:() => { gotoPhase(2); banner('BREAK ORBIT'); setObj('BREAK ORBIT', 'Route power to the engines and hold the burn', touchUI ? 'Tap ENG until it is full. Keep the drive alive until the burn completes.' : 'Press 3 until engines are full. Keep the drive alive until the burn completes.'); } },
+];
+function report() {
+  const m = S.m; if (!running || paused || S.over || m.phase < 1 || S.reportCd > 0 || S.p.down > 0) return;
+  S.reportCd = 4;
+  if (m.phase === 1 && m.pending) {
+    const st = STEPS[m.step]; say('ROOK', st.rook); say('HALE', st.hale); sfx.good();
+    S.stats.reports++; if (m.late) S.stats.late++; m.pending = false; m.late = false; m.pendT = 0; m.step++;
+    if (st.sys) S.sys[st.sys].reported = true;
+    if (m.step < STEPS.length) setObj(null, STEPS[m.step].obj, STEPS[m.step].hint);
+    if (st.after) st.after();
+  } else {
+    say('ROOK', m.phase === 2 ? `Engines at ${effBars('E')} bars. Burn is ${Math.round(m.progress)} percent complete.` : 'Still working the problem, Captain. Nothing new to report.');
+    say('HALE', m.phase === 2 ? 'Keep it coming, Rook.' : 'Understood. Call me the moment something comes back.');
+  }
+}
+function blackout() {
+  const m = S.m; gotoPhase(1); m.timer = 450; m.step = 0; m.pending = false;
+  const set = (k, hp, o) => Object.assign(S.sys[k], { hp, reported:false }, o);
+  set('R', 16); set('L', 30, { fault:FAULTS.L[0] }); set('S', 34, { blown:true }); set('W', 38, { fault:FAULTS.W[0] }); set('E', 28, { fault:FAULTS.E[0] });
+  S.breakers.forEach(b => { b.tripped = true; }); S.heat = 86; S.shield = 0; S.alloc = { S:0, W:0, E:0 }; S.oc = false; S.lights = false;
+  S.flash = .7; S.shake = 1; sfx.boom(); for (const k in S.sys) burst(S.sys[k].x, S.sys[k].y, 24, 'spark');
+  banner('DEAD ORBIT PROTOCOL');
+  say('SHIP', 'Main bus fault. All systems offline.');
+  say('HALE', 'Engineering, bridge. We have lost everything and Coalight has hold of us. I am declaring Dead Orbit Protocol. Bring her back one system at a time, and report each one to me so I know what I have.');
+  say('VOSS', 'Breakers first, Rook. Both boxes in the spine. I will hold the reactor bay.');
+  setObj('DEAD ORBIT PROTOCOL', STEPS[0].obj, STEPS[0].hint);
+}
 function missionUpdate(dt) {
-  const m = S.m, f = m.f; m.t += dt;
+  const m = S.m, f = m.f; m.t += dt; S.reportCd = Math.max(0, S.reportCd - dt);
   const once = (k, cond, fn) => { if (!f[k] && cond) { f[k] = true; fn(); } };
   if (m.phase === 0) {
-    once('a', m.t > 1.2, () => {
-      S.sys.S.hp = 52;
-      say('VOSS', "Rook. Shield generator's reading amber and we haven't even jumped. Get in there and bring it to full.");
-      setObj('PRE-JUMP CHECKS', 'Repair the shield generator', touchUI ? 'Follow the marker west down the spine. Hold USE at the generator, tap TUNE in the green band.' : 'Follow the marker west down the spine. Hold E or left mouse at the generator; tap SPACE or right mouse in the green band.');
-    });
-    once('b', f.a && S.sys.S.hp >= 99, () => {
-      say('VOSS', "That'll hold. Captain wants legs for the run in. Give the engines four bars.");
-      setObj(null, 'Route 4 bars of power to engines', touchUI ? 'Tap ENG on the power board. Power is taken from the fullest system.' : 'Press 3. Power is taken from the fullest system.');
-    });
-    once('c', f.b && S.alloc.E >= 4, () => {
-      m.ct = m.t;
-      say('HALE', 'All hands, this is the Captain. Operation Emberfall is go. We jump into the Cinder Gate blockade in ten seconds. Engineering, keep her alive.');
-      setObj(null, 'Stand by for jump', 'When the shooting starts: shields absorb hits, weapons kill ships, engines get us there.');
-    });
-    if (f.c && m.t > m.ct + 10) {
-      gotoPhase(1); S.flash = 1; sfx.jump(); S.shake = 1;
-      spawnEnemy('picket'); spawnEnemy('picket');
-      banner('ACT I  ·  RUN THE BLOCKADE');
-      say('TAC', 'Contacts! Two pickets dead ahead, weapons hot.');
-      setObj('RUN THE BLOCKADE', 'Reach the fortress', 'Engine power closes the distance. Follow the edge markers to damage.');
-    }
-  } else if (m.phase === 1) {
-    once('voss', m.t > 9, () => {
-      hullHit(20, 'reactor', true); addFire('reactor'); damageSys('R', 28, false);
-      S.voss.state = 'down'; burst(S.voss.x, S.voss.y, 30, 'spark');
-      say('SHIP', 'Casualty in the reactor bay.');
-      say('VOSS', "I'm hit. I'm out of this fight, Rook. Engineering is yours. Don't let her go cold.");
-    });
-    once('torp', m.progress >= 42, () => {
-      say('TAC', 'Torpedo in the water! Bearing zero-one-zero!');
-      giveOrder('TORPEDO INBOUND  ·  SHIELDS TO 5 BARS', 'S', 5, 14,
-        () => { S.shield = Math.max(0, S.shield - 45); S.shieldFlash = 1; sfx.shield(); say('HALE', 'Shields held. Good work, Engineering.'); },
-        () => { hullHit(34, pick(['shields', 'weapons', 'spine'])); say('HALE', 'That one hurt. I need those shields when I call for them!'); });
-    });
-    once('cru', m.progress >= 68, () => { spawnEnemy('cruiser'); say('TAC', 'Cruiser coming around the gate. She has our range.'); });
-    m.progress = Math.min(100, m.progress + eff('E') * .40 * dt);
-    if (m.progress >= 100) {
-      gotoPhase(2); banner('ACT II  ·  HOLD STATION');
-      S.enemies.forEach(e => { e.hp = 0; }); say('TAC', 'Blockade line is astern. Fortress batteries are waking up.');
-      spawnEnemy('battery'); spawnEnemy('interceptor'); spawnEnemy('interceptor');
-      S.sys.W.blown = true; S.sys.W.spark = 1.5; burst(S.sys.W.x, S.sys.W.y, 30, 'spark'); sfx.zap();
-      say('HALE', 'Station-keeping. Lantern team, you are go for drop.');
-      say('LANTERN', 'Lantern is away. Give us ninety seconds and that fortress is slag.');
-      say('SHIP', 'Weapons coupling blown. Spare couplings are in stores.');
-      setObj('HOLD STATION', 'Keep the ship alive until Lantern returns', 'Weapons are dead until you carry a spare coupling from STORES to the capacitor.');
-    }
-  } else if (m.phase === 2) {
-    const dur = 85; m.progress = Math.min(100, m.t / dur * 100);
-    once('spread', m.t > 36, () => {
-      say('TAC', 'Fortress is launching a torpedo spread. Point defense needs power.');
-      giveOrder('TORPEDO SPREAD  ·  WEAPONS TO 4 BARS', 'W', 4, 15,
-        () => { say('TAC', 'Spread intercepted. All fish down.'); sfx.good(); },
-        () => { hullHit(22, 'drive'); hullHit(18, 'life', true); say('HALE', 'Two hits aft! Damage control, move!'); });
-    });
-    once('wave', m.t > 56, () => { spawnEnemy('interceptor'); spawnEnemy('interceptor'); say('LANTERN', 'Charges are set. Lantern coming home hot, do not leave without us.'); });
-    if (m.t >= dur) {
-      gotoPhase(3); m.timer = 95; banner('ACT III  ·  BURN');
-      S.enemies.forEach(e => { if (e.kind === 'battery') e.rate = 3.6; });
-      S.voss.state = 'gone';
-      say('LANTERN', 'Lantern is aboard. Light it.');
-      say('HALE', 'Fortress core is going critical. Engineering, the jump capacitors need priming by hand, and I want everything you have in the engines. Now!');
-      setObj('BURN', 'Prime 3 jump capacitors in MAIN DRIVE, then burn clear', 'Capacitors are the three pylons in the drive room. Then max the engines.');
-    }
-  } else if (m.phase === 3) {
+    once('a', m.t > 1.2, () => { say('HALE', 'All hands, this is the Captain. Emberflight is six hours into the Coalight system and running quiet. Carry on.');
+      setObj('COALIGHT TRANSIT', 'Stand your watch', touchUI ? 'Drag on the left to walk, drag on the right to look around.' : 'Walk with WASD, look with the mouse.'); });
+    if (m.t > 10) blackout();
+  } else {
     m.timer -= dt;
-    once('aft', m.t > 12, () => { hullHit(16, 'drive', true); addFire('drive'); });
-    once('half', m.timer < 45, () => say('HALE', 'Forty-five seconds to the blast front. Engineering, where is my jump?'));
-    m.progress = Math.min(100, m.progress + eff('E') * .45 * dt);
-    const primed = S.caps.filter(c => c.primed).length;
-    m.obj = primed < 3 ? `Prime jump capacitors (${primed}/3) in MAIN DRIVE` : (m.progress < 100 ? 'Capacitors hot. Max the engines and burn clear' : 'Jump!');
-    if (primed === 3 && m.progress >= 100) return endGame(true);
-    if (m.timer <= 0) { sfx.boom(); S.flash = 1; return endGame(false, 'The fortress went up with the Kestrel Ardent still inside the blast front.'); }
+    once('half', m.timer < 150, () => say('HALE', 'Engineering, the orbit is decaying fast. Two and a half minutes until Coalight will not let us go.'));
+    once('min', m.timer < 60, () => say('HALE', 'One minute, Rook. Whatever you have, I need it now.'));
+    if (m.timer <= 0) { sfx.boom(); S.flash = 1; return endGame(false, 'The orbit decayed past the point of no return. Emberflight fell into Coalight with her systems still dark.'); }
+    if (m.phase === 1) {
+      const st = STEPS[m.step]; m.progress = m.step / STEPS.length * 100;
+      if (!m.pending && st.done()) { m.pending = true; m.pendT = 0; sfx.done(); }
+      if (m.pending) { m.pendT += dt; if (m.pendT > 14 && !m.late) { m.late = true; say('HALE', 'Engineering, bridge. I need a status, Rook. What have you got?'); } }
+    } else {
+      m.progress = Math.min(100, m.progress + eff('E') * .6 * dt);
+      if (m.progress >= 100) return endGame(true);
+    }
   }
-  // orders
   const o = S.order;
   if (o) { o.time -= dt; if (o.time <= 0) { S.order = null; if (effBars(o.sys) >= o.need) { S.stats.orders++; o.pass(); } else o.fail(); } }
 }
 function endGame(win, reason) {
   if (S.over) return;
   S.over = { win, reason }; S.overT = 0;
-  if (win) { S.flash = 1; sfx.jump(); say('HALE', 'Jump! Jump! Jump!'); }
+  if (win) { S.flash = 1; sfx.jump(); say('HALE', 'We are clear of Coalight. Dead Orbit Protocol is lifted. Well done, Engineering.'); }
 }
 
 /* ---------- simulation ---------- */
@@ -676,7 +686,7 @@ function update(dt) {
           o.prog = 0; sfx.done();
           if (t.type === 'fire') { S.fires.splice(S.fires.indexOf(o), 1); S.stats.fires++; }
           else if (t.type === 'breach') { S.breaches.splice(S.breaches.indexOf(o), 1); S.stats.breaches++; }
-          else if (t.type === 'fit') { o.blown = false; o.hp = Math.max(o.hp, 45); p.carrying = false; S.stats.repairs++; say('SHIP', `${o.name} coupling seated. System online.`); }
+          else if (t.type === 'fit') { o.blown = false; o.hp = Math.max(o.hp, 45); p.carrying = false; S.stats.repairs++; say('SHIP', `${o.name} coupling seated.`); }
           else if (t.type === 'take') { p.carrying = true; }
           else if (t.type === 'vent') { S.heat = Math.max(0, S.heat - 45); o.cd = 8; S.stats.jobs++; noise(.9, .3, 3500); for (let i = 0; i < 40; i++) part({ x:o.x + rand(-10, 10), y:o.y, vx:rand(-90, 90), vy:rand(-40, 160), life:rand(.5, 1.1), max:1.1, size:rand(6, 13), kind:'foam' }); }
           else if (t.type === 'breaker') { o.tripped = false; S.stats.jobs++; tone(90, .25, 'square', .12, 180); burst(o.x, o.y, 12, 'ok'); }
@@ -705,38 +715,32 @@ function update(dt) {
   }
   const L_ = S.sys.L;
   if (S.breaches.length) S.atmo -= 2.4 * S.breaches.length * dt;
+  else if (!online(L_)) S.atmo -= .42 * dt;
   else if (L_.fault) S.atmo -= 1.2 * dt;
-  else if (online(L_)) S.atmo += 3.2 * (L_.hp / 100) * dt; else S.atmo -= .8 * dt;
+  else S.atmo += 3.2 * (L_.hp / 100) * dt;
   S.atmo = clamp(S.atmo, 0, 100);
   for (const k in S.sys) { const s = S.sys[k]; s.spark = Math.max(0, s.spark - dt);
     if ((s.blown || s.hp < 45) && Math.random() < dt * 5) part({ x:s.x + rand(-16, 16), y:s.y + rand(-16, 16), vx:rand(-120, 120), vy:rand(-140, 40), life:.35, max:.35, size:1.6, kind:'spark' }); }
 
   // routine engineering jobs
   S.valve.cd = Math.max(0, S.valve.cd - dt); S.valve.spin += dt * (S.heat / 40);
-  if (S.m.phase >= 1) { S.jobT -= dt;
-    if (S.jobT <= 0) { S.jobT = rand(15, 24);
+  if (S.m.phase >= 1 && S.sys.R.reported) { S.jobT -= dt;
+    if (S.jobT <= 0) { S.jobT = rand(22, 32);
       const active = Object.values(S.sys).filter(s => s.fault).length + S.breakers.filter(b => b.tripped).length;
       if (active < 3) { const opts = ['S', 'W', 'E', 'L'].filter(k => !S.sys[k].fault && online(S.sys[k])); const br = S.breakers.filter(b => !b.tripped);
         if (br.length && (Math.random() < .35 || !opts.length)) { const b = pick(br); b.tripped = true; burst(b.x, b.y, 16, 'spark'); sfx.zap(); say('SHIP', 'Bus breaker tripped in the spine. Reactor output down two bars.'); }
         else if (opts.length) { const k = pick(opts); S.sys[k].fault = FAULTS[k][0]; S.sys[k].cal = 0; S.sys[k].spark = .8; say('SHIP', FAULTS[k][2]); } } } }
   // reactor
   if (S.scram > 0) { S.scram -= dt; if (S.scram <= 0) say('SHIP', 'Reactor restart complete.'); }
-  S.heat += (S.oc ? 5 : (S.sys.R.hp < 50 ? 1.5 : -4)) * dt; S.heat = clamp(S.heat, 0, 100);
+  if (S.sys.R.reported) S.heat += (S.oc ? 5 : (S.sys.R.hp < 50 ? 1.5 : -4)) * dt; S.heat = clamp(S.heat, 0, 100);
   if (S.heat >= 100 && S.scram <= 0) { S.scram = 12; S.oc = false; S.heat = 55; addFire('reactor'); sfx.boom(); S.shake = .8; say('SHIP', 'Reactor scram. Emergency power only for twelve seconds.'); }
   const a = S.alloc; let guard = 20;
   while (usedPips() > maxPips() && guard--) { const k = ['S', 'W', 'E'].sort((x, y) => a[y] - a[x])[0]; a[k]--; }
 
-  // battle
+  // shields and the debris belt
   if (S.m.phase > 0) {
     S.shield = clamp(S.shield + 1.8 * eff('S') * dt, 0, 100);
-    const tgt = S.enemies.find(e => !e.invuln && e.hp > 0);
-    const ew = eff('W');
-    if (tgt && ew > 0) {
-      tgt.hp -= 1.4 * ew * dt; S.weaponT -= dt;
-      if (S.weaponT <= 0) { S.weaponT = Math.max(.18, .9 - ew * .12); S.shots.push({ e:tgt, t:0, kind:'out' }); S.bolts.push({ e:tgt, kind:'out', t:0, hx:rand(8, 34), side:tgt.side }); }
-      if (tgt.hp <= 0) { S.stats.kills++; S.shots.push({ e:tgt, t:0, kind:'kill' }); say('TAC', `Splash one ${tgt.name.toLowerCase()}.`); tone(200, .4, 'sawtooth', .1, 60); }
-    }
-    for (const e of S.enemies) { if (e.hp <= 0) continue; e.arrive = Math.max(0, e.arrive - dt); e.cd -= dt; if (e.cd <= 0) { e.cd = e.rate * rand(.8, 1.2); incoming(e); } }
+    if (S.debrisT !== null) { S.debrisT -= dt; if (S.debrisT <= 0) { S.debrisT = rand(11, 17); S.stats.strikes++; incoming({ dmg:10, slot:(Math.random() * 6) | 0, side:Math.random() < .5 ? 1 : -1, arrive:0, hp:1 }); } }
   }
   for (const s of S.shots) s.t += dt * 2.6;
   S.shots = S.shots.filter(s => s.t < 1.4);
@@ -744,7 +748,7 @@ function update(dt) {
   S.bolts = S.bolts.filter(b => b.t < 1.5);
 
   missionUpdate(dt);
-  if (S.hull <= 0 && !S.over) { S.hull = 0; sfx.boom(); S.flash = 1; S.shake = 1; endGame(false, 'Hull integrity failed. The Kestrel Ardent was lost with all hands at the Cinder Gate.'); }
+  if (S.hull <= 0 && !S.over) { S.hull = 0; sfx.boom(); S.flash = 1; S.shake = 1; endGame(false, 'Hull integrity failed. Emberflight broke up in the Coalight debris belt.'); }
   updateParts(dt);
 }
 function updateParts(dt) {
@@ -773,22 +777,24 @@ function floorGlowCanvas() {
   return c;
 }
 function wallCanvases() {
-  const c = mkCanvas(256, 256), g = c.getContext('2d'), e = mkCanvas(256, 256), eg = e.getContext('2d');
-  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#4a586c'); gr.addColorStop(.5, '#2c3746'); gr.addColorStop(1, '#1b232f'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
-  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, 6, 256); g.fillRect(250, 0, 6, 256); g.fillRect(0, 44, 256, 5); g.fillRect(0, 206, 256, 5);
-  g.strokeStyle = 'rgba(10,14,20,.8)'; g.lineWidth = 10; g.beginPath(); g.moveTo(14, 56); g.lineTo(242, 200); g.moveTo(242, 56); g.lineTo(14, 200); g.stroke();
-  g.strokeStyle = 'rgba(120,150,190,.35)'; g.lineWidth = 3; g.stroke();
-  g.fillStyle = 'rgba(160,190,220,.4)'; for (const [x, y] of [[18, 60], [238, 60], [18, 196], [238, 196], [128, 128]]) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
-  g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(96, 100, 64, 56); g.fillStyle = 'rgba(120,200,255,.25)'; for (let i = 0; i < 5; i++) g.fillRect(104, 108 + i * 9, 20 + (i * 17) % 28, 3);
-  eg.fillStyle = '#000'; eg.fillRect(0, 0, 256, 256); eg.shadowColor = '#fff'; eg.shadowBlur = 14; eg.fillStyle = '#fff'; eg.fillRect(8, 16, 240, 12); eg.fillRect(8, 226, 240, 12);
-  eg.shadowBlur = 6; eg.strokeStyle = 'rgba(255,255,255,.28)'; eg.lineWidth = 3; eg.beginPath(); eg.moveTo(14, 56); eg.lineTo(242, 200); eg.moveTo(242, 56); eg.lineTo(14, 200); eg.stroke();
+  const N = 512, c = mkCanvas(N, N), g = c.getContext('2d'), e = mkCanvas(N, N), eg = e.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, N); gr.addColorStop(0, '#2e3643'); gr.addColorStop(.45, '#232a35'); gr.addColorStop(1, '#141920'); g.fillStyle = gr; g.fillRect(0, 0, N, N);
+  const line = (x0, y0, x1, y1, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+  g.fillStyle = '#0d1117'; g.fillRect(0, 70, N, 22); g.fillRect(0, 420, N, 26);
+  g.fillStyle = 'rgba(255,255,255,.035)'; rr(g, 26, 120, 300, 270, 18); g.fill(); rr(g, 350, 120, 136, 120, 14); g.fill(); rr(g, 350, 262, 136, 128, 14); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 3; rr(g, 26, 120, 300, 270, 18); g.stroke(); rr(g, 350, 120, 136, 120, 14); g.stroke(); rr(g, 350, 262, 136, 128, 14); g.stroke();
+  line(0, 1, N, 1, 'rgba(255,255,255,.12)', 2); line(1, 0, 1, N, 'rgba(0,0,0,.6)', 4); line(N - 1, 0, N - 1, N, 'rgba(0,0,0,.6)', 4);
+  for (let i = 0; i < 9; i++) line(368, 284 + i * 11, 468, 284 + i * 11, 'rgba(0,0,0,.6)', 4);
+  g.fillStyle = 'rgba(170,190,215,.5)'; g.font = '600 15px monospace'; g.fillText('DECK 04', 46, 150); g.fillStyle = 'rgba(170,190,215,.25)'; g.fillText('EMBERFLIGHT', 46, 372);
+  eg.fillStyle = '#000'; eg.fillRect(0, 0, N, N); eg.fillStyle = '#fff'; eg.shadowColor = '#fff'; eg.shadowBlur = 10; eg.fillRect(0, 76, N, 9); eg.fillRect(0, 428, N, 10);
+  eg.shadowBlur = 4; eg.fillStyle = 'rgba(255,255,255,.7)'; eg.fillRect(366, 140, 46, 5); eg.fillRect(366, 154, 22, 5); eg.fillRect(452, 214, 10, 10);
   return [c, e];
 }
 function ceilCanvases() {
-  const c = mkCanvas(128, 128), g = c.getContext('2d'), e = mkCanvas(128, 128), eg = e.getContext('2d');
-  g.fillStyle = '#10151d'; g.fillRect(0, 0, 128, 128); g.strokeStyle = '#05070b'; g.lineWidth = 6; g.strokeRect(0, 0, 128, 128); g.fillStyle = '#232d3a'; g.fillRect(30, 48, 68, 32);
-  g.strokeStyle = 'rgba(255,60,150,.25)'; g.lineWidth = 3; g.beginPath(); g.moveTo(6, 6); g.lineTo(122, 122); g.moveTo(122, 6); g.lineTo(6, 122); g.stroke();
-  eg.fillStyle = '#000'; eg.fillRect(0, 0, 128, 128); eg.shadowColor = '#fff'; eg.shadowBlur = 10; eg.fillStyle = '#fff'; eg.fillRect(36, 56, 56, 16);
+  const N = 256, c = mkCanvas(N, N), g = c.getContext('2d'), e = mkCanvas(N, N), eg = e.getContext('2d');
+  g.fillStyle = '#151a22'; g.fillRect(0, 0, N, N); g.strokeStyle = '#06080c'; g.lineWidth = 8; g.strokeRect(0, 0, N, N);
+  g.fillStyle = '#1f2630'; rr(g, 24, 24, N - 48, N - 48, 16); g.fill(); g.fillStyle = '#0a0d12'; rr(g, 44, 104, N - 88, 48, 12); g.fill();
+  eg.fillStyle = '#000'; eg.fillRect(0, 0, N, N); eg.shadowColor = '#fff'; eg.shadowBlur = 14; eg.fillStyle = '#fff'; rr(eg, 56, 116, N - 112, 24, 10); eg.fill();
   return [c, e];
 }
 function skyCanvas() {
@@ -810,7 +816,7 @@ function build3D() {
   const glc = document.getElementById('gl');
   const renderer = new T3.WebGLRenderer({ canvas:glc, antialias:true, powerPreference:'high-performance' });
   renderer.setClearColor(0x03040a);
-  const scene = new T3.Scene(); scene.fog = new T3.FogExp2(0x0b0714, .05);
+  const scene = new T3.Scene(); scene.fog = new T3.FogExp2(0x070812, .034);
   const camera = new T3.PerspectiveCamera(76, 1, .04, 900); camera.rotation.order = 'YXZ'; scene.add(camera);
   const glowTex = glowTexture();
   const std = (o) => new T3.MeshStandardMaterial(Object.assign({ roughness:.55, metalness:.35 }, o));
@@ -819,7 +825,8 @@ function build3D() {
   const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
 
   // space
-  const sky = new T3.Mesh(new T3.SphereGeometry(700, 40, 24), basic(0xffffff, { map:new T3.CanvasTexture(skyCanvas()), side:T3.BackSide, fog:false })); scene.add(sky);
+  const skyTex = new T3.CanvasTexture(skyCanvas()), sky = new T3.Mesh(new T3.SphereGeometry(700, 40, 24), basic(0xffffff, { map:skyTex, side:T3.BackSide, fog:false })); scene.add(sky);
+  try { skyTex.mapping = T3.EquirectangularReflectionMapping; scene.environment = new T3.PMREMGenerator(renderer).fromEquirectangular(skyTex).texture; skyTex.mapping = T3.UVMapping; } catch (_) {}
   const planet = at(new T3.Mesh(new T3.SphereGeometry(190, 48, 32), basic(0xffffff, { map:new T3.CanvasTexture(planetCanvas()), fog:false })), 30, -70, -360); scene.add(planet);
   scene.add(at(new T3.Mesh(new T3.SphereGeometry(197, 48, 32), basic(0x6fb8ff, { transparent:true, opacity:.16, side:T3.BackSide, fog:false, depthWrite:false })), 30, -70, -360));
   const fort = new T3.Group(); fort.position.set(46, 6, 9.5 + 64);
@@ -832,13 +839,14 @@ function build3D() {
   const bolts = []; for (let i = 0; i < 24; i++) { const m = new T3.Mesh(new T3.BoxGeometry(.14, .14, 3.4), basic(0xff4d7a, { transparent:true, blending:T3.AdditiveBlending, fog:false, depthWrite:false })); const f = sprite(0xff8a3a, 6, { fog:false }); m.visible = f.visible = false; scene.add(m, f); bolts.push({ m, f }); }
 
   // deck
-  const floorMat = std({ map:bigTex(deck), emissiveMap:bigTex(floorGlowCanvas()), emissive:0xffffff, emissiveIntensity:.85, roughness:.42, metalness:.5 });
+  const floorMat = std({ map:bigTex(deck), emissiveMap:bigTex(floorGlowCanvas()), emissive:0xffffff, emissiveIntensity:.85, roughness:.24, metalness:.82 });
   const floor = new T3.Mesh(new T3.PlaneGeometry(COLS, ROWS), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.set(COLS / 2, 0, ROWS / 2); scene.add(floor);
   const [cc, ce] = ceilCanvases(), ct = new T3.CanvasTexture(cc), cet = new T3.CanvasTexture(ce);
   for (const t of [ct, cet]) { t.wrapS = t.wrapT = T3.RepeatWrapping; t.repeat.set(COLS - 4, ROWS - 2); }
-  const ceilMat = std({ map:ct, emissiveMap:cet, emissive:0x9fc0ff, emissiveIntensity:.8, roughness:.8, metalness:.2 });
+  const ceilMat = std({ map:ct, emissiveMap:cet, emissive:0x9fc0ff, emissiveIntensity:.8, roughness:.5, metalness:.6 });
   const ceil = new T3.Mesh(new T3.PlaneGeometry(COLS - 4, ROWS - 2), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(COLS / 2, WALL_H, ROWS / 2); scene.add(ceil);
-  const [wc, we] = wallCanvases(), wt = new T3.CanvasTexture(wc), wet = new T3.CanvasTexture(we), groups = {}, wallMats = [];
+  const [wc, we] = wallCanvases(), wt = new T3.CanvasTexture(wc), wet = new T3.CanvasTexture(we), groups = {}, wallMats = [], glass = [];
+  wt.anisotropy = wet.anisotropy = 8;
   const push = (k, x, y, z, sy) => (groups[k] = groups[k] || []).push([x, y, z, sy]);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const t = MAP[r][c], x = c + .5, z = r + .5;
@@ -849,22 +857,24 @@ function build3D() {
       room = room || 'spine';
       const outer = r === 1 || r === ROWS - 2 || c === 2 || c === COLS - 3;
       const win = outer && direct && ((r === 1 || r === ROWS - 2) ? c % 3 !== 0 : r % 2 === 0);
-      if (win) { push(room, x, .21, z, .42); push(room, x, WALL_H - .14, z, .28); } else push(room, x, WALL_H / 2, z, WALL_H);
+      if (win) { push(room, x, .21, z, .42); push(room, x, WALL_H - .14, z, .28); glass.push([x, z, (r === 1 || r === ROWS - 2) ? 1 : .06, (r === 1 || r === ROWS - 2) ? .06 : 1]); } else push(room, x, WALL_H / 2, z, WALL_H);
     } else if (t !== ' ' && t !== 'O') {
       const row = solid(c - 1, r) && solid(c + 1, r), col = solid(c, r - 1) && solid(c, r + 1);
       if (t === 'D' || (row !== col)) push('door', x, WALL_H - .13, z, .26);
     }
   }
   const box = new T3.BoxGeometry(1, 1, 1), M4 = new T3.Matrix4();
-  for (const k in groups) { const mat = std({ map:wt, emissiveMap:wet, emissive:new T3.Color(NEON[k] || NEON.spine), emissiveIntensity:1.15 }); wallMats.push(mat);
+  for (const k in groups) { const mat = std({ map:wt, emissiveMap:wet, emissive:new T3.Color(NEON[k] || NEON.spine), emissiveIntensity:1.15, roughness:.34, metalness:.78 }); wallMats.push(mat);
     const im = new T3.InstancedMesh(box, mat, groups[k].length); groups[k].forEach((g, i) => { M4.makeScale(1, g[3], 1); M4.setPosition(g[0], g[1], g[2]); im.setMatrixAt(i, M4); }); im.instanceMatrix.needsUpdate = true; scene.add(im); }
+  const glassMat = std({ color:0x9fd4ff, transparent:true, opacity:.16, roughness:.03, metalness:1, depthWrite:false, envMapIntensity:1.4 });
+  const gim = new T3.InstancedMesh(box, glassMat, glass.length); glass.forEach((g, i) => { M4.makeScale(g[2], .64, g[3]); M4.setPosition(g[0], .74, g[1]); gim.setMatrixAt(i, M4); }); gim.instanceMatrix.needsUpdate = true; scene.add(gim);
   // spine ribs, like frames down a tunnel
   for (let c = 4; c <= 36; c += 2) { const col = c % 4 ? 0xff8a2e : 0xff2e9a; scene.add(at(new T3.Mesh(new T3.BoxGeometry(.07, .07, 3), basic(col)), c, WALL_H - .04, 10.5));
     for (const zz of [9.06, 11.94]) scene.add(at(new T3.Mesh(new T3.BoxGeometry(.07, WALL_H, .07), basic(col)), c, WALL_H / 2, zz)); }
 
   // reactor
   const core = new T3.Group(); core.position.set(19, 0, 5.5); scene.add(core);
-  const dark = std({ color:0x1a222e, roughness:.5, metalness:.6 }), steel = std({ color:0x3a485c, roughness:.4, metalness:.7 });
+  const dark = std({ color:0x1a222e, roughness:.32, metalness:.85 }), steel = std({ color:0x596a82, roughness:.22, metalness:.95 });
   core.add(at(new T3.Mesh(new T3.CylinderGeometry(1.5, 1.7, .22, 24), dark), 0, .11, 0), at(new T3.Mesh(new T3.CylinderGeometry(1.5, 1.5, .16, 24), dark), 0, WALL_H - .08, 0));
   const coreBall = at(new T3.Mesh(new T3.IcosahedronGeometry(.4, 2), basic(0xffb23e)), 0, .7, 0), coreGlow = at(sprite(0xffa040, 3.4), 0, .7, 0); core.add(coreBall, coreGlow);
   const rings = [0, 1, 2].map(i => { const m = at(new T3.Mesh(new T3.TorusGeometry(.72 + i * .12, .028, 8, 40), basic(0xffd9a0)), 0, .7, 0); core.add(m); return m; });
@@ -889,8 +899,8 @@ function build3D() {
   const voss = new T3.Group(); voss.add(at(new T3.Mesh(new T3.CylinderGeometry(.15, .17, .66, 10), std({ color:0x8a6420 })), 0, .36, 0), at(new T3.Mesh(new T3.SphereGeometry(.12, 12, 10), std({ color:0xd9c7a8 })), 0, .82, 0)); scene.add(voss);
 
   // hazards and particles
-  const fires = []; for (let i = 0; i < 7; i++) { const g = new T3.Group(), a = at(sprite(0xff5a1e, 1.3), 0, .35, 0), b = at(sprite(0xffd27a, .7), 0, .3, 0), c = at(sprite(0xff3a10, 1), 0, .7, 0); g.add(a, b, c); g.visible = false; scene.add(g); fires.push({ g, a, b, c }); }
-  const breaches = []; for (let i = 0; i < 4; i++) { const g = new T3.Group(); const crack = new T3.Mesh(new T3.PlaneGeometry(.9, .12), basic(0xe8f8ff, { side:T3.DoubleSide })); crack.rotation.z = .25; g.add(crack, sprite(0x8fd8ff, 2.2)); g.visible = false; scene.add(g); breaches.push(g); }
+  const fires = []; for (let i = 0; i < 7; i++) { const g = new T3.Group(), a = at(sprite(0xff5a1e, 1.3, { opacity:.5 }), 0, .35, 0), b = at(sprite(0xffb050, .7, { opacity:.55 }), 0, .3, 0), c = at(sprite(0xff3a10, 1, { opacity:.35 }), 0, .7, 0); g.add(a, b, c); g.visible = false; scene.add(g); fires.push({ g, a, b, c }); }
+  const breaches = []; for (let i = 0; i < 4; i++) { const g = new T3.Group(); const crack = new T3.Mesh(new T3.PlaneGeometry(.9, .12), basic(0x9fc8e0, { side:T3.DoubleSide })); crack.rotation.z = .25; g.add(crack, sprite(0x8fd8ff, 2.2, { opacity:.4 })); g.visible = false; scene.add(g); breaches.push(g); }
   const hazLights = [0, 1, 2].map(() => { const l = new T3.PointLight(0xff6a1e, 0, 7, 1.8); scene.add(l); return l; });
   const PN = 700, ppos = new Float32Array(PN * 3), pcol = new Float32Array(PN * 3), pgeo = new T3.BufferGeometry();
   pgeo.setAttribute('position', new T3.BufferAttribute(ppos, 3)); pgeo.setAttribute('color', new T3.BufferAttribute(pcol, 3));
@@ -905,7 +915,9 @@ function build3D() {
   tool.children[2].rotation.x = Math.PI / 2; const tip = at(new T3.Mesh(new T3.SphereGeometry(.018, 8, 8), basic(0xffb23e)), 0, .01, -.27), tipGlow = at(sprite(0xffc870, .25), 0, .01, -.27); tool.add(tip, tipGlow); camera.add(tool);
   const carry = at(new T3.Mesh(new T3.CylinderGeometry(.05, .05, .18, 12), basic(0xffb23e)), -.2, -.19, -.4); carry.rotation.z = 1.2; camera.add(carry);
 
-  R3 = { renderer, scene, camera, sky, fort, fortCore, fortGlow, fortRing, shield, enemies, bolts, floorMat, ceilMat, wallMats, coreBall, coreGlow, rings, coreLight, stations, wheel, breakers, caps, voss, fires, breaches, hazLights, points, ppos, pcol, PN, amb, lamp, spineA, spineB, tool, tip, tipGlow, carry, sprite, basic,
+  let composer = null, bloom = null;
+  try { if (T3.EffectComposer && T3.UnrealBloomPass) { composer = new T3.EffectComposer(renderer); composer.addPass(new T3.RenderPass(scene, camera)); bloom = new T3.UnrealBloomPass(new T3.Vector2(W, H), .85, .55, .62); composer.addPass(bloom); } } catch (_) { composer = null; }
+  R3 = { composer, bloom, envMats:[floorMat, ceilMat, dark, steel, ...wallMats], renderer, scene, camera, sky, fort, fortCore, fortGlow, fortRing, shield, enemies, bolts, floorMat, ceilMat, wallMats, coreBall, coreGlow, rings, coreLight, stations, wheel, breakers, caps, voss, fires, breaches, hazLights, points, ppos, pcol, PN, amb, lamp, spineA, spineB, tool, tip, tipGlow, carry, sprite, basic,
     v1:new T3.Vector3(), v2:new T3.Vector3(), col:new T3.Color() };
   miniCv = mkCanvas(480, 228); const mg = miniCv.getContext('2d'); mg.drawImage(deck, 0, 0, 480, 228); mg.drawImage(neon, 0, 0, 480, 228);
 }
@@ -914,7 +926,7 @@ function enemyPos(e, out) {
   return out.set(6 + e.slot * 5.5 + e.arrive * 70 + Math.sin(S.t * .35 + e.slot * 2) * 2.5, .5 + (e.slot % 3) * .55 + Math.sin(S.t * .6 + e.slot) * .2, 9.5 + e.side * (19 + e.slot * 2.2));
 }
 function render3D(dt) {
-  const r = R3; if (!r) return; const p = S.p, t = S.t, ph = S.m.phase, sc = S.scram > 0, alert = ph > 0;
+  const r = R3; if (!r) return; const p = S.p, t = S.t, ph = S.m.phase, sc = S.scram > 0 || !S.sys.R.reported, alert = ph > 0 && !sc;
   // camera
   const sh = reduceMotion ? 0 : S.shake * .09, cam = r.camera, moving = Math.sin(p.walk * 1.1);
   cam.position.set(p.x / TS + rand(-1, 1) * sh, (p.down > 0 ? .16 : EYE + moving * .018) + rand(-1, 1) * sh, p.y / TS + rand(-1, 1) * sh);
@@ -926,7 +938,9 @@ function render3D(dt) {
   const pulse = .5 + .5 * Math.sin(t * 3.2);
   if (sc) { r.amb.color.setRGB(.12, .1, .2); r.amb.intensity = .35; } else if (alert) { r.amb.color.setRGB(.5 + .25 * pulse, .2, .34); r.amb.intensity = .72; } else { r.amb.color.setHex(0x4a5578); r.amb.intensity = .8; }
   r.ceilMat.emissive.setRGB(alert ? 1 : .62, alert ? .16 + .1 * pulse : .75, alert ? .25 : 1); r.ceilMat.emissiveIntensity = sc ? (Math.random() < .08 ? .5 : .03) : alert ? .45 + .4 * pulse : .8;
+  if (sc && S.lights) { r.ceilMat.emissive.setRGB(1, .22, .16); r.ceilMat.emissiveIntensity = .3; r.amb.intensity = .5; }
   const flick = sc ? (Math.random() < .15 ? .8 : .12) : 1.1 + .12 * Math.sin(t * 2.3);
+  const envI = sc ? (S.lights ? .12 : .04) : .55; for (const m of r.envMats) m.envMapIntensity = envI; if (r.bloom) r.bloom.strength = sc ? 1.15 : .85;
   for (const m of r.wallMats) m.emissiveIntensity = flick; r.floorMat.emissiveIntensity = flick * .8; r.spineA.intensity = r.spineB.intensity = sc ? .1 : .9;
   // reactor
   const hot = S.heat / 100; r.col.setRGB(1, .72 - hot * .5, .3 - hot * .25); if (sc) r.col.setRGB(.25, .12, .2);
@@ -956,8 +970,9 @@ function render3D(dt) {
   r.points.geometry.setDrawRange(0, n); r.points.geometry.attributes.position.needsUpdate = true; r.points.geometry.attributes.color.needsUpdate = true;
   // space outside the windows
   r.sky.rotation.y += dt * .004 * (ph === 0 ? .3 : 1 + eff('E'));
-  r.fort.visible = ph >= 1; r.fort.position.x = 46 + (ph === 1 ? (100 - S.m.progress) * 3 : 0); r.fort.rotation.y = t * .05; r.fortRing.rotation.z = t * .1;
-  const crit = ph === 3 ? clamp(1 - S.m.timer / 95, 0, 1) : 0; r.fortGlow.scale.setScalar(ph === 3 ? 30 + crit * 120 : 1); r.fortGlow.material.opacity = ph === 3 ? .35 + crit * .65 : 0; r.fortCore.material.color.setRGB(.11 + crit * .9, .14 + crit * .4, .2);
+  const decay = ph >= 1 ? clamp(1 - S.m.timer / 450, 0, 1) : 0;
+  r.fort.visible = true; r.fort.children[1].visible = false; r.fortRing.visible = false; r.fort.position.set(40, 5, 9.5 + 150 - decay * 80);
+  r.fortCore.material.color.setRGB(1, .62 + .2 * Math.sin(t * .7), .28); r.fortGlow.scale.setScalar(70 + decay * 110 + Math.sin(t * 1.3) * 4); r.fortGlow.material.opacity = .85;
   r.shield.material.opacity = alert ? .025 + S.shield / 100 * .05 + S.shieldFlash * .5 : 0; r.shield.rotation.y = t * .03;
   for (const e of S.enemies) {
     if (e.invuln || e.gone) continue;
@@ -973,9 +988,9 @@ function render3D(dt) {
     const hull = r.v1.set(b.hx, .8, b.side > 0 ? ROWS - 1.3 : 1.3), ep = enemyPos(b.e, r.v2), out = b.kind === 'out', miss = b.kind === 'miss';
     if (miss) hull.set(b.hx, 7, 9.5 - b.side * 45);
     const from = out ? hull : ep, to = out ? ep : hull, tt = Math.min(1, b.t);
-    if (b.t < 1) { o.m.visible = true; o.m.position.lerpVectors(from, to, tt); o.m.lookAt(to); o.m.material.color.setHex(out ? 0xffc24a : 0xff4d7a); }
+    if (b.t < 1) { o.m.visible = true; o.m.position.lerpVectors(from, to, tt); o.m.lookAt(to); o.m.material.color.setHex(0xd8c8b0); }
     else if (!miss && !out) { o.f.visible = true; o.f.position.copy(to); o.f.material.color.setHex(b.kind === 'hull' ? 0xff8a3a : 0x58d6ff); o.f.scale.setScalar(3 + (b.t - 1) * 16); o.f.material.opacity = clamp(2 - b.t * 1.3, 0, 1); } });
-  r.renderer.render(r.scene, r.camera);
+  if (r.composer) r.composer.render(); else r.renderer.render(r.scene, r.camera);
 }
 function project(wx, wy, h) {
   const v = R3.v1.set(wx / TS, h, wy / TS).applyMatrix4(R3.camera.matrixWorldInverse), cx = v.x, cy = v.y, behind = v.z > -.05;
@@ -1040,39 +1055,21 @@ function wrap(text, maxW) { const words = text.split(' '), lines = []; let line 
 function drawTac(r) {
   panel(r.x, r.y, r.w, r.h);
   ctx.save(); ctx.beginPath(); ctx.rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2); ctx.clip();
-  if (spaceCv.width) { ctx.drawImage(spaceCv, spaceCv.width * .38, spaceCv.height * .5, spaceCv.width * .62, spaceCv.height * .5, r.x, r.y, r.w, r.h); ctx.fillStyle = 'rgba(4,6,12,.25)'; ctx.fillRect(r.x, r.y, r.w, r.h); }
-  if (S.m.phase > 0) { ctx.strokeStyle = 'rgba(220,235,255,.35)'; ctx.lineWidth = 1; ctx.beginPath(); for (let i = 0; i < 14; i++) { const u = ((i * .37 + S.t * (.25 + (i % 4) * .12) * (.4 + eff('E') * .15)) % 1), yy = r.y + ((i * 53) % 97) / 97 * r.h, xx = r.x + r.w * (1 - u); ctx.moveTo(xx, yy); ctx.lineTo(xx + 10 + (i % 4) * 5, yy); } ctx.stroke(); }
-  ctx.strokeStyle = 'rgba(88,214,255,.07)'; ctx.lineWidth = 1;
-  for (let i = 1; i < 6; i++) { ctx.beginPath(); ctx.moveTo(r.x + r.w * i / 6, r.y); ctx.lineTo(r.x + r.w * i / 6, r.y + r.h); ctx.stroke(); }
-  for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(r.x, r.y + r.h * i / 3); ctx.lineTo(r.x + r.w, r.y + r.h * i / 3); ctx.stroke(); }
-  const ox = r.x + r.w * .2, oy = r.y + r.h * .55, ph = S.m.phase;
-  if (ph >= 2) { // fortress
-    const fx = r.x + r.w * 1.05, fy = r.y + r.h * .5, fr = r.h * .62;
-    if (ph === 3) { const k = clamp(1 - S.m.timer / 95, 0, 1); const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr * (1 + k * 2.4)); g.addColorStop(0, `rgba(255,220,150,${.4 + k * .6})`); g.addColorStop(.5, `rgba(255,90,30,${.2 + k * .5})`); g.addColorStop(1, 'rgba(255,60,20,0)'); ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h); }
-    ctx.fillStyle = '#1b222d'; ctx.strokeStyle = 'rgba(255,77,61,.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(fx, fy, fr, 0, 7); ctx.fill(); ctx.stroke();
-  }
-  // own ship
-  ctx.shadowColor = '#58d6ff'; ctx.shadowBlur = 10;
-  ctx.fillStyle = C.ink; ctx.beginPath(); ctx.moveTo(ox + 16, oy); ctx.lineTo(ox - 8, oy - 6); ctx.lineTo(ox - 14, oy - 3); ctx.lineTo(ox - 14, oy + 3); ctx.lineTo(ox - 8, oy + 6); ctx.fill(); ctx.shadowBlur = 0;
-  if (ph > 0 && eff('E') > 0) { ctx.fillStyle = `rgba(108,240,160,${.4 + .3 * Math.random()})`; ctx.fillRect(ox - 16 - eff('E') * 3, oy - 2, eff('E') * 3, 4); }
-  ctx.strokeStyle = `rgba(88,214,255,${.12 + S.shield / 100 * .6 + S.shieldFlash * .4})`; ctx.lineWidth = 1.5 + S.shieldFlash * 2;
-  ctx.beginPath(); ctx.ellipse(ox, oy, 26, 15, 0, -1.2, 1.2); ctx.stroke();
-  for (const e of S.enemies) { if (e.hp <= 0) continue; const [tx, ty] = SLOTS[e.slot]; const x = r.x + r.w * (tx + e.arrive * .4), y = r.y + r.h * ty; e.px = x; e.py = y;
-    if (e.invuln) { e.px = r.x + r.w * .93; e.py = r.y + r.h * .5; continue; }
-    ctx.shadowColor = C.red; ctx.shadowBlur = 8; ctx.fillStyle = C.red; ctx.beginPath(); const s = e.kind === 'cruiser' ? 1.5 : e.kind === 'interceptor' ? .75 : 1; ctx.moveTo(x - 9 * s, y); ctx.lineTo(x + 6 * s, y - 5 * s); ctx.lineTo(x + 6 * s, y + 5 * s); ctx.fill(); ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(x - 9, y - 10 * s - 2, 18, 2); ctx.fillStyle = C.red; ctx.fillRect(x - 9, y - 10 * s - 2, 18 * e.hp / e.max, 2);
-  }
-  for (const s of S.shots) { const e = s.e, t = clamp(s.t, 0, 1); if (e.px === undefined) continue;
-    if (s.kind === 'out') { ctx.strokeStyle = `rgba(255,178,62,${1 - t})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(lerp(ox, e.px, t * .8), lerp(oy, e.py, t * .8)); ctx.lineTo(lerp(ox, e.px, Math.min(1, t * .8 + .25)), lerp(oy, e.py, Math.min(1, t * .8 + .25))); ctx.stroke(); }
-    else if (s.kind === 'kill') { ctx.fillStyle = `rgba(255,200,120,${1 - s.t / 1.4})`; ctx.beginPath(); ctx.arc(e.px, e.py, 4 + s.t * 14, 0, 7); ctx.fill(); }
-    else { const miss = s.kind === 'miss', dx = miss ? ox - 10 : ox + 20, dy = miss ? oy - 30 : oy;
-      ctx.strokeStyle = `rgba(255,77,61,${1 - t * .5})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(lerp(e.px, dx, t), lerp(e.py, dy, t)); ctx.lineTo(lerp(e.px, dx, Math.max(0, t - .2)), lerp(e.py, dy, Math.max(0, t - .2))); ctx.stroke();
-      if (t >= 1 && !miss) { ctx.fillStyle = s.kind === 'hull' ? `rgba(255,120,60,${1.4 - s.t})` : `rgba(88,214,255,${1.4 - s.t})`; ctx.beginPath(); ctx.arc(dx, dy, 5 + (s.t - 1) * 20, 0, 7); ctx.fill(); } }
-  }
+  if (spaceCv.width) { ctx.drawImage(spaceCv, 0, 0, spaceCv.width * .6, spaceCv.height * .45, r.x, r.y, r.w, r.h); ctx.fillStyle = 'rgba(4,6,12,.35)'; ctx.fillRect(r.x, r.y, r.w, r.h); }
+  const ph = S.m.phase, decay = ph >= 1 ? clamp(1 - S.m.timer / 450, 0, 1) : 0, sx = r.x + r.w * .68, sy = r.y + r.h * .55, R = Math.min(r.w * .28, r.h * .42);
+  const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, R * 1.1); g.addColorStop(0, 'rgba(255,240,200,1)'); g.addColorStop(.18, 'rgba(255,170,70,.95)'); g.addColorStop(.5, 'rgba(255,90,40,.25)'); g.addColorStop(1, 'rgba(255,60,20,0)');
+  ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(255,77,61,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(sx, sy, R * .42, R * .3, 0, 0, 7); ctx.stroke();
+  ctx.strokeStyle = 'rgba(223,232,242,.3)'; ctx.beginPath(); ctx.ellipse(sx, sy, R * 1.9, R * 1.05, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  const k = ph === 2 ? clamp(decay - S.m.progress / 100 * .5, 0, 1) : decay, rad = 1.9 - k * 1.48, a = S.t * (.25 + k * .5) + 2.4;
+  const px = sx + Math.cos(a) * R * rad, py = sy + Math.sin(a) * R * rad * .56;
+  ctx.shadowColor = '#58d6ff'; ctx.shadowBlur = 8; ctx.fillStyle = S.sys.R.reported ? C.ink : C.dim; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
+  if (ph === 2 && eff('E') > 0) { ctx.strokeStyle = 'rgba(108,240,160,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * -10, py + Math.sin(a) * -6); ctx.stroke(); }
+  if (S.debrisT !== null) { ctx.fillStyle = 'rgba(216,200,176,.6)'; for (let i = 0; i < 26; i++) { const aa = i * 2.4 + S.t * .05, rr2 = 1.25 + ((i * 37) % 10) / 22; ctx.fillRect(sx + Math.cos(aa) * R * rr2, sy + Math.sin(aa) * R * rr2 * .56, 1.5, 1.5); } }
   ctx.restore();
   ctx.font = `600 9px ${F_MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = C.dim;
-  const alive = S.enemies.filter(e => e.hp > 0 && !e.invuln).length;
-  ctx.fillText(ph === 0 ? 'HULL CAM · NO CONTACTS' : `HULL CAM · ${alive} HOSTILE${alive === 1 ? '' : 'S'}`, r.x + 6, r.y + 5);
+  ctx.fillText(ph === 0 ? 'ORBIT TRACK · COALIGHT TRANSIT' : 'ORBIT TRACK · DECAYING', r.x + 6, r.y + 5);
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,77,61,.9)'; if (ph >= 1) ctx.fillText('NO RETURN', sx + R * .42, sy + R * .3 + 4);
 }
 function drawHUD() {
   const m = S.m, st = L.status;
@@ -1099,11 +1096,13 @@ function drawHUD() {
   ctx.font = `800 22px ${F_DISP}`; ctx.fillStyle = C.amber; ctx.fillText(m.title, ob.x, oy);
   if (m.phase > 0) { const tw = ctx.measureText(m.title).width, px = ob.x + tw + 12, pw = Math.min(180, ob.w - tw - 70);
     if (pw > 40) { ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(px, oy + 8, pw, 6); ctx.fillStyle = C.amber; ctx.fillRect(px, oy + 8, pw * m.progress / 100, 6);
-      if (m.phase === 3) { ctx.font = `800 22px ${F_DISP}`; ctx.fillStyle = m.timer < 30 ? C.red : C.ink; ctx.fillText('T-' + Math.max(0, Math.ceil(m.timer)) + 's', px + pw + 10, oy); } } }
+      { const tm = Math.max(0, Math.ceil(m.timer)); ctx.font = `800 22px ${F_DISP}`; ctx.fillStyle = m.timer < 60 ? C.red : C.ink; ctx.fillText(Math.floor(tm / 60) + ':' + String(tm % 60).padStart(2, '0'), px + pw + 10, oy); } } }
   oy += 26; ctx.font = `600 12px ${F_MONO}`; ctx.fillStyle = C.ink;
   for (const ln of wrap(m.obj, ob.w)) { ctx.fillText(ln, ob.x, oy); oy += 16; }
   if (m.hint && (m.phase === 0 || m.t < 16)) { ctx.font = `400 11px ${F_MONO}`; ctx.fillStyle = C.dim; for (const ln of wrap(m.hint, Math.min(ob.w, 520))) { ctx.fillText(ln, ob.x, oy); oy += 15; } }
 
+  if (m.pending) { const txt = (touchUI ? 'TAP REPORT' : 'PRESS R') + ' · REPORT TO THE CAPTAIN'; ctx.font = `800 18px ${F_DISP}`; const w = ctx.measureText(txt).width + 24;
+    ctx.fillStyle = Math.sin(S.t * 7) > 0 ? 'rgba(20,60,40,.92)' : 'rgba(12,36,26,.92)'; ctx.fillRect(ob.x, oy + 6, w, 28); ctx.fillStyle = C.green; ctx.textBaseline = 'middle'; ctx.fillText(txt, ob.x + 12, oy + 21); ctx.textBaseline = 'top'; oy += 38; }
   // order banner
   const o = S.order;
   if (o) { const w = Math.min(W - 32, 460), x = (W - w) / 2, y = oy + 8, ok = effBars(o.sys) >= o.need;
@@ -1177,6 +1176,7 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(7,11,18,.6)'; ctx.strokeStyle = S.tune ? C.green : 'rgba(132,150,171,.5)';
     ctx.beginPath(); ctx.arc(tu.x, tu.y, tu.r, 0, 7); ctx.fill(); ctx.stroke();
     ctx.font = `800 15px ${F_DISP}`; ctx.fillStyle = C.ink; ctx.fillText('TUNE', tu.x, tu.y);
+    const rp = L.report; ctx.fillStyle = 'rgba(7,11,18,.6)'; ctx.strokeStyle = m.pending ? C.green : 'rgba(132,150,171,.5)'; ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r, 0, 7); ctx.fill(); ctx.stroke(); ctx.font = `800 13px ${F_DISP}`; ctx.fillStyle = m.pending ? C.green : C.ink; ctx.fillText('REPORT', rp.x, rp.y);
     if (input.joy) { const j = input.joy; ctx.strokeStyle = 'rgba(223,232,242,.35)'; ctx.beginPath(); ctx.arc(j.ox, j.oy, 46, 0, 7); ctx.stroke();
       ctx.fillStyle = 'rgba(223,232,242,.35)'; ctx.beginPath(); ctx.arc(j.ox + input.jx * 46, j.oy + input.jy * 46, 20, 0, 7); ctx.fill(); }
     else { ctx.strokeStyle = 'rgba(223,232,242,.14)'; ctx.beginPath(); ctx.arc(16 + 56, H - 16 - 56, 46, 0, 7); ctx.stroke(); ctx.font = `600 9px ${F_MONO}`; ctx.fillStyle = 'rgba(223,232,242,.3)'; ctx.fillText('MOVE', 16 + 56, H - 16 - 56); }
@@ -1215,14 +1215,14 @@ function startGame() { newGame(); running = true; paused = false; $('title').hid
 function setPaused(v) { if (!running || S.over) return; paused = v; $('pause').hidden = !v; if (v) { unlock(); input.actTouch = false; } else tryLock(); }
 function showEnd() {
   unlock(); running = false; const o = S.over, st = S.stats;
-  $('endTitle').textContent = o.win ? 'EMBERFALL COMPLETE' : 'SHIP LOST'; $('endTitle').className = o.win ? 'win' : 'loss';
+  $('endTitle').textContent = o.win ? 'ORBIT BROKEN' : 'SHIP LOST'; $('endTitle').className = o.win ? 'win' : 'loss';
   const rating = S.hull >= 70 ? 'Distinguished conduct' : S.hull >= 40 ? 'Commended' : 'Brought her home';
   $('endEyebrow').textContent = o.win ? 'After-action report · ' + rating : 'After-action report';
   $('endText').textContent = o.win
-    ? 'The fortress is burning behind you and the Kestrel Ardent is in jump space with Lantern team aboard. Chief Voss is asking the corpsman who was running her engine room.'
+    ? 'Emberflight is climbing out of Coalight under her own power, every system back on the board. The Captain has stood down Dead Orbit Protocol and asked for your name in the log.'
     : o.reason;
   const mm = Math.floor(S.t / 60), ss = String(Math.floor(S.t % 60)).padStart(2, '0');
-  const rows = [[Math.max(0, Math.ceil(S.hull)) + '%', 'Hull remaining'], [mm + ':' + ss, 'Time on station'], [st.repairs, 'Systems restored'], [st.jobs, 'Engineering jobs'], [st.fires, 'Fires put out'], [st.breaches, 'Breaches sealed'], [st.orders + '/' + st.ordersTotal, 'Bridge orders met'], [st.kills, 'Hostiles destroyed']];
+  const rows = [[Math.max(0, Math.ceil(S.hull)) + '%', 'Hull remaining'], [mm + ':' + ss, 'Time on station'], [st.repairs, 'Systems restored'], [st.jobs, 'Engineering jobs'], [st.fires, 'Fires put out'], [st.breaches, 'Breaches sealed'], [st.reports + '/6', 'Systems reported'], [st.late, 'Late reports'], [st.strikes, 'Debris strikes']];
   $('endStats').innerHTML = rows.map(r => `<div><b>${r[0]}</b><span>${r[1]}</span></div>`).join('');
   $('end').hidden = false;
 }
@@ -1241,7 +1241,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyP' || e.code === 'Escape') return setPaused(!paused);
   if (paused || S.over) return;
   if (e.code === 'Digit1') addPower('S'); else if (e.code === 'Digit2') addPower('W'); else if (e.code === 'Digit3') addPower('E');
-  else if (e.code === 'Digit4') toggleOC(); else if (e.code === 'Space') tryTune();
+  else if (e.code === 'Digit4') toggleOC(); else if (e.code === 'Space') tryTune(); else if (e.code === 'KeyR') report();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; input.actTouch = false; input.joy = null; input.jx = input.jy = 0; });
@@ -1262,6 +1262,7 @@ cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   if (inCircle(x, y, L.act)) { input.actTouch = true; pointers[e.pointerId] = { kind:'act' }; }
   else if (inCircle(x, y, L.tune)) { tryTune(); }
+  else if (inCircle(x, y, L.report)) { report(); }
   else if (x < W * .45 && y > H * .45) { input.joy = { ox:x, oy:y }; pointers[e.pointerId] = { kind:'joy' }; }
   else pointers[e.pointerId] = { kind:'look', x:e.clientX, y:e.clientY, k:.007 };
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1286,6 +1287,6 @@ function boot() {
 }
 let booted = false; const bootOnce = () => { if (!booted) { booted = true; boot(); } };
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(bootOnce, bootOnce); setTimeout(bootOnce, 1500);
-window.EMBER = { state:() => S, step:(dt, n) => { for (let i = 0; i < n; i++) update(dt); }, start:startGame };
+window.EMBER = { report, state:() => S, step:(dt, n) => { for (let i = 0; i < n; i++) update(dt); }, start:startGame };
 })();
 </script>
