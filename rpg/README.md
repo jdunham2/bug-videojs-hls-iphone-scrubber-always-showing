@@ -7,8 +7,9 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - 9 spells taught by Elder Mira (Mend, Blink, Frost Nova, Chain Lightning, Haste, Poison Cloud, Stone Skin, Spirit Wolves, Meteor), cast from slots 1-3
 - 8 regions with fog-of-war, a day/night cycle and rain
 - 13 monster types, including spitting toads, blinking wisps, lunging spiders and bandits, and magma slimes that split in two
-- 2 bosses: the Hollow King on his throne in the Sunken Ruins, and the Ashen Wyrm in the Ashen Wastes
-- 22 quests (8 main story, 14 side quests), 17 achievements and a Bestiary
+- 6 bosses: Varg the Bandit King (bandit camp), the Hollow King (Sunken Ruins), the Ashen Wyrm (Ashen Wastes), and one at the bottom of each dungeon
+- 3 dungeons with rooms, corridors, torches, treasure and monster packs: the Mossy Crypt (Arachne, the Brood Queen), the Drowned Temple (Nerith, the Tide Serpent) and the Frostfang Caverns (Glacius, the Frost Titan). Dungeon bosses can be fought again on every visit
+- 27 quests (8 main story, 19 side quests), 17 achievements and a Bestiary
 - Fishing minigame, mining, woodcutting and foraging, each with its own skill level
 - Forge (5 weapon and 5 armor tiers), potion brewing, campfire cooking
 - 9 pets with abilities (loot magnet, luck, healing, extra XP, defense, damage shield, fire and wisp attacks): bought, found as rare monster drops, or won from bosses
