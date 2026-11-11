@@ -205,6 +205,13 @@ def('gel','Moss gel',{price:15,desc:'Left behind by a mossling.'});
 def('wing','Dust wing',{price:25,desc:'Left behind by a cave moth.'});
 def('bouquet','Ribbon bouquet',{buy:500,desc:'Give it to someone at eight hearts to ask if they will walk out with you.'});
 def('ring','Riverstone ring',{desc:'Give it to the person you are courting at ten hearts to propose.'});
+const DISH={salad:['Radish salad',45,150,{radish:2,daffodil:1},'#e8507a'],omelette:['Farm omelette',70,220,{egg:1,milk:1},'#f6d743'],grill:['Grilled fish',50,120,{_fish:1,wood:1},'#c98a4b'],
+ chowder:['River chowder',90,300,{_fish:1,milk:1},'#f3e6cf','angler'],tart:['Strawberry tart',80,300,{strawberry:2,egg:1},'#e23b4e'],fritters:['Corn fritters',75,260,{corn:1,egg:1},'#f1cf3f','swift'],
+ tsoup:['Tomato soup',85,280,{tomato:2,milk:1},'#e2452f'],psoup:['Pumpkin soup',120,480,{pumpkin:1,milk:1},'#f0892b','guard'],mash:['Snowbean mash',80,300,{snowbean:2,egg:1},'#bfe6f2'],toast:['Mushroom toast',70,260,{chanterelle:2,egg:1},'#e59a2f']};
+const BUFF={angler:'Angler: the fishing zone is wider today.',swift:'Swift: you walk faster today.',guard:'Guard: you take half damage today.'};
+for(const k in DISH){const d=DISH[k];def(k,d[0],{dish:1,food:d[1],price:d[2],col:d[4],buff:d[5],desc:'Home cooked.'+(d[5]?' '+BUFF[d[5]]:'')})}
+const buff=k=>!!S.buff&&S.buff.day===S.day&&S.buff.k===k;
+const KNAMES=['Rowan','Juno','Fern','Ash','Linden','Wynn'];
 const FEST=[{d:7,name:'Blossom Fair',a:540,b:1020,when:'9 am to 5 pm'},{d:10,name:'Lantern Night',a:1080,b:1440,when:'6 pm to midnight'},{d:8,name:'Harvest Show',a:540,b:1020,when:'9 am to 5 pm'},{d:12,name:'Frostlight Feast',a:540,b:1020,when:'9 am to 5 pm'}];
 const festOn=day=>{const f=FEST[Math.floor((day-1)/14)%4];return(day-1)%14+1===f.d?f:null},festToday=()=>festOn(S.day),festOpen=()=>{const f=festToday();return f&&S.time>=f.a&&S.time<f.b?f:null};
 const FSP=[[44,11],[45,13],[49,13],[49,11],[51,13]];
@@ -285,6 +292,7 @@ function drawIcon(g,id){const it=I[id];
   else if(it.crop==='potato'){disc(g,8,9,5,col);disc(g,6,9,4,col);R(g,shade(col,-.25),6,7,1,1);R(g,shade(col,-.25),10,10,1,1);R(g,shade(col,.3),5,6,2,1)}
   else{disc(g,8,9,5,col);R(g,shade(col,.45),6,6,2,1);R(g,G,7,2,2,3);R(g,G,5,3,2,1);R(g,G,9,3,2,1);if(it.crop==='radish')R(g,'#fff',8,14,1,2)}
   return}
+ if(it.dish){const c=it.col;R(g,'#e8eef0',1,8,14,2);R(g,'#cfd6dc',2,10,12,2);R(g,'#cfd6dc',3,12,10,1);R(g,'#aab3ba',5,13,6,1);R(g,c,3,7,10,2);R(g,shade(c,.35),4,7,3,1);R(g,'#4c9a40',9,6,2,1);R(g,'#fff',5,2,1,3);R(g,'#fff',9,1,1,3);R(g,'#fff',7,3,1,2);return}
  if(it.fish){const c=it.col;R(g,c,4,6,8,5);R(g,c,3,7,10,3);R(g,c,13,5,2,2);R(g,c,13,10,2,2);R(g,c,12,7,2,3);R(g,shade(c,.45),5,10,6,1);R(g,shade(c,-.3),6,5,4,1);R(g,'#16212e',5,7,1,1);return}
  switch(id){
   case'wood':R(g,'#8a5a34',2,6,12,6);R(g,'#6b4a2e',2,11,12,1);disc(g,13,9,3,'#c99b60');R(g,'#8a5a34',13,9,1,1);R(g,'#a87a45',4,7,6,1);break;
@@ -339,7 +347,7 @@ const AURL={};const animalURL=k=>AURL[k]||(AURL[k]=(k==='hen'?henSprite(0,0):cow
 /* house interior: 11x9 room, walls on rows 0-1, doorway at the bottom centre */
 const IW=11,IH=9,ISOL=new Uint8Array(IW*IH),IINT={};
 for(let y=0;y<IH;y++)for(let x=0;x<IW;x++)if(y<2||y===8||x===0||x===10)ISOL[y*IW+x]=1;ISOL[8*IW+5]=0;
-for(const[x,y]of[[1,2],[1,3],[3,2],[7,4],[8,4],[9,7]])ISOL[y*IW+x]=1;
+for(const[x,y]of[[1,2],[1,3],[3,2],[7,4],[8,4],[9,7],[7,2]])ISOL[y*IW+x]=1;IINT[2*IW+7]='stove';
 IINT[2*IW+1]=IINT[3*IW+1]='bed';IINT[2*IW+3]='chest';IINT[IW+5]=IINT[IW+6]='fire';IINT[IW+8]=IINT[IW+9]='books';
 const roomSprite=()=>sprite('room',IW*T,IH*T,g=>{R(g,'#241915',0,0,176,144);R(g,'#3b2a20',12,0,152,132);
  R(g,'#d9c49a',16,2,144,30);R(g,'#c4ad82',16,2,144,3);for(let x=24;x<160;x+=16)R(g,'rgba(0,0,0,.05)',x,5,1,24);R(g,'#6b4a2e',16,29,144,3);
@@ -352,7 +360,9 @@ const roomSprite=()=>sprite('room',IW*T,IH*T,g=>{R(g,'#241915',0,0,176,144);R(g,
 const FURN=[{k:'bed',x:1,by:4,w:16,h:36,fn:g=>{R(g,'#6b4a2e',0,0,16,36);R(g,'#8a5a34',1,1,14,5);R(g,'#f6f1dc',1,6,14,28);R(g,'#fff',3,8,10,6);R(g,'#dfe6ea',3,13,10,1);R(g,'#3f78b8',1,17,14,17);R(g,'#62b8ea',1,19,14,2);R(g,'#2f5c91',1,33,14,1)}},
  {k:'chest',x:3,by:3,w:16,h:16,fn:g=>{R(g,'#5a3d25',1,2,14,14);R(g,'#8a6234',2,3,12,12);R(g,'#a87a45',2,3,12,5);R(g,'#5c636b',1,8,14,1);R(g,'#f2b63d',7,7,2,3)}},
  {k:'table',x:7,by:5,w:32,h:24,fn:g=>{R(g,'#6b4a2e',3,14,3,10);R(g,'#6b4a2e',26,14,3,10);R(g,'#a87a45',1,4,30,10);R(g,'#c99b60',1,4,30,2);R(g,'#8a6234',1,13,30,2);R(g,'#f6f1dc',13,1,5,5);R(g,'#62b8ea',14,2,3,1);R(g,'#f6d743',14,0,1,1);R(g,'#f07a93',16,0,1,1)}},
- {k:'plant',x:9,by:8,w:16,h:26,fn:g=>{R(g,'#b5483c',4,17,8,9);R(g,'#8f3b32',4,17,8,2);disc(g,8,11,5,'#3d7a33');disc(g,6,8,3,'#4f9440');disc(g,10,7,3,'#6bb457');R(g,'#3d7a33',8,13,1,5)}}];
+ {k:'plant',x:9,by:8,w:16,h:26,fn:g=>{R(g,'#b5483c',4,17,8,9);R(g,'#8f3b32',4,17,8,2);disc(g,8,11,5,'#3d7a33');disc(g,6,8,3,'#4f9440');disc(g,10,7,3,'#6bb457');R(g,'#3d7a33',8,13,1,5)}},
+ {k:'stove',x:7,by:3,w:16,h:28,fn:g=>{R(g,'#8d8478',5,0,7,6);R(g,'#a39a8c',5,0,7,1);R(g,'#5c636b',12,2,3,1);R(g,'#3b4047',1,9,14,19);R(g,'#5c636b',0,6,16,4);R(g,'#7d858e',0,6,16,1);R(g,'#1a1210',3,14,10,9);R(g,'#f6b23c',5,18,6,4);R(g,'#e2452f',6,20,4,2);R(g,'#5c636b',3,13,10,1);R(g,'#2a2d33',1,27,14,1)}},
+ {k:'crib',kid:1,x:9,by:3,w:16,h:20,fn:g=>{R(g,'#a87a45',1,3,14,15);R(g,'#f6f1dc',2,5,12,9);R(g,'#86d46c',2,9,12,5);R(g,'#b4ec9a',2,9,12,1);for(let x=1;x<15;x+=3)R(g,'#c99b60',x,12,2,6);R(g,'#c99b60',1,3,14,2);R(g,'#8a6234',1,18,2,2);R(g,'#8a6234',13,18,2,2)}}];
 const DOG={x:0,y:0,fl:0,mv:false,w:0};function resetDog(){DOG.x=15*T;DOG.y=10*T+8}
 
 /* ---------- world ---------- */
@@ -466,17 +476,19 @@ Object.assign(NPCS[4],{marry:1,court:'Oh. Oh, these are from the east meadow, th
  spouse:['I moved two hives to the edge of your field. Our field.','There is honey in the tea. There is honey in everything now, sorry.','I like the house best at this hour, when you have just come in.']});
 NPCS[0].loves.push('cream');NPCS[1].likes.push('milk','egg');NPCS[2].likes.push('egg','bigegg');NPCS[3].likes.push('milk');
 NPCS[1].lines.push('The quarry shaft south of the plaza goes down fifteen floors. Take a sword, and bring me back some iron.');NPCS[1].likes.push('iron','copper');NPCS[1].loves.push('goldore');NPCS[2].hates.push('gel');
+NPCS[0].loves.push('tart');NPCS[1].loves.push('psoup');NPCS[2].loves.push('salad','toast');NPCS[3].loves.push('chowder','grill');NPCS[4].loves.push('tart','omelette');for(const n of NPCS)for(const k in DISH)if(!n.loves.includes(k))n.likes.push(k);
 function npcSpot(n){if(festOpen()){const k=NPCS.indexOf(n);return[0,FSP[k][0],FSP[k][1]]}let s=n.spots[0];for(const q of n.spots)if(S.time>=q[0]+360||q[0]===0)s=S.time>=q[0]?q:s;return s}
 function placeNPCs(){for(const n of NPCS){const s=npcSpot(n);n.x=s[1]*T+8;n.y=s[2]*T+12;n.dir=0;n.walk=0}}
 
 /* ---------- state ---------- */
 const P={x:0,y:0,dir:0,walk:0,busy:0,moving:false};
-function newGame(){S={v:1,day:1,time:360,gold:500,energy:100,maxE:100,sel:0,inv:new Array(30).fill(null),water:20,weather:'sun',bin:[],shipped:0,fish:0,harvested:0,npc:{},flags:{},mill:{wood:0,stone:0,gold:0,done:false},mail:[],animals:[],hay:0,chest:new Array(20).fill(null),scene:'farm',hp:100,maxHp:100,kills:0,mineBest:1};
+function newGame(){S={v:1,day:1,time:360,gold:500,energy:100,maxE:100,sel:0,inv:new Array(30).fill(null),water:20,weather:'sun',bin:[],shipped:0,fish:0,harvested:0,npc:{},flags:{},mill:{wood:0,stone:0,gold:0,done:false},mail:[],animals:[],hay:0,chest:new Array(20).fill(null),scene:'farm',hp:100,maxHp:100,kills:0,mineBest:1,kids:[],cooked:0};
  genMap();['hoe','can','axe','pick','scythe','rod'].forEach((t,i)=>S.inv[i]={id:t,n:1});S.inv[6]={id:'radish_seed',n:15};S.inv[7]={id:'sword',n:1};
  for(const n of NPCS)S.npc[n.id]={f:0,talk:0,gift:0,met:0,rew:0};
  P.x=12*T+8;P.y=9*T+13;P.dir=0;spawn(4);placeNPCs();resetDog();renderGround()}
 function serialize(){return{S:Object.assign({},S,{px:P.x,py:P.y,dir:P.dir}),ground:Array.from(ground),wet:Array.from(wet),objs}}
 function restore(d){S=d.S;ground=Uint8Array.from(d.ground);wet=Uint8Array.from(d.wet);objs=d.objs;P.x=S.px;P.y=S.py;P.dir=S.dir||0;
+ if(!S.kids){S.kids=[];S.cooked=0;if(S.spouse&&!S.wedDay)S.wedDay=S.day}
  if(S.maxHp==null){S.maxHp=100;S.hp=100;S.kills=0;S.mineBest=1;setupCave();const k=S.inv.indexOf(null);if(k>=0)S.inv[k]={id:'sword',n:1}}
  if(S.scene==='mine'){S.scene='farm';P.x=47*T;P.y=17*T+12}
  if(!S.animals){S.animals=[];S.hay=0;S.chest=new Array(20).fill(null);S.scene='farm';setupPen()}
@@ -517,8 +529,8 @@ let toastT=0;function toast(m){const t=$('#toast');t.textContent=m;t.classList.a
 function fmtTime(){const h=Math.floor(S.time/60)%24,m=Math.floor(S.time%60/10)*10;return((h+11)%12+1)+':'+(m<10?'0':'')+m+(h<12?' am':' pm')}
 const dateStr=()=>SEASONS[season()]+' '+((S.day-1)%14+1)+', Year '+(Math.floor((S.day-1)/56)+1);
 let lastHud='';
-function renderHud(){const inMine=S.scene==='mine'&&M,k=dateStr()+fmtTime()+S.gold+S.weather+Math.round(S.energy)+'|'+S.hp+S.scene+(inMine?M.f:'');if(k===lastHud)return;lastHud=k;
- $('#hdate').textContent=dateStr()+' · '+(inMine?'Mine floor '+M.f:({sun:'Clear',rain:'Rain',snow:'Snow'})[S.weather]);$('#htime').textContent=fmtTime();$('#hgold').textContent=S.gold.toLocaleString()+'g';
+function renderHud(){const inMine=S.scene==='mine'&&M,k=dateStr()+fmtTime()+S.gold+S.weather+Math.round(S.energy)+'|'+S.hp+S.scene+(inMine?M.f:'')+(S.buff?S.buff.k+S.buff.day:'');if(k===lastHud)return;lastHud=k;
+ $('#hdate').textContent=dateStr()+' · '+(inMine?'Mine floor '+M.f:({sun:'Clear',rain:'Rain',snow:'Snow'})[S.weather])+(S.buff&&S.buff.day===S.day?' · '+BUFF[S.buff.k].split(':')[0]:'');$('#htime').textContent=fmtTime();$('#hgold').textContent=S.gold.toLocaleString()+'g';
  const e=$('#efill');e.style.width=clamp(S.energy/S.maxE*100,0,100)+'%';e.style.background=S.energy<25?'var(--gold)':'var(--leaf)';
  $('#health').hidden=!(inMine||S.hp<S.maxHp);$('#hfill').style.width=clamp(S.hp/S.maxHp*100,0,100)+'%'}
 function slotHTML(s,i,cls){const k=i<10?'<span class="k">'+((i+1)%10)+'</span>':'';if(!s)return'<button type="button" class="slot '+cls+'" data-slot="'+i+'" aria-label="Empty slot">'+k+'</button>';
@@ -538,7 +550,7 @@ $('#pclose').onclick=closeSheet;
 const hearts=f=>{const n=Math.floor(f/100);return'<span class="hearts">'+'♥'.repeat(n)+'<i>'+'♥'.repeat(10-n)+'</i></span>'};
 function goals(){const best=Math.max(...NPCS.map(n=>S.npc[n.id].f));return[
  ['Till a patch and plant your seeds',!!S.flags.planted],['Harvest your first crop',S.harvested>0],['Ship 1,000g of goods ('+Math.min(S.shipped,1000)+'/1,000)',S.shipped>=1000],
- ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Reach floor 5 of the mine ('+Math.min(S.mineBest||1,5)+'/5)',(S.mineBest||1)>=5],['Find what is at the bottom of the mine',!!S.flags.heart],['Take part in a festival',!!S.flags.festJoined],['Marry someone you love',!!S.spouse],['Restore the windmill',S.mill.done]]}
+ ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Reach floor 5 of the mine ('+Math.min(S.mineBest||1,5)+'/5)',(S.mineBest||1)>=5],['Find what is at the bottom of the mine',!!S.flags.heart],['Take part in a festival',!!S.flags.festJoined],['Marry someone you love',!!S.spouse],['Cook a meal at your stove',(S.cooked||0)>0],['Welcome a child into the family',S.kids.length>0],['Restore the windmill',S.mill.done]]}
 function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerHTML='';
  if(sheetKind==='bag'){$('#ptitle').textContent='Bag';
   h+='<div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,i===bagSel?'sel':'');h+='</div></div>';
@@ -558,12 +570,15 @@ function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerH
  else if(sheetKind==='journal'){$('#ptitle').textContent='Journal';
   h+='<div><h3>To do</h3>'+goals().map(g=>'<div class="goal'+(g[1]?' done':'')+'"><span class="bx">'+(g[1]?'✓':'·')+'</span><span>'+g[0]+'</span></div>').join('')+'</div>';
   h+='<div><h3>Neighbours</h3>'+NPCS.map(n=>{const s=S.npc[n.id];return'<div class="row"><div class="nm"><b>'+(s.met?n.name:'Someone in the village')+'</b><span>'+(s.met?n.role+(S.spouse===n.id?' · Married to you':S.engaged&&S.engaged.id===n.id?' · Engaged to you':s.dating?' · Courting':''):'You have not met yet.')+'</span></div>'+hearts(s.f)+'</div>'}).join('')+'</div>';
+  if(S.spouse||S.kids.length||S.expect){const sp=NPCS.find(n=>n.id===S.spouse);h+='<div><h3>Family</h3>'+(sp?'<div class="row"><div class="nm"><b>'+sp.name+'</b><span>Married on day '+(S.wedDay||S.day)+'.</span></div></div>':'')+S.kids.map(k=>'<div class="row"><div class="nm"><b>'+k.name+'</b><span>'+(S.day-k.born<14?'Baby, '+(S.day-k.born)+' days old. Asleep in the crib.':'Toddler, '+(S.day-k.born)+' days old. Loose in the house.')+'</span></div></div>').join('')+(S.expect?'<div class="row"><div class="nm"><b>'+S.expect.name+'</b><span>Arriving in '+Math.max(1,S.expect.day-S.day)+' day'+(S.expect.day-S.day>1?'s':'')+'.</span></div></div>':'')+'</div>'}
   h+='<div><h3>Festivals</h3>'+FEST.map((f,k)=>'<div class="goal"><span class="bx">'+(festToday()===f?'★':'·')+'</span><span>'+SEASONS[k]+' '+f.d+': '+f.name+', '+f.when+(festToday()===f?' (today)':'')+'</span></div>').join('')+'</div>';
   h+='<div><h3>Ledger</h3><p style="margin:0">Shipped and sold: '+S.shipped.toLocaleString()+'g. Crops harvested: '+S.harvested+'. Fish landed: '+S.fish+'. Mine creatures driven off: '+(S.kills||0)+'. Deepest floor: '+(S.mineBest||1)+'.</p></div>'}
  else if(sheetKind==='help'){$('#ptitle').textContent='How to play';
   h+='<dl class="keys"><dt><kbd>WASD</kbd> <kbd>Arrows</kbd></dt><dd>Walk. On a phone, drag the pad.</dd><dt><kbd>Space</kbd> <kbd>E</kbd> or click</dt><dd>Use what you hold on the outlined tile, or talk, harvest and open doors.</dd><dt><kbd>1</kbd>–<kbd>0</kbd>, wheel</dt><dd>Pick a hotbar slot.</dd><dt><kbd>I</kbd> <kbd>J</kbd></dt><dd>Bag and workbench, journal.</dd><dt><kbd>F</kbd></dt><dd>Eat the food you are holding.</dd></dl>';
   h+='<div><h3>A farming day</h3><p style="margin:0">Hoe grass into soil, plant seeds in season, water every morning. Ripe crops go in the bin beside your door and pay out overnight, or sell them at the store between 8 am and 6 pm. Go inside your house and sleep in the bed before 2 am. Rain waters for you.</p></div>';
-  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div><div><h3>The mine</h3><p style="margin:0">The quarry shaft is just south of the village plaza. Break rocks with the pickaxe for stone and ore, and swing your sword with Space at anything that comes for you. Ladders lead down fifteen floors; every fifth floor becomes a shortcut from the entrance. Food restores health as well as energy. If your health runs out you are dragged back to the surface and lose a tenth of your coin.</p></div><div><h3>Courting and festivals</h3><p style="margin:0">Odalys, Bram and Sorrel can be courted. At eight hearts, give a ribbon bouquet from the store. At ten hearts, craft a riverstone ring at the workbench (gold ore, quartz and amber) and give it to propose; the wedding is three days later and your spouse moves in. Each season has one festival in the village plaza, with dates in your journal. Use the striped stall to take part.</p></div>'}
+  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div><div><h3>The mine</h3><p style="margin:0">The quarry shaft is just south of the village plaza. Break rocks with the pickaxe for stone and ore, and swing your sword with Space at anything that comes for you. Ladders lead down fifteen floors; every fifth floor becomes a shortcut from the entrance. Food restores health as well as energy. If your health runs out you are dragged back to the surface and lose a tenth of your coin.</p></div><div><h3>Courting and festivals</h3><p style="margin:0">Odalys, Bram and Sorrel can be courted. At eight hearts, give a ribbon bouquet from the store. At ten hearts, craft a riverstone ring at the workbench (gold ore, quartz and amber) and give it to propose; the wedding is three days later and your spouse moves in. Each season has one festival in the village plaza, with dates in your journal. Use the striped stall to take part.</p></div><div><h3>Cooking and family</h3><p style="margin:0">The stove in your house turns produce, eggs, milk and fish into meals that restore far more than raw food and sell for more. Three dishes also give a bonus for the rest of the day. A week after the wedding your spouse may ask about raising a child; say yes, choose a name, and they arrive seven days later. Babies sleep in the crib for two weeks, then roam the house. Visit them daily.</p></div>'}
+ else if(sheetKind==='cook'){$('#ptitle').textContent='Stove';h+='<div class="info"><p>Cooking uses what you are carrying. Meals restore energy and half as much health.</p></div><div>';
+  for(const id in DISH){const d=DISH[id],ok=Object.keys(d[3]).every(k=>have(k)>=d[3][k]);h+='<div class="row"><img src="'+iconURL(id)+'" alt=""><div class="nm"><b>'+d[0]+'</b><span>'+Object.keys(d[3]).map(k=>d[3][k]+' '+(k==='_fish'?'fish of any kind':I[k].name.toLowerCase())+' ('+have(k)+')').join(', ')+'. Restores '+d[1]+'.'+(d[5]?' '+BUFF[d[5]]:'')+'</span></div><span class="pr">'+price(id)+'g</span><div class="bs"><button type="button" class="btn sm" data-act="cookit" data-id="'+id+'"'+(ok?'':' disabled')+'>Cook</button></div></div>'}h+='</div>'}
  else if(sheetKind==='chest'){$('#ptitle').textContent='Storage chest';
   h+='<div><h3>In the chest</h3><div class="grid">';for(let i=0;i<20;i++)h+=slotHTML(S.chest[i],10+i,'').replace('data-slot="'+(10+i)+'"','data-cs="'+i+'"');h+='</div></div><div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,'');h+='</div></div><div class="info"><p>Pick a stack to move it across. The chest keeps things safe between seasons.</p></div>'}
  else if(sheetKind==='barn'){$('#ptitle').textContent='Barn';const fb=count('fiber');
@@ -583,10 +598,11 @@ $('#pbody').addEventListener('click',e=>{const sl=e.target.closest('[data-slot]'
  else if(act==='craft'){const r=RECIPES.find(q=>q[0]===a.dataset.id);for(const k in r[2])removeItem(k,r[2][k]);addItem(r[0],r[1]);if(r[0]==='sprinkler')S.flags.sprinkler=1;sfx('pop');toast('Crafted '+I[r[0]].name+'.');renderSheet()}
  else if(act==='buy'){const it=I[a.dataset.id],n=+a.dataset.n;if(S.gold>=it.buy*n&&addItem(it.id,n)){S.gold-=it.buy*n;sfx('coin')}renderSheet()}
  else if(act==='sell'){const i=+a.dataset.i,s=S.inv[i];if(!s)return;const n=a.dataset.n==='all'?s.n:1,v=price(s.id)*n;S.gold+=v;S.shipped+=v;s.n-=n;if(!s.n)S.inv[i]=null;sfx('coin');renderHot()}
+ else if(act==='cookit'){const id=a.dataset.id,need=DISH[id][3];if(!Object.keys(need).every(k=>have(k)>=need[k]))return;for(const k in need)take(k,need[k]);if(addItem(id,1)){S.cooked=(S.cooked||0)+1;sfx('water');toast('Cooked '+I[id].name.toLowerCase()+'.')}renderSheet()}
  else if(act==='animal'){const k=a.dataset.k,A=ANIM[k];if(S.gold<A.cost||S.animals.length>=6)return;S.gold-=A.cost;const used=S.animals.map(q=>q.name),name=A.names.find(q=>!used.includes(q))||A.name;S.animals.push({k,name,f:0,pet:0,milk:0,fed:1,x:27.5*T,y:6.5*T});sfx('coin');toast(name+' the '+A.name.toLowerCase()+' is waiting in the paddock by your barn.');renderSheet()}
  else if(act==='hay'){const n=Math.min(count('fiber'),a.dataset.n==='all'?999:5);if(n>0){removeItem('fiber',n);S.hay+=n;sfx('cut');renderSheet()}}
  else if(act==='wake')closeSheet()});
-function eat(i){const s=S.inv[i];if(!s||!I[s.id].food)return;if(S.energy>=S.maxE&&S.hp>=S.maxHp){toast('You are not hungry.');return}S.energy=Math.min(S.maxE,S.energy+I[s.id].food);S.hp=Math.min(S.maxHp,S.hp+Math.round(I[s.id].food/2));s.n--;if(!s.n)S.inv[i]=null;sfx('pop');toast('Ate '+I[s.id===undefined?'':s.id].name+'.');renderHot()}
+function eat(i){const s=S.inv[i];if(!s||!I[s.id].food)return;if(S.energy>=S.maxE&&S.hp>=S.maxHp){toast('You are not hungry.');return}S.energy=Math.min(S.maxE,S.energy+I[s.id].food);S.hp=Math.min(S.maxHp,S.hp+Math.round(I[s.id].food/2));s.n--;if(!s.n)S.inv[i]=null;sfx('pop');if(I[s.id].buff)S.buff={k:I[s.id].buff,day:S.day};lastHud='';toast('Ate '+I[s.id].name+'.'+(I[s.id].buff?' '+BUFF[I[s.id].buff]:''));renderHot()}
 $('#mbag').onclick=()=>openSheet('bag');$('#mjournal').onclick=()=>openSheet('journal');$('#mhelp').onclick=()=>openSheet('help');
 $('#msound').onclick=()=>{muted=!muted;$('#msound').textContent=muted?'Sound off':'Sound on'};
 
@@ -646,6 +662,8 @@ function enterHome(){S.scene='home';P.x=5*T+8;P.y=7*T+12;P.dir=3;sfx('tick')}
 function exitHome(){S.scene='farm';P.x=12*T+8;P.y=9*T+13;P.dir=0;sfx('tick')}
 function actHome(tx,ty){const k=tx>=0&&ty>=0&&tx<IW&&ty<IH?IINT[ty*IW+tx]:null;
  if(spouseHome()&&(Math.hypot(tx*T+8-SPX,ty*T+8-(SPY-6))<14||Math.hypot(P.x-SPX,P.y-SPY)<16)){spouseTalk();return}
+ if(S.kids.length){const kd=kidNear(tx,ty);if(kd!=null){kidTalk(kd);return}if(tx===9&&ty===2){toast('The crib is empty. They have outgrown it.');return}}
+ if(k==='stove'){sfx('tick');openSheet('cook');return}
  if(k==='bed')say('Bed',['Turn in for the night?'],[['Sleep until morning',()=>endDay(false)],['Not yet']]);
  else if(k==='chest'){sfx('tick');openSheet('chest')}
  else if(k==='fire')say('Hearth',[S.time>1020?'The fire is banked low and the room smells of woodsmoke. A good night to be indoors.':'The hearth is warm. Aunt Mirabel\'s kettle still hangs on its hook.']);
@@ -674,7 +692,7 @@ function genMine(f){const r=mkrng(S.day*131+f*977+5),n=MW*MH,t=new Uint8Array(n)
 function enterMine(f){f=Math.min(15,f);S.mineBest=Math.max(S.mineBest||1,f);genMine(f);S.scene='mine';P.x=M.sx*T+8;P.y=M.sy*T+13;P.dir=0;P.inv=0;sfx('tick');toast(f===15?'Floor 15. The shaft ends here.':'Mine floor '+f+'.');lastHud=''}
 function exitMine(){S.scene='farm';M=null;P.x=47*T;P.y=17*T+12;P.dir=0;lastHud=''}
 function knockOut(){const lost=Math.round(S.gold*.1);S.gold-=lost;exitMine();S.hp=Math.round(S.maxHp/2);S.time=Math.min(1500,S.time+120);sfx('fail');say('The mine',['Everything goes dark. You come round on the grass outside the shaft, two hours later'+(lost?' and '+lost+'g lighter.':'.')])}
-function hurt(n,dx,dy){S.hp=Math.max(0,S.hp-n);P.inv=.9;sfx('fail');const d=Math.hypot(dx,dy)||1,nx=P.x+dx/d*8,ny=P.y+dy/d*8;if(!hit(nx,P.y))P.x=nx;if(!hit(P.x,ny))P.y=ny;if(S.hp<=0)knockOut()}
+function hurt(n,dx,dy){if(buff('guard'))n=Math.ceil(n/2);S.hp=Math.max(0,S.hp-n);P.inv=.9;sfx('fail');const d=Math.hypot(dx,dy)||1,nx=P.x+dx/d*8,ny=P.y+dy/d*8;if(!hit(nx,P.y))P.x=nx;if(!hit(P.x,ny))P.y=ny;if(S.hp<=0)knockOut()}
 function mbl(px,py,fly){const x=Math.floor(px/T),y=Math.floor((py-3)/T);if(x<0||y<0||x>=MW||y>=MH||M.t[y*MW+x])return true;const o=M.o[y*MW+x];return!fly&&!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}
 function updMine(dt){if(P.inv>0)P.inv-=dt;for(let k=M.mobs.length-1;k>=0;k--){const m=M.mobs[k],d=MOB[m.k];m.t+=dt;if(m.hit>0)m.hit-=dt;
   const dx=P.x-m.x,dy=P.y-m.y,dist=Math.hypot(dx,dy)||1;let vx,vy;
@@ -719,7 +737,9 @@ function court(n,id){const s=S.npc[n.id];
  if(S.engaged){say(n.name,['One ring is plenty. I am counting the days.']);return}
  if(!s.dating)say(n.name,['A ring? We have not even walked out together yet.','(Give a ribbon bouquet first.)']);else if(s.f<1000)say(n.name,['Ask me again soon. Not quite yet.','(You need ten hearts.)']);
  else{useSel();S.engaged={id:n.id,day:S.day+3};sfx('win');say(n.name,[n.propose,'The wedding will be in three days, in the village plaza.'])}}
-function spouseTalk(){const n=NPCS.find(q=>q.id===S.spouse),s=S.npc[n.id];if(s.kiss!==S.day){s.kiss=S.day;S.energy=Math.min(S.maxE,S.energy+15);parts.push({c:heartSprite(),x:SPX-3,y:SPY-28,l:.9});sfx('pop')}else sfx('talk');say(n.name,[n.spouse[(S.day+(S.time>=1080?1:0))%n.spouse.length]])}
+function spouseTalk(){const n=NPCS.find(q=>q.id===S.spouse),s=S.npc[n.id];
+ if(S.wedDay&&S.day-S.wedDay>=7&&!S.expect&&S.kids.length<2&&S.kids.every(k=>S.day-k.born>=14)&&(S.askDay||0)<=S.day){const used=S.kids.map(k=>k.name),names=KNAMES.filter(q=>!used.includes(q)).slice(0,4);
+  say(n.name,[S.kids.length?'I keep thinking the house could hold one more. Shall we raise another child?':'I have been thinking. The house is big enough for one more of us. Shall we raise a child?'],[['Yes',()=>say('A name',['What will you call them?'],names.map(nm=>[nm,()=>{S.expect={name:nm,day:S.day+7};sfx('win');say(n.name,['"'+nm+'." Yes. A week from now, then. I will start on the crib tonight.'])}]))],['Not yet',()=>{S.askDay=S.day+3;say(n.name,['No hurry. Ask me when the field is quieter.'])}]]);return}if(s.kiss!==S.day){s.kiss=S.day;S.energy=Math.min(S.maxE,S.energy+15);parts.push({c:heartSprite(),x:SPX-3,y:SPY-28,l:.9});sfx('pop')}else sfx('talk');say(n.name,[n.spouse[(S.day+(S.time>=1080?1:0))%n.spouse.length]])}
 const boothSprite=se=>sprite('booth'+se,32,38,g=>{const c=['#f07a93','#f2b63d','#d9772e','#62b8ea'][se];R(g,'#6b4a2e',1,10,2,28);R(g,'#6b4a2e',29,10,2,28);for(let x=0;x<32;x+=4){R(g,(x>>2)%2?'#f6f1dc':c,x,1,4,10);R(g,(x>>2)%2?'#e3dcc4':shade(c,-.2),x+1,11,2,1)}R(g,shade(c,-.3),0,0,32,1);
  R(g,'#c99b60',0,22,32,3);R(g,'#a87a45',0,25,32,13);for(let x=3;x<32;x+=7)R(g,'#8a6234',x,25,1,13);
  if(se===0){for(const[x,k]of[[6,'#f6d743'],[14,'#f07a93'],[22,'#fff']]){R(g,'#4c9a40',x+1,17,1,5);disc(g,x+1,16,2,k)}}else if(se===1){for(const x of[6,15,24]){R(g,'#f6b23c',x,15,4,6);R(g,'#fff3b0',x+1,16,2,3);R(g,'#3b4047',x,14,4,1)}}
@@ -736,6 +756,17 @@ function festBooth(){const f=festToday(),se=season(),key='fest'+S.day,held=S.inv
    else{S.gold+=100;say(f.name,['Third place, and 100g for taking part. Melons, pumpkins and cream tend to win.'])}}],['Pick something else']])}
  else{let best=NPCS[0];for(const n of NPCS)if(S.npc[n.id].met&&S.npc[n.id].f>S.npc[best.id].f)best=n;const g={odalys:['honeycake',3],bram:['iron',6],wren:['holly',5],ilse:['pike',1],sorrel:['honeycake',4]}[best.id];
   say(f.name,['A parcel on the stall has your name on it, in '+best.name+'\'s handwriting.'],[['Open it',()=>{done();addItem(g[0],g[1]);all(20);say(best.name,['"'+I[g[0]].name+', '+g[1]+' of. Do not look at me like that, it is Frostlight." You stay for soup.'])}]])}}
+/* ---------- cooking and children ---------- */
+const have=k=>k==='_fish'?S.inv.reduce((a,q)=>a+(q&&I[q.id].fish?q.n:0),0):count(k);
+function take(k,n){if(k!=='_fish'){removeItem(k,n);return}while(n>0){let b=-1;S.inv.forEach((q,i)=>{if(q&&I[q.id].fish&&(b<0||I[q.id].price<I[S.inv[b].id].price))b=i});if(b<0)break;S.inv[b].n--;if(!S.inv[b].n)S.inv[b]=null;n--}renderHot()}
+const KP=[];const kp=i=>KP[i]||(KP[i]={x:(4+i*2)*T+8,y:6*T+8,tx:0,ty:0,wait:1,dir:0,mv:false,w:0});
+function updKids(dt){S.kids.forEach((k,i)=>{if(S.day-k.born<14)return;const q=kp(i);if(!q.tx){q.mv=false;q.wait-=dt;if(q.wait<=0){const x=ri(1,9),y=ri(2,7);if(!ISOL[y*IW+x]&&!(x===9&&y===2)){q.tx=x*T+8;q.ty=y*T+10}}return}
+ const dx=q.tx-q.x,dy=q.ty-q.y,d=Math.hypot(dx,dy);if(d<2){q.tx=0;q.wait=.5+rnd()*3;return}const sp=30*dt,nx=q.x+dx/d*sp,ny=q.y+dy/d*sp;if(blocked(nx,ny-2)){q.tx=0;q.wait=.3;return}q.x=nx;q.y=ny;q.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0);q.mv=true;q.w+=dt*10})}
+function kidNear(tx,ty){for(let i=0;i<S.kids.length;i++){if(S.day-S.kids[i].born<14){if(tx===9&&ty===2)return i}else{const q=kp(i);if(Math.hypot(tx*T+8-q.x,ty*T+8-(q.y-5))<13||Math.hypot(P.x-q.x,P.y-q.y)<13)return i}}return null}
+function kidTalk(i){const k=S.kids[i],baby=S.day-k.born<14,q=baby?{x:9*T+8,y:3*T}:kp(i),first=k.pet!==S.day;if(first){k.pet=S.day;parts.push({c:heartSprite(),x:q.x-3,y:q.y-26,l:.9});sfx('pop')}else sfx('talk');
+ if(baby){say(k.name,[['Asleep, one fist tucked under their chin.','Awake, and studying the ceiling like it owes them money.','They have your frown. Everyone says so.'][(S.day+i)%3]]);return}
+ let line=['"Up! Up! Up!"','"I helped. I watered the rug."','"Biscuit is my dog now."','"Is the mine scary? I am not scared. Is it?"','"When I am big I will have nine cows."'][(S.day*3+i+Math.floor(S.time/300))%5];
+ if(first&&rnd()<.3){const g=['daffodil','stone','fiber','brambleberry'][ri(0,3)];if(addItem(g,1))line='"I found this. It is for you." ('+I[g].name+')'}say(k.name,[line])}
 function talk(n){const s=S.npc[n.id],held=S.inv[S.sel],it=held&&I[held.id];P.dir=Math.abs(n.x-P.x)>Math.abs(n.y-P.y)?(n.x<P.x?1:2):(n.y<P.y?3:0);n.dir=[3,2,1,0][P.dir];sfx('talk');
  const chat=()=>{let line;if(!s.met){s.met=1;line=n.intro}else if(festOpen())line=FLINES[season()][NPCS.indexOf(n)%3];else if(S.weather==='rain'&&hash(S.day,3,1)<.5)line=n.rain;else{const pool=s.f>=300?n.lines.concat(n.warm):n.lines;line=pool[Math.floor(hash(S.day,n.id.length,S.npc[n.id].f)*pool.length)]}
   if(s.talk!==S.day){s.talk=S.day;bump(n,20)}say(n.name,[line])};
@@ -760,7 +791,7 @@ function pickFish(){const pond=F.tx<32,night=S.time>1080,se=season(),rain=S.weat
  let tot=0;for(const k in w)tot+=w[k];let r=rnd()*tot;for(const k in w){r-=w[k];if(r<=0)return k}return'minnow'}
 function fishPress(){if(!F)return;
  if(F.ph==='wait'){toast('Too soon. The fish spooked.');endFish()}
- else if(F.ph==='bite'){F.kind=pickFish();const d=I[F.kind].diff;F.ph='reel';F.zw=clamp(.3/Math.sqrt(d)+(S.flags.lure?.07:0),.1,.5);F.z=rnd()*(1-F.zw);F.sp=.85*d;$('#fish').hidden=false;$('#flab').textContent='Hit the green';fishDom();sfx('pop')}
+ else if(F.ph==='bite'){F.kind=pickFish();const d=I[F.kind].diff;F.ph='reel';F.zw=clamp(.3/Math.sqrt(d)+(S.flags.lure?.07:0)+(buff('angler')?.08:0),.1,.5);F.z=rnd()*(1-F.zw);F.sp=.85*d;$('#fish').hidden=false;$('#flab').textContent='Hit the green';fishDom();sfx('pop')}
  else if(F.ph==='reel'){if(F.m>=F.z&&F.m<=F.z+F.zw){F.hits++;sfx('tick');if(F.hits>=3){if(addItem(F.kind,1)){S.fish++;pop(F.kind,Math.floor(P.x/T),Math.floor(P.y/T)-1);toast('Caught a '+I[F.kind].name.toLowerCase()+'.');sfx('coin')}endFish();return}F.z=rnd()*(1-F.zw);F.sp*=1.15}
   else{F.miss++;sfx('fail');if(F.miss>=2){toast('It slipped the hook.');endFish();return}}fishDom()}}
 function fishDom(){$('#fzone').style.left=F.z*100+'%';$('#fzone').style.width=F.zw*100+'%';$('#fhits').textContent=F.hits+'/3 · '+(2-F.miss)+' slips left'}
@@ -786,9 +817,11 @@ function endDay(passed){let total=0,rows='';for(const b of S.bin){const v=price(
  spawn();let hungry=0;for(const a of S.animals){if(S.hay>0){S.hay--;a.fed=1;if(a.k==='cow')a.milk=1;else for(let q=0;q<14;q++){const i=idx(ri(25,30),ri(4,8));if(!objs[i]){objs[i]={t:'drop',id:a.f>=500?'bigegg':'egg'};break}}}else{a.fed=0;a.milk=0;a.f=Math.max(0,a.f-20);hungry++}}
  S.scene='home';P.x=3*T+8;P.y=3*T+12;P.dir=0;resetDog();let mail='';
  const note=t=>{mail+='<div class="info"><p>'+t+'</p></div>'},ft=festToday(),ftm=festOn(S.day+1);
- if(S.engaged&&S.day>=S.engaged.day&&!ft){const n=NPCS.find(q=>q.id===S.engaged.id);S.spouse=n.id;S.engaged=null;S.npc[n.id].f=1000;for(const q of NPCS)if(q!==n)bump(q,30);
+ if(S.engaged&&S.day>=S.engaged.day&&!ft){const n=NPCS.find(q=>q.id===S.engaged.id);S.spouse=n.id;S.wedDay=S.day;S.engaged=null;S.npc[n.id].f=1000;for(const q of NPCS)if(q!==n)bump(q,30);
   note('<b>Your wedding day.</b> The whole village crowds into the plaza under an arch Bram finished at dawn. Captain Ilse reads the words off a river chart, Wren throws far too many petals, and '+n.name+' walks home beside you. The farmhouse has two people in it now.')}
  if(S.spouse){const n=NPCS.find(q=>q.id===S.spouse),q=rnd();if(q<.35&&S.weather==='sun'){let c=0;for(let i=0;i<N;i++)if(ground[i]===3&&!wet[i]){wet[i]=1;c++}if(c)note(n.name+' was up before you and watered the whole field.')}else if(q<.6){addItem('honeycake',1);note(n.name+' left breakfast on the table: a honey cake, in your bag.')}}
+ if(S.expect&&S.day>=S.expect.day){S.kids.push({name:S.expect.name,born:S.day,pet:0});const nm=S.expect.name;S.expect=null;note('<b>'+nm+' is here.</b> The crib by the bookshelf is not empty any more, and the whole house has gone very quiet and very careful.')}
+ for(const k of S.kids)if(S.day-k.born===14)note(k.name+' climbed out of the crib this morning and is now walking into furniture on purpose.');
  if(ft){note('<b>Today is the '+ft.name+'.</b> Come to the village plaza, '+ft.when+'. The store is closed for the day.');if(season()===0)for(let k=0;k<40;k++){const x=k%2?ri(36,60):ri(3,31),y=k%2?ri(14,40):ri(31,41),i=idx(x,y);if(ground[i]===0&&!objs[i]&&!solid[i])objs[i]={t:'forage',k:0}}}
  else if(ftm)note('Tomorrow is the '+ftm.name+', in the village plaza, '+ftm.when+'.');
  for(const id of S.mail){const n=NPCS.find(q=>q.id===id);for(const[a,b]of n.gift.items)addItem(a,b);if(n.gift.flag)S.flags[n.gift.flag]=1;mail+='<div class="info"><p>'+n.gift.text+'</p></div>'}S.mail=[];
@@ -819,7 +852,7 @@ $('#actbtn').addEventListener('pointerdown',e=>{e.preventDefault();act()});
 
 /* ---------- update ---------- */
 const cam={x:0,y:0};let clockT=0,animT=0;
-function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x];if(S.scene==='mine'){if(x<0||y<0||x>=MW||y>=MH)return true;const o=M.o[y*MW+x];return!!M.t[y*MW+x]||!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i]||(y===12&&(x===46||x===47)&&festToday()))return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
+function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x]||(x===9&&y===2&&S.kids.length>0);if(S.scene==='mine'){if(x<0||y<0||x>=MW||y>=MH)return true;const o=M.o[y*MW+x];return!!M.t[y*MW+x]||!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i]||(y===12&&(x===46||x===47)&&festToday()))return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
 const hit=(x,y)=>blocked(x-4,y-5)||blocked(x+4,y-5)||blocked(x-4,y-1)||blocked(x+4,y-1);
 function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').classList.remove('on')}
  for(let k=parts.length-1;k>=0;k--){const p=parts[k];p.l-=dt;p.y-=dt*22;if(p.l<=0)parts.splice(k,1)}
@@ -828,9 +861,9 @@ function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').c
  if(ui==='play'||ui==='fish'){S.time+=dt*1.4;if(S.time>=1560){if(ui==='fish')endFish();endDay(true);return}}
  if(ui==='play'){if(P.busy>0)P.busy-=dt;
   let vx=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0)+joy.x,vy=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0)+joy.y;const m=Math.hypot(vx,vy);P.moving=m>.1&&P.busy<=0;
-  if(P.moving){if(m>1){vx/=m;vy/=m}const sp=(S.energy<=0?42:74)*dt;P.dir=Math.abs(vx)>Math.abs(vy)?(vx<0?1:2):(vy<0?3:0);
+  if(P.moving){if(m>1){vx/=m;vy/=m}const sp=(S.energy<=0?42:buff('swift')?94:74)*dt;P.dir=Math.abs(vx)>Math.abs(vy)?(vx<0?1:2):(vy<0?3:0);
    const nx=P.x+vx*sp;if(!hit(nx,P.y))P.x=nx;const ny=P.y+vy*sp;if(!hit(P.x,ny))P.y=ny;P.walk+=dt*9}else P.walk=0;
-  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);if(P.atk>0)P.atk-=dt;if(lanT>0)lanT-=dt;if(S.scene==='mine'&&M)updMine(dt);
+  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);if(P.atk>0)P.atk-=dt;if(lanT>0)lanT-=dt;if(S.scene==='home')updKids(dt);if(S.scene==='mine'&&M)updMine(dt);
   for(const n of NPCS){const s=npcSpot(n),tx=s[1]*T+8,ty=s[2]*T+12,dx=tx-n.x,dy=ty-n.y,sp=26*dt;n.mv=false;
    if(Math.hypot(n.x-P.x,n.y-P.y)<20)continue;
    if(Math.abs(dx)>1){const band=n.y>=10*T+6&&n.y<=11*T+14,inPl=n.x>=42*T&&tx>=42*T;if(!band&&!inPl){const by=11*T+4;n.y+=Math.sign(by-n.y)*Math.min(sp,Math.abs(by-n.y));n.dir=by>n.y?0:3}else{n.x+=Math.sign(dx)*Math.min(sp,Math.abs(dx));n.dir=dx<0?1:2}n.mv=true}
@@ -849,8 +882,9 @@ function drawHome(){const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.
  if(S.time>1110){R(ctx,'#fff',38-cx,12-cy,1,1);R(ctx,'#fff',55-cx,16-cy,1,1);R(ctx,'#f6f1dc',42-cx,17-cy,2,2)}
  for(let k=0;k<6;k++){const h=3+Math.floor((Math.sin(animT*9+k*2.1)+1)*3.5);R(ctx,k%2?'#f6b23c':'#e2452f',88+k*3-cx,30-h-cy,3,h)}R(ctx,'#ffe08a',94-cx,27-cy,4,3);
  if(ui==='play'){let t=facing();if(hover){const dx=hover[0]*T+8-P.x,dy=hover[1]*T+8-(P.y-4);if(Math.hypot(dx,dy)<=T*1.9)t=hover}ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.strokeRect(t[0]*T-cx+.5,t[1]*T-cy+.5,T-1,T-1)}
- const L=FURN.map(f=>({y:f.by*T-2,f}));L.push({y:P.y,p:1});if(spouseHome())L.push({y:SPY,sp:NPCS.find(q=>q.id===S.spouse)});L.sort((a,b)=>a.y-b.y);
- for(const e of L){if(e.sp){R(ctx,'rgba(0,0,0,.22)',SPX-5-cx,SPY-2-cy,10,3);ctx.drawImage(charSprite(e.sp.id,e.sp.col,P.x<SPX-10?1:P.x>SPX+10?2:0,0),SPX-8-cx,SPY-22-cy)}else if(e.f){const f=e.f;ctx.drawImage(sprite('f_'+f.k,f.w,f.h,f.fn),f.x*T-cx,f.by*T-f.h-cy)}
+ const L=FURN.filter(f=>!f.kid||S.kids.length).map(f=>({y:f.by*T-2,f}));S.kids.forEach((k,i)=>{if(S.day-k.born>=14)L.push({y:kp(i).y,kid:i})});L.push({y:P.y,p:1});if(spouseHome())L.push({y:SPY,sp:NPCS.find(q=>q.id===S.spouse)});L.sort((a,b)=>a.y-b.y);
+ for(const e of L){if(e.sp){R(ctx,'rgba(0,0,0,.22)',SPX-5-cx,SPY-2-cy,10,3);ctx.drawImage(charSprite(e.sp.id,e.sp.col,P.x<SPX-10?1:P.x>SPX+10?2:0,0),SPX-8-cx,SPY-22-cy)}else if(e.kid!=null){const q=kp(e.kid),sp=NPCS.find(n=>n.id===S.spouse),c=sprite('kid'+e.kid+q.dir+(q.mv?1+Math.floor(q.w)%2:0)+(sp?sp.id:''),16,22,g=>g.drawImage(charSprite('k'+e.kid+(sp?sp.id:''),{skin:PCOL.skin,hair:e.kid?PCOL.hair:(sp?sp.col.hair:PCOL.hair),shirt:e.kid?'#62b8ea':'#f07a93',pants:'#4a4f63'},q.dir,q.mv?1+Math.floor(q.w)%2:0),0,0));R(ctx,'rgba(0,0,0,.2)',Math.round(q.x)-4-cx,Math.round(q.y)-2-cy,8,2);ctx.drawImage(c,Math.round(q.x)-6-cx,Math.round(q.y)-16-cy,12,16)}
+  else if(e.f){const f=e.f;ctx.drawImage(sprite('f_'+f.k,f.w,f.h,f.fn),f.x*T-cx,f.by*T-f.h-cy);if(f.k==='crib'&&S.kids.some(k=>S.day-k.born<14)){R(ctx,PCOL.skin,f.x*T+6-cx,f.by*T-f.h+5-cy,4,4);R(ctx,PCOL.hair,f.x*T+6-cx,f.by*T-f.h+5-cy,4,1);R(ctx,'#2a1d1a',f.x*T+7-cx,f.by*T-f.h+7-cy,2,1)}}
   else{const px=Math.round(P.x)-8-cx,py=Math.round(P.y)-22-cy;R(ctx,'rgba(0,0,0,.22)',px+3,py+20,10,3);ctx.drawImage(charSprite('p',PCOL,P.dir,P.moving?1+Math.floor(P.walk)%2:0),px,py)}}
  for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
  if(dk>.2){ctx.fillStyle='rgba(28,14,48,'+(dk*.45).toFixed(2)+')';ctx.fillRect(0,0,vw,vh);const g=ctx.createRadialGradient(96-cx,40-cy,4,96-cx,40-cy,70);g.addColorStop(0,'rgba(255,170,70,.28)');g.addColorStop(1,'rgba(255,170,70,0)');ctx.fillStyle=g;ctx.fillRect(16-cx,16-cy,144,120)}}
