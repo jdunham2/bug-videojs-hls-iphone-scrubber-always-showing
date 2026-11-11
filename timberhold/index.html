@@ -1,0 +1,709 @@
+<title>Timberhold</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed forest canvas; HUD pinned to the four corners like camp signage, build bar along the bottom edge. Single committed night-forest look. */
+:root{
+  color-scheme:dark;
+  --ink:#0d130e;        /* deep forest shadow */
+  --panel:rgba(16,24,17,.86);
+  --line:#34452f;       /* moss edge */
+  --bone:#ebe6d3;       /* text */
+  --dim:#a3ab92;        /* secondary text */
+  --ember:#f2a03d;      /* campfire accent */
+  --blood:#d1503a;      /* damage */
+  --leaf:#7fbf5a;       /* good / done */
+  --display:"Zilla Slab",Rockwell,Georgia,serif;
+  --ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+html,body{height:100%;margin:0}
+[hidden]{display:none!important}
+body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14px;overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#game{position:relative;height:100%;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+#hud{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  pointer-events:none}
+#top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;pointer-events:auto}
+#stats{min-width:150px}
+.bar{height:10px;background:#263023;border-radius:3px;overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;width:100%;background:var(--blood);transition:width .15s}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+#res{display:flex;gap:12px;margin-top:8px;font-variant-numeric:tabular-nums;font-weight:600}
+#res span b{color:var(--dim);font-weight:500;margin-right:4px}
+#clock{text-align:center;min-width:150px}
+#clock h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.1}
+#clock .bar>i{background:var(--ember);transition:none}
+#phase{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px}
+#goals{max-width:210px}
+#goals ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px;font-size:12.5px}
+#goals li{color:var(--dim)}
+#goals li::before{content:"○ "}
+#goals li.ok{color:var(--leaf)}
+#goals li.ok::before{content:"● "}
+#toast{align-self:center;font-family:var(--display);font-size:19px;text-align:center;text-wrap:balance;
+  text-shadow:0 2px 6px #000,0 0 2px #000;opacity:0;transition:opacity .4s;max-width:560px}
+#toast.on{opacity:1}
+#bottom{display:flex;align-items:flex-end;justify-content:center;gap:10px;flex-wrap:wrap}
+#tools{display:flex;gap:6px;overflow-x:auto;max-width:100%;pointer-events:auto;padding:2px}
+.tool{flex:none;background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;
+  font:inherit;padding:6px 9px;text-align:left;cursor:pointer;min-width:74px}
+.tool small{display:block;color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums}
+.tool kbd{font:600 10px var(--ui);color:var(--dim);margin-right:5px}
+.tool.sel{border-color:var(--ember);box-shadow:inset 0 -3px 0 var(--ember)}
+.tool.poor small{color:var(--blood)}
+#side{display:flex;gap:6px;pointer-events:auto}
+.btn{background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 13px var(--ui);
+  padding:8px 12px;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.tool:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+#act{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));
+  width:84px;height:84px;border-radius:50%;font:700 16px var(--display);background:rgba(242,160,61,.9);color:#1b1206;border:2px solid #1b1206;pointer-events:auto}
+.screen{position:absolute;inset:0;display:grid;place-items:center;background:rgba(8,12,9,.82);
+  padding:20px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.card{max-width:520px;width:100%;display:grid;gap:14px}
+.card h1{font-family:var(--display);font-size:clamp(40px,9vw,64px);line-height:.95;margin:0;text-wrap:balance}
+.card h1 em{font-style:normal;color:var(--ember)}
+.card p{margin:0;line-height:1.5;color:var(--bone);max-width:60ch}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;color:var(--dim);margin:0}
+.keys dt{color:var(--bone);font-weight:600}
+.keys dd{margin:0}
+.go{justify-self:start;background:var(--ember);color:#1b1206;border:0;border-radius:6px;font:700 18px var(--display);padding:12px 26px;cursor:pointer}
+.go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
+@media (max-width:640px){
+  #goals{max-width:150px}#goals ul{font-size:11.5px}
+  #stats,#clock{min-width:120px}
+  .tool{min-width:64px;padding:5px 7px}
+  #toast{font-size:16px}
+}
+</style>
+
+<div id="game">
+  <canvas id="cv"></canvas>
+  <div id="hud" hidden>
+    <div id="top">
+      <div class="panel" id="stats">
+        <div class="lbl">Health</div>
+        <div class="bar"><i id="hpbar"></i></div>
+        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Meat</b><span id="rm">0</span></span></div>
+      </div>
+      <div class="panel" id="clock">
+        <h2 id="dayname">Day 1</h2>
+        <div id="phase">Dusk in 1:30</div>
+        <div class="bar"><i id="tbar"></i></div>
+      </div>
+      <div class="panel" id="goals">
+        <div class="lbl">The house</div>
+        <ul>
+          <li id="g1">Wall in a room</li>
+          <li id="g2">Hang a door</li>
+          <li id="g3">Put a bed inside</li>
+          <li id="g4">Survive 5 nights</li>
+        </ul>
+      </div>
+    </div>
+    <div id="toast"></div>
+    <div id="bottom">
+      <div id="tools"></div>
+      <div id="side">
+        <button class="btn" id="eat" type="button">Eat meat (E)</button>
+        <button class="btn" id="craft" type="button">Flint axe · 6 wood 6 stone (C)</button>
+      </div>
+    </div>
+    <button id="act" type="button" hidden>Hit</button>
+  </div>
+
+  <div class="screen" id="start">
+    <div class="card">
+      <h1>Timber<em>hold</em></h1>
+      <p>You are alone in a clearing with an axe. Every night the forest sends wolves, then boars, then bears. Chop trees, quarry stone and raise a house around yourself before dark. A walled room with a door and a bed, still standing after the fifth night, wins.</p>
+      <dl class="keys">
+        <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
+        <dt>Mouse / Space</dt><dd>Swing the axe at trees, rocks and animals.</dd>
+        <dt>1 – 8</dt><dd>Pick a build piece, then click a nearby tile. Q returns to the axe.</dd>
+        <dt>E · C · P · M</dt><dd>Eat meat to heal · craft a flint axe · pause · mute.</dd>
+      </dl>
+      <button class="go" id="startbtn" type="button">Enter the forest</button>
+    </div>
+  </div>
+  <div class="screen" id="end" hidden>
+    <div class="card">
+      <h1 id="endtitle"></h1>
+      <p id="endtext"></p>
+      <button class="go" id="again" type="button">Try again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const dk = document.createElement('canvas'), dctx = dk.getContext('2d');
+const T = 48, W = 60, H = 60, WORLD = T * W, CX = WORLD / 2, CY = WORLD / 2;
+const rnd = (a, b) => a + Math.random() * (b - a), TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+
+const B = {
+  wall:  {name: 'Log wall',   cost: {wood: 3},           hp: 70,  solid: 1},
+  stone: {name: 'Stone wall', cost: {stone: 4, wood: 1}, hp: 190, solid: 1},
+  door:  {name: 'Door',       cost: {wood: 5},           hp: 65,  solid: 1, door: 1},
+  bed:   {name: 'Bed',        cost: {wood: 8},           hp: 40},
+  fire:  {name: 'Campfire',   cost: {wood: 5, stone: 3}, hp: 50},
+  spikes:{name: 'Spikes',     cost: {wood: 3, stone: 1}, hp: 60},
+};
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'remove'];
+const A = {
+  wolf: {hp: 26,  spd: 116, dmg: 8,  r: 12, sdmg: 6,  meat: 1, body: '#6f7477', head: '#8b9093'},
+  boar: {hp: 50,  spd: 90,  dmg: 13, r: 14, sdmg: 14, meat: 2, body: '#5a3d2b', head: '#6e4c36'},
+  bear: {hp: 135, spd: 64,  dmg: 24, r: 19, sdmg: 26, meat: 4, body: '#3b2a1f', head: '#4a3628'},
+  deer: {hp: 18,  spd: 135, dmg: 0,  r: 12, sdmg: 0,  meat: 2, body: '#a9793f', head: '#b98a4f', passive: 1},
+};
+const NIGHTS_TO_WIN = 5;
+
+let G, P, grid, interior, trees, rocks, animals, parts, floats, house;
+let vw = 0, vh = 0, dpr = 1, zoom = 1, cam = {x: CX, y: CY}, shake = 0;
+let running = false, paused = false, muted = false, tool = 'axe', last = 0, hudT = 0;
+const keys = {}, mouse = {x: 0, y: 0, down: false, fresh: false};
+const stick = {id: null, ox: 0, oy: 0, dx: 0, dy: 0};
+let touchMode = false, actDown = false, actFresh = false, toastT = 0, lastWarn = 0;
+
+/* ---------- audio ---------- */
+let ac;
+function snd(f, d = .08, type = 'square', vol = .05, slide = 0) {
+  if (!ac || muted) return;
+  const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d);
+}
+const howl = () => { snd(330, 1.1, 'sine', .06, 190); setTimeout(() => snd(520, 1.3, 'sine', .05, -200), 500); };
+
+/* ---------- world ---------- */
+function reset() {
+  G = {day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
+  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0};
+  grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
+  house = {room: false, door: false, bed: false};
+  trees = []; rocks = []; animals = []; parts = []; floats = []; tool = 'axe';
+  for (let i = 0; i < 2600 && trees.length < 560; i++) {
+    const x = rnd(40, WORLD - 40), y = rnd(40, WORLD - 40);
+    if (dist(x, y, CX, CY) < 290) continue;
+    if (trees.some(t => dist(x, y, t.x, t.y) < 50)) continue;
+    trees.push({x, y, r: rnd(24, 36), hp: 5, max: 5, dead: 0, shake: 0, hue: rnd(-8, 8)});
+  }
+  const addRock = (x, y) => {
+    if (rocks.some(r => dist(x, y, r.x, r.y) < 60)) return;
+    for (let i = trees.length - 1; i >= 0; i--) if (dist(x, y, trees[i].x, trees[i].y) < 42) trees.splice(i, 1);
+    rocks.push({x, y, r: rnd(15, 20), hp: 8, max: 8, dead: 0, shake: 0});
+  };
+  for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
+  for (let i = 0; i < 80; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
+  for (let i = 0; i < 4; i++) spawnDeer();
+  buildTools(); recalc();
+}
+const S = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? null : grid[ty * W + tx];
+function solidAt(tx, ty, animal) {
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return animal ? null : true;
+  const s = grid[ty * W + tx];
+  return s && B[s.type].solid && (animal || !B[s.type].door) ? s : null;
+}
+function hitBox(x, y, r, animal) {
+  const x0 = Math.floor((x - r) / T), x1 = Math.floor((x + r) / T), y0 = Math.floor((y - r) / T), y1 = Math.floor((y + r) / T);
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const s = solidAt(i, j, animal); if (s) return s; }
+  return null;
+}
+function move(e, dx, dy, animal) {
+  let hit = null, s = hitBox(e.x + dx, e.y, e.r * .8, animal);
+  if (s) hit = s; else e.x += dx;
+  s = hitBox(e.x, e.y + dy, e.r * .8, animal);
+  if (s) hit = hit || s; else e.y += dy;
+  return hit;
+}
+/* find enclosed floor tiles: flood from outside the structures' bounding box */
+function recalc() {
+  interior.fill(0); house = {room: false, door: false, bed: false};
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (const s of grid) if (s && B[s.type].solid) { x0 = Math.min(x0, s.tx); x1 = Math.max(x1, s.tx); y0 = Math.min(y0, s.ty); y1 = Math.max(y1, s.ty); }
+  if (x1 < 0) return;
+  x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(W - 1, x1 + 1); y1 = Math.min(H - 1, y1 + 1);
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, seen = new Uint8Array(bw * bh), st = [];
+  const push = (x, y) => { if (x < x0 || y < y0 || x > x1 || y > y1) return; const k = (y - y0) * bw + (x - x0); if (seen[k] || solidAt(x, y, true)) return; seen[k] = 1; st.push(x, y); };
+  for (let x = x0; x <= x1; x++) { push(x, y0); push(x, y1); }
+  for (let y = y0; y <= y1; y++) { push(x0, y); push(x1, y); }
+  while (st.length) { const y = st.pop(), x = st.pop(); push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1); }
+  let n = 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++)
+    if (!seen[(y - y0) * bw + (x - x0)] && !solidAt(x, y, true)) { interior[y * W + x] = 1; n++; }
+  house.room = n >= 4;
+  for (const s of grid) {
+    if (!s) continue;
+    if (s.type === 'bed' && interior[s.ty * W + s.tx]) house.bed = true;
+    if (s.type === 'door' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => s.tx + a >= 0 && s.tx + a < W && s.ty + b >= 0 && s.ty + b < H && interior[(s.ty + b) * W + s.tx + a])) house.door = true;
+  }
+}
+const houseDone = () => house.room && house.door && house.bed;
+
+/* ---------- building ---------- */
+const afford = c => (c.wood || 0) <= P.wood && (c.stone || 0) <= P.stone;
+const costText = c => Object.entries(c).map(([k, v]) => v + ' ' + k).join(' · ');
+function targetTile() {
+  if (touchMode) return {tx: Math.floor((P.x + Math.cos(P.ang) * T * 1.15) / T), ty: Math.floor((P.y + Math.sin(P.ang) * T * 1.15) / T)};
+  return {tx: Math.floor((cam.x + (mouse.x - vw / 2) / zoom) / T), ty: Math.floor((cam.y + (mouse.y - vh / 2) / zoom) / T)};
+}
+function canPlace(type, tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return 'Out of bounds';
+  const x = tx * T + T / 2, y = ty * T + T / 2;
+  if (dist(x, y, P.x, P.y) > 175) return 'Too far away';
+  const s = S(tx, ty);
+  if (type === 'remove') return s ? '' : 'Nothing to remove';
+  if (s) { if (s.type !== type) return 'Tile is taken'; if (s.hp >= s.max) return 'Already built'; return P.wood >= 1 || P.stone >= 1 ? '' : 'Need 1 wood or stone to repair'; }
+  if (!afford(B[type].cost)) return 'Need ' + costText(B[type].cost);
+  if (trees.some(t => !t.dead && dist(x, y, t.x, t.y) < 30) || rocks.some(r => !r.dead && dist(x, y, r.x, r.y) < 34)) return 'Clear the tile first';
+  if (B[type].solid) {
+    const over = e => Math.abs(e.x - x) < T / 2 + e.r * .8 && Math.abs(e.y - y) < T / 2 + e.r * .8;
+    if (!B[type].door && over(P)) return 'You are standing there';
+    if (animals.some(over)) return 'An animal is in the way';
+  }
+  return '';
+}
+function place(fresh) {
+  const {tx, ty} = targetTile(), err = canPlace(tool, tx, ty);
+  if (err) { if (fresh) { toast(err); snd(140, .08, 'square', .03); } return; }
+  const s = S(tx, ty), x = tx * T + T / 2, y = ty * T + T / 2;
+  if (tool === 'remove') {
+    const c = B[s.type].cost; P.wood += (c.wood || 0) >> 1; P.stone += (c.stone || 0) >> 1;
+    grid[ty * W + tx] = null; burst(x, y, '#8a6a45', 8);
+  } else if (s) {
+    if (s.type === 'stone' && P.stone >= 1) P.stone--; else if (P.wood >= 1) P.wood--; else P.stone--;
+    s.hp = s.max; float(x, y, 'repaired', '#7fbf5a');
+  } else {
+    const c = B[tool].cost; P.wood -= c.wood || 0; P.stone -= c.stone || 0;
+    grid[ty * W + tx] = {type: tool, tx, ty, hp: B[tool].hp, max: B[tool].hp, flash: 0};
+    burst(x, y, '#c9a26b', 6);
+  }
+  snd(220, .07, 'triangle', .07, -80);
+  const was = houseDone(); recalc();
+  if (!was && houseDone()) { toast('The house stands. Hold it through night ' + NIGHTS_TO_WIN + '.'); snd(520, .2, 'triangle', .07, 260); }
+}
+function damageStruct(s, d) {
+  s.hp -= d; s.flash = .15;
+  const x = s.tx * T + T / 2, y = s.ty * T + T / 2;
+  burst(x, y, s.type === 'stone' ? '#9a9a94' : '#8a6a45', 3); snd(90, .07, 'sawtooth', .04);
+  if (s.hp <= 0) {
+    grid[s.ty * W + s.tx] = null; burst(x, y, '#8a6a45', 14); recalc();
+    if (performance.now() - lastWarn > 4000) { toast('They broke through your ' + B[s.type].name.toLowerCase() + '.'); lastWarn = performance.now(); }
+  }
+}
+
+/* ---------- entities ---------- */
+function spawnDeer() {
+  for (let i = 0; i < 20; i++) {
+    const x = rnd(100, WORLD - 100), y = rnd(100, WORLD - 100);
+    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk('deer', x, y, 1)); return; }
+  }
+}
+function mk(type, x, y, scale) {
+  const d = A[type];
+  return {type, x, y, r: d.r, hp: d.hp * scale, max: d.hp * scale, ang: rnd(0, TAU), cd: rnd(0, .6), kx: 0, ky: 0, flash: 0, flee: false, wt: 0, wa: rnd(0, TAU), step: rnd(0, 9)};
+}
+function spawnHostile() {
+  const n = G.day, r = Math.random();
+  const type = n >= 3 && r < Math.min(.3, .12 + .05 * (n - 3)) ? 'bear' : n >= 2 && r < .42 ? 'boar' : 'wolf';
+  const a = rnd(0, TAU), d = Math.max(vw, vh) / zoom / 2 + rnd(140, 260);
+  animals.push(mk(type, clamp(P.x + Math.cos(a) * d, -60, WORLD + 60), clamp(P.y + Math.sin(a) * d, -60, WORLD + 60), 1 + .09 * (n - 1)));
+}
+function hurtPlayer(d, fx, fy) {
+  if (P.hurt > 0) return;
+  P.hp -= d; P.hurt = .45; shake = 9; snd(160, .18, 'sawtooth', .08, -90);
+  float(P.x, P.y - 22, '-' + d, '#ff7a63'); burst(P.x, P.y, '#d1503a', 8);
+  const l = Math.hypot(P.x - fx, P.y - fy) || 1; move(P, (P.x - fx) / l * 16, (P.y - fy) / l * 16, false);
+  if (P.hp <= 0) end(false);
+}
+function swing() {
+  if (P.cd > 0) return;
+  if (touchMode) { // aim for the player
+    let best = null, bd = 130;
+    for (const a of animals) { const d = dist(a.x, a.y, P.x, P.y); if (d < bd) { bd = d; best = a; } }
+    if (!best) { bd = 78; for (const o of trees.concat(rocks)) if (!o.dead) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; } } }
+    if (best) P.ang = Math.atan2(best.y - P.y, best.x - P.x);
+  }
+  P.cd = .34; P.swing = .18;
+  const reach = 58, dmg = P.flint ? 22 : 12;
+  const inArc = (o, extra) => {
+    const d = dist(o.x, o.y, P.x, P.y); if (d > reach + extra) return false;
+    let da = Math.atan2(o.y - P.y, o.x - P.x) - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+    return Math.abs(da) < 1.0 || d < 20;
+  };
+  let hit = false;
+  for (const a of animals) if (inArc(a, a.r)) {
+    hit = true; a.hp -= dmg; a.flash = .12; a.kx = Math.cos(P.ang) * 260; a.ky = Math.sin(P.ang) * 260;
+    float(a.x, a.y - a.r - 6, '' + dmg, '#fff'); burst(a.x, a.y, '#b03a2a', 5);
+  }
+  if (hit) { snd(240, .09, 'square', .06, -120); return; }
+  let best = null, bd = 1e9;
+  for (const o of trees) if (!o.dead && inArc(o, 14)) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; best.kind = 'wood'; } }
+  for (const o of rocks) if (!o.dead && inArc(o, o.r)) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; best.kind = 'stone'; } }
+  if (!best) { snd(420, .05, 'sine', .02, -200); return; }
+  const n = P.flint ? 2 : 1; best.hp -= n; best.shake = .2; let gain = n;
+  if (best.hp <= 0) { best.dead = best.kind === 'wood' ? 55 : 80; gain += 2; burst(best.x, best.y, best.kind === 'wood' ? '#4f7a3a' : '#8d8d86', 14); }
+  P[best.kind] += gain;
+  float(best.x, best.y - 24, '+' + gain + ' ' + best.kind, best.kind === 'wood' ? '#e0b676' : '#c9c9c2');
+  burst(best.x, best.y, best.kind === 'wood' ? '#c9a26b' : '#a8a8a0', 4);
+  best.kind === 'wood' ? snd(130, .07, 'square', .06, -40) : snd(700, .05, 'triangle', .06, -300);
+}
+function eat() {
+  if (!running || P.meat < 1) return toast('No meat. Hunt deer by day, or whatever comes at night.');
+  if (P.hp >= P.max) return toast('You are not hurt.');
+  P.meat--; P.hp = Math.min(P.max, P.hp + 30); float(P.x, P.y - 24, '+30', '#7fbf5a'); snd(300, .15, 'sine', .06, 200);
+}
+function craft() {
+  if (!running || P.flint) return;
+  if (P.wood < 6 || P.stone < 6) return toast('The flint axe needs 6 wood and 6 stone.');
+  P.wood -= 6; P.stone -= 6; P.flint = true; toast('Flint axe ready. It hits harder and chops twice as fast.'); snd(500, .2, 'triangle', .07, 300);
+}
+function burst(x, y, col, n) { for (let i = 0; i < n; i++) { const a = rnd(0, TAU), s = rnd(40, 170); parts.push({x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(.25, .55), col, size: rnd(2, 4.5)}); } }
+function float(x, y, txt, col) { floats.push({x, y, txt, col, life: .9}); }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); toastT = 3.2; }
+
+/* ---------- update ---------- */
+function update(dt) {
+  // clock
+  G.t += dt;
+  if (G.t >= G.len) {
+    G.t = 0;
+    if (G.phase === 'day') {
+      G.phase = 'night'; G.len = 52 + G.day * 3; G.queue = 4 + G.day * 3; G.spawnT = 2;
+      toast('Night ' + G.day + '. They are coming.'); howl();
+    } else {
+      G.nights++; G.day++; G.phase = 'day'; G.len = 75; G.queue = 0;
+      for (const a of animals) if (!A[a.type].passive) a.flee = true;
+      P.hp = Math.min(P.max, P.hp + 15);
+      if (G.nights >= NIGHTS_TO_WIN && houseDone()) return end(true);
+      toast(G.nights >= NIGHTS_TO_WIN ? 'You lived, but the house is not finished. Build it and hold one more night.' : 'Dawn. Night ' + G.nights + ' survived. Rebuild and gather.');
+      while (animals.filter(a => a.type === 'deer').length < 4) spawnDeer();
+    }
+  }
+  const left = G.len - G.t;
+  const target = G.phase === 'night' ? (left < 5 ? .35 : .8) : (left < 12 ? .35 : 0);
+  G.dark += (target - G.dark) * Math.min(1, dt * .7);
+  if (G.phase === 'night' && G.queue > 0 && (G.spawnT -= dt) <= 0) { spawnHostile(); G.queue--; G.spawnT = G.len * .62 / (4 + G.day * 3); }
+
+  // player
+  let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stick.dx;
+  let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.dy;
+  const ml = Math.hypot(mx, my);
+  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); }
+  if (!touchMode) P.ang = Math.atan2(cam.y + (mouse.y - vh / 2) / zoom - P.y, cam.x + (mouse.x - vw / 2) / zoom - P.x);
+  for (const o of trees) if (!o.dead) push(o, 9);
+  for (const o of rocks) if (!o.dead) push(o, o.r - 2);
+  P.cd -= dt; P.swing -= dt; P.hurt -= dt;
+  const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
+  if (acting) tool === 'axe' ? swing() : place(fresh);
+  mouse.fresh = actFresh = keys.SpaceFresh = false;
+  const ptx = Math.floor(P.x / T), pty = Math.floor(P.y / T);
+  if (interior[pty * W + ptx] && houseDone()) P.hp = Math.min(P.max, P.hp + 1.5 * dt);
+
+  // structures
+  for (const s of grid) {
+    if (!s) continue;
+    if (s.flash > 0) s.flash -= dt;
+    if (s.type === 'fire' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 110) P.hp = Math.min(P.max, P.hp + 4 * dt);
+  }
+  for (const o of trees) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
+  for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
+
+  // animals
+  for (let i = animals.length - 1; i >= 0; i--) {
+    const a = animals[i], d = A[a.type];
+    a.cd -= dt; a.flash -= dt; a.step += dt * 9;
+    if (a.hp <= 0) {
+      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); P.meat += d.meat; if (!d.passive) G.kills++;
+      float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60); continue;
+    }
+    const pd = dist(a.x, a.y, P.x, P.y);
+    let dx = 0, dy = 0, spd = d.spd;
+    if (a.flee) {
+      const l = Math.hypot(a.x - CX, a.y - CY) || 1; dx = (a.x - CX) / l; dy = (a.y - CY) / l; spd *= 1.2;
+      if (a.x < -40 || a.y < -40 || a.x > WORLD + 40 || a.y > WORLD + 40 || pd > 1500) { animals.splice(i, 1); continue; }
+    } else if (d.passive) {
+      if (pd < 170) { dx = (a.x - P.x) / pd; dy = (a.y - P.y) / pd; }
+      else { if ((a.wt -= dt) <= 0) { a.wt = rnd(1.5, 4); a.wa = Math.random() < .4 ? null : rnd(0, TAU); } if (a.wa !== null) { dx = Math.cos(a.wa); dy = Math.sin(a.wa); spd *= .3; } }
+      if (a.x < 60) dx = 1; if (a.y < 60) dy = 1; if (a.x > WORLD - 60) dx = -1; if (a.y > WORLD - 60) dy = -1;
+    } else if (pd > 1) { dx = (P.x - a.x) / pd; dy = (P.y - a.y) / pd; }
+    for (const b of animals) { // keep the pack from stacking
+      if (b === a) continue; const dd = dist(a.x, a.y, b.x, b.y), m = a.r + b.r;
+      if (dd < m && dd > .01) { dx += (a.x - b.x) / dd * .8; dy += (a.y - b.y) / dd * .8; }
+    }
+    const tile = S(Math.floor(a.x / T), Math.floor(a.y / T));
+    if (tile && tile.type === 'spikes' && !d.passive) {
+      a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
+      if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); }
+    }
+    if (dx || dy) a.ang = Math.atan2(dy, dx);
+    const blocked = move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
+    a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
+    if (d.passive || a.flee) continue;
+    if (blocked && blocked.type && a.cd <= 0) { damageStruct(blocked, d.sdmg); a.cd = .9; }
+    if (pd < a.r + P.r + 5 && a.cd <= 0) { hurtPlayer(d.dmg, a.x, a.y); a.cd = 1; }
+  }
+  for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; if ((p.life -= dt) <= 0) parts.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.y -= 34 * dt; if ((f.life -= dt) <= 0) floats.splice(i, 1); }
+  cam.x += (P.x - cam.x) * Math.min(1, dt * 8); cam.y += (P.y - cam.y) * Math.min(1, dt * 8);
+  shake *= Math.pow(.01, dt);
+  if (toastT > 0 && (toastT -= dt) <= 0) $('toast').classList.remove('on');
+}
+function push(o, r) {
+  const d = dist(P.x, P.y, o.x, o.y), m = r + P.r * .8;
+  if (d < m && d > .01) { const k = (m - d) / d; move(P, (P.x - o.x) * k, (P.y - o.y) * k, false); }
+}
+
+/* ---------- render ---------- */
+let pattern;
+function makePattern() {
+  const c = document.createElement('canvas'); c.width = c.height = 384; const g = c.getContext('2d');
+  g.fillStyle = '#2c4426'; g.fillRect(0, 0, 384, 384);
+  for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(${Math.random() < .5 ? '58,86,46' : '30,50,28'},.35)`; g.beginPath(); g.ellipse(rnd(0, 384), rnd(0, 384), rnd(8, 30), rnd(6, 18), rnd(0, 3), 0, TAU); g.fill(); }
+  g.strokeStyle = 'rgba(110,150,80,.5)'; g.lineWidth = 1.2;
+  for (let i = 0; i < 150; i++) { const x = rnd(4, 380), y = rnd(6, 380); g.beginPath(); g.moveTo(x, y); g.lineTo(x - 2, y - 5); g.moveTo(x, y); g.lineTo(x + 2, y - 6); g.stroke(); }
+  pattern = ctx.createPattern(c, 'repeat');
+}
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2); vw = cv.clientWidth; vh = cv.clientHeight;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  dk.width = Math.ceil(vw / 2); dk.height = Math.ceil(vh / 2);
+  zoom = clamp(Math.min(vw / 880, vh / 600), .58, 1.5);
+}
+function drawStruct(s, now) {
+  const x = s.tx * T, y = s.ty * T;
+  if (s.type === 'wall') {
+    ctx.fillStyle = '#7a5532'; ctx.fillRect(x, y, T, T);
+    ctx.fillStyle = '#93693f'; for (let i = 0; i < 3; i++) ctx.fillRect(x + 1, y + 2 + i * 16, T - 2, 11);
+    ctx.fillStyle = '#5d3f24'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x + 7, y + 7.5 + i * 16, 3, 0, TAU); ctx.arc(x + T - 7, y + 7.5 + i * 16, 3, 0, TAU); ctx.fill(); }
+  } else if (s.type === 'stone') {
+    ctx.fillStyle = '#6f716c'; ctx.fillRect(x, y, T, T); ctx.fillStyle = '#8f918b';
+    ctx.fillRect(x + 2, y + 2, 26, 13); ctx.fillRect(x + 30, y + 2, 16, 13); ctx.fillRect(x + 2, y + 17, 14, 13); ctx.fillRect(x + 18, y + 17, 28, 13); ctx.fillRect(x + 2, y + 32, 22, 14); ctx.fillRect(x + 26, y + 32, 20, 14);
+  } else if (s.type === 'door') {
+    ctx.fillStyle = '#5d3f24'; ctx.fillRect(x, y, T, T); ctx.fillStyle = '#b98a4f';
+    for (let i = 0; i < 4; i++) ctx.fillRect(x + 4 + i * 10.3, y + 4, 8.5, T - 8);
+    ctx.fillStyle = '#2a1d10'; ctx.beginPath(); ctx.arc(x + T - 11, y + T / 2, 3, 0, TAU); ctx.fill();
+  } else if (s.type === 'bed') {
+    ctx.fillStyle = '#6b4a2c'; ctx.fillRect(x + 6, y + 3, T - 12, T - 6);
+    ctx.fillStyle = '#9c3f33'; ctx.fillRect(x + 8, y + 16, T - 16, T - 21);
+    ctx.fillStyle = '#e7dfc8'; ctx.fillRect(x + 11, y + 6, T - 22, 9);
+  } else if (s.type === 'fire') {
+    ctx.fillStyle = '#77776f'; for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.beginPath(); ctx.arc(x + 24 + Math.cos(a) * 15, y + 24 + Math.sin(a) * 15, 5, 0, TAU); ctx.fill(); }
+    const f = Math.sin(now / 90 + s.tx) * 2;
+    ctx.fillStyle = '#e2552a'; ctx.beginPath(); ctx.arc(x + 24, y + 24, 10 + f, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f2a03d'; ctx.beginPath(); ctx.arc(x + 24 + f * .5, y + 24, 6.5, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffe9a3'; ctx.beginPath(); ctx.arc(x + 24, y + 24 - f * .4, 3, 0, TAU); ctx.fill();
+  } else if (s.type === 'spikes') {
+    ctx.fillStyle = 'rgba(60,40,22,.55)'; ctx.fillRect(x + 3, y + 3, T - 6, T - 6);
+    ctx.fillStyle = '#d6c7a1'; for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) { const px = x + 10 + i * 14, py = y + 12 + j * 14; ctx.beginPath(); ctx.moveTo(px, py - 7); ctx.lineTo(px + 4, py + 4); ctx.lineTo(px - 4, py + 4); ctx.fill(); }
+  }
+  if (s.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x, y, T, T); }
+  if (s.hp < s.max) hpBar(x + T / 2, y + 4, 30, s.hp / s.max);
+}
+function hpBar(x, y, w, f) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 6); ctx.fillStyle = f > .5 ? '#7fbf5a' : f > .25 ? '#f2a03d' : '#d1503a'; ctx.fillRect(x - w / 2, y, w * Math.max(0, f), 4); }
+function drawAnimal(a) {
+  const d = A[a.type], r = a.r, bob = Math.sin(a.step) * 1.2;
+  ctx.save(); ctx.translate(a.x, a.y);
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(2, 5, r * 1.25, r * .8, 0, 0, TAU); ctx.fill();
+  ctx.rotate(a.ang);
+  ctx.fillStyle = a.flash > 0 ? '#fff' : d.body;
+  ctx.beginPath(); ctx.ellipse(-r * .25, bob * .3, r * 1.25, r * .8, 0, 0, TAU); ctx.fill();
+  if (a.type === 'wolf') { ctx.beginPath(); ctx.moveTo(-r * 1.3, 0); ctx.lineTo(-r * 2.1, bob * 2); ctx.lineTo(-r * 1.2, 4); ctx.fill(); }
+  ctx.fillStyle = a.flash > 0 ? '#fff' : d.head;
+  ctx.beginPath(); ctx.arc(r * .85, 0, r * .62, 0, TAU); ctx.fill();
+  if (a.type === 'bear') { ctx.beginPath(); ctx.arc(r * .7, -r * .55, r * .25, 0, TAU); ctx.arc(r * .7, r * .55, r * .25, 0, TAU); ctx.fill(); }
+  else { ctx.beginPath(); ctx.moveTo(r * .6, -r * .45); ctx.lineTo(r * .35, -r * .95); ctx.lineTo(r * .95, -r * .5); ctx.moveTo(r * .6, r * .45); ctx.lineTo(r * .35, r * .95); ctx.lineTo(r * .95, r * .5); ctx.fill(); }
+  if (a.type === 'boar') { ctx.fillStyle = '#efe6cf'; ctx.fillRect(r * 1.25, -r * .45, 5, 2.5); ctx.fillRect(r * 1.25, r * .3, 5, 2.5); }
+  if (a.type === 'deer') { ctx.strokeStyle = '#e9dcbc'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r * .9, -4); ctx.lineTo(r * .5, -r * 1.2); ctx.moveTo(r * .9, 4); ctx.lineTo(r * .5, r * 1.2); ctx.stroke(); }
+  ctx.fillStyle = '#16100a'; ctx.beginPath(); ctx.arc(r * 1.4, 0, 2.2, 0, TAU); ctx.fill();
+  ctx.restore();
+  if (a.hp < a.max) hpBar(a.x, a.y - r - 12, 26, a.hp / a.max);
+}
+function render(now) {
+  const z = zoom * dpr, sx = (Math.random() - .5) * shake, sy = (Math.random() - .5) * shake;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0d130e'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(z, 0, 0, z, cv.width / 2 - (cam.x + sx) * z, cv.height / 2 - (cam.y + sy) * z);
+  const hw = vw / zoom / 2 + 60, hh = vh / zoom / 2 + 60, x0 = cam.x - hw, y0 = cam.y - hh, x1 = cam.x + hw, y1 = cam.y + hh;
+  const vis = (o, m) => o.x > x0 - m && o.x < x1 + m && o.y > y0 - m && o.y < y1 + m;
+  ctx.fillStyle = pattern; ctx.fillRect(Math.max(0, x0), Math.max(0, y0), Math.min(WORLD, x1) - Math.max(0, x0), Math.min(WORLD, y1) - Math.max(0, y0));
+  const cg = ctx.createRadialGradient(CX, CY, 60, CX, CY, 330); cg.addColorStop(0, 'rgba(150,170,90,.28)'); cg.addColorStop(1, 'rgba(150,170,90,0)');
+  ctx.fillStyle = cg; ctx.fillRect(CX - 340, CY - 340, 680, 680);
+  const tx0 = Math.max(0, Math.floor(x0 / T)), tx1 = Math.min(W - 1, Math.floor(x1 / T)), ty0 = Math.max(0, Math.floor(y0 / T)), ty1 = Math.min(H - 1, Math.floor(y1 / T));
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (interior[ty * W + tx]) {
+    ctx.fillStyle = '#8f6c43'; ctx.fillRect(tx * T, ty * T, T, T); ctx.fillStyle = 'rgba(40,26,12,.35)';
+    for (let i = 0; i < 4; i++) ctx.fillRect(tx * T, ty * T + i * 12, T, 1.5);
+    ctx.fillRect(tx * T + ((tx + ty) % 2 ? 14 : 32), ty * T, 1.5, T);
+  }
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) { const s = grid[ty * W + tx]; if (s) drawStruct(s, now); }
+  // build ghost
+  if (tool !== 'axe' && running) {
+    const {tx, ty} = targetTile(), ok = !canPlace(tool, tx, ty);
+    ctx.fillStyle = ok ? 'rgba(127,191,90,.4)' : 'rgba(209,80,58,.4)'; ctx.fillRect(tx * T, ty * T, T, T);
+    ctx.strokeStyle = ok ? '#7fbf5a' : '#d1503a'; ctx.lineWidth = 2; ctx.strokeRect(tx * T + 1, ty * T + 1, T - 2, T - 2);
+  }
+  for (const o of rocks) if (vis(o, 30)) {
+    if (o.dead) { ctx.fillStyle = 'rgba(90,90,84,.5)'; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, TAU); ctx.fill(); continue; }
+    const k = o.shake > 0 ? Math.sin(o.shake * 80) * 2 : 0;
+    ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(o.x + 3, o.y + 5, o.r * 1.1, o.r * .8, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#787a74'; ctx.beginPath(); ctx.arc(o.x + k, o.y, o.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#9fa19a'; ctx.beginPath(); ctx.arc(o.x + k - o.r * .25, o.y - o.r * .28, o.r * .55, 0, TAU); ctx.fill();
+  }
+  for (const o of trees) if (vis(o, 40)) { // trunks and stumps
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(o.x + 6, o.y + 8, o.dead ? 12 : o.r, o.dead ? 8 : o.r * .8, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#5a3d24'; ctx.beginPath(); ctx.arc(o.x, o.y, 9, 0, TAU); ctx.fill();
+    if (o.dead) { ctx.fillStyle = '#c9a26b'; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, TAU); ctx.fill(); }
+  }
+  for (const a of animals) if (vis(a, 40)) drawAnimal(a);
+  // player
+  ctx.save(); ctx.translate(P.x, P.y);
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(2, 5, 15, 10, 0, 0, TAU); ctx.fill();
+  ctx.rotate(P.ang);
+  const sw = P.swing > 0 ? (1 - P.swing / .18) * 2 - 1 : -.9;
+  ctx.save(); ctx.rotate(sw * 1.0); ctx.fillStyle = '#7a5532'; ctx.fillRect(8, -2, 26, 4);
+  ctx.fillStyle = P.flint ? '#3c4a52' : '#a9aba4'; ctx.beginPath(); ctx.moveTo(28, -9); ctx.lineTo(40, -7); ctx.lineTo(40, 7); ctx.lineTo(28, 2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = P.hurt > .3 ? '#fff' : '#b4452f'; ctx.beginPath(); ctx.ellipse(0, 0, 10, 14, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#e8b98a'; ctx.beginPath(); ctx.arc(2, 0, 7.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#3a2716'; ctx.beginPath(); ctx.arc(0, 0, 7.5, Math.PI * .5, Math.PI * 1.5); ctx.fill();
+  ctx.restore();
+  for (const o of trees) if (!o.dead && vis(o, 50)) { // canopies
+    const k = o.shake > 0 ? Math.sin(o.shake * 80) * 3 : 0, under = dist(o.x, o.y, P.x, P.y) < o.r + 6;
+    ctx.globalAlpha = under ? .45 : .96;
+    ctx.fillStyle = `hsl(${112 + o.hue},34%,19%)`; ctx.beginPath(); ctx.arc(o.x + k, o.y, o.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = `hsl(${108 + o.hue},36%,26%)`; ctx.beginPath(); ctx.arc(o.x + k - o.r * .15, o.y - o.r * .18, o.r * .72, 0, TAU); ctx.fill();
+    ctx.fillStyle = `hsl(${100 + o.hue},38%,33%)`; ctx.beginPath(); ctx.arc(o.x + k - o.r * .28, o.y - o.r * .32, o.r * .38, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (o.hp < o.max) hpBar(o.x, o.y - o.r - 8, 26, o.hp / o.max);
+  }
+  for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life * 3); ctx.fillStyle = p.col; ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }
+  ctx.globalAlpha = 1;
+  // dense forest beyond the map edge
+  ctx.fillStyle = '#0d130e';
+  ctx.fillRect(x0 - 100, y0 - 100, x1 - x0 + 200, -y0 + 100); ctx.fillRect(x0 - 100, WORLD, x1 - x0 + 200, y1 - WORLD + 100);
+  ctx.fillRect(x0 - 100, 0, -x0 + 100, WORLD); ctx.fillRect(WORLD, 0, x1 - WORLD + 100, WORLD);
+
+  // darkness with light holes
+  if (G.dark > .01) {
+    const toS = (wx, wy) => [(wx - cam.x - sx) * zoom / 2 + dk.width / 2, (wy - cam.y - sy) * zoom / 2 + dk.height / 2];
+    dctx.globalCompositeOperation = 'source-over'; dctx.clearRect(0, 0, dk.width, dk.height);
+    dctx.fillStyle = `rgba(5,9,20,${G.dark})`; dctx.fillRect(0, 0, dk.width, dk.height);
+    dctx.globalCompositeOperation = 'destination-out';
+    const light = (wx, wy, r, a) => { const [lx, ly] = toS(wx, wy), rr = r * zoom / 2, g = dctx.createRadialGradient(lx, ly, rr * .15, lx, ly, rr); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.fillRect(lx - rr, ly - rr, rr * 2, rr * 2); };
+    light(P.x, P.y, 210, .8);
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) { const s = grid[ty * W + tx]; if (s && s.type === 'fire') light(tx * T + 24, ty * T + 24, 280 + Math.sin(now / 110 + tx) * 12, .95); }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(dk, 0, 0, cv.width, cv.height); ctx.restore();
+    if (G.dark > .3) { // eyes in the dark
+      ctx.fillStyle = `rgba(255,214,90,${G.dark})`;
+      for (const a of animals) if (!A[a.type].passive && vis(a, 20)) {
+        const hx = a.x + Math.cos(a.ang) * a.r * .95, hy = a.y + Math.sin(a.ang) * a.r * .95, px = -Math.sin(a.ang) * a.r * .28, py = Math.cos(a.ang) * a.r * .28;
+        ctx.beginPath(); ctx.arc(hx + px, hy + py, 1.8, 0, TAU); ctx.arc(hx - px, hy - py, 1.8, 0, TAU); ctx.fill();
+      }
+    }
+  }
+  ctx.font = '600 14px "IBM Plex Sans",system-ui,sans-serif'; ctx.textAlign = 'center';
+  for (const f of floats) { ctx.globalAlpha = Math.min(1, f.life * 2.5); ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillText(f.txt, f.x + 1, f.y + 1); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); }
+  ctx.globalAlpha = 1;
+  if (stick.id !== null) { // joystick
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.strokeStyle = 'rgba(235,230,211,.45)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 46, 0, TAU); ctx.stroke();
+    ctx.fillStyle = 'rgba(235,230,211,.5)'; ctx.beginPath(); ctx.arc(stick.ox + stick.dx * 46, stick.oy + stick.dy * 46, 20, 0, TAU); ctx.fill();
+  }
+}
+
+/* ---------- HUD ---------- */
+function buildTools() {
+  const box = $('tools'); box.innerHTML = '';
+  TOOLS.forEach((t, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tool'; b.id = 'tool-' + t; b.dataset.t = t;
+    const name = t === 'axe' ? 'Axe' : t === 'remove' ? 'Remove' : B[t].name;
+    const sub = t === 'axe' ? 'chop · fight' : t === 'remove' ? 'half refund' : costText(B[t].cost);
+    b.innerHTML = `<kbd>${i + 1}</kbd>${name}<small>${sub}</small>`;
+    b.addEventListener('click', () => { tool = t; hud(); });
+    box.appendChild(b);
+  });
+}
+function hud() {
+  $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
+  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat;
+  const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
+  $('phase').textContent = (G.phase === 'day' ? 'Dusk in ' : 'Dawn in ') + mm;
+  $('tbar').style.width = (G.t / G.len * 100) + '%';
+  $('g1').className = house.room ? 'ok' : ''; $('g2').className = house.door ? 'ok' : ''; $('g3').className = house.bed ? 'ok' : '';
+  $('g4').className = G.nights >= NIGHTS_TO_WIN ? 'ok' : ''; $('g4').textContent = `Survive ${NIGHTS_TO_WIN} nights (${Math.min(G.nights, NIGHTS_TO_WIN)}/${NIGHTS_TO_WIN})`;
+  for (const t of TOOLS) { const b = $('tool-' + t); b.classList.toggle('sel', t === tool); b.classList.toggle('poor', !!B[t] && !afford(B[t].cost)); }
+  $('eat').disabled = P.meat < 1; $('craft').hidden = P.flint;
+  $('act').textContent = tool === 'axe' ? 'Hit' : tool === 'remove' ? 'Remove' : 'Build';
+}
+function end(won) {
+  running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
+  $('endtitle').innerHTML = won ? 'The house <em>held</em>' : 'The forest <em>took you</em>';
+  $('endtext').textContent = won
+    ? `Five nights, ${G.kills} animals driven off, and your walls are still standing. You are safe in the middle of the forest.`
+    : `You fell on ${G.phase === 'night' ? 'night' : 'day'} ${G.day} after surviving ${G.nights} night${G.nights === 1 ? '' : 's'} and fighting off ${G.kills} animals. Walls first, then a door, then the bed.`;
+  won ? snd(520, .5, 'triangle', .08, 400) : snd(200, .8, 'sawtooth', .07, -150);
+}
+function start() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  reset(); cam.x = P.x; cam.y = P.y; running = true; paused = false;
+  $('start').hidden = true; $('end').hidden = true; $('hud').hidden = false; hud();
+  toast('Chop wood before dusk. Walls first.');
+}
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
+  if (running && !paused) { update(dt); if ((hudT -= dt) <= 0) { hudT = .1; if (running) hud(); } }
+  render(now); requestAnimationFrame(frame);
+}
+
+/* ---------- input ---------- */
+addEventListener('keydown', e => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
+  keys[e.code] = true; if (e.repeat || !running) return;
+  const n = e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
+  if (n >= 1 && n <= TOOLS.length) { tool = TOOLS[n - 1]; hud(); }
+  if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
+  if (e.code === 'KeyE') eat();
+  if (e.code === 'KeyC') craft();
+  if (e.code === 'KeyM') { muted = !muted; toast(muted ? 'Sound off' : 'Sound on'); }
+  if (e.code === 'KeyP') { paused = !paused; $('toast').textContent = paused ? 'Paused. Press P to resume.' : ''; $('toast').classList.toggle('on', paused); }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
+cv.addEventListener('mousemove', e => { mouse.x = e.clientX - cv.getBoundingClientRect().left; mouse.y = e.clientY - cv.getBoundingClientRect().top; touchMode = false; $('act').hidden = true; });
+cv.addEventListener('mousedown', e => { if (e.button === 2) { tool = 'axe'; hud(); return; } mouse.down = mouse.fresh = true; });
+addEventListener('mouseup', () => { mouse.down = false; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('touchstart', e => {
+  e.preventDefault(); touchMode = true; $('act').hidden = false;
+  if (stick.id === null) { const t = e.changedTouches[0], r = cv.getBoundingClientRect(); stick.id = t.identifier; stick.ox = t.clientX - r.left; stick.oy = t.clientY - r.top; stick.dx = stick.dy = 0; }
+}, {passive: false});
+cv.addEventListener('touchmove', e => {
+  e.preventDefault(); const r = cv.getBoundingClientRect();
+  for (const t of e.changedTouches) if (t.identifier === stick.id) {
+    let dx = (t.clientX - r.left - stick.ox) / 46, dy = (t.clientY - r.top - stick.oy) / 46; const l = Math.hypot(dx, dy);
+    if (l > 1) { dx /= l; dy /= l; } stick.dx = dx; stick.dy = dy;
+  }
+}, {passive: false});
+const endTouch = e => { for (const t of e.changedTouches) if (t.identifier === stick.id) { stick.id = null; stick.dx = stick.dy = 0; } };
+cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
+const act = $('act');
+act.addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; actDown = actFresh = true; }, {passive: false});
+act.addEventListener('touchend', e => { e.preventDefault(); actDown = false; });
+act.addEventListener('touchcancel', () => { actDown = false; });
+$('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
+$('startbtn').addEventListener('click', start); $('again').addEventListener('click', start);
+addEventListener('resize', resize);
+
+resize(); makePattern(); reset(); G.dark = .55;
+requestAnimationFrame(frame);
+})();
+</script>
