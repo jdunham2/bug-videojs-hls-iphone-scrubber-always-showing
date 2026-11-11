@@ -32,7 +32,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 .bar{height:10px;background:#263023;border-radius:3px;overflow:hidden;margin-top:4px}
 .bar>i{display:block;height:100%;width:100%;background:var(--blood);transition:width .15s}
 .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
-#res{display:flex;gap:12px;margin-top:8px;font-variant-numeric:tabular-nums;font-weight:600}
+#res{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-variant-numeric:tabular-nums;font-weight:600}
 #res span b{color:var(--dim);font-weight:500;margin-right:4px}
 #clock{text-align:center;min-width:150px}
 #clock h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.1}
@@ -48,14 +48,15 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
   text-shadow:0 2px 6px #000,0 0 2px #000;opacity:0;transition:opacity .4s;max-width:560px}
 #toast.on{opacity:1}
 #bottom{display:flex;align-items:flex-end;justify-content:center;gap:10px;flex-wrap:wrap}
-#tools{display:flex;gap:6px;overflow-x:auto;max-width:100%;pointer-events:auto;padding:2px}
+#bars{display:grid;gap:6px;max-width:100%;min-width:0;justify-items:center}
+#tools,#weapons{display:flex;gap:6px;overflow-x:auto;max-width:100%;pointer-events:auto;padding:2px}
 .tool{flex:none;background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;
   font:inherit;padding:6px 9px;text-align:left;cursor:pointer;min-width:74px}
 .tool small{display:block;color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums}
 .tool kbd{font:600 10px var(--ui);color:var(--dim);margin-right:5px}
 .tool.sel{border-color:var(--ember);box-shadow:inset 0 -3px 0 var(--ember)}
 .tool.poor small{color:var(--blood)}
-#side{display:flex;gap:6px;pointer-events:auto}
+#side{display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;justify-content:center}
 .btn{background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 13px var(--ui);
   padding:8px 12px;cursor:pointer}
 .btn:disabled{opacity:.45;cursor:default}
@@ -89,7 +90,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div class="panel" id="stats">
         <div class="lbl">Health</div>
         <div class="bar"><i id="hpbar"></i></div>
-        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Meat</b><span id="rm">0</span></span></div>
+        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span></div>
       </div>
       <div class="panel" id="clock">
         <h2 id="dayname">Day 1</h2>
@@ -108,9 +109,11 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
     </div>
     <div id="toast"></div>
     <div id="bottom">
-      <div id="tools"></div>
+      <div id="bars"><div id="weapons"></div><div id="tools"></div></div>
       <div id="side">
         <button class="btn" id="eat" type="button">Eat meat (E)</button>
+        <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
+        <button class="btn" id="mkbullets" type="button">Bullets ×8 · 2 iron 1 stone (F)</button>
         <button class="btn" id="craft" type="button">Flint axe · 6 wood 6 stone (C)</button>
       </div>
     </div>
@@ -123,8 +126,9 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <p>You are alone in a clearing with an axe. Every night the forest sends wolves, then boars, then bears. Chop trees, quarry stone and raise a house around yourself before dark. A walled room with a door and a bed, still standing after the fifth night, wins.</p>
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
-        <dt>Mouse / Space</dt><dd>Swing the axe at trees, rocks and animals.</dd>
-        <dt>1 – 8</dt><dd>Pick a build piece, then click a nearby tile. Q returns to the axe.</dd>
+        <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
+        <dt>Weapon bar</dt><dd>Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
+        <dt>1 – 8</dt><dd>Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
         <dt>E · C · P · M</dt><dd>Eat meat to heal · craft a flint axe · pause · mute.</dd>
       </dl>
       <button class="go" id="startbtn" type="button">Enter the forest</button>
@@ -159,6 +163,15 @@ const B = {
   spikes:{name: 'Spikes',     cost: {wood: 3, stone: 1}, hp: 60},
 };
 const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'remove'];
+const WPN = {
+  axe:     {name: 'Axe', note: 'chops'},
+  spear:   {name: 'Spear',   cost: {wood: 8, stone: 3},  melee: 1, dmg: 28, reach: 98, arc: .5, cd: .42, note: 'long reach'},
+  bow:     {name: 'Bow',     cost: {wood: 10},           ammo: 'arrows',  dmg: 22, spd: 640,  cd: .55, range: 560},
+  pistol:  {name: 'Pistol',  cost: {wood: 4, iron: 8},   ammo: 'bullets', dmg: 34, spd: 1300, cd: .3,  range: 640},
+  shotgun: {name: 'Shotgun', cost: {wood: 8, iron: 12},  ammo: 'bullets', use: 2, pellets: 6, spread: .34, dmg: 16, spd: 1100, cd: .9, range: 300},
+  rifle:   {name: 'Rifle',   cost: {wood: 10, iron: 16}, ammo: 'bullets', dmg: 80, spd: 1800, cd: .95, range: 1000, pierce: 2},
+};
+const WKEYS = Object.keys(WPN);
 const A = {
   wolf: {hp: 26,  spd: 116, dmg: 8,  r: 12, sdmg: 6,  meat: 1, body: '#6f7477', head: '#8b9093'},
   boar: {hp: 50,  spd: 90,  dmg: 13, r: 14, sdmg: 14, meat: 2, body: '#5a3d2b', head: '#6e4c36'},
@@ -167,7 +180,7 @@ const A = {
 };
 const NIGHTS_TO_WIN = 5;
 
-let G, P, grid, interior, trees, rocks, animals, parts, floats, house;
+let G, P, grid, interior, trees, rocks, animals, parts, floats, house, shots = [];
 let vw = 0, vh = 0, dpr = 1, zoom = 1, cam = {x: CX, y: CY}, shake = 0;
 let running = false, paused = false, muted = false, tool = 'axe', last = 0, hudT = 0;
 const keys = {}, mouse = {x: 0, y: 0, wx: CX + 60, wy: CY, down: false, fresh: false};
@@ -189,10 +202,10 @@ const howl = () => { snd(330, 1.1, 'sine', .06, 190); setTimeout(() => snd(520, 
 /* ---------- world ---------- */
 function reset() {
   G = {day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
-  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0};
+  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
-  trees = []; rocks = []; animals = []; parts = []; floats = []; tool = 'axe';
+  trees = []; rocks = []; animals = []; parts = []; floats = []; shots = []; tool = 'axe';
   for (let i = 0; i < 2600 && trees.length < 560; i++) {
     const x = rnd(40, WORLD - 40), y = rnd(40, WORLD - 40);
     if (dist(x, y, CX, CY) < 290) continue;
@@ -252,7 +265,8 @@ function recalc() {
 const houseDone = () => house.room && house.door && house.bed;
 
 /* ---------- building ---------- */
-const afford = c => (c.wood || 0) <= P.wood && (c.stone || 0) <= P.stone;
+const afford = c => Object.keys(c).every(k => P[k] >= c[k]);
+const pay = c => { for (const k in c) P[k] -= c[k]; };
 const costText = c => Object.entries(c).map(([k, v]) => v + ' ' + k).join(' · ');
 function targetTile() {
   if (touchMode) return {tx: Math.floor((P.x + Math.cos(P.ang) * T * 1.15) / T), ty: Math.floor((P.y + Math.sin(P.ang) * T * 1.15) / T)};
@@ -327,14 +341,66 @@ function hurtPlayer(d, fx, fy) {
   const l = Math.hypot(P.x - fx, P.y - fy) || 1; move(P, (P.x - fx) / l * 16, (P.y - fy) / l * 16, false);
   if (P.hp <= 0) end(false);
 }
-function swing() {
+function autoAim(range, resources) { // touch players have no cursor, so aim for them
+  if (!touchMode) return;
+  let best = null, bd = range;
+  for (const a of animals) { const d = dist(a.x, a.y, P.x, P.y); if (d < bd) { bd = d; best = a; } }
+  if (!best && resources) { bd = 78; for (const o of trees.concat(rocks)) if (!o.dead) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; } } }
+  if (best) P.ang = Math.atan2(best.y - P.y, best.x - P.x);
+}
+function hitAnimal(a, dmg, dx, dy) {
+  a.hp -= dmg; a.flash = .12; a.kx = dx * 240; a.ky = dy * 240;
+  float(a.x, a.y - a.r - 6, '' + dmg, '#fff'); burst(a.x, a.y, '#b03a2a', 5);
+}
+function attack(fresh) {
   if (P.cd > 0) return;
-  if (touchMode) { // aim for the player
-    let best = null, bd = 130;
-    for (const a of animals) { const d = dist(a.x, a.y, P.x, P.y); if (d < bd) { bd = d; best = a; } }
-    if (!best) { bd = 78; for (const o of trees.concat(rocks)) if (!o.dead) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; } } }
-    if (best) P.ang = Math.atan2(best.y - P.y, best.x - P.x);
+  const w = WPN[P.weapon], cx = Math.cos(P.ang), cy = Math.sin(P.ang);
+  if (P.weapon === 'axe') return swing();
+  if (w.melee) {
+    autoAim(w.reach + 30); P.cd = w.cd; P.swing = .18; let hit = false;
+    const ax = Math.cos(P.ang), ay = Math.sin(P.ang);
+    for (const a of animals) {
+      const d = dist(a.x, a.y, P.x, P.y); if (d > w.reach + a.r) continue;
+      let da = Math.atan2(a.y - P.y, a.x - P.x) - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) < w.arc || d < 22) { hitAnimal(a, w.dmg, ax, ay); hit = true; }
+    }
+    hit ? snd(300, .09, 'square', .06, -160) : snd(520, .06, 'sine', .025, -260); return;
   }
+  const need = w.use || 1;
+  if (P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. Press ' + (w.ammo === 'arrows' ? 'R' : 'F') + ' to make more.'); return; }
+  autoAim(w.range * .85);
+  const ang = P.ang, mx = P.x + Math.cos(ang) * 22, my = P.y + Math.sin(ang) * 22;
+  P[w.ammo] -= need; P.cd = w.cd; P.swing = .1;
+  for (let i = 0; i < (w.pellets || 1); i++) {
+    const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
+    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows'});
+  }
+  if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
+  else { burst(mx, my, '#ffd27a', 5); shake = Math.max(shake, P.weapon === 'pistol' ? 3 : 7); snd(P.weapon === 'pistol' ? 210 : 130, P.weapon === 'pistol' ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
+}
+function equip(k) {
+  if (!running) return;
+  const w = WPN[k];
+  if (!P.owned[k]) {
+    if (!afford(w.cost)) return toast('The ' + w.name.toLowerCase() + ' needs ' + costText(w.cost) + '.');
+    pay(w.cost); P.owned[k] = true; snd(500, .2, 'triangle', .07, 300);
+    if (w.ammo === 'arrows' && !P.arrows) P.arrows = 6;
+    if (w.ammo === 'bullets' && !P.bullets) P.bullets = 8;
+    toast(w.name + ' crafted.' + (w.ammo ? ' It comes with a few ' + w.ammo + '.' : ''));
+  }
+  P.weapon = k; tool = 'axe'; hud();
+}
+function cycleWeapon(dir) {
+  const own = WKEYS.filter(k => P.owned[k]); P.weapon = own[(own.indexOf(P.weapon) + dir + own.length) % own.length]; tool = 'axe'; hud();
+}
+function makeAmmo(kind) {
+  if (!running) return;
+  const c = kind === 'arrows' ? {wood: 2, stone: 1} : {iron: 2, stone: 1};
+  if (!afford(c)) return toast((kind === 'arrows' ? 'Arrows need ' : 'Bullets need ') + costText(c) + '.');
+  pay(c); P[kind] += kind === 'arrows' ? 6 : 8; snd(440, .08, 'triangle', .05, 120); hud();
+}
+function swing() {
+  autoAim(130, true);
   P.cd = .34; P.swing = .18;
   const reach = 58, dmg = P.flint ? 22 : 12;
   const inArc = (o, extra) => {
@@ -344,8 +410,7 @@ function swing() {
   };
   let hit = false;
   for (const a of animals) if (inArc(a, a.r)) {
-    hit = true; a.hp -= dmg; a.flash = .12; a.kx = Math.cos(P.ang) * 260; a.ky = Math.sin(P.ang) * 260;
-    float(a.x, a.y - a.r - 6, '' + dmg, '#fff'); burst(a.x, a.y, '#b03a2a', 5);
+    hit = true; hitAnimal(a, dmg, Math.cos(P.ang), Math.sin(P.ang));
   }
   if (hit) { snd(240, .09, 'square', .06, -120); return; }
   let best = null, bd = 1e9;
@@ -355,6 +420,7 @@ function swing() {
   const n = P.flint ? 2 : 1; best.hp -= n; best.shake = .2; let gain = n;
   if (best.hp <= 0) { best.dead = best.kind === 'wood' ? 55 : 80; gain += 2; burst(best.x, best.y, best.kind === 'wood' ? '#4f7a3a' : '#8d8d86', 14); }
   P[best.kind] += gain;
+  if (best.kind === 'stone') for (let i = 0; i < n; i++) if (Math.random() < .4) { P.iron++; float(best.x + 34, best.y + 10, '+1 iron', '#9fc3e0'); }
   float(best.x, best.y - 24, '+' + gain + ' ' + best.kind, best.kind === 'wood' ? '#e0b676' : '#c9c9c2');
   burst(best.x, best.y, best.kind === 'wood' ? '#c9a26b' : '#a8a8a0', 4);
   best.kind === 'wood' ? snd(130, .07, 'square', .06, -40) : snd(700, .05, 'triangle', .06, -300);
@@ -406,7 +472,7 @@ function update(dt) {
   for (const o of rocks) if (!o.dead) push(o, o.r - 2);
   P.cd -= dt; P.swing -= dt; P.hurt -= dt;
   const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
-  if (acting) tool === 'axe' ? swing() : place(fresh);
+  if (acting) tool === 'axe' ? attack(fresh) : place(fresh);
   mouse.fresh = actFresh = keys.SpaceFresh = false;
   const ptx = Math.floor(P.x / T), pty = Math.floor(P.y / T);
   if (interior[pty * W + ptx] && houseDone()) P.hp = Math.min(P.max, P.hp + 1.5 * dt);
@@ -454,6 +520,19 @@ function update(dt) {
     if (blocked && blocked.type && a.cd <= 0) { damageStruct(blocked, d.sdmg); a.cd = .9; }
     if (pd < a.r + P.r + 5 && a.cd <= 0) { hurtPlayer(d.dmg, a.x, a.y); a.cd = 1; }
   }
+  for (let i = shots.length - 1; i >= 0; i--) { // arrows and bullets
+    const s = shots[i]; let dead = false;
+    for (let k = 0; k < 3 && !dead; k++) {
+      s.x += s.vx * dt / 3; s.y += s.vy * dt / 3;
+      if (hitBox(s.x, s.y, 2, true)) { burst(s.x, s.y, '#c9a26b', 3); dead = true; break; }
+      for (const a of animals) {
+        if (s.hit.has(a) || dist(a.x, a.y, s.x, s.y) > a.r + 5) continue;
+        const l = Math.hypot(s.vx, s.vy); s.hit.add(a); hitAnimal(a, s.dmg, s.vx / l * .7, s.vy / l * .7); snd(240, .06, 'square', .04, -120);
+        if (--s.pierce < 0) { dead = true; break; }
+      }
+    }
+    if ((s.life -= dt) <= 0 || dead) shots.splice(i, 1);
+  }
   for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; p.h += p.vh * dt; p.vh -= 620 * dt; if ((p.life -= dt) <= 0) parts.splice(i, 1); }
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.y -= 34 * dt; if ((f.life -= dt) <= 0) floats.splice(i, 1); }
   cam.x += (P.x - cam.x) * Math.min(1, dt * 8); cam.y += (P.y - cam.y) * Math.min(1, dt * 8);
@@ -467,6 +546,8 @@ function push(o, r) {
 
 /* ---------- render (three.js) ---------- */
 let renderer, scene, camera, sun, hemi, torch, fireLights = [], camDist = 760;
+const wm = {};
+let shotM;
 let trunkM, pineM, oakM, rockM, floorM, roofM, partM, ghost, playerG, axeG, axeHead, vmat;
 const GEO = {}, smeshes = [], ameshes = [], dummy = new THREE.Object3D(), v3 = new THREE.Vector3(), tmpC = new THREE.Color();
 const ray = new THREE.Raycaster(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -606,7 +687,18 @@ function initScene() {
   axeG = new THREE.Group(); axeG.position.set(6, 25, 12);
   const handle = new THREE.Mesh(merge([[cyl(1.6, 1.6, 30, 5), '#7a5532', M(15, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]]), vmat);
   axeHead = new THREE.Mesh(merge([[box(9, 3, 13), '#ffffff', M(29, 0, 3)], [box(5, 3.4, 16), '#e0e0e0', M(33, 0, 3)]]), new THREE.MeshLambertMaterial({vertexColors: true}));
-  handle.castShadow = axeHead.castShadow = true; axeG.add(handle, axeHead); playerG.add(axeG); scene.add(playerG);
+  handle.castShadow = axeHead.castShadow = true; wm.axe = new THREE.Group(); wm.axe.add(handle, axeHead); axeG.add(wm.axe);
+  const steel = '#2b2f33', stock = '#7a5532', WG = {
+    spear: [[cyl(1.3, 1.3, 60, 5), '#8a6238', M(18, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cone(3.2, 12, 4), '#c9ccc4', M(54, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)]],
+    bow: [[new THREE.TorusGeometry(15, 1.3, 4, 10, Math.PI), '#8a6238', M(6, 0, 0, 1, 1, 1, Math.PI / 2, 0, -Math.PI / 2)], [box(.7, .7, 30), '#efe6cf', M(6, 0, 0)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+    pistol: [[box(13, 4, 3.4), steel, M(10, 1, 0)], [box(4.5, 8, 3.4), stock, M(5, -4, 0, 1, 1, 1, 0, 0, .2)]],
+    shotgun: [[box(30, 3.6, 5.5), steel, M(20, 1, 0)], [box(9, 4, 6.5), stock, M(20, -1.5, 0)], [box(13, 6, 4.5), stock, M(-1, -1, 0)]],
+    rifle: [[box(42, 3, 3), steel, M(24, 1, 0)], [box(16, 6, 4.2), stock, M(-2, -1, 0)], [box(14, 4, 4), stock, M(10, -.5, 0)], [cyl(1.8, 1.8, 12, 6), steel, M(12, 4.5, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+  };
+  for (const k in WG) { wm[k] = new THREE.Mesh(merge(WG[k]), vmat); wm[k].castShadow = true; axeG.add(wm[k]); }
+  shotM = new THREE.InstancedMesh(box(1, 1, 1), new THREE.MeshBasicMaterial({fog: false}), 96); shotM.frustumCulled = false;
+  shotM.setColorAt(0, tmpC.set(1, 1, 1)); shotM.count = 0; scene.add(shotM);
+  playerG.add(axeG); scene.add(playerG);
 
   ghost = new THREE.Mesh(box(T - 2, 34, T - 2), new THREE.MeshBasicMaterial({transparent: true, opacity: .4, depthWrite: false})); scene.add(ghost);
   partM = inst(box(1, 1, 1), new THREE.MeshLambertMaterial(), 400, false);
@@ -722,7 +814,12 @@ function render(now, dt) {
   // player
   const moved = dist(P.x, P.y, lastPX, lastPY); lastPX = P.x; lastPY = P.y; if (moved > .2) walk += moved * .14;
   playerG.position.set(P.x, Math.abs(Math.sin(walk)) * 2.2, P.y); playerG.rotation.set(0, -P.ang, Math.sin(walk) * .06);
-  const sw = P.swing > 0 ? (1 - P.swing / .18) * 2 - 1 : -.9; axeG.rotation.set(0, -sw * 1.05, P.swing > 0 ? .25 : .7);
+  for (const k in wm) wm[k].visible = k === P.weapon;
+  if (P.weapon === 'axe') { const sw = P.swing > 0 ? (1 - P.swing / .18) * 2 - 1 : -.9; axeG.rotation.set(0, -sw * 1.05, P.swing > 0 ? .25 : .7); axeG.position.x = 6; }
+  else { axeG.rotation.set(0, 0, 0); axeG.position.x = 6 + (P.swing <= 0 ? 0 : WPN[P.weapon].melee ? Math.sin((1 - P.swing / .18) * Math.PI) * 24 : -P.swing / .1 * 5); }
+  const ns = Math.min(shots.length, 96);
+  for (let i = 0; i < ns; i++) { const s = shots[i]; dummy.position.set(s.x, 26, s.y); dummy.rotation.set(0, -Math.atan2(s.vy, s.vx), 0); dummy.scale.set(s.arrow ? 24 : 34, 1.6, 1.6); dummy.updateMatrix(); shotM.setMatrixAt(i, dummy.matrix); shotM.setColorAt(i, tmpC.set(s.arrow ? 0xe8dcc0 : 0xffe38a)); }
+  shotM.count = ns; shotM.instanceMatrix.needsUpdate = true; shotM.instanceColor.needsUpdate = true;
   axeHead.material.color.copy(P.flint ? C('#3c4a52') : C('#b9bbb4'));
   playerG.visible = P.hurt <= 0 || Math.floor(now / 60) % 2 === 0;
 
@@ -766,16 +863,21 @@ function buildTools() {
   const box = $('tools'); box.innerHTML = '';
   TOOLS.forEach((t, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tool'; b.id = 'tool-' + t; b.dataset.t = t;
-    const name = t === 'axe' ? 'Axe' : t === 'remove' ? 'Remove' : B[t].name;
+    const name = t === 'axe' ? 'Weapon' : t === 'remove' ? 'Remove' : B[t].name;
     const sub = t === 'axe' ? 'chop · fight' : t === 'remove' ? 'half refund' : costText(B[t].cost);
     b.innerHTML = `<kbd>${i + 1}</kbd>${name}<small>${sub}</small>`;
     b.addEventListener('click', () => { tool = t; hud(); });
     box.appendChild(b);
   });
+  const wb = $('weapons'); wb.innerHTML = '';
+  for (const k of WKEYS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tool'; b.id = 'wpn-' + k;
+    b.innerHTML = `${WPN[k].name}<small></small>`; b.addEventListener('click', () => equip(k)); wb.appendChild(b);
+  }
 }
 function hud() {
   $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
-  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat;
+  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron;
   const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
   $('phase').textContent = (G.phase === 'day' ? 'Dusk in ' : 'Dawn in ') + mm;
@@ -783,8 +885,15 @@ function hud() {
   $('g1').className = house.room ? 'ok' : ''; $('g2').className = house.door ? 'ok' : ''; $('g3').className = house.bed ? 'ok' : '';
   $('g4').className = G.nights >= NIGHTS_TO_WIN ? 'ok' : ''; $('g4').textContent = `Survive ${NIGHTS_TO_WIN} nights (${Math.min(G.nights, NIGHTS_TO_WIN)}/${NIGHTS_TO_WIN})`;
   for (const t of TOOLS) { const b = $('tool-' + t); b.classList.toggle('sel', t === tool); b.classList.toggle('poor', !!B[t] && !afford(B[t].cost)); }
+  for (const k of WKEYS) {
+    const b = $('wpn-' + k), w = WPN[k], own = P.owned[k];
+    b.classList.toggle('sel', own && P.weapon === k && tool === 'axe'); b.classList.toggle('poor', !own && !afford(w.cost));
+    b.lastChild.textContent = !own ? costText(w.cost) : w.ammo ? P[w.ammo] + ' ' + w.ammo : k === 'axe' && P.flint ? 'flint · chops' : w.note;
+  }
+  $('tool-axe').lastChild.textContent = WPN[P.weapon].name.toLowerCase() + ' in hand';
   $('eat').disabled = P.meat < 1; $('craft').hidden = P.flint;
-  $('act').textContent = tool === 'axe' ? 'Hit' : tool === 'remove' ? 'Remove' : 'Build';
+  $('mkarrows').hidden = !P.owned.bow; $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle);
+  $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
 function end(won) {
   running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
@@ -808,7 +917,7 @@ function frame(now) {
 
 /* ---------- input ---------- */
 addEventListener('keydown', e => {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
   if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
   keys[e.code] = true; if (e.repeat || !running) return;
   const n = e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
@@ -816,6 +925,9 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
   if (e.code === 'KeyE') eat();
   if (e.code === 'KeyC') craft();
+  if (e.code === 'KeyR') makeAmmo('arrows');
+  if (e.code === 'KeyF') makeAmmo('bullets');
+  if (e.code === 'Tab') cycleWeapon(e.shiftKey ? -1 : 1);
   if (e.code === 'KeyM') { muted = !muted; toast(muted ? 'Sound off' : 'Sound on'); }
   if (e.code === 'KeyP') { paused = !paused; $('toast').textContent = paused ? 'Paused. Press P to resume.' : ''; $('toast').classList.toggle('on', paused); }
 });
@@ -842,6 +954,8 @@ const act = $('act');
 act.addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; actDown = actFresh = true; }, {passive: false});
 act.addEventListener('touchend', e => { e.preventDefault(); actDown = false; });
 act.addEventListener('touchcancel', () => { actDown = false; });
+$('mkarrows').addEventListener('click', () => makeAmmo('arrows')); $('mkbullets').addEventListener('click', () => makeAmmo('bullets'));
+cv.addEventListener('wheel', e => { e.preventDefault(); if (running) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, {passive: false});
 $('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
 $('startbtn').addEventListener('click', start); $('again').addEventListener('click', start);
 addEventListener('resize', resize);
