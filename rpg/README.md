@@ -16,11 +16,13 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - 20 achievements and a Bestiary
 - Fishing minigame, mining, woodcutting and foraging, each with its own skill level
 - Forge (5 weapon and 5 armor tiers), potion brewing, campfire cooking
+- A workbench and Crafting skill: 30+ recipes for furniture, rings and amulets (equippable, with stat bonuses), bombs, whetstones and tonics
+- Willow Cottage, a house you can buy and decorate: place furniture, sleep for a Well Rested XP buff that grows with comfort, keep a storage chest, and mount boss trophies for bonus damage
 - 9 pets with abilities (loot magnet, luck, healing, extra XP, defense, damage shield, fire and wisp attacks): bought, found as rare monster drops, or won from bosses
 - 7 mounts, from a horse to a trampling boar, a frost wolf, a water-hopping toad and a flying drake
 - Shop with goods, weapons, pets and mounts; 14 treasure chests
 - Autosaves to the browser; plays with keyboard and mouse or touch
 
-Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, T for talents, L for the journal, M for the map.
+Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, T for talents, C to decorate your house, G to throw a bomb, L for the journal, M for the map.
 
 `game.html` is the source. Run `./build.sh` to rebuild `index.html` from it.
