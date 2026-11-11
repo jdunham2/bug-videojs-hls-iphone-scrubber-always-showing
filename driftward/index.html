@@ -197,6 +197,7 @@ button.go:disabled{opacity:.5;cursor:wait}
       <span>Hazard</span><b id="pHazard">—</b>
       <span>Flora</span><b id="pFlora">—</b>
       <span>Fauna</span><b id="pFauna">—</b>
+      <span>Weather</span><b id="pWeather">Clear</b>
       <span>Discoveries</span><b id="pDisc">0</b>
     </div>
   </div>
@@ -1129,7 +1130,7 @@ function updateFoot(dt){
   const sunDir=tV2.copy(sun.position).sub(player.pos).normalize();
   const night=d.dot(sunDir)<-.1;
   const rate=P.biome.hazard*(night&&P.biome.key==='glacial'?1.5:night&&P.biome.key==='scorched'?.5:1)*(player.swimming?1.3:1);
-  player.suit=Math.max(0,player.suit-rate*.55*(tech('lining')?.6:1)*dt);
+  player.suit=Math.max(0,player.suit-rate*.55*(tech('lining')?.6:1)*WX.drainMul*dt);
   if(player.suit<=0)player.health-=7*dt;else player.health=Math.min(100,player.health+1.5*dt);
   if(player.health<=0)die();
 }
@@ -2657,7 +2658,7 @@ function updateCreatures(dt){
     c.mesh.position.copy(c.lp).addScaledVector(up,hop);
   }
 }
-const SPACE=new C3('#03040b'),DUSK=new C3('#ff7a3a'),NIGHT=new C3('#070a1a'),NIGHT_AMB=new C3('#6a78c8'),tSky=new C3();
+const FLASH_C=new C3('#dfe8ff'),SPACE=new C3('#03040b'),DUSK=new C3('#ff7a3a'),NIGHT=new C3('#070a1a'),NIGHT_AMB=new C3('#6a78c8'),tSky=new C3();
 let fogPlanet=null;
 function updateEnv(){
   const P=current;if(!P)return;
@@ -2666,20 +2667,134 @@ function updateEnv(){
   const alt=r-P.radius;const atmoT=clamp(1-alt/(P.radius*.45),0,1),a2=atmoT*atmoT;
   const sunDir=tV2.copy(sun.position).sub(pos).normalize();
   const day=d.dot(sunDir),dayT=smooth(-.22,.35,day),dusk=clamp(1-Math.abs(day-.02)/.3,0,1);
-  tSky.copy(SPACE).lerp(NIGHT,a2*.8).lerp(P.col.atmo,a2*dayT).lerp(DUSK,dusk*a2*.4);
+  const wa=clamp(atmoT*1.6,0,1);tSky.copy(SPACE).lerp(NIGHT,a2*.8).lerp(P.col.atmo,a2*dayT).lerp(DUSK,dusk*a2*.4).lerp(WX.tint,WX.I*wa*.75);if(WX.flash>0)tSky.lerp(FLASH_C,WX.flash*.55*wa);
   scene.background.copy(tSky);scene.fog.color.copy(tSky);
-  scene.fog.near=lerp(1e5,40,a2);scene.fog.far=lerp(2.2e5,P.biome.fogFar*(.55+.6*dayT),a2);
-  stars.position.copy(pos);stars.material.opacity=1-a2*dayT*.97;
+  scene.fog.near=lerp(1e5,40,a2);scene.fog.far=lerp(2.2e5,P.biome.fogFar*(.55+.6*dayT),a2);if(WX.I>.01&&WX.W){const sf=P.biome.fogFar*WX.W.fog*2.2;const ff=scene.fog.far;if(sf<ff)scene.fog.far=Math.exp(lerp(Math.log(ff),Math.log(sf),WX.I*wa));scene.fog.near=Math.min(scene.fog.near,scene.fog.far*.08)}
+  stars.position.copy(pos);stars.material.opacity=(1-a2*dayT*.97)*(1-WX.I*wa*.9);
   for(const Q of planets){Q.atmo.uniforms.uSun.value.copy(sun.position).sub(Q.center).normalize();Q.atmo.uniforms.uFade.value=Q===P?1-a2*.92:1}
   sunLight.position.copy(sun.position);sunLight.target.position.copy(P.center);sunLight.target.updateMatrixWorld();
-  hemi.color.copy(P.col.atmo).lerp(NIGHT_AMB,1-dayT);hemi.intensity=.24+.26*a2*dayT+.3*a2*(1-dayT);
+  hemi.color.copy(P.col.atmo).lerp(NIGHT_AMB,1-dayT);hemi.intensity=.24+.26*a2*dayT+.3*a2*(1-dayT)+WX.flash*1.6;sunLight.intensity=1.35*(1-.55*WX.I*wa);
   sunGlow.position.copy(sun.position);
-  if(Sound.ctx){Sound.set(Sound.windG.gain,st.mode==='foot'?.05+a2*.05:a2*.06*(ship.speed/300),.4);Sound.set(Sound.windF.frequency,300+Math.sin(time*.3)*120,.5)}
+  if(Sound.ctx){Sound.set(Sound.windG.gain,(st.mode==='foot'?.05+a2*.05:a2*.06*(ship.speed/300))+WX.I*a2*.24,.4);if(WX.I<.02)Sound.set(Sound.windF.frequency,300+Math.sin(time*.3)*120,.5)}
   if(!P.discovered&&alt<P.radius*.35){P.discovered=true;const key=`P:${P.sysSeed}:${P.idx}`;
     if(!discover(key,`Planet discovered: ${P.name} · ${P.biome.label}`))toast(`Entering ${P.name}`)}
   // pain vignette
   const danger=st.mode==='foot'&&(player.suit<15||player.health<40);
   $('vignette').style.boxShadow=`inset 0 0 160px rgba(255,40,70,${danger?.45+Math.sin(time*5)*.15:0})`;
+}
+
+/* ---------- planetary weather and storms ---------- */
+// Storm timing comes from the real clock and the planet seed, so everyone on a planet shares the same weather.
+const WEATHER={
+  verdant:{name:'Thunderstorm',kind:'rain',color:'#b8cce8',tint:'#2e3a4c',fog:.22,haz:2.4,lightning:true,chance:.6,fall:38,wind:6},
+  caustic:{name:'Acid storm',kind:'rain',color:'#d6ee6a',tint:'#3e4a14',fog:.2,haz:3,lightning:true,chance:.7,fall:34,wind:8},
+  glacial:{name:'Blizzard',kind:'snow',color:'#ffffff',tint:'#c4d4e4',fog:.1,haz:3,lightning:false,chance:.7,fall:5,wind:16},
+  scorched:{name:'Firestorm',kind:'ember',color:'#ff9a4a',tint:'#4a1a0c',fog:.28,haz:3.2,lightning:false,chance:.7,fall:-3,wind:12},
+  barren:{name:'Dust storm',kind:'dust',color:'#d2bc8e',tint:'#7a6646',fog:.09,haz:2,lightning:false,chance:.6,fall:1,wind:22},
+  lumen:{name:'Spore storm',kind:'spore',color:'#ff9ae0',tint:'#341a46',fog:.3,haz:2,lightning:true,chance:.5,fall:1.5,wind:5},
+};
+const W_PERIOD=170,W_STORM=55,W_WARN=12;
+const WX={I:0,W:null,state:'clear',inSec:0,left:0,flash:0,drainMul:1,shelter:false,cycleKey:'',warned:'',crystals:[],windDir:new V3(),tint:new C3(),fog:1,strike:null};
+function weatherAt(P){
+  const W=WEATHER[P.biome.key];if(!W)return{state:'clear',I:0,W:null};
+  const key=((P.sysSeed>>>0)*131+P.idx*7919)>>>0;
+  const t=Date.now()/1000+(key%997),cyc=Math.floor(t/W_PERIOD),ph=t-cyc*W_PERIOD,start=W_PERIOD-W_STORM;
+  const has=mulberry32((key^Math.imul(cyc,2654435761))>>>0)()<W.chance;
+  const id=key+':'+cyc;
+  if(has&&ph>=start)return{state:'storm',I:smooth(0,8,ph-start)*smooth(0,6,W_PERIOD-ph),W,left:W_PERIOD-ph,id,cyc};
+  if(has&&ph>=start-W_WARN)return{state:'warn',I:0,W,inSec:start-ph,id,cyc};
+  return{state:'clear',I:0,W,id,cyc};
+}
+// particles: points for snow/dust/spores/embers, short streaks for rain
+const WP_N=1600,WP_BOX=42,WP_H=32;
+const wpOff=new Float32Array(WP_N*3);for(let i=0;i<WP_N;i++){wpOff[i*3]=(Math.random()*2-1)*WP_BOX;wpOff[i*3+1]=(Math.random()*2-1)*WP_H/2;wpOff[i*3+2]=(Math.random()*2-1)*WP_BOX}
+const wpPtsGeo=new THREE.BufferGeometry();wpPtsGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(WP_N*3),3));
+const wpDot=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.45,'rgba(255,255,255,.8)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)})();
+const wpPts=new THREE.Points(wpPtsGeo,new THREE.PointsMaterial({color:'#ffffff',size:.35,map:wpDot,transparent:true,opacity:0,depthWrite:false}));wpPts.frustumCulled=false;wpPts.visible=false;scene.add(wpPts);
+const wpLineGeo=new THREE.BufferGeometry();wpLineGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(WP_N*6),3));
+const wpLines=new THREE.LineSegments(wpLineGeo,new THREE.LineBasicMaterial({color:'#ffffff',transparent:true,opacity:0,depthWrite:false}));wpLines.frustumCulled=false;wpLines.visible=false;scene.add(wpLines);
+const boltLine=new THREE.Line(new THREE.BufferGeometry().setAttribute('position',new THREE.BufferAttribute(new Float32Array(14*3),3)),new THREE.LineBasicMaterial({color:'#f4f8ff',transparent:true,fog:false}));
+boltLine.frustumCulled=false;boltLine.visible=false;scene.add(boltLine);
+const crystalGeo=mergeColored([{geo:new THREE.OctahedronGeometry(.6,0).scale(.7,1.8,.7).translate(0,1.1,0),color:'#ffffff'},{geo:new THREE.OctahedronGeometry(.4,0).scale(.7,1.5,.7).rotateZ(.5).translate(.4,.8,.1),color:'#ffffff'}]);
+function underRoof(){
+  if(st.mode!=='foot')return true;
+  for(const B of allBaseList()){if(!baseRTs.has(B.id))continue;
+    if(withBase(B,()=>{if(!baseRT||baseRT.P!==current)return false;const L=baseRT.group.worldToLocal(tV3.copy(player.pos));
+      return base.pieces.some(pc=>pc.t==='roof'&&Math.abs(L.x-pc.x)<2.1&&Math.abs(L.z-pc.z)<2.1&&pc.y>L.y&&pc.y-L.y<12)}))return true}
+  return false;
+}
+function spawnStormCrystals(P,W){
+  clearStormCrystals();const ref=player.pos.clone().sub(P.center).normalize();
+  for(let k=0;k<30&&WX.crystals.length<6;k++){const d=dirNear(ref,40+Math.random()*130,P.radius,Math.random,new V3());const r=P.heightAt(d);if(P.sea!==null&&r<P.sea+.5)continue;
+    const m=new THREE.Mesh(crystalGeo,new THREE.MeshPhongMaterial({color:W.color,emissive:W.color,emissiveIntensity:.8,vertexColors:true,flatShading:true}));
+    uprightQuat(d,new V3().crossVectors(d,Math.abs(d.y)<.9?Y_AXIS:X_AXIS),m.quaternion);m.position.copy(P.center).addScaledVector(d,r-.2);scene.add(m);
+    WX.crystals.push({mesh:m,wp:m.position.clone().addScaledVector(d,1),P})}
+}
+function clearStormCrystals(){for(const c of WX.crystals){scene.remove(c.mesh);c.mesh.material.dispose()}WX.crystals=[]}
+function lightning(P,W){
+  WX.flash=1;const ref=st.mode==='foot'?player.pos:ship.group.position;const up=ref.clone().sub(P.center).normalize();
+  setTimeout(()=>Sound.boom(.55,2.4),300+Math.random()*900);
+  if(Math.random()>.45)return;
+  const near=Math.random()<.18,dist=near?1.5+Math.random()*4.5:15+Math.random()*60;
+  const d=dirNear(up,dist,P.radius,Math.random,new V3());const g=P.floorAt(d);const hit=P.center.clone().addScaledVector(d,g);
+  const a=boltLine.geometry.attributes.position.array,top=hit.clone().addScaledVector(d,140),side=new V3().crossVectors(d,Math.abs(d.y)<.9?Y_AXIS:X_AXIS).normalize(),side2=new V3().crossVectors(d,side);
+  for(let i=0;i<14;i++){const t=i/13;const p=top.clone().lerp(hit,t);if(i>0&&i<13)p.addScaledVector(side,(Math.random()-.5)*10).addScaledVector(side2,(Math.random()-.5)*10);a[i*3]=p.x;a[i*3+1]=p.y;a[i*3+2]=p.z}
+  boltLine.geometry.attributes.position.needsUpdate=true;boltLine.visible=true;boltLine.material.opacity=1;WX.strike=.3;
+  boom(hit,4,'#e8f0ff',.4);Sound.boom(.8,1.6);
+  if(st.mode==='foot'&&!WX.shelter&&player.pos.distanceTo(hit)<7){player.health-=28;player.suit=Math.max(0,player.suit-10);toast('Struck by lightning! Get under a roof or into your ship.','bad')}
+  else if(st.mode==='ship'&&ship.state==='flying'&&ship.group.position.distanceTo(hit)<60&&ship.group.position.distanceTo(P.center)-P.radius<220){damagePlayer(14);toast('Lightning hit your hull.','bad')}
+}
+function updateWeather(dt){
+  const P=current;
+  WX.flash=Math.max(0,WX.flash-dt*4);if(WX.strike!==null){WX.strike-=dt;boltLine.material.opacity=Math.max(0,WX.strike/.3);if(WX.strike<=0){boltLine.visible=false;WX.strike=null}}
+  if(!P||!planets.length){WX.I=0;WX.state='clear';wpPts.visible=wpLines.visible=false;return}
+  const w=weatherAt(P),W=w.W;
+  const ref=st.mode==='foot'?player.pos:ship.group.position;const alt=ref.distanceTo(P.center)-P.radius;
+  const inAir=clamp(1-alt/(P.radius*.3),0,1);
+  WX.W=W;WX.state=w.state;WX.inSec=w.inSec||0;WX.left=w.left||0;
+  WX.I=lerp(WX.I,w.I*inAir,1-Math.exp(-dt*1.5));
+  WX.shelter=underRoof();
+  WX.drainMul=W&&!WX.shelter?1+(W.haz-1)*WX.I:1;
+  if(W){WX.tint.set(W.tint);WX.fog=lerp(1,W.fog,WX.I)}else WX.fog=1;
+  // warnings, start and end of a storm
+  if(w.state==='warn'&&inAir>.3&&WX.warned!==w.id){WX.warned=w.id;toast(`${W.name} approaching in ${Math.ceil(w.inSec)} s. Life support will drain fast: shelter under a roof or in your ship.`,'bad');Sound.alarm()}
+  if(w.state==='storm'&&WX.cycleKey!==w.id&&inAir>.3){WX.cycleKey=w.id;if(WX.warned!==w.id){WX.warned=w.id;toast(`${W.name}! Find shelter.`,'bad')}
+    if(st.mode==='foot')spawnStormCrystals(P,W);toast('Storm crystals are forming nearby. Collect them before the storm passes.')}
+  if(w.state!=='storm'&&WX.crystals.length){clearStormCrystals();if(WX.cycleKey)toast('The storm has passed.')}
+  if(WX.crystals.length&&WX.crystals[0].P!==P)clearStormCrystals();
+  // particles
+  const show=W&&WX.I>.02;wpPts.visible=show&&W.kind!=='rain';wpLines.visible=show&&W.kind==='rain';
+  if(show){
+    const up=ref.clone().sub(P.center).normalize(),q=uprightQuat(up,new V3().crossVectors(up,Math.abs(up.y)<.9?Y_AXIS:X_AXIS),new Q4());
+    const gust=1+Math.sin(time*.7)*.35,wx=W.wind*gust,wz=W.wind*.4*Math.sin(time*.23),fall=W.fall;
+    WX.windDir.set(wx,0,wz).applyQuaternion(q);
+    const obj=W.kind==='rain'?wpLines:wpPts;obj.position.copy(camera.position);obj.quaternion.copy(q);
+    const pa=(W.kind==='rain'?wpLineGeo:wpPtsGeo).attributes.position.array,jit=W.kind==='spore'||W.kind==='ember';
+    for(let i=0;i<WP_N;i++){let x=wpOff[i*3]+wx*dt,y=wpOff[i*3+1]-fall*dt,z=wpOff[i*3+2]+wz*dt;
+      if(jit){x+=Math.sin(time*2+i)*dt*1.5;y+=Math.cos(time*1.7+i*.7)*dt*1.2}
+      if(y<-WP_H/2)y+=WP_H;else if(y>WP_H/2)y-=WP_H;if(x>WP_BOX)x-=2*WP_BOX;else if(x<-WP_BOX)x+=2*WP_BOX;if(z>WP_BOX)z-=2*WP_BOX;else if(z<-WP_BOX)z+=2*WP_BOX;
+      wpOff[i*3]=x;wpOff[i*3+1]=y;wpOff[i*3+2]=z;
+      if(W.kind==='rain'){const o=i*6,k=.045;pa[o]=x;pa[o+1]=y;pa[o+2]=z;pa[o+3]=x-wx*k;pa[o+4]=y+fall*k;pa[o+5]=z-wz*k}
+      else{pa[i*3]=x;pa[i*3+1]=y;pa[i*3+2]=z}}
+    (W.kind==='rain'?wpLineGeo:wpPtsGeo).attributes.position.needsUpdate=true;
+    obj.material.color.set(W.color);obj.material.opacity=Math.min(.85,WX.I*(WX.shelter&&st.mode==='foot'?.45:.85));
+    if(obj===wpPts)obj.material.size={snow:.28,dust:.45,ember:.24,spore:.34}[W.kind]||.3;
+    // wind push, turbulence, lightning
+    if(st.mode==='foot'&&!WX.shelter)player.pos.addScaledVector(WX.windDir,.06*WX.I*dt);
+    if(st.mode==='ship'&&ship.state==='flying'){ship.shake=Math.min(.6,ship.shake+WX.I*dt*2.4);ship.group.quaternion.multiply(tQ.setFromAxisAngle(Z_AXIS,(Math.random()-.5)*.02*WX.I))}
+    if(W.lightning&&WX.I>.45&&Math.random()<dt*.32*WX.I)lightning(P,W);
+  }
+  // storm crystals
+  if(st.mode==='foot')for(let i=WX.crystals.length-1;i>=0;i--){const c=WX.crystals[i];c.mesh.rotation.y+=dt;
+    if(c.wp.distanceTo(player.pos)<3.2){const l={nanites:ri(15,35),units:ri(20,60),aurium:Math.random()<.3?1:0};giveLoot(l);toast(`Storm crystal: ${lootText(l)}`);Sound.blip(1300,.3,'triangle',.15);
+      scene.remove(c.mesh);c.mesh.material.dispose();WX.crystals.splice(i,1);save()}}
+  if(Sound.ctx&&WX.I>.02)Sound.set(Sound.windF.frequency,420+WX.I*500+Math.sin(time*.9)*150,.4);
+}
+function weatherText(){
+  if(!WX.W)return 'Calm';
+  if(WX.state==='warn')return `${WX.W.name} in ${Math.ceil(WX.inSec)} s`;
+  if(WX.state==='storm'&&WX.I>.05)return `${WX.W.name} · ${Math.ceil(WX.left)} s left${WX.shelter&&st.mode==='foot'?' · sheltered':''}`;
+  return 'Clear';
 }
 
 /* ---------- HUD ---------- */
@@ -2726,6 +2841,7 @@ function drawMarkers(){
     if(dd>500){const p=proj(sw,true);marker(p.x,p.y,'#ffd9a3',station.name,`Space station · ${fmtDist(dd)}`,'diamond',9)}}
   for(const a of MP.avatars.values()){const onFoot=a.astro.visible,obj=onFoot?a.astro:a.ship;const w=obj.localToWorld(new V3(0,onFoot?2.4:4.5,0));
     const ref5=st.mode==='foot'?player.pos:ship.group.position;const dd=w.distanceTo(ref5);const p=proj(w,true);marker(p.x,p.y,a.color,a.name,fmtDist(dd),'ring',onFoot?4:6)}
+  for(const c of WX.crystals){const ref6=st.mode==='foot'?player.pos:ship.group.position;const dd=c.wp.distanceTo(ref6);if(dd<350&&dd>3){const p=proj(c.wp,false);if(!p.off)marker(p.x,p.y,WX.W?WX.W.color:'#fff','Storm crystal',fmtDist(dd),'diamond',6)}}
   for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
     if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
   if(!buildMode)for(const B of allBaseList()){const rt=baseRTs.get(B.id);if(!rt)continue;const mine=B===myBase;
@@ -2788,6 +2904,8 @@ function drawMarkers(){
   }
 }
 function objective(){
+  if(st.mode==='foot'&&WX.state==='storm'&&WX.I>.3&&!WX.shelter)return `${WX.W.name}! Life support drains ${WX.drainMul.toFixed(1)}× faster. Shelter under a roof or in your ship${WX.crystals.length?' · storm crystals glow nearby':''}`;
+  if(WX.state==='warn'&&WX.I<.05&&st.mode==='foot')return `${WX.W.name} in ${Math.ceil(WX.inSec)} s · head for shelter`;
   if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
   if(st.mode==='ship'&&allHostiles().length)return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
   if(st.mode==='ship'&&ship.state==='docked')return 'Docked · sell resources, refit, buy ships and take missions. E undocks';
@@ -2812,7 +2930,7 @@ function updateHUD(){
     setText('pFlora',P.floraLevel);
     const known=P.species.filter((s,i)=>st.disc.has(`S:${P.sysSeed}:${P.idx}:${i}`)).length;
     setText('pFauna',P.species.length?`${known}/${P.species.length} catalogued`:'None detected');
-    setText('pDisc',String(st.disc.size));
+    setText('pDisc',String(st.disc.size));setText('pWeather',weatherText());$('pWeather').style.color=WX.state==='storm'&&WX.I>.05?'var(--danger)':WX.state==='warn'?'var(--amber-hi)':'';
   }
   setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));setText('iU',inv.units.toLocaleString());
   setText('objective',objective());
@@ -2864,7 +2982,7 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateWeather(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
