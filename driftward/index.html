@@ -119,6 +119,31 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 .units{font-family:var(--f-display);font-size:13px;color:var(--amber-hi);letter-spacing:.06em;font-variant-numeric:tabular-nums}
 .trnote{color:var(--dim);font-size:11.5px;margin:10px 0 0;line-height:1.5}
 
+#crew{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.55);padding-inline:16px}
+#crew .card{max-width:560px;width:100%;max-height:calc(100% - 32px);overflow:auto;pointer-events:auto}
+#crewChip{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:calc(16px + env(safe-area-inset-right,0px));pointer-events:auto;font-family:var(--f-display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:7px 11px;border:1px solid var(--line);background:var(--panel);color:var(--amber-hi);border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:7px}
+#crewChip i{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block}
+#crewChip.on i{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+#crewChip:focus-visible{outline:2px solid var(--frost);outline-offset:2px}
+.crow{display:flex;align-items:center;gap:10px;padding-block:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+.crow .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.crow .who{flex:1;min-width:0}
+.crow .nm{font-family:var(--f-display);font-weight:600;font-size:13.5px;overflow-wrap:anywhere}
+.crow .wh{color:var(--dim);font-size:11px}
+.badge{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ok);border:1px solid rgba(138,240,180,.4);padding:2px 6px;border-radius:2px;white-space:nowrap}
+.crewme{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.crewme input,#crewMsg{font-family:var(--f-data);font-size:12.5px;padding:7px 9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:var(--text);border-radius:2px;min-width:0}
+.crewme input{flex:1 1 160px}
+.crewme input:focus,#crewMsg:focus{outline:2px solid var(--frost);outline-offset:0}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.sw.sel{border-color:var(--text)}
+#crewLog{max-height:170px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:4px;font-size:12px}
+#crewLog .ln{overflow-wrap:anywhere}
+#crewLog .ln b{font-weight:600}
+.chatrow{display:flex;gap:6px;margin-top:8px}
+#crewMsg{flex:1}
+@media (pointer:coarse){#crewChip{display:none}}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -253,6 +278,22 @@ button.go:disabled{opacity:.5;cursor:wait}
   </div>
 </div>
 
+<button type="button" id="crewChip" hidden><i></i><span id="crewChipT">Crew · solo</span></button>
+<div id="crew" hidden>
+  <div class="card">
+    <div class="eyebrow">Multiplayer</div>
+    <div class="pname">Crew</div>
+    <div class="trnote" id="crewStatus" style="margin-top:4px"></div>
+    <div class="crewme"><input id="crewName" maxlength="20" aria-label="Your name" autocomplete="off"><span id="crewSw" style="display:flex;gap:6px"></span></div>
+    <div class="csec">Online now</div>
+    <div id="crewList"></div>
+    <div class="csec">Chat</div>
+    <div id="crewLog"></div>
+    <div class="chatrow"><input id="crewMsg" maxlength="140" placeholder="Say something to everyone online" aria-label="Chat message" autocomplete="off"><button type="button" class="trbtn" id="crewSend">Send</button></div>
+    <p class="trnote">Players in the same star system see each other's ships and suits. Mining, pirates, bases and trades are your own. Press M to close, Enter to chat.</p>
+  </div>
+</div>
+
 <div id="help" hidden>
   <div class="card">
     <div class="eyebrow">Controls</div>
@@ -301,6 +342,7 @@ const CONTROLS=[
   ['Base building',null],['Build mode (on foot)','B'],['Place part','Left click'],['Rotate','R'],['Remove part (half refund)','X / right click'],
   ['Choose part','Wheel / 1–0 / [ ]'],['Collect from modules','E'],['Jump to your home base','J'],
   ['Stations & trading posts',null],['Dock at a space station','E near the bay'],['Undock','E'],['Land at a trading post','E near its pad'],['Trade at a terminal','E'],
+  ['Multiplayer',null],['Crew panel and chat','M / Enter'],['Join a crewmate','Jump button in the crew panel'],
 ];
 function renderControls(el){
   el.innerHTML=CONTROLS.map(([a,b])=>b===null?`<h3>${a}</h3>`:`<div><span>${a}</span><kbd>${b}</kbd></div>`).join('');
@@ -791,7 +833,7 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed,mission:st.mission}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -826,6 +868,7 @@ async function generateSystem(seed,first){
     const n=spawnNpc('trader',tcls[Math.floor(rand()*tcls.length)],P.center.clone().addScaledVector(randDir(rand,new V3()),P.radius*1.8),rand()<.5?PAINTS.trader:randomPaint(rand));
     n.way=pickWaypoint();}
   pirateTimer=first?110:55;
+  joinSystemRoom();
   if(base&&base.seed===seed&&planets[base.p])buildBase(planets[base.p]);
 }
 function uprightQuat(up,fwdHint,out){
@@ -855,6 +898,7 @@ function exitToFoot(){
 const keys={};let mouseDX=0,mouseDY=0,mouseDown=false,locked=false;
 const touchMove={x:0,y:0};
 addEventListener('keydown',e=>{
+  if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))return;
   if(!ready)return;
   if(e.code==='Tab'){e.preventDefault();toggleHelp();return}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
@@ -879,6 +923,8 @@ $('help').addEventListener('click',toggleHelp);
 function toggleHelp(){$('help').hidden=!$('help').hidden}
 
 function onPress(code){
+  if(code==='KeyM'){toggleCrew();return}
+  if(code==='Enter'||code==='NumpadEnter'){toggleCrew(true);return}
   if(code==='KeyB'){toggleBuild();return}
   if(code==='KeyJ'){tryWarp(true);return}
   if(buildMode){
@@ -904,7 +950,7 @@ function onPress(code){
 /* touch */
 if(TOUCH){
   $('touch').hidden=false;
-  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208],['BUILD','KeyB',264,40]];
+  const btns=[['FIRE','mine',24,120],['JUMP','Space',104,40],['USE','KeyE',104,124],['SCAN','KeyC',24,204],['FUEL','KeyR',104,208],['WARP','KeyH',184,40],['SHOP','KeyU',184,124],['CRAFT','KeyI',184,208],['BUILD','KeyB',264,40],['CREW','KeyM',264,124]];
   for(const [label,code,r,b] of btns){
     const el=document.createElement('div');el.className='tbtn';el.textContent=label;
     el.style.right=`calc(${r}px + env(safe-area-inset-right,0px))`;el.style.bottom=`calc(${b}px + env(safe-area-inset-bottom,0px))`;
@@ -1108,7 +1154,7 @@ function updateMining(dt){
     if(dx*dx+dy*dy+dz*dz-t*t<rr*rr){cT=t;lookCreature=cr}
   }
   if(lookCreature&&cT<bestT)mineTarget=null;
-  const firing=mouseDown&&!buildMode&&$('help').hidden&&$('craft').hidden&&$('upg').hidden&&$('trade').hidden;
+  const firing=mouseDown&&!buildMode&&$('help').hidden&&$('craft').hidden&&$('upg').hidden&&$('trade').hidden&&$('crew').hidden;
   if(firing){
     const tip=tool.userData.tip.getWorldPosition(tV2);
     const end=mineTarget?mineTarget.wp:o.clone().addScaledVector(dir,RANGE);
@@ -1204,7 +1250,7 @@ function updateShip(dt){
     g.position.addScaledVector(fwd,ship.speed*dt);
     // cannons
     ship.fireCD-=dt;ship.heat=Math.max(0,ship.heat-(ship.overheat?32:24)*dt);if(ship.overheat&&ship.heat<30)ship.overheat=false;
-    if(mouseDown&&$('help').hidden&&$('upg').hidden&&$('craft').hidden&&$('trade').hidden&&!ship.overheat&&ship.fireCD<=0){
+    if(mouseDown&&$('help').hidden&&$('upg').hidden&&$('craft').hidden&&$('trade').hidden&&$('crew').hidden&&!ship.overheat&&ship.fireCD<=0){
       const guns=g.userData.guns,gp=guns[ship.gunI++%guns.length];
       const muzzle=g.localToWorld(tV2.copy(gp));
       fireBolt(muzzle,fwd,tV3.copy(fwd).multiplyScalar(ship.speed),'player',S.dmg);
@@ -1253,7 +1299,7 @@ function updateShip(dt){
 }
 async function doWarp(home){
   if(home)st.seed=base.seed;else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
-  await generateSystem(st.seed,st.seed===st.firstSeed);
+  await generateSystem(st.seed,isFirst(st.seed));
   const P=home&&baseRT?baseRT.P:planets[0];current=P;
   const d=new V3().subVectors(new V3(),P.center).normalize();
   ship.group.position.copy(P.center).addScaledVector(d,P.radius*3.2).add(new V3(0,P.radius*.6,0));
@@ -1953,6 +1999,187 @@ $('trBody').addEventListener('click',e=>{
   renderTrade();
 });
 
+/* ---------- multiplayer ---------- */
+const CREW_COLORS=['#ffb45e','#9fe6ff','#8af0b4','#ff8ad8','#d7b6ff','#ff6274'];
+const MP={room:null,sys:null,avatars:new Map(),chat:[],lastPres:0,lastLobby:0,connected:false,jumping:false,announced:new Set(),since:performance.now()};
+const clean=(v,n)=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁩﻿]/g,'').trim().slice(0,n);
+const okColor=c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c)?c:'#cccccc';
+const okVec=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(Number.isFinite);
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+let myName=clean(lsGet('driftward-name'),20)||('Traveller-'+Math.floor(1000+Math.random()*9000));
+let myColor=CREW_COLORS.includes(lsGet('driftward-color'))?lsGet('driftward-color'):CREW_COLORS[Math.floor(Math.random()*CREW_COLORS.length)];
+function isFirst(seed){return seed===st.firstSeed||(st.extraFirst||[]).includes(seed)}
+function buildAstro(color){
+  const g=new THREE.Group();
+  const suit=new THREE.MeshPhongMaterial({color,flatShading:true,shininess:30}),dark=new THREE.MeshPhongMaterial({color:'#2a2d3e',flatShading:true});
+  const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m};
+  add(new THREE.CylinderGeometry(.3,.26,.75,8),suit,0,1.05,0);
+  add(new THREE.SphereGeometry(.3,10,8),suit,0,1.6,0);
+  add(new THREE.SphereGeometry(.2,10,8).scale(1,.7,.6),new THREE.MeshPhongMaterial({color:'#101420',emissive:'#1a3a5a',shininess:120}),0,1.62,-.17);
+  add(new THREE.BoxGeometry(.42,.5,.22),dark,0,1.15,.26);
+  add(new THREE.CylinderGeometry(.1,.09,.7,6),suit,.14,.35,0);add(new THREE.CylinderGeometry(.1,.09,.7,6),suit,-.14,.35,0);
+  add(new THREE.CylinderGeometry(.08,.07,.62,6),suit,.37,1.05,0);add(new THREE.CylinderGeometry(.08,.07,.62,6),suit,-.37,1.05,0);
+  return g;
+}
+function makeAvatar(s){
+  const a={cls:null,paintKey:'',ship:null,astro:buildAstro(okColor(s.c)),color:okColor(s.c),name:'',fresh:true};
+  scene.add(a.astro);return a;
+}
+function removeAvatar(a){for(const o of [a.ship,a.astro])if(o){scene.remove(o);o.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material)x.material.dispose()})}}
+function clearAvatars(){for(const a of MP.avatars.values())removeAvatar(a);MP.avatars.clear()}
+const tAQ=new Q4(),tAV=new V3(),tAM=new THREE.Matrix4();
+function updateAvatar(a,s,dt){
+  a.name=clean(s.n,20)||'Traveller';const col=okColor(s.c);
+  if(col!==a.color){a.color=col;a.astro.traverse(o=>{if(o.isMesh&&o.material.color&&o.material.color.getHexString()!=='2a2d3e'&&!o.material.emissive.getHex())o.material.color.set(col)})}
+  const cls=SHIP_CLASSES[s.cls]?s.cls:'shuttle';
+  const pt=s.paint&&typeof s.paint==='object'?{hull:okColor(s.paint.hull),trim:okColor(s.paint.trim),glow:okColor(s.paint.glow)}:PAINTS.player;
+  const pk=cls+pt.hull+pt.trim+pt.glow;
+  if(a.cls!==cls||a.paintKey!==pk){if(a.ship){scene.remove(a.ship)}a.ship=buildShip(cls,pt);scene.add(a.ship);a.cls=cls;a.paintKey=pk;a.fresh=true}
+  const k=1-Math.exp(-dt*10);
+  if(okVec(s.sp,3)&&okVec(s.sq,4)){
+    tAV.fromArray(s.sp);tAQ.fromArray(s.sq).normalize();
+    if(a.fresh||a.ship.position.distanceTo(tAV)>800){a.ship.position.copy(tAV);a.ship.quaternion.copy(tAQ)}
+    else{a.ship.position.lerp(tAV,k);a.ship.quaternion.slerp(tAQ,k)}
+    const th=Number.isFinite(s.th)?clamp(s.th,0,1):.1;for(const e of a.ship.userData.engines)e.scale.set(1,1,1+th*6);
+  }
+  const onFoot=s.m==='foot'&&okVec(s.p,3)&&okVec(s.f,3);
+  a.astro.visible=onFoot;
+  if(onFoot){
+    tAV.fromArray(s.p);const P=nearestPlanet(tAV);if(!P){a.astro.visible=false;a.fresh=false;return}
+    const up=tAV.clone().sub(P.center).normalize();const feet=tAV.clone().addScaledVector(up,-1.7);
+    if(a.fresh||a.astro.position.distanceTo(feet)>60)a.astro.position.copy(feet);else a.astro.position.lerp(feet,k);
+    const f=new V3().fromArray(s.f);f.addScaledVector(up,-f.dot(up));if(f.lengthSq()<1e-6)f.crossVectors(up,X_AXIS);f.normalize();
+    const back=f.clone().negate(),right=new V3().crossVectors(up,back);tAM.makeBasis(right,up,back);a.astro.quaternion.setFromRotationMatrix(tAM);
+  }
+  a.fresh=false;
+}
+function myPresence(){
+  const g=ship.group,r2=v=>Math.round(v*100)/100,r4=v=>Math.round(v*1e4)/1e4,foot=st.mode==='foot';
+  const th=st.mode==='ship'?(ship.state==='flying'?clamp(ship.speed/500,.15,1):ship.state==='takeoff'||ship.state==='warp'?1:.05):.05;
+  return{n:myName,c:myColor,m:st.mode,st:ship.state,p:foot?player.pos.toArray().map(r2):null,f:foot?player.fwd.toArray().map(r4):null,
+    sp:g.position.toArray().map(r2),sq:g.quaternion.toArray().map(r4),cls:ship.cls,paint:ship.paint,th:Math.round(th*100)/100};
+}
+function lobbyPresence(){return{n:myName,c:myColor,sys:system?system.name:'',seed:system?system.seed:null,systems:st.systems,first:system?isFirst(system.seed):false,where:current?current.name:'',m:st.mode}}
+async function joinSystemRoom(){
+  if(!MP.room||!system)return;const name='sys-'+system.seed;
+  if(MP.sys&&MP.sys.name===name)return;
+  const old=MP.sys;MP.sys=null;clearAvatars();if(old)old.leave().catch(()=>{});
+  try{const r=await MP.room.join(name);if(!system||'sys-'+system.seed!==name){r.leave().catch(()=>{});return}MP.sys=r;r.onPeers(()=>{},()=>{MP.sys=null})}catch(e){}
+}
+function updateMP(dt){
+  if(MP.sys&&ready){
+    const seen=new Set();
+    for(const pr of MP.sys.peers()){
+      if(pr.sameTab||pr.kind!=='viewer')continue;const s=pr.presence;if(!s||!okVec(s.sp,3))continue;
+      seen.add(pr.peer);let a=MP.avatars.get(pr.peer);if(!a){a=makeAvatar(s);MP.avatars.set(pr.peer,a)}updateAvatar(a,s,dt);
+    }
+    for(const [k,a] of MP.avatars)if(!seen.has(k)){removeAvatar(a);MP.avatars.delete(k)}
+    if(time-MP.lastPres>.1&&!MP.jumping){MP.lastPres=time;MP.sys.presence(myPresence()).catch(()=>{})}
+  }
+  if(MP.room&&ready&&time-MP.lastLobby>2){MP.lastLobby=time;MP.room.presence(lobbyPresence()).catch(()=>{});renderCrewChip();if(!$('crew').hidden)renderCrewList()}
+}
+function crewOthers(){return MP.room?MP.room.peers().filter(p=>!p.sameTab&&p.kind==='viewer'&&p.presence&&p.presence.n):[]}
+function renderCrewChip(){
+  const chip=$('crewChip');if(!ready){chip.hidden=true;return}chip.hidden=false;
+  const n=crewOthers().length;chip.classList.toggle('on',!!MP.room&&MP.connected);
+  setText('crewChipT',!MP.room?'Crew · solo':!MP.connected?'Crew · connecting':n?`Crew · ${n} online`:'Crew · just you');
+}
+function renderCrewList(){
+  const box=$('crewList');box.textContent='';
+  if(!MP.room){$('crewStatus').textContent='Multiplayer is not available in this view. Open this artifact on claude.ai while signed in; people in your organization you share it with can join you.';return}
+  $('crewStatus').textContent=MP.connected?'Connected. Everyone with this page open shows up here.':'Connecting…';
+  const others=crewOthers();
+  const mk=(color,name,where,right)=>{const r=document.createElement('div');r.className='crow';const d=document.createElement('span');d.className='dot';d.style.background=color;
+    const w=document.createElement('div');w.className='who';const n=document.createElement('div');n.className='nm';n.textContent=name;const h=document.createElement('div');h.className='wh';h.textContent=where;w.append(n,h);r.append(d,w);if(right)r.append(right);box.append(r)};
+  mk(myColor,myName+' (you)',`${system?system.name:''}${current?' · '+current.name:''}`,null);
+  if(!others.length){const p=document.createElement('p');p.className='trnote';p.textContent='Nobody else is online right now. Share this artifact with a friend in your organization to fly together.';box.append(p)}
+  for(const pr of others){const s=pr.presence;const name=clean(s.n,20)||'Traveller';
+    const where=`${clean(s.sys,24)||'Unknown system'}${s.where?' · '+clean(s.where,24):''}${s.m==='ship'?' · flying':s.m==='foot'?' · on foot':''}${pr.guest?' · guest':''}`;
+    let right;
+    if(system&&s.seed===system.seed){right=document.createElement('span');right.className='badge';right.textContent='Same system'}
+    else if(Number.isFinite(s.seed)){right=document.createElement('button');right.type='button';right.className='trbtn';right.textContent='Jump to their system';right.addEventListener('click',()=>crewJump(pr.peer))}
+    mk(okColor(s.c),name,where,right)}
+}
+function renderCrewLog(){
+  const log=$('crewLog');log.textContent='';
+  if(!MP.chat.length){const p=document.createElement('div');p.className='trnote';p.style.margin='0';p.textContent='No messages yet.';log.append(p)}
+  for(const m of MP.chat){const d=document.createElement('div');d.className='ln';const b=document.createElement('b');b.style.color=m.c;b.textContent=m.n+': ';d.append(b,document.createTextNode(m.t));log.append(d)}
+  log.scrollTop=log.scrollHeight;
+}
+function renderCrew(){
+  $('crewName').value=myName;
+  const sw=$('crewSw');sw.textContent='';
+  for(const c of CREW_COLORS){const b=document.createElement('button');b.type='button';b.className='sw'+(c===myColor?' sel':'');b.style.background=c;b.setAttribute('aria-label','Suit colour '+c);
+    b.addEventListener('click',()=>{myColor=c;lsSet('driftward-color',c);renderCrew();MP.lastLobby=-9});sw.append(b)}
+  renderCrewList();renderCrewLog();
+}
+function toggleCrew(focusChat=false){
+  const el=$('crew');
+  if(el.hidden){el.hidden=false;$('upg').hidden=true;$('craft').hidden=true;try{document.exitPointerLock()}catch(_){}renderCrew();if(focusChat)setTimeout(()=>$('crewMsg').focus(),0)}
+  else if(!focusChat)el.hidden=true;
+  else $('crewMsg').focus();
+}
+$('crewChip').addEventListener('click',()=>toggleCrew());
+$('crewName').addEventListener('change',()=>{myName=clean($('crewName').value,20)||myName;lsSet('driftward-name',myName);$('crewName').value=myName;MP.lastLobby=-9;renderCrewList()});
+$('crewName').addEventListener('keydown',e=>{if(e.key==='Enter')$('crewName').blur();if(e.key==='Escape'){$('crewName').blur();$('crew').hidden=true}});
+$('crewMsg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape'){$('crewMsg').blur();$('crew').hidden=true}});
+$('crewSend').addEventListener('click',sendChat);
+function sendChat(){
+  const inp=$('crewMsg'),t=clean(inp.value,140);if(!t)return;
+  if(!MP.room){toast('Multiplayer is not available in this view.','bad');return}
+  if(!MP.connected){toast('Not connected yet. Try again in a moment.','bad');return}
+  MP.room.emit('chat',{t,n:myName,c:myColor}).then(()=>{inp.value=''}).catch(e=>toast(e&&e.code==='not_permitted'?'You have view-only access: you can read chat but not send.':'Message not sent.','bad'));
+}
+function addChat(m){
+  const d=m&&m.data&&typeof m.data==='object'?m.data:{};const t=clean(d.t,140);if(!t)return;const n=clean(d.n,20)||'Traveller';
+  MP.chat.push({n,c:okColor(d.c),t});if(MP.chat.length>40)MP.chat.shift();
+  if(!$('crew').hidden)renderCrewLog();
+  if(!(m.isMe&&m.sameTab)){toast(`${n}: ${t}`);Sound.blip(880,.08,'sine',.06)}
+}
+async function crewJump(peer){
+  const pr=MP.room&&MP.room.peers().find(x=>x.peer===peer);if(!pr||!pr.presence)return;const s=pr.presence;
+  if(!Number.isFinite(s.seed)||MP.jumping)return;
+  if(['warp','docking','undocking','landing','takeoff'].includes(ship.state)&&st.mode==='ship'){toast('Finish your current manoeuvre first.','bad');return}
+  const name=clean(s.n,20)||'your crewmate';
+  MP.jumping=true;$('crew').hidden=true;if(trade)closeTrade();if(buildMode)toggleBuild();
+  $('flash').style.transition='opacity .5s';$('flash').style.background='#fff';$('flash').style.opacity=1;Sound.whoosh(1.6);
+  await new Promise(r=>setTimeout(r,500));
+  if(s.first){st.extraFirst=st.extraFirst||[];if(!st.extraFirst.includes(s.seed))st.extraFirst.push(s.seed)}
+  st.seed=s.seed>>>0;st.systems=Math.max(1,Math.floor(s.systems)||1);
+  await generateSystem(st.seed,isFirst(st.seed));
+  await joinSystemRoom();
+  let fp=null;for(let i=0;i<30&&!fp;i++){const q=MP.sys&&MP.sys.peers().find(x=>x.peer===peer);if(q&&q.presence&&okVec(q.presence.sp,3))fp=q.presence;else await new Promise(r=>setTimeout(r,100))}
+  if(fp&&fp.m==='foot'&&okVec(fp.p,3)){
+    const pos=new V3().fromArray(fp.p),P=nearestPlanet(pos);current=P;const d=pos.clone().sub(P.center).normalize();let dd=null;
+    for(let k=0;k<24&&!dd;k++){const c=dirNear(d,28+k*6,P.radius,Math.random,new V3());const h=P.heightAt(c);if(P.sea===null||h>P.sea+.5)dd=c}
+    landShipAt(P,dd||d);exitToFoot();
+  }else if(fp){
+    const pos=new V3().fromArray(fp.sp);current=nearestPlanet(pos);st.mode='ship';
+    ship.group.position.copy(pos).addScaledVector(randDir(Math.random,new V3()),160);ship.group.lookAt(pos);ship.group.rotateY(Math.PI);
+    ship.camQ.copy(ship.group.quaternion);ship.state='flying';ship.speed=0;
+  }else{const P=planets[0];current=P;landShipAt(P,P.spawnDir);exitToFoot()}
+  camera.fov=70;camera.updateProjectionMatrix();
+  $('flash').style.transition='opacity 1.6s';$('flash').style.opacity=0;
+  toast(fp?`Joined ${name} in ${system.name}.`:`Arrived in ${system.name}. ${name} has moved on.`,'big');
+  MP.jumping=false;save();
+}
+(async()=>{
+  let room=null;try{room=window.claude&&window.claude.use?await window.claude.use('room'):null}catch(e){room=null}
+  if(!room){renderCrewChip();return}
+  MP.room=room;
+  room.onConnection(c=>{MP.connected=c;renderCrewChip();if(!$('crew').hidden)renderCrewList()},()=>{MP.connected=false;MP.room=null;MP.sys=null;clearAvatars();renderCrewChip()});
+  room.onPeers(ch=>{
+    for(const p of ch.peers){if(p.sameTab||p.kind!=='viewer'||!p.presence||!p.presence.n||MP.announced.has(p.peer))continue;MP.announced.add(p.peer);
+      if(ready&&performance.now()-MP.since>5000)toast(`${clean(p.presence.n,20)||'A traveller'} came online.`)}
+    for(const p of ch.left){if(MP.announced.has(p.peer)&&p.presence&&p.presence.n&&ready)toast(`${clean(p.presence.n,20)||'A traveller'} went offline.`);MP.announced.delete(p.peer)}
+    renderCrewChip();if(!$('crew').hidden)renderCrewList();
+  },()=>{});
+  room.on('chat',addChat,()=>{});
+  if(ready)joinSystemRoom();
+  renderCrewChip();
+})();
+
 /* ---------- crafting ---------- */
 const AUR_R=()=>tech('scanner')?1000:500;
 const canWarp=()=>inv.aurium>=10||crafted.warpcell>0;
@@ -2114,6 +2341,8 @@ function drawMarkers(){
   }
   if(station&&st.mode==='ship'&&ship.state!=='warp'&&ship.state!=='docked'){const sw=station.group.position;const dd=sw.distanceTo(ship.group.position);
     if(dd>500){const p=proj(sw,true);marker(p.x,p.y,'#ffd9a3',station.name,`Space station · ${fmtDist(dd)}`,'diamond',9)}}
+  for(const a of MP.avatars.values()){const onFoot=a.astro.visible,obj=onFoot?a.astro:a.ship;const w=obj.localToWorld(new V3(0,onFoot?2.4:4.5,0));
+    const ref5=st.mode==='foot'?player.pos:ship.group.position;const dd=w.distanceTo(ref5);const p=proj(w,true);marker(p.x,p.y,a.color,a.name,fmtDist(dd),'ring',onFoot?4:6)}
   for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
     if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
   if(baseRT&&!buildMode){const bw=baseRT.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
@@ -2247,7 +2476,7 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
@@ -2261,11 +2490,11 @@ async function begin(saved){
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
     Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
-    base=saved.base||null;st.mission=saved.mission||null;if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
+    base=saved.base||null;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
-  await generateSystem(st.seed,st.seed===st.firstSeed);
+  await generateSystem(st.seed,isFirst(st.seed));
   const P=planets[0];current=P;
   if(baseRT)landAtBase();else landShipAt(P,P.spawnDir);
   exitToFoot();
@@ -2273,7 +2502,7 @@ async function begin(saved){
   const toShip=ship.group.position.clone().sub(player.pos);const up=player.pos.clone().sub(P.center).normalize();
   player.fwd.copy(toShip).addScaledVector(up,-toShip.dot(up)).normalize();
   $('title').hidden=true;['hudTL','hudTC','hudBL','hudBR'].forEach(id=>$(id).hidden=false);
-  ready=true;started=true;
+  ready=true;started=true;MP.lastLobby=-9;renderCrewChip();joinSystemRoom();
   toast(saved?`Welcome back to ${system.name}.`:`Stranded on ${P.name}. Your launch thrusters are empty.`,'big');
   if(!TOUCH)setTimeout(()=>toast('Click to capture the mouse. Tab shows controls.'),900);
   if(station)setTimeout(()=>toast(`A space station, ${station.name}, orbits nearby. Trading posts on planets buy and sell too.`),7000);
