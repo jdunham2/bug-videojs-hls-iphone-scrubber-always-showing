@@ -40,7 +40,13 @@ export const MODES = [
   { id: 'infection', name: 'Infection', blurb: 'Everyone a seeker catches becomes a seeker too. Be the last one standing.' },
   { id: 'freeze', name: 'Freeze Tag', blurb: 'Tagged hiders freeze where they stand. Teammates can thaw them.' },
   { id: 'props', name: 'Prop Hunt', blurb: 'Hiders are disguised as crates, barrels and bushes. A seeker who swings and misses is dazed.' },
+  { id: 'blackout', name: 'Blackout', blurb: 'Classic rules in the pitch dark. Seekers have flashlights; everyone else has a faint glow.' },
+  { id: 'heist', name: 'Coin Heist', blurb: 'Hiders win the moment they have collected enough coins between them.' },
+  { id: 'sardines', name: 'Sardines', blurb: 'One player hides and everyone else seeks. Find the hider and you join them. Do not be last.' },
+  { id: 'turbo', name: 'Turbo', blurb: 'Short, frantic rounds: everyone is faster and nobody runs out of breath.' },
 ];
+// Mode-specific numbers: Turbo shortens the round and speeds everyone up
+export const TURBO = { speed: 1.3, hide: 15, seek: 90 };
 export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
   { id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
@@ -53,7 +59,8 @@ export const LOOKS = {
   hats: ['No hat', 'Beanie', 'Cap', 'Top hat', 'Crown', 'Party hat', 'Headphones', 'Halo'],
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
-  pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball'],
+  pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball',
+    'Fox', 'Panda', 'Piglet', 'Unicorn', 'Turtle', 'Owl', 'Bat', 'Ghostling', 'Crab'],
 };
 export function cleanLook(l) {
   const v = (x, n) => (Number.isInteger(x) && x >= 0 && x < n ? x : (Math.random() * n) | 0);

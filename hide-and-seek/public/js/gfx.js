@@ -65,16 +65,27 @@ export class Gfx {
     this.scene.add(this.root);
     this.lever = this.water = this.flame = this.blink = null;
     this.coins = []; this.items = []; this.beacons = []; this.sites = []; this.siteT = 0;
-    const T = W.theme, u = this.sky.material.uniforms;
-    u.uTop.value.set(...T.sky[0]); u.uMid.value.set(...T.sky[1]); u.uHor.value.set(...T.sky[2]); u.uGlow.value = T.glow;
-    this.scene.fog.color.set(T.fog[0]); this.scene.fog.density = T.fog[1];
-    this.hemi.color.set(T.hemi[0]); this.hemi.groundColor.set(T.hemi[1]); this.hemi.intensity = T.hemi[2];
-    this.sun.color.set(T.sun[0]); this.sun.intensity = T.sun[1];
-    this.sunMesh.material.color.set(T.disc);
-    this.stars.visible = T.stars > 0; this.stars.material.opacity = T.stars;
-    this.renderer.toneMappingExposure = T.exposure;
+    this.applyTheme();
     this.buildGround();
     this.buildWorld();
+  }
+
+  // Lighting and sky for the current map. Blackout mode overrides it with near-total darkness.
+  applyTheme() {
+    const T = this.W.theme, u = this.sky.material.uniforms, D = this.dark;
+    const k = D ? 0.06 : 1;
+    u.uTop.value.set(...T.sky[0]).multiplyScalar(k); u.uMid.value.set(...T.sky[1]).multiplyScalar(k); u.uHor.value.set(...T.sky[2]).multiplyScalar(k); u.uGlow.value = D ? 0 : T.glow;
+    this.scene.fog.color.set(D ? 0x020308 : T.fog[0]); this.scene.fog.density = D ? 0.05 : T.fog[1];
+    this.hemi.color.set(T.hemi[0]); this.hemi.groundColor.set(T.hemi[1]); this.hemi.intensity = D ? 0.14 : T.hemi[2];
+    this.sun.color.set(T.sun[0]); this.sun.intensity = D ? 0.04 : T.sun[1];
+    this.sunMesh.material.color.set(T.disc); this.sunMesh.visible = !D;
+    this.stars.visible = D || T.stars > 0; this.stars.material.opacity = D ? 1 : T.stars;
+    this.renderer.toneMappingExposure = D ? 1.15 : T.exposure;
+  }
+  setDark(on) {
+    if (!!on === !!this.dark) return;
+    this.dark = !!on;
+    this.applyTheme();
   }
 
   // ---------- environment ----------
@@ -470,7 +481,12 @@ export class Gfx {
     this.camera.add(s, s.target);
     this.setSeekerView(false);
   }
-  setSeekerView(on) { this.torch.visible = on; this.spot.visible = on; }
+  // Seekers carry the flashlight. In a blackout everyone else gets a faint glow so they can find their feet.
+  setSeekerView(on) {
+    this.torch.visible = on; this.spot.visible = on;
+    if (!this.glow) { this.glow = new THREE.PointLight(0x9fb8ff, 0, 9, 1.6); this.camera.add(this.glow); }
+    this.glow.intensity = this.dark && !on ? 5 : 0;
+  }
   swing() { this.swingT = 0.25; }
 
   buildPools() {
@@ -866,7 +882,7 @@ export class Preview {
     this.ch.seeker.visible = false;
     this.scene.add(this.ch.inner);
     this.pet = makePet(look[4] | 0);
-    if (this.pet) this.scene.add(this.pet.g);
+    if (this.pet) { this.pet.g.visible = true; this.scene.add(this.pet.g); }
   }
   render(t) {
     if (!this.ch) return;
@@ -943,19 +959,82 @@ export function makePet(i) {
     for (const s of [-0.045, 0.045]) put(S(0.025, 6, 5), white, s, 0.06, -0.265, body, false);
     for (const s of [-1, 1]) { const w = put(new THREE.BoxGeometry(0.2, 0.008, 0.11), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide }), 0, 0, 0, body, false); w.geometry.translate(0.1, 0, 0); w.position.set(s * 0.05, 0.12, 0); w.scale.x = s; pet.wings.push(w); }
     put(new THREE.ConeGeometry(0.025, 0.08, 5), m(0x2a2320), 0, 0, 0.2, body).rotation.x = Math.PI / 2;
-  } else { // robo-ball
+  } else if (i === 8) { // robo-ball
     pet.fly = true;
     put(S(0.17, 14, 10), m(0xb8c0d0, { metalness: 0.8, roughness: 0.3 }), 0, 0, 0, body);
     put(S(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: 0x7df9ff }), 0, 0.02, -0.125, body, false);
     put(new THREE.TorusGeometry(0.175, 0.018, 6, 20), m(0x3a4254, { metalness: 0.6 }), 0, 0, 0, body).rotation.x = Math.PI / 2;
     put(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 5), m(0x3a4254), 0, 0.23, 0, body);
     put(S(0.03, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff5050 }), 0, 0.31, 0, body, false);
+  } else if (i === 9) { // fox
+    quad(0xe8742c, 0xb5501a, true);
+    pet.tail.scale.set(2.2, 1.3, 2.2);
+    put(S(0.05, 6, 5), m(0xffffff), 0, 0.47, 0.33, body);
+  } else if (i === 10) { // panda
+    put(S(0.18, 10, 8), m(0xf7f7f2), 0, 0.2, 0.02, body);
+    put(S(0.14, 10, 8), m(0xf7f7f2), 0, 0.44, -0.08, body);
+    for (const s of [-1, 1]) {
+      put(S(0.05, 6, 5), m(0x1a1a1e), s * 0.1, 0.57, -0.06, body);
+      put(S(0.04, 6, 5), m(0x1a1a1e), s * 0.055, 0.46, -0.2, body, false).scale.set(1, 1.3, 0.5);
+      put(S(0.07, 6, 5), m(0x1a1a1e), s * 0.15, 0.27, -0.06, body);
+      put(S(0.07, 6, 5), m(0x1a1a1e), s * 0.1, 0.06, 0.02, body);
+    }
+    for (const s of [-0.055, 0.055]) put(S(0.014, 5, 4), white, s, 0.47, -0.222, body, false);
+    put(S(0.02, 5, 4), black, 0, 0.41, -0.215, body, false);
+  } else if (i === 11) { // piglet
+    quad(0xffa8b8, 0xf08aa0, false);
+    const sn = put(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10), m(0xff8aa0), 0, 0.37, -0.4, body); sn.rotation.x = Math.PI / 2;
+    pet.tail.scale.set(0.8, 0.5, 0.8);
+  } else if (i === 12) { // unicorn
+    quad(0xffffff, 0xd9b3ff, true);
+    const horn = put(new THREE.ConeGeometry(0.03, 0.2, 6), new THREE.MeshStandardMaterial({ color: 0xffd447, emissive: 0x8a6a00, metalness: 0.6, roughness: 0.3 }), 0, 0.6, -0.28, body); horn.rotation.x = -0.35;
+    [0xff6b8a, 0xffc93c, 0x5fd17a, 0x4da3ff].forEach((c, k) => put(S(0.04, 6, 5), m(c), 0, 0.5 - k * 0.04, -0.13 + k * 0.06, body));
+  } else if (i === 13) { // turtle
+    put(new THREE.SphereGeometry(0.19, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), m(0x3f7d4a, { flatShading: true }), 0, 0.09, 0.02, body).scale.set(1, 0.85, 1.15);
+    put(new THREE.CylinderGeometry(0.19, 0.19, 0.04, 10), m(0xd9c98a), 0, 0.08, 0.02, body).scale.set(1, 1, 1.15);
+    put(S(0.07, 8, 6), m(0x7fbf6a), 0, 0.15, -0.25, body);
+    eyes(0.18, -0.305, 0.035, 0.016);
+    for (const s of [-1, 1]) for (const z of [-0.14, 0.17]) put(S(0.045, 6, 5), m(0x7fbf6a), s * 0.17, 0.05, z, body);
+    pet.tail = put(new THREE.ConeGeometry(0.02, 0.08, 4), m(0x7fbf6a), 0, 0.07, 0.25, body); pet.tail.rotation.x = -1.5;
+  } else if (i === 14) { // owl
+    pet.fly = true;
+    put(S(0.15, 10, 8), m(0x8a6a44), 0, 0, 0, body).scale.set(1, 1.2, 0.95);
+    put(S(0.1, 8, 6), m(0xe8d9b8), 0, -0.04, -0.07, body).scale.set(1, 1.2, 0.8);
+    for (const s of [-1, 1]) {
+      put(S(0.055, 8, 6), white, s * 0.06, 0.08, -0.12, body, false); put(S(0.028, 6, 5), black, s * 0.06, 0.08, -0.165, body, false);
+      put(new THREE.ConeGeometry(0.03, 0.08, 4), m(0x6a4a2a), s * 0.09, 0.2, -0.02, body);
+      const w = put(new THREE.BoxGeometry(0.24, 0.02, 0.16), m(0x6a4a2a), 0, 0, 0, body); w.geometry.translate(0.12, 0, 0); w.position.set(s * 0.12, 0.02, 0.02); w.scale.x = s; pet.wings.push(w);
+    }
+    const bk = put(new THREE.ConeGeometry(0.022, 0.05, 4), m(0xffb02e), 0, 0.03, -0.16, body); bk.rotation.x = Math.PI;
+  } else if (i === 15) { // bat
+    pet.fly = true;
+    put(S(0.1, 8, 6), m(0x3a3350), 0, 0, 0, body).scale.set(1, 1.15, 1);
+    for (const s of [-1, 1]) {
+      put(new THREE.ConeGeometry(0.03, 0.09, 4), m(0x3a3350), s * 0.055, 0.13, 0, body);
+      put(S(0.02, 5, 4), new THREE.MeshBasicMaterial({ color: 0xffe14d }), s * 0.04, 0.03, -0.09, body, false);
+      const w = put(new THREE.BoxGeometry(0.34, 0.01, 0.2), m(0x554a78, { side: THREE.DoubleSide }), 0, 0, 0, body); w.geometry.translate(0.17, 0, 0); w.position.set(s * 0.07, 0.03, 0); w.scale.x = s; pet.wings.push(w);
+    }
+  } else if (i === 16) { // ghostling
+    pet.fly = true;
+    put(new THREE.CapsuleGeometry(0.12, 0.14, 4, 10), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, roughness: 0.3, emissive: 0x556688 }), 0, 0, 0, body);
+    for (let k = 0; k < 5; k++) put(S(0.05, 6, 5), m(0xffffff, { transparent: true, opacity: 0.8 }), Math.cos(k * 1.257) * 0.08, -0.18, Math.sin(k * 1.257) * 0.08, body, false);
+    for (const s of [-0.045, 0.045]) put(S(0.025, 6, 5), black, s, 0.06, -0.105, body, false).scale.set(1, 1.5, 0.6);
+  } else { // crab
+    put(S(0.16, 10, 8), m(0xe0503a), 0, 0.14, 0, body).scale.set(1.25, 0.6, 0.9);
+    for (const s of [-1, 1]) {
+      put(new THREE.CylinderGeometry(0.012, 0.012, 0.1, 5), m(0xe0503a), s * 0.07, 0.26, -0.08, body);
+      put(S(0.03, 6, 5), white, s * 0.07, 0.32, -0.08, body, false); put(S(0.015, 5, 4), black, s * 0.07, 0.32, -0.105, body, false);
+      const claw = put(S(0.065, 8, 6), m(0xc23a28), s * 0.25, 0.2, -0.14, body); claw.scale.set(1, 0.8, 1.3); pet.wings.push(claw);
+      for (const z of [-0.04, 0.05, 0.13]) { const l = put(new THREE.CylinderGeometry(0.014, 0.014, 0.16, 5), m(0xc23a28), s * 0.2, 0.07, z, body); l.rotation.z = s * 0.9; }
+    }
+    pet.crab = true;
   }
   g.visible = false;
   return pet;
 }
 function animPet(p, t, moving) {
-  for (let i = 0; i < p.wings.length; i++) p.wings[i].rotation.z = (i ? -1 : 1) * Math.sin(t * 28) * 0.7;
+  if (p.crab) { for (let i = 0; i < 2; i++) p.wings[i].position.y = 0.2 + Math.max(0, Math.sin(t * 6 + i * 3)) * 0.08; }
+  else for (let i = 0; i < p.wings.length; i++) p.wings[i].rotation.z = (i ? -1 : 1) * Math.sin(t * 28) * 0.7;
   if (p.tail && !p.fly) p.tail.rotation.z = Math.sin(t * (moving ? 14 : 5)) * 0.5;
 }
 // Move a pet toward the point it wants to be at, and animate it.

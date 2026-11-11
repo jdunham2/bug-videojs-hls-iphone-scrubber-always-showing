@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-2, the starting map) or `MODE` (0-3) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-2, the starting map) or `MODE` (0-7) to change the defaults.
 
 ## How it plays
 
@@ -32,6 +32,10 @@ The host picks the mode in the lobby with **Next mode**.
 | **Infection** | Everyone a seeker catches becomes a seeker too. Survive until the clock runs out. |
 | **Freeze Tag** | Tagged hiders freeze where they stand. A teammate who holds **E** next to them for 1.5 seconds thaws them (+30). |
 | **Prop Hunt** | Hiders are disguised as crates, barrels, bushes, rocks or traffic cones (**R** changes disguise) and there are no hiding spots. A seeker who swings at a real prop is dazed. |
+| **Blackout** | Classic rules in near-total darkness. Seekers have flashlights, everyone else a faint glow, and street lamps are islands of light. |
+| **Coin Heist** | Hiders win the moment they have collected enough coins between them (4 plus 2 per hider). |
+| **Sardines** | One player hides and everyone else seeks. Tag the hider and you become a hider too, right there. The round ends when only one seeker is left. |
+| **Turbo** | 15 seconds to hide, 90 to seek, everyone 30% faster and nobody runs out of breath. |
 
 Beacons, power-ups, coins and challenges work in every mode.
 
@@ -52,7 +56,8 @@ Beacons, power-ups, coins and challenges work in every mode.
 ### Characters
 
 Eight characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien), 16 colours, seven hats, four patterns and
-eight pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball). Your pet runs just ahead of you;
+17 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
+owl, bat, ghostling, crab). Your pet runs just ahead of you;
 other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
 Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
 

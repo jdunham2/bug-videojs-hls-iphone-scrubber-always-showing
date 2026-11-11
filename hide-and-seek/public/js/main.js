@@ -1,5 +1,5 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, levelAt, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
+import { getWorld, collide, levelAt, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
 import { Gfx, Preview, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
 import { connectWs, connectLocal, connectRoom } from './net.js';
@@ -20,7 +20,7 @@ const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
-const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0 };
+const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0 };
 const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0, y: 0, vy: 0, freeUntil: 0, boostUntil: 0, chal: '', chalDone: false, lv: 0, gy: 0 };
 const keys = {};
 let playing = false, chatOpen = false, lastSend = 0, lastHud = 0, heartT = 0, tauntCd = 0, bannerT = 0;
@@ -143,6 +143,10 @@ function onMsg(m) {
     case 'noise': onNoise(m); break;
     case 'coin': if (m.w === myId) { sfx.coin(); feed('+10 coin', 'good'); } break;
     case 'caught':
+      if (m.m === 6) {
+        if (m.b === myId) { sfx.win(); banner('Found them! Now hide here too. +100'); } else if (m.w === myId) { sfx.thud(); banner('You were found. Shh, squeeze up!'); } else sfx.thud();
+        break;
+      }
       if (m.w === myId) { sfx.caught(); banner(m.m === 1 ? 'INFECTED! You are a seeker now' : m.m === 2 ? 'FROZEN! Wait for a thaw…' : 'CAUGHT! Wait for a rescue…'); }
       else if (m.b === myId) { sfx.win(); banner(m.m === 1 ? 'Infected one! +100' : m.m === 2 ? 'Frozen! +100' : 'Got one! +100'); }
       else sfx.thud();
@@ -188,6 +192,7 @@ function onState(m) {
   }
   G.bc = m.bc || G.bc;
   if ((m.md || 0) !== G.md) { G.md = m.md || 0; if (!playing) renderLobby(); }
+  G.cg = m.cg || 0;
   gfx.setItems(new Set(m.it || []));
   G.ct = new Set(m.ct);
   gfx.setCoins(G.ct);
@@ -212,7 +217,8 @@ function onEnd(w) {
   const p = players.get(myId), won = p && (p.role === 1) === (w === 'seekers');
   won ? sfx.win() : sfx.lose();
   $('resTitle').textContent = w === 'seekers' ? 'SEEKERS WIN' : 'HIDERS WIN';
-  $('resSub').textContent = w === 'seekers' ? 'Everyone was caught.' : G.bc.every((v) => v >= 1) ? 'All three beacons were lit.' : 'Somebody survived until the bell.';
+  $('resSub').textContent = G.md === 6 ? (w === 'seekers' ? 'Everyone found the hiding place. Last one in loses!' : 'Time ran out before everyone found the hiding place.')
+    : w === 'seekers' ? 'Everyone was caught.' : G.cg && G.ct.size >= G.cg ? 'The hiders pulled off the heist.' : G.bc.every((v) => v >= 1) ? 'All three beacons were lit.' : 'Somebody survived until the bell.';
   setTimeout(() => {
     const ul = $('resList');
     ul.textContent = '';
@@ -451,12 +457,12 @@ function update(dt, now) {
   me.crouch = !!keys.KeyC && !hidden && !frozen;
   let sprint = (keys.ShiftLeft || keys.ShiftRight || pushed) && moving && !me.crouch && t > me.wind && me.stam > 0;
   if (sprint) {
-    if (t > me.freeUntil) me.stam -= STAM.drain * dt;
+    if (t > me.freeUntil && G.md !== 7) me.stam -= STAM.drain * dt;
     if (me.stam <= 0) { me.stam = 0; me.wind = t + STAM.windedFor; sprint = false; feed(seeker ? 'Out of breath!' : 'Out of breath — seekers can hear you gasping!', 'bad'); }
   } else me.stam = Math.min(100, me.stam + (moving ? STAM.regenMove : STAM.regenIdle) * dt);
   const winded = t < me.wind;
   const base = seeker ? SPEED.seeker : SPEED.hider;
-  const sp = (me.crouch ? SPEED.crouch : sprint ? base.sprint : winded ? SPEED.winded : base.walk) * (t < me.boostUntil ? 1.35 : 1);
+  const sp = (me.crouch ? SPEED.crouch : sprint ? base.sprint : winded ? SPEED.winded : base.walk) * (t < me.boostUntil ? 1.35 : 1) * (G.md === 7 && G.ph !== 'lobby' ? TURBO.speed : 1);
   if (me.y > 0) { me.y += me.vy * dt; me.vy -= 15 * dt; if (me.y <= 0) { me.y = 0; me.vy = 0; sfx.step(true); } }
   if (hidden) { const s = W.spots[p.hid]; me.x = s.x; me.z = s.z; me.lv = s.lv; me.gy = s.lv * FLOOR_H; }
   else if (moving) {
@@ -506,6 +512,7 @@ function update(dt, now) {
   // camera
   const eyeT = hidden ? 1.15 : me.crouch ? 1.0 : 1.6;
   me.eye += (eyeT - me.eye) * Math.min(1, dt * 12);
+  gfx.setDark(G.md === 4 && (G.ph === 'hide' || G.ph === 'seek'));
   gfx.setSeekerView(seeker && G.ph !== 'lobby');
   gfx.updateSelfPet(me.x, me.gy, me.z, me.yaw, !hidden && !blind && !p.prop, dt);
   gfx.frame(dt, { x: me.x, y: me.gy + me.eye + me.y + (moving && !hidden ? Math.abs(Math.sin(me.bob)) * 0.05 : 0), z: me.z, yaw: me.yaw, pitch: me.pitch, bob: me.bob }, { res: G.res, jailed: jailedN > 0, bc: G.bc });
@@ -520,7 +527,7 @@ function hud(p, now, s) {
   $('timer').textContent = G.ph === 'lobby' ? '—' : `${(tl / 60) | 0}:${String(Math.ceil(tl) % 60).padStart(2, '0')}`;
   $('timer').classList.toggle('low', G.ph === 'seek' && tl < 20);
   const hs = [...players.values()].filter((q) => q.role === 0);
-  $('left').textContent = G.ph === 'seek' || G.ph === 'hide' ? `${hs.length - s.jailedN} of ${hs.length} hiders free · beacons ${G.bc.filter((v) => v >= 1).length}/3` : `Room ${roomCode}`;
+  $('left').textContent = G.ph === 'seek' || G.ph === 'hide' ? (G.md === 6 ? `${players.size - hs.length} still seeking` : `${hs.length - s.jailedN} of ${hs.length} hiders free`) + (G.cg ? ` · coins ${G.ct.size}/${G.cg}` : ` · beacons ${G.bc.filter((v) => v >= 1).length}/3`) : `Room ${roomCode}`;
 
   const role = $('role');
   const set = (cls, title, sub) => {
@@ -531,11 +538,14 @@ function hud(p, now, s) {
     if (me.chal && G.ph !== 'lobby') { const c = document.createElement('em'); c.textContent = (me.chalDone ? '✔ ' : '★ ') + me.chal; if (me.chalDone) c.className = 'done'; role.append(c); }
   };
   if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the map and learn the hiding spots.');
+  else if (s.seeker && G.md === 6) set('seeker', '🔦 SEEKER', 'Find the one hider and tag them to squeeze in beside them. Do not be the last one looking.');
   else if (s.seeker && G.md === 3) set('seeker', '🔦 SEEKER', 'Hiders look like props. Tag the ones that move. Miss and you are dazed.');
   else if (s.seeker) set('seeker', '🔦 SEEKER', TOUCH ? 'Tap TAG next to a hider. Search spots with USE, carefully.' : 'Tag hiders (click). Search spots with E — carefully.');
   else if (p.st === 1) set('jail', '⛓ JAILED', `A free teammate must hold ${USE} at the lever.`);
   else if (p.st === 2) set('jail', '🧊 FROZEN', `A free teammate can thaw you: they hold ${USE} next to you.`);
   else if (p.prop) set('hider', `📦 You are a ${PROPS[p.prop].toUpperCase()}`, `Hold still to blend in. ${TOUCH ? 'Tap PROP' : 'Press R'} to change disguise.`);
+  else if (G.md === 6) set('hider', '🐟 SARDINE', 'Stay hidden. Everyone who finds you hides here too.');
+  else if (G.md === 5) set('hider', '💰 THIEF', `Grab coins. Your team needs ${G.cg} between you to win.`);
   else if (G.md === 1) set('hider', '🙈 SURVIVOR', 'If a seeker tags you, you join them. Be the last one left.');
   else set('hider', '🙈 HIDER', s.hidden ? `Shh… ${USE} to climb out.` : 'Hide, grab coins, free your friends.');
 

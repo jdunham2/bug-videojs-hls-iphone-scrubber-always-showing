@@ -3,7 +3,7 @@
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
   levelAt, validLevel, cleanLook,
-  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
+  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
 // The world of whichever room is being processed. Every entry point sets it first; all code here is synchronous.
@@ -88,20 +88,23 @@ function leaveSpot(room, p, tp = true) {
 function startRound(room) {
   const all = [...room.players.values()];
   if (all.length < 2 || room.phase !== 'lobby') return;
-  const nS = Math.max(1, Math.floor(all.length / 4));
+  // Sardines turns the teams around: one hider, everybody else seeks
+  const nS = room.mode === 6 ? all.length - 1 : Math.max(1, Math.floor(all.length / 4));
   const order = all.map((p) => [p.seekCount + Math.random() * 0.9, p]).sort((a, b) => a[0] - b[0]).map((e) => e[1]);
   room.coins.clear(); room.spotOcc.clear(); room.resc = 0; room.winner = null;
   room.items.clear(); room.bc = [0, 0, 0];
+  room.startSeekers = nS;
+  room.coinGoal = room.mode === 5 ? Math.min(W.coins.length - 6, 4 + 2 * (all.length - nS)) : 0;
   const t = now();
   order.forEach((p, i) => {
     p.role = i < nS ? SEEKER : HIDER;
-    if (p.role === SEEKER) p.seekCount++;
+    if (p.role === SEEKER && room.mode !== 6) p.seekCount++;
     p.st = 0; p.hid = -1; p.rocks = 3; p.stunUntil = 0; p.immUntil = 0; p.tagCd = 0; p.tauntCd = 0; p.f = 0;
     p.ai = { stam: 100, wind: 0 };
     p.item = 0; p.cloakUntil = 0; p.silentUntil = 0; p.boostUntil = 0; p.cnt = {}; p.seen = new Set(); p.thaw = 0;
     p.prop = room.mode === 3 && p.role === HIDER ? 1 + ((Math.random() * (PROPS.length - 1)) | 0) : 0;
     // Prop Hunt has no hiding spots, so skip the challenges that need them
-    const pool = CHALLENGES[p.role].filter((c) => room.mode !== 3 || (c.k !== 'found' && c.k !== 'hide')), c = pool[(Math.random() * pool.length) | 0];
+    const pool = CHALLENGES[p.role].filter((c) => (room.mode !== 3 || (c.k !== 'found' && c.k !== 'hide')) && (room.mode !== 6 || c.k !== 'catch')), c = pool[(Math.random() * pool.length) | 0];
     p.ch = { ...c, n: c.k === 'catch' ? Math.min(c.n, order.length - nS) : c.n, done: false };
     if (p.ch.k === 'catch' && p.ch.n < 2) p.ch.text = 'Catch a hider';
     let pos;
@@ -110,7 +113,7 @@ function startRound(room) {
     teleport(p, pos[0], pos[1]);
   });
   room.phase = 'hide';
-  room.tEnd = t + room.cfg.hide;
+  room.tEnd = t + (room.mode === 7 ? TURBO.hide : room.cfg.hide);
   broadcast(room, { t: 'round', seekers: order.slice(0, nS).map((p) => p.id) });
   for (const p of order) send(p, { t: 'chal', text: p.ch.text });
   feed(room, `${order.slice(0, nS).map((p) => p.name).join(' & ')} ${nS > 1 ? 'are' : 'is'} seeking. Hide!`, 'big');
@@ -123,7 +126,7 @@ function endRound(room, winner) {
   room.tEnd = now() + END_T;
   for (const p of room.players.values()) {
     if (winner === 'hiders' && p.role === HIDER && p.st === 0) p.sc += 100;
-    if (winner === 'seekers' && p.role === SEEKER) p.sc += 50;
+    if (winner === 'seekers' && p.role === SEEKER && room.mode !== 6) p.sc += 50;
     leaveSpot(room, p);
     p.f = 0;
   }
@@ -144,6 +147,16 @@ function toLobby(room) {
 
 function catchPlayer(room, p, by, how) {
   if (p.st || p.role !== HIDER || room.phase !== 'seek') return;
+  if (room.mode === 6) {
+    // Sardines: the finder squeezes in and hides alongside
+    by.role = HIDER; by.item = 0; by.immUntil = now() + 2; by.f = 0;
+    by.ai = { stam: 100, wind: 0, state: 'camp', until: now() + 9999 };
+    by.sc += 100;
+    bump(room, by, 'found');
+    broadcast(room, { t: 'caught', w: p.id, b: by.id, m: 6 });
+    const left = seekers(room).length;
+    return feed(room, `${by.name} found ${p.name} and squeezed in. ${left} still looking.`, 'good');
+  }
   const mode = room.mode, where = how ? ` hiding in a ${how}` : '';
   leaveSpot(room, p, mode !== 0);
   p.f = 0; p.item = 0; p.prop = 0;
@@ -290,13 +303,13 @@ function botMove(b, wantSprint, dt, t) {
   const winded = t < ai.wind;
   if (wantSprint && !winded && (ai.spr ? ai.stam > 0 : ai.stam > 30)) {
     ai.spr = true;
-    ai.stam -= STAM.drain * dt;
+    if (!ai.turbo) ai.stam -= STAM.drain * dt;
     if (ai.stam <= 0) { ai.stam = 0; ai.wind = t + STAM.windedFor; ai.spr = false; }
   } else {
     ai.spr = false;
     ai.stam = Math.min(100, ai.stam + STAM.regenMove * dt);
   }
-  const speed = (ai.spr ? S.sprint : winded ? SPEED.winded : S.walk * (ai.slow || 1)) * (t < b.boostUntil ? 1.35 : 1);
+  const speed = (ai.spr ? S.sprint : winded ? SPEED.winded : S.walk * (ai.slow || 1)) * (t < b.boostUntil ? 1.35 : 1) * (ai.turbo ? TURBO.speed : 1);
   while (ai.pi + 1 < ai.path.length && ai.path[ai.pi][2] === b.lv && ai.path[ai.pi + 1][2] === b.lv && walkable(W, b.x, b.z, ai.path[ai.pi + 1][0], ai.path[ai.pi + 1][1], b.lv)) ai.pi++;
   const [tx, tz] = ai.path[ai.pi];
   const dx = tx - b.x, dz = tz - b.z, d = Math.hypot(dx, dz);
@@ -353,7 +366,7 @@ function pickHiderPlan(room, b, t) {
       if (setGoal(b, s.ex, s.ez, s.lv)) return;
     }
   }
-  if (seek && roll < 0.85) {
+  if (seek && (roll < 0.85 || room.mode === 5)) {
     const open = W.coins.filter((c) => !room.coins.has(c.id)).sort((a, c) => Math.hypot(a.x - b.x, a.z - b.z) - Math.hypot(c.x - b.x, c.z - b.z));
     if (open.length) {
       const c = open[(Math.random() * Math.min(3, open.length)) | 0];
@@ -450,7 +463,7 @@ function seekerAI(room, b, dt, t) {
   for (const h of room.players.values()) {
     if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || t < h.cloakUntil || h.lv !== b.lv) continue;
     const dx = h.x - b.x, dz = h.z - b.z, d = Math.hypot(dx, dz);
-    if (d > 18 || d >= bd) continue;
+    if (d > (room.mode === 4 ? 10 : 18) || d >= bd) continue; // in a blackout nobody sees far
     // crouching makes you much harder to spot, and a prop that holds still looks like any other prop
     const sneaky = ((h.f & F_CROUCH) && d > 9) || (h.prop && !(h.f & F_MOVE) && d > 4.5);
     if (d > 3 && ((dx * fx + dz * fz) / d < 0.35 || sneaky)) continue;
@@ -493,6 +506,7 @@ function botUpdate(room, b, dt, t) {
     return;
   }
   if (t < b.stunUntil) { b.f = 0; return; }
+  ai.turbo = room.mode === 7;
   if (b.item && (b.role === SEEKER ? Math.random() < 0.03 : ai.state === 'flee')) useItem(room, b, t);
   if (b.role === SEEKER) seekerAI(room, b, dt, t);
   else hiderAI(room, b, dt, t);
@@ -502,7 +516,7 @@ function botUpdate(room, b, dt, t) {
 function update(room, dt) {
   const t = now();
   if (room.phase === 'hide' && t >= room.tEnd) {
-    room.phase = 'seek'; room.tEnd = t + room.cfg.seek;
+    room.phase = 'seek'; room.tEnd = t + (room.mode === 7 ? TURBO.seek : room.cfg.seek);
     feed(room, 'Ready or not, here they come!', 'big');
   } else if (room.phase === 'seek' && t >= room.tEnd) endRound(room, 'hiders');
   else if (room.phase === 'end' && t >= room.tEnd) toLobby(room);
@@ -511,7 +525,10 @@ function update(room, dt) {
 
   if (room.phase === 'seek') {
     const hs = hiders(room), js = hs.filter((p) => p.st === 1), out = hs.filter((p) => p.st);
-    if (!seekers(room).length) return endRound(room, 'hiders');
+    if (room.mode === 6) {
+      // Sardines ends when only one seeker is still looking (or none, in a two-player game)
+      if (seekers(room).length <= (room.startSeekers > 1 ? 1 : 0)) return endRound(room, 'seekers');
+    } else if (!seekers(room).length) return endRound(room, 'hiders');
     if (!hs.length || out.length === hs.length) return endRound(room, 'seekers');
 
     const second = t >= room.scoreT;
@@ -547,6 +564,10 @@ function update(room, dt) {
         room.coins.add(c.id);
         p.sc += 10;
         bump(room, p, 'coin');
+        if (room.coinGoal && room.coins.size >= room.coinGoal) {
+          feed(room, 'The hiders pulled off the heist!', 'big');
+          endRound(room, 'hiders');
+        }
         broadcast(room, { t: 'coin', id: c.id, w: p.id });
       }
       if ((p.f & F_USE) && js.length && Math.hypot(W.lever.x - p.x, W.lever.z - p.z) < 2.4) rescuer = p;
@@ -595,7 +616,7 @@ function snapshot(room) {
   return ({
     t: 'st', ph: room.phase, tl: Math.max(0, +(room.tEnd - t).toFixed(1)), host: room.host,
     res: +(room.mode === 2 ? Math.max(0, ...[...room.players.values()].map((p) => (p.st === 2 ? p.thaw : 0))) : room.resc / 3).toFixed(2),
-    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode,
+    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0,
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
       p.id, +p.x.toFixed(2), +p.z.toFixed(2), +p.r.toFixed(2), p.f, p.role, p.st, p.hid, p.sc,
