@@ -1,0 +1,580 @@
+<title>Adulting Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap">
+<style>
+/* Layout: a chunky phone-planner — status bar on top, stats | actions | to-do list in three columns that stack on phones */
+:root {
+  --bg: #dff1ea;
+  --panel: #ffffff;
+  --ink: #1d2b36;
+  --muted: #5d6f7a;
+  --line: #c4ddd4;
+  --accent: #ff6b4a;
+  --accent-ink: #ffffff;
+  --sun: #ffc93c;
+  --good: #2bb673;
+  --warn: #f5a623;
+  --bad: #e5484d;
+  --track: #e6efeb;
+  --btn: #f4faf7;
+  --btn-hover: #e4f4ec;
+  --display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1d24; --panel: #172a33; --ink: #e8f2ee; --muted: #93a8b0; --line: #26404b;
+  --accent: #ff7a5c; --accent-ink: #1a0d08; --sun: #ffd25e; --good: #3fcf8a; --warn: #ffb547; --bad: #ff6369;
+  --track: #213843; --btn: #1d333d; --btn-hover: #244150; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1d24; --panel: #172a33; --ink: #e8f2ee; --muted: #93a8b0; --line: #26404b;
+  --accent: #ff7a5c; --accent-ink: #1a0d08; --sun: #ffd25e; --good: #3fcf8a; --warn: #ffb547; --bad: #ff6369;
+  --track: #213843; --btn: #1d333d; --btn-hover: #244150; color-scheme: dark }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 16px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.1; text-wrap: balance; }
+h2 { font-size: 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panel { background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* Top bar */
+.top { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.brand { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; }
+.brand span { color: var(--accent); }
+.clock { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+.sky { width: 46px; height: 46px; border-radius: 50%; position: relative; overflow: hidden; border: 2px solid var(--line); flex: none; transition: background .6s; }
+.sky i { position: absolute; width: 18px; height: 18px; border-radius: 50%; left: 12px; top: 12px; transition: background .6s, box-shadow .6s; }
+.time { font-family: var(--display); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dayname { color: var(--muted); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; }
+.chip { font-family: var(--display); font-weight: 700; background: var(--btn); border: 2px solid var(--line); padding: 4px 12px; border-radius: 999px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip.money { color: var(--good); }
+.chip.rent.due { color: var(--bad); border-color: var(--bad); }
+
+.grid { display: grid; grid-template-columns: 270px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 980px) { .grid { grid-template-columns: 1fr 1fr; } .actions-panel { grid-column: 1 / -1; order: -1; } }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+/* Stats */
+.stat { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 8px; font-weight: 800; font-size: .85rem; }
+.bar { height: 14px; background: var(--track); border-radius: 999px; overflow: hidden; }
+.bar b { display: block; height: 100%; border-radius: 999px; background: var(--good); transition: width .4s, background .4s; }
+.stat .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.stat.low .n { color: var(--bad); }
+.job { border-top: 2px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
+.job strong { font-family: var(--display); font-size: 1.1rem; }
+.kv { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-weight: 600; }
+.kv span:last-child { color: var(--ink); font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Actions */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { font: 700 .95rem var(--display); border: 2px solid var(--line); background: var(--btn); color: var(--ink); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.act { text-align: left; font: inherit; color: var(--ink); background: var(--btn); border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: transform .08s, background .15s, border-color .15s; position: relative; }
+.act:hover:not(:disabled) { background: var(--btn-hover); border-color: var(--good); }
+.act:active:not(:disabled) { transform: scale(.97); }
+.act:focus-visible, .tab:focus-visible, .big:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.act .t { font-family: var(--display); font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 6px; }
+.act .meta { font-size: .78rem; color: var(--muted); font-weight: 700; }
+.act .why { font-size: .75rem; color: var(--bad); font-weight: 700; }
+.act.todo-hit::after { content: "TO-DO"; position: absolute; top: 8px; right: 8px; font: 800 .62rem var(--body); letter-spacing: .8px; background: var(--sun); color: #3a2a00; padding: 1px 6px; border-radius: 6px; }
+.act.work { border-color: var(--accent); }
+.act.work .t { color: var(--accent); }
+
+/* To-do */
+.todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.todo li { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 8px 10px; border-radius: 12px; background: var(--btn); }
+.todo li .box { width: 22px; height: 22px; border-radius: 7px; border: 2.5px solid var(--muted); flex: none; display: grid; place-items: center; font-size: .8rem; color: var(--accent-ink); }
+.todo li.done { color: var(--muted); text-decoration: line-through; }
+.todo li.done .box { background: var(--good); border-color: var(--good); color: #fff; }
+.todo li.must .box { border-color: var(--accent); }
+.hint { font-size: .8rem; color: var(--muted); margin: 0; }
+
+.goals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: .88rem; font-weight: 700; }
+.goals li { display: flex; gap: 8px; align-items: center; }
+.goals li .star { color: var(--line); font-size: 1.1rem; }
+.goals li.got .star { color: var(--sun); }
+.goals li.got { color: var(--muted); }
+
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; font-size: .86rem; }
+.log li { padding: 6px 10px; border-radius: 10px; background: var(--btn); border-left: 4px solid var(--line); }
+.log li.good { border-left-color: var(--good); }
+.log li.bad { border-left-color: var(--bad); }
+.log li.event { border-left-color: var(--sun); }
+.log li small { color: var(--muted); font-weight: 800; margin-right: 6px; font-variant-numeric: tabular-nums; }
+
+/* Shop */
+.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.owned { color: var(--good) !important; }
+
+/* Overlay */
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); display: grid; place-items: center; z-index: 50;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.modal { background: var(--panel); border-radius: 22px; padding: 26px; max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 14px; border: 3px solid var(--ink); }
+.modal h3 { font-size: 1.8rem; }
+.modal p { margin: 0; }
+.big { font: 800 1.1rem var(--display); background: var(--accent); color: var(--accent-ink); border: none; border-radius: 14px; padding: 12px 18px; cursor: pointer; }
+.big.ghost { background: var(--btn); color: var(--ink); border: 2px solid var(--line); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--panel); font-weight: 800; padding: 10px 18px; border-radius: 999px; z-index: 60; max-width: calc(100% - 32px); text-align: center; transition: opacity .3s; }
+.toast.hide { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top panel">
+    <h1 class="brand">Adulting <span>Simulator</span></h1>
+    <div class="clock">
+      <div class="sky" id="sky"><i id="sun"></i></div>
+      <div>
+        <div class="dayname" id="dayname">Monday · Day 1</div>
+        <div class="time" id="time">7:00 AM</div>
+      </div>
+      <div class="chip money" id="money">$50</div>
+      <div class="chip rent" id="rent">Rent $120 in 7 days</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>How you feel</h2>
+      <div id="stats"></div>
+      <div class="job">
+        <div class="kv"><span>Job</span><span id="jobname">Burger Flipper</span></div>
+        <div class="kv"><span>Pay</span><span id="pay">$10/hr</span></div>
+        <div class="kv"><span>Skill</span><span id="skill">0</span></div>
+        <div class="kv"><span>Next promotion</span><span id="nextpromo">skill 15</span></div>
+        <div class="kv"><span>Boss warnings</span><span id="warn">0 / 3</span></div>
+        <div class="kv"><span>Groceries</span><span id="food">2 meals</span></div>
+      </div>
+    </section>
+
+    <section class="panel actions-panel">
+      <h2>What do you do? <span class="hint" id="hint"></span></h2>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="acts" id="acts"></div>
+    </section>
+
+    <aside style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <section class="panel">
+        <h2>Today's to-do <span class="hint" id="todocount"></span></h2>
+        <ul class="todo" id="todo"></ul>
+        <p class="hint">Finish everything before midnight for a $15 bonus. Every missed chore makes you feel worse.</p>
+      </section>
+      <section class="panel">
+        <h2>Life goals <span class="hint" id="stars"></span></h2>
+        <ul class="goals" id="goals"></ul>
+      </section>
+      <section class="panel">
+        <h2>Diary</h2>
+        <ul class="log" id="log"></ul>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
+<div class="toast hide" id="toast"></div>
+
+<script>
+(() => {
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const JOBS = [
+  { name: "Burger Flipper", pay: 10, need: 0 },
+  { name: "Cashier", pay: 14, need: 15 },
+  { name: "Shift Manager", pay: 20, need: 35 },
+  { name: "Store Manager", pay: 30, need: 60 },
+  { name: "Regional Boss", pay: 45, need: 90 },
+  { name: "CEO", pay: 80, need: 130 },
+];
+const STATS = [
+  ["energy","Energy"],["hunger","Food"],["clean","Hygiene"],["fun","Fun"],["social","Friends"],["home","Home"]
+];
+const RENT = 120;
+const ITEMS = {
+  bed:     { name: "Comfy Bed", price: 150, desc: "Sleep restores 30% more energy." },
+  bike:    { name: "Bike", price: 120, desc: "Work commute is 1 hour shorter." },
+  console: { name: "Game Console", price: 220, desc: "Video games give way more fun." },
+  coffee:  { name: "Coffee Maker", price: 60, desc: "Unlocks Make Coffee (+energy)." },
+  dog:     { name: "Adopt a Dog", price: 180, desc: "Fun and friends drop slower. Walk it daily!" },
+};
+
+const TODO_POOL = [
+  { id: "trash", text: "Take out the trash" },
+  { id: "dishes", text: "Wash the dishes" },
+  { id: "laundry", text: "Do laundry" },
+  { id: "groceries", text: "Buy groceries" },
+  { id: "callmom", text: "Call Mom" },
+  { id: "exercise", text: "Go for a run" },
+  { id: "study", text: "Study for 2 hours" },
+  { id: "shower", text: "Take a shower" },
+  { id: "cleanroom", text: "Clean your room" },
+  { id: "hangout", text: "See your friends" },
+  { id: "eat", text: "Eat a home-cooked meal" },
+];
+
+let S;
+function fresh() {
+  return {
+    t: 7, money: 50, rentMissed: 0,
+    energy: 80, hunger: 70, clean: 70, fun: 60, social: 60, home: 60,
+    job: 0, skill: 0, warnings: 0, daysWorked: 0, workedToday: false,
+    meals: 2, owned: {}, todos: [], log: [], goals: {}, over: false, totalEarned: 0, dogWalked: false,
+    tab: "home",
+  };
+}
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v) => Math.max(0, Math.min(100, v));
+const day = () => Math.floor(S.t / 24) + 1;
+const hour = () => S.t % 24;
+const weekday = () => day() % 7; // day 1 = Monday
+const isWorkday = () => weekday() >= 1 && weekday() <= 5;
+const fmtHour = (h) => { const ap = h < 12 ? "AM" : "PM"; const hh = h % 12 === 0 ? 12 : h % 12; return `${hh}:00 ${ap}`; };
+const daysToRent = () => 7 - ((day() - 1) % 7);
+
+function log(msg, kind = "") {
+  S.log.unshift({ msg, kind, when: `D${day()} ${fmtHour(hour())}` });
+  S.log = S.log.slice(0, 60);
+}
+let toastTimer;
+function toast(msg) {
+  const el = $("toast"); el.textContent = msg; el.classList.remove("hide");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add("hide"), 2200);
+}
+
+function newTodos() {
+  const pool = TODO_POOL.slice().sort(() => Math.random() - .5);
+  const n = 3;
+  S.todos = pool.slice(0, n).map((x) => ({ ...x, done: false }));
+  if (isWorkday()) S.todos.unshift({ id: "work", text: "Go to work (start 6–10 AM)", done: false, must: true });
+  if (S.owned.dog) S.todos.push({ id: "walkdog", text: "Walk the dog", done: false, must: true });
+}
+function tick(id) {
+  const td = S.todos.find((x) => x.id === id && !x.done);
+  if (td) { td.done = true; log(`Checked off: ${td.text}`, "good"); }
+}
+
+// ---- time ----
+function advance(hours, asleep = false) {
+  for (let i = 0; i < hours; i++) {
+    const dog = S.owned.dog ? 0.5 : 1;
+    if (asleep) {
+      S.hunger = clamp(S.hunger - 2); S.clean = clamp(S.clean - 1);
+    } else {
+      S.energy = clamp(S.energy - 3); S.hunger = clamp(S.hunger - 4); S.clean = clamp(S.clean - 2);
+      S.fun = clamp(S.fun - 2 * dog); S.social = clamp(S.social - 1 * dog);
+    }
+    S.home = clamp(S.home - 1);
+    S.t++;
+    if (hour() === 0) endOfDay();
+    if (S.over) return;
+    if (!asleep) checkCrisis();
+    if (S._po) { S._po = false; return; }
+  }
+}
+
+function endOfDay() {
+  const d = day() - 1;
+  const missed = S.todos.filter((x) => !x.done);
+  if (S.todos.length && missed.length === 0) {
+    S.money += 15; S.fun = clamp(S.fun + 10);
+    log("You finished every chore yesterday. +$15 bonus and you feel proud!", "good");
+  } else if (missed.length) {
+    S.fun = clamp(S.fun - 8 * missed.length);
+    log(`You skipped ${missed.length} chore${missed.length > 1 ? "s" : ""} on Day ${d}. You feel guilty.`, "bad");
+  }
+  const workMiss = missed.find((x) => x.id === "work");
+  if (workMiss) addWarning("You didn't show up to work!");
+  if (S.owned.dog && missed.find((x) => x.id === "walkdog")) { S.home = clamp(S.home - 25); log("The dog chewed your shoes because nobody walked it.", "bad"); }
+
+  // rent: due at the end of every 7th day
+  if (d % 7 === 0) {
+    if (S.money >= RENT) {
+      S.money -= RENT; S.rentMissed = 0; log(`Paid $${RENT} rent. Roof stays over your head.`, "");
+    } else {
+      S.rentMissed++;
+      if (S.rentMissed >= 2) return gameOver("Evicted!", `You couldn't pay rent twice in a row, so the landlord changed the locks. You lasted ${d} days.`);
+      log(`You couldn't pay rent! The landlord says you'd better pay double next week.`, "bad");
+      S.debt = (S.debt || 0) + RENT;
+      toast("Rent missed! Pay up next week or get evicted.");
+    }
+  }
+  if (S.debt && S.money >= S.debt && d % 7 === 0 && S.rentMissed === 0) { S.money -= S.debt; log(`Paid back $${S.debt} of late rent.`); S.debt = 0; }
+
+  S.workedToday = false;
+  newTodos();
+  randomEvent();
+}
+
+function randomEvent() {
+  const r = Math.random();
+  const ev = [
+    () => { S.money += 20; log("You found $20 in an old jacket!", "event"); },
+    () => { S.todos.push({ id: "hangout", text: "Go to your friend's birthday", done: false }); log("Your friend is having a birthday party today!", "event"); },
+    () => { S.money = Math.max(0, S.money - 30); log("Your phone screen cracked. Repair cost $30.", "event"); },
+    () => { S.home = clamp(S.home - 20); log("The sink leaked overnight. What a mess.", "event"); },
+    () => { S.social = clamp(S.social + 15); log("An old friend texted you out of nowhere. Nice!", "event"); },
+    () => { S.energy = clamp(S.energy - 15); log("Neighbors partied all night. You slept badly.", "event"); },
+  ];
+  if (r < 0.45) ev[Math.floor(Math.random() * ev.length)]();
+}
+
+function checkCrisis() {
+  if (S.hunger <= 0) { S.money = Math.max(0, S.money - 60); S.hunger = 40; S.energy = clamp(S.energy - 20); log("You fainted from hunger! Hospital bill: $60.", "bad"); toast("You fainted from hunger! -$60"); }
+  if (S.energy <= 0) { log("You passed out from exhaustion right on the floor.", "bad"); toast("You passed out!"); doSleep(true); S._po = true; }
+  if (S.clean <= 0) { S.social = clamp(S.social - 20); S.clean = 10; log("You smell so bad people are avoiding you.", "bad"); }
+  if (S.fun <= 0 && S.social <= 0) gameOver("Burnt out", `You were so lonely and bored you moved back in with your parents. You lasted ${day()} days.`);
+}
+
+function addWarning(why) {
+  S.warnings++;
+  log(`Boss warning (${S.warnings}/3): ${why}`, "bad");
+  if (S.warnings >= 3) {
+    if (S.job > 0) { S.job--; log(`You got demoted to ${JOBS[S.job].name}.`, "bad"); toast(`Demoted to ${JOBS[S.job].name}`); }
+    else { S.money = Math.max(0, S.money - 40); log("You got docked $40 pay for being unreliable.", "bad"); }
+    S.warnings = 0;
+  }
+}
+
+function doSleep(passedOut = false) {
+  let target = Math.floor(S.t / 24) * 24 + 7;
+  if (target <= S.t) target += 24;
+  const hrs = target - S.t;
+  const per = S.owned.bed ? 13 : 10;
+  const before = day();
+  advance(hrs, true);
+  if (S.over) return;
+  S.energy = clamp(S.energy + hrs * per * (passedOut ? .6 : 1));
+  if (hrs < 6) log(`Only ${hrs} hours of sleep. Ugh.`, "bad");
+  else if (!passedOut) log(`Slept ${hrs} hours. Good morning!`, "good");
+  if (day() !== before) toast(`${DAYS[weekday()]}, Day ${day()}`);
+}
+
+// ---- actions ----
+const A = [
+  // HOME
+  { id: "sleep", tab: "home", name: "Go to bed", hours: "until 7 AM", run: () => { doSleep(); } ,
+    can: () => hour() >= 19 || hour() < 6 ? true : "Only after 7 PM" },
+  { id: "nap", tab: "home", name: "Take a nap", hours: 2, fx: { energy: 22 } },
+  { id: "eat", tab: "home", name: "Cook & eat", hours: 1, fx: { hunger: 45, home: -5 }, can: () => S.meals > 0 || "No groceries", run: () => { S.meals--; } },
+  { id: "coffee", tab: "home", name: "Make coffee", hours: 0, fx: { energy: 15 }, can: () => S.owned.coffee ? (S.coffeeDay === day() ? "Already had one today" : true) : "Need a Coffee Maker", run: () => { S.coffeeDay = day(); } },
+  { id: "shower", tab: "home", name: "Shower", hours: 1, fx: { clean: 60, energy: 5 } },
+  { id: "cleanroom", tab: "home", name: "Clean your room", hours: 2, fx: { home: 45, energy: -8 } },
+  { id: "dishes", tab: "home", name: "Wash dishes", hours: 1, fx: { home: 20, energy: -3 } },
+  { id: "laundry", tab: "home", name: "Do laundry", hours: 1, fx: { home: 15, clean: 10 } },
+  { id: "trash", tab: "home", name: "Take out trash", hours: 1, fx: { home: 15 } },
+  { id: "games", tab: "home", name: "Play video games", hours: 2, fx: () => ({ fun: S.owned.console ? 45 : 25, energy: -4 }) },
+  { id: "tv", tab: "home", name: "Watch TV", hours: 1, fx: { fun: 12, energy: 3 } },
+  { id: "study", tab: "home", name: "Study", hours: 2, fx: { energy: -10, fun: -6 }, run: () => { S.skill += 5; } , note: "+5 skill" },
+  { id: "callmom", tab: "home", name: "Call Mom", hours: 1, fx: { social: 20, fun: 5 } },
+  // OUT
+  { id: "groceries", tab: "out", name: "Buy groceries", hours: 1, cost: 20, fx: {}, run: () => { S.meals += 4; }, note: "+4 meals" },
+  { id: "pizza", tab: "out", name: "Order pizza", hours: 1, cost: 15, fx: { hunger: 55, fun: 8 } },
+  { id: "hangout", tab: "out", name: "Hang out with friends", hours: 3, cost: 10, fx: { social: 40, fun: 20, energy: -8 } },
+  { id: "exercise", tab: "out", name: "Go for a run", hours: 1, fx: { energy: -12, fun: 8, clean: -20 }, run: () => { S.skill += 1; } },
+  { id: "park", tab: "out", name: "Walk in the park", hours: 1, fx: { fun: 10, social: 5 } },
+  { id: "walkdog", tab: "out", name: "Walk the dog", hours: 1, fx: { fun: 12, social: 8, energy: -5 }, can: () => S.owned.dog ? true : "You don't have a dog" },
+  { id: "movies", tab: "out", name: "Go to the movies", hours: 3, cost: 18, fx: { fun: 35, social: 10 } },
+  // WORK
+  { id: "work", tab: "work", name: "Work a shift", cls: "work",
+    hours: () => S.owned.bike ? 8 : 9,
+    can: () => {
+      if (!isWorkday()) return "It's the weekend";
+      if (S.workedToday) return "Already worked today";
+      if (hour() < 6 || hour() > 10) return "Shifts start 6–10 AM";
+      if (S.energy < 15) return "Too tired to work";
+      return true;
+    },
+    fx: { energy: -30, hunger: -10, fun: -10, clean: -10 },
+    run: () => {
+      if (S.clean < 30) addWarning("You showed up smelly.");
+      else if (S.energy < 30) addWarning("You fell asleep at the register.");
+      if (hour() > 9) addWarning("You were late.");
+      const pay = JOBS[S.job].pay * 8;
+      S.money += pay; S.totalEarned += pay; S.skill += 2; S.daysWorked++; S.workedToday = true;
+      log(`Worked a shift as ${JOBS[S.job].name}. Earned $${pay}.`, "good");
+      return () => promoCheck();
+    } },
+  { id: "overtime", tab: "work", name: "Work overtime", hours: 3, fx: { energy: -15, fun: -10 },
+    can: () => S.workedToday ? (S.otDay === day() ? "Already did overtime" : true) : "Work a shift first",
+    run: () => { const p = Math.round(JOBS[S.job].pay * 1.5 * 3); S.money += p; S.totalEarned += p; S.otDay = day(); log(`Overtime paid $${p}.`, "good"); } },
+  { id: "course", tab: "work", name: "Take a night class", hours: 3, cost: 40, fx: { energy: -12, fun: -5 },
+    can: () => hour() >= 17 && hour() <= 20 ? true : "Classes run 5–8 PM", run: () => { S.skill += 12; }, note: "+12 skill" },
+];
+
+function promoCheck() {
+  const next = JOBS[S.job + 1];
+  if (next && S.skill >= next.need && S.daysWorked >= (S.job + 1) * 2) {
+    S.job++; S.warnings = 0;
+    log(`PROMOTED to ${next.name}! Now $${next.pay}/hr.`, "good");
+    showModal(`<h3>Promotion!</h3><p>Your boss is impressed. You're now a <b>${next.name}</b> earning <b>$${next.pay}/hr</b>.</p><div class="row"><button class="big" data-close>Yay!</button></div>`);
+  }
+}
+
+const val = (x) => typeof x === "function" ? x() : x;
+function check(a) {
+  if (S.over) return "Game over";
+  if (a.cost && S.money < a.cost) return `Need $${a.cost}`;
+  if (a.can) { const c = a.can(); if (c !== true) return c; }
+  return true;
+}
+function doAction(a) {
+  if (check(a) !== true) return;
+  const hrs = a.hours === "until 7 AM" ? 0 : val(a.hours);
+  if (a.cost) S.money -= a.cost;
+  let after;
+  if (a.run) after = a.run();
+  const fx = val(a.fx) || {};
+  for (const k in fx) S[k] = clamp(S[k] + fx[k]);
+  tick(a.id);
+  if (a.id === "eat") tick("eat");
+  if (a.id === "study") tick("study");
+  if (hrs) advance(hrs);
+  if (typeof after === "function") after();
+  if (!S.over) evalGoals();
+  save(); render();
+}
+
+function buy(key) {
+  const it = ITEMS[key];
+  if (S.owned[key] || S.money < it.price) return;
+  S.money -= it.price; S.owned[key] = true;
+  log(`Bought: ${it.name}!`, "good"); toast(`You got a ${it.name}!`);
+  if (key === "dog") { S.todos.push({ id: "walkdog", text: "Walk the dog", done: false, must: true }); S.fun = clamp(S.fun + 20); }
+  evalGoals(); save(); render();
+}
+
+// ---- goals ----
+const GOALS = [
+  { id: "week", text: "Survive your first week", test: () => day() >= 8 },
+  { id: "promo", text: "Get your first promotion", test: () => S.job >= 1 },
+  { id: "buy", text: "Buy something from the shop", test: () => Object.keys(S.owned).length > 0 },
+  { id: "save500", text: "Have $500 saved", test: () => S.money >= 500 },
+  { id: "dog", text: "Adopt a dog", test: () => !!S.owned.dog },
+  { id: "manager", text: "Become Store Manager", test: () => S.job >= 3 },
+  { id: "rich", text: "Have $2,000 saved", test: () => S.money >= 2000 },
+  { id: "ceo", text: "Become CEO and win at life", test: () => S.job >= 5 },
+];
+function evalGoals() {
+  for (const g of GOALS) if (!S.goals[g.id] && g.test()) {
+    S.goals[g.id] = true; log(`Life goal reached: ${g.text}!`, "good"); toast(`★ ${g.text}`);
+    if (g.id === "ceo") showModal(`<h3>You won at life!</h3><p>From flipping burgers to running the whole company in ${day()} days. You earned $${S.totalEarned.toLocaleString()} along the way.</p><div class="row"><button class="big" data-restart>Live again</button><button class="big ghost" data-close>Keep playing</button></div>`);
+  }
+}
+
+function gameOver(title, text) {
+  S.over = true; log(title, "bad");
+  const stars = Object.keys(S.goals).length;
+  showModal(`<h3>${title}</h3><p>${text}</p><p>Life goals: <b>${stars} / ${GOALS.length}</b> · Money earned: <b>$${S.totalEarned.toLocaleString()}</b></p><div class="row"><button class="big" data-restart>Start a new life</button></div>`);
+}
+
+// ---- modal ----
+function showModal(html) { $("modal").innerHTML = html; $("overlay").hidden = false; $("modal").querySelector("button")?.focus(); }
+$("overlay").addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]")) $("overlay").hidden = true;
+  if (e.target.closest("[data-restart]")) { S = fresh(); newTodos(); log("A new life begins. You just moved into your first apartment!", "event"); $("overlay").hidden = true; save(); render(); }
+});
+
+// ---- render ----
+const TABS = [["home","Home"],["out","Go out"],["work","Work"],["shop","Shop"]];
+function render() {
+  const h = hour();
+  $("dayname").textContent = `${DAYS[weekday()]} · Day ${day()}`;
+  $("time").textContent = fmtHour(h);
+  $("money").textContent = `$${S.money.toLocaleString()}`;
+  const dr = daysToRent();
+  const owe = RENT + (S.debt || 0);
+  $("rent").textContent = dr === 1 ? `Rent $${owe} due tonight` : `Rent $${owe} in ${dr} days`;
+  $("rent").classList.toggle("due", dr <= 2 && S.money < owe);
+
+  // sky color by hour
+  const night = h < 6 || h >= 20, dusk = (h >= 6 && h < 8) || (h >= 17 && h < 20);
+  $("sky").style.background = night ? "#1b2550" : dusk ? "linear-gradient(#ff9a6b,#ffd27a)" : "linear-gradient(#7cc8ff,#bde6ff)";
+  $("sun").style.background = night ? "#eef0ff" : "#ffcf33";
+  $("sun").style.boxShadow = night ? "6px -4px 0 0 #1b2550 inset" : "0 0 12px #ffcf33";
+
+  $("stats").innerHTML = STATS.map(([k, label]) => {
+    const v = Math.round(S[k]);
+    const col = v < 25 ? "var(--bad)" : v < 50 ? "var(--warn)" : "var(--good)";
+    return `<div class="stat ${v < 25 ? "low" : ""}"><span>${label}</span><div class="bar" role="meter" aria-label="${label}" aria-valuenow="${v}" aria-valuemin="0" aria-valuemax="100"><b style="width:${v}%;background:${col}"></b></div><span class="n">${v}</span></div>`;
+  }).join("");
+  const j = JOBS[S.job], nj = JOBS[S.job + 1];
+  $("jobname").textContent = j.name;
+  $("pay").textContent = `$${j.pay}/hr`;
+  $("skill").textContent = S.skill;
+  $("nextpromo").textContent = nj ? `${nj.name} @ skill ${nj.need}` : "You're the boss!";
+  $("warn").textContent = `${S.warnings} / 3`;
+  $("food").textContent = `${S.meals} meal${S.meals === 1 ? "" : "s"}`;
+
+  $("tabs").innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" id="tab-${k}" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
+
+  const todoIds = new Set(S.todos.filter((x) => !x.done).map((x) => x.id));
+  if (S.tab === "shop") {
+    $("acts").className = "shop";
+    $("acts").innerHTML = Object.entries(ITEMS).map(([k, it]) => {
+      const own = S.owned[k], poor = S.money < it.price;
+      return `<button class="act" id="buy-${k}" data-buy="${k}" ${own || poor ? "disabled" : ""}><span class="t">${it.name}</span><span class="meta">${it.desc}</span><span class="meta ${own ? "owned" : ""}">${own ? "Owned ✓" : `$${it.price}`}</span></button>`;
+    }).join("");
+  } else {
+    $("acts").className = "acts";
+    $("acts").innerHTML = A.filter((a) => a.tab === S.tab).map((a) => {
+      const c = check(a);
+      const hrs = val(a.hours);
+      const fx = val(a.fx) || {};
+      const bits = [];
+      bits.push(typeof hrs === "string" ? hrs : hrs === 0 ? "instant" : `${hrs}h`);
+      if (a.cost) bits.push(`$${a.cost}`);
+      if (a.id === "work") bits.push(`+$${JOBS[S.job].pay * 8}`);
+      if (a.note) bits.push(a.note);
+      const ups = Object.entries(fx).filter(([, v]) => v > 0).map(([k]) => STATS.find((s) => s[0] === k)?.[1]).filter(Boolean);
+      if (ups.length) bits.push("+" + ups.join(", "));
+      return `<button class="act ${a.cls || ""} ${todoIds.has(a.id) ? "todo-hit" : ""}" id="act-${a.id}" data-act="${a.id}" ${c !== true ? "disabled" : ""}>
+        <span class="t">${a.name}</span><span class="meta">${bits.join(" · ")}</span>${c !== true ? `<span class="why">${c}</span>` : ""}</button>`;
+    }).join("");
+  }
+  $("hint").textContent = h >= 22 || h < 5 ? "It's late. Get some sleep!" : "";
+
+  const done = S.todos.filter((x) => x.done).length;
+  $("todocount").textContent = `${done}/${S.todos.length}`;
+  $("todo").innerHTML = S.todos.map((x) => `<li class="${x.done ? "done" : ""} ${x.must ? "must" : ""}"><span class="box">${x.done ? "✓" : ""}</span>${x.text}</li>`).join("");
+
+  const stars = Object.keys(S.goals).length;
+  $("stars").textContent = `${stars}/${GOALS.length} ★`;
+  $("goals").innerHTML = GOALS.map((g) => `<li class="${S.goals[g.id] ? "got" : ""}"><span class="star">★</span>${g.text}</li>`).join("");
+
+  $("log").innerHTML = S.log.map((l) => `<li class="${l.kind}"><small>${l.when}</small>${l.msg}</li>`).join("");
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-tab]"); if (t) { S.tab = t.dataset.tab; render(); save(); return; }
+  const b = e.target.closest("[data-act]"); if (b) { doAction(A.find((a) => a.id === b.dataset.act)); return; }
+  const s = e.target.closest("[data-buy]"); if (s) buy(s.dataset.buy);
+});
+
+// ---- save ----
+const KEY = "adulting-sim-v1";
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function load() { try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+
+function start(data) {
+  S = data?.S || load();
+  if (!S) {
+    S = fresh(); newTodos();
+    log("You just moved into your first apartment. Rent is due every 7 days. Don't get evicted!", "event");
+    log("Tip: work a shift on weekdays between 6 and 10 AM to earn money.", "");
+  }
+  render();
+  if (S.over) gameOver("Game over", "Start a new life to try again.");
+}
+window.claude?.hot?.snapshot?.(() => ({ S }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
