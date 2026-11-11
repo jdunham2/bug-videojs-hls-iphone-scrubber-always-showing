@@ -22,7 +22,10 @@ export const F_SPRINT = 1, F_CROUCH = 2, F_MOVE = 4, F_USE = 8, F_WIND = 16, F_J
 export const ITEMS = [null, { name: 'Energy drink', icon: '🥤', role: 0 }, { name: 'Shadow cloak', icon: '🫥', role: 0 }, { name: 'Radar', icon: '📡', role: 1 }, { name: 'Rocket boots', icon: '🥾', role: 1 }];
 
 // How far each kind of noise carries (metres)
-export const NOISE_RANGE = { run: 22, breath: 10, taunt: 60, rock: 35, beacon: 70 };
+export const NOISE_RANGE = { run: 22, breath: 10, taunt: 60, rock: 35, beacon: 70, engine: 34 };
+
+// Vehicles: top speed and handling are the same everywhere; each map just dresses them differently
+export const VEHICLE = { max: 12.5, reverse: 4, accel: 9, turn: 2.1, radius: 1.0, enter: 2.8, drain: 4, regen: 2.5, idleRegen: 6, gravity: 15 };
 
 function mulberry(seed) {
   let s = seed >>> 0;
@@ -49,11 +52,13 @@ export const MODES = [
 export const TURBO = { speed: 1.3, hide: 15, seek: 90 };
 export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
-  { id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
-  { id: 'camp', name: 'Frostpine Camp', blurb: 'A snowy campground in daylight: cabins, tents, thick pines.' },
-  { id: 'docks', name: 'Midnight Docks', blurb: 'A container yard at night: tight alleys, a warehouse, deep shadows.' },
-  { id: 'cove', name: 'Pirate Cove', blurb: 'A sunny beach: huts, palms, a shipwreck, rowboats to hide in and a lagoon.' },
-  { id: 'grave', name: 'Haunted Graveyard', blurb: 'A foggy graveyard at midnight: crypts, coffins, a chapel and a haunted mansion.' },
+  { veh: 'go-kart', id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
+  { veh: 'snowmobile', id: 'camp', name: 'Frostpine Camp', blurb: 'A snowy campground in daylight: cabins, tents, thick pines.' },
+  { veh: 'forklift', id: 'docks', name: 'Midnight Docks', blurb: 'A container yard at night: tight alleys, a warehouse, deep shadows.' },
+  { veh: 'beach buggy', id: 'cove', name: 'Pirate Cove', blurb: 'A sunny beach: huts, palms, a shipwreck, rowboats to hide in and a lagoon.' },
+  { veh: 'ghost cart', id: 'grave', name: 'Haunted Graveyard', blurb: 'A foggy graveyard at midnight: crypts, coffins, a chapel and a haunted mansion.' },
+  { veh: 'moon rover', id: 'moon', name: 'Moonbase Alpha', blurb: 'A base on the Moon: habitat modules, a hangar, escape pods to hide in, and low gravity.' },
+  { veh: 'cupcake car', id: 'candy', name: 'Candy Kingdom', blurb: 'A land of sweets: gingerbread houses, lollipop trees, gumdrops and a chocolate river.' },
 ];
 // What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
@@ -62,7 +67,8 @@ export const LOOKS = {
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
   pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball',
-    'Fox', 'Panda', 'Piglet', 'Unicorn', 'Turtle', 'Owl', 'Bat', 'Ghostling', 'Crab'],
+    'Fox', 'Panda', 'Piglet', 'Unicorn', 'Turtle', 'Owl', 'Bat', 'Ghostling', 'Crab',
+    'Hedgehog', 'Froglet', 'Parrot', 'Snail', 'Penguin chick', 'Mouse', 'Butterfly', 'Mini UFO'],
 };
 export function cleanLook(l) {
   const v = (x, n) => (Number.isInteger(x) && x >= 0 && x < n ? x : (Math.random() * n) | 0);
@@ -81,12 +87,16 @@ const THEMES = {
     sun: [0xfff2cc, 2.6], disc: 0xffffff, stars: 0, hills: 0x5fa870, outer: 0x2f9fc4, roof: 0xc9a45a, exposure: 1.0 },
   grave: { sky: [[0.02, 0.02, 0.06], [0.1, 0.06, 0.16], [0.2, 0.28, 0.22]], glow: 0.2, fog: [0x1a2420, 0.019], hemi: [0x7a8fb0, 0x26302a, 1.25],
     sun: [0xb8c8ff, 1.0], disc: 0xf0f4ff, stars: 0.9, hills: 0x10161a, outer: 0x151d1a, roof: 0x2a2632, exposure: 1.2 },
+  moon: { sky: [[0, 0, 0.01], [0.01, 0.01, 0.03], [0.06, 0.06, 0.09]], glow: 0.9, fog: [0x0a0a10, 0.0035], hemi: [0x9aa2ba, 0x44444e, 1.0],
+    sun: [0xffffff, 2.9], disc: 0xffffff, stars: 1, hills: 0x7a7a84, outer: 0x6a6a72, roof: 0xd8dce6, exposure: 1.1 },
+  candy: { sky: [[0.5, 0.72, 1], [0.96, 0.8, 0.95], [1, 0.93, 0.86]], glow: 0.4, fog: [0xffe6f2, 0.006], hemi: [0xffffff, 0xffc2dd, 1.6],
+    sun: [0xfff5e0, 2.3], disc: 0xffffff, stars: 0, hills: 0xff9ec7, outer: 0x9be3b4, roof: 0xff6fa8, exposure: 1.0 },
 };
 
 const _worlds = [];
 export function getWorld(i = 0) {
   i = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
-  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave][i](i));
+  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy][i](i));
 }
 
 // Shared construction kit for every map. All maps keep the same centre: a plaza with the jail cage and its lever.
@@ -302,9 +312,19 @@ function kit(seed) {
     const coins = sprinkle(44, 8.5, 7);
     for (const c of extraCoins) coins.push({ id: coins.length, ...c });
     const items = sprinkle(9, 26, 14, coins);
+    // Vehicles park on open ground with room to pull away
+    const roomy = (x, z) => { for (let dz = -1.5; dz <= 1.5; dz += 0.5) for (let dx = -1.5; dx <= 1.5; dx += 0.5) if (blocked[0][cellIdx(x + dx, z + dz)]) return false; return true; };
+    const vehicles = [];
+    for (let tries = 0; vehicles.length < 6 && tries < 20000; tries++) {
+      const c = list0[(R() * list0.length) | 0];
+      const x = -HALF + ((c % GN) + 0.5) * CELL, z = -HALF + (((c / GN) | 0) + 0.5) * CELL;
+      if (Math.hypot(x, z) < 14 || Math.abs(x) > HALF - 5 || Math.abs(z) > HALF - 5 || !roomy(x, z)) continue;
+      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 26) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
+      vehicles.push({ id: vehicles.length, x, z, r: R() * 6.28 });
+    }
     return {
-      i, id: MAPS[i].id, name: MAPS[i].name, theme: THEMES[MAPS[i].id],
-      boxes, bl, spots, coins, items, beacons, houses, lamps, stairs, upper, decks, pads, jail, lever,
+      i, id: MAPS[i].id, name: MAPS[i].name, vehName: MAPS[i].veh, theme: THEMES[MAPS[i].id],
+      boxes, bl, spots, coins, items, beacons, houses, lamps, stairs, upper, decks, pads, vehicles, gravity: 15, jail, lever,
       los: [bl[0].filter((b) => !b.see && b.h >= 1.6), bl[1].filter((b) => !b.see && b.h >= 1.6)],
       nav: { blocked, reach, list, list0, portal },
       seekerSpawn: [0, -5], ...extra,
@@ -504,6 +524,78 @@ function buildGrave(i) {
   scatter(16, 0.8, 0.8, 1.1, (x, z) => add(x, z, 0.8, 0.8, 0.7, 'pumpkin', { v: R(), see: true }));
   scatter(8, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
   return K.finish(i);
+}
+
+function buildMoon(i) {
+  const K = kit(196907), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const hull = 0xd9dde6, grey = 0xaab0bd, orange = 0xe09a4a;
+  // Habitat modules
+  home(-30, -28, 12, 9, hull, { S: [-2], E: [1] });
+  home(30, -28, 12, 9, grey, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, grey, { N: [0], E: [2] });
+  home(30, 28, 12, 10, hull, { N: [0], W: [2] });
+  home(-60, 6, 10, 9, hull, { S: [-2], E: [2] });
+  home(60, -8, 10, 9, grey, { S: [-2], W: [2] });
+  // Command centre and the science lab: two storeys each
+  manor(-54, -52, 16, 10, 0xc8ccd6, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0xb8bcc8, { S: [0], W: [0] });
+  // Hangar
+  house(0, -57, 28, 14, 5, 0x8a8f9c, { S: [-8, 8] }, 3.2);
+  for (const [x, z, h] of [[-11, -61.5, 2.6], [-9.6, -61.5, 1.3], [-2, -58, 2.6], [3, -61.5, 1.3], [11, -60, 2.6], [6, -54, 1.3], [-7, -53.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  for (const [x, z] of [[0, -62.5], [1.2, -62.5], [-12.5, -55]]) add(x, z, 0.8, 0.8, 1.1, 'barrel', see);
+  locker(13.2, -55, -1.3); locker(-13.2, -58.5, 1.3);
+
+  K.plaza('tower');
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [42, 0], [0, -36], [0, 42], [-44, -36], [44, 38]]) K.lamp(x, z);
+  K.lookout(-36, -6); K.lookout(40, 12); K.lookout(-16, 52); K.lookout(24, -40);
+  K.beacon(-68, 28); K.beacon(68, -32); K.beacon(10, 69);
+
+  // Escape pods you can climb into, and boulder fields to crouch among
+  scatter(11, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.4, 'hidebox', { color: R() < 0.5 ? hull : orange }); spot('pod', x - 0.6, z, 1.95, 0); });
+  scatter(14, 1.6, 1.6, 2, (x, z) => spot('boulders', x, z, 0, 0));
+  scatter(55, 1.6, 1.4, 1.3, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(16, 2.4, 2.4, 1.4, (x, z) => add(x, z, 2.4, 2.4, 2.8, 'bigrock', { v: R() }));
+  scatter(20, 0.8, 0.8, 1.2, (x, z) => add(x, z, 0.8, 0.8, 1.1, 'barrel', see));
+  scatter(18, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.4 ? 2.6 : 1.3, 'crate'));
+  scatter(12, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'solar') : add(x, z, 0.25, 6, 1.8, 'solar')));
+  return K.finish(i, { gravity: 5.5 });
+}
+
+function buildCandy(i) {
+  const K = kit(808080), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const ginger = 0xb5713c, dark = 0x8a4f2a;
+  // Gingerbread houses
+  home(-30, -28, 12, 10, ginger, { S: [-2], E: [1] });
+  home(30, -28, 12, 10, dark, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, dark, { N: [0], E: [2] });
+  home(-60, -10, 10, 9, ginger, { S: [-2], E: [2] });
+  home(60, 12, 10, 9, dark, { S: [-2], W: [2] });
+  home(58, -50, 10, 9, ginger, { S: [-2], W: [2] });
+  home(-58, 50, 10, 9, ginger, { S: [-2], E: [2] });
+  // The cake castle and the sweet shop: two storeys each
+  manor(-54, -52, 16, 10, 0xffd9ec, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0xd9f2ff, { S: [0], W: [0] });
+  // Chocolate factory
+  house(0, -57, 24, 13, 4.5, 0x7a4a32, { S: [-7, 7] }, 3);
+  for (const [x, z, h] of [[-9.5, -61, 2.6], [-8.1, -61, 1.3], [-2, -58, 1.3], [3, -61, 2.6], [9.5, -60, 1.3], [5, -54, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  for (const [x, z] of [[0, -62], [-5, -54], [10, -54.5]]) add(x, z, 0.8, 0.8, 1.1, 'barrel', see);
+  locker(11.2, -57, -1.3); locker(-11.2, -57, 1.3);
+
+  K.plaza('fountain');
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [0, -36], [0, 42], [-44, -36], [44, -30], [-30, 54]]) K.lamp(x, z);
+  K.keepOut.push([22, 14, 62, 40]); // the chocolate lake stays open
+  K.lookout(-36, 8); K.lookout(44, -12); K.lookout(10, 56); K.lookout(-10, -38);
+  K.beacon(-68, 30); K.beacon(68, -30); K.beacon(-12, 69);
+
+  scatter(9, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.4, 'giftbox', { color: [0xff5d8a, 0x5db8ff, 0xffd447, 0x7ddc8a][(R() * 4) | 0] }); spot('gift box', x - 0.6, z, 1.95, 0); });
+  scatter(15, 1.6, 1.6, 2, (x, z) => spot('gumdrops', x, z, 0, 0));
+  scatter(85, 0.6, 0.6, 1.5, (x, z) => add(x, z, 0.6, 0.6, 6, 'lolly', { v: R() }));
+  scatter(24, 0.5, 0.5, 1.2, (x, z) => add(x, z, 0.5, 0.5, 2.4, 'candycane', { v: R(), see: true }));
+  scatter(16, 1.4, 1.4, 1.2, (x, z) => add(x, z, 1.4, 1.4, 1.2, 'cupcake', { v: R(), see: true }));
+  scatter(12, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.35 ? 2.6 : 1.3, 'crate'));
+  scatter(10, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  scatter(7, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
+  return K.finish(i, { pond: [42, 27, 18, 11] });
 }
 
 function buildDocks(i) {

@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-4, the starting map) or `MODE` (0-7) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-6, the starting map) or `MODE` (0-7) to change the defaults.
 
 ## How it plays
 
@@ -57,8 +57,8 @@ Beacons, power-ups, coins and challenges work in every mode.
 
 Fourteen characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
 Duck), 16 colours, seven hats, four patterns and
-17 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
-owl, bat, ghostling, crab). Your pet runs just ahead of you;
+25 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
+owl, bat, ghostling, crab, hedgehog, froglet, parrot, snail, penguin chick, mouse, butterfly, mini UFO). Your pet runs just ahead of you;
 other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
 Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
 
@@ -76,6 +76,20 @@ The host picks the map in the lobby with **Next map**.
 | **Midnight Docks** | A container yard at night with tight alleys, a warehouse and two two-storey offices | Open containers, lockers, dumpsters |
 | **Pirate Cove** | A sunny beach with huts, palms, a shipwreck, an inn and a lagoon | Rowboats, bushes, lockers |
 | **Haunted Graveyard** | A foggy graveyard at midnight with crypts, a chapel and two haunted mansions | Coffins, bushes, lockers |
+| **Moonbase Alpha** | A base on the Moon with habitat modules and a hangar. Low gravity: jumps go nearly three times as high | Escape pods, boulder piles, lockers |
+| **Candy Kingdom** | Gingerbread houses, lollipop trees, a cake castle and a chocolate lake | Gift boxes, gumdrops, lockers |
+
+### Vehicles
+
+Every map has six vehicles, dressed to suit it: go-karts, snowmobiles, forklifts, beach buggies, ghost carts, moon
+rovers and cupcake cars. Stand next to one and press **E** to climb in or out, then drive with the move keys (or
+the joystick on a phone).
+
+- They do 12.5 m/s, nearly twice a sprint, but they are too wide for doorways and cannot climb stairs.
+- The engine is the loudest thing on the map: seekers see a ping every half second while a hider drives.
+- A full tank lasts 25 seconds of driving, then the vehicle only crawls until it has rested.
+- Seekers can drive too, and can tag from the driving seat. Getting caught throws you out.
+- Bots do not drive.
 
 ### Places to jump off
 
@@ -127,7 +141,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The five maps (each generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The seven maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |

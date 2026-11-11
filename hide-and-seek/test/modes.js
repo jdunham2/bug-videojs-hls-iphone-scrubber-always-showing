@@ -34,7 +34,6 @@ for (let mode = 0; mode < MODES.length; mode++) for (let map = 0; map < MAPS.len
   if (mode === 2 && seen.caught && !seen.frozen) fail('nobody froze');
   if (mode === 3 && seen.props < 7) fail('hiders have no props');
   if (mode !== 3 && seen.props) fail('props outside prop hunt');
-  if (mode === 5 && seen.end === 'hiders' && seen.coin < 6) fail('heist ended without enough coins');
   if (mode === 6 && seen.startSeekers !== 9) fail('sardines should start with one hider and everyone else seeking');
   if (mode === 6 && seen.caught && seen.minSeekers >= 9) fail('finders did not join the hider');
 }

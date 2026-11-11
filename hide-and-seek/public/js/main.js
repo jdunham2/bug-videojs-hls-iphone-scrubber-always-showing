@@ -1,5 +1,5 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, levelAt, inUpper, onStairs, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
+import { getWorld, collide, levelAt, inUpper, onStairs, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, VEHICLE, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
 import { Gfx, Preview, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
 import { connectWs, connectLocal, connectRoom } from './net.js';
@@ -20,7 +20,8 @@ const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
-const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0 };
+const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0, vh: [] };
+const car = { id: -1, x: 0, z: 0, r: 0, sp: 0, hit: 0 }; // the vehicle you are driving, simulated locally
 const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0, y: 0, vy: 0, freeUntil: 0, boostUntil: 0, chal: '', chalDone: false, lv: 0, gy: 0 };
 const keys = {};
 let playing = false, chatOpen = false, lastSend = 0, lastHud = 0, heartT = 0, tauntCd = 0, bannerT = 0;
@@ -193,13 +194,14 @@ function onState(m) {
   G.bc = m.bc || G.bc;
   if ((m.md || 0) !== G.md) { G.md = m.md || 0; if (!playing) renderLobby(); }
   G.cg = m.cg || 0;
+  G.vh = m.vh || [];
   gfx.setItems(new Set(m.it || []));
   G.ct = new Set(m.ct);
   gfx.setCoins(G.ct);
   for (const a of m.p) {
     let p = players.get(a[0]);
     if (!p) players.set(a[0], (p = { id: a[0], fd: 0, side: 1 }));
-    p.x = a[1]; p.z = a[2]; p.r = a[3]; p.f = a[4]; p.role = a[5]; p.st = a[6]; p.hid = a[7]; p.sc = a[8]; p.fx = a[9]; p.rocks = a[10]; p.item = a[11] || 0; p.lv = a[12] || 0; p.prop = a[13] || 0;
+    p.x = a[1]; p.z = a[2]; p.r = a[3]; p.f = a[4]; p.role = a[5]; p.st = a[6]; p.hid = a[7]; p.sc = a[8]; p.fx = a[9]; p.rocks = a[10]; p.item = a[11] || 0; p.lv = a[12] || 0; p.prop = a[13] || 0; p.veh = a[14] === undefined ? -1 : a[14];
   }
   if (prev !== G.ph) onPhase(prev);
   else if (prevHost !== G.host && !playing) renderLobby();
@@ -236,7 +238,7 @@ function onNoise(m) {
   if (m.k === 'taunt') sfx.taunt();
   if (d > range) return;
   const p = players.get(myId), seeker = p && p.role === 1;
-  const col = { run: 0xffffff, breath: 0x9fd8ff, taunt: 0xff66cc, rock: 0xffd27a, beacon: 0x6dff8a }[m.k];
+  const col = { run: 0xffffff, breath: 0x9fd8ff, taunt: 0xff66cc, rock: 0xffd27a, beacon: 0x6dff8a, engine: 0xffb347 }[m.k];
   gfx.ring(m.x, m.z, m.k === 'run' ? 2.2 : m.k === 'breath' ? 1.4 : 5, col, m.k === 'run' ? 0.8 : 1.4);
   if (m.k === 'rock') sfx.thud();
   if (seeker && m.id !== myId) { gfx.ping(m.x, m.z); sfx.ping(Math.max(0.25, 1 - d / range)); }
@@ -431,7 +433,7 @@ press('tJump', jump);
 press('tProp', () => send({ t: 'a', a: 'prop' }));
 function jump() {
   const p = players.get(myId);
-  if (!p || !playing || me.y > 0 || me.stam < 6 || p.hid >= 0 || (p.fx & 1) || (p.role === 1 && G.ph === 'hide')) return;
+  if (!p || !playing || p.veh >= 0 || me.y > 0 || me.stam < 6 || p.hid >= 0 || (p.fx & 1) || (p.role === 1 && G.ph === 'hide')) return;
   me.vy = 5.4; me.y = 0.001; me.stam -= 6;
   sfx.swing();
 }
@@ -453,8 +455,11 @@ function update(dt, now) {
     if (keys.KeyD || keys.ArrowRight) mx += 1;
     if (stick.id !== null && Math.hypot(stick.x, stick.y) > 0.18) { mx = stick.x; mz = stick.y; }
   }
+  // Driving: the same keys steer the vehicle instead of your legs
+  const myV = p.veh >= 0 ? G.vh[p.veh] : null, driving = !!myV, ax = mx, az = mz;
+  if (driving) mx = mz = 0;
   const moving = !!(mx || mz), pushed = stick.id !== null && Math.hypot(stick.x, stick.y) > 0.92;
-  me.crouch = !!keys.KeyC && !hidden && !frozen;
+  me.crouch = !!keys.KeyC && !hidden && !frozen && !driving;
   let sprint = (keys.ShiftLeft || keys.ShiftRight || pushed) && moving && !me.crouch && t > me.wind && me.stam > 0;
   if (sprint) {
     if (t > me.freeUntil && G.md !== 7) me.stam -= STAM.drain * dt;
@@ -476,8 +481,28 @@ function update(dt, now) {
     me.stepD += moved;
     if (me.stepD > (sprint ? 2.1 : 1.6)) { me.stepD = 0; if (!me.crouch) sfx.step(sprint); }
   }
+  if (driving) {
+    if (car.id !== p.veh) { car.id = p.veh; car.x = myV[0]; car.z = myV[1]; car.r = myV[2]; car.sp = 0; me.yaw = car.r; me.pitch = -0.08; }
+    const top = myV[4] > 0 ? VEHICLE.max : 2.5; // out of fuel: it only crawls
+    if (az) car.sp += -az * VEHICLE.accel * dt;
+    else car.sp -= Math.sign(car.sp) * Math.min(Math.abs(car.sp), 5 * dt);
+    car.sp = Math.max(-VEHICLE.reverse, Math.min(top, car.sp));
+    const turn = -ax * VEHICLE.turn * dt * Math.max(-1, Math.min(1, car.sp / 5));
+    car.r += turn; me.yaw += turn;
+    const nx = Math.max(-HALF + 1.2, Math.min(HALF - 1.2, car.x - Math.sin(car.r) * car.sp * dt));
+    const nz = Math.max(-HALF + 1.2, Math.min(HALF - 1.2, car.z - Math.cos(car.r) * car.sp * dt));
+    const c = collide(W, nx, nz, VEHICLE.radius, 0);
+    if (Math.hypot(c[0] - nx, c[1] - nz) > 0.02) {
+      if (Math.abs(car.sp) > 5 && now > car.hit) { car.hit = now + 400; sfx.thud(); }
+      car.sp *= 0.6;
+    }
+    car.x = c[0]; car.z = c[1];
+    me.x = car.x; me.z = car.z; me.lv = 0; me.gy = 0; me.y = 0; me.vy = 0;
+    me.stepD += Math.abs(car.sp) * dt;
+    if (me.stepD > 1.1) { me.stepD = 0; sfx.noise(0.09, 0.09, 70 + Math.abs(car.sp) * 16, 2); }
+  } else car.id = -1;
   // Height: me.gy is the floor you are standing on (or falling towards), me.y how far above it you are.
-  if (!hidden) {
+  if (!hidden && !driving) {
     // walked off the edge of a deck or balcony: the floor is now a storey further down
     if (me.lv === 1 && !onStairs(W, me.x, me.z) && !inUpper(W, me.x, me.z)) { me.lv = 0; me.gy = 0; me.y += FLOOR_H; me.peak = Math.max(me.peak || 0, me.y); }
     // jump pads fling you high enough to come down on a lookout
@@ -489,7 +514,7 @@ function update(dt, now) {
     }
     if (me.y > 0) {
       const before = me.y;
-      me.y += me.vy * dt; me.vy -= 15 * dt;
+      me.y += me.vy * dt; me.vy -= W.gravity * dt; // the Moon has a sixth of the pull
       me.peak = Math.max(me.peak || 0, me.gy + me.y);
       if (me.lv === 0 && me.vy < 0 && before >= FLOOR_H && me.y <= FLOOR_H && inUpper(W, me.x, me.z)) {
         me.lv = 1; me.gy = FLOOR_H; me.y = 0; me.vy = 0; me.peak = 0; // came down on top of something
@@ -505,7 +530,7 @@ function update(dt, now) {
   me.flags = (sprint ? F_SPRINT : 0) | (me.crouch ? F_CROUCH : 0) | (moving ? F_MOVE : 0) | (keys.KeyE && !frozen ? F_USE : 0) | (winded ? F_WIND : 0) | (me.y > 0 ? F_JUMP : 0);
   if (now - lastSend > 66) {
     lastSend = now;
-    send({ t: 's', x: +me.x.toFixed(2), z: +me.z.toFixed(2), r: +me.yaw.toFixed(3), f: me.flags, q: me.q, l: me.lv });
+    send({ t: 's', x: +me.x.toFixed(2), z: +me.z.toFixed(2), r: +me.yaw.toFixed(3), f: me.flags, q: me.q, l: me.lv, vr: driving ? +car.r.toFixed(3) : undefined });
   }
 
   // other players
@@ -524,7 +549,7 @@ function update(dt, now) {
     if (o.role === 1) nearSeeker = Math.min(nearSeeker, Math.hypot(o.x - me.x, o.z - me.z));
     gfx.updateAvatar(id, {
       x: o.x, y: levelAt(W, o.x, o.z, o.lv)[1], z: o.z, r: o.r, visible: o.hid < 0 && !blind && !((o.fx & 4) && o.role !== p.role), jump: !!(o.f & F_JUMP), moving: !!(o.f & F_MOVE), sprint: !!sprinting, crouch: !!(o.f & F_CROUCH),
-      seeker: o.role === 1 && G.ph !== 'lobby', showTag: G.ph === 'lobby' || G.ph === 'end' || o.role === p.role, stunned: !!(o.fx & 1), immune: !!(o.fx & 2), prop: o.prop, frozen: o.st === 2,
+      seeker: o.role === 1 && G.ph !== 'lobby', showTag: G.ph === 'lobby' || G.ph === 'end' || o.role === p.role, stunned: !!(o.fx & 1), immune: !!(o.fx & 2), prop: o.prop, frozen: o.st === 2, driving: o.veh >= 0,
       pet: !o.prop && (G.ph === 'lobby' || G.ph === 'end' || o.role === 1 || o.role === p.role),
     }, dt);
   }
@@ -535,7 +560,8 @@ function update(dt, now) {
   if (fear > 0.05 && now > heartT) { heartT = now + 1100 - fear * 650; sfx.heart(); }
 
   // camera
-  const eyeT = hidden ? 1.15 : me.crouch ? 1.0 : 1.6;
+  G.vh.forEach((v, i) => (driving && i === p.veh ? gfx.updateVehicle(i, car.x, car.z, car.r, true, dt) : gfx.updateVehicle(i, v[0], v[1], v[2], false, dt)));
+  const eyeT = driving ? 1.5 : hidden ? 1.15 : me.crouch ? 1.0 : 1.6;
   me.eye += (eyeT - me.eye) * Math.min(1, dt * 12);
   gfx.setDark(G.md === 4 && (G.ph === 'hide' || G.ph === 'seek'));
   gfx.setSeekerView(seeker && G.ph !== 'lobby');
@@ -576,7 +602,7 @@ function hud(p, now, s) {
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';
@@ -616,6 +642,7 @@ function hud(p, now, s) {
     bar.className = 'bar'; i.style.width = v * 100 + '%';
     bar.append(i); pr.append(bar);
   };
+  if (p.veh >= 0 && G.vh[p.veh]) return progress(`${USE}: get out · fuel`, G.vh[p.veh][4] / 100);
   if (!s.seeker && G.ph === 'seek') for (const b of W.beacons) {
     if (G.bc[b.id] >= 1 || Math.hypot(b.x - me.x, b.z - me.z) > 2.4) continue;
     return progress(`Hold ${USE} to light the beacon (it hums!)`, G.bc[b.id]);
@@ -631,12 +658,16 @@ function hud(p, now, s) {
     if (o.st !== 2 || o.lv !== me.lv || Math.hypot(o.x - me.x, o.z - me.z) > 2.3) continue;
     return progress(`Hold ${USE} to thaw ${(roster.get(o.id) || {}).n || 'your teammate'}`, G.res);
   }
-  if (G.md === 3) return;
-  for (const sp of W.spots) {
+  if (G.md !== 3) for (const sp of W.spots) {
     if (sp.lv !== me.lv) continue;
     if (Math.min(Math.hypot(sp.x - me.x, sp.z - me.z), Math.hypot(sp.ex - me.x, sp.ez - me.z)) > 2.3) continue;
     if (s.seeker) { if (G.ph === 'seek') pr.textContent = `${USE}: search the ${sp.kind} (empty = dazed!)`; }
     else if (G.ph !== 'end') pr.textContent = `${USE}: hide in the ${sp.kind}`;
+    return;
+  }
+  if (!me.lv && !p.prop) for (const v of G.vh) {
+    if (v[3] || Math.hypot(v[0] - me.x, v[1] - me.z) > VEHICLE.enter) continue;
+    pr.textContent = `${USE}: drive the ${W.vehName}`;
     return;
   }
 }

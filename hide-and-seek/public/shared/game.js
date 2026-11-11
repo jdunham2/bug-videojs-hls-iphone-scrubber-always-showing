@@ -3,7 +3,7 @@
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
   levelAt, validLevel, cleanLook,
-  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
+  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, VEHICLE, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
 // The world of whichever room is being processed. Every entry point sets it first; all code here is synchronous.
@@ -28,6 +28,7 @@ export function makeRoom(code, cfg = {}) {
     map: 0, W: getWorld(0), items: new Map(), bc: [0, 0, 0], mode: 0,
   };
   if (cfg.map) { room.map = cfg.map % MAPS.length; room.W = getWorld(room.map); }
+  resetVehicles(room);
   if (cfg.mode) room.mode = cfg.mode % MODES.length;
   return room;
 }
@@ -41,7 +42,7 @@ function makePlayer(room, name, out, look) {
     id: nextId++, out, bot: !out, name, color, look, lv: 0, role: HIDER, st: 0, hid: -1,
     x, z, r: 0, f: 0, sc: 0, q: 0, stunUntil: 0, immUntil: 0, tagCd: 0, tauntCd: 0, rocks: 3,
     seekCount: 0, noiseT: 0, ai: { stam: 100, wind: 0 },
-    item: 0, cloakUntil: 0, silentUntil: 0, boostUntil: 0, cnt: {}, ch: null, seen: new Set(),
+    item: 0, cloakUntil: 0, silentUntil: 0, boostUntil: 0, cnt: {}, ch: null, seen: new Set(), veh: -1,
   };
   room.players.set(p.id, p);
   return p;
@@ -94,6 +95,7 @@ function startRound(room) {
   room.coins.clear(); room.spotOcc.clear(); room.resc = 0; room.winner = null;
   room.items.clear(); room.bc = [0, 0, 0];
   room.startSeekers = nS;
+  resetVehicles(room);
   room.coinGoal = room.mode === 5 ? Math.min(W.coins.length - 6, 4 + 2 * (all.length - nS)) : 0;
   const t = now();
   order.forEach((p, i) => {
@@ -136,12 +138,56 @@ function endRound(room, winner) {
 function toLobby(room) {
   room.phase = 'lobby';
   room.spotOcc.clear();
+  resetVehicles(room);
   for (const p of room.players.values()) {
     p.role = HIDER; p.st = 0; p.hid = -1; p.stunUntil = 0; p.ai = { stam: 100, wind: 0 }; p.prop = 0;
     p.item = 0; p.cloakUntil = 0; p.boostUntil = 0; p.silentUntil = 0; p.ch = null;
     const a = Math.random() * Math.PI * 2;
     const pos = collide(W, Math.cos(a) * 6, Math.sin(a) * 6);
     teleport(p, pos[0], pos[1]);
+  }
+}
+
+// ---------- vehicles ----------
+function resetVehicles(room) {
+  room.veh = room.W.vehicles.map((v) => ({ id: v.id, x: v.x, z: v.z, r: v.r, driver: 0, fuel: 100, lx: v.x, lz: v.z, noiseT: 0 }));
+  for (const p of room.players.values()) p.veh = -1;
+}
+function enterVehicle(room, p) {
+  if (p.lv || p.prop || p.st || p.hid >= 0 || (p.role === SEEKER && room.phase === 'hide')) return;
+  let best = null, bd = VEHICLE.enter;
+  for (const v of room.veh) {
+    const d = Math.hypot(v.x - p.x, v.z - p.z);
+    if (!v.driver && d < bd) { bd = d; best = v; }
+  }
+  if (!best) return;
+  best.driver = p.id;
+  p.veh = best.id; p.x = best.x; p.z = best.z; p.f = 0;
+}
+function exitVehicle(room, p, tp = true) {
+  const v = room.veh[p.veh];
+  p.veh = -1;
+  if (!v) return;
+  v.driver = 0;
+  if (!tp) return;
+  // step out on whichever side has room
+  for (const a of [Math.PI / 2, -Math.PI / 2, Math.PI, 0]) {
+    const x = v.x - Math.sin(v.r + a) * 1.7, z = v.z - Math.cos(v.r + a) * 1.7, c = collide(W, x, z);
+    if (Math.hypot(c[0] - x, c[1] - z) < 0.05 && Math.abs(x) < HALF - 1 && Math.abs(z) < HALF - 1) return teleport(p, x, z);
+  }
+  teleport(p, v.x, v.z);
+}
+function updateVehicles(room, dt, t) {
+  for (const v of room.veh) {
+    const d = v.driver && room.players.get(v.driver);
+    if (v.driver && (!d || d.veh !== v.id)) v.driver = 0;
+    const moved = Math.hypot(v.x - v.lx, v.z - v.lz);
+    v.lx = v.x; v.lz = v.z;
+    if (d && moved > 0.008) {
+      v.fuel = Math.max(0, v.fuel - VEHICLE.drain * dt);
+      // consequences: an engine is the loudest thing on the map
+      if (room.phase === 'seek' && d.role === HIDER && t >= v.noiseT) { emitNoise(room, v.x, v.z, 'engine', d.id); v.noiseT = t + 0.5; }
+    } else v.fuel = Math.min(100, v.fuel + (d ? VEHICLE.regen : VEHICLE.idleRegen) * dt);
   }
 }
 
@@ -158,6 +204,7 @@ function catchPlayer(room, p, by, how) {
     return feed(room, `${by.name} found ${p.name} and squeezed in. ${left} still looking.`, 'good');
   }
   const mode = room.mode, where = how ? ` hiding in a ${how}` : '';
+  if (p.veh >= 0) exitVehicle(room, p, false);
   leaveSpot(room, p, mode !== 0);
   p.f = 0; p.item = 0; p.prop = 0;
   if (mode === 1) {
@@ -206,15 +253,16 @@ function searchSpot(room, s, spot, t) {
 
 function useAction(room, p, t) {
   if (p.st || t < p.stunUntil) return;
+  if (p.veh >= 0) return exitVehicle(room, p);
   if (p.hid >= 0) return leaveSpot(room, p);
-  if (room.mode === 3) return; // no hiding spots in Prop Hunt: your disguise is your hiding place
+  if (room.mode === 3) return enterVehicle(room, p); // no hiding spots in Prop Hunt: your disguise is your hiding place
   let best = null, bd = 2.3;
   for (const s of W.spots) {
     if (s.lv !== p.lv) continue;
     const d = Math.min(Math.hypot(s.x - p.x, s.z - p.z), Math.hypot(s.ex - p.x, s.ez - p.z));
     if (d < bd) { bd = d; best = s; }
   }
-  if (!best) return;
+  if (!best) return enterVehicle(room, p);
   if (p.role === SEEKER) return searchSpot(room, p, best, t);
   if (room.phase === 'end') return;
   if (room.spotOcc.has(best.id)) return send(p, { t: 'feed', m: 'Someone is already hiding in there!', k: '' });
@@ -276,6 +324,7 @@ function lightBeacon(room, p, bc) {
 function setMap(room, i) {
   room.map = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
   W = room.W = getWorld(room.map);
+  resetVehicles(room);
   room.spotOcc.clear();
   for (const p of room.players.values()) {
     p.hid = -1; p.ai = { stam: 100, wind: 0 };
@@ -515,6 +564,7 @@ function botUpdate(room, b, dt, t) {
 // ---------- simulation ----------
 function update(room, dt) {
   const t = now();
+  updateVehicles(room, dt, t);
   if (room.phase === 'hide' && t >= room.tEnd) {
     room.phase = 'seek'; room.tEnd = t + (room.mode === 7 ? TURBO.seek : room.cfg.seek);
     feed(room, 'Ready or not, here they come!', 'big');
@@ -617,10 +667,11 @@ function snapshot(room) {
     t: 'st', ph: room.phase, tl: Math.max(0, +(room.tEnd - t).toFixed(1)), host: room.host,
     res: +(room.mode === 2 ? Math.max(0, ...[...room.players.values()].map((p) => (p.st === 2 ? p.thaw : 0))) : room.resc / 3).toFixed(2),
     ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0,
+    vh: room.veh.map((v) => [+v.x.toFixed(2), +v.z.toFixed(2), +v.r.toFixed(2), v.driver, Math.round(v.fuel)]),
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
       p.id, +p.x.toFixed(2), +p.z.toFixed(2), +p.r.toFixed(2), p.f, p.role, p.st, p.hid, p.sc,
-      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv, p.prop || 0,
+      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv, p.prop || 0, p.veh,
     ]),
   });
 }
@@ -656,6 +707,7 @@ export function joinRoom(room, name, out, look) {
 // Returns false when no humans are left and the room can be discarded.
 export function leaveRoom(room, me) {
   W = room.W;
+  if (me.veh >= 0) exitVehicle(room, me, false);
   leaveSpot(room, me, false);
   room.players.delete(me.id);
   const humans = [...room.players.values()].filter((p) => !p.bot);
@@ -693,6 +745,8 @@ export function handleMessage(room, me, m) {
     if (Math.hypot(x - me.x, z - me.z) > 6) return teleport(me, me.x, me.z); // no teleport hacks
     me.x = x; me.z = z; me.f = m.f & 63;
     me.lv = validLevel(W, x, z, m.l === 1 ? 1 : 0);
+    const v = room.veh[me.veh];
+    if (v) { v.x = x; v.z = z; me.lv = 0; if (num(m.vr)) v.r = m.vr; }
   } else if (m.t === 'a') {
     if (m.a === 'use') useAction(room, me, t);
     else if (m.a === 'tag') tryTag(room, me, t);

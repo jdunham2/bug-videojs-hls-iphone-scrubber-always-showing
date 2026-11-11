@@ -9,12 +9,13 @@ MAPS.forEach((m, i) => {
   for (const s of W.spots) kinds[s.kind + (s.lv ? '↑' : '')] = (kinds[s.kind + (s.lv ? '↑' : '')] || 0) + 1;
   console.log(m.name, '| boxes', W.boxes.length, 'spots', JSON.stringify(kinds), 'coins', W.coins.length, 'items', W.items.length, 'two-storey', W.stairs.length, 'reach', W.nav.list0.length, '+', W.nav.list.length - W.nav.list0.length, 'upstairs');
   if (W.spots.length < 20) fail(m.id + ' too few spots');
+  if (W.vehicles.length < 5) fail(m.id + ' has only ' + W.vehicles.length + ' vehicles');
   if (W.coins.length < 40 || W.items.length < 8 || W.beacons.length !== 3) fail(m.id + ' missing pickups');
   if (W.nav.list0.length < 60000) fail(m.id + ' map mostly unreachable');
   if (W.stairs.length < 5 || W.pads.length < 3 || W.nav.list.length - W.nav.list0.length < 150 * W.stairs.length) fail(m.id + ' upstairs unreachable');
   const targets = [
     ...W.spots.map((s) => [s.ex, s.ez, s.lv, 'spot ' + s.kind]), ...W.coins.map((c) => [c.x, c.z, c.lv, 'coin']),
-    ...W.beacons.map((b) => [b.x + 1.1, b.z, 0, 'beacon']), [W.lever.x + 1.1, W.lever.z, 0, 'lever'], ...W.items.map((o) => [o.x, o.z, 0, 'item']),
+    ...W.beacons.map((b) => [b.x + 1.1, b.z, 0, 'beacon']), [W.lever.x + 1.1, W.lever.z, 0, 'lever'], ...W.vehicles.map((v) => [v.x, v.z, 0, 'vehicle']), ...W.items.map((o) => [o.x, o.z, 0, 'item']),
   ];
   for (const [x, z, lv, what] of targets) {
     const c = collide(W, x, z, 0.4, lv);
