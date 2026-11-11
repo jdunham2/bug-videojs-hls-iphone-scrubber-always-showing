@@ -9,7 +9,7 @@ import { makeRoom, joinRoom, leaveRoom, handleMessage, tickRoom, TICK } from './
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
-const CFG = { hide: +process.env.HIDE_T || 30, seek: +process.env.SEEK_T || 210, map: +process.env.MAP || 0 };
+const CFG = { hide: +process.env.HIDE_T || 30, seek: +process.env.SEEK_T || 210, map: +process.env.MAP || 0, mode: +process.env.MODE || 0 };
 
 // ---------- static files ----------
 const ROOTS = [

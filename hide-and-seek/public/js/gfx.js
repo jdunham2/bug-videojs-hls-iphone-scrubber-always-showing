@@ -524,7 +524,9 @@ export class Gfx {
     g.visible = false;
     this.scene.add(g);
     const old = this.avatars.get(id);
-    const a = { ...ch, g, tag, stun, phase: Math.random() * 6, x: 0, y: 0, z: 0, r: 0, init: false };
+    const pet = makePet(look[4] | 0);
+    if (pet) this.scene.add(pet.g);
+    const a = { ...ch, g, tag, stun, pet, phase: Math.random() * 6, x: 0, y: 0, z: 0, r: 0, init: false };
     if (old) { a.x = old.x; a.y = old.y; a.z = old.z; a.r = old.r; a.init = old.init; this.removeAvatar(id); }
     this.avatars.set(id, a);
     return a;
@@ -533,6 +535,7 @@ export class Gfx {
     const a = this.avatars.get(id);
     if (!a) return;
     this.scene.remove(a.g);
+    if (a.pet) this.scene.remove(a.pet.g);
     a.tag.material.map.dispose();
     this.avatars.delete(id);
   }
@@ -549,7 +552,20 @@ export class Gfx {
     a.r += dr * k;
     a.g.position.set(a.x, a.y, a.z);
     a.g.rotation.y = a.r;
+    // pets trail behind and to the left of their owner
+    if (a.pet) stepPet(a.pet, a.x + Math.sin(a.r) * 0.9 - Math.cos(a.r) * 0.6, a.y, a.z + Math.cos(a.r) * 0.9 + Math.sin(a.r) * 0.6, s.visible && s.pet, dt, this.time);
     if (!s.visible) return;
+    // Prop Hunt disguise, and the ice block of Freeze Tag
+    if ((s.prop || 0) !== (a.propI || 0)) {
+      if (a.propG) a.g.remove(a.propG);
+      a.propI = s.prop || 0;
+      a.propG = a.propI ? this.makeProp(a.propI) : null;
+      if (a.propG) a.g.add(a.propG);
+    }
+    if (s.frozen && !a.ice) {
+      a.ice = put(new THREE.BoxGeometry(1, 2.1, 1), new THREE.MeshStandardMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.45, roughness: 0.1, metalness: 0.2 }), 0, 1.05, 0, a.g, false);
+    }
+    if (a.ice) a.ice.visible = !!s.frozen;
     a.phase += dt * (s.sprint ? 15 : s.crouch ? 6 : 10) * (s.moving ? 1 : 0);
     const sw = s.moving ? Math.sin(a.phase) * (s.sprint ? 0.9 : 0.55) : 0;
     a.legs.forEach((l, i) => { l.rotation.x = i % 2 ? -sw : sw; });
@@ -565,7 +581,28 @@ export class Gfx {
     a.stun.visible = s.stunned;
     if (s.stunned) a.stun.rotation.y = this.time * 5;
     const blink = s.immune && Math.sin(this.time * 20) > 0;
-    a.inner.visible = !blink;
+    a.inner.visible = !blink && !a.propI;
+  }
+
+  makeProp(i) {
+    const g = new THREE.Group(), M = this.M;
+    if (i === 1) put(new THREE.BoxGeometry(1.3, 1.3, 1.3), M.crate, 0, 0.65, 0, g);
+    else if (i === 2) put(new THREE.CylinderGeometry(0.4, 0.4, 1.1, 10), M.barrel, 0, 0.55, 0, g);
+    else if (i === 3) for (let k = 0; k < 6; k++) { const a = k * 1.05, rr = k < 5 ? 0.75 : 0, m = put(new THREE.IcosahedronGeometry(k < 5 ? 0.85 : 1, 0), std(k % 2 ? 0x2e8b47 : 0x3fa35a, { roughness: 1 }), Math.cos(a) * rr, k < 5 ? 0.75 : 1.35, Math.sin(a) * rr, g); m.rotation.set(k, k * 2, k * 3); }
+    else if (i === 4) { const m = put(new THREE.IcosahedronGeometry(1, 0), M.rock, 0, 0.4, 0, g); m.scale.set(0.95, 0.75, 0.85); }
+    else { put(new THREE.ConeGeometry(0.28, 0.9, 12), std(0xff7a1a, { flatShading: false }), 0, 0.5, 0, g); put(new THREE.CylinderGeometry(0.19, 0.23, 0.14, 12), std(0xf4f4f4, { flatShading: false }), 0, 0.45, 0, g); put(new THREE.BoxGeometry(0.7, 0.06, 0.7), std(0xff7a1a), 0, 0.03, 0, g); }
+    return g;
+  }
+  // Your own pet runs a little ahead of you, where you can see it
+  setSelfPet(look) {
+    if (this.selfPet) this.scene.remove(this.selfPet.g);
+    this.selfPet = makePet(look[4] | 0);
+    if (this.selfPet) this.scene.add(this.selfPet.g);
+  }
+  updateSelfPet(x, y, z, yaw, visible, dt) {
+    if (!this.selfPet) return;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    stepPet(this.selfPet, x + fx * 2.4 + Math.cos(yaw) * 1.0, y, z + fz * 2.4 - Math.sin(yaw) * 1.0, visible, dt, this.time);
   }
 
   // ---------- effects ----------
@@ -814,8 +851,8 @@ export class Preview {
     this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene = new THREE.Scene();
     this.cam = new THREE.PerspectiveCamera(30, canvas.width / canvas.height, 0.1, 30);
-    this.cam.position.set(0, 1.5, 5.4);
-    this.cam.lookAt(0, 1.08, 0);
+    this.cam.position.set(0, 1.5, 6.2);
+    this.cam.lookAt(0, 1.02, 0);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x554466, 1.9));
     const d = new THREE.DirectionalLight(0xfff0dd, 2.2);
     d.position.set(2, 4, 3);
@@ -824,14 +861,121 @@ export class Preview {
   }
   set(look) {
     if (this.ch) this.scene.remove(this.ch.inner);
+    if (this.pet) this.scene.remove(this.pet.g);
     this.ch = makeCharacter(look);
     this.ch.seeker.visible = false;
     this.scene.add(this.ch.inner);
+    this.pet = makePet(look[4] | 0);
+    if (this.pet) this.scene.add(this.pet.g);
   }
   render(t) {
     if (!this.ch) return;
     this.ch.inner.rotation.y = Math.PI + t * 0.9;
     this.ch.inner.position.y = this.ch.float + Math.sin(t * 2.2) * 0.03;
+    if (this.pet) {
+      const a = t * 0.9;
+      this.pet.g.position.set(Math.cos(a) * 0.85, this.pet.fly ? 0.75 + Math.sin(t * 3) * 0.08 : Math.abs(Math.sin(t * 5)) * (this.pet.hop ? 0.16 : 0.04), -Math.sin(a) * 0.85);
+      this.pet.g.rotation.y = a + Math.PI;
+      animPet(this.pet, t, true);
+    }
     this.r.render(this.scene, this.cam);
   }
+}
+
+// ---------- pets ----------
+// Small companions, about knee high, facing -z. Returns null for "no pet".
+export function makePet(i) {
+  if (!i) return null;
+  const g = new THREE.Group(), body = new THREE.Group();
+  g.add(body);
+  const pet = { g, body, fly: false, hop: false, wings: [], tail: null, x: 0, y: 0, z: 0, r: 0, init: false, phase: Math.random() * 6 };
+  const m = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff }), black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const eyes = (y, z, sx, r = 0.03) => { for (const s of [-sx, sx]) put(S(r, 6, 5), black, s, y, z, body, false); };
+  const quad = (col, dark, pointy) => {
+    const b = put(new THREE.CapsuleGeometry(0.12, 0.22, 4, 10), m(col), 0, 0.24, 0, body); b.rotation.x = Math.PI / 2;
+    put(S(0.14, 10, 8), m(col), 0, 0.4, -0.24, body);
+    put(S(0.06, 8, 6), m(0xf4ece0), 0, 0.36, -0.36, body);
+    put(S(0.025, 6, 5), black, 0, 0.38, -0.415, body, false);
+    eyes(0.44, -0.355, 0.06);
+    for (const s of [-1, 1]) {
+      if (pointy) put(new THREE.ConeGeometry(0.05, 0.11, 4), m(dark), s * 0.08, 0.55, -0.22, body);
+      else { const e = put(new THREE.BoxGeometry(0.05, 0.13, 0.08), m(dark), s * 0.14, 0.4, -0.22, body); e.rotation.z = s * 0.3; }
+      for (const z of [-0.13, 0.13]) put(new THREE.CylinderGeometry(0.035, 0.035, 0.14, 6), m(dark), s * 0.08, 0.07, z, body);
+    }
+    pet.tail = put(new THREE.CylinderGeometry(0.02, 0.035, 0.22, 6), m(dark), 0, 0.36, 0.26, body);
+    pet.tail.rotation.x = pointy ? 0.5 : -0.7;
+  };
+  if (i === 1) quad(0xb9783f, 0x7a4a22, false);
+  else if (i === 2) quad(0x9a9aa6, 0x6a6a78, true);
+  else if (i === 3) { // bunny
+    pet.hop = true;
+    put(S(0.17, 10, 8), m(0xf7f4ef), 0, 0.2, 0.02, body).scale.set(1, 0.95, 1.15);
+    put(S(0.13, 10, 8), m(0xf7f4ef), 0, 0.4, -0.14, body);
+    for (const s of [-0.06, 0.06]) { const e = put(new THREE.CapsuleGeometry(0.03, 0.2, 3, 6), m(0xf7f4ef), s, 0.62, -0.12, body); e.rotation.z = -s * 3; put(new THREE.CapsuleGeometry(0.014, 0.16, 3, 6), m(0xffb3c7), s, 0.62, -0.145, body, false).rotation.z = -s * 3; }
+    put(S(0.022, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8fa8 }), 0, 0.38, -0.27, body, false);
+    eyes(0.44, -0.24, 0.06);
+    put(S(0.06, 8, 6), m(0xffffff), 0, 0.2, 0.2, body);
+  } else if (i === 4) { // duckling
+    put(S(0.15, 10, 8), m(0xffd93c), 0, 0.2, 0, body).scale.set(1, 0.9, 1.25);
+    put(S(0.11, 10, 8), m(0xffd93c), 0, 0.42, -0.13, body);
+    const bk = put(new THREE.ConeGeometry(0.045, 0.11, 6), m(0xff8a1f), 0, 0.4, -0.26, body); bk.rotation.x = -Math.PI / 2; bk.scale.y = 1; bk.scale.x = 1.5;
+    eyes(0.46, -0.215, 0.055, 0.022);
+    for (const s of [-0.07, 0.07]) put(new THREE.BoxGeometry(0.07, 0.02, 0.1), m(0xff8a1f), s, 0.02, -0.03, body);
+    pet.tail = put(new THREE.ConeGeometry(0.05, 0.1, 5), m(0xffd93c), 0, 0.27, 0.19, body); pet.tail.rotation.x = -0.9;
+  } else if (i === 5) { // baby dragon
+    pet.fly = true;
+    put(S(0.16, 10, 8), m(0x4fbf6a), 0, 0, 0, body).scale.set(1, 0.95, 1.3);
+    put(S(0.12, 10, 8), m(0x4fbf6a), 0, 0.14, -0.22, body);
+    put(S(0.07, 8, 6), m(0x7fdc8f), 0, 0.1, -0.33, body);
+    eyes(0.18, -0.31, 0.06, 0.028);
+    for (const s of [-1, 1]) { put(new THREE.ConeGeometry(0.025, 0.08, 4), m(0xffe98a), s * 0.06, 0.27, -0.2, body); const w = put(new THREE.BoxGeometry(0.3, 0.012, 0.2), m(0xff8a5c, { side: THREE.DoubleSide }), 0, 0, 0, body); w.geometry.translate(0.15, 0, 0); w.position.set(s * 0.1, 0.1, 0.02); w.scale.x = s; pet.wings.push(w); }
+    pet.tail = put(new THREE.ConeGeometry(0.05, 0.3, 5), m(0x4fbf6a), 0, -0.02, 0.3, body); pet.tail.rotation.x = -1.4;
+    put(S(0.1, 8, 6), m(0xf5e6a8), 0, -0.06, -0.02, body).scale.set(1, 0.7, 1.2);
+  } else if (i === 6) { // slime
+    pet.hop = true;
+    put(S(0.2, 12, 9), new THREE.MeshStandardMaterial({ color: 0x6dff8a, transparent: true, opacity: 0.75, roughness: 0.15 }), 0, 0.15, 0, body).scale.set(1, 0.78, 1);
+    for (const s of [-0.07, 0.07]) { put(S(0.04, 6, 5), white, s, 0.2, -0.165, body, false); put(S(0.02, 6, 5), black, s, 0.2, -0.2, body, false); }
+  } else if (i === 7) { // bee
+    pet.fly = true;
+    put(S(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd23c, map: pattern(1), roughness: 0.6 }), 0, 0, 0, body).scale.set(1, 1, 1.35);
+    put(S(0.09, 10, 8), m(0x2a2320), 0, 0.03, -0.19, body);
+    for (const s of [-0.045, 0.045]) put(S(0.025, 6, 5), white, s, 0.06, -0.265, body, false);
+    for (const s of [-1, 1]) { const w = put(new THREE.BoxGeometry(0.2, 0.008, 0.11), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide }), 0, 0, 0, body, false); w.geometry.translate(0.1, 0, 0); w.position.set(s * 0.05, 0.12, 0); w.scale.x = s; pet.wings.push(w); }
+    put(new THREE.ConeGeometry(0.025, 0.08, 5), m(0x2a2320), 0, 0, 0.2, body).rotation.x = Math.PI / 2;
+  } else { // robo-ball
+    pet.fly = true;
+    put(S(0.17, 14, 10), m(0xb8c0d0, { metalness: 0.8, roughness: 0.3 }), 0, 0, 0, body);
+    put(S(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: 0x7df9ff }), 0, 0.02, -0.125, body, false);
+    put(new THREE.TorusGeometry(0.175, 0.018, 6, 20), m(0x3a4254, { metalness: 0.6 }), 0, 0, 0, body).rotation.x = Math.PI / 2;
+    put(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 5), m(0x3a4254), 0, 0.23, 0, body);
+    put(S(0.03, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff5050 }), 0, 0.31, 0, body, false);
+  }
+  g.visible = false;
+  return pet;
+}
+function animPet(p, t, moving) {
+  for (let i = 0; i < p.wings.length; i++) p.wings[i].rotation.z = (i ? -1 : 1) * Math.sin(t * 28) * 0.7;
+  if (p.tail && !p.fly) p.tail.rotation.z = Math.sin(t * (moving ? 14 : 5)) * 0.5;
+}
+// Move a pet toward the point it wants to be at, and animate it.
+function stepPet(p, tx, ty, tz, visible, dt, t) {
+  p.g.visible = !!visible;
+  if (!visible) { p.init = false; return; }
+  if (!p.init || Math.hypot(tx - p.x, tz - p.z) > 9) { p.x = tx; p.y = ty; p.z = tz; p.init = true; }
+  const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz), moving = d > 0.3;
+  if (moving) {
+    const step = Math.min(d, Math.min(10, 1.5 + d * 3.5) * dt);
+    p.x += (dx / d) * step; p.z += (dz / d) * step;
+    let dr = Math.atan2(-dx, -dz) - p.r;
+    dr = Math.atan2(Math.sin(dr), Math.cos(dr));
+    p.r += dr * Math.min(1, dt * 10);
+    p.phase += dt * 12;
+  }
+  p.y += (ty - p.y) * Math.min(1, dt * 8);
+  const bob = p.fly ? 0.75 + Math.sin(t * 3 + p.phase * 0.1) * 0.08 : moving ? Math.abs(Math.sin(p.phase)) * (p.hop ? 0.22 : 0.05) : 0;
+  p.g.position.set(p.x, p.y + bob, p.z);
+  p.g.rotation.y = p.r;
+  if (p.hop) p.body.scale.y = 1 - (moving ? Math.abs(Math.cos(p.phase)) * 0.18 : Math.sin(t * 3) * 0.05);
+  animPet(p, t, moving);
 }

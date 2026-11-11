@@ -35,22 +35,30 @@ function mulberry(seed) {
   };
 }
 
+export const MODES = [
+  { id: 'classic', name: 'Classic', blurb: 'Caught hiders go to jail until a teammate pulls the lever.' },
+  { id: 'infection', name: 'Infection', blurb: 'Everyone a seeker catches becomes a seeker too. Be the last one standing.' },
+  { id: 'freeze', name: 'Freeze Tag', blurb: 'Tagged hiders freeze where they stand. Teammates can thaw them.' },
+  { id: 'props', name: 'Prop Hunt', blurb: 'Hiders are disguised as crates, barrels and bushes. A seeker who swings and misses is dazed.' },
+];
+export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
   { id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
   { id: 'camp', name: 'Frostpine Camp', blurb: 'A snowy campground in daylight: cabins, tents, thick pines.' },
   { id: 'docks', name: 'Midnight Docks', blurb: 'A container yard at night: tight alleys, a warehouse, deep shadows.' },
 ];
-// What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern].
+// What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
   chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien'],
   hats: ['No hat', 'Beanie', 'Cap', 'Top hat', 'Crown', 'Party hat', 'Headphones', 'Halo'],
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
+  pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball'],
 };
 export function cleanLook(l) {
   const v = (x, n) => (Number.isInteger(x) && x >= 0 && x < n ? x : (Math.random() * n) | 0);
   l = Array.isArray(l) ? l : [];
-  return [v(l[0], LOOKS.chars.length), v(l[1], LOOKS.colors), v(l[2], LOOKS.hats.length), v(l[3], LOOKS.pats.length)];
+  return [v(l[0], LOOKS.chars.length), v(l[1], LOOKS.colors), v(l[2], LOOKS.hats.length), v(l[3], LOOKS.pats.length), v(l[4], LOOKS.pets.length)];
 }
 
 const THEMES = {

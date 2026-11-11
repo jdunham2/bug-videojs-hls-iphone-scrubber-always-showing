@@ -3,7 +3,7 @@
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
   levelAt, validLevel, cleanLook,
-  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
+  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
 // The world of whichever room is being processed. Every entry point sets it first; all code here is synchronous.
@@ -25,9 +25,10 @@ export function makeRoom(code, cfg = {}) {
     cfg: { hide: cfg.hide || 30, seek: cfg.seek || 210 },
     code, players: new Map(), phase: 'lobby', tEnd: 0, host: null,
     coins: new Set(), spotOcc: new Map(), resc: 0, scoreT: 0, winner: null,
-    map: 0, W: getWorld(0), items: new Map(), bc: [0, 0, 0],
+    map: 0, W: getWorld(0), items: new Map(), bc: [0, 0, 0], mode: 0,
   };
   if (cfg.map) { room.map = cfg.map % MAPS.length; room.W = getWorld(room.map); }
+  if (cfg.mode) room.mode = cfg.mode % MODES.length;
   return room;
 }
 
@@ -97,8 +98,10 @@ function startRound(room) {
     if (p.role === SEEKER) p.seekCount++;
     p.st = 0; p.hid = -1; p.rocks = 3; p.stunUntil = 0; p.immUntil = 0; p.tagCd = 0; p.tauntCd = 0; p.f = 0;
     p.ai = { stam: 100, wind: 0 };
-    p.item = 0; p.cloakUntil = 0; p.silentUntil = 0; p.boostUntil = 0; p.cnt = {}; p.seen = new Set();
-    const pool = CHALLENGES[p.role], c = pool[(Math.random() * pool.length) | 0];
+    p.item = 0; p.cloakUntil = 0; p.silentUntil = 0; p.boostUntil = 0; p.cnt = {}; p.seen = new Set(); p.thaw = 0;
+    p.prop = room.mode === 3 && p.role === HIDER ? 1 + ((Math.random() * (PROPS.length - 1)) | 0) : 0;
+    // Prop Hunt has no hiding spots, so skip the challenges that need them
+    const pool = CHALLENGES[p.role].filter((c) => room.mode !== 3 || (c.k !== 'found' && c.k !== 'hide')), c = pool[(Math.random() * pool.length) | 0];
     p.ch = { ...c, n: c.k === 'catch' ? Math.min(c.n, order.length - nS) : c.n, done: false };
     if (p.ch.k === 'catch' && p.ch.n < 2) p.ch.text = 'Catch a hider';
     let pos;
@@ -131,7 +134,7 @@ function toLobby(room) {
   room.phase = 'lobby';
   room.spotOcc.clear();
   for (const p of room.players.values()) {
-    p.role = HIDER; p.st = 0; p.hid = -1; p.stunUntil = 0; p.ai = { stam: 100, wind: 0 };
+    p.role = HIDER; p.st = 0; p.hid = -1; p.stunUntil = 0; p.ai = { stam: 100, wind: 0 }; p.prop = 0;
     p.item = 0; p.cloakUntil = 0; p.boostUntil = 0; p.silentUntil = 0; p.ch = null;
     const a = Math.random() * Math.PI * 2;
     const pos = collide(W, Math.cos(a) * 6, Math.sin(a) * 6);
@@ -140,17 +143,27 @@ function toLobby(room) {
 }
 
 function catchPlayer(room, p, by, how) {
-  if (p.st === 1 || room.phase !== 'seek') return;
-  leaveSpot(room, p, false);
-  p.st = 1; p.f = 0;
-  teleport(p, W.jail.x + rand(-1.5, 1.5), W.jail.z + rand(-1.5, 1.5));
+  if (p.st || p.role !== HIDER || room.phase !== 'seek') return;
+  const mode = room.mode, where = how ? ` hiding in a ${how}` : '';
+  leaveSpot(room, p, mode !== 0);
+  p.f = 0; p.item = 0; p.prop = 0;
+  if (mode === 1) {
+    // Infection: the caught player switches sides after a moment of shock
+    p.role = SEEKER; p.stunUntil = now() + 3; p.tagCd = now() + 4; p.ai = { stam: 100, wind: 0 };
+    feed(room, `${by.name} infected ${p.name}${where}!`, 'bad');
+  } else if (mode === 2) {
+    p.st = 2; p.thaw = 0;
+    feed(room, `${by.name} froze ${p.name}${where}!`, 'bad');
+  } else {
+    p.st = 1;
+    teleport(p, W.jail.x + rand(-1.5, 1.5), W.jail.z + rand(-1.5, 1.5));
+    feed(room, how ? `${by.name} found ${p.name}${where}!` : `${by.name} caught ${p.name}!`, 'bad');
+  }
   by.sc += 100;
   bump(room, by, 'catch');
   if (how) bump(room, by, 'found');
-  broadcast(room, { t: 'caught', w: p.id, b: by.id });
-  feed(room, how ? `${by.name} found ${p.name} hiding in a ${how}!` : `${by.name} caught ${p.name}!`, 'bad');
+  broadcast(room, { t: 'caught', w: p.id, b: by.id, m: mode });
 }
-
 function tryTag(room, s, t) {
   if (room.phase !== 'seek' || s.role !== SEEKER || t < s.tagCd || t < s.stunUntil) return;
   s.tagCd = t + 0.8;
@@ -163,7 +176,9 @@ function tryTag(room, s, t) {
     if (d > 1 && (dx * fx + dz * fz) / d < 0.3) continue;
     best = h; bd = d;
   }
-  if (best) catchPlayer(room, best, s);
+  if (best) return catchPlayer(room, best, s);
+  // Prop Hunt: swinging at an ordinary crate costs you
+  if (room.mode === 3) { s.stunUntil = t + 1.2; s.f = 0; send(s, { t: 'feed', m: 'Just a prop. You are dazed for a moment.', k: 'bad' }); }
 }
 
 function searchSpot(room, s, spot, t) {
@@ -177,8 +192,9 @@ function searchSpot(room, s, spot, t) {
 }
 
 function useAction(room, p, t) {
-  if (p.st === 1 || t < p.stunUntil) return;
+  if (p.st || t < p.stunUntil) return;
   if (p.hid >= 0) return leaveSpot(room, p);
+  if (room.mode === 3) return; // no hiding spots in Prop Hunt: your disguise is your hiding place
   let best = null, bd = 2.3;
   for (const s of W.spots) {
     if (s.lv !== p.lv) continue;
@@ -213,7 +229,7 @@ function bump(room, p, k) {
 
 // 1 energy drink: full stamina and silent sprinting. 2 cloak: invisible. 3 radar: shows hiders. 4 boots: speed.
 function useItem(room, p, t) {
-  if (room.phase !== 'seek' || !p.item || p.st === 1 || t < p.stunUntil) return;
+  if (room.phase !== 'seek' || !p.item || p.st || t < p.stunUntil) return;
   const k = p.item;
   p.item = 0;
   if (k === 1) { p.silentUntil = t + 8; p.ai.stam = 100; p.ai.wind = 0; }
@@ -311,6 +327,12 @@ function nearestSeeker(room, b) {
 function pickHiderPlan(room, b, t) {
   const ai = b.ai, seek = room.phase === 'seek', roll = Math.random();
   ai.slow = 1;
+  const frozen = hiders(room).filter((h) => h.st === 2);
+  if (seek && frozen.length && roll < 0.45) {
+    const f = frozen.sort((a, c) => dist(a, b) - dist(c, b))[0];
+    ai.state = 'thaw'; ai.tid = f.id;
+    if (setGoal(b, f.x + 0.9, f.z, f.lv)) return;
+  }
   if (seek && jailed(room).length && roll < 0.4) {
     ai.state = 'rescue';
     if (setGoal(b, W.lever.x + 1.1, W.lever.z)) return;
@@ -323,7 +345,7 @@ function pickHiderPlan(room, b, t) {
       if (setGoal(b, bc.x + 1.1, bc.z)) return;
     }
   }
-  if (roll < 0.65) {
+  if (roll < 0.65 && room.mode !== 3) {
     const free = W.spots.filter((s) => !room.spotOcc.has(s.id) && ![...room.players.values()].some((o) => o !== b && o.bot && o.ai.state === 'spot' && o.ai.spot === s.id));
     if (free.length) {
       const s = free[(Math.random() * free.length) | 0];
@@ -363,7 +385,7 @@ function startFlee(room, b, s, t) {
 
 function hiderAI(room, b, dt, t) {
   const ai = b.ai;
-  if (b.st === 1) { b.f = 0; ai.state = 'jailed'; ai.path = null; return; }
+  if (b.st) { b.f = 0; ai.state = 'jailed'; ai.path = null; return; }
   if (!ai.state || ai.state === 'jailed') pickHiderPlan(room, b, t);
   const threat = room.phase === 'seek' ? nearestSeeker(room, b) : null;
   if (b.hid >= 0) {
@@ -375,7 +397,8 @@ function hiderAI(room, b, dt, t) {
   if (threat && t >= b.immUntil - 3 && (ai.state !== 'flee' || t > ai.fleeT) && (threat.d < 4 || (threat.d < 12 && threat.los))) startFlee(room, b, threat.p, t);
   if (ai.state === 'hold') {
     b.f = F_USE;
-    if (t > ai.until || (ai.holdB ? room.bc[ai.holdB - 1] >= 1 : !jailed(room).length)) pickHiderPlan(room, b, t);
+    const tw = ai.holdT && room.players.get(ai.holdT);
+    if (t > ai.until || (ai.holdT ? !tw || tw.st !== 2 : ai.holdB ? room.bc[ai.holdB - 1] >= 1 : !jailed(room).length)) pickHiderPlan(room, b, t);
     return;
   }
   if (ai.state === 'camp') {
@@ -394,9 +417,11 @@ function hiderAI(room, b, dt, t) {
       ai.until = t + rand(30, 80);
     } else pickHiderPlan(room, b, t);
   } else if (ai.state === 'rescue' && Math.hypot(W.lever.x - b.x, W.lever.z - b.z) < 2.3) {
-    ai.state = 'hold'; ai.holdB = 0; ai.until = t + 6;
+    ai.state = 'hold'; ai.holdB = 0; ai.holdT = 0; ai.until = t + 6;
+  } else if (ai.state === 'thaw') {
+    ai.state = 'hold'; ai.holdB = 0; ai.holdT = ai.tid; ai.until = t + 4;
   } else if (ai.state === 'beacon' && Math.hypot(W.beacons[ai.bid].x - b.x, W.beacons[ai.bid].z - b.z) < 2.3) {
-    ai.state = 'hold'; ai.holdB = ai.bid + 1; ai.until = t + 5;
+    ai.state = 'hold'; ai.holdB = ai.bid + 1; ai.holdT = 0; ai.until = t + 5;
   } else if (ai.state === 'point') {
     ai.state = 'camp'; ai.until = t + rand(12, 35);
   } else pickHiderPlan(room, b, t);
@@ -426,7 +451,8 @@ function seekerAI(room, b, dt, t) {
     if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || t < h.cloakUntil || h.lv !== b.lv) continue;
     const dx = h.x - b.x, dz = h.z - b.z, d = Math.hypot(dx, dz);
     if (d > 18 || d >= bd) continue;
-    const sneaky = (h.f & F_CROUCH) && d > 9; // crouching makes you much harder to spot
+    // crouching makes you much harder to spot, and a prop that holds still looks like any other prop
+    const sneaky = ((h.f & F_CROUCH) && d > 9) || (h.prop && !(h.f & F_MOVE) && d > 4.5);
     if (d > 3 && ((dx * fx + dz * fz) / d < 0.35 || sneaky)) continue;
     if (!hasLOS(W, b.x, b.z, h.x, h.z, b.lv)) continue;
     best = h; bd = d;
@@ -484,16 +510,16 @@ function update(room, dt) {
   for (const p of room.players.values()) if (p.bot) botUpdate(room, p, dt, t);
 
   if (room.phase === 'seek') {
-    const hs = hiders(room), js = hs.filter((p) => p.st === 1);
+    const hs = hiders(room), js = hs.filter((p) => p.st === 1), out = hs.filter((p) => p.st);
     if (!seekers(room).length) return endRound(room, 'hiders');
-    if (!hs.length || js.length === hs.length) return endRound(room, 'seekers');
+    if (!hs.length || out.length === hs.length) return endRound(room, 'seekers');
 
     const second = t >= room.scoreT;
     if (second) room.scoreT = t + 1;
     let rescuer = null;
     // power-up boxes: anyone can grab one, and they come back after 30 seconds
     for (const p of room.players.values()) {
-      if (p.st === 1 || p.hid >= 0 || p.item || p.lv) continue;
+      if (p.st || p.hid >= 0 || p.item || p.lv) continue;
       for (const it of W.items) {
         if ((room.items.get(it.id) || 0) > t || Math.abs(it.x - p.x) > 1.3 || Math.abs(it.z - p.z) > 1.3) continue;
         room.items.set(it.id, t + 30);
@@ -503,6 +529,7 @@ function update(room, dt) {
       }
     }
     for (const p of hs) {
+      if (p.st === 2) continue;
       if (p.st === 1) {
         // keep prisoners in the cage
         if (Math.abs(p.x - W.jail.x) > 2.15 || Math.abs(p.z - W.jail.z) > 2.15) teleport(p, W.jail.x + rand(-1.5, 1.5), W.jail.z + rand(-1.5, 1.5));
@@ -523,6 +550,18 @@ function update(room, dt) {
         broadcast(room, { t: 'coin', id: c.id, w: p.id });
       }
       if ((p.f & F_USE) && js.length && Math.hypot(W.lever.x - p.x, W.lever.z - p.z) < 2.4) rescuer = p;
+      // Freeze Tag: stand next to a frozen teammate and hold USE to thaw them
+      if (p.f & F_USE) for (const fz of out) {
+        if (fz.st !== 2 || fz.lv !== p.lv || Math.hypot(fz.x - p.x, fz.z - p.z) > 2.3) continue;
+        fz.thawing = t + 0.3;
+        fz.thaw += dt / 1.5;
+        if (fz.thaw < 1) continue;
+        fz.st = 0; fz.thaw = 0; fz.immUntil = t + 3; fz.ai.state = null;
+        p.sc += 30;
+        bump(room, p, 'rescue');
+        broadcast(room, { t: 'freed', b: p.id, n: 1 });
+        feed(room, `${p.name} thawed ${fz.name}!`, 'good');
+      }
       // objective: hold USE at a beacon to light it; it hums while charging
       if (p.f & F_USE) for (const bc of W.beacons) {
         if (room.bc[bc.id] >= 1 || Math.hypot(bc.x - p.x, bc.z - p.z) > 2.4) continue;
@@ -532,6 +571,7 @@ function update(room, dt) {
       }
     }
     if (room.phase !== 'seek') return;
+    for (const fz of out) if (fz.st === 2 && t > (fz.thawing || 0)) fz.thaw = Math.max(0, fz.thaw - dt);
     if (rescuer) {
       room.resc += dt;
       if (room.resc >= 3) {
@@ -554,11 +594,12 @@ function snapshot(room) {
   const t = now();
   return ({
     t: 'st', ph: room.phase, tl: Math.max(0, +(room.tEnd - t).toFixed(1)), host: room.host,
-    res: +(room.resc / 3).toFixed(2), ct: [...room.coins], w: room.winner, mp: room.map,
+    res: +(room.mode === 2 ? Math.max(0, ...[...room.players.values()].map((p) => (p.st === 2 ? p.thaw : 0))) : room.resc / 3).toFixed(2),
+    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode,
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
       p.id, +p.x.toFixed(2), +p.z.toFixed(2), +p.r.toFixed(2), p.f, p.role, p.st, p.hid, p.sc,
-      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv,
+      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv, p.prop || 0,
     ]),
   });
 }
@@ -635,6 +676,11 @@ export function handleMessage(room, me, m) {
     if (m.a === 'use') useAction(room, me, t);
     else if (m.a === 'tag') tryTag(room, me, t);
     else if (m.a === 'item') useItem(room, me, t);
+    else if (m.a === 'prop') {
+      if (room.mode !== 3 || me.role !== HIDER || me.st || t < (me.propCd || 0) || (room.phase !== 'seek' && room.phase !== 'hide')) return;
+      me.propCd = t + 0.6;
+      me.prop = (me.prop % (PROPS.length - 1)) + 1;
+    }
     else if (m.a === 'taunt') {
       if (room.phase !== 'seek' || me.role !== HIDER || me.st || t < me.tauntCd) return;
       me.tauntCd = t + 10; me.sc += 15;
@@ -659,6 +705,7 @@ export function handleMessage(room, me, m) {
       startRound(room);
     } else if (m.a === 'addBot') addBot(room);
     else if (m.a === 'map') setMap(room, room.map + 1);
+    else if (m.a === 'mode') { room.mode = (room.mode + 1) % MODES.length; feed(room, `Game mode: ${MODES[room.mode].name}.`); }
     else if (m.a === 'delBot') {
       const b = [...room.players.values()].reverse().find((p) => p.bot);
       if (b) { room.players.delete(b.id); sendRoster(room); }

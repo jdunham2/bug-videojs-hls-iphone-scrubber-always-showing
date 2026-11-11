@@ -14,13 +14,26 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), or `MAP` (0-2, the starting map) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-2, the starting map) or `MODE` (0-3) to change the defaults.
 
 ## How it plays
 
 One in four players is a **seeker**; everyone else hides. Seekers count with their eyes
 closed for 30 seconds, then have 3½ minutes to catch everybody. Roles rotate each round and
 scores carry over.
+
+### Game modes
+
+The host picks the mode in the lobby with **Next mode**.
+
+| Mode | How it works |
+| --- | --- |
+| **Classic** | Caught hiders go to jail until a teammate pulls the lever. |
+| **Infection** | Everyone a seeker catches becomes a seeker too. Survive until the clock runs out. |
+| **Freeze Tag** | Tagged hiders freeze where they stand. A teammate who holds **E** next to them for 1.5 seconds thaws them (+30). |
+| **Prop Hunt** | Hiders are disguised as crates, barrels, bushes, rocks or traffic cones (**R** changes disguise) and there are no hiding spots. A seeker who swings at a real prop is dazed. |
+
+Beacons, power-ups, coins and challenges work in every mode.
 
 ### Every action has a consequence
 
@@ -38,7 +51,9 @@ scores carry over.
 
 ### Characters
 
-Eight characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien), 16 colours, seven hats and four patterns.
+Eight characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien), 16 colours, seven hats, four patterns and
+eight pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball). Your pet runs just ahead of you;
+other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
 Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
 
 ### Maps
@@ -70,7 +85,7 @@ The host picks the map in the lobby with **Next map**.
 ### Controls
 
 Keyboard and mouse: `WASD` move · `Shift` sprint · `Space` jump · `C` crouch · `E` use / hide / search · `Click` or `F` tag ·
-`Q` rock · `T` taunt · `G` power-up · `Enter` chat · `Esc` menu
+`Q` rock · `T` taunt · `G` power-up · `R` change prop · `Enter` chat · `Esc` menu
 
 Phone or tablet: drag the left side of the screen to move (push the stick to its edge to sprint), drag anywhere
 else to look, and use the on-screen **USE**, **TAG**, **CROUCH**, **JUMP**, rock, taunt and power-up buttons. Landscape works best.
@@ -100,7 +115,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |
 | `public/js/audio.js` | Synthesised sound effects |
-| `test/` | `npm test`: checks every map is fully reachable, plays a full round on the server, and runs a hosted game through a fake realtime room |
+| `test/` | `npm test`: checks every map is fully reachable, plays every mode on every map with bots, plays a full round on the server, and runs a hosted game through a fake realtime room |
 
 The game module referees tags, hiding spots, coins, jail and rescues. Player movement is
 client-side with a loose sanity check, so this is fine for playing with friends but is
