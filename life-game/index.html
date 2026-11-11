@@ -190,6 +190,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .hsblind .hsc { font-family: var(--display); font-size: 120px; color: var(--gold); line-height: 1; }
 .hsblind p { font-weight: 800; color: var(--muted); }
 
+.qtrack { text-align: left; padding: 9px 12px; border-color: #9b5de5; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.qtrack .qt-h { font-size: 10.5px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; color: #c9a7ff; }
+.qtrack .qt-b { font-size: 12.5px; font-weight: 800; line-height: 1.3; }
+.dlg { font-weight: 700; font-size: 15px; line-height: 1.5; margin: 0; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.05); border-left: 3px solid #9b5de5; }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -246,12 +251,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
       <button class="todo-h" id="todoToggle" aria-expanded="true"><span>To-do</span><span id="todoCount">0/0</span></button>
       <ul id="todoList"></ul>
     </div>
+    <button class="card qtrack" id="qTrack" hidden></button>
   </div>
   <button class="prompt" id="prompt" hidden></button>
-  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
+    <button class="card" id="btnQuests" aria-label="Quests" style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 3h10a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2z"/><path d="M9 8h6M9 12h4"/></svg>Quests<span class="badge" id="questCount" hidden>0</span></button>
     <button class="card" id="btnGames" aria-label="Games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 4h12v4a6 6 0 0 1-12 0z"/><path d="M6 6H3v1a4 4 0 0 0 4 4M18 6h3v1a4 4 0 0 1-4 4"/><path d="M12 14v4M8 21h8"/></svg>Games</button>
     <button class="card" id="btnFriends" aria-label="Friends" hidden style="position:relative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="8.5" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M2.5 20c.8-3.4 3.2-5.2 6-5.2s5.2 1.8 6 5.2"/><path d="M15 14.6c2.6-.3 5 1.2 6 4.4"/></svg>Friends<span class="badge" id="friendsCount" hidden>0</span></button>
     <button class="card" id="btnPet" aria-label="Pet" hidden><svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="4.5" ry="3.8"/><circle cx="6.5" cy="10.5" r="2"/><circle cx="17.5" cy="10.5" r="2"/><circle cx="9.5" cy="6.5" r="2"/><circle cx="14.5" cy="6.5" r="2"/></svg>Pet</button>
@@ -705,6 +712,8 @@ const GOALS = [
   { id: "racewin", text: "Win a street race against friends", test: () => (S.raceWins || 0) >= 1 },
   { id: "coins25", text: "Grab 25 coins in Coin Rush", test: () => (S.bestCoins || 0) >= 25 },
   { id: "games10", text: "Play 10 minigames", test: () => (S.gamesPlayed || 0) >= 10 },
+  { id: "quests5", text: "Complete 5 quests or missions", test: () => (S.questCount || 0) >= 5 },
+  { id: "questsall", text: "Finish every story quest", test: () => QUESTS.every((q) => S.questsDone && S.questsDone[q.id]) },
   { id: "plushies", text: "Collect all 6 plushies", test: () => PLUSHES.every(owns) },
   { id: "hover", text: "Ride a hoverboard", test: () => owns("hoverboard") },
   { id: "outfit", text: "Wear a hat, glasses and a back item", test: () => !!(S.outfit && S.outfit.hat && S.outfit.glasses && S.outfit.back) },
@@ -741,7 +750,7 @@ function toast(msg, kind = "") {
   while (box.children.length > 3) box.lastChild.remove();
   setTimeout(() => el.remove(), 3200);
 }
-function earn(n, why) { n = Math.round(n); S.money += n; S.earned += n; log(`${why}: +${money(n)}`, "good"); }
+function earn(n, why) { n = Math.round(n); S.money += n; S.earned += n; log(`${why}: +${money(n)}`, "good"); if (n > 0 && typeof questEvent === "function" && !/^Quest reward|^Daily|^Duplicate|^Bonus/.test(why)) questEvent("earn", null, n); }
 
 function isOpen(b) {
   if (!b || !b.open) return true;
@@ -947,7 +956,7 @@ function doActivity(a, bid) {
     const fx = val(a.fx) || {};
     for (const k in fx) S[k] = clamp(S[k] + fx[k]);
     for (const k in a.skill || {}) S.skills[k] = clamp(S.skills[k] + a.skill[k]);
-    tick(a.id);
+    tick(a.id); questEvent("act", a.id);
     if (a.id !== "sleep" && mins) advance(mins);
     if (typeof after === "function") after();
     if (!S.over) evalGoals();
@@ -978,7 +987,7 @@ function buy(key) {
   S.money -= it.price; S.owned[key] = true;
   if (key === "outfit") S.skills.charm = clamp(S.skills.charm + 10);
   if (key === "dog") { S.fun = clamp(S.fun + 20); S.todos.push({ id: "walkdog", text: "Walk the dog in the park", done: false, must: true }); refreshBeacons(); }
-  log(`Bought: ${it.name}!`, "good"); toast(`You got: ${it.name}!`, "gold");
+  log(`Bought: ${it.name}!`, "good"); toast(`You got: ${it.name}!`, "gold"); questEvent("buy", key, "item");
   if (key === "car") { spawnOwnCar(); toast("Your car is parked outside your apartment!", "gold"); }
   updateRide(); evalGoals(); save(); renderSheet(); renderHUD(true);
 }
@@ -2033,7 +2042,7 @@ function enterBuilding(bid, instant) {
   if (!instant && !canEnter(bid)) { toast(`${BMAP[bid].name} is closed. Open ${openText(BMAP[bid])}`, "bad"); return; }
   const go = () => {
     if (!IN) { cam.outDist = cam.dist; cam.outPitch = cam.pitch; cam.outYaw = cam.yaw; }
-    buildInterior(bid); S.inside = bid; S.visited = S.visited || {}; if (!S.visited[bid]) { S.visited[bid] = 1; evalGoals(); }
+    buildInterior(bid); S.inside = bid; S.visited = S.visited || {}; if (!S.visited[bid]) { S.visited[bid] = 1; evalGoals(); } questEvent("visit", bid);
     player.position.set(IN.spawn.x, 0, IN.spawn.z); player.rotation.y = Math.PI; target = null; snapPet();
     cam.x = IN.spawn.x; cam.z = IN.spawn.z; cam.dist = 22; cam.pitch = 1.0; cam.yaw = 0;
     nearDoor = nearNpc = nearStation = null; save(); renderHUD(true);
@@ -2100,7 +2109,7 @@ function buyCar(id) {
   if (drive && drive.kind === "own") exitVehicle();
   S.money -= cost; S.owned.car = true; S.carModel = id; S.carColor = m.color;
   removeOwnCar(); S.ownCar = { x: 54, z: -88, h: Math.PI / 2, fuel: m.tank, health: 100 }; spawnOwnCar();
-  log(`Bought a ${m.name} for ${money(cost)}!`, "good");
+  log(`Bought a ${m.name} for ${money(cost)}!`, "good"); questEvent("buy", id, "car");
   showModal(`<h3>New car!</h3><p>Your <b>${m.name}</b> is parked right outside Speedy Motors. ${m.electric ? "It never needs gas." : "It comes with a full tank."}</p><div class="row"><button class="big" data-close>Let's drive</button></div>`);
   evalGoals(); save(); renderSheet(); renderHUD(true);
 }
@@ -2387,7 +2396,7 @@ function updateDriveUI() {
   document.querySelector(".dock").hidden = d;
   document.getElementById("help").innerHTML = d
     ? "<b>W/S</b> gas &amp; brake · <b>A/D</b> steer · <b>Space</b> handbrake · <b>F</b> get out"
-    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
+    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
 }
 
 
@@ -2590,7 +2599,7 @@ function petAction(kind) {
   if (kind === "play") {
     if (P.full < 10) { toast(`${nm} is too hungry to play. Feed them first!`, "bad"); return; }
     closeSheet();
-    startPetAnim(P.type === "dog" ? "fetch" : "zoomies", () => { petHappy(25); P.full = clamp(P.full - 5); S.fun = clamp(S.fun + 12); S.social = clamp(S.social + 3); S.energy = clamp(S.energy - 3); advance(30); tick("petplay"); evalGoals(); toast(`${nm} had a blast!`, "good"); save(); renderHUD(true); });
+    startPetAnim(P.type === "dog" ? "fetch" : "zoomies", () => { petHappy(25); P.full = clamp(P.full - 5); S.fun = clamp(S.fun + 12); S.social = clamp(S.social + 3); S.energy = clamp(S.energy - 3); advance(30); tick("petplay"); questEvent("act", "petplay"); evalGoals(); toast(`${nm} had a blast!`, "good"); save(); renderHUD(true); });
     return;
   }
   if (kind === "feed") {
@@ -3087,7 +3096,7 @@ function finishGame() {
   else { if (place === 1) prize += 75; else prize += 20; }
   if (prize) earn(prize, `${GAMES[myGame.type].name} prize`);
   S.fun = clamp(S.fun + 20); if (multi) S.social = clamp(S.social + 12);
-  S.gamesPlayed = (S.gamesPlayed || 0) + 1;
+  S.gamesPlayed = (S.gamesPlayed || 0) + 1; questEvent("game", myGame.type);
   log(`${GAMES[myGame.type].name}: finished ${multi ? ordinal(place) : ""}${note ? " · " + note : ""}`, "good");
   myGame.resultNote = note; myGame.prize = prize;
   evalGoals(); save();
@@ -3537,12 +3546,12 @@ function buyGood(id) {
   if (id === "hoverboard") S.ride = "hover";
   if (id === "skateboard" && rideMode() === "walk") S.ride = "skate";
   if (id === "drone") S.droneOn = true;
-  log(`Bought: ${it.name}!`, "good"); toast(`You got: ${it.name}!${it.use ? " Use it from your Me menu." : ""}`, "gold");
+  log(`Bought: ${it.name}!`, "good"); toast(`You got: ${it.name}!${it.use ? " Use it from your Me menu." : ""}`, "gold"); questEvent("buy", id, "good");
   updateRide(); evalGoals(); save(); renderSheet(); renderHUD(true);
 }
 function buyWear(slot, id) {
   const [name, price] = WEAR[slot][id]; S.wardrobe = S.wardrobe || {};
-  if (!S.wardrobe[id]) { if (S.money < price) return; S.money -= price; S.wardrobe[id] = 1; S.skills.charm = clamp(S.skills.charm + 2); log(`Bought: ${name}!`, "good"); }
+  if (!S.wardrobe[id]) { if (S.money < price) return; S.money -= price; S.wardrobe[id] = 1; S.skills.charm = clamp(S.skills.charm + 2); log(`Bought: ${name}!`, "good"); questEvent("buy", id, "wear"); }
   wearItem(slot, id);
 }
 function wearItem(slot, id) {
@@ -3627,6 +3636,312 @@ function shopTick(dt, now) {
   if (f && f.coasterPts) { const P = f.coasterPts, n = P.length - 1; f.cartT = ((f.cartT || 0) + Math.max(0, dt) * 0.07) % 1; const i = Math.max(0, Math.min(n - 1, Math.floor(f.cartT * n))); f.cart.position.copy(P[i]); f.cart.lookAt(P[(i + 6) % n]); }
 }
 
+
+// ============================================================ QUESTS & DAILY MISSIONS
+// Step types: visit (enter a place), act (do activity ids n times), buy (wear/good/any), collect (pick up items in the world),
+// goto (walk to points in order), game (finish a minigame), skill (reach a level), check (custom test), earn (make $ during the step)
+const GIVERS = {
+  mayor:   { name: "Mayor Ada", at: "cityhall", look: { shirt: 0x5b5134, hair: 0x9aa0a6, skin: 0xe0ac86, pants: 0x222222 }, wear: { hat: "tophat" } },
+  chef:    { name: "Chef Marco", at: "restaurant", look: { shirt: 0xffffff, hair: 0x2b1b10, skin: 0xc68642, pants: 0x222222 }, wear: {} },
+  walt:    { name: "Grandpa Walt", at: "park", look: { shirt: 0x8a6a4a, hair: 0xdddddd, skin: 0xf6d2b8, pants: 0x4a4a4a }, wear: { hat: "beanie", glasses: "nerd" } },
+  coach:   { name: "Coach Rita", at: "gym", look: { shirt: 0xe4572e, hair: 0x111111, skin: 0x8d5524, pants: 0x2e3a59 }, wear: { hat: "cap" } },
+  penny:   { name: "Dr. Penny", at: "lab", look: { shirt: 0xf4f4f4, hair: 0xb5452b, skin: 0xf6d2b8, pants: 0x2e3a59 }, wear: { glasses: "nerd" } },
+  nova:    { name: "DJ Nova", at: "club", look: { shirt: 0x9b5de5, hair: 0xf15bb5, skin: 0xc68642, pants: 0x111111 }, wear: { glasses: "stars" } },
+  grant:   { name: "Officer Grant", at: "police", look: { shirt: 0x1a2c55, hair: 0x111111, skin: 0xe0ac86, pants: 0x1a2c55 }, wear: { hat: "cap" } },
+  luna:    { name: "Luna", at: "vet", look: { shirt: 0x48d597, hair: 0xd9b45a, skin: 0xf6d2b8, pants: 0x7a5c3a }, wear: { back: "backpack" } },
+  gil:     { name: "Captain Gil", at: "beach", look: { shirt: 0x2d6cdf, hair: 0xdddddd, skin: 0xe0ac86, pants: 0xeeeeee }, wear: { hat: "cowboy" } },
+};
+const QUESTS = [
+  { id: "m1", giver: "mayor", title: "Welcome to Town", intro: "A new face! Let me show you around. Visit three of my favorite spots, then come back and tell me what you think.",
+    steps: [{ t: "visit", bid: "burger", text: "Visit Burger Barn" }, { t: "visit", bid: "park", text: "Visit Sunny Park" }, { t: "visit", bid: "library", text: "Visit the Public Library" }],
+    done: "Wonderful, isn't it? You're going to love it here.", reward: { money: 100 } },
+  { id: "m2", giver: "mayor", title: "Clean Streets", intro: "The wind blew litter all over downtown. Could you pick up 6 pieces for me? Look for the glowing bits on the ground.",
+    steps: [{ t: "collect", kind: "litter", n: 6, area: { x: 0, z: 0, r: 55 }, text: "Pick up litter downtown" }],
+    done: "Spotless! The whole town thanks you.", reward: { money: 150, skills: { charm: 3 } } },
+  { id: "m3", giver: "mayor", title: "Community Hero", intro: "Real heroes help others. Volunteer at City Hall and at General Hospital, and I'll give you something special.",
+    steps: [{ t: "act", ids: ["volunteer"], n: 1, text: "Volunteer at City Hall" }, { t: "act", ids: ["volhosp"], n: 1, text: "Volunteer at General Hospital" }],
+    done: "You're a true hero of this town. Wear this with pride!", reward: { money: 300, wear: ["back", "cape"] } },
+  { id: "c1", giver: "chef", title: "Shopping List", intro: "My delivery truck broke down! Could you buy some groceries at FreshMart and practice a recipe at home?",
+    steps: [{ t: "act", ids: ["groceries", "delivery"], n: 1, text: "Buy groceries" }, { t: "act", ids: ["cook", "practicecook"], n: 1, text: "Cook a meal at home" }],
+    done: "Smells good from here! You've got talent.", reward: { money: 80, skills: { cooking: 3 } } },
+  { id: "c2", giver: "chef", title: "Master Recipe", intro: "I only share my secret recipe with real cooks. Reach Cooking 20 and come see me.",
+    steps: [{ t: "skill", k: "cooking", v: 20, text: "Reach Cooking 20" }], done: "Bravo! The secret is... love. And butter. Lots of butter.", reward: { money: 250, skills: { cooking: 5 } } },
+  { id: "w1", giver: "walt", title: "Lost Letters", intro: "Oh dear, a gust took my old letters right out of my hands! They blew around the park and the beach. Could you find all 4?",
+    steps: [{ t: "collect", kind: "letter", n: 4, area: { x: -20, z: 80, r: 26 }, text: "Find Walt's letters" }], done: "My letters! Thank you, young one.", reward: { money: 120 } },
+  { id: "w2", giver: "walt", title: "Duck Friends", intro: "The ducks miss me when my knees hurt. Would you feed them twice for me?",
+    steps: [{ t: "act", ids: ["ducks"], n: 2, text: "Feed the ducks (twice)" }], done: "Quack quack! That means thank you in duck.", reward: { money: 60, skills: { charm: 1 } } },
+  { id: "w3", giver: "walt", title: "The Old Painting", intro: "There's a painting of this park at the Art Museum. I painted it when I was young! Go take a tour and see it.",
+    steps: [{ t: "visit", bid: "museum", text: "Go to the Art Museum" }, { t: "act", ids: ["tour"], n: 1, text: "Take a gallery tour" }], done: "You saw it! Here, I want you to have this.", reward: { money: 200, plush: true } },
+  { id: "r1", giver: "coach", title: "First Workout", intro: "Let's get you moving! Lift some weights at Iron Gym and go for a jog in the park.",
+    steps: [{ t: "act", ids: ["lift"], n: 1, text: "Lift weights at the gym" }, { t: "act", ids: ["jog"], n: 1, text: "Go for a jog" }], done: "Feel that burn? That's progress!", reward: { money: 100, skills: { fitness: 3 } } },
+  { id: "r2", giver: "coach", title: "Need for Speed", intro: "Fast feet, fast wheels. Finish a Street Race from the Games menu.",
+    steps: [{ t: "game", type: "race", text: "Finish a Street Race" }], done: "Zoom! You've got the need for speed.", reward: { money: 200 } },
+  { id: "r3", giver: "coach", title: "Champion", intro: "Champions train every day. Reach Fitness 30 and you'll earn my respect, and a prize.",
+    steps: [{ t: "skill", k: "fitness", v: 30, text: "Reach Fitness 30" }], done: "Champion! I knew you had it in you.", reward: { money: 500, good: "skateboard" } },
+  { id: "p1", giver: "penny", title: "Lab Samples", intro: "My glowing samples rolled out of the van on the outer roads! Please collect all 5 before they fizzle out.",
+    steps: [{ t: "collect", kind: "sample", n: 5, area: { x: 0, z: 0, r: 110, ring: true }, text: "Collect glowing samples" }], done: "All five! Science is saved.", reward: { money: 200, skills: { smarts: 4 } } },
+  { id: "p2", giver: "penny", title: "Brain Power", intro: "Let's test that big brain. Study at the library twice, then ace the Town Quiz.",
+    steps: [{ t: "act", ids: ["study"], n: 2, text: "Study at the library (twice)" }, { t: "game", type: "quiz", text: "Finish the Town Quiz" }], done: "Brilliant! You should be a scientist.", reward: { money: 250, skills: { smarts: 3 } } },
+  { id: "n1", giver: "nova", title: "Get Glam", intro: "You can't come to my party looking like that! Get a hat or some glasses at Style Studio.",
+    steps: [{ t: "buy", any: "wear", text: "Buy a hat, glasses or back item" }], done: "Now THAT is a look!", reward: { money: 100, skills: { charm: 3 } } },
+  { id: "n2", giver: "nova", title: "Dance Machine", intro: "Show me your moves. Play a round of Dance Off.",
+    steps: [{ t: "game", type: "dance", text: "Play Dance Off" }], done: "Those moves! You're hired as my backup dancer.", reward: { money: 200 } },
+  { id: "n3", giver: "nova", title: "Big Party", intro: "Party time! Sing karaoke here at the club, and bring cupcakes from Scoops for everyone.",
+    steps: [{ t: "act", ids: ["karaoke"], n: 1, text: "Sing karaoke" }, { t: "act", ids: ["cupcakes"], n: 1, text: "Share cupcakes at Scoops" }], done: "Best. Party. Ever.", reward: { money: 300, wear: ["glasses", "stars"] } },
+  { id: "g1", giver: "grant", title: "Neighborhood Watch", intro: "Help me patrol! Walk to each checkpoint I've marked around town, in order.",
+    steps: [{ t: "goto", pts: [[40, 20], [40, -40], [-40, -40], [-40, 40]], text: "Visit the patrol checkpoints" }], done: "All clear! Thanks for keeping an eye out.", reward: { money: 150, skills: { fitness: 2 } } },
+  { id: "g2", giver: "grant", title: "The Missing Bike", intro: "A kid's bike went missing. Someone saw it near the Funfair. Can you find it?",
+    steps: [{ t: "collect", kind: "bike", n: 1, area: { x: 20, z: -150, r: 14 }, text: "Find the missing bike" }], done: "You found it! That kid's going to be so happy.", reward: { money: 250, skills: { charm: 2 } } },
+  { id: "l1", giver: "luna", title: "Lost Kittens", intro: "Three kittens slipped out of the shelter! They're hiding around town. Please bring them home!",
+    steps: [{ t: "collect", kind: "kitten", n: 3, area: { x: 0, z: 0, r: 95 }, text: "Find the lost kittens" }], done: "My babies! Thank you so much!", reward: { money: 200, petFood: 5 } },
+  { id: "l2", giver: "luna", title: "Best Friends", intro: "Every person needs a best friend. Adopt a pet and teach it a trick!",
+    steps: [{ t: "check", test: "pettrick", text: "Adopt a pet and teach it a trick" }], done: "Look at them go! You two are adorable.", reward: { money: 150, petFood: 5 } },
+  { id: "g3", giver: "gil", title: "Fishing Trip", intro: "Ahoy! Nothing beats a day on the lake. Go fishing twice off my pier.",
+    steps: [{ t: "act", ids: ["fish"], n: 2, text: "Go fishing (twice)" }], done: "A fine catch, sailor!", reward: { money: 100 } },
+  { id: "g4", giver: "gil", title: "Buried Treasure", intro: "Legend says treasure is buried all over town. Go on a Treasure Hunt from the Games menu!",
+    steps: [{ t: "game", type: "treasure", text: "Finish a Treasure Hunt" }], done: "Arr, you've got the nose of a true treasure hunter!", reward: { money: 300, good: "kite" } },
+];
+const QMAP = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
+const QTESTS = { pettrick: () => hasPet() && learnedTricks().length > 0 };
+const DAILY_FOOD = ["burger", "combo", "slice", "pizzaparty", "dinner", "brunch", "icecream", "sundae", "foodcourt", "latte", "pastry", "nachos", "hotdog", "popcorn", "picnic", "cakeslice"];
+const DAILY_T = [
+  () => ({ title: "Shift Worker", steps: [{ t: "act", ids: ["work"], n: 1, text: "Work a shift at any job" }], reward: { money: 60 } }),
+  () => ({ title: "Foodie", steps: [{ t: "act", ids: DAILY_FOOD, n: 2, text: "Eat out twice" }], reward: { money: 40 } }),
+  () => ({ title: "Gym Rat", steps: [{ t: "act", ids: ["lift", "yoga", "swim", "boxing", "jog", "basketball"], n: 1, text: "Do a workout" }], reward: { money: 40, skills: { fitness: 1 } } }),
+  () => ({ title: "Social Butterfly", steps: [{ t: "act", ids: ["meet", "text", "callmom", "regulars", "bookclub", "dance"], n: 2, text: "Hang out with people twice" }], reward: { money: 40 } }),
+  (r) => { const ids = ["museum", "bowling", "cinema", "cafe", "library", "gym", "mall", "toys", "scoops", "lab"], b = ids[Math.floor(r() * ids.length)]; return { title: "Explorer", steps: [{ t: "visit", bid: b, text: `Visit ${BMAP[b].name}` }], reward: { money: 50 } }; },
+  () => ({ title: "Game Time", steps: [{ t: "game", type: "any", text: "Finish any minigame" }], reward: { money: 75 } }),
+  () => ({ title: "Shopper", steps: [{ t: "buy", any: "any", text: "Buy something new" }], reward: { money: 30 } }),
+  () => ({ title: "Clean Freak", steps: [{ t: "act", ids: ["cleanroom", "dishes", "laundry", "trash"], n: 2, text: "Do two chores" }], reward: { money: 35, skills: { charm: 1 } } }),
+  () => ({ title: "Big Earner", steps: [{ t: "earn", amt: 200, text: "Earn $200" }], reward: { money: 60 } }),
+  () => ({ title: "Thrill Seeker", steps: [{ t: "act", ids: ["coaster", "ferris", "bumper", "carousel", "funhouse"], n: 1, text: "Go on a Funfair ride" }], reward: { money: 40 } }),
+];
+let giverObjs = {}, nearGiver = null, questMeshes = [], qBeam = null, qTick = 0, questFind = null;
+
+function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function giverSpot(gid) {
+  const d = doors.find((x) => x.b.id === GIVERS[gid].at), [nx, nz] = FACE[d.b.face];
+  for (const s of [1, -1]) { const x = d.x + nz * 4.2 * s + nx * 0.6, z = d.z - nx * 4.2 * s + nz * 0.6; if (!blocked(x, z)) return { x, z, r: Math.atan2(nx, nz) }; }
+  return { x: d.x + nx * 2, z: d.z + nz * 2, r: Math.atan2(nx, nz) };
+}
+function markSprite(ch, color) {
+  const c = document.createElement("canvas"); c.width = 128; c.height = 128; const x = c.getContext("2d");
+  x.font = "900 110px Lilita One, Arial Black, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.lineWidth = 12; x.strokeStyle = "#1b1b1b"; x.strokeText(ch, 64, 70); x.fillStyle = color; x.fillText(ch, 64, 70);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })); sp.scale.set(1.6, 1.6, 1); return sp;
+}
+for (const gid in GIVERS) {
+  const G = GIVERS[gid], spot = giverSpot(gid), c = makeChar(G.look); dressChar(c, G.wear);
+  c.position.set(spot.x, 0, spot.z); c.rotation.y = spot.r; scene.add(c);
+  colliders.push({ x: spot.x, z: spot.z, hw: 0.6, hd: 0.6 });
+  const ex = markSprite("!", "#ffbe2e"), qu = markSprite("?", "#48d597"); ex.position.y = 5; qu.position.y = 5; c.add(ex); c.add(qu); ex.visible = qu.visible = false;
+  const tag = textSprite(G.name, { size: 40 }); tag.position.y = 4.2; tag.scale.multiplyScalar(0.85); c.add(tag);
+  giverObjs[gid] = { c, ex, qu, x: spot.x, z: spot.z };
+}
+function qState() { S.quests = S.quests || {}; S.questsDone = S.questsDone || {}; return S.quests; }
+function nextQuest(gid) { const chain = QUESTS.filter((q) => q.giver === gid); return chain.find((q) => !S.questsDone[q.id]); }
+function giverStatus(gid) {
+  const q = nextQuest(gid); if (!q) return "done";
+  const st = qState()[q.id]; if (!st) return "offer";
+  return st.step >= q.steps.length ? "ready" : "active";
+}
+function questDef(id) { if (QMAP[id]) return QMAP[id]; const d = dailyList().find((x) => x.id === id); return d; }
+function dailyList() {
+  const seedDay = day(), r = mulberry(hash("daily" + seedDay)), picks = shuffleSeeded(DAILY_T.map((f, i) => i), r).slice(0, 3);
+  return picks.map((i, k) => Object.assign({ id: `d${seedDay}-${k}`, daily: true }, DAILY_T[i](r)));
+}
+function ensureDaily() {
+  if (!S.daily || S.daily.day !== day()) {
+    S.daily = { day: day(), done: {} };
+    for (const k of Object.keys(qState())) if (k.startsWith("d")) delete S.quests[k];
+    for (const d of dailyList()) S.quests[d.id] = { step: 0, n: 0, got: [] };
+  }
+}
+function acceptQuest(id) {
+  const q = QMAP[id]; if (!q || qState()[id]) return;
+  S.quests[id] = { step: 0, n: 0, got: [] }; S.trackQ = id;
+  log(`New quest: ${q.title}`, "event"); toast(`New quest: ${q.title}`, "gold");
+  closeSheet(); refreshQuestWorld(); save(); renderHUD(true);
+}
+function grantReward(rw, title) {
+  const bits = [];
+  if (rw.money) { earn(rw.money, `Quest reward: ${title}`); bits.push(money(rw.money)); }
+  for (const k in rw.skills || {}) { S.skills[k] = clamp(S.skills[k] + rw.skills[k]); bits.push(`+${rw.skills[k]} ${SKILLNAME[k]}`); }
+  if (rw.wear) { S.wardrobe = S.wardrobe || {}; S.wardrobe[rw.wear[1]] = 1; bits.push(WEAR[rw.wear[0]][rw.wear[1]][0]); }
+  if (rw.good) { if (owns(rw.good)) { earn(100, "Duplicate prize"); bits.push("$100 (you already had one)"); } else { S.owned[rw.good] = true; bits.push(GOODS[rw.good].name); updateRide(); } }
+  if (rw.petFood) { S.petFood = (S.petFood || 0) + rw.petFood; bits.push(`${rw.petFood} pet food`); }
+  if (rw.plush) { const left = PLUSHES.filter((k) => !owns(k)); if (left.length) { const k = left[Math.floor(Math.random() * left.length)]; S.owned[k] = true; bits.push(GOODS[k].name); } else { earn(50, "Bonus"); bits.push("$50"); } }
+  return bits;
+}
+function turnIn(id) {
+  const q = QMAP[id], st = qState()[id]; if (!q || !st || st.step < q.steps.length) return;
+  delete S.quests[id]; S.questsDone[id] = 1; if (S.trackQ === id) S.trackQ = null;
+  const bits = grantReward(q.reward, q.title);
+  S.questCount = (S.questCount || 0) + 1;
+  log(`Quest complete: ${q.title}!`, "good");
+  refreshQuestWorld(); evalGoals(); save(); renderHUD(true);
+  showModal(`<h3>Quest complete!</h3><p><b>${q.title}</b></p><p>"${esc(q.done)}" — ${GIVERS[q.giver].name}</p><p>Reward: <b>${bits.join(" · ")}</b></p><div class="row"><button class="big" data-close>Awesome!</button></div>`);
+  closeSheet();
+}
+function advanceStep(id, q, st) {
+  st.step++; st.n = 0; st.got = [];
+  if (st.step >= q.steps.length) {
+    if (q.daily) {
+      delete S.quests[id]; S.daily.done[id] = 1; S.questCount = (S.questCount || 0) + 1;
+      const bits = grantReward(q.reward, q.title); toast(`Daily mission done: ${q.title}! ${bits.join(" · ")}`, "gold"); log(`Daily mission complete: ${q.title}`, "good");
+      evalGoals();
+    } else { toast(`Quest ready: return to ${GIVERS[q.giver].name}!`, "gold"); }
+  } else toast(`${q.title}: ${q.steps[st.step].text}`, "good");
+  refreshQuestWorld(); save(); renderHUD(true);
+}
+function questEvent(type, id, extra) {
+  if (!S || !S.quests) return;
+  for (const qid of Object.keys(S.quests)) {
+    const q = questDef(qid), st = S.quests[qid]; if (!q || st.step >= q.steps.length) continue;
+    const s = q.steps[st.step]; let hit = false;
+    if (s.t === type) {
+      if (type === "visit") hit = s.bid === id;
+      else if (type === "act") hit = s.ids.includes(id);
+      else if (type === "game") hit = s.type === "any" || s.type === id;
+      else if (type === "buy") hit = s.any === "any" || s.any === extra;
+      else if (type === "earn") { st.n += extra; if (st.n >= s.amt) advanceStep(qid, q, st); continue; }
+    }
+    if (!hit) continue;
+    st.n++;
+    if (st.n >= (s.n || 1)) advanceStep(qid, q, st); else { toast(`${q.title}: ${s.text} (${st.n}/${s.n})`); save(); }
+  }
+}
+function collectSpots(qid, s) {
+  const r = mulberry(hash(qid)), out = [];
+  for (let i = 0; out.length < s.n && i < 3000; i++) {
+    const a = r() * Math.PI * 2, d = s.area.ring ? s.area.r - r() * 12 : Math.sqrt(r()) * s.area.r;
+    const x = s.area.x + Math.cos(a) * d, z = s.area.z + Math.sin(a) * d;
+    if (blocked(x, z) || out.some((o) => Math.hypot(o.x - x, o.z - z) < 10)) continue;
+    out.push({ x, z });
+  }
+  return out;
+}
+function itemMesh(kind) {
+  const g = new THREE.Group();
+  if (kind === "litter") { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 0), mat(0xf4f4f4, { flatShading: true })); m.position.y = 0.35; g.add(m); cyl(0.15, 0.15, 0.45, 0xd7263d, 0.5, 0.22, 0.2, 10, g); }
+  if (kind === "letter") { box(0.8, 0.05, 0.55, 0xfff7e0, 0, 0.6, 0, g); box(0.2, 0.06, 0.2, 0xd7263d, 0, 0.63, 0, g); }
+  if (kind === "sample") { const v = cyl(0.18, 0.18, 0.6, new THREE.MeshStandardMaterial({ color: 0x9bff5d, emissive: 0x6fff2a, emissiveIntensity: 1 }), 0, 0.6, 0, 10, g); cyl(0.2, 0.2, 0.12, 0x555555, 0, 0.96, 0, 10, g); }
+  if (kind === "kitten") { const k = makePet("cat", [0xff9a3c, 0x666666, 0xf4f4f4][Math.floor(Math.random() * 3)]); k.scale.setScalar(0.65); g.add(k); g.userData.anim = k; }
+  if (kind === "bike") { const wg = new THREE.TorusGeometry(0.6, 0.1, 8, 20); for (const z of [0.9, -0.9]) { const w = new THREE.Mesh(wg, mat(0x111111)); w.rotation.y = Math.PI / 2; w.position.set(0, 0.6, z); g.add(w); } box(0.12, 0.12, 1.9, 0x2d6cdf, 0, 1.0, 0, g); box(0.12, 0.9, 0.12, 0x2d6cdf, 0, 1.2, 0.85, g); }
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.1, 24), new THREE.MeshBasicMaterial({ color: 0x9b5de5, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.06; g.add(glow);
+  return g;
+}
+function refreshQuestWorld() {
+  for (const m of questMeshes) scene.remove(m.g);
+  questMeshes = [];
+  if (!S || !S.quests) return;
+  for (const qid of Object.keys(S.quests)) {
+    const q = questDef(qid), st = S.quests[qid]; if (!q || st.step >= q.steps.length) continue;
+    const s = q.steps[st.step];
+    if (s.t === "collect") collectSpots(qid, s).forEach((p, i) => { if ((st.got || []).includes(i)) return; const g = itemMesh(s.kind); g.position.set(p.x, 0, p.z); scene.add(g); questMeshes.push({ g, qid, i, x: p.x, z: p.z }); });
+  }
+}
+function questTarget(qid) {
+  const q = questDef(qid), st = qState()[qid]; if (!q || !st) return null;
+  if (st.step >= q.steps.length) return q.daily ? null : { x: giverObjs[q.giver].x, z: giverObjs[q.giver].z, label: `Return to ${GIVERS[q.giver].name}` };
+  const s = q.steps[st.step], door = (bid) => { const d = doors.find((x) => x.b.id === bid); return d ? { x: d.x, z: d.z } : null; };
+  if (s.t === "visit") return door(s.bid);
+  if (s.t === "goto") { const p = s.pts[st.n]; return p ? { x: p[0], z: p[1] } : null; }
+  if (s.t === "collect") { let best = null, bd = Infinity; for (const m of questMeshes) if (m.qid === qid) { const d = Math.hypot(m.x - player.position.x, m.z - player.position.z); if (d < bd) { bd = d; best = m; } } return best; }
+  if (s.t === "act") { const home = ACT_HOME[s.ids[0]]; return home && home !== "phone" && home !== "home" ? door(home) : home === "home" ? door("home") : null; }
+  if (s.t === "buy") return s.any === "wear" ? door("boutique") : null;
+  return null;
+}
+function questProgressText(q, st) {
+  if (st.step >= q.steps.length) return q.daily ? "Done!" : `Return to ${GIVERS[q.giver].name}`;
+  const s = q.steps[st.step];
+  const cnt = s.t === "collect" ? ` (${(st.got || []).length}/${s.n})` : s.t === "goto" ? ` (${st.n}/${s.pts.length})` : s.t === "earn" ? ` (${money(st.n)}/${money(s.amt)})` : s.t === "skill" ? ` (${Math.floor(S.skills[s.k])}/${s.v})` : (s.n || 1) > 1 ? ` (${st.n}/${s.n})` : "";
+  return s.text + cnt;
+}
+function questTick(dt, now) {
+  if (state !== "play" || !S || !player) { nearGiver = null; return; }
+  qState(); ensureDaily();
+  if (!qBeam) { qBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 30, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0x9b5de5, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide })); scene.add(qBeam); refreshQuestWorld(); }
+  // giver markers + who is nearby
+  nearGiver = null; let best = 2.6;
+  for (const gid in giverObjs) {
+    const o = giverObjs[gid], stt = giverStatus(gid);
+    o.ex.visible = stt === "offer"; o.qu.visible = stt === "ready";
+    o.ex.position.y = o.qu.position.y = 5 + Math.sin(now / 300) * 0.15;
+    if (!IN && !drive) { const d = Math.hypot(o.x - player.position.x, o.z - player.position.z); if (d < best) { best = d; nearGiver = gid; } }
+  }
+  for (const m of questMeshes) { m.g.rotation.y += dt * 1.5; if (m.g.userData.anim) m.g.userData.anim.position.y = Math.abs(Math.sin(now / 250 + m.i)) * 0.2; }
+  // pickups, patrol points, skill and custom checks (cheap enough to run every frame)
+  for (const m of questMeshes.slice()) {
+    if (IN) break;
+    if (Math.hypot(m.x - player.position.x, m.z - player.position.z) < (drive ? 3 : 2)) {
+      const q = questDef(m.qid), st = S.quests[m.qid]; if (!q || !st) continue;
+      st.got = st.got || []; st.got.push(m.i); scene.remove(m.g); questMeshes.splice(questMeshes.indexOf(m), 1);
+      const s = q.steps[st.step]; spawnHearts({ x: m.x, y: 0, z: m.z }, 2);
+      if (st.got.length >= s.n) advanceStep(m.qid, q, st); else { toast(`${q.title}: ${st.got.length}/${s.n} found`, "good"); save(); }
+    }
+  }
+  for (const qid of Object.keys(S.quests)) {
+    const q = questDef(qid), st = S.quests[qid]; if (!q || st.step >= q.steps.length) continue;
+    const s = q.steps[st.step];
+    if (s.t === "goto" && !IN) { const p = s.pts[st.n]; if (p && Math.hypot(p[0] - player.position.x, p[1] - player.position.z) < 5) { st.n++; if (st.n >= s.pts.length) advanceStep(qid, q, st); else { toast(`Checkpoint ${st.n}/${s.pts.length}`, "good"); save(); } } }
+    if (s.t === "skill" && S.skills[s.k] >= s.v) advanceStep(qid, q, st);
+    if (s.t === "check" && QTESTS[s.test] && QTESTS[s.test]()) advanceStep(qid, q, st);
+  }
+  updateQuestHUD();
+}
+function trackedQuest() {
+  const ids = Object.keys(qState());
+  if (S.trackQ && S.quests[S.trackQ]) return S.trackQ;
+  return ids.find((k) => !k.startsWith("d")) || ids[0] || null;
+}
+function updateQuestHUD() {
+  const el = $("qTrack"), id = trackedQuest(), q = id && questDef(id);
+  const readyN = Object.keys(GIVERS).filter((g) => giverStatus(g) === "ready").length;
+  const badge = $("questCount"); if (badge) { badge.textContent = readyN; badge.hidden = !readyN; }
+  if (!q) {
+    el.hidden = true;
+    const find = questFind && performance.now() < questFind.until ? giverObjs[questFind.gid] : null;
+    if (qBeam) { qBeam.visible = !!find && !IN; if (find) qBeam.position.set(find.x, 15, find.z); }
+    updateQuestHUD.target = find && !IN ? { x: find.x, z: find.z } : null; return;
+  }
+  el.hidden = false;
+  const txt = questProgressText(q, S.quests[id]);
+  if (el.dataset.k !== id + txt) { el.dataset.k = id + txt; el.innerHTML = `<div class="qt-h">${q.daily ? "Daily mission" : "Quest"} · ${esc(q.title)}</div><div class="qt-b">${esc(txt)}</div>`; }
+  let t = questTarget(id);
+  if (questFind && performance.now() < questFind.until) { const o = giverObjs[questFind.gid]; t = { x: o.x, z: o.z }; }
+  if (qBeam) { qBeam.visible = !!t && !IN && !gameActive(); if (t) qBeam.position.set(t.x, 15, t.z); }
+  updateQuestHUD.target = t && !IN ? t : null;
+}
+function giverSheet(gid) {
+  return () => {
+    const G = GIVERS[gid], q = nextQuest(gid), stt = giverStatus(gid), lookHex = "#" + new THREE.Color(G.look.shirt).getHexString();
+    const rewardTxt = (rw) => [rw.money ? money(rw.money) : "", ...Object.entries(rw.skills || {}).map(([k, v]) => `+${v} ${SKILLNAME[k]}`), rw.wear ? WEAR[rw.wear[0]][rw.wear[1]][0] : "", rw.good ? GOODS[rw.good].name : "", rw.petFood ? `${rw.petFood} pet food` : "", rw.plush ? "a surprise plushie" : ""].filter(Boolean).join(" · ");
+    let body;
+    if (stt === "done") body = `<p class="dlg">"Thanks for all your help. You're the best neighbor in town!"</p>`;
+    else if (stt === "ready") body = `<p class="dlg">"${esc(q.done)}"</p><div class="row"><button class="btn" data-qturn="${q.id}">Collect reward: ${rewardTxt(q.reward)}</button></div>`;
+    else if (stt === "active") body = `<p class="dlg">"How's it going? Don't forget:"</p><div class="career"><b>${esc(q.title)}</b>${q.steps.map((s, i) => `<div class="req ${i < S.quests[q.id].step ? "ok" : ""}">${i < S.quests[q.id].step ? "✓ " : i === S.quests[q.id].step ? "→ " : "· "}${esc(i === S.quests[q.id].step ? questProgressText(q, S.quests[q.id]) : s.text)}</div>`).join("")}</div>`;
+    else body = `<p class="dlg">"${esc(q.intro)}"</p><div class="career"><b>${esc(q.title)}</b>${q.steps.map((s) => `<div class="req">· ${esc(s.text)}</div>`).join("")}<div class="req">Reward: <b>${rewardTxt(q.reward)}</b></div></div><div class="row"><button class="btn" data-qaccept="${q.id}">Accept quest</button><button class="btn ghost" data-x>Not now</button></div>`;
+    const chain = QUESTS.filter((x) => x.giver === gid), doneN = chain.filter((x) => S.questsDone[x.id]).length;
+    return header(G.name, `Quests ${doneN}/${chain.length}`, lookHex) + `<div class="sheet-b">${body}</div>`;
+  };
+}
+function openGiver(gid) { const o = giverObjs[gid]; if (player && o) o.c.rotation.y = Math.atan2(player.position.x - o.x, player.position.z - o.z); openSheet(giverSheet(gid)); }
+function questLogSheet() {
+  ensureDaily();
+  const active = Object.keys(S.quests).filter((k) => !k.startsWith("d")).map((k) => [k, QMAP[k]]).filter(([, q]) => q);
+  const daily = dailyList();
+  const offers = Object.keys(GIVERS).filter((g) => giverStatus(g) === "offer");
+  const doneN = Object.keys(S.questsDone).length;
+  const row = (id, q, st, isDaily) => `<div class="jobrow"><div><b>${esc(q.title)}</b>${isDaily ? "" : ` <span class="req">from ${GIVERS[q.giver].name}</span>`}<div class="req ${st && st.step >= q.steps.length ? "ok" : ""}">${st ? esc(questProgressText(q, st)) : "Done ✓"} · ${[q.reward.money ? money(q.reward.money) : ""].filter(Boolean).join("")}</div></div>${st && st.step < q.steps.length ? `<button class="btn ${trackedQuest() === id ? "" : "ghost"}" data-qtrack="${id}">${trackedQuest() === id ? "Tracking" : "Track"}</button>` : ""}</div>`;
+  return header("Quests", `${doneN}/${QUESTS.length} story quests done · ${S.questCount || 0} total completed`, "#9b5de5") + `<div class="sheet-b">
+    <div class="sec"><h3>Today's missions · new ones every day</h3><div style="display:flex;flex-direction:column;gap:6px">${daily.map((d) => row(d.id, d, S.quests[d.id], true)).join("")}</div></div>
+    <div class="sec"><h3>Your quests</h3><div style="display:flex;flex-direction:column;gap:6px">${active.length ? active.map(([k, q]) => row(k, q, S.quests[k], false)).join("") : `<p class="req">No quests yet. Look for people with a gold ! over their heads.</p>`}</div></div>
+    <div class="sec"><h3>People who need help</h3><div style="display:flex;flex-direction:column;gap:6px">${offers.length ? offers.map((g) => `<div class="jobrow"><div><b>${GIVERS[g].name}</b><div class="req">Near ${BMAP[GIVERS[g].at].name} · "${esc(nextQuest(g).title)}"</div></div><button class="btn ghost" data-qfind="${g}">Show me</button></div>`).join("") : `<p class="req">Nobody right now. Finish your current quests to unlock more.</p>`}</div></div>
+  </div>`;
+}
+function openQuests() { if (!busy && S) openSheet(questLogSheet); }
+
 // ============================================================ INPUT
 const keys = {};
 let state = "title";
@@ -3651,6 +3966,7 @@ addEventListener("keydown", (e) => {
   if (k === "j") openLog();
   if (k === "q") openPet();
   if (k === "g") openGames();
+  if (k === "l") openQuests();
   if (k === "t" && room) { e.preventDefault(); openFriends(true); }
 });
 addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
@@ -3821,6 +4137,7 @@ function updatePlayer(dt) {
 function interact(pref) {
   if (drive) { if (drive === raceCar && gameActive() && myGame.type === "race") { toast("Finish the race first! (Quit from the Games menu)"); return; } if (pref !== "car" && nearPump) refuel(); else exitVehicle(); return; }
   if (IN) { if (nearStation) openStation(nearStation); else if (nearFriend) highFive(); else if (nearNpc) talk(nearNpc); return; }
+  if (nearGiver && pref !== "car") { openGiver(nearGiver); return; }
   if (pref === "car" && !nearVehicle) return;
   if (nearVehicle && (pref === "car" || !nearDoor)) enterVehicle(nearVehicle);
   else if (nearDoor) openBuilding(nearDoor.b.id);
@@ -3972,6 +4289,7 @@ function renderHUD(force) {
   let p = "";
   if (!sheetOpen() && !busy && $("modalWrap").hidden) {
     if (IN && nearStation) p = `<kbd>E</kbd>${nearStation.sp === "exit" ? nearStation.n : "Use " + nearStation.n}`;
+    else if (nearGiver && !IN && !drive) p = `<kbd>E</kbd>Talk to ${GIVERS[nearGiver].name}${giverStatus(nearGiver) === "ready" ? " (quest done!)" : giverStatus(nearGiver) === "offer" ? " (new quest)" : ""}`;
     else if (nearDoor && HOUSES[nearDoor.b.id] && !(S.houses && S.houses[nearDoor.b.id])) p = `<kbd>E</kbd>For sale: ${nearDoor.b.name} (${money(HOUSES[nearDoor.b.id].price)})`;
     else if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
     else if (nearVehicle && !IN) p = `<kbd>F</kbd>${vehicleLabel(nearVehicle)}`;
@@ -4017,6 +4335,8 @@ function drawMinimap(now) {
   for (const v of vehicles) if (v.kind === "own" && v !== drive) { mx.fillStyle = "#ffbe2e"; mx.fillRect(X(v.car.position.x) - 3, Z(v.car.position.z) - 3, 6, 6); }
   const blink = Math.floor(now / 180) % 2;
   drawGameMap(X, Z);
+  for (const gid in giverObjs) { const stt = giverStatus(gid); if (stt !== "offer" && stt !== "ready") continue; const o = giverObjs[gid]; mx.fillStyle = stt === "ready" ? "#48d597" : "#ffbe2e"; mx.font = "900 15px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.strokeStyle = "#1b1b1b"; mx.lineWidth = 3; mx.strokeText(stt === "ready" ? "?" : "!", X(o.x), Z(o.z)); mx.fillText(stt === "ready" ? "?" : "!", X(o.x), Z(o.z)); }
+  if (updateQuestHUD.target) { const t = updateQuestHUD.target, r = 6 + Math.sin(now / 200) * 1.5; mx.fillStyle = "#b07cff"; mx.strokeStyle = "#fff"; mx.lineWidth = 2; mx.beginPath(); mx.moveTo(X(t.x), Z(t.z) - r); mx.lineTo(X(t.x) + r, Z(t.z)); mx.lineTo(X(t.x), Z(t.z) + r); mx.lineTo(X(t.x) - r, Z(t.z)); mx.closePath(); mx.fill(); mx.stroke(); }
   if (!hideTagsForSeeker()) for (const R of remotes.values()) if (R.loc === "out") { mx.fillStyle = "#00e5ff"; mx.strokeStyle = "#0b1330"; mx.lineWidth = 2; mx.beginPath(); mx.arc(X(R.x), Z(R.z), 5, 0, Math.PI * 2); mx.fill(); mx.stroke(); }
   for (const pc of police) { mx.fillStyle = blink ? "#ff3b3b" : "#3b7bff"; mx.beginPath(); mx.arc(X(pc.car.position.x), Z(pc.car.position.z), 4.5, 0, Math.PI * 2); mx.fill(); }
   if (wanted) { mx.strokeStyle = "rgba(72,213,151,.5)"; mx.lineWidth = 1.5; mx.beginPath(); mx.arc(X(player.position.x), Z(player.position.z), EVADE_DIST * sc, 0, Math.PI * 2); mx.stroke(); }
@@ -4066,6 +4386,10 @@ $("sheetWrap").addEventListener("click", (e) => {
   const bc = e.target.closest("[data-buycar]"); if (bc) { buyCar(bc.dataset.buycar); return; }
   if (e.target.closest("[data-repair]")) { repairCar(); return; }
   const pc = e.target.closest("[data-paint]"); if (pc) { paintCar(Number(pc.dataset.paint)); return; }
+  const qa = e.target.closest("[data-qaccept]"); if (qa) { acceptQuest(qa.dataset.qaccept); return; }
+  const qt = e.target.closest("[data-qturn]"); if (qt) { turnIn(qt.dataset.qturn); return; }
+  const qk = e.target.closest("[data-qtrack]"); if (qk) { S.trackQ = qk.dataset.qtrack; save(); renderSheet(); renderHUD(true); return; }
+  const qf = e.target.closest("[data-qfind]"); if (qf) { questFind = { gid: qf.dataset.qfind, until: performance.now() + 30000 }; closeSheet(); toast(`${GIVERS[qf.dataset.qfind].name} is marked with a purple beam and on your map.`, "gold"); return; }
   const gd = e.target.closest("[data-good]"); if (gd) { buyGood(gd.dataset.good); return; }
   const wr = e.target.closest("[data-wear]"); if (wr) { const [slot, id] = wr.dataset.wear.split(":"); if (S.wardrobe && S.wardrobe[id]) wearItem(slot, id); else buyWear(slot, id); return; }
   const dy = e.target.closest("[data-dye]"); if (dy && S.money >= 40) { const [part, c] = dy.dataset.dye.split(":"); S.money -= 40; S.look[part] = Number(c); rebuildPlayerLook(); toast("Looking good!", "good"); save(); renderSheet(); renderHUD(true); return; }
@@ -4176,7 +4500,7 @@ function stationSheet(bid, st) {
 }
 function openBuilding(bid) {
   if (HOUSES[bid] && !(S.houses && S.houses[bid])) { openSheet(houseSaleSheet(bid)); return; }
-  if (INTERIORS[bid]) enterBuilding(bid); else openSheet(buildingSheet(bid));
+  if (INTERIORS[bid]) enterBuilding(bid); else { openSheet(buildingSheet(bid)); questEvent("visit", bid); }
 }
 function openPhone() {
   openSheet(() => header("Phone", `${S.name}'s phone · ${money(S.money)} in the bank`, "#2d6cdf") + `<div class="sheet-b">
@@ -4205,6 +4529,8 @@ function openLog() {
 $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
 $("btnGames").addEventListener("click", openGames);
+$("btnQuests").addEventListener("click", openQuests);
+$("qTrack").addEventListener("click", openQuests);
 $("quiz").addEventListener("click", (e) => { const b = e.target.closest("[data-quiz]"); if (b) quizPick(Number(b.dataset.quiz)); });
 document.querySelectorAll("[data-dl]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.preventDefault(); danceHit(Number(b.dataset.dl)); }));
 $("btnFriends").addEventListener("click", () => { if (!busy) openFriends(false); });
@@ -4288,7 +4614,7 @@ function frame(now) {
   }
   updateWorld(dt, now);
   if (state === "play") updatePet(dt, now);
-  mpTick(dt); mpRender(dt, now); gameTick(dt, now);
+  mpTick(dt); mpRender(dt, now); gameTick(dt, now); questTick(dt, now);
   updateSky();
   updateCamera(dt, now);
   renderer.render(scene, camera);
