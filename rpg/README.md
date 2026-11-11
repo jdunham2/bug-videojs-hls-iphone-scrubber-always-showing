@@ -4,8 +4,8 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 
 - 6 classes: Warrior (Whirlwind), Mage (Fireball), Ranger (Arrow Storm), Rogue (Shadowstep backstab), Paladin (Holy Smite, stuns and heals) and Necromancer (Raise Dead skeleton army)
 - A talent tree with three shared branches (Might, Guard, Arcana) and a branch unique to each class that upgrades its signature skill; points come from levels and story chapters, and talents can be reset for gold
-- 17 weapons any class can use (swords, daggers, spear, cleaver, maul, staffs, wand, bows, crossbow, boomerang), with burn, freeze, poison, stun, chain lightning and piercing effects; your class gets +15% with its own weapon type
-- 9 spells taught by Elder Mira (Mend, Blink, Frost Nova, Chain Lightning, Haste, Poison Cloud, Stone Skin, Spirit Wolves, Meteor), cast from slots 1-3
+- 35+ weapons any class can use (swords, katana, daggers, spear, scythe, cleaver, maul, flail, staffs, wands, bows, crossbows, blowgun, boomerang, chakram), with burn, freeze, poison, stun, lifesteal, execute, chain lightning, piercing and raise-the-dead effects; your class gets +15% with its own weapon type
+- 17 spells taught by Elder Mira, including Mend, Blink, Frost Nova, Chain Lightning, Glacial Spike, Arcane Barrier, Vampiric Touch, Wall of Flames, Earthquake, Cyclone, Spirit Wolves, Meteor, Starfall and Recall, cast from slots 1-3
 - 8 regions with fog-of-war, a day/night cycle and rain
 - 13 monster types, including spitting toads, blinking wisps, lunging spiders and bandits, and magma slimes that split in two
 - 6 bosses: Varg the Bandit King (bandit camp), the Hollow King (Sunken Ruins), the Ashen Wyrm (Ashen Wastes), and one at the bottom of each dungeon

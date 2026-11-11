@@ -348,7 +348,7 @@ function onRemoteAttack(peer,pr,atk){
   if(atk.s==='arc'){effects.push({k:'slash',x:atk.x,y:atk.y-8,a,t:0,max:.18,r:Math.max(28,r-12),col,wide:clamp(+atk.arc||1,.3,3)});if(pvp&&dist(P.x,P.y,atk.x,atk.y-6)<r+P.r&&angDiff(Math.atan2(P.y-atk.y,P.x-atk.x),a)<clamp(+atk.arc||1,.3,3))pvpHit(dmg,peer,atk)}
   else if(atk.s==='thrust'){effects.push({k:'thrust',x:atk.x,y:atk.y-8,a,t:0,max:.16,r,col});const rx=P.x-atk.x,ry=P.y-(atk.y-6),al=rx*Math.cos(a)+ry*Math.sin(a),pp=Math.abs(rx*Math.sin(a)-ry*Math.cos(a));if(pvp&&al>-10&&al<r+P.r&&pp<clamp(+atk.w||20,5,60)+P.r*.6)pvpHit(dmg,peer,atk)}
   else if(atk.s==='circle'){const dl=clamp(+atk.dl||0,0,3);if(dl&&pvp)teles.push({x:atk.x,y:atk.y,r,t:0,max:dl,dmg,pvp:peer});else{effects.push({k:'ring',x:atk.x,y:atk.y,t:0,max:.4,r0:15,r1:r,col});if(pvp&&dist(P.x,P.y,atk.x,atk.y)<r+P.r)pvpHit(dmg,peer,atk)}}
-  else if(atk.s==='proj'&&Array.isArray(atk.ps)){const sp=clamp(+atk.spd||400,50,1200),lf=clamp(+atk.lf||1,.1,3),k=['arrow','bolt','spark','ice','void','fireball','bone','bomb','wave','boomerang'].includes(atk.k)?atk.k:'bolt';
+  else if(atk.s==='proj'&&Array.isArray(atk.ps)){const sp=clamp(+atk.spd||400,50,1200),lf=clamp(+atk.lf||1,.1,3),k=['arrow','bolt','spark','ice','void','fireball','bone','bomb','wave','boomerang','tornado'].includes(atk.k)?atk.k:'bolt';
     for(const pa of atk.ps.slice(0,12)){const an=+pa||0;projectiles.push({x:atk.x,y:atk.y-12,vx:Math.cos(an)*sp,vy:Math.sin(an)*sp,r:clamp(+atk.pr||6,3,20),life:lf,from:'r',k,a:an,col,aoe:clamp(+atk.ao||0,0,200),dmg,peer,pvp,t:0})}}
 }
 function netTick(dt){
@@ -364,7 +364,7 @@ function netTick(dt){
   if(state!=='play'||!P)return;net.sendT-=dt;if(net.sendT>0)return;net.sendT=.1;
   const S=stats(),w=WEAPONS[P.weapon],o={nm:P.name||'Adventurer',c:P.cls,l:P.lvl,lv:curLevel,x:Math.round(P.x),y:Math.round(P.y),fx:+P.fx.toFixed(2),fy:+P.fy.toFixed(2),w:w.draw,wc:w.col||null,t:P.wT,at:P.aT,rd:P.riding?P.mountId:null,mf:P.mfx||1,hp:Math.ceil(P.hp),mh:S.maxHp,k:P.pvpK||0,d:P.pvpD||0,dead:P.dead?1:0};
   const str=JSON.stringify(o);if(str!==net.lastS){net.lastS=str;room.presence(o).catch(()=>{})}}
-function drawRemote(g,o){const pr=o.pr,C=CLASSES[pr.c]||CLASSES.warrior,draws=['sword','staff','bow','daggers','spear','greataxe','maul','wand','crossbow','boomerang','hammer'],x=o.x,y=o.y;
+function drawRemote(g,o){const pr=o.pr,C=CLASSES[pr.c]||CLASSES.warrior,draws=['sword','staff','bow','daggers','spear','greataxe','maul','wand','crossbow','boomerang','hammer','scythe','flail','chakram','blowgun'],x=o.x,y=o.y;
   const look={body:C.body,trim:C.trim,hat:C.hat,hair:C.hair,skin:C.skin,weapon:draws.includes(pr.w)?pr.w:'sword',wcol:typeof pr.wc==='string'&&/^#[0-9a-f]{6}$/i.test(pr.wc)?pr.wc:null,tier:clamp(pr.t|0,0,5),cape:(pr.at|0)>=2?shade(C.body,-.3):null,alpha:pr.dead?.4:1};
   let top=y-46;if(pr.rd&&MOUNTS[pr.rd]&&!LVD){const seat=drawMount(g,pr.rd,x,y,pr.mf<0?-1:1,o.anim,o.mv);drawHumanoid(g,x,y+seat+4,Object.assign(look,{fx:+pr.fx||0,fy:+pr.fy||1,seated:true}));top=y+seat-34}
   else drawHumanoid(g,x,y,Object.assign(look,{anim:o.anim,moving:o.mv,fx:+pr.fx||0,fy:pr.fy==null?1:+pr.fy,attack:o.atkA}));
@@ -440,7 +440,7 @@ function drawFurn(g,id,x,y){const F=FURN[id]||{};g.save();const sh=w=>ell(g,x+2,
     default:if(F.trophy){sh(14);rr(g,x-14,y-26,28,30,3,'#6b4528');rr(g,x-11,y-23,22,24,3,'#8a5a32');const c=(BOSSES[F.trophy]||{col:'#ffd23f'}).col;circ(g,x,y-12,8,c);g.fillStyle=shade(c,-.4);g.beginPath();g.moveTo(x-6,y-17);g.lineTo(x-11,y-27);g.lineTo(x-2,y-19);g.moveTo(x+6,y-17);g.lineTo(x+11,y-27);g.lineTo(x+2,y-19);g.fill();circ(g,x-3,y-13,1.5,'#fff');circ(g,x+3,y-13,1.5,'#fff');g.fillStyle='#3a2414';g.fillRect(x-2,y+4,4,10)}
   }g.restore()}
 const GLADS=[{n:'Brakka the Brute',cls:'warrior'},{n:'Sylva Swiftbow',cls:'ranger'},{n:'Nyx the Shade',cls:'rogue'},{n:'Magister Vey',cls:'mage'},{n:'Ser Aldous',cls:'paladin'},{n:'Morwen the Pale',cls:'necro'},{n:'Ironjaw Grull',cls:'warrior'},{n:'Kael, Grand Champion',cls:'paladin',champ:1}];
-const ARENA_SHOP=[{t:'banner',k:'furn',cost:4},{t:'gladius',k:'wpn',cost:6},{t:'r_champ',k:'item',cost:10},{t:'a_glad',k:'item',cost:12},{t:'tiger',k:'mount',cost:12},{t:'trophy_arena',k:'furn',cost:15,rank:8},{t:'phoenix',k:'pet',cost:20}];
+const ARENA_SHOP=[{t:'banner',k:'furn',cost:4},{t:'gladius',k:'wpn',cost:6},{t:'r_champ',k:'item',cost:10},{t:'a_glad',k:'item',cost:12},{t:'tiger',k:'mount',cost:12},{t:'holyhammer',k:'wpn',cost:14},{t:'trophy_arena',k:'furn',cost:15,rank:8},{t:'phoenix',k:'pet',cost:20}];
 function genArena(){const L=newLevel('arena',ARENA.pal);LEVELS.arena=L;useLevel(L);const cx=24,cy=24;L.cx=cx;L.cy=cy;
   for(let y=cy-13;y<=cy+13;y++)for(let x=cx-13;x<=cx+13;x++)if(dist(x,y,cx,cy)<12.5)tiles[y*W+x]=DFLOOR;
   for(let y=cy+12;y<=cy+15;y++)for(let x=cx-1;x<=cx+1;x++)tiles[y*W+x]=DFLOOR;
@@ -786,7 +786,7 @@ const ACH={
   legend:['Legend of the Lake','Catch the Moonfin'],lumber:['Lumberjack','Chop 25 trees'],miner:['Prospector','Mine 25 rocks'],
   chef:['Camp Cook','Cook 5 meals'],rich:['Deep Pockets','Hold 1,000 gold'],lv5:['Seasoned','Reach level 5'],lv10:['Hero of Emberfall','Reach level 10'],
   explorer:['Cartographer','Discover all 8 regions'],chests:['Treasure Hunter','Open 10 chests'],smith:['Master Smith','Forge an Emberbrand weapon'],
-  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
+  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],warlord:['Warlord','Own 25 weapons'],spellweaver:['Spellweaver','Cast 200 spells'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
 };
 const WEAPONS={
   mace:{n:'Training Mace',kind:'melee',draw:'hammer',style:'arc',r:62,arc:1.1,mult:1.25,cd:.46,col:'#c9cfd6',fx:{stunC:.08},d:'Heavy blows that can stun.'},
@@ -812,6 +812,17 @@ const WEAPONS={
   vargaxe:{n:"Varg's Reaver",kind:'melee',draw:'greataxe',style:'arc',r:78,arc:1.5,mult:1.6,cd:.55,kb:1.6,col:'#d4a43a',fx:{leech:.1},d:"Wide swings that heal you as they hit. Taken from Varg."},
   trident:{n:'Tidecaller Trident',kind:'melee',draw:'spear',style:'thrust',r:138,w:26,mult:1.5,cd:.42,col:'#5fe0d0',fx:{slow:2},d:'Long thrusts that hit a whole line and slow. Taken from Nerith.'},
   titanfrost:{n:"Titan's Rime",kind:'melee',draw:'greataxe',style:'arc',r:86,arc:1.4,mult:2.1,cd:.6,kb:1.8,col:'#9fe8ff',fx:{slow:3,stunC:.15},wave:1,d:'Huge frozen swings that launch a wave of frost. Taken from Glacius.'},
+  katana:{n:'Moonlit Katana',kind:'melee',draw:'sword',style:'arc',r:68,arc:1.15,mult:1.25,cd:.28,crit:.2,col:'#e8eef6',d:'Swift, precise cuts with +20% critical chance.'},
+  scythe:{n:"Reaper's Scythe",kind:'melee',draw:'scythe',style:'arc',r:82,arc:2.6,mult:1.35,cd:.6,col:'#b8c0d8',fx:{leech:.06},d:'Sweeps almost all the way around you and steals life.'},
+  flail:{n:'Morningstar Flail',kind:'melee',draw:'flail',style:'slam',r:92,mult:1.7,cd:.7,col:'#c9cfd6',fx:{stunC:.25},d:'A spiked ball that smashes everything around you and can stun.'},
+  shadowblade:{n:'Umbral Dagger',kind:'melee',draw:'daggers',style:'arc',r:56,arc:.95,mult:.85,cd:.18,crit:.2,col:'#8a6ac8',fx:{exec:.6},d:'Fast stabs that deal 60% more damage to badly wounded enemies.'},
+  holyhammer:{n:'Dawnbreaker',kind:'melee',draw:'maul',style:'slam',r:105,mult:2.1,cd:.78,col:'#fff2b0',fx:{leech:.05,stunC:.2},d:'A radiant hammer: huge slams that heal you and can stun. Won in the Arena.'},
+  chakram:{n:'Sunfire Chakram',kind:'ranged',draw:'chakram',style:'shoot',pk:'boomerang',spd:540,mult:1,cd:.55,life:3,r:12,boom:1,col:'#ffb347',fx:{burn:2},d:'A blazing ring that flies out and back, burning everything it touches.'},
+  repeater:{n:'Repeater Crossbow',kind:'ranged',draw:'crossbow',style:'shoot',pk:'arrow',spd:760,mult:.45,cd:.13,life:.6,r:5,col:'#d9b46a',d:'Fires a rapid stream of light bolts.'},
+  blowgun:{n:'Viper Blowgun',kind:'ranged',draw:'blowgun',style:'shoot',pk:'arrow',spd:820,mult:.6,cd:.26,life:.7,r:4,col:'#9be15d',fx:{poison:5},d:'Silent darts with a strong poison.'},
+  frostbow:{n:'Frostbite Longbow',kind:'ranged',draw:'bow',style:'shoot',pk:'arrow',spd:720,mult:.85,cd:.42,life:.8,r:5,count:3,spread:.14,col:'#9fe8ff',fx:{slow:2},d:'Three freezing arrows at once. Taken from Glacius.'},
+  stormstaff:{n:'Tempest Staff',kind:'magic',draw:'staff',style:'shoot',pk:'spark',spd:660,mult:.95,cd:.4,life:.6,r:7,chain:5,col:'#9fd0ff',d:'Lightning that leaps between up to 6 enemies.'},
+  deathstaff:{n:'Staff of Souls',kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:380,mult:1.3,cd:.42,life:1.3,r:9,col:'#7fe0a0',seek:1,pierce:1,fx:{raise:1,leech:.03},d:'Seeking soul orbs. Enemies it kills may rise as skeletons that fight for you. Taken from Arachne.'},
   boomerang:{n:'Saltwind Boomerang',kind:'ranged',draw:'boomerang',style:'shoot',pk:'boomerang',spd:520,mult:1.1,cd:.55,life:3,r:11,boom:1,col:'#f08a5b',d:'Flies out and comes back, hitting on both passes.'},
 };
 const STARTER={warrior:'sword',mage:'staff',ranger:'bow',rogue:'daggers',paladin:'mace',necro:'bonewand'};
@@ -825,6 +836,14 @@ const SPELLS={
   cloud:{n:'Poison Cloud',mp:22,cd:10,lv:5,price:500,col:'#9be15d',d:'A toxic cloud that poisons every enemy inside it for 5 seconds.'},
   stoneskin:{n:'Stone Skin',mp:25,cd:20,lv:6,price:600,col:'#c9b89a',d:'Take half damage for 8 seconds.'},
   wolves:{n:'Spirit Wolves',mp:40,cd:25,lv:8,price:900,col:'#9fd6ff',d:'Summon two spirit wolves that hunt enemies for 15 seconds.'},
+  recall:{n:'Recall',mp:10,cd:60,lv:2,price:120,col:'#7fd6ff',d:'Teleport back to the village square. Only works outdoors.'},
+  spike:{n:'Glacial Spike',mp:18,cd:4,lv:3,price:300,col:'#bfeeff',d:'Hurl a huge piercing lance of ice that slows everything it passes through.'},
+  barrier:{n:'Arcane Barrier',mp:28,cd:22,lv:4,price:380,col:'#c8b4ff',d:'A shield that absorbs damage equal to 30% of your health for 10 seconds.'},
+  vamp:{n:'Vampiric Touch',mp:22,cd:16,lv:6,price:600,col:'#c84a6a',d:'For 6 seconds, every hit you land heals you for 12% of its damage.'},
+  firewall:{n:'Wall of Flames',mp:26,cd:12,lv:6,price:650,col:'#ff8a3d',d:'Raise a line of fire in front of you that burns enemies for 4 seconds.'},
+  quake:{n:'Earthquake',mp:32,cd:14,lv:7,price:800,col:'#c9a46a',d:'Shake the ground: heavy damage all around you, and most enemies are stunned.'},
+  tornado:{n:'Cyclone',mp:30,cd:10,lv:8,price:950,col:'#9fc8d8',d:'Send out a slow tornado that pulls enemies in and hits them again and again.'},
+  starfall:{n:'Starfall',mp:45,cd:20,lv:11,price:1600,col:'#ffe28a',d:'Stars rain down around you for two seconds, burning whatever they strike.'},
   meteor:{n:'Meteor',mp:35,cd:12,lv:9,price:1200,col:'#ff7a3d',d:'Call down a meteor that crushes and burns everything where it lands.'},
 };
 const PETS={
@@ -873,7 +892,7 @@ const SHOP=[
   {sp:'boots',n:'Swiftstep Boots',price:350,d:'Move 15% faster.',ic:'boots',c:'#8a5a3b'},
   {sp:'house',n:'Deed to Willow Cottage',price:1500,d:'Your own cottage in Emberfall, with a bed, chair and storage chest.',ic:'house',c:'#2f6f8f'},
   {pet:'bunny',price:300},{mount:'pony',price:400},{pet:'cat',price:400},{pet:'panda',price:900},{mount:'sunrunner',price:2200},{mount:'unicorn',price:3500},{pet:'fox',price:600},{pet:'owl',price:700},{mount:'horse',price:800},{mount:'boar',price:1200},{mount:'stag',price:2000},{mount:'rimewolf',price:2500},
-  {wpn:'daggers',price:300},{wpn:'spear',price:450},{wpn:'wand',price:450},{wpn:'crossbow',price:550},{wpn:'sword',price:120},{wpn:'mace',price:120},{wpn:'bonewand',price:120},{wpn:'staff',price:120},{wpn:'bow',price:120},
+  {wpn:'daggers',price:300},{wpn:'blowgun',price:500},{wpn:'shadowblade',price:1200},{wpn:'spear',price:450},{wpn:'wand',price:450},{wpn:'crossbow',price:550},{wpn:'sword',price:120},{wpn:'mace',price:120},{wpn:'bonewand',price:120},{wpn:'staff',price:120},{wpn:'bow',price:120},
 ];
 
 /* ---------- state ---------- */
@@ -1014,6 +1033,14 @@ function drawSpell(g,id,x,y,s){const sp=SPELLS[id];g.save();g.translate(x,y);g.s
     case'cloud':circ(g,-4,2,5);circ(g,4,1,4);circ(g,0,-5,4);break;
     case'stoneskin':g.moveTo(0,-9);g.lineTo(8,-5);g.quadraticCurveTo(7,6,0,10);g.quadraticCurveTo(-7,6,-8,-5);g.closePath();g.stroke();break;
     case'wolves':ell(g,0,4,5,4);circ(g,-6,-3,2.2);circ(g,-2,-7,2.2);circ(g,2,-7,2.2);circ(g,6,-3,2.2);break;
+    case'recall':g.moveTo(-8,1);g.lineTo(0,-8);g.lineTo(8,1);g.moveTo(-6,0);g.lineTo(-6,8);g.lineTo(6,8);g.lineTo(6,0);g.stroke();break;
+    case'spike':g.moveTo(-9,9);g.lineTo(8,-8);g.moveTo(8,-8);g.lineTo(2,-7);g.moveTo(8,-8);g.lineTo(7,-2);g.stroke();break;
+    case'barrier':g.arc(0,0,9,0,7);g.stroke();g.beginPath();g.arc(0,0,4,0,7);g.stroke();break;
+    case'vamp':g.moveTo(0,-9);g.quadraticCurveTo(8,2,0,9);g.quadraticCurveTo(-8,2,0,-9);g.fill();break;
+    case'firewall':for(const xo of[-6,0,6]){g.moveTo(xo-3,8);g.quadraticCurveTo(xo-3,-2,xo,-8);g.quadraticCurveTo(xo+3,-2,xo+3,8)}g.fill();break;
+    case'quake':g.moveTo(-10,2);g.lineTo(-5,-3);g.lineTo(-1,3);g.lineTo(3,-4);g.lineTo(6,2);g.lineTo(10,-2);g.moveTo(-8,8);g.lineTo(8,8);g.stroke();break;
+    case'tornado':for(let i=0;i<4;i++){g.moveTo(-9+i*2,-7+i*4);g.lineTo(9-i*2.5,-7+i*4)}g.stroke();break;
+    case'starfall':for(let i=0;i<10;i++){const an=i/10*Math.PI*2-Math.PI/2,rr2=i%2?3.5:9;g.lineTo(Math.cos(an)*rr2,Math.sin(an)*rr2)}g.closePath();g.fill();break;
     case'meteor':circ(g,3,3,5);g.moveTo(-1,-1);g.lineTo(-9,-9);g.moveTo(-3,4);g.lineTo(-10,-2);g.moveTo(4,-3);g.lineTo(-2,-10);g.stroke();break}
   g.restore()}
 function spellURL(id){if(spellCache[id])return spellCache[id];const c=document.createElement('canvas');c.width=c.height=64;drawSpell(c.getContext('2d'),id,32,32,1.8);return spellCache[id]=c.toDataURL()}
@@ -1051,6 +1078,10 @@ function drawIcon(g,kind,x,y,s,col){
     case'maul':g.rotate(-.5);g.fillStyle='#5a3a20';g.fillRect(-2,-6,4,24);rr(g,-12,-18,24,14,3,'#6c727a');g.fillStyle=col;g.fillRect(-12,-13,24,3);break;
     case'wand':g.rotate(-.6);g.fillStyle='#4a2f1a';g.fillRect(-1.5,-6,3,22);glow(g,0,-10,13,col,.7);g.fillStyle='#fff8c0';g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2,r2=i%2?2.5:6;g.lineTo(Math.cos(a)*r2,-10+Math.sin(a)*r2)}g.fill();break;
     case'crossbow':g.fillStyle='#6e4a2a';g.fillRect(-2.5,-8,5,24);g.strokeStyle='#4a4f58';g.lineWidth=3.5;g.beginPath();g.moveTo(-15,-4);g.quadraticCurveTo(0,-15,15,-4);g.stroke();g.strokeStyle='#ddd';g.lineWidth=1;g.beginPath();g.moveTo(-15,-4);g.lineTo(0,2);g.lineTo(15,-4);g.stroke();g.fillStyle=col;g.fillRect(-1,-16,2,14);break;
+    case'scythe':g.rotate(-.5);g.fillStyle='#4a3020';g.fillRect(-1.5,-14,3,30);g.fillStyle=col;g.beginPath();g.moveTo(0,-14);g.quadraticCurveTo(18,-16,20,-2);g.quadraticCurveTo(12,-10,0,-8);g.closePath();g.fill();break;
+    case'flail':g.rotate(-.5);g.fillStyle='#5a3a20';g.fillRect(-1.5,2,3,16);g.strokeStyle='#8a9098';g.lineWidth=1.5;g.beginPath();g.moveTo(0,2);g.lineTo(4,-6);g.stroke();circ(g,6,-10,6,col);g.fillStyle='#ffffff';for(let i=0;i<6;i++){const an=i/6*Math.PI*2;g.beginPath();g.moveTo(6+Math.cos(an)*6,-10+Math.sin(an)*6);g.lineTo(6+Math.cos(an)*9,-10+Math.sin(an)*9);g.lineTo(6+Math.cos(an+.4)*6,-10+Math.sin(an+.4)*6);g.fill()}break;
+    case'chakram':glow(g,0,0,18,col,.4);g.strokeStyle=col;g.lineWidth=4;g.beginPath();g.arc(0,0,11,0,7);g.stroke();g.strokeStyle='#fff6c0';g.lineWidth=1.5;for(let i=0;i<6;i++){const an=i/6*Math.PI*2;g.beginPath();g.moveTo(Math.cos(an)*11,Math.sin(an)*11);g.lineTo(Math.cos(an+.3)*15,Math.sin(an+.3)*15);g.stroke()}break;
+    case'blowgun':g.rotate(-.78);g.fillStyle='#6a8a3a';g.fillRect(-2,-16,4,32);g.fillStyle='#3a5a1a';g.fillRect(-2.5,-16,5,3);g.fillRect(-2.5,10,5,3);g.fillStyle=col;g.fillRect(-1,-22,2,6);break;
     case'boomerang':g.strokeStyle=col;g.lineWidth=7;g.lineCap='round';g.beginPath();g.moveTo(-13,8);g.lineTo(0,-10);g.lineTo(13,8);g.stroke();g.strokeStyle='rgba(255,255,255,.4)';g.lineWidth=2;g.beginPath();g.moveTo(-10,5);g.lineTo(0,-8);g.stroke();break;
     case'coin':circ(g,0,0,12,rgrad(g,0,0,12,'#fff2b0','#d99a1f'));g.strokeStyle='#a86a10';g.lineWidth=2;g.beginPath();g.arc(0,0,8,0,7);g.stroke();break;
     case'lure':g.strokeStyle='#ccc';g.lineWidth=1.5;g.beginPath();g.moveTo(0,-16);g.lineTo(0,-8);g.stroke();ell(g,0,0,6,10,rgrad(g,0,0,10,'#fff6c0',col));g.strokeStyle='#999';g.beginPath();g.arc(-3,12,4,0,Math.PI);g.stroke();break;
@@ -1117,6 +1148,10 @@ function drawWeapon(g,o){
   else if(w==='maul'){g.rotate(-.5+ag*2.4);g.fillStyle='#5a3a20';g.fillRect(-2,-30,4,36);rr(g,-10,-40,20,13,3,'#6c727a');g.fillStyle=col;g.fillRect(-10,-35,20,3);glow(g,0,-34,14,col,.35)}
   else if(w==='wand'){g.rotate(-.35-ag*.6);g.fillStyle='#4a2f1a';g.fillRect(-1.3,-18,2.6,22);glow(g,0,-21,13+Math.sin(time*8)*2,col,.65);g.fillStyle='#fff8c0';g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2,rr2=i%2?2:5;g.lineTo(Math.cos(a)*rr2,-21+Math.sin(a)*rr2)}g.fill()}
   else if(w==='crossbow'){g.rotate(-.1);g.fillStyle='#6e4a2a';g.fillRect(-2,-20,4,22);g.strokeStyle='#4a4f58';g.lineWidth=3;g.beginPath();g.moveTo(-12,-14);g.quadraticCurveTo(0,-22,12,-14);g.stroke();g.strokeStyle='#ddd';g.lineWidth=1;g.beginPath();g.moveTo(-12,-14);g.lineTo(0,-10+ag*4);g.lineTo(12,-14);g.stroke()}
+  else if(w==='scythe'){g.rotate(-.5+ag*2.6);g.fillStyle='#4a3020';g.fillRect(-1.6,-44,3.2,52);g.fillStyle=col;g.beginPath();g.moveTo(0,-44);g.quadraticCurveTo(22,-46,26,-30);g.quadraticCurveTo(16,-40,0,-38);g.closePath();g.fill()}
+  else if(w==='flail'){g.rotate(-.4+ag*2);g.fillStyle='#5a3a20';g.fillRect(-1.6,-16,3.2,20);g.strokeStyle='#8a9098';g.lineWidth=1.5;const sw2=Math.sin(time*8)*4;g.beginPath();g.moveTo(0,-16);g.quadraticCurveTo(sw2,-24,sw2*1.5,-30);g.stroke();circ(g,sw2*1.5,-33,5,col);g.fillStyle='#e8eef6';for(let i=0;i<6;i++){const an=i/6*Math.PI*2;g.beginPath();g.moveTo(sw2*1.5+Math.cos(an)*5,-33+Math.sin(an)*5);g.lineTo(sw2*1.5+Math.cos(an)*8,-33+Math.sin(an)*8);g.lineTo(sw2*1.5+Math.cos(an+.4)*5,-33+Math.sin(an+.4)*5);g.fill()}}
+  else if(w==='chakram'){g.rotate(time*(ag?20:2));g.strokeStyle=col;g.lineWidth=3.5;g.beginPath();g.arc(0,-10,8,0,7);g.stroke();glow(g,0,-10,12,col,.35)}
+  else if(w==='blowgun'){g.rotate(-.1);g.fillStyle='#6a8a3a';g.fillRect(-1.8,-30,3.6,32);g.fillStyle='#3a5a1a';g.fillRect(-2.2,-30,4.4,3);g.fillRect(-2.2,-6,4.4,3)}
   else if(w==='boomerang'){g.rotate(-.4+ag*2);g.strokeStyle=col;g.lineWidth=5;g.lineCap='round';g.beginPath();g.moveTo(-8,-6);g.lineTo(0,-18);g.lineTo(8,-6);g.stroke()}
   else if(w==='hammer'){g.rotate(-.4+ag*2.3);g.fillStyle='#6e4a2a';g.fillRect(-1.5,-20,3,24);rr(g,-7,-27,14,9,2,o.wcol||'#6c727a')}
   else if(w==='axe'||w==='pick'){g.rotate(-.9+ag*2.2);g.fillStyle='#6e4a2a';g.fillRect(-1.5,-20,3,24);if(w==='axe'){g.fillStyle='#b9c0c8';g.beginPath();g.moveTo(1,-20);g.quadraticCurveTo(10,-17,9,-10);g.lineTo(1,-12);g.fill()}else{g.strokeStyle='#9aa2ac';g.lineWidth=3;g.beginPath();g.arc(0,-12,10,-2.6,-.5);g.stroke()}}
@@ -1608,10 +1643,12 @@ function checkBoss(){
       banner={title:B.title,sub:B.sub,t:0,col:B.col};shake=1;if(k==='wyrm')SFX.roar();else{tone(70,1.4,'sawtooth',.12,.6);[220,207,196,185].forEach((f,i)=>tone(f,.5,'triangle',.08,0,i*.25))}puff(b.x,b.y,k==='wyrm'?'#3a2a28':'#5a5f8a',40)}}
 }
 function hurtEnemy(e,mult,ax,ay,critBonus=0,fx=null){
+  if(fx&&fx.exec&&e.hp<e.max*.35)mult*=1+fx.exec;
   if(e.type==='wyrm'&&P.flags.emberstone)mult*=1.35;
   if(e.dead||e.spawnT>.2||e.under)return;
   if(e.hp<e.max*.3&&tl('execute'))mult*=1.3;
   const S=stats();let crit=Math.random()<.12+critBonus+.03*tl('crit')+acc('crit');let dmg=Math.max(1,Math.round(S.atk*mult*rnd(.9,1.1)-e.def*.5));if(crit)dmg=Math.round(dmg*1.8);
+  if(fx&&fx.raise)e.raiseFx=1;if(P.buffs.vamp&&P.hp>0)P.hp=Math.min(S.maxHp,P.hp+dmg*.12);
   if(fx){if(fx.burn){e.burn=fx.burn;e.burnD=Math.max(1,S.atk*.2)}if(fx.poison){e.poison=fx.poison;e.poisD=Math.max(1,S.atk*.15)}if(fx.slow)e.slow=Math.max(e.slow||0,fx.slow);
     if(fx.stunC&&!e.boss&&Math.random()<fx.stunC){e.stun=1.3;ftext(e.x,e.y-e.r-30,'Stunned','#ffe066',13)}if(fx.leech&&P.hp>0)P.hp=Math.min(S.maxHp,P.hp+dmg*fx.leech)}
   if(tl('drain')&&P.hp>0)P.hp=Math.min(S.maxHp,P.hp+dmg*.03*tl('drain'));
@@ -1632,6 +1669,8 @@ function killEnemy(e){
   const pd=PET_DROP[e.type];if(pd&&!P.pets.includes(pd[0])&&Math.random()<pd[1])addPet(pd[0]);
   P.st.kt=P.st.kt||{};P.st.kt[e.type]=(P.st.kt[e.type]||0)+1;if(Object.keys(ENEMY).every(k=>ENEMY[k].ai==='boss'||ENEMY[k].noBest||P.st.kt[k]))unlock('scholar');
   if(e.type==='glad')arenaWin(e);
+  if(e.raiseFx&&!e.boss&&e.type!=='glad'&&Math.random()<.3){allies.push({type:'skeleton',x:e.x,y:e.y,t:12,cd:0,anim:0,face:0,flash:0,spawnT:0,hp:1,max:1,r:15,aggro:true,gcol:'#7fe0a0',mult:.55,moving:true});puff(e.x,e.y,'#7fe0a0',12);ftext(e.x,e.y-30,'Risen!','#7fe0a0',13);while(allies.filter(w=>w.type==='skeleton').length>8)allies.splice(allies.findIndex(w=>w.type==='skeleton'),1)}
+  if(e.type==='arachne'&&!P.weapons.includes('deathstaff')&&Math.random()<.35)addWeapon('deathstaff');if(e.type==='glacius'&&!P.weapons.includes('frostbow')&&Math.random()<.35)addWeapon('frostbow');
   if(d.split){for(const s of[-1,1]){const m=spawnEnemy('magmite',e.x+s*12,e.y,'ash');m.spawnT=0;m.kx=s*260;m.aggro=true}}
   if(e.boss&&BOSSES[e.type].win){const B=BOSSES[e.type],first=!P.flags[e.type];bossActive[e.type]=false;bossDone[e.type]=true;P.flags[e.type]=true;
     if(first){B.reward();unlock(B.ach);if(['arachne','nerith','glacius'].every(k=>P.flags[k]))unlock('delver')}else{drop('item',e.x,e.y,1,'crystal');drop('item',e.x,e.y,1,'ember')}
@@ -1649,7 +1688,8 @@ function explode(p){if(p.exploded)return;p.exploded=true;p.life=0;SFX.boom();sha
   for(const e of enemies){if(e.dead)continue;const d=dist(p.x,p.y,e.x,e.y);if(d<p.aoe+e.r*.5){const a=Math.atan2(e.y-p.y,e.x-p.x);hurtEnemy(e,p.mult*(d<p.aoe*.4?1:.75),Math.cos(a),Math.sin(a))}}}
 function drop(kind,x,y,amount,item){const a=rnd(0,Math.PI*2),s=rnd(40,140);pickups.push({kind,x,y,z:0,vz:rnd(120,200),vx:Math.cos(a)*s,vy:Math.sin(a)*s,amount,item,t:0})}
 function hurtPlayer(raw,src){
-  if(P.dead)return;const S=stats();const dmg=Math.max(1,Math.round(raw*rnd(.9,1.1)*(P.buffs.stone?.5:1)*(P.petId==='pebble'?.85:1)*(1-.05*tl('aura'))*(P.riding&&MOUNTS[P.mountId]&&MOUNTS[P.mountId].sturdy?.7:1)-S.def*.6));
+  if(P.dead)return;const S=stats();let dmg=Math.max(1,Math.round(raw*rnd(.9,1.1)*(P.buffs.stone?.5:1)*(P.petId==='pebble'?.85:1)*(1-.05*tl('aura'))*(P.riding&&MOUNTS[P.mountId]&&MOUNTS[P.mountId].sturdy?.7:1)-S.def*.6));
+  if(P.buffs.barrier&&P.shield>0){const ab=Math.min(P.shield,dmg);P.shield-=ab;dmg-=ab;ftext(P.x,P.y-52,'Absorbed '+ab,'#c8b4ff',13);if(P.shield<=0){delete P.buffs.barrier;effects.push({k:'ring',x:P.x,y:P.y-8,t:0,max:.4,r0:20,r1:60,col:'#c8b4ff'})}if(dmg<=0){P.iT=.4;return}}
   if(P.riding&&!MOUNTS[P.mountId].sturdy&&dismount())ftext(P.x,P.y-56,'Knocked off!','#ffb199',13);P.hp-=dmg;P.iT=.75;P.lastHit=0;hurtFlash=.5;shake=Math.max(shake,.35);
   ftext(P.x,P.y-34,'-'+dmg,'#ff6b6b',18);SFX.hurt();P.fish=null;P.gather=null;
   if(src){const a=Math.atan2(P.y-src.y,P.x-src.x);P.kx=Math.cos(a)*260;P.ky=Math.sin(a)*260}
@@ -1733,6 +1773,16 @@ function castSpell(i){
   else if(id==='wolves'){for(const s2 of[-1,1])allies.push({type:'wolf',x:P.x+s2*30,y:P.y+10,t:15,cd:0,anim:0,face:0,flash:0,spawnT:0,hp:1,max:1,r:16,aggro:true});puff(P.x,P.y,'#9fd6ff',20);tone(330,.6,'sine',.08,1.5)}
   else if(id==='meteor'){let tx=P.x+ca*170,ty=P.y+sa*170;let best=null,bd=300;for(const e of enemies){const d=dist(P.x,P.y,e.x,e.y);if(d<bd&&angDiff(Math.atan2(e.y-P.y,e.x-P.x),a)<.8){bd=d;best=e}}if(best){tx=best.x;ty=best.y}
     teles.push({x:tx,y:ty,r:110,t:0,max:.75,p:1,mult:4,fx:{burn:4}});netAttack({s:'circle',x:tx,y:ty,r:110,dl:.75,d:Math.round(S.atk*4),c:'#ff7a3d'});tone(500,.7,'sawtooth',.05,.2)}
+  else if(id==='recall'){if(LVD){ftext(P.x,P.y-40,'Recall only works outdoors','#7fd6ff',13);SFX.deny();return}if(P.riding)P.riding=false;puff(P.x,P.y,'#7fd6ff',16);P.x=(VX+.5)*T;P.y=(VY+1.6)*T;cam.x=P.x;cam.y=P.y;if(pet){pet.x=P.x-20;pet.y=P.y}enemies=enemies.filter(e=>!e.boss);bossActive={};fadeT=.7;tone(1047,.6,'sine',.08,.5);puff(P.x,P.y,'#7fd6ff',16)}
+  else if(id==='spike'){projectiles.push({x:P.x+ca*16,y:P.y-12,vx:ca*560,vy:sa*560,r:11,mult:2.5,from:'p',k:'ice',life:.9,a,pierce:1,hit:new Set(),fx:{slow:3},col:'#bfeeff',big:1,t:0});netAttack({s:'proj',x:P.x,y:P.y,k:'ice',spd:560,lf:.9,pr:11,ps:[+a.toFixed(3)],d:Math.round(S.atk*2.5),c:'#bfeeff'});noiseS(.25,.25,3600,1.5)}
+  else if(id==='barrier'){P.shield=Math.round(S.maxHp*.3);P.buffs.barrier=10;effects.push({k:'ring',x:P.x,y:P.y-8,t:0,max:.5,r0:50,r1:20,col:'#c8b4ff'});tone(660,.5,'sine',.07,1.5)}
+  else if(id==='vamp'){P.buffs.vamp=6;effects.push({k:'ring',x:P.x,y:P.y,t:0,max:.5,r0:10,r1:70,col:'#c84a6a'});tone(220,.5,'sawtooth',.05,.6)}
+  else if(id==='firewall'){for(let i=1;i<=6;i++)clouds.push({x:P.x+ca*i*36,y:P.y+sa*i*36,r:28,t:0,max:4,tick:0,kind:'fire'});noiseS(.6,.3,500,.5);SFX.fire()}
+  else if(id==='quake'){effects.push({k:'ring',x:P.x,y:P.y,t:0,max:.6,r0:20,r1:175,col:'#c9a46a'});shake=Math.max(shake,.8);noiseS(.8,.45,180,.6);tone(60,.8,'sine',.2,.5);for(let i=0;i<24;i++){const an=i/24*Math.PI*2;particles.push({x:P.x+Math.cos(an)*rnd(30,160),y:P.y+Math.sin(an)*rnd(20,110),vx:0,vy:-60,life:.6,max:.6,size:6,col:'#a8906a',k:'smoke'})}
+    for(const e of enemies){if(dist(P.x,P.y,e.x,e.y)<175+e.r*.5){const ea=Math.atan2(e.y-P.y,e.x-P.x);hurtEnemy(e,1.6,Math.cos(ea)*.8,Math.sin(ea)*.8,0,{stunC:.65})}}netAttack({s:'circle',x:P.x,y:P.y,r:175,d:Math.round(S.atk*1.6),c:'#c9a46a'})}
+  else if(id==='tornado'){projectiles.push({x:P.x+ca*20,y:P.y-6,vx:ca*170,vy:sa*170,r:24,mult:.55,from:'p',k:'tornado',life:3,a,pierce:1,hit:new Set(),hitT:.35,t:0});netAttack({s:'proj',x:P.x,y:P.y,k:'tornado',spd:170,lf:3,pr:24,ps:[+a.toFixed(3)],d:Math.round(S.atk*.9),c:'#9fc8d8'});noiseS(1,.2,900,.4)}
+  else if(id==='starfall'){for(let i=0;i<8;i++){const tx2=P.x+rnd(-170,170),ty2=P.y+rnd(-130,130);teles.push({x:tx2,y:ty2,r:62,t:-i*.22,max:.6,p:1,mult:1.8,fx:{burn:2}});netAttack({s:'circle',x:tx2,y:ty2,r:62,dl:.6+i*.22,d:Math.round(S.atk*1.8),c:'#ffe28a'})}[1047,1319,1568].forEach((f,i)=>tone(f,.5,'sine',.06,0,i*.12))}
+  P.st.casts=(P.st.casts||0)+1;if(P.st.casts>=200)unlock('spellweaver');
   P.mp-=spm;P.spCd[id]=sp.cd*(1-.05*tl('cdr'));
 }
 function updateAllies(dt){
@@ -1741,7 +1791,7 @@ function updateAllies(dt){
     const d=dist(w.x,w.y,tx,ty);if(d>4){const sp=tg?320:d>120?300:150;w.x+=(tx-w.x)/d*sp*dt;w.y+=(ty-w.y)/d*sp*dt;w.face=Math.atan2(ty-w.y,tx-w.x)}
     if(w.t<=0)puff(w.x,w.y,'#9fd6ff',10)}
   allies=allies.filter(w=>w.t>0);
-  for(const c of clouds){c.t+=dt;c.tick-=dt;if(c.tick<=0){c.tick=.5;const S=stats();for(const e of enemies)if(dist(c.x,c.y,e.x,e.y)<c.r+e.r*.5){e.poison=Math.max(e.poison||0,1.2);e.poisD=Math.max(1,S.atk*.3)}}}
+  for(const c of clouds){c.t+=dt;c.tick-=dt;if(c.tick<=0){c.tick=.5;const S=stats();for(const e of enemies)if(dist(c.x,c.y,e.x,e.y)<c.r+e.r*.5){if(c.kind==='fire'){e.burn=Math.max(e.burn||0,1.2);e.burnD=Math.max(1,S.atk*.35)}else{e.poison=Math.max(e.poison||0,1.2);e.poisD=Math.max(1,S.atk*.3)}}}}
   clouds=clouds.filter(c=>c.t<c.max);
   for(const k in P.spCd){P.spCd[k]-=dt;if(P.spCd[k]<=0)delete P.spCd[k]}
 }
@@ -2099,6 +2149,7 @@ function updatePlay(dt){
       if(p.seek){let tg=null,bd=280;for(const e of enemies){if(p.hit&&p.hit.has(e))continue;const d=dist(p.x,p.y,e.x,e.y);if(d<bd){bd=d;tg=e}}if(tg){const a=Math.atan2(tg.y-6-p.y,tg.x-p.x),cur=Math.atan2(p.vy,p.vx);let df=a-cur;while(df>Math.PI)df-=Math.PI*2;while(df<-Math.PI)df+=Math.PI*2;const sp=Math.hypot(p.vx,p.vy),n=cur+clamp(df,-4*dt,4*dt);p.vx=Math.cos(n)*sp;p.vy=Math.sin(n)*sp}}
       if(p.boom){if(!p.back&&p.t>.42){p.back=true;p.hit=new Set()}if(p.back){const d=dist(p.x,p.y,P.x,P.y-10);const sp=Math.min(700,380+p.t*300);p.vx=(P.x-p.x)/d*sp;p.vy=(P.y-10-p.y)/d*sp;if(d<20)p.life=0}else{p.vx*=Math.pow(.25,dt);p.vy*=Math.pow(.25,dt)}}
       if(p.k==='spark'&&Math.random()<.7)particles.push({x:p.x,y:p.y,vx:rnd(-30,30),vy:rnd(-30,30),life:.2,max:.2,size:2,col:'#fff6a0',k:'spark'});
+      if(p.k==='tornado'){p.hitT-=dt;if(p.hitT<=0){p.hitT=.35;p.hit=new Set()}for(const e of enemies){if(e.boss)continue;const d=dist(p.x,p.y,e.x,e.y);if(d<110&&d>4){e.kx+=(p.x-e.x)/d*900*dt;e.ky+=(p.y-e.y)/d*900*dt}}if(Math.random()<.6)particles.push({x:p.x+rnd(-14,14),y:p.y+rnd(-4,8),vx:rnd(-30,30),vy:rnd(-60,-20),life:.5,max:.5,size:4,col:'#c9d8de',k:'smoke'})}
       if((p.k==='ice'||p.k==='void')&&Math.random()<.5)particles.push({x:p.x,y:p.y,vx:rnd(-12,12),vy:rnd(-12,12),life:.35,max:.35,size:2.5,col:p.col,k:'spark'})}
     p.x+=p.vx*dt;p.y+=p.vy*dt;
     if(p.k==='fireball'||p.k==='efire'){if(Math.random()<.6)particles.push({x:p.x+rnd(-4,4),y:p.y+rnd(-4,4),vx:rnd(-20,20),vy:rnd(-30,0),life:.35,max:.35,size:rnd(3,6),col:pick(['#ff7a1f','#ffb347','#ff4d1f']),k:'ember'})}
@@ -2153,7 +2204,7 @@ function render(){
   // telegraphs
   for(const t of teles){if(t.t<0)continue;const k=Math.min(1,t.t/t.max);if(t.p){if(t.done)continue;g.strokeStyle=`rgba(255,200,90,${.5+k*.4})`;g.lineWidth=2;g.beginPath();g.ellipse(t.x,t.y,t.r,t.r*.6,0,0,7);g.stroke();g.fillStyle=`rgba(255,140,40,${k*.18})`;ell(g,t.x,t.y,t.r*k,t.r*.6*k);
       const my=t.y-(1-k)*380,mx=t.x+(1-k)*120;g.strokeStyle='rgba(255,170,60,.5)';g.lineWidth=10;g.beginPath();g.moveTo(mx,my);g.lineTo(mx+50,my-150);g.stroke();glow(g,mx,my,46,'#ff7a1f',.8);circ(g,mx,my,15,rgrad(g,mx,my,15,'#fff1a8','#7a3a1a'));continue}g.fillStyle=t.blue?`rgba(120,140,255,${.12+k*.22})`:`rgba(255,60,30,${.12+k*.2})`;ell(g,t.x,t.y,t.r,t.r*.6);g.strokeStyle=t.blue?'rgba(190,200,255,.7)':`rgba(255,120,60,${.6})`;g.lineWidth=2;g.beginPath();g.ellipse(t.x,t.y,t.r*k,t.r*.6*k,0,0,7);g.stroke()}
-  for(const c of clouds){const a=Math.min(1,(c.max-c.t)*2,c.t*4);for(let i=0;i<7;i++){const aa=i/7*Math.PI*2+time*.4,rr2=c.r*.55;circ(g,c.x+Math.cos(aa)*rr2,c.y+Math.sin(aa)*rr2*.6,c.r*.5,rgba('#7ec850',.16*a))}circ(g,c.x,c.y,c.r*.6,rgba('#9be15d',.14*a));if(Math.random()<.3)particles.push({x:c.x+rnd(-c.r,c.r)*.8,y:c.y+rnd(-c.r,c.r)*.5,vx:0,vy:-20,life:.8,max:.8,size:3,col:'#c8f27a',k:'smoke'})}
+  for(const c of clouds){const a=Math.min(1,(c.max-c.t)*2,c.t*4);if(c.kind==='fire'){glow(g,c.x,c.y,c.r*1.4,'#ff7a1f',.35*a);for(let i=0;i<3;i++){const f2=Math.sin(time*12+i*2+c.x)*3;g.fillStyle=rgba(['#ff4d1f','#ff9a1f','#ffe28a'][i],a);g.beginPath();g.moveTo(c.x-14+i*4,c.y+6);g.quadraticCurveTo(c.x+f2,c.y-26+i*7,c.x+14-i*4,c.y+6);g.fill()}if(Math.random()<.3)spark(c.x+rnd(-10,10),c.y-10,'#ffb347',1,40);continue}for(let i=0;i<7;i++){const aa=i/7*Math.PI*2+time*.4,rr2=c.r*.55;circ(g,c.x+Math.cos(aa)*rr2,c.y+Math.sin(aa)*rr2*.6,c.r*.5,rgba('#7ec850',.16*a))}circ(g,c.x,c.y,c.r*.6,rgba('#9be15d',.14*a));if(Math.random()<.3)particles.push({x:c.x+rnd(-c.r,c.r)*.8,y:c.y+rnd(-c.r,c.r)*.5,vx:0,vy:-20,life:.8,max:.8,size:3,col:'#c8f27a',k:'smoke'})}
   // interact target ring
   const tg=state==='play'&&!panel&&!(P&&P.placing)?findTarget():null;
   if(tg&&tg.k==='obj'){g.strokeStyle=`rgba(240,185,74,${.5+Math.sin(time*5)*.3})`;g.lineWidth=2;g.beginPath();g.ellipse(tg.o.x,tg.o.y+12,22,8,0,0,7);g.stroke()}
@@ -2189,9 +2240,10 @@ function render(){
   for(const p of projectiles){
     if(p.k==='arrow'){g.save();g.translate(p.x,p.y);g.rotate(p.a);g.strokeStyle='#e8dcc0';g.lineWidth=2;g.beginPath();g.moveTo(-14,0);g.lineTo(6,0);g.stroke();g.fillStyle=p.col||BLADE[P.wT];g.beginPath();g.moveTo(10,0);g.lineTo(4,-3);g.lineTo(4,3);g.fill();if(p.heavy){g.lineWidth=3.5;g.strokeStyle='#7a5530';g.beginPath();g.moveTo(-10,0);g.lineTo(4,0);g.stroke()}g.fillStyle=p.fx&&p.fx.poison?'#9be15d':'#d64545';g.fillRect(-15,-2,4,4);g.restore()}
     else if(p.k==='spark'){glow(g,p.x,p.y,18,'#ffe066',.7);g.strokeStyle='#fffbe0';g.lineWidth=2;g.beginPath();g.moveTo(p.x-6,p.y-4);g.lineTo(p.x,p.y+2);g.lineTo(p.x-2,p.y-2);g.lineTo(p.x+6,p.y+4);g.stroke()}
-    else if(p.k==='ice'){g.save();g.translate(p.x,p.y);g.rotate(p.a);glow(g,0,0,16,'#8fe3ff',.5);g.fillStyle='#e8fbff';g.beginPath();g.moveTo(10,0);g.lineTo(-4,-4);g.lineTo(-8,0);g.lineTo(-4,4);g.closePath();g.fill();g.restore()}
+    else if(p.k==='ice'){g.save();g.translate(p.x,p.y);g.rotate(p.a);if(p.big)g.scale(2.4,1.7);glow(g,0,0,16,'#8fe3ff',.5);g.fillStyle='#e8fbff';g.beginPath();g.moveTo(10,0);g.lineTo(-4,-4);g.lineTo(-8,0);g.lineTo(-4,4);g.closePath();g.fill();g.restore()}
     else if(p.k==='void'){glow(g,p.x,p.y,24,'#a98cff',.7);circ(g,p.x,p.y,7,'#2a1a4a');g.strokeStyle='#d8ccff';g.lineWidth=1.5;g.beginPath();g.arc(p.x,p.y,7,time*8,time*8+4);g.stroke()}
     else if(p.k==='wave'){g.save();g.translate(p.x,p.y);g.rotate(p.a);g.globalAlpha=Math.min(1,p.life*3);glow(g,0,0,30,p.col||'#ff7a1f',.5);g.strokeStyle=p.col||'#ffb347';g.lineWidth=7;g.lineCap='round';g.beginPath();g.arc(-10,0,22,-1,1);g.stroke();g.strokeStyle='#fff1a8';g.lineWidth=3;g.beginPath();g.arc(-10,0,22,-.8,.8);g.stroke();g.restore()}
+    else if(p.k==='tornado'){g.save();g.translate(p.x,p.y+10);for(let i=0;i<6;i++){const w2=6+i*4,yy=-i*7,sp2=time*14+i;g.strokeStyle=`rgba(200,225,235,${.75-i*.08})`;g.lineWidth=3;g.beginPath();g.ellipse(Math.sin(sp2*.4)*3,yy,w2,w2*.35,0,sp2%6.28,sp2%6.28+4.2);g.stroke()}g.restore()}
     else if(p.k==='boomerang'){g.save();g.translate(p.x,p.y);g.rotate(time*22);g.strokeStyle=p.col;g.lineWidth=5;g.lineCap='round';g.beginPath();g.moveTo(-9,6);g.lineTo(0,-8);g.lineTo(9,6);g.stroke();g.restore()}
     else if(p.k==='bolt'){glow(g,p.x,p.y,18,p.col,.6);circ(g,p.x,p.y,4.5,'#eef6ff')}
     else if(p.k==='bomb'){const z=Math.sin(Math.min(1,(p.t||0)/.6)*Math.PI)*42;ell(g,p.x,p.y+8,7,3,'rgba(0,0,0,.3)');drawIcon(g,'bomb',p.x,p.y-z,.55,'#3a3a44')}
@@ -2267,6 +2319,8 @@ function drawPlayer(g){
   const flick=P.iT>0&&Math.floor(time*20)%2===0&&P.dashT<=0;
   if(P.buffs.stew)glow(g,P.x,P.y,30,'#ffd23f',.15+Math.sin(time*4)*.05);
   if(P.slowT>0){g.strokeStyle='rgba(230,245,255,.75)';g.lineWidth=1.5;for(let i=0;i<4;i++){const a=i*.8+time;g.beginPath();g.moveTo(P.x+Math.cos(a)*16,P.y-8+Math.sin(a)*20);g.lineTo(P.x-Math.cos(a)*16,P.y-8-Math.sin(a)*20);g.stroke()}}
+  if(P.buffs.barrier){g.save();g.globalAlpha=.25+Math.sin(time*4)*.08;g.fillStyle='#c8b4ff';g.beginPath();g.ellipse(P.x,P.y-10,24,30,0,0,7);g.fill();g.globalAlpha=.8;g.strokeStyle='#e6dcff';g.lineWidth=2;g.stroke();g.restore()}
+  if(P.buffs.vamp&&Math.random()<.3)particles.push({x:P.x+rnd(-12,12),y:P.y+rnd(-20,6),vx:0,vy:-30,life:.5,max:.5,size:2.5,col:'#c84a6a',k:'spark'});
   if(P.buffs.stone){g.strokeStyle='rgba(201,184,154,.7)';g.lineWidth=3;g.beginPath();g.ellipse(P.x,P.y-8,20,26,0,0,7);g.stroke()}
   if(P.buffs.haste&&P.moving&&Math.random()<.5)particles.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,size:10,col:'#7fffd4',k:'ghost'});
   if(P.spin>0){g.save();g.translate(P.x,P.y);g.rotate(time*30);g.strokeStyle=rgba('#ffe28a',P.spin*1.5);g.lineWidth=5;g.beginPath();g.arc(0,0,60,0,4);g.stroke();g.restore()}
@@ -2299,7 +2353,7 @@ function drawHUD(tg){
   drawIcon(g,'coin',L+76,Tp+72,.45);g.font=`800 15px ${FONT_UI}`;g.textAlign='left';g.fillStyle='#ffe08a';g.fillText(P.gold.toLocaleString(),L+87,Tp+77);
   let bx=L+87+g.measureText(P.gold.toLocaleString()).width+16;
   if(P.buffs.stew){drawIcon(g,'bowl',bx,Tp+71,.42,'#e0a458');g.font=`700 11px ${FONT_UI}`;g.fillStyle='#ffd23f';g.fillText(Math.ceil(P.buffs.stew)+'s',bx+9,Tp+76);bx+=40}
-  for(const[b,c2,l2]of[['whet','#c9cfd6','ATK'],['bark','#c9a46a','DEF'],['rested','#ffd27a','XP']])if(P.buffs[b]){circ(g,bx,Tp+71,7,c2);g.font=`800 8px ${FONT_UI}`;g.textAlign='center';g.fillStyle='#1a1406';g.fillText(l2,bx,Tp+74);g.textAlign='left';g.font=`700 11px ${FONT_UI}`;g.fillStyle='#eaedf6';const sec=Math.ceil(P.buffs[b]);g.fillText(sec>90?Math.ceil(sec/60)+'m':sec+'s',bx+10,Tp+76);bx+=44}
+  for(const[b,c2,l2]of[['whet','#c9cfd6','ATK'],['bark','#c9a46a','DEF'],['rested','#ffd27a','XP'],['barrier','#c8b4ff','SHD'],['vamp','#c84a6a','VMP']])if(P.buffs[b]){circ(g,bx,Tp+71,7,c2);g.font=`800 8px ${FONT_UI}`;g.textAlign='center';g.fillStyle='#1a1406';g.fillText(l2,bx,Tp+74);g.textAlign='left';g.font=`700 11px ${FONT_UI}`;g.fillStyle='#eaedf6';const sec=Math.ceil(P.buffs[b]);g.fillText(sec>90?Math.ceil(sec/60)+'m':sec+'s',bx+10,Tp+76);bx+=44}
   for(const b of['haste','stone'])if(P.buffs[b]){drawSpell(g,b==='stone'?'stoneskin':'haste',bx,Tp+71,.4);g.font=`700 11px ${FONT_UI}`;g.fillStyle='#eaedf6';g.fillText(Math.ceil(P.buffs[b])+'s',bx+9,Tp+76);bx+=40}
   if(rain.on){g.fillStyle='#7fb6ff';g.fillText('Rain',bx,Tp+76)}
   // minimap
@@ -2404,7 +2458,7 @@ function openBag(){
 }
 function openSpells(learn){
   const slots=[0,1,2].map(i=>{const id=P.slots[i];return`<span class="chip ${id?'ok':''}">${id?`<img src="${spellURL(id)}" alt="">`:''}<b>${i+1}</b>&nbsp;${id?SPELLS[id].n:'Empty'}</span>`}).join('');
-  const rows=Object.entries(SPELLS).map(([id,sp])=>{const known=P.spells.includes(id);let act;
+  const rows=Object.entries(SPELLS).sort((x,y)=>x[1].lv-y[1].lv).map(([id,sp])=>{const known=P.spells.includes(id);let act;
     if(known)act=`<div class="row">${[0,1,2].map(i=>`<button class="btn sm ${P.slots[i]===id?'':'ghost'}" data-act="slot" data-id="${id}:${i}">${i+1}</button>`).join('')}</div>`;
     else if(learn)act=`<button class="btn sm" data-act="learn" data-id="${id}" ${P.lvl<sp.lv||P.gold<sp.price?'disabled':''}>Learn</button>`;
     else act=`<span class="sub">Elder Mira</span>`;
@@ -2441,7 +2495,7 @@ function openTalents(){
     <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="respec" ${Object.keys(P.tal||{}).length?'':'disabled'}>Reset talents (${cost} gold)</button></div>`);
   panel='talents';
 }
-function addWeapon(id){if(P.weapons.includes(id))return;P.weapons.push(id);toast('New weapon: '+WEAPONS[id].n,'Equip it from your bag (I)','#ffd23f');if(P.weapons.length>=8)unlock('arsenal')}
+function addWeapon(id){if(P.weapons.includes(id))return;P.weapons.push(id);toast('New weapon: '+WEAPONS[id].n,'Equip it from your bag (I)','#ffd23f');if(P.weapons.length>=8)unlock('arsenal');if(P.weapons.length>=25)unlock('warlord')}
 function openQuests(tab='active'){
   let body='';
   if(tab==='active'){const aq=activeQuests();body=aq.length?aq.map(q=>{const p=qProg(q);return`<div class="q"><div class="row" style="justify-content:space-between"><span class="nm">${q.name}</span><span class="pg">${p>=q.n?'Ready to turn in':p+' / '+q.n}</span></div><p class="sub">${q.desc}</p><button class="btn ghost sm" data-act="track" data-id="${q.id}" ${trackedQuest()===q?'disabled':''}>${trackedQuest()===q?'Tracking':'Track'}</button><p class="sub">From ${npcName(q.npc)} · Reward <span class="reward">${q.rw.gold} gold, ${q.rw.xp} XP</span></p><div class="bar"><i style="width:${p/q.n*100}%"></i></div></div>`}).join(''):'<p class="sub">No active quests. Look for a gold ! above villagers\' heads.</p>'}
@@ -2529,6 +2583,8 @@ const RECIPES=[
   {st:'forge',id:'rimewood',wpn:1,gold:600,req:{glowcap:6,crystal:3,wood:5}},
   {st:'forge',id:'maul',wpn:1,gold:800,req:{gold:6,iron:10,crystal:2}},
   {st:'forge',id:'emberfang',wpn:1,gold:900,req:{ember:3,gold:4}},
+  {st:'forge',id:'flail',wpn:1,gold:450,req:{iron:14,gold:2}},{st:'forge',id:'repeater',wpn:1,gold:500,req:{iron:10,wood:8,silk:2}},{st:'forge',id:'scythe',wpn:1,gold:650,req:{bone:12,crystal:2,gold:3}},
+  {st:'forge',id:'katana',wpn:1,gold:700,req:{crystal:3,iron:8,silk:4}},{st:'forge',id:'chakram',wpn:1,gold:800,req:{gold:5,ember:2,wood:4}},{st:'forge',id:'stormstaff',wpn:1,gold:1100,req:{crystal:6,gold:4,glowcap:4}},
   {st:'cauldron',id:'hpot',gold:5,req:{herb:2},n:'Health Potion',d:'Restores health. Press Q to drink.'},
   {st:'cauldron',id:'mpot',gold:5,req:{glowcap:2},n:'Mana Potion',d:'Restores 55 mana. Press R to drink.'},
   {st:'cauldron',id:'elixir',gold:50,req:{koi:1,crystal:2,glowcap:3},n:'Elixir of Might',d:'Permanently grants +3 attack.'},
