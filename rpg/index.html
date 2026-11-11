@@ -231,7 +231,7 @@ const REGIONS={
   ruins:{name:'Sunken Ruins',lv:'Danger: Lv 5-8'},
   hills:{name:'Ironcrag Hills',lv:'Danger: Lv 6-9'},
   ash:{name:'Ashen Wastes',lv:'Danger: Lv 9+'},
-  crypt:{name:'Mossy Crypt',lv:'Dungeon · Lv 4+'},temple:{name:'Drowned Temple',lv:'Dungeon · Lv 7+'},caverns:{name:'Frostfang Caverns',lv:'Dungeon · Lv 10+'},forge:{name:'Ashforge Depths',lv:'Dungeon · Lv 13+'},void:{name:'The Void Rift',lv:'Dungeon · Lv 16+'},house:{name:'Willow Cottage',lv:'Home'},arena:{name:'Emberfall Arena',lv:'PvP zone'}
+  crypt:{name:'Mossy Crypt',lv:'Dungeon · Lv 4+'},temple:{name:'Drowned Temple',lv:'Dungeon · Lv 7+'},caverns:{name:'Frostfang Caverns',lv:'Dungeon · Lv 10+'},forge:{name:'Ashforge Depths',lv:'Dungeon · Lv 13+'},void:{name:'The Void Rift',lv:'Dungeon · Lv 16+'},fungal:{name:'Mycelium Hollow',lv:'Dungeon · Lv 8+'},clockwork:{name:'The Clockwork Vault',lv:'Dungeon · Lv 18+'},house:{name:'Willow Cottage',lv:'Home'},arena:{name:'Emberfall Arena',lv:'PvP zone'}
 };
 const ARENA={n:'Emberfall Arena',deco:'arena',torch:'#ffb347',arena:1,pal:{10:'#5a4636',11:'#c9ab7c'}};
 const ARX=75,ARY=37;
@@ -243,6 +243,8 @@ const DUNGEONS={
   caverns:{n:'Frostfang Caverns',lv:10,f:2.6,fa:1.8,ex:100,ey:26,seed:37,boss:'glacius',mobs:['golem','wisp','wolf','bat','yeti','yeti'],pal:{10:'#2b4661',11:'#a8c3d6'},deco:'ice',chestLv:9,torch:'#9fe8ff'},
   forge:{n:'Ashforge Depths',lv:13,f:2.9,fa:2,ex:96,ey:59,seed:53,boss:'pyrrhus',mobs:['imp','magma','scorpion','golem','emberknight','emberknight'],pal:{10:'#3a2420',11:'#6e4434'},deco:'forge',chestLv:11,torch:'#ff7a1f'},
   void:{n:'The Void Rift',lv:16,f:3.3,fa:2.3,ex:62,ey:64,seed:71,boss:'malgrath',mobs:['shade','shade','cultist','cultist','ghoul','wisp'],pal:{10:'#1a1428',11:'#463a62'},deco:'void',chestLv:13,torch:'#b48cff'},
+  fungal:{n:'Mycelium Hollow',lv:8,f:1.8,fa:1.4,ex:42,ey:52,seed:89,boss:'mycelia',mobs:['sporeling','sporeling','mycoid','sporecap','spider','toad'],pal:{10:'#2a2438',11:'#4a5a3a',1:'#3a7a6a'},deco:'fungal',chestLv:7,torch:'#b8e05d'},
+  clockwork:{n:'The Clockwork Vault',lv:18,f:3.8,fa:2.6,ex:86,ey:48,seed:97,boss:'colossus',mobs:['clockbot','clockbot','spiderbot','spiderbot','sentry'],pal:{10:'#3a3028',11:'#7a6a4a'},deco:'clockwork',chestLv:15,torch:'#ffd27a'},
 };
 function borderDist(x,y){return Math.min(x,y,W-1-x,H-1-y)+(fbm(x*.12,y*.12,1)-.5)*5}
 function regionOf(x,y){
@@ -316,16 +318,17 @@ function genDungeon(id){
   for(let i=0;i<N-1;i++){const a=rooms[i],b=rooms[i+1];let x=a.cx,y=a.cy;while(x!==b.cx){for(let k=-1;k<=1;k++)carve(x,y+k);x+=Math.sign(b.cx-x)}while(y!==b.cy){for(let k=-1;k<=1;k++)carve(x+k,y);y+=Math.sign(b.cy-y)}for(let k=-1;k<=1;k++)for(let j=-1;j<=1;j++)carve(x+k,y+j)}
   const inner=m=>[m.x+1+ri(0,m.w-3),m.y+1+ri(0,m.h-3)];
   if(D.deco==='forge')for(let i=1;i<N-1;i++){const m=rooms[i];if(m.w>=11&&m.h>=9&&r()<.6)for(let y=m.cy-1;y<=m.cy;y++)for(let x=m.cx-1;x<=m.cx+1;x++)tiles[y*W+x]=LAVA}
+  if(D.deco==='fungal')for(let i=1;i<N-1;i++){const m=rooms[i];if(m.w>=11&&m.h>=9&&r()<.5)for(let y=m.cy-1;y<=m.cy;y++)for(let x=m.cx-1;x<=m.cx+1;x++)tiles[y*W+x]=WATER}
   if(D.deco==='temple')for(let i=1;i<N-1;i++){const m=rooms[i];if(m.w>=11&&m.h>=9&&r()<.7)for(let y=m.cy-1;y<=m.cy;y++)for(let x=m.cx-1;x<=m.cx+1;x++)tiles[y*W+x]=WATER}
   const s0=rooms[0];addObj('exit',s0.cx,s0.y+1);L.sx=(s0.cx+.5)*T;L.sy=(s0.cy+1.5)*T;
   for(let y=3;y<H-3;y++)for(let x=3;x<W-3;x++)if(tiles[y*W+x]===WALL&&tiles[(y+1)*W+x]===DFLOOR&&!grid[y*W+x]&&hash(x,y,40)<.16)addObj('torch',x,y);
-  const decoT=D.deco==='crypt'?['coffin','pillar','bones','bones']:D.deco==='temple'?['statue','pillar','bones']:D.deco==='forge'?['pillar','rock','bones','pillar']:D.deco==='void'?['statue','coffin','pillar','bones']:['stalagmite','stalagmite','rock'];
-  for(let i=1;i<N-1;i++){const m=rooms[i];for(let k=0;k<ri(2,4);k++){const[x,y]=inner(m);if(!free(x,y)||Math.abs(x-m.cx)<2&&Math.abs(y-m.cy)<2)continue;const t=pick2(r,decoT);if(t==='rock')addObj('rock',x,y,{ore:'crystal'});else addObj(t,x,y,t==='bones'?{solid:false}:{})}
+  const decoT=D.deco==='crypt'?['coffin','pillar','bones','bones']:D.deco==='temple'?['statue','pillar','bones']:D.deco==='forge'?['pillar','rock','bones','pillar']:D.deco==='void'?['statue','coffin','pillar','bones']:D.deco==='fungal'?['glowcap','glowcap','stalagmite','bones','glowcap']:D.deco==='clockwork'?['pillar','crate','anvil','statue']:['stalagmite','stalagmite','rock'];
+  for(let i=1;i<N-1;i++){const m=rooms[i];for(let k=0;k<ri(2,4);k++){const[x,y]=inner(m);if(!free(x,y)||Math.abs(x-m.cx)<2&&Math.abs(y-m.cy)<2)continue;const t=pick2(r,decoT);if(t==='rock')addObj('rock',x,y,{ore:'crystal'});else addObj(t,x,y,t==='bones'||t==='glowcap'?{solid:false}:{})}
     const n=ri(2,3)+(i>N/2?1:0);for(let k=0;k<n;k++){const[x,y]=inner(m);if(free(x,y))L.packs.push({t:pick2(r,D.mobs),x:(x+.5)*T,y:(y+.5)*T})}}
   const cr=[2,4,6,8].sort(()=>r()-.5).slice(0,3);cr.forEach((ri2,k)=>{const m=rooms[ri2];for(let tries=0;tries<20;tries++){const[x,y]=inner(m);if(free(x,y)&&free(x,y+1)){L.chests.push(addObj('chest',x,y,{id:'dg:'+id+':'+k,dg:1,lv:D.chestLv}));break}}});
   {const pi=PAGES.findIndex(p=>p.lv===id),m=rooms[5];for(let t2=0;t2<20&&pi>=0;t2++){const[x,y]=inner(m);if(free(x,y)){addObj('page',x,y,{solid:false,pid:pi});break}}}
   const b=rooms[N-1];BOSSES[D.boss].ax=b.cx+.5;BOSSES[D.boss].ay=b.cy+.5;L.boss=b;
-  [[b.x+1,b.y+1],[b.x+b.w-2,b.y+1],[b.x+1,b.y+b.h-2],[b.x+b.w-2,b.y+b.h-2]].forEach(([x,y])=>{if(free(x,y))addObj('brazier',x,y,{blue:D.deco!=='crypt'&&D.deco!=='forge'})});
+  [[b.x+1,b.y+1],[b.x+b.w-2,b.y+1],[b.x+1,b.y+b.h-2],[b.x+b.w-2,b.y+b.h-2]].forEach(([x,y])=>{if(free(x,y))addObj('brazier',x,y,{blue:D.deco!=='crypt'&&D.deco!=='forge'&&D.deco!=='clockwork'})});
   buildMinimap();useLevel(WORLD);
 }
 function resetEntities(){hazards=[];enemies=[];projectiles=[];pickups=[];teles=[];clouds=[];allies=[];bossActive={};bossDone={}}
@@ -696,6 +699,13 @@ const ENEMY={
   sporecap:{n:'Sporecap',hp:70,atk:10,def:2,spd:40,r:15,xp:26,gold:[3,8],drops:[['glowcap',.6]],ai:'spore'},
   yeti:{n:'Yeti',hp:180,atk:22,def:5,spd:80,r:22,xp:55,gold:[10,20],drops:[['pelt',.6],['crystal',.1]],ai:'yeti'},
   mimic:{n:'Mimic',hp:140,atk:20,def:5,spd:95,r:16,xp:60,gold:[40,80],drops:[['gold',.8],['crystal',.3]],ai:'chase',lunge:1},
+  sporeling:{n:'Sporeling',hp:28,atk:9,def:0,spd:120,r:10,xp:10,gold:[1,3],drops:[['glowcap',.15]],ai:'chase',burst:1},
+  mycoid:{n:'Mycoid',hp:120,atk:17,def:4,spd:60,r:17,xp:36,gold:[6,12],drops:[['glowcap',.5],['herb',.3]],ai:'chase',lunge:1,sting:1},
+  clockbot:{n:'Clockwork Soldier',hp:150,atk:24,def:10,spd:85,r:15,xp:50,gold:[10,20],drops:[['iron',.7],['gold',.2]],ai:'chase',lunge:1},
+  spiderbot:{n:'Spiderbot',hp:90,atk:20,def:6,spd:110,r:15,xp:44,gold:[8,16],drops:[['iron',.5],['crystal',.08]],ai:'zapper'},
+  sentry:{n:'Sentry Turret',hp:110,atk:18,def:12,spd:0,r:16,xp:40,gold:[8,14],drops:[['iron',.6]],ai:'sentry'},
+  mycelia:{n:'Mycelia, the Spore Mother',hp:2400,atk:26,def:6,spd:0,r:44,xp:1100,gold:[650,650],drops:[],ai:'boss'},
+  colossus:{n:'The Brass Colossus',hp:5000,atk:40,def:12,spd:55,r:44,xp:3000,gold:[1500,1500],drops:[],ai:'boss'},
   boar:{n:'Wild Boar',hp:70,atk:12,def:3,spd:70,r:16,xp:18,gold:[3,8],drops:[['pelt',.5],['herb',.1]],ai:'charger'},
   pixie:{n:'Mischief Pixie',hp:30,atk:4,def:0,spd:130,r:10,xp:20,gold:[2,6],drops:[['glowcap',.4],['crystal',.04]],ai:'pixie',steal:1},
   lurker:{n:'Marsh Lurker',hp:85,atk:14,def:3,spd:85,r:14,xp:26,gold:[5,11],drops:[['shell',.3],['herb',.2]],ai:'thrower'},
@@ -714,7 +724,7 @@ const ENEMY={
   wyrm:{n:'Ashen Wyrm',hp:2800,atk:30,def:10,spd:80,r:46,xp:1500,gold:[600,600],drops:[],ai:'boss'},
 };
 const SPAWN={meadow:[['slime',1],['bandit',.2],['boar',.8],['pixie',.25]],coast:[['slime',1],['crab',1.2],['harpy',.5],['sandworm',.7],['drowned',.4]],lake:[['slime',.6],['toad',1.2],['wolf',.3],['lurker',1.1],['pixie',.3]],forest:[['wolf',2.2],['spider',1.8],['slime',.5],['treant',.7],['sporecap',.8]],hills:[['golem',1],['wolf',.8],['bandit',1],['harpy',1],['gargoyle',.6]],ruins:[['skeleton',2.2],['wisp',1.1],['bat',.5],['ghoul',1.5],['gargoyle',.7]],ash:[['imp',2.2],['magma',1.4],['golem',.5],['scorpion',1.5]]};
-const WHERE={boar:'Emberfall Meadows',pixie:'Meadows and Mirror Lake (it steals gold!)',lurker:'Mirror Lake',sandworm:'Saltwind Coast',gargoyle:'Sunken Ruins, Ironcrag Hills',drowned:'Saltwind Coast',blackbrine:'The shipwreck on the southern coast',emberknight:'Ashforge Depths',shade:'The Void Rift',cultist:'The Void Rift',pyrrhus:'Deepest hall of the Ashforge Depths',malgrath:'Heart of the Void Rift',treant:'Whisperwood',harpy:'Ironcrag Hills, Saltwind Coast',ghoul:'Sunken Ruins, Mossy Crypt',scorpion:'Ashen Wastes',sporecap:'Whisperwood',yeti:'Frostfang Caverns',mimic:'Disguised as treasure chests',sylvara:'A blighted grove in the western Whisperwood',varg:'Bandit camp in the Ironcrag Hills',arachne:'Heart of the Mossy Crypt',nerith:'Heart of the Drowned Temple',glacius:'Heart of the Frostfang Caverns',slime:'Everywhere outside the village',wolf:'Whisperwood, Mirror Lake, hills',bat:'Anywhere at night',skeleton:'Sunken Ruins',golem:'Ironcrag Hills, Ashen Wastes',imp:'Ashen Wastes',crab:'Saltwind Coast',spider:'Whisperwood',toad:'Mirror Lake',wisp:'Sunken Ruins',bandit:'Ironcrag Hills, meadows',magma:'Ashen Wastes',magmite:'Born from Magma Slimes',hollow:'Throne in the Sunken Ruins',wyrm:'Arena in the Ashen Wastes'};
+const WHERE={sporeling:'Mycelium Hollow',mycoid:'Mycelium Hollow',clockbot:'The Clockwork Vault',spiderbot:'The Clockwork Vault',sentry:'The Clockwork Vault',mycelia:'Heart of Mycelium Hollow',colossus:'Deepest hall of the Clockwork Vault',boar:'Emberfall Meadows',pixie:'Meadows and Mirror Lake (it steals gold!)',lurker:'Mirror Lake',sandworm:'Saltwind Coast',gargoyle:'Sunken Ruins, Ironcrag Hills',drowned:'Saltwind Coast',blackbrine:'The shipwreck on the southern coast',emberknight:'Ashforge Depths',shade:'The Void Rift',cultist:'The Void Rift',pyrrhus:'Deepest hall of the Ashforge Depths',malgrath:'Heart of the Void Rift',treant:'Whisperwood',harpy:'Ironcrag Hills, Saltwind Coast',ghoul:'Sunken Ruins, Mossy Crypt',scorpion:'Ashen Wastes',sporecap:'Whisperwood',yeti:'Frostfang Caverns',mimic:'Disguised as treasure chests',sylvara:'A blighted grove in the western Whisperwood',varg:'Bandit camp in the Ironcrag Hills',arachne:'Heart of the Mossy Crypt',nerith:'Heart of the Drowned Temple',glacius:'Heart of the Frostfang Caverns',slime:'Everywhere outside the village',wolf:'Whisperwood, Mirror Lake, hills',bat:'Anywhere at night',skeleton:'Sunken Ruins',golem:'Ironcrag Hills, Ashen Wastes',imp:'Ashen Wastes',crab:'Saltwind Coast',spider:'Whisperwood',toad:'Mirror Lake',wisp:'Sunken Ruins',bandit:'Ironcrag Hills, meadows',magma:'Ashen Wastes',magmite:'Born from Magma Slimes',hollow:'Throne in the Sunken Ruins',wyrm:'Arena in the Ashen Wastes'};
 const BOSSES={
   sylvara:{level:'world',once:1,ax:GX,ay:GY,region:'forest',title:'Sylvara, the Blighted Heart',sub:'The forest itself rises in rage',col:'#b48cff',win:'The blight lifts from the Whisperwood',ach:'sylvara',reward:()=>{addWeapon('heartwood');addPet('sapling');addMount('mossback')}},
   varg:{level:'world',once:1,ax:VGX,ay:VGY,region:'hills',title:'Varg the Bandit King',sub:'"Your gold or your life!"',col:'#ffb36b',win:'Varg yields and flees the hills',ach:'varg',reward:()=>addWeapon('vargaxe')},
@@ -722,6 +732,8 @@ const BOSSES={
   wyrm:{level:'world',once:1,ax:BX,ay:BY,region:'ash',title:'The Ashen Wyrm',sub:'Scourge of Emberfall awakens',col:'#ff6b6b'},
   arachne:{level:'crypt',region:'crypt',title:'Arachne, the Brood Queen',sub:'Something huge skitters in the dark',col:'#c18cff',win:'The Brood Queen is slain',ach:'crypt',reward:()=>addPet('spiderling')},
   nerith:{level:'temple',region:'temple',title:'Nerith, the Tide Serpent',sub:'The waters begin to rise',col:'#5fe0d0',win:'The Tide Serpent sinks into the deep',ach:'temple',reward:()=>addWeapon('trident')},
+  mycelia:{level:'fungal',region:'fungal',title:'Mycelia, the Spore Mother',sub:'The whole cave breathes in',col:'#b8e05d',win:'The spore clouds settle',ach:'mycelia',reward:()=>{addWeapon('sporestaff');addMount('snail')}},
+  colossus:{level:'clockwork',region:'clockwork',title:'The Brass Colossus',sub:'Ancient gears grind back to life',col:'#ffb347',win:'The Colossus grinds to a halt',ach:'colossus',reward:()=>{addWeapon('teslacannon');addPet('cogling')}},
   blackbrine:{level:'world',once:1,ax:CPX,ay:CPY,region:'coast',title:'Captain Blackbrine',sub:'The drowned captain returns for his crew',col:'#7fe0c8',win:"The ghost ship's curse is broken",ach:'pirate',reward:()=>{addWeapon('cutlass');addPet('parrot')}},
   pyrrhus:{level:'forge',region:'forge',title:'Pyrrhus, the Forgemaster',sub:'The forge roars back to life',col:'#ff9a3d',win:'The forge fires go cold',ach:'forgeach',reward:()=>{addWeapon('forgehammer');addMount('magmahound')}},
   malgrath:{level:'void',region:'void',title:'Malgrath, the Void King',sub:'The dark between the stars opens its eyes',col:'#b48cff',win:'The Void Rift collapses',ach:'voidking',reward:()=>{addWeapon('voidscepter');addPet('voidling')}},
@@ -780,6 +792,9 @@ const QUESTS=[
   {id:'mx3',npc:'elder',name:'The Void King',type:'flag',t:'malgrath',n:1,at:'void',desc:'Malgrath, the Void King, whispered to Aldric and to Pyrrhus. Go to the heart of the Void Rift and end him.',rw:{gold:3000,xp:2500,items:{elixir:3},mount:'lunamoth'},
     intro:[['elder','Malgrath. The Void King. He whispered to Aldric, and he whispered to Pyrrhus. He wanted the Emberstone\'s fire to burn a door into our world.'],['elder','The Wyrm is dead, so he has come himself. Go to the heart of the rift and close that door for good.']],
     outro:[['narrator','With a sound like a sigh, the Void Rift folds in on itself and is gone.'],['elder','It is over. Truly over this time. Seraphine would have been proud of you, {class}.']]},
+  {id:'mz1',npc:'elder',name:'The Brass Colossus',type:'flag',t:'colossus',n:1,at:'clockwork',desc:'Beneath the Ironcrag Hills lies a vault of the old kings, guarded by a giant of brass. Seraphine locked her last pages inside. Go and get them.',rw:{gold:4000,xp:3000,items:{elixir:3}},
+    intro:[['elder','There is one place Seraphine never wrote about openly: the Clockwork Vault, deep in the Ironcrag Hills.'],['borin','The old kings\' vault? My grandfather said there\'s a brass giant in there that never sleeps. Gears as big as a house.'],['elder','Seraphine hid her last pages there. Whatever she could not tell us is inside. Go carefully, {class}.']],
+    outro:[['borin','You took down the Colossus? With that? I\'d have brought a bigger hammer.'],['elder','Seraphine\'s last pages... Thank you. I will read them tonight, and perhaps at last I will understand her.']]},
   {id:'r1',npc:'rhea',name:'Night Watch',type:'kill',t:'bat',n:8,desc:'Bats swarm out at night and bite anyone on the roads. Bring down eight.',rw:{gold:150,xp:120,items:{hpot:2}},
     intro:[['rhea','Captain Rhea, Emberfall Watch. The roads are crawling with monsters and I have six guards.'],['rhea','So I pay bounties. You hunt, I pay. Simple.']]},
   {id:'r2',npc:'rhea',name:'Spider Season',type:'kill',t:'spider',n:10,at:[56,16],desc:'Thicket spiders are spreading through the Whisperwood. Cull ten.',rw:{gold:260,xp:220}},
@@ -793,7 +808,7 @@ const QUESTS=[
     intro:[['orrin','Ah, a visitor! Orrin, scholar of the old kingdom. I study Seraphine, the archmage.'],['orrin','She raised waystones all across the land. Touch one and it remembers you. Touch another, and you can step between them in a heartbeat.'],['orrin','There is one here in the village square. Five more wait out in the wild.']]},
   {id:'o2',npc:'orrin',name:'Pages of the Past',type:'cond',n:4,cond:()=>P.pages.length,label:'Find journal pages',desc:'Seraphine\'s journal scattered when her tower fell. The pages glow gold. Find four.',rw:{gold:400,xp:350},
     intro:[['orrin','Seraphine kept a journal. When her tower fell, the pages scattered on the wind.'],['orrin','They shimmer gold. Some fell in the wild, and some, I fear, in deeper places. Read every one you find!']]},
-  {id:'o3',npc:'orrin',name:'The Complete Journal',type:'cond',n:10,cond:()=>P.pages.length,label:'Find journal pages',desc:'Find all ten pages of Seraphine\'s journal. Five of them lie deep inside the dungeons.',rw:{gold:1200,xp:900,weapon:'seraphstaff'},
+  {id:'o3',npc:'orrin',name:'The Complete Journal',type:'cond',n:12,cond:()=>P.pages.length,label:'Find journal pages',desc:'Find all twelve pages of Seraphine\'s journal. Seven of them lie deep inside the dungeons.',rw:{gold:1200,xp:900,weapon:'seraphstaff'},
     outro:[['orrin','The whole journal. She knew someone would come after her. She wrote it for you.'],['orrin','Take her staff. I dug it out of the ruins years ago and never dared to use it. It belongs with you.']]},
   {id:'o4',npc:'orrin',name:'Treasures of the Deep',type:'cond',n:6,cond:()=>(P.dch||[]).length,label:'Open dungeon chests',desc:'The old kingdom hid its treasures below ground. Open six chests in the dungeons.',rw:{gold:700,xp:600}},
   {id:'n1',npc:'ned',name:'Catch of the Day',type:'catch',n:5,desc:'Face the water and press E to cast. When the bobber dips, strike, then stop the needle in the green.',rw:{gold:40,xp:30,items:{grilled:2}}},
@@ -816,6 +831,9 @@ const QUESTS=[
   {id:'l6',npc:'lin',name:'Apprentice Brewer',type:'cond',n:5,cond:()=>P.st.brews||0,label:'Potions brewed',desc:'Learn the craft! Brew five potions at my cauldron.',rw:{gold:200,xp:180,items:{elixir:1}}},
   {id:'l7',npc:'lin',name:'The Blighted Heart',type:'flag',t:'sylvara',n:1,at:[GX,GY,"Sylvara's grove"],desc:'Something is poisoning the western Whisperwood: dead trees, spore clouds and walking treants. Find its heart and cut it out.',rw:{gold:900,xp:900,items:{elixir:1}},
     intro:[['lin','The western Whisperwood is dying. Trees are rotting where they stand, and some of them have started to walk.'],['lin','The old songs speak of Sylvara, the forest\'s guardian. I fear the blight has taken her heart.']]},
+  {id:'l8',npc:'lin',name:'The Spore Mother',type:'flag',t:'mycelia',n:1,at:'fungal',desc:'A cave of giant mushrooms has opened east of Mirror Lake. Its spores are poisoning the water. Find the source.',rw:{gold:800,xp:800,items:{hpot:4,elixir:1}},
+    intro:[['lin','My herbs by the lake are wilting, and the water smells of mushrooms. A cave has cracked open just east of Mirror Lake.'],['lin','Something big is breathing spores into the water down there. Please be careful, and bring me a sample!']],
+    outro:[['lin','A whole mushroom queen? Incredible! And terrifying.'],['lin','The lake is already clearing. Thank you!']]},
   {id:'t1',npc:'tess',name:'Pelts Wanted',type:'bring',t:'pelt',n:6,desc:'Wolf pelts sell well in the capital. Six, please.',rw:{gold:180,xp:110}},
   {id:'t2',npc:'tess',name:'Treasure Hunter',type:'chests',n:5,desc:'Old chests are hidden all over the land, two in every region. Open five.',rw:{gold:400,xp:250}},
   {id:'t3',npc:'tess',name:'Silk Road',type:'bring',t:'silk',n:6,desc:'Thicket spiders in the Whisperwood spin the finest silk. Bring me six bundles.',rw:{gold:260,xp:160}},
@@ -832,6 +850,7 @@ const CHAPTERS=[
   {n:'III',t:'Shards of the Emberstone',q:['m5','mv','mc','mt'],sum:'You took back Seraphine\'s map from Varg the Bandit King, then descended into the Mossy Crypt and the Drowned Temple to recover two of the shards.'},
   {n:'IV',t:'Fire and Ice',q:['m6','mg','me'],sum:'You pushed back the Wyrm\'s fire imps, claimed the last shard from the Frost Titan, and Mira and Borin forged the Emberstone whole.'},
   {n:'VI',t:'The Void Beneath',q:['mx1','mx2','mx3'],sum:'You faced Pyrrhus the Forgemaster in the Ashforge Depths, followed his black-glass crown to the Void Rift, and closed it by defeating Malgrath, the Void King.'},
+  {n:'VII',t:'The Clockwork Vault',q:['mz1'],sum:'You descended into the vault of the old kings beneath the Ironcrag Hills and defeated the Brass Colossus that guarded Seraphine\'s last secrets.'},
   {n:'V',t:'The Ashen Wyrm',q:['m7'],sum:'You carried the Emberstone into the Ashen Wastes and woke the Wyrm, to end three hundred years of fear.'},
 ];
 const PROLOGUE=[
@@ -858,6 +877,8 @@ const PAGES=[
   {lv:'crypt',hint:'The Mossy Crypt',t:'Aldric took the stone into himself. It burned him hollow. The stone cracked into three, and the shards fled to the deep places, as fire seeks the dark.'},
   {lv:'temple',hint:'The Drowned Temple',t:'One shard went to the crypt beneath the forest, one to the temple the sea swallowed, and one into the frozen roots of the eastern hills. I drew a map.'},
   {lv:'forge',hint:'The Ashforge Depths',t:'Aldric did not find the stone\'s secret alone. A voice came to him in dreams, he said: a king without a face, crowned in black glass, who promised him forever.'},
+  {lv:'fungal',hint:'Mycelium Hollow',t:'The fungus beneath the lake remembers everything that rots into it. I asked it about the Wyrm. It showed me fire, and then, strangely, gears.'},
+  {lv:'clockwork',hint:'The Clockwork Vault',t:'The old kings built a guardian of brass to watch over their vault. It obeys no one now. I have locked it in, with my last pages. Forgive me. — Seraphine'},
   {lv:'void',hint:'The Void Rift',t:'I have seen him now. Malgrath. He is no king of this world. He wants the Emberstone\'s fire to burn a door between his darkness and ours. I sealed the door. Pray it holds. — Seraphine'},
   {lv:'caverns',hint:'The Frostfang Caverns',t:'To whoever reads this: the Wyrm cannot be slain while it sleeps. Reforge the stone, wake the beast, and end it. I am sorry I could not. — Seraphine'},
 ];
@@ -866,7 +887,7 @@ const ACH={
   legend:['Legend of the Lake','Catch the Moonfin'],lumber:['Lumberjack','Chop 25 trees'],miner:['Prospector','Mine 25 rocks'],
   chef:['Camp Cook','Cook 5 meals'],rich:['Deep Pockets','Hold 1,000 gold'],lv5:['Seasoned','Reach level 5'],lv10:['Hero of Emberfall','Reach level 10'],
   explorer:['Cartographer','Discover all 8 regions'],chests:['Treasure Hunter','Open 10 chests'],smith:['Master Smith','Forge an Emberbrand weapon'],
-  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],pirate:['Mutiny!','Defeat Captain Blackbrine'],forgeach:['Forgebreaker','Defeat Pyrrhus, the Forgemaster'],voidking:['Voidwalker','Defeat Malgrath, the Void King'],deepdelver:['Master Delver','Conquer all five dungeons'],sylvara:['Heartsaver','Defeat Sylvara, the Blighted Heart'],mimicry:['Not a Chest','Defeat a Mimic'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],warlord:['Warlord','Own 25 weapons'],spellweaver:['Spellweaver','Cast 200 spells'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
+  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],mycelia:['Spore Slayer','Defeat Mycelia, the Spore Mother'],colossus:['Scrap Metal','Defeat the Brass Colossus'],pirate:['Mutiny!','Defeat Captain Blackbrine'],forgeach:['Forgebreaker','Defeat Pyrrhus, the Forgemaster'],voidking:['Voidwalker','Defeat Malgrath, the Void King'],deepdelver:['Master Delver','Conquer all seven dungeons'],sylvara:['Heartsaver','Defeat Sylvara, the Blighted Heart'],mimicry:['Not a Chest','Defeat a Mimic'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],warlord:['Warlord','Own 25 weapons'],spellweaver:['Spellweaver','Cast 200 spells'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
 };
 const WEAPONS={
   mace:{n:'Training Mace',kind:'melee',draw:'hammer',style:'arc',r:62,arc:1.1,mult:1.25,cd:.46,col:'#c9cfd6',fx:{stunC:.08},d:'Heavy blows that can stun.'},
@@ -906,6 +927,8 @@ const WEAPONS={
   frostbow:{n:'Frostbite Longbow',kind:'ranged',draw:'bow',style:'shoot',pk:'arrow',spd:720,mult:.85,cd:.42,life:.8,r:5,count:3,spread:.14,col:'#9fe8ff',fx:{slow:2},d:'Three freezing arrows at once. Taken from Glacius.'},
   stormstaff:{n:'Tempest Staff',kind:'magic',draw:'staff',style:'shoot',pk:'spark',spd:660,mult:.95,cd:.4,life:.6,r:7,chain:5,col:'#9fd0ff',d:'Lightning that leaps between up to 6 enemies.'},
   deathstaff:{n:'Staff of Souls',kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:380,mult:1.3,cd:.42,life:1.3,r:9,col:'#7fe0a0',seek:1,pierce:1,fx:{raise:1,leech:.03},d:'Seeking soul orbs. Enemies it kills may rise as skeletons that fight for you. Taken from Arachne.'},
+  sporestaff:{n:'Mycelial Staff',kind:'magic',draw:'staff',style:'shoot',pk:'spit',spd:460,mult:1.2,cd:.45,life:.9,r:8,aoe:60,col:'#b8e05d',fx:{poison:4},d:'Spore bombs that burst into poison. Taken from Mycelia.'},
+  teslacannon:{n:'Tesla Cannon',kind:'ranged',draw:'crossbow',style:'shoot',pk:'spark',spd:700,mult:1.6,cd:.55,life:.7,r:7,chain:4,col:'#9fd0ff',fx:{stunC:.1},d:'Fires bolts of lightning that leap between up to 5 enemies and can stun. Taken from the Brass Colossus.'},
   cutlass:{n:"Blackbrine's Cutlass",kind:'melee',draw:'sword',style:'arc',r:66,arc:1.25,mult:1.35,cd:.3,col:'#9fe0d0',fx:{leech:.04,slow:1},d:'A ghostly cutlass: very fast slashes that slow enemies and steal a little life. Taken from Captain Blackbrine.'},
   forgehammer:{n:"Forgemaster's Hammer",kind:'melee',draw:'maul',style:'slam',r:110,mult:2.3,cd:.8,col:'#ff9a3d',fx:{burn:3,stunC:.15},d:'Molten slams that burn and can stun. Taken from Pyrrhus.'},
   voidscepter:{n:'Scepter of the Void',kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:420,mult:1.45,cd:.4,life:1.4,r:10,col:'#b48cff',seek:1,pierce:1,fx:{slow:1.5,exec:.3},d:'Seeking void orbs that pierce, slow, and hit hurt enemies harder. Taken from Malgrath.'},
@@ -916,7 +939,7 @@ const WEAPONS={
   venomfangs:{n:'Venomfangs',kind:'melee',draw:'daggers',style:'arc',r:56,arc:.95,mult:.8,cd:.22,col:'#9be15d',fx:{poison:3},d:'Lightning-fast daggers that poison with every cut.'},
   earthshaker:{n:'Earthshaker',kind:'melee',draw:'maul',style:'slam',r:122,mult:2.2,cd:.9,col:'#c9a46a',fx:{stunC:.3},d:'A huge stone maul. Massive slams that often stun.'},
   crystalblade:{n:'Crystal Greatsword',kind:'melee',draw:'sword',style:'arc',r:84,arc:1.4,mult:1.7,cd:.58,col:'#7ff0ff',crit:.1,d:'A greatsword of living crystal: huge reach and +10% critical chance.'},
-  starblade:{n:'Starforged Blade',kind:'melee',draw:'sword',style:'arc',r:78,arc:1.35,mult:1.8,cd:.42,col:'#ffe28a',wave:1,crit:.1,fx:{burn:2,slow:1},d:'The finest blade in Emberfall. Fast, wide swings that burn and slow, plus a flying wave of starlight. Reward for conquering all five dungeons.'},
+  starblade:{n:'Starforged Blade',kind:'melee',draw:'sword',style:'arc',r:78,arc:1.35,mult:1.8,cd:.42,col:'#ffe28a',wave:1,crit:.1,fx:{burn:2,slow:1},d:'The finest blade in Emberfall. Fast, wide swings that burn and slow, plus a flying wave of starlight. Reward for conquering all seven dungeons.'},
   scattershot:{n:'Scattershot Crossbow',kind:'ranged',draw:'crossbow',style:'shoot',pk:'arrow',spd:760,mult:.7,cd:.6,life:.35,r:5,count:5,spread:.14,col:'#c9cfd6',d:'Fires a spread of five bolts. Devastating up close.'},
   knives:{n:'Fan of Knives',kind:'ranged',draw:'daggers',style:'shoot',pk:'knife',spd:640,mult:.75,cd:.38,life:.55,r:6,count:3,spread:.2,col:'#e8eef6',d:'Throws three spinning knives at once.'},
   moonbow:{n:'Moonshadow Bow',kind:'ranged',draw:'bow',style:'shoot',pk:'arrow',spd:820,mult:1.35,cd:.4,life:.85,r:5,pierce:1,crit:.2,col:'#c8b4ff',d:'Arrows that pierce everything, with +20% critical chance.'},
@@ -974,6 +997,7 @@ const PETS={
   inky:{n:'Inky',atk:'shoot',mult:.5,pk:'water',pfx:{slow:2},d:'A baby sea serpent that spits slowing water bolts.',src:'Sometimes left behind when Nerith, the Tide Serpent, falls'},
   panda:{n:'Mochi',atk:'bite',mult:.35,d:'A red panda with a nose for treasure: finds a crafting material every 45 seconds.',src:'Sold by Tess for 900 gold'},
   phoenix:{n:'Cinderwing',atk:'shoot',mult:.65,fly:1,pk:'fireball',pfx:{burn:3},d:'A phoenix chick. Once every 5 minutes, if you would fall, it brings you back with half your health.',src:'Arena token shop (20 tokens)'},
+  cogling:{n:'Cogsworth',atk:'shoot',mult:.6,pk:'spark',d:'A tiny clockwork robot that rolls after you and fires sparks.',src:'Rebuilt from the Brass Colossus'},
   parrot:{n:'Polly',atk:'bite',mult:.45,fly:1,d:'A loud, clever parrot with an eye for shiny things: +20% gold from monsters.',src:"Flew off Captain Blackbrine's shoulder when he fell"},
   skye:{n:'Skye',atk:'bite',mult:.45,fly:1,d:'A fluffy harpy chick. Your dash recharges 25% faster while it flutters along.',src:'Rare: sometimes left behind by harpies'},
   snowball:{n:'Snowball',atk:'bite',mult:.5,bfx:{slow:1.5},d:'A baby yeti: +10% max health, and its bites slow enemies.',src:'Rare: sometimes found after defeating yetis'},
@@ -1002,6 +1026,7 @@ const MOUNTS={
   unicorn:{n:'Starlight',kind:'Unicorn',spd:1.9,regen:1,horn:1,lv:12,d:'Heals you steadily while you ride.',src:'Sold by Tess for 3,500 gold (level 12)',draw:'horse',body:'#f6f2fa',dark:'#b8b0c8',mane:'#d8a8ff',glow:'#ffd0f0'},
   griffin:{n:'Skyclaw',kind:'Griffin',spd:2,fly:1,d:'A noble griffin. Flies over water, lava and walls.',src:'A gift from Elder Mira after the Wyrm falls',draw:'griffin'},
   magmahound:{n:'Brimstone',kind:'Magma Hound',spd:1.9,blaze:1,d:'Burning paws set nearby enemies alight as you run.',src:'Freed from the Ashforge Depths after Pyrrhus falls',draw:'wolf',body:'#3a2420',dark:'#1a0e0a',mane:'#ff7a1f'},
+  snail:{n:'Shellby',kind:'Giant Snail',spd:1.35,sturdy:1,regen:1,d:'Slow and steady: heals you, takes 30% less damage and never gets knocked off.',src:'Befriended in Mycelium Hollow after Mycelia falls',draw:'snail'},
   mammoth:{n:'Tundra',kind:'Woolly Mammoth',spd:1.5,sturdy:1,trample:1,lv:14,d:'Enormous and unstoppable: tramples enemies, takes 30% less damage and never gets knocked off.',src:'Sold by Tess for 4,000 gold (level 14)',draw:'mammoth',body:'#8a5a38',dark:'#4a2e1a'},
   raptor:{n:'Razor',kind:'Raptor',spd:2,trample:1,d:'The fastest mount on land. Tramples enemies in its path.',src:'Arena token shop (16 tokens)',draw:'raptor',body:'#3f8f5a',dark:'#1e4a2c',mane:'#ff7a3d'},
   lunamoth:{n:'Luna',kind:'Giant Moon Moth',spd:1.95,fly:1,d:'A gentle giant moth that glows softly. Flies over water, lava and walls.',src:'Reward for closing the Void Rift (Chapter VI)',draw:'moth'},
@@ -1329,7 +1354,14 @@ function drawEnemy(g,e){
     case'glad':{const C=CLASSES[e.gcls]||CLASSES.warrior,W2=WEAPONS[STARTER[e.gcls]]||WEAPONS.sword;if(e.champ)glow(g,0,-10,40,'#ffd23f',.25+Math.sin(time*4)*.08);drawHumanoid(g,0,0,{body:C.body,trim:C.trim,hat:C.hat,hair:C.hair,skin:C.skin,weapon:W2.draw,wcol:e.champ?'#ffd23f':W2.col,tier:Math.min(5,e.rank||0),cape:shade(C.body,-.3),anim:e.anim,moving:e.moving,fx:Math.cos(e.face),fy:Math.sin(e.face),attack:e.atkAnim||0});
       g.font='800 11px Alegreya Sans, sans-serif';g.textAlign='center';g.lineWidth=3;g.strokeStyle='rgba(0,0,0,.7)';g.strokeText(e.nm,0,-52);g.fillStyle='#ffb36b';g.fillText(e.nm,0,-52);if(e.windup>0){glow(g,0,-12,24,'#ff6b6b',.4)}break}
     case'varg':drawVarg(g,e);break;case'arachne':drawArachne(g,e);break;case'nerith':drawNerith(g,e);break;case'glacius':drawGlacius(g,e);break;case'sylvara':drawSylvara(g,e);break;
-    case'blackbrine':drawBlackbrine(g,e);break;
+    case'blackbrine':drawBlackbrine(g,e);break;case'mycelia':drawMycelia(g,e);break;case'colossus':drawColossus(g,e);break;
+    case'sporeling':{const hop=e.moving?Math.abs(Math.sin(e.anim*14))*4:0;ell(g,0,8,9,3,'rgba(0,0,0,.3)');g.translate(0,-hop);g.fillStyle='#e8dcc0';rr(g,-4,-4,8,11,3);ell(g,0,-6,11,7,rgrad(g,-2,-9,11,'#d8f07a','#6a9a2a'));circ(g,-4,-8,1.6,'#f6ffd8');circ(g,4,-9,1.3,'#f6ffd8');circ(g,-2+tx,0,1.2,'#1a0e08');circ(g,2+tx,0,1.2,'#1a0e08');break}
+    case'mycoid':{const st=Math.sin(e.anim*7)*(e.moving?3:0);ell(g,0,14,16,5,'rgba(0,0,0,.3)');g.fillStyle='#d8ccb0';rr(g,-8,2+st*.4,6,12,2);rr(g,2,2-st*.4,6,12,2);rr(g,-9,-22,18,26,6);g.strokeStyle='#d8ccb0';g.lineWidth=5;g.lineCap='round';g.beginPath();g.moveTo(-8,-14);g.lineTo(-15,-2+st);g.moveTo(8,-14);g.lineTo(15,-2-st+(e.lunge>0?-8:0));g.stroke();
+      ell(g,0,-26,22,13,rgrad(g,-4,-32,22,'#c86aa8','#5a1a4a'));for(const[a,b]of[[-10,-30],[2,-34],[11,-26],[-3,-24]])circ(g,a,b,2.6,'#f6e0ff');g.fillStyle='#8a4a7a';for(let i=-16;i<=16;i+=4)g.fillRect(i,-16,2,3);glow(g,-4+tx*3,-10,5,'#e8ff6a',.8);glow(g,4+tx*3,-10,5,'#e8ff6a',.8);break}
+    case'clockbot':{drawHumanoid(g,0,0,{body:'#b8904a',trim:'#6a5030',hat:'helm',hair:'#5a4a30',skin:'#8a7a5a',weapon:'sword',wcol:'#d8d0c0',tier:3,pants:'#6a5030',anim:e.anim,moving:e.moving,fx:tx,fy:ty,attack:e.lunge>0?1:0});if(ty>-.5){g.fillStyle='#9fd0ff';g.fillRect(-5+tx*3,-21,10,2.5)}g.save();g.translate(-tx*8,-14);g.rotate(time*4);g.strokeStyle='#d9a63a';g.lineWidth=2;g.beginPath();g.arc(0,0,4,0,7);g.stroke();for(let i=0;i<6;i++){g.rotate(Math.PI/3);g.fillStyle='#d9a63a';g.fillRect(3.5,-1,2.5,2)}g.restore();break}
+    case'spiderbot':{const st=Math.sin(e.anim*16)*(e.moving?3:0);ell(g,0,8,18,5,'rgba(0,0,0,.3)');g.strokeStyle='#6a5a40';g.lineWidth=2.5;g.lineCap='round';for(let i=0;i<4;i++)for(const s2 of[-1,1]){const lx=-6+i*4;g.beginPath();g.moveTo(lx,-6);g.lineTo(lx+s2*12,-12+((i%2)?st:-st));g.lineTo(lx+s2*16,6);g.stroke()}
+      ell(g,0,-6,13,9,rgrad(g,-3,-10,13,'#d8b070','#6a5030'));circ(g,0,-8,5,'#3a3028');glow(g,0,-8,10,e.atkAnim>0?'#ffffff':'#9fd0ff',.8);circ(g,0,-8,2.4,'#dff0ff');g.strokeStyle='#9a8a6a';g.lineWidth=1.5;g.beginPath();g.moveTo(0,-14);g.lineTo(0,-20);g.stroke();circ(g,0,-21,1.8,Math.sin(time*8)>0?'#ff5050':'#ffd23f');break}
+    case'sentry':{ell(g,0,12,18,5,'rgba(0,0,0,.3)');rr(g,-14,-4,28,16,4,'#6a5a40');rr(g,-10,-8,20,6,2,'#8a7a5a');g.save();g.translate(0,-18);g.rotate(e.face);rr(g,-10,-7,20,14,4,'#b8904a');g.fillStyle='#4a4038';rr(g,8,-3,14,6,2);g.restore();glow(g,0,-18,8,'#ff4a3a',e.atkAnim>0?1:.5);circ(g,0,-18,3,'#ff8a7a');break}
     case'boar':{const ch=e.chg>0,wd=e.wind>0?Math.sin(time*40)*1.5:0,st=Math.sin(e.anim*(ch?24:12))*(e.moving?3:0);ell(g,0,12,20,5,'rgba(0,0,0,.3)');g.scale(tx<0?-1:1,1);g.translate(wd,0);g.fillStyle='#3a2a1e';for(const[lx,ph]of[[-10,1],[-4,-1],[6,1],[12,-1]])rr(g,lx-2,4+ph*st*.4,4,9,1.5);
       ell(g,0,-2,18,11,rgrad(g,-2,-6,18,'#8a6448','#4a3020'));g.fillStyle='#2a1a10';for(let i=-12;i<10;i+=4){g.beginPath();g.moveTo(i,-11);g.lineTo(i+2,-16);g.lineTo(i+4,-11);g.fill()}ell(g,15,-2,9,8,'#7a5438');ell(g,22,0,4.5,4,'#c8907a');circ(g,21,-1,1,'#3a1a10');circ(g,23,0,1,'#3a1a10');
       g.strokeStyle='#f2ead8';g.lineWidth=2.5;g.lineCap='round';g.beginPath();g.moveTo(19,3);g.quadraticCurveTo(22,6,24,1);g.stroke();circ(g,15,-6,1.6,e.aggro?'#ff4040':'#1a0e08');ell(g,10,-9,3,4,'#5a3a24');g.strokeStyle='#4a3020';g.lineWidth=2;g.beginPath();g.moveTo(-17,-4);g.quadraticCurveTo(-22,-8,-20,-12);g.stroke();break}
@@ -1401,6 +1433,20 @@ function drawEnemy(g,e){
   g.restore();
   if(e.hp<e.max&&!e.boss){const w=Math.max(30,e.r*2),y=e.y-e.r-(e.type==='golem'?30:e.type==='bat'||e.type==='wisp'?32:e.type==='bandit'||e.type==='glad'||e.type==='yeti'?36:e.type==='treant'?44:e.type==='harpy'?34:20);g.fillStyle='rgba(0,0,0,.6)';rr(g,e.x-w/2-1,y-1,w+2,6,3);g.fillStyle=e.hp/e.max>.35?'#ff5a5a':'#ffb020';rr(g,e.x-w/2,y,w*Math.max(0,e.hp/e.max),4,2)}
 }
+function drawMycelia(g,e){const pl=1+(e.pulse||0)*.06,sw=Math.sin(time*1.4)*3;ell(g,0,24,70,18,'rgba(0,0,0,.4)');glow(g,0,-60,120,'#b8e05d',.15+(e.pulse||0)*.2);
+  for(const[x,s2]of[[-56,.6],[52,.7],[-34,.45],[40,.5]]){g.save();g.translate(x,18);g.scale(s2,s2);g.fillStyle='#e8dcc0';rr(g,-5,-14,10,18,4);ell(g,0,-16,16,10,rgrad(g,-3,-20,16,'#c86aa8','#5a1a4a'));circ(g,-5,-19,2.4,'#f6e0ff');g.restore()}
+  const st=g.createLinearGradient(-22,0,22,0);st.addColorStop(0,'#f0e6cc');st.addColorStop(1,'#b8a888');g.fillStyle=st;g.beginPath();g.moveTo(-26,20);g.quadraticCurveTo(-18,-30,-20,-70);g.lineTo(20,-70);g.quadraticCurveTo(18,-30,26,20);g.closePath();g.fill();
+  for(const s2 of[-9,9]){glow(g,s2,-44,12,'#e8ff6a',.9);circ(g,s2,-44,3.4,'#f8ffd0')}g.fillStyle='#5a4a3a';g.beginPath();g.ellipse(0,-28,8,4+(e.state==='spores'?4:0),0,0,7);g.fill();
+  g.save();g.translate(sw,-76);g.scale(pl,pl);g.fillStyle='#8a4a7a';g.beginPath();g.ellipse(0,8,82,16,0,0,Math.PI);g.fill();g.strokeStyle='#6a2a5a';g.lineWidth=1.5;for(let i=-70;i<=70;i+=8){g.beginPath();g.moveTo(i*.3,8);g.lineTo(i,16-Math.abs(i)*.08);g.stroke()}
+  g.fillStyle=rgrad(g,-10,-30,90,'#e07ac0','#5a1a4a');g.beginPath();g.ellipse(0,6,84,52,0,Math.PI,Math.PI*2);g.fill();for(const[a,b,r2]of[[-50,-14,9],[-18,-34,11],[22,-30,8],[52,-10,10],[0,-10,7],[-34,-2,6],[36,4,6]]){glow(g,a,b,r2*2,'#f6e0ff',.35);circ(g,a,b,r2,'#fbeaff')}g.restore();
+  if(Math.random()<.4)particles.push({x:e.x+rnd(-70,70),y:e.y-70+rnd(-20,10),vx:rnd(-10,10),vy:rnd(-20,-6),life:2,max:2,size:2.5,col:'#d8f07a',k:'spark'})}
+function drawColossus(g,e){const st=e.moving?Math.sin(e.anim*5):0,oh=e.overheat>0,core=oh?'#ffb347':e.enraged?'#ff4a3a':'#5fd0ff',fx=Math.cos(e.face);ell(g,0,22,60,16,'rgba(0,0,0,.4)');glow(g,0,-60,100,core,oh?.4:.2);
+  g.fillStyle='#5a4a30';for(const s2 of[-1,1]){const lift=Math.max(0,s2*st)*8;rr(g,s2*22-10,-24-lift,20,40,5);rr(g,s2*22-14,10-lift,28,10,3,'#3a3028')}
+  const tg=g.createLinearGradient(-44,0,44,0);tg.addColorStop(0,'#e0b860');tg.addColorStop(1,'#8a6430');g.fillStyle=tg;rr(g,-40,-100,80,80,12);g.strokeStyle='rgba(60,40,20,.5)';g.lineWidth=2;for(const yy of[-80,-60,-40]){g.beginPath();g.moveTo(-36,yy);g.lineTo(36,yy);g.stroke()}for(const[a,b]of[[-32,-92],[32,-92],[-32,-28],[32,-28]])circ(g,a,b,2.5,'#5a4020');
+  circ(g,0,-60,15,'#3a3028');glow(g,0,-60,26,core,.9);circ(g,0,-60,9,oh?'#fff0c0':'#e8fbff');g.save();g.translate(0,-60);g.rotate(time*(oh?1:3));g.strokeStyle='#d9a63a';g.lineWidth=3;for(let i=0;i<8;i++){g.rotate(Math.PI/4);g.beginPath();g.moveTo(15,0);g.lineTo(20,0);g.stroke()}g.restore();
+  for(const s2 of[-1,1]){const sw=e.state==='pound'?-20:Math.sin(e.anim*5+s2)*4;ell(g,s2*48,-92,18,14,rgrad(g,s2*48,-96,18,'#f0c870','#8a6430'));g.fillStyle='#8a6430';rr(g,s2*48-9,-84+sw,18,44,6);if(s2>0){g.fillStyle='#4a4038';rr(g,s2*48-7,-42+sw,14,22,3);glow(g,s2*48,-18+sw,10,'#ff4a3a',e.state==='laser'?.9:.3)}else{circ(g,s2*48,-36+sw,11,'#6a5030')}}
+  rr(g,-22,-136,44,36,10,'#c89a50');g.fillStyle='#1a1410';rr(g,-16,-124,32,9,4);glow(g,fx*6,-120,18,e.state==='laser'?'#ff4a3a':core,.9);g.fillStyle=e.state==='laser'?'#ffd0c0':'#e8fbff';rr(g,-12+fx*5,-122,24,4,2);g.strokeStyle='#8a6430';g.lineWidth=3;g.beginPath();g.moveTo(0,-136);g.lineTo(0,-150);g.stroke();circ(g,0,-152,4,core);
+  if(oh&&Math.random()<.5)particles.push({x:e.x+rnd(-40,40),y:e.y-rnd(60,130),vx:rnd(-15,15),vy:-70,life:.8,max:.8,size:rnd(5,9),col:'rgba(240,240,230,.6)',k:'smoke'})}
 function drawBlackbrine(g,e){const gh=e.under?.25:.92;glow(g,0,-40,90,'#7fe0c8',e.under?.15:.25);ell(g,0,16,40,12,`rgba(0,0,0,${.35*gh})`);g.globalAlpha*=gh;
   g.save();g.scale(2,2);drawHumanoid(g,0,0,{body:'#2a3a4a',trim:'#d9a63a',hat:'tricorn',hair:'#2a4a3a',skin:'#9fd0c0',weapon:'sword',wcol:'#9fe0d0',tier:4,cape:'#1a2a2a',pants:'#1a2228',beard:1,anim:e.anim,moving:e.moving,fx:Math.cos(e.face),fy:Math.sin(e.face),attack:e.atkAnim||0});g.restore();
   const fx=Math.cos(e.face)*6;for(const s2 of[-7,7]){glow(g,s2+fx,-40,9,'#9ff0e0',.9);circ(g,s2+fx,-40,2.2,'#e8fff8')}
@@ -1650,7 +1696,7 @@ function serialize(){if(!P)return null;const p=Object.assign({},P);p.opened=ches
 function save(){const d=serialize();if(!d)return;try{localStorage.setItem(SAVE_KEY,JSON.stringify(d))}catch(e){}}
 function loadData(d){
   const base=newPlayer(d.P.cls);P=Object.assign(base,d.P);P.sk=Object.assign(base.sk,d.P.sk||{});
-  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];if(P.weapons&&['arachne','nerith','glacius','pyrrhus','malgrath'].every(k=>P.flags[k])&&!P.weapons.includes('starblade'))P.weapons.push('starblade');if(P.mounts){if(P.flags.sylvara&&!P.mounts.includes('mossback'))P.mounts.push('mossback');if(P.q.mx3&&P.q.mx3.s==='done'&&!P.mounts.includes('lunamoth'))P.mounts.push('lunamoth')}P.st.fk=P.st.fk||{};if(P.q.m1)P.flags.prologue=1;P.placing=null;
+  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];if(P.weapons&&['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus'].every(k=>P.flags[k])&&!P.weapons.includes('starblade'))P.weapons.push('starblade');if(P.mounts){if(P.flags.sylvara&&!P.mounts.includes('mossback'))P.mounts.push('mossback');if(P.q.mx3&&P.q.mx3.s==='done'&&!P.mounts.includes('lunamoth'))P.mounts.push('lunamoth')}P.st.fk=P.st.fk||{};if(P.q.m1)P.flags.prologue=1;P.placing=null;
   explored.fill(0);try{unpackBits(d.ex,explored)}catch(e){}resetFog();
   chests.forEach(c=>c.open=(P.opened||[]).includes(c.id));
   if(P.own.pet&&!P.pets.includes('fox')){P.pets.push('fox');if(!P.petId)P.petId='fox'}P.riding=false;spawnPet();
@@ -1748,6 +1794,8 @@ function updateEnemies(dt){
       if(e.ai==='hop'){e.t-=dt;if(e.t<=0&&!e.hopping){e.hopping=.45;e.t=rnd(.5,1.1)}if(ENEMY[e.type].spit){e.cd-=dt;if(e.cd<=0&&d<320){e.cd=rnd(2.2,3.2);e.spitAnim=.3;const a=Math.atan2(ay,ax);projectiles.push({x:e.x,y:e.y-8,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:6,dmg:e.atk,from:'e',k:'spit',life:1.6});noiseS(.1,.15,1400,3)}}e.spitAnim=Math.max(0,(e.spitAnim||0)-dt);
         if(e.hopping>0){e.hopping-=dt;const k=Math.sin((1-e.hopping/.45)*Math.PI);e.hopZ=k*14;e.squash=-k*.6;mx=ax*e.spd*2.2;my=ay*e.spd*2.2;if(e.hopping<=0){e.hopping=0;e.squash=.7;e.hopZ=0}}else{e.squash=Math.max(0,(e.squash||0)-dt*3)}}
       else if(e.ai==='chase'){let sp=e.spd;if(ENEMY[e.type].lunge){e.cd-=dt;if(e.cd<=0&&d<170){e.lunge=.35;e.cd=rnd(1.6,2.6)}if(e.lunge>0){e.lunge-=dt;sp*=2.6}}mx=ax*sp;my=ay*sp;if((e.type==='skeleton'||e.type==='bandit')&&d<54&&!e.atkAnim)e.atkAnim=1}
+      else if(e.ai==='zapper'){const k=d>220?1:d<140?-1:0;mx=ax*e.spd*k+(-ay)*50*Math.sin(time*2+e.seed*9);my=ay*e.spd*k+ax*50*Math.sin(time*2+e.seed*9);e.cd-=dt;if(e.cd<=0&&d<380){e.cd=rnd(1.8,2.6);e.atkAnim=1;const a=Math.atan2(ay,ax);projectiles.push({x:e.x,y:e.y-12,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:7,dmg:e.atk,from:'e',k:'ebolt',life:1.2,col:'#9fd0ff'});noiseS(.12,.2,4000,2)}}
+      else if(e.ai==='sentry'){e.cd-=dt;if(e.cd<=0&&d<420){e.cd=2.6;e.burst=3}if(e.burst>0){e.bt=(e.bt||0)-dt;if(e.bt<=0){e.bt=.18;e.burst--;e.atkAnim=1;const a=Math.atan2(ay,ax);projectiles.push({x:e.x+Math.cos(a)*16,y:e.y-18,vx:Math.cos(a)*520,vy:Math.sin(a)*520,r:6,dmg:e.atk*.7,from:'e',k:'ebolt',life:1,col:'#ff6a4a'});SFX.arrow()}}}
       else if(e.ai==='charger'){e.cd-=dt;if(e.chg>0){e.chg-=dt;mx=e.cvx;my=e.cvy;if(Math.random()<.6)particles.push({x:e.x+rnd(-10,10),y:e.y+10,vx:0,vy:-20,life:.4,max:.4,size:5,col:'#b8a07a',k:'smoke'})}else if(e.wind>0){e.wind-=dt;e.face=e.ca;if(Math.random()<.4)particles.push({x:e.x-Math.cos(e.ca)*14,y:e.y+10,vx:-Math.cos(e.ca)*60,vy:-20,life:.3,max:.3,size:3,col:'#b8a07a',k:'smoke'});if(e.wind<=0){e.chg=.7;e.cvx=Math.cos(e.ca)*e.spd*4.2;e.cvy=Math.sin(e.ca)*e.spd*4.2;noiseS(.3,.2,300,1)}}else{mx=ax*e.spd;my=ay*e.spd;if(e.cd<=0&&d<280&&d>60){e.cd=rnd(3,4.5);e.wind=.55;e.ca=Math.atan2(ay,ax);tone(180,.3,'sawtooth',.05,.7)}}}
       else if(e.ai==='pixie'){if(e.flee>0){e.flee-=dt;mx=-ax*e.spd*1.25+Math.cos(time*7+e.seed*9)*50;my=-ay*e.spd*1.25+Math.sin(time*6+e.seed*9)*50}else{mx=ax*e.spd+Math.cos(time*6+e.seed*9)*90;my=ay*e.spd+Math.sin(time*7+e.seed*9)*90}}
       else if(e.ai==='thrower'){const k=d>200?1:d<100?-1:0;mx=ax*e.spd*k;my=ay*e.spd*k;e.cd-=dt;if(e.cd<=0&&d<360){e.cd=rnd(2.2,3);e.atkAnim=1;const a=Math.atan2(ay,ax);projectiles.push({x:e.x,y:e.y-16,vx:Math.cos(a)*380,vy:Math.sin(a)*380,r:7,dmg:e.atk,from:'e',k:'spear',life:1.2,a});SFX.swing()}}
@@ -1777,7 +1825,7 @@ function updateEnemies(dt){
 }
 function updateBoss(e,dt,d,ax,ay){
   if(dist(e.x,e.y,e.ax*T,e.ay*T)>16*T||dist(P.x,P.y,e.ax*T,e.ay*T)>18*T||P.dead){e.dead=true;bossActive[e.type]=false;toast(BOSSES[e.type].title+' retreats','Its wounds close','#ff6b6b');return}
-  ({blackbrine:updateBlackbrine,pyrrhus:updatePyrrhus,malgrath:updateMalgrath,sylvara:updateSylvara,hollow:updateHollow,wyrm:updateWyrm,varg:updateVarg,arachne:updateArachne,nerith:updateNerith,glacius:updateGlacius})[e.type](e,dt,d,ax,ay);
+  ({mycelia:updateMycelia,colossus:updateColossus,blackbrine:updateBlackbrine,pyrrhus:updatePyrrhus,malgrath:updateMalgrath,sylvara:updateSylvara,hollow:updateHollow,wyrm:updateWyrm,varg:updateVarg,arachne:updateArachne,nerith:updateNerith,glacius:updateGlacius})[e.type](e,dt,d,ax,ay);
 }
 function updateHollow(e,dt,d,ax,ay){
   e.face=Math.atan2(ay,ax);e.t-=dt;e.enraged=e.hp<e.max*.35;const spd=e.enraged?1.4:1;e.sumCd=(e.sumCd||0)-dt;
@@ -1842,6 +1890,32 @@ function updateGlacius(e,dt,d,ax,ay){
       else e.t=1.5}}
   else if(e.state==='shards'){e.sub-=dt;if(e.sub<=0&&e.waves<(e.enraged?4:3)){e.sub=.42;e.waves++;for(let i=0;i<14;i++){const a=i/14*Math.PI*2+e.waves*.22;projectiles.push({x:e.x,y:e.y-40,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:7,dmg:e.atk*.5,from:'e',k:'ice',life:2.2,a,pslow:1.2})}noiseS(.2,.25,3500,1)}if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}}
   else if(e.state==='breath'){e.sub-=dt;if(e.sub<=0){e.sub=.06;const a=e.face+rnd(-.35,.35);projectiles.push({x:e.x+Math.cos(e.face)*40,y:e.y-36,vx:Math.cos(a)*320,vy:Math.sin(a)*320,r:8,dmg:e.atk*.4,from:'e',k:'ice',life:1.2,a,pslow:1.5})}if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}}
+  else if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}
+  if(d<e.r+P.r&&P.iT<=0&&P.dashT<=0)hurtPlayer(e.atk,e);
+}
+function updateMycelia(e,dt,d,ax,ay){
+  e.face=Math.atan2(ay,ax);e.t-=dt;e.enraged=e.hp<e.max*.4;const spd=e.enraged?1.3:1;e.sumCd=(e.sumCd||0)-dt;e.pulse=Math.max(0,(e.pulse||0)-dt*2);
+  if(e.state==='move'){if(e.t<=0){const o=['spores','lines','rain','spores','lines'];if(e.sumCd<=0)o.push('summon');bossPick(e,o);
+      if(e.state==='spores'){e.t=1.4;e.pulse=1;for(let i=0;i<8;i++){const a=i/8*Math.PI*2+rnd(0,.4);hazards.push({x:e.x+Math.cos(a)*140,y:e.y+Math.sin(a)*100,r:58,t:-.6,max:4,tick:0,dps:e.atk*.5,col:'#b8e05d'})}for(let i=0;i<(e.enraged?4:2);i++)hazards.push({x:P.x+rnd(-80,80),y:P.y+rnd(-60,60),r:56,t:-.7,max:4,tick:0,dps:e.atk*.5,col:'#b8e05d'});noiseS(.5,.3,700,.5)}
+      else if(e.state==='lines'){e.t=1.4;const a0=e.face,n=e.enraged?8:4;for(let l=0;l<n;l++){const aa=a0+l/n*Math.PI*2;for(let i=1;i<=9;i++)teles.push({x:e.x+Math.cos(aa)*i*44,y:e.y+Math.sin(aa)*i*36,r:26,t:-i*.05,max:.6,dmg:e.atk*.8,pslow:.8})}tone(140,.5,'sawtooth',.06,.6)}
+      else if(e.state==='rain')e.t=2.2;
+      else{e.t=1;e.sumCd=12;for(let i=0;i<(e.enraged?6:4);i++){const m=spawnEnemy('sporeling',e.x+rnd(-140,140),e.y+rnd(40,120),'fungal');m.spawnT=0;m.aggro=true;puff(m.x,m.y,'#b8e05d',10)}toast('Sporelings burst from the ground!','','#b8e05d')}}}
+  else if(e.state==='rain'){e.sub-=dt;if(e.sub<=0&&e.waves<(e.enraged?10:7)){e.sub=.28;e.waves++;const a=Math.atan2(ay,ax)+rnd(-.5,.5);projectiles.push({x:e.x,y:e.y-90,vx:Math.cos(a)*260,vy:Math.sin(a)*260,r:9,dmg:e.atk*.55,from:'e',k:'spit',life:2.6,home:e.waves%2?1:0});noiseS(.1,.15,1400,3)}if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}}
+  else if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}
+  if(d<e.r+P.r&&P.iT<=0&&P.dashT<=0)hurtPlayer(e.atk,e);
+}
+function updateColossus(e,dt,d,ax,ay){
+  e.t-=dt;e.enraged=e.hp<e.max*.4;const spd=e.enraged?1.3:1;e.sumCd=(e.sumCd||0)-dt;e.moving=false;e.overheat=Math.max(0,(e.overheat||0)-dt);
+  if(e.state!=='laser')e.face=Math.atan2(ay,ax);
+  if(e.overheat>0){if(Math.random()<.7)particles.push({x:e.x+rnd(-30,30),y:e.y-rnd(40,90),vx:rnd(-20,20),vy:-60,life:.9,max:.9,size:rnd(6,10),col:'rgba(230,230,220,.6)',k:'smoke'});if(d<e.r+P.r&&P.iT<=0&&P.dashT<=0)hurtPlayer(e.atk*.6,e);return}
+  if(e.state==='move'){if(d>140){moveEnt(e,ax*e.spd*spd*dt,ay*e.spd*spd*dt);e.moving=true}
+    if(e.t<=0){const o=['laser','rockets','pound','laser','rockets'];if(e.sumCd<=0)o.push('summon');bossPick(e,o);
+      if(e.state==='laser'){e.t=2.2;e.la=e.face-1.2;e.atkAnim=1;tone(220,2,'sawtooth',.05,2)}
+      else if(e.state==='rockets'){e.t=1.6;const n=e.enraged?8:6;for(let i=0;i<n;i++){const a=-Math.PI/2+(i-(n-1)/2)*.35;projectiles.push({x:e.x+(i%2?24:-24),y:e.y-80,vx:Math.cos(a)*240,vy:Math.sin(a)*240,r:9,dmg:e.atk*.6,from:'e',k:'rocket',life:3.2,home:1})}noiseS(.6,.3,500,.6)}
+      else if(e.state==='pound'){e.t=1.8;e.atkAnim=1;for(let k=1;k<=3;k++){const n=8*k;for(let i=0;i<n;i++){const a=i/n*Math.PI*2+k*.2;teles.push({x:e.x+Math.cos(a)*85*k,y:e.y+Math.sin(a)*65*k,r:34,t:-(k-1)*.35,max:.6,dmg:e.atk*.8})}}shake=Math.max(shake,.5);tone(60,.8,'sine',.15,.5)}
+      else{e.t=1;e.sumCd=16;for(let i=0;i<(e.enraged?3:2);i++){const m=spawnEnemy(i===2?'clockbot':'spiderbot',e.x+rnd(-140,140),e.y+rnd(40,120),'clockwork');m.spawnT=0;m.aggro=true;puff(m.x,m.y,'#ffd27a',12)}toast('The Colossus deploys its drones!','','#ffb347')}}}
+  else if(e.state==='laser'){e.la+=dt*2.4/2.2*(e.enraged?1.2:1);e.face=e.la;e.sub-=dt;if(e.sub<=0){e.sub=.045;projectiles.push({x:e.x+Math.cos(e.la)*30,y:e.y-70,vx:Math.cos(e.la)*560,vy:Math.sin(e.la)*560,r:8,dmg:e.atk*.32,from:'e',k:'ebolt',life:1.1,col:'#ff4a3a'})}
+    if(e.t<=0){e.state='move';e.t=rnd(1.4,2)/spd;e.overheat=e.enraged?2:2.8;ftext(e.x,e.y-120,'OVERHEATED!','#ffb347',18);toast('The Colossus is overheating!','Strike now: it takes extra damage','#ffb347')}}
   else if(e.t<=0){e.state='move';e.t=rnd(1.3,2)/spd}
   if(d<e.r+P.r&&P.iT<=0&&P.dashT<=0)hurtPlayer(e.atk,e);
 }
@@ -1924,7 +1998,7 @@ function checkBoss(){
 }
 function hurtEnemy(e,mult,ax,ay,critBonus=0,fx=null){
   if(fx&&fx.exec&&e.hp<e.max*.35)mult*=1+fx.exec;
-  if(e.type==='wyrm'&&P.flags.emberstone)mult*=1.35;if(e.boss&&tl('titan'))mult*=1+.08*tl('titan');
+  if(e.type==='wyrm'&&P.flags.emberstone)mult*=1.35;if(e.type==='colossus'&&e.overheat>0)mult*=1.6;if(e.boss&&tl('titan'))mult*=1+.08*tl('titan');
   if(e.dead||e.spawnT>.2||e.under)return;
   if(e.hp<e.max*.3&&tl('execute'))mult*=1.3;
   const S=stats();let crit=Math.random()<.12+critBonus+.03*tl('crit')+acc('crit');let dmg=Math.max(1,Math.round(S.atk*mult*rnd(.9,1.1)-e.def*.5));if(crit)dmg=Math.round(dmg*1.8);
@@ -1949,13 +2023,14 @@ function killEnemy(e){
   const pd=PET_DROP[e.type];if(pd&&!P.pets.includes(pd[0])&&Math.random()<pd[1])addPet(pd[0]);
   if(e.type==='shade'&&!P.mounts.includes('umbra')&&Math.random()<.015){addMount('umbra');toast('A shadow panther stays behind!','Umbra joins your stable','#b48cff')}
   P.st.kt=P.st.kt||{};P.st.kt[e.type]=(P.st.kt[e.type]||0)+1;if(Object.keys(ENEMY).every(k=>ENEMY[k].ai==='boss'||ENEMY[k].noBest||P.st.kt[k]))unlock('scholar');
+  if(d.burst)hazards.push({x:e.x,y:e.y,r:46,t:0,max:2.5,tick:.3,dps:e.atk*.6,col:'#b8e05d'});
   if(e.stolen){for(let i=0;i<4;i++)drop('gold',e.x,e.y,Math.ceil(e.stolen/4));ftext(e.x,e.y-30,'Gold recovered!','#ffd23f',13)}
   if(e.type==='glad')arenaWin(e);if(e.type==='mimic'){unlock('mimicry');for(let i=0;i<2;i++)drop('item',e.x,e.y,1,pick(['crystal','gold','ember','hpot']))}
   if(e.raiseFx&&!e.boss&&e.type!=='glad'&&Math.random()<.3){allies.push({type:'skeleton',x:e.x,y:e.y,t:12,cd:0,anim:0,face:0,flash:0,spawnT:0,hp:1,max:1,r:15,aggro:true,gcol:'#7fe0a0',mult:.55,moving:true});puff(e.x,e.y,'#7fe0a0',12);ftext(e.x,e.y-30,'Risen!','#7fe0a0',13);while(allies.filter(w=>w.type==='skeleton').length>8)allies.splice(allies.findIndex(w=>w.type==='skeleton'),1)}
   if(e.type==='arachne'&&!P.weapons.includes('deathstaff')&&Math.random()<.35)addWeapon('deathstaff');if(e.type==='glacius'&&!P.weapons.includes('frostbow')&&Math.random()<.35)addWeapon('frostbow');
   if(d.split){for(const s of[-1,1]){const m=spawnEnemy('magmite',e.x+s*12,e.y,'ash');m.spawnT=0;m.kx=s*260;m.aggro=true}}
   if(e.boss&&BOSSES[e.type].win){const B=BOSSES[e.type],first=!P.flags[e.type];bossActive[e.type]=false;bossDone[e.type]=true;P.flags[e.type]=true;
-    if(first){B.reward();unlock(B.ach);if(['arachne','nerith','glacius'].every(k=>P.flags[k]))unlock('delver');if(['arachne','nerith','glacius','pyrrhus','malgrath'].every(k=>P.flags[k])){unlock('deepdelver');if(!P.weapons.includes('starblade')){addWeapon('starblade');toast('Starforged Blade','Your reward for conquering every dungeon','#ffe28a')}}}else{drop('item',e.x,e.y,1,'crystal');drop('item',e.x,e.y,1,'ember')}
+    if(first){B.reward();unlock(B.ach);if(['arachne','nerith','glacius'].every(k=>P.flags[k]))unlock('delver');if(['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus'].every(k=>P.flags[k])){unlock('deepdelver');if(!P.weapons.includes('starblade')){addWeapon('starblade');toast('Starforged Blade','Your reward for conquering every dungeon','#ffe28a')}}}else{drop('item',e.x,e.y,1,'crystal');drop('item',e.x,e.y,1,'ember')}
     banner={title:first?'Victory':'Victory again',sub:B.win,t:-1,col:B.col};shake=1;SFX.boom();for(let i=0;i<4;i++)setTimeout(()=>{spark(e.x+rnd(-50,50),e.y+rnd(-40,20),B.col,24,220)},i*200);
     if(B.level!=='world')openPortal(e);save()}
   else if(e.boss&&e.type==='hollow'){bossActive.hollow=false;P.flags.hollow=true;unlock('king');addWeapon('hollowstaff');addPet('lumen');addMount('shadow');drop('item',e.x,e.y,1,'crown');for(let i=0;i<3;i++)drop('item',e.x,e.y,1,'crystal');
@@ -2326,6 +2401,7 @@ function drawPetSprite(g,type,x,y,fx,anim,moving){
   if(type==='voidling'){const fl=Math.sin(time*3+x*.01)*3;g.save();g.translate(x,y);ell(g,0,7,7,2.5,'rgba(0,0,0,.2)');g.translate(0,-16+fl);glow(g,0,0,20,'#b48cff',.45);circ(g,0,0,8,rgrad(g,-2,-2,9,'#4a2a7a','#0a0612'));for(let i=0;i<3;i++){const an=time*2+i*2.1;circ(g,Math.cos(an)*12,Math.sin(an)*5,1.6,'#e6d0ff')}circ(g,-3,-1,1.6,'#ffffff');circ(g,3,-1,1.6,'#ffffff');g.restore();return}
   if(type==='sapling'){const hop=moving?Math.abs(Math.sin(anim*10))*3:0,sw=Math.sin(time*2)*1.5;g.save();g.translate(x,y);ell(g,0,7,8,3,'rgba(0,0,0,.25)');g.translate(0,-hop);g.fillStyle='#6a4a32';rr(g,-3,-8,6,14,2);g.strokeStyle='#6a4a32';g.lineWidth=2;g.beginPath();g.moveTo(-3,4);g.lineTo(-6,8);g.moveTo(3,4);g.lineTo(6,8);g.stroke();for(const[a,b,r2]of[[-5,-12,6],[5,-13,6],[0,-18,7]])circ(g,a+sw,b,r2,rgrad(g,a+sw,b,r2,'#9be15d','#3f8f3a'));circ(g,-2,-4,1,'#1a0e08');circ(g,2,-4,1,'#1a0e08');circ(g,3+sw,-20,1.6,'#ff8fb1');g.restore();return}
   if(type==='bat')return sc(.75,6,fake('bat',{r:11}));
+  if(type==='cogling'){const rl=moving?anim*12:0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,7,9,3,'rgba(0,0,0,.25)');for(const wx of[-5,5]){circ(g,wx,4,3.5,'#3a3028');g.strokeStyle='#8a7a5a';g.lineWidth=1;g.beginPath();g.moveTo(wx,4);g.lineTo(wx+Math.cos(rl)*3,4+Math.sin(rl)*3);g.stroke()}rr(g,-7,-10,14,12,3,'#c89a50');rr(g,-5,-18,10,8,2,'#d8b070');g.fillStyle='#1a1410';g.fillRect(-3,-16,7,3);circ(g,2,-14.5,1.2,'#5fd0ff');g.strokeStyle='#8a6430';g.lineWidth=1.2;g.beginPath();g.moveTo(0,-18);g.lineTo(0,-23);g.stroke();circ(g,0,-24,1.6,Math.sin(time*6)>0?'#ff5050':'#ffd23f');g.restore();return}
   if(type==='parrot'){const fl=Math.sin(time*16+x*.01),hov=Math.sin(time*3+x*.01)*3;g.save();g.translate(x,y);ell(g,0,7,6,2,'rgba(0,0,0,.2)');g.translate(0,-20+hov);g.scale(fx,1);g.fillStyle='#2a6ad8';for(const s2 of[-1,1]){g.beginPath();g.moveTo(-2,-2);g.lineTo(-6+s2*2,-12-fl*7*s2);g.lineTo(4,-1);g.closePath();g.fill()}g.fillStyle='#2f9a4a';g.beginPath();g.moveTo(-5,2);g.lineTo(-13,10);g.lineTo(-9,2);g.fill();ell(g,0,0,6,7,rgrad(g,-1,-2,7,'#ff5a4a','#b8201a'));circ(g,3,-7,4.5,'#ff5a4a');ell(g,3,-5,2.5,1.8,'#fff4e0');g.fillStyle='#f2d24a';g.beginPath();g.moveTo(6,-8);g.quadraticCurveTo(10,-7,7,-4);g.closePath();g.fill();circ(g,4,-8,1,'#111');g.restore();return}
   if(type==='stinger')return sc(.55,3,fake('scorpion'));
   if(type==='puff')return sc(.55,3,fake('sporecap',{puff:pet&&pet.cd>.6?1:0}));
@@ -2385,6 +2461,11 @@ function drawMount(g,id,x,y,fx,anim,moving){
     ell(g,22,-20,12,11,rgrad(g,22,-24,12,'#ffffff','#c9c3b4'));g.fillStyle='#ffc23f';g.beginPath();g.moveTo(32,-22);g.quadraticCurveTo(42,-20,34,-12);g.lineTo(30,-17);g.closePath();g.fill();circ(g,26,-23,2,'#2a1a10');g.fillStyle='#e8e4dc';g.beginPath();g.moveTo(16,-28);g.lineTo(14,-38);g.lineTo(21,-30);g.fill();
     g.fillStyle='#a8804a';g.beginPath();g.moveTo(-2,-14);g.lineTo(-22,-56-fl*22);g.lineTo(-10,-38);g.lineTo(-20,-28-fl*6);g.lineTo(10,-12);g.closePath();g.fill();g.fillStyle='#8a5a30';rr(g,-8,-20,16,6,3);
     g.restore();return -48+hov}
+  if(M.draw==='snail'){const sq=moving?Math.sin(anim*6)*2:0;ell(g,0,8,40,9,'rgba(0,0,0,.3)');g.scale(fx,1);g.fillStyle='rgba(200,230,240,.25)';ell(g,-20,8,26,4);
+    g.fillStyle='#c8b090';g.beginPath();g.moveTo(-40,8);g.quadraticCurveTo(-10,0+sq,24,6);g.quadraticCurveTo(34,-6,32,-24);g.quadraticCurveTo(30,-34,22,-32);g.quadraticCurveTo(18,-14,8,-6);g.lineTo(-40,0);g.closePath();g.fill();
+    g.strokeStyle='#c8b090';g.lineWidth=3;g.lineCap='round';for(const s2 of[0,6]){g.beginPath();g.moveTo(26+s2*.3,-30);g.lineTo(28+s2,-44);g.stroke();circ(g,28+s2,-45,3,'#3a2a20')}
+    circ(g,-6,-24,26,rgrad(g,-12,-32,28,'#e8a85a','#8a4a1a'));g.strokeStyle='#6a3a10';g.lineWidth=3;g.beginPath();for(let i=0;i<40;i++){const a=i*.35,rr2=24-i*.55;const px=-6+Math.cos(a)*rr2,py=-24+Math.sin(a)*rr2;i?g.lineTo(px,py):g.moveTo(px,py)}g.stroke();
+    g.fillStyle='#6a4a8a';rr(g,-16,-52,22,8,3);g.restore();return -52}
   if(M.draw==='mammoth'){const st=moving?Math.sin(anim*8):0,sw=Math.sin(time*2);ell(g,0,8,48,11,'rgba(0,0,0,.3)');g.scale(fx,1);
     g.fillStyle=M.dark;for(const[lx,ph]of[[-26,1],[-12,-1],[14,1],[28,-1]])rr(g,lx-6,-16+Math.max(0,ph*st)*-3,12,26,5);
     g.strokeStyle=M.dark;g.lineWidth=4;g.lineCap='round';g.beginPath();g.moveTo(-42,-36);g.quadraticCurveTo(-52,-24,-48,-12);g.stroke();
@@ -2483,6 +2564,8 @@ function updateWorld(dt){
     if(r==='forest'&&Math.random()<dt*2)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy-vh/2+rnd(0,vh*.5),vx:rnd(10,30),vy:rnd(15,35),life:7,max:7,size:3.5,col:pick(['#c8722b','#e0a02f','#7aa83a']),k:'leaf'});
     if(r==='crypt'&&Math.random()<dt*5)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+rnd(-vh/2,vh/2),vx:rnd(-6,6),vy:rnd(-6,6),life:5,max:5,size:2,col:'#cfc9bb',k:'smoke'});
     if(r==='caverns'&&Math.random()<dt*16)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy-vh/2+rnd(0,vh),vx:rnd(-10,10),vy:rnd(15,35),life:4,max:4,size:rnd(1.5,2.5),col:'#ffffff',k:'spark'});
+    if(r==='fungal'&&Math.random()<dt*10)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+rnd(-vh/2,vh/2),vx:rnd(-8,8),vy:rnd(-14,-4),life:4,max:4,size:rnd(1.5,3),col:pick(['#b8e05d','#e8ffb0','#7fd6a0']),k:'spark'});
+    if(r==='clockwork'&&Math.random()<dt*6)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+vh/2-rnd(0,vh),vx:rnd(-6,6),vy:rnd(-30,-12),life:2.5,max:2.5,size:rnd(4,7),col:'rgba(220,220,210,.5)',k:'smoke'});
     if(r==='forge'&&Math.random()<dt*14)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+vh/2-rnd(0,vh*.6),vx:rnd(-10,10),vy:rnd(-40,-15),life:3,max:3,size:rnd(1.5,3),col:pick(['#ff7a1f','#ffb347']),k:'ember'});
     if(r==='void'&&Math.random()<dt*8)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+rnd(-vh/2,vh/2),vx:rnd(-8,8),vy:rnd(-12,-4),life:4,max:4,size:rnd(2,3.5),col:pick(['#b48cff','#6a4aa8','#e6d0ff']),k:'spark'});
     if(r==='temple'&&Math.random()<dt*6)particles.push({x:cx+rnd(-vw/2,vw/2),y:cy+rnd(-vh/2,vh/2),vx:0,vy:rnd(-25,-10),life:2.5,max:2.5,size:rnd(2,4),col:'#9fe0ff',k:'smoke'});
@@ -2600,6 +2683,8 @@ function render(){
     else if(p.k==='ice'){g.save();g.translate(p.x,p.y);g.rotate(p.a);if(p.big)g.scale(2.4,1.7);glow(g,0,0,16,'#8fe3ff',.5);g.fillStyle='#e8fbff';g.beginPath();g.moveTo(10,0);g.lineTo(-4,-4);g.lineTo(-8,0);g.lineTo(-4,4);g.closePath();g.fill();g.restore()}
     else if(p.k==='void'){glow(g,p.x,p.y,24,'#a98cff',.7);circ(g,p.x,p.y,7,'#2a1a4a');g.strokeStyle='#d8ccff';g.lineWidth=1.5;g.beginPath();g.arc(p.x,p.y,7,time*8,time*8+4);g.stroke()}
     else if(p.k==='wave'){g.save();g.translate(p.x,p.y);g.rotate(p.a);g.globalAlpha=Math.min(1,p.life*3);glow(g,0,0,30,p.col||'#ff7a1f',.5);g.strokeStyle=p.col||'#ffb347';g.lineWidth=7;g.lineCap='round';g.beginPath();g.arc(-10,0,22,-1,1);g.stroke();g.strokeStyle='#fff1a8';g.lineWidth=3;g.beginPath();g.arc(-10,0,22,-.8,.8);g.stroke();g.restore()}
+    else if(p.k==='ebolt'){glow(g,p.x,p.y,16,p.col||'#9fd0ff',.7);g.strokeStyle='#ffffff';g.lineWidth=2.5;g.beginPath();g.moveTo(p.x-p.vx*.02,p.y-p.vy*.02);g.lineTo(p.x+p.vx*.012,p.y+p.vy*.012);g.stroke()}
+    else if(p.k==='rocket'){g.save();g.translate(p.x,p.y);g.rotate(Math.atan2(p.vy,p.vx));g.fillStyle='#b8a070';rr(g,-8,-3,14,6,3);g.fillStyle='#c03030';g.beginPath();g.moveTo(6,-3);g.lineTo(11,0);g.lineTo(6,3);g.fill();g.fillStyle='#6a5a40';g.fillRect(-9,-5,3,10);glow(g,-11,0,10,'#ff9a3d',.9);g.restore();if(Math.random()<.6)particles.push({x:p.x,y:p.y,vx:rnd(-10,10),vy:rnd(-10,10),life:.5,max:.5,size:4,col:'rgba(200,200,200,.6)',k:'smoke'})}
     else if(p.k==='anchor'){g.save();g.translate(p.x,p.y);g.rotate(p.spin||0);glow(g,0,0,26,'#7fe0c8',.3);g.strokeStyle='#5a6068';g.lineWidth=4;g.lineCap='round';g.beginPath();g.moveTo(0,-14);g.lineTo(0,12);g.moveTo(-7,-8);g.lineTo(7,-8);g.stroke();g.beginPath();g.arc(0,2,11,.3,Math.PI-.3);g.stroke();g.lineWidth=2.5;g.beginPath();g.arc(0,-17,3.5,0,7);g.stroke();g.restore()}
     else if(p.k==='spear'){g.save();g.translate(p.x,p.y);g.rotate(Math.atan2(p.vy,p.vx));g.strokeStyle='#8a6440';g.lineWidth=2.5;g.beginPath();g.moveTo(-18,0);g.lineTo(8,0);g.stroke();g.fillStyle='#c9cfd6';g.beginPath();g.moveTo(14,0);g.lineTo(6,-3.5);g.lineTo(6,3.5);g.closePath();g.fill();g.restore()}
     else if(p.k==='knife'){g.save();g.translate(p.x,p.y);g.rotate((p.t||0)*22);g.fillStyle='#e8eef6';g.beginPath();g.moveTo(9,0);g.lineTo(-2,-3);g.lineTo(-2,3);g.closePath();g.fill();g.fillStyle='#6a4a2a';g.fillRect(-7,-1.8,5,3.6);g.restore()}
@@ -2659,7 +2744,7 @@ function render(){
       else if(o.type==='glowcap'&&!o.gone)add(o.x,o.y,80,'#a493ff',.7);else if(o.type==='rock'&&o.ore==='crystal'&&!o.gone)add(o.x,o.y-14,90,'#72e9ff',.6)}
     for(const p of projectiles){const cool=p.k==='bolt'||p.k==='wisp'||p.k==='spark'||p.k==='ice'||p.k==='void';add(p.x,p.y,p.k==='arrow'||p.k==='bone'||p.k==='spit'||p.k==='boomerang'?0:cool?90:150,cool?(p.col||'#7fb6ff'):'#ff7a1f',.9)}for(const w of allies)add(w.x,w.y,80,'#9fd6ff',.6);if(pet&&pet.type==='lumen')add(pet.x,pet.y-20,240,'#7fd6ff',.9);if(pet&&pet.type==='glimmer')add(pet.x,pet.y-20,200,'#d8ffb0',.85);if(pet&&pet.type==='whelp')add(pet.x,pet.y-24,90,'#ff7a1f',.7);if(P&&P.riding&&P.mountId==='shadow')add(P.x,P.y-20,90,'#a98cff',.6);for(const t of teles)if(t.p&&!t.done)add(t.x,t.y,160,'#ff7a1f',.8);
     for(const p of particles)if(p.k==='firefly')add(p.x,p.y,30,'#d9ff7a',.5);
-    for(const e of enemies){if(e.boss&&['arachne','nerith','glacius','varg','sylvara','pyrrhus','malgrath','blackbrine'].includes(e.type))add(e.x,e.y-30,220,BOSSES[e.type].col,.6);if(e.type==='imp'||e.type==='wyrm'||e.type==='magma')add(e.x,e.y,e.boss?260:110,'#ff7a1f',.8);else if(e.type==='wisp'||e.type==='hollow')add(e.x,e.y-20,e.boss?240:110,'#7fb6ff',.8)}
+    for(const e of enemies){if(e.boss&&['arachne','nerith','glacius','varg','sylvara','pyrrhus','malgrath','blackbrine','mycelia','colossus'].includes(e.type))add(e.x,e.y-30,220,BOSSES[e.type].col,.6);if(e.type==='imp'||e.type==='wyrm'||e.type==='magma')add(e.x,e.y,e.boss?260:110,'#ff7a1f',.8);else if(e.type==='wisp'||e.type==='hollow')add(e.x,e.y-20,e.boss?240:110,'#7fb6ff',.8)}
     for(let i=0;i<lavaLights.length;i+=2)add(lavaLights[i][0],lavaLights[i][1],110,'#ff6a1f',.8);
     lctx.setTransform(1,0,0,1,0,0);lctx.globalCompositeOperation='source-over';lctx.clearRect(0,0,lc.width,lc.height);lctx.fillStyle=`rgba(6,9,30,${Math.min(.9,dk)})`;lctx.fillRect(0,0,lc.width,lc.height);
     lctx.globalCompositeOperation='destination-out';
@@ -2874,7 +2959,7 @@ function openQuests(tab='active'){
 }
 const portraitCache={};
 function enemyPortrait(type,unknown){const key=type+(unknown?'?':'');if(portraitCache[key])return portraitCache[key];const c=document.createElement('canvas');c.width=c.height=160;const g=c.getContext('2d');
-  const d=ENEMY[type],sc=['arachne','nerith','glacius','sylvara','pyrrhus','malgrath','blackbrine'].includes(type)?.5:type==='varg'?.95:type==='wyrm'?.62:type==='hollow'?.85:type==='golem'?1.5:type==='magma'?1.6:2;g.translate(80,type==='bat'||type==='wisp'?118:type==='hollow'?132:type==='wyrm'?100:104);g.scale(sc,sc);
+  const d=ENEMY[type],sc=['arachne','nerith','glacius','sylvara','pyrrhus','malgrath','blackbrine','mycelia','colossus'].includes(type)?.5:type==='varg'?.95:type==='wyrm'?.62:type==='hollow'?.85:type==='golem'?1.5:type==='magma'?1.6:2;g.translate(80,type==='bat'||type==='wisp'?118:type==='hollow'?132:type==='wyrm'?100:104);g.scale(sc,sc);
   const e={type,x:0,y:0,face:Math.PI/2,flash:0,spawnT:0,anim:.3,hp:1,max:1,r:d.r,col:d.col||'#5fd35f',seed:.4,state:'move',moving:false,atkAnim:0};drawEnemy(g,e);
   if(unknown){g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-in';g.fillStyle='#2b3354';g.fillRect(0,0,160,160)}
   return portraitCache[key]=c.toDataURL()
