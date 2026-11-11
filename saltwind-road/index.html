@@ -2162,6 +2162,10 @@ const NPCS = [
    hello:["Build it tall! Build it proud!","The tide waits for no castle.","Bucket and spade, ready?"], rumors:["Drop each layer right on top of the last. Any overhang crumbles away, so the tower gets thinner and thinner."]},
   {id:'fizzwick',town:'thorn',dx:-4,dy:3,name:'Fizzwick the Alchemist',role:'Strange potions',cols:{cloak:'#6a2a8a',skin:'#c0d0a0',hair:'#e0e040'},alchemist2:true,freeSpot:true,
    hello:["Bubble, bubble! Want to try something?","Side effects are half the fun!","Hee hee... one sip won't hurt."], rumors:["Drink a Giant Draught before a big fight. Drink a Shrinking Elixir to sneak past trouble. And never, ever mix them."]},
+  {id:'ned',town:'wren',dx:-6,dy:5,name:'Ned the Newsboy',role:'Paper route',cols:{cloak:'#3a5a8a',skin:'#e8c098',hair:'#c08040'},newsboy:true,freeSpot:true,
+   hello:["Extra! Extra! Read all about it!","Papers! Fresh papers!","My legs are tired. Want to do my route?"], rumors:["Just run past the houses with a paper over them. I throw 'em from the path, easy."]},
+  {id:'lotto',town:'highcairn',dx:-4,dy:-4,name:'Lottie Luckpenny',role:'Saltwind Lottery',cols:{cloak:'#2a8a4a',skin:'#d8b090',hair:'#2a2a2a'},lottery:true,freeSpot:true,
+   hello:["Feeling lucky?","Three numbers, one dream!","Tomorrow's draw could be yours!"], rumors:["The draw happens every morning. Match all three numbers and you win the jackpot!"]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4821,6 +4825,52 @@ function potTick(dt) {
   for (const k in POT) if (POT[k] > 0) { const b = POT[k]; POT[k] = Math.max(0, POT[k] - dt); if (b > 0 && POT[k] === 0) { floatText(S.x, S.y - 1.6, k === 'giant' ? 'Back to normal size' : k === 'tiny' ? 'You grow back' : 'The tonic wears off', '#cfd6dc'); partyT = 0; } else if (b > 5 && POT[k] <= 5) floatText(S.x, S.y - 1.6, 'Wearing off...', '#cfd6dc'); }
   if (POT.swift > 0 && player.moving && Math.random() < .3) particles.push({x: S.x, y: S.y - .2, vx: 0, vy: 0, t: .3, col: 'rgba(120,220,240,.6)'});
 }
+// ===== paper route =====
+let paper = null;
+function paperTalk(n) {
+  if (paper) { say(`“${paper.houses.filter(h => !h.done).length} houses to go and ${Math.ceil(paper.t)} seconds left! Run!”`, [{label: 'Quit the route', fn: () => { paper = null; $('courierUI').hidden = true; say('“Aww. I’ll do it myself then.”', [back(n)]); }}, back(n)]); return; }
+  if (S.paperDay === S.day) { say('“That’s today’s papers all delivered. Come back tomorrow!”', [back(n)]); return; }
+  say(`“Every house in town gets a paper today. Run past each one with a paper over it and I’ll pay you. Faster is better! You get 75 seconds.”${S.paperBest ? `<br><span style="color:var(--muted)">Your best time: ${S.paperBest}s</span>` : ''}`, [{label: 'Grab the papers', primary: true, fn: () => {
+    const T0 = TOWNS[n.town], hs = houses.filter(h => h.town === n.town).map(h => ({x: h.x + 1, y: h.y + 1.5})).sort(() => Math.random() - .5).slice(0, 8);
+    if (hs.length < 3) { say('“Hmm, not enough houses around here.”', [back(n)]); return; }
+    paper = {houses: hs, t: 75, max: 75}; $('courierUI').hidden = false; closeTalk(); SFX.chime(); toast('<b>Paper route!</b><br>Run past every house marked with a newspaper.', 3500);
+  }}, back(n)]);
+}
+function updatePaper(dt) {
+  const P = paper; if (!P) return; P.t -= dt; const ui = $('courierUI');
+  for (const h of P.houses) if (!h.done && Math.hypot(h.x - S.x, h.y - S.y) < 2.4) { h.done = true; SFX.pickup(); burst(h.x, h.y - .5, '#f0ece0', 8, 3); floatText(h.x, h.y - 1.4, 'Delivered!', '#f0ece0'); }
+  const left = P.houses.filter(h => !h.done).length;
+  if (!left) { const used = Math.round((P.max - P.t)*10)/10, c = 30 + Math.round(P.t*1.5); paper = null; ui.hidden = true; S.paperDay = S.day; S.papers = (S.papers || 0) + 1; S.paperBest = S.paperBest ? Math.min(S.paperBest, used) : used; S.coins += c; SFX.victory(); renderHUD(); save(); toast(`<b>Route complete in ${used}s!</b><br>Ned is thrilled. <span style="color:var(--good)">+${c} coin</span>`, 5000); return; }
+  if (P.t <= 0) { const done = P.houses.length - left, c = done*5; paper = null; ui.hidden = true; S.paperDay = S.day; S.coins += c; renderHUD(); toast(`<b>Time’s up!</b><br>You delivered ${done} of ${P.houses.length} papers. <span style="color:var(--good)">+${c} coin</span>`, 4500); return; }
+  const txt = `\u{1F4F0} Papers left: ${left} · ${Math.ceil(P.t)}s`; if (ui.textContent !== txt) ui.textContent = txt; ui.style.color = P.t < 15 ? '#ff8a6a' : '';
+}
+function drawPaperMark(h) {
+  const px = h.x*TS, py = h.y*TS - 26 + Math.sin(frameT*4 + h.x)*2;
+  ctx.fillStyle = '#f0ece0'; ctx.fillRect(px - 5, py - 4, 10, 7); ctx.fillStyle = '#5a5a6a'; ctx.fillRect(px - 4, py - 3, 8, 1); ctx.fillRect(px - 4, py - 1, 5, 1); ctx.fillRect(px - 4, py + 1, 6, 1);
+  ctx.strokeStyle = '#ffd040'; ctx.lineWidth = 1; ctx.strokeRect(px - 6, py - 5, 12, 9);
+}
+// ===== Saltwind Lottery =====
+function lottoTalk(n) {
+  const T = S.lotto;
+  if (T && T.day === S.day) { say(`“Your ticket for tomorrow’s draw: <b>${T.nums.join(' · ')}</b>. Good luck!”`, [back(n)]); return; }
+  say(`“Pick three different numbers from 1 to 9. The draw happens tomorrow morning. Match one: 30 coin. Match two: 250 coin. Match all three: the <b>2,500 coin jackpot</b>! Tickets are 25 coin.”${S.lottoLast ? `<br><span style="color:var(--muted)">Last draw: ${S.lottoLast.join(' · ')}</span>` : ''}`, [
+    {label: 'Pick my own numbers · 25◆', primary: true, disabled: S.coins < 25, fn: () => lottoPick(n, [])},
+    {label: 'Lucky dip (random) · 25◆', disabled: S.coins < 25, fn: () => { const a = []; while (a.length < 3) { const v = 1 + Math.floor(Math.random()*9); if (!a.includes(v)) a.push(v); } lottoBuy(n, a); }}, back(n)]);
+}
+function lottoPick(n, chosen) {
+  if (chosen.length === 3) { lottoBuy(n, chosen); return; }
+  say(`Pick number ${chosen.length + 1} of 3: <b>${chosen.join(' · ') || '—'}</b>`, [1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => ({label: String(v), disabled: chosen.includes(v), fn: () => lottoPick(n, [...chosen, v])})));
+}
+function lottoBuy(n, nums) {
+  if (S.coins < 25) return; S.coins -= 25; S.lotto = {day: S.day, nums: nums.slice().sort((a, b) => a - b)}; S.lottoTickets = (S.lottoTickets || 0) + 1; SFX.coin(); renderHUD(); save();
+  say(`“Ticket printed! Numbers <b>${S.lotto.nums.join(' · ')}</b>. The draw is tomorrow morning, and winnings come straight to you.”`, [back(n)]);
+}
+function lottoDraw() {
+  const T = S.lotto; if (!T || T.day >= S.day) return; S.lotto = null;
+  const d = []; while (d.length < 3) { const v = 1 + Math.floor(Math.random()*9); if (!d.includes(v)) d.push(v); } d.sort((a, b) => a - b); S.lottoLast = d;
+  const m = T.nums.filter(v => d.includes(v)).length, prize = [0, 30, 250, 2500][m]; S.coins += prize; if (m === 3) S.lottoJackpot = (S.lottoJackpot || 0) + 1;
+  setTimeout(() => toast(`<b>Saltwind Lottery draw: ${d.join(' · ')}</b><br>Your numbers: ${T.nums.join(' · ')} → ${m} match${m === 1 ? '' : 'es'}${prize ? `. <span style="color:var(--good)">You win ${prize} coin!</span>` : '. Better luck next time.'}`, 7000), 2500);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6369,8 +6419,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Paper route and lottery', 'Ned the Newsboy in Port Wren hands over his paper route once a day: run past every marked house within 75 seconds. Lottie Luckpenny in Highcairn sells Saltwind Lottery tickets: pick three numbers, and the draw happens the next morning. Match all three for the 2,500 coin jackpot.'],
   ['Strange potions', 'Fizzwick in Thornwick sells three odd potions you drink from your bag. Each lasts a minute. A Giant Draught makes you huge: +25% damage and no knockback, but a bit slower. A Swiftness Tonic makes you run 40% faster. A Shrinking Elixir makes you tiny, so monsters notice you from half as far away. Party members see you grow and shrink!'],
   ['Arm wrestling and sandcastles', 'Brawny Buck in Redrock takes on challengers at arm wrestling: mash Space or A to push his arm down, and hold on when he pushes back. He gets tougher every time you win. Sandy in Port Wren runs a sandcastle contest: drop each layer on top of the last, since any overhang crumbles away.'],
   ['Riddles and strongboxes', 'Enigma the Wanderer in Highcairn gives one riddle a day. Each one describes a town: travel there to solve it, and the farther it is, the bigger the reward. Bandits sometimes drop Locked Strongboxes: use one from your bag to pick the lock by setting four pins before your lockpicks run out.'],
@@ -6693,7 +6744,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7591,6 +7642,7 @@ function render() {
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
+  if (paper) for (const h of paper.houses) if (!h.done && inView(h.x, h.y)) sprites.push({y: 1e9 - 4, f: () => drawPaperMark(h)});
   for (const q of (S.digSites || [])) if (!q.done && inView(q.x, q.y)) sprites.push({y: q.y - .3, f: () => drawDigSite(q)});
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
   if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
@@ -8202,7 +8254,7 @@ function raidWalk(x, y) {
   return !ESTATE_TILES.has(idx(tx, ty));
 }
 function newDay() {
-  S.day++;
+  S.day++; lottoDraw();
   for (const n of NPCS) if (n.trader) {
     const st = S.npc[n.id];
     for (const g in n.stock) { const max = n.stock[g]; if (max > 0 && (st.stock[g] || 0) < max) st.stock[g] = Math.min(max, (st.stock[g] || 0) + Math.ceil(max/3)); }
@@ -8388,6 +8440,8 @@ function mainOptions(n) {
   if (n.wrestler) o.push({label: 'Arm wrestle · 15\u25c6', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); wrestleStart(); }});
   if (n.sandcastle) o.push({label: 'Build a sandcastle', primary: true, fn: () => castleStart()});
   if (n.alchemist2) o.push({label: 'Buy strange potions', primary: true, fn: () => shopTalk(n, [['giant_draught', 70], ['swift_tonic', 50], ['shrink_elixir', 50]], '“Fresh from the cauldron! Each one lasts a full minute. Drink from your bag.”')});
+  if (n.newsboy) o.push({label: paper ? 'About the paper route' : 'Do the paper route', primary: true, fn: () => paperTalk(n)});
+  if (n.lottery) o.push({label: 'Saltwind Lottery', primary: true, fn: () => lottoTalk(n)});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11188,6 +11242,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['paperboy','Paper Route','Complete 5 paper routes', () => (S.papers || 0) >= 5],
+  ['lottojack','Lottery Winner','Win the Saltwind Lottery jackpot', () => (S.lottoJackpot || 0) >= 1],
   ['potions','Mad Alchemist','Try all three of Fizzwick\u2019s strange potions', () => Object.keys(S.potionKinds || {}).length >= 3],
   ['coopboss','Raid Party','Defeat a boss together with your party', () => (S.coopBosses || 0) >= 1],
   ['armwrestle','Iron Grip','Win 3 arm-wrestling matches', () => (S.wrestleWins || 0) >= 3],
@@ -11754,7 +11810,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
