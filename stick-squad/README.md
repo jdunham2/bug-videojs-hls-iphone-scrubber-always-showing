@@ -56,7 +56,7 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Twenty-eight fighters, each with their own stats, look and special move:
+Thirty-two fighters, each with their own stats, look and special move:
 
 | Fighter | Style | Special |
 |---|---|---|
@@ -87,6 +87,10 @@ Twenty-eight fighters, each with their own stats, look and special move:
 | Kickflip Kai | Rides a skateboard (very fast); heavy attack is a board-slam ram | Grind Rush: zooms back and forth across the screen |
 | Buzzy Bea | Heavy attack releases bees that chase the nearest enemy | Hive Mind: a giant swarm of bees |
 | Samurai Sam | Heavy attack is a parry stance: block a hit and counter for big damage | Thousand Cuts: a flurry that hits every enemy |
+| Echo | A shadow twin behind you copies every attack | Phantoms: ghost copies strike every enemy at once |
+| Dynamite Dan | Heavy attack lobs a bouncing bomb that explodes after a fuse | Mega Blast: one giant bomb with a huge explosion |
+| Picasso Pip | Heavy attack splats sticky paint that slows and hurts enemies standing in it | Masterpiece: paints the whole floor |
+| Yoyo Yuki | Heavy attack flings a long-range yo-yo that zips back | Walk the Dog: the yo-yo orbits you, hitting everything nearby |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
 
 ## Modes
