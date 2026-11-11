@@ -59,6 +59,8 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 Thirty-two fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
 
+**Unlocking fighters:** you start with the first 8 fighters (Scribble to Halo). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 32. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
+
 | Fighter | Style | Special | Skill (Down + Light) |
 |---|---|---|---|
 | Scribble | All-rounder | Ink Burst: blasts everything around you | Ink Uppercut: rising launcher |

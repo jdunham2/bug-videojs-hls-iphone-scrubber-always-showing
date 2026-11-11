@@ -500,6 +500,12 @@ const G = { state: 'title', wave: 0, stage: 0, frame: 0, phase: 'intro', phaseT:
   enemies: [], projs: [], pickups: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
   best: 0, players: [], boss: null, lastTeamText: -999, pauseSel: 0, titleT: 0, newBest: false };
 try { G.chUnlocked = Math.min(7, +localStorage.getItem('stickSquadChapter') || 0); } catch (e) { G.chUnlocked = 0; }
+try { G.cleared = Math.max(G.chUnlocked, Math.min(8, +localStorage.getItem('stickSquadCleared') || 0)); } catch (e) { G.cleared = G.chUnlocked; }
+// fighter unlocks: the first 8 are free, each Story chapter beaten unlocks the next 3
+const START_FIGHTERS = 8, PER_CHAPTER = 3;
+const fighterUnlocked = i => i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0);
+const fighterCount = () => Math.min(CHARS.length, START_FIGHTERS + PER_CHAPTER * (G.cleared || 0));
+const unlockChapter = i => Math.floor((i - START_FIGHTERS) / PER_CHAPTER);
 try { G.best = +localStorage.getItem('stickSquadBest') || 0; G.bestRush = +localStorage.getItem('stickSquadRush') || 0; } catch (e) { }
 let parts = [], texts = [], shake = 0, flashA = 0, flashCol = '#fff', timeScale = 1, slowT = 0, zoom = 0, zoomX = W / 2, zoomY = H / 2, hurtVig = 0;
 const twoP = () => G.players.filter(p => p.joined).length >= 2;
@@ -2043,6 +2049,12 @@ function nextCampaign() {
   if (G.campWave > 3) {
     G.chUnlocked = Math.max(G.chUnlocked || 0, Math.min(ch + 1, CHAPTERS.length - 1));
     try { localStorage.setItem('stickSquadChapter', '' + G.chUnlocked); } catch (e) { }
+    if (ch + 1 > (G.cleared || 0)) {
+      const before = START_FIGHTERS + PER_CHAPTER * (G.cleared || 0);
+      G.cleared = ch + 1; try { localStorage.setItem('stickSquadCleared', '' + G.cleared); } catch (e) { }
+      const fresh = CHARS.slice(before, START_FIGHTERS + PER_CHAPTER * G.cleared).map(c => c.name);
+      if (fresh.length) { G.unlockToast = { names: fresh, t: 420 }; SFX.banner(); }
+    }
     playScene('c' + ch + 'o', () => {
       if (ch + 1 < CHAPTERS.length) { G.players.forEach(p => { if (p.joined) { if (p.dead || p.downed) p.reset(false); p.hp = p.maxHp; } }); beginChapter(ch + 1); }
       else playScene('end', () => { G.won = true; G.startStage = 0; gameOver(); });
@@ -2181,7 +2193,7 @@ function stepLocal() {
       if (!p.ready) {
         const d = menuDir(c, 8);
         if (d) { p.ci = (p.ci + d + CHARS.length) % CHARS.length; G.players.forEach(q => q.applyChar()); SFX.menu(); }
-        if (confirmPressed(p)) { p.ready = true; SFX.join(); rumble(p.idx, 0.4, 0.4, 120); }
+        if (confirmPressed(p)) { if (fighterUnlocked(p.ci)) { p.ready = true; SFX.join(); rumble(p.idx, 0.4, 0.4, 120); } else { SFX.hurt(); p.lockMsg = 70; } }
         else if (backPressed(p) && p.idx === 1) { p.joined = false; SFX.menu(); }
       } else if (backPressed(p)) { p.ready = false; SFX.menu(); }
     }
@@ -3344,6 +3356,10 @@ function statBar(label, frac, x, y, col) {
   ctx.fillStyle = col; ctx.fillRect(x + 100, y - 8, 180 * clamp(frac, 0, 1), 16);
   ctx.strokeStyle = THEMES[0].ink; ctx.lineWidth = 2; ctx.strokeRect(x + 100, y - 8, 180, 16);
 }
+function drawLock(x, y) {
+  ctx.save(); ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y - 6, 11, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = '#ffd23a'; ctx.fillRect(x - 16, y - 6, 32, 24); ctx.fillStyle = '#2a2a33'; ctx.fillRect(x - 3, y + 1, 6, 10); ctx.restore();
+}
 function drawSelect() {
   const ink = THEMES[0].ink, t = G.titleT;
   menuBackdrop('CHOOSE YOUR FIGHTER');
@@ -3356,9 +3372,18 @@ function drawSelect() {
     const d = selDemo[i];
     const tgt = picked.length && picked.some(p => p.ready) ? mk(Object.assign({}, P.idle(0), A.L3.hit)) : picked.length ? P.idle(t * 1.6) : P.idle(t);
     blend(d.pose, tgt, 0.3);
-    drawFigure(d, x + w / 2, y + 80, 0.66 * c.size, 1, d.pose, c.col, Object.assign(charLook(c, c.col), { backCol: c.back, weapon: c.sword ? 'pencil' : (c.weapon || null) }));
-    txt(c.name, x + w / 2, y + 95, c.name.length > 10 ? 11 : c.name.length > 8 ? 12 : 14, c.col, 'center', F1, '#fff', 4);
-    txt(c.role, x + w / 2, y + 110, 10, ink, 'center', F2);
+    const open = fighterUnlocked(i);
+    if (open) {
+      drawFigure(d, x + w / 2, y + 80, 0.66 * c.size, 1, d.pose, c.col, Object.assign(charLook(c, c.col), { backCol: c.back, weapon: c.sword ? 'pencil' : (c.weapon || null) }));
+      txt(c.name, x + w / 2, y + 95, c.name.length > 10 ? 11 : c.name.length > 8 ? 12 : 14, c.col, 'center', F1, '#fff', 4);
+      txt(c.role, x + w / 2, y + 110, 10, ink, 'center', F2);
+    } else {
+      ctx.fillStyle = 'rgba(30,30,40,0.55)'; ctx.fillRect(x, y, w, h);
+      drawFigure(d, x + w / 2, y + 80, 0.66 * c.size, 1, P.idle(0), '#2a2a33', Object.assign(charLook(c, '#2a2a33'), { backCol: '#2a2a33', weapon: null, noShadow: true }));
+      drawLock(x + w / 2, y + 44);
+      txt('???', x + w / 2, y + 95, 14, '#fff', 'center', F1);
+      txt('CHAPTER ' + (unlockChapter(i) + 1), x + w / 2, y + 110, 10, '#ffd23a', 'center', F1);
+    }
     picked.forEach(p => {
       const inset = picked.length > 1 && p.idx ? 8 : 0;
       ctx.strokeStyle = p.col; ctx.lineWidth = p.ready ? 8 : 5 + Math.sin(t * 0.25) * 1.5;
@@ -3379,6 +3404,15 @@ function drawSelect() {
       lines.forEach((l, k) => txt(l, w / 2, 180 + k * 36, 28, '#666', 'center', F2));
     } else {
       const c = p.char;
+      if (p.lockMsg > 0) p.lockMsg--;
+      if (!fighterUnlocked(p.ci)) {
+        txt('LOCKED', w / 2, 100, 50, '#555', 'center', F1, '#fff', 6);
+        drawLock(w / 2, 176);
+        ['Beat chapter ' + (unlockChapter(p.ci) + 1) + ' of STORY', 'mode to unlock this fighter!', '', 'Each chapter you beat', 'unlocks 3 new fighters.'].forEach((l, k) => txt(l, w / 2, 240 + k * 30, 21, ink, 'center', F2));
+        txt(fighterCount() + ' / ' + CHARS.length + ' FIGHTERS UNLOCKED', w / 2, 410, 18, '#7b3fd0', 'center', F1);
+        txt(p.lockMsg > 0 ? 'NOT UNLOCKED YET!' : 'PICK ANOTHER FIGHTER', w / 2, 456, 22, p.lockMsg > 0 ? '#d22' : ink, 'center', F1);
+        ctx.restore(); continue;
+      }
       txt(c.name, 24, 92, c.name.length > 10 ? 32 : c.name.length > 8 ? 36 : 44, p.col, 'left', F1, '#fff', 6);
       txt(c.role, 26, 132, 22, ink, 'left', F1);
       c.desc.forEach((l, k) => txt(l, 24, 172 + k * 30, 19, ink, 'left', F2));
@@ -3421,7 +3455,7 @@ function drawMode() {
   const ink = THEMES[0].ink, t = G.titleT, two = twoP();
   menuBackdrop('PICK A MODE');
   const M = [
-    ['STORY', ['8 chapters with cutscenes.', 'Stop the Grand Eraser!', G.chUnlocked > 0 ? 'Saved: up to chapter ' + (G.chUnlocked + 1) : 'Start your adventure.'], '#e2342c'],
+    ['STORY', ['8 chapters with cutscenes.', 'Beat chapters to unlock fighters!', G.chUnlocked > 0 ? 'Saved: up to chapter ' + (G.chUnlocked + 1) : 'Start your adventure.'], '#e2342c'],
     ['ARCADE', ['Endless waves of doodles.', 'Mini-boss on wave 3,', 'boss on wave 5.'], '#2a9a40'],
     ['BOSS RUSH', ['All ' + RUSH_LEN + ' bosses in a row.', 'Race the clock!', G.bestRush ? 'Best time: ' + fmtTime(G.bestRush) : 'No clear yet.'], '#d22'],
     ['VERSUS', ['P1 vs P2, best of 3.', '99 seconds per round.', two ? 'Power-ups included!' : 'Needs 2 players to join.'], '#7b3fd0'],
@@ -3669,7 +3703,18 @@ function render(now) {
   else if (G.state === 'cutscene') drawCutscene();
   else if (G.state === 'stage') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawStageSel(); }
   else { drawWorld(); drawHUD(); if (G.state === 'pause') drawPause(); if (G.state === 'over') drawOver(); }
+  drawUnlockToast();
   drawNetTag();
+  ctx.restore();
+}
+function drawUnlockToast() {
+  const u = G.unlockToast; if (!u || u.t <= 0) return;
+  u.t--;
+  const a = Math.min(1, u.t / 30, (420 - u.t) / 20 + 0.01), y = 430;
+  ctx.save(); ctx.globalAlpha = Math.max(0, a);
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(W / 2 - 380, y - 50, 760, 118); ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 6; ctx.strokeRect(W / 2 - 380, y - 50, 760, 118);
+  txt('NEW FIGHTERS UNLOCKED!', W / 2, y - 14, 38, '#e2342c', 'center', F1, '#fff', 6);
+  txt(u.names.join('  ·  '), W / 2, y + 36, 26, '#333', 'center', F1);
   ctx.restore();
 }
 
@@ -3709,7 +3754,7 @@ function buildSnapshot() {
     K: G.pickups.slice(0, 10).map(k => [ri(k.x), ri(k.y), PKK.indexOf(k.kind), k.t]),
     PT: G.portals.map(q => [ri(q.x), ri(q.y), ETN.indexOf(q.type), q.t, q.max]),
     Y: (G.geysers || []).map(g => [ri(g.x), g.t]), cs: G.enemySlowT || 0,
-    bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0,
+    bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0, cl: G.cleared || 0,
     DC: G.decoy ? [ri(G.decoy.x), ri(G.decoy.y), G.decoy.t, G.decoy.ci, G.decoy.facing] : 0,
     DK: G.dark ? [['light', 'warn', 'dark'].indexOf(G.dark.phase), G.dark.t] : 0, BT: G.belt ? [G.belt.dir, G.belt.t] : 0,
     WD: G.wind ? [['calm', 'warn', 'gust'].indexOf(G.wind.phase), G.wind.t, G.wind.dir] : 0,
@@ -3735,7 +3780,7 @@ function applySnapshot(s) {
   if (s.st === 'play' && prevState !== 'play' && prevState !== 'pause') sctx.clearRect(0, 0, W, H);
   updatePlatforms();
   G.bossOv = s.bo && s.bo[0] >= 0 ? ALLB[s.bo[0]] : null; G.miniOv = s.bo && s.bo[1] >= 0 ? ALLB[s.bo[1]] : null;
-  G.cut = s.ct ? { id: s.ct[0], i: s.ct[1], t: s.ct[2] } : null; G.campCh = s.cc; G.campWave = s.cw; G.chSel = s.chs; G.chUnlocked = s.chu;
+  G.cut = s.ct ? { id: s.ct[0], i: s.ct[1], t: s.ct[2] } : null; G.campCh = s.cc; G.campWave = s.cw; G.chSel = s.chs; G.chUnlocked = s.chu; if (s.cl !== undefined && s.cl !== G.cleared) { if (G.clSynced && s.cl > G.cleared) G.unlockToast = { names: CHARS.slice(START_FIGHTERS + PER_CHAPTER * G.cleared, START_FIGHTERS + PER_CHAPTER * s.cl).map(c => c.name), t: 420 }; G.cleared = s.cl; } G.clSynced = true;
   const live = s.st === 'play';
   let ciChanged = false;
   s.P.forEach((a, i) => {
