@@ -66,13 +66,15 @@ Twelve fighters, each with their own stats, look and special move:
 
 ## Modes
 
-- **Story:** pick a starting stage (or a random one) and fight wave after wave.
-- **Boss Rush:** fight all 12 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+After picking fighters you choose a mode:
+
+- **Story:** team up against waves of enemies. Pick a starting stage, or a random one.
+- **Boss Rush:** fight all 18 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 ## Stages
 
-Six stages of five waves each, and each one ends with its own boss:
-Notebook Heights (The Scribble King), Graph City (Graphzilla), Chalkboard Arena (Professor Chalk), Sticky Note Jungle (The Sticky Bandit), Blueprint Factory (Blueprint Golem, with moving platforms) and Midnight Sketchbook (The Midnight Smudge, with moving platforms).
+Nine stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels and Lava Doodle, where lava geysers erupt from the floor. Watch for the glowing warning circles; geysers hurt enemies too.
 
 ## Bosses
 
@@ -86,6 +88,9 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 | Sticky Note Jungle | Paperclip Pirate | The Sticky Bandit |
 | Blueprint Factory | Gear Grinder | Blueprint Golem |
 | Midnight Sketchbook | Night Owl | The Midnight Smudge |
+| Crayon Canyon | Crayon Cowpoke | The Wax Titan |
+| Comic Panels | Captain Kapow | Doctor Inkspot |
+| Lava Doodle | Magma Imp | The Eruptor |
 
 Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes) and **shadow clones**.
 
@@ -113,6 +118,6 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 - **Co-op mechanics:** hit an enemy your partner just hit for a **TEAM COMBO x2**. Stand next to a downed partner to **revive** them. When both ink meters are full and you're standing close, press Special to fire the **DOUBLE INK** screen-clearing team super.
 - **Combat:** combo chains, juggles, launcher into jump-cancel into air attacks, dash cancels, wall splats, and **projectile reflects**. Hit-stop, screen shake, slow-mo finishers and controller rumble give every hit weight.
 - **Enemies:** Grunts, Ninjas, Eraser-Throwers, armored Brutes with shockwave slams, and a two-phase boss, **The Scribble King**, every 5th wave.
-- **Endless:** after stage 6 the stages loop and the waves keep getting harder.
+- **Endless:** after stage 9 the stages loop and the waves keep getting harder.
 - **Audio:** procedural soundtrack and sound effects, all synthesized live with Web Audio.
 - **Saved high score:** your best team score is kept between sessions.
