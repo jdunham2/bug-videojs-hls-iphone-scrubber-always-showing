@@ -45,6 +45,15 @@ P1's action keys sit together in one cluster under the right hand:
 - Controllers that report a raw layout or a "hat" D-pad (common in other browsers) are handled.
 - If any button does the wrong thing, open **Controller Setup** from the title screen (press **C** or **−**) and press the button you want for each action. Your layout is saved.
 
+## Online multiplayer
+
+Press **O** on the title screen. One player picks **Host a game** and gets a 4-letter code; the other picks **Join a game** and types it. The host plays as P1, the friend plays as P2 with their own keyboard or controller, and every mode works online (Story, Boss Rush, Versus).
+
+- **In the Claude artifact:** invite your friend to the artifact from the Share menu (a public link can't join). Open games also show up as one-click **Join** buttons.
+- **Downloaded file:** both players open `index.html` in Chrome or Edge while online. Players connect directly with WebRTC, using the free PeerJS service to find each other.
+
+The host's computer runs the game and streams it to the friend about 30 times a second, so the host should have the better connection. If either side drops for 6 seconds, the game says so and P2 can carry on locally.
+
 ## Fighters
 
 Twelve fighters, each with their own stats, look and special move:
@@ -111,6 +120,12 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 | Star | Invincible for 8 seconds; touching enemies hurts them |
 | Ink Bomb | Big explosion around you |
 | Doodle Drone | A little helper that shoots the nearest enemy |
+| Ink Clone | A shadow copy behind you copies your attacks and guards your back |
+| Tornado | A whirlwind that roams the floor, pulling in and hitting enemies |
+| Storm Cloud | A cloud follows you and zaps the nearest enemy with lightning |
+| Regeneration | Steadily heals you for 10 seconds |
+| Double Damage | Your hits deal 2x damage |
+| Rocket Boots | Unlimited jumps and air dashes |
 | Mystery box | A random power-up |
 
 ## Features
