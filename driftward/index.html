@@ -890,7 +890,7 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,rep:st.rep,capital:st.capital||null,territory:st.territory||{},looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,rep:st.rep,capital:st.capital||null,crew:st.crew||[],crewHired:(st.crewHired||[]).slice(-60),territory:st.territory||{},looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -1044,7 +1044,7 @@ function setHTML(id,t){if(_txt.get(id)!==t){_txt.set(id,t);$(id).innerHTML=t}}
 function setBar(id,v,max=100,warnBelow=25){const el=$(id);el.querySelector('.f').style.width=clamp(v/max*100,0,100)+'%';el.querySelector('.n').textContent=Math.round(v);el.classList.toggle('warn',v<warnBelow)}
 function fmtDist(d){return d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(d<10000?2:1)} km`}
 function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);toast(label,'big');
-  setTimeout(()=>{addRep('lumen',/^(R:|A:)/.test(key)?5:2);if(tech('lens')){inv.nanites+=25}},300);Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
+  setTimeout(()=>{addRep('lumen',/^(R:|A:)/.test(key)?5:2);if(tech('lens')){inv.nanites+=25}if(crewB('scientist'))inv.nanites+=crewB('scientist');},300);Sound.blip(520,.5,'triangle',.2);setTimeout(()=>Sound.blip(780,.5,'triangle',.16),140);save();return true}
 
 /* ---------- actions ---------- */
 function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){const d=p.distanceTo(P.center)-P.radius;if(d<bd){bd=d;best=P}}return best}
@@ -2090,7 +2090,7 @@ function addRep(f,d,why){
 // price modifiers from your standing with the faction that owns the venue
 const venueFaction=()=>system&&system.faction;
 const repBuy=()=>1-repOf(venueFaction())*.002;
-const repSell=()=>(1+repOf(venueFaction())*.0015)*(tech('ledger')?1.15:1);
+const repSell=()=>(1+repOf(venueFaction())*.0015)*(tech('ledger')?1.15:1)*(1+crewB('trader'));
 function factionBanner(S,f){
   const col=FACTIONS[f].color,m=new THREE.MeshBasicMaterial({color:col});S.userData.bannerMat=m;
   for(const y of [52,-52]){const r=new THREE.Mesh(new THREE.TorusGeometry(49,1.4,6,40).rotateX(Math.PI/2),m);r.position.y=y;S.add(r)}
@@ -2376,10 +2376,10 @@ function updateCapital(dt){
   if(c.exped&&c.exped.until<=Date.now()&&!c.exped.told){c.exped.told=true;toast(`${c.name} is back from its expedition. Press K to collect the haul.`,'big');Sound.blip(700,.4,'triangle',.15);save()}
   if(c.repairUntil&&c.repairUntil<=Date.now()&&!c.repairTold){c.repairTold=true;toast(`${c.name} is repaired and ready to summon (K).`)}
   if(!CAPR.here||!CAPR.group)return;
-  if(time-CAPR.lastHit>10)c.hull=Math.min(capMax(),c.hull+6*dt);
-  const u=CAPR.group.userData,g=1+.25*(c.upg.guns||0);
+  if(time-CAPR.lastHit>10)c.hull=Math.min(capMax(),c.hull+6*(1+crewB('engineer'))*dt);
+  const u=CAPR.group.userData,g=1+.25*(c.upg.guns||0),fr=1+crewB('gunner'),dm=1+crewB('engineer');
   for(const t of u.turrets){t.cd-=dt;const w=t.g.getWorldPosition(new V3());const T=capTarget(w,2200);if(!T)continue;t.g.lookAt(T.group.position);
-    if(t.cd<=0){t.cd=.5/g+Math.random()*.2;const dd=w.distanceTo(T.group.position);const aim=T.group.position.clone().addScaledVector(T.vel||new V3(),dd/BOLT_SPEED).sub(w).normalize();fireBolt(w.addScaledVector(aim,8),aim,new V3(),'cap',10*g)}}
+    if(t.cd<=0){t.cd=.5/(g*fr)+Math.random()*.2;const dd=w.distanceTo(T.group.position);const aim=T.group.position.clone().addScaledVector(T.vel||new V3(),dd/BOLT_SPEED).sub(w).normalize();fireBolt(w.addScaledVector(aim,8),aim,new V3(),'cap',10*g*dm)}}
   for(const e of u.engines)e.scale.set(1,1,1.4+Math.sin(time*3)*.2);
   // carrier escorts
   if(CAP_CLASSES[c.cls].escorts&&!ship.dockCap){const have=npcs.filter(n=>n.escort).length;CAPR.escortT-=dt;
@@ -2387,7 +2387,7 @@ function updateCapital(dt){
       Object.assign(n,{escort:true,hostile:false,speed:320,turn:1.6,slot:have%2?1:-1});if(have===0)toast('Escort fighters launched.')}}
 }
 function capReward(dur){
-  const c=st.capital,m=CAP_CLASSES[c.cls].expMul*(1+.3*(c.upg.cargo||0)),r=()=>.8+Math.random()*.4,long=dur>=30;
+  const c=st.capital,m=CAP_CLASSES[c.cls].expMul*(1+.3*(c.upg.cargo||0))*(1+crewB('quarter')),r=()=>.8+Math.random()*.4,long=dur>=30;
   const l={units:Math.round((long?5000:1500)*m*r()),ferrite:Math.round((long?120:40)*m*r()),cobalt:Math.round((long?40:15)*m*r()),nanites:Math.round((long?250:80)*m*r()),aurium:Math.round((long?10:3)*m*r())};
   if(long&&Math.random()<.5)l.relics=1;return l;
 }
@@ -2395,7 +2395,7 @@ const EXP_STORIES=['charted a dead nebula and salvaged a lost survey probe','esc
 function sendExpedition(dur){
   const c=st.capital;if(c.exped)return;
   if(ship.dockCap&&ship.state==='docked'){capUndock();setTimeout(()=>sendExpedition(dur),1800);return}
-  c.exped={until:Date.now()+dur*60000,dur,told:false};
+  c.exped={until:Date.now()+Math.round(dur*60000*(1-crewB('navigator'))),dur,told:false};
   if(CAPR.here){boom(CAPR.group.position,90,'#bfe6ff',.9);Sound.whoosh(1.4)}
   for(const n of npcs.filter(n=>n.escort))scene.remove(n.group);npcs=npcs.filter(n=>!n.escort);
   clearCapital();toast(`${c.name} jumped away on a ${dur}-minute expedition.`,'big');save();renderCap();
@@ -2409,7 +2409,7 @@ function collectExpedition(){
 }
 function capJump(){
   const c=st.capital;if(c.jumpAt>Date.now()){toast(`Capital drive recharging: ${Math.ceil((c.jumpAt-Date.now())/1000)} s.`,'bad');return}
-  c.jumpAt=Date.now()+5*60000;closeCap();
+  c.jumpAt=Date.now()+Math.round(5*60000*(1-crewB('pilot')));closeCap();
   ship.dockCap=false;ship.state='flying';ship.group.position.copy(capMouth());
   ship.capJump=true;ship.state='warp';ship.t=1;ship.warped=false;ship.homeJump=false;Sound.whoosh(2.6);toast(`${c.name} spins up its drive and carries you to the next system.`,'big');save();
 }
@@ -2423,7 +2423,7 @@ function closeCap(){$('capPanel').hidden=true}
 function renderCap(){
   if($('capPanel').hidden||!st.capital)return;const c=st.capital,C=CAP_CLASSES[c.cls],docked=ship.dockCap&&ship.state==='docked'||(DR.on&&DR.kind==='capital');
   $('capTitle').textContent=c.name;$('capClass').textContent=`${C.label} · hull ${Math.round(c.hull)}/${capMax()} · ${C.turrets} turrets${C.escorts?' · '+C.escorts+' escorts':''}`;
-  $('capTabs').innerHTML=[['bridge','Bridge'],['hangar','Hangar'],['expeditions','Expeditions'],['upgrades','Upgrades']].map(([k,l])=>`<button type="button" data-ctab="${k}" class="${CAPR.tab===k?'on':''}">${l}</button>`).join('');
+  $('capTabs').innerHTML=[['bridge','Bridge'],['hangar','Hangar'],['expeditions','Expeditions'],['crew','Crew'],['upgrades','Upgrades']].map(([k,l])=>`<button type="button" data-ctab="${k}" class="${CAPR.tab===k?'on':''}">${l}</button>`).join('');
   $('capClose').textContent=DR.on&&DR.kind==='capital'?'Close':docked?'Undock':'Close';$('capUnits').textContent=`${inv.units.toLocaleString()} units`;
   let h='';
   if(CAPR.tab==='bridge'){
@@ -2437,6 +2437,7 @@ function renderCap(){
       <div class="urow"><div><span class="nm">Walk aboard</span></div><div class="ds">Step off your ship and explore the ${st.capital.name}: bridge, engineering, operations, crew quarters and trophy hall.</div><div class="acts"><button type="button" data-cact="walk" ${docked?'':'disabled'}>Walk aboard</button></div></div>
       <div class="urow"><div><span class="nm">Ship workshop</span></div><div class="ds">Upgrade your starship.</div><div class="acts"><button type="button" data-cact="workshop" ${docked?'':'disabled'}>Open</button></div></div>
       <div class="urow"><div><span class="nm">Fabricator</span></div><div class="ds">Craft consumables and technology.</div><div class="acts"><button type="button" data-cact="craft">Open</button></div></div>`;
+  }else if(CAPR.tab==='crew'){h=renderCrewTab();
   }else if(CAPR.tab==='expeditions'){
     if(c.exped){const left=c.exped.until-Date.now();h=left>0?`<p class="trnote">${c.name} is on a ${c.exped.dur}-minute expedition. Back in ${Math.ceil(left/60000)} min. It keeps going while you are offline.</p>`
       :`<div class="urow"><div><span class="nm">Expedition complete</span></div><div class="ds">The crew is waiting to unload.</div><div class="acts"><button type="button" data-cact="collect">Collect haul</button></div></div>`}
@@ -2462,6 +2463,7 @@ $('capBody').addEventListener('click',e=>{
   else if(a==='craft'){closeCap();toggleCraft()}
   else if(a==='exp'){if(DR.on&&DR.kind==='capital')exitCapInterior(true);sendExpedition(+b.dataset.d)}
   else if(a==='collect')collectExpedition();
+  else if(a==='promote'||a==='fire'){crewAction(a,+b.dataset.i)}
   else if(a==='upg'){const lv=c.upg[b.dataset.k]||0,cost=4000*(lv+1),nan=200*(lv+1);if(lv<3&&inv.units>=cost&&inv.nanites>=nan){inv.units-=cost;inv.nanites-=nan;c.upg[b.dataset.k]=lv+1;if(b.dataset.k==='armor')c.hull=capMax();toast(`${CAP_UPG.find(u=>u.key===b.dataset.k).name} upgraded.`)}}
   Sound.blip(600,.12,'triangle',.1);save();renderCap();
 });
@@ -2481,6 +2483,62 @@ function updateRemoteCap(a,cap){
   if(!a.capG||a.capKey!==key){if(a.capG)scene.remove(a.capG);a.capG=buildCapital(cls,paint);scene.add(a.capG);a.capKey=key;a.capG.position.set(cap[1],cap[2],cap[3])}
   a.capName=clean(cap[10],24)||'Capital ship';a.capG.position.lerp(tV.set(cap[1],cap[2],cap[3]),.2);a.capG.quaternion.set(cap[4],cap[5],cap[6],cap[7]).normalize();
 }
+
+/* ---------- hireable capital ship crew ---------- */
+const CREW_ROLES={
+  pilot:{label:'Pilot',vals:[.2,.35,.5],fee:1500,fmt:v=>`-${Math.round(v*100)}% capital jump cooldown`,spot:[-3,-77]},
+  navigator:{label:'Navigator',vals:[.15,.25,.35],fee:1400,fmt:v=>`expeditions finish ${Math.round(v*100)}% sooner`,spot:[3,-77]},
+  engineer:{label:'Engineer',vals:[.1,.2,.3],fee:1600,fmt:v=>`+${Math.round(v*100)}% turret damage and hull repair`,spot:[8,-33]},
+  gunner:{label:'Gunner',vals:[.15,.3,.45],fee:1600,fmt:v=>`+${Math.round(v*100)}% turret fire rate`,spot:[12,-40]},
+  quarter:{label:'Quartermaster',vals:[.1,.2,.35],fee:1500,fmt:v=>`+${Math.round(v*100)}% expedition rewards`,spot:[-8,39]},
+  scientist:{label:'Scientist',vals:[10,20,30],fee:1300,fmt:v=>`+${v} Nanites per discovery`,spot:[-8,-33]},
+  trader:{label:'Trader',vals:[.03,.06,.1],fee:1800,fmt:v=>`+${Math.round(v*100)}% sell prices`,spot:[-12,32]},
+};
+const CREW_ROLE_KEYS=Object.keys(CREW_ROLES);
+const CREW_SPECIES={human:{label:'Human',color:'#ffb45e'},vael:{label:'Vael',color:'#ffcf6a'},korrath:{label:'Korrath',color:'#ff7a6a'},lumen:{label:'Lumen',color:'#9fe6ff'}};
+const CREW_TRAITS=['Veteran of the Hollow Fleet wars','Grew up on a mining rig','Former station security','Exiled from a Korrath war clan','Lumen-trained scholar','Ex-smuggler with a clean record','Survived a derelict boarding gone wrong','Never misses a supply count','Hums old star shanties on duty','Collects pressed alien flowers'];
+const CAP_SLOTS={courier:3,carrier:4,dread:6};
+const crewSlots=()=>st.capital?CAP_SLOTS[st.capital.cls]:0;
+function crewB(role){let best=0;for(const m of st.crew||[])if(m.role===role)best=Math.max(best,m.rank);return best?CREW_ROLES[role].vals[best-1]:0}
+const crewKey=()=>(st.crew||[]).map(m=>m.id+m.rank).join('|');
+const crewFee=(role,rank)=>Math.round(CREW_ROLES[role].fee*Math.pow(rank,1.6)/50)*50;
+function crewCandidates(){
+  if(!station)return[];const hour=Math.floor(Date.now()/3600000),rand=mulberry32(((station.group.position.x*13+hour*7919)|0)>>>0);
+  const out=[];for(let i=0;i<3;i++){
+    const role=CREW_ROLE_KEYS[Math.floor(rand()*CREW_ROLE_KEYS.length)],rr=rand(),rank=rr<.6?1:rr<.9?2:3;
+    const sp=rand()<.55?(system.faction||'human'):['human','vael','korrath','lumen'][Math.floor(rand()*4)];
+    const id=`${Math.round(station.group.position.x)}:${hour}:${i}`;
+    out.push({id,name:makeName(rand,1,2,false)+' '+makeName(rand,2,2,false),species:CREW_SPECIES[sp]?sp:'human',role,rank,trait:CREW_TRAITS[Math.floor(rand()*CREW_TRAITS.length)],fee:Math.round(crewFee(role,rank)*repBuy())})}
+  return out.filter(c=>!(st.crewHired||[]).includes(c.id));
+}
+function hireCrew(cand){
+  if(!st.capital){toast('Crew serve aboard a capital ship. Buy one in the Capital yard first.','bad');return false}
+  st.crew=st.crew||[];if(st.crew.length>=crewSlots()){toast(`Your ${CAP_CLASSES[st.capital.cls].label} has room for ${crewSlots()} crew. Dismiss someone or upgrade your capital ship.`,'bad');return false}
+  if(inv.units<cand.fee){toast(`Hiring ${cand.name} costs ${cand.fee.toLocaleString()} units.`,'bad');return false}
+  inv.units-=cand.fee;st.crew.push({id:cand.id,name:cand.name,species:cand.species,role:cand.role,rank:cand.rank,trait:cand.trait});
+  (st.crewHired=st.crewHired||[]).push(cand.id);
+  toast(`${cand.name} joins your crew as ${CREW_ROLES[cand.role].label}: ${CREW_ROLES[cand.role].fmt(CREW_ROLES[cand.role].vals[cand.rank-1])}.`,'big');save();return true;
+}
+const crewStars=n=>'★'.repeat(n)+'☆'.repeat(3-n);
+function crewRow(m,actions){
+  const R=CREW_ROLES[m.role],S=CREW_SPECIES[m.species];
+  return `<div class="urow"><div><span class="nm">${clean(m.name,30)}</span> <span class="pips">${crewStars(m.rank)}</span></div>
+    <div class="ds"><span style="color:${S.color}">${S.label}</span> ${R.label} · ${R.fmt(R.vals[m.rank-1])}. ${m.trait}.</div><div class="acts">${actions}</div></div>`;
+}
+function renderCrewTab(){
+  const list=st.crew||[];let h=`<p class="trnote">${list.length}/${crewSlots()} crew aboard. Each role's best crew member sets its bonus. Hire specialists at station crew boards.</p>`;
+  if(!list.length)h+='<p class="trnote">You are flying with a skeleton crew.</p>';
+  h+=list.map((m,i)=>{const cost=2500*m.rank,can=m.rank<3&&inv.units>=cost;return crewRow(m,`${m.rank<3?`<button type="button" data-cact="promote" data-i="${i}" ${can?'':'disabled'}>Promote · ${cost.toLocaleString()} u</button>`:'<span class="own">Top rank</span>'}<button type="button" data-cact="fire" data-i="${i}">Dismiss</button>`)}).join('');
+  return h;
+}
+function crewAction(a,i){
+  const m=(st.crew||[])[i];if(!m)return;
+  if(a==='promote'){const cost=2500*m.rank;if(m.rank<3&&inv.units>=cost){inv.units-=cost;m.rank++;toast(`${m.name} promoted: ${CREW_ROLES[m.role].fmt(CREW_ROLES[m.role].vals[m.rank-1])}.`)}}
+  else if(a==='fire'){if(CAPR.pendingDismiss!==m.id||time-CAPR.pendingT>5){CAPR.pendingDismiss=m.id;CAPR.pendingT=time;toast(`Press Dismiss again to let ${m.name} go. Their hiring fee is not refunded.`,'bad');return}
+    st.crew.splice(i,1);CAPR.pendingDismiss=null;toast(`${m.name} has left your crew.`)}
+  save();
+}
+const CREW_SPECIES_LINES={human:['"Good to be aboard, Captain."'],vael:['"Every voyage is a ledger. Let us make ours profitable."'],korrath:['"Point me at the enemy, Captain."'],lumen:['"So much left to record out there."']};
 
 /* ---------- space stations & trading posts ---------- */
 let station=null,trade=null,nearPost=null;
@@ -2654,7 +2712,7 @@ function renderTrade(){
   $('trKind').textContent=isSt?`Space station · ${station.econ.name} economy`:`Trading post · ${v.planet.name}`;
   $('trName').textContent=v.name;
   $('trInfo').innerHTML=`<span>Ship <b>${SHIP_CLASSES[ship.cls].label}</b></span><span>Hull <b>${Math.round(ship.hull)}/${S.hull}</b></span><span>Launch fuel <b>${Math.round(ship.fuel)}</b></span><span>Nanites <b>${inv.nanites}</b></span>`;
-  const tabs=isSt?[['market','Market'],['outfitter','Outfitter'],['shipyard','Shipyard'],['services','Services'],['missions','Missions'],['faction','Faction'],['capital','Capital yard']]:[['market','Market'],['services','Services'],['faction','Faction']];
+  const tabs=isSt?[['market','Market'],['outfitter','Outfitter'],['shipyard','Shipyard'],['services','Services'],['missions','Missions'],['faction','Faction'],['capital','Capital yard'],['crewboard','Crew board']]:[['market','Market'],['services','Services'],['faction','Faction']];
   $('trTabs').innerHTML=tabs.map(([k,l])=>`<button type="button" data-tab="${k}" class="${trade.tab===k?'on':''}">${l}</button>`).join('');
   $('trUnits').textContent=`${inv.units.toLocaleString()} units`;
   let h='';
@@ -2684,6 +2742,10 @@ function renderTrade(){
       <tr><td>Hull repair</td><td>${Math.round(ship.hull)}/${S.hull}</td><td>${rc} u</td><td class="btns"><button type="button" data-act="repair" ${rc<=0||inv.units<rc?'disabled':''}>Repair</button></td></tr>
       <tr><td>Launch fuel</td><td>${Math.round(ship.fuel)}/100</td><td>${fc} u</td><td class="btns"><button type="button" data-act="refuel" ${fc<=0||inv.units<fc?'disabled':''}>Refuel</button></td></tr>
       </tbody></table></div><p class="trnote">${isSt?'Shields are recharged for free while docked.':'Repairs here reach your ship on the landing pad.'}</p>`;
+  }else if(trade.tab==='crewboard'){
+    const cands=crewCandidates(),full=st.capital&&(st.crew||[]).length>=crewSlots();
+    h=`<p class="trnote">${st.capital?`Recruits for the ${st.capital.name}: ${(st.crew||[]).length}/${crewSlots()} crew aboard.`:'Crew serve aboard a capital ship. Buy one in the Capital yard to hire them.'} New candidates arrive every hour.</p>`+
+      (cands.length?cands.map(m=>crewRow(m,`<button type="button" data-act="hire" data-id="${m.id}" ${st.capital&&!full&&inv.units>=m.fee?'':'disabled'}>Hire · ${m.fee.toLocaleString()} u</button>`)).join(''):'<p class="trnote">Everyone on this board has been hired. Check back next hour.</p>');
   }else if(trade.tab==='capital'){
     const tradeIn=st.capital?Math.round(CAP_CLASSES[st.capital.cls].price*.5):0;
     h=`<p class="trnote">Capital ships are mobile bases: summon one with K, land in its hangar for free repairs, send it on expeditions and jump between systems.${st.capital?` Your ${CAP_CLASSES[st.capital.cls].label} is worth ${tradeIn.toLocaleString()} units as a trade-in; its name, paint and upgrades carry over.`:''}</p>`+
@@ -2725,6 +2787,7 @@ $('trBody').addEventListener('click',e=>{
   else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2*repBuy());if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
   else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25);if(o.type==='boss'){st.bossDue=true;pirateTimer=Math.min(pirateTimer,30);toast('A dreadnought will hunt you once you are in open space, away from the station.')}}else ok=false}
   else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');addRep(system.faction,m.type==='boss'?15:8,'contract completed');st.mission=null}else ok=false}
+  else if(a==='hire'){const m=crewCandidates().find(x=>x.id===b.dataset.id);if(!m||!hireCrew(m))ok=false}
   else if(a==='buycap'){if(!buyCapital(b.dataset.c))ok=false}
   else if(a==='joinwar'){joinWar(b.dataset.f)}
   else if(a==='donate'){if(inv.units>=500){inv.units-=500;addRep(system.faction,5,'donation')}else ok=false}
@@ -3596,7 +3659,8 @@ function buildCapInterior(cls){
   term(14,-36,-Math.PI/2);add(new THREE.CylinderGeometry(1.4,1.4,4,12),new THREE.MeshPhongMaterial({color:'#3a3f50',emissive:'#1a4a7a'}),12,2,-40);
   term(-14,-36,Math.PI/2);add(new THREE.BoxGeometry(2.4,1.2,1.6),dark,-11,.6,-40);add(new THREE.BoxGeometry(2,.1,1.2),holo,-11,1.3,-40);
   term(-14,36,Math.PI/2);add(new THREE.BoxGeometry(4,.9,2.4),dark,-9,.45,36);add(new THREE.BoxGeometry(3.6,.05,2),holo,-9,.95,36);
-  // quarters: bunks
+  // quarters: bunks and the crew roster
+  term(14.5,36,-Math.PI/2);
   for(const z of [32,40])add(new THREE.BoxGeometry(2.2,.5,1),new THREE.MeshPhongMaterial({color:'#4a5a7a'}),14,.6,z);
   // hangar: exit terminal
   term(-14.5,0,Math.PI/2);add(new THREE.BoxGeometry(.1,3,6),new THREE.MeshBasicMaterial({color:'#ffb45e'}),-15.9,1.8,0);
@@ -3605,10 +3669,11 @@ function buildCapInterior(cls){
   for(let i=0;i<6;i++){const x=-5+i*2;add(new THREE.CylinderGeometry(.4,.5,1,8),dark,x,.5,84);const r=add(new THREE.TorusGeometry(.35,.1,6,14),relicMat,x,1.5,84);r.visible=i<(inv.relics||0);relics.push(r)}
   term(0,76.5,Math.PI);
   // crew members
-  const crew=[{name:'Pilot Ines Varro',role:'pilot',x:-3,z:-77,c:'#9fe6ff'},{name:'Chief Engineer Dax Oru',role:'engineer',x:8,z:-33,c:'#ffb45e'},{name:'Quartermaster Lio Senn',role:'quarter',x:-8,z:39,c:'#8af0b4'},{name:'Navigator Teo Ashby',role:'navigator',x:9,z:38,c:'#d7b6ff'}];
+  const used={};const crew=(st.crew||[]).map(m=>{const sp=CREW_ROLES[m.role].spot,k=used[m.role]=(used[m.role]||0)+1;return Object.assign({},m,{x:sp[0]+(k-1)*1.6,z:sp[1]+(k-1)*1.2,c:CREW_SPECIES[m.species].color})});
+  if(!crew.length)crew.push({name:'Deck officer Ama Reyes',role:'deck',x:-8,z:-3,c:'#c9ccd6',rank:1,species:'human'});
   const items=[
     {kind:'helm',pos:new V3(0,1,-80),key:''},{kind:'workshop',pos:new V3(14,1,-36),key:''},{kind:'fab',pos:new V3(-14,1,-36),key:''},
-    {kind:'expedition',pos:new V3(-14,1,36),key:''},{kind:'trophy',pos:new V3(0,1,76.5),key:''},{kind:'exitcap',pos:new V3(-14.5,1,0),key:''},
+    {kind:'expedition',pos:new V3(-14,1,36),key:''},{kind:'roster',pos:new V3(14.5,1,36),key:''},{kind:'trophy',pos:new V3(0,1,76.5),key:''},{kind:'exitcap',pos:new V3(-14.5,1,0),key:''},
   ];
   for(const m of crew){const a=buildAstro(m.c);a.position.set(m.x,0,m.z);a.rotation.y=Math.random()*6.28;ig.add(a);items.push({kind:'crew',pos:new V3(m.x,1,m.z),mesh:a,crew:m,key:''})}
   const lights=[0,1,2].map(()=>{const L=new THREE.PointLight('#dff2ff',1.3,26,1.4);ig.add(L);return L});
@@ -3616,7 +3681,7 @@ function buildCapInterior(cls){
 }
 function walkAboardCapital(){
   if(!CAPR.group||!(ship.dockCap&&ship.state==='docked'))return;
-  if(!CAPR.int||CAPR.intCls!==st.capital.cls){if(CAPR.int)CAPR.group.remove(CAPR.int.ig);CAPR.int=buildCapInterior(st.capital.cls);CAPR.intCls=st.capital.cls;CAPR.group.add(CAPR.int.ig)}
+  if(!CAPR.int||CAPR.intCls!==st.capital.cls||CAPR.intCrew!==crewKey()){if(CAPR.int)CAPR.group.remove(CAPR.int.ig);CAPR.int=buildCapInterior(st.capital.cls);CAPR.intCls=st.capital.cls;CAPR.intCrew=crewKey();CAPR.group.add(CAPR.int.ig)}
   const I=CAPR.int;I.relics.forEach((r,i)=>r.visible=i<(inv.relics||0));
   Object.assign(DR,{on:true,kind:'capital',items:I.items,lights:I.lights,ig:I.ig,rects:I.rects,rad:null,inRad:false,cells:0});
   DR.pos.set(-10,1.7,2);DR.yaw=-Math.PI/2;DR.pitch=0;
@@ -3629,6 +3694,10 @@ function exitCapInterior(silent){
   if(CAPR.group&&ship.dockCap){ship.state='docked';if(!silent)openCap('hangar')}else{ship.state='flying';ship.dockCap=false}
 }
 const CREW_LINES={
+  deck:()=>'"We are running a skeleton crew, Captain. Hire specialists from the crew boards on space stations, then check the roster terminal in crew quarters."',
+  gunner:()=>`"Turrets are hot and ready. ${npcs.some(n=>n.hostile||isWarEnemy(n))?'Hostiles on the scope!':'All quiet on the scopes.'}"`,
+  scientist:()=>`"${st.disc.size} discoveries logged so far. Every new world pays us in Nanites."`,
+  trader:()=>`"I have been haggling with the ${system&&system.faction?FN(system.faction):'locals'}. Our cargo sells for more now."`,
   pilot:()=>{const c=st.capital;return c.jumpAt>Date.now()?`"The capital drive needs ${Math.ceil((c.jumpAt-Date.now())/1000)} more seconds, Captain."`:'"Drive is charged. Say the word at the helm and we jump."'},
   engineer:()=>{const c=st.capital,next=CAP_UPG.find(u=>(c.upg[u.key]||0)<3);return next?`"Give me ${(4000*((c.upg[next.key]||0)+1)).toLocaleString()} units and I can refit the ${next.name.toLowerCase()}."`:'"Every system aboard is maxed out. She is a beauty."'},
   quarter:()=>{const e=st.capital.exped;return e?(e.until>Date.now()?`"The expedition team is still out there."`:'"The haul is in! Collect it at the operations console."'):`"The holds are empty, Captain. Send us out on an expedition."`},
@@ -3641,9 +3710,10 @@ function capInteract(it){
   if(it.kind==='fab'){toggleCraft();return}
   if(it.kind==='expedition'){openCap('expeditions');return}
   if(it.kind==='trophy'){toast(`Trophy log: ${kills} ships destroyed · ${st.disc.size} discoveries · ${inv.relics} relics aboard · ${st.systems} systems visited.`,'big');return}
-  if(it.kind==='crew'){it.mesh.lookAt(it.mesh.parent.localToWorld(new V3(DR.pos.x,0,DR.pos.z)));toast(`${it.crew.name}: ${CREW_LINES[it.crew.role]()}`);Sound.blip(420,.1,'sine',.08)}
+  if(it.kind==='roster'){openCap('crew');return}
+  if(it.kind==='crew'){it.mesh.lookAt(it.mesh.parent.localToWorld(new V3(DR.pos.x,0,DR.pos.z)));const R=CREW_ROLES[it.crew.role];const line=Math.random()<.25&&CREW_SPECIES_LINES[it.crew.species]?CREW_SPECIES_LINES[it.crew.species][0]:CREW_LINES[it.crew.role]();toast(`${it.crew.name}${R?' · '+R.label+' '+crewStars(it.crew.rank):''}: ${line}`);Sound.blip(420,.1,'sine',.08)}
 }
-const CAP_PROMPTS={exitcap:['Hangar terminal','Return to your ship'],helm:['Holo helm','Command the ship'],workshop:['Engineering terminal','Ship workshop'],fab:['Fabricator','Craft'],expedition:['Operations console','Expeditions'],trophy:['Trophy log','Read']};
+const CAP_PROMPTS={roster:['Crew roster','Manage crew'],exitcap:['Hangar terminal','Return to your ship'],helm:['Holo helm','Command the ship'],workshop:['Engineering terminal','Ship workshop'],fab:['Fabricator','Craft'],expedition:['Operations console','Expeditions'],trophy:['Trophy log','Read']};
 
 /* ---------- HUD ---------- */
 const mk=$('marks'),mctx=mk.getContext('2d');
@@ -3860,7 +3930,7 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.territory=saved.territory||{};st.capital=saved.capital||null;st.looted=new Set(saved.looted||[]);
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.territory=saved.territory||{};st.capital=saved.capital||null;st.crew=saved.crew||[];st.crewHired=saved.crewHired||[];st.looted=new Set(saved.looted||[]);
     myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
   else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();st.rep={vael:0,korrath:0,lumen:0};myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
