@@ -17,7 +17,7 @@ This project is meant to run on StackBlitz ⚡️
 An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loaded from a CDN, no build step). Open the file in a browser.
 
 - Steer your longship across an open sea with waves, wind, a day/night cycle, storms with rain and lightning, and procedural sound.
-- Ten islands to discover: towns, villages, a volcano, haunted ruins, a shrine, and the Jarl's walled fortress.
+- Seventeen islands to discover: trading towns, villages, a volcano, a glacier, two haunted barrow isles, two shrines, a seal rock, and the Jarl's walled fortress.
 - Go ashore to trade, hunt, explore, feast and upgrade your hall and ship.
 - Real-time sea battles: loose arrow volleys, raise a shield wall, ram at full sail, or come alongside and board. Black-sailed raiders hunt you, merchant ships can be attacked, sea serpents circle and strike, and raiding a town makes its warships sail out to fight before you can sack it.
 - Walk ashore with your warband (G): explore islands on foot, find treasure chests, fight wolves and draugr, and storm towns in real-time melee battles against their defenders (and Jarl Hakon himself at Stonegard).
@@ -25,6 +25,7 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 - Buy a horse of your own: it sails aboard your longship and comes when you call (C) on any island.
 - Swear oaths (quests) for townsfolk and villagers: deliveries, wolf and deer hunts, sinking raiders, slaying the serpent, cleansing the barrow and sacking rival towns.
 - Hunt deer that bolt when you approach, and talk to villagers for rumours and work.
-- Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, R ride/dismount, C call your horse, E land/set sail/interact, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
+- Switch between axe and bow on foot (Q). Arrows lead moving targets and work from horseback; some of your warband and some town defenders fight as archers.
+- Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, R ride/dismount, C call your horse, Q axe/bow, E land/set sail/interact, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
 
 The original 2D map version is still available at `viking/classic.html`.
