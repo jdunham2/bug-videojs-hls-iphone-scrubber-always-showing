@@ -56,7 +56,7 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Sixteen fighters, each with their own stats, look and special move:
+Twenty fighters, each with their own stats, look and special move:
 
 | Fighter | Style | Special |
 |---|---|---|
@@ -75,6 +75,10 @@ Sixteen fighters, each with their own stats, look and special move:
 | Frosty | Every hit briefly freezes enemies | Blizzard freezes everyone on screen |
 | Ghostly | Hold jump to float down slowly; dashes pass through attacks | Haunt: untouchable for 4 seconds, and touching enemies hurts them |
 | DJ Beats | Heavy attack fires growing sound waves that push enemies away | Drop the Bass: three screen-wide shockwaves |
+| Bubbles | Heavy attack blows bubbles that trap enemies | Bubble Storm fills the air with trapping bubbles |
+| Jetpack Jo | Hold jump in the air to fly; heavy attack fires a homing rocket | Air Strike: rockets rain from the sky |
+| Presto | Magician: dash is a short teleport; heavy attack throws three cards | Abracadabra turns every regular enemy into loot (bosses take damage) |
+| El Doodlo | Wrestler: heavy attack grabs an enemy and throws it into others | Doodlo Drop: a screen-shaking body slam |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
 
 ## Modes
@@ -144,6 +148,11 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 | Thorn Armor | Enemies that hit you take damage back |
 | Mega Hammer | Heavy attacks send shockwaves along the floor |
 | Slow-Mo Clock | Enemies move at half speed for 8 seconds (in Versus it slows your opponent) |
+| Shrink Ray | Regular enemies shrink and hit half as hard (in Versus it shrinks your opponent) |
+| Lucky Clover | 40% of your hits become 1.5x crits, and enemies drop more power-ups |
+| Ink Turret | Places a turret that shoots the nearest enemy |
+| Vampire Fangs | Heals you for a quarter of the damage you deal |
+| Invisibility | Enemies can't find you for 8 seconds |
 | Mystery box | A random power-up |
 
 ## Features
