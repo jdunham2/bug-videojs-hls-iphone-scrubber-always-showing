@@ -101,6 +101,24 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 @media (max-width:1400px){#buildbar{bottom:calc(150px + env(safe-area-inset-bottom,0px))}}
 @media (pointer:coarse){#buildbar{top:calc(14px + env(safe-area-inset-top,0px));bottom:auto} body.building #hudTL,body.building #hudBR,body.building #hudTC{display:none!important}}
 
+#trade{position:fixed;inset:0;display:grid;place-items:center;background:rgba(5,6,16,.55);padding-inline:16px}
+#trade .card{max-width:700px;width:100%;max-height:calc(100% - 32px);overflow:auto;pointer-events:auto}
+.tabs{display:flex;gap:4px;margin-top:12px;flex-wrap:wrap}
+.tabs button{font-family:var(--f-display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px;border:1px solid rgba(255,255,255,.18);background:transparent;color:var(--dim);border-radius:2px;cursor:pointer}
+.tabs button.on{border-color:var(--amber);color:var(--amber-hi);background:rgba(255,180,94,.14)}
+.mktwrap{overflow-x:auto;margin-top:8px}
+.mkt{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.mkt th{text-align:left;font-weight:500;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.1);white-space:nowrap}
+.mkt td{padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+.mkt td.btns{text-align:right}
+.mkt button,.trbtn{font-family:var(--f-data);font-size:11px;padding:5px 7px;border:1px solid var(--amber);background:rgba(255,180,94,.1);color:var(--amber-hi);border-radius:2px;cursor:pointer;margin-left:3px}
+.mkt button:disabled,.trbtn:disabled{opacity:.35;cursor:not-allowed}
+.mkt button:focus-visible,.trbtn:focus-visible,.tabs button:focus-visible{outline:2px solid var(--frost);outline-offset:1px}
+.tag-lo{color:var(--ok);font-size:10px;margin-left:6px}.tag-hi{color:var(--danger);font-size:10px;margin-left:6px}
+.trfoot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap}
+.units{font-family:var(--f-display);font-size:13px;color:var(--amber-hi);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.trnote{color:var(--dim);font-size:11.5px;margin:10px 0 0;line-height:1.5}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -182,6 +200,7 @@ button.go:disabled{opacity:.5;cursor:wait}
     <div class="res n"><span class="q" id="iN">0</span><span class="l">Nanites</span></div>
     <div class="res r"><span class="q" id="iR">0</span><span class="l">Relics</span></div>
   </div>
+  <div class="units"><span id="iU">0</span> units</div>
   <div style="font-size:11px;color:var(--dim)">Tab: controls</div>
 </div>
 
@@ -221,6 +240,17 @@ button.go:disabled{opacity:.5;cursor:wait}
   <div class="bb-tiles" id="bbTiles"></div>
   <div class="bb-foot"><span class="bb-hint">Click place · R rotate · X or right-click remove · wheel or 1–0 select · B exit</span>
     <span class="bb-acts"><button type="button" id="bbRot">Rotate</button><button type="button" id="bbDel">Remove aimed</button><button type="button" id="bbExit">Done</button></span></div>
+</div>
+
+<div id="trade" hidden>
+  <div class="card">
+    <div class="eyebrow" id="trKind">Space station</div>
+    <div class="pname" id="trName">—</div>
+    <div class="shipstats" id="trInfo"></div>
+    <div class="tabs" id="trTabs"></div>
+    <div id="trBody"></div>
+    <div class="trfoot"><span class="units" id="trUnits"></span><button type="button" class="trbtn" id="trClose">Undock</button></div>
+  </div>
 </div>
 
 <div id="help" hidden>
@@ -270,6 +300,7 @@ const CONTROLS=[
   ['Anywhere',null],['Crafting menu','I'],['Quick-use gel / hull patch','G'],
   ['Base building',null],['Build mode (on foot)','B'],['Place part','Left click'],['Rotate','R'],['Remove part (half refund)','X / right click'],
   ['Choose part','Wheel / 1–0 / [ ]'],['Collect from modules','E'],['Jump to your home base','J'],
+  ['Stations & trading posts',null],['Dock at a space station','E near the bay'],['Undock','E'],['Land at a trading post','E near its pad'],['Trade at a terminal','E'],
 ];
 function renderControls(el){
   el.innerHTML=CONTROLS.map(([a,b])=>b===null?`<h3>${a}</h3>`:`<div><span>${a}</span><kbd>${b}</kbd></div>`).join('');
@@ -536,6 +567,25 @@ gl_FragColor=vec4(uColor*g*lit*uFade*0.9,1.0);
       this.wrecks.push({group:wg,cls,paint,dir:wd.clone(),lp,wp:lp.clone().add(this.center),known:false});
     }
 
+    // trading posts
+    this.posts=[];
+    const nPosts=rand()<.75?(rand()<.3?2:1):0;
+    for(let k=0;k<nPosts;k++){
+      for(let tries=0;tries<12;tries++){
+        const pd=this.findLand(rand);
+        const q=uprightQuat(pd,new V3().crossVectors(pd,Math.abs(pd.y)<.9?Y_AXIS:X_AXIS),new Q4()).multiply(new Q4().setFromAxisAngle(Y_AXIS,rand()*6.28));
+        const xa=new V3(1,0,0).applyQuaternion(q),za=new V3(0,0,1).applyQuaternion(q);
+        let top=-Infinity,wet=false;
+        for(const [x,z] of [[-7,-7],[7,-7],[-7,19],[7,19],[0,6],[0,-7],[0,19],[-7,6],[7,6]]){
+          const pp=pd.clone().multiplyScalar(this.radius).addScaledVector(xa,x).addScaledVector(za,z).normalize();
+          const h=this.heightAt(pp);if(this.sea!==null&&h<this.sea+.5)wet=true;top=Math.max(top,h)}
+        if(wet)continue;
+        const post=buildPost();post.group.quaternion.copy(q);post.group.position.copy(pd).multiplyScalar(top);this.group.add(post.group);
+        post.name=makeName(rand,2,2,false)+' '+['Outpost','Trading Post','Exchange','Depot'][Math.floor(rand()*4)];
+        post.var={carbon:.85+rand()*.3,ferrite:.85+rand()*.3,cobalt:.85+rand()*.3,aurium:.85+rand()*.3};
+        post.planet=this;this.posts.push(post);break;
+      }
+    }
     const kind=this.biome.kind;
     const fmat=new THREE.MeshPhongMaterial({vertexColors:true,flatShading:true,shininess:6});
     if(kind==='mushroom'||kind==='shard'){fmat.emissive=new C3(this.floraCols[0]).multiplyScalar(kind==='mushroom'?.35:.15)}
@@ -734,14 +784,14 @@ const Sound={ctx:null,
 /* ---------- state ---------- */
 let planets=[],current=null,system=null,started=false,ready=false,time=0;
 const st={seed:0,systems:1,disc:new Set(),mode:'foot',scanUntil:0,scanCD:0,scanT:0,dead:0};
-const inv={carbon:0,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0};
+const inv={carbon:0,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:0};
 const player={pos:new V3(),fwd:new V3(0,0,-1),pitch:0,vUp:0,grounded:false,swimming:false,suit:100,health:100,jet:100,jetDelay:0,bob:0};
 let mineTarget=null,lookCreature=null,nearPickup=null,nearWreck=null,pendingClaim=null,pendingT=0;
 let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed,mission:st.mission}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -749,6 +799,8 @@ function setLoad(t){$('load').textContent=t}
 async function generateSystem(seed,first){
   for(const P of planets){scene.remove(P.group);P.dispose();for(const c of P.creatures)P.group.remove(c.mesh)}
   planets=[];current=null;baseRT=null;
+  if(station){scene.remove(station.group);station.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});station=null}
+  if(trade)closeTrade();
   clearCombat();
   const rand=mulberry32((seed^0x9e3779b9)>>>0);
   const star=STARS[Math.floor(rand()*STARS.length)];
@@ -767,6 +819,8 @@ async function generateSystem(seed,first){
     P.build();scene.add(P.group);out.push(P);
   }
   planets=out;setLoad('');
+  {const P0=planets[0];const sd=new V3().crossVectors(P0.center,Y_AXIS).normalize();if(rand()<.5)sd.negate();
+   station=makeStation((seed*7+13)>>>0,P0.center.clone().addScaledVector(sd,P0.radius*4.2).add(new V3(0,P0.radius*.8,0)),P0);}
   const nT=3+Math.floor(rand()*3),tcls=['hauler','shuttle','explorer','hauler'];
   for(let i=0;i<nT;i++){const P=planets[Math.floor(rand()*planets.length)];
     const n=spawnNpc('trader',tcls[Math.floor(rand()*tcls.length)],P.center.clone().addScaledVector(randDir(rand,new V3()),P.radius*1.8),rand()<.5?PAINTS.trader:randomPaint(rand));
@@ -887,12 +941,16 @@ function discover(key,label){if(st.disc.has(key))return false;st.disc.add(key);t
 function nearestPlanet(p){let best=null,bd=Infinity;for(const P of planets){const d=p.distanceTo(P.center)-P.radius;if(d<bd){bd=d;best=P}}return best}
 function nearShip(){return player.pos.distanceTo(ship.group.position)<ship.group.userData.radius+5}
 function interact(){
+  if(trade&&trade.kind==='post'){closeTrade();return}
   if(st.mode==='foot'){
-    if(nearShip()){if(buildMode)toggleBuild();st.mode='ship';ship.state='landed';ship.camQ.copy(ship.group.quaternion);Sound.blip(300,.2,'triangle');toast(canLaunch()?'Systems green. Space to take off.':'Launch thrusters need fuel. Press R to refuel with 20 Ferrite.')}
+    if(nearPost&&!buildMode)openTrade(nearPost);
+    else if(nearShip()){if(buildMode)toggleBuild();st.mode='ship';ship.state='landed';ship.camQ.copy(ship.group.quaternion);Sound.blip(300,.2,'triangle');toast(canLaunch()?'Systems green. Space to take off.':'Launch thrusters need fuel. Press R to refuel with 20 Ferrite.')}
     else if(nearBase)collectBase(nearBase);
     else if(nearPickup)openPickup(nearPickup);
     else if(nearWreck)claimWreck(nearWreck);
   }else if(ship.state==='landed'){exitToFoot();Sound.blip(260,.2,'triangle')}
+  else if(ship.state==='docked')undock();
+  else if(ship.state==='flying'&&stationNear())startDock();
   else if(ship.state==='flying'&&current){
     const P=current,d=ship.group.position.clone().sub(P.center);const r=d.length();d.divideScalar(r);
     const g=P.heightAt(d);
@@ -901,6 +959,10 @@ function interact(){
     if(pad){const up=baseUp();const qTo=uprightQuat(up,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
       ship.land={from:ship.group.position.clone(),to:pad.w.clone().addScaledVector(up,ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
       ship.state='landing';ship.t=0;ship.speed=0;Sound.blip(200,.6,'sawtooth',.08);toast('Landing pad locked. Auto-landing.');return}
+    const pp=nearestPostPad(P,ship.group.position,250);
+    if(pp){const up=new V3(0,1,0).applyQuaternion(pp.post.group.getWorldQuaternion(new Q4()));const qTo=uprightQuat(up,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
+      ship.land={from:ship.group.position.clone(),to:pp.w.clone().addScaledVector(up,ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
+      ship.state='landing';ship.t=0;ship.speed=0;Sound.blip(200,.6,'sawtooth',.08);toast(`Landing at ${pp.post.name}.`);return}
     if(P.sea!==null&&g<P.sea+.5){toast('Water below. Find dry land to set down.','bad');return}
     const qTo=uprightQuat(d,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
     ship.land={from:ship.group.position.clone(),to:P.center.clone().addScaledVector(d,g+ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
@@ -984,7 +1046,8 @@ function updateFoot(dt){
   player.fwd.addScaledVector(d,-player.fwd.dot(d)).normalize();
   const ground=P.heightAt(d),water=P.sea!==null&&ground<P.sea-1.2,eye=1.7;
   let floor=water?P.sea+.9:ground+eye;
-  const bs=baseSupport(P,player.pos);const onBase=bs!==null&&bs+eye>floor;if(onBase)floor=bs+eye;
+  let bs=baseSupport(P,player.pos);const ps=postSupport(P,player.pos);if(ps!==null&&(bs===null||ps>bs))bs=ps;
+  const onBase=bs!==null&&bs+eye>floor;if(onBase)floor=bs+eye;
   player.vUp-=20*dt;
   if(keys.Space&&(player.grounded||player.swimming)){player.vUp=player.swimming?5:7.5;player.grounded=false;player.jetDelay=.28}
   else if(keys.Space&&!player.grounded&&player.jet>0&&player.jetDelay<=0){player.vUp+=(tech('jet')?46:36)*dt;player.jet=Math.max(0,player.jet-(tech('jet')?15:30)*dt)}
@@ -1000,7 +1063,7 @@ function updateFoot(dt){
   player.bob+=moving?dt*speed*1.4:0;
   const bobA=REDUCED?0:(moving?.05:0);
   tV2.copy(player.pos).addScaledVector(d,Math.sin(player.bob)*bobA);
-  if(baseWalls(P)){d.copy(player.pos).sub(c).normalize();tV2.copy(player.pos)}
+  if(baseWalls(P)|postWalls(P)){d.copy(player.pos).sub(c).normalize();tV2.copy(player.pos)}
   setCamFoot(d,player.fwd,player.pitch,tV2);
   tool.position.set(.3+Math.cos(player.bob*.5)*bobA*.3,-.27+Math.abs(Math.sin(player.bob*.5))*bobA*.4,-.62);
   // life support
@@ -1025,7 +1088,7 @@ function updateMining(dt){
   tool.visible=true;
   const o=camera.position,dir=camera.getWorldDirection(tV);
   const RANGE=30;let bestT=RANGE;
-  nearPickup=null;nearWreck=null;let pd=4.8;nearBase=nearBasePiece();
+  nearPickup=null;nearWreck=null;let pd=4.8;nearBase=nearBasePiece();nearPost=nearPostTerminal();
   for(const w of P.wrecks)if(w.wp.distanceTo(player.pos)<w.group.userData.radius+9){nearWreck=w;w.known=true}
   for(const it of P.items){
     if(!it.alive)continue;
@@ -1045,7 +1108,7 @@ function updateMining(dt){
     if(dx*dx+dy*dy+dz*dz-t*t<rr*rr){cT=t;lookCreature=cr}
   }
   if(lookCreature&&cT<bestT)mineTarget=null;
-  const firing=mouseDown&&!buildMode&&$('help').hidden&&$('craft').hidden&&$('upg').hidden;
+  const firing=mouseDown&&!buildMode&&$('help').hidden&&$('craft').hidden&&$('upg').hidden&&$('trade').hidden;
   if(firing){
     const tip=tool.userData.tip.getWorldPosition(tV2);
     const end=mineTarget?mineTarget.wp:o.clone().addScaledVector(dir,RANGE);
@@ -1068,7 +1131,7 @@ function openPickup(it){
   hideItem(it);const P=current;
   if(it.type==='ion'){player.jet=100;player.suit=Math.min(100,player.suit+15);toast('Ion cell: jetpack refilled, life support +15');Sound.blip(1400,.18,'sine',.12);return}
   if(it.type==='pod'){
-    const l={carbon:ri(4,14),ferrite:ri(4,14),cobalt:ri(0,6),nanites:ri(8,30),aurium:Math.random()<.3?ri(1,3):0};
+    const l={units:ri(10,60),carbon:ri(4,14),ferrite:ri(4,14),cobalt:ri(0,6),nanites:ri(8,30),aurium:Math.random()<.3?ri(1,3):0};
     giveLoot(l);toast(`Supply pod: ${lootText(l)}`);Sound.blip(500,.15,'triangle',.14);setTimeout(()=>Sound.blip(800,.2,'triangle',.12),120);save();return;
   }
   if(it.type==='relic'){
@@ -1141,7 +1204,7 @@ function updateShip(dt){
     g.position.addScaledVector(fwd,ship.speed*dt);
     // cannons
     ship.fireCD-=dt;ship.heat=Math.max(0,ship.heat-(ship.overheat?32:24)*dt);if(ship.overheat&&ship.heat<30)ship.overheat=false;
-    if(mouseDown&&$('help').hidden&&$('upg').hidden&&$('craft').hidden&&!ship.overheat&&ship.fireCD<=0){
+    if(mouseDown&&$('help').hidden&&$('upg').hidden&&$('craft').hidden&&$('trade').hidden&&!ship.overheat&&ship.fireCD<=0){
       const guns=g.userData.guns,gp=guns[ship.gunI++%guns.length];
       const muzzle=g.localToWorld(tV2.copy(gp));
       fireBolt(muzzle,fwd,tV3.copy(fwd).multiplyScalar(ship.speed),'player',S.dmg);
@@ -1155,7 +1218,18 @@ function updateShip(dt){
     }
     const sd=g.position.length();
     if(sd<1400){g.position.multiplyScalar(1400/sd);ship.speed*=.5;if(ship.scrapeCD<=0){toast('Too close to the star. Hull temperature critical.','bad');ship.scrapeCD=2;damagePlayer(15,true)}}
+    stationCollide();
     ship.scrapeCD-=dt;
+  }else if(ship.state==='docking'){
+    const D=ship.dock;D.t+=dt/(D.phase?1.2:1.7);const e=ease(Math.min(1,D.t));
+    if(D.phase===0){g.position.lerpVectors(D.p0,D.mouth,e);g.quaternion.copy(D.q0).slerp(D.qIn,e);if(D.t>=1){D.phase=1;D.t=0}}
+    else{g.position.lerpVectors(D.mouth,D.inside,e);if(D.t>=1){ship.state='docked';onDocked()}}
+  }else if(ship.state==='docked'){
+    g.position.copy(stationInside());
+  }else if(ship.state==='undocking'){
+    const D=ship.dock;D.t+=dt/1.6;const e=ease(Math.min(1,D.t));
+    g.position.lerpVectors(D.inside,D.out,e);
+    if(D.t>=1){ship.state='flying';ship.speed=90}
   }else if(ship.state==='warp'){
     ship.t+=dt;
     const fwd=tV.set(0,0,-1).applyQuaternion(g.quaternion);
@@ -1187,6 +1261,7 @@ async function doWarp(home){
   ship.state='flying';ship.speed=200;camera.fov=70;camera.updateProjectionMatrix();
   $('flash').style.transition='opacity 1.8s';$('flash').style.opacity=0;
   toast(home?`Home system: ${system.name}. Your base is on ${P.name}.`:`Arrived: ${system.name} · ${system.star.name} star · ${planets.length} planets`,'big');
+  if(station)setTimeout(()=>toast(`${station.name} is in this system (${station.econ.name} economy). Fly to its bay and press E to dock.`),1800);
   save();
 }
 /* ---------- space combat ---------- */
@@ -1202,7 +1277,7 @@ function clearCombat(){
   for(const n of npcs)scene.remove(n.group);for(const s of salvage)scene.remove(s.mesh);for(const b of booms)scene.remove(b.mesh);
   npcs=[];bolts=[];salvage=[];booms=[];
 }
-function pickWaypoint(){const P=planets[Math.floor(Math.random()*planets.length)];return P.center.clone().addScaledVector(randDir(Math.random,new V3()),P.radius*(1.6+Math.random()*.6))}
+function pickWaypoint(){if(station&&Math.random()<.35)return stationMouth().addScaledVector(randDir(Math.random,new V3()),250);const P=planets[Math.floor(Math.random()*planets.length)];return P.center.clone().addScaledVector(randDir(Math.random,new V3()),P.radius*(1.6+Math.random()*.6))}
 function spawnNpc(faction,cls,pos,paint){
   const g=buildShip(cls,paint);g.position.copy(pos);scene.add(g);
   const c=SHIP_CLASSES[cls],pir=faction==='pirate';
@@ -1257,9 +1332,10 @@ function destroyNpc(n){
   const p=n.group.position;boom(p,n.radius*3,'#ffa050',1.2);boom(p,n.radius*1.6,'#fff2c0',.6);Sound.boom(.6);
   scene.remove(n.group);npcs.splice(npcs.indexOf(n),1);
   const trader=n.faction==='trader';kills++;
+  if(!trader&&st.mission&&st.mission.type==='bounty'&&st.mission.have<st.mission.need){st.mission.have++;setTimeout(()=>toast(st.mission.have>=st.mission.need?`Bounty complete. Dock at any station to collect ${st.mission.reward} units.`:`Bounty: ${st.mission.have}/${st.mission.need} pirates destroyed.`),400)}
   const drops=trader?ri(3,4):ri(1,2);
   for(let i=0;i<drops;i++){
-    const l=trader?{ferrite:ri(10,25),cobalt:ri(3,10),aurium:ri(0,3),nanites:ri(15,35)}:{nanites:ri(20,45),cobalt:ri(2,7),aurium:Math.random()<.45?ri(1,3):0,ferrite:ri(0,8)};
+    const l=trader?{ferrite:ri(10,25),cobalt:ri(3,10),aurium:ri(0,3),nanites:ri(15,35),units:ri(60,150)}:{units:ri(40,120),nanites:ri(20,45),cobalt:ri(2,7),aurium:Math.random()<.45?ri(1,3):0,ferrite:ri(0,8)};
     const m=new THREE.Mesh(salvGeo,salvMat);m.position.copy(p).addScaledVector(randDir(Math.random,new V3()),3);scene.add(m);
     salvage.push({mesh:m,vel:n.vel.clone().multiplyScalar(.3).addScaledVector(randDir(Math.random,new V3()),12),life:120,loot:l,spin:new V3(Math.random(),Math.random(),Math.random())});
   }
@@ -1330,8 +1406,9 @@ function updateBolts(dt){
   for(let i=bolts.length-1;i>=0;i--){
     const b=bolts[i];b.prev.copy(b.p);b.p.addScaledVector(b.v,dt);b.life-=dt;
     let dead=b.life<=0;
-    if(!dead&&b.owner==='player'){
-      for(const n of npcs)if(segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}
+    if(!dead&&b.owner!=='station'&&station&&segHit(b.prev,b.p,station.group.position,50)){dead=true;boom(b.p,1.5,'#9fe6ff',.2)}
+    if(!dead&&(b.owner==='player'||b.owner==='station')){
+      for(const n of npcs)if((b.owner==='player'||n.hostile)&&segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}
     }else if(!dead&&flying&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}
     if(!dead&&current){const d=bD.copy(b.p).sub(current.center);const r=d.length();if(r<current.radius*1.25){d.divideScalar(r);if(r<current.floorAt(d)){dead=true;boom(b.p,1.2,'#ffcf6a',.2)}}}
     if(dead)bolts.splice(i,1);
@@ -1339,7 +1416,7 @@ function updateBolts(dt){
   let ip=0,ie=0;
   for(const b of bolts){
     bQ.setFromUnitVectors(Z_AXIS,bD.copy(b.v).normalize());bM.compose(b.p,bQ,bS);
-    if(b.owner==='player'){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
+    if(b.owner!=='enemy'){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
   }
   boltMeshP.count=ip;boltMeshE.count=ie;boltMeshP.instanceMatrix.needsUpdate=true;boltMeshE.instanceMatrix.needsUpdate=true;
 }
@@ -1353,7 +1430,7 @@ function updateCombat(dt){
   // pirate waves
   if(flying&&current){
     const alt=ship.group.position.distanceTo(current.center)-current.radius;
-    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')){pirateTimer-=dt;if(pirateTimer<=0){spawnPirates();pirateTimer=80+Math.random()*80}}
+    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){spawnPirates();pirateTimer=80+Math.random()*80}}
   }
   updateNpcs(dt);updateBolts(dt);
   // salvage
@@ -1492,7 +1569,7 @@ function nearestPad(pos,maxD){
   for(const pc of base.pieces)if(pc.t==='pad'){const w=pc.mesh.localToWorld(new V3(0,.3,0));const d=w.distanceTo(pos);if(d<bd){bd=d;best={pc,w}}}
   return best;
 }
-const onPad=()=>!!nearestPad(ship.group.position,ship.group.userData.base+3);
+const onPad=()=>!!nearestPad(ship.group.position,ship.group.userData.base+3)||!!(current&&nearestPostPad(current,ship.group.position,ship.group.userData.base+3));
 const canLaunch=()=>onPad()||ship.fuel>=TO();
 function landAtBase(){
   const P=baseRT.P;current=P;
@@ -1650,6 +1727,231 @@ function deconstruct(){
   if(pc.t==='computer'){baseRT.P.group.remove(baseRT.group);baseRT=null;base=null;toast('Base dismantled.');buildSel=0;renderBuildBar()}
   save();
 }
+
+/* ---------- space stations & trading posts ---------- */
+let station=null,trade=null,nearPost=null;
+const ECON=[
+  {name:'Mining',m:{carbon:1.2,ferrite:.7,cobalt:.8,aurium:1.05,relics:1}},
+  {name:'Agricultural',m:{carbon:.6,ferrite:1.2,cobalt:1.05,aurium:1,relics:1}},
+  {name:'Industrial',m:{carbon:1,ferrite:1.3,cobalt:1.25,aurium:.95,relics:.9}},
+  {name:'High tech',m:{carbon:1.1,ferrite:1,cobalt:1.2,aurium:1.3,relics:1.1}},
+  {name:'Scientific',m:{carbon:1,ferrite:.95,cobalt:1,aurium:1.15,relics:1.6}},
+];
+const BASE_PRICE={carbon:6,ferrite:9,cobalt:24,aurium:75,relics:450};
+const SHOP_PRICE={gel:60,hullkit:90,battery:140,fuelcell:70,warpcell:950,beam:2400,jet:2000,lining:2200,scanner:2600,magnet:3000,resonator:3500};
+const SHIP_PRICE={shuttle:2500,explorer:7000,fighter:9500,hauler:11000,interceptor:13000};
+function buildStation(rand){
+  const g=new THREE.Group();
+  const M=(c,o={})=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:40},o));
+  const hue=rand(),hull=M('#b8bfcc'),dark=M('#363b4c'),acc=M(new C3().setHSL(hue,.6,.55),{emissive:new C3().setHSL(hue,.7,.18)});
+  const add=(geo,mat,x=0,y=0,z=0,par=g)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);par.add(m);return m};
+  add(new THREE.CylinderGeometry(45,45,150,16),hull);
+  add(new THREE.ConeGeometry(45,40,16),hull,0,95,0);add(new THREE.ConeGeometry(45,40,16).rotateX(Math.PI),hull,0,-95,0);
+  add(new THREE.CylinderGeometry(47,47,10,16),acc,0,42,0);add(new THREE.CylinderGeometry(47,47,10,16),acc,0,-42,0);
+  add(new THREE.CylinderGeometry(3,3,60,6),dark,0,135,0);
+  add(new THREE.BoxGeometry(300,2,36),M('#1d2c66',{emissive:'#0a1440',shininess:90}),0,150,0);
+  const ring=new THREE.Group();g.add(ring);
+  add(new THREE.TorusGeometry(175,13,10,56).rotateX(Math.PI/2),hull,0,0,0,ring);
+  for(let i=0;i<4;i++){const a=i*Math.PI/2;add(new THREE.BoxGeometry(130,8,8),dark,Math.cos(a)*108,0,Math.sin(a)*108,ring).rotation.y=-a}
+  const blink=[];
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+Math.PI/8;add(new THREE.BoxGeometry(26,22,30),i%2?dark:acc,Math.cos(a)*175,0,Math.sin(a)*175,ring).rotation.y=-a;
+    blink.push(add(new THREE.SphereGeometry(2.2,8,6),new THREE.MeshBasicMaterial({color:i%2?'#ff6274':'#8af0b4'}),Math.cos(a)*192,0,Math.sin(a)*192,ring))}
+  // docking bay facing +Z
+  add(new THREE.BoxGeometry(60,5,40),dark,0,17.5,58);add(new THREE.BoxGeometry(60,5,40),dark,0,-17.5,58);
+  add(new THREE.BoxGeometry(5,40,40),dark,27.5,0,58);add(new THREE.BoxGeometry(5,40,40),dark,-27.5,0,58);
+  add(new THREE.BoxGeometry(50,30,2),M('#0c0f1c',{emissive:'#101a30'}),0,0,40);
+  const edge=new THREE.MeshBasicMaterial({color:new C3().setHSL(hue,.8,.65)});
+  add(new THREE.BoxGeometry(56,1,1),edge,0,15,78.5);add(new THREE.BoxGeometry(56,1,1),edge,0,-15,78.5);add(new THREE.BoxGeometry(1,30,1),edge,25,0,78.5);add(new THREE.BoxGeometry(1,30,1),edge,-25,0,78.5);
+  for(let z=44;z<78;z+=6)add(new THREE.BoxGeometry(14,.4,1.2),new THREE.MeshBasicMaterial({color:'#ffb45e'}),0,-14.8,z);
+  const L=new THREE.PointLight('#bfe6ff',1.6,140,1.5);L.position.set(0,0,62);g.add(L);
+  g.userData={ring,blink,mouth:new V3(0,0,115),inside:new V3(0,0,55)};
+  return g;
+}
+function makeStation(seed,pos,P){
+  const rand=mulberry32(seed);
+  const g=buildStation(rand);g.position.copy(pos);g.lookAt(P.center);scene.add(g);g.updateMatrixWorld(true);
+  const S={group:g,econ:ECON[Math.floor(rand()*ECON.length)],name:makeName(rand,2,2,false)+' '+['Waystation','Exchange','Spire','Haven','Citadel'][Math.floor(rand()*5)],turretCD:0,ships:[],missions:[]};
+  const cls=Object.keys(SHIP_CLASSES).sort(()=>rand()-.5).slice(0,3);
+  S.ships=cls.map(c=>({cls:c,paint:randomPaint(rand),price:Math.round(SHIP_PRICE[c]*(.9+rand()*.25)/10)*10}));
+  const need=3+Math.floor(rand()*3);
+  const res=['carbon','ferrite','cobalt'][Math.floor(rand()*3)],qty={carbon:40+Math.floor(rand()*40),ferrite:30+Math.floor(rand()*30),cobalt:10+Math.floor(rand()*15)}[res];
+  S.missions=[{type:'bounty',need,have:0,reward:need*450+Math.round(rand()*20)*10},{type:'supply',res,qty,reward:Math.round(qty*BASE_PRICE[res]*1.8/10)*10}];
+  return S;
+}
+const stationMouth=()=>station.group.localToWorld(station.group.userData.mouth.clone());
+const stationInside=()=>station.group.localToWorld(station.group.userData.inside.clone());
+const stationNear=()=>!!station&&ship.group.position.distanceTo(stationMouth())<450;
+function startDock(){
+  const S=station.group,mouth=stationMouth(),inside=stationInside();
+  const up=new V3(0,1,0).applyQuaternion(S.quaternion);
+  const qIn=new Q4().setFromRotationMatrix(new THREE.Matrix4().lookAt(mouth,inside,up));
+  ship.dock={phase:0,t:0,p0:ship.group.position.clone(),q0:ship.group.quaternion.clone(),mouth,inside,qIn};
+  ship.state='docking';ship.speed=0;Sound.blip(300,.5,'sine',.12);toast(`Docking clearance granted by ${station.name}.`);
+}
+function onDocked(){
+  const s=shipStats();ship.shield=s.shield;ship.heat=0;ship.overheat=false;
+  for(const n of npcs.filter(n=>n.faction==='pirate'))scene.remove(n.group);
+  npcs=npcs.filter(n=>n.faction!=='pirate');for(const n of npcs)n.hostile=false;bolts=[];pirateTimer=Math.max(pirateTimer,60);
+  try{document.exitPointerLock()}catch(_){}
+  openTrade(station,st.mission&&missionDone()?'missions':'market');Sound.blip(500,.2,'triangle',.14);save();
+}
+function undock(){
+  closeTrade();
+  const S=station.group,mouth=stationMouth(),inside=stationInside();const up=new V3(0,1,0).applyQuaternion(S.quaternion);
+  ship.group.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(inside,mouth,up));ship.camQ.copy(ship.group.quaternion);
+  ship.dock={t:0,inside,out:mouth.clone().addScaledVector(mouth.clone().sub(inside).normalize(),80)};
+  ship.state='undocking';Sound.whoosh(1.2);
+}
+function stationCollide(){
+  if(!station)return;const g=ship.group,S=station.group;const L=S.worldToLocal(tV2.copy(g.position));const r=g.userData.radius;let hit=false;
+  if(Math.abs(L.y)<118){const h=Math.hypot(L.x,L.z);if(h<48+r){const k=(48+r)/Math.max(h,.01);L.x*=k;L.z*=k;hit=true}}
+  const h2=Math.hypot(L.x,L.z)||1,qx=L.x/h2*175,qz=L.z/h2*175,dx=L.x-qx,dy=L.y,dz=L.z-qz,dd=Math.hypot(dx,dy,dz);
+  if(dd<14+r){const k=(14+r)/Math.max(dd,.01);L.x=qx+dx*k;L.y=dy*k;L.z=qz+dz*k;hit=true}
+  if(hit){g.position.copy(S.localToWorld(L));ship.speed*=.5;if(ship.scrapeCD<=0){toast('Collision with the station hull.','bad');ship.scrapeCD=2;damagePlayer(5,true)}}
+}
+function updateStation(dt){
+  const blinkOn=(time*1.4)%2<1;
+  if(station){
+    const u=station.group.userData;u.ring.rotation.y+=dt*.04;u.blink.forEach((b,i)=>b.visible=((time*1.4+i*.25)%2)<1.2);
+    station.turretCD-=dt;
+    if(station.turretCD<=0){station.turretCD=.35;const sp=station.group.position;
+      const tgt=npcs.find(n=>n.hostile&&n.group.position.distanceTo(sp)<1600);
+      if(tgt){const dist=tgt.group.position.distanceTo(sp);const aim=tgt.group.position.clone().addScaledVector(tgt.vel,dist/BOLT_SPEED).sub(sp).normalize();
+        fireBolt(sp.clone().addScaledVector(aim,75),aim,new V3(),'station',14)}}
+  }
+  if(current&&current.posts)for(const p of current.posts)p.beacon.visible=blinkOn;
+  if(trade&&trade.kind==='post'&&(st.mode!=='foot'||player.pos.distanceTo(trade.venue.group.localToWorld(trade.venue.terminal.clone()))>7))closeTrade();
+}
+function buildPost(){
+  const g=new THREE.Group();
+  const M=(c,o={})=>new THREE.MeshPhongMaterial(Object.assign({color:c,flatShading:true,shininess:30},o));
+  const add=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m};
+  add(new THREE.BoxGeometry(14,.4,26),M('#9aa0ae'),0,.2,6);
+  add(new THREE.BoxGeometry(13.6,6,25.6),M('#3a3f50'),0,-3,6);
+  add(new THREE.BoxGeometry(7,4,5),M('#d9dce4'),-2,2.4,-3.5);
+  add(new THREE.BoxGeometry(7.6,.4,5.6),M('#e0a24a'),-2,4.6,-3.5);
+  add(new THREE.BoxGeometry(5,.6,.1),M('#1a3a4a',{emissive:'#ffd38a'}),-2,3.2,-.96);
+  add(new THREE.BoxGeometry(1.4,2.4,.1),M('#2a2d3e'),.4,1.6,-.96);
+  add(new THREE.CylinderGeometry(.1,.14,8,6),M('#3a3f50'),4.5,4.4,-5);
+  add(new THREE.BoxGeometry(1.6,.1,.1),M('#3a3f50'),4.5,7.4,-5);
+  const beacon=add(new THREE.SphereGeometry(.32,8,6),new THREE.MeshBasicMaterial({color:'#ff6274'}),4.5,8.5,-5);
+  add(new THREE.BoxGeometry(.9,1.2,.6),M('#3a3f50'),3,1,1.5);
+  add(new THREE.BoxGeometry(.8,.6,.08),M('#1a3a4a',{emissive:'#2a8ab0'}),3,1.8,1.18).rotation.x=-.3;
+  for(const [x,z,s] of [[-5.5,2,1],[-4.4,2.3,.8],[-5.4,3.4,.7]])add(new THREE.BoxGeometry(s,s,s),M('#7a6a4a'),x,.4+s/2,z);
+  const deco=new THREE.MeshBasicMaterial({color:'#ffb45e'});
+  add(new THREE.TorusGeometry(4.2,.12,4,32).rotateX(Math.PI/2),deco,0,.42,12);add(new THREE.BoxGeometry(.3,.02,3.2),deco,0,.42,12);add(new THREE.BoxGeometry(3.2,.02,.3),deco,0,.42,12);
+  return{group:g,beacon,terminal:new V3(3,1.7,1.5),pad:new V3(0,.4,12),
+    rects:[{x:0,z:6,hx:7,hz:13,top:.4,bottom:-6},{x:-2,z:-3.5,hx:3.5,hz:2.5,top:4.8,bottom:.4},{x:3,z:1.5,hx:.45,hz:.3,top:1.6,bottom:.4}]};
+}
+function nearestPostPad(P,pos,maxD){
+  if(!P||!P.posts)return null;let best=null,bd=maxD;
+  for(const post of P.posts){const w=post.group.localToWorld(post.pad.clone());const d=w.distanceTo(pos);if(d<bd){bd=d;best={post,w}}}
+  return best;
+}
+function nearPostTerminal(){
+  if(st.mode!=='foot'||!current||!current.posts)return null;
+  for(const post of current.posts)if(post.group.localToWorld(post.terminal.clone()).distanceTo(player.pos)<3.6)return post;
+  return null;
+}
+function postSupport(P,pos){
+  let best=null;
+  for(const post of P.posts||[]){const G=post.group;if(G.position.distanceTo(tV3.copy(pos).sub(P.center))>60)continue;
+    const L=G.worldToLocal(tV3.copy(pos)),feet=L.y-1.7;let top=null;
+    for(const r of post.rects)if(Math.abs(L.x-r.x)<r.hx&&Math.abs(L.z-r.z)<r.hz&&feet>=r.top-1.5&&(top===null||r.top>top))top=r.top;
+    if(top!==null){const rad=G.localToWorld(tV3.set(L.x,top,L.z)).distanceTo(P.center);if(best===null||rad>best)best=rad}}
+  return best;
+}
+function postWalls(P){
+  let moved=false;
+  for(const post of P.posts||[]){const G=post.group;if(G.position.distanceTo(tV3.copy(player.pos).sub(P.center))>60)continue;
+    const L=G.worldToLocal(tV3.copy(player.pos)),fe=L.y-1.7;let m=false;
+    for(const r of post.rects){if(fe>=r.top-1.5||L.y+.2<r.bottom)continue;const hx=r.hx+.35,hz=r.hz+.35,dx=L.x-r.x,dz=L.z-r.z;
+      if(Math.abs(dx)>=hx||Math.abs(dz)>=hz)continue;
+      if(hx-Math.abs(dx)<hz-Math.abs(dz))L.x=r.x+Math.sign(dx||1)*hx;else L.z=r.z+Math.sign(dz||1)*hz;m=true}
+    if(m){player.pos.copy(G.localToWorld(L));moved=true}}
+  return moved;
+}
+/* trading UI */
+const RES_TRADE=['carbon','ferrite','cobalt','aurium','relics'];
+const RES_NAME={carbon:'Carbon',ferrite:'Ferrite',cobalt:'Cobalt',aurium:'Aurium',relics:'Relics'};
+function priceMult(r,v){const e=station?station.econ:ECON[0];return e.m[r]*((v.var&&v.var[r])||1)}
+const buyPrice=(r,v)=>Math.max(1,Math.round(BASE_PRICE[r]*priceMult(r,v)));
+const sellPrice=(r,v)=>Math.max(1,Math.round(buyPrice(r,v)*.62));
+function missionDone(){const m=st.mission;if(!m)return false;return m.type==='bounty'?m.have>=m.need:inv[m.res]>=m.qty}
+function missionText(){const m=st.mission;if(!m)return '';
+  return m.type==='bounty'?`Bounty: ${m.have}/${m.need} pirates destroyed${m.have>=m.need?' · dock at a station to collect':''} · ${m.reward} units`
+    :`Supply contract: deliver ${m.qty} ${RES_NAME[m.res]} (${Math.min(inv[m.res],m.qty)}/${m.qty}) to any station · ${m.reward} units`}
+function openTrade(venue,tab){
+  trade={venue,kind:venue===station?'station':'post',tab:tab||'market'};
+  $('trade').hidden=false;$('upg').hidden=true;$('craft').hidden=true;try{document.exitPointerLock()}catch(_){}
+  $('trClose').textContent=trade.kind==='station'?'Undock':'Close';
+  renderTrade();
+}
+function closeTrade(){$('trade').hidden=true;trade=null}
+$('trClose').addEventListener('click',()=>{if(trade&&trade.kind==='station')undock();else closeTrade()});
+function renderTrade(){
+  if(!trade)return;const v=trade.venue,S=shipStats(),isSt=trade.kind==='station';
+  $('trKind').textContent=isSt?`Space station · ${station.econ.name} economy`:`Trading post · ${v.planet.name}`;
+  $('trName').textContent=v.name;
+  $('trInfo').innerHTML=`<span>Ship <b>${SHIP_CLASSES[ship.cls].label}</b></span><span>Hull <b>${Math.round(ship.hull)}/${S.hull}</b></span><span>Launch fuel <b>${Math.round(ship.fuel)}</b></span><span>Nanites <b>${inv.nanites}</b></span>`;
+  const tabs=isSt?[['market','Market'],['outfitter','Outfitter'],['shipyard','Shipyard'],['services','Services'],['missions','Missions']]:[['market','Market'],['services','Services']];
+  $('trTabs').innerHTML=tabs.map(([k,l])=>`<button type="button" data-tab="${k}" class="${trade.tab===k?'on':''}">${l}</button>`).join('');
+  $('trUnits').textContent=`${inv.units.toLocaleString()} units`;
+  let h='';
+  if(trade.tab==='market'){
+    const list=isSt?RES_TRADE:RES_TRADE.filter(r=>r!=='relics');
+    h=`<div class="mktwrap"><table class="mkt"><thead><tr><th>Resource</th><th>You have</th><th>Buy at</th><th>Sell for</th><th></th></tr></thead><tbody>`+list.map(r=>{
+      const m=priceMult(r,v),tag=m<.92?'<span class="tag-lo">low price</span>':m>1.08?'<span class="tag-hi">high demand</span>':'';
+      const bp=buyPrice(r,v),sp=sellPrice(r,v),canBuy=r!=='relics';
+      return `<tr><td>${RES_NAME[r]}${tag}</td><td>${inv[r]}</td><td>${canBuy?bp+' u':'—'}</td><td>${sp} u</td><td class="btns">
+        <button type="button" data-act="sell" data-r="${r}" data-n="1" ${inv[r]<1?'disabled':''}>Sell 1</button><button type="button" data-act="sell" data-r="${r}" data-n="10" ${inv[r]<1?'disabled':''}>10</button><button type="button" data-act="sell" data-r="${r}" data-n="all" ${inv[r]<1?'disabled':''}>All</button>
+        ${canBuy?`<button type="button" data-act="buy" data-r="${r}" data-n="1" ${inv.units<bp?'disabled':''}>Buy 1</button><button type="button" data-act="buy" data-r="${r}" data-n="10" ${inv.units<bp?'disabled':''}>10</button>`:''}</td></tr>`}).join('')+`</tbody></table></div>
+      <p class="trnote">${isSt?'Stations buy relics from collectors. ':''}Prices follow the system's economy${isSt?'':' and this post\'s local supply'}. Selling pays 62% of the buy price.</p>`;
+  }else if(trade.tab==='outfitter'){
+    h=`<div class="mktwrap"><table class="mkt"><thead><tr><th>Item</th><th>Effect</th><th>Owned</th><th>Price</th><th></th></tr></thead><tbody>`+RECIPES.map(r=>{
+      const own=r.kind==='tech'?(tech(r.id)?'Installed':'—'):(crafted[r.id]||0),pr=SHOP_PRICE[r.id],dis=inv.units<pr||(r.kind==='tech'&&tech(r.id));
+      return `<tr><td>${r.name}</td><td style="white-space:normal;color:var(--dim);font-size:11px;min-width:160px">${r.desc}</td><td>${own}</td><td>${pr.toLocaleString()} u</td><td class="btns"><button type="button" data-act="obuy" data-id="${r.id}" ${dis?'disabled':''}>Buy</button></td></tr>`}).join('')+`</tbody></table></div><p class="trnote">Everything here can also be crafted from resources in the crafting menu [I].</p>`;
+  }else if(trade.tab==='shipyard'){
+    const tradeIn=Math.round(SHIP_PRICE[ship.cls]*.45);
+    h=`<p class="trnote">Your ${SHIP_CLASSES[ship.cls].label} is worth <b style="color:var(--text)">${tradeIn.toLocaleString()} units</b> as a trade-in. Workshop upgrades carry over to your new ship.</p><div class="mktwrap"><table class="mkt"><thead><tr><th>Ship</th><th>Hull</th><th>Shield</th><th>Cannons</th><th>Agility</th><th>Price</th><th></th></tr></thead><tbody>`+
+      station.ships.map((o,i)=>{const c=SHIP_CLASSES[o.cls],net=Math.max(0,o.price-tradeIn);
+        return `<tr><td><span style="display:inline-block;width:10px;height:10px;background:${o.paint.hull};margin-right:6px;border-radius:1px"></span>${c.label}</td><td>${c.hull}</td><td>${c.shield}</td><td>${c.dmg}</td><td>${c.agility}</td><td>${o.price.toLocaleString()} u<br><span style="color:var(--dim);font-size:10.5px">${net.toLocaleString()} after trade-in</span></td>
+        <td class="btns"><button type="button" data-act="ship" data-i="${i}" ${inv.units<net?'disabled':''}>Buy</button></td></tr>`}).join('')+`</tbody></table></div>`;
+    if(!station.ships.length)h='<p class="trnote">The shipyard is sold out.</p>';
+  }else if(trade.tab==='services'){
+    const rc=Math.ceil((S.hull-ship.hull)*1.5),fc=Math.ceil((100-ship.fuel)*2);
+    h=`<div class="mktwrap"><table class="mkt"><tbody>
+      <tr><td>Hull repair</td><td>${Math.round(ship.hull)}/${S.hull}</td><td>${rc} u</td><td class="btns"><button type="button" data-act="repair" ${rc<=0||inv.units<rc?'disabled':''}>Repair</button></td></tr>
+      <tr><td>Launch fuel</td><td>${Math.round(ship.fuel)}/100</td><td>${fc} u</td><td class="btns"><button type="button" data-act="refuel" ${fc<=0||inv.units<fc?'disabled':''}>Refuel</button></td></tr>
+      </tbody></table></div><p class="trnote">${isSt?'Shields are recharged for free while docked.':'Repairs here reach your ship on the landing pad.'}</p>`;
+  }else if(trade.tab==='missions'){
+    const m=st.mission;
+    if(m)h+=`<div class="urow"><div><span class="nm">Active: ${m.type==='bounty'?'Pirate bounty':'Supply contract'}</span></div><div class="ds">${missionText()}</div>
+      <div class="acts"><button type="button" data-act="turnin" ${missionDone()?'':'disabled'}>Collect ${m.reward} u</button><button type="button" data-act="abandon">Abandon</button></div></div>`;
+    h+=`<div class="csec">Mission board</div>`+station.missions.map((o,i)=>`<div class="urow"><div><span class="nm">${o.type==='bounty'?`Bounty: destroy ${o.need} pirates`:`Supply: deliver ${o.qty} ${RES_NAME[o.res]}`}</span></div>
+      <div class="ds">${o.type==='bounty'?'Pirates will find you soon after you accept. Station turrets back you up near the station.':'Hand it over at any station.'} Reward ${o.reward.toLocaleString()} units.</div>
+      <div class="acts"><button type="button" data-act="accept" data-i="${i}" ${m?'disabled':''}>Accept</button></div></div>`).join('');
+    if(!station.missions.length)h+='<p class="trnote">No more missions here today.</p>';
+  }
+  $('trBody').innerHTML=h;
+}
+$('trTabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b&&trade){trade.tab=b.dataset.tab;renderTrade()}});
+$('trBody').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]');if(!b||!trade)return;const v=trade.venue,a=b.dataset.act;let ok=true;
+  if(a==='sell'){const r=b.dataset.r,n=b.dataset.n==='all'?inv[r]:Math.min(+b.dataset.n,inv[r]);if(n>0){inv[r]-=n;inv.units+=n*sellPrice(r,v);toast(`Sold ${n} ${RES_NAME[r]} for ${n*sellPrice(r,v)} units.`)}else ok=false}
+  else if(a==='buy'){const r=b.dataset.r,pr=buyPrice(r,v),n=Math.min(+b.dataset.n,Math.floor(inv.units/pr));if(n>0){inv[r]+=n;inv.units-=n*pr;toast(`Bought ${n} ${RES_NAME[r]} for ${n*pr} units.`)}else ok=false}
+  else if(a==='obuy'){const r=RECIPES.find(x=>x.id===b.dataset.id),pr=SHOP_PRICE[r.id];if(inv.units>=pr&&!(r.kind==='tech'&&tech(r.id))){inv.units-=pr;if(r.kind==='tech'){crafted[r.id]=true;toast(`${r.name} installed.`,'big')}else{crafted[r.id]=(crafted[r.id]||0)+1;toast(`Bought ${r.name}.`)}}else ok=false}
+  else if(a==='ship'){const o=station.ships[+b.dataset.i],tradeIn=Math.round(SHIP_PRICE[ship.cls]*.45),net=Math.max(0,o.price-tradeIn);
+    if(inv.units>=net){inv.units-=net;const old=SHIP_CLASSES[ship.cls].label;setShipModel(o.cls,o.paint);const s=shipStats();ship.hull=s.hull;ship.shield=s.shield;ship.fuel=Math.max(ship.fuel,60);
+      station.ships.splice(+b.dataset.i,1);toast(`New ship: ${SHIP_CLASSES[o.cls].label}. Your ${old} was traded in for ${tradeIn} units.`,'big');Sound.whoosh(1)}else ok=false}
+  else if(a==='repair'){const S=shipStats(),c=Math.ceil((S.hull-ship.hull)*1.5);if(c>0&&inv.units>=c){inv.units-=c;ship.hull=S.hull;toast('Hull fully repaired.')}else ok=false}
+  else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2);if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
+  else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25)}else ok=false}
+  else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');st.mission=null}else ok=false}
+  else if(a==='abandon'){st.mission=null;toast('Mission abandoned.')}
+  if(ok){Sound.blip(640,.12,'triangle',.12);save()}else Sound.blip(160,.12,'square',.06);
+  renderTrade();
+});
 
 /* ---------- crafting ---------- */
 const AUR_R=()=>tech('scanner')?1000:500;
@@ -1810,6 +2112,10 @@ function drawMarkers(){
     }
     const sp=proj(sun.position,false);if(!sp.off)marker(sp.x,sp.y,'#ffd9a3',system.star.name,fmtDist(ref.length()),'ring',12);
   }
+  if(station&&st.mode==='ship'&&ship.state!=='warp'&&ship.state!=='docked'){const sw=station.group.position;const dd=sw.distanceTo(ship.group.position);
+    if(dd>500){const p=proj(sw,true);marker(p.x,p.y,'#ffd9a3',station.name,`Space station · ${fmtDist(dd)}`,'diamond',9)}}
+  for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
+    if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
   if(baseRT&&!buildMode){const bw=baseRT.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
     if(dd>25){const p=proj(bw,st.mode==='foot'&&current===baseRT.P);if(!p.off||st.mode==='foot')marker(p.x,p.y,'#8af0b4','Home base',fmtDist(dd),'diamond',8)}}
   if(st.mode==='foot'){
@@ -1868,6 +2174,8 @@ function drawMarkers(){
 function objective(){
   if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
   if(st.mode==='ship'&&npcs.some(n=>n.hostile))return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
+  if(st.mode==='ship'&&ship.state==='docked')return 'Docked · sell resources, refit, buy ships and take missions. E undocks';
+  if(st.mission&&st.mode==='ship'&&ship.state==='flying')return missionText();
   if(st.mode==='foot'){
     if(ship.fuel<TO()&&inv.ferrite<20)return `Mine rocks with your laser for Ferrite · ${inv.ferrite}/20 to refuel your ship`;
     if(ship.fuel<TO())return 'Return to your ship, board it [E], and refuel the launch thrusters [R]';
@@ -1889,7 +2197,7 @@ function updateHUD(){
     setText('pFauna',P.species.length?`${known}/${P.species.length} catalogued`:'None detected');
     setText('pDisc',String(st.disc.size));
   }
-  setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));
+  setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));setText('iU',inv.units.toLocaleString());
   setText('objective',objective());
   const foot=st.mode==='foot';
   const combatView=!foot&&ship.state==='flying';$('footBars').hidden=!foot;$('shipBars').hidden=foot;$('reticle').hidden=!(foot||combatView);
@@ -1907,13 +2215,16 @@ function updateHUD(){
       else{tgt=`${d.name} · ${Math.floor(nearBase.stock||0)}/${d.prod.cap} ${RES_LABEL[d.prod.res]}`;pr=`<span class="k">E</span>Collect`}}
     if(buildMode){tgt='';pr=''}
     if(nearShip())pr='<span class="k">E</span>Board ship   <span class="k">U</span>Workshop';
+    if(nearPost&&!buildMode){tgt=nearPost.name;pr='<span class="k">E</span>Trade'}
     else if(player.suit<30&&inv.carbon>=8)pr='<span class="k">R</span>Recharge life support';
-  }else if(ship.state==='landed')pr=canLaunch()?'<span class="k">Space</span>Take off   <span class="k">E</span>Exit':'<span class="k">R</span>Refuel   <span class="k">E</span>Exit';
+  }else if(ship.state==='docked')pr='<span class="k">E</span>Undock';
+  else if(ship.state==='landed')pr=canLaunch()?'<span class="k">Space</span>Take off   <span class="k">E</span>Exit':'<span class="k">R</span>Refuel   <span class="k">E</span>Exit';
   else if(ship.state==='flying'&&P){
     const d=tV.copy(ship.group.position).sub(P.center);const r=d.length();d.divideScalar(r);const alt=r-P.heightAt(d);
     const hn=npcs.filter(n=>n.hostile).length;
     if(hn)pr=`<span class="k" style="border-color:var(--danger);color:var(--danger)">${hn}</span>Hostile${hn>1?'s':''} · hold left click to fire`;
-    else if(alt<140)pr='<span class="k">E</span>Land';
+    else if(stationNear())pr=`<span class="k">E</span>Dock at ${station.name}`;
+    else if(alt<140)pr=nearestPostPad(P,ship.group.position,250)?'<span class="k">E</span>Land at trading post':'<span class="k">E</span>Land';
     else if(canWarp()&&r-P.radius>P.radius*.6)pr='<span class="k">H</span>Engage hyperdrive';
     else if(r-P.radius>P.radius*1.4)pr='<span class="k">Shift</span>Pulse drive';
     else pr=`Altitude ${fmtDist(alt)}`;
@@ -1936,7 +2247,7 @@ function loop(now){
   }
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
@@ -1950,9 +2261,9 @@ async function begin(saved){
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
     Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
-    base=saved.base||null;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
+    base=saved.base||null;st.mission=saved.mission||null;if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
   await generateSystem(st.seed,st.seed===st.firstSeed);
   const P=planets[0];current=P;
@@ -1965,6 +2276,7 @@ async function begin(saved){
   ready=true;started=true;
   toast(saved?`Welcome back to ${system.name}.`:`Stranded on ${P.name}. Your launch thrusters are empty.`,'big');
   if(!TOUCH)setTimeout(()=>toast('Click to capture the mouse. Tab shows controls.'),900);
+  if(station)setTimeout(()=>toast(`A space station, ${station.name}, orbits nearby. Trading posts on planets buy and sell too.`),7000);
 }
 const saved=loadSave();
 if(saved){$('btnCont').hidden=false;$('btnCont').textContent=`Continue · system ${saved.systems||1}`}
