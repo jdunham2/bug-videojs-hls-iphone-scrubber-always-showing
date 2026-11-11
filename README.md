@@ -21,7 +21,7 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 - Go ashore to trade, hunt, explore, feast and upgrade your hall and ship.
 - Real-time sea battles: loose arrow volleys, raise a shield wall, ram at full sail, or come alongside and board. Black-sailed raiders hunt you, merchant ships can be attacked, sea serpents circle and strike, and raiding a town makes its warships sail out to fight before you can sack it.
 - Walk ashore with your warband (G): explore islands on foot, find treasure chests, fight wolves and draugr, and storm towns in real-time melee battles against their defenders (and Jarl Hakon himself at Stonegard).
-- Towns are walled with log palisades. Land battles use real pathfinding (a navigation grid with A* paths): defenders hold their posts inside the walls, your warband finds the gate, and every unit walks around buildings, walls and trees.
+- Towns are walled with log palisades. Land battles use real pathfinding (a navigation grid with A* paths): defenders hold their posts inside the walls behind shields that block frontal blows, bigger towns field elite huscarls, your warband finds the gate, and every unit walks around buildings, walls and trees.
 - Ride horses (R) on the farm and town islands: gallop across the land and charge into enemies for heavy damage.
 - Buy a horse of your own: it sails aboard your longship and comes when you call (C) on any island.
 - Swear oaths (quests) for townsfolk and villagers: deliveries, wolf and deer hunts, sinking raiders, slaying the serpent, cleansing the barrow and sacking rival towns.
