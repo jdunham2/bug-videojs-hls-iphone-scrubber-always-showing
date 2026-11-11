@@ -765,6 +765,9 @@ const GOODS = {
   pumpkin_lantern:{name:'Jack-o-Lantern',base:40,col:'#e07a2a',kind:'place',desc:'Place with B. A carved pumpkin with a candle inside.'},
   snow_globe:{name:'Giant Snow Globe',base:60,col:'#9fe8ff',kind:'place',desc:'Place with B. A tiny snowy village under glass.'},
   candy_apple:{name:'Candy Apple',base:15,col:'#e0302a',kind:'food',heal:10},
+  rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
+  war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
+  picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
   party_hat:{name:'Party Hat',base:120,col:'#ff5a8a',kind:'armor',slot:'head',armor:1,crit:.03,speed:.03},
   sun_charm:{name:'Sun Charm',base:200,col:'#f0c040',kind:'trinket',desc:'+5% critical chance'},
   festival_token:{name:'Festival Token',base:50,col:'#e3a948',kind:'good'},
@@ -2119,6 +2122,8 @@ const NPCS = [
    hello:["Music makes the coins fall!","Got rhythm, traveler?","La la laaa..."], rumors:["Lantern Bay crowds tip well for a good tune. Keep your rhythm and the coins come raining in."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
+  {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
+   hello:["The wilds breed champions. Want to meet one?","A good hunt needs good friends.","Blow the horn and they come running."], rumors:["Champions are four times as tough as an ordinary beast. Bring a party. Everyone who fights one shares the spoils."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3420,6 +3425,7 @@ function killEnemy(e) {
     setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
   }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
+  if (e.champion) { const c = 200 + (S.level || 1)*10; S.coins += c; got.push(`+${c} coin (champion)`); addItem('gem', 2); got.push('+2 Gem'); S.champions = (S.champions || 0) + 1; setTimeout(() => toast(`<b>Champion defeated!</b><br>${esc(e.labelName || 'The champion')} falls. Huntmaster Garrick will hear of this.`, 5000), 300); }
   if (e.elite && !e.agent) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
     const g1 = pick(ELITE_LOOT.filter(g => GOODS[g])), n1 = rint(1, 2); addItem(g1, n1); got.push(`+${n1} ${GOODS[g1].name}`);
@@ -3779,7 +3785,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dn: downed ? Math.ceil(downed.t) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3802,7 +3808,9 @@ function partyTick(dt) {
     if (p.mv) r.phase += dt*12;
     if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
     const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
-    if (!r.xinit) { r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; }
+    if (!r.xinit) { r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; r.fwI = p.fw && p.fw.i; r.pcI = p.pc && p.pc.i; }
+    if (p.fw && typeof p.fw === 'object' && p.fw.i !== r.fwI) { r.fwI = p.fw.i; if (isFinite(p.fw.x) && isFinite(p.fw.y) && Math.hypot(p.fw.x - S.x, p.fw.y - S.y) < 40) launchFireworks(+p.fw.x, +p.fw.y); }
+    if (p.pc && typeof p.pc === 'object' && p.pc.i !== r.pcI) { r.pcI = p.pc.i; if (isFinite(p.pc.x) && isFinite(p.pc.y)) { picnics.push({x: +p.pc.x, y: +p.pc.y, t: 180, who: r.name}); if (Math.hypot(p.pc.x - S.x, p.pc.y - S.y) < 8) { BUFFS.regen = Math.max(BUFFS.regen || 0, 180); toast(`<b>${esc(r.name)} spread a picnic!</b> You feel refreshed (health regenerates for 3 minutes).`, 4500); renderHUD(); } } }
     if (p.em && typeof p.em === 'object' && p.em.i !== r.emI) { r.emI = p.em.i; if (EMOTES.hasOwnProperty(p.em.k)) r.emote = {k: p.em.k, t: 3}; }
     if (p.pg && typeof p.pg === 'object' && p.pg.i !== r.pgI) { r.pgI = p.pg.i; if (isFinite(p.pg.x) && isFinite(p.pg.y)) { addPing(+p.pg.x, +p.pg.y, r.col, r.name); SFX.chime(); } }
     if (party.host && p.dm && typeof p.dm === 'object' && p.ds === NET_SID) netApply(pr.peer, r, p.dm);
@@ -3987,7 +3995,15 @@ function partyExtras(dt) {
   }
 }
 // ===== photo mode =====
-let photo = null;
+let photo = null, DLS = null;
+try { if (window.claude && typeof window.claude.use === 'function') window.claude.use('downloads').then(d => { DLS = d || null; }).catch(() => {}); } catch (e) {}
+function savePhoto(url) {
+  if (!DLS) return;
+  try {
+    const bin = atob(url.split(',')[1]), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    DLS.save({filename: `saltwind-road-day${S.day}.png`, data: new Blob([arr], {type: 'image/png'})}).then(r => { if (r && r.status === 'saved') toast('Picture saved!', 2500); }).catch(e => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('The picture could not be saved here.', 3000); });
+  } catch (e) {}
+}
 const PHOTO_F = [{n: 'Natural', css: 'none'}, {n: 'Sepia', css: 'sepia(.85) contrast(1.05)'}, {n: 'Black & white', css: 'grayscale(1) contrast(1.1)'}, {n: 'Warm', css: 'saturate(1.3) hue-rotate(-12deg) brightness(1.05)'}, {n: 'Dreamy', css: 'saturate(1.4) brightness(1.1) blur(.6px)'}];
 function photoHint() { const L = PAD.active && PAD.id ? padLabel() : null; $('photoUI').innerHTML = `<b>Photo mode</b> · filter: ${PHOTO_F[photo.f].n}<br><span style="color:var(--muted)">${L ? `Stick: pan · ${L.ok}: snap · ${L.atk}/${L.bomb}: filter · ${L.back}: exit` : 'WASD/arrows: pan · Space: snap · F: filter · Esc: exit'}</span>`; }
 function startPhoto() {
@@ -4014,7 +4030,7 @@ function snapPhoto() {
   SFX.coin(); endPhoto(); S.photos = (S.photos || 0) + 1; shake = 0;
   if (!url) { toast('The picture didn’t come out. Try again.', 3000); return; }
   openPanel('Snapshot', `<img src="${url}" alt="Your snapshot" style="width:100%;max-height:52vh;object-fit:contain;border-radius:4px;display:block">`, [
-    {label: 'Download', primary: true, fn: () => { try { const a = document.createElement('a'); a.href = url; a.download = `saltwind-road-day${S.day}.png`; document.body.appendChild(a); a.click(); a.remove(); } catch (e) {} }},
+    ...(DLS ? [{label: 'Save picture', primary: true, fn: () => savePhoto(url)}] : []),
     {label: 'Take another', fn: () => { closeTalk(); startPhoto(); }}, {label: 'Close', fn: closeTalk}]);
 }
 // ===== hide and seek =====
@@ -4178,6 +4194,47 @@ function skitEnd() {
   const K = skit; skit = null; const coins = K.total*2 + K.strikes*12; S.coins += coins; S.skitGames = (S.skitGames || 0) + 1; S.skitBest = Math.max(S.skitBest || 0, K.total); S.skitStrikes = (S.skitStrikes || 0) + K.strikes; if (K.total === 27) S.skitPerfect = true;
   renderHUD(); save(); SFX.coin();
   openPanel('Skittles', `${K.total === 27 ? '<b>A perfect game!</b> Bertha drops her pint. ' : ''}You knocked down <b>${K.total}</b> of 27 pins${K.strikes ? ` with ${K.strikes} strike${K.strikes > 1 ? 's' : ''}` : ''}.<br><span style="color:var(--good)">Bertha pays out ${coins} coin.</span>`, [{label: 'Play again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); startSkit(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== usable items: fireworks, war horn, picnic basket =====
+let rockets = [], picnics = [], myFw = null, myPicnic = null, fwSeq = 0;
+function shopTalk(n, list, intro) {
+  say(intro, [...list.map(([g, c]) => ({label: `${GOODS[g].name} · ${c}◆${have(g) ? ` (have ${have(g)})` : ''}`, disabled: S.coins < c, fn: () => { S.coins -= c; addItem(g, 1); SFX.coin(); renderHUD(); save(); shopTalk(n, list, intro); }})), back(n)]);
+}
+function useItem(g) {
+  if (!have(g) || mode !== 'play') return;
+  if (g === 'rocket_pack') { addItem(g, -1); myFw = {i: ++fwSeq, x: Math.round(S.x*10)/10, y: Math.round(S.y*10)/10}; partyT = 0; launchFireworks(S.x, S.y); S.fireworks = (S.fireworks || 0) + 1; renderHUD(); return; }
+  if (g === 'picnic_basket') {
+    if (enemies.some(e => !e.dead && ENEMIES[e.type] && !ENEMIES[e.type].passive && Math.hypot(e.x - S.x, e.y - S.y) < 8)) { toast('Not with monsters around!'); return; }
+    addItem(g, -1); myPicnic = {i: ++fwSeq, x: Math.round(S.x*10)/10, y: Math.round(S.y*10)/10}; partyT = 0; picnics.push({x: S.x, y: S.y + .4, t: 180, who: 'you'});
+    BUFFS.regen = Math.max(BUFFS.regen || 0, 180); S.hp = Math.min(maxHP(), S.hp + maxHP()*.25); S.picnics = (S.picnics || 0) + 1; SFX.chime(); renderHP(); renderHUD();
+    toast(`<b>You spread a picnic blanket.</b><br>Health regenerates for 3 minutes${party ? ', for party members nearby too' : ''}.`, 4500); return;
+  }
+  if (g === 'war_horn') {
+    if (inDungeon() || inArena() || townAt(S.x, S.y, 14) || S.y >= WORLD_H) { toast('Blow the horn out in the wild, away from towns.'); return; }
+    if (bossActive() || enemies.some(e => e.champion && !e.dead)) { toast('A champion is already on its way!'); return; }
+    let type = null; for (let k = 0; k < 6 && !type; k++) type = spawnTypeFor(map[idx(Math.floor(S.x), Math.floor(S.y))], S.x, S.time < .25 || S.time > .8);
+    if (!type || !ENEMIES[type] || ENEMIES[type].passive) type = 'wolf';
+    let spot = null; for (let k = 0; k < 40 && !spot; k++) { const a = Math.random()*6.283, x = S.x + Math.cos(a)*5, y = S.y + Math.sin(a)*5; if (enemyWalk(x, y)) spot = {x, y}; }
+    if (!spot) { toast('There’s no room here for a champion to appear.'); return; }
+    addItem(g, -1); const e = makeEnemy(type, spot.x, spot.y, {alert: true}); makeElite(e); const lv = 1 + (S.level || 1)*.05;
+    e.hp = e.max = Math.round(e.max*4*lv); e.dmgMul = (e.dmgMul || 1)*1.3; e.esize = 1.9; e.elite = {name: 'Champion', col: '#ffb030'}; e.champion = true; e.labelName = `Champion ${ENEMIES[type].name}`; enemies.push(e);
+    SFX.roar(); shake = .5; burst(spot.x, spot.y - .5, '#ffb030', 30, 6); renderHUD();
+    toast(`<b>The horn echoes across the land...</b><br>A <b>Champion ${esc(ENEMIES[type].name)}</b> answers the call!`, 5000); return;
+  }
+}
+const FW_COLS = ['#ff5a7a', '#ffd040', '#5ad0ff', '#7ae08a', '#c890ff', '#ffffff', '#ff9a3a'];
+function launchFireworks(x, y) { for (let k = 0; k < 7; k++) rockets.push({x: x + (Math.random() - .5)*4, y: y - .5, vy: -(7 + Math.random()*4), t: -k*.35, fuse: .7 + Math.random()*.5, col: FW_COLS[Math.floor(Math.random()*FW_COLS.length)]}); }
+function updateFireworks(dt) {
+  for (const r of rockets) { r.t += dt; if (r.t < 0) continue; if (!r.lit) { r.lit = true; AUD.tone(300, .3, 'sawtooth', .04, 900); } r.y += r.vy*dt; r.vy += 3*dt; if (Math.random() < .6) burst(r.x, r.y, '#ffe8b0', 1, .5);
+    if (r.t > r.fuse) { r.done = true; burst(r.x, r.y, r.col, 34, 7); burst(r.x, r.y, '#ffffff', 8, 3); AUD.tone(80 + Math.random()*40, .4, 'square', .08, -40); } }
+  rockets = rockets.filter(r => !r.done);
+  for (const q of picnics) q.t -= dt; if (picnics.length) picnics = picnics.filter(q => q.t > 0);
+}
+function drawRockets() { for (const r of rockets) { if (r.t < 0) continue; ctx.fillStyle = r.col; ctx.fillRect(r.x*TS - 1, r.y*TS - 2, 2, 4); } }
+function drawPicnic(q) {
+  const px = q.x*TS, py = q.y*TS; ctx.fillStyle = '#d84a4a'; ctx.fillRect(px - 10, py - 6, 20, 12);
+  ctx.fillStyle = '#f4efe2'; for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) if ((i + j) % 2) ctx.fillRect(px - 10 + i*5, py - 6 + j*4, 5, 4);
+  ctx.fillStyle = '#a06a30'; ctx.fillRect(px - 3, py - 7, 7, 5); ctx.fillStyle = '#7a4a20'; ctx.fillRect(px - 2, py - 9, 5, 2); ctx.fillStyle = '#e0302a'; ctx.beginPath(); ctx.arc(px + 7, py + 2, 1.5, 0, 7); ctx.fill();
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -5726,8 +5783,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Usable items', 'Some items have a Use button in your bag. Rocket Packs (from Melody in Lantern Bay) light up the sky for everyone in your party. A Picnic Basket (from Big Bertha in Highcairn) heals you and nearby party members over 3 minutes. A War Horn (from Huntmaster Garrick in Hollowpine) calls a Champion monster when you blow it out in the wild: four times as tough, and in a party everyone can fight it and share the spoils.'],
   ['Village games', 'Tib, a kid in Reedholm, plays hide and seek: find the rustling bush within 60 seconds. Melody in Lantern Bay lends you her lute to busk, a rhythm game played with the arrow keys or D-pad (three shows a day). Big Bertha runs a skittles alley in Highcairn: aim, pick your power and knock down the nine pins.'],
   ['Photo mode', 'Press H to freeze the moment and hide the screen clutter. Pan the camera with the movement keys or stick, press F to try filters (sepia, black and white, warm, dreamy), and press Space to snap. You can download every picture.'],
   ['Emotes and pings', 'Press Y to pick an emote that pops up above your head, and N to drop a ping marker where you stand. In a party, friends see your emotes, and your pings show up on their screen, minimap and world map. If you fall near a party member, you go down for 25 seconds instead of being knocked out: a friend can stand next to you and press E to revive you. Every party also gets a daily party challenge for bonus coin and XP.'],
@@ -6038,7 +6096,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -6925,6 +6983,8 @@ function render() {
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
   if (hideSeek && inView(hideSeek.x, hideSeek.y)) sprites.push({y: hideSeek.y, f: drawHideBush});
+  for (const q of picnics) if (inView(q.x, q.y)) sprites.push({y: q.y - .5, f: () => drawPicnic(q)});
+  if (rockets.length) sprites.push({y: 1e9 - 2, f: drawRockets});
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
   if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
@@ -7710,6 +7770,9 @@ function mainOptions(n) {
   if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
   if (n.hideseek) o.push({label: 'Play hide and seek', primary: true, fn: () => hsTalk(n)});
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
+  if (n.busker) o.push({label: 'Buy rocket packs', fn: () => shopTalk(n, [['rocket_pack', 30]], '“Every good show ends with a bang!”')});
+  if (n.skittles) o.push({label: 'Buy a picnic basket', fn: () => shopTalk(n, [['picnic_basket', 45]], '“Bread, cheese, pie and a flask of cider. Share it with friends!”')});
+  if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
   if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
@@ -8723,6 +8786,7 @@ function renderBag() {
     ${sec('Tools · used automatically', ['tool'])}
     ${sec('Trinkets · work while carried', ['trinket'])}
     ${sec('Food', ['food'], eatBtn)}
+    ${sec('Usable items', ['usable'], g => `<button class="btn sm primary" data-use="${g}">Use</button>`)}
     ${sec('Boss trophies', ['trophy'])}
     ${sec('Trade goods', ['good','craft'])}
     ${sec('Sunken chests', ['schest'], g => `<button class="btn sm primary" data-openschest="1">Open</button>`)}
@@ -8740,6 +8804,7 @@ $('bagSheet').addEventListener('click', e => {
   if (b.dataset.equip) { const g = b.dataset.equip; S.equip[slotOf(g)] = g; }
   if (b.dataset.unequip) { const g = b.dataset.unequip; S.equip[slotOf(g)] = null; }
   if (b.dataset.eat) eat(b.dataset.eat);
+  if (b.dataset.use) { closeModal('bag'); useItem(b.dataset.use); return; }
   if (b.dataset.place) { closeModal('bag'); placeItem(b.dataset.place); return; }
   if (b.dataset.readmap) { closeModal('bag'); readMap(); return; }
   if (b.dataset.lantern) { closeModal('bag'); releaseLantern(); return; }
@@ -10504,6 +10569,10 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['champion1','Champion Hunter','Defeat a Champion called by a War Horn', () => (S.champions || 0) >= 1],
+  ['champion10','Legend of the Hunt','Defeat 10 Champions', () => (S.champions || 0) >= 10],
+  ['pyro','Pyrotechnician','Launch 10 fireworks', () => (S.fireworks || 0) >= 10],
+  ['picnicker','Picnic Time','Spread a picnic blanket', () => (S.picnics || 0) >= 1],
   ['hideseek','Hide and Seek Champion','Find Tib 5 times', () => (S.hsWins || 0) >= 5],
   ['busker','Street Performer','Busk in Lantern Bay', () => (S.busks || 0) >= 1],
   ['buskstar','Virtuoso','Earn an S grade while busking', () => (S.buskS || 0) >= 1],
@@ -11044,7 +11113,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__vg = {get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
