@@ -1,580 +1,1485 @@
 <title>Adulting Simulator</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800;900&display=swap">
 <style>
-/* Layout: a chunky phone-planner — status bar on top, stats | actions | to-do list in three columns that stack on phones */
+/* Layout: full-screen 3D town; glass HUD cards pinned to the corners — clock + needs top-left, minimap + to-do top-right, dock bottom-right, building menus as a sheet */
 :root {
-  --bg: #dff1ea;
-  --panel: #ffffff;
-  --ink: #1d2b36;
-  --muted: #5d6f7a;
-  --line: #c4ddd4;
-  --accent: #ff6b4a;
-  --accent-ink: #ffffff;
-  --sun: #ffc93c;
-  --good: #2bb673;
-  --warn: #f5a623;
-  --bad: #e5484d;
-  --track: #e6efeb;
-  --btn: #f4faf7;
-  --btn-hover: #e4f4ec;
-  --display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --glass: rgba(13, 19, 33, 0.74);
+  --glass-hi: rgba(28, 38, 60, 0.92);
+  --edge: rgba(255, 255, 255, 0.13);
+  --ink: #f2f5fb;
+  --muted: #a3afc4;
+  --gold: #ffbe2e;
+  --gold-ink: #2b1d00;
+  --good: #48d597;
+  --warn: #ffab40;
+  --bad: #ff5c6c;
+  --sky: #0b1330;
+  --display: "Lilita One", "Arial Black", Impact, sans-serif;
   --body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0f1d24; --panel: #172a33; --ink: #e8f2ee; --muted: #93a8b0; --line: #26404b;
-  --accent: #ff7a5c; --accent-ink: #1a0d08; --sun: #ffd25e; --good: #3fcf8a; --warn: #ffb547; --bad: #ff6369;
-  --track: #213843; --btn: #1d333d; --btn-hover: #244150; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #0f1d24; --panel: #172a33; --ink: #e8f2ee; --muted: #93a8b0; --line: #26404b;
-  --accent: #ff7a5c; --accent-ink: #1a0d08; --sun: #ffd25e; --good: #3fcf8a; --warn: #ffb547; --bad: #ff6369;
-  --track: #213843; --btn: #1d333d; --btn-hover: #244150; color-scheme: dark }
-
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
-.wrap { max-width: 1180px; margin: 0 auto; padding-block: 16px 40px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; flex-direction: column; gap: 16px; }
-h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.1; text-wrap: balance; }
-h2 { font-size: 1.15rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.panel { background: var(--panel); border: 2px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--sky); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.4; -webkit-user-select: none; user-select: none; touch-action: none; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.card { background: var(--glass); border: 1px solid var(--edge); border-radius: 16px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
 
-/* Top bar */
-.top { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
-.brand { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.5px; }
-.brand span { color: var(--accent); }
-.clock { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
-.sky { width: 46px; height: 46px; border-radius: 50%; position: relative; overflow: hidden; border: 2px solid var(--line); flex: none; transition: background .6s; }
-.sky i { position: absolute; width: 18px; height: 18px; border-radius: 50%; left: 12px; top: 12px; transition: background .6s, box-shadow .6s; }
-.time { font-family: var(--display); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.dayname { color: var(--muted); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; }
-.chip { font-family: var(--display); font-weight: 700; background: var(--btn); border: 2px solid var(--line); padding: 4px 12px; border-radius: 999px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.chip.money { color: var(--good); }
-.chip.rent.due { color: var(--bad); border-color: var(--bad); }
-
-.grid { display: grid; grid-template-columns: 270px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-@media (max-width: 980px) { .grid { grid-template-columns: 1fr 1fr; } .actions-panel { grid-column: 1 / -1; order: -1; } }
-@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
-
-/* Stats */
-.stat { display: grid; grid-template-columns: 74px 1fr 34px; align-items: center; gap: 8px; font-weight: 800; font-size: .85rem; }
-.bar { height: 14px; background: var(--track); border-radius: 999px; overflow: hidden; }
-.bar b { display: block; height: 100%; border-radius: 999px; background: var(--good); transition: width .4s, background .4s; }
-.stat .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-.stat.low .n { color: var(--bad); }
-.job { border-top: 2px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
-.job strong { font-family: var(--display); font-size: 1.1rem; }
-.kv { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-weight: 600; }
-.kv span:last-child { color: var(--ink); font-weight: 800; font-variant-numeric: tabular-nums; }
-
-/* Actions */
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.tab { font: 700 .95rem var(--display); border: 2px solid var(--line); background: var(--btn); color: var(--ink); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
-.tab[aria-selected="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
-.acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-.act { text-align: left; font: inherit; color: var(--ink); background: var(--btn); border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: transform .08s, background .15s, border-color .15s; position: relative; }
-.act:hover:not(:disabled) { background: var(--btn-hover); border-color: var(--good); }
-.act:active:not(:disabled) { transform: scale(.97); }
-.act:focus-visible, .tab:focus-visible, .big:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
-.act:disabled { opacity: .45; cursor: not-allowed; }
-.act .t { font-family: var(--display); font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 6px; }
-.act .meta { font-size: .78rem; color: var(--muted); font-weight: 700; }
-.act .why { font-size: .75rem; color: var(--bad); font-weight: 700; }
-.act.todo-hit::after { content: "TO-DO"; position: absolute; top: 8px; right: 8px; font: 800 .62rem var(--body); letter-spacing: .8px; background: var(--sun); color: #3a2a00; padding: 1px 6px; border-radius: 6px; }
-.act.work { border-color: var(--accent); }
-.act.work .t { color: var(--accent); }
-
-/* To-do */
-.todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.todo li { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 8px 10px; border-radius: 12px; background: var(--btn); }
-.todo li .box { width: 22px; height: 22px; border-radius: 7px; border: 2.5px solid var(--muted); flex: none; display: grid; place-items: center; font-size: .8rem; color: var(--accent-ink); }
+/* HUD */
+.hud-tl { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; width: 236px; z-index: 5; }
+.hud-tr { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; width: 210px; z-index: 5; align-items: stretch; }
+.clock { padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.clock .time { font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.clock .day { color: var(--muted); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; grid-column: 1 / -1; }
+.clock .money { font-family: var(--display); font-size: 22px; color: var(--good); text-align: right; font-variant-numeric: tabular-nums; }
+.clock .rent { grid-column: 1 / -1; font-size: 12px; font-weight: 800; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.clock .rent.due b { color: var(--bad); }
+.needs { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.need { display: grid; grid-template-columns: 58px 1fr 26px; gap: 8px; align-items: center; font-size: 12px; font-weight: 800; }
+.need .bar { height: 9px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+.need .bar i { display: block; height: 100%; border-radius: 99px; transition: width .4s, background .4s; }
+.need .n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.need.low .n { color: var(--bad); }
+.job-line { font-size: 12px; font-weight: 800; color: var(--muted); border-top: 1px solid var(--edge); padding-top: 7px; margin-top: 2px; }
+.job-line b { color: var(--ink); }
+#minimap { width: 100%; aspect-ratio: 1; border-radius: 16px; display: block; border: 1px solid var(--edge); background: #1d3a24; max-width: 100%; }
+.todo { padding: 10px 12px; }
+.todo-h { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; }
+.todo-h span:first-child { font-family: var(--display); font-size: 17px; }
+.todo-h span:last-child { font-weight: 900; color: var(--gold); font-size: 13px; }
+.todo ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.todo li { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; font-size: 12.5px; line-height: 1.3; }
+.todo li .box { flex: none; width: 15px; height: 15px; border: 2px solid var(--muted); border-radius: 5px; margin-top: 1px; display: grid; place-items: center; font-size: 10px; }
+.todo li.must .box { border-color: var(--gold); }
 .todo li.done { color: var(--muted); text-decoration: line-through; }
-.todo li.done .box { background: var(--good); border-color: var(--good); color: #fff; }
-.todo li.must .box { border-color: var(--accent); }
-.hint { font-size: .8rem; color: var(--muted); margin: 0; }
+.todo li.done .box { background: var(--good); border-color: var(--good); color: #062; }
+.todo li small { display: block; color: var(--muted); font-weight: 700; text-decoration: none; font-size: 11px; }
 
-.goals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: .88rem; font-weight: 700; }
-.goals li { display: flex; gap: 8px; align-items: center; }
-.goals li .star { color: var(--line); font-size: 1.1rem; }
-.goals li.got .star { color: var(--sun); }
-.goals li.got { color: var(--muted); }
+.prompt { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 6; padding: 12px 20px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); border: 0; font-family: var(--display); font-size: 18px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; animation: bob 1.4s ease-in-out infinite; }
+.prompt kbd { font-family: var(--body); font-weight: 900; font-size: 13px; background: rgba(0,0,0,.18); padding: 1px 7px; border-radius: 6px; margin-right: 8px; }
+@keyframes bob { 50% { transform: translate(-50%, -4px); } }
+.dock { position: fixed; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; z-index: 6; }
+.dock button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 12px 7px; min-width: 64px; cursor: pointer; font-weight: 900; font-size: 11px; letter-spacing: .5px; text-transform: uppercase; }
+.dock button svg { width: 22px; height: 22px; }
+.dock button:hover { background: var(--glass-hi); }
+.help { position: fixed; left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding: 8px 12px; font-size: 12px; font-weight: 700; color: var(--muted); z-index: 5; max-width: calc(100% - 260px); }
+.help b { color: var(--ink); }
+.weather { font-size: 11px; font-weight: 900; color: var(--muted); text-align: right; }
 
-.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; font-size: .86rem; }
-.log li { padding: 6px 10px; border-radius: 10px; background: var(--btn); border-left: 4px solid var(--line); }
-.log li.good { border-left-color: var(--good); }
-.log li.bad { border-left-color: var(--bad); }
-.log li.event { border-left-color: var(--sun); }
-.log li small { color: var(--muted); font-weight: 800; margin-right: 6px; font-variant-numeric: tabular-nums; }
+/* Sheet (building menus, phone, diary) */
+.sheet-wrap { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(5, 8, 16, .45);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)); }
+.sheet { width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; background: rgba(15, 22, 38, .95); }
+.sheet-h { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--edge); }
+.sheet-h .swatch { width: 42px; height: 42px; border-radius: 12px; flex: none; border: 2px solid rgba(255,255,255,.25); }
+.sheet-h h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1; }
+.sheet-h p { margin: 3px 0 0; color: var(--muted); font-weight: 700; font-size: 12.5px; }
+.sheet-h .x { margin-left: auto; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(255,255,255,.06); cursor: pointer; font-size: 20px; flex: none; }
+.sheet-b { overflow-y: auto; padding: 14px 18px 20px; display: flex; flex-direction: column; gap: 16px; touch-action: pan-y; }
+.sec h3 { margin: 0 0 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.act { text-align: left; background: rgba(255,255,255,.05); border: 1px solid var(--edge); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; position: relative; transition: background .15s, border-color .15s, transform .08s; min-width: 0; }
+.act:hover:not(:disabled) { background: rgba(255,255,255,.1); border-color: var(--good); }
+.act:active:not(:disabled) { transform: scale(.98); }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.act .t { font-weight: 900; font-size: 14.5px; padding-right: 48px; }
+.act .m { font-size: 12px; color: var(--muted); font-weight: 700; }
+.act .fx { font-size: 12px; color: var(--good); font-weight: 800; }
+.act .why { font-size: 12px; color: var(--bad); font-weight: 800; }
+.act .tag { position: absolute; top: 9px; right: 9px; font-size: 9.5px; font-weight: 900; letter-spacing: .8px; background: var(--gold); color: var(--gold-ink); padding: 2px 6px; border-radius: 6px; }
+.act.primary { border-color: var(--gold); background: rgba(255,190,46,.1); }
+.act.primary .t { color: var(--gold); }
+.career { border: 1px solid var(--edge); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,.03); }
+.career .ladder { display: flex; flex-wrap: wrap; gap: 6px; }
+.career .rung { font-size: 11.5px; font-weight: 800; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--edge); color: var(--muted); }
+.career .rung.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.career .rung.past { color: var(--good); border-color: rgba(72,213,151,.4); }
+.req { font-size: 12px; font-weight: 700; color: var(--muted); }
+.req .ok, .ok { color: var(--good); } .req .no { color: var(--bad); }
+.jobrow { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--edge); border-radius: 12px; }
+.jobrow b { font-size: 14px; }
+.btn { border: 0; border-radius: 10px; padding: 8px 14px; font-weight: 900; cursor: pointer; background: var(--gold); color: var(--gold-ink); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.ghost { background: rgba(255,255,255,.08); color: var(--ink); border: 1px solid var(--edge); }
+.skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.skill { padding: 10px 12px; border: 1px solid var(--edge); border-radius: 12px; }
+.skill .top { display: flex; justify-content: space-between; font-weight: 900; }
+.skill .bar { height: 7px; border-radius: 99px; background: rgba(255,255,255,.1); margin-top: 6px; overflow: hidden; }
+.skill .bar i { display: block; height: 100%; background: var(--gold); border-radius: 99px; }
+.goals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.goals li { display: flex; gap: 8px; font-weight: 800; font-size: 13px; align-items: center; color: var(--muted); }
+.goals li.got { color: var(--ink); }
+.goals li .s { color: rgba(255,255,255,.2); font-size: 16px; }
+.goals li.got .s { color: var(--gold); }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.log li { padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border-left: 3px solid var(--edge); font-size: 13px; font-weight: 600; }
+.log li.good { border-left-color: var(--good); } .log li.bad { border-left-color: var(--bad); } .log li.event { border-left-color: var(--gold); }
+.log li small { color: var(--muted); font-weight: 900; margin-right: 6px; font-variant-numeric: tabular-nums; }
 
-/* Shop */
-.shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.owned { color: var(--good) !important; }
+/* Time skip */
+.skip { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(5, 8, 16, .72); }
+.skip > div { text-align: center; }
+.skip .what { font-family: var(--display); font-size: 34px; }
+.skip .clk { font-family: var(--display); font-size: 64px; color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.skip .bar { width: 240px; max-width: 70vw; height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); margin: 12px auto 0; overflow: hidden; }
+.skip .bar i { display: block; height: 100%; width: 0; background: var(--gold); }
 
-/* Overlay */
-.overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); display: grid; place-items: center; z-index: 50;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.modal { background: var(--panel); border-radius: 22px; padding: 26px; max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 14px; border: 3px solid var(--ink); }
-.modal h3 { font-size: 1.8rem; }
-.modal p { margin: 0; }
-.big { font: 800 1.1rem var(--display); background: var(--accent); color: var(--accent-ink); border: none; border-radius: 14px; padding: 12px 18px; cursor: pointer; }
-.big.ghost { background: var(--btn); color: var(--ink); border: 2px solid var(--line); }
-.row { display: flex; gap: 10px; flex-wrap: wrap; }
+/* Toasts */
+.toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: min(460px, calc(100% - 24px)); }
+.toast { padding: 9px 16px; border-radius: 99px; font-weight: 800; font-size: 13.5px; text-align: center; background: var(--glass-hi); border: 1px solid var(--edge); animation: tin .25s ease-out; }
+.toast.good { border-color: var(--good); } .toast.bad { border-color: var(--bad); } .toast.gold { border-color: var(--gold); color: var(--gold); }
+@keyframes tin { from { opacity: 0; transform: translateY(8px); } }
 
-.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--panel); font-weight: 800; padding: 10px 18px; border-radius: 999px; z-index: 60; max-width: calc(100% - 32px); text-align: center; transition: opacity .3s; }
-.toast.hide { opacity: 0; pointer-events: none; }
+/* Title */
+.title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
+  padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
+.title-in { width: min(480px, 100%); display: flex; flex-direction: column; gap: 16px; align-items: stretch; text-align: center; }
+.logo { font-family: var(--display); font-size: clamp(44px, 11vw, 78px); line-height: .9; text-shadow: 0 6px 0 rgba(0,0,0,.35); }
+.logo span { color: var(--gold); display: block; }
+.tagline { font-weight: 800; color: var(--ink); font-size: 15px; margin-top: -6px; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+.create { padding: 16px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.create label { font-size: 11px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+.create input { width: 100%; font: 800 16px var(--body); padding: 10px 12px; border-radius: 10px; border: 1px solid var(--edge); background: rgba(255,255,255,.07); color: var(--ink); -webkit-user-select: text; user-select: text; }
+.sw { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw button { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.sw button[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--sky); }
+.big { font-family: var(--display); font-size: 22px; padding: 13px 18px; border-radius: 14px; border: 0; background: var(--gold); color: var(--gold-ink); cursor: pointer; }
+.big.ghost { background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid var(--edge); }
+.modal-wrap { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(5,8,16,.6); padding: 16px; }
+.modal { width: min(440px, 100%); padding: 22px; display: flex; flex-direction: column; gap: 12px; background: rgba(15,22,38,.97); border-color: var(--gold); }
+.modal h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 34px; color: var(--gold); line-height: 1; }
+.modal p { margin: 0; font-weight: 700; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 720px) {
+  .hud-tl { width: 178px; gap: 8px; }
+  .hud-tr { width: 132px; gap: 8px; }
+  .clock { padding: 9px 11px; }
+  .clock .time { font-size: 23px; }
+  .clock .money { font-size: 17px; }
+  .need { grid-template-columns: 50px 1fr 22px; font-size: 11px; gap: 6px; }
+  .needs { padding: 8px 10px; gap: 5px; }
+  .help { display: none; }
+  .dock button { min-width: 54px; padding: 8px 9px 6px; }
+  .todo { padding: 8px 10px; }
+  .todo-h span:first-child { font-size: 15px; }
+  .prompt { font-size: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { .prompt, .toast { animation: none; } }
 </style>
 
-<div class="wrap">
-  <header class="top panel">
-    <h1 class="brand">Adulting <span>Simulator</span></h1>
-    <div class="clock">
-      <div class="sky" id="sky"><i id="sun"></i></div>
-      <div>
-        <div class="dayname" id="dayname">Monday · Day 1</div>
-        <div class="time" id="time">7:00 AM</div>
-      </div>
-      <div class="chip money" id="money">$50</div>
-      <div class="chip rent" id="rent">Rent $120 in 7 days</div>
+<canvas id="scene"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-tl">
+    <div class="card clock">
+      <div class="day" id="hDay">Monday · Day 1</div>
+      <div class="time" id="hTime">7:00 AM</div>
+      <div><div class="money" id="hMoney">$0</div><div class="weather" id="hWeather">Sunny</div></div>
+      <div class="rent" id="hRent"><span>Rent</span><b>$150 in 7 days</b></div>
     </div>
-  </header>
-
-  <div class="grid">
-    <section class="panel">
-      <h2>How you feel</h2>
-      <div id="stats"></div>
-      <div class="job">
-        <div class="kv"><span>Job</span><span id="jobname">Burger Flipper</span></div>
-        <div class="kv"><span>Pay</span><span id="pay">$10/hr</span></div>
-        <div class="kv"><span>Skill</span><span id="skill">0</span></div>
-        <div class="kv"><span>Next promotion</span><span id="nextpromo">skill 15</span></div>
-        <div class="kv"><span>Boss warnings</span><span id="warn">0 / 3</span></div>
-        <div class="kv"><span>Groceries</span><span id="food">2 meals</span></div>
-      </div>
-    </section>
-
-    <section class="panel actions-panel">
-      <h2>What do you do? <span class="hint" id="hint"></span></h2>
-      <div class="tabs" role="tablist" id="tabs"></div>
-      <div class="acts" id="acts"></div>
-    </section>
-
-    <aside style="display:flex;flex-direction:column;gap:16px;min-width:0">
-      <section class="panel">
-        <h2>Today's to-do <span class="hint" id="todocount"></span></h2>
-        <ul class="todo" id="todo"></ul>
-        <p class="hint">Finish everything before midnight for a $15 bonus. Every missed chore makes you feel worse.</p>
-      </section>
-      <section class="panel">
-        <h2>Life goals <span class="hint" id="stars"></span></h2>
-        <ul class="goals" id="goals"></ul>
-      </section>
-      <section class="panel">
-        <h2>Diary</h2>
-        <ul class="log" id="log"></ul>
-      </section>
-    </aside>
+    <div class="card needs" id="hNeeds"></div>
+  </div>
+  <div class="hud-tr">
+    <canvas id="minimap" width="220" height="220" aria-label="Town map"></canvas>
+    <div class="card todo">
+      <button class="todo-h" id="todoToggle" aria-expanded="true"><span>To-do</span><span id="todoCount">0/0</span></button>
+      <ul id="todoList"></ul>
+    </div>
+  </div>
+  <button class="prompt" id="prompt" hidden></button>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="dock">
+    <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
+    <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
+    <button class="card" id="btnLog" aria-label="Diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 3.5h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h6"/></svg>Diary</button>
   </div>
 </div>
 
-<div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
-<div class="toast hide" id="toast"></div>
+<div class="sheet-wrap" id="sheetWrap" hidden><div class="card sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="skip" id="skip" hidden><div><div class="what" id="skipWhat">Working</div><div class="clk" id="skipClk">9:00 AM</div><div class="bar"><i id="skipBar"></i></div></div></div>
+<div class="toasts" id="toasts"></div>
+<div class="modal-wrap" id="modalWrap" hidden><div class="card modal" id="modal"></div></div>
 
+<div class="title" id="title">
+  <div class="title-in">
+    <div class="logo">Adulting<span>Simulator</span></div>
+    <div class="tagline">Get a job. Pay the rent. Do your chores. Try to have a life.</div>
+    <div class="card create">
+      <div><label for="pName">Your name</label><input id="pName" maxlength="16" value="Sam" autocomplete="off"></div>
+      <div><label>Shirt</label><div class="sw" id="swShirt"></div></div>
+      <div><label>Hair</label><div class="sw" id="swHair"></div></div>
+      <div><label>Skin</label><div class="sw" id="swSkin"></div></div>
+    </div>
+    <button class="big" id="btnNew">Start a new life</button>
+    <button class="big ghost" id="btnContinue" hidden>Continue</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
+"use strict";
+// ============================================================ DATA
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-const JOBS = [
-  { name: "Burger Flipper", pay: 10, need: 0 },
-  { name: "Cashier", pay: 14, need: 15 },
-  { name: "Shift Manager", pay: 20, need: 35 },
-  { name: "Store Manager", pay: 30, need: 60 },
-  { name: "Regional Boss", pay: 45, need: 90 },
-  { name: "CEO", pay: 80, need: 130 },
+const NEEDS = [["energy","Energy"],["hunger","Food"],["clean","Hygiene"],["fun","Fun"],["social","Friends"],["home","Home"]];
+const SKILLS = [["smarts","Smarts"],["fitness","Fitness"],["charm","Charm"],["cooking","Cooking"],["creativity","Creativity"]];
+const SKILLNAME = Object.fromEntries(SKILLS);
+const NEEDNAME = Object.fromEntries(NEEDS);
+const RENT = 150;
+const WEEK = [1,2,3,4,5];
+
+const BUILDINGS = [
+  { id: "home", name: "Your Apartment", x: -20, z: 16, w: 12, d: 10, h: 6, color: "#f2c38b", sign: "#b8743a", face: "n", kind: "house" },
+  { id: "grocery", name: "FreshMart", x: 20, z: 20, w: 18, d: 14, h: 7, color: "#7cc576", sign: "#2f7d3a", face: "n", open: [7, 23] },
+  { id: "burger", name: "Burger Barn", x: 20, z: -20, w: 14, d: 12, h: 6, color: "#e94f37", sign: "#8c1d0e", face: "s", open: [6, 24] },
+  { id: "restaurant", name: "The Golden Fork", x: -20, z: -20, w: 16, d: 12, h: 7, color: "#8c5a3c", sign: "#3e2414", face: "s", open: [11, 23] },
+  { id: "office", name: "Pixel Corp", x: 60, z: -20, w: 18, d: 18, h: 44, color: "#5d7ea8", sign: "#1d3354", face: "s", open: [6, 22] },
+  { id: "hospital", name: "General Hospital", x: 60, z: 20, w: 22, d: 16, h: 18, color: "#e9edf1", sign: "#c62b3a", face: "n" },
+  { id: "police", name: "Police Station", x: -60, z: 20, w: 16, d: 14, h: 9, color: "#4a68a8", sign: "#1a2c55", face: "n" },
+  { id: "school", name: "Maple High", x: -60, z: -20, w: 22, d: 14, h: 10, color: "#d98c5f", sign: "#7a3b17", face: "s", open: [7, 21] },
+  { id: "gym", name: "Iron Gym", x: 20, z: 60, w: 18, d: 14, h: 8, color: "#4b525e", sign: "#e4572e", face: "n", open: [5, 23] },
+  { id: "park", name: "Sunny Park", x: -20, z: 60, w: 0, d: 0, h: 0, color: "#5fbf55", sign: "#2d7a2a", face: "n", kind: "zone" },
+  { id: "cinema", name: "Starlight Cinema", x: 60, z: 60, w: 20, d: 16, h: 11, color: "#6b3fa0", sign: "#2b1150", face: "n", open: [12, 25] },
+  { id: "club", name: "Neon Club", x: -60, z: 60, w: 16, d: 14, h: 8, color: "#25253a", sign: "#ff3fa4", face: "n", open: [18, 28] },
+  { id: "cityhall", name: "City Hall", x: 20, z: -60, w: 22, d: 16, h: 12, color: "#e8e2d0", sign: "#5b5134", face: "s", open: [8, 18] },
+  { id: "mall", name: "Mega Mall", x: -20, z: -60, w: 24, d: 16, h: 10, color: "#d5a6bd", sign: "#7d3560", face: "s", open: [9, 21] },
+  { id: "library", name: "Public Library", x: 60, z: -60, w: 18, d: 14, h: 9, color: "#9c6b4f", sign: "#3f2617", face: "s", open: [8, 20] },
+  { id: "apts", name: "", x: -60, z: -60, w: 16, d: 16, h: 26, color: "#b0a48f", sign: "#555", face: "s", kind: "deco" },
 ];
-const STATS = [
-  ["energy","Energy"],["hunger","Food"],["clean","Hygiene"],["fun","Fun"],["social","Friends"],["home","Home"]
-];
-const RENT = 120;
+const BMAP = Object.fromEntries(BUILDINGS.map((b) => [b.id, b]));
+
+const CAREERS = {
+  burger: { name: "Fast Food", days: WEEK, start: [6, 10], gain: { cooking: 2, charm: 1 }, ranks: [
+    ["Fry Cook", 10, {}], ["Cashier", 13, { cooking: 5, charm: 5 }], ["Shift Lead", 18, { cooking: 15, charm: 12 }], ["Restaurant Manager", 27, { cooking: 25, charm: 25, smarts: 10 }]] },
+  restaurant: { name: "Culinary", days: [2,3,4,5,6], start: [11, 15], gain: { cooking: 3 }, ranks: [
+    ["Dishwasher", 11, {}], ["Line Cook", 18, { cooking: 15 }], ["Sous Chef", 30, { cooking: 30 }], ["Head Chef", 48, { cooking: 50, charm: 15 }], ["Celebrity Chef", 95, { cooking: 75, charm: 40 }]] },
+  office: { name: "Tech", days: WEEK, start: [7, 10], gain: { smarts: 3 }, ranks: [
+    ["Intern", 15, { smarts: 10 }], ["Junior Developer", 28, { smarts: 25 }], ["Senior Developer", 45, { smarts: 45 }], ["Lead Engineer", 65, { smarts: 60, charm: 20 }], ["CTO", 120, { smarts: 80, charm: 40 }]] },
+  hospital: { name: "Medical", days: [0,1,2,3,4,5,6], start: [6, 20], gain: { smarts: 2, fitness: 1 }, ranks: [
+    ["Orderly", 13, {}], ["Nurse", 28, { smarts: 25 }], ["Doctor", 55, { smarts: 50 }], ["Surgeon", 85, { smarts: 70, fitness: 20 }], ["Chief of Medicine", 130, { smarts: 90, charm: 35 }]] },
+  police: { name: "Law Enforcement", days: WEEK, start: [6, 10], gain: { fitness: 2, smarts: 1 }, ranks: [
+    ["Cadet", 14, { fitness: 10 }], ["Officer", 24, { fitness: 20 }], ["Detective", 38, { fitness: 25, smarts: 30 }], ["Police Chief", 72, { fitness: 40, smarts: 50, charm: 30 }]] },
+  school: { name: "Education", days: WEEK, start: [7, 9], gain: { smarts: 2, charm: 1 }, ranks: [
+    ["Teacher's Aide", 12, { smarts: 5 }], ["Teacher", 24, { smarts: 25, charm: 15 }], ["Vice Principal", 36, { smarts: 40, charm: 30 }], ["Principal", 55, { smarts: 55, charm: 45 }]] },
+  gym: { name: "Sports", days: [1,2,3,4,5,6], start: [6, 12], gain: { fitness: 3 }, ranks: [
+    ["Front Desk", 11, {}], ["Personal Trainer", 22, { fitness: 25 }], ["Pro Athlete", 60, { fitness: 55 }], ["Sports Legend", 140, { fitness: 85, charm: 40 }]] },
+  club: { name: "Music", days: [4,5,6,0], start: [18, 21], gain: { charm: 2, creativity: 2 }, ranks: [
+    ["Roadie", 12, {}], ["Backup Singer", 20, { charm: 15, creativity: 10 }], ["Lead Singer", 42, { charm: 35, creativity: 30 }], ["Rock Star", 150, { charm: 70, creativity: 60 }]] },
+  library: { name: "Writing", days: WEEK, start: [8, 11], gain: { creativity: 2, smarts: 1 }, ranks: [
+    ["Library Assistant", 11, {}], ["Librarian", 20, { smarts: 20 }], ["Novelist", 45, { creativity: 40, smarts: 30 }], ["Bestselling Author", 110, { creativity: 70, smarts: 45 }]] },
+  mall: { name: "Fashion & Retail", days: [2,3,4,5,6], start: [9, 13], gain: { charm: 2, creativity: 1 }, ranks: [
+    ["Stock Clerk", 10, {}], ["Sales Associate", 14, { charm: 10 }], ["Store Manager", 26, { charm: 25, smarts: 15 }], ["Fashion Designer", 75, { creativity: 50, charm: 40 }]] },
+  cityhall: { name: "Politics", days: WEEK, start: [8, 10], gain: { charm: 2, smarts: 1 }, ranks: [
+    ["Office Clerk", 13, { smarts: 5 }], ["City Councilor", 30, { charm: 30, smarts: 25 }], ["Deputy Mayor", 55, { charm: 50, smarts: 40 }], ["Mayor", 110, { charm: 75, smarts: 60 }]] },
+};
+
 const ITEMS = {
-  bed:     { name: "Comfy Bed", price: 150, desc: "Sleep restores 30% more energy." },
-  bike:    { name: "Bike", price: 120, desc: "Work commute is 1 hour shorter." },
-  console: { name: "Game Console", price: 220, desc: "Video games give way more fun." },
-  coffee:  { name: "Coffee Maker", price: 60, desc: "Unlocks Make Coffee (+energy)." },
-  dog:     { name: "Adopt a Dog", price: 180, desc: "Fun and friends drop slower. Walk it daily!" },
+  bed:      { name: "Comfy Bed", price: 200, desc: "Sleep restores 30% more energy." },
+  coffee:   { name: "Coffee Maker", price: 60, desc: "Make coffee at home once a day." },
+  bike:     { name: "Bike", price: 150, desc: "Get around town 60% faster." },
+  car:      { name: "Car", price: 1500, desc: "Drive everywhere 2.6x faster." },
+  console:  { name: "Game Console", price: 250, desc: "Video games are way more fun." },
+  bigtv:    { name: "Big Screen TV", price: 400, desc: "TV is twice as fun." },
+  sofa:     { name: "Comfy Sofa", price: 180, desc: "Watching TV also restores energy." },
+  guitar:   { name: "Guitar", price: 120, desc: "Practice at home for Creativity and Charm." },
+  homegym:  { name: "Home Gym", price: 300, desc: "Work out at home for Fitness." },
+  robovac:  { name: "Robot Vacuum", price: 350, desc: "Your home gets messy half as fast." },
+  outfit:   { name: "Designer Outfit", price: 120, desc: "+10 Charm the moment you wear it." },
+  dog:      { name: "Adopt a Dog", price: 250, desc: "Fun and Friends drop slower. Walk it every day." },
+};
+
+const between = (a, b) => hour() >= a && hour() < b;
+const owns = (k) => !!(S && S.owned[k]);
+const ACTS = {
+  home: [
+    { id: "sleep", name: "Sleep", mins: () => minsUntil7(), can: () => (hour() >= 20 || hour() < 6 || S.energy < 25) || "Not sleepy yet (after 8 PM)", run: () => { doSleep(false); } },
+    { id: "nap", name: "Take a nap", mins: 120, fx: { energy: 22 } },
+    { id: "cook", name: "Cook a meal", mins: 60, fx: () => ({ hunger: 40 + Math.round(S.skills.cooking * 0.3), fun: 3, home: -4 }), skill: { cooking: 2 }, can: () => S.meals > 0 || "No groceries. Go to FreshMart.", run: () => { S.meals--; } },
+    { id: "coffee", name: "Make coffee", mins: 10, fx: { energy: 15 }, can: () => !owns("coffee") ? "Need a Coffee Maker (Mega Mall)" : S.used.coffee ? "Already had coffee today" : true, run: () => { S.used.coffee = 1; } },
+    { id: "shower", name: "Shower", mins: 30, fx: { clean: 55, energy: 5 } },
+    { id: "bath", name: "Bubble bath", mins: 90, fx: { clean: 80, fun: 10, energy: 8 } },
+    { id: "cleanroom", name: "Clean your room", mins: 120, fx: { home: 45, energy: -8 } },
+    { id: "dishes", name: "Wash the dishes", mins: 45, fx: { home: 20 } },
+    { id: "laundry", name: "Do laundry", mins: 60, fx: { home: 15, clean: 10 } },
+    { id: "trash", name: "Take out the trash", mins: 15, fx: { home: 12 } },
+    { id: "garden", name: "Water the plants", mins: 30, fx: { home: 8, fun: 6 } },
+    { id: "games", name: "Play video games", mins: 120, fx: () => ({ fun: owns("console") ? 45 : 25, energy: -4 }) },
+    { id: "tv", name: "Watch TV", mins: 60, fx: () => ({ fun: owns("bigtv") ? 25 : 12, energy: owns("sofa") ? 10 : 3 }) },
+    { id: "read", name: "Read a book", mins: 120, fx: { fun: 4 }, skill: { smarts: 4 } },
+    { id: "paint", name: "Paint a picture", mins: 120, fx: { fun: 10 }, skill: { creativity: 4 }, note: "Sell it once Creativity hits 25", run: () => { if (S.skills.creativity >= 25) earn(S.skills.creativity * 2, "Sold a painting"); } },
+    { id: "write", name: "Write a story", mins: 120, fx: { fun: 4 }, skill: { creativity: 3, smarts: 1 }, note: "Royalties once Creativity hits 40", run: () => { if (S.skills.creativity >= 40) earn(S.skills.creativity * 3, "Story royalties"); } },
+    { id: "guitar", name: "Practice guitar", mins: 60, fx: { fun: 10 }, skill: { creativity: 3, charm: 1 }, can: () => owns("guitar") || "Need a Guitar (Mega Mall)" },
+    { id: "homegym", name: "Home workout", mins: 60, fx: { energy: -12, clean: -15 }, skill: { fitness: 4 }, can: () => owns("homegym") || "Need a Home Gym (Mega Mall)" },
+    { id: "practicecook", name: "Practice recipes", mins: 90, fx: { hunger: 20, home: -8 }, skill: { cooking: 5 }, cost: 8 },
+  ],
+  grocery: [
+    { id: "groceries", name: "Buy groceries", mins: 30, cost: 25, note: "+5 meals", run: () => { S.meals += 5; } },
+    { id: "snacks", name: "Grab snacks", mins: 10, cost: 6, fx: { hunger: 15, fun: 5 } },
+    { id: "flowers", name: "Buy flowers for a friend", mins: 15, cost: 12, fx: { social: 12, fun: 4 } },
+  ],
+  burger: [
+    { id: "burger", name: "Eat a burger", mins: 30, cost: 9, fx: { hunger: 40, fun: 5 } },
+    { id: "combo", name: "Mega combo meal", mins: 45, cost: 15, fx: { hunger: 65, fun: 10, energy: -5 } },
+    { id: "shake", name: "Milkshake", mins: 15, cost: 5, fx: { hunger: 10, fun: 8 } },
+  ],
+  restaurant: [
+    { id: "dinner", name: "Fancy dinner", mins: 120, cost: 40, fx: { hunger: 70, fun: 20, social: 15 } },
+    { id: "cookclass", name: "Cooking class", mins: 180, cost: 35, fx: { fun: 8, energy: -8 }, skill: { cooking: 10 }, can: () => between(17, 21) || "Classes start 5–9 PM" },
+    { id: "brunch", name: "Weekend brunch", mins: 90, cost: 22, fx: { hunger: 50, social: 12, fun: 10 }, can: () => ((weekday() === 0 || weekday() === 6) && hour() < 15) || "Weekends before 3 PM" },
+  ],
+  office: [
+    { id: "espresso", name: "Free espresso", mins: 10, fx: { energy: 12 }, can: () => S.career === "office" ? (S.used.espresso ? "One per day" : true) : "Employees only", run: () => { S.used.espresso = 1; } },
+    { id: "hackathon", name: "Join a hackathon", mins: 240, fx: { energy: -20, fun: 15, social: 10 }, skill: { smarts: 8, creativity: 3 }, can: () => weekday() === 6 || "Saturdays only" },
+  ],
+  hospital: [
+    { id: "checkup", name: "Get a checkup", mins: 60, cost: 50, fx: { energy: 25, clean: 10 } },
+    { id: "blood", name: "Donate blood", mins: 60, fx: { energy: -15, social: 8, fun: 5 }, note: "+$30", can: () => !S.used.blood || "Once a day", run: () => { S.used.blood = 1; earn(30, "Blood donation"); } },
+    { id: "volhosp", name: "Volunteer at the hospital", mins: 180, fx: { social: 15, fun: 5, energy: -10 }, skill: { smarts: 2, charm: 2 } },
+  ],
+  police: [
+    { id: "ridealong", name: "Police ride-along", mins: 180, fx: { fun: 25, energy: -10 }, skill: { fitness: 2 } },
+    { id: "selfdef", name: "Self-defense class", mins: 120, cost: 20, fx: { energy: -15, clean: -15 }, skill: { fitness: 5 } },
+  ],
+  school: [
+    { id: "nightclass", name: "Night class", mins: 180, cost: 40, fx: { energy: -12, fun: -5 }, skill: { smarts: 12 }, can: () => between(17, 21) || "Classes start 5–9 PM" },
+    { id: "tutor", name: "Tutor kids", mins: 120, fx: { energy: -8, social: 10 }, skill: { smarts: 2, charm: 2 }, note: "+$25", run: () => earn(25, "Tutoring") },
+    { id: "drama", name: "Drama club", mins: 120, fx: { fun: 15, social: 12 }, skill: { charm: 3, creativity: 3 } },
+  ],
+  library: [
+    { id: "study", name: "Study", mins: 120, fx: { energy: -8, fun: -5 }, skill: { smarts: 5 } },
+    { id: "bookclub", name: "Book club", mins: 120, fx: { social: 20, fun: 8 }, skill: { smarts: 2, charm: 1 } },
+    { id: "writelib", name: "Write in a quiet corner", mins: 120, fx: { fun: 5 }, skill: { creativity: 4 } },
+  ],
+  gym: [
+    { id: "lift", name: "Lift weights", mins: 120, cost: 5, fx: { energy: -15, clean: -25, fun: 5 }, skill: { fitness: 5 } },
+    { id: "yoga", name: "Yoga class", mins: 60, cost: 8, fx: { energy: 6, fun: 8 }, skill: { fitness: 2 } },
+    { id: "swim", name: "Swim laps", mins: 60, cost: 5, fx: { clean: 15, fun: 10, energy: -8 }, skill: { fitness: 3 } },
+    { id: "boxing", name: "Boxing", mins: 90, cost: 10, fx: { energy: -20, fun: 12, clean: -20 }, skill: { fitness: 6 } },
+    { id: "gymshower", name: "Locker room shower", mins: 30, fx: { clean: 50 } },
+  ],
+  park: [
+    { id: "jog", name: "Go for a jog", mins: 60, fx: { energy: -10, fun: 8, clean: -20 }, skill: { fitness: 3 } },
+    { id: "basketball", name: "Pickup basketball", mins: 120, fx: { energy: -15, clean: -15, social: 15, fun: 15 }, skill: { fitness: 3 } },
+    { id: "picnic", name: "Have a picnic", mins: 120, cost: 8, fx: { hunger: 30, social: 10, fun: 10 } },
+    { id: "meet", name: "Meet new people", mins: 120, fx: { social: 30 }, skill: { charm: 2 } },
+    { id: "ducks", name: "Feed the ducks", mins: 30, fx: { fun: 10 } },
+    { id: "parkpaint", name: "Paint the scenery", mins: 120, fx: { fun: 10 }, skill: { creativity: 4 } },
+    { id: "walkdog", name: "Walk the dog", mins: 60, fx: { fun: 12, social: 8, energy: -5 }, can: () => owns("dog") || "You don't have a dog" },
+  ],
+  cinema: [
+    { id: "movie", name: "Watch a movie", mins: 180, cost: 15, fx: { fun: 35, social: 5 } },
+    { id: "popcorn", name: "Popcorn & soda", mins: 10, cost: 6, fx: { hunger: 15, fun: 5 } },
+    { id: "date", name: "Movie date night", mins: 180, cost: 45, fx: { social: 40, fun: 30 }, skill: { charm: 2 }, can: () => S.social >= 40 || "Need Friends 40+ to find a date" },
+    { id: "marathon", name: "Movie marathon", mins: 360, cost: 25, fx: { fun: 60, energy: -20, hunger: -10 }, can: () => (weekday() === 0 || weekday() === 6) || "Weekends only" },
+  ],
+  club: [
+    { id: "dance", name: "Dance all night", mins: 120, cost: 10, fx: { fun: 30, social: 20, energy: -12, clean: -10 }, skill: { fitness: 1 } },
+    { id: "karaoke", name: "Karaoke", mins: 90, fx: { fun: 20 }, skill: { charm: 3, creativity: 1 } },
+    { id: "openmic", name: "Open mic", mins: 60, fx: { fun: 10 }, skill: { creativity: 3, charm: 2 }, note: "Tips once Charm hits 30", run: () => { if (S.skills.charm >= 30) earn(S.skills.charm, "Open mic tips"); } },
+    { id: "arcade", name: "Arcade games", mins: 60, cost: 5, fx: { fun: 20 } },
+  ],
+  cityhall: [
+    { id: "volunteer", name: "Volunteer", mins: 180, fx: { social: 20, fun: 5 }, skill: { charm: 2 } },
+    { id: "payrent", name: "Pay back late rent", mins: 15, can: () => S.debt > 0 ? (S.money >= S.debt || `Need $${S.debt}`) : "You don't owe anything", run: () => { S.money -= S.debt; log(`Paid back $${S.debt} of late rent.`, "good"); S.debt = 0; S.rentMissed = 0; } },
+  ],
+  mall: [
+    { id: "haircut", name: "Get a haircut", mins: 30, cost: 20, fx: { clean: 20, social: 5 }, skill: { charm: 1 } },
+    { id: "foodcourt", name: "Food court lunch", mins: 30, cost: 10, fx: { hunger: 35, fun: 5 } },
+    { id: "window", name: "Window shopping", mins: 60, fx: { fun: 10 } },
+  ],
+  phone: [
+    { id: "callmom", name: "Call Mom", mins: 30, fx: { social: 20, fun: 5 } },
+    { id: "text", name: "Text your friends", mins: 10, fx: { social: 8 } },
+    { id: "scroll", name: "Scroll social media", mins: 30, fx: { fun: 6, social: 3, energy: -2 } },
+    { id: "pizza", name: "Order pizza delivery", mins: 30, cost: 18, fx: { hunger: 50, fun: 5 } },
+    { id: "delivery", name: "Order grocery delivery", mins: 30, cost: 35, note: "+5 meals", run: () => { S.meals += 5; } },
+    { id: "freelance", name: "Freelance gig", mins: 120, fx: { energy: -10, fun: -5 }, note: "Pays Smarts x2", can: () => S.skills.smarts >= 15 || "Need Smarts 15", run: () => earn(S.skills.smarts * 2, "Freelance gig") },
+  ],
 };
 
 const TODO_POOL = [
-  { id: "trash", text: "Take out the trash" },
-  { id: "dishes", text: "Wash the dishes" },
-  { id: "laundry", text: "Do laundry" },
-  { id: "groceries", text: "Buy groceries" },
-  { id: "callmom", text: "Call Mom" },
-  { id: "exercise", text: "Go for a run" },
-  { id: "study", text: "Study for 2 hours" },
-  { id: "shower", text: "Take a shower" },
-  { id: "cleanroom", text: "Clean your room" },
-  { id: "hangout", text: "See your friends" },
-  { id: "eat", text: "Eat a home-cooked meal" },
+  ["trash", "Take out the trash"], ["dishes", "Wash the dishes"], ["laundry", "Do laundry"], ["cleanroom", "Clean your room"],
+  ["shower", "Take a shower"], ["cook", "Cook a meal at home"], ["read", "Read a book"], ["garden", "Water the plants"],
+  ["groceries", "Buy groceries"], ["jog", "Go for a jog in the park"], ["ducks", "Feed the ducks"], ["meet", "Meet new people"],
+  ["study", "Study at the library"], ["lift", "Work out at the gym"], ["yoga", "Go to yoga"], ["volunteer", "Volunteer at City Hall"],
+  ["haircut", "Get a haircut"], ["callmom", "Call Mom"], ["text", "Text your friends"], ["movie", "See a movie"], ["burger", "Grab a burger"],
 ];
 
-let S;
-function fresh() {
-  return {
-    t: 7, money: 50, rentMissed: 0,
-    energy: 80, hunger: 70, clean: 70, fun: 60, social: 60, home: 60,
-    job: 0, skill: 0, warnings: 0, daysWorked: 0, workedToday: false,
-    meals: 2, owned: {}, todos: [], log: [], goals: {}, over: false, totalEarned: 0, dogWalked: false,
-    tab: "home",
-  };
-}
+const ACT_HOME = {};
+for (const bid in ACTS) for (const a of ACTS[bid]) ACT_HOME[a.id] = bid;
 
-const $ = (id) => document.getElementById(id);
-const clamp = (v) => Math.max(0, Math.min(100, v));
-const day = () => Math.floor(S.t / 24) + 1;
-const hour = () => S.t % 24;
-const weekday = () => day() % 7; // day 1 = Monday
-const isWorkday = () => weekday() >= 1 && weekday() <= 5;
-const fmtHour = (h) => { const ap = h < 12 ? "AM" : "PM"; const hh = h % 12 === 0 ? 12 : h % 12; return `${hh}:00 ${ap}`; };
-const daysToRent = () => 7 - ((day() - 1) % 7);
+const GOALS = [
+  { id: "week", text: "Survive your first week", test: () => day() >= 8 },
+  { id: "job", text: "Get a job", test: () => !!S.career },
+  { id: "promo", text: "Get promoted", test: () => S.promos >= 1 },
+  { id: "bike", text: "Buy a bike", test: () => owns("bike") },
+  { id: "chores", text: "Finish every chore 5 days", test: () => S.perfectDays >= 5 },
+  { id: "k1", text: "Have $1,000", test: () => S.money >= 1000 },
+  { id: "skill50", text: "Get any skill to 50", test: () => SKILLS.some(([k]) => S.skills[k] >= 50) },
+  { id: "dog", text: "Adopt a dog", test: () => owns("dog") },
+  { id: "car", text: "Buy a car", test: () => owns("car") },
+  { id: "three", text: "Work 3 different careers", test: () => Object.keys(S.careersTried).length >= 3 },
+  { id: "k10", text: "Have $10,000", test: () => S.money >= 10000 },
+  { id: "top", text: "Reach the top of a career", test: () => S.career && S.rank === CAREERS[S.career].ranks.length - 1 },
+];
 
-function log(msg, kind = "") {
-  S.log.unshift({ msg, kind, when: `D${day()} ${fmtHour(hour())}` });
-  S.log = S.log.slice(0, 60);
-}
-let toastTimer;
-function toast(msg) {
-  const el = $("toast"); el.textContent = msg; el.classList.remove("hide");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add("hide"), 2200);
-}
+const TALK = ["Nice weather today, huh?", "Have you tried Burger Barn? So good.", "I heard Pixel Corp is hiring.", "Rent in this town is wild.", "The ducks in Sunny Park are huge.", "Neon Club gets loud after 10.", "I'm late for work, bye!", "Love your shirt!", "The library has free Wi-Fi.", "Did you see the new movie?"];
 
+// ============================================================ STATE
+let S = null;
+const fresh = (look) => ({
+  t: 7 * 60, money: 120, energy: 85, hunger: 70, clean: 70, fun: 65, social: 55, home: 60,
+  skills: { smarts: 0, fitness: 0, charm: 0, cooking: 0, creativity: 0 },
+  career: null, rank: 0, daysAtRank: 0, warnings: 0, workedDay: -1, hiredDay: -1, promos: 0, careersTried: {},
+  meals: 3, owned: {}, todos: [], log: [], goals: {}, over: false, earned: 0, debt: 0, rentMissed: 0,
+  perfectDays: 0, used: {}, rain: false, pos: { x: BMAP.home.x, z: BMAP.home.z - 8 },
+  name: look.name, look,
+});
+const clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const day = () => Math.floor(S.t / 1440) + 1;
+const hour = () => Math.floor((S.t % 1440) / 60);
+const weekday = () => day() % 7;
+const fmt = (mins) => { const m = ((Math.round(mins) % 1440) + 1440) % 1440; const h = Math.floor(m / 60), mm = m % 60; return `${h % 12 === 0 ? 12 : h % 12}:${String(mm).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
+const fmtH = (h) => fmt((h % 24) * 60).replace(":00", "");
+const val = (x) => (typeof x === "function" ? x() : x);
+const minsUntil7 = () => { let tgt = Math.floor(S.t / 1440) * 1440 + 420; if (tgt <= S.t) tgt += 1440; return tgt - S.t; };
+const money = (n) => "$" + Math.round(n).toLocaleString();
+
+function log(msg, kind = "") { S.log.unshift({ msg, kind, when: `D${day()} ${fmt(S.t)}` }); if (S.log.length > 80) S.log.length = 80; }
+function toast(msg, kind = "") {
+  const el = document.createElement("div"); el.className = `toast ${kind}`; el.textContent = msg;
+  const box = document.getElementById("toasts"); box.prepend(el);
+  while (box.children.length > 3) box.lastChild.remove();
+  setTimeout(() => el.remove(), 3200);
+}
+function earn(n, why) { n = Math.round(n); S.money += n; S.earned += n; log(`${why}: +${money(n)}`, "good"); }
+
+function isOpen(b) {
+  if (!b || !b.open) return true;
+  const h = hour(), [a, z] = b.open;
+  return z <= 24 ? h >= a && h < z : h >= a || h < z - 24;
+}
+function openText(b) { return b.open ? `${fmtH(b.open[0])} – ${fmtH(b.open[1])}` : "Open 24 hours"; }
+
+// ============================================================ SIMULATION
 function newTodos() {
-  const pool = TODO_POOL.slice().sort(() => Math.random() - .5);
-  const n = 3;
-  S.todos = pool.slice(0, n).map((x) => ({ ...x, done: false }));
-  if (isWorkday()) S.todos.unshift({ id: "work", text: "Go to work (start 6–10 AM)", done: false, must: true });
-  if (S.owned.dog) S.todos.push({ id: "walkdog", text: "Walk the dog", done: false, must: true });
+  const pool = TODO_POOL.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  S.todos = pool.map(([id, text]) => ({ id, text, done: false }));
+  const c = S.career && CAREERS[S.career];
+  if (c && c.days.includes(weekday())) S.todos.unshift({ id: "work", text: `Go to work at ${BMAP[S.career].name}`, sub: `Start ${fmtH(c.start[0])}–${fmtH(c.start[1])}`, done: false, must: true });
+  if (owns("dog")) S.todos.push({ id: "walkdog", text: "Walk the dog in the park", done: false, must: true });
+  refreshBeacons();
 }
-function tick(id) {
-  const td = S.todos.find((x) => x.id === id && !x.done);
-  if (td) { td.done = true; log(`Checked off: ${td.text}`, "good"); }
+function tick(id) { const td = S.todos.find((x) => x.id === id && !x.done); if (td) { td.done = true; log(`Checked off: ${td.text}`, "good"); toast(`✓ ${td.text}`, "good"); refreshBeacons(); } }
+
+function decay(hrs, asleep) {
+  const late = !asleep && (hour() >= 1 && hour() < 6) ? 1.6 : 1;
+  const dog = owns("dog") ? 0.5 : 1;
+  if (asleep) { S.hunger = clamp(S.hunger - 2 * hrs); S.clean = clamp(S.clean - 1 * hrs); }
+  else {
+    S.energy = clamp(S.energy - 3 * hrs * late); S.hunger = clamp(S.hunger - 4 * hrs); S.clean = clamp(S.clean - 2 * hrs);
+    S.fun = clamp(S.fun - 2 * hrs * dog); S.social = clamp(S.social - 1.2 * hrs * dog);
+  }
+  S.home = clamp(S.home - (owns("robovac") ? 0.5 : 1) * hrs);
 }
 
-// ---- time ----
-function advance(hours, asleep = false) {
-  for (let i = 0; i < hours; i++) {
-    const dog = S.owned.dog ? 0.5 : 1;
-    if (asleep) {
-      S.hunger = clamp(S.hunger - 2); S.clean = clamp(S.clean - 1);
-    } else {
-      S.energy = clamp(S.energy - 3); S.hunger = clamp(S.hunger - 4); S.clean = clamp(S.clean - 2);
-      S.fun = clamp(S.fun - 2 * dog); S.social = clamp(S.social - 1 * dog);
-    }
-    S.home = clamp(S.home - 1);
-    S.t++;
-    if (hour() === 0) endOfDay();
-    if (S.over) return;
-    if (!asleep) checkCrisis();
-    if (S._po) { S._po = false; return; }
+function advance(mins, asleep = false) {
+  let left = mins;
+  while (left > 0 && !S.over) {
+    const toMid = 1440 - (S.t % 1440);
+    const step = Math.min(left, toMid, 60);
+    decay(step / 60, asleep);
+    S.t += step; left -= step;
+    if (S.t % 1440 === 0) endOfDay();
+    if (!asleep && crisis()) return;
   }
 }
 
 function endOfDay() {
   const d = day() - 1;
   const missed = S.todos.filter((x) => !x.done);
-  if (S.todos.length && missed.length === 0) {
-    S.money += 15; S.fun = clamp(S.fun + 10);
-    log("You finished every chore yesterday. +$15 bonus and you feel proud!", "good");
-  } else if (missed.length) {
-    S.fun = clamp(S.fun - 8 * missed.length);
-    log(`You skipped ${missed.length} chore${missed.length > 1 ? "s" : ""} on Day ${d}. You feel guilty.`, "bad");
-  }
-  const workMiss = missed.find((x) => x.id === "work");
-  if (workMiss) addWarning("You didn't show up to work!");
-  if (S.owned.dog && missed.find((x) => x.id === "walkdog")) { S.home = clamp(S.home - 25); log("The dog chewed your shoes because nobody walked it.", "bad"); }
-
-  // rent: due at the end of every 7th day
+  if (S.todos.length && !missed.length) { S.money += 20; S.fun = clamp(S.fun + 10); S.perfectDays++; log("You finished every chore yesterday! +$20 and you feel proud.", "good"); }
+  else if (missed.length) { S.fun = clamp(S.fun - 7 * missed.length); log(`You skipped ${missed.length} chore${missed.length > 1 ? "s" : ""} on Day ${d}. You feel guilty.`, "bad"); }
+  if (S.career && missed.find((x) => x.id === "work") && S.hiredDay < d) addWarning("You didn't show up to work!");
+  if (owns("dog") && missed.find((x) => x.id === "walkdog")) { S.home = clamp(S.home - 25); log("Nobody walked the dog, so it chewed up your shoes.", "bad"); }
   if (d % 7 === 0) {
-    if (S.money >= RENT) {
-      S.money -= RENT; S.rentMissed = 0; log(`Paid $${RENT} rent. Roof stays over your head.`, "");
-    } else {
-      S.rentMissed++;
-      if (S.rentMissed >= 2) return gameOver("Evicted!", `You couldn't pay rent twice in a row, so the landlord changed the locks. You lasted ${d} days.`);
-      log(`You couldn't pay rent! The landlord says you'd better pay double next week.`, "bad");
-      S.debt = (S.debt || 0) + RENT;
-      toast("Rent missed! Pay up next week or get evicted.");
+    if (S.money >= RENT) { S.money -= RENT; log(`Paid ${money(RENT)} rent.`); toast(`Rent paid: -${money(RENT)}`); }
+    else {
+      S.rentMissed++; S.debt += RENT;
+      if (S.rentMissed >= 2) { gameOver("Evicted!", `You missed rent twice, so the landlord changed the locks. You lasted ${d} days.`); return; }
+      log(`You couldn't pay rent! Pay ${money(S.debt)} at City Hall before next rent day or get evicted.`, "bad");
+      toast("Rent missed! Pay it back at City Hall.", "bad");
     }
   }
-  if (S.debt && S.money >= S.debt && d % 7 === 0 && S.rentMissed === 0) { S.money -= S.debt; log(`Paid back $${S.debt} of late rent.`); S.debt = 0; }
-
-  S.workedToday = false;
+  S.used = {};
+  S.rain = Math.random() < 0.22;
   newTodos();
   randomEvent();
 }
 
 function randomEvent() {
-  const r = Math.random();
+  if (Math.random() > 0.45) return;
   const ev = [
     () => { S.money += 20; log("You found $20 in an old jacket!", "event"); },
-    () => { S.todos.push({ id: "hangout", text: "Go to your friend's birthday", done: false }); log("Your friend is having a birthday party today!", "event"); },
+    () => { S.todos.push({ id: "dinner", text: "Friend's birthday dinner at The Golden Fork", done: false }); log("Your friend is having a birthday dinner today!", "event"); refreshBeacons(); },
     () => { S.money = Math.max(0, S.money - 30); log("Your phone screen cracked. Repair cost $30.", "event"); },
     () => { S.home = clamp(S.home - 20); log("The sink leaked overnight. What a mess.", "event"); },
     () => { S.social = clamp(S.social + 15); log("An old friend texted you out of nowhere. Nice!", "event"); },
-    () => { S.energy = clamp(S.energy - 15); log("Neighbors partied all night. You slept badly.", "event"); },
+    () => { S.energy = clamp(S.energy - 15); log("The neighbors partied all night. You slept badly.", "event"); },
+    () => { const g = 25 + Math.floor(Math.random() * 50); S.money += g; log(`Grandma sent you ${money(g)} in a card!`, "event"); },
   ];
-  if (r < 0.45) ev[Math.floor(Math.random() * ev.length)]();
+  ev[Math.floor(Math.random() * ev.length)]();
 }
 
-function checkCrisis() {
-  if (S.hunger <= 0) { S.money = Math.max(0, S.money - 60); S.hunger = 40; S.energy = clamp(S.energy - 20); log("You fainted from hunger! Hospital bill: $60.", "bad"); toast("You fainted from hunger! -$60"); }
-  if (S.energy <= 0) { log("You passed out from exhaustion right on the floor.", "bad"); toast("You passed out!"); doSleep(true); S._po = true; }
-  if (S.clean <= 0) { S.social = clamp(S.social - 20); S.clean = 10; log("You smell so bad people are avoiding you.", "bad"); }
-  if (S.fun <= 0 && S.social <= 0) gameOver("Burnt out", `You were so lonely and bored you moved back in with your parents. You lasted ${day()} days.`);
+function crisis() {
+  if (S.hunger <= 0) {
+    S.money = Math.max(0, S.money - 80); S.hunger = 50; S.energy = clamp(S.energy - 10);
+    log("You fainted from hunger! Hospital bill: $80.", "bad"); toast("You fainted from hunger! -$80", "bad");
+    teleport("hospital"); advance(120, true); return true;
+  }
+  if (S.energy <= 0) {
+    log("You passed out from exhaustion. Someone drove you home.", "bad"); toast("You passed out!", "bad");
+    teleport("home"); doSleep(true); return true;
+  }
+  if (S.clean <= 0) { S.social = clamp(S.social - 20); S.clean = 12; log("You smell so bad people are avoiding you.", "bad"); toast("You stink! Take a shower.", "bad"); }
+  if (S.fun <= 0 && S.social <= 0) { gameOver("Burnt out", `You got so lonely and bored that you moved back in with your parents. You lasted ${day()} days.`); return true; }
+  return false;
 }
 
 function addWarning(why) {
   S.warnings++;
-  log(`Boss warning (${S.warnings}/3): ${why}`, "bad");
+  log(`Boss warning (${S.warnings}/3): ${why}`, "bad"); toast(`Boss warning ${S.warnings}/3: ${why}`, "bad");
   if (S.warnings >= 3) {
-    if (S.job > 0) { S.job--; log(`You got demoted to ${JOBS[S.job].name}.`, "bad"); toast(`Demoted to ${JOBS[S.job].name}`); }
-    else { S.money = Math.max(0, S.money - 40); log("You got docked $40 pay for being unreliable.", "bad"); }
     S.warnings = 0;
+    if (S.rank > 0) { S.rank--; S.daysAtRank = 0; log(`You got demoted to ${CAREERS[S.career].ranks[S.rank][0]}.`, "bad"); toast("Demoted!", "bad"); }
+    else { log(`You got fired from ${BMAP[S.career].name}.`, "bad"); toast("You're fired!", "bad"); S.career = null; newTodos(); }
   }
 }
 
-function doSleep(passedOut = false) {
-  let target = Math.floor(S.t / 24) * 24 + 7;
-  if (target <= S.t) target += 24;
-  const hrs = target - S.t;
-  const per = S.owned.bed ? 13 : 10;
+function doSleep(passedOut) {
+  const mins = minsUntil7();
   const before = day();
-  advance(hrs, true);
+  advance(mins, true);
   if (S.over) return;
-  S.energy = clamp(S.energy + hrs * per * (passedOut ? .6 : 1));
-  if (hrs < 6) log(`Only ${hrs} hours of sleep. Ugh.`, "bad");
-  else if (!passedOut) log(`Slept ${hrs} hours. Good morning!`, "good");
-  if (day() !== before) toast(`${DAYS[weekday()]}, Day ${day()}`);
+  const per = owns("bed") ? 13 : 10;
+  S.energy = clamp(S.energy + (mins / 60) * per * (passedOut ? 0.6 : 1));
+  if (mins < 360) log(`Only ${Math.round(mins / 60)} hours of sleep. Ugh.`, "bad");
+  else if (!passedOut) log(`Slept ${Math.round(mins / 60)} hours. Good morning!`, "good");
+  if (day() !== before) toast(`${DAYS[weekday()]}, Day ${day()}${S.rain ? " · Rainy" : ""}`, "gold");
 }
 
-// ---- actions ----
-const A = [
-  // HOME
-  { id: "sleep", tab: "home", name: "Go to bed", hours: "until 7 AM", run: () => { doSleep(); } ,
-    can: () => hour() >= 19 || hour() < 6 ? true : "Only after 7 PM" },
-  { id: "nap", tab: "home", name: "Take a nap", hours: 2, fx: { energy: 22 } },
-  { id: "eat", tab: "home", name: "Cook & eat", hours: 1, fx: { hunger: 45, home: -5 }, can: () => S.meals > 0 || "No groceries", run: () => { S.meals--; } },
-  { id: "coffee", tab: "home", name: "Make coffee", hours: 0, fx: { energy: 15 }, can: () => S.owned.coffee ? (S.coffeeDay === day() ? "Already had one today" : true) : "Need a Coffee Maker", run: () => { S.coffeeDay = day(); } },
-  { id: "shower", tab: "home", name: "Shower", hours: 1, fx: { clean: 60, energy: 5 } },
-  { id: "cleanroom", tab: "home", name: "Clean your room", hours: 2, fx: { home: 45, energy: -8 } },
-  { id: "dishes", tab: "home", name: "Wash dishes", hours: 1, fx: { home: 20, energy: -3 } },
-  { id: "laundry", tab: "home", name: "Do laundry", hours: 1, fx: { home: 15, clean: 10 } },
-  { id: "trash", tab: "home", name: "Take out trash", hours: 1, fx: { home: 15 } },
-  { id: "games", tab: "home", name: "Play video games", hours: 2, fx: () => ({ fun: S.owned.console ? 45 : 25, energy: -4 }) },
-  { id: "tv", tab: "home", name: "Watch TV", hours: 1, fx: { fun: 12, energy: 3 } },
-  { id: "study", tab: "home", name: "Study", hours: 2, fx: { energy: -10, fun: -6 }, run: () => { S.skill += 5; } , note: "+5 skill" },
-  { id: "callmom", tab: "home", name: "Call Mom", hours: 1, fx: { social: 20, fun: 5 } },
-  // OUT
-  { id: "groceries", tab: "out", name: "Buy groceries", hours: 1, cost: 20, fx: {}, run: () => { S.meals += 4; }, note: "+4 meals" },
-  { id: "pizza", tab: "out", name: "Order pizza", hours: 1, cost: 15, fx: { hunger: 55, fun: 8 } },
-  { id: "hangout", tab: "out", name: "Hang out with friends", hours: 3, cost: 10, fx: { social: 40, fun: 20, energy: -8 } },
-  { id: "exercise", tab: "out", name: "Go for a run", hours: 1, fx: { energy: -12, fun: 8, clean: -20 }, run: () => { S.skill += 1; } },
-  { id: "park", tab: "out", name: "Walk in the park", hours: 1, fx: { fun: 10, social: 5 } },
-  { id: "walkdog", tab: "out", name: "Walk the dog", hours: 1, fx: { fun: 12, social: 8, energy: -5 }, can: () => S.owned.dog ? true : "You don't have a dog" },
-  { id: "movies", tab: "out", name: "Go to the movies", hours: 3, cost: 18, fx: { fun: 35, social: 10 } },
-  // WORK
-  { id: "work", tab: "work", name: "Work a shift", cls: "work",
-    hours: () => S.owned.bike ? 8 : 9,
-    can: () => {
-      if (!isWorkday()) return "It's the weekend";
-      if (S.workedToday) return "Already worked today";
-      if (hour() < 6 || hour() > 10) return "Shifts start 6–10 AM";
-      if (S.energy < 15) return "Too tired to work";
-      return true;
-    },
-    fx: { energy: -30, hunger: -10, fun: -10, clean: -10 },
-    run: () => {
-      if (S.clean < 30) addWarning("You showed up smelly.");
-      else if (S.energy < 30) addWarning("You fell asleep at the register.");
-      if (hour() > 9) addWarning("You were late.");
-      const pay = JOBS[S.job].pay * 8;
-      S.money += pay; S.totalEarned += pay; S.skill += 2; S.daysWorked++; S.workedToday = true;
-      log(`Worked a shift as ${JOBS[S.job].name}. Earned $${pay}.`, "good");
-      return () => promoCheck();
-    } },
-  { id: "overtime", tab: "work", name: "Work overtime", hours: 3, fx: { energy: -15, fun: -10 },
-    can: () => S.workedToday ? (S.otDay === day() ? "Already did overtime" : true) : "Work a shift first",
-    run: () => { const p = Math.round(JOBS[S.job].pay * 1.5 * 3); S.money += p; S.totalEarned += p; S.otDay = day(); log(`Overtime paid $${p}.`, "good"); } },
-  { id: "course", tab: "work", name: "Take a night class", hours: 3, cost: 40, fx: { energy: -12, fun: -5 },
-    can: () => hour() >= 17 && hour() <= 20 ? true : "Classes run 5–8 PM", run: () => { S.skill += 12; }, note: "+12 skill" },
-];
+function meets(req) { return Object.entries(req).every(([k, v]) => S.skills[k] >= v); }
+function reqHTML(req) {
+  const e = Object.entries(req);
+  if (!e.length) return `<span class="ok">No experience needed</span>`;
+  return e.map(([k, v]) => `<span class="${S.skills[k] >= v ? "ok" : "no"}">${SKILLNAME[k]} ${Math.floor(S.skills[k])}/${v}</span>`).join(" · ");
+}
+function hireRank(bid) { const r = CAREERS[bid].ranks; return r[1] && meets(r[1][2]) ? 1 : 0; }
 
+function apply(bid) {
+  const c = CAREERS[bid], r = hireRank(bid);
+  if (!meets(c.ranks[r][2])) return;
+  if (S.career && S.career !== bid) log(`You quit your job at ${BMAP[S.career].name}.`);
+  S.career = bid; S.rank = r; S.daysAtRank = 0; S.warnings = 0; S.hiredDay = day(); S.careersTried[bid] = 1;
+  log(`Hired at ${BMAP[bid].name} as ${c.ranks[r][0]} (${money(c.ranks[r][1])}/hr)!`, "good");
+  showModal(`<h3>You're hired!</h3><p>You start as <b>${c.ranks[r][0]}</b> at <b>${BMAP[bid].name}</b> for <b>${money(c.ranks[r][1])}/hr</b>.</p><p>Shifts: ${c.days.map((d) => DAYS[d].slice(0, 3)).join(", ")}, start between ${fmtH(c.start[0])} and ${fmtH(c.start[1])}.</p><div class="row"><button class="big" data-close>Let's go</button></div>`);
+  newTodos(); evalGoals(); save();
+}
+
+const WORK = {
+  id: "work", name: "Work a shift", mins: 480, primary: true,
+  fx: { energy: -30, hunger: -10, fun: -10, clean: -10 },
+  can: () => {
+    const c = CAREERS[S.career];
+    if (!c.days.includes(weekday())) return `Day off. You work ${c.days.map((d) => DAYS[d].slice(0, 3)).join(", ")}`;
+    if (S.workedDay === day()) return "You already worked today";
+    if (hour() < c.start[0] || hour() > c.start[1]) return `Shifts start ${fmtH(c.start[0])}–${fmtH(c.start[1])}`;
+    if (S.energy < 15) return "Too tired to work";
+    return true;
+  },
+  run: () => {
+    const c = CAREERS[S.career], r = c.ranks[S.rank];
+    if (S.clean < 25) addWarning("You showed up smelly.");
+    else if (S.energy < 25) addWarning("You dozed off on the job.");
+    if (!S.career) return;
+    const perf = (S.energy + S.clean + S.fun) / 3;
+    let pay = r[1] * 8; if (perf > 70) pay = Math.round(pay * 1.15);
+    earn(pay, perf > 70 ? `Great shift as ${r[0]} (bonus!)` : `Shift as ${r[0]}`);
+    for (const k in c.gain) S.skills[k] = clamp(S.skills[k] + c.gain[k]);
+    S.workedDay = day(); S.daysAtRank++;
+    return () => promoCheck();
+  },
+};
 function promoCheck() {
-  const next = JOBS[S.job + 1];
-  if (next && S.skill >= next.need && S.daysWorked >= (S.job + 1) * 2) {
-    S.job++; S.warnings = 0;
-    log(`PROMOTED to ${next.name}! Now $${next.pay}/hr.`, "good");
-    showModal(`<h3>Promotion!</h3><p>Your boss is impressed. You're now a <b>${next.name}</b> earning <b>$${next.pay}/hr</b>.</p><div class="row"><button class="big" data-close>Yay!</button></div>`);
+  if (!S.career) return;
+  const c = CAREERS[S.career], next = c.ranks[S.rank + 1];
+  if (next && S.daysAtRank >= 3 && meets(next[2])) {
+    S.rank++; S.daysAtRank = 0; S.warnings = 0; S.promos++;
+    log(`PROMOTED to ${next[0]}! Now ${money(next[1])}/hr.`, "good");
+    const top = S.rank === c.ranks.length - 1;
+    showModal(`<h3>${top ? "Top of the ladder!" : "Promotion!"}</h3><p>You're now <b>${next[0]}</b> earning <b>${money(next[1])}/hr</b>.</p>${top ? "<p>You made it to the very top. You won at life! Keep playing or try a new career.</p>" : ""}<div class="row"><button class="big" data-close>Yes!</button></div>`);
   }
 }
 
-const val = (x) => typeof x === "function" ? x() : x;
-function check(a) {
+function checkAct(a, bid) {
   if (S.over) return "Game over";
-  if (a.cost && S.money < a.cost) return `Need $${a.cost}`;
+  const b = BMAP[bid];
+  if (b && !isOpen(b) && a.id !== "work") return `Closed. Open ${openText(b)}`;
+  if (a.cost && S.money < a.cost) return `Need ${money(a.cost)}`;
   if (a.can) { const c = a.can(); if (c !== true) return c; }
   return true;
 }
-function doAction(a) {
-  if (check(a) !== true) return;
-  const hrs = a.hours === "until 7 AM" ? 0 : val(a.hours);
-  if (a.cost) S.money -= a.cost;
-  let after;
-  if (a.run) after = a.run();
-  const fx = val(a.fx) || {};
-  for (const k in fx) S[k] = clamp(S[k] + fx[k]);
-  tick(a.id);
-  if (a.id === "eat") tick("eat");
-  if (a.id === "study") tick("study");
-  if (hrs) advance(hrs);
-  if (typeof after === "function") after();
-  if (!S.over) evalGoals();
-  save(); render();
+function fxText(a) {
+  const fx = val(a.fx) || {}, bits = [];
+  for (const k in fx) if (fx[k] > 0) bits.push(`+${NEEDNAME[k]}`);
+  for (const k in a.skill || {}) bits.push(`+${a.skill[k]} ${SKILLNAME[k]}`);
+  return bits.join(" · ");
+}
+
+let busy = false;
+function doActivity(a, bid) {
+  if (busy || !a) return;
+  const c = checkAct(a, bid);
+  if (c !== true) { toast(c, "bad"); return; }
+  const mins = val(a.mins);
+  const go = () => {
+    if (a.cost) S.money -= a.cost;
+    const after = a.run ? a.run() : null;
+    const fx = val(a.fx) || {};
+    for (const k in fx) S[k] = clamp(S[k] + fx[k]);
+    for (const k in a.skill || {}) S.skills[k] = clamp(S.skills[k] + a.skill[k]);
+    tick(a.id);
+    if (a.id !== "sleep" && mins) advance(mins);
+    if (typeof after === "function") after();
+    if (!S.over) evalGoals();
+    save(); renderSheet(); renderHUD(true);
+  };
+  if (mins >= 30) timeSkip(a.id === "sleep" ? "Sleeping… Zzz" : a.name, mins, go); else go();
+}
+
+function timeSkip(label, mins, go) {
+  busy = true;
+  const el = document.getElementById("skip"), clk = document.getElementById("skipClk"), bar = document.getElementById("skipBar");
+  document.getElementById("skipWhat").textContent = label;
+  el.hidden = false;
+  const dur = Math.min(1500, 600 + mins * 1.2), t0 = performance.now(), from = S.t;
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / dur);
+    clk.textContent = fmt(from + mins * p);
+    bar.style.width = `${p * 100}%`;
+    if (p < 1) requestAnimationFrame(step);
+    else { el.hidden = true; busy = false; go(); }
+  };
+  requestAnimationFrame(step);
 }
 
 function buy(key) {
   const it = ITEMS[key];
-  if (S.owned[key] || S.money < it.price) return;
+  if (owns(key) || S.money < it.price) return;
   S.money -= it.price; S.owned[key] = true;
-  log(`Bought: ${it.name}!`, "good"); toast(`You got a ${it.name}!`);
-  if (key === "dog") { S.todos.push({ id: "walkdog", text: "Walk the dog", done: false, must: true }); S.fun = clamp(S.fun + 20); }
-  evalGoals(); save(); render();
+  if (key === "outfit") S.skills.charm = clamp(S.skills.charm + 10);
+  if (key === "dog") { S.fun = clamp(S.fun + 20); S.todos.push({ id: "walkdog", text: "Walk the dog in the park", done: false, must: true }); refreshBeacons(); }
+  log(`Bought: ${it.name}!`, "good"); toast(`You got: ${it.name}!`, "gold");
+  updateRide(); evalGoals(); save(); renderSheet(); renderHUD(true);
 }
 
-// ---- goals ----
-const GOALS = [
-  { id: "week", text: "Survive your first week", test: () => day() >= 8 },
-  { id: "promo", text: "Get your first promotion", test: () => S.job >= 1 },
-  { id: "buy", text: "Buy something from the shop", test: () => Object.keys(S.owned).length > 0 },
-  { id: "save500", text: "Have $500 saved", test: () => S.money >= 500 },
-  { id: "dog", text: "Adopt a dog", test: () => !!S.owned.dog },
-  { id: "manager", text: "Become Store Manager", test: () => S.job >= 3 },
-  { id: "rich", text: "Have $2,000 saved", test: () => S.money >= 2000 },
-  { id: "ceo", text: "Become CEO and win at life", test: () => S.job >= 5 },
-];
 function evalGoals() {
-  for (const g of GOALS) if (!S.goals[g.id] && g.test()) {
-    S.goals[g.id] = true; log(`Life goal reached: ${g.text}!`, "good"); toast(`★ ${g.text}`);
-    if (g.id === "ceo") showModal(`<h3>You won at life!</h3><p>From flipping burgers to running the whole company in ${day()} days. You earned $${S.totalEarned.toLocaleString()} along the way.</p><div class="row"><button class="big" data-restart>Live again</button><button class="big ghost" data-close>Keep playing</button></div>`);
-  }
+  for (const g of GOALS) if (!S.goals[g.id] && g.test()) { S.goals[g.id] = true; log(`Life goal: ${g.text}!`, "good"); toast(`★ Life goal: ${g.text}`, "gold"); }
 }
 
 function gameOver(title, text) {
-  S.over = true; log(title, "bad");
-  const stars = Object.keys(S.goals).length;
-  showModal(`<h3>${title}</h3><p>${text}</p><p>Life goals: <b>${stars} / ${GOALS.length}</b> · Money earned: <b>$${S.totalEarned.toLocaleString()}</b></p><div class="row"><button class="big" data-restart>Start a new life</button></div>`);
+  S.over = true; log(title, "bad"); save();
+  closeSheet();
+  showModal(`<h3>${title}</h3><p>${text}</p><p>Life goals: <b>${Object.keys(S.goals).length}/${GOALS.length}</b> · Money earned: <b>${money(S.earned)}</b></p><div class="row"><button class="big" data-restart>Start a new life</button></div>`);
 }
 
-// ---- modal ----
-function showModal(html) { $("modal").innerHTML = html; $("overlay").hidden = false; $("modal").querySelector("button")?.focus(); }
-$("overlay").addEventListener("click", (e) => {
-  if (e.target.closest("[data-close]")) $("overlay").hidden = true;
-  if (e.target.closest("[data-restart]")) { S = fresh(); newTodos(); log("A new life begins. You just moved into your first apartment!", "event"); $("overlay").hidden = true; save(); render(); }
+// ============================================================ 3D WORLD
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("scene"), antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8ccfff);
+scene.fog = new THREE.Fog(0x8ccfff, 110, 300);
+const camera = new THREE.PerspectiveCamera(48, 1, 0.5, 700);
+const hemi = new THREE.HemisphereLight(0xdcefff, 0x3e5a35, 0.6);
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, near: 1, far: 320 });
+sun.shadow.bias = -0.0006;
+scene.add(hemi, sun, sun.target);
+
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+
+const matCache = {};
+const mat = (c, extra) => { const key = c + JSON.stringify(extra || {}); return matCache[key] || (matCache[key] = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85 }, extra))); };
+const asMat = (m) => (m && m.isMaterial ? m : mat(m));
+function box(w, h, d, m, x = 0, y = 0, z = 0, parent = scene) {
+  const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), asMat(m));
+  o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; parent.add(o); return o;
+}
+function flat(w, d, c, y, x = 0, z = 0) {
+  const o = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(c, { roughness: 1 }));
+  o.rotation.x = -Math.PI / 2; o.position.set(x, y, z); o.receiveShadow = true; scene.add(o); return o;
+}
+function cyl(rt, rb, h, c, x, y, z, seg = 16, parent = scene) {
+  const o = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), asMat(c));
+  o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; parent.add(o); return o;
+}
+
+const ROADS = [-40, 0, 40];
+const BLOCKS = [-60, -20, 20, 60];
+const ground = flat(900, 900, 0x74c063, 0);
+flat(172, 172, 0xc8c3b6, 0.02);
+for (const bx of BLOCKS) for (const bz of BLOCKS) flat(28, 28, bx === -20 && bz === 60 ? 0x6ccf5e : 0x86cf73, 0.04, bx, bz);
+for (const r of ROADS) { flat(8, 500, 0x3a3f48, 0.06, r, 0); flat(500, 8, 0x3a3f48, 0.065, 0, r); }
+{ // lane dashes + crosswalks
+  const spots = [];
+  for (const r of ROADS) for (let p = -246; p <= 246; p += 6) {
+    if (ROADS.some((o) => Math.abs(p - o) < 7)) continue;
+    spots.push([r, p, 0], [p, r, 1]);
+  }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+  const dash = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.25, 2.4), mat(0xf4f1e6, { roughness: 1 }), spots.length);
+  spots.forEach(([x, z, rot], i) => { e.set(-Math.PI / 2, 0, rot ? Math.PI / 2 : 0); q.setFromEuler(e); m4.compose(new THREE.Vector3(x, 0.08, z), q, one); dash.setMatrixAt(i, m4); });
+  scene.add(dash);
+  const cw = [];
+  for (const rx of ROADS) for (const rz of ROADS) for (let k = -3; k <= 3; k++) cw.push([rx + k, rz - 5.2, 0], [rx + k, rz + 5.2, 0], [rx - 5.2, rz + k, 1], [rx + 5.2, rz + k, 1]);
+  const stripe = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.55, 2), mat(0xf4f1e6, { roughness: 1 }), cw.length);
+  cw.forEach(([x, z, rot], i) => { e.set(-Math.PI / 2, 0, rot ? Math.PI / 2 : 0); q.setFromEuler(e); m4.compose(new THREE.Vector3(x, 0.085, z), q, one); stripe.setMatrixAt(i, m4); });
+  scene.add(stripe);
+}
+
+// Street lamps
+const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2c4, emissive: 0xffd77a, emissiveIntensity: 0.1 });
+{
+  const pts = [];
+  for (const rx of ROADS) for (const rz of ROADS) for (const sx of [-1, 1]) for (const sz of [-1, 1]) pts.push([rx + sx * 5.6, rz + sz * 5.6]);
+  const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.2, 7, 6), mat(0x2d3340), pts.length);
+  const bulb = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 10, 8), bulbMat, pts.length);
+  const m4 = new THREE.Matrix4();
+  pts.forEach(([x, z], i) => { m4.makeTranslation(x, 3.5, z); pole.setMatrixAt(i, m4); m4.makeTranslation(x, 7.2, z); bulb.setMatrixAt(i, m4); });
+  pole.castShadow = true; scene.add(pole, bulb);
+}
+
+// Buildings
+const colliders = [];
+const windowMats = [];
+const signMats = [];
+const clickables = [ground];
+const doors = [];
+function wallTexture(color, w, h, kind) {
+  const c = document.createElement("canvas"); c.width = 256; c.height = 256;
+  const e = document.createElement("canvas"); e.width = 256; e.height = 256;
+  const x = c.getContext("2d"), y = e.getContext("2d");
+  x.fillStyle = color; x.fillRect(0, 0, 256, 256);
+  x.fillStyle = "rgba(0,0,0,.07)"; for (let i = 0; i < 256; i += 16) x.fillRect(0, i, 256, 1);
+  y.fillStyle = "#000"; y.fillRect(0, 0, 256, 256);
+  const cols = Math.max(2, Math.round(w / 3.2)), rows = Math.max(1, Math.round(h / (kind === "tower" ? 2.6 : 3.4)));
+  const cw = 256 / cols, rh = 256 / rows;
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+    const px = k * cw + cw * 0.2, py = r * rh + rh * 0.22, ww = cw * 0.6, hh = rh * 0.5;
+    x.fillStyle = kind === "tower" ? "#9fc7ec" : "#2c3b52"; x.fillRect(px, py, ww, hh);
+    x.fillStyle = "rgba(255,255,255,.25)"; x.fillRect(px, py, ww * 0.35, hh);
+    if (Math.random() < 0.72) { y.fillStyle = Math.random() < 0.8 ? "#ffd889" : "#bfe3ff"; y.fillRect(px, py, ww, hh); }
+  }
+  const map = new THREE.CanvasTexture(c), emissiveMap = new THREE.CanvasTexture(e);
+  const m = new THREE.MeshStandardMaterial({ map, emissiveMap, emissive: 0xffffff, emissiveIntensity: 0, roughness: kind === "tower" ? 0.35 : 0.85, metalness: kind === "tower" ? 0.2 : 0 });
+  windowMats.push(m);
+  return m;
+}
+function signTexture(text, bg) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 128;
+  const x = c.getContext("2d");
+  x.fillStyle = bg; x.fillRect(0, 0, 512, 128);
+  x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = 6; x.strokeRect(6, 6, 500, 116);
+  x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle";
+  let size = 64; x.font = `900 ${size}px "Arial Black", Impact, sans-serif`;
+  while (x.measureText(text.toUpperCase()).width > 460 && size > 20) { size -= 4; x.font = `900 ${size}px "Arial Black", Impact, sans-serif`; }
+  x.fillText(text.toUpperCase(), 256, 68);
+  return new THREE.CanvasTexture(c);
+}
+const FACE = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+
+const beacons = {};
+const beaconMat = new THREE.MeshStandardMaterial({ color: 0xffbe2e, emissive: 0xffa000, emissiveIntensity: 0.9 });
+const beamMat = new THREE.MeshBasicMaterial({ color: 0xffd25e, transparent: true, opacity: 0.22, depthWrite: false });
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd25e, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false });
+
+for (const b of BUILDINGS) {
+  const [nx, nz] = FACE[b.face];
+  const g = new THREE.Group(); g.position.set(b.x, 0, b.z); scene.add(g);
+  if (b.kind !== "zone") {
+    const kind = b.id === "office" ? "tower" : "";
+    const body = box(b.w, b.h, b.d, wallTexture(b.color, b.w, b.h, kind), 0, b.h / 2, 0, g);
+    body.userData.bid = b.kind === "deco" ? null : b.id;
+    clickables.push(body);
+    colliders.push({ x: b.x, z: b.z, hw: b.w / 2 + 0.7, hd: b.d / 2 + 0.7 });
+    if (b.kind === "house") {
+      const half = Math.max(b.w, b.d) / 2 + 0.9, r = half * Math.SQRT2;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(r, 4.5, 4), mat(0xa4453a));
+      roof.rotation.y = Math.PI / 4; roof.scale.set((b.w / 2 + 0.9) / half, 1, (b.d / 2 + 0.9) / half);
+      roof.position.y = b.h + 2.25; roof.castShadow = true; g.add(roof);
+      box(1.2, 3, 1.2, 0x8d4a3a, b.w * 0.25, b.h + 3.2, 0, g);
+      box(0.25, 1.2, 0.25, 0x555555, -b.w / 2 + 1, 0.6, -b.d / 2 - 3, g);
+      box(0.8, 0.55, 0.5, 0x2d6cdf, -b.w / 2 + 1, 1.4, -b.d / 2 - 3, g);
+    } else {
+      box(b.w + 0.6, 0.6, b.d + 0.6, new THREE.Color(b.color).multiplyScalar(0.7).getHex(), 0, b.h + 0.3, 0, g);
+    }
+    if (b.kind === "deco") continue;
+    const dx = nx * (b.w / 2 + 0.05), dz = nz * (b.d / 2 + 0.05);
+    box(nx ? 0.3 : 3, 3.8, nz ? 0.3 : 3, 0x22303f, dx, 1.9, dz, g);
+    box(nx ? 0.35 : 3.6, 0.35, nz ? 0.35 : 3.6, 0xf2f2f2, dx, 3.95, dz, g);
+    const tex = signTexture(b.name, b.sign);
+    const sm = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.15 });
+    signMats.push(sm);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.25), sm);
+    const sy = Math.min(b.h - 1.4, 6.2);
+    sign.position.set(nx * (b.w / 2 + 0.12), sy, nz * (b.d / 2 + 0.12));
+    sign.rotation.y = Math.atan2(nx, nz);
+    g.add(sign);
+  }
+  const zone = b.kind === "zone";
+  const px = b.x + nx * (zone ? 13 : b.w / 2 + 2.2), pz = b.z + nz * (zone ? 13 : b.d / 2 + 2.2);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 36), ringMat);
+  ring.rotation.x = -Math.PI / 2; ring.position.set(px, 0.12, pz); scene.add(ring);
+  doors.push({ b, x: px, z: pz, ring });
+  const bg = new THREE.Group(); bg.position.set(px, 0, pz);
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), beaconMat); gem.position.y = 7.5; bg.add(gem);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 14, 12, 1, true), beamMat); beam.position.y = 7; bg.add(beam);
+  bg.visible = false; scene.add(bg); beacons[b.id] = { g: bg, gem };
+}
+
+// Landmark details
+{
+  const B = BMAP;
+  { const x = B.burger.x, z = B.burger.z, y = B.burger.h + 0.6;
+    cyl(3, 3.2, 0.9, 0xd9973c, x, y + 0.45, z, 24); cyl(3.3, 3.3, 0.6, 0x5a2d14, x, y + 1.2, z, 24);
+    box(6.4, 0.15, 6.4, 0xffcc33, x, y + 1.55, z); cyl(3.4, 3.4, 0.25, 0x5cbf3a, x, y + 1.7, z, 24);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(3.1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xe0a24a)); top.position.set(x, y + 1.8, z); top.castShadow = true; scene.add(top); }
+  { const b = B.cityhall; const dome = new THREE.Mesh(new THREE.SphereGeometry(5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x9fb7c9, { metalness: 0.3, roughness: 0.4 }));
+    dome.position.set(b.x, b.h + 0.6, b.z); dome.castShadow = true; scene.add(dome); cyl(0.2, 0.2, 4, 0xdddddd, b.x, b.h + 7, b.z, 6);
+    for (let i = -3; i <= 3; i++) if (i && Math.abs(i) !== 1) cyl(0.55, 0.6, 7, 0xf6f2e6, b.x + i * 2.6, 3.5, b.z + b.d / 2 + 1.2, 12);
+    box(b.w, 0.8, 3, 0xf6f2e6, b.x, 7.3, b.z + b.d / 2 + 1.2); }
+  { const b = B.library; for (const i of [-2, 2]) cyl(0.5, 0.55, 6, 0xeee7d8, b.x + i * 3, 3, b.z + b.d / 2 + 1.1, 12); box(b.w * 0.8, 0.7, 2.6, 0xeee7d8, b.x, 6.3, b.z + b.d / 2 + 1.1); }
+  { const b = B.hospital, crossMat = new THREE.MeshStandardMaterial({ color: 0xe02b3c, emissive: 0xe02b3c, emissiveIntensity: 0.4 });
+    box(1.2, 4, 0.4, crossMat, b.x, b.h + 3, b.z - b.d / 2 + 1); box(4, 1.2, 0.4, crossMat, b.x, b.h + 3, b.z - b.d / 2 + 1); }
+  { const b = B.office; cyl(0.15, 0.25, 9, 0xcccccc, b.x + 5, b.h + 5, b.z + 5, 6); flat(8, 8, 0x333a44, b.h + 0.62, b.x - 2, b.z - 2); }
+  { const b = B.club; const n1 = new THREE.MeshStandardMaterial({ color: 0xff3fa4, emissive: 0xff3fa4, emissiveIntensity: 1 }), n2 = new THREE.MeshStandardMaterial({ color: 0x3ff0ff, emissive: 0x3ff0ff, emissiveIntensity: 1 });
+    box(b.w, 0.3, 0.3, n1, b.x, b.h - 0.3, b.z - b.d / 2 - 0.2); box(b.w, 0.3, 0.3, n2, b.x, 0.5, b.z - b.d / 2 - 0.2);
+    box(0.3, b.h, 0.3, n2, b.x - b.w / 2 - 0.2, b.h / 2, b.z - b.d / 2 - 0.2); box(0.3, b.h, 0.3, n1, b.x + b.w / 2 + 0.2, b.h / 2, b.z - b.d / 2 - 0.2); }
+  { const b = B.cinema; box(12, 1.2, 3, new THREE.MeshStandardMaterial({ color: 0xffd25e, emissive: 0xffb300, emissiveIntensity: 0.6 }), b.x, 4.6, b.z - b.d / 2 - 1.5); }
+  { const b = B.gym; const bar = cyl(0.3, 0.3, 8, 0x999999, b.x, b.h + 2, b.z, 8); bar.rotation.z = Math.PI / 2;
+    for (const s of [-1, 1]) { const p = cyl(1.6, 1.6, 0.8, 0x222222, b.x + s * 3.4, b.h + 2, b.z, 20); p.rotation.z = Math.PI / 2; } }
+  { const b = B.school; cyl(0.15, 0.15, 12, 0xdddddd, b.x + b.w / 2 + 2, 6, b.z + b.d / 2 + 3, 6);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.8), mat(0x2d6cdf, { side: THREE.DoubleSide })); flag.position.set(b.x + b.w / 2 + 3.6, 11, b.z + b.d / 2 + 3); scene.add(flag); B.school.flag = flag; }
+  { const b = B.police; B.police.lights = [
+    box(1.6, 0.6, 0.8, new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 1 }), b.x - 1, b.h + 1, b.z),
+    box(1.6, 0.6, 0.8, new THREE.MeshStandardMaterial({ color: 0x2a6bff, emissive: 0x2a6bff, emissiveIntensity: 1 }), b.x + 1, b.h + 1, b.z)]; }
+  { const b = B.grocery; box(b.w, 0.3, 2.5, 0xffffff, b.x, 4.7, b.z - b.d / 2 - 1.2); box(b.w, 0.32, 0.8, 0x2f9a45, b.x, 4.72, b.z - b.d / 2 - 2.1); }
+  { const b = B.park;
+    const pond = new THREE.Mesh(new THREE.CircleGeometry(5.5, 32), mat(0x3d9be0, { roughness: 0.2, metalness: 0.2 })); pond.rotation.x = -Math.PI / 2; pond.position.set(b.x + 5, 0.07, b.z + 4); scene.add(pond);
+    colliders.push({ x: b.x + 5, z: b.z + 4, hw: 5, hd: 5 });
+    flat(3, 26, 0xd9c9a3, 0.06, b.x - 4, b.z); flat(26, 3, 0xd9c9a3, 0.061, b.x, b.z - 6);
+    cyl(1.6, 2, 1, 0xbfbfbf, b.x - 4, 0.5, b.z - 6, 20); cyl(0.3, 0.3, 2.2, 0xbfbfbf, b.x - 4, 1.6, b.z - 6, 8);
+    flat(10, 7, 0xc8693a, 0.062, b.x + 5, b.z - 7); cyl(0.12, 0.12, 4, 0xffffff, b.x + 5, 2, b.z - 10.3, 6); box(1.6, 1.1, 0.1, 0xffffff, b.x + 5, 4, b.z - 10.2);
+    for (const [x, z] of [[-9, 3], [-9, 8], [1, -2]]) { box(2.6, 0.2, 0.9, 0x8a5a33, b.x + x, 0.75, b.z + z); box(0.2, 0.75, 0.9, 0x333333, b.x + x - 1.1, 0.37, b.z + z); box(0.2, 0.75, 0.9, 0x333333, b.x + x + 1.1, 0.37, b.z + z); }
+    b.ducks = [];
+    for (let i = 0; i < 4; i++) { const d = new THREE.Group(); box(0.7, 0.45, 0.45, 0xffe14d, 0, 0, 0, d); box(0.35, 0.35, 0.35, 0x2f8f2f, 0.35, 0.35, 0, d); d.position.set(b.x + 5, 0.3, b.z + 4); scene.add(d); b.ducks.push(d); } }
+}
+
+// Trees (instanced)
+{
+  const spots = [];
+  const bad = (x, z) => colliders.some((c) => Math.abs(x - c.x) < c.hw + 2 && Math.abs(z - c.z) < c.hd + 2) || ROADS.some((r) => Math.abs(x - r) < 7 || Math.abs(z - r) < 7) || doors.some((d) => Math.hypot(x - d.x, z - d.z) < 4);
+  for (let i = 0; i < 700 && spots.length < 230; i++) {
+    const a = Math.random() * Math.PI * 2, rad = 92 + Math.random() * 150;
+    const x = Math.cos(a) * rad, z = Math.sin(a) * rad;
+    if (!bad(x, z)) spots.push([x, z, 0.8 + Math.random() * 0.9]);
+  }
+  for (let i = 0; i < 20; i++) { const x = -20 + (Math.random() - 0.5) * 24, z = 60 + (Math.random() - 0.5) * 24; if (!bad(x, z) && Math.abs(x + 4) > 2.5 && Math.abs(z - 54) > 2.5 && !(x > -17 && z < 56)) spots.push([x, z, 0.7 + Math.random() * 0.5]); }
+  for (const bx of BLOCKS) for (const bz of BLOCKS) for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const x = bx + sx * 12, z = bz + sz * 12; if (!bad(x, z)) spots.push([x, z, 0.6]); }
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 0.5, 3, 6), mat(0x7a5233), spots.length);
+  const leaf = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.4, 0), new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), spots.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+  spots.forEach(([x, z, s], i) => {
+    q.identity(); m4.compose(new THREE.Vector3(x, 1.5 * s, z), q, new THREE.Vector3(s, s, s)); trunk.setMatrixAt(i, m4);
+    q.setFromEuler(new THREE.Euler(0, Math.random() * 3, 0));
+    m4.compose(new THREE.Vector3(x, 4.2 * s, z), q, new THREE.Vector3(s, s * 1.15, s)); leaf.setMatrixAt(i, m4);
+    col.setHSL(0.26 + Math.random() * 0.08, 0.5, 0.32 + Math.random() * 0.12); leaf.setColorAt(i, col);
+  });
+  trunk.castShadow = leaf.castShadow = true; leaf.receiveShadow = true;
+  scene.add(trunk, leaf);
+}
+for (let i = 0; i < 14; i++) {
+  const a = (i / 14) * Math.PI * 2, r = 280 + Math.random() * 40;
+  const hill = new THREE.Mesh(new THREE.ConeGeometry(40 + Math.random() * 30, 40 + Math.random() * 40, 7), new THREE.MeshStandardMaterial({ color: 0x5c9a52, flatShading: true, roughness: 1 }));
+  hill.position.set(Math.cos(a) * r, 15, Math.sin(a) * r); scene.add(hill);
+}
+
+// ============================================================ CHARACTERS
+function makeChar(look) {
+  const g = new THREE.Group();
+  const skin = mat(look.skin), shirt = mat(look.shirt), pants = mat(look.pants || 0x2e3a59), hair = mat(look.hair), shoe = mat(0x1d1d1d), eye = mat(0x111111);
+  box(1.0, 1.15, 0.6, shirt, 0, 2.05, 0, g);
+  box(0.78, 0.78, 0.78, skin, 0, 3.05, 0, g);
+  box(0.84, 0.26, 0.84, hair, 0, 3.5, 0, g);
+  box(0.84, 0.55, 0.18, hair, 0, 3.2, -0.36, g);
+  box(0.12, 0.14, 0.05, eye, -0.18, 3.1, 0.4, g); box(0.12, 0.14, 0.05, eye, 0.18, 3.1, 0.4, g);
+  const limb = (x, y, w, h, m, end) => { const p = new THREE.Group(); p.position.set(x, y, 0); g.add(p); box(w, h, w + 0.05, m, 0, -h / 2, 0, p); box(w, 0.28, w + 0.12, end, 0, -h - 0.1, 0.04, p); return p; };
+  const legL = limb(-0.25, 1.5, 0.42, 1.25, pants, shoe), legR = limb(0.25, 1.5, 0.42, 1.25, pants, shoe);
+  const armL = limb(-0.68, 2.55, 0.3, 0.95, shirt, skin), armR = limb(0.68, 2.55, 0.3, 0.95, shirt, skin);
+  g.userData = { legL, legR, armL, armR, phase: Math.random() * 6, swing: 0 };
+  return g;
+}
+function animChar(c, moving, dt, speed = 1) {
+  const u = c.userData;
+  if (moving) u.phase += dt * 9 * speed;
+  const target = moving ? Math.sin(u.phase) * 0.75 : 0;
+  u.swing += (target - u.swing) * Math.min(1, dt * 12);
+  u.legL.rotation.x = u.swing; u.legR.rotation.x = -u.swing; u.armL.rotation.x = -u.swing; u.armR.rotation.x = u.swing;
+}
+function makeCar(color) {
+  const g = new THREE.Group();
+  box(2.3, 1.0, 4.4, color, 0, 0.9, 0, g);
+  const cabin = box(2.0, 0.85, 2.3, color, 0, 1.8, -0.3, g);
+  const glass = box(2.05, 0.6, 2.0, mat(0x9fd3ff, { roughness: 0.2, metalness: 0.3 }), 0, 1.85, -0.3, g);
+  const wheel = new THREE.CylinderGeometry(0.45, 0.45, 0.35, 14), wm = mat(0x1a1a1a);
+  for (const [x, z] of [[-1.15, 1.4], [1.15, 1.4], [-1.15, -1.4], [1.15, -1.4]]) { const w = new THREE.Mesh(wheel, wm); w.rotation.z = Math.PI / 2; w.position.set(x, 0.45, z); g.add(w); }
+  const hl = new THREE.MeshStandardMaterial({ color: 0xfff7d6, emissive: 0xfff2b0, emissiveIntensity: 0.3 });
+  box(0.45, 0.3, 0.1, hl, -0.7, 1.0, 2.21, g); box(0.45, 0.3, 0.1, hl, 0.7, 1.0, 2.21, g);
+  const tl = mat(0xff3030, { emissive: 0xaa0000, emissiveIntensity: 0.5 });
+  box(0.45, 0.25, 0.1, tl, -0.7, 1.0, -2.21, g); box(0.45, 0.25, 0.1, tl, 0.7, 1.0, -2.21, g);
+  g.userData = { hl, cabin, glass };
+  return g;
+}
+
+let player = null, rideBike = null, rideCar = null;
+function buildPlayer(look) {
+  if (player) scene.remove(player);
+  player = makeChar(look);
+  rideBike = new THREE.Group();
+  const wg = new THREE.TorusGeometry(0.6, 0.1, 8, 20), wm = mat(0x111111);
+  rideBike.userData.wheels = [];
+  for (const z of [0.9, -0.9]) { const w = new THREE.Mesh(wg, wm); w.rotation.y = Math.PI / 2; w.position.set(0, 0.6, z); rideBike.add(w); rideBike.userData.wheels.push(w); }
+  box(0.12, 0.12, 1.9, 0xe4572e, 0, 1.0, 0, rideBike); box(0.12, 0.9, 0.12, 0xe4572e, 0, 1.2, 0.85, rideBike);
+  player.add(rideBike);
+  rideCar = makeCar(0xffbe2e); rideCar.position.y = -0.2; rideCar.userData.cabin.visible = rideCar.userData.glass.visible = false; player.add(rideCar);
+  scene.add(player);
+  updateRide();
+}
+function updateRide() {
+  if (!player) return;
+  const car = owns("car"), bike = owns("bike") && !car;
+  rideCar.visible = car; rideBike.visible = bike;
+  player.userData.legL.visible = player.userData.legR.visible = !car;
+}
+
+// NPCs
+const SHIRTS = [0xe4572e, 0x2d6cdf, 0x48d597, 0xffbe2e, 0x9b5de5, 0xf15bb5, 0x00bbf9, 0xffffff, 0x333333];
+const SKINS = [0xf6d2b8, 0xe0ac86, 0xc68642, 0x8d5524, 0x5c3a21];
+const HAIRS = [0x2b1b10, 0x6b3e1f, 0xd9b45a, 0x111111, 0xb5452b, 0x9aa0a6];
+const XS = ROADS.flatMap((r) => [r - 5, r + 5]);
+const npcs = [];
+for (let i = 0; i < 16; i++) {
+  const c = makeChar({ shirt: SHIRTS[i % SHIRTS.length], skin: SKINS[i % SKINS.length], hair: HAIRS[(i * 3) % HAIRS.length], pants: [0x2e3a59, 0x4a4a4a, 0x7a5c3a][i % 3] });
+  const ix = Math.floor(Math.random() * 6), iz = Math.floor(Math.random() * 6);
+  c.position.set(XS[ix], 0, XS[iz]); scene.add(c);
+  npcs.push({ c, ix, iz, tx: XS[ix], tz: XS[iz], wait: Math.random() * 3, speed: 3 + Math.random() * 1.5, talked: -1, chat: 0 });
+}
+function npcNext(n) {
+  if (Math.random() < 0.5) n.ix = clamp(n.ix + (Math.random() < 0.5 ? -1 : 1), 0, 5); else n.iz = clamp(n.iz + (Math.random() < 0.5 ? -1 : 1), 0, 5);
+  n.tx = XS[n.ix]; n.tz = XS[n.iz];
+}
+
+// Traffic
+const cars = [];
+const CARCOLS = [0xd7263d, 0x1b998b, 0x2e86de, 0xf4d35e, 0xffffff, 0x3d3d3d, 0x8e44ad, 0xee964b, 0x6ab04c, 0x22313f];
+let ci = 0;
+for (const r of ROADS) for (const axis of ["x", "z"]) for (const dir of [1, -1]) {
+  if (Math.random() < 0.25) continue;
+  const car = makeCar(CARCOLS[ci++ % CARCOLS.length]);
+  const p = (Math.random() - 0.5) * 400;
+  if (axis === "x") { car.position.set(p, 0, r + dir * 2); car.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
+  else { car.position.set(r - dir * 2, 0, p); car.rotation.y = dir > 0 ? 0 : Math.PI; }
+  scene.add(car);
+  cars.push({ car, axis, dir, speed: 11 + Math.random() * 6, v: 0 });
+}
+
+// Rain
+const RAIN_N = 1400;
+const rainGeo = new THREE.BufferGeometry();
+const rainPos = new Float32Array(RAIN_N * 3);
+for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = (Math.random() - 0.5) * 90; rainPos[i * 3 + 1] = Math.random() * 45; rainPos[i * 3 + 2] = (Math.random() - 0.5) * 90; }
+rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPos, 3));
+const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0xbcd6ff, size: 0.35, transparent: true, opacity: 0.7 }));
+rain.visible = false; rain.frustumCulled = false; scene.add(rain);
+
+const tapRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+tapRing.rotation.x = -Math.PI / 2; tapRing.position.y = 0.13; scene.add(tapRing);
+
+function refreshBeacons() {
+  if (!S) return;
+  const want = new Set(S.todos.filter((t) => !t.done).map((t) => (t.id === "work" ? S.career : ACT_HOME[t.id])));
+  for (const id in beacons) beacons[id].g.visible = want.has(id);
+}
+
+// ============================================================ INPUT
+const keys = {};
+let state = "title";
+let target = null;
+const cam = { yaw: 0.5, pitch: 0.95, dist: 30, x: 0, z: 0 };
+const $ = (id) => document.getElementById(id);
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (state !== "play") return;
+  if (k === "escape") { if (!$("modalWrap").hidden) closeModal(); else closeSheet(); return; }
+  if (sheetOpen() || busy || !$("modalWrap").hidden) return;
+  if (k === "e" || k === "enter") interact();
+  if (k === "p") openPhone();
+  if (k === "m") openMe();
+  if (k === "j") openLog();
 });
+addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 
-// ---- render ----
-const TABS = [["home","Home"],["out","Go out"],["work","Work"],["shop","Shop"]];
-function render() {
-  const h = hour();
-  $("dayname").textContent = `${DAYS[weekday()]} · Day ${day()}`;
-  $("time").textContent = fmtHour(h);
-  $("money").textContent = `$${S.money.toLocaleString()}`;
-  const dr = daysToRent();
-  const owe = RENT + (S.debt || 0);
-  $("rent").textContent = dr === 1 ? `Rent $${owe} due tonight` : `Rent $${owe} in ${dr} days`;
-  $("rent").classList.toggle("due", dr <= 2 && S.money < owe);
+const pointers = new Map();
+let drag = null, pinch = 0;
+const cv = renderer.domElement;
+cv.addEventListener("pointerdown", (e) => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); drag = null; }
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinch && d) cam.dist = clamp(cam.dist * (pinch / d), 14, 60); pinch = d; return;
+  }
+  if (!drag) return;
+  if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 7) drag.moved = true;
+  if (drag.moved) { cam.yaw -= (e.clientX - drag.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - drag.y) * 0.004, 0.35, 1.35); }
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+cv.addEventListener("pointerup", (e) => {
+  pointers.delete(e.pointerId);
+  if (drag && !drag.moved && state === "play" && !sheetOpen() && !busy) tap(e.clientX, e.clientY);
+  if (pointers.size === 0) { drag = null; pinch = 0; }
+});
+cv.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); drag = null; });
+cv.addEventListener("wheel", (e) => { e.preventDefault(); cam.dist = clamp(cam.dist * (1 + e.deltaY * 0.001), 14, 60); }, { passive: false });
 
-  // sky color by hour
-  const night = h < 6 || h >= 20, dusk = (h >= 6 && h < 8) || (h >= 17 && h < 20);
-  $("sky").style.background = night ? "#1b2550" : dusk ? "linear-gradient(#ff9a6b,#ffd27a)" : "linear-gradient(#7cc8ff,#bde6ff)";
-  $("sun").style.background = night ? "#eef0ff" : "#ffcf33";
-  $("sun").style.boxShadow = night ? "6px -4px 0 0 #1b2550 inset" : "0 0 12px #ffcf33";
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function tap(cx, cy) {
+  ndc.set((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(clickables, false)[0];
+  if (!hit) return;
+  const bid = hit.object.userData.bid;
+  if (bid) { const d = doors.find((x) => x.b.id === bid); target = { x: d.x, z: d.z, bid, stuck: 0 }; }
+  else { target = { x: hit.point.x, z: hit.point.z, stuck: 0 }; for (const d of doors) if (Math.hypot(d.x - hit.point.x, d.z - hit.point.z) < 2.5) target.bid = d.b.id; }
+  tapRing.position.x = target.x; tapRing.position.z = target.z; tapRing.material.opacity = 0.9; tapRing.scale.set(1, 1, 1);
+}
 
-  $("stats").innerHTML = STATS.map(([k, label]) => {
-    const v = Math.round(S[k]);
-    const col = v < 25 ? "var(--bad)" : v < 50 ? "var(--warn)" : "var(--good)";
-    return `<div class="stat ${v < 25 ? "low" : ""}"><span>${label}</span><div class="bar" role="meter" aria-label="${label}" aria-valuenow="${v}" aria-valuemin="0" aria-valuemax="100"><b style="width:${v}%;background:${col}"></b></div><span class="n">${v}</span></div>`;
-  }).join("");
-  const j = JOBS[S.job], nj = JOBS[S.job + 1];
-  $("jobname").textContent = j.name;
-  $("pay").textContent = `$${j.pay}/hr`;
-  $("skill").textContent = S.skill;
-  $("nextpromo").textContent = nj ? `${nj.name} @ skill ${nj.need}` : "You're the boss!";
-  $("warn").textContent = `${S.warnings} / 3`;
-  $("food").textContent = `${S.meals} meal${S.meals === 1 ? "" : "s"}`;
+// ============================================================ PLAYER UPDATE
+function blocked(x, z) {
+  if (Math.abs(x) > 140 || Math.abs(z) > 140) return true;
+  for (const c of colliders) if (Math.abs(x - c.x) < c.hw && Math.abs(z - c.z) < c.hd) return true;
+  return false;
+}
+let nearDoor = null, nearNpc = null;
+function updatePlayer(dt) {
+  let ix = 0, iz = 0;
+  if (keys.w || keys.arrowup) iz += 1;
+  if (keys.s || keys.arrowdown) iz -= 1;
+  if (keys.a || keys.arrowleft) ix -= 1;
+  if (keys.d || keys.arrowright) ix += 1;
+  let dx = 0, dz = 0;
+  if (ix || iz) {
+    target = null;
+    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
+    dx = rx * ix + fx * iz; dz = rz * ix + fz * iz;
+  } else if (target) {
+    dx = target.x - player.position.x; dz = target.z - player.position.z;
+    if (Math.hypot(dx, dz) < 0.35) {
+      const bid = target.bid; target = null; dx = dz = 0;
+      if (bid) { const d = doors.find((x) => x.b.id === bid); if (Math.hypot(d.x - player.position.x, d.z - player.position.z) < 3) openBuilding(bid); }
+    }
+  }
+  const len = Math.hypot(dx, dz);
+  const moving = len > 0.001;
+  const sprint = !!keys.shift && moving && !owns("car");
+  if (moving) {
+    dx /= len; dz /= len;
+    const sp = 8.5 * (owns("car") ? 2.6 : owns("bike") ? 1.6 : 1) * (sprint ? 1.5 : 1) * (S.energy < 15 ? 0.6 : 1);
+    let step = sp * dt;
+    if (target) step = Math.min(step, Math.hypot(target.x - player.position.x, target.z - player.position.z));
+    const nx = player.position.x + dx * step, nz = player.position.z + dz * step;
+    let moved = false;
+    if (!blocked(nx, player.position.z)) { player.position.x = nx; moved = true; }
+    if (!blocked(player.position.x, nz)) { player.position.z = nz; moved = true; }
+    if (!moved && target && (target.stuck += dt) > 0.4) target = null;
+    const want = Math.atan2(dx, dz);
+    let diff = want - player.rotation.y; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    player.rotation.y += diff * Math.min(1, dt * 14);
+    if (sprint) S.energy = clamp(S.energy - dt * 0.06);
+  }
+  animChar(player, moving && !owns("car"), dt, sprint ? 1.4 : owns("bike") ? 0.6 : 1);
+  if (rideBike.visible && moving) for (const w of rideBike.userData.wheels) w.rotation.x += dt * 10;
+  S.pos.x = player.position.x; S.pos.z = player.position.z;
 
-  $("tabs").innerHTML = TABS.map(([k, l]) => `<button class="tab" role="tab" id="tab-${k}" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("");
+  nearDoor = null; let best = 3.2;
+  for (const d of doors) { const dd = Math.hypot(d.x - player.position.x, d.z - player.position.z); if (dd < best) { best = dd; nearDoor = d; } }
+  nearNpc = null;
+  if (!nearDoor) { let bn = 3; for (const n of npcs) { const dd = n.c.position.distanceTo(player.position); if (dd < bn) { bn = dd; nearNpc = n; } } }
+}
+function interact() {
+  if (nearDoor) openBuilding(nearDoor.b.id);
+  else if (nearNpc) talk(nearNpc);
+}
+function talk(n) {
+  const line = TALK[Math.floor(Math.random() * TALK.length)];
+  n.chat = 3; n.c.lookAt(player.position.x, 0, player.position.z);
+  if (n.talked === day()) { toast(`"${line}"`); return; }
+  n.talked = day();
+  S.social = clamp(S.social + 6); S.skills.charm = clamp(S.skills.charm + 0.5); advance(10);
+  toast(`"${line}" · +Friends`, "good");
+}
+function teleport(bid) {
+  const d = doors.find((x) => x.b.id === bid);
+  if (player && d) { player.position.set(d.x, 0, d.z); target = null; cam.x = d.x; cam.z = d.z; if (S) { S.pos.x = d.x; S.pos.z = d.z; } }
+}
 
-  const todoIds = new Set(S.todos.filter((x) => !x.done).map((x) => x.id));
-  if (S.tab === "shop") {
-    $("acts").className = "shop";
-    $("acts").innerHTML = Object.entries(ITEMS).map(([k, it]) => {
-      const own = S.owned[k], poor = S.money < it.price;
-      return `<button class="act" id="buy-${k}" data-buy="${k}" ${own || poor ? "disabled" : ""}><span class="t">${it.name}</span><span class="meta">${it.desc}</span><span class="meta ${own ? "owned" : ""}">${own ? "Owned ✓" : `$${it.price}`}</span></button>`;
-    }).join("");
+// ============================================================ WORLD UPDATE
+let gameAcc = 0, saveAcc = 0;
+const cDay = new THREE.Color(0x8ccfff), cDusk = new THREE.Color(0xff9a6a), cNight = new THREE.Color(0x0b1330), cRain = new THREE.Color(0x7d8794), cTmp = new THREE.Color();
+const ORIGIN = new THREE.Vector3();
+function updateSky() {
+  const h = S && state === "play" ? ((S.t % 1440) + gameAcc) / 60 : 17.4;
+  const ang = ((h - 6) / 12) * Math.PI, e = Math.sin(ang);
+  if (e > 0.3) cTmp.copy(cDay); else if (e > 0.05) cTmp.copy(cDusk).lerp(cDay, (e - 0.05) / 0.25); else if (e > -0.15) cTmp.copy(cNight).lerp(cDusk, (e + 0.15) / 0.2); else cTmp.copy(cNight);
+  const raining = state === "play" && S && S.rain;
+  if (raining && e > -0.1) cTmp.lerp(cRain, 0.55);
+  scene.background.copy(cTmp); scene.fog.color.copy(cTmp);
+  const focus = player && state === "play" ? player.position : ORIGIN;
+  if (e > 0) {
+    sun.position.set(focus.x + Math.cos(ang) * 90, e * 110 + 12, focus.z + 50);
+    sun.intensity = (0.35 + 0.85 * e) * (raining ? 0.55 : 1);
+    sun.color.setHSL(0.1, 0.6, 0.6 + 0.35 * Math.min(1, e * 2));
   } else {
-    $("acts").className = "acts";
-    $("acts").innerHTML = A.filter((a) => a.tab === S.tab).map((a) => {
-      const c = check(a);
-      const hrs = val(a.hours);
-      const fx = val(a.fx) || {};
-      const bits = [];
-      bits.push(typeof hrs === "string" ? hrs : hrs === 0 ? "instant" : `${hrs}h`);
-      if (a.cost) bits.push(`$${a.cost}`);
-      if (a.id === "work") bits.push(`+$${JOBS[S.job].pay * 8}`);
-      if (a.note) bits.push(a.note);
-      const ups = Object.entries(fx).filter(([, v]) => v > 0).map(([k]) => STATS.find((s) => s[0] === k)?.[1]).filter(Boolean);
-      if (ups.length) bits.push("+" + ups.join(", "));
-      return `<button class="act ${a.cls || ""} ${todoIds.has(a.id) ? "todo-hit" : ""}" id="act-${a.id}" data-act="${a.id}" ${c !== true ? "disabled" : ""}>
-        <span class="t">${a.name}</span><span class="meta">${bits.join(" · ")}</span>${c !== true ? `<span class="why">${c}</span>` : ""}</button>`;
+    sun.position.set(focus.x - 40, 100, focus.z - 30);
+    sun.intensity = 0.22; sun.color.set(0x8fa8ff);
+  }
+  sun.target.position.copy(focus);
+  if (state === "title") { sun.shadow.camera.left = sun.shadow.camera.bottom = -110; sun.shadow.camera.right = sun.shadow.camera.top = 110; }
+  else { sun.shadow.camera.left = sun.shadow.camera.bottom = -55; sun.shadow.camera.right = sun.shadow.camera.top = 55; }
+  sun.shadow.camera.updateProjectionMatrix();
+  hemi.intensity = 0.28 + 0.42 * clamp(e + 0.2, 0, 1);
+  const night = 1 - clamp((e + 0.12) / 0.3, 0, 1);
+  for (const m of windowMats) m.emissiveIntensity = night * 0.9;
+  for (const m of signMats) m.emissiveIntensity = 0.15 + night * 0.6;
+  bulbMat.emissiveIntensity = 0.1 + night * 1.8;
+  for (const c of cars) c.car.userData.hl.emissiveIntensity = 0.3 + night * 1.5;
+  if (rideCar) rideCar.userData.hl.emissiveIntensity = 0.3 + night * 1.5;
+  rain.visible = !!raining;
+}
+function updateWorld(dt, now) {
+  for (const n of npcs) {
+    if (n.chat > 0) { n.chat -= dt; animChar(n.c, false, dt); continue; }
+    if (n.wait > 0) { n.wait -= dt; animChar(n.c, false, dt); continue; }
+    const dx = n.tx - n.c.position.x, dz = n.tz - n.c.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.2) { npcNext(n); if (Math.random() < 0.25) n.wait = 1 + Math.random() * 3; continue; }
+    const st = Math.min(d, n.speed * dt);
+    n.c.position.x += (dx / d) * st; n.c.position.z += (dz / d) * st;
+    n.c.rotation.y = Math.atan2(dx, dz); animChar(n.c, true, dt, n.speed / 4);
+  }
+  for (const c of cars) {
+    const p = c.car.position;
+    let want = c.speed;
+    if (player && state === "play") {
+      const ax = c.axis === "x" ? (player.position.x - p.x) * c.dir : (player.position.z - p.z) * c.dir;
+      const lat = c.axis === "x" ? Math.abs(player.position.z - p.z) : Math.abs(player.position.x - p.x);
+      if (ax > 0 && ax < 9 && lat < 2.2) want = 0;
+    }
+    c.v += (want - c.v) * Math.min(1, dt * 3);
+    if (c.axis === "x") { p.x += c.dir * c.v * dt; if (p.x * c.dir > 230) p.x = -230 * c.dir; }
+    else { p.z += c.dir * c.v * dt; if (p.z * c.dir > 230) p.z = -230 * c.dir; }
+  }
+  for (const id in beacons) { const b = beacons[id]; if (b.g.visible) { b.gem.rotation.y += dt * 2; b.gem.position.y = 9 + Math.sin(now / 400) * 0.4;
+    const near = player && state === "play" && Math.hypot(player.position.x - b.g.position.x, player.position.z - b.g.position.z) < 8; b.g.children.forEach((m) => { m.visible = !near; }); } }
+  ringMat.opacity = 0.45 + Math.sin(now / 300) * 0.25;
+  if (tapRing.material.opacity > 0) { tapRing.material.opacity = Math.max(0, tapRing.material.opacity - dt * 1.2); tapRing.scale.multiplyScalar(1 + dt * 0.8); }
+  const pl = BMAP.police.lights; if (pl) { const on = Math.floor(now / 350) % 2; pl[0].material.emissiveIntensity = on ? 1.4 : 0.1; pl[1].material.emissiveIntensity = on ? 0.1 : 1.4; }
+  if (BMAP.school.flag) BMAP.school.flag.rotation.y = Math.sin(now / 500) * 0.25;
+  BMAP.park.ducks.forEach((d, i) => { const a = now / 3000 + i * 1.6, r = 2 + i * 0.6; d.position.x = BMAP.park.x + 5 + Math.cos(a) * r; d.position.z = BMAP.park.z + 4 + Math.sin(a) * r; d.rotation.y = -a; });
+  if (rain.visible) {
+    const arr = rainGeo.attributes.position.array, cx = player ? player.position.x : 0, cz = player ? player.position.z : 0;
+    for (let i = 0; i < RAIN_N; i++) {
+      arr[i * 3 + 1] -= dt * 38;
+      if (arr[i * 3 + 1] < 0) { arr[i * 3] = cx + (Math.random() - 0.5) * 90; arr[i * 3 + 1] = 40 + Math.random() * 5; arr[i * 3 + 2] = cz + (Math.random() - 0.5) * 90; }
+    }
+    rainGeo.attributes.position.needsUpdate = true;
+  }
+}
+function updateCamera(dt, now) {
+  let fx = 0, fz = 0, yaw = cam.yaw, dist = cam.dist, pitch = cam.pitch;
+  if (state === "title") { yaw = now / 14000; dist = 150; pitch = 0.62; }
+  else { fx = player.position.x; fz = player.position.z; }
+  const k = state === "title" ? 1 : Math.min(1, dt * 6);
+  cam.x += (fx - cam.x) * k; cam.z += (fz - cam.z) * k;
+  camera.position.set(cam.x + Math.sin(yaw) * Math.cos(pitch) * dist, Math.sin(pitch) * dist + 1, cam.z + Math.cos(yaw) * Math.cos(pitch) * dist);
+  camera.lookAt(cam.x, 2.2, cam.z);
+}
+
+// ============================================================ HUD
+const needEls = {};
+$("hNeeds").innerHTML = NEEDS.map(([k, l]) => `<div class="need" id="nd-${k}"><span>${l}</span><div class="bar"><i></i></div><span class="n">0</span></div>`).join("") + `<div class="job-line" id="hJob"></div>`;
+for (const [k] of NEEDS) { const el = $(`nd-${k}`); needEls[k] = { el, bar: el.querySelector("i"), n: el.querySelector(".n") }; }
+let hudKey = "";
+function renderHUD(force) {
+  if (!S || state !== "play") return;
+  $("hDay").textContent = `${DAYS[weekday()]} · Day ${day()}`;
+  $("hTime").textContent = fmt(S.t);
+  $("hMoney").textContent = money(S.money);
+  $("hWeather").textContent = S.rain ? "Rainy" : hour() >= 20 || hour() < 6 ? "Clear night" : "Sunny";
+  const dr = 7 - ((day() - 1) % 7), owe = RENT + S.debt;
+  $("hRent").innerHTML = `<span>Rent</span><b>${money(owe)} ${dr === 1 ? "due tonight" : `in ${dr} days`}</b>`;
+  $("hRent").classList.toggle("due", dr <= 2 && S.money < owe);
+  for (const [k] of NEEDS) {
+    const v = Math.round(S[k]), e = needEls[k];
+    e.bar.style.width = `${v}%`; e.bar.style.background = v < 25 ? "var(--bad)" : v < 50 ? "var(--warn)" : "var(--good)";
+    e.n.textContent = v; e.el.classList.toggle("low", v < 25);
+  }
+  $("hJob").innerHTML = S.career ? `<b>${CAREERS[S.career].ranks[S.rank][0]}</b> · ${money(CAREERS[S.career].ranks[S.rank][1])}/hr` : `No job yet · every workplace is hiring`;
+  const key = JSON.stringify(S.todos);
+  if (force || key !== hudKey) {
+    hudKey = key;
+    $("todoCount").textContent = `${S.todos.filter((t) => t.done).length}/${S.todos.length}`;
+    $("todoList").innerHTML = S.todos.map((t) => {
+      const home = ACT_HOME[t.id];
+      const where = t.id === "work" ? "" : home === "phone" ? "Use your phone" : BMAP[home] ? BMAP[home].name : "";
+      return `<li class="${t.done ? "done" : ""} ${t.must ? "must" : ""}"><span class="box">${t.done ? "✓" : ""}</span><span>${t.text}<small>${t.sub || where}</small></span></li>`;
     }).join("");
   }
-  $("hint").textContent = h >= 22 || h < 5 ? "It's late. Get some sleep!" : "";
+  let p = "";
+  if (!sheetOpen() && !busy && $("modalWrap").hidden) {
+    if (nearDoor) p = `<kbd>E</kbd>${nearDoor.b.kind === "zone" ? "Visit" : "Enter"} ${nearDoor.b.name}${isOpen(nearDoor.b) ? "" : " (closed)"}`;
+    else if (nearNpc) p = `<kbd>E</kbd>Say hi`;
+  }
+  const pe = $("prompt");
+  if (p !== pe.dataset.p) { pe.dataset.p = p; pe.innerHTML = p; pe.hidden = !p; }
+}
+$("prompt").addEventListener("click", interact);
+$("todoToggle").addEventListener("click", () => { const ul = $("todoList"); ul.hidden = !ul.hidden; $("todoToggle").setAttribute("aria-expanded", String(!ul.hidden)); });
+if (innerWidth < 720) { $("todoList").hidden = true; $("todoToggle").setAttribute("aria-expanded", "false"); }
 
-  const done = S.todos.filter((x) => x.done).length;
-  $("todocount").textContent = `${done}/${S.todos.length}`;
-  $("todo").innerHTML = S.todos.map((x) => `<li class="${x.done ? "done" : ""} ${x.must ? "must" : ""}"><span class="box">${x.done ? "✓" : ""}</span>${x.text}</li>`).join("");
-
-  const stars = Object.keys(S.goals).length;
-  $("stars").textContent = `${stars}/${GOALS.length} ★`;
-  $("goals").innerHTML = GOALS.map((g) => `<li class="${S.goals[g.id] ? "got" : ""}"><span class="star">★</span>${g.text}</li>`).join("");
-
-  $("log").innerHTML = S.log.map((l) => `<li class="${l.kind}"><small>${l.when}</small>${l.msg}</li>`).join("");
+const mm = $("minimap"), mx = mm.getContext("2d");
+function drawMinimap(now) {
+  if (!S || !player) return;
+  const W = mm.width, sc = W / 200, X = (x) => (x + 100) * sc, Z = (z) => (z + 100) * sc;
+  mx.fillStyle = "#3d7a3a"; mx.fillRect(0, 0, W, W);
+  mx.fillStyle = "#b8b3a6"; mx.fillRect(X(-86), Z(-86), 172 * sc, 172 * sc);
+  mx.fillStyle = "#2d323a";
+  for (const r of ROADS) { mx.fillRect(X(r - 4), 0, 8 * sc, W); mx.fillRect(0, Z(r - 4), W, 8 * sc); }
+  for (const b of BUILDINGS) {
+    if (b.kind === "zone") { mx.fillStyle = "#5fbf55"; mx.fillRect(X(b.x - 14), Z(b.z - 14), 28 * sc, 28 * sc); }
+    else { mx.fillStyle = b.color; mx.fillRect(X(b.x - b.w / 2), Z(b.z - b.d / 2), b.w * sc, b.d * sc); }
+    if (beacons[b.id] && beacons[b.id].g.visible) { const r = 8 + Math.sin(now / 250) * 2; mx.strokeStyle = "#ffbe2e"; mx.lineWidth = 3; mx.beginPath(); mx.arc(X(b.x), Z(b.z), r, 0, Math.PI * 2); mx.stroke(); }
+  }
+  const hb = BMAP.home; mx.fillStyle = "#1b1b1b"; mx.font = "900 16px Nunito, sans-serif"; mx.textAlign = "center"; mx.textBaseline = "middle"; mx.fillText("H", X(hb.x), Z(hb.z) + 1);
+  mx.save(); mx.translate(X(player.position.x), Z(player.position.z)); mx.rotate(Math.PI - player.rotation.y);
+  mx.fillStyle = "#ffbe2e"; mx.strokeStyle = "#1b1b1b"; mx.lineWidth = 2;
+  mx.beginPath(); mx.moveTo(0, -9); mx.lineTo(7, 7); mx.lineTo(0, 3); mx.lineTo(-7, 7); mx.closePath(); mx.fill(); mx.stroke(); mx.restore();
 }
 
-document.addEventListener("click", (e) => {
-  const t = e.target.closest("[data-tab]"); if (t) { S.tab = t.dataset.tab; render(); save(); return; }
-  const b = e.target.closest("[data-act]"); if (b) { doAction(A.find((a) => a.id === b.dataset.act)); return; }
-  const s = e.target.closest("[data-buy]"); if (s) buy(s.dataset.buy);
+// ============================================================ SHEETS
+let sheetFn = null;
+function sheetOpen() { return !$("sheetWrap").hidden; }
+function openSheet(fn) { sheetFn = fn; $("sheetWrap").hidden = false; target = null; renderSheet(); }
+function closeSheet() { $("sheetWrap").hidden = true; sheetFn = null; }
+function renderSheet() {
+  if (!sheetFn || !sheetOpen()) return;
+  const old = $("sheet").querySelector(".sheet-b"), sc = old ? old.scrollTop : 0;
+  $("sheet").innerHTML = sheetFn();
+  const b = $("sheet").querySelector(".sheet-b"); if (b) b.scrollTop = sc;
+}
+$("sheetWrap").addEventListener("click", (e) => {
+  if (busy) return;
+  if (e.target === $("sheetWrap") || e.target.closest("[data-x]")) return closeSheet();
+  const a = e.target.closest("[data-act]");
+  if (a) { const [bid, id] = a.dataset.act.split(":"); const act = id === "work" ? WORK : ACTS[bid].find((x) => x.id === id); doActivity(act, bid); return; }
+  const ap = e.target.closest("[data-apply]"); if (ap) { apply(ap.dataset.apply); renderSheet(); renderHUD(true); return; }
+  const by = e.target.closest("[data-buy]"); if (by) { buy(by.dataset.buy); return; }
+  const tx = e.target.closest("[data-taxi]");
+  if (tx) {
+    const bid = tx.dataset.taxi; if (S.money < 12) return toast("Need $12", "bad");
+    S.money -= 12; closeSheet();
+    timeSkip(`Taxi to ${BMAP[bid].name}`, 20, () => { advance(20); teleport(bid); renderHUD(true); save(); });
+    return;
+  }
+  if (e.target.closest("[data-quit]")) { log(`You quit your job at ${BMAP[S.career].name}.`); S.career = null; newTodos(); save(); renderSheet(); renderHUD(true); toast("You quit your job."); return; }
+  if (e.target.closest("[data-phone]")) { openPhone(); return; }
+  if (e.target.closest("[data-taxis]")) { openSheet(taxiSheet); return; }
 });
 
-// ---- save ----
-const KEY = "adulting-sim-v1";
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
-function load() { try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
-
-function start(data) {
-  S = data?.S || load();
-  if (!S) {
-    S = fresh(); newTodos();
-    log("You just moved into your first apartment. Rent is due every 7 days. Don't get evicted!", "event");
-    log("Tip: work a shift on weekdays between 6 and 10 AM to earn money.", "");
-  }
-  render();
-  if (S.over) gameOver("Game over", "Start a new life to try again.");
+function actCard(a, bid) {
+  const c = checkAct(a, bid), mins = val(a.mins);
+  const time = mins >= 60 ? `${Math.round((mins / 60) * 10) / 10}h` : `${mins} min`;
+  const todo = S.todos.some((t) => !t.done && t.id === a.id && (a.id !== "work" || bid === S.career));
+  const meta = [a.id === "sleep" ? "until 7 AM" : time, a.cost ? money(a.cost) : "", a.note || "", a.id === "work" ? `+${money(CAREERS[S.career].ranks[S.rank][1] * 8)}` : ""].filter(Boolean).join(" · ");
+  const fx = fxText(a);
+  return `<button class="act ${a.primary ? "primary" : ""}" data-act="${bid}:${a.id}" ${c !== true ? "disabled" : ""}>${todo ? `<span class="tag">TO-DO</span>` : ""}<span class="t">${a.name}</span><span class="m">${meta}</span>${fx ? `<span class="fx">${fx}</span>` : ""}${c !== true ? `<span class="why">${c}</span>` : ""}</button>`;
 }
-window.claude?.hot?.snapshot?.(() => ({ S }));
-window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+function header(title, sub, color) {
+  return `<div class="sheet-h"><div class="swatch" style="background:${color}"></div><div><h2>${title}</h2><p>${sub}</p></div><button class="x" data-x aria-label="Close">✕</button></div>`;
+}
+const dayList = (c) => c.days.length === 7 ? "Every day" : c.days.map((d) => DAYS[d].slice(0, 3)).join(", ");
+function careerBlock(bid) {
+  const c = CAREERS[bid];
+  if (S.career === bid) {
+    const r = c.ranks[S.rank], next = c.ranks[S.rank + 1];
+    return `<div class="sec"><h3>Your job</h3><div class="career">
+      <div><b>${r[0]}</b> · ${money(r[1])}/hr · ${dayList(c)} · start ${fmtH(c.start[0])}–${fmtH(c.start[1])}</div>
+      <div class="ladder">${c.ranks.map((x, i) => `<span class="rung ${i === S.rank ? "on" : i < S.rank ? "past" : ""}">${x[0]}</span>`).join("")}</div>
+      ${next ? `<div class="req">Next: <b>${next[0]}</b> (${money(next[1])}/hr) · shifts ${Math.min(S.daysAtRank, 3)}/3 · ${reqHTML(next[2])}</div>` : `<div class="req"><span class="ok">You're at the top!</span></div>`}
+      <div class="req">Boss warnings: ${S.warnings}/3. Show up clean and rested.</div>
+      <div class="grid">${actCard(WORK, bid)}</div></div></div>`;
+  }
+  const r = hireRank(bid), job = c.ranks[r], ok = meets(job[2]);
+  return `<div class="sec"><h3>Now hiring · ${c.name}</h3><div class="career">
+    <div class="ladder">${c.ranks.map((x) => `<span class="rung">${x[0]} · ${money(x[1])}</span>`).join("")}</div>
+    <div><b>Open position: ${job[0]}</b> · ${money(job[1])}/hr · ${dayList(c)}</div>
+    <div class="req">${reqHTML(job[2])}</div>
+    ${S.career ? `<div class="req">Taking this job means quitting ${BMAP[S.career].name}.</div>` : ""}
+    <div><button class="btn" data-apply="${bid}" ${ok ? "" : "disabled"}>${ok ? "Apply and get hired" : "Not qualified yet"}</button></div></div></div>`;
+}
+function buildingSheet(bid) {
+  return () => {
+    const b = BMAP[bid];
+    const sub = bid === "home" ? `${S.meals} meals in the fridge · Home ${Math.round(S.home)}%` : `${isOpen(b) ? "Open now" : "Closed"} · ${openText(b)}`;
+    let html = header(b.name, sub, b.color) + `<div class="sheet-b">`;
+    if (CAREERS[bid]) html += careerBlock(bid);
+    if (bid === "cityhall") {
+      html += `<div class="sec"><h3>Job board · every career in town</h3><div style="display:flex;flex-direction:column;gap:6px">` +
+        Object.entries(CAREERS).map(([k, c]) => {
+          const r = hireRank(k), j = c.ranks[r], ok = meets(j[2]), mine = S.career === k;
+          return `<div class="jobrow"><div><b>${j[0]}</b> · ${money(j[1])}/hr <span class="req">at ${BMAP[k].name} · top job: ${c.ranks[c.ranks.length - 1][0]}</span><div class="req">${reqHTML(j[2])}</div></div>${mine ? `<span class="req ok">Your job</span>` : `<button class="btn" data-apply="${k}" ${ok ? "" : "disabled"}>Apply</button>`}</div>`;
+        }).join("") + `</div></div>`;
+    }
+    html += `<div class="sec"><h3>Things to do</h3><div class="grid">${ACTS[bid].map((a) => actCard(a, bid)).join("")}</div></div>`;
+    if (bid === "mall") {
+      html += `<div class="sec"><h3>Shop</h3><div class="grid">${Object.entries(ITEMS).map(([k, it]) => {
+        const own = owns(k), poor = S.money < it.price;
+        return `<button class="act" data-buy="${k}" ${own || poor || !isOpen(b) ? "disabled" : ""}><span class="t">${it.name}</span><span class="m">${it.desc}</span><span class="${own ? "fx" : "m"}">${own ? "Owned ✓" : money(it.price)}</span></button>`;
+      }).join("")}</div></div>`;
+    }
+    return html + `</div>`;
+  };
+}
+function openBuilding(bid) { openSheet(buildingSheet(bid)); }
+function openPhone() {
+  openSheet(() => header("Phone", `${S.name}'s phone · ${money(S.money)} in the bank`, "#2d6cdf") + `<div class="sheet-b">
+    <div class="sec"><h3>Apps</h3><div class="grid">${ACTS.phone.map((a) => actCard(a, "phone")).join("")}
+    <button class="act" data-taxis><span class="t">Call a taxi</span><span class="m">$12 · 20 min · go anywhere</span></button>
+    ${S.career ? `<button class="act" data-quit><span class="t">Quit your job</span><span class="m">${CAREERS[S.career].ranks[S.rank][0]} at ${BMAP[S.career].name}</span></button>` : ""}</div></div></div>`);
+}
+function taxiSheet() {
+  return header("Taxi", "Where to? Every ride costs $12.", "#ffbe2e") + `<div class="sheet-b"><div class="grid">${BUILDINGS.filter((b) => b.kind !== "deco").map((b) => `<button class="act" data-taxi="${b.id}" ${S.money < 12 ? "disabled" : ""}><span class="t">${b.name}</span><span class="m">${b.kind === "zone" || b.kind === "house" ? "Always open" : openText(b)}</span></button>`).join("")}</div><div><button class="btn ghost" data-phone>Back to phone</button></div></div>`;
+}
+function openMe() {
+  openSheet(() => {
+    const c = S.career && CAREERS[S.career];
+    return header(S.name, c ? `${c.ranks[S.rank][0]} at ${BMAP[S.career].name}` : "Unemployed", "#" + new THREE.Color(S.look.shirt).getHexString()) + `<div class="sheet-b">
+      <div class="sec"><h3>Skills</h3><div class="skills">${SKILLS.map(([k, l]) => `<div class="skill"><div class="top"><span>${l}</span><span>${Math.floor(S.skills[k])}</span></div><div class="bar"><i style="width:${S.skills[k]}%"></i></div></div>`).join("")}</div></div>
+      <div class="sec"><h3>Life goals · ${Object.keys(S.goals).length}/${GOALS.length}</h3><ul class="goals">${GOALS.map((g) => `<li class="${S.goals[g.id] ? "got" : ""}"><span class="s">★</span>${g.text}</li>`).join("")}</ul></div>
+      <div class="sec"><h3>Stuff you own</h3><p class="req">${Object.keys(S.owned).map((k) => ITEMS[k].name).join(", ") || "Nothing yet. Visit the Mega Mall."}</p></div>
+      <div class="sec"><h3>Stats</h3><p class="req">Money earned: ${money(S.earned)} · Perfect chore days: ${S.perfectDays} · Promotions: ${S.promos} · Groceries: ${S.meals} meals</p></div>
+    </div>`;
+  });
+}
+function openLog() {
+  openSheet(() => header("Diary", `Day ${day()} of your new life`, "#9b5de5") + `<div class="sheet-b"><ul class="log">${S.log.map((l) => `<li class="${l.kind}"><small>${l.when}</small>${l.msg}</li>`).join("")}</ul></div>`);
+}
+$("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
+$("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
+$("btnLog").addEventListener("click", () => { if (!busy) openLog(); });
+
+function showModal(html) { $("modal").innerHTML = html; $("modalWrap").hidden = false; setTimeout(() => { const b = $("modal").querySelector("button"); if (b) b.focus(); }, 30); }
+function closeModal() { $("modalWrap").hidden = true; }
+$("modalWrap").addEventListener("click", (e) => {
+  if (e.target.closest("[data-close]")) closeModal();
+  if (e.target.closest("[data-restart]")) { closeModal(); closeSheet(); showTitle(); }
+});
+
+// ============================================================ TITLE / SAVE
+const KEY = "adulting-sim-3d-v1";
+function save() { try { if (S) localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function loadSave() { try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+const look = { name: "Sam", shirt: SHIRTS[1], hair: HAIRS[0], skin: SKINS[1], pants: 0x2e3a59 };
+function swatches(id, list, key) {
+  const el = $(id);
+  el.innerHTML = list.map((c, i) => `<button style="background:#${new THREE.Color(c).getHexString()}" aria-label="Color ${i + 1}" aria-pressed="${look[key] === c}" data-c="${c}"></button>`).join("");
+  el.onclick = (e) => { const b = e.target.closest("[data-c]"); if (!b) return; look[key] = Number(b.dataset.c); swatches(id, list, key); };
+}
+swatches("swShirt", SHIRTS, "shirt"); swatches("swHair", HAIRS, "hair"); swatches("swSkin", SKINS, "skin");
+function showTitle() {
+  state = "title"; $("title").hidden = false; $("hud").hidden = true;
+  if (player) player.visible = false;
+  const sv = loadSave(); $("btnContinue").hidden = !(sv && !sv.over);
+}
+function begin(data) {
+  S = data;
+  buildPlayer(S.look);
+  player.position.set(S.pos.x, 0, S.pos.z);
+  if (blocked(S.pos.x, S.pos.z)) teleport("home");
+  cam.x = player.position.x; cam.z = player.position.z;
+  state = "play"; $("title").hidden = true; $("hud").hidden = false;
+  refreshBeacons(); renderHUD(true); save();
+}
+$("btnNew").addEventListener("click", () => {
+  look.name = ($("pName").value || "Sam").trim().slice(0, 16) || "Sam";
+  const s = fresh({ ...look });
+  S = s; newTodos();
+  log(`${s.name} just moved into a tiny apartment. Rent is ${money(RENT)} every 7 days. Find a job fast!`, "event");
+  log("Tip: every workplace is hiring. Walk up to a door and press E, or tap the building.", "");
+  begin(s);
+  showModal(`<h3>Welcome to town, ${s.name}!</h3><p>You have ${money(s.money)} and rent is due in 7 days.</p><p>Get a job at any workplace, keep your needs up, and finish your daily to-do list. Gold beams show where your chores are.</p><div class="row"><button class="big" data-close>Let's do this</button></div>`);
+});
+$("btnContinue").addEventListener("click", () => { const sv = loadSave(); if (sv) begin(sv); });
+
+// ============================================================ LOOP
+let last = performance.now(), hudAcc = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (state === "play" && S && !S.over) {
+    const paused = sheetOpen() || busy || !$("modalWrap").hidden;
+    if (!paused) {
+      updatePlayer(dt);
+      gameAcc += dt * 1.25;
+      if (gameAcc >= 1) { const m = Math.floor(gameAcc); gameAcc -= m; advance(m); if (!S.over) evalGoals(); }
+      saveAcc += dt; if (saveAcc > 5) { saveAcc = 0; save(); }
+    }
+    hudAcc += dt; if (hudAcc > 0.2) { hudAcc = 0; renderHUD(); }
+  }
+  updateWorld(dt, now);
+  updateSky();
+  updateCamera(dt, now);
+  renderer.render(scene, camera);
+  if (state === "play") drawMinimap(now);
+  requestAnimationFrame(frame);
+}
+if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({ S }));
+const boot = (data) => { showTitle(); if (data && data.S && !data.S.over) begin(data.S); requestAnimationFrame(frame); };
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot); else boot((window.claude && window.claude.hot && window.claude.hot.data) || {});
 })();
 </script>
