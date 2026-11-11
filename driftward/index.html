@@ -287,10 +287,13 @@ button.go:disabled{opacity:.5;cursor:wait}
     <div class="crewme"><input id="crewName" maxlength="20" aria-label="Your name" autocomplete="off"><span id="crewSw" style="display:flex;gap:6px"></span></div>
     <div class="csec">Online now</div>
     <div id="crewList"></div>
+    <div class="csec">Bases</div>
+    <label class="trnote" id="baseOpenRow" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="baseOpen"> Friends can build and collect at my base</label>
+    <div id="crewBases"></div>
     <div class="csec">Chat</div>
     <div id="crewLog"></div>
     <div class="chatrow"><input id="crewMsg" maxlength="140" placeholder="Say something to everyone online" aria-label="Chat message" autocomplete="off"><button type="button" class="trbtn" id="crewSend">Send</button></div>
-    <p class="trnote">Players in the same star system see each other's ships and suits. Mining, pirates, bases and trades are your own. Press M to close, Enter to chat.</p>
+    <p class="trnote">Players in the same star system see each other's ships, suits and bases, and fight the same pirates. Mining and trades are your own. Press M to close, Enter to chat.</p>
   </div>
 </div>
 
@@ -833,14 +836,14 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
 function setLoad(t){$('load').textContent=t}
 async function generateSystem(seed,first){
   for(const P of planets){scene.remove(P.group);P.dispose();for(const c of P.creatures)P.group.remove(c.mesh)}
-  planets=[];current=null;baseRT=null;
+  planets=[];current=null;baseRT=null;base=myBase;baseRTs.clear();
   if(station){scene.remove(station.group);station.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});station=null}
   if(trade)closeTrade();
   clearCombat();
@@ -869,7 +872,7 @@ async function generateSystem(seed,first){
     n.way=pickWaypoint();}
   pirateTimer=first?110:55;
   joinSystemRoom();
-  if(base&&base.seed===seed&&planets[base.p])buildBase(planets[base.p]);
+  for(const B of allBaseList())buildBaseFor(B);
 }
 function uprightQuat(up,fwdHint,out){
   const f=new V3().copy(fwdHint).addScaledVector(up,-fwdHint.dot(up));
@@ -1001,8 +1004,8 @@ function interact(){
     const P=current,d=ship.group.position.clone().sub(P.center);const r=d.length();d.divideScalar(r);
     const g=P.heightAt(d);
     if(r-g>140){toast('Get within 140 m of the ground to land.');return}
-    const pad=baseRT&&baseRT.P===P?nearestPad(ship.group.position,220):null;
-    if(pad){const up=baseUp();const qTo=uprightQuat(up,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
+    const pad=nearestPad(ship.group.position,220);
+    if(pad){const up=new V3(0,1,0).applyQuaternion(pad.pc.mesh.parent.getWorldQuaternion(new Q4()));const qTo=uprightQuat(up,Z_AXIS.clone().negate().applyQuaternion(ship.group.quaternion),new Q4());
       ship.land={from:ship.group.position.clone(),to:pad.w.clone().addScaledVector(up,ship.group.userData.base),qFrom:ship.group.quaternion.clone(),qTo};
       ship.state='landing';ship.t=0;ship.speed=0;Sound.blip(200,.6,'sawtooth',.08);toast('Landing pad locked. Auto-landing.');return}
     const pp=nearestPostPad(P,ship.group.position,250);
@@ -1039,8 +1042,8 @@ function tryTakeoff(){
 }
 function tryWarp(home=false){
   if(home){
-    if(!base){toast('You have no base yet. Press B on foot and place a base computer.','bad');return}
-    if(base.seed===system.seed){toast(`Your base is in this system, on ${base.pname}.`);return}
+    if(!myBase){toast('You have no base yet. Press B on foot and place a base computer.','bad');return}
+    if(myBase.seed===system.seed){toast(`Your base is in this system, on ${myBase.pname}.`);return}
   }
   if(st.mode!=='ship'||ship.state!=='flying'){toast('Hyperdrive works only while flying in your ship.');return}
   if(inv.aurium<10&&!crafted.warpcell){toast(`Hyperdrive needs 10 Aurium or a warp cell. You have ${inv.aurium} Aurium.`,'bad');return}
@@ -1298,9 +1301,9 @@ function updateShip(dt){
   if(Sound.ctx){Sound.set(Sound.engG.gain,.05+thrust*.07);Sound.set(Sound.eng.frequency,40+thrust*55);Sound.set(Sound.roarG.gain,thrust*.12);Sound.set(Sound.roarF.frequency,300+thrust*1400)}
 }
 async function doWarp(home){
-  if(home)st.seed=base.seed;else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
+  if(home){st.seed=myBase.seed;if(myBase.systems)st.systems=myBase.systems}else{st.seed=(st.seed*1103515245+12345+st.systems*7919)>>>0;st.systems++}
   await generateSystem(st.seed,isFirst(st.seed));
-  const P=home&&baseRT?baseRT.P:planets[0];current=P;
+  const myRT=myBase&&baseRTs.get(myBase.id);const P=home&&myRT?myRT.P:planets[0];current=P;
   const d=new V3().subVectors(new V3(),P.center).normalize();
   ship.group.position.copy(P.center).addScaledVector(d,P.radius*3.2).add(new V3(0,P.radius*.6,0));
   ship.group.lookAt(P.center);ship.group.rotateY(Math.PI);ship.camQ.copy(ship.group.quaternion);
@@ -1364,7 +1367,7 @@ function shipDestroyed(){
   inv.carbon=Math.floor(inv.carbon/2);inv.ferrite=Math.floor(inv.ferrite/2);inv.cobalt=Math.floor(inv.cobalt/2);inv.aurium=Math.floor(inv.aurium/2);inv.nanites=Math.floor(inv.nanites/2);
   const s=shipStats();ship.hull=s.hull*.5;ship.shield=s.shield;ship.heat=0;ship.overheat=false;
   let P=nearestPlanet(ship.group.position);current=P;
-  if(baseRT){landAtBase();P=baseRT.P}else landShipAt(P,P.findLand(Math.random,P.center.clone().negate().normalize()));
+  const myRT=myBase&&baseRTs.get(myBase.id);if(myRT){withBase(myBase,landAtBase);P=myRT.P}else landShipAt(P,P.findLand(Math.random,P.center.clone().negate().normalize()));
   ship.fuel=Math.max(ship.fuel,TO());
   exitToFoot();pirateTimer=90;
   toast('Ship destroyed. An emergency beacon brought you down on '+P.name+'. Half your cargo was lost.','bad');
@@ -1600,14 +1603,27 @@ function makePart(t){
   }
   return g;
 }
+const baseObjs=new Map(),baseRTs=new Map();let myBase=null;
+const allBaseList=()=>{const l=[...baseObjs.values()];if(myBase&&!baseObjs.has(myBase.id))l.push(myBase);return l.filter(B=>B&&Array.isArray(B.origin))};
+function withBase(B,fn){const ob=base,ort=baseRT;base=B;baseRT=baseRTs.get(B.id)||null;try{return fn()}finally{if(baseRT)baseRTs.set(B.id,baseRT);base=ob;baseRT=ort}}
+function focusBase(){
+  const ref=st.mode==='foot'?player.pos:ship.group.position;let best=null,bd=170;
+  for(const B of allBaseList()){const rt=baseRTs.get(B.id);if(!rt||rt.P!==current)continue;const d=rt.group.getWorldPosition(tV3).distanceTo(ref);if(d<bd){bd=d;best=B}}
+  const F=best||myBase;base=F||null;baseRT=F?baseRTs.get(F.id)||null:null;
+}
+const canBuildOn=B=>!!B&&(B===myBase||B.open!==false);
+const baseLabel=B=>B===myBase?'your base':`${clean(B.name,20)||'A crewmate'}'s base`;
+function dropBaseRT(B){const rt=baseRTs.get(B.id);if(rt){rt.P.group.remove(rt.group);rt.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});baseRTs.delete(B.id)}if(baseRT&&rt===baseRT){baseRT=null}}
+function buildBaseFor(B){if(!system||B.seed!==system.seed||!planets[B.p]||baseRTs.has(B.id))return;withBase(B,()=>buildBase(planets[B.p]));focusBase()}
+function stockNow(pc){const pr=PART[pc.t].prod;if(!pr)return 0;const eff=basePower().eff;return Math.min(pr.cap,(pc.stock||0)+pr.rate*eff*Math.max(0,Date.now()-(pc.at||Date.now()))/1000)}
+const newPieceId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const baseQuat=()=>baseRT.group.getWorldQuaternion(new Q4());
 const baseUp=()=>new V3(0,1,0).applyQuaternion(baseQuat());
 function buildBase(P){
   const g=new THREE.Group();g.position.fromArray(base.origin);g.quaternion.fromArray(base.quat);P.group.add(g);g.updateMatrixWorld(true);
   baseRT={P,group:g,lights:0};
   for(const pc of base.pieces)addPieceMesh(pc);
-  const away=clamp((Date.now()-(base.stamp||Date.now()))/1000,0,7200);produce(away);base.stamp=Date.now();
-  if(away>120){const ready=base.pieces.reduce((a,q)=>a+(PART[q.t].prod?Math.floor(q.stock||0):0),0);if(ready)setTimeout(()=>toast(`Your base produced while you were away: ${ready} resources ready.`),1500)}
+  if(base===myBase){const ready=base.pieces.reduce((a,q)=>a+Math.floor(stockNow(q)),0);if(ready>5)setTimeout(()=>toast(`Your base has ${ready} resources ready to collect.`),1500)}
 }
 function addPieceMesh(pc){
   const g=makePart(pc.t);g.position.set(pc.x,pc.y,pc.z);g.rotation.y=pc.r*Math.PI/2;
@@ -1616,10 +1632,10 @@ function addPieceMesh(pc){
   baseRT.group.add(g);g.updateMatrixWorld(true);
 }
 function basePower(){let s=0,d=0;if(base)for(const pc of base.pieces){const p=PART[pc.t].power||0;if(p>0)s+=p;else d-=p}return{s,d,eff:d?Math.min(1,s/d):1}}
-function produce(sec){if(!base)return;const {eff}=basePower();for(const pc of base.pieces){const pr=PART[pc.t].prod;if(pr)pc.stock=Math.min(pr.cap,(pc.stock||0)+pr.rate*eff*sec)}}
 function collectBase(pc){
+  if(!canBuildOn(base)){toast(`${baseLabel(base)} is locked to its owner.`,'bad');return}
   const list=pc.t==='computer'?base.pieces.filter(q=>PART[q.t].prod):[pc];const got={};
-  for(const q of list){const n=Math.floor(q.stock||0);if(n>0){const r=PART[q.t].prod.res;got[r]=(got[r]||0)+n;q.stock-=n}}
+  for(const q of list){const now=stockNow(q),n=Math.floor(now);if(n>0){const r=PART[q.t].prod.res;got[r]=(got[r]||0)+n;q.stock=now-n;q.at=Date.now();dbPiece(base,q)}}
   if(!Object.keys(got).length){toast(pc.t==='computer'?'Nothing ready yet. Build extractors, bio-domes or drills, plus solar panels to power them.':'Nothing ready yet.');return}
   giveLoot(got);toast(`Collected: ${lootText(got)}`);Sound.blip(600,.15,'triangle',.14);save();
 }
@@ -1629,6 +1645,11 @@ function nearBasePiece(){
   return best;
 }
 function nearestPad(pos,maxD){
+  let best=null;
+  for(const B of allBaseList()){if(!baseRTs.has(B.id))continue;const r=withBase(B,()=>nearestPad1(pos,maxD));if(r&&(!best||r.w.distanceTo(pos)<best.w.distanceTo(pos)))best=r}
+  return best;
+}
+function nearestPad1(pos,maxD){
   if(!base||!baseRT)return null;let best=null,bd=maxD;
   for(const pc of base.pieces)if(pc.t==='pad'){const w=pc.mesh.localToWorld(new V3(0,.3,0));const d=w.distanceTo(pos);if(d<bd){bd=d;best={pc,w}}}
   return best;
@@ -1637,19 +1658,21 @@ const onPad=()=>!!nearestPad(ship.group.position,ship.group.userData.base+3)||!!
 const canLaunch=()=>onPad()||ship.fuel>=TO();
 function landAtBase(){
   const P=baseRT.P;current=P;
-  const pad=nearestPad(baseRT.group.localToWorld(new V3()),400);
+  const pad=nearestPad1(baseRT.group.localToWorld(new V3()),400);
   if(pad){const up=baseUp();ship.group.position.copy(pad.w).addScaledVector(up,ship.group.userData.base);
     uprightQuat(up,new V3(1,0,0).applyQuaternion(baseQuat()),ship.group.quaternion);ship.state='landed';ship.speed=0}
   else{const o=baseRT.group.position.clone().normalize();landShipAt(P,dirNear(o,18,P.radius,Math.random,new V3()))}
 }
-function baseSupport(P,pos){
+function baseSupport(P,pos){let best=null;for(const B of allBaseList()){if(!baseRTs.has(B.id))continue;const v=withBase(B,()=>baseSupport1(P,pos));if(v!==null&&(best===null||v>best))best=v}return best}
+function baseWalls(P){let m=false;for(const B of allBaseList()){if(!baseRTs.has(B.id))continue;if(withBase(B,()=>baseWalls1(P)))m=true}return m}
+function baseSupport1(P,pos){
   if(!base||!baseRT||baseRT.P!==P)return null;const B=baseRT.group;const L=B.worldToLocal(tV3.copy(pos));
   if(L.x*L.x+L.z*L.z>8100)return null;const feet=L.y-1.7;let best=null;
   for(const pc of base.pieces){const d=PART[pc.t];if(d.top==null)continue;
     if(Math.abs(L.x-pc.x)<d.half&&Math.abs(L.z-pc.z)<d.half){const top=pc.y+d.top;if(feet>=top-1.5&&(best===null||top>best))best=top}}
   if(best===null)return null;return B.localToWorld(tV3.set(L.x,best,L.z)).distanceTo(P.center);
 }
-function baseWalls(P){
+function baseWalls1(P){
   if(!base||!baseRT||baseRT.P!==P)return false;const B=baseRT.group;const L=B.worldToLocal(tV3.copy(player.pos));
   if(L.x*L.x+L.z*L.z>8100)return false;const feet=L.y-1.7,head=L.y+.2;let moved=false;
   for(const pc of base.pieces){const d=PART[pc.t];if(!d.wall)continue;if(head<pc.y||feet>pc.y+3.95)continue;
@@ -1667,12 +1690,15 @@ function baseWalls(P){
   return moved;
 }
 function updateBase(dt){
+  focusBase();
+  for(const B of allBaseList())if(baseRTs.has(B.id))withBase(B,()=>updateBase1(dt));
+}
+function updateBase1(dt){
   if(!base||!baseRT)return;
-  produce(dt);base.stamp=Date.now();
   const pw=basePower();
   for(const pc of base.pieces){const u=pc.mesh.userData;
     if(u.spin)u.spin.rotation.y+=dt*(pw.eff>0?3*pw.eff:0);
-    if(u.ind){const pr=PART[pc.t].prod;u.ind.material.color.set(pw.eff<=0?'#ff6274':(pc.stock>=pr.cap?'#ffb45e':'#8af0b4'))}}
+    if(u.ind){const pr=PART[pc.t].prod;u.ind.material.color.set(pw.eff<=0?'#ff6274':(stockNow(pc)>=pr.cap-.01?'#ffb45e':'#8af0b4'))}}
   if(st.mode==='foot'&&baseRT.P===current&&pw.eff>0){
     for(const pc of base.pieces)if(pc.t==='recharge'&&pc.mesh.getWorldPosition(tV3).distanceTo(player.pos)<5){
       player.suit=Math.min(100,player.suit+14*pw.eff*dt);player.jet=Math.min(100,player.jet+40*dt);player.health=Math.min(100,player.health+6*dt);break}
@@ -1682,7 +1708,7 @@ function toggleBuild(){
   if(!buildMode&&st.mode!=='foot'){toast('Build mode works on foot. Land and step out first.');return}
   buildMode=!buildMode;$('buildbar').hidden=!buildMode;document.body.classList.toggle('building',buildMode);
   if(buildMode){if(base&&baseRT&&baseRT.P===current&&buildSel===0)buildSel=1;renderBuildBar();
-    toast(base&&baseRT&&baseRT.P===current?'Build mode. Your base computer is nearby.':'Build mode. Place a base computer first to claim this spot.')}
+    toast(base&&baseRT&&baseRT.P===current?(base===myBase?'Build mode. Your base computer is nearby.':canBuildOn(base)?`Build mode at ${baseLabel(base)}. You can help build here.`:`${baseLabel(base)} is locked to its owner. Move away to build your own.`):'Build mode. Place a base computer first to claim this spot.')}
   else if(ghost){ghost.visible=false}
 }
 function selectPart(i){buildSel=(i+PARTS.length)%PARTS.length;buildRot=0;renderBuildBar()}
@@ -1726,7 +1752,8 @@ function computeCandidate(){
     if(P.sea!==null&&hitW.distanceTo(P.center)<P.sea+.3){cand.reason="Can't build underwater";return cand}
     cand.newBase=true;
   }else{
-    if(part.t==='computer'){cand.reason='This base already has a computer';}
+    if(part.t==='computer'){cand.reason=base===myBase?'This base already has a computer':`Too close to ${baseLabel(base)}. Move 170 m away to start your own`;}
+    else if(!canBuildOn(base)){cand.reason=`${baseLabel(base)} is locked to its owner`;}
     const B=baseRT.group;const L=B.worldToLocal(hitW.clone());let y;
     if(hitPc){const nL=nW.applyQuaternion(baseQuat().invert());if(nL.y>.5)y=L.y;else{L.addScaledVector(nL,.6);y=hitPc.y}}
     let x,z,r;
@@ -1737,7 +1764,7 @@ function computeCandidate(){
     y=Math.round(y*20)/20;
     Object.assign(cand,{x,y,z,r});
     cand.pos=B.localToWorld(new V3(x,y,z));cand.quat=baseQuat().multiply(new Q4().setFromAxisAngle(Y_AXIS,r*Math.PI/2));
-    if(part.t==='computer')return cand;
+    if(part.t==='computer'||!canBuildOn(base))return cand;
     if(Math.hypot(x,z)>70){cand.reason='Too far from the base computer (70 m limit)';return cand}
     for(const pc of base.pieces){const q=PART[pc.t];if(q.slot!==part.slot)continue;
       if(Math.abs(pc.x-x)<.1&&Math.abs(pc.z-z)<.1&&Math.abs(pc.y-y)<1.5&&(part.slot!=='edge'||pc.r%2===r%2)){cand.reason='Something is already built there';return cand}}
@@ -1745,7 +1772,7 @@ function computeCandidate(){
   }
   const miss=Object.entries(part.cost).filter(([k,v])=>inv[k]<v);
   if(miss.length){cand.reason=`Need ${miss.map(([k,v])=>`${v-inv[k]} more ${RES_LABEL[k]}`).join(', ')}`;return cand}
-  cand.ok=true;cand.reason=cand.newBase&&base?`Ready · this replaces your base on ${base.pname}`:'Ready';return cand;
+  cand.ok=true;cand.reason=cand.newBase&&myBase?`Ready · this replaces your base on ${myBase.pname}`:base&&base!==myBase&&!cand.newBase?`Ready · building at ${baseLabel(base)}`:'Ready';return cand;
 }
 function updateBuild(){
   if(!buildMode||st.mode!=='foot'||!current){if(ghost)ghost.visible=false;if(buildMode&&st.mode!=='foot')toggleBuild();return}
@@ -1764,11 +1791,13 @@ function placePiece(){
   if(!c.ok){toast(c.reason,'bad');Sound.blip(160,.12,'square',.06);return}
   const P=current,part=c.part;
   if(c.newBase){
-    if(base){if(time-abandonT>6){abandonT=time;toast(`This abandons your base on ${base.pname} (${base.sname}). Click again to confirm.`,'bad');return}
-      if(baseRT){baseRT.P.group.remove(baseRT.group);baseRT.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}baseRT=null;}
+    if(myBase){if(time-abandonT>6){abandonT=time;toast(`This abandons your base on ${myBase.pname} (${myBase.sname}). Click again to confirm.`,'bad');return}
+      for(const q of myBase.pieces)dbDelPiece(q);dropBaseRT(myBase);baseObjs.delete(myBase.id);myBase=null}
     for(const k in part.cost)inv[k]-=part.cost[k];
-    base={seed:system.seed,p:P.idx,pname:P.name,sname:system.name,origin:c.pos.clone().sub(P.center).toArray(),quat:c.quat.toArray(),pieces:[],stamp:Date.now()};
-    buildBase(P);addPiece({t:'computer',x:0,y:0,z:0,r:0});
+    const B={id:DBS.uid||'local',name:myName,seed:system.seed,systems:st.systems,first:isFirst(system.seed),open:myBaseOpen,p:P.idx,pname:P.name,sname:system.name,
+      origin:c.pos.clone().sub(P.center).toArray().map(v=>Math.round(v*1000)/1000),quat:c.quat.toArray().map(v=>Math.round(v*1e6)/1e6),pieces:[],stamp:Date.now()};
+    myBase=B;if(DBS.uid)baseObjs.set(B.id,B);dbHeader();
+    base=B;baseRT=null;buildBase(P);baseRTs.set(B.id,baseRT);addPiece({t:'computer',x:0,y:0,z:0,r:0});
     toast(`Base claimed on ${P.name}. Press J in your ship to jump home from any system.`,'big');buildSel=1;renderBuildBar();
   }else{
     for(const k in part.cost)inv[k]-=part.cost[k];
@@ -1776,19 +1805,20 @@ function placePiece(){
   }
   Sound.blip(420,.08,'square',.07);setTimeout(()=>Sound.blip(640,.1,'triangle',.08),60);save();
 }
-function addPiece(pc){if(PART[pc.t].prod)pc.stock=0;base.pieces.push(pc);addPieceMesh(pc)}
+function addPiece(pc){pc.id=pc.id||newPieceId();if(PART[pc.t].prod){pc.stock=0;pc.at=Date.now()}base.pieces.push(pc);addPieceMesh(pc);dbPiece(base,pc)}
 function deconstruct(){
   const pc=aimedPiece();
   if(!pc){toast('Aim at one of your base parts within 14 m to remove it.');return}
+  if(base!==myBase&&(pc.t==='computer'||!canBuildOn(base))){toast(pc.t==='computer'?`Only the owner can remove ${baseLabel(base)}'s computer.`:`${baseLabel(base)} is locked to its owner.`,'bad');return}
   if(pc.t==='computer'&&base.pieces.length>1){toast('Remove every other part before the base computer.','bad');return}
   const d=PART[pc.t],ref={};for(const k in d.cost)ref[k]=Math.floor(d.cost[k]/2);
-  if(d.prod&&pc.stock>=1)ref[d.prod.res]=(ref[d.prod.res]||0)+Math.floor(pc.stock);
+  if(d.prod&&stockNow(pc)>=1)ref[d.prod.res]=(ref[d.prod.res]||0)+Math.floor(stockNow(pc));
   giveLoot(ref);
   if(pc.mesh.userData.light)baseRT.lights--;
   baseRT.group.remove(pc.mesh);pc.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});
-  base.pieces.splice(base.pieces.indexOf(pc),1);
+  base.pieces.splice(base.pieces.indexOf(pc),1);dbDelPiece(pc);
   toast(`Removed ${d.name}: ${lootText(ref)||'no refund'}`);Sound.blip(300,.12,'sawtooth',.06);
-  if(pc.t==='computer'){baseRT.P.group.remove(baseRT.group);baseRT=null;base=null;toast('Base dismantled.');buildSel=0;renderBuildBar()}
+  if(pc.t==='computer'){dropBaseRT(base);baseObjs.delete(base.id);if(DBS.db&&DBS.uid)DBS.db.doc('bases/'+DBS.uid).delete().catch(()=>{});myBase=null;focusBase();toast('Base dismantled.');buildSel=0;renderBuildBar()}
   save();
 }
 
@@ -2088,6 +2118,87 @@ function updateGhosts(dt){
             fireBolt(G.group.localToWorld(gp.clone()),aim,new V3(),me?'enemy':'fx',G.dmg);G.fireCD=.3+Math.random()*.35;if(me&&dist<500)Sound.pew(520,.03)}}}}
   }
 }
+/* ---------- shared bases: synced through the artifact's database ---------- */
+const DBS={db:null,uid:null,warned:false};
+let myBaseOpen=lsGet('driftward-baseopen')!=='0';
+function dbErr(e){if(!DBS.warned){DBS.warned=true;toast(e&&e.code==='quota_exceeded'?'The shared base store is full; remove some parts.':'Could not save to the shared base store. You may have view-only access.','bad')}}
+let headerBusy=false,headerAgain=false;
+async function dbHeader(){
+  if(!DBS.db||!DBS.uid||!myBase||myBase.id!==DBS.uid)return;if(headerBusy){headerAgain=true;return}headerBusy=true;
+  const B=myBase;
+  try{await DBS.db.doc('bases/'+DBS.uid).set({name:myName,seed:B.seed,systems:B.systems||1,first:!!B.first,open:myBaseOpen,p:B.p,pname:B.pname||'',sname:B.sname||'',origin:B.origin,quat:B.quat,at:Date.now()})}catch(e){dbErr(e)}
+  headerBusy=false;if(headerAgain){headerAgain=false;dbHeader()}
+}
+const pieceBusy=new Map();
+async function dbPiece(B,pc){
+  if(!DBS.db||!DBS.uid||!B||B.id==='local'||!pc.id)return;
+  if(pieceBusy.get(pc.id)){pieceBusy.set(pc.id,'again');return}pieceBusy.set(pc.id,true);
+  const o={b:B.id,t:pc.t,x:pc.x,y:pc.y,z:pc.z,r:pc.r,by:DBS.uid};if(PART[pc.t].prod){o.stock=Math.round((pc.stock||0)*100)/100;o.at=pc.at||Date.now()}
+  try{await DBS.db.collection('pieces').doc(pc.id).set(o)}catch(e){dbErr(e)}
+  const again=pieceBusy.get(pc.id)==='again';pieceBusy.delete(pc.id);if(again)dbPiece(B,pc);
+}
+function dbDelPiece(pc){if(DBS.db&&DBS.uid&&pc.id)DBS.db.collection('pieces').doc(pc.id).delete().catch(dbErr)}
+function applyHeader(id,d){
+  if(!d||!Number.isFinite(d.seed)||!Number.isInteger(d.p)||d.p<0||d.p>7||!okVec(d.origin,3)||!okVec(d.quat,4))return;
+  let B=baseObjs.get(id);const isNew=!B||!B.origin;if(!B){B={id,pieces:[]};baseObjs.set(id,B)}
+  const moved=!isNew&&(B.seed!==d.seed>>>0||B.p!==d.p||String(B.origin)!==String(d.origin));
+  Object.assign(B,{name:clean(d.name,20),seed:d.seed>>>0,systems:Math.max(1,Math.floor(d.systems)||1),first:!!d.first,open:d.open!==false,p:d.p,pname:clean(d.pname,24),sname:clean(d.sname,24),origin:d.origin.slice(0,3),quat:d.quat.slice(0,4)});
+  if(id===DBS.uid&&myBase!==B){if(myBase)dropBaseRT(myBase);myBase=B;myBaseOpen=B.open}
+  if(moved)dropBaseRT(B);
+  buildBaseFor(B);
+}
+function removeHeader(id){const B=baseObjs.get(id);if(!B)return;dropBaseRT(B);B.origin=null;if(myBase===B)myBase=null;focusBase()}
+function disposePieceMesh(B,pc){const rt=baseRTs.get(B.id);if(rt&&pc.mesh){if(pc.mesh.userData.light)rt.lights--;rt.group.remove(pc.mesh);pc.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}}
+function applyPiece(id,d,removed){
+  if(!d||typeof d.b!=='string')return;
+  let B=baseObjs.get(d.b);if(!B){if(removed)return;B={id:d.b,pieces:[]};baseObjs.set(d.b,B)}
+  const idx=B.pieces.findIndex(q=>q.id===id),rt=baseRTs.get(B.id);
+  if(removed){if(idx>=0){disposePieceMesh(B,B.pieces[idx]);B.pieces.splice(idx,1)}return}
+  if(!PART[d.t]||![d.x,d.y,d.z].every(Number.isFinite))return;
+  const f={t:d.t,x:d.x,y:d.y,z:d.z,r:(d.r|0)&3};
+  if(idx>=0){const pc=B.pieces[idx];
+    if(PART[d.t].prod&&Number.isFinite(d.stock)&&Number.isFinite(d.at)&&!pieceBusy.get(id)){pc.stock=d.stock;pc.at=d.at}
+    if(pc.t!==f.t||pc.x!==f.x||pc.y!==f.y||pc.z!==f.z||pc.r!==f.r){disposePieceMesh(B,pc);Object.assign(pc,f);if(rt)withBase(B,()=>addPieceMesh(pc))}
+    return}
+  const pc=Object.assign({id},f);if(PART[d.t].prod){pc.stock=Number.isFinite(d.stock)?d.stock:0;pc.at=Number.isFinite(d.at)?d.at:Date.now()}
+  B.pieces.push(pc);if(rt)withBase(B,()=>addPieceMesh(pc));
+}
+function migrateLocalBase(){
+  if(!myBase||myBase.id!=='local')return;
+  const srv=baseObjs.get(DBS.uid);
+  if(srv&&srv.origin){dropBaseRT(myBase);myBase=srv;buildBaseFor(srv);return}
+  const local=myBase,rt=baseRTs.get('local');baseRTs.delete('local');
+  local.id=DBS.uid;local.systems=local.systems||st.systems;if(local.first==null)local.first=isFirst(local.seed);local.open=myBaseOpen;
+  if(srv)local.pieces.push(...srv.pieces.filter(q=>!local.pieces.some(l=>l.id===q.id)));
+  baseObjs.set(local.id,local);if(rt)baseRTs.set(local.id,rt);
+  dbHeader();(async()=>{for(const pc of local.pieces)await dbPiece(local,pc)})();
+  toast('Your base is now shared with your crew.');
+}
+async function visitBase(id){
+  const B=baseObjs.get(id);if(!B||!B.origin||MP.jumping)return;
+  if(st.mode==='ship'&&['warp','docking','undocking','landing','takeoff'].includes(ship.state)){toast('Finish your current manoeuvre first.','bad');return}
+  MP.jumping=true;$('crew').hidden=true;if(trade)closeTrade();if(buildMode)toggleBuild();
+  $('flash').style.transition='opacity .5s';$('flash').style.background='#fff';$('flash').style.opacity=1;Sound.whoosh(1.6);
+  await new Promise(r=>setTimeout(r,500));
+  if(B.first){st.extraFirst=st.extraFirst||[];if(!st.extraFirst.includes(B.seed))st.extraFirst.push(B.seed)}
+  st.seed=B.seed;st.systems=B.systems||1;
+  await generateSystem(st.seed,isFirst(st.seed));
+  if(baseRTs.has(B.id)){withBase(B,landAtBase);exitToFoot()}else{const P=planets[0];current=P;landShipAt(P,P.spawnDir);exitToFoot()}
+  camera.fov=70;camera.updateProjectionMatrix();$('flash').style.transition='opacity 1.6s';$('flash').style.opacity=0;
+  toast(`Arrived at ${baseLabel(B)} on ${B.pname}.${canBuildOn(B)?' Press B to help build.':''}`,'big');MP.jumping=false;save();
+}
+(async()=>{
+  let user=null,db=null;
+  try{if(window.claude&&window.claude.use)[user,db]=await Promise.all([window.claude.use('user'),window.claude.use('db')])}catch(e){}
+  if(!user||!db)return;let uid=null;try{uid=await user.id()}catch(e){}if(!uid)return;
+  DBS.db=db;DBS.uid=uid;let loaded=false;
+  db.collection('bases').onSnapshot(snap=>{
+    for(const ch of snap.docChanges()){if(ch.type==='removed')removeHeader(ch.doc.id);else applyHeader(ch.doc.id,ch.doc.data())}
+    if(!snap.metadata.fromCache&&!loaded){loaded=true;migrateLocalBase()}
+    if(!$('crew').hidden)renderCrewList();
+  },()=>{});
+  db.collection('pieces').onSnapshot(snap=>{for(const ch of snap.docChanges())applyPiece(ch.doc.id,ch.doc.data(),ch.type==='removed')},()=>{});
+})();
 function isFirst(seed){return seed===st.firstSeed||(st.extraFirst||[]).includes(seed)}
 function buildAstro(color){
   const g=new THREE.Group();
@@ -2172,13 +2283,14 @@ function renderCrewChip(){
 }
 function renderCrewList(){
   const box=$('crewList');box.textContent='';
-  if(!MP.room){$('crewStatus').textContent='Multiplayer is not available in this view. Open this artifact on claude.ai while signed in; people in your organization you share it with can join you.';return}
+  if(!MP.room){renderCrewBases();$('crewStatus').textContent='Multiplayer is not available in this view. Open this artifact on claude.ai while signed in; people in your organization you share it with can join you.';return}
   $('crewStatus').textContent=MP.connected?'Connected. Everyone with this page open shows up here.':'Connecting…';
   const others=crewOthers();
   const mk=(color,name,where,right)=>{const r=document.createElement('div');r.className='crow';const d=document.createElement('span');d.className='dot';d.style.background=color;
     const w=document.createElement('div');w.className='who';const n=document.createElement('div');n.className='nm';n.textContent=name;const h=document.createElement('div');h.className='wh';h.textContent=where;w.append(n,h);r.append(d,w);if(right)r.append(right);box.append(r)};
   mk(myColor,myName+' (you)',`${system?system.name:''}${current?' · '+current.name:''}`,null);
   if(!others.length){const p=document.createElement('p');p.className='trnote';p.textContent='Nobody else is online right now. Share this artifact with a friend in your organization to fly together.';box.append(p)}
+  renderCrewBases();
   for(const pr of others){const s=pr.presence;const name=clean(s.n,20)||'Traveller';
     const where=`${clean(s.sys,24)||'Unknown system'}${s.where?' · '+clean(s.where,24):''}${s.m==='ship'?' · flying':s.m==='foot'?' · on foot':''}${pr.guest?' · guest':''}`;
     let right;
@@ -2186,6 +2298,20 @@ function renderCrewList(){
     else if(Number.isFinite(s.seed)){right=document.createElement('button');right.type='button';right.className='trbtn';right.textContent='Jump to their system';right.addEventListener('click',()=>crewJump(pr.peer))}
     mk(okColor(s.c),name,where,right)}
 }
+function renderCrewBases(){
+  const box=$('crewBases');box.textContent='';
+  $('baseOpenRow').hidden=!myBase;$('baseOpen').checked=myBaseOpen;
+  if(!DBS.db){const p=document.createElement('p');p.className='trnote';p.textContent='Shared bases need a signed-in view of this artifact with access to its saved data. Until then your base stays on this device.';box.append(p);return}
+  const list=allBaseList().filter(B=>B!==myBase);
+  if(!list.length){const p=document.createElement('p');p.className='trnote';p.textContent='No crew bases yet. When friends build a base computer, their base appears here, even while they are offline.';box.append(p);return}
+  for(const B of list){const r=document.createElement('div');r.className='crow';const d=document.createElement('span');d.className='dot';d.style.background='#d7b6ff';
+    const w=document.createElement('div');w.className='who';const n=document.createElement('div');n.className='nm';n.textContent=`${clean(B.name,20)||'Crew'}'s base`;
+    const h=document.createElement('div');h.className='wh';h.textContent=`${B.sname||'Unknown system'} · ${B.pname||''} · ${B.pieces.length} parts${B.open===false?' · locked':' · open to crew'}`;w.append(n,h);r.append(d,w);
+    if(system&&B.seed===system.seed){const b=document.createElement('span');b.className='badge';b.textContent='This system';r.append(b)}
+    else{const b=document.createElement('button');b.type='button';b.className='trbtn';b.textContent='Travel there';b.addEventListener('click',()=>visitBase(B.id));r.append(b)}
+    box.append(r)}
+}
+$('baseOpen').addEventListener('change',()=>{myBaseOpen=$('baseOpen').checked;lsSet('driftward-baseopen',myBaseOpen?'1':'0');if(myBase){myBase.open=myBaseOpen;dbHeader()}toast(myBaseOpen?'Friends can now build and collect at your base.':'Your base is now locked to you.')});
 function renderCrewLog(){
   const log=$('crewLog');log.textContent='';
   if(!MP.chat.length){const p=document.createElement('div');p.className='trnote';p.style.margin='0';p.textContent='No messages yet.';log.append(p)}
@@ -2206,7 +2332,7 @@ function toggleCrew(focusChat=false){
   else $('crewMsg').focus();
 }
 $('crewChip').addEventListener('click',()=>toggleCrew());
-$('crewName').addEventListener('change',()=>{myName=clean($('crewName').value,20)||myName;lsSet('driftward-name',myName);$('crewName').value=myName;MP.lastLobby=-9;renderCrewList()});
+$('crewName').addEventListener('change',()=>{myName=clean($('crewName').value,20)||myName;lsSet('driftward-name',myName);$('crewName').value=myName;MP.lastLobby=-9;renderCrewList();if(myBase)dbHeader()});
 $('crewName').addEventListener('keydown',e=>{if(e.key==='Enter')$('crewName').blur();if(e.key==='Escape'){$('crewName').blur();$('crew').hidden=true}});
 $('crewMsg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}else if(e.key==='Escape'){$('crewMsg').blur();$('crew').hidden=true}});
 $('crewSend').addEventListener('click',sendChat);
@@ -2430,8 +2556,9 @@ function drawMarkers(){
     const ref5=st.mode==='foot'?player.pos:ship.group.position;const dd=w.distanceTo(ref5);const p=proj(w,true);marker(p.x,p.y,a.color,a.name,fmtDist(dd),'ring',onFoot?4:6)}
   for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
     if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
-  if(baseRT&&!buildMode){const bw=baseRT.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
-    if(dd>25){const p=proj(bw,st.mode==='foot'&&current===baseRT.P);if(!p.off||st.mode==='foot')marker(p.x,p.y,'#8af0b4','Home base',fmtDist(dd),'diamond',8)}}
+  if(!buildMode)for(const B of allBaseList()){const rt=baseRTs.get(B.id);if(!rt)continue;const mine=B===myBase;
+    const bw=rt.group.localToWorld(new V3(0,2.5,0));const ref3=st.mode==='foot'?player.pos:ship.group.position;const dd=bw.distanceTo(ref3);
+    if(dd>25){const p=proj(bw,mine&&st.mode==='foot'&&current===rt.P);if(!p.off||(mine&&st.mode==='foot'))marker(p.x,p.y,mine?'#8af0b4':'#d7b6ff',mine?'Home base':`${clean(B.name,20)||'Crew'}'s base`,fmtDist(dd),'diamond',8)}}
   if(st.mode==='foot'){
     const sp=tV.copy(ship.group.position);const p=proj(sp,true);const dd=player.pos.distanceTo(sp);
     if(dd>14)marker(p.x,p.y,'#ffb45e','Ship',fmtDist(dd),'diamond',8);
@@ -2525,8 +2652,8 @@ function updateHUD(){
     if(nearPickup&&!mineTarget){tgt={pod:'Supply pod',relic:'Ancient relic'}[nearPickup.type];pr=`<span class="k">E</span>${nearPickup.type==='pod'?'Open pod':'Recover relic'}`}
     if(nearWreck&&!nearPickup){const c=SHIP_CLASSES[nearWreck.cls];tgt=`Crashed ${c.label}`;pr=`<span class="k">E</span>${pendingClaim===nearWreck&&time-pendingT<8?'Repair and claim':'Inspect wreck'}`}
     if(nearBase){const d=PART[nearBase.t];
-      if(nearBase.t==='computer'){const ready=base.pieces.reduce((a,q)=>a+(PART[q.t].prod?Math.floor(q.stock||0):0),0);const pw=basePower();tgt=`Base computer · power ${pw.s}/${pw.d}`;pr=`<span class="k">E</span>Collect from all modules (${ready})`}
-      else{tgt=`${d.name} · ${Math.floor(nearBase.stock||0)}/${d.prod.cap} ${RES_LABEL[d.prod.res]}`;pr=`<span class="k">E</span>Collect`}}
+      if(nearBase.t==='computer'){const ready=base.pieces.reduce((a,q)=>a+Math.floor(stockNow(q)),0);const pw=basePower();tgt=`${base===myBase?'Base computer':baseLabel(base)} · power ${pw.s}/${pw.d}`;pr=`<span class="k">E</span>Collect from all modules (${ready})`}
+      else{tgt=`${d.name} · ${Math.floor(stockNow(nearBase))}/${d.prod.cap} ${RES_LABEL[d.prod.res]}`;pr=`<span class="k">E</span>Collect`}}
     if(buildMode){tgt='';pr=''}
     if(nearShip())pr='<span class="k">E</span>Board ship   <span class="k">U</span>Workshop';
     if(nearPost&&!buildMode){tgt=nearPost.name;pr='<span class="k">E</span>Trade'}
@@ -2575,13 +2702,13 @@ async function begin(saved){
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
     Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});
-    base=saved.base||null;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
+    myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
-  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
+  else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
   {const S=shipStats();ship.hull=S.hull;ship.shield=S.shield}
   await generateSystem(st.seed,isFirst(st.seed));
   const P=planets[0];current=P;
-  if(baseRT)landAtBase();else landShipAt(P,P.spawnDir);
+  if(myBase&&baseRTs.has(myBase.id))withBase(myBase,landAtBase);else landShipAt(P,P.spawnDir);
   exitToFoot();
   // face the ship
   const toShip=ship.group.position.clone().sub(player.pos);const up=player.pos.clone().sub(P.center).normalize();
