@@ -26,6 +26,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#raceUI{position:absolute;left:50%;top:128px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #courierUI{position:absolute;left:50%;top:96px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #photoUI{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 14px;font-size:13px;text-align:center;z-index:30;max-width:calc(100% - 32px)}
 .padfocus{outline:3px solid #ffd040!important;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,208,64,.25)!important}
@@ -262,6 +263,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="prompt" class="panel" hidden></div>
   <div id="photoUI" class="panel" hidden></div>
   <div id="courierUI" class="panel" hidden></div>
+  <div id="raceUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -2132,6 +2134,10 @@ const NPCS = [
    hello:["Express post! Fast feet wanted!","Parcels don't deliver themselves.","Speed is everything in this business."], rumors:["Ride your fastest mount for express deliveries. Arrive with time to spare and the bonus is generous."]},
   {id:'avis',town:'petal',dx:-3,dy:3,name:'Avis the Birdwatcher',role:'Bird journal',cols:{cloak:'#6a8a5a',skin:'#e0b898',hair:'#c08040'},birder:true,freeSpot:true,
    hello:["Shh! You'll scare the finches.","Every land has its own birds.","Have you seen anything with feathers lately?"], rumors:["Some birds only come out at night. Owls in the snow, nightingales in the meadows. Others only live in one kind of land."]},
+  {id:'freya',town:'frost',dx:3,dy:3,name:'Freya the Skater',role:'Ice rink',cols:{cloak:'#7ab0e0',skin:'#f0d0c0',hair:'#f0e8c0'},rinker:true,freeSpot:true,
+   hello:["The ice is perfect today!","Glide, don't walk!","Mind the cracks!"], rumors:["On ice you can't stop on a coin. Start turning early and let the slide carry you to the stars."]},
+  {id:'jasper',town:'ashfall',dx:-3,dy:3,name:'Jasper the Lapidary',role:'Gem cutting',cols:{cloak:'#5a3a6a',skin:'#c8a080',hair:'#2a2a2a'},lapidary:true,freeSpot:true,
+   hello:["Every crystal hides a gem.","Steady hands, sharp eyes.","Want to try the wheel?"], rumors:["Cut a crystal on the wheel: stop the marker on the facet three times. Miss and you're left with dust."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3761,6 +3767,7 @@ function partyPanel() {
     ...(list.length ? [{label: 'Give a gift', fn: () => giftPick()}] : []),
     ...list.filter(r => r.p.sp === NET_SID && !(spar && spar.active)).slice(0, 2).map(r => ({label: `Accept spar with ${r.name}`, primary: true, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; }})),
     ...(!spar ? list.filter(r => r.p.sp !== NET_SID).slice(0, 2).map(r => ({label: `Challenge ${r.name} to a spar`, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; toast(`You challenged <b>${esc(r.name)}</b> to a friendly spar. Waiting for them to accept...`, 4000); }})) : [{label: spar.active ? 'Concede the spar' : 'Cancel the spar challenge', fn: () => { closeTalk(); if (spar.active) { sparLost = {sid: spar.sid, t: 3}; toast('You conceded the spar.', 3000); } spar = null; }}]),
+    ...(party.host && !prace && list.some(r => Math.hypot(r.x - S.x, r.y - S.y) < 20) ? [{label: 'Start a party race', fn: () => startPartyRace()}] : []),
     {label: 'Emote (Y)', fn: () => emotePanel()},
     {label: 'Ping my spot (N)', fn: () => { closeTalk(); sendPing(); }},
     {label: 'Leave party', fn: () => { leaveParty(); closeTalk(); }},
@@ -3781,7 +3788,7 @@ async function enterParty(code, host) {
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {}; netReset(); spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
+  const P = party; if (!P) return; party = null; remote = {}; netReset(); prace = null; myRace = null; $('raceUI').hidden = true; spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3798,7 +3805,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, pr: myRace, pj: prace ? prace.i : null, pf: prace && prace.myT != null ? {i: prace.i, t: prace.myT} : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3809,7 +3816,7 @@ function partyTick(dt) {
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
   for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
-  partyExtras(dt); sparTick(dt);
+  partyExtras(dt); sparTick(dt); raceTick(dt);
   for (const q of myGifts) q.t -= dt; if (myGifts.length) myGifts = myGifts.filter(q => q.t > 0);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
@@ -3822,10 +3829,11 @@ function partyTick(dt) {
     if (p.mv) r.phase += dt*12;
     if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
     const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
-    if (!r.xinit) { r.giftI = Array.isArray(p.gf) ? Math.max(0, ...p.gf.map(q => +q.i || 0)) : 0;
+    if (!r.xinit) { r.prI = p.pr ? p.pr.i : 0; r.giftI = Array.isArray(p.gf) ? Math.max(0, ...p.gf.map(q => +q.i || 0)) : 0;
       r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; r.fwI = p.fw && p.fw.i; r.pcI = p.pc && p.pc.i; }
     if (Array.isArray(p.gf)) receiveGifts(r, p.gf);
     sparPeer(r, p);
+    if (p.pr && typeof p.pr === 'object' && p.host && p.pr.i !== r.prI) { r.prI = p.pr.i; if (!prace && TOWNS[p.pr.to] && isFinite(p.pr.at) && Math.hypot(r.x - S.x, r.y - S.y) < 25 && !inDungeon()) joinRace(p.pr.i, p.pr.to, +p.pr.at); }
     if (p.fw && typeof p.fw === 'object' && p.fw.i !== r.fwI) { r.fwI = p.fw.i; if (isFinite(p.fw.x) && isFinite(p.fw.y) && Math.hypot(p.fw.x - S.x, p.fw.y - S.y) < 40) launchFireworks(+p.fw.x, +p.fw.y); }
     if (p.pc && typeof p.pc === 'object' && p.pc.i !== r.pcI) { r.pcI = p.pc.i; if (isFinite(p.pc.x) && isFinite(p.pc.y)) { picnics.push({x: +p.pc.x, y: +p.pc.y, t: 180, who: r.name}); if (Math.hypot(p.pc.x - S.x, p.pc.y - S.y) < 8) { BUFFS.regen = Math.max(BUFFS.regen || 0, 180); toast(`<b>${esc(r.name)} spread a picnic!</b> You feel refreshed (health regenerates for 3 minutes).`, 4500); renderHUD(); } } }
     if (p.em && typeof p.em === 'object' && p.em.i !== r.emI) { r.emI = p.em.i; if (EMOTES.hasOwnProperty(p.em.k)) r.emote = {k: p.em.k, t: 3}; }
@@ -4460,6 +4468,107 @@ function drawBird(b) {
   else { ctx.fillStyle = B.col; ctx.fillRect(-2.5, -3.5, 3, 1.5); ctx.fillStyle = '#8a6a3a'; ctx.fillRect(-.5, -1, .6, 1); ctx.fillRect(1, -1, .6, 1); }
   ctx.restore();
 }
+// ===== party races =====
+let prace = null, myRace = null;
+function startPartyRace() {
+  const cand = Object.keys(TOWNS).filter(k => k !== 'isle').map(k => [k, Math.hypot(TOWNS[k].x - S.x, TOWNS[k].y - S.y)]).filter(([, d]) => d > 45 && d < 120).sort((a, b) => a[1] - b[1]);
+  if (!cand.length) { toast('No town at a good racing distance from here.'); return; }
+  const [to] = pick(cand.slice(0, 4)), at = Date.now() + 6000; myRace = {i: Date.now() % 1e9, to, at}; partyT = 0; closeTalk();
+  joinRace(myRace.i, to, at);
+}
+function joinRace(i, to, at) {
+  prace = {i, to, at, myT: null, results: {}, end: at + 150000, said: -1}; $('raceUI').hidden = false; SFX.chime();
+  toast(`<b>Party race to ${TOWNS[to].name}!</b><br>Get ready... the race starts in a few seconds. First to arrive wins!`, 5000);
+}
+function raceTick(dt) {
+  const P = prace; if (!P) return; const now = Date.now(), ui = $('raceUI'), T1 = TOWNS[P.to];
+  const racers = [[netName(), P.myT, true], ...Object.values(remote).filter(r => r.p.pj === P.i).map(r => [r.name, r.p.pf && r.p.pf.i === P.i && isFinite(r.p.pf.t) ? +r.p.pf.t : null, false])];
+  const finished = racers.filter(x => x[1] != null).sort((a, b) => a[1] - b[1]);
+  if (now < P.at) { const c = Math.ceil((P.at - now)/1000); if (c !== P.said) { P.said = c; floatText(S.x, S.y - 1.8, c > 3 ? 'Get ready...' : String(c), '#ffd040'); SFX.click(); } ui.textContent = `\u{1F3C1} Race to ${T1.name} · starts in ${c}`; return; }
+  if (P.said !== 0) { P.said = 0; floatText(S.x, S.y - 1.8, 'GO!', '#7ae08a'); SFX.victory(); }
+  const el = (now - P.at)/1000;
+  if (P.myT == null && Math.hypot(T1.x - S.x, T1.y - S.y) < 7) { P.myT = Math.round(el*10)/10; partyT = 0; SFX.victory(); const place = finished.length + 1; floatText(S.x, S.y - 1.8, `Finished! ${place === 1 ? '1st' : place === 2 ? '2nd' : place === 3 ? '3rd' : place + 'th'}`, '#ffd040'); }
+  const mine = finished.findIndex(x => x[2]);
+  ui.textContent = P.myT == null ? `\u{1F3C1} ${T1.name} · ${Math.round(Math.hypot(T1.x - S.x, T1.y - S.y))} steps · ${Math.floor(el)}s${finished.length ? ` · ${finished[0][0]} finished!` : ''}` : `\u{1F3C1} You finished ${mine + 1}${['st', 'nd', 'rd'][mine] || 'th'} in ${P.myT}s · waiting for others`;
+  if ((finished.length === racers.length && racers.length > 0 && P.myT != null) || now > P.end) {
+    prace = null; myRace = null; ui.hidden = true;
+    const place = P.myT == null ? -1 : finished.findIndex(x => x[2]);
+    const prize = place === 0 ? 150 : place === 1 ? 75 : place >= 2 ? 30 : 0; S.coins += prize; if (place === 0 && racers.length > 1) S.partyRaceWins = (S.partyRaceWins || 0) + 1; S.partyRaces = (S.partyRaces || 0) + 1; renderHUD(); save();
+    toast(`<b>Race results</b><br>${finished.map((x, k) => `${k + 1}. ${esc(x[0])} · ${x[1]}s`).join('<br>') || 'Nobody finished!'}${prize ? `<br><span style="color:var(--good)">+${prize} coin</span>` : ''}`, 8000);
+  }
+}
+// ===== ice rink =====
+let rink = null;
+const RINK_W = 300, RINK_H = 220;
+function startRink() {
+  rink = {on: true, x: RINK_W/2, y: RINK_H/2, vx: 0, vy: 0, t: 45, stars: [], cracks: [], score: 0, combo: 0, stun: 0, keys: new Set(), pvx: 0, pvy: 0, last: performance.now(), trail: []};
+  for (let k = 0; k < 3; k++) rinkStar();
+  openPanel('Ice rink', '<canvas id="rinkC" width="300" height="220" style="display:block;margin:0 auto;border-radius:10px;max-width:100%"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Arrows / WASD / stick to skate · grab the stars, avoid the cracks</div>', [{label: 'Stop', fn: () => { rink = null; closeTalk(); }}]);
+  requestAnimationFrame(rinkLoop);
+}
+function rinkStar() { rink.stars.push({x: 20 + Math.random()*(RINK_W - 40), y: 20 + Math.random()*(RINK_H - 40), ph: Math.random()*6}); }
+function rinkLoop() {
+  const K = rink; if (!K || !K.on) return; const c = document.getElementById('rinkC');
+  if (!c || mode !== 'talk') { rink = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - K.last)/1000); K.last = now; K.t -= dt;
+  let ax = K.pvx, ay = K.pvy; if (K.keys.has('arrowleft') || K.keys.has('a')) ax -= 1; if (K.keys.has('arrowright') || K.keys.has('d')) ax += 1; if (K.keys.has('arrowup') || K.keys.has('w')) ay -= 1; if (K.keys.has('arrowdown') || K.keys.has('s')) ay += 1;
+  const am = Math.hypot(ax, ay); if (am > 1) { ax /= am; ay /= am; }
+  if (K.stun > 0) { K.stun -= dt; ax = ay = 0; }
+  K.vx += ax*260*dt; K.vy += ay*260*dt; K.vx *= Math.pow(.55, dt); K.vy *= Math.pow(.55, dt);
+  const sp = Math.hypot(K.vx, K.vy); if (sp > 210) { K.vx *= 210/sp; K.vy *= 210/sp; }
+  K.x += K.vx*dt; K.y += K.vy*dt;
+  if (K.x < 10) { K.x = 10; K.vx = Math.abs(K.vx)*.7; } if (K.x > RINK_W - 10) { K.x = RINK_W - 10; K.vx = -Math.abs(K.vx)*.7; }
+  if (K.y < 10) { K.y = 10; K.vy = Math.abs(K.vy)*.7; } if (K.y > RINK_H - 10) { K.y = RINK_H - 10; K.vy = -Math.abs(K.vy)*.7; }
+  K.trail.push([K.x, K.y]); if (K.trail.length > 18) K.trail.shift();
+  for (const st of K.stars) if (!st.got && Math.hypot(st.x - K.x, st.y - K.y) < 13) { st.got = true; K.combo++; K.score += 1 + Math.floor(K.combo/5); AUD.tone(500 + Math.min(K.combo, 12)*40, .12, 'triangle', .1); if (Math.random() < .5 && K.cracks.length < 6) K.cracks.push({x: 30 + Math.random()*(RINK_W - 60), y: 30 + Math.random()*(RINK_H - 60), r: 0, grow: 12 + Math.random()*6}); }
+  K.stars = K.stars.filter(st => !st.got); while (K.stars.length < 3) rinkStar();
+  for (const cr of K.cracks) { cr.r = Math.min(cr.grow, cr.r + dt*8); if (K.stun <= 0 && cr.r > 6 && Math.hypot(cr.x - K.x, cr.y - K.y) < cr.r) { K.stun = 1.2; K.combo = 0; K.vx *= -.3; K.vy *= -.3; SFX.hurt(); cr.r = cr.grow; } }
+  const g = c.getContext('2d'); const grd = g.createLinearGradient(0, 0, RINK_W, RINK_H); grd.addColorStop(0, '#d8eefa'); grd.addColorStop(1, '#b8d8ee'); g.fillStyle = grd; g.fillRect(0, 0, RINK_W, RINK_H);
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(k*60 - 20, 0); g.lineTo(k*60 + 40, RINK_H); g.stroke(); }
+  g.strokeStyle = '#6a8aa8'; g.lineWidth = 4; g.strokeRect(2, 2, RINK_W - 4, RINK_H - 4);
+  for (const cr of K.cracks) { g.strokeStyle = '#3a5a7a'; g.lineWidth = 1.5; for (let a = 0; a < 6; a++) { g.beginPath(); g.moveTo(cr.x, cr.y); g.lineTo(cr.x + Math.cos(a + cr.x)*cr.r, cr.y + Math.sin(a + cr.y)*cr.r); g.stroke(); } g.fillStyle = 'rgba(30,60,90,.35)'; g.beginPath(); g.arc(cr.x, cr.y, cr.r*.5, 0, 7); g.fill(); }
+  for (const st of K.stars) { st.ph += dt*4; const r = 7 + Math.sin(st.ph)*1.2; g.fillStyle = '#ffc830'; g.beginPath(); for (let k = 0; k < 10; k++) { const a = k/10*6.283 - 1.57, rr = k % 2 ? r*.45 : r; g.lineTo(st.x + Math.cos(a)*rr, st.y + Math.sin(a)*rr); } g.fill(); }
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2; g.beginPath(); K.trail.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+  g.fillStyle = K.stun > 0 && Math.floor(K.stun*10) % 2 ? '#ff8a6a' : player.cols.cloak; g.beginPath(); g.arc(K.x, K.y, 8, 0, 7); g.fill(); g.fillStyle = player.cols.skin; g.beginPath(); g.arc(K.x, K.y - 3, 3.5, 0, 7); g.fill();
+  g.fillStyle = '#1a2a3a'; g.font = 'bold 13px sans-serif'; g.textAlign = 'left'; g.fillText(`★ ${K.score}`, 10, 20); g.textAlign = 'right'; g.fillText(`${Math.ceil(K.t)}s`, RINK_W - 10, 20); if (K.combo >= 5) { g.textAlign = 'center'; g.fillText(`Combo ${K.combo}!`, RINK_W/2, 20); }
+  if (K.t <= 0) { rinkEnd(); return; }
+  requestAnimationFrame(rinkLoop);
+}
+function rinkEnd() {
+  const K = rink; rink = null; const c = K.score*6; S.coins += c; S.rinkBest = Math.max(S.rinkBest || 0, K.score); S.rinks = (S.rinks || 0) + 1; SFX.victory(); renderHUD(); save();
+  openPanel('Ice rink', `Time! You collected <b>${K.score}</b> stars${K.score >= (S.rinkBest || 0) ? ' (personal best!)' : ''}.<br><span style="color:var(--good)">Freya awards you ${c} coin.</span>`, [{label: 'Skate again · 5◆', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); startRink(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== gem cutting =====
+let cut = null;
+function startCut() {
+  cut = {on: true, round: 0, hits: 0, pos: 0, dir: 1, zone: 0, w: 22, last: performance.now(), res: []}; cutNewZone();
+  openPanel('Gem cutting', '<div style="text-align:center">Stop the marker inside the green facet. Three cuts make a gem.</div><div id="cutBar" style="position:relative;height:26px;margin:14px 6px;background:#1a222c;border:1px solid #444;border-radius:6px;overflow:hidden"><div id="cutZone" style="position:absolute;top:0;bottom:0;background:#3a9a4a"></div><div id="cutMk" style="position:absolute;top:-2px;bottom:-2px;width:4px;background:#fff;border-radius:2px"></div></div><div id="cutRes" style="text-align:center;font-size:18px;letter-spacing:.3em">○ ○ ○</div><div style="text-align:center;color:var(--muted);margin-top:4px">Space / E / A or click</div>', [{label: 'Cut!', primary: true, fn: () => cutPress()}]);
+  requestAnimationFrame(cutLoop);
+}
+function cutNewZone() { cut.w = 22 - cut.round*5; cut.zone = 8 + Math.random()*(84 - cut.w); }
+function cutLoop() {
+  const C = cut; if (!C || !C.on) return; const mk = document.getElementById('cutMk'), z = document.getElementById('cutZone');
+  if (!mk || mode !== 'talk') { cut = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - C.last)/1000); C.last = now;
+  if (!C.wait) { C.pos += C.dir*dt*(70 + C.round*25); if (C.pos > 100 || C.pos < 0) { C.pos = Math.max(0, Math.min(100, C.pos)); C.dir *= -1; } }
+  mk.style.left = `calc(${C.pos}% - 2px)`; z.style.left = C.zone + '%'; z.style.width = C.w + '%';
+  requestAnimationFrame(cutLoop);
+}
+function cutPress() {
+  const C = cut; if (!C || !C.on || C.wait) return;
+  const ok = C.pos >= C.zone && C.pos <= C.zone + C.w; C.res.push(ok); if (ok) { C.hits++; AUD.tone(880, .15, 'triangle', .12); } else SFX.hurt();
+  const el = document.getElementById('cutRes'); if (el) el.textContent = [0, 1, 2].map(k => C.res[k] == null ? '○' : C.res[k] ? '◆' : '✕').join(' ');
+  C.round++; if (C.round < 3) { C.wait = true; setTimeout(() => { if (cut === C) { C.wait = false; cutNewZone(); } }, 400); return; }
+  C.on = false; cut = null; const n = C.hits === 3 ? 2 : C.hits === 2 ? 1 : 0; if (n) addItem('gem', n); S.gemsCut = (S.gemsCut || 0) + n; if (C.hits === 3) S.flawlessCuts = (S.flawlessCuts || 0) + 1; renderHUD(); save();
+  setTimeout(() => openPanel('Gem cutting', C.hits === 3 ? '<b>A flawless cut!</b> The crystal splits into <b>two</b> sparkling gems.' : C.hits === 2 ? 'A clean cut. You get <b>one Cut Gem</b>.' : 'The crystal cracks into glittering dust. Better luck next time.', [{label: 'Cut another (3 Crystal)', primary: true, disabled: have('crystal') < 3, fn: () => { addItem('crystal', -3); startCut(); }}, {label: 'Close', fn: closeTalk}]), 500);
+  if (C.hits === 3) SFX.victory();
+}
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
+  else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
+}, {capture: true});
+addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6007,8 +6116,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Party races', 'The party leader can start a race from the Party menu when friends are nearby. Everyone within range races to the same town after a countdown, and the standings appear as each racer arrives. First place wins 150 coin.'],
+  ['Ice rink and gem cutting', 'Freya runs an ice rink in Frostgate: slide around collecting stars for 45 seconds and dodge the cracks. Jasper in Ashfall cuts gems from 3 Crystal: stop the marker on the facet three times for a flawless cut and two gems.'],
   ['Gifts and spars', 'In a party, open the Party menu to give a friend coins or items from your pack. You can also challenge a party member to a friendly spar: each of you gets an orange spar bar, and hits on each other drain only that, never your real health. First to empty the other\u2019s bar wins.'],
   ['Birdwatching', 'Avis in Petalfall lends you a bird journal and spyglass. Birds then appear as you travel: each land has its own species, and some only come out at night. Get within a few steps and press E to observe one, but don\u2019t get too close or it flies off. New species pay 30 coin, and a full journal earns a big reward.'],
   ['Quiz night and express post', 'Professor Quill in Thornwick runs a daily quiz about towns, trade, beasts and dungeons: 30 coin for each right answer and a bonus for a perfect round. Postmaster Pell in Hollowpine hands out timed express deliveries to towns you know. The faster you arrive, the bigger the pay.'],
@@ -6612,6 +6723,8 @@ function padPoll(dt) {
   if (!any && !PAD.active) { PAD.prev = B; return; }
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
+  if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (cut && cut.on) { if (down(OK) || down(BACK) || down(2) || down(3)) cutPress(); PAD.prev = B; return; }
   if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
   const menu = mode !== 'play' && mode !== 'fish';
   // movement
@@ -7581,7 +7694,7 @@ function update(dt) {
   if (keys.has('arrowdown') || keys.has('s')) vy += 1;
   if (touch.active) { vx += touch.vx; vy += touch.vy; }
   if (PAD.vx || PAD.vy) { vx += PAD.vx; vy += PAD.vy; const pm = Math.hypot(vx, vy); if (pm > 1) { vx /= pm; vy /= pm; } }
-  if (downed) { vx = 0; vy = 0; }
+  if (downed || (prace && Date.now() < prace.at)) { vx = 0; vy = 0; }
   player.rollCd = Math.max(0, player.rollCd - dt);
   if (player.roll > 0) {
     player.roll -= dt;
@@ -8004,6 +8117,8 @@ function mainOptions(n) {
   if (n.busker) o.push({label: 'Buy rocket packs', fn: () => shopTalk(n, [['rocket_pack', 30]], '“Every good show ends with a bang!”')});
   if (n.skittles) o.push({label: 'Buy a picnic basket', fn: () => shopTalk(n, [['picnic_basket', 45]], '“Bread, cheese, pie and a flask of cider. Share it with friends!”')});
   if (n.birder) o.push({label: S.birdJournal ? 'Show my bird journal' : 'Ask about birdwatching', primary: true, fn: () => birdTalk(n)});
+  if (n.rinker) o.push({label: 'Skate on the rink · 5\u25c6', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); startRink(); }});
+  if (n.lapidary) o.push({label: 'Cut a gem (3 Crystal)', primary: true, disabled: have('crystal') < 3, fn: () => { addItem('crystal', -3); startCut(); }});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -10803,6 +10918,9 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['racewin','Fastest in the Party','Win a party race', () => (S.partyRaceWins || 0) >= 1],
+  ['rink30','Ice Dancer','Collect 30 stars in one ice rink session', () => (S.rinkBest || 0) >= 30],
+  ['gemcut','Lapidary','Make a flawless gem cut', () => (S.flawlessCuts || 0) >= 1],
   ['giftgiver','Generous Friend','Give 10 gifts to party members', () => (S.giftsGiven || 0) >= 10],
   ['sparwin','Friendly Rival','Win a friendly spar', () => (S.sparWins || 0) >= 1],
   ['spar5','Sparring Champion','Win 5 friendly spars', () => (S.sparWins || 0) >= 5],
@@ -11356,7 +11474,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
