@@ -161,6 +161,13 @@ body{background:var(--void);color:var(--text);font-family:var(--f-data);font-siz
 .fbar i{position:absolute;top:0;bottom:0}.fbar b{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.35)}
 .envoy{font-style:italic;color:var(--text);margin:10px 0 4px;font-size:13px}
 
+#warBar{width:min(560px,100%);padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+.wside{font-size:11.5px;color:var(--amber-hi)}
+.wbar{position:relative;height:9px;display:flex;border-radius:1px;overflow:hidden;background:rgba(255,255,255,.08)}
+.wbar i{display:block;height:100%;transition:width .3s}.wbar b{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.6}
+.wsub{font-size:10.5px;color:var(--dim)}
+.warinfo{border:1px solid var(--line);padding:8px 10px;border-radius:2px;margin-top:10px;font-size:12px;line-height:1.5}
+
 /* Title screen */
 #title{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));
   background:radial-gradient(1200px 700px at 72% 28%,rgba(255,150,70,.22),transparent 60%),radial-gradient(900px 600px at 18% 80%,rgba(80,140,255,.22),transparent 60%),var(--void);overflow:auto}
@@ -216,6 +223,7 @@ button.go:disabled{opacity:.5;cursor:wait}
 
 <div class="hud tc" id="hudTC" hidden>
   <div id="objective"></div>
+  <div id="warBar" class="card" hidden><div class="bb-top"><span class="eyebrow" id="warTitle">Territory battle</span><span id="warSide" class="wside"></span></div><div class="wbar"><i id="warA"></i><i id="warB"></i><b></b></div><div class="wsub" id="warSub"></div></div>
   <div id="bossBar" class="card" hidden><div class="bb-top"><span class="eyebrow" id="bossPhase">Dreadnought</span><span id="bossName">—</span></div><div class="bbar"><i id="bossSh"></i></div><div class="bbar hull"><i id="bossHp"></i></div></div>
   <div id="toasts"></div>
 </div>
@@ -322,6 +330,7 @@ button.go:disabled{opacity:.5;cursor:wait}
   <div class="card">
     <div class="eyebrow">Reputation</div>
     <div class="pname">Faction standing</div>
+    <div id="warInfo" class="warinfo"></div>
     <div id="standingList"></div>
     <p class="trnote">Standing changes your prices, whether stations let you dock and whether patrols fight for or against you. Press P to close.</p>
   </div>
@@ -867,7 +876,7 @@ let bolts=[],npcs=[],salvage=[],booms=[],pirateTimer=75,kills=0;
 let base=null,baseRT=null,buildMode=false,buildSel=0,buildRot=0,buildCand=null,abandonT=0,nearBase=null;
 const crafted={};const tech=id=>!!crafted[id];
 
-function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,rep:st.rep,looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
+function save(){try{localStorage.setItem('driftward-v1',JSON.stringify({seed:st.seed,systems:st.systems,inv,fuel:ship.fuel,disc:[...st.disc],cls:ship.cls,paint:ship.paint,upg,kills,crafted,rep:st.rep,territory:st.territory||{},looted:[...(st.looted||[])],base:myBase,firstSeed:st.firstSeed,mission:st.mission,extraFirst:st.extraFirst||[]}))}catch(e){}}
 function loadSave(){try{const s=JSON.parse(localStorage.getItem('driftward-v1')||'null');return s&&typeof s.seed==='number'?s:null}catch(e){return null}}
 
 /* ---------- system generation ---------- */
@@ -880,7 +889,7 @@ async function generateSystem(seed,first){
   clearCombat();
   const rand=mulberry32((seed^0x9e3779b9)>>>0);
   const star=STARS[Math.floor(rand()*STARS.length)];
-  system={seed,name:makeName(rand,2,2,false).toUpperCase()+'-'+(100+Math.floor(rand()*900)),star};system.faction=factionOf(seed);
+  system={seed,name:makeName(rand,2,2,false).toUpperCase()+'-'+(100+Math.floor(rand()*900)),star};system.faction=ownerOf(seed);WAR.on=false;WAR.side=null;WAR.checkT=1;
   sunMat.color.set(star.color);sunGlow.material.color.set(star.color);sunLight.color.set(star.color);
   const n=3+Math.floor(rand()*3);let dist=3800+rand()*1200;const out=[];
   for(let i=0;i<n;i++){
@@ -1377,11 +1386,11 @@ function spawnNpc(faction,cls,pos,paint){
     radius:g.userData.radius,gunI:0,way:null,netId:++netIdSeq,shieldDelay:0,curSpeed:pir?260:110,vel:new V3(),leave:0};
   n.hull=n.maxHull;n.shield=n.maxShield;npcs.push(n);return n;
 }
-const allHostiles=()=>npcs.filter(n=>n.hostile).concat([...ghosts.values()]);
+const allHostiles=()=>npcs.filter(n=>n.hostile||isWarEnemy(n)).concat([...ghosts.values()]);
 function hostilesNear(r){const p=ship.group.position;return allHostiles().some(n=>n.group.position.distanceTo(p)<r)}
-function fireBolt(from,dir,baseVel,owner,dmg){
+function fireBolt(from,dir,baseVel,owner,dmg,side){
   if(bolts.length>=BOLT_MAX*2)return;
-  bolts.push({p:from.clone(),prev:from.clone(),v:dir.clone().multiplyScalar(BOLT_SPEED).add(baseVel),life:2.2,owner,dmg});
+  bolts.push({p:from.clone(),prev:from.clone(),v:dir.clone().multiplyScalar(BOLT_SPEED).add(baseVel),life:2.2,owner,dmg,side});
 }
 function segHit(a,b,c,r){
   const abx=b.x-a.x,aby=b.y-a.y,abz=b.z-a.z,l2=abx*abx+aby*aby+abz*abz||1e-6;
@@ -1413,8 +1422,9 @@ function shipDestroyed(){
   exitToFoot();pirateTimer=90;
   toast('Ship destroyed. An emergency beacon brought you down on '+P.name+'. Half your cargo was lost.','bad');
 }
-function damageNpc(n,dmg,at){
-  if(!n.hostile){n.hostile=true;if(n.faction==='trader'){toast('You fired on a trader. It is fighting back.','bad');addRep('vael',-5,'attacked a trader')}
+function damageNpc(n,dmg,at,src){
+  if(n.war)warHit(n,src);
+  else if(!n.hostile){n.hostile=true;if(n.faction==='trader'){toast('You fired on a trader. It is fighting back.','bad');addRep('vael',-5,'attacked a trader')}
     else if(n.faction==='korrath'){toast('You fired on a Korrath patrol. They are returning fire.','bad');addRep('korrath',-8,'attacked a patrol')}}
   n.shieldDelay=3;
   if(n.shield>0){const a=Math.min(n.shield,dmg);n.shield-=a;dmg-=a;boom(at,1.6,'#7fd0ff',.25)}else boom(at,1.4,'#ffcf6a',.25);
@@ -1425,12 +1435,12 @@ function damageNpc(n,dmg,at){
 function destroyNpc(n){
   const p=n.group.position;boom(p,n.radius*3,'#ffa050',1.2);boom(p,n.radius*1.6,'#fff2c0',.6);Sound.boom(.6);
   scene.remove(n.group);npcs.splice(npcs.indexOf(n),1);
-  const trader=n.faction==='trader'||n.faction==='korrath';kills++;onRepKill(n);
+  const trader=n.faction==='trader'||n.faction==='korrath'||!!n.war;kills++;onRepKill(n);
   if(n.boss){bossDown(n);return}
   if(!trader)creditBounty();
-  dropSalvage(p,n.vel,trader);
+  if(!n.war||n.lastPlayer)dropSalvage(p,n.vel,trader);
   if(!trader&&MP.sys)MP.sys.emit('kill',{id:n.netId,p:p.toArray().map(v=>Math.round(v*10)/10),h:[...(n.hitters||[])].slice(0,12)}).catch(()=>{});
-  if(!n.boss)toast(`${n.faction==='korrath'?'Korrath':trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
+  if(!n.boss&&(!n.war||n.lastPlayer))toast(`${n.war?FN(n.war):n.faction==='korrath'?'Korrath':trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
   if(!npcs.some(x=>x.hostile))setTimeout(()=>{if(!npcs.some(x=>x.hostile))toast('Area clear.','big')},600);
 }
 function creditBounty(){
@@ -1468,6 +1478,7 @@ function updateNpcs(dt){
   for(let i=npcs.length-1;i>=0;i--){
     const n=npcs[i],g=n.group;
     if(n.boss){updateBoss(n,dt);continue}
+    if(n.war){updateWarShip(n,dt);continue}
     n.shieldDelay-=dt;if(n.shieldDelay<=0)n.shield=Math.min(n.maxShield,n.shield+8*dt);
     const fwd=tV.set(0,0,-1).applyQuaternion(g.quaternion);
     let spd=n.speed,has=true;
@@ -1524,16 +1535,18 @@ function updateBolts(dt){
     let dead=b.life<=0;
     if(!dead&&b.owner!=='station'&&station&&segHit(b.prev,b.p,station.group.position,50)){dead=true;boom(b.p,1.5,'#9fe6ff',.2)}
     if(!dead&&(b.owner==='player'||b.owner==='station')){
-      for(const n of npcs){if(!(b.owner==='player'||n.hostile))continue;if(n.boss){if(bossHit(n,b.prev,b.p,b.dmg)){dead=true;break}continue}if(segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}}
+      for(const n of npcs){if(!(b.owner==='player'||n.hostile))continue;if(n.boss){if(bossHit(n,b.prev,b.p,b.dmg)){dead=true;break}continue}if(segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p,b.owner);dead=true;break}}
       if(!dead&&b.owner==='player')for(const G of ghosts.values())if(segHit(b.prev,b.p,G.group.position,G.radius)){boom(b.p,1.5,G.shield>0?'#7fd0ff':'#ffcf6a',.25);sendHit(G,b.dmg);dead=true;break}
     }else if(!dead&&b.owner==='enemy'&&flying&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}
+    else if(!dead&&b.owner==='war'){for(const n of npcs){if(!n.war||n.war===b.side)continue;if(segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p,'war');dead=true;break}}
+      if(!dead&&flying&&((WAR.side&&WAR.side!==b.side)||isHostileTo(b.side))&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}}
     if(!dead&&current){const d=bD.copy(b.p).sub(current.center);const r=d.length();if(r<current.radius*1.25){d.divideScalar(r);if(r<current.floorAt(d)){dead=true;boom(b.p,1.2,'#ffcf6a',.2)}}}
     if(dead)bolts.splice(i,1);
   }
   let ip=0,ie=0;
   for(const b of bolts){
     bQ.setFromUnitVectors(Z_AXIS,bD.copy(b.v).normalize());bM.compose(b.p,bQ,bS);
-    if(b.owner==='player'||b.owner==='station'){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
+    if(b.owner==='player'||b.owner==='station'||(b.owner==='war'&&b.side===WAR.side)){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
   }
   boltMeshP.count=ip;boltMeshE.count=ie;boltMeshP.instanceMatrix.needsUpdate=true;boltMeshE.instanceMatrix.needsUpdate=true;
 }
@@ -1548,7 +1561,7 @@ function updateCombat(dt){
   // pirate waves
   if(flying&&current){
     const alt=ship.group.position.distanceTo(current.center)-current.radius;
-    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&!ghosts.size&&amHost()&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){if(st.bossDue||(st.systems>=2&&waveCount%3===2))spawnBoss();else spawnPirates();waveCount++;pirateTimer=80+Math.random()*80}}
+    if(alt>current.radius*.5&&!WAR.on&&!npcs.some(n=>n.faction==='pirate')&&!ghosts.size&&amHost()&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){if(st.bossDue||(st.systems>=2&&waveCount%3===2))spawnBoss();else spawnPirates();waveCount++;pirateTimer=80+Math.random()*80}}
   }
   updateNpcs(dt);updateBolts(dt);
   // salvage
@@ -1574,7 +1587,7 @@ function updateCombat(dt){
 let missiles=[],waveCount=0;const lockS={tgt:null,t:0};
 const mslGeo=mergeColored([{geo:new THREE.CylinderGeometry(.22,.22,2.2,6).rotateX(Math.PI/2),color:'#c9ccd6'},{geo:new THREE.ConeGeometry(.22,.7,6).rotateX(-Math.PI/2).translate(0,0,-1.45),color:'#ff6274'},{geo:new THREE.SphereGeometry(.32,6,4).translate(0,0,1.2),color:'#ffd27a'}]);
 const mslMatP=new THREE.MeshBasicMaterial({vertexColors:true,fog:false}),mslMatE=new THREE.MeshBasicMaterial({color:'#ff5a4a',fog:false});
-const lockables=()=>npcs.filter(n=>n.hostile).concat([...ghosts.values()]);
+const lockables=()=>npcs.filter(n=>n.hostile||isWarEnemy(n)).concat([...ghosts.values()]);
 function updateLock(dt){
   if(!(st.mode==='ship'&&ship.state==='flying')){lockS.tgt=null;lockS.t=0;return}
   const fwd=tV.set(0,0,-1).applyQuaternion(ship.group.quaternion),sp=ship.group.position;let best=null,bd=Math.cos(20*Math.PI/180);
@@ -1617,7 +1630,7 @@ function updateMissiles(dt){
     if(!dead&&tp){
       if(M.owner==='player'&&M.tgt.boss&&!M.tgt.ghost){if(bossHit(M.tgt,prev,M.mesh.position,M.dmg))dead=true}
       else if(M.mesh.position.distanceTo(tp)<tr+4){dead=true;
-        if(M.owner==='player'){if(M.tgt.ghost)sendHit(M.tgt,M.dmg);else damageNpc(M.tgt,M.dmg,M.mesh.position.clone())}
+        if(M.owner==='player'){if(M.tgt.ghost)sendHit(M.tgt,M.dmg);else damageNpc(M.tgt,M.dmg,M.mesh.position.clone(),'player')}
         else if(M.me)damagePlayer(M.dmg)}
       if(dead){boom(M.mesh.position,7,'#ffb060',.6);Sound.boom(.25,.5)}}
     if(!dead&&current){const d=tV.copy(M.mesh.position).sub(current.center);const r=d.length();if(r<current.radius*1.25&&r<current.floorAt(d.divideScalar(r))){dead=true;boom(M.mesh.position,5,'#ffb060',.5)}}
@@ -2058,7 +2071,7 @@ const venueFaction=()=>system&&system.faction;
 const repBuy=()=>1-repOf(venueFaction())*.002;
 const repSell=()=>(1+repOf(venueFaction())*.0015)*(tech('ledger')?1.15:1);
 function factionBanner(S,f){
-  const col=FACTIONS[f].color,m=new THREE.MeshBasicMaterial({color:col});
+  const col=FACTIONS[f].color,m=new THREE.MeshBasicMaterial({color:col});S.userData.bannerMat=m;
   for(const y of [52,-52]){const r=new THREE.Mesh(new THREE.TorusGeometry(49,1.4,6,40).rotateX(Math.PI/2),m);r.position.y=y;S.add(r)}
   const b=new THREE.Mesh(new THREE.CylinderGeometry(4,4,10,8),m);b.position.y=170;S.add(b);
 }
@@ -2072,9 +2085,12 @@ function onRepKill(n){
   if(n.faction==='pirate'){addRep('korrath',n.boss?10:2,n.boss?'dreadnought destroyed':'');addRep('vael',n.boss?5:1)}
   else if(n.faction==='trader')addRep('vael',-10,'trader destroyed');
   else if(n.faction==='korrath')addRep('korrath',-15,'patrol destroyed');
+  else if(n.war)warKill(n);
 }
 function renderStanding(){
   const box=$('standingList');box.textContent='';
+  {const W=warSummary();const wi=$('warInfo');wi.textContent='';const a=document.createElement('div');a.style.fontWeight='600';a.textContent=W.line;wi.append(a);if(W.score){const b=document.createElement('div');b.style.color='var(--dim)';b.textContent=W.score;wi.append(b)}
+   if(system){const c=document.createElement('div');c.style.color='var(--dim)';c.textContent=WAR.on?`${system.name} is contested: the ${FN(WAR.chal)} is attacking the ${FN(WAR.owner)}.`:`${system.name} is held by the ${FN(system.faction)}.`;wi.append(c)}}
   const cur=venueFaction();
   for(const f of FACTION_KEYS){const F=FACTIONS[f],v=repOf(f),T=repTier(v);
     const row=document.createElement('div');row.className='frow';
@@ -2093,6 +2109,144 @@ function renderStanding(){
 function toggleStanding(){const el=$('standing');if(el.hidden){el.hidden=false;try{document.exitPointerLock()}catch(_){}renderStanding()}else el.hidden=true}
 
 $('crewStanding').addEventListener('click',()=>{$('crew').hidden=true;toggleStanding()});
+/* ---------- faction wars and territory battles ---------- */
+// The war schedule comes from the real clock, so every player sees the same war. Captured systems are saved to the shared database.
+const WAR_EPOCH=1800,WAR_CEASE=300;
+const WAR_PAINT={vael:{hull:'#d9c27a',trim:'#3a3220',glow:'#ffe7a0'},korrath:{hull:'#7a2a1a',trim:'#1a1010',glow:'#ff7a3a'},lumen:{hull:'#cfe8f0',trim:'#2a3e4a',glow:'#9fe6ff'}};
+const WAR_CLS={vael:['fighter','hauler','shuttle'],korrath:['fighter','interceptor'],lumen:['explorer','interceptor']};
+const WAR={on:false,seed:0,owner:null,chal:null,control:0,res:{},reinT:{},side:null,point:null,epoch:0,checkT:0,sub:false};
+const TERR=new Map();
+const FN=f=>FACTIONS[f]?FACTIONS[f].name:f;
+const territoryLocal=()=>st.territory||(st.territory={});
+function territoryGet(seed){const k=String(seed);return TERR.get(k)||territoryLocal()[k]||null}
+function ownerOf(seed){const t=territoryGet(seed);return t&&FACTIONS[t.f]?t.f:factionOf(seed)}
+function warNow(){
+  const t=Date.now()/1000,ep=Math.floor(t/WAR_EPOCH),r=mulberry32(Math.imul(ep,2654435761)>>>0);
+  const pairs=[['korrath','vael'],['vael','lumen'],['lumen','korrath']],pr=pairs[Math.floor(r()*3)],flip=r()<.5;
+  const left=WAR_EPOCH-(t-ep*WAR_EPOCH);return{epoch:ep,a:flip?pr[1]:pr[0],b:flip?pr[0]:pr[1],left,ceasefire:left<WAR_CEASE};
+}
+const battleResolved=(seed,ep)=>{const t=territoryGet(seed);return(t&&t.epoch===ep)||looted(`W:${ep}:${seed}`)};
+function contestFor(seed){
+  const w=warNow();if(w.ceasefire)return null;const o=ownerOf(seed);if(o!==w.a&&o!==w.b)return null;
+  if(mulberry32((seed^Math.imul(w.epoch,40503))>>>0)()>.6)return null;if(battleResolved(seed,w.epoch))return null;
+  return{owner:o,chal:o===w.a?w.b:w.a,epoch:w.epoch};
+}
+function setTerritory(seed,f,ep){
+  const k=String(seed);territoryLocal()[k]={f,epoch:ep};markLooted(`W:${ep}:${seed}`);
+  if(DBS.db&&DBS.uid)DBS.db.collection('territory').doc(k).set({f,epoch:ep,by:DBS.uid,at:Date.now()}).catch(()=>{});
+}
+function recolorBanner(){if(station&&station.group.userData.bannerMat)station.group.userData.bannerMat.color.set(FACTIONS[system.faction].color)}
+function applyTerritoryChange(){
+  if(!system)return;const f=ownerOf(system.seed);if(f===system.faction)return;
+  const old=system.faction;system.faction=f;recolorBanner();
+  toast(`The ${FN(f)} has taken control of ${system.name} from the ${FN(old)}.`,'big');
+  if(WAR.on&&WAR.seed===system.seed)endBattle(null,'remote');
+}
+const isWarEnemy=n=>!!n.war&&((WAR.side&&n.war!==WAR.side)||isHostileTo(n.war));
+function spawnWarShip(f,sign,reinforce){
+  const list=WAR_CLS[f],cls=list[Math.floor(Math.random()*list.length)],c=SHIP_CLASSES[cls];
+  const pos=WAR.point.clone().add(new V3(sign*(reinforce?1500:380),(Math.random()-.5)*220,(Math.random()-.5)*500));
+  const n=spawnNpc('war',cls,pos,WAR_PAINT[f]);
+  Object.assign(n,{war:f,hostile:false,speed:200+c.speed*40,turn:1.05*c.agility,dmg:4+c.dmg*.3,maxShield:Math.round(c.shield*.6),maxHull:c.hull,leave:0});
+  n.shield=n.maxShield;n.hull=n.maxHull;n.group.lookAt(WAR.point);n.group.rotateY(Math.PI);
+  if(reinforce)boom(pos,14,'#bfe6ff',.5);
+  return n;
+}
+function startBattle(c){
+  Object.assign(WAR,{on:true,seed:system.seed,owner:c.owner,chal:c.chal,epoch:c.epoch,control:0,side:null,res:{[c.owner]:8,[c.chal]:8},reinT:{}});
+  const sp=station.group.position,off=new V3().crossVectors(sp.clone().normalize(),Y_AXIS).normalize().multiplyScalar(3200);
+  WAR.point=sp.clone().add(off).add(new V3(0,600,0));
+  for(let i=0;i<4;i++){spawnWarShip(c.owner,-1);spawnWarShip(c.chal,1)}
+  pirateTimer=Math.max(pirateTimer,240);
+  toast(`Territory battle! The ${FN(c.chal)} is attacking the ${FN(c.owner)} for control of ${system.name}. Fire on one side to join the other, or enlist at the station.`,'big');Sound.alarm();
+}
+function joinWar(f){
+  if(!WAR.on||WAR.side)return;if(isHostileTo(f)){toast(`The ${FN(f)} will not have you on their side.`,'bad');return}
+  WAR.side=f;toast(`You now fight for the ${FN(f)}${f===WAR.owner?' in defense of':' in the attack on'} ${system.name}.`,'big');Sound.blip(500,.3,'triangle',.15);
+}
+function warHit(n,src){
+  if(src!=='player')return;n.lastPlayer=true;
+  if(!WAR.on)return;
+  if(!WAR.side)joinWar(n.war===WAR.owner?WAR.chal:WAR.owner);
+  else if(n.war===WAR.side&&(!n.ffT||time-n.ffT>4)){n.ffT=time;toast('Friendly fire! That ship is on your side.','bad');addRep(n.war,-2,'friendly fire')}
+}
+function warKill(n){
+  if(n.lastPlayer){addRep(n.war,-4,'warship destroyed');if(WAR.side&&WAR.side!==n.war)addRep(WAR.side,3)}
+  if(!WAR.on)return;const w=n.lastPlayer?12:8;WAR.control+=n.war===WAR.owner?w:-w;
+}
+function endBattle(winner,why){
+  if(!WAR.on)return;WAR.on=false;
+  if(winner){
+    if(winner===WAR.chal){setTerritory(WAR.seed,winner,WAR.epoch);const old=system.faction;system.faction=winner;recolorBanner();toast(`The ${FN(winner)} has seized ${system.name} from the ${FN(old)}!`,'big')}
+    else{setTerritory(WAR.seed,WAR.owner,WAR.epoch);toast(`The ${FN(WAR.owner)} held ${system.name}. The attackers are retreating.`,'big')}
+    if(WAR.side){const loser=winner===WAR.owner?WAR.chal:WAR.owner;
+      if(WAR.side===winner){addRep(winner,15,'battle won');addRep(loser,-10,'fought against them');const l={units:1200,nanites:150,aurium:3};giveLoot(l);setTimeout(()=>toast(`War merits: ${lootText(l)}`,'big'),1200)}
+      else{addRep(winner,-5);setTimeout(()=>toast('Your side lost the battle.','bad'),1200)}}
+    Sound.whoosh(1.4);
+  }else if(why==='ceasefire')toast('Ceasefire. The battle ends without a victor.');
+  WAR.side=null;save();
+}
+function updateWarShip(n,dt){
+  const g=n.group;n.shieldDelay-=dt;if(n.shieldDelay<=0)n.shield=Math.min(n.maxShield,n.shield+6*dt);
+  let T=null,bd=4500;
+  for(const o of npcs){if(!o.war||o.war===n.war)continue;const d=o.group.position.distanceTo(g.position);if(d<bd){bd=d;T={pos:o.group.position,vel:o.vel}}}
+  const flying=st.mode==='ship'&&ship.state==='flying';
+  if(flying&&((WAR.side&&WAR.side!==n.war)||isHostileTo(n.war))){const d=ship.group.position.distanceTo(g.position);if(d<bd*1.15){bd=d;T={pos:ship.group.position,vel:new V3(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed),me:true}}}
+  const fwd=new V3(0,0,-1).applyQuaternion(g.quaternion);let spd=n.speed;
+  if(!WAR.on){n.leave+=dt;desired.copy(fwd);spd*=1.5;if(n.leave>15){scene.remove(g);npcs.splice(npcs.indexOf(n),1);return}}
+  else if(T){const to=T.pos.clone().sub(g.position),dist=to.length();
+    if(n.evade>0){n.evade-=dt;desired.copy(n.evadeDir)}
+    else if(dist<100){n.evade=1.2+Math.random();n.evadeDir.copy(fwd).addScaledVector(randDir(Math.random,new V3()),1.2).normalize();desired.copy(n.evadeDir)}
+    else{desired.copy(to).addScaledVector(T.vel,dist/BOLT_SPEED).normalize();if(dist<300)spd*=.8}
+    n.fireCD-=dt;
+    if(n.fireCD<=0&&dist<800&&n.evade<=0){const aim=T.pos.clone().addScaledVector(T.vel,dist/BOLT_SPEED).sub(g.position).normalize();
+      if(fwd.dot(aim)>.97){const gp=g.userData.guns[n.gunI++%g.userData.guns.length];aim.add(new V3((Math.random()-.5)*.04,(Math.random()-.5)*.04,(Math.random()-.5)*.04)).normalize();
+        fireBolt(g.localToWorld(gp.clone()),aim,n.vel,'war',n.dmg,n.war);n.fireCD=.35+Math.random()*.35;if(T.me&&dist<500)Sound.pew(560,.03)}else n.fireCD=.08}}
+  else desired.copy(WAR.point).sub(g.position).normalize();
+  const P=nearestPlanet(g.position);
+  if(P){const d=tV2.copy(g.position).sub(P.center);const r=d.length();if(r<P.radius*1.4){d.divideScalar(r);const fl=P.floorAt(d);if(r<fl+80)desired.addScaledVector(d,2).normalize();if(r<fl+6)g.position.copy(P.center).addScaledVector(d,fl+6)}}
+  upL.set(0,1,0).applyQuaternion(g.quaternion);mL.lookAt(g.position,tV2.copy(g.position).add(desired),upL);qT.setFromRotationMatrix(mL);g.quaternion.rotateTowards(qT,n.turn*dt);
+  n.curSpeed=lerp(n.curSpeed,spd,1-Math.exp(-dt*1.2));n.vel.copy(fwd).multiplyScalar(n.curSpeed);g.position.addScaledVector(n.vel,dt);
+  const th=clamp(n.curSpeed/300,.2,1);for(const e of g.userData.engines)e.scale.set(1,1,1+th*5);
+}
+const warActive=f=>npcs.filter(n=>n.war===f).length;
+function updateWar(dt){
+  // shared territory: subscribe once the database is available
+  if(DBS.db&&!WAR.sub){WAR.sub=true;DBS.db.collection('territory').onSnapshot(snap=>{
+    for(const ch of snap.docChanges()){const d=ch.doc.data();if(ch.type==='removed')TERR.delete(ch.doc.id);else if(d&&FACTIONS[d.f]&&Number.isFinite(d.epoch))TERR.set(ch.doc.id,{f:d.f,epoch:d.epoch})}
+    applyTerritoryChange();if(!$('standing').hidden)renderStanding()},()=>{})}
+  if(!system||!station||!planets.length)return;
+  WAR.checkT-=dt;
+  if(!WAR.on&&WAR.checkT<=0){WAR.checkT=5;const c=contestFor(system.seed);if(c)startBattle(c)}
+  if(!WAR.on)return;
+  if(WAR.seed!==system.seed){WAR.on=false;WAR.side=null;return}
+  const w=warNow();if(w.epoch!==WAR.epoch||w.ceasefire){endBattle(null,'ceasefire');return}
+  const aO=warActive(WAR.owner),aC=warActive(WAR.chal);
+  WAR.control=clamp(WAR.control+(aC-aO)*.35*dt,-100,100);
+  for(const [f,sign] of [[WAR.owner,-1],[WAR.chal,1]]){const a=f===WAR.owner?aO:aC;
+    if(a<3&&WAR.res[f]>0&&(WAR.reinT[f]||0)<time){WAR.reinT[f]=time+8;const k=Math.min(2,WAR.res[f]);WAR.res[f]-=k;for(let i=0;i<k;i++)spawnWarShip(f,sign,true);
+      if(ship.group.position.distanceTo(WAR.point)<8000)toast(`${FN(f)} reinforcements have arrived.`)}}
+  if(WAR.control>=100||(warActive(WAR.owner)===0&&WAR.res[WAR.owner]<=0))endBattle(WAR.chal);
+  else if(WAR.control<=-100||(warActive(WAR.chal)===0&&WAR.res[WAR.chal]<=0))endBattle(WAR.owner);
+}
+function updateWarBar(){
+  const show=WAR.on&&WAR.point&&(st.mode==='foot'?false:ship.group.position.distanceTo(WAR.point)<25000);
+  $('warBar').hidden=!show;if(!show)return;
+  const O=FACTIONS[WAR.owner],C=FACTIONS[WAR.chal];
+  setText('warTitle',`Battle for ${system.name}`);
+  setText('warSide',WAR.side?`You fight for the ${FN(WAR.side)}`:'Fire on a side to join the other');
+  $('warA').style.background=O.color;$('warB').style.background=C.color;
+  $('warA').style.width=((100-WAR.control)/2)+'%';$('warB').style.width=((100+WAR.control)/2)+'%';
+  setText('warSub',`${O.name} defending · ${warActive(WAR.owner)} ships, ${WAR.res[WAR.owner]} in reserve   |   ${C.name} attacking · ${warActive(WAR.chal)} ships, ${WAR.res[WAR.chal]} in reserve`);
+}
+function warSummary(){
+  const w=warNow(),min=Math.ceil((w.left-(w.ceasefire?0:WAR_CEASE))/60);
+  if(w.ceasefire)return{line:`Ceasefire · the next war begins in ${Math.ceil(w.left/60)} min`,score:''};
+  const cnt={};const all=new Map([...Object.entries(territoryLocal()),...TERR]);
+  for(const [,t] of all)if(t.epoch===w.epoch)cnt[t.f]=(cnt[t.f]||0)+1;
+  return{line:`War: the ${FN(w.a)} and the ${FN(w.b)} are fighting · ${min} min until ceasefire`,score:`Systems held or seized this war: ${FN(w.a)} ${cnt[w.a]||0} · ${FN(w.b)} ${cnt[w.b]||0}`};
+}
+
 /* ---------- space stations & trading posts ---------- */
 let station=null,trade=null,nearPost=null;
 const ECON=[
@@ -2294,10 +2448,11 @@ function renderTrade(){
       <tr><td>Launch fuel</td><td>${Math.round(ship.fuel)}/100</td><td>${fc} u</td><td class="btns"><button type="button" data-act="refuel" ${fc<=0||inv.units<fc?'disabled':''}>Refuel</button></td></tr>
       </tbody></table></div><p class="trnote">${isSt?'Shields are recharged for free while docked.':'Repairs here reach your ship on the landing pad.'}</p>`;
   }else if(trade.tab==='faction'){
+    const warRow=WAR.on?`<div class="urow"><div><span class="nm">Territory battle</span></div><div class="ds">The ${FN(WAR.chal)} is attacking the ${FN(WAR.owner)} for this system. ${WAR.side?'You fight for the '+FN(WAR.side)+'.':'Enlist with a side; the winners pay war merits and standing.'}</div><div class="acts">${WAR.side?'':`<button type="button" data-act="joinwar" data-f="${WAR.owner}">Defend (${FN(WAR.owner).split(' ')[0]})</button><button type="button" data-act="joinwar" data-f="${WAR.chal}">Attack (${FN(WAR.chal).split(' ')[0]})</button>`}</div></div>`:'';
     const f=system.faction,F=FACTIONS[f],val=repOf(f),T=repTier(val),pk=F.perk,owned=tech(pk.id),canPerk=val>=60&&!owned,pkPrice=Math.round(pk.price*repBuy());
     h=`<div class="csec" style="color:${F.color}">${F.name}</div><p class="envoy">${F.lines[T.key]}</p>
       <p class="trnote">Your standing: <b style="color:${T.color}">${T.name} (${val>0?'+':''}${Math.round(val)})</b> · prices here ${Math.round((repBuy()-1)*100)>0?'+':''}${Math.round((repBuy()-1)*100)}% to buy, ${Math.round((repSell()-1)*100)>=0?'+':''}${Math.round((repSell()-1)*100)}% when selling. ${F.desc}</p>
-      <div class="urow"><div><span class="nm">Donate 500 units</span></div><div class="ds">A gift to the ${F.name}: +5 standing.</div><div class="acts"><button type="button" data-act="donate" ${inv.units<500?'disabled':''}>Donate</button></div></div>
+      ${warRow}<div class="urow"><div><span class="nm">Donate 500 units</span></div><div class="ds">A gift to the ${F.name}: +5 standing.</div><div class="acts"><button type="button" data-act="donate" ${inv.units<500?'disabled':''}>Donate</button></div></div>
       ${f==='lumen'?`<div class="urow"><div><span class="nm">Give a relic to the Archive</span></div><div class="ds">+12 standing and 150 Nanites per relic.</div><div class="acts"><button type="button" data-act="giverelic" ${inv.relics<1?'disabled':''}>Give relic (${inv.relics})</button></div></div>`:''}
       <div class="urow"><div><span class="nm">${pk.name}</span></div><div class="ds">${pk.desc}. Sold only to those the ${F.name} holds Honored (+60).</div>
         <div class="acts">${owned?'<span class="own">Installed</span>':`<button type="button" data-act="perk" ${canPerk&&inv.units>=pkPrice?'':'disabled'}>${val>=60?pkPrice.toLocaleString()+' u':'Requires Honored'}</button>`}</div></div>`;
@@ -2327,6 +2482,7 @@ $('trBody').addEventListener('click',e=>{
   else if(a==='refuel'){const c=Math.ceil((100-ship.fuel)*2*repBuy());if(c>0&&inv.units>=c){inv.units-=c;ship.fuel=100;toast('Launch thrusters refueled.')}else ok=false}
   else if(a==='accept'){if(!st.mission){const o=station.missions.splice(+b.dataset.i,1)[0];st.mission=Object.assign({},o,{have:0});toast(`Mission accepted: ${missionText()}`,'big');if(o.type==='bounty')pirateTimer=Math.min(pirateTimer,25);if(o.type==='boss'){st.bossDue=true;pirateTimer=Math.min(pirateTimer,30);toast('A dreadnought will hunt you once you are in open space, away from the station.')}}else ok=false}
   else if(a==='turnin'){if(missionDone()){const m=st.mission;if(m.type==='supply')inv[m.res]-=m.qty;inv.units+=m.reward;toast(`Mission complete: +${m.reward} units.`,'big');addRep(system.faction,m.type==='boss'?15:8,'contract completed');st.mission=null}else ok=false}
+  else if(a==='joinwar'){joinWar(b.dataset.f)}
   else if(a==='donate'){if(inv.units>=500){inv.units-=500;addRep(system.faction,5,'donation')}else ok=false}
   else if(a==='giverelic'){if(inv.relics>0){inv.relics--;inv.nanites+=150;addRep('lumen',12,'relic given to the Archive')}else ok=false}
   else if(a==='perk'){const F=FACTIONS[system.faction],pk=F.perk,pr=Math.round(pk.price*repBuy());if(repOf(system.faction)>=60&&!tech(pk.id)&&inv.units>=pr){inv.units-=pr;crafted[pk.id]=true;toast(`${pk.name} installed.`,'big')}else ok=false}
@@ -3190,6 +3346,7 @@ function drawMarkers(){
   if(st.mode==='ship'&&ship.state!=='warp'&&ship.state!=='docked'){const sp=ship.group.position;
     for(const a of anomalies){const dd=a.group.position.distanceTo(sp);if(dd<22000&&dd>80){const p=proj(a.group.position,false);if(!p.off)marker(p.x,p.y,ANOM_INFO[a.kind].color,ANOM_INFO[a.kind].label,fmtDist(dd)+(looted(a.key)?' · spent':''),'ring',8)}}
     if(freighter){const w=freighterAirlock(),dd=w.distanceTo(sp);if(dd<22000&&dd>60){const p=proj(dd<3000?w:freighter.group.position,false);if(!p.off)marker(p.x,p.y,'#ff8a6a','Derelict freighter',fmtDist(dd)+(dd<3000?' · airlock':''),'diamond',8)}}}
+  if(WAR.on&&WAR.point&&st.mode==='ship'){const dd=WAR.point.distanceTo(ship.group.position);if(dd>2500&&dd<40000){const p=proj(WAR.point,true);marker(p.x,p.y,'#ff9a6a','Territory battle',fmtDist(dd),'diamond',9)}}
   if(st.mode!=='derelict')for(const pst of (current&&current.posts)||[]){const pw=pst.group.localToWorld(new V3(0,5,0));const ref4=st.mode==='foot'?player.pos:ship.group.position;const dd=pw.distanceTo(ref4);
     if(dd>25&&dd<(st.mode==='foot'?2000:8000)){const p=proj(pw,false);if(!p.off)marker(p.x,p.y,'#ffb45e','Trading post',`${pst.name} · ${fmtDist(dd)}`,'ring',6)}}
   if(!buildMode)for(const B of allBaseList()){const rt=baseRTs.get(B.id);if(!rt)continue;const mine=B===myBase;
@@ -3208,14 +3365,15 @@ function drawMarkers(){
       if(!p.off){mctx.strokeStyle='rgba(255,217,163,.85)';mctx.lineWidth=1.5;mctx.beginPath();mctx.arc(p.x,p.y,9,0,Math.PI*2);mctx.moveTo(p.x-15,p.y);mctx.lineTo(p.x-11,p.y);mctx.moveTo(p.x+11,p.y);mctx.lineTo(p.x+15,p.y);mctx.stroke()}}
     for(const n of npcs.concat([...ghosts.values()])){
       const dist=n.group.position.distanceTo(sp);
-      if(n.hostile&&dist<6000){
+      if(n.war&&!isWarEnemy(n)){if(dist<6000){const p=proj(n.group.position,false);if(!p.off)marker(p.x,p.y,FACTIONS[n.war].color,`${FN(n.war).split(' ')[0]} ${SHIP_CLASSES[n.cls].label}${WAR.side?' · ally':''}`,fmtDist(dist),'ring',5)}continue}
+      if((n.hostile||isWarEnemy(n))&&dist<6000){
         const p=proj(n.group.position,true);
         const b=clamp(2200/Math.max(dist,1)*n.radius,10,46);
         mctx.strokeStyle='#ff6274';mctx.lineWidth=2;mctx.beginPath();
         for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){mctx.moveTo(p.x+sx*b,p.y+sy*b*.6);mctx.lineTo(p.x+sx*b,p.y+sy*b);mctx.lineTo(p.x+sx*b*.6,p.y+sy*b)}
         mctx.stroke();
         mctx.font='600 11px Oxanium, system-ui, sans-serif';mctx.textAlign='center';mctx.fillStyle='#ff9aa6';mctx.shadowColor='#000';mctx.shadowBlur=4;
-        mctx.fillText(`${n.boss?(n.name||'Pirate dreadnought'):({pirate:'Pirate',korrath:'Korrath'}[n.faction]||'Trader')+' '+SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
+        mctx.fillText(`${n.boss?(n.name||'Pirate dreadnought'):(n.war?FN(n.war).split(' ')[0]:({pirate:'Pirate',korrath:'Korrath'}[n.faction]||'Trader'))+' '+SHIP_CLASSES[n.cls].label} · ${fmtDist(dist)}`,p.x,p.y-b-16);mctx.shadowBlur=0;
         const w=Math.max(40,b*2);
         mctx.fillStyle='rgba(255,255,255,.15)';mctx.fillRect(p.x-w/2,p.y-b-11,w,3);mctx.fillRect(p.x-w/2,p.y-b-6,w,3);
         mctx.fillStyle='#9fe6ff';mctx.fillRect(p.x-w/2,p.y-b-11,w*Math.max(0,n.shield/n.maxShield),3);
@@ -3256,6 +3414,7 @@ function objective(){
   if(st.mode==='foot'&&WX.state==='storm'&&WX.I>.3&&!WX.shelter)return `${WX.W.name}! Life support drains ${WX.drainMul.toFixed(1)}× faster. Shelter under a roof or in your ship${WX.crystals.length?' · storm crystals glow nearby':''}`;
   if(WX.state==='warn'&&WX.I<.05&&st.mode==='foot')return `${WX.W.name} in ${Math.ceil(WX.inSec)} s · head for shelter`;
   if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
+  if(WAR.on&&st.mode==='ship')return WAR.side?`Battle for ${system.name}: fight for the ${FN(WAR.side)} · enemy ships have red brackets`:`Territory battle in this system: fire on one side to join the other, or stay clear`;
   if(st.mode==='ship'&&allHostiles().length)return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
   if(st.mode==='ship'&&ship.state==='docked')return 'Docked · sell resources, refit, buy ships and take missions. E undocks';
   if(st.mission&&st.mode==='ship'&&ship.state==='flying')return missionText();
@@ -3271,7 +3430,7 @@ function objective(){
   return 'Climb out of the atmosphere and press H to jump to a new star';
 }
 function updateHUD(){
-  updateBossBar();
+  updateBossBar();updateWarBar();
   const P=current;
   if(P){
     setText('sysName',`${system.name} · ${system.star.name}`);setText('pName',P.name);
@@ -3279,7 +3438,7 @@ function updateHUD(){
     setText('pFlora',P.floraLevel);
     const known=P.species.filter((s,i)=>st.disc.has(`S:${P.sysSeed}:${P.idx}:${i}`)).length;
     setText('pFauna',P.species.length?`${known}/${P.species.length} catalogued`:'None detected');
-    setText('pDisc',String(st.disc.size));setText('pWeather',weatherText());if(system&&system.faction){const F=FACTIONS[system.faction],T=repTier(repOf(system.faction));setText('pFaction',`${F.name} · ${T.name}`);$('pFaction').style.color=T.color}$('pWeather').style.color=WX.state==='storm'&&WX.I>.05?'var(--danger)':WX.state==='warn'?'var(--amber-hi)':'';
+    setText('pDisc',String(st.disc.size));setText('pWeather',weatherText());if(system&&system.faction){const F=FACTIONS[system.faction],T=repTier(repOf(system.faction));setText('pFaction',`${F.name} · ${T.name}${WAR.on?' · contested':''}`);$('pFaction').style.color=T.color}$('pWeather').style.color=WX.state==='storm'&&WX.I>.05?'var(--danger)':WX.state==='warn'?'var(--amber-hi)':'';
   }
   setText('iC',String(inv.carbon));setText('iF',String(inv.ferrite));setText('iA',String(inv.aurium));setText('iCo',String(inv.cobalt));setText('iN',String(inv.nanites));setText('iR',String(inv.relics));setText('iU',inv.units.toLocaleString());
   setText('objective',objective());
@@ -3336,7 +3495,7 @@ function loop(now){
   if(st.mode==='foot'&&current)updateFoot(dt);
   else if(st.mode==='ship'&&(current||ship.state==='warp'))updateShip(dt);
   else if(st.mode==='derelict')updateDerelict(dt);
-  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateAnomalies(dt);updateWeather(dt);updateEnv();
+  updateMining(dt);updateCreatures(dt);updateCombat(dt);updateBase(dt);updateBuild();updateStation(dt);updateMP(dt);updateMissiles(dt);updateLock(dt);updateWar(dt);updateAnomalies(dt);updateWeather(dt);updateEnv();
   if(time%15<dt)save();
   mouseDX=mouseDY=0;
   renderer.render(scene,camera);
@@ -3349,7 +3508,7 @@ async function begin(saved){
   $('btnNew').disabled=$('btnCont').disabled=true;
   Sound.init();
   if(saved){st.seed=saved.seed;st.systems=saved.systems||1;Object.assign(inv,saved.inv||{});ship.fuel=saved.fuel||0;st.disc=new Set(saved.disc||[]);
-    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.looted=new Set(saved.looted||[]);
+    Object.assign(upg,saved.upg||{});kills=saved.kills||0;Object.assign(crafted,saved.crafted||{});st.rep=Object.assign({vael:0,korrath:0,lumen:0},saved.rep||{});st.territory=saved.territory||{};st.looted=new Set(saved.looted||[]);
     myBase=saved.base||null;if(myBase){myBase.id=myBase.id||'local';for(const q of myBase.pieces){q.id=q.id||newPieceId();if(q.at==null)q.at=Date.now()}}base=myBase;st.mission=saved.mission||null;st.extraFirst=saved.extraFirst||[];if(!saved.inv||saved.inv.units==null)inv.units=300;st.firstSeed=saved.firstSeed!=null?saved.firstSeed:(st.systems===1?st.seed:null);
     if(saved.cls&&SHIP_CLASSES[saved.cls])setShipModel(saved.cls,saved.paint||PAINTS.player)}
   else{st.seed=(Math.random()*2**31)>>>0;st.firstSeed=st.seed;st.extraFirst=[];st.looted=new Set();st.rep={vael:0,korrath:0,lumen:0};myBase=null;base=null;st.systems=1;Object.assign(inv,{carbon:6,ferrite:0,aurium:0,cobalt:0,nanites:0,relics:0,units:300});ship.fuel=0;st.disc=new Set()}
