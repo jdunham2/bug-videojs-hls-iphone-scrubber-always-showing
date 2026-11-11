@@ -2197,6 +2197,10 @@ const NPCS = [
    hello:["Got any cards? I'll look at anything!","Every monster has a card. Some are very rare.","Trade with friends to fill your album!"], rumors:["Monsters sometimes drop a card of themselves. Elites drop them far more often. Party members can gift you the ones you're missing."]},
   {id:'iris',town:'maplehold',dx:3,dy:-3,name:'Iris the Photographer',role:'Photo requests',cols:{cloak:'#3a3a3a',skin:'#e8c8a8',hair:'#c83a3a'},photoreq:true,freeSpot:true,
    hello:["Say cheese!","The light is perfect today.","I need pictures for my gallery!"], rumors:["Press H for photo mode. Frame what I ask for, snap it, and I'll pay for every picture on my list."]},
+  {id:'bea',town:'reed',dx:4,dy:-3,name:'Farmer Bea',role:'Mole trouble',cols:{cloak:'#6a8a3a',skin:'#d8a880',hair:'#c8a040'},molefarm:true,freeSpot:true,
+   hello:["Those blasted moles!","My carrots! My poor carrots!","Got a mallet? I've got moles."], rumors:["Moles pop up and duck back down fast. Golden moles are worth extra, but don't bonk my cat!"]},
+  {id:'bjorn',town:'tallpine',dx:-3,dy:3,name:'Bjorn the Logroller',role:'Log rolling',cols:{cloak:'#8a3a2a',skin:'#e0b090',hair:'#d08a3a'},logroll:true,freeSpot:true,
+   hello:["Step on the log, if you dare!","Feet quick, knees loose!","Nobody stays on longer than me."], rumors:["When the log tips one way, lean the other. It spins faster the longer you stay on."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -4639,13 +4643,15 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
+  else if (logr && logr.on) { if (['arrowleft', 'arrowright', 'a', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); logr.keys.add(k); } }
+  else if (moles && moles.on) { const n9 = {'7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8, q: 0, w: 1, e: 2, a: 3, s: 4, d: 5, z: 6, x: 7, c: 8}[k]; if (n9 != null) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) moleWhack(n9); } }
   else if (cart && cart.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'arrowup' || k === 'w') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cartJump(); } }
   else if (snow && snow.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); snow.keys.add(k); } else if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) snowThrow(); } }
   else if (wrestle && wrestle.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) wrestleMash(); } }
   else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
-addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
+addEventListener('keyup', e => { if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
 const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
 const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
@@ -5048,6 +5054,56 @@ function photoReqTalk(n) {
   if (ready.length) { for (const R0 of ready) done[R0.k] = 'paid'; const c = ready.length*60; S.coins += c; S.photoReqPaid = PHOTO_REQS.filter(R0 => done[R0.k] === 'paid').length; SFX.victory(); renderHUD(); save();
     if (S.photoReqPaid === PHOTO_REQS.length && !S.photoGallery) { S.photoGallery = true; S.coins += 800; addItem('gem', 2); setTimeout(() => toast('<b>Iris’s gallery is complete!</b><br>She gives you 800 coin and two gems, and hangs your name by the door.', 6000), 400); } }
   say(`${ready.length ? `“Wonderful shots! Here’s ${ready.length*60} coin.”<br><br>` : ''}<b>Photo requests (${PHOTO_REQS.filter(R0 => done[R0.k] === 'paid').length}/${PHOTO_REQS.length})</b><br>${PHOTO_REQS.map(R0 => done[R0.k] === 'paid' ? `<span style="color:var(--good)">✓ ${R0.name}</span>` : `○ ${R0.name}`).join('<br>')}<br><br><span style="color:var(--muted)">Press H for photo mode, frame the shot and press Space. 60 coin per request.</span>`, [back(n)]);
+}
+// ===== whack-a-mole =====
+let moles = null;
+function moleStart() {
+  if (S.moleDay === S.day && (S.moleToday || 0) >= 3) { openPanel('Farmer Bea', '“That’s enough moles for one day, dear. Come back tomorrow!”', [{label: 'OK', fn: closeTalk}]); return; }
+  if (S.moleDay !== S.day) { S.moleDay = S.day; S.moleToday = 0; } S.moleToday++;
+  moles = {on: true, t: 30, holes: Array.from({length: 9}, () => ({up: 0, kind: null, wait: .5 + Math.random()*2})), score: 0, cur: 4, last: performance.now(), miss: 0};
+  openPanel('Whack-a-mole', '<div id="moleGrid" style="display:grid;grid-template-columns:repeat(3,72px);gap:8px;justify-content:center;margin:8px 0"></div><div id="moleInfo" style="text-align:center"></div><div style="text-align:center;color:var(--muted);margin-top:4px">Click a hole, or use Q W E / A S D / Z X C (or the number pad). Don’t bonk the cat!</div>', [{label: 'Stop', fn: () => { moles = null; closeTalk(); }}]);
+  setTimeout(() => { const g = document.getElementById('moleGrid'); if (!g) return; g.innerHTML = Array.from({length: 9}, (_, i) => `<button class="btn" data-mole="${i}" style="height:72px;padding:0;font-size:32px;background:#5a3a20;border-color:#3a2410"></button>`).join(''); g.querySelectorAll('[data-mole]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); moleWhack(+b.dataset.mole); })); }, 20);
+  requestAnimationFrame(moleLoop);
+}
+function moleCursor(i) { if (moles) moles.cur = i === 1 ? Math.max(0, moles.cur - 3) : i === 7 ? Math.min(8, moles.cur + 3) : i === 3 ? (moles.cur % 3 ? moles.cur - 1 : moles.cur) : (moles.cur % 3 < 2 ? moles.cur + 1 : moles.cur); }
+function moleWhack(i) {
+  const M = moles; if (!M || !M.on) return; const h = M.holes[i]; M.cur = i; if (!h) return;
+  if (h.up > 0 && h.kind && !h.hit) { h.hit = true; h.up = Math.min(h.up, .2);
+    if (h.kind === 'cat') { M.score = Math.max(0, M.score - 3); SFX.hurt(); } else { M.score += h.kind === 'gold' ? 5 : 1; AUD.tone(h.kind === 'gold' ? 1000 : 600, .08, 'square', .07); } }
+  else { M.miss++; SFX.click(); }
+}
+function moleLoop() {
+  const M = moles; if (!M || !M.on) return; const g = document.getElementById('moleGrid'); if (!g || mode !== 'talk') { moles = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - M.last)/1000); M.last = now; M.t -= dt;
+  const upT = Math.max(.55, 1.1 - (30 - M.t)*.018);
+  for (const h of M.holes) { if (h.up > 0) { h.up -= dt; if (h.up <= 0) { h.kind = null; h.hit = false; h.wait = .9 + Math.random()*2.6; } } else { h.wait -= dt; if (h.wait <= 0) { const r = Math.random(); h.kind = r < .1 ? 'gold' : r < .22 ? 'cat' : 'mole'; h.up = upT; h.hit = false; } } }
+  g.querySelectorAll('[data-mole]').forEach((b, i) => { const h = M.holes[i], t = h.up > 0 && h.kind ? (h.hit ? (h.kind === 'cat' ? '\u{1F63E}' : '\u{1F4AB}') : h.kind === 'cat' ? '\u{1F431}' : h.kind === 'gold' ? '\u{1F31F}' : '\u{1F439}') : ''; if (b.textContent !== t) b.textContent = t; b.style.outline = PAD.active && i === M.cur ? '3px solid #ffd040' : ''; });
+  const info = document.getElementById('moleInfo'); if (info) info.textContent = `Moles whacked: ${M.score} · ${Math.ceil(M.t)}s`;
+  if (M.t <= 0) { M.on = false; moles = null; const c = Math.min(150, M.score*2); S.coins += c; S.moleBest = Math.max(S.moleBest || 0, M.score); S.moleGames = (S.moleGames || 0) + 1; renderHUD(); save(); SFX.victory();
+    openPanel('Whack-a-mole', `Time! You whacked <b>${M.score}</b> points of moles.${M.score >= (S.moleBest || 0) && M.score ? ' A new best!' : ''}<br>“My carrots are saved! Take this for your trouble.” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Close', fn: closeTalk}]); return; }
+  requestAnimationFrame(moleLoop);
+}
+// ===== log rolling =====
+let logr = null;
+function logStart() {
+  logr = {on: true, bal: 0, v: 0, t: 0, keys: new Set(), pad: 0, last: performance.now(), push: 0, pt: 0, spin: 0};
+  openPanel('Log rolling', '<canvas id="logC" width="300" height="180" style="display:block;margin:0 auto;border-radius:6px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → (or A/D, stick) to keep your balance. Stay on as long as you can!</div>', [{label: 'Jump off', fn: () => { if (logr) logr.bal = 99; }}]);
+  requestAnimationFrame(logLoop);
+}
+function logLoop() {
+  const L = logr; if (!L || !L.on) return; const c = document.getElementById('logC'); if (!c || mode !== 'talk') { logr = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - L.last)/1000); L.last = now; L.t += dt; L.spin += dt*(2 + L.t*.15);
+  L.pt -= dt; if (L.pt <= 0) { L.pt = .6 + Math.random()*1.2; L.push = (Math.random() < .5 ? -1 : 1)*(.5 + Math.random()*(.6 + L.t*.03)); }
+  let inp = L.pad; if (L.keys.has('arrowleft') || L.keys.has('a')) inp -= 1; if (L.keys.has('arrowright') || L.keys.has('d')) inp += 1; inp = Math.max(-1, Math.min(1, inp));
+  L.v += (L.push*1.2 + L.bal*1.6 + inp*2.6)*dt; L.v *= Math.pow(.4, dt); L.bal += L.v*dt;
+  const g = c.getContext('2d'); g.fillStyle = '#6ab0d8'; g.fillRect(0, 0, 300, 180); g.fillStyle = '#4a90c0'; for (let i = 0; i < 6; i++) g.fillRect(((i*60 + L.t*30) % 330) - 30, 150 + (i % 2)*8, 30, 2);
+  g.fillStyle = '#7a4a2a'; g.fillRect(40, 118, 220, 24); g.fillStyle = '#5a3418'; for (let x = 0; x < 220; x += 18) g.fillRect(40 + ((x + L.spin*20) % 220), 120, 3, 20); g.fillStyle = '#a07040'; g.beginPath(); g.ellipse(40, 130, 6, 12, 0, 0, 7); g.ellipse(260, 130, 6, 12, 0, 0, 7); g.fill();
+  const ang = L.bal*.9; g.save(); g.translate(150, 118); g.rotate(ang); g.fillStyle = '#2a2420'; g.fillRect(-6, -18, 4, 18); g.fillRect(2, -18, 4, 18); g.fillStyle = player.cols.cloak; g.fillRect(-8, -40, 16, 22); g.fillStyle = player.cols.skin; g.beginPath(); g.arc(0, -46, 6, 0, 7); g.fill(); g.fillStyle = player.cols.cloak; g.fillRect(-22, -38 - inp*4, 14, 4); g.fillRect(8, -38 + inp*4, 14, 4); g.restore();
+  g.fillStyle = '#0d131b'; g.fillRect(75, 12, 150, 8); g.fillStyle = Math.abs(L.bal) > .7 ? '#ff6a4a' : '#7ae08a'; g.fillRect(150 + L.bal*75 - 3, 10, 6, 12); g.fillStyle = '#fff'; g.fillRect(149, 10, 2, 12);
+  g.font = 'bold 13px sans-serif'; g.fillStyle = '#0d131b'; g.textAlign = 'left'; g.fillText(`${L.t.toFixed(1)}s`, 10, 40);
+  if (Math.abs(L.bal) > 1) { L.on = false; logr = null; SFX.boom(); const tt = Math.round(L.t*10)/10, c2 = Math.round(tt*3); S.coins += c2; S.logBest = Math.max(S.logBest || 0, tt); S.logGames = (S.logGames || 0) + 1; renderHUD(); save();
+    setTimeout(() => openPanel('Log rolling', `<b>SPLASH!</b> You lasted <b>${tt} seconds</b>${tt >= (S.logBest || 0) ? ' (personal best!)' : ''}. Bjorn roars with laughter as you climb out of the river. <span style="color:var(--good)">+${c2} coin</span>`, [{label: 'Again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); logStart(); }}, {label: 'Close', fn: closeTalk}]), 200); return; }
+  requestAnimationFrame(logLoop);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -6597,8 +6653,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Whack-a-mole and log rolling', 'Farmer Bea in Reedholm needs help with moles: whack them as they pop up (golden ones are worth extra) but leave her cat alone. Bjorn in Tallpine dares you onto a spinning log in the river: lean against every wobble with the arrow keys to stay on as long as you can.'],
   ['Monster cards', 'Monsters sometimes drop a card of themselves (elites much more often). Tobias in Crownfall keeps your album: he pays 25 coin for each new card, buys duplicates, and gives prizes at 10, 20 and a full album. Party members can gift you the cards you\u2019re missing.'],
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
@@ -7216,6 +7273,8 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (logr && logr.on) { logr.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
+  if (moles && moles.on) { const map9 = {12: 1, 13: 7, 14: 3, 15: 5}; for (const d in map9) if (down(+d)) moleCursor(map9[d]); if (down(OK) || down(2)) moleWhack(moles.cur); PAD.prev = B; return; }
   if (cart && cart.on) { if (down(OK) || down(BACK) || down(2) || down(3) || down(12)) cartJump(); PAD.prev = B; return; }
   if (snow && snow.on) { snow.cvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); snow.cvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK) || down(2) || down(7)) snowThrow(); PAD.prev = B; return; }
   if (wrestle && wrestle.on) { [OK, BACK, 2, 3].forEach(i => { if (down(i)) wrestleMash(); }); PAD.prev = B; return; }
@@ -8632,6 +8691,8 @@ function mainOptions(n) {
   if (n.snowfight) o.push({label: 'Have a snowball fight', primary: true, fn: () => snowStart()});
   if (n.cardman) o.push({label: 'Show my card album', primary: true, fn: () => cardTalk(n)});
   if (n.photoreq) o.push({label: 'Photo requests', primary: true, fn: () => photoReqTalk(n)});
+  if (n.molefarm) o.push({label: 'Whack the moles', primary: true, fn: () => moleStart()});
+  if (n.logroll) o.push({label: 'Try log rolling · 10\u25c6', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); logStart(); }});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11433,6 +11494,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['mole30','Mole Patrol','Score 30 at whack-a-mole', () => (S.moleBest || 0) >= 30],
+  ['logroll60','Steady Feet','Stay on the rolling log for 60 seconds', () => (S.logBest || 0) >= 60],
   ['cards10','Card Collector','Put 10 monster cards in your album', () => Object.keys(S.cardAlbum || {}).length >= 10],
   ['cardsall','Complete Album','Fill the whole monster card album', () => Object.keys(S.cardAlbum || {}).length >= CARD_KEYS.length],
   ['gallery','Gallery Opening','Complete all of Iris\u2019s photo requests', () => !!S.photoGallery],
@@ -12021,7 +12084,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
