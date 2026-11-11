@@ -1324,15 +1324,17 @@ function clearCombat(){
   npcs=[];bolts=[];salvage=[];booms=[];
 }
 function pickWaypoint(){if(station&&Math.random()<.35)return stationMouth().addScaledVector(randDir(Math.random,new V3()),250);const P=planets[Math.floor(Math.random()*planets.length)];return P.center.clone().addScaledVector(randDir(Math.random,new V3()),P.radius*(1.6+Math.random()*.6))}
+let netIdSeq=0;
 function spawnNpc(faction,cls,pos,paint){
   const g=buildShip(cls,paint);g.position.copy(pos);scene.add(g);
   const c=SHIP_CLASSES[cls],pir=faction==='pirate';
   const n={group:g,cls,faction,hostile:pir,maxHull:Math.round(c.hull*(pir?.5:.8)),maxShield:Math.round(c.shield*(pir?.45:.5)),
     speed:pir?190+c.speed*90:110,turn:(pir?1.05:.55)*c.agility,dmg:pir?4+c.dmg*.3:4,fireCD:1+Math.random()*2,evade:0,evadeDir:new V3(),
-    radius:g.userData.radius,gunI:0,way:null,shieldDelay:0,curSpeed:pir?260:110,vel:new V3(),leave:0};
+    radius:g.userData.radius,gunI:0,way:null,netId:++netIdSeq,shieldDelay:0,curSpeed:pir?260:110,vel:new V3(),leave:0};
   n.hull=n.maxHull;n.shield=n.maxShield;npcs.push(n);return n;
 }
-function hostilesNear(r){const p=ship.group.position;return npcs.some(n=>n.hostile&&n.group.position.distanceTo(p)<r)}
+const allHostiles=()=>npcs.filter(n=>n.hostile).concat([...ghosts.values()]);
+function hostilesNear(r){const p=ship.group.position;return allHostiles().some(n=>n.group.position.distanceTo(p)<r)}
 function fireBolt(from,dir,baseVel,owner,dmg){
   if(bolts.length>=BOLT_MAX*2)return;
   bolts.push({p:from.clone(),prev:from.clone(),v:dir.clone().multiplyScalar(BOLT_SPEED).add(baseVel),life:2.2,owner,dmg});
@@ -1378,15 +1380,23 @@ function destroyNpc(n){
   const p=n.group.position;boom(p,n.radius*3,'#ffa050',1.2);boom(p,n.radius*1.6,'#fff2c0',.6);Sound.boom(.6);
   scene.remove(n.group);npcs.splice(npcs.indexOf(n),1);
   const trader=n.faction==='trader';kills++;
-  if(!trader&&st.mission&&st.mission.type==='bounty'&&st.mission.have<st.mission.need){st.mission.have++;setTimeout(()=>toast(st.mission.have>=st.mission.need?`Bounty complete. Dock at any station to collect ${st.mission.reward} units.`:`Bounty: ${st.mission.have}/${st.mission.need} pirates destroyed.`),400)}
+  if(!trader)creditBounty();
+  dropSalvage(p,n.vel,trader);
+  if(!trader&&MP.sys)MP.sys.emit('kill',{id:n.netId,p:p.toArray().map(v=>Math.round(v*10)/10),h:[...(n.hitters||[])].slice(0,12)}).catch(()=>{});
+  toast(`${trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
+  if(!npcs.some(x=>x.hostile))setTimeout(()=>{if(!npcs.some(x=>x.hostile))toast('Area clear.','big')},600);
+}
+function creditBounty(){
+  if(st.mission&&st.mission.type==='bounty'&&st.mission.have<st.mission.need){st.mission.have++;
+    setTimeout(()=>toast(st.mission.have>=st.mission.need?`Bounty complete. Dock at any station to collect ${st.mission.reward} units.`:`Bounty: ${st.mission.have}/${st.mission.need} pirates destroyed.`),400)}
+}
+function dropSalvage(p,vel,trader){
   const drops=trader?ri(3,4):ri(1,2);
   for(let i=0;i<drops;i++){
     const l=trader?{ferrite:ri(10,25),cobalt:ri(3,10),aurium:ri(0,3),nanites:ri(15,35),units:ri(60,150)}:{units:ri(40,120),nanites:ri(20,45),cobalt:ri(2,7),aurium:Math.random()<.45?ri(1,3):0,ferrite:ri(0,8)};
     const m=new THREE.Mesh(salvGeo,salvMat);m.position.copy(p).addScaledVector(randDir(Math.random,new V3()),3);scene.add(m);
-    salvage.push({mesh:m,vel:n.vel.clone().multiplyScalar(.3).addScaledVector(randDir(Math.random,new V3()),12),life:120,loot:l,spin:new V3(Math.random(),Math.random(),Math.random())});
+    salvage.push({mesh:m,vel:vel.clone().multiplyScalar(.3).addScaledVector(randDir(Math.random,new V3()),12),life:120,loot:l,spin:new V3(Math.random(),Math.random(),Math.random())});
   }
-  toast(`${trader?'Trader':'Pirate'} ${SHIP_CLASSES[n.cls].label.toLowerCase()} destroyed. Fly through the salvage to collect it.`);
-  if(!npcs.some(x=>x.hostile))setTimeout(()=>{if(!npcs.some(x=>x.hostile))toast('Area clear.','big')},600);
 }
 function spawnPirates(){
   const n=Math.min(5,2+Math.floor((st.systems-1)/2));
@@ -1396,19 +1406,26 @@ function spawnPirates(){
     const npc=spawnNpc('pirate',Math.random()<.5?'fighter':'interceptor',pos,PAINTS.pirate);
     npc.group.lookAt(sp);npc.group.rotateY(Math.PI);
   }
-  toast(`${n} pirates inbound! Hold left click to fire. Shields recharge when you stop taking hits.`,'bad');Sound.alarm();
+  toast(`${n} pirates inbound! Hold left click to fire.${MP.avatars.size?' Your crew in this system will see them too.':' Shields recharge when you stop taking hits.'}`,'bad');Sound.alarm();
 }
 const qT=new Q4(),mL=new THREE.Matrix4(),upL=new V3(),desired=new V3();
+const tVelMe=new V3(),tVelMe2=new V3();
+function pickTarget(n){
+  const flying=st.mode==='ship'&&ship.state==='flying';let best=null,bd=6000;
+  if(flying){const d=n.group.position.distanceTo(ship.group.position);if(d<bd){bd=d;best={pos:ship.group.position,vel:tVelMe.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed),peer:myPeer()||'me',me:true}}}
+  if(n.faction==='pirate')for(const [peer,a] of MP.avatars){if(!a.flying||!a.ship)continue;const d=n.group.position.distanceTo(a.ship.position);if(d<bd){bd=d;best={pos:a.ship.position,vel:a.vel,peer,me:false}}}
+  return best;
+}
 function updateNpcs(dt){
   const flying=st.mode==='ship'&&ship.state==='flying';
-  const sp=ship.group.position;
-  const shipVel=tV3.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(flying?ship.speed:0);
   for(let i=npcs.length-1;i>=0;i--){
     const n=npcs[i],g=n.group;
     n.shieldDelay-=dt;if(n.shieldDelay<=0)n.shield=Math.min(n.maxShield,n.shield+8*dt);
     const fwd=tV.set(0,0,-1).applyQuaternion(g.quaternion);
     let spd=n.speed,has=true;
-    if(n.hostile&&flying){
+    const T=n.hostile?pickTarget(n):null;n.tgt=T?T.peer:'';
+    if(n.hostile&&T){
+      const sp=T.pos,shipVel=T.vel;
       const to=tV2.copy(sp).sub(g.position),dist=to.length();
       if(n.evade>0){n.evade-=dt;desired.copy(n.evadeDir)}
       else if(dist<110){n.evade=1.4+Math.random();n.evadeDir.copy(fwd).addScaledVector(randDir(Math.random,new V3()),1.2).normalize();desired.copy(n.evadeDir)}
@@ -1421,7 +1438,7 @@ function updateNpcs(dt){
           aim.add(new V3((Math.random()-.5)*.03,(Math.random()-.5)*.03,(Math.random()-.5)*.03)).normalize();
           fireBolt(g.localToWorld(new V3().copy(gp)),aim,n.vel,'enemy',n.dmg);
           n.fireCD=n.faction==='pirate'?.3+Math.random()*.35:.7;
-          if(dist<500)Sound.pew(520,.03);
+          if(dist<500&&T.me)Sound.pew(520,.03);
         }else n.fireCD=.08;
       }
       if(dist>7000&&n.faction==='pirate'){scene.remove(g);npcs.splice(i,1);continue}
@@ -1455,14 +1472,15 @@ function updateBolts(dt){
     if(!dead&&b.owner!=='station'&&station&&segHit(b.prev,b.p,station.group.position,50)){dead=true;boom(b.p,1.5,'#9fe6ff',.2)}
     if(!dead&&(b.owner==='player'||b.owner==='station')){
       for(const n of npcs)if((b.owner==='player'||n.hostile)&&segHit(b.prev,b.p,n.group.position,n.radius)){damageNpc(n,b.dmg,b.p);dead=true;break}
-    }else if(!dead&&flying&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}
+      if(!dead&&b.owner==='player')for(const G of ghosts.values())if(segHit(b.prev,b.p,G.group.position,G.radius)){boom(b.p,1.5,G.shield>0?'#7fd0ff':'#ffcf6a',.25);sendHit(G,b.dmg);dead=true;break}
+    }else if(!dead&&b.owner==='enemy'&&flying&&segHit(b.prev,b.p,ship.group.position,ship.group.userData.radius*.9)){damagePlayer(b.dmg);dead=true}
     if(!dead&&current){const d=bD.copy(b.p).sub(current.center);const r=d.length();if(r<current.radius*1.25){d.divideScalar(r);if(r<current.floorAt(d)){dead=true;boom(b.p,1.2,'#ffcf6a',.2)}}}
     if(dead)bolts.splice(i,1);
   }
   let ip=0,ie=0;
   for(const b of bolts){
     bQ.setFromUnitVectors(Z_AXIS,bD.copy(b.v).normalize());bM.compose(b.p,bQ,bS);
-    if(b.owner!=='enemy'){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
+    if(b.owner==='player'||b.owner==='station'){if(ip<BOLT_MAX)boltMeshP.setMatrixAt(ip++,bM)}else if(ie<BOLT_MAX)boltMeshE.setMatrixAt(ie++,bM);
   }
   boltMeshP.count=ip;boltMeshE.count=ie;boltMeshP.instanceMatrix.needsUpdate=true;boltMeshE.instanceMatrix.needsUpdate=true;
 }
@@ -1476,7 +1494,7 @@ function updateCombat(dt){
   // pirate waves
   if(flying&&current){
     const alt=ship.group.position.distanceTo(current.center)-current.radius;
-    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){spawnPirates();pirateTimer=80+Math.random()*80}}
+    if(alt>current.radius*.5&&!npcs.some(n=>n.faction==='pirate')&&!ghosts.size&&amHost()&&(!station||ship.group.position.distanceTo(station.group.position)>2500)){pirateTimer-=dt;if(pirateTimer<=0){spawnPirates();pirateTimer=80+Math.random()*80}}
   }
   updateNpcs(dt);updateBolts(dt);
   // salvage
@@ -2009,6 +2027,67 @@ const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 let myName=clean(lsGet('driftward-name'),20)||('Traveller-'+Math.floor(1000+Math.random()*9000));
 let myColor=CREW_COLORS.includes(lsGet('driftward-color'))?lsGet('driftward-color'):CREW_COLORS[Math.floor(Math.random()*CREW_COLORS.length)];
+/* shared pirate fights: pirates owned by a crewmate's game, mirrored here */
+const ghosts=new Map();
+function myPeer(){if(MP.myPeerId)return MP.myPeerId;const p=MP.room&&MP.room.peers().find(x=>x.sameTab);if(p)MP.myPeerId=p.peer;return MP.myPeerId||null}
+function amHost(){
+  if(!MP.sys)return true;const me=myPeer();if(!me)return true;let host=me;
+  for(const pr of MP.sys.peers()){if(pr.sameTab||pr.kind!=='viewer')continue;const q=pr.presence;if(q&&q.m==='ship'&&q.st==='flying'&&pr.peer<host)host=pr.peer}
+  return host===me;
+}
+function removeGhost(G){scene.remove(G.group);G.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
+function clearGhosts(){for(const G of ghosts.values())removeGhost(G);ghosts.clear()}
+function sendHit(G,d){
+  G.shield=Math.max(0,G.shield-d);if(!G.shield)G.hull=Math.max(1,G.hull-d*.5);
+  if(MP.sys)MP.sys.emit('hit',{o:G.owner,id:G.id,d:Math.round(d*10)/10}).catch(()=>{});
+}
+function onHitMsg(m){
+  if(!m||m.sameTab)return;const d=m.data&&typeof m.data==='object'?m.data:{};
+  if(d.o!==myPeer()||!Number.isInteger(d.id))return;
+  const n=npcs.find(x=>x.netId===d.id&&x.faction==='pirate');if(!n)return;
+  (n.hitters=n.hitters||new Set()).add(m.peer);
+  damageNpc(n,clamp(Number(d.d)||0,0,40),n.group.position.clone().addScaledVector(randDir(Math.random,new V3()),n.radius*.6));
+}
+function onKillMsg(m){
+  if(!m||m.sameTab)return;const d=m.data&&typeof m.data==='object'?m.data:{};
+  if(!Number.isInteger(d.id)||!okVec(d.p,3))return;
+  const key=m.peer+':'+d.id,G=ghosts.get(key);if(G){removeGhost(G);ghosts.delete(key)}
+  const p=new V3().fromArray(d.p),ref=st.mode==='foot'?player.pos:ship.group.position;
+  if(ref.distanceTo(p)<9000){boom(p,18,'#ffa050',1.2);boom(p,10,'#fff2c0',.6);Sound.boom(.4)}
+  if(Array.isArray(d.h)&&d.h.includes(myPeer())){dropSalvage(p,new V3(),false);creditBounty();kills++;toast('Shared kill. Salvage dropped for you; fly through it to collect.')}
+}
+function updateGhosts(dt){
+  const seen=new Set();
+  if(MP.sys)for(const pr of MP.sys.peers()){
+    if(pr.sameTab||pr.kind!=='viewer')continue;const arr=pr.presence&&pr.presence.pir;if(!Array.isArray(arr))continue;
+    for(const e of arr.slice(0,8)){
+      if(!Array.isArray(e)||e.length<12)continue;const [id,c,x,y,z,qx,qy,qz,qw,h,sh,t]=e;
+      if(!Number.isInteger(id)||![x,y,z,qx,qy,qz,qw,h,sh].every(Number.isFinite))continue;
+      const key=pr.peer+':'+id;seen.add(key);let G=ghosts.get(key);
+      if(!G){const cls=c===1?'interceptor':'fighter',grp=buildShip(cls,PAINTS.pirate);grp.position.set(x,y,z);grp.quaternion.set(qx,qy,qz,qw).normalize();scene.add(grp);
+        G={ghost:true,key,owner:pr.peer,id,group:grp,cls,faction:'pirate',hostile:true,radius:grp.userData.radius,maxHull:100,maxShield:100,hull:100,shield:100,
+          vel:new V3(),net:new V3(x,y,z),netT:time,q:new Q4(),tgt:'',fireCD:1+Math.random(),gunI:0,dmg:4+SHIP_CLASSES[cls].dmg*.3};ghosts.set(key,G)}
+      if(G.net.x!==x||G.net.y!==y||G.net.z!==z){const nv=new V3(x,y,z);G.vel.copy(nv).sub(G.net).divideScalar(Math.max(.05,time-G.netT));if(G.vel.length()>4000)G.vel.set(0,0,0);G.net.copy(nv);G.netT=time}
+      G.q.set(qx,qy,qz,qw).normalize();G.hull=clamp(h,0,100);G.shield=clamp(sh,0,100);G.tgt=typeof t==='string'?t.slice(0,48):'';
+    }
+  }
+  for(const [k,G] of ghosts){
+    if(!seen.has(k)){removeGhost(G);ghosts.delete(k);continue}
+    const tgtPos=tV.copy(G.net).addScaledVector(G.vel,Math.min(.35,time-G.netT));
+    if(G.group.position.distanceTo(tgtPos)>600)G.group.position.copy(tgtPos);else G.group.position.lerp(tgtPos,1-Math.exp(-dt*12));
+    G.group.quaternion.slerp(G.q,1-Math.exp(-dt*10));
+    const th=Math.min(1,G.vel.length()/300);for(const e of G.group.userData.engines)e.scale.set(1,1,1+th*5);
+    G.fireCD-=dt;
+    if(G.fireCD<=0&&G.tgt){G.fireCD=.1;let tp=null,tv=null,me=false;
+      if(G.tgt===myPeer()){if(st.mode==='ship'&&ship.state==='flying'){tp=ship.group.position;tv=tVelMe2.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(ship.speed);me=true}}
+      else{const a=MP.avatars.get(G.tgt);if(a&&a.flying&&a.ship){tp=a.ship.position;tv=a.vel}}
+      if(tp){const dist=tp.distanceTo(G.group.position);
+        if(dist<750){const fwd=tV2.set(0,0,-1).applyQuaternion(G.group.quaternion),aim=tV3.copy(tp).addScaledVector(tv,dist/BOLT_SPEED).sub(G.group.position).normalize();
+          if(fwd.dot(aim)>.95){const gp=G.group.userData.guns[G.gunI++%G.group.userData.guns.length];
+            aim.add(new V3((Math.random()-.5)*.03,(Math.random()-.5)*.03,(Math.random()-.5)*.03)).normalize();
+            fireBolt(G.group.localToWorld(gp.clone()),aim,new V3(),me?'enemy':'fx',G.dmg);G.fireCD=.3+Math.random()*.35;if(me&&dist<500)Sound.pew(520,.03)}}}}
+  }
+}
 function isFirst(seed){return seed===st.firstSeed||(st.extraFirst||[]).includes(seed)}
 function buildAstro(color){
   const g=new THREE.Group();
@@ -2023,7 +2102,7 @@ function buildAstro(color){
   return g;
 }
 function makeAvatar(s){
-  const a={cls:null,paintKey:'',ship:null,astro:buildAstro(okColor(s.c)),color:okColor(s.c),name:'',fresh:true};
+  const a={cls:null,paintKey:'',ship:null,astro:buildAstro(okColor(s.c)),color:okColor(s.c),name:'',fresh:true,vel:new V3(),netSp:null,netT:0,flying:false};
   scene.add(a.astro);return a;
 }
 function removeAvatar(a){for(const o of [a.ship,a.astro])if(o){scene.remove(o);o.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material)x.material.dispose()})}}
@@ -2037,6 +2116,9 @@ function updateAvatar(a,s,dt){
   const pk=cls+pt.hull+pt.trim+pt.glow;
   if(a.cls!==cls||a.paintKey!==pk){if(a.ship){scene.remove(a.ship)}a.ship=buildShip(cls,pt);scene.add(a.ship);a.cls=cls;a.paintKey=pk;a.fresh=true}
   const k=1-Math.exp(-dt*10);
+  a.flying=s.m==='ship'&&s.st==='flying';
+  if(okVec(s.sp,3)){if(!a.netSp){a.netSp=new V3().fromArray(s.sp);a.netT=time}
+    else if(a.netSp.x!==s.sp[0]||a.netSp.y!==s.sp[1]||a.netSp.z!==s.sp[2]){const nv=new V3().fromArray(s.sp);a.vel.copy(nv).sub(a.netSp).divideScalar(Math.max(.05,time-a.netT));if(a.vel.length()>5000)a.vel.set(0,0,0);a.netSp.copy(nv);a.netT=time}}
   if(okVec(s.sp,3)&&okVec(s.sq,4)){
     tAV.fromArray(s.sp);tAQ.fromArray(s.sq).normalize();
     if(a.fresh||a.ship.position.distanceTo(tAV)>800){a.ship.position.copy(tAV);a.ship.quaternion.copy(tAQ)}
@@ -2058,16 +2140,19 @@ function myPresence(){
   const g=ship.group,r2=v=>Math.round(v*100)/100,r4=v=>Math.round(v*1e4)/1e4,foot=st.mode==='foot';
   const th=st.mode==='ship'?(ship.state==='flying'?clamp(ship.speed/500,.15,1):ship.state==='takeoff'||ship.state==='warp'?1:.05):.05;
   return{n:myName,c:myColor,m:st.mode,st:ship.state,p:foot?player.pos.toArray().map(r2):null,f:foot?player.fwd.toArray().map(r4):null,
-    sp:g.position.toArray().map(r2),sq:g.quaternion.toArray().map(r4),cls:ship.cls,paint:ship.paint,th:Math.round(th*100)/100};
+    sp:g.position.toArray().map(r2),sq:g.quaternion.toArray().map(r4),cls:ship.cls,paint:ship.paint,th:Math.round(th*100)/100,
+    pir:npcs.filter(n=>n.faction==='pirate').slice(0,6).map(n=>{const p=n.group.position,q=n.group.quaternion,r1=v=>Math.round(v*10)/10,r3=v=>Math.round(v*1000)/1000;
+      return[n.netId,n.cls==='interceptor'?1:0,r1(p.x),r1(p.y),r1(p.z),r3(q.x),r3(q.y),r3(q.z),r3(q.w),Math.round(n.hull/n.maxHull*100),Math.round(n.shield/n.maxShield*100),n.tgt||'']})};
 }
 function lobbyPresence(){return{n:myName,c:myColor,sys:system?system.name:'',seed:system?system.seed:null,systems:st.systems,first:system?isFirst(system.seed):false,where:current?current.name:'',m:st.mode}}
 async function joinSystemRoom(){
   if(!MP.room||!system)return;const name='sys-'+system.seed;
   if(MP.sys&&MP.sys.name===name)return;
-  const old=MP.sys;MP.sys=null;clearAvatars();if(old)old.leave().catch(()=>{});
-  try{const r=await MP.room.join(name);if(!system||'sys-'+system.seed!==name){r.leave().catch(()=>{});return}MP.sys=r;r.onPeers(()=>{},()=>{MP.sys=null})}catch(e){}
+  const old=MP.sys;MP.sys=null;clearAvatars();clearGhosts();if(old)old.leave().catch(()=>{});
+  try{const r=await MP.room.join(name);if(!system||'sys-'+system.seed!==name){r.leave().catch(()=>{});return}MP.sys=r;r.onPeers(()=>{},()=>{MP.sys=null;clearGhosts()});r.on('hit',onHitMsg,()=>{});r.on('kill',onKillMsg,()=>{})}catch(e){}
 }
 function updateMP(dt){
+  updateGhosts(dt);
   if(MP.sys&&ready){
     const seen=new Set();
     for(const pr of MP.sys.peers()){
@@ -2236,7 +2321,7 @@ function useItem(id){
   const ok=r.can();if(ok!==true){toast(ok,'bad');return}
   crafted[id]--;r.use();Sound.blip(700,.25,'sine',.14);save();if(!$('craft').hidden)renderCraft();
 }
-function quickUse(){useItem(st.mode==='foot'?'gel':(crafted.battery&&ship.shield<shipStats().shield*.5&&npcs.some(n=>n.hostile)?'battery':'hullkit'))}
+function quickUse(){useItem(st.mode==='foot'?'gel':(crafted.battery&&ship.shield<shipStats().shield*.5&&allHostiles().length?'battery':'hullkit'))}
 
 function updateCreatures(dt){
   const P=current;if(!P||!P.species.length)return;
@@ -2355,7 +2440,7 @@ function drawMarkers(){
     const sp=ship.group.position;
     if(ship.state==='flying'){const aim=tV3.set(0,0,-1).applyQuaternion(ship.group.quaternion).multiplyScalar(600).add(sp);const p=proj(aim,false);
       if(!p.off){mctx.strokeStyle='rgba(255,217,163,.85)';mctx.lineWidth=1.5;mctx.beginPath();mctx.arc(p.x,p.y,9,0,Math.PI*2);mctx.moveTo(p.x-15,p.y);mctx.lineTo(p.x-11,p.y);mctx.moveTo(p.x+11,p.y);mctx.lineTo(p.x+15,p.y);mctx.stroke()}}
-    for(const n of npcs){
+    for(const n of npcs.concat([...ghosts.values()])){
       const dist=n.group.position.distanceTo(sp);
       if(n.hostile&&dist<6000){
         const p=proj(n.group.position,true);
@@ -2402,7 +2487,7 @@ function drawMarkers(){
 }
 function objective(){
   if(buildMode)return base&&baseRT?'Build mode · walls and doors snap to floor edges, roofs sit on wall tops':'Build mode · place a base computer on open ground to claim your base';
-  if(st.mode==='ship'&&npcs.some(n=>n.hostile))return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
+  if(st.mode==='ship'&&allHostiles().length)return 'Pirates attacking · aim at the red marker ahead of each ship · R repairs the hull with 15 Ferrite';
   if(st.mode==='ship'&&ship.state==='docked')return 'Docked · sell resources, refit, buy ships and take missions. E undocks';
   if(st.mission&&st.mode==='ship'&&ship.state==='flying')return missionText();
   if(st.mode==='foot'){
@@ -2450,7 +2535,7 @@ function updateHUD(){
   else if(ship.state==='landed')pr=canLaunch()?'<span class="k">Space</span>Take off   <span class="k">E</span>Exit':'<span class="k">R</span>Refuel   <span class="k">E</span>Exit';
   else if(ship.state==='flying'&&P){
     const d=tV.copy(ship.group.position).sub(P.center);const r=d.length();d.divideScalar(r);const alt=r-P.heightAt(d);
-    const hn=npcs.filter(n=>n.hostile).length;
+    const hn=allHostiles().length;
     if(hn)pr=`<span class="k" style="border-color:var(--danger);color:var(--danger)">${hn}</span>Hostile${hn>1?'s':''} · hold left click to fire`;
     else if(stationNear())pr=`<span class="k">E</span>Dock at ${station.name}`;
     else if(alt<140)pr=nearestPostPad(P,ship.group.position,250)?'<span class="k">E</span>Land at trading post':'<span class="k">E</span>Land';
