@@ -26,7 +26,7 @@ P1's action keys sit together in one cluster under the right hand:
 ```
 
 | Action | P1 Keyboard | P2 Switch controller |
-|---|---|---|---|
+|---|---|---|
 | Move | W A S D | Left stick / D-pad |
 | Jump (double jump) | L (or Space) | B |
 | Light attack (3-hit chain) | J | Y |
@@ -62,7 +62,7 @@ Thirty-two fighters, each with their own stats, look, special move and a **uniqu
 **Unlocking fighters:** you start with the first 8 fighters (Scribble to Halo). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 32. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
 
 | Fighter | Style | Special | Skill (Down + Light) |
-|---|---|---|---|
+|---|---|---|
 | Scribble | All-rounder | Ink Burst: blasts everything around you | Ink Uppercut: rising launcher |
 | Bolt | Speedster, triple jump, fragile | Thunderclap: lightning hits 8 foes | Lightning Dash: invincible zap-through dash |
 | Boulder | Tank, heavy attacks can't be interrupted | Earthquake: hits every grounded foe | Rock Toss: lobs a huge boulder |
@@ -109,14 +109,14 @@ All modes work online.
 
 ## Stages
 
-Sixteen stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity) Windy Worksheet (wind gusts push everyone sideways after a warning) The Blank Page (home of the final boss), Toy Box (bouncy springs launch you into the air), Haunted Sketch (the lights go out and only spotlights around the players remain; enemy eyes glow in the dark) and Assembly Line (floor conveyor belts that reverse direction after a warning).
+Twenty stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity), Windy Worksheet (wind gusts push everyone sideways after a warning), The Blank Page (home of the final boss), Toy Box (bouncy springs launch you into the air), Haunted Sketch (the lights go out and only spotlights around the players remain; enemy eyes glow in the dark) Assembly Line (floor conveyor belts that reverse direction after a warning), **Storm Sketch** (lightning strikes where the flashing yellow lines appear; it hits enemies too), **Deep Sea Doodle** (underwater: you sink slowly and can tap jump to swim up), **Crumbling Castle** (cracked platforms collapse if you stand on them too long, then rebuild) and **Neon Arcade** (laser beams sweep across the floor or the platforms after a warning: jump over the floor ones).
 
 ## Bosses
 
 Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its own set of moves:
 
 | Stage | Mini-boss | Boss |
-|---|---|---|---|
+|---|---|---|
 | Notebook Heights | Eraser Knight | The Scribble King |
 | Graph City | Compass Captain | Graphzilla |
 | Chalkboard Arena | The Chalk Duster | Professor Chalk |
@@ -133,10 +133,14 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 | Toy Box | Jack-in-the-Box | The Wind-Up Tyrant |
 | Haunted Sketch | Poltergeist Pete | The Phantom Pencil |
 | Assembly Line | Forklift Fred | Mega Assembler |
+| Storm Sketch | Sparky | The Storm King |
+| Deep Sea Doodle | Puffer Pete | Kraken Scrawl |
+| Crumbling Castle | Gargoyle Gus | Sir Crumblemore |
+| Neon Arcade | High Score Hank | The Glitch Lord |
 
 Plus **Ink Hydra**, a three-headed boss you meet in Story mode and Boss Rush.
 
-Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it), **triple stomp**, **boomerangs** (they come back!), **triple quake** (three floor shockwaves to jump) and **burrow** (digs underground and bursts up under you: watch the dirt mound).
+Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it), **triple stomp**, **boomerangs** (they come back!), **triple quake** (three floor shockwaves to jump) **burrow** (digs underground and bursts up under you: watch the dirt mound), **lightning call** (bolts strike the flashing lines) and **laser wall** (laser beams sweep across the arena: jump or get off the platform).
 
 ## Power-ups
 
