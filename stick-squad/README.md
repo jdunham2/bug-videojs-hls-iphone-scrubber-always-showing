@@ -35,6 +35,7 @@ P1's action keys sit together in one cluster under the right hand:
 | Meteor slam | K in the air | X in the air |
 | Dash (invincible) | U (or Shift) | ZR / R / ZL / L |
 | Unique skill (2.5 s cooldown) | S + J | Down + Y |
+| **Super move** (full ink meter) | W + I | Up + A |
 | Special (full ink meter) | I | A |
 | Pause | Esc / P | + (or −) |
 | Music on/off | M | (none) |
@@ -57,9 +58,11 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Thirty-six fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
+Forty fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
 
-**Unlocking fighters:** you start with the first 12 fighters (Scribble to Chef). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 36. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
+**Super moves:** with a full ink meter, hold Up and press Special (W + I, or Up + A on a controller) for your fighter's screen-shaking super move, with a cinematic cut-in. **Scribble:** Ink Tsunami · **Bolt:** Storm Surge · **Boulder:** Meteor Slam · **Inkblade:** Thousand Blades · **Doodle Witch:** Hex Storm · **Shade:** Shadow Dance · **Robo:** Orbital Laser · **Halo:** Sanctuary · **Slugger:** Grand Slam · **Hopper:** Leap Frog · **Whiskers:** Nine Lives · **Chef:** Feast · **Frosty:** Absolute Zero · **Ghostly:** Poltergeist · **DJ Beats:** Subwoofer · **Sir Doodle:** Excalibur · **Bubbles:** Bubble Prison · **Jetpack Jo:** Carpet Bomb · **Presto:** Grand Finale · **El Doodlo:** Piledriver · **Mimic:** Copycat (a random super) · **Blaze:** Supernova · **Captain Ink:** Full Broadside · **Gravity Gus:** Singularity · **Gemma:** Diamond Storm · **Kickflip Kai:** 900 Spin · **Buzzy Bea:** Killer Swarm · **Samurai Sam:** Final Cut · **Echo:** Echo Chamber · **Dynamite Dan:** Nuke · **Picasso Pip:** Mural · **Yoyo Yuki:** Yoyo Storm · **Cactus Carl:** Needle Nova · **Fairy Fern:** Fairy Ring · **Viking Vera:** Valhalla · **Dr. Goo:** Goo-pocalypse · **Digger Dax:** Earth Shatter · **Astro Ace:** Big Bang · **Chrono Claire:** Time Fracture · **Lucky Lou:** All In.
+
+**Unlocking fighters:** you start with the first 16 fighters (Scribble to Jetpack Jo). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 40. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
 
 | Fighter | Style | Special | Skill (Down + Light) |
 |---|---|---|
@@ -98,6 +101,10 @@ Thirty-six fighters, each with their own stats, look, special move and a **uniqu
 | Fairy Fern | Triple jump, hold jump to float; heavy attack throws a homing sparkle | Wish: heals the team 40 HP and gives everyone a 2-hit shield | Pixie Dust: puts nearby enemies to sleep |
 | Viking Vera | Tough berserker; heavy attack is a huge spinning axe swing | Ragnarok: 8 lightning bolts strike her enemies | War Cry: double damage for a few seconds and pushes foes back |
 | Dr. Goo | Heavy attack lobs a flask that bursts into sticky, slowing goo | Mutate: turns giant, heals and regenerates | Acid Spray: short-range burning acid |
+| Digger Dax | Dashes dig underground for a longer dodge; heavy attack is a power drill | Cave-In: rocks fall on the enemies | Pop-Up: burrows under the nearest enemy and uppercuts |
+| Astro Ace | Low gravity, huge floaty jumps; heavy attack is a piercing ray gun | Satellite Strike: laser strikes from orbit | Gravity Flip: launches nearby enemies into the air |
+| Chrono Claire | Attacks a bit faster; heavy attack throws a boomerang gear | Time Stop: freezes every enemy | Rewind: jumps back to where you were a second ago and heals a little |
+| Lucky Lou | 25% chance to land critical hits; heavy attack rolls two random dice | Jackpot: a random prize (meteors, bomb, piñata, star power...) | Coin Flip: heads = big blast, tails = heal and ink |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack | Shield Bash: charging bash that raises a 1-hit guard |
 
 ## Modes
@@ -106,14 +113,14 @@ After picking fighters you choose a mode:
 
 - **Story:** an 8-chapter adventure to stop **the Grand Eraser**, who wants to wipe the whole notebook clean. Each chapter has a wave of enemies, a mini-boss and a boss, with comic-style cutscenes before the chapter, before the boss and after you win, plus an ending. Press J / A to advance the text, Enter / + to skip a scene. Progress is saved, and you can replay any chapter you've reached.
 - **Arcade:** endless waves of enemies. Pick a starting stage, or a random one.
-- **Boss Rush:** fight all 47 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Boss Rush:** fight all 55 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 - **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 All modes work online.
 
 ## Stages
 
-Twenty stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity), Windy Worksheet (wind gusts push everyone sideways after a warning), The Blank Page (home of the final boss), Toy Box (bouncy springs launch you into the air), Haunted Sketch (the lights go out and only spotlights around the players remain; enemy eyes glow in the dark) Assembly Line (floor conveyor belts that reverse direction after a warning), **Storm Sketch** (lightning strikes where the flashing yellow lines appear; it hits enemies too), **Deep Sea Doodle** (underwater: you sink slowly and can tap jump to swim up), **Crumbling Castle** (cracked platforms collapse if you stand on them too long, then rebuild) and **Neon Arcade** (laser beams sweep across the floor or the platforms after a warning: jump over the floor ones).
+Twenty-four stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity), Windy Worksheet (wind gusts push everyone sideways after a warning), The Blank Page (home of the final boss), Toy Box (bouncy springs launch you into the air), Haunted Sketch (the lights go out and only spotlights around the players remain; enemy eyes glow in the dark) Assembly Line (floor conveyor belts that reverse direction after a warning), **Storm Sketch** (lightning strikes where the flashing yellow lines appear; it hits enemies too), **Deep Sea Doodle** (underwater: you sink slowly and can tap jump to swim up), **Crumbling Castle** (cracked platforms collapse if you stand on them too long, then rebuild) **Neon Arcade** (laser beams sweep across the floor or the platforms after a warning: jump over the floor ones), **Subway Sketch** (a train roars along the floor after a warning: get up on a platform!), **Desert Doodle** (quicksand pits slow you down and weaken your jumps), **Toxic Swamp** (glowing green puddles appear and hurt anyone standing in them) and **Clock Tower** (a giant pendulum swings through the middle of the arena).
 
 ## Bosses
 
@@ -141,6 +148,10 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 | Deep Sea Doodle | Puffer Pete | Kraken Scrawl |
 | Crumbling Castle | Gargoyle Gus | Sir Crumblemore |
 | Neon Arcade | High Score Hank | The Glitch Lord |
+| Subway Sketch | Ticket Taker | The Conductor |
+| Desert Doodle | Scorpion Stan | Pharaoh Scrawl |
+| Toxic Swamp | Toadstool Ted | The Bog Beast |
+| Clock Tower | Cuckoo Clyde | Father Time |
 
 Plus **Ink Hydra**, a three-headed boss you meet in Story mode and Boss Rush.
 
