@@ -21,6 +21,7 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 - Go ashore to trade, hunt, explore, feast and upgrade your hall and ship.
 - Real-time sea battles: loose arrow volleys, raise a shield wall, ram at full sail, or come alongside and board. Black-sailed raiders hunt you, merchant ships can be attacked, sea serpents circle and strike, and raiding a town makes its warships sail out to fight before you can sack it.
 - Walk ashore with your warband (G): explore islands on foot, find treasure chests, fight wolves and draugr, and storm towns in real-time melee battles against their defenders (and Jarl Hakon himself at Stonegard).
-- Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, E land/set sail/interact, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
+- Ride horses (R) on the farm and town islands: gallop across the land and charge into enemies for heavy damage.
+- Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, R ride/dismount, E land/set sail/interact, F hail ships, J journal, M sound, drag to look, scroll to zoom. Progress saves automatically.
 
 The original 2D map version is still available at `viking/classic.html`.

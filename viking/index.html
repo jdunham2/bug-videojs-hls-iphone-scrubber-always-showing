@@ -134,7 +134,7 @@
   <kbd>W</kbd><kbd>S</kbd>sails &nbsp; <kbd>A</kbd><kbd>D</kbd>steer<br>
   <kbd>E</kbd>land / set sail &nbsp; <kbd>F</kbd>hail ship<br>
   <kbd>Space</kbd>arrows / strike &nbsp; <kbd>Shift</kbd>shields<br>
-  <kbd>B</kbd>board &nbsp; <kbd>G</kbd>go ashore on foot<br>
+  <kbd>B</kbd>board &nbsp; <kbd>G</kbd>go ashore &nbsp; <kbd>R</kbd>ride<br>
   <kbd>J</kbd>journal &nbsp; <kbd>M</kbd>sound &nbsp; <kbd>H</kbd>help<br>
   Drag to look · scroll to zoom
 </div>
@@ -151,7 +151,7 @@
   <h1>SAGA OF THE<br>NORTH SEA</h1>
   <div class="tag">The whale-road is yours. Trade, raid, explore — write your own saga.</div>
   <div class="actions" id="titleBtns"></div>
-  <div class="ctl">W / S — raise &amp; lower sail · A / D — steer · E — go ashore · F — hail ships<br>Space — loose arrows · Shift — shield wall · B — board · ram at full sail<br>G — walk ashore with your warband · Space — strike with your axe<br>Drag the mouse to look around · scroll to zoom</div>
+  <div class="ctl">W / S — raise &amp; lower sail · A / D — steer · E — go ashore · F — hail ships<br>Space — loose arrows · Shift — shield wall · B — board · ram at full sail<br>G — walk ashore with your warband · Space — strike with your axe · R — ride a horse<br>Drag the mouse to look around · scroll to zoom</div>
 </div>
 
 <script type="module">
@@ -400,6 +400,14 @@ const Sound = {
   clang() { this.pluck(1300, .07, .3); this.noiseBurst('highpass', 3500, .15, .1); },
   howl() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(320, now); o.frequency.linearRampToValueAtTime(620, now + .6); o.frequency.linearRampToValueAtTime(420, now + 1.8); this.env(o, .08, .3, 2).connect(this.master); o.start(); o.stop(now + 2.1); },
   groan() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, now); o.frequency.linearRampToValueAtTime(52, now + 1.5); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300; o.connect(f); this.env(f, .15, .2, 1.8).connect(this.master); o.start(); o.stop(now + 1.9); },
+  hoof() { this.noiseBurst('lowpass', 240, .22, .08); },
+  neigh() {
+    if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(), lfo = c.createOscillator(), lg = c.createGain(), f = c.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(520, now); o.frequency.linearRampToValueAtTime(880, now + .25); o.frequency.linearRampToValueAtTime(420, now + 1.1);
+    lfo.frequency.value = 11; lg.gain.value = 45; lfo.connect(lg); lg.connect(o.frequency);
+    f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 2; o.connect(f);
+    this.env(f, .09, .05, 1.2).connect(this.master); o.start(); lfo.start(); o.stop(now + 1.25); lfo.stop(now + 1.25);
+  },
   splash() { this.noiseBurst('bandpass', 700, .25, .9, .05); },
   toggle() { if (!this.ctx) return; this.muted = !this.muted; this.master.gain.setTargetAtTime(this.muted ? 0 : .7, this.ctx.currentTime, .1); },
 };
@@ -1530,7 +1538,52 @@ function makeWolf() {
   g.userData = { body, legs, tunic: fur, wolf: true };
   return g;
 }
+function makeHorse() {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const coat = new THREE.MeshStandardMaterial({ color: pick([0x6b4226, 0x3a2a1e, 0x8a6a4a, 0xd8d0c0, 0x5a5a5a, 0x9a5a2a]), roughness: .9, flatShading: true });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1e1610, roughness: 1 });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(.95, 1.0, 2.4), coat); torso.position.y = 2.0;
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(.62, 8, 6), coat); chest.position.set(0, 2.05, -1.15); chest.scale.set(.85, .9, .8);
+  const rump = chest.clone(); rump.position.z = 1.1;
+  const neck = new THREE.Group(); neck.position.set(0, 2.3, -1.3);
+  const nk = new THREE.Mesh(new THREE.BoxGeometry(.45, 1.2, .55), coat); nk.position.set(0, .5, -.2); nk.rotation.x = -.5;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.42, .45, .95), coat); head.position.set(0, 1.0, -.75);
+  const mane = new THREE.Mesh(new THREE.BoxGeometry(.12, 1.1, .2), dark); mane.position.set(0, .62, .06); mane.rotation.x = -.5;
+  const eyeM = new THREE.MeshStandardMaterial({ color: 0x050505 });
+  [-.22, .22].forEach(x => {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(.07, .22, 4), coat); ear.position.set(x * .6, 1.32, -.45); neck.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.05, 5, 4), eyeM); eye.position.set(x, 1.08, -.85); neck.add(eye);
+  });
+  neck.add(nk, head, mane);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(.15, 1.1, .2), dark); tail.position.set(0, 1.75, 1.45); tail.rotation.x = .35;
+  const saddle = new THREE.Mesh(new THREE.BoxGeometry(1.05, .18, .9), new THREE.MeshStandardMaterial({ color: 0x7a2a1a, roughness: .8 })); saddle.position.set(0, 2.55, -.1);
+  const legG = new THREE.BoxGeometry(.22, 1.5, .24).translate(0, -.75, 0), hoofG = new THREE.BoxGeometry(.26, .16, .28);
+  const legs = [[-.3, -1.0], [.3, -1.0], [-.3, 1.0], [.3, 1.0]].map(([x, z]) => {
+    const l = new THREE.Group(); l.add(new THREE.Mesh(legG, coat)); const hoof = new THREE.Mesh(hoofG, dark); hoof.position.y = -1.5; l.add(hoof);
+    l.position.set(x, 1.6, z); body.add(l); return l;
+  });
+  body.add(torso, chest, rump, neck, tail, saddle);
+  shadow(g, true, false);
+  g.userData = { body, legs, neck, tunic: coat, horse: true };
+  return g;
+}
+function toggleMount() {
+  if (!hero || hero.dead || modalOpen) return;
+  if (hero.mount) {
+    const m = hero.mount; m.rider = null; hero.mount = null; m.idle = rnd(4, 8); m.wt = null;
+    const nx = hero.x - Math.cos(hero.h) * 1.8, nz = hero.z - Math.sin(hero.h) * 1.8;
+    if (groundAt(ashore.p, nx, nz) !== null) { hero.x = nx; hero.z = nz; }
+    return;
+  }
+  let best = null, bd = 4.5;
+  for (const u of units) { if (u.kind !== 'horse' || u.rider || u.dead) continue; const d = Math.hypot(u.x - hero.x, u.z - hero.z); if (d < bd) { bd = d; best = u; } }
+  if (!best) return;
+  hero.mount = best; best.rider = hero; best.grazing = false; hero.x = best.x; hero.z = best.z; hero.h = best.h;
+  Sound.neigh();
+  if (!S.rodeBefore) { S.rodeBefore = true; banner('In the saddle', 'Gallop at full speed and strike for a charging blow'); }
+}
 const UNIT_DEF = {
+  horse: () => ({ hp: 80, dmg: 0, reach: 0, speed: 2.4, cd: 99, team: 'none' }),
   hero: () => ({ hp: 100 + S.weapons * 15, dmg: 24 * (1 + S.weapons * .2), reach: 3.4, speed: 9, cd: .55, team: 'us' }),
   ally: () => ({ hp: 45, dmg: 9 * (1 + S.weapons * .2), reach: 2.9, speed: 8.2, cd: rnd(1.1, 1.5), team: 'us' }),
   guard: () => ({ hp: 42, dmg: 8.5, reach: 2.9, speed: 7.6, cd: rnd(1.2, 1.6), team: 'them' }),
@@ -1550,7 +1603,7 @@ function unitLook(kind) {
   }
 }
 function addUnit(kind, x, z, extra = {}) {
-  const g = kind === 'wolf' ? makeWolf() : makeWarrior(unitLook(kind));
+  const g = kind === 'wolf' ? makeWolf() : kind === 'horse' ? makeHorse() : makeWarrior(unitLook(kind));
   const u = Object.assign({ kind, g, x, z, y: groundAt(ashore.p, x, z) ?? 0, h: rnd(0, 6.28), atkCd: rnd(.2, 1), swing: 0, swingHit: false, walk: 0, moveAmt: 0,
     dead: false, deathT: 0, flash: 0, aggro: false, dormant: false, rise: 1 }, UNIT_DEF[kind](), extra);
   u.maxHp = u.hp; scene.add(g); units.push(u); return u;
@@ -1614,6 +1667,10 @@ function spawnLocals(p) {
   ashore.draugr = false;
   if (['home', 'town', 'village', 'fortress'].includes(p.type) && !(S.hostile[p.id] > 0)) {
     for (let i = 0; i < 6; i++) { const a = rnd(0, 6.28), r = rnd(.05, .3) * p.R, pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r); addUnit('villager', pt.x, pt.z, { home: { x: p.wx, z: p.wz, r: p.R * .3 } }); }
+  }
+  if (['home', 'town', 'village', 'fortress'].includes(p.type)) {
+    const n = p.id === 'green' ? 5 : 3;
+    for (let i = 0; i < n; i++) { const a = rnd(0, 6.28), r = rnd(.15, .45) * p.R, pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r); addUnit('horse', pt.x, pt.z, { home: { x: p.wx, z: p.wz, r: p.R * .45 }, idle: rnd(0, 5) }); }
   }
   if (p.id === 'wolf') for (let gi = 0; gi < 2; gi++) {
     const a = rnd(0, 6.28), r = rnd(.25, .55) * p.R, c = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r);
@@ -1703,7 +1760,7 @@ function killUnit(u) {
     S.jarlSlain = true; S.glory += 100; ashore.jarlKilled = true;
     banner('Jarl Hakon falls!', '+100 glory'); log('Jarl Hakon the Grim falls beneath your axe! All the north will speak your name. (+100 glory)', 'gold');
   }
-  if (u === hero) heroDown();
+  if (u === hero) { if (u.mount) { u.mount.rider = null; u.mount = null; } heroDown(); }
 }
 function fightToward(u, t, dt) {
   const dx = t.x - u.x, dz = t.z - u.z, d = Math.hypot(dx, dz) || 1;
@@ -1727,16 +1784,18 @@ function updateUnit(u, dt) {
     if (u.deathT > 6) u.y -= dt * .5;
     u.g.position.set(u.x, u.y, u.z); return;
   }
+  if (u.rider) return; // moved and animated by its rider
   u.atkCd -= dt; u.flash = Math.max(0, u.flash - dt);
   let mx = 0, mz = 0, speed = u.speed;
   if (u === hero) {
     const ix = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0), iz = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
     const fx = Math.sin(footYaw), fz = -Math.cos(footYaw), rx = Math.cos(footYaw), rz = Math.sin(footYaw);
     mx = fx * iz + rx * ix; mz = fz * iz + rz * ix;
-    const l = Math.hypot(mx, mz); if (l > 0) { mx /= l; mz /= l; if (u.swing <= 0) u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 12); }
+    const l = Math.hypot(mx, mz); if (l > 0) { mx /= l; mz /= l; if (u.swing <= 0 || u.mount) u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * (u.mount ? 5 : 12)); }
     u.blocking = !!(keys.shift || touchShield);
     if (u.blocking) speed *= .45;
     if (u.swing > 0) speed *= .5;
+    if (u.mount) speed = (u.blocking ? 10 : 21) * (u.swing > 0 ? .85 : 1);
     if (!ashore.foes) u.hp = Math.min(u.maxHp, u.hp + dt * 8);
   } else if (u.dormant) {
     if (hero && !hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < u.wakeR) wakeGroup(u);
@@ -1756,8 +1815,15 @@ function updateUnit(u, dt) {
       const tx = hero.x - fx * (3.2 + row * 2.3) + rx * (col - 1.5) * 2.1, tz = hero.z - fz * (3.2 + row * 2.3) + rz * (col - 1.5) * 2.1;
       const dx = tx - u.x, dz = tz - u.z, d = Math.hypot(dx, dz);
       if (d > 70) { u.x = hero.x; u.z = hero.z; }
-      else if (d > 1) { mx = dx / d; mz = dz / d; if (d > 8) speed *= 1.35; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 8); }
+      else if (d > 1) { mx = dx / d; mz = dz / d; if (d > 8) speed *= hero.mount ? 2.3 : 1.35; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 8); }
       else u.h = turnTo(u.h, hero.h, dt * 4);
+    }
+  } else if (u.kind === 'horse') {
+    u.idle = (u.idle || 0) - dt; u.grazing = u.idle > 0;
+    if (!u.grazing) {
+      if (!u.wt) { const a = rnd(0, 6.28), r = rnd(0, u.home.r); u.wt = { x: u.home.x + Math.cos(a) * r, z: u.home.z + Math.sin(a) * r }; }
+      const dx = u.wt.x - u.x, dz = u.wt.z - u.z, d = Math.hypot(dx, dz) || 1;
+      if (d < 1.5) { u.wt = null; u.idle = rnd(4, 10); } else { mx = dx / d; mz = dz / d; u.h = turnTo(u.h, Math.atan2(mx, -mz), dt * 2); }
     }
   } else { // villagers
     if (u.flee && hero) { const dx = u.x - hero.x, dz = u.z - hero.z, d = Math.hypot(dx, dz) || 1; if (d < 60) { mx = dx / d; mz = dz / d; speed = 6; } }
@@ -1777,7 +1843,8 @@ function updateUnit(u, dt) {
         for (const o of units) {
           if (o.team !== 'them' || o.dead || o.rise < 1) continue;
           const dx = o.x - u.x, dz = o.z - u.z, d = Math.hypot(dx, dz) || 1;
-          if (d < u.reach + (o.kind === 'jarl' ? .8 : .3) && (dx * fx + dz * fz) / d > .2) { unitDamage(o, u.dmg * rnd(.85, 1.15), u); any = true; }
+          const charge = u.mount && u.moveAmt > 1.2 ? 1.6 : 1;
+          if (d < u.reach + (u.mount ? 1.3 : 0) + (o.kind === 'jarl' ? .8 : .3) && (dx * fx + dz * fz) / d > .2) { unitDamage(o, u.dmg * charge * rnd(.85, 1.15), u); any = true; }
         }
         if (any) { Sound.thunk(); shake = Math.max(shake, .12); }
       } else if (u.swingTarget && !u.swingTarget.dead && Math.hypot(u.swingTarget.x - u.x, u.swingTarget.z - u.z) < u.reach + .7) {
@@ -1792,28 +1859,41 @@ function updateUnit(u, dt) {
     if (groundAt(p, nx, nz) !== null || groundAt(p, u.x, u.z) === null) { u.x = nx; u.z = nz; }
     else if (groundAt(p, nx, u.z) !== null) u.x = nx;
     else if (groundAt(p, u.x, nz) !== null) u.z = nz;
-    pushOut(u, p, u.kind === 'jarl' ? .8 : .5);
+    pushOut(u, p, u.kind === 'jarl' || u.mount || u.kind === 'horse' ? 1 : .5);
   }
   const gy = groundAt(p, u.x, u.z); u.y = gy === null ? Math.max(terrainH(u.x, u.z), -1.5) : gy;
-  u.moveAmt = lerp(u.moveAmt, (mx || mz) ? speed / 9 : 0, clamp(dt * 8, 0, 1));
+  u.moveAmt = lerp(u.moveAmt, (mx || mz) ? speed / 9 : 0, clamp(dt * (u.mount ? 3 : 8), 0, 1));
+  if (u.mount) {
+    const m = u.mount; m.x = u.x; m.z = u.z; m.y = u.y; m.h = u.h; m.moveAmt = u.moveAmt; animUnit(m, dt);
+    u.hoofT = (u.hoofT || 0) - dt;
+    if (u.moveAmt > .4 && u.hoofT <= 0) { Sound.hoof(); u.hoofT = .62 / u.moveAmt; }
+  }
   animUnit(u, dt);
 }
 function animUnit(u, dt) {
   const ud = u.g.userData;
   u.walk += dt * u.moveAmt * 10;
   const sw = Math.sin(u.walk) * .7 * Math.min(1, u.moveAmt * 1.5);
-  if (ud.wolf) {
+  if (ud.horse) {
+    const gal = Math.min(1, u.moveAmt * 1.2), ph = u.walk * .8;
+    ud.legs.forEach((l, i) => l.rotation.x = Math.sin(ph + (i === 0 || i === 3 ? 0 : Math.PI) + (i > 1 ? .7 : 0)) * .7 * gal);
+    ud.body.position.y = Math.abs(Math.sin(ph)) * .22 * gal;
+    ud.body.rotation.x = Math.sin(ph * 2) * .04 * gal;
+    ud.neck.rotation.x = lerp(ud.neck.rotation.x, u.grazing ? 1.0 : Math.sin(ph * 2) * .1, .08);
+  } else if (ud.wolf) {
     ud.legs.forEach((l, i) => l.rotation.x = (i === 0 || i === 3) ? sw : -sw);
     ud.body.rotation.x = u.swing > 0 ? -Math.sin((1 - u.swing / .4) * Math.PI) * .35 : 0;
   } else {
-    ud.legL.rotation.x = sw; ud.legR.rotation.x = -sw;
-    let ar = .35 - sw * .5;
+    if (u.mount) { ud.legL.rotation.set(.55, 0, -.6); ud.legR.rotation.set(.55, 0, .6); }
+    else { ud.legL.rotation.set(sw, 0, 0); ud.legR.rotation.set(-sw, 0, 0); }
+    let ar = u.mount ? .5 : .35 - sw * .5;
     if (u.swing > 0) { const k = 1 - u.swing / .4; ar = k < .4 ? lerp(.4, 2.8, k / .4) : lerp(2.8, -.2, (k - .4) / .6); }
     ud.armR.rotation.x = ar;
     ud.armL.rotation.x = u.blocking ? 1.35 : .3 + sw * .5;
   }
   ud.tunic.emissive.setHex(u.flash > 0 ? 0x771100 : 0x000000);
-  u.g.position.set(u.x, u.y - 2.6 * (1 - u.rise), u.z); u.g.rotation.y = -u.h;
+  const seat = u.mount ? 1.5 + u.mount.g.userData.body.position.y : 0;
+  u.g.position.set(u.x, u.y - 2.6 * (1 - u.rise) + seat, u.z); u.g.rotation.y = -u.h;
 }
 function updateAshore(dt) {
   if (!hero) return;
@@ -1823,7 +1903,9 @@ function updateAshore(dt) {
     const a = units[i]; if (a.dead || a.dormant) continue;
     for (let j = i + 1; j < units.length; j++) {
       const b = units[j]; if (b.dead || b.dormant) continue;
-      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = (a.kind === 'jarl' || b.kind === 'jarl') ? 1.8 : 1.2;
+      if (a.rider === b || b.rider === a) continue;
+      const big = x => x.kind === 'jarl' || x.kind === 'horse' || x.mount;
+      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = big(a) || big(b) ? 1.9 : 1.2;
       if (d < m && d > 1e-4) { const push = (m - d) / 2, ux = dx / d, uz = dz / d; a.x -= ux * push; a.z -= uz * push; b.x += ux * push; b.z += uz * push; }
     }
   }
@@ -1846,6 +1928,7 @@ function updateAshore(dt) {
       if (c.p !== p || c.found || Math.hypot(hero.x - c.x, hero.z - c.z) > 3.5) continue;
       ashore.prompt = c.guarded && !(S.cleansed && S.cleansed[p.id]) ? 'The dead guard this hoard' : '<kbd>E</kbd>Open the chest'; ashore.interact = c; break;
     }
+    if (!ashore.prompt && !hero.mount && units.some(u => u.kind === 'horse' && !u.rider && Math.hypot(u.x - hero.x, u.z - hero.z) < 4.5)) ashore.prompt = '<kbd>R</kbd>Ride the horse';
   }
 }
 function interactAshore() {
@@ -2054,7 +2137,7 @@ function renderSailInfo() {
   if (ashore.on && hero) {
     const allies = units.filter(u => u.kind === 'ally' && !u.dead).length;
     $('sail').style.display = 'block';
-    $('sail').innerHTML = `<span class="hpbar"><i style="width:${clamp(hero.hp / hero.maxHp, 0, 1) * 100}%"></i></span> ${Math.max(0, Math.ceil(hero.hp))} / ${hero.maxHp} · Warband ${allies}${hero.blocking ? ' · <b>Shield raised</b>' : ''}`;
+    $('sail').innerHTML = `<span class="hpbar"><i style="width:${clamp(hero.hp / hero.maxHp, 0, 1) * 100}%"></i></span> ${Math.max(0, Math.ceil(hero.hp))} / ${hero.maxHp} · Warband ${allies}${hero.mount ? ' · Riding (<b>R</b> to dismount)' : ''}${hero.blocking ? ' · <b>Shield raised</b>' : ''}`;
     const pr = $('prompt'); pr.innerHTML = ashore.prompt; pr.style.display = ashore.prompt && !modalOpen ? 'block' : 'none';
     return;
   }
@@ -2094,6 +2177,7 @@ function help() {
   • Merchant ships can be hailed with <b>F</b>. Black-sailed raiders will hunt <i>you</i>.<br>
   • <b>Battle is real-time.</b> <b>Space</b> (or tap the sea) looses a volley of arrows at the nearest foe. Hold <b>Shift</b> to raise the shield wall. Ram at full sail, or come alongside and press <b>B</b> to board. Raiding a town makes its warships sail out to fight you.<br>
   • Press <b>G</b> while docked to <b>walk ashore</b> with your warband. Move with <b>WASD</b>, strike with <b>Space</b>, block with <b>Shift</b>. Search islands for treasure chests, beware the wolves of Wolfden and the draugr of the Dragon's Teeth. Beat a town's warships and your warband storms the shore to fight its defenders hand to hand. Walk back to the pier and press <b>E</b> to board.<br>
+  • Horses graze on the farmland and town islands. Walk up to one and press <b>R</b> to ride. Galloping is more than twice as fast as walking, and a strike at full gallop is a charge that hits much harder. Press <b>R</b> again to dismount.<br>
   • Each day at sea your crew eats. Storms, whales, castaways — and worse — await on the whale-road.<br>
   • Back home, expand your hall and improve your ship. Gain glory to rise from farmer to legend.<br>
   • <b>J</b> opens your saga journal, <b>M</b> toggles sound. Progress saves automatically.`);
@@ -2199,6 +2283,7 @@ addEventListener('keydown', e => {
   if (k === 'j') journal();
   if (k === 'e') tryLand();
   if (k === 'g') goAshore();
+  if ((k === 'r' || k === 'f') && ashore.on) { toggleMount(); return; }
   if (k === 'b' && !ashore.on) tryBoard();
   if (k === 'f' && nearShip) hailMerchant(nearShip);
   if (!S.docked && (k === 'w' || k === 'arrowup')) throttle = Math.min(3, throttle + 1);
@@ -2226,6 +2311,7 @@ if ('ontouchstart' in window) {
       if (k === 'up' && !S.docked) throttle = Math.min(3, throttle + 1);
       if (k === 'down' && !S.docked) throttle = Math.max(0, throttle - 1);
       if (k === 'e') tryLand();
+      if (k === 'f' && ashore.on) toggleMount();
       if (k === 'f' && nearShip) hailMerchant(nearShip);
       if (k === 'shoot') playerShoot();
       if (k === 'b') tryBoard();
@@ -2361,12 +2447,13 @@ function tick() {
   const foot = ashore.on && hero, focus = foot ? hero.g.position : ship.g.position;
   const ang = foot ? footYaw : ship.h + camYaw + dockBlend * Math.PI * .8 + (titleOn ? Math.sin(t * .06) * .5 : 0);
   camExtra = lerp(camExtra, combatOn ? 25 : 0, clamp(dt, 0, 1));
-  const dist = foot ? camFootDist : titleOn ? 85 : camDist + camExtra, pitch = foot ? clamp(camPitch, .12, 1.1) : titleOn ? .22 : camPitch;
+  const dist = foot ? camFootDist + (hero.mount ? 6 : 0) : titleOn ? 85 : camDist + camExtra, pitch = foot ? clamp(camPitch, .12, 1.1) : titleOn ? .22 : camPitch;
   const cx = focus.x - Math.sin(ang) * Math.cos(pitch) * dist, cz = focus.z + Math.cos(ang) * Math.cos(pitch) * dist;
   let cy = focus.y + (foot ? 2.5 : 6) + Math.sin(pitch) * dist;
   cy = Math.max(cy, waveH(cx, cz, t) + 3, terrainH(cx, cz) + (foot ? 2.5 : 22));
   const k = camSnap ? 1 : 1 - Math.exp(-dt * 5); camSnap = false;
   camera.position.x = lerp(camera.position.x, cx, k); camera.position.y = lerp(camera.position.y, cy, k); camera.position.z = lerp(camera.position.z, cz, k);
+  camera.position.y = Math.max(camera.position.y, terrainH(camera.position.x, camera.position.z) + 2, waveH(camera.position.x, camera.position.z, t) + 1.5);
   camera.lookAt(focus.x, focus.y + (foot ? 2.2 : 7), focus.z);
   if (shake > 0) { camera.position.x += rnd(-1, 1) * shake; camera.position.y += rnd(-1, 1) * shake * .6; shake = Math.max(0, shake - dt * 2.5); }
   water.position.set(Math.round(camera.position.x / 50) * 50, 0, Math.round(camera.position.z / 50) * 50);
@@ -2436,7 +2523,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
