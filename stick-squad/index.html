@@ -127,6 +127,9 @@ LAYOUTS.push(
    { x: 300, y: 420, w: 220 }, { x: 1080, y: 420, w: 220 }, { x: 650, y: 260, w: 300 }],
   [{ x: 100, y: 660, w: 240 }, { x: 1260, y: 660, w: 240 }, { x: 620, y: 640, w: 360 }, { x: 300, y: 490, w: 240 }, { x: 1060, y: 490, w: 240 }, { x: 680, y: 350, w: 240 }],
 );
+THEMES.push({ name: 'THE BLANK PAGE', kind: 'blank', paper: '#ffffff', line: 'rgba(0,0,0,0.05)', margin: 'rgba(220,60,60,0.15)',
+  ink: '#222222', enemy: '#2a2a2a', hatch: 'rgba(34,34,34,0.22)', text: '#222222', doodle: 'rgba(34,34,34,0.18)' });
+LAYOUTS.push([{ x: 200, y: 660, w: 240 }, { x: 1160, y: 660, w: 240 }, { x: 640, y: 620, w: 320 }, { x: 380, y: 470, w: 220 }, { x: 1000, y: 470, w: 220 }, { x: 690, y: 330, w: 220 }]);
 const NSTAGES = THEMES.length;
 const theme = () => THEMES[((G.stage % NSTAGES) + NSTAGES) % NSTAGES];
 const layout = () => LAYOUTS[((G.stage % NSTAGES) + NSTAGES) % NSTAGES];
@@ -139,7 +142,7 @@ const BOSSES = [
   { name: 'THE MIDNIGHT SMUDGE', acc: 'crown', cape: '#4a1a7a', hp: 1.35, spd: 1.3, s: 2.3 },
 ];
 const stageIdx = () => ((G.stage % NSTAGES) + NSTAGES) % NSTAGES;
-const bossInfo = () => BOSSES[stageIdx()];
+const bossInfo = () => G.bossOv || BOSSES[stageIdx()];
 const BOSS_MOVES = [['charge', 'leap', 'barrage', 'spin'], ['charge', 'leap', 'beam'], ['barrage', 'inkrain', 'teleport', 'leap'],
   ['charge', 'spin', 'clones'], ['leap', 'beam', 'vortex', 'charge'], ['teleport', 'clones', 'inkrain', 'beam']];
 BOSSES.forEach((b, i) => b.moves = BOSS_MOVES[i]);
@@ -171,7 +174,58 @@ MINIBOSSES.push(
   { name: 'COMET KID', acc: 'antenna', cape: '#6a4ad0', hp: 1.3, spd: 1.35, s: 1.65, moves: ['teleport', 'beam'] },
   { name: 'KITE BANDIT', acc: 'cowboy', cape: '#5a8f3a', hp: 1.35, spd: 1.3, s: 1.7, moves: ['charge', 'spin'] },
 );
-const miniInfo = () => MINIBOSSES[stageIdx()];
+BOSSES.push({ name: 'THE GRAND ERASER', acc: 'crown', cape: '#4a7ad0', col: '#e8798f', hp: 2.2, spd: 1.2, s: 2.8, moves: ['sweep', 'blackhole', 'stomp3', 'beam', 'clones', 'inkrain'] });
+MINIBOSSES.push({ name: 'PAPER DRAGON', acc: 'horns', cape: '#f2c230', col: '#c0392b', hp: 1.6, spd: 1.3, s: 2.05, moves: ['stomp3', 'beam', 'sweep'] });
+const HYDRA = { name: 'INK HYDRA', acc: 'horns', cape: '#1f8a70', col: '#3d2a6b', hp: 1.9, spd: 1.15, s: 2.6, moves: ['barrage', 'inkrain', 'blackhole', 'spin', 'clones'] };
+const EXTRA_BOSSES = [HYDRA];
+const miniInfo = () => G.miniOv || MINIBOSSES[stageIdx()];
+// ---------------------------------------------------------------- story
+const GRAND = BOSSES[12];
+const CHAPTERS = [
+  { stage: 0, title: 'NOTEBOOK HEIGHTS', boss: BOSSES[0], mini: MINIBOSSES[0] },
+  { stage: 1, title: 'GRAPH CITY', boss: BOSSES[1], mini: MINIBOSSES[1] },
+  { stage: 3, title: 'STICKY NOTE JUNGLE', boss: BOSSES[3], mini: MINIBOSSES[3] },
+  { stage: 9, title: 'ICE RINK', boss: BOSSES[9], mini: MINIBOSSES[9] },
+  { stage: 8, title: 'LAVA DOODLE', boss: BOSSES[8], mini: MINIBOSSES[8] },
+  { stage: 10, title: 'SPACE DOODLE', boss: BOSSES[10], mini: MINIBOSSES[10] },
+  { stage: 5, title: 'MIDNIGHT SKETCHBOOK', boss: HYDRA, mini: MINIBOSSES[5] },
+  { stage: 12, title: 'THE BLANK PAGE', boss: GRAND, mini: MINIBOSSES[12] },
+];
+// Line format: [who, text, textIfPlayingSolo]. who: n narrator, t title card, p1/p2 heroes, v chapter boss, e the Grand Eraser.
+const SCENES = {
+  c0i: { e: true, lines: [
+    ['n', 'Once upon a time, the doodles of a kid’s notebook lived happily ever after... almost.'],
+    ['n', 'One day, a shadow fell across the page.'],
+    ['e', 'At last! I am THE GRAND ERASER! Every doodle in this notebook will be wiped CLEAN!'],
+    ['p1', 'Hey! Somebody worked really hard on these doodles!'],
+    ['e', 'My minions are already spreading. That silly Scribble King works for ME now. Mwa ha ha!'],
+    ['p2', 'Then we’ll erase YOUR plans first!', 'Then I’ll erase YOUR plans first!'],
+    ['t', 'CHAPTER 1: NOTEBOOK HEIGHTS']] },
+  c0b: { v: 0, lines: [['v', 'Who dares interrupt my royal doodling?'], ['p1', 'The Grand Eraser is tricking you! Snap out of it!'], ['v', 'He promised me a BIGGER crown! Guards, CHARGE!']] },
+  c0o: { v: 0, vDown: true, lines: [['v', 'My crown... it’s just a paper hat...'], ['p1', 'Where is the Grand Eraser hiding?'], ['v', 'He went to Graph City... to erase all the lines!'], ['p2', 'Next stop: Graph City!', 'Next stop: Graph City!']] },
+  c1i: { lines: [['t', 'CHAPTER 2: GRAPH CITY'], ['n', 'The grid lines were vanishing, one little square at a time.'], ['p1', 'Look! Something HUGE is stomping through the city!']] },
+  c1b: { v: 1, lines: [['v', 'RAWRRR! I eat graph paper for breakfast!'], ['p2', 'Then it’s time for dessert: a knuckle sandwich!', 'Then it’s time for dessert: a knuckle sandwich!']] },
+  c1o: { v: 1, vDown: true, e: true, lines: [['v', 'Graphzilla sorry... Graphzilla just wanted to be a real dinosaur.'], ['e', 'Useless lizard! No matter. The Sticky Note Jungle is next!'], ['p1', 'After him!']] },
+  c2i: { lines: [['t', 'CHAPTER 3: STICKY NOTE JUNGLE'], ['p1', 'Ew. Everything here is sticky.'], ['p2', 'I think I stepped in gum.', 'I think I just stepped in gum.']] },
+  c2b: { v: 2, lines: [['v', 'Howdy, doodles. This jungle ain’t big enough for the both of us.'], ['p1', 'Good thing we brought our A-game!', 'Good thing I brought my A-game!']] },
+  c2o: { v: 2, vDown: true, e: true, lines: [['v', 'Alright, alright! I give up!'], ['e', 'Bah! Let’s see how you handle the cold. Brrr-wa ha ha!'], ['p1', 'Did that eraser just make a pun?']] },
+  c3i: { lines: [['t', 'CHAPTER 4: ICE RINK'], ['n', 'The whole page had frozen solid.'], ['p1', 'Careful, the floor is super slippery!']] },
+  c3b: { v: 3, lines: [['v', 'SNOW... MORE... DOODLES!'], ['p2', 'Somebody needs a hug. A very strong hug.', 'Somebody needs a hug. A very strong hug.']] },
+  c3o: { v: 3, vDown: true, e: true, lines: [['v', '*sniff* Nobody ever asks me to play.'], ['p1', 'We’ll play with you after we save the notebook. Promise!', 'I’ll play with you after I save the notebook. Promise!'], ['e', 'There won’t BE a notebook! Meet me where the floor is lava!']] },
+  c4i: { lines: [['t', 'CHAPTER 5: LAVA DOODLE'], ['p1', 'The floor is (sometimes) lava. Watch out for the geysers!']] },
+  c4b: { v: 4, lines: [['v', 'You’re really making me... ERUPT!'], ['p1', 'Somebody take a deep breath. Not me. Him.']] },
+  c4o: { v: 4, vDown: true, e: true, lines: [['v', 'Phew... I feel much calmer now.'], ['e', 'ENOUGH! I’ll erase you from OUTER SPACE!'], ['p2', 'Wait... we can go to space?!', 'Wait... I can go to space?!']] },
+  c5i: { lines: [['t', 'CHAPTER 6: SPACE DOODLE'], ['p1', 'Whoa! I feel so floaty!'], ['n', 'Low gravity: jumps go much higher here.']] },
+  c5b: { v: 5, lines: [['v', 'I have swallowed whole galaxies. You are a tiny snack!'], ['p1', 'This snack bites back!']] },
+  c5o: { v: 5, vDown: true, lines: [['v', 'Ugh... I think I ate too many stars.'], ['n', 'Far below, the whole notebook was going dark...'], ['p1', 'We have to hurry!', 'I have to hurry!']] },
+  c6i: { lines: [['t', 'CHAPTER 7: MIDNIGHT SKETCHBOOK'], ['p1', 'It’s so dark in here. Stay close!', 'It’s so dark in here...'], ['p2', 'I’m right behind you. Literally.', 'Deep breath. I can do this.']] },
+  c6b: { v: 6, lines: [['v', 'Three heads are better than one! HISSSS!'], ['p1', 'Three heads? That’s three times the bonks!']] },
+  c6o: { v: 6, vDown: true, lines: [['v', 'Hisss... the Eraser... waits on... the Blank Page...'], ['p1', 'This is it. The final page.']] },
+  c7i: { e: true, eSolid: true, lines: [['t', 'FINAL CHAPTER: THE BLANK PAGE'], ['n', 'Nothing was left here. Not a line. Not a dot.'], ['e', 'Welcome to my masterpiece: NOTHING!'], ['p1', 'Doodles aren’t nothing! We’re the best part of the notebook!'], ['e', 'Then my Paper Dragon will fold you into tiny squares!']] },
+  c7b: { v: 7, lines: [['v', 'My dragon, crumpled! Fine. I’ll erase you MYSELF!'], ['p1', 'Everyone... let’s DRAW our best!', 'Time to DRAW my best!'], ['p2', 'For the notebook!', 'For the notebook!']] },
+  c7o: { v: 7, vDown: true, lines: [['v', 'No... the ink... it’s too strong...'], ['n', 'With one final POW, the Grand Eraser crumbled into eraser dust.']] },
+  end: { stage: 0, lines: [['n', 'Lines came back. Colors came back. Every doodle came home.'], ['p1', 'We did it! The notebook is saved!', 'I did it! The notebook is saved!'], ['p2', 'Best. Doodle. Team. EVER!', 'Best. Doodle. Day. EVER!'], ['t', 'THE END'], ['n', '...or is it? Try Arcade, Boss Rush and Versus!']] },
+};
 const CHARS = [
   { name: 'SCRIBBLE', role: 'ALL-ROUNDER', desc: ['Balanced and easy to learn.', 'Special: Ink Burst blasts', 'everything around you.'], col: '#e2342c', back: '#9a2420', alt: '#ff7a3a', acc: 'band', hp: 100, spd: 1, dmg: 1, jumps: 2, size: 1, special: 'burst', sname: 'INK BURST' },
   { name: 'BOLT', role: 'SPEEDSTER', desc: ['Super fast with a TRIPLE jump.', 'Low health, hits a bit softer.', 'Special: Thunder strikes 8 foes.'], col: '#f0a000', back: '#a86f00', alt: '#c9c000', acc: 'spikes', hp: 80, spd: 1.32, dmg: 0.85, jumps: 3, size: 0.92, special: 'thunder', sname: 'THUNDERCLAP', dashMul: 1.2 },
@@ -391,6 +445,7 @@ function rumble(pi, strong, weak, dur) {
 const G = { state: 'title', wave: 0, stage: 0, frame: 0, phase: 'intro', phaseT: 0, queue: [], spawnT: 0,
   enemies: [], projs: [], pickups: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
   best: 0, players: [], boss: null, lastTeamText: -999, pauseSel: 0, titleT: 0, newBest: false };
+try { G.chUnlocked = Math.min(7, +localStorage.getItem('stickSquadChapter') || 0); } catch (e) { G.chUnlocked = 0; }
 try { G.best = +localStorage.getItem('stickSquadBest') || 0; G.bestRush = +localStorage.getItem('stickSquadRush') || 0; } catch (e) { }
 let parts = [], texts = [], shake = 0, flashA = 0, flashCol = '#fff', timeScale = 1, slowT = 0, zoom = 0, zoomX = W / 2, zoomY = H / 2, hurtVig = 0;
 const twoP = () => G.players.filter(p => p.joined).length >= 2;
@@ -1011,15 +1066,15 @@ class Enemy extends Fighter {
   constructor(type, x, y) {
     const T = ETYPES[type]; super(x, y, T.s);
     this.type = type; this.T = T;
-    const tier = Math.floor((G.wave - 1) / 5);
-    const hpScale = T.boss ? (1 + tier * 0.5) * (twoP() ? 1.5 : 1) : (1 + (G.wave - 1) * 0.06) * (twoP() ? 1.3 : 1);
+    const tier = G.mode === 'campaign' ? Math.floor((G.campCh || 0) / 4) : G.mode === 'rush' ? Math.floor(Math.max(0, G.rushIdx) / 9) : Math.floor((G.wave - 1) / 5);
+    const hpScale = (T.boss ? (1 + tier * 0.5) * (twoP() ? 1.5 : 1) : (1 + (G.wave - 1) * 0.06) * (twoP() ? 1.3 : 1)) * (G.mode === 'campaign' && T.boss ? 0.8 : 1);
     this.maxHp = this.hp = Math.round(T.hp * hpScale);
     this.speed = T.speed * rand(0.9, 1.1) * (1 + tier * 0.08);
     this.cd = randi(40, 90); this.armor = !!T.armor; this.facing = x < W / 2 ? 1 : -1;
     this.target = null; this.lastHitBy = null; this.lastHitT = -999; this.spawnT = 18; this.dying = 0;
     this.bstate = 'intro'; this.bt = 90; this.wobble = 0;
     this.fade = 1;
-    if (T.boss) { const B = T.mini ? miniInfo() : bossInfo(); this.moves = B.moves; this.s = B.s; this.maxHp = this.hp = Math.round(this.hp * B.hp); this.speed *= B.spd; this.bspd = B.spd; this.name = B.name; this.bacc = B.acc; this.bcape = B.cape; }
+    if (T.boss) { const B = T.mini ? miniInfo() : bossInfo(); this.moves = B.moves; this.s = B.s; this.maxHp = this.hp = Math.round(this.hp * B.hp); this.speed *= B.spd; this.bspd = B.spd; this.name = B.name; this.bacc = B.acc; this.bcape = B.cape; this.bcol = B.col; }
   }
   update() {
     this.anim++; if (this.flash > 0) this.flash--; if (this.dropT > 0) this.dropT--; if (this.wobble > 0) this.wobble--;
@@ -1119,7 +1174,11 @@ class Enemy extends Fighter {
           if (c === 'summon' && G.enemies.filter(e => !e.dead && !e.T.boss).length > 3) { this.bt = 10; break; }
           if (c === 'clones' && G.enemies.filter(e => !e.dead && e.type === 'shadow').length >= 3) { this.bt = 10; break; }
           this.lastMove = c;
-          this.bstate = c; this.bt = { charge: 42, leap: 20, barrage: 56, summon: 60, beam: 75, inkrain: 80, clones: 50, teleport: 64, spin: 100, vortex: 100 }[c];
+          this.stomps = 0;
+          if (c === 'stomp3') { c = 'leap'; this.stomps = 3; }
+          this.bstate = c; this.bt = { charge: 42, leap: 20, barrage: 56, summon: 60, beam: 75, inkrain: 80, clones: 50, teleport: 64, spin: 100, vortex: 100, sweep: 38, blackhole: 130 }[c];
+          if (c === 'sweep') SFX.roar();
+          if (c === 'blackhole') { this.bhX = clamp(t.x, 220, W - 220); this.bhY = 430; SFX.portal(); }
           if (c === 'beam') { this.beamY = this.y - 42; this.beamDir = this.facing; SFX.charge(); }
           if (c === 'inkrain') { const xs = alivePlayers().map(p => p.x); while (xs.length < (ph2 ? 8 : 6)) xs.push(rand(80, W - 80)); this.rainX = xs; SFX.roar(); }
           if (c === 'clones') SFX.roar();
@@ -1201,6 +1260,29 @@ class Enemy extends Fighter {
         this.physics();
         if (this.bt <= 0) { this.bstate = 'dazed'; this.bt = 60; floatText(this.x, this.y - this.hh - 40, 'DIZZY! ATTACK!', '#e8a800', 34, 60); }
         break;
+      case 'sweep':
+        if (this.bt > 0) { this.vx *= 0.7; if (t && this.bt > 10) this.facing = sign(t.x - this.x); if (this.bt % 4 === 0) dustBurst(this.x - this.facing * 30, this.y, 2); }
+        else {
+          this.vx = this.facing * 16 * (this.bspd || 1);
+          if (this.bt % 3 === 0) dustBurst(this.x + this.facing * 40, this.y, 2);
+          const sc = this.s / 2.3, box = { x: this.x - 55 * sc, y: this.y - 45, w: 110 * sc, h: 45 };
+          for (const p of ps) if (!this.hitSet.has(p.id) && overlap(box, p.hurtbox())) { this.hitSet.add(p.id); doHit(this, p, { dmg: 16, kb: [12, 9], stun: 26, hs: 6, heavy: true, sfx: 'heavy', shake: 8 }, this.facing); }
+          if (this.hitWall) { this.bstate = 'idle'; this.bt = ph2 ? 30 : 50; addShake(10); SFX.shock(); this.vx = -this.facing * 4; }
+          if (this.bt < -120) { this.bstate = 'idle'; this.bt = 30; }
+        }
+        this.physics(); break;
+      case 'blackhole':
+        fric(); this.physics();
+        if (this.bt < 100 && this.bt > 20) {
+          for (const p of alivePlayers()) if (p.dashT <= 0) { const dx = this.bhX - p.x; p.vx += sign(dx) * Math.min(0.8, Math.abs(dx) / 200); }
+          for (const e of G.enemies) if (!e.dead && !e.T.boss) e.vx += sign(this.bhX - e.x) * 0.5;
+          if (this.bt % 20 === 0) this.hitSet = new Set();
+          for (const p of ps) if (!this.hitSet.has(p.id) && Math.hypot(p.x - this.bhX, (p.y - 40) - this.bhY) < 90 + (FLOOR - this.bhY) * 0) { this.hitSet.add(p.id); doHit(this, p, { dmg: 10, kb: [6, 6], stun: 16, hs: 3, sfx: 'heavy' }, sign(p.x - this.bhX), true); }
+          for (const p of ps) if (!this.hitSet.has(p.id) && Math.abs(p.x - this.bhX) < 60) { this.hitSet.add(p.id); doHit(this, p, { dmg: 10, kb: [6, 6], stun: 16, hs: 3, sfx: 'heavy' }, sign(p.x - this.bhX), true); }
+          if (this.bt % 3 === 0) { const a = rand(0, 6.28), r = rand(120, 260); parts.push({ type: 'spark', x: this.bhX + Math.cos(a) * r, y: this.bhY + Math.sin(a) * r, vx: -Math.cos(a) * 9, vy: -Math.sin(a) * 9, life: 14, max: 14, col: '#7b3fd0' }); }
+        }
+        if (this.bt === 20) { SFX.shock(); addShake(10); ring(this.bhX, this.bhY, '#7b3fd0', 220, 8, 20); }
+        if (this.bt <= 0) { this.bstate = 'idle'; this.bt = 40; } break;
       case 'vortex':
         fric(); this.physics();
         if (this.bt > 40) {
@@ -1220,6 +1302,7 @@ class Enemy extends Fighter {
       this.leaping = false; this.bstate = 'idle'; this.bt = this.ph2 ? 35 : 60;
       SFX.shock(); addShake(16); dustBurst(this.x, this.y, 20); ring(this.x, this.y, theme().enemy, 220, 9, 22); stampSplat(this.x, this.y, 40, theme().enemy);
       spawnWave(this.x, 1, 10, 12); spawnWave(this.x, -1, 10, 12);
+      if (this.stomps > 1) { this.stomps--; this.bstate = 'leap'; this.bt = 10; } else this.stomps = 0;
       for (const p of alivePlayers()) if (p.inv <= 0 && Math.abs(p.x - this.x) < 150 && Math.abs(p.y - this.y) < 80) doHit(this, p, { dmg: 16, kb: [12, 12], stun: 30, hs: 6, heavy: true, sfx: 'heavy' }, sign(p.x - this.x), true);
     }
   }
@@ -1413,14 +1496,20 @@ function buildWave(n) {
   return q;
 }
 const fmtTime = f => { const sec = Math.floor(f / 60); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
-const RUSH_LEN = NSTAGES * 2;
+const RUSH_LIST = [];
+for (let st = 0; st < NSTAGES; st++) {
+  RUSH_LIST.push({ st, mini: true, B: MINIBOSSES[st] }, { st, mini: false, B: BOSSES[st] });
+  if (st === 5) RUSH_LIST.push({ st, mini: false, B: HYDRA });
+}
+const RUSH_LEN = RUSH_LIST.length;
 function nextRush() {
   G.rushIdx++;
   if (G.rushIdx >= RUSH_LEN) {
     G.won = true; G.rushDone = G.rushT; musIntensity = 1;
     banner('BOSS RUSH COMPLETE!', 'TIME ' + fmtTime(G.rushT), '#e8a800', 200); SFX.clear(); G.overT = 200; return;
   }
-  const st = Math.floor(G.rushIdx / 2), mini = G.rushIdx % 2 === 0;
+  const RE = RUSH_LIST[G.rushIdx], st = RE.st, mini = RE.mini;
+  G.bossOv = mini ? null : RE.B; G.miniOv = mini ? RE.B : null;
   const changed = st !== G.stage; G.stage = st;
   if (changed) { sctx.clearRect(0, 0, W, H); buildBG(); }
   G.wave = st * 5 + (mini ? 3 : 5);
@@ -1432,10 +1521,11 @@ function nextRush() {
     if (changed && G.rushIdx > 0) { p.x = p.idx ? 1000 : 600; p.y = FLOOR - 400; p.vy = 0; }
   }
   musIntensity = 2;
-  banner('BOSS RUSH ' + (G.rushIdx + 1) + ' / ' + RUSH_LEN, (mini ? MINIBOSSES : BOSSES)[st].name, '#d22', 110);
+  banner('BOSS RUSH ' + (G.rushIdx + 1) + ' / ' + RUSH_LEN, RE.B.name, '#d22', 110);
 }
 function nextWave() {
   if (G.mode === 'rush') return nextRush();
+  if (G.mode === 'campaign') return nextCampaign();
   G.wave++;
   const newStage = Math.floor((G.wave - 1) / 5) % NSTAGES;
   const stageChanged = newStage !== G.stage || G.wave === 1;
@@ -1494,7 +1584,7 @@ function banner(text, sub, col, life = 110) { G.banner = { text, sub, col, t: 0,
 // ---------------------------------------------------------------- flow
 function startGame(startStage = 0, mode = 'story') {
   initAudio();
-  G.startStage = startStage; G.mode = mode; G.won = false; G.rushIdx = -1; G.rushT = 0; G.newBestRush = false;
+  G.startStage = startStage; G.mode = mode; G.won = false; G.rushIdx = -1; G.rushT = 0; G.newBestRush = false; G.bossOv = null; G.miniOv = null; G.cut = null;
   G.state = 'play'; G.wave = mode === 'rush' ? 0 : startStage * 5; G.stage = -1; G.frame = 0; G.enemies = []; G.projs = []; G.pickups = []; G.portals = []; G.ghosts = [];
   G.overT = 0; G.teamSuperT = 0; G.boss = null; G.crateT = 700; G.newBest = false; parts = []; texts = []; slowT = 0; timeScale = 1;
   G.geysers = []; G.geyserT = 300; G.wind = null; G.enemySlowT = 0;
@@ -1502,7 +1592,81 @@ function startGame(startStage = 0, mode = 'story') {
   if (mode === 'versus') {
     G.stage = startStage; sctx.clearRect(0, 0, W, H); buildBG();
     G.vs = { round: 1, wins: [0, 0] }; G.crateT = 500; musIntensity = 2; startVersusRound();
-  } else nextWave();
+  } else if (mode === 'campaign') beginChapter(startStage);
+  else nextWave();
+}
+function playScene(id, then) {
+  const sc = SCENES[id];
+  if (sc.stage !== undefined && sc.stage !== G.stage) { G.stage = sc.stage; buildBG(); sctx.clearRect(0, 0, W, H); }
+  G.enemies = []; G.projs = []; G.portals = []; G.geysers = []; G.banner = null;
+  G.cut = { id, i: 0, t: 0, then }; G.state = 'cutscene'; musIntensity = 0;
+}
+function sceneLine(c) {
+  const sc = SCENES[c.id], line = sc.lines[Math.min(c.i, sc.lines.length - 1)];
+  let [who, text, solo] = line;
+  const heroes = G.players.filter(p => p.joined);
+  if (who === 'p2' && heroes.length < 2) { who = 'p1'; text = solo || text; }
+  else if (who === 'p1' && heroes.length < 2 && solo) text = solo;
+  return { who, text };
+}
+function endScene() { const f = G.cut && G.cut.then; G.cut = null; G.state = 'play'; if (f) f(); }
+function updateCutscene() {
+  const c = G.cut; if (!c) { G.state = 'play'; return; }
+  c.t++;
+  for (const p of G.players) {
+    if (!p.joined) continue;
+    const k = ctrls[p.idx];
+    if (k.pressed('start')) { SFX.menu(); endScene(); return; }
+    if (k.pressed('light') || k.pressed('jump') || k.pressed('special')) {
+      const full = sceneLine(c).text.length;
+      if (c.t * 1.6 < full) c.t = 999;
+      else { c.i++; c.t = 0; SFX.menu(); if (c.i >= SCENES[c.id].lines.length) { endScene(); return; } }
+      return;
+    }
+  }
+}
+function beginChapter(ch) {
+  const C = CHAPTERS[ch];
+  G.campCh = ch; G.campWave = 0; G.bossOv = C.boss; G.miniOv = C.mini; G.startStage = ch;
+  G.stage = C.stage; sctx.clearRect(0, 0, W, H); buildBG();
+  G.queue = []; G.phase = 'intro'; G.phaseT = 1;
+  G.players.forEach(p => { if (!p.joined) return; p.x = p.idx ? 1000 : 600; p.y = FLOOR; p.vx = p.vy = 0; });
+  const go = () => nextCampaign();
+  if (G.campSkipNext) { G.campSkipNext = false; go(); } else playScene('c' + ch + 'i', go);
+}
+function nextCampaign() {
+  G.campWave++;
+  const ch = G.campCh;
+  for (const p of G.players) {
+    if (!p.joined) continue;
+    if (p.dead || p.downed) { p.reset(false); p.hp = Math.round(p.maxHp * 0.6); floatText(p.x, p.y - 110, 'BACK IN!', p.col, 34, 70); }
+    else if (G.campWave > 1) p.hp = Math.min(p.maxHp, p.hp + 20);
+  }
+  if (G.campWave > 3) {
+    G.chUnlocked = Math.max(G.chUnlocked || 0, Math.min(ch + 1, CHAPTERS.length - 1));
+    try { localStorage.setItem('stickSquadChapter', '' + G.chUnlocked); } catch (e) { }
+    playScene('c' + ch + 'o', () => {
+      if (ch + 1 < CHAPTERS.length) { G.players.forEach(p => { if (p.joined) { if (p.dead || p.downed) p.reset(false); p.hp = p.maxHp; } }); beginChapter(ch + 1); }
+      else playScene('end', () => { G.won = true; G.startStage = 0; gameOver(); });
+    });
+    return;
+  }
+  G.wave = ch * 3 + G.campWave;
+  if (G.campWave === 3) playScene('c' + ch + 'b', () => startCampaignWave(3));
+  else startCampaignWave(G.campWave);
+}
+function startCampaignWave(n) {
+  G.state = 'play';
+  const ch = G.campCh, C = CHAPTERS[ch];
+  let q;
+  if (n === 1) {
+    let budget = 6 + ch * 2; if (twoP()) budget = Math.round(budget * 1.5);
+    const pool = [['grunt', 1]]; if (ch >= 1) pool.push(['thrower', 2]); if (ch >= 2) pool.push(['ninja', 2]); if (ch >= 3) pool.push(['brute', 4]);
+    q = []; while (budget > 0) { const [t, c] = pick(pool); if (c > budget) { q.push('grunt'); budget--; continue; } q.push(t); budget -= c; }
+  } else if (n === 2) { q = ['miniboss']; for (let i = 0; i < 2 + Math.floor(ch / 2) + (twoP() ? 2 : 0); i++) q.push(pick(['grunt', 'grunt', 'thrower', 'ninja'])); }
+  else q = ['boss'];
+  G.queue = q; G.spawnT = 40; G.phase = 'intro'; G.phaseT = 90; musIntensity = n >= 2 ? 2 : 1;
+  if (n === 1) banner('CHAPTER ' + (ch + 1), C.title, theme().text, 100);
 }
 function startVersusRound() {
   const V = G.vs; G.projs = []; G.pickups = []; G.ghosts = []; G.geysers = []; G.geyserT = 300;
@@ -1538,6 +1702,7 @@ function gameOver() {
   if (G.mode === 'rush' && G.won && (!G.bestRush || G.rushDone < G.bestRush)) { G.bestRush = G.rushDone; G.newBestRush = true; try { localStorage.setItem('stickSquadRush', '' + G.rushDone); } catch (e) { } }
 }
 function toTitle() { G.state = 'title'; musIntensity = 0; G.stage = 0; for (const p of G.players) p.ready = false; sctx.clearRect(0, 0, W, H); buildBG(); }
+const MODES = ['campaign', 'story', 'rush', 'versus'];
 function goSelect() { G.state = 'select'; for (const p of G.players) p.ready = false; SFX.join(); }
 function confirmPressed(p) { const c = ctrls[p.idx]; return p.idx ? (c.pressed('special') || c.pressed('start') || c.pressed('light')) : (c.pressed('light') || c.pressed('start') || c.pressed('jump') || c.pressed('special')); }
 const SETUP_STEPS = [['jump', 'JUMP'], ['light', 'LIGHT ATTACK'], ['heavy', 'HEAVY ATTACK'], ['special', 'SPECIAL'], ['dash', 'DASH'], ['start', 'PAUSE / START']];
@@ -1589,7 +1754,8 @@ function onKeyPress(code) {
     return;
   }
   if (G.state === 'over' && code === 'Escape') toTitle();
-  if ((G.state === 'select' || G.state === 'mode' || G.state === 'stage' || G.state === 'padsetup') && code === 'Escape') toTitle();
+  if ((G.state === 'select' || G.state === 'mode' || G.state === 'stage' || G.state === 'chapter' || G.state === 'padsetup') && code === 'Escape') toTitle();
+  if (G.state === 'cutscene' && code === 'Escape') { endScene(); return; }
   if (G.state === 'padsetup' && code === 'KeyR') resetPadMaps();
   if (G.state === 'title' && code === 'KeyC') enterSetup();
 }
@@ -1630,9 +1796,10 @@ function stepLocal() {
     for (const p of G.players) {
       if (!p.joined) continue;
       const c = ctrls[p.idx], d = c.pressed('left') ? -1 : c.pressed('right') ? 1 : 0;
-      if (d) { G.modeSel = (G.modeSel + d + 3) % 3; SFX.menu(); }
+      if (d) { G.modeSel = (G.modeSel + d + 4) % 4; SFX.menu(); }
       if (G.stageT > 5 && confirmPressed(p)) {
-        const m = ['story', 'rush', 'versus'][G.modeSel];
+        const m = MODES[G.modeSel];
+        if (m === 'campaign') { if (G.chUnlocked > 0) { G.state = 'chapter'; G.chSel = G.chUnlocked; G.stageT = 0; SFX.banner(); } else startGame(0, 'campaign'); return; }
         if (m === 'versus' && !twoP()) { SFX.hurt(); G.modeMsg = 120; return; }
         if (m === 'rush') { startGame(0, 'rush'); return; }
         G.pendingMode = m; G.state = 'stage'; G.stageSel = Math.min(G.startStage || 0, NSTAGES - 1); G.stageT = 0; SFX.banner(); return;
@@ -1659,9 +1826,21 @@ function stepLocal() {
     if (c1.pressed('back')) toTitle();
     return;
   }
+  if (G.state === 'cutscene') { updateCutscene(); updateParts(); return; }
+  if (G.state === 'chapter') {
+    G.stageT++;
+    for (const p of G.players) {
+      if (!p.joined) continue;
+      const c = ctrls[p.idx], d = menuDir(c, 4);
+      if (d) { G.chSel = (G.chSel + d + CHAPTERS.length) % CHAPTERS.length; SFX.menu(); }
+      if (G.stageT > 5 && confirmPressed(p)) { if (G.chSel <= (G.chUnlocked || 0)) startGame(G.chSel, 'campaign'); else SFX.hurt(); return; }
+      if (backPressed(p)) { G.state = 'mode'; G.stageT = 0; SFX.menu(); return; }
+    }
+    return;
+  }
   if (G.state === 'over') {
     updateParts();
-    if (G.titleT > 30 && (c0.pressed('start') || c1.pressed('start') || c0.pressed('jump') || c1.pressed('jump'))) startGame(G.startStage || 0, G.mode);
+    if (G.titleT > 30 && (c0.pressed('start') || c1.pressed('start') || c0.pressed('jump') || c1.pressed('jump'))) { if (G.mode === 'campaign' && !G.won) G.campSkipNext = true; startGame(G.startStage || 0, G.mode); }
     if (c1.pressed('back')) toTitle();
     return;
   }
@@ -1785,6 +1964,12 @@ function buildBG() {
     for (let i = 0; i < 12; i++) { b.fillStyle = pick(['rgba(200,120,40,0.5)', 'rgba(120,160,60,0.5)', 'rgba(220,170,40,0.5)']); b.beginPath(); b.ellipse(rand(60, W - 60), rand(100, 500), 10, 5, rand(0, 3), 0, Math.PI * 2); b.fill(); }
     b.strokeStyle = 'rgba(200,60,60,0.6)'; b.lineWidth = 3; b.beginPath(); b.moveTo(1400, 120); b.lineTo(1470, 90); b.lineTo(1450, 160); b.closePath(); b.stroke(); b.beginPath(); b.moveTo(1450, 160); b.bezierCurveTo(1420, 220, 1480, 260, 1440, 320); b.stroke();
     b.font = `38px ${F2}`; b.fillStyle = d; b.fillText('hold onto your homework!', 140, 90);
+  } else if (th.kind === 'blank') {
+    for (let y = 100; y < H + 40; y += 38) { b.strokeStyle = 'rgba(70,120,200,0.12)'; b.lineWidth = 2; b.setLineDash([rand(20, 200), rand(40, 260)]); b.beginPath(); b.moveTo(-40, y); b.lineTo(W + 40, y); b.stroke(); }
+    b.setLineDash([]);
+    for (let i = 0; i < 18; i++) { const gr = b.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, 'rgba(150,140,140,0.10)'); gr.addColorStop(1, 'rgba(150,140,140,0)'); b.save(); b.translate(rand(0, W), rand(0, FLOOR)); b.scale(rand(80, 200), rand(30, 70)); b.rotate(rand(-0.3, 0.3)); b.fillStyle = gr; b.beginPath(); b.arc(0, 0, 1, 0, Math.PI * 2); b.fill(); b.restore(); }
+    for (let i = 0; i < 90; i++) { b.fillStyle = pick(['rgba(232,121,143,0.5)', 'rgba(160,150,150,0.4)']); b.beginPath(); b.ellipse(rand(0, W), rand(FLOOR - 300, FLOOR - 4), rand(2, 5), rand(1.5, 3), rand(0, 3), 0, Math.PI * 2); b.fill(); }
+    b.font = `38px ${F2}`; b.fillStyle = th.doodle; b.fillText('(this page intentionally left blank)', 140, 80);
   } else if (th.kind === 'board') {
     for (let i = 0; i < 26; i++) { const g = b.createRadialGradient(0, 0, 0, 0, 0, 1); const x = rand(0, W), y = rand(0, H), r = rand(80, 260);
       b.save(); b.translate(x, y); b.scale(r, r * 0.5); g.addColorStop(0, 'rgba(255,255,255,0.06)'); g.addColorStop(1, 'rgba(255,255,255,0)'); b.fillStyle = g; b.beginPath(); b.arc(0, 0, 1, 0, Math.PI * 2); b.fill(); b.restore(); }
@@ -2031,6 +2216,8 @@ function poseFor(f) {
     if (b === 'beam') return f.bt > 20 ? P.specialWind : mk({ aFu: 1.57, aFl: 1.57, aBu: 1.4, aBl: 1.5, lean: -0.1, lFu: 0.5, lBu: -0.5 });
     if (b === 'inkrain' || b === 'clones' || b === 'vortex') return P.roar;
     if (b === 'teleport') return f.bt > 26 ? P.poundHang : P.pound;
+    if (b === 'sweep') return f.bt > 0 ? P.crouch : mk({ lean: 0.9, hip: 26, aFu: 1.6, aFl: 1.6, aBu: 1.4, aBl: 1.5, lFu: 1.2, lFl: 0.2, lBu: -1.0, lBl: -1.4 });
+    if (b === 'blackhole') return P.roar;
     if (b === 'spin') return f.bt > 80 ? P.crouch : mk({ aFu: 1.57, aFl: 1.57, aBu: -1.57, aBl: -1.57, lFu: 0.4, lBu: -0.4 });
   }
   if (a) return mk(f.at <= a.startup ? Object.assign({}, P.idle(0), a.wind) : Object.assign({}, P.idle(0), a.hit));
@@ -2084,7 +2271,7 @@ function drawFighter(f) {
   } else {
     const th = theme();
     const bs = f.bstate;
-    const tele = f.attack && f.at <= f.attack.startup || (f.T.boss && (((bs === 'charge' || bs === 'leap') && f.bt > 0) || (bs === 'beam' && f.bt > 20) || (bs === 'spin' && f.bt > 80) || (bs === 'vortex' && f.bt > 40) || (bs === 'teleport' && f.bt > 26 && f.bt <= 46)));
+    const tele = f.attack && f.at <= f.attack.startup || (f.T.boss && (((bs === 'charge' || bs === 'leap') && f.bt > 0) || (bs === 'beam' && f.bt > 20) || (bs === 'spin' && f.bt > 80) || (bs === 'vortex' && f.bt > 40) || (bs === 'teleport' && f.bt > 26 && f.bt <= 46) || (bs === 'sweep' && f.bt > 0) || (bs === 'blackhole' && f.bt >= 100)));
     if (f.fade < 1) alpha = Math.max(0.04, f.fade);
     if (f.T.boss && bs === 'beam' && f.bt > -15) {
       const x0 = f.beamDir > 0 ? f.x : 0, x1 = f.beamDir > 0 ? W : f.x;
@@ -2096,11 +2283,25 @@ function drawFighter(f) {
       ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, FLOOR); ctx.stroke(); ctx.setLineDash([]);
       ctx.beginPath(); ctx.ellipse(x, FLOOR - 2, 30 * (0.5 + k * 0.5), 7, 0, 0, Math.PI * 2); ctx.stroke();
     }
+    if (f.T.boss && bs === 'blackhole' && f.bt > 0 && f.bhX !== undefined) {
+      if (f.bt >= 100) { ctx.strokeStyle = 'rgba(123,63,208,' + (0.4 + 0.4 * Math.sin(G.frame * 0.6)) + ')'; ctx.lineWidth = 5; ctx.setLineDash([12, 10]); ctx.beginPath(); ctx.arc(f.bhX, f.bhY, 90, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+      else {
+        const r = 40 + Math.sin(G.frame * 0.4) * 5;
+        ctx.fillStyle = '#0b0614'; ctx.beginPath(); ctx.arc(f.bhX, f.bhY, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#7b3fd0'; ctx.lineWidth = 4;
+        for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(f.bhX, f.bhY, r + 12 + k * 14, G.frame * 0.15 + k * 2, G.frame * 0.15 + k * 2 + 3.6); ctx.stroke(); }
+      }
+    }
+    if (f.T.boss && bs === 'sweep' && f.bt <= 0 && f.bt > -120) {
+      const sc = f.s / 2.3, ex = f.x + f.facing * 40 * sc, w2 = 90 * sc;
+      ctx.fillStyle = '#f08aa0'; ctx.fillRect(ex - w2 / 2, f.y - 48, w2, 46); ctx.fillStyle = '#4a7ad0'; ctx.fillRect(f.facing > 0 ? ex - w2 / 2 : ex + w2 / 2 - w2 * 0.35, f.y - 48, w2 * 0.35, 46);
+      ctx.strokeStyle = '#3a2a2a'; ctx.lineWidth = 3; ctx.strokeRect(ex - w2 / 2, f.y - 48, w2, 46);
+    }
     if (f.T.boss && bs === 'teleport' && f.bt > 0 && f.bt <= 46) {
       ctx.strokeStyle = 'rgba(255,40,40,0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(f.x, f.warnY, 60, 12, 0, 0, Math.PI * 2); ctx.stroke();
       txt('!', f.x, f.warnY - 40, 40, '#ff2a2a', 'center', F1, th.paper, 6);
     }
-    const ecol = f.freeze > 0 ? '#7fd0ff' : th.enemy;
+    const ecol = f.freeze > 0 ? '#7fd0ff' : (f.bcol || th.enemy);
     const head = drawFigure(f, f.x + shakeX, f.y, s, f.facing, f.pose, ecol, {
       flash: f.flash > 0, lw: f.T.lw || 5.5, tele, alpha, eye: f.dying ? 'x' : 'enemy', eyeCol: f.T.boss && f.ph2 ? '#ffcc00' : '#ff3030',
       band: f.T.band, scarf: f.T.band, acc: f.T.boss ? f.bacc : f.sacc || null, cape: f.T.boss ? f.bcape : null,
@@ -2382,7 +2583,7 @@ function drawHUD() {
   }
   // center
   const rush = G.mode === 'rush';
-  if (G.mode !== 'versus') txt(rush ? 'BOSS RUSH ' + (Math.min(G.rushIdx, RUSH_LEN - 1) + 1) + ' / ' + RUSH_LEN : G.wave % 5 === 0 ? 'BOSS' : G.wave % 5 === 3 ? 'MINI-BOSS' : 'WAVE ' + G.wave, W / 2, 34, 34, th.text, 'center', F1, th.paper, 6);
+  if (G.mode !== 'versus') txt(G.mode === 'campaign' ? 'CHAPTER ' + ((G.campCh || 0) + 1) + (G.campWave === 3 ? ' · BOSS' : G.campWave === 2 ? ' · MINI-BOSS' : ' · WAVE 1') : rush ? 'BOSS RUSH ' + (Math.min(G.rushIdx, RUSH_LEN - 1) + 1) + ' / ' + RUSH_LEN : G.wave % 5 === 0 ? 'BOSS' : G.wave % 5 === 3 ? 'MINI-BOSS' : 'WAVE ' + G.wave, W / 2, 34, 34, th.text, 'center', F1, th.paper, 6);
   const left = G.queue.length + G.portals.length + G.enemies.filter(e => !e.dead).length;
   if (G.enemySlowT > 0) txt('SLOW-MO ' + Math.ceil(G.enemySlowT / 60) + 's', W / 2, 96, 22, '#2a6ae6', 'center', F1, th.paper, 5);
   if (G.mode !== 'versus') txt(rush ? theme().name + ' · TIME ' + fmtTime(G.won ? G.rushDone : G.rushT) : theme().name + ' · ' + left + ' FOES LEFT', W / 2, 66, 18, th.text, 'center', F2);
@@ -2541,7 +2742,7 @@ function drawSelect() {
   txt('P1: W A S D to pick · J to confirm · K to change      P2: stick / D-pad to pick · A to confirm · B to change', W / 2, 668, 22, ink, 'center', F2);
   txt('ESC — back to title', W / 2, 700, 20, ink, 'center', F2);
 }
-function drawStageThumb(i, x, y, w, h) {
+function drawStageThumb(i, x, y, w, h, Bov) {
   const th = THEMES[i], L = LAYOUTS[i], sx = w / W, sy = h / H;
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
   ctx.fillStyle = th.paper; ctx.fillRect(x, y, w, h);
@@ -2558,44 +2759,129 @@ function drawStageThumb(i, x, y, w, h) {
     ctx.beginPath(); ctx.moveTo(x + px * sx, y + py * sy); ctx.lineTo(x + (px + p.w) * sx, y + py * sy); ctx.stroke();
   }
   ctx.setLineDash([]);
-  const B = BOSSES[i];
-  drawFigure(null, x + w * 0.5, y + FLOOR * sy, 0.7, -1, P.idle(G.titleT), th.enemy, { acc: B.acc, cape: B.cape, eye: 'enemy', lw: 6, noShadow: true });
+  const B = Bov || BOSSES[i];
+  drawFigure(null, x + w * 0.5, y + FLOOR * sy, 0.7, -1, P.idle(G.titleT), B.col || th.enemy, { acc: B.acc, cape: B.cape, eye: 'enemy', lw: 6, noShadow: true });
   ctx.restore();
 }
 function drawMode() {
   const ink = THEMES[0].ink, t = G.titleT, two = twoP();
   menuBackdrop('PICK A MODE');
   const M = [
-    ['STORY', ['Team up against waves of doodles.', 'Mini-boss on wave 3, boss on', 'wave 5 of every stage.'], '#2a9a40'],
-    ['BOSS RUSH', ['All ' + RUSH_LEN + ' bosses back to back.', 'Race the clock!', G.bestRush ? 'Best time: ' + fmtTime(G.bestRush) : 'No clear yet.'], '#d22'],
-    ['VERSUS', ['P1 vs P2 · best of 3 rounds.', '99 seconds per round.', two ? 'Power-ups fall from the sky!' : 'Needs 2 players to join.'], '#7b3fd0'],
+    ['STORY', ['8 chapters with cutscenes.', 'Stop the Grand Eraser!', G.chUnlocked > 0 ? 'Saved: up to chapter ' + (G.chUnlocked + 1) : 'Start your adventure.'], '#e2342c'],
+    ['ARCADE', ['Endless waves of doodles.', 'Mini-boss on wave 3,', 'boss on wave 5.'], '#2a9a40'],
+    ['BOSS RUSH', ['All ' + RUSH_LEN + ' bosses in a row.', 'Race the clock!', G.bestRush ? 'Best time: ' + fmtTime(G.bestRush) : 'No clear yet.'], '#d22'],
+    ['VERSUS', ['P1 vs P2, best of 3.', '99 seconds per round.', two ? 'Power-ups included!' : 'Needs 2 players to join.'], '#7b3fd0'],
   ];
   const [p1, p2] = G.players;
   const look = p => Object.assign(charLook(p.char, p.col), { scarf: null, backCol: p.back, weapon: hasSword(p) ? 'pencil' : (p.char.weapon || null), noShadow: true });
   M.forEach(([name, lines, col], i) => {
-    const w = 440, h = 520, x = 100 + i * 480, y = 140, sel = G.modeSel === i, off = i === 2 && !two;
+    const w = 350, h = 520, x = 55 + i * 380, y = 140, sel = G.modeSel === i, off = i === 3 && !two;
     ctx.save();
     if (sel) { ctx.translate(x + w / 2, y + h / 2); ctx.scale(1.04, 1.04); ctx.rotate(Math.sin(t * 0.08) * 0.006); ctx.translate(-x - w / 2, -y - h / 2); }
     if (off) ctx.globalAlpha = 0.5;
     ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = col; const ga = ctx.globalAlpha; ctx.globalAlpha = ga * 0.13; ctx.fillRect(x, y, w, 260); ctx.globalAlpha = ga;
+    const ga = ctx.globalAlpha; ctx.fillStyle = col; ctx.globalAlpha = ga * 0.13; ctx.fillRect(x, y, w, 260); ctx.globalAlpha = ga;
     if (i === 0) {
-      drawFigure(null, x + 140, y + 235, 1.5, 1, mk(Object.assign({}, P.idle(0), A.L3.hit)), p1.col, look(p1));
-      for (const k of [0, 1]) drawFigure(null, x + 290 + k * 80, y + 235, 1.3, -1, P.hurt, THEMES[0].enemy, { eye: 'enemy', noShadow: true });
+      drawFigure(null, x + 100, y + 235, 1.35, 1, P.idle(t), p1.col, look(p1));
+      drawFigure(null, x + 250, y + 240, 0.95, -1, P.roar, GRAND.col, { acc: GRAND.acc, cape: GRAND.cape, eye: 'enemy', lw: 6, noShadow: true });
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = ink; ctx.lineWidth = 3; ctx.fillRect(x + 60, y + 30, 150, 52); ctx.strokeRect(x + 60, y + 30, 150, 52);
+      txt('“Doodles rule!”', x + 135, y + 56, 18, ink, 'center', F2);
     } else if (i === 1) {
-      [0, 4, 8].forEach((b, k) => { const B = BOSSES[b]; drawFigure(null, x + 110 + k * 110, y + 240, 0.9, k === 2 ? -1 : 1, P.roar, '#2a2a30', { acc: B.acc, cape: B.cape, eye: 'enemy', lw: 6, noShadow: true }); });
+      drawFigure(null, x + 110, y + 235, 1.35, 1, mk(Object.assign({}, P.idle(0), A.L3.hit)), p1.col, look(p1));
+      for (const k of [0, 1]) drawFigure(null, x + 230 + k * 70, y + 235, 1.15, -1, P.hurt, THEMES[0].enemy, { eye: 'enemy', noShadow: true });
+    } else if (i === 2) {
+      [0, 4, 8].forEach((b, k) => { const B = BOSSES[b]; drawFigure(null, x + 80 + k * 95, y + 240, 0.8, k === 2 ? -1 : 1, P.roar, '#2a2a30', { acc: B.acc, cape: B.cape, eye: 'enemy', lw: 6, noShadow: true }); });
     } else {
-      drawFigure(null, x + 120, y + 235, 1.5, 1, mk(Object.assign({}, P.idle(0), A.HAY.hit)), p1.col, look(p1));
-      drawFigure(null, x + 320, y + 235, 1.5, -1, P.idle(t), p2.col, look(p2));
-      txt('VS', x + w / 2, y + 120, 80, '#7b3fd0', 'center', F1, '#fff', 10);
+      drawFigure(null, x + 100, y + 235, 1.35, 1, mk(Object.assign({}, P.idle(0), A.HAY.hit)), p1.col, look(p1));
+      drawFigure(null, x + 270, y + 235, 1.35, -1, P.idle(t), p2.col, look(p2));
+      txt('VS', x + w / 2, y + 120, 70, '#7b3fd0', 'center', F1, '#fff', 10);
     }
     ctx.strokeStyle = sel ? col : ink; ctx.lineWidth = sel ? 8 : 3; ctx.strokeRect(x, y, w, h);
-    txt(name, x + w / 2, y + 310, 58, col, 'center', F1, '#fff', 8);
-    lines.forEach((l, k) => txt(l, x + w / 2, y + 380 + k * 36, 26, off && k === 2 ? '#d22' : ink, 'center', F2));
+    txt(name, x + w / 2, y + 310, 50, col, 'center', F1, '#fff', 8);
+    lines.forEach((l, k) => txt(l, x + w / 2, y + 380 + k * 34, 24, off && k === 2 ? '#d22' : ink, 'center', F2));
     ctx.restore();
   });
   if (G.modeMsg > 0) txt('Versus needs two players. Go back and have P2 press a button to join.', W / 2, 700, 26, '#d22', 'center', F2);
   txt('LEFT / RIGHT TO PICK  ·  J / A TO CHOOSE  ·  K / B TO GO BACK', W / 2, 760, 28, ink, 'center', F1, '#fff', 6);
+}
+function drawChapter() {
+  const ink = THEMES[0].ink, t = G.titleT;
+  menuBackdrop('STORY · PICK A CHAPTER');
+  CHAPTERS.forEach((C, i) => {
+    const col = i % 4, row = (i / 4) | 0, w = 340, h = 190, x = 82 + col * 365, y = 130 + row * 292;
+    const locked = i > (G.chUnlocked || 0), sel = G.chSel === i;
+    ctx.save();
+    if (sel) { ctx.translate(x + w / 2, y + h / 2); ctx.scale(1.05, 1.05); ctx.translate(-x - w / 2, -y - h / 2); }
+    if (locked) { ctx.fillStyle = '#d8d4c8'; ctx.fillRect(x, y, w, h); txt('?', x + w / 2, y + h / 2, 100, '#fff', 'center', F1, ink, 8); }
+    else drawStageThumb(C.stage, x, y, w, h, C.boss);
+    ctx.strokeStyle = sel ? '#e8a800' : ink; ctx.lineWidth = sel ? 8 : 3; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.94)'; ctx.fillRect(x, y + h, w, 58); ctx.strokeStyle = sel ? '#e8a800' : ink; ctx.strokeRect(x, y + h, w, 58);
+    txt('CHAPTER ' + (i + 1) + ' · ' + (locked ? '???' : C.title), x + w / 2, y + h + 19, 18, sel ? '#c07800' : ink, 'center', F1);
+    txt(locked ? 'Clear the chapter before it to unlock' : 'Boss: ' + C.boss.name, x + w / 2, y + h + 42, 14, ink, 'center', F2);
+    ctx.restore();
+  });
+  txt('Your progress is saved. Pick any chapter you have reached.', W / 2, 735, 24, ink, 'center', F2);
+  txt('MOVE TO PICK  ·  J / A TO PLAY  ·  K / B TO GO BACK', W / 2, 790, 28, ink, 'center', F1, '#fff', 6);
+}
+function wrapLines(str, maxW, size, font) {
+  ctx.font = `${size}px ${font}`;
+  const out = []; let cur = '';
+  for (const w of str.split(' ')) { const test = cur ? cur + ' ' + w : w; if (ctx.measureText(test).width > maxW && cur) { out.push(cur); cur = w; } else cur = test; }
+  if (cur) out.push(cur); return out;
+}
+function drawCutscene() {
+  const c = G.cut; if (!c || !SCENES[c.id]) return;
+  const sc = SCENES[c.id], L = sceneLine(c), t = G.titleT;
+  ctx.drawImage(bgCanvas, -40, -40);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 0, W, H);
+  const heroes = G.players.filter(p => p.joined); if (!heroes.length) heroes.push(G.players[0]);
+  const heroPos = [];
+  heroes.forEach((p, k) => {
+    const speaking = (L.who === 'p1' && k === 0) || (L.who === 'p2' && k === 1);
+    const x = 430 - k * 190, bob = speaking ? Math.abs(Math.sin(t * 0.25)) * 8 : 0;
+    const pose = speaking ? mk(Object.assign({}, P.idle(t), { aFu: 1.3 + Math.sin(t * 0.3) * 0.5, aFl: 2.2, lean: 0.12 })) : P.idle(t + k * 20);
+    drawFigure(null, x, FLOOR - bob, 2.0 * p.char.size, 1, pose, p.col, Object.assign(charLook(p.char, p.col), { scarf: null, backCol: p.back, weapon: hasSword(p) ? 'pencil' : (p.char.weapon || null) }));
+    heroPos.push([x, FLOOR - 190 * p.char.size, p.char.name, p.col]);
+  });
+  let vPos = null, ePos = null;
+  if (sc.v !== undefined) {
+    const B = CHAPTERS[sc.v].boss, speaking = L.who === 'v', sz = Math.min(2.5, B.s);
+    drawFigure(null, 1180, FLOOR - (speaking && !sc.vDown ? Math.abs(Math.sin(t * 0.2)) * 6 : 0), sz, -1, sc.vDown ? P.down : speaking ? P.roar : P.idle(t), B.col || theme().enemy, { acc: B.acc, cape: B.cape, eye: sc.vDown ? 'x' : 'enemy', lw: 7 });
+    vPos = [1180, sc.vDown ? FLOOR - 70 : FLOOR - 95 * sz, B.name, B.col || '#d22'];
+  }
+  if (sc.e) {
+    const fy = sc.eSolid ? FLOOR : 560 + Math.sin(t * 0.05) * 12, ex = sc.v !== undefined ? 1420 : 1220, sz = sc.eSolid ? 2.6 : 1.6;
+    drawFigure(null, ex, fy, sz, -1, L.who === 'e' ? P.roar : P.idle(t), GRAND.col, { acc: GRAND.acc, cape: GRAND.cape, eye: 'enemy', lw: 7, alpha: sc.eSolid ? 1 : 0.6, noShadow: !sc.eSolid });
+    ePos = [ex, fy - 95 * sz, GRAND.name, GRAND.col];
+  }
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, 64); ctx.fillRect(0, H - 64, W, 64);
+  const shown = L.text.slice(0, Math.floor(c.t * 1.6));
+  if (L.who === 't') {
+    const k = Math.min(1, c.t / 12);
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(W / 2, 330); ctx.rotate(-0.03); ctx.scale(0.8 + k * 0.2, 0.8 + k * 0.2);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-W, -70, W * 2, 140);
+    txt(L.text, 0, 0, 84, '#e2342c', 'center', F1, '#fff', 12); ctx.restore();
+  } else if (L.who === 'n') {
+    const lines = wrapLines(shown || ' ', 1100, 32, F2), bh = 40 + lines.length * 40;
+    ctx.save(); ctx.translate(250, 100); ctx.rotate(-0.01);
+    ctx.fillStyle = '#fbe68a'; ctx.fillRect(0, 0, 1180, bh); ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, 1180, bh);
+    lines.forEach((l, k) => txt(l, 30, 40 + k * 40, 32, '#24242a', 'left', F2));
+    ctx.restore();
+  } else {
+    const sp = L.who === 'p1' ? heroPos[0] : L.who === 'p2' ? (heroPos[1] || heroPos[0]) : L.who === 'v' ? vPos : ePos;
+    if (sp) {
+      const lines = wrapLines(shown || ' ', 640, 32, F2), bw = 700, bh = 72 + lines.length * 40;
+      const bx = clamp(sp[0] - bw / 2, 40, W - bw - 40), by = 96;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#24242a'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(clamp(sp[0] - 24, bx + 30, bx + bw - 70), by + bh - 2); ctx.lineTo(sp[0], Math.max(by + bh + 40, sp[1] - 30)); ctx.lineTo(clamp(sp[0] + 24, bx + 70, bx + bw - 30), by + bh - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = '#fff'; ctx.fillRect(clamp(sp[0] - 22, bx + 32, bx + bw - 68), by + bh - 6, 40, 10);
+      txt(sp[2], bx + 24, by + 30, 26, sp[3], 'left', F1);
+      lines.forEach((l, k) => txt(l, bx + 24, by + 70 + k * 40, 32, '#24242a', 'left', F2));
+    }
+  }
+  if (c.t * 1.6 >= L.text.length && Math.floor(t / 20) % 2) txt('▼', W - 70, H - 90, 30, '#fff', 'center', F1, '#000', 4);
+  txt('J / A  NEXT    ·    ENTER / +  SKIP SCENE', W / 2, H - 32, 22, '#fff', 'center', F1);
 }
 function drawStageSel() {
   const ink = THEMES[0].ink, t = G.titleT, vs = G.pendingMode === 'versus';
@@ -2608,7 +2894,7 @@ function drawStageSel() {
     let title, sub;
     if (i < NSTAGES) {
       drawStageThumb(i, x, y, w, h);
-      const feat = { lava: 'Hazard: lava geysers!', ice: 'Slippery ice floor!', space: 'Low gravity!', wind: 'Hazard: wind gusts!' }[THEMES[i].kind] || (LAYOUTS[i].some(q => q.move) ? 'Moving platforms' : 'Classic arena');
+      const feat = { blank: 'The final page', lava: 'Hazard: lava geysers!', ice: 'Slippery ice floor!', space: 'Low gravity!', wind: 'Hazard: wind gusts!' }[THEMES[i].kind] || (LAYOUTS[i].some(q => q.move) ? 'Moving platforms' : 'Classic arena');
       title = (i + 1) + ' · ' + THEMES[i].name; sub = vs ? feat : 'Boss: ' + BOSSES[i].name;
     } else {
       ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, h);
@@ -2696,8 +2982,10 @@ function drawOver() {
     txt('ESC / −  —  TITLE', W / 2, 825, 26, '#ccc', 'center', F1);
     return;
   }
-  txt(G.won ? 'VICTORY!' : 'GAME OVER', W / 2, 150, 120, G.won ? '#ffd23a' : '#ff4a3a', 'center', F1, '#000', 12);
-  const line = G.mode === 'rush'
+  const camp = G.mode === 'campaign';
+  txt(G.won ? (camp ? 'THE END!' : 'VICTORY!') : 'GAME OVER', W / 2, 150, 120, G.won ? '#ffd23a' : '#ff4a3a', 'center', F1, '#000', 12);
+  const line = camp ? (G.won ? 'YOU SAVED THE NOTEBOOK! · ALL 8 CHAPTERS CLEARED' : 'CHAPTER ' + (G.campCh + 1) + ': ' + CHAPTERS[G.campCh].title + ' · PRESS TO RETRY THE CHAPTER')
+    : G.mode === 'rush'
     ? (G.won ? 'ALL ' + RUSH_LEN + ' BOSSES DEFEATED · TIME ' + fmtTime(G.rushDone) : 'BOSS RUSH · BOSSES DEFEATED: ' + Math.max(0, G.rushIdx) + ' / ' + RUSH_LEN)
     : 'YOU REACHED WAVE ' + G.wave + ' · ' + theme().name;
   txt(line, W / 2, 250, 36, '#fff', 'center', F1);
@@ -2723,6 +3011,8 @@ function render(now) {
   else if (G.state === 'select') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawSelect(); }
   else if (G.state === 'padsetup') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawSetup(); }
   else if (G.state === 'mode') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawMode(); }
+  else if (G.state === 'chapter') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawChapter(); }
+  else if (G.state === 'cutscene') drawCutscene();
   else if (G.state === 'stage') { if (G.stage !== 0) { G.stage = 0; buildBG(); } drawStageSel(); }
   else { drawWorld(); drawHUD(); if (G.state === 'pause') drawPause(); if (G.state === 'over') drawOver(); }
   drawNetTag();
@@ -2740,7 +3030,8 @@ const NET = { role: null, connected: false, via: null, code: '', transport: null
 const IN_ARTIFACT = !!(window.claude && window.claude.use);
 for (const k of Object.keys(SFX)) { const f = SFX[k]; SFX[k] = () => { if (NET.role === 'host' && NET.connected) { NET.ev.push([++NET.evSeq, k]); if (NET.ev.length > 14) NET.ev.shift(); } f(); }; }
 const ETN = Object.keys(ETYPES), ATK = Object.keys(A), PWN = Object.keys(POWER_INFO);
-const BST = ['intro', 'roar', 'idle', 'charge', 'dazed', 'leap', 'barrage', 'summon', 'beam', 'inkrain', 'clones', 'teleport', 'spin', 'vortex'];
+const BST = ['intro', 'roar', 'idle', 'charge', 'dazed', 'leap', 'barrage', 'summon', 'beam', 'inkrain', 'clones', 'teleport', 'spin', 'vortex', 'sweep', 'blackhole'];
+const ALLB = [...BOSSES, ...MINIBOSSES, ...EXTRA_BOSSES];
 const PJK = ['eraser', 'blob', 'wave', 'ibolt', 'meteor', 'slash', 'laserbolt', 'pan', 'ball', 'pie', 'tornado', 'mine', 'sonic'];
 const PKK = ['heart', 'ink', 'pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'mystery', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock'];
 const r1 = v => Math.round(v * 10) / 10, ri = Math.round, poseArr = p => PK.map(k => Math.round(p[k] * 100));
@@ -2759,11 +3050,12 @@ function buildSnapshot() {
       ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0]),
     E: G.enemies.slice(0, 16).map(e => [e.id, ETN.indexOf(e.type), ri(e.x), ri(e.y), e.facing, poseArr(e.pose), ri(e.hp), e.maxHp, e.flash, e.dying, e.spawnT, e.freeze || 0,
       e.attack ? ATK.indexOf(Object.keys(A).find(k => A[k] === e.attack)) : -1, ri(e.at || 0), BST.indexOf(e.bstate), e.bt, ri((e.fade ?? 1) * 100), e.ph2 ? 1 : 0, ri((e.spin || 0) * 100),
-      e.T.boss ? [ri(e.beamY || 0), e.beamDir || 0, (e.rainX || []).map(ri), ri(e.warnY || 0)] : 0]),
+      e.T.boss ? [ri(e.beamY || 0), e.beamDir || 0, (e.rainX || []).map(ri), ri(e.warnY || 0), ri(e.bhX || 0), ri(e.bhY || 0)] : 0]),
     J: G.projs.slice(0, 26).map(pr => [PJK.indexOf(pr.kind), ri(pr.x), ri(pr.y), r1(pr.vx), r1(pr.vy), ri(pr.r), pr.owner === 'player' ? (pr.by ? pr.by.idx : 0) : -1, r1(pr.rot || 0), pr.face || 0, pr.life]),
     K: G.pickups.slice(0, 10).map(k => [ri(k.x), ri(k.y), PKK.indexOf(k.kind), k.t]),
     PT: G.portals.map(q => [ri(q.x), ri(q.y), ETN.indexOf(q.type), q.t, q.max]),
     Y: (G.geysers || []).map(g => [ri(g.x), g.t]), cs: G.enemySlowT || 0,
+    bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0,
     WD: G.wind ? [['calm', 'warn', 'gust'].indexOf(G.wind.phase), G.wind.t, G.wind.dir] : 0,
     B: G.boss ? G.boss.id : 0, ev: NET.ev.slice(),
   };
@@ -2786,6 +3078,8 @@ function applySnapshot(s) {
   if (s.sg !== G.stage) { G.stage = s.sg; buildBG(); sctx.clearRect(0, 0, W, H); }
   if (s.st === 'play' && prevState !== 'play' && prevState !== 'pause') sctx.clearRect(0, 0, W, H);
   updatePlatforms();
+  G.bossOv = s.bo && s.bo[0] >= 0 ? ALLB[s.bo[0]] : null; G.miniOv = s.bo && s.bo[1] >= 0 ? ALLB[s.bo[1]] : null;
+  G.cut = s.ct ? { id: s.ct[0], i: s.ct[1], t: s.ct[2] } : null; G.campCh = s.cc; G.campWave = s.cw; G.chSel = s.chs; G.chUnlocked = s.chu;
   const live = s.st === 'play';
   let ciChanged = false;
   s.P.forEach((a, i) => {
@@ -2809,7 +3103,7 @@ function applySnapshot(s) {
     let e = NET.emap.get(a[0]);
     if (!e) {
       e = Object.create(Enemy.prototype); e.id = a[0]; e.scarf = []; e.pose = mk({}); e.type = ETN[a[1]]; e.T = ETYPES[e.type]; e.x = a[2]; e.y = a[3];
-      if (e.T.boss) { const B = e.T.mini ? miniInfo() : bossInfo(); e.bacc = B.acc; e.bcape = B.cape; e.name = B.name; e.s = B.s; } else e.s = e.T.s;
+      if (e.T.boss) { const B = e.T.mini ? miniInfo() : bossInfo(); e.bacc = B.acc; e.bcape = B.cape; e.bcol = B.col; e.name = B.name; e.s = B.s; } else e.s = e.T.s;
       if (e.type === 'shadow') e.sacc = G.boss ? G.boss.bacc : bossInfo().acc;
       NET.emap.set(e.id, e);
       if (live) { splash(e.x, e.y - 40, theme().enemy, 12, 6); ring(e.x, e.y - 40, theme().enemy, 70, 5); }
@@ -2827,7 +3121,7 @@ function applySnapshot(s) {
     e.hp = a[6]; e.maxHp = a[7]; e.flash = a[8]; e.dying = a[9]; e.spawnT = a[10]; e.freeze = a[11];
     e.attack = a[12] >= 0 ? A[ATK[a[12]]] : null; e.at = a[13]; e.bstate = BST[a[14]] || 'idle'; e.bt = a[15]; e.fade = a[16] / 100; e.ph2 = !!a[17]; e.spin = a[18] / 100;
     e.dead = e.dying > 0;
-    if (a[19]) { e.beamY = a[19][0]; e.beamDir = a[19][1]; e.rainX = a[19][2]; e.warnY = a[19][3]; }
+    if (a[19]) { e.beamY = a[19][0]; e.beamDir = a[19][1]; e.rainX = a[19][2]; e.warnY = a[19][3]; e.bhX = a[19][4]; e.bhY = a[19][5]; }
     list.push(e);
   }
   const ids = new Set(list.map(e => e.id));
