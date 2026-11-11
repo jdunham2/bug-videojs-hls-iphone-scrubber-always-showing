@@ -10,7 +10,7 @@
   html,body{margin:0;height:100%;background:#0d0d10;overflow:hidden}
   canvas{display:block}
   #net{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,14,0.72);font-family:"Patrick Hand","Comic Sans MS",sans-serif;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-  #net[hidden]{display:none}
+  #net[hidden],#net [hidden]{display:none!important}
   #net .box{background:#f4f0e3;color:#24242a;border:4px solid #24242a;box-shadow:8px 8px 0 #24242a;padding:24px 28px;max-width:520px;width:100%;transform:rotate(-0.6deg)}
   #net h2{font-family:"Permanent Marker",Impact,sans-serif;font-size:40px;margin:0 0 8px;color:#e2342c}
   #net p{font-size:20px;line-height:1.35;margin:8px 0}
@@ -29,7 +29,7 @@
   <div class="box" role="dialog" aria-label="Online play">
     <h2>Online Play</h2>
     <p id="netInfo"></p>
-    <div id="netMain" class="row"><button id="bHost" class="primary">Host a game</button><button id="bJoin">Join a game</button></div>
+    <div id="netMain" class="row"><button id="bQuick" class="primary" hidden>Quick Match</button><button id="bHost" class="primary">Host a game</button><button id="bJoin">Join a game</button></div>
     <div id="netJoin" hidden><div class="row"><input id="netCodeIn" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Room code"><button id="bGo" class="primary">Join</button></div><div id="netList" class="row"></div></div>
     <div id="netCode" hidden></div>
     <p id="netStatus" aria-live="polite"></p>
@@ -374,7 +374,14 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
-addEventListener('mousedown', () => { initAudio(); window.focus(); });
+addEventListener('mousedown', e => {
+  initAudio(); window.focus();
+  if (G.state !== 'title' || !document.getElementById('net').hidden) return;
+  const r = canvas.getBoundingClientRect(), dpr = canvas.width / r.width;
+  const gx = ((e.clientX - r.left) * dpr - offX) / scale, gy = ((e.clientY - r.top) * dpr - offY) / scale;
+  if (gx >= ONLINE_BTN.x && gx <= ONLINE_BTN.x + ONLINE_BTN.w && gy >= ONLINE_BTN.y && gy <= ONLINE_BTN.y + ONLINE_BTN.h) netShow();
+});
+const ONLINE_BTN = { x: 1290, y: 22, w: 290, h: 64 };
 
 const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'dash', 'special', 'start', 'back'];
 class Ctrl {
@@ -3012,7 +3019,7 @@ function drawTitle(now) {
   txt('STICK SQUAD', 0, 0, 150, th.ink, 'center', F1, '#fff', 14);
   ctx.rotate(0.06); txt('INK WARS', 160, 100, 64, '#e2342c', 'center', F1, '#fff', 10);
   ctx.restore();
-  txt('A LOCAL CO-OP STICK BRAWLER', W / 2, 320, 28, th.ink, 'center', F2);
+  txt('A CO-OP STICK BRAWLER · PLAY LOCAL OR ONLINE', W / 2, 320, 28, th.ink, 'center', F2);
   // demo fighters
   demoFight(t);
   // cards
@@ -3046,6 +3053,11 @@ function drawTitle(now) {
     ctx.fillStyle = 'rgba(226,52,44,0.95)'; ctx.fillRect(W / 2 - 330, 360, 660, 56);
     txt('CLICK THE GAME FIRST SO IT CAN HEAR YOUR KEYS', W / 2, 389, 26, '#fff', 'center', F1);
   }
+  { const b = ONLINE_BTN, pulse = 1 + Math.sin(t * 0.08) * 0.03;
+    ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2); ctx.scale(pulse, pulse); ctx.rotate(0.02);
+    ctx.fillStyle = '#2a6ae6'; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.strokeStyle = th.ink; ctx.lineWidth = 4; ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+    txt(NET.connected ? 'ONLINE ✓' : 'ONLINE PLAY', 0, -6, 30, '#fff', 'center', F1); txt('click or press O', 0, 20, 16, '#dde7ff', 'center', F2);
+    ctx.restore(); canvas.style.cursor = 'pointer'; }
   const blink = Math.floor(t / 30) % 2;
   if (blink) txt('PRESS  ENTER  OR  +  TO PLAY   ·   O  FOR ONLINE', W / 2, 840, 36, th.ink, 'center', F1, '#fff', 8);
   txt('BEST TEAM SCORE  ' + G.best.toLocaleString() + '   ·   M = MUSIC ' + (musicOn ? 'ON' : 'OFF') + '   ·   C or − (MINUS) = CONTROLLER SETUP', W / 2, 885, 20, th.ink, 'center', F2);
@@ -3674,7 +3686,7 @@ let lobbyUnsub = null;
 function netShow() {
   $('net').hidden = false;
   const busy = !!NET.role;
-  $('netMain').hidden = busy; $('netJoin').hidden = true; $('bLeave').hidden = !busy;
+  $('netMain').hidden = busy; $('netJoin').hidden = true; $('bQuick').hidden = !IN_ARTIFACT; $('bLeave').hidden = !busy;
   if (!busy) { netShowCode(''); netStatusMsg(''); }
   $('netInfo').textContent = NET.connected ? (NET.role === 'host' ? 'You are hosting. Your friend plays as P2.' : 'You are connected as P2.')
     : IN_ARTIFACT ? 'Play with a friend on another computer. Invite them to this artifact from the Share menu (a public link can’t join online games). One of you hosts, the other joins with the 4-letter code.'
@@ -3697,6 +3709,19 @@ async function netShowJoin() {
   };
   lobbyUnsub = room.onPeers(ch => render(ch.peers), () => { });
 }
+async function netQuick() {
+  if (NET.role) return;
+  const room = await netRoom();
+  if (!room) { netStatusMsg('Quick Match works inside the Claude artifact. Use Host or Join with a code instead.'); return; }
+  $('netMain').hidden = true; netStatusMsg('Looking for an open game…');
+  room.onPeers(() => { }, () => { });
+  await new Promise(r => setTimeout(r, 1500));
+  if (NET.role) return;
+  const open = room.peers().filter(q => !q.isMe && q.presence && typeof q.presence.host === 'string' && /^[A-Z]{4}$/.test(q.presence.host));
+  if (open.length) netJoin(open[0].presence.host);
+  else { await netHost(); if (NET.role === 'host' && !NET.connected) netStatusMsg('No open games yet, so you are hosting one. When a friend picks Quick Match, they will join you automatically.'); }
+}
+$('bQuick').onclick = () => { initAudio(); netQuick(); };
 $('bHost').onclick = () => { initAudio(); $('netMain').hidden = true; netHost(); };
 $('bJoin').onclick = () => { initAudio(); netShowJoin(); };
 $('bGo').onclick = () => netJoin($('netCodeIn').value);

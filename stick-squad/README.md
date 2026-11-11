@@ -47,7 +47,7 @@ P1's action keys sit together in one cluster under the right hand:
 
 ## Online multiplayer
 
-Press **O** on the title screen. One player picks **Host a game** and gets a 4-letter code; the other picks **Join a game** and types it. The host plays as P1, the friend plays as P2 with their own keyboard or controller, and every mode works online (Story, Boss Rush, Versus).
+Click **ONLINE PLAY** on the title screen (or press **O**). One player picks **Host a game** and gets a 4-letter code; the other picks **Join a game** and types it. Inside the Claude artifact you can also pick **Quick Match**, which joins any open game or hosts one if there isn't any. The host plays as P1, the friend plays as P2 with their own keyboard or controller, and every mode works online (Story, Boss Rush, Versus).
 
 - **In the Claude artifact:** invite your friend to the artifact from the Share menu (a public link can't join). Open games also show up as one-click **Join** buttons.
 - **Downloaded file:** both players open `index.html` in Chrome or Edge while online. Players connect directly with WebRTC, using the free PeerJS service to find each other.
