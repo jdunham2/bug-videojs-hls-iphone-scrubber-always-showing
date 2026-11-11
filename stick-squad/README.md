@@ -12,6 +12,10 @@ Open `index.html` in Chrome or Edge (these browsers have the best gamepad suppor
 
 P2 can also drop in mid-game by pressing a button.
 
+After joining, each player picks a fighter, and then you pick a starting stage.
+
+No controller? P2 can play on the right side of the keyboard: arrow keys move, `/` jump, `,` light, `.` heavy, `;` special, Right Shift dash.
+
 ## Controls
 
 | Action | P1 Keyboard | P2 Pro Controller |
@@ -27,12 +31,28 @@ P2 can also drop in mid-game by pressing a button.
 | Pause | Esc / P | + |
 | Music on/off | M | (none) |
 
+## Fighters
+
+| Fighter | Style | Special |
+|---|---|---|
+| Scribble | All-rounder | Ink Burst: blasts everything around you |
+| Bolt | Speedster, triple jump, fragile | Thunderclap: lightning hits 8 foes |
+| Boulder | Tank, heavy attacks can't be interrupted | Earthquake: hits every grounded foe |
+| Inkblade | Always holds the Pencil Blade | Crescent Slash: giant piercing slashes |
+| Doodle Witch | Ranged, heavy attack fires ink bolts | Meteor Rain |
+| Shade | Ninja, 2 air dashes, 1.5x crits from behind | Shadow Strike: teleports through 6 foes |
+
+## Stages
+
+Six stages of five waves each, and each one ends with its own boss:
+Notebook Heights (The Scribble King), Graph City (Graphzilla), Chalkboard Arena (Professor Chalk), Sticky Note Jungle (The Sticky Bandit), Blueprint Factory (Blueprint Golem, with moving platforms) and Midnight Sketchbook (The Midnight Smudge, with moving platforms).
+
 ## Features
 
 - **Co-op mechanics:** hit an enemy your partner just hit for a **TEAM COMBO x2**. Stand next to a downed partner to **revive** them. When both ink meters are full and you're standing close, press Special to fire the **DOUBLE INK** screen-clearing team super.
 - **Combat:** combo chains, juggles, launcher into jump-cancel into air attacks, dash cancels, wall splats, and **projectile reflects**. Hit-stop, screen shake, slow-mo finishers and controller rumble give every hit weight.
 - **Enemies:** Grunts, Ninjas, Eraser-Throwers, armored Brutes with shockwave slams, and a two-phase boss, **The Scribble King**, every 5th wave.
-- **3 stages:** Notebook Heights, Graph City and Chalkboard Arena, with endless scaling waves.
+- **Endless:** after stage 6 the stages loop and the waves keep getting harder.
 - **Power-ups:** hearts, ink jars, the Pencil Blade, and Hyper Speed.
 - **Audio:** procedural soundtrack and sound effects, all synthesized live with Web Audio.
 - **Saved high score:** your best team score is kept between sessions.
