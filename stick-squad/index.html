@@ -29,6 +29,7 @@
   <div class="box" role="dialog" aria-label="Online play">
     <h2>Online Play</h2>
     <p id="netInfo"></p>
+    <div id="netWorld" class="row" hidden><button id="bRejoin" class="primary">Rejoin world</button></div>
     <div id="netMain" class="row"><button id="bQuick" class="primary" hidden>Quick Match</button><button id="bHost" class="primary">Host a game</button><button id="bJoin">Join a game</button></div>
     <div id="netJoin" hidden><div class="row"><input id="netCodeIn" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Room code"><button id="bGo" class="primary">Join</button></div><div id="netList" class="row"></div></div>
     <div id="netCode" hidden></div>
@@ -532,8 +533,9 @@ addEventListener('mousedown', e => {
   const r = canvas.getBoundingClientRect(), dpr = canvas.width / r.width;
   const gx = ((e.clientX - r.left) * dpr - offX) / scale, gy = ((e.clientY - r.top) * dpr - offY) / scale;
   if (gx >= ONLINE_BTN.x && gx <= ONLINE_BTN.x + ONLINE_BTN.w && gy >= ONLINE_BTN.y && gy <= ONLINE_BTN.y + ONLINE_BTN.h) netShow();
+  else if (G.world && !NET.role && gx >= REJOIN_BTN.x && gx <= REJOIN_BTN.x + REJOIN_BTN.w && gy >= REJOIN_BTN.y && gy <= REJOIN_BTN.y + REJOIN_BTN.h) netRejoin();
 });
-const ONLINE_BTN = { x: 1290, y: 22, w: 290, h: 64 };
+const ONLINE_BTN = { x: 1290, y: 22, w: 290, h: 64 }, REJOIN_BTN = { x: 1290, y: 98, w: 290, h: 52 };
 
 const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'light', 'heavy', 'dash', 'special', 'start', 'back'];
 class Ctrl {
@@ -2866,6 +2868,7 @@ function onKeyPress(code) {
   if (G.state === 'cutscene' && code === 'Escape') { endScene(); return; }
   if (G.state === 'padsetup' && code === 'KeyR') resetPadMaps();
   if (G.state === 'title' && code === 'KeyC') enterSetup();
+  if (G.state === 'title' && code === 'KeyR' && G.world && !NET.role) netRejoin();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play') G.state = 'pause'; });
 
@@ -4332,6 +4335,11 @@ function drawTitle(now) {
     ctx.fillStyle = '#2a6ae6'; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.strokeStyle = th.ink; ctx.lineWidth = 4; ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
     txt(NET.connected ? 'ONLINE ✓' : 'ONLINE PLAY', 0, -6, 30, '#fff', 'center', F1); txt('click or press O', 0, 20, 16, '#dde7ff', 'center', F2);
     ctx.restore(); canvas.style.cursor = 'pointer'; }
+  if (G.world && !NET.role) { const b = REJOIN_BTN;
+    ctx.save(); ctx.translate(b.x + b.w / 2, b.y + b.h / 2); ctx.rotate(-0.015);
+    ctx.fillStyle = '#21a35a'; ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); ctx.strokeStyle = th.ink; ctx.lineWidth = 4; ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+    txt('REJOIN WORLD ' + G.world.code, 0, -6, 24, '#fff', 'center', F1); txt('one click · or press R', 0, 16, 14, '#e0ffe8', 'center', F2);
+    ctx.restore(); }
   const blink = Math.floor(t / 30) % 2;
   if (blink) txt('PRESS  ENTER  OR  +  TO PLAY   ·   O  FOR ONLINE', W / 2, 840, 36, th.ink, 'center', F1, '#fff', 8);
   txt('BEST TEAM SCORE  ' + G.best.toLocaleString() + '   ·   M = MUSIC ' + (musicOn ? 'ON' : 'OFF') + '   ·   C or − (MINUS) = CONTROLLER SETUP', W / 2, 885, 20, th.ink, 'center', F2);
@@ -4892,7 +4900,7 @@ function netReceive(k, d) {
   if (k === 's' && NET.role === 'guest') applySnapshot(d);
 }
 function netConnected() {
-  NET.connected = true; NET.lastRecv = performance.now(); NET.tick = 0;
+  NET.connected = true; NET.worldOpen = false; NET.lastRecv = performance.now(); NET.tick = 0; NET.rejoining = null; saveWorld();
   netHide(); SFX.join();
   if (NET.role === 'host') {
     G.players[0].joined = true; G.players[1].joined = true;
@@ -4902,18 +4910,48 @@ function netConnected() {
 }
 function netClose() {
   try { if (NET.transport && NET.transport.close) NET.transport.close(); } catch (e) { }
-  Object.assign(NET, { role: null, connected: false, via: null, transport: null, remote: null, peerKey: null, lastP: null, conn: null, peer: null, code: '' });
+  Object.assign(NET, { worldOpen: false, rejoining: null, role: null, connected: false, via: null, transport: null, remote: null, peerKey: null, lastP: null, conn: null, peer: null, code: '' });
   ctrls[1].rc = null;
 }
 function netLost(msg) {
   if (!NET.role) return;
+  if (NET.role === 'host' && NET.connected) { keepWorldOpen(msg); return; }
+  if (NET.role === 'host' && NET.worldOpen) return;
   const wasGuest = NET.role === 'guest', wasConnected = NET.connected;
   netClose();
   if (wasGuest && wasConnected) { NET.emap.clear(); G.enemies = []; G.projs = []; G.pickups = []; G.portals = []; G.geysers = []; G.vs = null; G.players.forEach(p => { p.joined = false; p.tx = undefined; }); toTitle(); }
   else if (wasConnected && G.state === 'play') banner('P2 DISCONNECTED', 'P2 can keep playing on this computer', '#d22', 150);
-  netShow(); netStatusMsg(msg);
+  netShow(); netStatusMsg(msg + (wasGuest && G.world ? ' Click REJOIN WORLD to hop back in.' : ''));
 }
-function netLeave() { const wasGuest = NET.role === 'guest' && NET.connected; netClose(); if (wasGuest) { NET.emap.clear(); G.enemies = []; G.projs = []; G.pickups = []; G.vs = null; G.players.forEach(p => { p.joined = false; p.tx = undefined; }); toTitle(); } netShow(); netStatusMsg('You left the online game.'); }
+function netLeave() { if (NET.role === 'host' && NET.via === 'room' && NET.lobby) NET.lobby.presence({ host: null }).catch(() => { }); const wasGuest = NET.role === 'guest' && NET.connected; netClose(); if (wasGuest) { NET.emap.clear(); G.enemies = []; G.projs = []; G.pickups = []; G.vs = null; G.players.forEach(p => { p.joined = false; p.tx = undefined; }); toTitle(); } netShow(); netStatusMsg('You left the online game.'); }
+// ---- persistent worlds: the last online world is remembered and stays open for a one-click rejoin
+const loadWorld = () => { try { const w = JSON.parse(localStorage.getItem('stickSquadWorld') || 'null'); return w && /^[A-Z]{4}$/.test(w.code) ? w : null; } catch (e) { return null; } };
+G.world = loadWorld();
+function saveWorld() { G.world = { code: NET.code, t: Date.now() }; try { localStorage.setItem('stickSquadWorld', JSON.stringify(G.world)); } catch (e) { } }
+function keepWorldOpen(msg) {
+  NET.worldOpen = true; NET.connected = false; NET.peerKey = null; NET.lastP = null; NET.remote = null; ctrls[1].rc = null;
+  if (NET.conn) { try { NET.conn.close(); } catch (e) { } NET.conn = null; }
+  if (NET.via === 'peer' && NET.transport) NET.transport.send = () => { };
+  if (NET.via === 'room' && NET.lobby) NET.lobby.presence({ host: NET.code }).catch(() => { });
+  if (G.state === 'play') banner('FRIEND LEFT', 'WORLD ' + NET.code + ' STAYS OPEN · THEY CAN REJOIN', '#2a6ae6', 170);
+  else floatText(W / 2, 200, 'WORLD ' + NET.code + ' STAYS OPEN', '#2a6ae6', 34, 120);
+}
+async function netRejoin() {
+  const w = G.world; if (!w || NET.role) return;
+  initAudio(); netShow(); $('netMain').hidden = true; $('netWorld').hidden = true; $('bLeave').hidden = false;
+  netStatusMsg('Opening world ' + w.code + '…');
+  const room = await netRoom();
+  if (room) {
+    room.onPeers(() => { }, () => { });
+    await new Promise(r => setTimeout(r, 1200));
+    if (NET.role) return;
+    const hostThere = room.peers().some(q => !q.isMe && q.presence && q.presence.host === w.code);
+    if (hostThere) netJoin(w.code);
+    else { await netHost(w.code); if (NET.role === 'host' && !NET.connected) netStatusMsg('World ' + w.code + ' is open again! Your friend can click REJOIN WORLD to hop in.'); }
+    return;
+  }
+  NET.rejoining = w.code; netJoin(w.code);
+}
 const randCode = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[randi(0, 23)]).join('');
 async function netRoom() { if (!IN_ARTIFACT) return null; try { return await window.claude.use('room'); } catch (e) { return null; } }
 function loadPeerJS() {
@@ -4933,9 +4971,9 @@ function watchRoom(nr, wantRole, onPayload) {
     if (NET.peerKey && ch.left.some(p => p.peer === NET.peerKey)) netLost(wantRole === 'g' ? 'Your friend left.' : 'The host left.');
   }, () => netLost('Online play stopped working in this view.'));
 }
-async function netHost() {
+async function netHost(reuse) {
   if (NET.role) return;
-  const code = randCode(); NET.role = 'host'; NET.code = code; netStatusMsg('Starting…'); netShowCode(code);
+  const code = reuse || randCode(); NET.role = 'host'; NET.code = code; netStatusMsg('Starting…'); netShowCode(code);
   const room = await netRoom();
   if (room) {
     try {
@@ -4992,7 +5030,7 @@ async function netJoin(code) {
     conn.on('data', m => { if (m && m.k) netReceive(m.k, m.d); });
     conn.on('close', () => netLost('The host disconnected.'));
   });
-  peer.on('error', e => netStatusMsg(e.type === 'peer-unavailable' ? 'No game found with code ' + code + '.' : 'Connection problem: ' + (e.type || e.message)));
+  peer.on('error', e => { if (e.type === 'peer-unavailable' && NET.rejoining === code) { NET.rejoining = null; netClose(); netHost(code).then(() => netStatusMsg('World ' + code + ' is open again! Your friend can click REJOIN WORLD to hop in.')); return; } netStatusMsg(e.type === 'peer-unavailable' ? 'No game found with code ' + code + '.' : 'Connection problem: ' + (e.type || e.message)); });
   notFound();
 }
 // ---- online menu (HTML overlay)
@@ -5004,11 +5042,12 @@ function netShow() {
   $('net').hidden = false;
   const busy = !!NET.role;
   $('netMain').hidden = busy; $('netJoin').hidden = true; $('bQuick').hidden = !IN_ARTIFACT; $('bLeave').hidden = !busy;
+  $('netWorld').hidden = busy || !G.world; if (G.world) $('bRejoin').textContent = 'Rejoin world ' + G.world.code;
   if (!busy) { netShowCode(''); netStatusMsg(''); }
   $('netInfo').textContent = NET.connected ? (NET.role === 'host' ? 'You are hosting. Your friend plays as P2.' : 'You are connected as P2.')
     : IN_ARTIFACT ? 'Play with a friend on another computer. Invite them to this artifact from the Share menu (a public link can’t join online games). One of you hosts, the other joins with the 4-letter code.'
     : 'Play with a friend on another computer. You both open this game file in Chrome or Edge while online. One of you hosts, the other joins with the 4-letter code. Games connect directly using the free PeerJS service.';
-  (busy ? $('bLeave') : $('bHost')).focus();
+  (busy ? $('bLeave') : G.world ? $('bRejoin') : $('bHost')).focus();
 }
 function netHide() { $('net').hidden = true; if (lobbyUnsub) { lobbyUnsub(); lobbyUnsub = null; } canvas.focus && canvas.focus(); }
 async function netShowJoin() {
@@ -5043,9 +5082,11 @@ $('bHost').onclick = () => { initAudio(); $('netMain').hidden = true; netHost();
 $('bJoin').onclick = () => { initAudio(); netShowJoin(); };
 $('bGo').onclick = () => netJoin($('netCodeIn').value);
 $('netCodeIn').addEventListener('keydown', e => { if (e.key === 'Enter') netJoin($('netCodeIn').value); });
-$('bClose').onclick = () => { if (NET.role && !NET.connected) { netClose(); } netHide(); };
+$('bClose').onclick = () => { if (NET.role && !NET.connected && NET.role !== 'host') { netClose(); } netHide(); };
 $('bLeave').onclick = () => netLeave();
+$('bRejoin').onclick = () => netRejoin();
 function drawNetTag() {
+  if (NET.role === 'host' && !NET.connected && NET.code) { ctx.fillStyle = 'rgba(42,106,230,0.85)'; ctx.fillRect(W - 440, H - 32, 430, 26); txt('WORLD ' + NET.code + ' IS OPEN · FRIEND CAN REJOIN · O = MENU', W - 225, H - 19, 15, '#fff', 'center', F1); return; }
   if (!NET.connected) return;
   const t = NET.role === 'host' ? 'ONLINE · HOSTING (' + NET.code + ') · O = MENU' : 'ONLINE · YOU ARE P2 · O = MENU';
   ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(W - 360, H - 32, 350, 26);

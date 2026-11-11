@@ -56,6 +56,14 @@ Click **ONLINE PLAY** on the title screen (or press **O**). One player picks **H
 
 The host's computer runs the game and streams it to the friend about 30 times a second, so the host should have the better connection. If either side drops for 6 seconds, the game says so and P2 can carry on locally.
 
+**Worlds stay open.** After you play with someone, the game remembers that world (its 4-letter code):
+
+- If your friend leaves or their connection drops, the host keeps the world open (even in the middle of a game). The corner shows **WORLD ABCD IS OPEN**.
+- On the title screen, a green **REJOIN WORLD ABCD** button (or press **R**) jumps straight back in with one click.
+- If nobody has the world open, whoever clicks Rejoin first reopens it with the same code, and the other player joins them when they click.
+- To close your world, press O and choose **Leave online game**.
+
+
 ## Fighters
 
 Seventy-eight fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
