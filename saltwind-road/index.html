@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Saltwind Road</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +25,8 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#photoUI{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 14px;font-size:13px;text-align:center;z-index:30;max-width:calc(100% - 32px)}
 .padfocus{outline:3px solid #ffd040!important;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,208,64,.25)!important}
 kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);margin-left:4px}
 .panel{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
@@ -256,6 +259,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
     <button class="btn" id="btnCraft">Craft<kbd>C</kbd></button>
   </div>
   <div id="prompt" class="panel" hidden></div>
+  <div id="photoUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -2109,6 +2113,12 @@ const NPCS = [
    hello:["A ship! Er, a person! Hello!","I've been talking to a coconut for weeks.","Did you bring planks?"], rumors:["I've charted every cove on this coast from my little rock. If I ever get off it, I'll share my secrets."]},
   {id:'barnaby',town:'wren',dx:0,dy:0,name:'Ringmaster Barnaby',role:'The Traveling Circus',cols:{cloak:'#c83a3a',skin:'#e8c8a8',hair:'#2a2a2a'},circus:true,
    hello:["Roll up, roll up!","The greatest show in all the land!","Tickets, prizes, wonders!"], rumors:["The circus moves to a new town every week. Come test your strength!"]},
+  {id:'tib',town:'reed',dx:-3,dy:3,name:'Tib',role:'Village kid',cols:{cloak:'#e0a030',skin:'#e8c098',hair:'#a05a2a'},hideseek:true,freeSpot:true,
+   hello:["Wanna play? I'm the BEST hider!","Bet you can't find me!","Hee hee!"], rumors:["When I hide, I giggle. I can't help it. If you get close you'll hear me."]},
+  {id:'melody',town:'lantern',dx:3,dy:3,name:'Melody',role:'Street musician',cols:{cloak:'#b0402a',skin:'#c89070',hair:'#2a1a1a'},busker:true,freeSpot:true,
+   hello:["Music makes the coins fall!","Got rhythm, traveler?","La la laaa..."], rumors:["Lantern Bay crowds tip well for a good tune. Keep your rhythm and the coins come raining in."]},
+  {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
+   hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3175,7 +3185,7 @@ function gather(i) {
   if (d.boost && toolTier(d.boost)) amt += toolTier(d.boost);
   if (S.pet === 'monkey' && Math.random() < .3) amt += 1;
   if (Math.random() < .08*sk('gat')) amt += 1;
-  addItem(d.give, amt); S.gathered++; SFX.pickup(); gainXP(2);
+  addItem(d.give, amt); S.gathered++; SFX.pickup(); gainXP(2); if (party && partyNear()) pchalAdd('gather');
   if (d.seed && Math.random() < (d.seedP || .25)) { addItem(d.seed, 1); floatText(n.x + .5, n.y - .7, `+1 ${GOODS[d.seed].name}`, '#c8e0a0'); }
   floatText(n.x+.5, n.y, `+${amt} ${GOODS[d.give].name}`, '#86c98f');
   if (d.sting && Math.random() < .5) { hurtPlayer(1, null, true); floatText(S.x, S.y - 1.8, 'Stung!', '#f2b632'); }
@@ -3358,7 +3368,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.hp <= 0) killEnemy(e);
 }
 function killEnemy(e) {
-  e.dead = true; S.kills++;
+  e.dead = true; S.kills++; if (party && partyNear()) pchalAdd('kills');
   if (e.nid && party && party.host) netKilled.push({nid: e.nid, t: 2.5});
   const got = [];
   if (e.echo) {
@@ -3425,6 +3435,7 @@ function killEnemy(e) {
   renderHUD();
 }
 function hurtPlayer(dmg, from, ignoreInv) {
+  if (downed) return;
   if (player.roll > 0) { if (frameT - player.dodgeT > .4) { player.dodgeT = frameT; S.dodges = (S.dodges || 0) + 1; SFX.dodge(); floatText(S.x, S.y - 1.2, 'Dodged! Counter ready', '#bfe8ff'); player.counter = 2; } return; }
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
@@ -3441,6 +3452,8 @@ function hurtPlayer(dmg, from, ignoreInv) {
 function die() {
   if (S.pet === 'phoenix_chick' && S.phoenixDay !== S.day && !(S.arena && inArena())) { S.phoenixDay = S.day; S.hp = Math.ceil(maxHP()/2); player.inv = 2; renderHP(); burst(S.x, S.y - .5, '#ff8a2a', 30, 6); SFX.victory(); toast('<b>Your Phoenix Chick bursts into flame!</b><br>Warm fire wraps around you and you rise again. (Once per day.)', 5000); return; }
   if (S.arena && inArena()) { SFX.death(); S.hp = maxHP(); if (!S.arena.duel) S.deaths++; player.kx = player.ky = 0; leaveArena(true); return; }
+  if (!downed && party && !inDungeon() && !bossActive() && Object.values(remote).some(r => !r.p.dn && Math.hypot(r.x - S.x, r.y - S.y) < 20)) { downed = {t: 25}; S.hp = 0; player.kx = player.ky = 0; S.riding = false; fishing = null; SFX.death(); shake = .4; toast('<b>You are down!</b><br>A party member can revive you: they stand next to you and press E. If nobody comes within 25 seconds, you\u2019ll be carried to town.', 7000); renderHUD(); renderHP(); return; }
+  downed = null;
   let best = 'wren', bd = 1e9;
   for (const k in TOWNS) if (S.towns[k] && k !== 'isle') { const d = Math.hypot(S.x - TOWNS[k].x, S.y - TOWNS[k].y); if (d < bd) { bd = d; best = k; } }
   SFX.death();
@@ -3726,9 +3739,11 @@ function partyPanel() {
   }
   const list = Object.values(remote);
   const leader = list.find(r => r.p.host);
-  openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Near the leader, everyone fights the <b>same monsters</b>: hit them together, and everyone who helped gets the rewards. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat.</span><br><br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
+  openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Near the leader, everyone fights the <b>same monsters</b>: hit them together, and everyone who helped gets the rewards. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat, Y to emote and N to ping your spot on everyone\u2019s map. If you fall near a friend, they can revive you.</span><br><br>${pchalHTML()}<br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
     ...(leader && !party.host ? [{label: `Travel to ${leader.name}`, disabled: inDungeon() || inArena() || leader.p.dg || bossActive(), fn: () => { closeTalk(); SFX.travel(); fadeThen(() => { const spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]].map(([dx, dy]) => [leader.x + dx, leader.y + dy]).find(([x, y]) => passable(x, y)) || [leader.x, leader.y]; S.x = spot[0]; S.y = spot[1]; S.riding = !!S.riding && !!leader.p.mt; enemies = enemies.filter(e => e.boss); petE = null; compE = null; lastTile = -1; renderHUD(); }); }}] : []),
     {label: 'Chat', fn: () => chatPanel()},
+    {label: 'Emote (Y)', fn: () => emotePanel()},
+    {label: 'Ping my spot (N)', fn: () => { closeTalk(); sendPing(); }},
     {label: 'Leave party', fn: () => { leaveParty(); closeTalk(); }},
     {label: 'Close', fn: closeTalk}]);
 }
@@ -3747,7 +3762,7 @@ async function enterParty(code, host) {
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {}; netReset();
+  const P = party; if (!P) return; party = null; remote = {}; netReset(); reviving = null; if (downed) { downed = null; die(); }
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3764,7 +3779,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dn: downed ? Math.ceil(downed.t) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3775,6 +3790,7 @@ function partyTick(dt) {
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
   for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
+  partyExtras(dt);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
   for (const pr of peers) {
@@ -3786,6 +3802,9 @@ function partyTick(dt) {
     if (p.mv) r.phase += dt*12;
     if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
     const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
+    if (!r.xinit) { r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; }
+    if (p.em && typeof p.em === 'object' && p.em.i !== r.emI) { r.emI = p.em.i; if (EMOTES.hasOwnProperty(p.em.k)) r.emote = {k: p.em.k, t: 3}; }
+    if (p.pg && typeof p.pg === 'object' && p.pg.i !== r.pgI) { r.pgI = p.pg.i; if (isFinite(p.pg.x) && isFinite(p.pg.y)) { addPing(+p.pg.x, +p.pg.y, r.col, r.name); SFX.chime(); } }
     if (party.host && p.dm && typeof p.dm === 'object' && p.ds === NET_SID) netApply(pr.peer, r, p.dm);
     if (!party.host && p.host && typeof p.t === 'number' && isFinite(p.t)) { let dtm = Math.abs(S.time - p.t); dtm = Math.min(dtm, 1 - dtm); if (dtm > .02) S.time = Math.max(0, Math.min(.999, p.t)); }
   }
@@ -3808,6 +3827,8 @@ function drawRemote(r) {
   ctx.fillStyle = '#0d131b'; ctx.fillText(r.name, px + .7, top + .7); ctx.fillStyle = r.col; ctx.fillText(r.name, px, top);
   const hp = +p.hp || 0, mh = Math.max(1, +p.mh || 1); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 8, top + 2, 16, 3); ctx.fillStyle = '#e57a62'; ctx.fillRect(px - 7, top + 3, 14*Math.max(0, Math.min(1, hp/mh)), 1);
   if (r.bubble) drawBubble(px, top - 4, r.bubble.m);
+  if (r.emote) drawEmote(px, top - (r.bubble ? 18 : 6), r.emote);
+  if (p.dn) { const rv = reviving && reviving.peer === r.peer ? Math.min(1, reviving.t/REVIVE_T) : Math.max(0, Math.min(1, +p.rp || 0)); drawDownTag(px, top - 8, +p.dn, rv); }
 }
 // shared monsters: the leader's game runs them, guests mirror them and send their damage
 let netOn = false, netSeq = 0, netKilled = [], netMirror = {}, netDmg = {}, netHostSid = null, netToastDone = false;
@@ -3865,7 +3886,7 @@ function netSync(L, dt) {
   for (const k in netMirror) if (!seen[k]) {
     const m = netMirror[k]; delete netMirror[k];
     if (m.dead) continue;
-    if (kd.has(+k) && (netDmg[k] || 0) > 0) { delete netDmg[k]; m.netDying = false; killEnemy(m); S.sharedKills = (S.sharedKills || 0) + 1; floatText(S.x, S.y - 1.9, 'Shared victory!', L.col); }
+    if (kd.has(+k) && (netDmg[k] || 0) > 0) { delete netDmg[k]; m.netDying = false; killEnemy(m); S.sharedKills = (S.sharedKills || 0) + 1; pchalAdd('shared'); floatText(S.x, S.y - 1.9, 'Shared victory!', L.col); }
     else { m.dead = true; if (kd.has(+k)) burst(m.x, m.y - .4, '#ebe4d3', 10); }
   }
 }
@@ -3878,6 +3899,285 @@ function netEnemyTick(e, dt, safe) {
   const def = ENEMIES[e.type], dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
   if (!safe && d < .8 && e.cd <= 0) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
   if (def.ranged && !safe && d < def.ranged.range && d < def.aggro + 4) { e.rcd -= dt; if (e.rcd <= 0) { e.rcd = def.ranged.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), def.ranged.speed, def.dmg * (e.dmgMul || 1), def.ranged.col, .2); } }
+}
+// ===== party extras: revive, emotes, pings, party challenges =====
+let downed = null, reviving = null, myEmote = null, myEmoteShow = null, emoteSeq = 0, myPing = null, pingSeq = 0, pings = [];
+const REVIVE_T = 2.5;
+const EMOTES = {wave: '\u{1F44B}', heart: '❤️', laugh: '\u{1F602}', thumbs: '\u{1F44D}', alert: '❗', what: '❓', party: '\u{1F389}', sad: '\u{1F622}'};
+const EMOTE_NAMES = {wave: 'Wave', heart: 'Heart', laugh: 'Laugh', thumbs: 'Thumbs up', alert: 'Look out!', what: 'Huh?', party: 'Celebrate', sad: 'Sad'};
+function emotePanel() {
+  openPanel('Emotes', 'Pick an emote to show above your head.' + (party ? ' Your party sees it too.' : ''), [...Object.keys(EMOTES).map(k => ({label: `${EMOTES[k]} ${EMOTE_NAMES[k]}`, fn: () => { closeTalk(); doEmote(k); }})), {label: 'Close', fn: closeTalk}]);
+}
+function doEmote(k) {
+  myEmote = {i: ++emoteSeq, k}; myEmoteShow = {k, t: 3}; partyT = 0; S.emotes = (S.emotes || 0) + 1; SFX.chime();
+  if (party) pchalAdd('emote');
+}
+function drawEmote(px, py, em) {
+  const a = Math.min(1, em.t*2), bob = Math.sin(frameT*6)*1.5;
+  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.beginPath(); ctx.arc(px, py - 7 + bob, 7.5, 0, 7); ctx.fill();
+  ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(EMOTES[em.k] || '?', px, py - 6.5 + bob); ctx.textBaseline = 'alphabetic'; ctx.globalAlpha = 1;
+}
+function drawDownTag(px, py, secs, prog) {
+  const pulse = .6 + Math.sin(frameT*8)*.4; ctx.font = '7px "Pixelify Sans", monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 20, py - 9, 40, prog > 0 ? 14 : 10);
+  ctx.fillStyle = `rgba(255,110,90,${pulse})`; ctx.fillText(`DOWN ${secs}s`, px, py - 2);
+  if (prog > 0) { ctx.fillStyle = '#2a3a2a'; ctx.fillRect(px - 17, py + 1, 34, 2); ctx.fillStyle = '#86e08f'; ctx.fillRect(px - 17, py + 1, 34*prog, 2); }
+}
+function addPing(x, y, col, name) { pings.push({x, y, col, name, t: 15}); if (pings.length > 8) pings.shift(); }
+function sendPing() {
+  const x = Math.round(S.x*10)/10, y = Math.round(S.y*10)/10;
+  myPing = {i: ++pingSeq, x, y}; partyT = 0; addPing(x, y, '#ffffff', 'you'); SFX.chime();
+  floatText(S.x, S.y - 1.6, party ? 'Ping sent!' : 'Ping placed', '#ffffff'); S.pings = (S.pings || 0) + 1;
+}
+function drawPings(vw, vh) {
+  for (const q of pings) {
+    const px = q.x*TS, py = q.y*TS, on = px > camX + 8 && px < camX + vw - 8 && py > camY + 8 && py < camY + vh - 8;
+    ctx.strokeStyle = q.col; ctx.globalAlpha = Math.min(1, q.t/2);
+    if (on) { const r = 4 + (frameT*10 % 8); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(px, py, r, r*.5, 0, 0, 7); ctx.stroke(); ctx.fillStyle = q.col; ctx.beginPath(); ctx.moveTo(px, py - 4); ctx.lineTo(px - 3, py - 12); ctx.lineTo(px + 3, py - 12); ctx.fill(); }
+    else {
+      const cx = camX + vw/2, cy = camY + vh/2, a = Math.atan2(py - cy, px - cx), ex = Math.max(camX + 14, Math.min(camX + vw - 14, px)), ey = Math.max(camY + 14, Math.min(camY + vh - 14, py));
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(a); ctx.fillStyle = q.col; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-4, -5); ctx.lineTo(-4, 5); ctx.fill(); ctx.strokeStyle = '#0d131b'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+const PCHAL = [
+  {k: 'kills', name: 'Monster hunt', goal: 12, desc: 'Defeat 12 monsters while a party member is nearby'},
+  {k: 'shared', name: 'Side by side', goal: 5, desc: 'Win 5 shared fights with the leader’s monsters'},
+  {k: 'gather', name: 'Gathering party', goal: 15, desc: 'Gather 15 resources while a party member is nearby'},
+  {k: 'emote', name: 'Friendly faces', goal: 3, desc: 'Send 3 emotes to your party'},
+];
+function pchalCur() {
+  if (!party) return null; const key = party.code + ':' + S.day;
+  if (!S.pchal || S.pchal.key !== key) { let h = 0; for (const c of key) h = (h*31 + c.charCodeAt(0)) >>> 0; S.pchal = {key, k: PCHAL[h % PCHAL.length].k, n: 0, done: false}; }
+  return S.pchal;
+}
+function pchalAdd(k) {
+  const c = pchalCur(); if (!c || c.done || c.k !== k) return; const D = PCHAL.find(q => q.k === k);
+  c.n++; if (c.n < D.goal) return;
+  c.done = true; const coins = 120 + (S.level || 1)*8; S.coins += coins; gainXP(40 + (S.level || 1)*4); S.partyChals = (S.partyChals || 0) + 1; SFX.victory(); renderHUD();
+  setTimeout(() => toast(`<b>Party challenge complete: ${D.name}!</b><br><span style="color:var(--good)">+${coins} coin and bonus XP</span>. A new challenge comes with each new day.`, 6000), 300);
+}
+function pchalHTML() {
+  const c = pchalCur(); if (!c) return ''; const D = PCHAL.find(q => q.k === c.k);
+  return `<b>Today’s party challenge:</b> ${D.name} — ${D.desc} <b style="color:${c.done ? 'var(--good)' : 'var(--brass)'}">${c.done ? 'Done!' : `${Math.min(c.n, D.goal)}/${D.goal}`}</b><br>`;
+}
+function reviveTarget() {
+  if (!party || downed) return null;
+  const r = Object.values(remote).find(r => r.p.dn && Math.hypot(r.x - S.x, r.y - S.y) < 1.6); if (!r) return null;
+  if (reviving && reviving.peer === r.peer) return {key: 'reviving' + Math.floor(reviving.t*4), html: `Reviving ${esc(r.name)}… stay close`, btn: ''};
+  return {key: 'revive:' + r.peer, html: `<kbd style="margin:0 6px 0 0">E</kbd>Revive ${esc(r.name)}`, btn: 'Revive', fn: () => { reviving = {peer: r.peer, sid: r.p.sid, t: 0, after: 0}; partyT = 0; SFX.chime(); }};
+}
+function partyExtras(dt) {
+  for (const r of Object.values(remote)) if (r.emote) { r.emote.t -= dt; if (r.emote.t <= 0) r.emote = null; }
+  if (myEmoteShow) { myEmoteShow.t -= dt; if (myEmoteShow.t <= 0) myEmoteShow = null; }
+  for (const q of pings) q.t -= dt; if (pings.length) pings = pings.filter(q => q.t > 0);
+  if (reviving) {
+    const r = remote[reviving.peer];
+    if (!r || downed) reviving = null;
+    else if (!r.p.dn) { if (reviving.t >= REVIVE_T) { S.revives = (S.revives || 0) + 1; floatText(S.x, S.y - 1.6, `${r.name} is back up!`, '#86e08f'); gainXP(30); } reviving = null; }
+    else if (Math.hypot(r.x - S.x, r.y - S.y) > 2.2) { reviving = null; floatText(S.x, S.y - 1.4, 'Revive interrupted', '#e57a62'); }
+    else { reviving.t += dt; if (reviving.t >= REVIVE_T) { reviving.after += dt; if (reviving.after > 5) reviving = null; } else if (Math.random() < .3) burst(r.x, r.y - .5, '#86e08f', 1, 1); }
+  }
+  if (downed) {
+    S.hp = 0; downed.t -= dt; player.atkCd = Math.max(player.atkCd, .3); keys.clear();
+    const hr = Object.values(remote).find(r => r.p.rv === NET_SID && (+r.p.rp || 0) >= 1 && Math.hypot(r.x - S.x, r.y - S.y) < 3);
+    if (hr) { downed = null; S.hp = Math.ceil(maxHP()*.4); player.inv = 2.5; SFX.level(); burst(S.x, S.y - .5, '#86e08f', 24, 5); S.revivedByFriend = (S.revivedByFriend || 0) + 1; toast(`<b>${esc(hr.name)} revived you!</b>`, 3500); renderHP(); renderHUD(); }
+    else if (downed.t <= 0) { downed = null; die(); }
+  }
+}
+// ===== photo mode =====
+let photo = null;
+const PHOTO_F = [{n: 'Natural', css: 'none'}, {n: 'Sepia', css: 'sepia(.85) contrast(1.05)'}, {n: 'Black & white', css: 'grayscale(1) contrast(1.1)'}, {n: 'Warm', css: 'saturate(1.3) hue-rotate(-12deg) brightness(1.05)'}, {n: 'Dreamy', css: 'saturate(1.4) brightness(1.1) blur(.6px)'}];
+function photoHint() { const L = PAD.active && PAD.id ? padLabel() : null; $('photoUI').innerHTML = `<b>Photo mode</b> · filter: ${PHOTO_F[photo.f].n}<br><span style="color:var(--muted)">${L ? `Stick: pan · ${L.ok}: snap · ${L.atk}/${L.bomb}: filter · ${L.back}: exit` : 'WASD/arrows: pan · Space: snap · F: filter · Esc: exit'}</span>`; }
+function startPhoto() {
+  if (mode !== 'play') return; photo = {ox: 0, oy: 0, f: 0}; mode = 'photo'; keys.clear();
+  document.body.classList.add('photo'); $('photoUI').hidden = false; photoHint(); SFX.click();
+}
+function endPhoto() { photo = null; if (mode === 'photo') mode = 'play'; keys.clear(); view.style.filter = ''; document.body.classList.remove('photo'); $('photoUI').hidden = true; promptKey = null; renderHUD(); }
+function photoFilter() { if (!photo) return; photo.f = (photo.f + 1) % PHOTO_F.length; view.style.filter = PHOTO_F[photo.f].css === 'none' ? '' : PHOTO_F[photo.f].css; photoHint(); SFX.click(); }
+function photoUpdate(dt) {
+  if (!photo) return; let vx = PAD.vx, vy = PAD.vy;
+  if (keys.has('arrowleft') || keys.has('a')) vx -= 1; if (keys.has('arrowright') || keys.has('d')) vx += 1;
+  if (keys.has('arrowup') || keys.has('w')) vy -= 1; if (keys.has('arrowdown') || keys.has('s')) vy += 1;
+  photo.ox = Math.max(-10, Math.min(10, photo.ox + vx*dt*8)); photo.oy = Math.max(-8, Math.min(8, photo.oy + vy*dt*8));
+}
+function snapPhoto() {
+  if (!photo) return;
+  let url;
+  try {
+    const c = document.createElement('canvas'); c.width = view.width; c.height = view.height; const g = c.getContext('2d');
+    g.filter = PHOTO_F[photo.f].css; g.drawImage(view, 0, 0); g.filter = 'none';
+    g.font = `${Math.round(13*dpr)}px "Pixelify Sans", monospace`; g.textAlign = 'right'; g.fillStyle = 'rgba(0,0,0,.45)'; g.fillText(`Saltwind Road · Day ${S.day}`, c.width - 11*dpr, c.height - 11*dpr); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText(`Saltwind Road · Day ${S.day}`, c.width - 12*dpr, c.height - 12*dpr);
+    url = c.toDataURL('image/png');
+  } catch (e) { url = null; }
+  SFX.coin(); endPhoto(); S.photos = (S.photos || 0) + 1; shake = 0;
+  if (!url) { toast('The picture didn’t come out. Try again.', 3000); return; }
+  openPanel('Snapshot', `<img src="${url}" alt="Your snapshot" style="width:100%;max-height:52vh;object-fit:contain;border-radius:4px;display:block">`, [
+    {label: 'Download', primary: true, fn: () => { try { const a = document.createElement('a'); a.href = url; a.download = `saltwind-road-day${S.day}.png`; document.body.appendChild(a); a.click(); a.remove(); } catch (e) {} }},
+    {label: 'Take another', fn: () => { closeTalk(); startPhoto(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== hide and seek =====
+let hideSeek = null;
+function hsTalk(n) {
+  if (hideSeek) { say('“I’m already hiding! Go find me!”', [back(n)]); return; }
+  say(`“Okay! You count to ten, and I’ll hide somewhere near the village. You get 60 seconds. If you get close, you might hear me giggle!”${S.hsWins ? `<br><span style="color:var(--muted)">You’ve found Tib ${S.hsWins} time${S.hsWins === 1 ? '' : 's'}.</span>` : ''}`, [
+    {label: 'Start counting!', primary: true, fn: () => { closeTalk(); startHideSeek(n); }}, back(n)]);
+}
+function startHideSeek(n) {
+  const T0 = TOWNS[n.town]; let spot = null;
+  for (let k = 0; k < 300 && !spot; k++) {
+    const a = Math.random()*6.283, r = 6 + Math.random()*9, x = Math.floor(T0.x + Math.cos(a)*r) + .5, y = Math.floor(T0.y + Math.sin(a)*r) + .5;
+    if (!inB(Math.floor(x), Math.floor(y)) || !passable(x, y) || Math.hypot(x - S.x, y - S.y) < 5) continue;
+    if (NPCS.some(m => Math.hypot(m.x - x, m.y - y) < 1.5)) continue; spot = {x, y};
+  }
+  if (!spot) { toast('Tib couldn’t find a good hiding spot. Try again!'); return; }
+  n.away = true; hideSeek = {n, x: spot.x, y: spot.y, t: 60, hint: 3, lastD: Math.hypot(spot.x - S.x, spot.y - S.y), count: 3};
+  toast('<b>1... 2... 3... ready or not!</b><br>Find Tib in 60 seconds. Listen for giggles.', 4000); SFX.chime();
+}
+function endHideSeek(found) {
+  const H = hideSeek; if (!H) return; hideSeek = null; H.n.away = false;
+  if (found) {
+    S.hsWins = (S.hsWins || 0) + 1; const c = 25 + Math.min(10, S.hsWins)*5 + Math.round(H.t); S.coins += c;
+    if (S.hsWins % 5 === 0) { addItem('candy_apple', 2); }
+    SFX.victory(); burst(H.x, H.y - .5, '#ffd040', 16, 4); renderHUD(); save();
+    toast(`<b>Found you!</b><br>“Aww, no fair! Here, have my allowance.” <span style="color:var(--good)">+${c} coin</span>${S.hsWins % 5 === 0 ? ' and 2 Candy Apples' : ''}`, 5000);
+  } else toast('<b>Time’s up!</b><br>Tib pops out from behind a bush. “Ha! You’ll never find me!”', 4500);
+}
+function updateHideSeek(dt) {
+  const H = hideSeek; if (!H) return;
+  H.t -= dt; if (H.t <= 0) { endHideSeek(false); return; }
+  const d = Math.hypot(H.x - S.x, H.y - S.y);
+  if (d < 6 && Math.random() < dt*.5) { floatText(H.x, H.y - 1, 'hee hee!', '#ffe08a'); SFX.click(); }
+  H.hint -= dt; if (H.hint <= 0) { H.hint = 4; if (d > 6) floatText(S.x, S.y - 1.5, d < H.lastD - .5 ? 'Warmer...' : d > H.lastD + .5 ? 'Colder...' : `${Math.ceil(H.t)}s left`, d < H.lastD - .5 ? '#ff9a5a' : '#9fd0ff'); H.lastD = d; }
+}
+function hsTarget() {
+  const H = hideSeek; if (!H || Math.hypot(H.x - S.x, H.y - S.y) > 1.4) return null;
+  return {key: 'hs', html: '<kbd style="margin:0 6px 0 0">E</kbd>Look behind the bush', btn: 'Look', fn: () => endHideSeek(true)};
+}
+function drawHideBush() {
+  const H = hideSeek, px = H.x*TS, py = H.y*TS, near = Math.hypot(H.x - S.x, H.y - S.y) < 5, sh = near ? Math.sin(frameT*20)*1.2 : 0;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px, py + 1, 8, 2.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a7a3a'; ctx.beginPath(); ctx.arc(px - 4 + sh, py - 4, 5, 0, 7); ctx.arc(px + 4 + sh, py - 4, 5, 0, 7); ctx.arc(px + sh, py - 8, 6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#5aa04a'; ctx.beginPath(); ctx.arc(px - 2 + sh, py - 9, 2.5, 0, 7); ctx.arc(px + 4 + sh, py - 6, 2, 0, 7); ctx.fill();
+  if (near && Math.floor(frameT*2) % 3 === 0) { ctx.fillStyle = '#a05a2a'; ctx.fillRect(px + 5 + sh, py - 13, 3, 2); }
+}
+// ===== busking rhythm game =====
+let busk = null;
+const BUSK_KEYS = [['arrowleft', 'a', 'd'], ['arrowdown', 's', 'f'], ['arrowup', 'w', 'j'], ['arrowright', 'k', 'l']], BUSK_COLS = ['#ff7a8a', '#6ab0ff', '#7ae08a', '#ffd040'], BUSK_NOTES = [262, 330, 392, 523];
+const BUSK_SONGS = [{name: 'Saltwind Jig', bpm: 132, n: 40}, {name: 'Harbor Waltz', bpm: 108, n: 34}, {name: 'Storm Reel', bpm: 156, n: 48}];
+function buskTalk(n) {
+  const today = S.buskDay === S.day ? (S.buskToday || 0) : 0;
+  say(`“Borrow my lute and play for the crowd! Notes fall down the four lanes. Hit them when they reach the line: <b>← ↓ ↑ →</b> (or D F J K, or the D-pad). The better you play, the more they tip.”<br><span style="color:var(--muted)">${3 - today} performance${3 - today === 1 ? '' : 's'} left today.${S.buskBest ? ` Best score: ${S.buskBest}.` : ''}</span>`, [
+    ...BUSK_SONGS.map((sg, i) => ({label: `${sg.name}${i === 2 ? ' (hard)' : i === 1 ? ' (easy)' : ''}`, disabled: today >= 3, fn: () => startBusk(i)})), back(n)]);
+}
+function startBusk(si) {
+  const sg = BUSK_SONGS[si], beat = 60/sg.bpm, notes = []; let t = 2;
+  let r = 1234 + si*99 + (S.day || 1); const rnd = () => { r = (r*16807) % 2147483647; return r/2147483647; };
+  for (let k = 0; k < sg.n; k++) { const lane = Math.floor(rnd()*4); notes.push({lane, t, hit: null}); if (si === 2 && rnd() < .2) notes.push({lane: (lane + 2) % 4, t, hit: null}); t += beat*(rnd() < .25 ? .5 : 1); }
+  if (S.buskDay !== S.day) { S.buskDay = S.day; S.buskToday = 0; } S.buskToday++;
+  busk = {on: true, si, notes, t: 0, end: t + 1.5, score: 0, combo: 0, maxCombo: 0, perfect: 0, flash: [0, 0, 0, 0], msg: '', msgT: 0, last: performance.now()};
+  openPanel(`Busking · ${sg.name}`, '<canvas id="buskC" width="280" height="300" style="display:block;margin:0 auto;background:#0d131b;border-radius:6px;max-width:100%"></canvas>', [{label: 'Stop', fn: () => { busk = null; closeTalk(); }}]);
+  requestAnimationFrame(buskLoop);
+}
+function buskLoop(ts) {
+  const B0 = busk; if (!B0 || !B0.on) return; const c = document.getElementById('buskC');
+  if (!c || mode !== 'talk') { busk = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - B0.last)/1000); B0.last = now; B0.t += dt;
+  for (const n of B0.notes) if (!n.hit && B0.t - n.t > .18) { n.hit = 'miss'; B0.combo = 0; B0.msg = 'Miss'; B0.msgT = .5; }
+  for (let i = 0; i < 4; i++) B0.flash[i] = Math.max(0, B0.flash[i] - dt*4); B0.msgT -= dt;
+  const g = c.getContext('2d'), W = c.width, H = c.height, lw = W/4, hitY = H - 40, speed = 170;
+  g.fillStyle = '#0d131b'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#141c26' : '#111821'; g.fillRect(i*lw, 0, lw, H); if (B0.flash[i] > 0) { g.globalAlpha = B0.flash[i]*.5; g.fillStyle = BUSK_COLS[i]; g.fillRect(i*lw, 0, lw, H); g.globalAlpha = 1; } }
+  g.fillStyle = '#ebe4d3'; g.fillRect(0, hitY - 1, W, 2);
+  for (let i = 0; i < 4; i++) { g.strokeStyle = BUSK_COLS[i]; g.lineWidth = 2; g.beginPath(); g.arc(i*lw + lw/2, hitY, 13, 0, 7); g.stroke(); g.fillStyle = '#93a3b2'; g.font = '11px sans-serif'; g.textAlign = 'center'; g.fillText(['←', '↓', '↑', '→'][i], i*lw + lw/2, H - 12); }
+  for (const n of B0.notes) { if (n.hit && n.hit !== 'miss') continue; const y = hitY - (n.t - B0.t)*speed; if (y < -20 || y > H + 20) continue; g.globalAlpha = n.hit === 'miss' ? .3 : 1; g.fillStyle = BUSK_COLS[n.lane]; g.beginPath(); g.arc(n.lane*lw + lw/2, y, 11, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(n.lane*lw + lw/2 - 3, y - 3, 3, 0, 7); g.fill(); g.globalAlpha = 1; }
+  g.fillStyle = '#ffd27a'; g.font = 'bold 14px sans-serif'; g.textAlign = 'left'; g.fillText(`Score ${B0.score}`, 8, 20); g.textAlign = 'right'; g.fillText(B0.combo > 2 ? `Combo ${B0.combo}` : '', W - 8, 20);
+  if (B0.msgT > 0) { g.textAlign = 'center'; g.font = 'bold 18px sans-serif'; g.fillStyle = B0.msg === 'Perfect!' ? '#7ae08a' : B0.msg === 'Good' ? '#ffd040' : '#ff7a8a'; g.fillText(B0.msg, W/2, H/2); }
+  if (B0.t > B0.end) { buskEnd(); return; }
+  requestAnimationFrame(buskLoop);
+}
+function buskHit(lane) {
+  const B0 = busk; if (!B0 || !B0.on) return; B0.flash[lane] = 1;
+  let best = null, bd = .2; for (const n of B0.notes) { if (n.hit || n.lane !== lane) continue; const d = Math.abs(n.t - B0.t); if (d < bd) { bd = d; best = n; } }
+  if (!best) { B0.combo = 0; return; }
+  const perfect = bd < .07; best.hit = perfect ? 'perfect' : 'good'; B0.combo++; B0.maxCombo = Math.max(B0.maxCombo, B0.combo); if (perfect) B0.perfect++;
+  B0.score += (perfect ? 100 : 50) + Math.min(50, B0.combo*2); B0.msg = perfect ? 'Perfect!' : 'Good'; B0.msgT = .4;
+  AUD.tone(BUSK_NOTES[lane]*(perfect ? 1 : .5)*(B0.combo % 8 === 0 && B0.combo ? 2 : 1), .18, 'triangle', .12);
+}
+function buskEnd() {
+  const B0 = busk; busk = null; if (!B0) return; const total = B0.notes.length, hits = B0.notes.filter(n => n.hit && n.hit !== 'miss').length, pct = Math.round(hits/total*100);
+  const grade = pct >= 95 ? 'S' : pct >= 85 ? 'A' : pct >= 70 ? 'B' : pct >= 50 ? 'C' : 'D';
+  const coins = Math.round(B0.score/25*(B0.si === 2 ? 1.4 : B0.si === 1 ? .8 : 1));
+  S.coins += coins; S.buskBest = Math.max(S.buskBest || 0, B0.score); S.busks = (S.busks || 0) + 1; if (grade === 'S') S.buskS = (S.buskS || 0) + 1;
+  SFX.victory(); renderHUD(); save();
+  openPanel('Busking', `The last note rings out over Lantern Bay${pct >= 70 ? ' and the crowd cheers!' : '. A few people clap politely.'}<br><br>Grade <b style="font-size:22px;color:${grade === 'S' ? '#7ae08a' : '#ffd27a'}">${grade}</b> · ${hits}/${total} notes · ${B0.perfect} perfect · best combo ${B0.maxCombo}<br>Score <b>${B0.score}</b>${B0.score >= (S.buskBest || 0) ? ' (personal best!)' : ''}<br><span style="color:var(--good)">The crowd tips you ${coins} coin.</span>`, [{label: 'Back to Melody', primary: true, fn: () => openTalk(NPC_BY.melody)}, {label: 'Close', fn: closeTalk}]);
+}
+addEventListener('keydown', e => {
+  if (busk && busk.on) { const k = e.key.toLowerCase(); const lane = BUSK_KEYS.findIndex(ks => ks.includes(k)); if (lane >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) buskHit(lane); } else if (k === 'escape') { busk = null; } }
+  else if (skit && skit.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) skitPress(); } else if (k === 'escape') skit = null; }
+}, {capture: true});
+// ===== skittles =====
+let skit = null;
+const SKIT_W = 180, SKIT_H = 330, PIN_R = 5, BALL_R = 8;
+function skitTalk(n) {
+  say(`“Three frames, two balls each. Stop the arrow to aim, then stop the bar for power. Knock all nine down with the first ball for a strike! It’s 10 coin a game, and I pay out for every pin.”${S.skitBest ? `<br><span style="color:var(--muted)">Your best game: ${S.skitBest} pins.</span>` : ''}`, [
+    {label: 'Play a game · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); startSkit(); }}, back(n)]);
+}
+function skitRack() { const pins = []; [[40, [90]], [58, [79, 101]], [76, [68, 90, 112]], [94, [79, 101]], [112, [90]]].forEach(([y, xs]) => xs.forEach(x => pins.push({x, y, vx: 0, vy: 0, ox: x, oy: y, down: false}))); return pins; }
+function startSkit() {
+  skit = {on: true, frame: 1, ball: 1, total: 0, frames: [], pins: skitRack(), phase: 'aim', aim: 0, aimDir: 1, pow: 0, powDir: 1, b: null, strikes: 0, last: performance.now(), msg: '', msgT: 0, settle: 0};
+  openPanel('Skittles', '<canvas id="skitC" width="180" height="330" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%"></canvas><div id="skitInfo" style="text-align:center;margin-top:6px;color:var(--muted)">Space / E / A: aim, then power</div>', [{label: 'Quit', fn: () => { skit = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('skitC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); skitPress(); }); }, 30);
+  requestAnimationFrame(skitLoop);
+}
+function skitPress() {
+  const K = skit; if (!K || !K.on) return;
+  if (K.phase === 'aim') { K.phase = 'power'; SFX.click(); }
+  else if (K.phase === 'power') { const sp = 160 + K.pow*300, a = K.aim*.32; K.b = {x: 90 + K.aim*8, y: SKIT_H - 30, vx: Math.sin(a)*sp, vy: -Math.cos(a)*sp}; K.phase = 'roll'; K.settle = 0; SFX.throw(); }
+}
+function skitLoop() {
+  const K = skit; if (!K || !K.on) return; const c = document.getElementById('skitC');
+  if (!c || mode !== 'talk') { skit = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - K.last)/1000); K.last = now; K.msgT -= dt;
+  if (K.phase === 'aim') { K.aim += K.aimDir*dt*1.6; if (Math.abs(K.aim) > 1) { K.aim = Math.sign(K.aim); K.aimDir *= -1; } }
+  else if (K.phase === 'power') { K.pow += K.powDir*dt*1.4; if (K.pow > 1 || K.pow < 0) { K.pow = Math.max(0, Math.min(1, K.pow)); K.powDir *= -1; } }
+  else if (K.phase === 'roll') {
+    for (let st = 0; st < 4; st++) skitStep(dt/4);
+    const moving = (K.b && K.b.y > -20 && Math.hypot(K.b.vx, K.b.vy) > 8) || K.pins.some(p => !p.gone && Math.hypot(p.vx, p.vy) > 4);
+    K.settle = moving ? 0 : K.settle + dt; if (K.settle > .5 || (K.b && K.b.y < -20 && !K.pins.some(p => !p.gone && Math.hypot(p.vx, p.vy) > 4))) skitBallDone();
+  }
+  // draw
+  const g = c.getContext('2d'); g.fillStyle = '#6a4a2a'; g.fillRect(0, 0, SKIT_W, SKIT_H); g.fillStyle = '#c8a070'; g.fillRect(20, 0, SKIT_W - 40, SKIT_H); g.fillStyle = 'rgba(0,0,0,.08)'; for (let x = 20; x < SKIT_W - 20; x += 14) g.fillRect(x, 0, 1, SKIT_H);
+  for (const p of K.pins) { if (p.gone) continue; g.fillStyle = p.down ? 'rgba(240,235,220,.45)' : '#f4efe2'; g.beginPath(); g.arc(p.x, p.y, PIN_R, 0, 7); g.fill(); if (!p.down) { g.fillStyle = '#c0392b'; g.fillRect(p.x - PIN_R + 1, p.y - 1, PIN_R*2 - 2, 2); } }
+  if (K.b) { g.fillStyle = '#2a2a34'; g.beginPath(); g.arc(K.b.x, K.b.y, BALL_R, 0, 7); g.fill(); g.fillStyle = '#55556a'; g.beginPath(); g.arc(K.b.x - 2, K.b.y - 2, 2, 0, 7); g.fill(); }
+  if (K.phase === 'aim' || K.phase === 'power') { const bx = 90 + K.aim*8, by = SKIT_H - 30, a = K.aim*.32; g.fillStyle = '#2a2a34'; g.beginPath(); g.arc(bx, by, BALL_R, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by - 10); g.lineTo(bx + Math.sin(a)*60, by - 10 - Math.cos(a)*60); g.stroke();
+    if (K.phase === 'power') { g.fillStyle = '#0d131b'; g.fillRect(SKIT_W - 16, 120, 10, 120); g.fillStyle = K.pow > .8 ? '#ff7a5a' : '#ffd040'; g.fillRect(SKIT_W - 15, 240 - K.pow*118, 8, K.pow*118); } }
+  g.fillStyle = '#0d131b'; g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillText(`Frame ${K.frame}/3 · Ball ${K.ball}`, 24, SKIT_H - 8); g.textAlign = 'right'; g.fillText(`${K.total} pins`, SKIT_W - 24, SKIT_H - 8);
+  if (K.msgT > 0) { g.textAlign = 'center'; g.font = 'bold 20px sans-serif'; g.fillStyle = '#0d131b'; g.fillText(K.msg, 91, 171); g.fillStyle = '#ffd040'; g.fillText(K.msg, 90, 170); }
+  if (K.phase === 'over') { skitEnd(); return; }
+  requestAnimationFrame(skitLoop);
+}
+function skitStep(dt) {
+  const K = skit, b = K.b, bodies = K.pins.filter(p => !p.gone);
+  if (b) { b.x += b.vx*dt; b.y += b.vy*dt; b.vx *= Math.pow(.6, dt); b.vy *= Math.pow(.6, dt); if (b.x < 20 + BALL_R || b.x > SKIT_W - 20 - BALL_R) { b.vx = 0; b.vy *= .5; b.x = Math.max(20 + BALL_R, Math.min(SKIT_W - 20 - BALL_R, b.x)); } }
+  for (const p of bodies) { p.x += p.vx*dt; p.y += p.vy*dt; p.vx *= Math.pow(.15, dt); p.vy *= Math.pow(.15, dt); if (p.x < 20 || p.x > SKIT_W - 20 || p.y < -5) { p.down = true; p.gone = true; } if (Math.hypot(p.x - p.ox, p.y - p.oy) > 4) p.down = true; }
+  const col = (a, ra, ma, o, ro, mo) => { const dx = o.x - a.x, dy = o.y - a.y, d = Math.hypot(dx, dy); if (d >= ra + ro || d === 0) return; const nx = dx/d, ny = dy/d, rel = (a.vx - o.vx)*nx + (a.vy - o.vy)*ny; if (rel <= 0) return; const j = 2*rel/(ma + mo)*.9; a.vx -= j*mo*nx; a.vy -= j*mo*ny; o.vx += j*ma*nx; o.vy += j*ma*ny; o.down = true; const ov = (ra + ro - d)/2; o.x += nx*ov; o.y += ny*ov; a.x -= nx*ov; a.y -= ny*ov; if (Math.random() < .5) SFX.hit(); };
+  if (b) for (const p of bodies) col(b, BALL_R, 4, p, PIN_R, 1);
+  for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) { const a = bodies[i], o = bodies[j]; if (Math.hypot(a.vx, a.vy) >= Math.hypot(o.vx, o.vy)) col(a, PIN_R, 1, o, PIN_R, 1); else col(o, PIN_R, 1, a, PIN_R, 1); }
+}
+function skitBallDone() {
+  const K = skit; K.b = null; const downNow = K.pins.filter(p => p.down).length, before = K.ball === 1 ? 0 : K.frames[K.frames.length - 1] || 0;
+  K.pins.forEach(p => { if (p.down) p.gone = true; });
+  if (K.ball === 1) { K.frames.push(downNow); if (downNow === 9) { K.msg = 'STRIKE!'; K.msgT = 1.4; K.strikes++; SFX.victory(); K.total += 9; skitNextFrame(); return; } K.msg = downNow ? `${downNow} down` : 'Gutter!'; K.msgT = 1; K.ball = 2; K.phase = 'aim'; K.aim = 0; K.pow = 0; return; }
+  const add = downNow; K.frames[K.frames.length - 1] = add; K.total += add; if (add === 9) { K.msg = 'SPARE!'; K.msgT = 1.2; SFX.coin(); } else { K.msg = `${add} total`; K.msgT = 1; }
+  skitNextFrame();
+}
+function skitNextFrame() { const K = skit; if (K.frame >= 3) { K.phase = 'wait'; setTimeout(() => { if (skit === K) K.phase = 'over'; }, 1200); return; } K.frame++; K.ball = 1; K.pins = skitRack(); K.phase = 'aim'; K.aim = 0; K.pow = 0; }
+function skitEnd() {
+  const K = skit; skit = null; const coins = K.total*2 + K.strikes*12; S.coins += coins; S.skitGames = (S.skitGames || 0) + 1; S.skitBest = Math.max(S.skitBest || 0, K.total); S.skitStrikes = (S.skitStrikes || 0) + K.strikes; if (K.total === 27) S.skitPerfect = true;
+  renderHUD(); save(); SFX.coin();
+  openPanel('Skittles', `${K.total === 27 ? '<b>A perfect game!</b> Bertha drops her pint. ' : ''}You knocked down <b>${K.total}</b> of 27 pins${K.strikes ? ` with ${K.strikes} strike${K.strikes > 1 ? 's' : ''}` : ''}.<br><span style="color:var(--good)">Bertha pays out ${coins} coin.</span>`, [{label: 'Play again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); startSkit(); }}, {label: 'Close', fn: closeTalk}]);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -5426,8 +5726,11 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Village games', 'Tib, a kid in Reedholm, plays hide and seek: find the rustling bush within 60 seconds. Melody in Lantern Bay lends you her lute to busk, a rhythm game played with the arrow keys or D-pad (three shows a day). Big Bertha runs a skittles alley in Highcairn: aim, pick your power and knock down the nine pins.'],
+  ['Photo mode', 'Press H to freeze the moment and hide the screen clutter. Pan the camera with the movement keys or stick, press F to try filters (sepia, black and white, warm, dreamy), and press Space to snap. You can download every picture.'],
+  ['Emotes and pings', 'Press Y to pick an emote that pops up above your head, and N to drop a ping marker where you stand. In a party, friends see your emotes, and your pings show up on their screen, minimap and world map. If you fall near a party member, you go down for 25 seconds instead of being knocked out: a friend can stand next to you and press E to revive you. Every party also gets a daily party challenge for bonus coin and XP.'],
   ['Game controllers', 'Connect a Nintendo Switch Pro Controller, an Xbox or a PlayStation controller and press any button. Move with the left stick. On a Pro Controller: A talks and picks things up, B rolls, Y or ZR attacks (hold for a spin attack), X throws a bomb, L and R switch and cast spells, ZL rides, \u2212 opens the map, + pauses, and the D-pad opens your bag (\u2191), crafting (\u2193), journal (\u2190) and skills (\u2192). Home opens the party menu. In menus, use the D-pad or stick to move, A to choose and B to go back.'],
   ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, you all see and fight the same monsters, and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
   ['Sky whale & meteors', 'At dusk, keep an eye on the sky: a great whale sometimes swims overhead and drops a Cloud Pearl. On some nights meteors crash nearby. Mine the crater with a pickaxe for Meteorite Ore to forge the Meteor Blade.'],
@@ -5735,7 +6038,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -5877,6 +6180,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k) && mode === 'play') e.preventDefault();
   if (mode === 'play') {
+    if (downed && !['p', 't', 'y', 'n', 'escape'].includes(k)) return;
     keys.add(k);
     if (k === 'e' || k === ' ' || k === 'enter') interact();
     else if (k === 'f') { attack(); if (!e.repeat && chargeT == null) chargeT = 0; }
@@ -5895,6 +6199,10 @@ addEventListener('keydown', e => {
     else if (k === 'z') cycleSpell();
     else if (k === 'p') partyPanel();
     else if (k === 't' && party) { e.preventDefault(); chatPanel(); }
+    else if (k === 'y') emotePanel();
+    else if (k === 'n') sendPing();
+    else if (k === 'h' && !downed) startPhoto();
+  } else if (mode === 'photo') { keys.add(k); if (k === 'escape' || k === 'h') endPhoto(); else if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); snapPhoto(); } else if (k === 'f') photoFilter(); else if (k.startsWith('arrow')) e.preventDefault();
   } else if (mode === 'talk') {
     if (k === 'escape') closeTalk();
     const n = parseInt(k, 10);
@@ -5959,7 +6267,13 @@ document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click
 /* ================= game controllers ================= */
 // Works with Nintendo Switch Pro Controllers, Xbox and PlayStation pads (standard mapping).
 const PAD = {vx: 0, vy: 0, prev: [], id: null, nin: false, active: false, focus: null, navDir: null, navT: 0, hold: {}};
-const PAD_PLAY = {2: 'f', 7: 'f', 3: 'g', 4: 'z', 5: 'x', 6: 'v', 8: 'm', 9: 'Escape', 10: 'q', 11: 'b', 12: 'i', 13: 'c', 14: 'j', 15: 'k', 16: 'p', 17: 't'};
+const PAD_PLAY = {2: 'f', 7: 'f', 3: 'g', 4: 'z', 5: 'x', 6: 'v', 8: 'm', 9: 'Escape', 10: 'q', 11: 'b', 12: 'i', 13: 'c', 14: 'j', 15: 'k', 16: 'p', 17: 'y'};
+const PAD_HUD_KEYS = {};
+function padHud(on) {
+  PAD.hud = on; const L = padLabel(), N = PAD.nin;
+  const map = {btnMap: N ? '\u2212' : 'View', btnJournal: 'D\u2190', btnSkills: 'D\u2192', btnParty: N ? 'Home' : 'Guide', btnRide: N ? 'ZL' : 'LT', btnBag: 'D\u2191', btnCraft: 'D\u2193', rollPip: L.back};
+  for (const id in map) { const el = $(id), kb = el && el.querySelector('kbd'); if (!kb) continue; if (!(id in PAD_HUD_KEYS)) PAD_HUD_KEYS[id] = kb.textContent; kb.textContent = on ? map[id] : PAD_HUD_KEYS[id]; }
+}
 function padKey(k, up) { try { dispatchEvent(new KeyboardEvent(up ? 'keyup' : 'keydown', {key: k})); } catch (e) {} }
 function padRumble(mag, ms) {
   if (!PAD.active) return;
@@ -5969,7 +6283,7 @@ function padGet() { if (!navigator.getGamepads) return null; const gs = navigato
 const padLabel = () => PAD.nin ? {ok: 'A', back: 'B', atk: 'Y', bomb: 'X', name: 'Pro Controller'} : /054c|playstation|dualsense|dualshock/i.test(PAD.id || '') ? {ok: '✕', back: '○', atk: '□', bomb: '△', name: 'PlayStation controller'} : {ok: 'A', back: 'B', atk: 'X', bomb: 'Y', name: 'controller'};
 function padHelp() {
   const L = padLabel();
-  return `<b>${L.ok}</b> talk / pick up / confirm · <b>${L.back}</b> dodge roll / back · <b>${L.atk}</b> or <b>${PAD.nin ? 'ZR' : 'RT'}</b> attack (hold for a spin attack) · <b>${L.bomb}</b> throw bomb · <b>${PAD.nin ? 'L / R' : 'LB / RB'}</b> switch / cast spell · <b>${PAD.nin ? 'ZL' : 'LT'}</b> ride · <b>${PAD.nin ? '−' : 'View'}</b> map · <b>${PAD.nin ? '+' : 'Menu'}</b> pause · D-pad: ↑ bag, ↓ crafting, ← journal, → skills · left stick click: quick eat · right stick click: build · ${PAD.nin ? 'Home' : 'Guide'}: party`;
+  return `<b>${L.ok}</b> talk / pick up / confirm · <b>${L.back}</b> dodge roll / back · <b>${L.atk}</b> or <b>${PAD.nin ? 'ZR' : 'RT'}</b> attack (hold for a spin attack) · <b>${L.bomb}</b> throw bomb · <b>${PAD.nin ? 'L / R' : 'LB / RB'}</b> switch / cast spell · <b>${PAD.nin ? 'ZL' : 'LT'}</b> ride · <b>${PAD.nin ? '−' : 'View'}</b> map · <b>${PAD.nin ? 'Capture' : 'Share'}</b> emotes · <b>${PAD.nin ? '+' : 'Menu'}</b> pause · D-pad: ↑ bag, ↓ crafting, ← journal, → skills · left stick click: quick eat · right stick click: build · ${PAD.nin ? 'Home' : 'Guide'}: party`;
 }
 function padRoot() {
   if (!$('talk').hidden) return $('talk');
@@ -6007,14 +6321,17 @@ function padPoll(dt) {
   let sx = +ax[0] || 0, sy = +ax[1] || 0; const sm = Math.hypot(sx, sy);
   if (sm < .22) { sx = sy = 0; } else { const k = Math.min(1, (sm - .22)/.7)/sm; sx *= k; sy *= k; }
   const any = B.some(Boolean) || sm > .3;
-  if (any && !PAD.active) { PAD.active = true; if (S) S.usedPad = true; toast(`<b>${padLabel().name === 'controller' ? 'Controller' : padLabel().name} connected</b><br>${padHelp()}`, 9000); }
+  if (any && !PAD.active && PAD.toasted) { PAD.active = true; promptKey = null; }
+  if (any && !PAD.active) { PAD.active = true; PAD.toasted = true; if (S) S.usedPad = true; toast(`<b>${padLabel().name === 'controller' ? 'Controller' : padLabel().name} connected</b><br>${padHelp()}`, 9000); }
   if (!any && !PAD.active) { PAD.prev = B; return; }
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
+  if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
+  if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
   const menu = mode !== 'play' && mode !== 'fish';
   // movement
-  if (mode === 'play') { PAD.vx = sx; PAD.vy = sy; } else { PAD.vx = PAD.vy = 0; }
+  if (mode === 'play' || mode === 'photo') { PAD.vx = sx; PAD.vy = sy; } else { PAD.vx = PAD.vy = 0; }
   if (mode === 'play') {
-    if (PAD.focus) padSetFocus(null); S.usedPad = true;
+    if (PAD.focus) padSetFocus(null); S.usedPad = true; if (!PAD.hud) padHud(true);
     if (down(OK)) padKey('e');
     if (down(BACK)) doRoll();
     for (const i in PAD_PLAY) { const k = PAD_PLAY[i]; if (k === 'f') continue; if (down(+i)) padKey(k); }
@@ -6036,11 +6353,12 @@ function padPoll(dt) {
     else if (dir) { PAD.navT -= dt; if (PAD.navT <= 0) { PAD.navT = .11; padNav(dir); } }
     const ry = +ax[3] || 0; if (root && Math.abs(ry) > .3) { const sc = root.querySelector('.scroll, .modal-body') || root; sc.scrollTop += ry*dt*600; }
     if (down(OK) && PAD.focus && document.contains(PAD.focus)) { const f = PAD.focus; if (f.tagName === 'INPUT' && f.id === 'chatIn') sendChat(); else f.click(); }
+    if (mode === 'photo') { if (down(OK)) snapPhoto(); if (down(3) || down(2)) photoFilter(); }
     if (down(BACK) || down(9)) { if (mode === 'map') closeModal('mapView'); else padKey('Escape'); }
   }
   PAD.prev = B;
 }
-addEventListener('keydown', e => { if (e.isTrusted && PAD.focus) padSetFocus(null); }, {capture: true});
+addEventListener('keydown', e => { if (!e.isTrusted) return; if (PAD.focus) padSetFocus(null); if (PAD.hud) { padHud(false); PAD.active = false; promptKey = null; } }, {capture: true});
 addEventListener('mousedown', e => { if (e.isTrusted && PAD.focus) padSetFocus(null); }, {capture: true});
 
 /* ================= camera & render ================= */
@@ -6606,7 +6924,10 @@ function render() {
   for (const r of relics) if (inView(r.x, r.y)) sprites.push({y: r.y - .3, f: () => drawRelic(r)});
   if (herd) sprites.push({y: herd.pen.y - 2.5, f: drawHerd});
   if (regatta) sprites.push({y: 1e9 - 1, f: drawRegatta});
+  if (hideSeek && inView(hideSeek.x, hideSeek.y)) sprites.push({y: hideSeek.y, f: drawHideBush});
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
+  if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
+  if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
   if (meteor && inView(meteor.x, meteor.y - 4)) sprites.push({y: meteor.y, f: drawMeteor});
   for (const q of cloudPearls) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawCloudPearl(q)});
@@ -6739,6 +7060,7 @@ function render() {
   }
   for (const p of particles) { ctx.fillStyle = p.col; ctx.globalAlpha = Math.max(0, 1 - p.t*2); ctx.fillRect(p.x*TS, p.y*TS, 2, 2); }
   ctx.globalAlpha = 1;
+  if (pings.length) drawPings(vw, vh);
 
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const i = idx(x,y); if (S.explored[i]) continue;
@@ -6860,6 +7182,7 @@ function drawMini() {
   for (const k of BK) if (S.lairsSeen[k] && !S.bosses[k]) { g.fillStyle = '#e5484d'; const bx = (BOSSES[k].x - sx)*s, by = (BOSSES[k].y - sy)*s; g.fillRect(bx - 3, by - 1, 6, 2); g.fillRect(bx - 1, by - 3, 2, 6); }
   g.fillStyle = '#e57a62'; for (const e of enemies) if (S.explored[idx(Math.floor(e.x), Math.floor(e.y))]) g.fillRect((e.x - sx)*s - 1.5, (e.y - sy)*s - 1.5, e.boss ? 5 : 3, e.boss ? 5 : 3);
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x - sx)*s - 3, (HOME.y - sy)*s - 3, 6, 6);
+  for (const q of pings) { g.strokeStyle = q.col; g.lineWidth = 1.5; g.beginPath(); g.arc((q.x - sx)*s, (q.y - sy)*s, 3 + (frameT*4 % 3), 0, 7); g.stroke(); }
   if (party) for (const r of Object.values(remote)) { g.fillStyle = r.col || '#6ab0ff'; g.beginPath(); g.arc((r.x - sx)*s, (r.y - sy)*s, 3.5, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1; g.stroke(); }
   g.fillStyle = '#ffffff'; g.fillRect(m.width/2 - 2, m.height/2 - 2, 4, 4);
   g.strokeStyle = '#0d131b'; g.strokeRect(m.width/2 - 2.5, m.height/2 - 2.5, 5, 5);
@@ -6869,7 +7192,7 @@ function drawMini() {
 const player = {cols:{cloak:'#2f6b6b',skin:'#e0b18a',hair:'#3a2a1d'}, phase:0, moving:false, facing:'down', dir:{x:0,y:1}, atkCd:0, inv:0, sinceHit:99, swing:null, kx:0, ky:0, roll:0, rollCd:0, rdx:0, rdy:1, dodgeT:0};
 let lastRollCool = false;
 function doRoll() {
-  if (mode !== 'play' || player.roll > 0 || player.rollCd > 0) return;
+  if (mode !== 'play' || player.roll > 0 || player.rollCd > 0 || downed) return;
   let dx = 0, dy = 0;
   if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
   if (keys.has('arrowright') || keys.has('d')) dx += 1;
@@ -6967,6 +7290,7 @@ function update(dt) {
   if (keys.has('arrowdown') || keys.has('s')) vy += 1;
   if (touch.active) { vx += touch.vx; vy += touch.vy; }
   if (PAD.vx || PAD.vy) { vx += PAD.vx; vy += PAD.vy; const pm = Math.hypot(vx, vy); if (pm > 1) { vx /= pm; vy /= pm; } }
+  if (downed) { vx = 0; vy = 0; }
   player.rollCd = Math.max(0, player.rollCd - dt);
   if (player.roll > 0) {
     player.roll -= dt;
@@ -7044,9 +7368,10 @@ function update(dt) {
 
   let best = null, bd = 1.7;
   for (const n of NPCS) { if (n.away) continue; const d = Math.hypot(n.x - S.x, n.y - S.y); if (d < bd) { bd = d; best = n; } }
+  const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -7063,7 +7388,7 @@ function update(dt) {
   if (key !== promptKey) {
     promptKey = key;
     const pr = $('prompt'), ab = $('actBtn');
-    pr.hidden = !html; pr.innerHTML = html;
+    pr.hidden = !html; pr.innerHTML = PAD.active && PAD.id ? html.replace(/<kbd([^>]*)>E<\/kbd>/, (m0, a) => `<kbd${a}>${padLabel().ok}</kbd>`) : html;
     ab.hidden = !isTouch || !btn; ab.textContent = btn;
   }
   saveTimer += dt; if (saveTimer > 8) { saveTimer = 0; save(); }
@@ -7383,6 +7708,9 @@ function mainOptions(n) {
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
   if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
+  if (n.hideseek) o.push({label: 'Play hide and seek', primary: true, fn: () => hsTalk(n)});
+  if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
+  if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
   if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
@@ -9352,6 +9680,7 @@ function openMap() {
   { const mk = (x, y, col, txt, r = 4) => { const tx = x*s, ty = y*s; g.fillStyle = col; g.beginPath(); g.arc(tx, ty, r*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); if (txt) { g.fillStyle = col; g.fillText(txt, tx, ty - 8*dpr); } };
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
     if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
+    for (const q of pings) mk(q.x, q.y, q.col, `Ping (${q.name})`, 4);
     (S.summits || []).forEach(q => { if (q.flag || S.explored[idx(q.x, q.y)]) mk(q.x + .5, q.y + .5, q.flag ? '#c84a3a' : '#8a8478', q.flag ? '⚑' : '', 3); });
     (S.waystones || []).forEach(w => { if (w.on || S.explored[idx(w.x, w.y)]) mk(w.x + .5, w.y + .5, w.on ? '#8ad0ff' : '#5a6a7a', w.on ? '◈' : '', 4); });
     (S.vaults || []).forEach((v, i) => { if ((S.vaultsSeen || {})[i]) mk(v.x + .5, v.y + .5, v.done ? '#6a6a72' : '#e0c070', v.done ? '' : 'Vault'); });
@@ -9903,7 +10232,7 @@ const AUD = (() => {
   function setTrack(name) { if (name !== track) { track = name; step = 0; mel = 0; } }
   function setRain(v) { if (ac) rainG.gain.setTargetAtTime(v * SETTINGS.sfx * .12, ac.currentTime, .6); }
   document.addEventListener('visibilitychange', () => { if (!ac) return; document.hidden ? ac.suspend() : ac.resume(); });
-  return {init, apply, setTrack, setRain, sfx: S_};
+  return {init, apply, setTrack, setRain, sfx: S_, tone: (...a) => { try { if (ac) tone(...a); } catch (e) {} }};
 })();
 const SFX = new Proxy({}, {get: (o, k) => () => { try { AUD.sfx[k] && AUD.sfx[k](); } catch (e) {} }});
 addEventListener('pointerdown', () => AUD.init(), {capture: true});
@@ -10175,6 +10504,15 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['hideseek','Hide and Seek Champion','Find Tib 5 times', () => (S.hsWins || 0) >= 5],
+  ['busker','Street Performer','Busk in Lantern Bay', () => (S.busks || 0) >= 1],
+  ['buskstar','Virtuoso','Earn an S grade while busking', () => (S.buskS || 0) >= 1],
+  ['skittle','Strike!','Bowl a strike at skittles', () => (S.skitStrikes || 0) >= 1],
+  ['skitperfect','Perfect Game','Knock down all 27 pins in one skittles game', () => !!S.skitPerfect],
+  ['reviver','Lifesaver','Revive a party member', () => (S.revives || 0) >= 1],
+  ['partychal','Party Animals','Complete 5 daily party challenges', () => (S.partyChals || 0) >= 5],
+  ['shutterbug','Shutterbug','Take 5 photos in photo mode (H)', () => (S.photos || 0) >= 5],
+  ['emoter','Expressive','Send 20 emotes (Y)', () => (S.emotes || 0) >= 20],
   ['sharedkill','Shoulder to Shoulder','Win 10 shared fights with your party', () => (S.sharedKills || 0) >= 10],
   ['padplayer','Plug and Play','Play with a game controller', () => !!S.usedPad],
   ['skywhale','Song of the Sky','See the sky whale', () => (S.whales || 0) >= 1],
@@ -10660,8 +10998,10 @@ function step(ts) {
   if (mode === 'fish' && dt > 0) updateFishGame(dt);
   if (mode === 'title' || mode === 'creator') titleCam(raw);
   if (mode !== 'ending') updateWeather(raw);
-  const far = camF.x == null || Math.hypot(S.x - camF.x, S.y - camF.y) > 14, k = Math.min(1, raw*7);
-  camF.x = far ? S.x : camF.x + (S.x - camF.x)*k; camF.y = far ? S.y : camF.y + (S.y - camF.y)*k;
+  if (mode === 'photo') photoUpdate(raw);
+  const cfx = S.x + (photo ? photo.ox : 0), cfy = S.y + (photo ? photo.oy : 0);
+  const far = camF.x == null || Math.hypot(cfx - camF.x, cfy - camF.y) > 14, k = Math.min(1, raw*7);
+  camF.x = far ? cfx : camF.x + (cfx - camF.x)*k; camF.y = far ? cfy : camF.y + (cfy - camF.y)*k;
   musT -= raw; if (musT <= 0) { musT = .5; AUD.setTrack(musicContext()); }
   hurtFlash = Math.max(0, hurtFlash - raw*2.2);
   const low = mode === 'play' && S.hp < maxHP()*.3 ? .22 + Math.sin(frameT*6)*.12 : 0;
@@ -10704,6 +11044,8 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
+window.__vg = {get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
 window.__sw = {get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
