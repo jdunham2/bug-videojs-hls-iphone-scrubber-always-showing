@@ -37,6 +37,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 #clock{text-align:center;min-width:150px}
 #clock h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.1}
 #clock .bar>i{background:var(--ember);transition:none}
+#boss{margin-top:8px}#clock #boss .bar>i{background:var(--blood);transition:width .15s}#boss .lbl{color:var(--blood)}
 #phase{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px}
 #goals{max-width:210px}
 #goals ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px;font-size:12.5px}
@@ -96,6 +97,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <h2 id="dayname">Day 1</h2>
         <div id="phase">Dusk in 1:30</div>
         <div class="bar"><i id="tbar"></i></div>
+        <div id="boss" hidden><div class="lbl" id="bossname"></div><div class="bar"><i id="bossbar"></i></div></div>
       </div>
       <div class="panel" id="goals">
         <div class="lbl">The house</div>
@@ -123,7 +125,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
   <div class="screen" id="start">
     <div class="card">
       <h1>Timber<em>hold</em></h1>
-      <p>You are alone in a clearing with an axe. Every night the forest sends wolves, then boars, then bears. Chop trees, quarry stone and raise a house around yourself before dark. A walled room with a door and a bed, still standing after the fifth night, wins.</p>
+      <p>You are alone in a clearing with an axe. Every night the forest sends more against you: wolves and snakes, then crows that fly over walls, boars, cougars, bears and moose. Three bosses lead the worst nights. Chop trees, quarry stone and raise a house around yourself before dark. A walled room with a door and a bed, still standing after the fifth night, wins.</p>
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
@@ -177,7 +179,17 @@ const A = {
   boar: {hp: 50,  spd: 90,  dmg: 13, r: 14, sdmg: 14, meat: 2, body: '#5a3d2b', head: '#6e4c36'},
   bear: {hp: 135, spd: 64,  dmg: 24, r: 19, sdmg: 26, meat: 4, body: '#3b2a1f', head: '#4a3628'},
   deer: {hp: 18,  spd: 135, dmg: 0,  r: 12, sdmg: 0,  meat: 2, body: '#a9793f', head: '#b98a4f', passive: 1},
+  rabbit: {hp: 6,   spd: 150, dmg: 0,  r: 7,  sdmg: 0,  meat: 1, body: '#b9ab94', head: '#c9bca6', passive: 1, look: 'wolf'},
+  snake:  {hp: 14,  spd: 98,  dmg: 6,  r: 8,  sdmg: 2,  meat: 1, body: '#5f7a2e', head: '#6f8c36', poison: 1},
+  crow:   {hp: 10,  spd: 142, dmg: 5,  r: 9,  sdmg: 0,  meat: 0, body: '#1c1c22', head: '#26262e', fly: 1},
+  cougar: {hp: 42,  spd: 148, dmg: 14, r: 13, sdmg: 8,  meat: 2, body: '#b88a4a', head: '#c79a58', look: 'wolf', pounce: 1},
+  moose:  {hp: 115, spd: 80,  dmg: 20, r: 18, sdmg: 30, meat: 4, body: '#4a3423', head: '#5a4230', look: 'deer', fat: .9, charge: 6},
+  tusk:     {name: 'Old Tusk',             boss: 1, look: 'boar', hp: 340, spd: 84,  dmg: 22, r: 24, sdmg: 40, meat: 8,  body: '#3a2418', head: '#4a2f20', charge: 4.5},
+  greyfang: {name: 'Greyfang, the pack mother', boss: 1, look: 'wolf', hp: 400, spd: 122, dmg: 18, r: 20, sdmg: 14, meat: 8,  body: '#c9ccd0', head: '#e1e4e8', howl: 8, pounce: 1},
+  ursa:     {name: 'Ursa, the old bear',   boss: 1, look: 'bear', hp: 850, spd: 62,  dmg: 36, r: 32, sdmg: 70, meat: 12, body: '#1f1611', head: '#2b1f18', slam: 5},
 };
+const BOSS_NIGHT = {2: 'tusk', 4: 'greyfang', 5: 'ursa'};
+const isBoss = a => A[a.type].boss;
 const NIGHTS_TO_WIN = 5;
 
 let G, P, grid, interior, trees, rocks, animals, parts, floats, house, shots = [];
@@ -219,7 +231,7 @@ function reset() {
   };
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
   for (let i = 0; i < 80; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
-  for (let i = 0; i < 4; i++) spawnDeer();
+  for (let i = 0; i < 6; i++) spawnDeer();
   buildTools(); recalc(); syncWorld();
 }
 const S = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? null : grid[ty * W + tx];
@@ -321,18 +333,34 @@ function damageStruct(s, d) {
 function spawnDeer() {
   for (let i = 0; i < 20; i++) {
     const x = rnd(100, WORLD - 100), y = rnd(100, WORLD - 100);
-    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk('deer', x, y, 1)); return; }
+    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk(Math.random() < .5 ? 'rabbit' : 'deer', x, y, 1)); return; }
   }
 }
 function mk(type, x, y, scale) {
   const d = A[type];
-  return {type, x, y, r: d.r, hp: d.hp * scale, max: d.hp * scale, ang: rnd(0, TAU), cd: rnd(0, .6), kx: 0, ky: 0, flash: 0, flee: false, wt: 0, wa: rnd(0, TAU), step: rnd(0, 9)};
+  return {type, x, y, r: d.r, hp: d.hp * scale, max: d.hp * scale, ang: rnd(0, TAU), cd: rnd(0, .6), kx: 0, ky: 0, flash: 0, flee: false, wt: 0, wa: rnd(0, TAU), step: rnd(0, 9), at: rnd(2, 5), ch: 0, wind: 0};
 }
+function ringPos() { const a = rnd(0, TAU), d = rnd(820, 1000); return [clamp(P.x + Math.cos(a) * d, -60, WORLD + 60), clamp(P.y + Math.sin(a) * d, -60, WORLD + 60)]; }
 function spawnHostile() {
-  const n = G.day, r = Math.random();
-  const type = n >= 3 && r < Math.min(.3, .12 + .05 * (n - 3)) ? 'bear' : n >= 2 && r < .42 ? 'boar' : 'wolf';
-  const a = rnd(0, TAU), d = rnd(820, 1000);
-  animals.push(mk(type, clamp(P.x + Math.cos(a) * d, -60, WORLD + 60), clamp(P.y + Math.sin(a) * d, -60, WORLD + 60), 1 + .09 * (n - 1)));
+  const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0]];
+  let r = Math.random() * opts.reduce((t, o) => t + o[1], 0), type = 'wolf';
+  for (const [t, w] of opts) { if ((r -= w) < 0) { type = t; break; } }
+  const [x, y] = ringPos(); animals.push(mk(type, x, y, 1 + .09 * (n - 1)));
+}
+function spawnBoss(type) {
+  const [x, y] = ringPos(); animals.push(mk(type, x, y, 1 + Math.max(0, G.day - 5) * .25));
+  toast(A[type].name + ' has come out of the forest.'); shake = 8; snd(70, 1.2, 'sawtooth', .1, 40); snd(55, 1.5, 'square', .06, 30);
+}
+function slam(a) { // Ursa's ground slam: hurts you and anything you built nearby
+  shake = 18; snd(60, .5, 'sawtooth', .12, -30);
+  for (let i = 0; i < 20; i++) { const g = i / 20 * TAU; burst(a.x + Math.cos(g) * 95, a.y + Math.sin(g) * 95, '#8a7a5a', 3); }
+  if (dist(a.x, a.y, P.x, P.y) < 145) hurtPlayer(24, a.x, a.y);
+  const tx = Math.floor(a.x / T), ty = Math.floor(a.y / T);
+  for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const st = S(tx + i, ty + j); if (st && dist(st.tx * T + 24, st.ty * T + 24, a.x, a.y) < 125) damageStruct(st, 35); }
+}
+function tryWin() {
+  if (G.over || G.nights < NIGHTS_TO_WIN || G.phase !== 'day' || !houseDone() || animals.some(isBoss)) return false;
+  end(true); return true;
 }
 function hurtPlayer(d, fx, fy) {
   if (P.hurt > 0) return;
@@ -447,19 +475,22 @@ function update(dt) {
     G.t = 0;
     if (G.phase === 'day') {
       G.phase = 'night'; G.len = 52 + G.day * 3; G.queue = 4 + G.day * 3; G.spawnT = 2;
+      G.bossType = BOSS_NIGHT[G.day] || (G.day > 5 ? ['tusk', 'greyfang', 'ursa'][G.day % 3] : null); G.bossT = 9;
       toast('Night ' + G.day + '. They are coming.'); howl();
     } else {
       G.nights++; G.day++; G.phase = 'day'; G.len = 75; G.queue = 0;
-      for (const a of animals) if (!A[a.type].passive) a.flee = true;
+      for (const a of animals) if (!A[a.type].passive && !isBoss(a)) a.flee = true;
       P.hp = Math.min(P.max, P.hp + 15);
-      if (G.nights >= NIGHTS_TO_WIN && houseDone()) return end(true);
-      toast(G.nights >= NIGHTS_TO_WIN ? 'You lived, but the house is not finished. Build it and hold one more night.' : 'Dawn. Night ' + G.nights + ' survived. Rebuild and gather.');
-      while (animals.filter(a => a.type === 'deer').length < 4) spawnDeer();
+      if (tryWin()) return;
+      const bs = animals.find(isBoss);
+      toast(bs ? 'Dawn, but ' + A[bs.type].name + ' is still hunting you. Kill it.' : G.nights >= NIGHTS_TO_WIN ? 'You lived, but the house is not finished. Build it and hold one more night.' : 'Dawn. Night ' + G.nights + ' survived. Rebuild and gather.');
+      while (animals.filter(a => A[a.type].passive).length < 6) spawnDeer();
     }
   }
   const left = G.len - G.t;
   const target = G.phase === 'night' ? (left < 5 ? .35 : .8) : (left < 12 ? .35 : 0);
   G.dark += (target - G.dark) * Math.min(1, dt * .7);
+  if (G.phase === 'night' && G.bossType && (G.bossT -= dt) <= 0) { spawnBoss(G.bossType); G.bossType = null; }
   if (G.phase === 'night' && G.queue > 0 && (G.spawnT -= dt) <= 0) { spawnHostile(); G.queue--; G.spawnT = G.len * .62 / (4 + G.day * 3); }
 
   // player
@@ -471,6 +502,7 @@ function update(dt) {
   for (const o of trees) if (!o.dead) push(o, 9);
   for (const o of rocks) if (!o.dead) push(o, o.r - 2);
   P.cd -= dt; P.swing -= dt; P.hurt -= dt;
+  if (P.poison > 0) { P.poison -= dt; P.hp -= 3 * dt; if (P.hp <= 0) return end(false); }
   const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
   if (acting) tool === 'axe' ? attack(fresh) : place(fresh);
   mouse.fresh = actFresh = keys.SpaceFresh = false;
@@ -492,7 +524,9 @@ function update(dt) {
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
     if (a.hp <= 0) {
       animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); P.meat += d.meat; if (!d.passive) G.kills++;
-      float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60); continue;
+      if (d.meat) float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60);
+      if (d.boss) { P.iron += 10; burst(a.x, a.y, '#8c2f22', 40); shake = 12; toast(d.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); tryWin(); }
+      continue;
     }
     const pd = dist(a.x, a.y, P.x, P.y);
     let dx = 0, dy = 0, spd = d.spd;
@@ -503,22 +537,31 @@ function update(dt) {
       if (pd < 170) { dx = (a.x - P.x) / pd; dy = (a.y - P.y) / pd; }
       else { if ((a.wt -= dt) <= 0) { a.wt = rnd(1.5, 4); a.wa = Math.random() < .4 ? null : rnd(0, TAU); } if (a.wa !== null) { dx = Math.cos(a.wa); dy = Math.sin(a.wa); spd *= .3; } }
       if (a.x < 60) dx = 1; if (a.y < 60) dy = 1; if (a.x > WORLD - 60) dx = -1; if (a.y > WORLD - 60) dy = -1;
-    } else if (pd > 1) { dx = (P.x - a.x) / pd; dy = (P.y - a.y) / pd; }
+    } else if (pd > 1) {
+      dx = (P.x - a.x) / pd; dy = (P.y - a.y) / pd; a.at -= dt;
+      if (d.charge) { if (a.at <= 0 && pd < 430) { a.at = d.charge; a.ch = 1.1; snd(95, .3, 'sawtooth', .06, 60); } if (a.ch > 0) { a.ch -= dt; spd *= 2.6; } }
+      if (d.pounce && a.at <= 0 && pd > 70 && pd < 220) { a.at = 2.8; a.kx = dx * 560; a.ky = dy * 560; snd(380, .12, 'sawtooth', .04, 200); }
+      if (d.howl && a.at <= 0) { a.at = d.howl; howl(); if (animals.length < 45) for (let j = 0; j < 2; j++) animals.push(mk('wolf', a.x + rnd(-60, 60), a.y + rnd(-60, 60), 1)); }
+      if (d.slam) {
+        if (a.at <= 0 && pd < 175 && a.wind <= 0) a.wind = .85;
+        if (a.wind > 0) { spd = 0; if ((a.wind -= dt) <= 0) { a.at = d.slam; slam(a); } }
+      }
+    }
     for (const b of animals) { // keep the pack from stacking
       if (b === a) continue; const dd = dist(a.x, a.y, b.x, b.y), m = a.r + b.r;
       if (dd < m && dd > .01) { dx += (a.x - b.x) / dd * .8; dy += (a.y - b.y) / dd * .8; }
     }
     const tile = S(Math.floor(a.x / T), Math.floor(a.y / T));
-    if (tile && tile.type === 'spikes' && !d.passive) {
+    if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
       if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); }
     }
     if (dx || dy) a.ang = Math.atan2(dy, dx);
-    const blocked = move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
+    const blocked = d.fly ? (a.x += (dx * spd + a.kx) * dt, a.y += (dy * spd + a.ky) * dt, null) : move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
     a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
     if (d.passive || a.flee) continue;
     if (blocked && blocked.type && a.cd <= 0) { damageStruct(blocked, d.sdmg); a.cd = .9; }
-    if (pd < a.r + P.r + 5 && a.cd <= 0) { hurtPlayer(d.dmg, a.x, a.y); a.cd = 1; }
+    if (pd < a.r + P.r + 5 && a.cd <= 0 && P.hurt <= 0) { hurtPlayer(d.dmg, a.x, a.y); a.cd = 1; if (d.poison && !G.over) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } }
   }
   for (let i = shots.length - 1; i >= 0; i--) { // arrows and bullets
     const s = shots[i]; let dead = false;
@@ -573,9 +616,21 @@ function merge(list) { // [geometry, color, matrix] -> one vertex-coloured geome
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   return g;
 }
-function animalGeo(t) {
-  const d = A[t], r = d.r, b = d.body, h = d.head, L = [], leg = t === 'deer' ? 1.5 * r : t === 'bear' ? .75 * r : .95 * r, by = leg + r * .5;
-  const fat = t === 'bear' ? 1.05 : t === 'boar' ? .95 : t === 'deer' ? .68 : .72;
+function animalGeo(type) {
+  const d0 = A[type], r0 = d0.r;
+  if (type === 'snake') {
+    const L = [[sph(), d0.head, M(r0 * .7, r0 * .55, 0, r0 * .62, r0 * .45, r0 * .55)]];
+    for (let i = 0; i < 8; i++) L.push([sph(), i % 2 ? d0.body : '#4d6626', M(-i * r0 * .62, r0 * .4, Math.sin(i * 1.2) * r0 * .6, r0 * (.52 - i * .04))]);
+    const g = merge(L); g.userData = {eyeX: r0 * 1.0, eyeY: r0 * .8, eyeZ: r0 * .32}; return g;
+  }
+  if (type === 'crow') {
+    const g = merge([[sph(), d0.body, M(0, 0, 0, r0 * 1.1, r0 * .55, r0 * .6)], [sph(), d0.head, M(r0, r0 * .3, 0, r0 * .45)], [cone(r0 * .2, r0 * .7, 4), '#e0a030', M(r0 * 1.6, r0 * .25, 0, 1, 1, 1, 0, 0, -Math.PI / 2)],
+      [box(r0 * .9, r0 * .12, r0 * 3.6), d0.body, M(0, r0 * .25, 0)], [box(r0 * .9, r0 * .1, r0 * .8), d0.head, M(-r0 * 1.3, 0, 0)]]);
+    g.userData = {eyeX: r0 * 1.2, eyeY: r0 * .5, eyeZ: r0 * .25}; return g;
+  }
+  const t = d0.look || type;
+  const d = A[type], r = d.r, b = d.body, h = d.head, L = [], leg = t === 'deer' ? 1.5 * r : t === 'bear' ? .75 * r : .95 * r, by = leg + r * .5;
+  const fat = d.fat ? d.fat : t === 'bear' ? 1.05 : t === 'boar' ? .95 : t === 'deer' ? .68 : .72;
   L.push([sph(), b, M(-.2 * r, by, 0, 1.35 * r, fat * r, fat * r)]);
   const hx = t === 'deer' ? 1.3 * r : 1.2 * r, hy = by + (t === 'deer' ? 1.0 * r : .3 * r);
   if (t === 'deer') L.push([box(1, 1, 1), b, M(.95 * r, by + .55 * r, 0, .45 * r, 1.1 * r, .42 * r, 0, 0, -.5)]);
@@ -592,6 +647,8 @@ function animalGeo(t) {
   if (t === 'wolf') L.push([cone(.3 * r, 1.3 * r, 5), b, M(-1.9 * r, by + .2 * r, 0, 1, 1, 1, 0, 0, 1.2)]);
   if (t === 'deer') L.push([sph(), '#f4eede', M(-1.5 * r, by + .3 * r, 0, .25 * r)]);
   if (t === 'boar') L.push([box(1, 1, 1), '#2e1e14', M(-.2 * r, by + fat * r, 0, 1.8 * r, .25 * r, .2 * r)]);
+  if (type === 'rabbit') for (const sz of [-.2, .2]) L.push([box(1, 1, 1), h, M(hx - .2 * r, hy + 1.1 * r, sz * r, .22 * r, 1.3 * r, .16 * r)]);
+  if (d.boss) for (let i = 0; i < 5; i++) L.push([cone(.22 * r, .8 * r, 4), '#8d1f1f', M((-1.1 + i * .5) * r, by + fat * r + .25 * r, 0, 1, 1, 1, 0, 0, .3)]);
   const g = merge(L); g.userData = {eyeX: hx + .42 * r, eyeY: hy + .2 * r, eyeZ: .3 * r}; return g;
 }
 function grassTexture() {
@@ -735,7 +792,7 @@ function animalMesh(a) {
   const d = A[a.type], g = new THREE.Group(), m = new THREE.Mesh(GEO[a.type], new THREE.MeshLambertMaterial({vertexColors: true}));
   m.castShadow = true; g.add(m); g.userData.body = m;
   if (!d.passive) {
-    const u = GEO[a.type].userData, em = new THREE.MeshBasicMaterial({color: 0xffd65a, fog: false}), eyes = new THREE.Group();
+    const u = GEO[a.type].userData, em = new THREE.MeshBasicMaterial({color: d.boss ? 0xff3b2a : 0xffd65a, fog: false}), eyes = new THREE.Group();
     for (const z of [-1, 1]) { const e = new THREE.Mesh(GEO.eye, em); e.scale.setScalar(a.r * .11); e.position.set(u.eyeX, u.eyeY, u.eyeZ * z); eyes.add(e); }
     g.add(eyes); g.userData.eyes = eyes;
   }
@@ -807,9 +864,11 @@ function render(now, dt) {
   for (let i = ameshes.length - 1; i >= 0; i--) { const a = ameshes[i]; if (!animals.includes(a)) { scene.remove(a.mesh); a.mesh.userData.body.material.dispose(); ameshes.splice(i, 1); } }
   for (const a of animals) {
     if (!a.mesh) { a.mesh = animalMesh(a); scene.add(a.mesh); ameshes.push(a); }
-    a.mesh.position.set(a.x, Math.abs(Math.sin(a.step)) * 2.5, a.y); a.mesh.rotation.set(0, -a.ang, Math.sin(a.step) * .05);
+    const dd = A[a.type];
+    a.mesh.position.set(a.x, dd.fly ? 44 + Math.sin(a.step * .4) * 7 : Math.abs(Math.sin(a.step)) * 2.5 + (a.wind > 0 ? 12 : 0), a.y);
+    a.mesh.rotation.set(dd.fly ? Math.sin(a.step * 1.6) * .5 : 0, -a.ang, a.wind > 0 ? .45 : a.ch > 0 ? -.18 : Math.sin(a.step) * .05);
+    if (a.mesh.userData.eyes) a.mesh.userData.eyes.visible = k > .3 || !!dd.boss;
     a.mesh.userData.body.material.emissive.setScalar(a.flash > 0 ? .8 : 0);
-    if (a.mesh.userData.eyes) a.mesh.userData.eyes.visible = k > .3;
   }
   // player
   const moved = dist(P.x, P.y, lastPX, lastPY); lastPX = P.x; lastPY = P.y; if (moved > .2) walk += moved * .14;
@@ -839,7 +898,7 @@ function render(now, dt) {
 
   // 2D overlay: health bars, floating numbers, joystick
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, vw, vh);
-  for (const a of animals) if (a.hp < a.max) hpBar(a.x, a.r * 3.2 + 14, a.y, 30, a.hp / a.max);
+  for (const a of animals) if (a.hp < a.max) hpBar(a.x, a.r * 3.2 + 14 + (A[a.type].fly ? 44 : 0), a.y, isBoss(a) ? 56 : 30, a.hp / a.max);
   for (const s of smeshes) if (s.hp < s.max) hpBar(s.tx * T + 24, 84, s.ty * T + 24, 32, s.hp / s.max);
   for (const o of trees) if (!o.dead && o.hp < o.max) hpBar(o.x, 30, o.y, 28, o.hp / o.max);
   for (const o of rocks) if (!o.dead && o.hp < o.max) hpBar(o.x, o.r * 2 + 12, o.y, 28, o.hp / o.max);
@@ -877,6 +936,9 @@ function buildTools() {
 }
 function hud() {
   $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
+  $('hpbar').style.background = P.poison > 0 ? '#7fbf5a' : '';
+  const bs = animals.find(isBoss); $('boss').hidden = !bs;
+  if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
   $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron;
   const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
@@ -896,6 +958,7 @@ function hud() {
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
 function end(won) {
+  if (G.over) return;
   running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
   $('endtitle').innerHTML = won ? 'The house <em>held</em>' : 'The forest <em>took you</em>';
   $('endtext').textContent = won
