@@ -18,18 +18,32 @@ No controller? P2 can play on the right side of the keyboard: arrow keys move, `
 
 ## Controls
 
-| Action | P1 Keyboard | P2 Pro Controller |
+P1's action keys sit together in one cluster under the right hand:
+
+```
+  U  I            U = dash     I = special
+   J  K  L        J = light    K = heavy    L = jump
+```
+
+| Action | P1 Keyboard | P2 Switch controller |
 |---|---|---|
-| Move | A / D (W = up, S = down) | Left stick / D-pad |
-| Jump (double jump) | Space | B |
+| Move | W A S D | Left stick / D-pad |
+| Jump (double jump) | L (or Space) | B |
 | Light attack (3-hit chain) | J | Y |
 | Heavy attack | K | X |
 | Launcher | W + K | Up + X |
 | Meteor slam | K in the air | X in the air |
-| Dash (invincible) | L / Shift | ZR / R / ZL / L |
+| Dash (invincible) | U (or Shift) | ZR / R / ZL / L |
 | Special (full ink meter) | I | A |
-| Pause | Esc / P | + |
+| Pause | Esc / P | + (or −) |
 | Music on/off | M | (none) |
+
+### Nintendo Switch controllers
+
+- **Pro Controller** and **Joy-Con pairs** work automatically in Chrome and Edge.
+- **A single Joy-Con held sideways** works too, so two friends can each grab one Joy-Con.
+- Controllers that report a raw layout or a "hat" D-pad (common in other browsers) are handled.
+- If any button does the wrong thing, open **Controller Setup** from the title screen (press **C** or **−**) and press the button you want for each action. Your layout is saved.
 
 ## Fighters
 
@@ -47,12 +61,45 @@ No controller? P2 can play on the right side of the keyboard: arrow keys move, `
 Six stages of five waves each, and each one ends with its own boss:
 Notebook Heights (The Scribble King), Graph City (Graphzilla), Chalkboard Arena (Professor Chalk), Sticky Note Jungle (The Sticky Bandit), Blueprint Factory (Blueprint Golem, with moving platforms) and Midnight Sketchbook (The Midnight Smudge, with moving platforms).
 
+## Bosses
+
+Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its own set of moves:
+
+| Stage | Mini-boss | Boss |
+|---|---|---|
+| Notebook Heights | Eraser Knight | The Scribble King |
+| Graph City | Compass Captain | Graphzilla |
+| Chalkboard Arena | The Chalk Duster | Professor Chalk |
+| Sticky Note Jungle | Paperclip Pirate | The Sticky Bandit |
+| Blueprint Factory | Gear Grinder | Blueprint Golem |
+| Midnight Sketchbook | Night Owl | The Midnight Smudge |
+
+Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes) and **shadow clones**.
+
+## Power-ups
+
+Enemies drop them, and **mystery boxes** fall from the sky during fights.
+
+| Power-up | Effect |
+|---|---|
+| Heart | +30 health |
+| Ink jar | +50 special meter |
+| Pencil Blade | Longer reach, 1.5x damage |
+| Hyper Speed | Faster movement and attacks |
+| Shield | Blocks the next 3 hits |
+| Mega Size (XL) | Grow 1.5x bigger, 1.4x damage |
+| Fire Ink | Your hits set enemies on fire |
+| Freeze | Freezes every enemy on screen |
+| Star | Invincible for 8 seconds; touching enemies hurts them |
+| Ink Bomb | Big explosion around you |
+| Doodle Drone | A little helper that shoots the nearest enemy |
+| Mystery box | A random power-up |
+
 ## Features
 
 - **Co-op mechanics:** hit an enemy your partner just hit for a **TEAM COMBO x2**. Stand next to a downed partner to **revive** them. When both ink meters are full and you're standing close, press Special to fire the **DOUBLE INK** screen-clearing team super.
 - **Combat:** combo chains, juggles, launcher into jump-cancel into air attacks, dash cancels, wall splats, and **projectile reflects**. Hit-stop, screen shake, slow-mo finishers and controller rumble give every hit weight.
 - **Enemies:** Grunts, Ninjas, Eraser-Throwers, armored Brutes with shockwave slams, and a two-phase boss, **The Scribble King**, every 5th wave.
 - **Endless:** after stage 6 the stages loop and the waves keep getting harder.
-- **Power-ups:** hearts, ink jars, the Pencil Blade, and Hyper Speed.
 - **Audio:** procedural soundtrack and sound effects, all synthesized live with Web Audio.
 - **Saved high score:** your best team score is kept between sessions.
