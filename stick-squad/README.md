@@ -47,6 +47,8 @@ P1's action keys sit together in one cluster under the right hand:
 
 ## Fighters
 
+Twelve fighters, each with their own stats, look and special move:
+
 | Fighter | Style | Special |
 |---|---|---|
 | Scribble | All-rounder | Ink Burst: blasts everything around you |
@@ -55,6 +57,17 @@ P1's action keys sit together in one cluster under the right hand:
 | Inkblade | Always holds the Pencil Blade | Crescent Slash: giant piercing slashes |
 | Doodle Witch | Ranged, heavy attack fires ink bolts | Meteor Rain |
 | Shade | Ninja, 2 air dashes, 1.5x crits from behind | Shadow Strike: teleports through 6 foes |
+| Robo | Robot, heavy attack fires piercing lasers, takes 20% less damage | Mega Laser across the screen |
+| Halo | Healer, slowly regenerates health | Healing Light: heals the team and revives a downed partner |
+| Slugger | Swings a bat, heavy hits send foes flying, wall splats hurt extra | Fastball Fury |
+| Hopper | Four jumps, huge leap, extra-wide Meteor Slam | Mega Stomp shakes the whole floor |
+| Whiskers | Cat-quick, attacks 30% faster | Claw Storm shreds everything in front |
+| Chef | Heavy attack throws a boomerang frying pan | Food Fight: a barrage of pies |
+
+## Modes
+
+- **Story:** pick a starting stage (or a random one) and fight wave after wave.
+- **Boss Rush:** fight all 12 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 
 ## Stages
 
