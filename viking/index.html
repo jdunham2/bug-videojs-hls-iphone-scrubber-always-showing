@@ -213,7 +213,7 @@ const PLACES = [
   { id: 'salt', name: 'Saltmere', type: 'village', mx: 610, my: 330, R: 105, H: 7, peak: 0, clear: .4, def: 14,
     desc: 'A sleepy fishing village of salt pans and drying racks.',
     prices: { furs: 1.3, amber: 1.4, iron: 1.3, mead: 1.1, salt: .5, wool: .9 } },
-  { id: 'wolf', name: 'Wolfden Woods', type: 'wild', mx: 120, my: 420, R: 165, H: 16, peak: 46, clear: 0, wolves: 2, deer: 5,
+  { id: 'wolf', name: 'Wolfden Woods', type: 'wild', mx: 120, my: 420, R: 165, H: 16, peak: 46, clear: 0, wolves: 2, deer: 5, bears: 2, camp: true,
     desc: 'Dark pine forest teeming with game — and wolves.' },
   { id: 'mist', name: 'Mistfjord Shrine', type: 'shrine', mx: 400, my: 300, R: 85, H: 12, peak: 0, clear: .4,
     desc: 'A circle of standing stones wrapped in fog. The gods listen here.' },
@@ -230,14 +230,14 @@ const PLACES = [
   { id: 'skar', name: 'Skarholt', type: 'town', mx: 433, my: -177, R: 125, H: 11, peak: 30, clear: .42, def: 45,
     desc: 'A windswept trading post at the edge of the known sea. Merchants from far lands haggle for amber.',
     prices: { furs: .8, amber: 1.5, iron: 1.3, mead: 1.2, salt: .7, wool: 1.1 } },
-  { id: 'fang', name: 'Frostfang', type: 'wild', mx: 1000, my: -110, R: 165, H: 14, peak: 75, clear: 0, snowy: true, wolves: 2, deer: 4,
+  { id: 'fang', name: 'Frostfang', type: 'wild', mx: 1000, my: -110, R: 165, H: 14, peak: 75, clear: 0, snowy: true, wolves: 2, deer: 4, bears: 2, troll: true,
     desc: 'A glacier island of ice, snow and howling wind. Reindeer roam here, and white wolves hunt them.' },
   { id: 'graves', name: 'Isle of Graves', type: 'ruins', mx: -183, my: 40, R: 120, H: 7, peak: 22, clear: .3,
     desc: 'Burial mounds as far as the eye can see. The old kings sleep here with their gold. They do not sleep soundly.' },
-  { id: 'bjorn', name: 'Bjornstad', type: 'village', mx: -200, my: 640, R: 115, H: 8, peak: 10, clear: .4, def: 20, deer: 2,
+  { id: 'bjorn', name: 'Bjornstad', type: 'village', mx: -200, my: 640, R: 115, H: 8, peak: 10, clear: .4, def: 20, deer: 2, bears: 1,
     desc: 'A village of hunters and mead-brewers. Bear skulls hang above every door.',
     prices: { furs: 1.1, amber: 1.3, iron: 1.4, mead: .6, salt: 1.2, wool: .7 } },
-  { id: 'seal', name: 'Seal Rocks', type: 'wild', mx: 500, my: 840, R: 75, H: 5, peak: 12, clear: 0, bare: true,
+  { id: 'seal', name: 'Seal Rocks', type: 'wild', mx: 500, my: 840, R: 75, H: 5, peak: 12, clear: 0, bare: true, camp: true,
     desc: 'A bare spit of rock where seals bask and seabirds scream. Good fishing in the shallows.' },
   { id: 'ulf', name: 'Ulfsborg', type: 'town', mx: 1217, my: 640, R: 140, H: 13, peak: 20, clear: .42, def: 80,
     desc: 'A rich and proud town of a hundred longhouses. Its amber traders are wealthy, and its warriors know it.',
@@ -525,6 +525,7 @@ const Sound = {
   swish() { this.noiseBurst('bandpass', 1800, .12, .18, .02); },
   clang() { this.pluck(1300, .07, .3); this.noiseBurst('highpass', 3500, .15, .1); },
   howl() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(320, now); o.frequency.linearRampToValueAtTime(620, now + .6); o.frequency.linearRampToValueAtTime(420, now + 1.8); this.env(o, .08, .3, 2).connect(this.master); o.start(); o.stop(now + 2.1); },
+  roar() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(110, now); o.frequency.linearRampToValueAtTime(60, now + 1.4); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; o.connect(f); this.env(f, .22, .08, 1.6).connect(this.master); o.start(); o.stop(now + 1.7); this.noiseBurst('lowpass', 300, .3, 1.2, .05); },
   groan() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, now); o.frequency.linearRampToValueAtTime(52, now + 1.5); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300; o.connect(f); this.env(f, .15, .2, 1.8).connect(this.master); o.start(); o.stop(now + 1.9); },
   whistle() { if (!this.ctx) return; [0, 180].forEach((d, i) => setTimeout(() => { const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(1500 + i * 400, this.ctx.currentTime); o.frequency.linearRampToValueAtTime(2200 + i * 300, this.ctx.currentTime + .15); this.env(o, .06, .02, .25).connect(this.master); o.start(); o.stop(this.ctx.currentTime + .3); }, d)); },
   hoof() { this.noiseBurst('lowpass', 240, .22, .08); },
@@ -1103,7 +1104,30 @@ function buildSettlement(p) {
     const spring = new THREE.Mesh(new THREE.CircleGeometry(6, 16), new THREE.MeshStandardMaterial({ color: 0x5fc9c0, emissive: 0x1a6a66, roughness: .2 }));
     spring.rotation.x = -Math.PI / 2; spring.position.set(sx, groundY(sx, sz, 6) + .3, sz); scene.add(spring);
     chimneySmoke(sx, spring.position.y + 1, sz, .5);
-  } else if (p.id === 'wolf') {
+  }
+  if (p.camp) {
+    const a = Math.atan2(p.dock.dz, p.dock.dx) + 2.2, d = p.R * .38;
+    const c = landNear(p, p.wx + Math.cos(a) * d, p.wz + Math.sin(a) * d); p.campPos = c;
+    const cloth = new THREE.MeshStandardMaterial({ color: 0x7a6a4a, roughness: 1, flatShading: true });
+    for (let i = 0; i < 3; i++) {
+      const ta = i / 3 * Math.PI * 2 + .4, tx = c.x + Math.cos(ta) * 7, tz = c.z + Math.sin(ta) * 7;
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(2.4, 3.4, 4), cloth); tent.geometry.translate(0, 1.7, 0);
+      place(shadow(tent), tx, tz, ta, .2); addCircle(p, tx, tz, 2.1);
+    }
+    const fire = new THREE.Group();
+    for (let i = 0; i < 7; i++) { const st = new THREE.Mesh(new THREE.DodecahedronGeometry(.35, 0), M.rock); st.position.set(Math.cos(i) * 1.1, .2, Math.sin(i) * 1.1); fire.add(st); }
+    const embers = new THREE.Mesh(new THREE.ConeGeometry(.6, 1.1, 6), M.lava); embers.position.y = .5; fire.add(embers);
+    place(fire, c.x, c.z, 0, 0); chimneySmoke(c.x, groundY(c.x, c.z) + 1.5, c.z, .4);
+  }
+  if (p.troll) {
+    const a = Math.atan2(p.dock.dz, p.dock.dx) + Math.PI * .8, d = p.R * .42;
+    p.trollPos = landNear(p, p.wx + Math.cos(a) * d, p.wz + Math.sin(a) * d);
+    for (let i = 0; i < 6; i++) { // bones around the lair
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(.15, .2, rnd(1.5, 3), 5), M.bone); b.rotation.set(Math.PI / 2, 0, rnd(0, 6));
+      place(b, p.trollPos.x + rnd(-6, 6), p.trollPos.z + rnd(-6, 6), 0, -.2);
+    }
+  }
+  if (p.id === 'wolf') {
     const hut = longhouse(8, 5, 2.4, M.turf);
     place(hut, p.wx + p.dock.dx * (p.dock.shore - 22), p.wz + p.dock.dz * (p.dock.shore - 22), rnd(0, 6));
   }
@@ -1190,21 +1214,22 @@ function oceanPoint(minFromPlayer = 0, near = null, nearR = 0) {
 }
 const NPC_LOOKS = {
   merchant: { L: 18, W: 4.2, hull: 0x7d5a35, stripes: ['#d8c79d', '#8a6d3a'], dragon: false, shieldsOn: false, oars: false, mastH: 14, sailW: 11, sailH: 9, crew: false },
+  jomsviking: { hull: 0x241612, stripes: ['#7a1010', '#111111', '#d9a441'], shields: [0x7a1010, 0x111111, 0xd9a441], trim: 0x5a0a0a, L: 27, W: 3.8 },
   raider: { hull: 0x3a2618, stripes: ['#1a1a1a', '#7a1a1a'], shields: [0x222222, 0x7a1a1a], trim: 0x111111 },
   defender: { hull: 0x5a4028, stripes: ['#2f5d8a', '#efe4c8'], shields: [0x2f5d8a, 0xefe4c8, 0xd9a441] },
 };
 const cap = str => str.charAt(0).toUpperCase() + str.slice(1);
 function resetNPC(n) {
   const day = S ? S.day : 1;
-  const crew = n.kind === 'merchant' ? ri(5, 8) : n.kind === 'raider' ? ri(6, 11) + Math.floor(day / 8) : n.crewBase;
-  Object.assign(n, { maxCrew: crew, crewF: crew, maxHp: n.kind === 'merchant' ? 60 : n.kind === 'defender' ? 140 : 100, hostile: false, dead: false, sinkT: 0, reload: rnd(1, 3), side: chance(.5) ? 1 : -1, boardCd: 0, speed: 0, leaveT: 0 });
+  const crew = n.kind === 'merchant' ? ri(5, 8) : n.kind === 'raider' ? (n.elite ? ri(15, 20) : ri(6, 11)) + Math.floor(day / 8) : n.crewBase;
+  Object.assign(n, { maxCrew: crew, crewF: crew, maxHp: n.kind === 'merchant' ? 60 : n.kind === 'defender' ? 140 : n.elite ? 170 : 100, hostile: false, dead: false, sinkT: 0, reload: rnd(1, 3), side: chance(.5) ? 1 : -1, boardCd: 0, speed: 0, leaveT: 0 });
   n.hp = n.maxHp; n.g.rotation.set(0, 0, 0);
 }
 function spawnNPC(kind, opts = {}) {
-  const g = makeShip(NPC_LOOKS[kind]);
+  const g = makeShip(NPC_LOOKS[opts.elite ? 'jomsviking' : kind]);
   const pt = oceanPoint(500);
   const n = { kind, g, pos: new THREE.Vector2(pt.x, pt.z), h: rnd(0, 6.28), target: oceanPoint(), cooldown: 0, crewBase: opts.crew || 10,
-    name: opts.name || (kind === 'merchant' ? 'merchant knarr' : 'raider longship') };
+    name: opts.name || (kind === 'merchant' ? 'merchant knarr' : opts.elite ? 'Jomsviking warship' : 'raider longship'), elite: !!opts.elite };
   resetNPC(n); scene.add(g); npcs.push(n); return n;
 }
 function removeNPC(i) { const n = npcs[i]; scene.remove(n.g); npcs.splice(i, 1); const el = foeLabels.get(n); if (el) { el.remove(); foeLabels.delete(n); } }
@@ -1247,7 +1272,7 @@ function updateNPCs(dt, t) {
       desired = Math.atan2(n.target.x - n.pos.x, -(n.target.z - n.pos.y)); want = n.kind === 'merchant' ? 9 : 12;
       if (n.kind === 'raider' && !S.docked && n.cooldown <= 0 && !modalOpen && !titleOn && dp < 330) {
         desired = toP; want = 19;
-        if (dp < 210) { makeHostile(n); Sound.horn(); banner('Raiders!', 'SPACE loose arrows · SHIFT shield wall · ram or board'); log('A black-sailed raider ship comes at you!', 'bad'); }
+        if (dp < 210) { makeHostile(n); Sound.horn(); if (n.elite) { banner('Jomsvikings!', 'The deadliest sea-warriors of the north'); log('A Jomsviking warship bears down on you. They have sworn never to flee.', 'bad'); } else banner('Raiders!', 'SPACE loose arrows · SHIFT shield wall · ram or board'); log('A black-sailed raider ship comes at you!', 'bad'); }
       }
     }
     const fx = Math.sin(n.h), fz = -Math.cos(n.h);
@@ -1363,7 +1388,7 @@ function applyCrewDmg() {
 }
 function victory(n, how) {
   n.dead = true; n.hostile = false; n.sinkT = 0; if (boarding && boarding.n === n) boarding = null;
-  const base = n.kind === 'merchant' ? [30, 80, 3] : n.kind === 'raider' ? [40, 100, 12] : [20, 50, 8];
+  const base = n.kind === 'merchant' ? [30, 80, 3] : n.elite ? [110, 200, 25] : n.kind === 'raider' ? [40, 100, 12] : [20, 50, 8];
   let sv = ri(base[0], base[1]); const glory = base[2], got = [];
   if (how === 'sunk') sv = Math.round(sv * .4);
   else Object.keys(GOODS).sort(() => Math.random() - .5).slice(0, n.kind === 'merchant' ? 2 : 1).forEach(g => { const q = Math.min(ri(1, 4), S.cargoMax - cargoCount()); if (q > 0) { S.cargo[g] += q; got.push(`${q} ${GOODS[g].name}`); } });
@@ -1810,6 +1835,23 @@ function makeWarrior(o = {}) {
   g.userData = { body, legL, legR, armR, armL, tunic, axe, shield: shieldG, bow };
   return g;
 }
+function makeBear(white) {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const fur = new THREE.MeshStandardMaterial({ color: white ? 0xe8e4d8 : 0x5a3c26, roughness: 1, flatShading: true });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1a120c });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.25, 2.5), fur); torso.position.y = 1.45;
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(.75, 8, 6), fur); hump.position.set(0, 1.95, -.6);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.85, .75, .85), fur); head.position.set(0, 1.7, -1.6);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(.45, .38, .5), fur); snout.position.set(0, 1.55, -2.15);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(.2, .14, .08), dark); nose.position.set(0, 1.66, -2.42);
+  [-.3, .3].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(.13, 6, 5), fur); e.position.set(x, 2.1, -1.45); body.add(e); const ey = new THREE.Mesh(new THREE.SphereGeometry(.06, 5, 4), dark); ey.position.set(x * .6, 1.85, -2.03); body.add(ey); });
+  const legG = new THREE.BoxGeometry(.4, 1.0, .45).translate(0, -.5, 0);
+  const legs = [[-.45, -.85], [.45, -.85], [-.45, .85], [.45, .85]].map(([x, z]) => { const l = new THREE.Group(); l.add(new THREE.Mesh(legG, fur)); l.position.set(x, 1.0, z); body.add(l); return l; });
+  body.add(torso, hump, head, snout, nose);
+  shadow(g, true, false);
+  g.userData = { body, legs, tunic: fur, wolf: true };
+  return g;
+}
 function makeWolf(white) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
   const fur = new THREE.MeshStandardMaterial({ color: white ? 0xd8dce0 : 0x6a645c, roughness: 1, flatShading: true });
@@ -1882,6 +1924,9 @@ function makeQuest(p) {
     if (wants.length) { const g = pick(wants), n = ri(3, 6); opts.push({ type: 'deliver', giver: p.id, good: g, n, reward: Math.round(n * GOODS[g].base * 1.7), glory: 5, text: `Bring ${n} ${GOODS[g].name} to ${p.name}`, ask: `We are short of ${GOODS[g].name.toLowerCase()}. Bring us some and we will pay well.` }); }
   }
   opts.push({ type: 'wolves', n: 4, reward: 70, glory: 8, text: 'Kill 4 wolves in Wolfden Woods', ask: 'Wolves from Wolfden have taken our sheep. Thin the pack.' });
+  opts.push({ type: 'bear', n: 1, reward: 80, glory: 6, text: 'Slay a bear', ask: 'A bear has been raiding our stores. Bring us its hide.' });
+  if (!(S.cleansed && S.cleansed['wolf-camp'] && S.cleansed['seal-camp'])) opts.push({ type: 'outlaws', n: 1, reward: 90, glory: 8, text: 'Clear an outlaw camp (Wolfden Woods or Seal Rocks)', ask: 'Outlaws rob every boat that passes. Burn out their camp.' });
+  if (!S.trollSlain) opts.push({ type: 'troll', n: 1, reward: 250, glory: 25, text: 'Slay the Frost Troll on Frostfang', ask: 'A troll on Frostfang eats reindeer, herders and anyone foolish enough to look for it.' });
   opts.push({ type: 'deer', n: 3, reward: 50, glory: 4, text: 'Hunt 3 deer', ask: 'Our stores run low. Bring down some deer for the larder.' });
   opts.push({ type: 'raiders', n: 2, reward: 120, glory: 15, text: 'Sink or take 2 raider ships', ask: 'Black-sailed raiders burned our fishing boats. Make them pay.' });
   opts.push({ type: 'serpent', n: 1, reward: 150, glory: 20, text: 'Slay a sea serpent', ask: 'A serpent haunts the whale-road. Our fishermen will not put out.' });
@@ -1952,6 +1997,10 @@ const UNIT_DEF = {
   huscarl: () => ({ hp: 115, dmg: 16, reach: 3.1, speed: 7.4, cd: rnd(1.0, 1.25), team: 'them' }),
   jarl: () => ({ hp: 520, dmg: 26, reach: 3.9, speed: 7.4, cd: 1.3, team: 'them' }),
   wolf: () => ({ hp: 26, dmg: 6, reach: 2.4, speed: 11, cd: 1, team: 'them' }),
+  bear: () => ({ hp: 190, dmg: 19, reach: 3.2, speed: 9.5, cd: 1.6, team: 'them' }),
+  outlaw: () => ({ hp: 46, dmg: 9.5, reach: 2.9, speed: 7.8, cd: rnd(1.1, 1.5), team: 'them' }),
+  troll: () => ({ hp: 760, dmg: 34, reach: 5.2, speed: 5.6, cd: 2.1, team: 'them' }),
+  king: () => ({ hp: 400, dmg: 23, reach: 3.7, speed: 6.2, cd: 1.5, team: 'them' }),
   draugr: () => ({ hp: 55, dmg: 11, reach: 3, speed: 6, cd: 1.7, team: 'them' }),
   villager: () => ({ hp: 20, dmg: 0, reach: 0, speed: 5, cd: 99, team: 'none' }),
 };
@@ -1962,12 +2011,15 @@ function unitLook(kind) {
     case 'guard': return { tunic: 0x2f4d7a, shieldCol: 0x2f5d8a, beard: 0x5a4a3a };
     case 'huscarl': return { tunic: 0x2a2d36, legs: 0x1e1e22, shieldCol: 0xd9a441, beard: 0x3a2a1a, helmMat: IRON, scale: 1.12 };
     case 'jarl': return { tunic: 0x6a1010, helmMat: GOLD, shieldCol: 0x111111, beard: 0x8a8a8a, scale: 1.35 };
+    case 'outlaw': return { tunic: pick([0x4a4a2a, 0x5a3a2a, 0x3a4a3a, 0x6a5a3a]), legs: 0x2a2a1e, helm: chance(.4), shieldCol: pick([0x5a4a3a, 0x3a3a2a]), beard: pick([0x3a2a1a, 0x6a4a2a, 0x8a6a3a]) };
+    case 'troll': return { tunic: 0x4a3a28, legs: 0x3a2e20, skin: 0x7a8a72, helm: false, shield: false, eyes: 0xffcc22, beard: 0x5a6a4a, scale: 2.5 };
+    case 'king': return { tunic: 0x2a2a3a, skin: 0x6a7a70, eyes: 0x66ffee, helmMat: GOLD, shieldCol: 0x1a1a22, scale: 1.6 };
     case 'draugr': return { tunic: 0x3a4038, skin: 0x7a8a78, eyes: 0x66ffee, shieldCol: 0x3a3a3a };
     default: return { tunic: pick([0x8a7a5a, 0x6a7a4a, 0x9a8a6a]), helm: false, weapon: false, shield: false, beard: pick([0x6a4a2a, 0]) };
   }
 }
 function addUnit(kind, x, z, extra = {}) {
-  const g = kind === 'wolf' ? makeWolf(ashore.p && ashore.p.snowy) : kind === 'horse' ? makeHorse() : kind === 'deer' ? makeDeer() : makeWarrior(unitLook(kind));
+  const g = kind === 'bear' ? makeBear(ashore.p && ashore.p.snowy) : kind === 'wolf' ? makeWolf(ashore.p && ashore.p.snowy) : kind === 'horse' ? makeHorse() : kind === 'deer' ? makeDeer() : makeWarrior(unitLook(kind));
   const u = Object.assign({ kind, g, x, z, y: groundAt(ashore.p, x, z) ?? 0, h: rnd(0, 6.28), atkCd: rnd(.2, 1), swing: 0, swingHit: false, walk: 0, moveAmt: 0,
     dead: false, deathT: 0, flash: 0, aggro: false, dormant: false, rise: 1 }, UNIT_DEF[kind](), extra);
   u.maxHp = u.hp; scene.add(g); units.push(u); return u;
@@ -1977,7 +2029,7 @@ function addUnit(kind, x, z, extra = {}) {
 function buildCaches() {
   PLACES.forEach((p, pi) => {
     const r = seeded(777 + pi * 131), n = p.type === 'ruins' ? 2 : 2; let made = 0, tries = 0;
-    const mk = (x, z, guarded) => {
+    const mk = (x, z, guarded, key) => {
       const g = new THREE.Group();
       const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, .7, .9), M.wall); base.position.y = .35;
       const lid = new THREE.Group(); lid.position.set(0, .7, .45);
@@ -1985,7 +2037,7 @@ function buildCaches() {
       const band = new THREE.Mesh(new THREE.BoxGeometry(1.5, .12, .2), GOLD); band.position.set(0, .14, -.47); lid.add(band);
       const glint = new THREE.Mesh(new THREE.OctahedronGeometry(.32), M.glow); glint.position.y = 2;
       g.add(base, lid, glint); place(shadow(g), x, z, r() * 6, .1);
-      caches.push({ id: `${p.id}-${caches.filter(c => c.p === p).length}`, p, x, z, g, lid, glint, guarded, found: false });
+      caches.push({ id: `${p.id}-${caches.filter(c => c.p === p).length}`, p, x, z, g, lid, glint, guarded, key: key || p.id, found: false });
     };
     while (made < n && tries++ < 400) {
       const a = r() * Math.PI * 2, t = .25 + r() * .55, d = edgeR(p, a) * t, x = p.wx + Math.cos(a) * d, z = p.wz + Math.sin(a) * d, h = islandH(p, x, z);
@@ -1993,15 +2045,17 @@ function buildCaches() {
       mk(x, z, false); made++;
     }
     if (p.type === 'ruins') mk(p.wx - 4, p.wz + 26, true);
+    if (p.campPos) mk(p.campPos.x + 2.5, p.campPos.z + 2.5, true, p.id + '-camp');
   });
 }
 function syncCaches() { caches.forEach(c => { c.found = !!(S.found && S.found[c.id]); c.glint.visible = !c.found; c.lid.rotation.x = c.found ? -1.9 : 0; }); }
 function openCache(c) {
   const p = c.p;
-  if (c.guarded && !(S.cleansed && S.cleansed[p.id])) { banner('The dead guard this hoard', 'Defeat the draugr first'); return; }
+  if (c.guarded && !(S.cleansed && S.cleansed[c.key])) { banner(c.key === p.id ? 'The dead guard this hoard' : 'Outlaws guard this chest', 'Defeat them first'); return; }
   (S.found ||= {})[c.id] = true; syncCaches();
   let msg;
-  if (c.guarded) { const sv = ri(120, 220); S.silver += sv; S.glory += 10; if (S.weapons < 5) S.weapons++; msg = `The barrow hoard! ${sv} silver and an ancient rune-blade that improves your warband's arms. (+10 glory)`; }
+  if (c.guarded && c.key !== p.id) { const sv = ri(70, 130), g = pick(Object.keys(GOODS)), q = Math.min(ri(2, 4), S.cargoMax - cargoCount()); S.silver += sv; S.cargo[g] += q; msg = `The outlaws' loot: ${sv} silver${q ? ` and ${q} ${GOODS[g].name}` : ''}.`; }
+  else if (c.guarded) { const sv = ri(120, 220); S.silver += sv; S.glory += 10; if (S.weapons < 5) S.weapons++; msg = `The barrow hoard! ${sv} silver and an ancient rune-blade that improves your warband's arms. (+10 glory)`; }
   else if (p.volcano) { const a = Math.min(ri(2, 4), S.cargoMax - cargoCount()), sv = ri(10, 30); S.cargo.amber += a; S.silver += sv; msg = `A charred chest of glowing stones: ${a} amber and ${sv} silver.`; }
   else if (p.wolves) { const fu = Math.min(ri(2, 4), S.cargoMax - cargoCount()), sv = ri(15, 40); S.cargo.furs += fu; S.silver += sv; msg = `A trapper's hidden cache: ${fu} furs and ${sv} silver.`; }
   else if (p.type === 'shrine') { const sv = ri(20, 50); S.silver += sv; S.luck = Math.min(5, S.luck + 2); msg = `Offerings left by pilgrims: ${sv} silver. The gods smile on you.`; }
@@ -2033,7 +2087,13 @@ function goAshore(onReady) {
   });
 }
 function spawnLocals(p) {
-  ashore.draugr = false;
+  ashore.draugr = false; ashore.camp = false;
+  for (let i = 0; i < (p.bears || 0); i++) { const a = rnd(0, 6.28), r = rnd(.35, .7) * p.R, pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r); addUnit('bear', pt.x, pt.z, { dormant: true, group: 'bear' + i, wakeR: 22 }); }
+  if (p.camp && p.campPos && !(S.cleansed && S.cleansed[p.id + '-camp'])) {
+    ashore.camp = true; const c = p.campPos;
+    for (let i = 0; i < 6; i++) { const pt = landNear(p, c.x + rnd(-9, 9), c.z + rnd(-9, 9)); const o = addUnit('outlaw', pt.x, pt.z, { dormant: true, group: 'camp', wakeR: 34, archer: i % 3 === 2, shieldWall: i % 3 === 0 }); setWeapon(o); }
+  }
+  if (p.troll && p.trollPos && !S.trollSlain) addUnit('troll', p.trollPos.x, p.trollPos.z, { dormant: true, group: 'troll', wakeR: 30 });
   if (['home', 'town', 'village', 'fortress'].includes(p.type) && !(S.hostile[p.id] > 0)) {
     for (let i = 0; i < 6; i++) { const a = rnd(0, 6.28), r = rnd(.05, .3) * p.R, pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r); addUnit('villager', pt.x, pt.z, { home: { x: p.wx, z: p.wz, r: p.R * .3 } }); }
   }
@@ -2050,7 +2110,9 @@ function spawnLocals(p) {
   }
   if (p.type === 'ruins' && !(S.cleansed && S.cleansed[p.id])) {
     ashore.draugr = true;
-    for (let i = 0; i < 5; i++) { const pt = landNear(p, p.wx - 4 + rnd(-8, 8), p.wz - 10 + i * 7 + rnd(-2, 2)); addUnit('draugr', pt.x, pt.z, { dormant: true, group: 'barrow', wakeR: 45, rise: 0 }); }
+    const nd = p.id === 'graves' ? 7 : 5;
+    for (let i = 0; i < nd; i++) { const pt = landNear(p, p.wx - 4 + rnd(-9, 9), p.wz - 12 + i * 6 + rnd(-2, 2)); const d = addUnit('draugr', pt.x, pt.z, { dormant: true, group: 'barrow', wakeR: 45, rise: 0, archer: i % 3 === 2 }); setWeapon(d); }
+    if (p.id === 'graves') addUnit('king', p.wx - 4, p.wz + 18, { dormant: true, group: 'barrow', wakeR: 45, rise: 0, shieldWall: true });
   }
 }
 function leaveAshore(retreat) {
@@ -2120,6 +2182,10 @@ function wakeGroup(u) {
   if (!woke) return;
   if (u.kind === 'draugr') { banner('The dead awaken!', 'Draugr claw their way out of the barrows'); Sound.groan(); log('The earth splits and the draugr rise to defend their hoard!', 'bad'); }
   else if (u.kind === 'wolf') { banner('Wolves!', 'A pack charges from the pines'); Sound.howl(); }
+  else if (u.kind === 'bear') { banner('A bear!', 'It rises on its hind legs and roars'); Sound.roar(); }
+  else if (u.kind === 'outlaw') { banner('Outlaws!', 'Their camp is guarded'); Sound.horn(); log('Outlaws spill out of their tents, axes in hand!', 'bad'); }
+  else if (u.kind === 'troll') { banner('The Frost Troll!', 'Stay out of reach of its club'); Sound.roar(); log('The snow heaves and a troll as tall as a longhouse lumbers out of its lair!', 'bad'); }
+  if (u.group === 'barrow' && units.some(o => o.kind === 'king' && o.group === u.group)) setTimeout(() => banner('The Barrow-King wakes', 'A crowned dead lord leads the draugr'), 1600);
 }
 function unitDamage(u, amt, from) {
   if (u.dead) return;
@@ -2137,6 +2203,9 @@ function killUnit(u, from) {
   if (u.kind === 'ally') { if (u.member) loseMember(u.member, pick(['falls in the fight.', 'goes down under the enemy axes.', 'dies with a sword in hand. Valhalla awaits.'])); else S.crew = Math.max(1, S.crew - 1); renderHUD(); }
   else if (u.team === 'them') S.glory += u.kind === 'draugr' || u.kind === 'huscarl' ? 2 : 1;
   if (u.kind === 'wolf') questProgress('wolves');
+  if (u.kind === 'bear') { const fu = Math.min(2, S.cargoMax - cargoCount()); S.cargo.furs += fu; S.food += 15; S.glory += 3; log(`You slay a great bear. +15 food${fu ? `, +${fu} furs` : ''}. (+3 glory)`, 'gold'); questProgress('bear'); renderHUD(); }
+  if (u.kind === 'troll') { const sv = ri(160, 260); S.trollSlain = true; S.silver += sv; S.glory += 40; banner('Troll-slayer!', `+${sv} silver · +40 glory`); log(`The Frost Troll crashes into the snow and moves no more. Its lair holds ${sv} silver from a hundred lost travellers. (+40 glory)`, 'gold'); Sound.coins(); questProgress('troll'); renderHUD(); }
+  if (u.kind === 'king') { S.glory += 20; banner('The Barrow-King falls', '+20 glory'); log('The Barrow-King crumbles, his crown rolling across the frozen earth. (+20 glory)', 'gold'); renderHUD(); }
   if (u.kind === 'deer') {
     const food = ri(10, 16) + traitCount('hunter') * 3, fur = cargoCount() < S.cargoMax ? 1 : 0; S.food += food; S.cargo.furs += fur;
     log(`You bring down a deer: +${food} food${fur ? ', +1 furs' : ''}.`, 'good'); renderHUD(); questProgress('deer');
@@ -2151,7 +2220,8 @@ function setWeapon(u) {
   const ud = u.g.userData; if (!ud.bow) return;
   const b = !!(u.bowMode || u.archer); ud.axe.visible = !b; ud.shield.visible = !b; ud.bow.visible = b;
 }
-const aimY = o => o.y + (o.kind === 'wolf' || o.kind === 'deer' ? 1.1 : o.kind === 'jarl' ? 2 : 1.5) + (o.mount ? 1.6 : 0);
+const aimY = o => o.y + (o.kind === 'wolf' || o.kind === 'deer' ? 1.1 : o.kind === 'troll' ? 3.6 : o.kind === 'jarl' || o.kind === 'king' ? 2.2 : o.kind === 'bear' ? 1.5 : 1.5) + (o.mount ? 1.6 : 0);
+const bodyR = o => o.kind === 'troll' ? 2.2 : o.kind === 'jarl' || o.kind === 'king' || o.kind === 'bear' ? 1.15 : .8;
 function landArrow(src, tgt, spread, dmg, team) {
   const ox = src.x, oz = src.z, oy = src.y + (src.mount ? 3.5 : 2);
   const d = Math.hypot(tgt.x - ox, tgt.z - oz), T = clamp(d / 55, .2, 1.4);
@@ -2164,8 +2234,8 @@ function landArrowHit(a) {
   for (const o of units) {
     if (o.dead || o.dormant || o.rise < 1 || o === a.src) continue;
     if (a.team === 'us' ? (o.team !== 'them' && o.team !== 'game') : o.team !== 'us') continue;
-    const big = o.kind === 'jarl';
-    if (Math.hypot(a.p.x - o.x, a.p.z - o.z) < (big ? 1.1 : .8) && Math.abs(a.p.y - aimY(o)) < (big ? 1.7 : 1.2)) { unitDamage(o, a.dmg, a.src); hitFx(a.p, 0x8a6a40); return true; }
+    const r = bodyR(o);
+    if (Math.hypot(a.p.x - o.x, a.p.z - o.z) < r && Math.abs(a.p.y - aimY(o)) < (o.kind === 'troll' ? 3.4 : r > 1 ? 1.7 : 1.2)) { unitDamage(o, a.dmg, a.src); hitFx(a.p, 0x8a6a40); return true; }
   }
   return false;
 }
@@ -2291,7 +2361,7 @@ function updateUnit(u, dt) {
           if ((o.team !== 'them' && o.team !== 'game') || o.dead || o.rise < 1) continue;
           const dx = o.x - u.x, dz = o.z - u.z, d = Math.hypot(dx, dz) || 1;
           const charge = u.mount && u.moveAmt > 1.2 ? 1.6 : 1;
-          if (d < u.reach + (u.mount ? 1.3 : 0) + (o.kind === 'jarl' ? .8 : .3) && (dx * fx + dz * fz) / d > .2) { unitDamage(o, u.dmg * charge * rnd(.85, 1.15), u); any = true; }
+          if (d < u.reach + (u.mount ? 1.3 : 0) + bodyR(o) - .5 && (dx * fx + dz * fz) / d > .2) { unitDamage(o, u.dmg * charge * rnd(.85, 1.15), u); any = true; }
         }
         if (any) { Sound.thunk(); shake = Math.max(shake, .12); }
       } else if (u.swingTarget && !u.swingTarget.dead && Math.hypot(u.swingTarget.x - u.x, u.swingTarget.z - u.z) < u.reach + .7) {
@@ -2306,7 +2376,7 @@ function updateUnit(u, dt) {
     if (groundAt(p, nx, nz) !== null || groundAt(p, u.x, u.z) === null) { u.x = nx; u.z = nz; }
     else if (groundAt(p, nx, u.z) !== null) u.x = nx;
     else if (groundAt(p, u.x, nz) !== null) u.z = nz;
-    pushOut(u, p, u.kind === 'jarl' || u.mount || u.kind === 'horse' ? 1 : .5);
+    pushOut(u, p, u.kind === 'troll' ? 1.8 : u.kind === 'jarl' || u.kind === 'king' || u.kind === 'bear' || u.mount || u.kind === 'horse' ? 1 : .5);
   }
   u.vx = dt > 0 ? (u.x - ox) / dt : 0; u.vz = dt > 0 ? (u.z - oz) / dt : 0;
   const gy = groundAt(p, u.x, u.z); u.y = gy === null ? Math.max(terrainH(u.x, u.z), -1.5) : gy;
@@ -2354,8 +2424,8 @@ function updateAshore(dt) {
     for (let j = i + 1; j < units.length; j++) {
       const b = units[j]; if (b.dead || b.dormant) continue;
       if (a.rider === b || b.rider === a) continue;
-      const big = x => x.kind === 'jarl' || x.kind === 'horse' || x.mount;
-      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = big(a) || big(b) ? 1.9 : 1.2;
+      const big = x => x.kind === 'jarl' || x.kind === 'king' || x.kind === 'bear' || x.kind === 'horse' || x.mount;
+      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), m = a.kind === 'troll' || b.kind === 'troll' ? 3.4 : big(a) || big(b) ? 1.9 : 1.2;
       if (d < m && d > 1e-4) { const push = (m - d) / 2, ux = dx / d, uz = dz / d; a.x -= ux * push; a.z -= uz * push; b.x += ux * push; b.z += uz * push; }
     }
   }
@@ -2365,7 +2435,11 @@ function updateAshore(dt) {
   }
   const b = ashore.battle, p = ashore.p;
   if (b && b.kind === 'sack' && !hero.dead && !units.some(u => u.battle && !u.dead)) sackWon(b.p);
-  if (ashore.draugr && !(S.cleansed && S.cleansed[p.id]) && !units.some(u => u.kind === 'draugr' && !u.dead)) {
+  if (ashore.camp && !(S.cleansed && S.cleansed[p.id + '-camp']) && !units.some(u => u.kind === 'outlaw' && !u.dead)) {
+    (S.cleansed ||= {})[p.id + '-camp'] = true; S.glory += 6;
+    banner('The camp is cleared', 'Their loot is yours'); log('The last outlaw falls. Their stolen loot lies in a chest by the fire. (+6 glory)', 'gold'); questProgress('outlaws'); renderHUD();
+  }
+  if (ashore.draugr && !(S.cleansed && S.cleansed[p.id]) && !units.some(u => (u.kind === 'draugr' || u.kind === 'king') && !u.dead)) {
     (S.cleansed ||= {})[p.id] = true; S.glory += 8;
     banner('The barrow is cleansed', 'The hoard can now be claimed'); questProgress('barrow'); log('The last draugr crumbles to dust. The barrow hoard is yours to claim. (+8 glory)', 'gold'); renderHUD();
   }
@@ -2376,7 +2450,7 @@ function updateAshore(dt) {
     if (Math.hypot(hero.x - bp.x, hero.z - bp.z) < 8) { ashore.prompt = ashore.foes ? '<kbd>E</kbd>Retreat to your longship' : '<kbd>E</kbd>Board your longship'; ashore.interact = 'ship'; }
     else for (const c of caches) {
       if (c.p !== p || c.found || Math.hypot(hero.x - c.x, hero.z - c.z) > 3.5) continue;
-      ashore.prompt = c.guarded && !(S.cleansed && S.cleansed[p.id]) ? 'The dead guard this hoard' : '<kbd>E</kbd>Open the chest'; ashore.interact = c; break;
+      ashore.prompt = c.guarded && !(S.cleansed && S.cleansed[c.key]) ? (c.key === p.id ? 'The dead guard this hoard' : 'Outlaws guard this chest') : '<kbd>E</kbd>Open the chest'; ashore.interact = c; break;
     }
     if (!ashore.prompt && !ashore.foes) { const v = units.find(u => u.kind === 'villager' && !u.dead && !u.flee && Math.hypot(u.x - hero.x, u.z - hero.z) < 3.5); if (v) { ashore.prompt = '<kbd>E</kbd>Talk'; ashore.interact = { villager: v }; } }
     if (!ashore.prompt && !hero.mount && units.some(u => u.kind === 'horse' && !u.rider && Math.hypot(u.x - hero.x, u.z - hero.z) < 4.5)) ashore.prompt = '<kbd>R</kbd>Ride the horse';
@@ -2409,8 +2483,9 @@ function updateUnitLabels() {
     const show = ashore.on && u.team === 'them' && u.aggro && !u.dead && u.rise >= 1 && hero && Math.hypot(u.x - hero.x, u.z - hero.z) < 70;
     if (!show) { if (el) el.style.display = 'none'; continue; }
     if (!el) { el = document.createElement('div'); el.className = 'foe sm'; document.body.appendChild(el); unitLabels.set(u, el); }
-    if (placeLabel(el, u.g.position, u.kind === 'jarl' ? 4.4 : u.kind === 'wolf' ? 2.4 : 3.1))
-      el.innerHTML = (u.kind === 'jarl' ? '<div class="nm">Jarl Hakon the Grim</div>' : '') + `<div class="hb"><i style="width:${clamp(u.hp / u.maxHp, 0, 1) * 100}%"></i></div>`;
+    const boss = { jarl: 'Jarl Hakon the Grim', troll: 'The Frost Troll', king: 'The Barrow-King' }[u.kind];
+    if (placeLabel(el, u.g.position, u.kind === 'troll' ? 7.5 : u.kind === 'jarl' ? 4.4 : u.kind === 'king' ? 4.8 : u.kind === 'wolf' || u.kind === 'bear' ? 3 : 3.1))
+      el.innerHTML = (boss ? `<div class="nm">${boss}</div>` : '') + `<div class="hb"><i style="width:${clamp(u.hp / u.maxHp, 0, 1) * 100}%"></i></div>`;
   }
 }
 
@@ -2672,6 +2747,7 @@ function help() {
   • Horses graze on the farmland and town islands. Walk up to one and press <b>R</b> to ride. Galloping is more than twice as fast as walking, and a strike at full gallop is a charge that hits much harder. Press <b>R</b> again to dismount. Buy a horse of your own and it sails with you: press <b>C</b> on any island to call it.<br>
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
+  • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
   • <b>Seasons:</b> a year has four seasons of 10 days. Summer days are long and calm. Autumn brings storms and better prices for furs and salt. In winter snow covers the islands, days are short, blizzards blow, drift ice fills the northern sea, your crew eats more at sea and hunting is poor. Hold a Yule feast at Ravenholm in winter.<br>
   • <b>The wider sea:</b> beyond the home waters lie Skarholt, Ulfsborg, Bjornstad, the glacier of Frostfang, the Isle of Graves, Seal Rocks and Odin's Eyrie.<br>
   • <b>Oaths:</b> ask for work in towns or talk to villagers (<b>E</b>) to swear oaths: deliveries, hunts, sea battles, raids. Active oaths show under your stats and in the journal (<b>J</b>).<br>
@@ -3048,6 +3124,7 @@ try {
   buildWorld();
   for (let i = 0; i < 8; i++) spawnNPC('merchant');
   for (let i = 0; i < 5; i++) spawnNPC('raider');
+  for (let i = 0; i < 2; i++) spawnNPC('raider', { elite: true });
   S = newState(); dockAt(P.home); applySeason(true); renderHUD();
   const has = !!loadSave();
   const tb = $('titleBtns');
@@ -3062,7 +3139,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
