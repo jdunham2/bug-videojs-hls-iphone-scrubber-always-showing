@@ -2130,6 +2130,8 @@ const NPCS = [
    hello:["Knowledge is the finest treasure!","Care to test your wits?","Ahem. Question one..."], rumors:["Every town sells some goods cheap and pays well for others. A traveler who remembers which is never poor. Nor bad at quizzes."]},
   {id:'postpell',town:'hollow',dx:-3,dy:-3,name:'Postmaster Pell',role:'Express post',cols:{cloak:'#a03a2a',skin:'#d8b090',hair:'#3a2a1a'},postmaster:true,freeSpot:true,
    hello:["Express post! Fast feet wanted!","Parcels don't deliver themselves.","Speed is everything in this business."], rumors:["Ride your fastest mount for express deliveries. Arrive with time to spare and the bonus is generous."]},
+  {id:'avis',town:'petal',dx:-3,dy:3,name:'Avis the Birdwatcher',role:'Bird journal',cols:{cloak:'#6a8a5a',skin:'#e0b898',hair:'#c08040'},birder:true,freeSpot:true,
+   hello:["Shh! You'll scare the finches.","Every land has its own birds.","Have you seen anything with feathers lately?"], rumors:["Some birds only come out at night. Owls in the snow, nightingales in the meadows. Others only live in one kind of land."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3241,7 +3243,8 @@ function attack(dirX, dirY) {
   const w = weapon();
   if (dirX == null) {
     const best = nearestEnemy(w.ranged ? 9 : (w.reach || 1.2) + 1.2);
-    if (best) { dirX = best.x - S.x; dirY = best.y - .3*(best.size || 1) - (S.y - .4); } else { dirX = player.dir.x; dirY = player.dir.y; }
+    const so = !best && spar && spar.active ? remote[spar.peer] : null;
+    if (best) { dirX = best.x - S.x; dirY = best.y - .3*(best.size || 1) - (S.y - .4); } else if (so && Math.hypot(so.x - S.x, so.y - S.y) < (w.ranged ? 9 : (w.reach || 1.2) + 1.2)) { dirX = so.x - S.x; dirY = so.y - .3 - (S.y - .4); } else { dirX = player.dir.x; dirY = player.dir.y; }
   }
   const m = Math.hypot(dirX, dirY) || 1; dirX /= m; dirY /= m;
   player.dir = {x: dirX, y: dirY};
@@ -3278,6 +3281,7 @@ function attack(dirX, dirY) {
     const kx = w.arc === 'spin' ? dx/(d || 1) : dirX, ky = w.arc === 'spin' ? dy/(d || 1) : dirY;
     hitEnemy(e, (w.dmg + (have('golem_fist') ? 2 : 0)) * (w.silver && isUndead(e) ? 2 : 1), kx*kb, ky*kb, 'player');
   }
+  if (spar && spar.active) sparMelee(w, dirX, dirY, th);
 }
 let chargeT = null, spinCd = 0, mouseHeld = false;
 function powerShot() {
@@ -3754,6 +3758,9 @@ function partyPanel() {
   openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Near the leader, everyone fights the <b>same monsters</b>: hit them together, and everyone who helped gets the rewards. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat, Y to emote and N to ping your spot on everyone\u2019s map. If you fall near a friend, they can revive you.</span><br><br>${pchalHTML()}<br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
     ...list.filter(r => !r.p.dg).slice(0, 4).map(r => ({label: `Travel to ${r.name}${r.p.host ? ' (leader)' : ''}`, disabled: inDungeon() || inArena() || bossActive() || !!downed, fn: () => { closeTalk(); SFX.travel(); fadeThen(() => travelToPeer(r)); }})),
     {label: 'Chat', fn: () => chatPanel()},
+    ...(list.length ? [{label: 'Give a gift', fn: () => giftPick()}] : []),
+    ...list.filter(r => r.p.sp === NET_SID && !(spar && spar.active)).slice(0, 2).map(r => ({label: `Accept spar with ${r.name}`, primary: true, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; }})),
+    ...(!spar ? list.filter(r => r.p.sp !== NET_SID).slice(0, 2).map(r => ({label: `Challenge ${r.name} to a spar`, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; toast(`You challenged <b>${esc(r.name)}</b> to a friendly spar. Waiting for them to accept...`, 4000); }})) : [{label: spar.active ? 'Concede the spar' : 'Cancel the spar challenge', fn: () => { closeTalk(); if (spar.active) { sparLost = {sid: spar.sid, t: 3}; toast('You conceded the spar.', 3000); } spar = null; }}]),
     {label: 'Emote (Y)', fn: () => emotePanel()},
     {label: 'Ping my spot (N)', fn: () => { closeTalk(); sendPing(); }},
     {label: 'Leave party', fn: () => { leaveParty(); closeTalk(); }},
@@ -3774,7 +3781,7 @@ async function enterParty(code, host) {
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {}; netReset(); reviving = null; if (downed) { downed = null; die(); }
+  const P = party; if (!P) return; party = null; remote = {}; netReset(); spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3791,7 +3798,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3802,7 +3809,8 @@ function partyTick(dt) {
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
   for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
-  partyExtras(dt);
+  partyExtras(dt); sparTick(dt);
+  for (const q of myGifts) q.t -= dt; if (myGifts.length) myGifts = myGifts.filter(q => q.t > 0);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
   for (const pr of peers) {
@@ -3814,7 +3822,10 @@ function partyTick(dt) {
     if (p.mv) r.phase += dt*12;
     if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
     const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
-    if (!r.xinit) { r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; r.fwI = p.fw && p.fw.i; r.pcI = p.pc && p.pc.i; }
+    if (!r.xinit) { r.giftI = Array.isArray(p.gf) ? Math.max(0, ...p.gf.map(q => +q.i || 0)) : 0;
+      r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; r.fwI = p.fw && p.fw.i; r.pcI = p.pc && p.pc.i; }
+    if (Array.isArray(p.gf)) receiveGifts(r, p.gf);
+    sparPeer(r, p);
     if (p.fw && typeof p.fw === 'object' && p.fw.i !== r.fwI) { r.fwI = p.fw.i; if (isFinite(p.fw.x) && isFinite(p.fw.y) && Math.hypot(p.fw.x - S.x, p.fw.y - S.y) < 40) launchFireworks(+p.fw.x, +p.fw.y); }
     if (p.pc && typeof p.pc === 'object' && p.pc.i !== r.pcI) { r.pcI = p.pc.i; if (isFinite(p.pc.x) && isFinite(p.pc.y)) { picnics.push({x: +p.pc.x, y: +p.pc.y, t: 180, who: r.name}); if (Math.hypot(p.pc.x - S.x, p.pc.y - S.y) < 8) { BUFFS.regen = Math.max(BUFFS.regen || 0, 180); toast(`<b>${esc(r.name)} spread a picnic!</b> You feel refreshed (health regenerates for 3 minutes).`, 4500); renderHUD(); } } }
     if (p.em && typeof p.em === 'object' && p.em.i !== r.emI) { r.emI = p.em.i; if (EMOTES.hasOwnProperty(p.em.k)) r.emote = {k: p.em.k, t: 3}; }
@@ -3842,6 +3853,7 @@ function drawRemote(r) {
   const hp = +p.hp || 0, mh = Math.max(1, +p.mh || 1); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 8, top + 2, 16, 3); ctx.fillStyle = '#e57a62'; ctx.fillRect(px - 7, top + 3, 14*Math.max(0, Math.min(1, hp/mh)), 1);
   if (r.bubble) drawBubble(px, top - 4, r.bubble.m);
   if (r.emote) drawEmote(px, top - (r.bubble ? 18 : 6), r.emote);
+  if (spar && spar.active && spar.peer === r.peer) { const f = Math.max(0, Math.min(1, (+p.sh2 || 0)/SPAR_HP)); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, top + 6, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, top + 7, 22*f, 2); }
   if (p.dn) { const rv = reviving && reviving.peer === r.peer ? Math.min(1, reviving.t/REVIVE_T) : Math.max(0, Math.min(1, +p.rp || 0)); drawDownTag(px, top - 8, +p.dn, rv); }
 }
 // shared monsters: the leader's game runs them, guests mirror them and send their damage
@@ -4317,6 +4329,136 @@ function updateCourier(dt) {
     gainXP(20 + Math.round(C.max/4)); SFX.victory(); renderHUD(); save();
     toast(`<b>Delivered to ${T1.name}!</b><br>${Math.ceil(C.t)} seconds to spare. <span style="color:var(--good)">+${pay} coin</span>`, 5000);
   }
+}
+// ===== party gifts =====
+let myGifts = [], giftSeq = 0;
+function giftPick() {
+  const list = Object.values(remote); if (!list.length) return;
+  openPanel('Give a gift', 'Who do you want to give something to?', [...list.slice(0, 6).map(r => ({label: r.name, fn: () => giftItems(r)})), {label: 'Back', fn: () => partyPanel()}]);
+}
+function giftItems(r) {
+  const eq = Object.values(S.equip), items = GK.filter(g => have(g) > 0 && !eq.includes(g) && GOODS[g].kind !== 'trophy').sort((a, b) => have(b) - have(a)).slice(0, 12);
+  openPanel(`Gift for ${esc(r.name)}`, `Pick something to give <b>${esc(r.name)}</b>. It goes straight into their pack.`, [
+    ...[50, 250].filter(c => S.coins >= c).map(c => ({label: `${c} coin`, fn: () => sendGift(r, 'coins', c)})),
+    ...items.map(g => ({label: `${GOODS[g].name} (have ${have(g)})`, fn: () => giftAmount(r, g)})), {label: 'Back', fn: () => giftPick()}]);
+}
+function giftAmount(r, g) {
+  const h = have(g); if (h === 1) { sendGift(r, g, 1); return; }
+  openPanel('How many?', `Give how many <b>${GOODS[g].name}</b> to ${esc(r.name)}?`, [...[1, 5, Math.min(h, 99)].filter((v, i, a) => v <= h && a.indexOf(v) === i).map(n => ({label: n === Math.min(h, 99) && n > 5 ? `All (${n})` : String(n), fn: () => sendGift(r, g, n)})), {label: 'Back', fn: () => giftItems(r)}]);
+}
+function sendGift(r, g, n) {
+  if (!remote[r.peer]) { toast(`${esc(r.name)} isn’t in the party any more.`); closeTalk(); return; }
+  if (g === 'coins') { if (S.coins < n) return; S.coins -= n; } else { if (have(g) < n) return; addItem(g, -n); }
+  myGifts.push({i: ++giftSeq + Math.floor(Date.now()/1000)*100, to: r.p.sid, g, n, t: 30}); if (myGifts.length > 8) myGifts.shift(); partyT = 0;
+  S.giftsGiven = (S.giftsGiven || 0) + 1; SFX.coin(); renderHUD(); save(); closeTalk();
+  toast(`You gave <b>${g === 'coins' ? `${n} coin` : `${n} ${GOODS[g].name}`}</b> to ${esc(r.name)}.`, 3500);
+}
+function receiveGifts(r, list) {
+  let mx = r.giftI || 0;
+  for (const q of list.slice(0, 10)) {
+    const i = +q.i || 0; if (i <= (r.giftI || 0)) continue; mx = Math.max(mx, i); if (q.to !== NET_SID) continue;
+    const n = Math.floor(+q.n || 0); if (n <= 0) continue;
+    if (q.g === 'coins') { if (n > 100000) continue; S.coins += n; } else if (typeof q.g === 'string' && GOODS.hasOwnProperty(q.g) && n <= 999) addItem(q.g, n); else continue;
+    S.giftsGot = (S.giftsGot || 0) + 1; SFX.chime(); renderHUD();
+    toast(`<b>${esc(r.name)} sent you a gift!</b><br>${q.g === 'coins' ? `${n} coin` : `${n} ${GOODS[q.g].name}`}`, 4500);
+  }
+  r.giftI = mx;
+}
+// ===== friendly spars =====
+let spar = null, sparLost = null;
+const SPAR_HP = 30;
+function sparMelee(w, dirX, dirY, th) {
+  const r = remote[spar.peer]; if (!r) return;
+  const dx = r.x - S.x, dy = (r.y - .3) - (S.y - .4), d = Math.hypot(dx, dy);
+  if (d > (w.reach || 1.2) + .35) return; if (d > .4 && (dx*dirX + dy*dirY)/d < th) return;
+  sparDeal(w.dmg, r);
+}
+function sparDeal(dmg, r) { spar.dealt += dmg; partyT = Math.min(partyT, .03); floatText(r.x, r.y - 1.4, String(Math.round(dmg*10)/10), '#ff9a3a'); burst(r.x, r.y - .5, '#ff9a3a', 4); SFX.hit(); }
+function sparPeer(r, p) {
+  if (spar && spar.peer === r.peer) {
+    if (!spar.active && p.sp === NET_SID) { spar.active = true; spar.seen = +p.sd || 0; SFX.roar(); toast(`<b>Spar with ${esc(r.name)}!</b><br>First to drain the other’s orange spar bar wins. Your real health isn’t touched by each other’s hits.`, 5000); }
+    if (spar.active) {
+      if (p.sl === NET_SID) { sparWon(r); return; }
+      if (p.sp !== NET_SID && !p.sl) { toast(`${esc(r.name)} left the spar.`, 3000); spar = null; return; }
+      const sd = +p.sd || 0; if (sd > spar.seen) { const dl = Math.min(50, sd - spar.seen); spar.seen = sd; spar.hp -= dl; hurtFlash = Math.min(.5, hurtFlash + .2); SFX.hurt(); floatText(S.x, S.y - 1.2, `-${Math.round(dl*10)/10}`, '#ff9a3a');
+        if (spar.hp <= 0) { sparLost = {sid: spar.sid, t: 3}; S.sparLosses = (S.sparLosses || 0) + 1; toast(`<b>${esc(r.name)} wins the spar!</b><br>Good fight. A rematch, perhaps?`, 4500); spar = null; } }
+    }
+  } else if (!spar && p.sp === NET_SID && !r.sparToast) { r.sparToast = true; toast(`<b>${esc(r.name)} challenges you to a spar!</b><br>Open the Party menu (P) to accept.`, 6000); SFX.chime(); }
+  if (p.sp !== NET_SID) r.sparToast = false;
+}
+function sparWon(r) { S.sparWins = (S.sparWins || 0) + 1; spar = null; SFX.victory(); gainXP(25); toast(`<b>You win the spar against ${esc(r.name)}!</b>`, 4500); burst(S.x, S.y - .8, '#ffd040', 20, 5); }
+function sparTick(dt) {
+  if (sparLost) { sparLost.t -= dt; if (sparLost.t <= 0) sparLost = null; }
+  if (!spar) return; const r = remote[spar.peer];
+  if (!r || Math.hypot(r.x - S.x, r.y - S.y) > 40) { spar = null; toast('The spar was called off.', 3000); return; }
+  if (!spar.active) { spar.t -= dt; if (spar.t <= 0) { toast(`${esc(spar.name)} didn’t accept the spar.`, 3000); spar = null; } }
+}
+// ===== birdwatching =====
+const BIRDS = [
+  {k: 'robin', name: 'Red Robin', tiles: [T.GRASS, T.ROAD], time: 'day', col: '#c84a2a', body: '#7a5a3a'},
+  {k: 'bluejay', name: 'Blue Jay', tiles: [T.FOREST], time: 'day', col: '#3a7ad8', body: '#2a4a8a'},
+  {k: 'owl', name: 'Snowy Owl', tiles: [T.SNOW], time: 'any', col: '#f0f0f0', body: '#c8c8d0'},
+  {k: 'heron', name: 'Grey Heron', tiles: [T.MARSH, T.SHAL], time: 'day', col: '#9aa4b0', body: '#6a7480', big: true},
+  {k: 'parrot', name: 'Jungle Parrot', tiles: [T.JUNGLE], time: 'day', col: '#3ad04a', body: '#e03a2a'},
+  {k: 'lark', name: 'Desert Lark', tiles: [T.SAND, T.DUNE], time: 'day', col: '#d8b070', body: '#a07a40'},
+  {k: 'finch', name: 'Blossom Finch', tiles: [T.BLOSSOM], time: 'day', col: '#ff9ac0', body: '#c06080'},
+  {k: 'vulture', name: 'Savanna Vulture', tiles: [T.SAVANNA, T.MESA], time: 'day', col: '#4a3a3a', body: '#2a2020', big: true},
+  {k: 'raven', name: 'Moor Raven', tiles: [T.MOOR, T.RUINS, T.GLOOM], time: 'any', col: '#2a2a3a', body: '#1a1a24'},
+  {k: 'glimmer', name: 'Glimmerwing', tiles: [T.SHROOM, T.SHIMMER], time: 'any', col: '#9a7aff', body: '#5adaff'},
+  {k: 'woodpecker', name: 'Woodpecker', tiles: [T.REDWOOD, T.MAPLE], time: 'day', col: '#e03a2a', body: '#3a3a3a'},
+  {k: 'nightingale', name: 'Nightingale', tiles: [T.GRASS, T.FOREST], time: 'night', col: '#a08060', body: '#6a5040'},
+  {k: 'kingfisher', name: 'Kingfisher', tiles: [T.BAMBOO], time: 'day', col: '#2ac0e0', body: '#e08a2a'},
+  {k: 'ptarmigan', name: 'Hill Ptarmigan', tiles: [T.HILL], time: 'day', col: '#e8e0d0', body: '#a09080'},
+];
+let birds = [], birdT = 6;
+function birdTalk(n) {
+  if (!S.birdJournal) { S.birdJournal = true; save(); say(`“A fellow bird lover? Take this journal and my old spyglass. Birds will show up as you travel. Different lands, different birds, and some only at night. Get within a few steps and press E to observe one, but don’t get too close or it’ll fly off! I pay 30 coin for every new species, and something special if you fill the whole book: ${BIRDS.length} species.”`, [back(n)]); return; }
+  const got = BIRDS.filter(b => S.birds && S.birds[b.k]).length, done = got === BIRDS.length;
+  if (done && !S.birdDone) { S.birdDone = true; S.coins += 1000; addItem('gem', 3); SFX.victory(); renderHUD(); save(); }
+  say(`<b>Bird journal: ${got}/${BIRDS.length}</b><br>${BIRDS.map(b => S.birds && S.birds[b.k] ? `<span style="color:${b.col === '#2a2a3a' ? '#9a9ab0' : b.col}">●</span> ${b.name}` : '<span style="color:var(--muted)">○ ???</span>').join(' · ')}<br><br>${done ? '“A complete journal! You’re a true ornithologist. The reward is yours: 1,000 coin and three gems.”' : '“Keep looking! Check snowfields, marshes, jungles, deserts... and go out at night, too.”'}`, [back(n)]);
+}
+function birdFor(t, night) { const c = BIRDS.filter(b => b.tiles.includes(t) && (b.time === 'any' || (b.time === 'night') === night)); return c.length ? pick(c) : null; }
+function updateBirds(dt) {
+  for (const b of birds) {
+    b.t -= dt; b.ph += dt*(b.fly ? 20 : 2);
+    if (b.fly) { b.x += b.vx*dt; b.y += b.vy*dt; b.alt += dt*3; if (b.alt > 6) b.gone = true; continue; }
+    if (b.t <= 0 || Math.hypot(b.x - S.x, b.y - S.y) < 2.2) birdFlee(b);
+    else if (Math.random() < dt*.4) b.face = -b.face;
+  }
+  birds = birds.filter(b => !b.gone && Math.hypot(b.x - S.x, b.y - S.y) < 30);
+  if (!S.birdJournal || inDungeon() || S.y >= WORLD_H) return;
+  birdT -= dt; if (birdT > 0 || birds.length >= 2) return; birdT = 14 + Math.random()*14;
+  const night = S.time < .23 || S.time > .8;
+  for (let k = 0; k < 12; k++) {
+    const a = Math.random()*6.283, r = 7 + Math.random()*6, x = Math.floor(S.x + Math.cos(a)*r) + .5, y = Math.floor(S.y + Math.sin(a)*r) + .5;
+    if (!inB(Math.floor(x), Math.floor(y)) || townAt(x, y, 9)) continue;
+    const B = birdFor(map[idx(Math.floor(x), Math.floor(y))], night); if (!B) continue;
+    if (B.tiles.includes(T.SHAL) ? false : !passable(x, y)) continue;
+    birds.push({x, y, k: B.k, t: 45, ph: Math.random()*6, face: Math.random() < .5 ? -1 : 1, alt: 0}); return;
+  }
+}
+function birdFlee(b) { if (b.fly) return; b.fly = true; const a = Math.atan2(b.y - S.y, b.x - S.x); b.vx = Math.cos(a)*5; b.vy = Math.sin(a)*5 - 2; SFX.click(); }
+function birdTarget() {
+  if (!S.birdJournal) return null;
+  const b = birds.find(b => !b.fly && Math.hypot(b.x - S.x, b.y - S.y) < 6); if (!b) return null; const B = BIRDS.find(q => q.k === b.k);
+  const known = S.birds && S.birds[b.k];
+  return {key: 'bird' + b.k, html: `<kbd style="margin:0 6px 0 0">E</kbd>Observe the ${known ? B.name : 'bird'} through your spyglass`, btn: 'Observe', fn: () => {
+    S.birds = S.birds || {}; S.birdsSeen = (S.birdsSeen || 0) + 1;
+    if (!S.birds[b.k]) { S.birds[b.k] = true; S.coins += 30; SFX.victory(); const got = BIRDS.filter(q => S.birds[q.k]).length; toast(`<b>New bird: ${B.name}!</b><br>Logged in your journal (${got}/${BIRDS.length}). <span style="color:var(--good)">+30 coin</span>`, 4500); }
+    else floatText(b.x, b.y - 1, `${B.name} (already logged)`, '#cfd6dc');
+    birdFlee(b); renderHUD(); save();
+  }};
+}
+function drawBird(b) {
+  const B = BIRDS.find(q => q.k === b.k), sc = B.big ? 1.5 : 1, px = b.x*TS, py = b.y*TS - b.alt*TS;
+  if (!b.fly) { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(px, b.y*TS + 1, 3*sc, 1, 0, 0, 7); ctx.fill(); }
+  ctx.save(); ctx.translate(px, py); ctx.scale(b.face*sc, sc);
+  ctx.fillStyle = B.body; ctx.beginPath(); ctx.ellipse(0, -3, 3, 2.2, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = B.col; ctx.beginPath(); ctx.arc(2.5, -5, 1.8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e8b030'; ctx.fillRect(4, -5.3, 1.5, .8); ctx.fillStyle = '#000'; ctx.fillRect(2.8, -5.6, .7, .7);
+  if (b.fly) { const w = Math.sin(b.ph)*3; ctx.fillStyle = B.col; ctx.beginPath(); ctx.moveTo(-1, -3); ctx.lineTo(-3, -3 - 3 - w); ctx.lineTo(1, -3); ctx.fill(); }
+  else { ctx.fillStyle = B.col; ctx.fillRect(-2.5, -3.5, 3, 1.5); ctx.fillStyle = '#8a6a3a'; ctx.fillRect(-.5, -1, .6, 1); ctx.fillRect(1, -1, .6, 1); }
+  ctx.restore();
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -5865,8 +6007,10 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Gifts and spars', 'In a party, open the Party menu to give a friend coins or items from your pack. You can also challenge a party member to a friendly spar: each of you gets an orange spar bar, and hits on each other drain only that, never your real health. First to empty the other\u2019s bar wins.'],
+  ['Birdwatching', 'Avis in Petalfall lends you a bird journal and spyglass. Birds then appear as you travel: each land has its own species, and some only come out at night. Get within a few steps and press E to observe one, but don\u2019t get too close or it flies off. New species pay 30 coin, and a full journal earns a big reward.'],
   ['Quiz night and express post', 'Professor Quill in Thornwick runs a daily quiz about towns, trade, beasts and dungeons: 30 coin for each right answer and a bonus for a perfect round. Postmaster Pell in Hollowpine hands out timed express deliveries to towns you know. The faster you arrive, the bigger the pay.'],
   ['Usable items', 'Some items have a Use button in your bag. Rocket Packs (from Melody in Lantern Bay) light up the sky for everyone in your party. A Picnic Basket (from Big Bertha in Highcairn) heals you and nearby party members over 3 minutes. A War Horn (from Huntmaster Garrick in Hollowpine) calls a Champion monster when you blow it out in the wild: four times as tough, and in a party everyone can fight it and share the spoils.'],
   ['Village games', 'Tib, a kid in Reedholm, plays hide and seek: find the rustling bush within 60 seconds. Melody in Lantern Bay lends you her lute to busk, a rhythm game played with the arrow keys or D-pad (three shows a day). Big Bertha runs a skittles alley in Highcairn: aim, pick your power and knock down the nine pins.'],
@@ -6179,7 +6323,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -6267,6 +6411,7 @@ function updateCombat(dt, night) {
   }
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
+    if (spar && spar.active && !a.sparHit && !a.back) { const r = remote[spar.peer]; if (r && Math.hypot(r.x - a.x, r.y - .4 - a.y) < .6) { a.sparHit = true; sparDeal(a.dmg, r); if (!a.pierce) a.life = 0; } }
     { const at = tileAt(Math.floor(a.x), Math.floor(a.y)); if (at === T.DWALL || at === T.DTORCH || at === T.VOID) a.life = 0; }
     if (a.boom && !a.back && a.life < a.max/2) { a.back = true; a.hit = new Set(); }
     if (a.back) { const bx = S.x - a.x, by = S.y - .5 - a.y, bd = Math.hypot(bx, by) || 1; a.vx = bx/bd*12; a.vy = by/bd*12; a.life = Math.max(a.life, .05); if (bd < .6) a.life = 0; }
@@ -7069,6 +7214,8 @@ function render() {
   for (const q of picnics) if (inView(q.x, q.y)) sprites.push({y: q.y - .5, f: () => drawPicnic(q)});
   if (rockets.length) sprites.push({y: 1e9 - 2, f: drawRockets});
   if (party) { for (const r of Object.values(remote)) if (inView(r.x, r.y)) sprites.push({y: r.y, f: () => drawRemote(r)}); if (myBubble && myBubble.t > 0) sprites.push({y: 1e9 - 3, f: () => drawBubble(S.x*TS, S.y*TS - (S.riding ? 30 : 24), myBubble.m)}); }
+  if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
+  for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
   if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
@@ -7515,7 +7662,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -7856,6 +8003,7 @@ function mainOptions(n) {
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
   if (n.busker) o.push({label: 'Buy rocket packs', fn: () => shopTalk(n, [['rocket_pack', 30]], '“Every good show ends with a bang!”')});
   if (n.skittles) o.push({label: 'Buy a picnic basket', fn: () => shopTalk(n, [['picnic_basket', 45]], '“Bread, cheese, pie and a flask of cider. Share it with friends!”')});
+  if (n.birder) o.push({label: S.birdJournal ? 'Show my bird journal' : 'Ask about birdwatching', primary: true, fn: () => birdTalk(n)});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -10655,6 +10803,11 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['giftgiver','Generous Friend','Give 10 gifts to party members', () => (S.giftsGiven || 0) >= 10],
+  ['sparwin','Friendly Rival','Win a friendly spar', () => (S.sparWins || 0) >= 1],
+  ['spar5','Sparring Champion','Win 5 friendly spars', () => (S.sparWins || 0) >= 5],
+  ['birds5','Birdwatcher','Log 5 bird species', () => Object.keys(S.birds || {}).length >= 5],
+  ['birdsall','Ornithologist','Complete the bird journal', () => !!S.birdDone],
   ['quiz1','Know-It-All','Score 5/5 at quiz night', () => (S.quizPerfect || 0) >= 1],
   ['courier5','Express Rider','Make 5 express deliveries', () => (S.couriers || 0) >= 5],
   ['courierfast','Like the Wind','Deliver a parcel with more than half the time left', () => (S.courierFast || 0) >= 1],
@@ -11203,6 +11356,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
+window.__b2 = {get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
