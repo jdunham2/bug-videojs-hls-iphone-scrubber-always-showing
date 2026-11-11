@@ -2,7 +2,8 @@
 
 A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas, so there are no image assets. Open `index.html` in any modern browser.
 
-- 3 classes: Warrior, Mage and Ranger, each with its own skill
+- 6 classes: Warrior (Whirlwind), Mage (Fireball), Ranger (Arrow Storm), Rogue (Shadowstep backstab), Paladin (Holy Smite, stuns and heals) and Necromancer (Raise Dead skeleton army)
+- A talent tree with three shared branches (Might, Guard, Arcana) and a branch unique to each class that upgrades its signature skill; points come from levels and story chapters, and talents can be reset for gold
 - 17 weapons any class can use (swords, daggers, spear, cleaver, maul, staffs, wand, bows, crossbow, boomerang), with burn, freeze, poison, stun, chain lightning and piercing effects; your class gets +15% with its own weapon type
 - 9 spells taught by Elder Mira (Mend, Blink, Frost Nova, Chain Lightning, Haste, Poison Cloud, Stone Skin, Spirit Wolves, Meteor), cast from slots 1-3
 - 8 regions with fog-of-war, a day/night cycle and rain
@@ -20,6 +21,6 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - Shop with goods, weapons, pets and mounts; 14 treasure chests
 - Autosaves to the browser; plays with keyboard and mouse or touch
 
-Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, L for the journal, M for the map.
+Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, T for talents, L for the journal, M for the map.
 
 `game.html` is the source. Run `./build.sh` to rebuild `index.html` from it.
