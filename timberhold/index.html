@@ -73,6 +73,13 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 .keys{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;color:var(--dim);margin:0}
 .keys dt{color:var(--bone);font-weight:600}
 .keys dd{margin:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mp{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.mp p{color:var(--dim);font-size:13px}
+#code{width:86px;background:#0d130e;color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 15px var(--ui);padding:8px 10px;letter-spacing:.2em;text-transform:uppercase}
+#code:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+#netinfo{margin-top:4px;color:var(--leaf)}
+#gbtns{display:flex;gap:6px;margin-top:8px}#gbtns .btn{padding:4px 8px;font-size:12px}
 .go{justify-self:start;background:var(--ember);color:#1b1206;border:0;border-radius:6px;font:700 18px var(--display);padding:12px 26px;cursor:pointer}
 .go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
 @media (max-width:640px){
@@ -97,6 +104,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <h2 id="dayname">Day 1</h2>
         <div id="phase">Dusk in 1:30</div>
         <div class="bar"><i id="tbar"></i></div>
+        <div id="netinfo" class="lbl" hidden></div>
         <div id="boss" hidden><div class="lbl" id="bossname"></div><div class="bar"><i id="bossbar"></i></div></div>
       </div>
       <div class="panel" id="goals">
@@ -107,6 +115,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
           <li id="g3">Put a bed inside</li>
           <li id="g4">Survive 5 nights</li>
         </ul>
+        <div id="gbtns"><button class="btn" id="savebtn" type="button">Save (K)</button><button class="btn" id="quitbtn" type="button">Save and quit</button></div>
       </div>
     </div>
     <div id="toast"></div>
@@ -131,16 +140,30 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
         <dt>Weapon bar</dt><dd>Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
         <dt>1 – 8</dt><dd>Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
-        <dt>E · C · P · M</dt><dd>Eat meat to heal · craft a flint axe · pause · mute.</dd>
+        <dt>E · C · P · M · K</dt><dd>Eat meat to heal · craft a flint axe · pause · mute · save. The game also saves itself every dawn.</dd>
       </dl>
-      <button class="go" id="startbtn" type="button">Enter the forest</button>
+      <div class="row">
+        <button class="go" id="startbtn" type="button">New game</button>
+        <button class="btn" id="contbtn" type="button" hidden>Continue</button>
+      </div>
+      <div class="mp">
+        <div class="lbl">Play with friends</div>
+        <p id="mpnote">Checking whether friends can join…</p>
+        <div class="row" id="mprow" hidden>
+          <button class="btn" id="hostbtn" type="button">Host a new game</button>
+          <button class="btn" id="hostsaved" type="button" hidden>Host my saved game</button>
+          <input id="code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Game code">
+          <button class="btn" id="joinbtn" type="button">Join</button>
+        </div>
+        <div class="row" id="open"></div>
+      </div>
     </div>
   </div>
   <div class="screen" id="end" hidden>
     <div class="card">
       <h1 id="endtitle"></h1>
       <p id="endtext"></p>
-      <button class="go" id="again" type="button">Try again</button>
+      <button class="go" id="again" type="button">Back to the menu</button>
     </div>
   </div>
 </div>
@@ -152,7 +175,8 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ov = $('ov'), ctx = ov.getContext('2d');
 const T = 48, W = 60, H = 60, WORLD = T * W, CX = WORLD / 2, CY = WORLD / 2;
-const rnd = (a, b) => a + Math.random() * (b - a), TAU = Math.PI * 2;
+let RNG = Math.random;
+const rnd = (a, b) => a + RNG() * (b - a), TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -212,8 +236,9 @@ function snd(f, d = .08, type = 'square', vol = .05, slide = 0) {
 const howl = () => { snd(330, 1.1, 'sine', .06, 190); setTimeout(() => snd(520, 1.3, 'sine', .05, -200), 500); };
 
 /* ---------- world ---------- */
-function reset() {
-  G = {day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
+function reset(seed) {
+  RNG = mulberry(seed |= 0); // the same seed grows the same forest for every player
+  G = {seed, day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
   P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
@@ -231,8 +256,9 @@ function reset() {
   };
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
   for (let i = 0; i < 80; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
-  for (let i = 0; i < 6; i++) spawnDeer();
-  buildTools(); recalc(); syncWorld();
+  syncWorld(); RNG = Math.random;
+  if (!client()) for (let i = 0; i < 6; i++) spawnDeer();
+  buildTools(); recalc();
 }
 const S = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? null : grid[ty * W + tx];
 function solidAt(tx, ty, animal) {
@@ -312,9 +338,10 @@ function place(fresh) {
     s.hp = s.max; float(x, y, 'repaired', '#7fbf5a');
   } else {
     const c = B[tool].cost; P.wood -= c.wood || 0; P.stone -= c.stone || 0;
-    grid[ty * W + tx] = {type: tool, tx, ty, hp: B[tool].hp, max: B[tool].hp, flash: 0};
+    grid[ty * W + tx] = {type: tool, tx, ty, hp: B[tool].hp, max: B[tool].hp, flash: 0, lock: client() ? performance.now() + 2500 : 0};
     burst(x, y, '#c9a26b', 6);
   }
+  if (host()) gridDelta(tx, ty); else if (client()) netAct(tool === 'remove' ? {k: 'r', x: tx, y: ty} : {k: 'b', t: tool, x: tx, y: ty});
   snd(220, .07, 'triangle', .07, -80);
   const was = houseDone(); recalc();
   if (!was && houseDone()) { toast('The house stands. Hold it through night ' + NIGHTS_TO_WIN + '.'); snd(520, .2, 'triangle', .07, 260); }
@@ -324,7 +351,7 @@ function damageStruct(s, d) {
   const x = s.tx * T + T / 2, y = s.ty * T + T / 2;
   burst(x, y, s.type === 'stone' ? '#9a9a94' : '#8a6a45', 3); snd(90, .07, 'sawtooth', .04);
   if (s.hp <= 0) {
-    grid[s.ty * W + s.tx] = null; burst(x, y, '#8a6a45', 14); recalc();
+    grid[s.ty * W + s.tx] = null; burst(x, y, '#8a6a45', 14); recalc(); gridDelta(s.tx, s.ty);
     if (performance.now() - lastWarn > 4000) { toast('They broke through your ' + B[s.type].name.toLowerCase() + '.'); lastWarn = performance.now(); }
   }
 }
@@ -338,9 +365,9 @@ function spawnDeer() {
 }
 function mk(type, x, y, scale) {
   const d = A[type];
-  return {type, x, y, r: d.r, hp: d.hp * scale, max: d.hp * scale, ang: rnd(0, TAU), cd: rnd(0, .6), kx: 0, ky: 0, flash: 0, flee: false, wt: 0, wa: rnd(0, TAU), step: rnd(0, 9), at: rnd(2, 5), ch: 0, wind: 0};
+  return {id: ++nid, type, x, y, r: d.r, hp: d.hp * scale, max: d.hp * scale, ang: rnd(0, TAU), cd: rnd(0, .6), kx: 0, ky: 0, flash: 0, flee: false, wt: 0, wa: rnd(0, TAU), step: rnd(0, 9), at: rnd(2, 5), ch: 0, wind: 0};
 }
-function ringPos() { const a = rnd(0, TAU), d = rnd(820, 1000); return [clamp(P.x + Math.cos(a) * d, -60, WORLD + 60), clamp(P.y + Math.sin(a) * d, -60, WORLD + 60)]; }
+function ringPos() { const l = players(), q = l[Math.random() * l.length | 0] || P, a = rnd(0, TAU), d = rnd(820, 1000); return [clamp(q.x + Math.cos(a) * d, -60, WORLD + 60), clamp(q.y + Math.sin(a) * d, -60, WORLD + 60)]; }
 function spawnHostile() {
   const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0]];
   let r = Math.random() * opts.reduce((t, o) => t + o[1], 0), type = 'wolf';
@@ -355,6 +382,7 @@ function slam(a) { // Ursa's ground slam: hurts you and anything you built nearb
   shake = 18; snd(60, .5, 'sawtooth', .12, -30);
   for (let i = 0; i < 20; i++) { const g = i / 20 * TAU; burst(a.x + Math.cos(g) * 95, a.y + Math.sin(g) * 95, '#8a7a5a', 3); }
   if (dist(a.x, a.y, P.x, P.y) < 145) hurtPlayer(24, a.x, a.y);
+  if (host()) { netEv({k: 'sl', x: a.x | 0, y: a.y | 0}); for (const o of NET.others.values()) if (!o.dead && dist(a.x, a.y, o.x, o.y) < 145) netEv({k: 'd', p: o.peer, d: 24, x: a.x | 0, y: a.y | 0}); }
   const tx = Math.floor(a.x / T), ty = Math.floor(a.y / T);
   for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const st = S(tx + i, ty + j); if (st && dist(st.tx * T + 24, st.ty * T + 24, a.x, a.y) < 125) damageStruct(st, 35); }
 }
@@ -363,11 +391,11 @@ function tryWin() {
   end(true); return true;
 }
 function hurtPlayer(d, fx, fy) {
-  if (P.hurt > 0) return;
+  if (P.hurt > 0 || P.dead) return;
   P.hp -= d; P.hurt = .45; shake = 9; snd(160, .18, 'sawtooth', .08, -90);
   float(P.x, P.y - 22, '-' + d, '#ff7a63'); burst(P.x, P.y, '#d1503a', 8);
   const l = Math.hypot(P.x - fx, P.y - fy) || 1; move(P, (P.x - fx) / l * 16, (P.y - fy) / l * 16, false);
-  if (P.hp <= 0) end(false);
+  if (P.hp <= 0) die();
 }
 function autoAim(range, resources) { // touch players have no cursor, so aim for them
   if (!touchMode) return;
@@ -377,7 +405,8 @@ function autoAim(range, resources) { // touch players have no cursor, so aim for
   if (best) P.ang = Math.atan2(best.y - P.y, best.x - P.x);
 }
 function hitAnimal(a, dmg, dx, dy) {
-  a.hp -= dmg; a.flash = .12; a.kx = dx * 240; a.ky = dy * 240;
+  if (client()) netAct({k: 'h', i: a.id, d: dmg, x: +dx.toFixed(2), y: +dy.toFixed(2)}); else { a.hp -= dmg; a.kx = dx * 240; a.ky = dy * 240; }
+  a.flash = .12;
   float(a.x, a.y - a.r - 6, '' + dmg, '#fff'); burst(a.x, a.y, '#b03a2a', 5);
 }
 function attack(fresh) {
@@ -403,6 +432,7 @@ function attack(fresh) {
     const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
     shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows'});
   }
+  if (multi() && NET.room) NET.room.emit('fx', {x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon}).catch(() => {});
   if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
   else { burst(mx, my, '#ffd27a', 5); shake = Math.max(shake, P.weapon === 'pistol' ? 3 : 7); snd(P.weapon === 'pistol' ? 210 : 130, P.weapon === 'pistol' ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
 }
@@ -446,7 +476,7 @@ function swing() {
   for (const o of rocks) if (!o.dead && inArc(o, o.r)) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; best.kind = 'stone'; } }
   if (!best) { snd(420, .05, 'sine', .02, -200); return; }
   const n = P.flint ? 2 : 1; best.hp -= n; best.shake = .2; let gain = n;
-  if (best.hp <= 0) { best.dead = best.kind === 'wood' ? 55 : 80; gain += 2; burst(best.x, best.y, best.kind === 'wood' ? '#4f7a3a' : '#8d8d86', 14); }
+  if (best.hp <= 0) { best.dead = best.kind === 'wood' ? 55 : 80; gain += 2; burst(best.x, best.y, best.kind === 'wood' ? '#4f7a3a' : '#8d8d86', 14); if (client()) { best.lock = performance.now() + 6000; netAct({k: 't', i: best.i, r: best.kind === 'stone' ? 1 : 0}); } }
   P[best.kind] += gain;
   if (best.kind === 'stone') for (let i = 0; i < n; i++) if (Math.random() < .4) { P.iron++; float(best.x + 34, best.y + 10, '+1 iron', '#9fc3e0'); }
   float(best.x, best.y - 24, '+' + gain + ' ' + best.kind, best.kind === 'wood' ? '#e0b676' : '#c9c9c2');
@@ -467,9 +497,238 @@ function burst(x, y, col, n) { for (let i = 0; i < n; i++) { const a = rnd(0, TA
 function float(x, y, txt, col) { floats.push({x, y, txt, col, life: .9}); }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); toastT = 3.2; }
 
+/* ---------- multiplayer and saving ---------- */
+const NET = {mode: 'solo', room: null, code: '', me: null, hostPeer: null, hostMiss: 0, others: new Map(), swSeq: 0, wasSw: false, sendT: 0, syncT: 0, chunks: [], amap: new Map(), cyc: 0};
+const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon'];
+const SHIRTS = ['#3f7fbf', '#3fa66b', '#c9a227', '#8a56c2', '#c25690', '#d07a2d'];
+let lobby = null, db = null, userNS = null, uid = null, nid = 0, savedGame = null, openGames = [], menuMsg = '';
+const host = () => NET.mode === 'host', client = () => NET.mode === 'client', multi = () => NET.mode !== 'solo';
+const netAct = d => { if (client() && NET.room) NET.room.emit('act', d).catch(() => {}); };
+const netEv = d => { if (host() && NET.room) NET.room.emit('ev', d).catch(() => {}); };
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function players() { const l = P.dead ? [] : [P]; if (host()) for (const o of NET.others.values()) if (!o.dead) l.push(o); return l; }
+function nearestPlayer(x, y) { let b = P, bd = 1e9; for (const p of players()) { const d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; b = p; } } return b; }
+function gridDelta(tx, ty) { if (!host()) return; const s = S(tx, ty); netEv({k: 'g', x: tx, y: ty, t: s ? BK.indexOf(s.type) : -1, h: s ? Math.ceil(s.hp) : 0}); }
+
+function getInv() { const o = {owned: Object.keys(P.owned)}; for (const k of INV) o[k] = P[k]; return o; }
+function setInv(o) {
+  if (!o) return;
+  for (const k of INV) if (k in o) P[k] = o[k];
+  P.owned = {axe: true}; for (const k of o.owned || []) if (WPN[k]) P.owned[k] = true;
+  if (!P.owned[P.weapon]) P.weapon = 'axe'; P.hp = clamp(+P.hp || 100, 1, P.max);
+}
+function packStructs() { const l = []; for (const s of grid) if (s) l.push(s.tx + ',' + s.ty + ',' + BK.indexOf(s.type) + ',' + Math.max(1, Math.ceil(s.hp))); return l; }
+function deadList(arr) { const l = []; arr.forEach((o, i) => { if (o.dead) l.push(i); }); return l; }
+function applyStructs(list, now) {
+  const want = new Map(); let ch = false;
+  for (const e of list) { const [tx, ty, t, h] = String(e).split(',').map(Number), type = BK[t]; if (type && tx >= 0 && tx < W && ty >= 0 && ty < H) want.set(ty * W + tx, [type, tx, ty, h]); }
+  for (let i = 0; i < grid.length; i++) {
+    const s = grid[i], w = want.get(i);
+    if (!w) { if (s && !(s.lock > now)) { grid[i] = null; ch = true; } }
+    else if (!s || s.type !== w[0]) { grid[i] = {type: w[0], tx: w[1], ty: w[2], hp: w[3], max: B[w[0]].hp, flash: 0}; ch = true; }
+    else { if (w[3] < s.hp - 1) s.flash = .15; s.hp = Math.min(s.max, w[3]); }
+  }
+  return ch;
+}
+function applyDead(arr, list, now) { const set = new Set(list); arr.forEach((o, i) => { if (set.has(i)) { if (!o.dead) o.dead = 1; } else if (o.dead && !(o.lock > now)) { o.dead = 0; o.hp = o.max; } }); }
+
+/* saves live in the browser and, when signed in on claude.ai, in the player's private storage */
+function lsGet(k) { try { return JSON.parse(localStorage.getItem('timberhold-' + k) || 'null'); } catch (e) { return null; } }
+function lsSet(k, v) { try { v ? localStorage.setItem('timberhold-' + k, JSON.stringify(v)) : localStorage.removeItem('timberhold-' + k); } catch (e) {} }
+const docRef = k => db && uid ? db.collection('data/users/' + uid).doc(k) : null;
+const writing = {};
+async function store(k, v) {
+  lsSet(k, v); const r = docRef(k); if (!r || writing[k]) return;
+  writing[k] = true; try { v ? await r.set(v) : await r.delete(); } catch (e) {} writing[k] = false;
+}
+async function load(k) {
+  const a = lsGet(k), r = docRef(k); let b = null;
+  if (r) { try { const sn = await Promise.race([r.get(), new Promise(res => setTimeout(() => res(null), 5000))]); if (sn && sn.exists) b = sn.data(); } catch (e) {} }
+  return !a ? b : !b ? a : (b.at > a.at ? b : a);
+}
+function saveGame(quiet) {
+  if (!G || G.over || !running) return;
+  if (client()) { store('guest', {at: Date.now(), seed: G.seed, inv: getInv()}); if (!quiet) toast('Your gear is saved. The host saves the world.'); return; }
+  savedGame = {v: 1, at: Date.now(), seed: G.seed, day: G.day, phase: G.phase, nights: G.nights, kills: G.kills, t: G.t, inv: getInv(), px: P.x | 0, py: P.y | 0, s: packStructs(), dt: deadList(trees), dr: deadList(rocks)};
+  store('save', savedGame); if (!quiet) toast('Game saved.');
+}
+function loadInto(sv) {
+  reset(sv.seed); G.day = sv.day || 1; G.nights = sv.nights || 0; G.kills = sv.kills || 0;
+  if (sv.phase === 'night') { G.len = 75; G.t = 67; toast('Saved at night, so dusk is close. Get ready.'); } // a night save resumes just before that night
+  else { G.len = G.day === 1 ? 95 : 75; G.t = clamp(+sv.t || 0, 0, G.len - 5); }
+  applyStructs(sv.s || [], 0); applyDead(trees, sv.dt || [], 0); applyDead(rocks, sv.dr || [], 0);
+  for (const o of trees.concat(rocks)) if (o.dead) o.dead = 30;
+  recalc(); setInv(sv.inv); P.x = sv.px || CX; P.y = sv.py || CY;
+}
+
+/* --- what travels: each player's own state as presence; the host adds the world --- */
+function myState() { return [P.x | 0, P.y | 0, Math.round(P.ang * 100), WKEYS.indexOf(P.weapon), Math.max(0, Math.ceil(P.hp)), NET.swSeq, P.dead ? 1 : 0, P.flint ? 1 : 0]; }
+function worldState() {
+  return {s: G.seed, d: G.day, ph: G.phase === 'night' ? 1 : 0, t: Math.round(G.t * 10) / 10, l: G.len, n: G.nights, k: G.kills, o: G.over ? (G.won ? 1 : 2) : 0,
+    a: animals.slice(0, 90).map(a => [a.id, AK.indexOf(a.type), a.x | 0, a.y | 0, (a.ang * 10) | 0, Math.max(1, Math.ceil(a.hp / a.max * 100)), (a.wind > 0 ? 1 : 0) | (a.ch > 0 ? 2 : 0)].join(',')).join(';')};
+}
+function sendSync() {
+  const l = packStructs(), n = Math.max(1, Math.ceil(l.length / 160)), c = ++NET.cyc;
+  for (let i = 0; i < n; i++) { const d = {c, i, n, s: l.slice(i * 160, i * 160 + 160).join(';')}; if (!i) { d.dt = deadList(trees).slice(0, 200); d.dr = deadList(rocks); } NET.room.emit('sync', d).catch(() => {}); }
+}
+function netSend(dt) {
+  if (!multi() || !NET.room) return;
+  if (P.swing > 0 && !NET.wasSw) NET.swSeq = (NET.swSeq + 1) % 1000; NET.wasSw = P.swing > 0;
+  if ((NET.sendT -= dt) > 0) return; NET.sendT = .1;
+  const p = {p: myState()};
+  if (host()) { p.w = worldState(); if ((NET.syncT -= .1) <= 0) { NET.syncT = 3; sendSync(); } }
+  NET.room.presence(p).catch(() => {});
+}
+function applyWorld(w) {
+  const ph = w.ph ? 'night' : 'day';
+  if (G.seen && G.phase !== ph) {
+    if (ph === 'night') { toast('Night ' + w.d + '. They are coming.'); howl(); }
+    else { toast('Dawn. Night ' + w.n + ' survived. Rebuild and gather.'); P.hp = Math.min(P.max, P.hp + 15); saveGame(true); }
+  }
+  G.seen = true; G.day = w.d; G.phase = ph; G.t = +w.t || 0; G.len = +w.l || 75; G.nights = w.n | 0; G.kills = w.k | 0;
+  const seen = new Set(), list = [];
+  if (w.a) for (const e of String(w.a).split(';')) {
+    const v = e.split(',').map(Number), type = AK[v[1]]; if (!type) continue;
+    let a = NET.amap.get(v[0]);
+    if (!a) {
+      a = {id: v[0], type, x: v[2], y: v[3], r: A[type].r, hp: v[5], max: 100, ang: v[4] / 10, step: rnd(0, 9), flash: 0, wind: 0, ch: 0, sc: 1}; NET.amap.set(v[0], a);
+      if (A[type].boss) { toast(A[type].name + ' has come out of the forest.'); shake = 8; snd(70, 1.2, 'sawtooth', .1, 40); }
+    }
+    a.tx = v[2]; a.ty = v[3]; a.tang = v[4] / 10; if (v[5] < a.hp) a.flash = .12; a.hp = v[5]; a.wind = v[6] & 1; a.ch = v[6] & 2; seen.add(v[0]); list.push(a);
+  }
+  for (const id of NET.amap.keys()) if (!seen.has(id)) NET.amap.delete(id);
+  animals = list;
+  if (w.o) end(w.o === 1);
+}
+const turn = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
+function clientAnimals(dt) { const k = Math.min(1, dt * 10); for (const a of animals) { a.x += (a.tx - a.x) * k; a.y += (a.ty - a.y) * k; a.ang = turn(a.ang, a.tang, k); a.step += dt * 9; a.flash -= dt; } for (const o of trees) if (o.shake > 0) o.shake -= dt; for (const o of rocks) if (o.shake > 0) o.shake -= dt; }
+function updOthers(dt) { const k = Math.min(1, dt * 12); for (const o of NET.others.values()) { o.x += (o.tx - o.x) * k; o.y += (o.ty - o.y) * k; o.ang = turn(o.ang, o.tang, k); o.sw -= dt; } }
+function resolveNames() {
+  const ids = [...NET.others.values()].map(o => o.by).filter(Boolean); if (!userNS || !ids.length) return;
+  userNS.profiles(ids).then(ps => { for (const o of NET.others.values()) if (o.by && ps[o.by]) o.name = ps[o.by].name || ''; }).catch(() => {});
+}
+function netPoll(dt) {
+  if (!NET.room) return;
+  const seen = new Set();
+  for (const p of NET.room.peers()) {
+    if (p.isMe && p.sameTab) { NET.me = p.peer; continue; }
+    const pr = p.presence; if (p.kind !== 'viewer' || !pr || !Array.isArray(pr.p)) continue;
+    seen.add(p.peer); let o = NET.others.get(p.peer);
+    if (!o) { o = {peer: p.peer, by: p.by, r: 13, x: +pr.p[0] || CX, y: +pr.p[1] || CY, ang: 0, sw: 0, seq: pr.p[5], name: ''}; NET.others.set(p.peer, o); toast('A player joined.'); resolveNames(); NET.syncT = 0; }
+    if (o.pr !== pr) {
+      o.pr = pr; const a = pr.p; o.tx = +a[0] || 0; o.ty = +a[1] || 0; o.tang = (+a[2] || 0) / 100; o.w = WKEYS[a[3]] || 'axe'; o.hp = +a[4] || 0;
+      if (a[5] !== o.seq) { o.seq = a[5]; o.sw = .18; } o.dead = !!a[6]; o.flint = !!a[7];
+      if (client() && pr.w && p.peer === NET.hostPeer) applyWorld(pr.w);
+    }
+  }
+  for (const [k, o] of NET.others) if (!seen.has(k)) { if (o.m) scene.remove(o.m.g); NET.others.delete(k); toast('A player left.'); }
+  if (client()) { const now = performance.now(); if (seen.has(NET.hostPeer)) NET.hostMiss = now; else if (now - NET.hostMiss > 6000) quit('The host left the game. Your gear is saved.'); }
+}
+function onAct(d) { // a guest did something; the host applies it
+  if (d.k === 'h') {
+    const a = animals.find(a => a.id === d.i); if (!a) return;
+    a.hp -= clamp(+d.d || 0, 0, 100); a.flash = .12; a.kx = clamp(+d.x || 0, -1, 1) * 240; a.ky = clamp(+d.y || 0, -1, 1) * 240; burst(a.x, a.y, '#b03a2a', 4);
+  } else if (d.k === 't') {
+    const o = (d.r ? rocks : trees)[d.i | 0]; if (o && !o.dead) { o.dead = d.r ? 80 : 55; burst(o.x, o.y, d.r ? '#8d8d86' : '#4f7a3a', 12); }
+  } else if (d.k === 'b' || d.k === 'r') {
+    const tx = d.x | 0, ty = d.y | 0; if (tx < 0 || ty < 0 || tx >= W || ty >= H) return;
+    const s = S(tx, ty);
+    if (d.k === 'r') { if (!s) return; grid[ty * W + tx] = null; }
+    else if (!B[d.t]) return;
+    else if (!s) grid[ty * W + tx] = {type: d.t, tx, ty, hp: B[d.t].hp, max: B[d.t].hp, flash: 0};
+    else if (s.type === d.t) s.hp = s.max; else return;
+    recalc(); gridDelta(tx, ty);
+  }
+}
+function onEv(d) { // the host told us something happened
+  if (d.k === 'd') {
+    if (d.p !== NET.me) return;
+    hurtPlayer(clamp(+d.d || 0, 0, 60), +d.x || P.x, +d.y || P.y);
+    if (d.po && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); }
+  } else if (d.k === 'k') {
+    const t = A[d.t]; if (!t) return; const x = +d.x || 0, y = +d.y || 0;
+    P.meat += t.meat; if (t.meat) float(x, y - 10, '+' + t.meat + ' meat', '#f0a58f'); burst(x, y, '#8c2f22', 16); snd(110, .2, 'sawtooth', .06, -60);
+    if (t.boss) { P.iron += 10; shake = 12; burst(x, y, '#8c2f22', 40); toast(t.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); }
+  } else if (d.k === 'g') {
+    const tx = d.x | 0, ty = d.y | 0; if (tx < 0 || ty < 0 || tx >= W || ty >= H) return;
+    const type = BK[d.t], s = S(tx, ty);
+    if (!type) { if (s) { grid[ty * W + tx] = null; burst(tx * T + 24, ty * T + 24, '#8a6a45', 10); } }
+    else if (!s || s.type !== type) grid[ty * W + tx] = {type, tx, ty, hp: +d.h || B[type].hp, max: B[type].hp, flash: 0};
+    else s.hp = Math.min(s.max, +d.h || s.hp);
+    recalc();
+  } else if (d.k === 'sl') {
+    const x = +d.x || 0, y = +d.y || 0; shake = 14; snd(60, .5, 'sawtooth', .12, -30);
+    for (let i = 0; i < 20; i++) { const g = i / 20 * TAU; burst(x + Math.cos(g) * 95, y + Math.sin(g) * 95, '#8a7a5a', 3); }
+  }
+}
+function onSync(d) {
+  if (d.c !== NET.cyc) { NET.cyc = d.c; NET.chunks = []; }
+  NET.chunks[d.i | 0] = d; if (NET.chunks.filter(Boolean).length !== d.n) return;
+  const all = [], now = performance.now(); for (const c of NET.chunks) if (c.s) all.push(...String(c.s).split(';'));
+  const ch = applyStructs(all, now); applyDead(trees, NET.chunks[0].dt || [], now); applyDead(rocks, NET.chunks[0].dr || [], now);
+  if (ch) recalc();
+}
+function wire() {
+  const r = NET.room;
+  r.on('act', m => { if (!m.isMe && host() && running && m.data) onAct(m.data); });
+  r.on('ev', m => { if (client() && running && m.peer === NET.hostPeer && m.data) onEv(m.data); });
+  r.on('sync', m => { if (client() && running && m.peer === NET.hostPeer && m.data) onSync(m.data); });
+  r.on('fx', m => { // someone else fired: show the shot, it does no damage here
+    const d = m.data || {}, w = WPN[d.w]; if (m.isMe || !running || !w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
+    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', fx: true}); }
+    if (dist(d.x, d.y, P.x, P.y) < 700) w.ammo === 'arrows' ? snd(620, .09, 'triangle', .03, -420) : snd(150, .15, 'sawtooth', .05, -100);
+  });
+}
+function audioOn() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+function enter(msg) { cam.x = P.x; cam.y = P.y; running = true; paused = false; $('start').hidden = true; $('end').hidden = true; $('hud').hidden = false; hud(); toast(msg); }
+function start(sv) {
+  audioOn(); if (sv) loadInto(sv); else reset((Math.random() * 2147483647) | 0);
+  enter(sv ? 'Welcome back. Day ' + G.day + '.' : 'Chop wood before dusk. Walls first.');
+}
+async function hostGame(sv) {
+  if (!lobby || NET.room) return;
+  const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let code = ''; for (let i = 0; i < 4; i++) code += L[Math.random() * L.length | 0];
+  audioOn(); menuNote('Opening game ' + code + '…');
+  try { NET.room = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote('Could not open a game right now. Try again in a moment.'); }
+  NET.mode = 'host'; NET.code = code; wire(); start(sv); menuNote('');
+  lobby.presence({game: code}).catch(() => {}); NET.sendT = 0; netSend(1);
+  toast('Game ' + code + ' is open. Give your friends the code.');
+}
+async function joinGame(code) {
+  if (!lobby || NET.room) return;
+  code = String(code || '').toUpperCase().replace(/[^A-Z]/g, ''); if (code.length !== 4) return menuNote('Enter the 4-letter code from your host.');
+  audioOn(); menuNote('Joining ' + code + '…');
+  let r; try { r = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote('Could not join right now. Try again in a moment.'); }
+  let w = null, hp = null;
+  for (let i = 0; i < 28 && !w; i++) { for (const p of r.peers()) if (!p.isMe && p.presence && p.presence.w) { w = p.presence.w; hp = p.peer; } if (!w) await new Promise(s => setTimeout(s, 250)); }
+  if (!w || w.o) { r.leave().catch(() => {}); return menuNote('No game with the code ' + code + ' is running.'); }
+  NET.room = r; NET.mode = 'client'; NET.code = code; NET.hostPeer = hp; NET.hostMiss = performance.now(); wire();
+  reset(w.s); const g = await load('guest'); if (g && g.seed === w.s) setInv(g.inv);
+  menuNote(''); enter('You joined game ' + code + '.'); applyWorld(w);
+}
+function quit(msg) { // save, leave any shared game, and go back to the menu
+  saveGame(true);
+  if (NET.room) NET.room.leave().catch(() => {});
+  if (host() && lobby) lobby.presence({game: null}).catch(() => {});
+  for (const o of NET.others.values()) if (o.m) scene.remove(o.m.g);
+  NET.others.clear(); NET.amap.clear(); NET.room = null; NET.mode = 'solo'; NET.code = ''; NET.hostPeer = null; NET.chunks = [];
+  running = false; $('hud').hidden = true; $('end').hidden = true; $('start').hidden = false; menuNote(msg || ''); 
+}
+function menuNote(msg) { menuMsg = msg; refreshMenu(); }
+function refreshMenu() {
+  $('contbtn').hidden = !savedGame; if (savedGame) $('contbtn').textContent = 'Continue · day ' + savedGame.day;
+  $('hostsaved').hidden = !savedGame; $('mprow').hidden = !lobby;
+  $('mpnote').textContent = menuMsg || (lobby ? 'Host a game and give your friends the 4-letter code. They need access to this page: use Share and add them as Contributors.' : 'Playing with friends works when this page is open on claude.ai and you are signed in.');
+  const box = $('open'); box.textContent = '';
+  for (const c of openGames) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Join ' + c; b.addEventListener('click', () => joinGame(c)); box.appendChild(b); }
+}
+function die() {
+  if (!multi()) return end(false);
+  if (P.dead) return; P.dead = true; P.respawn = 15; P.hp = 0; toast('You are down. Back on your feet in 15 seconds.'); snd(200, .8, 'sawtooth', .07, -150);
+}
+
 /* ---------- update ---------- */
-function update(dt) {
-  // clock
+function updClock(dt) {
   G.t += dt;
   if (G.t >= G.len) {
     G.t = 0;
@@ -480,19 +739,27 @@ function update(dt) {
     } else {
       G.nights++; G.day++; G.phase = 'day'; G.len = 75; G.queue = 0;
       for (const a of animals) if (!A[a.type].passive && !isBoss(a)) a.flee = true;
-      P.hp = Math.min(P.max, P.hp + 15);
-      if (tryWin()) return;
+      P.hp = Math.min(P.max, P.hp + 15); saveGame(true);
+      if (tryWin()) return true;
       const bs = animals.find(isBoss);
       toast(bs ? 'Dawn, but ' + A[bs.type].name + ' is still hunting you. Kill it.' : G.nights >= NIGHTS_TO_WIN ? 'You lived, but the house is not finished. Build it and hold one more night.' : 'Dawn. Night ' + G.nights + ' survived. Rebuild and gather.');
       while (animals.filter(a => A[a.type].passive).length < 6) spawnDeer();
     }
   }
+  if (G.phase === 'night' && G.bossType && (G.bossT -= dt) <= 0) { spawnBoss(G.bossType); G.bossType = null; }
+  if (G.phase === 'night' && G.queue > 0 && (G.spawnT -= dt) <= 0) { spawnHostile(); G.queue--; G.spawnT = G.len * .62 / (4 + G.day * 3); }
+  return false;
+}
+function updDark(dt) {
   const left = G.len - G.t;
   const target = G.phase === 'night' ? (left < 5 ? .35 : .8) : (left < 12 ? .35 : 0);
   G.dark += (target - G.dark) * Math.min(1, dt * .7);
-  if (G.phase === 'night' && G.bossType && (G.bossT -= dt) <= 0) { spawnBoss(G.bossType); G.bossType = null; }
-  if (G.phase === 'night' && G.queue > 0 && (G.spawnT -= dt) <= 0) { spawnHostile(); G.queue--; G.spawnT = G.len * .62 / (4 + G.day * 3); }
-
+}
+function updPlayer(dt) {
+  if (P.dead) { // downed in a shared game: wait, then get back up in the clearing
+    if ((P.respawn -= dt) <= 0) { P.dead = false; P.hp = 60; P.poison = 0; P.x = CX; P.y = CY; P.hurt = 1.5; toast('Back on your feet.'); }
+    cam.x += (P.x - cam.x) * Math.min(1, dt * 8); cam.y += (P.y - cam.y) * Math.min(1, dt * 8); mouse.fresh = actFresh = keys.SpaceFresh = false; return;
+  }
   // player
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + stick.dx;
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.dy;
@@ -502,7 +769,7 @@ function update(dt) {
   for (const o of trees) if (!o.dead) push(o, 9);
   for (const o of rocks) if (!o.dead) push(o, o.r - 2);
   P.cd -= dt; P.swing -= dt; P.hurt -= dt;
-  if (P.poison > 0) { P.poison -= dt; P.hp -= 3 * dt; if (P.hp <= 0) return end(false); }
+  if (P.poison > 0) { P.poison -= dt; P.hp -= 3 * dt; if (P.hp <= 0) return die(); }
   const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
   if (acting) tool === 'axe' ? attack(fresh) : place(fresh);
   mouse.fresh = actFresh = keys.SpaceFresh = false;
@@ -515,6 +782,14 @@ function update(dt) {
     if (s.flash > 0) s.flash -= dt;
     if (s.type === 'fire' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 110) P.hp = Math.min(P.max, P.hp + 4 * dt);
   }
+}
+function update(dt) {
+  if ((G.saveT = (G.saveT || 45) - dt) <= 0) { G.saveT = 45; saveGame(true); }
+  if (client()) { netPoll(dt); if (!running) return; updDark(dt); updPlayer(dt); clientAnimals(dt); updOthers(dt); updFx(dt); netSend(dt); return; }
+  if (multi()) netPoll(dt);
+  if (updClock(dt)) return;
+  updDark(dt); updPlayer(dt); if (!running) return;
+  if (multi() && players().length === 0) return end(false); // everyone is down at once
   for (const o of trees) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
   for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
 
@@ -523,22 +798,22 @@ function update(dt) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
     if (a.hp <= 0) {
-      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); P.meat += d.meat; if (!d.passive) G.kills++;
+      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); P.meat += d.meat; if (!d.passive) G.kills++;
       if (d.meat) float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60);
       if (d.boss) { P.iron += 10; burst(a.x, a.y, '#8c2f22', 40); shake = 12; toast(d.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); tryWin(); }
       continue;
     }
-    const pd = dist(a.x, a.y, P.x, P.y);
+    const tg = nearestPlayer(a.x, a.y), pd = dist(a.x, a.y, tg.x, tg.y);
     let dx = 0, dy = 0, spd = d.spd;
     if (a.flee) {
       const l = Math.hypot(a.x - CX, a.y - CY) || 1; dx = (a.x - CX) / l; dy = (a.y - CY) / l; spd *= 1.2;
       if (a.x < -40 || a.y < -40 || a.x > WORLD + 40 || a.y > WORLD + 40 || pd > 1500) { animals.splice(i, 1); continue; }
     } else if (d.passive) {
-      if (pd < 170) { dx = (a.x - P.x) / pd; dy = (a.y - P.y) / pd; }
+      if (pd < 170) { dx = (a.x - tg.x) / pd; dy = (a.y - tg.y) / pd; }
       else { if ((a.wt -= dt) <= 0) { a.wt = rnd(1.5, 4); a.wa = Math.random() < .4 ? null : rnd(0, TAU); } if (a.wa !== null) { dx = Math.cos(a.wa); dy = Math.sin(a.wa); spd *= .3; } }
       if (a.x < 60) dx = 1; if (a.y < 60) dy = 1; if (a.x > WORLD - 60) dx = -1; if (a.y > WORLD - 60) dy = -1;
     } else if (pd > 1) {
-      dx = (P.x - a.x) / pd; dy = (P.y - a.y) / pd; a.at -= dt;
+      dx = (tg.x - a.x) / pd; dy = (tg.y - a.y) / pd; a.at -= dt;
       if (d.charge) { if (a.at <= 0 && pd < 430) { a.at = d.charge; a.ch = 1.1; snd(95, .3, 'sawtooth', .06, 60); } if (a.ch > 0) { a.ch -= dt; spd *= 2.6; } }
       if (d.pounce && a.at <= 0 && pd > 70 && pd < 220) { a.at = 2.8; a.kx = dx * 560; a.ky = dy * 560; snd(380, .12, 'sawtooth', .04, 200); }
       if (d.howl && a.at <= 0) { a.at = d.howl; howl(); if (animals.length < 45) for (let j = 0; j < 2; j++) animals.push(mk('wolf', a.x + rnd(-60, 60), a.y + rnd(-60, 60), 1)); }
@@ -554,21 +829,29 @@ function update(dt) {
     const tile = S(Math.floor(a.x / T), Math.floor(a.y / T));
     if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
-      if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); }
+      if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); gridDelta(tile.tx, tile.ty); }
     }
     if (dx || dy) a.ang = Math.atan2(dy, dx);
     const blocked = d.fly ? (a.x += (dx * spd + a.kx) * dt, a.y += (dy * spd + a.ky) * dt, null) : move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
     a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
     if (d.passive || a.flee) continue;
     if (blocked && blocked.type && a.cd <= 0) { damageStruct(blocked, d.sdmg); a.cd = .9; }
-    if (pd < a.r + P.r + 5 && a.cd <= 0 && P.hurt <= 0) { hurtPlayer(d.dmg, a.x, a.y); a.cd = 1; if (d.poison && !G.over) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } }
+    if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (tg !== P || P.hurt <= 0)) {
+      a.cd = 1;
+      if (tg !== P) netEv({k: 'd', p: tg.peer, d: d.dmg, x: a.x | 0, y: a.y | 0, po: d.poison ? 1 : 0});
+      else { hurtPlayer(d.dmg, a.x, a.y); if (d.poison && !G.over && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } }
+    }
   }
+  updOthers(dt); updFx(dt); netSend(dt);
+}
+function updFx(dt) {
   for (let i = shots.length - 1; i >= 0; i--) { // arrows and bullets
     const s = shots[i]; let dead = false;
     for (let k = 0; k < 3 && !dead; k++) {
       s.x += s.vx * dt / 3; s.y += s.vy * dt / 3;
       if (hitBox(s.x, s.y, 2, true)) { burst(s.x, s.y, '#c9a26b', 3); dead = true; break; }
       for (const a of animals) {
+        if (s.fx) break;
         if (s.hit.has(a) || dist(a.x, a.y, s.x, s.y) > a.r + 5) continue;
         const l = Math.hypot(s.vx, s.vy); s.hit.add(a); hitAnimal(a, s.dmg, s.vx / l * .7, s.vy / l * .7); snd(240, .06, 'square', .04, -120);
         if (--s.pierce < 0) { dead = true; break; }
@@ -736,15 +1019,9 @@ function initScene() {
   for (const t in A) GEO[t] = animalGeo(t);
   GEO.eye = sph();
 
-  // player
-  playerG = new THREE.Group();
-  const body = new THREE.Mesh(merge([[box(7, 14, 7), '#2f3a45', M(0, 7, -5)], [box(7, 14, 7), '#2f3a45', M(0, 7, 5)], [box(11, 17, 19), '#b4452f', M(0, 22, 0)], [box(11.6, 3, 19.6), '#3a2716', M(0, 15, 0)],
-    [sph(), '#e8b98a', M(1, 37, 0, 7.5)], [box(13, 6, 15), '#3a2716', M(-2, 43, 0)], [box(6, 12, 15), '#3a2716', M(-6.5, 38, 0)], [box(6, 15, 5), '#b4452f', M(1, 22, -12)], [box(13, 5, 5), '#b4452f', M(6, 25, 12)], [box(7, 13, 14), '#6b4a2c', M(-9, 23, 0)]]), vmat);
-  body.castShadow = true; playerG.add(body);
-  axeG = new THREE.Group(); axeG.position.set(6, 25, 12);
-  const handle = new THREE.Mesh(merge([[cyl(1.6, 1.6, 30, 5), '#7a5532', M(15, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]]), vmat);
-  axeHead = new THREE.Mesh(merge([[box(9, 3, 13), '#ffffff', M(29, 0, 3)], [box(5, 3.4, 16), '#e0e0e0', M(33, 0, 3)]]), new THREE.MeshLambertMaterial({vertexColors: true}));
-  handle.castShadow = axeHead.castShadow = true; wm.axe = new THREE.Group(); wm.axe.add(handle, axeHead); axeG.add(wm.axe);
+  // players
+  GEO.axeHandle = merge([[cyl(1.6, 1.6, 30, 5), '#7a5532', M(15, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]]);
+  GEO.axeHead = merge([[box(9, 3, 13), '#ffffff', M(29, 0, 3)], [box(5, 3.4, 16), '#e0e0e0', M(33, 0, 3)]]);
   const steel = '#2b2f33', stock = '#7a5532', WG = {
     spear: [[cyl(1.3, 1.3, 60, 5), '#8a6238', M(18, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cone(3.2, 12, 4), '#c9ccc4', M(54, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)]],
     bow: [[new THREE.TorusGeometry(15, 1.3, 4, 10, Math.PI), '#8a6238', M(6, 0, 0, 1, 1, 1, Math.PI / 2, 0, -Math.PI / 2)], [box(.7, .7, 30), '#efe6cf', M(6, 0, 0)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
@@ -752,20 +1029,35 @@ function initScene() {
     shotgun: [[box(30, 3.6, 5.5), steel, M(20, 1, 0)], [box(9, 4, 6.5), stock, M(20, -1.5, 0)], [box(13, 6, 4.5), stock, M(-1, -1, 0)]],
     rifle: [[box(42, 3, 3), steel, M(24, 1, 0)], [box(16, 6, 4.2), stock, M(-2, -1, 0)], [box(14, 4, 4), stock, M(10, -.5, 0)], [cyl(1.8, 1.8, 12, 6), steel, M(12, 4.5, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
   };
-  for (const k in WG) { wm[k] = new THREE.Mesh(merge(WG[k]), vmat); wm[k].castShadow = true; axeG.add(wm[k]); }
+  GEO.wpn = {}; for (const k in WG) GEO.wpn[k] = merge(WG[k]);
+  const pm = makePlayer('#b4452f'); playerG = pm.g; axeG = pm.hand; axeHead = pm.head; Object.assign(wm, pm.wm);
   shotM = new THREE.InstancedMesh(box(1, 1, 1), new THREE.MeshBasicMaterial({fog: false}), 96); shotM.frustumCulled = false;
   shotM.setColorAt(0, tmpC.set(1, 1, 1)); shotM.count = 0; scene.add(shotM);
-  playerG.add(axeG); scene.add(playerG);
 
   ghost = new THREE.Mesh(box(T - 2, 34, T - 2), new THREE.MeshBasicMaterial({transparent: true, opacity: .4, depthWrite: false})); scene.add(ghost);
   partM = inst(box(1, 1, 1), new THREE.MeshLambertMaterial(), 400, false);
+}
+function makePlayer(shirt) { // one model per player; friends get their own shirt colour
+  const g = new THREE.Group(), w = {};
+  const body = new THREE.Mesh(merge([[box(7, 14, 7), '#2f3a45', M(0, 7, -5)], [box(7, 14, 7), '#2f3a45', M(0, 7, 5)], [box(11, 17, 19), shirt, M(0, 22, 0)], [box(11.6, 3, 19.6), '#3a2716', M(0, 15, 0)],
+    [sph(), '#e8b98a', M(1, 37, 0, 7.5)], [box(13, 6, 15), '#3a2716', M(-2, 43, 0)], [box(6, 12, 15), '#3a2716', M(-6.5, 38, 0)], [box(6, 15, 5), shirt, M(1, 22, -12)], [box(13, 5, 5), shirt, M(6, 25, 12)], [box(7, 13, 14), '#6b4a2c', M(-9, 23, 0)]]), vmat);
+  body.castShadow = true; g.add(body);
+  const hand = new THREE.Group(); hand.position.set(6, 25, 12);
+  const handle = new THREE.Mesh(GEO.axeHandle, vmat), head = new THREE.Mesh(GEO.axeHead, new THREE.MeshLambertMaterial({vertexColors: true}));
+  handle.castShadow = head.castShadow = true; w.axe = new THREE.Group(); w.axe.add(handle, head); hand.add(w.axe);
+  for (const k in GEO.wpn) { w[k] = new THREE.Mesh(GEO.wpn[k], vmat); w[k].castShadow = true; hand.add(w[k]); }
+  g.add(hand); scene.add(g); return {g, hand, wm: w, head};
+}
+function poseHand(hand, weapon, swing) {
+  if (weapon === 'axe') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
+  else { hand.rotation.set(0, 0, 0); hand.position.x = 6 + (swing <= 0 ? 0 : WPN[weapon].melee ? Math.sin((1 - swing / .18) * Math.PI) * 24 : -swing / .1 * 5); }
 }
 function syncWorld() { // (re)build the per-game instances after reset()
   for (const s of smeshes.splice(0)) scene.remove(s.mesh);
   for (const a of ameshes.splice(0)) scene.remove(a.mesh);
   let np = 0, no = 0;
   trees.forEach((o, i) => {
-    o.i = i; o.oak = Math.random() < .38; o.ci = o.oak ? no++ : np++; o.rot = rnd(0, TAU); o.th = o.oak ? o.r * 1.5 : o.r * .95; o.vis = 1; o.sig = -1;
+    o.i = i; o.oak = RNG() < .38; o.ci = o.oak ? no++ : np++; o.rot = rnd(0, TAU); o.th = o.oak ? o.r * 1.5 : o.r * .95; o.vis = 1; o.sig = -1;
     (o.oak ? oakM : pineM).setColorAt(o.ci, o.oak ? HSL(98 + o.hue, rnd(40, 52), rnd(27, 35)) : HSL(132 + o.hue, rnd(32, 42), rnd(20, 27)));
   });
   trunkM.count = trees.length; pineM.count = np; oakM.count = no; pineM.instanceColor.needsUpdate = oakM.instanceColor.needsUpdate = true;
@@ -796,7 +1088,7 @@ function animalMesh(a) {
     for (const z of [-1, 1]) { const e = new THREE.Mesh(GEO.eye, em); e.scale.setScalar(a.r * .11); e.position.set(u.eyeX, u.eyeY, u.eyeZ * z); eyes.add(e); }
     g.add(eyes); g.userData.eyes = eyes;
   }
-  const k = Math.cbrt(a.max / d.hp); g.scale.setScalar(k); return g;
+  const k = a.sc || Math.cbrt(a.max / d.hp); g.scale.setScalar(k); return g;
 }
 function proj(x, h, y) { v3.set(x, h, y).project(camera); return [(v3.x + 1) / 2 * vw, (1 - v3.y) / 2 * vh]; }
 function hpBar(x, h, y, w, f) {
@@ -874,13 +1166,18 @@ function render(now, dt) {
   const moved = dist(P.x, P.y, lastPX, lastPY); lastPX = P.x; lastPY = P.y; if (moved > .2) walk += moved * .14;
   playerG.position.set(P.x, Math.abs(Math.sin(walk)) * 2.2, P.y); playerG.rotation.set(0, -P.ang, Math.sin(walk) * .06);
   for (const k in wm) wm[k].visible = k === P.weapon;
-  if (P.weapon === 'axe') { const sw = P.swing > 0 ? (1 - P.swing / .18) * 2 - 1 : -.9; axeG.rotation.set(0, -sw * 1.05, P.swing > 0 ? .25 : .7); axeG.position.x = 6; }
-  else { axeG.rotation.set(0, 0, 0); axeG.position.x = 6 + (P.swing <= 0 ? 0 : WPN[P.weapon].melee ? Math.sin((1 - P.swing / .18) * Math.PI) * 24 : -P.swing / .1 * 5); }
+  poseHand(axeG, P.weapon, P.swing);
+  for (const o of NET.others.values()) {
+    if (!o.m) { let h = 0; for (const c of o.peer) h = (h * 31 + c.charCodeAt(0)) >>> 0; o.m = makePlayer(SHIRTS[h % SHIRTS.length]); }
+    o.m.g.visible = !o.dead; o.m.g.position.set(o.x, 0, o.y); o.m.g.rotation.set(0, -o.ang, 0);
+    for (const k in o.m.wm) o.m.wm[k].visible = k === o.w;
+    poseHand(o.m.hand, o.w, o.sw); o.m.head.material.color.copy(o.flint ? C('#3c4a52') : C('#b9bbb4'));
+  }
   const ns = Math.min(shots.length, 96);
   for (let i = 0; i < ns; i++) { const s = shots[i]; dummy.position.set(s.x, 26, s.y); dummy.rotation.set(0, -Math.atan2(s.vy, s.vx), 0); dummy.scale.set(s.arrow ? 24 : 34, 1.6, 1.6); dummy.updateMatrix(); shotM.setMatrixAt(i, dummy.matrix); shotM.setColorAt(i, tmpC.set(s.arrow ? 0xe8dcc0 : 0xffe38a)); }
   shotM.count = ns; shotM.instanceMatrix.needsUpdate = true; shotM.instanceColor.needsUpdate = true;
   axeHead.material.color.copy(P.flint ? C('#3c4a52') : C('#b9bbb4'));
-  playerG.visible = P.hurt <= 0 || Math.floor(now / 60) % 2 === 0;
+  playerG.visible = !P.dead && (P.hurt <= 0 || Math.floor(now / 60) % 2 === 0);
 
   // build ghost
   ghost.visible = tool !== 'axe' && running;
@@ -905,6 +1202,11 @@ function render(now, dt) {
   ctx.font = '600 15px "IBM Plex Sans",system-ui,sans-serif'; ctx.textAlign = 'center';
   for (const f of floats) { const [px, py] = proj(f.x, 40 + (.9 - f.life) * 50, f.y); ctx.globalAlpha = Math.min(1, f.life * 2.5); ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillText(f.txt, px + 1, py + 1); ctx.fillStyle = f.col; ctx.fillText(f.txt, px, py); }
   ctx.globalAlpha = 1;
+  for (const o of NET.others.values()) { // friends: name and health
+    const [px, py] = proj(o.x, 62, o.y), name = o.dead ? 'down' : (o.name || 'Friend').slice(0, 18);
+    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillText(name, px + 1, py + 1); ctx.fillStyle = o.dead ? '#d1503a' : '#ebe6d3'; ctx.fillText(name, px, py);
+    if (!o.dead) hpBar(o.x, 54, o.y, 30, o.hp / 100);
+  }
   if (stick.id !== null) {
     ctx.strokeStyle = 'rgba(235,230,211,.45)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 46, 0, TAU); ctx.stroke();
     ctx.fillStyle = 'rgba(235,230,211,.5)'; ctx.beginPath(); ctx.arc(stick.ox + stick.dx * 46, stick.oy + stick.dy * 46, 20, 0, TAU); ctx.fill();
@@ -937,6 +1239,8 @@ function buildTools() {
 function hud() {
   $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
   $('hpbar').style.background = P.poison > 0 ? '#7fbf5a' : '';
+  $('netinfo').hidden = !multi(); if (multi()) $('netinfo').textContent = 'Game ' + NET.code + ' · ' + (NET.others.size + 1) + (NET.others.size ? ' players' : ' player');
+  $('savebtn').textContent = client() ? 'Save gear (K)' : 'Save (K)';
   const bs = animals.find(isBoss); $('boss').hidden = !bs;
   if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
   $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron;
@@ -959,18 +1263,14 @@ function hud() {
 }
 function end(won) {
   if (G.over) return;
-  running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
+  G.won = won; running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
+  if (host() && NET.room) NET.room.presence({p: myState(), w: worldState()}).catch(() => {});
+  if (!client()) { savedGame = null; store('save', null); }
   $('endtitle').innerHTML = won ? 'The house <em>held</em>' : 'The forest <em>took you</em>';
   $('endtext').textContent = won
     ? `Five nights, ${G.kills} animals driven off, and your walls are still standing. You are safe in the middle of the forest.`
     : `You fell on ${G.phase === 'night' ? 'night' : 'day'} ${G.day} after surviving ${G.nights} night${G.nights === 1 ? '' : 's'} and fighting off ${G.kills} animals. Walls first, then a door, then the bed.`;
   won ? snd(520, .5, 'triangle', .08, 400) : snd(200, .8, 'sawtooth', .07, -150);
-}
-function start() {
-  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
-  reset(); cam.x = P.x; cam.y = P.y; running = true; paused = false;
-  $('start').hidden = true; $('end').hidden = true; $('hud').hidden = false; hud();
-  toast('Chop wood before dusk. Walls first.');
 }
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
@@ -982,12 +1282,14 @@ function frame(now) {
 addEventListener('keydown', e => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
   if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
+  if (e.target && e.target.id === 'code') return;
   keys[e.code] = true; if (e.repeat || !running) return;
   const n = e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
   if (n >= 1 && n <= TOOLS.length) { tool = TOOLS[n - 1]; hud(); }
   if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
   if (e.code === 'KeyE') eat();
   if (e.code === 'KeyC') craft();
+  if (e.code === 'KeyK') saveGame(false);
   if (e.code === 'KeyR') makeAmmo('arrows');
   if (e.code === 'KeyF') makeAmmo('bullets');
   if (e.code === 'Tab') cycleWeapon(e.shiftKey ? -1 : 1);
@@ -1020,11 +1322,27 @@ act.addEventListener('touchcancel', () => { actDown = false; });
 $('mkarrows').addEventListener('click', () => makeAmmo('arrows')); $('mkbullets').addEventListener('click', () => makeAmmo('bullets'));
 cv.addEventListener('wheel', e => { e.preventDefault(); if (running) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, {passive: false});
 $('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
-$('startbtn').addEventListener('click', start); $('again').addEventListener('click', start);
+$('startbtn').addEventListener('click', () => start()); $('again').addEventListener('click', () => quit(''));
+$('contbtn').addEventListener('click', () => { if (savedGame) start(savedGame); });
+$('hostbtn').addEventListener('click', () => hostGame(null)); $('hostsaved').addEventListener('click', () => { if (savedGame) hostGame(savedGame); });
+$('joinbtn').addEventListener('click', () => joinGame($('code').value));
+$('code').addEventListener('keydown', e => { if (e.code === 'Enter') joinGame($('code').value); });
+$('savebtn').addEventListener('click', () => saveGame(false)); $('quitbtn').addEventListener('click', () => quit(''));
+addEventListener('pagehide', () => saveGame(true));
 addEventListener('resize', resize);
 
-initScene(); resize(); reset(); G.dark = .3;
-window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, mk, recalc};
+initScene(); resize(); reset(1); G.dark = .3; refreshMenu();
+window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, mk, recalc};
+(async () => { // light up saving and multiplayer once the page knows where it is running
+  const cl = window.claude;
+  if (cl && cl.use) { try { [db, userNS, lobby] = await Promise.all([cl.use('db'), cl.use('user'), cl.use('room')]); uid = userNS ? await userNS.id() : null; } catch (e) {} }
+  savedGame = await load('save');
+  if (lobby) lobby.onPeers(ch => {
+    openGames = [...new Set(ch.peers.filter(p => !p.isMe && p.presence && typeof p.presence.game === 'string' && /^[A-Z]{4}$/.test(p.presence.game)).map(p => p.presence.game))].slice(0, 6);
+    if (!running) refreshMenu();
+  }, () => {});
+  refreshMenu();
+})();
 requestAnimationFrame(frame);
 })();
 </script>
