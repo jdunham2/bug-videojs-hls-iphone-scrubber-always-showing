@@ -56,7 +56,7 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Twenty fighters, each with their own stats, look and special move:
+Twenty-four fighters, each with their own stats, look and special move:
 
 | Fighter | Style | Special |
 |---|---|---|
@@ -79,6 +79,10 @@ Twenty fighters, each with their own stats, look and special move:
 | Jetpack Jo | Hold jump in the air to fly; heavy attack fires a homing rocket | Air Strike: rockets rain from the sky |
 | Presto | Magician: dash is a short teleport; heavy attack throws three cards | Abracadabra turns every regular enemy into loot (bosses take damage) |
 | El Doodlo | Wrestler: heavy attack grabs an enemy and throws it into others | Doodlo Drop: a screen-shaking body slam |
+| Mimic | Heavy attack is a random move borrowed from other fighters | Mimic: a random special every time |
+| Blaze | Every hit sets enemies on fire; heavy attack throws a fireball | Inferno: walls of flame roll out both ways |
+| Captain Ink | Pirate: heavy attack fires an arcing, exploding cannonball | Broadside: a cannonball barrage |
+| Gravity Gus | Heavy attack makes a gravity well that pulls enemies in | Zero-G: enemies float helplessly, then slam down |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
 
 ## Modes
@@ -156,6 +160,11 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 | Ink Turret | Places a turret that shoots the nearest enemy |
 | Vampire Fangs | Heals you for a quarter of the damage you deal |
 | Invisibility | Enemies can't find you for 8 seconds |
+| Pocket Black Hole | A black hole that sucks in and damages enemies |
+| Healing Aura | Heals you and a nearby partner for 8 seconds |
+| Jetpack | Hold jump to fly for 12 seconds |
+| Ink Decoy | A cardboard copy of you that every enemy chases instead of you |
+| Meteor Call | Meteors rain down on the enemies |
 | Mystery box | A random power-up |
 
 ## Features
