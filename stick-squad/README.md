@@ -56,7 +56,7 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Twenty-four fighters, each with their own stats, look and special move:
+Twenty-eight fighters, each with their own stats, look and special move:
 
 | Fighter | Style | Special |
 |---|---|---|
@@ -83,6 +83,10 @@ Twenty-four fighters, each with their own stats, look and special move:
 | Blaze | Every hit sets enemies on fire; heavy attack throws a fireball | Inferno: walls of flame roll out both ways |
 | Captain Ink | Pirate: heavy attack fires an arcing, exploding cannonball | Broadside: a cannonball barrage |
 | Gravity Gus | Heavy attack makes a gravity well that pulls enemies in | Zero-G: enemies float helplessly, then slam down |
+| Gemma | Heavy attack makes crystal spikes burst out of the floor ahead | Crystal Prison freezes every enemy |
+| Kickflip Kai | Rides a skateboard (very fast); heavy attack is a board-slam ram | Grind Rush: zooms back and forth across the screen |
+| Buzzy Bea | Heavy attack releases bees that chase the nearest enemy | Hive Mind: a giant swarm of bees |
+| Samurai Sam | Heavy attack is a parry stance: block a hit and counter for big damage | Thousand Cuts: a flurry that hits every enemy |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack |
 
 ## Modes
