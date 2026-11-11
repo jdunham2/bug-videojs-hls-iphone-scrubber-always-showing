@@ -18,8 +18,8 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - Forge (5 weapon and 5 armor tiers), potion brewing, campfire cooking
 - A workbench and Crafting skill: 30+ recipes for furniture, rings and amulets (equippable, with stat bonuses), bombs, whetstones and tonics
 - Willow Cottage, a house you can buy and decorate: place furniture, sleep for a Well Rested XP buff that grows with comfort, keep a storage chest, and mount boss trophies for bonus damage
-- 9 pets with abilities (loot magnet, luck, healing, extra XP, defense, damage shield, fire and wisp attacks): bought, found as rare monster drops, or won from bosses
-- 7 mounts, from a horse to a trampling boar, a frost wolf, a water-hopping toad and a flying drake
+- 19 pets with abilities (loot magnet, luck, healing, coin and material finding, life-stealing bites, slowing and burning attacks, a phoenix that revives you): bought, adopted, fished up, found as rare drops, or won from bosses and the Arena
+- 15 mounts, from a pony to a trampling sabertooth, a sturdy cave bear, a healing unicorn, a swimming sea turtle and two fliers (drake and griffin)
 - Shop with goods, weapons, pets and mounts; 14 treasure chests
 - Online multiplayer when published as a claude.ai artifact with the `room` capability: everyone who has the game open at once sees each other's heroes (class, gear, mount, name) and can chat; offline and in the standalone file the game is single-player
 - The Emberfall Arena: a PvP zone where online players can fight each other, plus an 8-rank gladiator ladder against computer opponents (works offline) with a token shop

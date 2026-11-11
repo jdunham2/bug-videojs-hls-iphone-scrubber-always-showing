@@ -447,7 +447,7 @@ function drawFurn(g,id,x,y){const F=FURN[id]||{};g.save();const sh=w=>ell(g,x+2,
     default:if(F.trophy){sh(14);rr(g,x-14,y-26,28,30,3,'#6b4528');rr(g,x-11,y-23,22,24,3,'#8a5a32');const c=(BOSSES[F.trophy]||{col:'#ffd23f'}).col;circ(g,x,y-12,8,c);g.fillStyle=shade(c,-.4);g.beginPath();g.moveTo(x-6,y-17);g.lineTo(x-11,y-27);g.lineTo(x-2,y-19);g.moveTo(x+6,y-17);g.lineTo(x+11,y-27);g.lineTo(x+2,y-19);g.fill();circ(g,x-3,y-13,1.5,'#fff');circ(g,x+3,y-13,1.5,'#fff');g.fillStyle='#3a2414';g.fillRect(x-2,y+4,4,10)}
   }g.restore()}
 const GLADS=[{n:'Brakka the Brute',cls:'warrior'},{n:'Sylva Swiftbow',cls:'ranger'},{n:'Nyx the Shade',cls:'rogue'},{n:'Magister Vey',cls:'mage'},{n:'Ser Aldous',cls:'paladin'},{n:'Morwen the Pale',cls:'necro'},{n:'Ironjaw Grull',cls:'warrior'},{n:'Kael, Grand Champion',cls:'paladin',champ:1}];
-const ARENA_SHOP=[{t:'banner',k:'furn',cost:4},{t:'gladius',k:'wpn',cost:6},{t:'r_champ',k:'item',cost:10},{t:'a_glad',k:'item',cost:12},{t:'trophy_arena',k:'furn',cost:15,rank:8}];
+const ARENA_SHOP=[{t:'banner',k:'furn',cost:4},{t:'gladius',k:'wpn',cost:6},{t:'r_champ',k:'item',cost:10},{t:'a_glad',k:'item',cost:12},{t:'tiger',k:'mount',cost:12},{t:'trophy_arena',k:'furn',cost:15,rank:8},{t:'phoenix',k:'pet',cost:20}];
 function genArena(){const L=newLevel('arena',ARENA.pal);LEVELS.arena=L;useLevel(L);const cx=24,cy=24;L.cx=cx;L.cy=cy;
   for(let y=cy-13;y<=cy+13;y++)for(let x=cx-13;x<=cx+13;x++)if(dist(x,y,cx,cy)<12.5)tiles[y*W+x]=DFLOOR;
   for(let y=cy+12;y<=cy+15;y++)for(let x=cx-1;x<=cx+1;x++)tiles[y*W+x]=DFLOOR;
@@ -492,7 +492,7 @@ function openArena(tab='ladder'){
   const r=P.arenaRank||0,fighting=enemies.some(e=>e.type==='glad');let body='';
   if(tab==='ladder'){body=GLADS.map((G,i)=>{const done=i<r,next=i===Math.min(r,GLADS.length-1)&&r<GLADS.length;const C=CLASSES[G.cls];return`<div class="item ${done?'':''}" style="${done?'opacity:.6':''}"><img src="${weaponIcon(STARTER[G.cls])}" alt=""><div><div class="nm">${i+1}. ${G.n}</div><div class="ds">${C.n}${G.champ?' · the reigning champion':''} · ${done?'Defeated':'Reward: '+(2+i)+' tokens, '+(100*(i+1))+' gold'}</div></div>${next?`<button class="btn sm" data-act="bout" ${fighting?'disabled':''}>Fight</button>`:done?'<span class="sub">Won</span>':'<span class="sub">Locked</span>'}</div>`}).join('')+(r>=GLADS.length?`<p class="sub">You are the Grand Champion. Fight Kael again any time for tokens:</p><button class="btn sm" data-act="bout">Rematch</button>`:'')}
   else if(tab==='pvp'){const ps=netOthers().filter(o=>o.pr.lv==='arena');body=room?`<p>Everyone inside the Arena can hit everyone else. Your attacks, class skill, bombs and spells all count. Arena knockouts cost nothing.</p><p class="sub">Your record: <b class="reward">${P.pvpK||0} wins · ${P.pvpD||0} losses</b></p><h3>In the Arena now</h3>${ps.length?ps.map(o=>`<div class="stat"><span>${esc(o.pr.nm)} · ${esc((CLASSES[o.pr.c]||{n:'?'}).n)} Lv ${o.pr.l|0}</span><b>${o.pr.k|0} wins · ${o.pr.d|0} losses</b></div>`).join(''):'<p class="sub">Nobody else is here right now. Share the game link with friends and meet them in the Arena.</p>'}`:'<p>Online PvP needs the shared online version of the game, opened by two or more people at once. Here you can still fight the gladiator ladder.</p>'}
-  else{body=`<p class="sub">You have <b class="reward">${P.tokens||0} arena tokens</b>.</p><div class="list">`+ARENA_SHOP.map((it,i)=>{const nm=it.k==='wpn'?WEAPONS[it.t].n:it.k==='furn'?FURN[it.t].n:ITEMS[it.t].n,ds=it.k==='wpn'?WEAPONS[it.t].d:it.k==='furn'?FURN[it.t].d:ITEMS[it.t].d,ic=it.k==='wpn'?weaponIcon(it.t):it.k==='furn'?furnIcon(it.t):itemIcon(it.t),owned=it.k==='wpn'&&P.weapons.includes(it.t),lock=it.rank&&r<it.rank;
+  else{body=`<p class="sub">You have <b class="reward">${P.tokens||0} arena tokens</b>.</p><div class="list">`+ARENA_SHOP.map((it,i)=>{const nm=it.k==='wpn'?WEAPONS[it.t].n:it.k==='furn'?FURN[it.t].n:it.k==='pet'?PETS[it.t].n+' (pet)':it.k==='mount'?MOUNTS[it.t].n+' the '+MOUNTS[it.t].kind:ITEMS[it.t].n,ds=it.k==='wpn'?WEAPONS[it.t].d:it.k==='furn'?FURN[it.t].d:it.k==='pet'?PETS[it.t].d:it.k==='mount'?MOUNTS[it.t].d:ITEMS[it.t].d,ic=it.k==='wpn'?weaponIcon(it.t):it.k==='furn'?furnIcon(it.t):it.k==='pet'?companionPortrait('pet',it.t):it.k==='mount'?companionPortrait('mount',it.t):itemIcon(it.t),owned=(it.k==='wpn'&&P.weapons.includes(it.t))||(it.k==='pet'&&P.pets.includes(it.t))||(it.k==='mount'&&P.mounts.includes(it.t)),lock=it.rank&&r<it.rank;
     return`<div class="item comp"><img src="${ic}" alt=""><div><div class="nm">${nm}</div><div class="ds">${ds}</div><div class="req"><span class="chip ${(P.tokens||0)>=it.cost?'ok':'no'}">${it.cost} tokens</span>${it.rank?`<span class="chip ${lock?'no':'ok'}">Grand Champion</span>`:''}</div></div><button class="btn sm" data-act="abuy" data-id="${i}" ${owned||lock||(P.tokens||0)<it.cost?'disabled':''}>${owned?'Owned':'Buy'}</button></div>`}).join('')+'</div>'}
   const T4=(id,l)=>`<button class="tab ${tab===id?'on':''}" data-act="atab" data-id="${id}">${l}</button>`;
   openPanel('arena',`<h2>Emberfall Arena</h2><p class="sub">Rank ${Math.min(r,GLADS.length)} of ${GLADS.length} · ${P.tokens||0} tokens</p><div class="tabs">${T4('ladder','Gladiator ladder')}${T4('pvp','Player duels')}${T4('shop','Token shop')}</div>${body}`);panel='arena:'+tab}
@@ -710,6 +710,8 @@ const QUESTS=[
   {id:'me',npc:'elder',name:'Reforge the Emberstone',type:'bring',t:'shard',n:3,desc:'Bring the three Emberstone shards to Elder Mira so she and Borin can make the stone whole.',rw:{gold:300,xp:500,flag:'emberstone',items:{hpot:5,mpot:5}},
     intro:[['elder','Bring the three shards to me. Borin\'s forge and what is left of my magic should be enough to make the stone whole.']],
     outro:[['borin','Never thought I\'d forge with starlight and fire. Hold still, Mira.'],['narrator','The shards fuse in a flash of white heat. The Emberstone glows in your hands, whole for the first time in centuries.'],['elder','Carry it into the wastes. Where you strike, the Wyrm\'s scales will crack.'],['elder','Wake the beast. And end it.']]},
+  {id:'m8',npc:'elder',name:'Wings of Emberfall',type:'cond',n:1,cond:()=>P.flags.wyrm?1:0,label:'Defeat the Ashen Wyrm',desc:'Elder Mira has a gift for the hero who saved Emberfall.',rw:{gold:500,xp:300,mount:'griffin'},
+    intro:[['elder','Before you go off adventuring, there is someone who wants to meet you.'],['narrator','A great shadow sweeps over the square. A griffin lands beside Mira and bows its feathered head.'],['elder','Skyclaw has watched over Emberfall since I was a girl. He has chosen you.']]},
   {id:'m7',npc:'elder',name:'The Ashen Wyrm',type:'kill',t:'wyrm',n:1,at:[BX,BY,"The Wyrm's arena"],desc:'The Wyrm sleeps in a ring of braziers deep in the Ashen Wastes. Wake it, and end this.',rw:{gold:2000,xp:1500},
     intro:[['elder','There is nothing more I can teach you. Go, {class}. The dawn of Emberfall rests on you.']],
     outro:[['elder','You did it. You truly did it.'],['elder','For three hundred years we lived in its shadow. Tonight, we celebrate. Tomorrow, the world is yours to explore.']]},
@@ -733,6 +735,7 @@ const QUESTS=[
   {id:'n2',npc:'ned',name:'The Golden Koi',type:'bring',t:'koi',n:1,desc:'A golden koi lives in Mirror Lake. Rain and a good lure both help.',rw:{gold:250,xp:150}},
   {id:'n3',npc:'ned',name:'Legend of the Moonfin',type:'bring',t:'moonfin',n:1,desc:'They say the Moonfin only bites in Mirror Lake, and only at night.',rw:{gold:800,xp:500}},
   {id:'n4',npc:'ned',name:'Coastal Pests',type:'kill',t:'crab',n:6,desc:'Rock crabs keep snipping my nets on the Saltwind Coast. Crack six shells for me.',rw:{gold:150,xp:120,items:{grilled:3}}},
+  {id:'n7',npc:'ned',name:'The Old Turtle',type:'cond',n:40,cond:()=>P.st.fish,label:'Fish caught',desc:'There is a giant old sea turtle who visits my dock. She only trusts real anglers. Catch 40 fish and I\'ll introduce you.',rw:{gold:400,xp:350,mount:'seaturtle'}},
   {id:'n6',npc:'ned',name:'Master Angler',type:'cond',n:7,cond:()=>Object.keys(P.st.fk||{}).length,label:'Kinds of fish caught',desc:'Catch every kind of fish at least once: lake, sea, day and night.',rw:{gold:900,xp:600}},
   {id:'b1',npc:'borin',name:'Ore for the Forge',type:'bring',t:'iron',n:10,desc:'Mine iron ore from rocks in the meadows and hills. Bring me ten.',rw:{gold:120,xp:90}},
   {id:'b2',npc:'borin',name:'Crystal Clear',type:'bring',t:'crystal',n:4,desc:'Starcrystal grows in the far east of the Ironcrag Hills. You need Mining level 5 to cut it.',rw:{gold:500,xp:300}},
@@ -749,6 +752,7 @@ const QUESTS=[
   {id:'t4',npc:'tess',name:'Highway Robbers',type:'kill',t:'bandit',n:6,desc:'Bandits keep robbing my caravans near the Ironcrag Hills. Teach six of them a lesson.',rw:{gold:380,xp:300,items:{hpot:2}}},
   {id:'t7',npc:'tess',name:'A Place to Call Home',type:'cond',n:1,cond:()=>P.own.house?1:0,label:'Buy Willow Cottage',at:[PHX+2,PHY+3,'Willow Cottage'],desc:'The cottage on the east side of the village is for sale. Every adventurer needs a home! Buy it (1,500 gold).',rw:{gold:300,xp:200,furn:{plant:1,rug:1}}},
   {id:'t8',npc:'tess',name:'Home Sweet Home',type:'cond',n:15,cond:()=>comfort(),label:'House comfort',desc:'Make Willow Cottage cozy. Craft and place furniture until the house reaches 15 comfort.',rw:{gold:500,xp:400,furn:{fireplace:1}}},
+  {id:'b7',npc:'borin',name:'Saddle for a Bear',type:'bring',t:'pelt',n:15,desc:'A cave bear has been sleeping behind my forge all winter, and he likes you. Bring 15 wolf pelts and I\'ll stitch a saddle that fits him.',rw:{gold:300,xp:300,mount:'bear'}},
   {id:'b6',npc:'borin',name:'Handy with Tools',type:'cond',n:5,cond:()=>P.sk.crafting.l,label:'Crafting level',desc:'A smith respects a crafter. Reach Crafting level 5 at a workbench.',rw:{gold:400,xp:350,items:{whet:3,bomb:5}}},
   {id:'t6',npc:'tess',name:'Merchant Prince',type:'cond',n:5000,cond:()=>P.gold,label:'Gold in your purse',desc:'A true trader keeps a full purse. Hold 5,000 gold at once.',rw:{gold:500,xp:400}},
 ];
@@ -789,7 +793,7 @@ const ACH={
   legend:['Legend of the Lake','Catch the Moonfin'],lumber:['Lumberjack','Chop 25 trees'],miner:['Prospector','Mine 25 rocks'],
   chef:['Camp Cook','Cook 5 meals'],rich:['Deep Pockets','Hold 1,000 gold'],lv5:['Seasoned','Reach level 5'],lv10:['Hero of Emberfall','Reach level 10'],
   explorer:['Cartographer','Discover all 8 regions'],chests:['Treasure Hunter','Open 10 chests'],smith:['Master Smith','Forge an Emberbrand weapon'],
-  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
+  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
 };
 const WEAPONS={
   mace:{n:'Training Mace',kind:'melee',draw:'hammer',style:'arc',r:62,arc:1.1,mult:1.25,cd:.46,col:'#c9cfd6',fx:{stunC:.08},d:'Heavy blows that can stun.'},
@@ -840,9 +844,18 @@ const PETS={
   pebble:{n:'Pebble',atk:'bite',mult:.4,d:'A pocket golem that blocks 15% of all damage you take.',src:'Rare: sometimes found after breaking stone golems'},
   spiderling:{n:'Itsy',atk:'bite',mult:.5,d:'A tiny spider whose bites poison enemies.',src:'Hatched from the Brood Queen in the Mossy Crypt'},
   lumen:{n:'Lumen',atk:'shoot',mult:.5,fly:1,d:'A gentle wisp that lights up the night and fires seeking sparks.',src:'Freed when you defeat the Hollow King'},
+  bunny:{n:'Clover',atk:'bite',mult:.3,d:'A quick little rabbit. You move 8% faster while it hops along.',src:'Sold by Tess for 300 gold'},
+  chick:{n:'Peep',atk:'none',d:'A fluffy chick that pecks up a few coins for you every 30 seconds.',src:'Feed the village chickens three Redleaf Herbs'},
+  turtle:{n:'Shelly',atk:'bite',mult:.3,d:'A baby sea turtle. While you stand still, you heal 1.5% of your health every second.',src:'Rarely fished up on the coast'},
+  bat:{n:'Echo',atk:'bite',mult:.45,fly:1,d:'A friendly bat whose bites also heal you.',src:'Rare: sometimes found after defeating night bats'},
+  frost:{n:'Frostling',atk:'bite',mult:.45,fly:1,bfx:{slow:2.2},d:'A tiny ice sprite whose touch slows enemies.',src:'Rare: sometimes left behind by the ice golems of the Frostfang Caverns'},
+  magmy:{n:'Magmy',atk:'bite',mult:.5,bfx:{burn:3},d:'A baby magma slime whose bites set enemies on fire.',src:'Rare: sometimes splits off a Magma Slime'},
+  inky:{n:'Inky',atk:'shoot',mult:.5,pk:'water',pfx:{slow:2},d:'A baby sea serpent that spits slowing water bolts.',src:'Sometimes left behind when Nerith, the Tide Serpent, falls'},
+  panda:{n:'Mochi',atk:'bite',mult:.35,d:'A red panda with a nose for treasure: finds a crafting material every 45 seconds.',src:'Sold by Tess for 900 gold'},
+  phoenix:{n:'Cinderwing',atk:'shoot',mult:.65,fly:1,pk:'fireball',pfx:{burn:3},d:'A phoenix chick. Once every 5 minutes, if you would fall, it brings you back with half your health.',src:'Arena token shop (20 tokens)'},
   whelp:{n:'Ember the Whelp',atk:'shoot',mult:.6,fly:1,d:'A baby dragon that spits fireballs that burn.',src:'Hatched when you defeat the Ashen Wyrm'},
 };
-const PET_DROP={slime:['gloop',.02],wolf:['pup',.025],crab:['pinch',.03],golem:['pebble',.04]};
+const PET_DROP={slime:['gloop',.02],wolf:['pup',.025],crab:['pinch',.03],golem:['pebble',.04],bat:['bat',.025],magma:['magmy',.03]};
 const MOUNTS={
   horse:{n:'Chestnut',kind:'Horse',spd:1.55,d:'A steady, reliable horse.',src:'Sold by Tess for 800 gold',draw:'horse',body:'#8a5a33',dark:'#4a2e1a',mane:'#2a1a10'},
   boar:{n:'Tusk',kind:'War Boar',spd:1.45,trample:1,d:'A bit slower, but tramples any enemy it runs into.',src:'Sold by Tess for 1,200 gold',draw:'boar',body:'#6a4c38',dark:'#33231a',mane:'#1e140e'},
@@ -851,6 +864,13 @@ const MOUNTS={
   rimewolf:{n:'Rime',kind:'Frost Wolf',spd:1.7,frost:1,lv:8,d:'Leaves a trail of frost that slows nearby enemies.',src:'Sold by Tess for 2,500 gold (level 8)',draw:'wolf',body:'#e4edf7',dark:'#8fa6c2',mane:'#ffffff'},
   warhorse:{n:'Valor',kind:'Warhorse',spd:1.75,trample:1,d:'An armored warhorse that tramples enemies in its path.',src:'Reward from Captain Rhea',draw:'horse',body:'#e8e4dc',dark:'#9a948a',mane:'#c0392b'},
   shadow:{n:'Nightmare',kind:'Shadow Steed',spd:1.9,stealth:1,d:'A ghostly horse. Monsters only notice you when you ride right up to them.',src:"Claimed from the Hollow King's stable",draw:'horse',body:'#231d36',dark:'#0e0b18',mane:'#a98cff',glow:'#a98cff'},
+  pony:{n:'Buttercup',kind:'Pony',spd:1.4,s:.82,d:'Small, sweet and cheap. A great first mount.',src:'Sold by Tess for 400 gold',draw:'horse',body:'#d9b98a',dark:'#8a6a40',mane:'#f2e6c8'},
+  sunrunner:{n:'Sunrunner',kind:'Strider Bird',spd:1.85,lv:6,d:'A tall running bird with enormous strides.',src:'Sold by Tess for 2,200 gold (level 6)',draw:'bird'},
+  tiger:{n:'Stripes',kind:'Sabertooth',spd:1.75,trample:1,stripes:1,d:'Fast and fierce: tramples enemies in its path.',src:'Arena token shop (12 tokens)',draw:'wolf',body:'#e8892f',dark:'#7a3f10',mane:'#2a1a10'},
+  bear:{n:'Bruno',kind:'Cave Bear',spd:1.45,sturdy:1,s:1.12,d:'Tough as stone: you take 30% less damage while riding and never get knocked off.',src:'Reward from Borin for "Saddle for a Bear"',draw:'bear',body:'#6a4630',dark:'#33201a',mane:'#2a1a12'},
+  seaturtle:{n:'Old Shell',kind:'Giant Sea Turtle',spd:1.3,swim:1,d:'Slow on land, but swims across lakes and the open sea.',src:'Reward from Old Ned for "The Old Turtle"',draw:'turtle'},
+  unicorn:{n:'Starlight',kind:'Unicorn',spd:1.9,regen:1,horn:1,lv:12,d:'Heals you steadily while you ride.',src:'Sold by Tess for 3,500 gold (level 12)',draw:'horse',body:'#f6f2fa',dark:'#b8b0c8',mane:'#d8a8ff',glow:'#ffd0f0'},
+  griffin:{n:'Skyclaw',kind:'Griffin',spd:2,fly:1,d:'A noble griffin. Flies over water, lava and walls.',src:'A gift from Elder Mira after the Wyrm falls',draw:'griffin'},
   drake:{n:'Cinder',kind:'Ashen Drake',spd:2.05,fly:1,d:'The fastest mount. Flies over water, lava and walls.',src:'Tamed after you defeat the Ashen Wyrm',draw:'drake'},
 };
 const SHOP=[
@@ -859,7 +879,7 @@ const SHOP=[
   {sp:'lantern',n:'Brass Lantern',price:150,d:'A much wider light at night.',ic:'lantern',c:'#ffb347'},
   {sp:'boots',n:'Swiftstep Boots',price:350,d:'Move 15% faster.',ic:'boots',c:'#8a5a3b'},
   {sp:'house',n:'Deed to Willow Cottage',price:1500,d:'Your own cottage in Emberfall, with a bed, chair and storage chest.',ic:'house',c:'#2f6f8f'},
-  {pet:'cat',price:400},{pet:'fox',price:600},{pet:'owl',price:700},{mount:'horse',price:800},{mount:'boar',price:1200},{mount:'stag',price:2000},{mount:'rimewolf',price:2500},
+  {pet:'bunny',price:300},{mount:'pony',price:400},{pet:'cat',price:400},{pet:'panda',price:900},{mount:'sunrunner',price:2200},{mount:'unicorn',price:3500},{pet:'fox',price:600},{pet:'owl',price:700},{mount:'horse',price:800},{mount:'boar',price:1200},{mount:'stag',price:2000},{mount:'rimewolf',price:2500},
   {wpn:'daggers',price:300},{wpn:'spear',price:450},{wpn:'wand',price:450},{wpn:'crossbow',price:550},{wpn:'sword',price:120},{wpn:'mace',price:120},{wpn:'bonewand',price:120},{wpn:'staff',price:120},{wpn:'bow',price:120},
 ];
 
@@ -1380,7 +1400,7 @@ function comfort(){return((P.house&&P.house.items)||[]).reduce((a,i)=>a+((FURN[i
 function stats(){
   const c=CLASSES[P.cls],L=P.lvl-1;let atk=c.atk+L*2+WT[P.wT]+P.elixir*3;const def=c.def+L+AT[P.aT]+(P.petId==='pinch'?5:0);
   if(P.buffs.stew>0)atk*=1.25;atk*=1+.04*tl('power')+acc('dmg')+.02*trophyCount();if(P.buffs.whet)atk*=1.15;const maxHp=Math.round((c.hp+L*14+P.aT*12)*(1+.06*tl('vit'))+acc('hp'));if(tl('berserk')&&P.hp<maxHp*.5)atk*=1.25;
-  return{atk:Math.round(atk),def:def+2*tl('armor')+acc('def')+(P.buffs.bark?6:0),maxHp,maxMp:Math.round((c.mp+L*6)*(1+.08*tl('mana'))+acc('mp')),spd:172*(1+.03*tl('swift'))*(P.slowT>0?.55:1)*(P.own.boots?1.15:1)*(P.buffs.haste?1.4:1)*(P.riding&&MOUNTS[P.mountId]?MOUNTS[P.mountId].spd:1)};
+  return{atk:Math.round(atk),def:def+2*tl('armor')+acc('def')+(P.buffs.bark?6:0),maxHp,maxMp:Math.round((c.mp+L*6)*(1+.08*tl('mana'))+acc('mp')),spd:172*(1+.03*tl('swift'))*(P.petId==='bunny'?1.08:1)*(P.slowT>0?.55:1)*(P.own.boots?1.15:1)*(P.buffs.haste?1.4:1)*(P.riding&&MOUNTS[P.mountId]?MOUNTS[P.mountId].spd:1)};
 }
 const xpNeed=l=>Math.floor(25*Math.pow(l,1.6));
 
@@ -1461,7 +1481,7 @@ function spawner(dt){
   }
 }
 function moveEnt(e,dx,dy,fly){
-  if(e===P&&P.riding){const M=MOUNTS[P.mountId];if(M.fly)fly=true;else if(M.hop){const r=e.r*.75;const wk=(px,py)=>{const tx=Math.floor(px/T),ty=Math.floor(py/T),t=tileAt(tx,ty);if(t===DEEP||t===LAVA)return false;const o=grid[ty*W+tx];return!(o&&o.solid&&!o.stump&&!o.gone)};
+  if(e===P&&P.riding){const M=MOUNTS[P.mountId];if(M.fly)fly=true;else if(M.swim){const r=e.r*.75;const wk=(px,py)=>{const tx=Math.floor(px/T),ty=Math.floor(py/T);if(tx<3||ty<3||tx>=W-3||ty>=H-3)return false;const t=tileAt(tx,ty);if(t===LAVA||t===WALL)return false;const o=grid[ty*W+tx];return!(o&&o.solid&&!o.stump&&!o.gone)};const ok=(x,y)=>wk(x-r,y-r*.5)&&wk(x+r,y-r*.5)&&wk(x-r,y+r*.6)&&wk(x+r,y+r*.6);if(ok(e.x+dx,e.y))e.x+=dx;if(ok(e.x,e.y+dy))e.y+=dy;return}else if(M.hop){const r=e.r*.75;const wk=(px,py)=>{const tx=Math.floor(px/T),ty=Math.floor(py/T),t=tileAt(tx,ty);if(t===DEEP||t===LAVA)return false;const o=grid[ty*W+tx];return!(o&&o.solid&&!o.stump&&!o.gone)};
     const ok=(x,y)=>wk(x-r,y-r*.5)&&wk(x+r,y-r*.5)&&wk(x-r,y+r*.6)&&wk(x+r,y+r*.6);if(ok(e.x+dx,e.y))e.x+=dx;if(ok(e.x,e.y+dy))e.y+=dy;return}}
   if(fly){e.x+=dx;e.y+=dy;e.x=clamp(e.x,3*T,(W-3)*T);e.y=clamp(e.y,3*T,(H-3)*T);return}
   const r=e.r*.75;
@@ -1615,6 +1635,7 @@ function killEnemy(e){
   const g=Math.round(rint(d.gold[0],d.gold[1])*(P.petId==='cat'?1.25:1)*(e.rew||1)),nc=Math.min(8,Math.ceil(g/4));for(let i=0;i<nc;i++)drop('gold',e.x,e.y,Math.ceil(g/nc));
   const xpv=Math.round(d.xp*(e.rew||1)),xo=Math.min(6,Math.ceil(xpv/8));for(let i=0;i<xo;i++)drop('xp',e.x,e.y,Math.ceil(xpv/xo));
   d.drops.forEach(([id,ch])=>{if(Math.random()<ch)drop('item',e.x,e.y,1,id)});
+  if(e.ice&&!P.pets.includes('frost')&&Math.random()<.05)addPet('frost');if(e.type==='nerith'&&!P.pets.includes('inky')&&Math.random()<.4)addPet('inky');
   const pd=PET_DROP[e.type];if(pd&&!P.pets.includes(pd[0])&&Math.random()<pd[1])addPet(pd[0]);
   P.st.kt=P.st.kt||{};P.st.kt[e.type]=(P.st.kt[e.type]||0)+1;if(Object.keys(ENEMY).every(k=>ENEMY[k].ai==='boss'||ENEMY[k].noBest||P.st.kt[k]))unlock('scholar');
   if(e.type==='glad')arenaWin(e);
@@ -1635,12 +1656,13 @@ function explode(p){if(p.exploded)return;p.exploded=true;p.life=0;SFX.boom();sha
   for(const e of enemies){if(e.dead)continue;const d=dist(p.x,p.y,e.x,e.y);if(d<p.aoe+e.r*.5){const a=Math.atan2(e.y-p.y,e.x-p.x);hurtEnemy(e,p.mult*(d<p.aoe*.4?1:.75),Math.cos(a),Math.sin(a))}}}
 function drop(kind,x,y,amount,item){const a=rnd(0,Math.PI*2),s=rnd(40,140);pickups.push({kind,x,y,z:0,vz:rnd(120,200),vx:Math.cos(a)*s,vy:Math.sin(a)*s,amount,item,t:0})}
 function hurtPlayer(raw,src){
-  if(P.dead)return;const S=stats();const dmg=Math.max(1,Math.round(raw*rnd(.9,1.1)*(P.buffs.stone?.5:1)*(P.petId==='pebble'?.85:1)*(1-.05*tl('aura'))-S.def*.6));
-  if(P.riding&&dismount())ftext(P.x,P.y-56,'Knocked off!','#ffb199',13);P.hp-=dmg;P.iT=.75;P.lastHit=0;hurtFlash=.5;shake=Math.max(shake,.35);
+  if(P.dead)return;const S=stats();const dmg=Math.max(1,Math.round(raw*rnd(.9,1.1)*(P.buffs.stone?.5:1)*(P.petId==='pebble'?.85:1)*(1-.05*tl('aura'))*(P.riding&&MOUNTS[P.mountId]&&MOUNTS[P.mountId].sturdy?.7:1)-S.def*.6));
+  if(P.riding&&!MOUNTS[P.mountId].sturdy&&dismount())ftext(P.x,P.y-56,'Knocked off!','#ffb199',13);P.hp-=dmg;P.iT=.75;P.lastHit=0;hurtFlash=.5;shake=Math.max(shake,.35);
   ftext(P.x,P.y-34,'-'+dmg,'#ff6b6b',18);SFX.hurt();P.fish=null;P.gather=null;
   if(src){const a=Math.atan2(P.y-src.y,P.x-src.x);P.kx=Math.cos(a)*260;P.ky=Math.sin(a)*260}
   if(P.hp<=0&&tl('laststand')&&(P.lsT||0)<=0){P.hp=1;P.iT=2;P.lsT=90;toast('Last Stand!','You refuse to fall','#ffd23f');effects.push({k:'ring',x:P.x,y:P.y,t:0,max:.6,r0:10,r1:90,col:'#ffd23f'});SFX.level()}
   if(P.hp<=0&&curLevel==='arena'){arenaDown();return}
+  if(P.hp<=0&&P.petId==='phoenix'&&(P.phxT||0)<=0){const S2=stats();P.hp=Math.round(S2.maxHp*.5);P.iT=2;P.phxT=300;toast('Cinderwing revives you!','The phoenix can do this again in 5 minutes','#ff9a3d');effects.push({k:'ring',x:P.x,y:P.y,t:0,max:.7,r0:10,r1:120,col:'#ff9a3d'});spark(P.x,P.y-10,'#ffb347',40,220);SFX.level();return}
   if(P.hp<=0){P.hp=0;P.dead=true;setTimeout(showDeath,700)}
 }
 
@@ -1775,6 +1797,7 @@ function updatePlayer(dt){
 function findTarget(){
   if(!P||P.dead)return null;
   const fx=P.x+P.fx*26,fy=P.y+P.fy*22;let best=null,bd=1e9;
+  if(!LVD&&!P.pets.includes('chick'))for(const c of chickens){const d=dist(P.x,P.y,c.x,c.y);if(d<46&&d<bd){bd=d;best={k:'chicken',o:c,x:c.x,y:c.y-26,label:'Feed the chicken a Redleaf Herb'}}}
   if(!LVD)for(const n of npcs){const d=dist(P.x,P.y,n.x,n.y);if(d<64&&d<bd){bd=d;best={k:'npc',o:n,x:n.x,y:n.y-46,label:'Talk to '+n.name}}}
   if(best)return best;
   const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);
@@ -1817,6 +1840,8 @@ function interact(){
   if(P.fish){fishPress();return}
   const tg=findTarget();if(!tg)return;if(P.riding&&!dismount(true))return;
   if(tg.k==='npc'){talk(tg.o);return}
+  if(tg.k==='chicken'){if(!P.inv.herb){toast('The chicken wants a Redleaf Herb','Herbs grow in the meadows','#9ba4c2');SFX.deny();return}takeItems({herb:1});P.chickFed=(P.chickFed||0)+1;tg.o.peck=1;tg.o.tx=null;for(let i=0;i<6;i++)particles.push({x:tg.o.x+rnd(-8,8),y:tg.o.y-12,vx:rnd(-10,10),vy:-40,life:.9,max:.9,size:3,col:'#ff8fb1',k:'spark'});tone(1300,.08,'square',.04);tone(1500,.08,'square',.04,0,.1);
+    if(P.chickFed>=3)addPet('chick');else toast('Cluck! ('+P.chickFed+'/3)','The chickens like you more','#ff8fb1');save();return}
   if(tg.k==='fish'){startFish(tg.x,tg.y);return}
   const o=tg.o;P.fx=(o.x-P.x)/(dist(P.x,P.y,o.x,o.y)||1);P.fy=(o.y-P.y)/(dist(P.x,P.y,o.x,o.y)||1);
   if(o.type==='tree'){const l=P.sk.woodcutting.l;P.gather={o,t:0,dur:Math.max(.6,1.7-l*.12),kind:'axe',tick:0}}
@@ -1884,7 +1909,7 @@ function fishPress(){
   if(f.ph==='wait'||f.ph==='cast'){P.fish=null;toast('Too early!','Wait for the bobber to dip','#9ba4c2');return}
   if(f.ph==='bite'){const d=FISHDIFF[f.fish];const bonus=P.sk.fishing.l*.008;f.ph='reel';f.t=0;f.zw=d[0]+bonus;f.zc=rnd(.15+f.zw/2,.85-f.zw/2);f.sp=d[1];f.cur=0;return}
   if(f.ph==='reel'){
-    if(Math.abs(f.cur-f.zc)<=f.zw/2){const id=f.fish;addItem(id);P.st.fish++;P.st.fk=P.st.fk||{};P.st.fk[id]=1;qEvent('catch');gainSkill('fishing',{minnow:8,trout:11,bass:11,salmon:15,koi:30,angler:35,moonfin:60}[id]);
+    if(Math.abs(f.cur-f.zc)<=f.zw/2){const id=f.fish;addItem(id);P.st.fish++;P.st.fk=P.st.fk||{};P.st.fk[id]=1;qEvent('catch');if(f.ocean&&!P.pets.includes('turtle')&&Math.random()<(P.own.lure?.06:.03))setTimeout(()=>{addPet('turtle');toast('A baby sea turtle was tangled in your line!','Shelly decides to stay','#6fdc8c')},400);gainSkill('fishing',{minnow:8,trout:11,bass:11,salmon:15,koi:30,angler:35,moonfin:60}[id]);
       toast('Caught a '+ITEMS[id].n+'!',id==='moonfin'?'A legend of the lake!':id==='koi'||id==='angler'?'A rare catch!':'+'+ITEMS[id].v+' gold value',id==='moonfin'||id==='koi'?'#ffd23f':'#7fd6ff');SFX.catch();
       for(let i=0;i<16;i++)particles.push({x:f.bx,y:f.by,vx:rnd(-60,60),vy:rnd(-160,-60),life:.8,max:.8,size:3,col:'#cfe9ff',k:'spark',grav:300});
       if(P.st.fish>=10)unlock('angler');if(id==='moonfin')unlock('legend')}
@@ -1895,7 +1920,7 @@ function fishPress(){
 
 /* ---------- pet ---------- */
 function spawnPet(){pet=P.petId?{type:P.petId,x:P.x-30,y:P.y+6,cd:0,anim:0,fx:1,ht:0,moving:false}:null}
-function addPet(id){if(P.pets.includes(id))return;P.pets.push(id);toast(PETS[id].n+' wants to join you!',P.petId?'Summon it from the Stable (P)':'It follows you now','#ffd23f');SFX.chest();unlock('pet');if(P.pets.length>=5)unlock('tamer');if(!P.petId){P.petId=id;spawnPet();if(pet)puff(pet.x,pet.y,'#ffd23f',12)}}
+function addPet(id){if(P.pets.includes(id))return;P.pets.push(id);toast(PETS[id].n+' wants to join you!',P.petId?'Summon it from the Stable (P)':'It follows you now','#ffd23f');SFX.chest();unlock('pet');if(P.pets.length>=5)unlock('tamer');if(P.pets.length>=15)unlock('menagerie');if(!P.petId){P.petId=id;spawnPet();if(pet)puff(pet.x,pet.y,'#ffd23f',12)}}
 function addMount(id){if(P.mounts.includes(id))return;P.mounts.push(id);if(!P.mountId)P.mountId=id;toast('New mount: '+MOUNTS[id].n+' the '+MOUNTS[id].kind,'Press X to ride (choose mounts in the Stable, P)','#ffd23f');SFX.chest();unlock('rider');if(P.mounts.length>=Object.keys(MOUNTS).length)unlock('stable')}
 function mountSound(id){const M=MOUNTS[id];if(M.draw==='horse'||M.draw==='stag')[660,520,440].forEach((f,i)=>tone(f,.12,'sawtooth',.04,.8,i*.08));else if(M.draw==='boar')noiseS(.3,.3,300,1);else if(M.draw==='toad')tone(140,.25,'square',.07,1.6);else if(M.draw==='drake')SFX.roar();else tone(500,.5,'sine',.06,1.5)}
 function toggleRide(){
@@ -1909,19 +1934,24 @@ function dismount(manual){
 function updateMount(dt){
   P.mountCd=(P.mountCd||0)-dt;if(!P.riding)return;const M=MOUNTS[P.mountId];
   if(P.moving&&Math.random()<dt*14)particles.push({x:P.x+rnd(-10,10),y:P.y+12,vx:rnd(-20,20),vy:rnd(-20,-5),life:.45,max:.45,size:4,col:M.fly?'rgba(0,0,0,0)':'#d8cbb0',k:'smoke'});
+  if(M.regen){const S=stats();P.hp=Math.min(S.maxHp,P.hp+S.maxHp*.02*dt);if(Math.random()<dt*4)particles.push({x:P.x+rnd(-16,16),y:P.y,vx:0,vy:-40,life:.8,max:.8,size:2.5,col:'#ffd0f0',k:'spark'})}
   if(M.trample&&P.moving){for(const e of enemies){if(dist(P.x,P.y,e.x,e.y)<e.r+26&&(e.trAt||0)<time-.6){e.trAt=time;const a=Math.atan2(e.y-P.y,e.x-P.x);hurtEnemy(e,.9,Math.cos(a)*1.6,Math.sin(a)*1.6);P.iT=Math.max(P.iT,.3);shake=Math.max(shake,.15)}}}
   if(M.frost&&P.moving){if(Math.random()<dt*20)particles.push({x:P.x+rnd(-14,14),y:P.y+8,vx:0,vy:rnd(-15,-5),life:1,max:1,size:2.5,col:'#e8fbff',k:'spark'});for(const e of enemies)if(dist(P.x,P.y,e.x,e.y)<80)e.slow=Math.max(e.slow||0,1.5)}
   if(M.glow&&P.moving&&Math.random()<dt*10)particles.push({x:P.x-(P.mfx||1)*20,y:P.y-14,vx:-(P.mfx||1)*30,vy:-10,life:.6,max:.6,size:6,col:M.glow,k:'smoke'});
 }
 function updatePet(dt){
   if(!pet)return;const D=PETS[pet.type];pet.cd-=dt;pet.anim+=dt;pet.ht+=dt;
+  P.phxT=(P.phxT||0)-dt;
+  if(pet.type==='chick'&&pet.ht>30&&!P.dead){pet.ht=0;const n=rint(1,3);for(let i=0;i<n;i++)drop('gold',pet.x,pet.y,3+P.lvl);ftext(pet.x,pet.y-24,'Peep found coins!','#ffd23f',12)}
+  if(pet.type==='panda'&&pet.ht>45&&!P.dead){pet.ht=0;const r=Math.random(),it=r<.3?'herb':r<.55?'wood':r<.75?'iron':r<.88?'glowcap':r<.97?'gold':'crystal';addItem(it);ftext(pet.x,pet.y-24,'Mochi found '+ITEMS[it].n+'!','#ffb36b',12);SFX.pick()}
+  if(pet.type==='turtle'&&!P.moving&&!P.dead){const S=stats();if(P.hp<S.maxHp){P.hp=Math.min(S.maxHp,P.hp+S.maxHp*.015*dt);if(Math.random()<dt*3)particles.push({x:P.x+rnd(-10,10),y:P.y,vx:0,vy:-35,life:.7,max:.7,size:2.5,col:'#6fdc8c',k:'spark'})}}
   if(pet.type==='gloop'&&pet.ht>4){pet.ht=0;const S=stats();if(P.hp<S.maxHp&&!P.dead){const h=Math.round(S.maxHp*.04);P.hp=Math.min(S.maxHp,P.hp+h);ftext(P.x,P.y-44,'+'+h,'#6fdc8c',13);for(let i=0;i<8;i++)particles.push({x:P.x+rnd(-12,12),y:P.y+rnd(-4,10),vx:0,vy:rnd(-60,-30),life:.7,max:.7,size:2.5,col:'#9be15d',k:'spark'})}}
   let tx=P.x-P.fx*34,ty=P.y-P.fy*24+8,target=null;
   if(D.atk!=='none'&&pet.cd<=0){let bd=D.atk==='shoot'?280:200;for(const e of enemies){const d=dist(P.x,P.y,e.x,e.y);if(d<bd){bd=d;target=e}}}
   if(target&&D.atk==='shoot'){const a=Math.atan2(target.y-6-(pet.y-24),target.x-pet.x),wh=pet.type==='whelp';
-    projectiles.push({x:pet.x,y:pet.y-24,vx:Math.cos(a)*380,vy:Math.sin(a)*380,r:7,mult:D.mult*(petBed()?1.25:1),from:'p',k:wh?'fireball':'wisp',life:1,a,col:wh?'#ff7a1f':'#7fd6ff',fx:wh?{burn:3}:null,seek:wh?0:1,t:0});
+    projectiles.push({x:pet.x,y:pet.y-24,vx:Math.cos(a)*380,vy:Math.sin(a)*380,r:7,mult:D.mult*(petBed()?1.25:1),from:'p',k:D.pk||(wh?'fireball':'wisp'),life:1,a,col:wh||D.pk==='fireball'?'#ff7a1f':D.pk==='water'?'#5fd0ff':'#7fd6ff',fx:D.pfx||(wh?{burn:3}:null),seek:D.pk||wh?0:1,t:0});
     pet.cd=wh?1.1:.85;if(wh)SFX.fire();else tone(1100,.15,'sine',.04,.6);pet.fx=Math.cos(a)<0?-1:1;target=null}
-  if(target){tx=target.x;ty=target.y;if(dist(pet.x,pet.y,tx,ty)<target.r+14){hurtEnemy(target,D.mult*(petBed()?1.25:1),0,0,0,pet.type==='spiderling'?{poison:3}:null);pet.cd=.9;spark(target.x,target.y,'#ff8a3d',4)}}
+  if(target){tx=target.x;ty=target.y;if(dist(pet.x,pet.y,tx,ty)<target.r+14){hurtEnemy(target,D.mult*(petBed()?1.25:1),0,0,0,pet.type==='spiderling'?{poison:3}:D.bfx||null);if(pet.type==='bat'){const S=stats();P.hp=Math.min(S.maxHp,P.hp+3+P.lvl*.6)}pet.cd=.9;spark(target.x,target.y,'#ff8a3d',4)}}
   const d=dist(pet.x,pet.y,tx,ty),run=P.riding?1.9:1,sp=target?300:d>200?400*run:d>40?190*run:0;
   if(d>900){pet.x=P.x;pet.y=P.y}
   if(sp){pet.x+=(tx-pet.x)/d*sp*dt;pet.y+=(ty-pet.y)/d*sp*dt;pet.fx=tx>pet.x?1:-1;pet.moving=true}else pet.moving=false;
@@ -1934,6 +1964,20 @@ function drawPetSprite(g,type,x,y,fx,anim,moving){
   if(type==='pup')return sc(.62,2,fake('wolf'));
   if(type==='pinch')return sc(.6,2,fake('crab',{r:15}));
   if(type==='spiderling')return sc(.5,2,fake('spider'));
+  if(type==='bat')return sc(.75,6,fake('bat',{r:11}));
+  if(type==='magmy')return sc(.55,2,fake('magma',{col:'#ff6a1f',hopZ:moving?Math.abs(Math.sin(anim*9))*8:0}));
+  if(type==='bunny'){const hop=moving?Math.abs(Math.sin(anim*10))*6:0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,8,10,3.5,'rgba(0,0,0,.28)');g.translate(0,-hop);ell(g,-8,-1,4,4,'#ffffff');ell(g,0,0,9,7,rgrad(g,0,-2,9,'#fff4e6','#c9a888'));circ(g,7,-6,5.5,'#efe0cc');
+    for(const[ex,rot]of[[5,-.25],[8,.15]]){g.save();g.translate(ex,-10);g.rotate(rot);ell(g,0,-6,2.4,7,'#efe0cc');ell(g,0,-6,1.2,5,'#ffb8c8');g.restore()}circ(g,9,-7,1.3,'#111');circ(g,12,-5,1,'#ff8fa8');g.restore();return}
+  if(type==='chick'){const pk=pet&&pet.type==='chick'&&!moving?Math.abs(Math.sin(time*6))*2:0,st=moving?Math.sin(anim*20)*2:0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,6,6,2.5,'rgba(0,0,0,.25)');g.fillStyle='#e0a030';g.fillRect(-2,2+st*.5,1.2,4);g.fillRect(1,2-st*.5,1.2,4);circ(g,0,-1,6,rgrad(g,0,-3,6,'#fff3a0','#f0c030'));ell(g,-3,0,3,2,'#e8b828');circ(g,3,-4+pk,1.1,'#111');g.fillStyle='#ff9a20';g.beginPath();g.moveTo(5,-3+pk);g.lineTo(8,-2+pk);g.lineTo(5,-1+pk);g.fill();g.restore();return}
+  if(type==='turtle'){const sw=moving?Math.sin(anim*10):0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,7,12,4,'rgba(0,0,0,.25)');for(const[lx,ly]of[[-7,3],[7,3]]){ell(g,lx+sw*1.5,ly+2,3,2,'#6fae58')}ell(g,10,-1,4,3,'#7fc26a');circ(g,12,-2,.9,'#111');ell(g,0,-2,10,7,rgrad(g,0,-5,10,'#8fbf5a','#3d6e25'));g.strokeStyle='rgba(30,60,20,.6)';g.lineWidth=1;g.beginPath();g.moveTo(-5,-6);g.lineTo(5,-6);g.moveTo(-7,-2);g.lineTo(7,-2);g.moveTo(0,-8);g.lineTo(0,3);g.stroke();g.restore();return}
+  if(type==='frost'){const fl=Math.sin(time*16);g.save();g.translate(x,y);ell(g,0,8,7,2.5,'rgba(0,0,0,.18)');g.translate(0,-26+Math.sin(time*3+x*.01)*3);glow(g,0,0,22,'#9fe8ff',.45);g.fillStyle='rgba(220,245,255,.7)';for(const s2 of[-1,1]){g.beginPath();g.ellipse(s2*7,-2,6,3+fl*1.5,s2*.5,0,7);g.fill()}g.fillStyle=rgrad(g,0,-2,8,'#ffffff','#7fd0ff');g.beginPath();g.moveTo(0,-10);g.lineTo(5,0);g.lineTo(0,8);g.lineTo(-5,0);g.closePath();g.fill();circ(g,-1.5,-1,1,'#1d3a5a');circ(g,1.5,-1,1,'#1d3a5a');g.restore();return}
+  if(type==='phoenix'){const fl=Math.sin(time*13);g.save();g.translate(x,y);ell(g,0,8,9,3,'rgba(0,0,0,.2)');g.translate(0,-26+Math.sin(time*3+x*.01)*3);g.scale(fx,1);glow(g,0,0,26,'#ff9a3d',.45);
+    for(let i=0;i<3;i++){g.strokeStyle=['#ff4d1f','#ffb347','#fff1a8'][i];g.lineWidth=3-i*.6;g.beginPath();g.moveTo(-6,2);g.quadraticCurveTo(-18,4+i*3,-24,-2+i*4+Math.sin(time*6+i)*2);g.stroke()}
+    g.fillStyle='#ff6a1f';for(const s2 of[-1,1]){g.beginPath();g.moveTo(0,-2);g.lineTo(-4,-14-fl*5*s2);g.lineTo(6,-4);g.closePath();g.fill()}ell(g,0,0,8,6,rgrad(g,0,-2,8,'#ffe08a','#ff5a1f'));circ(g,7,-4,4.5,'#ffb347');g.fillStyle='#ffd23f';g.beginPath();g.moveTo(10,-5);g.lineTo(14,-3);g.lineTo(10,-2);g.fill();circ(g,8,-5,1,'#3a0d0a');g.fillStyle='#ff4d1f';g.beginPath();g.moveTo(5,-8);g.lineTo(6,-13);g.lineTo(8,-8);g.fill();g.restore();return}
+  if(type==='panda'){const run=moving?Math.sin(anim*16)*2:0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,8,12,4,'rgba(0,0,0,.28)');g.strokeStyle='#c8582a';g.lineWidth=5;g.lineCap='round';g.beginPath();g.moveTo(-8,0);g.quadraticCurveTo(-18,-2,-17,-12+Math.sin(time*3)*2);g.stroke();g.strokeStyle='#6a2a12';g.lineWidth=5;g.setLineDash([2.5,3]);g.stroke();g.setLineDash([]);
+    ell(g,0,0,9,6,rgrad(g,0,-2,9,'#e8743a','#a8401a'));g.fillStyle='#3a1a0e';g.fillRect(-5,4+run*.5,2.5,5);g.fillRect(4,4-run*.5,2.5,5);circ(g,8,-6,6,'#d8642a');ell(g,10,-4,4,3,'#fff4e6');circ(g,5,-11,2.4,'#d8642a');circ(g,10,-11,2.4,'#d8642a');circ(g,6,-7,1.1,'#111');circ(g,10,-7,1.1,'#111');circ(g,13,-4,1,'#111');g.restore();return}
+  if(type==='inky'){const w=Math.sin(time*6);g.save();g.translate(x,y);ell(g,0,7,10,3,'rgba(0,0,0,.22)');g.strokeStyle='#7a4ab8';g.lineWidth=3;g.lineCap='round';for(let i=0;i<5;i++){const lx=-8+i*4;g.beginPath();g.moveTo(lx,0);g.quadraticCurveTo(lx+w*2*(i%2?1:-1),4,lx+w*3,8);g.stroke()}
+    ell(g,0,-6,9,9,rgrad(g,0,-9,9,'#c8a0ff','#6a3aa8'));circ(g,-3+fx,-6,2.4,'#fff');circ(g,3+fx,-6,2.4,'#fff');circ(g,-3+fx*1.6,-6,1.2,'#1a1030');circ(g,3+fx*1.6,-6,1.2,'#1a1030');circ(g,-5,-11,1.2,'rgba(255,255,255,.5)');g.restore();return}
   if(type==='pebble')return sc(.45,4,fake('golem',{r:24}));
   if(type==='lumen'){glow(g,x,y-8,26,'#7fd6ff',.2);return sc(.7,-6,fake('wisp',{r:12}))}
   const hov=Math.sin(time*3+x*.01)*3;
@@ -1964,33 +2008,54 @@ function drawMount(g,id,x,y,fx,anim,moving){
     g.fillStyle='#4a120d';g.fillRect(-12,4,6,10+Math.sin(step)*2);g.fillRect(10,4,6,10-Math.sin(step)*2);
     g.fillStyle='rgba(150,35,25,.95)';g.beginPath();g.moveTo(-2,-14);g.lineTo(-24,-56-fl*22);g.lineTo(2,-30);g.lineTo(-6,-18-fl*6);g.lineTo(12,-12);g.closePath();g.fill();
     g.restore();return -50+hov}
+  if(M.draw==='griffin'){const fl=Math.sin(time*(moving?10:5)),hov=Math.sin(time*2.5)*4;ell(g,0,14,38,10,'rgba(0,0,0,.3)');g.translate(0,-30+hov);g.scale(fx,1);
+    g.fillStyle='#8a6a40';g.beginPath();g.moveTo(-6,-14);g.lineTo(-40,-48-fl*20);g.lineTo(-30,-30);g.lineTo(-36,-20-fl*8);g.lineTo(4,-12);g.closePath();g.fill();
+    g.strokeStyle='#b8862a';g.lineWidth=5;g.lineCap='round';g.beginPath();g.moveTo(-22,-4);g.quadraticCurveTo(-40,0,-46,-10);g.stroke();circ(g,-47,-11,4,'#5a3a20');
+    ell(g,0,-6,26,12,rgrad(g,0,-12,26,'#e8c070','#9a6a2a'));g.fillStyle='#9a6a2a';g.fillRect(-16,2,5,11+Math.sin(step)*2);g.fillRect(12,2,5,11-Math.sin(step)*2);
+    ell(g,22,-20,12,11,rgrad(g,22,-24,12,'#ffffff','#c9c3b4'));g.fillStyle='#ffc23f';g.beginPath();g.moveTo(32,-22);g.quadraticCurveTo(42,-20,34,-12);g.lineTo(30,-17);g.closePath();g.fill();circ(g,26,-23,2,'#2a1a10');g.fillStyle='#e8e4dc';g.beginPath();g.moveTo(16,-28);g.lineTo(14,-38);g.lineTo(21,-30);g.fill();
+    g.fillStyle='#a8804a';g.beginPath();g.moveTo(-2,-14);g.lineTo(-22,-56-fl*22);g.lineTo(-10,-38);g.lineTo(-20,-28-fl*6);g.lineTo(10,-12);g.closePath();g.fill();g.fillStyle='#8a5a30';rr(g,-8,-20,16,6,3);
+    g.restore();return -48+hov}
+  if(M.draw==='bird'){const st=moving?Math.sin(anim*16):0;ell(g,0,6,22,6,'rgba(0,0,0,.3)');g.scale(fx,1);const bob=moving?Math.abs(Math.sin(anim*16))*3:0;
+    g.strokeStyle='#c98a3a';g.lineWidth=3.5;g.lineCap='round';for(const s2 of[1,-1]){g.beginPath();g.moveTo(0,-32-bob);g.lineTo(s2*st*8,-14);g.lineTo(s2*st*12+4,4);g.stroke()}
+    g.translate(0,-bob);g.fillStyle='#2f9a8a';for(let i=0;i<4;i++){g.save();g.translate(-18,-40);g.rotate(-.5-i*.25);ell(g,-10,0,12,3.5);g.restore()}
+    ell(g,0,-38,20,13,rgrad(g,0,-42,20,'#ffd27a','#c8701a'));g.strokeStyle='#e8a84a';g.lineWidth=7;g.beginPath();g.moveTo(12,-42);g.quadraticCurveTo(22,-52,20,-66);g.stroke();
+    circ(g,21,-68,6,'#ffd27a');g.fillStyle='#ff8a20';g.beginPath();g.moveTo(26,-70);g.lineTo(34,-66);g.lineTo(26,-64);g.fill();circ(g,23,-70,1.4,'#111');g.fillStyle='#2f9a8a';g.beginPath();g.moveTo(18,-73);g.lineTo(14,-82);g.lineTo(22,-74);g.fill();g.fillStyle='#8a5a30';rr(g,-8,-52,16,6,3);
+    g.restore();return -52-bob}
+  if(M.draw==='turtle'){const sw=moving?Math.sin(anim*8):0,t2=tileAt(Math.floor(x/T),Math.floor(y/T)),wet=t2===WATER||t2===DEEP;
+    if(wet){g.strokeStyle='rgba(220,245,255,.6)';g.lineWidth=2;g.beginPath();g.ellipse(0,4,34+sw*2,10,0,0,7);g.stroke()}else ell(g,0,6,30,7,'rgba(0,0,0,.3)');g.scale(fx,1);
+    for(const[lx,ly,s2]of[[-18,0,1],[16,0,-1],[-14,6,-1],[14,6,1]]){g.save();g.translate(lx,ly);g.rotate(sw*.5*s2);ell(g,0,0,9,4,'#6fae58');g.restore()}
+    ell(g,28,-6,8,6.5,'#7fc26a');circ(g,31,-8,1.4,'#111');ell(g,0,-10,26,15,rgrad(g,0,-16,26,'#9ac06a','#3d6e25'));
+    g.strokeStyle='rgba(40,70,20,.55)';g.lineWidth=1.5;for(const[a,b]of[[-12,-14],[0,-18],[12,-14],[-6,-6],[6,-6]]){g.beginPath();for(let i=0;i<6;i++){const an=i/6*Math.PI*2;g.lineTo(a+Math.cos(an)*6,b+Math.sin(an)*4)}g.closePath();g.stroke()}g.fillStyle='#8a5a30';rr(g,-8,-26,16,6,3);
+    g.restore();return -28}
   if(M.draw==='toad'){const hop=moving?Math.abs(Math.sin(anim*7))*12:0,sq=moving?Math.cos(anim*14)*.08:0;ell(g,0,10,28,8,'rgba(0,0,0,.3)');g.translate(0,-hop);g.scale(fx*(1+sq),1-sq);
     ell(g,-18,2,10,7,'#4f8a2e');ell(g,16,6,7,5,'#4f8a2e');ell(g,0,-10,26,18,rgrad(g,0,-16,26,'#8fd25a','#3d6e25'));ell(g,4,-2,16,8,'#d8e8a0');
     for(const[a,b]of[[-10,-20],[2,-24],[-16,-8]])circ(g,a,b,2.4,'#5aa83a');circ(g,16,-24,7,'#7fc24a');circ(g,16,-24,5,'#ffe066');g.fillStyle='#111';g.fillRect(14,-25,5,2.4);
     g.strokeStyle='#2e5a1c';g.lineWidth=2;g.beginPath();g.moveTo(10,-12);g.quadraticCurveTo(20,-10,25,-15);g.stroke();g.fillStyle='#8a5a30';rr(g,-12,-30,18,6,3);g.restore();return -28-hop}
-  const isBoar=M.draw==='boar',isWolf=M.draw==='wolf',L=isBoar?9:isWolf?13:16,bh=isBoar?-12:-16-L*.4;
-  ell(g,0,6,30,7,'rgba(0,0,0,.3)');if(M.glow)glow(g,0,bh,48,M.glow,.25);g.scale(fx,1);
+  const isBoar=M.draw==='boar'||M.draw==='bear',isWolf=M.draw==='wolf',L=isBoar?9:isWolf?13:16,bh=isBoar?-12:-16-L*.4;
+  ell(g,0,6,30*(M.s||1),7,'rgba(0,0,0,.3)');if(M.glow)glow(g,0,bh,48,M.glow,.25);g.scale(fx,1);g.scale(M.s||1,M.s||1);
   const bob=moving?Math.abs(Math.sin(step))*2:0;g.translate(0,-bob);
   const leg=(lx,ph,col)=>{const sw=moving?Math.sin(step+ph)*6:0;g.strokeStyle=col;g.lineWidth=isBoar?5:4.5;g.lineCap='round';g.beginPath();g.moveTo(lx,bh+4);g.lineTo(lx+sw*.4,bh+4+L*.55);g.lineTo(lx+sw,4);g.stroke();g.fillStyle=isWolf?M.dark:'#2a2018';ell(g,lx+sw,4,3.2,2)};
   leg(-14,Math.PI,M.dark);leg(12,0,M.dark);
   // tail
   g.strokeStyle=M.mane;g.lineWidth=isBoar?2:5;g.beginPath();g.moveTo(-22,bh-2);g.quadraticCurveTo(-32,bh+2+Math.sin(time*4)*3,isWolf?-34:-30,bh+12);g.stroke();
   ell(g,0,bh,isBoar?24:23,isBoar?13:11,rgrad(g,0,bh-6,24,shade(M.body,.2),M.dark));
+  if(M.stripes){g.strokeStyle=M.dark;g.lineWidth=2.5;for(let i=-14;i<=12;i+=6){g.beginPath();g.moveTo(i,bh-10);g.lineTo(i+3,bh+3);g.stroke()}}
   if(id==='stag'){g.fillStyle='rgba(255,255,255,.55)';for(const[a,b]of[[-10,-4],[-4,-7],[3,-5],[-14,0]])circ(g,a,bh+b,1.8)}
   leg(-8,0,M.body);leg(18,Math.PI,M.body);
-  if(isBoar){ell(g,22,bh+2,12,10,rgrad(g,22,bh,12,shade(M.body,.15),M.dark));ell(g,32,bh+4,5,5,'#c79a8a');circ(g,33,bh+3,1,'#3a2018');circ(g,33,bh+6,1,'#3a2018');
+  if(M.draw==='bear'){ell(g,22,bh-2,12,10,rgrad(g,22,bh-5,12,shade(M.body,.15),M.dark));circ(g,16,bh-11,3.5,M.dark);circ(g,26,bh-12,3.5,M.dark);ell(g,32,bh+1,6,4.5,'#a8805a');circ(g,36,bh,1.8,'#1a0e08');circ(g,25,bh-4,1.6,'#1a0e08')}
+  else if(isBoar){ell(g,22,bh+2,12,10,rgrad(g,22,bh,12,shade(M.body,.15),M.dark));ell(g,32,bh+4,5,5,'#c79a8a');circ(g,33,bh+3,1,'#3a2018');circ(g,33,bh+6,1,'#3a2018');
     g.strokeStyle='#f5efe0';g.lineWidth=2.5;g.beginPath();g.moveTo(28,bh+8);g.quadraticCurveTo(34,bh+8,34,bh+1);g.stroke();g.fillStyle=M.dark;g.beginPath();g.moveTo(16,bh-6);g.lineTo(18,bh-14);g.lineTo(22,bh-7);g.fill();circ(g,25,bh-2,1.6,'#ffcf6b');
     g.strokeStyle=M.mane;g.lineWidth=2;for(let i=-14;i<16;i+=4){g.beginPath();g.moveTo(i,bh-11);g.lineTo(i-2,bh-16);g.stroke()}}
   else if(isWolf){ell(g,24,bh-6,10,8,rgrad(g,24,bh-8,10,shade(M.body,.1),M.dark));ell(g,33,bh-3,6,4,M.body);circ(g,38,bh-4,1.6,'#2a3448');g.fillStyle=M.dark;g.beginPath();g.moveTo(19,bh-12);g.lineTo(21,bh-22);g.lineTo(25,bh-13);g.moveTo(25,bh-13);g.lineTo(29,bh-21);g.lineTo(30,bh-11);g.fill();glow(g,27,bh-8,7,'#8fe3ff',.6);circ(g,27,bh-8,1.6,'#c8f4ff');
     g.strokeStyle=M.mane;g.lineWidth=3;for(let i=-10;i<14;i+=6){g.beginPath();g.moveTo(i,bh-10);g.lineTo(i-3,bh-15);g.stroke()}}
   else{g.fillStyle=M.body;g.beginPath();g.moveTo(14,bh-6);g.lineTo(24,bh-26);g.lineTo(32,bh-22);g.lineTo(22,bh+2);g.closePath();g.fill();
-    g.save();g.translate(32,bh-26);g.rotate(.5);ell(g,0,0,11,5.5,rgrad(g,0,-2,11,shade(M.body,.15),M.dark));g.restore();circ(g,29,bh-28,1.6,M.glow||'#111');if(M.glow)glow(g,29,bh-28,6,M.glow,.8);
+    g.save();g.translate(32,bh-26);g.rotate(.5);ell(g,0,0,11,5.5,rgrad(g,0,-2,11,shade(M.body,.15),M.dark));g.restore();circ(g,29,bh-28,1.6,M.glow||'#111');if(M.glow)glow(g,29,bh-28,6,M.glow,.8);if(M.horn){g.strokeStyle='#ffd23f';g.lineWidth=2.5;g.beginPath();g.moveTo(31,bh-32);g.lineTo(38,bh-48);g.stroke();g.strokeStyle='#fff6c0';g.lineWidth=1;for(let i=0;i<3;i++){g.beginPath();g.moveTo(32+i*2,bh-34-i*4);g.lineTo(34+i*2,bh-36-i*4);g.stroke()}glow(g,38,bh-48,8,'#ffd23f',.6)}
     g.fillStyle=M.dark;g.beginPath();g.moveTo(25,bh-30);g.lineTo(26,bh-37);g.lineTo(29,bh-31);g.fill();
     g.strokeStyle=M.mane;g.lineWidth=M.glow?4:3;g.lineCap='round';for(let i=0;i<5;i++){const t=i/5;g.beginPath();g.moveTo(16+t*9,bh-8-t*18);g.lineTo(12+t*9+Math.sin(time*6+i)*(M.glow?3:1),bh-6-t*18);g.stroke()}
     if(id==='stag'){g.strokeStyle='#efe4c8';g.lineWidth=2;g.beginPath();g.moveTo(26,bh-32);g.lineTo(22,bh-46);g.moveTo(24,bh-40);g.lineTo(17,bh-44);g.moveTo(23,bh-44);g.lineTo(27,bh-50);g.moveTo(29,bh-32);g.lineTo(33,bh-45);g.moveTo(31,bh-39);g.lineTo(37,bh-42);g.stroke()}
     g.fillStyle='#8a5a30';rr(g,-8,bh-12,16,6,3)}
   if(isBoar||isWolf){g.fillStyle=isWolf?'#3a5a8a':'#8a5a30';rr(g,-8,bh-14,16,6,3)}
-  g.restore();return bh-12-bob;
+  g.restore();return (bh-12-bob)*(M.s||1);
 }
 function drawFox(g,x,y,fx,anim,moving){const run=moving?Math.sin(anim*16)*2:0;g.save();g.translate(x,y);g.scale(fx,1);ell(g,0,8,12,4,'rgba(0,0,0,.3)');
   g.fillStyle='#ff8a3d';g.beginPath();g.moveTo(-8,-2);g.quadraticCurveTo(-22,-10+run,-20,4);g.quadraticCurveTo(-14,2,-8,4);g.fill();circ(g,-19,2+run*.3,3,'#fff');
@@ -2358,7 +2423,7 @@ function openSpells(learn){
 const portraitCache2={};
 function companionPortrait(kind,id,unknown){const key=kind+id+(unknown?'?':'');if(portraitCache2[key])return portraitCache2[key];const c=document.createElement('canvas');c.width=c.height=160;const g=c.getContext('2d');
   if(kind==='pet'){g.translate(80,PETS[id].fly?140:112);g.scale(2.6,2.6);drawPetSprite(g,id,0,0,1,0,false)}
-  else{g.translate(id==='drake'?62:72,id==='drake'?150:126);g.scale(id==='drake'?1.2:1.6,id==='drake'?1.2:1.6);drawMount(g,id,0,0,1,0,false)}
+  else{const fl=id==='drake'||id==='griffin',tall=id==='sunrunner';g.translate(fl?62:tall?70:72,fl?150:tall?140:126);const k=fl?1.2:tall?1.45:1.6;g.scale(k,k);drawMount(g,id,0,0,1,0,false)}
   if(unknown){g.setTransform(1,0,0,1,0,0);g.globalCompositeOperation='source-in';g.fillStyle='#2b3354';g.fillRect(0,0,160,160)}
   return portraitCache2[key]=c.toDataURL()}
 function openStable(tab='pets'){
@@ -2599,7 +2664,7 @@ function handleAct(act,id){
     case'close':closePanel();break;
     case'atab':openArena(id);break;
     case'bout':startBout();break;
-    case'abuy':{const it=ARENA_SHOP[+id];if((P.tokens||0)<it.cost||(it.rank&&(P.arenaRank||0)<it.rank))return;P.tokens-=it.cost;if(it.k==='wpn')addWeapon(it.t);else if(it.k==='furn'){P.furn[it.t]=(P.furn[it.t]||0)+1;toast(FURN[it.t].n+' won','Place it in your house','#ffd23f')}else{addItem(it.t);toast(ITEMS[it.t].n+' won','Equip it from your bag','#ffd23f')}SFX.coin();openArena('shop');save();break}
+    case'abuy':{const it=ARENA_SHOP[+id];if((P.tokens||0)<it.cost||(it.rank&&(P.arenaRank||0)<it.rank))return;if((it.k==='pet'&&P.pets.includes(it.t))||(it.k==='mount'&&P.mounts.includes(it.t)))return;P.tokens-=it.cost;if(it.k==='pet')addPet(it.t);else if(it.k==='mount')addMount(it.t);else if(it.k==='wpn')addWeapon(it.t);else if(it.k==='furn'){P.furn[it.t]=(P.furn[it.t]||0)+1;toast(FURN[it.t].n+' won','Place it in your house','#ffd23f')}else{addItem(it.t);toast(ITEMS[it.t].n+' won','Equip it from your bag','#ffd23f')}SFX.coin();openArena('shop');save();break}
     case'rename':{const v=cleanName(document.getElementById('nmIn').value);if(v){P.name=v;toast('You are now '+v,'','#7fd6ff');save()}openPlayers();break}
     case'ctab':openCraft('bench',id);break;
     case'buyhouse':buyHouse(false);break;
