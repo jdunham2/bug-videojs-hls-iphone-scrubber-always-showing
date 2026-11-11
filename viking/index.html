@@ -51,6 +51,16 @@
   .foe .cr { font-size: 11px; color: #e8dcc0; text-shadow: 0 1px 3px #000; }
   .foe.target .nm::before { content: '◆ '; color: var(--gold); }
   .foe.target .hb { border-color: var(--gold); }
+  .crewtag { position: fixed; z-index: 1; transform: translate(-50%, -100%); pointer-events: none; font-size: 12px; color: #f0e2bf; text-shadow: 0 1px 3px #000, 0 0 6px #000; white-space: nowrap; }
+  .roster { display: flex; flex-direction: column; gap: 6px; }
+  .crewrow { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; background: rgba(255,255,255,.04); border-radius: 6px; font-size: 13.5px; }
+  .crewrow small { color: var(--muted); }
+  .crewr { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .crewr button { font-size: 12px; padding: 2px 8px; }
+  .trait { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .vet { color: var(--gold); font-size: 12px; }
+  .crewlink { color: var(--gold); }
+  .modal .desc { color: var(--muted); font-style: italic; margin: 0 0 10px; font-size: 13.5px; }
   .foe.sm .hb { width: 54px; height: 5px; }
   .hpbar { display: inline-block; width: 120px; height: 9px; vertical-align: middle; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.25); border-radius: 4px; overflow: hidden; margin-right: 6px; }
   .hpbar i { display: block; height: 100%; background: linear-gradient(90deg, #a5301f, #e0573f); }
@@ -141,7 +151,7 @@
   <kbd>Space</kbd>arrows / strike &nbsp; <kbd>Shift</kbd>shields<br>
   <kbd>B</kbd>board &nbsp; <kbd>G</kbd>go ashore &nbsp; <kbd>R</kbd>ride &nbsp; <kbd>C</kbd>call horse<br>
   <kbd>Q</kbd>switch axe / bow<br>
-  <kbd>J</kbd>journal &nbsp; <kbd>M</kbd>sound &nbsp; <kbd>H</kbd>help<br>
+  <kbd>J</kbd>journal &nbsp; <kbd>K</kbd>crew &nbsp; <kbd>M</kbd>sound &nbsp; <kbd>H</kbd>help<br>
   Drag to look · scroll to zoom
 </div>
 <div class="ui glass" id="panel"></div>
@@ -299,7 +309,73 @@ function price(placeId, g) {
   const w = (.9 + ((Math.sin(S.day * 1.7 + placeId.length * 3.1 + g.length) + 1) / 2) * .2) * (SEASON_PRICE[seasonOf(S.day)][g] || 1);
   return Math.max(2, Math.round(GOODS[g].base * mod * w));
 }
-const power = () => S.crew * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
+// ---- named crew ----
+const TRAITS = {
+  strong:     { name: 'Strong',     w: 3, desc: 'Hits harder on land and in boarding fights.', ep: ['the Strong', 'Ironarm', 'Oak-back'] },
+  berserker:  { name: 'Berserker',  w: 1.5, desc: 'Fights like a bear on land. Counts double in boarding fights.', ep: ['Bear-shirt', 'the Wild', 'Wolf-howl'] },
+  archer:     { name: 'Keen-eyed',  w: 3, desc: 'Fights as an archer ashore. +1 arrow in every volley at sea.', ep: ['Hawkeye', 'Far-shot', 'the Archer'] },
+  shipwright: { name: 'Shipwright', w: 2, desc: 'Patches the hull at sea each day. Repairs cost less.', ep: ['Tar-hand', 'Keel-wright', 'Adze'] },
+  navigator:  { name: 'Navigator',  w: 2, desc: 'Reads stars and swells: the ship sails 5% faster.', ep: ['Star-reader', 'Wave-wise', 'the Pilot'] },
+  hunter:     { name: 'Hunter',     w: 2, desc: 'Hunting brings back more food.', ep: ['the Hunter', 'Elk-bane', 'Fox-foot'] },
+  skald:      { name: 'Skald',      w: 1.5, desc: 'Songs and stories keep morale up. Feasts win more glory.', ep: ['Silver-tongue', 'the Skald', 'Song-smith'] },
+  healer:     { name: 'Healer',     w: 1.5, desc: 'Can save wounded crew who would otherwise die.', ep: ['Herb-wise', 'the Mender', 'Kind-hand'] },
+  trader:     { name: 'Trader',     w: 2, desc: 'Buys a little cheaper and sells a little dearer.', ep: ['Coin-counter', 'the Shrewd', 'Scale-eye'] },
+  glutton:    { name: 'Glutton',    w: 1, desc: 'Eats enough for two. Brave, though.', ep: ['Big-belly', 'the Hungry', 'Mead-barrel'] },
+};
+const NAMES = ['Bjorn', 'Ragnar', 'Leif', 'Ulf', 'Sigurd', 'Ivar', 'Harald', 'Erik', 'Gunnar', 'Halfdan', 'Torvald', 'Knut', 'Olaf', 'Arne', 'Sven', 'Thorstein', 'Egil', 'Orm', 'Kari', 'Asgeir', 'Vigdis',
+  'Sigrid', 'Astrid', 'Freydis', 'Ingrid', 'Gudrun', 'Thyra', 'Ragnhild', 'Helga', 'Solveig', 'Asa', 'Hild', 'Gunnhild', 'Brynja', 'Eir', 'Yrsa', 'Ketil', 'Runa', 'Dagny', 'Hallvard', 'Svala'];
+function newMember() {
+  const total = Object.values(TRAITS).reduce((a, t) => a + t.w, 0); let r = Math.random() * total, trait = 'strong';
+  for (const [k, t] of Object.entries(TRAITS)) { r -= t.w; if (r <= 0) { trait = k; break; } }
+  const used = new Set((S.roster || []).map(m => m.name));
+  let name; for (let i = 0; i < 30; i++) { name = pick(NAMES); if (!used.has(name)) break; }
+  return { id: Math.random().toString(36).slice(2, 9), name, ep: pick(TRAITS[trait].ep), trait, kills: 0, vet: false, day: S.day };
+}
+const fullName = m => `${m.name} ${m.ep}`;
+const traitCount = t => (S.roster || []).filter(m => m.trait === t).length;
+function syncRoster(quiet) {
+  S.roster ||= [];
+  while (S.roster.length < S.crew) {
+    const m = newMember(); S.roster.push(m);
+    if (!quiet) log(`${fullName(m)} joins your crew. <i>${TRAITS[m.trait].name}: ${TRAITS[m.trait].desc}</i>`, 'good');
+  }
+  while (S.roster.length > S.crew) {
+    const healers = traitCount('healer');
+    const victim = S.roster.splice(Math.floor(Math.random() * S.roster.length), 1)[0];
+    const healer = S.roster.find(m => m.trait === 'healer');
+    if (healer && chance(Math.min(.5, healers * .25))) { S.roster.push(victim); S.crew++; log(`${fullName(victim)} is badly wounded, but ${healer.name} the healer pulls them back from death.`, 'good'); continue; }
+    log(`${fullName(victim)} is lost.`, 'bad');
+  }
+}
+function loseMember(m, how) {
+  const i = (S.roster || []).indexOf(m);
+  const healer = S.roster.find(x => x.trait === 'healer' && x !== m);
+  if (healer && chance(Math.min(.5, traitCount('healer') * .25))) { log(`${fullName(m)} falls, but ${healer.name} the healer binds the wound in time.`, 'good'); return false; }
+  if (i >= 0) S.roster.splice(i, 1);
+  S.crew = Math.max(1, S.crew - 1); syncRoster(true);
+  log(`${fullName(m)} ${how}`, 'bad'); return true;
+}
+function openRoster() {
+  syncRoster(true);
+  const tc = t => traitCount(t);
+  const bonus = [];
+  if (tc('navigator')) bonus.push(`+${Math.min(3, tc('navigator')) * 5}% sailing speed`);
+  if (tc('archer')) bonus.push(`+${Math.min(3, tc('archer'))} arrows per volley`);
+  if (tc('shipwright')) bonus.push(`hull +${tc('shipwright') * 3} per day at sea`);
+  if (tc('trader')) bonus.push(`${Math.min(4, tc('trader')) * 3}% better prices`);
+  if (tc('hunter')) bonus.push(`+${tc('hunter') * 25}% hunting food`);
+  if (tc('skald')) bonus.push(`+${tc('skald')} morale per day`);
+  if (tc('healer')) bonus.push(`${Math.min(50, tc('healer') * 25)}% chance to save the dying`);
+  if (tc('glutton')) bonus.push(`gluttons eat ${tc('glutton')} extra food a day`);
+  const rows = S.roster.map(m => `<div class="crewrow"><div><b>${fullName(m)}</b>${m.vet ? ' <span class="vet">★ veteran</span>' : ''}<br><span class="trait">${TRAITS[m.trait].name}</span> <small>${TRAITS[m.trait].desc}</small></div><div class="crewr"><small>${m.kills} kill${m.kills === 1 ? '' : 's'}</small>${S.docked && !ashore.on && S.crew > 1 ? `<button data-dismiss="${m.id}">Dismiss</button>` : ''}</div></div>`).join('');
+  openModal(`<h2>Your Crew</h2><p class="desc">${S.crew} of ${S.maxCrew} benches filled${bonus.length ? '<br>' + bonus.join(' · ') : ''}</p><div class="roster">${rows}</div>`, [['Close', () => {}]]);
+  $('modalBox').querySelectorAll('[data-dismiss]').forEach(b => b.onclick = () => {
+    const m = S.roster.find(x => x.id === b.dataset.dismiss); if (!m) return;
+    S.roster.splice(S.roster.indexOf(m), 1); S.crew = Math.max(1, S.crew - 1);
+    log(`You release ${fullName(m)} from your service. They walk off toward the mead-hall.`); save(); renderHUD(); openRoster();
+  });
+}
+const power = () => (S.crew + traitCount('strong') * .5 + traitCount('berserker')) * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
 const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5);
 
 function log(text, cls = '') {
@@ -323,7 +399,7 @@ function passDays(n, atSea) {
     const sn = seasonOf(S.day);
     if (dayInSeason(S.day) === 0) seasonChanged(sn);
     if (atSea && sn === 3 && chance(.5)) S.morale = clamp(S.morale - 3, 0, 100);
-    const eat = Math.ceil(S.crew * .5 * (atSea && sn === 3 ? 1.5 : 1));
+    const eat = Math.ceil((S.crew * .5 + traitCount('glutton')) * (atSea && sn === 3 ? 1.5 : 1));
     if (S.food >= eat) S.food -= eat;
     else {
       S.food = 0; S.morale = clamp(S.morale - 12, 0, 100);
@@ -334,6 +410,8 @@ function passDays(n, atSea) {
       }
     }
     if (!atSea) S.morale = clamp(S.morale + 1, 0, 100);
+    S.morale = clamp(S.morale + traitCount('skald'), 0, 100);
+    if (atSea && traitCount('shipwright')) S.hull = Math.min(S.maxHull, S.hull + traitCount('shipwright') * 3);
     if (S.hall > 0 && S.at === 'home' && S.docked) S.food += S.hall * 4;
     for (const k in S.hostile) if (S.hostile[k] > 0) S.hostile[k]--;
     for (const k in S.alert) if (S.alert[k] > 0 && chance(.1)) S.alert[k]--;
@@ -1195,7 +1273,7 @@ function playerShoot() {
     camera.getWorldDirection(tmpV); let bd = 170;
     for (const n of npcs) { if (n.dead) continue; const dx = n.pos.x - ship.pos.x, dz = n.pos.y - ship.pos.y, d = Math.hypot(dx, dz); if (d < bd && (dx * tmpV.x + dz * tmpV.z) / d > .8) { bd = d; tgt = n; } }
   }
-  const from = ship.g.position, count = clamp(Math.ceil(S.crew / 2), 2, 8);
+  const from = ship.g.position, count = clamp(Math.ceil(S.crew / 2), 2, 8) + Math.min(3, traitCount('archer'));
   if (tgt) {
     const isS = tgt === serpent, tp = isS ? tgt.head.getWorldPosition(tmpV2) : tgt.g.position;
     fireVolley(from, tp, isS ? { x: 0, z: 0 } : velOf(tgt.h, tgt.speed), count, 1.2 + Math.hypot(tp.x - from.x, tp.z - from.z) * .03, 'player');
@@ -1828,9 +1906,13 @@ function goAshore(onReady) {
     Object.assign(ashore, { on: true, p, battle: null, leaving: false, jarlKilled: false });
     const lp = p.landPt;
     hero = addUnit('hero', lp.x, lp.z); hero.h = lp.h;
+    syncRoster(true);
     for (let i = 0; i < Math.min(S.crew, 12); i++) {
       let pt = { x: lp.x + rnd(-3, 3), z: lp.z + rnd(-3, 3) }; if (groundAt(p, pt.x, pt.z) === null) pt = { x: lp.x, z: lp.z };
-      const al = addUnit('ally', pt.x, pt.z, { slot: i, archer: i % 3 === 2 }); al.h = lp.h; setWeapon(al);
+      const mem = S.roster[i], tr = mem ? mem.trait : '', vet = mem && mem.vet ? 1.25 : 1;
+      const al = addUnit('ally', pt.x, pt.z, { slot: i, member: mem, archer: tr === 'archer' }); al.h = lp.h; setWeapon(al);
+      const dm = (tr === 'berserker' ? 1.8 : tr === 'strong' ? 1.3 : 1) * vet, hm = (tr === 'berserker' ? 1.2 : tr === 'strong' ? 1.3 : 1) * vet;
+      al.dmg *= dm; al.hp = al.maxHp = Math.round(al.maxHp * hm); if (tr === 'berserker') al.speed *= 1.12;
     }
     footYaw = lp.h; camSnap = true;
     spawnLocals(p);
@@ -1929,15 +2011,16 @@ function unitDamage(u, amt, from) {
   u.hp -= amt; u.flash = .15;
   if (u.team === 'them' && !u.aggro) wakeGroup(u);
   if (u.kind === 'deer') { u.home = { x: u.x, z: u.z, r: 25 }; }
-  if (u.hp <= 0) killUnit(u);
+  if (u.hp <= 0) killUnit(u, from);
 }
-function killUnit(u) {
+function killUnit(u, from) {
+  if (from && from.member && u.team === 'them') { const m = from.member; m.kills++; if (m.kills === 3 && !m.vet) { m.vet = true; log(`${fullName(m)} has proven themselves in battle and becomes a veteran.`, 'gold'); } }
   u.dead = true; u.deathT = 0; u.hp = 0;
-  if (u.kind === 'ally') { S.crew = Math.max(1, S.crew - 1); log(pick(['One of your warband falls in the fight.', 'A shieldmate goes down under the enemy axes.', 'You lose a warrior in the melee.']), 'bad'); renderHUD(); }
+  if (u.kind === 'ally') { if (u.member) loseMember(u.member, pick(['falls in the fight.', 'goes down under the enemy axes.', 'dies with a sword in hand. Valhalla awaits.'])); else S.crew = Math.max(1, S.crew - 1); renderHUD(); }
   else if (u.team === 'them') S.glory += u.kind === 'draugr' ? 2 : 1;
   if (u.kind === 'wolf') questProgress('wolves');
   if (u.kind === 'deer') {
-    const food = ri(10, 16), fur = cargoCount() < S.cargoMax ? 1 : 0; S.food += food; S.cargo.furs += fur;
+    const food = ri(10, 16) + traitCount('hunter') * 3, fur = cargoCount() < S.cargoMax ? 1 : 0; S.food += food; S.cargo.furs += fur;
     log(`You bring down a deer: +${food} food${fur ? ', +1 furs' : ''}.`, 'good'); renderHUD(); questProgress('deer');
   }
   if (u.kind === 'jarl') {
@@ -2191,6 +2274,13 @@ function talkVillager(v) {
 function updateUnitLabels() {
   for (const u of units) {
     let el = unitLabels.get(u);
+    if (u.member) {
+      const near = ashore.on && !u.dead && hero && !ashore.foes && Math.hypot(u.x - hero.x, u.z - hero.z) < 11;
+      if (!near) { if (el) el.style.display = 'none'; continue; }
+      if (!el) { el = document.createElement('div'); el.className = 'crewtag'; document.body.appendChild(el); unitLabels.set(u, el); }
+      if (placeLabel(el, u.g.position, 3)) el.textContent = (u.member.vet ? '★ ' : '') + u.member.name;
+      continue;
+    }
     const show = ashore.on && u.team === 'them' && u.aggro && !u.dead && u.rise >= 1 && hero && Math.hypot(u.x - hero.x, u.z - hero.z) < 70;
     if (!show) { if (el) el.style.display = 'none'; continue; }
     if (!el) { el = document.createElement('div'); el.className = 'foe sm'; document.body.appendChild(el); unitLabels.set(u, el); }
@@ -2231,7 +2321,7 @@ const ACT = {
   hunt() {
     passDays(1, false);
     if (chance(.15)) { S.crew = Math.max(1, S.crew - 1); log('Wolves fell upon the hunting party. One warrior did not return.', 'bad'); return; }
-    const f = Math.round((ri(12, 32) + (S.at === 'wolf' ? 8 : 0)) * (seasonOf(S.day) === 3 ? .6 : 1)); S.food += f;
+    const f = Math.round((ri(12, 32) + (S.at === 'wolf' ? 8 : 0)) * (seasonOf(S.day) === 3 ? .6 : 1) * (1 + .25 * traitCount('hunter'))); S.food += f;
     const fur = chance(.45) ? Math.min(ri(1, 2), S.cargoMax - cargoCount()) : 0; S.cargo.furs += fur;
     log(`The hunt went well: +${f} food${fur ? `, +${fur} furs` : ''}.`, 'good');
   },
@@ -2258,11 +2348,11 @@ const ACT = {
   timber() { passDays(1, false); const h = Math.min(S.maxHull - S.hull, ri(10, 20)); S.hull += h; log(`You fell fresh timber and patch the ship (+${h} hull).`, 'good'); },
   recruit() { const n = Math.min(ri(1, 3), S.maxCrew - S.crew); if (S.silver < 15 || n <= 0) return; S.silver -= 15; S.crew += n; log(`You spend 15 silver on drink and boasts. ${n} warrior${n > 1 ? 's' : ''} join${n > 1 ? '' : 's'} your crew.`, 'good'); },
   feast() {
-    const cost = 10 + S.crew * 2; if (S.silver < cost) return; S.silver -= cost; S.morale = clamp(S.morale + 25, 0, 100); S.glory += 2;
+    const cost = 10 + S.crew * 2; if (S.silver < cost) return; S.silver -= cost; S.morale = clamp(S.morale + 25, 0, 100); S.glory += 2 + traitCount('skald');
     log(`You throw a feast (${cost} silver). ${pick(['Toasts are drunk to Odin and to absent friends.', 'A skald sings of your deeds — embellishing generously.', 'Someone challenges a bear to a drinking contest. The bear wins.', 'There is wrestling, boasting and at least one broken table.'])} (+2 glory)`, 'good');
   },
   buyFood() { if (S.silver < 10) return; S.silver -= 10; S.food += 20; Sound.coins(); log('You buy 20 food for 10 silver.'); },
-  repair() { const need = S.maxHull - S.hull, cost = Math.ceil(need * .6); if (need <= 0 || S.silver < cost) return; S.silver -= cost; S.hull = S.maxHull; log(`Shipwrights repair the hull for ${cost} silver.`, 'good'); },
+  repair() { const need = S.maxHull - S.hull, cost = repairPrice(); if (need <= 0 || S.silver < cost) return; S.silver -= cost; S.hull = S.maxHull; log(`Shipwrights repair the hull for ${cost} silver.`, 'good'); },
   offering() {
     if (S.silver < 20) return; S.silver -= 20; S.luck = Math.min(S.luck + 2, 5); S.morale = clamp(S.morale + 8, 0, 100);
     log(pick(['A raven circles three times overhead. The gods have noticed you.', 'The sacrificial fire burns blue. A good sign.', 'The seeress smiles knowingly. Fortune favours you.']), 'good');
@@ -2310,8 +2400,11 @@ const ACT = {
   },
   sagas() { passDays(1, false); S.morale = clamp(S.morale + 10, 0, 100); log(`Around the fire you tell the saga of ${title()}. The crew listens wide-eyed.`); },
 };
-function buy(g) { const pr = price(S.at, g); if (S.silver < pr || cargoCount() >= S.cargoMax) return; S.silver -= pr; S.cargo[g]++; Sound.coins(); save(); render(); }
-function sell(g) { if (S.cargo[g] <= 0) return; S.silver += price(S.at, g); S.cargo[g]--; Sound.coins(); save(); render(); }
+function repairPrice() { return Math.ceil((S.maxHull - S.hull) * .6 * (1 - .15 * Math.min(2, traitCount('shipwright')))); }
+const buyPrice = g => Math.max(1, Math.round(price(S.at, g) * (1 - .03 * Math.min(4, traitCount('trader')))));
+const sellPrice = g => Math.round(price(S.at, g) * (1 + .03 * Math.min(4, traitCount('trader'))));
+function buy(g) { const pr = buyPrice(g); if (S.silver < pr || cargoCount() >= S.cargoMax) return; S.silver -= pr; S.cargo[g]++; Sound.coins(); save(); render(); }
+function sell(g) { if (S.cargo[g] <= 0) return; S.silver += sellPrice(g); S.cargo[g]--; Sound.coins(); save(); render(); }
 
 // =====================================================================
 // UI
@@ -2332,11 +2425,11 @@ function renderHUD() {
       <div class="stat"><span>Hull</span><div class="bar"><i style="width:${S.hull / S.maxHull * 100}%;background:${S.hull < 35 ? 'var(--red)' : 'var(--blue)'}"></i></div></div>
       ${st(S.weapons, 'Arms')}${st(S.luck ? '✦'.repeat(S.luck) : '–', 'Luck')}
     </div>
-    <div class="cargo">Cargo ${cargoCount()}/${S.cargoMax}: ${cargo}</div>
+    <div class="cargo"><a href="#" class="crewlink" onclick="event.preventDefault(); window.__game.openRoster()">View crew (K)</a> · Cargo ${cargoCount()}/${S.cargoMax}: ${cargo}</div>
     <div class="title">You are known as ${title()}.</div>`;
 }
 let lastHudKey = '';
-function hudTick() { const k = `${S.day}|${todName(todNow())}|${weather.storm > .4}|${S.crew}|${Math.round(S.hull)}|${S.silver}|${S.glory}|${S.morale}`; if (k !== lastHudKey) { lastHudKey = k; renderHUD(); } }
+function hudTick() { if (S.roster && S.roster.length !== S.crew) { syncRoster(); renderHUD(); } const k = `${S.day}|${todName(todNow())}|${weather.storm > .4}|${S.crew}|${Math.round(S.hull)}|${S.silver}|${S.glory}|${S.morale}`; if (k !== lastHudKey) { lastHudKey = k; renderHUD(); } }
 
 function renderPanel() {
   const c = $('panel');
@@ -2345,10 +2438,10 @@ function renderPanel() {
   const p = P[S.at], hostile = (S.hostile[p.id] || 0) > 0;
   c.innerHTML = `<h2>${p.name}</h2><p class="desc">${p.desc}</p>`;
   const top = document.createElement('div'); top.className = 'actions'; top.style.marginBottom = '10px';
-  top.appendChild(btn('⛵ Set sail  [E]', undock, { cls: 'primary' })); top.appendChild(btn('🥾 Go ashore on foot  [G]', () => goAshore())); c.appendChild(top);
+  top.appendChild(btn('⛵ Set sail  [E]', undock, { cls: 'primary' })); top.appendChild(btn('🥾 Go ashore on foot  [G]', () => goAshore())); top.appendChild(btn('👥 Crew  [K]', openRoster)); c.appendChild(top);
   const a = document.createElement('div'); a.className = 'actions';
   const add = (...x) => a.appendChild(btn(...x));
-  const repairCost = Math.ceil((S.maxHull - S.hull) * .6);
+  const repairCost = repairPrice();
   if (p.type === 'home') {
     add('Rest a day', () => ACT.rest(1)); add('Rest a week', () => ACT.rest(7));
     add('Recruit (15)', ACT.recruit, { disabled: S.silver < 15 || S.crew >= S.maxCrew });
@@ -2391,19 +2484,19 @@ function renderPanel() {
   if (p.prices && !hostile) {
     c.insertAdjacentHTML('beforeend', '<h3>Market</h3>');
     const t = document.createElement('table'); t.className = 'trade';
-    t.innerHTML = '<tr><th>Good</th><th>Price</th><th>Held</th><th></th></tr>';
+    t.innerHTML = '<tr><th>Good</th><th>Buy / Sell</th><th>Held</th><th></th></tr>';
     Object.keys(GOODS).forEach(g => {
       const pr = price(S.at, g), tr = document.createElement('tr');
       const tag = pr < GOODS[g].base * .8 ? ' <span style="color:var(--green)">cheap</span>' : pr > GOODS[g].base * 1.2 ? ' <span style="color:var(--gold)">wanted</span>' : '';
-      tr.innerHTML = `<td>${GOODS[g].name}${tag}</td><td>${pr}</td><td>${S.cargo[g]}</td><td></td>`;
-      const b1 = document.createElement('button'); b1.textContent = 'Buy'; b1.disabled = S.silver < pr || cargoCount() >= S.cargoMax; b1.onclick = () => buy(g);
+      tr.innerHTML = `<td>${GOODS[g].name}${tag}</td><td>${buyPrice(g)} / ${sellPrice(g)}</td><td>${S.cargo[g]}</td><td></td>`;
+      const b1 = document.createElement('button'); b1.textContent = 'Buy'; b1.disabled = S.silver < buyPrice(g) || cargoCount() >= S.cargoMax; b1.onclick = () => buy(g);
       const b2 = document.createElement('button'); b2.textContent = 'Sell'; b2.disabled = S.cargo[g] <= 0; b2.onclick = () => sell(g);
       tr.lastChild.append(b1, ' ', b2); t.appendChild(tr);
     });
     c.appendChild(t);
   }
 }
-function render() { renderHUD(); renderPanel(); renderQuests(); }
+function render() { if (S.roster) syncRoster(); renderHUD(); renderPanel(); renderQuests(); }
 
 // sail info & prompt
 let nearPlace = null, nearShip = null;
@@ -2440,7 +2533,7 @@ function openModal(html, buttons) {
     b.onclick = () => { $('modal').classList.remove('on'); modalOpen = false; fn(); save(); render(); };
     a.appendChild(b);
   });
-  box.appendChild(a); $('modal').classList.add('on'); modalOpen = true;
+  box.appendChild(a); $('modal').classList.add('on'); modalOpen = true; box.scrollTop = 0;
 }
 const toast = (t, body) => openModal(`<h2>${t}</h2><p>${body}</p>`, [['Onward', () => {}]]);
 const choice = (t, body, opts) => openModal(`<h2>${t}</h2><p>${body}</p>`, opts);
@@ -2453,6 +2546,7 @@ function help() {
   • Press <b>G</b> while docked to <b>walk ashore</b> with your warband. Move with <b>WASD</b>, strike with <b>Space</b>, block with <b>Shift</b>. Search islands for treasure chests, beware the wolves of Wolfden and the draugr of the Dragon's Teeth. Beat a town's warships and your warband storms the shore to fight its defenders hand to hand. Walk back to the pier and press <b>E</b> to board.<br>
   • Horses graze on the farmland and town islands. Walk up to one and press <b>R</b> to ride. Galloping is more than twice as fast as walking, and a strike at full gallop is a charge that hits much harder. Press <b>R</b> again to dismount. Buy a horse of your own and it sails with you: press <b>C</b> on any island to call it.<br>
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
+  • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>Seasons:</b> a year has four seasons of 10 days. Summer days are long and calm. Autumn brings storms and better prices for furs and salt. In winter snow covers the islands, days are short, blizzards blow, drift ice fills the northern sea, your crew eats more at sea and hunting is poor. Hold a Yule feast at Ravenholm in winter.<br>
   • <b>The wider sea:</b> beyond the home waters lie Skarholt, Ulfsborg, Bjornstad, the glacier of Frostfang, the Isle of Graves, Seal Rocks and Odin's Eyrie.<br>
   • <b>Oaths:</b> ask for work in towns or talk to villagers (<b>E</b>) to swear oaths: deliveries, hunts, sea battles, raids. Active oaths show under your stats and in the journal (<b>J</b>).<br>
@@ -2561,6 +2655,7 @@ addEventListener('keydown', e => {
   keys[k] = true;
   if (k === 'h') help();
   if (k === 'j') journal();
+  if (k === 'k') openRoster();
   if (k === 'e') tryLand();
   if (k === 'g') goAshore();
   if (k === 'c' && ashore.on && hero) { const m = units.find(u => u.own && !u.rider); if (m) { m.called = true; Sound.whistle(); } else if (!S.horseOwned) banner('No horse of your own', 'Buy one in a town or at Ravenholm'); }
@@ -2685,7 +2780,7 @@ function tick() {
     const turn = (keys.a || keys.arrowleft ? -1 : 0) + (keys.d || keys.arrowright ? 1 : 0);
     ship.h += turn * dt * (.25 + .45 * clamp(Math.abs(ship.speed) / 20, 0, 1));
     const base = [0, 8, 17, 27][throttle];
-    let target = throttle >= 2 ? base * windFactor() * S.speed : base * S.speed;
+    let target = (throttle >= 2 ? base * windFactor() * S.speed : base * S.speed) * (1 + .05 * Math.min(3, traitCount('navigator')));
     if (throttle >= 2 && wind.calm > 0) target = 3;
     if (S.hull < 25) target *= .7;
     if (S.crew < 4 && throttle === 1) target *= .6;
@@ -2812,7 +2907,7 @@ function startGame(fresh) {
   S.log = S.log || [];
   if (saved && S.ship && !S.docked) { ship.pos.set(S.ship.x, S.ship.z); ship.h = S.ship.h; }
   else dockAt(P[S.at] || P.home);
-  dayTimer = S.dayTimer || 0; camSnap = true; syncCaches(); applySeason(true);
+  dayTimer = S.dayTimer || 0; camSnap = true; syncCaches(); applySeason(true); syncRoster(true);
   $('feed').innerHTML = '';
   Sound.init();
   titleOn = false; $('title').classList.add('hide');
@@ -2842,7 +2937,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
