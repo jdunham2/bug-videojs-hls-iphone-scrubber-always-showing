@@ -87,14 +87,14 @@ After picking fighters you choose a mode:
 
 - **Story:** an 8-chapter adventure to stop **the Grand Eraser**, who wants to wipe the whole notebook clean. Each chapter has a wave of enemies, a mini-boss and a boss, with comic-style cutscenes before the chapter, before the boss and after you win, plus an ending. Press J / A to advance the text, Enter / + to skip a scene. Progress is saved, and you can replay any chapter you've reached.
 - **Arcade:** endless waves of enemies. Pick a starting stage, or a random one.
-- **Boss Rush:** fight all 27 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
+- **Boss Rush:** fight all 33 mini-bosses and bosses back to back against the clock. You heal a little and get 2 power-ups between rounds, and your best time is saved.
 - **Versus:** P1 vs P2 on any stage. Best of 3 rounds, 99 seconds per round (if time runs out, whoever has more health wins the round). Mystery boxes still fall, so power-ups are in play. Needs both players.
 
 All modes work online.
 
 ## Stages
 
-Thirteen stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity) Windy Worksheet (wind gusts push everyone sideways after a warning) and The Blank Page, home of the final boss.
+Sixteen stages of five waves each: Notebook Heights, Graph City, Chalkboard Arena, Sticky Note Jungle, Blueprint Factory (moving platforms), Midnight Sketchbook (moving platforms), Crayon Canyon (bobbing platforms), Comic Panels, Lava Doodle (lava geysers erupt from the floor: watch for the glowing warning circles; geysers hurt enemies too), Ice Rink (slippery floor), Space Doodle (low gravity) Windy Worksheet (wind gusts push everyone sideways after a warning) The Blank Page (home of the final boss), Toy Box (bouncy springs launch you into the air), Haunted Sketch (the lights go out and only spotlights around the players remain; enemy eyes glow in the dark) and Assembly Line (floor conveyor belts that reverse direction after a warning).
 
 ## Bosses
 
@@ -115,10 +115,13 @@ Every stage has a mini-boss on wave 3 and a boss on wave 5, and each one has its
 | Space Doodle | Comet Kid | Galaxy Gobbler |
 | Windy Worksheet | Kite Bandit | The Tempest |
 | The Blank Page | Paper Dragon | The Grand Eraser |
+| Toy Box | Jack-in-the-Box | The Wind-Up Tyrant |
+| Haunted Sketch | Poltergeist Pete | The Phantom Pencil |
+| Assembly Line | Forklift Fred | Mega Assembler |
 
 Plus **Ink Hydra**, a three-headed boss you meet in Story mode and Boss Rush.
 
-Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it) and **triple stomp**.
+Boss moves: charge (dazed if it hits a wall), leap slam, ink barrage, **ink beam** (jump over it), **ink rain** (watch the red markers), **teleport slam**, **spin attack** (dizzy afterwards), **vortex** (pulls you in, then explodes), **shadow clones**, **eraser sweep** (a low dash across the floor: jump over it), **black hole** (pulls everyone toward it), **triple stomp**, **boomerangs** (they come back!), **triple quake** (three floor shockwaves to jump) and **burrow** (digs underground and bursts up under you: watch the dirt mound).
 
 ## Power-ups
 
@@ -160,6 +163,6 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 - **Co-op mechanics:** hit an enemy your partner just hit for a **TEAM COMBO x2**. Stand next to a downed partner to **revive** them. When both ink meters are full and you're standing close, press Special to fire the **DOUBLE INK** screen-clearing team super.
 - **Combat:** combo chains, juggles, launcher into jump-cancel into air attacks, dash cancels, wall splats, and **projectile reflects**. Hit-stop, screen shake, slow-mo finishers and controller rumble give every hit weight.
 - **Enemies:** Grunts, Ninjas, Eraser-Throwers, armored Brutes with shockwave slams, and a two-phase boss, **The Scribble King**, every 5th wave.
-- **Endless:** after stage 13 the stages loop and the waves keep getting harder.
+- **Endless:** after stage 16 the stages loop and the waves keep getting harder.
 - **Audio:** procedural soundtrack and sound effects, all synthesized live with Web Audio.
 - **Saved high score:** your best team score is kept between sessions.
