@@ -168,6 +168,28 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .countdown { position: fixed; inset: 0; display: grid; place-items: center; z-index: 26; pointer-events: none; font-family: var(--display); font-size: clamp(90px, 22vw, 200px); color: var(--gold); text-shadow: 0 8px 0 rgba(0,0,0,.35); }
 @media (max-width: 720px) { .gamebar { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); font-size: 12px; gap: 8px; } }
 
+.quiz { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; width: min(560px, calc(100% - 24px)); padding: 20px; display: flex; flex-direction: column; gap: 14px; background: rgba(15,22,38,.96); border-color: #9b5de5; }
+.quiz .qq { font-family: var(--display); font-size: 24px; line-height: 1.2; text-wrap: balance; }
+.quiz .qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 520px) { .quiz .qopts { grid-template-columns: 1fr; } }
+.qopt { text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(255,255,255,.06); cursor: pointer; font-weight: 800; font-size: 15px; }
+.qopt:hover:not(:disabled) { border-color: #9b5de5; background: rgba(155,93,229,.15); }
+.qopt kbd { font-family: var(--body); font-size: 11px; background: rgba(255,255,255,.12); border-radius: 6px; padding: 1px 6px; margin-right: 8px; }
+.qopt.right { border-color: var(--good); background: rgba(72,213,151,.22); } .qopt.wrong { border-color: var(--bad); background: rgba(255,92,108,.2); } .qopt.dim { opacity: .45; }
+.qbar { height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; } .qbar i { display: block; height: 100%; background: #9b5de5; }
+.dance { position: fixed; right: calc(12px + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); z-index: 22; padding: 10px; width: min(340px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 8px; border-color: #ff3fa4; }
+.dance canvas { width: 100%; height: auto; border-radius: 10px; display: block; }
+.dpads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.dpads button { height: 54px; border-radius: 12px; border: 1px solid var(--edge); background: rgba(255,255,255,.08); font-size: 24px; font-weight: 900; cursor: pointer; touch-action: none; }
+.dpads button:nth-child(1) { color: #ff3fa4; } .dpads button:nth-child(2) { color: #3ff0ff; } .dpads button:nth-child(3) { color: #48d597; } .dpads button:nth-child(4) { color: #ffbe2e; }
+.dhint { margin: 0; text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .dpads { display: none; } }
+@media (max-width: 720px) { .dance { top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: none; width: min(300px, calc(100% - 24px)); } }
+.hsblind { position: fixed; inset: 0; z-index: 21; display: grid; place-items: center; background: rgba(4,6,14,.94); text-align: center; }
+.hsblind .hst { font-family: var(--display); font-size: 34px; color: #7fb6ff; }
+.hsblind .hsc { font-family: var(--display); font-size: 120px; color: var(--gold); line-height: 1; }
+.hsblind p { font-weight: 800; color: var(--muted); }
+
 /* Title */
 .title { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: linear-gradient(180deg, rgba(8,12,26,.15), rgba(8,12,26,.75));
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); overflow-y: auto; touch-action: pan-y; }
@@ -244,6 +266,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 <div class="fade" id="fade"></div>
 <div class="card gamebar" id="gameBar" hidden></div>
 <div class="countdown" id="countdown" hidden>3</div>
+<div class="card quiz" id="quiz" hidden><div class="qq" id="quizQ"></div><div class="qopts" id="quizOpts"></div><div class="qbar"><i id="quizBar"></i></div></div>
+<div class="card dance" id="dance" hidden><canvas id="danceCv" width="640" height="720" aria-label="Dance lanes"></canvas><div class="dpads">
+  <button data-dl="0" aria-label="Left">&#8592;</button><button data-dl="1" aria-label="Down">&#8595;</button><button data-dl="2" aria-label="Up">&#8593;</button><button data-dl="3" aria-label="Right">&#8594;</button></div><p class="dhint">Arrow keys or WASD</p></div>
+<div class="hsblind" id="hsBlind" hidden><div><div class="hst">You're the seeker!</div><div class="hsc" id="hsCount">15</div><p>Everyone is hiding. No peeking...</p></div></div>
 <div class="card placebar" id="placebar" hidden><span id="placeTxt"></span><div class="row"><button class="btn ghost" id="btnRot">Rotate (R)</button><button class="btn ghost" id="btnCancelPlace">Cancel (Esc)</button></div></div>
 <div class="card wanted" id="wanted" hidden><div class="stars" id="wStars"></div><div class="wtxt" id="wTxt">Lose the cops!</div><div class="bar"><i id="wBar"></i></div></div>
 <div id="driveUI" hidden>
@@ -645,6 +671,8 @@ const GOALS = [
   { id: "getaway", text: "Escape a police chase", test: () => (S.escapes || 0) >= 1 },
   { id: "racewin", text: "Win a street race against friends", test: () => (S.raceWins || 0) >= 1 },
   { id: "coins25", text: "Grab 25 coins in Coin Rush", test: () => (S.bestCoins || 0) >= 25 },
+  { id: "games10", text: "Play 10 minigames", test: () => (S.gamesPlayed || 0) >= 10 },
+  { id: "dance5k", text: "Score 5,000 in Dance Off", test: () => (S.bestDance || 0) >= 5000 },
   { id: "top", text: "Reach the top of a career", test: () => S.career && S.rank === CAREERS[S.career].ranks.length - 1 },
 ];
 
@@ -2645,6 +2673,7 @@ function mpRender(dt, now) {
     const k = Math.min(1, dt * 10); R.x += (pr.x - R.x) * k; R.z += (pr.z - R.z) * k;
     let dr = pr.r - R.r; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); R.r += dr * k;
     R.g.position.set(R.x, 0, R.z); R.g.visible = vis;
+    if (R.tag) R.tag.visible = !hideTagsForSeeker();
     R.char.rotation.y = R.emote && R.emote.k === "dance" ? R.char.rotation.y : 0; R.g.rotation.y = 0;
     R.char.rotation.y = R.emote && R.emote.k === "dance" ? R.char.rotation.y : R.r;
     // car
@@ -2799,18 +2828,20 @@ function cleanGame(g) {
   const prog = {
     cp: Math.round(num(pr.cp, 0, 50)), t: num(pr.t, 0, 3600000), done: !!pr.done,
     got: Array.isArray(pr.got) ? pr.got.filter((v) => Number.isInteger(v) && v >= 0 && v < COIN_N).slice(0, COIN_N) : [],
+    sc: Math.round(num(pr.sc, 0, 1e7)), caught: !!pr.caught,
+    found: Array.isArray(pr.found) ? pr.found.filter((v) => typeof v === "string").map((v) => v.slice(0, 64)).slice(0, 8) : [],
     it: !!pr.it, safe: num(pr.safe, 0, 3600), tag: pr.tag && typeof pr.tag.to === "string" && typeof pr.tag.n === "number" ? { to: pr.tag.to.slice(0, 64), n: pr.tag.n } : null,
   };
   return { id: g.id.slice(0, 48), type: g.type, host: !!g.host, state: st, seed: Math.round(num(g.seed, 0, 2147483647)), n: Math.round(num(g.n, 0, 1e6)), prog };
 }
 function gamePresence() {
   if (!myGame) return null;
-  const pr = myGame.prog, prog = myGame.type === "race" ? { cp: pr.cp, t: pr.t, done: pr.done } : myGame.type === "coins" ? { got: pr.got } : { it: pr.it, safe: Math.round(pr.safe * 10) / 10, tag: pr.tag };
+  const pr = myGame.prog, prog = EXT[myGame.type] ? { sc: pr.sc, t: pr.t, done: pr.done, cp: pr.cp, got: pr.got, it: pr.it, safe: Math.round(pr.safe * 10) / 10, found: pr.found, caught: pr.caught } : myGame.type === "race" ? { cp: pr.cp, t: pr.t, done: pr.done } : myGame.type === "coins" ? { got: pr.got } : { it: pr.it, safe: Math.round(pr.safe * 10) / 10, tag: pr.tag };
   return { id: myGame.id, type: myGame.type, host: myGame.host, state: myGame.state, seed: myGame.seed, n: myGame.n, prog };
 }
 const gameActive = () => !!myGame && (myGame.state === "countdown" || myGame.state === "play");
-const gameFrozen = () => !!myGame && myGame.state === "countdown";
-function freshProg() { return { cp: 0, t: 0, done: false, got: [], it: false, safe: 0, tag: null }; }
+const gameFrozen = () => !!myGame && (myGame.state === "countdown" || playerFrozenByGame());
+function freshProg() { return { cp: 0, t: 0, done: false, got: [], it: false, safe: 0, tag: null, sc: 0, found: [], caught: false }; }
 function participants() {
   if (!myGame) return [];
   const list = [{ peer: myPeer || "me", name: S.name, prog: myGame.prog, isMe: true, state: myGame.state }];
@@ -2849,6 +2880,7 @@ function leaveGame(silent) {
   closeSheet(); renderHUD(true);
 }
 function cleanupGame() {
+  extCleanup();
   for (const m of gameObjs) { scene.remove(m); m.traverse && m.traverse((o) => { if (o.geometry && o.geometry !== heartGeo) o.geometry.dispose(); }); }
   gameObjs = []; cpMeshes = []; coinMeshes = []; arenaMesh = null; raceArrow = null;
   if (raceCar) {
@@ -2885,6 +2917,8 @@ function beginCountdown() {
     const spots = coinSpots(myGame.seed);
     spots.forEach((c) => { const m = addGameObj(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.15, 18), coinMat)); m.rotation.x = Math.PI / 2; m.position.set(c.x, 1.2, c.z); coinMeshes.push(m); });
     const a = (slot / 8) * Math.PI * 2; tpTo(-20 + Math.cos(a) * 4, 54 + Math.sin(a) * 3);
+  } else if (EXT[myGame.type]) {
+    EXT[myGame.type].setup(slot);
   } else {
     arenaMesh = addGameObj(new THREE.Mesh(new THREE.RingGeometry(TAG_R - 0.5, TAG_R, 64), new THREE.MeshBasicMaterial({ color: 0x48d597, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })));
     arenaMesh.rotation.x = -Math.PI / 2; arenaMesh.position.set(TAG_C.x, 0.15, TAG_C.z);
@@ -2900,6 +2934,7 @@ function tpTo(x, z) {
 }
 function rankList() {
   const ps = participants(), t = myGame.type;
+  if (EXT[t]) return ps.slice().sort((a, b) => (EXT[t].score(b) - EXT[t].score(a)) || (a.prog.t - b.prog.t));
   if (t === "race") return ps.slice().sort((a, b) => (b.prog.done - a.prog.done) || (a.prog.done ? a.prog.t - b.prog.t : b.prog.cp - a.prog.cp));
   if (t === "coins") return ps.slice().sort((a, b) => b.prog.got.length - a.prog.got.length);
   return ps.slice().sort((a, b) => b.prog.safe - a.prog.safe);
@@ -2908,7 +2943,7 @@ const fmtT = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000)
 const ordinal = (n) => n + (["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 function finishGame() {
   if (!myGame || myGame.state !== "play") return;
-  myGame.state = "done";
+  myGame.state = "done"; hideGameOverlays();
   const ps = participants(), ranks = rankList(), place = ranks.findIndex((p) => p.isMe) + 1, multi = ps.length > 1;
   let prize = 0, note = "";
   if (myGame.type === "race") {
@@ -2918,7 +2953,8 @@ function finishGame() {
   } else if (myGame.type === "coins") {
     const n = myGame.prog.got.length; prize += n * 3; if (n > (S.bestCoins || 0)) { S.bestCoins = n; note = `New best: ${n} coins!`; }
     if (multi && place === 1) prize += 50;
-  } else { if (place === 1) prize += 75; else prize += 20; }
+  } else if (EXT[myGame.type]) { prize += EXT[myGame.type].prize(place, multi); note = EXT[myGame.type].note ? EXT[myGame.type].note() : ""; }
+  else { if (place === 1) prize += 75; else prize += 20; }
   if (prize) earn(prize, `${GAMES[myGame.type].name} prize`);
   S.fun = clamp(S.fun + 20); if (multi) S.social = clamp(S.social + 12);
   S.gamesPlayed = (S.gamesPlayed || 0) + 1;
@@ -2956,6 +2992,7 @@ function gameTick(dt, now) {
   if (g.state !== "play") { if (g.state !== "countdown") bar.hidden = g.state !== "done"; return; }
   const el = performance.now() - g.t0, px = player.position.x, pz = player.position.z;
   const ranks = rankList(), place = ranks.findIndex((p) => p.isMe) + 1, multi = ranks.length > 1;
+  if (EXT[g.type]) { EXT[g.type].tick(dt, now, el, bar, ranks, place, multi); return; }
   if (g.type === "race") {
     const cp = g.prog.cp, [cx, cz] = RACE_CPS[Math.min(cp, RACE_CPS.length - 1)];
     if (Math.hypot(px - cx, pz - cz) < 6.5) {
@@ -2999,7 +3036,7 @@ function gamesSheet() {
   const lob = openLobbies();
   const cards = Object.entries(GAMES).map(([k, gm]) => `<div class="career"><div style="display:flex;gap:10px;align-items:center"><span style="width:14px;height:14px;border-radius:4px;background:${gm.icon};flex:none"></span><b>${gm.name}</b></div><div class="req">${gm.desc}</div>
       <div class="row">${gm.solo ? `<button class="btn ghost" data-game-solo="${k}">Play solo · ${gm.solo}</button>` : ""}${room ? `<button class="btn" data-game-host="${k}">Host for friends</button>` : ""}</div>
-      ${k === "race" && S.bestRace ? `<div class="req">Your best time: <b>${fmtT(S.bestRace)}</b></div>` : ""}${k === "coins" && S.bestCoins ? `<div class="req">Your best: <b>${S.bestCoins} coins</b></div>` : ""}${!gm.solo && !room ? `<div class="req">Needs friends playing at the same time.</div>` : ""}</div>`).join("");
+      ${k === "race" && S.bestRace ? `<div class="req">Your best time: <b>${fmtT(S.bestRace)}</b></div>` : ""}${k === "coins" && S.bestCoins ? `<div class="req">Your best: <b>${S.bestCoins} coins</b></div>` : ""}${EXT[k] && EXT[k].best && EXT[k].best() ? `<div class="req">${EXT[k].best()}</div>` : ""}${!gm.solo && !room ? `<div class="req">Needs friends playing at the same time.</div>` : ""}</div>`).join("");
   return header("Games", room ? "Play solo, host a game, or join a friend's" : "Play solo (multiplayer isn't available in this view)", "#d7263d") + `<div class="sheet-b">
     ${room ? `<div class="sec"><h3>Friends' open games</h3><div style="display:flex;flex-direction:column;gap:6px">${lob.length ? lob.map((R) => `<div class="jobrow"><div><b>${esc(R.name)}</b> is hosting <b>${GAMES[R.pr.g.type].name}</b><div class="req">${participantsOf(R.pr.g.id)} player(s) waiting</div></div><button class="btn" data-game-join="${esc(R.peer)}">Join</button></div>`).join("") : `<p class="req">No open games right now. Host one and your friends can join!</p>`}</div></div>` : ""}
     <div class="sec"><h3>Minigames</h3><div style="display:flex;flex-direction:column;gap:8px">${cards}</div></div></div>`;
@@ -3017,7 +3054,7 @@ function lobbySheet() {
 function resultsSheet() {
   if (!myGame) return gamesSheet();
   const gm = GAMES[myGame.type], ranks = rankList(), multi = ranks.length > 1;
-  const score = (p) => myGame.type === "race" ? (p.prog.done ? fmtT(p.prog.t) : `Racing · checkpoint ${p.prog.cp}`) : myGame.type === "coins" ? `${p.prog.got.length} coins` : `${Math.floor(p.prog.safe)}s safe`;
+  const score = (p) => EXT[myGame.type] ? EXT[myGame.type].label(p) : myGame.type === "race" ? (p.prog.done ? fmtT(p.prog.t) : `Racing · checkpoint ${p.prog.cp}`) : myGame.type === "coins" ? `${p.prog.got.length} coins` : `${Math.floor(p.prog.safe)}s safe`;
   const place = ranks.findIndex((p) => p.isMe) + 1;
   return header(multi ? (place === 1 ? "You win!" : `You finished ${ordinal(place)}`) : "Finished!", gm.name, gm.icon) + `<div class="sheet-b">
     <div class="sec"><h3>${multi ? "Standings" : "Your result"}</h3><div style="display:flex;flex-direction:column;gap:6px">${ranks.map((p, i) => `<div class="jobrow"><div><b>${multi ? ordinal(i + 1) + " · " : ""}${esc(p.name)}</b>${p.isMe ? ' <span class="req">you</span>' : ""}</div><span class="req">${esc(score(p))}</span></div>`).join("")}</div></div>
@@ -3027,10 +3064,269 @@ function resultsSheet() {
 function openGames() { if (!busy) openSheet(myGame && myGame.state === "lobby" ? lobbySheet : myGame && myGame.state === "done" ? resultsSheet : gamesSheet); }
 function drawGameMap(X, Z) {
   if (!myGame || !gameActive()) return;
+  if (EXT[myGame.type]) { if (EXT[myGame.type].map) EXT[myGame.type].map(X, Z); return; }
   if (myGame.type === "race") RACE_CPS.forEach(([x, z], i) => { if (i < myGame.prog.cp) return; mx.fillStyle = i === myGame.prog.cp ? "#ffbe2e" : "rgba(255,255,255,.55)"; mx.beginPath(); mx.arc(X(x), Z(z), i === myGame.prog.cp ? 6 : 3.5, 0, Math.PI * 2); mx.fill(); });
   if (myGame.type === "coins") coinMeshes.forEach((m) => { if (m.visible) { mx.fillStyle = "#ffd23f"; mx.fillRect(X(m.position.x) - 1.5, Z(m.position.z) - 1.5, 3, 3); } });
   if (myGame.type === "tag") { mx.strokeStyle = "#48d597"; mx.lineWidth = 2; mx.beginPath(); mx.arc(X(TAG_C.x), Z(TAG_C.z), Math.abs(X(TAG_C.x + TAG_R) - X(TAG_C.x)), 0, Math.PI * 2); mx.stroke(); }
 }
+
+
+// ============================================================ MORE MINIGAMES
+Object.assign(GAMES, {
+  delivery: { name: "Delivery Dash", desc: "Drive a delivery car and drop off as many pizzas around town as you can in 2 minutes.", min: 1, solo: "Beat your best", icon: "#f39c12" },
+  treasure: { name: "Treasure Hunt", desc: "Follow the clue and the hot-or-cold meter to dig up 5 treasures hidden around town.", min: 1, solo: "Find them all", icon: "#c98a2c" },
+  quiz:     { name: "Town Quiz", desc: "8 quick questions about the town. Most right answers wins, and speed breaks ties.", min: 1, solo: "Test yourself", icon: "#9b5de5" },
+  dance:    { name: "Dance Off", desc: "Hit the arrows in time with the beat. Biggest score wins.", min: 1, solo: "Set a high score", icon: "#ff3fa4" },
+  hide:     { name: "Hide and Seek", desc: "One seeker counts to 15 while everyone hides. Stay hidden as long as you can!", min: 2, solo: null, icon: "#2e86de" },
+});
+let ext = {}, actx = null;
+const DELIVERY_TIME = 120, TREASURE_N = 5, TREASURE_TIME = 180, QUIZ_N = 8, QUIZ_SEC = 10, DANCE_LEN = 40, DANCE_BPM = 120, DANCE_TRAVEL = 1.6;
+const HS_HIDE = 15, HS_SEEK = 120, HS_C = { x: -20, z: 40 }, HS_R = 40;
+const LANE_COLORS = ["#ff3fa4", "#3ff0ff", "#48d597", "#ffbe2e"], LANE_ARROWS = ["←", "↓", "↑", "→"];
+function shuffleSeeded(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function beep(freq, dur = 0.08, vol = 0.06, type = "square") {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = vol; g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
+  } catch (e) {}
+}
+function gameArrow() { const a = addGameObj(new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.8, 4), cpNextMat)); a.rotation.order = "YXZ"; return a; }
+function pointArrow(a, tx, tz, now) { a.position.set(player.position.x, 5.6 + Math.sin(now / 200) * 0.2, player.position.z); a.rotation.y = Math.atan2(tx - player.position.x, tz - player.position.z); a.rotation.x = Math.PI / 2; }
+function nearestPlaceName(x, z) { let best = null, bd = Infinity; for (const d of doors) { if (isDeco(d.b) || HOUSES[d.b.id]) continue; const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd) { bd = dd; best = d.b.name; } } return best || "the middle of town"; }
+function hideGameOverlays() { for (const id of ["quiz", "dance", "hsBlind"]) { const el = document.getElementById(id); if (el) el.hidden = true; } }
+function extCleanup() { hideGameOverlays(); ext = {}; }
+function hideTagsForSeeker() { return !!(myGame && gameActive() && myGame.type === "hide" && myGame.prog.it); }
+function playerFrozenByGame() { return !!(myGame && myGame.state === "play" && EXT[myGame.type] && EXT[myGame.type].freeze && EXT[myGame.type].freeze()); }
+
+// ---- quiz questions are built from the game's own data
+function quizPool() {
+  const placeQ = [
+    ["Where can you fill up your car with gas?", "gas"], ["Where can you adopt a pet?", "vet"], ["Where do you buy a new car?", "cardealer"],
+    ["Where can you go bowling?", "bowling"], ["Where can you watch a movie?", "cinema"], ["Which place has a giant burger on its roof?", "burger"],
+    ["Where do you pay back late rent?", "cityhall"], ["Where can you swim laps and lift weights?", "gym"], ["Where can you put money in savings?", "bank"],
+    ["Where can you sing karaoke?", "club"], ["Where can you get a haircut?", "mall"], ["Where can you join a book club?", "library"],
+    ["Which place has a giant coffee cup on its roof?", "cafe"], ["Where can you donate blood?", "hospital"],
+  ];
+  const places = ["gas", "vet", "cardealer", "bowling", "cinema", "burger", "cityhall", "gym", "bank", "club", "library", "hospital", "museum", "cafe", "pizza", "grocery", "mall", "school"];
+  const out = placeQ.map(([q, id]) => ({ q, a: BMAP[id].name, wrong: places.filter((x) => x !== id).map((x) => BMAP[x].name) }));
+  const tops = Object.values(CAREERS).map((c) => c.ranks[c.ranks.length - 1][0]);
+  out.push({ q: "How much is rent each week at your apartment?", a: money(RENT), wrong: ["$100", "$200", "$250", "$75"] });
+  out.push({ q: "Which car never needs gas?", a: CAR_MODELS.electric.name, wrong: Object.values(CAR_MODELS).filter((m) => !m.electric).map((m) => m.name) });
+  out.push({ q: "Which is the fastest car at Speedy Motors?", a: CAR_MODELS.sports.name, wrong: Object.values(CAR_MODELS).filter((m) => m !== CAR_MODELS.sports).map((m) => m.name) });
+  out.push({ q: "Which pet can fly?", a: "Parrot", wrong: ["Dog", "Cat", "Bunny"] });
+  out.push({ q: "How many tricks can a pet learn?", a: String(TRICKS.length), wrong: ["3", "4", "8", "10"] });
+  out.push({ q: "What is the top job at Pixel Corp?", a: CAREERS.office.ranks[CAREERS.office.ranks.length - 1][0], wrong: tops.filter((t) => t !== "CTO") });
+  out.push({ q: "Which career has the job Rock Star?", a: CAREERS.club.name, wrong: Object.values(CAREERS).filter((c) => c !== CAREERS.club).map((c) => c.name) });
+  out.push({ q: "What does a scratch-off ticket cost?", a: "$5", wrong: ["$1", "$10", "$20"] });
+  out.push({ q: "What do you need to own to stop paying rent?", a: "A house", wrong: ["A car", "A pet", "A boat"] });
+  out.push({ q: "How many life goals have a gold star when done?", a: "All of them", wrong: ["None", "Just one", "Only the hard ones"] });
+  return out;
+}
+function renderQuiz() {
+  const q = ext.qs[ext.qi]; if (!q) return;
+  document.getElementById("quizQ").textContent = `${ext.qi + 1}. ${q.q}`;
+  document.getElementById("quizOpts").innerHTML = q.opts.map((o, i) => {
+    let cls = ""; if (ext.picked !== null) cls = i === q.ans ? "right" : i === ext.picked ? "wrong" : "dim";
+    return `<button class="qopt ${cls}" data-quiz="${i}" ${ext.picked !== null ? "disabled" : ""}><kbd>${i + 1}</kbd>${esc(o)}</button>`;
+  }).join("");
+}
+function quizPick(i) {
+  if (!myGame || myGame.type !== "quiz" || myGame.state !== "play" || ext.picked !== null || !ext.qs[ext.qi]) return;
+  ext.picked = i; const q = ext.qs[ext.qi];
+  if (i === q.ans) { myGame.prog.sc++; myGame.prog.t += Math.round(ext.inQ); beep(880, 0.12, 0.05, "triangle"); } else { myGame.prog.t += QUIZ_SEC * 1000; beep(160, 0.2, 0.05, "sawtooth"); }
+  renderQuiz();
+}
+// ---- dance
+function danceHit(lane) {
+  if (!myGame || myGame.type !== "dance" || myGame.state !== "play") return;
+  ext.flash[lane] = 0.15;
+  let best = null, bd = 0.22;
+  for (const n of ext.notes) { if (n.judged || n.lane !== lane) continue; const d = Math.abs(n.t - ext.songT); if (d < bd) { bd = d; best = n; } }
+  if (!best) return;
+  best.judged = true; ext.combo++;
+  const pts = bd < 0.07 ? 100 : bd < 0.14 ? 50 : 20;
+  myGame.prog.sc += Math.round(pts * (1 + Math.min(ext.combo, 40) / 20));
+  ext.fb = { text: bd < 0.07 ? "PERFECT" : bd < 0.14 ? "GOOD" : "OK", t: 0.5, color: bd < 0.07 ? "#ffbe2e" : "#48d597" };
+  beep([523, 659, 784, 1047][lane], 0.1, 0.05, "triangle");
+}
+function drawDance() {
+  const cv = document.getElementById("danceCv"); if (!cv) return;
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height, lw = W / 4, hitY = H - 90;
+  x.clearRect(0, 0, W, H);
+  x.fillStyle = "rgba(10,14,26,.9)"; x.fillRect(0, 0, W, H);
+  for (let l = 0; l < 4; l++) {
+    x.fillStyle = l % 2 ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.02)"; x.fillRect(l * lw, 0, lw, H);
+    const f = ext.flash[l] > 0;
+    x.strokeStyle = LANE_COLORS[l]; x.lineWidth = f ? 8 : 4; x.globalAlpha = f ? 1 : 0.6;
+    x.strokeRect(l * lw + 14, hitY - 34, lw - 28, 68); x.globalAlpha = 1;
+    x.fillStyle = LANE_COLORS[l]; x.font = "900 46px Nunito, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.globalAlpha = 0.5; x.fillText(LANE_ARROWS[l], l * lw + lw / 2, hitY); x.globalAlpha = 1;
+  }
+  for (const n of ext.notes) {
+    if (n.judged) continue;
+    const y = hitY - ((n.t - ext.songT) / DANCE_TRAVEL) * (hitY + 40);
+    if (y < -60 || y > H + 60) continue;
+    x.fillStyle = LANE_COLORS[n.lane]; x.beginPath(); x.roundRect ? x.roundRect(n.lane * lw + 18, y - 28, lw - 36, 56, 14) : x.rect(n.lane * lw + 18, y - 28, lw - 36, 56); x.fill();
+    x.fillStyle = "#0b1330"; x.font = "900 40px Nunito, sans-serif"; x.fillText(LANE_ARROWS[n.lane], n.lane * lw + lw / 2, y + 2);
+  }
+  if (ext.fb && ext.fb.t > 0) { x.fillStyle = ext.fb.color; x.font = "900 54px Lilita One, Nunito, sans-serif"; x.fillText(ext.fb.text, W / 2, H * 0.4); }
+  x.fillStyle = "#fff"; x.font = "900 34px Nunito, sans-serif"; x.textAlign = "left"; x.fillText(`Combo ${ext.combo}`, 20, 40);
+  x.fillStyle = "rgba(255,255,255,.15)"; x.fillRect(0, H - 10, W, 10); x.fillStyle = "#ff3fa4"; x.fillRect(0, H - 10, W * Math.min(1, ext.songT / DANCE_LEN), 10);
+}
+function danceKey(k) {
+  if (!myGame || myGame.type !== "dance" || myGame.state !== "play") return false;
+  const lane = { arrowleft: 0, a: 0, arrowdown: 1, s: 1, arrowup: 2, w: 2, arrowright: 3, d: 3 }[k];
+  if (lane === undefined) return false;
+  danceHit(lane); return true;
+}
+
+const EXT = {
+  delivery: {
+    setup(slot) {
+      const rnd = mulberry(myGame.seed ^ 0xd311);
+      const pool = doors.filter((d) => !isDeco(d.b) && !HOUSES[d.b.id] && d.b.id !== "pizza" && d.b.kind !== "zone");
+      ext.targets = shuffleSeeded(pool, rnd).concat(shuffleSeeded(pool, rnd)).map((d) => ({ x: d.x, z: d.z, name: d.b.name }));
+      ext.beam = addGameObj(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 18, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xf39c12, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide })));
+      ext.arrow = gameArrow();
+      raceCar = addVehicle(makeCarModel("compact", RACE_COLORS[slot]), 14 - slot * 6, 82, Math.PI / 2, "race"); raceCar.fuel = 999;
+      player.position.set(raceCar.car.position.x, 0, 82); enterVehicle({ veh: raceCar }); cam.yaw = Math.PI / 2 + Math.PI;
+    },
+    tick(dt, now, el, bar, ranks, place, multi) {
+      const P = myGame.prog, T = ext.targets[P.cp % ext.targets.length];
+      if (Math.hypot(player.position.x - T.x, player.position.z - T.z) < 6.5) { P.sc++; P.cp++; toast(`Pizza delivered to ${T.name}! (${P.sc})`, "good"); spawnHearts({ x: T.x, y: 0, z: T.z }, 3); beep(988, 0.12, 0.05, "triangle"); }
+      const N = ext.targets[P.cp % ext.targets.length];
+      ext.beam.position.set(N.x, 9, N.z); pointArrow(ext.arrow, N.x, N.z, now);
+      const left = DELIVERY_TIME * 1000 - el;
+      bar.innerHTML = `<b>Delivery Dash</b><span>${P.sc} delivered</span><span>Next: ${esc(N.name)}</span><span class="t">${fmtT(Math.max(0, left))} left</span>${multi ? `<span class="pl">${ordinal(place)} of ${ranks.length}</span>` : ""}`;
+      if (left <= 0) { P.done = true; finishGame(); }
+    },
+    score: (p) => p.prog.sc, label: (p) => `${p.prog.sc} deliveries`,
+    prize: (place, multi) => myGame.prog.sc * 15 + (multi && place === 1 ? 50 : 0),
+    note: () => (myGame.prog.sc > (S.bestDelivery || 0) ? ((S.bestDelivery = myGame.prog.sc), `New best: ${myGame.prog.sc} deliveries!`) : ""),
+    best: () => (S.bestDelivery ? `Your best: <b>${S.bestDelivery} deliveries</b>` : ""),
+    map(X, Z) { const T = ext.targets && ext.targets[myGame.prog.cp % ext.targets.length]; if (T) { mx.fillStyle = "#f39c12"; mx.beginPath(); mx.arc(X(T.x), Z(T.z), 6, 0, Math.PI * 2); mx.fill(); } },
+  },
+  treasure: {
+    setup(slot) {
+      const rnd = mulberry(myGame.seed ^ 0x7e5e);
+      ext.spots = []; ext.shown = new Set();
+      for (let i = 0; ext.spots.length < TREASURE_N && i < 2000; i++) {
+        const x = -112 + rnd() * 224, z = -112 + rnd() * 224;
+        if (blocked(x, z) || Math.hypot(x, z) < 30 || ext.spots.some((s) => Math.hypot(s.x - x, s.z - z) < 45)) continue;
+        if (ROADS.some((r) => Math.abs(x - r) < 5) || ROADS.some((r) => Math.abs(z - r) < 5)) continue;
+        ext.spots.push({ x, z, hint: nearestPlaceName(x, z) });
+      }
+      const a = (slot / 8) * Math.PI * 2; tpTo(Math.cos(a) * 6 + 5, Math.sin(a) * 6 + 5);
+    },
+    tick(dt, now, el, bar, ranks, place, multi) {
+      const P = myGame.prog, claimed = new Set(P.got);
+      for (const p of participants()) if (!p.isMe) for (const i of p.prog.got) claimed.add(i);
+      ext.spots.forEach((s, i) => {
+        if (!claimed.has(i) && Math.hypot(player.position.x - s.x, player.position.z - s.z) < 3.2) { P.got.push(i); claimed.add(i); toast(`You dug up treasure near ${s.hint}!`, "gold"); beep(1175, 0.2, 0.05, "triangle"); }
+        if (claimed.has(i) && !ext.shown.has(i)) {
+          ext.shown.add(i);
+          const g = new THREE.Group(); box(1.4, 0.8, 1, 0x7a4a24, 0, 0.4, 0, g); box(1.46, 0.3, 1.06, 0xd4af37, 0, 0.95, -0.2, g).rotation.x = -0.6;
+          const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), beaconMat); gem.position.y = 1.6; g.add(gem);
+          g.position.set(s.x, 0, s.z); addGameObj(g);
+        }
+      });
+      const cur = ext.spots.findIndex((s, i) => !claimed.has(i)), left = TREASURE_TIME * 1000 - el;
+      if (cur < 0 || left <= 0) { P.done = true; finishGame(); return; }
+      const s = ext.spots[cur], d = Math.hypot(player.position.x - s.x, player.position.z - s.z);
+      const heat = d > 120 ? ["Freezing", "#7fb6ff"] : d > 70 ? ["Cold", "#a8d0ff"] : d > 40 ? ["Cool", "#d8ecff"] : d > 20 ? ["Warm", "#ffbe2e"] : d > 8 ? ["Hot!", "#ff7b39"] : ["ON FIRE!", "#ff5c6c"];
+      bar.innerHTML = `<b>Treasure Hunt</b><span>${P.got.length} found · ${TREASURE_N - claimed.size} left</span><span>Clue: near ${esc(s.hint)}</span><span style="color:${heat[1]}">${heat[0]}</span><span class="t">${fmtT(left)}</span>`;
+    },
+    score: (p) => p.prog.got.length, label: (p) => `${p.prog.got.length} treasure${p.prog.got.length === 1 ? "" : "s"}`,
+    prize: (place, multi) => myGame.prog.got.length * 60 + (multi && place === 1 ? 50 : 0),
+  },
+  quiz: {
+    freeze: () => true,
+    setup() {
+      const rnd = mulberry(myGame.seed ^ 0x9a1);
+      ext.qs = shuffleSeeded(quizPool(), rnd).slice(0, QUIZ_N).map((q) => {
+        const opts = shuffleSeeded([q.a].concat(shuffleSeeded(q.wrong.filter((w) => w !== q.a), rnd).slice(0, 3)), rnd);
+        return { q: q.q, opts, ans: opts.indexOf(q.a) };
+      });
+      ext.qi = -1; ext.picked = null;
+    },
+    tick(dt, now, el, bar, ranks, place, multi) {
+      const qi = Math.floor(el / (QUIZ_SEC * 1000));
+      if (qi >= QUIZ_N) { myGame.prog.done = true; finishGame(); return; }
+      document.getElementById("quiz").hidden = false;
+      ext.inQ = el - qi * QUIZ_SEC * 1000;
+      if (ext.qi !== qi) { ext.qi = qi; ext.picked = null; renderQuiz(); }
+      document.getElementById("quizBar").style.width = `${100 - (ext.inQ / (QUIZ_SEC * 1000)) * 100}%`;
+      bar.innerHTML = `<b>Town Quiz</b><span>Question ${qi + 1}/${QUIZ_N}</span><span>${myGame.prog.sc} right</span>${multi ? `<span class="pl">${ordinal(place)} of ${ranks.length}</span>` : ""}`;
+    },
+    score: (p) => p.prog.sc, label: (p) => `${p.prog.sc}/${QUIZ_N} right`,
+    prize: (place, multi) => myGame.prog.sc * 10 + (multi && place === 1 ? 50 : 0),
+  },
+  dance: {
+    freeze: () => true,
+    setup() {
+      const rnd = mulberry(myGame.seed ^ 0xda7c), beat = 60 / DANCE_BPM;
+      ext.notes = []; ext.combo = 0; ext.flash = [0, 0, 0, 0]; ext.songT = 0; ext.beatI = -1; ext.lastEmo = 0;
+      for (let b = 4; b < DANCE_LEN / beat - 2; b++) {
+        if (rnd() < 0.62) ext.notes.push({ t: b * beat, lane: Math.floor(rnd() * 4), judged: false });
+        if (b % 8 === 7 && rnd() < 0.6) ext.notes.push({ t: (b + 0.5) * beat, lane: Math.floor(rnd() * 4), judged: false });
+      }
+    },
+    tick(dt, now, el, bar, ranks, place, multi) {
+      document.getElementById("dance").hidden = false;
+      ext.songT = el / 1000;
+      const bi = Math.floor(ext.songT / (60 / DANCE_BPM));
+      if (bi !== ext.beatI && ext.songT < DANCE_LEN) { ext.beatI = bi; beep(bi % 4 === 0 ? 110 : 70, 0.06, 0.07, "sine"); }
+      for (const n of ext.notes) if (!n.judged && ext.songT - n.t > 0.22) { n.judged = true; ext.combo = 0; ext.fb = { text: "MISS", t: 0.4, color: "#ff5c6c" }; }
+      for (let l = 0; l < 4; l++) ext.flash[l] -= dt;
+      if (ext.fb) ext.fb.t -= dt;
+      if (!playerEmote) playerEmote = { k: "dance", t: 2.6 };
+      if (now - ext.lastEmo > 2400) { ext.lastEmo = now; myEmote = { k: "dance", at: Date.now() }; }
+      drawDance();
+      bar.innerHTML = `<b>Dance Off</b><span>Score ${myGame.prog.sc.toLocaleString()}</span><span>Combo ${ext.combo}</span>${multi ? `<span class="pl">${ordinal(place)} of ${ranks.length}</span>` : ""}`;
+      if (ext.songT > DANCE_LEN + 1) { myGame.prog.done = true; finishGame(); }
+    },
+    score: (p) => p.prog.sc, label: (p) => `${p.prog.sc.toLocaleString()} points`,
+    prize: (place, multi) => Math.round(myGame.prog.sc / 100) + (multi && place === 1 ? 50 : 0),
+    note: () => (myGame.prog.sc > (S.bestDance || 0) ? ((S.bestDance = myGame.prog.sc), `New high score: ${myGame.prog.sc.toLocaleString()}!`) : ""),
+    best: () => (S.bestDance ? `Your high score: <b>${S.bestDance.toLocaleString()}</b>` : ""),
+  },
+  hide: {
+    freeze: () => myGame.prog.it && ext.phase === "hide",
+    setup(slot) {
+      myGame.prog.it = slot === 0; ext.phase = "hide"; ext.caughtToast = false;
+      const ring = addGameObj(new THREE.Mesh(new THREE.RingGeometry(HS_R - 0.6, HS_R, 72), new THREE.MeshBasicMaterial({ color: 0x2e86de, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(HS_C.x, 0.15, HS_C.z);
+      const a = (slot / 8) * Math.PI * 2; tpTo(HS_C.x + Math.cos(a) * (slot ? 6 : 0), HS_C.z + Math.sin(a) * (slot ? 6 : 0));
+    },
+    tick(dt, now, el, bar, ranks, place, multi) {
+      const P = myGame.prog, ps = participants();
+      ext.phase = el < HS_HIDE * 1000 ? "hide" : "seek";
+      const blind = document.getElementById("hsBlind");
+      blind.hidden = !(P.it && ext.phase === "hide");
+      if (!blind.hidden) document.getElementById("hsCount").textContent = Math.ceil(HS_HIDE - el / 1000);
+      const seeker = ps.find((p) => p.prog.it);
+      const hiders = ps.filter((p) => !p.prog.it);
+      if (P.it && ext.phase === "seek") {
+        for (const p of hiders) if (!P.found.includes(p.peer) && p.R && p.R.g.visible && Math.hypot(p.R.x - player.position.x, p.R.z - player.position.z) < 2.6) { P.found.push(p.peer); toast(`Found ${p.name}!`, "good"); beep(880, 0.15, 0.05, "triangle"); }
+      } else if (!P.it) {
+        if (seeker && !seeker.isMe && seeker.prog.found.includes(myPeer) && !P.caught) { P.caught = true; toast("You've been found!", "bad"); }
+        if (!P.caught && ext.phase === "seek") P.safe += dt;
+      }
+      const d = Math.hypot(player.position.x - HS_C.x, player.position.z - HS_C.z);
+      if (d > HS_R) { player.position.x = HS_C.x + (player.position.x - HS_C.x) * (HS_R / d); player.position.z = HS_C.z + (player.position.z - HS_C.z) * (HS_R / d); }
+      const foundList = seeker ? seeker.prog.found : [], allFound = hiders.length > 0 && hiders.every((h) => foundList.includes(h.peer) || h.prog.caught);
+      const left = (HS_HIDE + HS_SEEK) * 1000 - el;
+      const status = P.it ? (ext.phase === "hide" ? "You're the seeker. Counting..." : `Seeking · found ${P.found.length}/${hiders.length}`) : P.caught ? "Found! Watch the rest" : ext.phase === "hide" ? `Hide! ${Math.ceil(HS_HIDE - el / 1000)}s` : "Stay hidden!";
+      bar.innerHTML = `<b>Hide and Seek</b><span class="${P.it ? "it" : ""}">${status}</span><span class="t">${fmtT(Math.max(0, left))}</span>`;
+      if (left <= 0 || (ext.phase === "seek" && allFound)) { P.done = true; finishGame(); }
+    },
+    score: (p) => (p.prog.it ? p.prog.found.length * 40 : Math.floor(p.prog.safe)),
+    label: (p) => (p.prog.it ? `Seeker · found ${p.prog.found.length}` : p.prog.caught ? `Found after ${Math.floor(p.prog.safe)}s` : `Never found! ${Math.floor(p.prog.safe)}s`),
+    prize: (place) => (place === 1 ? 75 : 20),
+  },
+};
 
 // ============================================================ INPUT
 const keys = {};
@@ -3043,6 +3339,8 @@ addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   keys[k] = true;
   if (state !== "play") return;
+  if (danceKey(k)) { e.preventDefault(); return; }
+  if (myGame && myGame.type === "quiz" && myGame.state === "play" && ["1", "2", "3", "4"].includes(k)) { quizPick(Number(k) - 1); return; }
   if (k === "escape" && placing) { cancelPlacing(); return; }
   if (k === "r" && placing) { rotatePlacing(); return; }
   if (k === "escape") { if (!$("modalWrap").hidden) closeModal(); else closeSheet(); return; }
@@ -3220,7 +3518,7 @@ function updatePlayer(dt) {
   if (!nearDoor) { let bn = 3; for (const n of npcs) { const dd = n.c.position.distanceTo(player.position); if (dd < bn) { bn = dd; nearNpc = n; } } }
 }
 function interact(pref) {
-  if (drive) { if (drive === raceCar && gameActive()) { toast("Finish the race first! (Quit from the Games menu)"); return; } if (pref !== "car" && nearPump) refuel(); else exitVehicle(); return; }
+  if (drive) { if (drive === raceCar && gameActive() && myGame.type === "race") { toast("Finish the race first! (Quit from the Games menu)"); return; } if (pref !== "car" && nearPump) refuel(); else exitVehicle(); return; }
   if (IN) { if (nearStation) openStation(nearStation); else if (nearFriend) highFive(); else if (nearNpc) talk(nearNpc); return; }
   if (pref === "car" && !nearVehicle) return;
   if (nearVehicle && (pref === "car" || !nearDoor)) enterVehicle(nearVehicle);
@@ -3417,7 +3715,7 @@ function drawMinimap(now) {
   for (const v of vehicles) if (v.kind === "own" && v !== drive) { mx.fillStyle = "#ffbe2e"; mx.fillRect(X(v.car.position.x) - 3, Z(v.car.position.z) - 3, 6, 6); }
   const blink = Math.floor(now / 180) % 2;
   drawGameMap(X, Z);
-  for (const R of remotes.values()) if (R.loc === "out") { mx.fillStyle = "#00e5ff"; mx.strokeStyle = "#0b1330"; mx.lineWidth = 2; mx.beginPath(); mx.arc(X(R.x), Z(R.z), 5, 0, Math.PI * 2); mx.fill(); mx.stroke(); }
+  if (!hideTagsForSeeker()) for (const R of remotes.values()) if (R.loc === "out") { mx.fillStyle = "#00e5ff"; mx.strokeStyle = "#0b1330"; mx.lineWidth = 2; mx.beginPath(); mx.arc(X(R.x), Z(R.z), 5, 0, Math.PI * 2); mx.fill(); mx.stroke(); }
   for (const pc of police) { mx.fillStyle = blink ? "#ff3b3b" : "#3b7bff"; mx.beginPath(); mx.arc(X(pc.car.position.x), Z(pc.car.position.z), 4.5, 0, Math.PI * 2); mx.fill(); }
   if (wanted) { mx.strokeStyle = "rgba(72,213,151,.5)"; mx.lineWidth = 1.5; mx.beginPath(); mx.arc(X(player.position.x), Z(player.position.z), EVADE_DIST * sc, 0, Math.PI * 2); mx.stroke(); }
   drawArrow(X(player.position.x), Z(player.position.z));
@@ -3596,6 +3894,8 @@ function openLog() {
 $("btnPhone").addEventListener("click", () => { if (!busy) openPhone(); });
 $("btnMe").addEventListener("click", () => { if (!busy) openMe(); });
 $("btnGames").addEventListener("click", openGames);
+$("quiz").addEventListener("click", (e) => { const b = e.target.closest("[data-quiz]"); if (b) quizPick(Number(b.dataset.quiz)); });
+document.querySelectorAll("[data-dl]").forEach((b) => b.addEventListener("pointerdown", (e) => { e.preventDefault(); danceHit(Number(b.dataset.dl)); }));
 $("btnFriends").addEventListener("click", () => { if (!busy) openFriends(false); });
 $("btnPet").addEventListener("click", () => { if (!busy) openPet(); });
 $("btnDecor").addEventListener("click", () => { if (!busy) openDecor(); });
