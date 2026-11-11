@@ -2,8 +2,8 @@
 
 A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas, so there are no image assets. Open `index.html` in any modern browser.
 
-- 6 classes: Warrior (Whirlwind), Mage (Fireball), Ranger (Arrow Storm), Rogue (Shadowstep backstab), Paladin (Holy Smite, stuns and heals) and Necromancer (Raise Dead skeleton army)
-- A talent tree with three shared branches (Might, Guard, Arcana) and a branch unique to each class that upgrades its signature skill; points come from levels and story chapters, and talents can be reset for gold
+- 9 classes: Warrior (Whirlwind), Mage (Fireball), Ranger (Arrow Storm), Rogue (Shadowstep backstab), Paladin (Holy Smite, stuns and heals), Necromancer (Raise Dead skeleton army), Monk (Flurry, a dash that strikes everything in its path), Druid (Bramble, a thorn patch that poisons and slows enemies and heals you) and Engineer (Turret, an auto-firing crossbow turret)
+- A talent tree with four shared branches (Might, Guard, Arcana and Survival, which boosts gathering, potions, pets, mounts and chest gold), each with a powerful tier-4 capstone, plus a branch unique to each class that upgrades its signature skill; points come from levels and story chapters, and talents can be reset for gold
 - 35+ weapons any class can use (swords, katana, daggers, spear, scythe, cleaver, maul, flail, staffs, wands, bows, crossbows, blowgun, boomerang, chakram), with burn, freeze, poison, stun, lifesteal, execute, chain lightning, piercing and raise-the-dead effects; your class gets +15% with its own weapon type
 - 17 spells taught by Elder Mira, including Mend, Blink, Frost Nova, Chain Lightning, Glacial Spike, Arcane Barrier, Vampiric Touch, Wall of Flames, Earthquake, Cyclone, Spirit Wolves, Meteor, Starfall and Recall, cast from slots 1-3
 - 8 regions with fog-of-war, a day/night cycle and rain
