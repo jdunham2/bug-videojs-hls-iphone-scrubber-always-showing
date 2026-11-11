@@ -618,7 +618,7 @@ function hud(p, now, s) {
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush', wagon: 'locker', 'giant egg': 'locker', 'hay bales': 'bush', ferns: 'bush' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush', wagon: 'locker', 'giant egg': 'locker', 'hay bales': 'bush', ferns: 'bush', 'giant clam': 'dumpster', kelp: 'bush', 'cardboard boxes': 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';

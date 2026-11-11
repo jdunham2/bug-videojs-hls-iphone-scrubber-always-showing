@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-8, the starting map) or `MODE` (0-10) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-10, the starting map) or `MODE` (0-10) to change the defaults.
 
 ## How it plays
 
@@ -58,10 +58,11 @@ Beacons, power-ups, coins and challenges work in every mode.
 
 ### Characters
 
-Fourteen characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
-Duck), 16 colours, seven hats, four patterns and
-25 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
-owl, bat, ghostling, crab, hedgehog, froglet, parrot, snail, penguin chick, mouse, butterfly, mini UFO). Your pet runs just ahead of you;
+Twenty characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
+Duck, Knight, Wizard, Pirate, Shark, Mushroom, Snowman), 16 colours, seven hats, four patterns and
+33 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
+owl, bat, ghostling, crab, hedgehog, froglet, parrot, snail, penguin chick, mouse, butterfly, mini UFO, baby shark, jellyfish, chick, lamb, tiny T-rex, squirrel, firefly,
+little cloud). Your pet runs just ahead of you;
 other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
 Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
 
@@ -83,6 +84,8 @@ The host picks the map in the lobby with **Next map**.
 | **Candy Kingdom** | Gingerbread houses, lollipop trees, a cake castle and a chocolate lake | Gift boxes, gumdrops, lockers |
 | **Dusty Gulch** | A wild-west main street with a saloon, a hotel, a barn and a lot of cactus | Covered wagons, hay bales, lockers |
 | **Dino Jungle** | A misty jungle with huts, a ruined temple, a swamp and old bones | Giant eggs, ferns, lockers |
+| **Coral Reef** | The sea floor, with coral forests, a sunken galleon and a palace. Floaty gravity: jumps go nearly twice as high | Giant clams, kelp, lockers |
+| **Neon City** | A city at night with glowing signs, shops, an arcade and parked cars | Dumpsters, cardboard boxes, lockers |
 
 ### Vehicles
 
@@ -91,7 +94,7 @@ Every map has ten vehicles. Stand next to one and press **E** to climb in or out
 
 | Vehicle | Top speed | A full tank lasts | Notes |
 | --- | --- | --- | --- |
-| The map's own ride (go-kart, snowmobile, forklift, beach buggy, ghost cart, moon rover, cupcake car, buckboard, safari jeep) | 12.5 m/s | about 310 m | The all-rounder; four per map |
+| The map's own ride (go-kart, snowmobile, forklift, beach buggy, ghost cart, moon rover, cupcake car, buckboard, safari jeep, mini submarine, hover taxi) | 12.5 m/s | about 310 m | The all-rounder; four per map |
 | Scooter | 10 m/s | about 300 m | Narrow enough to ride through doorways, and turns on the spot |
 | Monster truck | 10.5 m/s | about 525 m | Wide and slow to turn, but the tank goes on and on |
 | Hoverboard | 14 m/s | about 175 m | Silent: no engine pings |
@@ -153,7 +156,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The nine maps (each generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The eleven maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |

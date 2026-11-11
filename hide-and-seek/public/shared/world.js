@@ -74,16 +74,20 @@ export const MAPS = [
   { veh: 'cupcake car', id: 'candy', name: 'Candy Kingdom', blurb: 'A land of sweets: gingerbread houses, lollipop trees, gumdrops and a chocolate river.' },
   { veh: 'buckboard', id: 'west', name: 'Dusty Gulch', blurb: 'A wild-west town: a saloon, a barn, covered wagons, hay bales and cactus.' },
   { veh: 'safari jeep', id: 'jungle', name: 'Dino Jungle', blurb: 'A misty jungle: huts, a ruined temple, giant eggs to hide in and old bones.' },
+  { veh: 'mini submarine', id: 'reef', name: 'Coral Reef', blurb: 'The sea floor: coral forests, kelp, giant clams to hide in, a sunken wreck, and floaty jumps.' },
+  { veh: 'hover taxi', id: 'neon', name: 'Neon City', blurb: 'A city at night: glowing signs, shops, parked cars, back-alley dumpsters and cardboard boxes.' },
 ];
 // What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
-  chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien', 'Dino', 'Bunny', 'Astronaut', 'Ninja', 'Pumpkin', 'Duck'],
+  chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien', 'Dino', 'Bunny', 'Astronaut', 'Ninja', 'Pumpkin', 'Duck',
+    'Knight', 'Wizard', 'Pirate', 'Shark', 'Mushroom', 'Snowman'],
   hats: ['No hat', 'Beanie', 'Cap', 'Top hat', 'Crown', 'Party hat', 'Headphones', 'Halo'],
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
   pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball',
     'Fox', 'Panda', 'Piglet', 'Unicorn', 'Turtle', 'Owl', 'Bat', 'Ghostling', 'Crab',
-    'Hedgehog', 'Froglet', 'Parrot', 'Snail', 'Penguin chick', 'Mouse', 'Butterfly', 'Mini UFO'],
+    'Hedgehog', 'Froglet', 'Parrot', 'Snail', 'Penguin chick', 'Mouse', 'Butterfly', 'Mini UFO',
+    'Baby shark', 'Jellyfish', 'Chick', 'Lamb', 'Tiny T-rex', 'Squirrel', 'Firefly', 'Little cloud'],
 };
 export function cleanLook(l) {
   const v = (x, n) => (Number.isInteger(x) && x >= 0 && x < n ? x : (Math.random() * n) | 0);
@@ -110,12 +114,16 @@ const THEMES = {
     sun: [0xffd9a0, 2.6], disc: 0xfff0c8, stars: 0, hills: 0xb5653a, outer: 0xc98a4a, roof: 0x6b4630, exposure: 1.05 },
   jungle: { sky: [[0.25, 0.5, 0.55], [0.6, 0.8, 0.66], [0.86, 0.95, 0.8]], glow: 0.3, fog: [0x9fc8a0, 0.011], hemi: [0xe6ffe0, 0x3a5a36, 1.45],
     sun: [0xfff2c2, 2.2], disc: 0xffffe0, stars: 0, hills: 0x2f6b3a, outer: 0x2a5a30, roof: 0x8a7a4a, exposure: 1.0, lush: true },
+  reef: { sky: [[0, 0.12, 0.3], [0, 0.3, 0.5], [0.1, 0.55, 0.65]], glow: 0.3, fog: [0x0f5a78, 0.019], hemi: [0x9fe0ff, 0x0a3a4a, 1.45],
+    sun: [0xbfefff, 1.4], disc: 0xdff8ff, stars: 0, hills: 0x0c4a5a, outer: 0x0e4a60, roof: 0xd98a6a, exposure: 1.1 },
+  neon: { sky: [[0.02, 0, 0.08], [0.12, 0.02, 0.2], [0.45, 0.1, 0.4]], glow: 0.3, fog: [0x1a0a2a, 0.012], hemi: [0xb08aff, 0x1a1030, 1.05],
+    sun: [0xff7ad9, 0.7], disc: 0xffc2f0, stars: 0.6, hills: 0x140a24, outer: 0x0c0816, roof: 0x1c1830, exposure: 1.25, glass: 0x66f0ff },
 };
 
 const _worlds = [];
 export function getWorld(i = 0) {
   i = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
-  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy, buildWest, buildJungle][i](i));
+  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy, buildWest, buildJungle, buildReef, buildNeon][i](i));
 }
 
 // Shared construction kit for every map. All maps keep the same centre: a plaza with the jail cage and its lever.
@@ -692,6 +700,79 @@ function buildJungle(i) {
   scatter(10, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
   scatter(7, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
   return K.finish(i, { pond: [39, 26, 17, 12] });
+}
+
+function buildReef(i) {
+  const K = kit(20000), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const shell = 0xe8b89a, sand = 0xd9c9a0, teal = 0x5fb5a8;
+  // Coral-stone huts
+  home(-30, -28, 12, 10, shell, { S: [-2], E: [1] });
+  home(30, -28, 12, 10, teal, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, sand, { N: [0], E: [2] });
+  home(30, 28, 12, 10, shell, { N: [0], W: [2] });
+  home(-60, 4, 10, 9, teal, { S: [-2], E: [2] });
+  home(60, -50, 10, 9, sand, { S: [-2], W: [2] });
+  // The sunken palace and the sea lab: two storeys each
+  manor(-54, -52, 16, 10, 0x9ad0c8, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0xc8b0e0, { S: [0], W: [0] });
+  // The wreck of a galleon, resting on its keel
+  house(0, -57, 26, 12, 5, 0x5a4632, { S: [-8, 8] }, 3);
+  for (const [x, z, h] of [[-10.5, -60.5, 2.6], [-9.1, -60.5, 1.3], [-2, -58, 1.3], [3, -60.5, 2.6], [10.5, -59, 1.3], [5, -54, 1.3], [-6, -53.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  for (const [x, z] of [[0, -61.5], [8, -54.5]]) add(x, z, 0.8, 0.8, 1.1, 'barrel', see);
+  locker(12.2, -57, -1.3); locker(-12.2, -56, 1.3);
+
+  K.plaza('fountain');
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [42, 0], [0, -36], [0, 42], [-44, -36], [44, 38]]) K.lamp(x, z);
+  K.lookout(-38, 8); K.lookout(44, -10); K.lookout(8, 56); K.lookout(-8, -36);
+  K.beacon(-68, 30); K.beacon(68, -30); K.beacon(-12, 69);
+
+  // Giant clams that close over you, and kelp beds to float in
+  scatter(11, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 1.6, 'clam', { v: R() }); spot('giant clam', x - 0.6, z, 1.95, 0); });
+  scatter(18, 1.6, 1.6, 2, (x, z) => spot('kelp', x, z, 0, 0));
+  scatter(95, 0.8, 0.8, 1.5, (x, z) => add(x, z, 0.8, 0.8, 4, 'coral', { v: R() }));
+  scatter(30, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(14, 2.4, 2.4, 1.4, (x, z) => add(x, z, 2.4, 2.4, 2.8, 'bigrock', { v: R() }));
+  scatter(12, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
+  scatter(12, 0.8, 0.8, 1.2, (x, z) => add(x, z, 0.8, 0.8, 1.1, 'barrel', see));
+  return K.finish(i, { gravity: 8 });
+}
+
+function buildNeon(i) {
+  const K = kit(2077), { R, add, spot, house, home, manor, locker, dumpster, scatter, see } = K;
+  const c1 = 0x2a2440, c2 = 0x24304a, c3 = 0x3a2444;
+  // Shops along the main strip
+  home(-40, -17, 12, 10, c1, { S: [-2] });
+  home(-23, -17, 10, 10, c2, { S: [-2] });
+  home(23, -17, 10, 10, c3, { S: [-2] });
+  home(40, -17, 12, 10, c2, { S: [-2] });
+  home(-36, 27, 12, 10, c3, { N: [0] });
+  home(36, 27, 12, 10, c1, { N: [0] });
+  home(-60, 42, 10, 9, c2, { S: [-2], E: [2] });
+  home(60, -44, 10, 9, c3, { S: [-2], W: [2] });
+  // The noodle bar and the capsule hotel: two storeys each
+  manor(-54, -50, 16, 10, 0x30284e, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0x283a4e, { S: [0], W: [0] });
+  // The arcade
+  house(0, -56, 24, 13, 6, 0x221a3a, { S: [-7, 7] }, 3);
+  for (const [x, z] of [[-9.5, -60.5], [-7, -60.5], [-4.5, -60.5], [4.5, -60.5], [7, -60.5], [9.5, -60.5], [-10.6, -55], [10.6, -52.5]]) add(x, z, 0.9, 0.8, 2, 'vending', { v: R() });
+  locker(11.2, -58, -1.3); locker(-11.2, -52, 1.3);
+
+  K.plaza('tower');
+  for (const [x, z] of [[-12, -8], [12, -8], [-12, 10], [14, 18], [-44, -6], [44, -6], [0, -34], [0, 42], [-30, 44], [34, -40], [-60, 6], [60, 8]]) K.lamp(x, z);
+  K.lookout(-24, 50); K.lookout(30, -40); K.lookout(46, 6);
+  K.beacon(-68, 20); K.beacon(68, -22); K.beacon(8, 69);
+
+  scatter(9, 4.2, 2.6, 1.3, (x, z) => dumpster(x - 0.7, z, 1.4));
+  scatter(15, 1.6, 1.6, 2, (x, z) => spot('cardboard boxes', x, z, 0, 0));
+  const paint = [0xffd23c, 0xff5fc8, 0x3de0d0, 0x8a5fff, 0xf2f4f8, 0xff7a3c];
+  scatter(14, 5, 5, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 4.4, 1.9, 1.5, 'car', { color: paint[(R() * 6) | 0], see: true }) : add(x, z, 1.9, 4.4, 1.5, 'car', { color: paint[(R() * 6) | 0], see: true, turn: true })));
+  scatter(16, 0.9, 0.8, 1.2, (x, z) => add(x, z, 0.9, 0.8, 2, 'vending', { v: R() }));
+  scatter(30, 0.3, 0.3, 1.6, (x, z) => add(x, z, 0.3, 0.3, 5, 'neonsign', { v: R(), see: true }));
+  scatter(16, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.4 ? 2.6 : 1.3, 'crate'));
+  scatter(16, 0.8, 0.8, 1.2, (x, z) => add(x, z, 0.8, 0.8, 1.1, 'barrel', see));
+  scatter(12, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  scatter(6, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
+  return K.finish(i);
 }
 
 function buildDocks(i) {
