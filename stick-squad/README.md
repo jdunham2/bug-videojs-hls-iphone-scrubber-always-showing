@@ -57,9 +57,9 @@ The host's computer runs the game and streams it to the friend about 30 times a 
 
 ## Fighters
 
-Thirty-two fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
+Thirty-six fighters, each with their own stats, look, special move and a **unique skill** on Down + Light (S + J on keyboard, Down + Y on a controller) with a 2.5-second cooldown. The skill name and cooldown show in the HUD next to your score.
 
-**Unlocking fighters:** you start with the first 8 fighters (Scribble to Halo). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 32. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
+**Unlocking fighters:** you start with the first 12 fighters (Scribble to Chef). Every Story chapter you beat unlocks the next 3, so beating all 8 chapters unlocks all 36. Locked fighters show as a padlock on the select screen with the chapter that unlocks them. Progress is saved in your browser. In online play, the host's unlocks are used.
 
 | Fighter | Style | Special | Skill (Down + Light) |
 |---|---|---|
@@ -94,6 +94,10 @@ Thirty-two fighters, each with their own stats, look, special move and a **uniqu
 | Dynamite Dan | Heavy attack lobs a bouncing bomb that explodes after a fuse | Mega Blast: one giant bomb with a huge explosion | Mine Drop: plants a proximity mine |
 | Picasso Pip | Heavy attack splats sticky paint that slows and hurts enemies standing in it | Masterpiece: paints the whole floor | Color Wheel: six paint bolts in every direction |
 | Yoyo Yuki | Heavy attack flings a long-range yo-yo that zips back | Walk the Dog: the yo-yo orbits you, hitting everything nearby | Around the World: a wide yo-yo circle |
+| Cactus Carl | Prickly: enemies that hit him get stung; heavy attack fires a fan of needles | Cactus Field: spikes burst out of the whole floor | Tumbleweed: a rolling spin dash |
+| Fairy Fern | Triple jump, hold jump to float; heavy attack throws a homing sparkle | Wish: heals the team 40 HP and gives everyone a 2-hit shield | Pixie Dust: puts nearby enemies to sleep |
+| Viking Vera | Tough berserker; heavy attack is a huge spinning axe swing | Ragnarok: 8 lightning bolts strike her enemies | War Cry: double damage for a few seconds and pushes foes back |
+| Dr. Goo | Heavy attack lobs a flask that bursts into sticky, slowing goo | Mutate: turns giant, heals and regenerates | Acid Spray: short-range burning acid |
 | Sir Doodle | Knight: hold DOWN to block attacks from the front; heavy attack is a charging lance | Royal Whirl: a spinning blade attack | Shield Bash: charging bash that raises a 1-hit guard |
 
 ## Modes
@@ -180,6 +184,12 @@ Enemies drop them, and **mystery boxes** fall from the sky during fights.
 | Jetpack | Hold jump to fly for 12 seconds |
 | Ink Decoy | A cardboard copy of you that every enemy chases instead of you |
 | Meteor Call | Meteors rain down on the enemies |
+| Lightning Rod | Lightning strikes the nearest enemy every second or so (10 s) |
+| Moon Boots | 2 extra jumps and higher jumps (12 s) |
+| Mirror Shield | Enemy shots bounce back at double damage (10 s) |
+| Earthquake | Hits every enemy standing on the ground |
+| Piñata | Bursts into 4 random power-ups |
+| Zero-G Bomb | Launches every enemy into the air |
 | Mystery box | A random power-up |
 
 ## Features
