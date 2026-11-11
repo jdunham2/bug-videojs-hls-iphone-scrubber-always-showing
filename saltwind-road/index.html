@@ -778,6 +778,9 @@ const GOODS = {
   dig_horn:{name:'Carved Drinking Horn',base:180,col:'#d8c8a0',kind:'good',desc:'Carved with hunting scenes.'},
   dig_amulet:{name:'Serpent Amulet',base:320,col:'#6a4aaa',kind:'good',desc:'A coiled serpent in dark silver.'},
   strongbox:{name:'Locked Strongbox',base:60,col:'#6a6a7a',kind:'usable',desc:'A bandit’s strongbox. Use it to try picking the lock.'},
+  giant_draught:{name:'Giant Draught',base:60,col:'#d84a3a',kind:'usable',desc:'Grow huge for 60 seconds: +25% damage and no knockback, but a little slower.'},
+  swift_tonic:{name:'Swiftness Tonic',base:45,col:'#4ad0e0',kind:'usable',desc:'Run 40% faster for 60 seconds.'},
+  shrink_elixir:{name:'Shrinking Elixir',base:45,col:'#9a7aff',kind:'usable',desc:'Shrink for 60 seconds: monsters notice you from half as far away.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2157,6 +2160,8 @@ const NPCS = [
    hello:["Think you're strong? Prove it!","Elbows on the table!","Nobody's beaten me this week."], rumors:["Arm wrestling is all about rhythm. Mash steady and fast, and don't let up when I push back."]},
   {id:'sandy',town:'wren',dx:6,dy:5,name:'Sandy',role:'Sandcastle contest',cols:{cloak:'#e0c060',skin:'#e8c098',hair:'#d06a2a'},sandcastle:true,freeSpot:true,
    hello:["Build it tall! Build it proud!","The tide waits for no castle.","Bucket and spade, ready?"], rumors:["Drop each layer right on top of the last. Any overhang crumbles away, so the tower gets thinner and thinner."]},
+  {id:'fizzwick',town:'thorn',dx:-4,dy:3,name:'Fizzwick the Alchemist',role:'Strange potions',cols:{cloak:'#6a2a8a',skin:'#c0d0a0',hair:'#e0e040'},alchemist2:true,freeSpot:true,
+   hello:["Bubble, bubble! Want to try something?","Side effects are half the fun!","Hee hee... one sip won't hurt."], rumors:["Drink a Giant Draught before a big fight. Drink a Shrinking Elixir to sneak past trouble. And never, ever mix them."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3094,7 +3099,7 @@ const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => {
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
 function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+const speedMult = () => (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
 const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
@@ -3381,7 +3386,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3484,7 +3489,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * (compAbil('brann') ? .85 : 1) * 2) / 2);
   S.hp -= taken; padRumble(.25 + Math.min(.6, taken*.06), 150); SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
-  if (from) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
+  if (from && !(POT.giant > 0)) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
   if (S.hp <= 0) {
     if (have('phoenix') && S.phoenixDay !== S.day) { S.phoenixDay = S.day; S.hp = maxHP()/2; player.inv = 2.5; SFX.level(); burst(S.x, S.y - .5, '#ff8a3a', 30, 6); toast('<b>The Phoenix Feather blazes</b><br>You rise again from the ashes.', 5000); }
     else die();
@@ -3825,7 +3830,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, pr: myRace, pj: prace ? prace.i : null, pf: prace && prace.myT != null ? {i: prace.i, t: prace.myT} : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, ps: potScale(), dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, pr: myRace, pj: prace ? prace.i : null, pf: prace && prace.myT != null ? {i: prace.i, t: prace.myT} : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3873,8 +3878,10 @@ function drawRemote(r) {
   const p = r.p, px = Math.round(r.x*TS), py = Math.round(r.y*TS), c = (p.c && typeof p.c === 'object') ? {cloak: String(p.c.cloak || '#2f6b6b').slice(0, 9), skin: String(p.c.skin || '#e0b18a').slice(0, 9), hair: String(p.c.hair || '#3a2a1d').slice(0, 9)} : player.cols;
   const facing = ['up', 'down', 'left', 'right'].includes(p.f) ? p.f : 'down', hat = HATS[p.hat] ? p.hat : null, mt = MOUNTS[p.mt] ? p.mt : null;
   ctx.fillStyle = r.col; ctx.globalAlpha = .35; ctx.beginPath(); ctx.ellipse(px, py + 1, 7, 2.5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  const rsc = Math.max(.5, Math.min(1.6, +p.ps || 1)); if (rsc !== 1) { ctx.save(); ctx.translate(px, py); ctx.scale(rsc, rsc); ctx.translate(-px, -py); }
   if (mt) { drawMount(ctx, mt, px, py, facing === 'left' ? -1 : 1, r.phase, !!p.mv); drawPerson(ctx, px, py - (MOUNTS[mt].fly && p.mv ? 12 : 8), c, 0, false, facing, {scarf: true, pack: true, cos: hat}); }
   else drawPerson(ctx, px, py, c, r.phase, !!p.mv, facing, {scarf: true, pack: true, cos: hat});
+  if (rsc !== 1) ctx.restore();
   if (p.sw) { ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); const a = {up: -1.57, down: 1.57, left: 3.14, right: 0}[facing]; ctx.arc(px, py - 7, 10, a - .8, a + .8); ctx.stroke(); }
   const top = py - (mt ? 34 : 28); ctx.font = '7px "Pixelify Sans", monospace'; ctx.textAlign = 'center';
   ctx.fillStyle = '#0d131b'; ctx.fillText(r.name, px + .7, top + .7); ctx.fillStyle = r.col; ctx.fillText(r.name, px, top);
@@ -4277,6 +4284,7 @@ function useItem(g) {
     BUFFS.regen = Math.max(BUFFS.regen || 0, 180); S.hp = Math.min(maxHP(), S.hp + maxHP()*.25); S.picnics = (S.picnics || 0) + 1; SFX.chime(); renderHP(); renderHUD();
     toast(`<b>You spread a picnic blanket.</b><br>Health regenerates for 3 minutes${party ? ', for party members nearby too' : ''}.`, 4500); return;
   }
+  if (g === 'giant_draught' || g === 'swift_tonic' || g === 'shrink_elixir') { addItem(g, -1); const k = g === 'giant_draught' ? 'giant' : g === 'swift_tonic' ? 'swift' : 'tiny'; if (k === 'giant') POT.tiny = 0; if (k === 'tiny') POT.giant = 0; POT[k] = 60; S.potionsDrunk = (S.potionsDrunk || 0) + 1; S.potionKinds = S.potionKinds || {}; S.potionKinds[k] = true; SFX.level(); burst(S.x, S.y - .6, GOODS[g].col, 20, 4); floatText(S.x, S.y - 1.8, k === 'giant' ? 'You grow HUGE!' : k === 'tiny' ? 'You shrink!' : 'Zoom!', GOODS[g].col); renderHUD(); partyT = 0; return; }
   if (g === 'strongbox') { addItem(g, -1); renderHUD(); lockStart(); return; }
   if (g === 'war_horn') {
     if (inDungeon() || inArena() || townAt(S.x, S.y, 14) || S.y >= WORLD_H) { toast('Blow the horn out in the wild, away from towns.'); return; }
@@ -4805,6 +4813,13 @@ function castleEnd() {
   const C = castle; C.on = false; castle = null; const h = C.layers.length - 1, perf = C.layers.filter(L => L.perfect).length;
   const c = h*4 + perf*3; S.coins += c; S.castleBest = Math.max(S.castleBest || 0, h); S.castles = (S.castles || 0) + 1; SFX[h >= 15 ? 'victory' : 'coin'](); renderHUD(); save();
   setTimeout(() => openPanel('Sandcastle contest', `Your sandcastle stands <b>${h}</b> layers tall${perf ? ` with ${perf} perfect layer${perf > 1 ? 's' : ''}` : ''}!${h >= (S.castleBest || 0) && h ? ' A new personal best!' : ''}<br>“${h >= 20 ? 'Magnificent! A royal palace of sand!' : h >= 12 ? 'Now that’s a castle!' : 'Cute! Try again before the tide comes in.'}” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Build another', primary: true, fn: () => castleStart()}, {label: 'Close', fn: closeTalk}]), 500);
+}
+// ===== strange potions =====
+const POT = {giant: 0, swift: 0, tiny: 0};
+const potScale = () => POT.giant > 0 ? 1.5 : POT.tiny > 0 ? .6 : 1;
+function potTick(dt) {
+  for (const k in POT) if (POT[k] > 0) { const b = POT[k]; POT[k] = Math.max(0, POT[k] - dt); if (b > 0 && POT[k] === 0) { floatText(S.x, S.y - 1.6, k === 'giant' ? 'Back to normal size' : k === 'tiny' ? 'You grow back' : 'The tonic wears off', '#cfd6dc'); partyT = 0; } else if (b > 5 && POT[k] <= 5) floatText(S.x, S.y - 1.6, 'Wearing off...', '#cfd6dc'); }
+  if (POT.swift > 0 && player.moving && Math.random() < .3) particles.push({x: S.x, y: S.y - .2, vx: 0, vy: 0, t: .3, col: 'rgba(120,220,240,.6)'});
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -6342,6 +6357,7 @@ function legendSpawns() {
   }
 }
 const EARNED_TITLES = [
+  ['coopboss', 'Raid Leader'], ['reviver', 'Lifesaver'], ['birdsall', 'Ornithologist'], ['digall', 'Archaeologist'], ['riddle5', 'Riddle Master'], ['spar5', 'Sparring Champion'], ['castle20', 'Master Builder'], ['champion10', 'Champion Hunter'], ['potions', 'Mad Alchemist'],
   ['dragon', 'Dragon Rider'],
   ['knight', 'Knight of the Realm'],
   ['guildmaster', 'Trade Magnate'],
@@ -6353,8 +6369,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Strange potions', 'Fizzwick in Thornwick sells three odd potions you drink from your bag. Each lasts a minute. A Giant Draught makes you huge: +25% damage and no knockback, but a bit slower. A Swiftness Tonic makes you run 40% faster. A Shrinking Elixir makes you tiny, so monsters notice you from half as far away. Party members see you grow and shrink!'],
   ['Arm wrestling and sandcastles', 'Brawny Buck in Redrock takes on challengers at arm wrestling: mash Space or A to push his arm down, and hold on when he pushes back. He gets tougher every time you win. Sandy in Port Wren runs a sandcastle contest: drop each layer on top of the last, since any overhang crumbles away.'],
   ['Riddles and strongboxes', 'Enigma the Wanderer in Highcairn gives one riddle a day. Each one describes a town: travel there to solve it, and the farther it is, the bigger the reward. Bandits sometimes drop Locked Strongboxes: use one from your bag to pick the lock by setting four pins before your lockpicks run out.'],
   ['Archaeology', 'Professor Dunst in Dunmere Oasis gives you a trowel. Each day, dig sites appear on your map in ruins, deserts, savannas and mesas. Excavating opens a 5\u00d75 grid: each hole shows how many steps away the artifact is buried, and you have six digs. Collect all eight artifacts for a big reward.'],
@@ -6676,7 +6693,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -6730,7 +6747,7 @@ function updateCombat(dt, night) {
     const dSelf = d; let me = true, sf = safe;
     if (party && party.host && e.nid) { const o = netTarget(e, d); if (o) { dx = o.x - e.x; dy = o.y - e.y; d = Math.hypot(dx, dy) || .001; me = false; sf = !!townAt(o.x, o.y, 8); } }
     let mx = 0, my = 0, sp = def.speed * (e.spd || 1);
-    const aggro = (night ? def.aggro + 2 : def.aggro) + (e.alert ? 4 : 0);
+    const aggro = ((night ? def.aggro + 2 : def.aggro) + (e.alert ? 4 : 0)) * (POT.tiny > 0 && !e.alert ? .5 : 1);
     if (!sf && d < aggro) {
       if (def.ranged) {
         const R = def.ranged;
@@ -7625,7 +7642,7 @@ function render() {
   const held = S.equip.weapon && have(S.equip.weapon) ? S.equip.weapon : null;
   const helm = S.equip.head && have(S.equip.head) ? GOODS[S.equip.head].col : null, shield = S.equip.shield && have(S.equip.shield) ? GOODS[S.equip.shield].col : null;
   sprites.push({y: S.y, f: () => {
-    const px = Math.round(S.x*TS), py = Math.round(S.y*TS);
+    const px = Math.round(S.x*TS), py = Math.round(S.y*TS), psc = potScale(); if (psc !== 1) { ctx.save(); ctx.translate(px, py); ctx.scale(psc, psc); ctx.translate(-px, -py); }
     if (player.inv > 0 && Math.floor(frameT*20) % 2) ctx.globalAlpha = .5;
     const swimRide = S.riding && MOUNTS[S.mount] && MOUNTS[S.mount].swim;
     if (balloonF) drawBalloon(px, py);
@@ -7662,7 +7679,7 @@ function render() {
       drawPerson(ctx, 0, 7, player.cols, 0, false, player.facing, {scarf:true, pack:true});
       ctx.restore();
     } else drawPerson(ctx, px, py, player.cols, player.phase, player.moving, player.facing, {scarf:true, pack:true, held, helm, shield, cos: S.hat});
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1; if (psc !== 1) ctx.restore();
   }});
   if (inView(HOME.x, HOME.y)) drawFarm(ctx, frameT);
   // hazards under sprites
@@ -8370,6 +8387,7 @@ function mainOptions(n) {
   if (n.riddler) o.push({label: S.riddle ? 'Repeat the riddle' : 'Ask for a riddle', primary: true, fn: () => riddleTalk(n)});
   if (n.wrestler) o.push({label: 'Arm wrestle · 15\u25c6', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); wrestleStart(); }});
   if (n.sandcastle) o.push({label: 'Build a sandcastle', primary: true, fn: () => castleStart()});
+  if (n.alchemist2) o.push({label: 'Buy strange potions', primary: true, fn: () => shopTalk(n, [['giant_draught', 70], ['swift_tonic', 50], ['shrink_elixir', 50]], '“Fresh from the cauldron! Each one lasts a full minute. Drink from your bag.”')});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11170,6 +11188,7 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['potions','Mad Alchemist','Try all three of Fizzwick\u2019s strange potions', () => Object.keys(S.potionKinds || {}).length >= 3],
   ['coopboss','Raid Party','Defeat a boss together with your party', () => (S.coopBosses || 0) >= 1],
   ['armwrestle','Iron Grip','Win 3 arm-wrestling matches', () => (S.wrestleWins || 0) >= 3],
   ['castle20','Master Builder','Build a sandcastle 20 layers tall', () => (S.castleBest || 0) >= 20],
@@ -11735,7 +11754,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
