@@ -2,7 +2,9 @@
 
 A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas, so there are no image assets. Open `index.html` in any modern browser.
 
-- 3 classes: Warrior, Mage and Ranger, each with its own attack and skill
+- 3 classes: Warrior, Mage and Ranger, each with its own skill
+- 17 weapons any class can use (swords, daggers, spear, cleaver, maul, staffs, wand, bows, crossbow, boomerang), with burn, freeze, poison, stun, chain lightning and piercing effects; your class gets +15% with its own weapon type
+- 9 spells taught by Elder Mira (Mend, Blink, Frost Nova, Chain Lightning, Haste, Poison Cloud, Stone Skin, Spirit Wolves, Meteor), cast from slots 1-3
 - 8 regions with fog-of-war, a day/night cycle and rain
 - 13 monster types, including spitting toads, blinking wisps, lunging spiders and bandits, and magma slimes that split in two
 - 2 bosses: the Hollow King on his throne in the Sunken Ruins, and the Ashen Wyrm in the Ashen Wastes
@@ -12,6 +14,6 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - Shop with a lure, lantern, boots and a fox companion; 14 treasure chests
 - Autosaves to the browser; plays with keyboard and mouse or touch
 
-Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, E to interact, Q/R for potions, I for your bag, L for the journal, M for the map.
+Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, L for the journal, M for the map.
 
 `game.html` is the source. Run `./build.sh` to rebuild `index.html` from it.
