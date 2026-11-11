@@ -207,7 +207,7 @@ kbd.k{font-family:var(--ui);font-weight:800;font-size:12px;border:1px solid var(
 const T=40, W=112, H=84, CH=16, SEED=4271;
 const VX=56, VY=40, LX=26, LY=52, BX=100, BY=72, HX=42, HY=68;
 const DEEP=0,WATER=1,SAND=2,LAVA=3,ASH=4,STONE=5,PATH=6,GRASS=7,FOREST=8,FLOOR=9,WALL=10,DFLOOR=11;
-const ORDER=[1,2,3,4,5,6,7,8,9,11,10], VGX=86, VGY=15, PHX=VX+11, PHY=VY-6, GX=17, GY=17, CPX=30, CPY=74;
+const ORDER=[1,2,3,4,5,6,7,8,9,11,10], VGX=86, VGY=15, PHX=VX+11, PHY=VY-6, GX=17, GY=17, CPX=30, CPY=74, TWX=46, TWY=30;
 const COL=['#184467','#2a78ad','#dec389','#ff5a1c','#4a3f3d','#7e8680','#b8956a','#5ba746','#3b7a37','#a49d94','#2a2b31','#55525c'];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, rnd=(a,b)=>a+Math.random()*(b-a), rint=(a,b)=>Math.floor(rnd(a,b+1));
 const dist=(a,b,c,d)=>Math.hypot(c-a,d-b), pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -533,6 +533,9 @@ function placeObjects(){
   // arena braziers
   for(let k=0;k<8;k++){const a=k/8*Math.PI*2;const x=Math.round(BX+Math.cos(a)*6.5),y=Math.round(BY+Math.sin(a)*6.5);if(free(x,y))addObj('brazier',x,y)}
   for(let k=0;k<12;k++){const a=k/12*Math.PI*2;const x=Math.round(GX+Math.cos(a)*7),y=Math.round(GY+Math.sin(a)*7);if(free(x,y)&&!(x>GX+4&&Math.abs(y-GY)<2))addObj('tree',x,y,{kind:'dead'})}
+  for(let y=TWY-4;y<=TWY+4;y++)for(let x=TWX-4;x<=TWX+4;x++)if(dist(x,y,TWX,TWY)<4.2){if(tiles[y*W+x]!==DEEP&&tiles[y*W+x]!==WATER)tiles[y*W+x]=dist(x,y,TWX,TWY)<2.2?PATH:GRASS;grid[y*W+x]=null}
+  objs=objs.filter(o=>dist(o.tx,o.ty,TWX,TWY)>=4.2);addObj('startower',TWX,TWY-1);addObj('altar',TWX,TWY+1);
+  for(const b of BEACONS){for(let y=b.y-1;y<=b.y+1;y++)for(let x=b.x-1;x<=b.x+1;x++){if(tiles[y*W+x]===WATER||tiles[y*W+x]===DEEP)continue;grid[y*W+x]=null}objs=objs.filter(o=>Math.abs(o.tx-b.x)>1||Math.abs(o.ty-b.y)>1);tiles[b.y*W+b.x]=PATH;addObj('beacon',b.x,b.y,{bid:b.id})}
   addObj('wreck',CPX,CPY+5);[[-5,2],[5,3],[-3,-4],[6,-2]].forEach(([dx,dy],i)=>{if(free(CPX+dx,CPY+dy))addObj(i%2?'crate':'bones',CPX+dx,CPY+dy,i%2?{}:{solid:false})});
   for(let k=0;k<6;k++){const a=k/6*Math.PI*2+.5;const x=Math.round(GX+Math.cos(a)*5),y=Math.round(GY+Math.sin(a)*5);if(free(x,y))addObj('glowcap',x,y,{solid:false})}
   for(let k=0;k<8;k++){const a=k/8*Math.PI*2+.2;const x=Math.round(HX+Math.cos(a)*6.4),y=Math.round(HY+Math.sin(a)*6.4);if(free(x,y))addObj(k%2?'pillar':'brazier',x,y,{blue:true})}
@@ -541,7 +544,7 @@ function placeObjects(){
     if(t===DEEP||t===WATER||t===LAVA||t===PATH||t===FLOOR||grid[y*W+x])continue;
     if(dist(x,y,PHX+2,PHY+1)<4.5||dist(x,y,ARX,ARY)<4.5)continue;
     if(WAYSTONES.some(w=>dist(x,y,w.x,w.y)<2.5)||PAGES.some(p=>p.lv==='world'&&dist(x,y,p.x,p.y)<2))continue;
-    if(dist(x,y,VX+.5,VY+.5)<11||dist(x,y,GX,GY)<8.5||dist(x,y,CPX,CPY)<8||dist(x,y,BX,BY)<8||dist(x,y,HX,HY)<8||dist(x,y,VGX,VGY)<8||Object.values(DUNGEONS).some(D=>dist(x,y,D.ex,D.ey)<3.5))continue;
+    if(dist(x,y,VX+.5,VY+.5)<11||dist(x,y,GX,GY)<8.5||dist(x,y,CPX,CPY)<8||dist(x,y,TWX,TWY)<5||BEACONS.some(b=>dist(x,y,b.x,b.y)<2.5)||dist(x,y,BX,BY)<8||dist(x,y,HX,HY)<8||dist(x,y,VGX,VGY)<8||Object.values(DUNGEONS).some(D=>dist(x,y,D.ex,D.ey)<3.5))continue;
     const h=hash(x,y,3), h2=hash(x,y,4);
     if(r==='meadow'){ if(h<.035)addObj('tree',x,y,{kind:h2<.15?'autumn':'oak'}); else if(h<.046)addObj('herb',x,y,{solid:false}); else if(h<.052)addObj('rock',x,y,{ore:'iron'}); }
     else if(r==='coast'){ if(t===SAND&&h<.03)addObj('tree',x,y,{kind:'palm'}); else if(t===GRASS&&h<.04)addObj('tree',x,y,{kind:'oak'}); else if(h<.048)addObj('herb',x,y,{solid:false}); }
@@ -587,6 +590,8 @@ const ITEMS={
   a_hollow:{n:'Hollow Circlet',v:300,ic:'amulet',c:'#a9b4ff',use:1,slot:'amulet',st:{xp:.12},d:'Amulet: +12% XP.'},
   a_wyrm:{n:'Wyrmheart Talisman',v:600,ic:'amulet',c:'#ff4d3d',use:1,slot:'amulet',st:{dmg:.12,def:6},d:'Amulet: +12% damage, +6 defense.'},
   shard:{n:'Emberstone Shard',v:0,ic:'orb',c:'#ffb347',quest:1},
+  lute:{n:"Wren's Lute",v:0,ic:'wand',c:'#c8864a'},
+  a_seraph:{n:"Seraphine's Amulet",v:2000,ic:'amulet',c:'#9fd0ff',use:1,slot:'amulet',st:{hp:80,mp:60,dmg:.08}},
   shell:{n:'Crab Shell',v:12,ic:'shell',c:'#f08a5b'},
   silk:{n:'Spider Silk',v:11,ic:'silk',c:'#eef0f8'},
   crown:{n:'Hollow Crown',v:450,ic:'crown',c:'#ffd23f'},
@@ -707,7 +712,7 @@ const ENEMY={
   mycelia:{n:'Mycelia, the Spore Mother',hp:2400,atk:26,def:6,spd:0,r:44,xp:1100,gold:[650,650],drops:[],ai:'boss'},
   colossus:{n:'The Brass Colossus',hp:5000,atk:40,def:12,spd:55,r:44,xp:3000,gold:[1500,1500],drops:[],ai:'boss'},
   boar:{n:'Wild Boar',hp:70,atk:12,def:3,spd:70,r:16,xp:18,gold:[3,8],drops:[['pelt',.5],['herb',.1]],ai:'charger'},
-  pixie:{n:'Mischief Pixie',hp:30,atk:4,def:0,spd:130,r:10,xp:20,gold:[2,6],drops:[['glowcap',.4],['crystal',.04]],ai:'pixie',steal:1},
+  pixie:{n:'Mischief Pixie',hp:30,atk:4,def:0,spd:130,r:10,xp:20,gold:[2,6],drops:[['glowcap',.4],['crystal',.04],['lute',.3]],ai:'pixie',steal:1},
   lurker:{n:'Marsh Lurker',hp:85,atk:14,def:3,spd:85,r:14,xp:26,gold:[5,11],drops:[['shell',.3],['herb',.2]],ai:'thrower'},
   sandworm:{n:'Dune Worm',hp:110,atk:17,def:4,spd:70,r:18,xp:34,gold:[6,12],drops:[['shell',.4],['gold',.1]],ai:'burrow'},
   gargoyle:{n:'Gargoyle',hp:120,atk:19,def:7,spd:100,r:16,xp:42,gold:[8,16],drops:[['iron',.5],['crystal',.08]],ai:'gargoyle'},
@@ -795,6 +800,12 @@ const QUESTS=[
   {id:'mz1',npc:'elder',name:'The Brass Colossus',type:'flag',t:'colossus',n:1,at:'clockwork',desc:'Beneath the Ironcrag Hills lies a vault of the old kings, guarded by a giant of brass. Seraphine locked her last pages inside. Go and get them.',rw:{gold:4000,xp:3000,items:{elixir:3}},
     intro:[['elder','There is one place Seraphine never wrote about openly: the Clockwork Vault, deep in the Ironcrag Hills.'],['borin','The old kings\' vault? My grandfather said there\'s a brass giant in there that never sleeps. Gears as big as a house.'],['elder','Seraphine hid her last pages there. Whatever she could not tell us is inside. Go carefully, {class}.']],
     outro:[['borin','You took down the Colossus? With that? I\'d have brought a bigger hammer.'],['elder','Seraphine\'s last pages... Thank you. I will read them tonight, and perhaps at last I will understand her.']]},
+  {id:'mf1',npc:'elder',name:'Beacons of the Archmage',type:'cond',n:3,cond:()=>litBeacons(),label:'Beacons lit',at:()=>{const b=BEACONS.find(b=>!P.flags['bc'+b.id]);return b?[b.x,b.y,b.n]:null},desc:'Light Seraphine\'s three old beacons: one near the Whisperwood Glade waystone, one near Ironcrag Ridge, and one near Saltwind Point.',rw:{gold:2000,xp:2000,items:{elixir:2}},
+    intro:[['elder','I read Seraphine\'s last pages until dawn. {class}, sit down. You will want to be sitting.'],['orrin','She did not die. She sealed herself inside the Void to hold Malgrath\'s door shut from the other side.'],['elder','With Malgrath gone, nothing holds her there any longer. Except that she cannot find her way back.'],['orrin','She left three beacons for exactly this. Light them, and she will have a path home.']],
+    outro:[['elder','I can see the light of all three from my window. They look like new stars.'],['elder','Now the last step. Go to the ruins of her old tower, north-west of the village.']]},
+  {id:'mf2',npc:'elder',name:'The Starfall Tower',type:'cond',n:1,cond:()=>P.flags.seraphine?1:0,label:'Perform the ritual at the tower ruins',at:[TWX,TWY+1,"Seraphine's tower"],desc:'With all three beacons burning, go to the ruins of Seraphine\'s tower north-west of Emberfall and touch the altar.',rw:{gold:5000,xp:4000,items:{elixir:3,a_seraph:1}},
+    intro:[['elder','Her tower stood just north-west of the village, before the Wyrm burned it. The altar is still there.'],['elder','I was seven years old when she left. I hope she remembers me.']],
+    outro:[['seraphine','Mira. Look at you. You were this tall, and you would not stop asking me questions.'],['elder','I still have a few, Seraphine.'],['seraphine','Then we have time. Thanks to {class}, we finally have time.'],['narrator','That night, Emberfall holds the Festival of Stars for the first time in three hundred years.']]},
   {id:'r1',npc:'rhea',name:'Night Watch',type:'kill',t:'bat',n:8,desc:'Bats swarm out at night and bite anyone on the roads. Bring down eight.',rw:{gold:150,xp:120,items:{hpot:2}},
     intro:[['rhea','Captain Rhea, Emberfall Watch. The roads are crawling with monsters and I have six guards.'],['rhea','So I pay bounties. You hunt, I pay. Simple.']]},
   {id:'r2',npc:'rhea',name:'Spider Season',type:'kill',t:'spider',n:10,at:[56,16],desc:'Thicket spiders are spreading through the Whisperwood. Cull ten.',rw:{gold:260,xp:220}},
@@ -843,15 +854,37 @@ const QUESTS=[
   {id:'b7',npc:'borin',name:'Saddle for a Bear',type:'bring',t:'pelt',n:15,desc:'A cave bear has been sleeping behind my forge all winter, and he likes you. Bring 15 wolf pelts and I\'ll stitch a saddle that fits him.',rw:{gold:300,xp:300,mount:'bear'}},
   {id:'b6',npc:'borin',name:'Handy with Tools',type:'cond',n:5,cond:()=>P.sk.crafting.l,label:'Crafting level',desc:'A smith respects a crafter. Reach Crafting level 5 at a workbench.',rw:{gold:400,xp:350,items:{whet:3,bomb:5}}},
   {id:'t6',npc:'tess',name:'Merchant Prince',type:'cond',n:5000,cond:()=>P.gold,label:'Gold in your purse',desc:'A true trader keeps a full purse. Hold 5,000 gold at once.',rw:{gold:500,xp:400}},
+  {id:'rb1',npc:'rhea',name:'Boar Hunt',type:'kill',t:'boar',n:6,desc:'Wild boars are charging farmers in the meadows around Emberfall. Thin out six of them. Mind the tusks.',rw:{gold:300,xp:280,items:{grilled:3}}},
+  {id:'rb2',npc:'rhea',name:'Stone Sentinels',type:'kill',t:'gargoyle',n:5,desc:'Statues in the Sunken Ruins and Ironcrag Hills have started moving. Smash five gargoyles.',rw:{gold:700,xp:650,items:{hpot:3}}},
+  {id:'rb3',npc:'rhea',name:'Dune Duty',type:'kill',t:'sandworm',n:5,desc:'Something under the sand on the Saltwind Coast is swallowing fishing boats whole. Stop five Dune Worms.',rw:{gold:600,xp:600,items:{mpot:3}}},
+  {id:'bb1',npc:'borin',name:'Brass and Bolts',type:'kill',t:'clockbot',n:8,at:'clockwork',desc:'The old kings built soldiers out of brass. I want to see how! Scrap eight Clockwork Soldiers in the Clockwork Vault.',rw:{gold:1800,xp:1600,items:{crystal:4}}},
+  {id:'lb1',npc:'lin',name:'Spore Samples',type:'kill',t:'sporeling',n:12,at:'fungal',desc:'I need spores for a new potion. Pop twelve Sporelings in Mycelium Hollow, and try not to breathe in.',rw:{gold:500,xp:500,items:{elixir:1}}},
+  {id:'nb1',npc:'ned',name:'Drowned Debts',type:'kill',t:'drowned',n:8,desc:'Some of those drowned sailors still owe me money. Put eight of them to rest on the Saltwind Coast.',rw:{gold:500,xp:480,items:{grilled:4}}},
+  {id:'ob1',npc:'orrin',name:'The Great Bestiary',type:'cond',n:30,cond:()=>Object.keys(P.st.kt||{}).length,label:'Kinds of monster defeated',desc:'I am writing the greatest bestiary in history. Defeat thirty different kinds of monster so I can record them.',rw:{gold:2000,xp:1800,items:{crystal:3}}},
+  {id:'tb1',npc:'tess',name:'Mushroom Market',type:'bring',t:'glowcap',n:12,desc:'Glowcaps are all the rage in the capital! Bring me twelve and I will pay well.',rw:{gold:600,xp:300}},
+  {id:'w1',npc:'wren',name:'A Song Needs a Hero',type:'cond',n:6,cond:()=>P.ways.length,label:'Waystones awakened',at:'way',desc:'Every great ballad starts with a journey. Wake six of Seraphine\'s waystones and tell me what you saw.',rw:{gold:300,xp:250},
+    intro:[['wren','Oh! You are the {class} everyone is whispering about! I am Wren, wandering bard, teller of tales, occasional juggler.'],['wren','I am writing the ballad of Emberfall, and every ballad needs a hero. Interested? First, a hero needs a journey!']]},
+  {id:'w2',npc:'wren',name:'The Stolen Lute',type:'bring',t:'lute',n:1,desc:'A pixie snatched my lute while I napped by Mirror Lake! Pixies flit around the meadows and the lake. Catch one and get it back.',rw:{gold:400,xp:350,items:{hpot:3}},
+    intro:[['wren','Small problem. Tiny problem. Pixie-sized problem. One of them stole my lute.']]},
+  {id:'w3',npc:'wren',name:'Verses of Valor',type:'cond',n:3,cond:()=>['varg','hollow','wyrm','sylvara','blackbrine'].filter(k=>P.flags[k]).length,label:'World bosses defeated',desc:'The second verse needs monsters. Big ones! Defeat three of the great bosses that roam the land.',rw:{gold:800,xp:700}},
+  {id:'w4',npc:'wren',name:'Tales from the Deep',type:'cond',n:4,cond:()=>['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus'].filter(k=>P.flags[k]).length,label:'Dungeon bosses defeated',desc:'Dark caves, deadly traps, terrible beasts. Conquer four dungeons and tell me everything.',rw:{gold:1200,xp:1000}},
+  {id:'w5',npc:'wren',name:'A Thousand Foes',type:'cond',n:1000,cond:()=>P.st.kills,label:'Monsters defeated',desc:'For the big finale I need a number that sounds impressive. A thousand defeated foes should do it!',rw:{gold:1500,xp:1200}},
+  {id:'w6',npc:'wren',name:'Encore!',type:'cond',n:30,cond:()=>Object.keys(P.ach).length,label:'Achievements earned',desc:'A true legend has done a bit of everything. Earn thirty achievements and the ballad is complete.',rw:{gold:2500,xp:2000,weapon:'lyre'},
+    outro:[['wren','"And the {class} of Emberfall, with sword and spell and sorrow, held back the dark today so we could see tomorrow!"'],['wren','It is finished! Take my old lyre. It plays the tune all on its own now.']]},
+  {id:'s1',npc:'seraphine',name:'Starlight Lessons',type:'cond',n:150,cond:()=>P.st.casts||0,label:'Spells cast',desc:'Show me how you use magic. Cast one hundred and fifty spells, and I will teach you something special.',rw:{gold:1500,xp:1500,mount:'starstag'},
+    intro:[['seraphine','So you are the one Mira will not stop talking about. Let me see your magic.']],outro:[['seraphine','You listen to the world well. Here: Celeste has carried me through stranger places than this. She will carry you now.']]},
+  {id:'s2',npc:'seraphine',name:'Legend of Emberfall',type:'cond',n:12,cond:()=>['varg','hollow','wyrm','sylvara','blackbrine'].concat(['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus']).filter(k=>P.flags[k]).length,label:'Great foes defeated',desc:'Every great evil that rose while I was gone still has a lair. Defeat all twelve and Emberfall will be safe for a thousand years.',rw:{gold:6000,xp:6000,items:{elixir:5}},
+    outro:[['seraphine','Twelve great evils, and one hero. I bound the Wyrm with a stone and a lifetime. You did all this with your own two hands.'],['seraphine','Rest now, {class}. You have earned it.']]},
 ];
 const CHAPTERS=[
   {n:'I',t:'A Stranger in Emberfall',q:['m1','m2','m3'],sum:'You arrived in Emberfall as ash began to fall with the rain. Elder Mira tested your mettle, and Borin armed you. Then Mira told you of the Wyrm and the Emberstone.'},
   {n:'II',t:'The Hollow Crown',q:['m4','m4b'],sum:'In the Sunken Ruins you faced King Aldric, now the Hollow King. The Emberstone was gone from his throne. It had cracked, and its shards had fled.'},
   {n:'III',t:'Shards of the Emberstone',q:['m5','mv','mc','mt'],sum:'You took back Seraphine\'s map from Varg the Bandit King, then descended into the Mossy Crypt and the Drowned Temple to recover two of the shards.'},
   {n:'IV',t:'Fire and Ice',q:['m6','mg','me'],sum:'You pushed back the Wyrm\'s fire imps, claimed the last shard from the Frost Titan, and Mira and Borin forged the Emberstone whole.'},
+  {n:'V',t:'The Ashen Wyrm',q:['m7'],sum:'You carried the Emberstone into the Ashen Wastes and woke the Wyrm, to end three hundred years of fear.'},
   {n:'VI',t:'The Void Beneath',q:['mx1','mx2','mx3'],sum:'You faced Pyrrhus the Forgemaster in the Ashforge Depths, followed his black-glass crown to the Void Rift, and closed it by defeating Malgrath, the Void King.'},
   {n:'VII',t:'The Clockwork Vault',q:['mz1'],sum:'You descended into the vault of the old kings beneath the Ironcrag Hills and defeated the Brass Colossus that guarded Seraphine\'s last secrets.'},
-  {n:'V',t:'The Ashen Wyrm',q:['m7'],sum:'You carried the Emberstone into the Ashen Wastes and woke the Wyrm, to end three hundred years of fear.'},
+  {n:'VIII',t:'The Last Page',q:['mf1','mf2'],sum:'Seraphine\'s last pages revealed that she never died: she sealed herself inside the Void to hold Malgrath\'s door shut. You lit her three beacons and called her home.'},
 ];
 const PROLOGUE=[
   {art:'wyrm',title:'The Burning',text:'Three hundred years ago, the Ashen Wyrm rose from beneath the earth and set the kingdom of Emberfall ablaze.'},
@@ -859,11 +892,18 @@ const PROLOGUE=[
   {art:'hollow',title:'The Hollow Crown',text:'The stone was set upon the throne of King Aldric. In time the king came to covet its power, and his capital fell silent.'},
   {art:'village',title:'Ash on the Wind',text:'Now the ground grows warm, ash falls with the rain, and monsters stir. A lone {class} arrives at the village of Emberfall...'},
 ];
+const FINALE=[
+  {art:'return',title:'The Archmage Returns',text:'Three beacons burned, and a pillar of starlight fell upon the old tower. Out of it stepped Seraphine, home after three hundred years in the dark.'},
+  {art:'festival',title:'The Festival of Stars',text:'Emberfall held its first Festival of Stars. Lanterns filled the sky, Wren sang the ballad of the {class} until dawn, and even Borin danced.'},
+  {art:'village',title:'Your Legend Endures',text:'The old evils are gone, but the world is wide. Monsters still roam, dungeons still hide treasure, and Seraphine still has a lesson or two for you. Thank you for playing.'},
+];
 const EPILOGUE=[
   {art:'stone',title:'The Wyrm Falls',text:'With the Emberstone whole once more, the Ashen Wyrm fell, and its fire went out for good.'},
   {art:'dawn',title:'A New Dawn',text:'For the first time in three hundred years, the sky over the Ashen Wastes turned blue. Emberfall celebrated for seven days and seven nights.'},
   {art:'village',title:'Your Story Continues',text:'The dungeons still hold treasure, Captain Rhea still pays her bounties, and Seraphine\'s lost pages still wait to be found. Thank you for playing.'},
 ];
+const BEACONS=[{id:0,x:33,y:21,n:'Whisperwood beacon'},{id:1,x:93,y:47,n:'Ironcrag beacon'},{id:2,x:23,y:71,n:'Saltwind beacon'}];
+const litBeacons=()=>P?BEACONS.filter(b=>P.flags['bc'+b.id]).length:0;
 const WAYSTONES=[
   {id:'village',n:'Emberfall Square',x:VX+8,y:VY+1},{id:'glade',n:'Whisperwood Glade',x:30,y:18},{id:'point',n:'Saltwind Point',x:20,y:76},
   {id:'ridge',n:'Ironcrag Ridge',x:96,y:44},{id:'steps',n:'Sunken Steps',x:70,y:72},{id:'watch',n:'Ashen Watch',x:88,y:62},
@@ -887,7 +927,7 @@ const ACH={
   legend:['Legend of the Lake','Catch the Moonfin'],lumber:['Lumberjack','Chop 25 trees'],miner:['Prospector','Mine 25 rocks'],
   chef:['Camp Cook','Cook 5 meals'],rich:['Deep Pockets','Hold 1,000 gold'],lv5:['Seasoned','Reach level 5'],lv10:['Hero of Emberfall','Reach level 10'],
   explorer:['Cartographer','Discover all 8 regions'],chests:['Treasure Hunter','Open 10 chests'],smith:['Master Smith','Forge an Emberbrand weapon'],
-  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],mycelia:['Spore Slayer','Defeat Mycelia, the Spore Mother'],colossus:['Scrap Metal','Defeat the Brass Colossus'],pirate:['Mutiny!','Defeat Captain Blackbrine'],forgeach:['Forgebreaker','Defeat Pyrrhus, the Forgemaster'],voidking:['Voidwalker','Defeat Malgrath, the Void King'],deepdelver:['Master Delver','Conquer all seven dungeons'],sylvara:['Heartsaver','Defeat Sylvara, the Blighted Heart'],mimicry:['Not a Chest','Defeat a Mimic'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],warlord:['Warlord','Own 25 weapons'],spellweaver:['Spellweaver','Cast 200 spells'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
+  wyrm:['Wyrmslayer','Defeat the Ashen Wyrm'],king:['Kingslayer','Defeat the Hollow King'],scholar:['Monster Scholar','Defeat every kind of monster'],finale:['Starlight','Bring Seraphine home'],bard:['Legend in Song',"Complete Wren's ballad"],mycelia:['Spore Slayer','Defeat Mycelia, the Spore Mother'],colossus:['Scrap Metal','Defeat the Brass Colossus'],pirate:['Mutiny!','Defeat Captain Blackbrine'],forgeach:['Forgebreaker','Defeat Pyrrhus, the Forgemaster'],voidking:['Voidwalker','Defeat Malgrath, the Void King'],deepdelver:['Master Delver','Conquer all seven dungeons'],sylvara:['Heartsaver','Defeat Sylvara, the Blighted Heart'],mimicry:['Not a Chest','Defeat a Mimic'],varg:['Crownbreaker','Defeat Varg the Bandit King'],crypt:['Crypt Raider','Defeat the Brood Queen'],temple:['Tidebreaker','Defeat the Tide Serpent'],caverns:['Frostbane','Defeat the Frost Titan'],delver:['Dungeon Delver','Conquer all three dungeons'],story:['Legend of Emberfall','Finish the main story'],gladiator:['Gladiator','Win an arena bout'],champion:['Grand Champion','Defeat the Grand Champion of the Arena'],duelist:['Duelist','Defeat another player in the Arena'],social:['Not Alone','Adventure alongside another player online'],homeowner:['Homeowner','Buy Willow Cottage'],decorator:['Interior Designer','Reach 20 comfort at home'],artisan:['Master Artisan','Reach Crafting level 8'],specialist:['Specialist','Spend 10 talent points'],pinnacle:['Pinnacle','Learn a tier 3 talent'],pages:["Seraphine's Heir",'Find every journal page'],traveler:['Waywalker','Activate every waystone'],pet:['Best Friend','Adopt your first pet'],menagerie:['Menagerie','Own 15 pets'],tamer:['Beast Tamer','Own 5 pets'],rider:['Saddle Up','Get your first mount'],stable:['Stablemaster','Own every mount'],warlord:['Warlord','Own 25 weapons'],spellweaver:['Spellweaver','Cast 200 spells'],arsenal:['Arsenal','Own 8 weapons'],archmage:['Archmage','Learn every spell']
 };
 const WEAPONS={
   mace:{n:'Training Mace',kind:'melee',draw:'hammer',style:'arc',r:62,arc:1.1,mult:1.25,cd:.46,col:'#c9cfd6',fx:{stunC:.08},d:'Heavy blows that can stun.'},
@@ -927,6 +967,7 @@ const WEAPONS={
   frostbow:{n:'Frostbite Longbow',kind:'ranged',draw:'bow',style:'shoot',pk:'arrow',spd:720,mult:.85,cd:.42,life:.8,r:5,count:3,spread:.14,col:'#9fe8ff',fx:{slow:2},d:'Three freezing arrows at once. Taken from Glacius.'},
   stormstaff:{n:'Tempest Staff',kind:'magic',draw:'staff',style:'shoot',pk:'spark',spd:660,mult:.95,cd:.4,life:.6,r:7,chain:5,col:'#9fd0ff',d:'Lightning that leaps between up to 6 enemies.'},
   deathstaff:{n:'Staff of Souls',kind:'magic',draw:'staff',style:'shoot',pk:'void',spd:380,mult:1.3,cd:.42,life:1.3,r:9,col:'#7fe0a0',seek:1,pierce:1,fx:{raise:1,leech:.03},d:'Seeking soul orbs. Enemies it kills may rise as skeletons that fight for you. Taken from Arachne.'},
+  lyre:{n:"Wren's Lyre",kind:'magic',draw:'wand',style:'shoot',pk:'note',spd:420,mult:1.3,cd:.35,life:1.4,r:8,seek:1,col:'#ffb8f0',fx:{stunC:.08},d:'Fires seeking musical notes that can daze enemies. A gift from Wren.'},
   sporestaff:{n:'Mycelial Staff',kind:'magic',draw:'staff',style:'shoot',pk:'spit',spd:460,mult:1.2,cd:.45,life:.9,r:8,aoe:60,col:'#b8e05d',fx:{poison:4},d:'Spore bombs that burst into poison. Taken from Mycelia.'},
   teslacannon:{n:'Tesla Cannon',kind:'ranged',draw:'crossbow',style:'shoot',pk:'spark',spd:700,mult:1.6,cd:.55,life:.7,r:7,chain:4,col:'#9fd0ff',fx:{stunC:.1},d:'Fires bolts of lightning that leap between up to 5 enemies and can stun. Taken from the Brass Colossus.'},
   cutlass:{n:"Blackbrine's Cutlass",kind:'melee',draw:'sword',style:'arc',r:66,arc:1.25,mult:1.35,cd:.3,col:'#9fe0d0',fx:{leech:.04,slow:1},d:'A ghostly cutlass: very fast slashes that slow enemies and steal a little life. Taken from Captain Blackbrine.'},
@@ -1026,6 +1067,7 @@ const MOUNTS={
   unicorn:{n:'Starlight',kind:'Unicorn',spd:1.9,regen:1,horn:1,lv:12,d:'Heals you steadily while you ride.',src:'Sold by Tess for 3,500 gold (level 12)',draw:'horse',body:'#f6f2fa',dark:'#b8b0c8',mane:'#d8a8ff',glow:'#ffd0f0'},
   griffin:{n:'Skyclaw',kind:'Griffin',spd:2,fly:1,d:'A noble griffin. Flies over water, lava and walls.',src:'A gift from Elder Mira after the Wyrm falls',draw:'griffin'},
   magmahound:{n:'Brimstone',kind:'Magma Hound',spd:1.9,blaze:1,d:'Burning paws set nearby enemies alight as you run.',src:'Freed from the Ashforge Depths after Pyrrhus falls',draw:'wolf',body:'#3a2420',dark:'#1a0e0a',mane:'#ff7a1f'},
+  starstag:{n:'Celeste',kind:'Star Stag',spd:2,regen:1,d:'A stag woven from starlight: the fastest mount on land, and it heals you as you ride.',src:'A gift from Seraphine',draw:'stag',body:'#e8f0ff',dark:'#8a9ac8',mane:'#ffe28a',glow:'#9fd0ff'},
   snail:{n:'Shellby',kind:'Giant Snail',spd:1.35,sturdy:1,regen:1,d:'Slow and steady: heals you, takes 30% less damage and never gets knocked off.',src:'Befriended in Mycelium Hollow after Mycelia falls',draw:'snail'},
   mammoth:{n:'Tundra',kind:'Woolly Mammoth',spd:1.5,sturdy:1,trample:1,lv:14,d:'Enormous and unstoppable: tramples enemies, takes 30% less damage and never gets knocked off.',src:'Sold by Tess for 4,000 gold (level 14)',draw:'mammoth',body:'#8a5a38',dark:'#4a2e1a'},
   raptor:{n:'Razor',kind:'Raptor',spd:2,trample:1,d:'The fastest mount on land. Tramples enemies in its path.',src:'Arena token shop (16 tokens)',draw:'raptor',body:'#3f8f5a',dark:'#1e4a2c',mane:'#ff7a3d'},
@@ -1607,6 +1649,13 @@ function drawObj(g,o){
     case'waystone':{const on=P&&P.ways.includes(o.wid);ell(g,x+3,y+14,16,5,'rgba(0,0,0,.3)');g.fillStyle='#6f7680';g.fillRect(x-14,y+4,28,10);const gr=g.createLinearGradient(x-10,0,x+10,0);gr.addColorStop(0,'#a9b2bc');gr.addColorStop(1,'#59616b');g.fillStyle=gr;g.beginPath();g.moveTo(x-10,y+6);g.lineTo(x-7,y-44);g.lineTo(x,y-54);g.lineTo(x+7,y-44);g.lineTo(x+10,y+6);g.closePath();g.fill();
       const c=on?'#7fd6ff':'#4a525c';if(on)glow(g,x,y-24,34+Math.sin(time*3)*4,'#7fd6ff',.45);g.strokeStyle=c;g.lineWidth=2.5;g.beginPath();g.moveTo(x,y-40);g.lineTo(x,y-10);g.moveTo(x-5,y-30);g.lineTo(x+5,y-24);g.moveTo(x+5,y-34);g.lineTo(x-5,y-18);g.stroke();if(on&&Math.random()<.08)spark(x+rnd(-8,8),y-30,'#bfeeff',1,30);break}
     case'page':{if(o.gone)break;const b=Math.sin(time*2.5+s*9)*3;glow(g,x,y-10+b,26,'#ffd27a',.45);g.save();g.translate(x,y-10+b);g.rotate(Math.sin(time*1.5)*.15);g.fillStyle='#f3e6c4';g.fillRect(-8,-10,16,20);g.fillStyle='#c9b48a';g.fillRect(-8,-10,16,3);g.fillStyle='rgba(90,70,40,.6)';for(let i=0;i<4;i++)g.fillRect(-5,-4+i*4,10-(i%2)*3,1.4);g.restore();if(Math.random()<.06)spark(x,y-16,'#ffd27a',1,30);break}
+    case'beacon':{const lit=P&&P.flags['bc'+o.bid];ell(g,x+2,y+12,16,5,'rgba(0,0,0,.3)');g.fillStyle='#7a7a86';rr(g,x-9,y-30,18,42,3);g.fillStyle='#5a5a66';rr(g,x-12,y+6,24,8,2);rr(g,x-14,y-36,28,8,3);g.strokeStyle='#9fd0ff';g.globalAlpha=lit?.9:.25;g.lineWidth=1.5;g.beginPath();g.moveTo(x,y-22);g.lineTo(x-4,y-14);g.lineTo(x+4,y-14);g.closePath();g.moveTo(x,y-10);g.lineTo(x,y);g.stroke();g.globalAlpha=1;
+      if(lit){const f=Math.sin(time*9+o.bid)*3;glow(g,x,y-48,46,'#9fd0ff',.55);g.fillStyle='rgba(180,220,255,.85)';g.beginPath();g.moveTo(x-9,y-38);g.quadraticCurveTo(x+f,y-72,x+9,y-38);g.fill();g.fillStyle='#ffffff';g.beginPath();g.moveTo(x-4,y-38);g.quadraticCurveTo(x+f*.5,y-56,x+4,y-38);g.fill();if(Math.random()<.2)particles.push({x:x+rnd(-6,6),y:y-50,vx:0,vy:-40,life:.8,max:.8,size:2.5,col:'#dff0ff',k:'spark'})}break}
+    case'startower':{const done=P&&P.flags.seraphine;ell(g,x+6,y+20,64,14,'rgba(0,0,0,.3)');const tg=g.createLinearGradient(x-44,0,x+44,0);tg.addColorStop(0,'#a8a4b8');tg.addColorStop(1,'#5a5868');g.fillStyle=tg;g.beginPath();g.moveTo(x-44,y+18);g.lineTo(x-44,y-120);g.lineTo(x-30,y-132);g.lineTo(x-14,y-118);g.lineTo(x+2,y-146);g.lineTo(x+18,y-124);g.lineTo(x+30,y-136);g.lineTo(x+44,y-110);g.lineTo(x+44,y+18);g.closePath();g.fill();
+      g.strokeStyle='rgba(40,36,56,.35)';g.lineWidth=1.5;for(let yy=y-110;yy<y+18;yy+=14){g.beginPath();g.moveTo(x-44,yy);g.lineTo(x+44,yy);g.stroke()}g.fillStyle='#2a2638';g.beginPath();g.moveTo(x-12,y+18);g.lineTo(x-12,y-14);g.arc(x,y-14,12,Math.PI,0);g.lineTo(x+12,y+18);g.fill();for(const[wx,wy]of[[-22,-70],[20,-90],[0,-50]]){g.fillStyle=done?'#ffe9a8':'#1a1828';rr(g,x+wx-5,y+wy-9,10,18,5);if(done)glow(g,x+wx,y+wy,14,'#ffd27a',.5)}
+      g.strokeStyle='#4a8a4a';g.lineWidth=3;g.beginPath();g.moveTo(x-40,y+10);g.quadraticCurveTo(x-30,y-40,x-42,y-80);g.stroke();g.beginPath();g.moveTo(x+38,y+12);g.quadraticCurveTo(x+30,y-20,x+40,y-50);g.stroke();
+      for(let i=0;i<6;i++){const a=time*.6+i*1.05;g.fillStyle=`rgba(180,210,255,${done?.8:.3})`;g.fillRect(x+Math.cos(a)*54-2,y-60+Math.sin(a)*14-2,4,4)}break}
+    case'altar':{const lit=P&&litBeacons()>=3,done=P&&P.flags.seraphine;ell(g,x+2,y+12,22,6,'rgba(0,0,0,.3)');g.fillStyle='#8a8698';rr(g,x-18,y-8,36,18,3);g.fillStyle='#a8a4b8';rr(g,x-22,y-14,44,8,3);if(lit||done){glow(g,x,y-14,40,'#9fd0ff',.5+Math.sin(time*3)*.15)}g.strokeStyle=lit||done?'#dff0ff':'#5a5868';g.lineWidth=1.8;g.beginPath();for(let i=0;i<10;i++){const a=i/10*Math.PI*2-Math.PI/2,rr2=i%2?3:7;g.lineTo(x+Math.cos(a)*rr2,y-10+Math.sin(a)*rr2*.45)}g.closePath();g.stroke();break}
     case'wreck':{const bob=Math.sin(time*.8)*1.5;ell(g,x,y+16,110,16,'rgba(10,30,40,.35)');g.save();g.translate(x,y+bob);g.rotate(-.08);
       const hg=g.createLinearGradient(0,-40,0,22);hg.addColorStop(0,'#5a4030');hg.addColorStop(1,'#2a1c14');g.fillStyle=hg;g.beginPath();g.moveTo(-104,-30);g.quadraticCurveTo(-90,18,-40,22);g.lineTo(52,22);g.lineTo(70,4);g.lineTo(60,-6);g.lineTo(76,-14);g.lineTo(62,-22);g.lineTo(84,-34);g.lineTo(-104,-30);g.closePath();g.fill();
       g.strokeStyle='rgba(20,10,5,.55)';g.lineWidth=2;for(let i=0;i<4;i++){g.beginPath();g.moveTo(-100+i*4,-20+i*10);g.lineTo(60-i*6,-20+i*10);g.stroke()}g.fillStyle='#1a120c';g.beginPath();g.moveTo(10,-10);g.lineTo(26,-16);g.lineTo(34,4);g.lineTo(16,8);g.closePath();g.fill();
@@ -1664,6 +1713,7 @@ function makeNPCs(){
     {id:'tess',name:'Tess',role:'Merchant',x:(VX+5.5)*T,y:(VY+6.9)*T,look:{body:'#b5523b',trim:'#f0b94a',hair:'#e2b05a',skin:'#f3cfae',hat:'cap'}},
     {id:'rhea',name:'Captain Rhea',role:'Captain of the Watch',x:(VX+2.6)*T,y:(VY-7.4)*T,look:{body:'#46597e',trim:'#cfd6e2',hair:'#2a1a12',skin:'#c99a76',hat:'helm',cape:'#2c3a5a',weapon:'sword',tier:2}},
     {id:'orrin',name:'Orrin',role:'Scholar of the Old Kingdom',x:(VX+2.6)*T,y:(VY+12)*T,look:{body:'#6b5a3a',trim:'#e8c76a',hair:'#e9e4da',skin:'#e6c09c',hat:'wizard',beard:true,weapon:'staff'}},
+    {id:'wren',name:'Wren',role:'Wandering Bard',x:(VX-1.5)*T,y:(VY+8.5)*T,look:{body:'#8a3a6a',trim:'#f0c040',hair:'#d8a040',skin:'#f0c8a6',hat:'cap',cape:'#5a2a4a'}},
     {id:'ned',name:'Old Ned',role:'Fisherman',x:37.5*T,y:48.4*T,look:{body:'#3c5a7a',trim:'#e0c58a',hair:'#d0d0d0',skin:'#e0b08b',hat:'straw',beard:true,weapon:'rod'}},
   ];
   npcs.forEach(n=>{n.hx=n.x;n.hy=n.y;n.fx=0;n.fy=1;n.anim=0;n.t=rnd(1,4);n.tx=n.x;n.ty=n.y});
@@ -1696,7 +1746,7 @@ function serialize(){if(!P)return null;const p=Object.assign({},P);p.opened=ches
 function save(){const d=serialize();if(!d)return;try{localStorage.setItem(SAVE_KEY,JSON.stringify(d))}catch(e){}}
 function loadData(d){
   const base=newPlayer(d.P.cls);P=Object.assign(base,d.P);P.sk=Object.assign(base.sk,d.P.sk||{});
-  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];if(P.weapons&&['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus'].every(k=>P.flags[k])&&!P.weapons.includes('starblade'))P.weapons.push('starblade');if(P.mounts){if(P.flags.sylvara&&!P.mounts.includes('mossback'))P.mounts.push('mossback');if(P.q.mx3&&P.q.mx3.s==='done'&&!P.mounts.includes('lunamoth'))P.mounts.push('lunamoth')}P.st.fk=P.st.fk||{};if(P.q.m1)P.flags.prologue=1;P.placing=null;
+  P.atkCd=P.skillCd=P.dashCd=P.dashT=P.iT=0;P.fish=null;P.gather=null;P.spCd={};if(!WEAPONS[P.weapon])P.weapon=STARTER[P.cls];ensureSeraphine();if(P.weapons&&['arachne','nerith','glacius','pyrrhus','malgrath','mycelia','colossus'].every(k=>P.flags[k])&&!P.weapons.includes('starblade'))P.weapons.push('starblade');if(P.mounts){if(P.flags.sylvara&&!P.mounts.includes('mossback'))P.mounts.push('mossback');if(P.q.mx3&&P.q.mx3.s==='done'&&!P.mounts.includes('lunamoth'))P.mounts.push('lunamoth')}P.st.fk=P.st.fk||{};if(P.q.m1)P.flags.prologue=1;P.placing=null;
   explored.fill(0);try{unpackBits(d.ex,explored)}catch(e){}resetFog();
   chests.forEach(c=>c.open=(P.opened||[]).includes(c.id));
   if(P.own.pet&&!P.pets.includes('fox')){P.pets.push('fox');if(!P.petId)P.petId='fox'}P.riding=false;spawnPet();
@@ -1724,6 +1774,7 @@ function gainSkill(k,x){const s=P.sk[k];s.x+=x;const need=30*s.l;if(s.x>=need){s
 /* ---------- quests ---------- */
 function qProg(q){const s=P.q[q.id];if(!s)return 0;if(q.type==='bring')return Math.min(q.n,P.inv[q.t]||0);if(q.type==='craft')return P.wT>=1?1:0;if(q.type==='flag')return P.flags[q.t]?1:0;if(q.type==='cond')return Math.min(q.n,q.cond()||0);return Math.min(q.n,s.c||0)}
 function qEvent(type,t){QUESTS.forEach(q=>{const s=P.q[q.id];if(s&&s.s==='active'&&q.type===type&&(!q.t||q.t===t)){s.c=(s.c||0)+1;if(s.c===q.n)toast('Objective complete: '+q.name,'Return to '+npcName(q.npc),'#6fdc8c')}})}
+function ensureSeraphine(){npcs=npcs.filter(n=>n.id!=='seraphine');if(P&&P.flags.seraphine){const n={id:'seraphine',name:'Seraphine',role:'Archmage',x:(VX-2)*T,y:(VY-6)*T,look:{body:'#e9e4f5',trim:'#ffd27a',hat:'wizard',hair:'#f2f2f2',skin:'#f1d0b5',cape:'#8a7ab8',weapon:'staff'}};Object.assign(n,{hx:n.x,hy:n.y,fx:0,fy:1,anim:0,t:2,tx:n.x,ty:n.y});npcs.push(n)}}
 function npcName(id){const n=npcs.find(n=>n.id===id);return n?n.name:id}
 function nextQuest(id){return QUESTS.find(q=>q.npc===id&&(!P.q[q.id]||P.q[q.id].s!=='done'))}
 function checkQuests(){for(const q of activeQuests()){const s=P.q[q.id];if((q.type==='cond'||q.type==='flag'||q.type==='bring'||q.type==='craft')&&!s.note&&qProg(q)>=q.n){s.note=1;toast('Objective complete: '+q.name,'Return to '+npcName(q.npc),'#6fdc8c');SFX.quest()}}}
@@ -1732,7 +1783,7 @@ function trackedQuest(){const aq=activeQuests();return aq.find(q=>q.id===P.track
 function qTarget(q){
   if(!q)return null;const s=P.q[q.id];if(!s||s.s!=='active')return null;
   if(qProg(q)>=q.n){if(LVD){const L=LEVELS[curLevel];return{x:L.sx,y:L.sy-T,label:'Exit stairs'}}const n=npcs.find(n=>n.id===q.npc);return n?{x:n.x,y:n.y,label:'Return to '+n.name}:null}
-  const a=q.at==='way'?nearestWay():q.at;if(!a)return null;
+  const a=q.at==='way'?nearestWay():typeof q.at==='function'?q.at():q.at;if(!a)return null;
   if(typeof a==='string'){if(curLevel===a){const b=LEVELS[a].boss;return{x:(b.cx+.5)*T,y:(b.cy+.5)*T,label:'Boss chamber'}}if(LVD)return null;const D=DUNGEONS[a];return{x:(D.ex+.5)*T,y:(D.ey+.5)*T,label:D.n}}
   if(LVD)return null;return{x:(a[0]+.5)*T,y:(a[1]+.5)*T,label:a[2]||q.name}}
 function activeQuests(){return QUESTS.filter(q=>P.q[q.id]&&P.q[q.id].s==='active')}
@@ -1757,7 +1808,7 @@ function spawner(dt){
   for(let tries=0;tries<8;tries++){
     const a=rnd(0,Math.PI*2),d=rnd(560,900),x=P.x+Math.cos(a)*d,y=P.y+Math.sin(a)*d;
     const tx=Math.floor(x/T),ty=Math.floor(y/T);if(tx<4||ty<4||tx>=W-4||ty>=H-4)continue;
-    const r=regAt(tx,ty);if(r==='village'||!walkable(x,y)||dist(tx,ty,BX,BY)<9||dist(tx,ty,HX,HY)<9||dist(tx,ty,VGX,VGY)<9||dist(tx,ty,GX,GY)<9||dist(tx,ty,CPX,CPY)<9||dist(tx,ty,VX,VY)<13)continue;
+    const r=regAt(tx,ty);if(r==='village'||!walkable(x,y)||dist(tx,ty,BX,BY)<9||dist(tx,ty,HX,HY)<9||dist(tx,ty,VGX,VGY)<9||dist(tx,ty,GX,GY)<9||dist(tx,ty,CPX,CPY)<9||dist(tx,ty,TWX,TWY)<7||dist(tx,ty,VX,VY)<13)continue;
     let tab=(SPAWN[r]||[]).slice();if(isNight())tab.push(['bat',1.1]);if(!tab.length)continue;
     const tot=tab.reduce((s,a)=>s+a[1],0);let k=Math.random()*tot,type=tab[0][0];for(const[n,w]of tab){if((k-=w)<=0){type=n;break}}
     const pack=type==='wolf'||type==='slime'||type==='spider'?rint(1,3):type==='bat'||type==='crab'||type==='bandit'?rint(1,2):1;
@@ -2245,6 +2296,8 @@ function findTarget(){
     else if(o.type==='cauldron')label='Brew potions';
     else if(o.type==='campfire')label='Cook at the fire';
     else if(o.type==='well')label='Drink from the well';
+    else if(o.type==='beacon')label=P.flags['bc'+o.bid]?'The beacon burns with starlight':'Light the beacon';
+    else if(o.type==='altar')label=P.flags.seraphine?"Seraphine's altar":'Touch the altar';
     else if(o.type==='board')label='Read the notice board';
     else if(o.type==='dungeon')label='Enter '+DUNGEONS[o.id].n+' (Lv '+DUNGEONS[o.id].lv+'+)';
     else if(o.type==='exit')label='Climb back to the surface';
@@ -2283,6 +2336,11 @@ function interact(){
   else if(o.type==='cauldron')openCraft('cauldron');
   else if(o.type==='campfire')openCraft('fire');
   else if(o.type==='stall')openShop('buy');
+  else if(o.type==='beacon'){if(P.flags['bc'+o.bid]){toast(BEACONS[o.bid].n,'It burns with cold starlight','#9fd0ff');return}if(!P.q.mf1){toast('A cold stone beacon','Someone in Emberfall may know how to light it','#9fd0ff');SFX.deny();return}
+    P.flags['bc'+o.bid]=1;effects.push({k:'ring',x:o.x,y:o.y-40,t:0,max:.7,r0:10,r1:120,col:'#9fd0ff'});spark(o.x,o.y-50,'#dff0ff',30,200);[784,988,1175,1568].forEach((f,i)=>tone(f,.5,'sine',.07,0,i*.12));toast('Beacon lit ('+litBeacons()+' of 3)',litBeacons()>=3?'All three burn. Return to Elder Mira.':BEACONS[o.bid].n,'#9fd0ff');checkQuests();save()}
+  else if(o.type==='altar'){if(P.flags.seraphine){toast("Seraphine's altar",'The stars are quiet here now','#9fd0ff');return}if(!P.q.mf2||P.q.mf2.s!=='active'){toast('The altar hums faintly','Its time has not yet come','#9fd0ff');return}if(litBeacons()<3){toast('The altar is cold','Light all three beacons first','#9fd0ff');SFX.deny();return}
+    effects.push({k:'ring',x:o.x,y:o.y-10,t:0,max:1,r0:10,r1:260,col:'#dff0ff'});shake=.6;spark(o.x,o.y-20,'#dff0ff',60,280);[523,659,784,1047,1319].forEach((f,i)=>tone(f,.8,'sine',.07,0,i*.15));
+    playScene([['narrator','You lay your hand on the altar. Far away, three beacons answer, and a pillar of starlight falls from the sky.'],['seraphine','...Light. After three hundred years, light.'],['seraphine','You must be the one who closed Malgrath\'s door. I held it shut from the inside for so very long. Thank you, {class}.'],['you','Elder Mira has been waiting for you.'],['seraphine','Little Mira? She was a child when I left. Take me home.']],()=>{P.flags.seraphine=1;ensureSeraphine();checkQuests();save();toast('Seraphine has returned!','Bring the news to Elder Mira','#ffe28a')})}
   else if(o.type==='well'){const S=stats();P.hp=S.maxHp;P.mp=S.maxMp;ftext(P.x,P.y-40,'Fully restored','#6fdc8c');SFX.pick();spark(o.x,o.y-6,'#9fd6ff',12)}
   else if(o.type==='board')openHelp(true);
   else if(o.type==='dungeon')enterLevel(o.id);
@@ -2683,6 +2741,7 @@ function render(){
     else if(p.k==='ice'){g.save();g.translate(p.x,p.y);g.rotate(p.a);if(p.big)g.scale(2.4,1.7);glow(g,0,0,16,'#8fe3ff',.5);g.fillStyle='#e8fbff';g.beginPath();g.moveTo(10,0);g.lineTo(-4,-4);g.lineTo(-8,0);g.lineTo(-4,4);g.closePath();g.fill();g.restore()}
     else if(p.k==='void'){glow(g,p.x,p.y,24,'#a98cff',.7);circ(g,p.x,p.y,7,'#2a1a4a');g.strokeStyle='#d8ccff';g.lineWidth=1.5;g.beginPath();g.arc(p.x,p.y,7,time*8,time*8+4);g.stroke()}
     else if(p.k==='wave'){g.save();g.translate(p.x,p.y);g.rotate(p.a);g.globalAlpha=Math.min(1,p.life*3);glow(g,0,0,30,p.col||'#ff7a1f',.5);g.strokeStyle=p.col||'#ffb347';g.lineWidth=7;g.lineCap='round';g.beginPath();g.arc(-10,0,22,-1,1);g.stroke();g.strokeStyle='#fff1a8';g.lineWidth=3;g.beginPath();g.arc(-10,0,22,-.8,.8);g.stroke();g.restore()}
+    else if(p.k==='note'){glow(g,p.x,p.y,14,'#ffb8f0',.6);g.fillStyle='#ffe0f6';g.save();g.translate(p.x,p.y);g.rotate(Math.sin((p.t||0)*10)*.3);ell(g,-2,4,4,3);g.fillRect(1,-8,1.8,12);g.beginPath();g.moveTo(2.8,-8);g.quadraticCurveTo(8,-6,6,0);g.quadraticCurveTo(6,-4,2.8,-5);g.fill();g.restore()}
     else if(p.k==='ebolt'){glow(g,p.x,p.y,16,p.col||'#9fd0ff',.7);g.strokeStyle='#ffffff';g.lineWidth=2.5;g.beginPath();g.moveTo(p.x-p.vx*.02,p.y-p.vy*.02);g.lineTo(p.x+p.vx*.012,p.y+p.vy*.012);g.stroke()}
     else if(p.k==='rocket'){g.save();g.translate(p.x,p.y);g.rotate(Math.atan2(p.vy,p.vx));g.fillStyle='#b8a070';rr(g,-8,-3,14,6,3);g.fillStyle='#c03030';g.beginPath();g.moveTo(6,-3);g.lineTo(11,0);g.lineTo(6,3);g.fill();g.fillStyle='#6a5a40';g.fillRect(-9,-5,3,10);glow(g,-11,0,10,'#ff9a3d',.9);g.restore();if(Math.random()<.6)particles.push({x:p.x,y:p.y,vx:rnd(-10,10),vy:rnd(-10,10),life:.5,max:.5,size:4,col:'rgba(200,200,200,.6)',k:'smoke'})}
     else if(p.k==='anchor'){g.save();g.translate(p.x,p.y);g.rotate(p.spin||0);glow(g,0,0,26,'#7fe0c8',.3);g.strokeStyle='#5a6068';g.lineWidth=4;g.lineCap='round';g.beginPath();g.moveTo(0,-14);g.lineTo(0,12);g.moveTo(-7,-8);g.lineTo(7,-8);g.stroke();g.beginPath();g.arc(0,2,11,.3,Math.PI-.3);g.stroke();g.lineWidth=2.5;g.beginPath();g.arc(0,-17,3.5,0,7);g.stroke();g.restore()}
@@ -2739,7 +2798,7 @@ function render(){
     const L=[];const add=(x,y,rad,col,i=1)=>{if(x>x0-rad&&x<x1+rad&&y>y0-rad&&y<y1+rad)L.push([x,y,rad,col,i])};
     if(P&&state!=='title')add(P.x,P.y-10,P.own.lantern?300:190,'#ffcf8a',1);
     for(const o of objs){if(o.x<x0-200||o.x>x1+200||o.y<y0-200||o.y>y1+200)continue;
-      if(o.type==='lamp')add(o.x,o.y-36,190,'#ffcf6b');else if(o.type==='torch')add(o.x,o.y+14,210,(LVD&&LVD.torch)||'#ff9a3d');else if(o.type==='exit')add(o.x,o.y-10,240,'#fff2c0');else if(o.type==='portal')add(o.x,o.y-14,200,'#c8b4ff');else if(o.type==='waystone'&&P&&P.ways.includes(o.wid))add(o.x,o.y-24,150,'#7fd6ff',.8);else if(o.type==='furn'&&FURN[o.fid].light)add(o.x,o.y-12,o.fid==='fireplace'?250:150,FURN[o.fid].light,.9);else if(o.type==='window'&&darkness()<.4)add(o.x,o.y+34,190,'#fff2c0',.8);else if(o.type==='page'&&!o.gone)add(o.x,o.y-10,90,'#ffd27a',.7);else if(o.type==='dungeon')add(o.x,o.y-6,90,o.id==='temple'?'#5fe0d0':o.id==='caverns'?'#9fe8ff':'#c8b4ff',.6);else if(o.type==='campfire')add(o.x,o.y-6,240+Math.sin(time*13)*10,'#ff9a3d');else if(o.type==='brazier')add(o.x,o.y-20,170+Math.sin(time*11+o.seed)*8,o.blue?'#7f9cff':'#ff8a3d');
+      if(o.type==='lamp')add(o.x,o.y-36,190,'#ffcf6b');else if(o.type==='beacon'&&P&&P.flags['bc'+o.bid])add(o.x,o.y-48,230,'#9fd0ff');else if(o.type==='altar'&&P&&(P.flags.seraphine||litBeacons()>=3))add(o.x,o.y-14,150,'#9fd0ff');else if(o.type==='torch')add(o.x,o.y+14,210,(LVD&&LVD.torch)||'#ff9a3d');else if(o.type==='exit')add(o.x,o.y-10,240,'#fff2c0');else if(o.type==='portal')add(o.x,o.y-14,200,'#c8b4ff');else if(o.type==='waystone'&&P&&P.ways.includes(o.wid))add(o.x,o.y-24,150,'#7fd6ff',.8);else if(o.type==='furn'&&FURN[o.fid].light)add(o.x,o.y-12,o.fid==='fireplace'?250:150,FURN[o.fid].light,.9);else if(o.type==='window'&&darkness()<.4)add(o.x,o.y+34,190,'#fff2c0',.8);else if(o.type==='page'&&!o.gone)add(o.x,o.y-10,90,'#ffd27a',.7);else if(o.type==='dungeon')add(o.x,o.y-6,90,o.id==='temple'?'#5fe0d0':o.id==='caverns'?'#9fe8ff':'#c8b4ff',.6);else if(o.type==='campfire')add(o.x,o.y-6,240+Math.sin(time*13)*10,'#ff9a3d');else if(o.type==='brazier')add(o.x,o.y-20,170+Math.sin(time*11+o.seed)*8,o.blue?'#7f9cff':'#ff8a3d');
       else if(o.type==='cauldron')add(o.x,o.y,110,'#7dff9a',.7);else if(o.type==='house'){add(o.tx*T+34,o.ty*T+o.h*T*.42+24,80,'#ffd77a',.8);add(o.tx*T+o.w*T-34,o.ty*T+o.h*T*.42+24,80,'#ffd77a',.8)}
       else if(o.type==='glowcap'&&!o.gone)add(o.x,o.y,80,'#a493ff',.7);else if(o.type==='rock'&&o.ore==='crystal'&&!o.gone)add(o.x,o.y-14,90,'#72e9ff',.6)}
     for(const p of projectiles){const cool=p.k==='bolt'||p.k==='wisp'||p.k==='spark'||p.k==='ice'||p.k==='void';add(p.x,p.y,p.k==='arrow'||p.k==='bone'||p.k==='spit'||p.k==='boomerang'?0:cool?90:150,cool?(p.col||'#7fb6ff'):'#ff7a1f',.9)}for(const w of allies)add(w.x,w.y,80,'#9fd6ff',.6);if(pet&&pet.type==='lumen')add(pet.x,pet.y-20,240,'#7fd6ff',.9);if(pet&&pet.type==='glimmer')add(pet.x,pet.y-20,200,'#d8ffb0',.85);if(pet&&pet.type==='whelp')add(pet.x,pet.y-24,90,'#ff7a1f',.7);if(P&&P.riding&&P.mountId==='shadow')add(P.x,P.y-20,90,'#a98cff',.6);for(const t of teles)if(t.p&&!t.done)add(t.x,t.y,160,'#ff7a1f',.8);
@@ -2949,7 +3008,7 @@ function openQuests(tab='active'){
   else if(tab==='all'){body=QUESTS.map(q=>{const s=P.q[q.id];return`<div class="q ${s&&s.s==='done'?'done':''}"><div class="row" style="justify-content:space-between"><span class="nm">${s?q.name:'Unknown quest'}</span><span class="pg">${!s?'Not started':s.s==='done'?'Complete':'Active'}</span></div><p class="sub">${npcName(q.npc)} · ${q.npc==='elder'?'Main story':'Side quest'}</p></div>`}).join('')}
   else if(tab==='story'){body=CHAPTERS.map(c=>{const qs=c.q.map(id=>QUESTS.find(q=>q.id===id)),done=qs.every(q=>P.q[q.id]&&P.q[q.id].s==='done'),started=qs.some(q=>P.q[q.id]);
       return`<div class="q ${started?'':'done'}"><div class="row" style="justify-content:space-between"><span class="nm">Chapter ${c.n}: ${started?c.t:'???'}</span><span class="pg">${done?'Complete':started?'In progress':'Locked'}</span></div><p class="sub">${done?c.sum:started?'Your story is still being written.':'Follow the main story to unlock this chapter.'}</p></div>`}).join('')+
-      `<div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="replay" data-id="pro">Watch the prologue</button>${P.flags.wyrm&&P.q.m7&&P.q.m7.s==='done'?'<button class="btn ghost sm" data-act="replay" data-id="epi">Watch the epilogue</button>':''}</div>`}
+      `<div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="replay" data-id="pro">Watch the prologue</button>${P.flags.wyrm&&P.q.m7&&P.q.m7.s==='done'?'<button class="btn ghost sm" data-act="replay" data-id="epi">Watch the epilogue</button>':''}${P.q.mf2&&P.q.mf2.s==='done'?'<button class="btn ghost sm" data-act="replay" data-id="fin">Watch the finale</button>':''}</div>`}
   else if(tab==='lore'){body=`<p class="sub">${P.pages.length} of ${PAGES.length} pages of Seraphine's journal found.</p>`+PAGES.map((p,i)=>P.pages.includes(i)?`<div class="q"><div class="nm">Page ${i+1}</div><p class="say narr" style="margin:8px 0 0">${p.t}</p></div>`:`<div class="q done"><div class="nm">Page ${i+1}: missing</div><p class="sub">Somewhere in ${p.hint}.</p></div>`).join('')}
   else if(tab==='beast'){const kt=P.st.kt||{};body=`<div class="beast">${Object.keys(ENEMY).filter(k=>!ENEMY[k].noBest).map(k=>{const n=kt[k]||0,d=ENEMY[k];return`<div class="${n?'':'unk'}"><img src="${enemyPortrait(k,!n)}" alt=""><b>${n?d.n:'Unknown'}</b><span>${WHERE[k]}</span>${n?`<span>HP ${d.hp} · ATK ${d.atk} · DEF ${d.def}</span><em>${n} defeated</em>`:'<em>Not yet defeated</em>'}</div>`}).join('')}</div>`}
   else{body=`<div class="ach">${Object.entries(ACH).map(([k,[n,d]])=>`<div class="${P.ach[k]?'on':''}"><b>${n}</b>${d}</div>`).join('')}</div>`}
@@ -3097,6 +3156,8 @@ function openShop(tab='buy'){
   panel='shop:'+tab;
 }
 const LINES={
+  wren:['Every hero needs a song. Every song needs a hero. Lucky us!','I once wrote a ballad about a slime. It was surprisingly moving.','They say the Moonfin sings back if you hum to it. I have tried. It did not.','Rhyming with "Emberfall" is easier than you would think. Wall, hall, squall...'],
+  seraphine:['Three hundred years in the dark teaches patience. And a dislike of the dark.','Mira has grown old and wise. I am so proud of her.','Magic is only listening very carefully to the world, then asking it nicely.','Your waystones still work? I built those to last.'],
   rhea:['Stay off the roads at night unless you can handle bats.','The Watch is six people and a dog. The dog is the best of us.','Bounties are paid in gold, on the spot, no questions.'],
   orrin:['Seraphine wrote in a hand so neat it could cut glass.','The waystones hum if you stand very still. Try it.','Every ruin is a book, if you know how to read stone.'],
   elder:['The Wyrm\'s ash darkens our sky more each year.','Every hero began with slimes, child. Do not be ashamed.','Rest at the well in the square. Its water restores body and mind.'],
@@ -3137,6 +3198,12 @@ function drawArt(g,id,w,h){
     if(P){g.translate(w*.5,h*.88);g.scale(2.3,2.3);drawHumanoid(g,0,0,Object.assign(playerLook(),{fx:1,fy:0,moving:true,anim:.3}))}}
   else if(id==='stone'){sky('#0d0716','#3a1430');stars(50);glow(g,w*.5,h*.5,230,'#ff9a3d',.55);const cx=w*.5,cy=h*.5;g.fillStyle=rgrad(g,cx,cy,64,'#fff3c4','#ff6a1f');g.beginPath();for(let i=0;i<6;i++){const a=i/6*Math.PI*2+.3;g.lineTo(cx+Math.cos(a)*62,cy+Math.sin(a)*72)}g.closePath();g.fill();
     g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=2;g.beginPath();g.moveTo(cx-20,cy-60);g.lineTo(cx+14,cy+58);g.stroke();for(let i=0;i<10;i++){const a=i/10*Math.PI*2;g.strokeStyle='rgba(255,210,140,.35)';g.lineWidth=3;g.beginPath();g.moveTo(cx+Math.cos(a)*90,cy+Math.sin(a)*90);g.lineTo(cx+Math.cos(a)*170,cy+Math.sin(a)*170);g.stroke()}}
+  else if(id==='return'){sky('#05081a','#2a2a6a');stars(120);ridge('#0c1030',h*.78,14,.01,8);for(const bx of[.14,.5,.86]){const x0=w*bx,y0=h*.72+Math.sin(bx*9)*8;g.fillStyle='#3a3a4a';g.fillRect(x0-4,y0-26,8,26);glow(g,x0,y0-32,40,'#9fd0ff',.7);g.fillStyle='#dff0ff';g.beginPath();g.moveTo(x0-5,y0-26);g.quadraticCurveTo(x0,y0-48,x0+5,y0-26);g.fill()}
+    const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'rgba(220,240,255,0)');bg.addColorStop(.4,'rgba(220,240,255,.35)');bg.addColorStop(1,'rgba(220,240,255,.15)');g.fillStyle=bg;g.fillRect(w*.5-70,0,140,h*.86);glow(g,w*.5,h*.5,220,'#9fd0ff',.45);
+    for(let i=0;i<40;i++){g.fillStyle=`rgba(230,245,255,${.4+hash(i,7,2)*.6})`;g.fillRect(w*.5-60+hash(i,8,2)*120,hash(i,9,2)*h*.85,2,2)}g.translate(w*.5,h*.66);g.scale(3,3);drawHumanoid(g,0,0,{body:'#e9e4f5',trim:'#ffd27a',hat:'wizard',hair:'#f2f2f2',skin:'#f1d0b5',weapon:'staff',wcol:'#9fd0ff',fx:0,fy:1,cape:'#8a7ab8',attack:.4})}
+  else if(id==='festival'){sky('#0a0a2a','#3a2050');stars(70);for(let k=0;k<5;k++){const fx2=w*(.15+k*.18),fy2=h*(.18+hash(k,3,1)*.18),col=['#ff6a8a','#ffd23f','#9fd0ff','#9be15d','#ffb8f0'][k];glow(g,fx2,fy2,60,col,.35);for(let i=0;i<22;i++){const a=i/22*Math.PI*2,r2=34+hash(i,k,4)*16;g.fillStyle=col;g.fillRect(fx2+Math.cos(a)*r2-1.5,fy2+Math.sin(a)*r2-1.5,3,3)}}
+    ridge('#1a1030',h*.7,10,.01,3);houses(h*.86,'#140c24',6,true);g.strokeStyle='rgba(60,40,30,.8)';g.lineWidth=1.5;g.beginPath();g.moveTo(0,h*.52);g.quadraticCurveTo(w*.5,h*.64,w,h*.52);g.stroke();for(let i=0;i<16;i++){const t2=i/15,x=t2*w,y=h*.52+Math.sin(t2*Math.PI)*h*.1;glow(g,x,y+6,14,['#ffd27a','#ff8a5a','#9fd0ff'][i%3],.7);circ(g,x,y+6,4,['#ffd27a','#ff8a5a','#9fd0ff'][i%3])}
+    if(P){g.translate(w*.5,h*.94);g.scale(2,2);drawHumanoid(g,0,0,Object.assign(playerLook(),{fx:0,fy:1}));drawHumanoid(g,-36,2,{body:'#e9e4f5',trim:'#ffd27a',hat:'wizard',hair:'#f2f2f2',skin:'#f1d0b5',cape:'#8a7ab8',fx:.5,fy:1});drawHumanoid(g,36,2,Object.assign({fx:-.5,fy:1},npcs[0].look));drawHumanoid(g,-72,4,{body:'#8a3a6a',trim:'#f0c040',hair:'#d8a040',skin:'#f0c8a6',hat:'cap',fx:.6,fy:1,moving:true,anim:time});drawHumanoid(g,72,4,Object.assign({fx:-.6,fy:1,moving:true,anim:time+1},npcs[1].look))}}
   else if(id==='dawn'){sky('#ffcf8f','#8fc4e8');glow(g,w*.5,h*.62,270,'#fff2c0',.8);circ(g,w*.5,h*.62,60,'#fff6d8');ridge('#7fb46a',h*.66,18,.009,6);ridge('#5a9a4a',h*.76,12,.013,7);houses(h*.9,'#7a5a40',5,false);g.fillStyle='#4a8a3a';g.fillRect(0,h*.9,w,h*.1);
     if(P){g.translate(w*.5,h*.93);g.scale(2.2,2.2);drawHumanoid(g,0,0,Object.assign(playerLook(),{fx:0,fy:1}));drawHumanoid(g,-34,2,Object.assign({fx:.5,fy:1},npcs[0].look));drawHumanoid(g,34,2,Object.assign({fx:-.5,fy:1},npcs[1].look,{weapon:null}))}}
   g.restore();const vg=g.createRadialGradient(w/2,h/2,h*.3,w/2,h/2,w*.62);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=vg;g.fillRect(0,0,w,h)}
@@ -3149,7 +3216,7 @@ function talk(n){
     else{const p=qProg(q);qb=p>=q.n?`<div class="q"><div class="nm">${q.name}</div><p>You did it! Here is what I promised.</p>${rw}<button class="btn" data-act="turnin" data-id="${q.id}">Complete quest</button></div>`
       :`<div class="q"><div class="row" style="justify-content:space-between"><span class="nm">${q.name}</span><span class="pg">${p} / ${q.n}</span></div><p class="sub">${q.desc}</p><div class="bar"><i style="width:${p/q.n*100}%"></i></div></div>`}}
   else qb=`<p class="sub">${n.id==='elder'&&P.flags.wyrm?'You saved us all. Emberfall will sing of you for a hundred years.':'No more tasks for now. Thank you, friend.'}</p>`;
-  const svc={rhea:['tip','Ask about the roads'],orrin:['lore','Read the journal'],borin:['forge','Open the forge'],lin:['cauldron','Use the cauldron'],tess:['shop','Browse wares'],ned:['tip','Ask for a fishing tip'],elder:['magic','Study magic']}[n.id];
+  const svc={rhea:['tip','Ask about the roads'],orrin:['lore','Read the journal'],borin:['forge','Open the forge'],lin:['cauldron','Use the cauldron'],tess:['shop','Browse wares'],ned:['tip','Ask for a fishing tip'],elder:['magic','Study magic'],wren:['song','Hear a verse'],seraphine:['magic','Study magic']}[n.id];
   openPanel('talk',`<div class="speaker"><canvas id="face" width="144" height="144"></canvas><div><h2>${n.name}</h2><div class="sub">${n.role}</div></div></div>
    <p class="say" id="say">${pick(LINES[n.id])}</p>${qb}<div class="row" style="margin-top:12px"><button class="btn ghost" data-act="svc" data-id="${svc[0]}">${svc[1]}</button><button class="btn ghost" data-act="close">Goodbye</button></div>`,true);
   const fc=document.getElementById('face').getContext('2d');fc.scale(3.4,3.4);drawHumanoid(fc,21,44,Object.assign({anim:0,moving:false,fx:0,fy:1},n.look,{weapon:null}));
@@ -3157,7 +3224,7 @@ function talk(n){
 function acceptQ(id){P.q[id]={s:'active',c:0};P.track=id;const q=QUESTS.find(q=>q.id===id);const ch=CHAPTERS.find(c=>c.q[0]===id);if(ch)setTimeout(()=>{banner={title:'Chapter '+ch.n,sub:ch.t,t:0,col:'#f6d27a'}},200);toast('New quest: '+q.name,qLabel(q)+(q.n>1?' ×'+q.n:''),'#f0b94a');SFX.quest();talk(talkNPC)}
 function turnIn(id){const q=QUESTS.find(q=>q.id===id);if(qProg(q)<q.n)return;if(q.type==='bring')takeItems({[q.t]:q.n});P.q[id].s='done';P.gold+=q.rw.gold;Object.entries(q.rw.items||{}).forEach(([k,v])=>addItem(k,v));if(q.rw.mount)addMount(q.rw.mount);if(q.rw.pet)addPet(q.rw.pet);if(q.rw.weapon)addWeapon(q.rw.weapon);if(q.rw.flag)P.flags[q.rw.flag]=1;if(q.rw.tokens)P.tokens=(P.tokens||0)+q.rw.tokens;Object.entries(q.rw.furn||{}).forEach(([k,v])=>P.furn[k]=(P.furn[k]||0)+v);
   toast('Quest complete: '+q.name,'+'+q.rw.gold+' gold · +'+q.rw.xp+' XP','#6fdc8c');SFX.quest();gainXP(q.rw.xp);if(id==='m7')unlock('story');save();
-  const ch=CHAPTERS.find(c=>c.q[c.q.length-1]===id);if(ch){P.bonusSP=(P.bonusSP||0)+1;setTimeout(()=>toast('+1 talent point','For finishing a chapter of the story','#ffd23f'),600)}const after=()=>{if(id==='m7'){playCine(EPILOGUE,()=>{});return}if(ch)banner={title:'Chapter '+ch.n+' complete',sub:ch.t,t:0,col:'#f6d27a'};talk(talkNPC)};
+  const ch=CHAPTERS.find(c=>c.q[c.q.length-1]===id);if(ch){P.bonusSP=(P.bonusSP||0)+1;setTimeout(()=>toast('+1 talent point','For finishing a chapter of the story','#ffd23f'),600)}if(id==='mf2')unlock('finale');if(id==='w6')unlock('bard');const after=()=>{if(id==='m7'){playCine(EPILOGUE,()=>{});return}if(id==='mf2'){playCine(FINALE,()=>{});return}if(ch)banner={title:'Chapter '+ch.n+' complete',sub:ch.t,t:0,col:'#f6d27a'};talk(talkNPC)};
   if(q.outro)playScene(q.outro,after);else after()}
 function handleAct(act,id){
   SFX.click();
@@ -3182,7 +3249,7 @@ function handleAct(act,id){
     case'skip':endScene();break;
     case'travel':travelTo(id);break;
     case'track':P.track=id;openQuests('active');break;
-    case'replay':playCine(id==='epi'?EPILOGUE:PROLOGUE,()=>openQuests('story'));break;
+    case'replay':playCine(id==='epi'?EPILOGUE:id==='fin'?FINALE:PROLOGUE,()=>openQuests('story'));break;
     case'sttab':openStable(id);break;
     case'petsel':if(P.petId===id){if(pet)puff(pet.x,pet.y,'#d8cbb0',10);P.petId=null;pet=null}else{P.petId=id;spawnPet();puff(pet.x,pet.y,'#ffd23f',12)}openStable('pets');save();break;
     case'mountsel':{if(P.riding&&!dismount(true))return;P.mountId=id;toast(MOUNTS[id].n+' is saddled','Press X to ride','#f0b94a');openStable('mounts');save();break}
