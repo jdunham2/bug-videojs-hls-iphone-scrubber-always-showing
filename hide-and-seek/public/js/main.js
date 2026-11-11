@@ -1,5 +1,5 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, levelAt, inUpper, onStairs, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, VEHICLE, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
+import { getWorld, collide, levelAt, inUpper, onStairs, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, VEHICLE, VEHICLES, GIANT, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
 import { Gfx, Preview, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
 import { connectWs, connectLocal, connectRoom } from './net.js';
@@ -20,7 +20,7 @@ const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
-const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0, vh: [] };
+const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0, vh: [], vip: 0 };
 const car = { id: -1, x: 0, z: 0, r: 0, sp: 0, hit: 0 }; // the vehicle you are driving, simulated locally
 const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0, y: 0, vy: 0, freeUntil: 0, boostUntil: 0, chal: '', chalDone: false, lv: 0, gy: 0 };
 const keys = {};
@@ -144,6 +144,10 @@ function onMsg(m) {
     case 'noise': onNoise(m); break;
     case 'coin': if (m.w === myId) { sfx.coin(); feed('+10 coin', 'good'); } break;
     case 'caught':
+      if (m.m === 9) {
+        if (m.w === myId) { sfx.caught(); banner('TAG! You are it'); } else if (m.b === myId) { sfx.win(); banner('Tagged! Now run'); } else sfx.thud();
+        break;
+      }
       if (m.m === 6) {
         if (m.b === myId) { sfx.win(); banner('Found them! Now hide here too. +100'); } else if (m.w === myId) { sfx.thud(); banner('You were found. Shh, squeeze up!'); } else sfx.thud();
         break;
@@ -195,6 +199,7 @@ function onState(m) {
   if ((m.md || 0) !== G.md) { G.md = m.md || 0; if (!playing) renderLobby(); }
   G.cg = m.cg || 0;
   G.vh = m.vh || [];
+  G.vip = m.vip || 0;
   gfx.setItems(new Set(m.it || []));
   G.ct = new Set(m.ct);
   gfx.setCoins(G.ct);
@@ -219,7 +224,8 @@ function onEnd(w) {
   const p = players.get(myId), won = p && (p.role === 1) === (w === 'seekers');
   won ? sfx.win() : sfx.lose();
   $('resTitle').textContent = w === 'seekers' ? 'SEEKERS WIN' : 'HIDERS WIN';
-  $('resSub').textContent = G.md === 6 ? (w === 'seekers' ? 'Everyone found the hiding place. Last one in loses!' : 'Time ran out before everyone found the hiding place.')
+  const it = [...players.values()].find((q) => q.role === 1);
+  $('resSub').textContent = G.md === 9 ? `${(it && roster.get(it.id) || {}).n || 'Somebody'} was it when the clock ran out.` : G.md === 8 && w === 'seekers' && G.bc.some((v) => v < 1) ? 'The seekers got the VIP, or everybody else.' : G.md === 6 ? (w === 'seekers' ? 'Everyone found the hiding place. Last one in loses!' : 'Time ran out before everyone found the hiding place.')
     : w === 'seekers' ? 'Everyone was caught.' : G.cg && G.ct.size >= G.cg ? 'The hiders pulled off the heist.' : G.bc.every((v) => v >= 1) ? 'All three beacons were lit.' : 'Somebody survived until the bell.';
   setTimeout(() => {
     const ul = $('resList');
@@ -483,15 +489,16 @@ function update(dt, now) {
   }
   if (driving) {
     if (car.id !== p.veh) { car.id = p.veh; car.x = myV[0]; car.z = myV[1]; car.r = myV[2]; car.sp = 0; me.yaw = car.r; me.pitch = -0.08; }
-    const top = myV[4] > 0 ? VEHICLE.max : 2.5; // out of fuel: it only crawls
-    if (az) car.sp += -az * VEHICLE.accel * dt;
+    const VK = VEHICLES[(W.vehicles[p.veh] || {}).k || 0];
+    const top = myV[4] > 0 ? VK.max : 2.5; // out of fuel: it only crawls
+    if (az) car.sp += -az * VK.accel * dt;
     else car.sp -= Math.sign(car.sp) * Math.min(Math.abs(car.sp), 5 * dt);
     car.sp = Math.max(-VEHICLE.reverse, Math.min(top, car.sp));
-    const turn = -ax * VEHICLE.turn * dt * Math.max(-1, Math.min(1, car.sp / 5));
+    const turn = -ax * VK.turn * dt * Math.max(-1, Math.min(1, car.sp / 5));
     car.r += turn; me.yaw += turn;
     const nx = Math.max(-HALF + 1.2, Math.min(HALF - 1.2, car.x - Math.sin(car.r) * car.sp * dt));
     const nz = Math.max(-HALF + 1.2, Math.min(HALF - 1.2, car.z - Math.cos(car.r) * car.sp * dt));
-    const c = collide(W, nx, nz, VEHICLE.radius, 0);
+    const c = collide(W, nx, nz, VK.radius, 0);
     if (Math.hypot(c[0] - nx, c[1] - nz) > 0.02) {
       if (Math.abs(car.sp) > 5 && now > car.hit) { car.hit = now + 400; sfx.thud(); }
       car.sp *= 0.6;
@@ -549,7 +556,8 @@ function update(dt, now) {
     if (o.role === 1) nearSeeker = Math.min(nearSeeker, Math.hypot(o.x - me.x, o.z - me.z));
     gfx.updateAvatar(id, {
       x: o.x, y: levelAt(W, o.x, o.z, o.lv)[1], z: o.z, r: o.r, visible: o.hid < 0 && !blind && !((o.fx & 4) && o.role !== p.role), jump: !!(o.f & F_JUMP), moving: !!(o.f & F_MOVE), sprint: !!sprinting, crouch: !!(o.f & F_CROUCH),
-      seeker: o.role === 1 && G.ph !== 'lobby', showTag: G.ph === 'lobby' || G.ph === 'end' || o.role === p.role, stunned: !!(o.fx & 1), immune: !!(o.fx & 2), prop: o.prop, frozen: o.st === 2, driving: o.veh >= 0,
+      seeker: o.role === 1 && G.ph !== 'lobby', showTag: G.ph === 'lobby' || G.ph === 'end' || o.role === p.role, stunned: !!(o.fx & 1), immune: !!(o.fx & 2), prop: o.prop, frozen: o.st === 2, driving: o.veh >= 0, vip: o.id === G.vip && p.role === 0 && G.ph !== 'lobby',
+      scale: G.md === 10 && G.ph !== 'lobby' ? (o.role === 1 ? GIANT.seeker : GIANT.hider) : 1,
       pet: !o.prop && (G.ph === 'lobby' || G.ph === 'end' || o.role === 1 || o.role === p.role),
     }, dt);
   }
@@ -561,7 +569,8 @@ function update(dt, now) {
 
   // camera
   G.vh.forEach((v, i) => (driving && i === p.veh ? gfx.updateVehicle(i, car.x, car.z, car.r, true, dt) : gfx.updateVehicle(i, v[0], v[1], v[2], false, dt)));
-  const eyeT = driving ? 1.5 : hidden ? 1.15 : me.crouch ? 1.0 : 1.6;
+  const size = G.md === 10 && G.ph !== 'lobby' ? (seeker ? GIANT.seeker : GIANT.hider) : 1; // Giants: big or tiny
+  const eyeT = driving ? 1.5 : hidden ? 1.15 : (me.crouch ? 1.0 : 1.6) * size;
   me.eye += (eyeT - me.eye) * Math.min(1, dt * 12);
   gfx.setDark(G.md === 4 && (G.ph === 'hide' || G.ph === 'seek'));
   gfx.setSeekerView(seeker && G.ph !== 'lobby');
@@ -589,12 +598,19 @@ function hud(p, now, s) {
     if (me.chal && G.ph !== 'lobby') { const c = document.createElement('em'); c.textContent = (me.chalDone ? '✔ ' : '★ ') + me.chal; if (me.chalDone) c.className = 'done'; role.append(c); }
   };
   if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the map and learn the hiding spots.');
+  else if (s.seeker && G.md === 9) set('seeker', '🔦 YOU ARE IT', 'Tag anyone to pass it on. Do not be it when the clock runs out.');
+  else if (s.seeker && G.md === 10) set('seeker', '🦶 GIANT', 'You tower over everything and your reach is long. The hiders are tiny: look down.');
+  else if (s.seeker && G.md === 8) set('seeker', '🔦 SEEKER', 'One hider is the VIP. Catch the VIP and the round is yours.');
   else if (s.seeker && G.md === 6) set('seeker', '🔦 SEEKER', 'Find the one hider and tag them to squeeze in beside them. Do not be the last one looking.');
   else if (s.seeker && G.md === 3) set('seeker', '🔦 SEEKER', 'Hiders look like props. Tag the ones that move. Miss and you are dazed.');
   else if (s.seeker) set('seeker', '🔦 SEEKER', TOUCH ? 'Tap TAG next to a hider. Search spots with USE, carefully.' : 'Tag hiders (click). Search spots with E — carefully.');
   else if (p.st === 1) set('jail', '⛓ JAILED', `A free teammate must hold ${USE} at the lever.`);
   else if (p.st === 2) set('jail', '🧊 FROZEN', `A free teammate can thaw you: they hold ${USE} next to you.`);
   else if (p.prop) set('hider', `📦 You are a ${PROPS[p.prop].toUpperCase()}`, `Hold still to blend in. ${TOUCH ? 'Tap PROP' : 'Press R'} to change disguise.`);
+  else if (G.md === 9) set('hider', '🏃 RUN!', 'Stay away from whoever is it. You score while you are not it.');
+  else if (G.md === 10) set('hider', '🐜 TINY', 'You are small enough to hide behind almost anything. Giants reach a long way.');
+  else if (G.md === 8 && G.vip === myId) set('hider', '👑 YOU ARE THE VIP', 'If you are caught your team loses. Survive for +200.');
+  else if (G.md === 8) set('hider', '🛡 BODYGUARD', `Keep ${(roster.get(G.vip) || {}).n || 'the VIP'} (gold marker) from being caught.`);
   else if (G.md === 6) set('hider', '🐟 SARDINE', 'Stay hidden. Everyone who finds you hides here too.');
   else if (G.md === 5) set('hider', '💰 THIEF', `Grab coins. Your team needs ${G.cg} between you to win.`);
   else if (G.md === 1) set('hider', '🙈 SURVIVOR', 'If a seeker tags you, you join them. Be the last one left.');
@@ -602,7 +618,7 @@ function hud(p, now, s) {
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush', wagon: 'locker', 'giant egg': 'locker', 'hay bales': 'bush', ferns: 'bush' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';
@@ -665,9 +681,10 @@ function hud(p, now, s) {
     else if (G.ph !== 'end') pr.textContent = `${USE}: hide in the ${sp.kind}`;
     return;
   }
-  if (!me.lv && !p.prop) for (const v of G.vh) {
+  if (!me.lv && !p.prop) for (let i = 0; i < G.vh.length; i++) {
+    const v = G.vh[i], vk = (W.vehicles[i] || {}).k || 0;
     if (v[3] || Math.hypot(v[0] - me.x, v[1] - me.z) > VEHICLE.enter) continue;
-    pr.textContent = `${USE}: drive the ${W.vehName}`;
+    pr.textContent = `${USE}: ${vk === 3 ? 'ride' : 'drive'} the ${VEHICLES[vk].name || W.vehName}`;
     return;
   }
 }

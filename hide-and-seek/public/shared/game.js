@@ -3,7 +3,7 @@
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
   levelAt, validLevel, cleanLook,
-  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, VEHICLE, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
+  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, VEHICLE, VEHICLES, GIANT, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
 // The world of whichever room is being processed. Every entry point sets it first; all code here is synchronous.
@@ -90,11 +90,12 @@ function startRound(room) {
   const all = [...room.players.values()];
   if (all.length < 2 || room.phase !== 'lobby') return;
   // Sardines turns the teams around: one hider, everybody else seeks
-  const nS = room.mode === 6 ? all.length - 1 : Math.max(1, Math.floor(all.length / 4));
+  const nS = room.mode === 6 ? all.length - 1 : room.mode === 9 ? 1 : Math.max(1, Math.floor(all.length / 4)); // and Playground Tag has exactly one "it"
   const order = all.map((p) => [p.seekCount + Math.random() * 0.9, p]).sort((a, b) => a[0] - b[0]).map((e) => e[1]);
   room.coins.clear(); room.spotOcc.clear(); room.resc = 0; room.winner = null;
   room.items.clear(); room.bc = [0, 0, 0];
   room.startSeekers = nS;
+  room.vip = room.mode === 8 ? order[nS + ((Math.random() * (order.length - nS)) | 0)].id : 0;
   resetVehicles(room);
   room.coinGoal = room.mode === 5 ? Math.min(W.coins.length - 6, 4 + 2 * (all.length - nS)) : 0;
   const t = now();
@@ -128,6 +129,7 @@ function endRound(room, winner) {
   room.tEnd = now() + END_T;
   for (const p of room.players.values()) {
     if (winner === 'hiders' && p.role === HIDER && p.st === 0) p.sc += 100;
+    if (winner === 'hiders' && p.id === room.vip) p.sc += 200;
     if (winner === 'seekers' && p.role === SEEKER && room.mode !== 6) p.sc += 50;
     leaveSpot(room, p);
     p.f = 0;
@@ -150,7 +152,7 @@ function toLobby(room) {
 
 // ---------- vehicles ----------
 function resetVehicles(room) {
-  room.veh = room.W.vehicles.map((v) => ({ id: v.id, x: v.x, z: v.z, r: v.r, driver: 0, fuel: 100, lx: v.x, lz: v.z, noiseT: 0 }));
+  room.veh = room.W.vehicles.map((v) => ({ id: v.id, k: v.k, x: v.x, z: v.z, r: v.r, driver: 0, fuel: 100, movedAt: 0, noiseT: 0 }));
   for (const p of room.players.values()) p.veh = -1;
 }
 function enterVehicle(room, p) {
@@ -181,18 +183,25 @@ function updateVehicles(room, dt, t) {
   for (const v of room.veh) {
     const d = v.driver && room.players.get(v.driver);
     if (v.driver && (!d || d.veh !== v.id)) v.driver = 0;
-    const moved = Math.hypot(v.x - v.lx, v.z - v.lz);
-    v.lx = v.x; v.lz = v.z;
-    if (d && moved > 0.008) {
-      v.fuel = Math.max(0, v.fuel - VEHICLE.drain * dt);
+    // fuel is burned per metre driven (see the movement handler); here it only trickles back while parked
+    if (d && t - (v.movedAt || 0) < 0.4) {
       // consequences: an engine is the loudest thing on the map
-      if (room.phase === 'seek' && d.role === HIDER && t >= v.noiseT) { emitNoise(room, v.x, v.z, 'engine', d.id); v.noiseT = t + 0.5; }
+      if (room.phase === 'seek' && d.role === HIDER && !VEHICLES[v.k].quiet && t >= v.noiseT) { emitNoise(room, v.x, v.z, 'engine', d.id); v.noiseT = t + 0.5; }
     } else v.fuel = Math.min(100, v.fuel + (d ? VEHICLE.regen : VEHICLE.idleRegen) * dt);
   }
 }
 
 function catchPlayer(room, p, by, how) {
   if (p.st || p.role !== HIDER || room.phase !== 'seek') return;
+  if (room.mode === 9) {
+    // Playground Tag: the two swap places. The new "it" gets a moment to groan before giving chase.
+    if (p.veh >= 0) exitVehicle(room, p, false);
+    leaveSpot(room, p);
+    by.role = HIDER; by.immUntil = now() + 4; by.item = 0; by.ai = { stam: 100, wind: 0 }; by.sc += 25;
+    p.role = SEEKER; p.stunUntil = now() + 2; p.tagCd = now() + 3; p.item = 0; p.f = 0; p.ai = { stam: 100, wind: 0 };
+    broadcast(room, { t: 'caught', w: p.id, b: by.id, m: 9 });
+    return feed(room, `${by.name} tagged ${p.name}. ${p.name} is it!`, 'bad');
+  }
   if (room.mode === 6) {
     // Sardines: the finder squeezes in and hides alongside
     by.role = HIDER; by.item = 0; by.immUntil = now() + 2; by.f = 0;
@@ -223,12 +232,16 @@ function catchPlayer(room, p, by, how) {
   bump(room, by, 'catch');
   if (how) bump(room, by, 'found');
   broadcast(room, { t: 'caught', w: p.id, b: by.id, m: mode });
+  if (mode === 8 && p.id === room.vip) {
+    feed(room, `${p.name} was the VIP. The seekers win!`, 'big');
+    endRound(room, 'seekers');
+  }
 }
 function tryTag(room, s, t) {
   if (room.phase !== 'seek' || s.role !== SEEKER || t < s.tagCd || t < s.stunUntil) return;
   s.tagCd = t + 0.8;
   const fx = -Math.sin(s.r), fz = -Math.cos(s.r);
-  let best = null, bd = 2.7;
+  let best = null, bd = room.mode === 10 ? GIANT.reach : 2.7; // giants have long arms
   for (const h of room.players.values()) {
     if (h.role !== HIDER || h.st || h.hid >= 0 || t < h.immUntil || h.lv !== s.lv) continue;
     const dx = h.x - s.x, dz = h.z - s.z, d = Math.hypot(dx, dz);
@@ -666,7 +679,7 @@ function snapshot(room) {
   return ({
     t: 'st', ph: room.phase, tl: Math.max(0, +(room.tEnd - t).toFixed(1)), host: room.host,
     res: +(room.mode === 2 ? Math.max(0, ...[...room.players.values()].map((p) => (p.st === 2 ? p.thaw : 0))) : room.resc / 3).toFixed(2),
-    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0,
+    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0, vip: room.vip || 0,
     vh: room.veh.map((v) => [+v.x.toFixed(2), +v.z.toFixed(2), +v.r.toFixed(2), v.driver, Math.round(v.fuel)]),
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
@@ -746,7 +759,12 @@ export function handleMessage(room, me, m) {
     me.x = x; me.z = z; me.f = m.f & 63;
     me.lv = validLevel(W, x, z, m.l === 1 ? 1 : 0);
     const v = room.veh[me.veh];
-    if (v) { v.x = x; v.z = z; me.lv = 0; if (num(m.vr)) v.r = m.vr; }
+    if (v) {
+      const dd = Math.hypot(x - v.x, z - v.z), K = VEHICLES[v.k];
+      if (dd > 0.005) { v.fuel = Math.max(0, v.fuel - (dd * K.drain) / K.max); v.movedAt = t; }
+      v.x = x; v.z = z; me.lv = 0;
+      if (num(m.vr)) v.r = m.vr;
+    }
   } else if (m.t === 'a') {
     if (m.a === 'use') useAction(room, me, t);
     else if (m.a === 'tag') tryTag(room, me, t);

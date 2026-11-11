@@ -192,6 +192,31 @@ export class Gfx {
         plaza(g, '#d6c08a', '#b89f66');
         g.fillStyle = '#b89f66'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
       },
+      west: (g) => {
+        g.fillStyle = '#d9a66a'; g.fillRect(0, 0, S, S);
+        speckle(g, ['#e3b47a', '#c9955a', '#eac08a', '#b98850'], 26000, 0.6);
+        // the main street and wheel ruts out to each building
+        g.fillStyle = '#c08a52'; g.fillRect(0, px(-6), S, 12 * k);
+        g.strokeStyle = '#b07a46'; g.lineWidth = 2.6 * k; g.lineCap = 'round';
+        for (const h of W.houses) { g.beginPath(); g.moveTo(px(h.x * 0.6), C); g.lineTo(px(h.x * 0.9), px(h.z * 0.86)); g.stroke(); }
+        g.strokeStyle = 'rgba(120,80,40,0.5)'; g.lineWidth = 3;
+        for (const o of [-1.2, 1.2]) { g.beginPath(); g.moveTo(0, px(o)); g.lineTo(S, px(o)); g.stroke(); }
+        plaza(g, '#c9a070', '#a37a4a');
+        g.fillStyle = '#a37a4a'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
+      },
+      jungle: (g) => {
+        g.fillStyle = '#35603a'; g.fillRect(0, 0, S, S);
+        speckle(g, ['#3f7044', '#2c5232', '#4a8050', '#27482c', '#5a8a4a'], 30000, 0.55);
+        const [x, z, rx, rz] = W.pond;
+        g.fillStyle = '#4a6a3a'; g.beginPath(); g.ellipse(px(x), px(z), (rx + 1.5) * k, (rz + 1.5) * k, 0, 0, 7); g.fill();
+        g.fillStyle = '#3f6f5f'; g.beginPath(); g.ellipse(px(x), px(z), rx * k, rz * k, 0, 0, 7); g.fill();
+        g.fillStyle = '#6fae6a';
+        for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(px(x + (Math.random() - 0.5) * rx * 1.5), px(z + (Math.random() - 0.5) * rz * 1.5), (0.4 + Math.random() * 0.6) * k, 0.4, 6); g.fill(); }
+        g.strokeStyle = '#6b5a3a'; g.lineWidth = 2.4 * k; g.lineCap = 'round';
+        for (const h of W.houses) { g.beginPath(); g.moveTo(C, C); g.quadraticCurveTo(px(h.x * 0.3), px(h.z * 0.7), px(h.x * 0.86), px(h.z * 0.86)); g.stroke(); }
+        plaza(g, '#7a6a4a', '#5a4d36');
+        g.fillStyle = '#5a4d36'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
+      },
       moon: (g) => {
         g.fillStyle = '#8f9099'; g.fillRect(0, 0, S, S);
         speckle(g, ['#9a9ba4', '#83848d', '#a6a7b0', '#777881'], 26000, 0.6);
@@ -294,7 +319,7 @@ export class Gfx {
       for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(0, i * 32); g.lineTo(128, i * 32); g.stroke(); }
     });
     const M = {
-      wall: std({ town: 0x6d6a85, camp: 0x7a5a3c, docks: 0x4a505c, cove: 0xc9b382, grave: 0x3a3d48, moon: 0x8a8f9c, candy: 0xff9ec7 }[W.id]), hedge: std(0x2f6b3a, { roughness: 1 }), crate: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.9 }),
+      wall: std({ town: 0x6d6a85, camp: 0x7a5a3c, docks: 0x4a505c, cove: 0xc9b382, grave: 0x3a3d48, moon: 0x8a8f9c, candy: 0xff9ec7, west: 0x8a5a3a, jungle: 0x4a5a3a }[W.id]), hedge: std(0x2f6b3a, { roughness: 1 }), crate: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.9 }),
       trunk: std(0x5b3d28), fence: std(0x8a6a48), rock: std(0x7b7a8c), barrel: std(0xb5533c, { metalness: 0.3, roughness: 0.6 }),
       bench: std(0x8a6a48), bed: std(0x7fa7d9), pillow: std(0xf3efe6), table: std(0x9a6b42), sofa: std(0xb0567a), shelf: std(0x7a5a3c),
       locker: std(0x5f7f9a, { metalness: 0.5, roughness: 0.5 }), dark: std(0x1c1c26), dumpster: std(0x2f7d5b, { metalness: 0.3, roughness: 0.6 }),
@@ -303,7 +328,7 @@ export class Gfx {
       bulb: new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), tire: std(0x16161c), red: new THREE.MeshBasicMaterial({ color: 0xff3b3b }),
     };
     this.M = M;
-    const leaf = (T.snow ? [0x2c6b48, 0x357a55, 0x24583c, 0x2f7050] : [0x2f7d3f, 0x3e9150, 0x276b45, 0xd9822b, 0xc45a2a, 0x4aa05a]).map((c) => std(c, { roughness: 1 }));
+    const leaf = (T.snow ? [0x2c6b48, 0x357a55, 0x24583c, 0x2f7050] : T.lush ? [0x2f8d3f, 0x3ea150, 0x277b45, 0x4ab85a, 0x1f6b35, 0x5fc86a] : [0x2f7d3f, 0x3e9150, 0x276b45, 0xd9822b, 0xc45a2a, 0x4aa05a]).map((c) => std(c, { roughness: 1 }));
     const corr = canvasTex(64, 64, (g) => { for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#ffffff' : '#c4c4c4'; g.fillRect(i * 8, 0, 8, 64); } g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, 64, 3); g.fillRect(0, 61, 64, 3); });
     const boxMats = new Map();
     const boxMat = (c) => boxMats.get(c) || (boxMats.set(c, new THREE.MeshStandardMaterial({ color: c, map: corr, metalness: 0.35, roughness: 0.6 })), boxMats.get(c));
@@ -349,6 +374,37 @@ export class Gfx {
           break;
         }
         case 'post': box(b, M.trunk); break;
+        case 'haycube': for (let y = 0; y < b.h - 0.1; y += 1.3) { const hm = this.mesh(unit, M.hay || (M.hay = std(0xe0b84a, { roughness: 1 })), b.x, y + 0.65, b.z); hm.scale.set(1.3, 1.25, 1.3); } break;
+        case 'cactus': {
+          const cm = M.cactus || (M.cactus = std(0x4f8a4a, { roughness: 0.9 })), h = 2 + b.v * 1.4;
+          this.mesh(cyl, cm, b.x, h / 2, b.z).scale.set(0.24, h, 0.24);
+          this.mesh(ball, cm, b.x, h, b.z).scale.setScalar(0.24);
+          for (const sgn of [-1, 1]) { if (b.v * sgn > 0.35 * sgn && sgn > 0) continue; const ay = h * (0.45 + sgn * 0.1); this.mesh(cyl, cm, b.x + sgn * 0.3, ay, b.z).scale.set(0.15, 0.5, 0.15); this.mesh(cyl, cm, b.x + sgn * 0.5, ay + 0.45, b.z).scale.set(0.15, 1.0, 0.15); this.mesh(ball, cm, b.x + sgn * 0.5, ay + 0.95, b.z).scale.setScalar(0.15); }
+          break;
+        }
+        case 'wagon': {
+          box(b, M.fence, 0.9, 0.5);
+          const cover = this.mesh(new THREE.CylinderGeometry(1.2, 1.2, 2.4, 12, 1, false, 0, Math.PI), std(0xefe6d2, { flatShading: false, side: THREE.DoubleSide }), b.x, 1.4, b.z);
+          cover.rotation.set(0, 0, Math.PI / 2); cover.rotation.order = 'ZYX'; cover.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+          for (const sx of [-0.8, 0.8]) for (const sz of [-1.25, 1.25]) { const wh = this.mesh(new THREE.TorusGeometry(0.5, 0.07, 6, 14), M.trunk, b.x + sx, 0.55, b.z + sz); wh.userData.k = 1; }
+          this.mesh(unit, M.dark, b.x + b.w / 2 + 0.01, 1.35, b.z, par, false).scale.set(0.04, 1.6, 1.5);
+          break;
+        }
+        case 'egg': {
+          const em = M.egg || (M.egg = std(0xf2ead2, { flatShading: false, roughness: 0.6 }));
+          const e = this.mesh(ball, em, b.x, 1.5, b.z); e.scale.set(1.25, 1.6, 1.25);
+          for (let i = 0; i < 7; i++) { const sp = this.mesh(ball, std(0x7fae6a, { flatShading: false }), b.x + Math.cos(i * 2.1) * 0.9, 1.0 + (i % 4) * 0.5, b.z + Math.sin(i * 2.1) * 0.9, par, false); sp.scale.set(0.28, 0.28, 0.28); }
+          this.mesh(unit, M.dark, b.x + 1.18, 1.0, b.z, par, false).scale.set(0.12, 1.5, 0.7);
+          for (let i = 0; i < 8; i++) { const n = this.mesh(cyl, M.trunk, b.x + Math.cos(i * 0.785) * 1.5, 0.12, b.z + Math.sin(i * 0.785) * 1.5); n.scale.set(0.1, 1.2, 0.1); n.rotation.set(Math.PI / 2, 0, i * 0.785 + 0.6, 'YXZ'); n.rotation.order = 'YXZ'; n.rotation.set(Math.PI / 2, i * 0.785 + 0.6, 0); }
+          break;
+        }
+        case 'bones': {
+          const bm = M.bone || (M.bone = std(0xeee6d0, { flatShading: false, roughness: 0.7 })), long = b.w > b.d;
+          const spine = this.mesh(cyl, bm, b.x, 0.35, b.z); spine.scale.set(0.09, 2.4, 0.09); spine.rotation.set(long ? 0 : Math.PI / 2, 0, long ? Math.PI / 2 : 0);
+          for (let i = -2; i <= 2; i++) { const rib = this.mesh(new THREE.TorusGeometry(0.55 - Math.abs(i) * 0.06, 0.05, 5, 12, Math.PI), bm, b.x + (long ? i * 0.45 : 0), 0.35, b.z + (long ? 0 : i * 0.45)); rib.rotation.y = long ? Math.PI / 2 : 0; }
+          const skull = this.mesh(ball, bm, b.x + (long ? 1.35 : 0), 0.45, b.z + (long ? 0 : 1.35)); skull.scale.set(long ? 0.42 : 0.3, 0.3, long ? 0.3 : 0.42);
+          break;
+        }
         case 'bigrock': { const m = this.mesh(ico, M.rock, b.x, 1.1, b.z); m.scale.set(1.5, 1.7 + b.v * 0.6, 1.4); m.rotation.set(b.v * 3, b.v * 7, b.v); break; }
         case 'solar': {
           const long = b.w > b.d;
@@ -589,7 +645,7 @@ export class Gfx {
     }
     // Jump pads: step on one to be launched high enough to land on a lookout
     // Vehicles: one look per map
-    this.vehs = W.vehicles.map((v) => { const o = makeVehicle(W.id); o.g.position.set(v.x, 0, v.z); o.g.rotation.y = v.r; o.x = v.x; o.z = v.z; o.r = v.r; this.root.add(o.g); return o; });
+    this.vehs = W.vehicles.map((v) => { const o = makeVehicle(W.id, v.k); o.g.position.set(v.x, 0, v.z); o.g.rotation.y = v.r; o.x = v.x; o.z = v.z; o.r = v.r; this.root.add(o.g); return o; });
     this.pads = [];
     const padMat = new THREE.MeshStandardMaterial({ color: 0x3de0d0, emissive: 0x19a89a, emissiveIntensity: 1.2, roughness: 0.3 });
     for (const p of W.pads) {
@@ -607,11 +663,11 @@ export class Gfx {
         t.rotation.y = Math.PI / 4 + s.id;
         continue;
       }
-      if (!['bush', 'snowdrift', 'boulders', 'gumdrops'].includes(s.kind)) continue;
+      if (!['bush', 'snowdrift', 'boulders', 'gumdrops', 'hay bales', 'ferns'].includes(s.kind)) continue;
       const snowy = s.kind === 'snowdrift', gum = s.kind === 'gumdrops' && [0xff5d8a, 0x5db8ff, 0xffd447, 0xa56bff, 0x7ddc8a, 0xff9248].map((c) => std(c, { flatShading: false, roughness: 0.25, transparent: true, opacity: 0.92 }));
       for (let i = 0; i < 6; i++) {
         const a = i * 1.05, rr = i < 5 ? 0.75 : 0;
-        const m = this.mesh(gum ? ball : ico, gum ? gum[(i + s.id) % 6] : s.kind === 'boulders' ? M.rock : snowy ? M.snow : i % 2 ? bushMat : bushMat2, s.x + Math.cos(a) * rr, i < 5 ? 0.75 : 1.35, s.z + Math.sin(a) * rr);
+        const m = this.mesh(gum ? ball : s.kind === 'hay bales' ? unit : ico, gum ? gum[(i + s.id) % 6] : s.kind === 'hay bales' ? M.hay || (M.hay = std(0xe0b84a, { roughness: 1 })) : s.kind === 'boulders' ? M.rock : snowy ? M.snow : i % 2 ? bushMat : bushMat2, s.x + Math.cos(a) * rr, i < 5 ? 0.75 : 1.35, s.z + Math.sin(a) * rr);
         m.scale.setScalar(i < 5 ? 0.85 : 1.0);
         m.rotation.set(i, i * 2, i * 3);
       }
@@ -734,6 +790,9 @@ export class Gfx {
     dr = Math.atan2(Math.sin(dr), Math.cos(dr));
     a.r += dr * k;
     a.g.position.set(a.x, a.y, a.z);
+    a.g.scale.setScalar(a.g.scale.x + ((s.scale || 1) - a.g.scale.x) * Math.min(1, dt * 6)); // Giants mode
+    if (s.vip && !a.vipM) { a.vipM = put(new THREE.OctahedronGeometry(0.2), new THREE.MeshBasicMaterial({ color: 0xffd447 }), 0, a.top + 0.95, 0, a.g, false); }
+    if (a.vipM) { a.vipM.visible = !!s.vip; a.vipM.rotation.y = this.time * 3; }
     a.g.rotation.y = a.r;
     // pets trail behind and to the left of their owner
     if (a.pet) stepPet(a.pet, a.x + Math.sin(a.r) * 0.9 - Math.cos(a.r) * 0.6, a.y, a.z + Math.cos(a.r) * 0.9 + Math.sin(a.r) * 0.6, s.visible && s.pet, dt, this.time);
@@ -1355,7 +1414,7 @@ function stepPet(p, tx, ty, tz, visible, dt, t) {
 
 // ---------- vehicles ----------
 // One drivable machine, about 2.4 m long, facing -z, dressed for the map it is on.
-export function makeVehicle(style) {
+export function makeVehicle(style, kind = 0) {
   const g = new THREE.Group(), wheels = [];
   const m = (c, o) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, ...o });
   const tire = m(0x16161c, { roughness: 0.9 }), dark = m(0x23202e), glow = new THREE.MeshBasicMaterial({ color: 0xfff3c4 });
@@ -1364,6 +1423,41 @@ export function makeVehicle(style) {
   const seat = (c) => { put(new THREE.BoxGeometry(0.6, 0.12, 0.55), c, 0, 0.5, 0.35, g); put(new THREE.BoxGeometry(0.6, 0.55, 0.12), c, 0, 0.78, 0.66, g); };
   const steer = () => { const s = put(new THREE.TorusGeometry(0.16, 0.025, 6, 14), dark, 0, 0.88, -0.2, g); s.rotation.x = -1.0; put(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 5), dark, 0, 0.72, -0.32, g).rotation.x = 0.55; };
   const lights = (y = 0.5, z = -1.22) => { for (const x of [-0.42, 0.42]) put(new THREE.BoxGeometry(0.2, 0.12, 0.05), glow, x, y, z, g, false); };
+  if (kind === 1) { // scooter: narrow enough for doorways
+    put(new THREE.BoxGeometry(0.3, 0.1, 1.3), m(0x3de0d0, { metalness: 0.4 }), 0, 0.28, 0.1, g);
+    put(new THREE.CylinderGeometry(0.03, 0.03, 1.0, 6), dark, 0, 0.75, -0.6, g).rotation.x = -0.15;
+    put(new THREE.CylinderGeometry(0.025, 0.025, 0.6, 6), dark, 0, 1.22, -0.66, g).rotation.z = Math.PI / 2;
+    put(new THREE.BoxGeometry(0.28, 0.08, 0.4), dark, 0, 0.6, 0.45, g);
+    put(new THREE.BoxGeometry(0.1, 0.1, 0.05), glow, 0, 1.0, -0.7, g, false);
+    wheel(0, -0.68, 0.22, 0.1); wheel(0, 0.75, 0.22, 0.1);
+    return { g, wheels, x: 0, z: 0, r: 0 };
+  }
+  if (kind === 2) { // monster truck
+    put(new THREE.BoxGeometry(1.7, 0.6, 2.9), m(0x7a3cff, { metalness: 0.4 }), 0, 1.35, 0, g);
+    put(new THREE.BoxGeometry(1.5, 0.6, 1.3), m(0x1c1c26), 0, 1.9, 0.1, g);
+    put(new THREE.BoxGeometry(1.6, 0.08, 1.0), m(0xffd447), 0, 1.68, -1.0, g);
+    for (const x of [-0.95, 0.95]) for (const z of [-1.0, 1.05]) { wheel(x, z, 0.62, 0.5); put(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 5), dark, x * 0.75, 0.95, z, g); }
+    for (const x of [-0.6, 0.6]) put(new THREE.BoxGeometry(0.28, 0.16, 0.05), glow, x, 1.4, -1.47, g, false);
+    for (const x of [-0.5, 0, 0.5]) put(S(0.09, 6, 5), glow, x, 2.28, -0.3, g, false);
+    return { g, wheels, x: 0, z: 0, r: 0 };
+  }
+  if (kind === 3) { // hoverboard: silent, quick, thirsty
+    put(new THREE.BoxGeometry(0.5, 0.07, 1.4), m(0xff5fc8, { metalness: 0.5, roughness: 0.3 }), 0, 0.35, 0, g);
+    for (const z of [-0.45, 0.45]) { put(new THREE.CylinderGeometry(0.2, 0.16, 0.08, 14), m(0x23202e, { metalness: 0.6 }), 0, 0.28, z, g); wheels.push(put(new THREE.TorusGeometry(0.2, 0.03, 6, 16), new THREE.MeshBasicMaterial({ color: 0x7df9ff }), 0, 0.2, z, g, false)); wheels[wheels.length - 1].geometry.rotateX(Math.PI / 2); }
+    put(new THREE.BoxGeometry(0.42, 0.012, 0.9), new THREE.MeshBasicMaterial({ color: 0x7df9ff, transparent: true, opacity: 0.35 }), 0, 0.12, 0, g, false);
+    return { g, wheels: [], x: 0, z: 0, r: 0 };
+  }
+  if (kind === 4) { // rocket car: very fast in a straight line
+    put(new THREE.CylinderGeometry(0.42, 0.5, 2.6, 12), m(0xf2f4f8, { metalness: 0.5, roughness: 0.3 }), 0, 0.62, 0.1, g).rotation.x = Math.PI / 2;
+    put(new THREE.ConeGeometry(0.42, 0.9, 12), m(0xe8324a), 0, 0.62, -1.62, g).rotation.x = -Math.PI / 2;
+    put(new THREE.CylinderGeometry(0.3, 0.42, 0.4, 12), m(0x3a3f48, { metalness: 0.7 }), 0, 0.62, 1.55, g).rotation.x = Math.PI / 2;
+    put(new THREE.ConeGeometry(0.24, 0.9, 10), new THREE.MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.85 }), 0, 0.62, 2.15, g, false).rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) { const fin = put(new THREE.BoxGeometry(0.7, 0.06, 0.7), m(0xe8324a), s * 0.65, 0.5, 1.0, g); fin.rotation.y = s * 0.5; }
+    put(new THREE.BoxGeometry(0.06, 0.6, 0.7), m(0xe8324a), 0, 1.2, 1.0, g);
+    put(new THREE.SphereGeometry(0.34, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7df9ff, transparent: true, opacity: 0.5, roughness: 0.1 }), 0, 0.92, -0.2, g);
+    for (const x of [-0.6, 0.6]) for (const z of [-0.9, 0.9]) wheel(x, z, 0.24, 0.16);
+    return { g, wheels, x: 0, z: 0, r: 0 };
+  }
   if (style === 'camp') { // snowmobile
     put(new THREE.BoxGeometry(0.8, 0.4, 2.1), m(0x2f7fd9), 0, 0.5, 0, g);
     put(new THREE.BoxGeometry(0.7, 0.3, 0.7), m(0x1c1c26), 0, 0.82, -0.55, g).rotation.x = 0.35;
@@ -1399,9 +1493,10 @@ export function makeVehicle(style) {
     for (let k = 0; k < 10; k++) put(new THREE.BoxGeometry(0.1, 0.03, 0.03), new THREE.MeshBasicMaterial({ color: [0xffd447, 0x5db8ff, 0xffffff, 0xa56bff][k % 4] }), Math.cos(k * 0.63) * 0.9, 1.08, Math.sin(k * 0.63) * 0.9, g, false).rotation.y = k;
     four(0.3); seat(m(0xff6fa8)); steer(); lights(0.5, -0.99);
   } else { // go-kart (town) and beach buggy (cove)
-    const buggy = style === 'cove';
-    put(new THREE.BoxGeometry(1.25, 0.22, 2.3), m(buggy ? 0xffc93c : 0xd9342f, { metalness: 0.3 }), 0, 0.38, 0, g);
-    put(new THREE.BoxGeometry(0.9, 0.26, 0.7), m(buggy ? 0xff9248 : 0xb02a26), 0, 0.55, -0.82, g).rotation.x = 0.25;
+    const buggy = style === 'cove' || style === 'jungle';
+    const [c1, c2] = { cove: [0xffc93c, 0xff9248], jungle: [0x4f7a3a, 0x3a5a2a], west: [0x8a5a32, 0x6b4426] }[style] || [0xd9342f, 0xb02a26];
+    put(new THREE.BoxGeometry(1.25, 0.22, 2.3), m(c1, { metalness: style === 'west' ? 0 : 0.3 }), 0, 0.38, 0, g);
+    put(new THREE.BoxGeometry(0.9, 0.26, 0.7), m(c2), 0, 0.55, -0.82, g).rotation.x = 0.25;
     if (buggy) { for (const x of [-0.55, 0.55]) { put(new THREE.CylinderGeometry(0.035, 0.035, 1.1, 6), dark, x, 1.0, 0.75, g); put(new THREE.CylinderGeometry(0.035, 0.035, 1.3, 6), dark, x, 1.15, 0.05, g).rotation.x = 1.0; } put(new THREE.CylinderGeometry(0.035, 0.035, 1.1, 6), dark, 0, 1.55, 0.75, g).rotation.z = Math.PI / 2; }
     else { put(new THREE.BoxGeometry(1.3, 0.05, 0.3), dark, 0, 0.95, 1.1, g); for (const x of [-0.5, 0.5]) put(new THREE.BoxGeometry(0.05, 0.45, 0.2), dark, x, 0.72, 1.1, g); }
     four(buggy ? 0.36 : 0.26); seat(dark); steer(); lights(0.48, -1.17);

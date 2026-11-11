@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-6, the starting map) or `MODE` (0-7) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-8, the starting map) or `MODE` (0-10) to change the defaults.
 
 ## How it plays
 
@@ -36,6 +36,9 @@ The host picks the mode in the lobby with **Next mode**.
 | **Coin Heist** | Hiders win the moment they have collected enough coins between them (4 plus 2 per hider). |
 | **Sardines** | One player hides and everyone else seeks. Tag the hider and you become a hider too, right there. The round ends when only one seeker is left. |
 | **Turbo** | 15 seconds to hide, 90 to seek, everyone 30% faster and nobody runs out of breath. |
+| **VIP Escort** | One hider is the VIP, marked in gold for their team. If the VIP is caught the seekers win at once; if the VIP survives they get +200. |
+| **Playground Tag** | One player is "it". Tag someone and they are it instead (+25). Everyone else scores while they are not it. |
+| **Giants** | Seekers are 1.7× size with a 3.7 m reach. Hiders are half size and can hide behind almost anything. |
 
 Beacons, power-ups, coins and challenges work in every mode.
 
@@ -78,16 +81,25 @@ The host picks the map in the lobby with **Next map**.
 | **Haunted Graveyard** | A foggy graveyard at midnight with crypts, a chapel and two haunted mansions | Coffins, bushes, lockers |
 | **Moonbase Alpha** | A base on the Moon with habitat modules and a hangar. Low gravity: jumps go nearly three times as high | Escape pods, boulder piles, lockers |
 | **Candy Kingdom** | Gingerbread houses, lollipop trees, a cake castle and a chocolate lake | Gift boxes, gumdrops, lockers |
+| **Dusty Gulch** | A wild-west main street with a saloon, a hotel, a barn and a lot of cactus | Covered wagons, hay bales, lockers |
+| **Dino Jungle** | A misty jungle with huts, a ruined temple, a swamp and old bones | Giant eggs, ferns, lockers |
 
 ### Vehicles
 
-Every map has six vehicles, dressed to suit it: go-karts, snowmobiles, forklifts, beach buggies, ghost carts, moon
-rovers and cupcake cars. Stand next to one and press **E** to climb in or out, then drive with the move keys (or
-the joystick on a phone).
+Every map has ten vehicles. Stand next to one and press **E** to climb in or out, then drive with the move keys
+(or the joystick on a phone).
 
-- They do 12.5 m/s, nearly twice a sprint, but they are too wide for doorways and cannot climb stairs.
-- The engine is the loudest thing on the map: seekers see a ping every half second while a hider drives.
-- A full tank lasts 25 seconds of driving, then the vehicle only crawls until it has rested.
+| Vehicle | Top speed | A full tank lasts | Notes |
+| --- | --- | --- | --- |
+| The map's own ride (go-kart, snowmobile, forklift, beach buggy, ghost cart, moon rover, cupcake car, buckboard, safari jeep) | 12.5 m/s | about 310 m | The all-rounder; four per map |
+| Scooter | 10 m/s | about 300 m | Narrow enough to ride through doorways, and turns on the spot |
+| Monster truck | 10.5 m/s | about 525 m | Wide and slow to turn, but the tank goes on and on |
+| Hoverboard | 14 m/s | about 175 m | Silent: no engine pings |
+| Rocket car | 19 m/s | about 210 m | By far the fastest, with a very wide turning circle |
+
+- No vehicle can climb stairs, and all but the scooter and hoverboard are too wide for doorways.
+- Engines are the loudest thing on the map: seekers see a ping every half second while a hider drives.
+- Fuel is burned per metre driven. An empty vehicle only crawls until it has rested.
 - Seekers can drive too, and can tag from the driving seat. Getting caught throws you out.
 - Bots do not drive.
 
@@ -141,12 +153,12 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The seven maps (each generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The nine maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |
 | `public/js/audio.js` | Synthesised sound effects |
-| `test/` | `npm test`: checks every map is fully reachable, plays every mode on every map with bots, plays a full round on the server, and runs a hosted game through a fake realtime room |
+| `test/` | `npm test`: checks every map is fully reachable, plays every mode on every map with bots, drives a vehicle through the rules, plays a full round on the server, and runs a hosted game through a fake realtime room |
 
 The game module referees tags, hiding spots, coins, jail and rescues. Player movement is
 client-side with a loose sanity check, so this is fine for playing with friends but is

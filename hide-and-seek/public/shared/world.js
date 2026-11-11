@@ -47,9 +47,22 @@ export const MODES = [
   { id: 'heist', name: 'Coin Heist', blurb: 'Hiders win the moment they have collected enough coins between them.' },
   { id: 'sardines', name: 'Sardines', blurb: 'One player hides and everyone else seeks. Find the hider and you join them. Do not be last.' },
   { id: 'turbo', name: 'Turbo', blurb: 'Short, frantic rounds: everyone is faster and nobody runs out of breath.' },
+  { id: 'vip', name: 'VIP Escort', blurb: 'One hider is the VIP. If the seekers catch the VIP, the round is over.' },
+  { id: 'tag', name: 'Playground Tag', blurb: 'One player is "it". Tag someone and they are it instead. Do not be it when time runs out.' },
+  { id: 'giants', name: 'Giants', blurb: 'Seekers are towering giants with a long reach. Hiders are tiny and hard to spot.' },
 ];
 // Mode-specific numbers: Turbo shortens the round and speeds everyone up
 export const TURBO = { speed: 1.3, hide: 15, seek: 90 };
+export const GIANT = { seeker: 1.7, hider: 0.5, reach: 3.7 };
+// Vehicle types. Type 0 is each map's own ride; the others are the same everywhere.
+// drain is fuel per second (out of 100); quiet ones do not ping seekers.
+export const VEHICLES = [
+  { name: '', max: 12.5, accel: 9, turn: 2.1, radius: 1.0, drain: 4 },
+  { name: 'scooter', max: 10, accel: 14, turn: 3.0, radius: 0.55, drain: 3.3 },
+  { name: 'monster truck', max: 10.5, accel: 6, turn: 1.6, radius: 1.35, drain: 2 },
+  { name: 'hoverboard', max: 14, accel: 12, turn: 2.8, radius: 0.5, drain: 8, quiet: true },
+  { name: 'rocket car', max: 19, accel: 16, turn: 1.25, radius: 1.0, drain: 9 },
+];
 export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
   { veh: 'go-kart', id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
@@ -59,6 +72,8 @@ export const MAPS = [
   { veh: 'ghost cart', id: 'grave', name: 'Haunted Graveyard', blurb: 'A foggy graveyard at midnight: crypts, coffins, a chapel and a haunted mansion.' },
   { veh: 'moon rover', id: 'moon', name: 'Moonbase Alpha', blurb: 'A base on the Moon: habitat modules, a hangar, escape pods to hide in, and low gravity.' },
   { veh: 'cupcake car', id: 'candy', name: 'Candy Kingdom', blurb: 'A land of sweets: gingerbread houses, lollipop trees, gumdrops and a chocolate river.' },
+  { veh: 'buckboard', id: 'west', name: 'Dusty Gulch', blurb: 'A wild-west town: a saloon, a barn, covered wagons, hay bales and cactus.' },
+  { veh: 'safari jeep', id: 'jungle', name: 'Dino Jungle', blurb: 'A misty jungle: huts, a ruined temple, giant eggs to hide in and old bones.' },
 ];
 // What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
@@ -91,12 +106,16 @@ const THEMES = {
     sun: [0xffffff, 2.9], disc: 0xffffff, stars: 1, hills: 0x7a7a84, outer: 0x6a6a72, roof: 0xd8dce6, exposure: 1.1 },
   candy: { sky: [[0.5, 0.72, 1], [0.96, 0.8, 0.95], [1, 0.93, 0.86]], glow: 0.4, fog: [0xffe6f2, 0.006], hemi: [0xffffff, 0xffc2dd, 1.6],
     sun: [0xfff5e0, 2.3], disc: 0xffffff, stars: 0, hills: 0xff9ec7, outer: 0x9be3b4, roof: 0xff6fa8, exposure: 1.0 },
+  west: { sky: [[0.2, 0.42, 0.78], [0.72, 0.68, 0.7], [1, 0.72, 0.42]], glow: 0.7, fog: [0xe8c9a0, 0.006], hemi: [0xfff0dc, 0xb5744a, 1.5],
+    sun: [0xffd9a0, 2.6], disc: 0xfff0c8, stars: 0, hills: 0xb5653a, outer: 0xc98a4a, roof: 0x6b4630, exposure: 1.05 },
+  jungle: { sky: [[0.25, 0.5, 0.55], [0.6, 0.8, 0.66], [0.86, 0.95, 0.8]], glow: 0.3, fog: [0x9fc8a0, 0.011], hemi: [0xe6ffe0, 0x3a5a36, 1.45],
+    sun: [0xfff2c2, 2.2], disc: 0xffffe0, stars: 0, hills: 0x2f6b3a, outer: 0x2a5a30, roof: 0x8a7a4a, exposure: 1.0, lush: true },
 };
 
 const _worlds = [];
 export function getWorld(i = 0) {
   i = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
-  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy][i](i));
+  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy, buildWest, buildJungle][i](i));
 }
 
 // Shared construction kit for every map. All maps keep the same centre: a plaza with the jail cage and its lever.
@@ -315,12 +334,13 @@ function kit(seed) {
     // Vehicles park on open ground with room to pull away
     const roomy = (x, z) => { for (let dz = -1.5; dz <= 1.5; dz += 0.5) for (let dx = -1.5; dx <= 1.5; dx += 0.5) if (blocked[0][cellIdx(x + dx, z + dz)]) return false; return true; };
     const vehicles = [];
-    for (let tries = 0; vehicles.length < 6 && tries < 20000; tries++) {
+    const kinds = [0, 1, 3, 0, 2, 1, 0, 3, 4, 0];
+    for (let tries = 0; vehicles.length < kinds.length && tries < 30000; tries++) {
       const c = list0[(R() * list0.length) | 0];
       const x = -HALF + ((c % GN) + 0.5) * CELL, z = -HALF + (((c / GN) | 0) + 0.5) * CELL;
       if (Math.hypot(x, z) < 14 || Math.abs(x) > HALF - 5 || Math.abs(z) > HALF - 5 || !roomy(x, z)) continue;
-      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 26) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
-      vehicles.push({ id: vehicles.length, x, z, r: R() * 6.28 });
+      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 18) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
+      vehicles.push({ id: vehicles.length, x, z, r: R() * 6.28, k: kinds[vehicles.length] });
     }
     return {
       i, id: MAPS[i].id, name: MAPS[i].name, vehName: MAPS[i].veh, theme: THEMES[MAPS[i].id],
@@ -596,6 +616,82 @@ function buildCandy(i) {
   scatter(10, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
   scatter(7, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
   return K.finish(i, { pond: [42, 27, 18, 11] });
+}
+
+function buildWest(i) {
+  const K = kit(1885), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const plank = 0xb07a4a, faded = 0x9a8a6a, red = 0x9a4a3a;
+  // Main street: shops facing each other across the plaza
+  home(-40, -17, 12, 10, plank, { S: [-2] });
+  home(-23, -17, 10, 10, faded, { S: [-2] });
+  home(23, -17, 10, 10, red, { S: [-2] });
+  home(40, -17, 12, 10, plank, { S: [-2] });
+  home(-36, 27, 12, 10, faded, { N: [0] });
+  home(36, 27, 12, 10, plank, { N: [0] });
+  home(-60, 42, 10, 9, red, { S: [-2], E: [2] });
+  home(60, -44, 10, 9, faded, { S: [-2], W: [2] });
+  // The saloon and the hotel: two storeys each
+  manor(-54, -50, 16, 10, 0xa8683a, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0x8a5a4a, { S: [0], W: [0] });
+  // The barn
+  house(0, -56, 24, 13, 5, 0x8a3a2a, { S: [-7, 7] }, 3);
+  for (const [x, z, h] of [[-9.5, -60, 2.6], [-8.1, -60, 1.3], [-2, -58, 1.3], [3, -60.5, 2.6], [9.5, -59, 1.3], [5, -53, 1.3], [-6, -52.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'haycube');
+  locker(11.2, -57, -1.3); locker(-11.2, -56, 1.3);
+
+  K.plaza('fountain');
+  for (const [x, z] of [[-12, -8], [12, -8], [-12, 10], [14, 18], [-44, -6], [44, -6], [0, -34], [0, 42], [-30, 44], [34, -40]]) K.lamp(x, z);
+  K.lookout(-24, 50); K.lookout(30, -40); K.lookout(46, 6);
+  K.beacon(-68, 20); K.beacon(68, -22); K.beacon(8, 69);
+
+  // Covered wagons to climb into, and stacks of hay bales to burrow in
+  scatter(10, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.4, 'wagon'); spot('wagon', x - 0.6, z, 1.95, 0); });
+  scatter(15, 1.6, 1.6, 2, (x, z) => spot('hay bales', x, z, 0, 0));
+  scatter(75, 0.7, 0.7, 1.5, (x, z) => add(x, z, 0.7, 0.7, 3, 'cactus', { v: R(), see: true }));
+  scatter(28, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(12, 2.4, 2.4, 1.4, (x, z) => add(x, z, 2.4, 2.4, 2.8, 'bigrock', { v: R() }));
+  scatter(22, 0.8, 0.8, 1.2, (x, z) => add(x, z, 0.8, 0.8, 1.1, 'barrel', see));
+  scatter(12, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.35 ? 2.6 : 1.3, 'crate'));
+  scatter(15, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  scatter(6, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
+  return K.finish(i);
+}
+
+function buildJungle(i) {
+  const K = kit(6500), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const bamboo = 0xb89a5a, mud = 0x8a6a4a, stone = 0x7a8070;
+  home(-30, -28, 12, 10, bamboo, { S: [-2], E: [1] });
+  home(30, -28, 12, 10, mud, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, mud, { N: [0], E: [2] });
+  home(-60, 4, 10, 9, bamboo, { S: [-2], E: [2] });
+  home(60, -50, 10, 9, bamboo, { S: [-2], W: [2] });
+  home(-58, 52, 10, 9, mud, { S: [-2], E: [2] });
+  // The research station and the tree lodge: two storeys each
+  manor(-54, -52, 16, 10, 0x6a8a7a, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0x9a7a4a, { S: [0], W: [0] });
+  // The ruined temple
+  house(0, -57, 22, 14, 5, stone, { S: [-6, 6] }, 3);
+  for (const [x, z, h] of [[-8.5, -61.5, 2.6], [-2, -58, 1.3], [3, -61.5, 1.3], [8.5, -60, 2.6], [5, -53.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  add(0, -62.5, 3, 1.2, 1.2, 'table');
+  locker(10.2, -55, -1.3); locker(-10.2, -58, 1.3);
+
+  K.plaza('campfire');
+  for (const [x, z, w, d] of [[-8.6, -3, 0.6, 2], [8.6, -3, 0.6, 2], [0, -9, 2, 0.6]]) add(x, z, w, d, 0.5, 'bench', see);
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [0, -36], [0, 42], [-44, -36], [44, -30], [-30, 54]]) K.lamp(x, z);
+  K.keepOut.push([20, 12, 58, 40]); // the swamp stays open
+  K.lookout(-38, 8); K.lookout(44, -10); K.lookout(8, 56); K.lookout(-8, -36);
+  K.beacon(-68, 30); K.beacon(68, -30); K.beacon(-12, 69);
+
+  // Giant eggs with a crack big enough to squeeze through, and thick ferns
+  scatter(10, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.4, 'egg', { v: R() }); spot('giant egg', x - 0.6, z, 1.95, 0); });
+  scatter(17, 1.6, 1.6, 2, (x, z) => spot('ferns', x, z, 0, 0));
+  scatter(115, 0.7, 0.7, 1.4, (x, z) => add(x, z, 0.7, 0.7, 6, 'tree', { v: 0.55 + R() * 0.45 }));
+  scatter(55, 0.6, 0.6, 1.5, (x, z) => add(x, z, 0.6, 0.6, 7, 'palm', { v: R() }));
+  scatter(14, 2.6, 2.6, 1.3, (x, z) => (R() < 0.5 ? add(x, z, 2.6, 1.3, 1.3, 'bones', { v: R(), see: true }) : add(x, z, 1.3, 2.6, 1.3, 'bones', { v: R(), see: true })));
+  scatter(20, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(10, 2.4, 2.4, 1.4, (x, z) => add(x, z, 2.4, 2.4, 2.8, 'bigrock', { v: R() }));
+  scatter(10, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
+  scatter(7, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  return K.finish(i, { pond: [39, 26, 17, 12] });
 }
 
 function buildDocks(i) {
