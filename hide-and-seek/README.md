@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-2, the starting map) or `MODE` (0-7) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-4, the starting map) or `MODE` (0-7) to change the defaults.
 
 ## How it plays
 
@@ -55,7 +55,8 @@ Beacons, power-ups, coins and challenges work in every mode.
 
 ### Characters
 
-Eight characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien), 16 colours, seven hats, four patterns and
+Fourteen characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
+Duck), 16 colours, seven hats, four patterns and
 17 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
 owl, bat, ghostling, crab). Your pet runs just ahead of you;
 other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
@@ -73,6 +74,17 @@ The host picks the map in the lobby with **Next map**.
 | **Dusk Hollow** | A town at sunset with eleven houses (three of them two-storey), a warehouse and a hedge maze | Bushes, lockers, dumpsters |
 | **Frostpine Camp** | A snowy campground in daylight with cabins, three two-storey chalets, a lodge and a frozen pond | Tents, snowdrifts, lockers |
 | **Midnight Docks** | A container yard at night with tight alleys, a warehouse and two two-storey offices | Open containers, lockers, dumpsters |
+| **Pirate Cove** | A sunny beach with huts, palms, a shipwreck, an inn and a lagoon | Rowboats, bushes, lockers |
+| **Haunted Graveyard** | A foggy graveyard at midnight with crypts, a chapel and two haunted mansions | Coffins, bushes, lockers |
+
+### Places to jump off
+
+- **Lookout towers** (three or four per map): an open deck one storey up, with stairs on one side and no rail on the
+  other three. Run straight off the edge.
+- **Jump pads**: the glowing disc beside each lookout launches you about five metres up. Keep moving towards the
+  tower and you land on its deck.
+- **Balconies**: every two-storey house has one upstairs, open at the front.
+- A long drop lands with a thump that seekers can hear and costs a little stamina. Bots take the stairs.
 
 ### Things to do
 
@@ -115,7 +127,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The three maps (each generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The five maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |

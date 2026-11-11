@@ -176,6 +176,30 @@ export class Gfx {
         plaza(g, '#bdb4a8', '#a39a8e');
         g.fillStyle = '#9a9186'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
       },
+      cove: (g) => {
+        g.fillStyle = '#ead9a6'; g.fillRect(0, 0, S, S);
+        speckle(g, ['#f2e4b8', '#dcc88f', '#f7ecc8', '#d2bd84'], 26000, 0.6);
+        // surf along the edges and the lagoon
+        const [x, z, rx, rz] = W.pond;
+        for (const [col, grow] of [['#f7f3df', 1.6], ['#7fd6e0', 0.6], ['#3fb2d0', -0.6]]) {
+          g.fillStyle = col;
+          g.beginPath(); g.ellipse(px(x), px(z), (rx + grow) * k, (rz + grow) * k, 0, 0, 7); g.fill();
+        }
+        g.fillStyle = '#7fd6e0';
+        for (const r of [[0, 0, S, 5 * k], [0, S - 5 * k, S, 5 * k], [0, 0, 5 * k, S], [S - 5 * k, 0, 5 * k, S]]) g.fillRect(...r);
+        g.strokeStyle = '#c9b27a'; g.lineWidth = 2.4 * k; g.lineCap = 'round';
+        for (const h of W.houses) { g.beginPath(); g.moveTo(C, C); g.quadraticCurveTo(px(h.x * 0.3), px(h.z * 0.7), px(h.x * 0.86), px(h.z * 0.86)); g.stroke(); }
+        plaza(g, '#d6c08a', '#b89f66');
+        g.fillStyle = '#b89f66'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
+      },
+      grave: (g) => {
+        g.fillStyle = '#2b3a30'; g.fillRect(0, 0, S, S);
+        speckle(g, ['#33443a', '#24322a', '#3a4a3c', '#1f2b25', '#44503f'], 26000, 0.55);
+        g.strokeStyle = '#4a4438'; g.lineWidth = 3 * k; g.lineCap = 'round';
+        for (const [a, b, c, d] of [[0, -60, 0, 46], [-62, 0, 62, 0], [-54, -44, 0, 0], [56, 44, 0, 0]]) { g.beginPath(); g.moveTo(px(a), px(b)); g.lineTo(px(c), px(d)); g.stroke(); }
+        plaza(g, '#5a5866', '#3f3d4a');
+        g.fillStyle = '#34323c'; g.fillRect(px(-3.4), px(9.6), 6.8 * k, 6.8 * k);
+      },
       docks: (g) => {
         g.fillStyle = '#3d424c'; g.fillRect(0, 0, S, S);
         speckle(g, ['#454a55', '#353a43', '#4d525d', '#2f333b'], 24000, 0.6);
@@ -239,7 +263,7 @@ export class Gfx {
       for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(0, i * 32); g.lineTo(128, i * 32); g.stroke(); }
     });
     const M = {
-      wall: std({ town: 0x6d6a85, camp: 0x7a5a3c, docks: 0x4a505c }[W.id]), hedge: std(0x2f6b3a, { roughness: 1 }), crate: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.9 }),
+      wall: std({ town: 0x6d6a85, camp: 0x7a5a3c, docks: 0x4a505c, cove: 0xc9b382, grave: 0x3a3d48 }[W.id]), hedge: std(0x2f6b3a, { roughness: 1 }), crate: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.9 }),
       trunk: std(0x5b3d28), fence: std(0x8a6a48), rock: std(0x7b7a8c), barrel: std(0xb5533c, { metalness: 0.3, roughness: 0.6 }),
       bench: std(0x8a6a48), bed: std(0x7fa7d9), pillow: std(0xf3efe6), table: std(0x9a6b42), sofa: std(0xb0567a), shelf: std(0x7a5a3c),
       locker: std(0x5f7f9a, { metalness: 0.5, roughness: 0.5 }), dark: std(0x1c1c26), dumpster: std(0x2f7d5b, { metalness: 0.3, roughness: 0.6 }),
@@ -293,6 +317,54 @@ export class Gfx {
           else { const c = this.mesh(ico, mat, b.x, 3.9, b.z); c.scale.set(2.1 * s, 1.9 * s, 2.1 * s); c.rotation.set(b.v * 5, b.v * 9, 0); const c2 = this.mesh(ico, mat, b.x + 1 * s, 3.1, b.z + 0.5); c2.scale.setScalar(1.15 * s); }
           break;
         }
+        case 'post': box(b, M.trunk); break;
+        case 'palm': {
+          const lean = (b.v - 0.5) * 0.5, h = 4.6 + b.v * 1.6;
+          const tr = this.mesh(cyl, M.trunk, b.x + Math.sin(lean) * h * 0.25, h / 2, b.z); tr.scale.set(0.18, h, 0.18); tr.rotation.z = -lean * 0.5;
+          const tx = b.x + Math.sin(lean) * h * 0.5;
+          for (let i = 0; i < 7; i++) { const f = this.mesh(unit, leaf[i % 3], tx, h - 0.1, b.z); f.scale.set(0.5, 0.06, 2.6); f.rotation.order = 'YXZ'; f.rotation.set(-0.5, i * 0.9 + b.v * 3, 0); f.translateZ(1.2); }
+          for (let i = 0; i < 3; i++) this.mesh(ball, M.trunk, tx + Math.cos(i * 2.1) * 0.2, h - 0.35, b.z + Math.sin(i * 2.1) * 0.2).scale.setScalar(0.16);
+          break;
+        }
+        case 'deadtree': {
+          const t = this.mesh(cyl, M.dark, b.x, 1.7, b.z); t.scale.set(0.22, 3.4, 0.22);
+          for (let i = 0; i < 4; i++) { const br = this.mesh(cyl, M.dark, b.x, 2.6 + i * 0.35, b.z); br.scale.set(0.06, 1.8 - i * 0.25, 0.06); br.rotation.order = 'YXZ'; br.rotation.set(0.9 + b.v * 0.4, i * 1.7 + b.v * 6, 0); br.translateY(0.8 - i * 0.1); }
+          break;
+        }
+        case 'boat': {
+          const long = b.w > b.d;
+          box(b, M.fence, 0.55);
+          const rim = this.mesh(unit, M.trunk, b.x, 0.62, b.z); rim.scale.set(b.w + 0.12, 0.12, b.d + 0.12);
+          const seat = this.mesh(unit, M.table, b.x, 0.7, b.z); seat.scale.set(long ? 0.3 : b.w, 0.06, long ? b.d : 0.3);
+          const oar = this.mesh(cyl, M.table, b.x + (long ? 0.3 : 0.9), 0.5, b.z + (long ? 0.9 : 0.3)); oar.scale.set(0.035, 2.2, 0.035); oar.rotation.set(long ? 0 : 1.3, 0, long ? 1.3 : 0);
+          break;
+        }
+        case 'sandcastle': {
+          const sand = M.sand || (M.sand = std(0xe6cf8f, { roughness: 1 }));
+          box(b, sand, 0.5);
+          for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const tw = this.mesh(cyl, sand, b.x + sx * 0.6, 0.55, b.z + sz * 0.6); tw.scale.set(0.24, 1.1, 0.24); const c = this.mesh(cone, sand, b.x + sx * 0.6, 1.3, b.z + sz * 0.6); c.scale.set(0.3, 0.4, 0.3); }
+          const flag = this.mesh(unit, M.red, b.x + 0.12, 1.25, b.z, par, false); flag.scale.set(0.25, 0.16, 0.02);
+          const pole = this.mesh(cyl, M.dark, b.x, 0.95, b.z); pole.scale.set(0.015, 0.9, 0.015);
+          break;
+        }
+        case 'tomb': {
+          const st = this.mesh(unit, M.stone, b.x, 0.5, b.z); st.scale.set(b.w, 1.0, b.d); st.rotation.z = (b.v - 0.5) * 0.16;
+          const cap = this.mesh(cyl, M.stone, b.x, 1.0, b.z); cap.scale.set(b.w / 2, b.d, b.w / 2); cap.rotation.x = Math.PI / 2; cap.rotation.z = (b.v - 0.5) * 0.16;
+          break;
+        }
+        case 'coffinbox': {
+          box(b, M.shelf, 0.7);
+          const lid = this.mesh(unit, M.trunk, b.x + 0.08, 0.76, b.z); lid.scale.set(b.w + 0.1, 0.1, b.d + 0.1); lid.rotation.z = 0.08;
+          this.mesh(unit, M.metal, b.x + 0.08, 0.83, b.z - 0.3, par, false).scale.set(0.5, 0.02, 0.1);
+          this.mesh(unit, M.metal, b.x + 0.08, 0.83, b.z - 0.3, par, false).scale.set(0.1, 0.02, 0.8);
+          break;
+        }
+        case 'pumpkin': {
+          const pk = this.mesh(ball, M.pumpkin || (M.pumpkin = new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0xff5a00, emissiveIntensity: 0.55, roughness: 0.7, flatShading: true })), b.x, 0.3, b.z);
+          pk.scale.set(0.4, 0.32, 0.4); pk.rotation.y = b.v * 6;
+          this.mesh(cyl, M.hedge, b.x, 0.66, b.z).scale.set(0.04, 0.14, 0.04);
+          break;
+        }
         case 'fence': {
           const long = b.w > b.d;
           for (let i = -2.75; i <= 2.75; i += 0.5) { const p = this.mesh(unit, M.fence, b.x + (long ? i : 0), 0.9, b.z + (long ? 0 : i)); p.scale.set(long ? 0.42 : 0.12, 1.8, long ? 0.12 : 0.42); }
@@ -306,6 +378,7 @@ export class Gfx {
         case 'sofa': box(b, M.sofa, 0.45); { const bk = this.mesh(unit, M.sofa, b.x + (b.flip ? -0.35 : 0.35), 0.6, b.z); bk.scale.set(0.3, 0.9, b.d); } break;
         case 'shelf': box(b, M.shelf); break;
         case 'locker': {
+          if (b.coffin) { box(b, M.shelf); const cr = this.mesh(unit, M.metal, b.x, 1.45, b.z + (b.z > 0 ? -0.41 : 0.41), par, false); cr.scale.set(0.34, 0.07, 0.02); const cv = this.mesh(unit, M.metal, b.x, 1.4, b.z + (b.z > 0 ? -0.41 : 0.41), par, false); cv.scale.set(0.07, 0.5, 0.02); break; }
           box(b, M.locker);
           for (let i = 0; i < 4; i++) for (const [dx, dz] of [[0.41, 0], [-0.41, 0], [0, 0.41], [0, -0.41]]) { const v = this.mesh(unit, M.dark, b.x + dx, 1.45 + i * 0.1, b.z + dz, par, false); v.scale.set(dx ? 0.02 : 0.5, 0.04, dz ? 0.02 : 0.5); }
           break;
@@ -424,12 +497,33 @@ export class Gfx {
         const sl = this.mesh(unit, M.floor, (ax + bx) / 2, FLOOR_H - 0.1, (az + bz) / 2);
         sl.scale.set(bx - ax, 0.2, bz - az);
       }
+    }
+    // Every staircase, indoors or out
+    for (const st of W.stairs) {
       const steps = 12, run = (st.xb - st.xa) / steps;
       for (let i = 0; i < steps; i++) {
         const hh = ((i + 1) * FLOOR_H) / steps;
         const sp = this.mesh(unit, i % 2 ? M.table : M.shelf, st.xa + (i + 0.5) * run, hh / 2 - 0.1, (st.z0 + st.z1) / 2);
         sp.scale.set(Math.abs(run), hh, st.z1 - st.z0);
       }
+    }
+    // Lookout decks and balconies: places to jump off
+    for (const d of W.decks) {
+      const sl = this.mesh(unit, M.table, (d.x0 + d.x1) / 2, FLOOR_H - 0.1, (d.z0 + d.z1) / 2);
+      sl.scale.set(d.x1 - d.x0, 0.2, d.z1 - d.z0);
+      const edge = this.mesh(unit, new THREE.MeshBasicMaterial({ color: 0xffd447 }), (d.x0 + d.x1) / 2, FLOOR_H + 0.011, (d.z0 + d.z1) / 2, this.root, false);
+      edge.scale.set(d.x1 - d.x0 - 0.3, 0.004, d.z1 - d.z0 - 0.3);
+      const top = this.mesh(unit, M.table, (d.x0 + d.x1) / 2, FLOOR_H + 0.013, (d.z0 + d.z1) / 2, this.root, false);
+      top.scale.set(d.x1 - d.x0 - 0.6, 0.004, d.z1 - d.z0 - 0.6);
+    }
+    // Jump pads: step on one to be launched high enough to land on a lookout
+    this.pads = [];
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x3de0d0, emissive: 0x19a89a, emissiveIntensity: 1.2, roughness: 0.3 });
+    for (const p of W.pads) {
+      this.mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.14, 20), M.dark, p.x, 0.07, p.z);
+      this.pads.push(this.mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.08, 20), padMat, p.x, 0.17, p.z, this.root, false));
+      const ar = this.mesh(new THREE.ConeGeometry(0.3, 0.5, 4), new THREE.MeshBasicMaterial({ color: 0x9dfff3, transparent: true, opacity: 0.8 }), p.x, 1.2, p.z, this.root, false);
+      this.pads.push(ar);
     }
 
     // Hiding bushes
@@ -666,6 +760,7 @@ export class Gfx {
 
     for (let i = 0; i < this.coins.length; i++) { const m = this.coins[i]; m.rotation.y = t * 2.4 + i; m.position.y = m.userData.y0 + Math.sin(t * 2 + i) * 0.12; }
     if (this.water) this.water.material.emissiveIntensity = 0.8 + Math.sin(t * 3) * 0.2;
+    if (this.pads) for (let i = 1; i < this.pads.length; i += 2) { const m = this.pads[i]; m.position.y = 0.9 + ((t * 1.4 + i) % 1) * 1.1; m.material.opacity = 0.9 - ((t * 1.4 + i) % 1) * 0.9; this.pads[i - 1].scale.y = 1 + Math.sin(t * 6) * 0.3; }
     for (let i = 0; i < this.items.length; i++) { const m = this.items[i]; m.rotation.set(t * 0.9, t * 1.6 + i, 0); m.position.y = 1 + Math.sin(t * 2.4 + i * 2) * 0.15; }
     if (this.flame) this.flame.scale.set(0.7 + Math.sin(t * 13) * 0.08, 1.9 + Math.sin(t * 9) * 0.25, 0.7 + Math.cos(t * 11) * 0.08);
     if (this.blink) this.blink.visible = Math.sin(t * 3) > -0.3;
@@ -818,7 +913,62 @@ export function makeCharacter(look) {
     for (const s of [-0.34, 0.34]) arm(s, 0.98, 0, S(0.09, 8, 6));
     leg(-0.12); leg(0.12);
     hy = 1.72; hr = 0.36; face = 0.32; bz = 0.26;
-  } else { // Blob and Cat share a body
+  } else if (kind === 8) { // Dino
+    put(new THREE.CapsuleGeometry(0.34, 0.5, 4, 12), skin, 0, 0.92, 0, inner);
+    put(S(0.28), plain, 0, 1.56, -0.02, inner);
+    put(new THREE.BoxGeometry(0.34, 0.24, 0.34), plain, 0, 1.5, -0.3, inner);
+    for (const s of [-0.08, 0.08]) put(new THREE.ConeGeometry(0.03, 0.07, 4), new THREE.MeshBasicMaterial({ color: 0xffffff }), s, 1.37, -0.42, inner, false).rotation.x = Math.PI;
+    eyes(1.68, -0.22, 0.13, 0.06);
+    for (let i = 0; i < 5; i++) put(new THREE.ConeGeometry(0.07, 0.18, 4), pale, 0, 1.82 - i * 0.26, 0.2 + (i > 0 ? 0.12 : 0) + (i > 3 ? 0.1 : 0), inner);
+    const tail = put(new THREE.ConeGeometry(0.16, 0.7, 6), plain, 0, 0.6, 0.55, inner); tail.rotation.x = -1.9;
+    for (const s of [-0.36, 0.36]) arm(s, 1.05, -0.12, S(0.08, 8, 6));
+    leg(-0.17, 0.46, plain, 1.2); leg(0.17, 0.46, plain, 1.2);
+    hy = 1.56; hr = 0.28; face = 0.46; bz = 0.36;
+  } else if (kind === 10) { // Astronaut
+    const suit = new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.5 });
+    put(new THREE.CapsuleGeometry(0.36, 0.5, 4, 12), suit, 0, 0.92, 0, inner);
+    put(new THREE.BoxGeometry(0.3, 0.2, 0.06), skin, 0, 1.0, -0.36, inner);
+    put(S(0.33), suit, 0, 1.6, 0, inner);
+    put(S(0.25), new THREE.MeshStandardMaterial({ color: col, roughness: 0.1, metalness: 0.7 }), 0, 1.62, -0.13, inner).scale.set(1, 0.85, 0.8);
+    put(new THREE.BoxGeometry(0.46, 0.55, 0.22), suit, 0, 1.02, 0.36, inner);
+    for (const s of [-0.46, 0.46]) arm(s, 0.98, 0, S(0.12, 8, 6), suit);
+    leg(-0.16, 0.46, suit, 1.15); leg(0.16, 0.46, suit, 1.15);
+    hy = 1.6; hr = 0.33; face = 0.33; bz = 0.52;
+  } else if (kind === 11) { // Ninja
+    put(new THREE.CapsuleGeometry(0.32, 0.55, 4, 12), skin, 0, 0.92, 0, inner);
+    put(S(0.29), plain, 0, 1.58, 0, inner);
+    put(new THREE.BoxGeometry(0.4, 0.11, 0.1), pale, 0, 1.62, -0.235, inner, false);
+    for (const s of [-0.09, 0.09]) put(S(0.035, 6, 5), black, s, 1.62, -0.285, inner, false);
+    put(new THREE.CylinderGeometry(0.295, 0.295, 0.06, 14), std(0xc8324a, { flatShading: false }), 0, 1.74, 0, inner);
+    for (const s of [-0.06, 0.06]) { const tl = put(new THREE.BoxGeometry(0.06, 0.3, 0.02), std(0xc8324a), s, 1.6, 0.31, inner); tl.rotation.x = 0.4 + s * 3; }
+    put(new THREE.BoxGeometry(0.66, 0.08, 0.5), dark, 0, 0.82, 0, inner);
+    const sw = put(new THREE.BoxGeometry(0.05, 0.75, 0.03), std(0x9aa0b5, { metalness: 0.8, roughness: 0.3 }), 0.12, 1.15, 0.33, inner); sw.rotation.z = 0.5;
+    for (const s of [-0.4, 0.4]) arm(s, 0.95);
+    leg(-0.15); leg(0.15);
+    hy = 1.58; hr = 0.29; face = 0.24;
+  } else if (kind === 12) { // Pumpkin
+    put(new THREE.CapsuleGeometry(0.3, 0.55, 4, 12), skin, 0, 0.9, 0, inner);
+    const pm = new THREE.MeshStandardMaterial({ color: 0xff8a1f, roughness: 0.7, emissive: 0x5a2000 });
+    put(S(0.36, 12, 8), pm, 0, 1.6, 0, inner).scale.set(1, 0.85, 1);
+    for (const a of [0.5, -0.5, 1.6, -1.6]) put(S(0.36, 8, 8), pm, 0, 1.6, 0, inner).scale.set(0.62, 0.86, 1.04), (inner.children[inner.children.length - 1].rotation.y = a);
+    put(new THREE.CylinderGeometry(0.035, 0.05, 0.14, 6), std(0x3f7d4a), 0, 1.95, 0, inner);
+    const glow = new THREE.MeshBasicMaterial({ color: 0xffe14d });
+    for (const s of [-0.13, 0.13]) { const e = put(new THREE.ConeGeometry(0.065, 0.1, 3), glow, s, 1.67, -0.34, inner, false); e.rotation.y = Math.PI; }
+    put(new THREE.BoxGeometry(0.3, 0.05, 0.03), glow, 0, 1.5, -0.35, inner, false);
+    for (const s of [-0.38, 0.38]) arm(s, 0.95);
+    leg(-0.14); leg(0.14);
+    hy = 1.6; hr = 0.36; face = 0.36;
+  } else if (kind === 13) { // Duck
+    put(S(1), skin, 0, 0.82, 0.02, inner).scale.set(0.4, 0.5, 0.46);
+    put(S(0.27), plain, 0, 1.5, -0.04, inner);
+    const bill = put(new THREE.BoxGeometry(0.26, 0.07, 0.24), orange, 0, 1.44, -0.34, inner);
+    bill.geometry.translate(0, 0, 0);
+    eyes(1.57, -0.26, 0.1, 0.055);
+    const tail = put(new THREE.ConeGeometry(0.14, 0.3, 5), plain, 0, 1.0, 0.44, inner); tail.rotation.x = -0.9;
+    for (const s of [-0.4, 0.4]) arm(s, 0.9, 0.02, S(1, 8, 6)).scale.set(0.08, 0.26, 0.2);
+    leg(-0.14, 0.34, orange, 1.2); leg(0.14, 0.34, orange, 1.2);
+    hy = 1.5; hr = 0.27; face = 0.3; by = 0.88; bz = 0.44;
+  } else { // Blob, Cat and Bunny share a body
     put(new THREE.CapsuleGeometry(0.34, 0.55, 4, 12), skin, 0, 0.92, 0, inner);
     put(S(0.3), plain, 0, 1.58, 0, inner);
     eyes(1.62, -0.25);
@@ -830,8 +980,14 @@ export function makeCharacter(look) {
       for (const s of [-1, 1]) for (const a of [-0.15, 0.15]) { const w = put(new THREE.BoxGeometry(0.22, 0.008, 0.008), black, s * 0.2, 1.52 + a * 0.2, -0.27, inner, false); w.rotation.z = s * a; }
       const tail = put(new THREE.CylinderGeometry(0.045, 0.06, 0.6, 6), plain, 0, 0.82, 0.45, inner); tail.rotation.x = -0.9;
     }
+    if (kind === 9) {
+      for (const s of [-0.11, 0.11]) { const e = put(new THREE.CapsuleGeometry(0.06, 0.36, 4, 8), plain, s, 2.02, 0.02, inner); e.rotation.z = -s * 1.4; put(new THREE.CapsuleGeometry(0.03, 0.3, 3, 6), pale, s, 2.02, -0.035, inner, false).rotation.z = -s * 1.4; }
+      put(S(0.04, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8fa8 }), 0, 1.55, -0.3, inner, false);
+      put(new THREE.BoxGeometry(0.09, 0.07, 0.02), white, 0, 1.47, -0.285, inner, false);
+      put(S(0.11, 8, 6), pale, 0, 0.7, 0.38, inner);
+    }
   }
-  const top = hy + hr * (kind === 7 ? 1.22 : kind === 6 ? 1.05 : 1);
+  const top = hy + hr * (kind === 7 ? 1.22 : kind === 6 ? 1.05 : kind === 12 ? 0.85 : 1);
 
   // hat
   const hat = new THREE.Group(), hs = hr / 0.3;

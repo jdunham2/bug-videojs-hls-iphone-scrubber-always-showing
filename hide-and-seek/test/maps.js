@@ -11,7 +11,7 @@ MAPS.forEach((m, i) => {
   if (W.spots.length < 20) fail(m.id + ' too few spots');
   if (W.coins.length < 40 || W.items.length < 8 || W.beacons.length !== 3) fail(m.id + ' missing pickups');
   if (W.nav.list0.length < 60000) fail(m.id + ' map mostly unreachable');
-  if (W.stairs.length < 2 || W.nav.list.length - W.nav.list0.length < 300 * W.stairs.length) fail(m.id + ' upstairs unreachable');
+  if (W.stairs.length < 5 || W.pads.length < 3 || W.nav.list.length - W.nav.list0.length < 150 * W.stairs.length) fail(m.id + ' upstairs unreachable');
   const targets = [
     ...W.spots.map((s) => [s.ex, s.ez, s.lv, 'spot ' + s.kind]), ...W.coins.map((c) => [c.x, c.z, c.lv, 'coin']),
     ...W.beacons.map((b) => [b.x + 1.1, b.z, 0, 'beacon']), [W.lever.x + 1.1, W.lever.z, 0, 'lever'], ...W.items.map((o) => [o.x, o.z, 0, 'item']),

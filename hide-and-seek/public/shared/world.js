@@ -52,10 +52,12 @@ export const MAPS = [
   { id: 'town', name: 'Dusk Hollow', blurb: 'A sleepy town at sunset: houses, a hedge maze, parked cars.' },
   { id: 'camp', name: 'Frostpine Camp', blurb: 'A snowy campground in daylight: cabins, tents, thick pines.' },
   { id: 'docks', name: 'Midnight Docks', blurb: 'A container yard at night: tight alleys, a warehouse, deep shadows.' },
+  { id: 'cove', name: 'Pirate Cove', blurb: 'A sunny beach: huts, palms, a shipwreck, rowboats to hide in and a lagoon.' },
+  { id: 'grave', name: 'Haunted Graveyard', blurb: 'A foggy graveyard at midnight: crypts, coffins, a chapel and a haunted mansion.' },
 ];
 // What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
-  chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien'],
+  chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien', 'Dino', 'Bunny', 'Astronaut', 'Ninja', 'Pumpkin', 'Duck'],
   hats: ['No hat', 'Beanie', 'Cap', 'Top hat', 'Crown', 'Party hat', 'Headphones', 'Halo'],
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
@@ -75,19 +77,23 @@ const THEMES = {
     sun: [0xfff0d8, 2.3], disc: 0xffffff, stars: 0, hills: 0xdde6f0, outer: 0xe6edf5, roof: 0xf2f5fa, exposure: 1.0, snow: true },
   docks: { sky: [[0.01, 0.02, 0.05], [0.03, 0.06, 0.12], [0.09, 0.17, 0.24]], glow: 0.15, fog: [0x0a1420, 0.015], hemi: [0x5a7a9a, 0x141a24, 0.85],
     sun: [0x9fb8ff, 0.9], disc: 0xdfe8ff, stars: 1, hills: 0x0c121c, outer: 0x0b1824, roof: 0x2a2f3a, exposure: 1.25 },
+  cove: { sky: [[0.12, 0.42, 0.88], [0.4, 0.74, 0.97], [0.86, 0.96, 1]], glow: 0.5, fog: [0xbfe6f2, 0.006], hemi: [0xffffff, 0xd9c48a, 1.6],
+    sun: [0xfff2cc, 2.6], disc: 0xffffff, stars: 0, hills: 0x5fa870, outer: 0x2f9fc4, roof: 0xc9a45a, exposure: 1.0 },
+  grave: { sky: [[0.02, 0.02, 0.06], [0.1, 0.06, 0.16], [0.2, 0.28, 0.22]], glow: 0.2, fog: [0x1a2420, 0.019], hemi: [0x7a8fb0, 0x26302a, 1.25],
+    sun: [0xb8c8ff, 1.0], disc: 0xf0f4ff, stars: 0.9, hills: 0x10161a, outer: 0x151d1a, roof: 0x2a2632, exposure: 1.2 },
 };
 
 const _worlds = [];
 export function getWorld(i = 0) {
   i = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
-  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks][i](i));
+  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave][i](i));
 }
 
 // Shared construction kit for every map. All maps keep the same centre: a plaza with the jail cage and its lever.
 // Boxes, spots and coins carry a level: 0 is the ground, 1 is the upstairs floor of a two-storey house.
 function kit(seed) {
   const R = mulberry(seed);
-  const boxes = [], spots = [], houses = [], keepOut = [], lamps = [], beacons = [], stairs = [], upper = [], extraCoins = [];
+  const boxes = [], spots = [], houses = [], keepOut = [], lamps = [], beacons = [], stairs = [], upper = [], extraCoins = [], decks = [], pads = [];
   const add = (x, z, w, d, h, kind, o = {}) => {
     const b = { x, z, w, d, h, kind, ...o };
     boxes.push(b);
@@ -152,7 +158,7 @@ function kit(seed) {
   const manor = (cx, cz, w, d, color, doors) => {
     const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - d / 2, z1 = cz + d / 2, H = FLOOR_H;
     walls(cx, cz, w, d, H, doors, 2, { color });
-    walls(cx, cz, w, d, H, {}, 2, { color, lv: 1 });
+    walls(cx, cz, w, d, H, { S: [-3] }, 2, { color, lv: 1 }); // upstairs, the only opening is the balcony door
     const st = { xa: x0 + 2.5, xb: x0 + 7.5, x0: x0 + 2.5, x1: x0 + 7.5, z0: z0 + 0.3, z1: z0 + 2.3 };
     stairs.push(st);
     upper.push([x0, z0, x1, z1]);
@@ -174,6 +180,32 @@ function kit(seed) {
     add(x1 - 0.6, z0 + 2.2, 0.6, 2.4, 2, 'shelf', up);
     locker(x0 + 0.75, z1 - 0.75, 1.3, 1);
     extraCoins.push({ x: cx - 1.5, z: cz + 1.5, lv: 1 }, { x: x1 - 2.5, z: cz - 0.5, lv: 1 });
+    // A balcony on the south side with no rail at the front: step off it to drop to the ground
+    upper.push([cx - 5, z1 - 0.2, cx - 1, z1 + 2.5]);
+    decks.push({ x0: cx - 5, z0: z1 + 0.15, x1: cx - 1, z1: z1 + 2.5 });
+    add(cx - 5, z1 + 1.3, 0.12, 2.4, 1, 'rail', { lv: 1, see: true });
+    add(cx - 1, z1 + 1.3, 0.12, 2.4, 1, 'rail', { lv: 1, see: true });
+    for (const px of [cx - 4.85, cx - 1.15]) add(px, z1 + 2.35, 0.25, 0.25, H, 'post', see);
+  };
+
+  // A lookout: an open deck on stilts with stairs up its west side and a jump pad to the east.
+  // Three sides have no rail, so you can run straight off the edge.
+  const lookout = (cx, cz) => {
+    const H = FLOOR_H, st = { xa: cx - 8, xb: cx - 3, x0: cx - 8, x1: cx - 3, z0: cz - 1, z1: cz + 1 };
+    stairs.push(st);
+    upper.push([cx - 3, cz - 3, cx + 3, cz + 3]);
+    decks.push({ x0: cx - 3, z0: cz - 3, x1: cx + 3, z1: cz + 3, stair: st });
+    for (const sz of [-1, 1]) {
+      add(cx - 5.5, cz + sz, 5, 0.12, H, 'stairside');
+      add(cx - 5.5, cz + sz, 5, 0.12, 1, 'rail', { lv: 1, see: true });
+      add(cx - 3, cz + sz * 2, 0.12, 2, 1, 'rail', { lv: 1, see: true });
+      for (const sx of [-1, 1]) add(cx + sx * 2.8, cz + sz * 2.8, 0.3, 0.3, H, 'post', see);
+    }
+    add(cx - 3, cz, 0.12, 2, H, 'stairside');
+    add(cx - 8, cz, 0.12, 2, 1, 'rail', { lv: 1, see: true });
+    pads.push({ x: cx + 5.2, z: cz });
+    extraCoins.push({ x: cx + 1, z: cz, lv: 1 });
+    keepOut.push([cx - 10.5, cz - 4.5, cx + 7.5, cz + 4.5]);
   };
 
   const jail = { x: 0, z: 13, s: 5 }, lever = { x: 4, z: 13 };
@@ -226,6 +258,7 @@ function kit(seed) {
       for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) fn(iz * GN + ix, -HALF + (ix + 0.5) * CELL);
     };
     for (const u of upper) cells(u[0], u[1], u[2], u[3], (c) => { blocked[1][c] = 0; });
+    for (const st of stairs) cells(st.x0, st.z0, st.x1, st.z1, (c) => { blocked[1][c] = 0; });
     for (let lv = 0; lv < 2; lv++) for (const b of bl[lv]) cells(b.x - b.w / 2 - m, b.z - b.d / 2 - m, b.x + b.w / 2 + m, b.z + b.d / 2 + m, (c) => { blocked[lv][c] = 1; });
     // Stairs: the low half belongs to the ground level, the high half to upstairs, joined by portals in the middle
     const portal = new Int32Array(N * 2).fill(-1);
@@ -271,13 +304,13 @@ function kit(seed) {
     const items = sprinkle(9, 26, 14, coins);
     return {
       i, id: MAPS[i].id, name: MAPS[i].name, theme: THEMES[MAPS[i].id],
-      boxes, bl, spots, coins, items, beacons, houses, lamps, stairs, upper, jail, lever,
+      boxes, bl, spots, coins, items, beacons, houses, lamps, stairs, upper, decks, pads, jail, lever,
       los: [bl[0].filter((b) => !b.see && b.h >= 1.6), bl[1].filter((b) => !b.see && b.h >= 1.6)],
       nav: { blocked, reach, list, list0, portal },
       seekerSpawn: [0, -5], ...extra,
     };
   };
-  return { R, add, spot, line, house, home, manor, locker, dumpster, plaza, lamp, clear, scatter, beacon, finish, keepOut, see };
+  return { R, add, spot, line, house, home, manor, lookout, locker, dumpster, plaza, lamp, clear, scatter, beacon, finish, keepOut, see };
 }
 
 function buildTown(i) {
@@ -344,6 +377,7 @@ function buildTown(i) {
   const carColors = [0xd94f4f, 0x4f8fd9, 0xe0b23a, 0x6fbf73, 0xc77dff, 0xf5f5f5];
   [[-18, 4.9], [16, -4.9], [-44, -4.9], [40, 4.9], [-64, 4.9], [62, -4.9]].forEach(([x, z], n) => add(x, z, 4.4, 1.9, 1.5, 'car', { color: carColors[n], see: true }));
   for (const [x, z] of [[-12, 6], [12, -6], [-30, -6], [30, 6], [-6, -20], [6, 20], [-52, 6], [52, -6], [-6, -40], [-70, -6], [70, 6], [6, -30]]) K.lamp(x, z);
+  K.lookout(-42, 14); K.lookout(46, -16); K.lookout(24, 52);
   K.beacon(-67, 22); K.beacon(67, -24); K.beacon(26, 69);
 
   K.keepOut.push([-HALF, -3.6, HALF, 3.6], [-3.6, -46, 3.6, 24]);
@@ -379,6 +413,7 @@ function buildCamp(i) {
   for (const [x, z, w, d] of [[-8.6, -3, 0.6, 2], [8.6, -3, 0.6, 2], [0, -9, 2, 0.6]]) add(x, z, w, d, 0.5, 'bench', see);
   for (const [x, z] of [[-14, -10], [14, -10], [-14, 12], [16, 16], [-40, 2], [50, 0], [0, -36], [0, 40], [-44, -40], [44, 42]]) K.lamp(x, z);
   K.keepOut.push([14, -12, 46, 12]); // the frozen pond stays open
+  K.lookout(-28, -2); K.lookout(22, 44); K.lookout(44, -48);
   K.beacon(-68, -24); K.beacon(67, -30); K.beacon(8, 68);
 
   scatter(10, 3, 3, 2, (x, z) => spot('tent', x, z, 0, 0));
@@ -390,6 +425,85 @@ function buildCamp(i) {
   scatter(12, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
   scatter(9, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
   return K.finish(i, { pond: [30, 0, 15, 11] });
+}
+
+function buildCove(i) {
+  const K = kit(90210), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const bamboo = 0xd9b56a, drift = 0xb89a6a, teal = 0x4fb5b0, coral = 0xf08a6a;
+  // Beach huts
+  home(-32, -30, 10, 9, bamboo, { S: [-2], E: [1] });
+  home(32, -32, 10, 9, coral, { S: [-2], W: [1] });
+  home(-34, 32, 10, 10, teal, { N: [0], E: [2] });
+  home(-62, -8, 10, 9, drift, { S: [-2], E: [2] });
+  home(60, -56, 10, 9, bamboo, { S: [-2], W: [2] });
+  home(-60, 58, 10, 9, coral, { S: [-2], E: [2] });
+  // The Salty Parrot inn and the harbour master's house: two storeys each
+  manor(-54, -54, 14, 10, 0xc98f5a, { S: [0], E: [0] });
+  manor(56, 52, 16, 10, 0x5f9ab0, { S: [0], W: [0] });
+  // The shipwreck: a long hull lying on the north beach, full of cargo
+  house(2, -58, 28, 9, 4, 0x6b4a32, { S: [-9, 9] }, 2.6);
+  for (const [x, z, h] of [[-10, -60.5, 2.6], [-8.6, -60.5, 1.3], [-3, -57, 1.3], [1, -60.7, 2.6], [6, -56.5, 1.3], [11, -60.5, 2.6], [12.4, -60.5, 1.3], [-12.5, -56, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  for (const [x, z] of [[4, -60.8], [-5.5, -60.8], [9, -56]]) add(x, z, 0.8, 0.8, 1.1, 'barrel', see);
+  locker(15, -58.5, -1.3); locker(-11, -55.3, 1.3);
+
+  K.plaza('campfire');
+  for (const [x, z, w, d] of [[-8.6, -3, 0.6, 2], [8.6, -3, 0.6, 2], [0, -9, 2, 0.6]]) add(x, z, w, d, 0.5, 'bench', see);
+  for (const [x, z] of [[-14, -10], [14, -10], [-14, 12], [16, 16], [-42, 0], [0, -38], [0, 40], [-44, -40], [46, -30], [-30, 52]]) K.lamp(x, z);
+  K.keepOut.push([24, 2, 60, 36]); // the lagoon stays open
+  K.lookout(-30, 2); K.lookout(44, -14); K.lookout(10, 54); K.lookout(-44, 26);
+  K.beacon(-68, -30); K.beacon(68, -20); K.beacon(-10, 68);
+
+  // Rowboats pulled up on the sand: climb in and lie flat
+  scatter(11, 3.6, 3.6, 1.6, (x, z) => (R() < 0.5
+    ? (add(x, z - 0.4, 3, 1.4, 0.8, 'boat'), spot('rowboat', x, z - 0.4, 0, 1.45))
+    : (add(x - 0.4, z, 1.4, 3, 0.8, 'boat'), spot('rowboat', x - 0.4, z, 1.45, 0))));
+  scatter(13, 1.6, 1.6, 2, (x, z) => spot('bush', x, z, 0, 0));
+  scatter(80, 0.6, 0.6, 1.6, (x, z) => add(x, z, 0.6, 0.6, 7, 'palm', { v: R() }));
+  scatter(16, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(18, 0.8, 0.8, 1.2, (x, z) => add(x, z, 0.8, 0.8, 1.1, 'barrel', see));
+  scatter(14, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.35 ? 2.6 : 1.3, 'crate'));
+  scatter(9, 1.6, 1.6, 1.2, (x, z) => add(x, z, 1.6, 1.6, 1.1, 'sandcastle', see));
+  scatter(8, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  scatter(6, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
+  return K.finish(i, { pond: [42, 19, 16, 15] });
+}
+
+function buildGrave(i) {
+  const K = kit(131313), { R, add, spot, line, house, manor, locker, scatter, see } = K;
+  const stone = 0x6a6d7a, moss = 0x5a6658;
+  // Crypts: small stone rooms, each with a coffin stood on end to hide in
+  for (const [x, z, c, doors, lx] of [[-30, -30, stone, { S: [0] }, 1], [32, -30, moss, { S: [0] }, -1], [-32, 32, moss, { N: [0] }, 1], [34, 30, stone, { N: [0] }, -1],
+    [-62, 4, stone, { E: [0] }, 1], [62, -6, moss, { W: [0] }, -1], [-12, 62, stone, { N: [0] }, 1], [30, 62, moss, { N: [0] }, -1]]) {
+    house(x, z, 8, 7, 3.2, c, doors);
+    add(x + lx * 3.2, z + (doors.N ? 2.7 : -2.7), 0.8, 0.8, 2, 'locker', { coffin: true });
+    spot('coffin', x + lx * 3.2, z + (doors.N ? 2.7 : -2.7), -lx * 1.3, 0);
+  }
+  // The chapel (north) and two haunted mansions
+  house(0, -58, 20, 13, 5, 0x55505f, { S: [0] }, 2.6);
+  for (const x of [-6, 6]) for (const z of [-60.5, -56.5]) add(x, z, 3.4, 0.7, 0.9, 'bench', see);
+  add(0, -63, 2.4, 1, 1.1, 'table');
+  locker(9.2, -63.6, -1.3); locker(-9.2, -63.6, 1.3);
+  manor(-54, -52, 16, 11, 0x4a3f55, { S: [0], E: [0] });
+  manor(56, 52, 16, 11, 0x3f4a55, { S: [0], W: [0] });
+
+  // Hedge-lined walks out from the gate
+  for (const sx of [-1, 1]) { line(sx * 12, 22, sx * 12, 46, 0.6, 2.3, 'hedge', [[34, 2.6]]); line(sx * 18, -46, sx * 18, -22, 0.6, 2.3, 'hedge', [[-34, 2.6]]); }
+  K.plaza('fountain');
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-40, 0], [40, 0], [0, -34], [0, 44], [-44, -40], [44, 40]]) K.lamp(x, z);
+  K.lookout(-36, -8); K.lookout(40, 14); K.lookout(-20, 50);
+  K.beacon(-68, 30); K.beacon(68, -34); K.beacon(8, 69);
+
+  // Coffins lying in the open: lift the lid and lie down
+  scatter(9, 3.4, 3.4, 1.6, (x, z) => { add(x - 0.4, z, 1, 2.2, 0.8, 'coffinbox'); spot('coffin', x - 0.4, z, 1.3, 0); });
+  scatter(12, 1.6, 1.6, 2, (x, z) => spot('bush', x, z, 0, 0));
+  // Rows of tombstones, with gaps to slip through
+  scatter(26, 7, 2, 1.3, (x, z) => { for (let k = -1; k <= 1; k++) if (R() < 0.85) add(x + k * 2.2, z, 0.9, 0.35, 1.2, 'tomb', { v: R(), see: true }); });
+  scatter(60, 0.7, 0.7, 1.5, (x, z) => add(x, z, 0.7, 0.7, 6, 'deadtree', { v: R() }));
+  scatter(12, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  scatter(14, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(16, 0.8, 0.8, 1.1, (x, z) => add(x, z, 0.8, 0.8, 0.7, 'pumpkin', { v: R(), see: true }));
+  scatter(8, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
+  return K.finish(i);
 }
 
 function buildDocks(i) {
@@ -406,6 +520,7 @@ function buildDocks(i) {
   house(-60, 60, 10, 8, 3.2, 0x8a7f6a, { N: [0], E: [1] });
   add(-63.4, 62, 1.8, 1.1, 0.8, 'table'); locker(-56, 62.8, -1.3);
 
+  K.lookout(-30, 0); K.lookout(34, 0); K.lookout(0, -36);
   // Container stacks on a loose grid, leaving alleys between them, the two main roads and the building yards clear
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let a = 0; a < 7; a++) for (let b = 0; b < 7; b++) {
     const cx = sx * (12.5 + a * 9), cz = sz * (12.5 + b * 9);
@@ -450,8 +565,14 @@ export function levelAt(W, x, z, lv) {
   return [lv, lv * FLOOR_H];
 }
 // Upstairs only exists inside two-storey houses
+export function inUpper(W, x, z) {
+  return W.upper.some((u) => x > u[0] && x < u[2] && z > u[1] && z < u[3]);
+}
+export function onStairs(W, x, z) {
+  return W.stairs.some((st) => x >= st.x0 && x <= st.x1 && z >= st.z0 && z <= st.z1);
+}
 export function validLevel(W, x, z, lv) {
-  return lv === 1 && W.upper.some((u) => x > u[0] && x < u[2] && z > u[1] && z < u[3]) ? 1 : 0;
+  return lv === 1 && (inUpper(W, x, z) || onStairs(W, x, z)) ? 1 : 0;
 }
 
 // Push a circle out of all boxes on one level. Returns [x, z].

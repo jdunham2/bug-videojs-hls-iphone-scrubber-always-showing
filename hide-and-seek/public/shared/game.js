@@ -697,6 +697,12 @@ export function handleMessage(room, me, m) {
     if (m.a === 'use') useAction(room, me, t);
     else if (m.a === 'tag') tryTag(room, me, t);
     else if (m.a === 'item') useItem(room, me, t);
+    else if (m.a === 'land') {
+      // consequences: dropping from a height lands with a thump that seekers can hear
+      if (room.phase !== 'seek' || me.role !== HIDER || me.st || t < (me.landCd || 0)) return;
+      me.landCd = t + 1;
+      emitNoise(room, me.x, me.z, 'run', me.id);
+    }
     else if (m.a === 'prop') {
       if (room.mode !== 3 || me.role !== HIDER || me.st || t < (me.propCd || 0) || (room.phase !== 'seek' && room.phase !== 'hide')) return;
       me.propCd = t + 0.6;

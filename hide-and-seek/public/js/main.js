@@ -1,5 +1,5 @@
 // Dusk Hollow client: networking, input, first-person movement and HUD.
-import { getWorld, collide, levelAt, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
+import { getWorld, collide, levelAt, inUpper, onStairs, cleanLook, LOOKS, FLOOR_H, MAPS, MODES, PROPS, TURBO, ITEMS, SPEED, STAM, NOISE_RANGE, HALF, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND, F_JUMP } from '../shared/world.js';
 import { Gfx, Preview, COLORS } from './gfx.js';
 import { Sfx } from './audio.js';
 import { connectWs, connectLocal, connectRoom } from './net.js';
@@ -137,7 +137,7 @@ function onMsg(m) {
       break;
     }
     case 'st': onState(m); break;
-    case 'tp': me.x = m.x; me.z = m.z; me.q = m.q; me.lv = m.lv || 0; me.gy = me.lv * FLOOR_H; break;
+    case 'tp': me.x = m.x; me.z = m.z; me.q = m.q; me.lv = m.lv || 0; me.gy = me.lv * FLOOR_H; me.y = 0; me.vy = 0; break;
     case 'feed': feed(m.m, m.k === 'big' ? '' : m.k); if (m.k === 'big') banner(m.m); break;
     case 'chat': { const r = roster.get(m.id); feed(m.m, 'chat', r ? r.n : '?'); break; }
     case 'noise': onNoise(m); break;
@@ -463,7 +463,6 @@ function update(dt, now) {
   const winded = t < me.wind;
   const base = seeker ? SPEED.seeker : SPEED.hider;
   const sp = (me.crouch ? SPEED.crouch : sprint ? base.sprint : winded ? SPEED.winded : base.walk) * (t < me.boostUntil ? 1.35 : 1) * (G.md === 7 && G.ph !== 'lobby' ? TURBO.speed : 1);
-  if (me.y > 0) { me.y += me.vy * dt; me.vy -= 15 * dt; if (me.y <= 0) { me.y = 0; me.vy = 0; sfx.step(true); } }
   if (hidden) { const s = W.spots[p.hid]; me.x = s.x; me.z = s.z; me.lv = s.lv; me.gy = s.lv * FLOOR_H; }
   else if (moving) {
     const l = Math.hypot(mx, mz), s = Math.sin(me.yaw), c = Math.cos(me.yaw);
@@ -476,6 +475,32 @@ function update(dt, now) {
     me.bob += moved * (sprint ? 1.9 : 2.3);
     me.stepD += moved;
     if (me.stepD > (sprint ? 2.1 : 1.6)) { me.stepD = 0; if (!me.crouch) sfx.step(sprint); }
+  }
+  // Height: me.gy is the floor you are standing on (or falling towards), me.y how far above it you are.
+  if (!hidden) {
+    // walked off the edge of a deck or balcony: the floor is now a storey further down
+    if (me.lv === 1 && !onStairs(W, me.x, me.z) && !inUpper(W, me.x, me.z)) { me.lv = 0; me.gy = 0; me.y += FLOOR_H; me.peak = Math.max(me.peak || 0, me.y); }
+    // jump pads fling you high enough to come down on a lookout
+    if (me.y === 0 && me.lv === 0 && !frozen) for (const pd of W.pads) {
+      if (Math.hypot(pd.x - me.x, pd.z - me.z) > 0.85) continue;
+      me.vy = 12.4; me.y = 0.001; me.peak = 0;
+      sfx.freed();
+      break;
+    }
+    if (me.y > 0) {
+      const before = me.y;
+      me.y += me.vy * dt; me.vy -= 15 * dt;
+      me.peak = Math.max(me.peak || 0, me.gy + me.y);
+      if (me.lv === 0 && me.vy < 0 && before >= FLOOR_H && me.y <= FLOOR_H && inUpper(W, me.x, me.z)) {
+        me.lv = 1; me.gy = FLOOR_H; me.y = 0; me.vy = 0; me.peak = 0; // came down on top of something
+        sfx.step(true);
+      } else if (me.y <= 0) {
+        me.y = 0; me.vy = 0;
+        // consequences: a long drop lands with a thump seekers can hear, and knocks the wind out of you
+        if (me.peak - me.gy > 2.4) { sfx.thud(); me.stam = Math.max(0, me.stam - 8); send({ t: 'a', a: 'land' }); } else sfx.step(true);
+        me.peak = 0;
+      }
+    }
   }
   me.flags = (sprint ? F_SPRINT : 0) | (me.crouch ? F_CROUCH : 0) | (moving ? F_MOVE : 0) | (keys.KeyE && !frozen ? F_USE : 0) | (winded ? F_WIND : 0) | (me.y > 0 ? F_JUMP : 0);
   if (now - lastSend > 66) {
@@ -551,7 +576,7 @@ function hud(p, now, s) {
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';
