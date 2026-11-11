@@ -24,6 +24,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 #view{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.padfocus{outline:3px solid #ffd040!important;outline-offset:2px;box-shadow:0 0 0 5px rgba(255,208,64,.25)!important}
 kbd{font-family:var(--f-display);font-size:11px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;color:var(--muted);margin-left:4px}
 .panel{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
 .btn{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:7px 12px;font-size:14px;line-height:1.1}
@@ -3342,6 +3343,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
     if (crit) { shake = Math.max(shake, .18); burst(e.x, e.y - .5, '#ffec6a', 10, 5); }
   } else SFX.hit();
   if (src === 'player' && weapon().ench === 'holy' && isUndead(e)) dmg = Math.round(dmg*1.5*10)/10;
+  if (e.net) { if (e.netDying) return; netDmg[e.net] = (netDmg[e.net] || 0) + dmg; partyT = Math.min(partyT, .03); e.hp -= dmg; e.hurt = .15; floatText(e.x, e.y - 1 - (e.esize || 1)*.4, crit ? `${dmg}!` : String(dmg), crit ? '#ffec6a' : '#ffd27a', crit); burst(e.x, e.y - .4, '#e57a62', 4); if (e.hp <= 0) { e.hp = 0; e.netDying = true; e.dyT = 0; } return; }
   e.hp -= dmg; e.hurt = .15; e.alert = true;
   if (src === 'player' && e.hp > 0) { const E = weapon().ench;
     if (E === 'fire' && Math.random() < .3) { e.burn = 3; e.burnT = .5; }
@@ -3357,6 +3359,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
 }
 function killEnemy(e) {
   e.dead = true; S.kills++;
+  if (e.nid && party && party.host) netKilled.push({nid: e.nid, t: 2.5});
   const got = [];
   if (e.echo) {
     const B = BOSSES[e.boss]; SFX.victory(); hitStop = .3; gainXP(Math.round(B.hp*.8));
@@ -3426,7 +3429,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
   const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * (compAbil('brann') ? .85 : 1) * 2) / 2);
-  S.hp -= taken; SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
+  S.hp -= taken; padRumble(.25 + Math.min(.6, taken*.06), 150); SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
   if (from) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
   if (S.hp <= 0) {
@@ -3723,7 +3726,7 @@ function partyPanel() {
   }
   const list = Object.values(remote);
   const leader = list.find(r => r.p.host);
-  openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat.</span><br><br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
+  openPanel(`Party · ${party.code.toUpperCase()}`, `Party code: <b style="font-size:20px;letter-spacing:.2em">${party.code.toUpperCase()}</b> ${party.host ? '(you are the leader)' : ''}<br><span style="color:var(--muted)">Friends join from their Party menu with this code. Near the leader, everyone fights the <b>same monsters</b>: hit them together, and everyone who helped gets the rewards. Fighting near a party member gives +10% damage, and you share XP when they defeat foes nearby. Press T to chat.</span><br><br><b>${esc(netName())}</b> (you) · Lv ${S.level || 1}${list.map(r => `<br><span style="color:${r.col}">●</span> <b>${esc(r.name)}</b> · Lv ${r.p.lv || 1} · ${Math.round(Math.hypot(r.x - S.x, r.y - S.y))} paces away${r.p.host ? ' · leader' : ''}`).join('')}${list.length ? '' : '<br><span style="color:var(--muted)">Waiting for friends to join...</span>'}`, [
     ...(leader && !party.host ? [{label: `Travel to ${leader.name}`, disabled: inDungeon() || inArena() || leader.p.dg || bossActive(), fn: () => { closeTalk(); SFX.travel(); fadeThen(() => { const spot = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]].map(([dx, dy]) => [leader.x + dx, leader.y + dy]).find(([x, y]) => passable(x, y)) || [leader.x, leader.y]; S.x = spot[0]; S.y = spot[1]; S.riding = !!S.riding && !!leader.p.mt; enemies = enemies.filter(e => e.boss); petE = null; compE = null; lastTile = -1; renderHUD(); }); }}] : []),
     {label: 'Chat', fn: () => chatPanel()},
     {label: 'Leave party', fn: () => { leaveParty(); closeTalk(); }},
@@ -3739,12 +3742,12 @@ async function enterParty(code, host) {
   if (party) await leaveParty(true);
   let rm; try { rm = await ROOM.join('party-' + code); } catch (e) { toast(`Couldn't connect to the party (${esc((e && e.code) || 'error')}). Try again in a moment.`, 4500); return; }
   party = {code, host, room: rm, unsubs: []}; remote = {}; partyT = 0;
-  party.unsubs.push(rm.onPeers(ch => { for (const pr of ch.left) { const r = remote[pr.peer]; if (r) { toast(`<b>${esc(r.name)}</b> left the party.`, 3500); delete remote[pr.peer]; } } }, err => { if (party && party.room === rm) { toast('The party connection was lost.', 4000); party = null; remote = {}; } }));
+  party.unsubs.push(rm.onPeers(ch => { for (const pr of ch.left) { const r = remote[pr.peer]; if (r) { toast(`<b>${esc(r.name)}</b> left the party.`, 3500); delete remote[pr.peer]; } } }, err => { if (party && party.room === rm) { toast('The party connection was lost.', 4000); party = null; remote = {}; netReset(); } }));
   sendPresence(); SFX.chime(); S.partiesJoined = (S.partiesJoined || 0) + 1;
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {};
+  const P = party; if (!P) return; party = null; remote = {}; netReset();
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3761,7 +3764,9 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0};
+  if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
+  if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
 }
 function partyTick(dt) {
@@ -3769,6 +3774,7 @@ function partyTick(dt) {
   for (const r of Object.values(remote)) if (r.bubble) { r.bubble.t -= dt; if (r.bubble.t <= 0) r.bubble = null; }
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
+  for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
   for (const pr of peers) {
@@ -3780,9 +3786,11 @@ function partyTick(dt) {
     if (p.mv) r.phase += dt*12;
     if (p.ch && typeof p.ch === 'object' && p.ch.i !== r.chatI) { r.chatI = p.ch.i; const m = cleanText(p.ch.m, 100); if (m) { r.bubble = {m, t: 5}; chatLog.push({name: r.name, m, col: r.col}); if (chatLog.length > 30) chatLog.shift(); } }
     const kk = +p.k || 0; if (kk > r.kills) { const diff = Math.min(3, kk - r.kills); r.kills = kk; if (Math.hypot(r.x - S.x, r.y - S.y) < 25 && !p.dg === !(inDungeon() || inArena())) { gainXP((6 + (S.level || 1))*diff); S.partyXP = (S.partyXP || 0) + 1; floatText(S.x, S.y - 1.4, 'Party XP', r.col); } } else if (kk < r.kills) r.kills = kk;
+    if (party.host && p.dm && typeof p.dm === 'object' && p.ds === NET_SID) netApply(pr.peer, r, p.dm);
     if (!party.host && p.host && typeof p.t === 'number' && isFinite(p.t)) { let dtm = Math.abs(S.time - p.t); dtm = Math.min(dtm, 1 - dtm); if (dtm > .02) S.time = Math.max(0, Math.min(.999, p.t)); }
   }
   for (const k in remote) if (!seen[k]) delete remote[k];
+  if (!party.host) netSync(Object.values(remote).find(r => r.p.host) || null, dt); else if (netOn) netReset();
 }
 function drawBubble(px, py, m) {
   ctx.font = '7px "Pixelify Sans", monospace'; const w = Math.min(130, ctx.measureText(m).width + 8);
@@ -3800,6 +3808,76 @@ function drawRemote(r) {
   ctx.fillStyle = '#0d131b'; ctx.fillText(r.name, px + .7, top + .7); ctx.fillStyle = r.col; ctx.fillText(r.name, px, top);
   const hp = +p.hp || 0, mh = Math.max(1, +p.mh || 1); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 8, top + 2, 16, 3); ctx.fillStyle = '#e57a62'; ctx.fillRect(px - 7, top + 3, 14*Math.max(0, Math.min(1, hp/mh)), 1);
   if (r.bubble) drawBubble(px, top - 4, r.bubble.m);
+}
+// shared monsters: the leader's game runs them, guests mirror them and send their damage
+let netOn = false, netSeq = 0, netKilled = [], netMirror = {}, netDmg = {}, netHostSid = null, netToastDone = false;
+const NET_SID = Math.random().toString(36).slice(2, 8);
+function netReset() { netOn = false; netMirror = {}; if (enemies.some(e => e.net)) enemies = enemies.filter(e => !e.net); }
+function netTarget(e, dSelf) {
+  let best = null, bd = dSelf;
+  for (const r of Object.values(remote)) { if (!r.p.sh) continue; const d = Math.hypot(r.x - e.x, r.y - e.y); if (d < bd - .5) { bd = d; best = r; } }
+  return best;
+}
+function netList() {
+  const out = []; if (inDungeon() || inArena()) return out;
+  const c = [];
+  for (const e of enemies) {
+    if (e.dead || e.boss || e.minion || e.net || e.hidden > 0 || e.den != null) continue;
+    const def = ENEMIES[e.type]; if (!def || def.passive || def.target || def.den || def.swim || def.shipAI || def.isDummy || def.thief || def.flee) continue;
+    const d = Math.hypot(e.x - S.x, e.y - S.y); if (d < 26) c.push([d, e]);
+  }
+  c.sort((a, b) => a[0] - b[0]);
+  for (const [, e] of c.slice(0, 24)) { if (!e.nid) e.nid = ++netSeq; out.push([e.nid, e.type, Math.round(e.x*10), Math.round(e.y*10), Math.max(0, Math.round(e.hp*10)), Math.round(e.max), e.face < 0 ? -1 : 1, e.elite ? e.elite.col : 0, e.esize || 1, Math.round((e.dmgMul || 1)*10)/10, e.hurt > 0 ? 1 : 0]); }
+  return out;
+}
+function netApply(peer, r, dm) {
+  let n = 0;
+  for (const k in dm) {
+    if (++n > 40) break; const nid = +k, tot = +dm[k]; if (!isFinite(tot) || tot <= 0) continue;
+    const e = enemies.find(z => z.nid === nid && !z.dead); if (!e) continue;
+    e.netGot = e.netGot || {}; const dl = Math.min(500, tot - (e.netGot[peer] || 0)); if (dl <= 0) continue; e.netGot[peer] = tot;
+    e.hp -= dl; e.hurt = .15; e.alert = true; floatText(e.x, e.y - 1 - (e.esize || 1)*.4, String(Math.round(dl*10)/10), r.col); burst(e.x, e.y - .4, r.col, 3);
+    if (e.hp <= 0) killEnemy(e);
+  }
+}
+function netDmgOut() { const o = {}; let n = 0; for (const k in netMirror) if (netDmg[k] > 0 && n++ < 30) o[k] = Math.round(netDmg[k]*10)/10; return o; }
+function netSync(L, dt) {
+  const on = !!L && !L.p.dg && !inDungeon() && !inArena() && S.y < WORLD_H && !bossActive() && Math.hypot(L.x - S.x, L.y - S.y) < 30;
+  if (on !== netOn) { netOn = on; if (on) { enemies = enemies.filter(e => !e.wild); if (!netToastDone) { netToastDone = true; toast(`<b>Fighting together!</b><br>You're near ${esc(L.name)}, so you now see and fight the same monsters. Everyone who lands a hit shares the rewards.`, 5000); } } }
+  if (!on) { if (enemies.some(e => e.net)) enemies = enemies.filter(e => !e.net); netMirror = {}; return; }
+  const p = L.p;
+  if (p.sid !== netHostSid) { netHostSid = p.sid; netDmg = {}; netMirror = {}; enemies = enemies.filter(e => !e.net); }
+  const list = Array.isArray(p.en) ? p.en.slice(0, 40) : [], kd = new Set(Array.isArray(p.kd) ? p.kd.slice(0, 40).map(Number) : []), seen = {};
+  for (const a of list) {
+    if (!Array.isArray(a)) continue; const [nid, type, x10, y10, hp10, max, face, ecol, esz, dmul, hurt] = a;
+    if (typeof nid !== 'number' || typeof type !== 'string' || !ENEMIES.hasOwnProperty(type) || !isFinite(x10) || !isFinite(y10)) continue;
+    seen[nid] = true; const tx = x10/10, ty = y10/10, hp = Math.max(0, (+hp10 || 0)/10);
+    let m = netMirror[nid];
+    if (!m || m.dead) {
+      m = netMirror[nid] = makeEnemy(type, tx, ty, {net: nid, tx, ty, alert: true}); m.max = Math.max(1, +max || m.max); m.hp = hp;
+      if (typeof ecol === 'string' && ecol) { m.elite = {name: 'Elite', col: ecol.slice(0, 9)}; m.esize = Math.min(2.5, Math.max(1, +esz || 1.3)); }
+      m.dmgMul = Math.min(5, Math.max(.2, +dmul || 1)); enemies.push(m);
+    } else if (!enemies.includes(m)) enemies.push(m);
+    m.tx = tx; m.ty = ty; m.hface = face < 0 ? -1 : 1; if (hurt) m.hurt = Math.max(m.hurt, .1);
+    if (m.netDying) { m.dyT += dt; if (m.dyT > 2.5) { m.netDying = false; m.hp = hp; } }
+    else if (hp < m.hp) m.hp = hp;
+  }
+  for (const k in netMirror) if (!seen[k]) {
+    const m = netMirror[k]; delete netMirror[k];
+    if (m.dead) continue;
+    if (kd.has(+k) && (netDmg[k] || 0) > 0) { delete netDmg[k]; m.netDying = false; killEnemy(m); S.sharedKills = (S.sharedKills || 0) + 1; floatText(S.x, S.y - 1.9, 'Shared victory!', L.col); }
+    else { m.dead = true; if (kd.has(+k)) burst(m.x, m.y - .4, '#ebe4d3', 10); }
+  }
+}
+function netEnemyTick(e, dt, safe) {
+  const ddx = e.tx - e.x, ddy = e.ty - e.y, dd = Math.hypot(ddx, ddy);
+  if (dd > 5) { e.x = e.tx; e.y = e.ty; } else { const k = Math.min(1, dt*10); e.x += ddx*k; e.y += ddy*k; }
+  e.face = e.hface || e.face; if (dd > .03) e.phase += dt*10;
+  e.hurt = Math.max(0, e.hurt - dt); e.cd -= dt;
+  if (e.netDying) return;
+  const def = ENEMIES[e.type], dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
+  if (!safe && d < .8 && e.cd <= 0) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
+  if (def.ranged && !safe && d < def.ranged.range && d < def.aggro + 4) { e.rcd -= dt; if (e.rcd <= 0) { e.rcd = def.ranged.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), def.ranged.speed, def.dmg * (e.dmgMul || 1), def.ranged.col, .2); } }
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -5350,7 +5428,8 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
-  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. Each player keeps their own save.'],
+  ['Game controllers', 'Connect a Nintendo Switch Pro Controller, an Xbox or a PlayStation controller and press any button. Move with the left stick. On a Pro Controller: A talks and picks things up, B rolls, Y or ZR attacks (hold for a spin attack), X throws a bomb, L and R switch and cast spells, ZL rides, \u2212 opens the map, + pauses, and the D-pad opens your bag (\u2191), crafting (\u2193), journal (\u2190) and skills (\u2192). Home opens the party menu. In menus, use the D-pad or stick to move, A to choose and B to go back.'],
+  ['Online party', 'Press P (or the Party button) to create a party and get a 5-letter code. Friends who open Saltwind Road from the same link press Party and type the code to join your world: you see each other, chat with T, deal +10% damage when fighting together, and share XP from nearby victories. Guests can travel straight to the party leader, and the leader\u2019s time of day is shared. When you are within 30 steps of the leader, you all see and fight the same monsters, and everyone who landed a hit gets the rewards when one falls. Each player keeps their own save.'],
   ['Sky whale & meteors', 'At dusk, keep an eye on the sky: a great whale sometimes swims overhead and drops a Cloud Pearl. On some nights meteors crash nearby. Mine the crater with a pickaxe for Meteorite Ore to forge the Meteor Blade.'],
   ['Summits & exotic seeds', 'Climb the highest peaks with climbing gear and plant your flag at each summit (look for a stone cairn) for a wide view and a reward. Sorrel in Greenstem sells exotic seeds: Golden Wheat, Dragonfruit and Starfruit.'],
   ['Moon rabbit & display cases', 'On full-moon nights (every 14 days, as the Gazette will tell you) a glowing moon rabbit comes down to play. Chase it until it tires, then catch it for Moon Mochi and a Moon Charm. Craft a Display Case to show off your trophies at home.'],
@@ -5553,7 +5632,7 @@ function trySpawn(night) {
     if (!type || !enemyWalk(x+.5, y+.5)) continue;
     const pack = type === 'bat' || type === 'coyote' || type === 'hyena' ? 3 : type === 'wolf' && night ? 2 : 1;
     const eliteRoll = !ENEMIES[type].passive && Math.random() < (.045 + Math.min(.04, (S.level || 1)*.002)) * (bloodMoon() ? 3 : 1);
-    for (let p = 0; p < pack; p++) { const e = makeEnemy(type, x + .5 + p*.6, y + .5, {snow: type === 'wolf' && t === T.SNOW}); enemies.push(eliteRoll && p === 0 ? makeElite(e) : e); }
+    for (let p = 0; p < pack; p++) { const e = makeEnemy(type, x + .5 + p*.6, y + .5, {snow: type === 'wolf' && t === T.SNOW, wild: true}); enemies.push(eliteRoll && p === 0 ? makeElite(e) : e); }
     return;
   }
 }
@@ -5668,7 +5747,7 @@ function updateCombat(dt, night) {
     spawnT = bloodMoon() ? .7 : 1.4;
     bossNear(); legendSpawns(); ghostSpawns(); denSpawns(); outlawSpawns(); horsemanCheck(); guardianCheck(); stagCheck(); ensureVaults(); fairyCheck(); ensureShells(); dummySpawns(); clockSpawns(); lmapUpdate(); ensureWaystones(); ensureSummits();
     const cap = bloodMoon() ? 13 : night ? 8 : 5;
-    if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36)) trySpawn(night);
+    if (enemies.filter(e => !e.boss && !e.minion && !(ENEMIES[e.type] && ENEMIES[e.type].passive)).length < cap && (S.day > 1 || S.time > .36) && !netOn) trySpawn(night);
     if (enemies.filter(e => ENEMIES[e.type] && ENEMIES[e.type].passive).length < (night ? 4 : 7)) trySpawnCritter(night);
   }
   let boss = null;
@@ -5679,6 +5758,7 @@ function updateCombat(dt, night) {
       if (e.poison > 0) { e.poison -= dt; e.poisonT -= dt; if (Math.random() < .2) burst(e.x, e.y - .6, '#7ad04a', 1, 1); if (e.poisonT <= 0) { e.poisonT = .5; hitEnemy(e, Math.round(.8*lv*10)/10, 0, 0, 'dot'); } }
       if (e.dead) continue;
     }
+    if (e.net) { netEnemyTick(e, dt, safe); continue; }
     if (e.boss) { updateBoss(e, dt); boss = e; continue; }
     if (e.frozen > 0) { e.frozen -= dt; e.hurt = Math.max(0, e.hurt - dt); continue; }
     const def = ENEMIES[e.type];
@@ -5689,7 +5769,7 @@ function updateCombat(dt, night) {
     if (def.thief) { thiefTick(e, dt); continue; }
     if (def.isDummy) { dummyTick(e, dt); continue; }
     if (def.shipAI) { pirateTick(e, dt); continue; }
-    const dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
+    let dx = S.x - e.x, dy = S.y - e.y, d = Math.hypot(dx, dy) || .001;
     if (def.passive) {
       const trusts = def.tame && have(def.tame.food) && !e.alert;
       let px = 0, py = 0;
@@ -5706,16 +5786,18 @@ function updateCombat(dt, night) {
       if (d > 30) e.dead = true;
       continue;
     }
+    const dSelf = d; let me = true, sf = safe;
+    if (party && party.host && e.nid) { const o = netTarget(e, d); if (o) { dx = o.x - e.x; dy = o.y - e.y; d = Math.hypot(dx, dy) || .001; me = false; sf = !!townAt(o.x, o.y, 8); } }
     let mx = 0, my = 0, sp = def.speed * (e.spd || 1);
     const aggro = (night ? def.aggro + 2 : def.aggro) + (e.alert ? 4 : 0);
-    if (!safe && d < aggro) {
+    if (!sf && d < aggro) {
       if (def.ranged) {
         const R = def.ranged;
         if (d > R.range*.7) { mx = dx/d; my = dy/d; }
         else if (d < R.range*.4) { mx = -dx/d; my = -dy/d; }
         else { mx = -dy/d*.5; my = dx/d*.5; }
         e.rcd -= dt;
-        if (e.rcd <= 0 && d < R.range) { e.rcd = R.cd; shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), R.speed, def.dmg * (e.dmgMul || 1), R.col, .2); }
+        if (e.rcd <= 0 && d < R.range) { e.rcd = R.cd; if (me) shoot(e.x, e.y - .5, Math.atan2(S.y - .4 - (e.y - .5), dx), R.speed, def.dmg * (e.dmgMul || 1), R.col, .2); }
       } else { mx = dx/d; my = dy/d; }
       if (def.charge) {
         e.ccd -= dt;
@@ -5736,8 +5818,8 @@ function updateCombat(dt, night) {
     if (Math.abs(mx) > .05) e.face = mx < 0 ? -1 : 1;
     if (mx || my) e.phase += dt*10;
     e.cd -= dt; e.hurt = Math.max(0, e.hurt - dt);
-    if (d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
-    if ((d > 34 && !e.dungeon && !e.raid) || (e.legend && d > 45)) e.dead = true;
+    if (me && d < .8 && e.cd <= 0 && !safe) { hurtPlayer(def.dmg * (e.dmgMul || 1) * (bloodMoon() ? 1.3 : 1), e); e.cd = 1.1; }
+    if ((dSelf > 34 && !e.dungeon && !e.raid) || (e.legend && d > 45)) e.dead = true;
   }
   for (const a of arrows) {
     a.x += a.vx*dt; a.y += a.vy*dt; a.life -= dt;
@@ -5873,6 +5955,93 @@ $('btnJournal').addEventListener('click', () => mode === 'play' && openJournal()
 $('btnBag').addEventListener('click', () => mode === 'play' && openBag());
 $('btnCraft').addEventListener('click', () => mode === 'play' && openCraft());
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal(b.dataset.close)));
+
+/* ================= game controllers ================= */
+// Works with Nintendo Switch Pro Controllers, Xbox and PlayStation pads (standard mapping).
+const PAD = {vx: 0, vy: 0, prev: [], id: null, nin: false, active: false, focus: null, navDir: null, navT: 0, hold: {}};
+const PAD_PLAY = {2: 'f', 7: 'f', 3: 'g', 4: 'z', 5: 'x', 6: 'v', 8: 'm', 9: 'Escape', 10: 'q', 11: 'b', 12: 'i', 13: 'c', 14: 'j', 15: 'k', 16: 'p', 17: 't'};
+function padKey(k, up) { try { dispatchEvent(new KeyboardEvent(up ? 'keyup' : 'keydown', {key: k})); } catch (e) {} }
+function padRumble(mag, ms) {
+  if (!PAD.active) return;
+  try { const g = padGet(); const a = g && g.vibrationActuator; if (a && a.playEffect) a.playEffect('dual-rumble', {duration: ms, strongMagnitude: mag, weakMagnitude: Math.min(1, mag*1.2)}).catch(() => {}); } catch (e) {}
+}
+function padGet() { if (!navigator.getGamepads) return null; const gs = navigator.getGamepads(); for (const g of gs) if (g && g.connected && g.buttons && g.buttons.length >= 4) return g; return null; }
+const padLabel = () => PAD.nin ? {ok: 'A', back: 'B', atk: 'Y', bomb: 'X', name: 'Pro Controller'} : /054c|playstation|dualsense|dualshock/i.test(PAD.id || '') ? {ok: '✕', back: '○', atk: '□', bomb: '△', name: 'PlayStation controller'} : {ok: 'A', back: 'B', atk: 'X', bomb: 'Y', name: 'controller'};
+function padHelp() {
+  const L = padLabel();
+  return `<b>${L.ok}</b> talk / pick up / confirm · <b>${L.back}</b> dodge roll / back · <b>${L.atk}</b> or <b>${PAD.nin ? 'ZR' : 'RT'}</b> attack (hold for a spin attack) · <b>${L.bomb}</b> throw bomb · <b>${PAD.nin ? 'L / R' : 'LB / RB'}</b> switch / cast spell · <b>${PAD.nin ? 'ZL' : 'LT'}</b> ride · <b>${PAD.nin ? '−' : 'View'}</b> map · <b>${PAD.nin ? '+' : 'Menu'}</b> pause · D-pad: ↑ bag, ↓ crafting, ← journal, → skills · left stick click: quick eat · right stick click: build · ${PAD.nin ? 'Home' : 'Guide'}: party`;
+}
+function padRoot() {
+  if (!$('talk').hidden) return $('talk');
+  const ms = [...document.querySelectorAll('.modal')].filter(m => !m.hidden && m.getClientRects().length);
+  return ms[ms.length - 1] || null;
+}
+function padEls(root) { return [...root.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled && !el.hidden && el.getClientRects().length); }
+const padFirst = els => els.find(b => b.classList.contains('primary') && !b.dataset.close) || els.find(b => !b.dataset.close && !/^close/i.test(b.textContent.trim())) || els[0];
+function padSetFocus(el) {
+  if (PAD.focus && PAD.focus !== el) PAD.focus.classList.remove('padfocus');
+  PAD.focus = el; if (!el) return; el.classList.add('padfocus');
+  try { el.focus({preventScroll: true}); } catch (e) {}
+  try { el.scrollIntoView({block: 'nearest', inline: 'nearest'}); } catch (e) {}
+}
+function padNav(dir) {
+  const root = padRoot(); if (!root) return; const els = padEls(root); if (!els.length) return;
+  const cur = PAD.focus && els.includes(PAD.focus) ? PAD.focus : null;
+  if (!cur) { padSetFocus(padFirst(els)); return; }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width/2, ay = a.top + a.height/2;
+  let best = null, bs = 1e9;
+  for (const el of els) {
+    if (el === cur) continue; const b = el.getBoundingClientRect(), dx = b.left + b.width/2 - ax, dy = b.top + b.height/2 - ay;
+    const along = dir === 'r' ? dx : dir === 'l' ? -dx : dir === 'd' ? dy : -dy, across = dir === 'r' || dir === 'l' ? Math.abs(dy) : Math.abs(dx);
+    if (along <= 2) continue; const sc = along + across*2.5; if (sc < bs) { bs = sc; best = el; }
+  }
+  if (!best && (dir === 'd' || dir === 'u')) { const i = els.indexOf(cur); best = els[(i + (dir === 'd' ? 1 : -1) + els.length) % els.length]; }
+  if (best) { padSetFocus(best); SFX.tick && SFX.tick(); }
+}
+function padPoll(dt) {
+  const g = padGet();
+  if (!g) { if (PAD.id) { PAD.id = null; PAD.vx = PAD.vy = 0; PAD.prev = []; if (PAD.hold.f) { padKey('f', true); PAD.hold.f = false; } toast('Controller disconnected.', 2500); } return; }
+  if (PAD.id !== g.id) { PAD.id = g.id; PAD.nin = /nintendo|pro controller|joy-?con|057e/i.test(g.id); PAD.prev = g.buttons.map(b => b.pressed); return; }
+  const B = g.buttons.map(b => b.pressed || b.value > .5), ax = g.axes || [];
+  const was = i => !!PAD.prev[i], now = i => !!B[i], down = i => now(i) && !was(i), up = i => !now(i) && was(i);
+  let sx = +ax[0] || 0, sy = +ax[1] || 0; const sm = Math.hypot(sx, sy);
+  if (sm < .22) { sx = sy = 0; } else { const k = Math.min(1, (sm - .22)/.7)/sm; sx *= k; sy *= k; }
+  const any = B.some(Boolean) || sm > .3;
+  if (any && !PAD.active) { PAD.active = true; if (S) S.usedPad = true; toast(`<b>${padLabel().name === 'controller' ? 'Controller' : padLabel().name} connected</b><br>${padHelp()}`, 9000); }
+  if (!any && !PAD.active) { PAD.prev = B; return; }
+  const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
+  const menu = mode !== 'play' && mode !== 'fish';
+  // movement
+  if (mode === 'play') { PAD.vx = sx; PAD.vy = sy; } else { PAD.vx = PAD.vy = 0; }
+  if (mode === 'play') {
+    if (PAD.focus) padSetFocus(null); S.usedPad = true;
+    if (down(OK)) padKey('e');
+    if (down(BACK)) doRoll();
+    for (const i in PAD_PLAY) { const k = PAD_PLAY[i]; if (k === 'f') continue; if (down(+i)) padKey(k); }
+    const atk = now(2) || now(7);
+    if (atk && !PAD.hold.f) { PAD.hold.f = true; padKey('f'); }
+    else if (!atk && PAD.hold.f) { PAD.hold.f = false; padKey('f', true); }
+  } else {
+    if (PAD.hold.f) { PAD.hold.f = false; padKey('f', true); }
+  }
+  if (mode === 'fish') {
+    fishHold = now(OK) || now(2) || now(7);
+    if (down(BACK)) padKey('Escape');
+  } else if (menu) {
+    const root = padRoot();
+    if (root) { const els = padEls(root); if (els.length && !(PAD.focus && els.includes(PAD.focus))) padSetFocus(padFirst(els)); }
+    let dir = now(12) ? 'u' : now(13) ? 'd' : now(14) ? 'l' : now(15) ? 'r' : null;
+    if (!dir && sm > .6) dir = Math.abs(sx) > Math.abs(sy) ? (sx < 0 ? 'l' : 'r') : (sy < 0 ? 'u' : 'd');
+    if (dir !== PAD.navDir) { PAD.navDir = dir; PAD.navT = .35; if (dir) padNav(dir); }
+    else if (dir) { PAD.navT -= dt; if (PAD.navT <= 0) { PAD.navT = .11; padNav(dir); } }
+    const ry = +ax[3] || 0; if (root && Math.abs(ry) > .3) { const sc = root.querySelector('.scroll, .modal-body') || root; sc.scrollTop += ry*dt*600; }
+    if (down(OK) && PAD.focus && document.contains(PAD.focus)) { const f = PAD.focus; if (f.tagName === 'INPUT' && f.id === 'chatIn') sendChat(); else f.click(); }
+    if (down(BACK) || down(9)) { if (mode === 'map') closeModal('mapView'); else padKey('Escape'); }
+  }
+  PAD.prev = B;
+}
+addEventListener('keydown', e => { if (e.isTrusted && PAD.focus) padSetFocus(null); }, {capture: true});
+addEventListener('mousedown', e => { if (e.isTrusted && PAD.focus) padSetFocus(null); }, {capture: true});
 
 /* ================= camera & render ================= */
 const ctx = view.getContext('2d');
@@ -6707,6 +6876,7 @@ function doRoll() {
   if (keys.has('arrowup') || keys.has('w')) dy -= 1;
   if (keys.has('arrowdown') || keys.has('s')) dy += 1;
   if (touch.active) { dx += touch.vx; dy += touch.vy; }
+  dx += PAD.vx; dy += PAD.vy;
   if (Math.hypot(dx, dy) < .15) { dx = player.dir.x; dy = player.dir.y; }
   const m = Math.hypot(dx, dy) || 1; player.rdx = dx/m; player.rdy = dy/m;
   player.facing = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
@@ -6796,6 +6966,7 @@ function update(dt) {
   if (keys.has('arrowup') || keys.has('w')) vy -= 1;
   if (keys.has('arrowdown') || keys.has('s')) vy += 1;
   if (touch.active) { vx += touch.vx; vy += touch.vy; }
+  if (PAD.vx || PAD.vy) { vx += PAD.vx; vy += PAD.vy; const pm = Math.hypot(vx, vy); if (pm > 1) { vx /= pm; vy /= pm; } }
   player.rollCd = Math.max(0, player.rollCd - dt);
   if (player.roll > 0) {
     player.roll -= dt;
@@ -10004,6 +10175,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['sharedkill','Shoulder to Shoulder','Win 10 shared fights with your party', () => (S.sharedKills || 0) >= 10],
+  ['padplayer','Plug and Play','Play with a game controller', () => !!S.usedPad],
   ['skywhale','Song of the Sky','See the sky whale', () => (S.whales || 0) >= 1],
   ['cloudpearl','Pearl from the Clouds','Catch a cloud pearl', () => (S.cloudPearls || 0) >= 1],
   ['meteor','Star Struck','Mine meteorite ore from a crater', () => (S.meteorites || 0) >= 1],
@@ -10481,6 +10654,7 @@ function loop(ts) {
 }
 function step(ts) {
   const raw = Math.min(.05, (ts - last) / 1000 || 0); last = ts; frameT += raw;
+  try { padPoll(raw); } catch (e) {}
   let dt = raw; if (hitStop > 0) { hitStop -= raw; dt = 0; }
   if (mode === 'play' && dt > 0) update(dt);
   if (mode === 'fish' && dt > 0) updateFishGame(dt);
@@ -10530,6 +10704,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
+window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
 window.__sw = {get skyWhale(){return skyWhale;}, set whaleT(v){whaleT=v;}, get meteor(){return meteor;}, set meteorT(v){meteorT=v;}, get cloudPearls(){return cloudPearls;}, ensureSummits: () => ensureSummits(), get moonRabbit(){return moonRabbit;}, guardianCheck: () => guardianCheck(), get mustangs(){return mustangs;}, set mustT(v){mustT=v;}, set hwT(v){hwT=v;}, get CIRCUS(){return CIRCUS;}, get regatta(){return regatta;}, vexRaceOffer: () => vexRaceOffer(), get vexRun(){return vexRun;}, ensureWaystones: () => ensureWaystones(), get ISLET(){return ISLET;}, get herd(){return herd;}, harvest: i => harvest(i), set pirT(v){pirT=v;}, get auroraShards(){return auroraShards;}, ensureShells: () => ensureShells(), set eruptT(v){eruptT=v;}, get erupt(){return erupt;}, get volcRocks(){return volcRocks;}, get fairyRing(){return fairyRing;}, fairyCheck: () => fairyCheck(), get bugs(){return bugs;}, ensureVaults: () => ensureVaults(), get stagTrail(){return stagTrail;}, stagCheck: () => stagCheck(), set bottleT(v){bottleT=v;}, get bottles(){return bottles;}, get relics(){return relics;}, WELLS, ensureDens: () => ensureDens(), ghostDay: () => ghostDay(), set customsT(v){customsT = v;}, hasLost: n => hasLostPet(n), SHRINES, get escortPts(){return escortPts;}, startEscort: (a,b) => startEscort(a,b), invalidate: () => invalidateChunks(), MINE, goMineFloor: f => goMineFloor(f), WX, startRainbow: () => startRainbow(), startRace: i => startRace(RACES[i]), raceTrack: i => raceTrack(RACES[i]), legendSpawns: () => legendSpawns(), LEGENDS, get stars(){return fallingStars;}, rollCatch: n => rollCatch(n), endFishGame: w => endFishGame(w), startFish: i => { fishing = {i, t: 0}; startFishGame(); }, enterArena: () => enterArena(), ARENA, readMap: () => readMap(), makeElite: e => makeElite(e), makeEnemy: (t,x,y,o) => makeEnemy(t,x,y,o), weapon: () => weapon(), armorVal: () => armorVal(), openCraft: () => openCraft(), NPCS, PROPERTIES, renderTravel: () => renderTravel(), DUNGEONS, enterDungeon: k => enterDungeon(k), get chests(){return chests;}, openChest: c => openChest(c), get chunkN(){return chunkLive.length;}, get counts(){return {floats:floats.length, particles:particles.length, enemies:enemies.length, arrows:arrows.length, eproj:eproj.length, hazards:hazards.length, bombs:bombs.length, zaps:zaps.length};}, get frameT(){return frameT;}, map, W, H, T, TOWNS, LANDMARKS, BOSSES, nodes, NODES, flood, get S(){return S;}, get enemies(){return enemies;}, craft, gather, attack, throwBomb, openBoard, get hazards(){return hazards;}, get eproj(){return eproj;}, PROPERTIES, sleep: () => sleep(), die: () => die()};
 requestAnimationFrame(loop);
