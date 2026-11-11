@@ -11,9 +11,11 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 - 22 quests (8 main story, 14 side quests), 17 achievements and a Bestiary
 - Fishing minigame, mining, woodcutting and foraging, each with its own skill level
 - Forge (5 weapon and 5 armor tiers), potion brewing, campfire cooking
-- Shop with a lure, lantern, boots and a fox companion; 14 treasure chests
+- 9 pets with abilities (loot magnet, luck, healing, extra XP, defense, damage shield, fire and wisp attacks): bought, found as rare monster drops, or won from bosses
+- 7 mounts, from a horse to a trampling boar, a frost wolf, a water-hopping toad and a flying drake
+- Shop with goods, weapons, pets and mounts; 14 treasure chests
 - Autosaves to the browser; plays with keyboard and mouse or touch
 
-Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, L for the journal, M for the map.
+Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, L for the journal, M for the map.
 
 `game.html` is the source. Run `./build.sh` to rebuild `index.html` from it.
