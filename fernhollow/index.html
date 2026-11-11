@@ -203,13 +203,22 @@ def('iron','Iron ore',{price:50,desc:'Dug from the middle floors.'});
 def('goldore','Gold ore',{price:120,desc:'Dug from the deep floors.'});
 def('gel','Moss gel',{price:15,desc:'Left behind by a mossling.'});
 def('wing','Dust wing',{price:25,desc:'Left behind by a cave moth.'});
+def('bouquet','Ribbon bouquet',{buy:500,desc:'Give it to someone at eight hearts to ask if they will walk out with you.'});
+def('ring','Riverstone ring',{desc:'Give it to the person you are courting at ten hearts to propose.'});
+const FEST=[{d:7,name:'Blossom Fair',a:540,b:1020,when:'9 am to 5 pm'},{d:10,name:'Lantern Night',a:1080,b:1440,when:'6 pm to midnight'},{d:8,name:'Harvest Show',a:540,b:1020,when:'9 am to 5 pm'},{d:12,name:'Frostlight Feast',a:540,b:1020,when:'9 am to 5 pm'}];
+const festOn=day=>{const f=FEST[Math.floor((day-1)/14)%4];return(day-1)%14+1===f.d?f:null},festToday=()=>festOn(S.day),festOpen=()=>{const f=festToday();return f&&S.time>=f.a&&S.time<f.b?f:null};
+const FSP=[[44,11],[45,13],[49,13],[49,11],[51,13]];
+const FLINES=[['Happy Blossom Fair! The daffodils are out east of the stream, if you want a ribbon.','I wait all winter for this. Everything smells like petals.','Odalys judges the posies. She is stricter than she looks.'],
+ ['Lantern Night. You pick who you send yours up with, so choose well.','The whole sky fills up. It never gets old.','On the river we called this the captain\'s wake. Same lanterns, bigger water.'],
+ ['Harvest Show! Bring the best thing you grew, caught or raised, and hold it up at the stall.','Bram judges by weight. Mostly by weight.','A good pumpkin beats anything. Almost anything.'],
+ ['Frostlight Feast. Everyone brings a gift and nobody goes home empty-handed.','Come and get warm. The stall has yours.','Snow outside, soup inside. This is the best day of winter.']];
 const MOB={moss:{name:'Mossling',hp:20,dmg:8,sp:22,drop:'gel'},moth:{name:'Cave moth',hp:12,dmg:6,sp:44,fly:1,drop:'wing'},grav:{name:'Gravelback',hp:48,dmg:15,sp:15,drop:'iron'}};
 const ANIM={hen:{name:'Hen',cost:300,desc:'Lays an egg in the paddock each morning when fed.',names:['Pip','Mabel','Dot','Clover','Nettle','Pudding']},cow:{name:'Cow',cost:1200,desc:'Gives milk once a day when fed.',names:['Juniper','Bramble','Hazel','Marigold','Tansy','Olive']}};
 def('sprinkler','Sprinkler',{place:1,price:80,desc:'Waters the eight soil tiles around it every morning.'});
 def('fence','Fence',{place:1,price:2,desc:'Keeps things tidy.'});
 def('cobble','Stepping stones',{place:1,price:2,desc:'A path that stops weeds.'});
 def('lantern','Lantern',{place:1,price:60,desc:'Lights the dark.'});
-const RECIPES=[['sprinkler',1,{stone:10,wood:5,quartz:1}],['fence',2,{wood:2}],['cobble',2,{stone:1}],['lantern',1,{wood:5,amber:1}],['blade2',1,{iron:8,wood:5}]];
+const RECIPES=[['sprinkler',1,{stone:10,wood:5,quartz:1}],['fence',2,{wood:2}],['cobble',2,{stone:1}],['lantern',1,{wood:5,amber:1}],['blade2',1,{iron:8,wood:5}],['ring',1,{goldore:1,quartz:1,amber:1}]];
 const FORAGE=['daffodil','brambleberry','chanterelle','holly'];
 
 /* ---------- sprites ---------- */
@@ -295,6 +304,8 @@ function drawIcon(g,id){const it=I[id];
   case'copper':case'iron':case'goldore':{const c={copper:'#e0812f',iron:'#e8eef0',goldore:'#f6d743'}[id];disc(g,8,9,5,'#6f6a66');disc(g,7,8,4,'#8d8782');for(const[x,y]of[[5,7],[9,6],[10,10],[6,11],[8,9]])R(g,c,x,y,2,2);break}
   case'gel':disc(g,8,10,4,'#5fae4d');R(g,'#5fae4d',6,5,4,2);R(g,'#b4ec9a',6,8,2,2);break;
   case'wing':for(let i=0;i<7;i++)R(g,i%2?'#a9a3c4':'#8f89ad',3+i,4+i,9-i,2);R(g,'#6d6a7c',3,3,2,10);break;
+  case'bouquet':R(g,'#4c9a40',7,8,1,7);R(g,'#4c9a40',5,9,1,5);R(g,'#4c9a40',10,9,1,5);disc(g,8,5,2,'#f07a93');disc(g,4,7,2,'#f6d743');disc(g,11,7,2,'#fff');R(g,'#f6d743',8,5,1,1);R(g,'#b5483c',5,12,6,2);R(g,'#b5483c',4,14,2,1);R(g,'#b5483c',10,14,2,1);break;
+  case'ring':disc(g,8,10,4,'#f2b63d');disc(g,8,10,2,'#1e2c3f');g.clearRect(7,9,3,3);R(g,'#62b8ea',7,3,3,3);R(g,'#dff1fb',7,3,1,1);R(g,'#a9761b',6,6,5,1);break;
   default:g.drawImage(SPR.forage(it.forage),0,1)}
 }
 const icon=id=>sprite('i_'+id,16,16,g=>drawIcon(g,id));
@@ -441,9 +452,21 @@ const NPCS=[
   rain:'Good fishing weather. Bad everything-else weather.',warm:['Take my old lure. It widens your luck a little.','You\'ve got river hands now.'],
   gift:{text:'Captain Ilse tied a lucky lure to your door. The green zone is wider when you reel.',items:[],flag:'lure'}}
 ];
+NPCS.push({id:'sorrel',name:'Sorrel',role:'Beekeeper',col:{skin:'#d9a57c',hair:'#7a3f2a',shirt:'#e0a52e',pants:'#4f5a3a'},
+ spots:[[0,54,11],[660,57,12],[1080,52,12]],loves:['daffodil','strawberry','honeycake'],likes:['brambleberry','melon','cream','egg','bigegg'],hates:['gel','wing','stone'],
+ intro:'You must be the new farmer. Sorrel. I keep the hives behind the purple cottage, so if your strawberries set well this spring, you are welcome.',
+ lines:['Bees fly about as far as your field and back. We are in business together whether you like it or not.','There are four festivals a year. Your journal has the dates.','Wren swears the daffodils taste of honey. Please do not eat the daffodils.','I came here for one summer. That was six years ago.'],
+ rain:'The hives go quiet in the rain. So do I, a little.',warm:['I saved the first frame of the season for you.','You are easy to talk to. I do not say that to many people.'],
+ gift:{text:'Sorrel left a jar-wrapped parcel on your step: honey cakes, still sticky.',items:[['honeycake',2]]}});
+Object.assign(NPCS[0],{marry:1,court:'Well. I have priced a great many bouquets and never been handed one. Yes. I would like that very much.',propose:'You made this? From the mine? ...I have counted everything in this village except how long I hoped you would ask. Yes.',
+ spouse:['I did the accounts while you slept. We are doing well. I checked twice.','Go on, the field will not water itself. I will have supper on.','I never thought I would like coming home to somewhere that is not the shop.']});
+Object.assign(NPCS[1],{marry:1,court:'Huh. Nobody ever brought me flowers. I will build a shelf for them. Yes, obviously yes.',propose:'I have been trying to carve one of these for a month and kept splitting the wood. Yours is better. Yes.',
+ spouse:['I fixed the squeaky floorboard. Then I missed the squeak, so I put it back.','The roof will hold another fifty winters. I made sure.','Careful in that mine. Come back in one piece, that is all I ask.']});
+Object.assign(NPCS[4],{marry:1,court:'Oh. Oh, these are from the east meadow, the bees will be furious. Yes. I would love to.',propose:'I was going to stay one summer. Then six years. Now, I think, all of them. Yes.',
+ spouse:['I moved two hives to the edge of your field. Our field.','There is honey in the tea. There is honey in everything now, sorry.','I like the house best at this hour, when you have just come in.']});
 NPCS[0].loves.push('cream');NPCS[1].likes.push('milk','egg');NPCS[2].likes.push('egg','bigegg');NPCS[3].likes.push('milk');
 NPCS[1].lines.push('The quarry shaft south of the plaza goes down fifteen floors. Take a sword, and bring me back some iron.');NPCS[1].likes.push('iron','copper');NPCS[1].loves.push('goldore');NPCS[2].hates.push('gel');
-function npcSpot(n){let s=n.spots[0];for(const q of n.spots)if(S.time>=q[0]+360||q[0]===0)s=S.time>=q[0]?q:s;return s}
+function npcSpot(n){if(festOpen()){const k=NPCS.indexOf(n);return[0,FSP[k][0],FSP[k][1]]}let s=n.spots[0];for(const q of n.spots)if(S.time>=q[0]+360||q[0]===0)s=S.time>=q[0]?q:s;return s}
 function placeNPCs(){for(const n of NPCS){const s=npcSpot(n);n.x=s[1]*T+8;n.y=s[2]*T+12;n.dir=0;n.walk=0}}
 
 /* ---------- state ---------- */
@@ -515,7 +538,7 @@ $('#pclose').onclick=closeSheet;
 const hearts=f=>{const n=Math.floor(f/100);return'<span class="hearts">'+'♥'.repeat(n)+'<i>'+'♥'.repeat(10-n)+'</i></span>'};
 function goals(){const best=Math.max(...NPCS.map(n=>S.npc[n.id].f));return[
  ['Till a patch and plant your seeds',!!S.flags.planted],['Harvest your first crop',S.harvested>0],['Ship 1,000g of goods ('+Math.min(S.shipped,1000)+'/1,000)',S.shipped>=1000],
- ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Reach floor 5 of the mine ('+Math.min(S.mineBest||1,5)+'/5)',(S.mineBest||1)>=5],['Find what is at the bottom of the mine',!!S.flags.heart],['Restore the windmill',S.mill.done]]}
+ ['Catch 5 fish ('+Math.min(S.fish,5)+'/5)',S.fish>=5],['Reach 3 hearts with a neighbour',best>=300],['Craft a sprinkler',!!S.flags.sprinkler],['Bring home your first animal',S.animals.length>0],['Reach floor 5 of the mine ('+Math.min(S.mineBest||1,5)+'/5)',(S.mineBest||1)>=5],['Find what is at the bottom of the mine',!!S.flags.heart],['Take part in a festival',!!S.flags.festJoined],['Marry someone you love',!!S.spouse],['Restore the windmill',S.mill.done]]}
 function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerHTML='';
  if(sheetKind==='bag'){$('#ptitle').textContent='Bag';
   h+='<div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,i===bagSel?'sel':'');h+='</div></div>';
@@ -527,19 +550,20 @@ function renderSheet(){const b=$('#pbody'),tabs=$('#ptabs');let h='';tabs.innerH
  else if(sheetKind==='shop'){$('#ptitle').textContent='Odalys\' General Store';
   tabs.innerHTML='<button type="button" class="btn sm'+(shopTab==='buy'?'':' alt')+'" data-tab="buy">Buy</button> <button type="button" class="btn sm'+(shopTab==='sell'?'':' alt')+'" data-tab="sell">Sell</button>';
   h+='<div class="info"><p>You have <b style="color:var(--gold)">'+S.gold.toLocaleString()+'g</b>.'+(S.mill.done?' The mill is turning: everything you sell earns a quarter more.':'')+'</p></div><div>';
-  if(shopTab==='buy'){const se=season(),list=Object.keys(CROPS).filter(k=>CROPS[k].season.includes(se)).map(k=>k+'_seed').concat(['honeycake']);
+  if(shopTab==='buy'){const se=season(),list=Object.keys(CROPS).filter(k=>CROPS[k].season.includes(se)).map(k=>k+'_seed').concat(['honeycake','bouquet']);
    for(const id of list){const it=I[id];h+='<div class="row"><img src="'+iconURL(id)+'" alt=""><div class="nm"><b>'+it.name+'</b><span>'+it.desc+(it.seed?' Sells for '+CROPS[it.seed].sell+'g each.':'')+'</span></div><span class="pr">'+it.buy+'g</span><div class="bs"><button type="button" class="btn sm" data-act="buy" data-id="'+id+'" data-n="1"'+(S.gold>=it.buy?'':' disabled')+'>Buy</button><button type="button" class="btn sm alt" data-act="buy" data-id="'+id+'" data-n="5"'+(S.gold>=it.buy*5?'':' disabled')+'>×5</button></div></div>'}
    h+='</div><div><h3>Livestock ('+S.animals.length+'/6 in the paddock)</h3>';for(const k in ANIM){const a=ANIM[k];h+='<div class="row"><img src="'+animalURL(k)+'" alt="" style="object-fit:contain"><div class="nm"><b>'+a.name+'</b><span>'+a.desc+' Eats one fiber a night.</span></div><span class="pr">'+a.cost+'g</span><div class="bs"><button type="button" class="btn sm" data-act="animal" data-k="'+k+'"'+(S.gold>=a.cost&&S.animals.length<6?'':' disabled')+'>Buy</button></div></div>'}}
   else{let any=false;S.inv.forEach((s,i)=>{if(!s||I[s.id].tool||!I[s.id].price)return;any=true;h+='<div class="row"><img src="'+iconURL(s.id)+'" alt=""><div class="nm"><b>'+I[s.id].name+' ×'+s.n+'</b><span>'+I[s.id].desc+'</span></div><span class="pr">'+price(s.id)+'g</span><div class="bs"><button type="button" class="btn sm" data-act="sell" data-i="'+i+'" data-n="1">Sell</button><button type="button" class="btn sm alt" data-act="sell" data-i="'+i+'" data-n="all">All</button></div></div>'});
    if(!any)h+='<p>Nothing in your bag to sell yet. Crops, fish, forage and stone all fetch a price.</p>'}h+='</div>'}
  else if(sheetKind==='journal'){$('#ptitle').textContent='Journal';
   h+='<div><h3>To do</h3>'+goals().map(g=>'<div class="goal'+(g[1]?' done':'')+'"><span class="bx">'+(g[1]?'✓':'·')+'</span><span>'+g[0]+'</span></div>').join('')+'</div>';
-  h+='<div><h3>Neighbours</h3>'+NPCS.map(n=>{const s=S.npc[n.id];return'<div class="row"><div class="nm"><b>'+(s.met?n.name:'Someone in the village')+'</b><span>'+(s.met?n.role:'You have not met yet.')+'</span></div>'+hearts(s.f)+'</div>'}).join('')+'</div>';
+  h+='<div><h3>Neighbours</h3>'+NPCS.map(n=>{const s=S.npc[n.id];return'<div class="row"><div class="nm"><b>'+(s.met?n.name:'Someone in the village')+'</b><span>'+(s.met?n.role+(S.spouse===n.id?' · Married to you':S.engaged&&S.engaged.id===n.id?' · Engaged to you':s.dating?' · Courting':''):'You have not met yet.')+'</span></div>'+hearts(s.f)+'</div>'}).join('')+'</div>';
+  h+='<div><h3>Festivals</h3>'+FEST.map((f,k)=>'<div class="goal"><span class="bx">'+(festToday()===f?'★':'·')+'</span><span>'+SEASONS[k]+' '+f.d+': '+f.name+', '+f.when+(festToday()===f?' (today)':'')+'</span></div>').join('')+'</div>';
   h+='<div><h3>Ledger</h3><p style="margin:0">Shipped and sold: '+S.shipped.toLocaleString()+'g. Crops harvested: '+S.harvested+'. Fish landed: '+S.fish+'. Mine creatures driven off: '+(S.kills||0)+'. Deepest floor: '+(S.mineBest||1)+'.</p></div>'}
  else if(sheetKind==='help'){$('#ptitle').textContent='How to play';
   h+='<dl class="keys"><dt><kbd>WASD</kbd> <kbd>Arrows</kbd></dt><dd>Walk. On a phone, drag the pad.</dd><dt><kbd>Space</kbd> <kbd>E</kbd> or click</dt><dd>Use what you hold on the outlined tile, or talk, harvest and open doors.</dd><dt><kbd>1</kbd>–<kbd>0</kbd>, wheel</dt><dd>Pick a hotbar slot.</dd><dt><kbd>I</kbd> <kbd>J</kbd></dt><dd>Bag and workbench, journal.</dd><dt><kbd>F</kbd></dt><dd>Eat the food you are holding.</dd></dl>';
   h+='<div><h3>A farming day</h3><p style="margin:0">Hoe grass into soil, plant seeds in season, water every morning. Ripe crops go in the bin beside your door and pay out overnight, or sell them at the store between 8 am and 6 pm. Go inside your house and sleep in the bed before 2 am. Rain waters for you.</p></div>';
-  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div><div><h3>The mine</h3><p style="margin:0">The quarry shaft is just south of the village plaza. Break rocks with the pickaxe for stone and ore, and swing your sword with Space at anything that comes for you. Ladders lead down fifteen floors; every fifth floor becomes a shortcut from the entrance. Food restores health as well as energy. If your health runs out you are dragged back to the surface and lose a tenth of your coin.</p></div>'}
+  h+='<div><h3>Beyond the field</h3><p style="margin:0">Cross the bridge east to the village. Talk to neighbours daily and bring gifts they like. Fish the pond and stream. Chop and mine for the workbench in your bag. The notice board by the windmill has the village\'s big project.</p></div><div><h3>Home and animals</h3><p style="margin:0">Your house has a bed, a storage chest and a bookshelf of your aunt\'s tips. Odalys sells hens and cows, which live in the paddock beside the barn. Put fiber in the barn\'s hay loft, pat them daily, pick up eggs and milk the cows. Biscuit the dog follows you around the farm.</p></div><div><h3>The mine</h3><p style="margin:0">The quarry shaft is just south of the village plaza. Break rocks with the pickaxe for stone and ore, and swing your sword with Space at anything that comes for you. Ladders lead down fifteen floors; every fifth floor becomes a shortcut from the entrance. Food restores health as well as energy. If your health runs out you are dragged back to the surface and lose a tenth of your coin.</p></div><div><h3>Courting and festivals</h3><p style="margin:0">Odalys, Bram and Sorrel can be courted. At eight hearts, give a ribbon bouquet from the store. At ten hearts, craft a riverstone ring at the workbench (gold ore, quartz and amber) and give it to propose; the wedding is three days later and your spouse moves in. Each season has one festival in the village plaza, with dates in your journal. Use the striped stall to take part.</p></div>'}
  else if(sheetKind==='chest'){$('#ptitle').textContent='Storage chest';
   h+='<div><h3>In the chest</h3><div class="grid">';for(let i=0;i<20;i++)h+=slotHTML(S.chest[i],10+i,'').replace('data-slot="'+(10+i)+'"','data-cs="'+i+'"');h+='</div></div><div><h3>Carried</h3><div class="grid">';for(let i=0;i<30;i++)h+=slotHTML(S.inv[i],i,'');h+='</div></div><div class="info"><p>Pick a stack to move it across. The chest keeps things safe between seasons.</p></div>'}
  else if(sheetKind==='barn'){$('#ptitle').textContent='Barn';const fb=count('fiber');
@@ -572,17 +596,18 @@ function facing(){const d=DV[P.dir];return[Math.floor(P.x/T)+d[0],Math.floor((P.
 const parts=[];function pop(id,x,y){parts.push({c:icon(id),x:x*T,y:y*T,l:.8})}
 const shakes={};
 function spend(n){if(S.energy<=0){toast('You are worn out. Eat something or go to bed.');return false}S.energy=Math.max(0,S.energy-n);return true}
-function nearNPC(tx,ty){let best=null,bd=22;for(const n of NPCS){const d=Math.min(Math.hypot(n.x-(tx*T+8),n.y-6-(ty*T+8)),Math.hypot(n.x-P.x,n.y-P.y)-2);if(d<bd){bd=d;best=n}}return best}
+function nearNPC(tx,ty){let best=null,bd=22;for(const n of NPCS){if(gone(n))continue;const d=Math.min(Math.hypot(n.x-(tx*T+8),n.y-6-(ty*T+8)),Math.hypot(n.x-P.x,n.y-P.y)-2);if(d<bd){bd=d;best=n}}return best}
 function act(cx,cy){
  if(ui==='dialog'){advanceDialog();return}if(ui==='fish'){fishPress();return}if(ui!=='play'||P.busy>0)return;
  let t=null;if(cx!=null){const dx=cx*T+8-P.x,dy=cy*T+8-(P.y-4);if(Math.hypot(dx,dy)<=T*1.9){t=[cx,cy];if(Math.abs(dx)>4||Math.abs(dy)>4)P.dir=Math.abs(dx)>Math.abs(dy)?(dx<0?1:2):(dy<0?3:0)}}
  if(!t)t=facing();const[tx,ty]=t;if(S.scene==='home'){actHome(tx,ty);return}if(S.scene==='mine'){actMine(tx,ty);return}if(!inb(tx,ty))return;const i=idx(tx,ty),o=objs[i],g=ground[i],held=S.inv[S.sel],it=held&&I[held.id];
+ if(festToday()&&ty===12&&(tx===46||tx===47)){festBooth();return}
  const n=nearNPC(tx,ty);if(n){talk(n);return}
  const an=nearAnimal(tx,ty);if(an){tend(an);return}
  if(inter[i]==='home'){enterHome();return}
  if(inter[i]==='barn'){openSheet('barn');return}
  if(inter[i]==='cave'){const cps=[1,6,11].filter(c=>c<=(S.mineBest||1));say('The old quarry shaft',['Cold air comes up from below. Something down there is moving.'],cps.map(c=>['Go to floor '+c,()=>enterMine(c)]).concat([['Stay out']]));return}
- if(inter[i]==='shop'){const h=S.time/60;if(h>=8&&h<18){shopTab='buy';sfx('coin');openSheet('shop')}else say('General Store',['The sign says: open 8 am to 6 pm.']);return}
+ if(inter[i]==='shop'){if(festToday()){say('General Store',['Closed for the '+festToday().name+'. Odalys is in the plaza.']);return}const h=S.time/60;if(h>=8&&h<18){shopTab='buy';sfx('coin');openSheet('shop')}else say('General Store',['The sign says: open 8 am to 6 pm.']);return}
  if(inter[i]==='bin'){if(held&&!it.tool&&it.price){const b=S.bin.find(q=>q.id===held.id);if(b)b.n+=held.n;else S.bin.push({id:held.id,n:held.n});toast('Shipped '+held.n+' '+it.name+'. Pays '+price(held.id)*held.n+'g overnight.');S.inv[S.sel]=null;sfx('pop');renderHot()}
   else toast('Hold something to sell, then use the bin. Inside so far: '+S.bin.reduce((a,b)=>a+price(b.id)*b.n,0)+'g.');return}
  if(inter[i]==='board'){board();return}
@@ -620,6 +645,7 @@ function tend(a){const heart=()=>{parts.push({c:heartSprite(),x:a.x-3,y:a.y-24,l
 function enterHome(){S.scene='home';P.x=5*T+8;P.y=7*T+12;P.dir=3;sfx('tick')}
 function exitHome(){S.scene='farm';P.x=12*T+8;P.y=9*T+13;P.dir=0;sfx('tick')}
 function actHome(tx,ty){const k=tx>=0&&ty>=0&&tx<IW&&ty<IH?IINT[ty*IW+tx]:null;
+ if(spouseHome()&&(Math.hypot(tx*T+8-SPX,ty*T+8-(SPY-6))<14||Math.hypot(P.x-SPX,P.y-SPY)<16)){spouseTalk();return}
  if(k==='bed')say('Bed',['Turn in for the night?'],[['Sleep until morning',()=>endDay(false)],['Not yet']]);
  else if(k==='chest'){sfx('tick');openSheet('chest')}
  else if(k==='fire')say('Hearth',[S.time>1020?'The fire is banked low and the room smells of woodsmoke. A good night to be indoors.':'The hearth is warm. Aunt Mirabel\'s kettle still hangs on its hook.']);
@@ -681,16 +707,45 @@ function drawMine(){const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.
  for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
  if(lcv.width!==vw||lcv.height!==vh){lcv.width=vw;lcv.height=vh}lctx.globalCompositeOperation='source-over';lctx.fillStyle='#04050a';lctx.fillRect(0,0,vw,vh);lctx.globalCompositeOperation='destination-out';glow(Math.round(P.x)-cx,Math.round(P.y)-10-cy,84);for(const[x,y]of lights)glow(x-cx,y-cy,30);
  ctx.globalAlpha=Math.min(.92,.74+M.f*.012);ctx.drawImage(lcv,0,0);ctx.globalAlpha=1}
+/* ---------- courting, home life, festivals ---------- */
+let lanT=0;const SPX=8*T+8,SPY=6*T+12;
+const spouseHome=()=>!!S.spouse&&(S.time<540||S.time>=1080)&&!festOpen();
+const gone=n=>S.spouse===n.id&&spouseHome();
+function court(n,id){const s=S.npc[n.id];
+ if(!n.marry){say(n.name,['That is kind of you. I think it is meant for someone else, though.']);return}
+ if(S.spouse===n.id){say(n.name,['You already asked. I already said yes. I would say it again.']);return}
+ if(S.spouse||(S.engaged&&S.engaged.id!==n.id)){say(n.name,['You are spoken for, and I like you both too much for that.']);return}
+ if(id==='bouquet'){if(s.dating)say(n.name,['We are already walking out together. Keep the flowers for the table.']);else if(s.f<800)say(n.name,['Oh. That is lovely, but let us know each other a little better first.','(You need eight hearts.)']);else{useSel();s.dating=1;sfx('win');say(n.name,[n.court])}return}
+ if(S.engaged){say(n.name,['One ring is plenty. I am counting the days.']);return}
+ if(!s.dating)say(n.name,['A ring? We have not even walked out together yet.','(Give a ribbon bouquet first.)']);else if(s.f<1000)say(n.name,['Ask me again soon. Not quite yet.','(You need ten hearts.)']);
+ else{useSel();S.engaged={id:n.id,day:S.day+3};sfx('win');say(n.name,[n.propose,'The wedding will be in three days, in the village plaza.'])}}
+function spouseTalk(){const n=NPCS.find(q=>q.id===S.spouse),s=S.npc[n.id];if(s.kiss!==S.day){s.kiss=S.day;S.energy=Math.min(S.maxE,S.energy+15);parts.push({c:heartSprite(),x:SPX-3,y:SPY-28,l:.9});sfx('pop')}else sfx('talk');say(n.name,[n.spouse[(S.day+(S.time>=1080?1:0))%n.spouse.length]])}
+const boothSprite=se=>sprite('booth'+se,32,38,g=>{const c=['#f07a93','#f2b63d','#d9772e','#62b8ea'][se];R(g,'#6b4a2e',1,10,2,28);R(g,'#6b4a2e',29,10,2,28);for(let x=0;x<32;x+=4){R(g,(x>>2)%2?'#f6f1dc':c,x,1,4,10);R(g,(x>>2)%2?'#e3dcc4':shade(c,-.2),x+1,11,2,1)}R(g,shade(c,-.3),0,0,32,1);
+ R(g,'#c99b60',0,22,32,3);R(g,'#a87a45',0,25,32,13);for(let x=3;x<32;x+=7)R(g,'#8a6234',x,25,1,13);
+ if(se===0){for(const[x,k]of[[6,'#f6d743'],[14,'#f07a93'],[22,'#fff']]){R(g,'#4c9a40',x+1,17,1,5);disc(g,x+1,16,2,k)}}else if(se===1){for(const x of[6,15,24]){R(g,'#f6b23c',x,15,4,6);R(g,'#fff3b0',x+1,16,2,3);R(g,'#3b4047',x,14,4,1)}}
+ else if(se===2){disc(g,9,18,4,'#f0892b');R(g,'#4c9a40',9,12,1,3);disc(g,21,19,3,'#e23b4e');R(g,'#f1cf3f',25,15,2,7)}else{R(g,'#d8323f',6,15,7,7);R(g,'#f6d743',9,15,1,7);R(g,'#2f7f86',18,16,8,6);R(g,'#f6f1dc',21,16,2,6)}});
+function festBooth(){const f=festToday(),se=season(),key='fest'+S.day,held=S.inv[S.sel],it=held&&I[held.id],all=d=>{for(const n of NPCS)bump(n,d)},done=()=>{S.flags[key]=1;S.flags.festJoined=1;sfx('win')};
+ if(!festOpen()){say(f.name,[S.time<f.a?'The stall is still being set up. Come back '+f.when.split(' to ')[0]+' onwards.':'The stall is packed away. Until next year.']);return}
+ if(S.flags[key]){say(f.name,['You have taken part this year. Enjoy the rest of it.']);return}
+ if(se===0){const c=count('daffodil');say(f.name,['Odalys is judging posies. "Wild daffodils only, and five makes a posy worth a ribbon. You are carrying '+c+'. They are out all over the valley today."'],c>=5?[['Hand over 5 daffodils',()=>{removeItem('daffodil',5);done();S.gold+=300;addItem('strawberry_seed',10);all(15);say(f.name,['First ribbon. 300g, ten packets of strawberry seeds, and the whole plaza claps.'])}],['Keep looking']]:null)}
+ else if(se===1){const met=NPCS.filter(n=>S.npc[n.id].met);say(f.name,['A paper lantern with your name on it. Who do you send it up with?'],met.map(n=>['With '+n.name,()=>{done();bump(n,80);lanT=40;say(n.name,['You light it together and let go. It joins the others over the rooftops, and neither of you says anything for a while.'])}]).concat([['On your own',()=>{done();all(10);lanT=40;say(f.name,['You let it go on your own and watch until you cannot tell which one is yours.'])}],['Not yet']]))}
+ else if(se===2){if(!held||it.tool||!it.price){say(f.name,['Bram is weighing entries. "Hold the best thing you grew, caught or raised, and come back to the stall."']);return}
+  say(f.name,['Bram eyes your '+it.name.toLowerCase()+'. "That your entry?"'],[['Enter the '+it.name.toLowerCase(),()=>{const v=it.price;useSel();done();all(10);
+   if(v>=250){S.gold+=1500;addItem('sprinkler',2);say(f.name,['First place! 1,500g and two sprinklers. Bram shakes your hand hard enough to count as a second prize.'])}
+   else if(v>=100){S.gold+=500;say(f.name,['Second place, and 500g. "Bring something heavier next year," says Bram, grinning.'])}
+   else{S.gold+=100;say(f.name,['Third place, and 100g for taking part. Melons, pumpkins and cream tend to win.'])}}],['Pick something else']])}
+ else{let best=NPCS[0];for(const n of NPCS)if(S.npc[n.id].met&&S.npc[n.id].f>S.npc[best.id].f)best=n;const g={odalys:['honeycake',3],bram:['iron',6],wren:['holly',5],ilse:['pike',1],sorrel:['honeycake',4]}[best.id];
+  say(f.name,['A parcel on the stall has your name on it, in '+best.name+'\'s handwriting.'],[['Open it',()=>{done();addItem(g[0],g[1]);all(20);say(best.name,['"'+I[g[0]].name+', '+g[1]+' of. Do not look at me like that, it is Frostlight." You stay for soup.'])}]])}}
 function talk(n){const s=S.npc[n.id],held=S.inv[S.sel],it=held&&I[held.id];P.dir=Math.abs(n.x-P.x)>Math.abs(n.y-P.y)?(n.x<P.x?1:2):(n.y<P.y?3:0);n.dir=[3,2,1,0][P.dir];sfx('talk');
- const chat=()=>{let line;if(!s.met){s.met=1;line=n.intro}else if(S.weather==='rain'&&hash(S.day,3,1)<.5)line=n.rain;else{const pool=s.f>=300?n.lines.concat(n.warm):n.lines;line=pool[Math.floor(hash(S.day,n.id.length,S.npc[n.id].f)*pool.length)]}
+ const chat=()=>{let line;if(!s.met){s.met=1;line=n.intro}else if(festOpen())line=FLINES[season()][NPCS.indexOf(n)%3];else if(S.weather==='rain'&&hash(S.day,3,1)<.5)line=n.rain;else{const pool=s.f>=300?n.lines.concat(n.warm):n.lines;line=pool[Math.floor(hash(S.day,n.id.length,S.npc[n.id].f)*pool.length)]}
   if(s.talk!==S.day){s.talk=S.day;bump(n,20)}say(n.name,[line])};
  const opts=[];
- if(n.id==='odalys'&&S.time>=480&&S.time<1080&&s.met)opts.push(['Browse the store',()=>{shopTab='buy';openSheet('shop')}]);
- if(s.met&&it&&!it.tool)opts.push(['Give '+it.name,()=>{if(s.gift===S.day){say(n.name,['One gift a day is plenty. Thank you, though.']);return}
+ if(n.id==='odalys'&&S.time>=480&&S.time<1080&&s.met&&!festToday())opts.push(['Browse the store',()=>{shopTab='buy';openSheet('shop')}]);
+ if(s.met&&it&&!it.tool)opts.push(['Give '+it.name,()=>{if(held.id==='bouquet'||held.id==='ring'){court(n,held.id);return}if(s.gift===S.day){say(n.name,['One gift a day is plenty. Thank you, though.']);return}
   s.gift=S.day;const id=held.id;useSel();let d,l;if(n.loves.includes(id)){d=80;l='Oh! This is exactly my favourite. Thank you!'}else if(n.likes.includes(id)){d=45;l='That\'s thoughtful. I do like these.'}else if(n.hates.includes(id)){d=-20;l='Ah. I... will find somewhere for this.'}else{d=20;l='For me? Thank you.'}
   bump(n,d);sfx(d>0?'coin':'fail');say(n.name,[l])}]);
  if(opts.length){opts.unshift(['Chat',chat]);say(n.name,['"Morning. What do you need?"'],opts)}else chat()}
-function bump(n,d){const s=S.npc[n.id],was=s.f;s.f=clamp(s.f+d,0,1000);if(was<300&&s.f>=300&&!s.rew){s.rew=1;S.mail.push(n.id)}}
+function bump(n,d){const s=S.npc[n.id],was=s.f;s.f=clamp(s.f+d,0,n.marry&&!s.dating&&S.spouse!==n.id?Math.max(800,Math.min(s.f,1000)):1000);if(was<300&&s.f>=300&&!s.rew){s.rew=1;S.mail.push(n.id)}}
 function board(){const m=S.mill,need={wood:60,stone:40,gold:4000};
  if(m.done){say('Notice board',['The windmill turns. Flour goes upriver and Fernhollow\'s prices are up a quarter. Someone has pinned a pressed daffodil here with your name under it.']);return}
  const txt='WINDMILL REPAIR FUND. Wood '+m.wood+'/'+need.wood+'. Stone '+m.stone+'/'+need.stone+'. Coin '+m.gold+'/'+need.gold+'g.',opts=[];
@@ -730,6 +785,12 @@ function endDay(passed){let total=0,rows='';for(const b of S.bin){const v=price(
  for(let i=0;i<N;i++)if(objs[i]&&objs[i].t==='sprinkler'){const x=i%W,y=Math.floor(i/W);for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)if(inb(x+a,y+b)&&ground[idx(x+a,y+b)]===3)wet[idx(x+a,y+b)]=1}
  spawn();let hungry=0;for(const a of S.animals){if(S.hay>0){S.hay--;a.fed=1;if(a.k==='cow')a.milk=1;else for(let q=0;q<14;q++){const i=idx(ri(25,30),ri(4,8));if(!objs[i]){objs[i]={t:'drop',id:a.f>=500?'bigegg':'egg'};break}}}else{a.fed=0;a.milk=0;a.f=Math.max(0,a.f-20);hungry++}}
  S.scene='home';P.x=3*T+8;P.y=3*T+12;P.dir=0;resetDog();let mail='';
+ const note=t=>{mail+='<div class="info"><p>'+t+'</p></div>'},ft=festToday(),ftm=festOn(S.day+1);
+ if(S.engaged&&S.day>=S.engaged.day&&!ft){const n=NPCS.find(q=>q.id===S.engaged.id);S.spouse=n.id;S.engaged=null;S.npc[n.id].f=1000;for(const q of NPCS)if(q!==n)bump(q,30);
+  note('<b>Your wedding day.</b> The whole village crowds into the plaza under an arch Bram finished at dawn. Captain Ilse reads the words off a river chart, Wren throws far too many petals, and '+n.name+' walks home beside you. The farmhouse has two people in it now.')}
+ if(S.spouse){const n=NPCS.find(q=>q.id===S.spouse),q=rnd();if(q<.35&&S.weather==='sun'){let c=0;for(let i=0;i<N;i++)if(ground[i]===3&&!wet[i]){wet[i]=1;c++}if(c)note(n.name+' was up before you and watered the whole field.')}else if(q<.6){addItem('honeycake',1);note(n.name+' left breakfast on the table: a honey cake, in your bag.')}}
+ if(ft){note('<b>Today is the '+ft.name+'.</b> Come to the village plaza, '+ft.when+'. The store is closed for the day.');if(season()===0)for(let k=0;k<40;k++){const x=k%2?ri(36,60):ri(3,31),y=k%2?ri(14,40):ri(31,41),i=idx(x,y);if(ground[i]===0&&!objs[i]&&!solid[i])objs[i]={t:'forage',k:0}}}
+ else if(ftm)note('Tomorrow is the '+ftm.name+', in the village plaza, '+ftm.when+'.');
  for(const id of S.mail){const n=NPCS.find(q=>q.id===id);for(const[a,b]of n.gift.items)addItem(a,b);if(n.gift.flag)S.flags[n.gift.flag]=1;mail+='<div class="info"><p>'+n.gift.text+'</p></div>'}S.mail=[];
  placeNPCs();renderGround();save();
  dayHTML='<div><h3>'+dateStr()+'</h3><p style="margin:0">'+({sun:'A clear morning.',rain:'Rain on the roof. The soil is already watered.',snow:'Snow overnight. The soil is damp with it.'})[S.weather]+(se!==old?' '+SEASONS[se]+' has arrived, and the store has new seeds.':'')+(died?' '+died+' out-of-season crop'+(died>1?'s':'')+' withered.':'')+(hungry?' '+hungry+' animal'+(hungry>1?'s':'')+' went hungry. Add fiber to the hay loft in the barn.':'')+(passed?' You collapsed in the dark. Someone carried you home, and '+lost+'g went missing on the way.':'')+'</p></div>'
@@ -758,7 +819,7 @@ $('#actbtn').addEventListener('pointerdown',e=>{e.preventDefault();act()});
 
 /* ---------- update ---------- */
 const cam={x:0,y:0};let clockT=0,animT=0;
-function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x];if(S.scene==='mine'){if(x<0||y<0||x>=MW||y>=MH)return true;const o=M.o[y*MW+x];return!!M.t[y*MW+x]||!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i])return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
+function blocked(px,py){const x=Math.floor(px/T),y=Math.floor(py/T);if(S.scene==='home')return x<0||y<0||x>=IW||y>=IH||!!ISOL[y*IW+x];if(S.scene==='mine'){if(x<0||y<0||x>=MW||y>=MH)return true;const o=M.o[y*MW+x];return!!M.t[y*MW+x]||!!(o&&(o.t==='rock'||o.t==='ore'||o.t==='treasure'))}if(!inb(x,y))return true;const i=idx(x,y);if(ground[i]===2||solid[i]||(y===12&&(x===46||x===47)&&festToday()))return true;const o=objs[i];return!!(o&&(o.t==='rock'||o.t==='fence'||o.t==='sprinkler'||o.t==='lantern'||(o.t==='tree'&&o.g>=2)))}
 const hit=(x,y)=>blocked(x-4,y-5)||blocked(x+4,y-5)||blocked(x-4,y-1)||blocked(x+4,y-1);
 function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').classList.remove('on')}
  for(let k=parts.length-1;k>=0;k--){const p=parts[k];p.l-=dt;p.y-=dt*22;if(p.l<=0)parts.splice(k,1)}
@@ -769,7 +830,7 @@ function update(dt){animT+=dt;if(toastT>0){toastT-=dt;if(toastT<=0)$('#toast').c
   let vx=(keys.ArrowRight||keys.KeyD?1:0)-(keys.ArrowLeft||keys.KeyA?1:0)+joy.x,vy=(keys.ArrowDown||keys.KeyS?1:0)-(keys.ArrowUp||keys.KeyW?1:0)+joy.y;const m=Math.hypot(vx,vy);P.moving=m>.1&&P.busy<=0;
   if(P.moving){if(m>1){vx/=m;vy/=m}const sp=(S.energy<=0?42:74)*dt;P.dir=Math.abs(vx)>Math.abs(vy)?(vx<0?1:2):(vy<0?3:0);
    const nx=P.x+vx*sp;if(!hit(nx,P.y))P.x=nx;const ny=P.y+vy*sp;if(!hit(P.x,ny))P.y=ny;P.walk+=dt*9}else P.walk=0;
-  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);if(P.atk>0)P.atk-=dt;if(S.scene==='mine'&&M)updMine(dt);
+  if(S.scene==='home'&&Math.floor((P.y-3)/T)>=8)exitHome();updAnimals(dt);updDog(dt);if(P.atk>0)P.atk-=dt;if(lanT>0)lanT-=dt;if(S.scene==='mine'&&M)updMine(dt);
   for(const n of NPCS){const s=npcSpot(n),tx=s[1]*T+8,ty=s[2]*T+12,dx=tx-n.x,dy=ty-n.y,sp=26*dt;n.mv=false;
    if(Math.hypot(n.x-P.x,n.y-P.y)<20)continue;
    if(Math.abs(dx)>1){const band=n.y>=10*T+6&&n.y<=11*T+14,inPl=n.x>=42*T&&tx>=42*T;if(!band&&!inPl){const by=11*T+4;n.y+=Math.sign(by-n.y)*Math.min(sp,Math.abs(by-n.y));n.dir=by>n.y?0:3}else{n.x+=Math.sign(dx)*Math.min(sp,Math.abs(dx));n.dir=dx<0?1:2}n.mv=true}
@@ -788,8 +849,8 @@ function drawHome(){const vw=cv.width,vh=cv.height,cx=Math.round(cam.x),cy=Math.
  if(S.time>1110){R(ctx,'#fff',38-cx,12-cy,1,1);R(ctx,'#fff',55-cx,16-cy,1,1);R(ctx,'#f6f1dc',42-cx,17-cy,2,2)}
  for(let k=0;k<6;k++){const h=3+Math.floor((Math.sin(animT*9+k*2.1)+1)*3.5);R(ctx,k%2?'#f6b23c':'#e2452f',88+k*3-cx,30-h-cy,3,h)}R(ctx,'#ffe08a',94-cx,27-cy,4,3);
  if(ui==='play'){let t=facing();if(hover){const dx=hover[0]*T+8-P.x,dy=hover[1]*T+8-(P.y-4);if(Math.hypot(dx,dy)<=T*1.9)t=hover}ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.strokeRect(t[0]*T-cx+.5,t[1]*T-cy+.5,T-1,T-1)}
- const L=FURN.map(f=>({y:f.by*T-2,f}));L.push({y:P.y,p:1});L.sort((a,b)=>a.y-b.y);
- for(const e of L){if(e.f){const f=e.f;ctx.drawImage(sprite('f_'+f.k,f.w,f.h,f.fn),f.x*T-cx,f.by*T-f.h-cy)}
+ const L=FURN.map(f=>({y:f.by*T-2,f}));L.push({y:P.y,p:1});if(spouseHome())L.push({y:SPY,sp:NPCS.find(q=>q.id===S.spouse)});L.sort((a,b)=>a.y-b.y);
+ for(const e of L){if(e.sp){R(ctx,'rgba(0,0,0,.22)',SPX-5-cx,SPY-2-cy,10,3);ctx.drawImage(charSprite(e.sp.id,e.sp.col,P.x<SPX-10?1:P.x>SPX+10?2:0,0),SPX-8-cx,SPY-22-cy)}else if(e.f){const f=e.f;ctx.drawImage(sprite('f_'+f.k,f.w,f.h,f.fn),f.x*T-cx,f.by*T-f.h-cy)}
   else{const px=Math.round(P.x)-8-cx,py=Math.round(P.y)-22-cy;R(ctx,'rgba(0,0,0,.22)',px+3,py+20,10,3);ctx.drawImage(charSprite('p',PCOL,P.dir,P.moving?1+Math.floor(P.walk)%2:0),px,py)}}
  for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
  if(dk>.2){ctx.fillStyle='rgba(28,14,48,'+(dk*.45).toFixed(2)+')';ctx.fillRect(0,0,vw,vh);const g=ctx.createRadialGradient(96-cx,40-cy,4,96-cx,40-cy,70);g.addColorStop(0,'rgba(255,170,70,.28)');g.addColorStop(1,'rgba(255,170,70,0)');ctx.fillStyle=g;ctx.fillRect(16-cx,16-cy,144,120)}}
@@ -802,7 +863,7 @@ function draw(){if(S.scene==='home'){drawHome();return}if(S.scene==='mine'&&M){d
  const L=[];
  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const o=objs[idx(x,y)];if(o)L.push({y:(y+1)*T-(o.t==='crop'?6:1),o,x,ty:y})}
  for(const b of BLD)L.push({y:(b.y+b.h)*T-2,b});L.push({y:(MILL.y+3)*T-2,mill:1});for(const f of FIX)L.push({y:(f.y+1)*T-2,f});
- for(const n of NPCS)L.push({y:n.y,n});for(const a of S.animals)L.push({y:a.y,a});L.push({y:DOG.y,dog:1});L.push({y:P.y,p:1});L.sort((a,b)=>a.y-b.y);
+ for(const n of NPCS)if(!gone(n))L.push({y:n.y,n});const fe=festToday();if(fe)L.push({y:13*T-2,booth:1});for(const a of S.animals)L.push({y:a.y,a});L.push({y:DOG.y,dog:1});L.push({y:P.y,p:1});L.sort((a,b)=>a.y-b.y);
  for(const e of L){
   if(e.o){const o=e.o,bx=e.x*T+8-cx,by=(e.ty+1)*T-cy;let s,sc=1;
    if(o.t==='tree'){if(o.g===0)s=SPR.sprout();else{s=treeSprite(o.v,se);sc=[0,.45,.7,1][o.g]}}
@@ -820,6 +881,7 @@ function draw(){if(S.scene==='home'){drawHome();return}if(S.scene==='mine'&&M){d
   else if(e.f){const f=e.f,s=SPR[f.k]();ctx.drawImage(s,f.x*T-cx,(f.y+1)*T-s.height-cy)}
   else if(e.n){const n=e.n,fr=n.mv?1+Math.floor(n.walk)%2:0,px=Math.round(n.x)-8-cx,py=Math.round(n.y)-22-cy;R(ctx,'rgba(0,0,0,.22)',px+3,py+20,10,3);ctx.drawImage(charSprite(n.id,n.col,n.dir,fr),px,py);
    if(ui==='play'&&Math.hypot(n.x-P.x,n.y-P.y)<26){const by=py-9+Math.round(Math.sin(animT*4));R(ctx,'#f6f1dc',px+3,by,10,6);R(ctx,'#f6f1dc',px+7,by+6,2,1);for(let k=0;k<3;k++)R(ctx,'#16212e',px+5+k*3,by+2,1,2)}}
+  else if(e.booth){const s=boothSprite(se);ctx.drawImage(s,46*T-cx,13*T-s.height-cy)}
   else if(e.a||e.dog){const a=e.a||DOG,fr=a.mv?Math.floor(a.w||0)%2:0,s=e.dog?dogSprite(a.fl,fr):a.k==='hen'?henSprite(a.fl||0,fr):cowSprite(a.fl||0,fr),ax=Math.round(a.x)-cx-(s.width>>1),ay=Math.round(a.y)-cy-s.height;R(ctx,'rgba(0,0,0,.2)',ax+2,ay+s.height-1,s.width-4,2);ctx.drawImage(s,ax,ay)}
   else{const fr=P.moving?1+Math.floor(P.walk)%2:0,px=Math.round(P.x)-8-cx,py=Math.round(P.y)-22-cy;R(ctx,'rgba(0,0,0,.22)',px+3,py+20,10,3);
    const held=S.inv[S.sel],d=DV[P.dir],sw=P.busy>0&&held,drawHeld=()=>{if(sw)ctx.drawImage(icon(held.id),px+d[0]*10,py+5+d[1]*8+Math.round(Math.sin(P.busy*20)*2))};
@@ -828,12 +890,15 @@ function draw(){if(S.scene==='home'){drawHome();return}if(S.scene==='mine'&&M){d
     if(F.ph==='bite'){R(ctx,'#f2b63d',px+7,py-10,2,6);R(ctx,'#f2b63d',px+7,py-3,2,2)}}}
  }
  for(const p of parts){ctx.globalAlpha=clamp(p.l*2,0,1);ctx.drawImage(p.c,Math.round(p.x-cx),Math.round(p.y-cy));ctx.globalAlpha=1}
+ if(fe){const fc=['#f07a93','#f2b63d','#62b8ea','#86d46c'],by=9*T-7-cy;R(ctx,'#3b2a20',42*T-cx,by,17*T,1);R(ctx,'#6b4a2e',42*T-cx-1,by-2,2,20);R(ctx,'#6b4a2e',59*T-cx-1,by-2,2,20);
+  for(let x=42*T+3,k=0;x<59*T-6;x+=8,k++){const c=fc[k%4],sw=Math.round(Math.sin(animT*2+k)*.6);R(ctx,c,x-cx,by+1,5,2);R(ctx,c,x+1-cx+sw,by+3,3,1);R(ctx,c,x+2-cx+sw,by+4,1,1)}}
  const dk=darkness();
  if(dk>.01){if(lcv.width!==vw||lcv.height!==vh){lcv.width=vw;lcv.height=vh}lctx.globalCompositeOperation='source-over';lctx.fillStyle=S.time<420?'#3a2f5a':S.weather!=='sun'&&S.time<1020?'#27344a':'#0a1030';lctx.fillRect(0,0,vw,vh);
-  if(dk>.25){lctx.globalCompositeOperation='destination-out';glow(Math.round(P.x)-cx,Math.round(P.y)-10-cy,54);for(const b of BLD)for(const[wx,wy]of b.wins)glow(b.x*T+wx+4-cx,b.y*T-18+wy+6-cy,26);
+  if(dk>.25){lctx.globalCompositeOperation='destination-out';glow(Math.round(P.x)-cx,Math.round(P.y)-10-cy,54);if(fe){glow(47*T-cx,12*T-cy,64);for(let x=43;x<59;x+=3)glow(x*T-cx,9*T-cy,34)}for(const b of BLD)for(const[wx,wy]of b.wins)glow(b.x*T+wx+4-cx,b.y*T-18+wy+6-cy,26);
    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const o=objs[idx(x,y)];if(o&&o.t==='lantern')glow(x*T+8-cx,y*T-cy,60)}}
   ctx.globalAlpha=dk;ctx.drawImage(lcv,0,0);ctx.globalAlpha=1;
   if(dk>.25)for(const b of BLD)for(const[wx,wy]of b.wins){R(ctx,'#ffd87a',b.x*T+wx-cx,b.y*T-18+wy-cy,3,3);R(ctx,'#ffd87a',b.x*T+wx+4-cx,b.y*T-18+wy-cy,4,3);R(ctx,'#f6b23c',b.x*T+wx-cx,b.y*T-18+wy+4-cy,3,4);R(ctx,'#f6b23c',b.x*T+wx+4-cx,b.y*T-18+wy+4-cy,4,4)}}
+ if(lanT>0)for(let k=0;k<22;k++){const x=(42+hash(k,3,90)*16)*T+Math.sin(animT*.8+k)*9-cx,y=13*T-((k*31+(40-lanT)*15)%260)-cy;R(ctx,'#f6b23c',Math.round(x)-1,Math.round(y)-2,3,4);R(ctx,'#fff3b0',Math.round(x),Math.round(y)-1,1,2)}
  if(S.weather==='rain')for(let k=0;k<110;k++){const x=((hash(k,1,1)*vw-animT*50)%vw+vw)%vw,y=(hash(k,2,1)*vh+animT*(250+hash(k,3,1)*90))%vh;R(ctx,'rgba(200,225,255,.5)',Math.floor(x),Math.floor(y),1,4)}
  else if(S.weather==='snow')for(let k=0;k<90;k++){const x=((hash(k,1,2)*vw+Math.sin(animT+k)*6)%vw+vw)%vw,y=(hash(k,2,2)*vh+animT*(18+hash(k,3,2)*16))%vh;R(ctx,'rgba(255,255,255,.85)',Math.floor(x),Math.floor(y),k%3?1:2,k%3?1:2)}
  else if(se===0||se===2)for(let k=0;k<16;k++){const x=((hash(k,1,4)*vw+animT*14+Math.sin(animT+k)*8)%vw+vw)%vw,y=(hash(k,2,4)*vh+animT*(10+hash(k,3,4)*10))%vh;R(ctx,se===0?'rgba(246,193,211,.8)':'rgba(217,119,46,.8)',Math.floor(x),Math.floor(y),2,1)}
