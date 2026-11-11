@@ -777,6 +777,7 @@ const GOODS = {
   dig_crest:{name:'Old Kingdom Crest',base:350,col:'#e0c050',kind:'good',desc:'A golden crest from the Old Kingdom.'},
   dig_horn:{name:'Carved Drinking Horn',base:180,col:'#d8c8a0',kind:'good',desc:'Carved with hunting scenes.'},
   dig_amulet:{name:'Serpent Amulet',base:320,col:'#6a4aaa',kind:'good',desc:'A coiled serpent in dark silver.'},
+  strongbox:{name:'Locked Strongbox',base:60,col:'#6a6a7a',kind:'usable',desc:'A bandit’s strongbox. Use it to try picking the lock.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2150,6 +2151,8 @@ const NPCS = [
    hello:["History lies just beneath our feet!","Mind where you step, that's a dig site.","Every shard tells a story."], rumors:["Dig sites turn up in ruins, deserts and mesas. The numbers you uncover tell you how far you are from the find."]},
   {id:'morwen',town:'jade',dx:-3,dy:-3,name:'Old Salt Morwen',role:'Tides card game',cols:{cloak:'#2a4a5a',skin:'#c8a080',hair:'#e8e8e8'},tides:true,freeSpot:true,
    hello:["Fancy a hand of Tides?","The tide always turns, dearie.","Sit, sit. Cards are dealt."], rumors:["In Tides, the last round is High Tide and counts double. Save a big card for it."]},
+  {id:'enigma',town:'highcairn',dx:4,dy:4,name:'Enigma the Wanderer',role:'Riddles',cols:{cloak:'#4a2a6a',skin:'#d8b8a0',hair:'#1a1a2a'},riddler:true,freeSpot:true,
+   hello:["What walks the road but never tires?","A riddle for a traveler?","Answers are found by those who wander."], rumors:["My riddles always point to a town. Go there, and the answer reveals itself."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3453,6 +3456,7 @@ function killEnemy(e) {
     setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
   }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
+  if (['bandit', 'archer', 'thief'].includes(e.type) && !e.net && Math.random() < (e.elite ? .5 : .1)) { addItem('strongbox', 1); got.push('+1 Locked Strongbox'); }
   if (e.champion) { const c = 200 + (S.level || 1)*10; S.coins += c; got.push(`+${c} coin (champion)`); addItem('gem', 2); got.push('+2 Gem'); S.champions = (S.champions || 0) + 1; setTimeout(() => toast(`<b>Champion defeated!</b><br>${esc(e.labelName || 'The champion')} falls. Huntmaster Garrick will hear of this.`, 5000), 300); }
   if (e.elite && !e.agent) {
     const c = rint(40, 90) + (S.level || 1)*4; S.coins += c; got.push(`+${c} coin`);
@@ -4262,6 +4266,7 @@ function useItem(g) {
     BUFFS.regen = Math.max(BUFFS.regen || 0, 180); S.hp = Math.min(maxHP(), S.hp + maxHP()*.25); S.picnics = (S.picnics || 0) + 1; SFX.chime(); renderHP(); renderHUD();
     toast(`<b>You spread a picnic blanket.</b><br>Health regenerates for 3 minutes${party ? ', for party members nearby too' : ''}.`, 4500); return;
   }
+  if (g === 'strongbox') { addItem(g, -1); renderHUD(); lockStart(); return; }
   if (g === 'war_horn') {
     if (inDungeon() || inArena() || townAt(S.x, S.y, 14) || S.y >= WORLD_H) { toast('Blow the horn out in the wild, away from towns.'); return; }
     if (bossActive() || enemies.some(e => e.champion && !e.dead)) { toast('A champion is already on its way!'); return; }
@@ -4579,6 +4584,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
+  else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
 addEventListener('keyup', e => { if (rink) rink.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
@@ -4653,6 +4659,75 @@ function tidesTurn(G) {
       G.log.push(`Round ${G.round + 1}: your <b>${mine}</b> vs Morwen’s <b>${theirs}</b> → ${mine > theirs ? '<span style="color:var(--good)">you win</span>' : mine < theirs ? '<span style="color:#e57a62">Morwen wins</span>' : 'tie'}${high ? ' (double)' : ''}`);
       SFX.click(); G.round++; tidesTurn(G);
     }})));
+}
+// ===== riddles =====
+const RIDDLES = {
+  wren: 'Where every journey on the Saltwind Road begins, and gulls cry over the first harbor.',
+  frost: 'An icy gate stands where the north wind bites. The first town of the snows keeps watch.',
+  dun: 'Water in a sea of sand, palms around a pool. Where the thirsty caravans drink, find me.',
+  ashfall: 'Black roofs beneath a smoking mountain, where the ground is grey as old fire.',
+  redrock: 'The earth here bleeds red and rises in tall tables of stone.',
+  graven: 'Fog on the moor, and the graves outnumber the houses.',
+  storm: 'The farthest watch against the frozen sea, where thunder makes its home.',
+  lantern: 'A bay lit at night by a thousand paper lights.',
+  petal: 'Where pink blossoms drift down like warm snow.',
+  sunreach: 'Lions roam its golden grass, and the sun reaches every roof.',
+  skyhold: 'High above the clouds, an oracle reads the stars.',
+  crownfall: 'A kingdom fell here and left its crown among the ruins.',
+  sporehaven: 'Mushrooms taller than houses glow in the dark.',
+  prismvale: 'The land shimmers with every color of the rainbow.',
+  blackwater: 'A haven of dark water, cursed gold and pirates.',
+  reed: 'Built among the reeds beside the marsh, where a certain kid loves to hide.',
+  maplehold: 'Red and gold leaves fall here all year round.',
+  tidewatch: 'From a sandy shore in the far east, a harbormaster watches the tides.',
+  thorn: 'Briars and brambles guard this town, where a professor asks questions at night.',
+  jade: 'Green water, and an old woman who deals cards by the shore.',
+};
+function riddleTalk(n) {
+  if (S.riddle) { say(`“The riddle stands, traveler:”<br><br><i>“${RIDDLES[S.riddle.k]}”</i><br><br><span style="color:var(--muted)">Travel to the town it describes to solve it.</span>`, [{label: 'Give up (new riddle tomorrow)', fn: () => { S.riddle = null; S.riddleDay = S.day; save(); say('“Some answers take longer to find.”', [back(n)]); }}, back(n)]); return; }
+  if (S.riddleDay === S.day) { say('“One riddle a day is plenty. Come back tomorrow.”', [back(n)]); return; }
+  const here = TOWNS[n.town], opts = Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30 && !(S.riddlesSolved || {})[k]);
+  const pool = opts.length ? opts : Object.keys(RIDDLES).filter(k => TOWNS[k] && Math.hypot(TOWNS[k].x - here.x, TOWNS[k].y - here.y) > 30);
+  const k = pick(pool); S.riddle = {k, day: S.day}; save();
+  say(`“Listen closely, and go where the answer lies:”<br><br><i>“${RIDDLES[k]}”</i><br><br><span style="color:var(--muted)">Travel to the town this describes. The reward is bigger the farther it is.</span>`, [back(n)]);
+}
+let riddleT = 0;
+function riddleCheck(dt) {
+  if (!S.riddle) return; riddleT -= dt; if (riddleT > 0) return; riddleT = 1;
+  const k = S.riddle.k, T1 = TOWNS[k]; if (!T1 || Math.hypot(T1.x - S.x, T1.y - S.y) > 9) return;
+  const d = Math.hypot(T1.x - TOWNS.highcairn.x, T1.y - TOWNS.highcairn.y), c = Math.round(80 + d*1.2);
+  S.riddle = null; S.riddleDay = S.day; S.riddlesSolved = S.riddlesSolved || {}; S.riddlesSolved[k] = true; S.riddles = (S.riddles || 0) + 1;
+  S.coins += c; gainXP(30 + Math.round(d/4)); SFX.victory(); renderHUD(); save();
+  toast(`<b>Riddle solved: ${T1.name}!</b><br>A folded note waits for you here, sealed with Enigma’s mark. Inside: <span style="color:var(--good)">${c} coin</span>.`, 6000);
+}
+// ===== lockpicking =====
+let lock = null;
+function lockStart() {
+  lock = {on: true, pin: 0, pins: 4, picks: 3, pos: 0, dir: 1, zone: 0, w: 18, last: performance.now(), set: []}; lockZone();
+  openPanel('Locked strongbox', '<div style="text-align:center">Set each pin: press when the pick is in the gold zone. Miss and a lockpick snaps.</div><div style="display:flex;justify-content:center;gap:8px;margin:10px 0" id="lockPins"></div><div id="lockBar" style="position:relative;height:24px;margin:8px 6px;background:#1a1d22;border:1px solid #555;border-radius:4px;overflow:hidden"><div id="lockZone" style="position:absolute;top:0;bottom:0;background:#c8a040"></div><div id="lockMk" style="position:absolute;top:0;bottom:0;width:3px;background:#e8e8f0"></div></div><div id="lockInfo" style="text-align:center;color:var(--muted)"></div>', [{label: 'Pick!', primary: true, fn: () => lockPress()}, {label: 'Give up', fn: () => { lock = null; closeTalk(); }}]);
+  requestAnimationFrame(lockLoop);
+}
+function lockZone() { lock.w = 18 - lock.pin*3; lock.zone = 5 + Math.random()*(90 - lock.w); lock.dir = Math.random() < .5 ? 1 : -1; }
+function lockLoop() {
+  const L = lock; if (!L || !L.on) return; const mk = document.getElementById('lockMk'); if (!mk || mode !== 'talk') { lock = null; return; }
+  const now = performance.now(), dt = Math.min(.05, (now - L.last)/1000); L.last = now;
+  if (!L.wait) { L.pos += L.dir*dt*(80 + L.pin*30); if (L.pos > 100 || L.pos < 0) { L.pos = Math.max(0, Math.min(100, L.pos)); L.dir *= -1; } }
+  mk.style.left = `calc(${L.pos}% - 1px)`; const z = document.getElementById('lockZone'); z.style.left = L.zone + '%'; z.style.width = L.w + '%';
+  document.getElementById('lockPins').innerHTML = Array.from({length: L.pins}, (_, i) => `<div style="width:14px;height:${i < L.pin ? 14 : 30}px;margin-top:${i < L.pin ? 16 : 0}px;background:${i < L.pin ? '#c8a040' : i === L.pin ? '#e8e8f0' : '#555'};border-radius:3px"></div>`).join('');
+  document.getElementById('lockInfo').textContent = `Lockpicks left: ${'\u{1F5DD}'.repeat(L.picks)}`;
+  requestAnimationFrame(lockLoop);
+}
+function lockPress() {
+  const L = lock; if (!L || !L.on || L.wait) return;
+  if (L.pos >= L.zone && L.pos <= L.zone + L.w) { L.pin++; AUD.tone(660 + L.pin*110, .1, 'square', .08); if (L.pin >= L.pins) { L.on = false; lock = null; lockOpen(); return; } L.wait = true; setTimeout(() => { if (lock === L) { L.wait = false; lockZone(); } }, 250); }
+  else { L.picks--; SFX.hurt(); shake = .15; if (L.picks <= 0) { L.on = false; lock = null; S.locksFailed = (S.locksFailed || 0) + 1; openPanel('Locked strongbox', 'Your last lockpick snaps inside the lock. The strongbox is jammed for good.', [{label: 'Drat', fn: closeTalk}]); } }
+}
+function lockOpen() {
+  const lv = S.level || 1, c = rint(50, 150) + lv*5, got = [`${c} coin`]; S.coins += c;
+  const g1 = pick(['gem', 'silver', 'pearl', 'amber', 'spice', 'glass'].filter(g => GOODS[g])); const n1 = g1 === 'gem' ? 1 : rint(2, 4); addItem(g1, n1); got.push(`${n1} ${GOODS[g1].name}`);
+  if (Math.random() < .15) { addItem('treasure_map', 1); got.push('a Treasure Map'); }
+  S.locksPicked = (S.locksPicked || 0) + 1; SFX.victory(); renderHUD(); save();
+  openPanel('Locked strongbox', `<b>Click!</b> The lid springs open. Inside you find: <span style="color:var(--good)">${got.join(', ')}</span>.`, [{label: have('strongbox') ? `Open another (${have('strongbox')} left)` : 'Close', primary: true, fn: () => { if (have('strongbox')) { addItem('strongbox', -1); lockStart(); } else closeTalk(); }}]);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -6201,8 +6276,9 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Riddles and strongboxes', 'Enigma the Wanderer in Highcairn gives one riddle a day. Each one describes a town: travel there to solve it, and the farther it is, the bigger the reward. Bandits sometimes drop Locked Strongboxes: use one from your bag to pick the lock by setting four pins before your lockpicks run out.'],
   ['Archaeology', 'Professor Dunst in Dunmere Oasis gives you a trowel. Each day, dig sites appear on your map in ruins, deserts, savannas and mesas. Excavating opens a 5\u00d75 grid: each hole shows how many steps away the artifact is buried, and you have six digs. Collect all eight artifacts for a big reward.'],
   ['Tides', 'Old Salt Morwen in Jadewater plays Tides: each of you gets five cards, and in each of five rounds the higher card wins. The last round is High Tide and counts double. 20 coin to play, 50 for a win.'],
   ['Party races', 'The party leader can start a race from the Party menu when friends are nearby. Everyone within range races to the same town after a countdown, and the standings appear as each racer arrives. First place wins 150 coin.'],
@@ -6521,7 +6597,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); ensureDigSites(); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -6811,6 +6887,7 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (lock && lock.on) { if (down(OK) || down(BACK) || down(2) || down(3)) lockPress(); PAD.prev = B; return; }
   if (cut && cut.on) { if (down(OK) || down(BACK) || down(2) || down(3)) cutPress(); PAD.prev = B; return; }
   if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
   const menu = mode !== 'play' && mode !== 'fish';
@@ -8209,6 +8286,7 @@ function mainOptions(n) {
   if (n.lapidary) o.push({label: 'Cut a gem (3 Crystal)', primary: true, disabled: have('crystal') < 3, fn: () => { addItem('crystal', -3); startCut(); }});
   if (n.archaeo) o.push({label: S.trowel ? 'Show my finds' : 'Ask about archaeology', primary: true, fn: () => digTalk(n)});
   if (n.tides) o.push({label: 'Play Tides · 20\u25c6', primary: true, disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); tidesStart(n); }});
+  if (n.riddler) o.push({label: S.riddle ? 'Repeat the riddle' : 'Ask for a riddle', primary: true, fn: () => riddleTalk(n)});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11009,6 +11087,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['riddle5','Riddle Solver','Solve 5 of Enigma\u2019s riddles', () => (S.riddles || 0) >= 5],
+  ['lockpick5','Light Fingers','Pick 5 strongbox locks', () => (S.locksPicked || 0) >= 5],
   ['artidig','Archaeologist','Find 5 artifacts at dig sites', () => Object.keys(S.digFound || {}).length >= 5],
   ['digall','Curator of the Past','Complete the artifact collection', () => !!S.digDone],
   ['tides5','Card Shark','Win 5 games of Tides', () => (S.tidesWins || 0) >= 5],
@@ -11568,7 +11648,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__b2 = {get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
+window.__b2 = {get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
