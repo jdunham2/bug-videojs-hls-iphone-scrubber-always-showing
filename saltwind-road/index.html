@@ -26,6 +26,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#tagUI{position:absolute;left:50%;top:160px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #detUI{position:absolute;right:16px;bottom:86px;padding:5px 10px;font-size:13px;z-index:6;white-space:nowrap}
 #raceUI{position:absolute;left:50%;top:128px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #courierUI{position:absolute;left:50%;top:96px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
@@ -266,6 +267,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="courierUI" class="panel" hidden></div>
   <div id="raceUI" class="panel" hidden></div>
   <div id="detUI" class="panel" hidden></div>
+  <div id="tagUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -3848,6 +3850,7 @@ function partyPanel() {
     ...(list.length ? [{label: 'Give a gift', fn: () => giftPick()}] : []),
     ...list.filter(r => r.p.sp === NET_SID && !(spar && spar.active)).slice(0, 2).map(r => ({label: `Accept spar with ${r.name}`, primary: true, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; }})),
     ...(!spar ? list.filter(r => r.p.sp !== NET_SID).slice(0, 2).map(r => ({label: `Challenge ${r.name} to a spar`, fn: () => { closeTalk(); spar = {peer: r.peer, sid: r.p.sid, hp: SPAR_HP, dealt: 0, active: false, t: 30, name: r.name}; partyT = 0; toast(`You challenged <b>${esc(r.name)}</b> to a friendly spar. Waiting for them to accept...`, 4000); }})) : [{label: spar.active ? 'Concede the spar' : 'Cancel the spar challenge', fn: () => { closeTalk(); if (spar.active) { sparLost = {sid: spar.sid, t: 3}; toast('You conceded the spar.', 3000); } spar = null; }}]),
+    ...(party.host && !tag && list.some(r => Math.hypot(r.x - S.x, r.y - S.y) < 20) ? [{label: 'Start a game of tag', fn: () => { closeTalk(); tagStart(); }}] : []),
     ...(party.host && !prace && list.some(r => Math.hypot(r.x - S.x, r.y - S.y) < 20) ? [{label: 'Start a party race', fn: () => startPartyRace()}] : []),
     {label: 'Emote (Y)', fn: () => emotePanel()},
     {label: 'Ping my spot (N)', fn: () => { closeTalk(); sendPing(); }},
@@ -3869,7 +3872,7 @@ async function enterParty(code, host) {
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {}; netReset(); prace = null; myRace = null; $('raceUI').hidden = true; spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
+  const P = party; if (!P) return; party = null; remote = {}; netReset(); tag = null; myTag = null; tagReq = null; $('tagUI').hidden = true; prace = null; myRace = null; $('raceUI').hidden = true; spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3886,7 +3889,7 @@ function sendChat() {
 }
 function sendPresence() {
   if (!party) return;
-  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, ps: potScale(), dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, pr: myRace, pj: prace ? prace.i : null, pf: prace && prace.myT != null ? {i: prace.i, t: prace.myT} : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
+  const pz = {n: netName(), x: Math.round(S.x*100)/100, y: Math.round(S.y*100)/100, f: player.facing, mv: player.moving ? 1 : 0, c: S.look || player.cols, hat: S.hat || null, mt: S.riding ? S.mount : null, lv: S.level || 1, hp: Math.round(S.hp), mh: Math.round(maxHP()), host: !!party.host, t: Math.round(S.time*1000)/1000, k: S.kills || 0, dg: (inDungeon() || inArena()) ? 1 : 0, sw: player.swing ? 1 : 0, ch: myChat, sid: NET_SID, sh: netOn ? 1 : 0, ps: potScale(), dk: netZone(), dn: downed ? Math.ceil(downed.t) : 0, fw: myFw, pc: myPicnic, gf: myGifts.length ? myGifts.map(q => ({i: q.i, to: q.to, g: q.g, n: q.n})) : null, sp: spar ? spar.sid : null, sd: spar ? Math.round(spar.dealt*10)/10 : 0, sl: sparLost ? sparLost.sid : null, pr: myRace, pj: prace ? prace.i : null, tg: myTag ? {i: myTag.i, it: myTag.it, end: myTag.end, imm: myTag.imm} : null, tj: tag ? tag.i : null, tq: tagReq, tt: tag ? Math.round(tag.itTime*10)/10 : 0, pf: prace && prace.myT != null ? {i: prace.i, t: prace.myT} : null, sh2: spar && spar.active ? Math.max(0, Math.round(spar.hp)) : 0, rv: reviving ? reviving.sid : null, rp: reviving ? Math.min(1, reviving.t/REVIVE_T) : 0, em: myEmote, pg: myPing};
   if (party.host && Object.values(remote).some(r => r.p.sh)) { pz.en = netList(); pz.kd = netKilled.map(k => k.nid); }
   if (!party.host && netOn) { pz.dm = netDmgOut(); pz.ds = netHostSid; }
   party.room.presence(pz).catch(() => {});
@@ -3897,7 +3900,7 @@ function partyTick(dt) {
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
   for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
-  partyExtras(dt); sparTick(dt); raceTick(dt);
+  partyExtras(dt); sparTick(dt); raceTick(dt); tagTick(dt);
   for (const q of myGifts) q.t -= dt; if (myGifts.length) myGifts = myGifts.filter(q => q.t > 0);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
@@ -3913,7 +3916,7 @@ function partyTick(dt) {
     if (!r.xinit) { r.prI = p.pr ? p.pr.i : 0; r.giftI = Array.isArray(p.gf) ? Math.max(0, ...p.gf.map(q => +q.i || 0)) : 0;
       r.xinit = true; r.emI = p.em && p.em.i; r.pgI = p.pg && p.pg.i; r.fwI = p.fw && p.fw.i; r.pcI = p.pc && p.pc.i; }
     if (Array.isArray(p.gf)) receiveGifts(r, p.gf);
-    sparPeer(r, p);
+    sparPeer(r, p); tagPeer(r, p);
     if (p.pr && typeof p.pr === 'object' && p.host && p.pr.i !== r.prI) { r.prI = p.pr.i; if (!prace && TOWNS[p.pr.to] && isFinite(p.pr.at) && Math.hypot(r.x - S.x, r.y - S.y) < 25 && !inDungeon()) joinRace(p.pr.i, p.pr.to, +p.pr.at); }
     if (p.fw && typeof p.fw === 'object' && p.fw.i !== r.fwI) { r.fwI = p.fw.i; if (isFinite(p.fw.x) && isFinite(p.fw.y) && Math.hypot(p.fw.x - S.x, p.fw.y - S.y) < 40) launchFireworks(+p.fw.x, +p.fw.y); }
     if (p.pc && typeof p.pc === 'object' && p.pc.i !== r.pcI) { r.pcI = p.pc.i; if (isFinite(p.pc.x) && isFinite(p.pc.y)) { picnics.push({x: +p.pc.x, y: +p.pc.y, t: 180, who: r.name}); if (Math.hypot(p.pc.x - S.x, p.pc.y - S.y) < 8) { BUFFS.regen = Math.max(BUFFS.regen || 0, 180); toast(`<b>${esc(r.name)} spread a picnic!</b> You feel refreshed (health regenerates for 3 minutes).`, 4500); renderHUD(); } } }
@@ -3944,6 +3947,7 @@ function drawRemote(r) {
   const hp = +p.hp || 0, mh = Math.max(1, +p.mh || 1); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 8, top + 2, 16, 3); ctx.fillStyle = '#e57a62'; ctx.fillRect(px - 7, top + 3, 14*Math.max(0, Math.min(1, hp/mh)), 1);
   if (r.bubble) drawBubble(px, top - 4, r.bubble.m);
   if (r.emote) drawEmote(px, top - (r.bubble ? 18 : 6), r.emote);
+  if (tag && tag.it === p.sid) drawItTag(px, top - 10);
   if (spar && spar.active && spar.peer === r.peer) { const f = Math.max(0, Math.min(1, (+p.sh2 || 0)/SPAR_HP)); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, top + 6, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, top + 7, 22*f, 2); }
   if (p.dn) { const rv = reviving && reviving.peer === r.peer ? Math.min(1, reviving.t/REVIVE_T) : Math.max(0, Math.min(1, +p.rp || 0)); drawDownTag(px, top - 8, +p.dn, rv); }
 }
@@ -5424,6 +5428,36 @@ function caseAccuse(n, i) {
     say(`<b>${cul.name}</b> goes pale, then bursts into tears and confesses. ${C.item[0].toUpperCase() + C.item.slice(1)} is found hidden in their luggage.<br><br>“Brilliant deduction!” says Inspector Holloway. <span style="color:var(--good)">+${c} coin${first ? ' and the <b>Detective’s Badge</b> (+5% crit chance)' : ''}</span>`, [back(n)]); }
   else { S.casesFailed = (S.casesFailed || 0) + 1; SFX.hurt(); save(); say(`The accused protests their innocence... and while everyone is distracted, <b>${cul.name}</b> slips out the back door with ${C.item}!<br><br>“Blast! The clue pointed elsewhere,” sighs the inspector. “There will be other cases. Come back next week.”`, [back(n)]); }
 }
+// ===== party tag =====
+let tag = null, myTag = null, tagReq = null, tagSeq = 0;
+function tagStart() {
+  const cands = [NET_SID, ...Object.values(remote).filter(r => Math.hypot(r.x - S.x, r.y - S.y) < 25).map(r => r.p.sid)];
+  myTag = {i: Date.now() % 1e9, it: pick(cands), end: Date.now() + 90000, imm: null, seen: {}}; partyT = 0; tagJoin(myTag.i, myTag.it, myTag.end);
+}
+function tagJoin(i, it, end) { tag = {i, it, end, itTime: 0, cd: 0, said: null}; $('tagUI').hidden = false; SFX.chime(); toast(`<b>Tag!</b><br>Whoever is <b style="color:#ff6a5a">IT</b> must touch someone to pass it on. Spend as little time as IT as you can! 90 seconds.`, 5000); }
+function tagPeer(r, p) {
+  if (p.host && p.tg && typeof p.tg === 'object' && !party.host) {
+    if (!tag && p.tg.i !== r.tagI && isFinite(p.tg.end) && p.tg.end > Date.now() && Math.hypot(r.x - S.x, r.y - S.y) < 25) { r.tagI = p.tg.i; tagJoin(p.tg.i, p.tg.it, +p.tg.end); }
+    if (tag && tag.i === p.tg.i) { if (tag.it !== p.tg.it) tagChanged(p.tg.it); tag.imm = p.tg.imm; }
+  }
+  if (party.host && myTag && p.tq && typeof p.tq === 'object' && p.sid === myTag.it && p.tq.n !== myTag.seen[p.sid] && p.tq.i === myTag.i) { myTag.seen[p.sid] = p.tq.n; if (p.tq.to !== myTag.imm) { myTag.imm = p.sid; myTag.immT = Date.now(); myTag.it = p.tq.to; partyT = 0; tagChanged(p.tq.to); } }
+}
+function tagChanged(it) { if (!tag) return; tag.it = it; tag.cd = 1.2; if (it === NET_SID) { SFX.hurt(); floatText(S.x, S.y - 1.8, "You're IT!", '#ff6a5a'); } else SFX.click(); }
+function tagTick(dt) {
+  if (!tag) return; const ui = $('tagUI'), now = Date.now(); tag.cd -= dt; if (myTag && myTag.imm && now - (myTag.immT || 0) > 3000) { myTag.imm = null; partyT = 0; }
+  if (tag.it === NET_SID) { tag.itTime += dt;
+    if (tag.cd <= 0) for (const r of Object.values(remote)) { if (r.p.tj !== tag.i || r.p.sid === (party.host ? myTag.imm : tag.imm)) continue; if (Math.hypot(r.x - S.x, r.y - S.y) < .9) { tag.cd = 1.2; burst(r.x, r.y - .5, '#ff6a5a', 10, 3);
+      if (party.host) { myTag.imm = NET_SID; myTag.immT = Date.now(); myTag.it = r.p.sid; partyT = 0; tagChanged(r.p.sid); } else { tagReq = {i: tag.i, n: ++tagSeq, to: r.p.sid}; partyT = 0; } break; } } }
+  const itName = tag.it === NET_SID ? 'YOU' : (Object.values(remote).find(r => r.p.sid === tag.it) || {name: '?'}).name;
+  const left = Math.max(0, Math.ceil((tag.end - now)/1000)), txt = `\u{1F3C3} Tag · IT: ${itName} · ${left}s · your IT time ${tag.itTime.toFixed(1)}s`; if (ui.textContent !== txt) ui.textContent = txt; ui.style.color = tag.it === NET_SID ? '#ff8a6a' : '';
+  if (now >= tag.end) {
+    const res = [[netName(), tag.itTime], ...Object.values(remote).filter(r => r.p.tj === tag.i).map(r => [r.name, +r.p.tt || 0])].sort((a, b) => a[1] - b[1]);
+    const won = res[0] && res[0][0] === netName() && res.length > 1; tag = null; myTag = null; tagReq = null; ui.hidden = true;
+    S.tagGames = (S.tagGames || 0) + 1; if (won) { S.tagWins = (S.tagWins || 0) + 1; S.coins += 50; SFX.victory(); } renderHUD(); save();
+    toast(`<b>Tag is over!</b><br>${res.map((x, k) => `${k + 1}. ${esc(x[0])} · ${x[1].toFixed(1)}s as IT`).join('<br>')}${won ? '<br><span style="color:var(--good)">You win! +50 coin</span>' : ''}`, 8000);
+  }
+}
+function drawItTag(px, py) { const b = Math.sin(frameT*8)*1.5; ctx.fillStyle = '#ff5a4a'; ctx.fillRect(px - 9, py - 8 + b, 18, 9); ctx.fillStyle = '#fff'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('IT', px, py - 1.5 + b); }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6993,6 +7027,7 @@ const GUIDE = [
   ['Riddles and strongboxes', 'Enigma the Wanderer in Highcairn gives one riddle a day. Each one describes a town: travel there to solve it, and the farther it is, the bigger the reward. Bandits sometimes drop Locked Strongboxes: use one from your bag to pick the lock by setting four pins before your lockpicks run out.'],
   ['Archaeology', 'Professor Dunst in Dunmere Oasis gives you a trowel. Each day, dig sites appear on your map in ruins, deserts, savannas and mesas. Excavating opens a 5\u00d75 grid: each hole shows how many steps away the artifact is buried, and you have six digs. Collect all eight artifacts for a big reward.'],
   ['Tides', 'Old Salt Morwen in Jadewater plays Tides: each of you gets five cards, and in each of five rounds the higher card wins. The last round is High Tide and counts double. 20 coin to play, 50 for a win.'],
+  ['Party tag', 'The party leader can start a game of tag from the Party menu. Whoever is IT (marked over their head) must touch another player to pass it on, and you can\u2019t tag back the person who just tagged you. After 90 seconds, whoever spent the least time as IT wins.'],
   ['Party races', 'The party leader can start a race from the Party menu when friends are nearby. Everyone within range races to the same town after a countdown, and the standings appear as each racer arrives. First place wins 150 coin.'],
   ['Ice rink and gem cutting', 'Freya runs an ice rink in Frostgate: slide around collecting stars for 45 seconds and dodge the cracks. Jasper in Ashfall cuts gems from 3 Crystal: stop the marker on the facet three times for a flawless cut and two gems.'],
   ['Gifts and spars', 'In a party, open the Party menu to give a friend coins or items from your pack. You can also challenge a party member to a friendly spar: each of you gets an orange spar bar, and hits on each other drain only that, never your real health. First to empty the other\u2019s bar wins.'],
@@ -8223,6 +8258,7 @@ function render() {
   for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
   if (paper) for (const h of paper.houses) if (!h.done && inView(h.x, h.y)) sprites.push({y: 1e9 - 4, f: () => drawPaperMark(h)});
   for (const q of (S.digSites || [])) if (!q.done && inView(q.x, q.y)) sprites.push({y: q.y - .3, f: () => drawDigSite(q)});
+  if (tag && tag.it === NET_SID) sprites.push({y: 1e9 - 3, f: () => drawItTag(S.x*TS, S.y*TS - (S.riding ? 44 : 38))});
   if (myEmoteShow) sprites.push({y: 1e9 - 3, f: () => drawEmote(S.x*TS, S.y*TS - (S.riding ? 34 : 28) - (myBubble ? 14 : 0), myEmoteShow)});
   if (downed) { const rvp = Math.max(0, ...Object.values(remote).filter(r => r.p.rv === NET_SID).map(r => Math.min(1, +r.p.rp || 0)), 0); sprites.push({y: 1e9 - 3, f: () => drawDownTag(S.x*TS, S.y*TS - 30, Math.ceil(downed.t), rvp)}); }
   if (mustangs) for (const h of mustangs.herd) if (inView(h.x, h.y)) sprites.push({y: h.y, f: () => drawMount(ctx, 'mustang', Math.round(h.x*TS), Math.round(h.y*TS), h.f || 1, h.t*10, h.mv)});
@@ -11842,6 +11878,7 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['tagwin','Can\u2019t Catch Me','Win a game of tag with your party', () => (S.tagWins || 0) >= 1],
   ['detective1','Elementary','Solve a mystery case for Inspector Holloway', () => (S.casesSolved || 0) >= 1],
   ['detective5','Master Detective','Solve 5 mystery cases', () => (S.casesSolved || 0) >= 5],
   ['homedefend','Home Guard','Defend your homestead from raiders', () => (S.homeDefends || 0) >= 1],
@@ -12446,7 +12483,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
