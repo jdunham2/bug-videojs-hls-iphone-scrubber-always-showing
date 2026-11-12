@@ -28,7 +28,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
   pointer-events:none}
 #top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;pointer-events:auto}
-#stats{min-width:150px}
+#stats{min-width:150px;max-width:330px}
 .bar{height:10px;background:#263023;border-radius:3px;overflow:hidden;margin-top:4px}
 .bar>i{display:block;height:100%;width:100%;background:var(--blood);transition:width .15s}
 .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
@@ -98,7 +98,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div class="panel" id="stats">
         <div class="lbl">Health</div>
         <div class="bar"><i id="hpbar"></i></div>
-        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span><span><b>Herbs</b><span id="rh">0</span></span><span><b>Hide</b><span id="rd">0</span></span></div>
+        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span><span><b>Herbs</b><span id="rh">0</span></span><span><b>Hide</b><span id="rd">0</span></span><span><b>Gold</b><span id="rg">0</span></span><span><b>Crystal</b><span id="rc">0</span></span><span><b>Feathers</b><span id="rf">0</span></span><span><b>Bone</b><span id="rb">0</span></span></div>
       </div>
       <div class="panel" id="clock">
         <h2 id="dayname">Day 1</h2>
@@ -126,6 +126,11 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
         <button class="btn" id="mkbullets" type="button">Bullets ×8 · 2 iron 1 stone (F)</button>
         <button class="btn" id="bandage" type="button">Bandage · 2 herbs (Z)</button>
+        <button class="btn" id="stew" type="button">Stew · 2 meat 1 herb (U)</button>
+        <button class="btn" id="fletch" type="button">Arrows ×12 · 1 wood 3 feathers</button>
+        <button class="btn" id="gear-gaxe" type="button">Golden axe · 6 gold 4 wood</button>
+        <button class="btn" id="gear-plate" type="button">Plate armor · 8 gold 6 iron</button>
+        <button class="btn" id="gear-charm" type="button">Bone charm · 8 bone</button>
         <button class="btn" id="mkboots" type="button">Boots · 4 hide</button>
         <button class="btn" id="mkvest" type="button">Hide vest · 6 hide</button>
         <button class="btn" id="mkarmor" type="button" hidden>Armor · 6 iron 4 wood (V)</button>
@@ -145,10 +150,11 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
         <dt>Weapon bar</dt><dd>Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
-        <dt>Pick-ups</dt><dd>Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
+        <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
+        <dt>Pick-ups</dt><dd>Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
         <dt>Pets and rides</dt><dd>The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
         <dt>Night rewards</dt><dd>Every night you survive brings a gift and unlocks something new: traps, iron walls, armor (V), turrets, grenades (H to make, G to throw) and a machine gun.</dd>
-        <dt>1 – 9, 0, L, X</dt><dd>Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
+        <dt>1 – 9, 0, L, X</dt><dd>The crystal ward and bone fence have no key; click them. Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
         <dt>E · C · P · M · K</dt><dd>Eat meat to heal · craft a flint axe · pause · mute · save. The game also saves itself every dawn.</dd>
       </dl>
       <div class="lbl">Map</div>
@@ -202,7 +208,16 @@ const B = {
   iron:  {name: 'Iron wall',  cost: {iron: 3, stone: 2}, hp: 420, solid: 1, unlock: 2},
   turret:{name: 'Turret',     cost: {wood: 10, iron: 8}, hp: 90,  solid: 1, unlock: 3},
   lamp:  {name: 'Lantern',    cost: {wood: 2, iron: 1},  hp: 30},
+  ward:  {name: 'Crystal ward', cost: {crystal: 3, gold: 2}, hp: 60},
+  bone:  {name: 'Bone fence', cost: {bone: 3, wood: 1},  hp: 55, solid: 1},
 };
+const GEAR = {
+  gaxe:  {name: 'Golden axe',  cost: {gold: 6, wood: 4}, msg: 'Golden axe ready. It chops three at a time and hits hard.'},
+  plate: {name: 'Plate armor', cost: {gold: 8, iron: 6}, msg: 'Plate armor on. You take half damage.'},
+  charm: {name: 'Bone charm',  cost: {bone: 8},          msg: 'Bone charm made. Your pets hit half again as hard.'},
+};
+const ORE_COL = {iron: [18, 55, 42], gold: [46, 80, 52], crystal: [190, 70, 62]};
+const DROPS = {crow: [['feather', 1.7]], wolf: [['bone', .4]], boar: [['bone', .5]], cougar: [['bone', .4]], bear: [['bone', 1]], moose: [['bone', 1]], tusk: [['bone', 3]], greyfang: [['bone', 3]], ursa: [['bone', 4]]};
 /* each map changes the look, how much wood, stone and iron there is, and which animals come */
 const MAPS = {
   forest: {name: 'Pinewood',   note: 'balanced',                 trees: 1500, rocks: 230, oak: .38, pine: [132, 37, 23], oakc: [98, 46, 31], tuft: [100, 45, 37], tufts: 9000, flowers: ['#f4e9c9', '#f2c14e', '#e88bb0', '#c7a6f2', '#ffffff'],
@@ -223,8 +238,8 @@ function nightReward(n) { // every survived night: a gift, and on nights 1-5 som
   snd(520, .25, 'triangle', .07, 260);
   return 'Night ' + n + ' survived. ' + r[0] + ' Gift: ' + costText(give) + '.';
 }
-const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'remove'];
-const TKEY = i => i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : 'X';
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'remove'];
+const TKEY = i => TOOLS[i] === 'remove' ? 'X' : i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : '';
 const WPN = {
   axe:     {name: 'Axe', note: 'chops'},
   spear:   {name: 'Spear',   cost: {wood: 8, stone: 3},  melee: 1, dmg: 28, reach: 98, arc: .5, cd: .42, note: 'long reach'},
@@ -270,7 +285,7 @@ const VEH = {
 const PK = Object.keys(PETS), VK = Object.keys(VEH);
 const BOSS_NIGHT = {2: 'tusk', 4: 'greyfang', 5: 'ursa'};
 const isBoss = a => A[a.type].boss;
-const NIGHTS_TO_WIN = 5;
+const NIGHTS_TO_WIN = 5, DAY1 = 180, DAYN = 150; // seconds of daylight on the first day and after
 
 let G, P, grid, interior, trees, rocks, animals, parts, floats, house, shots = [];
 let vw = 0, vh = 0, dpr = 1, zoom = 1, cam = {x: CX, y: CY}, shake = 0;
@@ -295,8 +310,8 @@ const howl = () => { snd(330, 1.1, 'sine', .06, 190); setTimeout(() => snd(520, 
 function reset(seed, map) {
   RNG = mulberry(seed |= 0); // the same seed grows the same forest for every player
   const mp = MAPS[map] || MAPS.forest;
-  G = {seed, map: MAPS[map] ? map : 'forest', day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
-  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, herbs: 0, hide: 0, boots: false, vest: false, pets: [], vehicle: null, riding: false};
+  G = {seed, map: MAPS[map] ? map : 'forest', day: 1, phase: 'day', t: 0, len: DAY1, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
+  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, herbs: 0, hide: 0, boots: false, vest: false, gold: 0, crystal: 0, feathers: 0, bone: 0, gaxe: false, plate: false, charm: false, pets: [], vehicle: null, riding: false};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
   trees = []; rocks = []; animals = []; parts = []; floats = []; shots = []; items = []; tool = 'axe';
@@ -313,6 +328,7 @@ function reset(seed, map) {
   };
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
   for (let i = 0; i < mp.rocks; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
+  for (const o of rocks) { const r = RNG(); o.ore = r < .12 ? 'iron' : r < .19 ? 'gold' : r < .24 ? 'crystal' : null; if (o.ore) o.hp = o.max = 10; } // veins
   syncWorld(); RNG = Math.random;
   if (!client()) { for (let i = 0; i < 12; i++) spawnDeer(); stock(); }
   buildTools(); recalc();
@@ -451,7 +467,7 @@ function tryWin() {
 }
 function hurtPlayer(d, fx, fy) {
   if (P.hurt > 0 || P.dead) return;
-  if (P.armor) d = Math.round(d * .65);
+  if (P.plate) d = Math.round(d * .5); else if (P.armor) d = Math.round(d * .65);
   if (P.riding && VEH[P.vehicle.type].armor) d = Math.round(d * VEH[P.vehicle.type].armor);
   P.hp -= d; P.hurt = .45; shake = 9; snd(160, .18, 'sawtooth', .08, -90);
   float(P.x, P.y - 22, '-' + d, '#ff7a63'); burst(P.x, P.y, '#d1503a', 8);
@@ -522,7 +538,7 @@ function makeAmmo(kind) {
 function swing() {
   autoAim(130, true);
   P.cd = .34; P.swing = .18;
-  const reach = 58, dmg = P.flint ? 22 : 12;
+  const reach = 58, dmg = P.gaxe ? 32 : P.flint ? 22 : 12;
   const inArc = (o, extra) => {
     const d = dist(o.x, o.y, P.x, P.y); if (d > reach + extra) return false;
     let da = Math.atan2(o.y - P.y, o.x - P.x) - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -537,11 +553,11 @@ function swing() {
   for (const o of trees) if (!o.dead && inArc(o, 14)) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; best.kind = 'wood'; } }
   for (const o of rocks) if (!o.dead && inArc(o, o.r)) { const d = dist(o.x, o.y, P.x, P.y); if (d < bd) { bd = d; best = o; best.kind = 'stone'; } }
   if (!best) { snd(420, .05, 'sine', .02, -200); return; }
-  const n = P.flint ? 2 : 1; best.hp -= n; best.shake = .2; let gain = n;
+  const n = P.gaxe ? 3 : P.flint ? 2 : 1; best.hp -= n; best.shake = .2; let gain = n;
   if (best.hp <= 0) { best.dead = best.kind === 'wood' ? 55 : 80; gain += 2; burst(best.x, best.y, best.kind === 'wood' ? '#4f7a3a' : '#8d8d86', 14); if (client()) { best.lock = performance.now() + 6000; netAct({k: 't', i: best.i, r: best.kind === 'stone' ? 1 : 0}); } }
-  P[best.kind] += gain;
-  if (best.kind === 'stone') for (let i = 0; i < n; i++) if (Math.random() < MAPS[G.map].iron) { P.iron++; float(best.x + 34, best.y + 10, '+1 iron', '#9fc3e0'); }
-  float(best.x, best.y - 24, '+' + gain + ' ' + best.kind, best.kind === 'wood' ? '#e0b676' : '#c9c9c2');
+  const res = best.ore || best.kind; P[res] += gain;
+  if (best.kind === 'stone' && !best.ore) for (let i = 0; i < n; i++) if (Math.random() < MAPS[G.map].iron) { P.iron++; float(best.x + 34, best.y + 10, '+1 iron', '#9fc3e0'); }
+  float(best.x, best.y - 24, '+' + gain + ' ' + res, best.kind === 'wood' ? '#e0b676' : '#c9c9c2');
   burst(best.x, best.y, best.kind === 'wood' ? '#c9a26b' : '#a8a8a0', 4);
   best.kind === 'wood' ? snd(130, .07, 'square', .06, -40) : snd(700, .05, 'triangle', .06, -300);
 }
@@ -608,13 +624,13 @@ function updPets(dt) {
     const sa = i * 2.1 + 1, gx = tgt ? tgt.x : P.x + Math.cos(sa) * 46, gy = tgt ? tgt.y : P.y + Math.sin(sa) * 46, l = dist(q.x, q.y, gx, gy);
     if (l > 1200) { q.x = gx; q.y = gy; return; }
     if (l > (tgt ? tgt.r + d.r : 10)) { const st = Math.min(l, d.spd * dt); q.x += (gx - q.x) / l * st; q.y += (gy - q.y) / l * st; q.ang = Math.atan2(gy - q.y, gx - q.x); q.step += dt * 11; }
-    if (tgt && l < tgt.r + d.r + 10 && q.cd <= 0) { q.cd = d.cd; hitAnimal(tgt, d.dmg, (tgt.x - q.x) / (l || 1) * .35, (tgt.y - q.y) / (l || 1) * .35); snd(260, .06, 'square', .03, -120); }
+    if (tgt && l < tgt.r + d.r + 10 && q.cd <= 0) { q.cd = d.cd; hitAnimal(tgt, Math.round(d.dmg * (P.charm ? 1.5 : 1)), (tgt.x - q.x) / (l || 1) * .35, (tgt.y - q.y) / (l || 1) * .35); snd(260, .06, 'square', .03, -120); }
   });
 }
 /* things lying in the world: walk over them to pick them up */
 let items = [], iid = 0;
-const IK = ['herb', 'scrap', 'crate', 'hide'], STOCK = {herb: 70, scrap: 36, crate: 14};
-function dropItem(type, x, y) { if (!client() && items.length < 170) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
+const IK = ['herb', 'scrap', 'crate', 'hide', 'shroom', 'feather', 'bone', 'gem'], STOCK = {herb: 60, scrap: 30, crate: 12, shroom: 28, feather: 16, bone: 16, gem: 8};
+function dropItem(type, x, y) { if (!client() && items.length < 220) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
 function stock() { // top the world back up; called for a new game and at every dawn
   if (client()) return;
   for (const k in STOCK) { let n = STOCK[k] - items.filter(i => i.type === k).length; for (let t = 0; n > 0 && t < 400; t++) { const x = rnd(80, WORLD - 80), y = rnd(80, WORLD - 80); if (dist(x, y, CX, CY) > 260) { dropItem(k, x, y); n--; } } }
@@ -624,12 +640,32 @@ function grab(it) {
   if (it.type === 'herb') { const n = Math.random() < .35 ? 2 : 1; P.herbs += n; txt = '+' + n + ' herb' + (n > 1 ? 's' : ''); col = '#9bd45a'; }
   else if (it.type === 'scrap') { const n = 2 + (Math.random() * 3 | 0); P.iron += n; txt = '+' + n + ' iron'; col = '#9fc3e0'; }
   else if (it.type === 'hide') { P.hide++; txt = '+1 hide'; col = '#d9a86a'; }
+  else if (it.type === 'shroom') { P.hp = Math.min(P.max, P.hp + 12); txt = '+12 health'; col = '#7fbf5a'; }
+  else if (it.type === 'feather') { const n = 1 + (Math.random() * 2 | 0); P.feathers += n; txt = '+' + n + ' feather' + (n > 1 ? 's' : ''); }
+  else if (it.type === 'bone') { P.bone++; txt = '+1 bone'; }
+  else if (it.type === 'gem') { if (Math.random() < .5) { P.crystal++; txt = '+1 crystal'; col = '#7fd8f0'; } else { P.gold += 2; txt = '+2 gold'; col = '#f2c14e'; } }
   else { const l = [['wood', 12], ['stone', 9], ['iron', 6], ['bullets', 10], ['arrows', 8], ['meat', 3], ['herbs', 3], G.nights >= 4 ? ['grenades', 2] : ['iron', 8]], c = l[Math.random() * l.length | 0]; P[c[0]] += c[1]; txt = 'Crate: +' + c[1] + ' ' + c[0]; col = '#f2a03d'; }
   float(it.x, it.y - 10, txt, col); snd(700, .08, 'triangle', .05, 300);
 }
 function updItems() {
   if (P.dead || !running) return;
   for (let i = items.length - 1; i >= 0; i--) { const it = items[i]; if (dist(it.x, it.y, P.x, P.y) > 30) continue; items.splice(i, 1); grab(it); if (client()) { NET.took.set(it.id, performance.now() + 6000); netAct({k: 'p', i: it.id}); } }
+}
+function makeGear2(k) {
+  if (!running || P[k]) return; const g = GEAR[k];
+  if (!afford(g.cost)) return toast(g.name + ' needs ' + costText(g.cost) + '.');
+  pay(g.cost); P[k] = true; toast(g.msg); snd(500, .2, 'triangle', .07, 300); hud();
+}
+function stew() {
+  if (!running || P.dead) return;
+  if (!afford({meat: 2, herbs: 1})) return toast('Stew takes 2 meat and 1 herb.');
+  if (P.hp >= P.max) return toast('You are not hurt.');
+  pay({meat: 2, herbs: 1}); P.hp = Math.min(P.max, P.hp + 80); float(P.x, P.y - 24, '+80', '#7fbf5a'); snd(300, .2, 'sine', .06, 260); hud();
+}
+function fletch() {
+  if (!running) return;
+  if (!afford({wood: 1, feathers: 3})) return toast('Fletching takes 1 wood and 3 feathers. Crows drop feathers.');
+  pay({wood: 1, feathers: 3}); P.arrows += 12; snd(440, .08, 'triangle', .05, 120); hud();
 }
 function useBandage() {
   if (!running || P.dead) return;
@@ -660,7 +696,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 /* ---------- multiplayer and saving ---------- */
 const NET = {mode: 'solo', room: null, code: '', me: null, hostPeer: null, hostMiss: 0, others: new Map(), swSeq: 0, wasSw: false, sendT: 0, syncT: 0, chunks: [], amap: new Map(), cyc: 0};
 NET.took = new Map();
-const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades', 'herbs', 'hide', 'boots', 'vest'];
+const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades', 'herbs', 'hide', 'boots', 'vest', 'gold', 'crystal', 'feathers', 'bone', 'gaxe', 'plate', 'charm'];
 const SHIRTS = ['#3f7fbf', '#3fa66b', '#c9a227', '#8a56c2', '#c25690', '#d07a2d'];
 let selMap = 'forest';
 let lobby = null, db = null, userNS = null, uid = null, nid = 0, savedGame = null, openGames = [], menuMsg = '';
@@ -718,8 +754,8 @@ function saveGame(quiet) {
 }
 function loadInto(sv) {
   reset(sv.seed, sv.map); G.day = sv.day || 1; G.nights = sv.nights || 0; G.kills = sv.kills || 0;
-  if (sv.phase === 'night') { G.len = 75; G.t = 67; toast('Saved at night, so dusk is close. Get ready.'); } // a night save resumes just before that night
-  else { G.len = G.day === 1 ? 95 : 75; G.t = clamp(+sv.t || 0, 0, G.len - 5); }
+  if (sv.phase === 'night') { G.len = DAYN; G.t = DAYN - 8; toast('Saved at night, so dusk is close. Get ready.'); } // a night save resumes just before that night
+  else { G.len = G.day === 1 ? DAY1 : DAYN; G.t = clamp(+sv.t || 0, 0, G.len - 5); }
   applyStructs(sv.s || [], 0); applyDead(trees, sv.dt || [], 0); applyDead(rocks, sv.dr || [], 0);
   for (const o of trees.concat(rocks)) if (o.dead) o.dead = 30;
   recalc(); setInv(sv.inv); P.x = sv.px || CX; P.y = sv.py || CY; gather();
@@ -736,7 +772,8 @@ function worldState() {
 function sendSync() {
   const l = packStructs(), n = Math.max(1, Math.ceil(l.length / 160)), c = ++NET.cyc;
   for (let i = 0; i < n; i++) { const d = {c, i, n, s: l.slice(i * 160, i * 160 + 160).join(';')}; if (!i) { d.dt = deadList(trees).slice(0, 200); d.dr = deadList(rocks); } NET.room.emit('sync', d).catch(() => {}); }
-  netEv({k: 'it', l: items.map(i => [i.id, IK.indexOf(i.type), i.x | 0, i.y | 0].join(',')).join(';')});
+  const il = items.map(i => [i.id, IK.indexOf(i.type), i.x | 0, i.y | 0].join(',')), nn = Math.max(1, Math.ceil(il.length / 110));
+  for (let i = 0; i < nn; i++) netEv({k: 'it', c, i, n: nn, l: il.slice(i * 110, i * 110 + 110).join(';')});
 }
 function netSend(dt) {
   if (!multi() || !NET.room) return;
@@ -812,9 +849,11 @@ function onAct(d) { // a guest did something; the host applies it
   }
 }
 function onEv(d) { // the host told us something happened
-  if (d.k === 'it') {
+  if (d.k === 'it') { // the pick-up list arrives in pieces
+    if (d.c !== NET.itc) { NET.itc = d.c; NET.itp = []; }
+    NET.itp[d.i | 0] = String(d.l || ''); if (NET.itp.filter(x => x !== undefined).length !== d.n) return;
     const now = performance.now(), l = []; for (const [id, t] of NET.took) if (t < now) NET.took.delete(id);
-    if (d.l) for (const e of String(d.l).split(';')) { const v = e.split(',').map(Number); if (IK[v[1]] && !NET.took.has(v[0])) l.push({id: v[0], type: IK[v[1]], x: v[2], y: v[3]}); }
+    for (const e of NET.itp.join(';').split(';')) { const v = e.split(',').map(Number); if (IK[v[1]] && !NET.took.has(v[0])) l.push({id: v[0], type: IK[v[1]], x: v[2], y: v[3]}); }
     items = l; return;
   }
   if (d.k === 'd') {
@@ -918,7 +957,7 @@ function updClock(dt) {
       G.bossType = BOSS_NIGHT[G.day] || (G.day > 5 ? ['tusk', 'greyfang', 'ursa'][G.day % 3] : null); G.bossT = 9;
       toast('Night ' + G.day + '. They are coming.'); howl();
     } else {
-      G.nights++; G.day++; G.phase = 'day'; G.len = 75; G.queue = 0;
+      G.nights++; G.day++; G.phase = 'day'; G.len = DAYN; G.queue = 0;
       for (const a of animals) if (!A[a.type].passive && !isBoss(a)) a.flee = true;
       P.hp = Math.min(P.max, P.hp + 15); saveGame(true); stock();
       if (tryWin()) return true;
@@ -993,11 +1032,13 @@ function update(dt) {
   for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
 
   // animals
+  const wards = grid.filter(s => s && s.type === 'ward');
   for (let i = animals.length - 1; i >= 0; i--) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
     if (a.hp <= 0) {
       animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); P.meat += d.meat;
+      for (const [k, c] of DROPS[a.type] || []) for (let h = c; h > 0; h--) if (Math.random() < h) dropItem(k, a.x + rnd(-24, 24), a.y + rnd(-24, 24));
       for (let h = HIDES[a.type] || 0; h > 0; h--) if (Math.random() < h) dropItem('hide', a.x + rnd(-20, 20), a.y + rnd(-20, 20)); if (!d.passive) G.kills++;
       if (d.meat) float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60);
       if (d.boss) { P.iron += 10; burst(a.x, a.y, '#8c2f22', 40); shake = 12; toast(d.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); tryWin(); }
@@ -1032,6 +1073,7 @@ function update(dt) {
       grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty);
     }
     if (a.stun > 0) { a.stun -= dt; spd = 0; }
+    if (!d.passive) for (const wd of wards) if (dist(wd.tx * T + 24, wd.ty * T + 24, a.x, a.y) < 175) { spd *= .55; break; }
     if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
       if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); gridDelta(tile.tx, tile.ty); }
@@ -1040,7 +1082,7 @@ function update(dt) {
     const blocked = d.fly ? (a.x += (dx * spd + a.kx) * dt, a.y += (dy * spd + a.ky) * dt, null) : move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
     a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
     if (d.passive || a.flee) continue;
-    if (blocked && blocked.type && a.cd <= 0) { damageStruct(blocked, d.sdmg); a.cd = .9; }
+    if (blocked && blocked.type && a.cd <= 0) { if (blocked.type === 'bone') { a.hp -= 6; a.flash = .1; } damageStruct(blocked, d.sdmg); a.cd = .9; }
     if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (tg !== P || P.hurt <= 0)) {
       a.cd = 1;
       if (tg !== P) netEv({k: 'd', p: tg.peer, d: d.dmg, x: a.x | 0, y: a.y | 0, po: d.poison ? 1 : 0});
@@ -1225,6 +1267,8 @@ function initScene() {
   GEO.bed = merge([[box(42, 9, 28), '#6b4a2c', M(0, 6, 0)], [box(40, 6, 26), '#e7dfc8', M(0, 13, 0)], [box(26, 7, 27), '#9c3f33', M(7, 14, 0)], [box(9, 5, 17), '#ffffff', M(-13, 17.5, 0)], [box(4, 24, 28), '#5d3f24', M(-21, 12, 0)], [box(3, 14, 28), '#5d3f24', M(21, 7, 0)]]);
   GEO.fire = merge([...Array.from({length: 8}, (_, i) => [dod(5.5), i % 2 ? '#77776f' : '#8b8b83', M(Math.cos(i / 8 * TAU) * 16, 3, Math.sin(i / 8 * TAU) * 16, 1, .8, 1, i, i, 0)]), ...[0, 1, 2].map(i => [cyl(3, 3, 26, 6), '#3d2a18', M(0, 5, 0, 1, 1, 1, 0, i * TAU / 6, Math.PI / 2 - .25)])]);
   GEO.spikes = merge([[box(44, 2, 44), '#3c2816', M(0, 1, 0)], ...Array.from({length: 9}, (_, i) => [cone(4, 24, 5), i % 2 ? '#d6c7a1' : '#c2b189', M((i % 3 - 1) * 14, 13, ((i / 3 | 0) - 1) * 14, 1, 1, 1, (i % 3 - 1) * .18, 0, ((i / 3 | 0) - 1) * -.18)])]);
+  GEO.ward = merge([[cyl(13, 16, 8, 8), '#77776f', M(0, 4, 0)], [cone(8, 36, 5), '#7fd8f0', M(0, 26, 0)], [cone(4.5, 20, 5), '#b8ecfa', M(8, 16, 4, 1, 1, 1, 0, 0, -.35)], [cone(4, 16, 5), '#5cc0de', M(-7, 14, -5, 1, 1, 1, .3, 0, .35)]]);
+  GEO.bone = merge([...[-18, -9, 0, 9, 18].map((x, i) => [cyl(3, 3.6, 46 + (i % 2) * 8, 6), i % 2 ? '#e7dfc8' : '#d6cdb0', M(x, 23 + (i % 2) * 4, (i % 2) * 4 - 2)]), [box(48, 4, 5), '#b9ae8c', M(0, 30, 0)], [box(48, 4, 5), '#b9ae8c', M(0, 12, 0)], ...[-18, 0, 18].map(x => [sph(), '#e7dfc8', M(x, 48, 0, 4.2)])]);
   GEO.lamp = merge([[cyl(2.2, 3, 44, 6), '#4d3520', M(0, 22, 0)], [box(16, 2.5, 3), '#4d3520', M(6, 43, 0)], [box(9, 11, 9), '#2b2f33', M(12, 35, 0)]]);
   GEO.trap = merge([[cyl(17, 17, 2, 10), '#3a3f44', M(0, 1, 0)], [cyl(6, 6, 3, 8), '#8d1f1f', M(0, 2, 0)], ...Array.from({length: 10}, (_, i) => [cone(2.6, 9, 4), '#c9ccc4', M(Math.cos(i / 10 * TAU) * 14, 6, Math.sin(i / 10 * TAU) * 14)])]);
   GEO.iron = merge([[box(48, 60, 48), '#3d444b', M(0, 30, 0)], [box(50, 6, 50), '#59626b', M(0, 12, 0)], [box(50, 6, 50), '#59626b', M(0, 48, 0)], [box(50.5, 62, 8), '#2b3035', M(0, 31, 0)], [box(8, 62, 50.5), '#2b3035', M(0, 31, 0)],
@@ -1274,6 +1318,10 @@ function initScene() {
     scrap: merge([[box(16, 5, 12), '#6c737a', M(0, 2.5, 0, 1, 1, 1, 0, .4, 0)], [box(10, 4, 14), '#8a949e', M(3, 6, -2, 1, 1, 1, .2, 1.1, 0)], [cyl(3, 3, 12, 6), '#59626b', M(-5, 7, 3, 1, 1, 1, 0, .3, 1.4)], [box(6, 6, 6), '#a65a2a', M(6, 4, 6, 1, 1, 1, 0, .7, 0)]]),
     crate: merge([[box(22, 18, 22), '#a57c4c', M(0, 9, 0)], [box(23, 3, 23), '#6e4c2c', M(0, 3, 0)], [box(23, 3, 23), '#6e4c2c', M(0, 15, 0)], [box(4, 19, 23.5), '#f2a03d', M(0, 9, 0)]]),
     hide: merge([[cyl(5, 5, 20, 8), '#b07a45', M(0, 5, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(3, 10.6, 10.6), '#6e4c2c', M(-5, 5, 0)], [box(3, 10.6, 10.6), '#6e4c2c', M(5, 5, 0)]]),
+    shroom: merge([[cyl(2, 2.6, 8, 6), '#efe6cf', M(0, 4, 0)], [sph(), '#c0392b', M(0, 9, 0, 7, 4, 7)], [cyl(1.3, 1.7, 5, 5), '#efe6cf', M(7, 2.5, 3)], [sph(), '#c0392b', M(7, 6, 3, 4, 2.4, 4)], [sph(), '#ffffff', M(2, 12, 1, 1.4)], [sph(), '#ffffff', M(-3, 11, -2, 1.2)]]),
+    feather: merge([[box(18, 1, 5), '#e9e4d6', M(0, 5, 0, 1, 1, 1, 0, 0, .35)], [box(20, 1.2, 1.2), '#8d8777', M(0, 5, 0, 1, 1, 1, 0, 0, .35)], [box(8, 1, 4), '#2c2c34', M(6, 7.4, 0, 1, 1, 1, 0, 0, .35)]]),
+    bone: merge([[cyl(1.8, 1.8, 18, 6), '#e7dfc8', M(0, 4, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [sph(), '#e7dfc8', M(-9, 4, -2, 3)], [sph(), '#e7dfc8', M(-9, 4, 2, 3)], [sph(), '#e7dfc8', M(9, 4, -2, 3)], [sph(), '#e7dfc8', M(9, 4, 2, 3)]]),
+    gem: merge([[cone(6, 9, 6), '#7fd8f0', M(0, 12, 0)], [cone(6, 9, 6), '#4fb2d6', M(0, 3.5, 0, 1, 1, 1, Math.PI, 0, 0)]]),
   };
   for (const k in IG) itemM[k] = inst(IG[k], vmat, 180);
 }
@@ -1317,7 +1365,7 @@ function syncWorld() { // (re)build the per-game instances after reset()
     (o.oak ? oakM : pineM).setColorAt(o.ci, o.oak ? HSL(m.oakc[0] + o.hue, m.oakc[1] + rnd(-6, 6), m.oakc[2] + rnd(-4, 4)) : HSL(m.pine[0] + o.hue, m.pine[1] + rnd(-5, 5), m.pine[2] + rnd(-3, 4)));
   });
   trunkM.count = trees.length; pineM.count = np; oakM.count = no; pineM.instanceColor.needsUpdate = oakM.instanceColor.needsUpdate = true;
-  rocks.forEach((o, i) => { o.i = i; o.rot = rnd(0, TAU); o.sig = -1; rockM.setColorAt(i, HSL(rnd(60, 100), rnd(2, 7), rnd(44, 58))); });
+  rocks.forEach((o, i) => { o.i = i; o.rot = rnd(0, TAU); o.sig = -1; const oc = ORE_COL[o.ore]; rockM.setColorAt(i, oc ? HSL(oc[0] + rnd(-4, 4), oc[1], oc[2] + rnd(-5, 5)) : HSL(rnd(60, 100), rnd(2, 7), rnd(44, 58))); });
   rockM.count = rocks.length; rockM.instanceColor.needsUpdate = true; floorDirty = true;
 }
 function resize() {
@@ -1333,6 +1381,7 @@ function structMesh(s) {
   if (s.type === 'wall') g.rotation.y = ((s.tx * 7 + s.ty * 3) % 4) * Math.PI / 2;
   if (s.type === 'door' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'bed') g.rotation.y = (s.tx + s.ty) % 2 ? 0 : Math.PI / 2;
+  if (s.type === 'bone' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'lamp') { const l = new THREE.Mesh(GEO.eye, new THREE.MeshBasicMaterial({color: 0xffd98a, fog: false})); l.scale.setScalar(3.6); l.position.set(12, 35, 0); g.add(l); }
   if (s.type === 'turret') { const h = new THREE.Mesh(GEO.turretHead, vmat); h.position.y = 40; h.castShadow = true; g.add(h); g.userData.head = h; }
   if (s.type === 'fire') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); g.add(f); g.userData.flame = f; }
@@ -1438,7 +1487,7 @@ function render(now, dt) {
   const ns = Math.min(shots.length, 96);
   for (let i = 0; i < ns; i++) { const s = shots[i]; dummy.position.set(s.x, s.bomb ? 26 + Math.sin(s.t / s.T * Math.PI) * 80 : 26, s.y); dummy.rotation.set(0, -Math.atan2(s.vy, s.vx), 0); s.bomb ? dummy.scale.setScalar(8) : dummy.scale.set(s.arrow ? 24 : 34, 1.6, 1.6); dummy.updateMatrix(); shotM.setMatrixAt(i, dummy.matrix); shotM.setColorAt(i, tmpC.set(s.bomb ? 0x30362c : s.arrow ? 0xe8dcc0 : 0xffe38a)); }
   shotM.count = ns; shotM.instanceMatrix.needsUpdate = true; shotM.instanceColor.needsUpdate = true;
-  axeHead.material.color.copy(P.flint ? C('#3c4a52') : C('#b9bbb4'));
+  axeHead.material.color.copy(P.gaxe ? C('#e0b23a') : P.flint ? C('#3c4a52') : C('#b9bbb4'));
   playerG.visible = !P.dead && (P.hurt <= 0 || Math.floor(now / 60) % 2 === 0);
 
   // build ghost
@@ -1449,11 +1498,11 @@ function render(now, dt) {
   for (let i = 0; i < np; i++) { const p = parts[i]; dummy.position.set(p.x, Math.max(1, p.h), p.y); dummy.rotation.set(p.life * 9, p.life * 7, 0); dummy.scale.setScalar(p.size * Math.min(1, p.life * 4)); dummy.updateMatrix(); partM.setMatrixAt(i, dummy.matrix); partM.setColorAt(i, tmpC.set(p.col).convertSRGBToLinear()); }
   partM.count = np; partM.instanceMatrix.needsUpdate = true; if (np) partM.instanceColor.needsUpdate = true;
 
-  const ic = {herb: 0, scrap: 0, crate: 0, hide: 0};
+  const ic = {}; for (const k of IK) ic[k] = 0;
   for (const it of items) { // pick-ups: only the ones near the camera
     if (Math.abs(it.x - cam.x) > 1100 || Math.abs(it.y - cam.y) > 1100 || ic[it.type] >= 180) continue;
-    const hop = it.type === 'herb' ? 0 : Math.abs(Math.sin(now / 400 + it.id)) * 4;
-    dummy.position.set(it.x, hop, it.y); dummy.rotation.set(0, it.id * 1.7 + (it.type === 'herb' ? 0 : now / 1400), 0); dummy.scale.setScalar(1); dummy.updateMatrix(); itemM[it.type].setMatrixAt(ic[it.type]++, dummy.matrix);
+    const still = it.type === 'herb' || it.type === 'shroom', hop = still ? 0 : Math.abs(Math.sin(now / 400 + it.id)) * 4;
+    dummy.position.set(it.x, hop, it.y); dummy.rotation.set(0, it.id * 1.7 + (still ? 0 : now / 1400), 0); dummy.scale.setScalar(1); dummy.updateMatrix(); itemM[it.type].setMatrixAt(ic[it.type]++, dummy.matrix);
   }
   for (const k in ic) { itemM[k].count = ic[k]; itemM[k].instanceMatrix.needsUpdate = true; }
   renderer.render(scene, camera);
@@ -1517,8 +1566,9 @@ function hud() {
   $('savebtn').textContent = client() ? 'Save gear (K)' : 'Save (K)';
   const bs = animals.find(isBoss); $('boss').hidden = !bs;
   if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
-  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron; $('rh').textContent = P.herbs; $('rd').textContent = P.hide;
-  $('bandage').disabled = P.herbs < 2; $('mkboots').hidden = P.boots; $('mkvest').hidden = P.vest;
+  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron; $('rh').textContent = P.herbs; $('rd').textContent = P.hide; $('rg').textContent = P.gold; $('rc').textContent = P.crystal; $('rf').textContent = P.feathers; $('rb').textContent = P.bone;
+  for (const k in GEAR) $('gear-' + k).hidden = P[k] || !P[Object.keys(GEAR[k].cost)[0]]; $('stew').hidden = !afford({meat: 2, herbs: 1}); // craft buttons appear once you hold the main ingredient $('fletch').hidden = P.feathers < 1;
+  $('bandage').hidden = P.herbs < 1; $('bandage').disabled = P.herbs < 2; $('mkboots').hidden = P.boots || P.hide < 1; $('mkvest').hidden = P.vest || P.hide < 1;
   const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
   $('phase').textContent = (G.phase === 'day' ? 'Dusk in ' : 'Dawn in ') + mm;
@@ -1537,7 +1587,7 @@ function hud() {
     b.lastChild.textContent = own ? (PETS[k] ? 'with you' : P.riding ? 'riding · B gets off' : 'B to ride') : unlocked(d) ? costText(d.cost) : 'after night ' + d.unlock;
   }
   $('tool-axe').lastChild.textContent = WPN[P.weapon].name.toLowerCase() + ' in hand';
-  $('eat').disabled = P.meat < 1; $('craft').hidden = P.flint;
+  $('eat').hidden = P.meat < 1; $('craft').hidden = P.flint || P.gaxe || P.stone < 1;
   $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver);
   $('mkarmor').hidden = P.armor || G.nights < 2; $('mkgren').hidden = G.nights < 4; $('throw').hidden = P.grenades < 1; $('throw').textContent = 'Throw grenade (G) ×' + P.grenades;
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
@@ -1565,7 +1615,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
   if (e.target && e.target.id === 'code') return;
   keys[e.code] = true; if (e.repeat || !running) return;
-  const n = e.code === 'Digit0' ? 10 : e.code === 'KeyL' ? 11 : e.code === 'KeyX' ? 12 : e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
+  const n = e.code === 'Digit0' ? 10 : e.code === 'KeyL' ? 11 : e.code === 'KeyX' ? TOOLS.length : e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
   if (n >= 1 && n <= TOOLS.length) { tool = TOOLS[n - 1]; hud(); }
   if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
   if (e.code === 'KeyE') eat();
@@ -1576,6 +1626,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyG') throwGrenade();
   if (e.code === 'KeyB') toggleRide();
   if (e.code === 'KeyZ') useBandage();
+  if (e.code === 'KeyU') stew();
   if (e.code === 'KeyR') makeAmmo('arrows');
   if (e.code === 'KeyF') makeAmmo('bullets');
   if (e.code === 'Tab') cycleWeapon(e.shiftKey ? -1 : 1);
@@ -1613,6 +1664,8 @@ $('contbtn').addEventListener('click', () => { if (savedGame) start(savedGame); 
 $('hostbtn').addEventListener('click', () => hostGame(null)); $('hostsaved').addEventListener('click', () => { if (savedGame) hostGame(savedGame); });
 $('joinbtn').addEventListener('click', () => joinGame($('code').value));
 $('code').addEventListener('keydown', e => { if (e.code === 'Enter') joinGame($('code').value); });
+for (const k in GEAR) $('gear-' + k).addEventListener('click', () => makeGear2(k));
+$('stew').addEventListener('click', stew); $('fletch').addEventListener('click', fletch);
 $('bandage').addEventListener('click', useBandage); $('mkboots').addEventListener('click', () => makeGear('boots')); $('mkvest').addEventListener('click', () => makeGear('vest'));
 $('mkarmor').addEventListener('click', makeArmor); $('mkgren').addEventListener('click', makeGrenades); $('throw').addEventListener('click', throwGrenade);
 $('savebtn').addEventListener('click', () => saveGame(false)); $('quitbtn').addEventListener('click', () => quit(''));
@@ -1620,7 +1673,7 @@ addEventListener('pagehide', () => saveGame(true));
 addEventListener('resize', resize);
 
 initScene(); resize(); reset(1, 'forest'); G.dark = .3; refreshMenu();
-window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, mk, recalc};
+window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, get rocks() { return rocks; }, mk, recalc};
 (async () => { // light up saving and multiplayer once the page knows where it is running
   const cl = window.claude;
   if (cl && cl.use) { try { [db, userNS, lobby] = await Promise.all([cl.use('db'), cl.use('user'), cl.use('room')]); uid = userNS ? await userNS.id() : null; } catch (e) {} }
