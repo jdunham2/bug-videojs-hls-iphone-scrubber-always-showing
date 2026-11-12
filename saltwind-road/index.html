@@ -26,6 +26,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#detUI{position:absolute;right:16px;bottom:86px;padding:5px 10px;font-size:13px;z-index:6;white-space:nowrap}
 #raceUI{position:absolute;left:50%;top:128px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #courierUI{position:absolute;left:50%;top:96px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #photoUI{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 14px;font-size:13px;text-align:center;z-index:30;max-width:calc(100% - 32px)}
@@ -264,6 +265,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="photoUI" class="panel" hidden></div>
   <div id="courierUI" class="panel" hidden></div>
   <div id="raceUI" class="panel" hidden></div>
+  <div id="detUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -807,6 +809,7 @@ const GOODS = {
   spirit_charm:{name:'Spirit Charm',base:0,col:'#7ae0a0',kind:'trinket',desc:'A gift from the Spirit of the Wood. +10% XP while carried.'},
   elspeth_lantern:{name:'Elspeth\u2019s Lantern',base:0,col:'#bfe8ff',kind:'trinket',desc:'A lantern with a soft blue glow. +15% damage at night while carried.'},
   tide_bell:{name:'Tidecaller\u2019s Bell',base:0,col:'#6ac0d8',kind:'trinket',desc:'A small bronze bell from the deep. +25% speed on water while carried.'},
+  metal_detector:{name:'Metal Detector',base:150,col:'#a0a8b0',kind:'usable',desc:'Switch it on from your bag to hunt for buried treasure. It beeps faster as you get closer.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -4333,6 +4336,7 @@ function useItem(g) {
     toast(`<b>You spread a picnic blanket.</b><br>Health regenerates for 3 minutes${party ? ', for party members nearby too' : ''}.`, 4500); return;
   }
   if (g === 'giant_draught' || g === 'swift_tonic' || g === 'shrink_elixir') { addItem(g, -1); const k = g === 'giant_draught' ? 'giant' : g === 'swift_tonic' ? 'swift' : 'tiny'; if (k === 'giant') POT.tiny = 0; if (k === 'tiny') POT.giant = 0; POT[k] = 60; S.potionsDrunk = (S.potionsDrunk || 0) + 1; S.potionKinds = S.potionKinds || {}; S.potionKinds[k] = true; SFX.level(); burst(S.x, S.y - .6, GOODS[g].col, 20, 4); floatText(S.x, S.y - 1.8, k === 'giant' ? 'You grow HUGE!' : k === 'tiny' ? 'You shrink!' : 'Zoom!', GOODS[g].col); renderHUD(); partyT = 0; return; }
+  if (g === 'metal_detector') { det.on = !det.on; if (det.on) { det.cache = null; toast('<b>Metal detector on.</b><br>Walk around and watch the signal. When it\u2019s strongest, press E to dig.', 4500); } else toast('Metal detector off.', 2000); $('detUI').hidden = !det.on; SFX.click(); return; }
   if (g === 'strongbox') { addItem(g, -1); renderHUD(); lockStart(); return; }
   if (g === 'war_horn') {
     if (inDungeon() || inArena() || townAt(S.x, S.y, 14) || S.y >= WORLD_H) { toast('Blow the horn out in the wild, away from towns.'); return; }
@@ -5278,6 +5282,55 @@ function bellRing() {
   openPanel('Dawn at Tidewatch', 'The bell’s voice rolls out over the waves. Out on the water, pale lights rise one by one: dozens of them, the shapes of sailors in old coats, lifting their caps to you. Then the sun breaks the horizon, and they are gone, and the sea is calm and golden.<br><br>When you look down, the bell in your hand has become a tiny bronze charm, humming with the song of the sea.<br><br><span style="color:var(--good)">You receive the <b>Tidecaller’s Bell</b> (+25% speed on water while carried), 550 coin and 320 XP.</span>', [{label: 'Farewell, sailors', primary: true, fn: closeTalk}]);
 }
 function drawBellPiece(q) { const px = q.x*TS, py = q.y*TS; if (Math.floor(frameT*2 + q.x) % 3 === 0) { ctx.fillStyle = 'rgba(255,240,180,.6)'; ctx.fillRect(px - 1, py - 4, 2, 2); } ctx.fillStyle = '#b08a4a'; ctx.fillRect(px - 3, py - 1, 6, 3); ctx.fillStyle = '#d8b070'; ctx.fillRect(px - 2, py - 1, 3, 1); }
+// ===== metal detector =====
+const det = {on: false, cache: null, beep: 0};
+function detTick(dt) {
+  if (!det.on) return; const ui = $('detUI');
+  if (!have('metal_detector') || inDungeon() || S.y >= WORLD_H) { ui.hidden = true; return; } ui.hidden = false;
+  if (!det.cache) { for (let k = 0; k < 40; k++) { const a = Math.random()*6.283, r = 10 + Math.random()*16, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && !townAt(x, y, 9)) { det.cache = {x, y}; break; } } if (!det.cache) return; }
+  const d = Math.hypot(det.cache.x - S.x, det.cache.y - S.y), sig = Math.max(0, Math.min(1, 1 - d/28));
+  if (d > 40) { det.cache = null; return; }
+  const bars = Math.round(sig*8), txt = `\u{1F4E1} ${'▮'.repeat(bars)}${'▯'.repeat(8 - bars)}${d < 1.2 ? ' DIG!' : ''}`; if (ui.textContent !== txt) ui.textContent = txt; ui.style.color = d < 1.2 ? '#7ae08a' : sig > .7 ? '#ffd040' : '';
+  det.beep -= dt; if (det.beep <= 0) { det.beep = .15 + (1 - sig)*1.4; AUD.tone(400 + sig*800, .05, 'square', .03); }
+}
+function detTarget() {
+  if (!det.on || !det.cache || Math.hypot(det.cache.x - S.x, det.cache.y - S.y) > 1.2) return null;
+  return {key: 'detdig', html: '<kbd style="margin:0 6px 0 0">E</kbd>Dig where the detector beeps', btn: 'Dig', fn: () => {
+    const c = det.cache; det.cache = null; burst(c.x, c.y, '#8a6a3a', 14, 3); SFX.pickup();
+    const r = Math.random(), lv = S.level || 1; let got;
+    if (r < .45) { const n = rint(15, 50) + lv; S.coins += n; got = `${n} old coins`; }
+    else if (r < .65) { addItem('ancient_coin', 1); got = 'an Ancient Coin'; }
+    else if (r < .78) { const g = pick(['silver', 'amber', 'glass'].filter(z => GOODS[z])); addItem(g, 2); got = `2 ${GOODS[g].name}`; }
+    else if (r < .88) { addItem('gem', 1); got = 'a Cut Gem'; }
+    else if (r < .95) { const g = pick(CARD_KEYS); addItem(g, 1); got = `a ${GOODS[g].name} (in a tin box!)`; }
+    else { addItem('treasure_map', 1); got = 'a Treasure Map'; }
+    S.detFinds = (S.detFinds || 0) + 1; renderHUD(); save(); floatText(S.x, S.y - 1.4, 'Found something!', '#ffd040');
+    toast(`<b>You dig up ${got}!</b>`, 3500);
+  }};
+}
+// ===== pet expeditions =====
+const absDay = () => S.day + S.time;
+function petExpTalk(n) {
+  const E = S.petExp;
+  if (E) { const left = E.back - absDay(); say(left > 0 ? `“Your ${PETS[E.pet].name.toLowerCase()} is still out exploring. Back in about ${Math.max(1, Math.round(left*24))} hour${Math.round(left*24) === 1 ? '' : 's'}.”` : '“Should be home any moment now!”', [back(n)]); return; }
+  const P = PETS[S.pet];
+  say(`“Pets love an adventure! Send your ${P.name.toLowerCase()} out exploring and they’ll bring back whatever they find. You won’t have their help while they’re away, of course.”`, [
+    {label: 'A short trip (half a day)', primary: true, fn: () => petExpSend(n, .5)}, {label: 'A long expedition (a full day, better finds)', fn: () => petExpSend(n, 1)}, back(n)]);
+}
+function petExpSend(n, len) {
+  S.petExp = {pet: S.pet, back: absDay() + len, len}; const nm = PETS[S.pet].name.toLowerCase(); S.pet = null; petE = null; renderHUD(); save(); SFX.chime();
+  say(`Your ${nm} bounds off toward the horizon with a happy ${nm === 'cat' ? 'flick of the tail' : 'yip'}. They’ll come home on their own.`, [back(n)]);
+}
+let petExpT = 0;
+function petExpTick(dt) {
+  const E = S.petExp; if (!E) return; petExpT -= dt; if (petExpT > 0) return; petExpT = 2;
+  if (absDay() < E.back) return;
+  S.petExp = null; if (!S.pet) S.pet = E.pet; S.petTrips = (S.petTrips || 0) + 1;
+  const got = [], rolls = E.len >= 1 ? 4 : 2;
+  for (let k = 0; k < rolls; k++) { const r = Math.random(); if (r < .3) { const c = rint(20, 60)*(E.len >= 1 ? 2 : 1); S.coins += c; got.push(`${c} coin`); } else if (r < .55) { const g = pick(['herbs', 'berries', 'mushroom', 'shells', 'wood', 'stone'].filter(z => GOODS[z])); const nn = rint(2, 5); addItem(g, nn); got.push(`${nn} ${GOODS[g].name}`); } else if (r < .7) { addItem('pet_treat', 2); got.push('2 Pet Treats'); } else if (r < .82) { const g = pick(CARD_KEYS); addItem(g, 1); got.push(GOODS[g].name); } else if (r < .92) { addItem('gem', 1); got.push('a Cut Gem'); } else { addItem('treasure_map', 1); got.push('a Treasure Map'); } }
+  renderHUD(); save(); SFX.victory();
+  toast(`<b>Your ${PETS[E.pet].name.toLowerCase()} is back from ${E.len >= 1 ? 'a long expedition' : 'a short trip'}!</b><br>Muddy, happy, and carrying: <span style="color:var(--good)">${got.join(', ')}</span>`, 7000);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -6828,6 +6881,7 @@ const EARNED_TITLES = [
 ];
 const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
+  ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
   ['The Sunken Bell', 'A story quest: Old Marisol in Tidewatch tells of a bell lost in a great storm. Dig up its three fragments on the beaches nearby, then ring the bell at the water\u2019s edge at dawn.'],
   ['The Lady of Gravenmoor', 'A story quest: at night, a ghostly lady appears near Gravenmoor. Find her three lost keepsakes on the moors, then meet her at her grave at midnight.'],
@@ -7160,7 +7214,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -8517,7 +8571,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -8861,6 +8915,7 @@ function mainOptions(n) {
   if (n.birder) o.push({label: S.birdJournal ? 'Show my bird journal' : 'Ask about birdwatching', primary: true, fn: () => birdTalk(n)});
   if (n.rinker) o.push({label: 'Skate on the rink · 5\u25c6', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); startRink(); }});
   if (n.lapidary) o.push({label: 'Cut a gem (3 Crystal)', primary: true, disabled: have('crystal') < 3, fn: () => { addItem('crystal', -3); startCut(); }});
+  if (n.archaeo) o.push({label: have('metal_detector') ? 'Metal detector (owned)' : 'Buy a metal detector · 300\u25c6', disabled: have('metal_detector') || S.coins < 300, fn: () => { S.coins -= 300; addItem('metal_detector', 1); SFX.coin(); renderHUD(); save(); say('“A marvelous contraption! Switch it on from your bag and walk around. When it screams, dig!”', [back(n)]); }});
   if (n.archaeo) o.push({label: S.trowel ? 'Show my finds' : 'Ask about archaeology', primary: true, fn: () => digTalk(n)});
   if (n.tides) o.push({label: 'Play Tides · 20\u25c6', primary: true, disabled: S.coins < 20, fn: () => { S.coins -= 20; renderHUD(); tidesStart(n); }});
   if (n.riddler) o.push({label: S.riddle ? 'Repeat the riddle' : 'Ask for a riddle', primary: true, fn: () => riddleTalk(n)});
@@ -8886,6 +8941,7 @@ function mainOptions(n) {
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
   if (n.id === 'peg') o.push({label: `Cursed doubloons (${have('cursed_doubloon')})`, primary: have('cursed_doubloon') >= 3, fn: () => doubloonShop(n)});
   if (n.balloon) o.push({label: 'Take a balloon ride', primary: true, fn: () => balloonTalk(n)});
+  if (n.trainer && (S.pet || S.petExp)) o.push({label: S.petExp ? 'Check on your pet\u2019s expedition' : 'Send your pet on an expedition', fn: () => petExpTalk(n)});
   if (n.trainer && S.pet) o.push({label: `Name your ${PETS[S.pet].name.toLowerCase()}`, fn: () => namePetTalk(n)});
   if (n.trainer) o.push({label: petShowDay() ? 'Pet show today! ★' : 'Pet tricks', primary: petShowDay() && S.petShow !== S.day && !!S.pet, fn: () => trainerTalk(n)});
   if (n.auction) o.push({label: 'This week’s auction', primary: true, fn: () => auctionTalk(n)});
@@ -11686,6 +11742,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['detector20','Treasure Hunter','Dig up 20 finds with the metal detector', () => (S.detFinds || 0) >= 20],
+  ['pettrips5','Adventurous Pet','Send your pet on 5 expeditions', () => (S.petTrips || 0) >= 5],
   ['twinvault','Better Together, Literally','Open a Twin Plate vault with a friend', () => (S.twinVaults || 0) >= 1],
   ['twinvault5','Partners in Crime','Open 5 Twin Plate vaults', () => (S.twinVaults || 0) >= 5],
   ['sunkenbell','The Bell Tolls Again','Ring the Tidewatch bell at dawn', () => !!(S.sb && S.sb.step >= 4)],
@@ -12284,7 +12342,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
