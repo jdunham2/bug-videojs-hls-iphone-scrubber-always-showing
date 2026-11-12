@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-10, the starting map) or `MODE` (0-10) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-10, the starting map) or `MODE` (0-13) to change the defaults.
 
 ## How it plays
 
@@ -39,6 +39,9 @@ The host picks the mode in the lobby with **Next mode**.
 | **VIP Escort** | One hider is the VIP, marked in gold for their team. If the VIP is caught the seekers win at once; if the VIP survives they get +200. |
 | **Playground Tag** | One player is "it". Tag someone and they are it instead (+25). Everyone else scores while they are not it. |
 | **Giants** | Seekers are 1.7× size with a 3.7 m reach. Hiders are half size and can hide behind almost anything. |
+| **Closing Storm** | A storm wall shrinks from 100 m to 17 m around the plaza. A hider outside it for more than 4 seconds is swept off to jail. |
+| **Switcheroo** | Every 45 seconds each seeker becomes a hider, and the same number of free hiders become seekers. |
+| **Spotlight** | Seekers cannot tag. A hider held in the middle of a flashlight beam (within 15 m, in line of sight) for 1.2 seconds is caught. |
 
 Beacons, power-ups, coins and challenges work in every mode.
 
@@ -60,9 +63,9 @@ Beacons, power-ups, coins and challenges work in every mode.
 
 Twenty characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
 Duck, Knight, Wizard, Pirate, Shark, Mushroom, Snowman), 16 colours, seven hats, four patterns and
-33 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
+41 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
 owl, bat, ghostling, crab, hedgehog, froglet, parrot, snail, penguin chick, mouse, butterfly, mini UFO, baby shark, jellyfish, chick, lamb, tiny T-rex, squirrel, firefly,
-little cloud). Your pet runs just ahead of you;
+little cloud, corgi, red panda, koala, axolotl, ladybug, seahorse, phoenix, pumpkin sprout). Your pet runs just ahead of you;
 other players' pets trail behind them. Seekers cannot see a hider's pet, so it never gives you away.
 Choose on the start screen, or with **Change character** in the lobby; everyone else sees your look.
 
@@ -89,7 +92,7 @@ The host picks the map in the lobby with **Next map**.
 
 ### Vehicles
 
-Every map has ten vehicles. Stand next to one and press **E** to climb in or out, then drive with the move keys
+Every map has fourteen vehicles, always parked outdoors. Stand next to one and press **E** to climb in or out, then drive with the move keys
 (or the joystick on a phone).
 
 | Vehicle | Top speed | A full tank lasts | Notes |
@@ -99,8 +102,12 @@ Every map has ten vehicles. Stand next to one and press **E** to climb in or out
 | Monster truck | 10.5 m/s | about 525 m | Wide and slow to turn, but the tank goes on and on |
 | Hoverboard | 14 m/s | about 175 m | Silent: no engine pings |
 | Rocket car | 19 m/s | about 210 m | By far the fastest, with a very wide turning circle |
+| Bumper car | 9.5 m/s | about 365 m | Bounces off whatever it hits, and spins on the spot |
+| Motorbike | 16 m/s | about 265 m | Fast and narrow enough for doorways |
+| Tractor | 7.5 m/s | about 750 m | Barely faster than a sprint, but it almost never runs dry |
+| Shopping cart | 8.6 m/s | never runs out | No engine: silent and needs no fuel |
 
-- No vehicle can climb stairs, and all but the scooter and hoverboard are too wide for doorways.
+- No vehicle can climb stairs. Only the scooter, hoverboard, motorbike and shopping cart fit through doorways.
 - Engines are the loudest thing on the map: seekers see a ping every half second while a hider drives.
 - Fuel is burned per metre driven. An empty vehicle only crawls until it has rested.
 - Seekers can drive too, and can tag from the driving seat. Getting caught throws you out.

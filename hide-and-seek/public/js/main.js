@@ -20,7 +20,7 @@ const stick = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const looks = new Map(); // pointerId -> last position, for drag-to-look
 const roster = new Map(); // id -> {n, c, bot}
 const players = new Map(); // id -> live state
-const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0, vh: [], vip: 0 };
+const G = { ph: 'lobby', tl: 0, host: null, res: 0, ct: new Set(), w: null, at: 0, bc: [0, 0, 0], md: 0, cg: 0, vh: [], vip: 0, zr: 0 };
 const car = { id: -1, x: 0, z: 0, r: 0, sp: 0, hit: 0 }; // the vehicle you are driving, simulated locally
 const me = { x: 0, z: -5, yaw: 0, pitch: 0, stam: 100, wind: 0, crouch: false, q: 0, eye: 1.6, bob: 0, stepD: 0, y: 0, vy: 0, freeUntil: 0, boostUntil: 0, chal: '', chalDone: false, lv: 0, gy: 0 };
 const keys = {};
@@ -144,6 +144,7 @@ function onMsg(m) {
     case 'noise': onNoise(m); break;
     case 'coin': if (m.w === myId) { sfx.coin(); feed('+10 coin', 'good'); } break;
     case 'caught':
+      if (m.m === 11) { if (m.w === myId) { sfx.caught(); banner('The storm got you! Wait for a rescue…'); } else sfx.thud(); break; }
       if (m.m === 9) {
         if (m.w === myId) { sfx.caught(); banner('TAG! You are it'); } else if (m.b === myId) { sfx.win(); banner('Tagged! Now run'); } else sfx.thud();
         break;
@@ -157,6 +158,7 @@ function onMsg(m) {
       else sfx.thud();
       break;
     case 'freed': sfx.freed(); break;
+    case 'swap': sfx.horn(); banner(m.s.includes(myId) ? 'SWITCHEROO! You are a seeker now' : 'SWITCHEROO! Roles have changed'); break;
     case 'search': if (m.id === myId) { sfx.stun(); banner('Empty! You are dazed…'); } break;
     case 'rock': gfx.throwRock(m.fx, m.fz, m.x, m.z); break;
     case 'round': me.stam = 100; me.wind = 0; me.freeUntil = me.boostUntil = 0; me.chal = ''; break;
@@ -200,6 +202,7 @@ function onState(m) {
   G.cg = m.cg || 0;
   G.vh = m.vh || [];
   G.vip = m.vip || 0;
+  G.zr = m.zr || 0;
   gfx.setItems(new Set(m.it || []));
   G.ct = new Set(m.ct);
   gfx.setCoins(G.ct);
@@ -344,7 +347,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mousedown', (e) => { if (playing && !softLook && e.button === 0) tag(); });
 function tag() {
   const p = players.get(myId);
-  if (!p || p.role !== 1 || G.ph !== 'seek') return;
+  if (!p || p.role !== 1 || G.ph !== 'seek' || G.md === 13) return; // in Spotlight the beam does the catching
   gfx.swing(); sfx.swing();
   send({ t: 'a', a: 'tag' });
 }
@@ -501,7 +504,7 @@ function update(dt, now) {
     const c = collide(W, nx, nz, VK.radius, 0);
     if (Math.hypot(c[0] - nx, c[1] - nz) > 0.02) {
       if (Math.abs(car.sp) > 5 && now > car.hit) { car.hit = now + 400; sfx.thud(); }
-      car.sp *= 0.6;
+      car.sp *= VK.bouncy ? -0.7 : 0.6; // bumper cars bounce off
     }
     car.x = c[0]; car.z = c[1];
     me.x = car.x; me.z = car.z; me.lv = 0; me.gy = 0; me.y = 0; me.vy = 0;
@@ -564,7 +567,8 @@ function update(dt, now) {
 
   // tension: your heart pounds when a seeker is close
   const fear = !seeker && p.st === 0 && G.ph === 'seek' ? Math.max(0, Math.min(1, 1 - (nearSeeker - 4) / 11)) : 0;
-  $('vignette').style.opacity = (fear * (0.55 + 0.45 * Math.sin(now / 1000 * (4 + fear * 8)))).toFixed(2);
+  const warn = p.fx & 16 ? 0.75 + 0.25 * Math.sin(now / 60) : 0; // outside the storm wall, or caught in a beam
+  $('vignette').style.opacity = warn ? warn.toFixed(2) : (fear * (0.55 + 0.45 * Math.sin(now / 1000 * (4 + fear * 8)))).toFixed(2);
   if (fear > 0.05 && now > heartT) { heartT = now + 1100 - fear * 650; sfx.heart(); }
 
   // camera
@@ -573,6 +577,7 @@ function update(dt, now) {
   const eyeT = driving ? 1.5 : hidden ? 1.15 : (me.crouch ? 1.0 : 1.6) * size;
   me.eye += (eyeT - me.eye) * Math.min(1, dt * 12);
   gfx.setDark(G.md === 4 && (G.ph === 'hide' || G.ph === 'seek'));
+  gfx.setZone(G.ph === 'seek' ? G.zr : 0);
   gfx.setSeekerView(seeker && G.ph !== 'lobby');
   gfx.updateSelfPet(me.x, me.gy, me.z, me.yaw, !hidden && !blind && !p.prop, dt);
   gfx.frame(dt, { x: me.x, y: me.gy + me.eye + me.y + (moving && !hidden ? Math.abs(Math.sin(me.bob)) * 0.05 : 0), z: me.z, yaw: me.yaw, pitch: me.pitch, bob: me.bob }, { res: G.res, jailed: jailedN > 0, bc: G.bc });
@@ -598,6 +603,9 @@ function hud(p, now, s) {
     if (me.chal && G.ph !== 'lobby') { const c = document.createElement('em'); c.textContent = (me.chalDone ? '✔ ' : '★ ') + me.chal; if (me.chalDone) c.className = 'done'; role.append(c); }
   };
   if (G.ph === 'lobby') set('', 'Warm-up', 'Explore the map and learn the hiding spots.');
+  else if (s.seeker && G.md === 13) set('seeker', '🔦 SPOTLIGHT', 'You cannot tag. Hold the middle of your beam on a hider for a moment to catch them.');
+  else if (s.seeker && G.md === 12) set('seeker', '🔦 SEEKER (for now)', 'Roles swap every 45 seconds. Catch who you can before then.');
+  else if (s.seeker && G.md === 11) set('seeker', '🔦 SEEKER', 'The storm herds the hiders towards the plaza. It cannot hurt you.');
   else if (s.seeker && G.md === 9) set('seeker', '🔦 YOU ARE IT', 'Tag anyone to pass it on. Do not be it when the clock runs out.');
   else if (s.seeker && G.md === 10) set('seeker', '🦶 GIANT', 'You tower over everything and your reach is long. The hiders are tiny: look down.');
   else if (s.seeker && G.md === 8) set('seeker', '🔦 SEEKER', 'One hider is the VIP. Catch the VIP and the round is yours.');
@@ -607,6 +615,9 @@ function hud(p, now, s) {
   else if (p.st === 1) set('jail', '⛓ JAILED', `A free teammate must hold ${USE} at the lever.`);
   else if (p.st === 2) set('jail', '🧊 FROZEN', `A free teammate can thaw you: they hold ${USE} next to you.`);
   else if (p.prop) set('hider', `📦 You are a ${PROPS[p.prop].toUpperCase()}`, `Hold still to blend in. ${TOUCH ? 'Tap PROP' : 'Press R'} to change disguise.`);
+  else if (G.md === 13) set('hider', '🙈 HIDER', 'Stay out of the flashlight beams. A second or so in the light and you are caught.');
+  else if (G.md === 12) set('hider', '🙈 HIDER (for now)', 'Roles swap every 45 seconds. You might be seeking next.');
+  else if (G.md === 11) set('hider', '🌪 HIDER', `Stay inside the storm wall (${G.zr} m from the plaza and shrinking).`);
   else if (G.md === 9) set('hider', '🏃 RUN!', 'Stay away from whoever is it. You score while you are not it.');
   else if (G.md === 10) set('hider', '🐜 TINY', 'You are small enough to hide behind almost anything. Giants reach a long way.');
   else if (G.md === 8 && G.vip === myId) set('hider', '👑 YOU ARE THE VIP', 'If you are caught your team loses. Survive for +200.');
@@ -650,6 +661,7 @@ function hud(p, now, s) {
   pr.textContent = '';
   if (!playing || s.blind) return;
   if (s.stunned) { pr.textContent = '💫 Dazed…'; return; }
+  if (p.fx & 16) { pr.textContent = G.md === 11 ? '⚠ Outside the storm wall! Get back in!' : '⚠ You are in the beam! Break line of sight!'; return; }
   if (s.hidden) { pr.textContent = `${USE}: leave hiding spot`; return; }
   if (p.st) return;
   const progress = (text, v) => {

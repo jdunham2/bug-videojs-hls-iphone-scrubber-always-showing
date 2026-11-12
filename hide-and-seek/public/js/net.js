@@ -68,7 +68,7 @@ function roomHost(nr, name, code, h, look) {
     const t = Date.now();
     evs = evs.filter((e) => t - e.at < 4000);
     let out = evs.map((e) => ({ i: e.i, to: e.to, m: e.m }));
-    while (out.length > 40 || JSON.stringify(out).length > 1700) out.shift();
+    while (out.length > 40 || JSON.stringify(out).length > 1100) out.shift();
     nr.presence({ hs: 1, host: 1, st: { ...snap, k: ++k }, ev: out, ro: roster, pm: [...peers].map(([peer, v]) => [peer, v.pl.id]) }).catch(() => {});
   }, look);
   g.room.tap = (m) => {

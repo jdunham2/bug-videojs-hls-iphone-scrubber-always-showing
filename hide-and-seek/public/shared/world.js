@@ -50,10 +50,16 @@ export const MODES = [
   { id: 'vip', name: 'VIP Escort', blurb: 'One hider is the VIP. If the seekers catch the VIP, the round is over.' },
   { id: 'tag', name: 'Playground Tag', blurb: 'One player is "it". Tag someone and they are it instead. Do not be it when time runs out.' },
   { id: 'giants', name: 'Giants', blurb: 'Seekers are towering giants with a long reach. Hiders are tiny and hard to spot.' },
+  { id: 'storm', name: 'Closing Storm', blurb: 'A storm wall closes in on the plaza. Hiders caught outside it are swept off to jail.' },
+  { id: 'swap', name: 'Switcheroo', blurb: 'Every 45 seconds the seekers become hiders, and the same number of hiders become seekers.' },
+  { id: 'spotlight', name: 'Spotlight', blurb: 'Seekers cannot tag. They catch you by holding their flashlight beam on you for a moment.' },
 ];
 // Mode-specific numbers: Turbo shortens the round and speeds everyone up
 export const TURBO = { speed: 1.3, hide: 15, seek: 90 };
 export const GIANT = { seeker: 1.7, hider: 0.5, reach: 3.7 };
+export const STORM = { start: 100, end: 17, grace: 4 }; // wall radius in metres, and seconds you survive outside it
+export const SWAP_EVERY = 45;
+export const SPOT = { range: 15, cos: 0.975, time: 1.2 }; // how far the beam reaches, how tight it is, how long it must stay on you
 // Vehicle types. Type 0 is each map's own ride; the others are the same everywhere.
 // drain is fuel per second (out of 100); quiet ones do not ping seekers.
 export const VEHICLES = [
@@ -62,6 +68,10 @@ export const VEHICLES = [
   { name: 'monster truck', max: 10.5, accel: 6, turn: 1.6, radius: 1.35, drain: 2 },
   { name: 'hoverboard', max: 14, accel: 12, turn: 2.8, radius: 0.5, drain: 8, quiet: true },
   { name: 'rocket car', max: 19, accel: 16, turn: 1.25, radius: 1.0, drain: 9 },
+  { name: 'bumper car', max: 9.5, accel: 20, turn: 3.4, radius: 0.9, drain: 2.6, bouncy: true },
+  { name: 'motorbike', max: 16, accel: 13, turn: 2.4, radius: 0.6, drain: 6 },
+  { name: 'tractor', max: 7.5, accel: 5, turn: 1.7, radius: 1.3, drain: 1 },
+  { name: 'shopping cart', max: 8.6, accel: 6, turn: 1.9, radius: 0.6, drain: 0, quiet: true },
 ];
 export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
@@ -87,7 +97,8 @@ export const LOOKS = {
   pets: ['No pet', 'Puppy', 'Kitten', 'Bunny', 'Duckling', 'Baby dragon', 'Slime', 'Bee', 'Robo-ball',
     'Fox', 'Panda', 'Piglet', 'Unicorn', 'Turtle', 'Owl', 'Bat', 'Ghostling', 'Crab',
     'Hedgehog', 'Froglet', 'Parrot', 'Snail', 'Penguin chick', 'Mouse', 'Butterfly', 'Mini UFO',
-    'Baby shark', 'Jellyfish', 'Chick', 'Lamb', 'Tiny T-rex', 'Squirrel', 'Firefly', 'Little cloud'],
+    'Baby shark', 'Jellyfish', 'Chick', 'Lamb', 'Tiny T-rex', 'Squirrel', 'Firefly', 'Little cloud',
+    'Corgi', 'Red panda', 'Koala', 'Axolotl', 'Ladybug', 'Seahorse', 'Phoenix', 'Pumpkin sprout'],
 };
 export function cleanLook(l) {
   const v = (x, n) => (Number.isInteger(x) && x >= 0 && x < n ? x : (Math.random() * n) | 0);
@@ -342,12 +353,13 @@ function kit(seed) {
     // Vehicles park on open ground with room to pull away
     const roomy = (x, z) => { for (let dz = -1.5; dz <= 1.5; dz += 0.5) for (let dx = -1.5; dx <= 1.5; dx += 0.5) if (blocked[0][cellIdx(x + dx, z + dz)]) return false; return true; };
     const vehicles = [];
-    const kinds = [0, 1, 3, 0, 2, 1, 0, 3, 4, 0];
+    const kinds = [0, 1, 3, 0, 2, 1, 0, 3, 4, 0, 5, 6, 7, 8];
     for (let tries = 0; vehicles.length < kinds.length && tries < 30000; tries++) {
       const c = list0[(R() * list0.length) | 0];
       const x = -HALF + ((c % GN) + 0.5) * CELL, z = -HALF + (((c / GN) | 0) + 0.5) * CELL;
       if (Math.hypot(x, z) < 14 || Math.abs(x) > HALF - 5 || Math.abs(z) > HALF - 5 || !roomy(x, z)) continue;
-      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 18) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
+      if (houses.some((h) => Math.abs(x - h.x) < h.w / 2 + 2 && Math.abs(z - h.z) < h.d / 2 + 2)) continue; // never park indoors
+      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 16) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
       vehicles.push({ id: vehicles.length, x, z, r: R() * 6.28, k: kinds[vehicles.length] });
     }
     return {

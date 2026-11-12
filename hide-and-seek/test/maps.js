@@ -9,7 +9,8 @@ MAPS.forEach((m, i) => {
   for (const s of W.spots) kinds[s.kind + (s.lv ? '↑' : '')] = (kinds[s.kind + (s.lv ? '↑' : '')] || 0) + 1;
   console.log(m.name, '| boxes', W.boxes.length, 'spots', JSON.stringify(kinds), 'coins', W.coins.length, 'items', W.items.length, 'two-storey', W.stairs.length, 'reach', W.nav.list0.length, '+', W.nav.list.length - W.nav.list0.length, 'upstairs');
   if (W.spots.length < 20) fail(m.id + ' too few spots');
-  if (W.vehicles.length < 5) fail(m.id + ' has only ' + W.vehicles.length + ' vehicles');
+  if (W.vehicles.length < 14) fail(m.id + ' has only ' + W.vehicles.length + ' vehicles');
+  for (const v of W.vehicles) if (W.houses.some((h) => Math.abs(v.x - h.x) < h.w / 2 && Math.abs(v.z - h.z) < h.d / 2)) fail(m.id + ' has a vehicle parked inside a building');
   if (W.coins.length < 40 || W.items.length < 8 || W.beacons.length !== 3) fail(m.id + ' missing pickups');
   if (W.nav.list0.length < 60000) fail(m.id + ' map mostly unreachable');
   if (W.stairs.length < 5 || W.pads.length < 3 || W.nav.list.length - W.nav.list0.length < 150 * W.stairs.length) fail(m.id + ' upstairs unreachable');

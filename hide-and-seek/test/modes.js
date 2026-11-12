@@ -9,7 +9,7 @@ const fail = (m) => { console.error('FAIL:', m); bad++; };
 
 for (let mode = 0; mode < MODES.length; mode++) for (let map = 0; map < MAPS.length; map++) {
   const room = makeRoom('T', { map, mode, seek: 150 });
-  const seen = { caught: 0, freed: 0, coin: 0, item: 0, beacon: 0, maxSeekers: 0, frozen: 0, props: 0, upstairs: 0, end: null, startSeekers: -1, minSeekers: 99 };
+  const seen = { caught: 0, freed: 0, coin: 0, item: 0, beacon: 0, maxSeekers: 0, frozen: 0, props: 0, upstairs: 0, end: null, swap: 0, far: 0, startSeekers: -1, minSeekers: 99 };
   const me = joinRoom(room, 'Watcher', (m) => {
     if (m.t in seen) seen[m.t]++;
     if (m.t === 'end') seen.end = m.w;
@@ -26,6 +26,7 @@ for (let mode = 0; mode < MODES.length; mode++) for (let map = 0; map < MAPS.len
     seen.frozen = Math.max(seen.frozen, s.p.filter((p) => p[6] === 2).length);
     seen.props = Math.max(seen.props, s.p.filter((p) => p[13] > 0).length);
     seen.upstairs = Math.max(seen.upstairs, s.p.filter((p) => p[12] === 1).length);
+    seen.far = Math.max(0, ...s.p.filter((p) => p[5] === 0 && p[6] === 0).map((p) => Math.hypot(p[1], p[2])));
     for (const p of s.p) if (!Number.isFinite(p[1]) || !Number.isFinite(p[2])) fail('bad position');
   }
   console.log(`${MODES[mode].name.padEnd(10)} on ${MAPS[map].name.padEnd(15)}`, JSON.stringify(seen));
@@ -34,6 +35,8 @@ for (let mode = 0; mode < MODES.length; mode++) for (let map = 0; map < MAPS.len
   if (mode === 2 && seen.caught && !seen.frozen) fail('nobody froze');
   if (mode === 3 && seen.props < 7) fail('hiders have no props');
   if (mode !== 3 && seen.props) fail('props outside prop hunt');
+  if (mode === 11 && seen.end === 'hiders' && seen.far > 30) fail('a free hider finished far outside the storm wall');
+  if (mode === 12 && !seen.swap) fail('switcheroo never swapped');
   if (mode === 6 && seen.startSeekers !== 9) fail('sardines should start with one hider and everyone else seeking');
   if (mode === 6 && seen.caught && seen.minSeekers >= 9) fail('finders did not join the hider');
 }

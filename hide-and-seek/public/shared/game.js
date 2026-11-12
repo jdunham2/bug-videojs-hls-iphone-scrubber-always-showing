@@ -3,7 +3,7 @@
 import {
   getWorld, collide, hasLOS, findPath, walkable, randomPoint,
   levelAt, validLevel, cleanLook,
-  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, VEHICLE, VEHICLES, GIANT, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
+  PR, HALF, SPEED, STAM, NOISE_RANGE, MAPS, MODES, PROPS, TURBO, VEHICLE, VEHICLES, GIANT, STORM, SWAP_EVERY, SPOT, F_SPRINT, F_CROUCH, F_MOVE, F_USE, F_WIND,
 } from './world.js';
 
 // The world of whichever room is being processed. Every entry point sets it first; all code here is synchronous.
@@ -150,6 +150,59 @@ function toLobby(room) {
   }
 }
 
+// ---------- mode rules that run every tick ----------
+function stormCatch(room, p) {
+  if (p.veh >= 0) exitVehicle(room, p, false);
+  leaveSpot(room, p, false);
+  p.st = 1; p.f = 0; p.item = 0; p.outT = 0;
+  teleport(p, W.jail.x + rand(-1.5, 1.5), W.jail.z + rand(-1.5, 1.5));
+  broadcast(room, { t: 'caught', w: p.id, b: 0, m: 11 });
+  feed(room, `${p.name} was swallowed by the storm!`, 'bad');
+}
+function modeTick(room, hs, dt, t) {
+  if (room.mode === 11) {
+    // Closing Storm: the wall shrinks to its final size over the first 85% of the round
+    const k = Math.min(1, (t - room.seekT0) / ((room.tEnd - room.seekT0) * 0.85 || 1));
+    room.zr = STORM.start + (STORM.end - STORM.start) * k;
+    for (const p of hs) {
+      if (p.st) continue;
+      if (Math.hypot(p.x, p.z) <= room.zr) { p.outT = 0; continue; }
+      p.outT = (p.outT || 0) + dt; p.warnUntil = t + 0.3;
+      if (p.outT > STORM.grace) stormCatch(room, p);
+    }
+  } else if (room.mode === 12 && t >= room.swapAt) {
+    // Switcheroo: every seeker trades places with a random free hider
+    room.swapAt = t + SWAP_EVERY;
+    const S = seekers(room), F = hs.filter((p) => !p.st).sort(() => Math.random() - 0.5).slice(0, S.length);
+    if (!F.length) return;
+    for (const s of S.slice(0, F.length)) { if (s.veh >= 0) exitVehicle(room, s); s.role = HIDER; s.immUntil = t + 5; s.item = 0; s.ai = { stam: 100, wind: 0 }; }
+    for (const h of F) {
+      if (h.veh >= 0) exitVehicle(room, h);
+      leaveSpot(room, h);
+      h.role = SEEKER; h.stunUntil = t + 2.5; h.tagCd = t + 3; h.item = 0; h.prop = 0; h.f = 0; h.ai = { stam: 100, wind: 0 };
+    }
+    broadcast(room, { t: 'swap', s: F.map((h) => h.id) });
+    feed(room, `Switcheroo! ${F.map((h) => h.name).join(' & ')} ${F.length > 1 ? 'are' : 'is'} seeking now.`, 'big');
+  } else if (room.mode === 13) {
+    // Spotlight: a hider held in the middle of a seeker's beam for long enough is caught
+    for (const h of hs) {
+      if (h.st || h.hid >= 0) { h.spotT = 0; continue; }
+      let by = null;
+      if (t >= h.immUntil && t >= h.cloakUntil) for (const s of room.players.values()) {
+        if (s.role !== SEEKER || t < s.stunUntil || s.lv !== h.lv) continue;
+        const dx = h.x - s.x, dz = h.z - s.z, d = Math.hypot(dx, dz);
+        if (d > SPOT.range || d < 0.3 || (dx * -Math.sin(s.r) + dz * -Math.cos(s.r)) / d < SPOT.cos || !hasLOS(W, s.x, s.z, h.x, h.z, s.lv)) continue;
+        by = s;
+        break;
+      }
+      if (!by) { h.spotT = Math.max(0, (h.spotT || 0) - dt * 1.5); continue; }
+      h.spotT = (h.spotT || 0) + dt; h.warnUntil = t + 0.3;
+      if (h.spotT >= SPOT.time) { h.spotT = 0; catchPlayer(room, h, by); }
+    }
+  }
+}
+const inZone = (room, x, z, margin = 6) => room.mode !== 11 || !room.zr || Math.hypot(x, z) < room.zr - margin;
+
 // ---------- vehicles ----------
 function resetVehicles(room) {
   room.veh = room.W.vehicles.map((v) => ({ id: v.id, k: v.k, x: v.x, z: v.z, r: v.r, driver: 0, fuel: 100, movedAt: 0, noiseT: 0 }));
@@ -239,6 +292,7 @@ function catchPlayer(room, p, by, how) {
 }
 function tryTag(room, s, t) {
   if (room.phase !== 'seek' || s.role !== SEEKER || t < s.tagCd || t < s.stunUntil) return;
+  if (room.mode === 13) return; // Spotlight: the beam does the catching
   s.tagCd = t + 0.8;
   const fx = -Math.sin(s.r), fz = -Math.cos(s.r);
   let best = null, bd = room.mode === 10 ? GIANT.reach : 2.7; // giants have long arms
@@ -421,7 +475,7 @@ function pickHiderPlan(room, b, t) {
     }
   }
   if (roll < 0.65 && room.mode !== 3) {
-    const free = W.spots.filter((s) => !room.spotOcc.has(s.id) && ![...room.players.values()].some((o) => o !== b && o.bot && o.ai.state === 'spot' && o.ai.spot === s.id));
+    const free = W.spots.filter((s) => inZone(room, s.x, s.z) && !room.spotOcc.has(s.id) && ![...room.players.values()].some((o) => o !== b && o.bot && o.ai.state === 'spot' && o.ai.spot === s.id));
     if (free.length) {
       const s = free[(Math.random() * free.length) | 0];
       ai.state = 'spot'; ai.spot = s.id;
@@ -438,7 +492,7 @@ function pickHiderPlan(room, b, t) {
   }
   for (let i = 0; i < 8; i++) {
     const [x, z, lv] = randomPoint(W);
-    if (Math.hypot(x, z) < 16) continue;
+    if (Math.hypot(x, z) < (room.mode === 11 ? 6 : 16) || !inZone(room, x, z)) continue;
     ai.state = 'point';
     if (setGoal(b, x, z, lv)) return;
   }
@@ -461,6 +515,11 @@ function startFlee(room, b, s, t) {
 function hiderAI(room, b, dt, t) {
   const ai = b.ai;
   if (b.st) { b.f = 0; ai.state = 'jailed'; ai.path = null; return; }
+  // Closing Storm: head for the middle before the wall arrives
+  if (ai.state !== 'zone' && !inZone(room, b.x, b.z, 5)) {
+    leaveSpot(room, b);
+    for (let i = 0; i < 12; i++) { const [x, z] = randomPoint(W, true); if (Math.hypot(x, z) < room.zr * 0.55 && setGoal(b, x, z)) { ai.state = 'zone'; break; } }
+  }
   if (!ai.state || ai.state === 'jailed') pickHiderPlan(room, b, t);
   const threat = room.phase === 'seek' ? nearestSeeker(room, b) : null;
   if (b.hid >= 0) {
@@ -580,6 +639,7 @@ function update(room, dt) {
   updateVehicles(room, dt, t);
   if (room.phase === 'hide' && t >= room.tEnd) {
     room.phase = 'seek'; room.tEnd = t + (room.mode === 7 ? TURBO.seek : room.cfg.seek);
+    room.seekT0 = t; room.swapAt = t + SWAP_EVERY; room.zr = room.mode === 11 ? STORM.start : 0;
     feed(room, 'Ready or not, here they come!', 'big');
   } else if (room.phase === 'seek' && t >= room.tEnd) endRound(room, 'hiders');
   else if (room.phase === 'end' && t >= room.tEnd) toLobby(room);
@@ -596,6 +656,8 @@ function update(room, dt) {
 
     const second = t >= room.scoreT;
     if (second) room.scoreT = t + 1;
+    modeTick(room, hs, dt, t);
+    if (room.phase !== 'seek') return;
     let rescuer = null;
     // power-up boxes: anyone can grab one, and they come back after 30 seconds
     for (const p of room.players.values()) {
@@ -679,12 +741,12 @@ function snapshot(room) {
   return ({
     t: 'st', ph: room.phase, tl: Math.max(0, +(room.tEnd - t).toFixed(1)), host: room.host,
     res: +(room.mode === 2 ? Math.max(0, ...[...room.players.values()].map((p) => (p.st === 2 ? p.thaw : 0))) : room.resc / 3).toFixed(2),
-    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0, vip: room.vip || 0,
+    ct: [...room.coins], w: room.winner, mp: room.map, md: room.mode, cg: room.coinGoal || 0, vip: room.vip || 0, zr: room.mode === 11 && room.phase === 'seek' ? Math.round(room.zr) : 0,
     vh: room.veh.map((v) => [+v.x.toFixed(2), +v.z.toFixed(2), +v.r.toFixed(2), v.driver, Math.round(v.fuel)]),
     bc: room.bc.map((v) => +v.toFixed(2)), it: W.items.filter((o) => (room.items.get(o.id) || 0) > t).map((o) => o.id),
     p: [...room.players.values()].map((p) => [
       p.id, +p.x.toFixed(2), +p.z.toFixed(2), +p.r.toFixed(2), p.f, p.role, p.st, p.hid, p.sc,
-      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0), p.rocks, p.item, p.lv, p.prop || 0, p.veh,
+      (t < p.stunUntil ? 1 : 0) | (t < p.immUntil ? 2 : 0) | (t < p.cloakUntil ? 4 : 0) | (t < p.boostUntil || t < p.silentUntil ? 8 : 0) | (t < (p.warnUntil || 0) ? 16 : 0), p.rocks, p.item, p.lv, p.prop || 0, p.veh,
     ]),
   });
 }
