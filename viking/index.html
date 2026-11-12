@@ -376,7 +376,26 @@ function openRoster() {
   });
 }
 const power = () => (S.crew + traitCount('strong') * .5 + traitCount('berserker')) * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
-const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5);
+const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5) * (S.weak && S.weak[p.id] > S.day ? .7 : 1);
+const FACTION_COL = { frost: 0x2f5d8a, iron: 0x5a5a62, skar: 0x6a4a8a, ulf: 0xa07a20, jarl: 0x6a1010, salt: 0x3a7a7a, green: 0x4a7a3a, bjorn: 0x7a4a2a };
+function startWar() {
+  const towns = PLACES.filter(p => p.def && !(S.hostile[p.id] > 0));
+  if (towns.length < 2) return;
+  const a = pick(towns), b = pick(towns.filter(t => t !== a));
+  S.war = { a: a.id, b: b.id, done: false, from: S.day };
+  log(`War! ${a.name} has declared war on ${b.name}. ${a.name}'s army will soon land on ${b.name}. You could sail there to defend it, or join the attack.`, 'gold');
+  setTimeout(() => banner('War in the north!', `${a.name} marches on ${b.name}`), 2200);
+}
+function resolveWar() {
+  const w = S.war; if (!w || w.done) return;
+  const A = P[w.a], B = P[w.b], aWins = chance(A.def / (A.def + B.def * 1.3));
+  const loser = aWins ? B : A, winner = aWins ? A : B;
+  (S.weak ||= {})[loser.id] = S.day + SEASON_DAYS;
+  w.done = true; w.winner = winner.id;
+  log(`The war is over: ${winner.name} has beaten ${loser.name}. ${loser.name} licks its wounds; its walls are thinly manned this season.`, 'gold');
+}
+function warFor(p) { return S.war && !S.war.done && (S.war.a === p.id || S.war.b === p.id) ? S.war : null; }
+const favorAt = id => Math.min(3, (S.favor && S.favor[id]) || 0);
 
 function log(text, cls = '') {
   S.log.unshift({ d: S.day, t: text, c: cls });
@@ -441,6 +460,7 @@ function seasonChanged(sn) {
     ['Winter has come', 'Cold seas, short days, drift ice in the north', 'Winter has come. Snow blankets the islands and drift ice clogs the northern sea. Your crew eats more to stay warm at sea. Hold a Yule feast at Ravenholm.'],
   ][sn];
   setTimeout(() => banner(m[0], m[1]), 500); log(m[2], 'gold');
+  resolveWar(); if (chance(.75)) startWar();
 }
 function todNow() { // 0 = midnight, .5 = noon; the share of daylight depends on the season
   const dl = DAYLIGHT[S ? seasonOf(S.day) : 0], f = dayTimer / DAY_SECONDS;
@@ -1308,7 +1328,8 @@ function fireVolley(from, target, tv, count, spread, owner) {
 function currentTarget() {
   let best = null, bd = 260;
   for (const n of npcs) { if (!n.hostile || n.dead) continue; const d = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y); if (d < bd) { bd = d; best = n; } }
-  if (serpent && !serpent.sinking) { const d = Math.hypot(serpent.g.position.x - ship.pos.x, serpent.g.position.z - ship.pos.y); if (d < bd) best = serpent; }
+  if (serpent && !serpent.sinking) { const d = Math.hypot(serpent.g.position.x - ship.pos.x, serpent.g.position.z - ship.pos.y); if (d < bd) { bd = d; best = serpent; } }
+  if (kraken && !kraken.sinking) { const d = Math.hypot(kraken.x - ship.pos.x, kraken.z - ship.pos.y); if (d < bd + 40) best = kraken; }
   return best;
 }
 function playerShoot() {
@@ -1320,7 +1341,7 @@ function playerShoot() {
   }
   const from = ship.g.position, count = clamp(Math.ceil(S.crew / 2), 2, 8) + Math.min(3, traitCount('archer'));
   if (tgt) {
-    const isS = tgt === serpent, tp = isS ? tgt.head.getWorldPosition(tmpV2) : tgt.g.position;
+    const isS = tgt === serpent || tgt === kraken, tp = tgt === kraken ? tmpV2.set(kraken.x, kraken.g.position.y + 5, kraken.z) : isS ? tgt.head.getWorldPosition(tmpV2) : tgt.g.position;
     fireVolley(from, tp, isS ? { x: 0, z: 0 } : velOf(tgt.h, tgt.speed), count, 1.2 + Math.hypot(tp.x - from.x, tp.z - from.z) * .03, 'player');
   } else {
     camera.getWorldDirection(tmpV); tmpV.y = 0; tmpV.normalize();
@@ -1359,6 +1380,7 @@ function stepArrows(dt) {
     else if (a.owner === 'player') {
       for (const n of npcs) if (!n.dead && inShip(a.p, n.g, n.pos.x, n.pos.y, n.h)) { hitNPC(n, a.p); hit = true; break; }
       if (!hit && serpent && !serpent.sinking && serpentHitTest(a.p)) { hitSerpent(a.p); hit = true; }
+      if (!hit && kraken && !kraken.sinking) { const m = krakenHitTest(a.p); if (m) { hitKraken(a.p, m); hit = true; } }
     } else if (!S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
     const wh = waveH(a.p.x, a.p.z, elapsed);
     if (!hit && a.land && a.p.y < terrainH(a.p.x, a.p.z)) { a.life = 99; }
@@ -1459,6 +1481,7 @@ function defeat() {
   log(`Defeated! Your foes strip ${lost} silver from your ship and leave you drifting.`, 'bad'); banner('Defeated', `-${lost} silver`);
   npcs.forEach(n => { if (n.hostile && !n.dead) { disengage(n, 150); n.boardCd = 30; } });
   if (serpent) serpent.sinking = true;
+  if (kraken) { kraken.sinking = true; }
   boarding = null; abortRaid(); renderHUD(); save();
 }
 function startRaid() {
@@ -1498,6 +1521,7 @@ function hailMerchant(n) {
 }
 
 // foe health bars
+const krakenLabel = document.createElement('div'); krakenLabel.className = 'foe'; krakenLabel.style.display = 'none'; document.body.appendChild(krakenLabel);
 const serpentLabel = document.createElement('div'); serpentLabel.className = 'foe'; serpentLabel.style.display = 'none'; document.body.appendChild(serpentLabel);
 function foeHTML(name, hp, maxHp, crew) {
   return `<div class="nm">${cap(name)}</div><div class="hb"><i style="width:${clamp(hp / maxHp, 0, 1) * 100}%"></i></div>${crew != null ? `<div class="cr">${crew} warrior${crew === 1 ? '' : 's'}</div>` : ''}`;
@@ -1521,6 +1545,14 @@ function updateFoeLabels() {
   if (serpent && !serpent.sinking && !titleOn) {
     if (placeLabel(serpentLabel, serpent.head.getWorldPosition(tmpV2), 9)) { serpentLabel.innerHTML = foeHTML('sea serpent', serpent.hp, serpent.maxHp, null); serpentLabel.classList.toggle('target', serpent === tgt); }
   } else serpentLabel.style.display = 'none';
+  if (kraken && !kraken.sinking && !titleOn) {
+    if (placeLabel(krakenLabel, tmpV2.set(kraken.x, kraken.g.position.y + 20, kraken.z), 0)) { krakenLabel.innerHTML = foeHTML('the Kraken', kraken.hp, kraken.maxHp, null); krakenLabel.classList.toggle('target', kraken === tgt); }
+  } else krakenLabel.style.display = 'none';
+  if (maelLabel) {
+    const d = Math.hypot(MAELSTROM.x - camera.position.x, MAELSTROM.z - camera.position.z);
+    if (titleOn || d > 1500 || !placeLabel(maelLabel, tmpV2.set(MAELSTROM.x, 30, MAELSTROM.z), 0)) maelLabel.style.display = 'none';
+    else maelLabel.innerHTML = `The Maelstrom<small>${S.krakenSlain ? 'calm now' : 'here be the kraken'}</small>`;
+  }
 }
 function renderCombatHint() {
   const el = $('combat');
@@ -1528,7 +1560,7 @@ function renderCombatHint() {
     if (!ashore.foes || titleOn) { el.style.display = 'none'; return; }
     const left = ashore.battle ? units.filter(u => u.battle && !u.dead).length : 0;
     el.style.display = 'block';
-    el.innerHTML = `<kbd>Space</kbd>${hero && hero.bowMode ? 'shoot' : 'strike'} &nbsp; <kbd>Q</kbd>${hero && hero.bowMode ? 'axe' : 'bow'} &nbsp; <kbd>Shift</kbd>raise shield &nbsp; ${left ? `Defenders left: <b>${left}</b>` : `Foes: <b>${ashore.foes}</b>`}`;
+    el.innerHTML = `<kbd>Space</kbd>${hero && hero.bowMode ? 'shoot' : 'strike'} &nbsp; <kbd>Q</kbd>${hero && hero.bowMode ? 'axe' : 'bow'} &nbsp; <kbd>Shift</kbd>raise shield &nbsp; ${left ? `${ashore.battle && ashore.battle.kind === 'war' ? 'Invaders' : 'Defenders'} left: <b>${left}</b>` : `Foes: <b>${ashore.foes}</b>`}`;
     return;
   }
   if (!combatOn || S.docked || titleOn) { el.style.display = 'none'; return; }
@@ -1599,6 +1631,110 @@ function updateSerpent(dt, t, paused) {
   s.head.position.set(-35, 7 + Math.sin(t * 1.5) * 1.5, s.lunge < 0 ? 6 : 0); s.head.rotation.y = Math.PI * .8;
   s.g.lookAt(ship.g.position.x, s.g.position.y, ship.g.position.z);
   if (s.sinking && s.rise <= 0) { scene.remove(s.g); serpent = null; }
+}
+
+// the kraken and its maelstrom
+const MAELSTROM = { x: -2250, z: 1700 };
+let kraken = null, maelstrom = null, maelLabel = null;
+function buildMaelstrom() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  x.translate(128, 128);
+  for (let i = 0; i < 9; i++) { x.rotate(Math.PI * 2 / 9); x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 6; x.beginPath(); for (let r = 20; r < 125; r += 3) { const a = r * .045; x.lineTo(Math.cos(a) * r, Math.sin(a) * r); } x.stroke(); }
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: .55, depthWrite: false });
+  const g = new THREE.Group();
+  const a = new THREE.Mesh(new THREE.CircleGeometry(150, 48), mat); a.rotation.x = -Math.PI / 2;
+  const b = new THREE.Mesh(new THREE.CircleGeometry(80, 40), mat.clone()); b.rotation.x = -Math.PI / 2; b.material.opacity = .7;
+  const core = new THREE.Mesh(new THREE.CircleGeometry(18, 24), new THREE.MeshBasicMaterial({ color: 0x041018 })); core.rotation.x = -Math.PI / 2; core.position.y = .1;
+  g.add(a, b, core); g.position.set(MAELSTROM.x, 1.2, MAELSTROM.z); scene.add(g);
+  maelstrom = { g, a, b };
+  maelLabel = document.createElement('div'); maelLabel.className = 'label'; document.body.appendChild(maelLabel);
+}
+function spawnKraken() {
+  if (kraken || S.krakenSlain) return;
+  const g = new THREE.Group();
+  const skin = new THREE.MeshStandardMaterial({ color: 0x5a1e2a, roughness: .45, metalness: .1, flatShading: true });
+  const mantle = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), skin); mantle.scale.set(1, 1.4, 1); mantle.position.y = 5;
+  const eyeM = new THREE.MeshStandardMaterial({ color: 0x331100, emissive: 0xffc020, emissiveIntensity: 3 }), pup = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  [-4.6, 4.6].forEach(ex => { const e = new THREE.Mesh(new THREE.SphereGeometry(1.7, 10, 8), eyeM); e.position.set(ex, 4, -8.3); g.add(e); const pp = new THREE.Mesh(new THREE.BoxGeometry(.4, 2.2, .3), pup); pp.position.set(ex, 4, -9.9); g.add(pp); });
+  g.add(mantle);
+  const segG = new THREE.SphereGeometry(1, 8, 6), tentacles = [];
+  for (let k = 0; k < 8; k++) {
+    const segs = [];
+    for (let i = 0; i < 15; i++) { const m = new THREE.Mesh(segG, skin); m.scale.setScalar(2.7 - i * .15); m.castShadow = true; scene.add(m); segs.push(m); }
+    const warn = new THREE.Mesh(new THREE.RingGeometry(9, 12, 32), new THREE.MeshBasicMaterial({ color: 0xff5530, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    warn.rotation.x = -Math.PI / 2; scene.add(warn);
+    tentacles.push({ segs, warn, ang: k / 8 * Math.PI * 2, phase: rnd(0, 6), state: 'idle', t: 0, target: null, hit: false });
+  }
+  const fx = Math.sin(ship.h), fz = -Math.cos(ship.h);
+  kraken = { g, mantle, tentacles, hp: 650, maxHp: 650, rise: 0, sinking: false, x: ship.pos.x + fx * 70, z: ship.pos.y + fz * 70, atk: 4 };
+  scene.add(shadow(g));
+  throttle = Math.min(throttle, 2); Sound.roar(); setTimeout(() => Sound.roar(), 700); shake = 1;
+  banner('THE KRAKEN!', 'Shoot its eyes · steer clear of the red rings');
+  log('The sea boils. A monstrous kraken rises from the deep, tentacles thick as masts reaching for your ship!', 'bad');
+}
+function krakenHitTest(p) {
+  const k = kraken; if (Math.hypot(p.x - k.x, p.y - (k.g.position.y + 5), p.z - k.z) < 11.5) return 4;
+  for (const tn of k.tentacles) for (let i = 0; i < tn.segs.length; i += 2) if (tn.segs[i].position.distanceTo(p) < 2.8) return 1.5;
+  return 0;
+}
+function hitKraken(p, mult) {
+  const k = kraken; k.hp -= 2.6 * mult * (1 + S.weapons * .2); hitFx(p, 0x5a1e2a);
+  if (k.hp <= 0 && !k.sinking) {
+    k.sinking = true; S.krakenSlain = true;
+    const sv = ri(220, 340), am = Math.min(5, S.cargoMax - cargoCount());
+    S.silver += sv; S.cargo.amber += am; S.glory += 60; S.morale = clamp(S.morale + 25, 0, 100);
+    log(`The kraken shudders, its great eyes dim, and it sinks into the black water. In the wreckage of its lair you find ${sv} silver${am ? ` and ${am} lumps of ambergris-amber` : ''}. (+60 glory)`, 'gold');
+    banner('Kraken-slayer!', `+${sv} silver · +60 glory`); Sound.coins(); questProgress('kraken'); renderHUD(); save();
+  }
+}
+function updateKraken(dt, t, paused) {
+  const k = kraken; if (!k) return;
+  if (!paused) {
+    k.rise = clamp(k.rise + dt * (k.sinking ? -.3 : .35), 0, 1);
+    if (!k.sinking) {
+      const dx = ship.pos.x - k.x, dz = ship.pos.y - k.z, d = Math.hypot(dx, dz) || 1;
+      if (d > 58) { const sp = Math.min(15, d - 55); k.x += dx / d * sp * dt; k.z += dz / d * sp * dt; }
+      if (d < 75 && !S.docked) ship.speed *= (1 - dt * .3); // tentacles drag at the hull
+      if (d > 430 || S.docked) { k.sinking = true; log('The kraken slips back into the deep. It will be waiting.'); }
+      k.atk -= dt;
+      if (k.atk <= 0 && k.rise > .8) {
+        const idle = k.tentacles.filter(tn => tn.state === 'idle');
+        if (idle.length) {
+          const tn = pick(idle), lead = 1.5, v = velOf(ship.h, ship.speed);
+          tn.state = 'rise'; tn.t = 0; tn.hit = false; tn.target = { x: ship.pos.x + v.x * lead, z: ship.pos.y + v.z * lead };
+        }
+        k.atk = rnd(2.4, 4) * (k.hp < k.maxHp * .4 ? .7 : 1);
+      }
+    }
+  }
+  k.g.position.set(k.x, lerp(-26, -2, k.rise), k.z);
+  k.g.rotation.y = Math.atan2(-(ship.pos.x - k.x), -(ship.pos.y - k.z));
+  for (const tn of k.tentacles) {
+    const bx = k.x + Math.cos(tn.ang) * 8, bz = k.z + Math.sin(tn.ang) * 8, by = k.g.position.y + 1;
+    const sw = Math.sin(t * .5 + tn.phase) * .3, out = 27 + Math.sin(t * .8 + tn.phase) * 4;
+    let tx = k.x + Math.cos(tn.ang + sw) * out, tz = k.z + Math.sin(tn.ang + sw) * out, ty = 4 + Math.sin(t * 1.3 + tn.phase) * 5, ch = 10 + Math.sin(t + tn.phase) * 4;
+    if (!paused && tn.state !== 'idle') tn.t += dt;
+    if (tn.state === 'rise') {
+      const q = Math.min(1, tn.t / 1.4); tx = lerp(tx, tn.target.x, q); tz = lerp(tz, tn.target.z, q); ty = lerp(ty, 24, q); ch = 26;
+      tn.warn.position.set(tn.target.x, waveH(tn.target.x, tn.target.z, t) + .4, tn.target.z); tn.warn.material.opacity = .25 + .45 * Math.abs(Math.sin(t * 9));
+      if (tn.t >= 1.4) { tn.state = 'slam'; tn.t = 0; }
+    } else if (tn.state === 'slam') {
+      const q = Math.min(1, tn.t / .22); tx = tn.target.x; tz = tn.target.z; ty = lerp(24, -1, q); ch = lerp(26, 8, q); tn.warn.material.opacity = 0;
+      if (q >= 1 && !tn.hit) {
+        tn.hit = true; Sound.crash(); shake = Math.max(shake, .8);
+        for (let i = 0; i < 6; i++) puff(tn.target.x + rnd(-6, 6), 1, tn.target.z + rnd(-6, 6), 1.4, 0xeef4f8, 1.4, .6);
+        if (!S.docked && Math.hypot(ship.pos.x - tn.target.x, ship.pos.y - tn.target.z) < 17) {
+          const m = shieldUp ? .6 : 1; S.hull = Math.max(5, S.hull - 15 * m); pCrewDmg += 1.1 * m; applyCrewDmg();
+          banner('The kraken strikes!', 'Keep moving to dodge the tentacles'); renderHUD();
+        }
+      }
+      if (tn.t > 1) tn.state = 'idle';
+    } else tn.warn.material.opacity = 0;
+    const cx = (bx + tx) / 2, cz = (bz + tz) / 2, cy = Math.max(by, ty) + ch, sink = 24 * (1 - k.rise);
+    tn.segs.forEach((m, i) => { const u = i / (tn.segs.length - 1), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u; m.position.set(a * bx + b * cx + c * tx, a * by + b * cy + c * ty - sink, a * bz + b * cz + c * tz); });
+  }
+  if (k.sinking && k.rise <= 0) { scene.remove(k.g); k.tentacles.forEach(tn => { tn.segs.forEach(m => scene.remove(m)); scene.remove(tn.warn); }); kraken = null; }
 }
 
 // whales
@@ -1926,6 +2062,7 @@ function makeQuest(p) {
   opts.push({ type: 'wolves', n: 4, reward: 70, glory: 8, text: 'Kill 4 wolves in Wolfden Woods', ask: 'Wolves from Wolfden have taken our sheep. Thin the pack.' });
   opts.push({ type: 'bear', n: 1, reward: 80, glory: 6, text: 'Slay a bear', ask: 'A bear has been raiding our stores. Bring us its hide.' });
   if (!(S.cleansed && S.cleansed['wolf-camp'] && S.cleansed['seal-camp'])) opts.push({ type: 'outlaws', n: 1, reward: 90, glory: 8, text: 'Clear an outlaw camp (Wolfden Woods or Seal Rocks)', ask: 'Outlaws rob every boat that passes. Burn out their camp.' });
+  if (!S.krakenSlain) opts.push({ type: 'kraken', n: 1, reward: 300, glory: 30, text: 'Slay the Kraken of the Maelstrom', ask: 'Ships vanish near the Maelstrom in the far southwest. Something lives there. Kill it.' });
   if (!S.trollSlain) opts.push({ type: 'troll', n: 1, reward: 250, glory: 25, text: 'Slay the Frost Troll on Frostfang', ask: 'A troll on Frostfang eats reindeer, herders and anyone foolish enough to look for it.' });
   opts.push({ type: 'deer', n: 3, reward: 50, glory: 4, text: 'Hunt 3 deer', ask: 'Our stores run low. Bring down some deer for the larder.' });
   opts.push({ type: 'raiders', n: 2, reward: 120, glory: 15, text: 'Sink or take 2 raider ships', ask: 'Black-sailed raiders burned our fishing boats. Make them pay.' });
@@ -1961,9 +2098,10 @@ function completeQuest(q) {
 }
 function renderQuests() {
   const el = $('quests'); const qs = (S && S.quests) || [];
-  if (!qs.length || titleOn) { el.style.display = 'none'; return; }
+  const w = S && S.war && !S.war.done ? S.war : null;
+  if ((!qs.length && !w) || titleOn) { el.style.display = 'none'; return; }
   el.style.display = 'block';
-  el.innerHTML = '<div class="qh">Oaths</div>' + qs.map(q => `<div class="q">${q.text}${q.type === 'deliver' ? ` <small>(have ${S.cargo[q.good]})</small>` : q.n > 1 ? ` <small>${q.got}/${q.n}</small>` : ''}</div>`).join('');
+  el.innerHTML = (w ? `<div class="qh">War</div><div class="q">${P[w.a].name} ⚔ ${P[w.b].name} <small>fighting at ${P[w.b].name}</small></div>` : '') + (qs.length ? '<div class="qh">Oaths</div>' : '') + qs.map(q => `<div class="q">${q.text}${q.type === 'deliver' ? ` <small>(have ${S.cargo[q.good]})</small>` : q.n > 1 ? ` <small>${q.got}/${q.n}</small>` : ''}</div>`).join('');
 }
 
 // ---- deer ----
@@ -1997,6 +2135,8 @@ const UNIT_DEF = {
   huscarl: () => ({ hp: 115, dmg: 16, reach: 3.1, speed: 7.4, cd: rnd(1.0, 1.25), team: 'them' }),
   jarl: () => ({ hp: 520, dmg: 26, reach: 3.9, speed: 7.4, cd: 1.3, team: 'them' }),
   wolf: () => ({ hp: 26, dmg: 6, reach: 2.4, speed: 11, cd: 1, team: 'them' }),
+  militia: () => ({ hp: 55, dmg: 10, reach: 2.9, speed: 7.8, cd: rnd(1.1, 1.5), team: 'us' }),
+  soldier: () => ({ hp: 56, dmg: 11, reach: 2.9, speed: 7.8, cd: rnd(1.0, 1.4), team: 'them' }),
   bear: () => ({ hp: 190, dmg: 19, reach: 3.2, speed: 9.5, cd: 1.6, team: 'them' }),
   outlaw: () => ({ hp: 46, dmg: 9.5, reach: 2.9, speed: 7.8, cd: rnd(1.1, 1.5), team: 'them' }),
   troll: () => ({ hp: 760, dmg: 34, reach: 5.2, speed: 5.6, cd: 2.1, team: 'them' }),
@@ -2019,7 +2159,7 @@ function unitLook(kind) {
   }
 }
 function addUnit(kind, x, z, extra = {}) {
-  const g = kind === 'bear' ? makeBear(ashore.p && ashore.p.snowy) : kind === 'wolf' ? makeWolf(ashore.p && ashore.p.snowy) : kind === 'horse' ? makeHorse() : kind === 'deer' ? makeDeer() : makeWarrior(unitLook(kind));
+  const g = kind === 'bear' ? makeBear(ashore.p && ashore.p.snowy) : kind === 'wolf' ? makeWolf(ashore.p && ashore.p.snowy) : kind === 'horse' ? makeHorse() : kind === 'deer' ? makeDeer() : makeWarrior(extra.look || unitLook(kind));
   const u = Object.assign({ kind, g, x, z, y: groundAt(ashore.p, x, z) ?? 0, h: rnd(0, 6.28), atkCd: rnd(.2, 1), swing: 0, swingHit: false, walk: 0, moveAmt: 0,
     dead: false, deathT: 0, flash: 0, aggro: false, dormant: false, rise: 1 }, UNIT_DEF[kind](), extra);
   u.maxHp = u.hp; scene.add(g); units.push(u); return u;
@@ -2120,12 +2260,13 @@ function leaveAshore(retreat) {
   ashore.leaving = true;
   if (retreat && ashore.battle && ashore.battle.kind === 'sack') { log(`You fall back to the ship. The sack of ${ashore.p.name} has failed.`, 'bad'); raid = null; }
   fadeThen(() => {
+    (ashore.props || []).forEach(o => scene.remove(o)); ashore.props = [];
     units.forEach(u => scene.remove(u.g)); units.length = 0; unitLabels.forEach(el => el.remove()); unitLabels.clear();
     hero = null; Object.assign(ashore, { on: false, battle: null, leaving: false }); camSnap = true; dockBlend = 1;
     render(); save();
   });
 }
-function startSack(p) {
+function startSack(p, after) {
   goAshore(() => {
     ashore.battle = { kind: 'sack', p };
     const n = clamp(Math.round(defenseOf(p) / 6) + 3, 4, 20), alert = S.alert[p.id] || 0;
@@ -2143,10 +2284,66 @@ function startSack(p) {
     Sound.horn();
     banner(`The sack of ${p.name}!`, `${n} defenders${jarl ? ' and Jarl Hakon himself' : ''} hold the walls. Break through the gate`);
     log(`Your warband storms ashore at ${p.name}. ${n} defenders${jarl ? ', led by Jarl Hakon the Grim,' : ''} hold the walls against you. Find the gate!`, 'bad');
+    if (after) after();
   });
 }
+function militia(p, x, z, n, hold) {
+  const col = FACTION_COL[p.id] || 0x4a6a8a;
+  for (let i = 0; i < n; i++) {
+    const pt = landNear(ashore.p, x + rnd(-8, 8), z + rnd(-8, 8)), archer = i % 4 === 3;
+    const u = addUnit('militia', pt.x, pt.z, { archer, look: { tunic: col, shieldCol: col, beard: pick([0x5a4a3a, 0x8a6a3a, 0x3a2a1a]) }, hold: hold ? { x: pt.x, z: pt.z } : null }); setWeapon(u);
+  }
+}
+function farBeach(p, spread = 0) {
+  const a = Math.atan2(p.dock.dz, p.dock.dx) + Math.PI + spread;
+  let d = p.R * 1.4; while (d > 5 && groundAt(p, p.wx + Math.cos(a) * d, p.wz + Math.sin(a) * d) === null) d -= 2;
+  return { x: p.wx + Math.cos(a) * (d - 4), z: p.wz + Math.sin(a) * (d - 4), a, d };
+}
+function startWarDefense(p) {
+  const foe = P[S.war.a];
+  goAshore(() => {
+    ashore.battle = { kind: 'war', p, foe }; ashore.props = [];
+    militia(p, p.wx, p.wz, 11, true);
+    const n = clamp(Math.round(foe.def / 8) + 5, 8, 16), col = FACTION_COL[foe.id] || 0x7a2020;
+    for (let s = -1; s <= 1; s++) { // the invaders' beached longships
+      const bp = farBeach(p, s * .12), sh = makeShip({ hull: 0x3a2618, stripes: ['#' + col.toString(16).padStart(6, '0'), '#e8dcc0'], crew: false });
+      sh.position.set(p.wx + Math.cos(bp.a) * (bp.d + 14), -.6, p.wz + Math.sin(bp.a) * (bp.d + 14)); sh.rotation.y = -Math.atan2(Math.cos(bp.a), -Math.sin(bp.a)) + Math.PI; sh.rotation.z = .08;
+      scene.add(sh); ashore.props.push(sh);
+    }
+    for (let i = 0; i < n; i++) {
+      const bp = farBeach(p, rnd(-.15, .15)), kind = i % 6 === 0 ? 'huscarl' : 'soldier', archer = kind === 'soldier' && i % 4 === 3;
+      const pt = landNear(p, bp.x + rnd(-6, 6), bp.z + rnd(-6, 6));
+      const u = addUnit(kind, pt.x, pt.z, { aggro: true, battle: true, archer, shieldWall: !archer, look: kind === 'soldier' ? { tunic: col, shieldCol: col, beard: pick([0x5a4a3a, 0x3a2a1a]) } : undefined });
+      setWeapon(u);
+    }
+    units.forEach(u => { if (u.kind === 'villager') u.flee = true; });
+    Sound.horn(); setTimeout(() => Sound.horn(), 900);
+    banner(`War at ${p.name}!`, `${n} of ${foe.name}'s warriors have landed. Stand with the defenders`);
+    log(`You march out with ${p.name}'s defenders. ${foe.name}'s army of ${n} has beached its ships on the far shore and is coming for the town!`, 'bad');
+  });
+}
+function startWarAttack(p) {
+  const foe = P[S.war.a];
+  S.hostile[p.id] = 30; S.alert[p.id] = (S.alert[p.id] || 0) + 1;
+  startSack(p, () => {
+    ashore.battle.war = true;
+    militia(foe, hero.x, hero.z, 10, false);
+    log(`${foe.name}'s warriors storm ashore beside your warband.`, 'gold');
+  });
+}
+function warWon(b) {
+  const p = b.p; ashore.battle = null;
+  const sv = ri(90, 160) + Math.round(p.def), glory = 20;
+  S.silver += sv; S.glory += glory; S.food += 30; S.morale = clamp(S.morale + 15, 0, 100);
+  (S.favor ||= {})[p.id] = favorAt(p.id) + 1;
+  if (S.war) { S.war.done = true; S.war.winner = p.id; (S.weak ||= {})[b.foe.id] = S.day + SEASON_DAYS; }
+  log(`${b.foe.name}'s army is broken on the beach! ${p.name} pays you ${sv} silver, fills your stores and names you a friend of the town. (+${glory} glory)`, 'gold');
+  banner(`${p.name} is saved!`, `+${sv} silver · +${glory} glory · friendship`); Sound.coins(); questProgress('war'); renderHUD(); save();
+}
 function sackWon(p) {
+  const warJoin = ashore.battle && ashore.battle.war;
   ashore.battle = null; raid = null;
+  if (warJoin && S.war) { const A = P[S.war.a]; (S.favor ||= {})[A.id] = favorAt(A.id) + 1; S.war.done = true; S.war.winner = A.id; (S.weak ||= {})[p.id] = S.day + SEASON_DAYS; S.glory += 10; log(`${A.name} celebrates your part in the victory. They will trade with you as a friend. (+10 glory)`, 'gold'); }
   const mult = p.type === 'fortress' ? 5 : p.type === 'town' ? 2.5 : 1;
   const sv = Math.round(ri(40, 80) * mult), glory = Math.round(10 * mult), got = [];
   Object.keys(GOODS).sort(() => Math.random() - .5).slice(0, 3).forEach(g => { const q = Math.min(ri(1, 4), S.cargoMax - cargoCount()); if (q > 0) { S.cargo[g] += q; got.push(`${q} ${GOODS[g].name}`); } });
@@ -2319,6 +2516,7 @@ function updateUnit(u, dt) {
     if (!ashore.foes) u.hp = Math.min(u.maxHp, u.hp + dt * 4);
     const t = hero && !hero.dead ? nearestFoe(u, ashore.battle ? 260 : 40) : null;
     if (t) [mx, mz] = fightToward(u, t, dt);
+    else if (u.hold) { if (Math.hypot(u.hold.x - u.x, u.hold.z - u.z) > 3) [mx, mz] = steer(u, u.hold.x, u.hold.z); }
     else if (hero) {
       const i = u.slot || 0, row = Math.floor(i / 4), col = i % 4;
       const fx = Math.sin(hero.h), fz = -Math.cos(hero.h), rx = Math.cos(hero.h), rz = Math.sin(hero.h);
@@ -2435,6 +2633,7 @@ function updateAshore(dt) {
   }
   const b = ashore.battle, p = ashore.p;
   if (b && b.kind === 'sack' && !hero.dead && !units.some(u => u.battle && !u.dead)) sackWon(b.p);
+  if (b && b.kind === 'war' && !hero.dead && !units.some(u => u.battle && !u.dead)) warWon(b);
   if (ashore.camp && !(S.cleansed && S.cleansed[p.id + '-camp']) && !units.some(u => u.kind === 'outlaw' && !u.dead)) {
     (S.cleansed ||= {})[p.id + '-camp'] = true; S.glory += 6;
     banner('The camp is cleared', 'Their loot is yours'); log('The last outlaw falls. Their stolen loot lies in a chest by the fire. (+6 glory)', 'gold'); questProgress('outlaws'); renderHUD();
@@ -2494,6 +2693,7 @@ function updateUnitLabels() {
 // =====================================================================
 function pickSeaEvent() {
   const sn = seasonOf(S.day);
+  if (S.day > 15 && !S.krakenSlain && !kraken && terrainH(ship.pos.x, ship.pos.y) < -25 && chance(.07)) return spawnKraken;
   if ((sn === 2 && chance(.3)) || (sn === 3 && chance(.4))) return SEA_EVENTS[0];
   let e = pick(SEA_EVENTS);
   if (sn === 1 && e === SEA_EVENTS[0] && chance(.6)) e = pick(SEA_EVENTS);
@@ -2601,8 +2801,8 @@ const ACT = {
   sagas() { passDays(1, false); S.morale = clamp(S.morale + 10, 0, 100); log(`Around the fire you tell the saga of ${title()}. The crew listens wide-eyed.`); },
 };
 function repairPrice() { return Math.ceil((S.maxHull - S.hull) * .6 * (1 - .15 * Math.min(2, traitCount('shipwright')))); }
-const buyPrice = g => Math.max(1, Math.round(price(S.at, g) * (1 - .03 * Math.min(4, traitCount('trader')))));
-const sellPrice = g => Math.round(price(S.at, g) * (1 + .03 * Math.min(4, traitCount('trader'))));
+const buyPrice = g => Math.max(1, Math.round(price(S.at, g) * (1 - .03 * Math.min(4, traitCount('trader')) - .05 * favorAt(S.at))));
+const sellPrice = g => Math.round(price(S.at, g) * (1 + .03 * Math.min(4, traitCount('trader')) + .05 * favorAt(S.at)));
 function buy(g) { const pr = buyPrice(g); if (S.silver < pr || cargoCount() >= S.cargoMax) return; S.silver -= pr; S.cargo[g]++; Sound.coins(); save(); render(); }
 function sell(g) { if (S.cargo[g] <= 0) return; S.silver += sellPrice(g); S.cargo[g]--; Sound.coins(); save(); render(); }
 
@@ -2681,6 +2881,18 @@ function renderPanel() {
     if (!S.horseOwned) o.appendChild(btn('🐎 Buy a horse (60)', () => { S.silver -= 60; S.horseOwned = true; log('You buy a sturdy horse. It will travel aboard your longship and come ashore with you.', 'good'); }, { disabled: S.silver < 60 }));
     c.insertAdjacentHTML('beforeend', '<h3>Oaths & stables</h3>'); c.appendChild(o);
   }
+  const war = warFor(p);
+  if (war) {
+    const A = P[war.a], B = P[war.b];
+    if (war.b === p.id && !hostile) {
+      c.insertAdjacentHTML('beforeend', `<h3>War</h3><p class="desc">${A.name}'s army is about to land on ${p.name}.</p>`);
+      const w = document.createElement('div'); w.className = 'actions';
+      w.appendChild(btn(`🛡 Defend ${p.name}`, () => startWarDefense(p), { cls: 'red' }));
+      w.appendChild(btn(`⚔ Join ${A.name}'s attack`, () => choice(`Turn on ${p.name}?`, `You will fight beside ${A.name}'s warriors to sack ${p.name}. ${p.name} will be hostile to you, but ${A.name} will count you a friend.`, [['Join the attack', () => startWarAttack(p)], ['Not now', () => {}]]), { cls: 'red' }));
+      c.appendChild(w);
+    } else if (war.a === p.id) c.insertAdjacentHTML('beforeend', `<h3>War</h3><p class="desc">${p.name} is at war with ${B.name}. Their warriors gather at ${B.name}.</p>`);
+  }
+  if (favorAt(p.id)) c.insertAdjacentHTML('beforeend', `<p class="desc">A friend of ${p.name} ${'★'.repeat(favorAt(p.id))} · better prices</p>`);
   if (p.prices && !hostile) {
     c.insertAdjacentHTML('beforeend', '<h3>Market</h3>');
     const t = document.createElement('table'); t.className = 'trade';
@@ -2748,6 +2960,8 @@ function help() {
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
+  • <b>The Kraken</b> lurks in the Maelstrom in the far southwest and may surface in any deep water. Shoot its body and eyes, and keep moving: red rings on the water mark where a tentacle will slam down.<br>
+  • <b>Land wars:</b> each season towns may go to war. At the town under attack you can stand with its defenders against an invading army that lands on the far beach, or join the attackers and sack it with their help. The side you help becomes a friend and gives you better prices.<br>
   • <b>Seasons:</b> a year has four seasons of 10 days. Summer days are long and calm. Autumn brings storms and better prices for furs and salt. In winter snow covers the islands, days are short, blizzards blow, drift ice fills the northern sea, your crew eats more at sea and hunting is poor. Hold a Yule feast at Ravenholm in winter.<br>
   • <b>The wider sea:</b> beyond the home waters lie Skarholt, Ulfsborg, Bjornstad, the glacier of Frostfang, the Isle of Graves, Seal Rocks and Odin's Eyrie.<br>
   • <b>Oaths:</b> ask for work in towns or talk to villagers (<b>E</b>) to swear oaths: deliveries, hunts, sea battles, raids. Active oaths show under your stats and in the journal (<b>J</b>).<br>
@@ -2837,6 +3051,7 @@ function drawMini() {
     mcx.fillStyle = n.hostile ? '#ff5a3a' : n.kind === 'raider' ? '#ff9a6a' : n.kind === 'defender' ? '#9fc8ff' : '#f0d890'; mcx.beginPath(); mcx.arc(mx(n.pos.x), mz(n.pos.y), 2.4, 0, 7); mcx.fill();
   });
   mcx.save(); mcx.translate(mx(ship.pos.x), mz(ship.pos.y)); mcx.rotate(ship.h);
+  mcx.strokeStyle = S.krakenSlain ? 'rgba(255,255,255,.4)' : '#d0573f'; mcx.lineWidth = 1.5; mcx.beginPath(); mcx.arc(mx(MAELSTROM.x), mz(MAELSTROM.z), 4, 0, 5.5); mcx.stroke();
   mcx.fillStyle = '#fff'; mcx.beginPath(); mcx.moveTo(0, -6); mcx.lineTo(4, 4); mcx.lineTo(0, 2); mcx.lineTo(-4, 4); mcx.closePath(); mcx.fill(); mcx.restore();
   if (ashore.on && hero) { mcx.fillStyle = '#e0ad4a'; mcx.beginPath(); mcx.arc(mx(hero.x), mz(hero.z), 3, 0, 7); mcx.fill(); }
 }
@@ -3006,6 +3221,9 @@ function tick() {
       if (ship.speed > 9 && groundCooldown <= 0) { const dmg = ri(2, 6); S.hull = Math.max(5, S.hull - dmg); log(`The hull grinds against drift ice. Hull -${dmg}.`, 'bad'); banner('Drift ice!', 'Steer clear of the floes'); Sound.crash(); groundCooldown = 3; renderHUD(); }
       ship.speed *= .4;
     }
+    { const mdx = MAELSTROM.x - ship.pos.x, mdz = MAELSTROM.z - ship.pos.y, md = Math.hypot(mdx, mdz);
+      if (md < 170) { ship.pos.x += (mdx / md * 5 - mdz / md * 4) * dt; ship.pos.y += (mdz / md * 5 + mdx / md * 4) * dt; ship.h += dt * .12; }
+      if (md < 320 && !S.krakenSlain && !kraken) spawnKraken(); }
     // time passes at sea
     dayTimer += dt;
     if (dayTimer >= DAY_SECONDS) {
@@ -3034,8 +3252,9 @@ function tick() {
   if (ashore.on && !paused) updateAshore(dt);
   deckHorse.visible = !!(S.horseOwned && !ashore.on);
   caches.forEach(c => { if (c.glint.visible) { c.glint.rotation.y += dt * 2; c.glint.position.y = 2 + Math.sin(t * 2) * .2; } });
-  updateSerpent(dt, t, paused);
-  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking);
+  updateSerpent(dt, t, paused); updateKraken(dt, t, paused);
+  if (maelstrom) { maelstrom.a.rotation.z += dt * .25; maelstrom.b.rotation.z += dt * .6; }
+  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking) || !!(kraken && !kraken.sinking);
   if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
   if (combatOn && !paused && !S.docked && (S.crew <= 1 || S.hull <= 6)) defeat(); updateWhales(dt); updateSmoke(dt);
   flags.forEach(f => { const a = f.geometry.attributes.position.array, b = f.userData.base; for (let i = 0; i < a.length; i += 3) a[i + 2] = Math.sin(b[i] * .9 - t * 5) * b[i] * .12; f.geometry.attributes.position.needsUpdate = true; });
@@ -3100,6 +3319,7 @@ function buildWorld() {
   buildInstances();
   buildCaches();
   buildFloes();
+  buildMaelstrom();
 }
 
 function startGame(fresh) {
@@ -3109,6 +3329,7 @@ function startGame(fresh) {
   if (saved && S.ship && !S.docked) { ship.pos.set(S.ship.x, S.ship.z); ship.h = S.ship.h; }
   else dockAt(P[S.at] || P.home);
   dayTimer = S.dayTimer || 0; camSnap = true; syncCaches(); applySeason(true); syncRoster(true);
+  if (!S.war && S.day >= 11) startWar();
   $('feed').innerHTML = '';
   Sound.init();
   titleOn = false; $('title').classList.add('hide');
@@ -3139,7 +3360,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
