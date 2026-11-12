@@ -729,7 +729,7 @@ function rumble(pi, strong, weak, dur) {
 
 // ---------------------------------------------------------------- game
 const G = { state: 'title', wave: 0, stage: 0, frame: 0, phase: 'intro', phaseT: 0, queue: [], spawnT: 0,
-  enemies: [], projs: [], pickups: [], strikes: [], lasers: [], zapLines: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
+  enemies: [], projs: [], pickups: [], strikes: [], lasers: [], zapLines: [], hives: [], beams: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
   best: 0, players: [], boss: null, lastTeamText: -999, pauseSel: 0, titleT: 0, newBest: false };
 try { G.chUnlocked = Math.min(7, +localStorage.getItem('stickSquadChapter') || 0); } catch (e) { G.chUnlocked = 0; }
 try { G.cleared = Math.max(G.chUnlocked, Math.min(8, +localStorage.getItem('stickSquadCleared') || 0)); } catch (e) { G.cleared = G.chUnlocked; }
@@ -775,6 +775,18 @@ const CHALLENGES = [
   { short: '75 BOSSES', text: ['Defeat 75 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 75, prog: () => 'Bosses beaten: ' + Math.min(75, G.prog.bosses) + ' / 75' },
   { short: '10 VS WINS', text: ['Win 10 VERSUS', 'matches to unlock!'], need: () => G.prog.vs >= 10, prog: () => 'Versus wins: ' + Math.min(10, G.prog.vs) + ' / 10' },
   { short: 'WAVE 50', text: ['Reach wave 50 in', 'ARCADE mode to unlock!'], need: () => G.prog.wave >= 50, prog: () => 'Best Arcade wave: ' + Math.min(50, G.prog.wave) + ' / 50' },
+  ...Array.from({ length: 5 }, () => ({ short: 'FREE', text: ['', ''], need: () => true, prog: () => '' })),
+  { short: '120 COMBO', text: ['Land a 120-hit combo', 'to unlock!'], need: () => (G.prog.combo || 0) >= 120, prog: () => 'Best combo: ' + Math.min(120, G.prog.combo || 0) + ' / 120' },
+  { short: '2500 KOS', text: ['Defeat 2500 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 2500, prog: () => 'Enemies defeated: ' + Math.min(2500, G.prog.kos) + ' / 2500' },
+  { short: '100 BOSSES', text: ['Defeat 100 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 100, prog: () => 'Bosses beaten: ' + Math.min(100, G.prog.bosses) + ' / 100' },
+  { short: '200 POWER-UPS', text: ['Collect 200 power-ups', 'to unlock!'], need: () => G.prog.pickups >= 200, prog: () => 'Power-ups: ' + Math.min(200, G.prog.pickups) + ' / 200' },
+  { short: '150 SUPERS', text: ['Use 150 SUPER MOVES', 'to unlock!'], need: () => G.prog.supers >= 150, prog: () => 'Supers used: ' + Math.min(150, G.prog.supers) + ' / 150' },
+  ...Array.from({ length: 5 }, () => ({ short: 'FREE', text: ['', ''], need: () => true, prog: () => '' })),
+  { short: 'WAVE 60', text: ['Reach wave 60 in', 'ARCADE mode to unlock!'], need: () => G.prog.wave >= 60, prog: () => 'Best Arcade wave: ' + Math.min(60, G.prog.wave) + ' / 60' },
+  { short: '150 COMBO', text: ['Land a 150-hit combo', 'to unlock!'], need: () => (G.prog.combo || 0) >= 150, prog: () => 'Best combo: ' + Math.min(150, G.prog.combo || 0) + ' / 150' },
+  { short: '4000 KOS', text: ['Defeat 4000 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 4000, prog: () => 'Enemies defeated: ' + Math.min(4000, G.prog.kos) + ' / 4000' },
+  { short: '150 BOSSES', text: ['Defeat 150 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 150, prog: () => 'Bosses beaten: ' + Math.min(150, G.prog.bosses) + ' / 150' },
+  { short: '15 VS WINS', text: ['Win 15 VERSUS', 'matches to unlock!'], need: () => G.prog.vs >= 15, prog: () => 'Versus wins: ' + Math.min(15, G.prog.vs) + ' / 15' },
 ];
 const fighterUnlocked = i => i < STORY_FIGHTERS ? i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0) : !!(CHALLENGES[i - STORY_FIGHTERS] && CHALLENGES[i - STORY_FIGHTERS].need());
 const fighterCount = () => CHARS.filter((c, i) => fighterUnlocked(i)).length;
@@ -1325,6 +1337,109 @@ Object.assign(A, {
     onActive: f => dustBurst(f.x + f.facing * 60, f.y, 6) },
   RISING: { startup: 5, active: 7, recovery: 14, dmg: 11, kb: [3, 15], hb: { x: 22, y: 112, w: 72, h: 76 }, stun: 34, hs: 5, meter: 6, sfx: 'light', wind: A.UP.wind, hit: A.UP.hit, air: true },
 });
+// ---------------------------------------------------------- fighter pack 6
+const sticky = (f, r, t) => SUP.freeze(foesOf(f).filter(e => Math.hypot(e.x - f.x, e.y - f.y) < r), t);
+addF(F3('TURTLE TOBY', 'TURTLE', ['Super tough shell. Heavy is', 'a wide spinning shell attack.', 'Special: Shell Shock roll.'], '#3a8a4a', '#1a5a2a', '#c9a227', 'helmet', { hp: 140, spd: 0.85, dmg: 1.05, size: 1.05, tough: 0.8 }),
+  mel({ spin: true, startup: 6, active: 18, hb: { x: 0, y: 40, w: 160, h: 70 }, dmg: 14, kb: [12, 8], wind: A.AIRL.wind, hit: A.AIRL.hit }),
+  sk('HIDE', 'cast', { startup: 2, onActive: f => { f.shield = Math.max(f.shield, 2); f.inv = Math.max(f.inv, 30); floatText(f.x, f.y - 120, 'SHELL UP!', '#3a8a4a', 22, 30); SFX.reflect(); } }),
+  ['SHELL SHOCK', p => G.projs.push({ x: p.x + p.facing * 50, y: p.y - 40, vx: p.facing * 11, vy: -4, g: 0.5, r: 34, dmg: 20, owner: 'player', by: p, kind: 'spikeball', life: 170, col: '#3a8a4a', pierce: true, hitSet: new Set(), kb: [14, 10], meter: 0, hs: 5, spikeball: true, rot: 0 })],
+  ['TIDAL TURTLE', (p, f) => { SUP.waves(p, 'wave', 3, 10, { r: 34, dmg: 18, col: '#2a8ad0' }); SUP.quake(p, f, 20); p.shield = 3; }]);
+addF(F3('PENGUIN PENNY', 'PENGUIN', ['Slippery and chilly: hits freeze.', 'Heavy is a fast belly slide.', 'Special: Iceberg spikes.'], '#2a2a3a', '#111111', '#f2a030', 'beanie', { hp: 95, spd: 1.1, frost: true, size: 0.92 }),
+  mel({ startup: 5, active: 18, lungeV: 18, dmg: 14, kb: [13, 7], hb: { x: 34, y: 22, w: 90, h: 40 }, wind: A.RAM.wind, hit: A.RAM.hit }),
+  sk('SNOWBALL', 'throw', { startup: 6, onActive: f => shoot(f, { kind: 'cannonball', y: f.y - 60 * f.s, vx: f.facing * 10, vy: -7, g: 0.45, r: 13, dmg: 13, kb: [8, 8], life: 160, col: '#eef6ff' }) }),
+  ['ICEBERG', (p, f) => { G.projs.slice(0); f.slice(0, 8).forEach((e, k) => G.projs.push({ x: clamp(e.x, 30, W - 30), y: FLOOR - 30, vx: 0, vy: 0, g: 0, r: 30, dmg: 18, owner: 'player', by: p, kind: 'spike', life: 40, col: p.col, pierce: true, hitSet: new Set(), kb: [3, 15], meter: 0, hs: 4, delayT: k * 5, spike: true })); SUP.freeze(f, 120); }],
+  ['PENGUIN COLONY', (p, f) => { for (let k = 0; k < 6; k++) G.projs.push({ x: p.x, y: p.y - 60, vx: (k % 2 ? 1 : -1) * (7 + k), vy: -5, g: 0.5, r: 18, dmg: 14, owner: 'player', by: p, kind: 'spikeball', life: 220, col: '#2a2a3a', pierce: true, hitSet: new Set(), kb: [12, 9], meter: 0, hs: 4, spikeball: true, rot: 0 }); SUP.freeze(f, 150); }]);
+addF(F3('PAINTBALL PAX', 'PAINTBALLER', ['Heavy fires a rapid burst of', 'five colorful paintballs.', 'Special: Splat Attack.'], '#2a8ad0', '#1a5a90', '#ff4a8a', 'goggles', { hp: 95, spd: 1.08 }),
+  sht(f => { for (let k = 0; k < 5; k++) shoot(f, { kind: 'ibolt', vx: f.facing * 18, vy: rand(-0.8, 0.8), r: 8, dmg: 5, col: pick(['#ff4a4a', '#ffd23a', '#4aff8a', '#4a8aff', '#ff4aff']), life: 50, delayT: k * 4, kb: [4, 2] }); tone(900, 0.2, 'square', 0.05, 700); }, 'punch'),
+  sk('SPLAT MINE', 'throw', { startup: 5, onActive: f => G.projs.push({ x: clamp(f.x + f.facing * 100, 60, W - 60), y: FLOOR - 4, vx: 0, vy: 0, g: 0, r: 60, dmg: 3, owner: 'player', by: f, kind: 'paint', life: 300, col: pick(['#ff4a8a', '#4a8aff', '#4aff8a']), puddle: true }) }),
+  ['SPLAT ATTACK', p => { SUP.radial(p, 'ibolt', 20, 12, { dmg: 10, life: 70 }); G.projs.slice(-20).forEach((pr, k) => pr.col = ['#ff4a4a', '#ffd23a', '#4aff8a', '#4a8aff', '#ff4aff'][k % 5]); }],
+  ['PAINT WAR', (p, f) => { for (let i = 0; i < 6; i++) G.projs.push({ x: 130 + i * 268, y: FLOOR - 4, vx: 0, vy: 0, g: 0, r: 90, dmg: 3, owner: 'player', by: p, kind: 'paint', life: 360, col: pick(['#ff4a8a', '#4a8aff', '#4aff8a', '#ffd23a']), puddle: true }); SUP.rain(p, f, 'ibolt', 18, { r: 12, dmg: 12, col: '#ff4aff' }); }]);
+addF(F3('TOASTER TED', 'TOASTER BOT', ['Sturdy: heavy can\'t be stopped.', 'Heavy pops out two hot toasts.', 'Special: Breakfast Blast.'], '#8a8a9c', '#5a5a6a', '#c08a3a', 'antenna', { hp: 110, dmg: 1.05, armorHeavy: true }),
+  sht(f => { for (const sp of [7, 10]) shoot(f, { kind: 'pixel', y: f.y - 70 * f.s, vx: f.facing * sp, vy: -9, g: 0.45, r: 11, dmg: 11, col: '#c08a3a', life: 160 }); tone(1200, 0.1, 'triangle', 0.1, 1800); }, 'throw'),
+  sk('POP UP', 'up', { startup: 3, onActive: f => { hop(f, f.vx, -16); for (const d of [-1, 1]) shoot(f, { kind: 'pixel', y: f.y - 40, vx: d * 6, vy: -4, g: 0.45, r: 10, dmg: 9, col: '#c08a3a', life: 120 }); } }),
+  ['BREAKFAST BLAST', (p, f) => SUP.rain(p, f, 'pixel', 14, { r: 12, dmg: 14, col: '#c08a3a' })],
+  ['BURNT TOAST', (p, f) => { SUP.rain(p, f, 'fireball', 16, { r: 13, dmg: 14, burn: true, col: '#5a3a1a' }); SUP.nova(p, f, 260, 22, e => { if (e.T) { e.burn = 200; e.burnBy = p; } }); }]);
+addF(F3('FIREWORK FIONA', 'PYRO', ['Heavy launches a homing', 'firework rocket.', 'Special: Sky Show.'], '#e83a5a', '#a01a3a', '#ffd23a', 'pigtails', { hp: 90, spd: 1.05 }),
+  sht(f => { shoot(f, { kind: 'rocket', vx: f.facing * 8, vy: -3, r: 10, dmg: 15, homing: true, life: 170, col: pick(['#ff4a8a', '#ffd23a', '#4ac0ff']), kb: [9, 8] }); SFX.dash(); }),
+  sk('SPARKLER', 'spin', { spin: true, startup: 3, active: 14, dmg: 10, kb: [9, 8], hb: { x: 0, y: 50, w: 150, h: 90 }, onActive: f => { for (let i = 0; i < 10; i++) parts.push({ type: 'spark', x: f.x + rand(-70, 70), y: f.y - rand(0, 100), vx: rand(-2, 2), vy: rand(-3, 1), life: 18, max: 18, col: '#ffd23a' }); } }),
+  ['SKY SHOW', p => { SUP.radial(p, 'rocket', 10, 6, { homing: true, dmg: 14, life: 200, r: 10 }); G.projs.slice(-10).forEach((pr, k) => pr.col = ['#ff4a8a', '#ffd23a', '#4ac0ff', '#7ae05a', '#b05aff'][k % 5]); }],
+  ['NEW YEAR', (p, f) => { SUP.radial(p, 'rocket', 18, 6, { homing: true, dmg: 13, life: 220, r: 10 }); G.projs.slice(-18).forEach((pr, k) => pr.col = ['#ff4a8a', '#ffd23a', '#4ac0ff', '#7ae05a', '#b05aff'][k % 5]); SUP.strikes(p, f, 6, 20); }]);
+addF(F3('TOADSTOOL TOM', 'MUSHROOM', ['Every hit poisons (burns).', 'Heavy puffs floating spores.', 'Special: Spore Cloud.'], '#c0392b', '#7a1f16', '#f2f2e8', 'hat', { hp: 100, burn: true }),
+  sht(f => { for (const vy of [-1.5, 0, 1.5]) shoot(f, { kind: 'ibolt', vx: f.facing * 6, vy, r: 12, dmg: 6, burn: true, col: '#9ad04a', life: 90 }); noise(0.3, 0.15, 900, 'lowpass', 300); }),
+  sk('MUSHROOM BOUNCE', 'up', { startup: 3, active: 12, dmg: 10, kb: [6, 14], hb: { x: 10, y: 40, w: 100, h: 70 }, onActive: f => hop(f, f.facing * 4, -18) }),
+  ['SPORE CLOUD', (p, f, bd, SP) => { sticky(p, 260, 100); for (const e of f) if (Math.hypot(e.x - p.x, e.y - p.y) < 260) { doHit(p, e, SP(12, [2, 4]), sign(e.x - p.x) || 1, true); if (e.T) { e.burn = 240; e.burnBy = p; } } for (let i = 0; i < 20; i++) parts.push({ type: 'dust', x: p.x + rand(-240, 240), y: p.y - rand(0, 160), vx: 0, vy: -0.5, r: rand(10, 20), life: 50, max: 50 }); }],
+  ['FUNGUS FRENZY', (p, f) => { vineSpikes(p, Array.from({ length: 11 }, (_, i) => 70 + i * 146), 18); SUP.radial(p, 'ibolt', 16, 8, { dmg: 8, burn: true, col: '#9ad04a', life: 90 }); }]);
+addF(F3('VAC VIV', 'VACUUM BOT', ['Power-ups fly to her. Heavy', 'sucks enemies in close.', 'Special: Mega Suck.'], '#8a5ad0', '#5a3a9a', '#e8e8f0', 'antenna', { hp: 100, magnet: true }),
+  sht(f => { ring(f.x + f.facing * 120, f.y - 50, '#8a5ad0', 120, 4, 14); for (const e of foesOf(f)) if ((e.x - f.x) * f.facing > 0 && Math.abs(e.x - f.x) < 420 && Math.abs(e.y - f.y) < 160) doHit(f, e, { dmg: 7, kb: [Math.min(14, Math.abs(e.x - f.x) / 20), 4], stun: 30, hs: 3, sfx: 'light', meter: 4 }, -f.facing, true); noise(0.4, 0.2, 400, 'bandpass', 200); }),
+  sk('BLOW', 'cast', { startup: 4, onActive: f => { around(f, 220, { dmg: 6, kb: [18, 6] }); ring(f.x, f.y - 40, '#e8e8f0', 220, 5, 16); SFX.whoosh(); } }),
+  ['MEGA SUCK', (p, f, bd, SP) => { for (const e of f) doHit(p, e, SP(16, [Math.min(18, Math.abs(e.x - p.x) / 18), 6]), sign(p.x - e.x) || 1, true); ring(p.x, p.y - 40, '#8a5ad0', 500, 10, 26); }],
+  ['DUST BUNNY STORM', (p, f) => { torn(p, -1, { col: '#8a5ad0' }); torn(p, 1, { col: '#8a5ad0' }); for (const e of f) doHit(p, e, SUP.hit(16, [Math.min(18, Math.abs(e.x - p.x) / 18), 6]), sign(p.x - e.x) || 1, true); }]);
+addF(F3('BEETLE BRUCE', 'BEETLE', ['Armored and strong. Heavy', 'tosses foes high with his horn.', 'Special: Beetle Bash.'], '#2a6a4a', '#123a24', '#9ad04a', 'horns', { hp: 130, spd: 0.92, dmg: 1.15, tough: 0.85, armorHeavy: true, size: 1.08 }),
+  mel({ startup: 10, dmg: 20, kb: [4, 20], hb: { x: 40, y: 50, w: 70, h: 70 }, wind: A.UP.wind, hit: A.UP.hit }),
+  sk('SHELL CHARGE', 'dash', { startup: 5, active: 14, lungeV: 18, dmg: 15, kb: [15, 8], hb: { x: 40, y: 45, w: 84, h: 64 } }),
+  ['BEETLE BASH', (p, f) => { SUP.quake(p, f, 22); vineSpikes(p, [p.x - 120, p.x + 120, p.x - 240, p.x + 240], 16); }],
+  ['HERCULES', (p, f) => { setPower(p, 'giant'); SUP.flurry(p, f, 3, 14, [6, 20]); }]);
+addF(F3('GUMDROP GIGI', 'CANDY KID', ['Heavy blows a sticky gum', 'bubble that traps foes.', 'Special: Sticky Trap.'], '#ff4aa0', '#b02a70', '#7ae05a', 'bow', { hp: 90, spd: 1.1, size: 0.92 }),
+  sht(f => { shoot(f, { kind: 'bubble', vx: f.facing * 8, r: 20, dmg: 8, trap: true, life: 130, col: '#ff8ad0' }); tone(700, 0.15, 'sine', 0.1, 1100); }),
+  sk('BUBBLEGUM POP', 'cast', { startup: 4, onActive: f => { around(f, 170, { dmg: 9, kb: [8, 8] }); sticky(f, 170, 50); ring(f.x, f.y - 40, '#ff8ad0', 170, 6, 16); } }),
+  ['STICKY TRAP', (p, f, bd, SP) => { for (const e of f) if (Math.hypot(e.x - p.x, e.y - p.y) < 420) { trapFoe(e); doHit(p, e, SP(14, [0, 2]), 1, true); trapFoe(e); ring(e.x, e.y - 40, '#ff8ad0', 60, 4, 18); } }],
+  ['SUGAR STORM', (p, f) => { for (const e of f) trapFoe(e); SUP.rain(p, f, 'pie', 18, { r: 12, dmg: 14, col: '#ff8ad0' }); }]);
+addF(F3('BALLERINA BLAIR', 'BALLERINA', ['Graceful triple jump. Heavy is', 'a wide spinning pirouette.', 'Special: Swan Lake.'], '#d060a8', '#8a3a70', '#f2e0f0', 'tiara', { hp: 85, spd: 1.15, jumps: 3, size: 0.92 }),
+  mel({ spin: true, startup: 5, active: 16, hb: { x: 0, y: 55, w: 170, h: 100 }, dmg: 13, kb: [11, 9], wind: A.AIRL.wind, hit: A.AIRL.hit }),
+  sk('GRAND JETE', 'kick', { startup: 3, active: 14, dmg: 13, kb: [12, 10], hb: { x: 40, y: 40, w: 90, h: 60 }, onActive: f => hop(f, f.facing * 14, -11) }),
+  ['SWAN LAKE', p => SUP.radial(p, 'plane', 14, 8, { homing: true, dmg: 10, life: 220, r: 10, col: '#ffffff' })],
+  ['NUTCRACKER', (p, f) => { SUP.freeze(f, 140); SUP.flurry(p, f, 4, 9); }]);
+// ---------------------------------------------------------- fighter pack 7
+addF(F3('RACCOON RICO', 'RACCOON', ['Sneaky and quick. Heavy tosses', 'a trash can lid that arcs.', 'Special: Dumpster Dive.'], '#6a6a7a', '#3a3a4a', '#2a2a2a', 'mask', { hp: 90, spd: 1.15, size: 0.9 }),
+  sht(f => { shoot(f, { kind: 'pixel', y: f.y - 60 * f.s, vx: f.facing * 10, vy: -7, g: 0.4, r: 14, dmg: 13, col: '#9aa0a8', life: 160, kb: [9, 8] }); SFX.throw_(); }, 'throw'),
+  sk('SNATCH', 'dash', { startup: 3, active: 10, lungeV: 22, dmg: 12, kb: [10, 6], hb: { x: 36, y: 45, w: 80, h: 60 }, onActive: f => { f.meter = Math.min(100, f.meter + 8); } }),
+  ['DUMPSTER DIVE', (p, f) => SUP.rain(p, f, 'pixel', 14, { r: 13, dmg: 14, col: '#7a8a7a' })],
+  ['MIDNIGHT HEIST', (p, f) => { flashCol = '#1a1a2a'; p.invisT = 300; SUP.flurry(p, f, 3, 11); for (const e of f) e.dropMeter = 1; }]);
+addF(F3('SHARK SHELBY', 'SHARK', ['Fierce! Heavy is a huge bite.', 'Skill is a fast fin dash.', 'Special: Feeding Frenzy.'], '#5a7a9a', '#3a5070', '#e8e8f0', 'spikes', { hp: 110, spd: 1.05, dmg: 1.12 }),
+  mel({ startup: 9, dmg: 24, kb: [12, 10], hb: { x: 46, y: 60, w: 70, h: 56 } }),
+  sk('FIN DASH', 'dash', { startup: 3, active: 14, lungeV: 24, dmg: 12, kb: [11, 7], hb: { x: 34, y: 40, w: 80, h: 60 } }),
+  ['FEEDING FRENZY', (p, f, bd) => SUP.flurry(p, bd().slice(0, 4), 3, 9)],
+  ['JAWS', (p, f) => { SUP.waves(p, 'wave', 3, 10, { r: 34, dmg: 16, col: '#2a8ad0' }); SUP.flurry(p, f, 2, 14); }]);
+addF(F3('DRUMMER DANI', 'DRUMMER', ['Heavy is a drum roll of three', 'shockwaves in a row.', 'Special: Bass Drum quake.'], '#d0602a', '#8a3a10', '#e8c000', 'headphones', { hp: 100 }),
+  sht(f => { for (let k = 0; k < 3; k++) shoot(f, { kind: 'sonic', vx: f.facing * 11, r: 18, dmg: 7, pierce: true, hitSet: new Set(), face: f.facing, life: 50, kb: [8, 5], delayT: k * 7 }); tone(150, 0.3, 'square', 0.1, 120); }),
+  sk('CYMBAL CRASH', 'cast', { startup: 4, onActive: f => { around(f, 180, { dmg: 9, kb: [10, 8] }); sticky(f, 180, 40); ring(f.x, f.y - 50, '#e8c000', 180, 6, 16); noise(0.5, 0.3, 4000, 'highpass', 3000); } }),
+  ['BASS DRUM', (p, f) => SUP.quake(p, f, 22)],
+  ['DRUM SOLO', (p, f) => { SUP.waves(p, 'sonic', 6, 7, { r: 28, dmg: 13 }); SUP.quake(p, f, 16); }]);
+addF(F3('FOX FELIX', 'FOX', ['Fast trickster. Heavy throws', 'two homing blue foxfire flames.', 'Special: Fox Illusion.'], '#e0702a', '#a04a10', '#f2f2e8', 'cat', { hp: 90, spd: 1.18, size: 0.94 }),
+  sht(f => { for (const vy of [-3, 3]) shoot(f, { kind: 'fireball', vx: f.facing * 8, vy, r: 11, dmg: 9, homing: true, life: 150, col: '#4ac0ff' }); tone(900, 0.2, 'sine', 0.08, 1400); }),
+  sk('PHASE DASH', 'dash', { startup: 2, onActive: f => { f.ghost(14); f.x = clamp(f.x + f.facing * 220, 40, W - 40); f.inv = Math.max(f.inv, 20); SFX.portal(); } }),
+  ['FOX ILLUSION', (p, f, bd) => { G.decoy = { x: p.x, y: p.y, vx: 0, t: 300, ci: p.ci, facing: p.facing, hh: 78, s: 1 }; SUP.flurry(p, bd().slice(0, 3), 2, 10); }],
+  ['NINE FLAMES', (p, f) => { SUP.radial(p, 'fireball', 9, 8, { homing: true, dmg: 14, life: 220, r: 12, col: '#4ac0ff' }); }]);
+addF(F3('GRAVEL', 'STONE GOLEM', ['Giant rock golem, very tough.', 'Heavy is a crushing rock fist.', 'Special: Landslide.'], '#7a6a5a', '#4a3a2a', '#a09080', 'spikes', { hp: 160, spd: 0.75, dmg: 1.3, size: 1.3, tough: 0.8, armorHeavy: true }),
+  mel({ startup: 13, active: 6, dmg: 28, kb: [18, 10], hb: { x: 52, y: 60, w: 80, h: 70 }, shake: 10 }),
+  sk('STONE SKIN', 'cast', { startup: 3, onActive: f => { f.ironT = Math.max(f.ironT || 0, 300); floatText(f.x, f.y - 140, 'STONE SKIN!', '#8a8a9a', 24, 30); SFX.reflect(); } }),
+  ['LANDSLIDE', (p, f) => SUP.rain(p, f, 'cannonball', 12, { r: 18, dmg: 22, col: '#7a6a5a' })],
+  ['MOUNTAIN', (p, f) => { SUP.quake(p, f, 30); SUP.rain(p, f, 'cannonball', 12, { r: 20, dmg: 22, col: '#7a6a5a' }); }]);
+addF(F3('PILOT PETRA', 'ACE PILOT', ['Heavy fires a rapid stream of', 'machine-gun shots.', 'Special: Bomb Run.'], '#5a7a3a', '#3a5020', '#c0392b', 'goggles', { hp: 95, spd: 1.08, float: true }),
+  sht(f => { for (let k = 0; k < 6; k++) shoot(f, { kind: 'laserbolt', vx: f.facing * 24, vy: rand(-0.6, 0.6), r: 6, dmg: 4, col: '#ffd23a', life: 50, delayT: k * 3, kb: [3, 2] }); tone(800, 0.25, 'square', 0.05, 600); }, 'punch'),
+  sk('LOOP', 'spin', { spin: true, startup: 2, active: 16, dmg: 11, kb: [8, 12], hb: { x: 0, y: 50, w: 120, h: 100 }, onActive: f => hop(f, f.facing * 6, -14) }),
+  ['BOMB RUN', p => { for (let k = 0; k < 7; k++) G.projs.push({ x: clamp(p.x + p.facing * (80 + k * 120), 40, W - 40), y: -30 - k * 30, vx: 0, vy: 6, g: 0.45, r: 12, dmg: 18, owner: 'player', by: p, kind: 'bomb', life: 300, col: p.col, bomb: true, impact: true, blast: 110, kb: [10, 10], meter: 0 }); }],
+  ['DOGFIGHT', p => SUP.radial(p, 'rocket', 14, 7, { homing: true, dmg: 14, life: 220, r: 10 })]);
+addF(F3('DRUID DARA', 'DRUID', ['Nature magic, slowly heals.', 'Heavy fires a thorny vine.', "Special: Nature's Wrath."], '#4a8a3a', '#2a5a1a', '#8a6a3a', 'beret', { hp: 100, regen: true }),
+  sht(f => { vineSpikes(f, [f.x + f.facing * 90, f.x + f.facing * 180], 12); shoot(f, { kind: 'arrow', vx: f.facing * 18, r: 9, dmg: 8, col: '#4a8a3a', life: 60 }); }, 'cast'),
+  sk('BEAR FORM', 'cast', { startup: 4, onActive: f => { if (!f.power || f.power === 'giant') setPower(f, 'giant'); f.powerT = Math.min(f.powerT, 300); SFX.roar(); } }),
+  ["NATURE'S WRATH", (p, f) => { vineSpikes(p, f.slice(0, 8).map(e => e.x).concat([p.x + 140, p.x - 140]), 20, [3, 16]); healTeam(p, 25); }],
+  ['WORLD TREE', (p, f) => { vineSpikes(p, Array.from({ length: 22 }, (_, i) => 40 + (i % 11) * 152 + (i >= 11 ? 76 : 0)), 22, [3, 16]); healTeam(p, 50); }]);
+addF(F3('KARATE KIM', 'KARATE MASTER', ['Lightning-fast fists.', 'Heavy is a powerful karate chop.', 'Special: Dragon Kick.'], '#4a4a5a', '#2a2a2a', '#c0392b', 'band', { hp: 100, spd: 1.12, dmg: 1.05, atkSpd: 1.15 }),
+  mel({ startup: 7, active: 5, dmg: 20, kb: [16, 8], hb: { x: 48, y: 60, w: 64, h: 50 } }),
+  sk('COUNTER', 'cast', Object.assign({}, A.PARRY, { kname: 'COUNTER', skill: true })),
+  ['DRAGON KICK', (p, f, bd, SP) => { const x0 = p.x, x1 = p.facing > 0 ? W - 60 : 60; p.ghost(20); for (const e of f) if ((e.x - x0) * p.facing > -30 && Math.abs((e.y - e.hh / 2) - (p.y - 50)) < 120) doHit(p, e, SP(30, [18, 12]), p.facing, true); p.x = x1; }],
+  ['BLACK BELT', (p, f) => SUP.flurry(p, f, 6, 7)]);
+addF(F3('JELLYFISH JILL', 'JELLYFISH', ['Floats gently. Heavy fires a', 'zap that jumps between foes.', 'Special: Shock Field.'], '#c080e0', '#7a40a0', '#5ac8ff', 'wisp', { hp: 85, spd: 1, float: true }),
+  sht(f => { let from = f; const hit = []; for (let k = 0; k < 3; k++) { let best = null, bd = k ? 260 : 480; for (const e of foesOf(f)) { if (hit.includes(e)) continue; const d = Math.hypot(e.x - from.x, e.y - from.y); if (d < bd) { bd = d; best = e; } } if (!best) break; G.zapLines.push({ x1: from.x, y1: from.y - 50, x2: best.x, y2: best.y - 45, t: 14 }); hit.push(best); doHit(f, best, { dmg: 9, kb: [3, 5], stun: 34, hs: 3, sfx: 'light', meter: 3 }, sign(best.x - from.x) || 1, true); from = best; } SFX.shock(); }),
+  sk('STING', 'dash', { startup: 3, active: 10, lungeV: 18, dmg: 11, kb: [6, 6], stun: 60, hb: { x: 36, y: 50, w: 70, h: 70 } }),
+  ['SHOCK FIELD', (p, f, bd, SP) => { for (const e of f) if (Math.hypot(e.x - p.x, e.y - p.y) < 300) { doHit(p, e, SP(18, [6, 8]), sign(e.x - p.x) || 1, true); G.zapLines.push({ x1: p.x, y1: p.y - 50, x2: e.x, y2: e.y - 45, t: 18 }); } }],
+  ['BLOOM', (p, f) => { for (const e of f) { doHit(p, e, SUP.hit(22, [4, 10]), sign(e.x - p.x) || 1, true); G.zapLines.push({ x1: p.x, y1: p.y - 50, x2: e.x, y2: e.y - 45, t: 24 }); } SUP.freeze(f, 120); }]);
+addF(F3('LIGHTNING LIZ', 'STORM CALLER', ['Heavy fires a piercing bolt.', 'Skill is a sparking dash.', 'Special: Storm Call.'], '#e8c000', '#9a7a00', '#4a6ad0', 'spikes', { hp: 90, spd: 1.15 }),
+  sht(f => { shoot(f, { kind: 'laserbolt', vx: f.facing * 28, r: 9, dmg: 14, col: '#ffe066', pierce: true, hitSet: new Set(), life: 60 }); SFX.shock(); }),
+  sk('SPARK DASH', 'dash', { startup: 2, active: 12, lungeV: 26, dmg: 12, kb: [10, 8], hb: { x: 30, y: 45, w: 84, h: 64 }, onActive: f => { f.inv = Math.max(f.inv, 14); sparks(f.x, f.y - 50, f.facing, 10, '#ffe066'); } }),
+  ['STORM CALL', (p, f, bd) => SUP.strikes(p, bd(), 8, 24)],
+  ['SUPERCELL', (p, f) => { SUP.strikes(p, f, 14, 24); flashA = 1; flashCol = '#fff6a0'; }]);
 const SKILL_OF = { 'SCRIBBLE': 'SK_UPPER', 'BOLT': 'SK_BOLTDASH', 'BOULDER': 'SK_ROCK', 'INKBLADE': 'SK_RISE', 'DOODLE WITCH': 'SK_HEX', 'SHADE': 'SK_STEP', 'ROBO': 'SK_RPUNCH', 'HALO': 'SK_HALO',
   'SLUGGER': 'SK_LINE', 'HOPPER': 'SK_TONGUE', 'WHISKERS': 'SK_POUNCE', 'CHEF': 'SK_PIES', 'FROSTY': 'SK_ICICLE', 'GHOSTLY': 'SK_SPOOK', 'DJ BEATS': 'SK_DROP', 'SIR DOODLE': 'SK_BASH',
   'BUBBLES': 'SK_BHOP', 'JETPACK JO': 'SK_BURNER', 'PRESTO': 'SK_VANISH', 'EL DOODLO': 'SK_SUPLEX', 'MIMIC': 'SK_COPY', 'BLAZE': 'SK_FWALL', 'CAPTAIN INK': 'SK_RECOIL', 'GRAVITY GUS': 'SK_PULL',
@@ -1442,6 +1557,7 @@ function atkBox(f, a, sword) {
   return { x: cx - hb.w * s * k / 2, y: cy - hb.h * s / 2 * (sword ? 1.15 : 1), w: hb.w * s * k, h: hb.h * s * (sword ? 1.15 : 1) };
 }
 function startAttack(f, a) {
+  if (f.wandN > 0 && f instanceof Player && !a.skill) { f.wandN--; shoot(f, { kind: 'ibolt', vx: f.facing * 14, r: 11, dmg: 10, col: '#d08aff', homing: true, life: 120 }); }
   f.hammered = false;
   f.attack = a; f.at = 0; f.hitSet = new Set(); f.lunged = false; f.activated = false; f.landed = false;
   if (!a.quiet) SFX.whoosh();
@@ -1517,6 +1633,7 @@ function doHit(att, vic, a, dir, noAttHs) {
   const boss = vic.T && vic.T.boss;
   if (boss && vic.bstate === 'dazed') dmg *= 1.6;
   if (vic instanceof Player && vic.char.tough) dmg *= vic.char.tough;
+  if (vic instanceof Player && vic.ironT > 0) dmg *= 0.5;
   if (att && att.shrinkT > 0) dmg *= 0.5;
   dmg = Math.max(1, Math.round(dmg));
   vic.hp -= dmg; vic.flash = 7;
@@ -1583,7 +1700,7 @@ class Player extends Fighter {
     this.x = this.idx ? 1000 : 600; this.y = FLOOR; this.vx = this.vy = 0; this.facing = this.idx ? -1 : 1;
     this.applyChar(); this.hp = this.maxHp = this.char.hp; this.hpGhost = this.maxHp; this.attack = null; this.shadowQ = null; this.plat = null; this.stun = 0; this.inv = 60; this.dead = false; this.downed = false;
     this.dashT = 0; this.dashCd = 0; this.skillCd = 0; this.pounding = 0; this.specialT = 0; this.flipT = 0; this.spin = 0; this.jumps = 0; this.coyote = 0; this.airDash = this.char.airDashes || 1;
-    if (full) { this.meter = 0; this.score = 0; this.combo = 0; this.comboT = 0; this.maxCombo = 0; this.hits = 0; this.power = null; this.powerT = 0; this.shield = 0; this.droneT = 0; this.cloudT = 0; this.regenT = 0; this.magnetT = 0; this.thornT = 0; this.hauntT = 0; this.luckyT = 0; this.vampT = 0; this.invisT = 0; this.shrinkT = 0; this.fuel = 80; this.auraT = 0; this.yoyoT = 0; this.rodT = 0; this.moonT = 0; this.mirrorT = 0; this.gloveT = 0; this.bootsT = 0; this.orbitT = 0; this.bubbleT = 0; this.goldT = 0; this.fistN = 0; this.featherT = 0; this.bladeT = 0; }
+    if (full) { this.meter = 0; this.score = 0; this.combo = 0; this.comboT = 0; this.maxCombo = 0; this.hits = 0; this.power = null; this.powerT = 0; this.shield = 0; this.droneT = 0; this.cloudT = 0; this.regenT = 0; this.magnetT = 0; this.thornT = 0; this.hauntT = 0; this.luckyT = 0; this.vampT = 0; this.invisT = 0; this.shrinkT = 0; this.fuel = 80; this.auraT = 0; this.yoyoT = 0; this.rodT = 0; this.moonT = 0; this.mirrorT = 0; this.gloveT = 0; this.bootsT = 0; this.orbitT = 0; this.bubbleT = 0; this.goldT = 0; this.fistN = 0; this.featherT = 0; this.bladeT = 0; this.trailT = 0; this.ironT = 0; this.boomT = 0; this.wandN = 0; this.inkFountT = 0; }
   }
   get ctrl() { return ctrls[this.idx]; }
   update() {
@@ -1614,6 +1731,10 @@ class Player extends Fighter {
     if (this.gloveT > 0) this.gloveT--;
     if (this.bootsT > 0) this.bootsT--;
     if (this.goldT > 0) this.goldT--;
+    if (this.ironT > 0) this.ironT--;
+    if (this.inkFountT > 0) { this.inkFountT--; if (this.inkFountT % 3 === 0) this.meter = Math.min(100, this.meter + 1); }
+    if (this.trailT > 0) { this.trailT--; if (this.onGround && Math.abs(this.vx) > 2 && G.frame % 6 === 0) G.projs.push({ x: this.x, y: this.y - 14, vx: 0, vy: 0, g: 0, r: 14, dmg: 4, owner: 'player', by: this, kind: 'fireball', life: 55, col: '#ff6a1a', burn: true, pierce: true, hitSet: new Set(), kb: [2, 6], meter: 0, hs: 1 }); }
+    if (this.boomT > 0) { this.boomT--; if (this.boomT % 50 === 0) { const t = nearFoe(this, 900), d = t ? (sign(t.x - this.x) || this.facing) : this.facing; G.projs.push({ x: this.x + d * 30, y: this.y - 56 * this.s, vx: d * 15, vy: 0, g: 0, r: 18, dmg: 10, owner: 'player', by: this, kind: 'slash', life: 120, col: this.col, pierce: true, hitSet: new Set(), boom: true, boomDir: d, face: d, kb: [7, 6], meter: 1, hs: 2 }); } }
     if (this.featherT > 0) this.featherT--;
     if (this.bladeT > 0) {
       this.bladeT--; this.bladeHit = this.bladeHit || new Set();
@@ -2575,8 +2696,8 @@ function killEnemy(e, att, dir) {
 
 // ---------------------------------------------------------------- pickups
 const PICKS = ['heart', 'heart', 'heart', 'ink', 'ink', 'pencil', 'bolt', 'shield', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'drone',
-  'clone', 'tornado', 'cloud', 'regen', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'pinata', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield', 'goldstar', 'powerfist', 'feather', 'dashblades', 'hotfloor', 'thunderstorm'];
-const MYSTERY = ['pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield', 'goldstar', 'powerfist', 'feather', 'dashblades', 'hotfloor', 'thunderstorm'];
+  'clone', 'tornado', 'cloud', 'regen', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'pinata', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield', 'goldstar', 'powerfist', 'feather', 'dashblades', 'hotfloor', 'thunderstorm', 'firetrail', 'ironskin', 'beehive', 'megalaser', 'boomerang', 'inkwave', 'piggybank', 'superheal', 'blizzard', 'shockwave', 'rocketbarrage', 'escaperope', 'spikestrip', 'magicwand', 'healingrain', 'pumpkinbomb', 'starfall', 'teamshield', 'inkfountain', 'twintornado'];
+const MYSTERY = ['pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield', 'goldstar', 'powerfist', 'feather', 'dashblades', 'hotfloor', 'thunderstorm', 'firetrail', 'ironskin', 'beehive', 'megalaser', 'boomerang', 'inkwave', 'piggybank', 'superheal', 'blizzard', 'shockwave', 'rocketbarrage', 'escaperope', 'spikestrip', 'magicwand', 'healingrain', 'pumpkinbomb', 'starfall', 'teamshield', 'inkfountain', 'twintornado'];
 const POWER_INFO = { sword: ['PENCIL BLADE', '#c89800', 900], haste: ['HYPER SPEED', '#2ab0e0', 720], giant: ['MEGA SIZE', '#e2342c', 600], fire: ['FIRE INK', '#ff6a1a', 720], star: ['INVINCIBLE', '#e8a800', 480] };
 Object.assign(POWER_INFO, { hammer: ['MEGA HAMMER', '#8d5524', 720], double: ['DOUBLE DAMAGE', '#d0021b', 600], rocket: ['ROCKET BOOTS', '#ff8a00', 720], clone: ['INK CLONE', '#7b3fd0', 720], jet: ['JETPACK', '#5b7a2a', 720] });
 function setPower(p, k) { const [n, c, t] = POWER_INFO[k]; p.power = k; p.powerT = t; floatText(p.x, p.y - 110, n + '!', c, 32); }
@@ -2603,6 +2724,30 @@ function applyPickup(p, kind) {
       say('METEOR CALL!', '#ff6a1a'); SFX.special();
       { const foes = foesOf(p); for (let i = 0; i < 10; i++) { const tx = foes.length ? foes[i % foes.length].x + rand(-50, 50) : rand(100, W - 100); G.projs.push({ x: clamp(tx, 40, W - 40), y: -40 - i * 40, vx: rand(-0.6, 0.6), vy: 7, g: 0.35, r: 15, dmg: 20, owner: 'player', by: p, kind: 'meteor', life: 500, col: p.col, kb: [5, 9], meter: 0 }); } }
       break;
+    case 'piggybank': p.score += 5000; say('PIGGY BANK! +5000', '#ff8ab0'); for (let i = 0; i < 14; i++) parts.push({ type: 'spark', x: p.x + rand(-40, 40), y: p.y - rand(40, 120), vx: rand(-3, 3), vy: -rand(2, 6), life: 30, max: 30, col: '#ffd23a' }); SFX.banner(); break;
+    case 'superheal': p.hp = p.maxHp; say('FULL HEAL!', '#21a35a'); ring(p.x, p.y - 40, '#21a35a', 100, 6, 20); SFX.revive(); break;
+    case 'blizzard': say('BLIZZARD!', '#5ac8ff'); flashA = 0.5; flashCol = '#dff4ff'; for (const e of foesOf(p)) { doHit(p, e, { dmg: 10, kb: [0, 2], stun: 20, hs: 2, sfx: 'light', meter: 0 }, 1, true); SUP.freeze([e], 180); } break;
+    case 'shockwave': say('SHOCKWAVE!', '#ff6a1a'); SFX.shock(); addShake(16); SUP.nova(p, foesOf(p), 320, 20); break;
+    case 'rocketbarrage': say('ROCKET BARRAGE!', '#ff8a00'); SUP.fan(p, 'rocket', 6, 13, 1.4, { r: 10, dmg: 15 }); SFX.dash(); break;
+    case 'escaperope': { say('ESCAPE ROPE!', '#c08a3a'); const fs = foesOf(p); let bx = p.x, bd = -1; for (let x = 100; x <= W - 100; x += 100) { const d = Math.min(...fs.map(e => Math.abs(e.x - x)).concat([9999])); if (d > bd) { bd = d; bx = x; } } p.ghost(16); p.x = bx; p.y = Math.min(p.y, FLOOR); p.inv = Math.max(p.inv, 90); SFX.portal(); break; }
+    case 'spikestrip': say('SPIKE STRIP!', '#888'); vineSpikes(p, Array.from({ length: 11 }, (_, i) => 70 + i * 146).sort((a, b) => Math.abs(a - p.x) - Math.abs(b - p.x)), 18, [3, 15]); break;
+    case 'magicwand': p.wandN = 8; say('MAGIC WAND x8!', '#b05aff'); break;
+    case 'healingrain': G.healRain = { t: 360, by: p }; say('HEALING RAIN!', '#21a35a'); break;
+    case 'pumpkinbomb': say('PUMPKIN BOMB!', '#ff8a00'); G.projs.push({ x: p.x + p.facing * 40, y: p.y - 80, vx: p.facing * 8, vy: -8, g: 0.45, r: 18, dmg: 40, owner: 'player', by: p, kind: 'bomb', life: 80, col: '#ff8a00', bomb: true, impact: true, blast: 220, kb: [13, 13], meter: 0 }); break;
+    case 'starfall': say('STARFALL!', '#ffd23a'); SUP.rain(p, foesOf(p), 'ibolt', 15, { r: 12, dmg: 14, col: '#ffd23a' }); break;
+    case 'teamshield': say('TEAM SHIELD!', '#2a9ad0'); for (const q of (G.mode === 'versus' ? [p] : alivePlayers())) { q.shield = Math.max(q.shield, 2); ring(q.x, q.y - 40, '#2a9ad0', 80, 5, 16); } SFX.reflect(); break;
+    case 'inkfountain': p.inkFountT = 480; say('INK FOUNTAIN!', '#a040e0'); break;
+    case 'twintornado': say('TWIN TORNADOES!', p.col); torn(p, -1); torn(p, 1); SFX.whoosh(); break;
+    case 'firetrail': p.trailT = 600; say('FIRE TRAIL!', '#ff6a1a'); break;
+    case 'ironskin': p.ironT = 600; say('IRON SKIN! HALF DAMAGE', '#8a8a9a'); SFX.reflect(); break;
+    case 'beehive': G.hives.push({ x: clamp(p.x + p.facing * 60, 40, W - 40), t: 420, by: p }); say('BEE HIVE!', '#e8a800'); break;
+    case 'megalaser': {
+      say('MEGA LASER!', '#ff2a6a'); SFX.special(); addShake(10); const by = p.y - 56 * p.s, dir = p.facing;
+      G.beams.push({ x: p.x, y: by, dir, t: 26, col: p.col });
+      for (const e of foesOf(p)) if ((e.x - p.x) * dir > 0 && Math.abs((e.y - e.hh / 2) - by) < 75) doHit(p, e, { dmg: 32, kb: [14, 6], stun: 40, hs: 6, heavy: true, sfx: 'heavy', meter: 0 }, dir, true);
+      break; }
+    case 'boomerang': p.boomT = 600; say('BOOMERANG BUDDY!', p.col); break;
+    case 'inkwave': say('INK TIDAL WAVE!', '#7b3fd0'); SUP.waves(p, 'wave', 3, 10, { r: 40, dmg: 18, col: '#7b3fd0' }); addShake(10); break;
     case 'goldstar': p.goldT = 900; say('GOLD STAR! 2x POINTS', '#e8a800'); break;
     case 'powerfist': p.fistN = 6; say('POWER FIST x6!', '#c0392b'); break;
     case 'feather': p.featherT = 720; say('FEATHER! FLOAT + EXTRA JUMP', '#8ac0e0'); break;
@@ -2946,7 +3091,7 @@ function startGame(startStage = 0, mode = 'story') {
   G.startStage = startStage; G.mode = mode; G.won = false; G.rushIdx = -1; G.rushT = 0; G.newBestRush = false; G.bossOv = null; G.miniOv = null; G.cut = null;
   G.state = 'play'; G.wave = mode === 'rush' ? 0 : startStage * 5; G.stage = -1; G.frame = 0; G.enemies = []; G.projs = []; G.pickups = []; G.portals = []; G.ghosts = [];
   G.overT = 0; G.teamSuperT = 0; G.boss = null; G.crateT = 700; G.newBest = false; parts = []; texts = []; slowT = 0; timeScale = 1;
-  G.geysers = []; G.geyserT = 300; G.strikes = []; G.lasers = []; G.train = null; G.trainT = 300; G.pools = []; G.poolT = 240; G.gumT = 300; G.gumDir = 1; G.tide = null; G.disco = null; G.dart = null; G.volley = null; G.volleyT = 300; G.zapF = null; G.zapT = 360; G.inkRain = null; G.zapLines = []; G.bookWarn = null; G.bookT = 300; G.gwell = null; G.gwellT = 480; G.bumpFlash = [0, 0, 0]; G.hotFloor = null; G.beeWarn = null; G.beeT = 360; G.cutIn = null; G.stormT = 240; G.laserT = 300; for (const L of LAYOUTS) for (const p of L) if (p.crumble) { p.ct = 0; p.gone = 0; } G.wind = null; G.enemySlowT = 0; G.dark = null; G.belt = null; G.decoy = null;
+  G.geysers = []; G.geyserT = 300; G.strikes = []; G.lasers = []; G.train = null; G.trainT = 300; G.pools = []; G.poolT = 240; G.gumT = 300; G.gumDir = 1; G.tide = null; G.disco = null; G.dart = null; G.volley = null; G.volleyT = 300; G.zapF = null; G.zapT = 360; G.inkRain = null; G.zapLines = []; G.bookWarn = null; G.bookT = 300; G.gwell = null; G.gwellT = 480; G.bumpFlash = [0, 0, 0]; G.hotFloor = null; G.beeWarn = null; G.beeT = 360; G.hives = []; G.beams = []; G.healRain = null; G.cutIn = null; G.stormT = 240; G.laserT = 300; for (const L of LAYOUTS) for (const p of L) if (p.crumble) { p.ct = 0; p.gone = 0; } G.wind = null; G.enemySlowT = 0; G.dark = null; G.belt = null; G.decoy = null;
   for (const p of G.players) p.reset(true);
   if (mode === 'versus') {
     G.stage = startStage; sctx.clearRect(0, 0, W, H); buildBG();
@@ -4134,6 +4279,26 @@ function drawPickups() {
     if (k.kind === 'regen') { ctx.fillStyle = '#21a35a'; ctx.fillRect(-3, -11, 6, 22); ctx.fillRect(-11, -3, 22, 6); }
     if (k.kind === 'double') txt('x2', 0, 1, 19, '#d0021b', 'center', F1);
     if (k.kind === 'rocket') { ctx.fillStyle = '#555'; ctx.fillRect(-7, -10, 9, 14); ctx.fillRect(-7, 2, 15, 6); ctx.fillStyle = '#ff8a00'; ctx.beginPath(); ctx.moveTo(-6, 9); ctx.lineTo(-1, 16); ctx.lineTo(4, 9); ctx.fill(); }
+    if (k.kind === 'piggybank') { ctx.fillStyle = '#ff8ab0'; ctx.beginPath(); ctx.ellipse(0, 2, 12, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-9, 8, 4, 5); ctx.fillRect(5, 8, 4, 5); ctx.fillStyle = '#c0507a'; ctx.fillRect(-3, -8, 6, 2); ctx.beginPath(); ctx.arc(11, 1, 3, 0, Math.PI * 2); ctx.fill(); }
+    if (k.kind === 'superheal') { ctx.fillStyle = '#21a35a'; ctx.beginPath(); ctx.moveTo(0, 10); ctx.bezierCurveTo(-16, -1, -8, -13, 0, -4); ctx.bezierCurveTo(8, -13, 16, -1, 0, 10); ctx.fill(); txt('MAX', 0, 0, 8, '#fff', 'center', F1); }
+    if (k.kind === 'blizzard') { ctx.strokeStyle = '#5ac8ff'; ctx.lineWidth = 2.5; for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.lineTo(-Math.cos(a) * 12, -Math.sin(a) * 12); ctx.stroke(); } ctx.fillStyle = '#5ac8ff'; ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill(); }
+    if (k.kind === 'shockwave') { ctx.strokeStyle = '#ff6a1a'; ctx.lineWidth = 2.5; for (const r of [4, 8, 12]) { ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke(); } }
+    if (k.kind === 'rocketbarrage') { for (const dy of [-6, 0, 6]) { ctx.fillStyle = '#ff8a00'; ctx.fillRect(-10, dy - 2, 14, 4); ctx.beginPath(); ctx.moveTo(4, dy - 3); ctx.lineTo(11, dy); ctx.lineTo(4, dy + 3); ctx.fill(); } }
+    if (k.kind === 'escaperope') { ctx.strokeStyle = '#c08a3a'; ctx.lineWidth = 3; ctx.beginPath(); for (let a = 0; a < 12; a += 0.4) ctx.lineTo(Math.cos(a) * (2 + a * 0.8), Math.sin(a) * (2 + a * 0.8)); ctx.stroke(); }
+    if (k.kind === 'spikestrip') { ctx.fillStyle = '#888'; for (const dx of [-8, 0, 8]) { ctx.beginPath(); ctx.moveTo(dx - 4, 8); ctx.lineTo(dx, -10); ctx.lineTo(dx + 4, 8); ctx.fill(); } }
+    if (k.kind === 'magicwand') { ctx.save(); ctx.rotate(-0.7); ctx.fillStyle = '#5a3a2a'; ctx.fillRect(-2, -2, 4, 18); ctx.restore(); ctx.fillStyle = '#d08aff'; ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; ctx.lineTo(-6 + Math.cos(a) * 8, -6 + Math.sin(a) * 8); } ctx.closePath(); ctx.fill(); }
+    if (k.kind === 'healingrain') { ctx.fillStyle = '#7a9a8a'; for (const [cx, cy, r] of [[-5, -6, 6], [3, -8, 7], [9, -5, 5]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = '#21a35a'; ctx.fillRect(-1.5, 2, 3, 9); ctx.fillRect(-5, 5, 10, 3); }
+    if (k.kind === 'pumpkinbomb') { ctx.fillStyle = '#ff8a00'; ctx.beginPath(); ctx.ellipse(0, 2, 12, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2a6a1a'; ctx.fillRect(-2, -12, 4, 6); ctx.fillStyle = '#3a1a00'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-3, -4); ctx.lineTo(0, 0); ctx.moveTo(1, 0); ctx.lineTo(4, -4); ctx.lineTo(7, 0); ctx.fill(); }
+    if (k.kind === 'starfall') { for (const [dx, dy] of [[-6, -5], [5, -2], [-1, 7]]) { ctx.fillStyle = '#ffd23a'; ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; ctx.lineTo(dx + Math.cos(a) * 5, dy + Math.sin(a) * 5); } ctx.closePath(); ctx.fill(); } }
+    if (k.kind === 'teamshield') { ctx.strokeStyle = '#2a9ad0'; ctx.lineWidth = 3; for (const dx of [-5, 5]) { ctx.beginPath(); ctx.arc(dx, 0, 8, 0, Math.PI * 2); ctx.stroke(); } }
+    if (k.kind === 'inkfountain') { ctx.fillStyle = '#a040e0'; ctx.fillRect(-9, 2, 18, 9); for (const dx of [-5, 0, 5]) { ctx.beginPath(); ctx.arc(dx, -4 - Math.abs(dx) * 0.4 + Math.sin(G.frame * 0.2 + dx) * 2, 3, 0, Math.PI * 2); ctx.fill(); } }
+    if (k.kind === 'twintornado') { ctx.strokeStyle = '#555'; ctx.lineWidth = 2; for (const dx of [-6, 6]) for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(dx, 8 - i * 7, 2 + i * 2, 1 + i * 0.8, 0, 0, Math.PI * 2); ctx.stroke(); } }
+    if (k.kind === 'firetrail') { for (const [dx, h] of [[-8, 10], [0, 16], [8, 10]]) { ctx.fillStyle = '#ff6a1a'; ctx.beginPath(); ctx.moveTo(dx - 4, 8); ctx.quadraticCurveTo(dx, 8 - h * 2, dx + 4, 8); ctx.fill(); } ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-12, 8, 24, 4); }
+    if (k.kind === 'ironskin') { ctx.fillStyle = '#9a9aaa'; ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(10, -10); ctx.lineTo(10, 2); ctx.quadraticCurveTo(0, 14, -10, 2); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke(); }
+    if (k.kind === 'beehive') { ctx.fillStyle = '#e8a800'; ctx.beginPath(); ctx.ellipse(0, 0, 10, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8a5a00'; ctx.lineWidth = 1.5; for (const y of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(-9, y); ctx.lineTo(9, y); ctx.stroke(); } }
+    if (k.kind === 'megalaser') { ctx.fillStyle = '#555'; ctx.fillRect(-12, -5, 14, 10); ctx.fillStyle = '#ff2a6a'; ctx.fillRect(2, -3, 12, 6); ctx.fillStyle = '#fff'; ctx.fillRect(2, -1, 12, 2); }
+    if (k.kind === 'boomerang') { ctx.strokeStyle = '#c08a3a'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-10, 8); ctx.lineTo(0, -8); ctx.lineTo(10, 8); ctx.stroke(); }
+    if (k.kind === 'inkwave') { ctx.strokeStyle = '#7b3fd0'; ctx.lineWidth = 3; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-6 + i * 6, 6, 8 + i * 2, Math.PI, Math.PI * 1.8); ctx.stroke(); } }
     if (k.kind === 'goldstar') { ctx.fillStyle = '#f2c230'; ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 4 / 5; ctx.lineTo(Math.cos(a) * 13, Math.sin(a) * 13); } ctx.closePath(); ctx.fill(); txt('2x', 0, 1, 10, '#6b4c00', 'center', F1); }
     if (k.kind === 'powerfist') { ctx.fillStyle = '#e8b07a'; ctx.fillRect(-9, -8, 18, 14); ctx.fillStyle = '#c0392b'; ctx.fillRect(-9, 4, 18, 6); ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 1.5; for (const dx of [-4, 0, 4]) { ctx.beginPath(); ctx.moveTo(dx, -8); ctx.lineTo(dx, -2); ctx.stroke(); } }
     if (k.kind === 'feather') { ctx.save(); ctx.rotate(-0.6); ctx.fillStyle = '#8ac0e0'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#3a6a90'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(0, 15); ctx.stroke(); ctx.restore(); }
@@ -4327,6 +4492,10 @@ function startZap(boss) { if (G.zapF && G.zapF.ph !== 'idle') return; G.zapF = {
 const windArms = () => { const out = [], cx = W / 2, cy = 330; for (let k = 0; k < 4; k++) { const a = G.frame * 0.012 + k * Math.PI / 2; out.push([cx, cy, cx + Math.cos(a) * 300, cy + Math.sin(a) * 300]); } return out; };
 const twisterX = () => W / 2 + Math.sin(G.frame * 0.006) * 600;
 function updateNewHaz2() {
+  if (G.healRain) { const hr = G.healRain; if (--hr.t <= 0) G.healRain = null; else if (hr.t % 30 === 0) for (const q of (G.mode === 'versus' ? [hr.by] : alivePlayers())) if (q && !q.dead && !q.downed) q.hp = Math.min(q.maxHp, q.hp + 3); }
+  for (const hv of G.hives) { hv.t--; if (hv.t % 40 === 0 && hv.by) G.projs.push({ x: hv.x, y: FLOOR - 50, vx: rand(-4, 4), vy: -rand(3, 6), g: 0, r: 7, dmg: 5, owner: 'player', by: hv.by, kind: 'bee', life: 200, col: '#e8a800', kb: [3, 3], meter: 0, hs: 1, homing: true }); }
+  G.hives = G.hives.filter(h => h.t > 0);
+  for (const bm of G.beams) bm.t--; G.beams = G.beams.filter(b => b.t > 0);
   { const kd3 = theme().kind, foes3 = () => G.enemies.filter(e => !e.dead && e.spawnT <= 0 && !e.T.boss);
     if (kd3 === 'lab') {
       for (const f of alivePlayers().concat(foes3())) { if ((f.portCd || 0) > G.frame) continue; for (let k = 0; k < 2; k++) { const pa = PORTALS[k], pb = PORTALS[1 - k]; if (Math.abs(f.x - pa.x) < 28 && Math.abs(f.y - pa.y) < 30) { f.x = clamp(pb.x + (pb.x < W / 2 ? 60 : -60), 40, W - 40); f.y = pb.y; f.vy = Math.min(f.vy, 0); f.portCd = G.frame + 70; ring(pa.x, pa.y - 40, '#2ad0c0', 60, 4, 14); ring(pb.x, pb.y - 40, '#ff8a2a', 60, 4, 14); SFX.portal(); break; } } }
@@ -4397,6 +4566,10 @@ function updateNewHaz2() {
   }
 }
 function drawNewHaz2() {
+  if (G.healRain) { ctx.strokeStyle = 'rgba(90,220,120,0.5)'; ctx.lineWidth = 2; for (let i = 0; i < 36; i++) { const x = (i * 113 + G.frame * 2) % W, y = (i * 197 + G.frame * 12) % FLOOR; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2, y + 12); ctx.stroke(); } }
+  for (const hv of G.hives || []) { ctx.fillStyle = '#e8a800'; ctx.beginPath(); ctx.ellipse(hv.x, FLOOR - 40, 26, 36, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8a5a00'; ctx.lineWidth = 3; for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(hv.x - 24, FLOOR - 40 + k * 12); ctx.lineTo(hv.x + 24, FLOOR - 40 + k * 12); ctx.stroke(); } ctx.fillStyle = '#3a2a08'; ctx.beginPath(); ctx.arc(hv.x, FLOOR - 30, 7, 0, Math.PI * 2); ctx.fill(); }
+  for (const bm of G.beams || []) { const k = bm.t / 26, x1 = bm.dir > 0 ? bm.x : 0, x2 = bm.dir > 0 ? W : bm.x, h = 70 * k + 10; ctx.globalAlpha = Math.min(1, k * 1.5); ctx.fillStyle = bm.col; ctx.fillRect(x1, bm.y - h / 2, x2 - x1, h); ctx.fillStyle = '#fff'; ctx.fillRect(x1, bm.y - h / 6, x2 - x1, h / 3); ctx.globalAlpha = 1; }
+  for (const p of G.players) if (p.joined && !p.dead && p.ironT > 0) { ctx.strokeStyle = 'rgba(140,140,160,0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(p.x, p.y - 45 * p.s, 50 * p.s, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); }
   { const kd3 = theme().kind;
     if (kd3 === 'lab') PORTALS.forEach((pt, k) => { const c = k ? '#ff8a2a' : '#2ad0c0'; for (let i = 0; i < 3; i++) { ctx.strokeStyle = c; ctx.globalAlpha = 0.9 - i * 0.25; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(pt.x, pt.y - 42, 22 + i * 6 + Math.sin(G.frame * 0.1 + i) * 2, 40 + i * 6, 0, 0, Math.PI * 2); ctx.stroke(); } ctx.globalAlpha = 0.35; ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(pt.x, pt.y - 42, 20, 38, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; });
     if (kd3 === 'farm') { const arms = windArms(); ctx.lineCap = 'round'; for (const [x1, y1, x2, y2] of arms) { ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); const nx = -(y2 - y1) / 300, ny = (x2 - x1) / 300; ctx.fillStyle = 'rgba(240,230,200,0.9)'; ctx.beginPath(); ctx.moveTo(x1 + (x2 - x1) * 0.25, y1 + (y2 - y1) * 0.25); ctx.lineTo(x2, y2); ctx.lineTo(x2 + nx * 44, y2 + ny * 44); ctx.lineTo(x1 + (x2 - x1) * 0.25 + nx * 30, y1 + (y2 - y1) * 0.25 + ny * 30); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 2; ctx.stroke(); } ctx.fillStyle = '#4a3a2a'; ctx.beginPath(); ctx.arc(W / 2, 330, 18, 0, Math.PI * 2); ctx.fill(); }
@@ -4700,7 +4873,7 @@ function drawHUD() {
     if (p.luckyT > 0) extras.push('LUCKY ' + Math.ceil(p.luckyT / 60) + 's'); if (p.vampT > 0) extras.push('VAMPIRE ' + Math.ceil(p.vampT / 60) + 's');
     if (p.invisT > 0) extras.push('INVISIBLE ' + Math.ceil(p.invisT / 60) + 's'); if (p.shrinkT > 0) extras.push('SHRUNK ' + Math.ceil(p.shrinkT / 60) + 's');
     if (p.magnetT > 0) extras.push('MAGNET ' + Math.ceil(p.magnetT / 60) + 's'); if (p.thornT > 0) extras.push('THORNS ' + Math.ceil(p.thornT / 60) + 's');
-    if (p.rodT > 0) extras.push('ROD ' + Math.ceil(p.rodT / 60) + 's'); if (p.moonT > 0) extras.push('MOON ' + Math.ceil(p.moonT / 60) + 's'); if (p.mirrorT > 0) extras.push('MIRROR ' + Math.ceil(p.mirrorT / 60) + 's'); if (p.gloveT > 0) extras.push('GLOVE ' + Math.ceil(p.gloveT / 60) + 's'); if (p.bootsT > 0) extras.push('BOOTS ' + Math.ceil(p.bootsT / 60) + 's'); if (p.orbitT > 0) extras.push('ORBIT ' + Math.ceil(p.orbitT / 60) + 's'); if (p.bubbleT > 0) extras.push('BUBBLE'); if (p.goldT > 0) extras.push('2x ' + Math.ceil(p.goldT / 60) + 's'); if (p.fistN > 0) extras.push('FIST x' + p.fistN); if (p.featherT > 0) extras.push('FEATHER ' + Math.ceil(p.featherT / 60) + 's'); if (p.bladeT > 0) extras.push('BLADES ' + Math.ceil(p.bladeT / 60) + 's');
+    if (p.rodT > 0) extras.push('ROD ' + Math.ceil(p.rodT / 60) + 's'); if (p.moonT > 0) extras.push('MOON ' + Math.ceil(p.moonT / 60) + 's'); if (p.mirrorT > 0) extras.push('MIRROR ' + Math.ceil(p.mirrorT / 60) + 's'); if (p.gloveT > 0) extras.push('GLOVE ' + Math.ceil(p.gloveT / 60) + 's'); if (p.bootsT > 0) extras.push('BOOTS ' + Math.ceil(p.bootsT / 60) + 's'); if (p.orbitT > 0) extras.push('ORBIT ' + Math.ceil(p.orbitT / 60) + 's'); if (p.bubbleT > 0) extras.push('BUBBLE'); if (p.goldT > 0) extras.push('2x ' + Math.ceil(p.goldT / 60) + 's'); if (p.fistN > 0) extras.push('FIST x' + p.fistN); if (p.featherT > 0) extras.push('FEATHER ' + Math.ceil(p.featherT / 60) + 's'); if (p.bladeT > 0) extras.push('BLADES ' + Math.ceil(p.bladeT / 60) + 's'); if (p.trailT > 0) extras.push('FIRE TRAIL ' + Math.ceil(p.trailT / 60) + 's'); if (p.ironT > 0) extras.push('IRON ' + Math.ceil(p.ironT / 60) + 's'); if (p.boomT > 0) extras.push('BOOMERANG ' + Math.ceil(p.boomT / 60) + 's'); if (p.wandN > 0) extras.push('WAND x' + p.wandN); if (p.inkFountT > 0) extras.push('INK FOUNTAIN ' + Math.ceil(p.inkFountT / 60) + 's');
     if (p.cloudT > 0) extras.push('CLOUD ' + Math.ceil(p.cloudT / 60) + 's'); if (p.regenT > 0) extras.push('REGEN ' + Math.ceil(p.regenT / 60) + 's');
     const exY = extras.length && !p.dead ? 26 : 0;
     if (exY) { ctx.fillStyle = th.dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.75)'; ctx.fillRect(bx - 12, 148, 354, 24); txt(extras.join(' · '), x, 160, 17, '#2a9ad0', al, F1); }
@@ -5230,14 +5403,14 @@ function buildSnapshot() {
     P: G.players.map(p => [p.joined ? 1 : 0, p.ci, ri(p.x), ri(p.y), p.facing, poseArr(p.pose), ri(p.hp), p.maxHp, ri(p.meter), p.score, p.combo, p.comboT,
       (p.dead ? 1 : 0) | (p.downed ? 2 : 0) | (p.ready ? 4 : 0) | (p.flash > 0 ? 8 : 0), PWN.indexOf(p.power), p.powerT, p.shield || 0, p.droneT || 0, p.cloudT || 0, p.regenT || 0,
       ri((p.spin || 0) * 100), ri(p.revive || 0), ri(Math.min(p.bleed || 0, 99999)), p.hits, p.maxCombo, ri(p.s * 100), ri(p.inv), p.specialT || 0,
-      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0, p.skillCd || 0, p.rodT || 0, p.moonT || 0, p.mirrorT || 0, p.gloveT || 0, ri(p.maxHp), p.bootsT || 0, p.orbitT || 0, p.bubbleT || 0, p.goldT || 0, p.fistN || 0, p.featherT || 0, p.bladeT || 0]),
+      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0, p.skillCd || 0, p.rodT || 0, p.moonT || 0, p.mirrorT || 0, p.gloveT || 0, ri(p.maxHp), p.bootsT || 0, p.orbitT || 0, p.bubbleT || 0, p.goldT || 0, p.fistN || 0, p.featherT || 0, p.bladeT || 0, p.trailT || 0, p.ironT || 0, p.boomT || 0, p.wandN || 0, p.inkFountT || 0]),
     E: G.enemies.slice(0, 16).map(e => [e.id, ETN.indexOf(e.type), ri(e.x), ri(e.y), e.facing, poseArr(e.pose), ri(e.hp), e.maxHp, e.flash, e.dying, e.spawnT, e.freeze || 0,
       e.attack ? ATK.indexOf(Object.keys(A).find(k => A[k] === e.attack)) : -1, ri(e.at || 0), BST.indexOf(e.bstate), e.bt, ri((e.fade ?? 1) * 100), e.ph2 ? 1 : 0, ri((e.spin || 0) * 100),
       e.T.boss ? [ri(e.beamY || 0), e.beamDir || 0, (e.rainX || []).map(ri), ri(e.warnY || 0), ri(e.bhX || 0), ri(e.bhY || 0)] : 0, e.bubbled > 0 ? 1 : 0, e.shrinkT > 0 ? 1 : 0]),
     J: G.projs.slice(0, 26).map(pr => [PJK.indexOf(pr.kind), ri(pr.x), ri(pr.y), r1(pr.vx), r1(pr.vy), ri(pr.r), pr.owner === 'player' ? (pr.by ? pr.by.idx : 0) : -1, r1(pr.rot || 0), pr.face || 0, pr.life]),
     K: G.pickups.slice(0, 10).map(k => [ri(k.x), ri(k.y), PKK.indexOf(k.kind), k.t]),
     PT: G.portals.map(q => [ri(q.x), ri(q.y), ETN.indexOf(q.type), q.t, q.max]),
-    Y: (G.geysers || []).map(g => [ri(g.x), g.t]), SK: (G.strikes || []).map(k => [ri(k.x), k.t]), TR: G.train ? [['idle', 'warn', 'run'].indexOf(G.train.ph), G.train.t, ri(G.train.x), G.train.dir] : 0, PL: (G.pools || []).map(q => [ri(q.x), q.t]), GU: [G.gumT || 0, G.gumDir || 1], IR: G.inkRain ? G.inkRain.t : 0, HF: G.hotFloor ? G.hotFloor.t : 0, BE: G.beeWarn ? G.beeWarn.t : 0, BW: G.bookWarn ? [G.bookWarn.t, G.bookWarn.dir] : 0, GW: G.gwell ? [['idle', 'warn', 'pull'].indexOf(G.gwell.ph), G.gwell.t, ri(G.gwell.x), G.gwell.boss ? 1 : 0] : 0, DT: G.dart ? [G.dart.ph === 'warn' ? 1 : 0, G.dart.t, G.dart.ys] : 0, VL: G.volley && G.volley.ph === 'warn' ? [G.volley.t, G.volley.xs.map(ri)] : 0, ZF: G.zapF ? [['idle', 'warn', 'zap'].indexOf(G.zapF.ph), G.zapF.t] : 0, TD: G.tide ? [['calm', 'warn', 'flow'].indexOf(G.tide.ph), G.tide.t, G.tide.dir] : 0, DS: G.disco ? [['idle', 'warn', 'zap'].indexOf(G.disco.ph), G.disco.t, G.disco.tiles] : 0, CI: G.cutIn ? [G.cutIn.sname, G.cutIn.col, G.cutIn.t, G.cutIn.ci] : 0, LZ: (G.lasers || []).map(l => [ri(l.y), l.t]), CR: layout().filter(p => p.crumble).map(p => [ri(p.ct || 0), p.gone || 0]), cs: G.enemySlowT || 0,
+    Y: (G.geysers || []).map(g => [ri(g.x), g.t]), SK: (G.strikes || []).map(k => [ri(k.x), k.t]), TR: G.train ? [['idle', 'warn', 'run'].indexOf(G.train.ph), G.train.t, ri(G.train.x), G.train.dir] : 0, PL: (G.pools || []).map(q => [ri(q.x), q.t]), GU: [G.gumT || 0, G.gumDir || 1], IR: G.inkRain ? G.inkRain.t : 0, HF: G.hotFloor ? G.hotFloor.t : 0, HV: (G.hives || []).map(h => [ri(h.x), h.t]), HR: G.healRain ? G.healRain.t : 0, BE: G.beeWarn ? G.beeWarn.t : 0, BW: G.bookWarn ? [G.bookWarn.t, G.bookWarn.dir] : 0, GW: G.gwell ? [['idle', 'warn', 'pull'].indexOf(G.gwell.ph), G.gwell.t, ri(G.gwell.x), G.gwell.boss ? 1 : 0] : 0, DT: G.dart ? [G.dart.ph === 'warn' ? 1 : 0, G.dart.t, G.dart.ys] : 0, VL: G.volley && G.volley.ph === 'warn' ? [G.volley.t, G.volley.xs.map(ri)] : 0, ZF: G.zapF ? [['idle', 'warn', 'zap'].indexOf(G.zapF.ph), G.zapF.t] : 0, TD: G.tide ? [['calm', 'warn', 'flow'].indexOf(G.tide.ph), G.tide.t, G.tide.dir] : 0, DS: G.disco ? [['idle', 'warn', 'zap'].indexOf(G.disco.ph), G.disco.t, G.disco.tiles] : 0, CI: G.cutIn ? [G.cutIn.sname, G.cutIn.col, G.cutIn.t, G.cutIn.ci] : 0, LZ: (G.lasers || []).map(l => [ri(l.y), l.t]), CR: layout().filter(p => p.crumble).map(p => [ri(p.ct || 0), p.gone || 0]), cs: G.enemySlowT || 0,
     bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0, cl: G.cleared || 0, pg: [G.prog.bosses, G.prog.wave, G.prog.vs, G.prog.rush, G.prog.kos, G.prog.supers, G.prog.pickups, G.prog.combo || 0],
     DC: G.decoy ? [ri(G.decoy.x), ri(G.decoy.y), G.decoy.t, G.decoy.ci, G.decoy.facing] : 0,
     DK: G.dark ? [['light', 'warn', 'dark'].indexOf(G.dark.phase), G.dark.t] : 0, BT: G.belt ? [G.belt.dir, G.belt.t] : 0,
@@ -5279,7 +5452,7 @@ function applySnapshot(s) {
     p.dead = !!(a[12] & 1); p.downed = !!(a[12] & 2); p.ready = !!(a[12] & 4); p.flash = a[12] & 8 ? 2 : 0;
     p.power = a[13] >= 0 ? PWN[a[13]] : null; p.powerT = a[14]; p.shield = a[15]; p.droneT = a[16]; p.cloudT = a[17]; p.regenT = a[18];
     p.spin = a[19] / 100; p.revive = a[20]; p.bleed = a[21]; p.hits = a[22]; p.maxCombo = a[23]; p._s = a[24] / 100; p.inv = a[25]; p.specialT = a[26];
-    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39]; p.skillCd = a[40] || 0; p.rodT = a[41] || 0; p.moonT = a[42] || 0; p.mirrorT = a[43] || 0; p.gloveT = a[44] || 0; if (a[45]) p.maxHp = a[45]; p.bootsT = a[46] || 0; p.orbitT = a[47] || 0; p.bubbleT = a[48] || 0; p.goldT = a[49] || 0; p.fistN = a[50] || 0; p.featherT = a[51] || 0; p.bladeT = a[52] || 0;
+    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39]; p.skillCd = a[40] || 0; p.rodT = a[41] || 0; p.moonT = a[42] || 0; p.mirrorT = a[43] || 0; p.gloveT = a[44] || 0; if (a[45]) p.maxHp = a[45]; p.bootsT = a[46] || 0; p.orbitT = a[47] || 0; p.bubbleT = a[48] || 0; p.goldT = a[49] || 0; p.fistN = a[50] || 0; p.featherT = a[51] || 0; p.bladeT = a[52] || 0; p.trailT = a[53] || 0; p.ironT = a[54] || 0; p.boomT = a[55] || 0; p.wandN = a[56] || 0; p.inkFountT = a[57] || 0;
   });
   if (ciChanged) G.players.forEach(p => p.applyChar());
   G.players.forEach(p => { if (p._s) p.s = p._s; });
@@ -5318,7 +5491,7 @@ function applySnapshot(s) {
   if (live && G.pickups.length > s.K.length) SFX.pickup();
   G.pickups = s.K.map(a => ({ x: a[0], y: a[1], kind: PKK[a[2]], t: a[3] }));
   G.portals = s.PT.map(a => ({ x: a[0], y: a[1], type: ETN[a[2]], t: a[3], max: a[4] }));
-  G.geysers = s.Y.map(a => ({ x: a[0], t: a[1] })); G.strikes = (s.SK || []).map(a => ({ x: a[0], t: a[1] })); G.train = s.TR ? { ph: ['idle', 'warn', 'run'][s.TR[0]], t: s.TR[1], x: s.TR[2], dir: s.TR[3] } : null; G.pools = (s.PL || []).map(a => ({ x: a[0], t: a[1] })); if (s.GU) { G.gumT = s.GU[0]; G.gumDir = s.GU[1]; } G.inkRain = s.IR ? { t: s.IR } : null; G.hotFloor = s.HF ? { t: s.HF } : null; G.beeWarn = s.BE ? { t: s.BE } : null; G.bookWarn = s.BW ? { t: s.BW[0], dir: s.BW[1] } : null; G.gwell = s.GW ? { ph: ['idle', 'warn', 'pull'][s.GW[0]], t: s.GW[1], x: s.GW[2], boss: !!s.GW[3] } : null; G.dart = s.DT ? { ph: s.DT[0] ? 'warn' : 'idle', t: s.DT[1], ys: s.DT[2] } : null; G.volley = s.VL ? { ph: 'warn', t: s.VL[0], xs: s.VL[1] } : null; G.zapF = s.ZF ? { ph: ['idle', 'warn', 'zap'][s.ZF[0]], t: s.ZF[1], hit: new Set() } : null; G.tide = s.TD ? { ph: ['calm', 'warn', 'flow'][s.TD[0]], t: s.TD[1], dir: s.TD[2] } : null; G.disco = s.DS ? { ph: ['idle', 'warn', 'zap'][s.DS[0]], t: s.DS[1], tiles: s.DS[2] } : null; G.cutIn = s.CI ? { sname: s.CI[0], col: s.CI[1], t: s.CI[2], ci: s.CI[3] } : null; G.lasers = (s.LZ || []).map(a => ({ y: a[0], t: a[1] })); if (s.CR) { const cp = layout().filter(p => p.crumble); s.CR.forEach((a, k) => { if (cp[k]) { cp[k].ct = a[0]; cp[k].gone = a[1]; } }); } G.enemySlowT = s.cs || 0;
+  G.geysers = s.Y.map(a => ({ x: a[0], t: a[1] })); G.strikes = (s.SK || []).map(a => ({ x: a[0], t: a[1] })); G.train = s.TR ? { ph: ['idle', 'warn', 'run'][s.TR[0]], t: s.TR[1], x: s.TR[2], dir: s.TR[3] } : null; G.pools = (s.PL || []).map(a => ({ x: a[0], t: a[1] })); if (s.GU) { G.gumT = s.GU[0]; G.gumDir = s.GU[1]; } G.inkRain = s.IR ? { t: s.IR } : null; G.hotFloor = s.HF ? { t: s.HF } : null; G.hives = (s.HV || []).map(a => ({ x: a[0], t: a[1] })); G.healRain = s.HR ? { t: s.HR } : null; G.beeWarn = s.BE ? { t: s.BE } : null; G.bookWarn = s.BW ? { t: s.BW[0], dir: s.BW[1] } : null; G.gwell = s.GW ? { ph: ['idle', 'warn', 'pull'][s.GW[0]], t: s.GW[1], x: s.GW[2], boss: !!s.GW[3] } : null; G.dart = s.DT ? { ph: s.DT[0] ? 'warn' : 'idle', t: s.DT[1], ys: s.DT[2] } : null; G.volley = s.VL ? { ph: 'warn', t: s.VL[0], xs: s.VL[1] } : null; G.zapF = s.ZF ? { ph: ['idle', 'warn', 'zap'][s.ZF[0]], t: s.ZF[1], hit: new Set() } : null; G.tide = s.TD ? { ph: ['calm', 'warn', 'flow'][s.TD[0]], t: s.TD[1], dir: s.TD[2] } : null; G.disco = s.DS ? { ph: ['idle', 'warn', 'zap'][s.DS[0]], t: s.DS[1], tiles: s.DS[2] } : null; G.cutIn = s.CI ? { sname: s.CI[0], col: s.CI[1], t: s.CI[2], ci: s.CI[3] } : null; G.lasers = (s.LZ || []).map(a => ({ y: a[0], t: a[1] })); if (s.CR) { const cp = layout().filter(p => p.crumble); s.CR.forEach((a, k) => { if (cp[k]) { cp[k].ct = a[0]; cp[k].gone = a[1]; } }); } G.enemySlowT = s.cs || 0;
   G.decoy = s.DC ? { x: s.DC[0], y: s.DC[1], t: s.DC[2], ci: s.DC[3], facing: s.DC[4], vx: 0, hh: 78, s: 1 } : null;
   G.dark = s.DK ? { phase: ['light', 'warn', 'dark'][s.DK[0]], t: s.DK[1] } : null; G.belt = s.BT ? { dir: s.BT[0], t: s.BT[1] } : null;
   G.wind = s.WD ? { phase: ['calm', 'warn', 'gust'][s.WD[0]], t: s.WD[1], dir: s.WD[2] } : null;
