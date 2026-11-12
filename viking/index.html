@@ -1535,9 +1535,11 @@ function defeat() {
   const lost = Math.floor(S.silver / 2); S.silver -= lost; S.morale = clamp(S.morale - 20, 0, 100); S.hull = Math.max(S.hull, 15);
   log(`Defeated! Your foes strip ${lost} silver from your ship and leave you drifting.`, 'bad'); banner('Defeated', `-${lost} silver`);
   npcs.forEach(n => { if (n.hostile && !n.dead) { disengage(n, 150); n.boardCd = 30; } });
-  if (serpent) serpent.sinking = true;
-  if (kraken) { kraken.sinking = true; }
-  dragons.forEach(D => { if (!D.dead) { D.state = 'climb'; D.climbT = -8; } });
+  if (!WS.shared) {
+    if (serpent) serpent.sinking = true;
+    if (kraken) { kraken.sinking = true; }
+    dragons.forEach(D => { if (!D.dead) { D.state = 'climb'; D.climbT = -8; } });
+  }
   boarding = null; abortRaid(); renderHUD(); save();
 }
 function startRaid() {
@@ -1640,7 +1642,8 @@ function bestSell(g) { return PLACES.filter(p => p.prices).sort((a, b) => b.pric
 
 // sea serpent
 let serpent = null;
-function spawnSerpent() {
+function spawnSerpent(cx, cz, opts = {}) {
+  if (cx === undefined) { const fx = Math.sin(ship.h), fz = -Math.cos(ship.h); cx = ship.pos.x; cz = ship.pos.y; opts.ang = Math.atan2(fz, fx); }
   const g = new THREE.Group(), segs = [];
   const sm = new THREE.MeshStandardMaterial({ color: 0x1f4a3a, roughness: .5, metalness: .2, flatShading: true });
   for (let i = 0; i < 16; i++) { const sg = new THREE.Mesh(new THREE.SphereGeometry(2.6 - i * .1, 10, 8), sm); g.add(sg); segs.push(sg); }
@@ -1650,21 +1653,22 @@ function spawnSerpent() {
   [-1.3, 1.3].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(.5, 8, 6), em); e.position.set(x, 1, -3); head.add(e); });
   [-1, 1].forEach(x => { const h = new THREE.Mesh(new THREE.ConeGeometry(.5, 3.5, 5), M.bone); h.position.set(x, 2.4, 0); h.rotation.x = .9; head.add(h); });
   g.add(head);
-  const fx = Math.sin(ship.h), fz = -Math.cos(ship.h);
-  g.position.set(ship.pos.x + fx * 75, -22, ship.pos.y + fz * 75);
+  const ang = opts.ang !== undefined ? opts.ang : rnd(0, 6.28);
+  const x = cx + Math.cos(ang) * 75, z = cz + Math.sin(ang) * 75;
+  g.position.set(x, -22, z);
   scene.add(shadow(g));
-  serpent = { g, segs, head, rise: 0, sinking: false, hp: 150, maxHp: 150, ang: Math.atan2(fz, fx), R: 75, lunge: 6, struck: false };
-  Sound.splash(); throttle = Math.min(throttle, 2);
-  banner('Sea serpent!', 'SPACE loose arrows · SHIFT shield wall');
-  log('A sea serpent rises from the deep and circles your ship!', 'bad');
-}
-function hitSerpent(p) {
-  serpent.hp -= 3 * (1 + S.weapons * .2); hitFx(p, 0x2a6a4a);
-  if (serpent.hp <= 0 && !serpent.sinking) {
-    serpent.sinking = true; S.glory += 25; S.morale = clamp(S.morale + 15, 0, 100);
-    log("Your arrows find the serpent's eye. It thrashes and sinks into the black water! (+25 glory)", 'gold');
-    banner('Serpent-slayer!', '+25 glory'); renderHUD(); questProgress('serpent');
+  serpent = { g, segs, head, rise: 0, sinking: false, slain: false, hp: 150, maxHp: 150, ang, R: 75, lunge: 6, struck: false, x, z, cx, cz, wid: opts.wid || nextWid('S'), kindName: 'serpent' };
+  if (nearMe(x, z, 700)) {
+    Sound.splash(); throttle = Math.min(throttle, 2);
+    banner('Sea serpent!', 'SPACE loose arrows · SHIFT shield wall');
+    log('A sea serpent rises from the deep and circles the ships!', 'bad');
   }
+}
+function hitSerpent(p) { hitFx(p, 0x2a6a4a); damageMonster(serpent, 3 * (1 + S.weapons * .2)); }
+function rewardSerpent() {
+  S.glory += 25; S.morale = clamp(S.morale + 15, 0, 100);
+  log("The serpent's eye is pierced. It thrashes and sinks into the black water! (+25 glory)", 'gold');
+  banner('Serpent-slayer!', '+25 glory'); renderHUD(); questProgress('serpent');
 }
 function updateSerpent(dt, t, paused) {
   if (!serpent) return;
@@ -1672,26 +1676,33 @@ function updateSerpent(dt, t, paused) {
   if (!paused) {
     s.rise = clamp(s.rise + dt * (s.sinking ? -.35 : .45), 0, 1);
     if (!s.sinking) {
+      if (isAuth()) {
+        const T = nearestPlayer(s.x, s.z, p => !p.land && !p.docked);
+        if (!T || T.d > 380) { s.sinking = true; if (!WS.shared) log('You leave the serpent behind in your wake.'); }
+        else { s.cx = T.p.x; s.cz = T.p.z; }
+        if (s.lunge < -2.2) s.lunge = rnd(5, 8);
+      }
       s.ang += dt * .32; s.lunge -= dt;
       const lunging = s.lunge < 0;
       s.R = lerp(s.R, lunging ? 12 : 62, clamp(dt * (lunging ? 2.5 : .8), 0, 1));
+      if (!lunging) s.struck = false;
       if (lunging && s.R < 22 && !s.struck) {
-        s.struck = true; shake = 1; Sound.crash();
-        const m = shieldUp ? .5 : 1;
-        S.hull = Math.max(5, S.hull - 12 * m); if (chance(.6)) { pCrewDmg += m; applyCrewDmg(); }
-        banner('The serpent strikes!', shieldUp ? 'Your shield wall holds' : 'Raise the shield wall with SHIFT'); renderHUD();
+        s.struck = true;
+        if (!S.docked && !ashore.on && Math.hypot(ship.pos.x - s.x, ship.pos.y - s.z) < 32) {
+          shake = 1; Sound.crash();
+          const m = shieldUp ? .5 : 1;
+          S.hull = Math.max(5, S.hull - 12 * m); if (chance(.6)) { pCrewDmg += m; applyCrewDmg(); }
+          banner('The serpent strikes!', shieldUp ? 'Your shield wall holds' : 'Raise the shield wall with SHIFT'); renderHUD();
+        }
       }
-      if (s.lunge < -2.2) { s.lunge = rnd(5, 8); s.struck = false; }
-      if (S.docked || Math.hypot(s.g.position.x - ship.pos.x, s.g.position.z - ship.pos.y) > 380) { s.sinking = true; log('You leave the serpent behind in your wake.'); }
     }
     const k = clamp(dt * 3, 0, 1);
-    s.g.position.x = lerp(s.g.position.x, ship.pos.x + Math.cos(s.ang) * s.R, k);
-    s.g.position.z = lerp(s.g.position.z, ship.pos.y + Math.sin(s.ang) * s.R, k);
+    s.x = lerp(s.x, s.cx + Math.cos(s.ang) * s.R, k); s.z = lerp(s.z, s.cz + Math.sin(s.ang) * s.R, k);
   }
-  s.g.position.y = lerp(-22, 0, s.rise);
+  s.g.position.set(s.x, lerp(-22, 0, s.rise), s.z);
   s.segs.forEach((m, i) => m.position.set(i * 4.2 - 30, Math.sin(i * .6 - t * 2) * 5 - 1.5, Math.cos(i * .4 + t) * 2));
   s.head.position.set(-35, 7 + Math.sin(t * 1.5) * 1.5, s.lunge < 0 ? 6 : 0); s.head.rotation.y = Math.PI * .8;
-  s.g.lookAt(ship.g.position.x, s.g.position.y, ship.g.position.z);
+  s.g.lookAt(s.cx, s.g.position.y, s.cz);
   if (s.sinking && s.rise <= 0) { scene.remove(s.g); serpent = null; }
 }
 
@@ -1728,47 +1739,46 @@ function makeDragon(scale, body, belly, horn) {
   g.userData = { neck, head, mouth, tail, wings };
   return g;
 }
-function spawnDragon(kind, x, z) {
-  const great = kind === 'great';
-  const g = great ? makeDragon(2.2, 0x7a1a14, 0xd9a441, 0x2a1a10) : makeDragon(1, pick([0x2f5a2a, 0x6a4a1a, 0x3a3a5a]), 0xa89a6a, 0x1a1a1a);
+const DRAKE_COLS = [0x2f5a2a, 0x6a4a1a, 0x3a3a5a];
+function spawnDragon(kind, x, z, opts = {}) {
+  const great = kind === 'great', col = opts.col !== undefined ? opts.col : ri(0, 2);
+  const g = great ? makeDragon(2.2, 0x7a1a14, 0xd9a441, 0x2a1a10) : makeDragon(1, DRAKE_COLS[col % 3], 0xa89a6a, 0x1a1a1a);
   const D = { kind, great, g, pos: new THREE.Vector3(x, great ? 70 : 45, z), vel: new THREE.Vector3(0, 0, -20), hp: great ? 600 : 200, maxHp: great ? 600 : 200,
     r: great ? 15 : 7.5, state: 'circle', timer: rnd(3, 5), ang: rnd(0, 6.28), alt: great ? 55 : 38, R: great ? 110 : 75, speed: great ? 34 : 40, dps: great ? 15 : 8,
-    breath: 0, fireT: 0, dead: false, deathT: 0, name: great ? 'Fáfnir the dragon' : 'drake', warned: false };
+    breath: 0, fireT: 0, dead: false, deathT: 0, name: great ? 'Fáfnir the dragon' : 'drake', warned: false, col, wid: opts.wid || nextWid(great ? 'F' : 'D'), kindName: great ? 'fafnir' : 'drake' };
   scene.add(g); dragons.push(D);
+  if (!nearMe(x, z, 1300)) return D;
   Sound.roar(); setTimeout(() => Sound.roar(), 500);
   if (great) { banner('FÁFNIR!', 'The dragon of Dragonspine takes wing'); log('A shadow falls across the sea. Fáfnir, the great dragon of Dragonspine, unfurls wings like sails and screams in fury!', 'bad'); }
   else { banner('A drake!', 'A lesser dragon dives from the clouds'); log('A drake drops out of the clouds, smoke curling from its jaws!', 'bad'); }
   return D;
 }
-const spawnDrake = () => { const fx = Math.sin(ship.h), fz = -Math.cos(ship.h); spawnDragon('drake', ship.pos.x - fx * 200, ship.pos.y - fz * 200); };
+const spawnDrake = () => { const fx = Math.sin(ship.h), fz = -Math.cos(ship.h); return spawnDragon('drake', ship.pos.x - fx * 200, ship.pos.y - fz * 200); };
 function dragonFocus() {
   if (ashore.on && hero && !hero.dead) return { x: hero.x, y: hero.y, z: hero.z, land: true, vx: hero.vx || 0, vz: hero.vz || 0 };
   return { x: ship.pos.x, y: 0, z: ship.pos.y, land: false, vx: velOf(ship.h, ship.speed).x, vz: velOf(ship.h, ship.speed).z };
 }
 function hitDragon(D, p, mult) {
   if (D.dead) return;
-  D.hp -= 2.6 * mult * (1 + S.weapons * .2); hitFx(p, 0x7a1a14);
-  if (D.hp <= 0) {
-    D.dead = true; D.deathT = 0; Sound.roar();
-    if (D.great) {
-      S.dragonSlain = true; (S.cleansed ||= {})['spine-dragon'] = true; S.glory += 100; if (S.weapons < 5) S.weapons++;
-      banner('Dragon-slayer!', '+100 glory · the hoard of Dragonspine is yours');
-      log('Fáfnir shrieks, spirals out of the sky and crashes into the earth. Your smiths will forge dragon-steel from its scales (arms improve). Its hoard waits in the crater of Dragonspine. (+100 glory)', 'gold');
-      questProgress('dragon');
-    } else {
-      const sv = ri(60, 120); S.silver += sv; S.glory += 25;
-      banner('Drake slain!', `+${sv} silver · +25 glory`); log(`The drake tumbles from the sky in a burst of smoke. Gold glints in its gullet: ${sv} silver. (+25 glory)`, 'gold');
-      questProgress('drake');
-    }
-    Sound.coins(); renderHUD(); save();
+  hitFx(p, 0x7a1a14); damageMonster(D, 2.6 * mult * (1 + S.weapons * .2));
+}
+function rewardDragon(D) {
+  if (D.great) {
+    S.dragonSlain = true; (S.cleansed ||= {})['spine-dragon'] = true; S.glory += 100; if (S.weapons < 5) S.weapons++;
+    banner('Dragon-slayer!', '+100 glory · the hoard of Dragonspine is yours');
+    log('Fáfnir shrieks, spirals out of the sky and crashes into the earth. Your smiths will forge dragon-steel from its scales (arms improve). Its hoard waits in the crater of Dragonspine. (+100 glory)', 'gold');
+    questProgress('dragon');
+  } else {
+    const sv = ri(60, 120); S.silver += sv; S.glory += 25;
+    banner('Drake slain!', `+${sv} silver · +25 glory`); log(`The drake tumbles from the sky in a burst of smoke. Gold glints in its gullet: ${sv} silver. (+25 glory)`, 'gold');
+    questProgress('drake');
   }
+  Sound.coins(); renderHUD(); save();
 }
 function dragonHitTest(p) { for (const D of dragons) if (!D.dead && D.pos.distanceTo(p) < D.r) return D; return null; }
 const fv2 = new THREE.Vector3(), fv3 = new THREE.Vector3();
 function updateDragons(dt, t, paused) {
-  // the great dragon wakes when you come near Dragonspine
-  const sp = P.spine, fo = dragonFocus();
-  if (!S.dragonSlain && !titleOn && !dragons.some(d => d.great) && Math.hypot(fo.x - sp.wx, fo.z - sp.wz) < 750) spawnDragon('great', sp.wx, sp.wz);
+  const sp = P.spine;
   for (let i = dragons.length - 1; i >= 0; i--) {
     const D = dragons[i], ud = D.g.userData;
     if (!paused) {
@@ -1777,11 +1787,16 @@ function updateDragons(dt, t, paused) {
         const floor = Math.max(terrainH(D.pos.x, D.pos.z), 0);
         if (D.pos.y < floor) { D.pos.y = floor; D.vel.set(0, 0, 0); if (!D.crashed) { D.crashed = true; shake = 1; Sound.crash(); for (let k = 0; k < 10; k++) puff(D.pos.x + rnd(-8, 8), floor + 1, D.pos.z + rnd(-8, 8), 2, floor > .5 ? 0x6a5a4a : 0xeef4f8, 2, .5); } }
         if (D.deathT > 7) { scene.remove(D.g); dragons.splice(i, 1); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } continue; }
+      } else if (!isAuth()) { // mirrored from the world host
+        if (D.netPos) { D.netPos.addScaledVector(D.vel, dt); D.pos.lerp(D.netPos, 1 - Math.exp(-dt * 6)); }
+        D.breath = Math.max(0, D.breath - dt);
+        if (D.breath > 0) breatheFire(D, dt);
       } else {
-        const dist = Math.hypot(fo.x - D.pos.x, fo.z - D.pos.z);
-        const home = D.great ? Math.hypot(fo.x - sp.wx, fo.z - sp.wz) : 0;
+        const T = nearestPlayer(D.pos.x, D.pos.z), fo = T ? T.p : dragonFocus();
+        const dist = T ? T.d : 0;
+        const home = D.great ? (nearestPlayer(sp.wx, sp.wz) || { d: 1e9 }).d : 0;
         if ((D.great && home > 1600) || (!D.great && dist > 1100)) { scene.remove(D.g); dragons.splice(i, 1); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } continue; }
-        const passive = (S.docked && !ashore.on) || titleOn;
+        const passive = !!fo.docked || titleOn;
         const groundY = fo.land ? fo.y : 0;
         D.timer -= dt; D.breath = Math.max(0, D.breath - dt);
         if (D.state === 'circle' || passive) {
@@ -1809,7 +1824,7 @@ function updateDragons(dt, t, paused) {
           if (ld < 9) { D.state = 'ground'; D.groundT = 0; D.vel.set(0, 0, 0); Sound.roar(); shake = .7; }
         } else if (D.state === 'ground') {
           D.groundT += dt; D.vel.multiplyScalar(.8);
-          const tgt = nearestDragonVictim(D);
+          const tgt = nearestDragonVictim(D) || (fo.land ? fo : null);
           if (tgt) { const want = Math.atan2(tgt.x - D.pos.x, tgt.z - D.pos.z); D.faceY = want; if (Math.hypot(tgt.x - D.pos.x, tgt.z - D.pos.z) < 30 && (D.groundT % 2.4) < 1.1) D.breath = .25; }
           if (D.groundT > 7) { D.state = 'climb'; D.climbT = 0; D.pass = { x: Math.sin(D.ang), z: Math.cos(D.ang) }; Sound.roar(); }
         }
@@ -1903,8 +1918,8 @@ function buildMaelstrom() {
   maelstrom = { g, a, b };
   maelLabel = document.createElement('div'); maelLabel.className = 'label'; document.body.appendChild(maelLabel);
 }
-function spawnKraken() {
-  if (kraken || S.krakenSlain) return;
+function spawnKraken(sx, sz, opts = {}) {
+  if (kraken) return;
   const g = new THREE.Group();
   const skin = new THREE.MeshStandardMaterial({ color: 0x5a1e2a, roughness: .45, metalness: .1, flatShading: true });
   const mantle = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 12), skin); mantle.scale.set(1, 1.4, 1); mantle.position.y = 5;
@@ -1919,9 +1934,10 @@ function spawnKraken() {
     warn.rotation.x = -Math.PI / 2; scene.add(warn);
     tentacles.push({ segs, warn, ang: k / 8 * Math.PI * 2, phase: rnd(0, 6), state: 'idle', t: 0, target: null, hit: false });
   }
-  const fx = Math.sin(ship.h), fz = -Math.cos(ship.h);
-  kraken = { g, mantle, tentacles, hp: 650, maxHp: 650, rise: 0, sinking: false, x: ship.pos.x + fx * 70, z: ship.pos.y + fz * 70, atk: 4 };
+  if (sx === undefined) { const fx = Math.sin(ship.h), fz = -Math.cos(ship.h); sx = ship.pos.x + fx * 70; sz = ship.pos.y + fz * 70; }
+  kraken = { g, mantle, tentacles, hp: 650, maxHp: 650, rise: 0, sinking: false, slain: false, x: sx, z: sz, nx: sx, nz: sz, atk: 4, wid: opts.wid || nextWid('K'), kindName: 'kraken' };
   scene.add(shadow(g));
+  if (!nearMe(sx, sz, 900)) return;
   throttle = Math.min(throttle, 2); Sound.roar(); setTimeout(() => Sound.roar(), 700); shake = 1;
   banner('THE KRAKEN!', 'Shoot its eyes · steer clear of the red rings');
   log('The sea boils. A monstrous kraken rises from the deep, tentacles thick as masts reaching for your ship!', 'bad');
@@ -1931,38 +1947,37 @@ function krakenHitTest(p) {
   for (const tn of k.tentacles) for (let i = 0; i < tn.segs.length; i += 2) if (tn.segs[i].position.distanceTo(p) < 2.8) return 1.5;
   return 0;
 }
-function hitKraken(p, mult) {
-  const k = kraken; k.hp -= 2.6 * mult * (1 + S.weapons * .2); hitFx(p, 0x5a1e2a);
-  if (k.hp <= 0 && !k.sinking) {
-    k.sinking = true; S.krakenSlain = true;
-    const sv = ri(220, 340), am = Math.min(5, S.cargoMax - cargoCount());
-    S.silver += sv; S.cargo.amber += am; S.glory += 60; S.morale = clamp(S.morale + 25, 0, 100);
-    log(`The kraken shudders, its great eyes dim, and it sinks into the black water. In the wreckage of its lair you find ${sv} silver${am ? ` and ${am} lumps of ambergris-amber` : ''}. (+60 glory)`, 'gold');
-    banner('Kraken-slayer!', `+${sv} silver · +60 glory`); Sound.coins(); questProgress('kraken'); renderHUD(); save();
-  }
+function hitKraken(p, mult) { hitFx(p, 0x5a1e2a); damageMonster(kraken, 2.6 * mult * (1 + S.weapons * .2)); }
+function rewardKraken() {
+  S.krakenSlain = true;
+  const sv = ri(220, 340), am = Math.min(5, S.cargoMax - cargoCount());
+  S.silver += sv; S.cargo.amber += am; S.glory += 60; S.morale = clamp(S.morale + 25, 0, 100);
+  log(`The kraken shudders, its great eyes dim, and it sinks into the black water. In the wreckage of its lair you find ${sv} silver${am ? ` and ${am} lumps of ambergris-amber` : ''}. (+60 glory)`, 'gold');
+  banner('Kraken-slayer!', `+${sv} silver · +60 glory`); Sound.coins(); questProgress('kraken'); renderHUD(); save();
 }
 function updateKraken(dt, t, paused) {
   const k = kraken; if (!k) return;
   if (!paused) {
     k.rise = clamp(k.rise + dt * (k.sinking ? -.3 : .35), 0, 1);
-    if (!k.sinking) {
-      const dx = ship.pos.x - k.x, dz = ship.pos.y - k.z, d = Math.hypot(dx, dz) || 1;
-      if (d > 58) { const sp = Math.min(15, d - 55); k.x += dx / d * sp * dt; k.z += dz / d * sp * dt; }
-      if (d < 75 && !S.docked) ship.speed *= (1 - dt * .3); // tentacles drag at the hull
-      if (d > 430 || S.docked) { k.sinking = true; log('The kraken slips back into the deep. It will be waiting.'); }
-      k.atk -= dt;
-      if (k.atk <= 0 && k.rise > .8) {
-        const idle = k.tentacles.filter(tn => tn.state === 'idle');
-        if (idle.length) {
-          const tn = pick(idle), lead = 1.5, v = velOf(ship.h, ship.speed);
-          tn.state = 'rise'; tn.t = 0; tn.hit = false; tn.target = { x: ship.pos.x + v.x * lead, z: ship.pos.y + v.z * lead };
+    if (!k.sinking && !S.docked && !ashore.on && Math.hypot(ship.pos.x - k.x, ship.pos.y - k.z) < 75) ship.speed *= (1 - dt * .3); // tentacles drag at the hull
+    if (!k.sinking && isAuth()) {
+      const T = nearestPlayer(k.x, k.z, p => !p.land && !p.docked);
+      if (!T || T.d > 430) { k.sinking = true; if (!WS.shared) log('The kraken slips back into the deep. It will be waiting.'); }
+      else {
+        const dx = T.p.x - k.x, dz = T.p.z - k.z, d = T.d || 1;
+        if (d > 58) { const sp = Math.min(15, d - 55); k.x += dx / d * sp * dt; k.z += dz / d * sp * dt; }
+        k.atk -= dt;
+        if (k.atk <= 0 && k.rise > .8) {
+          const idle = k.tentacles.filter(tn => tn.state === 'idle');
+          if (idle.length) { const tn = pick(idle), lead = 1.5; tn.state = 'rise'; tn.t = 0; tn.hit = false; tn.target = { x: T.p.x + T.p.vx * lead, z: T.p.z + T.p.vz * lead }; }
+          k.atk = rnd(2.4, 4) * (k.hp < k.maxHp * .4 ? .7 : 1);
         }
-        k.atk = rnd(2.4, 4) * (k.hp < k.maxHp * .4 ? .7 : 1);
       }
-    }
+    } else if (!isAuth()) { const q = 1 - Math.exp(-dt * 4); k.x = lerp(k.x, k.nx, q); k.z = lerp(k.z, k.nz, q); }
   }
   k.g.position.set(k.x, lerp(-26, -2, k.rise), k.z);
-  k.g.rotation.y = Math.atan2(-(ship.pos.x - k.x), -(ship.pos.y - k.z));
+  const faceP = nearestPlayer(k.x, k.z, p => !p.land) || { p: { x: ship.pos.x, z: ship.pos.y } };
+  k.g.rotation.y = Math.atan2(-(faceP.p.x - k.x), -(faceP.p.z - k.z));
   for (const tn of k.tentacles) {
     const bx = k.x + Math.cos(tn.ang) * 8, bz = k.z + Math.sin(tn.ang) * 8, by = k.g.position.y + 1;
     const sw = Math.sin(t * .5 + tn.phase) * .3, out = 27 + Math.sin(t * .8 + tn.phase) * 4;
@@ -1977,7 +1992,7 @@ function updateKraken(dt, t, paused) {
       if (q >= 1 && !tn.hit) {
         tn.hit = true; Sound.crash(); shake = Math.max(shake, .8);
         for (let i = 0; i < 6; i++) puff(tn.target.x + rnd(-6, 6), 1, tn.target.z + rnd(-6, 6), 1.4, 0xeef4f8, 1.4, .6);
-        if (!S.docked && Math.hypot(ship.pos.x - tn.target.x, ship.pos.y - tn.target.z) < 17) {
+        if (!S.docked && !ashore.on && Math.hypot(ship.pos.x - tn.target.x, ship.pos.y - tn.target.z) < 17) {
           const m = shieldUp ? .6 : 1; S.hull = Math.max(5, S.hull - 15 * m); pCrewDmg += 1.1 * m; applyCrewDmg();
           banner('The kraken strikes!', 'Keep moving to dodge the tentacles'); renderHUD();
         }
@@ -2491,7 +2506,7 @@ function spawnLocals(p) {
     ashore.camp = true; const c = p.campPos;
     for (let i = 0; i < 6; i++) { const pt = landNear(p, c.x + rnd(-9, 9), c.z + rnd(-9, 9)); const o = addUnit('outlaw', pt.x, pt.z, { dormant: true, group: 'camp', wakeR: 34, archer: i % 3 === 2, shieldWall: i % 3 === 0 }); setWeapon(o); }
   }
-  if (p.troll && p.trollPos && !S.trollSlain) addUnit('troll', p.trollPos.x, p.trollPos.z, { dormant: true, group: 'troll', wakeR: 30 });
+  if (p.troll && p.trollPos && !worldDown('troll')) addUnit('troll', p.trollPos.x, p.trollPos.z, { dormant: true, group: 'troll', wakeR: 30 });
   if (['home', 'town', 'village', 'fortress'].includes(p.type) && !(S.hostile[p.id] > 0)) {
     for (let i = 0; i < 6; i++) { const a = rnd(0, 6.28), r = rnd(.05, .3) * p.R, pt = landNear(p, p.wx + Math.cos(a) * r, p.wz + Math.sin(a) * r); addUnit('villager', pt.x, pt.z, { home: { x: p.wx, z: p.wz, r: p.R * .3 } }); }
   }
@@ -2510,7 +2525,7 @@ function spawnLocals(p) {
     ashore.draugr = true;
     const nd = p.id === 'graves' ? 7 : 5;
     for (let i = 0; i < nd; i++) { const pt = landNear(p, p.wx - 4 + rnd(-9, 9), p.wz - 12 + i * 6 + rnd(-2, 2)); const d = addUnit('draugr', pt.x, pt.z, { dormant: true, group: 'barrow', wakeR: 45, rise: 0, archer: i % 3 === 2 }); setWeapon(d); }
-    if (p.id === 'graves') addUnit('king', p.wx - 4, p.wz + 18, { dormant: true, group: 'barrow', wakeR: 45, rise: 0, shieldWall: true });
+    if (p.id === 'graves' && !worldDown('king')) addUnit('king', p.wx - 4, p.wz + 18, { dormant: true, group: 'barrow', wakeR: 45, rise: 0, shieldWall: true });
   }
 }
 function leaveAshore(retreat) {
@@ -2659,8 +2674,8 @@ function killUnit(u, from) {
   else if (u.team === 'them') S.glory += u.kind === 'draugr' || u.kind === 'huscarl' ? 2 : 1;
   if (u.kind === 'wolf') questProgress('wolves');
   if (u.kind === 'bear') { const fu = Math.min(2, S.cargoMax - cargoCount()); S.cargo.furs += fu; S.food += 15; S.glory += 3; log(`You slay a great bear. +15 food${fu ? `, +${fu} furs` : ''}. (+3 glory)`, 'gold'); questProgress('bear'); renderHUD(); }
-  if (u.kind === 'troll') { const sv = ri(160, 260); S.trollSlain = true; S.silver += sv; S.glory += 40; banner('Troll-slayer!', `+${sv} silver · +40 glory`); log(`The Frost Troll crashes into the snow and moves no more. Its lair holds ${sv} silver from a hundred lost travellers. (+40 glory)`, 'gold'); Sound.coins(); questProgress('troll'); renderHUD(); }
-  if (u.kind === 'king') { S.glory += 20; banner('The Barrow-King falls', '+20 glory'); log('The Barrow-King crumbles, his crown rolling across the frozen earth. (+20 glory)', 'gold'); renderHUD(); }
+  if (u.kind === 'troll') { markDown('troll'); const sv = ri(160, 260); S.trollSlain = true; S.silver += sv; S.glory += 40; banner('Troll-slayer!', `+${sv} silver · +40 glory`); log(`The Frost Troll crashes into the snow and moves no more. Its lair holds ${sv} silver from a hundred lost travellers. (+40 glory)`, 'gold'); Sound.coins(); questProgress('troll'); renderHUD(); }
+  if (u.kind === 'king') { markDown('king'); S.glory += 20; banner('The Barrow-King falls', '+20 glory'); log('The Barrow-King crumbles, his crown rolling across the frozen earth. (+20 glory)', 'gold'); renderHUD(); }
   if (u.kind === 'deer') {
     const food = ri(10, 16) + traitCount('hunter') * 3, fur = cargoCount() < S.cargoMax ? 1 : 0; S.food += food; S.cargo.furs += fur;
     log(`You bring down a deer: +${food} food${fur ? ', +1 furs' : ''}.`, 'good'); renderHUD(); questProgress('deer');
@@ -2987,7 +3002,13 @@ function saveMP() {
 async function initMultiplayer() {
   if (!window.claude || typeof window.claude.use !== 'function') return;
   let room = null, user = null;
-  try { [room, user] = await Promise.all([window.claude.use('room'), window.claude.use('user')]); } catch (e) { return; }
+  let db = null;
+  try { [room, user, db] = await Promise.all([window.claude.use('room'), window.claude.use('user'), window.claude.use('db')]); } catch (e) { return; }
+  if (db) {
+    WS.db = db;
+    try { WS.canWrite = user ? (user.can('data.write') !== false) : true; } catch (e) { WS.canWrite = true; }
+    ['kraken', 'fafnir', 'troll', 'king'].forEach(n => { try { db.doc('world/' + n).onSnapshot(s => { const d = s.exists ? s.data() : null; WS.down[n] = d && typeof d.at === 'number' ? d.at : 0; }, () => {}); } catch (e) {} });
+  }
   MP.user = user;
   if (user && !MP.name) {
     try { const me = await user.me(); if (me && me.name) { MP.name = mpClean(me.name.split(' ')[0]); const inp = $('mpName'); if (inp && !inp.value) inp.value = MP.name; } } catch (e) {}
@@ -3042,10 +3063,13 @@ function mpPublish() {
   if (!MP.room || titleOn) return;
   const now = performance.now(); if (now - MP.lastSend < 110) return; MP.lastSend = now;
   const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
-  const p = { v: 1, n: MP.name, c: MP.color, x: r1(ship.pos.x), z: r1(ship.pos.y), h: r2(ship.h), sp: r1(ship.speed), sl: S.docked ? 0 : throttle, d: S.docked ? 1 : 0, at: S.at,
+  const p = { v: 1, ig: 1, cw: WS.canWrite ? 1 : 0, n: MP.name, c: MP.color, x: r1(ship.pos.x), z: r1(ship.pos.y), h: r2(ship.h), sp: r1(ship.speed), sl: S.docked ? 0 : throttle, d: S.docked ? 1 : 0, at: S.at,
     m: ashore.on && hero ? 1 : 0, g: S.glory, cr: S.crew, pvp: MP.pvp ? 1 : 0 };
   if (p.m) Object.assign(p, { hx: r1(hero.x), hz: r1(hero.z), hy: r1(hero.y), hh: r2(hero.h), hm: r1(hero.moveAmt), sw: hero.swing > 0 ? 1 : 0, bw: hero.bowMode ? 1 : 0 });
   else Object.assign(p, { hx: null, hz: null, hy: null, hh: null, hm: null, sw: null, bw: null });
+  p.w = WS.shared && WS.host ? buildSnap() : null;
+  p.dm = WS.shared && !WS.host && Object.keys(WS.dmgOut).length ? WS.dmgOut : null;
+  p.rq = WS.rq;
   MP.room.presence(p).catch(() => {});
 }
 function ghostFor(peer, pr) {
@@ -3133,12 +3157,163 @@ function openPlayers() {
 }
 
 // =====================================================================
+// shared world: one captain's game (the world host) runs the monsters for everyone
+// =====================================================================
+const WS = { shared: false, host: true, hostPeer: null, seq: 0, lastQ: -1, dmgOut: {}, dmgSeen: {}, touched: {}, credited: {}, down: {}, db: null, rq: null, rqSeq: 0, rqSeen: {}, widSeq: 0, canWrite: false };
+const RESPAWN_MS = { kraken: 20 * 60e3, fafnir: 30 * 60e3, troll: 20 * 60e3, king: 20 * 60e3 };
+const nextWid = pre => pre + (MP.myPeer ? MP.myPeer.slice(0, 4) : 'L') + (++WS.widSeq);
+const isAuth = () => !WS.shared || WS.host;
+function nearMe(x, z, r) { const me = myPlayer(); return Math.hypot(x - me.x, z - me.z) < r; }
+function myPlayer() {
+  const land = ashore.on && hero && !hero.dead, v = velOf(ship.h, ship.speed);
+  return { x: land ? hero.x : ship.pos.x, z: land ? hero.z : ship.pos.y, y: land ? hero.y : 0, land, at: S.at, docked: S.docked && !ashore.on, vx: land ? hero.vx || 0 : v.x, vz: land ? hero.vz || 0 : v.z, me: true };
+}
+function worldPlayers() {
+  const list = titleOn ? [] : [myPlayer()];
+  if (WS.shared) for (const gh of MP.ghosts.values()) {
+    const pr = gh.pr; if (!pr || pr.ig !== 1) continue;
+    const land = pr.m === 1 && typeof pr.hx === 'number', v = velOf(gh.h, gh.speed);
+    list.push({ x: land ? pr.hx : gh.x, z: land ? pr.hz : gh.z, y: land ? +pr.hy || 0 : 0, land, at: pr.at, docked: !!pr.d && !land, vx: land ? 0 : v.x, vz: land ? 0 : v.z, peer: gh.peer });
+  }
+  return list;
+}
+function nearestPlayer(x, z, filter) {
+  let best = null, bd = Infinity;
+  for (const p of worldPlayers()) { if (filter && !filter(p)) continue; const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } }
+  return best ? { p: best, d: bd } : null;
+}
+function worldDown(name) {
+  if (WS.shared) return !!WS.down[name] && Date.now() - WS.down[name] < RESPAWN_MS[name];
+  return name === 'kraken' ? !!S.krakenSlain : name === 'fafnir' ? !!S.dragonSlain : name === 'troll' ? !!S.trollSlain : false;
+}
+function markDown(name) {
+  if (!WS.shared) return;
+  WS.down[name] = Date.now();
+  if (WS.db && WS.canWrite) WS.db.doc('world/' + name).set({ at: Date.now() }).catch(() => {});
+}
+function findMonster(wid) {
+  if (kraken && kraken.wid === wid) return kraken;
+  if (serpent && serpent.wid === wid) return serpent;
+  return dragons.find(d => d.wid === wid) || null;
+}
+const monsterAlive = m => m && !m.slain && !m.dead && !m.sinking;
+// a hit from this game: the host applies it, everyone else adds it to the tally the host reads
+function damageMonster(m, amount) {
+  if (!monsterAlive(m)) return;
+  WS.touched[m.wid] = true;
+  if (isAuth()) { m.hp -= amount; if (m.hp <= 0) monsterDied(m); }
+  else { WS.dmgOut[m.wid] = Math.round(((WS.dmgOut[m.wid] || 0) + amount) * 10) / 10; m.hp = Math.max(1, m.hp - amount); }
+}
+function monsterDied(m) {
+  if (m.slain) return;
+  m.slain = true; m.hp = 0;
+  if (m === kraken) { kraken.sinking = true; if (isAuth()) markDown('kraken'); }
+  else if (m === serpent) serpent.sinking = true;
+  else { m.dead = true; m.deathT = 0; Sound.roar(); if (m.great && isAuth()) markDown('fafnir'); }
+  // everyone who drew blood, or fought close by, shares the reward
+  const px = m.pos ? m.pos.x : m.x, pz = m.pos ? m.pos.z : m.z;
+  if (WS.credited[m.wid] || !(WS.touched[m.wid] || (!titleOn && nearMe(px, pz, 450)))) return;
+  WS.credited[m.wid] = true;
+  if (m.kindName === 'kraken') rewardKraken(); else if (m.kindName === 'serpent') rewardSerpent(); else rewardDragon(m);
+}
+// a monster this game wants to start (from its own sea events)
+function worldRequest(kind) {
+  const me = myPlayer();
+  if (isAuth()) return hostSpawn(kind, me.x, me.z, ship.h);
+  WS.rq = { s: ++WS.rqSeq, k: kind, x: Math.round(me.x), z: Math.round(me.z), h: Math.round(ship.h * 100) / 100 };
+}
+function hostSpawn(kind, x, z, h = 0) {
+  if (kind === 'serpent' && !serpent) spawnSerpent(x, z, { ang: rnd(0, 6.28) });
+  else if (kind === 'drake' && dragons.filter(d => !d.great && !d.dead).length < 2) spawnDragon('drake', x - Math.sin(h) * 200, z + Math.cos(h) * 200);
+  else if (kind === 'kraken' && !kraken && !worldDown('kraken')) spawnKraken(x + Math.sin(h) * 70, z - Math.cos(h) * 70);
+}
+function electHost() {
+  WS.shared = !!(MP.room && MP.online && !titleOn && MP.myPeer);
+  if (!WS.shared) { WS.host = true; WS.hostPeer = null; return; }
+  const cands = MP.room.peers().filter(p => p.kind === 'viewer' && p.presence && p.presence.v === 1 && p.presence.ig === 1);
+  if (!cands.some(p => p.sameTab)) cands.push({ peer: MP.myPeer, sameTab: true, presence: { cw: WS.canWrite ? 1 : 0 } });
+  cands.sort((a, b) => ((b.presence.cw | 0) - (a.presence.cw | 0)) || (a.peer < b.peer ? -1 : a.peer > b.peer ? 1 : 0));
+  const was = WS.host;
+  WS.hostPeer = cands[0].peer; WS.host = WS.hostPeer === MP.myPeer;
+  if (WS.host && !was) dragons.forEach(D => { if (!D.dead) { D.state = 'circle'; D.timer = 2; } }); // take over smoothly
+}
+function buildSnap() {
+  const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, w = { q: ++WS.seq };
+  if (kraken) w.K = { i: kraken.wid, x: r1(kraken.x), z: r1(kraken.z), hp: Math.round(kraken.hp), sk: kraken.sinking ? 1 : 0, dd: kraken.slain ? 1 : 0,
+    tn: kraken.tentacles.map(tn => tn.state === 'rise' ? [r1(tn.target.x), r1(tn.target.z), r2(tn.t)] : 0) };
+  if (serpent) w.S = { i: serpent.wid, x: r1(serpent.x), z: r1(serpent.z), cx: r1(serpent.cx), cz: r1(serpent.cz), a: r2(serpent.ang), l: r2(serpent.lunge), hp: Math.round(serpent.hp), sk: serpent.sinking ? 1 : 0, dd: serpent.slain ? 1 : 0 };
+  if (dragons.length) w.D = dragons.map(D => [D.wid, D.great ? 1 : 0, r1(D.pos.x), r1(D.pos.y), r1(D.pos.z), r1(D.vel.x), r1(D.vel.y), r1(D.vel.z), Math.round(D.hp), D.state[0] + D.state[1], D.breath > 0 ? 1 : 0, D.dead ? 1 : 0, r2(D.faceY || 0), D.col | 0]);
+  return w;
+}
+const STATE_OF = { ci: 'circle', di: 'dive', cl: 'climb', la: 'land', gr: 'ground' };
+function applySnap(w) {
+  if (!w || w.q === WS.lastQ) return; WS.lastQ = w.q;
+  // kraken
+  if (w.K) {
+    if (kraken && kraken.wid !== w.K.i) { scene.remove(kraken.g); kraken.tentacles.forEach(tn => { tn.segs.forEach(m => scene.remove(m)); scene.remove(tn.warn); }); kraken = null; }
+    if (!kraken && !w.K.sk) spawnKraken(w.K.x, w.K.z, { wid: w.K.i });
+    if (kraken) {
+      kraken.nx = w.K.x; kraken.nz = w.K.z; kraken.hp = Math.min(kraken.hp, w.K.hp) || w.K.hp;
+      if (w.K.dd) monsterDied(kraken); else if (w.K.sk) kraken.sinking = true;
+      (w.K.tn || []).forEach((tq, i) => { const tn = kraken.tentacles[i]; if (tq && tn && tn.state === 'idle') { tn.state = 'rise'; tn.t = tq[2]; tn.hit = false; tn.target = { x: tq[0], z: tq[1] }; } });
+    }
+  } else if (kraken && !kraken.sinking) kraken.sinking = true;
+  // serpent
+  if (w.S) {
+    if (serpent && serpent.wid !== w.S.i) { scene.remove(serpent.g); serpent = null; }
+    if (!serpent && !w.S.sk) spawnSerpent(w.S.cx, w.S.cz, { wid: w.S.i, ang: w.S.a });
+    if (serpent) {
+      serpent.cx = w.S.cx; serpent.cz = w.S.cz; serpent.ang = w.S.a; serpent.lunge = w.S.l; serpent.hp = Math.min(serpent.hp, w.S.hp) || w.S.hp;
+      if (w.S.dd) monsterDied(serpent); else if (w.S.sk) serpent.sinking = true;
+    }
+  } else if (serpent && !serpent.sinking) serpent.sinking = true;
+  // dragons
+  const seen = new Set();
+  for (const a of (w.D || [])) {
+    const [wid, great, x, y, z, vx, vy, vz, hp, st, br, dead, fy, col] = a; seen.add(wid);
+    let D = dragons.find(d => d.wid === wid);
+    if (!D) { if (dead) continue; D = spawnDragon(great ? 'great' : 'drake', x, z, { wid, col }); D.pos.set(x, y, z); }
+    D.netPos = D.netPos || new THREE.Vector3(); D.netPos.set(x, y, z); D.vel.set(vx, vy, vz);
+    D.hp = Math.min(D.hp, hp) || hp; D.state = STATE_OF[st] || 'circle'; if (br) D.breath = .3; D.faceY = fy;
+    if (dead && !D.dead) monsterDied(D);
+  }
+  for (let i = dragons.length - 1; i >= 0; i--) { const D = dragons[i]; if (!seen.has(D.wid) && !D.dead) { scene.remove(D.g); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } dragons.splice(i, 1); } }
+}
+function worldTick(dt) {
+  electHost();
+  if (WS.shared && !WS.host) {
+    const hp = MP.room.peers().find(p => p.peer === WS.hostPeer);
+    if (hp && hp.presence && hp.presence.w) applySnap(hp.presence.w);
+    // forget tallies for monsters that are gone
+    for (const wid of Object.keys(WS.dmgOut)) if (!findMonster(wid)) delete WS.dmgOut[wid];
+    return;
+  }
+  if (titleOn) return;
+  // the host gathers everyone's hits and spawn requests
+  if (WS.shared) for (const gh of MP.ghosts.values()) {
+    const pr = gh.pr; if (!pr) continue;
+    if (pr.dm && typeof pr.dm === 'object') {
+      const seen = WS.dmgSeen[gh.peer] ||= {};
+      for (const wid of Object.keys(pr.dm)) {
+        const tot = +pr.dm[wid] || 0, delta = tot - (seen[wid] || 0);
+        if (delta > 0 && delta < 400) { const m = findMonster(wid); if (monsterAlive(m)) { m.hp -= delta; if (m.hp <= 0) monsterDied(m); } }
+        seen[wid] = Math.max(seen[wid] || 0, tot);
+      }
+    }
+    if (pr.rq && pr.rq.s && pr.rq.s !== WS.rqSeen[gh.peer]) { WS.rqSeen[gh.peer] = pr.rq.s; hostSpawn(String(pr.rq.k), +pr.rq.x || 0, +pr.rq.z || 0, +pr.rq.h || 0); }
+  }
+  // monsters that wake when any captain comes near
+  if (!kraken && !worldDown('kraken')) { const T = nearestPlayer(MAELSTROM.x, MAELSTROM.z, p => !p.land && !p.docked); if (T && T.d < 320) { const dx = MAELSTROM.x - T.p.x, dz = MAELSTROM.z - T.p.z, d = Math.hypot(dx, dz) || 1; spawnKraken(T.p.x + dx / d * 70, T.p.z + dz / d * 70); } }
+  if (!worldDown('fafnir') && !dragons.some(d => d.great)) { const T = nearestPlayer(P.spine.wx, P.spine.wz); if (T && T.d < 750) spawnDragon('great', P.spine.wx, P.spine.wz); }
+}
+
+// =====================================================================
 // sea events (each new day at sea)
 // =====================================================================
 function pickSeaEvent() {
   const sn = seasonOf(S.day);
-  if (Math.hypot(ship.pos.x, ship.pos.y) > 2700 && !dragons.some(d => !d.great) && chance(.3)) return spawnDrake;
-  if (S.day > 15 && !S.krakenSlain && !kraken && terrainH(ship.pos.x, ship.pos.y) < -25 && chance(.07)) return spawnKraken;
+  if (Math.hypot(ship.pos.x, ship.pos.y) > 2700 && !dragons.some(d => !d.great) && chance(.3)) return () => worldRequest('drake');
+  if (S.day > 15 && !worldDown('kraken') && !kraken && terrainH(ship.pos.x, ship.pos.y) < -25 && chance(.07)) return () => worldRequest('kraken');
   if ((sn === 2 && chance(.3)) || (sn === 3 && chance(.4))) return SEA_EVENTS[0];
   let e = pick(SEA_EVENTS);
   if (sn === 1 && e === SEA_EVENTS[0] && chance(.6)) e = pick(SEA_EVENTS);
@@ -3154,7 +3329,7 @@ const SEA_EVENTS = [
     ['Take them aboard', () => { const n = Math.min(3, S.maxCrew - S.crew); S.crew += n; if (n === 0) { S.food = Math.max(0, S.food - 5); S.glory += 2; } log(n > 0 ? `${n} castaway${n > 1 ? 's' : ''} joined your crew.` : 'No room on the benches, but you gave them food and a heading home. (+2 glory)', 'good'); }],
     ['Sail past', () => { S.morale = clamp(S.morale - 3, 0, 100); log('You left the castaways to their fate. Some of the crew mutter.'); }],
   ]),
-  () => { if (!serpent) spawnSerpent(); },
+  () => worldRequest('serpent'),
 ];
 
 // =====================================================================
@@ -3405,7 +3580,7 @@ function help() {
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
-  • <b>Multiplayer:</b> everyone who has this game open sails the same sea. You see their longships and, ashore on the same island, their warriors. <b>T</b> chats, <b>V</b> waves, <b>P</b> lists the captains at sea. Raiding rivals is off unless both captains switch it on in the captains list.<br>
+  • <b>Multiplayer:</b> everyone who has this game open sails the same sea, and the monsters are shared: the Kraken, serpents, Fáfnir and the drakes are the same beasts for every captain, everyone's arrows wear them down together, and everyone who helped shares the reward. Fáfnir, the Kraken, the Frost Troll and the Barrow-King stay dead for everyone until they return 20 to 30 minutes later. You see their longships and, ashore on the same island, their warriors. <b>T</b> chats, <b>V</b> waves, <b>P</b> lists the captains at sea. Raiding rivals is off unless both captains switch it on in the captains list.<br>
   • <b>Dragons:</b> Fáfnir nests on Dragonspine at the top of the world, sleeping on a vast hoard. Drakes hunt the outer seas. They circle, then dive and breathe fire: raise the shield wall, turn hard, and fill the sky with arrows. On land, Fáfnir may come down to fight. Strike it with your axe while it stands on the ground.<br>
   • <b>The world</b> now stretches far beyond the home waters, from the Ice Teeth in the north-west to Kaupang in the east and Kongshavn in the south.<br>
   • <b>The Kraken</b> lurks in the Maelstrom in the far southwest and may surface in any deep water. Shoot its body and eyes, and keep moving: red rings on the water mark where a tentacle will slam down.<br>
@@ -3679,7 +3854,7 @@ function tick() {
     }
     { const mdx = MAELSTROM.x - ship.pos.x, mdz = MAELSTROM.z - ship.pos.y, md = Math.hypot(mdx, mdz);
       if (md < 170) { ship.pos.x += (mdx / md * 5 - mdz / md * 4) * dt; ship.pos.y += (mdz / md * 5 + mdx / md * 4) * dt; ship.h += dt * .12; }
-      if (md < 320 && !S.krakenSlain && !kraken) spawnKraken(); }
+      }
     // time passes at sea
     dayTimer += dt;
     if (dayTimer >= DAY_SECONDS) {
@@ -3708,10 +3883,11 @@ function tick() {
   if (ashore.on && !paused) updateAshore(dt);
   deckHorse.visible = !!(S.horseOwned && !ashore.on);
   caches.forEach(c => { if (c.glint.visible) { c.glint.rotation.y += dt * 2; c.glint.position.y = 2 + Math.sin(t * 2) * .2; } });
+  worldTick(dt);
   updateSerpent(dt, t, paused); updateKraken(dt, t, paused); updateDragons(dt, t, paused);
   updateGhosts(dt, t); mpPublish(); if (frame % 30 === 0) renderOnline();
   if (maelstrom) { maelstrom.a.rotation.z += dt * .25; maelstrom.b.rotation.z += dt * .6; }
-  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking) || !!(kraken && !kraken.sinking) || dragons.some(d => !d.dead);
+  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking && nearMe(serpent.x, serpent.z, 450)) || !!(kraken && !kraken.sinking && nearMe(kraken.x, kraken.z, 500)) || dragons.some(d => !d.dead && nearMe(d.pos.x, d.pos.z, 650));
   if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
   if (combatOn && !paused && !S.docked && (S.crew <= 1 || S.hull <= 6)) defeat(); updateWhales(dt); updateSmoke(dt);
   flags.forEach(f => { const a = f.geometry.attributes.position.array, b = f.userData.base; for (let i = 0; i < a.length; i += 3) a[i + 2] = Math.sin(b[i] * .9 - t * 5) * b[i] * .12; f.geometry.attributes.position.needsUpdate = true; });
@@ -3820,7 +3996,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { MP, openPlayers, openChat, hitDragon, spawnDragon, spawnDrake, dragons, spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { damageMonster, WS, worldRequest, hostSpawn, findMonster, get serpentObj() { return serpent; }, MP, openPlayers, openChat, hitDragon, spawnDragon, spawnDrake, dragons, spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
