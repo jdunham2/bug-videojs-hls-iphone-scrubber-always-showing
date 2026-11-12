@@ -668,14 +668,14 @@ function rumble(pi, strong, weak, dur) {
 
 // ---------------------------------------------------------------- game
 const G = { state: 'title', wave: 0, stage: 0, frame: 0, phase: 'intro', phaseT: 0, queue: [], spawnT: 0,
-  enemies: [], projs: [], pickups: [], strikes: [], lasers: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
+  enemies: [], projs: [], pickups: [], strikes: [], lasers: [], zapLines: [], portals: [], ghosts: [], banner: null, teamSuperT: 0, overT: 0,
   best: 0, players: [], boss: null, lastTeamText: -999, pauseSel: 0, titleT: 0, newBest: false };
 try { G.chUnlocked = Math.min(7, +localStorage.getItem('stickSquadChapter') || 0); } catch (e) { G.chUnlocked = 0; }
 try { G.cleared = Math.max(G.chUnlocked, Math.min(8, +localStorage.getItem('stickSquadCleared') || 0)); } catch (e) { G.cleared = G.chUnlocked; }
 // fighter unlocks: the first 20 are free, each Story chapter beaten unlocks the next 3
 const START_FIGHTERS = 20, PER_CHAPTER = 3;
 const STORY_FIGHTERS = START_FIGHTERS + PER_CHAPTER * 8;
-try { G.prog = Object.assign({ bosses: 0, wave: 0, vs: 0, rush: 0, kos: 0, supers: 0, pickups: 0 }, JSON.parse(localStorage.getItem('stickSquadProg') || '{}')); } catch (e) { G.prog = { bosses: 0, wave: 0, vs: 0, rush: 0, kos: 0, supers: 0, pickups: 0 }; }
+try { G.prog = Object.assign({ bosses: 0, wave: 0, vs: 0, rush: 0, kos: 0, supers: 0, pickups: 0, combo: 0 }, JSON.parse(localStorage.getItem('stickSquadProg') || '{}')); } catch (e) { G.prog = { bosses: 0, wave: 0, vs: 0, rush: 0, kos: 0, supers: 0, pickups: 0 }; }
 const CHALLENGES = [
   { short: '10 BOSSES', text: ['Defeat 10 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 10, prog: () => 'Bosses beaten: ' + Math.min(10, G.prog.bosses) + ' / 10' },
   { short: 'WAVE 20', text: ['Reach wave 20 in', 'ARCADE mode to unlock!'], need: () => G.prog.wave >= 20, prog: () => 'Best Arcade wave: ' + Math.min(20, G.prog.wave) + ' / 20' },
@@ -702,13 +702,19 @@ const CHALLENGES = [
   { short: '50 BOSSES', text: ['Defeat 50 bosses', '(in any mode) to unlock!'], need: () => G.prog.bosses >= 50, prog: () => 'Bosses beaten: ' + Math.min(50, G.prog.bosses) + ' / 50' },
   { short: '5 VS WINS', text: ['Win 5 VERSUS', 'matches to unlock!'], need: () => G.prog.vs >= 5, prog: () => 'Versus wins: ' + Math.min(5, G.prog.vs) + ' / 5' },
   { short: 'CLEAR RUSH', text: ['Clear all of', 'BOSS RUSH to unlock!'], need: () => G.prog.rush > 0, prog: () => G.prog.rush > 0 ? 'Cleared!' : 'Not cleared yet' },
+  ...Array.from({ length: 5 }, () => ({ short: 'FREE', text: ['', ''], need: () => true, prog: () => '' })),
+  { short: '30 COMBO', text: ['Land a 30-hit combo', 'to unlock!'], need: () => (G.prog.combo || 0) >= 30, prog: () => 'Best combo: ' + Math.min(30, G.prog.combo || 0) + ' / 30' },
+  { short: '60 SUPERS', text: ['Use 60 SUPER MOVES', 'to unlock!'], need: () => G.prog.supers >= 60, prog: () => 'Supers used: ' + Math.min(60, G.prog.supers) + ' / 60' },
+  { short: '100 POWER-UPS', text: ['Collect 100 power-ups', 'to unlock!'], need: () => G.prog.pickups >= 100, prog: () => 'Power-ups: ' + Math.min(100, G.prog.pickups) + ' / 100' },
+  { short: '1500 KOS', text: ['Defeat 1500 enemies', '(in any mode) to unlock!'], need: () => G.prog.kos >= 1500, prog: () => 'Enemies defeated: ' + Math.min(1500, G.prog.kos) + ' / 1500' },
+  { short: '60 COMBO', text: ['Land a 60-hit combo', 'to unlock!'], need: () => (G.prog.combo || 0) >= 60, prog: () => 'Best combo: ' + Math.min(60, G.prog.combo || 0) + ' / 60' },
 ];
 const fighterUnlocked = i => i < STORY_FIGHTERS ? i < START_FIGHTERS + PER_CHAPTER * (G.cleared || 0) : !!(CHALLENGES[i - STORY_FIGHTERS] && CHALLENGES[i - STORY_FIGHTERS].need());
 const fighterCount = () => CHARS.filter((c, i) => fighterUnlocked(i)).length;
 function bumpProg(key, val) {
   if (NET.role === 'guest') return;
   const before = CHARS.map((c, i) => fighterUnlocked(i));
-  if (key === 'wave') G.prog.wave = Math.max(G.prog.wave, val); else G.prog[key] = (G.prog[key] || 0) + 1;
+  if (key === 'wave' || key === 'combo') G.prog[key] = Math.max(G.prog[key] || 0, val); else G.prog[key] = (G.prog[key] || 0) + 1;
   try { localStorage.setItem('stickSquadProg', JSON.stringify(G.prog)); } catch (e) { }
   const fresh = CHARS.filter((c, i) => !before[i] && fighterUnlocked(i)).map(c => c.name);
   if (fresh.length) { G.unlockToast = { names: fresh, t: 420 }; SFX.banner(); }
@@ -1142,6 +1148,57 @@ addF(F3('KING KONGO', 'GORILLA', ['Huge and strong. Heavy is a', 'ground pound w
   sk('CHEST BEAT', 'cast', { startup: 6, onActive: f => { SFX.roar(); addShake(6); if (!f.power || f.power === 'double') { f.power = 'double'; f.powerT = Math.max(f.powerT || 0, 240); } around(f, 200, { dmg: 8, kb: [12, 6] }); } }),
   ['BARREL ROLL', p => { for (let k = 0; k < 3; k++) barrel(p, p.facing * (6 + k * 2.5)); }],
   ['JUNGLE KING', (p, f) => { SUP.quake(p, f, 28); for (let k = 0; k < 4; k++) barrel(p, (k % 2 ? 1 : -1) * (6 + k * 2)); }]);
+// ---------------------------------------------------------- fighter pack 4
+addF(F3('DOCTOR DOLLY', 'MEDIC', ['Heals the team. Heavy throws', 'three quick syringe darts.', 'Special: Healing Wave.'], '#d84a5a', '#8a2a3a', '#5ac8ff', 'hardhat', { hp: 95, spd: 1.05, dmg: 0.95 }),
+  sht(f => { for (let k = 0; k < 3; k++) shoot(f, { kind: 'laserbolt', vx: f.facing * 22, vy: (k - 1) * 0.8, r: 6, dmg: 7, col: '#e2342c', life: 50, delayT: k * 3 }); tone(1500, 0.08, 'square', 0.05, 900); }, 'throw'),
+  sk('FIRST AID', 'cast', { startup: 4, onActive: f => { healTeam(f, 15); ring(f.x, f.y - 40, '#e2342c', 90, 5, 16); SFX.revive(); } }),
+  ['HEALING WAVE', (p, f, bd, SP) => { healTeam(p, 35); ring(p.x, p.y - 40, '#7ae05a', 320, 10, 24); for (const e of f) if (Math.hypot(e.x - p.x, e.y - p.y) < 320) doHit(p, e, SP(16, [14, 8]), sign(e.x - p.x) || 1, true); }],
+  ['MIRACLE', (p, f) => { if (G.mode !== 'versus') for (const q of G.players) if (q.joined && q.downed && !q.dead) { q.downed = false; q.hp = q.maxHp; q.inv = 120; floatText(q.x, q.y - 130, 'MIRACLE!', q.col, 32, 60); } for (const q of (G.mode === 'versus' ? [p] : alivePlayers())) { q.hp = q.maxHp; q.shield = Math.max(q.shield, 2); } SUP.nova(p, f, 300, 25); }]);
+addF(F3('SPARTAN SPIKE', 'SPARTAN', ['Tough soldier. Heavy throws', 'a long piercing spear.', 'Special: Phalanx shield wall.'], '#b0302a', '#6a1a14', '#c9a227', 'knighthelm', { hp: 125, spd: 0.95, dmg: 1.15, tough: 0.9 }),
+  sht(f => { shoot(f, { kind: 'arrow', vx: f.facing * 24, r: 12, dmg: 18, pierce: true, hitSet: new Set(), col: '#8a6a3a', life: 70, kb: [12, 6], hs: 5 }); SFX.throw_(); }, 'throw'),
+  sk('SPEAR LUNGE', 'dash', { startup: 5, active: 10, lungeV: 20, dmg: 16, kb: [14, 7], hb: { x: 60, y: 55, w: 110, h: 30 } }),
+  ['PHALANX', (p) => { p.shield = Math.max(p.shield, 3); floatText(p.x, p.y - 110, 'SHIELD x3', '#2a9ad0', 24, 40); SUP.waves(p, 'wave', 2, 10, { dmg: 16, col: '#c9a227' }); }],
+  ['THIS IS SPARTA', (p, f) => { const t = f.slice().sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0]; if (t) { p.ghost(14); p.x = clamp(t.x - (sign(t.x - p.x) || 1) * 60, 40, W - 40); doHit(p, t, SUP.hit(70, [26, 14]), sign(t.x - p.x) || 1, true); } SUP.nova(p, f, 260, 22); }]);
+addF(F3('CHEER CHLOE', 'CHEERLEADER', ['Boosts the team! Heavy is a', 'megaphone blast both ways.', 'Special: Team Spirit (ink + speed).'], '#ff6ab0', '#c03a7a', '#ffd23a', 'pigtails', { hp: 90, spd: 1.1, jumpMul: 1.12 }),
+  sht(f => { for (const d of [-1, 1]) shoot(f, { kind: 'sonic', x: f.x + d * 30, vx: d * 11, r: 20, dmg: 10, pierce: true, hitSet: new Set(), face: d, life: 45, kb: [12, 6] }); tone(700, 0.2, 'square', 0.08, 900); }),
+  sk('BACKFLIP KICK', 'spin', { spin: true, startup: 3, active: 14, dmg: 13, kb: [8, 14], hb: { x: 10, y: 40, w: 100, h: 70 }, onActive: f => hop(f, -f.facing * 4, -13) }),
+  ['TEAM SPIRIT', (p, f, bd, SP) => { for (const q of (G.mode === 'versus' ? [p] : alivePlayers())) { if (q !== p) q.meter = Math.min(100, q.meter + 60); if (!q.power || q.power === 'haste') { q.power = 'haste'; q.powerT = Math.max(q.powerT || 0, 480); } ring(q.x, q.y - 40, '#ff6ab0', 90, 5, 18); } for (const e of f) if (Math.hypot(e.x - p.x, e.y - p.y) < 220) doHit(p, e, SP(14, [10, 8]), sign(e.x - p.x) || 1, true); }],
+  ['VICTORY CHEER', (p, f) => { for (const q of (G.mode === 'versus' ? [p] : alivePlayers())) { q.power = 'star'; q.powerT = 300; } healTeam(p, 40); SUP.radial(p, 'card', 20, 12, { dmg: 9, r: 8 }); }]);
+addF(F3('PIZZA PAULO', 'PIZZA CHEF', ['Heavy throws a pizza that', 'spins back like a boomerang.', 'Special: Pizza Party heals all.'], '#e8a030', '#a0601a', '#c0392b', 'chef', { hp: 105 }),
+  sht(f => { shoot(f, { kind: 'gear', vx: f.facing * 15, r: 16, dmg: 12, pierce: true, hitSet: new Set(), boom: true, boomDir: f.facing, life: 140, col: '#f2c230', rot: 0 }); SFX.throw_(); }, 'throw'),
+  sk('DOUGH SPIN', 'spin', { spin: true, startup: 4, active: 18, dmg: 11, kb: [10, 8], hb: { x: 0, y: 50, w: 170, h: 90 } }),
+  ['PIZZA PARTY', (p, f) => { healTeam(p, 35); SUP.rain(p, f, 'pie', 10, { r: 12, dmg: 12, col: '#f2c230' }); }],
+  ['EXTRA CHEESE', (p, f) => { setPower(p, 'giant'); SUP.rain(p, f, 'pie', 20, { r: 13, dmg: 14, col: '#f2c230' }); SUP.radial(p, 'gear', 8, 13, { boom: true, boomDir: 1, pierce: true, dmg: 12, r: 14, life: 110, col: '#f2c230' }); }]);
+addF(F3('KANGAROO KIP', 'KANGAROO', ['Huge bouncy jumps. Heavy is', 'a massive double-foot kick.', 'Special: Pouch Power prizes.'], '#c08a4a', '#7a5020', '#e8c08a', 'band', { hp: 105, spd: 1.08, dmg: 1.05, jumpMul: 1.3 }),
+  mel({ startup: 9, dmg: 21, kb: [20, 9], hb: { x: 50, y: 35, w: 80, h: 50 }, wind: A.L3.wind, hit: A.L3.hit }),
+  sk('HOP KICK', 'kick', { startup: 4, active: 12, dmg: 14, kb: [12, 10], hb: { x: 40, y: 35, w: 80, h: 60 }, onActive: f => hop(f, f.facing * 12, -12) }),
+  ['POUCH POWER', p => { const L = ['shield', 'pencil', 'bolt', 'giant', 'fire', 'drone', 'glove', 'moon']; for (let i = 0; i < 2; i++) applyPickup(p, L.splice(randi(0, L.length - 1), 1)[0]); }],
+  ['OUTBACK STORM', (p, f) => { torn(p, -1, { col: '#c08a4a' }); torn(p, 1, { col: '#c08a4a' }); SUP.flurry(p, f, 3, 11); }]);
+addF(F3('VIPER VAL', 'SNAKE', ['Every hit poisons (burns).', 'Heavy spits venom blobs.', 'Special: Snake Pit.'], '#3aa04a', '#1a6a2a', '#d0c03a', 'mask', { hp: 90, spd: 1.12, burn: true }),
+  sht(f => { for (const vy of [-1.5, 0, 1.5]) shoot(f, { kind: 'fireball', vx: f.facing * 12, vy, r: 10, dmg: 6, burn: true, col: '#7ae05a', life: 50 }); noise(0.2, 0.15, 1400, 'highpass', 700); }),
+  sk('STRIKE', 'dash', { startup: 3, active: 10, lungeV: 26, dmg: 14, kb: [9, 6], hb: { x: 40, y: 40, w: 80, h: 40 }, burnHit: true }),
+  ['SNAKE PIT', (p, f) => vineSpikes(p, f.slice(0, 8).map(e => e.x).concat(Array.from({ length: 4 }, () => p.x + rand(-300, 300))), 18, [3, 15])],
+  ['HYDRA BITE', (p, f) => { SUP.flurry(p, f, 4, 9); for (const e of f) if (e.T) { e.burn = 300; e.burnBy = p; } }]);
+addF(F3('PRISM PAM', 'LIGHT MAGE', ['Heavy fires a rainbow of three', 'piercing light beams.', 'Special: Rainbow burst.'], '#9a6ae0', '#5a3a9a', '#ffd23a', 'tiara', { hp: 90, spd: 1.05 }),
+  sht(f => { ['#ff4a4a', '#4aff8a', '#4a8aff'].forEach((c, k) => shoot(f, { kind: 'laserbolt', vx: f.facing * 24, vy: (k - 1) * 1.2, r: 7, dmg: 7, col: c, pierce: true, hitSet: new Set(), life: 60 })); tone(1900, 0.12, 'sine', 0.07, 1200); }),
+  sk('FLASH', 'cast', { startup: 3, onActive: f => { flashA = Math.max(flashA, 0.4); flashCol = '#fff'; SUP.freeze(foesOf(f).filter(e => Math.hypot(e.x - f.x, e.y - f.y) < 280), 70); } }),
+  ['RAINBOW', p => { const cs = ['#ff4a4a', '#ff9a3a', '#ffd23a', '#4aff8a', '#4a8aff', '#9a4aff']; SUP.radial(p, 'ibolt', 18, 12, { dmg: 11, life: 70 }); G.projs.slice(-18).forEach((pr, k) => pr.col = cs[k % 6]); }],
+  ['SPECTRUM', (p, f) => { flashA = 1; SUP.strikes(p, f, 8, 24); SUP.radial(p, 'ibolt', 24, 13, { dmg: 10 }); G.projs.slice(-24).forEach((pr, k) => pr.col = ['#ff4a4a', '#ffd23a', '#4aff8a', '#4a8aff'][k % 4]); }]);
+addF(F3('SCARECROW SCOTT', 'SCARECROW', ['Heavy sends homing crows.', 'Skill leaves a straw decoy.', 'Special: Murder of Crows.'], '#c8a050', '#8a6a2a', '#4a3a2a', 'cowboy', { hp: 100, spd: 0.98 }),
+  sht(f => { for (let k = 0; k < 3; k++) shoot(f, { kind: 'bee', vx: f.facing * rand(5, 9), vy: rand(-3, 1), r: 8, dmg: 6, homing: true, life: 160, col: '#222' }); tone(500, 0.2, 'sawtooth', 0.05, 300); }),
+  sk('STRAW DECOY', 'cast', { startup: 3, onActive: f => { G.decoy = { x: f.x, y: f.y, vx: 0, t: 360, ci: f.ci, facing: f.facing, hh: 78, s: 1 }; f.ghost(12); f.x = clamp(f.x - f.facing * 160, 40, W - 40); f.inv = Math.max(f.inv, 16); } }),
+  ['MURDER OF CROWS', p => SUP.radial(p, 'bee', 20, 7, { homing: true, dmg: 7, life: 240, r: 8, col: '#222' })],
+  ['HARVEST MOON', (p, f) => { flashCol = '#ffb040'; SUP.radial(p, 'bee', 30, 7, { homing: true, dmg: 7, life: 260, r: 8, col: '#222' }); vineSpikes(p, Array.from({ length: 11 }, (_, i) => 70 + i * 146), 16); }]);
+addF(F3('YETI YURI', 'YETI', ['Huge and furry, hits freeze.', 'Heavy hurls a giant snowball.', 'Special: Avalanche.'], '#7ab0d8', '#3a6a90', '#dfeef8', 'beanie', { hp: 145, spd: 0.85, dmg: 1.2, size: 1.25, frost: true, tough: 0.9 }),
+  sht(f => { shoot(f, { kind: 'cannonball', y: f.y - 70 * f.s, vx: f.facing * 10, vy: -7, g: 0.45, r: 20, dmg: 22, kb: [12, 9], life: 200, col: '#eef6ff' }); tone(140, 0.3, 'sine', 0.2, 70); }, 'throw'),
+  sk('BELLY SLIDE', 'dash', { startup: 4, active: 20, lungeV: 18, dmg: 14, kb: [12, 8], hb: { x: 30, y: 25, w: 90, h: 40 } }),
+  ['AVALANCHE', (p, f) => { SUP.rain(p, f, 'cannonball', 10, { r: 18, dmg: 20, col: '#eef6ff' }); SUP.freeze(f.filter(e => Math.hypot(e.x - p.x, e.y - p.y) < 260), 90); }],
+  ['ICE AGE', (p, f) => { flashCol = '#bfe9ff'; SUP.freeze(f, 300); SUP.rain(p, f, 'cannonball', 14, { r: 18, dmg: 22, col: '#eef6ff' }); }]);
+addF(F3('RACER RITA', 'RACER', ['Super fast! Heavy launches a', 'bouncing spiked tire.', 'Special: Pit Stop heal + boost.'], '#2a2a2a', '#c0392b', '#ffd23a', 'helmet', { hp: 90, spd: 1.3, dmg: 0.95, dashMul: 1.2 }),
+  sht(f => { shoot(f, { kind: 'spikeball', vx: f.facing * 12, vy: -4, g: 0.5, r: 16, dmg: 12, pierce: true, hitSet: new Set(), spikeball: true, life: 150, col: '#333', rot: 0, kb: [10, 8] }); SFX.dash(); }, 'throw'),
+  sk('NITRO', 'dash', { startup: 2, active: 14, lungeV: 30, dmg: 12, kb: [12, 8], hb: { x: 30, y: 40, w: 90, h: 60 }, onActive: f => { f.inv = Math.max(f.inv, 16); for (let i = 0; i < 6; i++) parts.push({ type: 'flame', x: f.x - f.facing * 20, y: f.y - 30, vx: -f.facing * rand(3, 6), vy: rand(-1, 1), r: rand(5, 9), life: 16, max: 16 }); } }),
+  ['PIT STOP', (p, f) => { healTeam(p, 30); for (const q of (G.mode === 'versus' ? [p] : alivePlayers())) if (!q.power || q.power === 'haste') { q.power = 'haste'; q.powerT = 480; } SUP.waves(p, 'wave', 1, 0, { dmg: 14 }); }],
+  ['GRAND PRIX', (p, f) => { SUP.flurry(p, f, 2, 14); for (let k = 0; k < 4; k++) G.projs.push({ x: p.x, y: p.y - 60, vx: (k % 2 ? 1 : -1) * (8 + k * 2), vy: -6, g: 0.5, r: 18, dmg: 14, owner: 'player', by: p, kind: 'spikeball', life: 220, col: '#333', pierce: true, hitSet: new Set(), kb: [12, 10], meter: 0, hs: 4, spikeball: true, rot: 0 }); }]);
 const SKILL_OF = { 'SCRIBBLE': 'SK_UPPER', 'BOLT': 'SK_BOLTDASH', 'BOULDER': 'SK_ROCK', 'INKBLADE': 'SK_RISE', 'DOODLE WITCH': 'SK_HEX', 'SHADE': 'SK_STEP', 'ROBO': 'SK_RPUNCH', 'HALO': 'SK_HALO',
   'SLUGGER': 'SK_LINE', 'HOPPER': 'SK_TONGUE', 'WHISKERS': 'SK_POUNCE', 'CHEF': 'SK_PIES', 'FROSTY': 'SK_ICICLE', 'GHOSTLY': 'SK_SPOOK', 'DJ BEATS': 'SK_DROP', 'SIR DOODLE': 'SK_BASH',
   'BUBBLES': 'SK_BHOP', 'JETPACK JO': 'SK_BURNER', 'PRESTO': 'SK_VANISH', 'EL DOODLO': 'SK_SUPLEX', 'MIMIC': 'SK_COPY', 'BLAZE': 'SK_FWALL', 'CAPTAIN INK': 'SK_RECOIL', 'GRAVITY GUS': 'SK_PULL',
@@ -1309,6 +1366,7 @@ function doHit(att, vic, a, dir, noAttHs) {
     if (vic.char.block && vic.onGround && !vic.attack && vic.ctrl.down('down') && att && sign(att.x - vic.x) === vic.facing) {
       a = Object.assign({}, a, { dmg: Math.ceil((a.dmg || 5) * 0.2), kb: [2, 0], stun: 4 }); floatText(vic.x, vic.y - 110, 'BLOCK!', '#b8860b', 24, 30); SFX.reflect();
     }
+    if (vic.bubbleT > 0) { vic.bubbleT = 0; vic.inv = 40; SFX.reflect(); ring(vic.x, vic.y - 45, '#5ac8ff', 90, 6, 18); floatText(vic.x, vic.y - 120, 'POP!', '#5ac8ff', 30, 30); if (att && att.T) trapFoe(att); else if (att && att !== vic) att.stun = Math.max(att.stun, 60); return; }
     if (vic.shield > 0) {
       vic.shield--; vic.inv = 40; SFX.reflect(); ring(vic.x, vic.y - 40, '#5ac8ff', 70, 6, 16);
       floatText(vic.x, vic.y - 110, vic.shield ? 'BLOCKED! (' + vic.shield + ' LEFT)' : 'SHIELD BROKE!', '#2a9ad0', 26, 40);
@@ -1369,6 +1427,7 @@ function doHit(att, vic, a, dir, noAttHs) {
 
 function playerScored(p, vic, dmg, a) {
   p.combo++; p.comboT = 110; p.maxCombo = Math.max(p.maxCombo, p.combo); p.hits++;
+  if (p.combo > (G.prog.combo || 0) && p.combo % 5 === 0) bumpProg('combo', p.combo);
   let mult = 1 + Math.min(p.combo, 50) * 0.05, team = false;
   if (vic.lastHitBy && vic.lastHitBy !== p && G.frame - vic.lastHitT < 120) { team = true; mult *= 2; }
   vic.lastHitBy = p; vic.lastHitT = G.frame;
@@ -1395,7 +1454,7 @@ class Player extends Fighter {
     this.x = this.idx ? 1000 : 600; this.y = FLOOR; this.vx = this.vy = 0; this.facing = this.idx ? -1 : 1;
     this.applyChar(); this.hp = this.maxHp = this.char.hp; this.hpGhost = this.maxHp; this.attack = null; this.shadowQ = null; this.plat = null; this.stun = 0; this.inv = 60; this.dead = false; this.downed = false;
     this.dashT = 0; this.dashCd = 0; this.skillCd = 0; this.pounding = 0; this.specialT = 0; this.flipT = 0; this.spin = 0; this.jumps = 0; this.coyote = 0; this.airDash = this.char.airDashes || 1;
-    if (full) { this.meter = 0; this.score = 0; this.combo = 0; this.comboT = 0; this.maxCombo = 0; this.hits = 0; this.power = null; this.powerT = 0; this.shield = 0; this.droneT = 0; this.cloudT = 0; this.regenT = 0; this.magnetT = 0; this.thornT = 0; this.hauntT = 0; this.luckyT = 0; this.vampT = 0; this.invisT = 0; this.shrinkT = 0; this.fuel = 80; this.auraT = 0; this.yoyoT = 0; this.rodT = 0; this.moonT = 0; this.mirrorT = 0; this.gloveT = 0; }
+    if (full) { this.meter = 0; this.score = 0; this.combo = 0; this.comboT = 0; this.maxCombo = 0; this.hits = 0; this.power = null; this.powerT = 0; this.shield = 0; this.droneT = 0; this.cloudT = 0; this.regenT = 0; this.magnetT = 0; this.thornT = 0; this.hauntT = 0; this.luckyT = 0; this.vampT = 0; this.invisT = 0; this.shrinkT = 0; this.fuel = 80; this.auraT = 0; this.yoyoT = 0; this.rodT = 0; this.moonT = 0; this.mirrorT = 0; this.gloveT = 0; this.bootsT = 0; this.orbitT = 0; this.bubbleT = 0; }
   }
   get ctrl() { return ctrls[this.idx]; }
   update() {
@@ -1424,6 +1483,13 @@ class Player extends Fighter {
     if (this.rodT > 0) { this.rodT--; if (this.rodT % 70 === 35) { const t = nearFoe(this, 1000); if (t) G.strikes.push({ x: clamp(t.x, 40, W - 40), t: 22, by: this, dmg: 18, follow: t }); } }
     if (this.moonT > 0) this.moonT--;
     if (this.gloveT > 0) this.gloveT--;
+    if (this.bootsT > 0) this.bootsT--;
+    if (this.bubbleT > 0) this.bubbleT--;
+    if (this.orbitT > 0) {
+      this.orbitT--; this.orbHit = this.orbHit || {};
+      for (let k = 0; k < 3; k++) { const a = G.frame * 0.09 + k * 2.094, ox = this.x + Math.cos(a) * 75, oy = this.y - 45 * this.s + Math.sin(a) * 55;
+        for (const e of foesOf(this)) if (Math.hypot(e.x - ox, (e.y - e.hh / 2) - oy) < 30 + e.hw && (this.orbHit[e.id] || 0) < G.frame) { this.orbHit[e.id] = G.frame + 30; doHit(this, e, { dmg: 9, kb: [7, 6], stun: 22, hs: 2, sfx: 'light', meter: 1 }, sign(e.x - this.x) || 1, true); } }
+    }
     if (this.mirrorT > 0) { this.mirrorT--; if (this.mirrorT % 24 === 0) ring(this.x, this.y - 45 * this.s, '#5ac8ff', 55 * this.s, 3, 14); }
     if (this.regenT > 0) {
       this.regenT--;
@@ -1632,6 +1698,7 @@ class Player extends Fighter {
   }
   onLand(v) {
     super.onLand(v);
+    if (this.bootsT > 0 && v > 6 && !this.downed) { SFX.shock(); addShake(5); ring(this.x, this.y, '#8a5a2b', 90, 5, 14); for (const d of [-1, 1]) G.projs.push({ x: this.x + d * 30, y: FLOOR - 18, vx: d * 10, vy: 0, g: 0, r: 20, dmg: 10, owner: 'player', by: this, kind: 'wave', life: 50, col: '#8a5a2b', pierce: true, hitSet: new Set(), kb: [6, 10], meter: 1, hs: 2 }); }
     if (v > 8 && !this.pounding) SFX.land();
     if (this.attack && this.attack.air) { this.attack = null; this.spin = 0; }
     this.flipT = 0; this.spin = this.pounding ? 0 : this.spin;
@@ -2363,8 +2430,8 @@ function killEnemy(e, att, dir) {
 
 // ---------------------------------------------------------------- pickups
 const PICKS = ['heart', 'heart', 'heart', 'ink', 'ink', 'pencil', 'bolt', 'shield', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'drone',
-  'clone', 'tornado', 'cloud', 'regen', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'pinata', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove'];
-const MYSTERY = ['pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove'];
+  'clone', 'tornado', 'cloud', 'regen', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'pinata', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield'];
+const MYSTERY = ['pencil', 'bolt', 'shield', 'giant', 'fire', 'freeze', 'star', 'bomb', 'drone', 'clone', 'tornado', 'cloud', 'regen', 'double', 'rocket', 'magnet', 'mine', 'thorns', 'hammer', 'clock', 'shrink', 'lucky', 'turret', 'vampire', 'invisible', 'hole', 'aura', 'jetpack', 'decoy', 'meteors', 'lightning', 'moon', 'mirror', 'quake', 'zerog', 'medkit', 'superink', 'spikeball', 'banana', 'heartup', 'glove', 'fireworks', 'boots', 'orbit', 'chain', 'inkrain', 'bubbleshield'];
 const POWER_INFO = { sword: ['PENCIL BLADE', '#c89800', 900], haste: ['HYPER SPEED', '#2ab0e0', 720], giant: ['MEGA SIZE', '#e2342c', 600], fire: ['FIRE INK', '#ff6a1a', 720], star: ['INVINCIBLE', '#e8a800', 480] };
 Object.assign(POWER_INFO, { hammer: ['MEGA HAMMER', '#8d5524', 720], double: ['DOUBLE DAMAGE', '#d0021b', 600], rocket: ['ROCKET BOOTS', '#ff8a00', 720], clone: ['INK CLONE', '#7b3fd0', 720], jet: ['JETPACK', '#5b7a2a', 720] });
 function setPower(p, k) { const [n, c, t] = POWER_INFO[k]; p.power = k; p.powerT = t; floatText(p.x, p.y - 110, n + '!', c, 32); }
@@ -2391,6 +2458,18 @@ function applyPickup(p, kind) {
       say('METEOR CALL!', '#ff6a1a'); SFX.special();
       { const foes = foesOf(p); for (let i = 0; i < 10; i++) { const tx = foes.length ? foes[i % foes.length].x + rand(-50, 50) : rand(100, W - 100); G.projs.push({ x: clamp(tx, 40, W - 40), y: -40 - i * 40, vx: rand(-0.6, 0.6), vy: 7, g: 0.35, r: 15, dmg: 20, owner: 'player', by: p, kind: 'meteor', life: 500, col: p.col, kb: [5, 9], meter: 0 }); } }
       break;
+    case 'fireworks':
+      say('FIREWORKS!', '#ff4a8a'); SFX.special();
+      for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + (i - 3.5) * 0.28; G.projs.push({ x: p.x, y: p.y - 60, vx: Math.cos(a) * 9, vy: Math.sin(a) * 9, g: 0, r: 10, dmg: 15, owner: 'player', by: p, kind: 'rocket', life: 200, col: pick(['#ff4a8a', '#ffd23a', '#4ac0ff', '#7ae05a', '#b05aff']), kb: [8, 8], meter: 0, hs: 4, homing: true }); }
+      break;
+    case 'boots': p.bootsT = 600; say('QUAKE BOOTS!', '#8a5a2b'); break;
+    case 'orbit': p.orbitT = 600; p.orbHit = {}; say('ORBIT SHIELD!', '#5ac8ff'); break;
+    case 'chain': {
+      say('CHAIN LIGHTNING!', '#ffd23a'); SFX.shock(); const hit = []; let from = p;
+      for (let k = 0; k < 6; k++) { let best = null, bd = k ? 340 : 700; for (const e of foesOf(p)) { if (hit.includes(e)) continue; const d = Math.hypot(e.x - from.x, (e.y - 40) - (from.y - 40)); if (d < bd) { bd = d; best = e; } } if (!best) break; G.zapLines.push({ x1: from.x, y1: from.y - 50, x2: best.x, y2: best.y - 45, t: 18 }); hit.push(best); doHit(p, best, { dmg: 18, kb: [4, 6], stun: 40, hs: 4, heavy: true, sfx: 'heavy', meter: 0 }, sign(best.x - from.x) || 1, true); from = best; }
+      break; }
+    case 'inkrain': G.inkRain = { t: 360, by: p }; say('INK STORM!', '#7b3fd0'); break;
+    case 'bubbleshield': p.bubbleT = 900; say('BUBBLE SHIELD!', '#5ac8ff'); break;
     case 'medkit':
       say('MEDKIT!', '#e2342c'); SFX.revive();
       for (const q of G.players) { if (!q.joined || q.dead) continue; if (q.downed && G.mode !== 'versus') { q.downed = false; q.hp = 45; q.inv = 100; floatText(q.x, q.y - 130, 'REVIVED!', q.col, 34, 60); } else if (!q.downed && (q === p || G.mode !== 'versus')) { q.hp = Math.min(q.maxHp, q.hp + 50); floatText(q.x, q.y - 130, '+50', '#e2342c', 26, 40); } ring(q.x, q.y - 40, '#e2342c', 90, 5, 18); }
@@ -2715,7 +2794,7 @@ function startGame(startStage = 0, mode = 'story') {
   G.startStage = startStage; G.mode = mode; G.won = false; G.rushIdx = -1; G.rushT = 0; G.newBestRush = false; G.bossOv = null; G.miniOv = null; G.cut = null;
   G.state = 'play'; G.wave = mode === 'rush' ? 0 : startStage * 5; G.stage = -1; G.frame = 0; G.enemies = []; G.projs = []; G.pickups = []; G.portals = []; G.ghosts = [];
   G.overT = 0; G.teamSuperT = 0; G.boss = null; G.crateT = 700; G.newBest = false; parts = []; texts = []; slowT = 0; timeScale = 1;
-  G.geysers = []; G.geyserT = 300; G.strikes = []; G.lasers = []; G.train = null; G.trainT = 300; G.pools = []; G.poolT = 240; G.gumT = 300; G.gumDir = 1; G.tide = null; G.disco = null; G.dart = null; G.volley = null; G.volleyT = 300; G.zapF = null; G.zapT = 360; G.cutIn = null; G.stormT = 240; G.laserT = 300; for (const L of LAYOUTS) for (const p of L) if (p.crumble) { p.ct = 0; p.gone = 0; } G.wind = null; G.enemySlowT = 0; G.dark = null; G.belt = null; G.decoy = null;
+  G.geysers = []; G.geyserT = 300; G.strikes = []; G.lasers = []; G.train = null; G.trainT = 300; G.pools = []; G.poolT = 240; G.gumT = 300; G.gumDir = 1; G.tide = null; G.disco = null; G.dart = null; G.volley = null; G.volleyT = 300; G.zapF = null; G.zapT = 360; G.inkRain = null; G.zapLines = []; G.cutIn = null; G.stormT = 240; G.laserT = 300; for (const L of LAYOUTS) for (const p of L) if (p.crumble) { p.ct = 0; p.gone = 0; } G.wind = null; G.enemySlowT = 0; G.dark = null; G.belt = null; G.decoy = null;
   for (const p of G.players) p.reset(true);
   if (mode === 'versus') {
     G.stage = startStage; sctx.clearRect(0, 0, W, H); buildBG();
@@ -3866,6 +3945,12 @@ function drawPickups() {
     if (k.kind === 'regen') { ctx.fillStyle = '#21a35a'; ctx.fillRect(-3, -11, 6, 22); ctx.fillRect(-11, -3, 22, 6); }
     if (k.kind === 'double') txt('x2', 0, 1, 19, '#d0021b', 'center', F1);
     if (k.kind === 'rocket') { ctx.fillStyle = '#555'; ctx.fillRect(-7, -10, 9, 14); ctx.fillRect(-7, 2, 15, 6); ctx.fillStyle = '#ff8a00'; ctx.beginPath(); ctx.moveTo(-6, 9); ctx.lineTo(-1, 16); ctx.lineTo(4, 9); ctx.fill(); }
+    if (k.kind === 'fireworks') { for (const [dx, c] of [[-6, '#ff4a8a'], [0, '#ffd23a'], [6, '#4ac0ff']]) { ctx.fillStyle = c; ctx.fillRect(dx - 2, -10, 4, 14); ctx.beginPath(); ctx.moveTo(dx - 3, -10); ctx.lineTo(dx, -15); ctx.lineTo(dx + 3, -10); ctx.fill(); } ctx.fillStyle = '#ffd23a'; ctx.fillRect(-9, 4, 18, 3); }
+    if (k.kind === 'boots') { ctx.fillStyle = '#8a5a2b'; ctx.fillRect(-9, -8, 8, 14); ctx.fillRect(-9, 3, 16, 6); ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-12, 12); ctx.lineTo(12, 12); ctx.stroke(); }
+    if (k.kind === 'orbit') { ctx.strokeStyle = '#5ac8ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 0, 13, 7, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#5ac8ff'; for (let i = 0; i < 3; i++) { const a = G.frame * 0.1 + i * 2.094; ctx.beginPath(); ctx.arc(Math.cos(a) * 13, Math.sin(a) * 7, 3.5, 0, Math.PI * 2); ctx.fill(); } }
+    if (k.kind === 'chain') { ctx.strokeStyle = '#e8a800'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-12, -8); ctx.lineTo(-4, -2); ctx.lineTo(-8, 2); ctx.lineTo(2, 8); ctx.moveTo(4, -10); ctx.lineTo(10, -4); ctx.lineTo(6, 0); ctx.lineTo(12, 6); ctx.stroke(); }
+    if (k.kind === 'inkrain') { ctx.fillStyle = '#5a5a6a'; for (const [cx, cy, r] of [[-5, -6, 6], [3, -8, 7], [9, -5, 5]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); } ctx.strokeStyle = '#7b3fd0'; ctx.lineWidth = 2; for (const dx of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(dx, 2); ctx.lineTo(dx - 2, 10); ctx.stroke(); } }
+    if (k.kind === 'bubbleshield') { ctx.strokeStyle = '#5ac8ff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = 'rgba(90,200,255,0.3)'; ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-4, -4, 3, 0, Math.PI * 2); ctx.fill(); }
     if (k.kind === 'medkit') { ctx.fillStyle = '#fff'; ctx.fillRect(-12, -9, 24, 18); ctx.strokeStyle = '#e2342c'; ctx.lineWidth = 2; ctx.strokeRect(-12, -9, 24, 18); ctx.fillStyle = '#e2342c'; ctx.fillRect(-2.5, -6, 5, 12); ctx.fillRect(-6, -2.5, 12, 5); }
     if (k.kind === 'superink') { ctx.fillStyle = '#a040e0'; ctx.fillRect(-8, -6, 16, 15); ctx.fillStyle = '#333'; ctx.fillRect(-5, -12, 10, 6); txt('S', 0, 2, 13, '#fff', 'center', F1); }
     if (k.kind === 'spikeball') { ctx.fillStyle = '#555'; ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, rr = i % 2 ? 7 : 12; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); ctx.fill(); }
@@ -4042,6 +4127,8 @@ function startVolley(n, boss) {
 }
 function startZap(boss) { if (G.zapF && G.zapF.ph !== 'idle') return; G.zapF = { ph: 'warn', t: 80, boss: !!boss, hit: new Set() }; tone(120, 0.8, 'sawtooth', 0.06, 240); }
 function updateNewHaz2() {
+  if (G.inkRain) { const r = G.inkRain; if (--r.t <= 0) G.inkRain = null; else if (r.t % 30 === 0 && r.by && !r.by.dead) for (const e of foesOf(r.by)) doHit(r.by, e, { dmg: 6, kb: [0, 1], stun: 8, hs: 1, sfx: 'light', meter: 0 }, 1, true); }
+  for (const z of G.zapLines) z.t--; G.zapLines = G.zapLines.filter(z => z.t > 0);
   const kind = theme().kind, foes = () => G.enemies.filter(e => !e.dead && e.spawnT <= 0 && !e.T.boss);
   // temple dart traps
   if (kind === 'temple') {
@@ -4072,6 +4159,13 @@ function updateNewHaz2() {
   }
 }
 function drawNewHaz2() {
+  if (G.inkRain) { ctx.strokeStyle = 'rgba(123,63,208,0.55)'; ctx.lineWidth = 3; for (let i = 0; i < 40; i++) { const x = (i * 97 + G.frame * 3) % W, y = (i * 211 + G.frame * 18) % FLOOR; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 18); ctx.stroke(); } }
+  for (const z of G.zapLines || []) { ctx.globalAlpha = z.t / 18; for (const [lw, c] of [[10, 'rgba(255,230,90,0.6)'], [3, '#fff']]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(z.x1, z.y1); for (let k = 1; k < 6; k++) ctx.lineTo(z.x1 + (z.x2 - z.x1) * k / 6 + rand(-12, 12), z.y1 + (z.y2 - z.y1) * k / 6 + rand(-12, 12)); ctx.lineTo(z.x2, z.y2); ctx.stroke(); } ctx.globalAlpha = 1; }
+  for (const p of G.players) {
+    if (!p.joined || p.dead) continue;
+    if (p.orbitT > 0) for (let k = 0; k < 3; k++) { const a = G.frame * 0.09 + k * 2.094, ox = p.x + Math.cos(a) * 75, oy = p.y - 45 * p.s + Math.sin(a) * 55; ctx.fillStyle = '#5ac8ff'; ctx.beginPath(); ctx.arc(ox, oy, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ox - 3, oy - 3, 4, 0, Math.PI * 2); ctx.fill(); }
+    if (p.bubbleT > 0) { ctx.strokeStyle = 'rgba(90,200,255,0.8)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y - 45 * p.s, 62 * p.s, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = 'rgba(90,200,255,0.12)'; ctx.fill(); }
+  }
   const kind = theme().kind;
   const d = G.dart;
   if (kind === 'temple') {
@@ -4351,7 +4445,7 @@ function drawHUD() {
     if (p.luckyT > 0) extras.push('LUCKY ' + Math.ceil(p.luckyT / 60) + 's'); if (p.vampT > 0) extras.push('VAMPIRE ' + Math.ceil(p.vampT / 60) + 's');
     if (p.invisT > 0) extras.push('INVISIBLE ' + Math.ceil(p.invisT / 60) + 's'); if (p.shrinkT > 0) extras.push('SHRUNK ' + Math.ceil(p.shrinkT / 60) + 's');
     if (p.magnetT > 0) extras.push('MAGNET ' + Math.ceil(p.magnetT / 60) + 's'); if (p.thornT > 0) extras.push('THORNS ' + Math.ceil(p.thornT / 60) + 's');
-    if (p.rodT > 0) extras.push('ROD ' + Math.ceil(p.rodT / 60) + 's'); if (p.moonT > 0) extras.push('MOON ' + Math.ceil(p.moonT / 60) + 's'); if (p.mirrorT > 0) extras.push('MIRROR ' + Math.ceil(p.mirrorT / 60) + 's'); if (p.gloveT > 0) extras.push('GLOVE ' + Math.ceil(p.gloveT / 60) + 's');
+    if (p.rodT > 0) extras.push('ROD ' + Math.ceil(p.rodT / 60) + 's'); if (p.moonT > 0) extras.push('MOON ' + Math.ceil(p.moonT / 60) + 's'); if (p.mirrorT > 0) extras.push('MIRROR ' + Math.ceil(p.mirrorT / 60) + 's'); if (p.gloveT > 0) extras.push('GLOVE ' + Math.ceil(p.gloveT / 60) + 's'); if (p.bootsT > 0) extras.push('BOOTS ' + Math.ceil(p.bootsT / 60) + 's'); if (p.orbitT > 0) extras.push('ORBIT ' + Math.ceil(p.orbitT / 60) + 's'); if (p.bubbleT > 0) extras.push('BUBBLE');
     if (p.cloudT > 0) extras.push('CLOUD ' + Math.ceil(p.cloudT / 60) + 's'); if (p.regenT > 0) extras.push('REGEN ' + Math.ceil(p.regenT / 60) + 's');
     const exY = extras.length && !p.dead ? 26 : 0;
     if (exY) { ctx.fillStyle = th.dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.75)'; ctx.fillRect(bx - 12, 148, 354, 24); txt(extras.join(' · '), x, 160, 17, '#2a9ad0', al, F1); }
@@ -4881,15 +4975,15 @@ function buildSnapshot() {
     P: G.players.map(p => [p.joined ? 1 : 0, p.ci, ri(p.x), ri(p.y), p.facing, poseArr(p.pose), ri(p.hp), p.maxHp, ri(p.meter), p.score, p.combo, p.comboT,
       (p.dead ? 1 : 0) | (p.downed ? 2 : 0) | (p.ready ? 4 : 0) | (p.flash > 0 ? 8 : 0), PWN.indexOf(p.power), p.powerT, p.shield || 0, p.droneT || 0, p.cloudT || 0, p.regenT || 0,
       ri((p.spin || 0) * 100), ri(p.revive || 0), ri(Math.min(p.bleed || 0, 99999)), p.hits, p.maxCombo, ri(p.s * 100), ri(p.inv), p.specialT || 0,
-      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0, p.skillCd || 0, p.rodT || 0, p.moonT || 0, p.mirrorT || 0, p.gloveT || 0, ri(p.maxHp)]),
+      ri(p.droneX || 0), ri(p.droneY || 0), ri(p.cloudX || 0), ri(p.cloudY || 0), p.magnetT || 0, p.thornT || 0, p.hauntT || 0, p.luckyT || 0, p.vampT || 0, p.invisT || 0, p.shrinkT || 0, p.auraT || 0, p.yoyoT || 0, p.skillCd || 0, p.rodT || 0, p.moonT || 0, p.mirrorT || 0, p.gloveT || 0, ri(p.maxHp), p.bootsT || 0, p.orbitT || 0, p.bubbleT || 0]),
     E: G.enemies.slice(0, 16).map(e => [e.id, ETN.indexOf(e.type), ri(e.x), ri(e.y), e.facing, poseArr(e.pose), ri(e.hp), e.maxHp, e.flash, e.dying, e.spawnT, e.freeze || 0,
       e.attack ? ATK.indexOf(Object.keys(A).find(k => A[k] === e.attack)) : -1, ri(e.at || 0), BST.indexOf(e.bstate), e.bt, ri((e.fade ?? 1) * 100), e.ph2 ? 1 : 0, ri((e.spin || 0) * 100),
       e.T.boss ? [ri(e.beamY || 0), e.beamDir || 0, (e.rainX || []).map(ri), ri(e.warnY || 0), ri(e.bhX || 0), ri(e.bhY || 0)] : 0, e.bubbled > 0 ? 1 : 0, e.shrinkT > 0 ? 1 : 0]),
     J: G.projs.slice(0, 26).map(pr => [PJK.indexOf(pr.kind), ri(pr.x), ri(pr.y), r1(pr.vx), r1(pr.vy), ri(pr.r), pr.owner === 'player' ? (pr.by ? pr.by.idx : 0) : -1, r1(pr.rot || 0), pr.face || 0, pr.life]),
     K: G.pickups.slice(0, 10).map(k => [ri(k.x), ri(k.y), PKK.indexOf(k.kind), k.t]),
     PT: G.portals.map(q => [ri(q.x), ri(q.y), ETN.indexOf(q.type), q.t, q.max]),
-    Y: (G.geysers || []).map(g => [ri(g.x), g.t]), SK: (G.strikes || []).map(k => [ri(k.x), k.t]), TR: G.train ? [['idle', 'warn', 'run'].indexOf(G.train.ph), G.train.t, ri(G.train.x), G.train.dir] : 0, PL: (G.pools || []).map(q => [ri(q.x), q.t]), GU: [G.gumT || 0, G.gumDir || 1], DT: G.dart ? [G.dart.ph === 'warn' ? 1 : 0, G.dart.t, G.dart.ys] : 0, VL: G.volley && G.volley.ph === 'warn' ? [G.volley.t, G.volley.xs.map(ri)] : 0, ZF: G.zapF ? [['idle', 'warn', 'zap'].indexOf(G.zapF.ph), G.zapF.t] : 0, TD: G.tide ? [['calm', 'warn', 'flow'].indexOf(G.tide.ph), G.tide.t, G.tide.dir] : 0, DS: G.disco ? [['idle', 'warn', 'zap'].indexOf(G.disco.ph), G.disco.t, G.disco.tiles] : 0, CI: G.cutIn ? [G.cutIn.sname, G.cutIn.col, G.cutIn.t, G.cutIn.ci] : 0, LZ: (G.lasers || []).map(l => [ri(l.y), l.t]), CR: layout().filter(p => p.crumble).map(p => [ri(p.ct || 0), p.gone || 0]), cs: G.enemySlowT || 0,
-    bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0, cl: G.cleared || 0, pg: [G.prog.bosses, G.prog.wave, G.prog.vs, G.prog.rush, G.prog.kos, G.prog.supers, G.prog.pickups],
+    Y: (G.geysers || []).map(g => [ri(g.x), g.t]), SK: (G.strikes || []).map(k => [ri(k.x), k.t]), TR: G.train ? [['idle', 'warn', 'run'].indexOf(G.train.ph), G.train.t, ri(G.train.x), G.train.dir] : 0, PL: (G.pools || []).map(q => [ri(q.x), q.t]), GU: [G.gumT || 0, G.gumDir || 1], IR: G.inkRain ? G.inkRain.t : 0, DT: G.dart ? [G.dart.ph === 'warn' ? 1 : 0, G.dart.t, G.dart.ys] : 0, VL: G.volley && G.volley.ph === 'warn' ? [G.volley.t, G.volley.xs.map(ri)] : 0, ZF: G.zapF ? [['idle', 'warn', 'zap'].indexOf(G.zapF.ph), G.zapF.t] : 0, TD: G.tide ? [['calm', 'warn', 'flow'].indexOf(G.tide.ph), G.tide.t, G.tide.dir] : 0, DS: G.disco ? [['idle', 'warn', 'zap'].indexOf(G.disco.ph), G.disco.t, G.disco.tiles] : 0, CI: G.cutIn ? [G.cutIn.sname, G.cutIn.col, G.cutIn.t, G.cutIn.ci] : 0, LZ: (G.lasers || []).map(l => [ri(l.y), l.t]), CR: layout().filter(p => p.crumble).map(p => [ri(p.ct || 0), p.gone || 0]), cs: G.enemySlowT || 0,
+    bo: [ALLB.indexOf(G.bossOv), ALLB.indexOf(G.miniOv)], ct: G.cut ? [G.cut.id, G.cut.i, G.cut.t] : 0, cc: G.campCh || 0, cw: G.campWave || 0, chs: G.chSel || 0, chu: G.chUnlocked || 0, cl: G.cleared || 0, pg: [G.prog.bosses, G.prog.wave, G.prog.vs, G.prog.rush, G.prog.kos, G.prog.supers, G.prog.pickups, G.prog.combo || 0],
     DC: G.decoy ? [ri(G.decoy.x), ri(G.decoy.y), G.decoy.t, G.decoy.ci, G.decoy.facing] : 0,
     DK: G.dark ? [['light', 'warn', 'dark'].indexOf(G.dark.phase), G.dark.t] : 0, BT: G.belt ? [G.belt.dir, G.belt.t] : 0,
     WD: G.wind ? [['calm', 'warn', 'gust'].indexOf(G.wind.phase), G.wind.t, G.wind.dir] : 0,
@@ -4915,7 +5009,7 @@ function applySnapshot(s) {
   if (s.st === 'play' && prevState !== 'play' && prevState !== 'pause') sctx.clearRect(0, 0, W, H);
   updatePlatforms();
   G.bossOv = s.bo && s.bo[0] >= 0 ? ALLB[s.bo[0]] : null; G.miniOv = s.bo && s.bo[1] >= 0 ? ALLB[s.bo[1]] : null;
-  G.cut = s.ct ? { id: s.ct[0], i: s.ct[1], t: s.ct[2] } : null; G.campCh = s.cc; G.campWave = s.cw; G.chSel = s.chs; G.chUnlocked = s.chu; if (s.pg) G.prog = { bosses: s.pg[0], wave: s.pg[1], vs: s.pg[2], rush: s.pg[3], kos: s.pg[4] || 0, supers: s.pg[5] || 0, pickups: s.pg[6] || 0 }; if (s.cl !== undefined && s.cl !== G.cleared) { if (G.clSynced && s.cl > G.cleared) G.unlockToast = { names: CHARS.slice(START_FIGHTERS + PER_CHAPTER * G.cleared, START_FIGHTERS + PER_CHAPTER * s.cl).map(c => c.name), t: 420 }; G.cleared = s.cl; } G.clSynced = true;
+  G.cut = s.ct ? { id: s.ct[0], i: s.ct[1], t: s.ct[2] } : null; G.campCh = s.cc; G.campWave = s.cw; G.chSel = s.chs; G.chUnlocked = s.chu; if (s.pg) G.prog = { bosses: s.pg[0], wave: s.pg[1], vs: s.pg[2], rush: s.pg[3], kos: s.pg[4] || 0, supers: s.pg[5] || 0, pickups: s.pg[6] || 0, combo: s.pg[7] || 0 }; if (s.cl !== undefined && s.cl !== G.cleared) { if (G.clSynced && s.cl > G.cleared) G.unlockToast = { names: CHARS.slice(START_FIGHTERS + PER_CHAPTER * G.cleared, START_FIGHTERS + PER_CHAPTER * s.cl).map(c => c.name), t: 420 }; G.cleared = s.cl; } G.clSynced = true;
   const live = s.st === 'play';
   let ciChanged = false;
   s.P.forEach((a, i) => {
@@ -4930,7 +5024,7 @@ function applySnapshot(s) {
     p.dead = !!(a[12] & 1); p.downed = !!(a[12] & 2); p.ready = !!(a[12] & 4); p.flash = a[12] & 8 ? 2 : 0;
     p.power = a[13] >= 0 ? PWN[a[13]] : null; p.powerT = a[14]; p.shield = a[15]; p.droneT = a[16]; p.cloudT = a[17]; p.regenT = a[18];
     p.spin = a[19] / 100; p.revive = a[20]; p.bleed = a[21]; p.hits = a[22]; p.maxCombo = a[23]; p._s = a[24] / 100; p.inv = a[25]; p.specialT = a[26];
-    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39]; p.skillCd = a[40] || 0; p.rodT = a[41] || 0; p.moonT = a[42] || 0; p.mirrorT = a[43] || 0; p.gloveT = a[44] || 0; if (a[45]) p.maxHp = a[45];
+    p.droneX = a[27]; p.droneY = a[28]; p.cloudX = a[29]; p.cloudY = a[30]; p.magnetT = a[31]; p.thornT = a[32]; p.hauntT = a[33]; p.luckyT = a[34]; p.vampT = a[35]; p.invisT = a[36]; p.shrinkT = a[37]; p.auraT = a[38]; p.yoyoT = a[39]; p.skillCd = a[40] || 0; p.rodT = a[41] || 0; p.moonT = a[42] || 0; p.mirrorT = a[43] || 0; p.gloveT = a[44] || 0; if (a[45]) p.maxHp = a[45]; p.bootsT = a[46] || 0; p.orbitT = a[47] || 0; p.bubbleT = a[48] || 0;
   });
   if (ciChanged) G.players.forEach(p => p.applyChar());
   G.players.forEach(p => { if (p._s) p.s = p._s; });
@@ -4969,7 +5063,7 @@ function applySnapshot(s) {
   if (live && G.pickups.length > s.K.length) SFX.pickup();
   G.pickups = s.K.map(a => ({ x: a[0], y: a[1], kind: PKK[a[2]], t: a[3] }));
   G.portals = s.PT.map(a => ({ x: a[0], y: a[1], type: ETN[a[2]], t: a[3], max: a[4] }));
-  G.geysers = s.Y.map(a => ({ x: a[0], t: a[1] })); G.strikes = (s.SK || []).map(a => ({ x: a[0], t: a[1] })); G.train = s.TR ? { ph: ['idle', 'warn', 'run'][s.TR[0]], t: s.TR[1], x: s.TR[2], dir: s.TR[3] } : null; G.pools = (s.PL || []).map(a => ({ x: a[0], t: a[1] })); if (s.GU) { G.gumT = s.GU[0]; G.gumDir = s.GU[1]; } G.dart = s.DT ? { ph: s.DT[0] ? 'warn' : 'idle', t: s.DT[1], ys: s.DT[2] } : null; G.volley = s.VL ? { ph: 'warn', t: s.VL[0], xs: s.VL[1] } : null; G.zapF = s.ZF ? { ph: ['idle', 'warn', 'zap'][s.ZF[0]], t: s.ZF[1], hit: new Set() } : null; G.tide = s.TD ? { ph: ['calm', 'warn', 'flow'][s.TD[0]], t: s.TD[1], dir: s.TD[2] } : null; G.disco = s.DS ? { ph: ['idle', 'warn', 'zap'][s.DS[0]], t: s.DS[1], tiles: s.DS[2] } : null; G.cutIn = s.CI ? { sname: s.CI[0], col: s.CI[1], t: s.CI[2], ci: s.CI[3] } : null; G.lasers = (s.LZ || []).map(a => ({ y: a[0], t: a[1] })); if (s.CR) { const cp = layout().filter(p => p.crumble); s.CR.forEach((a, k) => { if (cp[k]) { cp[k].ct = a[0]; cp[k].gone = a[1]; } }); } G.enemySlowT = s.cs || 0;
+  G.geysers = s.Y.map(a => ({ x: a[0], t: a[1] })); G.strikes = (s.SK || []).map(a => ({ x: a[0], t: a[1] })); G.train = s.TR ? { ph: ['idle', 'warn', 'run'][s.TR[0]], t: s.TR[1], x: s.TR[2], dir: s.TR[3] } : null; G.pools = (s.PL || []).map(a => ({ x: a[0], t: a[1] })); if (s.GU) { G.gumT = s.GU[0]; G.gumDir = s.GU[1]; } G.inkRain = s.IR ? { t: s.IR } : null; G.dart = s.DT ? { ph: s.DT[0] ? 'warn' : 'idle', t: s.DT[1], ys: s.DT[2] } : null; G.volley = s.VL ? { ph: 'warn', t: s.VL[0], xs: s.VL[1] } : null; G.zapF = s.ZF ? { ph: ['idle', 'warn', 'zap'][s.ZF[0]], t: s.ZF[1], hit: new Set() } : null; G.tide = s.TD ? { ph: ['calm', 'warn', 'flow'][s.TD[0]], t: s.TD[1], dir: s.TD[2] } : null; G.disco = s.DS ? { ph: ['idle', 'warn', 'zap'][s.DS[0]], t: s.DS[1], tiles: s.DS[2] } : null; G.cutIn = s.CI ? { sname: s.CI[0], col: s.CI[1], t: s.CI[2], ci: s.CI[3] } : null; G.lasers = (s.LZ || []).map(a => ({ y: a[0], t: a[1] })); if (s.CR) { const cp = layout().filter(p => p.crumble); s.CR.forEach((a, k) => { if (cp[k]) { cp[k].ct = a[0]; cp[k].gone = a[1]; } }); } G.enemySlowT = s.cs || 0;
   G.decoy = s.DC ? { x: s.DC[0], y: s.DC[1], t: s.DC[2], ci: s.DC[3], facing: s.DC[4], vx: 0, hh: 78, s: 1 } : null;
   G.dark = s.DK ? { phase: ['light', 'warn', 'dark'][s.DK[0]], t: s.DK[1] } : null; G.belt = s.BT ? { dir: s.BT[0], t: s.BT[1] } : null;
   G.wind = s.WD ? { phase: ['calm', 'warn', 'gust'][s.WD[0]], t: s.WD[1], dir: s.WD[2] } : null;
