@@ -5604,6 +5604,69 @@ function memEnd() {
   const M = mem; M.on = false; mem = null; if (S.memDay !== S.day) { S.memDay = S.day; S.memToday = 0; } S.memToday++; const c = S.memToday > 3 ? 10 : Math.max(20, 120 - (M.tries - 8)*8); S.coins += c; S.memGames = (S.memGames || 0) + 1; S.memBest = S.memBest ? Math.min(S.memBest, M.tries) : M.tries; SFX.victory(); renderHUD(); save();
   setTimeout(() => openPanel('Matching pairs', `All pairs found in <b>${M.tries}</b> tries!${M.tries <= (S.memBest || 99) ? ' Your best yet!' : ''}<br>“${M.tries <= 12 ? 'Whoa, you have a better memory than me!' : 'Nice! Wanna go again?'}” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Play again', primary: true, fn: () => memStart()}, {label: 'Close', fn: closeTalk}]), 400);
 }
+// ===== the wandering tortoise merchant =====
+let tortoise = null, tortoiseT = 300;
+const TORT_STOCK = [['rocket_pack', 22], ['giant_draught', 55], ['swift_tonic', 40], ['shrink_elixir', 40], ['strongbox', 45], ['treasure_map', 110], ['gem', 95], ['pet_treat', 12], ['war_horn', 120], ['picnic_basket', 35]];
+function updateTortoise(dt) {
+  const Tt = tortoise;
+  if (Tt) { Tt.t -= dt; Tt.ph += dt*2; if (!Tt.stop) { Tt.wt -= dt; if (Tt.wt <= 0) { Tt.wt = 4 + Math.random()*4; const a = Math.random()*6.283; Tt.vx = Math.cos(a)*.6; Tt.vy = Math.sin(a)*.6; } const nx = Tt.x + Tt.vx*dt, ny = Tt.y + Tt.vy*dt; if (inB(Math.floor(nx), Math.floor(ny)) && passable(nx, ny) && passable(nx + 1, ny)) { Tt.x = nx; Tt.y = ny; } else Tt.wt = 0; }
+    Tt.stop = Math.hypot(Tt.x - S.x, Tt.y - S.y) < 3; if (Tt.t <= 0 || Math.hypot(Tt.x - S.x, Tt.y - S.y) > 50) { tortoise = null; } return; }
+  if (inDungeon() || S.y >= WORLD_H || townAt(S.x, S.y, 10)) return;
+  tortoiseT -= dt; if (tortoiseT > 0) return; tortoiseT = 500 + Math.random()*500; if (Math.random() > .5) return;
+  for (let k = 0; k < 30; k++) { const a = Math.random()*6.283, x = S.x + Math.cos(a)*12, y = S.y + Math.sin(a)*12; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && passable(x + 1, y) && !townAt(x, y, 8)) {
+    const stock = TORT_STOCK.filter(([g]) => GOODS[g]).sort(() => Math.random() - .5).slice(0, 4).map(([g, c]) => ({g, c, n: g === 'pet_treat' ? 3 : 1, left: 2}));
+    tortoise = {x, y, vx: 0, vy: 0, wt: 0, t: 150, ph: 0, stock}; SFX.chime(); toast('<b>Thud... thud... thud...</b><br>A giant tortoise lumbers into view, with a little market stall strapped to its shell!', 6000); return; } }
+}
+function tortoiseTarget() {
+  if (!tortoise || Math.hypot(tortoise.x - S.x, tortoise.y - S.y) > 2.6) return null;
+  return {key: 'tort', html: '<kbd style="margin:0 6px 0 0">E</kbd>Browse Old Tam’s shell-top market', btn: 'Shop', fn: () => tortoiseShop()};
+}
+function tortoiseShop() {
+  if (!tortoise) return; S.tortoiseVisits = (S.tortoiseVisits || 0) + (tortoise.visited ? 0 : 1); tortoise.visited = true;
+  openPanel('Old Tam’s shell-top market', 'An old man in a straw hat waves from the top of the shell. “Welcome, welcome! Grandmother Shell and I wander all over the land. Rare things, fair prices, but only a couple of each!”', [
+    ...tortoise.stock.map(st => ({label: `${st.n > 1 ? st.n + ' ' : ''}${GOODS[st.g].name} · ${st.c*st.n}◆${st.left ? '' : ' (sold out)'}`, disabled: !st.left || S.coins < st.c*st.n, fn: () => { S.coins -= st.c*st.n; addItem(st.g, st.n); st.left--; S.tortoiseBuys = (S.tortoiseBuys || 0) + 1; SFX.coin(); renderHUD(); save(); tortoiseShop(); }})),
+    {label: 'Pat Grandmother Shell', fn: () => { SFX.chime(); floatText(tortoise.x, tortoise.y - 2.5, '❤', '#ff7ab0'); S.tortoisePats = (S.tortoisePats || 0) + 1; closeTalk(); }}, {label: 'Goodbye', fn: closeTalk}]);
+}
+function drawTortoise() {
+  const Tt = tortoise, px = Tt.x*TS, py = Tt.y*TS, step = Tt.stop ? 0 : Math.sin(Tt.ph*2)*2;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(px + 8, py + 2, 26, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7a8a4a'; for (const [lx, d] of [[-10, 1], [2, -1], [14, 1], [24, -1]]) ctx.fillRect(px + lx, py - 4 + step*d, 6, 7);
+  ctx.fillStyle = '#8a9a5a'; ctx.beginPath(); ctx.ellipse(px + 34, py - 8, 7, 6, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#000'; ctx.fillRect(px + 37, py - 10, 2, 2);
+  ctx.fillStyle = '#6a5a2a'; ctx.beginPath(); ctx.ellipse(px + 8, py - 10, 24, 14, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#8a7a3a'; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(px + 8 + i*9, py - 14 - (2 - Math.abs(i))*2, 4, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#c84a3a'; ctx.fillRect(px - 2, py - 34, 20, 4); ctx.fillStyle = '#f0e0c0'; for (let i = 0; i < 5; i++) ctx.fillRect(px - 2 + i*4, py - 34, 2, 4); ctx.fillStyle = '#5a3a1a'; ctx.fillRect(px - 1, py - 30, 2, 8); ctx.fillRect(px + 15, py - 30, 2, 8);
+  drawPerson(ctx, px + 8, py - 20, {cloak: '#5a7a3a', skin: '#d8a880', hair: '#e8e8e8'}, 0, false, 'down', {cos: 'sunhat'});
+}
+// ===== sky pirate airship =====
+let airship = null, airshipT = 420, skyCrates = [];
+function updateAirship(dt) {
+  if (airship) { const A = airship; A.t += dt; A.x += A.vx*dt;
+    if (!A.dropped && A.t > 4) { A.dropped = true; for (let k = 0; k < 3; k++) { const a = Math.random()*6.283, r = 3 + Math.random()*5, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r; if (!passable(x, y)) continue; const c = {x, y, fall: 1.2 + k*.4}; skyCrates.push(c);
+      if (Math.random() < .6 && enemyWalk(x + 1, y)) { const lv = 1 + (S.level || 1)*.05, e = makeEnemy('bandit', x + 1, y, {alert: true}); e.hp = e.max = Math.round(e.max*lv*1.3); e.dmgMul = lv; e.labelName = 'Sky Pirate'; enemies.push(e); } } SFX.roar(); toast('<b>Crates are falling!</b><br>The sky pirates dropped some loot, and a few of their crew parachuted down with it!', 5000); }
+    if (A.t > 14) airship = null; }
+  for (const c of skyCrates) if (c.fall > 0) c.fall -= dt;
+  if (airship || inDungeon() || S.y >= WORLD_H || townAt(S.x, S.y, 12) || S.time < .3 || S.time > .75) return;
+  airshipT -= dt; if (airshipT > 0) return; airshipT = 600 + Math.random()*600; if (Math.random() > .4) return;
+  airship = {t: 0, x: -.2, vx: 1/12, dropped: false}; S.airships = (S.airships || 0) + 1; SFX.roar(); toast('<b>A shadow passes overhead...</b><br>A sky pirate airship drifts across the sky!', 5000);
+}
+function crateTarget() {
+  const c = skyCrates.find(c => c.fall <= 0 && Math.hypot(c.x - S.x, c.y - S.y) < 1.3); if (!c) return null;
+  return {key: 'crate' + c.x.toFixed(1), html: '<kbd style="margin:0 6px 0 0">E</kbd>Break open the sky crate', btn: 'Open', fn: () => {
+    skyCrates = skyCrates.filter(z => z !== c); const lv = S.level || 1, r = Math.random(); let got;
+    if (r < .4) { const n = rint(40, 100) + lv*3; S.coins += n; got = `${n} coin`; } else if (r < .6) { addItem('rocket_pack', 2); got = '2 Rocket Packs'; } else if (r < .75) { addItem('gem', 1); got = 'a Cut Gem'; } else if (r < .9) { const g = pick(['silk', 'spice', 'amber', 'silver'].filter(z => GOODS[z])); addItem(g, 3); got = `3 ${GOODS[g].name}`; } else { addItem('strongbox', 1); got = 'a Locked Strongbox'; }
+    S.skyCrates = (S.skyCrates || 0) + 1; SFX.coin(); burst(c.x, c.y - .4, '#c8a060', 14, 4); renderHUD(); save(); toast(`<b>Sky crate:</b> ${got}`, 3000);
+  }};
+}
+function drawSkyCrate(c) { const px = c.x*TS, py = c.y*TS - Math.max(0, c.fall)*80; if (c.fall > 0) { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(c.x*TS, c.y*TS, 6, 2, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#f0f0f0'; ctx.beginPath(); ctx.arc(px, py - 14, 9, Math.PI, 0); ctx.fill(); ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(px - 9, py - 14); ctx.lineTo(px - 4, py - 5); ctx.moveTo(px + 9, py - 14); ctx.lineTo(px + 4, py - 5); ctx.stroke(); }
+  ctx.fillStyle = '#8a6030'; ctx.fillRect(px - 5, py - 9, 10, 9); ctx.fillStyle = '#5a3a18'; ctx.fillRect(px - 5, py - 5, 10, 1); ctx.fillRect(px - 1, py - 9, 2, 9); }
+function drawAirship() {
+  const A = airship, w = ctx.canvas.width, h = ctx.canvas.height, sc = Math.min(w, h)/500, x = A.x*w*1.4 - w*.2, y = h*.22 + Math.sin(A.t)*6*sc;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = .9;
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x + 30*sc, y + 200*sc, 90*sc, 20*sc, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8a3a2a'; ctx.beginPath(); ctx.ellipse(x, y, 80*sc, 26*sc, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a84a3a'; ctx.fillRect(x - 60*sc, y - 4*sc, 120*sc, 6*sc);
+  ctx.fillStyle = '#5a3a1a'; ctx.fillRect(x - 35*sc, y + 30*sc, 70*sc, 16*sc); ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2*sc; ctx.beginPath(); ctx.moveTo(x - 30*sc, y + 22*sc); ctx.lineTo(x - 30*sc, y + 30*sc); ctx.moveTo(x + 30*sc, y + 22*sc); ctx.lineTo(x + 30*sc, y + 30*sc); ctx.stroke();
+  ctx.fillStyle = '#1a1a1a'; ctx.fillRect(x - 6*sc, y - 40*sc, 2*sc, 16*sc); ctx.fillRect(x - 4*sc, y - 40*sc, 14*sc, 8*sc); ctx.fillStyle = '#fff'; ctx.fillRect(x + 2*sc, y - 38*sc, 3*sc, 3*sc);
+  ctx.restore();
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7159,6 +7222,7 @@ const GUIDE = [
   ['Restaurant rush', 'Chef Gaston in Sunreach needs help in the kitchen: tickets show each dish\u2019s ingredients in order. Click them (or press 1 to 6) in the right sequence before the ticket runs out.'],
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['Wandering tortoise and sky pirates', 'Out in the wild you may meet Grandmother Shell, a giant tortoise carrying Old Tam\u2019s little market: rare items, fair prices, only a couple of each. On sunny days, a sky pirate airship sometimes passes overhead and drops crates of loot, along with a few pirates to guard them.'],
   ['The Marsh Witch', 'A story quest: Morga the Marsh Witch near Reedholm needs three ingredients that only glow at night to cure the sleeping children, and then the curse stone must be broken.'],
   ['Puzzles', 'Otto in Jadewater has sliding-tile puzzles (three a day; fewer moves pay more). Pippa in Petalfall plays matching pairs: find all eight pairs in as few tries as you can.'],
   ['The Lost Expedition', 'A story quest: Ingrid Frostmantle in Skyhold asks you to find the three camps her brother\u2019s expedition left in the snow, then face the beast that took him in its ice cave.'],
@@ -7495,7 +7559,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -8409,6 +8473,9 @@ function render() {
   for (const T0 of twinSites()) if (inView(T0.ax, T0.ay)) sprites.push({y: T0.vy - .4, f: () => drawTwin(T0)});
   if (S.ww && S.ww.step === 1) for (const q of S.ww.spots) if (inView(q.x, q.y)) sprites.push({y: q.y + .2, f: () => drawTotem(q)});
   if (tornado && inView(tornado.x, tornado.y)) sprites.push({y: tornado.y, f: drawTornado});
+  if (tortoise && inView(tortoise.x, tortoise.y)) sprites.push({y: tortoise.y, f: drawTortoise});
+  for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
+  if (airship) sprites.push({y: 1e9 - 1, f: drawAirship});
   for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
   if (paper) for (const h of paper.houses) if (!h.done && inView(h.x, h.y)) sprites.push({y: 1e9 - 4, f: () => drawPaperMark(h)});
   for (const q of (S.digSites || [])) if (!q.done && inView(q.x, q.y)) sprites.push({y: q.y - .3, f: () => drawDigSite(q)});
@@ -8859,7 +8926,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -12040,6 +12107,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['tortoise','Slow and Steady','Shop at the wandering tortoise market', () => (S.tortoiseBuys || 0) >= 1],
+  ['skycrates','Pirate Plunder','Open 10 sky pirate crates', () => (S.skyCrates || 0) >= 10],
   ['marshwitch','Sweet Dreams','Break the curse on Reedholm\u2019s children', () => !!(S.mw && S.mw.step >= 3)],
   ['slide30','Puzzle Master','Solve a sliding puzzle in 30 moves or fewer', () => (S.slideBest || 999) <= 30],
   ['mem12','Total Recall','Find all pairs in 12 tries or fewer', () => (S.memBest || 99) <= 12],
@@ -12653,7 +12722,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
