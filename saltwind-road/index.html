@@ -26,6 +26,10 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--text);font-fami
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 body.photo #game > *:not(#view):not(#photoUI){display:none!important}
+#partyUI{position:absolute;left:12px;top:190px;padding:6px 8px;font-size:12px;z-index:5;min-width:130px}
+#partyUI .pm{display:flex;align-items:center;gap:6px;margin:2px 0}
+#partyUI .pb{flex:1;height:4px;background:#0d131b;border-radius:2px;overflow:hidden}
+#partyUI .pb i{display:block;height:100%;background:#e57a62}
 #tagUI{position:absolute;left:50%;top:160px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
 #detUI{position:absolute;right:16px;bottom:86px;padding:5px 10px;font-size:13px;z-index:6;white-space:nowrap}
 #raceUI{position:absolute;left:50%;top:128px;transform:translateX(-50%);padding:5px 12px;font-size:13px;z-index:6;white-space:nowrap}
@@ -268,6 +272,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="raceUI" class="panel" hidden></div>
   <div id="detUI" class="panel" hidden></div>
   <div id="tagUI" class="panel" hidden></div>
+  <div id="partyUI" class="panel" hidden></div>
   <div id="toasts"></div>
 
   <div id="talk" class="panel" hidden>
@@ -3898,7 +3903,7 @@ async function enterParty(code, host) {
   openPanel('Party', host ? `Your party is ready! Give this code to your friends:<div style="font-size:28px;letter-spacing:.3em;text-align:center;margin:12px 0"><b>${code.toUpperCase()}</b></div><span style="color:var(--muted)">They open Saltwind Road from the same link, press Party, and type the code.</span>` : `You joined party <b>${code.toUpperCase()}</b>! Look for your friends on the map and minimap. Use "Travel to" in the Party menu to jump to the leader.`, [{label: 'OK', primary: true, fn: closeTalk}]);
 }
 async function leaveParty(quiet) {
-  const P = party; if (!P) return; party = null; remote = {}; netReset(); fcon = null; myFc = null; tag = null; myTag = null; tagReq = null; $('tagUI').hidden = true; prace = null; myRace = null; $('raceUI').hidden = true; spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
+  const P = party; if (!P) return; party = null; remote = {}; netReset(); $('partyUI').hidden = true; fcon = null; myFc = null; tag = null; myTag = null; tagReq = null; $('tagUI').hidden = true; prace = null; myRace = null; $('raceUI').hidden = true; spar = null; sparLost = null; myGifts = []; reviving = null; if (downed) { downed = null; die(); }
   for (const u of P.unsubs) { try { u(); } catch (e) {} }
   try { await P.room.leave(); } catch (e) {}
   if (!quiet) toast('You left the party.', 3000);
@@ -3926,7 +3931,7 @@ function partyTick(dt) {
   if (myBubble) { myBubble.t -= dt; if (myBubble.t <= 0) myBubble = null; }
   partyT -= dt; if (partyT <= 0) { partyT = .1; sendPresence(); }
   for (const k of netKilled) k.t -= dt; netKilled = netKilled.filter(k => k.t > 0);
-  partyExtras(dt); sparTick(dt); raceTick(dt); tagTick(dt); fconTick();
+  partyFrames(); partyExtras(dt); sparTick(dt); raceTick(dt); tagTick(dt); fconTick();
   for (const q of myGifts) q.t -= dt; if (myGifts.length) myGifts = myGifts.filter(q => q.t > 0);
   let peers; try { peers = party.room.peers(); } catch (e) { return; }
   const seen = {};
@@ -12672,7 +12677,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-stats="1">Stats</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -12692,7 +12697,7 @@ function renderPause() {
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } });
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } });
 const WN_VER = 6;
 const WHATS_NEW = [
   ['New story and a new mount', 'The Marsh Witch (Morga, near Reedholm). Finish three story quests, then visit Elder Rowan for the glowing Spirit Stag. Check progress in the Story quests page of this menu.'],
@@ -12713,6 +12718,23 @@ const WHATS_NEW = [
   ['Items to use', 'War Horns call Champions, Rocket Packs light the sky, Picnic Baskets heal your party, strange potions make you giant, swift or tiny, and bandits drop Locked Strongboxes to pick.'],
 ];
 const storiesDone = () => [S.ww, S.gh, S.sb, S.le, S.mw, S.rp].filter(o => o && o.step >= 4).length;
+let pfT = 0;
+function partyFrames() {
+  const ui = $('partyUI'); pfT -= 1/60; if (pfT > 0) return; pfT = .25;
+  const list = Object.values(remote); if (!list.length || mode === 'photo') { ui.hidden = true; return; } ui.hidden = false;
+  const tl = document.querySelector('.hud-tl'); if (tl) ui.style.top = Math.round(tl.getBoundingClientRect().bottom + 8) + 'px';
+  const html = `<div style="color:var(--muted);margin-bottom:2px">Party · ${party.code.toUpperCase()}</div>` + list.slice(0, 6).map(r => { const hp = Math.max(0, Math.min(1, (+r.p.hp || 0)/Math.max(1, +r.p.mh || 1))), d = Math.round(Math.hypot(r.x - S.x, r.y - S.y)); return `<div class="pm"><span style="color:${r.col}">●</span><span style="min-width:54px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span><div class="pb"><i style="width:${hp*100}%;background:${r.p.dn ? '#ff3a3a' : '#e57a62'}"></i></div><span style="color:var(--muted);min-width:28px;text-align:right">${r.p.dn ? 'DOWN' : r.p.dg ? 'dgn' : d + 'm'}</span></div>`; }).join('');
+  if (ui.innerHTML !== html) ui.innerHTML = html;
+}
+function statsPage() {
+  const rows = [
+    ['Days on the road', S.day], ['Level', S.level || 1], ['Monsters defeated', S.kills || 0], ['Elites defeated', S.eliteKills || 0], ['Bosses defeated', Object.keys(S.bosses || {}).filter(k => S.bosses[k]).length],
+    ['Times knocked out', S.deaths || 0], ['Trades made', S.trades || 0], ['Things gathered', S.gathered || 0], ['Fish caught', S.fishCaught || 0], ['Achievements', `${Object.keys(S.achievements || {}).length} of ${ACH.length}`],
+    ['Story quests complete', `${storiesDone()} of 6`], ['Mystery cases solved', S.casesSolved || 0], ['Bird species logged', Object.keys(S.birds || {}).length], ['Monster cards in album', Object.keys(S.cardAlbum || {}).length], ['Artifacts found', Object.keys(S.digFound || {}).length],
+    ['Parties joined', S.partiesJoined || 0], ['Shared victories', S.sharedKills || 0], ['Friends revived', S.revives || 0], ['Gifts given', S.giftsGiven || 0], ['Photos taken', S.photos || 0], ['Best daily streak', S.bestStreak || 0],
+  ];
+  openPanel('Your journey so far', `<div style="display:grid;grid-template-columns:1fr auto;gap:2px 16px;max-width:360px">${rows.map(([k, v]) => `<span style="color:var(--muted)">${k}</span><b style="text-align:right">${v}</b>`).join('')}</div>`, [{label: 'Close', primary: true, fn: closeTalk}]);
+}
 function questLog() {
   const st = (o, steps) => !o ? '<span style="color:var(--muted)">Not started</span>' : o.step >= 4 ? '<span style="color:var(--good)">✓ Complete</span>' : `<span style="color:var(--brass)">${steps[o.step] || 'In progress'}</span>`;
   const Q = [
