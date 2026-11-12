@@ -152,7 +152,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>Weapon bar</dt><dd>Nineteen weapons, from spear to sniper rifle; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
         <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
         <dt>Pick-ups</dt><dd>Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
-        <dt>Pets and rides</dt><dd>The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
+        <dt>Pets and rides</dt><dd>You can keep four pets; click one you own to let it go. The balloon floats over walls and trees where only flying animals reach you, and the tank fires its own gun. The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
         <dt>Night rewards</dt><dd>Every night you survive brings a gift and unlocks something new: traps, iron walls, armor (V), turrets, grenades (H to make, G to throw) and a machine gun.</dd>
         <dt>1 – 9, 0, L, X</dt><dd>The crystal ward and bone fence have no key; click them. Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
         <dt>E · C · P · M · K</dt><dd>Eat meat to heal · craft a flint axe · pause · mute · save. The game also saves itself every dawn.</dd>
@@ -312,11 +312,21 @@ const PETS = {
   dog:     {name: 'Dog',      cost: {meat: 4},  pet: 1, r: 10, look: 'wolf', body: '#a8794a', head: '#c29562', spd: 200, dmg: 10, cd: .7, range: 300},
   hawk:    {name: 'Hawk',     cost: {meat: 6},  pet: 1, r: 8,  fly: 1,       body: '#6b4a2c', head: '#e9dcbc', spd: 270, dmg: 7,  cd: .5, range: 380, unlock: 1},
   warbear: {name: 'War bear', cost: {meat: 20}, pet: 1, r: 17, look: 'bear', body: '#6b4a2c', head: '#7d5a38', spd: 150, dmg: 26, cd: 1,  range: 260, unlock: 3},
+  fox:     {name: 'Fox',      cost: {meat: 3},  pet: 1, r: 9,  look: 'wolf', body: '#c9682a', head: '#de8a45', spd: 240, dmg: 6,  cd: .45, range: 320},
+  wolf:    {name: 'Wolf',     cost: {meat: 8},  pet: 1, r: 12, look: 'wolf', body: '#6f7477', head: '#8b9093', spd: 210, dmg: 15, cd: .7, range: 320, unlock: 1},
+  boar:    {name: 'Boar',     cost: {meat: 12}, pet: 1, r: 14, look: 'boar', body: '#5a3d2b', head: '#6e4c36', spd: 170, dmg: 20, cd: .9, range: 280, unlock: 2, kb: 2.5},
+  spider:  {name: 'Spider',   cost: {meat: 6, herbs: 2}, pet: 1, r: 10, look: 'spider', body: '#2a2622', head: '#3a342e', spd: 190, dmg: 8, cd: .8, range: 300, unlock: 2, web: 1},
+  eagle:   {name: 'Eagle',    cost: {meat: 14, feathers: 4}, pet: 1, r: 11, look: 'crow', fly: 1, body: '#4a321d', head: '#f2eee4', spd: 290, dmg: 16, cd: .55, range: 420, unlock: 4},
 };
 const VEH = {
-  horse: {name: 'Horse',  cost: {meat: 8},            spd: 1.6,  ram: 0,  seat: 26},
+  horse: {name: 'Horse',  cost: {meat: 8},            spd: 1.6,  ram: 0,  seat: 26, animal: 1},
   buggy: {name: 'Buggy',  cost: {wood: 12, iron: 14}, spd: 2.1,  ram: 25, seat: 9,  unlock: 2},
   truck: {name: 'Truck',  cost: {wood: 20, iron: 30}, spd: 1.75, ram: 45, seat: 13, armor: .5, unlock: 4},
+  elk:     {name: 'Elk',       cost: {meat: 10},            spd: 1.85, ram: 0,  seat: 26, animal: 1},
+  bison:   {name: 'Bison',     cost: {meat: 12, herbs: 3},  spd: 1.4,  ram: 35, seat: 30, armor: .8, animal: 1, unlock: 2},
+  bike:    {name: 'Motorbike', cost: {wood: 8, iron: 10},   spd: 2.5,  ram: 15, seat: 10, unlock: 1},
+  balloon: {name: 'Balloon',   cost: {wood: 14, hide: 6},   spd: 1.15, ram: 0,  seat: 52, fly: 1, unlock: 3},
+  tank:    {name: 'Tank',      cost: {wood: 30, iron: 60},  spd: 1.25, ram: 70, seat: 20, armor: .3, cannon: 1, unlock: 5},
 };
 const PK = Object.keys(PETS), VK = Object.keys(VEH);
 const BOSSES = Object.keys(A).filter(k => A[k].boss);
@@ -492,7 +502,7 @@ function spawnBoss(type) {
 function slam(a) { // Ursa's ground slam: hurts you and anything you built nearby
   shake = 18; snd(60, .5, 'sawtooth', .12, -30);
   for (let i = 0; i < 20; i++) { const g = i / 20 * TAU; burst(a.x + Math.cos(g) * 95, a.y + Math.sin(g) * 95, '#8a7a5a', 3); }
-  if (dist(a.x, a.y, P.x, P.y) < 145) hurtPlayer(24, a.x, a.y);
+  if (dist(a.x, a.y, P.x, P.y) < 145 && !(P.riding && VEH[P.vehicle.type].fly)) hurtPlayer(24, a.x, a.y);
   if (host()) { netEv({k: 'sl', x: a.x | 0, y: a.y | 0}); for (const o of NET.others.values()) if (!o.dead && dist(a.x, a.y, o.x, o.y) < 145) netEv({k: 'd', p: o.peer, d: 24, x: a.x | 0, y: a.y | 0}); }
   const tx = Math.floor(a.x / T), ty = Math.floor(a.y / T);
   for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const st = S(tx + i, ty + j); if (st && dist(st.tx * T + 24, st.ty * T + 24, a.x, a.y) < 125) damageStruct(st, 35); }
@@ -631,7 +641,8 @@ function gather() { // bring pets and the ride to wherever the player now stands
 }
 function buyPet(k) {
   if (!running) return; const d = PETS[k];
-  if (P.pets.some(q => q.type === k)) return toast('Your ' + d.name.toLowerCase() + ' is already with you.');
+  if (P.pets.some(q => q.type === k)) { P.pets = P.pets.filter(q => q.type !== k); toast('You let your ' + d.name.toLowerCase() + ' go.'); return hud(); } // click a pet you own to release it
+  if (P.pets.length >= 4) return toast('You can keep four pets. Click one you own to let it go.');
   if (!unlocked(d)) return toast('The ' + d.name.toLowerCase() + ' can be tamed after night ' + d.unlock + '.');
   if (!afford(d.cost)) return toast('Taming a ' + d.name.toLowerCase() + ' takes ' + costText(d.cost) + '.');
   pay(d.cost); P.pets.push(mkPet(k, P.pets.length)); toast(d.name + ' tamed. It will fight beside you.'); snd(600, .2, 'triangle', .07, 300); hud();
@@ -647,12 +658,13 @@ function buyVeh(k) {
 function toggleRide() {
   if (!running || P.dead) return; const v = P.vehicle;
   if (!v) return toast('You have no ride yet. Get one from the top bar.');
+  if (P.riding && VEH[v.type].fly && hitBox(P.x, P.y, P.r * .8, false)) return toast('You cannot land on a wall. Move to open ground.');
   if (P.riding) { P.riding = false; v.x = P.x; v.y = P.y; move(P, 0, 34, false); snd(300, .08, 'triangle', .05, -100); return hud(); }
   if (dist(v.x, v.y, P.x, P.y) > 90) {
-    if (v.type !== 'horse') return toast('Your ' + VEH[v.type].name.toLowerCase() + ' is ' + Math.round(dist(v.x, v.y, P.x, P.y) / T) + ' tiles away. Walk to it.');
-    toast('Your horse comes running.');
+    if (!VEH[v.type].animal) return toast('Your ' + VEH[v.type].name.toLowerCase() + ' is ' + Math.round(dist(v.x, v.y, P.x, P.y) / T) + ' tiles away. Walk to it.');
+    toast('Your ' + VEH[v.type].name.toLowerCase() + ' comes running.');
   }
-  P.riding = true; snd(v.type === 'horse' ? 500 : 110, .25, v.type === 'horse' ? 'triangle' : 'sawtooth', .06, 80); hud();
+  P.riding = true; snd(VEH[v.type].animal ? 500 : 110, .25, VEH[v.type].animal ? 'triangle' : 'sawtooth', .06, 80); hud();
 }
 function updPets(dt) {
   P.pets.forEach((q, i) => {
@@ -661,7 +673,7 @@ function updPets(dt) {
     const sa = i * 2.1 + 1, gx = tgt ? tgt.x : P.x + Math.cos(sa) * 46, gy = tgt ? tgt.y : P.y + Math.sin(sa) * 46, l = dist(q.x, q.y, gx, gy);
     if (l > 1200) { q.x = gx; q.y = gy; return; }
     if (l > (tgt ? tgt.r + d.r : 10)) { const st = Math.min(l, d.spd * dt); q.x += (gx - q.x) / l * st; q.y += (gy - q.y) / l * st; q.ang = Math.atan2(gy - q.y, gx - q.x); q.step += dt * 11; }
-    if (tgt && l < tgt.r + d.r + 10 && q.cd <= 0) { q.cd = d.cd; hitAnimal(tgt, Math.round(d.dmg * (P.charm ? 1.5 : 1)), (tgt.x - q.x) / (l || 1) * .35, (tgt.y - q.y) / (l || 1) * .35); snd(260, .06, 'square', .03, -120); }
+    if (tgt && l < tgt.r + d.r + 10 && q.cd <= 0) { q.cd = d.cd; hitAnimal(tgt, Math.round(d.dmg * (P.charm ? 1.5 : 1)), (tgt.x - q.x) / (l || 1) * .35 * (d.kb || 1), (tgt.y - q.y) / (l || 1) * .35 * (d.kb || 1)); if (d.web && !client() && !A[tgt.type].boss) tgt.stun = Math.max(tgt.stun || 0, .9); snd(260, .06, 'square', .03, -120); }
   });
 }
 /* things lying in the world: walk over them to pick them up */
@@ -752,7 +764,7 @@ function setInv(o) {
   P.owned = {axe: true}; for (const k of o.owned || []) if (WPN[k]) P.owned[k] = true;
   P.max = P.vest ? 140 : 100;
   if (!P.owned[P.weapon]) P.weapon = 'axe'; P.hp = clamp(+P.hp || 100, 1, P.max);
-  P.pets = (o.pets || []).filter(k => PETS[k]).slice(0, 3).map(mkPet); P.vehicle = VEH[o.veh] ? {type: o.veh, x: P.x + 50, y: P.y, ang: 0} : null; P.riding = false;
+  P.pets = (o.pets || []).filter(k => PETS[k]).slice(0, 4).map(mkPet); P.vehicle = VEH[o.veh] ? {type: o.veh, x: P.x + 50, y: P.y, ang: 0} : null; P.riding = false;
 }
 function packStructs() { const l = []; for (const s of grid) if (s) l.push(s.tx + ',' + s.ty + ',' + BK.indexOf(s.type) + ',' + Math.max(1, Math.ceil(s.hp))); return l; }
 function deadList(arr) { const l = []; arr.forEach((o, i) => { if (o.dead) l.push(i); }); return l; }
@@ -860,7 +872,7 @@ function netPoll(dt) {
       o.pr = pr; const a = pr.p; o.tx = +a[0] || 0; o.ty = +a[1] || 0; o.tang = (+a[2] || 0) / 100; o.w = WKEYS[a[3]] || 'axe'; o.hp = +a[4] || 0;
       if (a[5] !== o.seq) { o.seq = a[5]; o.sw = .18; } o.dead = !!a[6]; o.flint = !!a[7];
       const v = a[8]; o.veh = Array.isArray(v) && VK[v[0]] ? {type: VK[v[0]], x: +v[1] || 0, y: +v[2] || 0, ang: (+v[3] || 0) / 100, riding: !!v[4]} : null;
-      const pl = Array.isArray(a[9]) ? a[9].filter(q => Array.isArray(q) && PK[q[0]]).slice(0, 3) : []; o.pets = o.pets || []; o.pets.length = pl.length;
+      const pl = Array.isArray(a[9]) ? a[9].filter(q => Array.isArray(q) && PK[q[0]]).slice(0, 4) : []; o.pets = o.pets || []; o.pets.length = pl.length;
       pl.forEach((q, i) => { const e = o.pets[i] && o.pets[i].type === PK[q[0]] ? o.pets[i] : (o.pets[i] = {type: PK[q[0]], x: +q[1] || 0, y: +q[2] || 0, ang: 0, step: 0}); e.tx = +q[1] || 0; e.ty = +q[2] || 0; e.ang = (+q[3] || 0) / 100; });
       if (client() && pr.w && p.peer === NET.hostPeer) applyWorld(pr.w);
     }
@@ -1023,8 +1035,14 @@ function updPlayer(dt) {
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.dy;
   const ml = Math.hypot(mx, my);
   const ride = P.riding ? VEH[P.vehicle.type] : null;
-  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (P.boots ? 1.15 : 1) * (P.slow > 0 ? .55 : 1) * (ride ? ride.spd : 1) * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
+  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (P.boots ? 1.15 : 1) * (P.slow > 0 ? .55 : 1) * (ride ? ride.spd : 1) * dt; if (ride && ride.fly) { P.x = clamp(P.x + mx * k, 20, WORLD - 20); P.y = clamp(P.y + my * k, 20, WORLD - 20); } else move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
   if (ride) {
+    if (ride.cannon && (P.vcd = (P.vcd || 0) - dt) <= 0) { // the tank's gun fires by itself
+      let best = null, bd = 430; for (const a of animals) { if (A[a.type].passive || a.flee) continue; const dd = dist(a.x, a.y, P.x, P.y); if (dd < bd) { bd = dd; best = a; } }
+      P.vcd = best ? 1.8 : .3;
+      if (best) { const g = Math.atan2(best.y - P.y, best.x - P.x), w = WPN.launcher; shots.push({x: P.x + Math.cos(g) * 40, y: P.y + Math.sin(g) * 40, vx: Math.cos(g) * w.spd, vy: Math.sin(g) * w.spd, life: bd / w.spd + .05, dmg: 20, pierce: 0, hit: new Set(), rocket: 1, ghost: true}); shake = Math.max(shake, 5); snd(90, .25, 'sawtooth', .09, -40);
+        if (multi() && NET.room) NET.room.emit('fx', {x: P.x | 0, y: P.y | 0, a: +g.toFixed(2), w: 'launcher'}).catch(() => {}); }
+    }
     P.vehicle.x = P.x; P.vehicle.y = P.y;
     if (ride.ram && ml > .3) for (const a of animals) { // run them down
       const dd = dist(a.x, a.y, P.x, P.y), now = performance.now();
@@ -1032,8 +1050,7 @@ function updPlayer(dt) {
     }
   }
   if (!touchMode) P.ang = Math.atan2(mouse.wy - P.y, mouse.wx - P.x);
-  for (const o of trees) if (!o.dead) push(o, 9);
-  for (const o of rocks) if (!o.dead) push(o, o.r - 2);
+  if (!(ride && ride.fly)) { for (const o of trees) if (!o.dead) push(o, 9); for (const o of rocks) if (!o.dead) push(o, o.r - 2); }
   P.cd -= dt; P.swing -= dt; P.hurt -= dt; if (P.slow > 0) P.slow -= dt;
   if (P.poison > 0) { P.poison -= dt; P.hp -= 3 * dt; if (P.hp <= 0) return die(); }
   const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
@@ -1121,7 +1138,8 @@ function update(dt) {
     a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
     if (d.passive || a.flee) continue;
     if (blocked && blocked.type && a.cd <= 0) { if (blocked.type === 'bone') { a.hp -= 6; a.flash = .1; } damageStruct(blocked, d.sdmg); a.cd = .9; }
-    if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (tg !== P || P.hurt <= 0)) {
+    const up = tg === P ? P.riding && VEH[P.vehicle.type].fly : tg.veh && tg.veh.riding && VEH[tg.veh.type].fly; // in a balloon only fliers can reach you
+    if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (!up || d.fly) && (tg !== P || P.hurt <= 0)) {
       a.cd = 1;
       if (tg !== P) netEv({k: 'd', p: tg.peer, d: d.dmg, x: a.x | 0, y: a.y | 0, po: d.poison ? 1 : 0, sl: d.web ? 1 : 0});
       else { hurtPlayer(d.dmg, a.x, a.y); if (d.poison && !G.over && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } if (d.web && !P.dead) { P.slow = 3; float(P.x, P.y - 40, 'webbed', '#d8d8d8'); } }
@@ -1329,6 +1347,13 @@ function initScene() {
     horse: animalGeo('horse', {r: 17, look: 'deer', fat: .85, plain: 1, saddle: 1, body: '#7a4a2a', head: '#8a5836'}),
     buggy: merge([[box(46, 8, 26), '#d07a2d', M(0, 13, 0)], [box(14, 10, 22), '#2b2f33', M(-14, 20, 0)], [box(10, 6, 24), '#b5651f', M(20, 16, 0)], [box(3, 20, 3), '#2b2f33', M(-4, 26, -11)], [box(3, 20, 3), '#2b2f33', M(-4, 26, 11)], [box(3, 3, 25), '#2b2f33', M(-4, 36, 0)],
       wheel(16, -15, 8, '#1c1c1c'), wheel(16, 15, 8, '#1c1c1c'), wheel(-16, -15, 8, '#1c1c1c'), wheel(-16, 15, 8, '#1c1c1c'), [sph(), '#ffe9a3', M(24, 16, -8, 2.5)], [sph(), '#ffe9a3', M(24, 16, 8, 2.5)]]),
+    elk: animalGeo('elk', {r: 17, look: 'deer', fat: .8, saddle: 1, body: '#8a6238', head: '#6e4c2c'}),
+    bison: animalGeo('bison', {r: 20, look: 'boar', saddle: 1, body: '#4a3626', head: '#2e2018'}),
+    bike: merge([[box(30, 5, 6), '#b0302a', M(0, 14, 0)], [box(12, 7, 8), '#2b2f33', M(-2, 9, 0)], [box(14, 4, 9), '#3a2716', M(-8, 18, 0)], [box(3, 14, 3), '#8a949e', M(13, 18, 0, 1, 1, 1, 0, 0, -.4)], [box(3, 3, 22), '#2b2f33', M(11, 25, 0)],
+      wheel(17, 0, 9, '#1c1c1c'), wheel(-17, 0, 9, '#1c1c1c'), [sph(), '#ffe9a3', M(18, 19, 0, 2.6)]]),
+    balloon: merge([[box(26, 14, 26), '#a57c4c', M(0, 51, 0)], [box(28, 3, 28), '#6e4c2c', M(0, 58, 0)], ...[[-11, -11], [11, -11], [-11, 11], [11, 11]].map(([x, z]) => [box(1.2, 44, 1.2), '#efe6cf', M(x * 1.2, 80, z * 1.2)]),
+      [sph(), '#d1503a', M(0, 136, 0, 44, 48, 44)], [sph(), '#f2c14e', M(0, 136, 0, 45, 30, 45)], [sph(), '#ebe6d3', M(0, 136, 0, 46, 12, 46)], [cyl(12, 16, 10, 8), '#6e4c2c', M(0, 96, 0)]]),
+    tank: merge([[box(78, 14, 44), '#4f5d3a', M(0, 19, 0)], [box(84, 12, 12), '#2b2f33', M(0, 9, -20)], [box(84, 12, 12), '#2b2f33', M(0, 9, 20)], [box(40, 14, 30), '#5d6d45', M(-4, 33, 0)], [cyl(3.4, 3.4, 54, 8), '#3a4430', M(38, 34, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5, 5, 6, 8), '#2b2f33', M(64, 34, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(10, 4, 10), '#3a4430', M(-10, 42, 0)]]),
     truck: merge([[box(66, 14, 34), '#4a5d3a', M(0, 20, 0)], [box(30, 16, 32), '#3e4f31', M(-14, 34, 0)], [box(20, 8, 30), '#566b44', M(22, 30, 0)], [box(4, 18, 38), '#2b2f33', M(35, 18, 0)], [box(28, 3, 28), '#2b2f33', M(-14, 43, 0)],
       wheel(22, -18, 11, '#1c1c1c'), wheel(22, 18, 11, '#1c1c1c'), wheel(-22, -18, 11, '#1c1c1c'), wheel(-22, 18, 11, '#1c1c1c'), [sph(), '#ffe9a3', M(34, 27, -11, 3)], [sph(), '#ffe9a3', M(34, 27, 11, 3)]]),
   };
@@ -1392,7 +1417,7 @@ const MYC = {}, itemM = {};
 function dropCompanions(h) { if (h.vm) scene.remove(h.vm); h.vm = null; h.vt = null; for (const q of h.pm || []) scene.remove(q.m); h.pm = []; }
 function drawCompanions(h, v, pets, rx, ry, now) {
   if (!v || h.vt !== v.type) { if (h.vm) scene.remove(h.vm); h.vm = null; h.vt = null; if (v) { h.vm = new THREE.Mesh(GEO.veh[v.type], vmat); h.vm.castShadow = true; scene.add(h.vm); h.vt = v.type; } }
-  if (v) { const x = v.riding ? rx : v.x, y = v.riding ? ry : v.y; h.vm.position.set(x, v.type === 'horse' && v.riding ? Math.abs(Math.sin(now / 90)) * 2 : 0, y); h.vm.rotation.set(0, -v.ang, 0); }
+  if (v) { const x = v.riding ? rx : v.x, y = v.riding ? ry : v.y; h.vm.position.set(x, VEH[v.type].fly ? (v.riding ? Math.sin(now / 700) * 3 : -44) : VEH[v.type].animal && v.riding ? Math.abs(Math.sin(now / 90)) * 2 : 0, y); h.vm.rotation.set(0, -v.ang, 0); }
   h.pm = h.pm || []; while (h.pm.length > pets.length) scene.remove(h.pm.pop().m);
   pets.forEach((q, i) => {
     if (!h.pm[i] || h.pm[i].t !== q.type) { if (h.pm[i]) scene.remove(h.pm[i].m); const m = new THREE.Mesh(GEO.pet[q.type], vmat); m.castShadow = true; scene.add(m); h.pm[i] = {t: q.type, m}; }
