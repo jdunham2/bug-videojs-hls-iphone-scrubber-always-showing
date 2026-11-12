@@ -814,6 +814,7 @@ const GOODS = {
   metal_detector:{name:'Metal Detector',base:150,col:'#a0a8b0',kind:'usable',desc:'Switch it on from your bag to hunt for buried treasure. It beeps faster as you get closer.'},
   detective_badge:{name:'Detective\u2019s Badge',base:0,col:'#c0a040',kind:'trinket',desc:'Awarded by Inspector Holloway. +5% crit chance while carried.'},
   pale_cloak:{name:'Pale Beast Cloak',base:0,col:'#e8eef4',kind:'trinket',desc:'Woven from the Pale Beast\u2019s fur. Sandstorms no longer slow you, and +2 max HP.'},
+  hex_charm:{name:'Marsh Witch\u2019s Charm',base:0,col:'#7a9a4a',kind:'trinket',desc:'A knot of bogroot and silver wire. +10% coin from monsters while carried.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -2221,6 +2222,12 @@ const NPCS = [
    hello:["Hmm. Most curious.","Every crime leaves a trace.","Elementary, my dear traveler."], rumors:["A good detective listens more than they speak. People always mention the little things that give them away."]},
   {id:'ingrid',town:'skyhold',dx:-3,dy:4,name:'Ingrid Frostmantle',role:'Expedition leader',cols:{cloak:'#4a6a8a',skin:'#f0d8c8',hair:'#e8d8b0'},expedition:true,freeSpot:true,
    hello:["My brother never came back from the ice.","Skyhold is the roof of the world.","Brrr. Keep moving or freeze."], rumors:["Three explorers set out from Skyhold last winter. Their journals must still be out there in the snow."]},
+  {id:'morga',town:'reed',dx:-5,dy:-4,name:'Morga the Marsh Witch',role:'Witch of the marsh',cols:{cloak:'#3a4a2a',skin:'#b8c8a0',hair:'#2a2a2a'},witch:true,freeSpot:true,
+   hello:["Heh heh. Come closer, dearie.","The marsh remembers everything.","Don't touch the jars."], rumors:["Some ingredients only glow at night. You'll never find them by daylight."]},
+  {id:'otto',town:'jade',dx:4,dy:4,name:'Otto the Puzzler',role:'Sliding puzzles',cols:{cloak:'#6a3a8a',skin:'#e0c0a0',hair:'#8a8a8a'},puzzler:true,freeSpot:true,
+   hello:["A puzzle a day keeps the dull away!","Can you put my picture back together?","Slide, slide, slide!"], rumors:["Solve the corners last. Or first. I forget which. That's the fun of it!"]},
+  {id:'pippa',town:'petal',dx:4,dy:-3,name:'Pippa',role:'Memory game',cols:{cloak:'#e07ab0',skin:'#f0d0b8',hair:'#e0a040'},memory:true,freeSpot:true,
+   hello:["Want to play matching pairs?","I never forget a card!","Bet you can't beat my record!"], rumors:["Turn over two cards. If they match, you keep them. Remember where everything is!"]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3514,7 +3521,7 @@ function killEnemy(e) {
   S.killsBy[e.type] = (S.killsBy[e.type] || 0) + 1;
   if (S.companion && !def.passive && !def.target) { S.compXP = S.compXP || {}; const k = S.companion, before = compLv(k); S.compXP[k] = (S.compXP[k] || 0) + e.max; S.compKills = S.compKills || {}; S.compKills[k] = (S.compKills[k] || 0) + 1; if (compLv(k) > before) setTimeout(() => toast(`<b>${COMPANIONS[k].name} reached level ${compLv(k)}!</b> They hit harder${k === 'mae' ? ' and heal more' : ''}.`, 4000), 200); }
   if (S.killsBy[e.type] === MASTERY && !def.passive) setTimeout(() => toast(`<b>Mastered: ${esc(def.name)}</b><br>You know their every move now. +10% damage against them.`, 5000), 300); gainXP(e.max*3*(bloodMoon() ? 2 : 1)); SFX.kill(); if (bloodMoon() && !def.passive) { S.bmKills = (S.bmKills || 0) + 1; const bc = rint(4, 12) + (S.level || 1); S.coins += bc; got.push(`+${bc} coin (blood moon)`); }
-  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1) * (1 + .05*conHas('coin')) * (perk('plunderer') ? 1.15 : 1)); S.coins += c; got.push(`+${c} coin`); }
+  if (def.coins) { const c = Math.round(rint(def.coins[0], def.coins[1]) * (S.pet === 'fox' ? 1.5 : S.pet === 'raccoon' ? 1.25 : 1) * (1 + .05*conHas('coin')) * (perk('plunderer') ? 1.15 : 1) * (have('hex_charm') ? 1.1 : 1)); S.coins += c; got.push(`+${c} coin`); }
   for (const [g, a, b, p] of def.drops) if (Math.random() < p) { const n = rint(a, b); addItem(g, n); got.push(`+${n} ${GOODS[g].name}`); }
   if (def.target && archery) { archery.score++; floatText(e.x, e.y - 1.4, `+1 (${archery.score})`, '#f0c040'); burst(e.x, e.y - .7, '#f0c040', 8, 3); SFX.coin(); }
   if (e.abyss && ABYSS.floor >= 3 && Math.random() < .12) { addItem('abyss_shard', 1); got.push('+1 Abyss Shard'); }
@@ -3524,6 +3531,7 @@ function killEnemy(e) {
     setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
   }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
+  if (e.mwHag && S.mw && S.mw.step === 2) { S.mw.step = 3; setTimeout(() => toast('<b>The Bog Hag shrieks and dissolves into mist!</b><br>The cursed stone cracks in two. Somewhere in Reedholm, a child yawns and wakes up. Return to Morga.', 8000), 600); }
   if (e.leBeast && S.le && S.le.step === 2) { S.le.step = 3; setTimeout(() => toast('<b>The Pale Beast falls!</b><br>Behind it, in the ice cave, a figure stirs: Ingrid\u2019s brother Leif, half-frozen but alive! Bring the news to Skyhold.', 8000), 600); }
   if (e.wwSpirit && S.ww && S.ww.step === 2) { S.ww.step = 3; setTimeout(() => toast('<b>The Spirit of the Wood is calmed.</b><br>Its rage fades into a soft green light. A voice like rustling leaves: <i>“Thank you, little one.”</i> Return to Elder Rowan in Hollowpine.', 8000), 600); }
   if (GOODS['card_' + e.type] && Math.random() < (e.elite ? .2 : .03)) { addItem('card_' + e.type, 1); got.push(`<b>+1 ${GOODS['card_' + e.type].name}!</b>`); S.cardsFound = (S.cardsFound || 0) + 1; }
@@ -4673,6 +4681,7 @@ addEventListener('keydown', e => {
   else if (logr && logr.on) { if (['arrowleft', 'arrowright', 'a', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); logr.keys.add(k); } }
   else if (moles && moles.on) { const n9 = {'7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8, q: 0, w: 1, e: 2, a: 3, s: 4, d: 5, z: 6, x: 7, c: 8}[k]; if (n9 != null) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) moleWhack(n9); } }
   else if (kitchen && kitchen.on) { const i = '123456'.indexOf(k); if (i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) kitchenAdd(i); } }
+  else if (slide && slide.on) { const dm = {arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd', arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r'}[k]; if (dm) { e.preventDefault(); e.stopImmediatePropagation(); slideMove(dm); } }
   else if (cart && cart.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'arrowup' || k === 'w') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cartJump(); } }
   else if (snow && snow.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); snow.keys.add(k); } else if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) snowThrow(); } }
   else if (wrestle && wrestle.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) wrestleMash(); } }
@@ -5514,6 +5523,87 @@ function leTick() {
   SFX.roar(); shake = .6; burst(e.x, e.y - .8, '#ffffff', 40, 7); toast('<b>The Pale Beast emerges from the ice cave!</b>', 4000);
 }
 function drawCamp(q) { const px = q.x*TS, py = q.y*TS; ctx.fillStyle = '#8a6a4a'; ctx.beginPath(); ctx.moveTo(px - 8, py + 2); ctx.lineTo(px, py - 9); ctx.lineTo(px + 8, py + 2); ctx.fill(); ctx.fillStyle = '#e8eef4'; ctx.fillRect(px - 7, py - 2, 14, 2); ctx.fillStyle = '#3a3a3a'; ctx.fillRect(px + 9, py, 4, 2); }
+// ===== story: the Marsh Witch =====
+function mwTalk(n) {
+  const W = S.mw, H = TOWNS.reed;
+  if (!W) {
+    const spots = [];
+    for (let k = 0; k < 6000 && spots.length < 4; k++) { const a = Math.random()*6.283, r = 12 + Math.random()*30, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
+      if (!inB(x, y) || ![T.MARSH, T.GRASS, T.FOREST].includes(map[idx(x, y)]) || !passable(x + .5, y + .5) || townAt(x, y, 8) || spots.some(q => Math.hypot(q.x - x, q.y - y) < 10)) continue; spots.push({x: x + .5, y: y + .5}); }
+    if (spots.length < 4) { say('“Not now, dearie. The marsh is sulking.”', [back(n)]); return; }
+    const names = ['Moonpetal', 'Glowing Bogroot', 'Will-o’-Wisp Dust'];
+    S.mw = {step: 1, herbs: spots.slice(0, 3).map((q, i) => ({...q, name: names[i], got: false})), stone: spots[3]}; save();
+    say('“So. The children of Reedholm won’t wake up, and the villagers think it’s MY doing. Hmph! It’s a curse, and an old one. I can brew a cure, but I need three things that only glow at night: <b>Moonpetal</b>, <b>Glowing Bogroot</b> and <b>Will-o’-Wisp Dust</b>. Fetch them, and quickly.”<br><span style="color:var(--muted)">The ingredients are marked on your map. They only appear at night.</span>', [back(n)]); return;
+  }
+  if (W.step === 1) { const g = W.herbs.filter(q => q.got).length; if (g < 3) { say(`“${g} of 3. Night-glow ingredients only show themselves after dark, remember.”`, [back(n)]); return; }
+    W.step = 2; save(); say('Morga tosses everything into her cauldron. It bubbles green, then purple, then a deep, angry red.<br><br>“Just as I thought. The cure won’t take while the curse stone still stands, and something nasty guards it: a Bog Hag. Smash the stone, and bring friends if you have any.”<br><span style="color:var(--muted)">The cursed stone is marked on your map.</span>', [back(n)]); return; }
+  if (W.step === 2) { say('“The stone, dearie. The STONE. Off you go.”', [back(n)]); return; }
+  if (W.step === 3) { W.step = 4; addItem('hex_charm', 1); S.coins += 550; gainXP(330); SFX.victory(); renderHUD(); save();
+    say('“Every child in Reedholm woke up this morning asking for pancakes. And the villagers brought me a basket of apples. Apples! For a witch!” Morga sniffs, but she’s smiling. “Here. A little charm of mine. Monsters will drop a bit more coin for you.”<br><br><span style="color:var(--good)">You receive the <b>Marsh Witch’s Charm</b> (+10% coin from monsters), 550 coin and 330 XP.</span>', [back(n)]); return; }
+  say('“Heh. Don’t tell anyone, but I quite like being the hero for once.”', [back(n)]);
+}
+function mwTarget() {
+  const W = S.mw; if (!W || W.step !== 1 || !(S.time > .8 || S.time < .22)) return null; const q = W.herbs.find(q => !q.got && Math.hypot(q.x - S.x, q.y - S.y) < 1.3); if (!q) return null;
+  return {key: 'mwherb' + q.name, html: `<kbd style="margin:0 6px 0 0">E</kbd>Gather the ${q.name}`, btn: 'Gather', fn: () => { q.got = true; SFX.chime(); burst(q.x, q.y - .3, '#9ae07a', 16, 3); save(); toast(`<b>Gathered: ${q.name}</b> (${W.herbs.filter(z => z.got).length}/3)`, 3500); }};
+}
+function mwTick() {
+  const W = S.mw; if (!W || W.step !== 2 || inDungeon() || enemies.some(e => e.mwHag && !e.dead) || Math.hypot(W.stone.x - S.x, W.stone.y - S.y) > 9) return;
+  const e = makeEnemy('lurker', W.stone.x + 1, W.stone.y, {alert: true}); makeElite(e); const lv = 1 + (S.level || 1)*.06;
+  e.hp = e.max = Math.round(42*lv*2.5); e.dmgMul = (e.dmgMul || 1)*1.4; e.esize = 2.3; e.elite = {name: 'Bog Hag', col: '#9a4ae0'}; e.labelName = 'The Bog Hag'; e.mwHag = true; enemies.push(e);
+  SFX.roar(); shake = .5; burst(e.x, e.y - .8, '#9a4ae0', 40, 7); toast('<b>The Bog Hag rises from the mud!</b><br><i>“My pretty curse! You shan’t break it!”</i>', 5000);
+}
+function drawNightHerb(q) { const px = q.x*TS, py = q.y*TS, g = .5 + Math.sin(frameT*4 + q.x)*.3; ctx.fillStyle = `rgba(154,224,122,${g*.4})`; ctx.beginPath(); ctx.arc(px, py - 3, 7, 0, 7); ctx.fill(); ctx.fillStyle = '#c8ffb0'; ctx.fillRect(px - 1, py - 6, 2, 6); ctx.fillRect(px - 3, py - 5, 6, 2); }
+function drawCurseStone() { const q = S.mw.stone, px = q.x*TS, py = q.y*TS; ctx.fillStyle = '#4a4a5a'; ctx.beginPath(); ctx.moveTo(px - 6, py + 2); ctx.lineTo(px - 4, py - 14); ctx.lineTo(px + 4, py - 16); ctx.lineTo(px + 6, py + 2); ctx.fill(); ctx.fillStyle = `rgba(154,74,224,${.5 + Math.sin(frameT*3)*.3})`; ctx.fillRect(px - 2, py - 11, 4, 2); ctx.fillRect(px - 1, py - 7, 2, 4); }
+// ===== sliding puzzle =====
+let slide = null;
+const SLIDE_PICS = [['\u{1F304}', 'Sunrise over the sea'], ['\u{1F3F0}', 'Crownfall castle'], ['\u{1F409}', 'The great dragon'], ['⛵', 'A ship at sea']];
+function slideStart() {
+  if (S.slideDay === S.day && (S.slideToday || 0) >= 3) { openPanel('Otto the Puzzler', '“Three puzzles a day is my limit. My brain needs a nap!”', [{label: 'OK', fn: closeTalk}]); return; }
+  if (S.slideDay !== S.day) { S.slideDay = S.day; S.slideToday = 0; } S.slideToday++;
+  const tiles = [1, 2, 3, 4, 5, 6, 7, 8, 0]; let blank = 8; const nb = i => [i - 3, i + 3, i % 3 ? i - 1 : -1, i % 3 < 2 ? i + 1 : -1].filter(j => j >= 0 && j < 9);
+  for (let k = 0; k < 120; k++) { const opts = nb(blank); const j = pick(opts); [tiles[blank], tiles[j]] = [tiles[j], tiles[blank]]; blank = j; }
+  slide = {on: true, tiles, moves: 0, t0: performance.now(), pic: pick(SLIDE_PICS)};
+  openPanel('Sliding puzzle', `<div style="text-align:center;margin-bottom:6px">Put the picture back in order: <b>${slide.pic[1]}</b></div><div id="slideGrid" style="display:grid;grid-template-columns:repeat(3,64px);gap:4px;justify-content:center"></div><div id="slideInfo" style="text-align:center;color:var(--muted);margin-top:6px">Click a tile next to the gap, or use the arrow keys / D-pad</div>`, [{label: 'Give up', fn: () => { slide = null; closeTalk(); }}]);
+  setTimeout(slideRender, 20);
+}
+function slideRender() {
+  const P = slide, g = document.getElementById('slideGrid'); if (!P || !g) return;
+  g.innerHTML = P.tiles.map((v, i) => v ? `<button class="btn" data-sl="${i}" style="height:64px;padding:0;font-size:12px;background:hsl(${v*40},45%,35%);display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:22px">${v === 5 ? P.pic[0] : ''}</span><b style="font-size:18px">${v}</b></button>` : '<div style="height:64px;border:1px dashed #555;border-radius:4px"></div>').join('');
+  g.querySelectorAll('[data-sl]').forEach(b => b.addEventListener('click', () => slideTap(+b.dataset.sl)));
+  const info = document.getElementById('slideInfo'); if (info) info.textContent = `Moves: ${P.moves}`;
+}
+function slideTap(i) { const P = slide; if (!P || !P.on) return; const b = P.tiles.indexOf(0); if ([b - 3, b + 3].includes(i) || (Math.floor(i/3) === Math.floor(b/3) && Math.abs(i - b) === 1)) { [P.tiles[b], P.tiles[i]] = [P.tiles[i], P.tiles[b]]; P.moves++; SFX.click(); slideRender(); slideCheck(); } }
+function slideMove(d) { const P = slide; if (!P || !P.on) return; const b = P.tiles.indexOf(0), i = d === 'u' ? b + 3 : d === 'd' ? b - 3 : d === 'l' ? (b % 3 < 2 ? b + 1 : -1) : (b % 3 ? b - 1 : -1); if (i >= 0 && i < 9) slideTap(i); }
+function slideCheck() {
+  const P = slide; if (P.tiles.join() !== '1,2,3,4,5,6,7,8,0') return; P.on = false; slide = null;
+  const secs = Math.round((performance.now() - P.t0)/1000), c = Math.max(30, 140 - P.moves); S.coins += c; S.slides = (S.slides || 0) + 1; S.slideBest = S.slideBest ? Math.min(S.slideBest, P.moves) : P.moves; SFX.victory(); renderHUD(); save();
+  setTimeout(() => openPanel('Sliding puzzle', `<div style="font-size:40px;text-align:center">${P.pic[0]}</div>Solved in <b>${P.moves}</b> moves and ${secs} seconds!${P.moves <= (S.slideBest || 999) ? ' A new record!' : ''}<br>“Splendid! Splendid!” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Close', fn: closeTalk}]), 300);
+}
+// ===== memory pairs =====
+let mem = null;
+const MEM_ICONS = ['\u{1F41F}', '\u{1F344}', '\u{1F48E}', '\u{1F33B}', '\u{1F98A}', '\u{1F41A}', '\u{1F34E}', '⭐'];
+function memStart() {
+  const deck = [...MEM_ICONS, ...MEM_ICONS].sort(() => Math.random() - .5);
+  mem = {on: true, deck, up: [], done: new Set(), tries: 0, lock: false};
+  openPanel('Matching pairs', '<div id="memGrid" style="display:grid;grid-template-columns:repeat(4,58px);gap:6px;justify-content:center"></div><div id="memInfo" style="text-align:center;color:var(--muted);margin-top:6px"></div>', [{label: 'Stop', fn: () => { mem = null; closeTalk(); }}]);
+  setTimeout(memRender, 20);
+}
+function memRender() {
+  const M = mem, g = document.getElementById('memGrid'); if (!M || !g) return;
+  g.innerHTML = M.deck.map((c, i) => { const shown = M.done.has(i) || M.up.includes(i); return `<button class="btn" data-mem="${i}" style="height:58px;padding:0;font-size:26px;background:${M.done.has(i) ? '#2a4a3a' : shown ? '#3a4a5a' : '#5a3a6a'}" ${M.done.has(i) ? 'disabled' : ''}>${shown ? c : '?'}</button>`; }).join('');
+  g.querySelectorAll('[data-mem]').forEach(b => b.addEventListener('click', () => memFlip(+b.dataset.mem)));
+  const info = document.getElementById('memInfo'); if (info) info.textContent = `Pairs: ${M.done.size/2}/8 · Tries: ${M.tries}`;
+}
+function memFlip(i) {
+  const M = mem; if (!M || !M.on || M.lock || M.done.has(i) || M.up.includes(i)) return; M.up.push(i); SFX.click(); memRender();
+  if (M.up.length < 2) return; M.tries++; const [a, b] = M.up;
+  if (M.deck[a] === M.deck[b]) { M.done.add(a); M.done.add(b); M.up = []; AUD.tone(800, .1, 'triangle', .08); memRender(); if (M.done.size === 16) memEnd(); }
+  else { M.lock = true; setTimeout(() => { if (mem !== M) return; M.up = []; M.lock = false; memRender(); }, 800); }
+}
+function memEnd() {
+  const M = mem; M.on = false; mem = null; if (S.memDay !== S.day) { S.memDay = S.day; S.memToday = 0; } S.memToday++; const c = S.memToday > 3 ? 10 : Math.max(20, 120 - (M.tries - 8)*8); S.coins += c; S.memGames = (S.memGames || 0) + 1; S.memBest = S.memBest ? Math.min(S.memBest, M.tries) : M.tries; SFX.victory(); renderHUD(); save();
+  setTimeout(() => openPanel('Matching pairs', `All pairs found in <b>${M.tries}</b> tries!${M.tries <= (S.memBest || 99) ? ' Your best yet!' : ''}<br>“${M.tries <= 12 ? 'Whoa, you have a better memory than me!' : 'Nice! Wanna go again?'}” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Play again', primary: true, fn: () => memStart()}, {label: 'Close', fn: closeTalk}]), 400);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7062,13 +7152,15 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['ingrid','Story: Lost Expedition'],['holloway','Mystery cases'],['gaston','Restaurant rush'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['morga','Story: Marsh Witch'],['otto','Sliding puzzles'],['pippa','Memory game'],['ingrid','Story: Lost Expedition'],['holloway','Mystery cases'],['gaston','Restaurant rush'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Mystery cases', 'Inspector Holloway in Crownfall has a new theft to solve each week. Question all three suspects, search the crime scene, then accuse the thief. Listen to what each suspect lets slip: one detail will match the clue at the scene.'],
   ['Homestead raids', 'Once you own a homestead, raiders sometimes come for your storage chest at night while you\u2019re nearby. Stop every one of them before they reach your home to earn a reward from the neighbors.'],
   ['Restaurant rush', 'Chef Gaston in Sunreach needs help in the kitchen: tickets show each dish\u2019s ingredients in order. Click them (or press 1 to 6) in the right sequence before the ticket runs out.'],
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['The Marsh Witch', 'A story quest: Morga the Marsh Witch near Reedholm needs three ingredients that only glow at night to cure the sleeping children, and then the curse stone must be broken.'],
+  ['Puzzles', 'Otto in Jadewater has sliding-tile puzzles (three a day; fewer moves pay more). Pippa in Petalfall plays matching pairs: find all eight pairs in as few tries as you can.'],
   ['The Lost Expedition', 'A story quest: Ingrid Frostmantle in Skyhold asks you to find the three camps her brother\u2019s expedition left in the snow, then face the beast that took him in its ice cave.'],
   ['The Sunken Bell', 'A story quest: Old Marisol in Tidewatch tells of a bell lost in a great storm. Dig up its three fragments on the beaches nearby, then ring the bell at the water\u2019s edge at dawn.'],
   ['The Lady of Gravenmoor', 'A story quest: at night, a ghostly lady appears near Gravenmoor. Find her three lost keepsakes on the moors, then meet her at her grave at midnight.'],
@@ -7403,7 +7495,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -7697,6 +7789,7 @@ function padPoll(dt) {
   if (logr && logr.on) { logr.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
   if (moles && moles.on) { const map9 = {12: 1, 13: 7, 14: 3, 15: 5}; for (const d in map9) if (down(+d)) moleCursor(map9[d]); if (down(OK) || down(2)) moleWhack(moles.cur); PAD.prev = B; return; }
   if (kitchen && kitchen.on) { const mp = {[OK]: 0, [BACK]: 1, 2: 2, 3: 3, 4: 4, 5: 5}; for (const i in mp) if (down(+i)) kitchenAdd(mp[i]); PAD.prev = B; return; }
+  if (slide && slide.on) { const dmap = {12: 'u', 13: 'd', 14: 'l', 15: 'r'}; for (const d in dmap) if (down(+d)) slideMove(dmap[d]); PAD.prev = B; return; }
   if (cart && cart.on) { if (down(OK) || down(BACK) || down(2) || down(3) || down(12)) cartJump(); PAD.prev = B; return; }
   if (snow && snow.on) { snow.cvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); snow.cvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK) || down(2) || down(7)) snowThrow(); PAD.prev = B; return; }
   if (wrestle && wrestle.on) { [OK, BACK, 2, 3].forEach(i => { if (down(i)) wrestleMash(); }); PAD.prev = B; return; }
@@ -8308,6 +8401,8 @@ function render() {
   if (spar && spar.active) sprites.push({y: 1e9 - 3, f: () => { const px = S.x*TS, py = S.y*TS - (S.riding ? 40 : 34); ctx.fillStyle = '#0d131b'; ctx.fillRect(px - 12, py, 24, 4); ctx.fillStyle = '#ff9a3a'; ctx.fillRect(px - 11, py + 1, 22*Math.max(0, spar.hp/SPAR_HP), 2); }});
   for (const b of birds) if (inView(b.x, b.y)) sprites.push({y: b.y, f: () => drawBird(b)});
   if (ghostSpot() && ghostVisible() && inView(ghostSpot().x, ghostSpot().y)) sprites.push({y: ghostSpot().y, f: drawGhostLady});
+  if (S.mw && S.mw.step === 1 && (S.time > .8 || S.time < .22)) for (const q of S.mw.herbs) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawNightHerb(q)});
+  if (S.mw && S.mw.step === 2 && inView(S.mw.stone.x, S.mw.stone.y)) sprites.push({y: S.mw.stone.y, f: drawCurseStone});
   if (S.le && S.le.step === 1) for (const q of S.le.camps) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawCamp(q)});
   if (S.sb && S.sb.step === 1) for (const q of S.sb.pieces) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawBellPiece(q)});
   if (S.gh && S.gh.step === 1) for (const q of S.gh.items) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawKeepsake(q)});
@@ -8764,7 +8859,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -9128,6 +9223,9 @@ function mainOptions(n) {
   if (n.chef) o.push({label: 'Help in the kitchen', primary: true, fn: () => kitchenStart()});
   if (n.detective) o.push({label: S.case && !S.case.done ? 'Continue the investigation' : 'Ask about a case', primary: true, fn: () => caseTalk(n)});
   if (n.expedition) o.push({label: !S.le ? 'Ask about the expedition' : S.le.step >= 4 ? 'Talk about the expedition' : 'About the lost expedition', primary: !S.le || S.le.step < 4, fn: () => leTalk(n)});
+  if (n.witch) o.push({label: !S.mw ? 'Ask about the sleeping children' : S.mw.step >= 4 ? 'Talk to Morga' : 'About the cure', primary: !S.mw || S.mw.step < 4, fn: () => mwTalk(n)});
+  if (n.puzzler) o.push({label: 'Solve a sliding puzzle', primary: true, fn: () => slideStart()});
+  if (n.memory) o.push({label: 'Play matching pairs', primary: true, fn: () => memStart()});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11106,6 +11204,8 @@ function openMap() {
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
     if (party) for (const r of Object.values(remote)) mk(r.x, r.y, r.col || '#6ab0ff', r.name, 5);
     for (const q of pings) mk(q.x, q.y, q.col, `Ping (${q.name})`, 4);
+    if (S.mw && S.mw.step === 1) S.mw.herbs.forEach(q => { if (!q.got) mk(q.x, q.y, '#9ae07a', `${q.name} (glows at night)`, 4); });
+    if (S.mw && S.mw.step === 2) mk(S.mw.stone.x, S.mw.stone.y, '#9a4ae0', 'The cursed stone', 6);
     if (S.le && S.le.step === 1) S.le.camps.forEach(q => { if (!q.got) mk(q.x, q.y, '#e8eef4', 'Abandoned camp', 4); });
     if (S.le && S.le.step === 2) mk(S.le.lair.x, S.le.lair.y, '#e8eef4', 'The Pale Beast\u2019s lair', 6);
     if (S.sb && S.sb.step === 1) S.sb.pieces.forEach(q => { if (!q.got) mk(q.x, q.y, '#6ac0d8', 'Bell fragment', 4); });
@@ -11940,6 +12040,9 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['marshwitch','Sweet Dreams','Break the curse on Reedholm\u2019s children', () => !!(S.mw && S.mw.step >= 3)],
+  ['slide30','Puzzle Master','Solve a sliding puzzle in 30 moves or fewer', () => (S.slideBest || 999) <= 30],
+  ['mem12','Total Recall','Find all pairs in 12 tries or fewer', () => (S.memBest || 99) <= 12],
   ['lostexped','Into the White','Rescue Leif from the Pale Beast', () => !!(S.le && S.le.step >= 3)],
   ['fishcontest','Reel Champion','Win a party fishing contest', () => (S.fishContestWins || 0) >= 1],
   ['tagwin','Can\u2019t Catch Me','Win a game of tag with your party', () => (S.tagWins || 0) >= 1],
@@ -12550,7 +12653,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
