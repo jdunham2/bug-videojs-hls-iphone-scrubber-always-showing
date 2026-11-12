@@ -95,6 +95,8 @@ blockquote cite { display: block; font-style: normal; font-size: 10px; letter-sp
       <blockquote>"We have lost everything and Coalight has hold of us. I am declaring Dead Orbit Protocol."<cite>Captain Hale, to all hands</cite></blockquote>
       <p><strong>Six hours into the Coalight system, the <em>Emberflight</em> goes dark.</strong> Reactor, air, shields, sensors and drive all shut down at once, and the ship is left stranded in a decaying orbit. You are Rook, engineer's mate, and the engineering deck is yours.</p>
       <p>Bring her back one system at a time. <strong>Each time something comes back, report it to the Captain</strong>: a repaired system stays off the board until the bridge has heard it from you.</p>
+      <p>Watch yourself as well as the ship. Your bag holds duct tape for breaches, a fire extinguisher, and room for what you find behind the wall panels: water, rations, oxygen, med gel, radiation tablets.</p>
+      <p>You are not alone. A ladder at the forward end of the spine leads up to the main ship, where the Captain and crew are fighting the same blackout. Talk to them: they have advice, and sometimes supplies.</p>
       <ol class="protocol">
         <li>Bus breakers</li><li>Reactor</li><li>Life support</li><li>Shields</li><li>Sensors</li><li>Main drive, then burn clear</li>
       </ol>
@@ -104,10 +106,12 @@ blockquote cite { display: block; font-style: normal; font-size: 10px; letter-sp
         <div><kbd>SPACE</kbd> or right mouse: tune in the green band</div>
         <div><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> power to shields, sensors, engines</div>
         <div><kbd>R</kbd> report to the Captain</div>
+        <div><kbd>E</kbd> also talks to crew and climbs the ladder</div>
+        <div><kbd>TAB</kbd> bag · <kbd>5</kbd>–<kbd>8</kbd> use an item</div>
         <div><kbd>4</kbd> overclock the reactor</div>
         <div><kbd>P</kbd> pause</div>
       </div>
-      <p class="note">On a phone: drag on the left to move, drag on the right to look, hold USE, tap REPORT, tap the power bars to route. No mouse lock? Drag to look, or turn with the arrow keys.</p>
+      <p class="note">On a phone: drag on the left to move, drag on the right to look, hold USE, tap REPORT, tap BAG for your inventory, tap the power bars to route. No mouse lock? Drag to look, or turn with the arrow keys.</p>
       <div class="row">
         <button id="start" type="button">Begin the watch</button>
         <span class="note">One mission · about 7 minutes</span>
@@ -170,6 +174,27 @@ const MAP = [
   '  #.j.....j.#.......#.......#........#  ',
   '  ####################################  ',
   '                                        ',
+  '                                        ',
+  '  ####################################  ',
+  '  #.........#..............#.........#  ',
+  '  #.........#..............#.........#  ',
+  '  #.........#..............#.........#  ',
+  '  #.........#..............#.........#  ',
+  '  ####.##########.##########.#########  ',
+  '  #..................................#  ',
+  '  #..................................#  ',
+  '  ####################################  ',
+  '                                        ',
+];
+const A_ROWS = 19, YB = 2.3, A_H = A_ROWS * 48;
+const lvl = y => y >= A_H ? 1 : 0, Z3 = y => y / 48 - (y >= A_H ? A_ROWS : 0), Y3 = y => y >= A_H ? YB : 0;
+const LADDER = [{ x:36.5 * 48, y:10.5 * 48, prog:0 }, { x:36.5 * 48, y:26.5 * 48, prog:0 }];
+const CREW = [
+  { id:'HALE',  name:'Captain Hale',  col:0x1f3a5c, a:[33, 22.5], b:[33, 22.5] },
+  { id:'MORA',  name:'Lt. Mora',      col:0x0a84c8, a:[30.5, 23.5], b:[35.5, 23.5] },
+  { id:'DUNNE', name:'Cook Dunne',    col:0xc9640a, a:[16, 22], b:[24.5, 26.6] },
+  { id:'SATO',  name:'Medic Sato',    col:0x128a52, a:[6, 22.5], b:[14.5, 23.5] },
+  { id:'PELL',  name:'Deckhand Pell', col:0x6450cf, a:[21, 23], b:[9.5, 26.6] },
 ];
 const COLS = 40, ROWS = MAP.length, WW = COLS * TS, WH = ROWS * TS;
 MAP.forEach((r, i) => { if (r.length !== COLS) console.error('map row width', i, r.length); });
@@ -188,6 +213,10 @@ const ROOMS = {
   life:    { name:'LIFE SUPPORT',     x0:13, y0:13, x1:19, y1:16, edge:'bottom' },
   stores:  { name:'STORES',           x0:21, y0:13, x1:27, y1:16, edge:'bottom' },
   med:     { name:'MEDBAY',           x0:29, y0:13, x1:36, y1:16, edge:'bottom' },
+  quarters:{ name:'CREW QUARTERS',    x0:3,  y0:21, x1:11, y1:24, edge:null },
+  mess:    { name:'MESS DECK',        x0:13, y0:21, x1:26, y1:24, edge:null },
+  bridge:  { name:'BRIDGE',           x0:28, y0:21, x1:36, y1:24, edge:null },
+  passage: { name:'MAIN PASSAGE',     x0:3,  y0:26, x1:36, y1:27, edge:null },
 };
 const SYSDEF = {
   R: { name:'REACTOR',      short:'RCT', room:'reactor', ch:'r', color:C.amber },
@@ -202,8 +231,19 @@ const WHO = {
   ROOK:    { name:'ROOK · YOU',  color:'#ffffff' },
   LANTERN: { name:'LANTERN ACTUAL', color:C.green },
   SHIP:    { name:'SHIP',        color:C.dim },
+  MORA:    { name:'LT. MORA · NAVIGATION', color:'#0a84c8' }, DUNNE: { name:'COOK DUNNE', color:'#c9640a' }, SATO: { name:'MEDIC SATO', color:'#128a52' }, PELL: { name:'DECKHAND PELL', color:'#6450cf' },
 };
 
+const PANEL_SPOTS = [[9, 2, -1], [31, 2, -1], [14, 7, 1], [20, 11, 1], [34, 9, -1], [9, 13, -1], [18, 16, 1], [35, 13, -1], [22, 16, 1]];
+const PANEL_LOOT = ['water', 'ration', 'o2', 'radtab', 'medgel', 'tape', 'water', 'ration', 'radtab'];
+const ITEMS = {
+  water:  { name:'Water pouch',  col:'#0a84c8', use:() => { S.vit.water = Math.min(100, S.vit.water + 55); }, msg:'Drank the water pouch' },
+  ration: { name:'Ration bar',   col:'#c9640a', use:() => { S.vit.food = Math.min(100, S.vit.food + 50); }, msg:'Ate the ration bar' },
+  o2:     { name:'O2 canister',  col:'#128a52', use:() => { S.vit.o2 = 100; }, msg:'Suit oxygen topped up' },
+  radtab: { name:'Rad tablets',  col:'#b0307c', use:() => { S.vit.rad = Math.max(0, S.vit.rad - 45); }, msg:'Radiation dose reduced' },
+  medgel: { name:'Med gel',      col:'#d2362a', use:() => { S.p.hp = Math.min(100, S.p.hp + 50); }, msg:'Applied med gel' },
+};
+const PROPS = [[26.5, 13.5], [26.5, 16.4], [21.5, 13.5], [36.3, 15.7]].map(([x, y]) => ({ x:x * TS, y:y * TS }));
 const rand = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -230,9 +270,9 @@ function layout() {
   const m = 16, top = 34;
   const lw = clamp(W * .36, 136, 240);
   const big = W > 760, tw = clamp(W - lw - m * 3, 120, 380), th = 104;
-  L.status = { x:m, y:top, w:lw, h:th };
+  L.status = { x:m, y:top, w:lw, h:90 };
   L.tac = { x:W - m - tw, y:top, w:tw, h:big ? 168 : th };
-  const deskMap = big && !touchUI, mw = deskMap ? 240 : Math.min(tw, 190), mh = mw * WH / WW;
+  const deskMap = big && !touchUI, mw = deskMap ? 240 : Math.min(tw, 190), mh = mw * A_ROWS / COLS + 18;
   L.map = deskMap ? { x:m, y:H - m - mh, w:mw, h:mh } : { x:W - m - mw, y:L.tac.y + L.tac.h + 8, w:mw, h:mh };
   L.obj = { x:m, y:top + th + 10, w:W - m * 2 - (big ? tw + m : mw + 12) };
   const pw = Math.min(W - m * 2, 440), ph = 62;
@@ -243,6 +283,8 @@ function layout() {
   L.comms = { x:(W - Math.min(W - m * 2, 560)) / 2, w:Math.min(W - m * 2, 560), bottom:py - 10 };
   L.act = { x:W - m - 46, y:H - m - 52, r:44 };
   L.tune = { x:W - m - 46 - 92, y:H - m - 40, r:32 };
+  L.invDock = !touchUI && W >= 1010; L.inv = L.invDock ? { x:W - m - 252, y:H - m - 152, w:252, h:152 } : { x:(W - 252) / 2, y:Math.max(top + 150, H * .5 - 100), w:252, h:152 };
+  L.bag = { x:W - m - 34, y:H - m - 146, r:26 };
   L.report = { x:W - m - 46 - 70, y:H - m - 108, r:30 };
 }
 addEventListener('resize', resize);
@@ -331,6 +373,8 @@ function buildDeck() {
   ng.shadowBlur = 10; ng.lineWidth = 2;
   for (const yy of [9.5, 11.5]) { ng.strokeStyle = ng.shadowColor = '#3a7bff'; ng.setLineDash([26, 22]); ng.beginPath(); ng.moveTo(3.3 * TS, yy * TS); ng.lineTo(36.7 * TS, yy * TS); ng.stroke(); }
   ng.setLineDash([]); ng.shadowBlur = 0;
+  for (const k in SYSDEF) { const d = SYSDEF[k], q = findCh(d.ch)[0]; g.strokeStyle = d.color; g.globalAlpha = .55; g.lineWidth = 6; g.beginPath(); g.arc(q.x, q.y, 44, 0, 7); g.stroke();
+    g.lineWidth = 2; g.setLineDash([10, 8]); g.beginPath(); g.arc(q.x, q.y, 58, 0, 7); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
   // stencilled room names
   g.textAlign = 'left'; g.textBaseline = 'top';
   for (const k in ROOMS) { const o = ROOMS[k];
@@ -404,11 +448,14 @@ function newGame() {
     fires:[], breaches:[], parts:[], enemies:[], shots:[],
     caps:findCh('j').map(o => ({ ...o, primed:false, prog:0 })),
     locker:{ ...findCh('k')[0], prog:0 }, med:findCh('m')[0],
-    voss:{ x:22.5 * TS, y:3.4 * TS, state:'up' },
+    voss:{ id:'VOSS', x:22.5 * TS, y:3.4 * TS, state:'up', prog:0 },
     valve:{ ...findCh('v')[0], prog:0, cd:0, spin:0 }, breakers:findCh('b').map(o => ({ ...o, tripped:false, prog:0 })), jobT:14, bolts:[],
     comms:[], commT:0, order:null,
     m:{ phase:0, t:0, f:{}, progress:0, timer:0, step:0, pending:false, pendT:0, late:false, title:'COALIGHT TRANSIT', obj:'Stand your watch', hint:'' },
     lights:true, debrisT:null, reportCd:0,
+    inv:{ tape:3, ext:100, slots:[null, null, null, null], open:false }, vit:{ o2:100, rad:0, food:100, water:100 }, toast:{ text:'', t:0 }, warned:{},
+    crew:CREW.map(c => ({ ...c, x:c.a[0] * TS, y:c.a[1] * TS, gave:false, prog:0 })),
+    panels:PANEL_SPOTS.map(([c, r, d], i) => ({ x:(c + .5) * TS, y:(r + .5 + d * .36) * TS, d, item:PANEL_LOOT[i], open:false, prog:0 })),
     shake:0, flash:0, hitFlash:0, shieldFlash:0, target:null, acting:false, tune:null,
     stats:{ reports:0, late:0, strikes:0, jobs:0, repairs:0, fires:0, breaches:0, kills:0, orders:0, ordersTotal:0 },
     over:null, overT:0, weaponT:0, banner:{ text:'', t:0 },
@@ -422,6 +469,8 @@ const effBars = k => online(S.sys[k]) ? S.alloc[k] : 0;
 const FAULTS = { S:['HARMONIC DRIFT', .4, 'Shield harmonics are drifting. Recalibrate at the generator.'], W:['ARRAY MISALIGNED', .3, 'Sensor array has drifted out of alignment. Realign it at the array.'], E:['INJECTOR FOULED', .5, 'Drive injectors are fouling. Flush them at the main drive.'], L:['SCRUBBER SATURATED', 1, 'Scrubbers are saturated. Cycle them in life support.'] };
 const eff = k => effBars(k) * (.5 + S.sys[k].hp / 200) * (S.sys[k].fault ? FAULTS[k][1] : 1);
 
+function toast(text) { S.toast = { text, t:2.6 }; }
+function useSlot(i) { const k = S.inv.slots[i]; if (!k || S.over || S.p.down > 0) return; ITEMS[k].use(); S.inv.slots[i] = null; sfx.good(); toast(ITEMS[k].msg); }
 function say(who, text) { S.comms.push({ who, text }); }
 function setObj(title, obj, hint) { const m = S.m; if (title) m.title = title; m.obj = obj; m.hint = hint || ''; }
 function banner(text) { S.banner = { text, t:3.2 }; }
@@ -487,7 +536,7 @@ function incoming(e) {
   if (Math.random() < evade) { S.shots.push({ e, t:0, kind:'miss' }); bolt('miss'); return; }
   const absorbed = Math.min(S.shield, e.dmg); S.shield -= absorbed; const over = e.dmg - absorbed;
   bolt(over > .5 ? 'hull' : 'shield');
-  if (over > .5) { S.shots.push({ e, t:0, kind:'hull' }); hullHit(over); }
+  if (over > .5) { S.shots.push({ e, t:0, kind:'hull' }); S.vit.rad = Math.min(100, S.vit.rad + 3); hullHit(over); }
   else { S.shots.push({ e, t:0, kind:'shield' }); S.shieldFlash = 1; S.shake = Math.min(1, S.shake + .12); sfx.shield(); }
 }
 function hurt(d) { const p = S.p; if (p.down > 0) return; p.hp -= d; p.lastHurt = S.t; if (p.hp <= 0) { p.hp = 0; p.down = 5; p.carrying = false; sfx.bad(); say('SHIP', 'Engineer down. Corpsman to deck four.'); } }
@@ -540,6 +589,27 @@ const STEPS = [
     hale:'All hands, stand by to burn. Engineering, everything you have into the engines.', sys:'E',
     after:() => { gotoPhase(2); banner('BREAK ORBIT'); setObj('BREAK ORBIT', 'Route power to the engines and hold the burn', touchUI ? 'Tap ENG until it is full. Keep the drive alive until the burn completes.' : 'Press 3 until engines are full. Keep the drive alive until the burn completes.'); } },
 ];
+const TIPS = [
+  'Breakers are the boxes on the north wall of the spine. Hold the handle until it clicks, both of them.',
+  'Vent the coolant before you touch the console or she will not hold. Hit the green band and the restart goes twice as fast.',
+  'Cycle the scrubbers first, then repair the unit. And tell the Captain: the air does not flow until the bridge opens the valves.',
+  'The shield coupling is cooked. Spares are in STORES at the bottom of the engineering deck. Carry one up and fit it.',
+  'The sensor array only needs realigning. Three clean hits on the green and it is done.',
+  'Flush the injectors before you repair the drive, and have your power ready for the burn.',
+];
+function talk(c) {
+  const m = S.m, v = S.vit, tm = Math.max(0, Math.ceil(m.timer)), clock = Math.floor(tm / 60) + ' minutes ' + (tm % 60) + ' seconds';
+  const tip = m.phase === 2 ? 'Everything into the engines now. Press 3 until the board is full.' : m.pending ? 'That one is fixed. Call it in to the Captain before you do anything else.' : TIPS[m.step];
+  let line;
+  if (m.phase === 0) line = { HALE:'Quiet watch, Rook. Coalight is a long way off the bow and I intend to keep it there.', MORA:'Six hours in and the plot is clean. Enjoy it while it lasts.', DUNNE:'Stew in an hour. Do not be late, engineers eat everything.', SATO:'If you are here for a headache, drink some water first.', PELL:'Card game after watch, if the Chief lets you out of the engine room.', VOSS:'All boards green. Walk the deck and learn where things are, Rook.' }[c.id];
+  else if (c.id === 'HALE') { if (m.phase === 1 && m.pending) { S.reportCd = 0; return report(); } line = m.phase === 2 ? 'Hold that burn, Rook. Do not let the drive drop out.' : 'I need the next one, Rook: ' + m.obj.toLowerCase() + '. Report the moment it is done.'; }
+  else if (c.id === 'MORA') line = 'By my plot we have ' + clock + ' before Coalight will not let go. ' + (S.sys.W.reported ? 'With sensors back I can pick our burn window.' : 'Get me sensors and I can tell you more.');
+  else if (c.id === 'DUNNE') { if (!c.gave && S.inv.slots.includes(null)) { c.gave = true; S.inv.slots[S.inv.slots.indexOf(null)] = v.water < v.food ? 'water' : 'ration'; line = 'You look grey. Take this, and check the wall panels, the crew stash things everywhere.'; } else line = 'Eat and drink when the bag tells you to. A crew that faints fixes nothing.'; }
+  else if (c.id === 'SATO') { if (!c.gave && v.rad > 35 && S.inv.slots.includes(null)) { c.gave = true; S.inv.slots[S.inv.slots.indexOf(null)] = 'radtab'; line = 'Your dose is climbing. Take these tablets. It keeps rising until the shields are back.'; } else line = 'Radiation climbs while the shields are down, tablets knock it back. If your health drops, stand on the medbay pad.'; }
+  else line = (c.id === 'PELL' ? 'I am pulling fuses up here. If you want my advice: ' : '') + tip;
+  say(c.id, line); keys.KeyE = false; input.actTouch = false;
+}
+function climb(i) { const d = LADDER[1 - i], p = S.p; p.x = d.x - TS; p.y = d.y; p.face = Math.PI; p.pitch = 0; S.flash = .55; tone(300, .15, 'triangle', .1, 500); toast(i === 0 ? 'Main ship · crew deck' : 'Engineering deck'); keys.KeyE = false; input.actTouch = false; }
 function report() {
   const m = S.m; if (!running || paused || S.over || m.phase < 1 || S.reportCd > 0 || S.p.down > 0) return;
   S.reportCd = 4;
@@ -558,6 +628,7 @@ function blackout() {
   const m = S.m; gotoPhase(1); m.timer = 450; m.step = 0; m.pending = false;
   const set = (k, hp, o) => Object.assign(S.sys[k], { hp, reported:false }, o);
   set('R', 16); set('L', 30, { fault:FAULTS.L[0] }); set('S', 34, { blown:true }); set('W', 38, { fault:FAULTS.W[0] }); set('E', 28, { fault:FAULTS.E[0] });
+  S.crew.forEach(c => { c.x = c.b[0] * TS; c.y = c.b[1] * TS; });
   S.breakers.forEach(b => { b.tripped = true; }); S.heat = 86; S.shield = 0; S.alloc = { S:0, W:0, E:0 }; S.oc = false; S.lights = false;
   S.flash = .7; S.shake = 1; sfx.boom(); for (const k in S.sys) burst(S.sys[k].x, S.sys[k].y, 24, 'spark');
   banner('DEAD ORBIT PROTOCOL');
@@ -601,8 +672,12 @@ const keys = {};
 const input = { jx:0, jy:0, joy:null, actTouch:false };
 function findTarget() {
   const p = S.p, list = [];
-  for (const o of S.fires) list.push({ type:'fire', o, x:o.x, y:o.y, label:'Extinguish fire', time:1.9 });
-  for (const o of S.breaches) list.push({ type:'breach', o, x:o.x, y:o.y, label:'Seal hull breach', time:2.8 });
+  for (const o of S.fires) list.push(S.inv.ext > 0 ? { type:'fire', o, x:o.x, y:o.y, label:'Extinguish fire', time:1.9 } : { type:'fire', o, x:o.x, y:o.y, label:'Smother fire by hand (extinguisher empty)', time:5.5 });
+  for (const o of S.breaches) list.push(S.inv.tape > 0 ? { type:'breach', o, x:o.x, y:o.y, label:'Tape over hull breach', time:2.6 } : { type:'breach', o, x:o.x, y:o.y, label:'Seal breach by hand (no duct tape)', time:8 });
+  for (const c of S.crew) list.push({ type:'talk', o:c, x:c.x, y:c.y, label:'Talk to ' + c.name, time:.3 });
+  if (S.voss.state !== 'gone') list.push({ type:'talk', o:S.voss, x:S.voss.x, y:S.voss.y, label:'Talk to Chief Voss', time:.3 });
+  LADDER.forEach((q, i) => list.push({ type:'ladder', o:q, i, x:q.x, y:q.y, label:i === 0 ? 'Climb up to the main ship' : 'Climb down to engineering', time:.6 }));
+  for (const o of S.panels) if (!o.open) list.push(o.item !== 'tape' && !S.inv.slots.includes(null) ? { type:'none', o, x:o.x, y:o.y, label:'Bag is full. Use something first.' } : { type:'panel', o, x:o.x, y:o.y, label:'Search wall panel', time:1.1 });
   for (const k in S.sys) { const s = S.sys[k];
     if (s.fault && !s.blown) list.push({ type:'cal', o:s, x:s.x, y:s.y, label:`Fix ${s.fault.toLowerCase()} (${s.cal}/3)` });
     else if (s.blown) list.push(p.carrying ? { type:'fit', o:s, x:s.x, y:s.y, label:`Fit coupling: ${s.name}`, time:1.8 } : { type:'none', o:s, x:s.x, y:s.y, label:'Needs a coupling from STORES' });
@@ -610,7 +685,8 @@ function findTarget() {
   }
   if (S.valve.cd <= 0 && S.heat > 25) list.push({ type:'vent', o:S.valve, x:S.valve.x, y:S.valve.y, label:'Vent reactor coolant', time:1.3 });
   for (const b of S.breakers) if (b.tripped) list.push({ type:'breaker', o:b, x:b.x, y:b.y, label:'Reset bus breaker', time:1.5 });
-  if (!p.carrying) list.push({ type:'take', o:S.locker, x:S.locker.x, y:S.locker.y, label:'Take spare coupling', time:.5 });
+  if (!p.carrying && Object.values(S.sys).some(q => q.blown)) list.push({ type:'take', o:S.locker, x:S.locker.x, y:S.locker.y, label:'Take spare coupling', time:.5 });
+  else if (S.inv.ext < 100 || S.inv.tape < 2) list.push({ type:'restock', o:S.locker, x:S.locker.x, y:S.locker.y, label:'Restock tape and extinguisher', time:1.2 });
   if (S.m.phase === 3) for (const c of S.caps) if (!c.primed) list.push({ type:'cap', o:c, x:c.x, y:c.y, label:'Prime jump capacitor', time:3.2 });
   let best = null, bd = 1e9; const fx = Math.cos(p.face), fy = Math.sin(p.face);
   for (const t of list) { const d = Math.hypot(t.x - p.x, t.y - p.y) || 1, dot = ((t.x - p.x) * fx + (t.y - p.y) * fy) / d; if (d > 96 || (dot < .25 && d > 44)) continue; const cost = d + (1 - dot) * 70; if (cost < bd) { bd = cost; best = t; } }
@@ -635,7 +711,7 @@ function update(dt) {
   // effects decay
   S.shake = Math.max(0, S.shake - dt * 1.6); S.flash = Math.max(0, S.flash - dt * .8);
   S.hitFlash = Math.max(0, S.hitFlash - dt * 2.2); S.shieldFlash = Math.max(0, S.shieldFlash - dt * 2.5);
-  if (S.banner.t > 0) S.banner.t -= dt;
+  if (S.banner.t > 0) S.banner.t -= dt; if (S.toast.t > 0) S.toast.t -= dt;
   // comms
   if (S.comms.length) { const c = S.comms[0]; if (S.commT === 0) sfx.comm(); S.commT += dt; if (S.commT > Math.max(3.2, c.text.length * .058) || (S.comms.length > 3 && S.commT > 2.2)) { S.comms.shift(); S.commT = 0; } }
   if (S.over) { S.overT += dt; updateParts(dt); return; }
@@ -659,7 +735,7 @@ function update(dt) {
       p.walk += dt * 11;
     }
     // machine obstacles
-    const obs = [...Object.values(S.sys), S.locker, ...S.caps];
+    const obs = [...Object.values(S.sys), S.locker, ...S.caps, ...PROPS, ...S.crew];
     for (const o of obs) { const dx = p.x - o.x, dy = p.y - o.y, d = Math.hypot(dx, dy) || 1, min = 13 + 20; if (d < min) { const nx = p.x + dx / d * (min - d), ny = p.y + dy / d * (min - d); if (!hitsWall(nx, ny, 13)) { p.x = nx; p.y = ny; } } }
     // act
     if (S.acting) {
@@ -681,8 +757,12 @@ function update(dt) {
         if (t.type === 'fire' && Math.random() < dt * 40) part({ x:lerp(p.x, o.x, rand(.3, 1)), y:lerp(p.y, o.y, rand(.3, 1)), vx:rand(-30, 30), vy:rand(-30, 30), life:.5, max:.5, size:rand(4, 9), kind:'foam' });
         if (o.prog >= 1) {
           o.prog = 0; sfx.done();
-          if (t.type === 'fire') { S.fires.splice(S.fires.indexOf(o), 1); S.stats.fires++; }
-          else if (t.type === 'breach') { S.breaches.splice(S.breaches.indexOf(o), 1); S.stats.breaches++; }
+          if (t.type === 'fire') { S.fires.splice(S.fires.indexOf(o), 1); S.stats.fires++; if (S.inv.ext > 0) { S.inv.ext = Math.max(0, S.inv.ext - 25); if (S.inv.ext === 0) toast('Extinguisher empty. Restock in STORES.'); } }
+          else if (t.type === 'breach') { S.breaches.splice(S.breaches.indexOf(o), 1); S.stats.breaches++; if (S.inv.tape > 0) { S.inv.tape--; if (S.inv.tape === 0) toast('Out of duct tape. Restock in STORES.'); } }
+          else if (t.type === 'talk') talk(o);
+          else if (t.type === 'ladder') climb(t.i);
+          else if (t.type === 'restock') { S.inv.ext = 100; S.inv.tape = Math.max(S.inv.tape, 3); toast('Restocked duct tape and extinguisher'); }
+          else if (t.type === 'panel') { o.open = true; if (o.item === 'tape') { S.inv.tape += 2; toast('Found 2 rolls of duct tape'); } else { S.inv.slots[S.inv.slots.indexOf(null)] = o.item; toast('Found: ' + ITEMS[o.item].name); } }
           else if (t.type === 'fit') { o.blown = false; o.hp = Math.max(o.hp, 45); p.carrying = false; S.stats.repairs++; say('SHIP', `${o.name} coupling seated.`); }
           else if (t.type === 'take') { p.carrying = true; }
           else if (t.type === 'vent') { S.heat = Math.max(0, S.heat - 45); o.cd = 8; S.stats.jobs++; noise(.9, .3, 3500); for (let i = 0; i < 40; i++) part({ x:o.x + rand(-10, 10), y:o.y, vx:rand(-90, 90), vy:rand(-40, 160), life:rand(.5, 1.1), max:1.1, size:rand(6, 13), kind:'foam' }); }
@@ -693,9 +773,15 @@ function update(dt) {
     } else S.tune = null;
     // hazards
     for (const f of S.fires) if (Math.hypot(f.x - p.x, f.y - p.y) < 46) hurt(13 * dt);
-    if (S.atmo <= 0) hurt(7 * dt);
+    const v = S.vit, live = S.m.phase >= 1;
+    v.o2 = clamp(v.o2 + (S.atmo < 35 ? -2.4 : 7) * dt, 0, 100);
+    if (live) { v.food = Math.max(0, v.food - .14 * dt); v.water = Math.max(0, v.water - .2 * dt);
+      v.rad = clamp(v.rad + (!online(S.sys.S) || S.shield < 15 ? .33 : -.5) * dt, 0, 100); }
+    if (v.o2 <= 0) hurt(7 * dt); if (v.rad > 70) hurt(2 * dt); if (v.food <= 0 || v.water <= 0) hurt(1.5 * dt);
+    for (const [k, low, msg] of [['o2', v.o2 < 30, 'Suit oxygen is low'], ['rad', v.rad > 60, 'Radiation dose is high'], ['food', v.food < 25, 'You need to eat'], ['water', v.water < 25, 'You need water']]) {
+      if (low && !S.warned[k]) { S.warned[k] = true; toast(msg + '. Check your bag.'); sfx.bad(); } else if (!low) S.warned[k] = false; }
     if (roomAt(p.x, p.y) === 'med') p.hp = Math.min(100, p.hp + 16 * dt);
-    else if (S.t - p.lastHurt > 4 && S.atmo > 40) p.hp = Math.min(100, p.hp + 2 * dt);
+    else if (S.t - p.lastHurt > 4 && v.food > 20 && v.water > 20) p.hp = Math.min(100, p.hp + 2 * dt);
   }
 
   // fires and breaches
@@ -812,7 +898,7 @@ function planetCanvas() {
 function build3D() {
   const glc = document.getElementById('gl');
   const renderer = new T3.WebGLRenderer({ canvas:glc, antialias:true, powerPreference:'high-performance' });
-  renderer.setClearColor(0xe9eef4);
+  renderer.setClearColor(0xe9eef4); renderer.shadowMap.enabled = true; renderer.shadowMap.type = T3.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
   const scene = new T3.Scene(); scene.fog = new T3.FogExp2(0xc9d2de, .012);
   const camera = new T3.PerspectiveCamera(76, 1, .04, 900); camera.rotation.order = 'YXZ'; scene.add(camera);
   const glowTex = glowTexture();
@@ -837,34 +923,38 @@ function build3D() {
 
   // deck
   const floorMat = std({ map:bigTex(deck), emissiveMap:bigTex(floorGlowCanvas()), emissive:0xffffff, emissiveIntensity:.2, roughness:.32, metalness:.08 });
-  const floor = new T3.Mesh(new T3.PlaneGeometry(COLS, ROWS), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.set(COLS / 2, 0, ROWS / 2); scene.add(floor);
+  const deckPlane = (r0, r1, y) => { const g = new T3.PlaneGeometry(COLS, r1 - r0), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - (r0 + (1 - uv.getY(i)) * (r1 - r0)) / ROWS);
+    const m = new T3.Mesh(g, floorMat); m.rotation.x = -Math.PI / 2; m.position.set(COLS / 2, y, (r1 - r0) / 2); m.receiveShadow = true; m.userData.flat = true; scene.add(m); return m; };
+  const floor = deckPlane(0, A_ROWS, 0); deckPlane(A_ROWS, ROWS, YB);
   const [cc, ce] = ceilCanvases(), ct = new T3.CanvasTexture(cc), cet = new T3.CanvasTexture(ce);
-  for (const t of [ct, cet]) { t.wrapS = t.wrapT = T3.RepeatWrapping; t.repeat.set(COLS - 4, ROWS - 2); }
-  const ceilMat = std({ map:ct, emissiveMap:cet, emissive:0xffffff, emissiveIntensity:.9, roughness:.6, metalness:.05 });
-  const ceil = new T3.Mesh(new T3.PlaneGeometry(COLS - 4, ROWS - 2), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(COLS / 2, WALL_H, ROWS / 2); scene.add(ceil);
+  for (const t of [ct, cet]) { t.wrapS = t.wrapT = T3.RepeatWrapping; t.repeat.set(COLS - 4, A_ROWS - 2); }
+  const ceilMat = std({ map:ct, emissiveMap:cet, emissive:0xffffff, emissiveIntensity:.9, roughness:.6, metalness:.05, side:T3.DoubleSide });
+  const ceil = new T3.Mesh(new T3.PlaneGeometry(COLS - 4, A_ROWS - 2), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(COLS / 2, WALL_H, A_ROWS / 2); ceil.userData.flat = true; scene.add(ceil);
+  { const nb = ROWS - A_ROWS - 2, g = new T3.PlaneGeometry(COLS - 4, nb), uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * nb / (A_ROWS - 2));
+    const m = new T3.Mesh(g, ceilMat); m.rotation.x = Math.PI / 2; m.position.set(COLS / 2, YB + WALL_H, (ROWS - A_ROWS) / 2); m.userData.flat = true; scene.add(m); }
   const [wc, we] = wallCanvases(), wt = new T3.CanvasTexture(wc), wet = new T3.CanvasTexture(we), groups = {}, wallMats = [], glass = [];
   wt.anisotropy = wet.anisotropy = 8;
   const push = (k, x, y, z, sy) => (groups[k] = groups[k] || []).push([x, y, z, sy]);
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const t = MAP[r][c], x = c + .5, z = r + .5;
+    const t = MAP[r][c], x = c + .5, z = r + .5 - (r >= A_ROWS ? A_ROWS : 0), yo = r >= A_ROWS ? YB : 0;
     if (t === '#') {
       let room = null, direct = false;
       for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) if (!solid(c + dx, r + dy)) { room = room || roomAt((c + dx + .5) * TS, (r + dy + .5) * TS); direct = true; }
       if (!room) for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) if (!solid(c + dx, r + dy)) room = room || roomAt((c + dx + .5) * TS, (r + dy + .5) * TS);
       room = room || 'spine';
-      const outer = r === 1 || r === ROWS - 2 || c === 2 || c === COLS - 3;
-      const win = outer && direct && ((r === 1 || r === ROWS - 2) ? c % 3 !== 0 : r % 2 === 0);
-      if (win) { push(room, x, .21, z, .42); push(room, x, WALL_H - .14, z, .28); glass.push([x, z, (r === 1 || r === ROWS - 2) ? 1 : .06, (r === 1 || r === ROWS - 2) ? .06 : 1]); } else push(room, x, WALL_H / 2, z, WALL_H);
+      const horiz = tileAt(c, r - 1) === ' ' || tileAt(c, r + 1) === ' ', outer = horiz || tileAt(c - 1, r) === ' ' || tileAt(c + 1, r) === ' ';
+      const win = outer && direct && (horiz ? c % 3 !== 0 : r % 2 === 0);
+      if (win) { push(room, x, .21 + yo, z, .42); push(room, x, WALL_H - .14 + yo, z, .28); glass.push([x, z, horiz ? 1 : .06, horiz ? .06 : 1, yo]); } else push(room, x, WALL_H / 2 + yo, z, WALL_H);
     } else if (t !== ' ' && t !== 'O') {
       const row = solid(c - 1, r) && solid(c + 1, r), col = solid(c, r - 1) && solid(c, r + 1);
-      if (t === 'D' || (row !== col)) push('door', x, WALL_H - .13, z, .26);
+      if (t === 'D' || (row !== col)) push('door', x, WALL_H - .13 + yo, z, .26);
     }
   }
   const box = new T3.BoxGeometry(1, 1, 1), M4 = new T3.Matrix4();
   for (const k in groups) { const mat = std({ map:wt, emissiveMap:wet, emissive:new T3.Color(NEON[k] || NEON.spine).lerp(new T3.Color(0xffffff), .62), emissiveIntensity:.55, roughness:.45, metalness:.06 }); wallMats.push(mat);
-    const im = new T3.InstancedMesh(box, mat, groups[k].length); groups[k].forEach((g, i) => { M4.makeScale(1, g[3], 1); M4.setPosition(g[0], g[1], g[2]); im.setMatrixAt(i, M4); }); im.instanceMatrix.needsUpdate = true; scene.add(im); }
+    const im = new T3.InstancedMesh(box, mat, groups[k].length); groups[k].forEach((g, i) => { M4.makeScale(1, g[3], 1); M4.setPosition(g[0], g[1], g[2]); im.setMatrixAt(i, M4); }); im.instanceMatrix.needsUpdate = true; im.castShadow = im.receiveShadow = true; scene.add(im); }
   const glassMat = std({ color:0x9fd4ff, transparent:true, opacity:.16, roughness:.03, metalness:1, depthWrite:false, envMapIntensity:1.4 });
-  const gim = new T3.InstancedMesh(box, glassMat, glass.length); glass.forEach((g, i) => { M4.makeScale(g[2], .64, g[3]); M4.setPosition(g[0], .74, g[1]); gim.setMatrixAt(i, M4); }); gim.instanceMatrix.needsUpdate = true; scene.add(gim);
+  const gim = new T3.InstancedMesh(box, glassMat, glass.length); glass.forEach((g, i) => { M4.makeScale(g[2], .64, g[3]); M4.setPosition(g[0], .74 + g[4], g[1]); gim.setMatrixAt(i, M4); }); gim.instanceMatrix.needsUpdate = true; scene.add(gim);
   // spine ribs, like frames down a tunnel
   const ribMat = std({ color:0xf4f6f9, roughness:.4, metalness:.05 });
   for (let c = 4; c <= 36; c += 2) { scene.add(at(new T3.Mesh(new T3.BoxGeometry(.09, .07, 3), ribMat), c, WALL_H - .04, 10.5));
@@ -896,6 +986,33 @@ function build3D() {
   const mp = findCh('m')[0]; const pad = at(new T3.Mesh(new T3.RingGeometry(.5, .62, 32), basic(0x6cf0a0, { side:T3.DoubleSide })), mp.x / TS, .02, mp.y / TS + 1); pad.rotation.x = -Math.PI / 2; scene.add(pad, at(label3('MEDBAY · HEAL', C.green, .7), mp.x / TS, 1.15, mp.y / TS + 1));
   const voss = new T3.Group(); voss.add(at(new T3.Mesh(new T3.CylinderGeometry(.15, .17, .66, 10), std({ color:0x8a6420 })), 0, .36, 0), at(new T3.Mesh(new T3.SphereGeometry(.12, 12, 10), std({ color:0xd9c7a8 })), 0, .82, 0)); scene.add(voss);
 
+  // props: crates, a medbay bunk, overhead pipes
+  const paint = (c) => std({ color:c, roughness:.5, metalness:.05 });
+  [[26.5, 13.5, 0xe8833a, .62], [26.5, 16.4, 0x2aa7a0, .62], [21.5, 13.5, 0xf2f4f7, .62], [26.45, 13.5, 0xf2f4f7, .4]].forEach(([x, z, c, h], i) => { const m = at(new T3.Mesh(new T3.BoxGeometry(i === 3 ? .5 : .72, h, i === 3 ? .5 : .72), paint(c)), x, i === 3 ? .82 : h / 2, z); m.rotation.y = i * .4; scene.add(m); });
+  scene.add(at(new T3.Mesh(new T3.BoxGeometry(.7, .34, 1.7), paint(0xf2f4f7)), 36.3, .17, 15.7), at(new T3.Mesh(new T3.BoxGeometry(.6, .1, .4), paint(0x2aa7a0)), 36.3, .39, 15.1));
+  [[9.22, 0xe8833a], [9.36, 0xf2f4f7], [11.78, 0x2aa7a0]].forEach(([z, c]) => { const m = at(new T3.Mesh(new T3.CylinderGeometry(.045, .045, 33.6, 10), std({ color:c, roughness:.35, metalness:.3 })), 20, WALL_H - .14, z); m.rotation.z = Math.PI / 2; scene.add(m); });
+  // ladder between the decks, crew, and crew-deck furniture
+  LADDER.forEach((q, i) => { const x = q.x / TS + .32, z = Z3(q.y), y0 = Y3(q.y), hgt = i ? 1.2 : WALL_H;
+    for (const dz of [-.2, .2]) scene.add(at(new T3.Mesh(new T3.CylinderGeometry(.025, .025, hgt, 8), std({ color:0xe8833a, roughness:.4, metalness:.3 })), x, y0 + hgt / 2, z + dz));
+    for (let k = 0; k < hgt / .22 - 1; k++) { const m = at(new T3.Mesh(new T3.CylinderGeometry(.018, .018, .4, 6), steel), x, y0 + .2 + k * .22, z); m.rotation.x = Math.PI / 2; scene.add(m); }
+    const hatch = at(new T3.Mesh(new T3.PlaneGeometry(.9, .9), basic(0x2b3644, { side:T3.DoubleSide })), x - .1, i ? y0 + .012 : WALL_H - .012, z); hatch.rotation.x = Math.PI / 2; scene.add(hatch, at(label3(i ? 'DOWN · ENGINEERING' : 'UP · MAIN SHIP', '#1d2733', .6), x - .1, y0 + 1.16, z)); });
+  const crew = CREW.map(c => { const g = new T3.Group(); g.add(at(new T3.Mesh(new T3.CylinderGeometry(.15, .18, .66, 12), paint(c.col)), 0, .36, 0), at(new T3.Mesh(new T3.SphereGeometry(.12, 14, 12), paint(0xd9b38c)), 0, .82, 0), at(label3(c.name.toUpperCase(), '#1d2733', .6), 0, 1.16, 0));
+    if (c.id === 'HALE') g.add(at(new T3.Mesh(new T3.CylinderGeometry(.13, .14, .06, 14), paint(0x1f3a5c)), 0, .93, 0)); scene.add(g); return g; });
+  const bz = z => z - A_ROWS;
+  [[18, 22.5, 2.2, .9], [22.5, 22.5, 2.2, .9]].forEach(([x, z, w, d]) => { scene.add(at(new T3.Mesh(new T3.BoxGeometry(w, .06, d), paint(0xf2f4f7)), x, YB + .5, bz(z)), at(new T3.Mesh(new T3.CylinderGeometry(.08, .12, .5, 10), steel), x, YB + .25, bz(z)));
+    for (const dx of [-.7, 0, .7]) for (const dz of [-.75, .75]) scene.add(at(new T3.Mesh(new T3.CylinderGeometry(.16, .16, .3, 12), paint(dz < 0 ? 0xe8833a : 0x2aa7a0)), x + dx, YB + .15, bz(z) + dz)); });
+  [[3.6, 21.6], [3.6, 23.9], [10.9, 21.6], [10.9, 23.9]].forEach(([x, z]) => scene.add(at(new T3.Mesh(new T3.BoxGeometry(.9, .32, 1.7), paint(0xf2f4f7)), x, YB + .16, bz(z) + .4), at(new T3.Mesh(new T3.BoxGeometry(.8, .09, .4), paint(0x2aa7a0)), x, YB + .37, bz(z) - .2)));
+  [[30.5, 21.4], [33, 21.4], [35.5, 21.4]].forEach(([x, z]) => scene.add(at(new T3.Mesh(new T3.BoxGeometry(1.6, .7, .5), paint(0xe4e8ee)), x, YB + .35, bz(z)), at(new T3.Mesh(new T3.BoxGeometry(1.5, .04, .44), basic(0x0a84c8)), x, YB + .72, bz(z))));
+  scene.add(at(new T3.Mesh(new T3.CylinderGeometry(.3, .34, .5, 14), paint(0x1f3a5c)), 33, YB + .25, bz(23.3)));
+  // searchable wall panels
+  const panels = PANEL_SPOTS.map(([c, r, d]) => { const g = new T3.Group(); g.position.set(c + .5, .78, r + .5 + d * .46);
+    g.add(new T3.Mesh(new T3.BoxGeometry(.66, .5, .07), paint(0xcfd6df)));
+    const door = at(new T3.Mesh(new T3.BoxGeometry(.58, .42, .04), paint(0xe8833a)), 0, 0, -d * .05), handle = at(new T3.Mesh(new T3.BoxGeometry(.2, .035, .03), steel), 0, -.08, -d * .08), led = at(new T3.Mesh(new T3.SphereGeometry(.022, 8, 8), basic(0x128a52)), .22, .15, -d * .08);
+    const inside = at(new T3.Mesh(new T3.BoxGeometry(.58, .42, .02), basic(0x2b3644)), 0, 0, -d * .04); inside.visible = false; g.add(door, handle, led, inside); scene.add(g); return { door, handle, led, inside }; });
+  // live wall screens
+  const screenCv = mkCanvas(256, 160), screenTex = new T3.CanvasTexture(screenCv), screenMat = basic(0xffffff, { map:screenTex });
+  [[3.02, 5.5, Math.PI / 2, 0], [36.98, 5.5, -Math.PI / 2, 0], [15.5, 2.02, 0, 0], [6.5, 16.98, Math.PI, 0], [15.5, 16.98, Math.PI, 0], [33.5, 16.98, Math.PI, 0], [24.5, 16.98, Math.PI, 0], [20.5, 9.02, 0, 0], [20.5, 11.98, Math.PI, 0], [18.5, 2.02, 0, YB], [21.5, 5.98, Math.PI, YB], [12.5, 8.98, Math.PI, YB]].forEach(([x, z, ry, yo]) => {
+    const fr = at(new T3.Mesh(new T3.BoxGeometry(.9, .6, .04), paint(0x2b3644)), x, .82 + yo, z), sc2 = at(new T3.Mesh(new T3.PlaneGeometry(.82, .52), screenMat), x + Math.sin(ry) * .025, .82 + yo, z + Math.cos(ry) * .025); fr.rotation.y = sc2.rotation.y = ry; scene.add(fr, sc2); });
   // hazards and particles
   const fires = []; for (let i = 0; i < 7; i++) { const g = new T3.Group(), N = { blending:T3.NormalBlending }, a = at(sprite(0xff5a1e, 1.3, { opacity:.85, ...N }), 0, .35, 0), b = at(sprite(0xffc23a, .7, { opacity:.95, ...N }), 0, .3, 0), c = at(sprite(0xe0390a, 1, { opacity:.6, ...N }), 0, .7, 0); g.add(a, b, c); g.visible = false; scene.add(g); fires.push({ g, a, b, c }); }
   const breaches = []; for (let i = 0; i < 4; i++) { const g = new T3.Group(); const crack = new T3.Mesh(new T3.PlaneGeometry(.9, .12), basic(0x9fc8e0, { side:T3.DoubleSide })); crack.rotation.z = .25; g.add(crack, sprite(0x8fd8ff, 2.2, { opacity:.4 })); g.visible = false; scene.add(g); breaches.push(g); }
@@ -912,12 +1029,20 @@ function build3D() {
   tool.add(new T3.Mesh(new T3.BoxGeometry(.06, .08, .3), std({ color:0xf2f4f7, roughness:.35, metalness:.1 })), at(new T3.Mesh(new T3.BoxGeometry(.065, .03, .1), basic(0xffb23e)), 0, .045, .02), at(new T3.Mesh(new T3.CylinderGeometry(.012, .02, .12, 8), steel), 0, .01, -.2));
   tool.children[2].rotation.x = Math.PI / 2; const tip = at(new T3.Mesh(new T3.SphereGeometry(.018, 8, 8), basic(0xffb23e)), 0, .01, -.27), tipGlow = at(sprite(0xffc870, .25), 0, .01, -.27); tool.add(tip, tipGlow); camera.add(tool);
   const carry = at(new T3.Mesh(new T3.CylinderGeometry(.05, .05, .18, 12), basic(0xffb23e)), -.2, -.19, -.4); carry.rotation.z = 1.2; camera.add(carry);
+  const extModel = new T3.Group(); extModel.position.set(.17, -.17, -.36); extModel.rotation.set(.25, .2, -.1);
+  extModel.add(new T3.Mesh(new T3.CylinderGeometry(.045, .045, .2, 14), std({ color:0xd2362a, roughness:.3, metalness:.2 })), at(new T3.Mesh(new T3.CylinderGeometry(.02, .03, .05, 10), dark), 0, .125, 0), at(new T3.Mesh(new T3.CylinderGeometry(.012, .018, .12, 8), std({ color:0x2b3644 })), 0, .15, -.06));
+  extModel.children[2].rotation.x = Math.PI / 2; camera.add(extModel);
+  const tapeModel = at(new T3.Mesh(new T3.TorusGeometry(.05, .026, 10, 24), std({ color:0x9aa3ae, roughness:.5, metalness:.3 })), .15, -.13, -.32); tapeModel.rotation.set(.5, .5, 0); camera.add(tapeModel);
+  const sun = new T3.DirectionalLight(0xffffff, .42); sun.position.set(20.3, 30, 9.8); sun.target.position.set(20, 0, 9.5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left:-22, right:22, top:12, bottom:-12, near:28.25, far:30.9 }); sun.shadow.bias = -.0006; sun.shadow.radius = 3; scene.add(sun, sun.target);
+  scene.traverse(o => { if (o.isMesh && !o.isInstancedMesh && !o.userData.flat && o !== sky && o.material && o.material.isMeshStandardMaterial && !o.material.transparent && !camera.children.includes(o.parent) && o.parent !== camera) o.castShadow = true; });
+  renderer.shadowMap.needsUpdate = true;
 
   let composer = null, bloom = null;
   try { if (T3.EffectComposer && T3.UnrealBloomPass) { composer = new T3.EffectComposer(renderer); composer.addPass(new T3.RenderPass(scene, camera)); bloom = new T3.UnrealBloomPass(new T3.Vector2(W, H), .14, .4, .985); composer.addPass(bloom); } } catch (_) { composer = null; }
-  R3 = { composer, bloom, envMats:[floorMat, ceilMat, dark, steel, ...wallMats], renderer, scene, camera, sky, fort, fortCore, fortGlow, fortRing, shield, enemies, bolts, floorMat, ceilMat, wallMats, coreBall, coreGlow, rings, coreLight, stations, wheel, breakers, caps, voss, fires, breaches, hazLights, points, ppos, pcol, PN, amb, lamp, spineA, spineB, tool, tip, tipGlow, carry, sprite, basic,
+  R3 = { crew, sun, panels, screenCv, screenTex, screenT:1, extModel, tapeModel, composer, bloom, envMats:[floorMat, ceilMat, dark, steel, ...wallMats], renderer, scene, camera, sky, fort, fortCore, fortGlow, fortRing, shield, enemies, bolts, floorMat, ceilMat, wallMats, coreBall, coreGlow, rings, coreLight, stations, wheel, breakers, caps, voss, fires, breaches, hazLights, points, ppos, pcol, PN, amb, lamp, spineA, spineB, tool, tip, tipGlow, carry, sprite, basic,
     v1:new T3.Vector3(), v2:new T3.Vector3(), col:new T3.Color() };
-  miniCv = mkCanvas(480, 228); const mg = miniCv.getContext('2d'); mg.drawImage(deck, 0, 0, 480, 228);
+  miniCv = mkCanvas(480, Math.round(480 * WH / WW)); const mg = miniCv.getContext('2d'); mg.drawImage(deck, 0, 0, miniCv.width, miniCv.height);
 }
 function enemyPos(e, out) {
   if (e.invuln) return out.set(40 + (S.m.phase === 1 ? (100 - S.m.progress) * 3 : 0), 3, 9.5 + 50);
@@ -927,19 +1052,31 @@ function render3D(dt) {
   const r = R3; if (!r) return; const p = S.p, t = S.t, ph = S.m.phase, sc = S.scram > 0 || !S.sys.R.reported, alert = ph > 0 && !sc;
   // camera
   const sh = reduceMotion ? 0 : S.shake * .09, cam = r.camera, moving = Math.sin(p.walk * 1.1);
-  cam.position.set(p.x / TS + rand(-1, 1) * sh, (p.down > 0 ? .16 : EYE + moving * .018) + rand(-1, 1) * sh, p.y / TS + rand(-1, 1) * sh);
+  cam.position.set(p.x / TS + rand(-1, 1) * sh, Y3(p.y) + (p.down > 0 ? .16 : EYE + moving * .018) + rand(-1, 1) * sh, Z3(p.y) + rand(-1, 1) * sh);
   cam.rotation.set(p.down > 0 ? -.3 : p.pitch, -p.face - Math.PI / 2, (p.down > 0 ? 1.1 : 0) + rand(-1, 1) * sh * .5);
   cam.updateMatrixWorld();
   r.tool.position.y = -.15 + moving * .006 + (S.acting ? Math.sin(t * 40) * .004 : 0); r.tool.position.z = S.acting ? -.46 : -.4;
-  r.tip.material.color.setHex(S.acting ? 0xffffff : 0xffb23e); r.tipGlow.scale.setScalar(S.acting ? .5 + Math.random() * .4 : .18); r.carry.visible = !!p.carrying; r.tool.visible = p.down <= 0;
+  r.tip.material.color.setHex(S.acting ? 0xffffff : 0xffb23e); r.tipGlow.scale.setScalar(S.acting ? .5 + Math.random() * .4 : .18); r.carry.visible = !!p.carrying; const tt = S.acting && S.target ? S.target.type : ''; r.extModel.visible = tt === 'fire' && S.inv.ext > 0; r.tapeModel.visible = tt === 'breach' && S.inv.tape > 0; if (r.tapeModel.visible) r.tapeModel.rotation.z = t * 6;
+  r.tool.visible = p.down <= 0 && !r.extModel.visible && !r.tapeModel.visible;
   // mood lighting
   const pulse = .5 + .5 * Math.sin(t * 3.2);
   const danger = alert && (S.hull < 40 || (ph >= 1 && S.m.timer < 60)) ? pulse : 0;
-  if (sc) { r.amb.color.setRGB(.85, .9, 1); r.amb.intensity = S.lights ? .34 : .2; } else { r.amb.color.setRGB(1, 1 - danger * .28, 1 - danger * .32); r.amb.intensity = .5; }
+  if (sc) { r.amb.color.setRGB(.85, .9, 1); r.amb.intensity = S.lights ? .34 : .2; } else { r.amb.color.setRGB(1, 1 - danger * .28, 1 - danger * .32); r.amb.intensity = .4; }
   r.ceilMat.emissive.setRGB(1, sc ? .8 : 1 - danger * .3, sc ? .6 : 1 - danger * .35); r.ceilMat.emissiveIntensity = sc ? (S.lights ? .3 : (Math.random() < .06 ? .3 : .02)) : .6;
   const flick = sc ? (S.lights ? .14 : .03) : .32;
   const envI = sc ? .1 : .25; for (const m of r.envMats) m.envMapIntensity = envI; r.lamp.intensity = sc ? .85 : .1;
   for (const m of r.wallMats) m.emissiveIntensity = flick; r.floorMat.emissiveIntensity = flick * .4; r.spineA.intensity = r.spineB.intensity = sc ? .05 : .22;
+  r.sun.intensity = sc ? .06 : .42;
+  S.crew.forEach((c, i) => { const g = r.crew[i]; g.position.set(c.x / TS, Y3(c.y) + (ph >= 1 && c.id !== 'HALE' ? Math.abs(Math.sin(t * 3 + i)) * .03 : 0), Z3(c.y)); g.rotation.y = Math.atan2(p.x - c.x, p.y - c.y); });
+  S.panels.forEach((pn, i) => { const o = r.panels[i]; o.door.visible = o.handle.visible = !pn.open; o.inside.visible = pn.open; o.led.material.color.setHex(pn.open ? 0x8a929c : 0x128a52); });
+  r.screenT += dt; if (r.screenT > .25) { r.screenT = 0; const g = r.screenCv.getContext('2d'), on = S.sys.R.reported;
+    const sp = S.comms[0] && S.comms[0].who === 'HALE';
+    if (sp) { g.fillStyle = '#dbe6f0'; g.fillRect(0, 0, 256, 160); drawFace(g, 'HALE', 8, 8, 144, t); g.fillStyle = '#141a22'; g.font = '700 13px monospace'; g.textBaseline = 'top'; g.fillText('CAPT. HALE', 160, 16); g.fillStyle = '#566374'; g.font = '700 10px monospace'; g.fillText('BRIDGE', 160, 36); g.fillStyle = '#d2362a'; g.beginPath(); g.arc(166, 64, 5, 0, 7); g.fill(); g.fillText('LIVE', 178, 59); r.screenTex.needsUpdate = true; r.screenT = .17; } else {
+    g.fillStyle = on ? '#eaf2f9' : '#2b1c1c'; g.fillRect(0, 0, 256, 160); g.font = '700 15px monospace'; g.textBaseline = 'top'; g.fillStyle = on ? '#141a22' : '#ff6a5a'; g.fillText(on ? 'EMBERFLIGHT · DECK 04' : 'NO POWER', 12, 10);
+    if (on) { let y = 36; for (const k of ['R', 'L', 'S', 'W', 'E']) { const q = S.sys[k], ok = online(q); g.fillStyle = '#566374'; g.font = '700 11px monospace'; g.fillText(q.short, 12, y); g.fillStyle = 'rgba(20,30,45,.12)'; g.fillRect(48, y + 1, 120, 9); g.fillStyle = ok ? q.color : '#d2362a'; g.fillRect(48, y + 1, 120 * q.hp / 100, 9); g.fillStyle = ok ? '#128a52' : '#d2362a'; g.fillText(ok ? 'ONLINE' : 'DOWN', 178, y); y += 17; }
+      g.strokeStyle = '#0a84c8'; g.lineWidth = 2; g.beginPath(); for (let x = 0; x <= 232; x += 4) { const yy = 140 + Math.sin(x * .09 + t * 3) * 7 * (1 + Math.sin(x * .031 + t)); x ? g.lineTo(12 + x, yy) : g.moveTo(12, yy); } g.stroke(); }
+    else if (Math.sin(t * 4) > 0) { g.fillStyle = '#ff6a5a'; g.fillRect(12, 40, 60, 6); }
+    r.screenTex.needsUpdate = true; } }
   // reactor
   const hot = S.heat / 100; r.col.setRGB(1, .72 - hot * .5, .3 - hot * .25); if (sc) r.col.setRGB(.25, .12, .2);
   r.coreBall.material.color.copy(r.col); r.coreGlow.material.color.copy(r.col); r.coreLight.color.copy(r.col); r.coreLight.intensity = sc ? .12 : .45 + hot * .7 + Math.sin(t * (4 + hot * 10)) * .12;
@@ -983,7 +1120,7 @@ function render3D(dt) {
     else e.eng.scale.setScalar(2.2 + Math.random() * .8);
   }
   r.bolts.forEach((o, i) => { const b = S.bolts[i]; o.m.visible = o.f.visible = false; if (!b) return;
-    const hull = r.v1.set(b.hx, .8, b.side > 0 ? ROWS - 1.3 : 1.3), ep = enemyPos(b.e, r.v2), out = b.kind === 'out', miss = b.kind === 'miss';
+    const hull = r.v1.set(b.hx, .8, b.side > 0 ? A_ROWS - 1.3 : 1.3), ep = enemyPos(b.e, r.v2), out = b.kind === 'out', miss = b.kind === 'miss';
     if (miss) hull.set(b.hx, 7, 9.5 - b.side * 45);
     const from = out ? hull : ep, to = out ? ep : hull, tt = Math.min(1, b.t);
     if (b.t < 1) { o.m.visible = true; o.m.position.lerpVectors(from, to, tt); o.m.lookAt(to); o.m.material.color.setHex(0xd8c8b0); }
@@ -991,12 +1128,16 @@ function render3D(dt) {
   if (r.composer) r.composer.render(); else r.renderer.render(r.scene, r.camera);
 }
 function project(wx, wy, h) {
-  const v = R3.v1.set(wx / TS, h, wy / TS).applyMatrix4(R3.camera.matrixWorldInverse), cx = v.x, cy = v.y, behind = v.z > -.05;
+  const v = R3.v1.set(wx / TS, h + Y3(wy), Z3(wy)).applyMatrix4(R3.camera.matrixWorldInverse), cx = v.x, cy = v.y, behind = v.z > -.05;
   v.applyMatrix4(R3.camera.projectionMatrix); return { x:(v.x * .5 + .5) * W, y:(-v.y * .5 + .5) * H, behind, cx, cy };
 }
 function currentTask() {
   const p = S.p, m = S.m, near = list => list.slice().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
   if (m.phase < 1 || S.over) return null;
+  const t0 = currentTask0(); if (t0 && lvl(t0.y) !== lvl(p.y)) { const q = LADDER[lvl(p.y)]; return { x:q.x, y:q.y, c:C.amber, t:'LADDER' }; } return t0;
+}
+function currentTask0() {
+  const p = S.p, m = S.m, near = list => list.slice().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
   if (S.fires.length) { const f = near(S.fires); return { x:f.x, y:f.y, c:'#d9560d', t:'FIRE' }; }
   if (S.breaches.length) { const b = near(S.breaches); return { x:b.x, y:b.y, c:'#2a8fd0', t:'BREACH' }; }
   const sysMark = k => { const s = S.sys[k]; if (s.blown) return p.carrying ? { x:s.x, y:s.y, c:C.amber, t:'FIT COUPLING' } : { x:S.locker.x, y:S.locker.y, c:C.amber, t:'SPARE COUPLING' }; return { x:s.x, y:s.y, c:C.amber, t:s.fault || 'REPAIR ' + s.name }; };
@@ -1036,11 +1177,14 @@ function overlay2D() {
   else if (running) { ctx.strokeStyle = 'rgba(20,26,34,.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(W / 2, H / 2, S.target && S.target.type !== 'none' ? 7 : 3, 0, 7); ctx.stroke(); }
 }
 function drawMini(r) {
-  if (!miniCv) return; panel(r.x, r.y, r.w, r.h); ctx.globalAlpha = .9; ctx.drawImage(miniCv, r.x + 2, r.y + 2, r.w - 4, r.h - 4); ctx.globalAlpha = 1;
-  const X = x => r.x + 2 + x / WW * (r.w - 4), Y = y => r.y + 2 + y / WH * (r.h - 4), dot = (x, y, c, s) => { ctx.fillStyle = c; ctx.fillRect(X(x) - s / 2, Y(y) - s / 2, s, s); };
+  if (!miniCv) return; const lv = lvl(S.p.y), r0 = lv ? A_ROWS : 0, nr = lv ? ROWS - A_ROWS : A_ROWS, sc = (r.w - 4) / WW, hh = nr * TS * sc;
+  panel(r.x, r.y, r.w, hh + 4 + 14); ctx.drawImage(miniCv, 0, r0 / ROWS * miniCv.height, miniCv.width, nr / ROWS * miniCv.height, r.x + 2, r.y + 2, r.w - 4, hh);
+  ctx.font = `600 9px ${F_MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = C.dim; ctx.fillText(lv ? 'MAIN SHIP · CREW DECK' : 'ENGINEERING DECK', r.x + 6, r.y + hh + 5);
+  const X = x => r.x + 2 + x * sc, Y = y => r.y + 2 + (y - r0 * TS) * sc, dot = (x, y, c, s2) => { if (lvl(y) !== lv) return; ctx.fillStyle = c; ctx.fillRect(X(x) - s2 / 2, Y(y) - s2 / 2, s2, s2); };
   const bl = Math.sin(S.t * 8) > -.3;
-  for (const k in S.sys) { const s = S.sys[k]; dot(s.x, s.y, s.blown || s.hp < 25 ? (bl ? C.red : '#501') : s.fault ? (bl ? '#b0307c' : '#613') : s.hp < 60 ? C.amber : s.color, 5); }
-  const cur = currentTask(); if (cur && bl) { ctx.strokeStyle = cur.c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(cur.x), Y(cur.y), 6, 0, 7); ctx.stroke(); }
+  for (const k in S.sys) { const q = S.sys[k]; dot(q.x, q.y, q.blown || q.hp < 25 ? (bl ? C.red : '#501') : q.fault ? (bl ? '#b0307c' : '#613') : q.hp < 60 ? C.amber : q.color, 5); }
+  for (const c of S.crew) dot(c.x, c.y, '#566374', 4); dot(LADDER[lv].x, LADDER[lv].y, C.ink, 6);
+  const cur = currentTask(); if (cur && bl && lvl(cur.y) === lv) { ctx.strokeStyle = cur.c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(cur.x), Y(cur.y), 6, 0, 7); ctx.stroke(); }
   ctx.save(); ctx.translate(X(S.p.x), Y(S.p.y)); ctx.rotate(S.p.face); ctx.fillStyle = '#141a22'; ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.fill(); ctx.restore();
 }
 
@@ -1075,6 +1219,46 @@ function drawTac(r) {
   ctx.fillText(ph === 0 ? 'ORBIT TRACK · COALIGHT TRANSIT' : 'ORBIT TRACK · DECAYING', r.x + 6, r.y + 5);
   ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,77,61,.9)'; if (ph >= 1) ctx.fillText('NO RETURN', sx + R * .42, sy + R * .3 + 4);
 }
+const FACES = { HALE:['#1f3a5c', '#c9a27a', '#e9eef4', 1], VOSS:['#8a6420', '#b98a62', '#3a3a3a', 0], ROOK:['#c9640a', '#d9b38c', '#5a3a22', 0], MORA:['#0a84c8', '#8a5a3c', '#20242c', 0], DUNNE:['#c9640a', '#e0b896', '#b9b9b9', 0], SATO:['#128a52', '#d7b08a', '#20242c', 0], PELL:['#6450cf', '#a9744f', '#7a3a1c', 0] };
+function drawFace(g, who, x, y, sz, t) {
+  const f = FACES[who]; g.save(); g.translate(x, y); g.scale(sz / 100, sz / 100); g.beginPath(); g.rect(0, 0, 100, 100); g.clip();
+  g.fillStyle = '#dbe6f0'; g.fillRect(0, 0, 100, 100);
+  if (!f) { g.fillStyle = '#566374'; for (let i = 0; i < 5; i++) { const h = 14 + 26 * Math.abs(Math.sin(t * 9 + i * 1.7)); g.fillRect(18 + i * 14, 50 - h / 2, 8, h); } g.restore(); return; }
+  g.fillStyle = f[0]; g.beginPath(); g.ellipse(50, 112, 46, 36, 0, 0, 7); g.fill();
+  g.fillStyle = f[1]; g.fillRect(42, 66, 16, 16); g.beginPath(); g.ellipse(50, 46, 22, 26, 0, 0, 7); g.fill();
+  g.fillStyle = f[2]; g.beginPath(); g.ellipse(50, 28, 23, 13, 0, Math.PI, 0); g.fill();
+  if (f[3]) { g.fillStyle = '#1f3a5c'; g.beginPath(); g.ellipse(50, 26, 27, 13, 0, Math.PI, 0); g.fill(); g.fillRect(22, 24, 56, 6); g.fillStyle = '#d9a520'; g.fillRect(24, 26, 52, 3); g.fillRect(46, 15, 8, 6); g.fillStyle = '#d9a520'; g.fillRect(20, 84, 12, 4); g.fillRect(68, 84, 12, 4); }
+  g.fillStyle = '#141a22'; const bl = Math.sin(t * 1.3) > .96 ? 1 : 4; g.fillRect(39, 44, 6, bl); g.fillRect(55, 44, 6, bl);
+  g.fillStyle = '#5a2a22'; const mo = 2 + 6 * Math.abs(Math.sin(t * 11)) * (.5 + .5 * Math.sin(t * 3.1)); g.beginPath(); g.ellipse(50, 60, 7, mo / 2 + 1, 0, 0, 7); g.fill();
+  g.restore();
+}
+function drawIcon(k, x, y, col) {
+  ctx.save(); ctx.translate(x, y); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  if (k === 'tape') { ctx.lineWidth = 6; ctx.strokeStyle = '#8a929c'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.strokeStyle = '#5b6470'; ctx.beginPath(); ctx.arc(0, 0, 11, 0, 7); ctx.stroke(); }
+  else if (k === 'ext') { ctx.fillStyle = '#d2362a'; rr(ctx, -6, -6, 12, 18, 4); ctx.fill(); ctx.fillStyle = '#2b3644'; ctx.fillRect(-3, -11, 6, 5); ctx.fillRect(2, -11, 9, 3); }
+  else if (k === 'water') { ctx.beginPath(); ctx.moveTo(0, -11); ctx.bezierCurveTo(9, 0, 8, 10, 0, 10); ctx.bezierCurveTo(-8, 10, -9, 0, 0, -11); ctx.fill(); }
+  else if (k === 'ration') { rr(ctx, -10, -6, 20, 12, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-4, -6, 2, 12); ctx.fillRect(3, -6, 2, 12); }
+  else if (k === 'o2') { rr(ctx, -6, -8, 12, 19, 5); ctx.fill(); ctx.fillRect(-2, -12, 4, 5); ctx.fillStyle = '#fff'; ctx.font = `600 8px ${F_MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('O2', 0, 2); }
+  else if (k === 'radtab') { ctx.rotate(-.6); rr(ctx, -10, -5, 20, 10, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-1, -5, 2, 10); }
+  else if (k === 'medgel') { ctx.fillRect(-3, -10, 6, 20); ctx.fillRect(-10, -3, 20, 6); }
+  ctx.restore();
+}
+function drawInv(r) {
+  panel(r.x, r.y, r.w, r.h); const inv = S.inv, v = S.vit;
+  ctx.font = `600 10px ${F_MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = C.dim; ctx.fillText('INVENTORY', r.x + 9, r.y + 7);
+  L.slots = [];
+  for (let i = 0; i < 6; i++) { const x = r.x + 9 + i * 40, y = r.y + 22, k = i === 0 ? 'tape' : i === 1 ? 'ext' : inv.slots[i - 2];
+    ctx.fillStyle = k ? 'rgba(20,30,45,.07)' : 'rgba(20,30,45,.03)'; ctx.fillRect(x, y, 34, 34); ctx.strokeStyle = 'rgba(20,30,45,.22)'; ctx.lineWidth = 1; ctx.setLineDash(i > 1 && !k ? [3, 3] : []); ctx.strokeRect(x + .5, y + .5, 33, 33); ctx.setLineDash([]);
+    if (k) drawIcon(k, x + 17, y + 16, ITEMS[k] ? ITEMS[k].col : C.ink);
+    ctx.font = `600 9px ${F_MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = i === 0 ? (inv.tape ? C.ink : C.red) : i === 1 ? (inv.ext ? C.ink : C.red) : C.dim;
+    ctx.fillText(i === 0 ? '×' + inv.tape : i === 1 ? inv.ext + '%' : (touchUI ? (k ? 'USE' : '') : String(i + 3)), x + 17, y + 37);
+    if (i > 1) L.slots.push({ i:i - 2, x, y, w:34, h:34 }); }
+  const rows = [['HEALTH', S.p.hp, S.p.hp > 40 ? C.green : C.red], ['O2', v.o2, v.o2 > 30 ? C.cyan : C.red], ['RAD', v.rad, v.rad > 60 ? C.red : '#b0307c'], ['FOOD', v.food, v.food > 25 ? C.amber : C.red], ['WATER', v.water, v.water > 25 ? '#2a6fd0' : C.red]];
+  rows.forEach(([lab, val, col], j) => { const y = r.y + 76 + j * 14; ctx.font = `600 9px ${F_MONO}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = C.dim; ctx.fillText(lab, r.x + 9, y + 4);
+    ctx.fillStyle = 'rgba(20,30,45,.11)'; ctx.fillRect(r.x + 56, y, r.w - 56 - 44, 8); ctx.fillStyle = col; ctx.fillRect(r.x + 56, y, (r.w - 100) * clamp(val / 100, 0, 1), 8);
+    ctx.textAlign = 'right'; ctx.fillStyle = C.ink; ctx.fillText(Math.round(val) + '%', r.x + r.w - 9, y + 4); });
+}
 function drawHUD() {
   const m = S.m, st = L.status;
   // status
@@ -1083,16 +1267,17 @@ function drawHUD() {
   bar(bx, st.y + 9, bw, 'HULL', S.hull / 100, S.hull > 50 ? C.ink : S.hull > 25 ? C.amber : C.red, Math.ceil(S.hull) + '%');
   bar(bx, st.y + 26, bw, 'SHLD', S.shield / 100, C.cyan, Math.round(S.shield) + '%');
   bar(bx, st.y + 43, bw, 'ATMO', S.atmo / 100, S.atmo > 30 ? '#6450cf' : C.red, Math.round(S.atmo) + '%');
-  bar(bx, st.y + 60, bw, 'SUIT', S.p.hp / 100, S.p.hp > 40 ? C.green : C.red, Math.ceil(S.p.hp) + '%');
   const chipW = (bw - 4 * 4) / 5; let i = 0;
   ctx.font = `600 9px ${F_MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (const k of ['R', 'S', 'W', 'E', 'L']) { const s = S.sys[k], x = bx + i++ * (chipW + 4), y = st.y + 80;
+  for (const k of ['R', 'S', 'W', 'E', 'L']) { const s = S.sys[k], x = bx + i++ * (chipW + 4), y = st.y + 66;
     const col = s.blown || s.hp < 25 ? C.red : s.fault ? '#b0307c' : s.hp < 60 ? C.amber : C.green;
     ctx.fillStyle = 'rgba(20,30,45,.11)'; ctx.fillRect(x, y, chipW, 16);
     ctx.fillStyle = col; ctx.fillRect(x, y + 14, chipW * s.hp / 100, 2);
     if ((s.blown || s.hp < 25) && Math.sin(S.t * 8) > 0) { ctx.globalAlpha = .3; ctx.fillRect(x, y, chipW, 16); ctx.globalAlpha = 1; }
     ctx.fillStyle = col; ctx.fillText(s.short, x + chipW / 2, y + 7); }
   drawTac(L.tac); drawMini(L.map);
+  if (L.invDock || S.inv.open) drawInv(L.inv); else if (!touchUI) { ctx.font = `600 10px ${F_MONO}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; tag('TAB · OPEN BAG', W - 21, H - 24, 'right', C.dim); }
+  if (S.toast.t > 0) { ctx.globalAlpha = clamp(S.toast.t * 2, 0, 1); ctx.font = `600 12px ${F_MONO}`; ctx.textBaseline = 'middle'; const tw = ctx.measureText(S.toast.text).width + 24; ctx.fillStyle = 'rgba(20,26,34,.9)'; ctx.fillRect(W / 2 - tw / 2, H / 2 + 104, tw, 26); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(S.toast.text, W / 2, H / 2 + 117); ctx.globalAlpha = 1; }
 
   // objective
   const ob = L.obj; let oy = ob.y;
@@ -1143,13 +1328,14 @@ function drawHUD() {
   ctx.fillText(`REACTOR OUTPUT ${maxPips()} BARS` + (free > 0 ? ` · ${free} UNASSIGNED` : ''), W / 2, L.power.y - 4);
 
   // comms
-  if (S.comms.length) { const c = S.comms[0], who = WHO[c.who], cm = L.comms;
+  if (S.comms.length) { const c = S.comms[0], who = WHO[c.who], cm = L.comms, px0 = 64;
     ctx.font = `400 12px ${F_MONO}`;
-    const shown = c.text.slice(0, Math.floor(S.commT * 55)), lines = wrap(c.text, cm.w - 24), h = 28 + lines.length * 16, y = cm.bottom - 18 - h;
+    const shown = c.text.slice(0, Math.floor(S.commT * 55)), lines = wrap(c.text, cm.w - 24 - px0), h = Math.max(64, 28 + lines.length * 16), y = cm.bottom - 18 - h;
     panel(cm.x, y, cm.w, h); ctx.fillStyle = who.color; ctx.fillRect(cm.x, y, 3, h);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `600 10px ${F_MONO}`; ctx.fillText(who.name, cm.x + 12, y + 7);
+    drawFace(ctx, c.who, cm.x + 10, y + 7, 50, shown.length < c.text.length ? S.t : 0);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = `600 10px ${F_MONO}`; ctx.fillStyle = who.color; ctx.fillText(who.name, cm.x + 12 + px0, y + 7);
     ctx.font = `400 12px ${F_MONO}`; ctx.fillStyle = C.ink; let left = shown.length, yy = y + 22;
-    for (const ln of lines) { if (left <= 0) break; ctx.fillText(ln.slice(0, left), cm.x + 12, yy); left -= ln.length + 1; yy += 16; } }
+    for (const ln of lines) { if (left <= 0) break; ctx.fillText(ln.slice(0, left), cm.x + 12 + px0, yy); left -= ln.length + 1; yy += 16; } }
 
   // interaction prompt
   const t = S.target;
@@ -1181,6 +1367,7 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(255,255,255,.72)'; ctx.strokeStyle = S.tune ? C.green : 'rgba(20,30,45,.4)';
     ctx.beginPath(); ctx.arc(tu.x, tu.y, tu.r, 0, 7); ctx.fill(); ctx.stroke();
     ctx.font = `800 15px ${F_DISP}`; ctx.fillStyle = C.ink; ctx.fillText('TUNE', tu.x, tu.y);
+    const bg = L.bag; ctx.fillStyle = S.inv.open ? 'rgba(201,100,10,.3)' : 'rgba(255,255,255,.72)'; ctx.strokeStyle = 'rgba(20,30,45,.4)'; ctx.beginPath(); ctx.arc(bg.x, bg.y, bg.r, 0, 7); ctx.fill(); ctx.stroke(); ctx.font = `800 13px ${F_DISP}`; ctx.fillStyle = C.ink; ctx.fillText('BAG', bg.x, bg.y);
     const rp = L.report; ctx.fillStyle = 'rgba(255,255,255,.72)'; ctx.strokeStyle = m.pending ? C.green : 'rgba(20,30,45,.4)'; ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r, 0, 7); ctx.fill(); ctx.stroke(); ctx.font = `800 13px ${F_DISP}`; ctx.fillStyle = m.pending ? C.green : C.ink; ctx.fillText('REPORT', rp.x, rp.y);
     if (input.joy) { const j = input.joy; ctx.strokeStyle = 'rgba(20,30,45,.4)'; ctx.beginPath(); ctx.arc(j.ox, j.oy, 46, 0, 7); ctx.stroke();
       ctx.fillStyle = 'rgba(20,30,45,.4)'; ctx.beginPath(); ctx.arc(j.ox + input.jx * 46, j.oy + input.jy * 46, 20, 0, 7); ctx.fill(); }
@@ -1240,13 +1427,14 @@ $('mute').addEventListener('click', () => { AU.muted = !AU.muted; if (AU.master)
 /* ---------- input ---------- */
 addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'BUTTON' && (e.code === 'Space' || e.code === 'Enter')) return;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (e.repeat) return; keys[e.code] = true;
   if (!running) return;
   if (e.code === 'KeyP' || e.code === 'Escape') return setPaused(!paused);
   if (paused || S.over) return;
   if (e.code === 'Digit1') addPower('S'); else if (e.code === 'Digit2') addPower('W'); else if (e.code === 'Digit3') addPower('E');
-  else if (e.code === 'Digit4') toggleOC(); else if (e.code === 'Space') tryTune(); else if (e.code === 'KeyR') report();
+  else if (e.code === 'Digit4') toggleOC(); else if (e.code === 'Space') tryTune(); else if (e.code === 'KeyR') report(); else if (e.code === 'Tab' || e.code === 'KeyI') S.inv.open = !S.inv.open;
+  else if (/^Digit[5-8]$/.test(e.code)) useSlot(+e.code.slice(5) - 5);
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; input.actTouch = false; input.joy = null; input.jx = input.jy = 0; });
@@ -1259,6 +1447,7 @@ cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   if (e.pointerType === 'touch' && !touchUI) { touchUI = true; layout(); }
   if (!locked) for (const c of L.cells) if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) { c.k === 'OC' ? toggleOC() : addPower(c.k); return; }
+  if ((L.invDock || S.inv.open) && L.slots && (!locked || e.pointerType === 'touch')) for (const q of L.slots) if (x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h + 12) { useSlot(q.i); return; }
   if (e.pointerType !== 'touch') {
     if (!locked) { tryLock(); pointers[e.pointerId] = { kind:'look', x:e.clientX, y:e.clientY, k:.005 }; try { cv.setPointerCapture(e.pointerId); } catch (_) {} }
     if (e.button === 2) tryTune(); else if (e.button === 0) input.actTouch = true;
@@ -1268,6 +1457,7 @@ cv.addEventListener('pointerdown', e => {
   if (inCircle(x, y, L.act)) { input.actTouch = true; pointers[e.pointerId] = { kind:'act' }; }
   else if (inCircle(x, y, L.tune)) { tryTune(); }
   else if (inCircle(x, y, L.report)) { report(); }
+  else if (inCircle(x, y, L.bag)) { S.inv.open = !S.inv.open; }
   else if (x < W * .45 && y > H * .45) { input.joy = { ox:x, oy:y }; pointers[e.pointerId] = { kind:'joy' }; }
   else pointers[e.pointerId] = { kind:'look', x:e.clientX, y:e.clientY, k:.007 };
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
