@@ -5667,6 +5667,38 @@ function drawAirship() {
   ctx.fillStyle = '#1a1a1a'; ctx.fillRect(x - 6*sc, y - 40*sc, 2*sc, 16*sc); ctx.fillRect(x - 4*sc, y - 40*sc, 14*sc, 8*sc); ctx.fillStyle = '#fff'; ctx.fillRect(x + 2*sc, y - 38*sc, 3*sc, 3*sc);
   ctx.restore();
 }
+// ===== lost and found =====
+const LOST_NAMES = ['a red rubber ball', 'a knitted scarf', 'some reading glasses', 'a toy boat', 'a sealed love letter', 'a lucky horseshoe', 'a battered cookbook', 'a silver pocket watch', 'a stuffed bear', 'a wooden flute', 'a garden trowel', 'a sketchbook'];
+let lostT = 0;
+function lostTick(dt) {
+  lostT -= dt; if (lostT > 0) return; lostT = 3;
+  dailyStreak();
+  if (S.lostDay === S.day) return; S.lostDay = S.day; S.lostItems = (S.lostItems || []).filter(q => q.got && !q.done);
+  const towns = Object.keys(TOWNS).filter(k => S.towns[k] && k !== 'isle').sort(() => Math.random() - .5).slice(0, 3);
+  for (const k of towns) {
+    const owners = NPCS.filter(n => n.town === k && !n.wander && !n.away && n.hello); if (!owners.length) continue; const T0 = TOWNS[k];
+    for (let t = 0; t < 40; t++) { const a = Math.random()*6.283, r = 3 + Math.random()*7, x = T0.x + .5 + Math.cos(a)*r, y = T0.y + .5 + Math.sin(a)*r;
+      if (!inB(Math.floor(x), Math.floor(y)) || !passable(x, y) || NPCS.some(n => Math.hypot(n.x - x, n.y - y) < 1)) continue;
+      S.lostItems.push({x, y, town: k, owner: pick(owners).id, name: pick(LOST_NAMES), got: false, done: false}); break; }
+  }
+}
+function lostTarget() {
+  const q = (S.lostItems || []).find(q => !q.got && Math.hypot(q.x - S.x, q.y - S.y) < 1.2); if (!q) return null; const o = NPC_BY[q.owner];
+  return {key: 'lost' + q.x.toFixed(1), html: `<kbd style="margin:0 6px 0 0">E</kbd>Pick up ${q.name}`, btn: 'Take', fn: () => { q.got = true; SFX.pickup(); save(); toast(`<b>You found ${q.name}.</b><br>A tag says it belongs to <b>${esc(o ? o.name : 'someone')}</b> in ${TOWNS[q.town].name}.`, 5000); }};
+}
+function lostReturn(n, q) {
+  q.done = true; const c = 35 + (S.level || 1)*2; S.coins += c; addRep(n.town, .1); S.lostReturned = (S.lostReturned || 0) + 1; SFX.victory(); renderHUD(); save();
+  say(`“${q.name.replace(/^(a|an|some) /, 'My ').replace(/^./, ch => ch.toUpperCase())}! Oh, thank you! I’ve been looking everywhere!” <span style="color:var(--good)">+${c} coin, and ${TOWNS[n.town].name} thinks a little better of you.</span>`, [back(n)]);
+}
+function drawLost(q) { const px = q.x*TS, py = q.y*TS; if (Math.floor(frameT*3 + q.x) % 4 === 0) { ctx.fillStyle = 'rgba(255,240,200,.8)'; ctx.fillRect(px + 2, py - 7, 2, 2); } ctx.fillStyle = '#ffb0d0'; ctx.fillRect(px - 3, py - 4, 6, 4); ctx.fillStyle = '#fff'; ctx.fillRect(px - 1, py - 4, 2, 1); }
+// ===== daily visit streak =====
+function dailyStreak() {
+  let today; try { today = new Date().toISOString().slice(0, 10); } catch (e) { return; }
+  if (S.streakDate === today) return; const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  S.streak = S.streakDate === y ? (S.streak || 0) + 1 : 1; S.streakDate = today; S.bestStreak = Math.max(S.bestStreak || 0, S.streak);
+  const c = Math.min(250, 30 + S.streak*20); S.coins += c; const bonus = S.streak % 7 === 0; if (bonus) addItem('gem', 2); renderHUD(); save();
+  setTimeout(() => toast(`<b>Welcome back! Day ${S.streak} in a row</b><br><span style="color:var(--good)">+${c} coin${bonus ? ' and 2 gems for a full week!' : ''}</span>${S.streak > 1 ? '' : '<br><span style="color:var(--muted)">Come back tomorrow to build a streak.</span>'}`, 6000), 3000);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7222,6 +7254,8 @@ const GUIDE = [
   ['Restaurant rush', 'Chef Gaston in Sunreach needs help in the kitchen: tickets show each dish\u2019s ingredients in order. Click them (or press 1 to 6) in the right sequence before the ticket runs out.'],
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['Lost and found', 'Every day, townsfolk in places you\u2019ve visited drop things around town: a toy boat, a scarf, a love letter. Pick one up to see whose it is (it also shows on your map once you\u2019ve explored there), then talk to the owner to return it.'],
+  ['Daily streak', 'Play on consecutive real-world days to build a streak. Each day gives coin, growing with the streak, and every seventh day adds two gems.'],
   ['Wandering tortoise and sky pirates', 'Out in the wild you may meet Grandmother Shell, a giant tortoise carrying Old Tam\u2019s little market: rare items, fair prices, only a couple of each. On sunny days, a sky pirate airship sometimes passes overhead and drops crates of loot, along with a few pirates to guard them.'],
   ['The Marsh Witch', 'A story quest: Morga the Marsh Witch near Reedholm needs three ingredients that only glow at night to cure the sleeping children, and then the curse stone must be broken.'],
   ['Puzzles', 'Otto in Jadewater has sliding-tile puzzles (three a day; fewer moves pay more). Pippa in Petalfall plays matching pairs: find all eight pairs in as few tries as you can.'],
@@ -7559,7 +7593,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0);
@@ -8474,6 +8508,7 @@ function render() {
   if (S.ww && S.ww.step === 1) for (const q of S.ww.spots) if (inView(q.x, q.y)) sprites.push({y: q.y + .2, f: () => drawTotem(q)});
   if (tornado && inView(tornado.x, tornado.y)) sprites.push({y: tornado.y, f: drawTornado});
   if (tortoise && inView(tortoise.x, tortoise.y)) sprites.push({y: tortoise.y, f: drawTortoise});
+  for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
   if (airship) sprites.push({y: 1e9 - 1, f: drawAirship});
   for (const q of essences) if (inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawEssence(q)});
@@ -8926,7 +8961,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -9262,6 +9297,7 @@ function mainOptions(n) {
   if (n.keeper) o.push({label: (S.lighthouse || 0) >= 3 ? 'The lighthouse' : 'Restore the lighthouse', primary: (S.lighthouse || 0) < 3 && upCanPay(LIGHT_STAGES[S.lighthouse || 0].cost), fn: () => lighthouseTalk(n)});
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
+  for (const q of (S.lostItems || [])) if (q.got && !q.done && q.owner === n.id) o.unshift({label: `Return ${q.name}`, primary: true, fn: () => lostReturn(n, q)});
   if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
   if (n.hideseek) o.push({label: 'Play hide and seek', primary: true, fn: () => hsTalk(n)});
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
@@ -11283,6 +11319,7 @@ function openMap() {
     twinSites().forEach(T0 => { if (S.explored[idx(Math.floor(T0.vx), Math.floor(T0.vy))]) mk(T0.vx, T0.vy, '#e0c050', 'Twin Plate vault (needs 2 players)', 4); });
     if (S.ww && S.ww.step === 1) S.ww.spots.forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#7ae0a0', 'Old totem (Whispering Woods)', 4); });
     if (S.ww && S.ww.step === 2) mk(S.ww.glade.x + .5, S.ww.glade.y + .5, '#7ae0a0', 'The Spirit\u2019s glade', 6);
+    (S.lostItems || []).forEach(q => { if (!q.got && S.explored[idx(Math.floor(q.x), Math.floor(q.y))]) mk(q.x, q.y, '#ffb0d0', `Lost: ${q.name}`, 3); });
     (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
     (S.summits || []).forEach(q => { if (q.flag || S.explored[idx(q.x, q.y)]) mk(q.x + .5, q.y + .5, q.flag ? '#c84a3a' : '#8a8478', q.flag ? '⚑' : '', 3); });
     (S.waystones || []).forEach(w => { if (w.on || S.explored[idx(w.x, w.y)]) mk(w.x + .5, w.y + .5, w.on ? '#8ad0ff' : '#5a6a7a', w.on ? '◈' : '', 4); });
@@ -12107,6 +12144,8 @@ const ACH = [
   ['chef','Head Chef','Cook a Coconut Curry', () => have('coconut_curry') > 0 || (S.cookedCurry || 0) > 0],
   ['onlineparty','Better Together','Join or create an online party', () => (S.partiesJoined || 0) >= 1],
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
+  ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
+  ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
   ['tortoise','Slow and Steady','Shop at the wandering tortoise market', () => (S.tortoiseBuys || 0) >= 1],
   ['skycrates','Pirate Plunder','Open 10 sky pirate crates', () => (S.skyCrates || 0) >= 10],
   ['marshwitch','Sweet Dreams','Break the curse on Reedholm\u2019s children', () => !!(S.mw && S.mw.step >= 3)],
