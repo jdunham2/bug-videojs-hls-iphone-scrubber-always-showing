@@ -2268,6 +2268,8 @@ const NPCS = [
    hello:["The stars sing, if you listen.","Watch closely. Remember.","Each star has its own note."], rumors:["Watch which stars light up, and in what order. Then touch them in the same order. Every round adds one more."]},
   {id:'putt',town:'greenstem',dx:-4,dy:4,name:'Putter Pete',role:'Mini golf',cols:{cloak:'#3a8a3a',skin:'#e0b898',hair:'#d0a040'},golf:true,freeSpot:true,
    hello:["Fore!","Three holes, a putter and a dream.","Mind the bumpers!"], rumors:["Bank it off the walls. And they say there are twelve secret glades hidden across the land, sparkling where no road goes."]},
+  {id:'onenell',town:'blackwater',dx:4,dy:4,name:'One-Eyed Nell',role:'Retired pirate',cols:{cloak:'#4a2a2a',skin:'#c89070',hair:'#8a2a2a'},pirkmap:true,freeSpot:true,
+   hello:["Arr. What d'ye want?","I sailed with the Pirate King, I did.","Treasure? Heh. There's always treasure."], rumors:["The Pirate King tore his map in three and gave a piece to each of his captains. They still guard 'em, the stubborn fools."]},
   {id:'sorrel',town:'greenstem',dx:4,dy:-3,name:'Sorrel the Seed Seller',role:'Exotic seeds',cols:{cloak:'#5a8a3a',skin:'#d8b090',hair:'#e8c040'},seedsman:true,freeSpot:true,
    hello:["Seeds from beyond the seas!","Plant something wonderful.","Every seed is a promise."], rumors:["Starfruit takes a while to grow, but sells like gold. Golden wheat grows quick and fetches a fine price."]},
   {id:'quinn',town:'tidewatch',dx:-4,dy:2,name:'Harbormaster Quinn',role:'Export office',cols:{cloak:'#2a4a7a',skin:'#d8b090',hair:'#5a3a2a'},exporter:true,freeSpot:true,
@@ -3570,6 +3572,7 @@ function killEnemy(e) {
     addItem(L.drop, 1); got.push(`+1 ${GOODS[L.drop].name}`); const lc = 300 + (S.level || 1)*10; S.coins += lc; got.push(`+${lc} coin`);
     setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
   }
+  if (e.pkCap != null && S.pk && S.pk.step === 1) { const q = S.pk.caps[e.pkCap]; if (q && !q.got) { q.got = true; const n = S.pk.caps.filter(z => z.got).length; if (n >= 3) S.pk.step = 2; save(); setTimeout(() => toast(`<b>${q.name} drops a torn piece of map!</b> (${n}/3)${n >= 3 ? '<br>The three pieces fit together. X marks the spot, and it\u2019s on your map now!' : ''}`, 6000), 500); } }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
   if (e.mwHag && S.mw && S.mw.step === 2) { S.mw.step = 3; setTimeout(() => toast('<b>The Bog Hag shrieks and dissolves into mist!</b><br>The cursed stone cracks in two. Somewhere in Reedholm, a child yawns and wakes up. Return to Morga.', 8000), 600); }
   if (e.leBeast && S.le && S.le.step === 2) { S.le.step = 3; setTimeout(() => toast('<b>The Pale Beast falls!</b><br>Behind it, in the ice cave, a figure stirs: Ingrid\u2019s brother Leif, half-frozen but alive! Bring the news to Skyhold.', 8000), 600); }
@@ -5982,6 +5985,37 @@ function golfEnd() {
   const G = golf; G.on = false; golf = null; const par = GOLF_HOLES.reduce((a, h) => a + h.par, 0), diff = G.total - par, c = Math.max(5, 60 - diff*12); S.coins += c; S.golfGames = (S.golfGames || 0) + 1; S.golfBest = S.golfBest ? Math.min(S.golfBest, G.total) : G.total; if (G.card.includes(1)) S.holeInOne = (S.holeInOne || 0) + 1; renderHUD(); save(); SFX.victory();
   openPanel('Mini golf', `Scorecard: ${G.card.map((s, i) => `hole ${i + 1}: <b>${s}</b>`).join(' · ')}<br>Total <b>${G.total}</b> (par ${par}, ${diff === 0 ? 'even' : diff > 0 ? `+${diff}` : diff}).${G.total <= (S.golfBest || 99) ? ' A personal best!' : ''}<br><span style="color:var(--good)">+${c} coin</span>`, [{label: 'Play again · 15◆', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); golfStart(); }}, {label: 'Close', fn: closeTalk}]);
 }
+// ===== story: the Pirate King's Map =====
+function pkTalk(n) {
+  const W = S.pk, H = TOWNS.blackwater;
+  if (!W) {
+    const spots = [];
+    for (let k = 0; k < 8000 && spots.length < 4; k++) { const a = Math.random()*6.283, r = 18 + Math.random()*45, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
+      if (!inB(x, y) || !coastal(x, y) || !passable(x + .5, y + .5) || townAt(x, y, 9) || spots.some(q => Math.hypot(q.x - x, q.y - y) < 12)) continue; spots.push({x: x + .5, y: y + .5}); }
+    if (spots.length < 4) { say('“Not today. The tide’s wrong.”', [back(n)]); return; }
+    const names = ['Captain Saltbeard', 'Captain Redsash', 'Captain Ironhook'];
+    S.pk = {step: 1, caps: spots.slice(0, 3).map((q, i) => ({...q, name: names[i], got: false})), x: spots[3]}; save();
+    say('“The Pirate King’s treasure? Heh. Before he died, he tore his map into three pieces and gave one to each of his captains: Saltbeard, Redsash and Ironhook. Their ghosts... er, their crews still haunt the coves along this coast. Beat ’em, take the pieces, and the treasure’s yours. I just want to see it before I die.”<br><span style="color:var(--muted)">The three captains’ coves are marked on your map. They put up a real fight.</span>', [back(n)]); return;
+  }
+  if (W.step === 1) { say(`“${W.caps.filter(q => q.got).length} pieces out of three. Keep at it, matey.”`, [back(n)]); return; }
+  if (W.step === 2) { say('“The whole map! X marks the spot. Go dig, go DIG!”', [back(n)]); return; }
+  if (W.step === 3) { W.step = 4; S.coins += 400; gainXP(300); SFX.victory(); renderHUD(); save(); say('Nell runs her hand over the old chest and wipes away a tear. “Fifty years I waited to see that. Keep it all, matey. I’ve had my treasure today.” She presses her own battered tricorn onto your head.<br><br><span style="color:var(--good)">+400 coin and 300 XP. The tricorn hat is yours (find it in the hat shop for free).</span>', [back(n)]); S.hats = S.hats || {}; S.hats.tricorn = true; return; }
+  say('“Arr. Them were the days.”', [back(n)]);
+}
+function pkTick() {
+  const W = S.pk; if (!W || W.step !== 1 || inDungeon()) return;
+  W.caps.forEach((q, i) => { if (q.got || enemies.some(e => e.pkCap === i && !e.dead) || Math.hypot(q.x - S.x, q.y - S.y) > 9) return;
+    const lv = 1 + (S.level || 1)*.06, e = makeEnemy(i === 1 ? 'archer' : 'bandit', q.x, q.y, {alert: true}); makeElite(e); e.hp = e.max = Math.round(38*lv*2.4); e.dmgMul = (e.dmgMul || 1)*1.35; e.esize = 1.9; e.elite = {name: 'Pirate Captain', col: '#c84a3a'}; e.labelName = q.name; e.pkCap = i; enemies.push(e);
+    for (let k = 0; k < 2; k++) { const m = makeEnemy('bandit', q.x + (k ? 1.5 : -1.5), q.y + 1, {alert: true}); if (enemyWalk(m.x, m.y)) { m.hp = m.max = Math.round(m.max*lv); m.dmgMul = lv; m.labelName = 'Pirate'; enemies.push(m); } }
+    SFX.roar(); toast(`<b>${q.name} draws a cutlass!</b><br><i>“Ye want the map? Come and take it!”</i>`, 4000); });
+}
+function pkTarget() {
+  const W = S.pk; if (!W || W.step !== 2 || Math.hypot(W.x.x - S.x, W.x.y - S.y) > 1.3) return null;
+  return {key: 'pkdig', html: '<kbd style="margin:0 6px 0 0">E</kbd>Dig at the X', btn: 'Dig', fn: () => {
+    W.step = 3; addItem('pirate_gold', 8); addItem('gem', 4); const c = 800 + (S.level || 1)*20; S.coins += c; SFX.victory(); shake = .3; burst(S.x, S.y - .5, '#f0c040', 40, 6); renderHUD(); save();
+    openPanel('The Pirate King’s treasure', `Your shovel hits wood! You drag up an iron-banded chest, crusted with barnacles, and heave the lid open. Gold spills out into the sand.<br><br><span style="color:var(--good)">${c} coin, 8 Pirate Gold and 4 gems!</span><br><br><span style="color:var(--muted)">One-Eyed Nell in Blackwater would love to hear about this.</span>`, [{label: 'Yo ho ho!', primary: true, fn: closeTalk}]);
+  }};
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7530,13 +7564,14 @@ const EARNED_TITLES = [
   ['elitehunter', 'Elite Hunter'], ['legendhunter', 'Legend Hunter'], ['gladiator', 'Gladiator'], ['sailor', 'Sailor'],
   ['curator', 'Patron of the Arts'], ['defender', 'Defender'], ['racer', 'Racer'], ['shards', 'Shard Bearer'],
 ];
-const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['putt','Mini golf'],['stella','Star memory'],['dartsdot','Darts'],['gramps','Four in a Row'],['chamberlain','Story: Runaway Princess'],['morga','Story: Marsh Witch'],['otto','Sliding puzzles'],['pippa','Memory game'],['ingrid','Story: Lost Expedition'],['holloway','Mystery cases'],['gaston','Restaurant rush'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
+const SERVICES = [['aldous','Hall of Fame'],['gilda','Auction'],['sorrel','Exotic seeds'],['tib','Hide and seek'],['quizzy','Quiz night'],['onenell','Story: Pirate King\u2019s Map'],['putt','Mini golf'],['stella','Star memory'],['dartsdot','Darts'],['gramps','Four in a Row'],['chamberlain','Story: Runaway Princess'],['morga','Story: Marsh Witch'],['otto','Sliding puzzles'],['pippa','Memory game'],['ingrid','Story: Lost Expedition'],['holloway','Mystery cases'],['gaston','Restaurant rush'],['bellmari','Story: Sunken Bell'],['rowan','Story: Whispering Woods'],['bea','Whack-a-mole'],['bjorn','Log rolling'],['tobias','Monster cards'],['iris','Photo requests'],['dusty','Mine cart'],['sven','Snowball fight'],['ned','Paper route'],['lotto','Lottery'],['fizzwick','Strange potions'],['brawn','Arm wrestling'],['sandy','Sandcastles'],['enigma','Riddles'],['dunst','Archaeology'],['morwen','Tides cards'],['freya','Ice rink'],['jasper','Gem cutting'],['avis','Birdwatching'],['postpell','Express post'],['garrick','War horns'],['melody','Busking'],['bertha','Skittles'],['barnaby','Circus'],['quinn','Exports'],['ewan','Herding'],['dorran','Monuments'],['ottoline','Library'],['whimsy','Mystery boxes'],['cogsworth','Inventor'],['fennick','Unicorn'],['herald','Decrees'],['maude','Hats'],['haywood','Farmhand'],['zora','Fortunes'],['vex','Rival duels'],['auguste','Cook-off'],['pennyworth','Bank'],['mara','Lighthouse'],['opaline','Gem sockets'],...BALLOON_TOWNS.map(k => ['bln_' + k, 'Balloon']),['wilma','Pet show'],['lark','Ballads'],['pemberton','League'],['thane','Wardens'],['ilyra','Magic'],['holt','Archery'],['noctis','Night market'],['darius','Caravans'],['kade','Bounties'],['marlin','Angler'],['bess','Shipwright'],['sten','Mercenaries'],['gwen','Races'],['brutus','Arena'],['vess','Museum'],['wendell','Maps'],['durn','Deep Mine'],['veyra','Oracle'],['lou','Dice'],['rosa','Dice'],['finn','Dice'],['morgana','Pirates'],['festa','Festival']];
 const GUIDE = [
   ['Mystery cases', 'Inspector Holloway in Crownfall has a new theft to solve each week. Question all three suspects, search the crime scene, then accuse the thief. Listen to what each suspect lets slip: one detail will match the clue at the scene.'],
   ['Homestead raids', 'Once you own a homestead, raiders sometimes come for your storage chest at night while you\u2019re nearby. Stop every one of them before they reach your home to earn a reward from the neighbors.'],
   ['Restaurant rush', 'Chef Gaston in Sunreach needs help in the kitchen: tickets show each dish\u2019s ingredients in order. Click them (or press 1 to 6) in the right sequence before the ticket runs out.'],
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['The Pirate King\u2019s Map', 'A story quest: One-Eyed Nell in Blackwater tells of the Pirate King\u2019s map, torn in three. Defeat Captains Saltbeard, Redsash and Ironhook in their coves along the coast, then dig where X marks the spot.'],
   ['Secret glades', 'Twelve secret glades are hidden across the land, well away from towns and roads. They only reveal themselves when you are right next to one: a ring of glowing flowers around a mossy chest. Find all twelve for a hidden bonus.'],
   ['Mini golf', 'Putter Pete in Greenstem runs a three-hole course. Aim with the arrow keys or stick, press Space or A once to start your swing and again to hit, and bank shots off the walls.'],
   ['Star song', 'Stella in Skyhold plays a memory game with the stars: watch which ones light up and in what order, then touch them in the same order. Each round adds one more star.'],
@@ -7885,7 +7920,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); pkTick(); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = (party && (S.placed || []).some(q => q.t === 'party_banner' && Math.hypot(q.x - S.x, q.y - S.y) < 6) ? .3 : 0) + (safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0));
@@ -8806,6 +8841,7 @@ function render() {
   if (tortoise && inView(tortoise.x, tortoise.y)) sprites.push({y: tortoise.y, f: drawTortoise});
   if (S.rp && S.rp.step === 1) S.rp.trail.forEach((q, i) => { if (i <= S.rp.seen && inView(q.x, q.y)) sprites.push({y: q.y - .4, f: () => drawPrints(q, i)}); });
   if (S.rp && (S.rp.step === 1 && S.rp.seen >= S.rp.trail.length || S.rp.step === 2) && rpPrincess && inView(rpPrincess.x, rpPrincess.y)) sprites.push({y: rpPrincess.y, f: drawPrincess});
+  if (S.pk && S.pk.step === 2 && inView(S.pk.x.x, S.pk.x.y)) sprites.push({y: S.pk.x.y - .5, f: () => { const px = S.pk.x.x*TS, py = S.pk.x.y*TS; ctx.strokeStyle = '#c8302a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - 5, py - 5); ctx.lineTo(px + 5, py + 5); ctx.moveTo(px + 5, py - 5); ctx.lineTo(px - 5, py + 5); ctx.stroke(); ctx.lineWidth = 1; }});
   for (const [i, q] of secretGlades().entries()) if (Math.hypot(q.x - S.x, q.y - S.y) < 6 && inView(q.x, q.y)) sprites.push({y: q.y - 1, f: () => drawGlade(q, i)});
   for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
@@ -9260,7 +9296,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || pkTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -9635,6 +9671,7 @@ function mainOptions(n) {
   if (n.darts) o.push({label: 'Play darts · 10\u25c6', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); dartStart(); }});
   if (n.starmem) o.push({label: 'Play the star song game', primary: true, fn: () => starStart()});
   if (n.golf) o.push({label: 'Play mini golf · 15\u25c6', primary: true, disabled: S.coins < 15, fn: () => { S.coins -= 15; renderHUD(); golfStart(); }});
+  if (n.pirkmap) o.push({label: !S.pk ? 'Ask about the Pirate King' : S.pk.step >= 4 ? 'Talk about old times' : 'About the map', primary: !S.pk || S.pk.step < 4, fn: () => pkTalk(n)});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
@@ -11627,6 +11664,8 @@ function openMap() {
     if (S.ww && S.ww.step === 1) S.ww.spots.forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#7ae0a0', 'Old totem (Whispering Woods)', 4); });
     if (S.ww && S.ww.step === 2) mk(S.ww.glade.x + .5, S.ww.glade.y + .5, '#7ae0a0', 'The Spirit\u2019s glade', 6);
     if (S.rp && S.rp.step === 1) { const q = S.rp.trail[Math.min(S.rp.seen, S.rp.trail.length - 1)]; mk(q.x, q.y, '#c09060', S.rp.seen ? 'Last footprints you found' : 'Where the trail starts', 4); }
+    if (S.pk && S.pk.step === 1) S.pk.caps.forEach(q => { if (!q.got) mk(q.x, q.y, '#c84a3a', q.name, 5); });
+    if (S.pk && S.pk.step === 2) mk(S.pk.x.x, S.pk.x.y, '#f0c040', 'X marks the spot', 6);
     secretGlades().forEach((q, i) => { if ((S.glades || {})[i]) mk(q.x, q.y, '#ffd0f0', 'Secret glade (found)', 3); });
     (S.lostItems || []).forEach(q => { if (!q.got && S.explored[idx(Math.floor(q.x), Math.floor(q.y))]) mk(q.x, q.y, '#ffb0d0', `Lost: ${q.name}`, 3); });
     (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
@@ -12455,6 +12494,7 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
+  ['pirateking','Heir to the Pirate King','Dig up the Pirate King\u2019s treasure', () => !!(S.pk && S.pk.step >= 3)],
   ['glades3','Hidden Places','Find 3 secret glades', () => Object.keys(S.glades || {}).length >= 3],
   ['gladesall','Keeper of Secrets','Find all 12 secret glades', () => Object.keys(S.glades || {}).length >= 12],
   ['holeinone','Hole in One','Sink a hole in one at mini golf', () => (S.holeInOne || 0) >= 1],
@@ -12469,7 +12509,7 @@ const ACH = [
   ['mastermind','Code Breaker','Solve the Alchemist\u2019s Riddle in 4 guesses or fewer', () => (S.mmBest || 99) <= 4],
   ['tortoise','Slow and Steady','Shop at the wandering tortoise market', () => (S.tortoiseBuys || 0) >= 1],
   ['skycrates','Pirate Plunder','Open 10 sky pirate crates', () => (S.skyCrates || 0) >= 10],
-  ['storyteller','Storyteller','Complete all five story quests', () => storiesDone() >= 5],
+  ['storyteller','Storyteller','Complete all seven story quests', () => storiesDone() >= 7],
   ['spiritstag','Spirit Rider','Receive the Spirit Stag', () => S.mounts.includes('spirit_stag')],
   ['marshwitch','Sweet Dreams','Break the curse on Reedholm\u2019s children', () => !!(S.mw && S.mw.step >= 3)],
   ['slide30','Puzzle Master','Solve a sliding puzzle in 30 moves or fewer', () => (S.slideBest || 999) <= 30],
@@ -12951,7 +12991,7 @@ const WHATS_NEW = [
   ['Jobs and hobbies', 'Express post (Hollowpine), paper route (Port Wren), birdwatching (Petalfall), archaeology (Dunmere Oasis), gem cutting (Ashfall), daily riddles and the lottery (Highcairn).'],
   ['Items to use', 'War Horns call Champions, Rocket Packs light the sky, Picnic Baskets heal your party, strange potions make you giant, swift or tiny, and bandits drop Locked Strongboxes to pick.'],
 ];
-const storiesDone = () => [S.ww, S.gh, S.sb, S.le, S.mw, S.rp].filter(o => o && o.step >= 4).length;
+const storiesDone = () => [S.ww, S.gh, S.sb, S.le, S.mw, S.rp, S.pk].filter(o => o && o.step >= 4).length;
 let pfT = 0;
 function partyFrames() {
   const ui = $('partyUI'); pfT -= 1/60; if (pfT > 0) return; pfT = .25;
@@ -12964,7 +13004,7 @@ function statsPage() {
   const rows = [
     ['Days on the road', S.day], ['Level', S.level || 1], ['Monsters defeated', S.kills || 0], ['Elites defeated', S.eliteKills || 0], ['Bosses defeated', Object.keys(S.bosses || {}).filter(k => S.bosses[k]).length],
     ['Times knocked out', S.deaths || 0], ['Trades made', S.trades || 0], ['Things gathered', S.gathered || 0], ['Fish caught', S.fishCaught || 0], ['Achievements', `${Object.keys(S.achievements || {}).length} of ${ACH.length}`],
-    ['Story quests complete', `${storiesDone()} of 6`], ['Mystery cases solved', S.casesSolved || 0], ['Bird species logged', Object.keys(S.birds || {}).length], ['Monster cards in album', Object.keys(S.cardAlbum || {}).length], ['Artifacts found', Object.keys(S.digFound || {}).length],
+    ['Story quests complete', `${storiesDone()} of 7`], ['Mystery cases solved', S.casesSolved || 0], ['Bird species logged', Object.keys(S.birds || {}).length], ['Monster cards in album', Object.keys(S.cardAlbum || {}).length], ['Artifacts found', Object.keys(S.digFound || {}).length],
     ['Best skittles game', `${S.skitBest || 0} pins`], ['Best busking score', S.buskBest || 0], ['Longest log roll', `${(S.logBest || 0).toFixed ? (S.logBest || 0).toFixed(1) : 0}s`], ['Best darts game', S.dartBest || 0], ['Mine cart record', `${S.cartBest || 0} m`], ['Star song record', S.starBest || 0], ['Tallest sandcastle', S.castleBest || 0],
     ['Parties joined', S.partiesJoined || 0], ['Shared victories', S.sharedKills || 0], ['Friends revived', S.revives || 0], ['Gifts given', S.giftsGiven || 0], ['Photos taken', S.photos || 0], ['Best daily streak', S.bestStreak || 0],
   ];
@@ -12977,6 +13017,7 @@ function questLog() {
     ['The Lady of Gravenmoor', 'A ghost near Gravenmoor (at night)', S.gh, ['', 'Find her three keepsakes on the moors', 'Talk to her again at night', 'Kneel at her grave at midnight']],
     ['The Sunken Bell', 'Old Marisol, Tidewatch', S.sb, ['', 'Dig up the three bell fragments on the beaches', '', 'Ring the bell at the water’s edge at dawn']],
     ['The Lost Expedition', 'Ingrid Frostmantle, Skyhold', S.le, ['', 'Search the three abandoned camps in the snow', 'Defeat the Pale Beast at its ice cave', 'Return to Ingrid']],
+    ['The Pirate King\u2019s Map', 'One-Eyed Nell, Blackwater', S.pk, ['', 'Defeat the three pirate captains for their map pieces', 'Dig at the X on your map', 'Tell One-Eyed Nell']],
     ['The Runaway Princess', 'Chamberlain Wexley, Crownfall', S.rp, ['', 'Follow the princess\u2019s footprints', 'Lead the princess back to Crownfall', 'Talk to Chamberlain Wexley']],
     ['The Marsh Witch', 'Morga, near Reedholm', S.mw, ['', 'Gather the three night-glowing ingredients', 'Break the curse stone and defeat the Bog Hag', 'Return to Morga']],
   ];
