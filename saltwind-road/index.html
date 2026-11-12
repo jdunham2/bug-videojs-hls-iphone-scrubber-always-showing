@@ -3576,6 +3576,7 @@ function killEnemy(e) {
   }
   if (e.pkCap != null && S.pk && S.pk.step === 1) { const q = S.pk.caps[e.pkCap]; if (q && !q.got) { q.got = true; const n = S.pk.caps.filter(z => z.got).length; if (n >= 3) S.pk.step = 2; save(); setTimeout(() => toast(`<b>${q.name} drops a torn piece of map!</b> (${n}/3)${n >= 3 ? '<br>The three pieces fit together. X marks the spot, and it\u2019s on your map now!' : ''}`, 6000), 500); } }
   if (S.hunt && S.hunt.day === S.day && !S.hunt.done && e.type === S.hunt.type && !e.net) { S.hunt.n = (S.hunt.n || 0) + 1; if (S.hunt.n >= S.hunt.goal) { S.hunt.done = true; const c = 120 + (S.level || 1)*6; S.coins += c; S.huntsDone = (S.huntsDone || 0) + 1; setTimeout(() => toast(`<b>Daily hunt complete!</b><br>Huntmaster Garrick\u2019s bounty: <span style="color:var(--good)">+${c} coin</span>`, 5000), 400); } else floatText(e.x, e.y - 1.8, `Hunt ${S.hunt.n}/${S.hunt.goal}`, '#ffb030'); }
+  if (e.warlord != null) { S.warlordDone = S.warlordDone || {}; S.warlordDone[e.warlord] = true; S.warlords = (S.warlords || 0) + 1; const c = 600 + (S.level || 1)*20; S.coins += c; got.push(`+${c} coin (Warlord bounty)`); addItem('gem', 3); addItem('elite_essence', 3); got.push('+3 Gem, +3 Elite Essence'); setTimeout(() => toast(`<b>The Warlord ${esc(e.labelName || '')} has fallen!</b><br>Huntmaster Garrick will be singing your praises all week.`, 6000), 400); }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
   if (e.mwHag && S.mw && S.mw.step === 2) { S.mw.step = 3; setTimeout(() => toast('<b>The Bog Hag shrieks and dissolves into mist!</b><br>The cursed stone cracks in two. Somewhere in Reedholm, a child yawns and wakes up. Return to Morga.', 8000), 600); }
   if (e.leBeast && S.le && S.le.step === 2) { S.le.step = 3; setTimeout(() => toast('<b>The Pale Beast falls!</b><br>Behind it, in the ice cave, a figure stirs: Ingrid\u2019s brother Leif, half-frozen but alive! Bring the news to Skyhold.', 8000), 600); }
@@ -6084,6 +6085,29 @@ function fowTalk(n) {
   say(`“This week I’m paying top coin for a <b>${GOODS[f].name}</b>. Bring me one you caught yourself this week and I’ll pay three times its worth, plus a little extra.”`, [
     {label: `Sell a ${GOODS[f].name} (have ${have(f)})`, primary: true, disabled: !have(f) || !(S.fowCaught || {})[wk], fn: () => { addItem(f, -1); const c = GOODS[f].base*3 + 50; S.coins += c; S.fowPaid[wk] = true; S.fowDone = (S.fowDone || 0) + 1; SFX.coin(); renderHUD(); save(); say(`“A beauty! Here you go.” <span style="color:var(--good)">+${c} coin</span>`, [back(n)]); }}, back(n)]);
 }
+// ===== weekly warlord =====
+const WL_NAMES = ['Grimjaw the Ravager', 'Skarra Bloodmane', 'Old Tusk', 'Vorn the Unbroken', 'Mother Fang', 'The Ash Baron', 'Kragg Stonehide', 'Sable the Night Hunter'];
+const WL_TYPES = ['wolf', 'boar', 'bandit', 'jaguar', 'lion', 'skeleton', 'rockgolem', 'shadow_wolf'];
+let WL_CACHE = null;
+function warlord() {
+  const wk = Math.floor(S.day/7); if (WL_CACHE && WL_CACHE.wk === wk) return WL_CACHE;
+  let sd = (wk + 1)*48271 + SEED; const rnd = () => { sd = (sd*16807) % 2147483647; return sd/2147483647; };
+  const towns = Object.keys(TOWNS).filter(k => k !== 'isle'); const T0 = TOWNS[towns[Math.floor(rnd()*towns.length)]]; let spot = null;
+  for (let k = 0; k < 400 && !spot; k++) { const a = rnd()*6.283, r = 20 + rnd()*20, x = Math.floor(T0.x + Math.cos(a)*r), y = Math.floor(T0.y + Math.sin(a)*r); if (inB(x, y) && enemyWalk(x + .5, y + .5) && !townAt(x, y, 12)) spot = {x: x + .5, y: y + .5}; }
+  const i = Math.floor(rnd()*WL_NAMES.length); WL_CACHE = spot ? {wk, x: spot.x, y: spot.y, name: WL_NAMES[i], type: WL_TYPES[i], near: T0.name} : null; return WL_CACHE;
+}
+function warlordTalk(n) {
+  const WL = warlord(); if (!WL) { say('“No warlord sighted this week. Enjoy the quiet.”', [back(n)]); return; }
+  S.warlordSeen = WL.wk; save(); const done = (S.warlordDone || {})[WL.wk];
+  say(done ? `“You took down <b>${WL.name}</b> this week! A new warlord always rises by next week.”` : `“This week’s warlord is <b>${WL.name}</b>, terrorizing the land near <b>${WL.near}</b>. Ten times tougher than a normal brute, with a pack of followers. I wouldn’t go alone. Bring your party.”<br><span style="color:var(--muted)">The warlord’s lair is now marked on your map.</span>`, [back(n)]);
+}
+function warlordTick() {
+  if (inDungeon() || S.y >= WORLD_H || netOn) return; const WL = warlord(); if (!WL || (S.warlordDone || {})[WL.wk] || enemies.some(e => e.warlord != null && !e.dead) || Math.hypot(WL.x - S.x, WL.y - S.y) > 10) return;
+  if (!ENEMIES[WL.type]) return; const lv = 1 + (S.level || 1)*.07, e = makeEnemy(WL.type, WL.x, WL.y, {alert: true}); makeElite(e);
+  e.hp = e.max = Math.round(Math.max(60, ENEMIES[WL.type].hp*10)*lv*1.4); e.dmgMul = (e.dmgMul || 1)*1.7; e.esize = 2.6; e.elite = {name: 'Warlord', col: '#ff5a3a'}; e.labelName = WL.name; e.warlord = WL.wk; enemies.push(e);
+  for (let k = 0; k < 3; k++) { const a = k/3*6.283, m = makeEnemy(WL.type === 'shadow_wolf' ? 'wolf' : WL.type, WL.x + Math.cos(a)*2, WL.y + Math.sin(a)*2, {alert: true}); if (enemyWalk(m.x, m.y)) { m.hp = m.max = Math.round(m.max*lv*1.5); m.dmgMul = lv; enemies.push(m); } }
+  SFX.roar(); shake = .6; toast(`<b>${WL.name} emerges!</b><br>The warlord and its pack are ready for a fight.`, 5000);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7640,6 +7664,7 @@ const GUIDE = [
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
   ['The Pirate King\u2019s Map', 'A story quest: One-Eyed Nell in Blackwater tells of the Pirate King\u2019s map, torn in three. Defeat Captains Saltbeard, Redsash and Ironhook in their coves along the coast, then dig where X marks the spot.'],
+  ['Weekly Warlord', 'Every week a Warlord rises somewhere in the land: a monster ten times tougher than normal, with a pack of followers. Ask Huntmaster Garrick in Hollowpine where it is (it\u2019s the same for everyone in your party), and bring friends.'],
   ['Daily hunt and fish of the week', 'Huntmaster Garrick in Hollowpine posts a new hunt every day: defeat a set number of one kind of monster for a bounty. Tamsin the fishmonger in Port Wren names a fish of the week: catch one yourself that week and she pays three times its value.'],
   ['Sled run', 'Sledmaster Olga in Stormwatch runs the sled slope: steer left and right to pass through the flag gates and dodge the trees. You go faster the longer you ride.'],
   ['Trick-or-treat', 'On autumn nights, town houses put out jack-o\u2019-lanterns. Knock on the door for a treat (wearing a hat as a costume helps), but watch out for tricks! Each house answers once a night.'],
@@ -7991,7 +8016,7 @@ function updateCombat(dt, night) {
   const tAt = townAt(S.x, S.y, 8), safe = !!tAt && tAt !== raidTown();
   if (S.raid) updateRaid(dt);
   if (balloonF) { updateBalloon(dt); keys.clear(); } else customsCheck(dt);
-  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); pkTick(); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
+  updateRelics(dt); serpentCheck(dt); updateBottles(dt); thiefCheck(dt); updateBugs(dt); updateEruption(dt); updateSkyLanterns(dt); updateAurora(dt); navalUpdate(dt); updateWatch(dt); highwayCheck(dt); updateMustangs(dt); updateHerd(dt); updateVexRun(dt); updateRegatta(dt); moonUpdate(dt); updateWhale(dt); updateMeteor(dt); updateHideSeek(dt); updateCourier(dt); potTick(dt); warlordTick(); pkTick(); gladeTick(); rpTick(dt); lostTick(dt); updateTortoise(dt); updateAirship(dt); mwTick(); leTick(); homeRaidTick(dt); detTick(dt); petExpTick(dt); twinTick(dt); wwTick(dt); updateTornado(dt); updatePaper(dt); updateBirds(dt); ensureDigSites(); riddleCheck(dt); updateFireworks(dt); partyTick(dt);
   if (S.riding && S.mount === 'unicorn' && S.hp < maxHP()) { S.hp = Math.min(maxHP(), S.hp + .15*dt); }
   if (S.hp < maxHP()) {
     const rate = (party && (S.placed || []).some(q => q.t === 'party_banner' && Math.hypot(q.x - S.x, q.y - S.y) < 6) ? .3 : 0) + (safe ? 1.5 : (player.sinceHit > 6 ? (S.pet === 'fawn' ? .35 : .12) + (have('bloom_heart') ? .2 : 0) : 0));
@@ -9749,6 +9774,7 @@ function mainOptions(n) {
   if (n.sled) o.push({label: 'Ride the sled run · 5\u25c6', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); sledStart(); }});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
+  if (n.huntmaster) o.push({label: 'This week\u2019s Warlord', fn: () => warlordTalk(n)});
   if (n.huntmaster) o.push({label: 'Today\u2019s hunt', fn: () => huntTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
@@ -11742,6 +11768,7 @@ function openMap() {
     if (S.rp && S.rp.step === 1) { const q = S.rp.trail[Math.min(S.rp.seen, S.rp.trail.length - 1)]; mk(q.x, q.y, '#c09060', S.rp.seen ? 'Last footprints you found' : 'Where the trail starts', 4); }
     if (S.pk && S.pk.step === 1) S.pk.caps.forEach(q => { if (!q.got) mk(q.x, q.y, '#c84a3a', q.name, 5); });
     if (S.pk && S.pk.step === 2) mk(S.pk.x.x, S.pk.x.y, '#f0c040', 'X marks the spot', 6);
+    { const WL = warlord(); if (WL && S.warlordSeen === WL.wk && (S.warlordDone || {})[WL.wk] !== true) mk(WL.x, WL.y, '#ff5a3a', `Warlord: ${WL.name}`, 6); }
     secretGlades().forEach((q, i) => { if ((S.glades || {})[i]) mk(q.x, q.y, '#ffd0f0', 'Secret glade (found)', 3); });
     (S.lostItems || []).forEach(q => { if (!q.got && S.explored[idx(Math.floor(q.x), Math.floor(q.y))]) mk(q.x, q.y, '#ffb0d0', `Lost: ${q.name}`, 3); });
     (S.digSites || []).forEach(q => { if (!q.done) mk(q.x + .5, q.y + .5, '#c08a3a', 'Dig site', 4); });
@@ -12570,6 +12597,7 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
+  ['warlord','Warlord Slayer','Defeat a weekly Warlord', () => (S.warlords || 0) >= 1],
   ['hunts5','Hunter\u2019s Calendar','Complete 5 daily hunts for Huntmaster Garrick', () => (S.huntsDone || 0) >= 5],
   ['fow3','Catch of the Week','Bring Tamsin the fish of the week 3 times', () => (S.fowDone || 0) >= 3],
   ['sled20','Slalom Star','Pass 20 flag gates in one sled run', () => (S.sledGates || 0) >= 20],
@@ -13246,7 +13274,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
