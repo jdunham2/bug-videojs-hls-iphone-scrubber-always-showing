@@ -35,4 +35,6 @@ An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loa
 - Switch between axe and bow on foot (Q). Arrows lead moving targets and work from horseback; some of your warband and some town defenders fight as archers.
 - Controls: W/S sails, A/D steer, Space arrows (at sea) or axe strike (on foot), Shift shield wall, B board, G go ashore, R ride/dismount, C call your horse, Q axe/bow, E land/set sail/interact, F hail ships, J journal, K crew, M sound, drag to look, scroll to zoom. Progress saves automatically.
 
+**Multiplayer** works when the game is opened as a shared claude.ai Artifact: everyone with it open sails the same sea, sees each other's longships and warriors, chats (T), waves (V) and can list the captains at sea (P). Raiding rivals is opt-in for both captains. Each player's monsters, raids and NPCs stay in their own game. Opened as a plain file, the game is single-player.
+
 The original 2D map version is still available at `viking/classic.html`.

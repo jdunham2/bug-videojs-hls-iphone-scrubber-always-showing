@@ -75,7 +75,24 @@
   .keys { right: 14px; bottom: 14px; font-size: 12px; color: var(--muted); padding: 8px 10px; line-height: 1.9; }
   .keys button { margin-top: 4px; }
 
-  #panel { top: 230px; right: 14px; width: 380px; max-height: calc(100vh - 250px); overflow-y: auto; padding: 14px; display: none; }
+  #online { top: 248px; right: 14px; padding: 5px 10px; font-size: 12.5px; display: none; cursor: pointer; }
+  #online b { color: var(--gold); }
+  #chat { bottom: 160px; left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 6px; display: none; }
+  #chat input { width: 100%; font: inherit; font-size: 15px; background: rgba(0,0,0,.4); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; }
+  #feed p.chat { border-color: var(--blue); }
+  .mpSetup { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 0 18px; }
+  .mpSetup label { font-size: 13px; color: var(--muted); letter-spacing: .5px; }
+  .mpSetup input { font: inherit; font-size: 17px; text-align: center; width: 220px; background: rgba(0,0,0,.45); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  #mpCols { display: flex; gap: 6px; }
+  #mpCols button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); }
+  #mpCols button.on { border-color: #fff; box-shadow: 0 0 0 2px var(--gold); }
+  #mpStatus { font-size: 12.5px; color: var(--muted); font-style: italic; text-shadow: 0 1px 4px #000; }
+  .label.mp { font-weight: bold; }
+  .plist { display: flex; flex-direction: column; gap: 6px; }
+  .prow { display: flex; align-items: center; gap: 10px; padding: 6px 9px; background: rgba(255,255,255,.04); border-radius: 6px; font-size: 13.5px; }
+  .prow i { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .prow small { color: var(--muted); }
+  #panel { top: 290px; right: 14px; width: 380px; max-height: calc(100vh - 250px); overflow-y: auto; padding: 14px; display: none; }
   #panel h2 { margin: 0 0 4px; color: var(--gold); font-size: 22px; }
   #panel h3 { margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
   #panel .desc { color: var(--muted); font-style: italic; margin: 0 0 10px; }
@@ -126,7 +143,7 @@
   @media (max-width: 820px) {
     #hud { width: calc(100vw - 196px); padding: 7px 8px; } #hud .cargo, #hud .title { display: none; } #quests { display: none !important; }
     .stat b { font-size: 13px; } .stat span { font-size: 9px; }
-    #compass { display: none; } .keys { display: none; } #combat { white-space: normal; width: calc(100vw - 32px); bottom: 186px; font-size: 13px; text-align: center; } #feed { bottom: 190px; width: 300px; }
+    #compass { display: none; } .keys { display: none; } #online { top: 230px; } #combat { white-space: normal; width: calc(100vw - 32px); bottom: 186px; font-size: 13px; text-align: center; } #feed { bottom: 190px; width: 300px; }
     #panel { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52vh; }
     #banner h1 { font-size: 30px; }
   }
@@ -141,6 +158,8 @@
 <div class="ui glass" id="quests"></div>
 <div class="ui glass" id="compass"><canvas id="compassCv" width="360" height="40"></canvas></div>
 <div class="ui glass" id="mini"><canvas id="miniCv" width="240" height="200"></canvas></div>
+<div class="ui glass" id="online"></div>
+<div class="ui glass" id="chat"><input id="chatIn" maxlength="140" autocomplete="off" placeholder="Say something to the other captains (Enter to send, Esc to close)"></div>
 <div class="ui glass" id="sail"></div>
 <div class="ui glass" id="combat"></div>
 <div class="ui glass" id="prompt"></div>
@@ -152,6 +171,7 @@
   <kbd>B</kbd>board &nbsp; <kbd>G</kbd>go ashore &nbsp; <kbd>R</kbd>ride &nbsp; <kbd>C</kbd>call horse<br>
   <kbd>Q</kbd>switch axe / bow<br>
   <kbd>J</kbd>journal &nbsp; <kbd>K</kbd>crew &nbsp; <kbd>M</kbd>sound &nbsp; <kbd>H</kbd>help<br>
+  <kbd>T</kbd>chat &nbsp; <kbd>P</kbd>captains &nbsp; <kbd>V</kbd>wave<br>
   Drag to look · scroll to zoom
 </div>
 <div class="ui glass" id="panel"></div>
@@ -166,6 +186,7 @@
 <div class="ui" id="title">
   <h1>SAGA OF THE<br>NORTH SEA</h1>
   <div class="tag">The whale-road is yours. Trade, raid, explore — write your own saga.</div>
+  <div class="mpSetup" id="mpSetup"><label for="mpName">Captain's name</label><input id="mpName" maxlength="16" autocomplete="off" placeholder="Your name"><div id="mpCols" aria-label="Sail colour"></div><div id="mpStatus">Single-player: open the shared game link to sail with others</div></div>
   <div class="actions" id="titleBtns"></div>
   <div class="ctl">W / S — raise &amp; lower sail · A / D — steer · E — go ashore · F — hail ships<br>Space — loose arrows · Shift — shield wall · B — board · ram at full sail<br>G — walk ashore with your warband · Space — strike with your axe · R — ride a horse<br>Drag the mouse to look around · scroll to zoom</div>
 </div>
@@ -1357,6 +1378,7 @@ function fireVolley(from, target, tv, count, spread, owner) {
 function currentTarget() {
   let best = null, bd = 260;
   for (const n of npcs) { if (!n.hostile || n.dead) continue; const d = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y); if (d < bd) { bd = d; best = n; } }
+  for (const gh of MP.ghosts.values()) { if (!pvpTarget(gh)) continue; const d = Math.hypot(gh.x - ship.pos.x, gh.z - ship.pos.y); if (d < bd) { bd = d; best = gh; } }
   if (serpent && !serpent.sinking) { const d = Math.hypot(serpent.g.position.x - ship.pos.x, serpent.g.position.z - ship.pos.y); if (d < bd) { bd = d; best = serpent; } }
   if (kraken && !kraken.sinking) { const d = Math.hypot(kraken.x - ship.pos.x, kraken.z - ship.pos.y); if (d < bd + 40) { bd = d; best = kraken; } }
   for (const D of dragons) { if (D.dead) continue; const d = D.pos.distanceTo(ship.g.position); if (d < Math.max(bd, 170)) { bd = d; best = D; } }
@@ -1413,6 +1435,7 @@ function stepArrows(dt) {
       if (!hit && serpent && !serpent.sinking && serpentHitTest(a.p)) { hitSerpent(a.p); hit = true; }
       if (!hit && kraken && !kraken.sinking) { const m = krakenHitTest(a.p); if (m) { hitKraken(a.p, m); hit = true; } }
       if (!hit) { const D = dragonHitTest(a.p); if (D) { hitDragon(D, a.p, 2); hit = true; } }
+      if (!hit && MP.ghosts.size && mpArrowHit(a.p)) hit = true;
     } else if (!S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
     const wh = waveH(a.p.x, a.p.z, elapsed);
     if (!hit && a.land && a.p.y < terrainH(a.p.x, a.p.z)) { a.life = 99; }
@@ -2929,6 +2952,187 @@ function updateUnitLabels() {
 }
 
 // =====================================================================
+// multiplayer: other captains on the same sea, through the artifact's room
+// =====================================================================
+const MP_COLORS = ['#b8352a', '#2f6db8', '#2f8a4a', '#c8952a', '#7a3a9a', '#2a9a9a', '#d8d0c0', '#2a2a2a'];
+const MP = { room: null, user: null, myPeer: null, ghosts: new Map(), name: '', color: 0, pvp: false, lastSend: 0, lastFlush: 0, online: false, chatDenied: false };
+try { MP.name = localStorage.getItem('northsea-name') || ''; MP.color = (+localStorage.getItem('northsea-color') || 0) % MP_COLORS.length; MP.pvp = localStorage.getItem('northsea-pvp') === '1'; } catch (e) {}
+const mpClean = v => (String(v == null ? '' : v).replace(/[^\p{L}\p{N} '._-]/gu, '').trim().slice(0, 16)) || 'A captain';
+const mpEsc = v => String(v == null ? '' : v).slice(0, 140).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const mpCol = c => MP_COLORS[Math.abs(c | 0) % MP_COLORS.length];
+const titleFor = g => TITLES.filter(t => (+g || 0) >= t[0]).pop()[1];
+function mpFeed(html, cls = 'chat') {
+  const el = document.createElement('p'); el.className = cls; el.innerHTML = html;
+  const feed = $('feed'); feed.appendChild(el); while (feed.children.length > 6) feed.firstChild.remove();
+  setTimeout(() => el.classList.add('fade'), 12000); setTimeout(() => el.remove(), 13200);
+}
+function setupTitleMP() {
+  const inp = $('mpName'); inp.value = MP.name;
+  const cols = $('mpCols');
+  MP_COLORS.forEach((c, i) => {
+    const b = document.createElement('button'); b.style.background = c; b.title = 'Sail colour'; b.setAttribute('aria-label', 'Sail colour ' + (i + 1));
+    if (i === MP.color) b.className = 'on';
+    b.onclick = () => { MP.color = i; cols.querySelectorAll('button').forEach((x, j) => x.className = j === i ? 'on' : ''); paintMySail(); };
+    cols.appendChild(b);
+  });
+  paintMySail();
+}
+function paintMySail() {
+  const sail = ship.g.userData.sail; sail.material.map = flagTex([mpCol(MP.color), '#efe4c8']); sail.material.needsUpdate = true;
+}
+function saveMP() {
+  MP.name = mpClean($('mpName').value || MP.name);
+  try { localStorage.setItem('northsea-name', MP.name); localStorage.setItem('northsea-color', String(MP.color)); localStorage.setItem('northsea-pvp', MP.pvp ? '1' : '0'); } catch (e) {}
+}
+async function initMultiplayer() {
+  if (!window.claude || typeof window.claude.use !== 'function') return;
+  let room = null, user = null;
+  try { [room, user] = await Promise.all([window.claude.use('room'), window.claude.use('user')]); } catch (e) { return; }
+  MP.user = user;
+  if (user && !MP.name) {
+    try { const me = await user.me(); if (me && me.name) { MP.name = mpClean(me.name.split(' ')[0]); const inp = $('mpName'); if (inp && !inp.value) inp.value = MP.name; } } catch (e) {}
+  }
+  if (!room) return;
+  MP.room = room; MP.online = true;
+  $('mpStatus').textContent = 'Multiplayer: everyone with this game open sails the same sea';
+  room.onPeers(ch => {
+    const me = ch.peers.find(p => p.sameTab); if (me) MP.myPeer = me.peer;
+    for (const p of ch.left) removeGhost(p.peer);
+    for (const p of ch.joined) if (!p.sameTab && p.kind === 'viewer' && p.presence && p.presence.n) mpFeed(`⚓ <b style="color:${mpCol(p.presence.c)}">${mpEsc(mpClean(p.presence.n))}</b> sails into these waters.`);
+    renderOnline();
+  }, () => { MP.online = false; renderOnline(); });
+  room.onConnection(c => { MP.online = c; renderOnline(); }, () => {});
+  room.on('chat', m => {
+    const d = m.data || {}; const text = String(d.text || '').trim(); if (!text) return;
+    mpFeed(`<b style="color:${mpCol(d.c)}">${mpEsc(mpClean(d.n))}${m.guest ? ' (guest)' : ''}:</b> ${mpEsc(text)}`);
+  }, () => {});
+  room.on('wave', m => {
+    const d = m.data || {}, who = `<b style="color:${mpCol(d.c)}">${mpEsc(mpClean(d.n))}</b>`;
+    if (d.kind === 'beaten') {
+      const winner = MP.ghosts.get(d.by), wname = d.by === MP.myPeer ? 'you' : winner && winner.pr ? mpEsc(mpClean(winner.pr.n)) : 'a rival';
+      mpFeed(`⚔ ${who} was beaten at sea by ${wname}!`);
+      if (d.by === MP.myPeer && !m.isMe) { S.glory += 15; banner('Victory over a rival!', '+15 glory'); log(`You beat ${mpEsc(mpClean(d.n))} in a sea battle. (+15 glory)`, 'gold'); renderHUD(); }
+    } else if (!m.sameTab) { mpFeed(`👋 ${who} waves to you.`); }
+  }, () => {});
+  room.on('hit', m => {
+    const d = m.data || {};
+    if (m.sameTab || d.to !== MP.myPeer || !MP.pvp || S.docked || ashore.on || titleOn) return;
+    const att = MP.ghosts.get(m.peer), aname = att && att.pr ? mpClean(att.pr.n) : 'A rival';
+    const dmg = clamp(+d.dmg || 0, 0, 30), m2 = shieldUp ? .3 : 1;
+    S.hull = Math.max(5, S.hull - dmg * m2); pCrewDmg += clamp(+d.crew || 0, 0, 2) * m2; applyCrewDmg();
+    if (!MP.hitWarn || performance.now() - MP.hitWarn > 5000) { MP.hitWarn = performance.now(); banner(`${aname} attacks!`, 'Raise the shield wall, or fight back'); }
+    if (S.hull <= 6) {
+      const lost = Math.floor(S.silver * .25); S.silver -= lost; S.hull = 15;
+      log(`${mpEsc(aname)} has beaten you at sea and taken ${lost} silver.`, 'bad'); banner('Beaten by a rival', `-${lost} silver`);
+      MP.room.emit('wave', { kind: 'beaten', n: MP.name, c: MP.color, by: m.peer }).catch(() => {});
+      MP.pvp = false; saveMP();
+    }
+    renderHUD();
+  }, () => {});
+  renderOnline();
+}
+function renderOnline() {
+  const el = $('online');
+  if (!MP.room || titleOn) { el.style.display = 'none'; return; }
+  const others = MP.room.peers().filter(p => !p.sameTab && p.kind === 'viewer').length;
+  el.style.display = 'block';
+  el.innerHTML = MP.online ? `⚓ <b>${others + 1}</b> captain${others ? 's' : ''} at sea · <kbd>P</kbd>` : 'Reconnecting…';
+}
+function mpPublish() {
+  if (!MP.room || titleOn) return;
+  const now = performance.now(); if (now - MP.lastSend < 110) return; MP.lastSend = now;
+  const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+  const p = { v: 1, n: MP.name, c: MP.color, x: r1(ship.pos.x), z: r1(ship.pos.y), h: r2(ship.h), sp: r1(ship.speed), sl: S.docked ? 0 : throttle, d: S.docked ? 1 : 0, at: S.at,
+    m: ashore.on && hero ? 1 : 0, g: S.glory, cr: S.crew, pvp: MP.pvp ? 1 : 0 };
+  if (p.m) Object.assign(p, { hx: r1(hero.x), hz: r1(hero.z), hy: r1(hero.y), hh: r2(hero.h), hm: r1(hero.moveAmt), sw: hero.swing > 0 ? 1 : 0, bw: hero.bowMode ? 1 : 0 });
+  else Object.assign(p, { hx: null, hz: null, hy: null, hh: null, hm: null, sw: null, bw: null });
+  MP.room.presence(p).catch(() => {});
+}
+function ghostFor(peer, pr) {
+  let gh = MP.ghosts.get(peer.peer);
+  if (!gh) {
+    const col = mpCol(pr.c);
+    const g = makeShip({ stripes: [col, '#efe4c8'], shields: [parseInt(col.slice(1), 16), 0xe8dcc0, 0xd9a441] }); scene.add(g);
+    const label = document.createElement('div'); label.className = 'label mp'; label.style.color = col; document.body.appendChild(label);
+    gh = { g, label, col, x: pr.x, z: pr.z, h: pr.h || 0, speed: 0, hero: null, peer: peer.peer, pend: 0, pendCrew: 0 };
+    MP.ghosts.set(peer.peer, gh);
+  }
+  return gh;
+}
+function removeGhost(id) { const gh = MP.ghosts.get(id); if (!gh) return; scene.remove(gh.g); if (gh.hero) scene.remove(gh.hero.g); gh.label.remove(); MP.ghosts.delete(id); }
+function updateGhosts(dt, t) {
+  if (!MP.room) return;
+  const peers = MP.room.peers(), seen = new Set();
+  for (const p of peers) {
+    if (p.sameTab || p.kind !== 'viewer') continue;
+    const pr = p.presence; if (!pr || pr.v !== 1 || typeof pr.x !== 'number' || typeof pr.z !== 'number') continue;
+    seen.add(p.peer);
+    const gh = ghostFor(p, pr); gh.pr = pr; gh.guest = p.guest;
+    const k = 1 - Math.exp(-dt * 6);
+    if (Math.hypot(gh.x - pr.x, gh.z - pr.z) > 150) { gh.x = pr.x; gh.z = pr.z; gh.h = +pr.h || 0; }
+    gh.x = lerp(gh.x, pr.x, k); gh.z = lerp(gh.z, pr.z, k); gh.h += angDiff(+pr.h || 0, gh.h) * k; gh.speed = +pr.sp || 0;
+    floatShip(gh.g, gh.x, gh.z, gh.h, t); animateShip(gh.g, t, gh.speed, clamp(pr.sl | 0, 0, 3), .7);
+    // their warrior, when you both walk the same island
+    const showHero = pr.m === 1 && ashore.on && ashore.p && pr.at === ashore.p.id && typeof pr.hx === 'number';
+    if (showHero) {
+      if (!gh.hero) { const g = makeWarrior({ tunic: parseInt(gh.col.slice(1), 16), shieldCol: 0xd9a441, beard: 0x8a6a3a }); scene.add(g); gh.hero = { g, x: pr.hx, z: pr.hz, y: pr.hy || 0, h: pr.hh || 0, walk: 0, moveAmt: 0, swing: 0, flash: 0, rise: 1 }; }
+      const u = gh.hero; u.g.visible = true;
+      u.x = lerp(u.x, pr.hx, k); u.z = lerp(u.z, pr.hz, k); u.y = lerp(u.y, +pr.hy || 0, k); u.h += angDiff(+pr.hh || 0, u.h) * k; u.moveAmt = +pr.hm || 0;
+      if (pr.sw && !u.lastSw) u.swing = .4; u.lastSw = pr.sw; u.swing = Math.max(0, u.swing - dt);
+      u.bowMode = !!pr.bw; setWeapon(u); animUnit(u, dt);
+    } else if (gh.hero) gh.hero.g.visible = false;
+    // name tag
+    const anchor = showHero ? gh.hero.g.position : gh.g.position, dist = Math.hypot(anchor.x - camera.position.x, anchor.z - camera.position.z);
+    if (titleOn || dist > 1800 || !placeLabel(gh.label, anchor, showHero ? 3.4 : 24)) gh.label.style.display = 'none';
+    else {
+      gh.label.textContent = '';
+      const nm = document.createElement('span'); nm.textContent = mpClean(pr.n) + (pr.pvp ? ' ⚔' : '') + (p.guest ? ' (guest)' : ''); gh.label.appendChild(nm);
+      const sm = document.createElement('small'); sm.textContent = `${titleFor(pr.g)} · ${Math.round(dist / 10) * 10} paces`; gh.label.appendChild(sm);
+    }
+    // flush raiding hits on this rival
+    if (gh.pend > 0 && performance.now() - MP.lastFlush > 300) {
+      MP.lastFlush = performance.now();
+      MP.room.emit('hit', { to: gh.peer, dmg: Math.round(gh.pend * 10) / 10, crew: Math.round(gh.pendCrew * 100) / 100 }).catch(() => {});
+      gh.pend = 0; gh.pendCrew = 0;
+    }
+  }
+  for (const id of [...MP.ghosts.keys()]) if (!seen.has(id)) removeGhost(id);
+}
+const pvpTarget = gh => MP.pvp && gh.pr && gh.pr.pvp && !gh.pr.d && !gh.pr.m && !S.docked && !ashore.on;
+function mpArrowHit(p) {
+  for (const gh of MP.ghosts.values()) if (pvpTarget(gh) && inShip(p, gh.g, gh.x, gh.z, gh.h)) { gh.pend += 2.5 * (1 + S.weapons * .15); gh.pendCrew += .22; hitFx(p, 0x8a6a40); return true; }
+  return false;
+}
+function openChat() {
+  if (!MP.room) { banner('Single-player', 'Open the shared game link to talk to other captains'); return; }
+  if (MP.chatDenied) { banner('Chat is closed to you', 'You need Contributor access to this game to chat'); return; }
+  $('chat').style.display = 'block'; const i = $('chatIn'); i.value = ''; i.focus();
+}
+function closeChat() { $('chat').style.display = 'none'; $('chatIn').blur(); }
+function sendChat() {
+  const text = $('chatIn').value.trim(); closeChat(); if (!text || !MP.room) return;
+  if (!MP.online) { mpFeed('<i>Not connected right now. Your message was not sent.</i>'); return; }
+  MP.room.emit('chat', { n: MP.name, c: MP.color, text: text.slice(0, 140) }).catch(e => { if (e && e.code === 'not_permitted') { MP.chatDenied = true; mpFeed('<i>Chat needs Contributor access to this game.</i>'); } });
+}
+function wave() {
+  if (!MP.room || !MP.online) return;
+  MP.room.emit('wave', { kind: 'wave', n: MP.name, c: MP.color }).catch(() => {});
+  banner('You wave', 'Every captain at sea sees it');
+}
+function openPlayers() {
+  const rows = [];
+  rows.push(`<div class="prow"><i style="background:${mpCol(MP.color)}"></i><div><b>${mpEsc(MP.name)}</b> <small>(you)</small><br><small>${mpEsc(title())} · ${S.glory} glory</small></div></div>`);
+  for (const gh of MP.ghosts.values()) {
+    const pr = gh.pr || {}, where = pr.m ? `ashore on ${P[pr.at] ? P[pr.at].name : 'an island'}` : pr.d ? `docked at ${P[pr.at] ? P[pr.at].name : 'a harbour'}` : 'at sea';
+    rows.push(`<div class="prow"><i style="background:${gh.col}"></i><div><b>${mpEsc(mpClean(pr.n))}</b>${pr.pvp ? ' ⚔' : ''}${gh.guest ? ' <small>(guest)</small>' : ''}<br><small>${mpEsc(titleFor(pr.g))} · ${+pr.g || 0} glory · ${pr.cr | 0} crew · ${where}</small></div></div>`);
+  }
+  const body = MP.room ? `<p class="desc">Everyone with this game open sails the same sea. Each captain's monsters and raids are their own.</p><div class="plist">${rows.join('')}</div>`
+    : '<p class="desc">You are sailing alone. Open the shared game link on claude.ai to sail with other captains.</p>';
+  openModal(`<h2>Captains at sea</h2>${body}${MP.room ? `<h3>Raiding rivals</h3><p class="desc">${MP.pvp ? 'On: your arrows can strike other raiders flying ⚔, and theirs can strike you.' : 'Off: nobody can harm your ship.'} Beaten captains lose a quarter of their silver.</p>` : ''}`,
+    MP.room ? [[MP.pvp ? 'Stop raiding rivals' : 'Raid rivals ⚔', () => { MP.pvp = !MP.pvp; saveMP(); banner(MP.pvp ? 'Raiding rivals' : 'Peaceful', MP.pvp ? 'Your ship flies the war banner ⚔' : 'Your ship is safe from rivals'); }], ['Close', () => {}]] : [['Close', () => {}]]);
+}
+
+// =====================================================================
 // sea events (each new day at sea)
 // =====================================================================
 function pickSeaEvent() {
@@ -3201,6 +3405,7 @@ function help() {
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
+  • <b>Multiplayer:</b> everyone who has this game open sails the same sea. You see their longships and, ashore on the same island, their warriors. <b>T</b> chats, <b>V</b> waves, <b>P</b> lists the captains at sea. Raiding rivals is off unless both captains switch it on in the captains list.<br>
   • <b>Dragons:</b> Fáfnir nests on Dragonspine at the top of the world, sleeping on a vast hoard. Drakes hunt the outer seas. They circle, then dive and breathe fire: raise the shield wall, turn hard, and fill the sky with arrows. On land, Fáfnir may come down to fight. Strike it with your axe while it stands on the ground.<br>
   • <b>The world</b> now stretches far beyond the home waters, from the Ice Teeth in the north-west to Kaupang in the east and Kongshavn in the south.<br>
   • <b>The Kraken</b> lurks in the Maelstrom in the far southwest and may surface in any deep water. Shoot its body and eyes, and keep moving: red rings on the water mark where a tentacle will slam down.<br>
@@ -3294,8 +3499,9 @@ function drawMini() {
     if (n.dead || Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y) > 600) return;
     mcx.fillStyle = n.hostile ? '#ff5a3a' : n.kind === 'raider' ? '#ff9a6a' : n.kind === 'defender' ? '#9fc8ff' : '#f0d890'; mcx.beginPath(); mcx.arc(mx(n.pos.x), mz(n.pos.y), 2.4, 0, 7); mcx.fill();
   });
-  mcx.save(); mcx.translate(mx(ship.pos.x), mz(ship.pos.y)); mcx.rotate(ship.h);
   mcx.strokeStyle = S.krakenSlain ? 'rgba(255,255,255,.4)' : '#d0573f'; mcx.lineWidth = 1.5; mcx.beginPath(); mcx.arc(mx(MAELSTROM.x), mz(MAELSTROM.z), 4, 0, 5.5); mcx.stroke();
+  for (const gh of MP.ghosts.values()) { mcx.fillStyle = gh.col; mcx.strokeStyle = '#fff'; mcx.lineWidth = 1; mcx.beginPath(); mcx.arc(mx(gh.x), mz(gh.z), 3.5, 0, 7); mcx.fill(); mcx.stroke(); }
+  mcx.save(); mcx.translate(mx(ship.pos.x), mz(ship.pos.y)); mcx.rotate(ship.h);
   mcx.fillStyle = '#fff'; mcx.beginPath(); mcx.moveTo(0, -6); mcx.lineTo(4, 4); mcx.lineTo(0, 2); mcx.lineTo(-4, 4); mcx.closePath(); mcx.fill(); mcx.restore();
   if (ashore.on && hero) { mcx.fillStyle = '#e0ad4a'; mcx.beginPath(); mcx.arc(mx(hero.x), mz(hero.z), 3, 0, 7); mcx.fill(); }
 }
@@ -3306,6 +3512,9 @@ function drawMini() {
 const keys = {};
 let camYaw = 0, camPitch = .32, camDist = 62, dragging = false, lastX = 0, lastY = 0;
 addEventListener('keydown', e => {
+  const tgtEl = e.target;
+  if (tgtEl && tgtEl.id === 'chatIn') { if (e.key === 'Enter') sendChat(); else if (e.key === 'Escape') closeChat(); return; }
+  if (tgtEl && (tgtEl.tagName === 'INPUT' || tgtEl.tagName === 'TEXTAREA')) return;
   if (e.code === 'Space') { e.preventDefault(); if (!titleOn && !modalOpen) ashore.on ? heroAttack() : playerShoot(); return; }
   if (e.repeat) return;
   const k = e.key.toLowerCase();
@@ -3316,6 +3525,9 @@ addEventListener('keydown', e => {
   if (k === 'h') help();
   if (k === 'j') journal();
   if (k === 'k') openRoster();
+  if (k === 't' || k === 'enter') { e.preventDefault(); openChat(); return; }
+  if (k === 'p') openPlayers();
+  if (k === 'v') wave();
   if (k === 'e') tryLand();
   if (k === 'g') goAshore();
   if (k === 'c' && ashore.on && hero) { const m = units.find(u => u.own && !u.rider); if (m) { m.called = true; Sound.whistle(); } else if (!S.horseOwned) banner('No horse of your own', 'Buy one in a town or at Ravenholm'); }
@@ -3497,6 +3709,7 @@ function tick() {
   deckHorse.visible = !!(S.horseOwned && !ashore.on);
   caches.forEach(c => { if (c.glint.visible) { c.glint.rotation.y += dt * 2; c.glint.position.y = 2 + Math.sin(t * 2) * .2; } });
   updateSerpent(dt, t, paused); updateKraken(dt, t, paused); updateDragons(dt, t, paused);
+  updateGhosts(dt, t); mpPublish(); if (frame % 30 === 0) renderOnline();
   if (maelstrom) { maelstrom.a.rotation.z += dt * .25; maelstrom.b.rotation.z += dt * .6; }
   const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking) || !!(kraken && !kraken.sinking) || dragons.some(d => !d.dead);
   if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
@@ -3576,7 +3789,8 @@ function startGame(fresh) {
   if (!S.war && S.day >= 11) startWar();
   $('feed').innerHTML = '';
   Sound.init();
-  titleOn = false; $('title').classList.add('hide');
+  saveMP(); paintMySail();
+  titleOn = false; $('title').classList.add('hide'); renderOnline();
   if (!saved) {
     log('Spring has come to Ravenholm. The ice has left the fjord, your longship is tarred and your warriors are restless. Where will the whale-road take you?', 'gold');
     help();
@@ -3599,12 +3813,14 @@ try {
   } }));
   $('loading').remove();
   camera.position.set(ship.pos.x + 80, 40, ship.pos.y + 80);
+  setupTitleMP(); initMultiplayer();
+  $('online').onclick = openPlayers;
   tick();
 } catch (err) {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { hitDragon, spawnDragon, spawnDrake, dragons, spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { MP, openPlayers, openChat, hitDragon, spawnDragon, spawnDrake, dragons, spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>
