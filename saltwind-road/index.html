@@ -3575,6 +3575,7 @@ function killEnemy(e) {
     setTimeout(() => toast(`<b>Legend slain: ${L.name}</b><br>You claim the <b>${GOODS[L.drop].name}</b>. Marshal Kade will want to hear about this.`, 7000), 400);
   }
   if (e.pkCap != null && S.pk && S.pk.step === 1) { const q = S.pk.caps[e.pkCap]; if (q && !q.got) { q.got = true; const n = S.pk.caps.filter(z => z.got).length; if (n >= 3) S.pk.step = 2; save(); setTimeout(() => toast(`<b>${q.name} drops a torn piece of map!</b> (${n}/3)${n >= 3 ? '<br>The three pieces fit together. X marks the spot, and it\u2019s on your map now!' : ''}`, 6000), 500); } }
+  if (S.hunt && S.hunt.day === S.day && !S.hunt.done && e.type === S.hunt.type && !e.net) { S.hunt.n = (S.hunt.n || 0) + 1; if (S.hunt.n >= S.hunt.goal) { S.hunt.done = true; const c = 120 + (S.level || 1)*6; S.coins += c; S.huntsDone = (S.huntsDone || 0) + 1; setTimeout(() => toast(`<b>Daily hunt complete!</b><br>Huntmaster Garrick\u2019s bounty: <span style="color:var(--good)">+${c} coin</span>`, 5000), 400); } else floatText(e.x, e.y - 1.8, `Hunt ${S.hunt.n}/${S.hunt.goal}`, '#ffb030'); }
   if (e.agent) S.agentsBeaten = (S.agentsBeaten || 0) + 1;
   if (e.mwHag && S.mw && S.mw.step === 2) { S.mw.step = 3; setTimeout(() => toast('<b>The Bog Hag shrieks and dissolves into mist!</b><br>The cursed stone cracks in two. Somewhere in Reedholm, a child yawns and wakes up. Return to Morga.', 8000), 600); }
   if (e.leBeast && S.le && S.le.step === 2) { S.le.step = 3; setTimeout(() => toast('<b>The Pale Beast falls!</b><br>Behind it, in the ice cave, a figure stirs: Ingrid\u2019s brother Leif, half-frozen but alive! Bring the news to Skyhold.', 8000), 600); }
@@ -6066,6 +6067,23 @@ function sledEnd() {
   const L = sled; L.on = false; sled = null; const m = Math.floor(L.dist/10), c = Math.min(120, Math.round(L.score*.6 + m/20)); S.coins += c; S.sledBest = Math.max(S.sledBest || 0, m); S.sledGates = Math.max(S.sledGates || 0, L.gates); renderHUD(); save(); SFX.coin();
   openPanel('Sled run', `<b>Whumph!</b> You tumble into the snow after <b>${m} m</b>, through ${L.gates} gate${L.gates === 1 ? '' : 's'}.${m >= (S.sledBest || 0) ? ' A new record!' : ''}<br><span style="color:var(--good)">+${c} coin</span>`, [{label: 'Again · 5◆', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); sledStart(); }}, {label: 'Close', fn: closeTalk}]);
 }
+// ===== daily hunt & fish of the week =====
+const HUNT_POOL = ['wolf', 'boar', 'skeleton', 'bandit', 'spider', 'harpy', 'scorpion', 'lurker', 'ghoul', 'hyena', 'jaguar', 'slime'];
+function huntToday() {
+  if (!S.hunt || S.hunt.day !== S.day) { let h = S.day*2654435761 >>> 0; const type = HUNT_POOL[h % HUNT_POOL.length]; S.hunt = {day: S.day, type, goal: 4 + (h >>> 8) % 4, n: 0, done: false}; }
+  return S.hunt;
+}
+function huntTalk(n) {
+  const H = huntToday(), E = ENEMIES[H.type];
+  say(`“Today’s hunt: <b>${H.goal} ${plural(H.type, H.goal)}</b>. They’ve been bothering travelers. Bring ’em down and the bounty’s yours.”<br><span style="color:${H.done ? 'var(--good)' : 'var(--muted)'}">${H.done ? 'Done for today. Good work!' : `Progress: ${H.n}/${H.goal}. A new hunt every day.`}</span>`, [back(n)]);
+}
+const fowFish = () => { const pool = FISH_SPECIES.map(f => f.id).filter(f => GOODS[f]); return pool[(Math.floor((S ? S.day : 1)/7)*7919) % pool.length]; };
+function fowTalk(n) {
+  const f = fowFish(), wk = Math.floor(S.day/7); S.fowPaid = S.fowPaid || {};
+  if (S.fowPaid[wk]) { say(`“You already brought me this week’s ${GOODS[f].name}. Come back next week for a new one!”`, [back(n)]); return; }
+  say(`“This week I’m paying top coin for a <b>${GOODS[f].name}</b>. Bring me one you caught yourself this week and I’ll pay three times its worth, plus a little extra.”`, [
+    {label: `Sell a ${GOODS[f].name} (have ${have(f)})`, primary: true, disabled: !have(f) || !(S.fowCaught || {})[wk], fn: () => { addItem(f, -1); const c = GOODS[f].base*3 + 50; S.coins += c; S.fowPaid[wk] = true; S.fowDone = (S.fowDone || 0) + 1; SFX.coin(); renderHUD(); save(); say(`“A beauty! Here you go.” <span style="color:var(--good)">+${c} coin</span>`, [back(n)]); }}, back(n)]);
+}
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7622,6 +7640,7 @@ const GUIDE = [
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
   ['The Pirate King\u2019s Map', 'A story quest: One-Eyed Nell in Blackwater tells of the Pirate King\u2019s map, torn in three. Defeat Captains Saltbeard, Redsash and Ironhook in their coves along the coast, then dig where X marks the spot.'],
+  ['Daily hunt and fish of the week', 'Huntmaster Garrick in Hollowpine posts a new hunt every day: defeat a set number of one kind of monster for a bounty. Tamsin the fishmonger in Port Wren names a fish of the week: catch one yourself that week and she pays three times its value.'],
   ['Sled run', 'Sledmaster Olga in Stormwatch runs the sled slope: steer left and right to pass through the flag gates and dodge the trees. You go faster the longer you ride.'],
   ['Trick-or-treat', 'On autumn nights, town houses put out jack-o\u2019-lanterns. Knock on the door for a treat (wearing a hat as a costume helps), but watch out for tricks! Each house answers once a night.'],
   ['Secret glades', 'Twelve secret glades are hidden across the land, well away from towns and roads. They only reveal themselves when you are right next to one: a ring of glowing flowers around a mossy chest. Find all twelve for a hidden bonus.'],
@@ -9687,6 +9706,7 @@ function mainOptions(n) {
   if (n.gemcutter) o.push({label: 'Socket gems into my gear', primary: true, fn: () => socketTalk(n)});
   if (n.id === 'wendell') o.push({label: 'Sell my map survey', primary: surveyNext() != null && mapPct() >= surveyNext(), fn: () => surveyTalk(n)});
   for (const q of (S.lostItems || [])) if (q.got && !q.done && q.owner === n.id) o.unshift({label: `Return ${q.name}`, primary: true, fn: () => lostReturn(n, q)});
+  if (n.id === 'tamsin') o.push({label: 'Fish of the week', fn: () => fowTalk(n)});
   if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
   if (n.hideseek) o.push({label: 'Play hide and seek', primary: true, fn: () => hsTalk(n)});
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
@@ -9729,6 +9749,7 @@ function mainOptions(n) {
   if (n.sled) o.push({label: 'Ride the sled run · 5\u25c6', primary: true, disabled: S.coins < 5, fn: () => { S.coins -= 5; renderHUD(); sledStart(); }});
   if (n.quizmaster) o.push({label: 'Play quiz night', primary: true, fn: () => quizTalk(n)});
   if (n.postmaster) o.push({label: courier ? 'About your delivery' : 'Take an express delivery', primary: true, fn: () => courierTalk(n)});
+  if (n.huntmaster) o.push({label: 'Today\u2019s hunt', fn: () => huntTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
@@ -12153,7 +12174,7 @@ function endFishGame(win) {
   const n = G.node >= 0 && nodes[G.node] ? nodes[G.node] : {x: S.x - .5, y: S.y - 1};
   if (win) {
     const amt = (G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1) + (S.pet === 'penguin' ? 1 : 0);
-    addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1; if (fcon && Date.now() < fcon.end) { fcon.pts += (GOODS[G.c].base || 10)*amt; fcon.n += amt; partyT = 0; floatText(S.x, S.y - 1.8, `+${(GOODS[G.c].base || 10)*amt} contest points`, '#6ab0ff'); }
+    addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1; if (G.c === fowFish()) { S.fowCaught = S.fowCaught || {}; const wk = Math.floor(S.day/7); if (!S.fowCaught[wk]) { S.fowCaught[wk] = 1; setTimeout(() => toast(`<b>You caught the fish of the week!</b><br>Take it to Tamsin in Port Wren for a bonus.`, 5000), 600); } } if (fcon && Date.now() < fcon.end) { fcon.pts += (GOODS[G.c].base || 10)*amt; fcon.n += amt; partyT = 0; floatText(S.x, S.y - 1.8, `+${(GOODS[G.c].base || 10)*amt} contest points`, '#6ab0ff'); }
     if (G.c === 'goldcarp') S.goldcarps = (S.goldcarps || 0) + 1;
     S.fishLog = S.fishLog || {};
     if (FISH_LOG_IDS.includes(G.c)) { const first = !S.fishLog[G.c]; S.fishLog[G.c] = (S.fishLog[G.c] || 0) + 1; if (first) setTimeout(() => toast(`<b>New fish: ${GOODS[G.c].name}!</b><br>Fish log ${Object.keys(S.fishLog).length}/${FISH_LOG_IDS.length}. Old Marlin in Port Wren rewards new catches.`, 6000), 400); }
@@ -12549,6 +12570,8 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
+  ['hunts5','Hunter\u2019s Calendar','Complete 5 daily hunts for Huntmaster Garrick', () => (S.huntsDone || 0) >= 5],
+  ['fow3','Catch of the Week','Bring Tamsin the fish of the week 3 times', () => (S.fowDone || 0) >= 3],
   ['sled20','Slalom Star','Pass 20 flag gates in one sled run', () => (S.sledGates || 0) >= 20],
   ['treats25','Sweet Tooth','Collect 25 treats trick-or-treating', () => (S.treats || 0) >= 25],
   ['pirateking','Heir to the Pirate King','Dig up the Pirate King\u2019s treasure', () => !!(S.pk && S.pk.step >= 3)],
