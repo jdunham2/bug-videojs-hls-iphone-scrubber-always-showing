@@ -6016,6 +6016,20 @@ function pkTarget() {
     openPanel('The Pirate King’s treasure', `Your shovel hits wood! You drag up an iron-banded chest, crusted with barnacles, and heave the lid open. Gold spills out into the sand.<br><br><span style="color:var(--good)">${c} coin, 8 Pirate Gold and 4 gems!</span><br><br><span style="color:var(--muted)">One-Eyed Nell in Blackwater would love to hear about this.</span>`, [{label: 'Yo ho ho!', primary: true, fn: closeTalk}]);
   }};
 }
+// ===== trick-or-treat (autumn nights) =====
+const totOn = () => season().name === 'Autumn' && (S.time > .8 || S.time < .2) && !inDungeon();
+function totTarget() {
+  if (!totOn()) return null; const h = houses.find(h => h.town && Math.hypot(h.x + 1 - S.x, h.y + 1.9 - S.y) < 1.4); if (!h) return null;
+  const key = h.x + ',' + h.y; if ((S.tot || {})[key] === S.day) return null;
+  return {key: 'tot' + key, html: '<kbd style="margin:0 6px 0 0">E</kbd>Knock: “Trick or treat!”', btn: 'Knock', fn: () => {
+    S.tot = S.tot || {}; S.tot[key] = S.day; const costume = !!S.hat, r = Math.random();
+    if (r < (costume ? .82 : .7)) { const c = rint(5, 15) + (costume ? 10 : 0); S.coins += c; const g = Math.random() < .5 ? 'candy_apple' : (GOODS.pumpkin_pie ? 'pumpkin_pie' : 'candy_apple'); addItem(g, 1); S.treats = (S.treats || 0) + 1; SFX.coin(); toast(`<b>Treat!</b> ${costume ? '“Ooh, what a lovely costume!” ' : ''}<span style="color:var(--good)">+${c} coin and a ${GOODS[g].name}</span>`, 3500); }
+    else if (Math.random() < .5) { S.hp = Math.max(1, S.hp - 1); renderHP(); SFX.hurt(); burst(S.x, S.y - 1, '#6ab0ff', 16, 3); toast('<b>Trick!</b> A bucket of cold water splashes over you from an upstairs window!', 3500); }
+    else { for (let k = 0; k < 2; k++) { const e = makeEnemy('bat', S.x + (k ? 1.5 : -1.5), S.y - 1, {alert: true}); e.labelName = 'Trick Bat'; enemies.push(e); } SFX.roar(); toast('<b>Trick!</b> The door creaks open and bats flutter out!', 3500); }
+    renderHUD(); save();
+  }};
+}
+function drawJack(h) { const px = (h.x + 1)*TS + 12, py = (h.y + 2)*TS - 3, fl = .7 + Math.sin(frameT*8 + h.x)*.3; ctx.fillStyle = '#e07a20'; ctx.beginPath(); ctx.ellipse(px, py, 5, 4, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#4a7a2a'; ctx.fillRect(px - .5, py - 6, 1.5, 2.5); ctx.fillStyle = `rgba(255,220,80,${fl})`; ctx.fillRect(px - 3, py - 2, 2, 1.5); ctx.fillRect(px + 1, py - 2, 2, 1.5); ctx.fillRect(px - 2, py + 1, 4, 1); }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
 function updateWhale(dt) {
@@ -7572,6 +7586,7 @@ const GUIDE = [
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
   ['The Pirate King\u2019s Map', 'A story quest: One-Eyed Nell in Blackwater tells of the Pirate King\u2019s map, torn in three. Defeat Captains Saltbeard, Redsash and Ironhook in their coves along the coast, then dig where X marks the spot.'],
+  ['Trick-or-treat', 'On autumn nights, town houses put out jack-o\u2019-lanterns. Knock on the door for a treat (wearing a hat as a costume helps), but watch out for tricks! Each house answers once a night.'],
   ['Secret glades', 'Twelve secret glades are hidden across the land, well away from towns and roads. They only reveal themselves when you are right next to one: a ring of glowing flowers around a mossy chest. Find all twelve for a hidden bonus.'],
   ['Mini golf', 'Putter Pete in Greenstem runs a three-hole course. Aim with the arrow keys or stick, press Space or A once to start your swing and again to hit, and bank shots off the walls.'],
   ['Star song', 'Stella in Skyhold plays a memory game with the stars: watch which ones light up and in what order, then touch them in the same order. Each round adds one more star.'],
@@ -8842,6 +8857,7 @@ function render() {
   if (S.rp && S.rp.step === 1) S.rp.trail.forEach((q, i) => { if (i <= S.rp.seen && inView(q.x, q.y)) sprites.push({y: q.y - .4, f: () => drawPrints(q, i)}); });
   if (S.rp && (S.rp.step === 1 && S.rp.seen >= S.rp.trail.length || S.rp.step === 2) && rpPrincess && inView(rpPrincess.x, rpPrincess.y)) sprites.push({y: rpPrincess.y, f: drawPrincess});
   if (S.pk && S.pk.step === 2 && inView(S.pk.x.x, S.pk.x.y)) sprites.push({y: S.pk.x.y - .5, f: () => { const px = S.pk.x.x*TS, py = S.pk.x.y*TS; ctx.strokeStyle = '#c8302a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - 5, py - 5); ctx.lineTo(px + 5, py + 5); ctx.moveTo(px + 5, py - 5); ctx.lineTo(px - 5, py + 5); ctx.stroke(); ctx.lineWidth = 1; }});
+  if (totOn()) for (const h of houses) if (h.town && inView(h.x + 1, h.y + 1.5)) { const key = h.x + ',' + h.y; if ((S.tot || {})[key] !== S.day) sprites.push({y: h.y + 2.1, f: () => drawJack(h)}); }
   for (const [i, q] of secretGlades().entries()) if (Math.hypot(q.x - S.x, q.y - S.y) < 6 && inView(q.x, q.y)) sprites.push({y: q.y - 1, f: () => drawGlade(q, i)});
   for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
@@ -9296,7 +9312,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || pkTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || hsTarget() || pkTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -12494,6 +12510,7 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
+  ['treats25','Sweet Tooth','Collect 25 treats trick-or-treating', () => (S.treats || 0) >= 25],
   ['pirateking','Heir to the Pirate King','Dig up the Pirate King\u2019s treasure', () => !!(S.pk && S.pk.step >= 3)],
   ['glades3','Hidden Places','Find 3 secret glades', () => Object.keys(S.glades || {}).length >= 3],
   ['gladesall','Keeper of Secrets','Find all 12 secret glades', () => Object.keys(S.glades || {}).length >= 12],
@@ -13166,7 +13183,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
