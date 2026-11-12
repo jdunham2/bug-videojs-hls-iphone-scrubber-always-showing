@@ -419,7 +419,8 @@ function openRoster() {
   });
 }
 const power = () => (S.crew + traitCount('strong') * .5 + traitCount('berserker')) * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
-const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5) * (S.weak && S.weak[p.id] > S.day ? .7 : 1);
+const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5) * (S.weak && S.weak[p.id] > S.day ? .7 : 1) * (townSacked(p.id) ? .6 : 1);
+const townSacked = id => typeof WS !== 'undefined' && WS.shared && WS.sacked[id] && Date.now() - WS.sacked[id] < 15 * 60e3;
 const FACTION_COL = { hrafn: 0x2a6a4a, kaup: 0x8a5a1a, kong: 0x4a2a6a, sun: 0xc0a030, frost: 0x2f5d8a, iron: 0x5a5a62, skar: 0x6a4a8a, ulf: 0xa07a20, jarl: 0x6a1010, salt: 0x3a7a7a, green: 0x4a7a3a, bjorn: 0x7a4a2a };
 function startWar() {
   const towns = PLACES.filter(p => p.def && !(S.hostile[p.id] > 0));
@@ -1299,15 +1300,17 @@ function spawnNPC(kind, opts = {}) {
   const g = makeShip(NPC_LOOKS[opts.elite ? 'jomsviking' : kind]);
   const pt = oceanPoint(500);
   const n = { kind, g, pos: new THREE.Vector2(pt.x, pt.z), h: rnd(0, 6.28), target: oceanPoint(), cooldown: 0, crewBase: opts.crew || 10,
-    name: opts.name || (kind === 'merchant' ? 'merchant knarr' : opts.elite ? 'Jomsviking warship' : 'raider longship'), elite: !!opts.elite };
+    name: opts.name || (kind === 'merchant' ? 'merchant knarr' : opts.elite ? 'Jomsviking warship' : 'raider longship'), elite: !!opts.elite, id: opts.id || nextWid('n'), htPeer: '', fs: 0, ft: '', bdPeer: null, tw: opts.tw || '' };
   resetNPC(n); scene.add(g); npcs.push(n); return n;
 }
 function removeNPC(i) { const n = npcs[i]; scene.remove(n.g); npcs.splice(i, 1); const el = foeLabels.get(n); if (el) { el.remove(); foeLabels.delete(n); } }
-function respawnNPC(n) { resetNPC(n); const pt = oceanPoint(700); n.pos.set(pt.x, pt.z); n.target = oceanPoint(); n.cooldown = 45; }
+function respawnNPC(n) { resetNPC(n); n.id = nextWid('n'); n.htPeer = ''; n.bdPeer = null; n.fs = 0; const pt = oceanPoint(700); n.pos.set(pt.x, pt.z); n.target = oceanPoint(); n.cooldown = 45; }
 function makeHostile(n) { if (n.hostile || n.dead) return; n.hostile = true; if (n.kind === 'merchant') log('The merchant crew panics and turns to flee!'); }
-function disengage(n, cd = 60) { n.hostile = false; n.cooldown = cd; n.target = oceanPoint(); }
+function disengage(n, cd = 60) { n.hostile = false; n.htPeer = ''; n.cooldown = cd; n.target = oceanPoint(); }
 
+function playerByPeer(peer) { if (!peer) return null; return worldPlayers().find(p => p.peer === peer) || null; }
 function updateNPCs(dt, t) {
+  const mirror = WS.shared && !WS.host;
   for (let i = npcs.length - 1; i >= 0; i--) {
     const n = npcs[i];
     if (n.dead) {
@@ -1315,34 +1318,55 @@ function updateNPCs(dt, t) {
       n.g.position.y -= dt * (.4 + n.sinkT * .45);
       n.g.rotation.z += dt * .07 * n.side; n.g.rotation.x += dt * .04;
       if (n.sinkT < 3 && chance(dt * 5)) puff(n.pos.x + rnd(-4, 4), 2, n.pos.y + rnd(-4, 4), .8, 0x6a6a6a);
-      if (n.sinkT > 7) { if (n.kind === 'defender') removeNPC(i); else respawnNPC(n); }
+      if (n.sinkT > 7) { if (mirror || n.kind === 'defender') removeNPC(i); else respawnNPC(n); }
       continue;
     }
+    if (mirror) { mirrorNPC(n, dt, t); continue; }
     checkNPCDeath(n); if (n.dead) continue;
     n.cooldown = Math.max(0, n.cooldown - dt); n.boardCd = Math.max(0, n.boardCd - dt);
-    const dx = ship.pos.x - n.pos.x, dz = ship.pos.y - n.pos.y, dp = Math.hypot(dx, dz), toP = Math.atan2(dx, -dz);
     if (boarding && boarding.n === n) { floatShip(n.g, n.pos.x, n.pos.y, n.h, t); animateShip(n.g, t, 0, 0, .3); continue; }
+    // another captain has grappled this ship: it stays lashed alongside them
+    const bp = n.bdPeer && playerByPeer(n.bdPeer);
+    if (bp && !bp.land) {
+      const rx = Math.cos(bp.h), rz = Math.sin(bp.h), q = clamp(dt * 2, 0, 1);
+      n.pos.x = lerp(n.pos.x, bp.shipX + rx * 9.5 * (n.bdSide || 1), q); n.pos.y = lerp(n.pos.y, bp.shipZ + rz * 9.5 * (n.bdSide || 1), q);
+      n.h += angDiff(bp.h, n.h) * q; n.speed = 0;
+      floatShip(n.g, n.pos.x, n.pos.y, n.h, t); animateShip(n.g, t, 0, 0, .3); continue;
+    } else if (n.bdPeer) n.bdPeer = null;
+    // the captain this ship is fighting, or the nearest one at sea
+    let T = n.htPeer ? playerByPeer(n.htPeer) : null;
+    if (!T || T.land) { const np = nearestPlayer(n.pos.x, n.pos.y, p => !p.land); T = np ? np.p : null; if (n.hostile && T) n.htPeer = T.peer; }
+    const dx = T ? T.x - n.pos.x : 0, dz = T ? T.z - n.pos.y : 0, dp = T ? Math.hypot(dx, dz) : 1e9, toP = Math.atan2(dx, -dz);
+    const tMe = !!(T && T.me), tDocked = !T || T.docked;
     let desired, want;
     if (n.hostile) {
-      if (dp > (n.kind === 'defender' ? 1100 : 500)) { disengage(n, 60); if (n.kind !== 'defender') log(`You lose the ${n.name} in the swell.`); }
+      if (dp > (n.kind === 'defender' ? 1100 : 500)) { if (tMe && n.kind !== 'defender') log(`You lose the ${n.name} in the swell.`); disengage(n, 60); }
       if (n.kind === 'merchant') { desired = toP + Math.PI; want = 14; }
       else {
-        const wantBoard = n.boardCd <= 0 && (n.crewF >= S.crew * 1.5 || S.hull < 25 || S.crew <= 3);
-        if (wantBoard) { desired = toP; want = 21; if (dp < 26 && !boarding && !S.docked) startBoarding(n, true); }
+        const tCrew = tMe ? S.crew : (T && T.cr) || 10, tHull = tMe ? S.hull : 100;
+        const wantBoard = n.boardCd <= 0 && (n.crewF >= tCrew * 1.5 || tHull < 25 || tCrew <= 3);
+        if (wantBoard) {
+          desired = toP; want = 21;
+          if (dp < 26 && !tDocked) { if (tMe) { if (!boarding) startBoarding(n, true); } else if (!n.bdPeer) { n.bdPeer = T.peer; n.bdSide = 1; n.bdT = 0; } }
+        }
         else if (dp > 120) { desired = toP; want = 19; }
         else { desired = toP + n.side * (dp < 60 ? 2.1 : 1.45); want = 15; }
         n.reload -= dt;
-        if (n.reload <= 0 && dp < 175 && !boarding && !S.docked) { npcVolley(n, dp); n.reload = rnd(2.6, 3.8); }
+        if (n.reload <= 0 && dp < 175 && !tDocked && !(tMe && boarding)) { npcFire(n, T, dp); n.reload = rnd(2.6, 3.8); }
       }
     } else if (n.kind === 'defender') {
+      if (!n.home) n.home = n.tw && P[n.tw] ? { x: P[n.tw].dock.x, z: P[n.tw].dock.z } : { x: n.pos.x, z: n.pos.y };
       desired = Math.atan2(n.home.x - n.pos.x, -(n.home.z - n.pos.y)); want = 10; n.leaveT += dt;
       if (n.leaveT > 30 || Math.hypot(n.home.x - n.pos.x, n.home.z - n.pos.y) < 40) { removeNPC(i); continue; }
     } else {
       if (Math.hypot(n.target.x - n.pos.x, n.target.z - n.pos.y) < 50) n.target = oceanPoint();
       desired = Math.atan2(n.target.x - n.pos.x, -(n.target.z - n.pos.y)); want = n.kind === 'merchant' ? 9 : 12;
-      if (n.kind === 'raider' && !S.docked && n.cooldown <= 0 && !modalOpen && !titleOn && dp < 330) {
-        desired = toP; want = 19;
-        if (dp < 210) { makeHostile(n); Sound.horn(); if (n.elite) { banner('Jomsvikings!', 'The deadliest sea-warriors of the north'); log('A Jomsviking warship bears down on you. They have sworn never to flee.', 'bad'); } else banner('Raiders!', 'SPACE loose arrows · SHIFT shield wall · ram or board'); log('A black-sailed raider ship comes at you!', 'bad'); }
+      if (n.kind === 'raider' && n.cooldown <= 0) {
+        const np = nearestPlayer(n.pos.x, n.pos.y, p => !p.land && !p.docked);
+        if (np && np.d < 330 && !(np.p.me && (modalOpen || titleOn))) {
+          desired = Math.atan2(np.p.x - n.pos.x, -(np.p.z - n.pos.y)); want = 19;
+          if (np.d < 210) { makeHostile(n); n.htPeer = np.p.peer || ''; if (np.p.me) raiderAlarm(n); }
+        }
       }
     }
     const fx = Math.sin(n.h), fz = -Math.cos(n.h);
@@ -1355,6 +1379,29 @@ function updateNPCs(dt, t) {
     floatShip(n.g, n.pos.x, n.pos.y, n.h, t);
     animateShip(n.g, t, n.speed, n.kind === 'merchant' ? 3 : 2, .7);
   }
+}
+function raiderAlarm(n) {
+  Sound.horn();
+  if (n.elite) { banner('Jomsvikings!', 'The deadliest sea-warriors of the north'); log('A Jomsviking warship bears down on you. They have sworn never to flee.', 'bad'); }
+  else { banner('Raiders!', 'SPACE loose arrows · SHIFT shield wall · ram or board'); log('A black-sailed raider ship comes at you!', 'bad'); }
+}
+// a volley at a captain: real arrows if it's you, harmless ones for everyone else to watch
+function npcFire(n, T, dp) {
+  if (T.me) npcVolley(n, dp);
+  else fireVolley(n.g.position, { x: T.shipX, y: 0, z: T.shipZ }, { x: T.vx, z: T.vz }, clamp(Math.ceil(n.crewF / 2), 1, 7), 2 + dp * .045, 'vis');
+  n.fs = (n.fs || 0) + 1; n.ft = T.peer || '';
+}
+function mirrorNPC(n, dt, t) {
+  if (boarding && boarding.n === n) { floatShip(n.g, n.pos.x, n.pos.y, n.h, t); animateShip(n.g, t, 0, 0, .3); return; }
+  if (n.netX !== undefined) {
+    n.netX += Math.sin(n.netH) * n.speed * dt; n.netZ += -Math.cos(n.netH) * n.speed * dt;
+    const k = 1 - Math.exp(-dt * 4);
+    if (Math.hypot(n.netX - n.pos.x, n.netZ - n.pos.y) > 120) { n.pos.set(n.netX, n.netZ); n.h = n.netH; }
+    n.pos.x = lerp(n.pos.x, n.netX, k); n.pos.y = lerp(n.pos.y, n.netZ, k); n.h += angDiff(n.netH, n.h) * k;
+  }
+  if (n.hp < n.maxHp * .5 && chance(dt * 5)) puff(n.pos.x + rnd(-3, 3), 3, n.pos.y + rnd(-3, 3), .6, 0x3a3a3a);
+  floatShip(n.g, n.pos.x, n.pos.y, n.h, t);
+  animateShip(n.g, t, n.speed, n.kind === 'merchant' ? 3 : 2, .7);
 }
 
 // ---------- real-time combat ----------
@@ -1436,7 +1483,7 @@ function stepArrows(dt) {
       if (!hit && kraken && !kraken.sinking) { const m = krakenHitTest(a.p); if (m) { hitKraken(a.p, m); hit = true; } }
       if (!hit) { const D = dragonHitTest(a.p); if (D) { hitDragon(D, a.p, 2); hit = true; } }
       if (!hit && MP.ghosts.size && mpArrowHit(a.p)) hit = true;
-    } else if (!S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
+    } else if (a.owner !== 'vis' && !S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
     const wh = waveH(a.p.x, a.p.z, elapsed);
     if (!hit && a.land && a.p.y < terrainH(a.p.x, a.p.z)) { a.life = 99; }
     if (hit || a.p.y < wh - .3 || a.life > 6) {
@@ -1447,12 +1494,21 @@ function stepArrows(dt) {
 }
 function hitFx(p, color) { puff(p.x, p.y, p.z, .3, color, .6, .2); if (hitSoundCd <= 0) { Sound.thunk(); hitSoundCd = .08; } }
 function hitNPC(n, p) {
-  makeHostile(n);
-  n.hp -= 2.5 * (1 + S.weapons * .15);
-  n.crewF -= .34 * (1 + S.weapons * .25) * (1 + S.luck * .05);
-  hitFx(p, 0x8a6a40); checkNPCDeath(n);
+  hitFx(p, 0x8a6a40);
+  npcDamage(n, 2.5 * (1 + S.weapons * .15), .34 * (1 + S.weapons * .25) * (1 + S.luck * .05));
 }
-function checkNPCDeath(n) { if (n.dead) return; if (n.hp <= 0) victory(n, 'sunk'); else if (n.crewF <= .4) victory(n, 'slain'); }
+// your blows on a ship: applied here when this game runs the world, else tallied for the host
+function npcDamage(n, hpAmt, crewAmt) {
+  if (!n || n.dead) return;
+  WS.touched[n.id] = true; if (n.tw) WS.touchedTown[n.tw] = true;
+  if (isAuth()) { if (!n.hostile) makeHostile(n); if (WS.shared && !n.htPeer) n.htPeer = MP.myPeer; n.hp -= hpAmt; n.crewF -= crewAmt; checkNPCDeath(n); }
+  else {
+    if (!n.hostile && n.kind === 'merchant') log('The merchant crew panics and turns to flee!');
+    const c = WS.ndm[n.id] || (WS.ndm[n.id] = [0, 0]); c[0] = Math.round((c[0] + hpAmt) * 10) / 10; c[1] = Math.round((c[1] + crewAmt) * 100) / 100;
+    n.hostile = true; n.hp = Math.max(1, n.hp - hpAmt); n.crewF = Math.max(.5, n.crewF - crewAmt);
+  }
+}
+function checkNPCDeath(n) { if (n.dead) return; if (n.hp <= 0) victory(n, 'sunk'); else if (n.crewF <= .4) victory(n, (boarding && boarding.n === n) || n.bdPeer ? 'boarded' : 'slain'); }
 function hitPlayer(p) {
   const m = shieldUp ? .25 : 1;
   S.hull = Math.max(5, S.hull - 1.2 * m); pCrewDmg += .2 * m; applyCrewDmg(); hitFx(p, 0x8a6a40);
@@ -1464,7 +1520,10 @@ function applyCrewDmg() {
   }
 }
 function victory(n, how) {
-  n.dead = true; n.hostile = false; n.sinkT = 0; if (boarding && boarding.n === n) boarding = null;
+  if (n.dead) return;
+  n.dead = true; n.how = how; n.hostile = false; n.sinkT = 0; if (boarding && boarding.n === n) boarding = null;
+  if (!WS.touched[n.id] || WS.credited[n.id]) return; // only the captains who fought her share the spoils
+  WS.credited[n.id] = true;
   const base = n.kind === 'merchant' ? [30, 80, 3] : n.elite ? [110, 200, 25] : n.kind === 'raider' ? [40, 100, 12] : [20, 50, 8];
   let sv = ri(base[0], base[1]); const glory = base[2], got = [];
   if (how === 'sunk') sv = Math.round(sv * .4);
@@ -1496,10 +1555,9 @@ function updateBoarding(dt) {
   if (b.tick <= 0) {
     b.tick = .5;
     const enemyPow = n.crewF * (n.kind === 'merchant' ? .45 : 1 + S.day / 40);
-    n.crewF -= power() * rnd(.035, .08);
+    npcDamage(n, 0, power() * rnd(.035, .08));
     pCrewDmg += enemyPow * rnd(.035, .08) * (shieldUp ? .8 : 1);
     applyCrewDmg(); Sound.clash1(); shake = Math.max(shake, .25);
-    if (n.crewF <= .4) victory(n, 'boarded');
   }
 }
 function cutLoose() { if (!boarding) return; boarding.n.boardCd = 8; log('You hack through the grappling lines and pull away.'); boarding = null; }
@@ -1524,17 +1582,17 @@ function updateCollisions(dt) {
     const facing = Math.sin(ship.h) * ux - Math.cos(ship.h) * uz;
     if (ramCd <= 0 && ship.speed > 11 && facing > .55) {
       const sp = ship.speed, dmg = Math.round(sp * 2.4);
-      n.hp -= dmg; n.crewF -= sp * .1; S.hull = Math.max(5, S.hull - sp * .35);
-      ship.speed *= .3; n.speed *= .3; ramCd = 1.5; shake = 1;
-      makeHostile(n); banner('Rammed!', `${cap(n.name)} takes ${dmg} damage`); Sound.crash();
-      log(`You ram the ${n.name} at full speed!`, 'gold'); checkNPCDeath(n); renderHUD();
+      S.hull = Math.max(5, S.hull - sp * .35); ship.speed *= .3; n.speed *= .3; ramCd = 1.5; shake = 1;
+      banner('Rammed!', `${cap(n.name)} takes ${dmg} damage`); Sound.crash();
+      log(`You ram the ${n.name} at full speed!`, 'gold'); npcDamage(n, dmg, sp * .1); renderHUD();
     } else ship.speed *= .9;
   }
 }
 function defeat() {
   const lost = Math.floor(S.silver / 2); S.silver -= lost; S.morale = clamp(S.morale - 20, 0, 100); S.hull = Math.max(S.hull, 15);
   log(`Defeated! Your foes strip ${lost} silver from your ship and leave you drifting.`, 'bad'); banner('Defeated', `-${lost} silver`);
-  npcs.forEach(n => { if (n.hostile && !n.dead) { disengage(n, 150); n.boardCd = 30; } });
+  if (isAuth()) npcs.forEach(n => { if (n.hostile && !n.dead && (!WS.shared || n.htPeer === MP.myPeer)) { disengage(n, 150); n.boardCd = 30; } });
+  else WS.defeatSeq++;
   if (!WS.shared) {
     if (serpent) serpent.sinking = true;
     if (kraken) { kraken.sinking = true; }
@@ -1547,32 +1605,46 @@ function startRaid() {
   if (S.crew < 2) { toast('Too few hands', 'You need at least 2 crew to sail into battle.'); return; }
   S.hostile[p.id] = 30; S.alert[p.id] = (S.alert[p.id] || 0) + 1; S.raids++;
   S.docked = false; throttle = 1; ship.speed = 3;
-  const count = p.type === 'fortress' ? 4 : p.type === 'town' ? 2 : 1, crew = Math.round(defenseOf(p) / count * .6) + 4;
-  raid = { p, cleared: false };
-  for (let i = 0; i < count; i++) {
-    const n = spawnNPC('defender', { crew, name: `${p.name} warship` }), lat = -30 - i * 28;
-    n.pos.set(p.wx + p.dock.dx * (p.dock.shore + 12) - p.dock.dz * lat, p.wz + p.dock.dz * (p.dock.shore + 12) + p.dock.dx * lat);
-    n.h = Math.atan2(p.dock.dx, -p.dock.dz); n.raid = raid; n.home = { x: p.dock.x, z: p.dock.z }; n.reload = rnd(2, 4);
-    makeHostile(n);
-  }
+  const count = p.type === 'fortress' ? 4 : p.type === 'town' ? 2 : 1;
+  raid = { p, cleared: false, shared: WS.shared, t: Date.now() };
+  if (isAuth()) spawnRaidDefenders(p, MP.myPeer || '', raid); else WS.rq = { s: ++WS.rqSeq, k: 'raid', t: p.id, x: Math.round(ship.pos.x), z: Math.round(ship.pos.y), h: 0 };
   Sound.horn();
   banner(`${p.name} sounds the alarm!`, `${count > 1 ? count + ' warships sail' : 'A warship sails'} out. Sink or board ${count > 1 ? 'them' : 'it'}, then land to sack the town`);
   render();
   log(`You raise the raven banner. ${p.name}'s war horns answer and ${count > 1 ? count + ' warships put' : 'a warship puts'} out to meet you!`, 'bad');
 }
+function spawnRaidDefenders(p, ownerPeer, localRaid) {
+  const count = p.type === 'fortress' ? 4 : p.type === 'town' ? 2 : 1, crew = Math.round(defenseOf(p) / count * .6) + 4;
+  for (let i = 0; i < count; i++) {
+    const n = spawnNPC('defender', { crew, name: `${p.name} warship`, tw: p.id }), lat = -30 - i * 28;
+    n.pos.set(p.wx + p.dock.dx * (p.dock.shore + 12) - p.dock.dz * lat, p.wz + p.dock.dz * (p.dock.shore + 12) + p.dock.dx * lat);
+    n.h = Math.atan2(p.dock.dx, -p.dock.dz); n.raid = localRaid || null; n.home = { x: p.dock.x, z: p.dock.z }; n.reload = rnd(2, 4);
+    makeHostile(n); n.htPeer = ownerPeer;
+  }
+  if (WS.shared) WS.raids[p.id] = { cleared: false, t: Date.now() };
+}
 function updateRaid() {
+  // a shared raid you helped with has broken the harbor's defence: you may land and sack it too
+  if (WS.shared) for (const tw of Object.keys(WS.raidSnap)) {
+    if (WS.raidSnap[tw] && WS.touchedTown[tw] && !(raid && raid.p.id === tw) && !WS.sackOffered[tw]) {
+      WS.sackOffered[tw] = true; raid = { p: P[tw], cleared: true, shared: true, t: Date.now() };
+      banner('The harbor is yours', `Land at ${P[tw].name} (E) to sack it`); log(`${P[tw].name}'s warships are beaten. Land to sack the town!`, 'gold');
+    }
+  }
   if (!raid) return;
-  if (!raid.cleared && !npcs.some(n => n.raid === raid && !n.dead)) {
+  const shareCleared = raid.shared && (WS.raidSnap[raid.p.id] === true || (WS.host && WS.raids[raid.p.id] && WS.raids[raid.p.id].cleared));
+  const localCleared = !raid.shared && !npcs.some(n => n.raid === raid && !n.dead);
+  if (!raid.cleared && (shareCleared || localCleared)) {
     raid.cleared = true; banner('The harbor is yours', `Land at ${raid.p.name} (E) to sack it`);
     log(`${raid.p.name}'s warships are beaten. Land to sack the town!`, 'gold');
   }
   if (raid && !S.docked && Math.hypot(ship.pos.x - raid.p.wx, ship.pos.y - raid.p.wz) > 900) abortRaid(`You sail away and the raid on ${raid.p.name} is abandoned.`);
 }
-function abortRaid(msg) { if (!raid) return; npcs.forEach(n => { if (n.raid === raid && !n.dead) disengage(n, 0); }); if (msg) log(msg); raid = null; }
+function abortRaid(msg) { if (!raid) return; if (isAuth()) npcs.forEach(n => { if ((n.raid === raid || (n.tw && n.tw === raid.p.id && n.htPeer === MP.myPeer)) && !n.dead) disengage(n, 0); }); if (msg) log(msg); raid = null; }
 function hailMerchant(n) {
   n.cooldown = 60;
   choice('A merchant knarr', 'A fat merchant ship wallows in the swell. Her crew eyes your shields nervously.', [
-    ['Attack her!', () => { makeHostile(n); banner('Attack!', 'SPACE loose arrows · ram at speed · B to board alongside'); }],
+    ['Attack her!', () => { if (isAuth()) makeHostile(n); else npcDamage(n, .01, 0); banner('Attack!', 'SPACE loose arrows · ram at speed · B to board alongside'); }],
     ['Trade news & wine', () => { S.luck = Math.min(5, S.luck + 1); S.morale = clamp(S.morale + 6, 0, 100); log(`The merchants share wine and gossip: "${pick(rumours())}"`, 'good'); }],
     ['Sail on', () => {}],
   ]);
@@ -2616,6 +2688,7 @@ function warWon(b) {
 function sackWon(p) {
   const warJoin = ashore.battle && ashore.battle.war;
   ashore.battle = null; raid = null;
+  if (WS.shared) { WS.sacked[p.id] = Date.now(); if (WS.db && WS.canWrite) WS.db.doc('towns/' + p.id).set({ sackedAt: Date.now() }).catch(() => {}); }
   if (warJoin && S.war) { const A = P[S.war.a]; (S.favor ||= {})[A.id] = favorAt(A.id) + 1; S.war.done = true; S.war.winner = A.id; (S.weak ||= {})[p.id] = S.day + SEASON_DAYS; S.glory += 10; log(`${A.name} celebrates your part in the victory. They will trade with you as a friend. (+10 glory)`, 'gold'); }
   const mult = p.type === 'fortress' ? 5 : p.type === 'town' ? 2.5 : 1;
   const sv = Math.round(ri(40, 80) * mult), glory = Math.round(10 * mult), got = [];
@@ -3007,6 +3080,7 @@ async function initMultiplayer() {
   if (db) {
     WS.db = db;
     try { WS.canWrite = user ? (user.can('data.write') !== false) : true; } catch (e) { WS.canWrite = true; }
+    try { db.collection('towns').onSnapshot(qs => { qs.docs.forEach(d => { const v = d.exists ? d.data() : null; WS.sacked[d.id] = v && typeof v.sackedAt === 'number' ? v.sackedAt : 0; }); }, () => {}); } catch (e) {}
     ['kraken', 'fafnir', 'troll', 'king'].forEach(n => { try { db.doc('world/' + n).onSnapshot(s => { const d = s.exists ? s.data() : null; WS.down[n] = d && typeof d.at === 'number' ? d.at : 0; }, () => {}); } catch (e) {} });
   }
   MP.user = user;
@@ -3070,6 +3144,9 @@ function mpPublish() {
   p.w = WS.shared && WS.host ? buildSnap() : null;
   p.dm = WS.shared && !WS.host && Object.keys(WS.dmgOut).length ? WS.dmgOut : null;
   p.rq = WS.rq;
+  p.nd = WS.shared && !WS.host && Object.keys(WS.ndm).length ? WS.ndm : null;
+  p.bd = boarding ? boarding.n.id : null;
+  p.df = WS.defeatSeq || null;
   MP.room.presence(p).catch(() => {});
 }
 function ghostFor(peer, pr) {
@@ -3159,21 +3236,21 @@ function openPlayers() {
 // =====================================================================
 // shared world: one captain's game (the world host) runs the monsters for everyone
 // =====================================================================
-const WS = { shared: false, host: true, hostPeer: null, seq: 0, lastQ: -1, dmgOut: {}, dmgSeen: {}, touched: {}, credited: {}, down: {}, db: null, rq: null, rqSeq: 0, rqSeen: {}, widSeq: 0, canWrite: false };
+const WS = { ndm: {}, touchedTown: {}, raids: {}, raidSnap: {}, sackOffered: {}, sacked: {}, defeatSeq: 0, defeatSeen: {}, wasMirror: false, shared: false, host: true, hostPeer: null, seq: 0, lastQ: -1, dmgOut: {}, dmgSeen: {}, touched: {}, credited: {}, down: {}, db: null, rq: null, rqSeq: 0, rqSeen: {}, widSeq: 0, canWrite: false };
 const RESPAWN_MS = { kraken: 20 * 60e3, fafnir: 30 * 60e3, troll: 20 * 60e3, king: 20 * 60e3 };
 const nextWid = pre => pre + (MP.myPeer ? MP.myPeer.slice(0, 4) : 'L') + (++WS.widSeq);
 const isAuth = () => !WS.shared || WS.host;
 function nearMe(x, z, r) { const me = myPlayer(); return Math.hypot(x - me.x, z - me.z) < r; }
 function myPlayer() {
   const land = ashore.on && hero && !hero.dead, v = velOf(ship.h, ship.speed);
-  return { x: land ? hero.x : ship.pos.x, z: land ? hero.z : ship.pos.y, y: land ? hero.y : 0, land, at: S.at, docked: S.docked && !ashore.on, vx: land ? hero.vx || 0 : v.x, vz: land ? hero.vz || 0 : v.z, me: true };
+  return { peer: MP.myPeer || '', shipX: ship.pos.x, shipZ: ship.pos.y, h: ship.h, cr: S.crew, x: land ? hero.x : ship.pos.x, z: land ? hero.z : ship.pos.y, y: land ? hero.y : 0, land, at: S.at, docked: S.docked && !ashore.on, vx: land ? hero.vx || 0 : v.x, vz: land ? hero.vz || 0 : v.z, me: true };
 }
 function worldPlayers() {
   const list = titleOn ? [] : [myPlayer()];
   if (WS.shared) for (const gh of MP.ghosts.values()) {
     const pr = gh.pr; if (!pr || pr.ig !== 1) continue;
     const land = pr.m === 1 && typeof pr.hx === 'number', v = velOf(gh.h, gh.speed);
-    list.push({ x: land ? pr.hx : gh.x, z: land ? pr.hz : gh.z, y: land ? +pr.hy || 0 : 0, land, at: pr.at, docked: !!pr.d && !land, vx: land ? 0 : v.x, vz: land ? 0 : v.z, peer: gh.peer });
+    list.push({ shipX: gh.x, shipZ: gh.z, h: gh.h, cr: pr.cr | 0, x: land ? pr.hx : gh.x, z: land ? pr.hz : gh.z, y: land ? +pr.hy || 0 : 0, land, at: pr.at, docked: !!pr.d && !land, vx: land ? 0 : v.x, vz: land ? 0 : v.z, peer: gh.peer });
   }
   return list;
 }
@@ -3222,7 +3299,8 @@ function worldRequest(kind) {
   if (isAuth()) return hostSpawn(kind, me.x, me.z, ship.h);
   WS.rq = { s: ++WS.rqSeq, k: kind, x: Math.round(me.x), z: Math.round(me.z), h: Math.round(ship.h * 100) / 100 };
 }
-function hostSpawn(kind, x, z, h = 0) {
+function hostSpawn(kind, x, z, h = 0, extra = {}) {
+  if (kind === 'raid') { const p = P[extra.t]; if (p && p.def && !npcs.some(n => n.tw === p.id && !n.dead)) spawnRaidDefenders(p, extra.peer || '', null); return; }
   if (kind === 'serpent' && !serpent) spawnSerpent(x, z, { ang: rnd(0, 6.28) });
   else if (kind === 'drake' && dragons.filter(d => !d.great && !d.dead).length < 2) spawnDragon('drake', x - Math.sin(h) * 200, z + Math.cos(h) * 200);
   else if (kind === 'kraken' && !kraken && !worldDown('kraken')) spawnKraken(x + Math.sin(h) * 70, z - Math.cos(h) * 70);
@@ -3242,7 +3320,21 @@ function buildSnap() {
   if (kraken) w.K = { i: kraken.wid, x: r1(kraken.x), z: r1(kraken.z), hp: Math.round(kraken.hp), sk: kraken.sinking ? 1 : 0, dd: kraken.slain ? 1 : 0,
     tn: kraken.tentacles.map(tn => tn.state === 'rise' ? [r1(tn.target.x), r1(tn.target.z), r2(tn.t)] : 0) };
   if (serpent) w.S = { i: serpent.wid, x: r1(serpent.x), z: r1(serpent.z), cx: r1(serpent.cx), cz: r1(serpent.cz), a: r2(serpent.ang), l: r2(serpent.lunge), hp: Math.round(serpent.hp), sk: serpent.sinking ? 1 : 0, dd: serpent.slain ? 1 : 0 };
+  // ships near any captain, as many as fit in the presence budget
+  const pl = worldPlayers(), peers = [];
+  const pi = peer => { if (!peer) return -1; let k = peers.indexOf(peer); if (k < 0) { peers.push(peer); k = peers.length - 1; } return k; };
+  const near = npcs.map(n => ({ n, d: Math.min(...pl.map(p => Math.hypot(p.shipX - n.pos.x, p.shipZ - n.pos.y)), 1e9) })).filter(o => o.d < 1700).sort((a, b) => a.d - b.d);
+  const KC = { merchant: 'm', raider: 'r', defender: 'd' };
+  w.N = []; w.P = peers;
+  for (const { n } of near) {
+    w.N.push([n.id, n.elite ? 'j' : KC[n.kind] || 'r', Math.round(n.pos.x), Math.round(n.pos.y), r2(n.h), Math.round(n.speed), Math.round(n.hp), Math.ceil(n.crewF), n.hostile ? pi(n.htPeer || '*') : -1,
+      n.dead ? ({ sunk: 1, slain: 2, boarded: 3 }[n.how] || 1) : 0, n.fs | 0, pi(n.ft), pi(n.bdPeer), n.tw || '']);
+    if (w.N.length >= 22) break;
+  }
+  const rs = Object.keys(WS.raids); if (rs.length) w.R = rs.map(tw => [tw, WS.raids[tw].cleared ? 1 : 0]);
   if (dragons.length) w.D = dragons.map(D => [D.wid, D.great ? 1 : 0, r1(D.pos.x), r1(D.pos.y), r1(D.pos.z), r1(D.vel.x), r1(D.vel.y), r1(D.vel.z), Math.round(D.hp), D.state[0] + D.state[1], D.breath > 0 ? 1 : 0, D.dead ? 1 : 0, r2(D.faceY || 0), D.col | 0]);
+  // keep the whole presence object under its 4 KiB limit
+  while (JSON.stringify(w).length > 3000 && w.N && w.N.length) w.N.pop();
   return w;
 }
 const STATE_OF = { ci: 'circle', di: 'dive', cl: 'climb', la: 'land', gr: 'ground' };
@@ -3277,15 +3369,48 @@ function applySnap(w) {
     D.hp = Math.min(D.hp, hp) || hp; D.state = STATE_OF[st] || 'circle'; if (br) D.breath = .3; D.faceY = fy;
     if (dead && !D.dead) monsterDied(D);
   }
+  // ships
+  if (w.N) {
+    const P2 = w.P || [], peerAt = k => k >= 0 ? P2[k] || '' : '', seenN = new Set();
+    const KIND = { m: 'merchant', r: 'raider', j: 'raider', d: 'defender' };
+    for (const a of w.N) {
+      const [id, kc, x, z, h, sp, hp, cr, ht, st, fs, ft, bd, tw] = a; seenN.add(id);
+      let n = npcs.find(o => o.id === id);
+      if (!n) {
+        if (st) continue;
+        const kind = KIND[kc] || 'raider';
+        n = spawnNPC(kind, { id, elite: kc === 'j', tw, crew: cr, name: kind === 'defender' && P[tw] ? `${P[tw].name} warship` : undefined });
+        n.pos.set(x, z); n.h = h; n.lastFs = fs;
+        if (tw && P[tw]) n.home = { x: P[tw].dock.x, z: P[tw].dock.z };
+      }
+      n.netX = x; n.netZ = z; n.netH = h; n.speed = sp; n.hp = hp; n.crewF = cr; n.maxCrew = Math.max(n.maxCrew || 0, cr);
+      const htp = peerAt(ht), wasMine = n.hostileToMe;
+      n.hostile = ht >= 0; n.hostileToMe = !!htp && htp === MP.myPeer;
+      if (n.hostileToMe && !wasMine && n.kind === 'raider') raiderAlarm(n);
+      if (st && !n.dead) victory(n, st === 3 ? 'boarded' : st === 2 ? 'slain' : 'sunk');
+      if (fs !== n.lastFs) {
+        n.lastFs = fs; const tp = peerAt(ft);
+        if (tp && tp === MP.myPeer) npcVolley(n, Math.hypot(ship.pos.x - n.pos.x, ship.pos.y - n.pos.y));
+        else { const gh = MP.ghosts.get(tp); if (gh) fireVolley(n.g.position, gh.g.position, velOf(gh.h, gh.speed), clamp(Math.ceil(cr / 2), 1, 7), 3, 'vis'); }
+      }
+      if (peerAt(bd) === MP.myPeer && !boarding && !S.docked && !ashore.on && !n.dead) startBoarding(n, true);
+    }
+    for (let i = npcs.length - 1; i >= 0; i--) if (!seenN.has(npcs[i].id) && !npcs[i].dead && !(boarding && boarding.n === npcs[i])) removeNPC(i);
+  }
+  WS.raidSnap = {}; (w.R || []).forEach(([tw, c]) => { WS.raidSnap[tw] = !!c; });
   for (let i = dragons.length - 1; i >= 0; i--) { const D = dragons[i]; if (!seen.has(D.wid) && !D.dead) { scene.remove(D.g); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } dragons.splice(i, 1); } }
 }
 function worldTick(dt) {
   electHost();
+  const mirror = WS.shared && !WS.host;
+  if (mirror && !WS.wasMirror) { for (let i = npcs.length - 1; i >= 0; i--) removeNPC(i); } // the host's sea replaces your own
+  WS.wasMirror = mirror;
   if (WS.shared && !WS.host) {
     const hp = MP.room.peers().find(p => p.peer === WS.hostPeer);
     if (hp && hp.presence && hp.presence.w) applySnap(hp.presence.w);
     // forget tallies for monsters that are gone
     for (const wid of Object.keys(WS.dmgOut)) if (!findMonster(wid)) delete WS.dmgOut[wid];
+    for (const id of Object.keys(WS.ndm)) if (!npcs.some(n => n.id === id && !n.dead)) delete WS.ndm[id];
     return;
   }
   if (titleOn) return;
@@ -3300,7 +3425,29 @@ function worldTick(dt) {
         seen[wid] = Math.max(seen[wid] || 0, tot);
       }
     }
-    if (pr.rq && pr.rq.s && pr.rq.s !== WS.rqSeen[gh.peer]) { WS.rqSeen[gh.peer] = pr.rq.s; hostSpawn(String(pr.rq.k), +pr.rq.x || 0, +pr.rq.z || 0, +pr.rq.h || 0); }
+    if (pr.rq && pr.rq.s && pr.rq.s !== WS.rqSeen[gh.peer]) { WS.rqSeen[gh.peer] = pr.rq.s; hostSpawn(String(pr.rq.k), +pr.rq.x || 0, +pr.rq.z || 0, +pr.rq.h || 0, { t: String(pr.rq.t || ''), peer: gh.peer }); }
+    // blows on ships, grapples and defeats
+    if (pr.nd && typeof pr.nd === 'object') {
+      const seen = WS.dmgSeen['n:' + gh.peer] ||= {};
+      for (const id of Object.keys(pr.nd)) {
+        const v = pr.nd[id]; if (!Array.isArray(v)) continue;
+        const prev = seen[id] || [0, 0], dh = (+v[0] || 0) - prev[0], dc = (+v[1] || 0) - prev[1];
+        const n = npcs.find(x => x.id === id);
+        if (n && !n.dead && (dh > 0 || dc > 0) && dh < 200 && dc < 20) { if (!n.hostile) makeHostile(n); if (!n.htPeer) n.htPeer = gh.peer; n.hp -= Math.max(0, dh); n.crewF -= Math.max(0, dc); checkNPCDeath(n); }
+        seen[id] = [Math.max(prev[0], +v[0] || 0), Math.max(prev[1], +v[1] || 0)];
+      }
+    }
+    for (const n of npcs) {
+      if (n.dead) continue;
+      if (pr.bd === n.id && n.bdPeer !== gh.peer) { n.bdPeer = gh.peer; n.bdT = 0; n.bdSide = Math.sign((n.pos.x - gh.x) * Math.cos(gh.h) + (n.pos.y - gh.z) * Math.sin(gh.h)) || 1; if (!n.hostile) makeHostile(n); }
+      if (n.bdPeer === gh.peer && pr.bd !== n.id && (n.bdT = (n.bdT || 0) + dt) > 3) { n.bdPeer = null; n.boardCd = 8; }
+    }
+    if ((pr.df | 0) !== (WS.defeatSeen[gh.peer] | 0)) { WS.defeatSeen[gh.peer] = pr.df | 0; npcs.forEach(n => { if (n.htPeer === gh.peer && !n.dead) { disengage(n, 150); n.boardCd = 30; } }); }
+  }
+  for (const tw of Object.keys(WS.raids)) {
+    const r = WS.raids[tw];
+    if (!r.cleared && !npcs.some(n => n.tw === tw && !n.dead)) r.cleared = true;
+    if (Date.now() - r.t > 6 * 60e3) delete WS.raids[tw];
   }
   // monsters that wake when any captain comes near
   if (!kraken && !worldDown('kraken')) { const T = nearestPlayer(MAELSTROM.x, MAELSTROM.z, p => !p.land && !p.docked); if (T && T.d < 320) { const dx = MAELSTROM.x - T.p.x, dz = MAELSTROM.z - T.p.z, d = Math.hypot(dx, dz) || 1; spawnKraken(T.p.x + dx / d * 70, T.p.z + dz / d * 70); } }
@@ -3512,6 +3659,7 @@ function renderPanel() {
       c.appendChild(w);
     } else if (war.a === p.id) c.insertAdjacentHTML('beforeend', `<h3>War</h3><p class="desc">${p.name} is at war with ${B.name}. Their warriors gather at ${B.name}.</p>`);
   }
+  if (townSacked(p.id)) c.insertAdjacentHTML('beforeend', `<p class="desc">Smoke still rises: another captain sacked ${p.name} not long ago. Its defences are thin.</p>`);
   if (favorAt(p.id)) c.insertAdjacentHTML('beforeend', `<p class="desc">A friend of ${p.name} ${'★'.repeat(favorAt(p.id))} · better prices</p>`);
   if (p.prices && !hostile) {
     c.insertAdjacentHTML('beforeend', '<h3>Market</h3>');
@@ -3580,7 +3728,7 @@ function help() {
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
-  • <b>Multiplayer:</b> everyone who has this game open sails the same sea, and the monsters are shared: the Kraken, serpents, Fáfnir and the drakes are the same beasts for every captain, everyone's arrows wear them down together, and everyone who helped shares the reward. Fáfnir, the Kraken, the Frost Troll and the Barrow-King stay dead for everyone until they return 20 to 30 minutes later. You see their longships and, ashore on the same island, their warriors. <b>T</b> chats, <b>V</b> waves, <b>P</b> lists the captains at sea. Raiding rivals is off unless both captains switch it on in the captains list.<br>
+  • <b>Multiplayer:</b> everyone who has this game open sails the same sea, and the monsters, the ships and the raids are shared: the Kraken, serpents, Fáfnir and the drakes are the same beasts for every captain, everyone's arrows wear them down together, and everyone who helped shares the reward. Merchants, raiders, Jomsvikings and town warships sail the same course for every captain, and whoever helps sink or take a ship shares its plunder. When a captain raids a town, anyone may help fight its warships and then land to sack it, and a sacked town stays weakened for everyone for a while. Fáfnir, the Kraken, the Frost Troll and the Barrow-King stay dead for everyone until they return 20 to 30 minutes later. You see their longships and, ashore on the same island, their warriors. <b>T</b> chats, <b>V</b> waves, <b>P</b> lists the captains at sea. Raiding rivals is off unless both captains switch it on in the captains list.<br>
   • <b>Dragons:</b> Fáfnir nests on Dragonspine at the top of the world, sleeping on a vast hoard. Drakes hunt the outer seas. They circle, then dive and breathe fire: raise the shield wall, turn hard, and fill the sky with arrows. On land, Fáfnir may come down to fight. Strike it with your axe while it stands on the ground.<br>
   • <b>The world</b> now stretches far beyond the home waters, from the Ice Teeth in the north-west to Kaupang in the east and Kongshavn in the south.<br>
   • <b>The Kraken</b> lurks in the Maelstrom in the far southwest and may surface in any deep water. Shoot its body and eyes, and keep moving: red rings on the water mark where a tentacle will slam down.<br>
@@ -3614,7 +3762,7 @@ function tryLand() {
   if (ashore.on) { interactAshore(); return; }
   if (S.docked) { undock(); return; }
   if (!nearPlace) return;
-  const onlyDragons = combatOn && !npcs.some(n => n.hostile && !n.dead) && !(serpent && !serpent.sinking) && !(kraken && !kraken.sinking);
+  const onlyDragons = combatOn && !npcs.some(n => n.hostile && !n.dead && (!WS.shared || nearMe(n.pos.x, n.pos.y, 520))) && !(serpent && !serpent.sinking) && !(kraken && !kraken.sinking);
   if (combatOn && !onlyDragons) { banner('Enemies near!', 'Win the fight or escape before landing'); return; }
   dock(nearPlace);
 }
@@ -3879,15 +4027,16 @@ function tick() {
     shieldUp = !!(keys.shift || touchShield) && !S.docked;
     updateArrows(dt); updateBoarding(dt); updateCollisions(dt); updateRaid();
   }
-  updateNPCs(paused ? 0 : dt, t);
+  const worldPaused = titleOn || (modalOpen && !(WS.shared && WS.host));
+  updateNPCs(worldPaused ? 0 : dt, t);
   if (ashore.on && !paused) updateAshore(dt);
   deckHorse.visible = !!(S.horseOwned && !ashore.on);
   caches.forEach(c => { if (c.glint.visible) { c.glint.rotation.y += dt * 2; c.glint.position.y = 2 + Math.sin(t * 2) * .2; } });
   worldTick(dt);
-  updateSerpent(dt, t, paused); updateKraken(dt, t, paused); updateDragons(dt, t, paused);
+  updateSerpent(dt, t, worldPaused); updateKraken(dt, t, worldPaused); updateDragons(dt, t, worldPaused);
   updateGhosts(dt, t); mpPublish(); if (frame % 30 === 0) renderOnline();
   if (maelstrom) { maelstrom.a.rotation.z += dt * .25; maelstrom.b.rotation.z += dt * .6; }
-  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking && nearMe(serpent.x, serpent.z, 450)) || !!(kraken && !kraken.sinking && nearMe(kraken.x, kraken.z, 500)) || dragons.some(d => !d.dead && nearMe(d.pos.x, d.pos.z, 650));
+  const foesNow = npcs.some(n => n.hostile && !n.dead && (!WS.shared || nearMe(n.pos.x, n.pos.y, 520))) || !!(serpent && !serpent.sinking && nearMe(serpent.x, serpent.z, 450)) || !!(kraken && !kraken.sinking && nearMe(kraken.x, kraken.z, 500)) || dragons.some(d => !d.dead && nearMe(d.pos.x, d.pos.z, 650));
   if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
   if (combatOn && !paused && !S.docked && (S.crew <= 1 || S.hull <= 6)) defeat(); updateWhales(dt); updateSmoke(dt);
   flags.forEach(f => { const a = f.geometry.attributes.position.array, b = f.userData.base; for (let i = 0; i < a.length; i += 3) a[i + 2] = Math.sin(b[i] * .9 - t * 5) * b[i] * .12; f.geometry.attributes.position.needsUpdate = true; });
