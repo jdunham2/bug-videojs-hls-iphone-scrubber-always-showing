@@ -271,7 +271,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
     <button class="card qtrack" id="qTrack" hidden></button>
   </div>
   <button class="prompt" id="prompt" hidden></button>
-  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>Space</b> blast (in the woods) · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
+  <div class="card help" id="help"><b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>X</b> journal · <b>Space</b> blast (in the woods) · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go</div>
   <div class="dock">
     <button class="card" id="btnPhone" aria-label="Phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>Phone</button>
     <button class="card" id="btnMe" aria-label="My life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.4-6 8-6s6.8 2 8 6"/></svg>Me</button>
@@ -375,6 +375,11 @@ const BUILDINGS = [
   { id: "gadgets", name: "Gadget Hub", x: -60, z: -100, w: 18, d: 16, h: 10, color: "#1f2a44", sign: "#00a8c6", face: "s", open: [9, 21] },
   { id: "woods", name: "Shadow Woods", x: -165, z: 10, w: 0, d: 0, h: 0, color: "#3a2a5a", sign: "#9b5de5", face: "e", kind: "zone" },
   { id: "fair", name: "Funfair", x: 20, z: -150, w: 0, d: 0, h: 0, color: "#ffcf5c", sign: "#d7263d", face: "w", kind: "zone", open: [10, 23] },
+  { id: "caves", name: "Crystal Caves", x: 160, z: -20, w: 0, d: 0, h: 0, color: "#7ff6ff", sign: "#3a2a6a", face: "w", kind: "zone" },
+  { id: "farm", name: "Maple Farm", x: 160, z: 60, w: 0, d: 0, h: 0, color: "#b8322a", sign: "#5a2a1a", face: "w", kind: "zone" },
+  { id: "lighthouse", name: "Sunset Lighthouse", x: 120, z: 160, w: 0, d: 0, h: 0, color: "#2a8fd6", sign: "#d7263d", face: "n", kind: "zone" },
+  { id: "ruins", name: "Ancient Ruins", x: -150, z: -150, w: 0, d: 0, h: 0, color: "#c9b48a", sign: "#6b5a3a", face: "e", kind: "zone" },
+  { id: "peak", name: "Snowy Peak", x: -150, z: 150, w: 0, d: 0, h: 0, color: "#f4f8ff", sign: "#2e86de", face: "e", kind: "zone" },
 ];
 const isDeco = (b) => b.kind === "deco" || (b.kind === "decohouse" && !b.sale);
 const HOUSES = {
@@ -747,6 +752,9 @@ const GOALS = [
   { id: "drake", text: "Defeat the Umbra Drake", test: () => !!(S.bosses || {}).drake },
   { id: "weapons4", text: "Own 4 different weapons", test: () => WEAPON_ORDER.filter(ownsWeapon).length >= 4 },
   { id: "bestiary", text: "Fill in the whole Monster Book", test: () => Object.keys(MONSTERS).every((k) => (S.kills || {})[k]) },
+  { id: "explore9", text: "Discover all 9 outdoor places", test: () => EXPLORE.every((k) => (S.found || {})[k]) },
+  { id: "chests10", text: "Open 10 treasure chests", test: () => Object.keys(S.chests || {}).length >= 10 },
+  { id: "relics", text: "Collect all 8 relics", test: () => Object.keys(RELICS).every((k) => (S.relics || {})[k]) },
   { id: "kill50", text: "Pop 50 monsters", test: () => (S.killTotal || 0) >= 50 },
   { id: "quests5", text: "Complete 5 quests or missions", test: () => (S.questCount || 0) >= 5 },
   { id: "questsall", text: "Finish every story quest", test: () => QUESTS.every((q) => S.questsDone && S.questsDone[q.id]) },
@@ -1398,7 +1406,7 @@ const PUMPS = [];
 // Trees (instanced)
 {
   const spots = [];
-  const bad = (x, z) => (Math.abs(x - 20) < 24 && Math.abs(z + 150) < 24) || Math.hypot(x + 165, z - 10) < 52 || colliders.some((c) => Math.abs(x - c.x) < c.hw + 2 && Math.abs(z - c.z) < c.hd + 2) || ROADS.some((r) => Math.abs(x - r) < 7 || Math.abs(z - r) < 7) || doors.some((d) => Math.hypot(x - d.x, z - d.z) < 4);
+  const bad = (x, z) => exploreBad(x, z) || (Math.abs(x - 20) < 24 && Math.abs(z + 150) < 24) || Math.hypot(x + 165, z - 10) < 52 || colliders.some((c) => Math.abs(x - c.x) < c.hw + 2 && Math.abs(z - c.z) < c.hd + 2) || ROADS.some((r) => Math.abs(x - r) < 7 || Math.abs(z - r) < 7) || doors.some((d) => Math.hypot(x - d.x, z - d.z) < 4);
   for (let i = 0; i < 1200 && spots.length < 320; i++) {
     const a = Math.random() * Math.PI * 2, rad = 132 + Math.random() * 180;
     const x = Math.cos(a) * rad, z = Math.sin(a) * rad;
@@ -2432,7 +2440,7 @@ function updateDriveUI() {
   document.querySelector(".dock").hidden = d;
   document.getElementById("help").innerHTML = d
     ? "<b>W/S</b> gas &amp; brake · <b>A/D</b> steer · <b>Space</b> handbrake · <b>F</b> get out"
-    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>Space</b> blast (in the woods) · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
+    : "<b>WASD</b> walk · <b>Shift</b> run · <b>E</b> enter / use · <b>F</b> get in a car · <b>Q</b> pet · <b>T</b> chat · <b>G</b> games · <b>L</b> quests · <b>X</b> journal · <b>Space</b> blast (in the woods) · <b>drag</b> look · <b>scroll</b> zoom · or just <b>click</b> where to go";
 }
 
 
@@ -3556,6 +3564,7 @@ function dressChar(char, o) {
   if (o.hat === "slimecrown") { const goo = new THREE.MeshStandardMaterial({ color: 0x6fdc4a, roughness: 0.2, emissive: 0x6fdc4a, emissiveIntensity: 0.3 }); cyl(0.44, 0.46, 0.22, goo, 0, 3.62, 0, 16, w); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, d = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), goo); d.position.set(Math.cos(a) * 0.4, 3.82, Math.sin(a) * 0.4); w.add(d); } }
   if (o.hat === "frosthorns") { const ice = new THREE.MeshStandardMaterial({ color: 0xdff6ff, emissive: 0x9fe8ff, emissiveIntensity: 0.7 }); B(0.9, 0.14, 0.9, 0xf4f8ff, 0, 3.5, 0); for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.6, 6), ice); h.position.set(sx * 0.36, 3.82, 0); h.rotation.z = -sx * 0.5; w.add(h); } }
   if (o.hat === "mushcap") { const c = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x7a2a8a)); c.position.y = 3.45; c.scale.y = 0.7; w.add(c); const gl = new THREE.MeshStandardMaterial({ color: 0xd9ff7a, emissive: 0xb6ff3a, emissiveIntensity: 0.9 }); for (let i = 0; i < 6; i++) { const a = i * 1.05, d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), gl); d.position.set(Math.cos(a) * 0.38, 3.7, Math.sin(a) * 0.38); w.add(d); } }
+  if (o.hat === "safari") { cyl(0.72, 0.72, 0.06, 0xc9a86a, 0, 3.5, 0, 20, w); cyl(0.4, 0.44, 0.38, 0xc9a86a, 0, 3.7, 0, 16, w); cyl(0.45, 0.45, 0.09, 0x6b4a2f, 0, 3.58, 0, 16, w); }
   if (o.glasses === "shades") { B(0.26, 0.15, 0.04, 0x111111, -0.18, 3.1, 0.42); B(0.26, 0.15, 0.04, 0x111111, 0.18, 3.1, 0.42); B(0.14, 0.04, 0.04, 0x111111, 0, 3.13, 0.42); }
   if (o.glasses === "nerd") { for (const s of [-1, 1]) { B(0.27, 0.24, 0.03, 0x3a2a1a, s * 0.18, 3.1, 0.41); B(0.19, 0.16, 0.035, 0xcfe8ff, s * 0.18, 3.1, 0.415); } B(0.12, 0.04, 0.04, 0x3a2a1a, 0, 3.14, 0.42); }
   if (o.glasses === "stars") { for (const s of [-1, 1]) { const st = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.04, 5), mat(0xff3fa4)); st.rotation.x = Math.PI / 2; st.position.set(s * 0.19, 3.1, 0.43); w.add(st); } }
@@ -3692,6 +3701,7 @@ const GIVERS = {
   grant:   { name: "Officer Grant", at: "police", look: { shirt: 0x1a2c55, hair: 0x111111, skin: 0xe0ac86, pants: 0x1a2c55 }, wear: { hat: "cap" } },
   luna:    { name: "Luna", at: "vet", look: { shirt: 0x48d597, hair: 0xd9b45a, skin: 0xf6d2b8, pants: 0x7a5c3a }, wear: { back: "backpack" } },
   ivy:     { name: "Ranger Ivy", at: "woods", look: { shirt: 0x3f6b4a, hair: 0x6b3e1f, skin: 0xe0ac86, pants: 0x7a5c3a }, wear: { hat: "cowboy", back: "backpack" } },
+  pip:     { name: "Pip the Explorer", at: "ruins", look: { shirt: 0xc9a86a, hair: 0x2b1b10, skin: 0xc68642, pants: 0x6b4a2f }, wear: { hat: "cowboy", back: "backpack" } },
   gil:     { name: "Captain Gil", at: "beach", look: { shirt: 0x2d6cdf, hair: 0xdddddd, skin: 0xe0ac86, pants: 0xeeeeee }, wear: { hat: "cowboy" } },
 };
 const QUESTS = [
@@ -3765,9 +3775,21 @@ const QUESTS = [
     steps: [{ t: "kill", kind: "spore", n: 1, text: "Defeat the Sporelord" }], done: "Achoo... I mean, thank you!", reward: { money: 650 } },
   { id: "v11", giver: "ivy", title: "The Last Guardian", intro: "Legends say the Umbra Drake sleeps behind the phantom king. Beat Gloomshade, then face the drake. Be careful up there!",
     steps: [{ t: "kill", kind: "phantom", n: 1, text: "Defeat Gloomshade" }, { t: "kill", kind: "drake", n: 1, text: "Defeat the Umbra Drake" }], done: "The drake is beaten! You are a true legend of Shadow Woods!", reward: { money: 1500, skills: { fitness: 6, charm: 4 } } },
+  { id: "x1", giver: "pip", title: "Wanderlust", intro: "Hello, fellow explorer! There's so much to see outside town. Visit the Crystal Caves, Maple Farm and Sunset Lighthouse for me.",
+    steps: [{ t: "visit", bid: "caves", text: "Visit the Crystal Caves" }, { t: "visit", bid: "farm", text: "Visit Maple Farm" }, { t: "visit", bid: "lighthouse", text: "Visit Sunset Lighthouse" }], done: "Amazing, right? The world is full of wonders!", reward: { money: 200, skills: { fitness: 2 } } },
+  { id: "x2", giver: "pip", title: "Top of the World", intro: "Up north-west there's a snowy mountain. Go to Snowy Peak and ride a sled down the hill!",
+    steps: [{ t: "visit", bid: "peak", text: "Visit Snowy Peak" }, { t: "act", ids: ["sled", "ski"], n: 1, text: "Go sledding or skiing" }], done: "Wheee! I can see the snow on your boots!", reward: { money: 180 } },
+  { id: "x3", giver: "pip", title: "Treasure Hunter", intro: "Legend says golden chests are hidden all around town. Find and open 5 of them! Check the Journal (X) for hints.",
+    steps: [{ t: "check", test: "chests5", text: "Open 5 treasure chests" }], done: "Shiny! You've got a nose for treasure.", reward: { money: 300 } },
+  { id: "x4", giver: "pip", title: "Dig It!", intro: "These ruins hide old coins and relics. Grab a shovel and dig here 3 times.",
+    steps: [{ t: "act", ids: ["dig"], n: 3, text: "Dig for artifacts at the ruins" }], done: "Look at all that! You're a real archaeologist.", reward: { money: 200, skills: { smarts: 3 } } },
+  { id: "x5", giver: "pip", title: "Relic Collector", intro: "There are 8 ancient relics out there. Find any 3. Chests, digging, caves and tide pools all hide them.",
+    steps: [{ t: "check", test: "relics3", text: "Collect 3 relics" }], done: "Incredible finds! The museum would be jealous.", reward: { money: 500, skills: { smarts: 4 } } },
+  { id: "x6", giver: "pip", title: "Master Explorer", intro: "The final challenge: open every single treasure chest in the world. You'll even get a special hat!",
+    steps: [{ t: "check", test: "chestsall", text: "Open every treasure chest" }], done: "You did it! You are the greatest explorer this town has ever seen!", reward: { money: 1000, skills: { fitness: 3, smarts: 3 } } },
 ];
 const QMAP = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
-const QTESTS = { pettrick: () => hasPet() && learnedTricks().length > 0 };
+const QTESTS = { pettrick: () => hasPet() && learnedTricks().length > 0, chests5: () => Object.keys(S.chests || {}).length >= 5, relics3: () => Object.keys(S.relics || {}).length >= 3, chestsall: () => Object.keys(S.chests || {}).length >= CHEST_SPOTS.length };
 const DAILY_FOOD = ["burger", "combo", "slice", "pizzaparty", "dinner", "brunch", "icecream", "sundae", "foodcourt", "latte", "pastry", "nachos", "hotdog", "popcorn", "picnic", "cakeslice"];
 const DAILY_T = [
   () => ({ title: "Shift Worker", steps: [{ t: "act", ids: ["work"], n: 1, text: "Work a shift at any job" }], reward: { money: 60 } }),
@@ -4745,6 +4767,220 @@ const BOSS_AI = {
   },
 };
 
+
+// ============================================================ EXPLORING: new places, treasure chests, relics, journal
+const EXPLORE = ["park", "beach", "woods", "fair", "caves", "farm", "lighthouse", "ruins", "peak"];
+const PLACE_INFO = {
+  park: "Trees, a pond and a playground right downtown.", beach: "Sand, sun and a sparkling lake.", woods: "Spooky woods full of monsters and bosses.", fair: "Rides, games and cotton candy.",
+  caves: "Giant glowing crystals hide in a rocky canyon.", farm: "A cozy farm with cows, chickens and apple trees.", lighthouse: "A tall lighthouse by the sea. Great sunsets!",
+  ruins: "Crumbling stone ruins from long ago. Dig for treasure!", peak: "A snowy mountain with sleds, skis and hot cocoa.",
+};
+const RELICS = {
+  idol: "Golden Idol", owl: "Crystal Owl", compass: "Old Compass", coin: "Pirate Coin",
+  fossil: "Dino Fossil", starmap: "Star Map", moonstone: "Moon Stone", mask: "Ancient Mask",
+};
+function findRelic(chance, where) {
+  const left = Object.keys(RELICS).filter((k) => !(S.relics || {})[k]);
+  if (!left.length || Math.random() > chance) return false;
+  const k = left[Math.floor(Math.random() * left.length)]; S.relics = S.relics || {}; S.relics[k] = 1;
+  toast(`You found a relic: ${RELICS[k]}!`, "gold"); log(`Found the ${RELICS[k]} ${where}!`, "good"); beep(880, 0.2, 0.06, "triangle");
+  return true;
+}
+Object.assign(ACTS, {
+  caves: [
+    { id: "minecrystal", name: "Mine crystals", mins: 60, fx: { energy: -10, fun: 5 }, skill: { fitness: 1 }, note: "Sell them · rare relics", run: () => { earn(15 + Math.floor(Math.random() * 30), "Sold crystals"); findRelic(0.1, "in the Crystal Caves"); } },
+    { id: "tunnels", name: "Explore the deep tunnels", mins: 90, fx: { fun: 15, energy: -8 }, skill: { smarts: 2 }, note: "Might find a relic", run: () => { findRelic(0.12, "deep in the tunnels"); } },
+    { id: "crystalpic", name: "Take crystal photos", mins: 30, fx: { fun: 8 }, skill: { creativity: 2 } },
+  ],
+  farm: [
+    { id: "apples", name: "Pick apples", mins: 60, fx: { fun: 8 }, skill: { fitness: 1 }, note: "+3 meals", run: () => { S.meals += 3; } },
+    { id: "milkcow", name: "Milk the cow", mins: 30, fx: { fun: 8 }, note: "+1 meal", run: () => { S.meals += 1; } },
+    { id: "chickens", name: "Feed the chickens", mins: 30, fx: { fun: 10 } },
+    { id: "hayride", name: "Hay ride", mins: 30, cost: 5, fx: { fun: 15, social: 6 } },
+    { id: "farmshift", name: "Farmhand shift", mins: 240, fx: { energy: -20, hunger: -10 }, skill: { fitness: 3 }, note: "+$70", can: () => !S.used.farmshift || "One shift a day", run: () => { S.used.farmshift = 1; earn(70, "Farmhand shift"); } },
+  ],
+  lighthouse: [
+    { id: "climb", name: "Climb the lighthouse", mins: 30, fx: { fun: 12, energy: -5 }, skill: { fitness: 2 } },
+    { id: "sunset", name: "Watch the sunset", mins: 60, fx: { fun: 20, energy: 5 }, can: () => (hour() >= 17 && hour() <= 20) || "Come back between 5 PM and 9 PM" },
+    { id: "tidepools", name: "Look in the tide pools", mins: 60, fx: { fun: 12 }, skill: { smarts: 2 }, note: "Might find a relic", run: () => { findRelic(0.08, "in a tide pool"); } },
+    { id: "kayak", name: "Go kayaking", mins: 60, cost: 10, fx: { fun: 18, energy: -8 }, skill: { fitness: 3 } },
+    { id: "pierfish", name: "Fish off the pier", mins: 90, fx: { fun: 10 }, note: "Sell your catch", run: () => earn(15 + Math.floor(Math.random() * 30), "Sold your sea fish") },
+  ],
+  ruins: [
+    { id: "dig", name: "Dig for artifacts", mins: 90, fx: { energy: -10, fun: 8 }, skill: { smarts: 1 }, note: "Coins · 25% relic", run: () => { earn(10 + Math.floor(Math.random() * 25), "Sold old coins"); findRelic(0.25, "while digging at the ruins"); } },
+    { id: "puzzle", name: "Solve the temple puzzle", mins: 60, fx: { fun: 15 }, note: "Need Smarts 20 · big prize", can: () => S.used.puzzleDone ? "Already solved!" : S.skills.smarts >= 20 || "Need Smarts 20", run: () => { S.used.puzzleDone = 1; earn(400, "Solved the temple puzzle"); toast("The temple door opens... treasure!", "gold"); findRelic(1, "inside the temple"); } },
+    { id: "sketch", name: "Sketch the ruins", mins: 60, fx: { fun: 8 }, skill: { creativity: 3 } },
+  ],
+  peak: [
+    { id: "sled", name: "Go sledding", mins: 30, fx: { fun: 25, energy: -5 }, skill: { fitness: 2 } },
+    { id: "ski", name: "Ski down the mountain", mins: 60, cost: 15, fx: { fun: 30, energy: -10 }, skill: { fitness: 4 } },
+    { id: "snowman", name: "Build a snowman", mins: 30, fx: { fun: 12 }, skill: { creativity: 2 } },
+    { id: "cocoa", name: "Hot cocoa at the lodge", mins: 15, cost: 4, fx: { hunger: 10, fun: 8, energy: 5 } },
+    { id: "snowball", name: "Snowball fight", mins: 30, fx: { fun: 15, social: 12, energy: -5 } },
+  ],
+});
+// ---- scenery for the new places
+const exploreFx = { spin: [], bob: [] };
+{
+  const B = BMAP, glow = (c, i) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: i });
+  const col = (x, z, hw, hd) => colliders.push({ x, z, hw, hd });
+  // Crystal Caves: a rocky canyon with giant glowing crystals
+  { const b = B.caves, cx = b.x, cz = b.z;
+    flat(34, 30, 0x6b6470, 0.03, cx + 2, cz);
+    const rockM = new THREE.MeshStandardMaterial({ color: 0x5a5560, flatShading: true, roughness: 1 });
+    for (const [dx, dz, r, h] of [[12, -12, 6, 9], [14, 0, 7, 12], [12, 12, 6, 8], [2, -14, 5, 7], [2, 14, 5, 7], [-6, -14, 4, 5], [-6, 14, 4, 5]]) {
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rockM); m.position.set(cx + dx, h * 0.35, cz + dz); m.scale.y = h / r * 0.7; m.castShadow = true; scene.add(m); col(cx + dx, cz + dz, r * 0.8, r * 0.8);
+    }
+    const mouth = new THREE.Mesh(new THREE.CircleGeometry(3.2, 20, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0b0814 })); mouth.position.set(cx + 7.6, 0.05, cz); mouth.rotation.y = -Math.PI / 2; scene.add(mouth);
+    const cc = [0x7ff6ff, 0xff7ad9, 0xb07cff, 0x7dff9a];
+    for (let i = 0; i < 14; i++) {
+      const a = i * 2.4, r = 3 + (i % 5) * 1.7, x = cx + Math.cos(a) * r - 1, z = cz + Math.sin(a) * r * 1.1;
+      const h = 1.5 + (i % 4) * 1.1, c = new THREE.Mesh(new THREE.OctahedronGeometry(0.6, 0), glow(cc[i % 4], 0.8)); c.scale.set(1, h, 1); c.position.set(x, h * 0.5, z); c.rotation.z = (i % 3 - 1) * 0.3; scene.add(c);
+      if (h > 3) col(x, z, 0.6, 0.6);
+    }
+    const big = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), glow(0x7ff6ff, 1)); big.scale.y = 3; big.position.set(cx - 2, 4.6, cz); scene.add(big); exploreFx.spin.push(big); col(cx - 2, cz, 1.3, 1.3);
+    const lamp = new THREE.PointLight(0x9fe8ff, 1.2, 26); lamp.position.set(cx - 2, 5, cz); scene.add(lamp);
+  }
+  // Maple Farm: barn, silo, windmill, animals, apple trees
+  { const b = B.farm, cx = b.x, cz = b.z;
+    flat(34, 30, 0x8ccf5a, 0.03, cx + 2, cz);
+    box(10, 7, 9, 0xb8322a, cx + 9, 3.5, cz - 5); const roof = new THREE.Mesh(new THREE.CylinderGeometry(5.3, 5.3, 10, 4, 1, false), mat(0x5a2a1a)); roof.rotation.z = Math.PI / 2; roof.rotation.x = Math.PI / 4; roof.scale.set(1, 1, 0.75); roof.position.set(cx + 9, 7.6, cz - 5); scene.add(roof);
+    box(0.2, 4, 3.6, 0xffffff, cx + 3.9, 2, cz - 5); box(0.25, 3.8, 0.25, 0xffffff, cx + 3.9, 2, cz - 5).rotation.x = 0.75; col(cx + 9, cz - 5, 5.3, 4.8);
+    cyl(2, 2, 11, 0xd7d7d7, cx + 14.5, 5.5, cz + 2, 16); const dome = new THREE.Mesh(new THREE.SphereGeometry(2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x8a8f98)); dome.position.set(cx + 14.5, 11, cz + 2); scene.add(dome); col(cx + 14.5, cz + 2, 2.2, 2.2);
+    cyl(0.3, 0.5, 9, 0xeeeeee, cx + 10, 4.5, cz + 10, 8); const fan = new THREE.Group(); fan.position.set(cx + 9.4, 9, cz + 10); fan.rotation.y = -Math.PI / 2; scene.add(fan);
+    for (let i = 0; i < 4; i++) { const bl = box(0.5, 3.6, 0.1, 0xffffff, 0, 1.8, 0, new THREE.Group()); const p = bl.parent; p.rotation.z = i * Math.PI / 2; fan.add(p); } exploreFx.spin.push(fan); fan.userData.axis = "z"; col(cx + 10, cz + 10, 0.6, 0.6);
+    for (let i = 0; i < 9; i++) { box(0.2, 1, 0.2, 0xf2e6cc, cx - 4 + i * 1.8, 0.5, cz + 3); box(0.2, 1, 0.2, 0xf2e6cc, cx - 4 + i * 1.8, 0.5, cz + 13); }
+    box(14.6, 0.15, 0.1, 0xf2e6cc, cx + 3.2, 0.8, cz + 3); box(14.6, 0.15, 0.1, 0xf2e6cc, cx + 3.2, 0.8, cz + 13);
+    for (let i = 0; i < 3; i++) { const cow = new THREE.Group(); cow.position.set(cx - 1 + i * 4, 0, cz + 8 + (i % 2) * 2); cow.rotation.y = i * 1.3; scene.add(cow);
+      box(1.8, 1, 0.9, 0xffffff, 0, 1.1, 0, cow); box(0.6, 0.6, 0.6, 0xffffff, 1.1, 1.5, 0, cow); box(0.5, 0.5, 0.92, 0x222222, -0.3, 1.2, 0, cow); box(0.2, 0.25, 0.5, 0xffb3c1, 1.45, 1.35, 0, cow);
+      for (const [lx, lz] of [[-0.6, -0.3], [-0.6, 0.3], [0.6, -0.3], [0.6, 0.3]]) box(0.2, 0.6, 0.2, 0xffffff, lx, 0.3, lz, cow); exploreFx.bob.push(cow); col(cow.position.x, cow.position.z, 1, 1); }
+    for (let i = 0; i < 5; i++) { const ch = new THREE.Group(); ch.position.set(cx - 2 + i * 1.3, 0, cz - 9 + (i % 2)); scene.add(ch); box(0.5, 0.45, 0.6, 0xffffff, 0, 0.35, 0, ch); box(0.12, 0.15, 0.12, 0xd7263d, 0, 0.66, 0.2, ch); box(0.1, 0.08, 0.15, 0xffbe2e, 0, 0.5, 0.36, ch); exploreFx.bob.push(ch); }
+    for (const [dx, dz] of [[-6, -12], [-2, -13], [2, -12.5]]) { cyl(0.3, 0.4, 2.4, 0x7a5233, cx + dx, 1.2, cz + dz, 6); const l = new THREE.Mesh(new THREE.IcosahedronGeometry(1.8, 0), new THREE.MeshStandardMaterial({ color: 0x3f9a3a, flatShading: true })); l.position.set(cx + dx, 3.4, cz + dz); l.castShadow = true; scene.add(l);
+      for (let k = 0; k < 5; k++) { const ap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), mat(0xd7263d)); ap.position.set(cx + dx + Math.cos(k * 1.3) * 1.5, 3 + (k % 2) * 0.8, cz + dz + Math.sin(k * 1.3) * 1.5); scene.add(ap); } col(cx + dx, cz + dz, 0.5, 0.5); }
+    for (let i = 0; i < 6; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat(0xff8a1f)); p.scale.y = 0.75; p.position.set(cx - 7 + (i % 3) * 1.6, 0.35, cz + 5 + Math.floor(i / 3) * 1.6); scene.add(p); }
+    for (const [dx, dz] of [[4, 0], [5.5, 0.8]]) { const hay = cyl(0.8, 0.8, 1.2, 0xe8c45a, cx + dx, 0.6, cz + dz, 12); hay.rotation.z = Math.PI / 2; }
+  }
+  // Sunset Lighthouse: rocky point by the sea
+  { const b = B.lighthouse, cx = b.x, cz = b.z;
+    flat(40, 26, 0xe8d6a8, 0.03, cx, cz + 2);
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(110, 120), new THREE.MeshStandardMaterial({ color: 0x2a8fd6, roughness: 0.25, metalness: 0.1, transparent: true, opacity: 0.92 })); sea.rotation.x = -Math.PI / 2; sea.position.set(cx + 30, 0.05, cz + 76); scene.add(sea); b.sea = sea;
+    for (let x = -26; x <= 86; x += 2) colliders.push({ x: cx + x, z: cz + 16, hw: 1.2, hd: 1 });
+    const rockM = new THREE.MeshStandardMaterial({ color: 0x77706a, flatShading: true });
+    const base = new THREE.Mesh(new THREE.DodecahedronGeometry(5, 0), rockM); base.scale.y = 0.4; base.position.set(cx + 8, 0.6, cz + 6); scene.add(base);
+    const L = new THREE.Group(); L.position.set(cx + 8, 1.6, cz + 6); scene.add(L);
+    for (let i = 0; i < 6; i++) cyl(1.9 - i * 0.12, 2 - i * 0.12, 2.6, i % 2 ? 0xd7263d : 0xffffff, 0, 1.3 + i * 2.6, 0, 18, L);
+    cyl(1.6, 1.6, 0.3, 0x333333, 0, 15.8, 0, 18, L); const lampM = glow(0xfff2a8, 0.6); const lampG = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.6, 12), lampM); lampG.position.y = 16.8; L.add(lampG);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.6, 12), mat(0x222222)); cap.position.y = 18.4; L.add(cap);
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(3, 30, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })); beam.rotation.z = Math.PI / 2; beam.position.x = 15; const bp = new THREE.Group(); bp.position.y = 16.8; bp.add(beam); L.add(bp);
+    b.lampM = lampM; b.beam = bp; col(cx + 8, cz + 6, 2.6, 2.6);
+    box(3, 0.3, 14, 0x8a6a4a, cx - 8, 0.4, cz + 16); for (let i = 0; i < 5; i++) for (const s of [-1, 1]) cyl(0.15, 0.15, 1.6, 0x6b4a2f, cx - 8 + s * 1.3, 0.2, cz + 10 + i * 3, 6);
+    const boat = new THREE.Group(); boat.position.set(cx - 18, 0.2, cz + 24); scene.add(boat); box(4, 0.8, 1.6, 0xffffff, 0, 0.4, 0, boat); cyl(0.08, 0.08, 4, 0x6b4a2f, 0, 2.4, 0, 6, boat); const sail = new THREE.Mesh(new THREE.ConeGeometry(1.4, 3.4, 3), mat(0xffbe2e)); sail.position.set(0.4, 2.6, 0); boat.add(sail); exploreFx.bob.push(boat); b.boat = boat;
+    for (const [dx, dz] of [[-14, 8], [-12, 10], [14, 12]]) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), rockM); r.position.set(cx + dx, 0.4, cz + dz); scene.add(r); }
+  }
+  // Ancient Ruins: pillars, arches, a stepped temple
+  { const b = B.ruins, cx = b.x, cz = b.z;
+    flat(36, 34, 0xc9b48a, 0.03, cx - 2, cz);
+    const stone = new THREE.MeshStandardMaterial({ color: 0xb8ab90, roughness: 1, flatShading: true });
+    for (let i = 0; i < 4; i++) { const s = 14 - i * 3; const t = new THREE.Mesh(new THREE.BoxGeometry(s, 1.8, s), stone); t.position.set(cx - 10, 0.9 + i * 1.8, cz); t.castShadow = true; t.receiveShadow = true; scene.add(t); }
+    box(2.4, 2.4, 0.3, 0x2a2018, cx - 10, 8.2, cz + 2.6); col(cx - 10, cz, 7.2, 7.2);
+    const gemM = glow(0x48d597, 0.9); const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.8), gemM); gem.position.set(cx - 10, 10.6, cz); scene.add(gem); exploreFx.spin.push(gem);
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8, x = cx + 2 + Math.cos(a) * 8, z = cz + Math.sin(a) * 8; const h = i % 3 === 0 ? 1.4 : 4.5; const p = cyl(0.6, 0.7, h, stone, x, h / 2, z, 10); p.rotation.z = i % 3 === 0 ? 0 : (i % 2 ? 0.04 : -0.03); col(x, z, 0.7, 0.7); if (i % 3 === 0) { const f = cyl(0.6, 0.6, 2.5, stone, x + 1.2, 0.6, z + 0.6, 10); f.rotation.z = Math.PI / 2; } }
+    for (const dz of [-11, 11]) { box(0.9, 4, 0.9, stone, cx + 6, 2, cz + dz); box(0.9, 4, 0.9, stone, cx + 10, 2, cz + dz); box(5.4, 0.9, 1, stone, cx + 8, 4.4, cz + dz); col(cx + 6, cz + dz, 0.6, 0.6); col(cx + 10, cz + dz, 0.6, 0.6); }
+    for (let i = 0; i < 6; i++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5 + (i % 3) * 0.2, 0), stone); r.position.set(cx - 2 + Math.cos(i * 2) * 12, 0.3, cz + Math.sin(i * 2) * 12); scene.add(r); }
+    const head = new THREE.Group(); head.position.set(cx + 4, 0, cz - 14); scene.add(head); box(2.4, 3.4, 2, stone, 0, 1.7, 0, head); box(2.6, 0.5, 0.4, 0x8a7d62, 0, 2.4, 1.05, head); box(0.6, 1, 0.5, 0x8a7d62, 0, 1.4, 1.1, head); col(cx + 4, cz - 14, 1.4, 1.2);
+  }
+  // Snowy Peak: a big mountain, snow, pine trees and a ski lodge
+  { const b = B.peak, cx = b.x, cz = b.z;
+    flat(40, 40, 0xf4f8ff, 0.035, cx - 4, cz);
+    const mtn = new THREE.Mesh(new THREE.ConeGeometry(26, 42, 9), new THREE.MeshStandardMaterial({ color: 0x8a96a8, flatShading: true })); mtn.position.set(cx - 34, 21, cz + 14); mtn.castShadow = true; scene.add(mtn);
+    const snowcap = new THREE.Mesh(new THREE.ConeGeometry(12.5, 20, 9), new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true })); snowcap.position.set(cx - 34, 32.2, cz + 14); scene.add(snowcap);
+    const m2 = new THREE.Mesh(new THREE.ConeGeometry(16, 26, 8), mtn.material); m2.position.set(cx - 10, 13, cz + 30); scene.add(m2); const c2 = new THREE.Mesh(new THREE.ConeGeometry(7, 11, 8), snowcap.material); c2.position.set(cx - 10, 21.6, cz + 30); scene.add(c2);
+    col(cx - 34, cz + 14, 20, 20); col(cx - 10, cz + 30, 12, 12);
+    const slope = new THREE.Mesh(new THREE.PlaneGeometry(6, 26), new THREE.MeshStandardMaterial({ color: 0xffffff })); slope.rotation.x = -Math.PI / 2 + 0.35; slope.rotation.z = 0.9; slope.position.set(cx - 14, 3.5, cz + 5); scene.add(slope);
+    box(9, 4.5, 7, 0x7a4a2a, cx - 4, 2.25, cz - 11); const lr = new THREE.Mesh(new THREE.ConeGeometry(6.6, 3.4, 4), mat(0xffffff)); lr.rotation.y = Math.PI / 4; lr.scale.z = 0.8; lr.position.set(cx - 4, 6.2, cz - 11); scene.add(lr);
+    box(1.6, 2.2, 0.2, 0x3a2414, cx - 4, 1.1, cz - 7.4); const win = glow(0xffcf5c, 0.6); box(1.4, 1, 0.1, win, cx - 6.8, 2.6, cz - 7.45); box(1.4, 1, 0.1, win, cx - 1.2, 2.6, cz - 7.45); cyl(0.4, 0.4, 3, 0x777777, cx - 1, 6.5, cz - 12, 8);
+    col(cx - 4, cz - 11, 4.8, 3.8);
+    const pine = new THREE.MeshStandardMaterial({ color: 0x2f6b4a, flatShading: true });
+    for (let i = 0; i < 14; i++) { const a = i * 1.7, r = 12 + (i % 4) * 2.5, x = cx - 4 + Math.cos(a) * r, z = cz + Math.sin(a) * r; if (Math.abs(z - cz) < 4 && x > cx) continue;
+      cyl(0.25, 0.3, 1.4, 0x6b4a2f, x, 0.7, z, 6); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.ConeGeometry(1.6 - k * 0.4, 1.8, 7), pine); c.position.set(x, 1.8 + k * 1, z); c.castShadow = true; scene.add(c); const sc = new THREE.Mesh(new THREE.ConeGeometry(0.7 - k * 0.15, 0.6, 7), snowcap.material); sc.position.set(x, 2.5 + k * 1, z); scene.add(sc); } col(x, z, 0.6, 0.6); }
+    for (const [dx, dz] of [[4, 6], [-8, -2]]) { const sm = new THREE.Group(); sm.position.set(cx + dx, 0, cz + dz); scene.add(sm); const w = mat(0xffffff); for (const [y, r] of [[0.7, 0.8], [1.8, 0.6], [2.7, 0.42]]) { const s = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), w); s.position.y = y; sm.add(s); }
+      const n = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.4, 6), mat(0xff8a1f)); n.rotation.x = Math.PI / 2; n.position.set(0, 2.7, 0.55); sm.add(n); cyl(0.3, 0.3, 0.4, 0x222222, 0, 3.25, 0, 10, sm); col(cx + dx, cz + dz, 0.8, 0.8); }
+    const sled = new THREE.Group(); sled.position.set(cx + 2, 0, cz - 3); scene.add(sled); box(1.6, 0.15, 0.8, 0xd7263d, 0, 0.35, 0, sled); for (const s of [-1, 1]) box(1.8, 0.1, 0.1, 0x555555, 0, 0.15, s * 0.35, sled);
+    const n = 500, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) { pos[i * 3] = cx - 4 + (Math.random() - 0.5) * 60; pos[i * 3 + 1] = Math.random() * 20; pos[i * 3 + 2] = cz + (Math.random() - 0.5) * 60; }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    b.snow = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.35, transparent: true, opacity: 0.85, depthWrite: false })); scene.add(b.snow);
+  }
+}
+// ---- treasure chests hidden around the world
+const CHEST_SPOTS = [
+  [168, -28], [150, -8], [170, 70], [140, 48], [128, 168], [96, 166], [-164, -160], [-138, -132], [-166, 162], [-140, 138],
+  [-118, -8], [36, -164], [-38, 114], [114, -114], [-4, -124], [126, 4], [-62, 132], [64, 132], [-122, 42], [6, 66],
+];
+const chests = [];
+{
+  const wood = mat(0x8a5a2a), gold = mat(0xffd23f, { metalness: 0.7, roughness: 0.3 });
+  CHEST_SPOTS.forEach(([x0, z0], i) => {
+    let x = x0, z = z0;
+    for (let r = 0; r < 10 && blocked(x, z); r++) { const a = r * 2.1; x = x0 + Math.cos(a) * (1 + r); z = z0 + Math.sin(a) * (1 + r); }
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = (i * 1.7) % 6; scene.add(g);
+    box(1.3, 0.75, 0.85, wood, 0, 0.38, 0, g); box(1.36, 0.12, 0.9, gold, 0, 0.7, 0, g); box(0.2, 0.3, 0.1, gold, 0, 0.55, 0.45, g);
+    const lid = new THREE.Group(); lid.position.set(0, 0.76, -0.42); g.add(lid);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.3, 10, 1, false, 0, Math.PI), wood); top.rotation.z = Math.PI / 2; top.position.z = 0.42; lid.add(top);
+    const shine = new THREE.Mesh(new THREE.OctahedronGeometry(0.22), new THREE.MeshStandardMaterial({ color: 0xffe9a8, emissive: 0xffd23f, emissiveIntensity: 1.2 })); shine.position.y = 1.7; g.add(shine);
+    chests.push({ i, g, lid, shine, x, z });
+  });
+}
+function refreshChests() { const got = (S && S.chests) || {}; for (const c of chests) { const o = !!got[c.i]; c.lid.rotation.x = o ? -1.9 : 0; c.shine.visible = !o; } }
+function openChest(c) {
+  S.chests = S.chests || {}; if (S.chests[c.i]) return;
+  S.chests[c.i] = 1; c.lid.rotation.x = -1.9; c.shine.visible = false;
+  const n = Object.keys(S.chests).length, cash = 40 + Math.floor(Math.random() * 60);
+  earn(cash, "Treasure chest"); popAt(c.x, 1.2, c.z, 0xffd23f, 18); beep(660, 0.12, 0.06, "triangle"); setTimeout(() => beep(990, 0.18, 0.05, "triangle"), 120);
+  toast(`Treasure chest! +${money(cash)} (${n}/${chests.length})`, "gold");
+  findRelic(0.4, "in a treasure chest");
+  if (n === chests.length) { S.wardrobe = S.wardrobe || {}; S.wardrobe.safari = 1; showModal(`<h3>Master Treasure Hunter!</h3><p>You found every treasure chest in town. Here is your very own <b>Explorer Hat</b>! Wear it from the Me screen.</p><div class="row"><button class="big" data-close>Awesome!</button></div>`); }
+  questEvent("act", "chest"); evalGoals(); save(); renderHUD(true);
+}
+let exploreT = 0, chestsSynced = null;
+function exploreTick(dt, now) {
+  for (const m of exploreFx.spin) { if (m.userData.axis === "z") m.rotation.z += dt * 0.8; else m.rotation.y += dt * 0.7; }
+  exploreFx.bob.forEach((m, i) => { m.position.y = (m === BMAP.lighthouse.boat ? 0.2 + Math.sin(now / 700) * 0.15 : Math.abs(Math.sin(now / 500 + i)) * 0.06); });
+  const L = BMAP.lighthouse, night = clamp((bulbMat.emissiveIntensity - 0.1) / 1.8, 0, 1);
+  L.beam.rotation.y += dt * 0.9; L.beam.visible = night > 0.3; L.lampM.emissiveIntensity = 0.6 + night * 2;
+  if (L.sea) L.sea.material.color.setHSL(0.57, 0.65, 0.45 + Math.sin(now / 1100) * 0.03);
+  const snow = BMAP.peak.snow, sp = snow.geometry.attributes.position, a = sp.array;
+  if (player && Math.hypot(player.position.x - BMAP.peak.x, player.position.z - BMAP.peak.z) < 70) { snow.visible = true; for (let i = 1; i < a.length; i += 3) { a[i] -= dt * 2.2; if (a[i] < 0) a[i] = 20; } sp.needsUpdate = true; } else snow.visible = false;
+  for (const c of chests) if (c.shine.visible) { c.shine.rotation.y += dt * 2; c.shine.position.y = 1.7 + Math.sin(now / 300 + c.i) * 0.15; }
+  if (state !== "play" || !S || !player || IN) return;
+  if (chestsSynced !== S) { chestsSynced = S; refreshChests(); }
+  const px = player.position.x, pz = player.position.z;
+  for (const c of chests) if (c.shine.visible && Math.abs(px - c.x) < 2.2 && Math.abs(pz - c.z) < 2.2) openChest(c);
+  exploreT -= dt; if (exploreT > 0) return; exploreT = 0.5;
+  S.found = S.found || {};
+  for (const id of EXPLORE) {
+    if (S.found[id]) continue; const b = BMAP[id], d = doors.find((x) => x.b.id === id);
+    if (Math.hypot(px - b.x, pz - b.z) < 16 || (d && Math.hypot(px - d.x, pz - d.z) < 6)) {
+      S.found[id] = 1; earn(50, `Discovered ${b.name}`);
+      toast(`New place discovered: ${b.name}! +${money(50)}`, "gold"); log(`Discovered ${b.name}!`, "good"); beep(523, 0.12, 0.05, "triangle"); setTimeout(() => beep(784, 0.2, 0.05, "triangle"), 140);
+      evalGoals(); save(); renderHUD(true);
+    }
+  }
+}
+function journalSheet() {
+  const f = S.found || {}, ch = Object.keys(S.chests || {}).length, rel = S.relics || {};
+  return header("Explorer's Journal", `${EXPLORE.filter((k) => f[k]).length}/${EXPLORE.length} places · ${ch}/${chests.length} chests · ${Object.keys(rel).length}/${Object.keys(RELICS).length} relics`, "#48d597") + `<div class="sheet-b">
+    <div class="sec"><h3>Places</h3><div class="grid">${EXPLORE.map((k) => { const b = BMAP[k]; return f[k] ? `<button class="act" data-taxi="${k}" ${S.money < 12 ? "disabled" : ""}><span class="t">${b.name}</span><span class="m">${PLACE_INFO[k]} · Taxi $12</span></button>` : `<div class="act" style="opacity:.55"><span class="t">??? Undiscovered</span><span class="m">Hint: ${PLACE_INFO[k].split(".")[0]}.</span></div>`; }).join("")}</div></div>
+    <div class="sec"><h3>Treasure chests · ${ch}/${chests.length}</h3><p class="req">Golden chests are hidden all over: in town, at the beach, near the woods and in every new place. Walk up to one to open it. Each has coins and a chance of a relic.</p></div>
+    <div class="sec"><h3>Relics · ${Object.keys(rel).length}/${Object.keys(RELICS).length}</h3><p class="req">${Object.keys(RELICS).map((k) => rel[k] ? `<b>${RELICS[k]}</b>` : "???").join(" · ")}</p><p class="req">Find relics in chests, by digging at the Ancient Ruins, in the Crystal Caves and in tide pools.</p></div></div>`;
+}
+function openJournal() { openSheet(journalSheet); }
+function exploreBad(x, z) {
+  for (const id of ["caves", "farm", "lighthouse", "ruins", "peak"]) { const b = BMAP[id]; if (Math.hypot(x - b.x, z - b.z) < 30) return true; }
+  const L = BMAP.lighthouse; return x > L.x - 38 && x < L.x + 88 && z > L.z + 12 && z < L.z + 140;
+}
+
+Object.assign(WEAR.hat, { safari: ["Explorer Hat", 0, true] });
+
 // ============================================================ INPUT
 const keys = {};
 let state = "title";
@@ -4770,6 +5006,7 @@ addEventListener("keydown", (e) => {
   if (k === "q") openPet();
   if (k === "g") openGames();
   if (k === "l") openQuests();
+  if (k === "x") openJournal();
   if (k === " " && !drive && inWoods()) { e.preventDefault(); shoot(); }
   if (inWoods() && /^[1-7]$/.test(k)) { const w = WEAPON_ORDER[Number(k) - 1]; if (ownsWeapon(w)) selectWeapon(w); else toast(`Buy the ${WEAPONS[w].name} from Ranger Ivy first.`); }
   if (k === "t" && room) { e.preventDefault(); openFriends(true); }
@@ -5131,7 +5368,8 @@ function drawMinimap(now) {
   if (!S || !player) return;
   if (IN) { drawInteriorMap(now); return; }
   if (inWoods()) { drawWoodsMap(now); return; }
-  const W = mm.width, sc = W / 330, X = (x) => (x + 140) * sc, Z = (z) => (z + 140) * sc;
+  const far = Math.abs(player.position.x) > 112 || Math.abs(player.position.z) > 112, ox = far ? player.position.x - 165 : -140, oz = far ? player.position.z - 165 : -140;
+  const W = mm.width, sc = W / 330, X = (x) => (x - ox) * sc, Z = (z) => (z - oz) * sc;
   mx.fillStyle = "#3d7a3a"; mx.fillRect(0, 0, W, W);
   mx.fillStyle = "#b8b3a6"; mx.fillRect(X(-126), Z(-126), 252 * sc, 252 * sc);
   mx.fillStyle = "#2d323a";
@@ -5243,6 +5481,7 @@ $("sheetWrap").addEventListener("click", (e) => {
   if (e.target.closest("[data-quit]")) { log(`You quit your job at ${BMAP[S.career].name}.`); S.career = null; newTodos(); save(); renderSheet(); renderHUD(true); toast("You quit your job."); return; }
   if (e.target.closest("[data-phone]")) { openPhone(); return; }
   if (e.target.closest("[data-taxis]")) { openSheet(taxiSheet); return; }
+  if (e.target.closest("[data-journal]")) { openJournal(); return; }
 });
 
 function actCard(a, bid) {
@@ -5321,6 +5560,7 @@ function openPhone() {
   openSheet(() => header("Phone", `${S.name}'s phone · ${money(S.money)} in the bank`, "#2d6cdf") + `<div class="sheet-b">
     <div class="sec"><h3>Apps</h3><div class="grid">${ACTS.phone.map((a) => actCard(a, "phone")).join("")}
     <button class="act" data-taxis><span class="t">Call a taxi</span><span class="m">$12 · 20 min · go anywhere</span></button>
+    <button class="act" data-journal><span class="t">Explorer's Journal</span><span class="m">Places, treasure chests and relics</span></button>
     ${S.career ? `<button class="act" data-quit><span class="t">Quit your job</span><span class="m">${CAREERS[S.career].ranks[S.rank][0]} at ${BMAP[S.career].name}</span></button>` : ""}</div></div></div>`);
 }
 function taxiSheet() {
@@ -5431,7 +5671,7 @@ function frame(now) {
   }
   updateWorld(dt, now);
   if (state === "play") updatePet(dt, now);
-  mpTick(dt); mpRender(dt, now); gameTick(dt, now); questTick(dt, now); combatTick(dt, now);
+  mpTick(dt); mpRender(dt, now); gameTick(dt, now); questTick(dt, now); combatTick(dt, now); exploreTick(dt, now);
   updateSky();
   updateCamera(dt, now);
   renderer.render(scene, camera);
