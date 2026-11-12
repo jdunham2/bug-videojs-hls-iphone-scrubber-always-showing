@@ -98,7 +98,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div class="panel" id="stats">
         <div class="lbl">Health</div>
         <div class="bar"><i id="hpbar"></i></div>
-        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span></div>
+        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span><span><b>Herbs</b><span id="rh">0</span></span><span><b>Hide</b><span id="rd">0</span></span></div>
       </div>
       <div class="panel" id="clock">
         <h2 id="dayname">Day 1</h2>
@@ -125,6 +125,9 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <button class="btn" id="eat" type="button">Eat meat (E)</button>
         <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
         <button class="btn" id="mkbullets" type="button">Bullets ×8 · 2 iron 1 stone (F)</button>
+        <button class="btn" id="bandage" type="button">Bandage · 2 herbs (Z)</button>
+        <button class="btn" id="mkboots" type="button">Boots · 4 hide</button>
+        <button class="btn" id="mkvest" type="button">Hide vest · 6 hide</button>
         <button class="btn" id="mkarmor" type="button" hidden>Armor · 6 iron 4 wood (V)</button>
         <button class="btn" id="mkgren" type="button" hidden>Grenades ×2 · 3 iron 2 stone (H)</button>
         <button class="btn" id="throw" type="button" hidden>Throw grenade (G)</button>
@@ -142,9 +145,10 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
         <dt>Weapon bar</dt><dd>Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
+        <dt>Pick-ups</dt><dd>Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
         <dt>Pets and rides</dt><dd>The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
         <dt>Night rewards</dt><dd>Every night you survive brings a gift and unlocks something new: traps, iron walls, armor (V), turrets, grenades (H to make, G to throw) and a machine gun.</dd>
-        <dt>1 – 9, 0, X</dt><dd>Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
+        <dt>1 – 9, 0, L, X</dt><dd>Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
         <dt>E · C · P · M · K</dt><dd>Eat meat to heal · craft a flint axe · pause · mute · save. The game also saves itself every dawn.</dd>
       </dl>
       <div class="lbl">Map</div>
@@ -197,6 +201,7 @@ const B = {
   trap:  {name: 'Bear trap',  cost: {wood: 2, iron: 2},  hp: 30,  unlock: 1},
   iron:  {name: 'Iron wall',  cost: {iron: 3, stone: 2}, hp: 420, solid: 1, unlock: 2},
   turret:{name: 'Turret',     cost: {wood: 10, iron: 8}, hp: 90,  solid: 1, unlock: 3},
+  lamp:  {name: 'Lantern',    cost: {wood: 2, iron: 1},  hp: 30},
 };
 /* each map changes the look, how much wood, stone and iron there is, and which animals come */
 const MAPS = {
@@ -218,8 +223,8 @@ function nightReward(n) { // every survived night: a gift, and on nights 1-5 som
   snd(520, .25, 'triangle', .07, 260);
   return 'Night ' + n + ' survived. ' + r[0] + ' Gift: ' + costText(give) + '.';
 }
-const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'remove'];
-const TKEY = i => i < 9 ? '' + (i + 1) : i === 9 ? '0' : 'X';
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'remove'];
+const TKEY = i => i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : 'X';
 const WPN = {
   axe:     {name: 'Axe', note: 'chops'},
   spear:   {name: 'Spear',   cost: {wood: 8, stone: 3},  melee: 1, dmg: 28, reach: 98, arc: .5, cd: .42, note: 'long reach'},
@@ -228,7 +233,14 @@ const WPN = {
   shotgun: {name: 'Shotgun', cost: {wood: 8, iron: 12},  ammo: 'bullets', use: 2, pellets: 6, spread: .34, dmg: 16, spd: 1100, cd: .9, range: 300},
   rifle:   {name: 'Rifle',   cost: {wood: 10, iron: 16}, ammo: 'bullets', dmg: 80, spd: 1800, cd: .95, range: 1000, pierce: 2},
   smg:     {name: 'Machine gun', cost: {wood: 6, iron: 20}, light: 1, ammo: 'bullets', dmg: 17, spd: 1400, cd: .09, range: 600, spread: .07, unlock: 5},
+  sling:    {name: 'Sling',    cost: {wood: 4, hide: 1},   ammo: 'stone',   dmg: 13, spd: 700,  cd: .55, range: 480},
+  machete:  {name: 'Machete',  cost: {wood: 4, iron: 8},   melee: 1, dmg: 30, reach: 72, arc: 1.25, cd: .3, note: 'wide, fast swing'},
+  crossbow: {name: 'Crossbow', cost: {wood: 10, iron: 6},  ammo: 'arrows',  dmg: 48, spd: 1000, cd: .8,  range: 720, pierce: 1},
+  revolver: {name: 'Revolver', cost: {wood: 4, iron: 14},  ammo: 'bullets', dmg: 58, spd: 1500, cd: .5,  range: 700, unlock: 1},
+  launcher: {name: 'Rocket launcher', cost: {wood: 10, iron: 24}, ammo: 'grenades', dmg: 20, spd: 800, cd: 1.2, range: 620, rocket: 1, unlock: 4},
 };
+const AMMO_HINT = {arrows: 'Press R to make more.', bullets: 'Press F to make more.', stone: 'Mine rocks for more.', grenades: 'Press H to make more.'};
+const HIDES = {wolf: .5, boar: .6, cougar: .6, bear: 1, moose: 1, deer: .7, tusk: 3, greyfang: 3, ursa: 4};
 const WKEYS = Object.keys(WPN);
 const A = {
   wolf: {hp: 26,  spd: 116, dmg: 8,  r: 12, sdmg: 6,  meat: 1, body: '#6f7477', head: '#8b9093'},
@@ -284,10 +296,10 @@ function reset(seed, map) {
   RNG = mulberry(seed |= 0); // the same seed grows the same forest for every player
   const mp = MAPS[map] || MAPS.forest;
   G = {seed, map: MAPS[map] ? map : 'forest', day: 1, phase: 'day', t: 0, len: 95, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
-  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, pets: [], vehicle: null, riding: false};
+  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, herbs: 0, hide: 0, boots: false, vest: false, pets: [], vehicle: null, riding: false};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
-  trees = []; rocks = []; animals = []; parts = []; floats = []; shots = []; tool = 'axe';
+  trees = []; rocks = []; animals = []; parts = []; floats = []; shots = []; items = []; tool = 'axe';
   for (let i = 0; i < mp.trees * 6 && trees.length < mp.trees; i++) {
     const x = rnd(40, WORLD - 40), y = rnd(40, WORLD - 40);
     if (dist(x, y, CX, CY) < 290) continue;
@@ -302,7 +314,7 @@ function reset(seed, map) {
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
   for (let i = 0; i < mp.rocks; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
   syncWorld(); RNG = Math.random;
-  if (!client()) for (let i = 0; i < 12; i++) spawnDeer();
+  if (!client()) { for (let i = 0; i < 12; i++) spawnDeer(); stock(); }
   buildTools(); recalc();
 }
 const S = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? null : grid[ty * W + tx];
@@ -473,13 +485,13 @@ function attack(fresh) {
     hit ? snd(300, .09, 'square', .06, -160) : snd(520, .06, 'sine', .025, -260); return;
   }
   const need = w.use || 1;
-  if (P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. Press ' + (w.ammo === 'arrows' ? 'R' : 'F') + ' to make more.'); return; }
+  if (P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. ' + AMMO_HINT[w.ammo]); return; }
   autoAim(w.range * .85);
   const ang = P.ang, mx = P.x + Math.cos(ang) * 22, my = P.y + Math.sin(ang) * 22;
   P[w.ammo] -= need; P.cd = w.cd; P.swing = .1;
   for (let i = 0; i < (w.pellets || 1); i++) {
     const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
-    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows'});
+    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket});
   }
   if (multi() && NET.room) NET.room.emit('fx', {x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon}).catch(() => {});
   if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
@@ -494,7 +506,7 @@ function equip(k) {
     pay(w.cost); P.owned[k] = true; snd(500, .2, 'triangle', .07, 300);
     if (w.ammo === 'arrows' && !P.arrows) P.arrows = 6;
     if (w.ammo === 'bullets' && !P.bullets) P.bullets = 8;
-    toast(w.name + ' crafted.' + (w.ammo ? ' It comes with a few ' + w.ammo + '.' : ''));
+    toast(w.name + ' crafted.' + (w.ammo === 'arrows' || w.ammo === 'bullets' ? ' It comes with a few ' + w.ammo + '.' : w.ammo ? ' It uses your ' + w.ammo + '.' : ''));
   }
   P.weapon = k; tool = 'axe'; hud();
 }
@@ -599,6 +611,38 @@ function updPets(dt) {
     if (tgt && l < tgt.r + d.r + 10 && q.cd <= 0) { q.cd = d.cd; hitAnimal(tgt, d.dmg, (tgt.x - q.x) / (l || 1) * .35, (tgt.y - q.y) / (l || 1) * .35); snd(260, .06, 'square', .03, -120); }
   });
 }
+/* things lying in the world: walk over them to pick them up */
+let items = [], iid = 0;
+const IK = ['herb', 'scrap', 'crate', 'hide'], STOCK = {herb: 70, scrap: 36, crate: 14};
+function dropItem(type, x, y) { if (!client() && items.length < 170) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
+function stock() { // top the world back up; called for a new game and at every dawn
+  if (client()) return;
+  for (const k in STOCK) { let n = STOCK[k] - items.filter(i => i.type === k).length; for (let t = 0; n > 0 && t < 400; t++) { const x = rnd(80, WORLD - 80), y = rnd(80, WORLD - 80); if (dist(x, y, CX, CY) > 260) { dropItem(k, x, y); n--; } } }
+}
+function grab(it) {
+  let txt, col = '#ebe6d3';
+  if (it.type === 'herb') { const n = Math.random() < .35 ? 2 : 1; P.herbs += n; txt = '+' + n + ' herb' + (n > 1 ? 's' : ''); col = '#9bd45a'; }
+  else if (it.type === 'scrap') { const n = 2 + (Math.random() * 3 | 0); P.iron += n; txt = '+' + n + ' iron'; col = '#9fc3e0'; }
+  else if (it.type === 'hide') { P.hide++; txt = '+1 hide'; col = '#d9a86a'; }
+  else { const l = [['wood', 12], ['stone', 9], ['iron', 6], ['bullets', 10], ['arrows', 8], ['meat', 3], ['herbs', 3], G.nights >= 4 ? ['grenades', 2] : ['iron', 8]], c = l[Math.random() * l.length | 0]; P[c[0]] += c[1]; txt = 'Crate: +' + c[1] + ' ' + c[0]; col = '#f2a03d'; }
+  float(it.x, it.y - 10, txt, col); snd(700, .08, 'triangle', .05, 300);
+}
+function updItems() {
+  if (P.dead || !running) return;
+  for (let i = items.length - 1; i >= 0; i--) { const it = items[i]; if (dist(it.x, it.y, P.x, P.y) > 30) continue; items.splice(i, 1); grab(it); if (client()) { NET.took.set(it.id, performance.now() + 6000); netAct({k: 'p', i: it.id}); } }
+}
+function useBandage() {
+  if (!running || P.dead) return;
+  if (P.herbs < 2) return toast('A bandage takes 2 herbs. Look for the berry bushes.');
+  if (P.hp >= P.max && !(P.poison > 0)) return toast('You are not hurt.');
+  P.herbs -= 2; P.hp = Math.min(P.max, P.hp + 45); P.poison = 0; float(P.x, P.y - 24, '+45', '#7fbf5a'); snd(300, .15, 'sine', .06, 200); hud();
+}
+function makeGear(k) {
+  if (!running || P[k]) return; const need = k === 'boots' ? 4 : 6;
+  if (P.hide < need) return toast((k === 'boots' ? 'Boots need ' : 'The hide vest needs ') + need + ' hide. Animals drop it.');
+  P.hide -= need; P[k] = true; if (k === 'vest') { P.max = 140; P.hp += 40; }
+  toast(k === 'boots' ? 'Boots on. You move faster.' : 'Hide vest on. More health.'); snd(500, .2, 'triangle', .07, 300); hud();
+}
 function eat() {
   if (!running || P.meat < 1) return toast('No meat. Hunt deer by day, or whatever comes at night.');
   if (P.hp >= P.max) return toast('You are not hurt.');
@@ -615,7 +659,8 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 /* ---------- multiplayer and saving ---------- */
 const NET = {mode: 'solo', room: null, code: '', me: null, hostPeer: null, hostMiss: 0, others: new Map(), swSeq: 0, wasSw: false, sendT: 0, syncT: 0, chunks: [], amap: new Map(), cyc: 0};
-const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades'];
+NET.took = new Map();
+const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades', 'herbs', 'hide', 'boots', 'vest'];
 const SHIRTS = ['#3f7fbf', '#3fa66b', '#c9a227', '#8a56c2', '#c25690', '#d07a2d'];
 let selMap = 'forest';
 let lobby = null, db = null, userNS = null, uid = null, nid = 0, savedGame = null, openGames = [], menuMsg = '';
@@ -632,6 +677,7 @@ function setInv(o) {
   if (!o) return;
   for (const k of INV) if (k in o) P[k] = o[k];
   P.owned = {axe: true}; for (const k of o.owned || []) if (WPN[k]) P.owned[k] = true;
+  P.max = P.vest ? 140 : 100;
   if (!P.owned[P.weapon]) P.weapon = 'axe'; P.hp = clamp(+P.hp || 100, 1, P.max);
   P.pets = (o.pets || []).filter(k => PETS[k]).slice(0, 3).map(mkPet); P.vehicle = VEH[o.veh] ? {type: o.veh, x: P.x + 50, y: P.y, ang: 0} : null; P.riding = false;
 }
@@ -690,6 +736,7 @@ function worldState() {
 function sendSync() {
   const l = packStructs(), n = Math.max(1, Math.ceil(l.length / 160)), c = ++NET.cyc;
   for (let i = 0; i < n; i++) { const d = {c, i, n, s: l.slice(i * 160, i * 160 + 160).join(';')}; if (!i) { d.dt = deadList(trees).slice(0, 200); d.dr = deadList(rocks); } NET.room.emit('sync', d).catch(() => {}); }
+  netEv({k: 'it', l: items.map(i => [i.id, IK.indexOf(i.type), i.x | 0, i.y | 0].join(',')).join(';')});
 }
 function netSend(dt) {
   if (!multi() || !NET.room) return;
@@ -748,6 +795,7 @@ function netPoll(dt) {
   if (client()) { const now = performance.now(); if (seen.has(NET.hostPeer)) NET.hostMiss = now; else if (now - NET.hostMiss > 6000) quit('The host left the game. Your gear is saved.'); }
 }
 function onAct(d) { // a guest did something; the host applies it
+  if (d.k === 'p') { const i = items.findIndex(it => it.id === d.i); if (i >= 0) items.splice(i, 1); return; }
   if (d.k === 'h') {
     const a = animals.find(a => a.id === d.i); if (!a) return;
     a.hp -= clamp(+d.d || 0, 0, 100); a.flash = .12; a.kx = clamp(+d.x || 0, -1, 1) * 240; a.ky = clamp(+d.y || 0, -1, 1) * 240; burst(a.x, a.y, '#b03a2a', 4);
@@ -764,6 +812,11 @@ function onAct(d) { // a guest did something; the host applies it
   }
 }
 function onEv(d) { // the host told us something happened
+  if (d.k === 'it') {
+    const now = performance.now(), l = []; for (const [id, t] of NET.took) if (t < now) NET.took.delete(id);
+    if (d.l) for (const e of String(d.l).split(';')) { const v = e.split(',').map(Number); if (IK[v[1]] && !NET.took.has(v[0])) l.push({id: v[0], type: IK[v[1]], x: v[2], y: v[3]}); }
+    items = l; return;
+  }
   if (d.k === 'd') {
     if (d.p !== NET.me) return;
     hurtPlayer(clamp(+d.d || 0, 0, 60), +d.x || P.x, +d.y || P.y);
@@ -801,7 +854,7 @@ function wire() {
     if (d.w === 'grenade' && isFinite(d.x + d.y + d.tx + d.ty)) { shots.push({bomb: true, fx: true, x: d.x, y: d.y, x0: d.x, y0: d.y, tx: d.tx, ty: d.ty, t: 0, T: .65, vx: 1, vy: 0}); return; }
     if (d.w === 'turret' && isFinite(d.x + d.y + d.a)) { shots.push({x: d.x, y: d.y, vx: Math.cos(d.a) * 900, vy: Math.sin(d.a) * 900, life: .42, dmg: 0, pierce: 0, hit: new Set(), arrow: true, ghost: true, fx: true}); return; }
     if (!w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
-    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', fx: true}); }
+    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, fx: true}); }
     if (dist(d.x, d.y, P.x, P.y) < 700) w.ammo === 'arrows' ? snd(620, .09, 'triangle', .03, -420) : snd(150, .15, 'sawtooth', .05, -100);
   });
 }
@@ -867,7 +920,7 @@ function updClock(dt) {
     } else {
       G.nights++; G.day++; G.phase = 'day'; G.len = 75; G.queue = 0;
       for (const a of animals) if (!A[a.type].passive && !isBoss(a)) a.flee = true;
-      P.hp = Math.min(P.max, P.hp + 15); saveGame(true);
+      P.hp = Math.min(P.max, P.hp + 15); saveGame(true); stock();
       if (tryWin()) return true;
       const bs = animals.find(isBoss), rw = nightReward(G.nights);
       toast(bs ? 'Dawn, but ' + A[bs.type].name + ' is still hunting you. Kill it.' : rw + (G.nights >= NIGHTS_TO_WIN ? ' Finish the house to win.' : ''));
@@ -893,7 +946,7 @@ function updPlayer(dt) {
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.dy;
   const ml = Math.hypot(mx, my);
   const ride = P.riding ? VEH[P.vehicle.type] : null;
-  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (ride ? ride.spd : 1) * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
+  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (P.boots ? 1.15 : 1) * (ride ? ride.spd : 1) * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
   if (ride) {
     P.vehicle.x = P.x; P.vehicle.y = P.y;
     if (ride.ram && ml > .3) for (const a of animals) { // run them down
@@ -944,7 +997,8 @@ function update(dt) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
     if (a.hp <= 0) {
-      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); P.meat += d.meat; if (!d.passive) G.kills++;
+      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); P.meat += d.meat;
+      for (let h = HIDES[a.type] || 0; h > 0; h--) if (Math.random() < h) dropItem('hide', a.x + rnd(-20, 20), a.y + rnd(-20, 20)); if (!d.passive) G.kills++;
       if (d.meat) float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60);
       if (d.boss) { P.iron += 10; burst(a.x, a.y, '#8c2f22', 40); shake = 12; toast(d.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); tryWin(); }
       continue;
@@ -996,7 +1050,7 @@ function update(dt) {
   updOthers(dt); updFx(dt); netSend(dt);
 }
 function updFx(dt) {
-  updPets(dt);
+  updPets(dt); updItems();
   for (let i = shots.length - 1; i >= 0; i--) { // arrows and bullets
     const s = shots[i]; let dead = false;
     if (s.bomb) { s.t += dt; const q = Math.min(1, s.t / s.T); s.x = s.x0 + (s.tx - s.x0) * q; s.y = s.y0 + (s.ty - s.y0) * q; if (q >= 1) { shots.splice(i, 1); explode(s); } continue; }
@@ -1010,7 +1064,7 @@ function updFx(dt) {
         if (--s.pierce < 0) { dead = true; break; }
       }
     }
-    if ((s.life -= dt) <= 0 || dead) shots.splice(i, 1);
+    if ((s.life -= dt) <= 0 || dead) { shots.splice(i, 1); if (s.rocket) explode(s); }
   }
   for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; p.h += p.vh * dt; p.vh -= 620 * dt; if ((p.life -= dt) <= 0) parts.splice(i, 1); }
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.y -= 34 * dt; if ((f.life -= dt) <= 0) floats.splice(i, 1); }
@@ -1171,6 +1225,7 @@ function initScene() {
   GEO.bed = merge([[box(42, 9, 28), '#6b4a2c', M(0, 6, 0)], [box(40, 6, 26), '#e7dfc8', M(0, 13, 0)], [box(26, 7, 27), '#9c3f33', M(7, 14, 0)], [box(9, 5, 17), '#ffffff', M(-13, 17.5, 0)], [box(4, 24, 28), '#5d3f24', M(-21, 12, 0)], [box(3, 14, 28), '#5d3f24', M(21, 7, 0)]]);
   GEO.fire = merge([...Array.from({length: 8}, (_, i) => [dod(5.5), i % 2 ? '#77776f' : '#8b8b83', M(Math.cos(i / 8 * TAU) * 16, 3, Math.sin(i / 8 * TAU) * 16, 1, .8, 1, i, i, 0)]), ...[0, 1, 2].map(i => [cyl(3, 3, 26, 6), '#3d2a18', M(0, 5, 0, 1, 1, 1, 0, i * TAU / 6, Math.PI / 2 - .25)])]);
   GEO.spikes = merge([[box(44, 2, 44), '#3c2816', M(0, 1, 0)], ...Array.from({length: 9}, (_, i) => [cone(4, 24, 5), i % 2 ? '#d6c7a1' : '#c2b189', M((i % 3 - 1) * 14, 13, ((i / 3 | 0) - 1) * 14, 1, 1, 1, (i % 3 - 1) * .18, 0, ((i / 3 | 0) - 1) * -.18)])]);
+  GEO.lamp = merge([[cyl(2.2, 3, 44, 6), '#4d3520', M(0, 22, 0)], [box(16, 2.5, 3), '#4d3520', M(6, 43, 0)], [box(9, 11, 9), '#2b2f33', M(12, 35, 0)]]);
   GEO.trap = merge([[cyl(17, 17, 2, 10), '#3a3f44', M(0, 1, 0)], [cyl(6, 6, 3, 8), '#8d1f1f', M(0, 2, 0)], ...Array.from({length: 10}, (_, i) => [cone(2.6, 9, 4), '#c9ccc4', M(Math.cos(i / 10 * TAU) * 14, 6, Math.sin(i / 10 * TAU) * 14)])]);
   GEO.iron = merge([[box(48, 60, 48), '#3d444b', M(0, 30, 0)], [box(50, 6, 50), '#59626b', M(0, 12, 0)], [box(50, 6, 50), '#59626b', M(0, 48, 0)], [box(50.5, 62, 8), '#2b3035', M(0, 31, 0)], [box(8, 62, 50.5), '#2b3035', M(0, 31, 0)],
     ...[[-16, -16], [16, -16], [-16, 16], [16, 16]].map(([x, z]) => [sph(), '#8a949e', M(x, 61, z, 3.5)])]);
@@ -1199,6 +1254,11 @@ function initScene() {
     bow: [[new THREE.TorusGeometry(15, 1.3, 4, 10, Math.PI), '#8a6238', M(6, 0, 0, 1, 1, 1, Math.PI / 2, 0, -Math.PI / 2)], [box(.7, .7, 30), '#efe6cf', M(6, 0, 0)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
     pistol: [[box(13, 4, 3.4), steel, M(10, 1, 0)], [box(4.5, 8, 3.4), stock, M(5, -4, 0, 1, 1, 1, 0, 0, .2)]],
     shotgun: [[box(30, 3.6, 5.5), steel, M(20, 1, 0)], [box(9, 4, 6.5), stock, M(20, -1.5, 0)], [box(13, 6, 4.5), stock, M(-1, -1, 0)]],
+    sling: [[box(16, 1.2, 1.2), '#d9a86a', M(8, 0, 0)], [sph(), '#8f918b', M(18, 0, 0, 3.2)], [box(5, 1.5, 6), '#7a5532', M(18, 0, 0)]],
+    machete: [[box(8, 3, 3.4), '#3a2716', M(4, 0, 0)], [box(3, 3, 8), '#2b2f33', M(9, 0, 0)], [box(30, 1.2, 6), '#c9ccc4', M(25, 0, 1)]],
+    crossbow: [[box(30, 4, 4), stock, M(12, 0, 0)], [box(4, 2.5, 34), '#2b2f33', M(25, 1, 0)], [box(.8, .8, 34), '#efe6cf', M(19, 2, 0)], [cyl(.7, .7, 20, 4), '#d9c9a0', M(20, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+    revolver: [[box(17, 4, 3.2), '#8a949e', M(12, 1.5, 0)], [cyl(3.2, 3.2, 6, 6), steel, M(8, 1, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(5, 9, 3.4), stock, M(4, -4, 0, 1, 1, 1, 0, 0, .25)]],
+    launcher: [[cyl(4.5, 4.5, 46, 8), '#4a5d3a', M(14, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5.8, 4.5, 6, 8), '#3e4f31', M(-10, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(4, 8, 3.4), steel, M(8, -4, 0)], [cone(3.6, 9, 6), '#8d1f1f', M(40, 3, 0, 1, 1, 1, 0, 0, -Math.PI / 2)]],
     smg: [[box(26, 4.5, 4.5), steel, M(16, 1, 0)], [box(5, 12, 3.5), steel, M(14, -6, 0)], [box(10, 5, 4), stock, M(0, 0, 0)], [box(5, 7, 3.5), stock, M(6, -4, 0, 1, 1, 1, 0, 0, .2)]],
     rifle: [[box(42, 3, 3), steel, M(24, 1, 0)], [box(16, 6, 4.2), stock, M(-2, -1, 0)], [box(14, 4, 4), stock, M(10, -.5, 0)], [cyl(1.8, 1.8, 12, 6), steel, M(12, 4.5, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
   };
@@ -1209,6 +1269,13 @@ function initScene() {
 
   ghost = new THREE.Mesh(box(T - 2, 34, T - 2), new THREE.MeshBasicMaterial({transparent: true, opacity: .4, depthWrite: false})); scene.add(ghost);
   partM = inst(box(1, 1, 1), new THREE.MeshLambertMaterial(), 400, false);
+  const IG = {
+    herb: merge([[sph(), '#3f8a3a', M(0, 8, 0, 11, 8, 11)], [sph(), '#4f9a45', M(5, 12, 3, 7)], ...[[6, 13, -4], [-5, 12, 5], [1, 16, 2], [-7, 9, -3], [8, 8, 5]].map(([x, y, z]) => [sph(), '#d1304a', M(x, y, z, 2.2)])]),
+    scrap: merge([[box(16, 5, 12), '#6c737a', M(0, 2.5, 0, 1, 1, 1, 0, .4, 0)], [box(10, 4, 14), '#8a949e', M(3, 6, -2, 1, 1, 1, .2, 1.1, 0)], [cyl(3, 3, 12, 6), '#59626b', M(-5, 7, 3, 1, 1, 1, 0, .3, 1.4)], [box(6, 6, 6), '#a65a2a', M(6, 4, 6, 1, 1, 1, 0, .7, 0)]]),
+    crate: merge([[box(22, 18, 22), '#a57c4c', M(0, 9, 0)], [box(23, 3, 23), '#6e4c2c', M(0, 3, 0)], [box(23, 3, 23), '#6e4c2c', M(0, 15, 0)], [box(4, 19, 23.5), '#f2a03d', M(0, 9, 0)]]),
+    hide: merge([[cyl(5, 5, 20, 8), '#b07a45', M(0, 5, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(3, 10.6, 10.6), '#6e4c2c', M(-5, 5, 0)], [box(3, 10.6, 10.6), '#6e4c2c', M(5, 5, 0)]]),
+  };
+  for (const k in IG) itemM[k] = inst(IG[k], vmat, 180);
 }
 function makePlayer(shirt) { // one model per player; friends get their own shirt colour
   const g = new THREE.Group(), w = {};
@@ -1222,7 +1289,7 @@ function makePlayer(shirt) { // one model per player; friends get their own shir
   g.add(hand); scene.add(g); return {g, hand, wm: w, head};
 }
 /* companions and rides, for the local player and for friends alike */
-const MYC = {};
+const MYC = {}, itemM = {};
 function dropCompanions(h) { if (h.vm) scene.remove(h.vm); h.vm = null; h.vt = null; for (const q of h.pm || []) scene.remove(q.m); h.pm = []; }
 function drawCompanions(h, v, pets, rx, ry, now) {
   if (!v || h.vt !== v.type) { if (h.vm) scene.remove(h.vm); h.vm = null; h.vt = null; if (v) { h.vm = new THREE.Mesh(GEO.veh[v.type], vmat); h.vm.castShadow = true; scene.add(h.vm); h.vt = v.type; } }
@@ -1234,7 +1301,7 @@ function drawCompanions(h, v, pets, rx, ry, now) {
   });
 }
 function poseHand(hand, weapon, swing) {
-  if (weapon === 'axe') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
+  if (weapon === 'axe' || weapon === 'machete') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
   else { hand.rotation.set(0, 0, 0); hand.position.x = 6 + (swing <= 0 ? 0 : WPN[weapon].melee ? Math.sin((1 - swing / .18) * Math.PI) * 24 : -swing / .1 * 5); }
 }
 function syncWorld() { // (re)build the per-game instances after reset()
@@ -1266,6 +1333,7 @@ function structMesh(s) {
   if (s.type === 'wall') g.rotation.y = ((s.tx * 7 + s.ty * 3) % 4) * Math.PI / 2;
   if (s.type === 'door' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'bed') g.rotation.y = (s.tx + s.ty) % 2 ? 0 : Math.PI / 2;
+  if (s.type === 'lamp') { const l = new THREE.Mesh(GEO.eye, new THREE.MeshBasicMaterial({color: 0xffd98a, fog: false})); l.scale.setScalar(3.6); l.position.set(12, 35, 0); g.add(l); }
   if (s.type === 'turret') { const h = new THREE.Mesh(GEO.turretHead, vmat); h.position.y = 40; h.castShadow = true; g.add(h); g.userData.head = h; }
   if (s.type === 'fire') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); g.add(f); g.userData.flame = f; }
   return g;
@@ -1323,6 +1391,7 @@ function render(now, dt) {
     if (s.pop > 0) s.pop -= dt;
     const sc = 1 + Math.max(0, s.flash) * .5 - Math.max(0, s.pop) * 1.6; s.mesh.scale.set(1 + Math.max(0, s.flash) * .4, sc, 1 + Math.max(0, s.flash) * .4);
     if (s.type === 'turret') s.mesh.userData.head.rotation.y = -(s.aim || 0);
+    if (s.type === 'lamp') fires.push(s);
     if (s.type === 'fire') { const f = s.mesh.userData.flame, fl = Math.sin(now / 70 + s.tx) * .12 + Math.sin(now / 31) * .06; f.scale.set(1 + fl, 1.1 + fl * 2.2, 1 + fl); f.rotation.y = now / 300; fires.push(s); }
   }
   fires.sort((a, b) => dist(a.tx * T, a.ty * T, P.x, P.y) - dist(b.tx * T, b.ty * T, P.x, P.y));
@@ -1380,6 +1449,13 @@ function render(now, dt) {
   for (let i = 0; i < np; i++) { const p = parts[i]; dummy.position.set(p.x, Math.max(1, p.h), p.y); dummy.rotation.set(p.life * 9, p.life * 7, 0); dummy.scale.setScalar(p.size * Math.min(1, p.life * 4)); dummy.updateMatrix(); partM.setMatrixAt(i, dummy.matrix); partM.setColorAt(i, tmpC.set(p.col).convertSRGBToLinear()); }
   partM.count = np; partM.instanceMatrix.needsUpdate = true; if (np) partM.instanceColor.needsUpdate = true;
 
+  const ic = {herb: 0, scrap: 0, crate: 0, hide: 0};
+  for (const it of items) { // pick-ups: only the ones near the camera
+    if (Math.abs(it.x - cam.x) > 1100 || Math.abs(it.y - cam.y) > 1100 || ic[it.type] >= 180) continue;
+    const hop = it.type === 'herb' ? 0 : Math.abs(Math.sin(now / 400 + it.id)) * 4;
+    dummy.position.set(it.x, hop, it.y); dummy.rotation.set(0, it.id * 1.7 + (it.type === 'herb' ? 0 : now / 1400), 0); dummy.scale.setScalar(1); dummy.updateMatrix(); itemM[it.type].setMatrixAt(ic[it.type]++, dummy.matrix);
+  }
+  for (const k in ic) { itemM[k].count = ic[k]; itemM[k].instanceMatrix.needsUpdate = true; }
   renderer.render(scene, camera);
 
   // aim: where the cursor meets the ground
@@ -1441,7 +1517,8 @@ function hud() {
   $('savebtn').textContent = client() ? 'Save gear (K)' : 'Save (K)';
   const bs = animals.find(isBoss); $('boss').hidden = !bs;
   if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
-  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron;
+  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron; $('rh').textContent = P.herbs; $('rd').textContent = P.hide;
+  $('bandage').disabled = P.herbs < 2; $('mkboots').hidden = P.boots; $('mkvest').hidden = P.vest;
   const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
   $('phase').textContent = (G.phase === 'day' ? 'Dusk in ' : 'Dawn in ') + mm;
@@ -1461,7 +1538,7 @@ function hud() {
   }
   $('tool-axe').lastChild.textContent = WPN[P.weapon].name.toLowerCase() + ' in hand';
   $('eat').disabled = P.meat < 1; $('craft').hidden = P.flint;
-  $('mkarrows').hidden = !P.owned.bow; $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg);
+  $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver);
   $('mkarmor').hidden = P.armor || G.nights < 2; $('mkgren').hidden = G.nights < 4; $('throw').hidden = P.grenades < 1; $('throw').textContent = 'Throw grenade (G) ×' + P.grenades;
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
@@ -1488,7 +1565,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
   if (e.target && e.target.id === 'code') return;
   keys[e.code] = true; if (e.repeat || !running) return;
-  const n = e.code === 'Digit0' ? 10 : e.code === 'KeyX' ? 11 : e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
+  const n = e.code === 'Digit0' ? 10 : e.code === 'KeyL' ? 11 : e.code === 'KeyX' ? 12 : e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
   if (n >= 1 && n <= TOOLS.length) { tool = TOOLS[n - 1]; hud(); }
   if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
   if (e.code === 'KeyE') eat();
@@ -1498,6 +1575,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH') makeGrenades();
   if (e.code === 'KeyG') throwGrenade();
   if (e.code === 'KeyB') toggleRide();
+  if (e.code === 'KeyZ') useBandage();
   if (e.code === 'KeyR') makeAmmo('arrows');
   if (e.code === 'KeyF') makeAmmo('bullets');
   if (e.code === 'Tab') cycleWeapon(e.shiftKey ? -1 : 1);
@@ -1535,13 +1613,14 @@ $('contbtn').addEventListener('click', () => { if (savedGame) start(savedGame); 
 $('hostbtn').addEventListener('click', () => hostGame(null)); $('hostsaved').addEventListener('click', () => { if (savedGame) hostGame(savedGame); });
 $('joinbtn').addEventListener('click', () => joinGame($('code').value));
 $('code').addEventListener('keydown', e => { if (e.code === 'Enter') joinGame($('code').value); });
+$('bandage').addEventListener('click', useBandage); $('mkboots').addEventListener('click', () => makeGear('boots')); $('mkvest').addEventListener('click', () => makeGear('vest'));
 $('mkarmor').addEventListener('click', makeArmor); $('mkgren').addEventListener('click', makeGrenades); $('throw').addEventListener('click', throwGrenade);
 $('savebtn').addEventListener('click', () => saveGame(false)); $('quitbtn').addEventListener('click', () => quit(''));
 addEventListener('pagehide', () => saveGame(true));
 addEventListener('resize', resize);
 
 initScene(); resize(); reset(1, 'forest'); G.dark = .3; refreshMenu();
-window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, mk, recalc};
+window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, mk, recalc};
 (async () => { // light up saving and multiplayer once the page knows where it is running
   const cl = window.claude;
   if (cl && cl.use) { try { [db, userNS, lobby] = await Promise.all([cl.use('db'), cl.use('user'), cl.use('room')]); uid = userNS ? await userNS.id() : null; } catch (e) {} }
