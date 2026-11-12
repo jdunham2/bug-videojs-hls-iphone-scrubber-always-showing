@@ -149,7 +149,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
-        <dt>Weapon bar</dt><dd>Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
+        <dt>Weapon bar</dt><dd>Nineteen weapons, from spear to sniper rifle; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
         <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
         <dt>Pick-ups</dt><dd>Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
         <dt>Pets and rides</dt><dd>The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
@@ -217,7 +217,7 @@ const GEAR = {
   charm: {name: 'Bone charm',  cost: {bone: 8},          msg: 'Bone charm made. Your pets hit half again as hard.'},
 };
 const ORE_COL = {iron: [18, 55, 42], gold: [46, 80, 52], crystal: [190, 70, 62]};
-const DROPS = {crow: [['feather', 1.7]], wolf: [['bone', .4]], boar: [['bone', .5]], cougar: [['bone', .4]], bear: [['bone', 1]], moose: [['bone', 1]], tusk: [['bone', 3]], greyfang: [['bone', 3]], ursa: [['bone', 4]]};
+const DROPS = {bison: [['bone', 1]], wolverine: [['bone', .5]], crow: [['feather', 1.7]], wolf: [['bone', .4]], boar: [['bone', .5]], cougar: [['bone', .4]], bear: [['bone', 1]], moose: [['bone', 1]], tusk: [['bone', 3]], greyfang: [['bone', 3]], ursa: [['bone', 4]]};
 /* each map changes the look, how much wood, stone and iron there is, and which animals come */
 const MAPS = {
   forest: {name: 'Pinewood',   note: 'balanced',                 trees: 1500, rocks: 230, oak: .38, pine: [132, 37, 23], oakc: [98, 46, 31], tuft: [100, 45, 37], tufts: 9000, flowers: ['#f4e9c9', '#f2c14e', '#e88bb0', '#c7a6f2', '#ffffff'],
@@ -268,9 +268,16 @@ const WPN = {
   crossbow: {name: 'Crossbow', cost: {wood: 10, iron: 6},  ammo: 'arrows',  dmg: 48, spd: 1000, cd: .8,  range: 720, pierce: 1},
   revolver: {name: 'Revolver', cost: {wood: 4, iron: 14},  ammo: 'bullets', dmg: 58, spd: 1500, cd: .5,  range: 700, unlock: 1},
   launcher: {name: 'Rocket launcher', cost: {wood: 10, iron: 24}, ammo: 'grenades', dmg: 20, spd: 800, cd: 1.2, range: 620, rocket: 1, unlock: 4},
+  hammer:   {name: 'War hammer', cost: {wood: 6, stone: 10, iron: 4}, melee: 1, dmg: 62, reach: 66, arc: 1.4, cd: .8, kb: 2.4, note: 'slow, huge knockback'},
+  pike:     {name: 'Pike',       cost: {wood: 8, iron: 10},  melee: 1, dmg: 40, reach: 126, arc: .32, cd: .55, note: 'longest reach'},
+  bbow:     {name: 'Bone bow',   cost: {bone: 6, wood: 6},   ammo: 'arrows',  dmg: 20, spd: 700,  cd: .6,  range: 560, pellets: 3, spread: .16},
+  dual:     {name: 'Twin pistols', cost: {wood: 6, iron: 16}, light: 1, ammo: 'bullets', use: 2, pellets: 2, spread: .06, dmg: 30, spd: 1300, cd: .22, range: 620, unlock: 1},
+  staff:    {name: 'Crystal staff', cost: {wood: 6, crystal: 5}, ammo: 'magic', free: 1, quiet: 1, dmg: 18, spd: 640, cd: .5, range: 560, pierce: 1},
+  flamer:   {name: 'Flamethrower', cost: {wood: 8, iron: 16}, ammo: 'wood', quiet: 1, flame: 1, pellets: 3, spread: .28, dmg: 9, spd: 430, cd: .15, range: 175, pierce: 3, unlock: 3},
+  sniper:   {name: 'Sniper rifle', cost: {wood: 12, iron: 26, gold: 4}, ammo: 'bullets', dmg: 165, spd: 2400, cd: 1.6, range: 1400, pierce: 4, unlock: 3},
 };
-const AMMO_HINT = {arrows: 'Press R to make more.', bullets: 'Press F to make more.', stone: 'Mine rocks for more.', grenades: 'Press H to make more.'};
-const HIDES = {wolf: .5, boar: .6, cougar: .6, bear: 1, moose: 1, deer: .7, tusk: 3, greyfang: 3, ursa: 4};
+const AMMO_HINT = {arrows: 'Press R to make more.', bullets: 'Press F to make more.', stone: 'Mine rocks for more.', grenades: 'Press H to make more.', wood: 'Chop more trees.'};
+const HIDES = {fox: .5, wolverine: .7, bison: 1, elk: 1, goat: .6, wolf: .5, boar: .6, cougar: .6, bear: 1, moose: 1, deer: .7, tusk: 3, greyfang: 3, ursa: 4};
 const WKEYS = Object.keys(WPN);
 const A = {
   wolf: {hp: 26,  spd: 116, dmg: 8,  r: 12, sdmg: 6,  meat: 1, body: '#6f7477', head: '#8b9093'},
@@ -285,6 +292,13 @@ const A = {
   tusk:     {name: 'Old Tusk',             boss: 1, look: 'boar', hp: 340, spd: 84,  dmg: 22, r: 24, sdmg: 40, meat: 8,  body: '#3a2418', head: '#4a2f20', charge: 4.5},
   greyfang: {name: 'Greyfang, the pack mother', boss: 1, look: 'wolf', hp: 400, spd: 122, dmg: 18, r: 20, sdmg: 14, meat: 8,  body: '#c9ccd0', head: '#e1e4e8', howl: 8, pounce: 1},
   ursa:     {name: 'Ursa, the old bear',   boss: 1, look: 'bear', hp: 850, spd: 62,  dmg: 36, r: 32, sdmg: 70, meat: 12, body: '#1f1611', head: '#2b1f18', slam: 5},
+  fox:       {hp: 20,  spd: 152, dmg: 6,  r: 10, sdmg: 3,  meat: 1, body: '#c9682a', head: '#de8a45', look: 'wolf'},
+  bat:       {hp: 7,   spd: 165, dmg: 4,  r: 6,  sdmg: 0,  meat: 0, body: '#3a2f3a', head: '#4a3d4a', look: 'crow', fly: 1},
+  spider:    {hp: 30,  spd: 124, dmg: 9,  r: 11, sdmg: 4,  meat: 0, body: '#2a2622', head: '#3a342e', look: 'spider', web: 1},
+  wolverine: {hp: 62,  spd: 122, dmg: 16, r: 12, sdmg: 16, meat: 2, body: '#3a2a1c', head: '#c9b58a', look: 'bear'},
+  bison:     {hp: 165, spd: 78,  dmg: 22, r: 20, sdmg: 34, meat: 5, body: '#4a3626', head: '#2e2018', look: 'boar', charge: 5},
+  elk:       {hp: 34,  spd: 128, dmg: 0,  r: 15, sdmg: 0,  meat: 4, body: '#8a6238', head: '#6e4c2c', look: 'deer', passive: 1},
+  goat:      {hp: 14,  spd: 120, dmg: 0,  r: 10, sdmg: 0,  meat: 2, body: '#e7e2d6', head: '#f2eee4', look: 'deer', passive: 1},
   viper:      {name: 'Hollowfang, the viper',  boss: 1, look: 'snake', hp: 260,  spd: 105, dmg: 16, r: 18, sdmg: 10, meat: 6,  body: '#7a2f4a', head: '#93405c', poison: 1, pounce: 1},
   stormwing:  {name: 'Stormwing',              boss: 1, look: 'crow',  hp: 280,  spd: 150, dmg: 14, r: 20, sdmg: 0,  meat: 6,  body: '#2a2440', head: '#3a3358', fly: 1, howl: 7, summon: 'crow'},
   thunderhoof:{name: 'Thunderhoof',            boss: 1, look: 'deer',  hp: 520,  spd: 86,  dmg: 26, r: 26, sdmg: 55, meat: 10, body: '#2f2018', head: '#3d2b20', fat: .95, charge: 3.5},
@@ -456,7 +470,7 @@ function damageStruct(s, d) {
 function spawnDeer() {
   for (let i = 0; i < 20; i++) {
     const x = rnd(100, WORLD - 100), y = rnd(100, WORLD - 100);
-    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk(Math.random() < .5 ? 'rabbit' : 'deer', x, y, 1)); return; }
+    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk(['rabbit', 'rabbit', 'deer', 'deer', 'elk', 'goat'][Math.random() * 6 | 0], x, y, 1)); return; }
   }
 }
 function mk(type, x, y, scale) {
@@ -465,7 +479,7 @@ function mk(type, x, y, scale) {
 }
 function ringPos() { const l = players(), q = l[Math.random() * l.length | 0] || P, a = rnd(0, TAU), d = rnd(820, 1000); return [clamp(q.x + Math.cos(a) * d, -60, WORLD + 60), clamp(q.y + Math.sin(a) * d, -60, WORLD + 60)]; }
 function spawnHostile() {
-  const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0]];
+  const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0], ['fox', 3], ['bat', 2.5], ['spider', n >= 2 ? 2 : 0], ['wolverine', n >= 3 ? 2 : 0], ['bison', n >= 4 ? 1.2 : 0]];
   const wt = MAPS[G.map].wt; for (const o of opts) if (o[0] in wt) o[1] *= wt[o[0]];
   let r = Math.random() * opts.reduce((t, o) => t + o[1], 0), type = 'wolf';
   for (const [t, w] of opts) { if ((r -= w) < 0) { type = t; break; } }
@@ -518,21 +532,22 @@ function attack(fresh) {
     for (const a of animals) {
       const d = dist(a.x, a.y, P.x, P.y); if (d > w.reach + a.r) continue;
       let da = Math.atan2(a.y - P.y, a.x - P.x) - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
-      if (Math.abs(da) < w.arc || d < 22) { hitAnimal(a, w.dmg, ax, ay); hit = true; }
+      if (Math.abs(da) < w.arc || d < 22) { hitAnimal(a, w.dmg, ax * (w.kb || 1), ay * (w.kb || 1)); hit = true; }
     }
     hit ? snd(300, .09, 'square', .06, -160) : snd(520, .06, 'sine', .025, -260); return;
   }
-  const need = w.use || 1;
-  if (P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. ' + AMMO_HINT[w.ammo]); return; }
+  const need = w.free ? 0 : w.use || 1;
+  if (!w.free && P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. ' + AMMO_HINT[w.ammo]); return; }
   autoAim(w.range * .85);
   const ang = P.ang, mx = P.x + Math.cos(ang) * 22, my = P.y + Math.sin(ang) * 22;
-  P[w.ammo] -= need; P.cd = w.cd; P.swing = .1;
+  if (!w.free) P[w.ammo] -= need; P.cd = w.cd; P.swing = .1;
   for (let i = 0; i < (w.pellets || 1); i++) {
     const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
-    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket});
+    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free});
   }
   if (multi() && NET.room) NET.room.emit('fx', {x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon}).catch(() => {});
-  if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
+  if (w.quiet) snd(w.flame ? 160 : 760, .07, w.flame ? 'sawtooth' : 'sine', .025, w.flame ? -60 : 300);
+  else if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
   else { burst(mx, my, '#ffd27a', 5); shake = Math.max(shake, w.light ? 3 : 7); snd(w.light ? 210 : 130, w.light ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
 }
 function equip(k) {
@@ -882,6 +897,7 @@ function onEv(d) { // the host told us something happened
     if (d.p !== NET.me) return;
     hurtPlayer(clamp(+d.d || 0, 0, 60), +d.x || P.x, +d.y || P.y);
     if (d.po && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); }
+    if (d.sl && !P.dead) { P.slow = 3; float(P.x, P.y - 40, 'webbed', '#d8d8d8'); }
   } else if (d.k === 'k') {
     const t = A[d.t]; if (!t) return; const x = +d.x || 0, y = +d.y || 0;
     P.meat += t.meat; if (t.meat) float(x, y - 10, '+' + t.meat + ' meat', '#f0a58f'); burst(x, y, '#8c2f22', 16); snd(110, .2, 'sawtooth', .06, -60);
@@ -915,7 +931,7 @@ function wire() {
     if (d.w === 'grenade' && isFinite(d.x + d.y + d.tx + d.ty)) { shots.push({bomb: true, fx: true, x: d.x, y: d.y, x0: d.x, y0: d.y, tx: d.tx, ty: d.ty, t: 0, T: .65, vx: 1, vy: 0}); return; }
     if (d.w === 'turret' && isFinite(d.x + d.y + d.a)) { shots.push({x: d.x, y: d.y, vx: Math.cos(d.a) * 900, vy: Math.sin(d.a) * 900, life: .42, dmg: 0, pierce: 0, hit: new Set(), arrow: true, ghost: true, fx: true}); return; }
     if (!w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
-    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, fx: true}); }
+    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free, fx: true}); }
     if (dist(d.x, d.y, P.x, P.y) < 700) w.ammo === 'arrows' ? snd(620, .09, 'triangle', .03, -420) : snd(150, .15, 'sawtooth', .05, -100);
   });
 }
@@ -1007,7 +1023,7 @@ function updPlayer(dt) {
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + stick.dy;
   const ml = Math.hypot(mx, my);
   const ride = P.riding ? VEH[P.vehicle.type] : null;
-  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (P.boots ? 1.15 : 1) * (ride ? ride.spd : 1) * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
+  if (ml > .05) { const k = Math.min(1, ml) / ml * 172 * (P.boots ? 1.15 : 1) * (P.slow > 0 ? .55 : 1) * (ride ? ride.spd : 1) * dt; move(P, mx * k, my * k, false); if (touchMode) P.ang = Math.atan2(my, mx); if (ride) P.vehicle.ang = turn(P.vehicle.ang, Math.atan2(my, mx), Math.min(1, dt * 10)); }
   if (ride) {
     P.vehicle.x = P.x; P.vehicle.y = P.y;
     if (ride.ram && ml > .3) for (const a of animals) { // run them down
@@ -1018,7 +1034,7 @@ function updPlayer(dt) {
   if (!touchMode) P.ang = Math.atan2(mouse.wy - P.y, mouse.wx - P.x);
   for (const o of trees) if (!o.dead) push(o, 9);
   for (const o of rocks) if (!o.dead) push(o, o.r - 2);
-  P.cd -= dt; P.swing -= dt; P.hurt -= dt;
+  P.cd -= dt; P.swing -= dt; P.hurt -= dt; if (P.slow > 0) P.slow -= dt;
   if (P.poison > 0) { P.poison -= dt; P.hp -= 3 * dt; if (P.hp <= 0) return die(); }
   const acting = mouse.down || mouse.fresh || actDown || actFresh || keys.Space || keys.SpaceFresh, fresh = mouse.fresh || actFresh || keys.SpaceFresh;
   if (acting) tool === 'axe' ? attack(fresh) : place(fresh);
@@ -1107,8 +1123,8 @@ function update(dt) {
     if (blocked && blocked.type && a.cd <= 0) { if (blocked.type === 'bone') { a.hp -= 6; a.flash = .1; } damageStruct(blocked, d.sdmg); a.cd = .9; }
     if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (tg !== P || P.hurt <= 0)) {
       a.cd = 1;
-      if (tg !== P) netEv({k: 'd', p: tg.peer, d: d.dmg, x: a.x | 0, y: a.y | 0, po: d.poison ? 1 : 0});
-      else { hurtPlayer(d.dmg, a.x, a.y); if (d.poison && !G.over && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } }
+      if (tg !== P) netEv({k: 'd', p: tg.peer, d: d.dmg, x: a.x | 0, y: a.y | 0, po: d.poison ? 1 : 0, sl: d.web ? 1 : 0});
+      else { hurtPlayer(d.dmg, a.x, a.y); if (d.poison && !G.over && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); } if (d.web && !P.dead) { P.slow = 3; float(P.x, P.y - 40, 'webbed', '#d8d8d8'); } }
     }
   }
   updOthers(dt); updFx(dt); netSend(dt);
@@ -1180,6 +1196,11 @@ function animalGeo(type, def) {
     const L = [[sph(), d0.head, M(r0 * .7, r0 * .55, 0, r0 * .62, r0 * .45, r0 * .55)]];
     for (let i = 0; i < 8; i++) L.push([sph(), i % 2 ? d0.body : '#4d6626', M(-i * r0 * .62, r0 * .4, Math.sin(i * 1.2) * r0 * .6, r0 * (.52 - i * .04))]);
     const g = merge(L); g.userData = {eyeX: r0 * 1.0, eyeY: r0 * .8, eyeZ: r0 * .32}; return g;
+  }
+  if (lk === 'spider') {
+    const L = [[sph(), d0.body, M(-r0 * .7, r0 * .9, 0, r0 * 1.0, r0 * .7, r0 * .9)], [sph(), d0.head, M(r0 * .45, r0 * .8, 0, r0 * .55)], [sph(), '#8d1f1f', M(-r0 * .9, r0 * 1.45, 0, r0 * .3)]];
+    for (const sd of [-1, 1]) for (let i = 0; i < 4; i++) { L.push([box(r0 * .13, r0 * .13, r0 * 1.2), d0.body, M((-.35 + i * .3) * r0, r0 * .95, sd * r0 * .95, 1, 1, 1, sd * .7, (i - 1.5) * -.25, 0)]); L.push([box(r0 * .11, r0 * .9, r0 * .11), d0.body, M((-.35 + i * .3) * r0 - (i - 1.5) * r0 * .12, r0 * .5, sd * r0 * 1.45)]); }
+    const g = merge(L); g.userData = {eyeX: r0 * .9, eyeY: r0 * .95, eyeZ: r0 * .2}; return g;
   }
   if (lk === 'crow' || type === 'hawk') {
     const g = merge([[sph(), d0.body, M(0, 0, 0, r0 * 1.1, r0 * .55, r0 * .6)], [sph(), d0.head, M(r0, r0 * .3, 0, r0 * .45)], [cone(r0 * .2, r0 * .7, 4), '#e0a030', M(r0 * 1.6, r0 * .25, 0, 1, 1, 1, 0, 0, -Math.PI / 2)],
@@ -1325,6 +1346,13 @@ function initScene() {
     machete: [[box(8, 3, 3.4), '#3a2716', M(4, 0, 0)], [box(3, 3, 8), '#2b2f33', M(9, 0, 0)], [box(30, 1.2, 6), '#c9ccc4', M(25, 0, 1)]],
     crossbow: [[box(30, 4, 4), stock, M(12, 0, 0)], [box(4, 2.5, 34), '#2b2f33', M(25, 1, 0)], [box(.8, .8, 34), '#efe6cf', M(19, 2, 0)], [cyl(.7, .7, 20, 4), '#d9c9a0', M(20, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
     revolver: [[box(17, 4, 3.2), '#8a949e', M(12, 1.5, 0)], [cyl(3.2, 3.2, 6, 6), steel, M(8, 1, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(5, 9, 3.4), stock, M(4, -4, 0, 1, 1, 1, 0, 0, .25)]],
+    hammer: [[cyl(1.8, 1.8, 34, 5), '#7a5532', M(17, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(12, 10, 18), '#6c6e68', M(34, 0, 0)], [box(13, 4, 19), '#3d444b', M(34, 0, 0)]],
+    pike: [[cyl(1.4, 1.4, 86, 5), '#8a6238', M(32, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cone(3.4, 16, 4), '#c9ccc4', M(82, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)], [box(2, 1.5, 12), '#c9ccc4', M(70, 0, 0)]],
+    bbow: [[new THREE.TorusGeometry(16, 1.6, 4, 10, Math.PI), '#e7dfc8', M(6, 0, 0, 1, 1, 1, Math.PI / 2, 0, -Math.PI / 2)], [box(.7, .7, 32), '#8d1f1f', M(6, 0, 0)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, -4, 1, 1, 1, 0, .16, Math.PI / 2)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(.6, .6, 22, 4), '#d9c9a0', M(14, 0, 4, 1, 1, 1, 0, -.16, Math.PI / 2)]],
+    dual: [[box(13, 4, 3.4), steel, M(10, 1, 0)], [box(4.5, 8, 3.4), stock, M(5, -4, 0, 1, 1, 1, 0, 0, .2)], [box(13, 4, 3.4), steel, M(10, 1, -24)], [box(4.5, 8, 3.4), stock, M(5, -4, -24, 1, 1, 1, 0, 0, .2)]],
+    staff: [[cyl(1.5, 1.8, 50, 5), '#5d3f24', M(12, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cone(5, 14, 5), '#7fd8f0', M(42, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)], [sph(), '#b8ecfa', M(36, 0, 0, 3.4)]],
+    flamer: [[cyl(3, 3, 34, 7), steel, M(18, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5, 5, 16, 8), '#b0302a', M(-2, -4, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(4, 8, 3.4), stock, M(10, -4, 0)], [cone(4, 7, 6), '#e2552a', M(38, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+    sniper: [[box(58, 2.6, 2.6), steel, M(32, 1, 0)], [box(18, 6, 4.2), stock, M(-3, -1, 0)], [box(16, 4, 4), stock, M(10, -.5, 0)], [cyl(2.4, 2.4, 20, 6), steel, M(12, 5, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(3, 6, 1.5), steel, M(40, -3, 0)]],
     launcher: [[cyl(4.5, 4.5, 46, 8), '#4a5d3a', M(14, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5.8, 4.5, 6, 8), '#3e4f31', M(-10, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(4, 8, 3.4), steel, M(8, -4, 0)], [cone(3.6, 9, 6), '#8d1f1f', M(40, 3, 0, 1, 1, 1, 0, 0, -Math.PI / 2)]],
     smg: [[box(26, 4.5, 4.5), steel, M(16, 1, 0)], [box(5, 12, 3.5), steel, M(14, -6, 0)], [box(10, 5, 4), stock, M(0, 0, 0)], [box(5, 7, 3.5), stock, M(6, -4, 0, 1, 1, 1, 0, 0, .2)]],
     rifle: [[box(42, 3, 3), steel, M(24, 1, 0)], [box(16, 6, 4.2), stock, M(-2, -1, 0)], [box(14, 4, 4), stock, M(10, -.5, 0)], [cyl(1.8, 1.8, 12, 6), steel, M(12, 4.5, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
@@ -1372,7 +1400,7 @@ function drawCompanions(h, v, pets, rx, ry, now) {
   });
 }
 function poseHand(hand, weapon, swing) {
-  if (weapon === 'axe' || weapon === 'machete') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
+  if (weapon === 'axe' || weapon === 'machete' || weapon === 'hammer') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
   else { hand.rotation.set(0, 0, 0); hand.position.x = 6 + (swing <= 0 ? 0 : WPN[weapon].melee ? Math.sin((1 - swing / .18) * Math.PI) * 24 : -swing / .1 * 5); }
 }
 function syncWorld() { // (re)build the per-game instances after reset()
@@ -1508,7 +1536,7 @@ function render(now, dt) {
     poseHand(o.m.hand, o.w, o.sw); o.m.head.material.color.copy(o.flint ? C('#3c4a52') : C('#b9bbb4'));
   }
   const ns = Math.min(shots.length, 96);
-  for (let i = 0; i < ns; i++) { const s = shots[i]; dummy.position.set(s.x, s.bomb ? 26 + Math.sin(s.t / s.T * Math.PI) * 80 : 26, s.y); dummy.rotation.set(0, -Math.atan2(s.vy, s.vx), 0); s.bomb ? dummy.scale.setScalar(8) : dummy.scale.set(s.arrow ? 24 : 34, 1.6, 1.6); dummy.updateMatrix(); shotM.setMatrixAt(i, dummy.matrix); shotM.setColorAt(i, tmpC.set(s.bomb ? 0x30362c : s.arrow ? 0xe8dcc0 : 0xffe38a)); }
+  for (let i = 0; i < ns; i++) { const s = shots[i]; dummy.position.set(s.x, s.bomb ? 26 + Math.sin(s.t / s.T * Math.PI) * 80 : 26, s.y); dummy.rotation.set(0, -Math.atan2(s.vy, s.vx), 0); s.bomb ? dummy.scale.setScalar(8) : s.flame ? dummy.scale.set(16, 7, 7) : s.magic ? dummy.scale.set(12, 5, 5) : dummy.scale.set(s.arrow ? 24 : 34, 1.6, 1.6); dummy.updateMatrix(); shotM.setMatrixAt(i, dummy.matrix); shotM.setColorAt(i, tmpC.set(s.flame ? 0xff7a2a : s.magic ? 0x7fd8f0 : s.bomb ? 0x30362c : s.arrow ? 0xe8dcc0 : 0xffe38a)); }
   shotM.count = ns; shotM.instanceMatrix.needsUpdate = true; shotM.instanceColor.needsUpdate = true;
   axeHead.material.color.copy(P.gaxe ? C('#e0b23a') : P.flint ? C('#3c4a52') : C('#b9bbb4'));
   playerG.visible = !P.dead && (P.hurt <= 0 || Math.floor(now / 60) % 2 === 0);
@@ -1602,7 +1630,7 @@ function hud() {
   for (const k of WKEYS) {
     const b = $('wpn-' + k), w = WPN[k], own = P.owned[k];
     b.classList.toggle('sel', own && P.weapon === k && tool === 'axe'); b.classList.toggle('poor', !own && (!unlocked(w) || !afford(w.cost)));
-    b.lastChild.textContent = !own ? (unlocked(w) ? costText(w.cost) : 'after night ' + w.unlock) : w.ammo ? P[w.ammo] + ' ' + w.ammo : k === 'axe' && P.flint ? 'flint · chops' : w.note;
+    b.lastChild.textContent = !own ? (unlocked(w) ? costText(w.cost) : 'after night ' + w.unlock) : w.free ? 'needs no ammo' : w.ammo ? P[w.ammo] + ' ' + w.ammo : k === 'axe' && P.flint ? 'flint · chops' : w.note;
   }
   for (const k of PK.concat(VK)) {
     const b = $('st-' + k), d = PETS[k] || VEH[k], own = PETS[k] ? P.pets.some(q => q.type === k) : !!P.vehicle && P.vehicle.type === k, on = own && (PETS[k] || P.riding);
@@ -1611,7 +1639,7 @@ function hud() {
   }
   $('tool-axe').lastChild.textContent = WPN[P.weapon].name.toLowerCase() + ' in hand';
   $('eat').hidden = P.meat < 1; $('craft').hidden = P.flint || P.gaxe || P.stone < 1;
-  $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver);
+  $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow || P.owned.bbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver || P.owned.dual || P.owned.sniper);
   $('mkarmor').hidden = P.armor || G.nights < 2; $('mkgren').hidden = G.nights < 4; $('throw').hidden = P.grenades < 1; $('throw').textContent = 'Throw grenade (G) ×' + P.grenades;
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
