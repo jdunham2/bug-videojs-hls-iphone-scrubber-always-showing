@@ -12583,7 +12583,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -12603,7 +12603,7 @@ function renderPause() {
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } });
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } });
 const WN_VER = 5;
 const WHATS_NEW = [
   ['Party games', 'The party leader can now start a game of tag or a three-minute fishing contest from the Party menu.'],
@@ -12619,6 +12619,18 @@ const WHATS_NEW = [
   ['Jobs and hobbies', 'Express post (Hollowpine), paper route (Port Wren), birdwatching (Petalfall), archaeology (Dunmere Oasis), gem cutting (Ashfall), daily riddles and the lottery (Highcairn).'],
   ['Items to use', 'War Horns call Champions, Rocket Packs light the sky, Picnic Baskets heal your party, strange potions make you giant, swift or tiny, and bandits drop Locked Strongboxes to pick.'],
 ];
+function questLog() {
+  const st = (o, steps) => !o ? '<span style="color:var(--muted)">Not started</span>' : o.step >= 4 ? '<span style="color:var(--good)">✓ Complete</span>' : `<span style="color:var(--brass)">${steps[o.step] || 'In progress'}</span>`;
+  const Q = [
+    ['The Whispering Woods', 'Elder Rowan, Hollowpine', S.ww, ['', 'Find the three old totems in the forest', 'Face the Spirit of the Wood in its glade', 'Return to Elder Rowan']],
+    ['The Lady of Gravenmoor', 'A ghost near Gravenmoor (at night)', S.gh, ['', 'Find her three keepsakes on the moors', 'Talk to her again at night', 'Kneel at her grave at midnight']],
+    ['The Sunken Bell', 'Old Marisol, Tidewatch', S.sb, ['', 'Dig up the three bell fragments on the beaches', '', 'Ring the bell at the water’s edge at dawn']],
+    ['The Lost Expedition', 'Ingrid Frostmantle, Skyhold', S.le, ['', 'Search the three abandoned camps in the snow', 'Defeat the Pale Beast at its ice cave', 'Return to Ingrid']],
+    ['The Marsh Witch', 'Morga, near Reedholm', S.mw, ['', 'Gather the three night-glowing ingredients', 'Break the curse stone and defeat the Bog Hag', 'Return to Morga']],
+  ];
+  const cases = `<b>Mystery cases</b> · <span style="color:var(--muted)">Inspector Holloway, Crownfall</span><br>${S.case && !S.case.done ? '<span style="color:var(--brass)">A case is open: question the suspects and search the scene</span>' : `<span style="color:var(--muted)">Solved: ${S.casesSolved || 0}. A new case each week.</span>`}`;
+  openPanel('Story quests', Q.map(([t, w, o, steps]) => `<b>${t}</b> · <span style="color:var(--muted)">${w}</span><br>${st(o, steps)}`).join('<br><br>') + '<br><br>' + cases + `<br><br><span style="color:var(--muted)">${Q.filter(q => q[2] && q[2].step >= 4).length} of ${Q.length} stories complete. Active objectives are marked on your map.</span>`, [{label: 'Close', primary: true, fn: closeTalk}]);
+}
 function whatsNew() {
   try { localStorage.setItem('saltwind-whatsnew', String(WN_VER)); } catch (e) {}
   openPanel('What’s new', WHATS_NEW.map(([h, t]) => `<b>${h}</b><br><span style="color:var(--muted)">${t}</span>`).join('<br><br>') + '<br><br><span style="color:var(--muted)">The map marks every new service, and the Adventurer’s Guide in your journal explains each one.</span>', [{label: 'Let’s go!', primary: true, fn: closeTalk}]);
