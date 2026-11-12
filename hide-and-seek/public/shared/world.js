@@ -72,6 +72,9 @@ export const VEHICLES = [
   { name: 'motorbike', max: 16, accel: 13, turn: 2.4, radius: 0.6, drain: 6 },
   { name: 'tractor', max: 7.5, accel: 5, turn: 1.7, radius: 1.3, drain: 1 },
   { name: 'shopping cart', max: 8.6, accel: 6, turn: 1.9, radius: 0.6, drain: 0, quiet: true },
+  { name: 'ice-cream van', max: 11, accel: 7, turn: 1.8, radius: 1.2, drain: 2.4, loud: true },
+  { name: 'skateboard', max: 10, accel: 4.5, turn: 2.6, radius: 0.45, drain: 0, quiet: true },
+  { name: 'flying saucer', max: 13.5, accel: 11, turn: 3.2, radius: 1.0, drain: 7 },
 ];
 export const PROPS = [null, 'crate', 'barrel', 'bush', 'rock', 'traffic cone'];
 export const MAPS = [
@@ -86,11 +89,14 @@ export const MAPS = [
   { veh: 'safari jeep', id: 'jungle', name: 'Dino Jungle', blurb: 'A misty jungle: huts, a ruined temple, giant eggs to hide in and old bones.' },
   { veh: 'mini submarine', id: 'reef', name: 'Coral Reef', blurb: 'The sea floor: coral forests, kelp, giant clams to hide in, a sunken wreck, and floaty jumps.' },
   { veh: 'hover taxi', id: 'neon', name: 'Neon City', blurb: 'A city at night: glowing signs, shops, parked cars, back-alley dumpsters and cardboard boxes.' },
+  { veh: 'toy race car', id: 'toy', name: 'Toy Room', blurb: 'A bedroom floor seen from ankle height: brick houses, alphabet blocks, giant books and toy chests.' },
+  { veh: 'lava buggy', id: 'lava', name: 'Volcano Island', blurb: 'Black rock and glowing crystals around a lake of lava. Step in the lava and you bounce straight out.' },
 ];
 // What a player can look like. Indexes into these lists travel over the wire as [character, colour, hat, pattern, pet].
 export const LOOKS = {
   chars: ['Blob', 'Robot', 'Cat', 'Bear', 'Penguin', 'Ghost', 'Frog', 'Alien', 'Dino', 'Bunny', 'Astronaut', 'Ninja', 'Pumpkin', 'Duck',
-    'Knight', 'Wizard', 'Pirate', 'Shark', 'Mushroom', 'Snowman'],
+    'Knight', 'Wizard', 'Pirate', 'Shark', 'Mushroom', 'Snowman',
+    'Cowboy', 'Chef', 'Zombie', 'Superhero', 'Clown', 'Viking'],
   hats: ['No hat', 'Beanie', 'Cap', 'Top hat', 'Crown', 'Party hat', 'Headphones', 'Halo'],
   pats: ['Plain', 'Stripes', 'Dots', 'Two-tone'],
   colors: 16,
@@ -129,12 +135,16 @@ const THEMES = {
     sun: [0xbfefff, 1.4], disc: 0xdff8ff, stars: 0, hills: 0x0c4a5a, outer: 0x0e4a60, roof: 0xd98a6a, exposure: 1.1 },
   neon: { sky: [[0.02, 0, 0.08], [0.12, 0.02, 0.2], [0.45, 0.1, 0.4]], glow: 0.3, fog: [0x1a0a2a, 0.012], hemi: [0xb08aff, 0x1a1030, 1.05],
     sun: [0xff7ad9, 0.7], disc: 0xffc2f0, stars: 0.6, hills: 0x140a24, outer: 0x0c0816, roof: 0x1c1830, exposure: 1.25, glass: 0x66f0ff },
+  toy: { sky: [[0.55, 0.75, 0.95], [0.85, 0.9, 0.98], [1, 0.96, 0.86]], glow: 0.35, fog: [0xf2e8d8, 0.005], hemi: [0xffffff, 0xd9b890, 1.7],
+    sun: [0xfff4dc, 2.2], disc: 0xffffff, stars: 0, hills: 0xa9c8e8, outer: 0xc9955a, roof: 0xe8324a, exposure: 1.0 },
+  lava: { sky: [[0.05, 0.02, 0.03], [0.25, 0.06, 0.04], [0.9, 0.3, 0.1]], glow: 0.9, fog: [0x3a1a14, 0.012], hemi: [0xff9a7a, 0x2a1410, 1.1],
+    sun: [0xff7a3c, 1.6], disc: 0xff5a1f, stars: 0.3, hills: 0x2a1612, outer: 0x1c100e, roof: 0x2a2428, exposure: 1.2 },
 };
 
 const _worlds = [];
 export function getWorld(i = 0) {
   i = ((i | 0) % MAPS.length + MAPS.length) % MAPS.length;
-  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy, buildWest, buildJungle, buildReef, buildNeon][i](i));
+  return _worlds[i] || (_worlds[i] = [buildTown, buildCamp, buildDocks, buildCove, buildGrave, buildMoon, buildCandy, buildWest, buildJungle, buildReef, buildNeon, buildToy, buildLava][i](i));
 }
 
 // Shared construction kit for every map. All maps keep the same centre: a plaza with the jail cage and its lever.
@@ -353,13 +363,13 @@ function kit(seed) {
     // Vehicles park on open ground with room to pull away
     const roomy = (x, z) => { for (let dz = -1.5; dz <= 1.5; dz += 0.5) for (let dx = -1.5; dx <= 1.5; dx += 0.5) if (blocked[0][cellIdx(x + dx, z + dz)]) return false; return true; };
     const vehicles = [];
-    const kinds = [0, 1, 3, 0, 2, 1, 0, 3, 4, 0, 5, 6, 7, 8];
+    const kinds = [0, 1, 3, 0, 2, 1, 0, 3, 4, 0, 5, 6, 7, 8, 9, 10, 11];
     for (let tries = 0; vehicles.length < kinds.length && tries < 30000; tries++) {
       const c = list0[(R() * list0.length) | 0];
       const x = -HALF + ((c % GN) + 0.5) * CELL, z = -HALF + (((c / GN) | 0) + 0.5) * CELL;
       if (Math.hypot(x, z) < 14 || Math.abs(x) > HALF - 5 || Math.abs(z) > HALF - 5 || !roomy(x, z)) continue;
       if (houses.some((h) => Math.abs(x - h.x) < h.w / 2 + 2 && Math.abs(z - h.z) < h.d / 2 + 2)) continue; // never park indoors
-      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 16) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
+      if (vehicles.some((v) => Math.hypot(v.x - x, v.z - z) < 15) || pads.some((p) => Math.hypot(p.x - x, p.z - z) < 5)) continue;
       vehicles.push({ id: vehicles.length, x, z, r: R() * 6.28, k: kinds[vehicles.length] });
     }
     return {
@@ -785,6 +795,77 @@ function buildNeon(i) {
   scatter(12, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
   scatter(6, 2, 0.6, 1.2, (x, z) => add(x, z, 2, 0.6, 0.5, 'bench', see));
   return K.finish(i);
+}
+
+function buildToy(i) {
+  const K = kit(4040), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const red = 0xe8324a, blue = 0x3d7fc9, yellow = 0xffd23c, green = 0x4f9a5f;
+  // Houses built from plastic bricks
+  home(-30, -28, 12, 10, red, { S: [-2], E: [1] });
+  home(30, -28, 12, 10, blue, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, yellow, { N: [0], E: [2] });
+  home(30, 28, 12, 10, green, { N: [0], W: [2] });
+  home(-60, 4, 10, 9, blue, { S: [-2], E: [2] });
+  home(60, -50, 10, 9, yellow, { S: [-2], W: [2] });
+  // The dollhouse and the castle: two storeys each
+  manor(-54, -52, 16, 10, 0xffb3d1, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0x9aa8c8, { S: [0], W: [0] });
+  // The big toy box
+  house(0, -57, 26, 12, 5, 0xc98a4a, { S: [-8, 8] }, 3);
+  for (const [x, z, h] of [[-10.5, -60.5, 2.6], [-9.1, -60.5, 1.3], [-2, -58, 1.3], [3, -60.5, 2.6], [10.5, -59, 1.3], [5, -54, 1.3], [-6, -53.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'block', { v: R() });
+  locker(12.2, -57, -1.3); locker(-12.2, -56, 1.3);
+
+  K.plaza('fountain');
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [42, 0], [0, -36], [0, 42], [-44, -36], [44, 38]]) K.lamp(x, z);
+  K.lookout(-38, 8); K.lookout(44, -10); K.lookout(8, 56); K.lookout(-8, -36);
+  K.beacon(-68, 30); K.beacon(68, -30); K.beacon(-12, 69);
+
+  scatter(11, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.4, 'toychest', { color: [red, blue, green, 0x8a5fc9][(R() * 4) | 0] }); spot('toy chest', x - 0.6, z, 1.95, 0); });
+  scatter(17, 1.6, 1.6, 2, (x, z) => spot('plushies', x, z, 0, 0));
+  scatter(60, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.4 ? 2.6 : 1.3, 'block', { v: R() }));
+  scatter(18, 3, 3, 1.3, (x, z) => (R() < 0.5 ? add(x, z, 3, 2.2, 0.6 + ((R() * 3) | 0) * 0.6, 'book', { v: R(), see: true }) : add(x, z, 2.2, 3, 0.6 + ((R() * 3) | 0) * 0.6, 'book', { v: R(), see: true })));
+  scatter(18, 1.5, 1.5, 1.2, (x, z) => add(x, z, 1.5, 1.5, 1.5, 'ball', { v: R(), see: true }));
+  scatter(28, 0.5, 0.5, 1.3, (x, z) => add(x, z, 0.5, 0.5, 3.4, 'pencil', { v: R(), see: true }));
+  scatter(12, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'domino') : add(x, z, 0.25, 6, 1.8, 'domino')));
+  return K.finish(i);
+}
+
+function buildLava(i) {
+  const K = kit(1883), { R, add, spot, house, home, manor, locker, scatter, see } = K;
+  const basalt = 0x5a5560, scorched = 0x6a5a55;
+  home(-30, -28, 12, 10, basalt, { S: [-2], E: [1] });
+  home(30, -28, 12, 10, scorched, { S: [-2], W: [1] });
+  home(-30, 28, 12, 10, scorched, { N: [0], E: [2] });
+  home(-60, 4, 10, 9, basalt, { S: [-2], E: [2] });
+  home(60, -50, 10, 9, basalt, { S: [-2], W: [2] });
+  home(-58, 52, 10, 9, scorched, { S: [-2], E: [2] });
+  // The observatory and the lodge: two storeys each
+  manor(-54, -52, 16, 10, 0x4a4550, { S: [0], E: [0] });
+  manor(54, 52, 16, 10, 0x70564a, { S: [0], W: [0] });
+  // The forge
+  house(0, -57, 22, 13, 5, 0x3a3540, { S: [-6, 6] }, 3);
+  for (const [x, z, h] of [[-8.5, -61, 2.6], [-2, -58, 1.3], [3, -61, 1.3], [8.5, -60, 2.6], [5, -53.5, 1.3]]) add(x, z, 1.3, 1.3, h, 'crate');
+  for (const [x, z] of [[0, -62], [-6, -54]]) add(x, z, 0.8, 0.8, 1.1, 'barrel', see);
+  locker(10.2, -55, -1.3); locker(-10.2, -58, 1.3);
+
+  K.plaza('campfire');
+  for (const [x, z, w, d] of [[-8.6, -3, 0.6, 2], [8.6, -3, 0.6, 2], [0, -9, 2, 0.6]]) add(x, z, w, d, 0.5, 'bench', see);
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 12], [12, 18], [-42, 0], [0, -36], [0, 42], [-44, -36], [44, -30], [-30, 54]]) K.lamp(x, z);
+  K.keepOut.push([20, 12, 58, 40]); // the lava lake
+  K.lookout(-38, 8); K.lookout(44, -10); K.lookout(8, 56); K.lookout(-8, -36);
+  K.beacon(-68, 30); K.beacon(68, -30); K.beacon(-12, 69);
+
+  // Lava tubes to crawl into, and drifts of ash to lie under
+  scatter(11, 4.4, 2.6, 1.2, (x, z) => { add(x - 0.6, z, 2.4, 2.4, 2.0, 'tube', { v: R() }); spot('cave', x - 0.6, z, 1.95, 0); });
+  scatter(17, 1.6, 1.6, 2, (x, z) => spot('ash pile', x, z, 0, 0));
+  scatter(30, 2.4, 2.4, 1.4, (x, z) => add(x, z, 2.4, 2.4, 2.8, 'bigrock', { v: R() }));
+  scatter(40, 1.6, 1.4, 1.2, (x, z) => add(x, z, 1.6, 1.4, 1.0, 'rock', { v: R(), see: true }));
+  scatter(34, 0.8, 0.8, 1.3, (x, z) => add(x, z, 0.8, 0.8, 3, 'crystal', { v: R() }));
+  scatter(45, 0.7, 0.7, 1.5, (x, z) => add(x, z, 0.7, 0.7, 6, 'deadtree', { v: R() }));
+  scatter(16, 0.9, 0.9, 1.2, (x, z) => add(x, z, 0.9, 0.9, 0.6, 'vent', { v: R(), see: true }));
+  scatter(10, 1.3, 1.3, 1.2, (x, z) => add(x, z, 1.3, 1.3, R() < 0.3 ? 2.6 : 1.3, 'crate'));
+  scatter(7, 6, 6, 1.2, (x, z) => (R() < 0.5 ? add(x, z, 6, 0.25, 1.8, 'fence') : add(x, z, 0.25, 6, 1.8, 'fence')));
+  return K.finish(i, { pond: [39, 26, 17, 12], hot: true });
 }
 
 function buildDocks(i) {

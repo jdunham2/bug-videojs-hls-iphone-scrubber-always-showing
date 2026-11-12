@@ -516,6 +516,12 @@ function update(dt, now) {
     // walked off the edge of a deck or balcony: the floor is now a storey further down
     if (me.lv === 1 && !onStairs(W, me.x, me.z) && !inUpper(W, me.x, me.z)) { me.lv = 0; me.gy = 0; me.y += FLOOR_H; me.peak = Math.max(me.peak || 0, me.y); }
     // jump pads fling you high enough to come down on a lookout
+    // Volcano Island: lava is too hot to stand in. You bounce out, singed and winded.
+    if (W.hot && me.y === 0 && me.lv === 0 && ((me.x - W.pond[0]) / W.pond[2]) ** 2 + ((me.z - W.pond[1]) / W.pond[3]) ** 2 < 1) {
+      me.vy = 8.5; me.y = 0.001; me.peak = 0; me.stam = Math.max(0, me.stam - 14);
+      sfx.stun();
+      if (now > (me.hotMsg || 0)) { me.hotMsg = now + 4000; feed('Ouch! The lava is hot.', 'bad'); }
+    }
     if (me.y === 0 && me.lv === 0 && !frozen) for (const pd of W.pads) {
       if (Math.hypot(pd.x - me.x, pd.z - me.z) > 0.85) continue;
       me.vy = 12.4; me.y = 0.001; me.peak = 0;
@@ -629,7 +635,7 @@ function hud(p, now, s) {
 
   $('blind').classList.toggle('on', s.blind);
   if (s.blind) $('blindCount').textContent = Math.ceil(tl);
-  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush', wagon: 'locker', 'giant egg': 'locker', 'hay bales': 'bush', ferns: 'bush', 'giant clam': 'dumpster', kelp: 'bush', 'cardboard boxes': 'locker' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
+  $('hideview').className = s.hidden ? ({ tent: 'dumpster', snowdrift: 'bush snow', container: 'locker', rowboat: 'dumpster', coffin: 'locker', pod: 'locker', 'gift box': 'locker', boulders: 'bush snow', gumdrops: 'bush', wagon: 'locker', 'giant egg': 'locker', 'hay bales': 'bush', ferns: 'bush', 'giant clam': 'dumpster', kelp: 'bush', 'cardboard boxes': 'locker', 'toy chest': 'locker', plushies: 'bush', cave: 'dumpster', 'ash pile': 'bush snow' }[W.spots[p.hid].kind] || W.spots[p.hid].kind) : '';
   $('stam').style.width = me.stam + '%';
   $('stam').classList.toggle('wind', s.winded);
   const canAct = !s.blind && p.st === 0 && G.ph === 'seek';

@@ -35,7 +35,7 @@ for (let mode = 0; mode < MODES.length; mode++) for (let map = 0; map < MAPS.len
   if (mode === 2 && seen.caught && !seen.frozen) fail('nobody froze');
   if (mode === 3 && seen.props < 7) fail('hiders have no props');
   if (mode !== 3 && seen.props) fail('props outside prop hunt');
-  if (mode === 11 && seen.end === 'hiders' && seen.far > 30) fail('a free hider finished far outside the storm wall');
+  if (mode === 11 && seen.far > room.zr + 30) fail(`a free hider finished ${seen.far.toFixed(0)} m out with the storm wall at ${room.zr.toFixed(0)} m`);
   if (mode === 12 && !seen.swap) fail('switcheroo never swapped');
   if (mode === 6 && seen.startSeekers !== 9) fail('sardines should start with one hider and everyone else seeking');
   if (mode === 6 && seen.caught && seen.minSeekers >= 9) fail('finders did not join the hider');

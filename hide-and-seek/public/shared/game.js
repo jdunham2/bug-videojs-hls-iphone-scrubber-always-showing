@@ -239,7 +239,7 @@ function updateVehicles(room, dt, t) {
     // fuel is burned per metre driven (see the movement handler); here it only trickles back while parked
     if (d && t - (v.movedAt || 0) < 0.4) {
       // consequences: an engine is the loudest thing on the map
-      if (room.phase === 'seek' && d.role === HIDER && !VEHICLES[v.k].quiet && t >= v.noiseT) { emitNoise(room, v.x, v.z, 'engine', d.id); v.noiseT = t + 0.5; }
+      if (room.phase === 'seek' && d.role === HIDER && !VEHICLES[v.k].quiet && t >= v.noiseT) { emitNoise(room, v.x, v.z, 'engine', d.id); v.noiseT = t + (VEHICLES[v.k].loud ? 0.25 : 0.5); }
     } else v.fuel = Math.min(100, v.fuel + (d ? VEHICLE.regen : VEHICLE.idleRegen) * dt);
   }
 }

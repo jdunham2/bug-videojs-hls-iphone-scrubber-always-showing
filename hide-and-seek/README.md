@@ -14,7 +14,7 @@ npm start
 
 Open http://localhost:3000, pick a name and press **Play**. Share the invite link
 (or the 4-letter room code) with friends on the same server. The host can add bots
-and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-10, the starting map) or `MODE` (0-13) to change the defaults.
+and start the round. Set `PORT`, `HIDE_T` or `SEEK_T` (seconds), `MAP` (0-12, the starting map) or `MODE` (0-13) to change the defaults.
 
 ## How it plays
 
@@ -61,8 +61,9 @@ Beacons, power-ups, coins and challenges work in every mode.
 
 ### Characters
 
-Twenty characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
-Duck, Knight, Wizard, Pirate, Shark, Mushroom, Snowman), 16 colours, seven hats, four patterns and
+Twenty-six characters (Blob, Robot, Cat, Bear, Penguin, Ghost, Frog, Alien, Dino, Bunny, Astronaut, Ninja, Pumpkin,
+Duck, Knight, Wizard, Pirate, Shark, Mushroom, Snowman, Cowboy, Chef, Zombie, Superhero, Clown, Viking),
+16 colours, seven hats, four patterns and
 41 pets (puppy, kitten, bunny, duckling, baby dragon, slime, bee, robo-ball, fox, panda, piglet, unicorn, turtle,
 owl, bat, ghostling, crab, hedgehog, froglet, parrot, snail, penguin chick, mouse, butterfly, mini UFO, baby shark, jellyfish, chick, lamb, tiny T-rex, squirrel, firefly,
 little cloud, corgi, red panda, koala, axolotl, ladybug, seahorse, phoenix, pumpkin sprout). Your pet runs just ahead of you;
@@ -89,15 +90,17 @@ The host picks the map in the lobby with **Next map**.
 | **Dino Jungle** | A misty jungle with huts, a ruined temple, a swamp and old bones | Giant eggs, ferns, lockers |
 | **Coral Reef** | The sea floor, with coral forests, a sunken galleon and a palace. Floaty gravity: jumps go nearly twice as high | Giant clams, kelp, lockers |
 | **Neon City** | A city at night with glowing signs, shops, an arcade and parked cars | Dumpsters, cardboard boxes, lockers |
+| **Toy Room** | A bedroom floor from ankle height: brick houses, alphabet blocks, giant books and a play rug | Toy chests, piles of plushies, lockers |
+| **Volcano Island** | Black rock and glowing crystals around a lava lake. Step in the lava and you bounce out, losing stamina | Lava-tube caves, ash piles, lockers |
 
 ### Vehicles
 
-Every map has fourteen vehicles, always parked outdoors. Stand next to one and press **E** to climb in or out, then drive with the move keys
+Every map has seventeen vehicles, always parked outdoors. Stand next to one and press **E** to climb in or out, then drive with the move keys
 (or the joystick on a phone).
 
 | Vehicle | Top speed | A full tank lasts | Notes |
 | --- | --- | --- | --- |
-| The map's own ride (go-kart, snowmobile, forklift, beach buggy, ghost cart, moon rover, cupcake car, buckboard, safari jeep, mini submarine, hover taxi) | 12.5 m/s | about 310 m | The all-rounder; four per map |
+| The map's own ride (go-kart, snowmobile, forklift, beach buggy, ghost cart, moon rover, cupcake car, buckboard, safari jeep, mini submarine, hover taxi, toy race car, lava buggy) | 12.5 m/s | about 310 m | The all-rounder; four per map |
 | Scooter | 10 m/s | about 300 m | Narrow enough to ride through doorways, and turns on the spot |
 | Monster truck | 10.5 m/s | about 525 m | Wide and slow to turn, but the tank goes on and on |
 | Hoverboard | 14 m/s | about 175 m | Silent: no engine pings |
@@ -106,8 +109,11 @@ Every map has fourteen vehicles, always parked outdoors. Stand next to one and p
 | Motorbike | 16 m/s | about 265 m | Fast and narrow enough for doorways |
 | Tractor | 7.5 m/s | about 750 m | Barely faster than a sprint, but it almost never runs dry |
 | Shopping cart | 8.6 m/s | never runs out | No engine: silent and needs no fuel |
+| Ice-cream van | 11 m/s | about 460 m | Its jingle pings seekers twice as often as any other engine |
+| Skateboard | 10 m/s | never runs out | Silent, fits through doorways, slow to get going |
+| Flying saucer | 13.5 m/s | about 195 m | The most agile thing on the map, and thirsty |
 
-- No vehicle can climb stairs. Only the scooter, hoverboard, motorbike and shopping cart fit through doorways.
+- No vehicle can climb stairs. Only the scooter, hoverboard, motorbike, shopping cart and skateboard fit through doorways.
 - Engines are the loudest thing on the map: seekers see a ping every half second while a hider drives.
 - Fuel is burned per metre driven. An empty vehicle only crawls until it has rested.
 - Seekers can drive too, and can tag from the driving seat. Getting caught throws you out.
@@ -163,7 +169,7 @@ run `npm run build:artifact` and publish `artifact/index.html` with `public/styl
 | --- | --- |
 | `server.js` | HTTP + WebSocket server: one game room per code |
 | `public/shared/game.js` | Rules, rounds, scoring and bot AI — runs on the server or in a browser tab |
-| `public/shared/world.js` | The eleven maps (each generated from a fixed seed), collision, line of sight, pathfinding |
+| `public/shared/world.js` | The thirteen maps (each generated from a fixed seed), collision, line of sight, pathfinding |
 | `public/js/net.js` | The three connection modes above |
 | `public/js/main.js` | Client: input (keyboard, mouse, touch), movement, HUD |
 | `public/js/gfx.js` | Three.js scene, the character models and picker preview, effects |
