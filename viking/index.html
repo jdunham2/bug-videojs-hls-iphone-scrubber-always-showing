@@ -140,7 +140,7 @@
 <div class="ui glass" id="hud"></div>
 <div class="ui glass" id="quests"></div>
 <div class="ui glass" id="compass"><canvas id="compassCv" width="360" height="40"></canvas></div>
-<div class="ui glass" id="mini"><canvas id="miniCv" width="200" height="140"></canvas></div>
+<div class="ui glass" id="mini"><canvas id="miniCv" width="240" height="200"></canvas></div>
 <div class="ui glass" id="sail"></div>
 <div class="ui glass" id="combat"></div>
 <div class="ui glass" id="prompt"></div>
@@ -244,11 +244,33 @@ const PLACES = [
     prices: { furs: 1.5, amber: .6, iron: .9, mead: 1.3, salt: 1.5, wool: 1.2 } },
   { id: 'eyrie', name: "Odin's Eyrie", type: 'shrine', mx: 1133, my: 273, R: 90, H: 14, peak: 30, clear: .4,
     desc: 'A crag where ravens gather by the thousand. Some say the All-Father himself watches from the peak.' },
+  { id: 'spine', name: 'Dragonspine', type: 'wild', mx: 567, my: -643, R: 190, H: 12, peak: 120, clear: 0, volcano: true, dragon: true,
+    desc: 'A jagged volcano at the top of the world. Scorched bones litter its slopes, and something vast sleeps in the crater.' },
+  { id: 'iceteeth', name: 'The Ice Teeth', type: 'wild', mx: -567, my: -493, R: 160, H: 14, peak: 80, clear: 0, snowy: true, wolves: 2, bears: 2, deer: 3,
+    desc: 'Frozen spires in the far north-west, where the sea itself turns to ice in winter.' },
+  { id: 'hrafn', name: 'Hrafnfjord', type: 'town', mx: -683, my: 240, R: 130, H: 11, peak: 25, clear: .42, def: 50,
+    desc: 'A fjord town at the western edge of the world, famous for its shipwrights and its ravens.',
+    prices: { furs: .8, amber: 1.4, iron: 1.2, mead: 1.1, salt: 1.3, wool: .9 } },
+  { id: 'moss', name: 'Mossmere Forest', type: 'wild', mx: -600, my: 1107, R: 170, H: 15, peak: 35, clear: 0, deer: 5, bears: 2, wolves: 1, camp: true,
+    desc: 'An ancient green forest dripping with moss. Outlaws hide here, and the deer grow fat.' },
+  { id: 'sun', name: 'Sunhaven', type: 'village', mx: 800, my: 1290, R: 120, H: 7, peak: 0, clear: .4, def: 22, deer: 2,
+    desc: 'A warm southern village of orchards and beehives. Its mead is the sweetest in the world.',
+    prices: { furs: 1.5, amber: 1.3, iron: 1.3, mead: .55, salt: 1.1, wool: 1 } },
+  { id: 'glimmer', name: 'Glimmerholm', type: 'shrine', mx: 1567, my: 1173, R: 95, H: 12, peak: 20, clear: .4,
+    desc: 'An island of pale stones that glitter at dusk. Freyja is said to walk here.' },
+  { id: 'kaup', name: 'Kaupang', type: 'town', mx: 1733, my: 440, R: 140, H: 10, peak: 15, clear: .42, def: 70, smith: true,
+    desc: 'The greatest market of the east. Silks, silver and swords from lands beyond the sea change hands here.',
+    prices: { furs: 1.6, amber: 1.2, iron: .8, mead: 1.4, salt: 1.2, wool: 1.5 } },
+  { id: 'skull', name: 'Skull Isle', type: 'ruins', mx: 1600, my: -493, R: 125, H: 7, peak: 25, clear: .3,
+    desc: 'A black rock shaped like a grinning skull. The barrows here are older than any king.' },
+  { id: 'kong', name: 'Kongshavn', type: 'town', mx: 100, my: 1340, R: 145, H: 12, peak: 20, clear: .42, def: 100,
+    desc: "The king's harbour: a great walled town of a thousand warriors and the richest treasury in the south.",
+    prices: { furs: 1.3, amber: .9, iron: 1.1, mead: 1.2, salt: 1.4, wool: 1.1 } },
 ];
 PLACES.forEach((p, i) => { p.wx = (p.mx - 500) * 3; p.wz = (p.my - 340) * 3; p.seed = i * 1.37 + .5; p.colliders = []; p.treePts = []; });
 function seeded(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 const P = Object.fromEntries(PLACES.map(p => [p.id, p]));
-const WORLD = { minX: -2550, maxX: 2650, minZ: -2000, maxZ: 1950 };
+const WORLD = { minX: -4200, maxX: 4200, minZ: -3500, maxZ: 3500 };
 
 function edgeR(p, a) {
   return p.R * (1 + .16 * Math.sin(a * 3 + p.seed) + .09 * Math.sin(a * 5 + p.seed * 1.7) + .05 * Math.sin(a * 11 + p.seed * 2.3));
@@ -377,7 +399,7 @@ function openRoster() {
 }
 const power = () => (S.crew + traitCount('strong') * .5 + traitCount('berserker')) * (1 + S.weapons * .3) * (.6 + S.morale / 250) * (1 + S.luck * .1);
 const defenseOf = p => p.def * (1 + (S.alert[p.id] || 0) * .5) * (S.weak && S.weak[p.id] > S.day ? .7 : 1);
-const FACTION_COL = { frost: 0x2f5d8a, iron: 0x5a5a62, skar: 0x6a4a8a, ulf: 0xa07a20, jarl: 0x6a1010, salt: 0x3a7a7a, green: 0x4a7a3a, bjorn: 0x7a4a2a };
+const FACTION_COL = { hrafn: 0x2a6a4a, kaup: 0x8a5a1a, kong: 0x4a2a6a, sun: 0xc0a030, frost: 0x2f5d8a, iron: 0x5a5a62, skar: 0x6a4a8a, ulf: 0xa07a20, jarl: 0x6a1010, salt: 0x3a7a7a, green: 0x4a7a3a, bjorn: 0x7a4a2a };
 function startWar() {
   const towns = PLACES.filter(p => p.def && !(S.hostile[p.id] > 0));
   if (towns.length < 2) return;
@@ -545,6 +567,7 @@ const Sound = {
   swish() { this.noiseBurst('bandpass', 1800, .12, .18, .02); },
   clang() { this.pluck(1300, .07, .3); this.noiseBurst('highpass', 3500, .15, .1); },
   howl() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(320, now); o.frequency.linearRampToValueAtTime(620, now + .6); o.frequency.linearRampToValueAtTime(420, now + 1.8); this.env(o, .08, .3, 2).connect(this.master); o.start(); o.stop(now + 2.1); },
+  fire() { this.noiseBurst('bandpass', 500, .18, .35, .02); this.noiseBurst('lowpass', 160, .2, .4, .02); },
   roar() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(110, now); o.frequency.linearRampToValueAtTime(60, now + 1.4); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; o.connect(f); this.env(f, .22, .08, 1.6).connect(this.master); o.start(); o.stop(now + 1.7); this.noiseBurst('lowpass', 300, .3, 1.2, .05); },
   groan() { if (!this.ctx) return; const c = this.ctx, now = c.currentTime, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, now); o.frequency.linearRampToValueAtTime(52, now + 1.5); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 300; o.connect(f); this.env(f, .15, .2, 1.8).connect(this.master); o.start(); o.stop(now + 1.9); },
   whistle() { if (!this.ctx) return; [0, 180].forEach((d, i) => setTimeout(() => { const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(1500 + i * 400, this.ctx.currentTime); o.frequency.linearRampToValueAtTime(2200 + i * 300, this.ctx.currentTime + .15); this.env(o, .06, .02, .25).connect(this.master); o.start(); o.stop(this.ctx.currentTime + .3); }, d)); },
@@ -926,8 +949,8 @@ function applySeason(force) {
 const floes = [];
 function buildFloes() {
   const r = seeded(4242), mat = new THREE.MeshStandardMaterial({ color: 0xe8f0f4, roughness: .55, flatShading: true });
-  for (let i = 0; i < 90; i++) {
-    const x = WORLD.minX + r() * (WORLD.maxX - WORLD.minX), z = WORLD.minZ + r() * 1350;
+  for (let i = 0; i < 170; i++) {
+    const x = WORLD.minX + r() * (WORLD.maxX - WORLD.minX), z = WORLD.minZ + r() * 2200;
     if (terrainH(x, z) > -15) continue;
     const rad = 5 + r() * 12, m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * .85, 1.6, 5 + Math.floor(r() * 3)), mat);
     m.position.set(x, .2, z); m.rotation.y = r() * 6; m.visible = false; m.receiveShadow = true; scene.add(m);
@@ -1010,7 +1033,7 @@ function pole(x, z, cols) {
   place(shadow(g), x, z, 0, .3);
 }
 
-let shrineOrb, shrineLight, volcanoLight; const shrines = [];
+let shrineOrb, shrineLight, volcanoLight; const shrines = [], volcanoLights = [];
 const animated = [];
 function buildSettlement(p) {
   const rr = (a, b) => { const r = rnd(a, b) * p.R, ang = rnd(0, Math.PI * 2); return [p.wx + Math.cos(ang) * r, p.wz + Math.sin(ang) * r]; };
@@ -1117,7 +1140,7 @@ function buildSettlement(p) {
   } else if (p.volcano) {
     const cy = islandH(p, p.wx, p.wz);
     const lava = new THREE.Mesh(new THREE.CircleGeometry(p.R * .1, 16), M.lava); lava.rotation.x = -Math.PI / 2; lava.position.set(p.wx, cy + 1.5, p.wz); scene.add(lava);
-    volcanoLight = new THREE.PointLight(0xff5a20, 4000, 400, 2); volcanoLight.position.set(p.wx, cy + 12, p.wz); scene.add(volcanoLight);
+    volcanoLight = new THREE.PointLight(0xff5a20, 4000, 400, 2); volcanoLight.position.set(p.wx, cy + 12, p.wz); scene.add(volcanoLight); volcanoLights.push(volcanoLight);
     chimneySmoke(p.wx, cy + 6, p.wz, 3.5);
     // hot spring
     const sx = p.wx + p.dock.dx * (p.dock.shore - 30), sz = p.wz + p.dock.dz * (p.dock.shore - 30);
@@ -1138,6 +1161,12 @@ function buildSettlement(p) {
     for (let i = 0; i < 7; i++) { const st = new THREE.Mesh(new THREE.DodecahedronGeometry(.35, 0), M.rock); st.position.set(Math.cos(i) * 1.1, .2, Math.sin(i) * 1.1); fire.add(st); }
     const embers = new THREE.Mesh(new THREE.ConeGeometry(.6, 1.1, 6), M.lava); embers.position.y = .5; fire.add(embers);
     place(fire, c.x, c.z, 0, 0); chimneySmoke(c.x, groundY(c.x, c.z) + 1.5, c.z, .4);
+  }
+  if (p.dragon) {
+    const a = Math.atan2(p.dock.dz, p.dock.dx) + Math.PI, d = p.R * .3;
+    p.lairPos = landNear(p, p.wx + Math.cos(a) * d, p.wz + Math.sin(a) * d);
+    for (let i = 0; i < 9; i++) { const pile = new THREE.Mesh(new THREE.ConeGeometry(rnd(.8, 1.6), rnd(.6, 1.2), 7), GOLDPILE); place(pile, p.lairPos.x + rnd(-7, 7), p.lairPos.z + rnd(-7, 7), 0, .1); }
+    for (let i = 0; i < 6; i++) { const rib = new THREE.Mesh(new THREE.TorusGeometry(3.5, .25, 4, 10, Math.PI), M.bone); place(rib, p.lairPos.x + rnd(-12, 12), p.lairPos.z + rnd(-12, 12), rnd(0, 6), .8); }
   }
   if (p.troll) {
     const a = Math.atan2(p.dock.dz, p.dock.dx) + Math.PI * .8, d = p.R * .42;
@@ -1329,7 +1358,8 @@ function currentTarget() {
   let best = null, bd = 260;
   for (const n of npcs) { if (!n.hostile || n.dead) continue; const d = Math.hypot(n.pos.x - ship.pos.x, n.pos.y - ship.pos.y); if (d < bd) { bd = d; best = n; } }
   if (serpent && !serpent.sinking) { const d = Math.hypot(serpent.g.position.x - ship.pos.x, serpent.g.position.z - ship.pos.y); if (d < bd) { bd = d; best = serpent; } }
-  if (kraken && !kraken.sinking) { const d = Math.hypot(kraken.x - ship.pos.x, kraken.z - ship.pos.y); if (d < bd + 40) best = kraken; }
+  if (kraken && !kraken.sinking) { const d = Math.hypot(kraken.x - ship.pos.x, kraken.z - ship.pos.y); if (d < bd + 40) { bd = d; best = kraken; } }
+  for (const D of dragons) { if (D.dead) continue; const d = D.pos.distanceTo(ship.g.position); if (d < Math.max(bd, 170)) { bd = d; best = D; } }
   return best;
 }
 function playerShoot() {
@@ -1341,6 +1371,7 @@ function playerShoot() {
   }
   const from = ship.g.position, count = clamp(Math.ceil(S.crew / 2), 2, 8) + Math.min(3, traitCount('archer'));
   if (tgt) {
+    if (tgt.pos && tgt.vel) { fireVolley(from, tgt.pos, { x: tgt.vel.x, z: tgt.vel.z }, count, 2 + tgt.pos.distanceTo(from) * .03, 'player'); shootCd = Math.max(1, 2.2 - S.weapons * .2); Sound.bow(count); return; }
     const isS = tgt === serpent || tgt === kraken, tp = tgt === kraken ? tmpV2.set(kraken.x, kraken.g.position.y + 5, kraken.z) : isS ? tgt.head.getWorldPosition(tmpV2) : tgt.g.position;
     fireVolley(from, tp, isS ? { x: 0, z: 0 } : velOf(tgt.h, tgt.speed), count, 1.2 + Math.hypot(tp.x - from.x, tp.z - from.z) * .03, 'player');
   } else {
@@ -1381,6 +1412,7 @@ function stepArrows(dt) {
       for (const n of npcs) if (!n.dead && inShip(a.p, n.g, n.pos.x, n.pos.y, n.h)) { hitNPC(n, a.p); hit = true; break; }
       if (!hit && serpent && !serpent.sinking && serpentHitTest(a.p)) { hitSerpent(a.p); hit = true; }
       if (!hit && kraken && !kraken.sinking) { const m = krakenHitTest(a.p); if (m) { hitKraken(a.p, m); hit = true; } }
+      if (!hit) { const D = dragonHitTest(a.p); if (D) { hitDragon(D, a.p, 2); hit = true; } }
     } else if (!S.docked && inShip(a.p, ship.g, ship.pos.x, ship.pos.y, ship.h)) { hitPlayer(a.p); hit = true; }
     const wh = waveH(a.p.x, a.p.z, elapsed);
     if (!hit && a.land && a.p.y < terrainH(a.p.x, a.p.z)) { a.life = 99; }
@@ -1482,6 +1514,7 @@ function defeat() {
   npcs.forEach(n => { if (n.hostile && !n.dead) { disengage(n, 150); n.boardCd = 30; } });
   if (serpent) serpent.sinking = true;
   if (kraken) { kraken.sinking = true; }
+  dragons.forEach(D => { if (!D.dead) { D.state = 'climb'; D.climbT = -8; } });
   boarding = null; abortRaid(); renderHUD(); save();
 }
 function startRaid() {
@@ -1548,6 +1581,12 @@ function updateFoeLabels() {
   if (kraken && !kraken.sinking && !titleOn) {
     if (placeLabel(krakenLabel, tmpV2.set(kraken.x, kraken.g.position.y + 20, kraken.z), 0)) { krakenLabel.innerHTML = foeHTML('the Kraken', kraken.hp, kraken.maxHp, null); krakenLabel.classList.toggle('target', kraken === tgt); }
   } else krakenLabel.style.display = 'none';
+  for (const D of dragons) {
+    let el = foeLabels.get(D);
+    if (D.dead || titleOn) { if (el) el.style.display = 'none'; continue; }
+    if (!el) { el = document.createElement('div'); el.className = 'foe'; document.body.appendChild(el); foeLabels.set(D, el); }
+    if (placeLabel(el, D.pos, D.great ? 14 : 7)) el.innerHTML = foeHTML(D.great ? 'Fáfnir the dragon' : 'drake', D.hp, D.maxHp, null);
+  }
   if (maelLabel) {
     const d = Math.hypot(MAELSTROM.x - camera.position.x, MAELSTROM.z - camera.position.z);
     if (titleOn || d > 1500 || !placeLabel(maelLabel, tmpV2.set(MAELSTROM.x, 30, MAELSTROM.z), 0)) maelLabel.style.display = 'none';
@@ -1631,6 +1670,197 @@ function updateSerpent(dt, t, paused) {
   s.head.position.set(-35, 7 + Math.sin(t * 1.5) * 1.5, s.lunge < 0 ? 6 : 0); s.head.rotation.y = Math.PI * .8;
   s.g.lookAt(ship.g.position.x, s.g.position.y, ship.g.position.z);
   if (s.sinking && s.rise <= 0) { scene.remove(s.g); serpent = null; }
+}
+
+// ---- dragons: Fáfnir of Dragonspine and the drakes of the outer seas ----
+const dragons = [], fireSprites = [];
+const fireMat = new THREE.SpriteMaterial({ map: SOFT, color: 0xff7a20, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false });
+function makeDragon(scale, body, belly, horn) {
+  const g = new THREE.Group(), skin = new THREE.MeshStandardMaterial({ color: body, roughness: .55, metalness: .15, flatShading: true });
+  const bellyM = new THREE.MeshStandardMaterial({ color: belly, roughness: .6, flatShading: true }), hornM = new THREE.MeshStandardMaterial({ color: horn, roughness: .4 });
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), skin); torso.scale.set(2.2, 2, 5);
+  const under = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6), bellyM); under.scale.set(1.8, 1.4, 4.2); under.position.y = -.7;
+  g.add(torso, under);
+  const neck = [];
+  for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(1.2 - i * .1, 8, 6), skin); m.position.set(0, .8 + i * .9, -4.6 - i * 1.3); g.add(m); neck.push(m); }
+  const head = new THREE.Group(); head.position.set(0, 5.4, -11.2); g.add(head);
+  const skull = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.3, 3.2), skin); head.add(skull);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(1.3, .45, 2.8), bellyM); jaw.position.set(0, -.8, -.3); head.add(jaw);
+  [-.55, .55].forEach(x => {
+    const h = new THREE.Mesh(new THREE.ConeGeometry(.25, 2.2, 5), hornM); h.position.set(x, 1.1, 1); h.rotation.x = 1.1; head.add(h);
+    const e = new THREE.Mesh(new THREE.SphereGeometry(.2, 6, 4), new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xffaa00, emissiveIntensity: 3 })); e.position.set(x * 1.2, .35, -.9); head.add(e);
+  });
+  const mouth = new THREE.Object3D(); mouth.position.set(0, -.4, -2); head.add(mouth);
+  const tail = [];
+  for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(1 - i * .09, 8, 6), skin); m.position.set(0, 0, 4.6 + i * 1.3); g.add(m); tail.push(m); }
+  const spike = new THREE.Mesh(new THREE.ConeGeometry(.5, 1.8, 4), hornM); spike.rotation.x = Math.PI / 2; spike.position.set(0, 0, 16.6); g.add(spike); tail.push(spike);
+  const wingShape = new THREE.Shape(); [[0, 0], [5, 1.4], [11, 1], [14, -1.5], [10.5, -3], [7.5, -6.5], [4.5, -4], [2, -6], [0, -3.5]].forEach(([x, y], i) => i ? wingShape.lineTo(x, y) : wingShape.moveTo(x, y));
+  const wingG = new THREE.ShapeGeometry(wingShape), wingM = new THREE.MeshStandardMaterial({ color: body, roughness: .7, side: THREE.DoubleSide, transparent: true, opacity: .93 });
+  const wings = [-1, 1].map(sd => {
+    const pv = new THREE.Group(); pv.position.set(sd * 1.6, 1.3, -1.5);
+    const w = new THREE.Mesh(wingG, wingM); w.rotation.x = -Math.PI / 2; w.scale.set(sd, 1, 1); pv.add(w); g.add(pv); return pv;
+  });
+  [[-1.3, -2.5], [1.3, -2.5], [-1.3, 2.5], [1.3, 2.5]].forEach(([x, z]) => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.35, .25, 2.2, 5), skin); l.position.set(x, -2, z); g.add(l); });
+  g.scale.setScalar(scale); shadow(g, true, false);
+  g.userData = { neck, head, mouth, tail, wings };
+  return g;
+}
+function spawnDragon(kind, x, z) {
+  const great = kind === 'great';
+  const g = great ? makeDragon(2.2, 0x7a1a14, 0xd9a441, 0x2a1a10) : makeDragon(1, pick([0x2f5a2a, 0x6a4a1a, 0x3a3a5a]), 0xa89a6a, 0x1a1a1a);
+  const D = { kind, great, g, pos: new THREE.Vector3(x, great ? 70 : 45, z), vel: new THREE.Vector3(0, 0, -20), hp: great ? 600 : 200, maxHp: great ? 600 : 200,
+    r: great ? 15 : 7.5, state: 'circle', timer: rnd(3, 5), ang: rnd(0, 6.28), alt: great ? 55 : 38, R: great ? 110 : 75, speed: great ? 34 : 40, dps: great ? 15 : 8,
+    breath: 0, fireT: 0, dead: false, deathT: 0, name: great ? 'Fáfnir the dragon' : 'drake', warned: false };
+  scene.add(g); dragons.push(D);
+  Sound.roar(); setTimeout(() => Sound.roar(), 500);
+  if (great) { banner('FÁFNIR!', 'The dragon of Dragonspine takes wing'); log('A shadow falls across the sea. Fáfnir, the great dragon of Dragonspine, unfurls wings like sails and screams in fury!', 'bad'); }
+  else { banner('A drake!', 'A lesser dragon dives from the clouds'); log('A drake drops out of the clouds, smoke curling from its jaws!', 'bad'); }
+  return D;
+}
+const spawnDrake = () => { const fx = Math.sin(ship.h), fz = -Math.cos(ship.h); spawnDragon('drake', ship.pos.x - fx * 200, ship.pos.y - fz * 200); };
+function dragonFocus() {
+  if (ashore.on && hero && !hero.dead) return { x: hero.x, y: hero.y, z: hero.z, land: true, vx: hero.vx || 0, vz: hero.vz || 0 };
+  return { x: ship.pos.x, y: 0, z: ship.pos.y, land: false, vx: velOf(ship.h, ship.speed).x, vz: velOf(ship.h, ship.speed).z };
+}
+function hitDragon(D, p, mult) {
+  if (D.dead) return;
+  D.hp -= 2.6 * mult * (1 + S.weapons * .2); hitFx(p, 0x7a1a14);
+  if (D.hp <= 0) {
+    D.dead = true; D.deathT = 0; Sound.roar();
+    if (D.great) {
+      S.dragonSlain = true; (S.cleansed ||= {})['spine-dragon'] = true; S.glory += 100; if (S.weapons < 5) S.weapons++;
+      banner('Dragon-slayer!', '+100 glory · the hoard of Dragonspine is yours');
+      log('Fáfnir shrieks, spirals out of the sky and crashes into the earth. Your smiths will forge dragon-steel from its scales (arms improve). Its hoard waits in the crater of Dragonspine. (+100 glory)', 'gold');
+      questProgress('dragon');
+    } else {
+      const sv = ri(60, 120); S.silver += sv; S.glory += 25;
+      banner('Drake slain!', `+${sv} silver · +25 glory`); log(`The drake tumbles from the sky in a burst of smoke. Gold glints in its gullet: ${sv} silver. (+25 glory)`, 'gold');
+      questProgress('drake');
+    }
+    Sound.coins(); renderHUD(); save();
+  }
+}
+function dragonHitTest(p) { for (const D of dragons) if (!D.dead && D.pos.distanceTo(p) < D.r) return D; return null; }
+const fv2 = new THREE.Vector3(), fv3 = new THREE.Vector3();
+function updateDragons(dt, t, paused) {
+  // the great dragon wakes when you come near Dragonspine
+  const sp = P.spine, fo = dragonFocus();
+  if (!S.dragonSlain && !titleOn && !dragons.some(d => d.great) && Math.hypot(fo.x - sp.wx, fo.z - sp.wz) < 750) spawnDragon('great', sp.wx, sp.wz);
+  for (let i = dragons.length - 1; i >= 0; i--) {
+    const D = dragons[i], ud = D.g.userData;
+    if (!paused) {
+      if (D.dead) {
+        D.deathT += dt; D.vel.y -= 30 * dt; D.vel.x *= .99; D.vel.z *= .99; D.pos.addScaledVector(D.vel, dt);
+        const floor = Math.max(terrainH(D.pos.x, D.pos.z), 0);
+        if (D.pos.y < floor) { D.pos.y = floor; D.vel.set(0, 0, 0); if (!D.crashed) { D.crashed = true; shake = 1; Sound.crash(); for (let k = 0; k < 10; k++) puff(D.pos.x + rnd(-8, 8), floor + 1, D.pos.z + rnd(-8, 8), 2, floor > .5 ? 0x6a5a4a : 0xeef4f8, 2, .5); } }
+        if (D.deathT > 7) { scene.remove(D.g); dragons.splice(i, 1); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } continue; }
+      } else {
+        const dist = Math.hypot(fo.x - D.pos.x, fo.z - D.pos.z);
+        const home = D.great ? Math.hypot(fo.x - sp.wx, fo.z - sp.wz) : 0;
+        if ((D.great && home > 1600) || (!D.great && dist > 1100)) { scene.remove(D.g); dragons.splice(i, 1); const el = foeLabels.get(D); if (el) { el.remove(); foeLabels.delete(D); } continue; }
+        const passive = (S.docked && !ashore.on) || titleOn;
+        const groundY = fo.land ? fo.y : 0;
+        D.timer -= dt; D.breath = Math.max(0, D.breath - dt);
+        if (D.state === 'circle' || passive) {
+          D.ang += dt * (D.great ? .3 : .4);
+          const R = fo.land ? D.R * .55 : D.R;
+          steerDragon(D, fo.x + Math.cos(D.ang) * R, groundY + D.alt * (fo.land ? .7 : 1), fo.z + Math.sin(D.ang) * R, D.speed, dt, 1.1);
+          if (!passive && D.timer <= 0) {
+            if (D.great && fo.land && chance(.4)) { D.state = 'land'; D.landAt = { x: fo.x + rnd(-14, 14), z: fo.z + rnd(-14, 14) }; }
+            else { D.state = 'dive'; D.diveT = 0; const dx = fo.x - D.pos.x, dz = fo.z - D.pos.z, dd = Math.hypot(dx, dz) || 1; D.pass = { x: dx / dd, z: dz / dd }; }
+          }
+        } else if (D.state === 'dive') {
+          D.diveT += dt;
+          const lead = 1.2, tx = fo.x + fo.vx * lead + D.pass.x * 35, tz = fo.z + fo.vz * lead + D.pass.z * 35;
+          steerDragon(D, tx, groundY + (fo.land ? 9 : 13), tz, D.speed * 1.3, dt, 1.7);
+          const hd = Math.hypot(fo.x - D.pos.x, fo.z - D.pos.z), ahead = (fo.x - D.pos.x) * D.pass.x + (fo.z - D.pos.z) * D.pass.z;
+          if (hd < 70 && ahead > -10 && D.pos.y < groundY + 40) D.breath = .25;
+          if (D.diveT > 6 || ahead < -45) { D.state = 'climb'; D.climbT = 0; }
+        } else if (D.state === 'climb') {
+          D.climbT += dt; steerDragon(D, D.pos.x + D.pass.x * 60, groundY + D.alt, D.pos.z + D.pass.z * 60, D.speed, dt, 1.2);
+          if (D.climbT > 2.2) { D.state = 'circle'; D.timer = rnd(3.5, 6.5) * (D.hp < D.maxHp * .35 ? .7 : 1); }
+        } else if (D.state === 'land') {
+          const gy = Math.max(terrainH(D.landAt.x, D.landAt.z), 0) + 4.5;
+          const ld = Math.hypot(D.pos.x - D.landAt.x, D.pos.y - gy, D.pos.z - D.landAt.z);
+          steerDragon(D, D.landAt.x, gy, D.landAt.z, D.speed * clamp(ld / 40, .25, .8), dt, 2.2);
+          if (ld < 9) { D.state = 'ground'; D.groundT = 0; D.vel.set(0, 0, 0); Sound.roar(); shake = .7; }
+        } else if (D.state === 'ground') {
+          D.groundT += dt; D.vel.multiplyScalar(.8);
+          const tgt = nearestDragonVictim(D);
+          if (tgt) { const want = Math.atan2(tgt.x - D.pos.x, tgt.z - D.pos.z); D.faceY = want; if (Math.hypot(tgt.x - D.pos.x, tgt.z - D.pos.z) < 30 && (D.groundT % 2.4) < 1.1) D.breath = .25; }
+          if (D.groundT > 7) { D.state = 'climb'; D.climbT = 0; D.pass = { x: Math.sin(D.ang), z: Math.cos(D.ang) }; Sound.roar(); }
+        }
+        if (D.state !== 'ground') D.pos.addScaledVector(D.vel, dt);
+        const floor = Math.max(terrainH(D.pos.x, D.pos.z), 0) + 5;
+        if (D.pos.y < floor) { D.pos.y = floor; D.vel.y = Math.max(D.vel.y, 0); }
+        if (D.breath > 0) breatheFire(D, dt);
+      }
+    }
+    // pose
+    D.g.position.copy(D.pos);
+    if (D.state === 'ground' && !D.dead) { D.g.rotation.set(0, (D.faceY || 0) + Math.PI, 0); }
+    else if (D.vel.lengthSq() > 1) { fv2.copy(D.pos).sub(D.vel); D.g.lookAt(fv2); }
+    if (D.dead) D.g.rotation.z += dt * 2;
+    const flap = D.state === 'ground' ? .2 : D.state === 'dive' ? .25 : .75;
+    ud.wings.forEach((w, k) => w.rotation.z = (k ? -1 : 1) * (Math.sin(t * (D.great ? 3.2 : 4.5)) * flap - (D.state === 'ground' ? .9 : 0)));
+    ud.tail.forEach((m, k) => m.position.x = Math.sin(t * 2.5 - k * .5) * k * .18);
+    ud.neck.forEach((m, k) => m.position.x = Math.sin(t * 1.6 - k * .4) * k * .08);
+    if (!paused && D.great && !D.dead && chance(dt * 1.5)) puff(D.pos.x, D.pos.y + 6, D.pos.z, .6, 0x3a3a3a, 1.5, .3);
+  }
+  // flames
+  for (let i = fireSprites.length - 1; i >= 0; i--) {
+    const f = fireSprites[i], u = f.userData; u.life += paused ? 0 : dt;
+    if (u.life > u.max) { scene.remove(f); f.material.dispose(); fireSprites.splice(i, 1); continue; }
+    if (!paused) f.position.addScaledVector(u.v, dt);
+    const k = u.life / u.max, sc = (1.5 + k * 7) * u.big; f.scale.set(sc, sc, 1);
+    f.material.opacity = (1 - k) * .9; f.material.color.setHSL(.08 - k * .07, 1, .55 - k * .2);
+  }
+}
+function steerDragon(D, tx, ty, tz, speed, dt, turn) {
+  const dx = tx - D.pos.x, dy = ty - D.pos.y, dz = tz - D.pos.z, d = Math.hypot(dx, dy, dz) || 1, k = Math.min(1, dt * turn);
+  D.vel.x += (dx / d * speed - D.vel.x) * k; D.vel.y += (dy / d * speed - D.vel.y) * k; D.vel.z += (dz / d * speed - D.vel.z) * k;
+}
+function nearestDragonVictim(D) {
+  let best = null, bd = 1e9;
+  for (const u of units) { if (u.dead || u.team !== 'us') continue; const d = Math.hypot(u.x - D.pos.x, u.z - D.pos.z); if (d < bd) { bd = d; best = u; } }
+  return best;
+}
+function breatheFire(D, dt) {
+  const ud = D.g.userData; ud.mouth.getWorldPosition(fv2);
+  ud.head.getWorldDirection(fv3); fv3.negate();
+  if (D.state === 'ground') fv3.y = Math.min(fv3.y, -.35);
+  else fv3.y = Math.min(fv3.y - .45, -.3);
+  fv3.normalize();
+  const vic = ashore.on ? nearestDragonVictim(D) : (!S.docked ? { x: ship.g.position.x, y: ship.g.position.y + 1, z: ship.g.position.z } : null);
+  if (vic) { // turn the breath toward the prey if it lies ahead of the jaws
+    const tx = vic.x - fv2.x, ty = (vic.y + 1.2) - fv2.y, tz = vic.z - fv2.z, tl = Math.hypot(tx, ty, tz) || 1;
+    if ((tx * fv3.x + ty * fv3.y + tz * fv3.z) / tl > .35 && tl < 75) fv3.set(tx / tl, ty / tl, tz / tl);
+  }
+  const L = D.great ? 60 : 40;
+  D.fireT -= dt;
+  if (D.fireT <= 0 && fireSprites.length < 260) {
+    D.fireT = .025;
+    for (let k = 0; k < (D.great ? 3 : 2); k++) {
+      const sp = new THREE.Sprite(fireMat.clone()); sp.position.copy(fv2);
+      sp.userData = { life: 0, max: rnd(.55, .8), big: D.great ? 1.6 : 1, v: fv3.clone().multiplyScalar(L * 1.4).add(new THREE.Vector3(rnd(-4, 4), rnd(-2, 2), rnd(-4, 4))).add(D.vel.clone().multiplyScalar(.5)) };
+      scene.add(sp); fireSprites.push(sp);
+    }
+    if (chance(.3)) Sound.fire();
+  }
+  // what the flames touch
+  const seg = (px, py, pz) => { const vx = px - fv2.x, vy = py - fv2.y, vz = pz - fv2.z, tt = clamp(vx * fv3.x + vy * fv3.y + vz * fv3.z, 0, L); return Math.hypot(vx - fv3.x * tt, vy - fv3.y * tt, vz - fv3.z * tt); };
+  if (ashore.on) {
+    for (const u of units) {
+      if (u.dead || u.team !== 'us') continue;
+      if (seg(u.x, u.y + 1.5, u.z) < (D.great ? 4 : 3)) unitDamage(u, D.dps * 1.5 * dt, { x: D.pos.x, z: D.pos.z });
+    }
+  } else if (!S.docked) {
+    const gp = ship.g.position;
+    if (seg(gp.x, gp.y + 3, gp.z) < (D.great ? 12 : 9)) {
+      const m = shieldUp ? .5 : 1; S.hull = Math.max(5, S.hull - D.dps * dt * m); pCrewDmg += .28 * dt * m * (D.great ? 1.5 : 1); applyCrewDmg();
+      if (!D.warned) { D.warned = true; banner('Dragonfire!', 'Raise the shield wall (Shift) or turn hard'); setTimeout(() => D.warned = false, 4000); }
+    }
+  }
 }
 
 // the kraken and its maelstrom
@@ -1925,6 +2155,7 @@ const turnTo = (h, target, rate) => h + clamp(angDiff(target, h), -rate, rate);
 const SKIN = new THREE.MeshStandardMaterial({ color: 0xd9a982, roughness: .9 });
 const IRON = new THREE.MeshStandardMaterial({ color: 0x8a8d92, metalness: .7, roughness: .4 });
 const BOWSTRING = new THREE.MeshBasicMaterial({ color: 0xe8e0c8 });
+const GOLDPILE = new THREE.MeshStandardMaterial({ color: 0xd9a441, metalness: .9, roughness: .25, emissive: 0x3a2400 });
 const GOLD = new THREE.MeshStandardMaterial({ color: 0xd9a441, metalness: .8, roughness: .3 });
 function makeWarrior(o = {}) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
@@ -2062,6 +2293,8 @@ function makeQuest(p) {
   opts.push({ type: 'wolves', n: 4, reward: 70, glory: 8, text: 'Kill 4 wolves in Wolfden Woods', ask: 'Wolves from Wolfden have taken our sheep. Thin the pack.' });
   opts.push({ type: 'bear', n: 1, reward: 80, glory: 6, text: 'Slay a bear', ask: 'A bear has been raiding our stores. Bring us its hide.' });
   if (!(S.cleansed && S.cleansed['wolf-camp'] && S.cleansed['seal-camp'])) opts.push({ type: 'outlaws', n: 1, reward: 90, glory: 8, text: 'Clear an outlaw camp (Wolfden Woods or Seal Rocks)', ask: 'Outlaws rob every boat that passes. Burn out their camp.' });
+  if (!S.dragonSlain) opts.push({ type: 'dragon', n: 1, reward: 500, glory: 40, text: 'Slay Fáfnir, the dragon of Dragonspine', ask: 'A dragon burns our ships from the north. They say it sleeps on gold in the crater of Dragonspine.' });
+  opts.push({ type: 'drake', n: 1, reward: 150, glory: 12, text: 'Slay a drake in the outer seas', ask: 'Drakes hunt the far waters. Bring down one of the beasts.' });
   if (!S.krakenSlain) opts.push({ type: 'kraken', n: 1, reward: 300, glory: 30, text: 'Slay the Kraken of the Maelstrom', ask: 'Ships vanish near the Maelstrom in the far southwest. Something lives there. Kill it.' });
   if (!S.trollSlain) opts.push({ type: 'troll', n: 1, reward: 250, glory: 25, text: 'Slay the Frost Troll on Frostfang', ask: 'A troll on Frostfang eats reindeer, herders and anyone foolish enough to look for it.' });
   opts.push({ type: 'deer', n: 3, reward: 50, glory: 4, text: 'Hunt 3 deer', ask: 'Our stores run low. Bring down some deer for the larder.' });
@@ -2185,16 +2418,18 @@ function buildCaches() {
       mk(x, z, false); made++;
     }
     if (p.type === 'ruins') mk(p.wx - 4, p.wz + 26, true);
+    if (p.lairPos) mk(p.lairPos.x, p.lairPos.z, true, p.id + '-dragon');
     if (p.campPos) mk(p.campPos.x + 2.5, p.campPos.z + 2.5, true, p.id + '-camp');
   });
 }
 function syncCaches() { caches.forEach(c => { c.found = !!(S.found && S.found[c.id]); c.glint.visible = !c.found; c.lid.rotation.x = c.found ? -1.9 : 0; }); }
 function openCache(c) {
   const p = c.p;
-  if (c.guarded && !(S.cleansed && S.cleansed[c.key])) { banner(c.key === p.id ? 'The dead guard this hoard' : 'Outlaws guard this chest', 'Defeat them first'); return; }
+  if (c.guarded && !(S.cleansed && S.cleansed[c.key])) { banner(c.key === p.id ? 'The dead guard this hoard' : c.key.endsWith('-dragon') ? 'The dragon guards this hoard' : 'Outlaws guard this chest', 'Defeat them first'); return; }
   (S.found ||= {})[c.id] = true; syncCaches();
   let msg;
-  if (c.guarded && c.key !== p.id) { const sv = ri(70, 130), g = pick(Object.keys(GOODS)), q = Math.min(ri(2, 4), S.cargoMax - cargoCount()); S.silver += sv; S.cargo[g] += q; msg = `The outlaws' loot: ${sv} silver${q ? ` and ${q} ${GOODS[g].name}` : ''}.`; }
+  if (c.key === p.id + '-dragon') { const sv = ri(450, 650), am = Math.min(6, S.cargoMax - cargoCount()); S.silver += sv; S.cargo.amber += am; S.glory += 20; msg = `Fáfnir's hoard! ${sv} silver${am ? `, ${am} amber` : ''}, and gold enough to blind a man. (+20 glory)`; }
+  else if (c.guarded && c.key !== p.id) { const sv = ri(70, 130), g = pick(Object.keys(GOODS)), q = Math.min(ri(2, 4), S.cargoMax - cargoCount()); S.silver += sv; S.cargo[g] += q; msg = `The outlaws' loot: ${sv} silver${q ? ` and ${q} ${GOODS[g].name}` : ''}.`; }
   else if (c.guarded) { const sv = ri(120, 220); S.silver += sv; S.glory += 10; if (S.weapons < 5) S.weapons++; msg = `The barrow hoard! ${sv} silver and an ancient rune-blade that improves your warband's arms. (+10 glory)`; }
   else if (p.volcano) { const a = Math.min(ri(2, 4), S.cargoMax - cargoCount()), sv = ri(10, 30); S.cargo.amber += a; S.silver += sv; msg = `A charred chest of glowing stones: ${a} amber and ${sv} silver.`; }
   else if (p.wolves) { const fu = Math.min(ri(2, 4), S.cargoMax - cargoCount()), sv = ri(15, 40); S.cargo.furs += fu; S.silver += sv; msg = `A trapper's hidden cache: ${fu} furs and ${sv} silver.`; }
@@ -2428,6 +2663,7 @@ function landArrow(src, tgt, spread, dmg, team) {
   arrows.push({ mesh, p: new THREE.Vector3(ox, oy, oz), v, owner: src, wait: 0, life: 0, land: true, team, dmg, src });
 }
 function landArrowHit(a) {
+  if (a.team === 'us') { const D = dragonHitTest(a.p); if (D) { hitDragon(D, a.p, 2 * a.dmg / 2.6 / (1 + S.weapons * .2)); return true; } }
   for (const o of units) {
     if (o.dead || o.dormant || o.rise < 1 || o === a.src) continue;
     if (a.team === 'us' ? (o.team !== 'them' && o.team !== 'game') : o.team !== 'us') continue;
@@ -2446,7 +2682,9 @@ function heroShoot() {
     const dot = (dx * fx + dz * fz) / d; if (dot < .72) continue;
     const score = dot * 2 - d / 80; if (score > bs) { bs = score; best = o; }
   }
-  const tgt = best ? { x: best.x, y: aimY(best), z: best.z, vx: best.vx, vz: best.vz } : { x: hero.x + fx * 50, y: hero.y + 1.5, z: hero.z + fz * 50 };
+  let dTgt = null;
+  for (const D of dragons) { if (D.dead) continue; const dx = D.pos.x - hero.x, dz = D.pos.z - hero.z, d = Math.hypot(dx, dz); if (d < 110 && (!best || (dx * fx + dz * fz) / (d || 1) > .5)) dTgt = D; }
+  const tgt = dTgt ? { x: dTgt.pos.x, y: dTgt.pos.y, z: dTgt.pos.z, vx: dTgt.vel.x, vz: dTgt.vel.z } : best ? { x: best.x, y: aimY(best), z: best.z, vx: best.vx, vz: best.vz } : { x: hero.x + fx * 50, y: hero.y + 1.5, z: hero.z + fz * 50 };
   hero.h = Math.atan2(tgt.x - hero.x, -(tgt.z - hero.z));
   landArrow(hero, tgt, best ? .25 : 0, 20 * (1 + S.weapons * .15), 'us');
   hero.atkCd = .7; hero.draw = .3; Sound.bow(1);
@@ -2516,6 +2754,7 @@ function updateUnit(u, dt) {
     if (!ashore.foes) u.hp = Math.min(u.maxHp, u.hp + dt * 4);
     const t = hero && !hero.dead ? nearestFoe(u, ashore.battle ? 260 : 40) : null;
     if (t) [mx, mz] = fightToward(u, t, dt);
+    if (!t && u.archer && u.atkCd <= 0) { const D = dragons.find(d => !d.dead && Math.hypot(d.pos.x - u.x, d.pos.z - u.z) < 80); if (D) { landArrow(u, { x: D.pos.x, y: D.pos.y, z: D.pos.z, vx: D.vel.x, vz: D.vel.z }, 2, u.dmg * 1.1, 'us'); u.atkCd = u.cd * 1.7; u.draw = .3; } }
     else if (u.hold) { if (Math.hypot(u.hold.x - u.x, u.hold.z - u.z) > 3) [mx, mz] = steer(u, u.hold.x, u.hold.z); }
     else if (hero) {
       const i = u.slot || 0, row = Math.floor(i / 4), col = i % 4;
@@ -2561,6 +2800,7 @@ function updateUnit(u, dt) {
           const charge = u.mount && u.moveAmt > 1.2 ? 1.6 : 1;
           if (d < u.reach + (u.mount ? 1.3 : 0) + bodyR(o) - .5 && (dx * fx + dz * fz) / d > .2) { unitDamage(o, u.dmg * charge * rnd(.85, 1.15), u); any = true; }
         }
+        for (const D of dragons) if (!D.dead && D.state === 'ground' && Math.hypot(D.pos.x - u.x, D.pos.z - u.z) < 9) { hitDragon(D, D.pos, u.dmg / 2.6); any = true; }
         if (any) { Sound.thunk(); shake = Math.max(shake, .12); }
       } else if (u.swingTarget && !u.swingTarget.dead && Math.hypot(u.swingTarget.x - u.x, u.swingTarget.z - u.z) < u.reach + .7) {
         unitDamage(u.swingTarget, u.dmg * rnd(.8, 1.2), u);
@@ -2615,7 +2855,7 @@ function animUnit(u, dt) {
 function updateAshore(dt) {
   navBudget = 5;
   if (!hero) return;
-  ashore.foes = units.filter(u => u.team === 'them' && u.aggro && !u.dead).length;
+  ashore.foes = units.filter(u => u.team === 'them' && u.aggro && !u.dead).length + dragons.filter(d => !d.dead).length;
   for (const u of units) updateUnit(u, dt);
   for (let i = 0; i < units.length; i++) {
     const a = units[i]; if (a.dead || a.dormant) continue;
@@ -2693,6 +2933,7 @@ function updateUnitLabels() {
 // =====================================================================
 function pickSeaEvent() {
   const sn = seasonOf(S.day);
+  if (Math.hypot(ship.pos.x, ship.pos.y) > 2700 && !dragons.some(d => !d.great) && chance(.3)) return spawnDrake;
   if (S.day > 15 && !S.krakenSlain && !kraken && terrainH(ship.pos.x, ship.pos.y) < -25 && chance(.07)) return spawnKraken;
   if ((sn === 2 && chance(.3)) || (sn === 3 && chance(.4))) return SEA_EVENTS[0];
   let e = pick(SEA_EVENTS);
@@ -2960,6 +3201,8 @@ function help() {
   • <b>Bow:</b> on foot, press <b>Q</b> to switch between axe and bow. With the bow, <b>Space</b> looses an arrow at the enemy or deer you're facing, leading moving targets. It works from horseback too. Some of your warriors are archers, and so are some town defenders.<br>
   • <b>Your crew</b> are named warriors, each with a trait: Strong, Berserker, Keen-eyed archer, Shipwright, Navigator, Hunter, Skald, Healer, Trader or Glutton. Traits change how your ship sails, trades and fights. Press <b>K</b> to see your crew and dismiss anyone you'd rather leave ashore. Warriors who make 3 kills become veterans.<br>
   • <b>More foes:</b> bears roam the forests and Frostfang. Outlaws camp on Wolfden Woods and Seal Rocks with stolen loot. A Frost Troll guards a lair on Frostfang. The Barrow-King leads draugr and draugr archers on the Isle of Graves. At sea, black-and-crimson Jomsviking warships hunt the bold.<br>
+  • <b>Dragons:</b> Fáfnir nests on Dragonspine at the top of the world, sleeping on a vast hoard. Drakes hunt the outer seas. They circle, then dive and breathe fire: raise the shield wall, turn hard, and fill the sky with arrows. On land, Fáfnir may come down to fight. Strike it with your axe while it stands on the ground.<br>
+  • <b>The world</b> now stretches far beyond the home waters, from the Ice Teeth in the north-west to Kaupang in the east and Kongshavn in the south.<br>
   • <b>The Kraken</b> lurks in the Maelstrom in the far southwest and may surface in any deep water. Shoot its body and eyes, and keep moving: red rings on the water mark where a tentacle will slam down.<br>
   • <b>Land wars:</b> each season towns may go to war. At the town under attack you can stand with its defenders against an invading army that lands on the far beach, or join the attackers and sack it with their help. The side you help becomes a friend and gives you better prices.<br>
   • <b>Seasons:</b> a year has four seasons of 10 days. Summer days are long and calm. Autumn brings storms and better prices for furs and salt. In winter snow covers the islands, days are short, blizzards blow, drift ice fills the northern sea, your crew eats more at sea and hunting is poor. Hold a Yule feast at Ravenholm in winter.<br>
@@ -2991,7 +3234,8 @@ function tryLand() {
   if (ashore.on) { interactAshore(); return; }
   if (S.docked) { undock(); return; }
   if (!nearPlace) return;
-  if (combatOn) { banner('Enemies near!', 'Win the fight or escape before landing'); return; }
+  const onlyDragons = combatOn && !npcs.some(n => n.hostile && !n.dead) && !(serpent && !serpent.sinking) && !(kraken && !kraken.sinking);
+  if (combatOn && !onlyDragons) { banner('Enemies near!', 'Win the fight or escape before landing'); return; }
   dock(nearPlace);
 }
 function undock() {
@@ -3037,7 +3281,7 @@ function drawCompass() {
   ccx.fillStyle = '#e0ad4a'; ccx.fillRect(w / 2 - 1, 0, 2, 6); ccx.fillRect(w / 2 - 1, h - 6, 2, 6);
 }
 function drawMini() {
-  const W = 200, H = 140, sx = W / (WORLD.maxX - WORLD.minX), sz = H / (WORLD.maxZ - WORLD.minZ);
+  const W = 240, H = 200, sx = W / (WORLD.maxX - WORLD.minX), sz = H / (WORLD.maxZ - WORLD.minZ);
   const mx = x => (x - WORLD.minX) * sx, mz = z => (z - WORLD.minZ) * sz;
   mcx.fillStyle = '#0f3550'; mcx.fillRect(0, 0, W, H);
   PLACES.forEach(p => {
@@ -3252,14 +3496,14 @@ function tick() {
   if (ashore.on && !paused) updateAshore(dt);
   deckHorse.visible = !!(S.horseOwned && !ashore.on);
   caches.forEach(c => { if (c.glint.visible) { c.glint.rotation.y += dt * 2; c.glint.position.y = 2 + Math.sin(t * 2) * .2; } });
-  updateSerpent(dt, t, paused); updateKraken(dt, t, paused);
+  updateSerpent(dt, t, paused); updateKraken(dt, t, paused); updateDragons(dt, t, paused);
   if (maelstrom) { maelstrom.a.rotation.z += dt * .25; maelstrom.b.rotation.z += dt * .6; }
-  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking) || !!(kraken && !kraken.sinking);
+  const foesNow = npcs.some(n => n.hostile && !n.dead) || !!(serpent && !serpent.sinking) || !!(kraken && !kraken.sinking) || dragons.some(d => !d.dead);
   if (foesNow !== combatOn) { combatOn = foesNow; if (!combatOn) boarding = null; }
   if (combatOn && !paused && !S.docked && (S.crew <= 1 || S.hull <= 6)) defeat(); updateWhales(dt); updateSmoke(dt);
   flags.forEach(f => { const a = f.geometry.attributes.position.array, b = f.userData.base; for (let i = 0; i < a.length; i += 3) a[i + 2] = Math.sin(b[i] * .9 - t * 5) * b[i] * .12; f.geometry.attributes.position.needsUpdate = true; });
   shrines.forEach(([o, l]) => { o.position.y += Math.sin(t * 1.5) * .01; o.rotation.y += dt; l.intensity = 500 + Math.sin(t * 3) * 120; });
-  if (volcanoLight) volcanoLight.intensity = 3500 + Math.sin(t * 7) * 600 + Math.sin(t * 13) * 300;
+  volcanoLights.forEach((l, i) => l.intensity = 3500 + Math.sin(t * 7 + i) * 600 + Math.sin(t * 13 + i) * 300);
 
   // camera
   dockBlend = lerp(dockBlend, S.docked || titleOn ? 1 : 0, 1 - Math.exp(-dt * 1.5));
@@ -3343,9 +3587,9 @@ function startGame(fresh) {
 
 try {
   buildWorld();
-  for (let i = 0; i < 8; i++) spawnNPC('merchant');
-  for (let i = 0; i < 5; i++) spawnNPC('raider');
-  for (let i = 0; i < 2; i++) spawnNPC('raider', { elite: true });
+  for (let i = 0; i < 14; i++) spawnNPC('merchant');
+  for (let i = 0; i < 9; i++) spawnNPC('raider');
+  for (let i = 0; i < 3; i++) spawnNPC('raider', { elite: true });
   S = newState(); dockAt(P.home); applySeason(true); renderHUD();
   const has = !!loadSave();
   const tb = $('titleBtns');
@@ -3360,7 +3604,7 @@ try {
   $('loading').textContent = 'Could not start the game: ' + err.message;
   console.error(err);
 }
-window.__game = { spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
+window.__game = { hitDragon, spawnDragon, spawnDrake, dragons, spawnKraken, get kraken() { return kraken; }, startWar, startWarDefense, startWarAttack, MAELSTROM, leaveAshore, findPath, buildNav, steer, unitDamage, openRoster, syncRoster, traitCount, applySeason, setDay: d => { S.day = d; applySeason(true); renderHUD(); }, setFootYaw: v => footYaw = v, switchWeapon, heroShoot, offerQuest, questProgress, makeQuest, toggleMount, goAshore, heroAttack, get hero() { return hero; }, units, ashore, caches, startSack, setTimeScale: v => timeScale = v, get combatOn() { return combatOn; }, get raid() { return raid; }, get boarding() { return boarding; }, startRaid, playerShoot, spawnSerpent, tryBoard, get S() { return S; }, get serpent() { return serpent; }, setCam: (y, p, d) => { camYaw = y; camPitch = p; camDist = d; }, setTime: f => { dayTimer = f * DAY_SECONDS; }, ship, P, dock: p => dock(P[p]), undock, setThrottle: v => throttle = v, weather, SEA_EVENTS, npcs, camera };
 </script>
 </body>
 </html>

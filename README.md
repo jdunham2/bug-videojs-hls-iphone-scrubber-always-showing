@@ -17,12 +17,13 @@ This project is meant to run on StackBlitz ⚡️
 An open-world 3D Viking sandbox in `viking/index.html` (built with three.js, loaded from a CDN, no build step). Open the file in a browser.
 
 - Steer your longship across an open sea with waves, wind, a day/night cycle, storms with rain and lightning, and procedural sound.
-- Seventeen islands to discover: trading towns, villages, a volcano, a glacier, two haunted barrow isles, two shrines, a seal rock, and the Jarl's walled fortress.
+- Twenty-six islands across a vast sea: trading towns, villages, two volcanoes, glaciers, haunted barrow isles, shrines, forests, the Jarl's walled fortress and the king's harbour of Kongshavn.
 - Go ashore to trade, hunt, explore, feast and upgrade your hall and ship.
 - Real-time sea battles: loose arrow volleys, raise a shield wall, ram at full sail, or come alongside and board. Black-sailed raiders hunt you, merchant ships can be attacked, sea serpents circle and strike, and raiding a town makes its warships sail out to fight before you can sack it.
 - Walk ashore with your warband (G): explore islands on foot, find treasure chests, fight wolves and draugr, and storm towns in real-time melee battles against their defenders (and Jarl Hakon himself at Stonegard).
 - Towns are walled with log palisades. Land battles use real pathfinding (a navigation grid with A* paths): defenders hold their posts inside the walls behind shields that block frontal blows, bigger towns field elite huscarls, your warband finds the gate, and every unit walks around buildings, walls and trees.
 - More foes: bears (white bears on Frostfang), outlaw camps with stolen loot on Wolfden Woods and Seal Rocks, the Frost Troll boss on Frostfang, the Barrow-King and draugr archers on the Isle of Graves, and elite Jomsviking warships at sea. New oaths send you after them.
+- Dragons: Fáfnir nests on Dragonspine above a great hoard, and drakes hunt the outer seas. They circle, dive and breathe fire on your ship; on land Fáfnir can come down to fight.
 - The Kraken: a sea boss in the Maelstrom of the far southwest (and a rare danger in any deep water). Its tentacles telegraph their slams with red rings on the water.
 - Land wars: each season towns may go to war. Defend the besieged town against an invading army in a field battle, or join the attackers in an assisted sack; the side you help becomes a friend with better prices.
 - Ride horses (R) on the farm and town islands: gallop across the land and charge into enemies for heavy damage.
