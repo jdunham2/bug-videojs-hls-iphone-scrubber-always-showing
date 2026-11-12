@@ -1834,6 +1834,7 @@ const MOUNTS = {
   tiger:{name:'Striped Tiger', speed:1.85, terrain:[T.JUNGLE,T.BAMBOO,T.GRASS,T.SAVANNA], desc:'Silent and swift through jungle, bamboo and grassland.'},
   glowmoth:{name:'Glowmoth', speed:1.7, fly:true, desc:'A giant glowing moth. Flies over water and mountains, a little slower than a griffon.'},
   sea_turtle:{name:'Sea Turtle', speed:1.7, swim:true, desc:'Slow on land, but carries you across any water.'},
+  spirit_stag:{name:'Spirit Stag', speed:1.85, terrain:[T.FOREST,T.SNOW,T.GLOOM,T.JUNGLE,T.MARSH,T.HILL,T.BLOSSOM,T.MAPLE,T.REDWOOD,T.BAMBOO,T.SHROOM,T.MOOR], desc:'A gift of the old spirits for a true storyteller. Glows softly and is never slowed by wild terrain.'},
   strider:{name:'Sun Strider', speed:1.9, terrain:[T.SAVANNA,T.SAND,T.DUNE,T.GRASS], desc:'A tall running bird. Fastest on grass, savanna and sand.'},
 };
 
@@ -5151,6 +5152,7 @@ const WW_LORE = [
 function wwLabel() { const st = S.ww ? S.ww.step : 0; return st === 0 ? 'Ask about the whispering' : st === 1 ? 'About the totems' : st === 2 ? 'About the Spirit' : st === 3 ? 'The Spirit is calmed' : 'Talk about the woods'; }
 function wwTalk(n) {
   const W = S.ww;
+  if ((!W || W.step !== 3) && storiesDone() >= 3 && !S.mounts.includes('spirit_stag')) { say('Elder Rowan looks at you for a long moment. “The spirits talk, you know. They say you have helped the forest, the sea, the snow and the dead. They asked me to give you this.” A white stag steps out of the trees, glowing softly green, and lowers its head to you.', [back(n)]); addMount('spirit_stag'); S.coins += 300; renderHUD(); return; }
   if (!W) {
     const H = TOWNS.hollow, spots = [];
     for (let k = 0; k < 3000 && spots.length < 4; k++) { const a = Math.random()*6.283, r = 14 + Math.random()*30, x = Math.floor(H.x + Math.cos(a)*r), y = Math.floor(H.y + Math.sin(a)*r);
@@ -10866,6 +10868,7 @@ const PET_DRAW = {bunny:['rabbit',1], fawn:['deer',.75], frog:['frog',1], turtle
 function drawMount(g, id, x, y, f, phase, moving) {
   const step = moving ? Math.sin(phase)*1.5 : 0;
   g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, 9, 2.2, 0, 0, 7); g.fill();
+  if (id === 'spirit_stag') { g.save(); try { g.filter = 'sepia(1) hue-rotate(70deg) saturate(2.5) brightness(1.35)'; } catch (e) {} drawMount(g, 'elk', x, y, f, phase, moving); g.restore(); g.globalAlpha = .25 + Math.sin(frameT*3)*.1; g.fillStyle = '#9af0c0'; g.beginPath(); g.ellipse(x, y - 8, 14, 10, 0, 0, 7); g.fill(); g.globalAlpha = 1; if (Math.random() < .15) particles.push({x: x/TS + (Math.random() - .5)*.8, y: (y - 10)/TS, vx: 0, vy: -1, t: .5, col: '#bfffd8'}); return; }
   if (id === 'dragon') {
     const wf = Math.sin(frameT*(moving ? 8 : 2.5))*5, hy = moving ? -5 : 0;
     g.fillStyle = '#8a2a1a'; g.fillRect(x-6, y-4 + hy, 3, 4); g.fillRect(x+3, y-4 + hy, 3, 4);
@@ -12148,6 +12151,8 @@ const ACH = [
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
   ['tortoise','Slow and Steady','Shop at the wandering tortoise market', () => (S.tortoiseBuys || 0) >= 1],
   ['skycrates','Pirate Plunder','Open 10 sky pirate crates', () => (S.skyCrates || 0) >= 10],
+  ['storyteller','Storyteller','Complete all five story quests', () => storiesDone() >= 5],
+  ['spiritstag','Spirit Rider','Receive the Spirit Stag', () => S.mounts.includes('spirit_stag')],
   ['marshwitch','Sweet Dreams','Break the curse on Reedholm\u2019s children', () => !!(S.mw && S.mw.step >= 3)],
   ['slide30','Puzzle Master','Solve a sliding puzzle in 30 moves or fewer', () => (S.slideBest || 999) <= 30],
   ['mem12','Total Recall','Find all pairs in 12 tries or fewer', () => (S.memBest || 99) <= 12],
@@ -12619,6 +12624,7 @@ const WHATS_NEW = [
   ['Jobs and hobbies', 'Express post (Hollowpine), paper route (Port Wren), birdwatching (Petalfall), archaeology (Dunmere Oasis), gem cutting (Ashfall), daily riddles and the lottery (Highcairn).'],
   ['Items to use', 'War Horns call Champions, Rocket Packs light the sky, Picnic Baskets heal your party, strange potions make you giant, swift or tiny, and bandits drop Locked Strongboxes to pick.'],
 ];
+const storiesDone = () => [S.ww, S.gh, S.sb, S.le, S.mw].filter(o => o && o.step >= 4).length;
 function questLog() {
   const st = (o, steps) => !o ? '<span style="color:var(--muted)">Not started</span>' : o.step >= 4 ? '<span style="color:var(--good)">✓ Complete</span>' : `<span style="color:var(--brass)">${steps[o.step] || 'In progress'}</span>`;
   const Q = [
@@ -12629,7 +12635,7 @@ function questLog() {
     ['The Marsh Witch', 'Morga, near Reedholm', S.mw, ['', 'Gather the three night-glowing ingredients', 'Break the curse stone and defeat the Bog Hag', 'Return to Morga']],
   ];
   const cases = `<b>Mystery cases</b> · <span style="color:var(--muted)">Inspector Holloway, Crownfall</span><br>${S.case && !S.case.done ? '<span style="color:var(--brass)">A case is open: question the suspects and search the scene</span>' : `<span style="color:var(--muted)">Solved: ${S.casesSolved || 0}. A new case each week.</span>`}`;
-  openPanel('Story quests', Q.map(([t, w, o, steps]) => `<b>${t}</b> · <span style="color:var(--muted)">${w}</span><br>${st(o, steps)}`).join('<br><br>') + '<br><br>' + cases + `<br><br><span style="color:var(--muted)">${Q.filter(q => q[2] && q[2].step >= 4).length} of ${Q.length} stories complete. Active objectives are marked on your map.</span>`, [{label: 'Close', primary: true, fn: closeTalk}]);
+  openPanel('Story quests', Q.map(([t, w, o, steps]) => `<b>${t}</b> · <span style="color:var(--muted)">${w}</span><br>${st(o, steps)}`).join('<br><br>') + '<br><br>' + cases + `<br><br><span style="color:var(--muted)">${Q.filter(q => q[2] && q[2].step >= 4).length} of ${Q.length} stories complete. Active objectives are marked on your map.${storiesDone() >= 3 && !S.mounts.includes('spirit_stag') ? ' <b>Elder Rowan in Hollowpine has something for you.</b>' : storiesDone() < 3 ? ' Finish three stories for a special reward.' : ''}</span>`, [{label: 'Close', primary: true, fn: closeTalk}]);
 }
 function whatsNew() {
   try { localStorage.setItem('saltwind-whatsnew', String(WN_VER)); } catch (e) {}
