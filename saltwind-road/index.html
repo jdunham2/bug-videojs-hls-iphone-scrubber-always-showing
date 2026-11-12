@@ -824,6 +824,7 @@ const GOODS = {
   pale_cloak:{name:'Pale Beast Cloak',base:0,col:'#e8eef4',kind:'trinket',desc:'Woven from the Pale Beast\u2019s fur. Sandstorms no longer slow you, and +2 max HP.'},
   hex_charm:{name:'Marsh Witch\u2019s Charm',base:0,col:'#7a9a4a',kind:'trinket',desc:'A knot of bogroot and silver wire. +10% coin from monsters while carried.'},
   royal_ring:{name:'Princess Rosalind\u2019s Ring',base:0,col:'#f0c040',kind:'trinket',desc:'A thank-you from the princess. +3 max HP and 5% better prices when selling.'},
+  ocarina:{name:'Clay Ocarina',base:80,col:'#c8905a',kind:'usable',desc:'Play it from your bag. Some melodies have a little magic in them.'},
   rocket_pack:{name:'Rocket Pack',base:25,col:'#ff5aa0',kind:'usable',desc:'Light up the sky. Party members see the show too.'},
   war_horn:{name:'War Horn',base:120,col:'#b08040',kind:'usable',desc:'Blow it in the wild to call out a Champion monster. In a party, everyone can fight it.'},
   picnic_basket:{name:'Picnic Basket',base:40,col:'#c89050',kind:'usable',desc:'Spread a picnic: you and nearby party members regenerate health for 3 minutes.'},
@@ -4396,6 +4397,7 @@ function useItem(g) {
   }
   if (g === 'giant_draught' || g === 'swift_tonic' || g === 'shrink_elixir') { addItem(g, -1); const k = g === 'giant_draught' ? 'giant' : g === 'swift_tonic' ? 'swift' : 'tiny'; if (k === 'giant') POT.tiny = 0; if (k === 'tiny') POT.giant = 0; POT[k] = 60; S.potionsDrunk = (S.potionsDrunk || 0) + 1; S.potionKinds = S.potionKinds || {}; S.potionKinds[k] = true; SFX.level(); burst(S.x, S.y - .6, GOODS[g].col, 20, 4); floatText(S.x, S.y - 1.8, k === 'giant' ? 'You grow HUGE!' : k === 'tiny' ? 'You shrink!' : 'Zoom!', GOODS[g].col); renderHUD(); partyT = 0; return; }
   if (g === 'metal_detector') { det.on = !det.on; if (det.on) { det.cache = null; toast('<b>Metal detector on.</b><br>Walk around and watch the signal. When it\u2019s strongest, press E to dig.', 4500); } else toast('Metal detector off.', 2000); $('detUI').hidden = !det.on; SFX.click(); return; }
+  if (g === 'ocarina') { ocaOpen(); return; }
   if (g === 'strongbox') { addItem(g, -1); renderHUD(); lockStart(); return; }
   if (g === 'war_horn') {
     if (inDungeon() || inArena() || townAt(S.x, S.y, 14) || S.y >= WORLD_H) { toast('Blow the horn out in the wild, away from towns.'); return; }
@@ -4719,6 +4721,7 @@ addEventListener('keydown', e => {
   else if (moles && moles.on) { const n9 = {'7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8, q: 0, w: 1, e: 2, a: 3, s: 4, d: 5, z: 6, x: 7, c: 8}[k]; if (n9 != null) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) moleWhack(n9); } }
   else if (kitchen && kitchen.on) { const i = '123456'.indexOf(k); if (i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) kitchenAdd(i); } }
   else if (slide && slide.on) { const dm = {arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd', arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r'}[k]; if (dm) { e.preventDefault(); e.stopImmediatePropagation(); slideMove(dm); } }
+  else if (ocaOn() && '123456'.includes(k) && k.length === 1) { e.preventDefault(); e.stopImmediatePropagation(); ocaNote(+k - 1); }
   else if (darts && darts.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) dartThrow(); } }
   else if (cart && cart.on) { if (k === ' ' || k === 'enter' || k === 'e' || k === 'arrowup' || k === 'w') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cartJump(); } }
   else if (snow && snow.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); snow.keys.add(k); } else if (k === ' ' || k === 'enter' || k === 'e' || k === 'f') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) snowThrow(); } }
@@ -5855,6 +5858,42 @@ function dartLoop() {
 function dartEnd() {
   const D = darts; D.on = false; darts = null; const c = Math.round(D.score/4); S.coins += c; S.dartBest = Math.max(S.dartBest || 0, D.score); S.dartBulls = (S.dartBulls || 0) + D.bulls; renderHUD(); save(); SFX.victory();
   openPanel('Darts', `Nine darts thrown: <b>${D.score}</b> points${D.bulls ? ` with ${D.bulls} bullseye${D.bulls > 1 ? 's' : ''}` : ''}.${D.score >= (S.dartBest || 0) ? ' A new best!' : ''}<br>“${D.score >= 250 ? 'You might be better than me!' : 'Not bad at all.'}” <span style="color:var(--good)">+${c} coin</span>`, [{label: 'Again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); dartStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== ocarina songs =====
+const OCA_NOTES = [262, 294, 330, 392, 440, 523], OCA_SYM = ['↑', '↓', '←', '→', 'A', 'Y'];
+const OCA_SONGS = [
+  {k: 'dawn', name: 'Song of Dawn', seq: [0, 2, 4, 2, 0], desc: 'Hurries the night along to morning (once a day).'},
+  {k: 'home', name: 'Song of Return', seq: [5, 4, 3, 2, 1, 0], desc: 'Carries you home on the wind (once a day).'},
+  {k: 'mend', name: 'Song of Mending', seq: [2, 3, 2, 3, 5], desc: 'Heals you and your party nearby (once an hour).'},
+  {k: 'whale', name: '???', seq: [0, 0, 5, 5, 3], desc: 'A secret song. Some say the whales in the sky sing it at dusk.', secret: true},
+];
+let oca = null;
+const ocaOn = () => !!oca && mode === 'talk' && !$('talk').hidden && ($('talkWho').textContent || '').startsWith('Clay Ocarina');
+function ocaTalk(n) {
+  if (!have('ocarina')) { S.coins -= 150; addItem('ocarina', 1); renderHUD(); save(); }
+  S.ocaSongs = S.ocaSongs || {}; ['dawn', 'home', 'mend'].forEach(k => S.ocaSongs[k] = true); save();
+  say(`“An ocarina! Wonderful. Play it from your bag: the notes are 1 to 6 on the keyboard, or the D-pad, A and Y. Here are three old songs with a bit of magic in them:”<br><br>${OCA_SONGS.filter(q => !q.secret).map(q => `<b>${q.name}</b>: ${q.seq.map(i => i + 1).join(' ')}<br><span style="color:var(--muted)">${q.desc}</span>`).join('<br>')}<br><br>“There’s a fourth song, they say, that only the sky whales know...”`, [back(n)]);
+}
+function ocaOpen() { if (mode !== 'play') return; oca = {seq: []}; ocaRender(); }
+function ocaRender(msg) {
+  if (!oca) return; const known = OCA_SONGS.filter(q => (S.ocaSongs || {})[q.k]);
+  openPanel('Clay Ocarina', `<div style="text-align:center;font-size:22px;letter-spacing:.2em;min-height:30px">${oca.seq.slice(-8).map(i => `<span style="color:hsl(${i*55},70%,65%)">♪${i + 1}</span>`).join(' ') || '<span style="color:var(--muted);font-size:14px">Play some notes...</span>'}</div>${msg ? `<div style="text-align:center;margin:6px 0">${msg}</div>` : ''}<div style="color:var(--muted);font-size:12px;margin-top:6px">${known.map(q => `${q.name}: ${q.seq.map(i => i + 1).join(' ')}`).join(' · ') || 'You don’t know any songs yet. Ask Melody in Lantern Bay.'}</div>`,
+    [...OCA_NOTES.map((f, i) => ({label: `♪ ${i + 1}`, fn: () => ocaNote(i)})), {label: 'Put it away', fn: () => { oca = null; closeTalk(); }}]);
+}
+function ocaNote(i) {
+  if (!oca) return; AUD.tone(OCA_NOTES[i], .35, 'sine', .14); oca.seq.push(i); if (oca.seq.length > 12) oca.seq.shift();
+  for (const q of OCA_SONGS) { const tail = oca.seq.slice(-q.seq.length); if (tail.length === q.seq.length && tail.every((v, j) => v === q.seq[j])) { oca.seq = []; ocaSong(q); return; } }
+  ocaRender();
+}
+function ocaSong(q) {
+  S.ocaSongs = S.ocaSongs || {}; const learned = !S.ocaSongs[q.k]; S.ocaSongs[q.k] = true; S.ocaPlayed = (S.ocaPlayed || 0) + 1; const cd = S.ocaCd = S.ocaCd || {};
+  setTimeout(() => OCA_NOTES.slice().reverse().forEach((f, j) => setTimeout(() => AUD.tone(f*2, .2, 'triangle', .06), j*70)), 200);
+  let msg = '';
+  if (q.k === 'dawn') { if (cd.dawn === S.day) msg = 'The notes hang in the air, but the sky has already heard this song today.'; else if (S.time > .25 && S.time < .75) msg = 'A lovely tune, but it is already day.'; else { cd.dawn = S.day; if (S.time > .5) { S.time = .27; newDay(); } else S.time = .27; msg = '<b>The sky brightens!</b> Morning comes early.'; } }
+  else if (q.k === 'home') { if (cd.home === S.day) msg = 'The wind ignores you. It already carried you once today.'; else if (inDungeon() || bossActive() || S.y >= WORLD_H) msg = 'The wind can’t reach you here.'; else { cd.home = S.day; oca = null; closeTalk(); fadeThen(() => { if (S.home && S.home.level >= 1) { S.x = HOME.x + .5; S.y = HOME.y + 2; } else { S.x = TOWNS.wren.x + .5; S.y = TOWNS.wren.y + 2.3; } enemies = enemies.filter(e => e.boss); petE = null; lastTile = -1; renderHUD(); }); toast('<b>Song of Return</b><br>A warm wind lifts you and sets you down at home.', 4000); return; } }
+  else if (q.k === 'mend') { if (cd.mend && frameT - cd.mend < 3600/60 && cd.mendDay === S.day) msg = 'Your voice is tired. Rest a while before singing it again.'; else { cd.mend = frameT; cd.mendDay = S.day; S.hp = Math.min(maxHP(), S.hp + maxHP()*.5); renderHP(); BUFFS.regen = Math.max(BUFFS.regen || 0, 30); burst(S.x, S.y - .6, '#86e08f', 24, 4); msg = '<b>A soothing melody.</b> You feel much better.'; if (party) { myPicnic = {i: ++fwSeq, x: Math.round(S.x*10)/10, y: Math.round(S.y*10)/10}; partyT = 0; } } }
+  else if (q.k === 'whale') { if (learned) S.ocaSecret = true; if (!skyWhale && !inDungeon() && S.y < WORLD_H) { skyWhale = {t: 0, x: 0, vx: 1/14, dropped: false}; S.whales = (S.whales || 0) + 1; msg = '<b>Far above, something answers your song...</b> A great whale swims into the sky!'; } else msg = 'An eerie, beautiful melody. Nothing seems to happen... this time.'; }
+  ocaRender(`<span style="color:var(--brass)">${q.k === 'whale' && learned ? 'You discovered the <b>Song of the Sky Whale</b>! ' : `<b>${q.name}</b>. `}</span>${msg}`); save();
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -7411,6 +7450,7 @@ const GUIDE = [
   ['Restaurant rush', 'Chef Gaston in Sunreach needs help in the kitchen: tickets show each dish\u2019s ingredients in order. Click them (or press 1 to 6) in the right sequence before the ticket runs out.'],
   ['Metal detector and pet expeditions', 'Professor Dunst in Dunmere Oasis sells a Metal Detector. Switch it on from your bag and watch the signal in the corner: it beeps faster as you get closer to buried treasure, and you press E to dig when it says DIG. At the pet trainer, you can send your pet on a half-day or full-day expedition. They come home on their own with whatever they found.'],
   ['Twin Plate vaults', 'Stone vaults with two pressure plates stand near several towns (they show on your map once you have seen them). They only open when two party members stand on both plates at the same time. Everyone there gets the treasure, and the vault reseals each dawn.'],
+  ['Ocarina', 'Melody in Lantern Bay sells a clay ocarina and teaches three magic songs. Play it from your bag with keys 1 to 6 (or the D-pad, A and Y). The Song of Dawn brings morning, the Song of Return carries you home, and the Song of Mending heals you and your party. A fourth, secret song is known only to the sky whales...'],
   ['Darts', 'Dot in Thornwick runs the dartboard: the aim drifts around, so wait until it floats over the bullseye before you throw. Nine darts a game.'],
   ['Four in a Row', 'Gramps Tobin in Maplehold plays Four in a Row: drop discs into the columns and line up four of your red discs in a row, column or diagonal before he lines up his yellow ones. Your first win each day pays best.'],
   ['Home decorations', 'Craft an Aquarium (it shows fish from your fish log swimming around), a Bird Feeder (birds for your journal come more often, near it), a Wind Chime, or a Party Banner (party members nearby heal faster) at the workbench, then place them with B.'],
@@ -8050,6 +8090,7 @@ function padPoll(dt) {
   if (moles && moles.on) { const map9 = {12: 1, 13: 7, 14: 3, 15: 5}; for (const d in map9) if (down(+d)) moleCursor(map9[d]); if (down(OK) || down(2)) moleWhack(moles.cur); PAD.prev = B; return; }
   if (kitchen && kitchen.on) { const mp = {[OK]: 0, [BACK]: 1, 2: 2, 3: 3, 4: 4, 5: 5}; for (const i in mp) if (down(+i)) kitchenAdd(mp[i]); PAD.prev = B; return; }
   if (slide && slide.on) { const dmap = {12: 'u', 13: 'd', 14: 'l', 15: 'r'}; for (const d in dmap) if (down(+d)) slideMove(dmap[d]); PAD.prev = B; return; }
+  if (ocaOn()) { [12, 13, 14, 15, OK, 2].forEach((d, i) => { if (down(d)) ocaNote(i); }); if (down(BACK)) { oca = null; closeTalk(); } PAD.prev = B; return; }
   if (darts && darts.on) { if (down(OK) || down(BACK) || down(2) || down(3) || down(7)) dartThrow(); PAD.prev = B; return; }
   if (cart && cart.on) { if (down(OK) || down(BACK) || down(2) || down(3) || down(12)) cartJump(); PAD.prev = B; return; }
   if (snow && snow.on) { snow.cvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); snow.cvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK) || down(2) || down(7)) snowThrow(); PAD.prev = B; return; }
@@ -9467,6 +9508,7 @@ function mainOptions(n) {
   if (n.seedsman) o.push({label: 'Buy exotic seeds', primary: true, fn: () => seedTalk(n)});
   if (n.hideseek) o.push({label: 'Play hide and seek', primary: true, fn: () => hsTalk(n)});
   if (n.busker) o.push({label: 'Busk with Melody', primary: true, fn: () => buskTalk(n)});
+  if (n.busker) o.push({label: have('ocarina') ? 'Learn ocarina songs' : 'Buy an ocarina · 150\u25c6', disabled: !have('ocarina') && S.coins < 150, fn: () => ocaTalk(n)});
   if (n.busker) o.push({label: 'Buy rocket packs', fn: () => shopTalk(n, [['rocket_pack', 30]], '“Every good show ends with a bang!”')});
   if (n.skittles) o.push({label: 'Buy a picnic basket', fn: () => shopTalk(n, [['picnic_basket', 45]], '“Bread, cheese, pie and a flask of cider. Share it with friends!”')});
   if (n.birder) o.push({label: S.birdJournal ? 'Show my bird journal' : 'Ask about birdwatching', primary: true, fn: () => birdTalk(n)});
@@ -12318,6 +12360,8 @@ const ACH = [
   ['partyxp','Teamwork','Earn party XP from a friend\'s victory', () => (S.partyXP || 0) >= 1],
   ['lostfound10','Lost and Found','Return 10 lost items to their owners', () => (S.lostReturned || 0) >= 10],
   ['streak7','Regular Visitor','Play on 7 days in a row', () => (S.bestStreak || 0) >= 7],
+  ['ocarina','Melodious','Play a magic song on the ocarina', () => (S.ocaPlayed || 0) >= 1],
+  ['whalesong','Whale Song','Discover the secret song of the sky whales', () => !!S.ocaSecret],
   ['bullseye3','Bullseye!','Hit 3 bullseyes at darts', () => (S.dartBulls || 0) >= 3],
   ['partyrespawn','Never Leave a Friend','Wake up beside a party member after being knocked out', () => (S.partyRespawns || 0) >= 1],
   ['variants','Rare Breeds','Defeat a Shadow Wolf, a Crystal Slime and a Gilded Scorpion', () => ['shadow_wolf', 'crystal_slime', 'gilded_scorpion'].every(k => (S.killsBy || {})[k])],
@@ -12976,7 +13020,7 @@ window.claude?.hot?.snapshot?.(() => ({save: S && mode !== 'title' ? serialize()
 const hotData = window.claude?.hot?.data;
 if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (e) {} }
 renderHUD();
-window.__gs = () => ghostSpot(); window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
+window.__gs = () => ghostSpot(); window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
 window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
