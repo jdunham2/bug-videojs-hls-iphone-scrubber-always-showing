@@ -167,6 +167,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
         <dt>Craft menu (J)</dt><dd>Opens pets, rides and every recipe you have the ingredients for. Close it with its Close button, J or Esc. I hides the weapon and build bars for a clear view; their keys still work.</dd>
         <dt>Weapon bar</dt><dd>Twenty-five weapons, from spear to minigun; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
+        <dt>More builds</dt><dd>Iron door, arrow-slit wall (you can shoot through it, animals cannot pass), shock fence, ballista, landmine, fire grate, scarecrow (keeps flying animals away), torch post, and a garden plot and beehive that grow herbs, berries and honey over time.</dd>
         <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal, black is coal. Coal and sulfur make powder rounds and dynamite. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
         <dt>Pick-ups</dt><dd>New finds: berry bushes, honeycombs, resin, sulfur crystals, and wool from sheep. Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
         <dt>Pets and rides</dt><dd>You can keep four pets; click one you own to let it go. The balloon floats over walls and trees where only flying animals reach you, and the tank fires its own gun. The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
@@ -229,7 +230,21 @@ const B = {
   bone:  {name: 'Bone fence', cost: {bone: 3, wood: 1},  hp: 55, solid: 1},
   tar:   {name: 'Tar pit',    cost: {resin: 3, coal: 1}, hp: 50},
   brazier: {name: 'Brazier',  cost: {coal: 3, stone: 4, iron: 1}, hp: 70},
+  idoor: {name: 'Iron door',   cost: {iron: 4, wood: 2},  hp: 320, solid: 1, door: 1, unlock: 2},
+  slit:  {name: 'Arrow-slit wall', cost: {wood: 4, stone: 2}, hp: 90, solid: 1, slit: 1},
+  efence:{name: 'Shock fence', cost: {iron: 4, crystal: 2}, hp: 160, solid: 1, unlock: 3},
+  ballista: {name: 'Ballista', cost: {wood: 14, iron: 10}, hp: 110, solid: 1, unlock: 3},
+  mine:  {name: 'Landmine',    cost: {iron: 2, sulfur: 2, coal: 1}, hp: 20},
+  flametrap: {name: 'Fire grate', cost: {iron: 3, coal: 2, resin: 1}, hp: 80},
+  scarecrow: {name: 'Scarecrow', cost: {wood: 4, hide: 1}, hp: 40},
+  torch: {name: 'Torch post',  cost: {wood: 2, resin: 1}, hp: 25},
+  garden:{name: 'Garden plot', cost: {wood: 4, herbs: 2}, hp: 40},
+  hive:  {name: 'Beehive',     cost: {wood: 6, honey: 1}, hp: 40},
 };
+/* auto-firing defences */
+const GUNS = {turret: {range: 340, cd: 1.1, dmg: 18, spd: 900, pierce: 0}, ballista: {range: 580, cd: 2.4, dmg: 70, spd: 1150, pierce: 2}};
+const FARMS = {garden: {every: 40, yields: ['herb', 'berry']}, hive: {every: 55, yields: ['honey']}};
+
 const GEAR = {
   gaxe:  {name: 'Golden axe',  cost: {gold: 6, wood: 4}, msg: 'Golden axe ready. It chops three at a time and hits hard.'},
   plate: {name: 'Plate armor', cost: {gold: 8, iron: 6}, msg: 'Plate armor on. You take half damage.'},
@@ -286,7 +301,7 @@ function nightReward(n) { // every survived night: a gift, and on nights 1-5 som
   snd(520, .25, 'triangle', .07, 260);
   return 'Night ' + n + ' survived. ' + r[0] + ' Gift: ' + costText(give) + '.';
 }
-const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'tar', 'brazier', 'remove'];
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'tar', 'brazier', 'idoor', 'slit', 'efence', 'ballista', 'mine', 'flametrap', 'scarecrow', 'torch', 'garden', 'hive', 'remove'];
 const TKEY = i => TOOLS[i] === 'remove' ? 'X' : i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : '';
 const WPN = {
   axe:     {name: 'Axe', note: 'chops'},
@@ -468,7 +483,7 @@ function recalc() {
   for (const s of grid) {
     if (!s) continue;
     if (s.type === 'bed' && interior[s.ty * W + s.tx]) house.bed = true;
-    if (s.type === 'door' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => s.tx + a >= 0 && s.tx + a < W && s.ty + b >= 0 && s.ty + b < H && interior[(s.ty + b) * W + s.tx + a])) house.door = true;
+    if (B[s.type].door && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => s.tx + a >= 0 && s.tx + a < W && s.ty + b >= 0 && s.ty + b < H && interior[(s.ty + b) * W + s.tx + a])) house.door = true;
   }
 }
 const houseDone = () => house.room && house.door && house.bed;
@@ -1151,6 +1166,11 @@ function updPlayer(dt) {
     if (!s) continue;
     if (s.flash > 0) s.flash -= dt;
     if (s.type === 'fire' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 110) P.hp = Math.min(P.max, P.hp + 4 * dt);
+    const fm = FARMS[s.type];
+    if (fm && !client() && (s.grow = (s.grow === undefined ? fm.every * .5 : s.grow) - dt) <= 0) { // gardens and hives grow things nearby
+      s.grow = fm.every; const cx = s.tx * T + 24, cy = s.ty * T + 24;
+      if (items.filter(i => dist(i.x, i.y, cx, cy) < 90).length < 3) { const a = rnd(0, TAU); dropItem(fm.yields[Math.random() * fm.yields.length | 0], cx + Math.cos(a) * 46, cy + Math.sin(a) * 46); }
+    }
     if (s.type === 'brazier' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 160) P.hp = Math.min(P.max, P.hp + 6 * dt);
   }
 }
@@ -1162,12 +1182,12 @@ function update(dt) {
   updDark(dt); updPlayer(dt); if (!running) return;
   if (multi() && players().length === 0) return end(false); // everyone is down at once
   for (const s of grid) { // turrets pick off the nearest hostile animal
-    if (!s || s.type !== 'turret' || (s.cdT = (s.cdT || 0) - dt) > 0) continue;
-    const x = s.tx * T + 24, y = s.ty * T + 24; let best = null, bd = 340;
+    const gun = s && GUNS[s.type]; if (!gun || (s.cdT = (s.cdT || 0) - dt) > 0) continue;
+    const x = s.tx * T + 24, y = s.ty * T + 24; let best = null, bd = gun.range;
     for (const a of animals) { if (A[a.type].passive || a.flee) continue; const d = dist(a.x, a.y, x, y); if (d < bd) { bd = d; best = a; } }
     if (!best) { s.cdT = .3; continue; }
-    s.cdT = 1.1; s.aim = Math.atan2(best.y - y, best.x - x);
-    shots.push({x, y, vx: Math.cos(s.aim) * 900, vy: Math.sin(s.aim) * 900, life: .42, dmg: 18, pierce: 0, hit: new Set(), arrow: true, ghost: true});
+    s.cdT = gun.cd; s.aim = Math.atan2(best.y - y, best.x - x);
+    shots.push({x, y, vx: Math.cos(s.aim) * gun.spd, vy: Math.sin(s.aim) * gun.spd, life: gun.range / gun.spd, dmg: gun.dmg, pierce: gun.pierce, hit: new Set(), arrow: true, ghost: true});
     if (dist(x, y, P.x, P.y) < 700) snd(520, .07, 'triangle', .035, -300);
     if (host() && NET.room) NET.room.emit('fx', {w: 'turret', x, y, a: +s.aim.toFixed(2)}).catch(() => {});
   }
@@ -1175,7 +1195,7 @@ function update(dt) {
   for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
 
   // animals
-  const wards = grid.filter(s => s && s.type === 'ward');
+  const wards = grid.filter(s => s && s.type === 'ward'), scares = grid.filter(s => s && s.type === 'scarecrow');
   for (let i = animals.length - 1; i >= 0; i--) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
@@ -1217,6 +1237,16 @@ function update(dt) {
     }
     if (a.stun > 0) { a.stun -= dt; spd = 0; }
     if (!d.passive) for (const wd of wards) if (dist(wd.tx * T + 24, wd.ty * T + 24, a.x, a.y) < 175) { spd *= .55; break; }
+    if (d.fly && !d.boss) for (const sc of scares) { const sx = sc.tx * T + 24, sy = sc.ty * T + 24, dd = dist(a.x, a.y, sx, sy); if (dd < 230 && dd > 1) { dx += (a.x - sx) / dd * 2.2; dy += (a.y - sy) / dd * 2.2; } } // scarecrows turn birds and bats away
+    if (tile && tile.type === 'mine' && !d.passive && !d.fly) { // boom
+      grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty); const bx = tile.tx * T + 24, by = tile.ty * T + 24;
+      explode({x: bx, y: by}); for (const q of animals) { const dd = dist(q.x, q.y, bx, by); if (dd < 110 + q.r) q.hp -= 50; }
+      if (host() && NET.room) NET.room.emit('fx', {w: 'grenade', x: bx, y: by, tx: bx, ty: by}).catch(() => {});
+    }
+    if (tile && tile.type === 'flametrap' && !d.passive && !d.fly) {
+      a.hp -= 34 * dt; tile.hp -= 3 * dt; if (Math.random() < dt * 10) burst(a.x, a.y, '#ff8a2a', 2);
+      if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; gridDelta(tile.tx, tile.ty); }
+    }
     if (tile && tile.type === 'tar' && !d.passive && !d.fly) spd *= A[a.type].boss ? .6 : .3; // stuck in tar
     if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
@@ -1226,7 +1256,7 @@ function update(dt) {
     const blocked = d.fly ? (a.x += (dx * spd + a.kx) * dt, a.y += (dy * spd + a.ky) * dt, null) : move(a, (dx * spd + a.kx) * dt, (dy * spd + a.ky) * dt, true);
     a.kx *= Math.pow(.002, dt); a.ky *= Math.pow(.002, dt);
     if (d.passive || a.flee) continue;
-    if (blocked && blocked.type && a.cd <= 0) { if (blocked.type === 'bone') { a.hp -= 6; a.flash = .1; } damageStruct(blocked, d.sdmg); a.cd = .9; }
+    if (blocked && blocked.type && a.cd <= 0) { if (blocked.type === 'bone') { a.hp -= 6; a.flash = .1; } if (blocked.type === 'efence') { a.hp -= 22; a.flash = .15; if (!d.boss) a.stun = .8; burst(a.x, a.y, '#bfe8ff', 5); snd(1500, .08, 'square', .04, -1200); } damageStruct(blocked, d.sdmg); a.cd = .9; }
     const up = tg === P ? P.riding && VEH[P.vehicle.type].fly : tg.veh && tg.veh.riding && VEH[tg.veh.type].fly; // in a balloon only fliers can reach you
     if (pd < a.r + tg.r + 5 && a.cd <= 0 && !tg.dead && (!up || d.fly) && (tg !== P || P.hurt <= 0)) {
       a.cd = 1;
@@ -1243,7 +1273,8 @@ function updFx(dt) {
     if (s.bomb) { s.t += dt; const q = Math.min(1, s.t / s.T); s.x = s.x0 + (s.tx - s.x0) * q; s.y = s.y0 + (s.ty - s.y0) * q; if (q >= 1) { shots.splice(i, 1); explode(s); } continue; }
     for (let k = 0; k < 3 && !dead; k++) {
       s.x += s.vx * dt / 3; s.y += s.vy * dt / 3;
-      if (!s.ghost && hitBox(s.x, s.y, 2, true)) { burst(s.x, s.y, '#c9a26b', 3); dead = true; break; }
+      const wallHit = !s.ghost && hitBox(s.x, s.y, 2, true);
+      if (wallHit && !B[wallHit.type].slit) { burst(s.x, s.y, '#c9a26b', 3); dead = true; break; }
       for (const a of animals) {
         if (s.fx) break;
         if (s.hit.has(a) || dist(a.x, a.y, s.x, s.y) > a.r + 5) continue;
@@ -1418,6 +1449,20 @@ function initScene() {
   GEO.bed = merge([[box(42, 9, 28), '#6b4a2c', M(0, 6, 0)], [box(40, 6, 26), '#e7dfc8', M(0, 13, 0)], [box(26, 7, 27), '#9c3f33', M(7, 14, 0)], [box(9, 5, 17), '#ffffff', M(-13, 17.5, 0)], [box(4, 24, 28), '#5d3f24', M(-21, 12, 0)], [box(3, 14, 28), '#5d3f24', M(21, 7, 0)]]);
   GEO.fire = merge([...Array.from({length: 8}, (_, i) => [dod(5.5), i % 2 ? '#77776f' : '#8b8b83', M(Math.cos(i / 8 * TAU) * 16, 3, Math.sin(i / 8 * TAU) * 16, 1, .8, 1, i, i, 0)]), ...[0, 1, 2].map(i => [cyl(3, 3, 26, 6), '#3d2a18', M(0, 5, 0, 1, 1, 1, 0, i * TAU / 6, Math.PI / 2 - .25)])]);
   GEO.spikes = merge([[box(44, 2, 44), '#3c2816', M(0, 1, 0)], ...Array.from({length: 9}, (_, i) => [cone(4, 24, 5), i % 2 ? '#d6c7a1' : '#c2b189', M((i % 3 - 1) * 14, 13, ((i / 3 | 0) - 1) * 14, 1, 1, 1, (i % 3 - 1) * .18, 0, ((i / 3 | 0) - 1) * -.18)])]);
+  const plank = (x, y, z, w, h, d, c) => [box(w, h, d), c, M(x, y, z)];
+  GEO.idoor = merge([[box(8, 66, 12), '#3d444b', M(-20, 33, 0)], [box(8, 66, 12), '#3d444b', M(20, 33, 0)], [box(48, 8, 12), '#3d444b', M(0, 64, 0)], [box(32, 58, 5), '#6c737a', M(0, 29, 0)],
+    [box(32, 4, 7), '#2b3035', M(0, 12, 0)], [box(32, 4, 7), '#2b3035', M(0, 29, 0)], [box(32, 4, 7), '#2b3035', M(0, 46, 0)], [sph(), '#c9a227', M(10, 29, 4.5, 2.4)], [sph(), '#c9a227', M(10, 29, -4.5, 2.4)]]);
+  GEO.slit = merge([plank(0, 10, 0, 48, 20, 46, '#7a5532'), plank(0, 50, 0, 48, 20, 46, '#7a5532'), plank(-17, 30, 0, 14, 20, 46, '#8a6238'), plank(17, 30, 0, 14, 20, 46, '#8a6238'), plank(0, 61, 0, 50, 4, 48, '#5d3f24'), plank(0, 30, 0, 20, 2, 46, '#4d3520')]);
+  GEO.efence = merge([...[-20, 20].map(x => [cyl(3, 3.6, 58, 6), '#3d444b', M(x, 29, 0)]), ...[12, 24, 36, 48].map(y => [box(40, 1.2, 1.2), '#bfe8ff', M(0, y, 0)]), [sph(), '#7fd8f0', M(-20, 60, 0, 4)], [sph(), '#7fd8f0', M(20, 60, 0, 4)], [box(48, 3, 8), '#2b3035', M(0, 1.5, 0)]]);
+  GEO.ballista = merge([[box(40, 18, 40), '#6e4c2c', M(0, 9, 0)], [box(44, 4, 44), '#4d3520', M(0, 20, 0)], [cyl(5, 7, 10, 6), '#3d444b', M(0, 25, 0)]]);
+  GEO.ballistaHead = merge([[box(50, 6, 8), '#7a5532', M(4, 0, 0)], [box(6, 5, 56), '#5d3f24', M(14, 2, 0, 1, 1, 1, 0, 0, 0)], [box(44, 2, 2), '#d9c9a0', M(6, 5, 0)], [cone(3.5, 12, 4), '#c9ccc4', M(32, 5, 0, 1, 1, 1, 0, 0, -Math.PI / 2)], [box(1, 1, 56), '#efe6cf', M(4, 4, 0)]]);
+  GEO.mine = merge([[cyl(9, 10, 3, 10), '#3a3f2c', M(0, 1.5, 0)], [cyl(3, 3, 2, 8), '#8d1f1f', M(0, 3.5, 0)], [sph(), '#5a5440', M(0, 0, 0, 14, 1.2, 14)]]);
+  GEO.flametrap = merge([[box(44, 3, 44), '#2b2f33', M(0, 1.5, 0)], ...[-15, -5, 5, 15].map(x => [box(3, 3.5, 40), '#55504a', M(x, 3, 0)]), [box(40, 2, 6), '#ff5a1f', M(0, 1.8, 0)]]);
+  GEO.scarecrow = merge([[cyl(2, 2, 56, 5), '#6e4c2c', M(0, 28, 0)], [box(3, 3, 40), '#6e4c2c', M(0, 42, 0)], [box(10, 16, 16), '#8a6a45', M(0, 38, 0)], [box(12, 4, 4), '#c9a26b', M(0, 42, -21)], [box(12, 4, 4), '#c9a26b', M(0, 42, 21)],
+    [sph(), '#d9b87a', M(0, 54, 0, 6.5)], [cyl(10, 10, 1.5, 10), '#a07a3a', M(0, 59, 0)], [cone(5, 8, 8), '#a07a3a', M(0, 64, 0)]]);
+  GEO.torch = merge([[cyl(2, 2.6, 46, 6), '#5d3f24', M(0, 23, 0)], [cyl(4, 3, 6, 6), '#3a2716', M(0, 47, 0)]]);
+  GEO.garden = merge([plank(0, 3, 0, 44, 6, 44, '#6e4c2c'), plank(0, 5, 0, 38, 4, 38, '#4a3220'), ...[[-12, -12], [0, -12], [12, -12], [-12, 0], [12, 0], [-12, 12], [0, 12], [12, 12], [0, 0]].map(([x, z], i) => [sph(), i % 3 ? '#3f8a3a' : '#5aa04a', M(x, 9, z, 5, 4, 5)]), [sph(), '#6a2a8a', M(4, 12, -12, 1.8)], [sph(), '#6a2a8a', M(-12, 12, 4, 1.8)]]);
+  GEO.hive = merge([[box(30, 4, 30), '#5d3f24', M(0, 14, 0)], ...[0, 1, 2, 3].map(i => [box(28 - i * 2, 7, 28 - i * 2), i % 2 ? '#e0a63a' : '#f2c14e', M(0, 19.5 + i * 7, 0)]), [box(26, 3, 26), '#7a5532', M(0, 48, 0)], [box(6, 3, 1), '#2b1d10', M(0, 18, 14)], ...[[-10, -10], [10, -10], [-10, 10], [10, 10]].map(([x, z]) => [box(3, 12, 3), '#5d3f24', M(x, 6, z)])]);
   GEO.tar = merge([[cyl(21, 22, 2, 12), '#141210', M(0, 1, 0)], [cyl(23, 23, 1.5, 12), '#3a2a18', M(0, .5, 0)], [sph(), '#26201a', M(6, 2.5, -4, 3, 1.4, 3)], [sph(), '#26201a', M(-8, 2.5, 5, 2.4, 1.1, 2.4)], [sph(), '#2e2620', M(-2, 2.5, -9, 1.8, .9, 1.8)]]);
   GEO.brazier = merge([[cyl(4, 6, 22, 6), '#3d444b', M(0, 11, 0)], [cyl(14, 8, 10, 8), '#2b3035', M(0, 26, 0)], [cyl(15, 15, 2, 8), '#59626b', M(0, 31, 0)], [dod(4.5), '#1c1c1c', M(4, 31, 3)], [dod(4), '#1c1c1c', M(-5, 31, -2)], [cyl(10, 12, 3, 6), '#59626b', M(0, 1.5, 0)]]);
   GEO.ward = merge([[cyl(13, 16, 8, 8), '#77776f', M(0, 4, 0)], [cone(8, 36, 5), '#7fd8f0', M(0, 26, 0)], [cone(4.5, 20, 5), '#b8ecfa', M(8, 16, 4, 1, 1, 1, 0, 0, -.35)], [cone(4, 16, 5), '#5cc0de', M(-7, 14, -5, 1, 1, 1, .3, 0, .35)]]);
@@ -1557,12 +1602,12 @@ function structMesh(s) {
   const g = new THREE.Group(), m = new THREE.Mesh(GEO[s.type], vmat); m.castShadow = m.receiveShadow = true; g.add(m);
   g.position.set(s.tx * T + T / 2, 0, s.ty * T + T / 2);
   if (s.type === 'wall') g.rotation.y = ((s.tx * 7 + s.ty * 3) % 4) * Math.PI / 2;
-  if (s.type === 'door' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
+  if ((B[s.type].door || s.type === 'slit' || s.type === 'efence') && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'bed') g.rotation.y = (s.tx + s.ty) % 2 ? 0 : Math.PI / 2;
   if (s.type === 'bone' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'lamp') { const l = new THREE.Mesh(GEO.eye, new THREE.MeshBasicMaterial({color: 0xffd98a, fog: false})); l.scale.setScalar(3.6); l.position.set(12, 35, 0); g.add(l); }
-  if (s.type === 'turret') { const h = new THREE.Mesh(GEO.turretHead, vmat); h.position.y = 40; h.castShadow = true; g.add(h); g.userData.head = h; }
-  if (s.type === 'brazier') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); f.position.y = 30; f.scale.setScalar(.8); g.add(f); g.userData.flame = f; }
+  if (GEO[s.type + 'Head']) { const h = new THREE.Mesh(GEO[s.type + 'Head'], vmat); h.position.y = s.type === 'ballista' ? 30 : 40; h.castShadow = true; g.add(h); g.userData.head = h; }
+  if (s.type === 'brazier' || s.type === 'torch' || s.type === 'flametrap') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); f.position.y = s.type === 'torch' ? 50 : s.type === 'flametrap' ? 2 : 30; f.scale.setScalar(s.type === 'torch' ? .45 : s.type === 'flametrap' ? .6 : .8); g.add(f); g.userData.flame = f; }
   if (s.type === 'fire') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); g.add(f); g.userData.flame = f; }
   return g;
 }
@@ -1618,9 +1663,9 @@ function render(now, dt) {
     if (!s.mesh) { s.mesh = structMesh(s); s.pop = .25; scene.add(s.mesh); smeshes.push(s); }
     if (s.pop > 0) s.pop -= dt;
     const sc = 1 + Math.max(0, s.flash) * .5 - Math.max(0, s.pop) * 1.6; s.mesh.scale.set(1 + Math.max(0, s.flash) * .4, sc, 1 + Math.max(0, s.flash) * .4);
-    if (s.type === 'turret') s.mesh.userData.head.rotation.y = -(s.aim || 0);
+    if (s.mesh.userData.head) s.mesh.userData.head.rotation.y = -(s.aim || 0);
     if (s.type === 'lamp') fires.push(s);
-    if (s.type === 'fire' || s.type === 'brazier') { const f = s.mesh.userData.flame, fl = Math.sin(now / 70 + s.tx) * .12 + Math.sin(now / 31) * .06; f.scale.set(1 + fl, 1.1 + fl * 2.2, 1 + fl); f.rotation.y = now / 300; fires.push(s); }
+    if (s.type === 'fire' || s.type === 'brazier' || s.type === 'torch' || s.type === 'flametrap') { const f = s.mesh.userData.flame, fl = Math.sin(now / 70 + s.tx) * .12 + Math.sin(now / 31) * .06; f.scale.set(1 + fl, 1.1 + fl * 2.2, 1 + fl); f.rotation.y = now / 300; fires.push(s); }
   }
   fires.sort((a, b) => dist(a.tx * T, a.ty * T, P.x, P.y) - dist(b.tx * T, b.ty * T, P.x, P.y));
   fireLights.forEach((l, i) => { const s = fires[i]; if (s) { l.position.set(s.tx * T + 24, 34, s.ty * T + 24); l.intensity = (.5 + k * 1.6) * (1 + Math.sin(now / 90 + i * 2) * .12); } else l.intensity = 0; });
