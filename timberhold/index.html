@@ -49,6 +49,9 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
   text-shadow:0 2px 6px #000,0 0 2px #000;opacity:0;transition:opacity .4s;max-width:560px}
 #toast.on{opacity:1}
 #bottom{display:flex;align-items:flex-end;justify-content:center;gap:10px;flex-wrap:wrap}
+#side{max-width:100%;min-width:0}
+#craftbox{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;flex:1 1 100%;min-width:0;max-width:100%;max-height:34vh;overflow-y:auto;pointer-events:auto;padding:2px}
+#craftbox #stable{width:100%;max-width:100%;min-width:0}
 #bars{display:grid;gap:6px;max-width:100%;min-width:0;justify-items:center}
 #tools,#weapons,#stable{display:flex;gap:6px;overflow-x:auto;max-width:100%;pointer-events:auto;padding:2px}
 .tool{flex:none;background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;
@@ -61,6 +64,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 .btn{background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 13px var(--ui);
   padding:8px 12px;cursor:pointer}
 .btn:disabled{opacity:.45;cursor:default}
+.btn.sel{border-color:var(--ember);box-shadow:inset 0 -3px 0 var(--ember)}
 .btn:focus-visible,.tool:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 #act{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));
   width:84px;height:84px;border-radius:50%;font:700 16px var(--display);background:rgba(242,160,61,.9);color:#1b1206;border:2px solid #1b1206;pointer-events:auto}
@@ -98,7 +102,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div class="panel" id="stats">
         <div class="lbl">Health</div>
         <div class="bar"><i id="hpbar"></i></div>
-        <div id="res"><span><b>Wood</b><span id="rw">0</span></span><span><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span><span><b>Herbs</b><span id="rh">0</span></span><span><b>Hide</b><span id="rd">0</span></span><span><b>Gold</b><span id="rg">0</span></span><span><b>Crystal</b><span id="rc">0</span></span><span><b>Feathers</b><span id="rf">0</span></span><span><b>Bone</b><span id="rb">0</span></span></div>
+        <div id="res"><span data-keep="1"><b>Wood</b><span id="rw">0</span></span><span data-keep="1"><b>Stone</b><span id="rs">0</span></span><span><b>Iron</b><span id="ri">0</span></span><span><b>Meat</b><span id="rm">0</span></span><span><b>Herbs</b><span id="rh">0</span></span><span><b>Hide</b><span id="rd">0</span></span><span><b>Gold</b><span id="rg">0</span></span><span><b>Crystal</b><span id="rc">0</span></span><span><b>Feathers</b><span id="rf">0</span></span><span><b>Bone</b><span id="rb">0</span></span><span><b>Berries</b><span id="rbe">0</span></span><span><b>Honey</b><span id="rho">0</span></span><span><b>Resin</b><span id="rre">0</span></span><span><b>Sulfur</b><span id="rsu">0</span></span><span><b>Coal</b><span id="rco">0</span></span><span><b>Wool</b><span id="rwo">0</span></span></div>
       </div>
       <div class="panel" id="clock">
         <h2 id="dayname">Day 1</h2>
@@ -122,9 +126,17 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
     <div id="bottom">
       <div id="bars"><div id="stable"></div><div id="weapons"></div><div id="tools"></div></div>
       <div id="side">
+        <button class="btn" id="craftmenu" type="button">Craft menu (J)</button>
         <button class="btn" id="eat" type="button">Eat meat (E)</button>
         <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
         <button class="btn" id="mkbullets" type="button">Bullets ×8 · 2 iron 1 stone (F)</button>
+        <button class="btn" id="rc-salve" type="button">Healing salve · 2 honey 1 herb</button>
+        <button class="btn" id="rc-jam" type="button">Berry jam · 3 berries 1 honey</button>
+        <button class="btn" id="rc-snack" type="button">Eat berries · 2 berries</button>
+        <button class="btn" id="rc-rounds" type="button">Powder rounds ×16 · 1 coal 1 sulfur 1 iron</button>
+        <button class="btn" id="rc-dynamite" type="button">Dynamite ×3 · 2 sulfur 2 coal 1 resin</button>
+        <button class="btn" id="rc-tarrows" type="button">Tar arrows ×10 · 1 resin 1 wood 2 feathers</button>
+        <button class="btn" id="rc-coat" type="button">Wool coat · 6 wool</button>
         <button class="btn" id="bandage" type="button">Bandage · 2 herbs (Z)</button>
         <button class="btn" id="stew" type="button">Stew · 2 meat 1 herb (U)</button>
         <button class="btn" id="fletch" type="button">Arrows ×12 · 1 wood 3 feathers</button>
@@ -149,9 +161,10 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
-        <dt>Weapon bar</dt><dd>Nineteen weapons, from spear to sniper rifle; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
-        <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
-        <dt>Pick-ups</dt><dd>Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
+        <dt>Craft menu (J)</dt><dd>Opens pets, rides and every recipe you have the ingredients for.</dd>
+        <dt>Weapon bar</dt><dd>Twenty-five weapons, from spear to minigun; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
+        <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal, black is coal. Coal and sulfur make powder rounds and dynamite. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
+        <dt>Pick-ups</dt><dd>New finds: berry bushes, honeycombs, resin, sulfur crystals, and wool from sheep. Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
         <dt>Pets and rides</dt><dd>You can keep four pets; click one you own to let it go. The balloon floats over walls and trees where only flying animals reach you, and the tank fires its own gun. The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
         <dt>Night rewards</dt><dd>Every night you survive brings a gift and unlocks something new: traps, iron walls, armor (V), turrets, grenades (H to make, G to throw) and a machine gun.</dd>
         <dt>1 – 9, 0, L, X</dt><dd>The crystal ward and bone fence have no key; click them. Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
@@ -210,14 +223,16 @@ const B = {
   lamp:  {name: 'Lantern',    cost: {wood: 2, iron: 1},  hp: 30},
   ward:  {name: 'Crystal ward', cost: {crystal: 3, gold: 2}, hp: 60},
   bone:  {name: 'Bone fence', cost: {bone: 3, wood: 1},  hp: 55, solid: 1},
+  tar:   {name: 'Tar pit',    cost: {resin: 3, coal: 1}, hp: 50},
+  brazier: {name: 'Brazier',  cost: {coal: 3, stone: 4, iron: 1}, hp: 70},
 };
 const GEAR = {
   gaxe:  {name: 'Golden axe',  cost: {gold: 6, wood: 4}, msg: 'Golden axe ready. It chops three at a time and hits hard.'},
   plate: {name: 'Plate armor', cost: {gold: 8, iron: 6}, msg: 'Plate armor on. You take half damage.'},
   charm: {name: 'Bone charm',  cost: {bone: 8},          msg: 'Bone charm made. Your pets hit half again as hard.'},
 };
-const ORE_COL = {iron: [18, 55, 42], gold: [46, 80, 52], crystal: [190, 70, 62]};
-const DROPS = {bison: [['bone', 1]], wolverine: [['bone', .5]], crow: [['feather', 1.7]], wolf: [['bone', .4]], boar: [['bone', .5]], cougar: [['bone', .4]], bear: [['bone', 1]], moose: [['bone', 1]], tusk: [['bone', 3]], greyfang: [['bone', 3]], ursa: [['bone', 4]]};
+const ORE_COL = {iron: [18, 55, 42], gold: [46, 80, 52], crystal: [190, 70, 62], coal: [220, 8, 13]};
+const DROPS = {sheep: [['wool', 1.6]], turkey: [['feather', 1.6]], owl: [['feather', 1]], rhino: [['bone', 1]], bison: [['bone', 1]], wolverine: [['bone', .5]], crow: [['feather', 1.7]], wolf: [['bone', .4]], boar: [['bone', .5]], cougar: [['bone', .4]], bear: [['bone', 1]], moose: [['bone', 1]], tusk: [['bone', 3]], greyfang: [['bone', 3]], ursa: [['bone', 4]]};
 /* each map changes the look, how much wood, stone and iron there is, and which animals come */
 const MAPS = {
   forest: {name: 'Pinewood',   note: 'balanced',                 trees: 1500, rocks: 230, oak: .38, pine: [132, 37, 23], oakc: [98, 46, 31], tuft: [100, 45, 37], tufts: 9000, flowers: ['#f4e9c9', '#f2c14e', '#e88bb0', '#c7a6f2', '#ffffff'],
@@ -267,7 +282,7 @@ function nightReward(n) { // every survived night: a gift, and on nights 1-5 som
   snd(520, .25, 'triangle', .07, 260);
   return 'Night ' + n + ' survived. ' + r[0] + ' Gift: ' + costText(give) + '.';
 }
-const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'remove'];
+const TOOLS = ['axe', 'wall', 'stone', 'door', 'bed', 'fire', 'spikes', 'trap', 'iron', 'turret', 'lamp', 'ward', 'bone', 'tar', 'brazier', 'remove'];
 const TKEY = i => TOOLS[i] === 'remove' ? 'X' : i < 9 ? '' + (i + 1) : i === 9 ? '0' : i === 10 ? 'L' : '';
 const WPN = {
   axe:     {name: 'Axe', note: 'chops'},
@@ -288,10 +303,16 @@ const WPN = {
   dual:     {name: 'Twin pistols', cost: {wood: 6, iron: 16}, light: 1, ammo: 'bullets', use: 2, pellets: 2, spread: .06, dmg: 30, spd: 1300, cd: .22, range: 620, unlock: 1},
   staff:    {name: 'Crystal staff', cost: {wood: 6, crystal: 5}, ammo: 'magic', free: 1, quiet: 1, dmg: 18, spd: 640, cd: .5, range: 560, pierce: 1},
   flamer:   {name: 'Flamethrower', cost: {wood: 8, iron: 16}, ammo: 'wood', quiet: 1, flame: 1, pellets: 3, spread: .28, dmg: 9, spd: 430, cd: .15, range: 175, pierce: 3, unlock: 3},
+  blowgun:  {name: 'Blowgun',    cost: {wood: 4, resin: 2},  ammo: 'feathers', quiet: 1, dmg: 9, spd: 760, cd: .4, range: 520, stunHit: .8},
+  halberd:  {name: 'Halberd',    cost: {wood: 8, iron: 12},  melee: 1, dmg: 50, reach: 108, arc: .8, cd: .65, note: 'long reach, wide arc'},
+  katana:   {name: 'Katana',     cost: {iron: 14, gold: 2},  melee: 1, dmg: 40, reach: 72, arc: 1.05, cd: .24, note: 'very fast cuts', unlock: 2},
+  musket:   {name: 'Musket',     cost: {wood: 10, iron: 8},  ammo: 'bullets', dmg: 95, spd: 1500, cd: 1.4, range: 760, smoke: 1},
+  storm:    {name: 'Storm rod',  cost: {wood: 4, crystal: 6, gold: 4}, ammo: 'crystal', chain: 3, dmg: 60, range: 420, cd: .8, unlock: 4},
+  minigun:  {name: 'Minigun',    cost: {iron: 40, gold: 6},  ammo: 'bullets', dmg: 14, spd: 1500, cd: .05, range: 620, spread: .12, unlock: 5},
   sniper:   {name: 'Sniper rifle', cost: {wood: 12, iron: 26, gold: 4}, ammo: 'bullets', dmg: 165, spd: 2400, cd: 1.6, range: 1400, pierce: 4, unlock: 3},
 };
-const AMMO_HINT = {arrows: 'Press R to make more.', bullets: 'Press F to make more.', stone: 'Mine rocks for more.', grenades: 'Press H to make more.', wood: 'Chop more trees.'};
-const HIDES = {fox: .5, wolverine: .7, bison: 1, elk: 1, goat: .6, wolf: .5, boar: .6, cougar: .6, bear: 1, moose: 1, deer: .7, tusk: 3, greyfang: 3, ursa: 4};
+const AMMO_HINT = {arrows: 'Press R to make more.', bullets: 'Press F to make more.', stone: 'Mine rocks for more.', grenades: 'Press H to make more.', wood: 'Chop more trees.', feathers: 'Crows, owls and turkeys drop feathers.', crystal: 'Mine the blue veins.'};
+const HIDES = {hyena: .5, lynx: .6, badger: .5, rhino: 1, fox: .5, wolverine: .7, bison: 1, elk: 1, goat: .6, wolf: .5, boar: .6, cougar: .6, bear: 1, moose: 1, deer: .7, tusk: 3, greyfang: 3, ursa: 4};
 const WKEYS = Object.keys(WPN);
 const A = {
   wolf: {hp: 26,  spd: 116, dmg: 8,  r: 12, sdmg: 6,  meat: 1, body: '#6f7477', head: '#8b9093'},
@@ -325,6 +346,14 @@ const A = {
   ironhide:   {name: 'Ironhide, the bison king',     boss: 1, look: 'boar',   hp: 950, spd: 80,  dmg: 32, r: 32, sdmg: 70, meat: 14, body: '#33261c', head: '#1f1611', charge: 3},
   gnasher:    {name: 'Gnasher, the wolverine',       boss: 1, look: 'bear',   hp: 560, spd: 132, dmg: 30, r: 22, sdmg: 36, meat: 9,  body: '#2e2016', head: '#c9b58a', pounce: 1},
   redtail:    {name: 'Redtail, the trickster fox',   boss: 1, look: 'wolf',   hp: 300, spd: 186, dmg: 14, r: 16, sdmg: 8,  meat: 6,  body: '#b5451f', head: '#e08a45', pounce: 1, howl: 10, summon: 'fox'},
+  hyena:    {hp: 34,  spd: 142, dmg: 10, r: 12, sdmg: 6,  meat: 1, body: '#a08a5a', head: '#8a7448', look: 'wolf'},
+  scorpion: {hp: 28,  spd: 112, dmg: 8,  r: 11, sdmg: 3,  meat: 0, body: '#3a2a1a', head: '#6a4220', look: 'spider', poison: 1},
+  lynx:     {hp: 48,  spd: 156, dmg: 15, r: 12, sdmg: 8,  meat: 2, body: '#b9a27a', head: '#cbb48a', look: 'wolf', pounce: 1},
+  badger:   {hp: 42,  spd: 102, dmg: 12, r: 10, sdmg: 16, meat: 1, body: '#3a3a3a', head: '#e0e0e0', look: 'bear'},
+  rhino:    {hp: 230, spd: 72,  dmg: 28, r: 22, sdmg: 48, meat: 5, body: '#7d7a74', head: '#8c8983', look: 'boar', fat: .95, charge: 5},
+  owl:      {hp: 16,  spd: 150, dmg: 7,  r: 10, sdmg: 0,  meat: 0, body: '#7a5a3a', head: '#c9a87a', look: 'crow', fly: 1},
+  sheep:    {hp: 16,  spd: 100, dmg: 0,  r: 12, sdmg: 0,  meat: 2, body: '#efeae0', head: '#3a3330', look: 'bear', passive: 1},
+  turkey:   {hp: 10,  spd: 112, dmg: 0,  r: 9,  sdmg: 0,  meat: 2, body: '#5a3a24', head: '#c0392b', look: 'crow', passive: 1},
 };
 /* companions fight beside their owner; rides make you faster and the machines ram */
 const PETS = {
@@ -376,7 +405,7 @@ function reset(seed, map) {
   RNG = mulberry(seed |= 0); // the same seed grows the same forest for every player
   const mp = MAPS[map] || MAPS.forest;
   G = {seed, map: MAPS[map] ? map : 'forest', day: 1, phase: 'day', t: 0, len: DAY1, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
-  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, herbs: 0, hide: 0, boots: false, vest: false, gold: 0, crystal: 0, feathers: 0, bone: 0, gaxe: false, plate: false, charm: false, pets: [], vehicle: null, riding: false};
+  P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, berries: 0, honey: 0, resin: 0, sulfur: 0, coal: 0, wool: 0, coat: false, herbs: 0, hide: 0, boots: false, vest: false, gold: 0, crystal: 0, feathers: 0, bone: 0, gaxe: false, plate: false, charm: false, pets: [], vehicle: null, riding: false};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
   trees = []; rocks = []; animals = []; parts = []; floats = []; shots = []; items = []; tool = 'axe';
@@ -393,7 +422,7 @@ function reset(seed, map) {
   };
   for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + rnd(-.3, .3), d = rnd(250, 360); addRock(CX + Math.cos(a) * d, CY + Math.sin(a) * d); }
   for (let i = 0; i < mp.rocks; i++) { const x = rnd(60, WORLD - 60), y = rnd(60, WORLD - 60); if (dist(x, y, CX, CY) > 400) addRock(x, y); }
-  for (const o of rocks) { const r = RNG(); const q = mp.ore || [.12, .07, .05]; o.ore = r < q[0] ? 'iron' : r < q[0] + q[1] ? 'gold' : r < q[0] + q[1] + q[2] ? 'crystal' : null; if (o.ore) o.hp = o.max = 10; } // veins
+  for (const o of rocks) { const r = RNG(); const q = mp.ore || [.12, .07, .05]; o.ore = r < q[0] ? 'iron' : r < q[0] + q[1] ? 'gold' : r < q[0] + q[1] + q[2] ? 'crystal' : r < q[0] + q[1] + q[2] + .07 ? 'coal' : null; if (o.ore) o.hp = o.max = 10; } // veins
   syncWorld(); RNG = Math.random;
   if (!client()) { for (let i = 0; i < 12; i++) spawnDeer(); stock(); }
   buildTools(); recalc();
@@ -499,7 +528,7 @@ function damageStruct(s, d) {
 function spawnDeer() {
   for (let i = 0; i < 20; i++) {
     const x = rnd(100, WORLD - 100), y = rnd(100, WORLD - 100);
-    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk(['rabbit', 'rabbit', 'deer', 'deer', 'elk', 'goat'][Math.random() * 6 | 0], x, y, 1)); return; }
+    if (dist(x, y, P.x, P.y) > 600) { animals.push(mk(['rabbit', 'rabbit', 'deer', 'deer', 'elk', 'goat', 'sheep', 'sheep', 'turkey'][Math.random() * 9 | 0], x, y, 1)); return; }
   }
 }
 function mk(type, x, y, scale) {
@@ -508,7 +537,7 @@ function mk(type, x, y, scale) {
 }
 function ringPos() { const l = players(), q = l[Math.random() * l.length | 0] || P, a = rnd(0, TAU), d = rnd(820, 1000); return [clamp(q.x + Math.cos(a) * d, -60, WORLD + 60), clamp(q.y + Math.sin(a) * d, -60, WORLD + 60)]; }
 function spawnHostile() {
-  const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0], ['fox', 3], ['bat', 2.5], ['spider', n >= 2 ? 2 : 0], ['wolverine', n >= 3 ? 2 : 0], ['bison', n >= 4 ? 1.2 : 0]];
+  const n = G.day, opts = [['wolf', 5], ['snake', 1.5], ['crow', n >= 2 ? 2 : 0], ['boar', n >= 2 ? 3 : 0], ['cougar', n >= 3 ? 2.5 : 0], ['bear', n >= 3 ? 1 + (n - 3) * .5 : 0], ['moose', n >= 4 ? 1.5 : 0], ['fox', 3], ['bat', 2.5], ['spider', n >= 2 ? 2 : 0], ['wolverine', n >= 3 ? 2 : 0], ['bison', n >= 4 ? 1.2 : 0], ['hyena', n >= 2 ? 2.5 : 0], ['scorpion', 1.5], ['lynx', n >= 3 ? 2 : 0], ['badger', n >= 2 ? 1.5 : 0], ['rhino', n >= 4 ? 1 : 0], ['owl', n >= 2 ? 2 : 0]];
   const wt = MAPS[G.map].wt; for (const o of opts) if (o[0] in wt) o[1] *= wt[o[0]];
   let r = Math.random() * opts.reduce((t, o) => t + o[1], 0), type = 'wolf';
   for (const [t, w] of opts) { if ((r -= w) < 0) { type = t; break; } }
@@ -567,17 +596,26 @@ function attack(fresh) {
   }
   const need = w.free ? 0 : w.use || 1;
   if (!w.free && P[w.ammo] < need) { P.cd = .3; snd(900, .03, 'square', .03); if (fresh) toast('Out of ' + w.ammo + '. ' + AMMO_HINT[w.ammo]); return; }
+  if (w.chain) { // lightning jumps to the nearest animals in front of you
+    autoAim(w.range);
+    const l = animals.filter(a => { if (A[a.type].passive) return false; const d = dist(a.x, a.y, P.x, P.y); let da = Math.atan2(a.y - P.y, a.x - P.x) - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); return d < w.range && (Math.abs(da) < .9 || d < 60); }).sort((a, b) => dist(a.x, a.y, P.x, P.y) - dist(b.x, b.y, P.x, P.y)).slice(0, w.chain);
+    P[w.ammo] -= need; P.cd = w.cd; P.swing = .1; snd(1200, .18, 'sawtooth', .06, -1000); shake = Math.max(shake, 4);
+    let px = P.x, py = P.y;
+    for (const a of l) { for (let i = 1; i <= 6; i++) burst(px + (a.x - px) * i / 6 + rnd(-6, 6), py + (a.y - py) * i / 6 + rnd(-6, 6), '#bfe8ff', 1); hitAnimal(a, w.dmg, (a.x - px) / (dist(a.x, a.y, px, py) || 1) * .4, (a.y - py) / (dist(a.x, a.y, px, py) || 1) * .4); px = a.x; py = a.y; }
+    if (!l.length) burst(P.x + Math.cos(P.ang) * 60, P.y + Math.sin(P.ang) * 60, '#bfe8ff', 6);
+    return;
+  }
   autoAim(w.range * .85);
   const ang = P.ang, mx = P.x + Math.cos(ang) * 22, my = P.y + Math.sin(ang) * 22;
   if (!w.free) P[w.ammo] -= need; P.cd = w.cd; P.swing = .1;
   for (let i = 0; i < (w.pellets || 1); i++) {
     const a = ang + (w.spread ? rnd(-w.spread, w.spread) : 0), sp = w.spd * (w.spread ? rnd(.85, 1.1) : 1);
-    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free});
+    shots.push({x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: w.range / sp, dmg: w.dmg, pierce: w.pierce || 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free, stunHit: w.stunHit});
   }
   if (multi() && NET.room) NET.room.emit('fx', {x: mx | 0, y: my | 0, a: +ang.toFixed(2), w: P.weapon}).catch(() => {});
   if (w.quiet) snd(w.flame ? 160 : 760, .07, w.flame ? 'sawtooth' : 'sine', .025, w.flame ? -60 : 300);
   else if (w.ammo === 'arrows') snd(620, .09, 'triangle', .05, -420);
-  else { burst(mx, my, '#ffd27a', 5); shake = Math.max(shake, w.light ? 3 : 7); snd(w.light ? 210 : 130, w.light ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
+  else { burst(mx, my, '#ffd27a', 5); if (w.smoke) burst(mx, my, '#c9c4bc', 12); shake = Math.max(shake, w.light ? 3 : 7); snd(w.light ? 210 : 130, w.light ? .12 : .22, 'sawtooth', .1, -100); snd(1400, .05, 'square', .04, -1100); }
 }
 function equip(k) {
   if (!running) return;
@@ -697,8 +735,8 @@ function updPets(dt) {
 }
 /* things lying in the world: walk over them to pick them up */
 let items = [], iid = 0;
-const IK = ['herb', 'scrap', 'crate', 'hide', 'shroom', 'feather', 'bone', 'gem'], STOCK = {herb: 60, scrap: 30, crate: 12, shroom: 28, feather: 16, bone: 16, gem: 8};
-function dropItem(type, x, y) { if (!client() && items.length < 220) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
+const IK = ['herb', 'scrap', 'crate', 'hide', 'shroom', 'feather', 'bone', 'gem', 'berry', 'honey', 'resin', 'sulfur', 'wool'], STOCK = {herb: 50, scrap: 28, crate: 12, shroom: 24, feather: 14, bone: 14, gem: 8, berry: 40, honey: 14, resin: 20, sulfur: 14};
+function dropItem(type, x, y) { if (!client() && items.length < 300) items.push({id: ++iid, type, x: clamp(x, 30, WORLD - 30), y: clamp(y, 30, WORLD - 30)}); }
 function stock() { // top the world back up; called for a new game and at every dawn
   if (client()) return;
   for (const k in STOCK) { let n = STOCK[k] - items.filter(i => i.type === k).length; for (let t = 0; n > 0 && t < 400; t++) { const x = rnd(80, WORLD - 80), y = rnd(80, WORLD - 80); if (dist(x, y, CX, CY) > 260) { dropItem(k, x, y); n--; } } }
@@ -711,6 +749,11 @@ function grab(it) {
   else if (it.type === 'shroom') { P.hp = Math.min(P.max, P.hp + 12); txt = '+12 health'; col = '#7fbf5a'; }
   else if (it.type === 'feather') { const n = 1 + (Math.random() * 2 | 0); P.feathers += n; txt = '+' + n + ' feather' + (n > 1 ? 's' : ''); }
   else if (it.type === 'bone') { P.bone++; txt = '+1 bone'; }
+  else if (it.type === 'berry') { const n = 2 + (Math.random() * 2 | 0); P.berries += n; txt = '+' + n + ' berries'; col = '#c7509a'; }
+  else if (it.type === 'honey') { P.honey++; txt = '+1 honey'; col = '#f2c14e'; }
+  else if (it.type === 'resin') { const n = 1 + (Math.random() * 2 | 0); P.resin += n; txt = '+' + n + ' resin'; col = '#e0a030'; }
+  else if (it.type === 'sulfur') { const n = 1 + (Math.random() * 2 | 0); P.sulfur += n; txt = '+' + n + ' sulfur'; col = '#e8e05a'; }
+  else if (it.type === 'wool') { P.wool += 2; txt = '+2 wool'; }
   else if (it.type === 'gem') { if (Math.random() < .5) { P.crystal++; txt = '+1 crystal'; col = '#7fd8f0'; } else { P.gold += 2; txt = '+2 gold'; col = '#f2c14e'; } }
   else { const l = [['wood', 12], ['stone', 9], ['iron', 6], ['bullets', 10], ['arrows', 8], ['meat', 3], ['herbs', 3], G.nights >= 4 ? ['grenades', 2] : ['iron', 8]], c = l[Math.random() * l.length | 0]; P[c[0]] += c[1]; txt = 'Crate: +' + c[1] + ' ' + c[0]; col = '#f2a03d'; }
   float(it.x, it.y - 10, txt, col); snd(700, .08, 'triangle', .05, 300);
@@ -718,6 +761,27 @@ function grab(it) {
 function updItems() {
   if (P.dead || !running) return;
   for (let i = items.length - 1; i >= 0; i--) { const it = items[i]; if (dist(it.x, it.y, P.x, P.y) > 30) continue; items.splice(i, 1); grab(it); if (client()) { NET.took.set(it.id, performance.now() + 6000); netAct({k: 'p', i: it.id}); } }
+}
+const maxHp = () => 100 + (P.vest ? 40 : 0) + (P.coat ? 30 : 0);
+const RECIPES = {
+  salve:    {cost: {honey: 2, herbs: 1},         heal: 100, cure: 1, key: 'honey'},
+  jam:      {cost: {berries: 3, honey: 1},       heal: 60, key: 'berries'},
+  snack:    {cost: {berries: 2},                 heal: 20, key: 'berries'},
+  rounds:   {cost: {coal: 1, sulfur: 1, iron: 1}, give: {bullets: 16}, key: 'sulfur'},
+  dynamite: {cost: {sulfur: 2, coal: 2, resin: 1}, give: {grenades: 3}, key: 'sulfur'},
+  tarrows:  {cost: {resin: 1, wood: 1, feathers: 2}, give: {arrows: 10}, key: 'resin'},
+  coat:     {cost: {wool: 6}, gear: 'coat', key: 'wool'},
+};
+function craftR(k) {
+  if (!running || P.dead) return; const r = RECIPES[k];
+  if (r.gear && P[r.gear]) return;
+  if (!afford(r.cost)) return toast('That needs ' + costText(r.cost) + '.');
+  if (r.heal && P.hp >= P.max && !(r.cure && P.poison > 0)) return toast('You are not hurt.');
+  pay(r.cost);
+  if (r.heal) { P.hp = Math.min(P.max, P.hp + r.heal); if (r.cure) P.poison = 0; float(P.x, P.y - 24, '+' + r.heal, '#7fbf5a'); snd(300, .18, 'sine', .06, 220); }
+  if (r.give) { for (const g in r.give) P[g] += r.give[g]; float(P.x, P.y - 24, '+' + costText(r.give), '#f2a03d'); snd(440, .08, 'triangle', .05, 120); }
+  if (r.gear) { P[r.gear] = true; P.max = maxHp(); P.hp += 30; toast('Wool coat on. More health.'); snd(500, .2, 'triangle', .07, 300); }
+  hud();
 }
 function makeGear2(k) {
   if (!running || P[k]) return; const g = GEAR[k];
@@ -744,7 +808,7 @@ function useBandage() {
 function makeGear(k) {
   if (!running || P[k]) return; const need = k === 'boots' ? 4 : 6;
   if (P.hide < need) return toast((k === 'boots' ? 'Boots need ' : 'The hide vest needs ') + need + ' hide. Animals drop it.');
-  P.hide -= need; P[k] = true; if (k === 'vest') { P.max = 140; P.hp += 40; }
+  P.hide -= need; P[k] = true; if (k === 'vest') { P.max = maxHp(); P.hp += 40; }
   toast(k === 'boots' ? 'Boots on. You move faster.' : 'Hide vest on. More health.'); snd(500, .2, 'triangle', .07, 300); hud();
 }
 function eat() {
@@ -764,7 +828,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 /* ---------- multiplayer and saving ---------- */
 const NET = {mode: 'solo', room: null, code: '', me: null, hostPeer: null, hostMiss: 0, others: new Map(), swSeq: 0, wasSw: false, sendT: 0, syncT: 0, chunks: [], amap: new Map(), cyc: 0};
 NET.took = new Map();
-const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades', 'herbs', 'hide', 'boots', 'vest', 'gold', 'crystal', 'feathers', 'bone', 'gaxe', 'plate', 'charm'];
+const AK = Object.keys(A), BK = Object.keys(B), INV = ['hp', 'wood', 'stone', 'meat', 'iron', 'arrows', 'bullets', 'flint', 'weapon', 'armor', 'grenades', 'herbs', 'hide', 'boots', 'vest', 'gold', 'crystal', 'feathers', 'bone', 'gaxe', 'plate', 'charm', 'berries', 'honey', 'resin', 'sulfur', 'coal', 'wool', 'coat'];
 const SHIRTS = ['#3f7fbf', '#3fa66b', '#c9a227', '#8a56c2', '#c25690', '#d07a2d'];
 let selMap = 'forest';
 let lobby = null, db = null, userNS = null, uid = null, nid = 0, savedGame = null, openGames = [], menuMsg = '';
@@ -781,7 +845,7 @@ function setInv(o) {
   if (!o) return;
   for (const k of INV) if (k in o) P[k] = o[k];
   P.owned = {axe: true}; for (const k of o.owned || []) if (WPN[k]) P.owned[k] = true;
-  P.max = P.vest ? 140 : 100;
+  P.max = maxHp();
   if (!P.owned[P.weapon]) P.weapon = 'axe'; P.hp = clamp(+P.hp || 100, 1, P.max);
   P.pets = (o.pets || []).filter(k => PETS[k]).slice(0, 4).map(mkPet); P.vehicle = VEH[o.veh] ? {type: o.veh, x: P.x + 50, y: P.y, ang: 0} : null; P.riding = false;
 }
@@ -962,7 +1026,7 @@ function wire() {
     if (d.w === 'grenade' && isFinite(d.x + d.y + d.tx + d.ty)) { shots.push({bomb: true, fx: true, x: d.x, y: d.y, x0: d.x, y0: d.y, tx: d.tx, ty: d.ty, t: 0, T: .65, vx: 1, vy: 0}); return; }
     if (d.w === 'turret' && isFinite(d.x + d.y + d.a)) { shots.push({x: d.x, y: d.y, vx: Math.cos(d.a) * 900, vy: Math.sin(d.a) * 900, life: .42, dmg: 0, pierce: 0, hit: new Set(), arrow: true, ghost: true, fx: true}); return; }
     if (!w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
-    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free, fx: true}); }
+    for (let i = 0; i < (w.pellets || 1); i++) { const a = d.a + (w.spread ? rnd(-w.spread, w.spread) : 0); shots.push({x: d.x, y: d.y, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd, life: w.range / w.spd, dmg: 0, pierce: 0, hit: new Set(), arrow: w.ammo === 'arrows', rocket: w.rocket, flame: w.flame, magic: w.free, stunHit: w.stunHit, fx: true}); }
     if (dist(d.x, d.y, P.x, P.y) < 700) w.ammo === 'arrows' ? snd(620, .09, 'triangle', .03, -420) : snd(150, .15, 'sawtooth', .05, -100);
   });
 }
@@ -1083,6 +1147,7 @@ function updPlayer(dt) {
     if (!s) continue;
     if (s.flash > 0) s.flash -= dt;
     if (s.type === 'fire' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 110) P.hp = Math.min(P.max, P.hp + 4 * dt);
+    if (s.type === 'brazier' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 160) P.hp = Math.min(P.max, P.hp + 6 * dt);
   }
 }
 function update(dt) {
@@ -1148,6 +1213,7 @@ function update(dt) {
     }
     if (a.stun > 0) { a.stun -= dt; spd = 0; }
     if (!d.passive) for (const wd of wards) if (dist(wd.tx * T + 24, wd.ty * T + 24, a.x, a.y) < 175) { spd *= .55; break; }
+    if (tile && tile.type === 'tar' && !d.passive && !d.fly) spd *= A[a.type].boss ? .6 : .3; // stuck in tar
     if (tile && tile.type === 'spikes' && !d.passive && !d.fly) {
       a.hp -= 16 * dt; spd *= .45; tile.hp -= 5 * dt; if (Math.random() < dt * 6) burst(a.x, a.y, '#b03a2a', 1);
       if (tile.hp <= 0) { grid[tile.ty * W + tile.tx] = null; burst(a.x, a.y, '#8a6a45', 10); gridDelta(tile.tx, tile.ty); }
@@ -1177,7 +1243,7 @@ function updFx(dt) {
       for (const a of animals) {
         if (s.fx) break;
         if (s.hit.has(a) || dist(a.x, a.y, s.x, s.y) > a.r + 5) continue;
-        const l = Math.hypot(s.vx, s.vy); s.hit.add(a); hitAnimal(a, s.dmg, s.vx / l * .7, s.vy / l * .7); snd(240, .06, 'square', .04, -120);
+        const l = Math.hypot(s.vx, s.vy); s.hit.add(a); hitAnimal(a, s.dmg, s.vx / l * .7, s.vy / l * .7); if (s.stunHit && !s.fx && !client() && !A[a.type].boss) a.stun = Math.max(a.stun || 0, s.stunHit); snd(240, .06, 'square', .04, -120);
         if (--s.pierce < 0) { dead = true; break; }
       }
     }
@@ -1348,6 +1414,8 @@ function initScene() {
   GEO.bed = merge([[box(42, 9, 28), '#6b4a2c', M(0, 6, 0)], [box(40, 6, 26), '#e7dfc8', M(0, 13, 0)], [box(26, 7, 27), '#9c3f33', M(7, 14, 0)], [box(9, 5, 17), '#ffffff', M(-13, 17.5, 0)], [box(4, 24, 28), '#5d3f24', M(-21, 12, 0)], [box(3, 14, 28), '#5d3f24', M(21, 7, 0)]]);
   GEO.fire = merge([...Array.from({length: 8}, (_, i) => [dod(5.5), i % 2 ? '#77776f' : '#8b8b83', M(Math.cos(i / 8 * TAU) * 16, 3, Math.sin(i / 8 * TAU) * 16, 1, .8, 1, i, i, 0)]), ...[0, 1, 2].map(i => [cyl(3, 3, 26, 6), '#3d2a18', M(0, 5, 0, 1, 1, 1, 0, i * TAU / 6, Math.PI / 2 - .25)])]);
   GEO.spikes = merge([[box(44, 2, 44), '#3c2816', M(0, 1, 0)], ...Array.from({length: 9}, (_, i) => [cone(4, 24, 5), i % 2 ? '#d6c7a1' : '#c2b189', M((i % 3 - 1) * 14, 13, ((i / 3 | 0) - 1) * 14, 1, 1, 1, (i % 3 - 1) * .18, 0, ((i / 3 | 0) - 1) * -.18)])]);
+  GEO.tar = merge([[cyl(21, 22, 2, 12), '#141210', M(0, 1, 0)], [cyl(23, 23, 1.5, 12), '#3a2a18', M(0, .5, 0)], [sph(), '#26201a', M(6, 2.5, -4, 3, 1.4, 3)], [sph(), '#26201a', M(-8, 2.5, 5, 2.4, 1.1, 2.4)], [sph(), '#2e2620', M(-2, 2.5, -9, 1.8, .9, 1.8)]]);
+  GEO.brazier = merge([[cyl(4, 6, 22, 6), '#3d444b', M(0, 11, 0)], [cyl(14, 8, 10, 8), '#2b3035', M(0, 26, 0)], [cyl(15, 15, 2, 8), '#59626b', M(0, 31, 0)], [dod(4.5), '#1c1c1c', M(4, 31, 3)], [dod(4), '#1c1c1c', M(-5, 31, -2)], [cyl(10, 12, 3, 6), '#59626b', M(0, 1.5, 0)]]);
   GEO.ward = merge([[cyl(13, 16, 8, 8), '#77776f', M(0, 4, 0)], [cone(8, 36, 5), '#7fd8f0', M(0, 26, 0)], [cone(4.5, 20, 5), '#b8ecfa', M(8, 16, 4, 1, 1, 1, 0, 0, -.35)], [cone(4, 16, 5), '#5cc0de', M(-7, 14, -5, 1, 1, 1, .3, 0, .35)]]);
   GEO.bone = merge([...[-18, -9, 0, 9, 18].map((x, i) => [cyl(3, 3.6, 46 + (i % 2) * 8, 6), i % 2 ? '#e7dfc8' : '#d6cdb0', M(x, 23 + (i % 2) * 4, (i % 2) * 4 - 2)]), [box(48, 4, 5), '#b9ae8c', M(0, 30, 0)], [box(48, 4, 5), '#b9ae8c', M(0, 12, 0)], ...[-18, 0, 18].map(x => [sph(), '#e7dfc8', M(x, 48, 0, 4.2)])]);
   GEO.lamp = merge([[cyl(2.2, 3, 44, 6), '#4d3520', M(0, 22, 0)], [box(16, 2.5, 3), '#4d3520', M(6, 43, 0)], [box(9, 11, 9), '#2b2f33', M(12, 35, 0)]]);
@@ -1396,6 +1464,12 @@ function initScene() {
     dual: [[box(13, 4, 3.4), steel, M(10, 1, 0)], [box(4.5, 8, 3.4), stock, M(5, -4, 0, 1, 1, 1, 0, 0, .2)], [box(13, 4, 3.4), steel, M(10, 1, -24)], [box(4.5, 8, 3.4), stock, M(5, -4, -24, 1, 1, 1, 0, 0, .2)]],
     staff: [[cyl(1.5, 1.8, 50, 5), '#5d3f24', M(12, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cone(5, 14, 5), '#7fd8f0', M(42, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)], [sph(), '#b8ecfa', M(36, 0, 0, 3.4)]],
     flamer: [[cyl(3, 3, 34, 7), steel, M(18, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5, 5, 16, 8), '#b0302a', M(-2, -4, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(4, 8, 3.4), stock, M(10, -4, 0)], [cone(4, 7, 6), '#e2552a', M(38, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+    blowgun: [[cyl(1.3, 1.3, 40, 6), '#8a6238', M(18, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(1.8, 1.8, 3, 6), '#3a2716', M(2, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(1.8, 1.8, 3, 6), '#3a2716', M(30, 2, 0, 1, 1, 1, 0, 0, Math.PI / 2)]],
+    halberd: [[cyl(1.4, 1.4, 80, 5), '#6e4c2c', M(28, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(10, 1.4, 16), '#c9ccc4', M(64, 0, 6)], [cone(2.6, 12, 4), '#c9ccc4', M(74, 0, 0, 1, 1, 1, 0, 0, -Math.PI / 2)], [box(4, 1.4, 6), '#c9ccc4', M(64, 0, -5)]],
+    katana: [[box(10, 2.4, 2.4), '#2a1e2e', M(5, 0, 0)], [box(2, 4, 6), '#c9a227', M(10.5, 0, 0)], [box(32, 1, 2.6), '#dfe3e6', M(27, 0, .5)]],
+    musket: [[box(48, 2.6, 2.6), '#3d444b', M(26, 2, 0)], [box(22, 5, 4), '#7a5532', M(4, 0, 0)], [box(12, 7, 4), '#6e4c2c', M(-10, -1, 0)], [box(4, 3, 3), '#c9a227', M(14, 3.5, 0)]],
+    storm: [[cyl(1.6, 1.6, 44, 6), '#3d444b', M(14, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [new THREE.TorusGeometry(5, 1, 4, 10), '#c9a227', M(37, 0, 0, 1, 1, 1, 0, Math.PI / 2, 0)], [sph(), '#bfe8ff', M(40, 0, 0, 3.6)]],
+    minigun: [[cyl(5, 5, 14, 8), '#2b3035', M(4, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2)], ...[[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]].map(([y, z]) => [cyl(1.1, 1.1, 34, 5), '#59626b', M(26, y, z, 1, 1, 1, 0, 0, Math.PI / 2)]), [box(6, 9, 4), '#7a5532', M(2, -7, 0)], [box(10, 4, 10), '#3d444b', M(4, 7, 0)]],
     sniper: [[box(58, 2.6, 2.6), steel, M(32, 1, 0)], [box(18, 6, 4.2), stock, M(-3, -1, 0)], [box(16, 4, 4), stock, M(10, -.5, 0)], [cyl(2.4, 2.4, 20, 6), steel, M(12, 5, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(3, 6, 1.5), steel, M(40, -3, 0)]],
     launcher: [[cyl(4.5, 4.5, 46, 8), '#4a5d3a', M(14, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [cyl(5.8, 4.5, 6, 8), '#3e4f31', M(-10, 3, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [box(4, 8, 3.4), steel, M(8, -4, 0)], [cone(3.6, 9, 6), '#8d1f1f', M(40, 3, 0, 1, 1, 1, 0, 0, -Math.PI / 2)]],
     smg: [[box(26, 4.5, 4.5), steel, M(16, 1, 0)], [box(5, 12, 3.5), steel, M(14, -6, 0)], [box(10, 5, 4), stock, M(0, 0, 0)], [box(5, 7, 3.5), stock, M(6, -4, 0, 1, 1, 1, 0, 0, .2)]],
@@ -1416,6 +1490,11 @@ function initScene() {
     shroom: merge([[cyl(2, 2.6, 8, 6), '#efe6cf', M(0, 4, 0)], [sph(), '#c0392b', M(0, 9, 0, 7, 4, 7)], [cyl(1.3, 1.7, 5, 5), '#efe6cf', M(7, 2.5, 3)], [sph(), '#c0392b', M(7, 6, 3, 4, 2.4, 4)], [sph(), '#ffffff', M(2, 12, 1, 1.4)], [sph(), '#ffffff', M(-3, 11, -2, 1.2)]]),
     feather: merge([[box(18, 1, 5), '#e9e4d6', M(0, 5, 0, 1, 1, 1, 0, 0, .35)], [box(20, 1.2, 1.2), '#8d8777', M(0, 5, 0, 1, 1, 1, 0, 0, .35)], [box(8, 1, 4), '#2c2c34', M(6, 7.4, 0, 1, 1, 1, 0, 0, .35)]]),
     bone: merge([[cyl(1.8, 1.8, 18, 6), '#e7dfc8', M(0, 4, 0, 1, 1, 1, 0, 0, Math.PI / 2)], [sph(), '#e7dfc8', M(-9, 4, -2, 3)], [sph(), '#e7dfc8', M(-9, 4, 2, 3)], [sph(), '#e7dfc8', M(9, 4, -2, 3)], [sph(), '#e7dfc8', M(9, 4, 2, 3)]]),
+    berry: merge([[sph(), '#2f6a32', M(0, 7, 0, 10, 7, 10)], [sph(), '#3a7a3a', M(-4, 10, 3, 6)], ...[[5, 11, -3], [-4, 12, -4], [2, 13, 4], [7, 8, 5], [-8, 8, 1], [0, 14, 0]].map(([x, y, z]) => [sph(), '#6a2a8a', M(x, y, z, 2)])]),
+    honey: merge([[cyl(7, 7, 8, 6), '#e8a62a', M(0, 4, 0)], [cyl(5, 5, 8.4, 6), '#f2c14e', M(8, 4, 3)], [cyl(5, 5, 8.4, 6), '#d9951f', M(-6, 4, 6)]]),
+    resin: merge([[sph(), '#d98a1a', M(0, 4, 0, 6, 4, 5)], [sph(), '#f2a83a', M(4, 6, 2, 3.5)], [sph(), '#c47414', M(-4, 3, 3, 3)]]),
+    sulfur: merge([[cone(4, 12, 5), '#e8e05a', M(0, 6, 0)], [cone(3, 9, 5), '#d6cc3a', M(5, 4.5, 2, 1, 1, 1, 0, 0, -.4)], [cone(3, 8, 5), '#f2ec7a', M(-4, 4, -3, 1, 1, 1, .4, 0, .3)], [dod(5), '#9a9a8a', M(0, 2, 0, 1.3, .5, 1.3)]]),
+    wool: merge([[sph(), '#efeae0', M(0, 6, 0, 9, 6, 8)], [sph(), '#f7f3ea', M(5, 8, 3, 5)], [sph(), '#e2dccf', M(-5, 7, -3, 5)]]),
     gem: merge([[cone(6, 9, 6), '#7fd8f0', M(0, 12, 0)], [cone(6, 9, 6), '#4fb2d6', M(0, 3.5, 0, 1, 1, 1, Math.PI, 0, 0)]]),
   };
   for (const k in IG) itemM[k] = inst(IG[k], vmat, 180);
@@ -1444,7 +1523,7 @@ function drawCompanions(h, v, pets, rx, ry, now) {
   });
 }
 function poseHand(hand, weapon, swing) {
-  if (weapon === 'axe' || weapon === 'machete' || weapon === 'hammer') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
+  if (weapon === 'axe' || weapon === 'machete' || weapon === 'hammer' || weapon === 'katana') { const sw = swing > 0 ? (1 - swing / .18) * 2 - 1 : -.9; hand.rotation.set(0, -sw * 1.05, swing > 0 ? .25 : .7); hand.position.x = 6; }
   else { hand.rotation.set(0, 0, 0); hand.position.x = 6 + (swing <= 0 ? 0 : WPN[weapon].melee ? Math.sin((1 - swing / .18) * Math.PI) * 24 : -swing / .1 * 5); }
 }
 function syncWorld() { // (re)build the per-game instances after reset()
@@ -1479,6 +1558,7 @@ function structMesh(s) {
   if (s.type === 'bone' && (solidAt(s.tx, s.ty - 1, true) || solidAt(s.tx, s.ty + 1, true))) g.rotation.y = Math.PI / 2;
   if (s.type === 'lamp') { const l = new THREE.Mesh(GEO.eye, new THREE.MeshBasicMaterial({color: 0xffd98a, fog: false})); l.scale.setScalar(3.6); l.position.set(12, 35, 0); g.add(l); }
   if (s.type === 'turret') { const h = new THREE.Mesh(GEO.turretHead, vmat); h.position.y = 40; h.castShadow = true; g.add(h); g.userData.head = h; }
+  if (s.type === 'brazier') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); f.position.y = 30; f.scale.setScalar(.8); g.add(f); g.userData.flame = f; }
   if (s.type === 'fire') { const f = new THREE.Mesh(GEO.flame, new THREE.MeshBasicMaterial({vertexColors: true, fog: false})); g.add(f); g.userData.flame = f; }
   return g;
 }
@@ -1536,7 +1616,7 @@ function render(now, dt) {
     const sc = 1 + Math.max(0, s.flash) * .5 - Math.max(0, s.pop) * 1.6; s.mesh.scale.set(1 + Math.max(0, s.flash) * .4, sc, 1 + Math.max(0, s.flash) * .4);
     if (s.type === 'turret') s.mesh.userData.head.rotation.y = -(s.aim || 0);
     if (s.type === 'lamp') fires.push(s);
-    if (s.type === 'fire') { const f = s.mesh.userData.flame, fl = Math.sin(now / 70 + s.tx) * .12 + Math.sin(now / 31) * .06; f.scale.set(1 + fl, 1.1 + fl * 2.2, 1 + fl); f.rotation.y = now / 300; fires.push(s); }
+    if (s.type === 'fire' || s.type === 'brazier') { const f = s.mesh.userData.flame, fl = Math.sin(now / 70 + s.tx) * .12 + Math.sin(now / 31) * .06; f.scale.set(1 + fl, 1.1 + fl * 2.2, 1 + fl); f.rotation.y = now / 300; fires.push(s); }
   }
   fires.sort((a, b) => dist(a.tx * T, a.ty * T, P.x, P.y) - dist(b.tx * T, b.ty * T, P.x, P.y));
   fireLights.forEach((l, i) => { const s = fires[i]; if (s) { l.position.set(s.tx * T + 24, 34, s.ty * T + 24); l.intensity = (.5 + k * 1.6) * (1 + Math.sin(now / 90 + i * 2) * .12); } else l.intensity = 0; });
@@ -1596,7 +1676,7 @@ function render(now, dt) {
   const ic = {}; for (const k of IK) ic[k] = 0;
   for (const it of items) { // pick-ups: only the ones near the camera
     if (Math.abs(it.x - cam.x) > 1100 || Math.abs(it.y - cam.y) > 1100 || ic[it.type] >= 180) continue;
-    const still = it.type === 'herb' || it.type === 'shroom', hop = still ? 0 : Math.abs(Math.sin(now / 400 + it.id)) * 4;
+    const still = it.type === 'herb' || it.type === 'shroom' || it.type === 'berry', hop = still ? 0 : Math.abs(Math.sin(now / 400 + it.id)) * 4;
     dummy.position.set(it.x, hop, it.y); dummy.rotation.set(0, it.id * 1.7 + (still ? 0 : now / 1400), 0); dummy.scale.setScalar(1); dummy.updateMatrix(); itemM[it.type].setMatrixAt(ic[it.type]++, dummy.matrix);
   }
   for (const k in ic) { itemM[k].count = ic[k]; itemM[k].instanceMatrix.needsUpdate = true; }
@@ -1661,8 +1741,10 @@ function hud() {
   $('savebtn').textContent = client() ? 'Save gear (K)' : 'Save (K)';
   const bs = animals.find(isBoss); $('boss').hidden = !bs;
   if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
-  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron; $('rh').textContent = P.herbs; $('rd').textContent = P.hide; $('rg').textContent = P.gold; $('rc').textContent = P.crystal; $('rf').textContent = P.feathers; $('rb').textContent = P.bone;
-  for (const k in GEAR) $('gear-' + k).hidden = P[k] || !P[Object.keys(GEAR[k].cost)[0]]; $('stew').hidden = !afford({meat: 2, herbs: 1}); $('fletch').hidden = P.feathers < 1; // craft buttons appear once you hold the main ingredient
+  $('rw').textContent = P.wood; $('rs').textContent = P.stone; $('rm').textContent = P.meat; $('ri').textContent = P.iron; $('rh').textContent = P.herbs; $('rd').textContent = P.hide; $('rg').textContent = P.gold; $('rc').textContent = P.crystal; $('rf').textContent = P.feathers; $('rb').textContent = P.bone; $('rbe').textContent = P.berries; $('rho').textContent = P.honey; $('rre').textContent = P.resin; $('rsu').textContent = P.sulfur; $('rco').textContent = P.coal; $('rwo').textContent = P.wool;
+  for (const k in GEAR) $('gear-' + k).hidden = P[k] || !P[Object.keys(GEAR[k].cost)[0]]; $('stew').hidden = !afford({meat: 2, herbs: 1}); $('fletch').hidden = P.feathers < 1;
+  for (const k in RECIPES) { const r = RECIPES[k]; $('rc-' + k).hidden = !P[r.key] || (r.gear && P[r.gear]); }
+  for (const sp of $('res').children) sp.hidden = !sp.dataset.keep && sp.lastChild.textContent === '0'; // only show what you carry // craft buttons appear once you hold the main ingredient
   $('bandage').hidden = P.herbs < 1; $('bandage').disabled = P.herbs < 2; $('mkboots').hidden = P.boots || P.hide < 1; $('mkvest').hidden = P.vest || P.hide < 1;
   const left = Math.max(0, Math.ceil(G.len - G.t)), mm = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   $('dayname').textContent = G.phase === 'day' ? 'Day ' + G.day : 'Night ' + G.day;
@@ -1683,7 +1765,7 @@ function hud() {
   }
   $('tool-axe').lastChild.textContent = WPN[P.weapon].name.toLowerCase() + ' in hand';
   $('eat').hidden = P.meat < 1; $('craft').hidden = P.flint || P.gaxe || P.stone < 1;
-  $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow || P.owned.bbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver || P.owned.dual || P.owned.sniper);
+  $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow || P.owned.bbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver || P.owned.dual || P.owned.sniper || P.owned.musket || P.owned.minigun);
   $('mkarmor').hidden = P.armor || G.nights < 2; $('mkgren').hidden = G.nights < 4; $('throw').hidden = P.grenades < 1; $('throw').textContent = 'Throw grenade (G) ×' + P.grenades;
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
@@ -1721,6 +1803,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyG') throwGrenade();
   if (e.code === 'KeyB') toggleRide();
   if (e.code === 'KeyZ') useBandage();
+  if (e.code === 'KeyJ') window.__toggleCraft();
   if (e.code === 'KeyU') stew();
   if (e.code === 'KeyR') makeAmmo('arrows');
   if (e.code === 'KeyF') makeAmmo('bullets');
@@ -1760,7 +1843,15 @@ $('hostbtn').addEventListener('click', () => hostGame(null)); $('hostsaved').add
 $('joinbtn').addEventListener('click', () => joinGame($('code').value));
 $('code').addEventListener('keydown', e => { if (e.code === 'Enter') joinGame($('code').value); });
 for (const k in GEAR) $('gear-' + k).addEventListener('click', () => makeGear2(k));
-$('stew').addEventListener('click', stew); $('fletch').addEventListener('click', fletch);
+for (const k in RECIPES) $('rc-' + k).addEventListener('click', () => craftR(k));
+$('stew').addEventListener('click', stew);
+{ // crafting lives in a menu so the controls do not bury the screen
+  const box = document.createElement('div'); box.id = 'craftbox'; box.hidden = true; box.appendChild($('stable'));
+  for (const b of [...$('side').children]) if (!['craftmenu', 'eat', 'bandage', 'throw', 'mkarrows', 'mkbullets'].includes(b.id)) box.appendChild(b);
+  $('side').appendChild(box);
+  const toggle = () => { box.hidden = !box.hidden; $('craftmenu').classList.toggle('sel', !box.hidden); $('craftmenu').textContent = box.hidden ? 'Craft menu (J)' : 'Close menu (J)'; };
+  $('craftmenu').addEventListener('click', toggle); window.__toggleCraft = toggle;
+} $('fletch').addEventListener('click', fletch);
 $('bandage').addEventListener('click', useBandage); $('mkboots').addEventListener('click', () => makeGear('boots')); $('mkvest').addEventListener('click', () => makeGear('vest'));
 $('mkarmor').addEventListener('click', makeArmor); $('mkgren').addEventListener('click', makeGrenades); $('throw').addEventListener('click', throwGrenade);
 $('savebtn').addEventListener('click', () => saveGame(false)); $('quitbtn').addEventListener('click', () => quit(''));
