@@ -52,6 +52,9 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 #side{max-width:100%;min-width:0}
 #craftbox{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;flex:1 1 100%;min-width:0;max-width:100%;max-height:34vh;overflow-y:auto;pointer-events:auto;padding:2px}
 #craftbox #stable{width:100%;max-width:100%;min-width:0}
+.cmhead{flex:1 1 100%;display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 6px 6px 12px;z-index:1}
+.cmhead .lbl{color:var(--bone)}
+#craftclose{background:var(--blood);border-color:var(--blood);color:#fff}
 #bars{display:grid;gap:6px;max-width:100%;min-width:0;justify-items:center}
 #tools,#weapons,#stable{display:flex;gap:6px;overflow-x:auto;max-width:100%;pointer-events:auto;padding:2px}
 .tool{flex:none;background:var(--panel);color:var(--bone);border:1px solid var(--line);border-radius:6px;
@@ -127,6 +130,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div id="bars"><div id="stable"></div><div id="weapons"></div><div id="tools"></div></div>
       <div id="side">
         <button class="btn" id="craftmenu" type="button">Craft menu (J)</button>
+        <button class="btn" id="barsbtn" type="button">Hide bars (I)</button>
         <button class="btn" id="eat" type="button">Eat meat (E)</button>
         <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
         <button class="btn" id="mkbullets" type="button">Bullets ×8 · 2 iron 1 stone (F)</button>
@@ -161,7 +165,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
-        <dt>Craft menu (J)</dt><dd>Opens pets, rides and every recipe you have the ingredients for.</dd>
+        <dt>Craft menu (J)</dt><dd>Opens pets, rides and every recipe you have the ingredients for. Close it with its Close button, J or Esc. I hides the weapon and build bars for a clear view; their keys still work.</dd>
         <dt>Weapon bar</dt><dd>Twenty-five weapons, from spear to minigun; scroll the bar sideways to see them all. Click a weapon to craft it, then to equip it. Tab or the mouse wheel switches. R makes arrows, F makes bullets.</dd>
         <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal, black is coal. Coal and sulfur make powder rounds and dynamite. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
         <dt>Pick-ups</dt><dd>New finds: berry bushes, honeycombs, resin, sulfur crystals, and wool from sheep. Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
@@ -1792,6 +1796,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' && !keys.Space) keys.SpaceFresh = true;
   if (e.target && e.target.id === 'code') return;
   keys[e.code] = true; if (e.repeat || !running) return;
+  if (e.code === 'Escape') window.__closeCraft();
+  if (e.code === 'KeyI') window.__toggleBars();
   const n = e.code === 'Digit0' ? 10 : e.code === 'KeyL' ? 11 : e.code === 'KeyX' ? TOOLS.length : e.code.startsWith('Digit') ? +e.code.slice(5) : 0;
   if (n >= 1 && n <= TOOLS.length) { tool = TOOLS[n - 1]; hud(); }
   if (e.code === 'KeyQ') { tool = 'axe'; hud(); }
@@ -1846,11 +1852,18 @@ for (const k in GEAR) $('gear-' + k).addEventListener('click', () => makeGear2(k
 for (const k in RECIPES) $('rc-' + k).addEventListener('click', () => craftR(k));
 $('stew').addEventListener('click', stew);
 { // crafting lives in a menu so the controls do not bury the screen
-  const box = document.createElement('div'); box.id = 'craftbox'; box.hidden = true; box.appendChild($('stable'));
-  for (const b of [...$('side').children]) if (!['craftmenu', 'eat', 'bandage', 'throw', 'mkarrows', 'mkbullets'].includes(b.id)) box.appendChild(b);
+  const box = document.createElement('div'); box.id = 'craftbox'; box.hidden = true;
+  const head = document.createElement('div'); head.className = 'cmhead';
+  head.innerHTML = '<span class="lbl">Craft menu</span><button class="btn" id="craftclose" type="button">Close ✕</button>';
+  box.appendChild(head); box.appendChild($('stable'));
+  for (const b of [...$('side').children]) if (!['craftmenu', 'barsbtn', 'eat', 'bandage', 'throw', 'mkarrows', 'mkbullets'].includes(b.id)) box.appendChild(b);
   $('side').appendChild(box);
   const toggle = () => { box.hidden = !box.hidden; $('craftmenu').classList.toggle('sel', !box.hidden); $('craftmenu').textContent = box.hidden ? 'Craft menu (J)' : 'Close menu (J)'; };
-  $('craftmenu').addEventListener('click', toggle); window.__toggleCraft = toggle;
+  $('craftmenu').addEventListener('click', toggle); $('craftclose').addEventListener('click', toggle); window.__toggleCraft = toggle;
+  window.__closeCraft = () => { if (!box.hidden) toggle(); };
+  const setBars = hide => { $('bars').hidden = hide; $('barsbtn').textContent = hide ? 'Show bars (I)' : 'Hide bars (I)'; $('barsbtn').classList.toggle('sel', hide); try { localStorage.setItem('timberhold-bars', hide ? '1' : ''); } catch (e) {} };
+  $('barsbtn').addEventListener('click', () => setBars(!$('bars').hidden)); window.__toggleBars = () => setBars(!$('bars').hidden);
+  try { if (localStorage.getItem('timberhold-bars')) setBars(true); } catch (e) {}
 } $('fletch').addEventListener('click', fletch);
 $('bandage').addEventListener('click', useBandage); $('mkboots').addEventListener('click', () => makeGear('boots')); $('mkvest').addEventListener('click', () => makeGear('vest'));
 $('mkarmor').addEventListener('click', makeArmor); $('mkgren').addEventListener('click', makeGrenades); $('throw').addEventListener('click', throwGrenade);
