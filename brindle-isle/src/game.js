@@ -51,6 +51,10 @@ const SFX = (() => {
     lucky: a => [1047, 1319, 1568].forEach((f, i) => tone(a, f, 0.1, 'square', 0.03, 0, i * 0.05)),
     drink: a => [300, 420, 360, 520].forEach((f, i) => tone(a, f, 0.07, 'sine', 0.08, 80, i * 0.09)),
     leap: a => tone(a, 260, 0.16, 'triangle', 0.07, 260),
+    thud: a => { tone(a, 70, 0.25, 'sine', 0.22, -30); noise(a, 0.15, 0.1, 300); },
+    slam: a => { tone(a, 55, 0.5, 'sine', 0.3, -25); noise(a, 0.45, 0.2, 250); },
+    boss: a => [196, 185, 175, 147].forEach((f, i) => tone(a, f, 0.32, 'sawtooth', 0.06, 0, i * 0.22)),
+    wisp: a => tone(a, 700, 0.25, 'sine', 0.05, -400),
   };
   return {
     play(n) { if (muted) return; const a = audio(); if (a && FX[n]) try { FX[n](a); } catch (_) {} },
@@ -107,7 +111,13 @@ function road(dx, dy, len) {
     if (isLand(tileAt(x, y)) && isLand(tileAt(x + dx * 2, y + dy * 2))) tiles[y * W + x] = PATH;
   }
 }
-road(1, 0, 13); road(-1, 0, 13); road(0, -1, 12);
+// boss arena at the island's north tip
+let arenaTY = 0;
+for (let y = 0; y < cy; y++) if (isLand(tileAt(cx, y)) && isLand(tileAt(cx - 1, y))) { arenaTY = y + 8; break; }
+const ARENA = { x: cx * T, y: arenaTY * T + 16, r: 5 * T };
+for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) if (x * x + y * y <= 26) { const i = (arenaTY + y) * W + cx + x; if (i >= 0 && i < W * H && isLand(tiles[i])) tiles[i] = LAND; }
+const nearArena = (tx, ty, d) => Math.hypot(tx - cx, ty - arenaTY) < d;
+road(1, 0, 13); road(-1, 0, 13); road(0, -1, Math.max(12, cy - arenaTY - 5));
 let dockY = cy;
 for (let y = cy; y < H; y++) if (isLand(tileAt(cx, y)) && isLand(tileAt(cx - 1, y))) dockY = y; else break;
 for (let y = cy; y <= dockY; y++) { tiles[y * W + cx] = PATH; tiles[y * W + cx - 1] = PATH; }
@@ -157,6 +167,11 @@ function buildCache() {
     if (isLand(t) && t !== PATH && !isBridge(x, y) && REGION_TINT[rg]) { tc.fillStyle = REGION_TINT[rg]; tc.fillRect(x, y, 1, 1); }
   }
   c.imageSmoothingEnabled = true; c.drawImage(tint, 0, 0, W * T, H * T); c.imageSmoothingEnabled = false;
+  // arena floor: worn stone circle with a rune ring
+  c.fillStyle = 'rgba(60,48,96,.30)'; ellipse(c, ARENA.x, ARENA.y, ARENA.r, ARENA.r * 0.82);
+  c.strokeStyle = 'rgba(230,224,255,.45)'; c.lineWidth = 4; c.beginPath(); c.ellipse(ARENA.x, ARENA.y, ARENA.r - 10, ARENA.r * 0.82 - 10, 0, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = 'rgba(230,224,255,.35)';
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; c.fillRect(ARENA.x + Math.cos(a) * (ARENA.r - 26) - 3, ARENA.y + Math.sin(a) * (ARENA.r * 0.82 - 22) - 3, 6, 6); }
   for (const [x, y] of bridgeTiles) {
     const px = x * T, py = y * T;
     if (S.bridge) {
@@ -182,6 +197,7 @@ const ITEMS = {
   planks:  { name: 'Plank Bundle', price: 14 },
   potion:  { name: 'Meadow Tonic', price: 20 },
   charm:   { name: 'Crystal Charm', price: 70 },
+  crown:   { name: 'Slime Crown', price: 120 },
 };
 const RECIPES = [
   { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
@@ -191,7 +207,7 @@ const RECIPES = [
   { id: 'blade', name: 'Crystal Blade', desc: 'Doubles sword damage. Makes the grove slimes easy.', cost: { crystal: 3, wood: 3 }, tool: true },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0 },
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0 }, bossDefeated: false,
     tools: { pickaxe: false, blade: false }, hp: 6, maxHp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -217,7 +233,7 @@ function addRes(type, tx, ty) {
 const nearVillage = (x, y, d) => Math.hypot(x - cx, y - cy) < d;
 for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
   const t = tiles[y * W + x];
-  if (t !== LAND || nearVillage(x, y, 8)) continue;
+  if (t !== LAND || nearVillage(x, y, 8) || nearArena(x, y, 7)) continue;
   if (!isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
   const r = rng(), rg = region[y * W + x];
   if (rg === 4) { if (r < 0.17) addRes('tree', x, y); else if (r < 0.2) addRes('herb', x, y); else if (r < 0.24) decor.push({ key: r < 0.22 ? 'bush' : 'mush', x: x * T + 16, y: y * T + 22, s: 2 }); }
@@ -228,18 +244,30 @@ for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
     const x = 2 + Math.floor(rng() * (W - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist)) return [x * T + 16, y * T + 16];
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
-function addEnemy(kind, rg) {
-  const [x, y] = randomTileIn(rg, 11);
-  enemies.push({ kind, x, y, hx: x, hy: y, hp: kind === 'purple' ? 4 : 2, max: kind === 'purple' ? 4 : 2, alive: true, respawn: 0, hop: rng() * 6, hurt: 0, kx: 0, ky: 0, wx: 0, wy: 0, wt: 0 });
+// Each enemy type has its own way of fighting; see updateEnemy.
+const ENEMY = {
+  green:   { name: 'Slime', sprite: 'slime', hp: 2, sp: 55, dmg: 1, aggro: 160, drops: [['goo', 1], ['gold', 1]], col: '#5fd0b0', hopper: true },
+  purple:  { name: 'Grove Slime', sprite: 'slime_p', hp: 4, sp: 72, dmg: 2, aggro: 200, drops: [['goo', 2], ['gold', 3]], col: '#a879ff', hopper: true },
+  minion:  { name: 'Slimeling', sprite: 'slime', hp: 1, sp: 85, dmg: 1, aggro: 999, drops: [['goo', 1]], col: '#5fd0b0', hopper: true, small: true },
+  bat:     { name: 'Bat', sprite: 'bat', hp: 2, sp: 90, dmg: 1, aggro: 190, drops: [['gold', 2]], col: '#c08a5a', flyer: true },
+  spider:  { name: 'Spider', sprite: 'spider', hp: 3, sp: 40, dmg: 1, aggro: 170, drops: [['goo', 1], ['gold', 2]], col: '#9aa0a8' },
+  crab:    { name: 'Crab', sprite: 'crab', hp: 6, sp: 40, dmg: 1, aggro: 150, drops: [['stone', 2], ['gold', 2]], col: '#e0584a', heavy: true },
+  cyclops: { name: 'Cyclops', sprite: 'cyclops', hp: 4, sp: 34, dmg: 1, aggro: 240, drops: [['stone', 1], ['gold', 3]], col: '#e8b27a' },
+  ghost:   { name: 'Ghost', sprite: 'ghost', hp: 3, sp: 36, dmg: 1, aggro: 230, drops: [['crystal', 1], ['gold', 2]], col: '#d6dbe8', flyer: true, ghostly: true },
+};
+function makeEnemy(kind, x, y) {
+  return { kind, x, y, hx: x, hy: y, hp: ENEMY[kind].hp, max: ENEMY[kind].hp, alive: true, respawn: 0, hop: rng() * 6, anim: rng() * 6, hurt: 0,
+    kx: 0, ky: 0, wx: 0, wy: 0, wt: 0, state: 'move', st: 0, cd: rng() * 2, phaseT: rng() * 3, faded: false };
 }
-for (let i = 0; i < 4; i++) addEnemy('green', 4);
-for (let i = 0; i < 3; i++) addEnemy('green', 3);
-for (let i = 0; i < 3; i++) addEnemy('green', 2);
-for (let i = 0; i < 6; i++) addEnemy('purple', 1);
+function addEnemy(kind, rg) { const [x, y] = randomTileIn(rg, 11); enemies.push(makeEnemy(kind, x, y)); }
+for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['green', 3, 2], ['crab', 3, 3], ['green', 2, 2], ['spider', 2, 2], ['cyclops', 2, 2], ['purple', 1, 4], ['ghost', 1, 3]])
+  for (let i = 0; i < n; i++) addEnemy(kind, rg);
+const projectiles = [];
+const BOSS = { x: ARENA.x, y: ARENA.y, z: 0, hp: 50, max: 50, state: 'sleep', st: 0, active: false, hurt: 0, seq: 0, phase: 1, sx: 0, sy: 0, tx: 0, ty: 0, volleys: 0, ring: null, anim: 0 };
 
 // village
 const HOUSE = { x: cx * T - 84, y: cy * T - 66 }; // bottom-center of Oma's cottage
@@ -262,6 +290,10 @@ const RECTS = [{ x0: HOUSE.x - 48, x1: HOUSE.x + 48, y0: HOUSE.y - 40, y1: HOUSE
 decor.push({ key: 'barrel', x: HOUSE.x - 64, y: HOUSE.y + 4, s: 2, solid: 10 }, { key: 'crate', x: HOUSE.x + 64, y: HOUSE.y + 2, s: 2, solid: 11 },
   { key: 'hive', x: cx * T + 128, y: cy * T - 50, s: 2, solid: 10 }, { key: 'sign', x: cx * T - 52, y: dockY * T + 2, s: 2, solid: 8 },
   { key: 'fence_l', x: cx * T + 96, y: cy * T + 88, s: 2 }, { key: 'fence_h', x: cx * T + 128, y: cy * T + 88, s: 2 }, { key: 'fence_r', x: cx * T + 160, y: cy * T + 88, s: 2 });
+for (let i = 0; i < 8; i++) {
+  const a = i / 8 * Math.PI * 2 + 0.39, x = ARENA.x + Math.cos(a) * 5.7 * T, y = ARENA.y + Math.sin(a) * 5.2 * T;
+  if (walkable(x, y)) decor.push({ key: 'crystal', x, y, s: 3, solid: 12, glow: true });
+}
 for (const [key, n] of [['chicken', 3], ['sheep', 1], ['cow', 1]]) for (let i = 0; i < n; i++) {
   const a = rng() * Math.PI * 2, d = 70 + rng() * 80;
   animals.push({ key, x: cx * T + Math.cos(a) * d + 60, y: cy * T + 60 + Math.sin(a) * 40, vx: 0, vy: 0, t: rng() * 3, flip: false, hop: rng() * 6 });
@@ -274,7 +306,7 @@ const ICON_DRAW = {
   planks: c => { for (let i = 0; i < 3; i++) { c.fillStyle = '#2a1a10'; c.fillRect(3, 7 + i * 6, 26, 6); c.fillStyle = i % 2 ? '#a8713f' : '#8a5a32'; c.fillRect(4, 8 + i * 6, 24, 4); } c.fillStyle = '#d8c48a'; c.fillRect(14, 6, 4, 20); },
   charm: c => { c.strokeStyle = '#f4b740'; c.lineWidth = 2.5; c.beginPath(); c.arc(16, 17, 10, 0, 7); c.stroke(); c.fillStyle = '#a593ff'; diamond(c, 16, 17, 5, 8); c.fillStyle = '#f4b740'; c.fillRect(14, 3, 4, 5); },
 };
-const ICON_ATLAS = { stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', blade: 'blade', gold: 'coin' };
+const ICON_ATLAS = { crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', blade: 'blade', gold: 'coin' };
 const ICON_CANVAS = {}, ICONS = {};
 function buildIcons() {
   for (const k of [...Object.keys(ICON_DRAW), ...Object.keys(ICON_ATLAS)]) {
@@ -288,7 +320,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'planks', 'potion', 'charm'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'planks', 'potion', 'charm', 'crown'];
 function objectiveText() {
   if (S.bridge) return 'The bridge is open. Keep exploring, or cross it to the mainland.';
   if (S.gold >= GOAL) return 'You have enough! Bring 400g to Tobin at the south dock.';
@@ -296,7 +328,7 @@ function objectiveText() {
     if (S.inv.wood < 5 || S.inv.stone < 4) return `Chop trees and break rocks (wood ${Math.min(S.inv.wood, 5)}/5, stone ${Math.min(S.inv.stone, 4)}/4), then craft a pickaxe at the village workbench.`;
     return 'Craft a Stone Pickaxe at the workbench in the village.';
   }
-  return `Mine crystals in the purple grove up north, craft Crystal Charms, and sell them to Oma Fen. ${S.gold} / ${GOAL}g`;
+  return `Mine crystals in the purple grove up north, craft Crystal Charms, and sell them to Oma Fen${S.bossDefeated ? '' : ', or challenge the Slime King at the north tip'}. ${S.gold} / ${GOAL}g`;
 }
 function updateHUD() {
   let h = '';
@@ -306,7 +338,7 @@ function updateHUD() {
   $('objective').textContent = objectiveText();
   $('fund').style.width = Math.min(100, S.gold / GOAL * 100) + '%';
   let inv = '';
-  for (const k of INV_ORDER) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
+  for (const k of INV_ORDER) if (k !== 'crown' || S.inv.crown) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
   if (S.tools.pickaxe) inv += `<div class="slot tool" title="Stone Pickaxe"><img src="${ICONS.pickaxe}" alt="Stone Pickaxe"></div>`;
   if (S.tools.blade) inv += `<div class="slot tool" title="Crystal Blade"><img src="${ICONS.blade}" alt="Crystal Blade"></div>`;
   $('inventory').innerHTML = inv;
@@ -336,7 +368,7 @@ panelEl.addEventListener('click', e => { if (e.target === panelEl) closePanel();
 const canAfford = cost => Object.entries(cost).every(([k, n]) => S.inv[k] >= n);
 const sellAllValue = () => INV_ORDER.filter(k => k !== 'potion').reduce((s, k) => s + S.inv[k] * ITEMS[k].price, 0);
 let resetArmed = false;
-const CREDITS = `<div class="credits"><b>Art credits.</b> Characters: Universal LPC Spritesheet Character Generator (Liberated Pixel Cup) by __LPC_AUTHORS__. Licensed CC-BY-SA 3.0, GPL 3.0 and OGA-BY 3.0; colors adjusted for this game. Tiles, trees, animals, slimes and items: Kenney's Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs (kenney.nl, CC0).</div>`;
+const CREDITS = `<div class="credits"><b>Art credits.</b> Characters: Universal LPC Spritesheet Character Generator (Liberated Pixel Cup) by __LPC_AUTHORS__. Licensed CC-BY-SA 3.0, GPL 3.0 and OGA-BY 3.0; colors adjusted for this game. Tiles, trees, animals, monsters and items: Kenney's Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs (kenney.nl, CC0).</div>`;
 function renderPanel() {
   let html = '';
   if (panel === 'shop') {
@@ -375,6 +407,14 @@ function renderPanel() {
       <dt>Hold, then release</dt><dd>Whirlwind: spin and hit every slime, tree and rock around you.</dd>
       <dt>Attack after a dash</dt><dd>Dash Strike: a lunging double-damage slash.</dd>
       <dt>Lucky!</dt><dd>Sometimes a finished tree, rock or herb drops a bonus item.</dd></dl>
+      <div class="label">Creatures</div>
+      <dl class="controls">
+      <dt>Bats</dt><dd>Forest. They circle you and swoop. Swing as they dive.</dd>
+      <dt>Crabs</dt><dd>Meadow. Tough. Sidestep the charge and they get dizzy if they crash.</dd>
+      <dt>Spiders</dt><dd>Quarry. Creep closer, then pounce.</dd>
+      <dt>Cyclopes</dt><dd>Quarry. Throw rocks at the red circle. Move, or swing to knock rocks away.</dd>
+      <dt>Ghosts</dt><dd>Grove. Can't be hit while faded. Their wisps follow you; swing to break them.</dd>
+      <dt>Slime King</dt><dd>Boss at the north tip. Leap over his shockwave, then hit him while he's dazed for double damage.</dd></dl>
       <p class="sub">Standing in the village slowly restores your hearts. Progress saves in this browser automatically.</p>
       <button class="btn" data-act="mute">${SFX.muted ? 'Turn sound on' : 'Turn sound off'}</button>
       <button class="btn" data-act="reset">${resetArmed ? 'Tap again to erase your save' : 'Start a new game'}</button>${CREDITS}`;
@@ -534,6 +574,7 @@ function onAction() {
   if (n) { face(n); interact(n); return false; }
   const { enemy, res } = findTarget();
   if (enemy) { face(enemy); doAct('sword', hitEnemies); return true; }
+  if (bossHittable() && Math.hypot(BOSS.x - P.x, BOSS.y - P.y) < 110) { face(BOSS); doAct('sword', hitEnemies); return true; }
   if (res) {
     face(res);
     if (res.type === 'tree') doAct('axe', a => hitResource(res, a));
@@ -551,6 +592,7 @@ function interact(n) {
       'A new face! Washed up with the last storm, did you? Welcome to Brindle Isle.',
       'Bring me anything you find. Wood, stone, herbs, slime goo. I pay fair, and I pay more for crafted goods.',
       'Want real money? The purple grove up north is full of crystals. You will need a pickaxe from the workbench across the square.',
+      'And past the grove, at the very north tip, the Slime King sleeps on a pile of gold. Only fools and heroes wake him.',
     ], () => openPanel('shop')); return; }
     openPanel('shop'); return;
   }
@@ -570,16 +612,30 @@ function drinkTonic() {
   S.inv.potion--; updateHUD(); SFX.play('drink');
   startAct('drink', () => { S.hp = Math.min(S.maxHp, S.hp + 3); burst(P.x, P.y - 30, '#e45a8f', 12); updateHUD(); floatText(P.x, P.y - 52, '+3 ♥', '#ec5257'); });
 }
+function damageEnemy(e, dmg, kx, ky) {
+  const D = ENEMY[e.kind];
+  if (D.ghostly && e.faded) { floatText(e.x, e.y - 44, 'Miss', '#c8d0e0'); burst(e.x, e.y - 20, '#c8d0e0', 4); return false; }
+  e.hp -= dmg; e.hurt = 0.2; e.kx = kx * (D.heavy ? 0.4 : 1); e.ky = ky * (D.heavy ? 0.4 : 1);
+  if (e.state !== 'move') { e.state = 'move'; e.cd = Math.max(e.cd, 0.8); } // a hit interrupts wind-ups
+  burst(e.x, e.y - 14, D.col, 8); floatText(e.x + (rng() - 0.5) * 12, e.y - 46, String(dmg), '#ffffff');
+  if (e.hp <= 0) killEnemy(e);
+  return true;
+}
+function deflect(hx, hy, rad) {
+  let n = 0;
+  for (const p of projectiles) if (!p.dead && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
+  if (n) { floatText(hx, hy - 20, 'Deflect!', '#ffffff'); SFX.play('hit'); }
+}
 function hitEnemies(a) {
   const sp = a && a.special, reach = sp ? 30 : 24, rad = sp ? 46 : 34;
   const hx = P.x + P.fx * reach, hy = P.y - 10 + P.fy * reach, dmg = (S.tools.blade ? 2 : 1) * (sp ? 2 : 1);
   let hit = false;
   for (const e of enemies) {
-    if (!e.alive || Math.hypot(e.x - hx, e.y - 10 - hy) > rad) continue;
-    hit = true; e.hp -= dmg; e.hurt = 0.2; e.kx = P.fx * (sp ? 520 : 260); e.ky = P.fy * (sp ? 520 : 260);
-    burst(e.x, e.y - 12, e.kind === 'purple' ? '#a879ff' : '#5fd0b0', sp ? 14 : 6);
-    if (e.hp <= 0) killEnemy(e);
+    if (!e.alive || Math.hypot(e.x - hx, e.y - 10 - hy) > rad + (ENEMY[e.kind].flyer ? 10 : 0)) continue;
+    if (damageEnemy(e, dmg, P.fx * (sp ? 520 : 260), P.fy * (sp ? 520 : 260))) hit = true;
   }
+  if (bossHittable() && Math.hypot(BOSS.x - hx, BOSS.y - 26 - hy) < rad + 30) { damageBoss(dmg); hit = true; }
+  deflect(hx, hy, rad + 6);
   if (sp) { impact(7); burst(hx, hy, '#ffe08a', 14); } else if (hit) impact(2);
   if (hit) SFX.play('hit');
 }
@@ -589,10 +645,10 @@ function spinHit(a) {
     if (!e.alive) continue;
     const dx = e.x - P.x, dy = e.y - P.y, d = Math.hypot(dx, dy) || 1;
     if (d > 72) continue;
-    e.hp -= dmg; e.hurt = 0.25; e.kx = dx / d * 460; e.ky = dy / d * 460;
-    burst(e.x, e.y - 12, e.kind === 'purple' ? '#a879ff' : '#5fd0b0', 10);
-    if (e.hp <= 0) killEnemy(e);
+    damageEnemy(e, dmg, dx / d * 460, dy / d * 460);
   }
+  if (bossHittable() && Math.hypot(BOSS.x - P.x, BOSS.y - P.y) < 100) damageBoss(dmg);
+  deflect(P.x, P.y - 14, 80);
   for (const r of resources) if (r.alive && Math.hypot(r.x - P.x, r.y - P.y) < 62) hitResource(r, a);
   for (let i = 0; i < 24; i++) { const ang = i / 24 * Math.PI * 2; particles.push({ x: P.x + Math.cos(ang) * 40, y: P.y - 14 + Math.sin(ang) * 26, vx: Math.cos(ang) * 120, vy: Math.sin(ang) * 80 - 30, life: 0.5, color: '#ffe08a' }); }
   impact(8);
@@ -623,12 +679,12 @@ function hitResource(r, a) {
   burst(r.x, r.y - 16, col, 12);
 }
 function killEnemy(e) {
-  e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; SFX.play('slime');
-  burst(e.x, e.y - 10, e.kind === 'purple' ? '#a879ff' : '#5fd0b0', 16);
-  drop(e.x, e.y - 6, 'goo', e.kind === 'purple' ? 2 : 1);
-  drop(e.x, e.y - 6, 'gold', e.kind === 'purple' ? 3 : 1);
+  const D = ENEMY[e.kind];
+  e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; SFX.play('slime');
+  burst(e.x, e.y - 10, D.col, 16);
+  for (const [item, n] of D.drops) drop(e.x, e.y - 6, item, n);
 }
-function drop(x, y, item, n) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 60 + rng() * 60; pickups.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, item, t: 0 }); } }
+function drop(x, y, item, n, v = 1) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 60 + rng() * 60 + (n > 6 ? rng() * 80 : 0); pickups.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, item, t: 0, v }); } }
 function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 40 + rng() * 90; particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.5 + rng() * 0.3, color }); } }
 function floatText(x, y, text, color) { floats.push({ x, y, text, color, life: 1.1 }); }
 function damagePlayer(n, from) {
@@ -732,38 +788,10 @@ function update(dt) {
     else if (r.grow !== undefined && r.grow < 1) r.grow = Math.min(1, r.grow + dt * 2.5);
   }
   const fainted = P.act && P.act.kind === 'faint';
-  for (const e of enemies) {
-    if (!e.alive) { if (e.dieT > 0) e.dieT -= dt; e.respawn -= dt; if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) { e.alive = true; e.hp = e.max; e.x = e.hx; e.y = e.hy; e.spawnT = 0.45; } continue; }
-    e.hurt = Math.max(0, e.hurt - dt); if (e.spawnT > 0) e.spawnT -= dt;
-    e.cd = Math.max(0, (e.cd || 0) - dt);
-    // purple slimes wind up, then leap at you
-    if (e.state === 'windup') {
-      e.st -= dt; e.hop = 0;
-      if (e.st <= 0) { e.state = 'leap'; e.st = 0.38; const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1; e.lx = dx / d * 260; e.ly = dy / d * 260; }
-      continue;
-    }
-    if (e.state === 'leap') {
-      e.st -= dt; moveBody(e, e.lx * dt, e.ly * dt, 9); pushOut(e, 9);
-      if (Math.hypot(P.x - e.x, P.y - e.y) < 22 && !(P.act && P.act.kind === 'faint')) damagePlayer(2, e);
-      if (e.st <= 0) { e.state = 'move'; e.cd = 2 + rng(); burst(e.x, e.y, '#a879ff', 6); }
-      continue;
-    }
-    const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy);
-    const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
-    const chase = !fainted && d < (e.kind === 'purple' ? 200 : 160) && homeD < 320 && Math.hypot(P.x - cx * T, P.y - cy * T) > 7 * T;
-    const sp = e.kind === 'purple' ? 72 : 55;
-    e.hop += dt * (chase ? 9 : 4);
-    let vx = 0, vy = 0;
-    const knocked = Math.abs(e.kx) + Math.abs(e.ky) > 5;
-    if (knocked) { vx = e.kx; vy = e.ky; e.kx *= Math.pow(0.001, dt); e.ky *= Math.pow(0.001, dt); }
-    else if (chase && e.kind === 'purple' && d < 120 && e.cd <= 0) { e.state = 'windup'; e.st = 0.5; continue; }
-    else if (chase) { vx = dx / d * sp; vy = dy / d * sp; }
-    else if (homeD > 220) { vx = (e.hx - e.x) / homeD * sp; vy = (e.hy - e.y) / homeD * sp; }
-    else { e.wt -= dt; if (e.wt <= 0) { e.wt = 1 + rng() * 2; const a = rng() * Math.PI * 2, go = rng() < 0.6; e.wx = go ? Math.cos(a) * sp * 0.5 : 0; e.wy = go ? Math.sin(a) * sp * 0.5 : 0; } vx = e.wx; vy = e.wy; }
-    const hopF = knocked ? 1 : Math.max(0, Math.sin(e.hop)) * 1.8;
-    moveBody(e, vx * hopF * dt, vy * hopF * dt, 9); pushOut(e, 9);
-    if (d < 20 && !fainted) damagePlayer(e.kind === 'purple' ? 2 : 1, e);
-  }
+  for (const e of enemies) updateEnemy(e, dt, fainted);
+  for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
+  updateProjectiles(dt, fainted);
+  updateBoss(dt, fainted);
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i]; p.t += dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.01, dt); p.vy *= Math.pow(0.01, dt);
@@ -771,7 +799,7 @@ function update(dt) {
     if (p.t > 0.35 && d < 72 && !fainted) { const s = 260 * dt; p.x += (P.x - p.x) / d * s; p.y += (P.y - 14 - p.y) / d * s; if (Math.random() < dt * 20) particles.push({ x: p.x, y: p.y, vx: 0, vy: -10, life: 0.3, color: '#fff6c8', size: 2 }); }
     if (p.t > 0.35 && d < 14 && !fainted) {
       pickups.splice(i, 1);
-      if (p.item === 'gold') { addGold(1); floatText(P.x, P.y - 56, '+1g', '#f4b740'); SFX.play('coin'); }
+      if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else { S.inv[p.item]++; floatText(P.x, P.y - 56, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); SFX.play('collect'); }
       updateHUD();
       const slot = p.item === 'gold' ? document.querySelector('.gold') : document.querySelector(`.slot[data-item="${p.item}"]`);
@@ -795,6 +823,261 @@ function updateAnimal(a, dt) {
   const nx = a.x + a.vx * dt, ny = a.y + a.vy * dt;
   if (Math.hypot(nx - (cx * T + 60), ny - (cy * T + 60)) < 170 && walkable(nx, ny)) { a.x = nx; a.y = ny; } else { a.vx = -a.vx; a.vy = -a.vy; }
   if (a.vx) a.flip = a.vx > 0;
+}
+
+// ---------- enemy AI ----------
+function moveEnemy(e, dx, dy) {
+  if (ENEMY[e.kind].flyer) { e.x = Math.max(16, Math.min(W * T - 16, e.x + dx)); e.y = Math.max(16, Math.min(H * T - 16, e.y + dy)); }
+  else { moveBody(e, dx, dy, 9); pushOut(e, 9); }
+}
+function updateEnemy(e, dt, fainted) {
+  const D = ENEMY[e.kind];
+  if (!e.alive) {
+    if (e.dieT > 0) e.dieT -= dt;
+    if (e.minion) { if (e.dieT <= 0) e.remove = true; return; }
+    e.respawn -= dt;
+    if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) Object.assign(e, { alive: true, hp: e.max, x: e.hx, y: e.hy, spawnT: 0.45, state: 'move', cd: 1 });
+    return;
+  }
+  e.hurt = Math.max(0, e.hurt - dt); if (e.spawnT > 0) e.spawnT -= dt;
+  e.cd = Math.max(0, e.cd - dt); e.anim += dt;
+  const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1;
+  const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
+  const chase = !fainted && d < D.aggro && (homeD < 320 || e.minion) && Math.hypot(P.x - cx * T, P.y - cy * T) > 7 * T;
+  const touch = (n, r = 20) => { if (d < r && !fainted && !e.faded) damagePlayer(n, e); };
+  // knockback overrides everything
+  if (Math.abs(e.kx) + Math.abs(e.ky) > 5) {
+    moveEnemy(e, e.kx * dt, e.ky * dt); e.kx *= Math.pow(0.001, dt); e.ky *= Math.pow(0.001, dt); return;
+  }
+  e.kx = e.ky = 0;
+  const wander = sp => {
+    if (homeD > 220) { moveEnemy(e, (e.hx - e.x) / homeD * sp * dt, (e.hy - e.y) / homeD * sp * dt); return; }
+    e.wt -= dt; if (e.wt <= 0) { e.wt = 1 + rng() * 2; const a = rng() * Math.PI * 2, go = rng() < 0.6; e.wx = go ? Math.cos(a) * sp * 0.5 : 0; e.wy = go ? Math.sin(a) * sp * 0.5 : 0; }
+    moveEnemy(e, e.wx * dt, e.wy * dt);
+  };
+  const lockOn = sp => { e.lx = dx / d * sp; e.ly = dy / d * sp; };
+
+  if (D.hopper) {
+    if (e.state === 'windup') { e.st -= dt; e.hop = 0; if (e.st <= 0) { e.state = 'leap'; e.st = 0.38; lockOn(260); } return; }
+    if (e.state === 'leap') {
+      e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); touch(D.dmg, 22);
+      if (e.st <= 0) { e.state = 'move'; e.cd = 2 + rng(); burst(e.x, e.y, D.col, 6); }
+      return;
+    }
+    e.hop += dt * (chase ? 9 : 4);
+    const hopF = Math.max(0, Math.sin(e.hop)) * 1.8;
+    if (chase && e.kind === 'purple' && d < 120 && e.cd <= 0) { e.state = 'windup'; e.st = 0.5; return; }
+    if (chase) moveEnemy(e, dx / d * D.sp * hopF * dt, dy / d * D.sp * hopF * dt);
+    else { e.wx *= 1; wander(D.sp * hopF); }
+    touch(D.dmg, D.small ? 16 : 20);
+    return;
+  }
+  if (e.kind === 'bat') { // flutters around you, then swoops
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'attack'; e.st = 0.42; lockOn(250); } return; }
+    if (e.state === 'attack') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); touch(D.dmg, 22); if (e.st <= 0) { e.state = 'recover'; e.st = 0.7; } return; }
+    if (e.state === 'recover') { e.st -= dt; moveEnemy(e, -dx / d * D.sp * dt, -dy / d * D.sp * dt); if (e.st <= 0) { e.state = 'move'; e.cd = 1.2 + rng(); } return; }
+    if (chase) {
+      const side = Math.sin(e.anim * 1.7) * 60, tx = P.x - dy / d * side - dx / d * 70, ty = P.y + dx / d * side - dy / d * 70;
+      const ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1;
+      moveEnemy(e, ex / el * Math.min(el, D.sp * dt), ey / el * Math.min(el, D.sp * dt));
+      if (d < 110 && e.cd <= 0) { e.state = 'windup'; e.st = 0.28; }
+    } else moveEnemy(e, Math.cos(e.anim * 0.9) * 40 * dt + (e.hx - e.x) * 0.3 * dt, Math.sin(e.anim * 1.3) * 30 * dt + (e.hy - e.y) * 0.3 * dt);
+    return;
+  }
+  if (e.kind === 'spider') { // creeps in bursts, then pounces
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'attack'; e.st = 0.28; lockOn(340); SFX.play('leap'); } return; }
+    if (e.state === 'attack') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); touch(D.dmg, 22); if (e.st <= 0) { e.state = 'move'; e.cd = 1.6 + rng(); } return; }
+    const burstF = Math.sin(e.anim * 7) > 0 ? 1.7 : 0.15;
+    if (chase) { moveEnemy(e, dx / d * D.sp * burstF * dt, dy / d * D.sp * burstF * dt); if (d < 115 && e.cd <= 0) { e.state = 'windup'; e.st = 0.35; } }
+    else wander(D.sp * burstF);
+    touch(D.dmg);
+    return;
+  }
+  if (e.kind === 'crab') { // winds up, then charges in a straight line; dizzy if it hits something
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'attack'; e.st = 0.7; lockOn(240); } return; }
+    if (e.state === 'attack') {
+      e.st -= dt; const ox = e.x, oy = e.y; moveEnemy(e, e.lx * dt, e.ly * dt); touch(D.dmg, 24);
+      const stuck = Math.hypot(e.x - ox, e.y - oy) < 240 * dt * 0.3;
+      if (stuck) { e.state = 'recover'; e.st = 1.2; burst(e.x, e.y - 10, '#ffffff', 6); impact(2); floatText(e.x, e.y - 46, 'Dizzy', '#ffe08a'); }
+      else if (e.st <= 0) { e.state = 'move'; e.cd = 2 + rng(); }
+      return;
+    }
+    if (e.state === 'recover') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 1.5; } return; }
+    if (chase) { moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (d < 150 && e.cd <= 0) { e.state = 'windup'; e.st = 0.6; } }
+    else wander(D.sp);
+    touch(D.dmg, 22);
+    return;
+  }
+  if (e.kind === 'cyclops') { // keeps its distance and lobs rocks at where you stand
+    if (e.state === 'windup') {
+      e.st -= dt;
+      if (e.st <= 0) {
+        e.state = 'move'; e.cd = 2.4 + rng();
+        const lead = 0.4; projectiles.push({ kind: 'rock', sx: e.x, sy: e.y - 30, x: e.x, y: e.y - 30, tx: P.x + (P.moving ? P.fx * 130 * lead : 0), ty: P.y + (P.moving ? P.fy * 130 * lead : 0), t: 0, dur: 0.9, z: 0 });
+        SFX.play('swing');
+      }
+      return;
+    }
+    if (chase) {
+      const want = d < 110 ? -1 : d > 180 ? 1 : 0, side = Math.sin(e.anim * 0.8);
+      moveEnemy(e, (dx / d * want - dy / d * side * 0.6) * D.sp * dt, (dy / d * want + dx / d * side * 0.6) * D.sp * dt);
+      if (d < 250 && e.cd <= 0) { e.state = 'windup'; e.st = 0.6; }
+    } else wander(D.sp);
+    touch(D.dmg);
+    return;
+  }
+  if (e.kind === 'ghost') { // fades out (can't be hit) and casts homing wisps
+    e.phaseT += dt;
+    const cycle = e.phaseT % 4.6; e.faded = cycle > 3.0;
+    if (e.state === 'windup') { e.st -= dt; e.faded = false; if (e.st <= 0) { e.state = 'move'; e.cd = 2.6 + rng(); projectiles.push({ kind: 'wisp', x: e.x, y: e.y - 26, ang: Math.atan2(P.y - 14 - (e.y - 26), P.x - e.x), t: 0, life: 3.6 }); SFX.play('wisp'); } return; }
+    if (chase) {
+      const want = d < 100 ? -1 : d > 160 ? 1 : 0;
+      moveEnemy(e, (dx / d * want + Math.cos(e.anim) * 0.5) * D.sp * dt, (dy / d * want + Math.sin(e.anim * 1.3) * 0.5) * D.sp * dt);
+      if (!e.faded && d < 240 && e.cd <= 0 && cycle < 2.4) { e.state = 'windup'; e.st = 0.5; }
+    } else moveEnemy(e, Math.cos(e.anim * 0.6) * 20 * dt + (e.hx - e.x) * 0.2 * dt, Math.sin(e.anim * 0.8) * 20 * dt + (e.hy - e.y) * 0.2 * dt);
+    touch(D.dmg);
+  }
+}
+function updateProjectiles(dt, fainted) {
+  for (const p of projectiles) {
+    p.t += dt;
+    if (p.kind === 'rock') {
+      const k = Math.min(1, p.t / p.dur); p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k; p.z = Math.sin(Math.PI * k) * 80 + (1 - k) * 30;
+      if (k >= 1 && !p.dead) {
+        p.dead = true; SFX.play('crumble'); impact(2);
+        for (let i = 0; i < 8; i++) { const a = rng() * Math.PI * 2; particles.push({ x: p.tx, y: p.ty, vx: Math.cos(a) * 90, vy: Math.sin(a) * 60 - 80, life: 0.5, color: i % 2 ? '#9c9690' : '#6c6764', size: 4 }); }
+        if (!fainted && Math.hypot(P.x - p.tx, P.y - p.ty) < 26) damagePlayer(1, { x: p.tx, y: p.ty });
+      }
+    } else {
+      if (p.kind === 'wisp') {
+        const want = Math.atan2(P.y - 14 - p.y, P.x - p.x); let da = want - p.ang;
+        while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+        p.ang += Math.max(-1.6 * dt, Math.min(1.6 * dt, da));
+        p.x += Math.cos(p.ang) * 95 * dt; p.y += Math.sin(p.ang) * 95 * dt;
+        if (Math.random() < dt * 30) particles.push({ x: p.x, y: p.y, vx: 0, vy: -10, life: 0.3, color: '#c9b8ff', size: 3 });
+      } else { p.x += p.vx * dt; p.y += p.vy * dt; }
+      if (!fainted && Math.hypot(P.x - p.x, P.y - 14 - p.y) < 14) { damagePlayer(1, p); p.dead = true; burst(p.x, p.y, '#c9b8ff', 6); }
+      if (p.t > p.life) p.dead = true;
+    }
+  }
+  for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
+}
+
+// ---------- the Slime King ----------
+const bossHittable = () => BOSS.active && BOSS.z < 30 && BOSS.state !== 'dying' && BOSS.state !== 'wake';
+const BOSS_SEQ = { 1: ['hop', 'hop', 'hop', 'slam'], 2: ['hop', 'summon', 'hop', 'slam', 'hop'], 3: ['shards', 'hop', 'slam', 'summon', 'shards', 'hop', 'slam'] };
+function bossBar() { const b = $('bossbar'); b.hidden = !BOSS.active; $('bossfill').style.width = Math.max(0, BOSS.hp / BOSS.max * 100) + '%'; }
+function damageBoss(n) {
+  const dazed = BOSS.state === 'dazed', dmg = n * (dazed ? 2 : 1);
+  BOSS.hp -= dmg; BOSS.hurt = 0.15;
+  floatText(BOSS.x + (rng() - 0.5) * 30, BOSS.y - 90, dazed ? `${dmg}!` : String(dmg), dazed ? '#ffe08a' : '#ffffff');
+  burst(BOSS.x, BOSS.y - 30, '#5fd0b0', 10); SFX.play('hit');
+  const phase = BOSS.hp / BOSS.max > 0.66 ? 1 : BOSS.hp / BOSS.max > 0.33 ? 2 : 3;
+  if (phase > BOSS.phase && BOSS.hp > 0) { BOSS.phase = phase; BOSS.seq = 0; banner(phase === 2 ? 'The King calls his children!' : 'The King is furious!', '#ff9a9a'); }
+  if (BOSS.hp <= 0) {
+    BOSS.hp = 0; BOSS.state = 'dying'; BOSS.st = 1.8; BOSS.z = 0; BOSS.ring = null;
+    for (const e of enemies) if (e.minion && e.alive) killEnemy(e);
+    projectiles.length = 0;
+  }
+  bossBar();
+}
+function bossStart(action) {
+  const B = BOSS;
+  if (action === 'hop') {
+    const dx = P.x - B.x, dy = P.y - B.y, d = Math.hypot(dx, dy) || 1, step = Math.min(d, 110);
+    B.sx = B.x; B.sy = B.y; B.tx = B.x + dx / d * step; B.ty = B.y + dy / d * step;
+    const ax = B.tx - ARENA.x, ay = B.ty - ARENA.y, ad = Math.hypot(ax, ay), lim = ARENA.r - 40;
+    if (ad > lim) { B.tx = ARENA.x + ax / ad * lim; B.ty = ARENA.y + ay / ad * lim; }
+    B.state = 'hop'; B.st = 0;
+  } else if (action === 'slam') { B.state = 'rise'; B.st = 0; SFX.play('leap'); }
+  else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
+  else if (action === 'shards') { B.state = 'shards'; B.st = 0.7; B.volleys = B.phase === 3 ? 2 : 1; }
+}
+function bossNext() { const seq = BOSS_SEQ[BOSS.phase]; bossStart(seq[BOSS.seq++ % seq.length]); }
+function bossRest(t) { BOSS.state = 'rest'; BOSS.st = t; }
+function updateBoss(dt, fainted) {
+  const B = BOSS;
+  if (S.bossDefeated && B.state !== 'dying') return;
+  B.anim += dt; B.hurt = Math.max(0, B.hurt - dt);
+  const d = Math.hypot(P.x - B.x, P.y - B.y), dA = Math.hypot(P.x - ARENA.x, P.y - ARENA.y);
+  if (B.ring) {
+    const R = B.ring; R.r += 250 * dt;
+    if (!R.hit && !fainted && !P.dash && Math.abs(Math.hypot((P.x - R.x), (P.y - R.y) / 0.6) - R.r) < 16) { R.hit = true; damagePlayer(2, R); }
+    if (R.r > R.max) B.ring = null;
+  }
+  // walk away and the King goes back to sleep, fully healed
+  if (B.active && B.state !== 'dying' && (dA > 11 * T || fainted)) {
+    Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: ARENA.x, y: ARENA.y, z: 0, ring: null });
+    for (const e of enemies) if (e.minion) e.remove = true;
+    projectiles.length = 0; bossBar();
+    if (!fainted) toast('The Slime King lumbers back to sleep.');
+    return;
+  }
+  switch (B.state) {
+    case 'sleep':
+      if (!fainted && dA < 4.2 * T) { B.state = 'wake'; B.st = 1.5; B.active = true; bossBar(); banner('The Slime King awakens!', '#ff9a9a'); SFX.play('boss'); impact(6); }
+      break;
+    case 'wake': B.st -= dt; if (B.st <= 0) bossNext(); break;
+    case 'rest': B.st -= dt; if (B.st <= 0) bossNext(); break;
+    case 'hop': {
+      B.st += dt; const k = Math.min(1, B.st / 0.72);
+      B.x = B.sx + (B.tx - B.sx) * k; B.y = B.sy + (B.ty - B.sy) * k; B.z = Math.sin(Math.PI * k) * 40;
+      if (k >= 1) { B.z = 0; impact(4); SFX.play('thud'); burst(B.x, B.y, '#7ccf86', 10); if (d < 54 && !fainted) damagePlayer(1, B); bossRest(0.3); }
+      break;
+    }
+    case 'rise': B.st += dt; B.z = Math.min(1, B.st / 0.45) * 300; if (B.st >= 0.45) { B.state = 'hover'; B.st = 0; } break;
+    case 'hover': {
+      B.st += dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1, sp = Math.min(dd, 160 * dt);
+      B.x += dx / dd * sp; B.y += dy / dd * sp;
+      const ax = B.x - ARENA.x, ay = B.y - ARENA.y, ad = Math.hypot(ax, ay), lim = ARENA.r - 40;
+      if (ad > lim) { B.x = ARENA.x + ax / ad * lim; B.y = ARENA.y + ay / ad * lim; }
+      if (B.st >= 1.25) { B.state = 'fall'; B.st = 0; }
+      break;
+    }
+    case 'fall':
+      B.st += dt; B.z = 300 * Math.max(0, 1 - B.st / 0.22);
+      if (B.st >= 0.22) {
+        B.z = 0; impact(12); hitStop = 0.09; SFX.play('slam');
+        if (d < 58 && !fainted) damagePlayer(2, B);
+        B.ring = { x: B.x, y: B.y, r: 30, max: 190, hit: false };
+        for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; particles.push({ x: B.x + Math.cos(a) * 40, y: B.y + Math.sin(a) * 22, vx: Math.cos(a) * 140, vy: Math.sin(a) * 70 - 40, life: 0.6, color: '#d9cfb0', size: 5 }); }
+        B.state = 'dazed'; B.st = 1.8; floatText(B.x, B.y - 100, 'Dazed! Hit him now!', '#ffe08a');
+      }
+      break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(0.3); break;
+    case 'summon':
+      B.st -= dt;
+      if (B.st <= 0) {
+        const alive = enemies.filter(e => e.minion && e.alive).length;
+        for (let i = 0; i < Math.min(3, 5 - alive); i++) {
+          const a = rng() * Math.PI * 2, m = makeEnemy('minion', B.x + Math.cos(a) * 60, B.y + Math.sin(a) * 40);
+          m.minion = true; m.spawnT = 0.45; m.hx = ARENA.x; m.hy = ARENA.y; enemies.push(m);
+        }
+        SFX.play('slime'); burst(B.x, B.y - 30, '#5fd0b0', 16); bossRest(0.6);
+      }
+      break;
+    case 'shards':
+      B.st -= dt;
+      if (B.st <= 0) {
+        const off = B.volleys % 2 ? 0 : Math.PI / 12;
+        for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + off; projectiles.push({ kind: 'shard', x: B.x, y: B.y - 30, vx: Math.cos(a) * 165, vy: Math.sin(a) * 165, ang: a, t: 0, life: 2.2 }); }
+        SFX.play('crumble'); impact(3);
+        B.volleys--; if (B.volleys > 0) B.st = 0.55; else bossRest(0.6);
+      }
+      break;
+    case 'dying':
+      B.st -= dt; if (!REDUCED_MOTION) shake = Math.max(shake, 4);
+      if (Math.random() < dt * 14) burst(B.x + (rng() - 0.5) * 60, B.y - 30 + (rng() - 0.5) * 40, rng() < 0.5 ? '#5fd0b0' : '#ffe08a', 10);
+      if (B.st <= 0) {
+        B.state = 'dead'; B.active = false; S.bossDefeated = true; bossBar();
+        for (let i = 0; i < 40; i++) { const a = rng() * Math.PI * 2, v = 80 + rng() * 200; particles.push({ x: B.x, y: B.y - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 0.9, color: i % 3 ? '#5fd0b0' : '#ffe08a', size: 6 }); }
+        drop(B.x, B.y - 10, 'gold', 20, 5); drop(B.x, B.y - 10, 'crystal', 3); drop(B.x, B.y - 10, 'crown', 1);
+        impact(12); SFX.play('craft'); banner('Slime King defeated!', '#ffe08a'); save(); updateHUD();
+        P.pendingCheer = null; setTimeout(() => { if (!P.act) { P.fx = 0; P.fy = 1; startAct('cheer', () => burst(P.x, P.y - 50, '#ffe08a', 20)); } }, 900);
+      }
+      break;
+  }
+  if (B.active && B.z < 14 && d < 38 && !fainted && B.state !== 'dying') damagePlayer(2, B);
 }
 
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
@@ -830,6 +1113,7 @@ function drawAmbient(c) {
 
 // ---------- render ----------
 let vw = 0, vh = 0, dpr = 1, Z = 1;
+const camFocus = { x: 0, y: 0 };
 function resize() {
   dpr = Math.min(2, window.devicePixelRatio || 1); vw = innerWidth; vh = innerHeight;
   cvs.width = Math.round(vw * dpr); cvs.height = Math.round(vh * dpr);
@@ -875,6 +1159,76 @@ function drawRes(c, r) {
   });
   if (r.hp < r.max && r.type !== 'herb') healthBar(c, r.x, r.y + 8, r.hp / r.max);
 }
+function drawEnemy(c, e) { if (ENEMY[e.kind].hopper) drawSlime(c, e); else drawCreature(c, e); }
+function drawCreature(c, e) {
+  const D = ENEMY[e.kind], A = ATLAS[D.sprite];
+  let sx = 1, sy = 1, lift = 0, ox = 0, alpha = 1;
+  if (e.kind === 'bat') { lift = 20 + Math.sin(e.anim * 5) * 5; sy = 0.75 + Math.abs(Math.sin(e.anim * 18)) * 0.35; sx = 1.1 - (sy - 0.75) * 0.3; }
+  else if (e.kind === 'spider') { ox = Math.sin(e.anim * 40) * (Math.sin(e.anim * 7) > 0 ? 1.2 : 0); sy = 1 + Math.sin(e.anim * 14) * 0.04; }
+  else if (e.kind === 'crab') { ox = Math.sin(e.anim * 9) * 2; sy = 1 + Math.abs(Math.sin(e.anim * 9)) * 0.05; }
+  else if (e.kind === 'cyclops') { lift = Math.abs(Math.sin(e.anim * 4)) * 3; if (e.state === 'windup') { sy = 1.12; sx = 0.92; } }
+  else if (e.kind === 'ghost') { lift = 12 + Math.sin(e.anim * 2) * 5; alpha = e.faded ? 0.18 : 0.88; }
+  if (e.state === 'windup') ox += Math.sin(time * 60) * 2;
+  if (e.state === 'attack' && e.kind === 'spider') lift = 8;
+  if (!e.alive) { const k = 1 - Math.max(0, e.dieT) / 0.4; sx *= 1 - k; sy *= 1 - k; alpha *= 1 - k; }
+  if (e.spawnT > 0) { const k = 1 - e.spawnT / 0.45, pop = k < 0.7 ? k / 0.7 * 1.2 : 1.2 - (k - 0.7) / 0.3 * 0.2; sx *= pop; sy *= pop; }
+  shadow(c, e.x, e.y + 2, D.flyer ? 8 : 12, D.flyer ? 3 : 4);
+  if (e.hurt > 0) alpha *= 0.5;
+  c.globalAlpha = alpha;
+  const w = 40 * sx, h = 40 * sy;
+  c.drawImage(IMG.kenney_atlas, A[0], A[1], 16, 16, Math.round(e.x + ox - w / 2), Math.round(e.y + 6 - h - lift), Math.round(w), Math.round(h));
+  c.globalAlpha = 1;
+  if (!e.alive) return;
+  if (e.state === 'windup') { c.fillStyle = '#ffe08a'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText('!', e.x, e.y - 42 - lift); c.fillText('!', e.x, e.y - 42 - lift); }
+  if (e.kind === 'crab' && e.state === 'recover') drawStars(c, e.x, e.y - 40, 10);
+  if (e.hp < e.max && !e.faded) healthBar(c, e.x, e.y - 42 - lift, e.hp / e.max);
+}
+function drawStars(c, x, y, r) { c.fillStyle = '#ffe08a'; for (let i = 0; i < 3; i++) { const a = time * 5 + i * 2.1; c.fillRect(Math.round(x + Math.cos(a) * r - 2), Math.round(y + Math.sin(a) * r * 0.4 - 2), 4, 4); } }
+function drawProjectiles(c) {
+  for (const p of projectiles) {
+    if (p.kind === 'rock') {
+      const pulse = 0.5 + Math.sin(time * 16) * 0.3;
+      c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.ellipse(p.tx, p.ty, 22, 10, 0, 0, Math.PI * 2); c.stroke();
+      shadow(c, p.x, p.y + 30 * (1 - p.t / p.dur), 7, 3);
+      sprB(c, 'rock_g', p.x, p.y - p.z + 8, 1.25);
+    } else if (p.kind === 'wisp') {
+      c.fillStyle = 'rgba(180,160,255,.35)'; circle(c, p.x, p.y, 9); c.fillStyle = '#efeaff'; circle(c, p.x, p.y, 4);
+    } else {
+      c.save(); c.translate(p.x, p.y); c.rotate(p.ang + Math.PI / 2); c.fillStyle = '#6c5ce7'; diamond(c, 0, 0, 4, 9); c.fillStyle = '#e6e0ff'; diamond(c, -1, -1, 1.5, 5); c.restore();
+    }
+  }
+}
+function drawBoss(c) {
+  const B = BOSS; if (S.bossDefeated && B.state !== 'dying') return;
+  let sx = 1, sy = 1, ox = 0;
+  if (B.state === 'sleep') { const br = Math.sin(B.anim * 1.5) * 0.04; sx = 1 + br; sy = 1 - br; }
+  else if (B.state === 'hop') { const k = Math.min(1, B.st / 0.72); if (k < 0.15 || k > 0.85) { sx = 1.15; sy = 0.85; } else { sx = 0.9; sy = 1.12; } }
+  else if (B.state === 'summon' || B.state === 'shards') { const k = Math.sin(time * 30) * 0.05; sx = 1.1 + k; sy = 0.9 - k; ox = Math.sin(time * 50) * 2; }
+  else if (B.state === 'dazed') { sx = 1.18; sy = 0.82; }
+  else if (B.state === 'dying') { ox = Math.sin(time * 70) * 4; const k = 1 - Math.max(0, B.st) / 1.8; sy = 1 - k * 0.5; sx = 1 + k * 0.3; }
+  else { const br = Math.sin(B.anim * 3) * 0.05; sx = 1 + br; sy = 1 - br; }
+  // landing warning while the King is in the air
+  if (B.state === 'hover' || B.state === 'fall' || B.state === 'rise') {
+    const pulse = 0.45 + Math.sin(time * 18) * 0.3;
+    c.fillStyle = `rgba(236,82,87,${pulse * 0.35})`; ellipse(c, B.x, B.y, 58, 28);
+    c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 3; c.beginPath(); c.ellipse(B.x, B.y, 58, 28, 0, 0, Math.PI * 2); c.stroke();
+  }
+  const shr = Math.max(0.3, 1 - B.z / 400);
+  c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, B.x, B.y + 4, 46 * shr, 16 * shr);
+  const w = 104 * sx, h = 104 * sy, A = ATLAS.slime, top = B.y + 14 - h - B.z;
+  if (B.hurt > 0 || (B.state === 'dying' && Math.floor(time * 20) % 2)) c.globalAlpha = 0.55;
+  c.drawImage(IMG.kenney_atlas, A[0], A[1], 16, 16, Math.round(B.x + ox - w / 2), Math.round(top), Math.round(w), Math.round(h));
+  c.globalAlpha = 1;
+  const C = ATLAS.crown; c.drawImage(IMG.kenney_atlas, C[0], C[1] + 8, 16, 8, Math.round(B.x + ox - 24), Math.round(top - 14 + h * 0.06), 48, 24);
+  if (B.state === 'sleep') { const f = (B.anim % 2) / 2; c.globalAlpha = 1 - f; c.fillStyle = '#eef3e6'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('z', B.x + 40 + f * 14, top - f * 26); c.globalAlpha = 1; }
+  if (B.state === 'dazed') drawStars(c, B.x, top - 4, 30);
+}
+function drawRing(c) {
+  const R = BOSS.ring; if (!R) return;
+  const k = R.r / R.max;
+  c.strokeStyle = `rgba(255,255,255,${0.9 - k * 0.6})`; c.lineWidth = 6; c.beginPath(); c.ellipse(R.x, R.y, R.r, R.r * 0.6, 0, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = `rgba(165,147,255,${0.8 - k * 0.6})`; c.lineWidth = 12; c.beginPath(); c.ellipse(R.x, R.y, R.r - 8, (R.r - 8) * 0.6, 0, 0, Math.PI * 2); c.stroke();
+}
 function drawSlime(c, e) {
   const sq = Math.sin(e.hop);
   let lift = Math.max(0, sq) * 7, sx = 1 + Math.max(0, -sq) * 0.18, sy = 1 - Math.max(0, -sq) * 0.14 + Math.max(0, sq) * 0.08, ox = 0;
@@ -883,13 +1237,13 @@ function drawSlime(c, e) {
   else if (e.state === 'leap') { const k = 1 - e.st / 0.38; lift = Math.sin(Math.PI * k) * 26; sx = 0.85; sy = 1.2; }
   if (e.spawnT > 0) { const k = 1 - e.spawnT / 0.45, pop = k < 0.7 ? k / 0.7 * 1.2 : 1.2 - (k - 0.7) / 0.3 * 0.2; sx *= pop; sy *= pop; }
   shadow(c, e.x, e.y + 2, Math.max(4, 13 - lift * 0.3), 4);
-  const w = 40 * sx, h = 40 * sy, a = ATLAS[e.kind === 'purple' ? 'slime_p' : 'slime'];
+  const base = ENEMY[e.kind].small ? 26 : 40, w = base * sx, h = base * sy, a = ATLAS[e.kind === 'purple' ? 'slime_p' : 'slime'];
   if (e.hurt > 0) c.globalAlpha = 0.5;
   c.drawImage(IMG.kenney_atlas, a[0], a[1], 16, 16, Math.round(e.x + ox - w / 2), Math.round(e.y + 6 - h - lift), Math.round(w), Math.round(h));
   c.globalAlpha = 1;
   if (!e.alive) return;
   if (e.state === 'windup') { c.fillStyle = '#ffe08a'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('!', e.x, e.y - 44); }
-  if (e.hp < e.max) healthBar(c, e.x, e.y - 38 - lift, e.hp / e.max);
+  if (e.hp < e.max && !ENEMY[e.kind].small) healthBar(c, e.x, e.y - 38 - lift, e.hp / e.max);
 }
 function healthBar(c, x, y, f) { c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x - 13, y, 26, 5); c.fillStyle = '#ec5257'; c.fillRect(x - 12, y + 1, 24 * f, 3); }
 function drawLPC(c, sheet, frame, row, x, y, size) {
@@ -967,8 +1321,11 @@ function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#5ec6e8'; ctx.fillRect(0, 0, cvs.width, cvs.height);
   const viewW = vw / Z, viewH = vh / Z;
-  let camX = W * T <= viewW ? (W * T - viewW) / 2 : Math.max(0, Math.min(W * T - viewW, P.x - viewW / 2));
-  let camY = H * T <= viewH ? (H * T - viewH) / 2 : Math.max(0, Math.min(H * T - viewH, P.y - 20 - viewH / 2));
+  // during the boss fight, frame both the hero and the King
+  if (BOSS.active) { camFocus.x += (P.x * 0.6 + BOSS.x * 0.4 - camFocus.x) * 0.08; camFocus.y += (P.y * 0.6 + (BOSS.y - 40) * 0.4 - camFocus.y) * 0.08; }
+  else { camFocus.x += (P.x - camFocus.x) * 0.2; camFocus.y += (P.y - camFocus.y) * 0.2; if (Math.hypot(P.x - camFocus.x, P.y - camFocus.y) > 300) { camFocus.x = P.x; camFocus.y = P.y; } }
+  let camX = W * T <= viewW ? (W * T - viewW) / 2 : Math.max(0, Math.min(W * T - viewW, camFocus.x - viewW / 2));
+  let camY = H * T <= viewH ? (H * T - viewH) / 2 : Math.max(0, Math.min(H * T - viewH, camFocus.y - 20 - viewH / 2));
   if (shake) { camX += (Math.random() - 0.5) * shake; camY += (Math.random() - 0.5) * shake; }
   const k = dpr * Z;
   ctx.setTransform(k, 0, 0, k, -Math.round(camX * k), -Math.round(camY * k));
@@ -998,19 +1355,23 @@ function render() {
   for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
   for (const a of animals) if (inView(a.x, a.y)) list.push([a.y, 6, a]);
   if (inView(HOUSE.x, HOUSE.y, 150)) list.push([HOUSE.y - 4, 4, null]);
+  if (!S.bossDefeated || BOSS.state === 'dying') { if (inView(BOSS.x, BOSS.y, 200)) list.push([BOSS.y, 7, BOSS]); }
+  drawRing(ctx);
   list.push([P.y, 3, P]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, kind, o] of list) {
     if (kind === 0) drawRes(ctx, o);
-    else if (kind === 1) drawSlime(ctx, o);
+    else if (kind === 1) drawEnemy(ctx, o);
+    else if (kind === 7) drawBoss(ctx);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) drawPlayer(ctx);
     else if (kind === 4) drawHouse(ctx);
-    else if (kind === 5) { if (o.solid) shadow(ctx, o.x, o.y + 3, 12, 4); sprB(ctx, o.key, o.x, o.y + 6, o.s); }
+    else if (kind === 5) { if (o.glow) { ctx.fillStyle = `rgba(165,147,255,${0.2 + Math.sin(time * 2 + o.x) * 0.08})`; circle(ctx, o.x, o.y - 20, 26); } if (o.solid) shadow(ctx, o.x, o.y + 3, 12, 4); sprB(ctx, o.key, o.x, o.y + 6, o.s); }
     else drawAnimal(ctx, o);
   }
   for (const p of particles) { const z = p.size || 4; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6)); ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x - z / 2), Math.round(p.y - z / 2), z, z); }
   ctx.globalAlpha = 1;
+  drawProjectiles(ctx);
   drawAmbient(ctx);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.font = '700 13px "Pixelify Sans", sans-serif';
@@ -1031,6 +1392,7 @@ function render() {
   mctx.strokeStyle = 'rgba(255,255,255,.7)'; mctx.lineWidth = 1; mctx.strokeRect(camX * mxs, camY * mys, viewW * mxs, viewH * mys);
   mctx.fillStyle = '#c2477a'; mctx.fillRect(NPCS[0].x * mxs - 2, NPCS[0].y * mys - 2, 4, 4);
   mctx.fillStyle = '#f4b740'; mctx.fillRect(NPCS[2].x * mxs - 2, NPCS[2].y * mys - 2, 4, 4);
+  if (!S.bossDefeated) { mctx.fillStyle = Math.floor(time * 2) % 2 ? '#ec5257' : '#f4b740'; mctx.fillRect(ARENA.x * mxs - 3, ARENA.y * mys - 3, 6, 6); }
   mctx.fillStyle = '#ffffff'; mctx.beginPath(); mctx.arc(P.x * mxs, P.y * mys, 2.5, 0, 7); mctx.fill();
 }
 
@@ -1055,6 +1417,7 @@ async function start(hot) {
   applySave(data);
   if (S.bridge) for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
   P.x = S.px; P.y = S.py;
+  camFocus.x = P.x; camFocus.y = P.y;
   if (!walkable(P.x, P.y)) { P.x = cx * T; P.y = (cy + 2) * T; }
   buildIcons(); buildCache(); resize(); updateHUD();
   window.claude?.hot?.snapshot?.(() => ({ save: serialize() }));
