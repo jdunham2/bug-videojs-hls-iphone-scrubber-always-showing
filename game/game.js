@@ -139,6 +139,10 @@
     objects.push(makePicnicTable(47 * TILE, 31 * TILE));
     reserve(45, 29, 4, 3);
 
+    // The raccoon's hideout: a hollow log in a clearing by the west road
+    reserve(3, 20, 6, 5);
+    objects.push(makeHideoutLog(4.8 * TILE, 22.5 * TILE));
+
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       const edge = Math.min(x, y, MW - 1 - x, MH - 1 - y);
@@ -553,6 +557,45 @@
     };
   }
 
+  function makeHideoutLog(x, y) {
+    return {
+      kind: 'hideout', x, y,
+      hitbox: box(x - 34, y - 11, 66, 12),
+      bounds: { l: x - 60, r: x + 50, t: y - 50, b: y + 8 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.25)'; ellipse(ctx, x + 2, y - 1, 40, 7); },
+      draw(ctx) {
+        // log body
+        ctx.fillStyle = '#6e4a2c'; roundRect(ctx, x - 36, y - 30, 66, 29, 13, true);
+        ctx.strokeStyle = '#563820'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        for (const [yy, x0, x1] of [[-23, -28, 6], [-16, -32, 18], [-9, -26, 10]]) {
+          ctx.beginPath(); ctx.moveTo(x + x0, y + yy); ctx.quadraticCurveTo(x + (x0 + x1) / 2, y + yy - 2, x + x1, y + yy); ctx.stroke();
+        }
+        // moss
+        ctx.fillStyle = '#6a9a3a';
+        ellipse(ctx, x - 18, y - 29, 12, 4); ellipse(ctx, x + 2, y - 30, 8, 3);
+        // cut end with the hollow (the entrance)
+        ctx.fillStyle = '#c9a06a'; ellipse(ctx, x + 30, y - 15.5, 9, 14.5);
+        ctx.strokeStyle = '#a8804e'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(x + 30, y - 15.5, 6.5, 11.5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#24170e'; ellipse(ctx, x + 30.5, y - 14.5, 5, 9);
+        // two eyes glinting inside (someone's home)
+        ctx.fillStyle = 'rgba(255,220,120,0.8)'; circle(ctx, x + 29, y - 17, 0.9); circle(ctx, x + 32, y - 17, 0.9);
+        // mushrooms
+        for (const [mx, s] of [[-30, 1], [-24, 0.75]]) {
+          ctx.fillStyle = '#efe3cf'; ctx.fillRect(x + mx - 1, y - 6 * s, 2, 6 * s);
+          ctx.fillStyle = '#d23b3b'; ctx.beginPath(); ctx.arc(x + mx, y - 6 * s, 4 * s, Math.PI, 0); ctx.fill();
+          ctx.fillStyle = '#fff'; circle(ctx, x + mx - 1.4 * s, y - 8 * s, 0.8 * s);
+        }
+        // hand-painted sign
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x - 49, y - 26, 3, 26);
+        ctx.fillStyle = '#c99b63'; ctx.save(); ctx.translate(x - 47.5, y - 27); ctx.rotate(-0.12);
+        roundRect(ctx, -12, -6, 24, 11, 2, true);
+        ctx.fillStyle = '#4a3220'; ctx.font = '800 7px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('MINE', 0, 0); ctx.restore();
+      },
+    };
+  }
+
   function makePicnicTable(x, y) {
     return {
       kind: 'picnic', x, y,
@@ -721,6 +764,22 @@
       circle(g, x, y, 1.1);
     }
 
+    // Hideout nest: trampled straw and leaves in front of the log
+    g.fillStyle = 'rgba(120,90,45,0.45)';
+    ellipse(g, 4.8 * TILE, 23.8 * TILE, 48, 26);
+    g.lineCap = 'round'; g.lineWidth = 1.3;
+    for (let k = 0; k < 70; k++) {
+      const a = grng() * Math.PI * 2, d = Math.sqrt(grng());
+      const sx = 4.8 * TILE + Math.cos(a) * 44 * d, sy = 23.8 * TILE + Math.sin(a) * 23 * d;
+      g.strokeStyle = grng() < 0.5 ? 'rgba(230,200,120,0.8)' : 'rgba(180,140,70,0.8)';
+      const ang = grng() * Math.PI;
+      g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + Math.cos(ang) * 5, sy + Math.sin(ang) * 2); g.stroke();
+    }
+    for (let k = 0; k < 12; k++) {
+      g.fillStyle = ['#c0643a', '#d9a43a', '#8a5a2e'][k % 3];
+      ellipse(g, 4.8 * TILE + gr(-40, 40), 23.8 * TILE + gr(-19, 19), 2.6, 1.4);
+    }
+
     // Minimap
     mini = document.createElement('canvas');
     mini.width = MW * 3; mini.height = MH * 3;
@@ -838,7 +897,7 @@
     // You can't chitter with your mouth full: light things fall out
     if (player.held && !player.held.type.heavy) dropHeld(true);
     for (const v of villagers) {
-      if (Math.hypot(v.x - player.x, v.y - player.y) < 95) startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']));
+      if (Math.hypot(v.x - player.x, v.y - player.y) < 95 && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
     }
     for (const b of butterflies) {
       if (Math.hypot(b.x - player.x, b.y - player.y) < 140) b.flee = 1.5;
@@ -1359,10 +1418,22 @@
   }
 
   function pickUp(it) {
+    const wasPlanted = it.planted;
     if (it.planted) { puff(it.x, it.y, 5, 'soil'); sfx('pop'); } else sfx(it.type.heavy ? 'heave' : 'pick');
     Object.assign(it, { held: true, heldBy: null, air: false, floating: false, planted: false, ghost: false, vx: 0, vy: 0, vz: 0, rot: 0, spin: 0 });
     player.held = it;
     sparkle(it.x, it.y, it.z + it.type.h * 0.5);
+    // to-do list
+    if (wasPlanted) {
+      tasks.cropPulls++;
+      setProgress('crops5', tasks.cropPulls);
+      if (it.kind === 'carrot') completeTask('carrot');
+    }
+    if (it.kind === 'pie') completeTask('pie');
+    if (it.kind === 'hat') {
+      const f = VILLAGER.fennick;
+      if (f && f.state === 'act' && f.stops[f.stopIdx].needs === 'hat' && Math.hypot(f.x - it.x, f.y - it.y) < 90) completeTask('hat');
+    }
   }
 
   function dropHeld(pop) {
@@ -1409,6 +1480,7 @@
         const k = 60 + player.speed * 1.2;
         it.vx = Math.cos(a) * k; it.vy = Math.sin(a) * k; it.vz = 70 + player.speed * 0.3; it.air = true; it.kicker = null;
         sfx('bounce');
+        completeTask('kick');
       }
 
       if (it.floating) {
@@ -1433,6 +1505,7 @@
           if (Math.hypot(it.x - v.x, it.y - v.y) > 11) continue;
           it.vx *= -0.3; it.vy *= -0.3;
           sfx('bonk');
+          if (v.id === 'fennick') completeTask('bonk');
           startleV(v, 'Ow!', it.owner === v.id ? { state: 'fetch', target: it } : { state: 'chase', target: null });
           break;
         }
@@ -1442,6 +1515,7 @@
         it.z = 0;
         if (tileAt(it.x, it.y) === WATER) {
           splash(it.x, it.y, it.type.heavy);
+          if (!it.kicker) { completeTask('splash'); if (it.kind === 'ball') completeTask('ballpond'); }
           if (it.type.floats) Object.assign(it, { floating: true, air: false, vz: 0, rot: 0, spin: 0, vx: it.vx * 0.3, vy: it.vy * 0.3 });
           else items.splice(i, 1); // glub glub
           continue;
@@ -1820,6 +1894,7 @@
     v.hopV = 170; v.hop = 0.01;
     say(v, text, 1.1);
     const dropped = villagerDrop(v);
+    if (dropped && v.id === 'bertram') completeTask('bertdrop');
     v.after = after || (dropped ? { state: 'fetch', target: dropped } : { state: v.state, target: v.target });
     v.state = 'startled'; v.stateT = 0.75; v.path = null;
     return true;
@@ -1886,7 +1961,10 @@
         v.lineT = 1 + Math.random() * 2; v.searching = false;
         if (stop.needs) {
           const it = ownedKind(v, stop.needs);
-          if (!it || it.held || displaced(it)) { say(v, `Where's my ${ITEM[stop.needs].name}?!`); v.searching = true; }
+          if (!it || it.held || displaced(it)) {
+            say(v, `Where's my ${ITEM[stop.needs].name}?!`); v.searching = true;
+            if (v.id === 'rosa' && stop.needs === 'pie') completeTask('picnic');
+          }
         }
       }
       return;
@@ -1914,7 +1992,7 @@
     if (v.tidyT > 0 || v.held) return;
     v.tidyT = 0.5;
     for (const it of items) {
-      if (it.owner !== v.id || it.held || it.air || it.floating || !displaced(it)) continue;
+      if (it.owner !== v.id || it.held || it.air || it.floating || !displaced(it) || inHideout(it)) continue;
       if (canSee(v, it.x, it.y - 4)) {
         v.state = 'fetch'; v.target = it; v.path = null; v.stateT = 15;
         say(v, rpick(['Hm?', 'How did that get there?', 'Oh, for goodness sake.']));
@@ -1934,6 +2012,7 @@
       toRoute(v); return;
     }
     if (it.floating) { sulk(v, 'Hmph! In the pond?!'); return; }
+    if (inHideout(it)) { sulk(v, 'Not in that smelly log...'); return; }
     if (v.stateT <= 0) { sulk(v, 'I give up.'); return; }
     const d = Math.hypot(it.x - v.x, it.y - v.y);
     if (d < 14 && !it.air) { villagerPick(v, it); return; }
@@ -1965,7 +2044,11 @@
       if (v.stateT <= 0) { sulk(v, 'And stay out!'); v.cooldown = 2; return; }
     }
     if (sees) { v.lostT = 0; v.lastSeen = { x: player.x, y: player.y }; } else v.lostT += dt;
-    if (v.lostT > 3) { sulk(v, it ? 'Thief!' : 'Hmph.'); v.cooldown = 2.5; return; }
+    if (playerInHideout()) { // nobody follows a raccoon into its den
+      if (it && player.held === it) completeTask('escape');
+      sulk(v, rpick(['Rotten raccoon!', "I'm not going in there."])); v.cooldown = 3; return;
+    }
+    if (v.lostT > 3) { if (it && player.held === it) completeTask('escape'); sulk(v, it ? 'Thief!' : 'Hmph.'); v.cooldown = 2.5; return; }
     const d = Math.hypot(player.x - v.x, player.y - v.y);
     if (d < 15) { catchPlayer(v); return; }
     if (sees && lineClear(v.x, v.y, player.x, player.y)) { moveToward(v, player.x, player.y, v.chase, dt); v.path = null; return; }
@@ -1985,7 +2068,7 @@
 
       const sees = started && canSee(v, player.x, player.y - 6);
       const ph = player.held;
-      if (ph && ph.owner === v.id && sees && v.cooldown <= 0 && !v.held && v.state !== 'chase' && v.state !== 'startled') startChase(v, ph);
+      if (ph && ph.owner === v.id && sees && !playerInHideout() && v.cooldown <= 0 && !v.held && v.state !== 'chase' && v.state !== 'startled') startChase(v, ph);
 
       switch (v.state) {
         case 'route': case 'act': routine(v, dt); if (started) tidyScan(v, dt); break;
@@ -2136,6 +2219,160 @@
   }
 
   // ---------------------------------------------------------------------------
+  // The raccoon's hideout (a hollow log at the forest edge) — a safe zone
+  // ---------------------------------------------------------------------------
+  const HIDEOUT = { x: 4.8 * TILE, y: 23.8 * TILE, rx: 50, ry: 28 };
+  function inHideoutPt(x, y) {
+    const dx = (x - HIDEOUT.x) / HIDEOUT.rx, dy = (y - HIDEOUT.y) / HIDEOUT.ry;
+    return dx * dx + dy * dy <= 1;
+  }
+  const inHideout = (it) => !it.held && !it.air && inHideoutPt(it.x, it.y);
+  const playerInHideout = () => inHideoutPt(player.x, player.y - 4);
+
+  function drawHideoutZone(ctx, t) {
+    // Dashed ring when you're carrying something nearby: "drop it here"
+    if (!player.held || Math.hypot(player.x - HIDEOUT.x, player.y - HIDEOUT.y) > 160) return;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,181,71,${0.55 + Math.sin(t * 4) * 0.25})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -t * 12;
+    ctx.beginPath(); ctx.ellipse(HIDEOUT.x, HIDEOUT.y, HIDEOUT.rx, HIDEOUT.ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mischief to-do list
+  // ---------------------------------------------------------------------------
+  const TASKS = [
+    { id: 'carrot', tier: 'Easy', text: 'Pull up a carrot' },
+    { id: 'pie', tier: 'Easy', text: "Steal Rosa's pie" },
+    { id: 'jump', tier: 'Easy', text: 'Make someone jump' },
+    { id: 'kick', tier: 'Easy', text: "Kick Toby's ball" },
+    { id: 'splash', tier: 'Easy', text: 'Throw something in the pond' },
+    { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
+    { id: 'bonk', tier: 'Medium', text: 'Bonk Mrs. Fennick' },
+    { id: 'bertdrop', tier: 'Medium', text: "Make Bertram drop what he's carrying" },
+    { id: 'escape', tier: 'Medium', text: 'Escape a chase' },
+    { id: 'crops5', tier: 'Medium', text: 'Pull up 5 crops', goal: 5 },
+    { id: 'picnic', tier: 'Hard', text: 'Ruin the picnic' },
+    { id: 'hat', tier: 'Hard', text: 'Steal the hat from under her nose' },
+    { id: 'double', tier: 'Hard', text: 'Get chased by two villagers at once' },
+    { id: 'garden', tier: 'Hard', text: 'Empty the garden' },
+    { id: 'stash5', tier: 'Hard', text: 'Stash 5 things in your hideout', goal: 5 },
+    { id: 'feast', tier: 'Final', text: 'Have a feast', hint: 'Pie, sandwich and an apple in your hideout', final: true },
+  ];
+  const tasks = { done: new Set(), progress: {}, cropPulls: 0, startedAt: 0, finished: false, checkT: 0 };
+  const TASK_BY_ID = Object.fromEntries(TASKS.map((t) => [t.id, t]));
+  const regularTasksDone = () => TASKS.every((t) => t.final || tasks.done.has(t.id));
+
+  function completeTask(id) {
+    const task = TASK_BY_ID[id];
+    if (!started || !task || tasks.done.has(id)) return;
+    if (task.final && !regularTasksDone()) return;
+    tasks.done.add(id);
+    tasks.progress[id] = task.goal;
+    sfx(task.final ? 'fanfare' : 'ding');
+    toast(task.text, task.final ? 'Feast had!' : 'Done!');
+    for (let k = 0; k < 3; k++) sparkle(player.x + rr(-10, 10), player.y, 20 + k * 6);
+    renderTodo(id);
+    if (!task.final && regularTasksDone()) {
+      setTimeout(() => { sfx('fanfare'); toast('Have a feast', 'Final task unlocked!'); renderTodo(); }, 1600);
+    }
+    if (tasks.done.size === TASKS.length) setTimeout(showWin, 1800);
+  }
+  function setProgress(id, n) {
+    const task = TASK_BY_ID[id];
+    if (tasks.done.has(id) || tasks.progress[id] === n) return;
+    tasks.progress[id] = Math.min(n, task.goal);
+    renderTodo();
+    if (n >= task.goal) completeTask(id);
+  }
+
+  // Conditions that are easier to poll than to catch as events
+  function checkTasks(dt) {
+    tasks.checkT -= dt;
+    if (tasks.checkT > 0 || !started) return;
+    tasks.checkT = 0.25;
+    if (villagers.filter((v) => v.state === 'chase').length >= 2) completeTask('double');
+    const crops = items.filter((it) => it.home && it.home.planted);
+    if (crops.every((c) => !c.planted)) completeTask('garden');
+    const stashed = items.filter(inHideout);
+    setProgress('stash5', stashed.length);
+    if (['pie', 'sandwich', 'apple'].every((k) => stashed.some((it) => it.kind === k))) completeTask('feast');
+  }
+
+  // UI ---------------------------------------------------------------------------
+  const todoEl = document.getElementById('todo');
+  const todoList = document.getElementById('todo-list');
+  const todoCount = document.getElementById('todo-count');
+  const toastEl = document.getElementById('toast');
+  let toastTimer = 0;
+
+  function buildTodo() {
+    let tier = '';
+    todoList.innerHTML = '';
+    for (const task of TASKS) {
+      if (task.tier !== tier) {
+        tier = task.tier;
+        const h = document.createElement('li');
+        h.className = 'tier';
+        h.textContent = tier;
+        todoList.appendChild(h);
+      }
+      const li = document.createElement('li');
+      li.className = 'task';
+      li.dataset.id = task.id;
+      li.innerHTML = '<span class="box"></span><span class="txt"></span><span class="prog"></span>' +
+        '<svg class="scribble" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M1 6 C 15 2, 30 9, 48 5 S 80 2, 99 6"/></svg>';
+      todoList.appendChild(li);
+    }
+    renderTodo();
+    // Open by default on big screens, collapsed on phones
+    let open = !isTouch && window.innerWidth > 700;
+    try { const s = localStorage.getItem('mischief-todo-open'); if (s !== null) open = s === '1'; } catch (_) { /* no storage */ }
+    setTodoOpen(open);
+    document.getElementById('todo-toggle').addEventListener('click', (e) => { e.currentTarget.blur(); setTodoOpen(!todoEl.classList.contains('open')); });
+  }
+  function setTodoOpen(open) {
+    todoEl.classList.toggle('open', open);
+    document.getElementById('todo-toggle').setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem('mischief-todo-open', open ? '1' : '0'); } catch (_) { /* no storage */ }
+  }
+  function renderTodo(justDone) {
+    const unlocked = regularTasksDone();
+    for (const li of todoList.querySelectorAll('.task')) {
+      const task = TASK_BY_ID[li.dataset.id];
+      const done = tasks.done.has(task.id);
+      const locked = task.final && !unlocked;
+      li.classList.toggle('done', done);
+      li.classList.toggle('locked', locked);
+      li.classList.toggle('fresh', task.id === justDone);
+      li.querySelector('.txt').textContent = locked ? 'Finish everything else first' : task.text + (task.hint && !done ? ` (${task.hint})` : '');
+      li.querySelector('.prog').textContent = task.goal && !done ? `${tasks.progress[task.id] || 0}/${task.goal}` : '';
+    }
+    todoCount.textContent = `${tasks.done.size}/${TASKS.length}`;
+  }
+  function toast(text, label) {
+    toastEl.innerHTML = '';
+    const l = document.createElement('span'); l.className = 'label'; l.textContent = label;
+    const tx = document.createElement('span'); tx.className = 'what'; tx.textContent = text;
+    toastEl.append(l, tx);
+    toastEl.hidden = false;
+    toastEl.classList.remove('show'); void toastEl.offsetWidth; toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2600);
+  }
+  function showWin() {
+    if (tasks.finished) return;
+    tasks.finished = true;
+    const secs = Math.round((performance.now() - tasks.startedAt) / 1000);
+    document.getElementById('win-time').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    document.getElementById('win').hidden = false;
+  }
+  document.getElementById('win-close').addEventListener('click', () => { document.getElementById('win').hidden = true; });
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -2186,6 +2423,8 @@
       case 'alert': tone(660, 880, 0.08, 'square', 0.06); tone(880, 1320, 0.12, 'square', 0.06, 0.09); break;
       case 'snatch': noise(0.12, 0.15, 1800); tone(420, 200, 0.16, 'sawtooth', 0.05); break;
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
+      case 'ding': tone(988, 988, 0.12, 'triangle', 0.09); tone(1319, 1319, 0.22, 'triangle', 0.09, 0.1); break;
+      case 'fanfare': [523, 659, 784, 1047].forEach((f, k) => tone(f, f, k === 3 ? 0.4 : 0.14, 'square', 0.05, k * 0.12)); break;
     }
   }
   // Villager "voices": a few pitched blips per sentence
@@ -2230,6 +2469,7 @@
     audioInit();
     if (started) return;
     started = true;
+    tasks.startedAt = performance.now();
     document.getElementById('start').hidden = true;
   }
 
@@ -2242,6 +2482,7 @@
     if (e.code === 'KeyE' && !e.repeat) grabOrDrop();
     if (e.code === 'KeyF' && !e.repeat) throwHeld();
     if (e.code === 'KeyN' && !e.repeat) muted = !muted;
+    if (e.code === 'KeyT' && !e.repeat) setTodoOpen(!todoEl.classList.contains('open'));
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
   window.addEventListener('blur', () => keys.clear());
@@ -2356,6 +2597,8 @@
       }
     }
 
+    drawHideoutZone(ctx, t);
+
     // Y-sorted draw: objects + items + player
     const playerEntry = { y: player.y, isPlayer: true };
     vis.push(playerEntry);
@@ -2418,6 +2661,9 @@
       circle(ctx, mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3);
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#ffb547'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
       for (const v of villagers) {
         const vx = mx + v.x / WORLD_W * mw, vy = my + v.y / WORLD_H * mh;
         ctx.fillStyle = v.state === 'chase' ? '#e8453c' : v.shirt;
@@ -2439,6 +2685,7 @@
     updatePlayer(dt, readInput());
     updateItems(dt);
     updateVillagers(dt);
+    checkTasks(dt);
     updateAmbient(dt);
     target = findTarget();
     syncTouchButtons();
@@ -2458,6 +2705,8 @@
     placeItems();
     spawnVillagers();
     spawnAmbient();
+    buildTodo();
+    if (data && Array.isArray(data.tasksDone)) { for (const id of data.tasksDone) if (TASK_BY_ID[id]) tasks.done.add(id); renderTodo(); }
     if (data && data.player && !collides(data.player.x, data.player.y)) {
       player.x = data.player.x; player.y = data.player.y; player.dir = data.player.dir || 'down';
       if (data.started) start();
@@ -2468,10 +2717,10 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers };
+  window.mischief = { player, items, objects, villagers, tasks, completeTask };
 
   // Keep the raccoon where it was when the page hot-reloads in the viewer
-  try { window.claude?.hot?.snapshot?.(() => ({ player: { x: player.x, y: player.y, dir: player.dir }, started })); } catch (_) { /* optional */ }
+  try { window.claude?.hot?.snapshot?.(() => ({ player: { x: player.x, y: player.y, dir: player.dir }, started, tasksDone: [...tasks.done] })); } catch (_) { /* optional */ }
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(boot); else boot(hot?.data ?? {});
 })();

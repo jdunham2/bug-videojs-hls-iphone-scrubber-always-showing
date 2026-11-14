@@ -14,6 +14,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Throw | F | "throw" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
+| Show / hide to-do list | T | "To-do" tab |
 | Mute sound | N | — |
 
 ## What's in the slice
@@ -36,6 +37,15 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - Chitter near them or hit them with a thrown item and they jump, dropping whatever they carry. Hit them with
     something that isn't theirs and they chase you off
   - Toby plays with his beach ball; Rosa and Mrs. Fennick complain when their pie/sandwich/hat is missing
+- **Mischief to-do list**: 16 tasks on a notepad (Easy / Medium / Hard / Final), crossed off with a scribble,
+  a toast and a jingle; a "Village ransacked!" screen with your time when everything's done
+  - Easy: pull up a carrot, steal Rosa's pie, make someone jump, kick Toby's ball, throw something in the pond
+  - Medium: ball into the pond, bonk Mrs. Fennick, make Bertram drop what he's carrying, escape a chase, pull up 5 crops
+  - Hard: ruin the picnic, steal the hat from under her nose, get chased by two villagers at once, empty the garden,
+    stash 5 things in your hideout
+  - Final (unlocks last): have a feast (pie, sandwich and an apple in your hideout)
+- **Hideout**: a hollow log in a clearing by the west road. Things in its nest count as stashed; villagers won't
+  take them back and won't follow you in, so it's also a safe spot to end a chase
 - Smooth camera with look-ahead, minimap, drifting cloud shadows, butterflies that flee, running dust
 
 ## Code layout (`game.js`)
@@ -43,6 +53,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Items**: `ITEM` table (name, size, heavy, floats, draw), `placeItems()`, `updateItems()` physics, `grabOrDrop()` / `throwHeld()`
 - **Villagers**: `VILLAGER_DEFS` (looks, speeds, routine stops, lines), `updateVillagers()` state machine
   (route → act, chase, fetch, return, sulk, startled), `findPath()` A* over the `nav` grid, `canSee()`
+- **To-do list**: `TASKS` table, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
+  polled conditions; notepad markup + styles live in `index.html`
 - **Objects**: `make*()` factories return `{x, y, hitbox, bounds, draw, shadow}`; add new props here
 - **Player**: `updatePlayer()` (movement/collision) and `drawRaccoon*()` (rendering)
 - **Render**: `render()` draws ground → shadows → y-sorted objects → UI

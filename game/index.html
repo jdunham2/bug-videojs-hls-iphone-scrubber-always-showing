@@ -1,6 +1,6 @@
 <title>Mischief Lane</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Nunito:wght@600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Nunito:wght@600;800&family=Patrick+Hand&display=swap">
 <style>
   /* Layout: full-bleed canvas world; HUD plates float in the corners, clear of safe areas. */
   :root {
@@ -39,6 +39,10 @@
     line-height: 1.45;
     max-width: calc(100vw - 24px);
     pointer-events: none;
+  }
+  @media (max-width: 640px) {
+    .hud { max-width: calc(100vw - 150px); font-size: 12px; }
+    .hud h1 { font-size: 19px; }
   }
   .hud h1 {
     margin: 0;
@@ -89,8 +93,116 @@
   #grab.ready { color: var(--accent); border-color: var(--accent); }
   #throw { color: var(--accent); }
 
+  /* ---- Mischief to-do notepad ---- */
+  .todo {
+    --paper: #fbf5e2;
+    --rule: rgba(80, 110, 160, 0.22);
+    --margin: rgba(214, 74, 74, 0.45);
+    --pen: #2c3d63;
+    --pen-done: #8a8678;
+    --font-hand: "Patrick Hand", "Comic Sans MS", cursive;
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    width: min(272px, calc(100vw - 24px));
+    display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+    z-index: 2;
+  }
+  .todo-tab {
+    font-family: var(--font-display); font-size: 17px; letter-spacing: 0.02em;
+    color: var(--accent);
+    background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 10px;
+    padding: 6px 12px; cursor: pointer;
+    display: inline-flex; gap: 8px; align-items: baseline;
+  }
+  .todo-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #todo-count { font-family: var(--font-body); font-weight: 800; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .todo-paper {
+    display: none;
+    width: 100%;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    background:
+      linear-gradient(90deg, transparent 30px, var(--margin) 30px, var(--margin) 31.5px, transparent 31.5px),
+      repeating-linear-gradient(180deg, transparent 0 22px, var(--rule) 22px 23px),
+      var(--paper);
+    background-position: 0 0, 0 13px, 0 0;
+    color: var(--pen);
+    font-family: var(--font-hand);
+    border-radius: 4px 4px 10px 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(0,0,0,0.2);
+    padding: 6px 12px 12px 40px;
+    transform: rotate(0.6deg);
+    pointer-events: auto;
+  }
+  .todo.open .todo-paper { display: block; }
+  .todo-paper h2 { margin: 2px 0 0; font-family: var(--font-hand); font-weight: 400; font-size: 23px; line-height: 30px; color: var(--pen); }
+  #todo-list { list-style: none; margin: 0; padding: 0; }
+  #todo-list .tier {
+    font-family: var(--font-body); font-weight: 800; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #b25a3a; line-height: 23px; margin-left: -2px;
+  }
+  .task { position: relative; display: flex; align-items: flex-start; gap: 7px; font-size: 16.5px; line-height: 23px; }
+  .task .box {
+    flex: none; width: 11px; height: 11px; border: 1.6px solid var(--pen); border-radius: 2px;
+    margin-top: 5px; transform: rotate(-3deg);
+  }
+  .task .txt { flex: 1; min-width: 0; }
+  .task .prog { flex: none; font-size: 15px; color: #b25a3a; font-variant-numeric: tabular-nums; }
+  .task .scribble {
+    position: absolute; left: 16px; right: 0; top: 7px; height: 10px; width: calc(100% - 16px);
+    fill: none; stroke: #c43f3f; stroke-width: 2.4; stroke-linecap: round;
+    stroke-dasharray: 130; stroke-dashoffset: 130; vector-effect: non-scaling-stroke; overflow: visible;
+  }
+  .task.done { color: var(--pen-done); }
+  .task.done .box { border-color: var(--pen-done); background: linear-gradient(135deg, transparent 45%, #c43f3f 45% 60%, transparent 60%); }
+  .task.done .scribble { stroke-dashoffset: 0; }
+  .task.fresh .scribble { transition: stroke-dashoffset 0.6s ease-out; }
+  .task.locked { color: var(--pen-done); font-style: italic; }
+  .task.locked .box { border-style: dashed; border-color: var(--pen-done); }
+  @media (prefers-reduced-motion: reduce) { .task.fresh .scribble { transition: none; } }
+
+  /* ---- "Done!" toast ---- */
+  .toast {
+    position: fixed; left: 50%;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    transform: translateX(-50%);
+    background: #fbf5e2; color: #2c3d63;
+    border-radius: 10px; padding: 8px 16px 9px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    pointer-events: none; z-index: 3;
+    max-width: calc(100vw - 32px); text-align: center;
+  }
+  .toast.show { animation: toast-in 0.35s cubic-bezier(.2,1.6,.4,1); }
+  .toast .label { font-family: var(--font-body); font-weight: 800; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #c43f3f; }
+  .toast .what { font-family: "Patrick Hand", cursive; font-size: 21px; line-height: 1.15; text-decoration: line-through; text-decoration-color: #c43f3f; text-decoration-thickness: 2px; }
+  @keyframes toast-in { from { transform: translate(-50%, -30px) scale(0.8); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .toast.show { animation: none; } }
+  @media (max-width: 640px) { .toast { top: calc(64px + env(safe-area-inset-top, 0px)); } }
+
+  /* ---- Win screen ---- */
+  #win {
+    position: fixed; inset: 0; display: grid; place-items: center; z-index: 4;
+    background: radial-gradient(ellipse at center, rgba(20, 30, 16, 0.45), rgba(20, 30, 16, 0.82));
+  }
+  #win .card { text-align: center; padding: 24px 28px; max-width: 440px; }
+  #win h2 {
+    margin: 0; font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(42px, 10vw, 72px); line-height: 1; color: var(--accent);
+    text-shadow: 0 4px 0 #6b3d10, 0 8px 24px rgba(0,0,0,0.4); text-wrap: balance;
+  }
+  #win p { margin: 14px 0 0; font-size: 17px; }
+  #win-time { font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+  #win button {
+    margin-top: 22px; font-family: var(--font-display); font-size: 20px; color: #3a2a1a;
+    background: var(--accent); border: 0; border-radius: 999px; padding: 10px 24px; cursor: pointer;
+    box-shadow: 0 4px 0 #9a5a12;
+  }
+  #win button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
   #start {
-    position: fixed; inset: 0;
+    position: fixed; inset: 0; z-index: 5;
     display: grid; place-items: center;
     background: radial-gradient(ellipse at center, rgba(20, 30, 16, 0.35), rgba(20, 30, 16, 0.75));
     cursor: pointer;
@@ -122,7 +234,7 @@
 
 <div class="hud" id="hud">
   <h1>Mischief Lane</h1>
-  <div class="keys desktop-only"><kbd>WASD</kbd>/<kbd>Arrows</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> chitter<br><kbd>E</kbd> grab / drop · <kbd>F</kbd> throw · <kbd>M</kbd> map · <kbd>N</kbd> sound</div>
+  <div class="keys desktop-only"><kbd>WASD</kbd>/<kbd>Arrows</kbd> walk · <kbd>Shift</kbd> run · <kbd>Space</kbd> chitter<br><kbd>E</kbd> grab / drop · <kbd>F</kbd> throw · <kbd>T</kbd> to-do · <kbd>M</kbd> map · <kbd>N</kbd> sound</div>
   <div class="keys touch-only">Drag anywhere to walk · push far to run</div>
 </div>
 
@@ -136,9 +248,27 @@
   <div class="card">
     <h2>Mischief Lane</h2>
     <p>You're a raccoon. There's a whole village full of other people's stuff.</p>
-    <p class="sub">Grab it. Don't get caught.</p>
+    <p class="sub">Grab it. Don't get caught. Work through your to-do list.</p>
     <span class="go desktop-only">Press any key to start</span>
     <span class="go touch-only">Tap to start</span>
+  </div>
+</div>
+
+<aside class="todo" id="todo" aria-label="Mischief to-do list">
+  <button id="todo-toggle" class="todo-tab" type="button" aria-controls="todo-paper">To-do <span id="todo-count">0/16</span></button>
+  <div class="todo-paper" id="todo-paper">
+    <h2>Things to do</h2>
+    <ul id="todo-list"></ul>
+  </div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<div id="win" hidden>
+  <div class="card">
+    <h2>Village ransacked!</h2>
+    <p>Every task done in <span id="win-time">0:00</span>. The villagers will be talking about this for weeks.</p>
+    <button id="win-close" type="button">Keep causing trouble</button>
   </div>
 </div>
 
