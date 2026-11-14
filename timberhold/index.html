@@ -88,9 +88,21 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 #code:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 #netinfo{margin-top:4px;color:var(--leaf)}
 #gbtns{display:flex;gap:6px;margin-top:8px}#gbtns .btn{padding:4px 8px;font-size:12px}
+details.help{border-top:1px solid var(--line);padding-top:12px}
+details.help summary{cursor:pointer;font-weight:600;color:var(--bone);font-size:15px}
+details.help summary:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+details.help[open] summary{margin-bottom:10px}
+.mappick select{background:#0d130e;color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 14px var(--ui);padding:8px 10px;max-width:100%}
+.mappick select:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+#mapnote{text-transform:none;letter-spacing:0;font-size:13px}
 .go{justify-self:start;background:var(--ember);color:#1b1206;border:0;border-radius:6px;font:700 18px var(--display);padding:12px 26px;cursor:pointer}
 .go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
+#swap{position:absolute;right:max(34px,calc(env(safe-area-inset-right,0px) + 14px));width:56px;height:56px;border-radius:50%;font:700 12px var(--ui);background:var(--panel);color:var(--bone);border:1px solid var(--line);pointer-events:auto}
+.gsum{display:none;color:var(--ember)}
 @media (max-width:640px){
+  #goals{margin-left:auto;max-width:132px}#goals ul{display:none}.gsum{display:inline}
+  #minimap{margin-top:6px}#gbtns{flex-wrap:wrap}#gbtns .btn{padding:4px 7px;font-size:11px}
+  #act{width:76px;height:76px}
   #goals{max-width:150px}#goals ul{font-size:11.5px}
   #stats,#clock{min-width:120px}
   .tool{min-width:64px;padding:5px 7px}
@@ -116,7 +128,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <div id="boss" hidden><div class="lbl" id="bossname"></div><div class="bar"><i id="bossbar"></i></div></div>
       </div>
       <div class="panel" id="goals">
-        <div class="lbl">The house</div>
+        <div class="lbl">The house <span class="gsum" id="gsum"></span></div>
         <ul>
           <li id="g1">Wall in a room</li>
           <li id="g2">Hang a door</li>
@@ -132,6 +144,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       <div id="bars"><div id="stable"></div><div id="weapons"></div><div id="tools"></div></div>
       <div id="side">
         <button class="btn" id="craftmenu" type="button">Craft menu (J)</button>
+        <button class="btn" id="ridebtn" type="button" hidden>Ride (B)</button>
         <button class="btn" id="barsbtn" type="button">Hide bars (I)</button>
         <button class="btn" id="eat" type="button">Eat meat (E)</button>
         <button class="btn" id="mkarrows" type="button">Arrows ×6 · 2 wood 1 stone (R)</button>
@@ -166,12 +179,33 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
       </div>
     </div>
     <button id="act" type="button" hidden>Hit</button>
+    <button id="swap" type="button" hidden>Swap</button>
   </div>
 
   <div class="screen" id="start">
     <div class="card">
       <h1>Timber<em>hold</em></h1>
       <p>You are alone in a clearing with an axe. Every night the forest sends more against you: wolves and snakes, then crows that fly over walls, boars, cougars, bears and moose. A boss leads each night from the second on, and every map has its own line-up. Chop trees, quarry stone and raise a house around yourself before dark. A walled room with a door and a bed, still standing after the fifth night, wins.</p>
+      <div class="row">
+        <button class="go" id="startbtn" type="button">New game</button>
+        <button class="btn" id="contbtn" type="button" hidden>Continue</button>
+      </div>
+      <div class="row mappick"><label class="lbl" for="mapsel">Map</label><select id="mapsel"></select><span class="lbl" id="mapnote"></span></div>
+      <div class="row"><button class="btn" id="gfxbtn" type="button">Graphics: High</button><span class="lbl" id="gfxnote">Low is smoother on phones and older computers.</span></div>
+      <details class="help" id="mapmore"><summary>Browse all maps</summary><div class="row" id="maps"></div></details>
+      <div class="mp">
+        <div class="lbl">Play with friends</div>
+        <p id="mpnote">Checking whether friends can join…</p>
+        <div class="row" id="mprow" hidden>
+          <button class="btn" id="hostbtn" type="button">Host a new game</button>
+          <button class="btn" id="hostsaved" type="button" hidden>Host my saved game</button>
+          <input id="code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Game code">
+          <button class="btn" id="joinbtn" type="button">Join</button>
+        </div>
+        <div class="row" id="open"></div>
+      </div>
+      <details class="help" id="help">
+        <summary>How to play</summary>
       <dl class="keys">
         <dt>WASD / arrows</dt><dd>Move. On a phone, drag anywhere to move.</dd>
         <dt>Mouse / Space</dt><dd>Use the weapon in hand. Only the axe chops trees and rocks; rocks also give iron.</dd>
@@ -186,24 +220,7 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
         <dt>1 – 9, 0, L, X</dt><dd>The crystal ward and bone fence have no key; click them. Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
         <dt>E · C · P · M · K</dt><dd>Eat meat to heal · craft a flint axe · pause · mute · save. The game also saves itself every dawn.</dd>
       </dl>
-      <div class="row"><button class="btn" id="gfxbtn" type="button">Graphics: High</button><span class="lbl" id="gfxnote">Low is smoother on phones and older computers.</span></div>
-      <div class="lbl">Map</div>
-      <div class="row" id="maps"></div>
-      <div class="row">
-        <button class="go" id="startbtn" type="button">New game</button>
-        <button class="btn" id="contbtn" type="button" hidden>Continue</button>
-      </div>
-      <div class="mp">
-        <div class="lbl">Play with friends</div>
-        <p id="mpnote">Checking whether friends can join…</p>
-        <div class="row" id="mprow" hidden>
-          <button class="btn" id="hostbtn" type="button">Host a new game</button>
-          <button class="btn" id="hostsaved" type="button" hidden>Host my saved game</button>
-          <input id="code" maxlength="4" placeholder="CODE" autocomplete="off" aria-label="Game code">
-          <button class="btn" id="joinbtn" type="button">Join</button>
-        </div>
-        <div class="row" id="open"></div>
-      </div>
+      </details>
     </div>
   </div>
   <div class="screen" id="end" hidden>
@@ -1277,6 +1294,9 @@ function quit(msg) { // save, leave any shared game, and go back to the menu
 function menuNote(msg) { menuMsg = msg; refreshMenu(); }
 function refreshMenu() {
   $('contbtn').hidden = !savedGame; if (savedGame) $('contbtn').textContent = 'Continue · ' + (MAPS[savedGame.map] || MAPS.forest).name + ', day ' + savedGame.day;
+  const ms = $('mapsel');
+  if (ms.options.length !== Object.keys(MAPS).length) { ms.textContent = ''; for (const k in MAPS) { const o = document.createElement('option'); o.value = k; o.textContent = MAPS[k].name; ms.appendChild(o); } }
+  ms.value = selMap; $('mapnote').textContent = MAPS[selMap].note;
   const mb = $('maps'); mb.textContent = '';
   for (const k in MAPS) { const b = document.createElement('button'); b.type = 'button'; b.className = 'tool' + (k === selMap ? ' sel' : ''); b.textContent = MAPS[k].name; const sm = document.createElement('small'); sm.textContent = MAPS[k].note; b.appendChild(sm); b.addEventListener('click', () => { selMap = k; refreshMenu(); }); mb.appendChild(b); }
   $('hostsaved').hidden = !savedGame; $('mprow').hidden = !lobby;
@@ -1352,8 +1372,7 @@ function updPlayer(dt) {
   if (interior[pty * W + ptx] && houseDone()) P.hp = Math.min(P.max, P.hp + 1.5 * dt);
 
   // structures
-  for (const s of grid) {
-    if (!s) continue;
+  for (const s of liveS) {
     if (s.flash > 0) s.flash -= dt;
     if (s.type === 'fire' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 110) P.hp = Math.min(P.max, P.hp + 4 * dt);
     const fm = FARMS[s.type];
@@ -1364,14 +1383,16 @@ function updPlayer(dt) {
     if (s.type === 'brazier' && dist(s.tx * T + T / 2, s.ty * T + T / 2, P.x, P.y) < 160) P.hp = Math.min(P.max, P.hp + 6 * dt);
   }
 }
+let liveS = []; // standing structures, rebuilt once per update and once per render
 function update(dt) {
+  liveS = grid.filter(Boolean);
   if ((G.saveT = (G.saveT || 45) - dt) <= 0) { G.saveT = 45; saveGame(true); }
   if (client()) { netPoll(dt); if (!running) return; updDark(dt); updPlayer(dt); clientAnimals(dt); updOthers(dt); updFx(dt); netSend(dt); return; }
   if (multi()) netPoll(dt);
   if (updClock(dt)) return;
   updDark(dt); updPlayer(dt); if (!running) return;
   if (multi() && players().length === 0) return end(false); // everyone is down at once
-  for (const s of grid) { // turrets pick off the nearest hostile animal
+  for (const s of liveS) { // turrets pick off the nearest hostile animal
     const gun = s && GUNS[s.type]; if (!gun || (s.cdT = (s.cdT || 0) - dt) > 0) continue;
     const x = s.tx * T + 24, y = s.ty * T + 24; let best = null, bd = gun.range;
     for (const a of animals) { if (A[a.type].passive || a.flee) continue; const d = dist(a.x, a.y, x, y); if (d < bd) { bd = d; best = a; } }
@@ -1385,7 +1406,7 @@ function update(dt) {
   for (const o of rocks) { if (o.dead && (o.dead -= dt) <= 0) { o.dead = 0; o.hp = o.max; } if (o.shake > 0) o.shake -= dt; }
 
   // animals
-  const wards = grid.filter(s => s && s.type === 'ward'), scares = grid.filter(s => s && s.type === 'scarecrow');
+  const wards = liveS.filter(s => s.type === 'ward'), scares = liveS.filter(s => s.type === 'scarecrow');
   for (let i = animals.length - 1; i >= 0; i--) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
@@ -1552,7 +1573,7 @@ function applyQuality() {
   const sz = HIGH ? 4096 : 1024; sun.shadow.mapSize.set(sz, sz); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   pineM.castShadow = oakM.castShadow = HIGH; if (G) tuftM.count = tuftCount();
   if (wxPts) wxPts.visible = HIGH;
-  $('gfxbtn').textContent = 'Graphics: ' + (HIGH ? 'High' : 'Low');
+  $('gfxbtn').textContent = 'Graphics: ' + (HIGH ? 'High' : 'Low'); if (vw) resize();
   try { localStorage.setItem('timberhold-gfx', HIGH ? 'high' : 'low'); } catch (e) {}
 }
 function spriteTex() { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 2, 32, 32, 30); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.45, 'rgba(255,255,255,.6)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); }
@@ -1650,7 +1671,7 @@ function buildMinimap() {
 function drawMinimap() {
   const el = $('minimap'); if (!mmBg || !el) return; const x = el.getContext('2d'), k = 180 / WORLD;
   x.drawImage(mmBg, 0, 0);
-  x.fillStyle = '#e0b676'; for (const s of grid) if (s && B[s.type].solid) x.fillRect(s.tx * T * k, s.ty * T * k, 1.6, 1.6);
+  x.fillStyle = '#e0b676'; for (const s of liveS) if (B[s.type].solid) x.fillRect(s.tx * T * k, s.ty * T * k, 1.6, 1.6);
   for (const a of animals) { if (A[a.type].passive) continue; const b = isBoss(a), r = b ? 3.5 : 1.3; x.fillStyle = b ? '#ff3b2a' : 'rgba(255,110,90,.85)'; x.fillRect(a.x * k - r, a.y * k - r, r * 2, r * 2); }
   x.fillStyle = '#7fd8f0'; for (const o of NET.others.values()) { x.beginPath(); x.arc(o.x * k, o.y * k, 3, 0, TAU); x.fill(); }
   x.save(); x.translate(P.x * k, P.y * k); x.rotate(P.ang); x.fillStyle = '#ffffff'; x.strokeStyle = '#000'; x.lineWidth = 1;
@@ -1962,21 +1983,32 @@ function syncWorld() { // (re)build the per-game instances after reset()
   for (let i = 0; i < 1500; i++) flowerM.setColorAt(i, C(m.flowers[i % m.flowers.length]));
   tuftM.count = tuftCount(); tuftM.instanceColor.needsUpdate = flowerM.instanceColor.needsUpdate = true;
   trees.forEach((o, i) => {
-    o.i = i; o.oak = RNG() < m.oak; o.ci = o.oak ? no++ : np++; o.rot = rnd(0, TAU); o.th = o.oak ? o.r * 1.5 : o.r * .95; o.vis = 1; o.sig = -1;
-    (o.oak ? oakM : pineM).setColorAt(o.ci, o.oak ? HSL(m.oakc[0] + o.hue, m.oakc[1] + rnd(-6, 6), m.oakc[2] + rnd(-4, 4)) : HSL(m.pine[0] + o.hue, m.pine[1] + rnd(-5, 5), m.pine[2] + rnd(-3, 4)));
+    o.i = i; o.oak = RNG() < m.oak; o.rot = rnd(0, TAU); o.th = o.oak ? o.r * 1.5 : o.r * .95; o.vis = 1; o.sig = -1; o.mT = new Float32Array(16); o.mC = new Float32Array(16);
+    o.col = (o.oak ? HSL(m.oakc[0] + o.hue, m.oakc[1] + rnd(-6, 6), m.oakc[2] + rnd(-4, 4)) : HSL(m.pine[0] + o.hue, m.pine[1] + rnd(-5, 5), m.pine[2] + rnd(-3, 4)));
   });
-  trunkM.count = trees.length; pineM.count = np; oakM.count = no; pineM.instanceColor.needsUpdate = oakM.instanceColor.needsUpdate = true;
   rocks.forEach((o, i) => { o.i = i; o.rot = rnd(0, TAU); o.sig = -1; const oc = ORE_COL[o.ore]; rockM.setColorAt(i, oc ? HSL(oc[0] + rnd(-4, 4), oc[1], oc[2] + rnd(-5, 5)) : HSL(rnd(60, 100), rnd(2, 7), rnd(44, 58))); });
   rockM.count = rocks.length; rockM.instanceColor.needsUpdate = true; floorDirty = true;
   buildPonds(); setupWeather(); buildMinimap();
 }
+const viewBox = {x0: -1400, x1: 1400, z0: -1400, z1: 1200};
+function measureView() { // where the screen corners meet the ground, relative to the camera target, plus room for shadows
+  camera.position.set(0, camDist * .86, camDist * .51); camera.lookAt(0, 18, 0); camera.updateMatrixWorld();
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for (const [nx, ny] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    ray.setFromCamera({x: nx, y: ny}, camera);
+    const hit = ray.ray.intersectPlane(groundPlane, v3) ? v3.clone() : new THREE.Vector3(nx * 2500, 0, -2500);
+    x0 = Math.min(x0, hit.x); x1 = Math.max(x1, hit.x); z0 = Math.min(z0, hit.z); z1 = Math.max(z1, hit.z);
+  }
+  Object.assign(viewBox, {x0: x0 - 260, x1: x1 + 320, z0: z0 - 260, z1: z1 + 320});
+}
 function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer:coarse)').matches ? 1.5 : 2); vw = cv.clientWidth || 1; vh = cv.clientHeight || 1;
+  const coarse = matchMedia('(pointer:coarse)').matches;
+  dpr = Math.min(window.devicePixelRatio || 1, coarse ? (HIGH ? 1.5 : 1.1) : (HIGH ? 1.75 : 1.25)); vw = cv.clientWidth || 1; vh = cv.clientHeight || 1;
   renderer.setPixelRatio(dpr); renderer.setSize(vw, vh, false);
   if (composer) { composer.setPixelRatio(dpr); composer.setSize(vw, vh); }
   ov.width = Math.round(vw * dpr); ov.height = Math.round(vh * dpr);
   camera.aspect = vw / vh; camDist = 780 * clamp(1.3 / camera.aspect, 1, 1.9); camera.updateProjectionMatrix();
-  setFog();
+  setFog(); measureView();
 }
 function structMesh(s) {
   const g = new THREE.Group(), m = new THREE.Mesh(GEO[s.type], vmat); m.castShadow = m.receiveShadow = true; g.add(m);
@@ -2018,17 +2050,26 @@ function render(now, dt) {
   camera.updateMatrixWorld();
 
   // trees and rocks: only touch instances that changed
-  let tu = false, ru = false;
-  for (const o of trees) {
+  let ru = false, tN = 0, pN = 0, oN = 0;
+  const tA = trunkM.instanceMatrix.array, pA = pineM.instanceMatrix.array, oA = oakM.instanceMatrix.array, pC = pineM.instanceColor.array, oC = oakM.instanceColor.array;
+  for (const o of trees) { // only trees in (or casting shadows into) the view are drawn
+    const dx = o.x - cam.x, dz = o.y - cam.y;
+    if (dx < viewBox.x0 || dx > viewBox.x1 || dz < viewBox.z0 || dz > viewBox.z1) continue;
     const hide = !o.dead && o.y > P.y + 4 && o.y - P.y < o.r * 3.4 && Math.abs(o.x - P.x) < o.r * 1.15;
     o.vis += ((hide ? .32 : 1) - o.vis) * Math.min(1, dt * 9);
     const sig = (o.dead ? 9 : 0) + Math.max(0, o.shake) + Math.round(o.vis * 200);
-    if (sig === o.sig) continue; o.sig = sig; tu = true;
-    const w = o.shake > 0 ? Math.sin(o.shake * 80) * .07 : 0, s = o.r / 30;
-    dummy.position.set(o.x, 0, o.y); dummy.rotation.set(w, o.rot, w); dummy.scale.set(s, o.dead ? 9 : o.th, s); dummy.updateMatrix(); trunkM.setMatrixAt(o.i, dummy.matrix);
-    dummy.position.y = o.th * .72; dummy.scale.setScalar(o.dead ? .0001 : s * o.vis); dummy.updateMatrix(); (o.oak ? oakM : pineM).setMatrixAt(o.ci, dummy.matrix);
+    if (sig !== o.sig) {
+      o.sig = sig; const w = o.shake > 0 ? Math.sin(o.shake * 80) * .07 : 0, sc = o.r / 30;
+      dummy.position.set(o.x, 0, o.y); dummy.rotation.set(w, o.rot, w); dummy.scale.set(sc, o.dead ? 9 : o.th, sc); dummy.updateMatrix(); dummy.matrix.toArray(o.mT);
+      dummy.position.y = o.th * .72; dummy.scale.setScalar(sc * o.vis); dummy.updateMatrix(); dummy.matrix.toArray(o.mC);
+    }
+    tA.set(o.mT, tN++ * 16);
+    if (o.dead) continue;
+    if (o.oak) { oA.set(o.mC, oN * 16); oC[oN * 3] = o.col.r; oC[oN * 3 + 1] = o.col.g; oC[oN * 3 + 2] = o.col.b; oN++; }
+    else { pA.set(o.mC, pN * 16); pC[pN * 3] = o.col.r; pC[pN * 3 + 1] = o.col.g; pC[pN * 3 + 2] = o.col.b; pN++; }
   }
-  if (tu) trunkM.instanceMatrix.needsUpdate = pineM.instanceMatrix.needsUpdate = oakM.instanceMatrix.needsUpdate = true;
+  trunkM.count = tN; pineM.count = pN; oakM.count = oN;
+  trunkM.instanceMatrix.needsUpdate = pineM.instanceMatrix.needsUpdate = oakM.instanceMatrix.needsUpdate = pineM.instanceColor.needsUpdate = oakM.instanceColor.needsUpdate = true;
   for (const o of rocks) {
     const sig = (o.dead ? 9 : 0) + Math.max(0, o.shake); if (sig === o.sig) continue; o.sig = sig; ru = true;
     const s = o.dead ? o.r * .3 : o.r * 1.25; dummy.position.set(o.x + (o.shake > 0 ? Math.sin(o.shake * 80) * 2 : 0), 0, o.y); dummy.rotation.set(0, o.rot, 0); dummy.scale.setScalar(s); dummy.updateMatrix(); rockM.setMatrixAt(o.i, dummy.matrix);
@@ -2037,9 +2078,8 @@ function render(now, dt) {
 
   // structures
   for (let i = smeshes.length - 1; i >= 0; i--) { const s = smeshes[i]; if (grid[s.ty * W + s.tx] !== s) { scene.remove(s.mesh); smeshes.splice(i, 1); } }
-  const fires = [];
-  for (const s of grid) {
-    if (!s) continue;
+  const fires = []; liveS = grid.filter(Boolean);
+  for (const s of liveS) {
     if (!s.mesh) { s.mesh = structMesh(s); s.pop = .25; scene.add(s.mesh); smeshes.push(s); }
     if (s.pop > 0) s.pop -= dt;
     const sc = 1 + Math.max(0, s.flash) * .5 - Math.max(0, s.pop) * 1.6; s.mesh.scale.set(1 + Math.max(0, s.flash) * .4, sc, 1 + Math.max(0, s.flash) * .4);
@@ -2199,6 +2239,9 @@ function hud() {
   $('eat').hidden = P.meat < 1; $('craft').hidden = P.flint || P.gaxe || P.stone < 1;
   $('mkarrows').hidden = !(P.owned.bow || P.owned.crossbow || P.owned.bbow || P.owned.frostbow); $('mkbullets').hidden = !(P.owned.pistol || P.owned.shotgun || P.owned.rifle || P.owned.smg || P.owned.revolver || P.owned.dual || P.owned.burst || P.owned.sniper || P.owned.musket || P.owned.minigun);
   $('mkarmor').hidden = P.armor || G.nights < 2; $('mkgren').hidden = G.nights < 4; $('throw').hidden = P.grenades < 1; $('throw').textContent = 'Throw grenade (G) ×' + P.grenades;
+  $('ridebtn').hidden = !P.vehicle; if (P.vehicle) $('ridebtn').textContent = P.riding ? 'Get off (B)' : 'Ride (B)';
+  const gl = ['g1', 'g2', 'g3', 'g4'].filter(id => $(id).className === 'ok').length; $('gsum').textContent = gl + '/4';
+  if (touchMode) { const top = $('bottom').getBoundingClientRect().top, h = innerHeight - top + 14; $('act').style.bottom = h + 'px'; $('swap').style.bottom = (h + 90) + 'px'; }
   $('act').textContent = tool === 'axe' ? (WPN[P.weapon].ammo ? 'Fire' : 'Hit') : tool === 'remove' ? 'Remove' : 'Build';
 }
 function end(won) {
@@ -2212,8 +2255,18 @@ function end(won) {
     : `You fell on ${G.phase === 'night' ? 'night' : 'day'} ${G.day} after surviving ${G.nights} night${G.nights === 1 ? '' : 's'} and fighting off ${G.kills} animals. Walls first, then a door, then the bed.`;
   won ? snd(520, .5, 'triangle', .08, 400) : snd(200, .8, 'sawtooth', .07, -150);
 }
+const perf = {t: 0, n: 0, done: false};
+function watchSpeed(dt) { // if High graphics run slowly, drop to Low once, unless the player picked High themselves
+  if (perf.done || !running) return;
+  perf.t += dt; perf.n++;
+  if (perf.t < 4) { perf.n = 0; return; }
+  if (perf.t < 10) return;
+  perf.done = true; const fps = perf.n / (perf.t - 4);
+  let chosen = false; try { chosen = !!localStorage.getItem('timberhold-gfx-chosen'); } catch (e) {}
+  if (HIGH && fps < 28 && !chosen) { HIGH = false; applyQuality(); toast('Switched to Low graphics so the game runs smoother. You can change it on the start screen.'); }
+}
 function frame(now) {
-  const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
+  const raw = (now - last) / 1000 || 0, dt = Math.min(.05, raw); last = now; watchSpeed(Math.min(raw, .5));
   if (running && !paused) { update(dt); if ((hudT -= dt) <= 0) { hudT = .1; if (running) hud(); } }
   render(now, dt); requestAnimationFrame(frame);
 }
@@ -2247,12 +2300,12 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX - cv.getBoundingClientRect().left; mouse.y = e.clientY - cv.getBoundingClientRect().top; touchMode = false; $('act').hidden = true; });
+cv.addEventListener('mousemove', e => { mouse.x = e.clientX - cv.getBoundingClientRect().left; mouse.y = e.clientY - cv.getBoundingClientRect().top; touchMode = false; $('act').hidden = true; $('swap').hidden = true; });
 cv.addEventListener('mousedown', e => { if (e.button === 2) { tool = 'axe'; hud(); return; } mouse.down = mouse.fresh = true; });
 addEventListener('mouseup', () => { mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('touchstart', e => {
-  e.preventDefault(); touchMode = true; $('act').hidden = false;
+  e.preventDefault(); touchMode = true; $('act').hidden = false; $('swap').hidden = false;
   if (stick.id === null) { const t = e.changedTouches[0], r = cv.getBoundingClientRect(); stick.id = t.identifier; stick.ox = t.clientX - r.left; stick.oy = t.clientY - r.top; stick.dx = stick.dy = 0; }
 }, {passive: false});
 cv.addEventListener('touchmove', e => {
@@ -2265,13 +2318,16 @@ cv.addEventListener('touchmove', e => {
 const endTouch = e => { for (const t of e.changedTouches) if (t.identifier === stick.id) { stick.id = null; stick.dx = stick.dy = 0; } };
 cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
 const act = $('act');
+$('swap').addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; if (running) cycleWeapon(1); }, {passive: false});
+$('swap').addEventListener('click', () => { if (running) cycleWeapon(1); });
 act.addEventListener('touchstart', e => { e.preventDefault(); touchMode = true; actDown = actFresh = true; }, {passive: false});
 act.addEventListener('touchend', e => { e.preventDefault(); actDown = false; });
 act.addEventListener('touchcancel', () => { actDown = false; });
 $('mkarrows').addEventListener('click', () => makeAmmo('arrows')); $('mkbullets').addEventListener('click', () => makeAmmo('bullets'));
 cv.addEventListener('wheel', e => { e.preventDefault(); if (running) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, {passive: false});
 $('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
-$('gfxbtn').addEventListener('click', () => { HIGH = !HIGH; applyQuality(); });
+$('mapsel').addEventListener('change', e => { selMap = e.target.value; refreshMenu(); });
+$('gfxbtn').addEventListener('click', () => { HIGH = !HIGH; applyQuality(); try { localStorage.setItem('timberhold-gfx-chosen', '1'); } catch (e) {} });
 $('startbtn').addEventListener('click', () => start()); $('again').addEventListener('click', () => quit(''));
 $('contbtn').addEventListener('click', () => { if (savedGame) start(savedGame); });
 $('hostbtn').addEventListener('click', () => hostGame(null)); $('hostsaved').addEventListener('click', () => { if (savedGame) hostGame(savedGame); });
@@ -2285,14 +2341,14 @@ $('stew').addEventListener('click', stew);
   const head = document.createElement('div'); head.className = 'cmhead';
   head.innerHTML = '<span class="lbl">Craft menu</span><button class="btn" id="craftclose" type="button">Close ✕</button>';
   box.appendChild(head); box.appendChild($('stable'));
-  for (const b of [...$('side').children]) if (!['craftmenu', 'barsbtn', 'eat', 'bandage', 'throw', 'mkarrows', 'mkbullets'].includes(b.id)) box.appendChild(b);
+  for (const b of [...$('side').children]) if (!['craftmenu', 'barsbtn', 'ridebtn', 'eat', 'bandage', 'throw', 'mkarrows', 'mkbullets'].includes(b.id)) box.appendChild(b);
   $('side').appendChild(box);
   const toggle = () => { box.hidden = !box.hidden; $('craftmenu').classList.toggle('sel', !box.hidden); $('craftmenu').textContent = box.hidden ? 'Craft menu (J)' : 'Close menu (J)'; };
-  $('craftmenu').addEventListener('click', toggle); $('craftclose').addEventListener('click', toggle); window.__toggleCraft = toggle;
+  $('craftmenu').addEventListener('click', toggle); $('ridebtn').addEventListener('click', toggleRide); $('craftclose').addEventListener('click', toggle); window.__toggleCraft = toggle;
   window.__closeCraft = () => { if (!box.hidden) toggle(); };
-  const setBars = hide => { $('bars').hidden = hide; $('barsbtn').textContent = hide ? 'Show bars (I)' : 'Hide bars (I)'; $('barsbtn').classList.toggle('sel', hide); try { localStorage.setItem('timberhold-bars', hide ? '1' : ''); } catch (e) {} };
+  const setBars = hide => { $('bars').hidden = hide; $('barsbtn').textContent = hide ? 'Show bars (I)' : 'Hide bars (I)'; $('barsbtn').classList.toggle('sel', hide); try { localStorage.setItem('timberhold-bars', hide ? '1' : '0'); } catch (e) {} };
   $('barsbtn').addEventListener('click', () => setBars(!$('bars').hidden)); window.__toggleBars = () => setBars(!$('bars').hidden);
-  try { if (localStorage.getItem('timberhold-bars')) setBars(true); } catch (e) {}
+  try { const v = localStorage.getItem('timberhold-bars'); if (v === '1' || (v === null && matchMedia('(pointer:coarse)').matches)) setBars(true); } catch (e) {}
 } $('fletch').addEventListener('click', fletch);
 $('bandage').addEventListener('click', useBandage); $('mkboots').addEventListener('click', () => makeGear('boots')); $('mkvest').addEventListener('click', () => makeGear('vest'));
 $('mkarmor').addEventListener('click', makeArmor); $('mkgren').addEventListener('click', makeGrenades); $('throw').addEventListener('click', throwGrenade);
