@@ -67,7 +67,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
   background:radial-gradient(120% 90% at 50% 20%,rgba(44,26,85,.35),var(--scrim));
   padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.panel{width:100%;max-width:820px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.panel{width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
 .logo{font-family:var(--display);font-size:clamp(46px,12vw,108px);line-height:.88;margin:0;color:var(--ink);text-wrap:balance;
   text-shadow:0 6px 0 var(--coral),0 12px 0 var(--plum)}
 .logo span{color:var(--sun)}
@@ -118,7 +118,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 #windInd.warn .arrow{animation:blink .35s infinite alternate}
 @keyframes blink{to{opacity:.3}}
 /* Character select */
-.chars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%}
+.chars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%}
 .char{font-family:var(--body);color:var(--ink);background:var(--glass);border:3px solid transparent;border-radius:18px;padding:12px 14px 16px;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;transition:transform .1s,border-color .1s}
 .char:hover{transform:translateY(-3px)}
@@ -129,13 +129,13 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .stat{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;width:100%;max-width:200px;font-size:11px;font-weight:700;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .pips{display:flex;gap:3px}.pips i{flex:1;height:7px;border-radius:3px;background:rgba(203,184,232,.22)}.pips i.on{background:var(--mint)}
-.seg{display:inline-flex;background:var(--glass);border-radius:12px;padding:4px;gap:4px}
+.seg{display:inline-flex;flex-wrap:wrap;justify-content:center;background:var(--glass);border-radius:12px;padding:4px;gap:4px}
 .seg button{font-family:var(--display);font-size:14px;border:0;border-radius:9px;padding:9px 14px;background:transparent;color:var(--muted);cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--sun);color:var(--night)}
 .seg button:focus-visible,.char:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 @media (max-width:560px){ .pct{font-size:30px} .card{min-width:96px;padding:6px 10px 8px} #wave{font-size:12px}
-  .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
+  .chars{grid-template-columns:repeat(2,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
 @media (prefers-reduced-motion:reduce){ #banner.show{animation-duration:1.4s} .card.hit .pct{animation:none} }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
@@ -195,7 +195,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
       <b>JUMP / DASH</b><span>Double jump and a dodge dash (Tank-o: hold DASH to shield)</span>
     </div>
     <p class="rule">The <strong>%</strong> under each fighter is damage. Higher damage means hits send you flying farther. Fall off the island and you lose a life.</p>
-    <p class="rule">Items drop during fights. Walk over one to grab it: <strong>Hammer</strong>, <strong>Bomb</strong>, <strong>Boomerang</strong> and <strong>Banana</strong> (attack to use them), <strong>Star</strong> (6s invincible) and <strong>Heart</strong> (heals 30%).</p>
+    <p class="rule">Items drop during fights. Walk over one to grab it: <strong>Hammer</strong>, <strong>Bomb</strong>, <strong>Boomerang</strong>, <strong>Banana</strong> and <strong>Ray Gun</strong> (attack to use them), <strong>Star</strong>, <strong>Jetpack</strong>, <strong>Heart</strong> and the <strong>Mystery Box</strong> (anything could be inside).</p>
     <p class="rule" id="best"></p>
   </div>
 </section>
@@ -210,6 +210,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arSky" data-a="sky">SKY ISLE</button>
         <button id="arLava" data-a="lava">LAVA FORGE</button>
         <button id="arWind" data-a="wind">WINDY PEAKS</button>
+        <button id="arGear" data-a="gear">CLOCKWORK</button>
       </div>
     </div>
     <div class="row">
@@ -540,6 +541,72 @@ const flags = [];
   }
 })();
 
+/* ---------- Clockwork Tower: spinning gears carry you, pistons launch you ---------- */
+const GEAR_PLATFORMS = [
+  { x: 0, z: 0, y: 0, r: 12.5, solid: true, depth: 3, main: true },
+  { x: -6.2, z: -1.5, y: 2.8, r: 3, spin: .7 },
+  { x: 6.2, z: -1.5, y: 2.8, r: 3, spin: -.7 },
+  { x: 0, z: -8, y: 5, r: 2.4, spin: 1.1 },
+];
+const gearGroup = new THREE.Group(); gearGroup.visible = false; scene.add(gearGroup);
+const brass = new THREE.MeshStandardMaterial({ color: 0xc9953f, metalness: .75, roughness: .35 });
+const copper = new THREE.MeshStandardMaterial({ color: 0xb8643a, metalness: .7, roughness: .4 });
+const steel = new THREE.MeshStandardMaterial({ color: 0x7d8796, metalness: .8, roughness: .35 });
+const gearSpinners = [], pads = [], bgGears = [];
+let clockHands = null;
+function makeGear(r, h, teeth, mat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 40), mat); body.castShadow = body.receiveShadow = true; g.add(body);
+  for (let i = 0; i < teeth; i++) {
+    const a = i / teeth * Math.PI * 2, t = new THREE.Mesh(new THREE.BoxGeometry(.5, h * .9, .6), mat);
+    t.position.set(Math.cos(a) * (r + .2), 0, Math.sin(a) * (r + .2)); t.rotation.y = -a; t.castShadow = true; g.add(t);
+  }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(r * .25, r * .25, h + .06, 16), steel); g.add(hub);
+  return g;
+}
+(function buildGear() {
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 12.5, .8, 72), brass); floor.position.y = -.4; floor.receiveShadow = true; gearGroup.add(floor);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(11.6, 72), new THREE.MeshStandardMaterial({ color: 0xf3e6c8, roughness: .8 }));
+  face.rotation.x = -Math.PI / 2; face.position.y = .01; face.receiveShadow = true; gearGroup.add(face);
+  const inkMat = new THREE.MeshStandardMaterial({ color: 0x2c1a3a, roughness: .6 });
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2, big = i % 3 === 0, t = new THREE.Mesh(new THREE.BoxGeometry(big ? .5 : .25, .03, big ? 1.6 : 1), inkMat);
+    t.position.set(Math.cos(a) * 10.4, .02, Math.sin(a) * 10.4); t.rotation.y = -a + Math.PI / 2; gearGroup.add(t);
+  }
+  clockHands = new THREE.Group(); clockHands.position.y = .025;
+  const hour = new THREE.Mesh(new THREE.BoxGeometry(.5, .03, 5.5), inkMat); hour.position.z = -2.4; clockHands.add(hour);
+  const minute = new THREE.Mesh(new THREE.BoxGeometry(.3, .03, 8.5), inkMat); minute.position.z = -3.8; minute.name = 'min';
+  const minPivot = new THREE.Group(); minPivot.add(minute); minPivot.name = 'minPivot'; clockHands.add(minPivot);
+  gearGroup.add(clockHands);
+  const rimRing = new THREE.Mesh(new THREE.TorusGeometry(12.45, .2, 8, 96), copper); rimRing.rotation.x = Math.PI / 2; gearGroup.add(rimRing);
+  // the tower below
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(9, 10.5, 70, 8), new THREE.MeshStandardMaterial({ color: 0x5a4a6a, roughness: 1, flatShading: true }));
+  tower.position.y = -35.8; gearGroup.add(tower);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 9.2, 3, 40), copper); band.position.y = -2.3; gearGroup.add(band);
+  // piston pads
+  const padPts = [[-5, 3.5], [5, 3.5], [0, -.5], [-8.5, -4], [8.5, -4], [-3.2, -7.2], [3.2, -7.2], [-8.6, 4.8], [8.6, 4.8]];
+  for (const [x, z] of padPts) {
+    const ringM = new THREE.MeshStandardMaterial({ color: 0x2a2a30, emissive: 0xff3020, emissiveIntensity: 0 });
+    const ring2 = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.45, 32), ringM); ring2.rotation.x = -Math.PI / 2; ring2.position.set(x, .03, z); gearGroup.add(ring2);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.6, 24), steel); head.position.set(x, -.81, z); head.castShadow = true; gearGroup.add(head);
+    pads.push({ x, z, ringM, head, phase: 'idle', t: 0 });
+  }
+  // spinning gear platforms
+  for (const p of GEAR_PLATFORMS.slice(1)) {
+    const g = makeGear(p.r - .25, .5, Math.round(p.r * 5), p.spin > 0 ? brass : copper); g.position.set(p.x, p.y - .25, p.z);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(.25, .04, p.r * 1.6), new THREE.MeshStandardMaterial({ color: 0x2c1a3a })); stripe.position.y = .27; g.add(stripe);
+    gearGroup.add(g); gearSpinners.push({ g, spin: p.spin });
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, p.y + 1, 10), steel); axle.position.set(p.x, (p.y - .5) / 2 - .5, p.z); gearGroup.add(axle);
+  }
+  // giant background gears
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2 + rand(-.2, .2), r = rand(70, 130), size = rand(10, 24);
+    const g = makeGear(size, 2.5, Math.round(size * 1.6), Math.random() < .5 ? brass : copper);
+    g.position.set(Math.cos(a) * r, rand(-30, 30), Math.sin(a) * r); g.rotation.x = Math.PI / 2; g.lookAt(0, g.position.y, 0); g.rotateX(Math.PI / 2);
+    gearGroup.add(g); bgGears.push({ g, spin: rand(.05, .2) * (Math.random() < .5 ? -1 : 1) });
+  }
+})();
+
 // Lava cycle (seconds): calm 10, warning 2, sink 1.5, sunk 4, rise 1.5
 const LAVA_CYCLE = 19;
 const ARENAS = {
@@ -605,6 +672,51 @@ const ARENAS = {
       for (const f of flags) {
         f.rotation.y = lerpAngle(f.rotation.y, yaw, 1 - Math.exp(-4 * dt));
         f.children[0].rotation.y = Math.sin(game.simTime * (6 + this.wind * 14) + f.position.x) * (.15 + this.wind * .25);
+      }
+    },
+    danger() { return false; },
+  },
+  gear: {
+    key: 'gear', name: 'CLOCKWORK TOWER', group: gearGroup, platforms: GEAR_PLATFORMS, R: 12.5, pads,
+    colors: { top: 0x1b2440, mid: 0xf2a65a, bot: 0x2b1d3a, fog: 0x7a5a70, near: 70, far: 230, hemiS: 0xffe2c0, hemiG: 0x3a2a4a, hemiI: 1.2, sun: 0xffd8a0, sunI: 2.5, rim: 0x6fd8ff, rimI: .9 },
+    t: 0, next: 4,
+    reset() { this.t = 0; this.next = 4; for (const p of pads) { p.phase = 'idle'; p.t = 0; p.head.position.y = -.81; p.ringM.emissiveIntensity = 0; } },
+    update(dt, active) {
+      for (const s of gearSpinners) s.g.rotation.y += s.spin * dt;
+      for (const b of bgGears) b.g.rotateY(b.spin * dt);
+      clockHands.rotation.y -= dt * .05; clockHands.getObjectByName('minPivot').rotation.y -= dt * .55;
+      if (active) {
+        this.t += dt;
+        if (this.t >= this.next) {
+          this.next = this.t + Math.max(3, 5.5 - game.wave * .25);
+          const idle = pads.filter(p => p.phase === 'idle').sort(() => Math.random() - .5);
+          for (const p of idle.slice(0, 2 + (game.wave >= 5 ? 1 : 0))) { p.phase = 'warn'; p.t = 0; }
+          sfx('hiss');
+        }
+      }
+      for (const p of pads) {
+        if (p.phase === 'idle') continue;
+        p.t += dt;
+        if (p.phase === 'warn') {
+          p.ringM.emissiveIntensity = 1 + Math.sin(p.t * 25);
+          if (Math.random() < .5) emit(p.x + rand(-1, 1), .1, p.z + rand(-1, 1), 1, { color: 0xffffff, speed: .5, up: 3, life: .6, grav: -1, size: .2, drag: 1 });
+          if (p.t >= 1.2) {
+            p.phase = 'fire'; p.t = 0; sfx('piston'); game.shake = Math.max(game.shake, .3);
+            for (const f of FIGHTERS) {
+              if (!f.alive || Math.abs(f.pos.y) > .7 || Math.hypot(f.pos.x - p.x, f.pos.z - p.z) > 1.7) continue;
+              const d = 5 * f.stats.dmgTaken; f.damage += d;
+              f.vel.set(f.vel.x * .3, 22, f.vel.z * .3);
+              Object.assign(f, { state: 'hitstun', stateTime: 0, stunDur: .5, onGround: false, flash: 1, tumbleSpd: 8, atk: null, atkName: '', charging: false, charge: 0 });
+              popup(Math.round(d) + '%', new THREE.Vector3(f.pos.x, f.pos.y + 2, f.pos.z), '#ffb347', 24);
+            }
+            emit(p.x, .3, p.z, 20, { color: [0xffffff, 0xcccccc], speed: 6, flat: true, life: .5, grav: 0, size: .25 });
+          }
+        } else {
+          p.ringM.emissiveIntensity = 0;
+          const ext = p.t < .1 ? p.t / .1 : Math.max(0, 1 - (p.t - .1) / .6);
+          p.head.position.y = -.81 + ext * 1.6;
+          if (p.t > .75) { p.phase = 'idle'; p.head.position.y = -.81; }
+        }
       }
     },
     danger() { return false; },
@@ -765,6 +877,14 @@ function sfx(name, k = 1) {
       case 'slip': tone(900, 150, .35, 'sawtooth', .1); break;
       case 'zap': noise(.25, .4, 5000, 'highpass'); tone(1800, 200, .2, 'square', .12); break;
       case 'rocket': noise(.4, .3, 900, 'bandpass'); tone(120, 400, .3, 'sawtooth', .1); break;
+      case 'hiss': noise(1.1, .2, 5000, 'highpass'); break;
+      case 'piston': tone(90, 40, .25, 'square', .3); noise(.15, .4, 1500); break;
+      case 'laser': tone(1600, 500, .12, 'square', .08); break;
+      case 'box': [392, 523, 659].forEach((f, i) => tone(f, f * 1.5, .1, 'square', .08, i * .05)); break;
+      case 'jet': noise(.25, .25, 700); break;
+      case 'shock': tone(80, 30, .35, 'sine', .5); noise(.3, .3, 600); break;
+      case 'echo': noise(.14, .08, 2600, 'bandpass'); tone(700, 350, .14, 'sine', .05); break;
+      case 'clang': tone(900, 860, .25, 'triangle', .12); tone(1340, 1300, .2, 'sine', .08); break;
     }
   } catch (e) {}
 }
@@ -778,11 +898,13 @@ const ROSTER = {
   moss: { name: 'MOSS', style: 'moss', color: 0x6fbf4a, accent: 0xff7fb0, scale: 1.38, speed: 5.8, power: 1.3, weight: 1.45, fist: .28, blurb: 'Huge and hard to launch' },
   pyra: { name: 'PYRA', style: 'mage', kit: 'pyra', color: 0xff8a3d, accent: 0x5a2a8a, fx: 0xff7a2a, scale: .95, speed: 8.2, power: .95, weight: .88, fist: .16 },
   tanko: { name: 'TANK-O', style: 'robot', kit: 'tank', color: 0x8ea4bf, accent: 0xff6b3d, scale: .95, speed: 7, power: 1.1, weight: 1.3, fist: .25 },
+  whisk: { name: 'WHISK', style: 'chef', kit: 'chef', color: 0x5b8def, accent: 0xff5a6e, scale: 1, speed: 8.2, power: 1, weight: 1, fist: .18 },
 };
 const PLAYABLE = {
   nova: { role: 'Sword fighter. Fast 3-hit combo and a strong charged smash.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 2 } },
   pyra: { role: 'Fire mage. Throws fireballs from range. Up close, her charged fire burst blasts enemies away.', pips: { Speed: 3, Power: 3, Weight: 2, Range: 5 } },
   tanko: { role: 'Little robot. Hold DASH on the ground to raise a shield. Charge SMASH for a rocket punch.', pips: { Speed: 2, Power: 4, Weight: 5, Range: 3 } },
+  whisk: { role: 'Chef. Fast frying-pan combo. SMASH throws the pan, and it boomerangs back to him.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 4 } },
 };
 
 // Shared meshes for held items and pickups
@@ -831,6 +953,46 @@ function makePeel() {
     leaf.position.set(Math.cos(a) * .22, .05, Math.sin(a) * .22); leaf.rotation.set(Math.sin(a) * 1.35, 0, -Math.cos(a) * 1.35); g.add(leaf);
   }
   const tip = new THREE.Mesh(new THREE.SphereGeometry(.08, 8, 6), woodMat); tip.position.y = .1; g.add(tip);
+  return g;
+}
+const panMat = new THREE.MeshStandardMaterial({ color: 0x2a2a34, metalness: .6, roughness: .4 });
+const gunMat = new THREE.MeshStandardMaterial({ color: 0xe8ecf4, metalness: .4, roughness: .3 });
+const glowGreen = new THREE.MeshStandardMaterial({ color: 0x7dffb0, emissive: 0x2aff7a, emissiveIntensity: 1.3 });
+function makePan() {
+  const g = new THREE.Group();
+  const h = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .5, 6), woodMat); h.position.y = -.25; g.add(h);
+  const pan = new THREE.Mesh(new THREE.CylinderGeometry(.36, .3, .08, 22), panMat); pan.position.y = -.82; pan.rotation.x = Math.PI / 2; g.add(pan);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function makeRaygun() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.2, 14, 10), gunMat); body.scale.set(1, 1, 1.5); g.add(body);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.06, .09, .45, 10), gunMat); barrel.rotation.x = Math.PI / 2; barrel.position.z = .38; g.add(barrel);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), glowGreen); tip.position.z = .62; g.add(tip);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(.1, .28, .12), panMat); grip.position.set(0, -.2, -.05); g.add(grip);
+  return g;
+}
+let qTex = null;
+function makeBox() {
+  if (!qTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+    x.fillStyle = '#ffb347'; x.fillRect(0, 0, 128, 128); x.strokeStyle = '#8a4a00'; x.lineWidth = 10; x.strokeRect(5, 5, 118, 118);
+    x.fillStyle = '#fff6ea'; x.font = 'bold 92px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('?', 64, 70);
+    qTex = new THREE.CanvasTexture(c); qTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.BoxGeometry(.75, .75, .75), new THREE.MeshStandardMaterial({ map: qTex, emissive: 0x553300, emissiveIntensity: .45, roughness: .5 }));
+  m.castShadow = true; g.add(m); return g;
+}
+function makeJetpack() {
+  const g = new THREE.Group();
+  for (const s of [-1, 1]) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, .62, 12), gunMat); t.position.x = s * .18; g.add(t);
+    const n = new THREE.Mesh(new THREE.ConeGeometry(.14, .2, 12), panMat); n.position.set(s * .18, -.4, 0); n.rotation.x = Math.PI; g.add(n);
+    const c = new THREE.Mesh(new THREE.SphereGeometry(.16, 12, 8), new THREE.MeshStandardMaterial({ color: 0xff5a6e })); c.position.set(s * .18, .31, 0); c.scale.y = .6; g.add(c);
+  }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return g;
 }
 function makeHeart() {
@@ -883,6 +1045,12 @@ function buildModel(d) {
     weapon = new THREE.Group(); armR.add(weapon);
     add(new THREE.CylinderGeometry(.05, .05, 1.4, 8), woodMat, 0, -.75, 0, weapon);
     add(new THREE.SphereGeometry(.17, 14, 10), new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0xff6a1a, emissiveIntensity: 1.4 }), 0, -1.5, 0, weapon);
+  } else if (d.style === 'chef') {
+    add(new THREE.CylinderGeometry(.34, .31, .45, 16), white, 0, 2.56, 0);
+    add(new THREE.SphereGeometry(.44, 16, 12), white, 0, 2.88, 0).scale.y = .65;
+    for (const sx of [-1, 1]) add(new THREE.SphereGeometry(.11, 10, 8), dark, sx * .11, 1.9, .4).scale.set(1.5, .6, .6);
+    add(new THREE.BoxGeometry(.66, .72, .08), white, 0, 1.12, .42);
+    weapon = new THREE.Group(); armR.add(weapon); const pan = makePan(); pan.position.y = -.66; weapon.add(pan);
   } else if (d.style === 'robot') {
     add(new THREE.BoxGeometry(.66, .17, .14), M(0x163a4a, { emissive: 0x4ff0c8, emissiveIntensity: 1.2 }), 0, 2.07, .36);
     for (const s of [-1, 1]) {
@@ -910,10 +1078,12 @@ function buildModel(d) {
   const bomb = makeBomb(); bomb.position.y = 2.95; bomb.visible = false; inner.add(bomb);
   const boomer = makeBoomerang(); boomer.position.set(0, -.75, .12); boomer.rotation.x = Math.PI / 2; boomer.visible = false; armR.add(boomer);
   const banana = makeBananaHeld(); banana.position.set(0, -.75, .1); banana.visible = false; armL.add(banana);
+  const raygun = makeRaygun(); raygun.position.set(0, -.75, .15); raygun.rotation.x = -Math.PI / 2; raygun.visible = false; armR.add(raygun);
+  const jetpack = makeJetpack(); jetpack.position.set(0, 1.35, -.5); jetpack.visible = false; inner.add(jetpack);
   const shield = new THREE.Mesh(new THREE.SphereGeometry(1.25, 28, 18), new THREE.MeshBasicMaterial({
     color: 0x8be0ff, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   shield.visible = false; rig.add(shield);
-  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield };
+  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield, raygun, jetpack };
 }
 
 const ATTACKS = {
@@ -935,6 +1105,12 @@ const ATTACKS = {
   rocket: { charge: true, maxCharge: .9, startup: .1, active: .28, recovery: .35, dmg: 12, kb: 9.5, growth: .13, range: 1.2, radius: 1.1, lift: .4, lunge: 16, rocket: true },
 };
 const STAR_HIT = { dmg: 8, kb: 8, growth: .1, lift: .5 };
+ATTACKS.panToss = { startup: .1, active: 0, recovery: .2, proj: 'pan' };
+ATTACKS.zap = { startup: .05, active: 0, recovery: .14, proj: 'laser' };
+const PAN_HIT = { dmg: 7, kb: 6.5, growth: .07, lift: .35 };
+const LASER = { dmg: 3, kb: 3.5, growth: .035, lift: .2 };
+const SHOCK = { dmg: 5, kb: 7.5, growth: .06, lift: .55 };
+const NO_ECHO = ['bomb', 'banana', 'boomerang', 'pan'];
 const BOOM_HIT = { dmg: 6, kb: 5.5, growth: .06, lift: .35 };
 const FIREBALL = { dmg: 4, kb: 4.5, growth: .045, lift: .3 };
 const BLAST = { dmg: 15, kb: 11, growth: .14, lift: .6 };
@@ -942,8 +1118,8 @@ const HAMMER_TIME = 8, BOMB_FUSE = 5;
 const GRAV = 32;
 
 const game = { state: 'title', wave: 1, timer: 0, hitstop: 0, shake: 0, timeScale: 1, simTime: 0, perks: [] };
-game.charKey = ['nova', 'pyra', 'tanko'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
-game.startArena = ['sky', 'lava', 'wind'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
+game.charKey = ['nova', 'pyra', 'tanko', 'whisk'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
+game.startArena = ['sky', 'lava', 'wind', 'gear'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
 game.itemT = 6;
 
 class Fighter {
@@ -954,13 +1130,15 @@ class Fighter {
     this.def = def; this.name = def.name; this.size = def.scale;
     this.model = buildModel(def); scene.add(this.model.root);
     this.stats = { speed: def.speed * (scale.speed ?? 1), jump: 13, power: def.power * (scale.power ?? 1), weight: def.weight * (scale.weight ?? 1),
-      jumps: 2, dashCd: .55, airRadius: 1, chargeRate: 1, lifesteal: 0, secondWind: false, glass: false, dmgTaken: 1, thorns: 0, fireTrail: false, chain: false };
+      jumps: 2, dashCd: .55, airRadius: 1, chargeRate: 1, lifesteal: 0, secondWind: false, glass: false, dmgTaken: 1, thorns: 0, fireTrail: false, chain: false, magnet: false, shock: false, echo: false };
   }
   pickAttack(kind) {
     if (this.held === 'hammer') return 'hammer';
     if (this.held === 'bomb') return 'throw';
     if (this.held === 'boomerang' && !this.boomOut) return 'toss';
     if (this.held === 'banana') return 'drop';
+    if (this.held === 'raygun') return 'zap';
+    if (this.def.kit === 'chef' && kind === 'heavy') return this.panOut ? 'smash' : 'panToss';
     if (this.def.kit === 'tank' && kind === 'heavy') return 'rocket';
     if (this.def.kit === 'pyra') return kind === 'light' ? (this.onGround ? 'fire' : 'fireAir') : 'burst';
     if (kind === 'heavy') return 'smash';
@@ -988,7 +1166,7 @@ class Fighter {
       onGround: !fromSky, jumpsLeft: this.stats.jumps, airDash: true, dashCdT: 0, combo: 0, lastJabEnd: -9, buffer: false,
       atk: null, atkName: '', charging: false, charge: 0, flash: 0, squash: 0, tumbleSpd: 0, animT: 0, hitDone: false, lunged: false,
       held: null, heldT: 0, burnCd: 0, groundP: null, starT: 0, starHitCd: 0, boomOut: false, heldUses: 0, fireCd: 0, trailT: 0,
-      shieldHP: 100, hitCount: 0 });
+      shieldHP: 100, hitCount: 0, jetT: 0, panOut: false, landVy: 0 });
     this.model.root.visible = true;
     if (fromSky) { emit(this.pos.x, this.pos.y + 1, this.pos.z, 24, { color: [0xffffff, this.def.color], speed: 7, life: .6, grav: 0 }); }
   }
@@ -1038,7 +1216,7 @@ class Fighter {
       }
     }
 
-    this.fireCd -= dt;
+    this.fireCd -= dt; if (this.jetT > 0) this.jetT -= dt;
     if (this.state !== 'shield') this.shieldHP = Math.min(100, this.shieldHP + 15 * dt);
     if (this.starT > 0) {
       this.starT -= dt; this.starHitCd -= dt; this.invuln = Math.max(this.invuln, .05);
@@ -1067,9 +1245,11 @@ class Fighter {
       const acc = (this.onGround ? 70 : 24) * dt, ddx = tx - this.vel.x, ddz = tz - this.vel.z, dl = Math.hypot(ddx, ddz);
       if (dl > acc) { this.vel.x += ddx / dl * acc; this.vel.z += ddz / dl * acc; } else { this.vel.x = tx; this.vel.z = tz; }
       if (ml > .1) this.facing = lerpAngle(this.facing, Math.atan2(I.mx, I.mz), 1 - Math.exp(-14 * dt));
-      if (I.jump && this.jumpsLeft > 0 && this.held !== 'hammer') {
+      if (I.jump && (this.jumpsLeft > 0 || (this.jetT > 0 && !this.onGround)) && this.held !== 'hammer') {
         const first = this.onGround;
-        this.vel.y = this.stats.jump * (first ? 1 : .92); this.jumpsLeft--; this.onGround = false;
+        this.vel.y = this.stats.jump * (first ? 1 : .92); this.onGround = false;
+        if (this.jumpsLeft > 0) this.jumpsLeft--;
+        else { emit(this.pos.x, this.pos.y + .8, this.pos.z, 14, { color: [0xff7a2a, 0xffe066, 0xffffff], speed: 3, up: -8, life: .35, grav: 0, size: .16 }); sfx('jet'); }
         if (!first) { ring(_v.set(this.pos.x, this.pos.y + .1, this.pos.z), 0xffffff, 1.6, .3, true); this.tumbleSpd = 0; }
         else emit(this.pos.x, this.pos.y + .1, this.pos.z, 6, { color: 0xe8f7d8, speed: 3, flat: true, life: .35, grav: 0 });
         sfx('jump');
@@ -1105,6 +1285,11 @@ class Fighter {
       this.pos.x += arena.windDir.x * w * dt; this.pos.z += arena.windDir.z * w * dt;
     }
     this.collide(prevY);
+    // spinning gears carry whoever stands on them
+    if (this.onGround && this.groundP && this.groundP.spin) {
+      const p = this.groundP, a = p.spin * dt, ox = this.pos.x - p.x, oz = this.pos.z - p.z, c = Math.cos(a), sn = Math.sin(a);
+      this.pos.x = p.x + ox * c + oz * sn; this.pos.z = p.z - ox * sn + oz * c; this.facing += a;
+    }
 
     if (this.state === 'hitstun' && Math.hypot(this.vel.x, this.vel.y, this.vel.z) > 14 && Math.random() < .7)
       emit(this.pos.x, this.pos.y + 1, this.pos.z, 1, { color: [0xffffff, 0xffd9c4], speed: .5, life: .6, grav: -1, size: .32, drag: 1 });
@@ -1137,7 +1322,10 @@ class Fighter {
         spawnProjectile(this, a.proj, opp);
         if (a.proj === 'bomb' || a.proj === 'banana') this.held = null;
         if (a.proj === 'boomerang') this.boomOut = true;
+        if (a.proj === 'pan') this.panOut = true;
+        if (a.proj === 'laser' && this.held === 'raygun' && --this.heldUses <= 0) this.held = null;
       }
+      if (this.stats.echo && !this.isEcho && !NO_ECHO.includes(a.proj)) queueEcho(this, this.atkName, this.charge);
       if (a.rocket) sfx('rocket');
     }
     if (a.rocket && t >= a.startup && t < a.startup + a.active) {
@@ -1242,6 +1430,7 @@ class Fighter {
           game.shake = Math.max(game.shake, .35); sfx('land', 2);
           continue;
         }
+        if (!stick) this.landVy = this.vel.y;
         this.vel.y = 0; this.onGround = true; this.groundP = p;
       }
       if (p.solid && this.pos.y < p.y - .08 && this.pos.y > p.y - p.depth && r < p.r + .35) {
@@ -1253,6 +1442,7 @@ class Fighter {
     }
     if (this.onGround && !was) {
       this.jumpsLeft = this.stats.jumps; this.airDash = true; this.squash = 1; this.tumbleSpd = 0;
+      if (this.stats.shock && this.landVy < -15 && this.state !== 'hitstun') shockwave(this);
       if (this.state === 'attack' && this.atkName === 'air') { this.state = 'normal'; this.atk = null; this.atkName = ''; }
       emit(this.pos.x, this.pos.y + .1, this.pos.z, 5, { color: 0xe8f7d8, speed: 2.5, flat: true, life: .3, grav: 0 });
       sfx('land', .7);
@@ -1314,7 +1504,10 @@ class Fighter {
     m.bomb.visible = this.held === 'bomb';
     m.boomer.visible = this.held === 'boomerang' && !this.boomOut;
     m.banana.visible = this.held === 'banana';
-    if (m.weapon) m.weapon.visible = this.held !== 'hammer' && !m.boomer.visible;
+    m.raygun.visible = this.held === 'raygun';
+    m.jetpack.visible = this.jetT > 0;
+    if (m.weapon) m.weapon.visible = this.held !== 'hammer' && !m.boomer.visible && !m.raygun.visible && !this.panOut;
+    if (this.held === 'raygun' && s !== 'hitstun' && s !== 'shield') { T.aR = -1.5; T.aRz = 0; }
     m.shield.visible = s === 'shield';
     if (s === 'shield') { m.shield.scale.setScalar(.55 + .45 * this.shieldHP / 100); m.shield.material.opacity = .22 + .1 * Math.sin(game.simTime * 12); }
 
@@ -1349,6 +1542,8 @@ const FIGHTERS = [player, enemy];
 
 /* ================= projectiles ================= */
 const projectiles = [];
+const laserGeo = new THREE.CylinderGeometry(.06, .06, 1, 6).rotateX(Math.PI / 2);
+const laserMat = new THREE.MeshBasicMaterial({ color: 0x9dffc4, toneMapped: false });
 const fireGeo = new THREE.SphereGeometry(.3, 14, 10), fireCore = new THREE.MeshBasicMaterial({ color: 0xffe08a, toneMapped: false });
 const fireGlow = new THREE.MeshBasicMaterial({ color: 0xff5a1c, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 function surfaceHit(x, y, z) {
@@ -1357,6 +1552,19 @@ function surfaceHit(x, y, z) {
 }
 function spawnProjectile(owner, kind, opp) {
   let fx = Math.sin(owner.facing), fz = Math.cos(owner.facing);
+  const realOwner = owner.isEcho ? Object.getPrototypeOf(owner) : owner;
+  if (kind === 'laser') {
+    const pos = new THREE.Vector3(owner.pos.x + fx * .9 * owner.size, owner.pos.y + 1.3 * owner.size, owner.pos.z + fz * .9 * owner.size);
+    let vy = 0;
+    if (opp && opp.alive) {
+      const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
+      if (d < 20 && d > .5 && (dx * fx + dz * fz) / d > .6) { fx = dx / d; fz = dz / d; owner.facing = Math.atan2(fx, fz); vy = clamp((opp.pos.y + 1.1 * opp.size - pos.y) / d, -.6, .6) * 30; }
+    }
+    const mesh = new THREE.Mesh(laserGeo, laserMat); mesh.position.copy(pos); scene.add(mesh);
+    projectiles.push({ kind, owner: realOwner, pos, vel: new THREE.Vector3(fx * 30, vy, fz * 30), life: .7, grav: 0, mesh, armT: 0 });
+    sfx('laser');
+    return;
+  }
   if (kind === 'fireball') {
     if (opp && opp.alive) { // soft aim at a target roughly in front
       const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
@@ -1372,20 +1580,21 @@ function spawnProjectile(owner, kind, opp) {
     mesh.add(new THREE.Mesh(fireGeo, fireCore));
     const glow = new THREE.Mesh(fireGeo, fireGlow); glow.scale.setScalar(1.7); mesh.add(glow);
     mesh.position.copy(pos); scene.add(mesh);
-    projectiles.push({ kind, owner, pos, vel: new THREE.Vector3(fx * speed, vy, fz * speed), life: 1.1, grav: 0, mesh, armT: 0 });
+    projectiles.push({ kind, owner: realOwner, pos, vel: new THREE.Vector3(fx * speed, vy, fz * speed), life: 1.1, grav: 0, mesh, armT: 0 });
   } else if (kind === 'bomb') {
     const pos = new THREE.Vector3(owner.pos.x, owner.pos.y + 2.6 * owner.size, owner.pos.z);
     let hs = 12;
     if (opp && opp.alive) { const d = Math.hypot(opp.pos.x - pos.x, opp.pos.z - pos.z); if (d < 14) hs = clamp(d / .66, 4, 18); }
     const mesh = makeBomb(); mesh.position.copy(pos); scene.add(mesh);
     projectiles.push({ kind, owner, pos, vel: new THREE.Vector3(fx * hs, 7, fz * hs), life: 3, grav: GRAV, mesh, armT: .25 });
-  } else if (kind === 'boomerang') {
+  } else if (kind === 'boomerang' || kind === 'pan') {
     if (opp && opp.alive) {
       const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
       if (d < 12 && d > .5 && (dx * fx + dz * fz) / d > .5) { fx = dx / d; fz = dz / d; owner.facing = Math.atan2(fx, fz); }
     }
     const pos = new THREE.Vector3(owner.pos.x + fx * .8, owner.pos.y + 1.2 * owner.size, owner.pos.z + fz * .8);
-    const mesh = makeBoomerang(); mesh.scale.setScalar(1.3); mesh.position.copy(pos); scene.add(mesh);
+    const mesh = kind === 'pan' ? makePan() : makeBoomerang(); mesh.scale.setScalar(1.3); mesh.position.copy(pos); scene.add(mesh);
+    if (kind === 'pan') mesh.rotation.x = Math.PI / 2;
     projectiles.push({ kind, owner, pos, vel: new THREE.Vector3(fx * 19, 0, fz * 19), life: 3, grav: 0, mesh, armT: 0, age: 0, leg: 'out', hit: new Set() });
   } else if (kind === 'banana') {
     const pos = new THREE.Vector3(owner.pos.x + fx * .6, owner.pos.y + 1.4 * owner.size, owner.pos.z + fz * .6);
@@ -1398,7 +1607,10 @@ function updateProjectiles(dt) {
     const P = projectiles[i];
     P.vel.y -= P.grav * dt; P.pos.addScaledVector(P.vel, dt); P.life -= dt; P.armT -= dt;
     P.mesh.position.copy(P.pos);
-    if (P.kind === 'fireball') {
+    if (P.kind === 'laser') {
+      P.mesh.lookAt(_v.copy(P.pos).add(P.vel));
+      if (Math.random() < .6) emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: 0x7dffb0, speed: .3, life: .2, grav: 0, size: .07 });
+    } else if (P.kind === 'fireball') {
       P.mesh.rotation.y += dt * 10;
       emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: [0xff5a1c, 0xffc040], speed: .8, life: .3, grav: -1, size: .2 });
     } else if (P.kind === 'bomb') {
@@ -1406,15 +1618,16 @@ function updateProjectiles(dt) {
       if (arena.wind > 0) { P.vel.x += arena.windDir.x * arena.wind * 8 * dt; P.vel.z += arena.windDir.z * arena.wind * 8 * dt; }
     } else if (P.kind === 'banana') P.mesh.rotation.y += dt * 9;
     let done = false;
-    if (P.kind === 'boomerang') {
-      P.age += dt; P.mesh.rotation.y += dt * 22;
+    if (P.kind === 'boomerang' || P.kind === 'pan') {
+      P.age += dt; if (P.kind === 'pan') P.mesh.rotation.z += dt * 18; else P.mesh.rotation.y += dt * 22;
       if (P.leg === 'out' && P.age > .5) { P.leg = 'back'; P.hit.clear(); }
       if (P.leg === 'back') {
         const o = P.owner, tx = o.pos.x - P.pos.x, ty = o.pos.y + 1.2 * o.size - P.pos.y, tz = o.pos.z - P.pos.z, d = Math.hypot(tx, ty, tz) || 1;
         P.vel.set(tx / d * 21, ty / d * 21, tz / d * 21);
         if (!o.alive || d < 1) {
-          o.boomOut = false; done = true;
-          if (o.alive && o.held === 'boomerang' && --o.heldUses <= 0) o.held = null;
+          done = true;
+          if (P.kind === 'pan') { o.panOut = false; if (o.alive) sfx('clang'); }
+          else { o.boomOut = false; if (o.alive && o.held === 'boomerang' && --o.heldUses <= 0) o.held = null; }
         }
       }
     }
@@ -1427,12 +1640,14 @@ function updateProjectiles(dt) {
       if (Math.hypot(P.pos.x - f.pos.x, dy * .8, P.pos.z - f.pos.z) < .55 * f.size + .35) {
         const l = Math.hypot(P.vel.x, P.vel.z) || 1, src = { x: P.pos.x - P.vel.x / l, z: P.pos.z - P.vel.z / l };
         if (P.kind === 'fireball') { f.takeHit(P.owner, FIREBALL, 0, src); done = true; }
+        else if (P.kind === 'laser') { f.takeHit(P.owner, LASER, 0, src); done = true; }
+        else if (P.kind === 'pan') { f.takeHit(P.owner, PAN_HIT, 0, src); P.hit.add(f); sfx('clang'); }
         else if (P.kind === 'bomb') { explode(P.pos.clone(), P.owner); done = true; }
         else if (P.kind === 'boomerang') { f.takeHit(P.owner, BOOM_HIT, 0, src); P.hit.add(f); }
         else if (P.kind === 'banana') { if (f.starT <= 0 && f.state !== 'shield') f.trip(); done = true; }
       }
     }
-    if (!done && P.kind !== 'boomerang' && surfaceHit(P.pos.x, P.pos.y, P.pos.z)) {
+    if (!done && P.kind !== 'boomerang' && P.kind !== 'pan' && surfaceHit(P.pos.x, P.pos.y, P.pos.z)) {
       if (P.kind === 'bomb') explode(P.pos.clone(), P.owner);
       else if (P.kind === 'banana') makeTrap(P.pos.x, P.pos.y + .2, P.pos.z, P.owner, 1);
       else emit(P.pos.x, P.pos.y + .1, P.pos.z, 8, { color: [0xff5a1c, 0xffc040], speed: 3, flat: true, life: .3, grav: 0 });
@@ -1441,6 +1656,7 @@ function updateProjectiles(dt) {
     if (!done && (P.life <= 0 || P.pos.y < -30)) {
       if (P.kind === 'bomb' && P.pos.y > -20) explode(P.pos.clone(), P.owner);
       if (P.kind === 'boomerang') P.owner.boomOut = false;
+      if (P.kind === 'pan') P.owner.panOut = false;
       done = true;
     }
     if (done) { scene.remove(P.mesh); projectiles.splice(i, 1); }
@@ -1505,6 +1721,37 @@ function updateBolts(dt) {
   }
 }
 
+/* ================= echo + shockwave ================= */
+const echoes = [];
+const opponentOf = f => (f === player ? enemy : player);
+function queueEcho(f, name, charge) { echoes.push({ f, name, charge, x: f.pos.x, y: f.pos.y, z: f.pos.z, facing: f.facing, t: .32 }); }
+function updateEchoes(dt) {
+  for (let i = echoes.length - 1; i >= 0; i--) {
+    const E = echoes[i]; E.t -= dt; if (E.t > 0) continue;
+    echoes.splice(i, 1);
+    const f = E.f; if (!f.alive) continue;
+    const a = ATTACKS[E.name]; if (!a) continue;
+    const ghost = Object.create(f);
+    ghost.pos = new THREE.Vector3(E.x, E.y, E.z); ghost.facing = E.facing; ghost.isEcho = true; ghost.charge = E.charge; ghost.hitDone = false;
+    const reach = (a.range || 0) * f.size;
+    const c = new THREE.Vector3(E.x + Math.sin(E.facing) * reach, E.y + 1.1 * f.size, E.z + Math.cos(E.facing) * reach);
+    ring(c, 0xc8b8ff, a.spin ? 3.2 : 2.2, .3, !!a.spin);
+    emit(c.x, c.y, c.z, 10, { color: [0xc8b8ff, 0xffffff], speed: 4, life: .35, grav: 0, size: .12 });
+    sfx('echo');
+    if (a.proj) { spawnProjectile(ghost, a.proj, opponentOf(f)); continue; }
+    ghost.atk = { ...a, dmg: a.dmg * .5, kb: a.kb * .7 };
+    ghost.hitCheck(opponentOf(f));
+  }
+}
+function shockwave(f) {
+  const p = new THREE.Vector3(f.pos.x, f.pos.y + .1, f.pos.z);
+  ring(p, f.def.accent, 7, .4, true); ring(p, 0xffffff, 4, .3, true);
+  emit(p.x, p.y, p.z, 26, { color: [0xffffff, 0xe8e0d0], speed: 9, flat: true, life: .45, grav: 0, size: .22 });
+  game.shake = Math.max(game.shake, .4); sfx('shock');
+  const o = opponentOf(f);
+  if (o.alive && o.invuln <= 0 && Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < 3.8 && Math.abs(o.pos.y - f.pos.y) < 1.6) o.takeHit(f, SHOCK, 0, { x: p.x, z: p.z });
+}
+
 /* ================= items ================= */
 const items = [];
 const ITEM_DEFS = {
@@ -1514,8 +1761,11 @@ const ITEM_DEFS = {
   star: { make: makeStar, color: 0xffe066 },
   boomerang: { make: makeBoomerang, color: 0xff5a3d },
   banana: { make: makeBananaHeld, color: 0xffdf4a },
+  raygun: { make: makeRaygun, color: 0x7dffb0 },
+  box: { make: makeBox, color: 0xffb347 },
+  jetpack: { make: makeJetpack, color: 0xff5a6e },
 };
-const ITEM_POOL = ['hammer', 'bomb', 'bomb', 'heart', 'heart', 'star', 'boomerang', 'boomerang', 'banana', 'banana'];
+const ITEM_POOL = ['hammer', 'bomb', 'bomb', 'heart', 'heart', 'star', 'boomerang', 'banana', 'banana', 'raygun', 'raygun', 'box', 'box', 'jetpack'];
 function makeTrap(x, y, z, owner, grace) {
   const g = new THREE.Group(); g.add(makePeel()); g.position.set(x, y, z); scene.add(g);
   items.push({ type: 'trap', mesh: g, x, z, y, vy: 0, landed: false, life: 12, owner, grace });
@@ -1545,7 +1795,8 @@ function clearArenaObjects() {
   while (items.length) removeItem(0);
   while (projectiles.length) scene.remove(projectiles.pop().mesh);
   while (firePatches.length) { const P = firePatches.pop(); scene.remove(P.mesh); P.mesh.material.dispose(); }
-  for (const f of FIGHTERS) f.boomOut = false;
+  for (const f of FIGHTERS) { f.boomOut = false; f.panOut = false; }
+  echoes.length = 0;
 }
 function updateItems(dt, fighting) {
   if (fighting) { game.itemT -= dt; if (game.itemT <= 0) { if (items.filter(i => i.type !== 'trap').length < 2) spawnItem(); game.itemT = rand(7, 11); } }
@@ -1553,7 +1804,18 @@ function updateItems(dt, fighting) {
     const it = items[i];
     const sup = supportTop(it.x, it.z), floor = sup ? sup.y : -Infinity;
     if (!it.landed) { it.vy -= 25 * dt; it.y += it.vy * dt; if (it.y <= floor) { it.y = floor; it.vy = 0; it.landed = true; emit(it.x, it.y + .1, it.z, 6, { color: 0xffffff, speed: 2.5, flat: true, life: .3, grav: 0 }); } }
-    else it.y = floor;
+    else {
+      it.y = floor;
+      if (sup && sup.spin) { const a = sup.spin * dt, ox = it.x - sup.x, oz = it.z - sup.z; it.x = sup.x + ox * Math.cos(a) + oz * Math.sin(a); it.z = sup.z - ox * Math.sin(a) + oz * Math.cos(a); }
+      if (it.type !== 'trap') for (const f of FIGHTERS) {
+        if (!f.stats.magnet || !f.alive) continue;
+        const dx = f.pos.x - it.x, dz = f.pos.z - it.z, d = Math.hypot(dx, dz);
+        if (d < 14 && d > .3 && Math.abs(f.pos.y - it.y) < 3) {
+          const nx = it.x + dx / d * 6 * dt, nz = it.z + dz / d * 6 * dt, ns = supportTop(nx, nz);
+          if (ns && Math.abs(ns.y - it.y) < .2) { it.x = nx; it.z = nz; if (Math.random() < .3) emit(it.x, it.y + .4, it.z, 1, { color: 0x8be0ff, speed: .5, life: .3, grav: 0, size: .08 }); }
+        }
+      }
+    }
     it.life -= dt;
     if (arena.lavaY !== undefined && it.landed && it.y < arena.lavaY) { emit(it.x, arena.lavaY + .2, it.z, 12, { color: [0xff5a1c, 0x888888], speed: 3, up: 3, life: .5, grav: 0 }); removeItem(i); continue; }
     if (it.life <= 0 || it.y < -30) { removeItem(i); continue; }
@@ -1573,26 +1835,43 @@ function updateItems(dt, fighting) {
     for (const f of FIGHTERS) {
       if (!f.alive) continue;
       if (Math.hypot(f.pos.x - it.x, f.pos.z - it.z) > .9 + .35 * f.size || f.pos.y < it.y - 1 || f.pos.y > it.y + 1.6) continue;
-      if (it.type === 'star') {
-        f.starT = 6; f.starHitCd = 0;
-        emit(f.pos.x, f.pos.y + 1, f.pos.z, 30, { color: [0xffe066, 0xff5a6e, 0x4ff0c8, 0x8be0ff], speed: 7, life: .6, grav: 0 });
-        sfx('star'); if (f.isPlayer) toast('STAR POWER! Run into them!');
-      } else if (it.type === 'heart') {
-        const heal = Math.min(30, f.damage); f.damage -= heal;
-        popup('-' + Math.round(heal) + '%', new THREE.Vector3(f.pos.x, f.pos.y + 2.4 * f.size, f.pos.z), '#4ff0c8', 26);
-        emit(f.pos.x, f.pos.y + 1, f.pos.z, 24, { color: [0x4ff0c8, 0xffffff, 0xff3d6e], speed: 4, up: 3, life: .6, grav: 0 });
-        sfx('heal');
-      } else {
-        if (f.held) continue;
-        f.held = it.type; f.heldT = { hammer: HAMMER_TIME, bomb: BOMB_FUSE, boomerang: 12, banana: 10 }[it.type]; f.heldUses = 3;
-        emit(f.pos.x, f.pos.y + 1.5, f.pos.z, 14, { color: ITEM_DEFS[it.type].color, speed: 4, life: .4, grav: 0 });
-        sfx('pickup');
-        if (f.isPlayer) toast({ hammer: 'HAMMER! Attack to smash. No jumping.', bomb: 'BOMB! Attack to throw it before it blows.',
-          boomerang: 'BOOMERANG! Attack to throw. It comes back (3 throws).', banana: 'BANANA! Attack to toss a peel trap.' }[it.type]);
-      }
+      if (it.type === 'box') {
+        sfx('box'); emit(it.x, it.y + .8, it.z, 24, { color: [0xffb347, 0xffffff], speed: 6, life: .5, grav: 4 });
+        if (Math.random() < .22) { popup('TRAP!', new THREE.Vector3(it.x, it.y + 2, it.z), '#ff5a6e', 24); explode(new THREE.Vector3(it.x, it.y + .8, it.z), f); }
+        else {
+          const pool = ['star', 'heart', 'jetpack'].concat(f.held ? [] : ['hammer', 'bomb', 'boomerang', 'banana', 'raygun']);
+          grantItem(f, pool[Math.random() * pool.length | 0]);
+        }
+      } else if (!grantItem(f, it.type)) continue;
       removeItem(i); break;
     }
   }
+}
+
+function grantItem(f, type) {
+  if (type === 'star') {
+    f.starT = 6; f.starHitCd = 0;
+    emit(f.pos.x, f.pos.y + 1, f.pos.z, 30, { color: [0xffe066, 0xff5a6e, 0x4ff0c8, 0x8be0ff], speed: 7, life: .6, grav: 0 });
+    sfx('star'); if (f.isPlayer) toast('STAR POWER! Run into them!');
+  } else if (type === 'heart') {
+    const heal = Math.min(30, f.damage); f.damage -= heal;
+    popup('-' + Math.round(heal) + '%', new THREE.Vector3(f.pos.x, f.pos.y + 2.4 * f.size, f.pos.z), '#4ff0c8', 26);
+    emit(f.pos.x, f.pos.y + 1, f.pos.z, 24, { color: [0x4ff0c8, 0xffffff, 0xff3d6e], speed: 4, up: 3, life: .6, grav: 0 });
+    sfx('heal');
+  } else if (type === 'jetpack') {
+    f.jetT = 10; sfx('pickup');
+    emit(f.pos.x, f.pos.y + 1.5, f.pos.z, 14, { color: 0xff5a6e, speed: 4, life: .4, grav: 0 });
+    if (f.isPlayer) toast('JETPACK! Jump as many times as you want for 10s.');
+  } else {
+    if (f.held) return false;
+    f.held = type; f.heldT = { hammer: HAMMER_TIME, bomb: BOMB_FUSE, boomerang: 12, banana: 10, raygun: 15 }[type]; f.heldUses = type === 'raygun' ? 6 : 3;
+    emit(f.pos.x, f.pos.y + 1.5, f.pos.z, 14, { color: ITEM_DEFS[type].color, speed: 4, life: .4, grav: 0 });
+    sfx('pickup');
+    if (f.isPlayer) toast({ hammer: 'HAMMER! Attack to smash. No jumping.', bomb: 'BOMB! Attack to throw it before it blows.',
+      boomerang: 'BOOMERANG! Attack to throw. It comes back (3 throws).', banana: 'BANANA! Attack to toss a peel trap.',
+      raygun: 'RAY GUN! Attack to fire (6 shots).' }[type]);
+  }
+  return true;
 }
 
 /* ================= AI ================= */
@@ -1611,6 +1890,7 @@ class Brain {
       I.mx = -f.pos.x / (r || 1); I.mz = -f.pos.z / (r || 1);
       if (f.state === 'normal') {
         if (f.vel.y < -1 && f.jumpsLeft > 0 && this.jumpCd <= 0) { I.jump = true; this.jumpCd = .3; }
+        else if (f.jetT > 0 && f.vel.y < -1 && this.jumpCd <= 0) { I.jump = true; this.jumpCd = .3; }
         else if (f.jumpsLeft === 0 && f.airDash && f.vel.y < -2 && f.dashCdT <= 0) I.dash = true;
       }
       return I;
@@ -1628,6 +1908,14 @@ class Brain {
       }
       return I;
     }
+    // step off a piston pad that is about to fire
+    if (arena.pads && f.onGround && f.groundP && f.groundP.main) {
+      for (const pd of arena.pads) {
+        if (pd.phase !== 'warn') continue;
+        const dx = f.pos.x - pd.x, dz = f.pos.z - pd.z, d = Math.hypot(dx, dz);
+        if (d < 2.3 && Math.random() < .4 + sk * .6) { I.mx = dx / (d || 1); I.mz = dz / (d || 1); return I; }
+      }
+    }
     let mx = 0, mz = 0;
     if (!tg.alive) { mx = -f.pos.x * .1; mz = -f.pos.z * .1; }
     else {
@@ -1636,7 +1924,9 @@ class Brain {
       // throw a held bomb from mid range
       const toss = (f.held === 'bomb' && dist > 1.5 && dist < 9 && (this.cd <= 0 || f.heldT < 1.5))
         || (f.held === 'boomerang' && !f.boomOut && dist < 10 && this.cd <= 0)
-        || (f.held === 'banana' && dist < 5 && this.cd <= 0);
+        || (f.held === 'banana' && dist < 5 && this.cd <= 0)
+        || (f.held === 'raygun' && dist < 15 && this.cd <= 0);
+      if (f.held === 'raygun' && toss) { I.light = true; this.cd = rand(.25, .5); return I; }
       if (toss && f.state === 'normal') { I.light = true; this.cd = .8; return I; }
       // run from a starred opponent
       if (tg.starT > 0) {
@@ -1677,7 +1967,7 @@ class Brain {
       else if (this.cd > 0) { mx = -ux * .35 - uz * this.strafe * .6; mz = -uz * .35 + ux * this.strafe * .6; }
       // detour for a nearby item worth grabbing
       for (const it of items) {
-        if (!it.landed || it.type === 'trap' || (it.type === 'heart' ? f.damage < 25 : it.type === 'star' ? false : !!f.held)) continue;
+        if (!it.landed || it.type === 'trap' || (it.type === 'heart' ? f.damage < 25 : (it.type === 'star' || it.type === 'jetpack') ? false : !!f.held)) continue;
         const ix = it.x - f.pos.x, iz = it.z - f.pos.z, idist = Math.hypot(ix, iz);
         if (idist < 9 && idist < dist * 1.3 + 2 && Math.abs(it.y - f.pos.y) < 2) { mx = ix / idist; mz = iz / idist; break; }
       }
@@ -1700,7 +1990,7 @@ class Brain {
   }
 }
 const brain = new Brain(enemy);
-window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, get arena() { return arena; } }; // debug handle for the browser console
+window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, shockwave, get arena() { return arena; } }; // debug handle for the browser console
 
 /* ================= input ================= */
 const keys = new Set(), pressed = new Set();
@@ -1840,8 +2130,13 @@ function updateHUD() {
     setHud('name' + s, f.name);
   }
   setHud('wave', `WAVE ${game.wave}<small>${arena.name} · vs ${enemy.def.name}</small>`);
-  setHud('heldP', player.starT > 0 ? `STAR ${Math.ceil(player.starT)}s` : player.held === 'boomerang' ? `BOOMERANG ×${player.heldUses}`
-    : player.held ? `${player.held.toUpperCase()} ${Math.ceil(player.heldT)}s` : '');
+  const chips = [];
+  if (player.starT > 0) chips.push(`STAR ${Math.ceil(player.starT)}s`);
+  if (player.jetT > 0) chips.push(`JETPACK ${Math.ceil(player.jetT)}s`);
+  if (player.held === 'boomerang') chips.push(`BOOMERANG ×${player.heldUses}`);
+  else if (player.held === 'raygun') chips.push(`RAY GUN ×${player.heldUses}`);
+  else if (player.held) chips.push(`${player.held.toUpperCase()} ${Math.ceil(player.heldT)}s`);
+  setHud('heldP', chips.join(' · '));
   const wi = $('windInd'), showWind = arena.key === 'wind' && arena.phase !== 'calm' && game.state === 'fight';
   if (wi.hidden === showWind) wi.hidden = !showWind;
   if (showWind) {
@@ -1908,6 +2203,9 @@ const UPGRADES = [
   { name: 'Thorns', tag: 'Defense', desc: 'Enemies take 3% damage every time they hit you.', ok: s => s.thorns < 6, apply: s => s.thorns += 3 },
   { name: 'Fire Trail', tag: 'Dash', desc: 'Dashing leaves a trail of fire that burns enemies.', ok: s => !s.fireTrail, apply: s => s.fireTrail = true },
   { name: 'Chain Lightning', tag: 'Combo', desc: 'Every 3rd hit you land calls down lightning for +6%.', ok: s => !s.chain, apply: s => s.chain = true },
+  { name: 'Magnet', tag: 'Items', desc: 'Items slide toward you from across the arena.', ok: s => !s.magnet, apply: s => s.magnet = true },
+  { name: 'Shockwave Landing', tag: 'Air', desc: 'Landing from a high jump knocks nearby enemies away.', ok: s => !s.shock, apply: s => s.shock = true },
+  { name: 'Echo', tag: 'Combo', desc: 'Every attack repeats as a ghost hit a moment later, at half strength.', ok: s => !s.echo, apply: s => s.echo = true },
   { name: 'Glass Cannon', tag: 'Risk', desc: 'Your hits launch twice as far. You take double damage.', ok: s => !s.glass, apply: s => { s.glass = true; s.power *= 2; s.dmgTaken *= 2; } },
 ];
 function showUpgrades() {
@@ -2023,6 +2321,7 @@ function frame(now) {
       separate();
       updateProjectiles(simDt);
       updateFirePatches(simDt);
+      updateEchoes(simDt);
       updateItems(simDt, fighting);
       arena.update(simDt, fighting);
       pressed.clear();

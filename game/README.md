@@ -1,14 +1,15 @@
 # Knockout Isle (vertical slice)
 
-A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: three playable fighters, AI opponents, three arenas, items, and a wave loop with power-ups.
+A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: four playable fighters, AI opponents, four arenas, items, and a wave loop with power-ups.
 
 ## Content
 
-- **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) and Tank-o (hold dash on the ground to shield, charged rocket punch). Enemies: Grub, Vex, Bolt, Moss.
+- **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) Tank-o (hold dash on the ground to shield, charged rocket punch) and Whisk (frying-pan combo; smash throws the pan, which boomerangs back). Enemies: Grub, Vex, Bolt, Moss.
 - **Arenas** (alternate every wave):
   - **Sky Isle**: a floating island with three floating platforms.
   - **Lava Forge**: every 19 seconds the floor sinks into lava for about 4 seconds. Touching lava adds 7% and bounces you up, so get onto the raised pillars.
   - **Windy Peaks**: every 12 seconds a gust blows across the summit for 3.5 seconds (an arrow shows its direction). Walk into it, or shield to brace.
+  - **Clockwork Tower**: a giant clock face. The gear platforms spin and carry you with them, and piston pads glow red, then launch anyone standing on them.
 - **Items** (drop every 7–11s, walk over to grab):
   - **Hammer**: 8s of big swings, no jumping.
   - **Bomb**: attack to throw, explodes on contact. It blows up in your hands after 5s.
@@ -16,7 +17,10 @@ A third-person platform brawler roguelike built with three.js. The slice focuses
   - **Star**: 6s of invincibility and extra speed. Touching the enemy hurts them.
   - **Boomerang**: 3 throws; it flies out, comes back and can hit both ways.
   - **Banana**: toss a peel trap. Whoever steps on it slips.
-- **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken), **Thorns** (attackers take 3%), **Fire Trail** (dashes leave burning fire), **Chain Lightning** (every 3rd hit zaps for +6%).
+  - **Ray Gun**: 6 fast laser shots.
+  - **Jetpack**: unlimited air jumps for 10s.
+  - **Mystery Box**: a random item, or sometimes an explosion.
+- **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken), **Thorns** (attackers take 3%), **Fire Trail** (dashes leave burning fire), **Chain Lightning** (every 3rd hit zaps for +6%), **Magnet** (items slide to you), **Shockwave Landing** (big landings knock enemies away), **Echo** (each attack repeats as a half-strength ghost hit).
 
 ## Run it
 
