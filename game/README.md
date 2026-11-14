@@ -1,6 +1,18 @@
 # Knockout Isle (vertical slice)
 
-A third-person platform brawler roguelike built with three.js. This first slice focuses on the core fight: one hero, one AI opponent, one floating-island arena, and a short wave loop with power-ups.
+A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: two playable fighters, AI opponents, two arenas, items, and a wave loop with power-ups.
+
+## Content
+
+- **Fighters**: Nova (sword combo + charged smash) and Pyra (fireballs from range, charged fire burst up close). Enemies: Grub, Vex, Bolt, Moss.
+- **Arenas** (alternate every wave):
+  - **Sky Isle**: a floating island with three floating platforms.
+  - **Lava Forge**: every 19 seconds the floor sinks into lava for about 4 seconds. Touching lava adds 7% and bounces you up, so get onto the raised pillars.
+- **Items** (drop every 7–11s, walk over to grab):
+  - **Hammer**: 8s of big swings, no jumping.
+  - **Bomb**: attack to throw, explodes on contact. It blows up in your hands after 5s.
+  - **Heart**: heals 30%.
+- **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken).
 
 ## Run it
 
@@ -33,7 +45,10 @@ Then open http://localhost:8000.
 
 ## Code map (`index.html`)
 
-- `ROSTER`: character definitions (stats, colors, silhouette style). Add a character here.
+- `ROSTER` / `PLAYABLE`: character definitions (stats, colors, silhouette style, kit) and the select-screen info.
+- `ARENAS`: arena definitions (platforms, sky/fog/light colors, hazard `update`). `setArena(key)` swaps them.
+- `spawnProjectile` / `explode`: fireballs and thrown bombs.
+- `ITEM_DEFS` / `updateItems`: item spawning, pickup and effects.
 - `ATTACKS`: frame data per move (startup, active, recovery, damage, knockback, growth).
 - `Fighter`: movement, physics, attacks, hit detection, knockback and procedural animation. The player and the AI share this class.
 - `Brain`: AI that turns the game state into the same input struct the player produces.
