@@ -434,6 +434,15 @@ const DIFFS = {
 const Sfx = (() => {
   let ctx = null, master, sfxBus, musicBus, noise, lastHit = 0, lastBoom = 0, lastZap = 0, musicMuted = false;
   let musicOn = false, step = 0, nextT = 0, intensity = 0;
+  const THEMES = [
+    { bpm: 128, roots: [38, 38, 34, 36, 38, 38, 41, 36], arp: [0, 3, 7, 10, 12, 10, 7, 3], lead: [12, 10, 7, 10, 12, 15, 14, 10], wave: 'square', bass: 'sawtooth', pad: 7 },
+    { bpm: 106, roots: [33, 33, 36, 31, 33, 33, 29, 31], arp: [0, 3, 5, 7, 12, 7, 5, 3], lead: [7, 5, 3, 5, 7, 10, 8, 7], wave: 'triangle', bass: 'triangle', pad: 3, half: true },
+    { bpm: 142, roots: [40, 40, 41, 40, 38, 38, 41, 43], arp: [0, 1, 5, 7, 8, 7, 5, 1], lead: [12, 13, 12, 8, 7, 8, 5, 7], wave: 'sawtooth', bass: 'sawtooth', pad: 7 },
+    { bpm: 132, roots: [37, 37, 33, 35, 37, 37, 40, 35], arp: [0, 3, 6, 7, 10, 7, 6, 3], lead: [15, 14, 12, 10, 12, 11, 10, 6], wave: 'square', bass: 'sawtooth', pad: 6 },
+    { bpm: 150, roots: [36, 36, 32, 34, 36, 36, 39, 34], arp: [0, 3, 7, 12, 15, 12, 7, 3], lead: [12, 15, 19, 17, 15, 12, 10, 12], wave: 'sawtooth', bass: 'sawtooth', pad: 7 },
+    { bpm: 146, roots: [35, 35, 38, 33, 35, 35, 31, 33], arp: [0, 3, 7, 10, 12, 10, 7, 3], lead: [10, 12, 15, 12, 10, 7, 5, 7], wave: 'square', bass: 'square', pad: 7 },
+  ];
+  let theme = THEMES[0];
   function init() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
@@ -457,8 +466,11 @@ const Sfx = (() => {
     swing(p = 1, v = .22) { if (!ok()) return; const t = ctx.currentTime; const s = nz(t, .25); const f = filt('bandpass', 600 * p, 1.3);
       f.frequency.setValueAtTime(500 * p, t); f.frequency.exponentialRampToValueAtTime(3400 * p, t + .11);
       const g = ctx.createGain(); env(g, t, .03, v, .15); s.connect(f).connect(g).connect(sfxBus); },
-    hit(heavy, count = 1) { if (!ok()) return; const t = ctx.currentTime; if (t - lastHit < .028) return; lastHit = t;
+    hit(heavy, count = 1, kind = '') { if (!ok()) return; const t = ctx.currentTime; if (t - lastHit < .028) return; lastHit = t;
       const v = Math.min(1, .38 + count * .07) * (heavy ? 1.15 : .8);
+      const blunt = kind === 'hammer' || kind === 'shieldmace' || kind === 'gauntlets', blade = /sword|spear|daggers|scythe|halberd|glaive|chakram|fans|whip/.test(kind);
+      if (blunt) { osc('sine', 120, 32, t, .3, v * .9); const s2 = nz(t, .12), g2 = ctx.createGain(); env(g2, t, .002, v * .5, .1); s2.connect(filt('lowpass', 700)).connect(g2).connect(sfxBus); }
+      if (blade) osc('triangle', 2600 + Math.random() * 500, 1700, t, .07, v * .07);
       const s = nz(t, .14), g = ctx.createGain(); env(g, t, .002, v * .55, heavy ? .13 : .07); s.connect(filt('highpass', heavy ? 800 : 1700)).connect(g).connect(sfxBus);
       osc('sine', heavy ? 170 : 240, heavy ? 38 : 70, t, heavy ? .26 : .12, v);
       osc('square', heavy ? 90 : 130, 40, t, .06, v * .18);
@@ -479,24 +491,37 @@ const Sfx = (() => {
     chime() { if (!ok()) return; const t = ctx.currentTime; [523, 659, 784, 1047, 1319].forEach((f, i) => osc('triangle', f, f, t + i * .07, .45, .16)); },
     warn() { if (!ok()) return; const t = ctx.currentTime; osc('sawtooth', 70, 140, t, .5, .16, sfxBus, .1); },
     charge() { if (!ok()) return; const t = ctx.currentTime; osc('sawtooth', 110, 880, t, .9, .18, sfxBus, .3); osc('sine', 220, 1760, t, .9, .15, sfxBus, .3); },
+    clang() { if (!ok()) return; const t = ctx.currentTime; if (t - lastHit < .04) return; lastHit = t; [1850, 2470, 3120].forEach((f, i) => osc('triangle', f, f * .98, t, .25 - i * .05, .07)); const s2 = nz(t, .05), g2 = ctx.createGain(); env(g2, t, .001, .25, .04); s2.connect(filt('highpass', 4000)).connect(g2).connect(sfxBus); },
+    horn() { if (!ok()) return; const t = ctx.currentTime; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(98, t); o.frequency.linearRampToValueAtTime(110, t + .3); o.frequency.linearRampToValueAtTime(104, t + 1.4); const lfo = ctx.createOscillator(); lfo.frequency.value = 5; const lg = ctx.createGain(); lg.gain.value = 3; lfo.connect(lg).connect(o.frequency); const f = filt('lowpass', 900, 2); const g = ctx.createGain(); env(g, t, .15, .3, 1.3); o.connect(f).connect(g).connect(sfxBus); o.start(t); o.stop(t + 1.6); lfo.start(t); lfo.stop(t + 1.6); },
+    groan() { if (!ok()) return; const t = ctx.currentTime; osc('sawtooth', 150, 55, t, .5, .14, sfxBus, .03); },
+    fuse() { if (!ok()) return; const t = ctx.currentTime; for (let i = 0; i < 5; i++) osc('square', 900 + i * 120, 900 + i * 120, t + i * .16, .05, .06); },
+    hex() { if (!ok()) return; const t = ctx.currentTime; osc('sine', 330, 660, t, .6, .1, sfxBus, .2); osc('sine', 415, 830, t + .05, .6, .07, sfxBus, .2); },
     pickup() { if (!ok()) return; const t = ctx.currentTime; osc('sine', 880, 1760, t, .12, .12); },
     setIntensity(i) { intensity = i; },
     toggleMusic() { musicMuted = !musicMuted; if (musicBus) musicBus.gain.value = musicMuted ? 0 : .28 * CFG.music; return musicMuted; },
     applyVolumes() { if (sfxBus) sfxBus.gain.value = .9 * CFG.sfx; if (musicBus) musicBus.gain.value = musicMuted ? 0 : .28 * CFG.music; },
+    setTheme(i) { theme = THEMES[i] || THEMES[0]; },
     startMusic() {
       if (!ctx || musicOn) return; musicOn = true; nextT = ctx.currentTime + .1; step = 0;
       const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
-      const roots = [38, 38, 34, 36, 38, 38, 41, 36];
       const play = (s, t) => {
-        const bar = Math.floor(s / 16) % 8, st = s % 16;
-        if (st % 4 === 0 || (intensity > 1 && st === 14)) { osc('sine', 150, 40, t, .22, .9, musicBus, .002); }
+        const T = theme, bar = Math.floor(s / 16) % 8, st = s % 16, root = T.roots[bar], boss = intensity > 1;
+        // drums
+        if (st % 4 === 0 || (boss && st === 14) || (T.half && st === 10)) osc('sine', 150, 40, t, .22, .9, musicBus, .002);
         if (st === 4 || st === 12) { const n = nz(t, .2), g = ctx.createGain(); env(g, t, .002, .45, .14); n.connect(filt('bandpass', 1800, .8)).connect(g).connect(musicBus); }
         if (intensity > 0 && st % 2 === 0) { const n = nz(t, .05), g = ctx.createGain(); env(g, t, .001, st % 4 === 2 ? .2 : .1, .04); n.connect(filt('highpass', 7000)).connect(g).connect(musicBus); }
-        if (st % 2 === 0) { const r = roots[bar] + (st === 6 || st === 14 ? 12 : 0); const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(r); const f = filt('lowpass', 500 + intensity * 250, 4); const g = ctx.createGain(); env(g, t, .005, .35, .16); o.connect(f).connect(g).connect(musicBus); o.start(t); o.stop(t + .25); }
-        if (intensity > 1 && st % 2 === 1) { const arp = [0, 3, 7, 10, 12, 10, 7, 3]; const n = roots[bar] + 36 + arp[(st >> 1) % 8]; osc('square', mtof(n), mtof(n), t, .1, .045, musicBus, .003); }
-        if (st === 0 && bar % 2 === 0) { const n = roots[bar] + 24; osc('triangle', mtof(n), mtof(n), t, 1.6, .07, musicBus, .3); osc('triangle', mtof(n + 7), mtof(n + 7), t, 1.6, .05, musicBus, .3); }
+        if (bar === 7 && st >= 12) { const f0 = [220, 180, 150, 120][st - 12]; osc('sine', f0, f0 * .6, t, .18, .5, musicBus, .002); }
+        if (boss && bar === 0 && st === 0) { const n = nz(t, 1.2), g = ctx.createGain(); env(g, t, .002, .35, 1.1); n.connect(filt('highpass', 5000)).connect(g).connect(musicBus); }
+        // bass
+        if (st % 2 === 0) { const r = root + (st === 6 || st === 14 ? 12 : 0); const o = ctx.createOscillator(); o.type = T.bass; o.frequency.value = mtof(r); const f = filt('lowpass', 500 + intensity * 250, 4); const g = ctx.createGain(); env(g, t, .005, .35, .16); o.connect(f).connect(g).connect(musicBus); o.start(t); o.stop(t + .25); }
+        // lead melody (from the first fight on)
+        if (intensity > 0 && st % 4 === 0 && bar % 4 >= 2) { const n = root + 24 + T.lead[(bar % 2) * 4 + st / 4]; osc(T.wave, mtof(n), mtof(n), t, .32, .05, musicBus, .01); }
+        // boss arpeggio
+        if (boss && st % 2 === 1) { const n = root + 36 + T.arp[(st >> 1) % 8]; osc('square', mtof(n), mtof(n), t, .1, .045, musicBus, .003); }
+        // pad
+        if (st === 0 && bar % 2 === 0) { const n = root + 24; osc('triangle', mtof(n), mtof(n), t, 1.6, .07, musicBus, .3); osc('triangle', mtof(n + T.pad), mtof(n + T.pad), t, 1.6, .05, musicBus, .3); }
       };
-      setInterval(() => { const spb = 60 / 128 / 4; while (nextT < ctx.currentTime + .12) { play(step, nextT); nextT += spb; step = (step + 1) % 128; } }, 25);
+      setInterval(() => { while (nextT < ctx.currentTime + .12) { play(step, nextT); nextT += 60 / (theme.bpm * (intensity > 1 ? 1.06 : 1)) / 4; step = (step + 1) % 128; } }, 25);
     }
   };
 })();
@@ -706,7 +731,7 @@ const LEVELS = [
     start: [0, 92], waveAt: [0, 64], rift: [0, -92], bossAt: [0, -78],
     paths: [[0, 95, 0, 50], [0, 50, -52, 28], [0, 50, 54, 14], [-52, 28, 0, -34], [54, 14, 0, -34], [0, -34, 0, -92]],
     outposts: [{ name: 'WESTWATCH', x: -52, z: 28, captain: 'Captain Vorsk' }, { name: 'EASTGATE', x: 54, z: 14, captain: 'Captain Ilthra' }, { name: 'SUNSPIRE RUINS', x: 0, z: -34, captain: 'Captain Morrow' }],
-    wave: 25, mix: { grunt: 1 },
+    wave: 25, mix: { grunt: .78, bomber: .1, shield: .12 },
     boss: BOSSES.morvath1, warlord: ['gorrak'],
     story: ['For a thousand years the <em>Sunspire</em> held back the dark. Last night, it went out.',
       'From the Rift of Nocturne pours the <em>Hollow Legion</em>: soldiers emptied of their souls, led by <em>Morvath, the Hollow King</em>, who was once Aurelia\'s greatest hero.',
@@ -724,7 +749,7 @@ const LEVELS = [
     start: [88, 30], waveAt: [62, 26], rift: [-72, -62], bossAt: [-60, -50],
     paths: [[88, 30, 60, 25], [60, 25, 20, 60], [60, 25, -30, 10], [-30, 10, 10, -40], [20, 60, -30, 10], [10, -40, -72, -62]],
     outposts: [{ name: 'SUNKEN CHAPEL', x: 20, z: 60, captain: 'Captain Brine' }, { name: 'WILLOW GATE', x: -30, z: 10, captain: 'Captain Sallow' }, { name: "SEREN'S TOWER", x: 10, z: -40, captain: 'Captain Mire' }],
-    wave: 30, mix: { grunt: .72, archer: .28 },
+    wave: 30, mix: { grunt: .5, archer: .22, wraith: .14, hexer: .06, shield: .08 },
     boss: BOSSES.veyla, warlord: ['ysolde'],
     story: ['Morvath fled west into the <em>Drowned Marches</em>, where the river Lumen sinks into black water.',
       'The stormcaller <em>Seren Vael</em> holds her tower there, alone, while <em>Veyla, the Drowned Queen</em>, raises the dead from the bog.',
@@ -742,7 +767,7 @@ const LEVELS = [
     start: [-80, 70], waveAt: [-58, 56], rift: [-10, -88], bossAt: [-10, -74],
     paths: [[-80, 70, -55, 55], [-55, 55, -20, 30], [-20, 30, 45, 40], [-20, 30, 35, -30], [45, 40, 35, -30], [35, -30, -10, -85], [-20, 30, -10, -85]],
     outposts: [{ name: 'FORGEHOLD', x: -20, z: 30, captain: 'Captain Slag' }, { name: 'MAGMA BRIDGE', x: 45, z: 40, captain: 'Captain Cinder' }, { name: "BRAKKA'S WATCH", x: 35, z: -30, captain: 'Captain Kiln' }],
-    wave: 30, mix: { grunt: .62, brute: .24, archer: .14 },
+    wave: 30, mix: { grunt: .42, brute: .2, archer: .12, bomber: .14, shield: .12 },
     boss: BOSSES.grael, warlord: ['kharn'],
     story: ['The only road to the Rift runs through <em>Emberpeak</em>, where the mountain bleeds fire.',
       '<em>Brakka</em>\'s people held this pass for six hundred years. Now <em>Grael, the Ash Colossus</em>, forges new Hollow from molten stone.',
@@ -760,7 +785,7 @@ const LEVELS = [
     start: [0, 95], waveAt: [0, 66], rift: [0, -92], bossAt: [0, -76],
     paths: [[0, 95, 0, 62], [0, 62, -55, 40], [0, 62, 55, 40], [-55, 40, -45, -30], [55, 40, 45, -30], [-45, -30, 0, -88], [45, -30, 0, -88]],
     outposts: [{ name: 'GATE OF ASH', x: -55, z: 40, captain: 'Captain Wraith' }, { name: 'BELL OF SORROW', x: 55, z: 40, captain: 'Captain Hollowmere' }, { name: 'THE BLIND CHOIR', x: -45, z: -30, captain: 'Captain Sable' }, { name: 'THRONE STAIR', x: 45, z: -30, captain: 'Captain Vex' }],
-    wave: 35, mix: { grunt: .55, archer: .2, brute: .25 },
+    wave: 35, mix: { grunt: .3, archer: .14, brute: .16, wraith: .14, hexer: .08, bomber: .1, shield: .08 },
     boss: BOSSES.morvath2, warlord: ['twinA', 'twinB'],
     story: ['Beyond the Rift lies what is left of old Aurelia: emptied, silent, and crowned in shadow.',
       '<em>Nyx</em> was Hollow once, and she knows the way in. <em>Old Thorne</em> swears he knows the way out.',
@@ -776,13 +801,27 @@ const LEVELS = [
     trees: { n: 30, style: 'dead', trunk: 0x1e1614, leaves: [0xffd040, 0xff6a3a] }, rocks: 40, pools: [], pool: null,
     grunt: [0x2a1a20, 0x200810], riftColor: 0xffb040,
     start: [0, 40], waveAt: [0, 0], rift: [0, -92], bossAt: [0, -10],
-    paths: [[0, 95, 0, -92], [-95, 0, 95, 0]], outposts: [], wave: 0, mix: { grunt: .6, archer: .2, brute: .2 },
+    paths: [[0, 95, 0, -92], [-95, 0, 95, 0]], outposts: [], wave: 0, mix: { grunt: .4, archer: .15, brute: .15, bomber: .15, wraith: .15 },
     boss: BOSSES.morvath2,
     story: ['Long ago, Aurelia crowned its kings in this hall. Now every Hollow lord who ever wore a crown waits inside it.',
       'Eight rounds. <em>Nine bosses.</em> No outposts, no retreat, only a breath and a little healing between fights.',
       'Bosses here carry less health than in their own chapters, but they come one after another, and the Legion keeps sending soldiers.',
       'Walk in as a champion. <em>Walk out as a legend.</em>'],
     end: 'The hall falls silent. Nine crowns lie in the dust, and the Vanguard\'s names are carved above the door.'
+  },
+  {
+    numeral: '∞', name: 'ENDLESS SURVIVAL', blurb: 'Wave after wave in the moonlit coliseum. How long can you hold the line?', rec: 'garrick', diff: 1, startLevel: 3, endless: true,
+    sky: [0x070a18, 0x1c2448, 0x7a8acc], stars: 1.4, fog: [0x141a30, 40, 150], hemi: [0xb0c0ff, 0x10141e, .8], sun: [0xc8d4ff, 1.7], rim: 0x8ab4ff,
+    ground: [0x2a3036, 0x343a40, 0x4a4a50, 0x14161c], tuft: [.55, .6, .2, .18, .28], stone: 0x6a7080, cliff: 0x23262e,
+    trees: { n: 24, style: 'dead', trunk: 0x1a1c22, leaves: [0x8ab4ff, 0xc8d4ff] }, rocks: 30, pools: [], pool: null,
+    grunt: [0x24222e, 0x0c0818], riftColor: 0x8ab4ff,
+    start: [0, 30], waveAt: [0, 0], rift: [0, -92], bossAt: [0, -20],
+    paths: [[-70, 0, 70, 0], [0, -70, 0, 70]], outposts: [], wave: 0, mix: { grunt: 1 }, boss: BOSSES.gorrak,
+    story: ['Under the old moon, the coliseum of Aurelia still stands, and the Hollow have never stopped coming.',
+      'Every wave brings more of them, and stranger ones. <em>Captains</em> lead every fifth wave. Every tenth, a <em>king</em> walks in.',
+      'There is no victory here, only how long you last.',
+      'Hold the line. <em>See how far the light reaches.</em>'],
+    end: ''
   },
 ];
 let L = LEVELS[0], levelIdx = 0, OUTPOSTS = [], PATHS = L.paths, RIFT = { x: 0, z: -92 };
@@ -1092,6 +1131,7 @@ const EG = {
   core: new THREE.OctahedronGeometry(.18), warn: new THREE.RingGeometry(.7, .95, 24), hood: new THREE.ConeGeometry(.32, .45, 8), axe: new THREE.BoxGeometry(.08, .7, .9), orb: new THREE.IcosahedronGeometry(.28, 1),
   bow: new THREE.TorusGeometry(.5, .03, 4, 16, PI), club: new THREE.BoxGeometry(.32, .32, 1.1), arrow: new THREE.BoxGeometry(.04, .04, 1.1), arrowTip: new THREE.ConeGeometry(.06, .2, 4), sphere: new THREE.SphereGeometry(1, 12, 10)
 };
+EG.shieldB = new THREE.BoxGeometry(.7, 1.0, .1); EG.wraithB = new THREE.ConeGeometry(.45, 1.5, 8); EG.bombB = new THREE.SphereGeometry(.55, 14, 12);
 EG.blob.rotateX(-PI / 2); EG.warn.rotateX(-PI / 2); EG.arrowTip.rotateX(PI / 2); EG.arrowTip.translate(0, 0, .6);
 const EM = {
   hollow: new THREE.MeshStandardMaterial({ color: 0x2c2238, roughness: .7, metalness: .15, emissive: 0x14061c }),
@@ -1106,6 +1146,12 @@ const EM = {
   blob: new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .32, depthWrite: false }),
   warn: new THREE.MeshBasicMaterial({ color: 0xff2a3a, transparent: true, opacity: .8, depthWrite: false }),
   core: new THREE.MeshBasicMaterial({ color: 0xff7a2a }),
+  shieldM: new THREE.MeshStandardMaterial({ color: 0x5a6070, roughness: .35, metalness: .8, emissive: 0x0a0a14 }),
+  wraith: new THREE.MeshStandardMaterial({ color: 0x3a2a5a, emissive: 0x2a1050, transparent: true, opacity: .82, roughness: .6 }),
+  eyeW: new THREE.MeshBasicMaterial({ color: 0xc8a0ff }),
+  hexer: new THREE.MeshStandardMaterial({ color: 0x1e3a24, roughness: .8, emissive: 0x06200a }),
+  hexOrb: new THREE.MeshBasicMaterial({ color: 0x7aff7a }),
+  bomb: new THREE.MeshStandardMaterial({ color: 0x5a1a10, emissive: 0xff4a10, emissiveIntensity: .5, roughness: .5 }),
   coreHot: new THREE.MeshBasicMaterial({ color: 0xfff27a }),
 };
 function buildGrunt(variant) {
@@ -1129,6 +1175,34 @@ function buildBrute() {
   r.arm.clear(); const c = new THREE.Mesh(EG.club, EM.metal); c.position.z = .8; r.arm.add(c);
   r.g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return r;
+}
+function buildShieldGrunt() {
+  const r = buildGrunt(true);
+  const sh = new THREE.Mesh(EG.shieldB, EM.shieldM); sh.position.set(.32, .9, .38); sh.rotation.y = -.25; r.g.add(sh); r.flashables.push(sh);
+  const boss2 = new THREE.Mesh(EG.eye, EM.eye); boss2.scale.setScalar(1.6); boss2.position.set(.36, 1.05, .45); r.g.add(boss2);
+  return r;
+}
+function buildWraith() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(EG.wraithB, EM.wraith); body.rotation.x = PI; body.position.y = .3; g.add(body);
+  const head = new THREE.Mesh(EG.head, EM.wraith); head.position.y = 1.15; g.add(head);
+  const hood = new THREE.Mesh(EG.hood, EM.wraith); hood.position.set(0, 1.35, -.05); hood.rotation.x = -.3; g.add(hood);
+  const e1 = new THREE.Mesh(EG.eye, EM.eyeW); e1.position.set(.1, 1.18, .23); const e2 = e1.clone(); e2.position.x = -.1; g.add(e1, e2);
+  const arm = new THREE.Group(); arm.position.set(0, .9, .1); for (const sx of [-1, 1]) { const c = new THREE.Mesh(EG.tip, EM.eyeW); c.position.set(sx * .35, 0, .3); c.rotation.x = PI / 2; arm.add(c); } g.add(arm);
+  return { g, flashables: [body, head, hood], arm, eyes: [e1, e2] };
+}
+function buildHexer() {
+  const r = buildGrunt(false); r.flashables.forEach(m => m.material = EM.hexer);
+  r.arm.clear(); const st = new THREE.Mesh(EG.spear, EM.wood); st.position.z = .3; const orb = new THREE.Mesh(EG.core, EM.hexOrb); orb.position.z = 1.25; orb.scale.setScalar(1.3); r.arm.add(st, orb);
+  return r;
+}
+function buildBomber() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(EG.bombB, EM.bomb); body.position.y = .62; g.add(body);
+  const e1 = new THREE.Mesh(EG.eye, EM.eye); e1.position.set(.14, .8, .42); const e2 = e1.clone(); e2.position.x = -.14; g.add(e1, e2);
+  const fuse = new THREE.Mesh(EG.core, EM.coreHot); fuse.position.y = 1.22; fuse.scale.setScalar(.7); g.add(fuse);
+  const arm = new THREE.Group(); g.add(arm);
+  return { g, flashables: [body], arm, eyes: [e1, e2] };
 }
 function buildCaptain() {
   const r = buildGrunt(true); const g = r.g;
@@ -1878,7 +1952,7 @@ function tornado(pos, dir, k = 1, life = 3) {
   const mesh = new THREE.Mesh(new THREE.ConeGeometry(1.3 * k, 3.4 * k, 14, 1, true), addMat(MI, { opacity: .45 })); mesh.rotation.x = PI;
   shoot({ pos: new V3(pos.x, 1.7 * k, pos.z), dir, speed: 7, life, mesh, noFlightHit: true, noOrient: true, trail: MI, trailSize: 1.2 * k,
     update: (pp, dt) => { mesh.rotation.y += dt * 14; pp.tick = (pp.tick || 0) + dt; if (pp.tick < .2) return; pp.tick = 0; const mp = mesh.position;
-      for (const e of enemies) { if (e.dead || e.state === 'spawn') continue; const dx = mp.x - e.pos.x, dz = mp.z - e.pos.z, d = Math.hypot(dx, dz); if (d > 4.5 * k) continue; if (e.kind !== 'boss') { e.vel.x += dx / (d || 1) * 4; e.vel.z += dz / (d || 1) * 4; } hitEnemy(e, 10, { dir: new V3(-dx, 0, -dz).normalize(), kb: .3, up: e.kind === 'grunt' || e.kind === 'archer' ? 2.5 : 0, quiet: true, noProc: true }); } },
+      for (const e of enemies) { if (e.dead || e.state === 'spawn') continue; const dx = mp.x - e.pos.x, dz = mp.z - e.pos.z, d = Math.hypot(dx, dz); if (d > 4.5 * k) continue; if (e.kind !== 'boss') { e.vel.x += dx / (d || 1) * 4; e.vel.z += dz / (d || 1) * 4; } hitEnemy(e, 10, { dir: new V3(-dx, 0, -dz).normalize(), kb: .3, up: isSmall(e) ? 2.5 : 0, quiet: true, noProc: true }); } },
     onEnd: pp => { boom(new V3(pp.mesh.position.x, 0, pp.mesh.position.z), 3.6 * k, 40, 7, 6, { color: MI, noProc: true }); pp.mesh.geometry.dispose(); } });
 }
 const thrust = (s0, s1) => S(s0, s1, -.3, .05, 0, .03, -.6, .55);
@@ -2195,7 +2269,7 @@ function doHit(h) {
     if (hitEnemy(e, h.dmg, { dir, kb: h.kb, up: h.up, heavy: h.heavy })) count++;
   }
   if (h.ring) { const p = new V3(cx, 0, cz); shock(p, h.range * 1.2, 0xffd27a, .5); shock(p, h.range * .7, 0xffffff, .35); Particles.ring(p, h.range, 50, 0xffc070, .6, .9); Particles.burst(new V3(cx, .5, cz), 40, 0x8a7a6a, 7, .9, .9, 6); lightFlash(p, 90); Sfx.boom(.7); }
-  if (count) { game.hitstop = Math.max(game.hitstop, h.stop ?? .04); addShake(h.shake ?? .12); Sfx.hit(h.heavy, count); }
+  if (count) { game.hitstop = Math.max(game.hitstop, h.stop ?? .04); addShake(h.shake ?? .12); Sfx.hit(h.heavy, count, P.def.weapon); }
   return count;
 }
 
@@ -2204,6 +2278,11 @@ function hitEnemy(e, base, o) {
   const crit = !o.raw && Math.random() < .12;
   let dmg = o.raw ? base : base * P.dmgMult * (game.edge > 0 ? 1.6 : 1) * (P.buffT > 0 ? 1.3 : 1) * rand(.9, 1.1) * (crit ? 1.6 : 1);
   if (e.puppet) return puppetHit(e, dmg, crit, o);
+  let blocked = false;
+  if (e.kind === 'shield' && !o.heavy && !o.force && e.state !== 'down' && Math.abs(angDiff(e.facing, Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z))) < 1.15) {
+    dmg *= .15; blocked = true; Sfx.clang(); Particles.sparks(new V3(e.pos.x, 1, e.pos.z), o.dir.clone().multiplyScalar(-1), 10, 0x9ad0ff, 10);
+    if (P === ME) tipOnce('shieldTip', 'Shieldbearers block from the front. Hit them from behind, or break the guard with heavy finishers and skills.');
+  }
   if (e.weakExposed) {
     e.weakGauge -= dmg * (e.kind === 'boss' ? .32 : .5);
     if (e.weakGauge <= 0) { weakSmash(e); return true; }
@@ -2217,11 +2296,11 @@ function hitEnemy(e, base, o) {
     Particles.burst(hp, 4, 0xb04aff, 3, .4, .35, 0);
     slashFlash(hp, game.edge > 0 ? 0xa0f4ff : 0xfff0c0, (o.heavy ? 3.2 : 2.4) * Math.min(2.2, e.scale));
   }
-  const armored = e.kind === 'boss' || ((e.kind === 'captain' || e.kind === 'brute') && !o.heavy && !o.force);
+  const armored = blocked || e.kind === 'boss' || ((e.kind === 'captain' || e.kind === 'brute') && !o.heavy && !o.force);
   if (!armored) {
     const resist = e.kind === 'captain' ? .5 : e.kind === 'brute' ? .6 : 1;
     e.vel.addScaledVector(o.dir, o.kb * resist);
-    if (o.up) { e.vy = Math.max(e.vy, o.up * (e.kind === 'captain' ? .4 : e.kind === 'brute' ? .55 : 1)); }
+    if (o.up && e.kind !== 'wraith') { e.vy = Math.max(e.vy, o.up * (e.kind === 'captain' ? .4 : e.kind === 'brute' ? .55 : 1)); }
     else if (e.y > .2) e.vy = Math.max(e.vy, 3.2);
     if (e.tele) { removeTele(e.tele); e.tele = null; }
     releaseToken(e);
@@ -2262,6 +2341,8 @@ function killEnemy(e, dir, kb) {
   if (e.dead) return;
   e.dead = true; e.deadT = 0; releaseToken(e); if (e.tele) { removeTele(e.tele); e.tele = null; }
   setFlash(e, false); e.warnRing.visible = false;
+  if (e.kind === 'bomber') bomberBlast(e, false);
+  if (e.kind === 'captain' || e.kind === 'brute') Sfx.groan();
   if (e.kind === 'boss') { bossDefeated(e); return; }
   const f = e.kind === 'captain' ? .5 : e.kind === 'brute' ? .7 : 1;
   e.vel.copy(dir).multiplyScalar(Math.max(6, kb * 1.7 + 4) * f); e.vy = rand(5, 9) * f + 2; e.spinV = rand(-14, 14);
@@ -2270,7 +2351,7 @@ function killEnemy(e, dir, kb) {
   if (game.kos % 100 === 0) showBanner(game.kos + ' KOs', 'THE HOLLOW FALTER', '', 1.8);
   addXP(e.kind === 'captain' ? 25 : e.kind === 'brute' ? 4 : 1);
   P.valor = Math.min(100, P.valor + (e.kind === 'captain' ? 20 : e.kind === 'brute' ? 4 : 1.4));
-  if ((e.kind === 'grunt' || e.kind === 'archer') && Math.random() < .045) spawnPickup(e.pos);
+  if (isSmall(e) && Math.random() < (L.endless ? .08 : .045)) spawnPickup(e.pos);
   if (e.kind === 'brute' && Math.random() < .3) spawnPickup(e.pos);
   if (e.kind === 'captain') { for (let i = 0; i < 3; i++) spawnPickup(new V3(e.pos.x + rand(-2, 2), 0, e.pos.z + rand(-2, 2))); captainDown(e); }
   if (game.objective === 0) { game.waveKills++; updateObjective(); }
@@ -2448,23 +2529,30 @@ const TYPES = {
   brute: { hp: 280, dmg: 80, speed: 2.8, radius: .85, scale: 1.45 },
   captain: { hp: 1300, dmg: 95, speed: 3.0, radius: 1.05, scale: 1.8 },
   boss: { hp: 15000, dmg: 140, speed: 3.6, radius: 2.4, scale: 1.4 },
+  shield: { hp: 90, dmg: 40, speed: 3.2, radius: .62, scale: 1.05 },
+  wraith: { hp: 40, dmg: 38, speed: 5.2, radius: .5, scale: 1 },
+  hexer: { hp: 70, dmg: 20, speed: 3.2, radius: .55, scale: 1 },
+  bomber: { hp: 24, dmg: 110, speed: 6.2, radius: .5, scale: .9 },
 };
+const SMALL = new Set(['grunt', 'archer', 'shield', 'wraith', 'hexer', 'bomber']);
+const isSmall = e => SMALL.has(e.kind);
 function pickKind() { const r = Math.random(); let acc = 0; for (const k in L.mix) { acc += L.mix[k]; if (r < acc) return k; } return 'grunt'; }
 function spawnEnemy(kind, x, z, outpost = null, opts = {}) {
   const T = TYPES[kind]; const cfg = kind === 'boss' ? (opts.cfg || L.boss) : null;
-  const r = kind === 'boss' ? buildBoss(cfg) : kind === 'captain' ? buildCaptain() : kind === 'brute' ? buildBrute() : kind === 'archer' ? buildArcher() : buildGrunt(Math.random() < .3);
+  const r = kind === 'boss' ? buildBoss(cfg) : kind === 'captain' ? buildCaptain() : kind === 'brute' ? buildBrute() : kind === 'archer' ? buildArcher() : kind === 'shield' ? buildShieldGrunt() : kind === 'wraith' ? buildWraith() : kind === 'hexer' ? buildHexer() : kind === 'bomber' ? buildBomber() : buildGrunt(Math.random() < .3);
   const scale = cfg ? cfg.scale : T.scale, radius = cfg ? T.radius * cfg.scale / 1.4 : T.radius;
   r.g.scale.setScalar(scale);
   const blob = new THREE.Mesh(EG.blob, EM.blob); blob.scale.setScalar(radius * 1.2);
   const warnRing = new THREE.Mesh(EG.warn, EM.warn); warnRing.visible = false; warnRing.scale.setScalar(radius * 1.6);
   scene.add(r.g, blob, warnRing);
-  const hpMul = (1 + game.captured * .15) * L.diff;
+  const hpMul = (1 + game.captured * .15) * L.diff * (L.endless ? game.waveHp || 1 : 1);
   const maxHp = (cfg ? cfg.hp * (opts.hpMul || 1) : kind === 'captain' ? T.hp * L.diff : T.hp * hpMul) * curDiff().hp;
   const e = {
     nid: ++Net.nid, puppet: !!opts.puppet,
     kind, g: r.g, parts: r, blob, warnRing, flashables: r.flashables, mats: r.flashables.map(m => m.material), core: r.core, cfg,
     pos: new V3(x, 0, z), vel: new V3(), y: kind === 'boss' ? 0 : -1.8, vy: 0, facing: rand(0, TAU), hp: maxHp, maxHp, radius, scale, speed: T.speed * rand(.9, 1.1), dmg: (cfg && cfg.dmg) || T.dmg,
     state: 'spawn', stateT: 0, atkCD: rand(1, 3), slot: rand(0, TAU), slotR: kind === 'archer' ? rand(10, 15) : rand(2.2, 4.2), outpost, dead: false, flashT: 0, squash: 0, token: false, shooter: false, invuln: 0,
+    flank: (kind === 'grunt' || kind === 'shield') && Math.random() < .3, baseDmg: (cfg && cfg.dmg) || T.dmg, buffT: 0,
     weakMax: (kind === 'captain' || kind === 'boss') ? 100 : 0, weakGauge: 100, weakExposed: false, weakT: 0, name: opts.name || '', aggro: opts.aggro ?? (kind !== 'grunt'), bob: rand(0, TAU), mark: 0, markT: 0, downFor: .7
   };
   if (kind === 'boss') { e.state = 'intro'; e.y = -8; e.invuln = 99; e.introDelay = opts.introDelay || 0; e.bkey = cfg.key; }
@@ -2496,13 +2584,17 @@ function updateEnemies(dt) {
     e.pos.addScaledVector(e.vel, dt);
     const grounded = e.y <= 0 && e.vy <= 0;
     e.vel.multiplyScalar(Math.exp(-dt * (grounded ? 7 : 1.2)));
-    if (e.state !== 'spawn' && e.state !== 'intro' && (e.y > 0 || e.vy > 0)) {
+    if (e.state !== 'spawn' && e.state !== 'intro' && e.kind !== 'wraith' && (e.y > 0 || e.vy > 0)) {
       e.vy -= 28 * dt; e.y += e.vy * dt;
       if (e.y <= 0) { e.y = 0; if (e.vy < -7) { e.state = 'down'; e.stateT = 0; Particles.burst(new V3(e.pos.x, .2, e.pos.z), 8, 0x8a7a6a, 3, .5, .6, 4); } e.vy = 0; }
     }
     if (e.weakExposed) { e.weakT -= dt; if (e.weakT <= 0) { e.weakExposed = false; e.core.material = EM.core; } }
     const dx = px - e.pos.x, dz = pz - e.pos.z, dist = Math.hypot(dx, dz), toP = Math.atan2(dx, dz);
-    if (e.kind === 'grunt') updateGrunt(e, dt, dist, toP);
+    if (e.buffT > 0) { e.buffT -= dt; if (Math.random() < dt * 10) Particles.spawn(e.pos.x + rand(-.4, .4), e.y + rand(.3, 1.6) * e.scale, e.pos.z + rand(-.4, .4), 0, 1.5, 0, .5, .4, 0xff3a3a, 0, 1); if (e.buffT <= 0) e.dmg = e.baseDmg; }
+    if (e.kind === 'grunt' || e.kind === 'shield') updateGrunt(e, dt, dist, toP);
+    else if (e.kind === 'wraith') updateWraith(e, dt, dist, toP);
+    else if (e.kind === 'hexer') updateHexer(e, dt, dist, toP);
+    else if (e.kind === 'bomber') updateBomber(e, dt, dist, toP);
     else if (e.kind === 'archer') updateArcher(e, dt, dist, toP);
     else if (e.kind === 'brute') updateBrute(e, dt, dist, toP);
     else if (e.kind === 'captain') updateCaptain(e, dt, dist, toP);
@@ -2529,7 +2621,7 @@ function updateEnemies(dt) {
     if (A.puppet) continue;
     for (const pl of players) {
       const dx = A.pos.x - pl.pos.x, dz = A.pos.z - pl.pos.z, d = Math.hypot(dx, dz), min = A.radius + .45;
-      if (d < min && d > .001) { if (A.kind === 'grunt' || A.kind === 'archer' || pl.remote) { A.pos.x = pl.pos.x + dx / d * min; A.pos.z = pl.pos.z + dz / d * min; } else { pl.pos.x = A.pos.x - dx / d * min; pl.pos.z = A.pos.z - dz / d * min; } }
+      if (d < min && d > .001) { if (isSmall(A) || pl.remote) { A.pos.x = pl.pos.x + dx / d * min; A.pos.z = pl.pos.z + dz / d * min; } else { pl.pos.x = A.pos.x - dx / d * min; pl.pos.z = A.pos.z - dz / d * min; } }
     }
   }
   P = prevP;
@@ -2540,8 +2632,8 @@ function updateDead(e, dt) {
   e.vy -= 26 * dt; e.y += e.vy * dt; e.pos.addScaledVector(e.vel, dt); e.vel.multiplyScalar(Math.exp(-dt * .8));
   e.g.rotation.x += e.spinV * dt; e.g.rotation.z += e.spinV * .4 * dt;
   e.g.position.set(e.pos.x, Math.max(0, e.y), e.pos.z); e.blob.position.set(e.pos.x, .03, e.pos.z);
-  if (e.vel.length() > 7 && (e.kind === 'grunt' || e.kind === 'archer')) {
-    for (const o of enemies) { if (o === e || o.dead || (o.kind !== 'grunt' && o.kind !== 'archer') || e.hitSet.has(o) || o.state === 'spawn') continue; if (Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 1.2 && e.y < 2.2) { e.hitSet.add(o); hitEnemy(o, 12, { dir: e.vel.clone().normalize(), kb: 6, up: 4, noProc: true, quiet: true }); } }
+  if (e.vel.length() > 7 && (isSmall(e))) {
+    for (const o of enemies) { if (o === e || o.dead || !isSmall(o) || e.hitSet.has(o) || o.state === 'spawn') continue; if (Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 1.2 && e.y < 2.2) { e.hitSet.add(o); hitEnemy(o, 12, { dir: e.vel.clone().normalize(), kb: 6, up: 4, noProc: true, quiet: true }); } }
   }
   if ((e.y <= 0 && e.deadT > .15) || e.deadT > 1.6) {
     const p = new V3(e.pos.x, .6 * e.scale, e.pos.z); const big = e.kind === 'captain' || e.kind === 'brute';
@@ -2563,7 +2655,8 @@ function slotMove(e, dt, dist, toP) {
   if (!e.aggro && dist < 26) e.aggro = true;
   if (!e.aggro) { e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 2); return; }
   e.slot += dt * .15;
-  const tx = P.pos.x + Math.sin(e.slot) * e.slotR, tz = P.pos.z + Math.cos(e.slot) * e.slotR;
+  const sl = e.flank ? P.facing + PI + Math.sin(game.time * .5 + e.nid) * .9 : e.slot;
+  const tx = P.pos.x + Math.sin(sl) * e.slotR, tz = P.pos.z + Math.cos(sl) * e.slotR;
   const mx = tx - e.pos.x, mz = tz - e.pos.z, md = Math.hypot(mx, mz);
   if (md > .4) { const sp = e.speed * (dist > 14 ? 1.6 : 1); e.pos.x += mx / md * sp * dt; e.pos.z += mz / md * sp * dt; }
   e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 8);
@@ -2575,6 +2668,7 @@ function updateGrunt(e, dt, dist, toP) {
   switch (e.state) {
     case 'idle':
       slotMove(e, dt, dist, toP); if (!e.aggro) break;
+      if (P.state === 'attack' && P.atk && P.atk.armor && dist < 3.6 && Math.random() < dt * 1.4) e.vel.addScaledVector(fwdVec(toP), -7);
       e.atkCD -= dt;
       if (e.atkCD <= 0 && dist < 3.2 && takeToken(e)) { e.state = 'windup'; e.stateT = 0; e.warnRing.visible = true; }
       break;
@@ -2602,8 +2696,9 @@ function updateArcher(e, dt, dist, toP) {
       if (!e.aggro) break;
       e.atkCD -= dt;
       if (e.atkCD <= 0 && dist < 24 && game.shooters < 3 && game.edge <= 0) {
-        e.state = 'aim'; e.stateT = 0; e.shooter = true; game.shooters++; e.facing = toP;
-        e.tele = makeTele('rect', e.pos.x, e.pos.z, toP, .95, (t) => {
+        const lead = P.mi ? P.mi.clone().multiplyScalar(P.def.speed * .5) : new V3(); const aimA = Math.atan2(P.pos.x + lead.x - e.pos.x, P.pos.z + lead.z - e.pos.z);
+        e.state = 'aim'; e.stateT = 0; e.shooter = true; game.shooters++; e.facing = aimA;
+        e.tele = makeTele('rect', e.pos.x, e.pos.z, aimA, .95, (t) => {
           e.tele = null; if (e.dead) return;
           const f = fwdVec(t.a); const m = arrowMesh(0xff4a3a, 1); m.position.set(e.pos.x + f.x, 1.3, e.pos.z + f.z); m.lookAt(m.position.clone().add(f)); scene.add(m);
           eShots.push({ mesh: m, vel: f.multiplyScalar(26), t: 0, life: .9, dmg: e.dmg * .8 });
@@ -2612,7 +2707,7 @@ function updateArcher(e, dt, dist, toP) {
       }
       break;
     case 'aim': e.parts.arm.rotation.x = -.2; break;
-    case 'recover': if (e.stateT > .8) { e.state = 'idle'; e.atkCD = rand(3, 5.5); } break;
+    case 'recover': if (e.stateT > .8) { e.state = 'idle'; e.atkCD = rand(3, 5.5); e.slot += rand(1.2, 2.6) * (Math.random() < .5 ? -1 : 1); } break;
     default: e.state = 'idle';
   }
 }
@@ -2633,12 +2728,90 @@ function updateBrute(e, dt, dist, toP) {
           hitPlayersIn(t, e.dmg, p, 9);
           e.state = 'recover'; e.stateT = 0; releaseToken(e);
         }, { r: 3.2 });
+      } else if (e.atkCD <= 0 && dist > 8 && dist < 18 && Math.random() < dt * 1.2 && takeToken(e)) {
+        e.state = 'tele'; e.stateT = 0; e.facing = toP;
+        e.tele = makeTele('rect', e.pos.x, e.pos.z, toP, .9, () => { e.tele = null; if (e.dead) return; e.state = 'charge'; e.stateT = 0; e.chargeHit = false; }, { w: 2.6, len: 13 });
+        Sfx.warn();
       }
+      break;
+    case 'charge':
+      e.pos.addScaledVector(fwdVec(e.facing), 20 * dt); arm.rotation.x = .5; Particles.spawn(e.pos.x, .5, e.pos.z, 0, 1, 0, .4, .8, 0x8a7a6a, 0, 1);
+      if (!e.chargeHit && dist < 2) { e.chargeHit = true; playerTryHit(e.dmg, e.pos, 11); }
+      if (e.stateT > .6) { e.state = 'recover'; e.stateT = 0; releaseToken(e); }
       break;
     case 'tele': arm.rotation.x = lerp(arm.rotation.x, -2.2, Math.min(1, dt * 6)); break;
     case 'recover': arm.rotation.x = lerp(arm.rotation.x, 0, Math.min(1, dt * 3)); if (e.stateT > 1.1) { e.state = 'idle'; e.atkCD = rand(1.5, 3); } break;
     default: e.state = 'idle';
   }
+}
+
+function updateWraith(e, dt, dist, toP) {
+  e.vy = 0; const hover = 1.7 + Math.sin(game.time * 3 + e.nid) * .3;
+  if (e.state === 'spawn') { e.y = Math.min(hover, e.y + dt * 4); if (e.y >= hover - .05) { e.state = 'idle'; e.stateT = 0; } return; }
+  e.parts.arm.rotation.x = e.state === 'swoop' ? -.8 : Math.sin(game.time * 6 + e.nid) * .3;
+  switch (e.state) {
+    case 'stagger': case 'air': case 'down': e.y = lerp(e.y, hover, Math.min(1, dt * 3)); if (e.stateT > .35) e.state = 'idle'; break;
+    case 'idle': {
+      e.y = lerp(e.y, hover, Math.min(1, dt * 3));
+      if (!e.aggro && dist < 30) e.aggro = true; if (!e.aggro) break;
+      e.slot += dt * .9; const tx = P.pos.x + Math.sin(e.slot) * 7, tz = P.pos.z + Math.cos(e.slot) * 7; const mx = tx - e.pos.x, mz = tz - e.pos.z, md = Math.hypot(mx, mz);
+      if (md > .4) { e.pos.x += mx / md * e.speed * dt; e.pos.z += mz / md * e.speed * dt; }
+      e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 8);
+      e.atkCD -= dt;
+      if (e.atkCD <= 0 && dist < 14 && takeToken(e)) { const a = toP; e.state = 'tele'; e.stateT = 0; e.facing = a; Sfx.warn();
+        e.tele = makeTele('rect', e.pos.x, e.pos.z, a, .8, () => { e.tele = null; if (e.dead) return; e.state = 'swoop'; e.stateT = 0; e.hitDone = false; e.swoopA = a; }, { w: 1.6, len: Math.min(16, dist + 4) }); }
+      break; }
+    case 'tele': e.y = lerp(e.y, 2.7, Math.min(1, dt * 4)); break;
+    case 'swoop': e.y = lerp(e.y, .7, Math.min(1, dt * 10)); e.pos.addScaledVector(fwdVec(e.swoopA), 22 * dt);
+      Particles.spawn(e.pos.x, e.y + .6, e.pos.z, 0, .5, 0, .4, .6, 0x9a6aff, 0, 1);
+      if (!e.hitDone && dist < 1.6) { e.hitDone = true; playerTryHit(e.dmg, e.pos, 7); }
+      if (e.stateT > .5) { e.state = 'recover'; e.stateT = 0; releaseToken(e); } break;
+    case 'recover': e.y = lerp(e.y, hover, Math.min(1, dt * 3)); if (e.stateT > .8) { e.state = 'idle'; e.atkCD = rand(2.5, 4.5); } break;
+    default: e.state = 'idle';
+  }
+}
+function hexPulse(e) {
+  shock(e.pos, 8, 0x6aff6a, .6); Particles.burst(new V3(e.pos.x, 1.2, e.pos.z), 30, 0x6aff6a, 6, .7, .6, -2); Sfx.hex();
+  for (const o of enemies) {
+    if (o.dead || o === e || o.kind === 'boss' || o.puppet) continue;
+    if (Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 8) { o.hp = Math.min(o.maxHp, o.hp + o.maxHp * .3); if (!(o.buffT > 0)) o.dmg = o.baseDmg * 1.4; o.buffT = 6; }
+  }
+}
+function updateHexer(e, dt, dist, toP) {
+  e._dt = dt; if (commonReact(e)) return;
+  switch (e.state) {
+    case 'idle': {
+      if (!e.aggro && dist < 30) e.aggro = true; if (!e.aggro) break;
+      const k = dist < 9.5 ? -1 : dist > 13 ? 1 : 0; e.pos.addScaledVector(fwdVec(toP), k * e.speed * dt);
+      e.slot += dt * .4; e.pos.addScaledVector(fwdVec(toP + PI / 2), Math.sin(e.slot) * e.speed * .5 * dt);
+      e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 6);
+      e.atkCD -= dt; if (e.atkCD <= 0) { e.state = 'cast'; e.stateT = 0; e.warnRing.visible = true; }
+      break; }
+    case 'cast': e.parts.arm.rotation.x = -2.4; Particles.spawn(e.pos.x, 2.4, e.pos.z, rand(-1, 1), 1, rand(-1, 1), .4, .5, 0x6aff6a, 0, 1);
+      if (e.stateT > .8) { hexPulse(e); e.state = 'idle'; e.atkCD = rand(4.5, 6); e.parts.arm.rotation.x = 0; e.warnRing.visible = false; } break;
+    default: e.state = 'idle';
+  }
+}
+function updateBomber(e, dt, dist, toP) {
+  e._dt = dt; if (e.state !== 'fuse' && commonReact(e)) return;
+  switch (e.state) {
+    case 'idle':
+      if (!e.aggro && dist < 28) e.aggro = true; if (!e.aggro) break;
+      e.facing = toP; e.pos.addScaledVector(fwdVec(toP), e.speed * dt * (dist > 3 ? 1 : .3)); e.y = Math.abs(Math.sin(game.time * 14 + e.nid)) * .25;
+      if (dist < 2.7) { e.state = 'fuse'; e.stateT = 0; e.warnRing.visible = true; Sfx.fuse(); e.tele = makeTele('circle', e.pos.x, e.pos.z, 0, .9, () => { e.tele = null; if (!e.dead) bomberBlast(e, true); }, { r: 3.2 }); }
+      break;
+    case 'fuse': e.y = 0; e.warnRing.scale.setScalar(e.radius * (1.8 + Math.sin(e.stateT * 30) * .5)); e.squash = .1 + Math.sin(e.stateT * 30) * .1; break;
+    default: e.state = 'idle';
+  }
+}
+function bomberBlast(e, hurt) {
+  if (e.blasted) return; e.blasted = true; if (e.tele) { removeTele(e.tele); e.tele = null; }
+  const p = new V3(e.pos.x, 0, e.pos.z);
+  shock(p, 4.6, 0xff8a2a, .5); shock(p, 2.4, 0xffffff, .3); Particles.burst(new V3(p.x, .8, p.z), 50, 0xff8a2a, 9, .7, .8, 3); Particles.burst(new V3(p.x, .8, p.z), 20, 0x4a3a30, 5, 1, 1, -1);
+  lightFlash(p, 80, 0xff8a2a); Sfx.boom(.8); addShake(.4);
+  for (const o of enemies) { if (o === e || o.dead || o.state === 'spawn' || o.puppet) continue; const d = Math.hypot(o.pos.x - p.x, o.pos.z - p.z); if (d < 3.8 + o.radius) hitEnemy(o, 70, { dir: new V3(o.pos.x - p.x, 0, o.pos.z - p.z).normalize(), kb: 9, up: 6, heavy: true, raw: true, noProc: true }); }
+  if (hurt) for (const pl of players) { if (pl.state === 'dead' || pl.netDead) continue; if (Math.hypot(pl.pos.x - p.x, pl.pos.z - p.z) < 3.3) { const pv = P; P = pl; playerTryHit(e.dmg, p, 10); P = pv; } }
+  if (!e.dead) killEnemy(e, new V3(0, 0, 1), 2);
 }
 
 /* ----- telegraphs (ground warnings for big attacks) ----- */
@@ -2672,7 +2845,12 @@ function updateTeles(dt) {
   teleMatO.opacity = .18 + Math.sin(game.time * 20) * .06;
 }
 
+function captainHorn(e) {
+  e.called = true; Sfx.horn(); showBanner((e.name || 'THE CAPTAIN').toUpperCase() + ' SOUNDS THE HORN', 'REINFORCEMENTS INCOMING', 'red', 2);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; later(.3 + i * .12, () => { if (!e.dead && enemies.length < 88) spawnEnemy(pickKind(), e.pos.x + Math.cos(a) * 7, e.pos.z + Math.sin(a) * 7, e.outpost, { aggro: true }); }); }
+}
 function updateCaptain(e, dt, dist, toP) {
+  if (!e.called && e.hp < e.maxHp * .5) captainHorn(e);
   e._dt = dt; if (e.state === 'spawn' || e.state === 'down' || e.state === 'stagger' || e.state === 'air') { if (e.state === 'down') { if (e.stateT > (e.downFor || 1.2)) { e.state = 'idle'; e.downFor = 1.2; e.atkCD = .8; } return; } if (e.state === 'spawn') { commonReact(e); return; } if (e.y <= 0 && e.vy <= 0 && e.stateT > .4) e.state = 'idle'; return; }
   const arm = e.parts.arm;
   switch (e.state) {
@@ -2717,7 +2895,7 @@ function updateBoss(e, dt, dist, toP) {
   switch (e.state) {
     case 'intro':
       e.y = Math.min(0, -8 + e.stateT * 3.2); Particles.spawn(e.pos.x + rand(-3, 3), .3, e.pos.z + rand(-3, 3), 0, rand(3, 8), 0, 1, 1.2, cfg.fx, 0, .5);
-      e.facing = toP; if (e.y >= 0) { e.state = 'idle'; e.stateT = 0; e.invuln = 0; e.atkCD = 1 + e.introDelay; Sfx.boom(1.4); shock(e.pos, 16, cfg.fx, .8); addShake(1.2); }
+      e.facing = toP; if (e.y >= 0) { e.state = 'idle'; e.stateT = 0; e.invuln = 0; e.atkCD = 1 + e.introDelay; Sfx.boom(1.4); Sfx.roar(); shock(e.pos, 16, cfg.fx, .8); addShake(1.2); }
       break;
     case 'idle':
       e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 3 * spd);
@@ -2830,6 +3008,7 @@ const OBJ_TEXT = [
   () => `Defeat ${capWords(L.boss.name)}, ${capWords(L.boss.title.split('·').pop().trim())}`,
   () => `Victory`,
   () => `The Gauntlet · round ${Math.min(game.round + 1, L.rush.length)}/${L.rush.length}${game.bossLabel ? ' · ' + capWords(game.bossLabel) : ''}`,
+  () => `Endless · wave ${game.wave} · ${game.waveQueue.length + enemies.filter(e => !e.dead).length} Hollow left`,
 ];
 function updateObjective() {
   $('objTxt').textContent = OBJ_TEXT[game.objective]();
@@ -2881,6 +3060,7 @@ function setObjective(n) {
       showTip('Read the red ground. Dodge as it fills for <b>Edge Time</b>, then punish the glowing core.', 6);
     });
   }
+  if (n === 6) { game.wave = 0; game.waveQueue = []; game.waveBreak = 2.5; Sfx.setIntensity(1); }
   if (n === 5) {
     game.round = 0; Sfx.setIntensity(2);
     later(1.5, startRound);
@@ -2893,13 +3073,40 @@ function captainDown(e) {
   o.flagM.color.set(0xe8b44a); o.flagM.emissive.set(0x604000); o.beam.material.color.set(0xffd27a); o.inner.material.color.set(0xffd27a);
   pillar(new V3(o.x, 0, o.z), 4, 40, 0xffe08a, 1.4); shock(new V3(o.x, 0, o.z), 18, 0xffd27a, 1);
   showBanner(o.name + ' RECLAIMED', 'THE LIGHT RETURNS', '', 2.4); Sfx.chime(); game.slowmo = .8;
-  const routed = enemies.filter(x => !x.dead && (x.kind === 'grunt' || x.kind === 'archer') && Math.hypot(x.pos.x - o.x, x.pos.z - o.z) < 28);
+  const routed = enemies.filter(x => !x.dead && (isSmall(x)) && Math.hypot(x.pos.x - o.x, x.pos.z - o.z) < 28);
   routed.sort((a, b) => Math.hypot(a.pos.x - o.x, a.pos.z - o.z) - Math.hypot(b.pos.x - o.x, b.pos.z - o.z));
   routed.forEach((x, i) => later(.25 + i * .05, () => { if (!x.dead) { const d = new V3(x.pos.x - o.x, 0, x.pos.z - o.z).normalize(); slashFlash(new V3(x.pos.x, 1, x.pos.z), 0xffe08a, 3); killEnemy(x, d, 6); Sfx.hit(false, 2); } }));
   healAll(.25);
   updateObjective();
   later(2, () => o.beam.visible = false);
   if (game.captured >= OUTPOSTS.length) setObjective(L.warlord ? 2 : 3);
+}
+const ENDLESS_BOSSES = ['gorrak', 'ysolde', 'kharn', ['twinA', 'twinB'], 'morvath1', 'veyla', 'grael', 'morvath2'];
+function nextWave() {
+  game.wave++; const w = game.wave;
+  if (w >= 10) unlock('endless_10'); if (w >= 25) unlock('endless_25');
+  const pool = ['grunt']; if (w >= 2) pool.push('bomber'); if (w >= 3) pool.push('shield'); if (w >= 4) pool.push('archer'); if (w >= 6) pool.push('wraith'); if (w >= 7) pool.push('hexer'); if (w >= 8) pool.push('brute');
+  const n = Math.min(70, 14 + w * 4); game.waveQueue = [];
+  for (let i = 0; i < n; i++) game.waveQueue.push(i % 3 === 0 ? 'grunt' : pool[Math.floor(Math.random() * pool.length)]);
+  for (let i = 0; i < Math.floor(w / 5); i++) game.waveQueue.splice(Math.floor(game.waveQueue.length / 2), 0, 'captain');
+  game.waveHp = 1 + (w - 1) * .07;
+  const bossWave = w % 10 === 0;
+  showBanner('WAVE ' + w, bossWave ? 'A KING ENTERS THE ARENA' : Math.floor(w / 5) && w % 5 === 0 ? 'CAPTAINS LEAD THIS WAVE' : n + ' HOLLOW', bossWave ? 'red' : '', 2.2);
+  if (bossWave) { const k = ENDLESS_BOSSES[(w / 10 - 1) % ENDLESS_BOSSES.length]; later(1.5, () => { const [x, z] = aheadPoint(16); spawnBossGroup(Array.isArray(k) ? k : [k], x, z, .45 + w * .01); }); }
+  Sfx.setIntensity(bossWave ? 2 : 1); updateObjective();
+}
+function endlessTick(dt) {
+  if (game.waveBreak > 0) { game.waveBreak -= dt; if (game.waveBreak <= 0) nextWave(); return; }
+  game.spawnT = (game.spawnT || 0) - dt;
+  if (game.waveQueue.length && game.spawnT <= 0 && enemies.length < 72) {
+    game.spawnT = 1.2; const anchor = alivePlayers()[0] || ME; const a = rand(0, TAU), r = rand(24, 32);
+    let x = anchor.pos.x + Math.cos(a) * r, z = anchor.pos.z + Math.sin(a) * r; const rr = Math.hypot(x, z); if (rr > ARENA_R - 8) { x *= (ARENA_R - 8) / rr; z *= (ARENA_R - 8) / rr; }
+    for (let k = 0; k < 6 && game.waveQueue.length; k++) { const kind = game.waveQueue.shift(); spawnEnemy(kind, x + rand(-4, 4), z + rand(-4, 4), null, { aggro: true, name: kind === 'captain' ? 'Arena Captain' : '' }); }
+  }
+  game.objT = (game.objT || 0) - dt; if (game.objT <= 0) { game.objT = .5; updateObjective(); }
+  if (!game.waveQueue.length && !enemies.some(e => !e.dead) && game.wave > 0) {
+    showBanner('WAVE ' + game.wave + ' CLEARED', 'CATCH YOUR BREATH', '', 2); healAll(.2, 10); Sfx.chime(); game.waveBreak = 4; $('boss').classList.remove('on');
+  }
 }
 function bossExplode(e, big) {
   const cfg = e.cfg;
@@ -2923,6 +3130,7 @@ function bossDefeated(e) {
     return;
   }
   $('boss').classList.remove('on');
+  if (game.objective === 6) { showBanner(game.bossLabel + ' FALLS', 'THE WAVE ROLLS ON', '', 2.4); bossExplode(e, true); healAll(.3, 30); return; }
   if (game.objective === 2) {
     showBanner(game.bossLabel + ' DEFEATED', 'THE ROAD TO THE RIFT OPENS', '', 3);
     bossExplode(e, true); game.slowmo = 1.5; game.hitstop = .25;
@@ -2990,10 +3198,13 @@ function updateMission(dt) {
     }
   }
   runTimers(dt);
+  if (game.objective === 6) endlessTick(dt);
   if (game.net === 'host' && !alivePlayers().length && game.state === 'play' && !game.defeatT) game.defeatT = 2.2;
   if (game.defeatT) { game.defeatT -= dt; if (game.defeatT <= 0) { game.defeatT = 0; showResults(false); } }
   if (P.valor >= 100) tipOnce('valor', `Valor is full! Press <kbd>R</kbd> to unleash <b>${P.def.ult.name}</b>.`);
   if (L.mix.archer && enemies.some(e => e.kind === 'archer' && !e.dead && e.aggro)) tipOnce('archer', 'Hollow archers fire along the red lines. Step out of the line or dodge through the arrow.');
+  for (const [k, msg] of [['bomber', 'Bombers rush in and explode. Kill them early and they blow up their own side instead.'], ['wraith', 'Wraiths fly and swoop along the red lines. Sidestep the dive, then punish them.'], ['hexer', 'Hexers heal and empower nearby Hollow (red glow). Take them out first.']])
+    if (enemies.some(e => e.kind === k && !e.dead && e.aggro)) tipOnce(k, msg);
   if (L.mix.brute && enemies.some(e => e.kind === 'brute' && !e.dead && e.aggro)) tipOnce('brute', 'Ash Brutes ignore light hits. Heavy finishers and skills knock them around.');
   if (game.ending > 0) { game.ending -= dt; if (game.ending <= 0) showResults(true); }
   if (world.riftDisc) world.riftDisc.material.uniforms.t.value = game.time;
@@ -3026,7 +3237,7 @@ function drawOverlay(dt) {
     const d = camera.position.distanceTo(e.g.position); if (d > 45) continue;
     const s = toScreen(_v.set(e.pos.x, e.y + 2.1 * e.scale, e.pos.z)); if (!s) continue;
     if (e.mark) { octx.fillStyle = '#c890ff'; for (let k = 0; k < e.mark; k++) { const x = s[0] - (e.mark - 1) * 5 + k * 10, y = s[1] - 12; octx.beginPath(); octx.moveTo(x, y - 4); octx.lineTo(x + 3, y); octx.lineTo(x, y + 4); octx.lineTo(x - 3, y); octx.fill(); } }
-    if ((e.kind === 'grunt' || e.kind === 'archer') && e.hp >= e.maxHp) continue;
+    if ((isSmall(e)) && e.hp >= e.maxHp) continue;
     const w = e.kind === 'captain' ? 90 : e.kind === 'brute' ? 54 : 34, h = e.kind === 'captain' ? 7 : 4;
     octx.fillStyle = '#000a'; octx.fillRect(s[0] - w / 2 - 1, s[1] - 1, w + 2, h + 2);
     octx.fillStyle = e.kind === 'captain' ? '#e0344b' : '#d04a5a'; octx.fillRect(s[0] - w / 2, s[1], w * Math.max(0, e.hp / e.maxHp), h);
@@ -3082,7 +3293,7 @@ function drawMinimap() {
   mm.strokeStyle = '#ffffff30'; mm.lineWidth = 3; mm.beginPath(); mm.arc(tx(0), tz(0), ARENA_R * sc, 0, TAU); mm.stroke();
   for (const o of OUTPOSTS) { mm.fillStyle = o.state === 'enemy' ? (o.active ? '#e0344b' : '#7a3a44') : '#f2b33d'; mm.beginPath(); mm.arc(tx(o.x), tz(o.z), 14, 0, TAU); mm.fill(); mm.strokeStyle = '#000'; mm.lineWidth = 3; mm.stroke(); }
   mm.fillStyle = '#a040ff'; mm.beginPath(); mm.arc(tx(RIFT.x), tz(RIFT.z), 12, 0, TAU); mm.fill();
-  for (const e of enemies) { if (e.dead) continue; mm.fillStyle = e.kind === 'grunt' ? '#ff5a6a' : e.kind === 'archer' ? '#ff9a8a' : '#ffb03a'; const s = e.kind === 'grunt' || e.kind === 'archer' ? 4 : e.kind === 'boss' ? 14 : e.kind === 'brute' ? 6 : 9; mm.fillRect(tx(e.pos.x) - s / 2, tz(e.pos.z) - s / 2, s, s); }
+  for (const e of enemies) { if (e.dead) continue; mm.fillStyle = e.kind === 'grunt' ? '#ff5a6a' : e.kind === 'archer' ? '#ff9a8a' : '#ffb03a'; const s = isSmall(e) ? 4 : e.kind === 'boss' ? 14 : e.kind === 'brute' ? 6 : 9; mm.fillRect(tx(e.pos.x) - s / 2, tz(e.pos.z) - s / 2, s, s); }
   for (const p of pickups) { mm.fillStyle = '#6aff8a'; mm.fillRect(tx(p.mesh.position.x) - 3, tz(p.mesh.position.z) - 3, 6, 6); }
   mm.restore();
   mm.save(); mm.translate(R, R); mm.rotate(cam.yaw + PI - P.facing); mm.fillStyle = '#fff3d6'; mm.beginPath(); mm.moveTo(0, -14); mm.lineTo(9, 10); mm.lineTo(0, 5); mm.lineTo(-9, 10); mm.closePath(); mm.fill(); mm.restore();
@@ -3279,7 +3490,7 @@ function updateProxy(pl, dt) {
 }
 
 // ---------- host: apply guest hits, publish the world ----------
-const KIND_CODE = { grunt: 0, archer: 1, brute: 2, captain: 3, boss: 4 }, KIND_OF = ['grunt', 'archer', 'brute', 'captain', 'boss'];
+const KIND_CODE = { grunt: 0, archer: 1, brute: 2, captain: 3, boss: 4, shield: 5, wraith: 6, hexer: 7, bomber: 8 }, KIND_OF = ['grunt', 'archer', 'brute', 'captain', 'boss', 'shield', 'wraith', 'hexer', 'bomber'];
 function hostReadHits() {
   for (const pr of Net.room.peers()) {
     if (pr.sameTab || !pr.presence || !pr.presence.h) continue;
@@ -3299,7 +3510,7 @@ function packWorld(budget) {
   const ents = [];
   for (const e of enemies) {
     if (e.dead || (e.retreating)) continue;
-    const fl = (e.weakExposed ? 1 : 0) | (e.warnRing.visible ? 2 : 0) | (e.state === 'down' ? 4 : 0) | (e.state === 'air' ? 8 : 0) | (e.state === 'spawn' || e.state === 'intro' ? 16 : 0) | (e.flashing ? 32 : 0);
+    const fl = (e.weakExposed ? 1 : 0) | (e.warnRing.visible ? 2 : 0) | (e.state === 'down' ? 4 : 0) | (e.state === 'air' ? 8 : 0) | (e.state === 'spawn' || e.state === 'intro' ? 16 : 0) | (e.flashing ? 32 : 0) | (e.buffT > 0 ? 64 : 0);
     const row = [e.nid, KIND_CODE[e.kind], r1(e.pos.x), r1(e.pos.z), r1(e.y), r2(e.facing), Math.max(1, Math.round(e.hp / e.maxHp * 100)), fl];
     if (e.weakMax) row.push(Math.round(e.weakGauge)); if (e.kind === 'boss') row.push(e.bkey);
     ents.push([playerDist(e.pos.x, e.pos.z) - (e.kind === 'boss' || e.kind === 'captain' ? 1e4 : 0), row]);
@@ -3324,7 +3535,7 @@ function puppetHit(e, dmg, crit, o) {
   const hp = new V3(e.pos.x, e.y + 1.1 * e.scale, e.pos.z);
   addDmgNum(hp, dmg, crit, e.weakExposed);
   if (!o.quiet || Math.random() < .5) { Particles.sparks(hp, o.dir, o.heavy ? 18 : 10, crit ? 0xfff2a0 : P.def.accent, o.heavy ? 16 : 12); slashFlash(hp, game.edge > 0 ? 0xa0f4ff : 0xfff0c0, (o.heavy ? 3.2 : 2.4) * Math.min(2.2, e.scale)); }
-  if (e.kind === 'grunt' || e.kind === 'archer' || o.heavy) e.pos.addScaledVector(o.dir, Math.min(1.2, o.kb * .12));
+  if (isSmall(e) || o.heavy) e.pos.addScaledVector(o.dir, Math.min(1.2, o.kb * .12));
   game.combo++; game.comboT = 2.6; game.maxCombo = Math.max(game.maxCombo, game.combo); comboPop();
   if (game.combo >= 100) unlock('combo_100'); if (game.combo >= 300) unlock('combo_300');
   if (!(P.atk && P.atk.ult)) P.valor = Math.min(100, P.valor + (e.kind === 'grunt' ? .55 : .9) * P.def.valorRate);
@@ -3341,6 +3552,7 @@ function updatePuppet(e, dt) {
   if (fl & 4) e.g.rotation.x = lerp(e.g.rotation.x, -1.3, Math.min(1, dt * 12)); else if (fl & 8) e.g.rotation.x += dt * 6; else e.g.rotation.x = lerp(e.g.rotation.x, 0, Math.min(1, dt * 10));
   e.blob.position.set(e.pos.x, .03, e.pos.z); e.warnRing.position.set(e.pos.x, .06, e.pos.z); e.warnRing.visible = !!(fl & 2);
   if (e.core) { e.core.material = e.weakExposed ? EM.coreHot : EM.core; e.core.scale.setScalar(e.weakExposed ? 1.6 + Math.sin(game.time * 18) * .3 : 1); }
+  if (fl & 64 && Math.random() < dt * 10) Particles.spawn(e.pos.x + rand(-.4, .4), e.y + rand(.3, 1.6) * e.scale, e.pos.z + rand(-.4, .4), 0, 1.5, 0, .5, .4, 0xff3a3a, 0, 1);
   if (e.parts.arm) e.parts.arm.rotation.x = (fl & 2) ? -1.3 : Math.sin(game.time * 8 + e.nid) * .15;
 }
 function applyWorld(w) {
@@ -3450,6 +3662,8 @@ const ACH = [
   ['roster', 'Full Vanguard', 'Clear a chapter with all eight champions.'],
   ['coop', 'Brothers in Arms', 'Clear a chapter in local or online co-op.'],
   ['costume', 'Dressed for Battle', 'Unlock a costume.'],
+  ['endless_10', 'Holding the Line', 'Reach wave 10 in Endless Survival.'],
+  ['endless_25', 'Last Light', 'Reach wave 25 in Endless Survival.'],
 ];
 const ACH_KEY = 'emberfall.ach.v1', STAT_KEY = 'emberfall.stats.v1', COS_KEY = 'emberfall.costume.v1';
 const achGot = store.get(ACH_KEY, {});
@@ -3620,7 +3834,7 @@ function buildChapters() {
     b.style.setProperty('--s1', hexCss(lv.sky[0])); b.style.setProperty('--s2', hexCss(lv.sky[1])); b.style.setProperty('--s3', hexCss(lv.sky[2])); b.style.setProperty('--c', hexCss(lv.riftColor));
     const mine = best[i] && best[i][heroId]; const rec = HEROES[lv.rec];
     b.innerHTML = `<div class="scene"></div><div class="num">${lv.numeral}</div><h3>${lv.name}</h3><p>${lv.blurb}</p>
-      <div class="meta"><span>${lv.rush ? `BOSSES <b>${lv.rush.flat().length} IN A ROW</b>` : `BOSSES <b>${[...lv.warlord.map(k => BOSSES[k].name), lv.boss.name].join(', ')}</b>`}</span><span>BEST <b>${mine || '—'}</b></span></div><div class="meta"><span>Suggested: ${rec.name}</span><span>Start LV ${lv.startLevel}</span></div>`;
+      <div class="meta"><span>${lv.endless ? `BEST WAVE <b>${(stats.endlessBest || {})[heroId] || 0}</b>` : lv.rush ? `BOSSES <b>${lv.rush.flat().length} IN A ROW</b>` : `BOSSES <b>${[...lv.warlord.map(k => BOSSES[k].name), lv.boss.name].join(', ')}</b>`}</span><span>BEST <b>${mine || '—'}</b></span></div><div class="meta"><span>Suggested: ${rec.name}</span><span>Start LV ${lv.startLevel}</span></div>`;
     b.onclick = () => { levelIdx = i; L = LEVELS[i]; if (game.mode === 'online') { hostCreate(); return; } openStory(); };
     el.appendChild(b);
   });
@@ -3658,13 +3872,15 @@ function newGame() {
   if (world.built !== levelIdx) buildWorld(levelIdx);
   clearWorld();
   if (game.net !== 'host' && game.net !== 'guest') setupLocalPlayers(); else setupNetPlayers();
-  Object.assign(game, { bosses: [], bossLabel: '', round: 0, bossKills: 0, time: 0, kos: 0, maxCombo: 0, combo: 0, comboT: 0, dmgTaken: 0, slowmo: 0, edge: 0, hitstop: 0, shake: 0, boss: null, captured: 0, ambientT: 4, tipsShown: {}, ending: 0, attackers: 0, shooters: 0, waveKills: 0, defeatT: 0 });
+  Object.assign(game, { bosses: [], bossLabel: '', round: 0, bossKills: 0, wave: 0, waveQueue: [], waveBreak: 0, waveHp: 1, spawnT: 0, time: 0, kos: 0, maxCombo: 0, combo: 0, comboT: 0, dmgTaken: 0, slowmo: 0, edge: 0, hitstop: 0, shake: 0, boss: null, captured: 0, ambientT: 4, tipsShown: {}, ending: 0, attackers: 0, shooters: 0, waveKills: 0, defeatT: 0 });
   cam.yaw = P.facing + PI; cam.pitch = .42; cam.distT = 9.5; cam.target.set(P.pos.x, 1.6, P.pos.z);
   $('boss').classList.remove('on'); koPop();
   $('pName').textContent = P.def.name; $('pLetter').textContent = P.def.letter; $('skDashLbl').textContent = P.def.skill.short; $('skUltLbl').textContent = P.def.ult.short;
   $('moveTitle').textContent = P.def.name + ' · ' + P.def.wname.toUpperCase(); $('moveList').innerHTML = P.def.moveList.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('');
+  Sfx.setTheme(L.endless ? 5 : levelIdx);
   if (game.net === 'guest') { $('objTxt').textContent = 'Joining the battle…'; Sfx.setIntensity(1); return; }
   if (L.rush) { setObjective(5); Sfx.setIntensity(2); return; }
+  if (L.endless) { setObjective(6); return; }
   setObjective(0);
   const [wx, wz] = L.waveAt;
   for (let s = 0; s < 3; s++) { const a = Math.atan2(wx - L.start[0], wz - L.start[1]); const side = (s - 1) * 9, fwd = s * 4; const cx = wx + Math.cos(a) * side + Math.sin(a) * fwd, cz = wz - Math.sin(a) * side + Math.cos(a) * fwd;
@@ -3705,13 +3921,15 @@ function showResults(win) {
   ['vUlt', 'vDark', 'vEdge'].forEach(id => $(id).style.opacity = 0);
   const t = game.time, mins = Math.floor(t / 60), secs = Math.floor(t % 60).toString().padStart(2, '0');
   let score = 0; score += game.kos >= 450 ? 3 : game.kos >= 300 ? 2 : game.kos >= 180 ? 1 : 0; score += game.maxCombo >= 250 ? 3 : game.maxCombo >= 140 ? 2 : game.maxCombo >= 70 ? 1 : 0; score += game.dmgTaken < 800 ? 3 : game.dmgTaken < 2000 ? 2 : game.dmgTaken < 4000 ? 1 : 0; score += t < 600 ? 2 : t < 900 ? 1 : 0;
-  const rank = !win ? '—' : score >= 9 ? 'S' : score >= 6 ? 'A' : score >= 4 ? 'B' : 'C';
+  const endless = !!L.endless; if (endless) { stats.endlessBest = stats.endlessBest || {}; game.newBest = game.wave > (stats.endlessBest[heroId] || 0); if (game.newBest) stats.endlessBest[heroId] = game.wave; statsDirty = true; }
+  const rank = endless ? (game.wave >= 25 ? 'S' : game.wave >= 15 ? 'A' : game.wave >= 8 ? 'B' : 'C') : !win ? '—' : score >= 9 ? 'S' : score >= 6 ? 'A' : score >= 4 ? 'B' : 'C';
   if (win) { const best = store.get(BEST_KEY, {}); best[levelIdx] = best[levelIdx] || {}; const order = 'CBAS'; const prev = best[levelIdx][heroId]; if (!prev || order.indexOf(rank) > order.indexOf(prev)) best[levelIdx][heroId] = rank; store.set(BEST_KEY, best); }
   if (win) recordVictory(rank);
   $('resTitle').textContent = win ? 'VICTORY' : 'DEFEAT';
   $('resSub').textContent = win ? `CHAPTER ${L.numeral} COMPLETE · ${P.def.name} · ${P.def.wname.toUpperCase()}` : `CHAPTER ${L.numeral} · ${L.name}`;
   $('resSub').textContent += ' · ' + curDiff().name;
-  $('resRank').textContent = rank; $('resRank').style.display = win ? '' : 'none';
+  if (endless) { $('resTitle').textContent = 'SURVIVAL OVER'; $('resSub').textContent = `WAVE ${game.wave} REACHED${game.newBest ? ' · NEW BEST' : ''} · ${P.def.name} · ${curDiff().name}`; $('resNote').textContent = 'The coliseum waits for your next attempt. Best wave for ' + P.def.name + ': ' + stats.endlessBest[heroId] + '.'; $('bAgain').textContent = game.net === 'guest' ? 'LEAVE BATTLE' : 'TRY AGAIN'; }
+  $('resRank').textContent = rank; $('resRank').style.display = win || endless ? '' : 'none';
   $('resNote').textContent = win ? L.end : 'Rise again. The Hollow are still waiting.';
   $('bAgain').textContent = game.net === 'guest' ? 'LEAVE BATTLE' : win ? 'PLAY AGAIN' : 'TRY AGAIN';
   $('bNext').hidden = !(win && levelIdx < LEVELS.length - 1) || game.net === 'guest';
@@ -3788,5 +4006,5 @@ function tick(rdt, now = performance.now()) {
 requestAnimationFrame(frame);
 // Debug/test hook: sim(seconds) advances the game logic without rendering
 window.__emberfall = { scene, camera, cam, game, enemies, keys, pressed, LEVELS, HEROES, get player() { return P; }, sim(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); },
-  start(hero, lvl, weapon = 0, hero2) { heroId = hero; levelIdx = lvl; L = LEVELS[lvl]; weaponChoice[hero] = weapon; if (hero2) { game.mode = 'coop'; hero2Id = hero2; } else if (game.mode === 'coop') game.mode = 'solo'; startGame(); }, players, setObjective, BOSSES, Net, CFG, stats, achGot, COSTUMES, TOUCH, hurt(i, dmg) { const pv = P; P = players[i]; P.invuln = 0; P.perfectCD = 9; playerTryHit(dmg, new V3(P.pos.x + 1, 0, P.pos.z), 4); P = pv; }, hostCreate, joinGame, get heroId() { return heroId; }, set heroId(v) { heroId = v; }, setLevel(i) { levelIdx = i; L = LEVELS[i]; }, setMode(m) { game.mode = m; } };
+  start(hero, lvl, weapon = 0, hero2) { heroId = hero; levelIdx = lvl; L = LEVELS[lvl]; weaponChoice[hero] = weapon; if (hero2) { game.mode = 'coop'; hero2Id = hero2; } else if (game.mode === 'coop') game.mode = 'solo'; startGame(); }, players, setObjective, BOSSES, Net, CFG, nextWave, spawnEnemy, Sfx, stats, achGot, COSTUMES, TOUCH, hurt(i, dmg) { const pv = P; P = players[i]; P.invuln = 0; P.perfectCD = 9; playerTryHit(dmg, new V3(P.pos.x + 1, 0, P.pos.z), 4); P = pv; }, hostCreate, joinGame, get heroId() { return heroId; }, set heroId(v) { heroId = v; }, setLevel(i) { levelIdx = i; L = LEVELS[i]; }, setMode(m) { game.mode = m; } };
 </script>
