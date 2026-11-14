@@ -3492,7 +3492,7 @@ function updateHUD() {
     setHud('stk' + s, '<i></i>'.repeat(Math.max(0, f.stocks)));
     setHud('name' + s, f.name);
   }
-  setHud('wave', `WAVE ${game.wave}<small>${arena.name} · vs ${enemy.def.name}</small>`);
+  setHud('wave', `WAVE ${game.wave}<small>${fullRandom() ? 'CHAOS · ' : ''}${arena.name} · vs ${enemy.def.name}</small>`);
   const chips = [];
   if (player.starT > 0) chips.push(`STAR ${Math.ceil(player.starT)}s`);
   if (player.jetT > 0) chips.push(`JETPACK ${Math.ceil(player.jetT)}s`);
@@ -3545,15 +3545,20 @@ function startRun() {
 }
 function startWave() {
   const w = game.wave;
-  const key = w <= ENEMY_ORDER.length ? ENEMY_ORDER[w - 1] : ENEMY_ORDER[Math.random() * ENEMY_ORDER.length | 0];
-  enemy.setDef(ROSTER[key], { power: 1 + (w - 1) * .08, speed: 1 + Math.min(.25, (w - 1) * .03), weight: 1 + (w - 1) * .04 });
-  enemy.stocks = w >= 4 ? 2 : 1;
-  brain.reset(clamp(.22 + w * .12, 0, 1));
+  if (game.randomMode) swapToRandomFighter();
+  const chaos = fullRandom(); // fully random: tougher, smarter enemies that can be any fighter
+  let key;
+  if (chaos) { const pool = Object.keys(ROSTER).filter(k => k !== player.key); key = pool[Math.random() * pool.length | 0]; }
+  else key = w <= ENEMY_ORDER.length ? ENEMY_ORDER[w - 1] : ENEMY_ORDER[Math.random() * ENEMY_ORDER.length | 0];
+  enemy.setDef(ROSTER[key], chaos
+    ? { power: 1.25 + (w - 1) * .1, speed: 1.1 + Math.min(.3, (w - 1) * .035), weight: 1.2 + (w - 1) * .05 }
+    : { power: 1 + (w - 1) * .08, speed: 1 + Math.min(.25, (w - 1) * .03), weight: 1 + (w - 1) * .04 });
+  enemy.stocks = chaos ? (w >= 6 ? 3 : w >= 3 ? 2 : 1) : (w >= 4 ? 2 : 1);
+  brain.reset(clamp(.22 + w * .12 + (chaos ? .25 : 0), 0, 1));
   game.arenaKey = game.randomArena ? randomArenaFor(w === 1 ? null : game.arenaKey)
     : w === 1 ? game.startArena : nextArenaAfter(game.arenaKey);
   setArena(game.arenaKey);
   clearArenaObjects(); game.itemT = rand(5, 8);
-  if (game.randomMode) swapToRandomFighter();
   player.spawn(false); player.facing = Math.PI; player.windUsed = false;
   if (game.startPerk.star) player.starT = 7.5;
   if (game.startPerk.jet) player.jetT = 11.5;
@@ -3570,7 +3575,8 @@ function startWave() {
   game.state = 'intro'; game.timer = 1.6; game.timeScale = 1;
   show(null); $('hud').hidden = false; $('touch').hidden = !isTouch;
   banner(game.randomMode ? `WAVE ${w}<small>You are ${player.name} · ${arena.name} · vs ${enemy.def.name}</small>`
-    : `WAVE ${w}<small>${arena.name} · vs ${enemy.def.name}: ${enemy.def.blurb}</small>`, 'gold');
+    : `WAVE ${w}<small>${arena.name} · vs ${enemy.def.name}${enemy.def.blurb ? ': ' + enemy.def.blurb : ''}</small>`, 'gold');
+  if (chaos && w === 1) setTimeout(() => toast('Fully random: enemies are tougher, smarter and can be any fighter!'), 1600);
   lockPointer();
 }
 function onKO(f) {
@@ -3807,7 +3813,7 @@ function syncFullRandom() {
   const on = fullRandom(), b = $('btnFullRandom');
   b.setAttribute('aria-pressed', on);
   b.textContent = `FULLY RANDOM: ${on ? 'ON' : 'OFF'}`;
-  $('fullHint').textContent = on ? 'A random fighter in a random arena every wave. Every random reward stacks, plus a CHAOS BONUS: a free random power-up after every wave.' : '';
+  $('fullHint').textContent = on ? 'A random fighter in a random arena every wave. Every random reward stacks, plus a CHAOS BONUS: a free random power-up after every wave. Watch out: enemies hit harder, are heavier and smarter, get extra lives sooner, and can be any fighter.' : '';
 }
 $('btnFullRandom').addEventListener('click', () => {
   const on = !fullRandom();
@@ -3923,7 +3929,7 @@ function frame(now) {
       game.simTime += simDt;
       const fighting = game.state === 'fight';
       const pin = fighting ? readPlayerInput() : blankInput();
-      const tgt = decoy && decoy.fooled ? decoy : player;
+      const tgt = decoy && decoy.fooled && decoy.owner === player ? decoy : player;
       const ein = fighting ? brain.get(simDt, tgt) : blankInput();
       player.update(simDt, pin, enemy);
       enemy.update(simDt, ein, tgt);
