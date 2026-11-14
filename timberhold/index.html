@@ -95,6 +95,25 @@ details.help[open] summary{margin-bottom:10px}
 .mappick select{background:#0d130e;color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 14px var(--ui);padding:8px 10px;max-width:100%}
 .mappick select:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 #mapnote{text-transform:none;letter-spacing:0;font-size:13px}
+.opts{gap:10px 14px}
+.kitpick{display:flex;align-items:center;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--ember)}
+.chk .lbl{text-transform:none;letter-spacing:0;font-weight:400}
+#kitsel{background:#0d130e;color:var(--bone);border:1px solid var(--line);border-radius:6px;font:600 13px var(--ui);padding:6px 8px;max-width:100%}
+#kitsel:focus-visible,.chk input:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+#score{margin-top:2px;color:var(--ember);font-variant-numeric:tabular-nums}
+.recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.recgrid ol{margin:6px 0 0;padding-left:22px;display:grid;gap:3px;font-size:13px;font-variant-numeric:tabular-nums}
+.recgrid ol li span{color:var(--dim)}
+.dim{color:var(--dim);font-size:12.5px}
+#achs{list-style:none;margin:6px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+#achs li,.endachs li{border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;color:var(--dim)}
+#achs li b,.endachs li b{display:block;color:var(--dim);font-size:13px}
+#achs li.got{border-color:var(--leaf)}#achs li.got b{color:var(--leaf)}
+#achs li i{display:block;font-style:normal;color:var(--ember);margin-top:2px}
+.endscore{font:700 22px var(--display);color:var(--ember)}
+.endachs{list-style:none;margin:0;padding:0;display:grid;gap:6px}.endachs li{border-color:var(--leaf)}.endachs li b{color:var(--leaf)}
 .go{justify-self:start;background:var(--ember);color:#1b1206;border:0;border-radius:6px;font:700 18px var(--display);padding:12px 26px;cursor:pointer}
 .go:focus-visible{outline:2px solid var(--bone);outline-offset:3px}
 #swap{position:absolute;right:max(34px,calc(env(safe-area-inset-right,0px) + 14px));width:56px;height:56px;border-radius:50%;font:700 12px var(--ui);background:var(--panel);color:var(--bone);border:1px solid var(--line);pointer-events:auto}
@@ -123,6 +142,7 @@ details.help[open] summary{margin-bottom:10px}
       <div class="panel" id="clock">
         <h2 id="dayname">Day 1</h2>
         <div id="phase">Dusk in 1:30</div>
+        <div id="score" class="lbl">Score 0</div>
         <div class="bar"><i id="tbar"></i></div>
         <div id="netinfo" class="lbl" hidden></div>
         <div id="boss" hidden><div class="lbl" id="bossname"></div><div class="bar"><i id="bossbar"></i></div></div>
@@ -190,6 +210,10 @@ details.help[open] summary{margin-bottom:10px}
         <button class="go" id="startbtn" type="button">New game</button>
         <button class="btn" id="contbtn" type="button" hidden>Continue</button>
       </div>
+      <div class="row opts">
+        <label class="chk"><input type="checkbox" id="endless"> Endless mode <span class="lbl">no win, survive as long as you can</span></label>
+        <span class="kitpick"><label class="lbl" for="kitsel">Starting kit</label><select id="kitsel"></select></span>
+      </div>
       <div class="row mappick"><label class="lbl" for="mapsel">Map</label><select id="mapsel"></select><span class="lbl" id="mapnote"></span></div>
       <div class="row"><button class="btn" id="gfxbtn" type="button">Graphics: High</button><span class="lbl" id="gfxnote">Low is smoother on phones and older computers.</span></div>
       <details class="help" id="mapmore"><summary>Browse all maps</summary><div class="row" id="maps"></div></details>
@@ -204,6 +228,15 @@ details.help[open] summary{margin-bottom:10px}
         </div>
         <div class="row" id="open"></div>
       </div>
+      <details class="help" id="records">
+        <summary>Records and achievements <span class="lbl" id="recsum"></span></summary>
+        <div class="recgrid">
+          <div><div class="lbl">Leaderboard</div><ol id="board"></ol><p class="dim" id="boardnote"></p></div>
+          <div><div class="lbl">Your best runs</div><ol id="runs"></ol></div>
+        </div>
+        <div class="lbl">Achievements</div>
+        <ul id="achs"></ul>
+      </details>
       <details class="help" id="help">
         <summary>How to play</summary>
       <dl class="keys">
@@ -227,6 +260,8 @@ details.help[open] summary{margin-bottom:10px}
     <div class="card">
       <h1 id="endtitle"></h1>
       <p id="endtext"></p>
+      <p id="endscore" class="endscore"></p>
+      <ul id="endachs" class="endachs"></ul>
       <button class="go" id="again" type="button">Back to the menu</button>
     </div>
   </div>
@@ -594,7 +629,7 @@ const howl = () => { snd(330, 1.1, 'sine', .06, 190); setTimeout(() => snd(520, 
 function reset(seed, map) {
   RNG = mulberry(seed |= 0); // the same seed grows the same forest for every player
   const mp = MAPS[map] || MAPS.forest;
-  G = {seed, map: MAPS[map] ? map : 'forest', day: 1, phase: 'day', t: 0, len: DAY1, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
+  G = {seed, map: MAPS[map] ? map : 'forest', endless: false, bossKills: 0, day: 1, phase: 'day', t: 0, len: DAY1, nights: 0, dark: 0, queue: 0, spawnT: 0, kills: 0, over: false};
   P = {x: CX, y: CY, r: 13, hp: 100, max: 100, ang: 0, cd: 0, swing: 0, hurt: 0, flint: false, wood: 0, stone: 0, meat: 0, iron: 0, arrows: 0, bullets: 0, weapon: 'axe', owned: {axe: true}, armor: false, grenades: 0, berries: 0, honey: 0, resin: 0, sulfur: 0, coal: 0, wool: 0, coat: false, pack: false, helmet: false, amulet: false, quiver: false, herbs: 0, hide: 0, boots: false, vest: false, gold: 0, crystal: 0, feathers: 0, bone: 0, gaxe: false, plate: false, charm: false, pets: [], vehicle: null, riding: false};
   grid = new Array(W * H).fill(null); interior = new Uint8Array(W * H);
   house = {room: false, door: false, bed: false};
@@ -758,6 +793,7 @@ function slam(a) { // Ursa's ground slam: hurts you and anything you built nearb
   for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const st = S(tx + i, ty + j); if (st && dist(st.tx * T + 24, st.ty * T + 24, a.x, a.y) < 125) damageStruct(st, 35); }
 }
 function tryWin() {
+  if (G.endless) { if (G.nights === NIGHTS_TO_WIN && houseDone() && !G.endlessNote) { G.endlessNote = true; toast('Endless mode: there is no win. See how long you last.'); } return false; }
   if (G.over || G.nights < NIGHTS_TO_WIN || G.phase !== 'day' || !houseDone() || animals.some(isBoss)) return false;
   end(true); return true;
 }
@@ -1091,6 +1127,103 @@ function applyStructs(list, now) {
 function applyDead(arr, list, now) { const set = new Set(list); arr.forEach((o, i) => { if (set.has(i)) { if (!o.dead) o.dead = 1; } else if (o.dead && !(o.lock > now)) { o.dead = 0; o.hp = o.max; } }); }
 
 /* saves live in the browser and, when signed in on claude.ai, in the player's private storage */
+/* ---------- progression: score, achievements, starting kits, leaderboard ---------- */
+const ACH = [
+  {id: 'night1',  name: 'First light',     desc: 'Survive a night.',                       kit: 'woodpile'},
+  {id: 'house',   name: 'Homesteader',     desc: 'Finish the house.',                      kit: 'mason'},
+  {id: 'boss1',   name: 'Giant slayer',    desc: 'Kill a boss.',                           kit: 'flint'},
+  {id: 'boss5',   name: 'Monster hunter',  desc: 'Kill 5 different bosses.',               kit: 'hound'},
+  {id: 'win',     name: 'The house held',  desc: 'Win a game.',                            kit: 'gunsmith'},
+  {id: 'maps3',   name: 'Wanderer',        desc: 'Win on 3 different maps.',               kit: 'rider'},
+  {id: 'kills100',name: 'Hundred down',    desc: 'Drive off 100 animals in total.',        kit: 'archer'},
+  {id: 'night10', name: 'Long haul',       desc: 'Reach night 10 in endless mode.',        kit: 'veteran'},
+  {id: 'coop',    name: 'Not alone',       desc: 'Survive a night with a friend.'},
+  {id: 'pets3',   name: 'Pack leader',     desc: 'Have three pets at once.'},
+  {id: 'tank',    name: 'Tank commander',  desc: 'Ride the tank.'},
+  {id: 'kills500',name: 'Forest legend',   desc: 'Drive off 500 animals in total.'},
+  {id: 'boss15',  name: 'Bestiary',        desc: 'Kill 15 different bosses.'},
+  {id: 'night20', name: 'Unbroken',        desc: 'Reach night 20 in endless mode.'},
+];
+const KITS = {
+  none:     {name: 'No kit'},
+  woodpile: {name: 'Woodpile · 20 wood',             give: {wood: 20}},
+  mason:    {name: 'Mason · 12 stone, 4 iron',      give: {stone: 12, iron: 4}},
+  flint:    {name: 'Flint axe',                      flint: 1},
+  hound:    {name: 'Hound · a dog',                  pet: 'dog'},
+  gunsmith: {name: 'Gunsmith · pistol, 16 bullets', weapon: 'pistol', give: {bullets: 16}},
+  rider:    {name: 'Rider · a horse',                ride: 'horse'},
+  archer:   {name: 'Archer · bow, 20 arrows',       weapon: 'bow', give: {arrows: 20}},
+  veteran:  {name: 'Veteran · armor, 10 iron',      armor: 1, give: {iron: 10}},
+};
+let prog = {v: 1, ach: {}, kills: 0, bosses: {}, wins: {}, best: 0, runs: [], kit: 'none'}, newAch = [], board = [], progT = null;
+const nightsTxt = n => (n | 0) + ' night' + ((n | 0) === 1 ? '' : 's');
+const runScore = () => Math.round((G.nights || 0) * 100 + (G.kills || 0) * 4 + (G.bossKills || 0) * 60 + (G.won ? 500 : 0));
+function saveProg() { clearTimeout(progT); progT = setTimeout(() => { prog.at = Date.now(); store('prog', prog); }, 1200); }
+function award(id) {
+  if (prog.ach[id]) return; const a = ACH.find(x => x.id === id); if (!a) return;
+  prog.ach[id] = Date.now(); newAch.push(id); saveProg();
+  toast('Achievement: ' + a.name + (a.kit ? '. New starting kit: ' + KITS[a.kit].name.split(' ·')[0] + '.' : '.')); snd(660, .3, 'triangle', .07, 330);
+}
+function onKill(type) {
+  prog.kills++; if (prog.kills >= 100) award('kills100'); if (prog.kills >= 500) award('kills500');
+  if (A[type] && A[type].boss) { G.bossKills = (G.bossKills || 0) + 1; prog.bosses[type] = (prog.bosses[type] || 0) + 1; award('boss1'); const n = Object.keys(prog.bosses).length; if (n >= 5) award('boss5'); if (n >= 15) award('boss15'); }
+  if (prog.kills % 10 === 0) saveProg();
+}
+function onDawn(n) {
+  award('night1'); if (multi() && NET.others.size) award('coop');
+  if (G.endless && n >= 10) award('night10'); if (G.endless && n >= 20) award('night20');
+}
+function checkAch() {
+  if (houseDone()) award('house');
+  if (P.pets && P.pets.length >= 3) award('pets3');
+  if (P.riding && P.vehicle && P.vehicle.type === 'tank') award('tank');
+}
+function applyKit() {
+  const k = KITS[prog.kit]; if (!k || prog.kit === 'none') return;
+  for (const r in k.give || {}) P[r] += k.give[r];
+  if (k.flint) P.flint = true; if (k.armor) P.armor = true;
+  if (k.weapon) { P.owned[k.weapon] = true; P.weapon = k.weapon; }
+  if (k.pet) P.pets.push(mkPet(k.pet, 0));
+  if (k.ride) P.vehicle = {type: k.ride, x: P.x + 50, y: P.y, ang: 0};
+}
+function recordRun() { // keep this run among the player's best and offer it to the shared board
+  const sc = runScore(), run = {score: sc, map: G.map, nights: G.nights, kills: G.kills, mode: G.endless ? 'endless' : 'normal', at: Date.now()};
+  const isBest = sc > (prog.best || 0); prog.best = Math.max(prog.best || 0, sc);
+  prog.runs = [...(prog.runs || []), run].sort((a, b) => b.score - a.score).slice(0, 5); saveProg();
+  if (db && uid && sc > 0) {
+    const ref = db.doc('scores/' + uid);
+    ref.get().then(d => { const old = d.exists ? +(d.data().best) || 0 : 0; if (sc > old) return ref.set({best: sc, nights: G.nights, kills: G.kills, map: G.map, mode: run.mode, at: run.at}); }).catch(() => {});
+  }
+  return {sc, isBest};
+}
+function watchBoard() {
+  if (!db) { $('boardnote').textContent = 'The shared leaderboard works when this page is open on claude.ai and you are signed in.'; return; }
+  $('boardnote').textContent = 'Loading scores…';
+  const t = setTimeout(() => { if (!board.length) $('boardnote').textContent = 'No scores yet. Finish a game to set the first one.'; }, 10000);
+  try {
+    db.collection('scores').orderBy('best', 'desc').limit(10).onSnapshot(snap => {
+      clearTimeout(t); board = snap.docs.map(d => ({id: d.id, ...d.data()})); renderRecords();
+    }, () => { clearTimeout(t); $('boardnote').textContent = 'The leaderboard could not be loaded.'; });
+  } catch (e) { clearTimeout(t); }
+}
+async function renderRecords() {
+  const got = ACH.filter(a => prog.ach[a.id]).length;
+  $('recsum').textContent = '· best ' + (prog.best || 0) + ' · ' + got + '/' + ACH.length + ' achievements';
+  const al = $('achs'); al.textContent = '';
+  for (const a of ACH) { const li = document.createElement('li'); li.className = prog.ach[a.id] ? 'got' : ''; const b = document.createElement('b'); b.textContent = (prog.ach[a.id] ? '✓ ' : '') + a.name; li.append(b, a.desc); if (a.kit) { const i = document.createElement('i'); i.textContent = 'Unlocks kit: ' + KITS[a.kit].name; li.appendChild(i); } al.appendChild(li); }
+  const rl = $('runs'); rl.textContent = '';
+  if (!(prog.runs || []).length) { const li = document.createElement('li'); li.textContent = 'No finished runs yet.'; rl.appendChild(li); }
+  for (const r of prog.runs || []) { const li = document.createElement('li'); li.textContent = r.score + ' '; const sp = document.createElement('span'); sp.textContent = (MAPS[r.map] ? MAPS[r.map].name : '?') + ', ' + nightsTxt(r.nights) + (r.mode === 'endless' ? ', endless' : ''); li.appendChild(sp); rl.appendChild(li); }
+  const ks = $('kitsel'), opts = Object.keys(KITS).filter(k => k === 'none' || ACH.some(a => a.kit === k && prog.ach[a.id]));
+  ks.textContent = ''; for (const k of opts) { const o = document.createElement('option'); o.value = k; o.textContent = KITS[k].name; ks.appendChild(o); }
+  if (!opts.includes(prog.kit)) prog.kit = 'none'; ks.value = prog.kit;
+  const bl = $('board'); bl.textContent = '';
+  if (board.length) {
+    $('boardnote').textContent = '';
+    const ps = userNS ? await userNS.profiles(board.map(r => r.id)) : {};
+    for (const r of board) { const li = document.createElement('li'); const nm = (ps[r.id] && ps[r.id].name) || 'Someone'; li.textContent = (Math.round(+r.best) || 0) + ' · ' + nm + ' '; const sp = document.createElement('span'); sp.textContent = (MAPS[r.map] ? MAPS[r.map].name : '') + ', ' + nightsTxt(r.nights) + (r.mode === 'endless' ? ', endless' : ''); li.appendChild(sp); bl.appendChild(li); }
+  }
+}
 function lsGet(k) { try { return JSON.parse(localStorage.getItem('timberhold-' + k) || 'null'); } catch (e) { return null; } }
 function lsSet(k, v) { try { v ? localStorage.setItem('timberhold-' + k, JSON.stringify(v)) : localStorage.removeItem('timberhold-' + k); } catch (e) {} }
 const docRef = k => db && uid ? db.collection('data/users/' + uid).doc(k) : null;
@@ -1107,11 +1240,11 @@ async function load(k) {
 function saveGame(quiet) {
   if (!G || G.over || !running) return;
   if (client()) { store('guest', {at: Date.now(), seed: G.seed, inv: getInv()}); if (!quiet) toast('Your gear is saved. The host saves the world.'); return; }
-  savedGame = {v: 3, at: Date.now(), seed: G.seed, map: G.map, day: G.day, phase: G.phase, nights: G.nights, kills: G.kills, t: G.t, inv: getInv(), px: P.x | 0, py: P.y | 0, s: packStructs(), dt: deadList(trees), dr: deadList(rocks)};
+  savedGame = {v: 3, at: Date.now(), seed: G.seed, map: G.map, endless: G.endless, bossKills: G.bossKills, day: G.day, phase: G.phase, nights: G.nights, kills: G.kills, t: G.t, inv: getInv(), px: P.x | 0, py: P.y | 0, s: packStructs(), dt: deadList(trees), dr: deadList(rocks)};
   store('save', savedGame); if (!quiet) toast('Game saved.');
 }
 function loadInto(sv) {
-  reset(sv.seed, sv.map); G.day = sv.day || 1; G.nights = sv.nights || 0; G.kills = sv.kills || 0;
+  reset(sv.seed, sv.map); G.endless = !!sv.endless; G.bossKills = sv.bossKills | 0; G.day = sv.day || 1; G.nights = sv.nights || 0; G.kills = sv.kills || 0;
   if (sv.phase === 'night') { G.len = DAYN; G.t = DAYN - 8; toast('Saved at night, so dusk is close. Get ready.'); } // a night save resumes just before that night
   else { G.len = G.day === 1 ? DAY1 : DAYN; G.t = clamp(+sv.t || 0, 0, G.len - 5); }
   applyStructs(sv.s || [], 0); applyDead(trees, sv.dt || [], 0); applyDead(rocks, sv.dr || [], 0);
@@ -1124,7 +1257,7 @@ function myState() { return [P.x | 0, P.y | 0, Math.round(P.ang * 100), WKEYS.in
   P.vehicle ? [VK.indexOf(P.vehicle.type), P.vehicle.x | 0, P.vehicle.y | 0, Math.round(P.vehicle.ang * 100), P.riding ? 1 : 0] : 0,
   P.pets.map(q => [PK.indexOf(q.type), q.x | 0, q.y | 0, Math.round(q.ang * 100)])]; }
 function worldState() {
-  return {s: G.seed, m: G.map, d: G.day, ph: G.phase === 'night' ? 1 : 0, t: Math.round(G.t * 10) / 10, l: G.len, n: G.nights, k: G.kills, o: G.over ? (G.won ? 1 : 2) : 0,
+  return {s: G.seed, m: G.map, e: G.endless ? 1 : 0, d: G.day, ph: G.phase === 'night' ? 1 : 0, t: Math.round(G.t * 10) / 10, l: G.len, n: G.nights, k: G.kills, o: G.over ? (G.won ? 1 : 2) : 0,
     a: animals.slice(0, 90).map(a => [a.id, AK.indexOf(a.type), a.x | 0, a.y | 0, (a.ang * 10) | 0, Math.max(1, Math.ceil(a.hp / a.max * 100)), (a.wind > 0 ? 1 : 0) | (a.ch > 0 ? 2 : 0)].join(',')).join(';')};
 }
 function sendSync() {
@@ -1145,9 +1278,9 @@ function applyWorld(w) {
   const ph = w.ph ? 'night' : 'day';
   if (G.seen && G.phase !== ph) {
     if (ph === 'night') { toast('Night ' + w.d + '. They are coming.'); howl(); landBalloon(); }
-    else { toast(nightReward(w.n | 0)); P.hp = Math.min(P.max, P.hp + 15); saveGame(true); }
+    else { onDawn(w.n | 0); toast(nightReward(w.n | 0)); P.hp = Math.min(P.max, P.hp + 15); saveGame(true); }
   }
-  G.seen = true; G.day = w.d; G.phase = ph; G.t = +w.t || 0; G.len = +w.l || 75; G.nights = w.n | 0; G.kills = w.k | 0;
+  G.seen = true; G.endless = !!w.e; G.day = w.d; G.phase = ph; G.t = +w.t || 0; G.len = +w.l || 75; G.nights = w.n | 0; G.kills = w.k | 0;
   const seen = new Set(), list = [];
   if (w.a) for (const e of String(w.a).split(';')) {
     const v = e.split(',').map(Number), type = AK[v[1]]; if (!type) continue;
@@ -1220,7 +1353,7 @@ function onEv(d) { // the host told us something happened
     if (d.po && !P.dead) { P.poison = 4; float(P.x, P.y - 40, 'poisoned', '#9bd45a'); }
     if (d.sl && !P.dead) { P.slow = 3; float(P.x, P.y - 40, 'webbed', '#d8d8d8'); }
   } else if (d.k === 'k') {
-    const t = A[d.t]; if (!t) return; const x = +d.x || 0, y = +d.y || 0;
+    const t = A[d.t]; if (!t) return; const x = +d.x || 0, y = +d.y || 0; if (!t.passive) onKill(d.t);
     P.meat += t.meat; if (t.meat) float(x, y - 10, '+' + t.meat + ' meat', '#f0a58f'); burst(x, y, '#8c2f22', 16); snd(110, .2, 'sawtooth', .06, -60);
     if (t.boss) { P.iron += 10; shake = 12; burst(x, y, '#8c2f22', 40); toast(t.name + ' is dead. +10 iron.'); snd(330, .6, 'triangle', .08, 330); }
   } else if (d.k === 'g') {
@@ -1259,7 +1392,7 @@ function wire() {
 function audioOn() { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
 function enter(msg) { cam.x = P.x; cam.y = P.y; running = true; paused = false; $('start').hidden = true; $('end').hidden = true; $('hud').hidden = false; hud(); toast(msg); }
 function start(sv) {
-  audioOn(); if (sv) loadInto(sv); else reset((Math.random() * 2147483647) | 0, selMap);
+  audioOn(); if (sv) loadInto(sv); else { reset((Math.random() * 2147483647) | 0, selMap); G.endless = $('endless').checked; applyKit(); newAch = []; }
   enter(sv ? 'Welcome back. Day ' + G.day + '.' : 'Chop wood before dusk. Walls first.');
 }
 async function hostGame(sv) {
@@ -1280,7 +1413,7 @@ async function joinGame(code) {
   for (let i = 0; i < 28 && !w; i++) { for (const p of r.peers()) if (!p.isMe && p.presence && p.presence.w) { w = p.presence.w; hp = p.peer; } if (!w) await new Promise(s => setTimeout(s, 250)); }
   if (!w || w.o) { r.leave().catch(() => {}); return menuNote('No game with the code ' + code + ' is running.'); }
   NET.room = r; NET.mode = 'client'; NET.code = code; NET.hostPeer = hp; NET.hostMiss = performance.now(); wire();
-  reset(w.s, w.m); const g = await load('guest'); if (g && g.seed === w.s) { setInv(g.inv); gather(); }
+  reset(w.s, w.m); const g = await load('guest'); if (g && g.seed === w.s) { setInv(g.inv); gather(); } else applyKit();
   menuNote(''); enter('You joined game ' + code + '.'); applyWorld(w);
 }
 function quit(msg) { // save, leave any shared game, and go back to the menu
@@ -1323,7 +1456,7 @@ function updClock(dt) {
       for (const a of animals) if (!A[a.type].passive && !isBoss(a)) a.flee = true;
       P.hp = Math.min(P.max, P.hp + 15); saveGame(true); stock();
       if (tryWin()) return true;
-      const bs = animals.find(isBoss), rw = nightReward(G.nights);
+      onDawn(G.nights); const bs = animals.find(isBoss), rw = nightReward(G.nights);
       toast(bs ? 'Dawn, but ' + A[bs.type].name + ' is still hunting you. Kill it.' : rw + (G.nights >= NIGHTS_TO_WIN ? ' Finish the house to win.' : ''));
       while (animals.filter(a => A[a.type].passive).length < 12) spawnDeer();
     }
@@ -1411,7 +1544,7 @@ function update(dt) {
     const a = animals[i], d = A[a.type];
     a.cd -= dt; a.flash -= dt; a.step += dt * 9;
     if (a.hp <= 0) {
-      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); P.meat += d.meat;
+      animals.splice(i, 1); burst(a.x, a.y, '#8c2f22', 16); netEv({k: 'k', t: a.type, x: a.x | 0, y: a.y | 0}); if (!d.passive) onKill(a.type); P.meat += d.meat;
       for (const [k, c] of DROPS[a.type] || []) for (let h = c; h > 0; h--) if (Math.random() < h) dropItem(k, a.x + rnd(-24, 24), a.y + rnd(-24, 24));
       for (let h = HIDES[a.type] || (d.boss ? 3 : 0); h > 0; h--) if (Math.random() < h) dropItem('hide', a.x + rnd(-20, 20), a.y + rnd(-20, 20)); if (!d.passive) G.kills++;
       if (d.meat) float(a.x, a.y - 10, '+' + d.meat + ' meat', '#f0a58f'); snd(110, .2, 'sawtooth', .06, -60);
@@ -2206,6 +2339,7 @@ function buildTools() {
   }
 }
 function hud() {
+  checkAch(); $('score').textContent = (G.endless ? 'Endless · ' : '') + 'Score ' + runScore();
   if (mmTick++ % 3 === 0) drawMinimap();
   $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
   $('hpbar').style.background = P.poison > 0 ? '#7fbf5a' : '';
@@ -2249,8 +2383,14 @@ function end(won) {
   G.won = won; running = false; G.over = true; $('hud').hidden = true; $('end').hidden = false;
   if (host() && NET.room) NET.room.presence({p: myState(), w: worldState()}).catch(() => {});
   if (!client()) { savedGame = null; store('save', null); }
-  $('endtitle').innerHTML = won ? 'The house <em>held</em>' : 'The forest <em>took you</em>';
-  $('endtext').textContent = won
+  if (won) { award('win'); prog.wins[G.map] = true; if (Object.keys(prog.wins).length >= 3) award('maps3'); }
+  const rr = recordRun();
+  $('endscore').textContent = 'Score ' + rr.sc + (rr.isBest ? ' · new personal best' : '');
+  const ea = $('endachs'); ea.textContent = '';
+  for (const id of newAch) { const a = ACH.find(x => x.id === id); const li = document.createElement('li'); const b = document.createElement('b'); b.textContent = 'Achievement: ' + a.name; li.append(b, a.desc + (a.kit ? ' New starting kit: ' + KITS[a.kit].name + '.' : '')); ea.appendChild(li); }
+  newAch = []; renderRecords();
+  $('endtitle').innerHTML = won ? 'The house <em>held</em>' : G.endless ? 'The forest <em>won in the end</em>' : 'The forest <em>took you</em>';
+  $('endtext').textContent = G.endless && !won ? `You held out for ${G.nights} night${G.nights === 1 ? '' : 's'} on ${MAPS[G.map].name} and drove off ${G.kills} animals.` : won
     ? `Five nights, ${G.kills} animals driven off, and your walls are still standing. You are safe in the middle of the forest.`
     : `You fell on ${G.phase === 'night' ? 'night' : 'day'} ${G.day} after surviving ${G.nights} night${G.nights === 1 ? '' : 's'} and fighting off ${G.kills} animals. Walls first, then a door, then the bed.`;
   won ? snd(520, .5, 'triangle', .08, 400) : snd(200, .8, 'sawtooth', .07, -150);
@@ -2326,6 +2466,7 @@ act.addEventListener('touchcancel', () => { actDown = false; });
 $('mkarrows').addEventListener('click', () => makeAmmo('arrows')); $('mkbullets').addEventListener('click', () => makeAmmo('bullets'));
 cv.addEventListener('wheel', e => { e.preventDefault(); if (running) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, {passive: false});
 $('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
+$('kitsel').addEventListener('change', e => { prog.kit = e.target.value; saveProg(); });
 $('mapsel').addEventListener('change', e => { selMap = e.target.value; refreshMenu(); });
 $('gfxbtn').addEventListener('click', () => { HIGH = !HIGH; applyQuality(); try { localStorage.setItem('timberhold-gfx-chosen', '1'); } catch (e) {} });
 $('startbtn').addEventListener('click', () => start()); $('again').addEventListener('click', () => quit(''));
@@ -2356,11 +2497,12 @@ $('savebtn').addEventListener('click', () => saveGame(false)); $('quitbtn').addE
 addEventListener('pagehide', () => saveGame(true));
 addEventListener('resize', resize);
 
-initScene(); setupPost(); resize(); reset(1, 'forest'); applyQuality(); G.dark = .3; refreshMenu();
+initScene(); setupPost(); resize(); reset(1, 'forest'); applyQuality(); G.dark = .3; renderRecords(); refreshMenu();
 window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals() { return animals; }, get grid() { return grid; }, get NET() { return NET; }, get items() { return items; }, get rocks() { return rocks; }, get ponds() { return ponds; }, get trees() { return trees; }, reset, mk, recalc};
 (async () => { // light up saving and multiplayer once the page knows where it is running
   const cl = window.claude;
   if (cl && cl.use) { try { [db, userNS, lobby] = await Promise.all([cl.use('db'), cl.use('user'), cl.use('room')]); uid = userNS ? await userNS.id() : null; } catch (e) {} }
+  const pg = await load('prog'); if (pg && pg.v === 1) prog = Object.assign(prog, pg); renderRecords(); watchBoard();
   savedGame = await load('save'); if (savedGame && savedGame.v !== 3) savedGame = null; // older saves were for a smaller world
   if (lobby) lobby.onPeers(ch => {
     openGames = [...new Set(ch.peers.filter(p => !p.isMe && p.presence && typeof p.presence.game === 'string' && /^[A-Z]{4}$/.test(p.presence.game)).map(p => p.presence.game))].slice(0, 6);
