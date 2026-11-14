@@ -28,6 +28,6 @@ A browser action RPG. Every sprite, tile and effect is drawn in code on a canvas
 
 - Craftable ranged units at the workbench: Archer and Musketeer contracts hire allies who follow you and shoot, and a Field Cannon fires exploding cannonballs; press V to deploy one
 
-Controls: WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, T for talents, C to decorate your house, G to throw a bomb, V to deploy a ranged unit, Enter to chat, O for the player list, L for the journal, M for the map.
+Controls: Esc or the Pause button to pause (the game also pauses itself when you switch tabs), WASD to move, Space or click to attack, F or right-click for your skill, Shift to dash, X to ride, P for the stable, 1/2/3 to cast spells, B for the spellbook, E to interact, Q/R for potions, I for your bag and weapons, T for talents, C to decorate your house, G to throw a bomb, V to deploy a ranged unit, Enter to chat, O for the player list, L for the journal, M for the map.
 
 `game.html` is the source. Run `./build.sh` to rebuild `index.html` from it.

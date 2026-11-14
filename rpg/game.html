@@ -157,6 +157,7 @@ kbd.k{font-family:var(--ui);font-weight:800;font-size:12px;border:1px solid var(
 <canvas id="game" tabindex="0" aria-label="Emberfall Chronicles game world"></canvas>
 <div id="probe"></div>
 <div id="menu" hidden>
+  <button data-m="pause" id="pauseBtn" title="Pause the game">Pause <kbd>Esc</kbd></button>
   <button data-m="bag" title="Character and bag">Bag <kbd>I</kbd></button>
   <button data-m="quests" title="Quest log">Quests <kbd>L</kbd></button>
   <button data-m="spells" title="Spellbook">Spells <kbd>B</kbd></button>
@@ -3589,13 +3590,19 @@ function openMap(){
   chests.forEach(o=>{if(explored[o.ty*W+o.tx]){g.fillStyle=o.open?'#6b5338':'#ffd23f';g.fillRect(o.tx*8-4,o.ty*8-4,8,8)}});
   circ(g,P.x/T*8,P.y/T*8,9,'#fff');circ(g,P.x/T*8,P.y/T*8,5,'#3a7bff');
 }
+function openPause(){if(state!=='play'||!P)return;const S=stats(),where=(REGIONS[curLevel]||REGIONS[regAt(Math.floor(P.x/T),Math.floor(P.y/T))]||{name:'Emberfall'}).name;
+  const mins=Math.floor((P.st.playT||0)/60),q=QUESTS.filter(q=>P.q[q.id]&&P.q[q.id].s==='done').length;
+  openPanel('pause',`<h2>Paused</h2><p class="sub">The world holds its breath until you return.${room&&netOthers().length?' Other players in the shared world keep playing.':''}</p>
+   <div class="stat"><span>Hero</span><b>${esc(P.name||'')}${P.name?' · ':''}${CLASSES[P.cls].n} · level ${P.lvl}</b></div><div class="stat"><span>Location</span><b>${where}</b></div><div class="stat"><span>Health</span><b>${Math.round(P.hp)} / ${S.maxHp}</b></div><div class="stat"><span>Quests completed</span><b>${q} of ${QUESTS.length}</b></div><div class="stat"><span>Time played</span><b>${mins>=60?Math.floor(mins/60)+'h '+mins%60+'m':mins+' min'}</b></div>
+   <div class="row" style="margin-top:16px;flex-wrap:wrap;gap:8px"><button class="btn" data-act="resume">Resume</button><button class="btn ghost" data-act="psave">Save game</button><button class="btn ghost" data-act="psound">${soundOn?'Mute sound':'Unmute sound'}</button><button class="btn ghost" data-act="phelp">Controls</button></div>
+   <p class="sub" style="margin-top:10px">Press <kbd class="k">Esc</kbd> to resume. The game also pauses by itself when you switch to another tab.</p>`);panel='pause'}
 function openHelp(board){
   openPanel('help',`<h2>${board?'Notice Board':'How to Play'}</h2>${board?'<p class="say">"Adventurers wanted! Talk to Elder Mira, west of the square. Borin forges arms, Lin brews potions, Tess trades goods, and Old Ned fishes at Mirror Lake to the southwest."</p>':''}
   <h3>Controls</h3><div class="help">
    <div><span>Move</span><span><kbd class="k">W A S D</kbd> or arrows</span></div><div><span>Attack</span><span><kbd class="k">Space</kbd> or left click</span></div>
    <div><span>Class skill</span><span><kbd class="k">F</kbd> or right click</span></div><div><span>Dash (dodges hits)</span><span><kbd class="k">Shift</kbd></span></div>
    <div><span>Interact, gather, fish</span><span><kbd class="k">E</kbd></span></div><div><span>Health / mana potion</span><span><kbd class="k">Q</kbd> <kbd class="k">R</kbd></span></div>
-   <div><span>Cast spells</span><span><kbd class="k">1</kbd> <kbd class="k">2</kbd> <kbd class="k">3</kbd></span></div><div><span>Spellbook</span><span><kbd class="k">B</kbd></span></div><div><span>Ride or get off your mount</span><span><kbd class="k">X</kbd></span></div><div><span>Chat with other players</span><span><kbd class="k">Enter</kbd></span></div><div><span>Players online</span><span><kbd class="k">O</kbd></span></div><div><span>Decorate your house</span><span><kbd class="k">C</kbd></span></div><div><span>Throw a bomb</span><span><kbd class="k">G</kbd></span></div><div><span>Talent tree</span><span><kbd class="k">T</kbd></span></div><div><span>Stable (pets and mounts)</span><span><kbd class="k">P</kbd></span></div><div><span>Bag, weapons, character</span><span><kbd class="k">I</kbd></span></div><div><span>Journal</span><span><kbd class="k">L</kbd></span></div><div><span>Map</span><span><kbd class="k">M</kbd></span></div><div><span>Close menu</span><span><kbd class="k">Esc</kbd></span></div></div>
+   <div><span>Cast spells</span><span><kbd class="k">1</kbd> <kbd class="k">2</kbd> <kbd class="k">3</kbd></span></div><div><span>Spellbook</span><span><kbd class="k">B</kbd></span></div><div><span>Ride or get off your mount</span><span><kbd class="k">X</kbd></span></div><div><span>Chat with other players</span><span><kbd class="k">Enter</kbd></span></div><div><span>Players online</span><span><kbd class="k">O</kbd></span></div><div><span>Decorate your house</span><span><kbd class="k">C</kbd></span></div><div><span>Throw a bomb</span><span><kbd class="k">G</kbd></span></div><div><span>Talent tree</span><span><kbd class="k">T</kbd></span></div><div><span>Stable (pets and mounts)</span><span><kbd class="k">P</kbd></span></div><div><span>Bag, weapons, character</span><span><kbd class="k">I</kbd></span></div><div><span>Journal</span><span><kbd class="k">L</kbd></span></div><div><span>Map</span><span><kbd class="k">M</kbd></span></div><div><span>Pause or close menu</span><span><kbd class="k">Esc</kbd></span></div></div>
   <h3>Things to do</h3><div class="help">
    <div><span>Main story</span><span>${QUESTS.filter(q=>q.npc==='elder').length} quests, 2 bosses</span></div><div><span>Side quests</span><span>${QUESTS.filter(q=>q.npc!=='elder').length} from villagers</span></div><div><span>Monsters</span><span>${Object.keys(ENEMY).length} kinds in the Bestiary</span></div>
    <div><span>Fishing</span><span>7 fish, some only at night</span></div><div><span>Mining</span><span>Iron, gold, starcrystal</span></div>
@@ -3795,6 +3802,10 @@ function handleAct(act,id){
   SFX.click();
   switch(act){
     case'close':closePanel();break;
+    case'resume':closePanel();break;
+    case'psave':save();toast('Game saved','Your progress is stored in this browser','#6fdc8c');break;
+    case'psound':soundOn=!soundOn;{const sb=document.getElementById('sndBtn');if(sb)sb.textContent=soundOn?'Sound':'Muted'}openPause();break;
+    case'phelp':openHelp();break;
     case'atab':openArena(id);break;
     case'bout':startBout();break;
     case'abuy':{const it=ARENA_SHOP[+id];if((P.tokens||0)<it.cost||(it.rank&&(P.arenaRank||0)<it.rank))return;if((it.k==='pet'&&P.pets.includes(it.t))||(it.k==='mount'&&P.mounts.includes(it.t)))return;P.tokens-=it.cost;if(it.k==='pet')addPet(it.t);else if(it.k==='mount')addMount(it.t);else if(it.k==='wpn')addWeapon(it.t);else if(it.k==='furn'){P.furn[it.t]=(P.furn[it.t]||0)+1;toast(FURN[it.t].n+' won','Place it in your house','#ffd23f')}else{addItem(it.t);toast(ITEMS[it.t].n+' won','Equip it from your bag','#ffd23f')}SFX.coin();openArena('shop');save();break}
@@ -3852,7 +3863,7 @@ addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
   if(state!=='play')return;
   if(panel==='scene'||panel==='cine'){if(!e.repeat&&['Space','Enter','KeyE'].includes(e.code))handleAct('next');else if(e.code==='Escape')endScene();return}
-  if(e.code==='Escape'){if(panel)closePanel();else if(P.placing)P.placing=null;else openHelp();return}
+  if(e.code==='Escape'){if(panel)closePanel();else if(P.placing)P.placing=null;else openPause();return}
   if(panel){if((e.code==='KeyI'&&panel==='bag')||(e.code==='KeyL'&&panel==='quests')||(e.code==='KeyM'&&panel==='map')||(e.code==='KeyH'&&panel==='help')||(e.code==='KeyB'&&panel&&panel.startsWith('spells'))||(e.code==='KeyP'&&panel&&panel.startsWith('stable'))||(e.code==='KeyT'&&panel==='talents')||(e.code==='KeyC'&&panel==='decor'))closePanel();return}
   if(e.repeat&&e.code!=='Space'){keys[e.code]=true;return}
   keys[e.code]=true;
@@ -3880,7 +3891,7 @@ document.querySelectorAll('#touch button').forEach(b=>{
   const up=()=>{if(b.dataset.t==='atk')keys.Space=false};b.addEventListener('pointerup',up);b.addEventListener('pointerleave',up);b.addEventListener('pointercancel',up);
 });
 document.getElementById('menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b||state!=='play')return;initAudio();const m=b.dataset.m;
-  if(m==='bag')openBag();else if(m==='players')openPlayers();else if(m==='chat')openChat();else if(m==='decor')openDecor();else if(m==='talents')openTalents();else if(m==='stable')openStable();else if(m==='spells')openSpells();else if(m==='quests')openQuests();else if(m==='map')openMap();else if(m==='help')openHelp();else if(m==='sound'){soundOn=!soundOn;b.textContent=soundOn?'Sound':'Muted'}b.blur()});
+  if(m==='pause')openPause();else if(m==='bag')openBag();else if(m==='players')openPlayers();else if(m==='chat')openChat();else if(m==='decor')openDecor();else if(m==='talents')openTalents();else if(m==='stable')openStable();else if(m==='spells')openSpells();else if(m==='quests')openQuests();else if(m==='map')openMap();else if(m==='help')openHelp();else if(m==='sound'){soundOn=!soundOn;b.textContent=soundOn?'Sound':'Muted'}b.blur()});
 
 /* ---------- title ---------- */
 function buildTitle(){
@@ -3904,10 +3915,11 @@ function startGame(cls,data){
 
 /* ---------- loop ---------- */
 let last=performance.now(),saveT=0,titleA=0;
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play'&&!panel&&P&&!P.dead)openPause()});
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
   try{
-    if(state==='play'&&!panel){updatePlay(dt)}
+    if(state==='play'&&!panel){updatePlay(dt);if(P)P.st.playT=(P.st.playT||0)+dt}
     updateWorld(state==='play'&&panel?0:dt);
     if(state==='play'){cam.x=lerp(cam.x,P.x,1-Math.pow(.0005,dt));cam.y=lerp(cam.y,P.y-10,1-Math.pow(.0005,dt));saveT+=dt;if(saveT>20){saveT=0;save()}}
     else{titleA+=dt*.05;cam.x=(VX+Math.cos(titleA)*14)*T;cam.y=(VY+4+Math.sin(titleA*1.3)*8)*T}
