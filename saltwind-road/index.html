@@ -13090,7 +13090,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-photo="1">Photo</button><button class="btn" data-emote="1">Emote</button><button class="btn" data-stats="1">Stats</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-backup="1">Save backup</button><button class="btn" data-photo="1">Photo</button><button class="btn" data-emote="1">Emote</button><button class="btn" data-stats="1">Stats</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -13110,7 +13110,7 @@ function renderPause() {
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } });
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } });
 const WN_VER = 8;
 const WHATS_NEW = [
   ['A seventh story', 'The Pirate King\u2019s Map (One-Eyed Nell, Blackwater): defeat three pirate captains and dig up the treasure.'],
@@ -13158,6 +13158,21 @@ function statsPage() {
     ['Parties joined', S.partiesJoined || 0], ['Shared victories', S.sharedKills || 0], ['Friends revived', S.revives || 0], ['Gifts given', S.giftsGiven || 0], ['Photos taken', S.photos || 0], ['Best daily streak', S.bestStreak || 0],
   ];
   openPanel('Your journey so far', `<div style="display:grid;grid-template-columns:1fr auto;gap:2px 16px;max-width:360px">${rows.map(([k, v]) => `<span style="color:var(--muted)">${k}</span><b style="text-align:right">${v}</b>`).join('')}</div>`, [{label: 'Close', primary: true, fn: closeTalk}]);
+}
+function backupPanel() {
+  save(); let code = ''; try { code = serialize(); } catch (e) {}
+  openPanel('Save backup', `Your progress saves automatically in this browser, but clearing your browser data erases it. Keep a backup here.<br><br><b>Back up:</b> ${DLS ? 'save a backup file, or ' : ''}copy this save code somewhere safe.<textarea id="bkOut" readonly style="width:100%;height:60px;margin:6px 0;font:11px monospace;background:#0d131b;color:#cfd6dc;border:1px solid #444;border-radius:4px">${esc(code)}</textarea><b>Restore:</b> paste a save code below${'<span>, or choose a backup file</span>'}.<textarea id="bkIn" placeholder="Paste a save code here" style="width:100%;height:50px;margin:6px 0;font:11px monospace;background:#0d131b;color:#cfd6dc;border:1px solid #444;border-radius:4px"></textarea><input id="bkFile" type="file" accept=".json,.txt,application/json,text/plain" style="font-size:12px">`, [
+    ...(DLS ? [{label: 'Save backup file', primary: true, fn: () => { try { DLS.save({filename: `saltwind-road-save-day${S.day}.json`, data: new Blob([code], {type: 'application/json'})}).then(r => { if (r && r.status === 'saved') toast('Backup saved!', 2500); }).catch(() => {}); } catch (e) {} }}] : []),
+    {label: 'Copy save code', fn: () => { const t = document.getElementById('bkOut'); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} try { navigator.clipboard && navigator.clipboard.writeText(code).then(() => toast('Save code copied!', 2500)).catch(() => {}); } catch (e) {} if (ok) toast('Save code copied!', 2500); }},
+    {label: 'Restore from code or file', fn: () => backupRestore()}, {label: 'Close', fn: closeTalk}]);
+  setTimeout(() => { const f = document.getElementById('bkFile'); if (f) f.addEventListener('change', () => { const file = f.files && f.files[0]; if (!file) return; file.text().then(t => { const el = document.getElementById('bkIn'); if (el) el.value = t; toast('Backup file loaded. Press Restore to use it.', 3500); }).catch(() => {}); }); const ta = document.getElementById('bkIn'); if (ta) ta.addEventListener('keydown', e => e.stopPropagation()); }, 30);
+}
+function backupRestore() {
+  const el = document.getElementById('bkIn'), txt = (el ? el.value : '').trim(); if (!txt) { toast('Paste a save code (or choose a file) first.', 3000); return; }
+  let st; try { st = deserialize(txt); } catch (e) { st = null; }
+  if (!st || typeof st.day !== 'number' || !st.inv) { toast('That doesn’t look like a Saltwind Road save.', 3500); return; }
+  openPanel('Restore this save?', `This backup is <b>${esc(st.name || 'a traveler')}</b>, level ${st.level || 1}, day ${st.day}, with ${st.coins || 0} coin.<br><br>Restoring replaces your current game in this browser. This can’t be undone, so back up your current game first if you want to keep it.`, [
+    {label: 'Restore it', primary: true, fn: () => { closeTalk(); if (party) leaveParty(true); begin(st); save(); toast('<b>Save restored!</b> Welcome back.', 4000); }}, {label: 'Cancel', fn: () => backupPanel()}]);
 }
 function questLog() {
   const st = (o, steps) => !o ? '<span style="color:var(--muted)">Not started</span>' : o.step >= 4 ? '<span style="color:var(--good)">✓ Complete</span>' : `<span style="color:var(--brass)">${steps[o.step] || 'In progress'}</span>`;
