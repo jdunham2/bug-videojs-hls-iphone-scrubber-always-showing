@@ -140,6 +140,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .buy b{color:var(--sun)}
 .char.rolling{border-color:var(--mint)}
+.bonus span{display:block}
+.bonus span+span{margin-top:3px}
 .bonus{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--mint);background:rgba(79,240,200,.12);border:1px solid rgba(79,240,200,.4);border-radius:10px;padding:6px 12px;max-width:62ch}
 .randmode{display:flex;flex-direction:column;align-items:center;gap:6px}
 .toggle{font-family:var(--display);font-size:13px;letter-spacing:.04em;border:2px solid var(--muted);background:var(--glass);color:var(--ink);border-radius:12px;padding:9px 16px;cursor:pointer}
@@ -3533,7 +3535,7 @@ function swapToRandomFighter() {
 }
 function startRun() {
   initAudio();
-  game.wave = 1; game.perks = []; game.perkObjs = []; game.randAcc = 0; game.randBonusNow = false; game.gold = 0; game.startPerk = {};
+  game.wave = 1; game.perks = []; game.perkObjs = []; game.randAcc = 0; game.randBonusNow = false; game.arenaCount = 0; game.arenaBonusNow = false; game.gold = 0; game.startPerk = {};
   player.setDef(ROSTER[game.charKey]); player.stocks = 3;
   startWave();
 }
@@ -3553,6 +3555,12 @@ function startWave() {
   if (game.startPerk.jet) player.jetT = 11.5;
   if (game.startPerk.hammer) { player.held = 'hammer'; player.heldT = HAMMER_TIME + 1.5; }
   game.startPerk = {}; syncDrones();
+  if (game.randomArena) { // explorer bonus: a Mystery Box drops in at the start of every wave
+    let q = randomSpotOn(PLATFORMS[0], 3);
+    for (let tries = 0; tries < 12 && (Math.hypot(q.x - player.home.x, q.z - player.home.z) < 3.5 || Math.hypot(q.x - enemy.home.x, q.z - enemy.home.z) < 3.5); tries++) q = randomSpotOn(PLATFORMS[0], 3);
+    const sup = supportTop(q.x, q.z);
+    if (sup) { spawnItemAt('box', q.x, platTop(sup, q.x) + 12, q.z); setTimeout(() => toast('Explorer bonus: a Mystery Box is dropping in!'), 900); }
+  }
   enemy.spawn(false); enemy.facing = 0;
   cam.yaw = 0; cam.pitch = .32; cam.manualT = 0; cam.focus.set(0, 1.5, 3);
   game.state = 'intro'; game.timer = 1.6; game.timeScale = 1;
@@ -3567,9 +3575,14 @@ function onKO(f) {
     if (enemy.stocks <= 0) {
       game.state = 'cleared'; game.timer = 1.8; game.timeScale = .35; banner('K.O.!', 'gold'); sfx('clear');
       progress.waves++;
-      if (game.randomMode) { // random-mode rewards: +8 gold, and every second wave counts double toward unlocks
+      game.randBonusNow = game.arenaBonusNow = false;
+      if (game.randomMode) { // random-fighter rewards: +8 gold, and every second wave counts double toward unlocks
         game.gold += RAND_GOLD; game.randAcc = (game.randAcc || 0) + .5;
         game.randBonusNow = game.randAcc >= 1; if (game.randBonusNow) { game.randAcc -= 1; progress.waves++; }
+      }
+      if (game.randomArena) { // random-arena rewards: +4 gold, and every third wave counts double toward unlocks
+        game.gold += ARENA_GOLD; game.arenaCount = (game.arenaCount || 0) + 1;
+        game.arenaBonusNow = game.arenaCount % 3 === 0; if (game.arenaBonusNow) progress.waves++;
       }
       saveProgress();
     }
@@ -3648,9 +3661,11 @@ function showUpgrades() {
   }
   if (freshF.length || freshA.length) { saveProgress(); setTimeout(() => sfx('star'), 250); }
   $('nextUnlockUp').textContent = nextUnlockText();
-  $('randBonus').hidden = !game.randomMode;
-  if (game.randomMode) $('randBonus').textContent = `RANDOM MODE BONUS: +${RAND_GOLD} gold · 4 power-up choices · `
-    + (game.randBonusNow ? '+1 extra wave toward unlocks!' : 'next wave earns +1 extra toward unlocks');
+  const bonus = [];
+  if (game.randomMode) bonus.push(`RANDOM FIGHTER BONUS: +${RAND_GOLD} gold, 4 power-up choices, ` + (game.randBonusNow ? '+1 extra wave toward unlocks!' : 'next wave earns +1 extra toward unlocks'));
+  if (game.randomArena) { const left = 3 - (game.arenaCount % 3); bonus.push(`RANDOM ARENA BONUS: +${ARENA_GOLD} gold, a free Mystery Box next wave, ` + (game.arenaBonusNow ? '+1 extra wave toward unlocks!' : `+1 extra toward unlocks in ${left} wave${left === 1 ? '' : 's'}`)); }
+  $('randBonus').hidden = !bonus.length;
+  $('randBonus').innerHTML = bonus.map(b => `<span>${b}</span>`).join('');
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
 }
 function showGameOver() {
@@ -3775,13 +3790,13 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
 game.randomMode = store.get('koisle-randmode') === '1';
-const RAND_GOLD = 8;
+const RAND_GOLD = 8, ARENA_GOLD = 4;
 game.randomArena = store.get('koisle-randarena') === '1';
 function syncRandArenaMode() {
   const b = $('btnRandArenaMode');
   b.setAttribute('aria-pressed', game.randomArena);
   b.textContent = `RANDOM ARENA EVERY WAVE: ${game.randomArena ? 'ON' : 'OFF'}`;
-  $('arenaRandHint').textContent = game.randomArena ? `Every wave is fought in a random arena from your ${arenaUnlockedCount()} unlocked ones. The starting arena above is ignored.` : '';
+  $('arenaRandHint').textContent = game.randomArena ? `Every wave is fought in a random arena from your ${arenaUnlockedCount()} unlocked ones. The starting arena above is ignored. Rewards: a free Mystery Box every wave, +${ARENA_GOLD} gold every wave, and unlocks come about 1.33× faster.` : '';
   document.querySelectorAll('#arenaSeg button').forEach(x => x.style.opacity = game.randomArena && !x.classList.contains('locked') ? .75 : '');
 }
 $('btnRandArenaMode').addEventListener('click', () => {
