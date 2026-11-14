@@ -8066,6 +8066,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Heart scenes and the almanac', 'Give gifts to Odile, Garrick, Bertha, Warden Kessa, Elder Rowan or Captain Marisol. At three hearts, each one has a personal moment to share with you. The Almanac in the menu (Esc) lists festivals, tournaments, Blood Moons, eclipses and birthdays for the next ten days.'],
   ['The Last Rainmaker', 'Grandmother Amani in Sunreach remembers when it still rained on the savanna. Take the three rain stones from the Drought Spirits that guard them, then set them in the dry spring. The eighth story quest.'],
   ['Armor sets', 'Six armor sets give a bonus when you wear all three pieces (body, head and shield): Pathfinder (leather), Ironclad (iron), Sea Dog (serpent cloak, pirate hat, kraken shield), Royal Guard (knight plate, royal helm, tower shield), Crystal Regalia and Mithril Guard. Your Pack shows which pieces you have.'],
   ['Solar eclipse', 'At noon on day 2 of summer and of winter, the moon covers the sun. For a few hours it\u2019s as dark as night and night monsters roam. Glowing shadow wisps appear nearby: walk up and press E to catch them for Eclipse Shards, which sell well. You can catch up to 6 in one eclipse. The Gazette warns you the day before.'],
@@ -10217,6 +10218,7 @@ function mainOptions(n) {
   if (n.rumors) o.push({label:'Heard anything?', fn: () => rumorTalk(n)});
   if (S.partner === n.id) o.push({label: S.lovedDay === S.day ? 'Spend time together (done today)' : 'Spend time together ♥', primary: S.lovedDay !== S.day, fn: () => partnerTalk(n)});
   else if (!S.partner && S.gifts && S.gifts[n.id] && S.gifts[n.id].keepsake && !n.festival) o.push({label: have('promise_ring') ? 'Propose (Promise Ring) ♥' : 'Propose... (need a Promise Ring)', disabled: !have('promise_ring'), primary: !!have('promise_ring'), fn: () => proposeTalk(n)});
+  if (heartReady(n)) o.unshift({label: `♥ Spend time with ${({odile: 'Odile', garrick: 'Garrick', bertha: 'Bertha', kessa: 'Kessa', rowan: 'Rowan', marisol: 'Marisol'})[n.id] || n.name}`, primary: true, fn: () => heartScene(n)});
   if (!n.festival) o.push({label: (S.gifts && S.gifts[n.id] && S.gifts[n.id].day === S.day) ? 'Give a gift (given today)' : isBirthday(n) ? 'Give a birthday gift 🎂' : 'Give a gift', primary: isBirthday(n) && !(S.gifts && S.gifts[n.id] && S.gifts[n.id].day === S.day), fn: () => giftTalk(n)});
   o.push({label:'Goodbye', fn: closeTalk});
   return o;
@@ -10323,12 +10325,46 @@ function giftTalk(n) {
       addRep(n.town, pts*.06); gainXP(5 + pts*5);
       const line = {love: ['Oh! I love it! How did you know?', 'This is wonderful. Thank you, truly.'], like: ['How thoughtful of you!', 'Oh, I can use this. Thank you!'], ok: ['Thank you, that\'s kind.', 'Oh, for me? Thanks.'], meh: ['Um... thanks, I suppose.', 'What... is this for?']}[r];
       let extra = '';
+      if (HEART_SCENES[n.id] && !(S.hearts || {})[n.id] && G.pts >= HEART_PTS && G.pts - pts < HEART_PTS) extra += `<br><br><span style="color:var(--brass)">♥ ${esc(n.name)} seems to want to talk. Speak to them again.</span>`;
       if (G.pts >= 15 && !G.keepsake) { G.keepsake = true; const k = pick(KEEPSAKES.filter(x => GOODS[x])); addItem(k, 1); S.bestFriends = (S.bestFriends || 0) + 1; extra = `<br><br>“You've been such a good friend. Please, take this.” <b>+1 ${GOODS[k].name}</b>`; SFX.victory(); }
       else SFX.coin();
       renderHUD(); save();
       say(`“${pick(line)}”${r === 'love' ? ' ♥' : ''}${bday && pts ? '<br><span style="color:var(--good)">A birthday gift! Friendship ×3.</span>' : ''}${extra}`, [back(n)]);
     }})),
     back(n)]);
+}
+// ===== friendship heart scenes (3 hearts with key townsfolk) =====
+const HEART_PTS = 9;
+const HEART_SCENES = {
+  odile: {title: 'The old charter', text: 'Odile takes a yellowed scroll from a locked drawer. “The guild’s founding charter. Look at the signatures.” One name near the top is scratched out so hard the quill tore the paper. “My grandmother. She founded this guild, and they struck her name off when she married a fisherman. I took this job to put it back.”',
+    a: ['Ask her what her grandmother was like', '“Stubborn. Brilliant. She could out-haggle a Dunmere spice lord.” Odile laughs. “She hid maps in her books. I found one last week. Here, you’re more of an explorer than I am.”', {item: 'treasure_map'}],
+    b: ['Tell her the guild is lucky to have her', 'Odile is quiet for a moment. “Thank you. Nobody’s said that before.” She presses a small purse into your hand. “For the road. Don’t argue.”', {coins: 180}]},
+  garrick: {title: 'Around the campfire', text: 'Garrick pokes the fire and touches the long scar down his arm. “Everyone thinks I killed the beast that gave me this. I didn’t. I ran. Twenty years I’ve trained hunters, and I’ve never told a soul.”',
+    a: ['Tell him running kept him alive to teach others', '“Huh. I never thought of it like that.” He straightens up. “You’ve got a good head on you. Take this. I won it from a lucky gambler years ago.”', {item: 'golden_horseshoe'}],
+    b: ['Promise to keep his secret', '“I knew I could trust you.” He grips your shoulder and slides over a cut gem. “Found it in that beast’s den the next day. Never had the heart to sell it.”', {item: 'gem'}]},
+  bertha: {title: 'After closing time', text: 'The alley is empty. Bertha rolls ball after ball, perfectly, never missing. “My Alfie built this lane with his own two hands,” she says without looking up. “He never bowled a strike in his life. Terrible aim. Lovely man.”',
+    a: ['Bowl a frame with her', 'You bowl together until the candles burn low. You don’t hit a single strike. Bertha laughs until she cries. “Just like Alfie!” She won’t let you leave without your winnings from an old bet.', {coins: 150}],
+    b: ['Ask her to tell you about Alfie', 'She talks for an hour: the lane, the wedding, the day he carved the pins. Then she fetches a dusty bottle from behind the bar. “He brewed this for luck. Last one. Drink it on a day you need it.”', {item: 'luck_draught'}]},
+  kessa: {title: 'On the wall at dusk', text: 'Kessa stands on the walls of Sunreach, watching the savanna go gold. “My father was the greatest warden this town ever had. Every day I wonder if they look at me and see a girl wearing his coat.”',
+    a: ['Tell her they see a warden who keeps them safe', '“You really think so?” She squares her shoulders. “Then I’ll keep earning it.” She hands you a pouch of coin. “A warden’s thanks.”', {coins: 160}],
+    b: ['Ask what her father would say', '“He’d say stop moping and check the east gate.” She laughs for the first time you’ve seen. “He found this amber on his first patrol. I think he’d want a friend of mine to have it.”', {item: 'amber'}]},
+  rowan: {title: 'The oldest tree', text: 'Elder Rowan leads you to an enormous oak deep in the pines. Names are carved all over its bark, hundreds of them. “Every elder of Hollowpine carves their name here. Mine is the last.” There is empty bark beneath it. “I have no one to pass this to.”',
+    a: ['Say the forest will choose someone, as it chose him', '“Perhaps. Perhaps it already has.” He looks at you a long while. Then he picks up something glittering from the roots. “The tree drops these once a century. Keep it.”', {item: 'star_fragment'}],
+    b: ['Offer to help him find an apprentice', '“You would do that?” He smiles. “Then you are already more help than you know.” He gives you a vial of sap. “Healing elixir. The tree makes it for those who care for others.”', {item: 'elixir'}]},
+  marisol: {title: 'A letter in a bottle', text: 'Captain Marisol sits at the end of the pier, turning a green bottle over in her hands. “My first mate, Tomas, threw this overboard the night our ship went down. It washed up thirty years later. I’ve never opened it.”',
+    a: ['Encourage her to open it', 'Her hands shake as she pulls the cork. She reads, and laughs, and cries. “He says I owe him six coin from a card game.” She wipes her eyes and pays the debt to you instead. Then much more. “He’d want it spent on adventures.”', {coins: 200}],
+    b: ['Sit with her quietly until sunset', 'You watch the ships come in. When the sun touches the water, she puts the bottle back in her coat, still sealed. “Some things are better kept. Thank you for staying.” She gives you a pearl from her old captain’s hat.', {item: 'pearl'}]},
+};
+function heartReady(n) { const H = HEART_SCENES[n.id]; return !!H && !(S.hearts || {})[n.id] && ((S.gifts || {})[n.id] || {pts: 0}).pts >= HEART_PTS; }
+function heartScene(n) {
+  const H = HEART_SCENES[n.id]; if (!H) return;
+  const pickOpt = o => () => {
+    S.hearts = S.hearts || {}; S.hearts[n.id] = true; const G = S.gifts[n.id]; G.pts += 2;
+    let got = ''; if (o[2].coins) { S.coins += o[2].coins; got = `${o[2].coins} coin`; } if (o[2].item && GOODS[o[2].item]) { addItem(o[2].item, 1); got = GOODS[o[2].item].name; }
+    gainXP(80); SFX.chime(); renderHUD(); save();
+    say(`${o[1]}<br><br><span style="color:var(--good)">♥ Your friendship with ${esc(n.name)} grows. +${got}</span>`, [back(n)]);
+  };
+  say(`<b style="color:var(--brass)">♥ ${H.title}</b><br>${H.text}`, [{label: H.a[0], primary: true, fn: pickOpt(H.a)}, {label: H.b[0], fn: pickOpt(H.b)}]);
 }
 // ===== pet tricks & shows =====
 const petName = id => { id = id || S.pet; return (S.petNames && S.petNames[id]) || (PETS[id] ? PETS[id].name : 'pet'); };
@@ -12944,6 +12980,8 @@ $('skillsSheet').addEventListener('click', e => {
 /* ================= achievements ================= */
 const ACH = [
   ['first_blood','First Blood','Defeat your first enemy', () => S.kills >= 1],
+  ['heart1','Kindred Spirit','Share a heart scene with a friend in town', () => Object.keys(S.hearts || {}).length >= 1],
+  ['heart6','Beloved','Share all six heart scenes', () => Object.keys(S.hearts || {}).length >= 6],
   ['full_set','Matching Outfit','Wear a full armor set', () => Object.keys(S.setsWorn || {}).length >= 1],
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
@@ -13477,7 +13515,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-backup="1">Save backup</button><button class="btn" data-photo="1">Photo</button><button class="btn" data-emote="1">Emote</button><button class="btn" data-stats="1">Stats</button><button class="btn" data-records="1">Records</button><button class="btn" data-album="1">Album</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-backup="1">Save backup</button><button class="btn" data-photo="1">Photo</button><button class="btn" data-emote="1">Emote</button><button class="btn" data-stats="1">Stats</button><button class="btn" data-records="1">Records</button><button class="btn" data-almanac="1">Almanac</button><button class="btn" data-album="1">Album</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -13502,9 +13540,11 @@ function renderPause() {
   $('sUi').addEventListener('change', e => { SETTINGS.ui = e.target.value; saveSettings(); applyLook(); });
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 15;
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
+const WN_VER = 16;
 const WHATS_NEW = [
+  ['Heart scenes', 'Make friends with Odile, Garrick, Bertha, Warden Kessa, Elder Rowan or Captain Marisol (three hearts from gifts) and they\u2019ll share a personal moment with you.'],
+  ['Almanac', 'A calendar in the menu shows what\u2019s coming in the next ten days: festivals, tournaments, Blood Moons, eclipses and birthdays.'],
   ['An eighth story', 'The Last Rainmaker (Grandmother Amani, Sunreach): why did the rain stop fifty years ago? Win back the rain stones and find out what waits at the dry spring.'],
   ['Armor sets', 'Wear a matching body armor, helmet and shield for a set bonus, like Mithril Guard (+15% damage, +6 health) or Pathfinder (+10% speed). Check your Pack to see your sets.'],
   ['Solar eclipse', 'Twice a year (day 2 of summer and of winter) the sun goes dark at noon. Catch the glowing shadow wisps for Eclipse Shards before the light returns.'],
@@ -13591,6 +13631,26 @@ function backupNudge() {
   if (since >= 14 && S.bkRemDay !== S.day) { S.bkRemDay = S.day; toast(`<b>Time for a backup?</b><br>It’s been ${since} days since your last one. Open the menu (Esc) and choose <b>Save backup</b> so clearing your browser can’t erase your progress.`, 8000); }
 }
 setInterval(backupNudge, 20000);
+// ===== almanac: what's coming up =====
+function almanacDay(d) {
+  const ds = ((d - 1) % 7) + 1, si = Math.floor((d - 1)/7) % 4, ev = [];
+  if (ds === 1) ev.push(['season', `${SEASONS[si].name} begins`]);
+  if (ds === 4) ev.push(['fest', `${FESTIVALS[si].name} in ${TOWNS[FESTIVALS[si].town].name}`]);
+  if (ds === 2 && (si === 1 || si === 3)) ev.push(['eclipse', 'Total eclipse at noon']);
+  if (ds === 6) ev.push(['fish', 'Fishing tournament (Old Marlin)']);
+  if (d >= 6 && d % 6 === 0) ev.push(['blood', 'Blood Moon tonight']);
+  if (si === 3 && d % 3 === 1) ev.push(['aurora', 'Northern lights likely tonight']);
+  if (d % 7 === 0) ev.push(['fow', 'New fish of the week tomorrow']);
+  const bd = NPCS.filter(n => !n.wander && !n.festival && (S.met || {})[n.id] && ((d - 1) % 28) + 1 === bdayOf(n)).map(n => n.name);
+  if (bd.length) ev.push(['bday', `Birthday: ${bd.slice(0, 3).join(', ')}${bd.length > 3 ? ` and ${bd.length - 3} more` : ''}`]);
+  return ev;
+}
+function almanacPage() {
+  const COL = {season: '#86c98f', fest: '#f0c040', eclipse: '#c8a8ff', fish: '#6ab0e0', blood: '#e85a5a', aurora: '#7ae8c8', fow: '#9fd8ff', bday: '#ff9ac8'};
+  const rows = []; for (let i = 0; i < 10; i++) { const d = S.day + i, ds = ((d - 1) % 7) + 1, si = Math.floor((d - 1)/7) % 4, ev = almanacDay(d);
+    rows.push(`<div style="display:grid;grid-template-columns:120px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)"><div><b>${i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : 'Day ' + d}</b><div style="font-size:12px;color:var(--muted)">${SEASONS[si].name}, day ${ds}</div></div><div>${ev.length ? ev.map(([k, t]) => `<div><span style="color:${COL[k]}">●</span> ${t}</div>`).join('') : '<span style="color:var(--muted)">Nothing special</span>'}</div></div>`); }
+  openPanel('Almanac', `<div style="color:var(--muted);margin-bottom:6px">The next ten days. Birthdays show for people you’ve met.</div><div style="max-height:46vh;overflow:auto">${rows.join('')}</div>`, [{label: 'Close', primary: true, fn: closeTalk}]);
+}
 function statsPage() {
   const rows = [
     ['Days on the road', S.day], ['Level', S.level || 1], ['Monsters defeated', S.kills || 0], ['Elites defeated', S.eliteKills || 0], ['Bosses defeated', Object.keys(S.bosses || {}).filter(k => S.bosses[k]).length],
