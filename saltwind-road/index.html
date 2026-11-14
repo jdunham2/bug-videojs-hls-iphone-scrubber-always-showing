@@ -1569,7 +1569,7 @@ function drawCorona(a) {
 }
 const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
 const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
-const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1) * (S && S.monuments && S.monuments.maplehold >= 3 ? 1.15 : 1);
+const cropRate = c => (season().crops.includes(c) ? 1.4 : S && S.home && S.home.greenhouse ? 1.15 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1) * (S && S.monuments && S.monuments.maplehold >= 3 ? 1.15 : 1);
 const CROP_LOOK = {giant_pumpkin:'ground', starfruit:'tree', dragonfruit:'bush', golden_wheat:'stalk', strawberry:'bush', tomato:'bush', chili:'bush', cotton:'bush', potato:'ground', melon:'ground', corn:'stalk', rice:'stalk', sunflower:'flower', grape:'vine', apple:'tree', peach:'tree', orange:'tree'};
 const CROPS = {
   wheat:{name:'Wheat',grow:1,yield:[3,5]},
@@ -7977,6 +7977,21 @@ function lighthouseTalk(n) {
       say(`${L.txt}${L.coins ? `<br><span style="color:var(--good)">Mara presses ${L.coins} coin into your hand.</span>` : ''}${S.lighthouse >= 3 ? '<br><br><b>The Tidewatch lighthouse burns again!</b> Your boat sails 15% faster and sailors will tell of this for years.' : ''}`, [back(n)]);
     }}, back(n)]);
 }
+// ===== homestead greenhouse =====
+const GREENHOUSE_COST = {coins: 900, glass: 10, planks: 8, iron: 4};
+function greenhouseTalk(n) {
+  if (S.home.greenhouse) { say('“Your greenhouse is the envy of the coast. Winter can’t touch your crops now.”<br><span style="color:var(--good)">Crops grow at full speed in winter, and out-of-season crops grow 15% faster.</span>', [back(n)]); return; }
+  const ok = upCanPay(GREENHOUSE_COST);
+  say(`“A greenhouse over your fields? Glass walls, a good oak frame. Winter would stop slowing your crops, and even out-of-season seeds would grow faster.”<div class="req" style="margin-top:8px">${upCostHTML(GREENHOUSE_COST)}</div>`, [
+    {label: 'Build the greenhouse', primary: ok, disabled: !ok, fn: () => { upPay(GREENHOUSE_COST); S.home.greenhouse = true; SFX.victory(); gainXP(120); renderHUD(); save(); say('“There! Sunlight in, frost out. Your crops will thank you.”<br><span style="color:var(--good)">Greenhouse built: no more winter slowdown, and out-of-season crops grow 15% faster.</span>', [back(n)]); }}, back(n)]);
+}
+function drawGreenhouse() {
+  const x = (HOME.x + 4)*TS, y = (HOME.y - 3)*TS;
+  ctx.fillStyle = 'rgba(200,235,255,.35)'; ctx.fillRect(x, y, 30, 22); ctx.strokeStyle = '#8a6a4a'; ctx.lineWidth = 1.5; ctx.strokeRect(x, y, 30, 22);
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 15, y - 9); ctx.lineTo(x + 30, y); ctx.stroke(); ctx.fillStyle = 'rgba(220,245,255,.45)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 15, y - 9); ctx.lineTo(x + 30, y); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x + 10, y); ctx.lineTo(x + 10, y + 22); ctx.moveTo(x + 20, y); ctx.lineTo(x + 20, y + 22); ctx.stroke();
+  ctx.fillStyle = '#4a9a3a'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 3 + i*6, y + 14, 3, 6);
+}
 // ===== lighthouse night watch =====
 let lhw = null;
 const LHW = 340, LHH = 250;
@@ -8343,6 +8358,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Greenhouse', 'Once you own the homestead, Pell the land agent can build a greenhouse (900 coin, 10 glass, 8 planks and 4 iron). Your crops stop slowing down in winter, and out-of-season crops grow 15% faster.'],
   ['Lighthouse night watch', 'Once the Tidewatch lighthouse is restored, Mara lets you keep the night watch (once a night, after dark). Swing the beam onto ships with left and right. A lit ship steers for the gap between the rocks, while a ship left in the dark drifts. Guide all ten home for a bonus.'],
   ['Pie-eating contest', 'On festival days, the festival merchant runs a pie-eating contest (once per day, free). Mash Space, E or tap for twenty seconds. Eight bites make a pie, and the most pies wins the Golden Pie Tin.'],
   ['Legendary fish', 'Five legendary fish each bite in one kind of place, and some only in one season or at one time of day. You need at least a good rod (tier 2). They fight much harder than normal fish. The Gazette\u2019s angler\u2019s corner gives a hint each day. Catch all five for a big reward.'],
@@ -9616,6 +9632,7 @@ function render() {
   if (totOn()) for (const h of houses) if (h.town && inView(h.x + 1, h.y + 1.5)) { const key = h.x + ',' + h.y; if ((S.tot || {})[key] !== S.day) sprites.push({y: h.y + 2.1, f: () => drawJack(h)}); }
   for (const [i, q] of secretGlades().entries()) if (Math.hypot(q.x - S.x, q.y - S.y) < 6 && inView(q.x, q.y)) sprites.push({y: q.y - 1, f: () => drawGlade(q, i)});
   for (const w of eclWisps) if (inView(w.x, w.y)) sprites.push({y: w.y + .5, f: () => drawWisp(w)});
+  if (S.home && S.home.greenhouse && inView(HOME.x + 5, HOME.y - 2)) sprites.push({y: HOME.y - 1.6, f: drawGreenhouse});
   for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
   if (airship) sprites.push({y: 1e9 - 1, f: drawAirship});
@@ -10379,6 +10396,7 @@ function mainOptions(n) {
   }
   if (n.teaches && Object.keys(n.teaches).some(r => !isKnown(r))) o.push({label:'Teach me a craft', fn: () => teachTalk(n)});
   if (n.animals) o.push({label:'Buy animals', fn: () => animalsTalk(n)});
+  if (n.homestead && S.home.level) o.push({label: S.home.greenhouse ? 'The greenhouse' : 'Build a greenhouse', fn: () => greenhouseTalk(n)});
   if (n.homestead) o.push({label: S.home.level ? 'About my homestead' : 'Buy the homestead', fn: () => homesteadTalk(n), primary: !S.home.level && S.coins >= HOME_LEVELS[1].cost.coins});
   if (n.collector) { const unshown = CK.filter(k => S.curios[k] && !S.curiosShown[k]).length; o.push({label: unshown ? `Show curios (${unshown} new)` : 'About curios', fn: () => curioTalk(n), primary: unshown > 0}); }
   if (n.id === 'gwen') o.push({label: 'Race!', fn: () => raceTalk(n)});
@@ -13303,6 +13321,7 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['greenhouse','Glass Gardener','Build a greenhouse on your homestead', () => !!(S.home && S.home.greenhouse)],
   ['lh_watch','Lamplighter','Keep a night watch at the Tidewatch lighthouse', () => (S.lhShifts || 0) >= 1],
   ['lh_perfect','Not One Lost','Guide all ten ships home in one night watch', () => (S.lhPerfect || 0) >= 1],
   ['pie_win','Pie Champion','Win a festival pie-eating contest', () => (S.pieWins || 0) >= 1],
@@ -13960,8 +13979,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 24;
+const WN_VER = 25;
 const WHATS_NEW = [
+  ['Greenhouse', 'Ask Pell, the land agent, to build a greenhouse on your homestead so winter stops slowing your crops.'],
   ['Lighthouse night watch', 'Restored the Tidewatch lighthouse? Keep the night watch and swing the beam to guide ships past the rocks.'],
   ['Pie-eating contest', 'Every festival day: mash your way through as many pies as you can in twenty seconds to win the Golden Pie Tin.'],
   ['Legendary fish', 'Five giant legendary fish lurk in the right place, season and hour. Check the Gazette for hints, bring a good rod, and hold on tight.'],
