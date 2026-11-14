@@ -149,6 +149,11 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .lockbar i{display:block;height:100%;background:var(--sun);border-radius:4px}
 .lockic{font-family:var(--display);font-size:11px;letter-spacing:.1em;color:var(--sun)}
 .sub{margin:-8px 0 0;font-size:14px;color:var(--muted)}
+.unlocks{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.unlocks:empty{display:none}
+.unlock .thumb{width:128px;height:72px;border-radius:10px;object-fit:cover}
+.seg button.locked{opacity:.45;cursor:not-allowed}
+.seg button small{display:block;font-family:var(--body);font-weight:700;font-size:9px;letter-spacing:.08em;margin-top:2px}
 .unlock{display:flex;align-items:center;gap:14px;padding:10px 18px 10px 10px;border-radius:16px;background:var(--glass);border:2px solid var(--sun);animation:glow 1.2s ease-in-out infinite alternate}
 .unlock img{width:84px;height:84px}
 .unlock .k{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--sun)}
@@ -230,7 +235,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
     <p class="sub" id="unlockSummary"></p>
     <div class="chars" id="chars"></div>
     <div>
-      <span class="lbl">Starting arena (arenas switch every wave)</span>
+      <span class="lbl" id="arenaLbl">Starting arena (arenas switch every wave)</span>
       <div class="seg" id="arenaSeg">
         <button id="arSky" data-a="sky">SKY ISLE</button>
         <button id="arLava" data-a="lava">LAVA FORGE</button>
@@ -256,7 +261,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 <section class="screen" id="scrUp" hidden>
   <div class="panel">
     <h2 id="upTitle">WAVE 1 CLEARED</h2>
-    <div class="unlock" id="unlockBox" hidden><img id="unlockImg" alt=""><div><span class="k">NEW FIGHTER UNLOCKED</span><span class="n" id="unlockName"></span></div></div>
+    <div class="unlocks" id="unlocks"></div>
     <p class="rule" id="nextUnlockUp"></p>
     <p class="tag">Pick one power-up. It lasts for the rest of the run.</p>
     <div class="ups" id="ups"></div>
@@ -1803,21 +1808,33 @@ const progress = { waves: Math.max(0, +(store.get('koisle-waves') || 0) || 0), s
 try { for (const k of JSON.parse(store.get('koisle-seen') || '[]')) progress.seen.add(k); } catch (e) {}
 const isUnlocked = k => progress.waves >= (UNLOCKS[k] ?? 0);
 const unlockedCount = () => Object.keys(PLAYABLE).filter(isUnlocked).length;
-function nextUnlock() {
+// Arenas unlock from the same counter. Locked arenas are skipped in the run rotation.
+const ARENA_UNLOCKS = { sky: 0, lava: 0, wind: 3, gear: 5, ice: 8, ship: 12, shrink: 16, bounce: 21, night: 26, garden: 31, train: 36 };
+const isArenaUnlocked = k => progress.waves >= (ARENA_UNLOCKS[k] ?? 0);
+const arenaUnlockedCount = () => Object.keys(ARENAS).filter(isArenaUnlocked).length;
+function nextArenaAfter(k) {
+  const keys = Object.keys(ARENAS), i = keys.indexOf(k);
+  for (let j = 1; j <= keys.length; j++) { const c = keys[(i + j) % keys.length]; if (isArenaUnlocked(c)) return c; }
+  return k;
+}
+function nextUnlock() { // the soonest locked fighter or arena
   let best = null;
-  for (const k of Object.keys(PLAYABLE)) if (!isUnlocked(k) && (!best || UNLOCKS[k] < UNLOCKS[best])) best = k;
+  for (const k of Object.keys(PLAYABLE)) if (!isUnlocked(k) && (!best || UNLOCKS[k] < best.at)) best = { kind: 'fighter', key: k, at: UNLOCKS[k], name: ROSTER[k].name };
+  for (const k of Object.keys(ARENAS)) if (!isArenaUnlocked(k) && (!best || ARENA_UNLOCKS[k] < best.at)) best = { kind: 'arena', key: k, at: ARENA_UNLOCKS[k], name: ARENAS[k].name };
   return best;
 }
 function nextUnlockText() {
-  const k = nextUnlock();
-  if (!k) return `All ${Object.keys(PLAYABLE).length} fighters unlocked. Waves cleared in total: ${progress.waves}.`;
-  const left = UNLOCKS[k] - progress.waves;
-  return `Next fighter unlocks in ${left} more wave${left === 1 ? '' : 's'} (${progress.waves} of ${UNLOCKS[k]} cleared in total).`;
+  const n = nextUnlock();
+  if (!n) return `Everything is unlocked: all ${Object.keys(PLAYABLE).length} fighters and ${Object.keys(ARENAS).length} arenas. Waves cleared in total: ${progress.waves}.`;
+  const left = n.at - progress.waves;
+  return `Next unlock: ${n.kind === 'arena' ? 'a new arena' : 'a new fighter'} in ${left} more wave${left === 1 ? '' : 's'} (${progress.waves} of ${n.at} cleared in total).`;
 }
 function saveProgress() { store.set('koisle-waves', progress.waves); store.set('koisle-seen', JSON.stringify([...progress.seen])); }
 game.charKey = Object.keys(PLAYABLE).includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
 if (!isUnlocked(game.charKey)) game.charKey = 'nova';
 game.startArena = Object.keys(ARENAS).includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
+if (!isArenaUnlocked(game.startArena)) game.startArena = 'sky';
+game.arenaKey = game.startArena;
 game.itemT = 6; game.gold = 0; game.startPerk = {};
 
 class Fighter {
@@ -3039,7 +3056,7 @@ class Brain {
   }
 }
 const brain = new Brain(enemy);
-window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, vinePatches, progress, UNLOCKS, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
+window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, vinePatches, progress, UNLOCKS, ARENA_UNLOCKS, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
 
 /* ================= input ================= */
 const keys = new Set(), pressed = new Set();
@@ -3224,8 +3241,8 @@ function startWave() {
   enemy.setDef(ROSTER[key], { power: 1 + (w - 1) * .08, speed: 1 + Math.min(.25, (w - 1) * .03), weight: 1 + (w - 1) * .04 });
   enemy.stocks = w >= 4 ? 2 : 1;
   brain.reset(clamp(.22 + w * .12, 0, 1));
-  const keys = Object.keys(ARENAS), start = keys.indexOf(game.startArena);
-  setArena(keys[(start + w - 1) % keys.length]);
+  game.arenaKey = w === 1 ? game.startArena : nextArenaAfter(game.arenaKey);
+  setArena(game.arenaKey);
   clearArenaObjects(); game.itemT = rand(5, 8);
   player.spawn(false); player.facing = Math.PI; player.windUsed = false;
   if (game.startPerk.star) player.starT = 7.5;
@@ -3306,15 +3323,20 @@ function showUpgrades() {
   });
   game.gold += coins.length; clearCoins();
   renderShop();
-  const fresh = Object.keys(PLAYABLE).filter(k => isUnlocked(k) && !progress.seen.has(k));
-  $('unlockBox').hidden = !fresh.length;
-  if (fresh.length) {
-    const k = fresh[fresh.length - 1];
-    $('unlockName').textContent = fresh.map(f => ROSTER[f].name).join(' + ');
-    const src = getPortrait(k); if (src) $('unlockImg').src = src;
-    for (const f of fresh) progress.seen.add(f);
-    saveProgress(); setTimeout(() => sfx('star'), 250);
+  const freshF = Object.keys(PLAYABLE).filter(k => isUnlocked(k) && !progress.seen.has(k));
+  const freshA = Object.keys(ARENAS).filter(k => isArenaUnlocked(k) && ARENA_UNLOCKS[k] > 0 && !progress.seen.has('a:' + k));
+  const ub = $('unlocks'); ub.innerHTML = '';
+  for (const k of freshF) {
+    const src = getPortrait(k), d = document.createElement('div'); d.className = 'unlock';
+    d.innerHTML = `${src ? `<img src="${src}" alt="">` : ''}<div><span class="k">NEW FIGHTER UNLOCKED</span><span class="n">${ROSTER[k].name}</span></div>`;
+    ub.appendChild(d); progress.seen.add(k);
   }
+  for (const k of freshA) {
+    const src = arenaThumb(k), d = document.createElement('div'); d.className = 'unlock';
+    d.innerHTML = `${src ? `<img class="thumb" src="${src}" alt="">` : ''}<div><span class="k">NEW ARENA UNLOCKED</span><span class="n">${ARENAS[k].name}</span></div>`;
+    ub.appendChild(d); progress.seen.add('a:' + k);
+  }
+  if (freshF.length || freshA.length) { saveProgress(); setTimeout(() => sfx('star'), 250); }
   $('nextUnlockUp').textContent = nextUnlockText();
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
 }
@@ -3356,6 +3378,29 @@ function portrait(def) {
   ctx.putImageData(img, 0, 0);
   return c.toDataURL();
 }
+const thumbCache = {};
+function arenaThumb(key) { // render a small preview of an arena (used between waves, when the arena is reset anyway)
+  if (key in thumbCache) return thumbCache[key];
+  try {
+    const W = 320, H = 180, prev = arena.key, hidden = [player.model.root, enemy.model.root, marker, pMesh];
+    const vis = hidden.map(o => o.visible); hidden.forEach(o => o.visible = false);
+    setArena(key);
+    const cam2 = new THREE.PerspectiveCamera(55, W / H, .1, 600);
+    const far = key === 'ship' || key === 'train' ? 26 : 21; cam2.position.set(far * .55, 11, far); cam2.lookAt(0, -.5, 0);
+    sky.position.copy(cam2.position);
+    const rt = new THREE.WebGLRenderTarget(W, H); rt.texture.colorSpace = THREE.SRGBColorSpace;
+    renderer.setRenderTarget(rt); renderer.render(scene, cam2);
+    const buf = new Uint8Array(W * H * 4); renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
+    renderer.setRenderTarget(null); rt.dispose();
+    setArena(prev); hidden.forEach((o, i) => o.visible = vis[i]);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const ctx = c.getContext('2d'), img = ctx.createImageData(W, H);
+    for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+    ctx.putImageData(img, 0, 0);
+    thumbCache[key] = c.toDataURL('image/jpeg', .85);
+  } catch (e) { thumbCache[key] = ''; }
+  return thumbCache[key];
+}
 const portraitCache = {};
 function getPortrait(key) { if (!(key in portraitCache)) { try { portraitCache[key] = portrait(ROSTER[key]); } catch (e) { portraitCache[key] = ''; } } return portraitCache[key]; }
 let portraitsBuilt = false;
@@ -3390,14 +3435,23 @@ function syncSelect() {
     }
   });
   $('unlockSummary').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters unlocked · ${progress.waves} waves cleared in total`;
-  document.querySelectorAll('#arenaSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === game.startArena));
+  if (!isArenaUnlocked(game.startArena)) game.startArena = 'sky';
+  document.querySelectorAll('#arenaSeg button').forEach(b => {
+    const k = b.dataset.a, open = isArenaUnlocked(k);
+    if (!b.dataset.name) b.dataset.name = b.textContent.trim();
+    b.classList.toggle('locked', !open); b.setAttribute('aria-disabled', !open);
+    b.setAttribute('aria-pressed', open && k === game.startArena);
+    b.innerHTML = open ? b.dataset.name : `${b.dataset.name}<small>LOCKED · ${ARENA_UNLOCKS[k] - progress.waves} MORE WAVES</small>`;
+  });
+  $('arenaLbl').textContent = `Starting arena · ${arenaUnlockedCount()} of ${Object.keys(ARENAS).length} unlocked · unlocked arenas rotate every wave`;
 }
 function openSelect() {
   if (!portraitsBuilt) buildSelect();
-  game.state = 'select'; setArena(game.startArena); syncSelect(); show('scrSelect');
+  game.state = 'select'; syncSelect(); setArena(game.startArena); show('scrSelect');
   $('hud').hidden = true; $('touch').hidden = true;
 }
 document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('click', () => {
+  if (!isArenaUnlocked(b.dataset.a)) { sfx('clang'); toast(`Clear ${ARENA_UNLOCKS[b.dataset.a] - progress.waves} more waves to unlock ${ARENAS[b.dataset.a].name}.`); return; }
   game.startArena = b.dataset.a; store.set('koisle-arena', b.dataset.a); setArena(b.dataset.a); sfx('select'); syncSelect();
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
@@ -3413,7 +3467,7 @@ $('btnReset').addEventListener('click', () => {
 const bestSaved = +(store.get('koisle-best') || 0);
 function updateTitleInfo() {
   const best = +(store.get('koisle-best') || 0) || bestSaved;
-  $('best').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters unlocked` + (best ? ` · Best run: wave ${best}` : '') + '. Clear waves to unlock more.';
+  $('best').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters and ${arenaUnlockedCount()} of ${Object.keys(ARENAS).length} arenas unlocked` + (best ? ` · Best run: wave ${best}` : '') + '. Clear waves to unlock more.';
 }
 updateTitleInfo();
 
