@@ -162,6 +162,9 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .unlocks:empty{display:none}
 .unlock .thumb{width:128px;height:72px;border-radius:10px;object-fit:cover}
 .seg button.locked{opacity:.45;cursor:not-allowed}
+.seg button.rolling{box-shadow:inset 0 0 0 2px var(--mint);color:var(--mint)}
+#btnRandArena{display:block;margin:8px auto 0}
+.toggle:disabled{opacity:.5;cursor:default}
 .seg button small{display:block;font-family:var(--body);font-weight:700;font-size:9px;letter-spacing:.08em;margin-top:2px}
 .unlock{display:flex;align-items:center;gap:14px;padding:10px 18px 10px 10px;border-radius:16px;background:var(--glass);border:2px solid var(--sun);animation:glow 1.2s ease-in-out infinite alternate}
 .unlock img{width:84px;height:84px}
@@ -263,6 +266,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arGarden" data-a="garden">GRAVITY GARDEN</button>
         <button id="arTrain" data-a="train">TRAIN TOP</button>
       </div>
+      <button class="toggle" id="btnRandArena">RANDOM ARENA</button>
     </div>
     <div class="randmode">
       <button class="toggle" id="btnRandMode" aria-pressed="false">RANDOM FIGHTER EVERY WAVE: OFF</button>
@@ -270,7 +274,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
     </div>
     <div class="row">
       <button class="btn ghost" id="btnBack">BACK</button>
-      <button class="btn ghost" id="btnRandom">RANDOM</button>
+      <button class="btn ghost" id="btnRandom">RANDOM FIGHTER</button>
       <button class="btn" id="btnGo">FIGHT</button>
     </div>
     <button class="linkbtn" id="btnReset">Reset unlock progress</button>
@@ -3772,34 +3776,48 @@ $('btnRandMode').addEventListener('click', () => {
   game.randomMode = !game.randomMode; store.set('koisle-randmode', game.randomMode ? '1' : '0');
   sfx(game.randomMode ? 'star' : 'select'); syncRandMode();
 });
-// Random fighter: a short roulette across the unlocked fighters, slowing down before it lands
+// Random picks: a short roulette that slows down and lands on a different unlocked choice
 let rolling = false;
-$('btnRandom').addEventListener('click', () => {
+const SPIN_LOCK = ['btnRandom', 'btnRandArena', 'btnGo', 'btnBack'];
+function spinPick({ pool, current, mark, land }) {
   if (rolling) return;
-  const pool = Object.keys(PLAYABLE).filter(isUnlocked);
-  if (pool.length < 2) { sfx('clang'); toast('Unlock more fighters to use Random. Clear waves to earn them.'); return; }
-  const others = pool.filter(k => k !== game.charKey), pick = others[Math.random() * others.length | 0];
+  const others = pool.filter(k => k !== current), pick = others[Math.random() * others.length | 0];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const steps = reduce ? 0 : 12 + pool.length + (Math.random() * pool.length | 0);
-  let i = Math.max(0, pool.indexOf(game.charKey)), n = 0;
-  rolling = true; for (const id of ['btnRandom', 'btnGo', 'btnBack']) $(id).disabled = true;
-  const cards = () => document.querySelectorAll('.char');
-  const land = () => {
-    cards().forEach(c => c.classList.remove('rolling'));
-    rolling = false; for (const id of ['btnRandom', 'btnGo', 'btnBack']) $(id).disabled = false;
-    game.charKey = pick; store.set('koisle-char', pick); syncSelect();
-    const card = $('char-' + pick); card.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
-    sfx('star'); toast(`Random pick: ${ROSTER[pick].name}!`);
-  };
+  let i = Math.max(0, pool.indexOf(current)), n = 0;
+  rolling = true; for (const id of SPIN_LOCK) $(id).disabled = true;
+  const finish = () => { mark(null); rolling = false; for (const id of SPIN_LOCK) $(id).disabled = false; land(pick); };
   const tick = () => {
-    if (n >= steps) { land(); return; }
+    if (n >= steps) { finish(); return; }
     i = (i + 1) % pool.length; n++;
-    if (n >= steps - pool.length && pool[i] === pick) { land(); return; } // stop on the chosen fighter during the last lap
-    cards().forEach(c => c.classList.toggle('rolling', c.dataset.k === pool[i]));
-    sfx('jump');
+    if (n >= steps - pool.length && pool[i] === pick) { finish(); return; } // stop on the chosen one during the last lap
+    mark(pool[i]); sfx('jump');
     setTimeout(tick, 55 + Math.pow(n / steps, 2.2) * 260);
   };
   tick();
+}
+$('btnRandom').addEventListener('click', () => {
+  const pool = Object.keys(PLAYABLE).filter(isUnlocked);
+  if (pool.length < 2) { sfx('clang'); toast('Unlock more fighters to use Random. Clear waves to earn them.'); return; }
+  spinPick({
+    pool, current: game.charKey,
+    mark: k => document.querySelectorAll('.char').forEach(c => c.classList.toggle('rolling', c.dataset.k === k)),
+    land: k => {
+      game.charKey = k; store.set('koisle-char', k); syncSelect();
+      $('char-' + k).scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      sfx('star'); toast(`Random pick: ${ROSTER[k].name}!`);
+    },
+  });
+});
+$('btnRandArena').addEventListener('click', () => {
+  spinPick({
+    pool: Object.keys(ARENAS).filter(isArenaUnlocked), current: game.startArena,
+    mark: k => document.querySelectorAll('#arenaSeg button').forEach(b => b.classList.toggle('rolling', b.dataset.a === k)),
+    land: k => {
+      game.startArena = k; store.set('koisle-arena', k); setArena(k); syncSelect();
+      sfx('star'); toast(`Random arena: ${ARENAS[k].name}!`);
+    },
+  });
 });
 $('btnBack').addEventListener('click', () => { game.state = 'title'; updateTitleInfo(); show('scrTitle'); });
 $('btnChange').addEventListener('click', () => { sfx('select'); openSelect(); });
