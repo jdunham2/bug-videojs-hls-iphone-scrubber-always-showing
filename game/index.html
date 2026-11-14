@@ -118,14 +118,14 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 #windInd.warn .arrow{animation:blink .35s infinite alternate}
 @keyframes blink{to{opacity:.3}}
 /* Character select */
-.chars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%}
-.char{font-family:var(--body);color:var(--ink);background:var(--glass);border:3px solid transparent;border-radius:18px;padding:12px 14px 16px;
+.chars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:100%}
+.char{font-family:var(--body);color:var(--ink);background:var(--glass);border:3px solid transparent;border-radius:18px;padding:8px 12px 12px;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;transition:transform .1s,border-color .1s}
 .char:hover{transform:translateY(-3px)}
 .char[aria-pressed="true"]{border-color:var(--sun)}
-.char img{width:150px;height:150px;max-width:100%;object-fit:contain}
+.char img{width:92px;height:92px;max-width:100%;object-fit:contain}
 .char .n{font-family:var(--display);font-size:22px}
-.char .r{font-size:13px;color:var(--muted);line-height:1.4;min-height:3.6em}
+.char .r{font-size:12px;color:var(--muted);line-height:1.35}
 .stat{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;width:100%;max-width:200px;font-size:11px;font-weight:700;
   letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .pips{display:flex;gap:3px}.pips i{flex:1;height:7px;border-radius:3px;background:rgba(203,184,232,.22)}.pips i.on{background:var(--mint)}
@@ -218,6 +218,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arWind" data-a="wind">WINDY PEAKS</button>
         <button id="arGear" data-a="gear">CLOCKWORK</button>
         <button id="arIce" data-a="ice">FROZEN LAKE</button>
+        <button id="arShip" data-a="ship">PIRATE SHIP</button>
+        <button id="arShrink" data-a="shrink">SHRINKING</button>
       </div>
     </div>
     <div class="row">
@@ -335,6 +337,33 @@ const SKY_PLATFORMS = [
   { x: 0, z: -8.5, y: 6.2, r: 2.3 },
 ];
 let PLATFORMS = SKY_PLATFORMS;
+// Platforms are circles {r} or axis-aligned boxes {box, hw, hd}. A platform with tilt follows the arena's roll angle.
+function platTop(p, x) { return p.tilt ? p.y + (x - p.x) * Math.tan(arena.roll || 0) : p.y; }
+function platInside(p, x, z, m = 0) {
+  const dx = x - p.x, dz = z - p.z;
+  return p.box ? Math.abs(dx) < p.hw + m && Math.abs(dz) < p.hd + m : Math.hypot(dx, dz) < p.r + m;
+}
+function platPush(p, f, m) { // push a fighter out through the nearest side of a solid platform; returns the outward normal
+  const dx = f.pos.x - p.x, dz = f.pos.z - p.z;
+  if (!p.box) {
+    const r = Math.hypot(dx, dz); if (r >= p.r + m) return null;
+    const nx = dx / (r || 1), nz = dz / (r || 1); f.pos.x = p.x + nx * (p.r + m); f.pos.z = p.z + nz * (p.r + m); return [nx, nz];
+  }
+  const ox = p.hw + m - Math.abs(dx), oz = p.hd + m - Math.abs(dz);
+  if (ox <= 0 || oz <= 0) return null;
+  if (ox < oz) { const sx = Math.sign(dx) || 1; f.pos.x = p.x + sx * (p.hw + m); return [sx, 0]; }
+  const sz = Math.sign(dz) || 1; f.pos.z = p.z + sz * (p.hd + m); return [0, sz];
+}
+function edgeOf(x, z) { // distance to the main platform's edge and the inward direction
+  const p = PLATFORMS[0], dx = x - p.x, dz = z - p.z;
+  if (p.box) { const ex = p.hw - Math.abs(dx), ez = p.hd - Math.abs(dz); return ex < ez ? { d: ex, nx: -(Math.sign(dx) || 1), nz: 0 } : { d: ez, nx: 0, nz: -(Math.sign(dz) || 1) }; }
+  const r = Math.hypot(dx, dz) || 1; return { d: p.r - r, nx: -dx / r, nz: -dz / r };
+}
+function randomSpotOn(p, margin) {
+  if (p.box) return { x: p.x + rand(-1, 1) * Math.max(.2, p.hw - margin), z: p.z + rand(-1, 1) * Math.max(.2, p.hd - margin) };
+  const a = rand(0, Math.PI * 2), r = p.main ? rand(1.5, Math.max(1.6, p.r - margin)) : rand(0, p.r * .55);
+  return { x: p.x + Math.cos(a) * r, z: p.z + Math.sin(a) * r };
+}
 const skyGroup = new THREE.Group(); scene.add(skyGroup);
 const hash3 = (x, y, z) => { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return s - Math.floor(s); };
 function roughen(geo, amt, keepY) {
@@ -685,6 +714,111 @@ function crackIce(x, z) {
 function holeAt(x, z) { for (const h of iceHoles) if (Math.hypot(x - h.x, z - h.z) < h.r - .15) return h; return null; }
 function clearHoles() { while (iceHoles.length) iceGroup.remove(iceHoles.pop().mesh); }
 
+/* ---------- Pirate Ship: the deck rolls, cannons fire across it ---------- */
+const SHIP_HW = 4.6, SHIP_HD = 13;
+const SHIP_PLATFORMS = [
+  { x: 0, z: 0, y: 0, box: true, hw: SHIP_HW, hd: SHIP_HD, solid: true, depth: 3, main: true, tilt: true },
+  { x: 0, z: 11.2, y: 1.6, box: true, hw: SHIP_HW, hd: 1.8, solid: true, depth: 1.6, tilt: true },
+  { x: 0, z: -11.2, y: 1.6, box: true, hw: SHIP_HW, hd: 1.8, solid: true, depth: 1.6, tilt: true },
+  { x: 0, z: -1.5, y: 6.4, r: 1.7, tilt: true },
+];
+const shipGroup = new THREE.Group(); shipGroup.visible = false; scene.add(shipGroup);
+const ship = new THREE.Group(); shipGroup.add(ship); // rolls
+const cannons = [], laneMarks = [];
+const WORLD = { stats: { power: 1, lifesteal: 0, goldRush: false, chain: false, dmgTaken: 1 }, def: { accent: 0xffb347, color: 0x333333 },
+  pos: new THREE.Vector3(), facing: 0, alive: false, damage: 0 };
+const CANNON = { dmg: 14, kb: 12, growth: .13, lift: .5 };
+(function buildShip() {
+  const wood = new THREE.MeshStandardMaterial({ color: 0x9a6a42, roughness: .85 });
+  const woodDk = new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: .9 });
+  const plankLine = new THREE.MeshBasicMaterial({ color: 0x6a4a30 });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(SHIP_HW * 2, .3, SHIP_HD * 2), wood); deck.position.y = -.15; deck.receiveShadow = true; ship.add(deck);
+  for (let i = -4; i <= 4; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(.04, .02, SHIP_HD * 2), plankLine); l.position.set(i * 1.02, .01, 0); ship.add(l); }
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(SHIP_HW * 2 + .3, 3.4, SHIP_HD * 2), woodDk); hull.position.y = -1.95; ship.add(hull);
+  const keel = new THREE.Mesh(new THREE.CylinderGeometry(SHIP_HW + .15, 1.2, 2.2, 4, 1), woodDk); keel.rotation.y = Math.PI / 4; keel.scale.z = SHIP_HD / SHIP_HW * .75; keel.position.y = -4.6; ship.add(keel);
+  for (const sx of [-1, 1]) { // low rails (decor)
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(.18, .35, SHIP_HD * 2), woodDk); rail.position.set(sx * (SHIP_HW + .05), .17, 0); ship.add(rail);
+  }
+  for (const sz of [-1, 1]) { // raised decks at bow and stern (fade when they block the camera)
+    const dm = wood.clone(); dm.transparent = true;
+    OCCLUDERS.push({ group: shipGroup, box: true, x: 0, z: sz * 11.2, hw: SHIP_HW, hd: 1.8, top: 1.6, mats: [dm] });
+    const d = new THREE.Mesh(new THREE.BoxGeometry(SHIP_HW * 2, 1.6, 3.6), dm); d.position.set(0, .8, sz * 11.2); d.castShadow = d.receiveShadow = true; ship.add(d);
+  }
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(.18, .24, 9, 10), woodDk); mast.position.set(0, 4.5, -1.5); ship.add(mast);
+  const nest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.4, .4, 16, 1, true), woodDk); nest.position.set(0, 6.2, -1.5); ship.add(nest);
+  const nestFloor = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, .12, 16), wood); nestFloor.position.set(0, 6.34, -1.5); ship.add(nestFloor);
+  const sailM = new THREE.MeshStandardMaterial({ color: 0xfff4e0, side: THREE.DoubleSide, roughness: 1 });
+  const sail = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.2, 8, 4), sailM); sail.position.set(0, 4, -1.4);
+  const sp = sail.geometry.attributes.position; for (let i = 0; i < sp.count; i++) sp.setZ(i, Math.cos(sp.getX(i) / 3.5 * 1.4) * .6); sail.geometry.computeVertexNormals(); ship.add(sail);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .8), new THREE.MeshStandardMaterial({ color: 0x1d1830, side: THREE.DoubleSide })); flag.position.set(.7, 8.6, -1.5); ship.add(flag);
+  const laneM = new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: .45, depthWrite: false });
+  for (const z of [-6.5, -3, 2.5, 6.5]) {
+    const c = new THREE.Group(); c.position.set(-SHIP_HW - .2, .55, z);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.28, .36, 1.4, 14), new THREE.MeshStandardMaterial({ color: 0x2a2a34, metalness: .6, roughness: .4 }));
+    barrel.rotation.z = -Math.PI / 2; c.add(barrel);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(.9, .35, .8), woodDk); base.position.set(-.2, -.35, 0); c.add(base);
+    ship.add(c); cannons.push({ z, g: c, phase: 'idle', t: 0 });
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(SHIP_HW * 2, 1.7), laneM.clone()); lane.rotation.x = -Math.PI / 2; lane.position.set(0, .03, z); lane.visible = false; ship.add(lane); laneMarks.push(lane);
+  }
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ color: 0x1f6f9a, roughness: .35, metalness: .15 }));
+  sea.rotation.x = -Math.PI / 2; sea.position.y = -7; shipGroup.add(sea);
+  for (let i = 0; i < 10; i++) { // distant islands with palm-ish tufts
+    const a = rand(0, Math.PI * 2), r = rand(90, 170), s2 = rand(4, 10);
+    const isl = new THREE.Mesh(new THREE.SphereGeometry(s2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8d29a, roughness: 1 }));
+    isl.position.set(Math.cos(a) * r, -7, Math.sin(a) * r); isl.scale.y = .35; shipGroup.add(isl);
+    const tuft = new THREE.Mesh(new THREE.ConeGeometry(s2 * .5, s2 * .9, 6), new THREE.MeshStandardMaterial({ color: 0x3fae6e, flatShading: true })); tuft.position.set(isl.position.x, -7 + s2 * .6, isl.position.z); shipGroup.add(tuft);
+  }
+})();
+function fireCannon(c) {
+  const roll = arena.roll || 0, y = .55 + (-SHIP_HW) * Math.tan(roll) + .5;
+  const pos = new THREE.Vector3(-SHIP_HW - .9, y, c.z);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(.42, 14, 10), new THREE.MeshStandardMaterial({ color: 0x1a1a22, metalness: .5, roughness: .4 }));
+  mesh.position.copy(pos); scene.add(mesh);
+  projectiles.push({ kind: 'cannonball', owner: null, pos, vel: new THREE.Vector3(24, 24 * Math.tan(roll), 0), life: 1.1, grav: 0, mesh, armT: 0, hit: new Set() });
+  emit(pos.x, pos.y, pos.z, 26, { color: [0xffffff, 0xbbbbbb, 0xff9a40], speed: 5, vx: 4, life: .6, grav: -1, size: .3, drag: 2 });
+  game.shake = Math.max(game.shake, .4); sfx('cannon');
+}
+
+/* ---------- Shrinking Arena: the island crumbles inward, ring by ring ---------- */
+const SHRINK_R = [12.5, 10.5, 8.5, 6.5, 4.8];
+const SHRINK_PLATFORMS = [
+  { x: 0, z: 0, y: 0, r: 12.5, solid: true, depth: 3, main: true },
+  { x: -7.5, z: -5, y: 3.4, r: 2.3 },
+  { x: 7.5, z: -5, y: 3.4, r: 2.3 },
+  { x: 0, z: -9.5, y: 5, r: 2 },
+];
+const shrinkGroup = new THREE.Group(); shrinkGroup.visible = false; scene.add(shrinkGroup);
+const shrinkTiles = [], ringMats = [];
+(function buildShrink() {
+  const stone = new THREE.MeshStandardMaterial({ color: 0x8a6a9a, roughness: 1, flatShading: true });
+  for (let ring = 0; ring < 4; ring++) {
+    const grass = new THREE.MeshStandardMaterial({ color: [0x7ad07a, 0x6cc46e, 0x5fb862, 0x54ac58][ring], roughness: .95, emissive: 0xff2a1a, emissiveIntensity: 0 });
+    ringMats.push(grass);
+    const r1 = SHRINK_R[ring], r0 = SHRINK_R[ring + 1] + .02, n = 8;
+    for (let k = 0; k < n; k++) {
+      const a0 = k / n * Math.PI * 2 + .01, a1 = (k + 1) / n * Math.PI * 2 - .01, sh = new THREE.Shape();
+      sh.absarc(0, 0, r1, a0, a1, false); sh.absarc(0, 0, r0, a1, a0, true);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 1.2, bevelEnabled: false, curveSegments: 8 }); geo.rotateX(-Math.PI / 2); geo.translate(0, -1.2, 0);
+      const m = new THREE.Mesh(geo, [grass, stone]); m.receiveShadow = true; shrinkGroup.add(m);
+      shrinkTiles.push({ mesh: m, ring, falling: false, vy: 0, spin: rand(-1, 1), delay: 0 });
+    }
+  }
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.5, 1.2, 40), [new THREE.MeshStandardMaterial({ color: 0x7ad07a, roughness: .95 }), new THREE.MeshStandardMaterial({ color: 0x7ad07a }), stone]);
+  core.material = [stone, new THREE.MeshStandardMaterial({ color: 0x82d882, roughness: .95 }), stone]; core.position.y = -.6; core.receiveShadow = true; shrinkGroup.add(core);
+  const cone = new THREE.Mesh(roughen(new THREE.ConeGeometry(4.5, 14, 9, 4), 1, 7), stone); cone.rotation.x = Math.PI; cone.position.y = -1.2 - 7; shrinkGroup.add(cone);
+  const star = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.8, 5), new THREE.MeshStandardMaterial({ color: 0xffd36b })); star.rotation.x = -Math.PI / 2; star.position.y = .012; shrinkGroup.add(star);
+  for (const p of SHRINK_PLATFORMS.slice(1)) {
+    const pg = new THREE.Group(); pg.position.set(p.x, p.y, p.z);
+    const slab = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * .85, .5, 9), stone); slab.position.y = -.25; slab.castShadow = slab.receiveShadow = true; pg.add(slab);
+    const under = new THREE.Mesh(roughen(new THREE.ConeGeometry(p.r * .85, 2.4, 7, 2), .3, 1.2), stone); under.rotation.x = Math.PI; under.position.y = -.5 - 1.2; pg.add(under);
+    shrinkGroup.add(pg);
+  }
+  for (let i = 0; i < 40; i++) { // floating debris
+    const m = new THREE.Mesh(roughen(new THREE.IcosahedronGeometry(rand(.4, 2.2), 0), .4), stone);
+    const a = rand(0, Math.PI * 2), r = rand(25, 110); m.position.set(Math.cos(a) * r, rand(-30, 25), Math.sin(a) * r); shrinkGroup.add(m);
+  }
+})();
+
 // Lava cycle (seconds): calm 10, warning 2, sink 1.5, sunk 4, rise 1.5
 const LAVA_CYCLE = 19;
 const ARENAS = {
@@ -750,6 +884,65 @@ const ARENAS = {
       for (const f of flags) {
         f.rotation.y = lerpAngle(f.rotation.y, yaw, 1 - Math.exp(-4 * dt));
         f.children[0].rotation.y = Math.sin(game.simTime * (6 + this.wind * 14) + f.position.x) * (.15 + this.wind * .25);
+      }
+    },
+    danger() { return false; },
+  },
+  ship: {
+    key: 'ship', name: 'PIRATE SHIP', group: shipGroup, platforms: SHIP_PLATFORMS, R: SHIP_HW, roll: 0, t: 0, next: 4, koY: -7,
+    colors: { top: 0x2a7fd4, mid: 0xbfe6ff, bot: 0x1f6f9a, fog: 0x9ccbe8, near: 80, far: 260, hemiS: 0xffffff, hemiG: 0x2a6a8a, hemiI: 1.3, sun: 0xfff2d8, sunI: 2.6, rim: 0x8be0ff, rimI: .5 },
+    reset() { this.roll = 0; this.t = 0; this.next = 4; ship.rotation.z = 0; for (const c of cannons) { c.phase = 'idle'; c.t = 0; } for (const l of laneMarks) l.visible = false; },
+    update(dt, active) {
+      this.t += dt;
+      this.roll = Math.sin(this.t * .55) * .12;
+      ship.rotation.z = this.roll;
+      for (const p of SHIP_PLATFORMS) p.x = -p.y * Math.sin(this.roll); // raised parts swing sideways as the hull rolls
+      if (active && this.t >= this.next) {
+        this.next = this.t + Math.max(2.5, 5 - game.wave * .2);
+        const idle = cannons.filter(c => c.phase === 'idle');
+        if (idle.length) { const c = idle[Math.random() * idle.length | 0]; c.phase = 'warn'; c.t = 0; sfx('creak'); }
+      }
+      cannons.forEach((c, i) => {
+        if (c.phase === 'idle') return;
+        c.t += dt; const lane = laneMarks[i];
+        if (c.phase === 'warn') {
+          lane.visible = true; lane.material.opacity = .25 + .25 * Math.sin(c.t * 18);
+          if (Math.random() < .4) emit(-SHIP_HW - 1, 1, c.z, 1, { color: 0xcccccc, speed: .5, up: 2, life: .6, grav: -1, size: .2 });
+          if (c.t >= 1.4) { c.phase = 'cool'; c.t = 0; lane.visible = false; fireCannon(c); }
+        } else if (c.t > 1) c.phase = 'idle';
+      });
+    },
+    danger() { return false; },
+  },
+  shrink: {
+    key: 'shrink', name: 'SHRINKING ARENA', group: shrinkGroup, platforms: SHRINK_PLATFORMS, R: 12.5, safeR: 0, t: 0, ring: 0, phase: 'calm',
+    colors: { top: 0x1a1030, mid: 0xd0607a, bot: 0x2a1030, fog: 0x7a3a5a, near: 60, far: 220, hemiS: 0xffd0e0, hemiG: 0x3a1a4a, hemiI: 1.2, sun: 0xffc8a0, sunI: 2.4, rim: 0xff6aa0, rimI: .9 },
+    reset() {
+      this.t = 0; this.ring = 0; this.phase = 'calm'; this.safeR = 0; SHRINK_PLATFORMS[0].r = 12.5; STAGE_R = 12.5;
+      for (const tl of shrinkTiles) { tl.falling = false; tl.vy = 0; tl.mesh.visible = true; tl.mesh.position.set(0, 0, 0); tl.mesh.rotation.set(0, 0, 0); }
+      for (const m of ringMats) m.emissiveIntensity = 0;
+    },
+    update(dt, active) {
+      if (active && this.ring < 4) {
+        this.t += dt;
+        if (this.phase === 'calm' && this.t > 10) { this.phase = 'warn'; this.t = 0; this.safeR = SHRINK_R[this.ring + 1]; toast('The edge is crumbling! Move in!'); sfx('rumble'); }
+        else if (this.phase === 'warn') {
+          ringMats[this.ring].emissiveIntensity = .5 + .5 * Math.sin(this.t * 20);
+          for (const tl of shrinkTiles) if (tl.ring === this.ring) tl.mesh.position.set(rand(-.04, .04), rand(-.03, .03), rand(-.04, .04));
+          if (this.t > 2.5) {
+            for (const tl of shrinkTiles) if (tl.ring === this.ring) { tl.falling = true; tl.delay = rand(0, .4); }
+            ringMats[this.ring].emissiveIntensity = 0;
+            SHRINK_PLATFORMS[0].r = SHRINK_R[this.ring + 1]; STAGE_R = SHRINK_PLATFORMS[0].r;
+            this.ring++; this.phase = 'calm'; this.t = 0; this.safeR = 0;
+            game.shake = Math.max(game.shake, .6); sfx('crumble');
+          }
+        }
+      }
+      for (const tl of shrinkTiles) {
+        if (!tl.falling || !tl.mesh.visible) continue;
+        if ((tl.delay -= dt) > 0) continue;
+        tl.vy -= 20 * dt; tl.mesh.position.y += tl.vy * dt; tl.mesh.rotation.x += tl.spin * dt * .6; tl.mesh.rotation.z += tl.spin * dt * .4;
+        if (tl.mesh.position.y < -45) tl.mesh.visible = false;
       }
     },
     danger() { return false; },
@@ -991,6 +1184,12 @@ function sfx(name, k = 1) {
       case 'coin': tone(988, 988, .06, 'square', .06); tone(1318, 1318, .14, 'square', .06, .06); break;
       case 'teleport': tone(1200, 300, .15, 'sine', .1); noise(.15, .15, 3000, 'bandpass'); break;
       case 'poof': noise(.35, .25, 1200); break;
+      case 'cannon': tone(70, 30, .5, 'sine', .6); noise(.6, .5, 800); break;
+      case 'creak': tone(180, 120, .5, 'sawtooth', .05); break;
+      case 'crumble': noise(1.2, .45, 400); tone(80, 40, 1, 'sawtooth', .1); break;
+      case 'slap': noise(.05, .2, 2500, 'bandpass'); break;
+      case 'pop': tone(600, 1400, .08, 'sine', .15); noise(.08, .2, 4000, 'highpass'); break;
+      case 'bubble': tone(300, 700, .25, 'sine', .1); break;
     }
   } catch (e) {}
 }
@@ -1006,6 +1205,8 @@ const ROSTER = {
   tanko: { name: 'TANK-O', style: 'robot', kit: 'tank', color: 0x8ea4bf, accent: 0xff6b3d, scale: .95, speed: 7, power: 1.1, weight: 1.3, fist: .25 },
   whisk: { name: 'WHISK', style: 'chef', kit: 'chef', color: 0x5b8def, accent: 0xff5a6e, scale: 1, speed: 8.2, power: 1, weight: 1, fist: .18 },
   shade: { name: 'SHADE', style: 'ninja', kit: 'ninja', color: 0x35304d, accent: 0xc03fff, scale: .95, speed: 9.5, power: .9, weight: .85, fist: .16 },
+  bubbles: { name: 'BUBBLES', style: 'octo', kit: 'octo', color: 0xff7fb8, accent: 0x4ff0c8, scale: 1.05, speed: 7.8, power: .9, weight: .95, fist: .17 },
+  rex: { name: 'REX', style: 'dino', kit: 'dino', color: 0x5ccf6a, accent: 0xffd36b, scale: .95, speed: 8.4, power: 1.05, weight: 1.1, fist: .17 },
 };
 const PLAYABLE = {
   nova: { role: 'Sword fighter. Fast 3-hit combo and a strong charged smash.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 2 } },
@@ -1013,6 +1214,8 @@ const PLAYABLE = {
   tanko: { role: 'Little robot. Hold DASH on the ground to raise a shield. Charge SMASH for a rocket punch.', pips: { Speed: 2, Power: 4, Weight: 5, Range: 3 } },
   whisk: { role: 'Chef. Fast frying-pan combo. SMASH throws the pan, and it boomerangs back to him.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 4 } },
   shade: { role: 'Ninja. DASH teleports, right behind the enemy if they are close. SMASH leaves a decoy that fools them.', pips: { Speed: 5, Power: 2, Weight: 2, Range: 3 } },
+  bubbles: { role: 'Octopus. Attack unleashes 8 rapid slaps. SMASH blows a bubble that traps the enemy and floats them away.', pips: { Speed: 3, Power: 3, Weight: 3, Range: 4 } },
+  rex: { role: 'Little dinosaur. The 3rd combo hit is a tail swipe. SMASH jumps and ground-pounds, blasting anyone nearby.', pips: { Speed: 4, Power: 4, Weight: 4, Range: 2 } },
 };
 
 // Shared meshes for held items and pickups
@@ -1162,6 +1365,19 @@ function buildModel(d) {
     weapon = new THREE.Group(); armR.add(weapon);
     add(new THREE.CylinderGeometry(.05, .05, 1.4, 8), woodMat, 0, -.75, 0, weapon);
     add(new THREE.SphereGeometry(.17, 14, 10), new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0xff6a1a, emissiveIntensity: 1.4 }), 0, -1.5, 0, weapon);
+  } else if (d.style === 'octo') {
+    add(new THREE.SphereGeometry(.56, 20, 14), body, 0, 2.25, -.1).scale.set(1, 1.15, 1.05);
+    for (const sx of [-1, 1]) add(new THREE.TorusGeometry(.13, .035, 6, 14), acc, sx * .16, 2.08, .4);
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2, t = add(new THREE.CapsuleGeometry(.09, .5, 4, 8), body, Math.cos(a) * .42, .35, Math.sin(a) * .42);
+      t.rotation.set(Math.sin(a) * .55, 0, -Math.cos(a) * .55);
+    }
+    for (const L of [legL, legR]) L.children[0].material = body;
+  } else if (d.style === 'dino') {
+    add(new THREE.SphereGeometry(.3, 14, 10), body, 0, 1.86, .38).scale.set(1.1, .8, 1.35);
+    for (const sx of [-1, 1]) add(new THREE.SphereGeometry(.035, 6, 4), dark, sx * .1, 1.92, .76);
+    for (let i = 0; i < 5; i++) { const sp = add(new THREE.ConeGeometry(.12, .32, 5), acc, 0, 2.38 - i * .3, -.3 - i * .09); sp.rotation.x = -.5 - i * .15; }
+    const tail = add(new THREE.ConeGeometry(.3, 1.4, 10), body, 0, .85, -.9); tail.rotation.x = -Math.PI / 2 - .35;
   } else if (d.style === 'ninja') {
     add(new THREE.BoxGeometry(.8, .3, .2), dark, 0, 1.88, .3);
     const band = add(new THREE.TorusGeometry(.43, .06, 6, 20), acc, 0, 2.22, 0); band.rotation.x = Math.PI / 2;
@@ -1206,11 +1422,13 @@ function buildModel(d) {
   const freezer = makeRaygun(iceTip); freezer.position.set(0, -.75, .15); freezer.rotation.x = -Math.PI / 2; freezer.visible = false; armR.add(freezer);
   const ice = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), new THREE.MeshStandardMaterial({ color: 0xbfeaff, transparent: true, opacity: .55, roughness: .05, metalness: .1, depthWrite: false }));
   ice.position.y = 1.2; ice.visible = false; root.add(ice);
+  const bubble = new THREE.Mesh(new THREE.SphereGeometry(1.45, 24, 16), new THREE.MeshStandardMaterial({ color: 0xc8f4ff, transparent: true, opacity: .35, roughness: .05, metalness: .2, emissive: 0xff7fb8, emissiveIntensity: .25, depthWrite: false }));
+  bubble.position.y = 1.15; bubble.visible = false; root.add(bubble);
   const jetpack = makeJetpack(); jetpack.position.set(0, 1.35, -.5); jetpack.visible = false; inner.add(jetpack);
   const shield = new THREE.Mesh(new THREE.SphereGeometry(1.25, 28, 18), new THREE.MeshBasicMaterial({
     color: 0x8be0ff, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   shield.visible = false; rig.add(shield);
-  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield, raygun, jetpack, freezer, ice };
+  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield, raygun, jetpack, freezer, ice, bubble };
 }
 
 const ATTACKS = {
@@ -1237,10 +1455,16 @@ ATTACKS.zap = { startup: .05, active: 0, recovery: .14, proj: 'laser' };
 const PAN_HIT = { dmg: 7, kb: 6.5, growth: .07, lift: .35 };
 const LASER = { dmg: 3, kb: 3.5, growth: .035, lift: .2 };
 const SHOCK = { dmg: 5, kb: 7.5, growth: .06, lift: .55 };
-const NO_ECHO = ['bomb', 'banana', 'boomerang', 'pan', 'ice'];
+const NO_ECHO = ['bomb', 'banana', 'boomerang', 'pan', 'ice', 'bubble'];
 ATTACKS.freezeShot = { startup: .06, active: 0, recovery: .2, proj: 'ice' };
 ATTACKS.decoyMove = { startup: .05, active: 0, recovery: .12, special: 'decoy' };
 const ICE_HIT = { dmg: 2, kb: 2, growth: .02, lift: .2 };
+ATTACKS.slaps = { startup: .06, active: .64, recovery: .2, multi: 8, dmg: 1.2, kb: 1.2, growth: .01, range: 1.25, radius: 1, lift: .1,
+  finisher: { dmg: 4, kb: 6.5, growth: .075, range: 1.3, radius: 1.1, lift: .45 } };
+ATTACKS.bubbleShot = { startup: .12, active: 0, recovery: .25, proj: 'bubble' };
+ATTACKS.tail = { startup: .1, active: .14, recovery: .28, dmg: 7, kb: 8, growth: .09, range: 0, radius: 1.8, lift: .4, spin: true };
+ATTACKS.pound = { startup: .12, active: 99, recovery: 0, pound: true };
+const STOMP = { dmg: 10, kb: 9, growth: .12, lift: .7 };
 const DRONE_SHOT = { dmg: 2, kb: 2.5, growth: .02, lift: .2 };
 const BOOM_HIT = { dmg: 6, kb: 5.5, growth: .06, lift: .35 };
 const FIREBALL = { dmg: 4, kb: 4.5, growth: .045, lift: .3 };
@@ -1249,8 +1473,8 @@ const HAMMER_TIME = 8, BOMB_FUSE = 5;
 const GRAV = 32;
 
 const game = { state: 'title', wave: 1, timer: 0, hitstop: 0, shake: 0, timeScale: 1, simTime: 0, perks: [] };
-game.charKey = ['nova', 'pyra', 'tanko', 'whisk', 'shade'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
-game.startArena = ['sky', 'lava', 'wind', 'gear', 'ice'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
+game.charKey = ['nova', 'pyra', 'tanko', 'whisk', 'shade', 'bubbles', 'rex'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
+game.startArena = ['sky', 'lava', 'wind', 'gear', 'ice', 'ship', 'shrink'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
 game.itemT = 6; game.gold = 0; game.startPerk = {};
 
 class Fighter {
@@ -1270,12 +1494,25 @@ class Fighter {
     if (this.held === 'banana') return 'drop';
     if (this.held === 'raygun') return 'zap';
     if (this.held === 'freezeray') return 'freezeShot';
+    if (this.def.kit === 'octo') { if (kind === 'heavy') return this.bubbleOut ? 'smash' : 'bubbleShot'; if (this.onGround) return 'slaps'; }
+    if (this.def.kit === 'dino' && kind === 'heavy') return 'pound';
     if (this.def.kit === 'ninja' && kind === 'heavy') return decoy && decoy.owner === this ? 'smash' : 'decoyMove';
     if (this.def.kit === 'chef' && kind === 'heavy') return this.panOut ? 'smash' : 'panToss';
     if (this.def.kit === 'tank' && kind === 'heavy') return 'rocket';
     if (this.def.kit === 'pyra') return kind === 'light' ? (this.onGround ? 'fire' : 'fireAir') : 'burst';
     if (kind === 'heavy') return 'smash';
     return this.onGround ? null : 'air'; // null = ground combo
+  }
+  comboName(step) { return step === 3 && this.def.kit === 'dino' ? 'tail' : 'jab' + step; }
+  poundLand() {
+    const p = new THREE.Vector3(this.pos.x, this.pos.y + .1, this.pos.z);
+    ring(p, this.def.accent, 7.5, .45, true); ring(p, 0xffffff, 4.5, .3, true);
+    emit(p.x, p.y, p.z, 34, { color: [0xffffff, 0xe8e0d0, this.def.color], speed: 10, flat: true, life: .5, grav: 0, size: .24 });
+    game.shake = Math.max(game.shake, .7); game.hitstop = Math.max(game.hitstop, .06); sfx('shock');
+    if (this.groundP && this.groundP.ice && this.groundP.main) crackIce(this.pos.x + 2, this.pos.z);
+    const o = opponentOf(this);
+    if (o.alive && o.invuln <= 0 && Math.hypot(o.pos.x - p.x, o.pos.z - p.z) < 3.5 && Math.abs(o.pos.y - this.pos.y) < 1.7) o.takeHit(this, STOMP, 0, { x: p.x, z: p.z });
+    Object.assign(this, { state: 'normal', atk: null, atkName: '', stateTime: 0, poundPhase: null });
   }
   onIce() { return this.onGround && this.groundP && this.groundP.ice; }
   grow() {
@@ -1287,11 +1524,15 @@ class Fighter {
     const s = this.stats; s.power /= 1.3; s.weight /= 1.6; s.speed /= .8;
     this.isBig = false; this.bigT = 0; this.size = this.def.scale; sfx('shrink');
   }
-  freeze(dur) {
+  freeze(dur, kind = 'ice') {
+    this.trapKind = kind;
     Object.assign(this, { state: 'frozen', stateTime: 0, freezeDur: dur, atk: null, atkName: '', charging: false, charge: 0, tumbleSpd: 0 });
-    this.vel.x *= .2; this.vel.z *= .2; this.model.rig.rotation.x = 0; sfx('freeze');
+    this.vel.x *= .2; this.vel.z *= .2; this.model.rig.rotation.x = 0; sfx(kind === 'bubble' ? 'bubble' : 'freeze');
   }
   shatter() {
+    if (this.trapKind === 'bubble') {
+      emit(this.pos.x, this.pos.y + 1.2 * this.size, this.pos.z, 24, { color: [0xc8f4ff, 0xff7fb8, 0xffffff], speed: 6, life: .4, grav: 0, size: .14 }); sfx('pop'); return;
+    }
     emit(this.pos.x, this.pos.y + 1.2 * this.size, this.pos.z, 26, { color: [0xbfeaff, 0xffffff], speed: 7, life: .5, grav: 10, size: .16 }); sfx('shatter');
   }
   splash() {
@@ -1341,7 +1582,7 @@ class Fighter {
       onGround: !fromSky, jumpsLeft: this.stats.jumps, airDash: true, dashCdT: 0, combo: 0, lastJabEnd: -9, buffer: false,
       atk: null, atkName: '', charging: false, charge: 0, flash: 0, squash: 0, tumbleSpd: 0, animT: 0, hitDone: false, lunged: false,
       held: null, heldT: 0, burnCd: 0, groundP: null, starT: 0, starHitCd: 0, boomOut: false, heldUses: 0, fireCd: 0, trailT: 0,
-      shieldHP: 100, hitCount: 0, jetT: 0, panOut: false, landVy: 0, freezeDur: 0 });
+      shieldHP: 100, hitCount: 0, jetT: 0, panOut: false, landVy: 0, freezeDur: 0, trapKind: null, bubbleOut: false, multiIdx: -1, poundPhase: null });
     this.model.root.visible = true;
     if (fromSky) { emit(this.pos.x, this.pos.y + 1, this.pos.z, 24, { color: [0xffffff, this.def.color], speed: 7, life: .6, grav: 0 }); }
   }
@@ -1353,7 +1594,7 @@ class Fighter {
   }
   startAttack(name, opp) {
     const a = ATTACKS[name];
-    Object.assign(this, { atk: a, atkName: name, state: 'attack', stateTime: 0, hitDone: false, lunged: false, charging: !!a.charge, charge: 0, buffer: false });
+    Object.assign(this, { atk: a, atkName: name, state: 'attack', stateTime: 0, hitDone: false, lunged: false, charging: !!a.charge, charge: 0, buffer: false, multiIdx: -1 });
     this.aim(opp);
     if (a.proj === 'fireball') sfx('fire');
     else if (!a.charge) sfx('swing', name === 'jab3' || name === 'air' || name === 'hammer' ? 1.3 : 1);
@@ -1411,7 +1652,10 @@ class Fighter {
     }
 
     if (this.state === 'frozen') {
-      if (this.stateTime >= this.freezeDur) { this.state = 'normal'; this.shatter(); }
+      if (this.stateTime >= this.freezeDur) {
+        this.state = 'normal'; this.shatter();
+        if (this.trapKind === 'bubble') { const d = 3 * this.stats.dmgTaken; this.damage += d; popup(Math.round(d) + '%', new THREE.Vector3(this.pos.x, this.pos.y + 2.2, this.pos.z), '#ff7fb8', 20); }
+      }
     } else if (this.state === 'shield') {
       this.shieldHP -= 10 * dt;
       if (!I.dashDown || !this.onGround || this.shieldHP <= 0 || I.jump) this.state = 'normal';
@@ -1446,7 +1690,7 @@ class Fighter {
         if (name) this.startAttack(name, opp);
         else {
           const step = (game.simTime - this.lastJabEnd < .4 && this.combo < 3) ? this.combo + 1 : 1;
-          this.combo = step; this.startAttack('jab' + step, opp);
+          this.combo = step; this.startAttack(this.comboName(step), opp);
         }
       }
     }
@@ -1454,9 +1698,10 @@ class Fighter {
     // physics
     const prevY = this.pos.y;
     let g = GRAV;
+    if (this.state === 'frozen' && this.trapKind === 'bubble') { g = 0; this.vel.y = 1.4; } // bubbles float upward
     if (this.state === 'dash') g *= .15;
     if (this.charging && !this.onGround) g *= .35;
-    this.vel.y = Math.max(-28, this.vel.y - g * dt);
+    this.vel.y = Math.max(this.atkName === 'pound' ? -34 : -28, this.vel.y - g * dt);
     let k = 0;
     if (this.state === 'hitstun') k = this.onGround ? 5 : .8;
     else if (this.state === 'attack') k = this.atk && this.atk.rocket && !this.charging ? 2 : this.onGround ? 9 : 1.2;
@@ -1465,6 +1710,8 @@ class Fighter {
     if (k && this.onIce()) k *= .25;
     if (k) { const d = Math.exp(-k * dt); this.vel.x *= d; this.vel.z *= d; }
     this.pos.addScaledVector(this.vel, dt);
+    // a rolling deck slides you downhill
+    if (this.onGround && this.groundP && this.groundP.tilt && this.state !== 'shield') this.pos.x -= Math.tan(arena.roll) * 9 * dt;
     // wind pushes everyone except a raised shield (bracing)
     if (arena.wind > 0 && this.state !== 'shield') {
       const w = arena.wind * (this.onGround ? 3.6 : 6.5) / this.stats.weight * (this.charging ? .5 : 1);
@@ -1483,7 +1730,10 @@ class Fighter {
     if (arena.lavaY !== undefined && this.pos.y < arena.lavaY && Math.hypot(this.pos.x, this.pos.z) < arena.lavaR && this.burnCd <= 0 && this.blink <= 0 && this.starT <= 0) this.burn();
     if (arena.waterY !== undefined && this.pos.y < arena.waterY && this.burnCd <= 0 && arena.holeAt(this.pos.x, this.pos.z)) this.splash();
 
-    if (this.pos.y < -24 || Math.hypot(this.pos.x, this.pos.z) > 48 || this.pos.y > 45) this.ko();
+    if (this.pos.y < (arena.koY ?? -24) || Math.hypot(this.pos.x, this.pos.z) > 48 || this.pos.y > 45) {
+      if (arena.koY) emit(this.pos.x, arena.koY + .2, this.pos.z, 30, { color: [0xffffff, 0x8be0ff], speed: 6, up: 8, life: .7, grav: 14, size: .2 });
+      this.ko();
+    }
   }
   updateAttack(dt, I, opp) {
     const a = this.atk;
@@ -1516,25 +1766,39 @@ class Fighter {
       if (a.special === 'decoy') spawnDecoy(this);
       if (this.stats.echo && !this.isEcho && (a.dmg || a.proj) && !NO_ECHO.includes(a.proj)) queueEcho(this, this.atkName, this.charge);
       if (a.rocket) sfx('rocket');
+      if (a.pound) { if (this.onGround) { this.vel.y = 13; this.onGround = false; } this.poundPhase = 'rise'; sfx('jump'); }
+      if (a.proj === 'bubble') this.bubbleOut = true;
     }
     if (a.rocket && t >= a.startup && t < a.startup + a.active) {
       if (!this.onGround) this.vel.y = Math.max(this.vel.y, .5);
       const bx = this.pos.x - Math.sin(this.facing) * .6, bz = this.pos.z - Math.cos(this.facing) * .6;
       emit(bx, this.pos.y + 1.1 * this.size, bz, 2, { color: [0xff6b3d, 0xffc040, 0xffffff], speed: 2, life: .3, grav: 0, size: .18 });
     }
-    if (t >= a.startup && t < a.startup + a.active) this.hitCheck(opp);
+    if (a.pound) {
+      if (this.poundPhase === 'rise' && this.vel.y < 3) { this.poundPhase = 'slam'; this.vel.y = -32; this.vel.x *= .3; this.vel.z *= .3; }
+      if (this.poundPhase === 'slam') emit(this.pos.x, this.pos.y + .5, this.pos.z, 1, { color: 0xffffff, speed: .5, life: .3, grav: 0, size: .25 });
+      if (t > 3) { this.state = 'normal'; this.atk = null; this.atkName = ''; }
+      return;
+    }
+    if (t >= a.startup && t < a.startup + a.active) {
+      if (a.multi) {
+        const idx = Math.min(a.multi - 1, Math.floor((t - a.startup) / (a.active / a.multi)));
+        if (idx !== this.multiIdx) { this.multiIdx = idx; this.hitDone = false; sfx('slap'); }
+        this.hitCheck(opp, idx === a.multi - 1 ? a.finisher : null);
+      } else this.hitCheck(opp);
+    }
     if (I.light && this.atkName.startsWith('jab') && this.combo < 3) this.buffer = true;
     if (t >= a.startup + a.active + a.recovery) {
       const wasJab = this.atkName.startsWith('jab');
       this.state = 'normal'; this.atk = null; this.charge = 0; this.atkName = '';
       if (wasJab) this.lastJabEnd = game.simTime;
-      if (wasJab && this.buffer && this.onGround) { this.combo++; this.startAttack('jab' + this.combo, opp); }
+      if (wasJab && this.buffer && this.onGround) { this.combo++; this.startAttack(this.comboName(this.combo), opp); }
       this.buffer = false;
     }
   }
-  hitCheck(o) {
+  hitCheck(o, override) {
     if (!o || this.hitDone || !o.alive || o.invuln > 0) return;
-    const a = this.atk, reach = a.range * this.size;
+    const a = override || this.atk, reach = a.range * this.size;
     const cx = this.pos.x + Math.sin(this.facing) * reach, cz = this.pos.z + Math.cos(this.facing) * reach, cy = this.pos.y + 1.1 * this.size;
     const oy = o.pos.y + 1.1 * o.size;
     const rad = (a.spin ? a.radius * this.stats.airRadius : a.radius) * this.size + .5 * o.size;
@@ -1614,11 +1878,11 @@ class Fighter {
     const was = this.onGround; this.onGround = false;
     for (const p of PLATFORMS) {
       if (p.main && arena.holeAt && arena.holeAt(this.pos.x, this.pos.z)) continue; // fell through the ice
-      const dx = this.pos.x - p.x, dz = this.pos.z - p.z, r = Math.hypot(dx, dz);
-      // "stick" keeps you planted on a floor that is moving down (Lava Forge)
-      const stick = was && this.groundP === p && this.vel.y <= 0 && this.pos.y > p.y - .6;
-      if (r < p.r + .15 && this.vel.y <= 0 && (prevY >= p.y - .06 || stick) && this.pos.y <= p.y + (stick ? .3 : 0)) {
-        this.pos.y = p.y;
+      const py = platTop(p, this.pos.x);
+      // "stick" keeps you planted on a floor that moves (sinking lava floor, rolling ship deck)
+      const stick = was && this.groundP === p && this.vel.y <= 0 && this.pos.y > py - .6;
+      if (platInside(p, this.pos.x, this.pos.z, .15) && this.vel.y <= 0 && (prevY >= py - .06 || stick) && this.pos.y <= py + (stick ? .3 : 0)) {
+        this.pos.y = py;
         if (this.state === 'hitstun' && this.vel.y < -14) {
           if (p.ice && p.main) crackIce(this.pos.x, this.pos.z);
           this.vel.y = -this.vel.y * .45;
@@ -1629,17 +1893,16 @@ class Fighter {
         if (!stick) this.landVy = this.vel.y;
         this.vel.y = 0; this.onGround = true; this.groundP = p;
       }
-      if (p.solid && this.pos.y < p.y - .08 && this.pos.y > p.y - p.depth && r < p.r + .35) {
-        const nx = dx / (r || 1), nz = dz / (r || 1);
-        this.pos.x = p.x + nx * (p.r + .35); this.pos.z = p.z + nz * (p.r + .35);
-        const vn = this.vel.x * nx + this.vel.z * nz;
-        if (vn < 0) { this.vel.x -= vn * nx; this.vel.z -= vn * nz; }
+      if (p.solid && this.pos.y < py - .08 && this.pos.y > py - p.depth) {
+        const n = platPush(p, this, .35);
+        if (n) { const vn = this.vel.x * n[0] + this.vel.z * n[1]; if (vn < 0) { this.vel.x -= vn * n[0]; this.vel.z -= vn * n[1]; } }
       }
     }
     if (this.onGround && !was) {
       this.jumpsLeft = this.stats.jumps; this.airDash = true; this.squash = 1; this.tumbleSpd = 0;
       if (this.stats.shock && this.landVy < -15 && this.state !== 'hitstun') shockwave(this);
       if (this.state === 'attack' && this.atkName === 'air') { this.state = 'normal'; this.atk = null; this.atkName = ''; }
+      if (this.state === 'attack' && this.atkName === 'pound' && this.poundPhase === 'slam') this.poundLand();
       emit(this.pos.x, this.pos.y + .1, this.pos.z, 5, { color: 0xe8f7d8, speed: 2.5, flat: true, life: .3, grav: 0 });
       sfx('land', .7);
     }
@@ -1674,7 +1937,9 @@ class Fighter {
     m.root.rotation.y = this.facing;
     const sc = m.root.scale.x + (this.size - m.root.scale.x) * (1 - Math.exp(-6 * dt)); m.root.scale.setScalar(sc);
     if (this.isBig && this.bigT < 1.5) m.root.visible = Math.floor(this.bigT * 10) % 2 === 0;
-    m.ice.visible = this.state === 'frozen';
+    m.ice.visible = this.state === 'frozen' && this.trapKind !== 'bubble';
+    m.bubble.visible = this.state === 'frozen' && this.trapKind === 'bubble';
+    if (m.bubble.visible) m.bubble.scale.setScalar(1 + Math.sin(game.simTime * 6) * .04);
     if (this.state === 'frozen') return;
     this.animT += dt;
     const hs = Math.hypot(this.vel.x, this.vel.z), s = this.state;
@@ -1684,6 +1949,8 @@ class Fighter {
     else if (s === 'attack' && this.atk) {
       const a = this.atk, t = this.stateTime, n = this.atkName;
       if (this.charging) { T.aR = 1.5; T.aL = -.7; T.twist = .8; T.lean = -.15; T.lL = -.5; T.lR = .4; }
+      else if (a.multi) { const k = Math.sin(t * 55); T.aR = -1.5 + k * .5; T.aL = -1.5 - k * .5; T.aLz = -.3; T.aRz = .3; T.lean = .2; T.lL = -.3; T.lR = .3; }
+      else if (a.pound) { T.lL = -1.2; T.lR = -1.2; T.aL = -2.6; T.aR = -2.6; T.lean = this.poundPhase === 'slam' ? .4 : -.2; }
       else if (a.spin) { T.spin = t / (a.startup + a.active + a.recovery); T.aLz = -1.5; T.aRz = 1.5; T.lL = -.9; T.lR = -.9; }
       else {
         const ph = t < a.startup ? 0 : (t < a.startup + a.active || (a.proj && t < a.startup + .08)) ? 1 : 2;
@@ -1751,7 +2018,7 @@ const droneLaserMat = new THREE.MeshBasicMaterial({ color: 0xffe066, toneMapped:
 const fireGeo = new THREE.SphereGeometry(.3, 14, 10), fireCore = new THREE.MeshBasicMaterial({ color: 0xffe08a, toneMapped: false });
 const fireGlow = new THREE.MeshBasicMaterial({ color: 0xff5a1c, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 function surfaceHit(x, y, z) {
-  for (const p of PLATFORMS) if (Math.hypot(x - p.x, z - p.z) < p.r && y <= p.y && y > p.y - 1.2) return true;
+  for (const p of PLATFORMS) { const py = platTop(p, x); if (platInside(p, x, z) && y <= py && y > py - 1.2) return true; }
   return false;
 }
 function spawnProjectile(owner, kind, opp) {
@@ -1792,6 +2059,15 @@ function spawnProjectile(owner, kind, opp) {
     if (opp && opp.alive) { const d = Math.hypot(opp.pos.x - pos.x, opp.pos.z - pos.z); if (d < 14) hs = clamp(d / .66, 4, 18); }
     const mesh = makeBomb(); mesh.position.copy(pos); scene.add(mesh);
     projectiles.push({ kind, owner, pos, vel: new THREE.Vector3(fx * hs, 7, fz * hs), life: 3, grav: GRAV, mesh, armT: .25 });
+  } else if (kind === 'bubble') {
+    if (opp && opp.alive) {
+      const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
+      if (d < 12 && d > .5 && (dx * fx + dz * fz) / d > .5) { fx = dx / d; fz = dz / d; owner.facing = Math.atan2(fx, fz); }
+    }
+    const pos = new THREE.Vector3(owner.pos.x + fx * 1.1, owner.pos.y + 1.2 * owner.size, owner.pos.z + fz * 1.1);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(.5, 18, 12), new THREE.MeshStandardMaterial({ color: 0xc8f4ff, transparent: true, opacity: .45, roughness: .05, emissive: 0xff7fb8, emissiveIntensity: .3, depthWrite: false }));
+    mesh.position.copy(pos); scene.add(mesh); sfx('bubble');
+    projectiles.push({ kind, owner: realOwner, pos, vel: new THREE.Vector3(fx * 9, .6, fz * 9), life: 2.2, grav: 0, mesh, armT: 0 });
   } else if (kind === 'boomerang' || kind === 'pan') {
     if (opp && opp.alive) {
       const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
@@ -1822,6 +2098,8 @@ function updateProjectiles(dt) {
       P.mesh.rotation.x += dt * 8; if (Math.random() < .7) emit(P.pos.x, P.pos.y + .5, P.pos.z, 1, { color: 0xffe066, speed: 1, life: .2, grav: 0, size: .07 });
       if (arena.wind > 0) { P.vel.x += arena.windDir.x * arena.wind * 8 * dt; P.vel.z += arena.windDir.z * arena.wind * 8 * dt; }
     } else if (P.kind === 'banana') P.mesh.rotation.y += dt * 9;
+    else if (P.kind === 'bubble') P.mesh.scale.setScalar(1 + Math.sin(P.life * 12) * .06);
+    else if (P.kind === 'cannonball' && Math.random() < .5) emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: 0xbbbbbb, speed: .3, life: .5, grav: -1, size: .25 });
     let done = false;
     if (P.kind === 'boomerang' || P.kind === 'pan') {
       P.age += dt; if (P.kind === 'pan') P.mesh.rotation.z += dt * 18; else P.mesh.rotation.y += dt * 22;
@@ -1842,7 +2120,7 @@ function updateProjectiles(dt) {
       if (f === P.owner && (P.kind !== 'bomb' || P.armT > 0)) continue;
       if (P.hit && P.hit.has(f)) continue;
       const dy = P.pos.y - (f.pos.y + 1.1 * f.size);
-      if (Math.hypot(P.pos.x - f.pos.x, dy * .8, P.pos.z - f.pos.z) < .55 * f.size + .35) {
+      if (Math.hypot(P.pos.x - f.pos.x, dy * .8, P.pos.z - f.pos.z) < .55 * f.size + (P.kind === 'cannonball' ? .7 : .35)) {
         const l = Math.hypot(P.vel.x, P.vel.z) || 1, src = { x: P.pos.x - P.vel.x / l, z: P.pos.z - P.vel.z / l };
         if (P.kind === 'fireball') { f.takeHit(P.owner, FIREBALL, 0, src); done = true; }
         else if (P.kind === 'laser') { f.takeHit(P.owner, P.hitDef || LASER, 0, src); done = true; }
@@ -1855,12 +2133,18 @@ function updateProjectiles(dt) {
           done = true;
         }
         else if (P.kind === 'pan') { f.takeHit(P.owner, PAN_HIT, 0, src); P.hit.add(f); sfx('clang'); }
+        else if (P.kind === 'cannonball') { f.takeHit(WORLD, CANNON, 0, src); P.hit.add(f); }
+        else if (P.kind === 'bubble') {
+          if (f.state === 'shield') f.takeHit(P.owner, ICE_HIT, 0, src);
+          else { f.damage += 2 * f.stats.dmgTaken; f.freeze(1.7, 'bubble'); popup('BUBBLED!', new THREE.Vector3(f.pos.x, f.pos.y + 2.8 * f.size, f.pos.z), '#ff7fb8', 22); }
+          done = true;
+        }
         else if (P.kind === 'bomb') { explode(P.pos.clone(), P.owner); done = true; }
         else if (P.kind === 'boomerang') { f.takeHit(P.owner, BOOM_HIT, 0, src); P.hit.add(f); }
         else if (P.kind === 'banana') { if (f.starT <= 0 && f.state !== 'shield') f.trip(); done = true; }
       }
     }
-    if (!done && P.kind !== 'boomerang' && P.kind !== 'pan' && surfaceHit(P.pos.x, P.pos.y, P.pos.z)) {
+    if (!done && P.kind !== 'boomerang' && P.kind !== 'pan' && P.kind !== 'cannonball' && surfaceHit(P.pos.x, P.pos.y, P.pos.z)) {
       if (P.kind === 'bomb') explode(P.pos.clone(), P.owner);
       else if (P.kind === 'banana') makeTrap(P.pos.x, P.pos.y + .2, P.pos.z, P.owner, 1);
       else emit(P.pos.x, P.pos.y + .1, P.pos.z, 8, { color: [0xff5a1c, 0xffc040], speed: 3, flat: true, life: .3, grav: 0 });
@@ -1872,7 +2156,7 @@ function updateProjectiles(dt) {
       if (P.kind === 'pan') P.owner.panOut = false;
       done = true;
     }
-    if (done) { scene.remove(P.mesh); projectiles.splice(i, 1); }
+    if (done) { if (P.kind === 'bubble' && P.owner) P.owner.bubbleOut = false; scene.remove(P.mesh); projectiles.splice(i, 1); }
   }
 }
 function explode(pos, owner) {
@@ -1982,7 +2266,8 @@ function updateCoins(dt) {
     const c = coins[i];
     c.vy -= 25 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.life -= dt;
     const sup = supportTop(c.x, c.z);
-    if (sup && c.y <= sup.y + .22 && c.y > sup.y - 1 && c.vy < 0) { c.y = sup.y + .22; c.vy = Math.abs(c.vy) > 2 ? -c.vy * .35 : 0; c.vx *= .6; c.vz *= .6; }
+    const sy = sup ? platTop(sup, c.x) : 0;
+    if (sup && c.y <= sy + .22 && c.y > sy - 1 && c.vy < 0) { c.y = sy + .22; c.vy = Math.abs(c.vy) > 2 ? -c.vy * .35 : 0; c.vx *= .6; c.vz *= .6; }
     if (player.alive && player.stats.magnet) {
       const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz);
       if (d < 14 && d > .2) { c.x += dx / d * 8 * dt; c.z += dz / d * 8 * dt; }
@@ -2091,7 +2376,7 @@ function supportTop(x, z) {
   let top = null;
   for (const p of PLATFORMS) {
     if (p.main && arena.holeAt && arena.holeAt(x, z)) continue;
-    if (Math.hypot(x - p.x, z - p.z) < p.r - .2 && (top === null || p.y > top.y)) top = p;
+    if (platInside(p, x, z, -.2) && (top === null || platTop(p, x) > platTop(top, x))) top = p;
   }
   return top;
 }
@@ -2101,9 +2386,8 @@ function spawnItem() {
   const raised = PLATFORMS.slice(1);
   let x, z;
   if (raised.length && (Math.random() < .35 || arena.danger())) {
-    const p = raised[Math.random() * raised.length | 0], a = rand(0, Math.PI * 2), r = rand(0, p.r * .55);
-    x = p.x + Math.cos(a) * r; z = p.z + Math.sin(a) * r;
-  } else { const a = rand(0, Math.PI * 2), r = rand(1.5, STAGE_R - 2.5); x = Math.cos(a) * r; z = Math.sin(a) * r; }
+    const q = randomSpotOn(raised[Math.random() * raised.length | 0], .8); x = q.x; z = q.z;
+  } else { const q = randomSpotOn(PLATFORMS[0], 2.5); x = q.x; z = q.z; }
   const g = new THREE.Group(); g.add(ITEM_DEFS[type].make());
   const halo = new THREE.Mesh(new THREE.RingGeometry(.55, .75, 32), new THREE.MeshBasicMaterial({ color: ITEM_DEFS[type].color, transparent: true, opacity: .7, side: THREE.DoubleSide, toneMapped: false }));
   halo.rotation.x = -Math.PI / 2; halo.position.y = -.55; g.add(halo);
@@ -2115,14 +2399,14 @@ function clearArenaObjects() {
   while (items.length) removeItem(0);
   while (projectiles.length) scene.remove(projectiles.pop().mesh);
   while (firePatches.length) { const P = firePatches.pop(); scene.remove(P.mesh); P.mesh.material.dispose(); }
-  for (const f of FIGHTERS) { f.boomOut = false; f.panOut = false; }
+  for (const f of FIGHTERS) { f.boomOut = false; f.panOut = false; f.bubbleOut = false; }
   echoes.length = 0; clearCoins(); removeDecoy();
 }
 function updateItems(dt, fighting) {
   if (fighting) { game.itemT -= dt; if (game.itemT <= 0) { if (items.filter(i => i.type !== 'trap').length < 2) spawnItem(); game.itemT = rand(7, 11); } }
   for (let i = items.length - 1; i >= 0; i--) {
     const it = items[i];
-    const sup = supportTop(it.x, it.z), floor = sup ? sup.y : -Infinity;
+    const sup = supportTop(it.x, it.z), floor = sup ? platTop(sup, it.x) : -Infinity;
     if (!it.landed) { it.vy -= 25 * dt; it.y += it.vy * dt; if (it.y <= floor) { it.y = floor; it.vy = 0; it.landed = true; emit(it.x, it.y + .1, it.z, 6, { color: 0xffffff, speed: 2.5, flat: true, life: .3, grav: 0 }); } }
     else {
       it.y = floor;
@@ -2207,9 +2491,9 @@ class Brain {
     if (!f.alive) return I;
     this.t -= dt; this.cd -= dt; this.jumpCd -= dt;
     if (this.hold > 0) { this.hold -= dt; I.heavyDown = true; if (tg.alive) { const dx = tg.pos.x - f.pos.x, dz = tg.pos.z - f.pos.z, d = Math.hypot(dx, dz) || 1; I.mx = dx / d * .3; I.mz = dz / d * .3; } return I; }
-    const r = Math.hypot(f.pos.x, f.pos.z);
+    const r = Math.hypot(f.pos.x, f.pos.z) || 1, eg = edgeOf(f.pos.x, f.pos.z);
     // get back to the island
-    if (!f.onGround && (r > STAGE_R - .6 || f.pos.y < PLATFORMS[0].y - 1)) {
+    if (!f.onGround && (eg.d < .6 || f.pos.y < platTop(PLATFORMS[0], f.pos.x) - 1)) {
       I.mx = -f.pos.x / (r || 1); I.mz = -f.pos.z / (r || 1);
       if (f.state === 'normal') {
         if (f.vel.y < -1 && f.jumpsLeft > 0 && this.jumpCd <= 0) { I.jump = true; this.jumpCd = .3; }
@@ -2255,7 +2539,7 @@ class Brain {
       // run from a starred opponent
       if (tg.starT > 0) {
         mx = -ux - uz * this.strafe * .6; mz = -uz + ux * this.strafe * .6;
-        if (f.onGround && r > STAGE_R - 3) { mx -= f.pos.x / r * 1.5; mz -= f.pos.z / r * 1.5; }
+        if (f.onGround && eg.d < 3) { mx += eg.nx * 1.5; mz += eg.nz * 1.5; }
         const l = Math.hypot(mx, mz) || 1; I.mx = mx / l; I.mz = mz / l; return I;
       }
       if (this.t <= 0) {
@@ -2277,7 +2561,7 @@ class Brain {
         if (f.onGround && dist < reach && Math.abs(dy) < 1.6 && this.cd <= 0 && f.state === 'normal' && Math.random() < lerp(.45, .95, sk)) {
           const tr = Math.hypot(tg.pos.x, tg.pos.z);
           let smashChance = tg.damage > 75 ? .6 : tg.damage > 40 ? .32 : .1;
-          if (tr > STAGE_R - 4) smashChance += .2 * sk;
+          if (edgeOf(tg.pos.x, tg.pos.z).d < 4) smashChance += .2 * sk;
           if (Math.random() < smashChance) { I.heavyPressed = true; I.heavyDown = true; this.hold = rand(.1, .25 + .5 * sk); this.cd = rand(.7, 1.1); return I; }
           this.jabs = Math.random() < .35 + sk * .45 ? 3 : 1 + (Math.random() * 2 | 0); this.cd = rand(.5, .9) - sk * .2;
         }
@@ -2302,17 +2586,19 @@ class Brain {
       if (od > p.r - .9 && mx * ox + mz * oz > 0) { mx = -ox / (od || 1) * .3; mz = -oz / (od || 1) * .3; }
     }
     // stay away from the edge
-    if (f.onGround && r > STAGE_R - 2.2) {
-      const nx = -f.pos.x / r, nz = -f.pos.z / r, out = -(mx * nx + mz * nz);
-      if (out > 0) { mx += nx * out * 1.4; mz += nz * out * 1.4; }
+    if (f.onGround && f.groundP && f.groundP.main && eg.d < 2.2) {
+      const out = -(mx * eg.nx + mz * eg.nz);
+      if (out > 0) { mx += eg.nx * out * 1.4; mz += eg.nz * out * 1.4; }
     }
+    // move inward before the outer ring crumbles (Shrinking Arena)
+    if (arena.safeR && f.onGround && f.groundP && f.groundP.main && r > arena.safeR - 1) { mx -= f.pos.x / r * 1.6; mz -= f.pos.z / r * 1.6; }
     // steer around holes in the ice
     if (arena.holes) for (const h of arena.holes) {
       const hx = f.pos.x - h.x, hz = f.pos.z - h.z, hd = Math.hypot(hx, hz) || 1;
       if (hd < h.r + 1.6) { mx += hx / hd * 1.6; mz += hz / hd * 1.6; }
     }
     // lean into the wind near the edge
-    if (arena.windDir && arena.phase !== 'calm') { const k = r > STAGE_R - 6 ? 1.1 : .35; mx -= arena.windDir.x * k; mz -= arena.windDir.z * k; }
+    if (arena.windDir && arena.phase !== 'calm') { const k = eg.d < 6 ? 1.1 : .35; mx -= arena.windDir.x * k; mz -= arena.windDir.z * k; }
     const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
     I.mx = mx; I.mz = mz;
     return I;
@@ -2439,8 +2725,12 @@ function updateCamera(dt) {
     let block = false;
     if (o.group.visible && cam.focus.y < o.top - .3) {
       const cx = camera.position.x, cz = camera.position.z, dx = cam.focus.x - cx, dz = cam.focus.z - cz, L2 = dx * dx + dz * dz || 1;
-      const t = clamp(((o.x - cx) * dx + (o.z - cz) * dz) / L2, 0, 1);
-      block = t > .05 && t < .97 && Math.hypot(cx + dx * t - o.x, cz + dz * t - o.z) < o.r + .4;
+      if (o.box) {
+        for (let k = 1; k < 12 && !block; k++) { const px = cx + dx * k / 12, pz = cz + dz * k / 12; block = Math.abs(px - o.x) < o.hw + .3 && Math.abs(pz - o.z) < o.hd + .3; }
+      } else {
+        const t = clamp(((o.x - cx) * dx + (o.z - cz) * dz) / L2, 0, 1);
+        block = t > .05 && t < .97 && Math.hypot(cx + dx * t - o.x, cz + dz * t - o.z) < o.r + .4;
+      }
     }
     const target = block ? .22 : 1;
     for (const m of o.mats) { m.opacity += (target - m.opacity) * (1 - Math.exp(-10 * dt)); m.depthWrite = m.opacity > .95; }
