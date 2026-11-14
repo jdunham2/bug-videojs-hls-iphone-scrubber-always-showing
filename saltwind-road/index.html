@@ -3274,10 +3274,32 @@ const GEM_KINDS = ['ruby','sapphire','emerald','topaz','amethyst'];
 const gemSum = k => S && S.sockets ? ['weapon', ...EQ_SLOTS].reduce((n, sl) => { const g = S.equip[sl]; return n + (g && have(g) > 0 && S.sockets[g] === k ? 1 : 0); }, 0) : 0;
 const eqStat = k => EQ_SLOTS.reduce((n, sl) => { const g = S.equip[sl]; if (!(g && have(g) > 0)) return n; const L = enhOf(g); return n + (GOODS[g][k] || 0) + (k === 'armor' ? .5*L : k === 'block' && GOODS[g].block ? .02*L : 0); }, 0);
 const slotOf = g => GOODS[g].kind === 'armor' ? ({head:'head', shield:'shield'}[GOODS[g].slot] || 'armor') : 'weapon';
-function armorVal() { return eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
-const speedMult = () => (have('tide_bell') && S && [T.DEEP, T.SHAL].includes(tileAt(Math.floor(S.x), Math.floor(S.y))) ? 1.25 : 1) * (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
+// ===== armor sets: wear all three matching pieces for a bonus =====
+const ARMOR_SETS = [
+  {id: 'path', name: 'Pathfinder', parts: ['leather_armor', 'leather_cap', 'wooden_shield'], speed: .1, txt: '+10% move speed'},
+  {id: 'iron', name: 'Ironclad', parts: ['iron_mail', 'iron_helm', 'iron_shield'], armor: 1.5, txt: '+1.5 armor'},
+  {id: 'sea', name: 'Sea Dog', parts: ['serpent_cloak', 'pirate_hat', 'kraken_shield'], armor: 1, speed: .1, txt: '+1 armor, +10% move speed'},
+  {id: 'royal', name: 'Royal Guard', parts: ['knight_plate', 'royal_helm', 'tower_shield'], armor: 1, hp: 4, txt: '+1 armor, +4 max health'},
+  {id: 'crystal', name: 'Crystal Regalia', parts: ['crystal_plate', 'crystal_crown', 'crystal_aegis'], dmg: .1, speed: .05, txt: '+10% damage, +5% move speed'},
+  {id: 'mithril', name: 'Mithril Guard', parts: ['mithril_plate', 'mithril_helm', 'mithril_shield'], dmg: .15, hp: 6, txt: '+15% damage, +6 max health'},
+];
+const setWorn = A => A.parts.filter(g => have(g) > 0 && Object.values(S.equip).includes(g)).length;
+const activeSets = () => S && S.equip ? ARMOR_SETS.filter(A => setWorn(A) === 3) : [];
+const setStat = k => activeSets().reduce((n, A) => n + (A[k] || 0), 0);
+let setSeen = null;
+function setWatch() {
+  const ids = activeSets().map(A => A.id).join(',');
+  if (setSeen !== null && ids !== setSeen) for (const A of activeSets()) if (!setSeen.split(',').includes(A.id)) { SFX.level(); toast(`<b>Set bonus: ${A.name}</b><br>You’re wearing the full set: ${A.txt}.`, 5000); S.setsWorn = S.setsWorn || {}; S.setsWorn[A.id] = 1; }
+  setSeen = ids;
+}
+function setsHTML() {
+  const rows = ARMOR_SETS.filter(A => A.parts.some(g => have(g) > 0) || setWorn(A)).map(A => { const w = setWorn(A); return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${w === 3 ? '<b style="color:var(--good)">' + A.name + '</b>' : A.name} <span style="color:var(--muted)">${A.parts.map(g => GOODS[g].name).join(' · ')}</span></span><span style="white-space:nowrap;${w === 3 ? 'color:var(--good)' : 'color:var(--muted)'}">${w}/3 worn · ${A.txt}</span></div>`; });
+  return rows.length ? `<div class="vals" style="margin-top:8px;display:grid;gap:2px"><b style="color:var(--brass)">Armor sets</b>${rows.join('')}</div>` : '';
+}
+function armorVal() { return setStat('armor') + eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
+const speedMult = () => (1 + setStat('speed')) * (have('tide_bell') && S && [T.DEEP, T.SHAL].includes(tileAt(Math.floor(S.x), Math.floor(S.y))) ? 1.25 : 1) * (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + 2*sk('vit') + (S.bonusHP || 0) + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
+const maxHP = () => BASE_HP + setStat('hp') + 2*sk('vit') + (S.bonusHP || 0) + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3562,7 +3584,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (have('elspeth_lantern') && (S.time > .8 || S.time < .22) ? .15 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + setStat('dmg') + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (have('elspeth_lantern') && (S.time > .8 || S.time < .22) ? .15 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('detective_badge') ? .05 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -7992,6 +8014,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Armor sets', 'Six armor sets give a bonus when you wear all three pieces (body, head and shield): Pathfinder (leather), Ironclad (iron), Sea Dog (serpent cloak, pirate hat, kraken shield), Royal Guard (knight plate, royal helm, tower shield), Crystal Regalia and Mithril Guard. Your Pack shows which pieces you have.'],
   ['Solar eclipse', 'At noon on day 2 of summer and of winter, the moon covers the sun. For a few hours it\u2019s as dark as night and night monsters roam. Glowing shadow wisps appear nearby: walk up and press E to catch them for Eclipse Shards, which sell well. You can catch up to 6 in one eclipse. The Gazette warns you the day before.'],
   ['Shell Stones and pony jumping', 'Nan Cowrie at the Reedholm inn plays Shell Stones: sow stones round the board, land in your store to go again, and capture from empty cups. Hettie Hurdle in Hollowpine runs a pony jumping show: time your jumps over 15 fences, and a round with no faults wins the blue ribbon.'],
   ['Settings and accessibility', 'In the menu (Esc) you can change any key, make the text larger, and switch to colorblind-friendly colors (blue and orange instead of green and red). Records lists all your personal bests, and the Album keeps your last 12 photos.'],
@@ -9609,7 +9632,7 @@ function update(dt) {
   if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
-  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck(); eclipseTick();
+  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck(); eclipseTick(); setWatch();
     if (S.starfall === S.day && S.time > .74 && S.time < .8 && S.sfWarned !== S.day) { S.sfWarned = S.day; toast('<b>A starfall night!</b><br>Shooting stars are streaking across the sky. Where they land, star fragments glow until morning. Go and find them!', 8000); SFX.chime(); }
     if (bloodMoonDay() && S.time > .72 && S.time < .8 && S.bmWarned !== S.day) { S.bmWarned = S.day; toast('<b>The moon is rising red...</b><br>Tonight is a Blood Moon. Monsters will be stronger and far more numerous, and elites will walk the land. Every kill pays double.', 8000); SFX.roar(); }
     if (S.day % 6 === 1 && S.time > .22 && S.time < .32 && S.bmWarned === S.day - 1 && S.bmSurvived !== S.day) { S.bmSurvived = S.day; S.bloodMoons = (S.bloodMoons || 0) + 1; toast('<b>The Blood Moon sets</b><br>You survived the night.', 5000); }
@@ -11117,6 +11140,7 @@ function renderBag() {
   $('bagSheet').innerHTML = `
     <div class="sheet-head"><h2>Your Pack</h2><button class="btn" data-x="bag">Close<kbd>I</kbd></button></div>
     <div class="vals" style="margin-top:6px">HP ${Math.ceil(S.hp)}/${maxHP()} · Weapon: ${esc(weapon().name)} (${weapon().dmg} dmg) · Damage blocked: ${Math.round(armorCut()*100)}% · ${S.coins}◆</div>
+    ${setsHTML()}
     ${held.length ? '' : '<div class="none" style="margin-top:12px">Your pack is empty. Gather things out in the wild with E.</div>'}
     ${sec('Weapons & armor', ['weapon','armor'], equipBtn)}
     ${sec('Tools · used automatically', ['tool'])}
@@ -12862,6 +12886,8 @@ $('skillsSheet').addEventListener('click', e => {
 /* ================= achievements ================= */
 const ACH = [
   ['first_blood','First Blood','Defeat your first enemy', () => S.kills >= 1],
+  ['full_set','Matching Outfit','Wear a full armor set', () => Object.keys(S.setsWorn || {}).length >= 1],
+  ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
   ['stones_win','Shell Shark','Beat Nan Cowrie at Shell Stones', () => (S.stonesWins || 0) >= 1],
@@ -13418,8 +13444,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 13;
+const WN_VER = 14;
 const WHATS_NEW = [
+  ['Armor sets', 'Wear a matching body armor, helmet and shield for a set bonus, like Mithril Guard (+15% damage, +6 health) or Pathfinder (+10% speed). Check your Pack to see your sets.'],
   ['Solar eclipse', 'Twice a year (day 2 of summer and of winter) the sun goes dark at noon. Catch the glowing shadow wisps for Eclipse Shards before the light returns.'],
   ['Two new games', 'Shell Stones with Nan Cowrie in Reedholm (a classic pit-and-pebble board game), and the pony jumping show with Hettie Hurdle in Hollowpine.'],
   ['Save reminders', 'A small Saved sign appears when the game saves, and the game reminds you to make a backup every couple of weeks.'],
