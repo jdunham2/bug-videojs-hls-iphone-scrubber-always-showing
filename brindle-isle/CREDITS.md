@@ -8,7 +8,7 @@ Authors: Benjamin K. Smith (BenCreating), bluecarrot16, Durrani, Eliza Wyatt (El
 
 Licenses: CC-BY-SA 3.0, GPL 3.0, OGA-BY 3.0 (see the generator's CREDITS.csv for per-file details).
 
-## Tiles, trees, animals, monsters and items
+## Tiles, trees, animals, monsters, dungeon tiles and items
 [Kenney](https://kenney.nl) Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs, CC0 (public domain).
 
 ## Hand-drawn

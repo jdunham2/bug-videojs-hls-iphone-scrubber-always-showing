@@ -3,7 +3,8 @@
 // Art is embedded by build.py: character sprites from the LPC project, tiles from Kenney's Tiny packs.
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
-const T = 32, W = 72, H = 56, GOAL = 400, SEED = 7;
+// The overworld (OW wide) and the Old Mine dungeon (DW wide, starting at DX) share one tile grid.
+const T = 32, OW = 72, DX = OW + 2, DW = 40, W = DX + DW, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -75,13 +76,14 @@ function vnoise(x, y) {
 }
 
 // ---------- world generation ----------
-const DEEP = 0, LAND = 2, PATH = 6, PLANK = 9;
+const DEEP = 0, LAND = 2, PATH = 6, PLANK = 9, WALL = 10, FLOOR = 11, GATE = 12, LOCK = 13, BDOOR = 14, STAIRS = 15;
 const REGIONS = ['village', 'grove', 'quarry', 'meadow', 'forest'];
 const REGION_TINT = [null, 'rgba(96,44,160,.34)', 'rgba(128,110,84,.38)', 'rgba(255,226,90,.10)', 'rgba(8,52,28,.30)'];
 const tiles = new Uint8Array(W * H), region = new Uint8Array(W * H);
-const cx = W / 2, cy = H / 2;
+const cx = OW / 2, cy = H / 2;
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? DEEP : tiles[y * W + x];
-const isLand = t => t >= LAND;
+const isLand = t => t >= LAND && t !== WALL && t !== GATE && t !== LOCK && t !== BDOOR;
+const inDungeon = x => x >= DX * T;
 function regionOf(x, y) {
   const dx = x - cx, dy = y - cy;
   if (dx * dx + dy * dy < 40) return 0;
@@ -92,7 +94,7 @@ function regionOf(x, y) {
   return 4;
 }
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-  const dx = (x - cx) / (W * 0.46), dy = (y - cy) / (H * 0.46);
+  const dx = (x - cx) / (OW * 0.46), dy = (y - cy) / (H * 0.46);
   const d = Math.hypot(dx, dy) + (vnoise(x / 7, y / 7) - 0.5) * 0.32 + (vnoise(x / 3, y / 3) - 0.5) * 0.08;
   tiles[y * W + x] = d > 0.86 ? DEEP : LAND;
   region[y * W + x] = regionOf(x, y);
@@ -117,7 +119,50 @@ for (let y = 0; y < cy; y++) if (isLand(tileAt(cx, y)) && isLand(tileAt(cx - 1, 
 const ARENA = { x: cx * T, y: arenaTY * T + 16, r: 5 * T };
 for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) if (x * x + y * y <= 26) { const i = (arenaTY + y) * W + cx + x; if (i >= 0 && i < W * H && isLand(tiles[i])) tiles[i] = LAND; }
 const nearArena = (tx, ty, d) => Math.hypot(tx - cx, ty - arenaTY) < d;
-road(1, 0, 13); road(-1, 0, 13); road(0, -1, Math.max(12, cy - arenaTY - 5));
+// the Old Mine entrance sits in the quarry at the end of the east road
+let MINE = { x: (cx + 16) * T, y: (cy - 1) * T };
+search: for (let x = cx + 15; x < cx + 24; x++) for (let y = cy - 3; y <= cy + 1; y++) {
+  let ok = true; for (let yy = y - 2; yy <= y + 1; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (!isLand(tileAt(xx, yy))) ok = false;
+  if (ok) { MINE = { x: x * T, y: y * T + 4, tx: x, ty: y }; break search; }
+}
+const nearMine = (tx, ty, d) => Math.hypot(tx - MINE.x / T, ty - MINE.y / T) < d;
+road(1, 0, Math.round(MINE.x / T) - cx + 1); road(-1, 0, 13); road(0, -1, Math.max(12, cy - arenaTY - 5));
+for (let y = Math.floor(MINE.y / T); y <= cy; y++) { const i = y * W + Math.round(MINE.x / T); if (isLand(tiles[i])) tiles[i] = PATH; const j = i - 1; if (isLand(tiles[j])) tiles[j] = PATH; }
+
+// ---------- the Old Mine (dungeon layout) ----------
+const DUN = { doors: [], chests: [], torches: [], spawns: [] };
+const dset = (x, y, t) => { tiles[y * W + DX + x] = t; };
+const dget = (x, y) => tileAt(DX + x, y);
+for (let y = 0; y < H; y++) for (let x = OW; x < W; x++) { tiles[y * W + x] = x >= DX ? WALL : DEEP; region[y * W + x] = 5; }
+function carve(x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) dset(x, y, FLOOR); }
+carve(2, 1, 17, 11);   // Rockjaw's chamber
+carve(22, 1, 37, 11);  // the Hollow Wizard's sanctum
+carve(3, 13, 36, 21);  // pillared hall
+carve(2, 23, 37, 32);  // crystal cavern
+for (let y = 23; y <= 32; y++) for (let x = 2; x <= 37; x++) {
+  const edge = y === 23 || y === 32 || x === 2 || x === 37;
+  if (edge && Math.abs(x - 19.5) > 3 && !(x <= 4 && y <= 25) && hash(x + 300, y) < 0.45) dset(x, y, WALL);
+}
+carve(19, 33, 20, 34); carve(13, 35, 26, 42);
+dset(19, 42, STAIRS); dset(20, 42, STAIRS);
+function addDoor(id, kind, cells, t) { for (const [x, y] of cells) dset(x, y, t); DUN.doors.push({ id, kind, cells, below: [cells[0][0], cells[0][1] + 1] }); }
+addDoor('gate', 'gate', [[19, 22], [20, 22]], GATE);
+addDoor('lock', 'lock', [[9, 12], [10, 12]], LOCK);
+addDoor('boss', 'boss', [[29, 12], [30, 12]], BDOOR);
+for (const [x, y] of [[6, 0], [13, 0], [25, 0], [34, 0], [5, 12], [16, 12], [23, 12], [35, 12], [9, 22], [30, 22], [15, 34], [24, 34]]) DUN.torches.push({ x, y });
+// flood-fill rooms (doors count as walls) so a gate knows which creatures guard it
+const dreg = new Int16Array(W * H).fill(-1);
+{
+  let id = 0;
+  for (let y = 0; y < H; y++) for (let x = DX; x < W; x++) {
+    const t0 = tiles[y * W + x]; if ((t0 !== FLOOR && t0 !== STAIRS) || dreg[y * W + x] >= 0) continue;
+    const q = [[x, y]]; dreg[y * W + x] = id;
+    while (q.length) { const [qx, qy] = q.pop(); for (const [nx, ny] of [[qx + 1, qy], [qx - 1, qy], [qx, qy + 1], [qx, qy - 1]]) { const t = tileAt(nx, ny); if ((t === FLOOR || t === STAIRS) && dreg[ny * W + nx] < 0) { dreg[ny * W + nx] = id; q.push([nx, ny]); } } }
+    id++;
+  }
+  for (const d of DUN.doors) d.reg = dreg[d.below[1] * W + DX + d.below[0]];
+}
+const DSTART = { x: (DX + 20) * T, y: 40 * T + 16 };
 let dockY = cy;
 for (let y = cy; y < H; y++) if (isLand(tileAt(cx, y)) && isLand(tileAt(cx - 1, y))) dockY = y; else break;
 for (let y = cy; y <= dockY; y++) { tiles[y * W + cx] = PATH; tiles[y * W + cx - 1] = PATH; }
@@ -148,9 +193,32 @@ function edgeKey(prefix, other, x, y) {
 }
 const landForShore = (x, y) => isLand(tileAt(x, y)) && !isBridge(x, y);
 const notPath = (x, y) => tileAt(x, y) !== PATH;
+const floorLike = t => t === FLOOR || t === STAIRS || t === GATE || t === LOCK || t === BDOOR;
+function drawDungeonTile(c, x, y) {
+  const t = tileAt(x, y), px = x * T, py = y * T, lx = x - DX;
+  c.fillStyle = '#0b0910'; c.fillRect(px, py, T, T);
+  if (floorLike(t)) {
+    const h = hash(x, y); spr(c, h < 0.03 ? 'd_floor2' : h < 0.12 ? 'd_floor1' : 'd_floor0', px, py);
+    if (!floorLike(tileAt(x, y - 1))) { c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(px, py, T, 8); }
+    if (t === STAIRS) spr(c, 'd_stairs', px, py);
+    if (t === GATE) spr(c, 'd_gate', px, py);
+    if (t === LOCK) spr(c, 'd_door', px, py);
+    if (t === BDOOR) spr(c, 'd_bossdoor', px, py);
+  } else if (floorLike(tileAt(x, y + 1))) {
+    spr(c, DUN.torches.some(q => q.x === lx && q.y === y) ? 'd_walltorch' : 'd_wall', px, py);
+  } else {
+    let near = false; for (let yy = -1; yy <= 1; yy++) for (let xx = -1; xx <= 1; xx++) if (floorLike(tileAt(x + xx, y + yy))) near = true;
+    if (near) spr(c, 'd_top', px, py);
+  }
+}
+function redrawArea(x0, y0, x1, y1) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (x >= DX) drawDungeonTile(cctx, x, y);
+  const m = miniCache.getContext('2d'); m.drawImage(cache, 0, 0, miniCache.width, miniCache.height);
+}
 function buildCache() {
   const c = cctx; c.imageSmoothingEnabled = false;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  for (let y = 0; y < H; y++) for (let x = DX; x < W; x++) drawDungeonTile(c, x, y);
+  for (let y = 0; y < H; y++) for (let x = 0; x < OW; x++) {
     const t = tiles[y * W + x], px = x * T, py = y * T, h = hash(x, y), rg = region[y * W + x];
     if (!isLand(t) || isBridge(x, y)) { spr(c, edgeKey('w_', landForShore, x, y), px, py); }
     else {
@@ -162,7 +230,7 @@ function buildCache() {
   // region color washes: one pixel per tile, scaled up smoothly so biomes blend instead of forming squares
   const tint = document.createElement('canvas'); tint.width = W; tint.height = H;
   const tc = tint.getContext('2d');
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  for (let y = 0; y < H; y++) for (let x = 0; x < OW; x++) {
     const t = tiles[y * W + x], rg = region[y * W + x];
     if (isLand(t) && t !== PATH && !isBridge(x, y) && REGION_TINT[rg]) { tc.fillStyle = REGION_TINT[rg]; tc.fillRect(x, y, 1, 1); }
   }
@@ -198,6 +266,7 @@ const ITEMS = {
   potion:  { name: 'Meadow Tonic', price: 20 },
   charm:   { name: 'Crystal Charm', price: 70 },
   crown:   { name: 'Slime Crown', price: 120 },
+  gem:     { name: 'Hollow Gem', price: 250 },
 };
 const RECIPES = [
   { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
@@ -207,7 +276,7 @@ const RECIPES = [
   { id: 'blade', name: 'Crystal Blade', desc: 'Doubles sword damage. Makes the grove slimes easy.', cost: { crystal: 3, wood: 3 }, tool: true },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0 }, bossDefeated: false,
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0 }, defeated: {}, mineOpen: false, dg: { open: {}, chests: {}, keys: 0, bossKey: false },
     tools: { pickaxe: false, blade: false }, hp: 6, maxHp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -233,7 +302,7 @@ function addRes(type, tx, ty) {
 const nearVillage = (x, y, d) => Math.hypot(x - cx, y - cy) < d;
 for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
   const t = tiles[y * W + x];
-  if (t !== LAND || nearVillage(x, y, 8) || nearArena(x, y, 7)) continue;
+  if (t !== LAND || nearVillage(x, y, 8) || nearArena(x, y, 7) || nearMine(x, y, 3.5)) continue;
   if (!isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1))) continue;
   const r = rng(), rg = region[y * W + x];
   if (rg === 4) { if (r < 0.17) addRes('tree', x, y); else if (r < 0.2) addRes('herb', x, y); else if (r < 0.24) decor.push({ key: r < 0.22 ? 'bush' : 'mush', x: x * T + 16, y: y * T + 22, s: 2 }); }
@@ -244,7 +313,7 @@ for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
     const x = 2 + Math.floor(rng() * (W - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9)) return [x * T + 16, y * T + 16];
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -266,8 +335,38 @@ function makeEnemy(kind, x, y) {
 function addEnemy(kind, rg) { const [x, y] = randomTileIn(rg, 11); enemies.push(makeEnemy(kind, x, y)); }
 for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['green', 3, 2], ['crab', 3, 3], ['green', 2, 2], ['spider', 2, 2], ['cyclops', 2, 2], ['purple', 1, 4], ['ghost', 1, 3]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
+// dungeon creatures never respawn; clearing a room opens its gate
+for (const [kind, x, y] of [['bat', 8, 26], ['bat', 30, 27], ['bat', 20, 29], ['spider', 12, 30], ['spider', 27, 25], ['purple', 6, 29], ['purple', 33, 30],
+  ['green', 15, 38], ['green', 24, 38], ['ghost', 8, 15], ['ghost', 31, 15], ['cyclops', 12, 19], ['cyclops', 27, 19], ['purple', 19, 17], ['bat', 22, 15]]) {
+  const e = makeEnemy(kind, (DX + x) * T + 16, y * T + 16); e.noRespawn = true; e.dreg = dreg[y * W + DX + x]; enemies.push(e);
+}
+for (const [x, y] of [[5, 25], [35, 24], [34, 31], [4, 31], [22, 24]]) addRes('crystal', DX + x, y);
+for (const [x, y] of [[10, 24], [15, 31], [25, 31], [30, 25], [14, 37], [25, 40]]) addRes('rock', DX + x, y);
+DUN.chests.push({ id: 'key', item: 'key', x: (DX + 3) * T + 16, y: 24 * T + 22 }, { id: 'hall', item: 'gold', x: (DX + 35) * T + 16, y: 14 * T + 22 });
+for (const [x, y] of [[8, 17], [31, 17], [24, 3], [35, 3], [24, 9], [35, 9]]) decor.push({ key: 'pillar', x: (DX + x) * T + 16, y: y * T + 22, s: 2.5, solid: 13 });
 const projectiles = [];
-const BOSS = { x: ARENA.x, y: ARENA.y, z: 0, hp: 50, max: 50, state: 'sleep', st: 0, active: false, hurt: 0, seq: 0, phase: 1, sx: 0, sy: 0, tx: 0, ty: 0, volleys: 0, ring: null, anim: 0 };
+const BOSS_INFO = {
+  slime:  { name: 'The Slime King', hp: 50, contact: 38, wake: 4.2 * T, col: '#5fd0b0',
+    seq: { 1: ['hop', 'hop', 'hop', 'slam'], 2: ['hop', 'summon', 'hop', 'slam', 'hop'], 3: ['shards', 'hop', 'slam', 'summon', 'shards', 'hop', 'slam'] },
+    lines: { 2: 'The King calls his children!', 3: 'The King is furious!' } },
+  golem:  { name: 'Rockjaw the Cyclops', hp: 60, contact: 36, wake: 4.5 * T, col: '#e8b27a',
+    seq: { 1: ['stomp', 'boulders', 'stomp', 'charge'], 2: ['boulders', 'charge', 'quake', 'stomp', 'charge'], 3: ['quake', 'charge', 'boulders', 'charge', 'quake', 'stomp'] },
+    lines: { 2: 'Rockjaw roars! The ceiling shakes!', 3: 'Rockjaw is enraged!' } },
+  wizard: { name: 'The Hollow Wizard', hp: 44, contact: 28, wake: 5 * T, col: '#b58cff',
+    seq: { 1: ['orb', 'teleport', 'orb', 'spiral'], 2: ['orb', 'summon', 'teleport', 'orb', 'spiral'], 3: ['orb', 'spiral', 'teleport', 'orb', 'summon', 'spiral'] },
+    lines: { 2: 'The Wizard calls up the restless dead!', 3: 'The Wizard\'s shield flickers with rage!' } },
+};
+function makeBoss(type, x, y, arena) {
+  const I = BOSS_INFO[type];
+  return { type, name: I.name, x, y, hx: x, hy: y, z: 0, hp: I.hp, max: I.hp, state: 'sleep', st: 0, active: false, hurt: 0, seq: 0, phase: 1,
+    sx: 0, sy: 0, tx: 0, ty: 0, vx: 0, vy: 0, volleys: 0, ring: null, anim: 0, arena, alpha: 1, shield: 0, timer: 0, spin: 0 };
+}
+const roomArena = (x0, y0, x1, y1) => ({ rect: true, x0: (DX + x0) * T, y0: y0 * T, x1: (DX + x1 + 1) * T, y1: (y1 + 1) * T, cx: (DX + (x0 + x1 + 1) / 2) * T, cy: (y0 + y1 + 1) / 2 * T });
+const BOSSES = [
+  makeBoss('slime', ARENA.x, ARENA.y, { cx: ARENA.x, cy: ARENA.y, r: ARENA.r }),
+  makeBoss('golem', (DX + 10) * T, 6 * T, roomArena(2, 1, 17, 11)),
+  makeBoss('wizard', (DX + 30) * T, 5 * T, roomArena(22, 1, 37, 11)),
+];
 
 // village
 const HOUSE = { x: cx * T - 84, y: cy * T - 66 }; // bottom-center of Oma's cottage
@@ -286,7 +385,7 @@ function updateNPC(n, dt) {
   if (d < 2) { n.target = (n.target + 1) % n.path.length; n.wait = 2 + rng() * 4; return; }
   const sp = Math.min(d, 38 * dt); n.x += dx / d * sp; n.y += dy / d * sp; n.fx = dx / d; n.fy = dy / d; n.moving = true; n.step += sp;
 }
-const RECTS = [{ x0: HOUSE.x - 48, x1: HOUSE.x + 48, y0: HOUSE.y - 40, y1: HOUSE.y - 2 }];
+const RECTS = [{ x0: HOUSE.x - 48, x1: HOUSE.x + 48, y0: HOUSE.y - 40, y1: HOUSE.y - 2 }, { x0: MINE.x - 56, x1: MINE.x - 18, y0: MINE.y - 56, y1: MINE.y - 4 }, { x0: MINE.x + 18, x1: MINE.x + 56, y0: MINE.y - 56, y1: MINE.y - 4 }, { x0: MINE.x - 18, x1: MINE.x + 18, y0: MINE.y - 56, y1: MINE.y - 20 }];
 decor.push({ key: 'barrel', x: HOUSE.x - 64, y: HOUSE.y + 4, s: 2, solid: 10 }, { key: 'crate', x: HOUSE.x + 64, y: HOUSE.y + 2, s: 2, solid: 11 },
   { key: 'hive', x: cx * T + 128, y: cy * T - 50, s: 2, solid: 10 }, { key: 'sign', x: cx * T - 52, y: dockY * T + 2, s: 2, solid: 8 },
   { key: 'fence_l', x: cx * T + 96, y: cy * T + 88, s: 2 }, { key: 'fence_h', x: cx * T + 128, y: cy * T + 88, s: 2 }, { key: 'fence_r', x: cx * T + 160, y: cy * T + 88, s: 2 });
@@ -306,7 +405,7 @@ const ICON_DRAW = {
   planks: c => { for (let i = 0; i < 3; i++) { c.fillStyle = '#2a1a10'; c.fillRect(3, 7 + i * 6, 26, 6); c.fillStyle = i % 2 ? '#a8713f' : '#8a5a32'; c.fillRect(4, 8 + i * 6, 24, 4); } c.fillStyle = '#d8c48a'; c.fillRect(14, 6, 4, 20); },
   charm: c => { c.strokeStyle = '#f4b740'; c.lineWidth = 2.5; c.beginPath(); c.arc(16, 17, 10, 0, 7); c.stroke(); c.fillStyle = '#a593ff'; diamond(c, 16, 17, 5, 8); c.fillStyle = '#f4b740'; c.fillRect(14, 3, 4, 5); },
 };
-const ICON_ATLAS = { crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', blade: 'blade', gold: 'coin' };
+const ICON_ATLAS = { gem: 'gem', key: 'key', bosskey: 'bosskey', crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', blade: 'blade', gold: 'coin' };
 const ICON_CANVAS = {}, ICONS = {};
 function buildIcons() {
   for (const k of [...Object.keys(ICON_DRAW), ...Object.keys(ICON_ATLAS)]) {
@@ -320,15 +419,23 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'planks', 'potion', 'charm', 'crown'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'planks', 'potion', 'charm', 'crown', 'gem'];
 function objectiveText() {
+  if (inDungeon(P.x)) {
+    if (!S.dg.open.gate) return 'Defeat every creature in the crystal cavern to open the sealed gate to the north.';
+    if (!S.dg.open.lock) return S.dg.keys ? 'Use the small key on the locked door in the hall\'s west wall.' : 'Find a small key. A chest hides in a corner of the crystal cavern.';
+    if (!S.defeated.golem) return 'Defeat Rockjaw in the west chamber. Make him charge into a wall.';
+    if (!S.dg.open.boss) return 'Open the skull door in the hall\'s east wall with the Boss Key.';
+    if (!S.defeated.wizard) return 'Defeat the Hollow Wizard. Swing at his orb to send it back.';
+    return 'The Old Mine is quiet now. Take the stairs back up.';
+  }
   if (S.bridge) return 'The bridge is open. Keep exploring, or cross it to the mainland.';
   if (S.gold >= GOAL) return 'You have enough! Bring 400g to Tobin at the south dock.';
   if (!S.tools.pickaxe) {
     if (S.inv.wood < 5 || S.inv.stone < 4) return `Chop trees and break rocks (wood ${Math.min(S.inv.wood, 5)}/5, stone ${Math.min(S.inv.stone, 4)}/4), then craft a pickaxe at the village workbench.`;
     return 'Craft a Stone Pickaxe at the workbench in the village.';
   }
-  return `Mine crystals in the purple grove up north, craft Crystal Charms, and sell them to Oma Fen${S.bossDefeated ? '' : ', or challenge the Slime King at the north tip'}. ${S.gold} / ${GOAL}g`;
+  return `Mine crystals in the purple grove up north, craft Crystal Charms, and sell them to Oma Fen${S.defeated.slime ? '' : ', or challenge the Slime King at the north tip'}. ${S.gold} / ${GOAL}g`;
 }
 function updateHUD() {
   let h = '';
@@ -336,11 +443,14 @@ function updateHUD() {
   $('hearts').innerHTML = h;
   $('gold').textContent = S.gold;
   $('objective').textContent = objectiveText();
+  document.querySelector('.objective .label').textContent = inDungeon(P.x) ? 'The Old Mine' : 'Goal · Rebuild the south bridge';
   $('fund').style.width = Math.min(100, S.gold / GOAL * 100) + '%';
   let inv = '';
-  for (const k of INV_ORDER) if (k !== 'crown' || S.inv.crown) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
+  for (const k of INV_ORDER) if ((k !== 'crown' && k !== 'gem') || S.inv[k]) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
   if (S.tools.pickaxe) inv += `<div class="slot tool" title="Stone Pickaxe"><img src="${ICONS.pickaxe}" alt="Stone Pickaxe"></div>`;
   if (S.tools.blade) inv += `<div class="slot tool" title="Crystal Blade"><img src="${ICONS.blade}" alt="Crystal Blade"></div>`;
+  if (S.dg.keys) inv += `<div class="slot tool" title="Small Key"><img src="${ICONS.key}" alt="Small Key"><b>${S.dg.keys}</b></div>`;
+  if (S.dg.bossKey) inv += `<div class="slot tool" title="Boss Key"><img src="${ICONS.bosskey}" alt="Boss Key"></div>`;
   $('inventory').innerHTML = inv;
 }
 $('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (!b) return; if (b.dataset.item === 'potion') drinkTonic(); else toast(`${ITEMS[b.dataset.item].name} · sells for ${ITEMS[b.dataset.item].price}g`); });
@@ -368,7 +478,7 @@ panelEl.addEventListener('click', e => { if (e.target === panelEl) closePanel();
 const canAfford = cost => Object.entries(cost).every(([k, n]) => S.inv[k] >= n);
 const sellAllValue = () => INV_ORDER.filter(k => k !== 'potion').reduce((s, k) => s + S.inv[k] * ITEMS[k].price, 0);
 let resetArmed = false;
-const CREDITS = `<div class="credits"><b>Art credits.</b> Characters: Universal LPC Spritesheet Character Generator (Liberated Pixel Cup) by __LPC_AUTHORS__. Licensed CC-BY-SA 3.0, GPL 3.0 and OGA-BY 3.0; colors adjusted for this game. Tiles, trees, animals, monsters and items: Kenney's Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs (kenney.nl, CC0).</div>`;
+const CREDITS = `<div class="credits"><b>Art credits.</b> Characters: Universal LPC Spritesheet Character Generator (Liberated Pixel Cup) by __LPC_AUTHORS__. Licensed CC-BY-SA 3.0, GPL 3.0 and OGA-BY 3.0; colors adjusted for this game. Tiles, trees, animals, monsters, dungeon tiles and items: Kenney's Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs (kenney.nl, CC0).</div>`;
 function renderPanel() {
   let html = '';
   if (panel === 'shop') {
@@ -415,6 +525,12 @@ function renderPanel() {
       <dt>Cyclopes</dt><dd>Quarry. Throw rocks at the red circle. Move, or swing to knock rocks away.</dd>
       <dt>Ghosts</dt><dd>Grove. Can't be hit while faded. Their wisps follow you; swing to break them.</dd>
       <dt>Slime King</dt><dd>Boss at the north tip. Leap over his shockwave, then hit him while he's dazed for double damage.</dd></dl>
+      <div class="label">The Old Mine</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>East of the village, at the end of the road. Needs a pickaxe to clear the rubble.</dd>
+      <dt>Gates and keys</dt><dd>Clear the cavern to open its gate. Find the small key in a chest to open the locked door.</dd>
+      <dt>Rockjaw</dt><dd>Dodge his charge so he crashes into a wall, then hit him while he's stunned. Watch for red circles: rocks are falling.</dd>
+      <dt>Hollow Wizard</dt><dd>His shield blocks swords. Swing at his orb to send it back and break the shield.</dd></dl>
       <p class="sub">Standing in the village slowly restores your hearts. Progress saves in this browser automatically.</p>
       <button class="btn" data-act="mute">${SFX.muted ? 'Turn sound on' : 'Turn sound off'}</button>
       <button class="btn" data-act="reset">${resetArmed ? 'Tap again to erase your save' : 'Start a new game'}</button>${CREDITS}`;
@@ -572,9 +688,14 @@ function onAction() {
   if (P.act) { if (!['faint', 'drink', 'spin'].includes(P.act.kind)) P.queued = true; return true; }
   const n = nearestNPC();
   if (n) { face(n); interact(n); return false; }
+  const ch = nearestChest(); if (ch) { face(ch); openChest(ch); return false; }
+  const dr = doorAhead(); if (dr) { doorMsgCd = 0; tryDoor(dr); return false; }
   const { enemy, res } = findTarget();
+  const orb = projectiles.find(o => o.kind === 'orb' && !o.returned && Math.hypot(o.x - P.x, o.y - P.y + 14) < 90);
+  if (orb) { face({ x: orb.x, y: orb.y + 14 }); doAct('sword', hitEnemies); return true; }
   if (enemy) { face(enemy); doAct('sword', hitEnemies); return true; }
-  if (bossHittable() && Math.hypot(BOSS.x - P.x, BOSS.y - P.y) < 110) { face(BOSS); doAct('sword', hitEnemies); return true; }
+  const AB = activeBoss();
+  if (AB && bossHittable(AB) && Math.hypot(AB.x - P.x, AB.y - P.y) < 110) { face(AB); doAct('sword', hitEnemies); return true; }
   if (res) {
     face(res);
     if (res.type === 'tree') doAct('axe', a => hitResource(res, a));
@@ -593,6 +714,7 @@ function interact(n) {
       'Bring me anything you find. Wood, stone, herbs, slime goo. I pay fair, and I pay more for crafted goods.',
       'Want real money? The purple grove up north is full of crystals. You will need a pickaxe from the workbench across the square.',
       'And past the grove, at the very north tip, the Slime King sleeps on a pile of gold. Only fools and heroes wake him.',
+      'East of the village is the Old Mine. Rubble sealed it after something awful moved in. Bring a pickaxe, and courage.',
     ], () => openPanel('shop')); return; }
     openPanel('shop'); return;
   }
@@ -623,7 +745,10 @@ function damageEnemy(e, dmg, kx, ky) {
 }
 function deflect(hx, hy, rad) {
   let n = 0;
-  for (const p of projectiles) if (!p.dead && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
+  for (const p of projectiles) if (p.kind === 'orb' && !p.returned && !p.dead && Math.hypot(p.x - hx, p.y - hy) < rad + 8) {
+    p.returned = true; p.sp = 270; floatText(p.x, p.y - 20, 'Return!', '#ffe08a'); SFX.play('special'); impact(4); burst(p.x, p.y, '#ffe08a', 10);
+  }
+  for (const p of projectiles) if (!p.dead && p.kind !== 'orb' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
   if (n) { floatText(hx, hy - 20, 'Deflect!', '#ffffff'); SFX.play('hit'); }
 }
 function hitEnemies(a) {
@@ -634,7 +759,8 @@ function hitEnemies(a) {
     if (!e.alive || Math.hypot(e.x - hx, e.y - 10 - hy) > rad + (ENEMY[e.kind].flyer ? 10 : 0)) continue;
     if (damageEnemy(e, dmg, P.fx * (sp ? 520 : 260), P.fy * (sp ? 520 : 260))) hit = true;
   }
-  if (bossHittable() && Math.hypot(BOSS.x - hx, BOSS.y - 26 - hy) < rad + 30) { damageBoss(dmg); hit = true; }
+  const AB = activeBoss();
+  if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - 26 - AB.z - hy) < rad + 30) { damageBoss(AB, dmg); hit = true; }
   deflect(hx, hy, rad + 6);
   if (sp) { impact(7); burst(hx, hy, '#ffe08a', 14); } else if (hit) impact(2);
   if (hit) SFX.play('hit');
@@ -647,7 +773,8 @@ function spinHit(a) {
     if (d > 72) continue;
     damageEnemy(e, dmg, dx / d * 460, dy / d * 460);
   }
-  if (bossHittable() && Math.hypot(BOSS.x - P.x, BOSS.y - P.y) < 100) damageBoss(dmg);
+  const AB = activeBoss();
+  if (AB && bossHittable(AB) && Math.hypot(AB.x - P.x, AB.y - P.y) < 100) damageBoss(AB, dmg);
   deflect(P.x, P.y - 14, 80);
   for (const r of resources) if (r.alive && Math.hypot(r.x - P.x, r.y - P.y) < 62) hitResource(r, a);
   for (let i = 0; i < 24; i++) { const ang = i / 24 * Math.PI * 2; particles.push({ x: P.x + Math.cos(ang) * 40, y: P.y - 14 + Math.sin(ang) * 26, vx: Math.cos(ang) * 120, vy: Math.sin(ang) * 80 - 30, life: 0.5, color: '#ffe08a' }); }
@@ -719,6 +846,7 @@ function pushOut(b, r) {
   for (const o of resources) if (o.alive && SOLID[o.type]) pushCircle(b, o.x, o.y, r + SOLID[o.type]);
   for (const n of NPCS) pushCircle(b, n.x, n.y, r + (n.bench ? 18 : 10));
   for (const d of decor) if (d.solid) pushCircle(b, d.x, d.y, r + d.solid);
+  for (const c of DUN.chests) pushCircle(b, c.x, c.y, r + 11);
   for (const q of RECTS) {
     if (b.x > q.x0 - r && b.x < q.x1 + r && b.y > q.y0 - r && b.y < q.y1 + r) {
       const o = [b.x - (q.x0 - r), (q.x1 + r) - b.x, b.y - (q.y0 - r), (q.y1 + r) - b.y], m = Math.min(...o);
@@ -732,6 +860,7 @@ function pushOut(b, r) {
 let time = 0, saveT = 0, edgeToast = false;
 function update(dt) {
   time += dt;
+  if (fade > 0) fade = Math.max(0, fade - dt * 1.6);
   for (const a of animals) updateAnimal(a, dt);
   for (const n of NPCS) updateNPC(n, dt);
   if (paused()) return;
@@ -791,7 +920,8 @@ function update(dt) {
   for (const e of enemies) updateEnemy(e, dt, fainted);
   for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].remove) enemies.splice(i, 1);
   updateProjectiles(dt, fainted);
-  updateBoss(dt, fainted);
+  updateBosses(dt, fainted);
+  updateWorldLinks(dt);
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i]; p.t += dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.01, dt); p.vy *= Math.pow(0.01, dt);
@@ -800,6 +930,8 @@ function update(dt) {
     if (p.t > 0.35 && d < 14 && !fainted) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
+      else if (p.item === 'key') { S.dg.keys++; banner('Small Key!', '#ffe08a'); SFX.play('lucky'); }
+      else if (p.item === 'bosskey') { S.dg.bossKey = true; banner('Boss Key!', '#ff9a9a'); SFX.play('craft'); }
       else { S.inv[p.item]++; floatText(P.x, P.y - 56, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); SFX.play('collect'); }
       updateHUD();
       const slot = p.item === 'gold' ? document.querySelector('.gold') : document.querySelector(`.slot[data-item="${p.item}"]`);
@@ -814,7 +946,13 @@ function update(dt) {
   updateAmbient(dt);
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.life -= dt; f.y -= 28 * dt; if (f.life <= 0) floats.splice(i, 1); }
   const n = nearestNPC(), pr = $('prompt');
-  if (n && !P.act) { pr.hidden = false; const key = matchMedia('(pointer: coarse)').matches ? 'A' : 'Space'; pr.innerHTML = `<kbd>${key}</kbd> ${n.verb} ${n.name}`; } else pr.hidden = true;
+  const key = matchMedia('(pointer: coarse)').matches ? 'A' : 'Space', ch = nearestChest(), dr = inDungeon(P.x) ? doorAhead() : null;
+  if (n && !P.act) { pr.hidden = false; pr.innerHTML = `<kbd>${key}</kbd> ${n.verb} ${n.name}`; }
+  else if (ch && !P.act) { pr.hidden = false; pr.innerHTML = `<kbd>${key}</kbd> Open the chest`; }
+  else if (dr && dr.kind !== 'gate') { pr.hidden = false; pr.innerHTML = dr.kind === 'lock' ? (S.dg.keys ? `<kbd>${key}</kbd> Unlock the door` : 'Locked door (needs a small key)') : (S.dg.bossKey ? `<kbd>${key}</kbd> Open the skull door` : 'Skull door (needs the Boss Key)'); }
+  else if (Math.hypot(P.x - MINE.x, P.y - MINE.y) < 70) { pr.hidden = false; pr.innerHTML = S.mineOpen || S.tools.pickaxe ? 'Walk in to enter the Old Mine' : 'The Old Mine (rubble: needs a pickaxe)'; }
+  else if (tileAt(Math.floor(P.x / T), Math.floor((P.y + 20) / T)) === STAIRS) { pr.hidden = false; pr.innerHTML = 'Walk down the stairs to leave the mine'; }
+  else pr.hidden = true;
   saveT += dt; if (saveT > 8) { saveT = 0; save(); }
 }
 function updateAnimal(a, dt) {
@@ -825,9 +963,59 @@ function updateAnimal(a, dt) {
   if (a.vx) a.flip = a.vx > 0;
 }
 
+// ---------- the Old Mine: travel, chests, doors and gates ----------
+let fade = 0, linkCd = 0, doorMsgCd = 0, gateCheck = 0;
+function travel(x, y, fx, fy, msg) {
+  P.x = x; P.y = y; P.fx = fx; P.fy = fy; P.act = null; P.dash = null; P.kx = P.ky = 0; camFocus.x = x; camFocus.y = y;
+  fade = 1; linkCd = 1; projectiles.length = 0; setTimeout(updateHUD, 0); SFX.play('dash'); if (msg) setTimeout(() => banner(msg, '#ffe08a'), 250);
+}
+const doorAt = (tx, ty) => DUN.doors.find(d => !S.dg.open[d.id] && d.cells.some(([x, y]) => DX + x === tx && y === ty));
+function openDoor(d, quiet) {
+  S.dg.open[d.id] = true;
+  for (const [x, y] of d.cells) dset(x, y, FLOOR);
+  redrawArea(DX + d.cells[0][0] - 1, d.cells[0][1] - 1, DX + d.cells[d.cells.length - 1][0] + 1, d.cells[0][1] + 1);
+  if (quiet) return;
+  SFX.play('crumble'); SFX.play('craft'); impact(5); burst((DX + d.cells[0][0]) * T + 32, d.cells[0][1] * T + 16, '#ffe08a', 16);
+  updateHUD();
+  banner(d.kind === 'gate' ? 'The gate opens!' : d.kind === 'boss' ? 'The great door groans open...' : 'Unlocked!', '#ffe08a');
+  save();
+}
+function tryDoor(d) {
+  if (doorMsgCd > 0) return; doorMsgCd = 1.5;
+  if (d.kind === 'gate') toast('Sealed by old magic. Defeat every creature in the cavern to open it.');
+  else if (d.kind === 'lock') { if (S.dg.keys > 0) { S.dg.keys--; openDoor(d); updateHUD(); } else toast('Locked. There must be a small key somewhere in the mine.'); }
+  else if (S.dg.bossKey) openDoor(d); else toast('A heavy door with a skull lock. Rockjaw guards its key.');
+}
+function doorAhead() { const tx = Math.floor((P.x + P.fx * 20) / T), ty = Math.floor((P.y - 4 + P.fy * 20) / T); return doorAt(tx, ty); }
+const nearestChest = () => DUN.chests.find(c => !S.dg.chests[c.id] && Math.hypot(c.x - P.x, c.y - P.y) < 44);
+function openChest(c) {
+  S.dg.chests[c.id] = true; SFX.play('lucky'); burst(c.x, c.y - 16, '#ffe08a', 14);
+  if (c.item === 'key') drop(c.x, c.y - 10, 'key', 1); else drop(c.x, c.y - 10, 'gold', 10, 4);
+  save();
+}
+function updateWorldLinks(dt) {
+  linkCd = Math.max(0, linkCd - dt); doorMsgCd = Math.max(0, doorMsgCd - dt);
+  const dm = Math.hypot(P.x - MINE.x, P.y - MINE.y);
+  if (linkCd <= 0 && dm < 18 && P.fy < -0.3) {
+    if (!S.mineOpen && !S.tools.pickaxe) { if (doorMsgCd <= 0) { doorMsgCd = 1.5; toast('Rubble blocks the Old Mine. A pickaxe could clear it.'); } P.y = MINE.y + 22; }
+    else {
+      if (!S.mineOpen) { S.mineOpen = true; SFX.play('crumble'); toast('You clear the rubble with your pickaxe.'); }
+      travel(DSTART.x, DSTART.y, 0, -1, 'The Old Mine');
+    }
+  }
+  if (linkCd <= 0 && tileAt(Math.floor(P.x / T), Math.floor(P.y / T)) === STAIRS && P.fy > 0.3) travel(MINE.x, MINE.y + 34, 0, 1, null);
+  // bumping into a locked door tries to open it
+  if (P.moving && inDungeon(P.x)) { const d = doorAhead(); if (d) tryDoor(d); }
+  gateCheck -= dt;
+  if (gateCheck <= 0) {
+    gateCheck = 0.4;
+    for (const d of DUN.doors) if (d.kind === 'gate' && !S.dg.open[d.id] && inDungeon(P.x) && !enemies.some(e => e.alive && e.dreg === d.reg)) openDoor(d);
+  }
+}
+
 // ---------- enemy AI ----------
 function moveEnemy(e, dx, dy) {
-  if (ENEMY[e.kind].flyer) { e.x = Math.max(16, Math.min(W * T - 16, e.x + dx)); e.y = Math.max(16, Math.min(H * T - 16, e.y + dy)); }
+  if (ENEMY[e.kind].flyer && !inDungeon(e.x)) { e.x = Math.max(16, Math.min(OW * T - 16, e.x + dx)); e.y = Math.max(16, Math.min(H * T - 16, e.y + dy)); }
   else { moveBody(e, dx, dy, 9); pushOut(e, 9); }
 }
 function updateEnemy(e, dt, fainted) {
@@ -835,6 +1023,7 @@ function updateEnemy(e, dt, fainted) {
   if (!e.alive) {
     if (e.dieT > 0) e.dieT -= dt;
     if (e.minion) { if (e.dieT <= 0) e.remove = true; return; }
+    if (e.noRespawn) return;
     e.respawn -= dt;
     if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) Object.assign(e, { alive: true, hp: e.max, x: e.hx, y: e.hy, spawnT: 0.45, state: 'move', cd: 1 });
     return;
@@ -941,8 +1130,25 @@ function updateEnemy(e, dt, fainted) {
 function updateProjectiles(dt, fainted) {
   for (const p of projectiles) {
     p.t += dt;
+    if (p.kind === 'orb') {
+      const o = p.owner, tx = p.returned ? o.x : P.x, ty = p.returned ? o.y - 30 - o.z : P.y - 14;
+      const want = Math.atan2(ty - p.y, tx - p.x); let da = want - p.ang;
+      while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      const turn = p.returned ? 8 : 1.3; p.ang += Math.max(-turn * dt, Math.min(turn * dt, da));
+      p.x += Math.cos(p.ang) * p.sp * dt; p.y += Math.sin(p.ang) * p.sp * dt;
+      if (Math.random() < dt * 40) particles.push({ x: p.x, y: p.y, vx: 0, vy: -10, life: 0.35, color: p.returned ? '#ffe08a' : '#c9b8ff', size: 3 });
+      if (!p.returned && !fainted && Math.hypot(P.x - p.x, P.y - 14 - p.y) < 16) { damagePlayer(2, p); p.dead = true; burst(p.x, p.y, '#c9b8ff', 12); }
+      if (p.returned && Math.hypot(tx - p.x, ty - p.y) < 30) {
+        if (o.phase === 3 && !p.batted && rng() < 0.4) { p.returned = false; p.batted = true; p.sp = 150; p.ang += Math.PI; floatText(o.x, o.y - 90, 'He swats it back!', '#ff9a9a'); SFX.play('hit'); }
+        else { p.dead = true; burst(p.x, p.y, '#ffe08a', 20); wizardDaze(o); }
+      }
+      if (p.t > p.life) p.dead = true;
+      continue;
+    }
     if (p.kind === 'rock') {
-      const k = Math.min(1, p.t / p.dur); p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k; p.z = Math.sin(Math.PI * k) * 80 + (1 - k) * 30;
+      const k = Math.max(0, Math.min(1, p.t / p.dur));
+      if (p.fall) { p.x = p.tx; p.y = p.ty; p.z = (1 - k) * 320; }
+      else { p.x = p.sx + (p.tx - p.sx) * k; p.y = p.sy + (p.ty - p.sy) * k; p.z = Math.sin(Math.PI * k) * 80 + (1 - k) * 30; }
       if (k >= 1 && !p.dead) {
         p.dead = true; SFX.play('crumble'); impact(2);
         for (let i = 0; i < 8; i++) { const a = rng() * Math.PI * 2; particles.push({ x: p.tx, y: p.ty, vx: Math.cos(a) * 90, vy: Math.sin(a) * 60 - 80, life: 0.5, color: i % 2 ? '#9c9690' : '#6c6764', size: 4 }); }
@@ -963,74 +1169,134 @@ function updateProjectiles(dt, fainted) {
   for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
 }
 
-// ---------- the Slime King ----------
-const bossHittable = () => BOSS.active && BOSS.z < 30 && BOSS.state !== 'dying' && BOSS.state !== 'wake';
-const BOSS_SEQ = { 1: ['hop', 'hop', 'hop', 'slam'], 2: ['hop', 'summon', 'hop', 'slam', 'hop'], 3: ['shards', 'hop', 'slam', 'summon', 'shards', 'hop', 'slam'] };
-function bossBar() { const b = $('bossbar'); b.hidden = !BOSS.active; $('bossfill').style.width = Math.max(0, BOSS.hp / BOSS.max * 100) + '%'; }
-function damageBoss(n) {
-  const dazed = BOSS.state === 'dazed', dmg = n * (dazed ? 2 : 1);
-  BOSS.hp -= dmg; BOSS.hurt = 0.15;
-  floatText(BOSS.x + (rng() - 0.5) * 30, BOSS.y - 90, dazed ? `${dmg}!` : String(dmg), dazed ? '#ffe08a' : '#ffffff');
-  burst(BOSS.x, BOSS.y - 30, '#5fd0b0', 10); SFX.play('hit');
-  const phase = BOSS.hp / BOSS.max > 0.66 ? 1 : BOSS.hp / BOSS.max > 0.33 ? 2 : 3;
-  if (phase > BOSS.phase && BOSS.hp > 0) { BOSS.phase = phase; BOSS.seq = 0; banner(phase === 2 ? 'The King calls his children!' : 'The King is furious!', '#ff9a9a'); }
-  if (BOSS.hp <= 0) {
-    BOSS.hp = 0; BOSS.state = 'dying'; BOSS.st = 1.8; BOSS.z = 0; BOSS.ring = null;
+// ---------- bosses ----------
+const activeBoss = () => BOSSES.find(B => B.active);
+const bossHittable = B => B && B.active && B.z < 30 && !['dying', 'wake', 'vanish', 'appear', 'dead'].includes(B.state);
+function bossBar() {
+  const B = activeBoss(), el = $('bossbar'); el.hidden = !B; if (!B) return;
+  el.querySelector('.label').textContent = B.name; $('bossfill').style.width = Math.max(0, B.hp / B.max * 100) + '%';
+}
+function clampBoss(B, m = 40) {
+  const A = B.arena;
+  if (A.rect) { B.x = Math.max(A.x0 + 30, Math.min(A.x1 - 30, B.x)); B.y = Math.max(A.y0 + 44, Math.min(A.y1 - 12, B.y)); }
+  else { const ax = B.x - A.cx, ay = B.y - A.cy, ad = Math.hypot(ax, ay), lim = A.r - m; if (ad > lim) { B.x = A.cx + ax / ad * lim; B.y = A.cy + ay / ad * lim; } }
+}
+function playerOutside(B) {
+  const A = B.arena;
+  if (A.rect) return P.x < A.x0 - T || P.x > A.x1 + T || P.y < A.y0 - T || P.y > A.y1 + T * 1.5;
+  return Math.hypot(P.x - A.cx, P.y - A.cy) > 11 * T;
+}
+let shieldHint = false;
+function damageBoss(B, n) {
+  if (B.type === 'wizard' && B.state !== 'dazed') {
+    B.shield = 0.35; floatText(B.x, B.y - 90 - B.z, 'Blocked!', '#c8d0ff'); SFX.play('mine');
+    if (!shieldHint) { shieldHint = true; toast('His magic shield blocks your sword. Swing at his orb to send it back at him!', 4500); }
+    return;
+  }
+  const dazed = B.state === 'dazed', dmg = n * (dazed ? 2 : 1);
+  B.hp -= dmg; B.hurt = 0.15;
+  floatText(B.x + (rng() - 0.5) * 30, B.y - 90 - B.z, dazed ? `${dmg}!` : String(dmg), dazed ? '#ffe08a' : '#ffffff');
+  burst(B.x, B.y - 30 - B.z, BOSS_INFO[B.type].col, 10); SFX.play('hit');
+  const phase = B.hp / B.max > 0.66 ? 1 : B.hp / B.max > 0.33 ? 2 : 3;
+  if (phase > B.phase && B.hp > 0) { B.phase = phase; B.seq = 0; banner(BOSS_INFO[B.type].lines[phase], '#ff9a9a'); }
+  if (B.hp <= 0) {
+    B.hp = 0; B.state = 'dying'; B.st = 1.8; B.ring = null; B.alpha = 1;
     for (const e of enemies) if (e.minion && e.alive) killEnemy(e);
     projectiles.length = 0;
   }
   bossBar();
 }
-function bossStart(action) {
-  const B = BOSS;
-  if (action === 'hop') {
-    const dx = P.x - B.x, dy = P.y - B.y, d = Math.hypot(dx, dy) || 1, step = Math.min(d, 110);
-    B.sx = B.x; B.sy = B.y; B.tx = B.x + dx / d * step; B.ty = B.y + dy / d * step;
-    const ax = B.tx - ARENA.x, ay = B.ty - ARENA.y, ad = Math.hypot(ax, ay), lim = ARENA.r - 40;
-    if (ad > lim) { B.tx = ARENA.x + ax / ad * lim; B.ty = ARENA.y + ay / ad * lim; }
-    B.state = 'hop'; B.st = 0;
-  } else if (action === 'slam') { B.state = 'rise'; B.st = 0; SFX.play('leap'); }
-  else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
-  else if (action === 'shards') { B.state = 'shards'; B.st = 0.7; B.volleys = B.phase === 3 ? 2 : 1; }
+function wizardDaze(B) { B.state = 'dazed'; B.st = 2.8; B.hurt = 0.2; impact(8); SFX.play('slam'); floatText(B.x, B.y - 100, 'Shield broken! Hit him now!', '#ffe08a'); }
+function bossRest(B, t) { B.state = 'rest'; B.st = t; }
+function bossNext(B) { const seq = BOSS_INFO[B.type].seq[B.phase]; bossStart(B, seq[B.seq++ % seq.length]); }
+function summonMinions(B, kinds, cap) {
+  const alive = enemies.filter(e => e.minion && e.alive).length;
+  for (let i = 0; i < Math.min(kinds.length, cap - alive); i++) {
+    const a = rng() * Math.PI * 2, m = makeEnemy(kinds[i], B.x + Math.cos(a) * 60, B.y + Math.sin(a) * 40);
+    m.minion = true; m.spawnT = 0.45; m.hx = B.arena.cx; m.hy = B.arena.cy; enemies.push(m);
+  }
 }
-function bossNext() { const seq = BOSS_SEQ[BOSS.phase]; bossStart(seq[BOSS.seq++ % seq.length]); }
-function bossRest(t) { BOSS.state = 'rest'; BOSS.st = t; }
-function updateBoss(dt, fainted) {
-  const B = BOSS;
-  if (S.bossDefeated && B.state !== 'dying') return;
-  B.anim += dt; B.hurt = Math.max(0, B.hurt - dt);
-  const d = Math.hypot(P.x - B.x, P.y - B.y), dA = Math.hypot(P.x - ARENA.x, P.y - ARENA.y);
-  if (B.ring) {
-    const R = B.ring; R.r += 250 * dt;
-    if (!R.hit && !fainted && !P.dash && Math.abs(Math.hypot((P.x - R.x), (P.y - R.y) / 0.6) - R.r) < 16) { R.hit = true; damagePlayer(2, R); }
-    if (R.r > R.max) B.ring = null;
+function bossStart(B, action) {
+  B.st = 0;
+  if (B.type === 'slime') {
+    if (action === 'hop') {
+      const dx = P.x - B.x, dy = P.y - B.y, d = Math.hypot(dx, dy) || 1, step = Math.min(d, 110);
+      B.sx = B.x; B.sy = B.y; B.x += dx / d * step; B.y += dy / d * step; clampBoss(B); B.tx = B.x; B.ty = B.y; B.x = B.sx; B.y = B.sy;
+      B.state = 'hop';
+    } else if (action === 'slam') { B.state = 'rise'; SFX.play('leap'); }
+    else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
+    else if (action === 'shards') { B.state = 'shards'; B.st = 0.7; B.volleys = B.phase === 3 ? 2 : 1; }
+  } else if (B.type === 'golem') {
+    if (action === 'stomp') { B.state = 'stomp'; B.timer = 0; }
+    else if (action === 'boulders') { B.state = 'boulders'; B.st = 0.65; }
+    else if (action === 'charge') { B.state = 'chargeWind'; B.st = 0.75; }
+    else if (action === 'quake') { B.state = 'quake'; B.st = 0.55; }
+  } else if (B.type === 'wizard') {
+    if (action === 'orb') { if (projectiles.some(p => p.kind === 'orb')) { bossRest(B, 0.4); return; } B.state = 'orb'; B.st = 0.9; }
+    else if (action === 'teleport') { B.state = 'vanish'; B.st = 0.4; SFX.play('wisp'); }
+    else if (action === 'spiral') { B.state = 'spiral'; B.st = 1.8; B.timer = 0; }
+    else if (action === 'summon') { B.state = 'summon'; B.st = 0.8; }
   }
-  // walk away and the King goes back to sleep, fully healed
-  if (B.active && B.state !== 'dying' && (dA > 11 * T || fainted)) {
-    Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: ARENA.x, y: ARENA.y, z: 0, ring: null });
-    for (const e of enemies) if (e.minion) e.remove = true;
-    projectiles.length = 0; bossBar();
-    if (!fainted) toast('The Slime King lumbers back to sleep.');
-    return;
+}
+function finishBoss(B) {
+  B.state = 'dead'; B.active = false; S.defeated[B.type] = true; bossBar();
+  for (let i = 0; i < 40; i++) { const a = rng() * Math.PI * 2, v = 80 + rng() * 200; particles.push({ x: B.x, y: B.y - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 0.9, color: i % 3 ? BOSS_INFO[B.type].col : '#ffe08a', size: 6 }); }
+  if (B.type === 'slime') { drop(B.x, B.y - 10, 'gold', 20, 5); drop(B.x, B.y - 10, 'crystal', 3); drop(B.x, B.y - 10, 'crown', 1); banner('Slime King defeated!', '#ffe08a'); }
+  if (B.type === 'golem') { drop(B.x, B.y - 10, 'gold', 12, 5); drop(B.x, B.y - 10, 'stone', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('Rockjaw defeated!', '#ffe08a'); }
+  if (B.type === 'wizard') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'gem', 1); banner('The Old Mine is free!', '#ffe08a'); }
+  impact(12); SFX.play('craft'); save(); updateHUD();
+  P.pendingCheer = null; setTimeout(() => { if (!P.act) { P.fx = 0; P.fy = 1; startAct('cheer', () => burst(P.x, P.y - 50, '#ffe08a', 20)); } }, 900);
+}
+function updateBosses(dt, fainted) {
+  for (const B of BOSSES) {
+    if ((S.defeated[B.type] || B.state === 'dead') && B.state !== 'dying') continue;
+    B.anim += dt; B.hurt = Math.max(0, B.hurt - dt); B.shield = Math.max(0, B.shield - dt);
+    const d = Math.hypot(P.x - B.x, P.y - B.y), I = BOSS_INFO[B.type];
+    if (B.ring) {
+      const R = B.ring; R.r += 250 * dt;
+      if (!R.hit && !fainted && !P.dash && Math.abs(Math.hypot((P.x - R.x), (P.y - R.y) / 0.6) - R.r) < 16) { R.hit = true; damagePlayer(2, R); }
+      if (R.r > R.max) B.ring = null;
+    }
+    // leave the arena (or faint) and the boss resets, fully healed
+    if (B.active && B.state !== 'dying' && (playerOutside(B) || fainted)) {
+      Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
+      for (const e of enemies) if (e.minion) e.remove = true;
+      projectiles.length = 0; bossBar();
+      if (!fainted) toast(`${B.name} waits for your return.`);
+      continue;
+    }
+    if (B.state === 'sleep') {
+      if (!fainted && !activeBoss() && Math.hypot(P.x - B.arena.cx, P.y - B.arena.cy) < I.wake) {
+        B.state = 'wake'; B.st = 1.5; B.active = true; bossBar(); banner(`${B.name} awakens!`, '#ff9a9a'); SFX.play('boss'); impact(6);
+      }
+      continue;
+    }
+    if (B.state === 'dying') {
+      B.st -= dt; if (!REDUCED_MOTION) shake = Math.max(shake, 4);
+      if (Math.random() < dt * 14) burst(B.x + (rng() - 0.5) * 60, B.y - 30 + (rng() - 0.5) * 40, rng() < 0.5 ? I.col : '#ffe08a', 10);
+      if (B.st <= 0) finishBoss(B);
+      continue;
+    }
+    if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.st <= 0) bossNext(B); }
+    else if (B.type === 'slime') updateSlimeKing(B, dt, fainted, d);
+    else if (B.type === 'golem') updateGolem(B, dt, fainted, d);
+    else updateWizard(B, dt, fainted, d);
+    const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead'].includes(B.state);
+    if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
+}
+function updateSlimeKing(B, dt, fainted, d) {
   switch (B.state) {
-    case 'sleep':
-      if (!fainted && dA < 4.2 * T) { B.state = 'wake'; B.st = 1.5; B.active = true; bossBar(); banner('The Slime King awakens!', '#ff9a9a'); SFX.play('boss'); impact(6); }
-      break;
-    case 'wake': B.st -= dt; if (B.st <= 0) bossNext(); break;
-    case 'rest': B.st -= dt; if (B.st <= 0) bossNext(); break;
     case 'hop': {
       B.st += dt; const k = Math.min(1, B.st / 0.72);
       B.x = B.sx + (B.tx - B.sx) * k; B.y = B.sy + (B.ty - B.sy) * k; B.z = Math.sin(Math.PI * k) * 40;
-      if (k >= 1) { B.z = 0; impact(4); SFX.play('thud'); burst(B.x, B.y, '#7ccf86', 10); if (d < 54 && !fainted) damagePlayer(1, B); bossRest(0.3); }
+      if (k >= 1) { B.z = 0; impact(4); SFX.play('thud'); burst(B.x, B.y, '#7ccf86', 10); if (d < 54 && !fainted) damagePlayer(1, B); bossRest(B, 0.3); }
       break;
     }
     case 'rise': B.st += dt; B.z = Math.min(1, B.st / 0.45) * 300; if (B.st >= 0.45) { B.state = 'hover'; B.st = 0; } break;
     case 'hover': {
       B.st += dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1, sp = Math.min(dd, 160 * dt);
-      B.x += dx / dd * sp; B.y += dy / dd * sp;
-      const ax = B.x - ARENA.x, ay = B.y - ARENA.y, ad = Math.hypot(ax, ay), lim = ARENA.r - 40;
-      if (ad > lim) { B.x = ARENA.x + ax / ad * lim; B.y = ARENA.y + ay / ad * lim; }
+      B.x += dx / dd * sp; B.y += dy / dd * sp; clampBoss(B);
       if (B.st >= 1.25) { B.state = 'fall'; B.st = 0; }
       break;
     }
@@ -1044,40 +1310,102 @@ function updateBoss(dt, fainted) {
         B.state = 'dazed'; B.st = 1.8; floatText(B.x, B.y - 100, 'Dazed! Hit him now!', '#ffe08a');
       }
       break;
-    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(0.3); break;
-    case 'summon':
-      B.st -= dt;
-      if (B.st <= 0) {
-        const alive = enemies.filter(e => e.minion && e.alive).length;
-        for (let i = 0; i < Math.min(3, 5 - alive); i++) {
-          const a = rng() * Math.PI * 2, m = makeEnemy('minion', B.x + Math.cos(a) * 60, B.y + Math.sin(a) * 40);
-          m.minion = true; m.spawnT = 0.45; m.hx = ARENA.x; m.hy = ARENA.y; enemies.push(m);
-        }
-        SFX.play('slime'); burst(B.x, B.y - 30, '#5fd0b0', 16); bossRest(0.6);
-      }
-      break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+    case 'summon': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['minion', 'minion', 'minion'], 5); SFX.play('slime'); burst(B.x, B.y - 30, '#5fd0b0', 16); bossRest(B, 0.6); } break;
     case 'shards':
       B.st -= dt;
       if (B.st <= 0) {
         const off = B.volleys % 2 ? 0 : Math.PI / 12;
         for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + off; projectiles.push({ kind: 'shard', x: B.x, y: B.y - 30, vx: Math.cos(a) * 165, vy: Math.sin(a) * 165, ang: a, t: 0, life: 2.2 }); }
         SFX.play('crumble'); impact(3);
-        B.volleys--; if (B.volleys > 0) B.st = 0.55; else bossRest(0.6);
-      }
-      break;
-    case 'dying':
-      B.st -= dt; if (!REDUCED_MOTION) shake = Math.max(shake, 4);
-      if (Math.random() < dt * 14) burst(B.x + (rng() - 0.5) * 60, B.y - 30 + (rng() - 0.5) * 40, rng() < 0.5 ? '#5fd0b0' : '#ffe08a', 10);
-      if (B.st <= 0) {
-        B.state = 'dead'; B.active = false; S.bossDefeated = true; bossBar();
-        for (let i = 0; i < 40; i++) { const a = rng() * Math.PI * 2, v = 80 + rng() * 200; particles.push({ x: B.x, y: B.y - 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, life: 0.9, color: i % 3 ? '#5fd0b0' : '#ffe08a', size: 6 }); }
-        drop(B.x, B.y - 10, 'gold', 20, 5); drop(B.x, B.y - 10, 'crystal', 3); drop(B.x, B.y - 10, 'crown', 1);
-        impact(12); SFX.play('craft'); banner('Slime King defeated!', '#ffe08a'); save(); updateHUD();
-        P.pendingCheer = null; setTimeout(() => { if (!P.act) { P.fx = 0; P.fy = 1; startAct('cheer', () => burst(P.x, P.y - 50, '#ffe08a', 20)); } }, 900);
+        B.volleys--; if (B.volleys > 0) B.st = 0.55; else bossRest(B, 0.6);
       }
       break;
   }
-  if (B.active && B.z < 14 && d < 38 && !fainted && B.state !== 'dying') damagePlayer(2, B);
+}
+function fallingRocks(B, n, spread) {
+  const A = B.arena;
+  for (let i = 0; i < n; i++) projectiles.push({ kind: 'rock', fall: true, tx: A.x0 + 60 + rng() * (A.x1 - A.x0 - 120), ty: A.y0 + 80 + rng() * (A.y1 - A.y0 - 110), x: 0, y: 0, t: -rng() * spread, dur: 0.9, z: 320 });
+}
+function golemWallAhead(B, nx, ny) {
+  const A = B.arena;
+  return nx < A.x0 + 30 || nx > A.x1 - 30 || ny < A.y0 + 44 || ny > A.y1 - 12 || !walkable(nx + Math.sign(B.vx) * 26, ny) || !walkable(nx, ny + Math.sign(B.vy) * 10);
+}
+function updateGolem(B, dt, fainted, d) {
+  const fast = B.phase === 3 ? 1.25 : 1;
+  switch (B.state) {
+    case 'stomp': {
+      B.st += dt; const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1;
+      if (dd > 30) { B.x += dx / dd * 70 * fast * dt; B.y += dy / dd * 70 * fast * dt; clampBoss(B); }
+      B.timer += dt; if (B.timer > 0.45) { B.timer = 0; impact(2); SFX.play('thud'); burst(B.x, B.y, '#b9ae98', 4); }
+      if (B.st > 1.7) bossRest(B, 0.3);
+      break;
+    }
+    case 'boulders':
+      B.st -= dt;
+      if (B.st <= 0) {
+        const n = 2 + B.phase;
+        for (let i = 0; i < n; i++) {
+          const a = rng() * Math.PI * 2, r = i === 0 ? 0 : 30 + rng() * 60;
+          projectiles.push({ kind: 'rock', sx: B.x, sy: B.y - 60, x: B.x, y: B.y - 60, tx: P.x + Math.cos(a) * r, ty: P.y + Math.sin(a) * r, t: -i * 0.12, dur: 0.95, z: 0 });
+        }
+        SFX.play('swing'); bossRest(B, 0.6);
+      }
+      break;
+    case 'chargeWind':
+      B.st -= dt;
+      if (B.st <= 0) { const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.vx = dx / dd * 330 * fast; B.vy = dy / dd * 330 * fast; B.state = 'charge'; B.st = 0; SFX.play('dash'); }
+      break;
+    case 'charge': {
+      B.st += dt; const nx = B.x + B.vx * dt, ny = B.y + B.vy * dt;
+      if (Math.random() < dt * 20) burst(B.x, B.y, '#b9ae98', 2);
+      if (golemWallAhead(B, nx, ny)) {
+        clampBoss(B); impact(12); hitStop = 0.1; SFX.play('slam'); fallingRocks(B, 3, 0.3);
+        B.state = 'dazed'; B.st = 2.3; floatText(B.x, B.y - 100, 'Stunned! Hit him now!', '#ffe08a');
+      } else { B.x = nx; B.y = ny; if (B.st > 1.3) bossRest(B, 0.5); }
+      break;
+    }
+    case 'quake':
+      B.st -= dt; B.z = Math.max(0, Math.sin(Math.PI * Math.min(1, 1 - B.st / 0.55)) * 26);
+      if (B.st <= 0) {
+        B.z = 0; impact(10); hitStop = 0.07; SFX.play('slam');
+        B.ring = { x: B.x, y: B.y, r: 30, max: 230, hit: false };
+        fallingRocks(B, 4 + B.phase * 2, 0.6);
+        bossRest(B, 0.7);
+      }
+      break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function updateWizard(B, dt, fainted, d) {
+  if (B.state !== 'dazed') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 6); else B.z = Math.max(0, B.z - 60 * dt);
+  switch (B.state) {
+    case 'orb':
+      B.st -= dt;
+      if (B.st <= 0) { projectiles.push({ kind: 'orb', owner: B, x: B.x, y: B.y - 44 - B.z, ang: Math.atan2(P.y - B.y, P.x - B.x), sp: 105, t: 0, life: 9 }); SFX.play('wisp'); bossRest(B, 1.4); }
+      break;
+    case 'vanish':
+      B.st -= dt; B.alpha = Math.max(0, B.st / 0.4);
+      if (B.st <= 0) {
+        const A = B.arena;
+        for (let i = 0; i < 12; i++) { const x = A.x0 + 60 + rng() * (A.x1 - A.x0 - 120), y = A.y0 + 80 + rng() * (A.y1 - A.y0 - 110); if (Math.hypot(x - P.x, y - P.y) > 160 && walkable(x, y)) { B.x = x; B.y = y; break; } }
+        B.state = 'appear'; B.st = 0.4; burst(B.x, B.y - 30, '#b58cff', 14);
+      }
+      break;
+    case 'appear': B.st -= dt; B.alpha = 1 - Math.max(0, B.st / 0.4); if (B.st <= 0) { B.alpha = 1; bossRest(B, 0.3); } break;
+    case 'spiral': {
+      B.st -= dt; B.timer -= dt;
+      if (B.timer <= 0) {
+        B.timer = 0.11; const arms = B.phase === 3 ? 3 : 2;
+        for (let i = 0; i < arms; i++) { const a = B.spin + i / arms * Math.PI * 2; projectiles.push({ kind: 'shard', x: B.x, y: B.y - 30 - B.z, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140, ang: a, t: 0, life: 2.4 }); }
+        B.spin += 0.42;
+      }
+      if (B.st <= 0) bossRest(B, 0.6);
+      break;
+    }
+    case 'summon': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['bat', 'ghost'], 4); SFX.play('wisp'); burst(B.x, B.y - 30, '#b58cff', 16); bossRest(B, 0.6); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.4); break;
+  }
 }
 
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
@@ -1089,6 +1417,7 @@ function updateAmbient(dt) {
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
       else if (rg === 3) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#ffffff', '#ffd65a', '#f28fb4'][Math.floor(Math.random() * 3)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
+      else if (rg === 5) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 8, vy: -4 - Math.random() * 6 });
       else if (rg === 1) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 14 });
     }
   }
@@ -1103,6 +1432,7 @@ function updateAmbient(dt) {
 function drawAmbient(c) {
   for (const a of ambient) {
     const fade = Math.min(1, a.life, (a.kind === 'leaf' ? 4 : a.kind === 'fly' ? 6 : 5) - a.life);
+    if (a.kind === 'mote') { c.globalAlpha = Math.max(0, fade) * 0.6; c.fillStyle = '#ffe9c4'; c.fillRect(Math.round(a.x), Math.round(a.y), 2, 2); continue; }
     c.globalAlpha = Math.max(0, fade);
     if (a.kind === 'leaf') { c.fillStyle = a.col; const w = 2 + Math.abs(Math.sin(a.ph * 3)) * 3; c.fillRect(Math.round(a.x - w / 2), Math.round(a.y), Math.round(w), 3); }
     else if (a.kind === 'fly') { c.fillStyle = a.col; const f = Math.abs(Math.sin(a.ph * 14)) * 3 + 1; c.fillRect(Math.round(a.x - f - 1), Math.round(a.y), Math.round(f), 3); c.fillRect(Math.round(a.x + 1), Math.round(a.y), Math.round(f), 3); }
@@ -1189,17 +1519,71 @@ function drawProjectiles(c) {
     if (p.kind === 'rock') {
       const pulse = 0.5 + Math.sin(time * 16) * 0.3;
       c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.ellipse(p.tx, p.ty, 22, 10, 0, 0, Math.PI * 2); c.stroke();
-      shadow(c, p.x, p.y + 30 * (1 - p.t / p.dur), 7, 3);
+      shadow(c, p.x, p.fall ? p.ty : p.y + 30 * (1 - Math.max(0, p.t) / p.dur), 7, 3);
       sprB(c, 'rock_g', p.x, p.y - p.z + 8, 1.25);
     } else if (p.kind === 'wisp') {
       c.fillStyle = 'rgba(180,160,255,.35)'; circle(c, p.x, p.y, 9); c.fillStyle = '#efeaff'; circle(c, p.x, p.y, 4);
+    } else if (p.kind === 'orb') {
+      const pu = 1 + Math.sin(time * 14) * 0.12;
+      c.fillStyle = p.returned ? 'rgba(255,224,138,.35)' : 'rgba(170,140,255,.35)'; circle(c, p.x, p.y, 17 * pu);
+      c.fillStyle = p.returned ? '#ffe08a' : '#b58cff'; circle(c, p.x, p.y, 10 * pu); c.fillStyle = '#ffffff'; circle(c, p.x - 3, p.y - 3, 3.5);
     } else {
       c.save(); c.translate(p.x, p.y); c.rotate(p.ang + Math.PI / 2); c.fillStyle = '#6c5ce7'; diamond(c, 0, 0, 4, 9); c.fillStyle = '#e6e0ff'; diamond(c, -1, -1, 1.5, 5); c.restore();
     }
   }
 }
-function drawBoss(c) {
-  const B = BOSS; if (S.bossDefeated && B.state !== 'dying') return;
+function drawBossAny(c, B) { if (B.type === 'slime') drawBoss(c, B); else if (B.type === 'golem') drawGolem(c, B); else drawWizard(c, B); }
+function drawGolem(c, B) {
+  let sx = 1, sy = 1, ox = 0, rot = 0;
+  if (B.state === 'sleep') { const br = Math.sin(B.anim * 1.2) * 0.03; sy = 1 - br; }
+  else if (B.state === 'stomp') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.06; sx = 1 + k * 0.04; }
+  else if (B.state === 'chargeWind' || B.state === 'boulders') ox = Math.sin(time * 60) * 2.5;
+  else if (B.state === 'charge') rot = Math.sign(B.vx || 1) * 0.15;
+  else if (B.state === 'dazed') { sx = 1.05; sy = 0.92; }
+  else if (B.state === 'dying') { ox = Math.sin(time * 70) * 4; const k = 1 - Math.max(0, B.st) / 1.8; sy = 1 - k * 0.6; sx = 1 + k * 0.2; }
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, B.x, B.y + 4, 40 * Math.max(0.5, 1 - B.z / 80), 13);
+  if (B.hurt > 0 || (B.state === 'dying' && Math.floor(time * 20) % 2)) c.globalAlpha = 0.55;
+  withBase(c, B.x + ox, B.y + 10 - B.z, sx, sy, rot, () => sprB(c, 'cyclops', 0, 0, 5));
+  c.globalAlpha = 1;
+  if (B.state === 'boulders') sprB(c, 'rock_g', B.x, B.y - 82, 2.25);
+  if (B.state === 'chargeWind') { c.fillStyle = '#ffe08a'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 22px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText('!', B.x, B.y - 92); c.fillText('!', B.x, B.y - 92); }
+  if (B.state === 'sleep') { const f = (B.anim % 2) / 2; c.globalAlpha = 1 - f; c.fillStyle = '#eef3e6'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('z', B.x + 36 + f * 14, B.y - 80 - f * 26); c.globalAlpha = 1; }
+  if (B.state === 'dazed') drawStars(c, B.x, B.y - 86, 26);
+}
+function drawWizard(c, B) {
+  const bob = B.z, glow = 0.25 + Math.sin(time * 4) * 0.1;
+  c.fillStyle = 'rgba(0,0,0,.28)'; ellipse(c, B.x, B.y + 4, 26 * Math.max(0.5, 1 - bob / 80), 9);
+  c.globalAlpha = B.alpha;
+  if (B.state !== 'dazed') { c.fillStyle = `rgba(181,140,255,${glow})`; circle(c, B.x, B.y - 34 - bob, 44); }
+  if (B.state === 'orb') { const k = 1 - B.st / 0.9; c.fillStyle = `rgba(200,180,255,${0.4 + k * 0.4})`; circle(c, B.x, B.y - 84 - bob, 6 + k * 10); }
+  if (B.hurt > 0 || (B.state === 'dying' && Math.floor(time * 20) % 2)) c.globalAlpha *= 0.55;
+  const tilt = B.state === 'dazed' ? 0.35 : 0, ox = B.state === 'dying' ? Math.sin(time * 70) * 4 : 0;
+  withBase(c, B.x + ox, B.y + 8 - bob, 1, 1, tilt, () => sprB(c, 'wizard', 0, 0, 4.5));
+  c.globalAlpha = 1;
+  if (B.shield > 0 || (B.state !== 'dazed' && B.state !== 'dying' && B.active && Math.sin(time * 3) > 0.9)) {
+    c.strokeStyle = `rgba(200,220,255,${B.shield > 0 ? 0.9 : 0.35})`; c.lineWidth = 3; c.beginPath(); c.ellipse(B.x, B.y - 36 - bob, 40, 48, 0, 0, Math.PI * 2); c.stroke();
+  }
+  if (B.state === 'sleep') { const f = (B.anim % 2) / 2; c.globalAlpha = 1 - f; c.fillStyle = '#eef3e6'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('z', B.x + 30 + f * 14, B.y - 80 - bob - f * 26); c.globalAlpha = 1; }
+  if (B.state === 'dazed') drawStars(c, B.x, B.y - 76, 22);
+}
+function drawChest(c, ch) {
+  const open = S.dg.chests[ch.id];
+  shadow(c, ch.x, ch.y + 3, 13, 4);
+  sprB(c, open ? 'chest_open' : 'chest', ch.x, ch.y + 6, 2);
+  if (!open && Math.sin(time * 3 + ch.x) > 0.85) { c.fillStyle = '#ffffff'; c.fillRect(ch.x + 8, ch.y - 26, 2, 6); c.fillRect(ch.x + 6, ch.y - 24, 6, 2); }
+}
+function drawMine(c) {
+  const x = MINE.x, y = MINE.y;
+  c.fillStyle = 'rgba(0,0,0,.25)'; ellipse(c, x, y - 2, 64, 14);
+  for (const [ox, oy, sc] of [[-44, -6, 3], [44, -6, 3], [-30, -34, 3.2], [30, -34, 3.2], [0, -50, 3.4], [-54, -26, 2.4], [54, -26, 2.4]]) sprB(c, 'rock_g', x + ox, y + oy, sc);
+  c.fillStyle = '#120d0b'; c.beginPath(); c.moveTo(x - 17, y - 2); c.lineTo(x - 17, y - 30); c.quadraticCurveTo(x, y - 46, x + 17, y - 30); c.lineTo(x + 17, y - 2); c.closePath(); c.fill();
+  c.fillStyle = '#6b4423'; c.fillRect(x - 21, y - 36, 5, 34); c.fillRect(x + 16, y - 36, 5, 34); c.fillRect(x - 23, y - 40, 46, 6);
+  c.fillStyle = '#3b2414'; c.fillRect(x - 23, y - 35, 46, 1);
+  if (!S.mineOpen) { sprB(c, 'rock_g', x - 8, y + 2, 1.6); sprB(c, 'rock_g', x + 9, y + 1, 1.4); sprB(c, 'rock_g', x, y - 10, 1.5); }
+  else { const g = 0.18 + Math.sin(time * 3) * 0.06; c.fillStyle = `rgba(255,170,80,${g})`; circle(c, x, y - 18, 10); }
+}
+
+function drawBoss(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'sleep') { const br = Math.sin(B.anim * 1.5) * 0.04; sx = 1 + br; sy = 1 - br; }
   else if (B.state === 'hop') { const k = Math.min(1, B.st / 0.72); if (k < 0.15 || k > 0.85) { sx = 1.15; sy = 0.85; } else { sx = 0.9; sy = 1.12; } }
@@ -1223,8 +1607,8 @@ function drawBoss(c) {
   if (B.state === 'sleep') { const f = (B.anim % 2) / 2; c.globalAlpha = 1 - f; c.fillStyle = '#eef3e6'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('z', B.x + 40 + f * 14, top - f * 26); c.globalAlpha = 1; }
   if (B.state === 'dazed') drawStars(c, B.x, top - 4, 30);
 }
-function drawRing(c) {
-  const R = BOSS.ring; if (!R) return;
+function drawRing(c, B) {
+  const R = B.ring; if (!R) return;
   const k = R.r / R.max;
   c.strokeStyle = `rgba(255,255,255,${0.9 - k * 0.6})`; c.lineWidth = 6; c.beginPath(); c.ellipse(R.x, R.y, R.r, R.r * 0.6, 0, 0, Math.PI * 2); c.stroke();
   c.strokeStyle = `rgba(165,147,255,${0.8 - k * 0.6})`; c.lineWidth = 12; c.beginPath(); c.ellipse(R.x, R.y, R.r - 8, (R.r - 8) * 0.6, 0, 0, Math.PI * 2); c.stroke();
@@ -1319,13 +1703,15 @@ function drawAnimal(c, a) {
 }
 function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#5ec6e8'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  ctx.fillStyle = inDungeon(P.x) ? '#0b0910' : '#5ec6e8'; ctx.fillRect(0, 0, cvs.width, cvs.height);
   const viewW = vw / Z, viewH = vh / Z;
   // during the boss fight, frame both the hero and the King
-  if (BOSS.active) { camFocus.x += (P.x * 0.6 + BOSS.x * 0.4 - camFocus.x) * 0.08; camFocus.y += (P.y * 0.6 + (BOSS.y - 40) * 0.4 - camFocus.y) * 0.08; }
+  const AB = activeBoss();
+  if (AB) { camFocus.x += (P.x * 0.6 + AB.x * 0.4 - camFocus.x) * 0.08; camFocus.y += (P.y * 0.6 + (AB.y - 40) * 0.4 - camFocus.y) * 0.08; }
   else { camFocus.x += (P.x - camFocus.x) * 0.2; camFocus.y += (P.y - camFocus.y) * 0.2; if (Math.hypot(P.x - camFocus.x, P.y - camFocus.y) > 300) { camFocus.x = P.x; camFocus.y = P.y; } }
-  let camX = W * T <= viewW ? (W * T - viewW) / 2 : Math.max(0, Math.min(W * T - viewW, camFocus.x - viewW / 2));
-  let camY = H * T <= viewH ? (H * T - viewH) / 2 : Math.max(0, Math.min(H * T - viewH, camFocus.y - 20 - viewH / 2));
+  const inD = inDungeon(P.x), bx0 = inD ? DX * T : 0, bw = (inD ? DW : OW) * T, bh = (inD ? 44 : H) * T;
+  let camX = bw <= viewW ? bx0 + (bw - viewW) / 2 : Math.max(bx0, Math.min(bx0 + bw - viewW, camFocus.x - viewW / 2));
+  let camY = bh <= viewH ? (bh - viewH) / 2 : Math.max(0, Math.min(bh - viewH, camFocus.y - 20 - viewH / 2));
   if (shake) { camX += (Math.random() - 0.5) * shake; camY += (Math.random() - 0.5) * shake; }
   const k = dpr * Z;
   ctx.setTransform(k, 0, 0, k, -Math.round(camX * k), -Math.round(camY * k));
@@ -1336,7 +1722,7 @@ function render() {
   // gentle water sparkle
   ctx.fillStyle = 'rgba(255,255,255,.55)';
   for (let ty = Math.floor(camY / T); ty < (camY + viewH) / T; ty++) for (let tx = Math.floor(camX / T); tx < (camX + viewW) / T; tx++) {
-    if (isLand(tileAt(tx, ty)) || hash(tx, ty) < 0.8) continue;
+    if (tileAt(tx, ty) !== DEEP || tx >= OW || hash(tx, ty) < 0.8) continue;
     const ph = (time * 0.8 + hash(ty, tx) * 6) % 3; if (ph > 1) continue;
     ctx.fillRect(tx * T + 6 + hash(tx + 1, ty) * 18, ty * T + 8 + hash(tx, ty + 1) * 14, 6 * (1 - Math.abs(ph - 0.5) * 2) + 2, 2);
   }
@@ -1355,14 +1741,17 @@ function render() {
   for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
   for (const a of animals) if (inView(a.x, a.y)) list.push([a.y, 6, a]);
   if (inView(HOUSE.x, HOUSE.y, 150)) list.push([HOUSE.y - 4, 4, null]);
-  if (!S.bossDefeated || BOSS.state === 'dying') { if (inView(BOSS.x, BOSS.y, 200)) list.push([BOSS.y, 7, BOSS]); }
-  drawRing(ctx);
+  for (const B of BOSSES) if ((!S.defeated[B.type] || B.state === 'dying') && inView(B.x, B.y, 220)) { list.push([B.y, 7, B]); drawRing(ctx, B); }
+  for (const ch of DUN.chests) if (inView(ch.x, ch.y)) list.push([ch.y, 8, ch]);
+  if (inView(MINE.x, MINE.y, 120)) list.push([MINE.y - 6, 9, null]);
   list.push([P.y, 3, P]);
   list.sort((a, b) => a[0] - b[0]);
   for (const [, kind, o] of list) {
     if (kind === 0) drawRes(ctx, o);
     else if (kind === 1) drawEnemy(ctx, o);
-    else if (kind === 7) drawBoss(ctx);
+    else if (kind === 7) drawBossAny(ctx, o);
+    else if (kind === 8) drawChest(ctx, o);
+    else if (kind === 9) drawMine(ctx);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) drawPlayer(ctx);
     else if (kind === 4) drawHouse(ctx);
@@ -1373,6 +1762,11 @@ function render() {
   ctx.globalAlpha = 1;
   drawProjectiles(ctx);
   drawAmbient(ctx);
+  if (inD) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const q of DUN.torches) { const tx = (DX + q.x) * T + 16, ty = q.y * T + 24; if (!inView(tx, ty, 120)) continue; const f = 0.13 + Math.sin(time * 9 + q.x) * 0.03 + Math.sin(time * 23 + q.y) * 0.02; const g = ctx.createRadialGradient(tx, ty, 4, tx, ty, 110); g.addColorStop(0, `rgba(255,170,80,${f * 2})`); g.addColorStop(1, 'rgba(255,170,80,0)'); ctx.fillStyle = g; ctx.fillRect(tx - 110, ty - 110, 220, 220); }
+    ctx.restore();
+  }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.font = '700 13px "Pixelify Sans", sans-serif';
   for (const f of floats) {
@@ -1386,14 +1780,29 @@ function render() {
     } else { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(f.text, f.x + 1, f.y + 1); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
   }
   ctx.globalAlpha = 1;
+  // darkness vignette in the mine, then the travel fade (screen space)
+  if (inD || fade > 0) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (inD) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
+    if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
+  }
   mctx.imageSmoothingEnabled = false;
-  mctx.drawImage(miniCache, 0, 0, mini.width, mini.height);
-  const mxs = mini.width / (W * T), mys = mini.height / (H * T);
+  const mOx = inD ? DX * T : 0, mW = (inD ? DW : OW) * T, mH = (inD ? 44 : H) * T;
+  mctx.fillStyle = '#0b0910'; mctx.fillRect(0, 0, mini.width, mini.height);
+  mctx.drawImage(miniCache, mOx / T * 2, 0, mW / T * 2, mH / T * 2, 0, 0, mini.width, mini.height);
+  const mxs = mini.width / mW, mys = mini.height / mH;
+  camX -= mOx;
   mctx.strokeStyle = 'rgba(255,255,255,.7)'; mctx.lineWidth = 1; mctx.strokeRect(camX * mxs, camY * mys, viewW * mxs, viewH * mys);
-  mctx.fillStyle = '#c2477a'; mctx.fillRect(NPCS[0].x * mxs - 2, NPCS[0].y * mys - 2, 4, 4);
-  mctx.fillStyle = '#f4b740'; mctx.fillRect(NPCS[2].x * mxs - 2, NPCS[2].y * mys - 2, 4, 4);
-  if (!S.bossDefeated) { mctx.fillStyle = Math.floor(time * 2) % 2 ? '#ec5257' : '#f4b740'; mctx.fillRect(ARENA.x * mxs - 3, ARENA.y * mys - 3, 6, 6); }
-  mctx.fillStyle = '#ffffff'; mctx.beginPath(); mctx.arc(P.x * mxs, P.y * mys, 2.5, 0, 7); mctx.fill();
+  if (!inD) {
+    mctx.fillStyle = '#c2477a'; mctx.fillRect(NPCS[0].x * mxs - 2, NPCS[0].y * mys - 2, 4, 4);
+    mctx.fillStyle = '#f4b740'; mctx.fillRect(NPCS[2].x * mxs - 2, NPCS[2].y * mys - 2, 4, 4);
+    mctx.fillStyle = '#8a5a32'; mctx.fillRect(MINE.x * mxs - 3, MINE.y * mys - 3, 6, 6);
+  } else {
+    for (const B of BOSSES) if (B.type !== 'slime' && !S.defeated[B.type]) { mctx.fillStyle = Math.floor(time * 2) % 2 ? '#ec5257' : '#f4b740'; mctx.fillRect((B.hx - mOx) * mxs - 3, B.hy * mys - 3, 6, 6); }
+    for (const ch of DUN.chests) if (!S.dg.chests[ch.id]) { mctx.fillStyle = '#ffe08a'; mctx.fillRect((ch.x - mOx) * mxs - 2, ch.y * mys - 2, 4, 4); }
+  }
+  if (!S.defeated.slime && !inD) { mctx.fillStyle = Math.floor(time * 2) % 2 ? '#ec5257' : '#f4b740'; mctx.fillRect(ARENA.x * mxs - 3, ARENA.y * mys - 3, 6, 6); }
+  mctx.fillStyle = '#ffffff'; mctx.beginPath(); mctx.arc((P.x - mOx) * mxs, P.y * mys, 2.5, 0, 7); mctx.fill();
 }
 
 // ---------- save / load ----------
@@ -1402,7 +1811,10 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize(
 function applySave(d) {
   if (!d || typeof d !== 'object') return;
   const base = freshState();
-  S = { ...base, ...d, inv: { ...base.inv, ...(d.inv || {}) }, tools: { ...base.tools, ...(d.tools || {}) }, met: { ...(d.met || {}) } };
+  const dg = d.dg || {};
+  S = { ...base, ...d, inv: { ...base.inv, ...(d.inv || {}) }, tools: { ...base.tools, ...(d.tools || {}) }, met: { ...(d.met || {}) },
+    defeated: { ...(d.defeated || {}), ...(d.bossDefeated ? { slime: true } : {}) }, dg: { ...base.dg, ...dg, open: { ...(dg.open || {}) }, chests: { ...(dg.chests || {}) } } };
+  delete S['bossDefeated'];
   if (S.hp <= 0) S.hp = S.maxHp;
 }
 
@@ -1416,6 +1828,8 @@ async function start(hot) {
   if (!data) { try { data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (_) { data = null; } }
   applySave(data);
   if (S.bridge) for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
+  for (const d of DUN.doors) if (S.dg.open[d.id]) { for (const [x, y] of d.cells) dset(x, y, FLOOR); if (d.kind === 'gate') for (const e of enemies) if (e.dreg === d.reg) { e.alive = false; e.dieT = 0; } }
+  for (const B of BOSSES) if (S.defeated[B.type]) B.state = 'dead';
   P.x = S.px; P.y = S.py;
   camFocus.x = P.x; camFocus.y = P.y;
   if (!walkable(P.x, P.y)) { P.x = cx * T; P.y = (cy + 2) * T; }
