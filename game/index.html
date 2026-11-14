@@ -67,7 +67,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
   background:radial-gradient(120% 90% at 50% 20%,rgba(44,26,85,.35),var(--scrim));
   padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.panel{width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.panel{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
 .logo{font-family:var(--display);font-size:clamp(46px,12vw,108px);line-height:.88;margin:0;color:var(--ink);text-wrap:balance;
   text-shadow:0 6px 0 var(--coral),0 12px 0 var(--plum)}
 .logo span{color:var(--sun)}
@@ -118,7 +118,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 #windInd.warn .arrow{animation:blink .35s infinite alternate}
 @keyframes blink{to{opacity:.3}}
 /* Character select */
-.chars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%}
+.chars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:100%}
 .char{font-family:var(--body);color:var(--ink);background:var(--glass);border:3px solid transparent;border-radius:18px;padding:12px 14px 16px;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;transition:transform .1s,border-color .1s}
 .char:hover{transform:translateY(-3px)}
@@ -133,9 +133,15 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .seg button{font-family:var(--display);font-size:14px;border:0;border-radius:9px;padding:9px 14px;background:transparent;color:var(--muted);cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--sun);color:var(--night)}
 .seg button:focus-visible,.char:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
+#shop{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+.shopRow{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.buy{font-family:var(--body);font-weight:700;font-size:14px;color:var(--ink);background:var(--glass);border:2px solid var(--sun);border-radius:12px;padding:9px 14px;cursor:pointer}
+.buy:disabled{opacity:.4;cursor:default;border-color:var(--muted)}
+.buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+.buy b{color:var(--sun)}
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 @media (max-width:560px){ .pct{font-size:30px} .card{min-width:96px;padding:6px 10px 8px} #wave{font-size:12px}
-  .chars{grid-template-columns:repeat(2,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
+  .chars{grid-template-columns:repeat(3,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
 @media (prefers-reduced-motion:reduce){ #banner.show{animation-duration:1.4s} .card.hit .pct{animation:none} }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
@@ -195,7 +201,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
       <b>JUMP / DASH</b><span>Double jump and a dodge dash (Tank-o: hold DASH to shield)</span>
     </div>
     <p class="rule">The <strong>%</strong> under each fighter is damage. Higher damage means hits send you flying farther. Fall off the island and you lose a life.</p>
-    <p class="rule">Items drop during fights. Walk over one to grab it: <strong>Hammer</strong>, <strong>Bomb</strong>, <strong>Boomerang</strong>, <strong>Banana</strong> and <strong>Ray Gun</strong> (attack to use them), <strong>Star</strong>, <strong>Jetpack</strong>, <strong>Heart</strong> and the <strong>Mystery Box</strong> (anything could be inside).</p>
+    <p class="rule">Items drop during fights. Walk over one to grab it: <strong>Hammer</strong>, <strong>Bomb</strong>, <strong>Boomerang</strong>, <strong>Banana</strong> and <strong>Ray Gun</strong> (attack to use them), <strong>Freeze Ray</strong>, <strong>Star</strong>, <strong>Jetpack</strong>, <strong>Giant Mushroom</strong>, <strong>Heart</strong> and the <strong>Mystery Box</strong> (anything could be inside).</p>
     <p class="rule" id="best"></p>
   </div>
 </section>
@@ -211,6 +217,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arLava" data-a="lava">LAVA FORGE</button>
         <button id="arWind" data-a="wind">WINDY PEAKS</button>
         <button id="arGear" data-a="gear">CLOCKWORK</button>
+        <button id="arIce" data-a="ice">FROZEN LAKE</button>
       </div>
     </div>
     <div class="row">
@@ -225,6 +232,10 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
     <h2 id="upTitle">WAVE 1 CLEARED</h2>
     <p class="tag">Pick one power-up. It lasts for the rest of the run.</p>
     <div class="ups" id="ups"></div>
+    <div id="shop" hidden>
+      <span class="lbl">Shop · you have <b id="goldAmt">0</b> gold</span>
+      <div class="shopRow" id="shopRow"></div>
+    </div>
   </div>
 </section>
 
@@ -607,6 +618,73 @@ function makeGear(r, h, teeth, mat) {
   }
 })();
 
+/* ---------- Frozen Lake: slippery ice that cracks open under big hits ---------- */
+const ICE_PLATFORMS = [
+  { x: 0, z: 0, y: 0, r: 12.5, solid: true, depth: 3, main: true, ice: true },
+  { x: -6.5, z: -2.5, y: 2.8, r: 2.4, ice: true },
+  { x: 6.5, z: -2.5, y: 2.8, r: 2.4, ice: true },
+  { x: 0, z: -9, y: 4.8, r: 2.2 },
+];
+const iceGroup = new THREE.Group(); iceGroup.visible = false; scene.add(iceGroup);
+const iceHoles = [];
+const iceMat = new THREE.MeshStandardMaterial({ color: 0xd4f1ff, roughness: .1, metalness: .08 });
+const snowMat2 = new THREE.MeshStandardMaterial({ color: 0xf4f8ff, roughness: .9, flatShading: true });
+const holeWaterMat = new THREE.MeshStandardMaterial({ color: 0x0b2a44, roughness: .15, metalness: .2 });
+const auroraMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+  uniforms: { t: { value: 0 }, c1: { value: new THREE.Color(0x2affb0) }, c2: { value: new THREE.Color(0x8a5cff) } },
+  vertexShader: `uniform float t; varying vec2 vUv; void main(){ vUv = uv; vec3 p = position; p.z += sin(p.x * .05 + t * .4) * 8.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+  fragmentShader: `uniform vec3 c1, c2; uniform float t; varying vec2 vUv;
+    void main(){ float a = smoothstep(0., .35, vUv.y) * (1. - vUv.y) * (.55 + .45 * sin(vUv.x * 22. + t)); vec3 col = mix(c1, c2, vUv.y);
+      gl_FragColor = vec4(col * a * .5, 1.0);
+      #include <colorspace_fragment>
+    }`,
+});
+(function buildIce() {
+  const lake = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 12.2, .8, 72), iceMat); lake.position.y = -.4; lake.receiveShadow = true; iceGroup.add(lake);
+  const crackM = new THREE.MeshBasicMaterial({ color: 0x8fc4e0 });
+  for (let i = 0; i < 22; i++) {
+    const a = rand(0, Math.PI * 2), r = rand(1, 10.5), len = rand(1, 3.5), c = new THREE.Mesh(new THREE.BoxGeometry(.05, .02, len), crackM);
+    c.position.set(Math.cos(a) * r, .012, Math.sin(a) * r); c.rotation.y = rand(0, Math.PI); iceGroup.add(c);
+  }
+  const bank = new THREE.Mesh(roughen(new THREE.TorusGeometry(12.6, .45, 6, 48), .3), snowMat2); bank.rotation.x = Math.PI / 2; bank.position.y = -.1; iceGroup.add(bank);
+  const berg = new THREE.Mesh(roughen(new THREE.ConeGeometry(12.2, 18, 11, 5), 2, 9), new THREE.MeshStandardMaterial({ color: 0x9fd8f0, roughness: .4, flatShading: true }));
+  berg.rotation.x = Math.PI; berg.position.y = -.8 - 9; iceGroup.add(berg);
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), new THREE.MeshStandardMaterial({ color: 0x0d2a44, roughness: .25, metalness: .3 }));
+  sea.rotation.x = -Math.PI / 2; sea.position.y = -26; iceGroup.add(sea);
+  for (const p of ICE_PLATFORMS.slice(1)) {
+    const pg = new THREE.Group(); pg.position.set(p.x, p.y, p.z);
+    const m1 = (p.ice ? iceMat : snowMat2).clone(), m2 = new THREE.MeshStandardMaterial({ color: 0xa8dcf2, roughness: .3, flatShading: true });
+    m1.transparent = m2.transparent = true;
+    OCCLUDERS.push({ group: iceGroup, x: p.x, z: p.z, r: p.r, top: p.y, mats: [m1, m2] });
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * .9, .5, 12), m1); top.position.y = -.25; top.castShadow = top.receiveShadow = true; pg.add(top);
+    const col = new THREE.Mesh(roughen(new THREE.CylinderGeometry(p.r * .5, p.r * .8, 3.5, 7, 2), .35), m2);
+    col.position.y = -2.25; pg.add(col);
+    iceGroup.add(pg);
+  }
+  // icebergs and pines in the distance
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * Math.PI * 2 + rand(-.2, .2), r = rand(60, 150), h = rand(8, 30);
+    const b = new THREE.Mesh(roughen(new THREE.ConeGeometry(h * .7, h, 6, 2), h * .12), snowMat2); b.position.set(Math.cos(a) * r, -26 + h / 2, Math.sin(a) * r); iceGroup.add(b);
+  }
+  for (let i = 0; i < 3; i++) {
+    const ar = new THREE.Mesh(new THREE.PlaneGeometry(320, 50, 40, 1), auroraMat); ar.position.set(rand(-60, 60), 75 + i * 14, -170 - i * 30); ar.rotation.y = rand(-.4, .4); iceGroup.add(ar);
+  }
+})();
+function crackIce(x, z) {
+  if (arena.key !== 'ice' || Math.hypot(x, z) > 11 || iceHoles.length >= 4 || iceHoles.some(h => Math.hypot(h.x - x, h.z - z) < 3)) return;
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(1.8, 22), holeWaterMat.clone()); water.rotation.x = -Math.PI / 2; water.position.y = .02; g.add(water);
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2, c = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(.18, .32), 0), iceMat); c.position.set(Math.cos(a) * 1.85, .05, Math.sin(a) * 1.85); g.add(c);
+  }
+  iceGroup.add(g); iceHoles.push({ x, z, r: 1.8, life: 7, mesh: g });
+  emit(x, .3, z, 30, { color: [0xffffff, 0xbfe8ff], speed: 7, up: 3, life: .5, grav: 12, size: .14 });
+  game.shake = Math.max(game.shake, .35); sfx('crack');
+}
+function holeAt(x, z) { for (const h of iceHoles) if (Math.hypot(x - h.x, z - h.z) < h.r - .15) return h; return null; }
+function clearHoles() { while (iceHoles.length) iceGroup.remove(iceHoles.pop().mesh); }
+
 // Lava cycle (seconds): calm 10, warning 2, sink 1.5, sunk 4, rise 1.5
 const LAVA_CYCLE = 19;
 const ARENAS = {
@@ -672,6 +750,25 @@ const ARENAS = {
       for (const f of flags) {
         f.rotation.y = lerpAngle(f.rotation.y, yaw, 1 - Math.exp(-4 * dt));
         f.children[0].rotation.y = Math.sin(game.simTime * (6 + this.wind * 14) + f.position.x) * (.15 + this.wind * .25);
+      }
+    },
+    danger() { return false; },
+  },
+  ice: {
+    key: 'ice', name: 'FROZEN LAKE', group: iceGroup, platforms: ICE_PLATFORMS, R: 12.5, waterY: -1, holes: iceHoles, holeAt, crack: crackIce,
+    colors: { top: 0x081430, mid: 0x3f8fc8, bot: 0x14244a, fog: 0x2a4a6a, near: 60, far: 220, hemiS: 0xcfe8ff, hemiG: 0x2a3a6a, hemiI: 1.3, sun: 0xd8ecff, sunI: 2.2, rim: 0x2affb0, rimI: .7 },
+    reset() { clearHoles(); },
+    update(dt, active) {
+      auroraMat.uniforms.t.value += dt;
+      if (Math.random() < .6) emit(rand(-16, 16), 12, rand(-16, 16), 1, { color: 0xffffff, speed: .3, life: 4, grav: 1.2, size: .06, drag: .2 });
+      for (let i = iceHoles.length - 1; i >= 0; i--) {
+        const h = iceHoles[i]; h.life -= dt;
+        if (h.life < 1.2) { const k = Math.max(0, h.life / 1.2); h.mesh.children[0].material.color.lerpColors(new THREE.Color(0xd4f1ff), new THREE.Color(0x0b2a44), k); }
+        if (h.life <= 0) {
+          for (const f of FIGHTERS) if (f.alive && f.pos.y < 0 && f.pos.y > -3 && Math.hypot(f.pos.x - h.x, f.pos.z - h.z) < h.r) { f.pos.y = .05; f.vel.y = 8; }
+          emit(h.x, .2, h.z, 16, { color: 0xffffff, speed: 3, life: .4, grav: 0 });
+          iceGroup.remove(h.mesh); iceHoles.splice(i, 1);
+        }
       }
     },
     danger() { return false; },
@@ -885,6 +982,15 @@ function sfx(name, k = 1) {
       case 'shock': tone(80, 30, .35, 'sine', .5); noise(.3, .3, 600); break;
       case 'echo': noise(.14, .08, 2600, 'bandpass'); tone(700, 350, .14, 'sine', .05); break;
       case 'clang': tone(900, 860, .25, 'triangle', .12); tone(1340, 1300, .2, 'sine', .08); break;
+      case 'crack': noise(.35, .4, 3500, 'highpass'); tone(160, 60, .3, 'sawtooth', .12); break;
+      case 'splash': noise(.6, .4, 900); tone(300, 90, .4, 'sine', .15); break;
+      case 'freeze': tone(500, 1600, .35, 'sine', .12); noise(.3, .15, 6000, 'highpass'); break;
+      case 'shatter': noise(.4, .4, 5000, 'highpass'); [1800, 1400, 2200].forEach((f, i) => tone(f, f * .8, .08, 'square', .05, i * .04)); break;
+      case 'grow': tone(150, 600, .7, 'triangle', .14); break;
+      case 'shrink': tone(600, 150, .6, 'triangle', .12); break;
+      case 'coin': tone(988, 988, .06, 'square', .06); tone(1318, 1318, .14, 'square', .06, .06); break;
+      case 'teleport': tone(1200, 300, .15, 'sine', .1); noise(.15, .15, 3000, 'bandpass'); break;
+      case 'poof': noise(.35, .25, 1200); break;
     }
   } catch (e) {}
 }
@@ -899,12 +1005,14 @@ const ROSTER = {
   pyra: { name: 'PYRA', style: 'mage', kit: 'pyra', color: 0xff8a3d, accent: 0x5a2a8a, fx: 0xff7a2a, scale: .95, speed: 8.2, power: .95, weight: .88, fist: .16 },
   tanko: { name: 'TANK-O', style: 'robot', kit: 'tank', color: 0x8ea4bf, accent: 0xff6b3d, scale: .95, speed: 7, power: 1.1, weight: 1.3, fist: .25 },
   whisk: { name: 'WHISK', style: 'chef', kit: 'chef', color: 0x5b8def, accent: 0xff5a6e, scale: 1, speed: 8.2, power: 1, weight: 1, fist: .18 },
+  shade: { name: 'SHADE', style: 'ninja', kit: 'ninja', color: 0x35304d, accent: 0xc03fff, scale: .95, speed: 9.5, power: .9, weight: .85, fist: .16 },
 };
 const PLAYABLE = {
   nova: { role: 'Sword fighter. Fast 3-hit combo and a strong charged smash.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 2 } },
   pyra: { role: 'Fire mage. Throws fireballs from range. Up close, her charged fire burst blasts enemies away.', pips: { Speed: 3, Power: 3, Weight: 2, Range: 5 } },
   tanko: { role: 'Little robot. Hold DASH on the ground to raise a shield. Charge SMASH for a rocket punch.', pips: { Speed: 2, Power: 4, Weight: 5, Range: 3 } },
   whisk: { role: 'Chef. Fast frying-pan combo. SMASH throws the pan, and it boomerangs back to him.', pips: { Speed: 4, Power: 3, Weight: 3, Range: 4 } },
+  shade: { role: 'Ninja. DASH teleports, right behind the enemy if they are close. SMASH leaves a decoy that fools them.', pips: { Speed: 5, Power: 2, Weight: 2, Range: 3 } },
 };
 
 // Shared meshes for held items and pickups
@@ -965,11 +1073,20 @@ function makePan() {
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return g;
 }
-function makeRaygun() {
+const iceTip = new THREE.MeshStandardMaterial({ color: 0xbfeaff, emissive: 0x3fb8ff, emissiveIntensity: 1.4 });
+function makeMushroom() {
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, .4, 12), new THREE.MeshStandardMaterial({ color: 0xfff1d8 })); stem.position.y = -.15; g.add(stem);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(.42, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xff3d4e, roughness: .5 })); cap.position.y = .02; g.add(cap);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, d = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffffff })); d.position.set(Math.cos(a) * .28, .3, Math.sin(a) * .28); g.add(d); }
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function makeRaygun(tipMat = glowGreen) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.SphereGeometry(.2, 14, 10), gunMat); body.scale.set(1, 1, 1.5); g.add(body);
   const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.06, .09, .45, 10), gunMat); barrel.rotation.x = Math.PI / 2; barrel.position.z = .38; g.add(barrel);
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), glowGreen); tip.position.z = .62; g.add(tip);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), tipMat); tip.position.z = .62; g.add(tip);
   const grip = new THREE.Mesh(new THREE.BoxGeometry(.1, .28, .12), panMat); grip.position.set(0, -.2, -.05); g.add(grip);
   return g;
 }
@@ -1045,6 +1162,13 @@ function buildModel(d) {
     weapon = new THREE.Group(); armR.add(weapon);
     add(new THREE.CylinderGeometry(.05, .05, 1.4, 8), woodMat, 0, -.75, 0, weapon);
     add(new THREE.SphereGeometry(.17, 14, 10), new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0xff6a1a, emissiveIntensity: 1.4 }), 0, -1.5, 0, weapon);
+  } else if (d.style === 'ninja') {
+    add(new THREE.BoxGeometry(.8, .3, .2), dark, 0, 1.88, .3);
+    const band = add(new THREE.TorusGeometry(.43, .06, 6, 20), acc, 0, 2.22, 0); band.rotation.x = Math.PI / 2;
+    for (const sx of [-1, 1]) add(new THREE.BoxGeometry(.08, .45, .05), acc, sx * .1, 2.05, -.46).rotation.z = sx * .35;
+    weapon = new THREE.Group(); armR.add(weapon);
+    add(new THREE.BoxGeometry(.05, .55, .12), new THREE.MeshStandardMaterial({ color: 0xdfe6f0, metalness: .7, roughness: .2 }), 0, -1.05, 0, weapon);
+    add(new THREE.CylinderGeometry(.04, .04, .2, 6), dark, 0, -.72, 0, weapon);
   } else if (d.style === 'chef') {
     add(new THREE.CylinderGeometry(.34, .31, .45, 16), white, 0, 2.56, 0);
     add(new THREE.SphereGeometry(.44, 16, 12), white, 0, 2.88, 0).scale.y = .65;
@@ -1079,11 +1203,14 @@ function buildModel(d) {
   const boomer = makeBoomerang(); boomer.position.set(0, -.75, .12); boomer.rotation.x = Math.PI / 2; boomer.visible = false; armR.add(boomer);
   const banana = makeBananaHeld(); banana.position.set(0, -.75, .1); banana.visible = false; armL.add(banana);
   const raygun = makeRaygun(); raygun.position.set(0, -.75, .15); raygun.rotation.x = -Math.PI / 2; raygun.visible = false; armR.add(raygun);
+  const freezer = makeRaygun(iceTip); freezer.position.set(0, -.75, .15); freezer.rotation.x = -Math.PI / 2; freezer.visible = false; armR.add(freezer);
+  const ice = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), new THREE.MeshStandardMaterial({ color: 0xbfeaff, transparent: true, opacity: .55, roughness: .05, metalness: .1, depthWrite: false }));
+  ice.position.y = 1.2; ice.visible = false; root.add(ice);
   const jetpack = makeJetpack(); jetpack.position.set(0, 1.35, -.5); jetpack.visible = false; inner.add(jetpack);
   const shield = new THREE.Mesh(new THREE.SphereGeometry(1.25, 28, 18), new THREE.MeshBasicMaterial({
     color: 0x8be0ff, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   shield.visible = false; rig.add(shield);
-  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield, raygun, jetpack };
+  return { root, rig, inner, head, armL, armR, legL, legR, mats, weapon, hammer, bomb, boomer, banana, shield, raygun, jetpack, freezer, ice };
 }
 
 const ATTACKS = {
@@ -1110,7 +1237,11 @@ ATTACKS.zap = { startup: .05, active: 0, recovery: .14, proj: 'laser' };
 const PAN_HIT = { dmg: 7, kb: 6.5, growth: .07, lift: .35 };
 const LASER = { dmg: 3, kb: 3.5, growth: .035, lift: .2 };
 const SHOCK = { dmg: 5, kb: 7.5, growth: .06, lift: .55 };
-const NO_ECHO = ['bomb', 'banana', 'boomerang', 'pan'];
+const NO_ECHO = ['bomb', 'banana', 'boomerang', 'pan', 'ice'];
+ATTACKS.freezeShot = { startup: .06, active: 0, recovery: .2, proj: 'ice' };
+ATTACKS.decoyMove = { startup: .05, active: 0, recovery: .12, special: 'decoy' };
+const ICE_HIT = { dmg: 2, kb: 2, growth: .02, lift: .2 };
+const DRONE_SHOT = { dmg: 2, kb: 2.5, growth: .02, lift: .2 };
 const BOOM_HIT = { dmg: 6, kb: 5.5, growth: .06, lift: .35 };
 const FIREBALL = { dmg: 4, kb: 4.5, growth: .045, lift: .3 };
 const BLAST = { dmg: 15, kb: 11, growth: .14, lift: .6 };
@@ -1118,9 +1249,9 @@ const HAMMER_TIME = 8, BOMB_FUSE = 5;
 const GRAV = 32;
 
 const game = { state: 'title', wave: 1, timer: 0, hitstop: 0, shake: 0, timeScale: 1, simTime: 0, perks: [] };
-game.charKey = ['nova', 'pyra', 'tanko', 'whisk'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
-game.startArena = ['sky', 'lava', 'wind', 'gear'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
-game.itemT = 6;
+game.charKey = ['nova', 'pyra', 'tanko', 'whisk', 'shade'].includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
+game.startArena = ['sky', 'lava', 'wind', 'gear', 'ice'].includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
+game.itemT = 6; game.gold = 0; game.startPerk = {};
 
 class Fighter {
   constructor(isPlayer) { this.isPlayer = isPlayer; this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.home = new THREE.Vector3(); }
@@ -1130,7 +1261,7 @@ class Fighter {
     this.def = def; this.name = def.name; this.size = def.scale;
     this.model = buildModel(def); scene.add(this.model.root);
     this.stats = { speed: def.speed * (scale.speed ?? 1), jump: 13, power: def.power * (scale.power ?? 1), weight: def.weight * (scale.weight ?? 1),
-      jumps: 2, dashCd: .55, airRadius: 1, chargeRate: 1, lifesteal: 0, secondWind: false, glass: false, dmgTaken: 1, thorns: 0, fireTrail: false, chain: false, magnet: false, shock: false, echo: false };
+      jumps: 2, dashCd: .55, airRadius: 1, chargeRate: 1, lifesteal: 0, secondWind: false, glass: false, dmgTaken: 1, thorns: 0, fireTrail: false, chain: false, magnet: false, shock: false, echo: false, goldRush: false, drones: 0 };
   }
   pickAttack(kind) {
     if (this.held === 'hammer') return 'hammer';
@@ -1138,11 +1269,54 @@ class Fighter {
     if (this.held === 'boomerang' && !this.boomOut) return 'toss';
     if (this.held === 'banana') return 'drop';
     if (this.held === 'raygun') return 'zap';
+    if (this.held === 'freezeray') return 'freezeShot';
+    if (this.def.kit === 'ninja' && kind === 'heavy') return decoy && decoy.owner === this ? 'smash' : 'decoyMove';
     if (this.def.kit === 'chef' && kind === 'heavy') return this.panOut ? 'smash' : 'panToss';
     if (this.def.kit === 'tank' && kind === 'heavy') return 'rocket';
     if (this.def.kit === 'pyra') return kind === 'light' ? (this.onGround ? 'fire' : 'fireAir') : 'burst';
     if (kind === 'heavy') return 'smash';
     return this.onGround ? null : 'air'; // null = ground combo
+  }
+  onIce() { return this.onGround && this.groundP && this.groundP.ice; }
+  grow() {
+    if (!this.isBig) { const s = this.stats; s.power *= 1.3; s.weight *= 1.6; s.speed *= .8; this.isBig = true; this.size = this.def.scale * 1.5; }
+    this.bigT = 10; sfx('grow');
+  }
+  endBig() {
+    if (!this.isBig) return;
+    const s = this.stats; s.power /= 1.3; s.weight /= 1.6; s.speed /= .8;
+    this.isBig = false; this.bigT = 0; this.size = this.def.scale; sfx('shrink');
+  }
+  freeze(dur) {
+    Object.assign(this, { state: 'frozen', stateTime: 0, freezeDur: dur, atk: null, atkName: '', charging: false, charge: 0, tumbleSpd: 0 });
+    this.vel.x *= .2; this.vel.z *= .2; this.model.rig.rotation.x = 0; sfx('freeze');
+  }
+  shatter() {
+    emit(this.pos.x, this.pos.y + 1.2 * this.size, this.pos.z, 26, { color: [0xbfeaff, 0xffffff], speed: 7, life: .5, grav: 10, size: .16 }); sfx('shatter');
+  }
+  splash() {
+    const prot = this.blink > 0 || this.starT > 0, dmg = prot ? 0 : 5 * this.stats.dmgTaken; this.damage += dmg;
+    const r = Math.hypot(this.pos.x, this.pos.z) || 1;
+    this.vel.set(-this.pos.x / r * 4, 16, -this.pos.z / r * 4);
+    Object.assign(this, { state: 'hitstun', stateTime: 0, stunDur: .35, onGround: false, flash: .8, burnCd: .5, tumbleSpd: 0, atk: null, atkName: '', charging: false, charge: 0 });
+    emit(this.pos.x, this.pos.y + .3, this.pos.z, 30, { color: [0x3fb8ff, 0xffffff, 0x0b2a44], speed: 7, up: 6, life: .6, grav: 14, size: .16 });
+    if (dmg) popup(Math.round(dmg) + '%', new THREE.Vector3(this.pos.x, this.pos.y + 1.5, this.pos.z), '#8be0ff', 22);
+    game.shake = Math.max(game.shake, .3); sfx('splash');
+  }
+  teleport(dx, dz, opp) {
+    const from = this.pos.clone();
+    let tx = this.pos.x + dx * 4.5, tz = this.pos.z + dz * 4.5, face = Math.atan2(dx, dz);
+    if (opp && opp.alive) {
+      const ox = opp.pos.x - this.pos.x, oz = opp.pos.z - this.pos.z, od = Math.hypot(ox, oz) || 1;
+      if (od < 6 && (ox * dx + oz * dz) / od > .5 && Math.abs(opp.pos.y - this.pos.y) < 2.5) {
+        tx = opp.pos.x + ox / od * 1.4; tz = opp.pos.z + oz / od * 1.4; face = Math.atan2(-ox, -oz); this.pos.y = Math.max(this.pos.y, opp.pos.y);
+      }
+    }
+    const puff = (x, y, z) => emit(x, y + 1, z, 22, { color: [0x35304d, 0xc03fff, 0x888899], speed: 4, life: .5, grav: -1, size: .3, drag: 3 });
+    puff(from.x, from.y, from.z);
+    this.pos.x = tx; this.pos.z = tz; this.facing = face; this.vel.x = 0; this.vel.z = 0;
+    if (!this.onGround) this.vel.y = Math.max(this.vel.y, 4);
+    puff(this.pos.x, this.pos.y, this.pos.z); sfx('teleport');
   }
   trip() {
     const dmg = 4 * this.stats.dmgTaken; this.damage += dmg;
@@ -1161,12 +1335,13 @@ class Fighter {
     game.shake = Math.max(game.shake, .3); sfx('burn');
   }
   spawn(fromSky) {
+    if (this.isBig) this.endBig();
     this.pos.set(this.home.x, fromSky ? 7 : 0, this.home.z); this.vel.set(0, 0, 0);
     Object.assign(this, { damage: 0, state: 'normal', stateTime: 0, invuln: fromSky ? 2 : 0, blink: fromSky ? 2 : 0,
       onGround: !fromSky, jumpsLeft: this.stats.jumps, airDash: true, dashCdT: 0, combo: 0, lastJabEnd: -9, buffer: false,
       atk: null, atkName: '', charging: false, charge: 0, flash: 0, squash: 0, tumbleSpd: 0, animT: 0, hitDone: false, lunged: false,
       held: null, heldT: 0, burnCd: 0, groundP: null, starT: 0, starHitCd: 0, boomOut: false, heldUses: 0, fireCd: 0, trailT: 0,
-      shieldHP: 100, hitCount: 0, jetT: 0, panOut: false, landVy: 0 });
+      shieldHP: 100, hitCount: 0, jetT: 0, panOut: false, landVy: 0, freezeDur: 0 });
     this.model.root.visible = true;
     if (fromSky) { emit(this.pos.x, this.pos.y + 1, this.pos.z, 24, { color: [0xffffff, this.def.color], speed: 7, life: .6, grav: 0 }); }
   }
@@ -1183,9 +1358,15 @@ class Fighter {
     if (a.proj === 'fireball') sfx('fire');
     else if (!a.charge) sfx('swing', name === 'jab3' || name === 'air' || name === 'hammer' ? 1.3 : 1);
   }
-  startDash(I, ml) {
+  startDash(I, ml, opp) {
     let dx = Math.sin(this.facing), dz = Math.cos(this.facing);
     if (ml > .1) { dx = I.mx / ml; dz = I.mz / ml; }
+    if (this.def.kit === 'ninja') {
+      this.teleport(dx, dz, opp);
+      this.state = 'dash'; this.stateTime = .08; this.invuln = Math.max(this.invuln, .25); this.dashCdT = this.stats.dashCd;
+      if (!this.onGround) this.airDash = false;
+      return;
+    }
     this.state = 'dash'; this.stateTime = 0; this.facing = Math.atan2(dx, dz);
     this.vel.x = dx * 21; this.vel.z = dz * 21; this.vel.y = this.onGround ? 0 : Math.max(this.vel.y, 5);
     this.invuln = Math.max(this.invuln, .22); this.dashCdT = this.stats.dashCd;
@@ -1217,6 +1398,7 @@ class Fighter {
     }
 
     this.fireCd -= dt; if (this.jetT > 0) this.jetT -= dt;
+    if (this.isBig && (this.bigT -= dt) <= 0) this.endBig();
     if (this.state !== 'shield') this.shieldHP = Math.min(100, this.shieldHP + 15 * dt);
     if (this.starT > 0) {
       this.starT -= dt; this.starHitCd -= dt; this.invuln = Math.max(this.invuln, .05);
@@ -1228,7 +1410,9 @@ class Fighter {
       }
     }
 
-    if (this.state === 'shield') {
+    if (this.state === 'frozen') {
+      if (this.stateTime >= this.freezeDur) { this.state = 'normal'; this.shatter(); }
+    } else if (this.state === 'shield') {
       this.shieldHP -= 10 * dt;
       if (!I.dashDown || !this.onGround || this.shieldHP <= 0 || I.jump) this.state = 'normal';
     } else if (this.state === 'hitstun') {
@@ -1242,7 +1426,7 @@ class Fighter {
 
     if (this.state === 'normal') {
       const spd = this.stats.speed * (this.starT > 0 ? 1.3 : 1), tx = I.mx * spd, tz = I.mz * spd;
-      const acc = (this.onGround ? 70 : 24) * dt, ddx = tx - this.vel.x, ddz = tz - this.vel.z, dl = Math.hypot(ddx, ddz);
+      const acc = (this.onGround ? (this.onIce() ? 11 : 70) : 24) * dt, ddx = tx - this.vel.x, ddz = tz - this.vel.z, dl = Math.hypot(ddx, ddz);
       if (dl > acc) { this.vel.x += ddx / dl * acc; this.vel.z += ddz / dl * acc; } else { this.vel.x = tx; this.vel.z = tz; }
       if (ml > .1) this.facing = lerpAngle(this.facing, Math.atan2(I.mx, I.mz), 1 - Math.exp(-14 * dt));
       if (I.jump && (this.jumpsLeft > 0 || (this.jetT > 0 && !this.onGround)) && this.held !== 'hammer') {
@@ -1256,7 +1440,7 @@ class Fighter {
       } else if (I.dash && this.def.kit === 'tank' && this.onGround && this.shieldHP > 15) {
         this.state = 'shield'; this.stateTime = 0; sfx('shield');
       } else if (I.dash && this.dashCdT <= 0 && (this.onGround || this.airDash)) {
-        this.startDash(I, ml);
+        this.startDash(I, ml, opp);
       } else if (I.light || I.heavyPressed) {
         const name = this.pickAttack(I.light ? 'light' : 'heavy');
         if (name) this.startAttack(name, opp);
@@ -1277,6 +1461,8 @@ class Fighter {
     if (this.state === 'hitstun') k = this.onGround ? 5 : .8;
     else if (this.state === 'attack') k = this.atk && this.atk.rocket && !this.charging ? 2 : this.onGround ? 9 : 1.2;
     else if (this.state === 'shield') k = 12;
+    else if (this.state === 'frozen') k = 4;
+    if (k && this.onIce()) k *= .25;
     if (k) { const d = Math.exp(-k * dt); this.vel.x *= d; this.vel.z *= d; }
     this.pos.addScaledVector(this.vel, dt);
     // wind pushes everyone except a raised shield (bracing)
@@ -1295,6 +1481,7 @@ class Fighter {
       emit(this.pos.x, this.pos.y + 1, this.pos.z, 1, { color: [0xffffff, 0xffd9c4], speed: .5, life: .6, grav: -1, size: .32, drag: 1 });
 
     if (arena.lavaY !== undefined && this.pos.y < arena.lavaY && Math.hypot(this.pos.x, this.pos.z) < arena.lavaR && this.burnCd <= 0 && this.blink <= 0 && this.starT <= 0) this.burn();
+    if (arena.waterY !== undefined && this.pos.y < arena.waterY && this.burnCd <= 0 && arena.holeAt(this.pos.x, this.pos.z)) this.splash();
 
     if (this.pos.y < -24 || Math.hypot(this.pos.x, this.pos.z) > 48 || this.pos.y > 45) this.ko();
   }
@@ -1324,8 +1511,10 @@ class Fighter {
         if (a.proj === 'boomerang') this.boomOut = true;
         if (a.proj === 'pan') this.panOut = true;
         if (a.proj === 'laser' && this.held === 'raygun' && --this.heldUses <= 0) this.held = null;
+        if (a.proj === 'ice' && this.held === 'freezeray' && --this.heldUses <= 0) this.held = null;
       }
-      if (this.stats.echo && !this.isEcho && !NO_ECHO.includes(a.proj)) queueEcho(this, this.atkName, this.charge);
+      if (a.special === 'decoy') spawnDecoy(this);
+      if (this.stats.echo && !this.isEcho && (a.dmg || a.proj) && !NO_ECHO.includes(a.proj)) queueEcho(this, this.atkName, this.charge);
       if (a.rocket) sfx('rocket');
     }
     if (a.rocket && t >= a.startup && t < a.startup + a.active) {
@@ -1371,8 +1560,12 @@ class Fighter {
       }
       return;
     }
+    if (this.state === 'frozen') this.shatter();
+    const iceUnder = this.onGround && this.groundP && this.groundP.ice && this.groundP.main;
     const dmg = a.dmg * (1 + charge * .7) * (.55 + .45 * att.stats.power) * this.stats.dmgTaken;
     this.damage += dmg;
+    const realAtt = att.isEcho ? Object.getPrototypeOf(att) : att;
+    if (realAtt !== this && realAtt.stats.goldRush) dropCoins(this.pos.x, this.pos.y + 1.2 * this.size, this.pos.z, Math.max(1, Math.round(dmg / 4)));
     if (att !== this && att.stats.chain && ++att.hitCount % 3 === 0) {
       const zap = 6 * this.stats.dmgTaken; this.damage += zap; lightning(this);
       popup('+' + Math.round(zap) + '% ZAP', new THREE.Vector3(this.pos.x, this.pos.y + 2.8 * this.size, this.pos.z), '#8be0ff', 22);
@@ -1383,6 +1576,7 @@ class Fighter {
       emit(att.pos.x, att.pos.y + 1.1 * att.size, att.pos.z, 8, { color: 0xc58cff, speed: 5, life: .3, grav: 0, size: .1 });
     }
     const kb = (a.kb + this.damage * a.growth * (1 + charge * .9)) * att.stats.power / this.stats.weight;
+    if (iceUnder && kb > 13) crackIce(this.pos.x, this.pos.z);
     let dx, dz, d;
     if (src) {
       dx = this.pos.x - src.x; dz = this.pos.z - src.z; d = Math.hypot(dx, dz);
@@ -1419,12 +1613,14 @@ class Fighter {
   collide(prevY) {
     const was = this.onGround; this.onGround = false;
     for (const p of PLATFORMS) {
+      if (p.main && arena.holeAt && arena.holeAt(this.pos.x, this.pos.z)) continue; // fell through the ice
       const dx = this.pos.x - p.x, dz = this.pos.z - p.z, r = Math.hypot(dx, dz);
       // "stick" keeps you planted on a floor that is moving down (Lava Forge)
-      const stick = was && this.groundP === p && this.vel.y <= 0;
+      const stick = was && this.groundP === p && this.vel.y <= 0 && this.pos.y > p.y - .6;
       if (r < p.r + .15 && this.vel.y <= 0 && (prevY >= p.y - .06 || stick) && this.pos.y <= p.y + (stick ? .3 : 0)) {
         this.pos.y = p.y;
         if (this.state === 'hitstun' && this.vel.y < -14) {
+          if (p.ice && p.main) crackIce(this.pos.x, this.pos.z);
           this.vel.y = -this.vel.y * .45;
           emit(this.pos.x, this.pos.y + .1, this.pos.z, 14, { color: 0xe8f7d8, speed: 6, flat: true, life: .4, grav: 0 });
           game.shake = Math.max(game.shake, .35); sfx('land', 2);
@@ -1459,6 +1655,7 @@ class Fighter {
       banner('SECOND WIND!', 'mint'); sfx('wind');
       return;
     }
+    this.endBig();
     this.stocks--; this.state = 'dead'; this.deadT = 1.6; this.model.root.visible = false; this.held = null;
     const r = Math.hypot(this.pos.x, this.pos.z), k = r > 26 ? 26 / r : 1;
     const p = new THREE.Vector3(this.pos.x * k, clamp(this.pos.y, -14, 30), this.pos.z * k);
@@ -1475,6 +1672,10 @@ class Fighter {
     m.root.position.copy(this.pos);
     if (game.hitstop > 0 && this.flash > .5) m.root.position.x += rand(-.12, .12);
     m.root.rotation.y = this.facing;
+    const sc = m.root.scale.x + (this.size - m.root.scale.x) * (1 - Math.exp(-6 * dt)); m.root.scale.setScalar(sc);
+    if (this.isBig && this.bigT < 1.5) m.root.visible = Math.floor(this.bigT * 10) % 2 === 0;
+    m.ice.visible = this.state === 'frozen';
+    if (this.state === 'frozen') return;
     this.animT += dt;
     const hs = Math.hypot(this.vel.x, this.vel.z), s = this.state;
     const T = { aL: 0, aR: 0, aLz: 0, aRz: 0, lL: 0, lR: 0, lean: 0, twist: 0, spin: null, bob: 0 };
@@ -1505,9 +1706,10 @@ class Fighter {
     m.boomer.visible = this.held === 'boomerang' && !this.boomOut;
     m.banana.visible = this.held === 'banana';
     m.raygun.visible = this.held === 'raygun';
+    m.freezer.visible = this.held === 'freezeray';
     m.jetpack.visible = this.jetT > 0;
-    if (m.weapon) m.weapon.visible = this.held !== 'hammer' && !m.boomer.visible && !m.raygun.visible && !this.panOut;
-    if (this.held === 'raygun' && s !== 'hitstun' && s !== 'shield') { T.aR = -1.5; T.aRz = 0; }
+    if (m.weapon) m.weapon.visible = this.held !== 'hammer' && !m.boomer.visible && !m.raygun.visible && !m.freezer.visible && !this.panOut;
+    if ((this.held === 'raygun' || this.held === 'freezeray') && s !== 'hitstun' && s !== 'shield') { T.aR = -1.5; T.aRz = 0; }
     m.shield.visible = s === 'shield';
     if (s === 'shield') { m.shield.scale.setScalar(.55 + .45 * this.shieldHP / 100); m.shield.material.opacity = .22 + .1 * Math.sin(game.simTime * 12); }
 
@@ -1544,6 +1746,8 @@ const FIGHTERS = [player, enemy];
 const projectiles = [];
 const laserGeo = new THREE.CylinderGeometry(.06, .06, 1, 6).rotateX(Math.PI / 2);
 const laserMat = new THREE.MeshBasicMaterial({ color: 0x9dffc4, toneMapped: false });
+const iceBeamMat = new THREE.MeshBasicMaterial({ color: 0xbfeaff, toneMapped: false });
+const droneLaserMat = new THREE.MeshBasicMaterial({ color: 0xffe066, toneMapped: false });
 const fireGeo = new THREE.SphereGeometry(.3, 14, 10), fireCore = new THREE.MeshBasicMaterial({ color: 0xffe08a, toneMapped: false });
 const fireGlow = new THREE.MeshBasicMaterial({ color: 0xff5a1c, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 function surfaceHit(x, y, z) {
@@ -1553,16 +1757,17 @@ function surfaceHit(x, y, z) {
 function spawnProjectile(owner, kind, opp) {
   let fx = Math.sin(owner.facing), fz = Math.cos(owner.facing);
   const realOwner = owner.isEcho ? Object.getPrototypeOf(owner) : owner;
-  if (kind === 'laser') {
+  if (kind === 'laser' || kind === 'ice') {
     const pos = new THREE.Vector3(owner.pos.x + fx * .9 * owner.size, owner.pos.y + 1.3 * owner.size, owner.pos.z + fz * .9 * owner.size);
     let vy = 0;
     if (opp && opp.alive) {
       const dx = opp.pos.x - owner.pos.x, dz = opp.pos.z - owner.pos.z, d = Math.hypot(dx, dz);
       if (d < 20 && d > .5 && (dx * fx + dz * fz) / d > .6) { fx = dx / d; fz = dz / d; owner.facing = Math.atan2(fx, fz); vy = clamp((opp.pos.y + 1.1 * opp.size - pos.y) / d, -.6, .6) * 30; }
     }
-    const mesh = new THREE.Mesh(laserGeo, laserMat); mesh.position.copy(pos); scene.add(mesh);
-    projectiles.push({ kind, owner: realOwner, pos, vel: new THREE.Vector3(fx * 30, vy, fz * 30), life: .7, grav: 0, mesh, armT: 0 });
-    sfx('laser');
+    const sp = kind === 'ice' ? 24 : 30;
+    const mesh = new THREE.Mesh(laserGeo, kind === 'ice' ? iceBeamMat : laserMat); mesh.position.copy(pos); if (kind === 'ice') mesh.scale.set(2.2, 2.2, 1.3); scene.add(mesh);
+    projectiles.push({ kind, owner: realOwner, pos, vel: new THREE.Vector3(fx * sp, vy * sp / 30, fz * sp), life: .8, grav: 0, mesh, armT: 0 });
+    sfx(kind === 'ice' ? 'freeze' : 'laser');
     return;
   }
   if (kind === 'fireball') {
@@ -1607,9 +1812,9 @@ function updateProjectiles(dt) {
     const P = projectiles[i];
     P.vel.y -= P.grav * dt; P.pos.addScaledVector(P.vel, dt); P.life -= dt; P.armT -= dt;
     P.mesh.position.copy(P.pos);
-    if (P.kind === 'laser') {
+    if (P.kind === 'laser' || P.kind === 'ice') {
       P.mesh.lookAt(_v.copy(P.pos).add(P.vel));
-      if (Math.random() < .6) emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: 0x7dffb0, speed: .3, life: .2, grav: 0, size: .07 });
+      if (Math.random() < .6) emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: P.kind === 'ice' ? 0xbfeaff : P.hitDef ? 0xffe066 : 0x7dffb0, speed: .3, life: .2, grav: 0, size: P.kind === 'ice' ? .12 : .07 });
     } else if (P.kind === 'fireball') {
       P.mesh.rotation.y += dt * 10;
       emit(P.pos.x, P.pos.y, P.pos.z, 1, { color: [0xff5a1c, 0xffc040], speed: .8, life: .3, grav: -1, size: .2 });
@@ -1640,7 +1845,15 @@ function updateProjectiles(dt) {
       if (Math.hypot(P.pos.x - f.pos.x, dy * .8, P.pos.z - f.pos.z) < .55 * f.size + .35) {
         const l = Math.hypot(P.vel.x, P.vel.z) || 1, src = { x: P.pos.x - P.vel.x / l, z: P.pos.z - P.vel.z / l };
         if (P.kind === 'fireball') { f.takeHit(P.owner, FIREBALL, 0, src); done = true; }
-        else if (P.kind === 'laser') { f.takeHit(P.owner, LASER, 0, src); done = true; }
+        else if (P.kind === 'laser') { f.takeHit(P.owner, P.hitDef || LASER, 0, src); done = true; }
+        else if (P.kind === 'ice') {
+          if (f.state === 'shield') f.takeHit(P.owner, ICE_HIT, 0, src);
+          else {
+            const d = 2 * f.stats.dmgTaken; f.damage += d; f.freeze(2.2);
+            popup('FROZEN!', new THREE.Vector3(f.pos.x, f.pos.y + 2.6 * f.size, f.pos.z), '#bfeaff', 24);
+          }
+          done = true;
+        }
         else if (P.kind === 'pan') { f.takeHit(P.owner, PAN_HIT, 0, src); P.hit.add(f); sfx('clang'); }
         else if (P.kind === 'bomb') { explode(P.pos.clone(), P.owner); done = true; }
         else if (P.kind === 'boomerang') { f.takeHit(P.owner, BOOM_HIT, 0, src); P.hit.add(f); }
@@ -1721,6 +1934,108 @@ function updateBolts(dt) {
   }
 }
 
+/* ================= decoy (Shade) ================= */
+let decoy = null;
+function smokePuff(x, y, z) { emit(x, y + 1, z, 26, { color: [0x35304d, 0xc03fff, 0x888899], speed: 4, life: .55, grav: -1, size: .32, drag: 3 }); sfx('poof'); }
+function spawnDecoy(f) {
+  if (decoy) removeDecoy();
+  const m = buildModel(f.def);
+  for (const mt of m.mats) { mt.transparent = true; mt.opacity = .72; }
+  m.root.position.copy(f.pos); m.root.rotation.y = f.facing; scene.add(m.root);
+  decoy = {
+    owner: f, model: m, pos: f.pos.clone(), vel: new THREE.Vector3(), state: 'normal', damage: f.damage, starT: 0, size: f.size, invuln: 0,
+    stats: { weight: 1, dmgTaken: 1 }, onGround: true, groundP: f.groundP, held: null, jetT: 0, life: 4, alive: true,
+    fooled: Math.random() < .85 - brain.skill * .35,
+    takeHit(att) {
+      popup('DECOY!', new THREE.Vector3(this.pos.x, this.pos.y + 2.3, this.pos.z), '#c58cff', 24);
+      if (att && att.alive && !att.isEcho) Object.assign(att, { state: 'hitstun', stateTime: 0, stunDur: 1, flash: .5, atk: null, atkName: '', charging: false, charge: 0 });
+      removeDecoy();
+    },
+  };
+  smokePuff(f.pos.x, f.pos.y, f.pos.z); f.blink = .6;
+}
+function removeDecoy() {
+  if (!decoy) return;
+  smokePuff(decoy.pos.x, decoy.pos.y, decoy.pos.z);
+  scene.remove(decoy.model.root); decoy = null;
+}
+function updateDecoy(dt) {
+  if (!decoy) return;
+  decoy.life -= dt;
+  if (decoy.life <= 0 || !decoy.owner.alive) { removeDecoy(); return; }
+  decoy.model.inner.position.y = -1.1 + Math.sin(game.simTime * 3) * .03;
+}
+
+/* ================= coins (Gold Rush) ================= */
+const coins = [];
+const coinGeo = new THREE.CylinderGeometry(.22, .22, .06, 16).rotateX(Math.PI / 2);
+const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd34a, emissive: 0x8a6000, emissiveIntensity: .6, metalness: .6, roughness: .3 });
+function dropCoins(x, y, z, n) {
+  for (let i = 0; i < n && coins.length < 60; i++) {
+    const mesh = new THREE.Mesh(coinGeo, coinMat); mesh.position.set(x, y, z); scene.add(mesh);
+    coins.push({ mesh, x, y, z, vx: rand(-4, 4), vy: rand(5, 9), vz: rand(-4, 4), life: 12 });
+  }
+}
+function clearCoins() { while (coins.length) scene.remove(coins.pop().mesh); }
+function updateCoins(dt) {
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.vy -= 25 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt; c.life -= dt;
+    const sup = supportTop(c.x, c.z);
+    if (sup && c.y <= sup.y + .22 && c.y > sup.y - 1 && c.vy < 0) { c.y = sup.y + .22; c.vy = Math.abs(c.vy) > 2 ? -c.vy * .35 : 0; c.vx *= .6; c.vz *= .6; }
+    if (player.alive && player.stats.magnet) {
+      const dx = player.pos.x - c.x, dz = player.pos.z - c.z, d = Math.hypot(dx, dz);
+      if (d < 14 && d > .2) { c.x += dx / d * 8 * dt; c.z += dz / d * 8 * dt; }
+    }
+    if (player.alive && Math.hypot(player.pos.x - c.x, player.pos.z - c.z) < 1.2 && c.y > player.pos.y - .5 && c.y < player.pos.y + 2.5) {
+      game.gold++; sfx('coin'); emit(c.x, c.y, c.z, 4, { color: 0xffd34a, speed: 2, life: .25, grav: 0, size: .08 });
+      scene.remove(c.mesh); coins.splice(i, 1); continue;
+    }
+    if (c.y < -30 || c.life <= 0) { scene.remove(c.mesh); coins.splice(i, 1); continue; }
+    c.mesh.position.set(c.x, c.y, c.z); c.mesh.rotation.y += dt * 6;
+    c.mesh.visible = c.life > 2 || Math.floor(c.life * 8) % 2 === 0;
+  }
+}
+
+/* ================= pet drones ================= */
+const drones = [];
+function makeDrone() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.22, 14, 10), gunMat); g.add(body);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(.08, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe066, toneMapped: false })); eye.position.z = .19; g.add(eye);
+  const ringM = new THREE.Mesh(new THREE.TorusGeometry(.34, .03, 6, 24), panMat); ringM.rotation.x = Math.PI / 2; g.add(ringM);
+  const rotor = new THREE.Mesh(new THREE.BoxGeometry(.6, .02, .07), panMat); rotor.position.y = .26; rotor.name = 'rotor'; g.add(rotor);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+function syncDrones() {
+  while (drones.length) scene.remove(drones.pop().mesh);
+  for (let i = 0; i < player.stats.drones; i++) {
+    const mesh = makeDrone(); scene.add(mesh);
+    drones.push({ owner: player, mesh, idx: i, cd: 1.2 + i * .8, pos: player.pos.clone().add(new THREE.Vector3(0, 2.5, 0)) });
+  }
+}
+function updateDrones(dt, fighting) {
+  for (const D of drones) {
+    const o = D.owner; D.mesh.visible = o.alive; if (!o.alive) continue;
+    const side = D.idx ? -1 : 1, rx = Math.cos(o.facing), rz = -Math.sin(o.facing);
+    const tx = o.pos.x + rx * side * 1.1 - Math.sin(o.facing) * .4, tz = o.pos.z + rz * side * 1.1 - Math.cos(o.facing) * .4;
+    D.pos.lerp(_v.set(tx, o.pos.y + 2.4 * o.size + Math.sin(game.simTime * 3 + D.idx) * .15, tz), 1 - Math.exp(-6 * dt));
+    D.mesh.position.copy(D.pos); D.mesh.getObjectByName('rotor').rotation.y += dt * 30;
+    const e = opponentOf(o);
+    if (e.alive) D.mesh.lookAt(e.pos.x, e.pos.y + 1, e.pos.z);
+    D.cd -= dt;
+    if (fighting && D.cd <= 0) {
+      const dx = e.pos.x - D.pos.x, dy = e.pos.y + 1.1 * e.size - D.pos.y, dz = e.pos.z - D.pos.z, d = Math.hypot(dx, dy, dz);
+      if (e.alive && d < 14) {
+        const mesh = new THREE.Mesh(laserGeo, droneLaserMat); mesh.position.copy(D.pos); scene.add(mesh);
+        projectiles.push({ kind: 'laser', owner: o, pos: D.pos.clone(), vel: new THREE.Vector3(dx / d * 26, dy / d * 26, dz / d * 26), life: .8, grav: 0, mesh, armT: 0, hitDef: DRONE_SHOT });
+        sfx('laser'); D.cd = 1.8;
+      } else D.cd = .4;
+    }
+  }
+}
+
 /* ================= echo + shockwave ================= */
 const echoes = [];
 const opponentOf = f => (f === player ? enemy : player);
@@ -1764,15 +2079,20 @@ const ITEM_DEFS = {
   raygun: { make: makeRaygun, color: 0x7dffb0 },
   box: { make: makeBox, color: 0xffb347 },
   jetpack: { make: makeJetpack, color: 0xff5a6e },
+  mushroom: { make: makeMushroom, color: 0xff3d4e },
+  freezeray: { make: () => makeRaygun(iceTip), color: 0xbfeaff },
 };
-const ITEM_POOL = ['hammer', 'bomb', 'bomb', 'heart', 'heart', 'star', 'boomerang', 'banana', 'banana', 'raygun', 'raygun', 'box', 'box', 'jetpack'];
+const ITEM_POOL = ['hammer', 'bomb', 'bomb', 'heart', 'heart', 'star', 'boomerang', 'banana', 'banana', 'raygun', 'raygun', 'box', 'box', 'jetpack', 'mushroom', 'mushroom', 'freezeray', 'freezeray'];
 function makeTrap(x, y, z, owner, grace) {
   const g = new THREE.Group(); g.add(makePeel()); g.position.set(x, y, z); scene.add(g);
   items.push({ type: 'trap', mesh: g, x, z, y, vy: 0, landed: false, life: 12, owner, grace });
 }
 function supportTop(x, z) {
   let top = null;
-  for (const p of PLATFORMS) if (Math.hypot(x - p.x, z - p.z) < p.r - .2 && (top === null || p.y > top.y)) top = p;
+  for (const p of PLATFORMS) {
+    if (p.main && arena.holeAt && arena.holeAt(x, z)) continue;
+    if (Math.hypot(x - p.x, z - p.z) < p.r - .2 && (top === null || p.y > top.y)) top = p;
+  }
   return top;
 }
 function spawnItem() {
@@ -1796,7 +2116,7 @@ function clearArenaObjects() {
   while (projectiles.length) scene.remove(projectiles.pop().mesh);
   while (firePatches.length) { const P = firePatches.pop(); scene.remove(P.mesh); P.mesh.material.dispose(); }
   for (const f of FIGHTERS) { f.boomOut = false; f.panOut = false; }
-  echoes.length = 0;
+  echoes.length = 0; clearCoins(); removeDecoy();
 }
 function updateItems(dt, fighting) {
   if (fighting) { game.itemT -= dt; if (game.itemT <= 0) { if (items.filter(i => i.type !== 'trap').length < 2) spawnItem(); game.itemT = rand(7, 11); } }
@@ -1839,7 +2159,7 @@ function updateItems(dt, fighting) {
         sfx('box'); emit(it.x, it.y + .8, it.z, 24, { color: [0xffb347, 0xffffff], speed: 6, life: .5, grav: 4 });
         if (Math.random() < .22) { popup('TRAP!', new THREE.Vector3(it.x, it.y + 2, it.z), '#ff5a6e', 24); explode(new THREE.Vector3(it.x, it.y + .8, it.z), f); }
         else {
-          const pool = ['star', 'heart', 'jetpack'].concat(f.held ? [] : ['hammer', 'bomb', 'boomerang', 'banana', 'raygun']);
+          const pool = ['star', 'heart', 'jetpack', 'mushroom'].concat(f.held ? [] : ['hammer', 'bomb', 'boomerang', 'banana', 'raygun', 'freezeray']);
           grantItem(f, pool[Math.random() * pool.length | 0]);
         }
       } else if (!grantItem(f, it.type)) continue;
@@ -1858,18 +2178,21 @@ function grantItem(f, type) {
     popup('-' + Math.round(heal) + '%', new THREE.Vector3(f.pos.x, f.pos.y + 2.4 * f.size, f.pos.z), '#4ff0c8', 26);
     emit(f.pos.x, f.pos.y + 1, f.pos.z, 24, { color: [0x4ff0c8, 0xffffff, 0xff3d6e], speed: 4, up: 3, life: .6, grav: 0 });
     sfx('heal');
+  } else if (type === 'mushroom') {
+    f.grow(); emit(f.pos.x, f.pos.y + 1, f.pos.z, 20, { color: [0xff3d4e, 0xffffff], speed: 5, life: .5, grav: 0 });
+    if (f.isPlayer) toast('GIANT! Hit harder and resist knockback for 10s.');
   } else if (type === 'jetpack') {
     f.jetT = 10; sfx('pickup');
     emit(f.pos.x, f.pos.y + 1.5, f.pos.z, 14, { color: 0xff5a6e, speed: 4, life: .4, grav: 0 });
     if (f.isPlayer) toast('JETPACK! Jump as many times as you want for 10s.');
   } else {
     if (f.held) return false;
-    f.held = type; f.heldT = { hammer: HAMMER_TIME, bomb: BOMB_FUSE, boomerang: 12, banana: 10, raygun: 15 }[type]; f.heldUses = type === 'raygun' ? 6 : 3;
+    f.held = type; f.heldT = { hammer: HAMMER_TIME, bomb: BOMB_FUSE, boomerang: 12, banana: 10, raygun: 15, freezeray: 15 }[type]; f.heldUses = type === 'raygun' ? 6 : 3;
     emit(f.pos.x, f.pos.y + 1.5, f.pos.z, 14, { color: ITEM_DEFS[type].color, speed: 4, life: .4, grav: 0 });
     sfx('pickup');
     if (f.isPlayer) toast({ hammer: 'HAMMER! Attack to smash. No jumping.', bomb: 'BOMB! Attack to throw it before it blows.',
       boomerang: 'BOOMERANG! Attack to throw. It comes back (3 throws).', banana: 'BANANA! Attack to toss a peel trap.',
-      raygun: 'RAY GUN! Attack to fire (6 shots).' }[type]);
+      raygun: 'RAY GUN! Attack to fire (6 shots).', freezeray: 'FREEZE RAY! Attack to freeze them solid (3 shots).' }[type]);
   }
   return true;
 }
@@ -1925,7 +2248,8 @@ class Brain {
       const toss = (f.held === 'bomb' && dist > 1.5 && dist < 9 && (this.cd <= 0 || f.heldT < 1.5))
         || (f.held === 'boomerang' && !f.boomOut && dist < 10 && this.cd <= 0)
         || (f.held === 'banana' && dist < 5 && this.cd <= 0)
-        || (f.held === 'raygun' && dist < 15 && this.cd <= 0);
+        || (f.held === 'raygun' && dist < 15 && this.cd <= 0)
+        || (f.held === 'freezeray' && dist < 12 && this.cd <= 0 && tg.state !== 'frozen');
       if (f.held === 'raygun' && toss) { I.light = true; this.cd = rand(.25, .5); return I; }
       if (toss && f.state === 'normal') { I.light = true; this.cd = .8; return I; }
       // run from a starred opponent
@@ -1967,7 +2291,7 @@ class Brain {
       else if (this.cd > 0) { mx = -ux * .35 - uz * this.strafe * .6; mz = -uz * .35 + ux * this.strafe * .6; }
       // detour for a nearby item worth grabbing
       for (const it of items) {
-        if (!it.landed || it.type === 'trap' || (it.type === 'heart' ? f.damage < 25 : (it.type === 'star' || it.type === 'jetpack') ? false : !!f.held)) continue;
+        if (!it.landed || it.type === 'trap' || (it.type === 'heart' ? f.damage < 25 : (it.type === 'star' || it.type === 'jetpack' || it.type === 'mushroom') ? false : !!f.held)) continue;
         const ix = it.x - f.pos.x, iz = it.z - f.pos.z, idist = Math.hypot(ix, iz);
         if (idist < 9 && idist < dist * 1.3 + 2 && Math.abs(it.y - f.pos.y) < 2) { mx = ix / idist; mz = iz / idist; break; }
       }
@@ -1982,6 +2306,11 @@ class Brain {
       const nx = -f.pos.x / r, nz = -f.pos.z / r, out = -(mx * nx + mz * nz);
       if (out > 0) { mx += nx * out * 1.4; mz += nz * out * 1.4; }
     }
+    // steer around holes in the ice
+    if (arena.holes) for (const h of arena.holes) {
+      const hx = f.pos.x - h.x, hz = f.pos.z - h.z, hd = Math.hypot(hx, hz) || 1;
+      if (hd < h.r + 1.6) { mx += hx / hd * 1.6; mz += hz / hd * 1.6; }
+    }
     // lean into the wind near the edge
     if (arena.windDir && arena.phase !== 'calm') { const k = r > STAGE_R - 6 ? 1.1 : .35; mx -= arena.windDir.x * k; mz -= arena.windDir.z * k; }
     const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
@@ -1990,7 +2319,7 @@ class Brain {
   }
 }
 const brain = new Brain(enemy);
-window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, shockwave, get arena() { return arena; } }; // debug handle for the browser console
+window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
 
 /* ================= input ================= */
 const keys = new Set(), pressed = new Set();
@@ -2135,7 +2464,10 @@ function updateHUD() {
   if (player.jetT > 0) chips.push(`JETPACK ${Math.ceil(player.jetT)}s`);
   if (player.held === 'boomerang') chips.push(`BOOMERANG ×${player.heldUses}`);
   else if (player.held === 'raygun') chips.push(`RAY GUN ×${player.heldUses}`);
+  else if (player.held === 'freezeray') chips.push(`FREEZE RAY ×${player.heldUses}`);
   else if (player.held) chips.push(`${player.held.toUpperCase()} ${Math.ceil(player.heldT)}s`);
+  if (player.isBig) chips.push(`GIANT ${Math.ceil(player.bigT)}s`);
+  if (player.stats.goldRush || game.gold > 0) chips.push(`GOLD ${game.gold}`);
   setHud('heldP', chips.join(' · '));
   const wi = $('windInd'), showWind = arena.key === 'wind' && arena.phase !== 'calm' && game.state === 'fight';
   if (wi.hidden === showWind) wi.hidden = !showWind;
@@ -2158,7 +2490,7 @@ function show(id) { for (const s of ['scrTitle', 'scrSelect', 'scrUp', 'scrOver'
 const ENEMY_ORDER = ['grub', 'vex', 'bolt', 'moss'];
 function startRun() {
   initAudio();
-  game.wave = 1; game.perks = [];
+  game.wave = 1; game.perks = []; game.gold = 0; game.startPerk = {};
   player.setDef(ROSTER[game.charKey]); player.stocks = 3;
   startWave();
 }
@@ -2172,6 +2504,10 @@ function startWave() {
   setArena(keys[(start + w - 1) % keys.length]);
   clearArenaObjects(); game.itemT = rand(5, 8);
   player.spawn(false); player.facing = Math.PI; player.windUsed = false;
+  if (game.startPerk.star) player.starT = 7.5;
+  if (game.startPerk.jet) player.jetT = 11.5;
+  if (game.startPerk.hammer) { player.held = 'hammer'; player.heldT = HAMMER_TIME + 1.5; }
+  game.startPerk = {}; syncDrones();
   enemy.spawn(false); enemy.facing = 0;
   cam.yaw = 0; cam.pitch = .32; cam.manualT = 0; cam.focus.set(0, 1.5, 3);
   game.state = 'intro'; game.timer = 1.6; game.timeScale = 1;
@@ -2180,6 +2516,7 @@ function startWave() {
   lockPointer();
 }
 function onKO(f) {
+  if (f === enemy && player.stats.goldRush) { game.gold += 10; toast('+10 GOLD for the KO'); }
   if (f === enemy) {
     if (enemy.stocks <= 0) { game.state = 'cleared'; game.timer = 1.8; game.timeScale = .35; banner('K.O.!', 'gold'); sfx('clear'); }
     else banner('KO!', 'gold');
@@ -2206,8 +2543,28 @@ const UPGRADES = [
   { name: 'Magnet', tag: 'Items', desc: 'Items slide toward you from across the arena.', ok: s => !s.magnet, apply: s => s.magnet = true },
   { name: 'Shockwave Landing', tag: 'Air', desc: 'Landing from a high jump knocks nearby enemies away.', ok: s => !s.shock, apply: s => s.shock = true },
   { name: 'Echo', tag: 'Combo', desc: 'Every attack repeats as a ghost hit a moment later, at half strength.', ok: s => !s.echo, apply: s => s.echo = true },
+  { name: 'Gold Rush', tag: 'Loot', desc: 'Hits knock coins out of enemies. Spend them in the shop between waves.', ok: s => !s.goldRush, apply: s => s.goldRush = true },
+  { name: 'Pet Drone', tag: 'Ally', desc: 'A little drone follows you and zaps the enemy every couple of seconds.', ok: s => s.drones < 2, apply: s => s.drones++ },
   { name: 'Glass Cannon', tag: 'Risk', desc: 'Your hits launch twice as far. You take double damage.', ok: s => !s.glass, apply: s => { s.glass = true; s.power *= 2; s.dmgTaken *= 2; } },
 ];
+const SHOP = [
+  { name: 'Extra Life', cost: 30, ok: () => player.stocks < 5, buy: () => player.stocks++ },
+  { name: 'Start next wave with a Star', cost: 12, ok: () => !game.startPerk.star, buy: () => game.startPerk.star = true },
+  { name: 'Start with a Jetpack', cost: 10, ok: () => !game.startPerk.jet, buy: () => game.startPerk.jet = true },
+  { name: 'Start holding a Hammer', cost: 8, ok: () => !game.startPerk.hammer, buy: () => game.startPerk.hammer = true },
+];
+function renderShop() {
+  const show = game.gold > 0 || player.stats.goldRush;
+  $('shop').hidden = !show; if (!show) return;
+  $('goldAmt').textContent = game.gold;
+  const row = $('shopRow'); row.innerHTML = '';
+  SHOP.forEach((it, i) => {
+    const b = document.createElement('button'); b.className = 'buy'; b.id = 'buy' + i;
+    b.innerHTML = `${it.name} · <b>${it.cost}</b>`; b.disabled = game.gold < it.cost || !it.ok();
+    b.addEventListener('click', () => { if (game.gold < it.cost || !it.ok()) return; game.gold -= it.cost; it.buy(); sfx('coin'); renderShop(); });
+    row.appendChild(b);
+  });
+}
 function showUpgrades() {
   game.state = 'upgrade';
   if (document.pointerLockElement) document.exitPointerLock();
@@ -2220,6 +2577,8 @@ function showUpgrades() {
     b.addEventListener('click', () => { sfx('select'); u.apply(player.stats); game.perks.push(u.name); game.wave++; startWave(); });
     box.appendChild(b);
   });
+  game.gold += coins.length; clearCoins();
+  renderShop();
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
 }
 function showGameOver() {
@@ -2315,13 +2674,15 @@ function frame(now) {
       game.simTime += simDt;
       const fighting = game.state === 'fight';
       const pin = fighting ? readPlayerInput() : blankInput();
-      const ein = fighting ? brain.get(simDt, player) : blankInput();
+      const tgt = decoy && decoy.fooled ? decoy : player;
+      const ein = fighting ? brain.get(simDt, tgt) : blankInput();
       player.update(simDt, pin, enemy);
-      enemy.update(simDt, ein, player);
+      enemy.update(simDt, ein, tgt);
       separate();
       updateProjectiles(simDt);
       updateFirePatches(simDt);
       updateEchoes(simDt);
+      updateDecoy(simDt); updateCoins(simDt); updateDrones(simDt, fighting);
       updateItems(simDt, fighting);
       arena.update(simDt, fighting);
       pressed.clear();
