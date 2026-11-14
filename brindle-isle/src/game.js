@@ -10,6 +10,55 @@ const cvs = $('game'), ctx = cvs.getContext('2d');
 const mini = $('minimap'), mctx = mini.getContext('2d');
 const IMG = {};
 
+// ---------- sound: tiny synthesized effects, no audio files ----------
+const SFX = (() => {
+  let ac = null, muted = false;
+  try { muted = localStorage.getItem('brindle-mute') === '1'; } catch (_) {}
+  function audio() {
+    if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; } }
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+  function tone(a, f, dur, type = 'square', vol = 0.06, slide = 0, delay = 0) {
+    const t0 = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t0); if (slide) o.frequency.linearRampToValueAtTime(Math.max(30, f + slide), t0 + dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function noise(a, dur, vol, freq, delay = 0) {
+    const t0 = a.currentTime + delay, len = Math.ceil(a.sampleRate * dur), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8;
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f).connect(g).connect(a.destination); src.start(t0);
+  }
+  const FX = {
+    swing: a => noise(a, 0.13, 0.18, 2200),
+    hit: a => { tone(a, 200, 0.1, 'square', 0.06, -110); noise(a, 0.06, 0.12, 1200); },
+    chop: a => { tone(a, 150, 0.09, 'triangle', 0.14, -70); noise(a, 0.07, 0.14, 800); },
+    mine: a => { tone(a, 1200, 0.06, 'square', 0.035); noise(a, 0.07, 0.14, 3500); },
+    pick: a => tone(a, 520, 0.08, 'triangle', 0.08, 320),
+    collect: a => tone(a, 880, 0.06, 'triangle', 0.05, 220),
+    coin: a => { tone(a, 988, 0.06, 'square', 0.035); tone(a, 1319, 0.12, 'square', 0.035, 0, 0.06); },
+    hurt: a => tone(a, 330, 0.25, 'sawtooth', 0.07, -220),
+    special: a => [523, 659, 784, 1047].forEach((f, i) => tone(a, f, 0.1, 'square', 0.04, 0, i * 0.05)),
+    dash: a => noise(a, 0.18, 0.12, 700),
+    fall: a => { noise(a, 0.5, 0.14, 300); tone(a, 90, 0.35, 'triangle', 0.12, -40, 0.15); },
+    crumble: a => { noise(a, 0.3, 0.16, 1500); noise(a, 0.2, 0.1, 500, 0.08); },
+    slime: a => tone(a, 160, 0.16, 'sine', 0.14, 260),
+    craft: a => [392, 523, 659, 784].forEach((f, i) => tone(a, f, 0.14, 'triangle', 0.07, 0, i * 0.08)),
+    lucky: a => [1047, 1319, 1568].forEach((f, i) => tone(a, f, 0.1, 'square', 0.03, 0, i * 0.05)),
+    drink: a => [300, 420, 360, 520].forEach((f, i) => tone(a, f, 0.07, 'sine', 0.08, 80, i * 0.09)),
+    leap: a => tone(a, 260, 0.16, 'triangle', 0.07, 260),
+  };
+  return {
+    play(n) { if (muted) return; const a = audio(); if (a && FX[n]) try { FX[n](a); } catch (_) {} },
+    get muted() { return muted; },
+    toggle() { muted = !muted; try { localStorage.setItem('brindle-mute', muted ? '1' : '0'); } catch (_) {} if (!muted) audio(); },
+  };
+})();
+
 // ---------- random + noise ----------
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const rng = mulberry32(SEED);
@@ -148,12 +197,14 @@ function freshState() {
 }
 let S = freshState();
 const P = { x: 0, y: 0, fx: 0, fy: 1, inv: 0, walkDist: 0, moving: false, kx: 0, ky: 0, healT: 0, act: null,
-  combo: 0, lastKind: null, lastActEnd: -9, queued: false, held: false, charge: 0, dash: null, dashCd: 0, dashEnd: -9, trail: [] };
+  combo: 0, lastKind: null, lastActEnd: -9, queued: false, held: false, charge: 0, dash: null, dashCd: 0, dashEnd: -9, trail: [],
+  idleT: 0, running: false, pendingCheer: null };
+let touchRun = false;
 let shake = 0, hitStop = 0;
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- objects ----------
-const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [];
+const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
 const SOLID = { tree: 11, rock: 12, crystal: 11 };
 const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5 };
 const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir']];
@@ -193,10 +244,20 @@ for (let i = 0; i < 6; i++) addEnemy('purple', 1);
 // village
 const HOUSE = { x: cx * T - 84, y: cy * T - 66 }; // bottom-center of Oma's cottage
 const NPCS = [
-  { id: 'oma', name: 'Oma Fen', x: HOUSE.x, y: HOUSE.y + 18, sheet: 'oma_idle', verb: 'Trade with' },
+  { id: 'oma', name: 'Oma Fen', x: HOUSE.x, y: HOUSE.y + 18, sheet: 'oma_idle', walk: 'oma_walk', verb: 'Trade with', path: [[HOUSE.x - 46, HOUSE.y + 18], [HOUSE.x + 40, HOUSE.y + 18], [HOUSE.x, HOUSE.y + 18]] },
   { id: 'bench', name: 'Workbench', x: cx * T + 76, y: cy * T - 46, bench: true, verb: 'Craft at' },
-  { id: 'tobin', name: 'Tobin', x: cx * T + 24, y: dockY * T + 6, sheet: 'tobin_idle', verb: 'Talk to' },
+  { id: 'tobin', name: 'Tobin', x: cx * T + 24, y: dockY * T + 6, sheet: 'tobin_idle', walk: 'tobin_walk', verb: 'Talk to', path: [[cx * T + 24, dockY * T + 6], [cx * T + 24, dockY * T - 70], [cx * T - 20, dockY * T - 30]] },
 ];
+for (const n of NPCS) Object.assign(n, { fx: 0, fy: 1, wait: 2 + rng() * 3, target: 0, moving: false, step: 0 });
+function updateNPC(n, dt) {
+  if (!n.path) return;
+  n.moving = false;
+  if (Math.hypot(n.x - P.x, n.y - P.y) < 70) return; // stop to chat when you walk up
+  if (n.wait > 0) { n.wait -= dt; return; }
+  const [tx, ty] = n.path[n.target], dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy);
+  if (d < 2) { n.target = (n.target + 1) % n.path.length; n.wait = 2 + rng() * 4; return; }
+  const sp = Math.min(d, 38 * dt); n.x += dx / d * sp; n.y += dy / d * sp; n.fx = dx / d; n.fy = dy / d; n.moving = true; n.step += sp;
+}
 const RECTS = [{ x0: HOUSE.x - 48, x1: HOUSE.x + 48, y0: HOUSE.y - 40, y1: HOUSE.y - 2 }];
 decor.push({ key: 'barrel', x: HOUSE.x - 64, y: HOUSE.y + 4, s: 2, solid: 10 }, { key: 'crate', x: HOUSE.x + 64, y: HOUSE.y + 2, s: 2, solid: 11 },
   { key: 'hive', x: cx * T + 128, y: cy * T - 50, s: 2, solid: 10 }, { key: 'sign', x: cx * T - 52, y: dockY * T + 2, s: 2, solid: 8 },
@@ -266,7 +327,10 @@ $('dialogue').addEventListener('click', advanceDialogue);
 let panel = null;
 const panelEl = $('panel'), body = $('panelBody');
 function openPanel(kind) { panel = kind; panelEl.hidden = false; renderPanel(); panelEl.querySelector('.sheet').focus(); }
-function closePanel() { if (!panel) return; panel = null; panelEl.hidden = true; save(); }
+function closePanel() {
+  if (!panel) return; panel = null; panelEl.hidden = true; save();
+  if (P.pendingCheer) { const t = P.pendingCheer; P.pendingCheer = null; P.fx = 0; P.fy = 1; startAct('cheer', () => { banner(t, '#ffe08a'); burst(P.x, P.y - 50, '#ffe08a', 16); }); }
+}
 $('panelClose').addEventListener('click', closePanel);
 panelEl.addEventListener('click', e => { if (e.target === panelEl) closePanel(); });
 const canAfford = cost => Object.entries(cost).every(([k, n]) => S.inv[k] >= n);
@@ -301,7 +365,8 @@ function renderPanel() {
     html = `<dl class="controls">
       <dt>WASD / Arrows</dt><dd>Move (joystick on touch screens)</dd>
       <dt>Space / J / E</dt><dd>Use the right tool on whatever is in front of you: sword for slimes, axe for trees, pickaxe for rocks, hands for herbs. Also talks and opens the workbench (A button).</dd>
-      <dt>Shift / K</dt><dd>Dash through danger (Dash button on touch)</dd>
+      <dt>Shift / K</dt><dd>Leap through danger. Keep holding to sprint (hold the Dash button on touch).</dd>
+      <dt>M</dt><dd>Sound on or off</dd>
       <dt>Q</dt><dd>Drink a Meadow Tonic</dd>
       <dt>Esc</dt><dd>Close menus</dd></dl>
       <div class="label">Special moves</div>
@@ -311,6 +376,7 @@ function renderPanel() {
       <dt>Attack after a dash</dt><dd>Dash Strike: a lunging double-damage slash.</dd>
       <dt>Lucky!</dt><dd>Sometimes a finished tree, rock or herb drops a bonus item.</dd></dl>
       <p class="sub">Standing in the village slowly restores your hearts. Progress saves in this browser automatically.</p>
+      <button class="btn" data-act="mute">${SFX.muted ? 'Turn sound on' : 'Turn sound off'}</button>
       <button class="btn" data-act="reset">${resetArmed ? 'Tap again to erase your save' : 'Start a new game'}</button>${CREDITS}`;
   }
   body.innerHTML = html;
@@ -320,18 +386,21 @@ body.addEventListener('click', e => {
   const k = b.dataset.k, act = b.dataset.act;
   if (act === 'sell1' || act === 'sellk') {
     const n = act === 'sell1' ? 1 : S.inv[k]; if (!n) return;
-    S.inv[k] -= n; addGold(n * ITEMS[k].price); toast(`Sold ${n} ${ITEMS[k].name} for ${n * ITEMS[k].price}g`);
+    S.inv[k] -= n; addGold(n * ITEMS[k].price); toast(`Sold ${n} ${ITEMS[k].name} for ${n * ITEMS[k].price}g`); SFX.play('coin');
+    if (n * ITEMS[k].price >= 60) P.pendingCheer = 'Big sale!';
   } else if (act === 'sellall') {
-    const v = sellAllValue(); for (const kk of INV_ORDER) if (kk !== 'potion') S.inv[kk] = 0; addGold(v); toast(`Sold everything for ${v}g`);
+    const v = sellAllValue(); for (const kk of INV_ORDER) if (kk !== 'potion') S.inv[kk] = 0; addGold(v); toast(`Sold everything for ${v}g`); SFX.play('coin');
+    if (v >= 60) P.pendingCheer = 'Big sale!';
   } else if (act === 'craft') {
     const r = RECIPES.find(r => r.id === k); if (!r || !canAfford(r.cost)) return;
     for (const [kk, n] of Object.entries(r.cost)) S.inv[kk] -= n;
-    if (r.tool) S.tools[r.id] = true; else S.inv[r.id]++;
-    toast(`Crafted ${r.name}!`);
+    if (r.tool) { S.tools[r.id] = true; P.pendingCheer = `${r.name}!`; } else S.inv[r.id]++;
+    toast(`Crafted ${r.name}!`); SFX.play('craft');
   } else if (act === 'fund') {
     if (S.gold < GOAL) return; S.gold -= GOAL; S.bridge = true;
     for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
     buildCache(); closePanel(); showVictory();
+  } else if (act === 'mute') { SFX.toggle();
   } else if (act === 'reset') {
     if (!resetArmed) { resetArmed = true; } else { resetArmed = false; try { localStorage.removeItem(SAVE_KEY); } catch (_) {} location.reload(); return; }
   }
@@ -344,7 +413,7 @@ function showVictory() {
   $('victoryStats').textContent = `You earned ${S.earned}g in ${m} minute${m === 1 ? '' : 's'} and funded the crossing. That is the end of this slice of Brindle Isle. Thanks for playing!`;
   $('victory').hidden = false;
 }
-$('victoryBtn').addEventListener('click', () => { $('victory').hidden = true; updateHUD(); });
+$('victoryBtn').addEventListener('click', () => { $('victory').hidden = true; updateHUD(); P.fx = 0; P.fy = 1; startAct('cheer', () => { banner('Bridge open!', '#ffe08a'); burst(P.x, P.y - 50, '#ffe08a', 24); SFX.play('craft'); }); });
 
 // ---------- input ----------
 const keys = {};
@@ -359,6 +428,7 @@ addEventListener('keydown', e => {
   if (k === ' ' || k === 'j' || k === 'e' || k === 'enter') pressAction();
   if (k === 'q') drinkTonic();
   if (k === 'shift' || k === 'k' || k === 'l') dash();
+  if (k === 'm') { SFX.toggle(); toast(SFX.muted ? 'Sound off' : 'Sound on', 1200); }
 });
 addEventListener('keyup', e => {
   const k = e.key.toLowerCase(); keys[k] = false;
@@ -377,13 +447,17 @@ function moveJoy(e) {
 }
 $('btnA').addEventListener('pointerdown', e => { e.preventDefault(); pressAction(); });
 $('btnA').addEventListener('pointerup', releaseAction); $('btnA').addEventListener('pointercancel', releaseAction);
-$('btnB').addEventListener('pointerdown', e => { e.preventDefault(); dash(); });
+$('btnB').addEventListener('pointerdown', e => { e.preventDefault(); dash(); touchRun = true; });
+const endRun = () => { touchRun = false; };
+$('btnB').addEventListener('pointerup', endRun); $('btnB').addEventListener('pointercancel', endRun);
 $('btnTonic').addEventListener('pointerdown', e => { e.preventDefault(); drinkTonic(); });
 
 // ---------- hero animation ----------
 // Each action plays real LPC frames; the effect lands on a specific frame (hitAt) so impacts match the motion.
 const ACTS = {
   sword:  { sheet: 'hero_sword', size: 128, frames: [0, 1, 2, 3, 4, 5], dur: 0.36, hitAt: 0.2, move: 0.4 },
+  backslash: { sheet: 'hero_backslash', size: 128, frames: [7, 8, 9, 10, 11, 12], dur: 0.36, hitAt: 0.17, move: 0.4 },
+  cheer:  { sheet: 'hero_emote', size: 64, frames: [0, 2, 2, 2, 2, 2, 1], dur: 1.0, hitAt: 0.15, move: 0 },
   power:  { sheet: 'hero_sword', size: 128, frames: [0, 1, 2, 3, 4, 5, 5], dur: 0.44, hitAt: 0.22, move: 0, lunge: 220 },
   spin:   { sheet: 'hero_sword', size: 128, frames: [3, 4, 5, 4, 5, 4, 5, 5], rows: [0, 3, 2, 1, 0, 3, 2, 1], dur: 0.5, hitAt: 0.2, move: 0.25 },
   axe:    { sheet: 'hero_axe', size: 128, frames: [5, 5, 4, 3, 1, 0, 0], dur: 0.5, hitAt: 0.33, move: 0 },
@@ -393,8 +467,9 @@ const ACTS = {
   faint:  { sheet: 'hero_hurt', size: 64, frames: [0, 1, 2, 3, 4, 5, 5, 5, 5], dur: 1.3, hitAt: 1.25, move: 0, oneRow: true },
 };
 function startAct(kind, onHit, special) {
-  P.act = { kind, ...ACTS[kind], t: 0, hit: false, onHit, special };
-  if (special) { banner(special, special === 'Whirlwind' ? '#ffe08a' : '#f4b740'); if (special === 'Dash Strike') P.act.lunge = 260; }
+  P.act = { kind, ...ACTS[kind], t: 0, hit: false, onHit, special }; P.idleT = 0;
+  if (['sword', 'backslash', 'power', 'spin'].includes(kind)) SFX.play('swing');
+  if (special) { SFX.play('special'); banner(special, special === 'Whirlwind' ? '#ffe08a' : '#f4b740'); if (special === 'Dash Strike') P.act.lunge = 260; }
 }
 // Special moves: the 3rd hit in a quick chain becomes a finisher; attacking right after a dash is a Dash Strike.
 const FINISHERS = { sword: 'Power Slash', axe: 'Mighty Chop', pick: 'Rock Smash', gather: 'Green Thumb' };
@@ -407,7 +482,7 @@ function doAct(kind, onHit) {
     else if (P.combo === 2) floatText(P.x + 22, P.y - 50, 'x2', '#ffe08a');
   }
   P.lastKind = kind;
-  startAct(special && kind === 'sword' ? 'power' : kind, onHit, special);
+  startAct(special && kind === 'sword' ? 'power' : (kind === 'sword' && P.combo === 2 ? 'backslash' : kind), onHit, special);
 }
 function pressAction() { P.held = onAction(); P.charge = 0; }
 function releaseAction() {
@@ -421,9 +496,9 @@ function dash() {
   let my = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0) + joy.dy;
   const l = Math.hypot(mx, my);
   if (l > 0.15) { mx /= l; my /= l; P.fx = mx; P.fy = my; } else { mx = P.fx; my = P.fy; }
-  P.act = null; P.charge = 0; P.held = false;
-  P.dash = { t: 0, dur: 0.2, dx: mx, dy: my }; P.dashCd = 0.6;
-  burst(P.x, P.y - 2, '#d9cfb0', 8);
+  P.act = null; P.charge = 0; P.held = false; SFX.play('dash');
+  P.dash = { t: 0, dur: 0.26, dx: mx, dy: my }; P.dashCd = 0.6; P.idleT = 0;
+  burst(P.x, P.y - 2, '#d9cfb0', 8); SFX.play('leap');
 }
 function banner(text, color) { floats.push({ x: P.x, y: P.y - 70, text, color, life: 1.3, big: true }); }
 function impact(power) { if (!REDUCED_MOTION) shake = Math.max(shake, power); hitStop = 0.06; }
@@ -492,7 +567,7 @@ function drinkTonic() {
   if (paused() || P.act) return;
   if (!S.inv.potion) { toast('No tonics left. Craft one from 2 herbs and 1 slime goo.'); return; }
   if (S.hp >= S.maxHp) { toast('Your hearts are already full.'); return; }
-  S.inv.potion--; updateHUD();
+  S.inv.potion--; updateHUD(); SFX.play('drink');
   startAct('drink', () => { S.hp = Math.min(S.maxHp, S.hp + 3); burst(P.x, P.y - 30, '#e45a8f', 12); updateHUD(); floatText(P.x, P.y - 52, '+3 ♥', '#ec5257'); });
 }
 function hitEnemies(a) {
@@ -506,6 +581,7 @@ function hitEnemies(a) {
     if (e.hp <= 0) killEnemy(e);
   }
   if (sp) { impact(7); burst(hx, hy, '#ffe08a', 14); } else if (hit) impact(2);
+  if (hit) SFX.play('hit');
 }
 function spinHit(a) {
   const dmg = (S.tools.blade ? 2 : 1) * 2;
@@ -530,12 +606,16 @@ function hitResource(r, a) {
   r.hp -= power * (sp && sp !== 'Whirlwind' ? 2 : 1);
   if (sp && sp !== 'Whirlwind') { impact(6); burst(r.x, r.y - 18, '#ffe08a', 12); }
   const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff' }[r.type];
+  if (r.hp > 0) SFX.play(r.type === 'tree' ? 'chop' : r.type === 'herb' ? 'pick' : 'mine');
+  if (r.type === 'tree') for (let i = 0; i < 4; i++) particles.push({ x: r.x + (rng() - 0.5) * 30, y: r.y - 40 - rng() * 20, vx: (rng() - 0.5) * 40, vy: -20, life: 0.9, color: i % 2 ? '#5aa65c' : '#3d8448', leaf: true });
   burst(r.x, r.y - 16, col, 6);
   if (r.hp > 0) return;
-  r.alive = false; r.respawn = 35 + rng() * 20;
+  r.alive = false; r.respawn = 35 + rng() * 20; r.fall = 0; r.fallDir = P.x <= r.x ? 1 : -1;
+  SFX.play(r.type === 'tree' ? 'fall' : r.type === 'herb' ? 'pick' : 'crumble');
+  if (r.type === 'rock' || r.type === 'crystal') for (let i = 0; i < 10; i++) { const a = rng() * Math.PI * 2, v = 60 + rng() * 120; particles.push({ x: r.x, y: r.y - 10, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 90, life: 0.7, color: r.type === 'rock' ? (i % 2 ? '#9c9690' : '#6c6764') : (i % 2 ? '#a593ff' : '#e6e0ff'), size: 5 }); }
   // Lucky hit: a random bonus drop with a gold sparkle
   const lucky = rng() < 0.15 ? 1 : 0;
-  if (lucky) { floatText(r.x, r.y - 44, 'Lucky!', '#ffe08a'); burst(r.x, r.y - 20, '#ffe08a', 16); }
+  if (lucky) { SFX.play('lucky'); floatText(r.x, r.y - 44, 'Lucky!', '#ffe08a'); burst(r.x, r.y - 20, '#ffe08a', 16); }
   if (r.type === 'tree') drop(r.x, r.y - 10, 'wood', 2 + lucky);
   if (r.type === 'rock') drop(r.x, r.y - 6, 'stone', (S.tools.pickaxe ? 2 : 1) + lucky);
   if (r.type === 'herb') drop(r.x, r.y - 4, 'herb', (sp === 'Green Thumb' ? 3 : 1) + lucky);
@@ -543,7 +623,7 @@ function hitResource(r, a) {
   burst(r.x, r.y - 16, col, 12);
 }
 function killEnemy(e) {
-  e.alive = false; e.respawn = 25;
+  e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; SFX.play('slime');
   burst(e.x, e.y - 10, e.kind === 'purple' ? '#a879ff' : '#5fd0b0', 16);
   drop(e.x, e.y - 6, 'goo', e.kind === 'purple' ? 2 : 1);
   drop(e.x, e.y - 6, 'gold', e.kind === 'purple' ? 3 : 1);
@@ -553,7 +633,8 @@ function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = rng() *
 function floatText(x, y, text, color) { floats.push({ x, y, text, color, life: 1.1 }); }
 function damagePlayer(n, from) {
   if (P.inv > 0 || P.dash || (P.act && P.act.kind === 'faint')) return;
-  S.hp -= n; P.inv = 1.0;
+  S.hp -= n; P.inv = 1.0; P.idleT = 0; SFX.play('hurt');
+  const hearts = $('hearts'); hearts.classList.remove('hit'); void hearts.offsetWidth; hearts.classList.add('hit');
   const a = Math.atan2(P.y - from.y, P.x - from.x); P.kx = Math.cos(a) * 320; P.ky = Math.sin(a) * 320;
   burst(P.x, P.y - 24, '#ec5257', 8);
   if (S.hp <= 0) {
@@ -596,6 +677,7 @@ let time = 0, saveT = 0, edgeToast = false;
 function update(dt) {
   time += dt;
   for (const a of animals) updateAnimal(a, dt);
+  for (const n of NPCS) updateNPC(n, dt);
   if (paused()) return;
   shake *= Math.pow(0.0005, dt); if (shake < 0.3) shake = 0;
   for (let i = P.trail.length - 1; i >= 0; i--) { P.trail[i].life -= dt; if (P.trail[i].life <= 0) P.trail.splice(i, 1); }
@@ -606,9 +688,9 @@ function update(dt) {
   P.dashCd = Math.max(0, P.dashCd - dt);
   if (P.dash) {
     const D = P.dash; D.t += dt; moveMul = 0;
-    moveBody(P, D.dx * 420 * dt, D.dy * 420 * dt, 9); pushOut(P, 9);
-    P.trail.push({ x: P.x, y: P.y, row: dirRow(P.fx, P.fy), frame: 1 + Math.floor(D.t * 40) % 8, life: 0.22 });
-    if (D.t >= D.dur) { P.dash = null; P.dashEnd = time; }
+    moveBody(P, D.dx * 360 * dt, D.dy * 360 * dt, 9); pushOut(P, 9);
+    P.trail.push({ x: P.x, y: P.y - Math.sin(Math.PI * Math.min(1, D.t / D.dur)) * 14, row: dirRow(P.fx, P.fy), frame: Math.min(4, Math.floor(D.t / D.dur * 5)), life: 0.22 });
+    if (D.t >= D.dur) { P.dash = null; P.dashEnd = time; burst(P.x, P.y, '#d9cfb0', 6); }
   }
   if (P.act) {
     const A = P.act; A.t += dt; moveMul = A.move;
@@ -626,27 +708,46 @@ function update(dt) {
   let my = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0) + joy.dy;
   const ml = Math.hypot(mx, my);
   P.moving = false;
+  P.running = (keys['shift'] || touchRun) && !P.act && !P.held;
   if (ml > 0.15 && moveMul > 0) {
     const n = Math.min(1, ml); mx /= ml; my /= ml;
     if (!P.act) { P.fx = mx; P.fy = my; }
-    const ox = P.x, oy = P.y, sp = 130 * n * moveMul;
+    const ox = P.x, oy = P.y, sp = 130 * n * moveMul * (P.running ? 1.65 : 1);
+    P.idleT = 0;
+    if (P.running && Math.random() < dt * 10) particles.push({ x: P.x - mx * 8, y: P.y, vx: -mx * 30, vy: -30, life: 0.35, color: '#d9cfb0' });
     moveBody(P, mx * sp * dt, my * sp * dt, 9);
     const moved = Math.hypot(P.x - ox, P.y - oy);
     if (moved > 0.01) { P.moving = true; P.walkDist += moved; }
   }
   if (P.kx || P.ky) { moveBody(P, P.kx * dt, P.ky * dt, 9); P.kx *= Math.pow(0.002, dt); P.ky *= Math.pow(0.002, dt); if (Math.hypot(P.kx, P.ky) < 5) P.kx = P.ky = 0; }
   pushOut(P, 9);
+  if (!P.moving && !P.act && !P.dash && !P.held) P.idleT += dt; else P.idleT = 0;
+  if (P.idleT > 7 && P.idleT - dt <= 7) floatText(P.x + 16, P.y - 60, 'z', '#eef3e6');
   P.inv = Math.max(0, P.inv - dt);
   if (Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T && S.hp < S.maxHp && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 2) * T) { edgeToast = true; toast('The mainland is just over the horizon. That is a story for the full game.', 4000); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
-    if (!r.alive) { r.respawn -= dt; if (r.respawn <= 0 && Math.hypot(r.x - P.x, r.y - P.y) > 60) { r.alive = true; r.hp = r.max; } }
+    if (!r.alive) { const pf = r.fall; r.fall += dt; if (r.type === 'tree' && pf < 0.5 && r.fall >= 0.5) { burst(r.x + r.fallDir * 44, r.y - 4, '#5aa65c', 12); impact(3); } r.respawn -= dt; if (r.respawn <= 0 && Math.hypot(r.x - P.x, r.y - P.y) > 60) { r.alive = true; r.hp = r.max; r.grow = 0; } }
+    else if (r.grow !== undefined && r.grow < 1) r.grow = Math.min(1, r.grow + dt * 2.5);
   }
   const fainted = P.act && P.act.kind === 'faint';
   for (const e of enemies) {
-    if (!e.alive) { e.respawn -= dt; if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) { e.alive = true; e.hp = e.max; e.x = e.hx; e.y = e.hy; } continue; }
-    e.hurt = Math.max(0, e.hurt - dt);
+    if (!e.alive) { if (e.dieT > 0) e.dieT -= dt; e.respawn -= dt; if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) { e.alive = true; e.hp = e.max; e.x = e.hx; e.y = e.hy; e.spawnT = 0.45; } continue; }
+    e.hurt = Math.max(0, e.hurt - dt); if (e.spawnT > 0) e.spawnT -= dt;
+    e.cd = Math.max(0, (e.cd || 0) - dt);
+    // purple slimes wind up, then leap at you
+    if (e.state === 'windup') {
+      e.st -= dt; e.hop = 0;
+      if (e.st <= 0) { e.state = 'leap'; e.st = 0.38; const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1; e.lx = dx / d * 260; e.ly = dy / d * 260; }
+      continue;
+    }
+    if (e.state === 'leap') {
+      e.st -= dt; moveBody(e, e.lx * dt, e.ly * dt, 9); pushOut(e, 9);
+      if (Math.hypot(P.x - e.x, P.y - e.y) < 22 && !(P.act && P.act.kind === 'faint')) damagePlayer(2, e);
+      if (e.st <= 0) { e.state = 'move'; e.cd = 2 + rng(); burst(e.x, e.y, '#a879ff', 6); }
+      continue;
+    }
     const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy);
     const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
     const chase = !fainted && d < (e.kind === 'purple' ? 200 : 160) && homeD < 320 && Math.hypot(P.x - cx * T, P.y - cy * T) > 7 * T;
@@ -655,6 +756,7 @@ function update(dt) {
     let vx = 0, vy = 0;
     const knocked = Math.abs(e.kx) + Math.abs(e.ky) > 5;
     if (knocked) { vx = e.kx; vy = e.ky; e.kx *= Math.pow(0.001, dt); e.ky *= Math.pow(0.001, dt); }
+    else if (chase && e.kind === 'purple' && d < 120 && e.cd <= 0) { e.state = 'windup'; e.st = 0.5; continue; }
     else if (chase) { vx = dx / d * sp; vy = dy / d * sp; }
     else if (homeD > 220) { vx = (e.hx - e.x) / homeD * sp; vy = (e.hy - e.y) / homeD * sp; }
     else { e.wt -= dt; if (e.wt <= 0) { e.wt = 1 + rng() * 2; const a = rng() * Math.PI * 2, go = rng() < 0.6; e.wx = go ? Math.cos(a) * sp * 0.5 : 0; e.wy = go ? Math.sin(a) * sp * 0.5 : 0; } vx = e.wx; vy = e.wy; }
@@ -666,15 +768,22 @@ function update(dt) {
     const p = pickups[i]; p.t += dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.01, dt); p.vy *= Math.pow(0.01, dt);
     const d = Math.hypot(P.x - p.x, P.y - 14 - p.y);
-    if (p.t > 0.35 && d < 72 && !fainted) { const s = 260 * dt; p.x += (P.x - p.x) / d * s; p.y += (P.y - 14 - p.y) / d * s; }
+    if (p.t > 0.35 && d < 72 && !fainted) { const s = 260 * dt; p.x += (P.x - p.x) / d * s; p.y += (P.y - 14 - p.y) / d * s; if (Math.random() < dt * 20) particles.push({ x: p.x, y: p.y, vx: 0, vy: -10, life: 0.3, color: '#fff6c8', size: 2 }); }
     if (p.t > 0.35 && d < 14 && !fainted) {
       pickups.splice(i, 1);
-      if (p.item === 'gold') { addGold(1); floatText(P.x, P.y - 56, '+1g', '#f4b740'); }
-      else { S.inv[p.item]++; floatText(P.x, P.y - 56, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); }
+      if (p.item === 'gold') { addGold(1); floatText(P.x, P.y - 56, '+1g', '#f4b740'); SFX.play('coin'); }
+      else { S.inv[p.item]++; floatText(P.x, P.y - 56, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); SFX.play('collect'); }
       updateHUD();
+      const slot = p.item === 'gold' ? document.querySelector('.gold') : document.querySelector(`.slot[data-item="${p.item}"]`);
+      if (slot) { slot.classList.remove('bump'); void slot.offsetWidth; slot.classList.add('bump'); }
     } else if (p.t > 60) pickups.splice(i, 1);
   }
-  for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; if (p.life <= 0) particles.splice(i, 1); }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.leaf) { p.vy = 30; p.x += Math.sin(time * 6 + i) * 0.6; } else p.vy += 260 * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  updateAmbient(dt);
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.life -= dt; f.y -= 28 * dt; if (f.life <= 0) floats.splice(i, 1); }
   const n = nearestNPC(), pr = $('prompt');
   if (n && !P.act) { pr.hidden = false; const key = matchMedia('(pointer: coarse)').matches ? 'A' : 'Space'; pr.innerHTML = `<kbd>${key}</kbd> ${n.verb} ${n.name}`; } else pr.hidden = true;
@@ -688,6 +797,37 @@ function updateAnimal(a, dt) {
   if (a.vx) a.flip = a.vx > 0;
 }
 
+// ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
+let viewRect = { x: 0, y: 0, w: 800, h: 600 };
+function updateAmbient(dt) {
+  if (ambient.length < 34 && Math.random() < dt * 12) {
+    const x = viewRect.x + Math.random() * viewRect.w, y = viewRect.y + Math.random() * viewRect.h;
+    const tx = Math.floor(x / T), ty = Math.floor(y / T), rg = region[ty * W + tx];
+    if (isLand(tileAt(tx, ty))) {
+      if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
+      else if (rg === 3) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#ffffff', '#ffd65a', '#f28fb4'][Math.floor(Math.random() * 3)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
+      else if (rg === 1) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 14 });
+    }
+  }
+  for (let i = ambient.length - 1; i >= 0; i--) {
+    const a = ambient[i]; a.life -= dt; a.ph += dt;
+    if (a.kind === 'leaf') { a.y += 22 * dt; a.x += Math.sin(a.ph * 2) * 22 * dt; }
+    else if (a.kind === 'fly') { if (Math.random() < dt) { a.vx = (Math.random() - 0.5) * 40; a.vy = (Math.random() - 0.5) * 30; } a.x += a.vx * dt; a.y += a.vy * dt + Math.sin(a.ph * 5) * 0.4; }
+    else { a.x += a.vx * dt; a.y += a.vy * dt; }
+    if (a.life <= 0) ambient.splice(i, 1);
+  }
+}
+function drawAmbient(c) {
+  for (const a of ambient) {
+    const fade = Math.min(1, a.life, (a.kind === 'leaf' ? 4 : a.kind === 'fly' ? 6 : 5) - a.life);
+    c.globalAlpha = Math.max(0, fade);
+    if (a.kind === 'leaf') { c.fillStyle = a.col; const w = 2 + Math.abs(Math.sin(a.ph * 3)) * 3; c.fillRect(Math.round(a.x - w / 2), Math.round(a.y), Math.round(w), 3); }
+    else if (a.kind === 'fly') { c.fillStyle = a.col; const f = Math.abs(Math.sin(a.ph * 14)) * 3 + 1; c.fillRect(Math.round(a.x - f - 1), Math.round(a.y), Math.round(f), 3); c.fillRect(Math.round(a.x + 1), Math.round(a.y), Math.round(f), 3); }
+    else { const p = 0.5 + Math.sin(a.ph * 3) * 0.5; c.globalAlpha *= p; c.fillStyle = 'rgba(214,200,255,.35)'; circle(c, a.x, a.y, 5); c.fillStyle = '#fff4b8'; c.fillRect(Math.round(a.x - 1), Math.round(a.y - 1), 2, 2); }
+  }
+  c.globalAlpha = 1;
+}
+
 // ---------- render ----------
 let vw = 0, vh = 0, dpr = 1, Z = 1;
 function resize() {
@@ -699,25 +839,56 @@ function resize() {
 addEventListener('resize', resize);
 
 function shadow(c, x, y, rx, ry) { c.fillStyle = 'rgba(0,0,0,.22)'; ellipse(c, x, y, rx, ry); }
-function drawRes(c, r) {
-  const s = r.shake ? Math.round(Math.sin(time * 70) * 2) : 0;
-  if (r.type === 'tree') { shadow(c, r.x, r.y + 3, 15, 5); sprB(c, r.key, r.x + s, r.y + 7, 3); }
-  else if (r.type === 'rock') { shadow(c, r.x, r.y + 3, 15, 5); sprB(c, 'rock_g', r.x + s, r.y + 8, 2.25); }
-  else if (r.type === 'herb') { const sw = Math.sin(time * 2 + r.seed * 9) > 0.7 ? 1 : 0; sprB(c, r.key, r.x + sw, r.y + 6, 2); }
-  else if (r.type === 'crystal') {
-    const g = 0.22 + Math.sin(time * 3 + r.seed * 10) * 0.08;
-    c.fillStyle = `rgba(165,147,255,${g})`; circle(c, r.x, r.y - 12, 22);
-    shadow(c, r.x, r.y + 3, 13, 4); sprB(c, 'crystal', r.x + s, r.y + 8, 2.5);
+// scale-around-the-base helper so things can squash, grow and topple from where they stand
+function withBase(c, x, y, sx, sy, rot, fn) { c.save(); c.translate(x, y); if (rot) c.rotate(rot); c.scale(sx, sy); fn(); c.restore(); }
+function drawRemains(c, r) {
+  if (r.type === 'tree') {
+    if (r.fall < 0.7) { // toppling tree
+      const k = Math.min(1, r.fall / 0.55), rot = r.fallDir * k * k * 1.45;
+      c.globalAlpha = r.fall > 0.5 ? Math.max(0, 1 - (r.fall - 0.5) / 0.2) : 1;
+      withBase(c, r.x, r.y + 6, 1, 1, rot, () => sprB(c, r.key, 0, 1, 3));
+      c.globalAlpha = 1;
+    }
+    c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, r.x, r.y + 4, 11, 4);
+    c.fillStyle = '#3b2414'; c.fillRect(r.x - 7, r.y - 4, 14, 9);
+    c.fillStyle = '#7a4b27'; c.fillRect(r.x - 6, r.y - 3, 12, 7); c.fillStyle = '#c99a63'; ellipse(c, r.x, r.y - 3, 6, 2.5);
+  } else if (r.type === 'rock' || r.type === 'crystal') {
+    c.fillStyle = r.type === 'rock' ? '#7f7a76' : '#6c5ce7';
+    c.fillRect(r.x - 9, r.y + 1, 4, 3); c.fillRect(r.x + 3, r.y + 2, 5, 3); c.fillRect(r.x - 2, r.y - 1, 3, 2);
   }
+}
+function drawRes(c, r) {
+  if (!r.alive) { drawRemains(c, r); return; }
+  const s = r.shake ? Math.round(Math.sin(time * 70) * 2) : 0;
+  const g = r.grow === undefined ? 1 : r.grow, pop = g < 1 ? (g < 0.7 ? g / 0.7 * 1.15 : 1.15 - (g - 0.7) / 0.3 * 0.15) : 1;
+  const squash = r.shake > 0.1 && r.type !== 'tree' ? 1 + (r.shake - 0.1) * 1.2 : 1;
+  withBase(c, r.x + s, r.y + 7, pop * squash, pop / squash, 0, () => {
+    if (r.type === 'tree') { shadow(c, 0, -4, 15, 5); sprB(c, r.key, 0, 0, 3); }
+    else if (r.type === 'rock') { shadow(c, 0, -4, 15, 5); sprB(c, 'rock_g', 0, 1, 2.25); }
+    else if (r.type === 'herb') { const sw = Math.sin(time * 2 + r.seed * 9) > 0.7 ? 1 : 0; sprB(c, r.key, sw, -1, 2); }
+    else if (r.type === 'crystal') {
+      const gl = 0.22 + Math.sin(time * 3 + r.seed * 10) * 0.08;
+      c.fillStyle = `rgba(165,147,255,${gl})`; circle(c, 0, -19, 22);
+      shadow(c, 0, -4, 13, 4); sprB(c, 'crystal', 0, 1, 2.5);
+      if (Math.sin(time * 2.3 + r.seed * 20) > 0.97) { c.fillStyle = '#ffffff'; c.fillRect(-6, -34, 2, 6); c.fillRect(-8, -32, 6, 2); }
+    }
+  });
   if (r.hp < r.max && r.type !== 'herb') healthBar(c, r.x, r.y + 8, r.hp / r.max);
 }
 function drawSlime(c, e) {
-  const sq = Math.sin(e.hop), lift = Math.max(0, sq) * 7, sx = 1 + Math.max(0, -sq) * 0.18, sy = 1 - Math.max(0, -sq) * 0.14 + Math.max(0, sq) * 0.08;
-  shadow(c, e.x, e.y + 2, 13 - lift * 0.5, 4);
+  const sq = Math.sin(e.hop);
+  let lift = Math.max(0, sq) * 7, sx = 1 + Math.max(0, -sq) * 0.18, sy = 1 - Math.max(0, -sq) * 0.14 + Math.max(0, sq) * 0.08, ox = 0;
+  if (!e.alive) { const k = 1 - Math.max(0, e.dieT) / 0.4; sx = 1 + k * 0.9; sy = Math.max(0.08, 1 - k * 0.92); lift = 0; c.globalAlpha = Math.max(0, 1 - k * 0.8); }
+  else if (e.state === 'windup') { const k = 1 - e.st / 0.5; sx = 1 + k * 0.3; sy = 1 - k * 0.3; lift = 0; ox = Math.sin(time * 60) * 1.5; }
+  else if (e.state === 'leap') { const k = 1 - e.st / 0.38; lift = Math.sin(Math.PI * k) * 26; sx = 0.85; sy = 1.2; }
+  if (e.spawnT > 0) { const k = 1 - e.spawnT / 0.45, pop = k < 0.7 ? k / 0.7 * 1.2 : 1.2 - (k - 0.7) / 0.3 * 0.2; sx *= pop; sy *= pop; }
+  shadow(c, e.x, e.y + 2, Math.max(4, 13 - lift * 0.3), 4);
   const w = 40 * sx, h = 40 * sy, a = ATLAS[e.kind === 'purple' ? 'slime_p' : 'slime'];
   if (e.hurt > 0) c.globalAlpha = 0.5;
-  c.drawImage(IMG.kenney_atlas, a[0], a[1], 16, 16, Math.round(e.x - w / 2), Math.round(e.y + 6 - h - lift), Math.round(w), Math.round(h));
+  c.drawImage(IMG.kenney_atlas, a[0], a[1], 16, 16, Math.round(e.x + ox - w / 2), Math.round(e.y + 6 - h - lift), Math.round(w), Math.round(h));
   c.globalAlpha = 1;
+  if (!e.alive) return;
+  if (e.state === 'windup') { c.fillStyle = '#ffe08a'; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('!', e.x, e.y - 44); }
   if (e.hp < e.max) healthBar(c, e.x, e.y - 38 - lift, e.hp / e.max);
 }
 function healthBar(c, x, y, f) { c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x - 13, y, 26, 5); c.fillStyle = '#ec5257'; c.fillRect(x - 12, y + 1, 24 * f, 3); }
@@ -726,9 +897,10 @@ function drawLPC(c, sheet, frame, row, x, y, size) {
   const ox = size === 128 ? 64 : 32, oy = size === 128 ? 94 : 62;
   c.drawImage(img, frame * size, row * size, size, size, Math.round(x - ox), Math.round(y - oy), size, size);
 }
+const enemyNear = r => enemies.some(e => e.alive && Math.hypot(e.x - P.x, e.y - P.y) < r);
 function drawPlayer(c) {
   if (P.inv > 0 && !(P.act && P.act.kind === 'faint') && Math.floor(time * 20) % 2 === 0) return;
-  for (const g of P.trail) { c.globalAlpha = g.life * 2.2; drawLPC(c, 'hero_walk', g.frame, g.row, g.x, g.y, 64); }
+  for (const g of P.trail) { c.globalAlpha = g.life * 2.2; drawLPC(c, 'hero_jump', g.frame, g.row, g.x, g.y, 64); }
   c.globalAlpha = 1;
   shadow(c, P.x, P.y + 1, 11, 4);
   if (P.held && P.charge > 0.15 && !P.act) {
@@ -751,8 +923,14 @@ function drawPlayer(c) {
       c.strokeStyle = `rgba(255,224,138,${k})`; c.lineWidth = 5;
       c.beginPath(); c.ellipse(P.x, P.y - 12, rad, rad * 0.55, 0, 0, Math.PI * 2); c.stroke();
     }
-  } else if (P.dash) drawLPC(c, 'hero_walk', 1 + Math.floor(P.dash.t * 40) % 8, row, P.x, P.y, 64);
+  } else if (P.dash) {
+    const k = Math.min(1, P.dash.t / P.dash.dur);
+    drawLPC(c, 'hero_jump', Math.min(4, Math.floor(k * 5)), row, P.x, P.y - Math.sin(Math.PI * k) * 14, 64);
+  }
+  else if (P.moving && P.running) drawLPC(c, 'hero_run', Math.floor(P.walkDist / 9) % 8, row, P.x, P.y, 64);
   else if (P.moving) drawLPC(c, 'hero_walk', 1 + Math.floor(P.walkDist / 7) % 8, row, P.x, P.y, 64);
+  else if (P.idleT > 7) drawLPC(c, 'hero_sit', P.idleT < 7.25 ? 0 : 1, row, P.x, P.y, 64);
+  else if (enemyNear(150)) drawLPC(c, 'hero_combat_idle', Math.floor(time * 3) % 2, row, P.x, P.y, 64);
   else drawLPC(c, 'hero_idle', Math.floor(time * 1.6) % 2, row, P.x, P.y, 64);
 }
 function drawHouse(c) {
@@ -770,8 +948,8 @@ function drawNPC(c, n) {
     sprB(c, 'pickaxe', n.x - 10, n.y - 13, 1.25); sprB(c, 'axe', n.x + 10, n.y - 13, 1.25);
   } else {
     shadow(c, n.x, n.y + 1, 11, 4);
-    const row = near ? dirRow(P.x - n.x, P.y - n.y) : 2;
-    drawLPC(c, n.sheet, Math.floor(time * 1.4 + n.x) % 2, row, n.x, n.y, 64);
+    if (n.moving) drawLPC(c, n.walk, 1 + Math.floor(n.step / 7) % 8, dirRow(n.fx, n.fy), n.x, n.y, 64);
+    else drawLPC(c, n.sheet, Math.floor(time * 1.4) % 2, near ? dirRow(P.x - n.x, P.y - n.y) : dirRow(n.fx, n.fy), n.x, n.y, 64);
   }
   const alert = (n.id === 'oma' && !S.met.oma) || (n.id === 'tobin' && ((!S.met.tobin && !S.bridge) || (S.gold >= GOAL && !S.bridge)));
   if (alert) { const b = Math.sin(time * 5) * 2; c.fillStyle = '#f4b740'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 20px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText('!', n.x, n.y - 62 + b); c.fillText('!', n.x, n.y - 62 + b); }
@@ -805,12 +983,18 @@ function render() {
     const ph = (time * 0.8 + hash(ty, tx) * 6) % 3; if (ph > 1) continue;
     ctx.fillRect(tx * T + 6 + hash(tx + 1, ty) * 18, ty * T + 8 + hash(tx, ty + 1) * 14, 6 * (1 - Math.abs(ph - 0.5) * 2) + 2, 2);
   }
+  viewRect = { x: camX, y: camY, w: viewW, h: viewH };
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
-  for (const p of pickups) { if (!inView(p.x, p.y)) continue; const b = Math.sin(time * 6 + p.t * 3) * 2; shadow(ctx, p.x, p.y + 8, 6, 2); ctx.drawImage(ICON_CANVAS[p.item], Math.round(p.x - 10), Math.round(p.y - 10 + b), 20, 20); }
+  for (const p of pickups) {
+    if (!inView(p.x, p.y)) continue;
+    const b = Math.sin(time * 6 + p.t * 3) * 2, spin = p.item === 'gold' ? Math.max(0.15, Math.abs(Math.cos(time * 5 + p.x))) : 1;
+    shadow(ctx, p.x, p.y + 8, 6, 2);
+    ctx.drawImage(ICON_CANVAS[p.item], Math.round(p.x - 10 * spin), Math.round(p.y - 10 + b), Math.round(20 * spin), 20);
+  }
   const list = [];
   for (const d of decor) if (inView(d.x, d.y)) list.push([d.y, 5, d]);
-  for (const r of resources) if (r.alive && inView(r.x, r.y)) list.push([r.y, 0, r]);
-  for (const e of enemies) if (e.alive && inView(e.x, e.y)) list.push([e.y, 1, e]);
+  for (const r of resources) if ((r.alive || r.type !== 'herb') && inView(r.x, r.y)) list.push([r.y, 0, r]);
+  for (const e of enemies) if ((e.alive || e.dieT > 0) && inView(e.x, e.y)) list.push([e.y, 1, e]);
   for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
   for (const a of animals) if (inView(a.x, a.y)) list.push([a.y, 6, a]);
   if (inView(HOUSE.x, HOUSE.y, 150)) list.push([HOUSE.y - 4, 4, null]);
@@ -825,7 +1009,9 @@ function render() {
     else if (kind === 5) { if (o.solid) shadow(ctx, o.x, o.y + 3, 12, 4); sprB(ctx, o.key, o.x, o.y + 6, o.s); }
     else drawAnimal(ctx, o);
   }
-  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life * 1.6); ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x - 2), Math.round(p.y - 2), 4, 4); }
+  for (const p of particles) { const z = p.size || 4; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6)); ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x - z / 2), Math.round(p.y - z / 2), z, z); }
+  ctx.globalAlpha = 1;
+  drawAmbient(ctx);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.font = '700 13px "Pixelify Sans", sans-serif';
   for (const f of floats) {
