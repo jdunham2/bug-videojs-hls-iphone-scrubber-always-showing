@@ -50,30 +50,33 @@ const WEAPONS={
 const TIER_DMG=[1,1.65,2.5,3.7], TIER_CD=[1,.9,.8,.7], TIER_PRICE=[1,1.9,3.4,6];
 
 const ITEMS=[
-  {id:'protein',name:'Protein Bar',r:0,price:14,sym:'♥',col:'#ff6b8a',mods:{maxHp:4,melee:1}},
+  {id:'protein',name:"Choco Bar",r:0,price:14,sym:'♥',col:'#ff6b8a',mods:{maxHp:4,melee:1}},
   {id:'coffee',name:'Bitter Coffee',r:0,price:15,sym:'◉',col:'#c98a4b',mods:{atkSpd:8,speed:-2}},
   {id:'scope',name:'Tin Scope',r:0,price:14,sym:'◎',col:'#9fd0ff',mods:{range:40,atkSpd:-3}},
-  {id:'boots',name:'Spring Boots',r:0,price:15,sym:'➶',col:'#7bd35a',mods:{speed:7}},
-  {id:'bandage',name:'Bandage',r:0,price:13,sym:'✚',col:'#ffffff',mods:{regen:2}},
-  {id:'clover',name:'Clover',r:0,price:13,sym:'✤',col:'#5ee07a',mods:{luck:12}},
-  {id:'trowel',name:'Trowel',r:0,price:16,sym:'▲',col:'#d9b26b',mods:{harvest:6}},
-  {id:'bark',name:'Bark Shell',r:0,price:15,sym:'⬢',col:'#b07a4a',mods:{armor:2,speed:-2}},
-  {id:'fang',name:'Fang Charm',r:1,price:30,sym:'▼',col:'#ff4d6d',mods:{lifesteal:3}},
+  {id:'boots',name:"Running Socks",r:0,price:15,sym:'➶',col:'#7bd35a',mods:{speed:7}},
+  {id:'bandage',name:"Pocket Defib",r:0,price:13,sym:'✚',col:'#ffffff',mods:{regen:2}},
+  {id:'clover',name:"Lucky Star",r:0,price:13,sym:'✤',col:'#5ee07a',mods:{luck:12}},
+  {id:'trowel',name:"Shovel",r:0,price:16,sym:'▲',col:'#d9b26b',mods:{harvest:6}},
+  {id:'bark',name:"Bark Shield",r:0,price:15,sym:'⬢',col:'#b07a4a',mods:{armor:2,speed:-2}},
+  {id:'fang',name:"Blood Chalice",r:1,price:30,sym:'▼',col:'#ff4d6d',mods:{lifesteal:3}},
   {id:'lens',name:'Cracked Lens',r:1,price:28,sym:'◈',col:'#ffe066',mods:{crit:6,range:15}},
   {id:'fizz',name:'Fizzy Drink',r:1,price:30,sym:'ϟ',col:'#6fe3ff',mods:{atkSpd:15,maxHp:-3}},
-  {id:'belt',name:'Ammo Belt',r:1,price:32,sym:'≡',col:'#e0b84f',mods:{ranged:3,atkSpd:5}},
-  {id:'hood',name:'Shadow Hood',r:1,price:30,sym:'☾',col:'#9b8cff',mods:{dodge:6}},
-  {id:'magnet',name:'Horseshoe Magnet',r:1,price:24,sym:'∩',col:'#ff5a5a',mods:{pickup:80,harvest:3}},
-  {id:'knuckles',name:'Iron Knuckles',r:1,price:30,sym:'■',col:'#b8b8c8',mods:{melee:3,armor:1}},
-  {id:'overcharger',name:'Overcharger',r:2,price:55,sym:'✺',col:'#ff8a3d',mods:{dmg:22,armor:-2}},
-  {id:'thorn',name:'Thorny Vest',r:2,price:50,sym:'✳',col:'#6cc24a',mods:{thorns:14,armor:3},extra:'Enemies that touch you take 14 damage'},
-  {id:'twin',name:'Twin Barrels',r:2,price:62,sym:'‖',col:'#ffcc4d',mods:{extraProj:1,dmg:-5},extra:'Ranged weapons fire +1 projectile',max:2},
-  {id:'mask',name:'Berserker Mask',r:2,price:55,sym:'✖',col:'#e0336f',mods:{dmg:15,atkSpd:12,maxHp:-5}},
+  {id:'belt',name:"Ammo Clip",r:1,price:32,sym:'≡',col:'#e0b84f',mods:{ranged:3,atkSpd:5}},
+  {id:'hood',name:"Cool Shades",r:1,price:30,sym:'☾',col:'#9b8cff',mods:{dodge:6}},
+  {id:'magnet',ic:'i_coin',name:"Coin Magnet",r:1,price:24,sym:'∩',col:'#ff5a5a',mods:{pickup:80,harvest:3}},
+  {id:'knuckles',name:"Hard Hat",r:1,price:30,sym:'■',col:'#b8b8c8',mods:{melee:3,armor:1}},
+  {id:'overcharger',name:"Power Crystal",r:2,price:55,sym:'✺',col:'#ff8a3d',mods:{dmg:22,armor:-2}},
+  {id:'thorn',name:"Cactus Armor",r:2,price:50,sym:'✳',col:'#6cc24a',mods:{thorns:14,armor:3},extra:'Enemies that touch you take 14 damage'},
+  {id:'twin',name:"Double Shells",r:2,price:62,sym:'‖',col:'#ffcc4d',mods:{extraProj:1,dmg:-5},extra:'Ranged weapons fire +1 projectile',max:2},
+  {id:'mask',name:"Jack-o'-Mask",r:2,price:55,sym:'✖',col:'#e0336f',mods:{dmg:15,atkSpd:12,maxHp:-5}},
   {id:'core',name:'Alien Core',r:3,price:90,sym:'✦',col:'#5ef2b0',mods:{dmg:15,atkSpd:15,maxHp:6,speed:5}},
   {id:'reactor',name:'Chain Reactor',r:3,price:95,sym:'✹',col:'#ff6b3d',mods:{boom:35},max:2},
-  {id:'crown',name:'Vampire Crown',r:3,price:90,sym:'♛',col:'#ff4d6d',mods:{lifesteal:7,maxHp:10}},
+  {id:'crown',name:"Blood Ruby",r:3,price:90,sym:'♛',col:'#ff4d6d',mods:{lifesteal:7,maxHp:10}},
 ];
 const ITEM_BY=Object.fromEntries(ITEMS.map(i=>[i.id,i]));
+function iconHTML(key,fallback,col,cls='iimg'){const a=A[key];return a?`<img class="${cls}" src="${a.src}" alt="">`:`<span class="sym" style="color:${col}">${fallback}</span>`}
+const itemIcon=(it,cls)=>iconHTML(it.ic||'i_'+it.id,it.sym,it.col,cls);
+const UPG_IC={maxHp:'i_heart',regen:'i_bandage',lifesteal:'i_fang',dmg:'i_overcharger',melee:'i_knuckles',ranged:'i_belt',atkSpd:'i_coffee',crit:'i_lens',range:'i_scope',armor:'i_bark',dodge:'i_hood',speed:'i_boots',luck:'i_clover',harvest:'i_trowel'};
 
 const UPG=[['maxHp',[3,6,9,12],'♥','#ff6b8a'],['regen',[2,3,4,5],'✚','#fff'],['lifesteal',[1,2,3,4],'▼','#ff4d6d'],['dmg',[5,8,12,16],'✺','#ff8a3d'],['melee',[1,2,3,4],'■','#b8b8c8'],['ranged',[1,2,3,4],'≡','#e0b84f'],['atkSpd',[5,10,15,20],'ϟ','#6fe3ff'],['crit',[3,5,7,9],'◈','#ffe066'],['range',[15,30,45,60],'◎','#9fd0ff'],['armor',[1,2,3,4],'⬢','#b07a4a'],['dodge',[3,6,9,12],'☾','#9b8cff'],['speed',[3,6,9,12],'➶','#7bd35a'],['luck',[5,10,15,20],'✤','#5ee07a'],['harvest',[5,8,10,12],'▲','#d9b26b']];
 
@@ -864,13 +867,13 @@ function showLevelUp(){
   state='levelup'; showUI('lvl');
   $('lvlTitle').textContent='LEVEL UP!'; $('lvlTitle').style.color='';
   $('lvlSub').textContent=run.pendingLv>1?`Pick one (${run.pendingLv} upgrades waiting)`:'Pick one';
-  const box=$('lvlCards'); box.innerHTML=''; $('lvlBtns').innerHTML='';
+  const box=$('lvlCards'); box.innerHTML=''; $('lvlBtns').innerHTML=''; box.style.gridTemplateColumns='';
   const used=new Set();
   for(let i=0;i<4;i++){
     let u; do{u=pick(UPG)}while(used.has(u[0])); used.add(u[0]);
     const r=rollRarity(); const v=u[1][r];
     const card=document.createElement('button'); card.className='card pickable r'+r;
-    card.innerHTML=`<div class="ic"><span class="sym" style="color:${u[3]}">${u[2]}</span></div><div class="ct">${RAR[r].n}</div><div class="cn">${STAT[u[0]].replace('% ','')}</div><ul><li class="pos">+${v}${STAT[u[0]][0]==='%'?'':' '}${STAT[u[0]]}</li></ul>`;
+    card.innerHTML=`<div class="ic">${iconHTML(UPG_IC[u[0]],u[2],u[3])}</div><div class="ct">${RAR[r].n}</div><div class="cn">${STAT[u[0]].replace('% ','')}</div><ul><li class="pos">+${v}${STAT[u[0]][0]==='%'?'':' '}${STAT[u[0]]}</li></ul>`;
     card.onclick=()=>{S[u[0]]+=v;if(u[0]==='maxHp')P.hp+=v;run.pendingLv--;sfx('buy');nextStep()};
     box.appendChild(card);
   }
@@ -879,7 +882,7 @@ function showCrate(){
   state='levelup'; showUI('lvl');
   $('lvlTitle').textContent='CRATE!'; $('lvlTitle').style.color='#ffcc4d';
   $('lvlSub').textContent=run.crates>1?`${run.crates} crates to open`:'Something rattles inside';
-  const it=randomItem(Math.min(3,rollRarity(2))); const box=$('lvlCards'); box.innerHTML='';
+  const it=randomItem(Math.min(3,rollRarity(2))); const box=$('lvlCards'); box.innerHTML=''; box.style.gridTemplateColumns='minmax(0,230px)';
   box.appendChild(itemCard(it));
   const rec=Math.max(1,Math.round(iPrice(it)*.45));
   const bx=$('lvlBtns'); bx.innerHTML='';
@@ -891,7 +894,7 @@ function applyItem(it){run.items[it.id]=(run.items[it.id]||0)+1;for(const k in i
 function itemCard(it){
   const card=document.createElement('div'); card.className='card r'+it.r;
   const lines=modLines(it.mods); if(it.extra)lines.unshift([it.extra,'neu']);
-  card.innerHTML=`<div class="ic"><span class="sym" style="color:${it.col}">${it.sym}</span></div><div class="ct">${RAR[it.r].n} item${run.items[it.id]?` · own ${run.items[it.id]}`:''}</div><div class="cn">${it.name}</div><ul>${fmtLines(lines)}</ul>`;
+  card.innerHTML=`<div class="ic">${itemIcon(it)}</div><div class="ct">${RAR[it.r].n} item${run.items[it.id]?` · own ${run.items[it.id]}`:''}</div><div class="cn">${it.name}</div><ul>${fmtLines(lines)}</ul>`;
   return card;
 }
 function wStatLine(def,tier){return `${Math.round(wDmg(def,tier))}${def.pellets?'×'+(def.pellets+S.extraProj):''} dmg · ${wCd(def,tier).toFixed(2)}s · ${Math.round(wRange(def))} range`}
@@ -967,7 +970,7 @@ function renderShop(){
     row.appendChild(sb);
   }else pop.hidden=true;
   const oi=$('ownedItems'); const ids=Object.keys(run.items);
-  oi.innerHTML=ids.length?ids.map(id=>{const it=ITEM_BY[id];return `<span class="oi" title="${it.name}"><span class="sym" style="color:${it.col}">${it.sym}</span>${it.name}${run.items[id]>1?' ×'+run.items[id]:''}</span>`}).join(''):'<span class="none">Nothing yet. Items stack.</span>';
+  oi.innerHTML=ids.length?ids.map(id=>{const it=ITEM_BY[id];return `<span class="oi" title="${it.name}">${itemIcon(it)}${it.name}${run.items[id]>1?' ×'+run.items[id]:''}</span>`}).join(''):'<span class="none">Nothing yet. Items stack.</span>';
   $('statList').innerHTML=STAT_ORDER.map(k=>{let v=S[k];if(k==='maxHp')v=maxHp();v=Math.round(v*10)/10;const c=v>0?'pos':v<0?'neg':'';return `<dt>${STAT[k].replace('% ','')}${STAT[k].startsWith('%')?' %':''}</dt><dd class="${k==='maxHp'?'':c}">${v}</dd>`}).join('');
 }
 function gameOver(win){

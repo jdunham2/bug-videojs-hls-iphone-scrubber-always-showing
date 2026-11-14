@@ -57,6 +57,7 @@ def put(name, im, q=82, **meta):
 
 
 # ---------- 3D renders ----------
+HUE = {'i_core': -92, 'i_crown': 92}  # hue shift (0-255 scale): purple crystal -> alien green, blue jewel -> ruby red
 ROT = {'w_hammer': -90, 'w_spear': -90, 'w_axe': -90, 'w_sword': -90, 'w_pan': 90}
 FLIP = {'w_knife', 'w_pistol', 'w_smg', 'w_shotgun', 'w_rocket', 'w_zapper', 'w_sniper', 'w_minigun', 'w_bouncer', 'w_lobber', 'w_flamer'}
 for f in sorted(os.listdir(RAW)):
@@ -76,6 +77,12 @@ for f in sorted(os.listdir(RAW)):
                     px[x, y] = (min(255, int(r * 1.0)), int(g * .35), int(b * .62), a)
     if n.startswith('veg_'):
         im = outline(im, 7); im, _ = fit(im, 200, 200)
+    elif n.startswith('i_'):
+        if n in HUE:
+            r, g, b, al = im.split(); h, sat, v = Image.merge('RGB', (r, g, b)).convert('HSV').split()
+            h = h.point(lambda x: (x + HUE[n]) % 256); sat = sat.point(lambda x: min(255, int(x * 1.15)))
+            im = Image.merge('HSV', (h, sat, v)).convert('RGB'); im.putalpha(al)
+        im = outline(im, 6); im, _ = fit(im, 96, 96)
     elif n.startswith('w_'):
         im = outline(im, 6); im, _ = fit(im, 160, 110)
     elif n.startswith('d_'):
