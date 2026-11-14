@@ -1,18 +1,22 @@
 # Knockout Isle (vertical slice)
 
-A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: two playable fighters, AI opponents, two arenas, items, and a wave loop with power-ups.
+A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: three playable fighters, AI opponents, three arenas, items, and a wave loop with power-ups.
 
 ## Content
 
-- **Fighters**: Nova (sword combo + charged smash) and Pyra (fireballs from range, charged fire burst up close). Enemies: Grub, Vex, Bolt, Moss.
+- **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) and Tank-o (hold dash on the ground to shield, charged rocket punch). Enemies: Grub, Vex, Bolt, Moss.
 - **Arenas** (alternate every wave):
   - **Sky Isle**: a floating island with three floating platforms.
   - **Lava Forge**: every 19 seconds the floor sinks into lava for about 4 seconds. Touching lava adds 7% and bounces you up, so get onto the raised pillars.
+  - **Windy Peaks**: every 12 seconds a gust blows across the summit for 3.5 seconds (an arrow shows its direction). Walk into it, or shield to brace.
 - **Items** (drop every 7–11s, walk over to grab):
   - **Hammer**: 8s of big swings, no jumping.
   - **Bomb**: attack to throw, explodes on contact. It blows up in your hands after 5s.
   - **Heart**: heals 30%.
-- **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken).
+  - **Star**: 6s of invincibility and extra speed. Touching the enemy hurts them.
+  - **Boomerang**: 3 throws; it flies out, comes back and can hit both ways.
+  - **Banana**: toss a peel trap. Whoever steps on it slips.
+- **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken), **Thorns** (attackers take 3%), **Fire Trail** (dashes leave burning fire), **Chain Lightning** (every 3rd hit zaps for +6%).
 
 ## Run it
 
@@ -32,7 +36,7 @@ Then open http://localhost:8000.
 | Jump (double jump) | Space | JUMP |
 | Attack (3-hit combo, air spin) | J / left click | HIT |
 | Smash (hold to charge) | K / right click | SMASH (hold) |
-| Dash (dodge, once in air) | Shift | DASH |
+| Dash (dodge, once in air); Tank-o: hold to shield | Shift | DASH |
 | Camera | Mouse (click to capture), Q toggles lock-on | Drag the right side |
 | Pause | Esc / P | II button |
 
