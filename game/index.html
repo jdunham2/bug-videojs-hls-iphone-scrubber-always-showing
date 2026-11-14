@@ -163,7 +163,9 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .unlock .thumb{width:128px;height:72px;border-radius:10px;object-fit:cover}
 .seg button.locked{opacity:.45;cursor:not-allowed}
 .seg button.rolling{box-shadow:inset 0 0 0 2px var(--mint);color:var(--mint)}
-#btnRandArena{display:block;margin:8px auto 0}
+.arenaRand{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:8px}
+.arenaHint{display:block;margin-top:6px;font-size:12px;color:var(--muted)}
+.arenaHint:empty{display:none}
 .toggle:disabled{opacity:.5;cursor:default}
 .seg button small{display:block;font-family:var(--body);font-weight:700;font-size:9px;letter-spacing:.08em;margin-top:2px}
 .unlock{display:flex;align-items:center;gap:14px;padding:10px 18px 10px 10px;border-radius:16px;background:var(--glass);border:2px solid var(--sun);animation:glow 1.2s ease-in-out infinite alternate}
@@ -266,7 +268,11 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arGarden" data-a="garden">GRAVITY GARDEN</button>
         <button id="arTrain" data-a="train">TRAIN TOP</button>
       </div>
-      <button class="toggle" id="btnRandArena">RANDOM ARENA</button>
+      <div class="arenaRand">
+        <button class="toggle" id="btnRandArena">RANDOM ARENA</button>
+        <button class="toggle" id="btnRandArenaMode" aria-pressed="false">RANDOM ARENA EVERY WAVE: OFF</button>
+      </div>
+      <span class="hint arenaHint" id="arenaRandHint"></span>
     </div>
     <div class="randmode">
       <button class="toggle" id="btnRandMode" aria-pressed="false">RANDOM FIGHTER EVERY WAVE: OFF</button>
@@ -3511,6 +3517,11 @@ function show(id) { for (const s of ['scrTitle', 'scrSelect', 'scrUp', 'scrOver'
 
 const ENEMY_ORDER = ['grub', 'vex', 'bolt', 'moss'];
 // Random-every-wave mode: become a different unlocked fighter each wave; stat power-ups are re-applied to the new body.
+function randomArenaFor(prev) { // any unlocked arena except the one just played
+  const pool = Object.keys(ARENAS).filter(isArenaUnlocked), others = pool.filter(k => k !== prev);
+  const from = others.length ? others : pool;
+  return from[Math.random() * from.length | 0];
+}
 function swapToRandomFighter() {
   const pool = Object.keys(PLAYABLE).filter(isUnlocked), others = pool.filter(k => k !== player.key);
   const pick = (others.length ? others : pool)[Math.random() * (others.length || pool.length) | 0];
@@ -3532,7 +3543,8 @@ function startWave() {
   enemy.setDef(ROSTER[key], { power: 1 + (w - 1) * .08, speed: 1 + Math.min(.25, (w - 1) * .03), weight: 1 + (w - 1) * .04 });
   enemy.stocks = w >= 4 ? 2 : 1;
   brain.reset(clamp(.22 + w * .12, 0, 1));
-  game.arenaKey = w === 1 ? game.startArena : nextArenaAfter(game.arenaKey);
+  game.arenaKey = game.randomArena ? randomArenaFor(w === 1 ? null : game.arenaKey)
+    : w === 1 ? game.startArena : nextArenaAfter(game.arenaKey);
   setArena(game.arenaKey);
   clearArenaObjects(); game.itemT = rand(5, 8);
   if (game.randomMode) swapToRandomFighter();
@@ -3750,6 +3762,7 @@ function syncSelect() {
     b.innerHTML = open ? b.dataset.name : `${b.dataset.name}<small>LOCKED · ${ARENA_UNLOCKS[k] - progress.waves} MORE WAVES</small>`;
   });
   $('arenaLbl').textContent = `Starting arena · ${arenaUnlockedCount()} of ${Object.keys(ARENAS).length} unlocked · unlocked arenas rotate every wave`;
+  syncRandArenaMode();
 }
 function openSelect() {
   if (!portraitsBuilt) buildSelect();
@@ -3763,6 +3776,18 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
 game.randomMode = store.get('koisle-randmode') === '1';
 const RAND_GOLD = 8;
+game.randomArena = store.get('koisle-randarena') === '1';
+function syncRandArenaMode() {
+  const b = $('btnRandArenaMode');
+  b.setAttribute('aria-pressed', game.randomArena);
+  b.textContent = `RANDOM ARENA EVERY WAVE: ${game.randomArena ? 'ON' : 'OFF'}`;
+  $('arenaRandHint').textContent = game.randomArena ? `Every wave is fought in a random arena from your ${arenaUnlockedCount()} unlocked ones. The starting arena above is ignored.` : '';
+  document.querySelectorAll('#arenaSeg button').forEach(x => x.style.opacity = game.randomArena && !x.classList.contains('locked') ? .75 : '');
+}
+$('btnRandArenaMode').addEventListener('click', () => {
+  game.randomArena = !game.randomArena; store.set('koisle-randarena', game.randomArena ? '1' : '0');
+  sfx(game.randomArena ? 'star' : 'select'); syncRandArenaMode();
+});
 function syncRandMode() {
   const b = $('btnRandMode'), n = unlockedCount();
   b.setAttribute('aria-pressed', game.randomMode);
@@ -3778,7 +3803,7 @@ $('btnRandMode').addEventListener('click', () => {
 });
 // Random picks: a short roulette that slows down and lands on a different unlocked choice
 let rolling = false;
-const SPIN_LOCK = ['btnRandom', 'btnRandArena', 'btnGo', 'btnBack'];
+const SPIN_LOCK = ['btnRandom', 'btnRandArena', 'btnRandArenaMode', 'btnRandMode', 'btnGo', 'btnBack'];
 function spinPick({ pool, current, mark, land }) {
   if (rolling) return;
   const others = pool.filter(k => k !== current), pick = others[Math.random() * others.length | 0];
