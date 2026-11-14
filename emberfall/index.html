@@ -124,7 +124,14 @@ h2.title{font-family:var(--display);font-weight:800;letter-spacing:.14em;font-si
 .card p{margin:0;color:var(--muted);font-size:15px;line-height:1.3}
 .stats{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;font-size:12px;letter-spacing:.14em;color:var(--muted);margin-top:4px}
 .pips{display:flex;gap:3px}.pips i{height:6px;flex:1;background:#ffffff1a;transform:skewX(-18deg)}.pips i.on{background:var(--c)}
-#chapters{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;width:min(1120px,100%)}
+#chapters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;width:min(1120px,100%)}
+#weaponPick{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;width:min(600px,100%);margin-bottom:20px}
+.wbtn{pointer-events:auto;text-align:left;font:inherit;color:inherit;background:#1a1220;border:1px solid #ffffff26;padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}
+.wbtn small{font-size:11px;letter-spacing:.24em;color:var(--hero)}
+.wbtn b{font-family:var(--display);letter-spacing:.12em;font-size:17px;color:var(--sun)}
+.wbtn span{color:var(--muted);font-size:14px;line-height:1.3}
+.wbtn.on{border-color:var(--hero);background:#221628;box-shadow:0 0 18px color-mix(in srgb,var(--hero) 40%,transparent)}
+.wbtn:hover,.wbtn:focus-visible{border-color:var(--hero);outline:none}
 .chap{--c:var(--ember)}
 .chap .num{font-family:var(--display);font-weight:900;font-size:44px;line-height:1;color:var(--c)}
 .chap .scene{height:90px;border:1px solid #ffffff18;background:linear-gradient(180deg,var(--s1) 0%,var(--s2) 55%,var(--s3) 100%)}
@@ -192,13 +199,14 @@ h2.title{font-family:var(--display);font-weight:800;letter-spacing:.14em;font-si
   <h2 class="title">THE LAST VANGUARD</h2>
   <div class="subt">CHOOSE YOUR CHAMPION</div>
   <div id="roster"></div>
-  <div class="hint">Every champion plays differently. Try each one on any chapter.</div>
+  <div class="hint">Every champion plays differently, and each carries two weapons. Pick the weapon on the next screen.</div>
 </section>
 
 <!-- Chapter select -->
 <section class="screen" id="sChapter">
   <h2 class="title">CHOOSE A CHAPTER</h2>
   <div class="subt" id="chHero"></div>
+  <div id="weaponPick"></div>
   <div id="chapters"></div>
   <button class="btn ghost" id="bBackHero">CHANGE CHAMPION</button>
 </section>
@@ -521,6 +529,18 @@ class Trail {
 /* =========================================================
    Chapters
    ========================================================= */
+const BOSSES = {
+  morvath1: { name: 'MORVATH', title: 'THE HOLLOW KING', hp: 15000, scale: 1.4, body: 0x241a2e, crown: 0x8a6a3a, eye: 0xff3a4a, fx: 0xb040ff, style: 'crown', tempo: 1, enrageAt: .5, summon: 7, retreat: true },
+  veyla: { name: 'VEYLA', title: 'THE DROWNED QUEEN', hp: 16000, scale: 1.4, body: 0x18343a, crown: 0x3ab0a0, eye: 0x7affea, fx: 0x3ad0ff, style: 'fins', tempo: .95, enrageAt: .5, summon: 8, weights: { rain: .35, sweep: .15, slam: .2, nova: .15, trail: .15 } },
+  grael: { name: 'GRAEL', title: 'THE ASH COLOSSUS', hp: 18000, scale: 1.75, body: 0x3a2218, crown: 0x2a2a2a, eye: 0xffaa2a, fx: 0xff6a1a, style: 'horns', tempo: .95, enrageAt: .5, summon: 8, weights: { slam: .3, charge: .25, sweep: .15, rain: .1, cross: .2 } },
+  morvath2: { name: 'MORVATH', title: 'ASCENDED · THE HOLLOW KING', hp: 26000, scale: 1.6, body: 0x16081e, crown: 0xe0b040, eye: 0xff2a5a, fx: 0xc040ff, style: 'crown', tempo: .82, enrageAt: .6, summon: 12, weights: { charge: .15, rain: .15, sweep: .15, slam: .15, nova: .13, trail: .14, cross: .13 } },
+  // Warlords: mid-chapter bosses
+  gorrak: { name: 'GORRAK', title: 'THE BONEBREAKER', hp: 7000, dmg: 110, scale: 1.15, body: 0x3a2a22, crown: 0xd8c8a8, eye: 0xffaa3a, fx: 0xff8a3a, style: 'horns', tempo: .9, enrageAt: .4, summon: 5, weights: { slam: .35, charge: .25, trail: .25, sweep: .15 } },
+  ysolde: { name: 'YSOLDE', title: 'THE LANTERN WITCH', hp: 8500, dmg: 110, scale: 1.05, body: 0x1a2a24, crown: 0x6affb0, eye: 0xa0ffd0, fx: 0x6affb0, style: 'hood', tempo: .9, enrageAt: .5, summon: 6, weights: { rain: .3, trail: .3, nova: .25, sweep: .15 } },
+  kharn: { name: 'KHARN', title: 'THE MOLTEN WARDEN', hp: 10000, dmg: 125, scale: 1.25, body: 0x2a1a14, crown: 0xff7a2a, eye: 0xffdd55, fx: 0xff7a1a, style: 'horns', tempo: .9, enrageAt: .5, summon: 6, weights: { slam: .3, cross: .3, nova: .25, charge: .15 } },
+  twinA: { name: 'VAEL', title: 'THE PALE TWINS', hp: 7500, dmg: 120, scale: 1.05, body: 0xc8c0d8, crown: 0x8a6aff, eye: 0x8a6aff, fx: 0x9a7aff, style: 'mask', tempo: .95, enrageAt: .5, summon: 0, weights: { charge: .3, cross: .3, trail: .2, sweep: .2 } },
+  twinB: { name: 'VIRA', title: 'THE PALE TWINS', hp: 7500, dmg: 120, scale: 1.05, body: 0x2a2238, crown: 0xff6aa0, eye: 0xff6aa0, fx: 0xff6aa0, style: 'mask', tempo: .95, enrageAt: .5, summon: 0, weights: { rain: .3, nova: .3, trail: .2, slam: .2 } },
+};
 const LEVELS = [
   {
     numeral: 'I', name: 'THE FIELDS OF LUMEN', blurb: 'Dusk over burning farmland. The Hollow Legion marches.', rec: 'kael', diff: 1, startLevel: 1,
@@ -532,7 +552,7 @@ const LEVELS = [
     paths: [[0, 95, 0, 50], [0, 50, -52, 28], [0, 50, 54, 14], [-52, 28, 0, -34], [54, 14, 0, -34], [0, -34, 0, -92]],
     outposts: [{ name: 'WESTWATCH', x: -52, z: 28, captain: 'Captain Vorsk' }, { name: 'EASTGATE', x: 54, z: 14, captain: 'Captain Ilthra' }, { name: 'SUNSPIRE RUINS', x: 0, z: -34, captain: 'Captain Morrow' }],
     wave: 25, mix: { grunt: 1 },
-    boss: { name: 'MORVATH', title: 'THE HOLLOW KING', hp: 15000, scale: 1.4, body: 0x241a2e, crown: 0x8a6a3a, eye: 0xff3a4a, fx: 0xb040ff, style: 'crown', tempo: 1, enrageAt: .5, summon: 7, retreat: true },
+    boss: BOSSES.morvath1, warlord: ['gorrak'],
     story: ['For a thousand years the <em>Sunspire</em> held back the dark. Last night, it went out.',
       'From the Rift of Nocturne pours the <em>Hollow Legion</em>: soldiers emptied of their souls, led by <em>Morvath, the Hollow King</em>, who was once Aurelia\'s greatest hero.',
       'The Sunforged Order fell at the gates. A handful of champions walked out of the ash still holding their oaths.',
@@ -550,7 +570,7 @@ const LEVELS = [
     paths: [[88, 30, 60, 25], [60, 25, 20, 60], [60, 25, -30, 10], [-30, 10, 10, -40], [20, 60, -30, 10], [10, -40, -72, -62]],
     outposts: [{ name: 'SUNKEN CHAPEL', x: 20, z: 60, captain: 'Captain Brine' }, { name: 'WILLOW GATE', x: -30, z: 10, captain: 'Captain Sallow' }, { name: "SEREN'S TOWER", x: 10, z: -40, captain: 'Captain Mire' }],
     wave: 30, mix: { grunt: .72, archer: .28 },
-    boss: { name: 'VEYLA', title: 'THE DROWNED QUEEN', hp: 16000, scale: 1.4, body: 0x18343a, crown: 0x3ab0a0, eye: 0x7affea, fx: 0x3ad0ff, style: 'fins', tempo: .95, enrageAt: .5, summon: 8, weights: { rain: .45, sweep: .2, slam: .25, charge: .1 } },
+    boss: BOSSES.veyla, warlord: ['ysolde'],
     story: ['Morvath fled west into the <em>Drowned Marches</em>, where the river Lumen sinks into black water.',
       'The stormcaller <em>Seren Vael</em> holds her tower there, alone, while <em>Veyla, the Drowned Queen</em>, raises the dead from the bog.',
       'Hollow archers wait in the reeds. Watch for the red lines on the water and keep moving.',
@@ -568,7 +588,7 @@ const LEVELS = [
     paths: [[-80, 70, -55, 55], [-55, 55, -20, 30], [-20, 30, 45, 40], [-20, 30, 35, -30], [45, 40, 35, -30], [35, -30, -10, -85], [-20, 30, -10, -85]],
     outposts: [{ name: 'FORGEHOLD', x: -20, z: 30, captain: 'Captain Slag' }, { name: 'MAGMA BRIDGE', x: 45, z: 40, captain: 'Captain Cinder' }, { name: "BRAKKA'S WATCH", x: 35, z: -30, captain: 'Captain Kiln' }],
     wave: 30, mix: { grunt: .62, brute: .24, archer: .14 },
-    boss: { name: 'GRAEL', title: 'THE ASH COLOSSUS', hp: 18000, scale: 1.75, body: 0x3a2218, crown: 0x2a2a2a, eye: 0xffaa2a, fx: 0xff6a1a, style: 'horns', tempo: .95, enrageAt: .5, summon: 8, weights: { slam: .35, charge: .3, sweep: .2, rain: .15 } },
+    boss: BOSSES.grael, warlord: ['kharn'],
     story: ['The only road to the Rift runs through <em>Emberpeak</em>, where the mountain bleeds fire.',
       '<em>Brakka</em>\'s people held this pass for six hundred years. Now <em>Grael, the Ash Colossus</em>, forges new Hollow from molten stone.',
       'Ash Brutes shrug off quick blows. Hit them with heavy finishers, and keep out of the lava.',
@@ -586,12 +606,28 @@ const LEVELS = [
     paths: [[0, 95, 0, 62], [0, 62, -55, 40], [0, 62, 55, 40], [-55, 40, -45, -30], [55, 40, 45, -30], [-45, -30, 0, -88], [45, -30, 0, -88]],
     outposts: [{ name: 'GATE OF ASH', x: -55, z: 40, captain: 'Captain Wraith' }, { name: 'BELL OF SORROW', x: 55, z: 40, captain: 'Captain Hollowmere' }, { name: 'THE BLIND CHOIR', x: -45, z: -30, captain: 'Captain Sable' }, { name: 'THRONE STAIR', x: 45, z: -30, captain: 'Captain Vex' }],
     wave: 35, mix: { grunt: .55, archer: .2, brute: .25 },
-    boss: { name: 'MORVATH', title: 'ASCENDED · THE HOLLOW KING', hp: 26000, scale: 1.6, body: 0x16081e, crown: 0xe0b040, eye: 0xff2a5a, fx: 0xc040ff, style: 'crown', tempo: .82, enrageAt: .6, summon: 12, weights: { charge: .25, rain: .3, sweep: .25, slam: .2 } },
+    boss: BOSSES.morvath2, warlord: ['twinA', 'twinB'],
     story: ['Beyond the Rift lies what is left of old Aurelia: emptied, silent, and crowned in shadow.',
       '<em>Nyx</em> was Hollow once, and she knows the way in. <em>Old Thorne</em> swears he knows the way out.',
       'Four bastions guard the <em>Throne Stair</em>. At the top, Morvath has stopped running.',
       'End it. <em>Light the Sunspire, or it goes dark forever.</em>'],
     end: 'Morvath\'s crown shatters. The Hollow remember their names, and far away the Sunspire burns white again. The Oath is kept. Thank you for playing Emberfall.'
+  },
+  {
+    numeral: 'V', name: 'THE GAUNTLET OF KINGS', blurb: 'Every boss, back to back, in the ruined coronation hall.', rec: 'kael', diff: 1.2, startLevel: 9,
+    rush: ['gorrak', 'morvath1', 'ysolde', 'veyla', 'kharn', 'grael', ['twinA', 'twinB'], 'morvath2'], rushHp: .55,
+    sky: [0x0a0408, 0x3a0a14, 0xd0a040], stars: .6, fog: [0x2a0e14, 40, 160], hemi: [0xffd0a0, 0x1a0808, .85], sun: [0xffc070, 2.2], rim: 0xff5a3a,
+    ground: [0x2a1c1c, 0x34221e, 0x5a4430, 0x140c0c], tuft: [0, .05, .35, .15, .25], stone: 0x5a4a44, cliff: 0x2a1a18,
+    trees: { n: 30, style: 'dead', trunk: 0x1e1614, leaves: [0xffd040, 0xff6a3a] }, rocks: 40, pools: [], pool: null,
+    grunt: [0x2a1a20, 0x200810], riftColor: 0xffb040,
+    start: [0, 40], waveAt: [0, 0], rift: [0, -92], bossAt: [0, -10],
+    paths: [[0, 95, 0, -92], [-95, 0, 95, 0]], outposts: [], wave: 0, mix: { grunt: .6, archer: .2, brute: .2 },
+    boss: BOSSES.morvath2,
+    story: ['Long ago, Aurelia crowned its kings in this hall. Now every Hollow lord who ever wore a crown waits inside it.',
+      'Eight rounds. <em>Nine bosses.</em> No outposts, no retreat, only a breath and a little healing between fights.',
+      'Bosses here carry less health than in their own chapters, but they come one after another, and the Legion keeps sending soldiers.',
+      'Walk in as a champion. <em>Walk out as a legend.</em>'],
+    end: 'The hall falls silent. Nine crowns lie in the dust, and the Vanguard\'s names are carved above the door.'
   },
 ];
 let L = LEVELS[0], levelIdx = 0, OUTPOSTS = [], PATHS = L.paths, RIFT = { x: 0, z: -92 };
@@ -832,6 +868,28 @@ function buildHero(H) {
     const blade = new THREE.Mesh(new THREE.BoxGeometry(.07, .025, .6), mBlade); blade.position.z = .85; swordRoot.add(blade);
     const g2 = box(.18, .05, .05, mGold); g2.position.z = .55; swordRoot.add(g2);
     const d2 = new THREE.Mesh(new THREE.BoxGeometry(.06, .025, .5), mBlade); d2.position.set(0, -.62, .22); d2.rotation.x = PI / 2 - .3; armL.add(d2);
+  } else if (H.weapon === 'greatsword') {
+    const hilt = box(.07, .07, .45, mDark); hilt.position.z = .6; swordRoot.add(hilt);
+    const guard = box(.62, .09, .12, mGold); guard.position.z = .85; swordRoot.add(guard);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(.21, .045, 2.05), mBlade); blade.position.z = 1.92; blade.castShadow = true; swordRoot.add(blade);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(.11, .32, 4), mBlade); tip.rotation.x = PI / 2; tip.position.z = 3.1; swordRoot.add(tip);
+  } else if (H.weapon === 'staff') {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.04, .045, 2.3, 6), mGold); shaft.rotation.x = PI / 2; shaft.position.z = .95; shaft.castShadow = true; swordRoot.add(shaft);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(.17, 12, 10), new THREE.MeshBasicMaterial({ color: H.accent })); orb.position.z = 2.2; swordRoot.add(orb);
+    for (let k = 0; k < 2; k++) { const rg = new THREE.Mesh(new THREE.TorusGeometry(.27, .02, 4, 20), mGold); rg.position.z = 2.2; rg.rotation.set(k ? PI / 2 : 0, k ? 0 : PI / 2, 0); swordRoot.add(rg); }
+  } else if (H.weapon === 'gauntlets') {
+    const fist = box(.34, .32, .38, mMetal); fist.position.z = .62; swordRoot.add(fist);
+    const kn = new THREE.Mesh(new THREE.BoxGeometry(.36, .08, .06), mBlade); kn.position.set(0, .07, .82); swordRoot.add(kn);
+    const lf = box(.32, .32, .34, mMetal); lf.position.set(0, -.68, 0); armL.add(lf);
+    const lk = new THREE.Mesh(new THREE.BoxGeometry(.34, .07, .06), mBlade); lk.position.set(0, -.68, .18); armL.add(lk);
+  } else if (H.weapon === 'scythe') {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, 2.6, 6), mDark); shaft.rotation.x = PI / 2; shaft.position.z = 1.05; shaft.castShadow = true; swordRoot.add(shaft);
+    const bl = new THREE.Mesh(new THREE.TorusGeometry(.75, .06, 4, 18, PI * .7), mBlade); bl.rotation.x = PI / 2; bl.position.set(.62, 0, 2.05); bl.scale.set(1, 1, .35); swordRoot.add(bl);
+    const cap2 = box(.12, .12, .12, mGold); cap2.position.z = 2.35; swordRoot.add(cap2);
+  } else if (H.weapon === 'whip') {
+    const hd = box(.06, .06, .32, mDark); hd.position.z = .56; swordRoot.add(hd);
+    const vine = new THREE.Mesh(new THREE.CylinderGeometry(.02, .035, 4, 5), mBlade); vine.rotation.x = PI / 2; vine.position.z = 2.7; swordRoot.add(vine);
+    for (let k = 0; k < 9; k++) { const th = new THREE.Mesh(new THREE.ConeGeometry(.035, .14, 4), mBlade); th.position.set(k % 2 ? .04 : -.04, 0, 1.0 + k * .42); th.rotation.z = k % 2 ? -PI / 2 : PI / 2; swordRoot.add(th); }
   } else if (H.weapon === 'bow') {
     arrow = new THREE.Group(); const sh = box(.025, .025, .95, mGold); sh.position.z = .45; const tp = new THREE.Mesh(new THREE.ConeGeometry(.04, .14, 4), mBlade); tp.rotation.x = PI / 2; tp.position.z = .96; arrow.add(sh, tp); arrow.position.z = .45; swordRoot.add(arrow);
     bow = new THREE.Mesh(new THREE.TorusGeometry(.6, .03, 4, 20, PI * 1.05), new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: .7, emissive: H.accent, emissiveIntensity: .25 }));
@@ -909,6 +967,8 @@ function buildBoss(cfg) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(.55, 16, 12), mat); head.position.y = 3.6; g.add(head);
   if (cfg.style === 'crown') { for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.ConeGeometry(.1, .7 + (i === 3 ? .5 : 0), 5), crownM); const a = (i - 3) * .32; s.position.set(Math.sin(a) * .5, 4.05, Math.cos(a) * .2 - .05); s.rotation.z = -a * .6; g.add(s); } }
   else if (cfg.style === 'fins') { for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(new THREE.ConeGeometry(.22, 1.3, 3), crownM); const a = (i - 2) * .45; s.position.set(Math.sin(a) * .45, 4.0, -.15); s.rotation.set(-.5, 0, -a * .9); s.scale.z = .3; g.add(s); } }
+  else if (cfg.style === 'hood') { const hood = new THREE.Mesh(new THREE.ConeGeometry(.85, 1.8, 8), mat); hood.position.set(0, 4.0, -.1); g.add(hood); const lan = new THREE.Mesh(new THREE.SphereGeometry(.3, 10, 8), eyeM); lan.position.set(1.7, 1.1, .7); g.add(lan); const lp = new THREE.PointLight(cfg.eye, 8, 12); lp.position.copy(lan.position); g.add(lp); }
+  else if (cfg.style === 'mask') { const mask = new THREE.Mesh(new THREE.CircleGeometry(.44, 20), new THREE.MeshStandardMaterial({ color: 0xf0ece0, roughness: .35, side: THREE.DoubleSide })); mask.position.set(0, 3.62, .57); g.add(mask); for (const sx of [-1, 1]) { const sl = new THREE.Mesh(new THREE.BoxGeometry(.14, .04, .02), eyeM); sl.position.set(sx * .15, 3.68, .58); g.add(sl); } const halo = new THREE.Mesh(new THREE.TorusGeometry(.85, .05, 6, 32), new THREE.MeshBasicMaterial({ color: cfg.crown })); halo.position.set(0, 3.85, -.45); g.add(halo); }
   else { for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.ConeGeometry(.2, 1.6, 6), crownM); h.position.set(sx * .55, 4.1, 0); h.rotation.z = -sx * .9; g.add(h); } const back = new THREE.Mesh(new THREE.DodecahedronGeometry(.8, 0), crownM); back.position.set(0, 3.0, -.7); g.add(back); }
   const e1 = new THREE.Mesh(new THREE.SphereGeometry(.09, 8, 8), eyeM); e1.position.set(.2, 3.65, .48); const e2 = e1.clone(); e2.position.x = -.2; g.add(e1, e2);
   const arms = [];
@@ -1422,6 +1482,157 @@ const HEROES = {
     moveList: [['□ ×5', 'Ranger String: rapid shots, triple on the 5th'], ['△', 'Bramble Kick: launch and leap back'], ['□ △', 'Piercing Shot: charged arrow through a line'], ['□□ △', 'Volley: arrows rain on your target'], ['□□□ △', 'Blast Arrow: backflip + explosive shot'], ['□□□□ △', 'Arrow Storm: 13 piercing arrows'], ['□×5 △', "Hunter's Mark: giant arrow, explodes along its path"], ['E', 'Hawk Dive: spirit hawk tears through a line'], ['R', "Heavens' Volley: three waves of arrow rain"]]
   },
 };
+/* ---------- Second weapons (skill and ultimate stay with the champion) ---------- */
+function waveShot(color, dmg, k = 1, extra = {}) {
+  const f = fwdVec(P.facing); const geo = new THREE.RingGeometry(1.1 * k, 2.0 * k, 32, 1, -PI / 2 - 1.15, 2.3); geo.rotateX(-PI / 2);
+  shoot(Object.assign({ pos: new V3(P.pos.x + f.x, 1.1, P.pos.z + f.z), dir: f, speed: 28, life: .8, mesh: new THREE.Mesh(geo, addMat(color)), dmg, kb: 7, up: 2, heavy: true, pierce: true, radius: 1.9 * k, grow: 1.5, fade: true, trail: color, onEnd: p => p.mesh.geometry.dispose() }, extra));
+  Sfx.swing(.55, .35);
+}
+function staffBolt(a, dmg) {
+  const f = fwdVec(a);
+  shoot({ pos: new V3(P.pos.x + f.x * 1.3, 1.6, P.pos.z + f.z * 1.3), dir: f, speed: 38, life: .5, mesh: orbMesh(CY, .26), dmg, kb: 2.5, radius: .6, noProc: true, trail: CY, trailSize: .5, onHit: e => { if (Math.random() < .3) chainFrom(e, 1, 10); } });
+  Sfx.swing(1.9, .12);
+}
+function pullIn(range, cone, color) {
+  const list = enemies.filter(e => !e.dead && e.state !== 'spawn' && e.kind !== 'boss' && Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < range && (cone >= PI || Math.abs(angDiff(P.facing, Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z))) < cone));
+  for (const e of list) { const dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, d = Math.hypot(dx, dz) || 1; const k = Math.min(15, d * 2.4) * (e.kind === 'captain' ? .4 : 1); e.vel.x += dx / d * k; e.vel.z += dz / d * k; boltFX(new V3(e.pos.x, 1, e.pos.z), new V3(P.pos.x, 1, P.pos.z), color, .04, .22, .3); }
+  Sfx.swing(.5, .35); return list.length;
+}
+const [bjS, bjH] = flurry(12, .04, .07, .05, 12, 3.0, { thrust: true, arc: 70, offset: .3 });
+const [scS, scH] = flurry(6, .05, .12, .09, 18, 3.9, { arc: 220 });
+const [wpS, wpH] = flurry(8, .05, .1, .08, 15, 5.6, { arc: 120 });
+const sweep = (dur, cancel, a0, a1, tilt, range, arc, dmg, kb, x = {}) => Object.assign({ dur, cancel, swings: [S(.03, Math.min(.2, dur * .38), a0, a1, tilt)], hits: [H(Math.min(.15, dur * .26), range, arc, dmg, kb, 0, x.hit || {})], lunge: [0, .12, x.lunge ?? .9] }, x.def || {});
+
+Object.assign(HEROES.kael, { wname: 'Sunblade', wdesc: 'Balanced longsword. Fast strings and six finishers.' });
+HEROES.kael.alt = {
+  wname: 'Dawnbreaker', wdesc: 'Two-handed greatsword. Slower and wider, every swing staggers captains.', weapon: 'greatsword', trail: [.95, 3.05], speed: 7.8, valorRate: 1.3,
+  idle: { angle: -.6, tilt: 0, pitch: 1.15, ext: 0 }, run: { angle: -2.3, tilt: .15, pitch: .7, ext: 0 },
+  lights: [
+    { name: 'L1', dur: .52, cancel: .28, swings: [S(.08, .22, -2.4, 1.6, .25)], hits: [H(.17, 3.9, 190, 40, 6, 0, { heavy: true, stop: .06, shake: .25 })], lunge: [.03, .2, 1.2] },
+    { name: 'L2', dur: .52, cancel: .28, swings: [S(.08, .22, 1.8, -2.4, -.3)], hits: [H(.17, 3.9, 190, 42, 6, 0, { heavy: true, stop: .06, shake: .25 })], lunge: [.03, .2, 1.2] },
+    { name: 'L3', dur: .6, cancel: .34, swings: [S(.12, .26, 2.6, -1.3, PI / 2)], hits: [H(.22, 4.1, 90, 52, 4, 3, { heavy: true, stop: .08, shake: .35, offset: .8 })], events: [{ t: .23, fn: 'gsQuake' }], lunge: [.03, .22, 1.3] },
+    { name: 'L4', dur: .78, cancel: .48, swings: [S(.12, .34, 2.9, -3.3, 0)], hits: [H(.25, 4.5, 320, 60, 10, 2, { heavy: true, stop: .1, shake: .45 })], lunge: [.03, .28, 1.5] },
+  ],
+  charges: [
+    { name: 'DAWN RISE', dur: .72, cancel: .56, armor: true, swings: [S(.12, .26, -1.5, 2.6, PI / 2)], hits: [H(.2, 4.1, 130, 60, 2, 13, { heavy: true, stop: .1, shake: .4, offset: .4 })], lunge: [.02, .18, 1.2] },
+    { name: 'HORIZON CLEAVE', dur: .7, cancel: .54, armor: true, swings: [S(.1, .24, -2.6, 2.2, .1)], hits: [H(.17, 4, 200, 44, 6, 0, { heavy: true, stop: .07, shake: .3 })], events: [{ t: .18, fn: 'gsWave' }] },
+    { name: 'SOLAR CYCLONE', dur: 1.25, cancel: 1.1, armor: true, spin: { t0: .06, t1: 1.05, turns: 3 }, steer: 3.5, swings: [], hits: [.28, .52, .76, 1.0].map((t, i) => H(t, 4.9, 360, 34, i === 3 ? 11 : 3, i === 3 ? 3 : 0, { heavy: true, stop: .04, shake: .2 })) },
+    { name: 'SKYFALL CLEAVER', dur: 1.05, cancel: .9, armor: true, jump: { t0: .05, t1: .52, h: 4 }, swings: [S(.34, .51, 2.8, -1.5, PI / 2)], hits: [H(.52, 7.6, 360, 90, 11, 9, { heavy: true, stop: .14, shake: .8, ring: true })], lunge: [.05, .48, 4] },
+    { name: 'DAYBREAK', dur: 1.4, cancel: 1.25, armor: true, swings: [S(.12, .55, -1.2, 2.9, PI / 2), S(.6, .74, 2.9, -1.4, PI / 2)], hits: [H(.68, 4.2, 110, 70, 7, 5, { heavy: true, stop: .12, shake: .5 })], events: [{ t: .7, fn: 'judgment' }, { t: .7, fn: 'gsQuake' }] },
+  ],
+  events: {
+    gsQuake() { const f = fwdVec(P.facing); boom(new V3(P.pos.x + f.x * 2.4, 0, P.pos.z + f.z * 2.4), 3.6, 24, 3, 4, { color: 0xffd27a, small: true }); },
+    gsWave() { waveShot(0xffc040, 55, 1.4, { speed: 26, life: .9, kb: 9, up: 3 }); addShake(.3); },
+  },
+  moveList: [['□ ×4', 'Dawn String: wide swings that stagger captains'], ['△', 'Dawn Rise: big launcher'], ['□ △', 'Horizon Cleave: giant sword wave'], ['□□ △', 'Solar Cyclone: four-hit greatsword spin'], ['□□□ △', 'Skyfall Cleaver: leaping crater strike'], ['□□□□ △', 'Daybreak: slam + line of light pillars'], ['E', 'Radiant Dash: cuts burst a beat later'], ['R', 'Sunbreak: screen-clearing nova']]
+};
+
+Object.assign(HEROES.seren, { wname: 'Tide Spear', wdesc: 'Long reach. Sweeps and thrusts that spark chain lightning.' });
+HEROES.seren.alt = {
+  wname: 'Stormglass Staff', wdesc: 'A caster\'s staff. Fires lightning bolts from range; finishers summon ball lightning.', weapon: 'staff', trail: [1.75, 2.35], aimRange: 18,
+  idle: { angle: -.2, tilt: 0, pitch: 1.25, ext: 0 }, run: { angle: -2.2, tilt: .1, pitch: .6, ext: 0 },
+  lights: [
+    ...[0, 1, 2, 3].map(i => ({ name: 'L' + (i + 1), dur: .32, cancel: .16, ranged: true, swings: [S(.02, .1, -.5 + (i % 2) * .3, .05, 0, .15, -.2, .35)], hits: [], events: [{ t: .08, fn: 'sbolt' }] })),
+    { name: 'L5', dur: .46, cancel: .26, ranged: true, swings: [S(.03, .14, -1.2, 1.2, 0, .1)], hits: [], events: [{ t: .12, fn: 'sfan' }] },
+  ],
+  charges: [
+    { name: 'STATIC NOVA', dur: .7, cancel: .55, armor: true, swings: [S(.08, .24, -1.3, 2.4, PI / 2)], hits: [], events: [{ t: .24, fn: 'zapNova' }] },
+    Object.assign({}, HEROES.seren.charges[1], { ranged: true }),
+    { name: 'BALL LIGHTNING', dur: .7, cancel: .55, armor: true, ranged: true, swings: [S(.08, .2, -.4, .05, 0, .2, -.3, .5)], hits: [], events: [{ t: .18, fn: 'ballLightning' }] },
+    HEROES.seren.charges[3],
+    { name: 'THUNDER LANCE', dur: .8, cancel: .65, armor: true, ranged: true, swings: [S(.1, .4, -.4, -.2, 0, .2, -.4, -.6), S(.42, .5, -.2, .05, 0, .2, -.6, .6)], hits: [], events: [{ t: .46, fn: 'javelin' }] },
+    Object.assign({}, HEROES.seren.charges[5], { ranged: true }),
+  ],
+  events: {
+    sbolt() { staffBolt(P.facing, 18); },
+    sfan() { for (const d of [-.2, 0, .2]) staffBolt(P.facing + d, 18); },
+    zapNova() { for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; boltFX(new V3(P.pos.x, 1.2, P.pos.z), new V3(P.pos.x + Math.cos(a) * 5, .2, P.pos.z + Math.sin(a) * 5), CY, .05, .22, .5); } boom(P.pos, 5, 40, 9, 6, { color: CY, noProc: true }); Sfx.zap(); },
+    ballLightning() {
+      const f = fwdVec(P.facing); let z = 0;
+      shoot({ pos: new V3(P.pos.x + f.x * 1.5, 1.4, P.pos.z + f.z * 1.5), dir: f, speed: 11, life: 2.4, mesh: orbMesh(CY, .8), noFlightHit: true, noOrient: true, trail: CY, trailSize: 1.2,
+        update: (p, dt) => { z += dt; if (z < .16) return; z = 0; const mp = p.mesh.position; const list = enemies.filter(e => !e.dead && e.state !== 'spawn' && Math.hypot(e.pos.x - mp.x, e.pos.z - mp.z) < 5.5).slice(0, 3);
+          for (const e of list) { boltFX(mp.clone(), new V3(e.pos.x, e.y + 1.1 * e.scale, e.pos.z), CY, .05, .15, .5); hitEnemy(e, 16, { dir: new V3(e.pos.x - mp.x, 0, e.pos.z - mp.z).normalize(), kb: 1.5, up: 0, noProc: true, quiet: true }); }
+          if (list.length) Sfx.zap(); },
+        onEnd: p => boom(new V3(p.mesh.position.x, 0, p.mesh.position.z), 5, 60, 7, 8, { color: CY, noProc: true }) });
+      Sfx.zap();
+    },
+  },
+  moveList: [['□ ×5', 'Bolt String: lightning bolts from range, triple on the 5th'], ['△', 'Static Nova: lightning burst around you'], ['□ △', 'Chain Bolt: orb that chains to 6 foes'], ['□□ △', 'Ball Lightning: slow orb that zaps everything near it'], ['□□□ △', 'Skyfall: leap and call 7 strikes'], ['□□□□ △', 'Thunder Lance: charged piercing javelin'], ['□×5 △', 'Tempest Field: a storm that keeps striking'], ['E', 'Storm Blink: teleport through a line of foes'], ['R', 'Wrath of the Skies: 24 strikes + a final bolt']]
+};
+
+Object.assign(HEROES.brakka, { wname: 'Mountain Maul', wdesc: 'Huge warhammer. Slow swings and earthquakes.' });
+const jab = i => ({ name: 'L' + (i + 1), dur: .28, cancel: .14, swings: [S(.02, .09, -.35 + (i % 2) * .25, -.05, 0, .15, -.55, .45)], hits: [H(.07, 3.0, 80, 22, 4, 0, { heavy: true, stop: .04, shake: .12, offset: .2 })], lunge: [0, .08, .8] });
+HEROES.brakka.alt = {
+  wname: 'Ironfist Gauntlets', wdesc: 'Bare-knuckle brawling. Rapid punches that still stagger captains, and a knockout haymaker.', weapon: 'gauntlets', trail: [.35, .9], speed: 8.0, valorRate: 1.1,
+  idle: { angle: -.3, tilt: 0, pitch: .9, ext: -.2 }, run: { angle: -1.2, tilt: 0, pitch: 1.2, ext: -.2 },
+  lights: [jab(0), jab(1), jab(2), jab(3), jab(4), { name: 'L6', dur: .5, cancel: .28, swings: [S(.06, .18, -2.0, 1.3, .25)], hits: [H(.13, 3.4, 200, 44, 9, 1, { heavy: true, stop: .08, shake: .3 })], lunge: [0, .15, 1.2] }],
+  charges: [
+    { name: 'RISING FIST', dur: .62, cancel: .48, swings: [S(.08, .2, -1.2, 2.0, PI / 2, 0, -.3, .4)], hits: [H(.15, 3.1, 130, 52, 2, 13, { heavy: true, stop: .09, shake: .35 })], lunge: [0, .12, 1] },
+    { name: 'SHOCK PUNCH', dur: .6, cancel: .46, swings: [S(.1, .18, -.3, 0, 0, .15, -.6, .6)], hits: [H(.15, 3.1, 70, 40, 8, 0, { heavy: true, stop: .08, shake: .3 })], events: [{ t: .16, fn: 'shockPunch' }] },
+    { name: 'GATLING FISTS', dur: 1.15, cancel: 1.0, swings: [...bjS, S(.92, 1.02, -1.8, 1.2, .2)], hits: [...bjH, H(.98, 3.5, 200, 48, 11, 2, { heavy: true, stop: .1, shake: .45 })], lunge: [0, .85, 1.6] },
+    { name: 'METEOR DROP', dur: 1.05, cancel: .9, jump: { t0: .05, t1: .55, h: 4.4 }, swings: [S(.38, .54, 2.4, -1.4, PI / 2)], hits: [], events: [{ t: .55, fn: 'leapQuake' }], lunge: [.05, .5, 4.5] },
+    { name: 'EARTHBREAKER', dur: 1.0, cancel: .85, swings: [S(.1, .36, -1, 2.6, PI / 2), S(.4, .52, 2.6, -1.5, PI / 2)], hits: [], events: [{ t: .52, fn: 'fissure' }] },
+    { name: "KING'S KNUCKLE", dur: 1.1, cancel: .95, swings: [S(.05, .55, -.3, -.4, 0, .1, 0, -.9), S(.58, .66, -.4, 0, 0, .1, -.9, .8)], hits: [], events: [{ t: .64, fn: 'megaPunch' }] },
+  ],
+  events: {
+    shockPunch() { const f = fwdVec(P.facing); for (let i = 0; i < 3; i++) later(i * .05, () => boom(new V3(P.pos.x + f.x * (2 + i * 2), 0, P.pos.z + f.z * (2 + i * 2)), 2.6, 38, 3, 7, { color: OR, small: i < 2 })); },
+    megaPunch() { const f = fwdVec(P.facing); const c = new V3(P.pos.x + f.x * 2.4, 0, P.pos.z + f.z * 2.4); boom(c, 5.4, 125, 5, 18, { color: OR }); for (let i = 0; i < 5; i++) later(i * .04, () => shock(new V3(P.pos.x + f.x * (3 + i * 2), 0, P.pos.z + f.z * (3 + i * 2)), 2.5, OR, .35)); game.hitstop = .14; cam.fovKick = 8; },
+  },
+  moveList: [['□ ×6', 'Brawler String: rapid jabs, a hook on the 6th'], ['△', 'Rising Fist: uppercut launcher'], ['□ △', 'Shock Punch: three shockwaves forward'], ['□□ △', 'Gatling Fists: 12-punch flurry'], ['□□□ △', 'Meteor Drop: leaping quake'], ['□□□□ △', 'Earthbreaker: line of erupting rock'], ["□×5 △", "King's Knuckle: charged knockout punch"], ['passive', 'Super armor: hits never interrupt your attacks'], ['E', 'Iron Roar: knockback + 30% power for 8s'], ['R', 'Titanfall: three earth-shaking slams']]
+};
+
+Object.assign(HEROES.nyx, { wname: 'Twin Fangs', wdesc: 'Paired daggers. The fastest weapon in the Vanguard.' });
+HEROES.nyx.alt = {
+  wname: 'Night Scythe', wdesc: 'A reaper\'s scythe. Huge sweeping arcs, crescent waves, and a pull that drags crowds in.', weapon: 'scythe', trail: [1.6, 3.0], speed: 9.2, valorRate: .9,
+  idle: { angle: -.6, tilt: 0, pitch: 1.0, ext: 0 }, run: { angle: -2.5, tilt: .1, pitch: .4, ext: 0 },
+  lights: [
+    Object.assign(sweep(.38, .18, -2.2, 1.8, .1, 3.9, 220, 20, 3.5), { name: 'L1' }),
+    Object.assign(sweep(.38, .18, 1.9, -2.3, -.2, 3.9, 220, 20, 3.5), { name: 'L2' }),
+    { name: 'L3', dur: .42, cancel: .2, swings: [S(.04, .16, 2.5, -1.3, PI / 2)], hits: [H(.11, 4.0, 90, 26, 4, 0, { offset: .6, stop: .05 })], lunge: [0, .12, 1.1] },
+    Object.assign(sweep(.4, .19, -2.4, 2.2, .5, 3.9, 230, 22, 4), { name: 'L4' }),
+    { name: 'L5', dur: .6, cancel: .32, swings: [S(.06, .24, 2.8, -3.4, 0)], hits: [H(.15, 4.3, 340, 36, 7, 2, { heavy: true, stop: .07, shake: .3 })], lunge: [0, .18, 1.2] },
+  ],
+  charges: [
+    { name: 'REAPER RISE', dur: .64, cancel: .5, armor: true, swings: [S(.08, .2, -1.4, 2.5, PI / 2)], hits: [H(.15, 3.9, 120, 38, 2, 12, { heavy: true, stop: .08, shake: .3, offset: .4 })], lunge: [0, .12, 1] },
+    { name: 'CRESCENT HARVEST', dur: .6, cancel: .45, armor: true, swings: [S(.07, .19, -2.5, 2.1, .1)], hits: [H(.13, 3.7, 190, 30, 5, 0, { heavy: true, stop: .05, shake: .2 })], events: [{ t: .14, fn: 'scytheWave' }] },
+    { name: 'DEATH SPIRAL', dur: 1.0, cancel: .85, armor: true, spin: { t0: .05, t1: .82, turns: 3 }, steer: 5, swings: [], hits: [.25, .5, .78].map((t, i) => H(t, 4.4, 360, 26, i === 2 ? 10 : 2.5, i === 2 ? 3 : 0, { heavy: true, stop: .03, shake: .15 })) },
+    { name: 'GRIM PULL', dur: .8, cancel: .65, armor: true, swings: [S(.05, .2, 2.4, -1.6, 0), S(.32, .44, -1.8, 2.2, 0)], hits: [], events: [{ t: .12, fn: 'pull' }] },
+    { name: 'SOUL HARVEST', dur: 1.0, cancel: .85, armor: true, swings: [...scS], hits: [...scH, H(.82, 4.3, 360, 40, 9, 3, { heavy: true, stop: .08, shake: .35 })], lunge: [0, .75, 1.4] },
+    HEROES.nyx.charges[5],
+  ],
+  events: {
+    scytheWave() { waveShot(VI, 34, 1.15, { mark: 1 }); },
+    pull() { pullIn(9.5, PI, VI); later(.3, () => boom(P.pos, 4.5, 45, 5, 6, { color: VI, mark: 1 })); },
+  },
+  moveList: [['□ ×5', 'Reaper String: wide sweeping arcs'], ['△', 'Reaper Rise: launcher'], ['□ △', 'Crescent Harvest: shadow wave'], ['□□ △', 'Death Spiral: three-turn scythe spin'], ['□□□ △', 'Grim Pull: drag enemies in, then burst'], ['□□□□ △', 'Soul Harvest: six heavy sweeps'], ['□×5 △', 'Nightbloom: shadow burst, heavy marks'], ['passive', 'Every hit leaves a shadow mark (up to 5)'], ['E', 'Reap: detonate all nearby marks'], ['R', 'Eclipse: blink through up to 16 enemies']]
+};
+
+Object.assign(HEROES.thorne, { wname: 'Old Yew Greatbow', wdesc: 'Rapid shots, explosive arrows, and volleys from the sky.' });
+HEROES.thorne.alt = {
+  wname: 'Briarwhip', wdesc: 'A thorned vine whip. Mid-range lashes, a long vine crack, and thorns that burst from the ground.', weapon: 'whip', trail: [1.2, 4.75], aimRange: 8, speed: 9, valorRate: 1,
+  idle: { angle: -.6, tilt: 0, pitch: 1.3, ext: 0 }, run: { angle: -2.4, tilt: 0, pitch: 1.0, ext: 0 },
+  lights: [
+    Object.assign(sweep(.36, .17, -2.0, 1.5, .15, 5.7, 120, 18, 3, { lunge: .4 }), { name: 'L1' }),
+    Object.assign(sweep(.36, .17, 1.6, -2.0, -.2, 5.7, 120, 18, 3, { lunge: .4 }), { name: 'L2' }),
+    { name: 'L3', dur: .4, cancel: .19, swings: [S(.04, .15, 2.5, -1.2, PI / 2)], hits: [H(.11, 6.1, 50, 24, 4, 0, { offset: .5 })], lunge: [0, .1, .4] },
+    Object.assign(sweep(.38, .18, -2.2, 1.8, .6, 5.7, 130, 20, 3, { lunge: .4 }), { name: 'L4' }),
+    { name: 'L5', dur: .55, cancel: .3, swings: [S(.05, .2, 2.6, -1.3, PI / 2)], hits: [H(.17, 6.3, 60, 32, 6, 1, { heavy: true, stop: .06, shake: .25, offset: .6 })], events: [{ t: .18, fn: 'thornBurst' }] },
+  ],
+  charges: [
+    { name: 'SNARE LIFT', dur: .66, cancel: .5, armor: true, swings: [S(.08, .22, -1.3, 2.4, PI / 2)], hits: [H(.17, 5.7, 80, 36, 1, 12, { heavy: true, stop: .08, shake: .3, offset: .4 })] },
+    { name: 'VINE LASH', dur: .62, cancel: .48, armor: true, swings: [S(.08, .18, -.3, .05, 0, .05, -1.2, 1.6)], hits: [H(.15, 8.2, 30, 54, 8, 1, { heavy: true, stop: .07, shake: .3 })] },
+    { name: 'BRAMBLE WHIRL', dur: .95, cancel: .8, armor: true, spin: { t0: .05, t1: .78, turns: 2 }, steer: 4, swings: [], hits: [.25, .5, .75].map((t, i) => H(t, 5.9, 360, 24, i === 2 ? 9 : 2, i === 2 ? 3 : 0, { heavy: true, stop: .03, shake: .15 })) },
+    { name: 'THORN GRASP', dur: .85, cancel: .7, armor: true, swings: [S(.05, .18, -.3, 0, 0, .05, -1, 1.5), S(.34, .48, 1.6, -1.8, 0)], hits: [], events: [{ t: .12, fn: 'grasp' }] },
+    { name: 'BRIAR STORM', dur: 1.05, cancel: .9, armor: true, swings: [...wpS], hits: [...wpH, H(.92, 6.1, 200, 36, 8, 2, { heavy: true, stop: .08, shake: .3 })], lunge: [0, .8, 1] },
+    { name: 'WILD GROWTH', dur: 1.0, cancel: .85, armor: true, swings: [S(.1, .4, -1.2, 2.8, PI / 2), S(.45, .58, 2.8, -1.4, PI / 2)], hits: [], events: [{ t: .58, fn: 'growth' }] },
+  ],
+  events: {
+    thornBurst() { const f = fwdVec(P.facing); const c = new V3(P.pos.x + f.x * 5, 0, P.pos.z + f.z * 5); spikeFX(c, 0x4a6a2a); boom(c, 2.6, 20, 6, 3, { color: GR, small: true }); },
+    grasp() { pullIn(8.5, .8, GR); later(.32, () => { for (let i = 0; i < 5; i++) spikeFX(new V3(P.pos.x + Math.cos(i * 1.3) * 2, 0, P.pos.z + Math.sin(i * 1.3) * 2), 0x4a6a2a); boom(P.pos, 3.8, 42, 8, 5, { color: GR }); }); },
+    growth() { for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; later(i * .02, () => spikeFX(new V3(P.pos.x + Math.cos(a) * rand(3, 7), 0, P.pos.z + Math.sin(a) * rand(3, 7)), 0x4a6a2a)); } boom(P.pos, 7.2, 62, 9, 8, { color: GR }); },
+  },
+  moveList: [['□ ×5', 'Briar String: long lashes, thorns burst on the 5th'], ['△', 'Snare Lift: launch from range'], ['□ △', 'Vine Lash: 8-metre piercing crack'], ['□□ △', 'Bramble Whirl: spinning lash'], ['□□□ △', 'Thorn Grasp: pull a cone in, spikes erupt'], ['□□□□ △', 'Briar Storm: eight-lash flurry'], ['□×5 △', 'Wild Growth: a ring of thorns'], ['E', 'Hawk Dive: spirit hawk tears through a line'], ['R', "Heavens' Volley: three waves of arrow rain"]]
+};
 const HERO_ORDER = ['kael', 'seren', 'brakka', 'nyx', 'thorne'];
 
 function fireArrow(angle, dmg, scale, o) {
@@ -1444,8 +1655,15 @@ function blinkSlash(e, dmg) {
 /* =========================================================
    Player
    ========================================================= */
+const WKEY = 'emberfall.weapons.v1';
+const weaponChoice = store.get(WKEY, {});
+function heroDef(id) {
+  const base = HEROES[id];
+  if (weaponChoice[id] === 1 && base.alt) return Object.assign({}, base, base.alt, { events: Object.assign({}, base.events, base.alt.events) });
+  return base;
+}
 function makePlayer(id) {
-  const def = HEROES[id]; const m = buildHero(def); const Lv = L;
+  const def = heroDef(id); const m = buildHero(def); const Lv = L;
   const lvl = Lv.startLevel;
   const maxHp = def.hp + (lvl - 1) * 80;
   const sa = Math.atan2(Lv.waveAt[0] - Lv.start[0], Lv.waveAt[1] - Lv.start[1]);
@@ -1497,7 +1715,7 @@ function startAttack(kind) {
   else def = D.ult;
   P.state = 'attack'; P.atk = def; P.atkT = 0; P.armor = !!def.armor || !!D.superArmor; P.buffer = null;
   const mi = moveInput(); const dirA = mi ? Math.atan2(mi.x, mi.z) : P.facing;
-  const range = def.ult ? 0 : (def.aim ? D.aimRange : Math.min(D.aimRange, 8));
+  const range = def.ult ? 0 : (def.aim || def.ranged ? D.aimRange : Math.min(D.aimRange, 8));
   const tgt = nearestEnemy(P.pos, dirA, range, mi ? (def.aim ? .7 : 1.2) : 1.6);
   if (tgt) { P.facing = Math.atan2(tgt.pos.x - P.pos.x, tgt.pos.z - P.pos.z); P.aimDist = Math.hypot(tgt.pos.x - P.pos.x, tgt.pos.z - P.pos.z) - tgt.radius; }
   else { P.facing = dirA; P.aimDist = 99; }
@@ -1765,7 +1983,7 @@ const TYPES = {
 };
 function pickKind() { const r = Math.random(); let acc = 0; for (const k in L.mix) { acc += L.mix[k]; if (r < acc) return k; } return 'grunt'; }
 function spawnEnemy(kind, x, z, outpost = null, opts = {}) {
-  const T = TYPES[kind]; const cfg = kind === 'boss' ? L.boss : null;
+  const T = TYPES[kind]; const cfg = kind === 'boss' ? (opts.cfg || L.boss) : null;
   const r = kind === 'boss' ? buildBoss(cfg) : kind === 'captain' ? buildCaptain() : kind === 'brute' ? buildBrute() : kind === 'archer' ? buildArcher() : buildGrunt(Math.random() < .3);
   const scale = cfg ? cfg.scale : T.scale, radius = cfg ? T.radius * cfg.scale / 1.4 : T.radius;
   r.g.scale.setScalar(scale);
@@ -1773,14 +1991,14 @@ function spawnEnemy(kind, x, z, outpost = null, opts = {}) {
   const warnRing = new THREE.Mesh(EG.warn, EM.warn); warnRing.visible = false; warnRing.scale.setScalar(radius * 1.6);
   scene.add(r.g, blob, warnRing);
   const hpMul = (1 + game.captured * .15) * L.diff;
-  const maxHp = cfg ? cfg.hp : kind === 'captain' ? T.hp * L.diff : T.hp * hpMul;
+  const maxHp = cfg ? cfg.hp * (opts.hpMul || 1) : kind === 'captain' ? T.hp * L.diff : T.hp * hpMul;
   const e = {
     kind, g: r.g, parts: r, blob, warnRing, flashables: r.flashables, mats: r.flashables.map(m => m.material), core: r.core, cfg,
-    pos: new V3(x, 0, z), vel: new V3(), y: kind === 'boss' ? 0 : -1.8, vy: 0, facing: rand(0, TAU), hp: maxHp, maxHp, radius, scale, speed: T.speed * rand(.9, 1.1), dmg: T.dmg,
+    pos: new V3(x, 0, z), vel: new V3(), y: kind === 'boss' ? 0 : -1.8, vy: 0, facing: rand(0, TAU), hp: maxHp, maxHp, radius, scale, speed: T.speed * rand(.9, 1.1), dmg: (cfg && cfg.dmg) || T.dmg,
     state: 'spawn', stateT: 0, atkCD: rand(1, 3), slot: rand(0, TAU), slotR: kind === 'archer' ? rand(10, 15) : rand(2.2, 4.2), outpost, dead: false, flashT: 0, squash: 0, token: false, shooter: false, invuln: 0,
     weakMax: (kind === 'captain' || kind === 'boss') ? 100 : 0, weakGauge: 100, weakExposed: false, weakT: 0, name: opts.name || '', aggro: opts.aggro ?? (kind !== 'grunt'), bob: rand(0, TAU), mark: 0, markT: 0, downFor: .7
   };
-  if (kind === 'boss') { e.state = 'intro'; e.y = -8; e.invuln = 99; }
+  if (kind === 'boss') { e.state = 'intro'; e.y = -8; e.invuln = 99; e.introDelay = opts.introDelay || 0; }
   r.g.position.set(x, e.y, z);
   enemies.push(e);
   if (outpost) outpost.linked++;
@@ -2020,7 +2238,7 @@ function updateBoss(e, dt, dist, toP) {
   switch (e.state) {
     case 'intro':
       e.y = Math.min(0, -8 + e.stateT * 3.2); Particles.spawn(e.pos.x + rand(-3, 3), .3, e.pos.z + rand(-3, 3), 0, rand(3, 8), 0, 1, 1.2, cfg.fx, 0, .5);
-      e.facing = toP; if (e.y >= 0) { e.state = 'idle'; e.stateT = 0; e.invuln = 0; e.atkCD = 1; Sfx.boom(1.4); shock(e.pos, 16, cfg.fx, .8); addShake(1.2); }
+      e.facing = toP; if (e.y >= 0) { e.state = 'idle'; e.stateT = 0; e.invuln = 0; e.atkCD = 1 + e.introDelay; Sfx.boom(1.4); shock(e.pos, 16, cfg.fx, .8); addShake(1.2); }
       break;
     case 'idle':
       e.facing += angDiff(e.facing, toP) * Math.min(1, dt * 3 * spd);
@@ -2045,9 +2263,10 @@ function bossChooseAttack(e, dist, toP, enraged) {
   const cfg = e.cfg;
   e.atkCount = (e.atkCount || 0) + 1; e.facing = toP; e.state = 'tele'; e.stateT = 0; Sfx.warn();
   const dur = (enraged ? .85 : 1.15) * cfg.tempo;
-  const finish = () => { e.tele = null; return !e.dead; };
+  const finish = () => { e.tele = null; return !e.dead && e.state === 'tele'; };
+  const recover = (w) => { if (!e.dead && e.state === 'tele') { e.state = 'recover'; e.stateT = 0; exposeWeak(e, w); } };
   const R = e.scale / 1.4;
-  if (e.atkCount % 5 === 0) {
+  if (cfg.summon && e.atkCount % 5 === 0) {
     e.atkType = 'summon';
     showTip(cfg.name.charAt(0) + cfg.name.slice(1).toLowerCase() + ' calls the Legion. Thin the crowd and build Valor.', 3);
     const n = (enraged ? 1.4 : 1) * cfg.summon | 0;
@@ -2056,9 +2275,10 @@ function bossChooseAttack(e, dist, toP, enraged) {
     return;
   }
   const w = cfg.weights || { charge: .25, rain: .25, sweep: .25, slam: .25 };
-  let pick = null;
-  if (dist > 12) pick = Math.random() < w.charge / (w.charge + w.rain) ? 'charge' : 'rain';
-  else { const r = Math.random() * (w.rain + w.sweep + w.slam); pick = r < w.rain ? 'rain' : r < w.rain + w.sweep ? 'sweep' : 'slam'; }
+  const melee = ['sweep', 'slam', 'nova'];
+  let cands = Object.keys(w).filter(k => dist > 12 ? !melee.includes(k) : true); if (!cands.length) cands = ['charge'];
+  let r = Math.random() * cands.reduce((a, k) => a + (w[k] || .1), 0), pick = cands[0];
+  for (const k of cands) { r -= (w[k] || .1); if (r <= 0) { pick = k; break; } }
   e.atkType = pick;
   if (pick === 'charge') {
     e.tele = makeTele('rect', e.pos.x, e.pos.z, toP, dur, () => { if (!finish()) return; e.state = 'charge'; e.stateT = 0; e.chargeHit = false; }, { w: 4.5 * R, len: 19 });
@@ -2069,7 +2289,7 @@ function bossChooseAttack(e, dist, toP, enraged) {
       makeTele('circle', x, z, 0, dur + i * .06, (t) => {
         done++; const p = new V3(t.x, 0, t.z); pillar(p, 2.4, 16, cfg.fx, .5); shock(p, 3.4, cfg.fx, .4); Particles.burst(new V3(t.x, .5, t.z), 20, cfg.fx, 6, .6, .7, 2); Sfx.boom(.35); addShake(.2);
         if (teleContains(t, P.pos.x, P.pos.z)) playerTryHit(e.dmg * .7, p, 8);
-        if (done === n && !e.dead) { e.state = 'recover'; e.stateT = 0; exposeWeak(e, 2.2); }
+        if (done === n) recover(2.2);
       }, { r: 2.6 });
     }
   } else if (pick === 'sweep') {
@@ -2079,6 +2299,33 @@ function bossChooseAttack(e, dist, toP, enraged) {
       if (teleContains(t, P.pos.x, P.pos.z)) playerTryHit(e.dmg, e.pos, 12);
       e.state = 'recover'; e.stateT = 0; exposeWeak(e, 2.2);
     }, { r: 8 * R, arc: 160 * D2R });
+  } else if (pick === 'nova') {
+    e.tele = makeTele('circle', e.pos.x, e.pos.z, 0, dur * 1.15, (t) => {
+      if (!finish()) return; const p = new V3(t.x, 0, t.z); shock(p, 11 * R, cfg.fx, .7); shock(p, 6 * R, 0xffffff, .4); Particles.ring(p, 9 * R, 60, cfg.fx, .6, 1); Sfx.boom(1.1); addShake(1);
+      if (teleContains(t, P.pos.x, P.pos.z)) playerTryHit(e.dmg * 1.1, p, 14);
+      recover(2.6);
+    }, { r: 9.5 * R });
+  } else if (pick === 'trail') {
+    const n = enraged ? 7 : 5; let done = 0;
+    for (let i = 0; i < n; i++) later(i * .3, () => {
+      if (e.dead) return;
+      makeTele('circle', P.pos.x, P.pos.z, 0, .75 * cfg.tempo, (t) => {
+        done++; const p = new V3(t.x, 0, t.z); pillar(p, 2.2, 14, cfg.fx, .45); shock(p, 3.2, cfg.fx, .35); Particles.burst(new V3(t.x, .5, t.z), 14, cfg.fx, 5, .5, .6, 2); Sfx.boom(.3); addShake(.15);
+        if (teleContains(t, P.pos.x, P.pos.z)) playerTryHit(e.dmg * .6, p, 7);
+        if (done === n) recover(2.2);
+      }, { r: 2.8 });
+    });
+  } else if (pick === 'cross') {
+    const a0 = rand(0, PI); let done = 0;
+    for (const a of [a0, a0 + PI / 2]) {
+      const f = fwdVec(a);
+      makeTele('rect', P.pos.x - f.x * 13, P.pos.z - f.z * 13, a, dur * 1.05, (t) => {
+        done++; for (let k = 0; k < 7; k++) { const d = k * 26 / 6; pillar(new V3(t.x + Math.sin(t.a) * d, 0, t.z + Math.cos(t.a) * d), 1.4, 12, cfg.fx, .45); }
+        Sfx.boom(.6); addShake(.5);
+        if (teleContains(t, P.pos.x, P.pos.z)) playerTryHit(e.dmg * .9, new V3(t.x, 0, t.z), 9);
+        if (done === 2) recover(2.4);
+      }, { w: 3.2, len: 26 });
+    }
   } else {
     const fx = e.pos.x + Math.sin(toP) * 3 * R, fz = e.pos.z + Math.cos(toP) * 3 * R;
     e.tele = makeTele('circle', fx, fz, 0, dur, (t) => {
@@ -2095,15 +2342,41 @@ function spawnPickup(pos) { const m = new THREE.Mesh(EG.orb, orbMat); m.position
 /* =========================================================
    Mission flow
    ========================================================= */
+const capWords = t => t.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+// Objectives: 0 vanguard, 1 outposts, 2 warlord, 3 final boss, 4 victory, 5 boss gauntlet
 const OBJ_TEXT = [
   () => `Break the Hollow vanguard (${Math.min(game.waveKills, L.wave)}/${L.wave})`,
   () => `Retake the outposts (${game.captured}/${OUTPOSTS.length})`,
-  () => `Defeat ${L.boss.name.charAt(0) + L.boss.name.slice(1).toLowerCase()}, ${L.boss.title.split('·').pop().trim().toLowerCase().replace(/^the /, 'the ').replace(/\b\w/g, c => c.toUpperCase())}`,
-  () => `Victory`
+  () => `Defeat the warlord: ${capWords(game.bossLabel || '…')}`,
+  () => `Defeat ${capWords(L.boss.name)}, ${capWords(L.boss.title.split('·').pop().trim())}`,
+  () => `Victory`,
+  () => `The Gauntlet · round ${Math.min(game.round + 1, L.rush.length)}/${L.rush.length}${game.bossLabel ? ' · ' + capWords(game.bossLabel) : ''}`,
 ];
 function updateObjective() {
   $('objTxt').textContent = OBJ_TEXT[game.objective]();
   if (game.objective === 0 && game.waveKills >= L.wave) setObjective(1);
+}
+function spawnBossGroup(list, x, z, hpMul = 1) {
+  const cfgs = list.map(k => typeof k === 'string' ? BOSSES[k] : k);
+  const a = Math.atan2(P.pos.x - x, P.pos.z - z);
+  game.bosses = cfgs.map((c, i) => { const off = cfgs.length > 1 ? (i - (cfgs.length - 1) / 2) * 9 : 0; return spawnEnemy('boss', x + Math.cos(a) * off, z - Math.sin(a) * off, null, { cfg: c, hpMul, introDelay: i * 1.8 }); });
+  game.boss = game.bosses[0];
+  game.bossLabel = cfgs.map(c => c.name).join(' & ');
+  $('bossName').textContent = game.bossLabel; $('bossTitle').textContent = cfgs[0].title;
+  $('boss').classList.add('on'); game.slowmo = 1.0; Sfx.setIntensity(2);
+  updateObjective();
+}
+function aheadPoint(dist) {
+  const f = fwdVec(P.facing); let x = P.pos.x + f.x * dist, z = P.pos.z + f.z * dist; const r = Math.hypot(x, z);
+  if (r > ARENA_R - 12) { x *= (ARENA_R - 12) / r; z *= (ARENA_R - 12) / r; } return [x, z];
+}
+function startRound() {
+  if (game.state !== 'play' || game.objective !== 5) return;
+  const k = L.rush[game.round]; const list = Array.isArray(k) ? k : [k];
+  const d = Math.hypot(P.pos.x, P.pos.z); let x, z;
+  if (d > 6) { x = P.pos.x - P.pos.x / d * 16; z = P.pos.z - P.pos.z / d * 16; } else [x, z] = aheadPoint(16);
+  spawnBossGroup(list, x, z, L.rushHp);
+  showBanner('ROUND ' + (game.round + 1), game.bossLabel + ' · ' + BOSSES[list[0]].title, 'red', 2.4);
 }
 function setObjective(n) {
   game.objective = n; updateObjective();
@@ -2114,13 +2387,24 @@ function setObjective(n) {
     later(2.8, () => showTip(`${OUTPOSTS.length} outposts glow red on the map. Kill each <b>Captain</b> to claim it.`, 6));
   }
   if (n === 2) {
+    const first = BOSSES[L.warlord[0]];
+    later(1.2, () => { showBanner('A WARLORD APPROACHES', L.warlord.length > 1 ? 'THE PALE TWINS STRIKE TOGETHER' : first.name + ', ' + first.title, 'red', 2.6); Sfx.warn(); addShake(.6); });
+    later(3.6, () => {
+      const [x, z] = aheadPoint(18); spawnBossGroup(L.warlord, x, z);
+      tipOnce('warlord', 'Warlords guard the road to the Rift. Read the red ground, dodge as it fills, and break the glowing core.', 6);
+    });
+  }
+  if (n === 3) {
     later(1.5, () => { showBanner('THE RIFT TEARS OPEN', L.boss.name + ' COMES', 'red', 3); Sfx.boom(1.6); addShake(1); });
     later(4.5, () => {
-      game.boss = spawnEnemy('boss', L.bossAt[0], L.bossAt[1], null, { name: L.boss.name });
-      $('bossName').textContent = L.boss.name; $('bossTitle').textContent = L.boss.title;
-      $('boss').classList.add('on'); Sfx.setIntensity(2); game.slowmo = 1.2;
+      spawnBossGroup([L.boss], L.bossAt[0], L.bossAt[1]); game.slowmo = 1.2;
       showTip('Read the red ground. Dodge as it fills for <b>Edge Time</b>, then punish the glowing core.', 6);
     });
+  }
+  if (n === 5) {
+    game.round = 0; Sfx.setIntensity(2);
+    later(1.5, startRound);
+    later(.5, () => showTip('Eight rounds of bosses. You heal a little after each one. Save your ultimate for the twins and the final king.', 7));
   }
 }
 function captainDown(e) {
@@ -2135,23 +2419,50 @@ function captainDown(e) {
   P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .25);
   updateObjective();
   later(2, () => o.beam.visible = false);
-  if (game.captured >= OUTPOSTS.length) setObjective(2);
+  if (game.captured >= OUTPOSTS.length) setObjective(L.warlord ? 2 : 3);
+}
+function bossExplode(e, big) {
+  const cfg = e.cfg;
+  for (let i = 0; i < (big ? 10 : 6); i++) later(i * .12, () => { const p = new V3(e.pos.x + rand(-3, 3), 0, e.pos.z + rand(-3, 3)); pillar(p, 1.8, 18, 0xffe08a, .7); Particles.burst(new V3(p.x, 2, p.z), 50, i % 2 ? cfg.fx : 0xffd060, 10, 1, 1, 0); Sfx.boom(.6); addShake(.5); });
+  later(1.3, () => { const i = enemies.indexOf(e); if (i >= 0) removeEnemy(i); flashScreen(big ? 1 : .5); });
+}
+function finishVictory(e) {
+  game.slowmo = 2.5; game.ending = 4.5; game.hitstop = .3;
+  enemies.filter(x => x !== e && !x.dead && x.kind !== 'boss').forEach((x, i) => later(.4 + i * .03, () => killEnemy(x, new V3(x.pos.x - e.pos.x, 0, x.pos.z - e.pos.z).normalize(), 8)));
+  game.objective = 4; updateObjective();
 }
 function bossDefeated(e) {
-  const cfg = e.cfg;
-  game.slowmo = 2.5; game.ending = 4.5; game.hitstop = .3; $('boss').classList.remove('on');
+  const cfg = e.cfg; game.bossKills++;
+  const group = game.bosses && game.bosses.length ? game.bosses : [e];
+  const remaining = group.filter(b => b !== e && !b.dead);
+  if (remaining.length) {
+    showBanner(cfg.name + ' FALLS', remaining.map(b => b.cfg.name).join(' & ') + ' FIGHTS ON', 'red', 2.2);
+    bossExplode(e, false); game.slowmo = .8; game.hitstop = .2;
+    remaining.forEach(b => { b.hp = Math.min(b.maxHp, b.hp + b.maxHp * .15); b.enraged = false; b.cfg = Object.assign({}, b.cfg, { enrageAt: 1.01 }); });
+    return;
+  }
+  $('boss').classList.remove('on');
+  if (game.objective === 2) {
+    showBanner(game.bossLabel + ' DEFEATED', 'THE ROAD TO THE RIFT OPENS', '', 3);
+    bossExplode(e, true); game.slowmo = 1.5; game.hitstop = .25;
+    P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .4); P.valor = Math.min(100, P.valor + 50); Sfx.chime();
+    later(4, () => { if (game.objective === 2) setObjective(3); });
+    return;
+  }
+  if (game.objective === 5) {
+    game.round++; bossExplode(e, true); game.slowmo = 1.2; game.hitstop = .25;
+    P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .35); P.valor = Math.min(100, P.valor + 25);
+    if (game.round < L.rush.length) { showBanner('ROUND ' + game.round + ' CLEARED', 'HEALTH RESTORED', '', 2.4); Sfx.chime(); game.bossLabel = ''; updateObjective(); later(4, startRound); }
+    else { showBanner('THE GAUNTLET IS YOURS', 'EVERY KING HAS FALLEN', '', 4); finishVictory(e); }
+    return;
+  }
   if (cfg.retreat) {
     showBanner(cfg.name + ' RETREATS', 'INTO THE RIFT, WOUNDED', '', 4);
     e.retreating = true; e.dead = false; e.invuln = 99; e.state = 'retreat'; e.hp = 1;
     shock(e.pos, 12, cfg.fx, .8); Particles.burst(new V3(e.pos.x, 2, e.pos.z), 120, cfg.fx, 10, 1.2, 1, 0); Sfx.boom(1.4); flashScreen(.6);
     later(2.5, () => { const i = enemies.indexOf(e); if (i >= 0) removeEnemy(i); });
-  } else {
-    showBanner(cfg.name + ' FALLS', L.name, '', 4);
-    for (let i = 0; i < 10; i++) later(i * .12, () => { const p = new V3(e.pos.x + rand(-3, 3), 0, e.pos.z + rand(-3, 3)); pillar(p, 1.8, 18, 0xffe08a, .7); Particles.burst(new V3(p.x, 2, p.z), 50, i % 2 ? cfg.fx : 0xffd060, 10, 1, 1, 0); Sfx.boom(.6); addShake(.5); });
-    later(1.3, () => { const i = enemies.indexOf(e); if (i >= 0) removeEnemy(i); flashScreen(1); });
-  }
-  enemies.filter(x => x !== e && !x.dead).forEach((x, i) => later(.4 + i * .03, () => killEnemy(x, new V3(x.pos.x - e.pos.x, 0, x.pos.z - e.pos.z).normalize(), 8)));
-  game.objective = 3; updateObjective();
+  } else { showBanner(cfg.name + ' FALLS', L.name, '', 4); bossExplode(e, true); }
+  finishVictory(e);
 }
 function updateMission(dt) {
   for (const o of OUTPOSTS) {
@@ -2182,10 +2493,11 @@ function updateMission(dt) {
       for (let k = 0; k < 8; k++) spawnEnemy(pickKind(), x + rand(-4, 4), z + rand(-4, 4), null, { aggro: true });
     }
   }
-  if (game.objective >= 1 && game.objective < 3) {
+  if ([1, 2, 3, 5].includes(game.objective)) {
     game.ambientT -= dt;
-    if (game.ambientT <= 0 && enemies.length < (game.objective === 2 ? 30 : 50)) {
-      game.ambientT = game.objective === 2 ? 7 : 5;
+    const cap = { 1: 50, 2: 35, 3: 30, 5: 18 }[game.objective];
+    if (game.ambientT <= 0 && enemies.length < cap) {
+      game.ambientT = { 1: 5, 2: 6, 3: 7, 5: 8 }[game.objective];
       for (let tries = 0; tries < 6; tries++) {
         const a = rand(0, TAU), r = rand(20, 28); let x = P.pos.x + Math.cos(a) * r, z = P.pos.z + Math.sin(a) * r;
         const rr = Math.hypot(x, z); if (rr > ARENA_R - 6) { x *= (ARENA_R - 6) / rr; z *= (ARENA_R - 6) / rr; }
@@ -2254,7 +2566,7 @@ function drawOverlay(dt) {
   let target = null;
   if (game.objective === 0) target = { x: L.waveAt[0], z: L.waveAt[1] };
   if (game.objective === 1) { let bd = 1e9; for (const o of OUTPOSTS) if (o.state === 'enemy') { const d = Math.hypot(o.x - P.pos.x, o.z - P.pos.z); if (d < bd) { bd = d; target = o; } } }
-  if (game.objective === 2 && game.boss && !game.boss.dead) target = { x: game.boss.pos.x, z: game.boss.pos.z };
+  if ([2, 3, 5].includes(game.objective) && game.bosses) { const b = game.bosses.find(b => !b.dead && !b.retreating); if (b) target = { x: b.pos.x, z: b.pos.z }; }
   if (target) {
     const dist = Math.hypot(target.x - P.pos.x, target.z - P.pos.z);
     _proj.set(target.x, 3, target.z).project(camera);
@@ -2298,10 +2610,11 @@ function updateHUD(dt) {
   $('buff').classList.toggle('on', P.buffT > 0);
   game.comboT -= dt; if (game.comboT <= 0 && game.combo > 0) game.combo = 0;
   $('combo').classList.toggle('on', game.combo > 1); $('comboTimer').style.transform = `scaleX(${Math.max(0, game.comboT / 2.6)})`;
-  if (game.boss) {
-    const b = game.boss; b.hpLag = Math.max(b.hp, (b.hpLag ?? b.maxHp) - b.maxHp * .12 * dt);
-    $('bossFill').style.transform = `scaleX(${Math.max(0, b.hp / b.maxHp)})`; $('bossLag').style.transform = `scaleX(${Math.max(0, b.hpLag / b.maxHp)})`;
-    $('bossWeak').style.opacity = b.weakExposed ? 1 : 0; $('bossWeakFill').style.transform = `scaleX(${Math.max(0, b.weakGauge / b.weakMax)})`;
+  if (game.bosses && game.bosses.length) {
+    let hp = 0, mx = 0, lag = 0, weak = null;
+    for (const b of game.bosses) { const h = b.dead ? 0 : Math.max(0, b.hp); b.hpLag = Math.max(h, (b.hpLag ?? b.maxHp) - b.maxHp * .12 * dt); hp += h; mx += b.maxHp; lag += b.hpLag; if (b.weakExposed && !weak) weak = b; }
+    $('bossFill').style.transform = `scaleX(${hp / mx})`; $('bossLag').style.transform = `scaleX(${lag / mx})`;
+    $('bossWeak').style.opacity = weak ? 1 : 0; if (weak) $('bossWeakFill').style.transform = `scaleX(${Math.max(0, weak.weakGauge / weak.weakMax)})`;
   }
   $('vEdge').style.opacity = game.edge > 0 ? 1 : 0;
   mmT -= dt; if (mmT <= 0) { mmT = 1 / 30; drawMinimap(); }
@@ -2324,7 +2637,17 @@ function buildRoster() {
     el.appendChild(b);
   }
 }
+function buildWeaponPick() {
+  const h = HEROES[heroId]; const el = $('weaponPick'); el.innerHTML = '';
+  [h, h.alt].forEach((w, i) => {
+    const b = document.createElement('button'); b.className = 'wbtn' + ((weaponChoice[heroId] || 0) === i ? ' on' : ''); b.id = 'weapon-' + i;
+    b.innerHTML = `<small>${i ? 'SECOND WEAPON' : 'SIGNATURE WEAPON'}</small><b>${w.wname}</b><span>${w.wdesc}</span>`;
+    b.onclick = () => { weaponChoice[heroId] = i; store.set(WKEY, weaponChoice); buildWeaponPick(); previewHero(); };
+    el.appendChild(b);
+  });
+}
 function buildChapters() {
+  buildWeaponPick();
   const h = HEROES[heroId]; $('chHero').textContent = `CHAMPION: ${h.name}, ${h.title.toUpperCase()}`;
   const best = store.get(BEST_KEY, {});
   const el = $('chapters'); el.innerHTML = '';
@@ -2333,7 +2656,7 @@ function buildChapters() {
     b.style.setProperty('--s1', hexCss(lv.sky[0])); b.style.setProperty('--s2', hexCss(lv.sky[1])); b.style.setProperty('--s3', hexCss(lv.sky[2])); b.style.setProperty('--c', hexCss(lv.riftColor));
     const mine = best[i] && best[i][heroId]; const rec = HEROES[lv.rec];
     b.innerHTML = `<div class="scene"></div><div class="num">${lv.numeral}</div><h3>${lv.name}</h3><p>${lv.blurb}</p>
-      <div class="meta"><span>BOSS <b>${lv.boss.name}</b></span><span>BEST <b>${mine || '—'}</b></span></div><div class="meta"><span>Suggested: ${rec.name}</span><span>Start LV ${lv.startLevel}</span></div>`;
+      <div class="meta"><span>${lv.rush ? `BOSSES <b>${lv.rush.flat().length} IN A ROW</b>` : `BOSSES <b>${[...lv.warlord.map(k => BOSSES[k].name), lv.boss.name].join(', ')}</b>`}</span><span>BEST <b>${mine || '—'}</b></span></div><div class="meta"><span>Suggested: ${rec.name}</span><span>Start LV ${lv.startLevel}</span></div>`;
     b.onclick = () => { levelIdx = i; L = LEVELS[i]; openStory(); };
     el.appendChild(b);
   });
@@ -2362,11 +2685,12 @@ function newGame() {
   if (world.built !== levelIdx) buildWorld(levelIdx);
   clearWorld();
   previewHero();
-  Object.assign(game, { time: 0, kos: 0, maxCombo: 0, combo: 0, comboT: 0, dmgTaken: 0, slowmo: 0, edge: 0, hitstop: 0, shake: 0, boss: null, captured: 0, ambientT: 4, tipsShown: {}, ending: 0, attackers: 0, shooters: 0, waveKills: 0 });
+  Object.assign(game, { bosses: [], bossLabel: '', round: 0, bossKills: 0, time: 0, kos: 0, maxCombo: 0, combo: 0, comboT: 0, dmgTaken: 0, slowmo: 0, edge: 0, hitstop: 0, shake: 0, boss: null, captured: 0, ambientT: 4, tipsShown: {}, ending: 0, attackers: 0, shooters: 0, waveKills: 0 });
   cam.yaw = P.facing + PI; cam.pitch = .42; cam.distT = 9.5; cam.target.set(P.pos.x, 1.6, P.pos.z);
   $('boss').classList.remove('on'); koPop();
   $('pName').textContent = P.def.name; $('pLetter').textContent = P.def.letter; $('skDashLbl').textContent = P.def.skill.short; $('skUltLbl').textContent = P.def.ult.short;
-  $('moveTitle').textContent = P.def.name + "'S MOVESET"; $('moveList').innerHTML = P.def.moveList.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('');
+  $('moveTitle').textContent = P.def.name + ' · ' + P.def.wname.toUpperCase(); $('moveList').innerHTML = P.def.moveList.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('');
+  if (L.rush) { setObjective(5); Sfx.setIntensity(2); return; }
   setObjective(0);
   const [wx, wz] = L.waveAt;
   for (let s = 0; s < 3; s++) { const a = Math.atan2(wx - L.start[0], wz - L.start[1]); const side = (s - 1) * 9, fwd = s * 4; const cx = wx + Math.cos(a) * side + Math.sin(a) * fwd, cz = wz - Math.sin(a) * side + Math.cos(a) * fwd;
@@ -2377,7 +2701,7 @@ function startGame() {
   Sfx.init(); Sfx.startMusic();
   newGame(); show(null); game.state = 'play'; $('hud').classList.add('on');
   showBanner('CHAPTER ' + L.numeral, L.name, '', 2.6);
-  later(1.2, () => showTip(`Playing as <b>${P.def.name}</b>. <kbd>WASD</kbd> move · <kbd>LMB</kbd>/<kbd>J</kbd> attack · <kbd>RMB</kbd>/<kbd>K</kbd> heavy finisher · <kbd>Space</kbd> dodge · click the game to steer the camera with the mouse.`, 8));
+  later(1.2, () => showTip(`Playing as <b>${P.def.name}</b> with the <b>${P.def.wname}</b>. <kbd>WASD</kbd> move · <kbd>LMB</kbd>/<kbd>J</kbd> attack · <kbd>RMB</kbd>/<kbd>K</kbd> heavy finisher · <kbd>Space</kbd> dodge · click the game to steer the camera with the mouse.`, 8));
   later(10, () => showTip(`Lights then a heavy unlock different finishers. <kbd>E</kbd> is ${P.def.skill.name}. <kbd>Esc</kbd> shows the full moveset.`, 7));
 }
 function togglePause(forceOn) {
@@ -2397,12 +2721,12 @@ function showResults(win) {
   const rank = !win ? '—' : score >= 9 ? 'S' : score >= 6 ? 'A' : score >= 4 ? 'B' : 'C';
   if (win) { const best = store.get(BEST_KEY, {}); best[levelIdx] = best[levelIdx] || {}; const order = 'CBAS'; const prev = best[levelIdx][heroId]; if (!prev || order.indexOf(rank) > order.indexOf(prev)) best[levelIdx][heroId] = rank; store.set(BEST_KEY, best); }
   $('resTitle').textContent = win ? 'VICTORY' : 'DEFEAT';
-  $('resSub').textContent = win ? `CHAPTER ${L.numeral} COMPLETE · ${L.name} · ${P.def.name}` : `CHAPTER ${L.numeral} · ${L.name}`;
+  $('resSub').textContent = win ? `CHAPTER ${L.numeral} COMPLETE · ${P.def.name} · ${P.def.wname.toUpperCase()}` : `CHAPTER ${L.numeral} · ${L.name}`;
   $('resRank').textContent = rank; $('resRank').style.display = win ? '' : 'none';
   $('resNote').textContent = win ? L.end : 'Rise again. The Hollow are still waiting.';
   $('bAgain').textContent = win ? 'PLAY AGAIN' : 'TRY AGAIN';
   $('bNext').hidden = !(win && levelIdx < LEVELS.length - 1);
-  $('resStats').innerHTML = `<span>Enemies defeated</span><b>${game.kos}</b><span>Max combo</span><b>${game.maxCombo}</b><span>Outposts reclaimed</span><b>${game.captured}/${OUTPOSTS.length}</b><span>Damage taken</span><b>${Math.round(game.dmgTaken)}</b><span>Level reached</span><b>${P.level}</b><span>Time</span><b>${mins}:${secs}</b>`;
+  $('resStats').innerHTML = `<span>Enemies defeated</span><b>${game.kos}</b><span>Max combo</span><b>${game.maxCombo}</b>${L.rush ? '' : `<span>Outposts reclaimed</span><b>${game.captured}/${OUTPOSTS.length}</b>`}<span>Bosses defeated</span><b>${game.bossKills}${L.rush ? '/' + L.rush.flat().length : ''}</b><span>Damage taken</span><b>${Math.round(game.dmgTaken)}</b><span>Level reached</span><b>${P.level}</b><span>Time</span><b>${mins}:${secs}</b>`;
   show('sResults');
 }
 $('bStart').onclick = () => { Sfx.init(); buildRoster(); show('sSelect'); game.state = 'select'; };
@@ -2467,5 +2791,5 @@ function tick(rdt, now = performance.now()) {
 requestAnimationFrame(frame);
 // Debug/test hook: sim(seconds) advances the game logic without rendering
 window.__emberfall = { scene, camera, cam, game, enemies, keys, pressed, LEVELS, HEROES, get player() { return P; }, sim(sec) { for (let i = 0; i < sec * 60; i++) tick(1 / 60); },
-  start(hero, lvl) { heroId = hero; levelIdx = lvl; L = LEVELS[lvl]; startGame(); }, setObjective };
+  start(hero, lvl, weapon = 0) { heroId = hero; levelIdx = lvl; L = LEVELS[lvl]; weaponChoice[hero] = weapon; startGame(); }, setObjective, BOSSES };
 </script>
