@@ -705,6 +705,7 @@ const GOODS = {
   maple_syrup:{name:'Maple Syrup',base:18,col:'#b0601a',kind:'food',heal:3},
   marble:{name:'Marble',base:15,col:'#e8e4e8',kind:'mat'},
   ancient_coin:{name:'Ancient Coin',base:80,col:'#e3a948',kind:'good'},
+  eclipse_shard:{name:'Eclipse Shard',base:150,col:'#c8a8ff',kind:'good'},
   coral:{name:'Coral',base:40,col:'#f07a7a',kind:'good'},
   kings_crown:{name:"Fallen King's Crown",base:300,col:'#e3a948',kind:'trophy'},
   maple_candy:{name:'Maple Candy',base:45,col:'#c8702a',kind:'craft'},
@@ -1520,6 +1521,39 @@ const FESTIVALS = [
   {name:'Harvest Moon', town:'wren', cols:['#e07a2a','#c8402a','#f0c040','#5a3a1a'], special:'pumpkin_lantern', desc:'pumpkins, pies and fireworks over the harbor'},
   {name:'Winterlights', town:'frost', cols:['#9fe8ff','#ffffff','#e05a5a','#86c98f'], special:'snow_globe', desc:'candles, carols and sky lanterns on the ice'},
 ];
+// ===== solar eclipse: noon on day 2 of summer and winter =====
+const eclipseDay = () => !!S && dayOfSeason() === 2 && (seasonIdx() === 1 || seasonIdx() === 3);
+function eclipseAmt() { if (!eclipseDay() || inDungeon() || inArena() || S.y >= WORLD_H) return 0; const d = Math.abs(S.time - .51); return d > .045 ? 0 : Math.min(1, (.045 - d)/.025); }
+const eclipseNow = () => eclipseAmt() > .5;
+let eclWisps = [];
+function eclipseTick() {
+  if (!eclipseDay()) { if (eclWisps.length) eclWisps = []; return; }
+  if (S.time > .4 && S.time < .46 && S.eclWarn !== S.day) { S.eclWarn = S.day; toast('<b>The sun is going dark...</b><br>A total eclipse begins at noon! Shadow monsters will roam, and glowing <b>shadow wisps</b> appear. Catch them for Eclipse Shards.', 7000); }
+  if (eclipseNow()) {
+    S.eclSeen = S.day; S.eclGot = S.eclGot || {}; const got = S.eclGot[S.day] || 0;
+    if (eclWisps.length < 3 && got + eclWisps.length < 6 && Math.random() < .25) for (let k = 0; k < 20; k++) { const a = Math.random()*6.283, r = 3 + Math.random()*5, x = S.x + Math.cos(a)*r, y = S.y + Math.sin(a)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y)) { eclWisps.push({x, y, ph: Math.random()*6}); break; } }
+  } else if (eclWisps.length && eclipseAmt() === 0) eclWisps = [];
+  if (S.eclSeen === S.day && S.eclDone !== S.day && S.time > .56) { S.eclDone = S.day; S.eclipses = (S.eclipses || 0) + 1; toast(`<b>The sun returns</b><br>You witnessed a total eclipse${(S.eclGot || {})[S.day] ? ` and caught ${S.eclGot[S.day]} shadow wisp${S.eclGot[S.day] > 1 ? 's' : ''}` : ''}. The next one comes ${seasonIdx() === 1 ? 'in winter' : 'next summer'}.`, 6500); }
+}
+function eclTarget() {
+  const i = eclWisps.findIndex(w => Math.hypot(w.x - S.x, w.y - S.y) < 1.4); if (i < 0) return null;
+  return {key: 'eclw', html: '<kbd style="margin:0 6px 0 0">E</kbd>Catch the shadow wisp', btn: 'Catch', fn: () => {
+    const w = eclWisps.splice(i, 1)[0]; S.eclGot = S.eclGot || {}; S.eclGot[S.day] = (S.eclGot[S.day] || 0) + 1; S.eclShards = (S.eclShards || 0) + 1;
+    addItem('eclipse_shard', 1); burst(w.x, w.y - .6, '#c8a8ff', 22, 4); SFX.sparkle(); renderHUD(); save();
+    floatText(S.x, S.y - 1.6, '+1 Eclipse Shard', '#c8a8ff');
+  }};
+}
+function drawWisp(w) {
+  const t = performance.now()/1000, bx = w.x*TS + Math.sin(t*1.3 + w.ph)*6, by = w.y*TS - 12 + Math.cos(t*1.7 + w.ph)*4;
+  const gr = ctx.createRadialGradient(bx, by, 1, bx, by, 14); gr.addColorStop(0, 'rgba(255,220,140,.9)'); gr.addColorStop(.35, 'rgba(200,168,255,.55)'); gr.addColorStop(1, 'rgba(120,80,200,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bx, by, 14, 0, 7); ctx.fill(); ctx.fillStyle = '#140a24'; ctx.beginPath(); ctx.arc(bx, by, 3.2, 0, 7); ctx.fill();
+}
+function drawCorona(a) {
+  const W = ctx.canvas.width, cx = W*.78, cy = 78*dpr, r = 20*dpr;
+  const gr = ctx.createRadialGradient(cx, cy, r*.9, cx, cy, r*3); gr.addColorStop(0, `rgba(255,230,170,${.85*a})`); gr.addColorStop(.3, `rgba(255,190,110,${.35*a})`); gr.addColorStop(1, 'rgba(255,170,90,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, r*3, 0, 7); ctx.fill();
+  ctx.fillStyle = `rgba(10,8,16,${Math.min(1, a*1.2)})`; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+}
 const festivalToday = () => S && dayOfSeason() === 4 ? FESTIVALS[seasonIdx()] : null;
 const FEST_SHOP = [['fireworks', 30], ['sky_lantern', 25], ['candy_apple', 15], ['party_hat', 120]];
 const cropRate = c => (season().crops.includes(c) ? 1.4 : seasonIdx() === 3 ? .5 : 1) * (S && toolTier('can') ? 1.25 : 1) * (S && S.monuments && S.monuments.maplehold >= 3 ? 1.15 : 1);
@@ -7423,6 +7457,8 @@ function gazette() {
   for (const a of vis) for (const g of TOWNS[a].produce) { if (!GOODS[g]) continue; for (const b of vis) { if (b === a) continue; const m = price(b, g) - price(a, g); if (!best || m > best.m) best = {a, b, g, m}; } }
   if (best && best.m > 5) H.push(`<b>Trade tip:</b> merchants whisper that ${GOODS[best.g].name} bought in ${TOWNS[best.a].name} sells for about ${Math.round(best.m)} coin more in ${TOWNS[best.b].name}.`);
   if (festivalToday()) H.push(`<b>FESTIVAL TODAY!</b> ${festivalToday().name} celebrations in every town.`);
+  if (eclipseDay()) H.push('<b>Sky watch:</b> a <span style="color:#c8a8ff">total eclipse of the sun</span> at noon today! Catch the shadow wisps that appear in the dark.');
+  else if (dayOfSeason() === 1 && (seasonIdx() === 1 || seasonIdx() === 3)) H.push('<b>Sky watch:</b> astronomers predict a total eclipse at noon tomorrow.');
   if (bloodMoonDay()) H.push('<b>WARNING:</b> astronomers predict a <span style="color:#e85a5a">Blood Moon</span> tonight. Stay indoors, or bring a big sword.');
   if (seasonIdx() === 3 && S.day % 3 === 1) H.push('<b>Sky watch:</b> conditions are perfect for the northern lights tonight.');
   if (CIRCUS && TOWNS[CIRCUS.town]) H.push(`<b>Roll up!</b> The Traveling Circus is in ${TOWNS[CIRCUS.town].name} this week.`);
@@ -7956,6 +7992,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Solar eclipse', 'At noon on day 2 of summer and of winter, the moon covers the sun. For a few hours it\u2019s as dark as night and night monsters roam. Glowing shadow wisps appear nearby: walk up and press E to catch them for Eclipse Shards, which sell well. You can catch up to 6 in one eclipse. The Gazette warns you the day before.'],
   ['Shell Stones and pony jumping', 'Nan Cowrie at the Reedholm inn plays Shell Stones: sow stones round the board, land in your store to go again, and capture from empty cups. Hettie Hurdle in Hollowpine runs a pony jumping show: time your jumps over 15 fences, and a round with no faults wins the blue ribbon.'],
   ['Settings and accessibility', 'In the menu (Esc) you can change any key, make the text larger, and switch to colorblind-friendly colors (blue and orange instead of green and red). Records lists all your personal bests, and the Album keeps your last 12 photos.'],
   ['Minigame rewards', 'Most minigames (the rink, mine carts, sledding, darts, skittles, snowball fights, the kitchen, sandcastles, hide and seek, wrestling, golf, log rolling and Tides) pay full prizes for your first three games each day. After that, the prize drops to a fifth until tomorrow. Records, achievements and fun still count every time. Courier runs work the same way, and a metal detector finds mostly rusty coins after about a dozen digs in one day.'],
@@ -9211,6 +9248,7 @@ function render() {
   if (S.pk && S.pk.step === 2 && inView(S.pk.x.x, S.pk.x.y)) sprites.push({y: S.pk.x.y - .5, f: () => { const px = S.pk.x.x*TS, py = S.pk.x.y*TS; ctx.strokeStyle = '#c8302a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px - 5, py - 5); ctx.lineTo(px + 5, py + 5); ctx.moveTo(px + 5, py - 5); ctx.lineTo(px - 5, py + 5); ctx.stroke(); ctx.lineWidth = 1; }});
   if (totOn()) for (const h of houses) if (h.town && inView(h.x + 1, h.y + 1.5)) { const key = h.x + ',' + h.y; if ((S.tot || {})[key] !== S.day) sprites.push({y: h.y + 2.1, f: () => drawJack(h)}); }
   for (const [i, q] of secretGlades().entries()) if (Math.hypot(q.x - S.x, q.y - S.y) < 6 && inView(q.x, q.y)) sprites.push({y: q.y - 1, f: () => drawGlade(q, i)});
+  for (const w of eclWisps) if (inView(w.x, w.y)) sprites.push({y: w.y + .5, f: () => drawWisp(w)});
   for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
   if (airship) sprites.push({y: 1e9 - 1, f: drawAirship});
@@ -9372,11 +9410,11 @@ function render() {
   }
 
   const sun = Math.cos((S.time - .5) * Math.PI * 2);
-  const dark = inDungeon() ? .86 : Math.max(0, Math.min(1, -sun*1.3 + .15)) * .72;
+  const eclA = eclipseAmt(), dark = inDungeon() ? .86 : Math.max(eclA*.66, Math.max(0, Math.min(1, -sun*1.3 + .15)) * .72);
   if (dark > .01) {
     lctx.globalCompositeOperation = 'source-over';
     lctx.clearRect(0, 0, lightC.width, lightC.height);
-    lctx.fillStyle = bloodMoon() ? `rgba(46,4,10,${Math.min(.8, dark*1.05)})` : `rgba(8,12,34,${dark})`; lctx.fillRect(0, 0, lightC.width, lightC.height);
+    lctx.fillStyle = bloodMoon() ? `rgba(46,4,10,${Math.min(.8, dark*1.05)})` : eclA > .2 ? `rgba(18,10,30,${dark})` : `rgba(8,12,34,${dark})`; lctx.fillRect(0, 0, lightC.width, lightC.height);
     lctx.globalCompositeOperation = 'destination-out';
     const hole = (wx, wy, r, a) => {
       const sx = (wx - camX)*Z, sy = (wy - camY)*Z, rr = r*Z;
@@ -9412,10 +9450,12 @@ function render() {
     }
     for (const e of enemies) if (e.type === 'imp' || e.type === 'wisp' || e.boss === 'wyrm' || e.boss === 'lich') hole(e.x*TS, e.y*TS - 12, 30, .6);
     for (const p of eproj) hole(p.x*TS, p.y*TS, 14, .5);
+    for (const w of eclWisps) hole(w.x*TS, w.y*TS - 12, 28, .75);
     for (const h of hazards) if (h.fire && h.wind <= 0) hole(h.x*TS, h.y*TS, 30, .6);
     ctx.setTransform(1,0,0,1,0,0);
     ctx.drawImage(lightC, 0, 0);
     if (auroraNow()) drawAurora(dark);
+    if (eclA > 0) drawCorona(eclA);
     ctx.setTransform(Z,0,0,Z,-camX*Z,-camY*Z);
     ctx.fillStyle = `rgba(255,200,110,${dark*.5})`;
     for (const h of houses) { ctx.fillRect(h.x*TS+5, h.y*TS+16, 6, 6); ctx.fillRect(h.x*TS+21, h.y*TS+16, 6, 6); }
@@ -9569,7 +9609,7 @@ function update(dt) {
   if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
-  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck();
+  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck(); eclipseTick();
     if (S.starfall === S.day && S.time > .74 && S.time < .8 && S.sfWarned !== S.day) { S.sfWarned = S.day; toast('<b>A starfall night!</b><br>Shooting stars are streaking across the sky. Where they land, star fragments glow until morning. Go and find them!', 8000); SFX.chime(); }
     if (bloodMoonDay() && S.time > .72 && S.time < .8 && S.bmWarned !== S.day) { S.bmWarned = S.day; toast('<b>The moon is rising red...</b><br>Tonight is a Blood Moon. Monsters will be stronger and far more numerous, and elites will walk the land. Every kill pays double.', 8000); SFX.roar(); }
     if (S.day % 6 === 1 && S.time > .22 && S.time < .32 && S.bmWarned === S.day - 1 && S.bmSurvived !== S.day) { S.bmSurvived = S.day; S.bloodMoons = (S.bloodMoons || 0) + 1; toast('<b>The Blood Moon sets</b><br>You survived the night.', 5000); }
@@ -9652,7 +9692,7 @@ function update(dt) {
 
   gatherCd = Math.max(0, gatherCd - dt);
   updateFishing(dt);
-  updateCombat(dt, night);
+  updateCombat(dt, night || eclipseNow());
   shake = Math.max(0, shake - dt);
   for (const f of floats) f.t += dt;
   while (floats.length && floats[0].t > 1.2) floats.shift();
@@ -9664,7 +9704,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || hsTarget() || pkTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || eclTarget() || hsTarget() || pkTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -12822,6 +12862,8 @@ $('skillsSheet').addEventListener('click', e => {
 /* ================= achievements ================= */
 const ACH = [
   ['first_blood','First Blood','Defeat your first enemy', () => S.kills >= 1],
+  ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
+  ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
   ['stones_win','Shell Shark','Beat Nan Cowrie at Shell Stones', () => (S.stonesWins || 0) >= 1],
   ['stones_rout','Clean Sweep','Beat Nan Cowrie at Shell Stones by 15 or more', () => (S.stonesBest || 0) >= 15],
   ['clear_round','Clear Round','Ride a clear round at the pony jumping show', () => (S.jumpClean || 0) >= 1],
@@ -13376,8 +13418,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 12;
+const WN_VER = 13;
 const WHATS_NEW = [
+  ['Solar eclipse', 'Twice a year (day 2 of summer and of winter) the sun goes dark at noon. Catch the glowing shadow wisps for Eclipse Shards before the light returns.'],
   ['Two new games', 'Shell Stones with Nan Cowrie in Reedholm (a classic pit-and-pebble board game), and the pony jumping show with Hettie Hurdle in Hollowpine.'],
   ['Save reminders', 'A small Saved sign appears when the game saves, and the game reminds you to make a backup every couple of weeks.'],
   ['Your keys, your way', 'Open this menu and choose Change keys to put any action on the key you like. There\u2019s also a Text size setting and colorblind-friendly colors.'],
@@ -13644,7 +13687,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
