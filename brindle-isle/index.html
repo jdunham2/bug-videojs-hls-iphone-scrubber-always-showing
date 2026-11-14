@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brindle Isle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: full-bleed canvas world, HUD floats in the corners like a field journal pinned over the map. */
+:root {
+  --night: #12232a;      /* panel ground */
+  --night-2: #1c343c;    /* raised rows */
+  --line: #2e5059;       /* borders */
+  --text: #eef3e6;       /* main text */
+  --muted: #9fb7b0;      /* secondary text */
+  --gold: #f4b740;       /* money / primary action */
+  --heart: #ec5257;      /* health */
+  --crystal: #a593ff;    /* rare resource accent */
+  --ok: #7fd17a;
+  --display: "Pixelify Sans", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; background: #1d4e6b; color: var(--text); font-family: var(--body); font-size: 14px; }
+canvas#game { position: fixed; inset: 0; display: block; touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.card { background: color-mix(in srgb, var(--night) 88%, transparent); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 0 rgba(0,0,0,.25); }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+.hud-top {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap;
+}
+.stats { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+#hearts { font-size: 20px; letter-spacing: 1px; line-height: 1; }
+#hearts .on { color: var(--heart); }
+#hearts .off { color: #3c4f55; }
+.gold { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 20px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.gold img { width: 20px; height: 20px; image-rendering: pixelated; }
+.objective { padding: 8px 12px; flex: 1 1 260px; max-width: 420px; min-width: 0; }
+.label { font-family: var(--display); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+#objective { margin: 2px 0 6px; line-height: 1.35; }
+.bar { height: 8px; border-radius: 4px; background: #0b171b; overflow: hidden; border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+#minimap { margin-left: auto; width: 144px; height: 112px; border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 4px 0 rgba(0,0,0,.25); image-rendering: pixelated; }
+#helpBtn { pointer-events: auto; position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(env(safe-area-inset-top, 0px) + 130px); width: 36px; height: 36px; border-radius: 50%; background: var(--night); border: 1px solid var(--line); font-family: var(--display); font-size: 18px; }
+
+#inventory {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  display: flex; gap: 4px; padding: 6px; pointer-events: auto; max-width: calc(100vw - 24px); overflow-x: auto;
+}
+.slot { position: relative; width: 42px; height: 42px; border-radius: 8px; background: var(--night-2); border: 1px solid var(--line); display: grid; place-items: center; flex: none; padding: 0; }
+.slot img { width: 28px; height: 28px; image-rendering: pixelated; }
+.slot b { position: absolute; right: 3px; bottom: 1px; font-family: var(--display); font-size: 13px; text-shadow: 0 1px 0 #000; font-variant-numeric: tabular-nums; }
+.slot.zero { opacity: .35; }
+.slot.tool { border-color: var(--crystal); }
+#prompt { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); padding: 6px 12px; font-family: var(--display); font-size: 15px; white-space: nowrap; }
+#prompt kbd { background: var(--gold); color: #2a1a00; border-radius: 4px; padding: 0 6px; font-family: inherit; }
+
+#toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 140px); transform: translate(-50%, -8px); padding: 8px 14px; max-width: min(90vw, 440px); text-align: center; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#dialogue { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); width: min(560px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 10px; cursor: pointer; z-index: 5; }
+#dlgWho { font-family: var(--display); font-size: 16px; color: var(--gold); margin-bottom: 4px; }
+#dlgText { font-size: 16px; line-height: 1.45; min-height: 3em; }
+.hint { color: var(--muted); font-size: 12px; text-align: right; margin-top: 6px; }
+
+#panel { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(5, 12, 15, .55); z-index: 6; padding: 16px; box-sizing: border-box; }
+.sheet { width: min(520px, 100%); max-height: calc(100% - 20px); overflow-y: auto; padding: 16px; box-sizing: border-box; outline: none; }
+.sheet header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 24px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
+.rows { display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--night-2); border-radius: 8px; }
+.row > img { width: 32px; height: 32px; image-rendering: pixelated; flex: none; }
+.row .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row .meta span { color: var(--muted); font-size: 13px; }
+.row.empty { opacity: .5; }
+.costs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.cost { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.cost img { width: 18px; height: 18px; image-rendering: pixelated; }
+.cost.ok { color: var(--ok); }
+.cost.no { color: #f08a7e; }
+.btn, .sheet header button, .row button { background: #29464e; border: 1px solid var(--line); border-radius: 7px; padding: 7px 12px; flex: none; }
+.btn:disabled, .row button:disabled { opacity: .4; cursor: default; }
+.primary { background: var(--gold) !important; color: #2a1a00; border: 0 !important; font-weight: 700; border-radius: 8px; padding: 10px 14px; width: 100%; margin-bottom: 10px; }
+.primary:disabled { opacity: .45; cursor: default; }
+.fund { display: flex; align-items: center; gap: 12px; margin: 6px 0 14px; font-family: var(--display); font-size: 18px; color: var(--gold); }
+.fund .bar { flex: 1; height: 12px; }
+.controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 14px; }
+.controls dt { font-family: var(--display); color: var(--gold); }
+.controls dd { margin: 0; color: var(--text); }
+
+#victory { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(5, 12, 15, .6); z-index: 7; padding: 16px; }
+#victory .sheet { text-align: center; }
+#victory h2 { font-size: 34px; color: var(--gold); margin: 4px 0 8px; }
+
+#touch { display: none; }
+@media (pointer: coarse) {
+  #touch { display: block; position: fixed; inset: auto 0 0 0; height: 0; z-index: 4; }
+  #stick { position: fixed; left: max(20px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 120px; height: 120px; border-radius: 50%; background: rgba(18,35,42,.45); border: 2px solid rgba(238,243,230,.25); touch-action: none; }
+  #nub { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(238,243,230,.55); }
+  .tbtns { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); display: flex; gap: 12px; align-items: flex-end; }
+  .tbtns button { touch-action: none; border-radius: 50%; border: 2px solid rgba(0,0,0,.3); font-family: var(--display); }
+  #btnA { width: 78px; height: 78px; background: var(--gold); color: #2a1a00; font-size: 26px; }
+  #btnTonic { width: 54px; height: 54px; background: #c2477a; font-size: 12px; }
+  #inventory { bottom: calc(env(safe-area-inset-bottom, 0px) + 156px); }
+  #prompt { bottom: calc(env(safe-area-inset-bottom, 0px) + 216px); }
+}
+@media (max-width: 560px) {
+  #minimap { width: 100px; height: 78px; }
+  #helpBtn { top: calc(env(safe-area-inset-top, 0px) + 96px); }
+  .objective { order: 3; flex-basis: 100%; max-width: none; }
+  #hearts { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { #toast, .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Brindle Isle game world"></canvas>
+
+<div id="hud">
+  <div class="hud-top">
+    <div class="stats card">
+      <div id="hearts" aria-label="Health"></div>
+      <div class="gold"><img id="coinIcon" alt=""><span id="gold">0</span></div>
+    </div>
+    <div class="objective card">
+      <div class="label">Goal · Rebuild the south bridge</div>
+      <div id="objective"></div>
+      <div class="bar"><i id="fund"></i></div>
+    </div>
+    <canvas id="minimap" width="144" height="112" aria-label="Island map"></canvas>
+  </div>
+  <button id="helpBtn" aria-label="Controls and options">?</button>
+  <div id="prompt" class="card" hidden></div>
+  <div id="inventory" class="card"></div>
+</div>
+
+<div id="toast" class="card" role="status"></div>
+
+<div id="dialogue" class="card" hidden>
+  <div id="dlgWho"></div>
+  <div id="dlgText"></div>
+  <div class="hint">Space or tap to continue</div>
+</div>
+
+<div id="panel" hidden>
+  <div class="sheet card" tabindex="-1">
+    <header><h2 id="panelTitle"></h2><button id="panelClose">Close</button></header>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<div id="victory" hidden>
+  <div class="sheet card">
+    <div class="label">Chapter one complete</div>
+    <h2>The bridge is open</h2>
+    <p class="sub" id="victoryStats"></p>
+    <button class="primary" id="victoryBtn">Keep exploring</button>
+  </div>
+</div>
+
+<div id="touch">
+  <div id="stick"><div id="nub"></div></div>
+  <div class="tbtns"><button id="btnTonic">Tonic</button><button id="btnA" aria-label="Action">A</button></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const T = 32, W = 72, H = 56, GOAL = 400, SEED = 7;
+const SAVE_KEY = 'brindle-isle-save-v1';
+const $ = id => document.getElementById(id);
+const cvs = $('game'), ctx = cvs.getContext('2d');
+const mini = $('minimap'), mctx = mini.getContext('2d');
+
+// ---------- random + noise ----------
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rng = mulberry32(SEED);
+function hash(x, y) { let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + SEED * 1013904223) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const s = t => t * t * (3 - 2 * t), u = s(xf), v = s(yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+// ---------- world ----------
+const DEEP = 0, SHALLOW = 1, SAND = 2, GRASS = 3, FOREST = 4, QUARRY = 5, PATH = 6, GROVE = 7, MEADOW = 8, PLANK = 9;
+const TILE_COLORS = ['#1d4e6b', '#2f7f95', '#e0c78e', '#7cb35b', '#4f8a45', '#a79f88', '#c9a76a', '#6f69a3', '#98c562', '#8a5a32'];
+const tiles = new Uint8Array(W * H);
+const cx = W / 2, cy = H / 2;
+const tileAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? DEEP : tiles[y * W + x];
+function regionOf(x, y) {
+  const dx = x - cx, dy = y - cy;
+  if (dx * dx + dy * dy < 40) return 'village';
+  const a = Math.atan2(dy, dx) + (vnoise(x / 5, y / 5) - 0.5) * 0.7;
+  if (a > -2.36 && a < -0.79) return 'grove';
+  if (a >= -0.79 && a < 0.79) return 'quarry';
+  if (a >= 0.79 && a < 2.36) return 'meadow';
+  return 'forest';
+}
+const REGION_TILE = { village: GRASS, grove: GROVE, quarry: QUARRY, meadow: MEADOW, forest: FOREST };
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const dx = (x - cx) / (W * 0.46), dy = (y - cy) / (H * 0.46);
+  const d = Math.hypot(dx, dy) + (vnoise(x / 7, y / 7) - 0.5) * 0.32 + (vnoise(x / 3, y / 3) - 0.5) * 0.08;
+  tiles[y * W + x] = d > 0.98 ? DEEP : d > 0.9 ? SHALLOW : d > 0.84 ? SAND : REGION_TILE[regionOf(x, y)];
+}
+const isLand = t => t >= SAND;
+// paths: plaza + four roads
+for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= 10) tiles[(cy + y) * W + cx + x] = PATH;
+function road(dx, dy, len) {
+  for (let k = 0; k < len; k++) for (let w = -1; w <= 0; w++) {
+    const x = cx + dx * k + (dy ? w : 0), y = cy + dy * k + (dx ? w : 0);
+    if (isLand(tileAt(x, y)) && tileAt(x, y) !== SAND) tiles[y * W + x] = PATH;
+  }
+}
+road(1, 0, 13); road(-1, 0, 13); road(0, -1, 12);
+// south road all the way to the dock
+let dockY = cy;
+for (let y = cy; y < H; y++) if (isLand(tileAt(cx, y)) && isLand(tileAt(cx - 1, y))) dockY = y; else break;
+for (let y = cy; y <= dockY; y++) { tiles[y * W + cx] = PATH; tiles[y * W + cx - 1] = PATH; }
+tiles[dockY * W + cx] = PLANK; tiles[dockY * W + cx - 1] = PLANK;
+const bridgeTiles = [];
+for (let y = dockY + 1; y < H; y++) { bridgeTiles.push([cx - 1, y], [cx, y]); }
+
+const cache = document.createElement('canvas');
+cache.width = W * T; cache.height = H * T;
+const cctx = cache.getContext('2d');
+const miniCache = document.createElement('canvas');
+miniCache.width = W * 2; miniCache.height = H * 2;
+function buildCache() {
+  const c = cctx;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = tiles[y * W + x], h = hash(x, y), px = x * T, py = y * T;
+    c.fillStyle = TILE_COLORS[t]; c.fillRect(px, py, T, T);
+    c.fillStyle = h > 0.5 ? `rgba(255,255,255,${(h - 0.5) * 0.05})` : `rgba(0,0,0,${(0.5 - h) * 0.05})`;
+    c.fillRect(px, py, T, T);
+    if (t === GRASS || t === FOREST || t === MEADOW || t === GROVE) {
+      c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const gx = px + hash(x * 3 + i, y) * 28 + 2, gy = py + hash(x, y * 3 + i) * 26 + 4;
+        c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx - 2, gy - 5); c.moveTo(gx, gy); c.lineTo(gx + 2, gy - 5); c.stroke();
+      }
+      if (t === MEADOW && h > 0.8) { c.fillStyle = h > 0.9 ? '#fff4b0' : '#f7b7d2'; c.beginPath(); c.arc(px + 16, py + 16, 2, 0, 7); c.fill(); }
+    } else if (t === QUARRY && h > 0.6) {
+      c.fillStyle = 'rgba(60,55,45,.25)'; c.fillRect(px + h * 20, py + 10 + h * 10, 4, 3);
+    } else if (t === SHALLOW && h > 0.7) {
+      c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(px + 6, py + 16); c.quadraticCurveTo(px + 12, py + 12, px + 18, py + 16); c.stroke();
+    } else if (t === PLANK) {
+      c.fillStyle = 'rgba(0,0,0,.25)';
+      for (let i = 1; i < 4; i++) c.fillRect(px, py + i * 8, T, 1.5);
+    }
+  }
+  if (!S.bridge) {
+    c.fillStyle = '#4b3220';
+    for (const [x, y] of bridgeTiles) { if ((y - dockY) % 2 === 1) { c.fillRect(x * T + 4, y * T + 10, 5, 12); c.fillRect(x * T + 23, y * T + 10, 5, 12); } }
+  }
+  const m = miniCache.getContext('2d');
+  m.imageSmoothingEnabled = false;
+  m.drawImage(cache, 0, 0, miniCache.width, miniCache.height);
+}
+function walkable(px, py) { return isLand(tileAt(Math.floor(px / T), Math.floor(py / T))); }
+
+// ---------- game state ----------
+const ITEMS = {
+  wood:    { name: 'Wood', price: 2 },
+  stone:   { name: 'Stone', price: 3 },
+  herb:    { name: 'Herb', price: 3 },
+  goo:     { name: 'Slime Goo', price: 4 },
+  crystal: { name: 'Crystal', price: 15 },
+  planks:  { name: 'Plank Bundle', price: 14 },
+  potion:  { name: 'Meadow Tonic', price: 20 },
+  charm:   { name: 'Crystal Charm', price: 70 },
+};
+const RECIPES = [
+  { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
+  { id: 'planks', name: 'Plank Bundle', desc: 'Sells for 14g, much more than loose wood.', cost: { wood: 4 } },
+  { id: 'potion', name: 'Meadow Tonic', desc: 'Restores 3 hearts (press Q). Sells for 20g.', cost: { herb: 2, goo: 1 } },
+  { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
+  { id: 'blade', name: 'Crystal Blade', desc: 'Doubles sword damage. Makes the grove slimes easy.', cost: { crystal: 3, wood: 3 }, tool: true },
+];
+function freshState() {
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0 },
+    tools: { pickaxe: false, blade: false }, hp: 6, maxHp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
+    px: cx * T, py: (cy + 4) * T };
+}
+let S = freshState();
+const P = { x: 0, y: 0, fx: 0, fy: 1, swing: 0, cool: 0, inv: 0, walk: 0, kx: 0, ky: 0, healT: 0 };
+
+const resources = [], enemies = [], pickups = [], particles = [], floats = [];
+const SOLID = { tree: 12, rock: 12, crystal: 11 };
+const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5 };
+function addRes(type, tx, ty) {
+  const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 18 + (rng() - 0.5) * 8, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
+  if (type === 'rock') r.shape = Array.from({ length: 7 }, () => 0.75 + rng() * 0.35);
+  resources.push(r);
+}
+const dockX = cx * T;
+for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+  const t = tiles[y * W + x];
+  if (t === PATH || t === SAND || t === PLANK || !isLand(t)) continue;
+  if (Math.hypot(x - cx, y - cy) < 8) continue;
+  const r = rng();
+  if (t === FOREST) { if (r < 0.17) addRes('tree', x, y); else if (r < 0.2) addRes('herb', x, y); }
+  else if (t === QUARRY) { if (r < 0.1) addRes('rock', x, y); else if (r < 0.12) addRes('tree', x, y); }
+  else if (t === MEADOW) { if (r < 0.09) addRes('herb', x, y); else if (r < 0.12) addRes('tree', x, y); else if (r < 0.13) addRes('rock', x, y); }
+  else if (t === GROVE) { if (r < 0.045) addRes('crystal', x, y); else if (r < 0.09) addRes('rock', x, y); else if (r < 0.11) addRes('tree', x, y); }
+}
+function randomTileIn(region, minDist) {
+  for (let i = 0; i < 500; i++) {
+    const x = 2 + Math.floor(rng() * (W - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    const t = tiles[y * W + x];
+    if (t === REGION_TILE[region] && Math.hypot(x - cx, y - cy) > minDist) return [x * T + 16, y * T + 16];
+  }
+  return [cx * T + 300, cy * T];
+}
+function addEnemy(kind, region) {
+  const [x, y] = randomTileIn(region, 11);
+  enemies.push({ kind, x, y, hx: x, hy: y, hp: kind === 'purple' ? 4 : 2, max: kind === 'purple' ? 4 : 2, alive: true, respawn: 0,
+    hop: rng() * 6, hurt: 0, kx: 0, ky: 0, wx: 0, wy: 0, wt: 0 });
+}
+for (let i = 0; i < 4; i++) addEnemy('green', 'forest');
+for (let i = 0; i < 3; i++) addEnemy('green', 'meadow');
+for (let i = 0; i < 3; i++) addEnemy('green', 'quarry');
+for (let i = 0; i < 6; i++) addEnemy('purple', 'grove');
+
+const NPCS = [
+  { id: 'oma', name: 'Oma Fen', x: cx * T - 56, y: cy * T - 40, tunic: '#c2477a', hair: '#d9d4c7', verb: 'Trade with' },
+  { id: 'bench', name: 'Workbench', x: cx * T + 56, y: cy * T - 40, bench: true, verb: 'Craft at' },
+  { id: 'tobin', name: 'Tobin', x: dockX + 22, y: dockY * T + 8, tunic: '#3f8f6b', hair: '#7a3e1d', verb: 'Talk to' },
+];
+
+// ---------- icons ----------
+function circle(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
+function ellipse(c, x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
+function diamond(c, x, y, w, h) { c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h * 0.5); c.lineTo(x - w, y); c.closePath(); c.fill(); }
+const ICON_DRAW = {
+  wood: c => { c.fillStyle = '#7a4b27'; c.fillRect(5, 11, 22, 11); c.fillStyle = '#c99a63'; ellipse(c, 25, 16.5, 4, 5.5); c.strokeStyle = '#7a4b27'; c.lineWidth = 1; c.beginPath(); c.arc(25, 16.5, 2, 0, 7); c.stroke(); },
+  stone: c => { c.fillStyle = '#8d8a86'; c.beginPath(); c.moveTo(6, 22); c.lineTo(9, 11); c.lineTo(18, 7); c.lineTo(26, 13); c.lineTo(26, 23); c.closePath(); c.fill(); c.fillStyle = '#b4b1ab'; c.beginPath(); c.moveTo(10, 12); c.lineTo(18, 9); c.lineTo(20, 14); c.lineTo(12, 16); c.fill(); },
+  herb: c => { c.strokeStyle = '#3c8a3f'; c.lineWidth = 2; c.beginPath(); c.moveTo(16, 28); c.lineTo(16, 12); c.stroke(); c.fillStyle = '#5bbf55'; ellipse(c, 11, 19, 5, 2.5); ellipse(c, 21, 16, 5, 2.5); c.fillStyle = '#f28fb4'; circle(c, 16, 9, 5); c.fillStyle = '#ffe07a'; circle(c, 16, 9, 2); },
+  goo: c => { c.fillStyle = '#5fd06a'; c.beginPath(); c.moveTo(16, 5); c.quadraticCurveTo(26, 18, 22, 24); c.quadraticCurveTo(16, 30, 10, 24); c.quadraticCurveTo(6, 18, 16, 5); c.fill(); c.fillStyle = 'rgba(255,255,255,.6)'; circle(c, 13, 19, 2.5); },
+  crystal: c => { c.fillStyle = '#6c5ce7'; diamond(c, 16, 16, 8, 13); c.fillStyle = '#a593ff'; diamond(c, 14, 15, 4, 9); c.fillStyle = '#e6e0ff'; circle(c, 13, 10, 1.5); },
+  planks: c => { for (let i = 0; i < 3; i++) { c.fillStyle = i % 2 ? '#a8713f' : '#8a5a32'; c.fillRect(4, 8 + i * 6, 24, 5); } c.fillStyle = '#d8c48a'; c.fillRect(14, 6, 4, 20); },
+  potion: c => { c.fillStyle = '#d9e6ea'; c.fillRect(13, 4, 6, 6); c.fillStyle = '#7a4b27'; c.fillRect(12, 3, 8, 3); c.fillStyle = '#e45a8f'; circle(c, 16, 19, 9); c.fillStyle = 'rgba(255,255,255,.5)'; circle(c, 12, 16, 2.5); },
+  charm: c => { c.strokeStyle = '#f4b740'; c.lineWidth = 2.5; c.beginPath(); c.arc(16, 17, 10, 0, 7); c.stroke(); c.fillStyle = '#a593ff'; diamond(c, 16, 17, 5, 8); c.fillStyle = '#f4b740'; c.fillRect(14, 3, 4, 5); },
+  pickaxe: c => { c.strokeStyle = '#7a4b27'; c.lineWidth = 3; c.beginPath(); c.moveTo(8, 27); c.lineTo(22, 9); c.stroke(); c.strokeStyle = '#9a978f'; c.lineWidth = 4; c.beginPath(); c.arc(20, 14, 11, -2.6, -0.2); c.stroke(); },
+  blade: c => { c.strokeStyle = '#a593ff'; c.lineWidth = 4; c.beginPath(); c.moveTo(10, 23); c.lineTo(26, 5); c.stroke(); c.strokeStyle = '#f4b740'; c.lineWidth = 3; c.beginPath(); c.moveTo(6, 18); c.lineTo(14, 27); c.stroke(); c.strokeStyle = '#7a4b27'; c.beginPath(); c.moveTo(9, 24); c.lineTo(5, 28); c.stroke(); },
+  gold: c => { c.fillStyle = '#c8861a'; circle(c, 16, 16, 11); c.fillStyle = '#f4b740'; circle(c, 16, 16, 8.5); c.fillStyle = '#ffe08a'; c.fillRect(14, 10, 4, 12); },
+};
+const ICON_CANVAS = {}, ICONS = {};
+for (const k in ICON_DRAW) { const c = document.createElement('canvas'); c.width = c.height = 32; ICON_DRAW[k](c.getContext('2d')); ICON_CANVAS[k] = c; ICONS[k] = c.toDataURL(); }
+$('coinIcon').src = ICONS.gold;
+
+// ---------- HUD ----------
+const toastEl = $('toast'); let toastTimer = 0;
+function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'planks', 'potion', 'charm'];
+function objectiveText() {
+  if (S.bridge) return 'The bridge is open. Keep exploring, or cross it to the mainland.';
+  if (S.gold >= GOAL) return 'You have enough! Bring 400g to Tobin at the south dock.';
+  if (!S.tools.pickaxe) {
+    if (S.inv.wood < 5 || S.inv.stone < 4) return `Chop trees and break rocks (wood ${Math.min(S.inv.wood, 5)}/5, stone ${Math.min(S.inv.stone, 4)}/4), then craft a pickaxe at the village workbench.`;
+    return 'Craft a Stone Pickaxe at the workbench in the village.';
+  }
+  return `Mine crystals in the purple grove up north, craft Crystal Charms, and sell them to Oma Fen. ${S.gold} / ${GOAL}g`;
+}
+function updateHUD() {
+  let h = '';
+  for (let i = 0; i < S.maxHp; i++) h += `<span class="${i < S.hp ? 'on' : 'off'}">♥</span>`;
+  $('hearts').innerHTML = h;
+  $('gold').textContent = S.gold;
+  $('objective').textContent = objectiveText();
+  $('fund').style.width = Math.min(100, S.gold / GOAL * 100) + '%';
+  let inv = '';
+  for (const k of INV_ORDER) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
+  if (S.tools.pickaxe) inv += `<div class="slot tool" title="Stone Pickaxe"><img src="${ICONS.pickaxe}" alt="Stone Pickaxe"></div>`;
+  if (S.tools.blade) inv += `<div class="slot tool" title="Crystal Blade"><img src="${ICONS.blade}" alt="Crystal Blade"></div>`;
+  $('inventory').innerHTML = inv;
+}
+$('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (!b) return; if (b.dataset.item === 'potion') drinkTonic(); else toast(`${ITEMS[b.dataset.item].name} · sells for ${ITEMS[b.dataset.item].price}g`); });
+
+// ---------- dialogue ----------
+let dlg = null;
+function say(who, lines, done) { dlg = { who, lines, i: 0, done }; $('dialogue').hidden = false; $('dlgWho').textContent = who; $('dlgText').textContent = lines[0]; }
+function advanceDialogue() {
+  if (!dlg) return; dlg.i++;
+  if (dlg.i >= dlg.lines.length) { const d = dlg.done; dlg = null; $('dialogue').hidden = true; if (d) d(); return; }
+  $('dlgText').textContent = dlg.lines[dlg.i];
+}
+$('dialogue').addEventListener('click', advanceDialogue);
+
+// ---------- panels ----------
+let panel = null;
+const panelEl = $('panel'), body = $('panelBody');
+function openPanel(kind) { panel = kind; panelEl.hidden = false; renderPanel(); panelEl.querySelector('.sheet').focus(); }
+function closePanel() { if (!panel) return; panel = null; panelEl.hidden = true; save(); }
+$('panelClose').addEventListener('click', closePanel);
+panelEl.addEventListener('click', e => { if (e.target === panelEl) closePanel(); });
+const canAfford = cost => Object.entries(cost).every(([k, n]) => S.inv[k] >= n);
+const sellAllValue = () => INV_ORDER.filter(k => k !== 'potion').reduce((s, k) => s + S.inv[k] * ITEMS[k].price, 0);
+let resetArmed = false;
+function renderPanel() {
+  let html = '';
+  if (panel === 'shop') {
+    $('panelTitle').textContent = 'Oma Fen\'s Stall';
+    const v = sellAllValue();
+    html = `<p class="sub">Oma buys anything you bring. Crafted goods are worth far more than raw materials.</p>
+      <button class="primary" data-act="sellall" ${v ? '' : 'disabled'}>Sell everything except tonics (+${v}g)</button><div class="rows">` +
+      INV_ORDER.map(k => `<div class="row ${S.inv[k] ? '' : 'empty'}"><img src="${ICONS[k]}" alt=""><div class="meta"><b>${ITEMS[k].name}</b><span>${ITEMS[k].price}g each · you have ${S.inv[k]}</span></div>
+        <button data-act="sell1" data-k="${k}" ${S.inv[k] ? '' : 'disabled'}>Sell 1</button><button data-act="sellk" data-k="${k}" ${S.inv[k] ? '' : 'disabled'}>All</button></div>`).join('') + '</div>';
+  } else if (panel === 'craft') {
+    $('panelTitle').textContent = 'Workbench';
+    html = `<p class="sub">Turn what you gather into tools and goods worth selling.</p><div class="rows">` + RECIPES.map(r => {
+      const owned = r.tool && S.tools[r.id], can = !owned && canAfford(r.cost);
+      const costs = Object.entries(r.cost).map(([k, n]) => `<span class="cost ${S.inv[k] >= n ? 'ok' : 'no'}"><img src="${ICONS[k]}" alt="${ITEMS[k].name}">${S.inv[k]}/${n}</span>`).join('');
+      return `<div class="row"><img src="${ICONS[r.id === 'pickaxe' || r.id === 'blade' ? r.id : r.id]}" alt=""><div class="meta"><b>${r.name}</b><span>${r.desc}</span><div class="costs">${costs}</div></div>
+        <button data-act="craft" data-k="${r.id}" ${can ? '' : 'disabled'}>${owned ? 'Owned' : 'Craft'}</button></div>`;
+    }).join('') + '</div>';
+  } else if (panel === 'bridge') {
+    $('panelTitle').textContent = 'The South Bridge';
+    html = S.bridge ? `<p class="sub">The bridge stands again. The mainland is waiting on the other side.</p>` :
+      `<p class="sub">Tobin has the timber and the know-how. He needs 400g to pay the crew.</p>
+       <div class="fund"><div class="bar"><i style="width:${Math.min(100, S.gold / GOAL * 100)}%"></i></div><span>${Math.min(S.gold, GOAL)} / ${GOAL}g</span></div>
+       <button class="primary" data-act="fund" ${S.gold >= GOAL ? '' : 'disabled'}>Pay 400g to rebuild the bridge</button>`;
+  } else if (panel === 'help') {
+    $('panelTitle').textContent = 'Controls';
+    html = `<dl class="controls">
+      <dt>WASD / Arrows</dt><dd>Move (joystick on touch screens)</dd>
+      <dt>Space / J / E</dt><dd>Swing sword, gather, talk, use the workbench (A button)</dd>
+      <dt>Q</dt><dd>Drink a Meadow Tonic</dd>
+      <dt>Esc</dt><dd>Close menus</dd></dl>
+      <p class="sub">Standing in the village slowly restores your hearts. Progress saves in this browser automatically.</p>
+      <button class="btn" data-act="reset">${resetArmed ? 'Tap again to erase your save' : 'Start a new game'}</button>`;
+  }
+  body.innerHTML = html;
+}
+body.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const k = b.dataset.k, act = b.dataset.act;
+  if (act === 'sell1' || act === 'sellk') {
+    const n = act === 'sell1' ? 1 : S.inv[k]; if (!n) return;
+    S.inv[k] -= n; addGold(n * ITEMS[k].price); toast(`Sold ${n} ${ITEMS[k].name} for ${n * ITEMS[k].price}g`);
+  } else if (act === 'sellall') {
+    const v = sellAllValue(); for (const kk of INV_ORDER) if (kk !== 'potion') S.inv[kk] = 0; addGold(v); toast(`Sold everything for ${v}g`);
+  } else if (act === 'craft') {
+    const r = RECIPES.find(r => r.id === k); if (!r || !canAfford(r.cost)) return;
+    for (const [kk, n] of Object.entries(r.cost)) S.inv[kk] -= n;
+    if (r.tool) S.tools[r.id] = true; else S.inv[r.id]++;
+    toast(`Crafted ${r.name}!`);
+  } else if (act === 'fund') {
+    if (S.gold < GOAL) return; S.gold -= GOAL; S.bridge = true;
+    for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
+    buildCache(); closePanel(); showVictory();
+  } else if (act === 'reset') {
+    if (!resetArmed) { resetArmed = true; } else { resetArmed = false; try { localStorage.removeItem(SAVE_KEY); } catch (_) {} location.reload(); return; }
+  }
+  updateHUD(); if (panel) renderPanel(); save();
+});
+function addGold(n) { S.gold += n; S.earned += n; }
+$('helpBtn').addEventListener('click', () => { resetArmed = false; openPanel('help'); });
+function showVictory() {
+  const m = Math.floor(S.time / 60);
+  $('victoryStats').textContent = `You earned ${S.earned}g in ${m} minute${m === 1 ? '' : 's'} and funded the crossing. That is the end of this slice of Brindle Isle. Thanks for playing!`;
+  $('victory').hidden = false;
+}
+$('victoryBtn').addEventListener('click', () => { $('victory').hidden = true; updateHUD(); });
+
+// ---------- input ----------
+const keys = {};
+const joy = { id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
+const paused = () => !!panel || !!dlg || !$('victory').hidden;
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (panel) { if (k === 'escape') closePanel(); return; }
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  keys[k] = true;
+  if (e.repeat) return;
+  if (k === ' ' || k === 'j' || k === 'e' || k === 'enter') onAction();
+  if (k === 'q') drinkTonic();
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+const stick = $('stick'), nub = $('nub');
+stick.addEventListener('pointerdown', e => { joy.id = e.pointerId; const r = stick.getBoundingClientRect(); joy.ox = r.left + r.width / 2; joy.oy = r.top + r.height / 2; stick.setPointerCapture(e.pointerId); moveJoy(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === joy.id) moveJoy(e); });
+const endJoy = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.dx = joy.dy = 0; nub.style.transform = ''; };
+stick.addEventListener('pointerup', endJoy); stick.addEventListener('pointercancel', endJoy);
+function moveJoy(e) {
+  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), max = 44;
+  if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+  joy.dx = dx / max; joy.dy = dy / max; nub.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+$('btnA').addEventListener('pointerdown', e => { e.preventDefault(); onAction(); });
+$('btnTonic').addEventListener('pointerdown', e => { e.preventDefault(); drinkTonic(); });
+
+// ---------- actions ----------
+function nearestNPC() {
+  let best = null, bd = 48;
+  for (const n of NPCS) { const d = Math.hypot(n.x - P.x, n.y - P.y); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+function onAction() {
+  if (dlg) { advanceDialogue(); return; }
+  if (!$('victory').hidden || panel) return;
+  const n = nearestNPC();
+  if (n) { interact(n); return; }
+  swing();
+}
+function interact(n) {
+  if (n.id === 'bench') { openPanel('craft'); return; }
+  if (n.id === 'oma') {
+    if (!S.met.oma) { S.met.oma = true; say('Oma Fen', [
+      'A new face! Washed up with the last storm, did you? Welcome to Brindle Isle.',
+      'Bring me anything you find. Wood, stone, herbs, slime goo. I pay fair, and I pay more for crafted goods.',
+      'Want real money? The purple grove up north is full of crystals. You will need a pickaxe from the workbench beside me.',
+    ], () => openPanel('shop')); return; }
+    openPanel('shop'); return;
+  }
+  if (n.id === 'tobin') {
+    if (!S.met.tobin && !S.bridge) { S.met.tobin = true; say('Tobin', [
+      'Storm took the bridge clean off. Only road to the mainland, too.',
+      'I have the timber. What I lack is coin for the crew. Four hundred gold should do it.',
+      'Earn it however you like. Come back when your purse is heavy.',
+    ], () => openPanel('bridge')); return; }
+    openPanel('bridge');
+  }
+}
+function drinkTonic() {
+  if (paused()) return;
+  if (!S.inv.potion) { toast('No tonics left. Craft one from 2 herbs and 1 slime goo.'); return; }
+  if (S.hp >= S.maxHp) { toast('Your hearts are already full.'); return; }
+  S.inv.potion--; S.hp = Math.min(S.maxHp, S.hp + 3); burst(P.x, P.y - 14, '#e45a8f', 10); updateHUD(); toast('You feel refreshed.');
+}
+function swing() {
+  if (P.cool > 0) return;
+  P.swing = 0.22; P.cool = 0.32;
+  const hx = P.x + P.fx * 24, hy = P.y - 8 + P.fy * 24, dmg = S.tools.blade ? 2 : 1;
+  for (const e of enemies) {
+    if (!e.alive || Math.hypot(e.x - hx, e.y - 6 - hy) > 30) continue;
+    e.hp -= dmg; e.hurt = 0.2; e.kx = P.fx * 260; e.ky = P.fy * 260; burst(e.x, e.y - 8, e.kind === 'purple' ? '#a879ff' : '#5fd06a', 6);
+    if (e.hp <= 0) killEnemy(e);
+  }
+  let best = null, bd = 30;
+  for (const r of resources) {
+    if (!r.alive) continue;
+    const d = Math.hypot(r.x - hx, r.y - 6 - hy);
+    if (d < bd) { bd = d; best = r; }
+  }
+  if (best) hitResource(best, dmg);
+}
+function hitResource(r, dmg) {
+  r.shake = 0.18;
+  if (r.type === 'crystal' && !S.tools.pickaxe) { toast('Too hard to break by hand. Craft a Stone Pickaxe at the village workbench.'); burst(r.x, r.y - 10, '#cfc6ff', 3); return; }
+  const power = (r.type === 'rock' || r.type === 'crystal') ? (S.tools.pickaxe ? 2 : 1) : dmg;
+  r.hp -= power;
+  const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff' }[r.type];
+  burst(r.x, r.y - 10, col, 5);
+  if (r.hp > 0) return;
+  r.alive = false; r.respawn = 35 + rng() * 20;
+  if (r.type === 'tree') drop(r.x, r.y - 10, 'wood', 2);
+  if (r.type === 'rock') drop(r.x, r.y - 6, 'stone', S.tools.pickaxe ? 2 : 1);
+  if (r.type === 'herb') drop(r.x, r.y - 4, 'herb', 1);
+  if (r.type === 'crystal') drop(r.x, r.y - 8, 'crystal', 1);
+  burst(r.x, r.y - 10, col, 10);
+}
+function killEnemy(e) {
+  e.alive = false; e.respawn = 25;
+  burst(e.x, e.y - 6, e.kind === 'purple' ? '#a879ff' : '#5fd06a', 14);
+  drop(e.x, e.y - 6, 'goo', e.kind === 'purple' ? 2 : 1);
+  drop(e.x, e.y - 6, 'gold', e.kind === 'purple' ? 3 : 1);
+}
+function drop(x, y, item, n) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 60 + rng() * 60; pickups.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, item, t: 0 }); } }
+function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 40 + rng() * 90; particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.5 + rng() * 0.3, color }); } }
+function floatText(x, y, text, color) { floats.push({ x, y, text, color, life: 1.1 }); }
+function damagePlayer(n, from) {
+  if (P.inv > 0) return;
+  S.hp -= n; P.inv = 1.0;
+  const a = Math.atan2(P.y - from.y, P.x - from.x); P.kx = Math.cos(a) * 320; P.ky = Math.sin(a) * 320;
+  burst(P.x, P.y - 12, '#ec5257', 8);
+  if (S.hp <= 0) {
+    const lost = Math.floor(S.gold * 0.1); S.gold -= lost;
+    S.hp = S.maxHp; P.x = cx * T; P.y = (cy + 2) * T; P.kx = P.ky = 0;
+    toast(lost ? `You passed out and woke in the village. You dropped ${lost}g.` : 'You passed out and woke in the village.', 3500);
+  }
+  updateHUD();
+}
+
+// ---------- physics ----------
+function moveBody(b, dx, dy, r) {
+  if (dx) { const nx = b.x + dx, ex = nx + Math.sign(dx) * r; if (walkable(ex, b.y - r * 0.5) && walkable(ex, b.y + r * 0.5)) b.x = nx; }
+  if (dy) { const ny = b.y + dy, ey = ny + Math.sign(dy) * r; if (walkable(b.x - r * 0.6, ey) && walkable(b.x + r * 0.6, ey)) b.y = ny; }
+}
+function pushOut(b, r) {
+  const px = b.x, py = b.y;
+  for (const o of resources) {
+    if (!o.alive || !SOLID[o.type]) continue;
+    const dx = b.x - o.x, dy = b.y - o.y; if (Math.abs(dx) > 40 || Math.abs(dy) > 40) continue;
+    const d = Math.hypot(dx, dy), m = r + SOLID[o.type];
+    if (d < m && d > 0.01) { b.x += dx / d * (m - d); b.y += dy / d * (m - d); }
+  }
+  for (const n of NPCS) {
+    const dx = b.x - n.x, dy = b.y - n.y, d = Math.hypot(dx, dy), m = r + (n.bench ? 16 : 10);
+    if (d < m && d > 0.01) { b.x += dx / d * (m - d); b.y += dy / d * (m - d); }
+  }
+  if (!walkable(b.x, b.y)) { b.x = px; b.y = py; }
+}
+
+// ---------- update ----------
+let time = 0, saveT = 0, edgeToast = false;
+function update(dt) {
+  time += dt;
+  if (paused()) return;
+  S.time += dt;
+  // player
+  let mx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0) + joy.dx;
+  let my = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0) + joy.dy;
+  const ml = Math.hypot(mx, my);
+  if (ml > 0.15) {
+    const n = Math.min(1, ml); mx /= ml; my /= ml;
+    P.fx = mx; P.fy = my;
+    const sp = 135 * n * (P.swing > 0 ? 0.55 : 1);
+    moveBody(P, mx * sp * dt, my * sp * dt, 9); P.walk += dt * 10;
+  } else P.walk = 0;
+  if (P.kx || P.ky) { moveBody(P, P.kx * dt, P.ky * dt, 9); P.kx *= Math.pow(0.002, dt); P.ky *= Math.pow(0.002, dt); if (Math.hypot(P.kx, P.ky) < 5) P.kx = P.ky = 0; }
+  pushOut(P, 9);
+  P.swing = Math.max(0, P.swing - dt); P.cool = Math.max(0, P.cool - dt); P.inv = Math.max(0, P.inv - dt);
+  // rest in village
+  if (Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T && S.hp < S.maxHp) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 30, '+♥', '#ec5257'); } } else P.healT = 0;
+  if (S.bridge && !edgeToast && P.y > (H - 2) * T) { edgeToast = true; toast('The mainland is just over the horizon. That is a story for the full game.', 4000); }
+  // resources
+  for (const r of resources) {
+    r.shake = Math.max(0, r.shake - dt);
+    if (!r.alive) { r.respawn -= dt; if (r.respawn <= 0 && Math.hypot(r.x - P.x, r.y - P.y) > 60) { r.alive = true; r.hp = r.max; } }
+  }
+  // enemies
+  for (const e of enemies) {
+    if (!e.alive) { e.respawn -= dt; if (e.respawn <= 0 && Math.hypot(e.hx - P.x, e.hy - P.y) > 320) { e.alive = true; e.hp = e.max; e.x = e.hx; e.y = e.hy; } continue; }
+    e.hurt = Math.max(0, e.hurt - dt);
+    const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy);
+    const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
+    const chase = d < (e.kind === 'purple' ? 200 : 160) && homeD < 320 && Math.hypot(P.x - cx * T, P.y - cy * T) > 7 * T;
+    const sp = e.kind === 'purple' ? 72 : 55;
+    e.hop += dt * (chase ? 9 : 4);
+    let vx = 0, vy = 0;
+    if (Math.abs(e.kx) + Math.abs(e.ky) > 5) { vx = e.kx; vy = e.ky; e.kx *= Math.pow(0.001, dt); e.ky *= Math.pow(0.001, dt); }
+    else if (chase) { vx = dx / d * sp; vy = dy / d * sp; }
+    else if (homeD > 220) { vx = (e.hx - e.x) / homeD * sp; vy = (e.hy - e.y) / homeD * sp; }
+    else { e.wt -= dt; if (e.wt <= 0) { e.wt = 1 + rng() * 2; const a = rng() * Math.PI * 2, go = rng() < 0.6; e.wx = go ? Math.cos(a) * sp * 0.5 : 0; e.wy = go ? Math.sin(a) * sp * 0.5 : 0; } vx = e.wx; vy = e.wy; }
+    // slimes move in hops
+    const hopF = Math.abs(e.kx) + Math.abs(e.ky) > 5 ? 1 : Math.max(0, Math.sin(e.hop)) * 1.8;
+    moveBody(e, vx * hopF * dt, vy * hopF * dt, 9); pushOut(e, 9);
+    if (d < 20) damagePlayer(e.kind === 'purple' ? 2 : 1, e);
+  }
+  // pickups
+  for (let i = pickups.length - 1; i >= 0; i--) {
+    const p = pickups[i]; p.t += dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(0.01, dt); p.vy *= Math.pow(0.01, dt);
+    const d = Math.hypot(P.x - p.x, P.y - 8 - p.y);
+    if (p.t > 0.35 && d < 72) { const s = 260 * dt; p.x += (P.x - p.x) / d * s; p.y += (P.y - 8 - p.y) / d * s; }
+    if (p.t > 0.35 && d < 14) {
+      pickups.splice(i, 1);
+      if (p.item === 'gold') { addGold(1); floatText(P.x, P.y - 34, '+1g', '#f4b740'); }
+      else { S.inv[p.item]++; floatText(P.x, P.y - 34, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); }
+      updateHUD();
+    } else if (p.t > 60) pickups.splice(i, 1);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; if (p.life <= 0) particles.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.life -= dt; f.y -= 28 * dt; if (f.life <= 0) floats.splice(i, 1); }
+  // prompt
+  const n = nearestNPC(), pr = $('prompt');
+  if (n) { pr.hidden = false; const key = matchMedia('(pointer: coarse)').matches ? 'A' : 'Space'; pr.innerHTML = `<kbd>${key}</kbd> ${n.verb} ${n.name}`; } else pr.hidden = true;
+  saveT += dt; if (saveT > 8) { saveT = 0; save(); }
+}
+
+// ---------- render ----------
+let vw = 0, vh = 0, dpr = 1, Z = 1;
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1); vw = innerWidth; vh = innerHeight;
+  cvs.width = Math.round(vw * dpr); cvs.height = Math.round(vh * dpr);
+  cvs.style.width = vw + 'px'; cvs.style.height = vh + 'px';
+  Z = Math.max(1, Math.min(2, Math.min(vw / (22 * T), vh / (14 * T))));
+}
+addEventListener('resize', resize);
+
+function drawTree(c, r) {
+  const s = r.shake ? Math.sin(time * 70) * 2 : 0, x = r.x, y = r.y;
+  c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, x, y + 2, 14, 5);
+  c.fillStyle = '#6b4423'; c.fillRect(x - 4, y - 14, 8, 16);
+  c.fillStyle = '#2f6b3a'; circle(c, x + s, y - 27, 16);
+  c.fillStyle = '#3d8448'; circle(c, x - 7 + s, y - 31, 10); circle(c, x + 8 + s, y - 24, 10);
+  c.fillStyle = '#5aa65c'; circle(c, x - 5 + s, y - 36, 6);
+}
+function drawRock(c, r) {
+  const s = r.shake ? Math.sin(time * 70) * 1.5 : 0, x = r.x + s, y = r.y - 6;
+  c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, r.x, r.y + 2, 14, 5);
+  c.fillStyle = '#7f7c78'; c.beginPath();
+  r.shape.forEach((k, i) => { const a = i / 7 * Math.PI * 2; const px = x + Math.cos(a) * 13 * k, py = y + Math.sin(a) * 10 * k; i ? c.lineTo(px, py) : c.moveTo(px, py); });
+  c.closePath(); c.fill();
+  c.fillStyle = '#a9a6a0'; ellipse(c, x - 3, y - 4, 6, 3.5);
+}
+function drawHerb(c, r) {
+  const x = r.x, y = r.y, sw = Math.sin(time * 2 + r.seed * 9) * 1.5;
+  c.strokeStyle = '#3c8a3f'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y); c.lineTo(x + sw, y - 12); c.stroke();
+  c.fillStyle = '#5bbf55'; ellipse(c, x - 4, y - 5, 4, 2); ellipse(c, x + 4, y - 7, 4, 2);
+  c.fillStyle = r.seed > 0.5 ? '#f28fb4' : '#ffd65a'; circle(c, x + sw, y - 14, 4);
+  c.fillStyle = '#fff6d6'; circle(c, x + sw, y - 14, 1.5);
+}
+function drawCrystal(c, r) {
+  const s = r.shake ? Math.sin(time * 70) * 1.5 : 0, x = r.x + s, y = r.y, g = 0.25 + Math.sin(time * 3 + r.seed * 10) * 0.1;
+  c.fillStyle = `rgba(165,147,255,${g})`; circle(c, x, y - 10, 20);
+  c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, r.x, y + 2, 12, 4);
+  c.fillStyle = '#5a4bd1'; diamond(c, x - 7, y - 6, 5, 10);
+  c.fillStyle = '#6c5ce7'; diamond(c, x + 6, y - 5, 5, 9);
+  c.fillStyle = '#a593ff'; diamond(c, x, y - 10, 7, 17);
+  c.fillStyle = '#e6e0ff'; circle(c, x - 2, y - 20, 1.6);
+}
+function drawSlime(c, e) {
+  const sq = Math.sin(e.hop), lift = Math.max(0, sq) * 6, sx = 1 + Math.min(0, sq) * -0.15, sy = 1 - Math.min(0, sq) * -0.12;
+  c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, e.x, e.y + 2, 11 - lift * 0.5, 4);
+  const col = e.hurt > 0 ? '#ffffff' : e.kind === 'purple' ? '#a879ff' : '#5fd06a';
+  c.fillStyle = col; c.beginPath(); c.ellipse(e.x, e.y - 8 - lift, 12 * sx, 10 * sy, 0, Math.PI, 0); c.lineTo(e.x + 12 * sx, e.y - 2 - lift); c.lineTo(e.x - 12 * sx, e.y - 2 - lift); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.45)'; ellipse(c, e.x - 5, e.y - 13 - lift, 3, 2);
+  c.fillStyle = '#1b1a2e'; const ex = Math.sign(P.x - e.x) * 2;
+  circle(c, e.x - 4 + ex, e.y - 8 - lift, 1.8); circle(c, e.x + 4 + ex, e.y - 8 - lift, 1.8);
+  if (e.kind === 'purple') { c.fillStyle = '#e6e0ff'; diamond(c, e.x, e.y - 20 - lift, 3, 5); }
+  if (e.hp < e.max) healthBar(c, e.x, e.y - 26 - lift, e.hp / e.max);
+}
+function healthBar(c, x, y, f) { c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(x - 12, y, 24, 4); c.fillStyle = '#ec5257'; c.fillRect(x - 12, y, 24 * f, 4); }
+function drawPerson(c, x, y, tunic, hair, fx, fy, walk, flash) {
+  c.fillStyle = 'rgba(0,0,0,.22)'; ellipse(c, x, y + 1, 9, 3.5);
+  const step = Math.sin(walk) * 3;
+  c.fillStyle = '#3a2c25'; c.fillRect(x - 5, y - 6 + (walk ? step * 0.3 : 0), 4, 7); c.fillRect(x + 1, y - 6 - (walk ? step * 0.3 : 0), 4, 7);
+  c.fillStyle = flash ? '#ffffff' : tunic; c.beginPath(); c.roundRect(x - 8, y - 18, 16, 14, 5); c.fill();
+  c.fillStyle = '#f1c89a'; circle(c, x, y - 24, 7.5);
+  c.fillStyle = hair; c.beginPath(); c.arc(x, y - 25, 8, Math.PI * 1.05, Math.PI * 1.95); c.fill();
+  if (fy < -0.6) { c.fillStyle = hair; circle(c, x, y - 24, 7.5); }
+  else { c.fillStyle = '#1b1a2e'; circle(c, x - 2.5 + fx * 2, y - 23 + fy, 1.3); circle(c, x + 2.5 + fx * 2, y - 23 + fy, 1.3); }
+}
+function drawPlayer(c) {
+  const blink = P.inv > 0 && Math.floor(time * 20) % 2 === 0;
+  if (P.swing > 0 && P.fy < 0) drawSword(c);
+  if (!blink) drawPerson(c, P.x, P.y, '#2f7dd1', '#4a2f1e', P.fx, P.fy, P.walk, false);
+  if (P.swing > 0 && P.fy >= 0) drawSword(c);
+}
+function drawSword(c) {
+  const base = Math.atan2(P.fy, P.fx), p = 1 - P.swing / 0.22, a = base - 1.3 + 2.6 * p, ox = P.x, oy = P.y - 12;
+  c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 8; c.lineCap = 'round';
+  c.beginPath(); c.arc(ox, oy, 22, base - 1.3, a); c.stroke();
+  c.strokeStyle = S.tools.blade ? '#b9a8ff' : '#dfe8ef'; c.lineWidth = 3.5;
+  c.beginPath(); c.moveTo(ox + Math.cos(a) * 8, oy + Math.sin(a) * 8); c.lineTo(ox + Math.cos(a) * 28, oy + Math.sin(a) * 28); c.stroke();
+  c.lineCap = 'butt';
+}
+function drawNPC(c, n) {
+  if (n.id === 'oma') {
+    c.fillStyle = '#6b4423'; c.fillRect(n.x - 26, n.y - 48, 4, 46); c.fillRect(n.x + 22, n.y - 48, 4, 46);
+    for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? '#f3ead2' : '#c2477a'; c.fillRect(n.x - 30 + i * 10, n.y - 54, 10, 12); }
+    c.fillStyle = '#8a5a32'; c.fillRect(n.x - 26, n.y - 2, 52, 8);
+  }
+  if (n.bench) {
+    c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, n.x, n.y + 4, 22, 6);
+    c.fillStyle = '#6b4423'; c.fillRect(n.x - 18, n.y - 8, 4, 12); c.fillRect(n.x + 14, n.y - 8, 4, 12);
+    c.fillStyle = '#a8713f'; c.fillRect(n.x - 22, n.y - 14, 44, 8);
+    c.drawImage(ICON_CANVAS.pickaxe, n.x - 18, n.y - 32, 18, 18);
+    c.drawImage(ICON_CANVAS.planks, n.x + 2, n.y - 28, 16, 16);
+  } else drawPerson(c, n.x, n.y, n.tunic, n.hair, 0, 1, 0, false);
+  const near = Math.hypot(n.x - P.x, n.y - P.y) < 48;
+  const alert = (n.id === 'oma' && !S.met.oma) || (n.id === 'tobin' && ((!S.met.tobin && !S.bridge) || (S.gold >= GOAL && !S.bridge)));
+  if (alert) { const b = Math.sin(time * 5) * 2; c.fillStyle = '#f4b740'; c.font = '700 18px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.fillText('!', n.x, n.y - 40 + b); }
+  if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); }
+}
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = TILE_COLORS[DEEP]; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  const viewW = vw / Z, viewH = vh / Z;
+  const camX = W * T <= viewW ? (W * T - viewW) / 2 : Math.max(0, Math.min(W * T - viewW, P.x - viewW / 2));
+  const camY = H * T <= viewH ? (H * T - viewH) / 2 : Math.max(0, Math.min(H * T - viewH, P.y - viewH / 2));
+  const k = dpr * Z;
+  ctx.setTransform(k, 0, 0, k, -Math.round(camX * k), -Math.round(camY * k));
+  ctx.imageSmoothingEnabled = false;
+  const sx = Math.max(0, Math.floor(camX)), sy = Math.max(0, Math.floor(camY));
+  const sw = Math.min(W * T - sx, Math.ceil(viewW) + 2), sh = Math.min(H * T - sy, Math.ceil(viewH) + 2);
+  if (sw > 0 && sh > 0) ctx.drawImage(cache, sx, sy, sw, sh, sx, sy, sw, sh);
+  // water shimmer
+  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1.5;
+  for (let ty = Math.floor(camY / T); ty < (camY + viewH) / T; ty++) for (let tx = Math.floor(camX / T); tx < (camX + viewW) / T; tx++) {
+    if (tileAt(tx, ty) !== DEEP || hash(tx, ty) < 0.85) continue;
+    const o = Math.sin(time * 1.5 + tx + ty) * 4; ctx.beginPath(); ctx.moveTo(tx * T + 8 + o, ty * T + 16); ctx.lineTo(tx * T + 20 + o, ty * T + 16); ctx.stroke();
+  }
+  const inView = (x, y, m = 60) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
+  for (const p of pickups) { if (!inView(p.x, p.y)) continue; const b = Math.sin(time * 6 + p.t * 3) * 2; ctx.fillStyle = 'rgba(0,0,0,.2)'; ellipse(ctx, p.x, p.y + 6, 6, 2); ctx.drawImage(ICON_CANVAS[p.item], p.x - 9, p.y - 9 + b, 18, 18); }
+  const list = [];
+  for (const r of resources) if (r.alive && inView(r.x, r.y)) list.push([r.y, 0, r]);
+  for (const e of enemies) if (e.alive && inView(e.x, e.y)) list.push([e.y, 1, e]);
+  for (const n of NPCS) if (inView(n.x, n.y)) list.push([n.y, 2, n]);
+  list.push([P.y, 3, P]);
+  list.sort((a, b) => a[0] - b[0]);
+  for (const [, kind, o] of list) {
+    if (kind === 0) { ({ tree: drawTree, rock: drawRock, herb: drawHerb, crystal: drawCrystal })[o.type](ctx, o); if (o.hp < o.max && o.type !== 'herb') healthBar(ctx, o.x, o.y + 6, o.hp / o.max); }
+    else if (kind === 1) drawSlime(ctx, o);
+    else if (kind === 2) drawNPC(ctx, o);
+    else drawPlayer(ctx);
+  }
+  for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life * 1.6); ctx.fillStyle = p.color; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.font = '700 13px "Pixelify Sans", sans-serif';
+  for (const f of floats) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillText(f.text, f.x + 1, f.y + 1); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
+  ctx.globalAlpha = 1;
+  // minimap
+  mctx.imageSmoothingEnabled = false;
+  mctx.drawImage(miniCache, 0, 0, mini.width, mini.height);
+  const mxs = mini.width / (W * T), mys = mini.height / (H * T);
+  mctx.strokeStyle = 'rgba(255,255,255,.6)'; mctx.lineWidth = 1; mctx.strokeRect(camX * mxs, camY * mys, viewW * mxs, viewH * mys);
+  mctx.fillStyle = '#c2477a'; mctx.fillRect(NPCS[0].x * mxs - 2, NPCS[0].y * mys - 2, 4, 4);
+  mctx.fillStyle = '#f4b740'; mctx.fillRect(NPCS[2].x * mxs - 2, NPCS[2].y * mys - 2, 4, 4);
+  mctx.fillStyle = '#ffffff'; mctx.beginPath(); mctx.arc(P.x * mxs, P.y * mys, 2.5, 0, 7); mctx.fill();
+}
+
+// ---------- save / load ----------
+function serialize() { return { ...S, px: P.x, py: P.y }; }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (_) {} }
+function applySave(d) {
+  if (!d || typeof d !== 'object') return;
+  const base = freshState();
+  S = { ...base, ...d, inv: { ...base.inv, ...(d.inv || {}) }, tools: { ...base.tools, ...(d.tools || {}) }, met: { ...(d.met || {}) } };
+}
+
+// ---------- boot ----------
+function start(hot) {
+  let data = hot && hot.save;
+  if (!data) { try { data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (_) { data = null; } }
+  applySave(data);
+  if (S.bridge) for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
+  P.x = S.px; P.y = S.py;
+  if (!walkable(P.x, P.y)) { P.x = cx * T; P.y = (cy + 4) * T; }
+  buildCache(); resize(); updateHUD();
+  window.claude?.hot?.snapshot?.(() => ({ save: serialize() }));
+  if (!S.intro) {
+    S.intro = true;
+    say('Brindle Isle', [
+      'The storm passed in the night. You wake on the sand of a small island village.',
+      'The only bridge to the mainland was swept away. Rebuilding it will cost 400 gold.',
+      'Gather, craft, and trade your way there. Oma Fen at the market stall is a good place to start.',
+    ]);
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  addEventListener('pagehide', save);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
