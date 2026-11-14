@@ -369,6 +369,103 @@ const gearA = () => ARMORS[S.gear.armor] || ARMORS.cloth;
 const maxHp = () => 6 + gearA().hearts;
 const weaponDmg = () => gearW().dmg;
 let craftTab = 'items';
+// ---------- quests ----------
+const QUESTS = [
+  { id: 'pests', giver: 'pell', name: 'Pest Control', goal: { kill: [['green', 5]] }, reward: { gold: 40, items: { potion: 2 } },
+    offer: ['Slimes keep oozing into my turnip patch! Ruined half the crop.', 'Squash five of the green ones for me and I\'ll make it worth your while.'],
+    done: ['Not a slime in sight! Here, take these tonics and a bit of coin.'] },
+  { id: 'herbs', giver: 'oma', name: 'Herbal Remedy', goal: { bring: { herb: 6 } }, reward: { gold: 20, items: { potion: 3 } },
+    offer: ['My knees ache something fierce when the sea air rolls in.', 'Bring me six herbs and I\'ll brew enough tonic for the both of us.'],
+    done: ['Lovely, fresh herbs! Here are three tonics, still warm.'] },
+  { id: 'bandits', giver: 'marla', name: 'Bandit Trouble', goal: { kill: [['bandit', 3]] }, reward: { gold: 60, items: { crystal: 2 } },
+    offer: ['Bandits wash up with every storm and prey on travelers along the roads.', 'They grab your purse and run. Catch three of them and the island owes you.'],
+    done: ['Three fewer thieves on my roads. Good work, recruit. Your pay.'] },
+  { id: 'ring', giver: 'pell', name: 'The Lost Ring', req: 'pests', goal: { find: 'ring' }, reward: { gold: 50, items: { crystal: 3 } },
+    offer: ['I dropped my wife\'s ring while gathering firewood in the western forest.', 'Look for something sparkling between the trees. Please, before she notices!'],
+    done: ['That\'s it! You saved my marriage. Take this, I found these crystals in the field.'] },
+  { id: 'lumber', giver: 'tobin', name: 'Lumber for the Crew', goal: { bring: { wood: 10, planks: 4 } }, reward: { gold: 90 },
+    offer: ['The crew will need extra timber for scaffolding.', 'Bring ten wood and four plank bundles and I\'ll pay above market.'],
+    done: ['Fine timber. The crew will be glad. Here, as promised.'] },
+  { id: 'rats', giver: 'pell', name: 'Rat Catcher', req: 'ring', goal: { kill: [['rat', 6]] }, reward: { gold: 50, items: { goo: 5 } },
+    offer: ['Rats from the quarry are chewing through my grain sacks.', 'Six of the little thieves should send the rest a message.'],
+    done: ['My grain is safe. You\'re handier than any cat.'] },
+  { id: 'hunter', giver: 'marla', name: 'Monster Hunter', req: 'bandits', goal: { kill: [['snail', 3], ['mage', 3]] }, reward: { gold: 100, items: { crystal: 5 } },
+    offer: ['Giant snails in the meadow and hooded cultists in the grove. Strange times.', 'Bring down three of each. Hit snails before they hide, and watch for fireballs.'],
+    done: ['You\'ve the makings of a fine hunter. Take these crystals for your next blade.'] },
+  { id: 'mine', giver: 'hob', name: 'Into the Old Mine', goal: { boss: ['wizard'] }, reward: { gold: 150 },
+    offer: ['A darkness has nested beneath the quarry. The Old Mine.', 'Its master is a hollow sorcerer. Free the mine and the shrine will reward you.'],
+    done: ['I felt the darkness lift from here. Bless you, and take this offering.'] },
+  { id: 'cleanse', giver: 'hob', name: 'Cleanse the Island', req: 'mine', goal: { boss: ['crab', 'knight'] }, reward: { gold: 200, items: { crystal: 5 } },
+    offer: ['Two more shadows remain: the drowned temple to the southwest, and the crypt in the western woods.', 'Defeat King Clawdius and the Bone Knight.'],
+    done: ['The island breathes easy at last. You have done a great deed.'] },
+  { id: 'hero', giver: 'hob', name: 'Hero of Brindle', req: 'cleanse', goal: { boss: ['slime', 'golem', 'wizard', 'queen', 'crab', 'bat', 'knight'] }, reward: { gold: 500 },
+    offer: ['One last trial, should you seek it. Every great beast of this isle must fall.', 'All seven. Then the songs will be about you.'],
+    done: ['Seven beasts, one hero. The bards are already arguing over rhymes. This is yours.'] },
+];
+const IDLE_TALK = {
+  pell: ['Fine weather for turnips.', 'The chickens get nervous when slimes are near.'],
+  marla: ['Keep your blade sharp and your purse close.', 'I\'ve seen fireballs in the grove. Cultists, mark my words.'],
+  hob: ['May the tides guide you.', 'The shrine keeps watch over every soul on the isle.'],
+};
+const qState = id => S.quests[id];
+const killsFor = (q, kind) => (S.kills[kind] || 0) - ((qState(q.id) && qState(q.id).base[kind]) || 0);
+function questDone(q) {
+  const g = q.goal;
+  if (g.kill) return g.kill.every(([k, n]) => killsFor(q, k) >= n);
+  if (g.bring) return Object.entries(g.bring).every(([k, n]) => S.inv[k] >= n);
+  if (g.find) return !!S.found[g.find];
+  if (g.boss) return g.boss.every(b => S.defeated[b]);
+  return false;
+}
+function questProgress(q) {
+  const g = q.goal;
+  if (g.kill) return g.kill.map(([k, n]) => `${ENEMY[k].name}s ${Math.min(n, killsFor(q, k))}/${n}`).join(', ');
+  if (g.bring) return Object.entries(g.bring).map(([k, n]) => `${ITEMS[k].name} ${Math.min(n, S.inv[k])}/${n}`).join(', ');
+  if (g.find) return S.found[g.find] ? 'Found! Return it.' : 'Search the western forest';
+  if (g.boss) return `Bosses ${g.boss.filter(b => S.defeated[b]).length}/${g.boss.length}`;
+  return '';
+}
+const questAvailable = q => !qState(q.id) && (!q.req || (qState(q.req) && qState(q.req).state === 'done'));
+const questReady = q => qState(q.id) && qState(q.id).state === 'active' && questDone(q);
+function questMark(id) {
+  if (QUESTS.some(q => q.giver === id && questReady(q))) return '?';
+  if (QUESTS.some(q => q.giver === id && questAvailable(q))) return '!';
+  return null;
+}
+let questReadyNotified = {};
+function questTick() {
+  for (const q of QUESTS) if (questReady(q) && !questReadyNotified[q.id]) { questReadyNotified[q.id] = true; toast(`Quest complete: ${q.name}. Return to ${NPCS.find(n => n.id === q.giver).name}.`, 3500); SFX.play('lucky'); }
+  updateHUD();
+}
+function spawnRing() {
+  if (S.found.ring || pickups.some(p => p.item === 'ring')) return;
+  for (let i = 0; i < 4000; i++) {
+    const x = 2 + Math.floor(hash(i, 77) * (OW - 4)), y = 2 + Math.floor(hash(77, i) * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === 4 && Math.hypot(x - cx, y - cy) > 14) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item: 'ring', t: 0.4, keep: true }); return; }
+  }
+}
+function acceptQuest(q) {
+  S.quests[q.id] = { state: 'active', base: { ...S.kills } };
+  if (q.goal.find === 'ring') spawnRing();
+  banner(`New quest: ${q.name}`, '#ffe08a'); SFX.play('collect'); questTick(); save();
+}
+function completeQuest(q) {
+  if (q.goal.bring) for (const [k, n] of Object.entries(q.goal.bring)) S.inv[k] -= n;
+  S.quests[q.id].state = 'done';
+  if (q.reward.gold) { addGold(q.reward.gold); floatText(P.x, P.y - 70, `+${q.reward.gold}g`, '#f4b740'); burst(P.x, P.y - 40, '#f4b740', 18); SFX.play('coin'); }
+  for (const [k, n] of Object.entries(q.reward.items || {})) S.inv[k] += n;
+  banner(`Quest complete: ${q.name}`, '#ffe08a'); SFX.play('craft'); P.pendingCheer = null;
+  setTimeout(() => { if (!P.act) { P.fx = 0; P.fy = 1; startAct('cheer', () => burst(P.x, P.y - 50, '#ffe08a', 16)); } }, 300);
+  updateHUD(); save();
+}
+// returns true when a quest conversation took over the interaction
+function questInteract(n, after) {
+  const ready = QUESTS.find(q => q.giver === n.id && questReady(q));
+  if (ready) { say(n.name, ready.done, () => { completeQuest(ready); if (after) after(); }); return true; }
+  const avail = QUESTS.find(q => q.giver === n.id && questAvailable(q));
+  if (avail) { say(n.name, avail.offer, () => { acceptQuest(avail); if (after) after(); }); return true; }
+  return false;
+}
 const RECIPES = [
   { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
   { id: 'planks', name: 'Plank Bundle', desc: 'Sells for 14g, much more than loose wood.', cost: { wood: 4 } },
@@ -376,7 +473,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0 }, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -427,22 +524,26 @@ const ENEMY = {
   crab:    { name: 'Crab', sprite: 'crab', hp: 6, sp: 40, dmg: 1, aggro: 150, drops: [['stone', 2], ['gold', 2]], col: '#e0584a', heavy: true },
   cyclops: { name: 'Cyclops', sprite: 'cyclops', hp: 4, sp: 34, dmg: 1, aggro: 240, drops: [['stone', 1], ['gold', 3]], col: '#e8b27a' },
   ghost:   { name: 'Ghost', sprite: 'ghost', hp: 3, sp: 36, dmg: 1, aggro: 230, drops: [['crystal', 1], ['gold', 2]], col: '#d6dbe8', flyer: true, ghostly: true },
+  bandit:  { name: 'Bandit', sprite: 'bandit', hp: 3, sp: 88, dmg: 1, aggro: 200, drops: [['gold', 3]], col: '#4f9a5a' },
+  snail:   { name: 'Snail', sprite: 'snail', hp: 4, sp: 22, dmg: 1, aggro: 130, drops: [['goo', 2], ['herb', 1]], col: '#e0a050' },
+  rat:     { name: 'Rat', sprite: 'rat', hp: 1, sp: 105, dmg: 1, aggro: 160, drops: [['gold', 1]], col: '#9a9aa4' },
+  mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
 function makeEnemy(kind, x, y) {
   return { kind, x, y, hx: x, hy: y, hp: ENEMY[kind].hp, max: ENEMY[kind].hp, alive: true, respawn: 0, hop: rng() * 6, anim: rng() * 6, hurt: 0,
     kx: 0, ky: 0, wx: 0, wy: 0, wt: 0, state: 'move', st: 0, cd: rng() * 2, phaseT: rng() * 3, faded: false };
 }
 function addEnemy(kind, rg) { const [x, y] = randomTileIn(rg, 11); enemies.push(makeEnemy(kind, x, y)); }
-for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['green', 3, 2], ['crab', 3, 3], ['green', 2, 2], ['spider', 2, 2], ['cyclops', 2, 2], ['purple', 1, 4], ['ghost', 1, 3]])
+for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], ['green', 3, 3], ['crab', 3, 3], ['snail', 3, 4], ['green', 2, 2], ['spider', 2, 2], ['cyclops', 2, 2], ['bandit', 2, 2], ['rat', 2, 4], ['purple', 1, 4], ['ghost', 1, 3], ['mage', 1, 2]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
 // dungeon creatures never respawn; clearing a room opens its gate
 function dSpawn(D, list) {
   for (const [kind, x, y] of list) { const e = makeEnemy(kind, (D.x0 + x) * T + 16, y * T + 16); e.noRespawn = true; e.dreg = dreg[y * W + D.x0 + x]; enemies.push(e); }
 }
-dSpawn(MINE_D, [['bat', 8, 26], ['bat', 30, 27], ['bat', 20, 29], ['spider', 12, 30], ['spider', 27, 25], ['purple', 6, 29], ['purple', 33, 30],
+dSpawn(MINE_D, [['rat', 10, 27], ['rat', 26, 29], ['rat', 31, 24], ['bat', 8, 26], ['bat', 30, 27], ['bat', 20, 29], ['spider', 12, 30], ['spider', 27, 25], ['purple', 6, 29], ['purple', 33, 30],
   ['green', 15, 38], ['green', 24, 38], ['ghost', 8, 15], ['ghost', 31, 15], ['cyclops', 12, 19], ['cyclops', 27, 19], ['purple', 19, 17], ['bat', 22, 15]]);
-dSpawn(TEMPLE_D, [['crab', 16, 39], ['crab', 23, 38], ['spider', 27, 30], ['spider', 32, 31], ['crab', 17, 16], ['crab', 33, 23], ['spider', 20, 22], ['spider', 31, 16], ['ghost', 25, 15], ['purple', 30, 20]]);
-dSpawn(CRYPT_D, [['bat', 16, 38], ['bat', 23, 37], ['ghost', 8, 23], ['ghost', 30, 28], ['ghost', 20, 25], ['purple', 12, 29], ['purple', 27, 22], ['bat', 33, 25],
+dSpawn(TEMPLE_D, [['snail', 29, 29], ['snail', 22, 15], ['crab', 16, 39], ['crab', 23, 38], ['spider', 27, 30], ['spider', 32, 31], ['crab', 17, 16], ['crab', 33, 23], ['spider', 20, 22], ['spider', 31, 16], ['ghost', 25, 15], ['purple', 30, 20]]);
+dSpawn(CRYPT_D, [['mage', 25, 27], ['mage', 11, 23], ['mage', 24, 13], ['bat', 16, 38], ['bat', 23, 37], ['ghost', 8, 23], ['ghost', 30, 28], ['ghost', 20, 25], ['purple', 12, 29], ['purple', 27, 22], ['bat', 33, 25],
   ['cyclops', 6, 27], ['spider', 34, 30], ['ghost', 18, 14], ['ghost', 29, 16]]);
 for (const [x, y] of [[5, 25], [35, 24], [34, 31], [4, 31], [22, 24]]) addRes('crystal', MINE_D.x0 + x, y);
 for (const [x, y] of [[10, 24], [15, 31], [25, 31], [30, 25], [14, 37], [25, 40]]) addRes('rock', MINE_D.x0 + x, y);
@@ -503,6 +604,9 @@ const HOUSE = { x: cx * T - 84, y: cy * T - 66 }; // bottom-center of Oma's cott
 const NPCS = [
   { id: 'oma', name: 'Oma Fen', x: HOUSE.x, y: HOUSE.y + 18, sheet: 'oma_idle', walk: 'oma_walk', verb: 'Trade with', path: [[HOUSE.x - 46, HOUSE.y + 18], [HOUSE.x + 40, HOUSE.y + 18], [HOUSE.x, HOUSE.y + 18]] },
   { id: 'bench', name: 'Workbench', x: cx * T + 76, y: cy * T - 46, bench: true, verb: 'Craft at' },
+  { id: 'pell', name: 'Farmer Pell', x: cx * T + 132, y: cy * T + 56, sheet: 'pell_idle', walk: 'pell_walk', verb: 'Talk to', path: [[cx * T + 132, cy * T + 56], [cx * T + 176, cy * T + 60], [cx * T + 110, cy * T + 66]] },
+  { id: 'marla', name: 'Captain Marla', x: cx * T + 60, y: cy * T - 128, sheet: 'marla_idle', walk: 'marla_walk', verb: 'Talk to', path: [[cx * T + 60, cy * T - 128], [cx * T + 60, cy * T - 172], [cx * T + 64, cy * T - 104]] },
+  { id: 'hob', name: 'Brother Hob', x: cx * T - 150, y: cy * T + 52, sheet: 'hob_idle', walk: 'hob_walk', verb: 'Talk to', path: [[cx * T - 150, cy * T + 52], [cx * T - 110, cy * T + 60], [cx * T - 170, cy * T + 70]] },
   { id: 'tobin', name: 'Tobin', x: cx * T + 24, y: dockY * T + 6, sheet: 'tobin_idle', walk: 'tobin_walk', verb: 'Talk to', path: [[cx * T + 24, dockY * T + 6], [cx * T + 24, dockY * T - 70], [cx * T - 20, dockY * T - 30]] },
 ];
 for (const n of NPCS) Object.assign(n, { fx: 0, fy: 1, wait: 2 + rng() * 3, target: 0, moving: false, step: 0 });
@@ -536,6 +640,7 @@ const ICON_DRAW = {
   planks: c => { for (let i = 0; i < 3; i++) { c.fillStyle = '#2a1a10'; c.fillRect(3, 7 + i * 6, 26, 6); c.fillStyle = i % 2 ? '#a8713f' : '#8a5a32'; c.fillRect(4, 8 + i * 6, 24, 4); } c.fillStyle = '#d8c48a'; c.fillRect(14, 6, 4, 20); },
   pearl: c => { c.fillStyle = '#f2b6c6'; ellipse(c, 16, 22, 11, 6); c.fillStyle = '#e88aa5'; ellipse(c, 16, 22, 9, 4); c.fillStyle = '#f7f4ff'; circle(c, 16, 15, 7); c.fillStyle = '#ffffff'; circle(c, 13, 12, 2.5); },
   relic: c => { c.fillStyle = '#7a5a14'; c.beginPath(); c.moveTo(6, 5); c.lineTo(26, 5); c.lineTo(26, 16); c.quadraticCurveTo(16, 30, 16, 30); c.quadraticCurveTo(6, 22, 6, 16); c.closePath(); c.fill(); c.fillStyle = '#f4b740'; c.beginPath(); c.moveTo(8, 7); c.lineTo(24, 7); c.lineTo(24, 16); c.quadraticCurveTo(16, 27, 16, 27); c.quadraticCurveTo(8, 21, 8, 16); c.closePath(); c.fill(); c.fillStyle = '#c8d0e0'; c.fillRect(15, 9, 3, 14); c.fillRect(11, 13, 11, 3); },
+  ring: c => { c.strokeStyle = '#7a5a14'; c.lineWidth = 5; c.beginPath(); c.arc(16, 19, 8, 0, 7); c.stroke(); c.strokeStyle = '#f4b740'; c.lineWidth = 3; c.beginPath(); c.arc(16, 19, 8, 0, 7); c.stroke(); c.fillStyle = '#ec5257'; diamond(c, 16, 10, 4, 6); c.fillStyle = '#ffffff'; c.fillRect(14, 7, 2, 2); },
   charm: c => { c.strokeStyle = '#f4b740'; c.lineWidth = 2.5; c.beginPath(); c.arc(16, 17, 10, 0, 7); c.stroke(); c.fillStyle = '#a593ff'; diamond(c, 16, 17, 5, 8); c.fillStyle = '#f4b740'; c.fillRect(14, 3, 4, 5); },
 };
 const ICON_ATLAS = { gem: 'gem', key: 'key', bosskey: 'bosskey', crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', gold: 'coin' };
@@ -575,6 +680,8 @@ function updateHUD() {
   $('hearts').innerHTML = h;
   $('gold').textContent = S.gold;
   $('objective').textContent = objectiveText();
+  const act = QUESTS.filter(q => qState(q.id) && qState(q.id).state === 'active');
+  $('qtrack').innerHTML = act.slice(0, 3).map(q => `<div class="${questDone(q) ? 'qdone' : ''}"><b>${q.name}</b> · ${questDone(q) ? 'Return to ' + NPCS.find(n => n.id === q.giver).name : questProgress(q)}</div>`).join('');
   const DL = dungeonAt(P.x);
   document.querySelector('.objective .label').textContent = DL ? DL.name : 'Goal · Rebuild the south bridge';
   $('fund').style.width = Math.min(100, S.gold / GOAL * 100) + '%';
@@ -646,6 +753,15 @@ function renderPanel() {
       `<p class="sub">Tobin has the timber and the know-how. He needs 400g to pay the crew.</p>
        <div class="fund"><div class="bar"><i style="width:${Math.min(100, S.gold / GOAL * 100)}%"></i></div><span>${Math.min(S.gold, GOAL)} / ${GOAL}g</span></div>
        <button class="primary" data-act="fund" ${S.gold >= GOAL ? '' : 'disabled'}>Pay 400g to rebuild the bridge</button>`;
+  } else if (panel === 'quests') {
+    $('panelTitle').textContent = 'Quest Log';
+    const row = (q, st) => `<div class="row ${st === 'done' ? 'empty' : ''}"><div class="meta"><b>${q.name} <small>${NPCS.find(n => n.id === q.giver).name}</small></b><span>${st === 'done' ? 'Completed' : st === 'ready' ? 'Done! Return to ' + NPCS.find(n => n.id === q.giver).name + '.' : questProgress(q)}</span>
+      <span>Reward: ${[q.reward.gold ? q.reward.gold + 'g' : '', ...Object.entries(q.reward.items || {}).map(([k, n]) => `${n} ${ITEMS[k].name}`)].filter(Boolean).join(', ')}</span></div></div>`;
+    const active = QUESTS.filter(q => qState(q.id) && qState(q.id).state === 'active'), done = QUESTS.filter(q => qState(q.id) && qState(q.id).state === 'done');
+    const avail = [...new Set(QUESTS.filter(questAvailable).map(q => q.giver))].map(id => NPCS.find(n => n.id === id).name);
+    html = `<p class="sub">${avail.length ? `Look for the yellow ! over ${avail.join(', ')}.` : 'No new quests right now.'} Completed ${done.length} of ${QUESTS.length}.</p>
+      <div class="label">Active</div><div class="rows">${active.length ? active.map(q => row(q, questReady(q) ? 'ready' : 'active')).join('') : '<p class="sub">No active quests.</p>'}</div>
+      ${done.length ? `<div class="label" style="margin-top:12px">Completed</div><div class="rows">${done.map(q => row(q, 'done')).join('')}</div>` : ''}`;
   } else if (panel === 'help') {
     $('panelTitle').textContent = 'Controls';
     html = `<dl class="controls">
@@ -655,6 +771,10 @@ function renderPanel() {
       <dt>M</dt><dd>Sound on or off</dd>
       <dt>Q</dt><dd>Drink a Meadow Tonic</dd>
       <dt>Esc</dt><dd>Close menus</dd></dl>
+      <div class="label">Quests</div>
+      <dl class="controls">
+      <dt>L / Quests</dt><dd>Open the quest log. A yellow ! marks a villager with work for you, a green ? means a quest is ready to hand in.</dd>
+      <dt>New faces</dt><dd>Farmer Pell by the animal pen, Captain Marla on the north road and Brother Hob west of the square.</dd></dl>
       <div class="label">Gear</div>
       <dl class="controls">
       <dt>Workbench</dt><dd>Craft weapons and armor under the Weapons and Armor tabs, and switch what you have equipped.</dd>
@@ -672,6 +792,10 @@ function renderPanel() {
       <dt>Spiders</dt><dd>Quarry. Creep closer, then pounce.</dd>
       <dt>Cyclopes</dt><dd>Quarry. Throw rocks at the red circle. Move, or swing to knock rocks away.</dd>
       <dt>Ghosts</dt><dd>Grove. Can't be hit while faded. Their wisps follow you; swing to break them.</dd>
+      <dt>Bandits</dt><dd>Forest and quarry roads. They steal gold and flee. Catch them to get it back.</dd>
+      <dt>Snails</dt><dd>Meadow. They hide in their shells when hit; wait, then strike again.</dd>
+      <dt>Rats</dt><dd>Quarry and mine. Fast and twitchy, but one hit does it.</dd>
+      <dt>Cultists</dt><dd>Grove and crypt. They blink away when you get close and hurl fireballs.</dd>
       <dt>Slime King</dt><dd>Boss at the north tip. Leap over his shockwave, then hit him while he's dazed for double damage.</dd></dl>
       <div class="label">The Old Mine</div>
       <dl class="controls">
@@ -734,6 +858,7 @@ body.addEventListener('click', e => {
 });
 function addGold(n) { S.gold += n; S.earned += n; }
 $('helpBtn').addEventListener('click', () => { resetArmed = false; openPanel('help'); });
+$('questBtn').addEventListener('click', () => openPanel('quests'));
 function showVictory() {
   const m = Math.floor(S.time / 60);
   $('victoryStats').textContent = `You earned ${S.earned}g in ${m} minute${m === 1 ? '' : 's'} and funded the crossing. That is the end of this slice of Brindle Isle. Thanks for playing!`;
@@ -753,6 +878,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (k === ' ' || k === 'j' || k === 'e' || k === 'enter') pressAction();
   if (k === 'q') drinkTonic();
+  if (k === 'l') openPanel('quests');
   if (k === 'shift' || k === 'k' || k === 'l') dash();
   if (k === 'm') { SFX.toggle(); toast(SFX.muted ? 'Sound off' : 'Sound on', 1200); }
 });
@@ -882,6 +1008,11 @@ function onAction() {
 }
 function interact(n) {
   if (n.id === 'bench') { openPanel('craft'); return; }
+  if (n.id === 'pell' || n.id === 'marla' || n.id === 'hob') {
+    if (!questInteract(n)) { const lines = IDLE_TALK[n.id]; say(n.name, [lines[Math.floor(time) % lines.length]]); }
+    return;
+  }
+  if ((n.id === 'oma' && S.met.oma) || (n.id === 'tobin' && S.met.tobin)) { if (questInteract(n, () => openPanel(n.id === 'oma' ? 'shop' : 'bridge'))) return; }
   if (n.id === 'oma') {
     if (!S.met.oma) { S.met.oma = true; say('Oma Fen', [
       'A new face! Washed up with the last storm, did you? Welcome to Brindle Isle.',
@@ -911,8 +1042,10 @@ function drinkTonic() {
 function damageEnemy(e, dmg, kx, ky) {
   const D = ENEMY[e.kind];
   if (D.ghostly && e.faded) { floatText(e.x, e.y - 44, 'Miss', '#c8d0e0'); burst(e.x, e.y - 20, '#c8d0e0', 4); return false; }
+  if (e.kind === 'snail' && e.shell > 0) { floatText(e.x, e.y - 40, 'Clink', '#e0c08a'); SFX.play('mine'); return false; }
   e.hp -= dmg; e.hurt = 0.2; e.kx = kx * (D.heavy ? 0.4 : 1); e.ky = ky * (D.heavy ? 0.4 : 1);
   if (gearW().poison) { e.poison = 3; e.poisonT = 1; }
+  if (e.kind === 'snail' && e.hp > 0 && rng() < 0.45) e.shell = 1.6;
   if (e.state !== 'move') { e.state = 'move'; e.cd = Math.max(e.cd, 0.8); } // a hit interrupts wind-ups
   burst(e.x, e.y - 14, D.col, 8); floatText(e.x + (rng() - 0.5) * 12, e.y - 46, String(dmg), '#ffffff');
   if (e.hp <= 0) killEnemy(e);
@@ -988,6 +1121,8 @@ function killEnemy(e) {
   e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; SFX.play('slime');
   burst(e.x, e.y - 10, D.col, 16);
   for (const [item, n] of D.drops) drop(e.x, e.y - 6, item, n);
+  if (e.loot) { drop(e.x, e.y - 6, 'gold', Math.min(12, e.loot), Math.ceil(e.loot / Math.min(12, e.loot))); floatText(e.x, e.y - 50, 'Your gold!', '#f4b740'); e.loot = 0; }
+  S.kills[e.kind] = (S.kills[e.kind] || 0) + 1; questTick();
   if (gearW().lifesteal && S.hp < maxHp() && S.hp > 0) { S.hp++; floatText(P.x, P.y - 60, '+♥', '#ec5257'); updateHUD(); }
 }
 function tickPoison(o, dt, onHurt) {
@@ -1116,13 +1251,14 @@ function update(dt) {
     if (p.t > 0.35 && d < 14 && !fainted) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
+      else if (p.item === 'ring') { S.found.ring = true; banner('Found the lost ring!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'key') { const DK = dungeonAt(p.x); if (DK) dgs(DK).keys++; banner('Small Key!', '#ffe08a'); SFX.play('lucky'); }
       else if (p.item === 'bosskey') { const DK = dungeonAt(p.x); if (DK) dgs(DK).bossKey = true; banner('Boss Key!', '#ff9a9a'); SFX.play('craft'); }
       else { S.inv[p.item]++; floatText(P.x, P.y - 56, `+1 ${ITEMS[p.item].name}`, '#eef3e6'); SFX.play('collect'); }
       updateHUD();
       const slot = p.item === 'gold' ? document.querySelector('.gold') : document.querySelector(`.slot[data-item="${p.item}"]`);
       if (slot) { slot.classList.remove('bump'); void slot.offsetWidth; slot.classList.add('bump'); }
-    } else if (p.t > 60) pickups.splice(i, 1);
+    } else if (p.t > 60 && !p.keep) pickups.splice(i, 1);
   }
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
@@ -1142,7 +1278,7 @@ function update(dt) {
   }
   else if (tileAt(Math.floor(P.x / T), Math.floor((P.y + 20) / T)) === STAIRS) { pr.hidden = false; pr.innerHTML = 'Walk down the stairs to leave the mine'; }
   else pr.hidden = true;
-  saveT += dt; if (saveT > 8) { saveT = 0; save(); }
+  saveT += dt; if (saveT > 8) { saveT = 0; save(); questTick(); }
 }
 function updateAnimal(a, dt) {
   a.t -= dt; a.hop += dt * 8;
@@ -1265,6 +1401,47 @@ function updateEnemy(e, dt, fainted) {
     touch(D.dmg, D.small ? 16 : 20);
     return;
   }
+  if (e.kind === 'bandit') { // dashes in, snatches gold, then runs for it
+    if (e.state === 'flee') {
+      e.st -= dt; moveEnemy(e, -dx / d * 115 * dt, -dy / d * 115 * dt);
+      if (Math.random() < dt * 8) particles.push({ x: e.x, y: e.y - 30, vx: 0, vy: -20, life: 0.4, color: '#f4b740', size: 3 });
+      if (e.st <= 0) { e.state = 'move'; e.cd = 2; }
+      return;
+    }
+    if (chase) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); else wander(D.sp * 0.6);
+    if (d < 20 && !fainted && P.inv <= 0 && !P.dash) {
+      const amt = Math.min(S.gold, 5 + Math.floor(S.gold * 0.1), 30);
+      damagePlayer(1, e);
+      if (amt > 0) { S.gold -= amt; e.loot = (e.loot || 0) + amt; floatText(P.x, P.y - 60, `-${amt}g`, '#f4b740'); toast('A bandit snatched your gold! Catch them to get it back.'); updateHUD(); }
+      e.state = 'flee'; e.st = 3.5;
+    }
+    return;
+  }
+  if (e.kind === 'snail') { // slow, and hides in its shell when struck
+    e.shell = Math.max(0, (e.shell || 0) - dt);
+    if (e.shell > 0) return;
+    if (chase) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); else wander(D.sp);
+    touch(D.dmg);
+    return;
+  }
+  if (e.kind === 'rat') { // darts around in quick zig-zags
+    const zig = Math.sin(e.anim * 9) * 0.8, go = Math.sin(e.anim * 4) > -0.3 ? 1 : 0.1;
+    if (chase) moveEnemy(e, (dx / d - dy / d * zig) * D.sp * go * dt, (dy / d + dx / d * zig) * D.sp * go * dt); else wander(D.sp * 0.5);
+    touch(D.dmg, 16);
+    return;
+  }
+  if (e.kind === 'mage') { // blinks away when you close in and hurls fireballs
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 2.2 + rng(); const a = Math.atan2(P.y - 14 - (e.y - 24), P.x - e.x); projectiles.push({ kind: 'fire', x: e.x, y: e.y - 24, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, ang: a, t: 0, life: 2.4 }); SFX.play('swing'); } return; }
+    if (chase && d < 80 && (e.blink || 0) <= 0) {
+      for (let i = 0; i < 10; i++) { const a = rng() * Math.PI * 2, nx = e.x + Math.cos(a) * 130, ny = e.y + Math.sin(a) * 130; if (walkable(nx, ny) && Math.hypot(nx - P.x, ny - P.y) > 110) { burst(e.x, e.y - 20, '#e08a3c', 10); e.x = nx; e.y = ny; burst(e.x, e.y - 20, '#e08a3c', 10); SFX.play('wisp'); break; } }
+      e.blink = 2.5;
+    }
+    e.blink = Math.max(0, (e.blink || 0) - dt);
+    if (chase) { const want = d < 120 ? -0.6 : d > 190 ? 1 : 0; moveEnemy(e, dx / d * want * D.sp * dt, dy / d * want * D.sp * dt); if (d < 260 && e.cd <= 0) { e.state = 'windup'; e.st = 0.55; } }
+    else wander(D.sp);
+    touch(D.dmg);
+    return;
+  }
   if (e.kind === 'bat') { // flutters around you, then swoops
     if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'attack'; e.st = 0.42; lockOn(250); } return; }
     if (e.state === 'attack') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); touch(D.dmg, 22); if (e.st <= 0) { e.state = 'recover'; e.st = 0.7; } return; }
@@ -1378,8 +1555,10 @@ function updateProjectiles(dt, fainted) {
         if (Math.random() < dt * 30) particles.push({ x: p.x, y: p.y, vx: 0, vy: -10, life: 0.3, color: '#c9b8ff', size: 3 });
       } else if (p.kind === 'bubble') { p.x += p.vx * dt + Math.sin(p.t * 4 + p.ph) * 0.8; p.y += p.vy * dt + Math.cos(p.t * 3 + p.ph) * 0.6; }
       else { p.x += p.vx * dt; p.y += p.vy * dt; }
+      if (p.kind === 'fire' && Math.random() < dt * 40) particles.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 20, vy: -20, life: 0.3, color: Math.random() < 0.5 ? '#ffb347' : '#ec5257', size: 3 });
+      if (p.kind === 'fire' && inDungeon(p.x) && !walkable(p.x, p.y + 14)) { p.dead = true; burst(p.x, p.y, '#ffb347', 8); }
       if (!fainted && Math.hypot(P.x - p.x, P.y - 14 - p.y) < (p.kind === 'bubble' ? 16 : 14)) {
-        damagePlayer(1, p); p.dead = true; burst(p.x, p.y, p.kind === 'web' ? '#ffffff' : p.kind === 'bubble' ? '#bfe8ff' : '#c9b8ff', 6);
+        damagePlayer(p.kind === 'fire' ? 2 : 1, p); p.dead = true; burst(p.x, p.y, p.kind === 'web' ? '#ffffff' : p.kind === 'bubble' ? '#bfe8ff' : p.kind === 'fire' ? '#ffb347' : '#c9b8ff', 6);
         if (p.kind === 'web') { P.slow = 2.2; floatText(P.x, P.y - 60, 'Webbed!', '#ffffff'); }
       }
       if (p.t > p.life) p.dead = true;
@@ -1899,6 +2078,10 @@ function drawCreature(c, e) {
   else if (e.kind === 'crab') { ox = Math.sin(e.anim * 9) * 2; sy = 1 + Math.abs(Math.sin(e.anim * 9)) * 0.05; }
   else if (e.kind === 'cyclops') { lift = Math.abs(Math.sin(e.anim * 4)) * 3; if (e.state === 'windup') { sy = 1.12; sx = 0.92; } }
   else if (e.kind === 'ghost') { lift = 12 + Math.sin(e.anim * 2) * 5; alpha = e.faded ? 0.18 : 0.88; }
+  else if (e.kind === 'snail') { if (e.shell > 0) { sy = 0.6; sx = 0.85; } else sx = 1 + Math.sin(e.anim * 3) * 0.05; }
+  else if (e.kind === 'rat') { ox = Math.sin(e.anim * 30) * 1; sy = 0.8; sx = 0.85; }
+  else if (e.kind === 'bandit') { lift = Math.abs(Math.sin(e.anim * 10)) * 2; }
+  else if (e.kind === 'mage') { lift = 4 + Math.sin(e.anim * 2.5) * 3; if (e.state === 'windup') { c.fillStyle = 'rgba(255,170,80,.5)'; circle(c, e.x, e.y - 56, 6 + (1 - e.st / 0.55) * 6); } }
   if (e.state === 'windup') ox += Math.sin(time * 60) * 2;
   if (e.state === 'attack' && e.kind === 'spider') lift = 8;
   if (!e.alive) { const k = 1 - Math.max(0, e.dieT) / 0.4; sx *= 1 - k; sy *= 1 - k; alpha *= 1 - k; }
@@ -1912,6 +2095,7 @@ function drawCreature(c, e) {
   if (!e.alive) return;
   if (e.state === 'windup') { c.fillStyle = '#ffe08a'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 16px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText('!', e.x, e.y - 42 - lift); c.fillText('!', e.x, e.y - 42 - lift); }
   if (e.kind === 'crab' && e.state === 'recover') drawStars(c, e.x, e.y - 40, 10);
+  if (e.kind === 'bandit' && e.loot) { c.fillStyle = '#f4b740'; c.strokeStyle = '#2a1a00'; c.lineWidth = 2; c.font = '700 11px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText(`${e.loot}g`, e.x, e.y - 52 - lift); c.fillText(`${e.loot}g`, e.x, e.y - 52 - lift); }
   if (e.hp < e.max && !e.faded) healthBar(c, e.x, e.y - 42 - lift, e.hp / e.max);
 }
 function drawStars(c, x, y, r) { c.fillStyle = '#ffe08a'; for (let i = 0; i < 3; i++) { const a = time * 5 + i * 2.1; c.fillRect(Math.round(x + Math.cos(a) * r - 2), Math.round(y + Math.sin(a) * r * 0.4 - 2), 4, 4); } }
@@ -1932,6 +2116,9 @@ function drawProjectiles(c) {
       sprB(c, 'rock_g', p.x, p.y - p.z + 8, 1.25);
     } else if (p.kind === 'wisp') {
       c.fillStyle = 'rgba(180,160,255,.35)'; circle(c, p.x, p.y, 9); c.fillStyle = '#efeaff'; circle(c, p.x, p.y, 4);
+    } else if (p.kind === 'fire') {
+      const pu = 1 + Math.sin(time * 20) * 0.15;
+      c.fillStyle = 'rgba(255,140,60,.35)'; circle(c, p.x, p.y, 12 * pu); c.fillStyle = '#ffb347'; circle(c, p.x, p.y, 7 * pu); c.fillStyle = '#fff2c4'; circle(c, p.x - 1, p.y - 1, 3);
     } else if (p.kind === 'web') {
       c.strokeStyle = '#f2f2f2'; c.lineWidth = 1.5;
       for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4 + p.t * 3; c.beginPath(); c.moveTo(p.x - Math.cos(a) * 8, p.y - Math.sin(a) * 8); c.lineTo(p.x + Math.cos(a) * 8, p.y + Math.sin(a) * 8); c.stroke(); }
@@ -2241,7 +2428,9 @@ function drawNPC(c, n) {
     if (n.moving) drawLPC(c, n.walk, 1 + Math.floor(n.step / 7) % 8, dirRow(n.fx, n.fy), n.x, n.y, 64);
     else drawLPC(c, n.sheet, Math.floor(time * 1.4) % 2, near ? dirRow(P.x - n.x, P.y - n.y) : dirRow(n.fx, n.fy), n.x, n.y, 64);
   }
-  const alert = (n.id === 'oma' && !S.met.oma) || (n.id === 'tobin' && ((!S.met.tobin && !S.bridge) || (S.gold >= GOAL && !S.bridge)));
+  const qm = questMark(n.id);
+  if (qm) { const b = Math.sin(time * 5) * 2; c.fillStyle = qm === '?' ? '#7fe07a' : '#f4b740'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 22px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText(qm, n.x, n.y - 62 + b); c.fillText(qm, n.x, n.y - 62 + b); }
+  const alert = !qm && ((n.id === 'oma' && !S.met.oma) || (n.id === 'tobin' && ((!S.met.tobin && !S.bridge) || (S.gold >= GOAL && !S.bridge))));
   if (alert) { const b = Math.sin(time * 5) * 2; c.fillStyle = '#f4b740'; c.strokeStyle = '#2a1a00'; c.lineWidth = 3; c.font = '700 20px "Pixelify Sans", sans-serif'; c.textAlign = 'center'; c.strokeText('!', n.x, n.y - 62 + b); c.fillText('!', n.x, n.y - 62 + b); }
   if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); }
 }
@@ -2370,7 +2559,7 @@ function applySave(d) {
   const dgsIn = { ...(d.dgs || {}) }; if (d.dg && !dgsIn.mine) dgsIn.mine = d.dg;
   for (const k in dgsIn) { const g = dgsIn[k] || {}; dgsIn[k] = { open: { ...(g.open || {}) }, chests: { ...(g.chests || {}) }, switches: { ...(g.switches || {}) }, keys: g.keys || 0, bossKey: !!g.bossKey }; }
   S = { ...base, ...d, inv: { ...base.inv, ...(d.inv || {}) }, tools: { ...base.tools, ...(d.tools || {}) }, met: { ...(d.met || {}) },
-    defeated: { ...(d.defeated || {}), ...(d.bossDefeated ? { slime: true } : {}) }, dgs: dgsIn };
+    defeated: { ...(d.defeated || {}), ...(d.bossDefeated ? { slime: true } : {}) }, dgs: dgsIn, quests: { ...(d.quests || {}) }, kills: { ...(d.kills || {}) }, found: { ...(d.found || {}) } };
   delete S['bossDefeated']; delete S['dg'];
   S.gear = { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'], ...(d.gear || {}) };
   S.gear.weapons = [...new Set(['wood', ...(S.gear.weapons || [])])]; S.gear.armors = [...new Set(['cloth', ...(S.gear.armors || [])])];
@@ -2392,6 +2581,8 @@ async function start(hot) {
   if (S.bridge) for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
   for (const D of DUNGEONS) for (const d of D.doors) if (dgs(D).open[d.id]) { for (const [x, y] of d.cells) dset(D, x, y, FLOOR); if (d.kind === 'gate') for (const e of enemies) if (e.dreg === d.reg) { e.alive = false; e.dieT = 0; } }
   for (const B of BOSSES) if (S.defeated[B.type]) B.state = 'dead';
+  if (qState('ring') && qState('ring').state === 'active') spawnRing();
+  for (const q of QUESTS) if (questReady(q)) questReadyNotified[q.id] = true;
   P.x = S.px; P.y = S.py;
   camFocus.x = P.x; camFocus.y = P.y;
   if (!walkable(P.x, P.y)) { P.x = cx * T; P.y = (cy + 2) * T; }
