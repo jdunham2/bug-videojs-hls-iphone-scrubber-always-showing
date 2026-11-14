@@ -27,11 +27,22 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   - Things that land in the pond splash: some float and drift, others sink for good
   - Crops start planted and get pulled up; kick the beach ball by running into it
   - Synthesized sound effects (no audio files)
+- **Villagers**: Bertram (gardener), Mrs. Fennick (neighbour), Rosa (picnicker), Toby (kid)
+  - Daily routines with A* pathfinding around houses, fences and water; idle chatter with little voice blips
+  - Each owns certain items (the prompt says whose: "Rosa's pie"). If they **see** you holding their stuff: "!" and a chase
+  - Vision is a cone in front of them blocked by houses/trees, so sneak up from behind
+  - Caught? They snatch it back, shove you, and carry it home (crops get replanted, the pie goes back on the table)
+  - They notice their things lying in the wrong place and tidy them up; floating/sunk items make them sulk
+  - Chitter near them or hit them with a thrown item and they jump, dropping whatever they carry. Hit them with
+    something that isn't theirs and they chase you off
+  - Toby plays with his beach ball; Rosa and Mrs. Fennick complain when their pie/sandwich/hat is missing
 - Smooth camera with look-ahead, minimap, drifting cloud shadows, butterflies that flee, running dust
 
 ## Code layout (`game.js`)
 - **Map**: `buildMap()` lays out tiles and places objects (seeded RNG, same village every time)
 - **Items**: `ITEM` table (name, size, heavy, floats, draw), `placeItems()`, `updateItems()` physics, `grabOrDrop()` / `throwHeld()`
+- **Villagers**: `VILLAGER_DEFS` (looks, speeds, routine stops, lines), `updateVillagers()` state machine
+  (route → act, chase, fetch, return, sulk, startled), `findPath()` A* over the `nav` grid, `canSee()`
 - **Objects**: `make*()` factories return `{x, y, hitbox, bounds, draw, shadow}`; add new props here
 - **Player**: `updatePlayer()` (movement/collision) and `drawRaccoon*()` (rendering)
 - **Render**: `render()` draws ground → shadows → y-sorted objects → UI

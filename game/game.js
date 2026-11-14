@@ -751,6 +751,7 @@
     bubble: null,     // { text, t }
     dustT: 0,
     held: null,       // item being carried
+    stun: 0,          // seconds of lost control after being shoved
     speed: 0,
   };
   const PLAYER_HB = { w: 16, h: 9 };
@@ -777,6 +778,7 @@
 
   function updatePlayer(dt, input) {
     let ix = input.x, iy = input.y;
+    if (player.stun > 0) { player.stun -= dt; ix = 0; iy = 0; }
     const mag = Math.hypot(ix, iy);
     if (mag > 1) { ix /= mag; iy /= mag; }
     const heavy = player.held && player.held.type.heavy;
@@ -835,6 +837,9 @@
     sfx('chitter');
     // You can't chitter with your mouth full: light things fall out
     if (player.held && !player.held.type.heavy) dropHeld(true);
+    for (const v of villagers) {
+      if (Math.hypot(v.x - player.x, v.y - player.y) < 95) startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']));
+    }
     for (const b of butterflies) {
       if (Math.hypot(b.x - player.x, b.y - player.y) < 140) b.flee = 1.5;
     }
@@ -999,19 +1004,31 @@
   }
 
   function drawBubble(ctx, p) {
-    if (!p.bubble) return;
-    const a = Math.min(1, p.bubble.t / 0.25);
-    const x = p.x, y = p.y - p.hop - 42;
+    if (p.bubble) drawBubbleAt(ctx, p.x, p.y - p.hop - 42, p.bubble);
+  }
+  function drawBubbleAt(ctx, x, y, b) {
+    const a = Math.min(1, b.t / 0.25);
     ctx.save();
     ctx.globalAlpha = a;
+    if (b.alert) { // big red "!"
+      const pop = 1 + Math.max(0, b.t - 0.85) * 2;
+      ctx.translate(x, y); ctx.scale(pop, pop);
+      ctx.fillStyle = '#e8453c'; circle(ctx, 0, 0, 8);
+      ctx.beginPath(); ctx.moveTo(-3, 6); ctx.lineTo(3, 6); ctx.lineTo(0, 11); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '800 12px Nunito, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('!', 0, 0.5);
+      ctx.restore();
+      return;
+    }
     ctx.font = '700 10px Nunito, sans-serif';
-    const w = Math.max(22, ctx.measureText(p.bubble.text).width + 12);
+    const w = Math.max(22, ctx.measureText(b.text).width + 12);
     ctx.fillStyle = '#fffaf0';
     roundRect(ctx, x - w / 2, y - 9, w, 18, 8, true);
     ctx.beginPath(); ctx.moveTo(x - 4, y + 8); ctx.lineTo(x + 4, y + 8); ctx.lineTo(x, y + 14); ctx.fill();
     ctx.fillStyle = '#3a2a1a';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.bubble.text, x, y + 0.5);
+    ctx.fillText(b.text, x, y + 0.5);
     ctx.restore();
   }
 
@@ -1219,8 +1236,10 @@
     const it = {
       isItem: true, kind, type: ITEM[kind], x, y, z: opts.z || 0,
       vx: 0, vy: 0, vz: 0, rot: 0, spin: 0, roll: 0, ph0: rand() * 6,
-      air: false, held: false, ghost: false, floating: false, planted: !!opts.planted,
+      air: false, held: false, heldBy: null, ghost: false, floating: false, planted: !!opts.planted,
+      owner: opts.owner || null,
     };
+    it.home = { x, y, z: it.z, planted: it.planted }; // where its owner wants it
     items.push(it);
     return it;
   }
@@ -1257,6 +1276,7 @@
   }
   function placeFree(kind, x, y, opts) {
     const r = ITEM[kind].r;
+    opts = opts || {};
     for (let ring = 0; ring < 8; ring++) {
       for (let k = 0; k < Math.max(1, ring * 6); k++) {
         const a = (k / Math.max(1, ring * 6)) * Math.PI * 2;
@@ -1271,7 +1291,7 @@
     const T = TILE;
     // Garden crops (planted until pulled)
     for (let y = 33; y <= 40; y += 2) for (let x = 10; x <= 18; x += 1.5) {
-      addItem(y % 4 === 1 ? 'cabbage' : 'carrot', (x + 0.5) * T, (y + 0.6) * T, { planted: true });
+      addItem(y % 4 === 1 ? 'cabbage' : 'carrot', (x + 0.5) * T, (y + 0.6) * T, { planted: true, owner: 'bertram' });
     }
     // Heavy things
     placeFree('crate', 15.6 * T, 14.6 * T);
@@ -1280,21 +1300,21 @@
     placeFree('barrel', 45.7 * T, 14.4 * T);
     placeFree('barrel', 44.6 * T, 37.6 * T);
     // Things resting on furniture
-    addItem('pie', 47 * T + 16, 31 * T + 1, { z: 19 });
-    addItem('hat', 36 * T - 6, 30.6 * T + 1, { z: 12 });
-    addItem('sandwich', 28 * T + 8, 21.4 * T + 1, { z: 12 });
+    addItem('pie', 47 * T + 16, 31 * T + 1, { z: 19, owner: 'rosa' });
+    addItem('hat', 36 * T - 6, 30.6 * T + 1, { z: 12, owner: 'fennick' });
+    addItem('sandwich', 28 * T + 8, 21.4 * T + 1, { z: 12, owner: 'fennick' });
     // Loose stuff around the village
-    placeFree('bucket', 32 * T + 30, 24.2 * T + 4);
-    placeFree('ball', 30 * T, 28.5 * T);
-    placeFree('newspaper', 12.5 * T - 18, 15.5 * T);
+    placeFree('bucket', 32 * T + 30, 24.2 * T + 4, { owner: 'rosa' });
+    placeFree('ball', 30 * T, 28.5 * T, { owner: 'toby' });
+    placeFree('newspaper', 12.5 * T - 18, 15.5 * T, { owner: 'fennick' });
     placeFree('newspaper', 42.5 * T - 18, 15.5 * T);
     placeFree('newspaper', 49.5 * T - 18, 16.5 * T);
-    placeFree('gnome', 22.6 * T, 13.8 * T);
-    placeFree('gnome', 21 * T, 33 * T);
-    placeFree('duck', 44.4 * T, 40.5 * T);
-    placeFree('can', 9.8 * T, 32.8 * T);
+    placeFree('gnome', 22.6 * T, 13.8 * T, { owner: 'fennick' });
+    placeFree('gnome', 21 * T, 33 * T, { owner: 'bertram' });
+    placeFree('duck', 44.4 * T, 40.5 * T, { owner: 'toby' });
+    placeFree('can', 9.8 * T, 32.8 * T, { owner: 'bertram' });
     placeFree('boot', 36.4 * T, 36.4 * T);
-    placeFree('pot', 8.3 * T, 15.6 * T);
+    placeFree('pot', 8.3 * T, 15.6 * T, { owner: 'fennick' });
     placeFree('pot', 21.8 * T, 14.6 * T);
     placeFree('pot', 44.2 * T, 15.8 * T);
     // Apples fallen under some trees
@@ -1340,7 +1360,7 @@
 
   function pickUp(it) {
     if (it.planted) { puff(it.x, it.y, 5, 'soil'); sfx('pop'); } else sfx(it.type.heavy ? 'heave' : 'pick');
-    Object.assign(it, { held: true, air: false, floating: false, planted: false, ghost: false, vx: 0, vy: 0, vz: 0, rot: 0, spin: 0 });
+    Object.assign(it, { held: true, heldBy: null, air: false, floating: false, planted: false, ghost: false, vx: 0, vy: 0, vz: 0, rot: 0, spin: 0 });
     player.held = it;
     sparkle(it.x, it.y, it.z + it.type.h * 0.5);
   }
@@ -1355,7 +1375,7 @@
     let x = player.x + d[0] * reach;
     let y = player.y + d[1] * (it.type.heavy ? 12 : 10) + (d[1] >= 0 ? 1 : 0);
     if (itemBlocked(it, x, y)) { x = player.x; y = player.y + 1; }
-    Object.assign(it, { x, y, z: it.type.heavy ? 10 : 8, air: true, ghost: true, vz: pop ? 110 : 0, vx: player.vx * 0.3, vy: player.vy * 0.3, spin: pop ? (Math.random() - 0.5) * 10 : 0 });
+    Object.assign(it, { x, y, z: it.type.heavy ? 10 : 8, air: true, ghost: true, kicker: null, vz: pop ? 110 : 0, vx: player.vx * 0.3, vy: player.vy * 0.3, spin: pop ? (Math.random() - 0.5) * 10 : 0 });
   }
 
   function throwHeld() {
@@ -1371,7 +1391,7 @@
       vx: d[0] * sp + player.vx * 0.6,
       vy: d[1] * sp * 0.75 + player.vy * 0.6,
       vz: heavy ? 110 : 150,
-      air: true, ghost: true,
+      air: true, ghost: true, kicker: null,
       spin: heavy ? (d[0] || 1) * 4 : (Math.random() - 0.5) * 18 + d[0] * 8,
     });
     sfx('throw');
@@ -1380,14 +1400,14 @@
   function updateItems(dt) {
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
-      if (it.held) { const hp = heldPos(time); it.x = hp.x; it.y = hp.y; it.z = hp.z; continue; }
+      if (it.held) { const hp = it.heldBy ? heldPosV(it.heldBy) : heldPos(time); it.x = hp.x; it.y = hp.y; it.z = hp.z; continue; }
       if (it.ghost && !overlapsPlayer(it)) it.ghost = false;
 
       // Beach balls get kicked when you run into them
       if (it.kind === 'ball' && !it.floating && it.z < 6 && player.speed > 20 && Math.hypot(it.x - player.x, it.y - player.y) < 13) {
         const a = Math.atan2(it.y - player.y, it.x - player.x);
         const k = 60 + player.speed * 1.2;
-        it.vx = Math.cos(a) * k; it.vy = Math.sin(a) * k; it.vz = 70 + player.speed * 0.3; it.air = true;
+        it.vx = Math.cos(a) * k; it.vy = Math.sin(a) * k; it.vz = 70 + player.speed * 0.3; it.air = true; it.kicker = null;
         sfx('bounce');
       }
 
@@ -1407,6 +1427,16 @@
       if (itemBlocked(it, nx, it.y)) { if (Math.abs(it.vx) > 60) sfx('bonk'); it.vx = -it.vx * 0.45; } else it.x = nx;
       const ny = it.y + it.vy * dt;
       if (itemBlocked(it, it.x, ny)) { if (Math.abs(it.vy) > 60) sfx('bonk'); it.vy = -it.vy * 0.45; } else it.y = ny;
+      // Bonk! Thrown things hit villagers
+      if (Math.hypot(it.vx, it.vy) > 80 && it.z < 34 && !it.kicker) { // villagers don't bonk themselves
+        for (const v of villagers) {
+          if (Math.hypot(it.x - v.x, it.y - v.y) > 11) continue;
+          it.vx *= -0.3; it.vy *= -0.3;
+          sfx('bonk');
+          startleV(v, 'Ow!', it.owner === v.id ? { state: 'fetch', target: it } : { state: 'chase', target: null });
+          break;
+        }
+      }
 
       if (it.z <= 0) {
         it.z = 0;
@@ -1513,7 +1543,8 @@
     ctx.font = '800 7px Nunito, sans-serif';
     ctx.textBaseline = 'middle';
     const keyW = isTouch ? 0 : 10;
-    const w = ctx.measureText(it.type.name).width + 8 + keyW;
+    const label = itemName(it);
+    const w = ctx.measureText(label).width + 8 + keyW;
     const lx = x - w / 2, ly = y0 - 17;
     ctx.fillStyle = 'rgba(28,36,24,0.85)'; roundRect(ctx, lx, ly, w, 11, 4, true);
     if (!isTouch) {
@@ -1521,7 +1552,587 @@
       ctx.fillStyle = '#3a2a1a'; ctx.textAlign = 'center'; ctx.fillText('E', lx + 6, ly + 5.8);
     }
     ctx.fillStyle = '#fff4d6'; ctx.textAlign = 'left';
-    ctx.fillText(it.type.name, lx + 4 + keyW, ly + 5.8);
+    ctx.fillText(label, lx + 4 + keyW, ly + 5.8);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Navigation: tile grid of blocked cells + A* pathfinding
+  // ---------------------------------------------------------------------------
+  let nav = null; // 1 = blocked
+  function buildNav() {
+    nav = new Uint8Array(MW * MH);
+    for (let i = 0; i < MW * MH; i++) if (map[i] === WATER) nav[i] = 1;
+    for (const o of solidObjects) {
+      const h = o.hitbox;
+      const x0 = Math.floor((h.x + 3) / TILE), x1 = Math.floor((h.x + h.w - 3) / TILE);
+      const y0 = Math.floor((h.y + 2) / TILE), y1 = Math.floor((h.y + h.h - 2) / TILE);
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) nav[idx(x, y)] = 1;
+    }
+  }
+  const navOpen = (tx, ty) => inb(tx, ty) && nav[idx(tx, ty)] === 0;
+  const navBlockedPt = (x, y) => !navOpen(Math.floor(x / TILE), Math.floor(y / TILE));
+
+  function nearestOpen(tx, ty) {
+    if (navOpen(tx, ty)) return [tx, ty];
+    for (let r = 1; r <= 6; r++) {
+      let best = null, bd = Infinity;
+      for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
+        if (Math.max(Math.abs(i), Math.abs(j)) !== r || !navOpen(tx + i, ty + j)) continue;
+        const d = i * i + j * j;
+        if (d < bd) { bd = d; best = [tx + i, ty + j]; }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+
+  // Returns a list of world-space waypoints, or null
+  function findPath(sx, sy, gx, gy) {
+    const s = nearestOpen(Math.floor(sx / TILE), Math.floor(sy / TILE));
+    const goalTx = Math.floor(gx / TILE), goalTy = Math.floor(gy / TILE);
+    const g = nearestOpen(goalTx, goalTy);
+    if (!s || !g) return null;
+    const N = MW * MH, si = idx(s[0], s[1]), gi = idx(g[0], g[1]);
+    const gs = new Float32Array(N).fill(Infinity);
+    const came = new Int32Array(N).fill(-1);
+    const closed = new Uint8Array(N);
+    const heap = []; // [f, i]
+    const push = (f, i) => {
+      heap.push([f, i]);
+      let k = heap.length - 1;
+      while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; }
+    };
+    const pop = () => {
+      const top = heap[0], last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let k = 0;
+        for (;;) {
+          const l = k * 2 + 1, r = l + 1; let m = k;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === k) break;
+          [heap[m], heap[k]] = [heap[k], heap[m]]; k = m;
+        }
+      }
+      return top;
+    };
+    const h = (i) => { const dx = Math.abs((i % MW) - g[0]), dy = Math.abs(Math.floor(i / MW) - g[1]); return dx + dy + (Math.SQRT2 - 2) * Math.min(dx, dy); };
+    gs[si] = 0; push(h(si), si);
+    let iter = 0;
+    while (heap.length && iter++ < 6000) {
+      const [, cur] = pop();
+      if (cur === gi) break;
+      if (closed[cur]) continue;
+      closed[cur] = 1;
+      const cx = cur % MW, cy = Math.floor(cur / MW);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = cx + dx, ny = cy + dy;
+        if (!navOpen(nx, ny)) continue;
+        if (dx && dy && (!navOpen(cx + dx, cy) || !navOpen(cx, cy + dy))) continue; // no corner cutting
+        const ni = idx(nx, ny);
+        const ng = gs[cur] + (dx && dy ? Math.SQRT2 : 1);
+        if (ng < gs[ni]) { gs[ni] = ng; came[ni] = cur; push(ng + h(ni), ni); }
+      }
+    }
+    if (si !== gi && came[gi] === -1) return null;
+    const pts = [];
+    for (let i = gi; i !== si && i !== -1; i = came[i]) pts.push({ x: (i % MW + 0.5) * TILE, y: (Math.floor(i / MW) + 0.6) * TILE });
+    pts.reverse();
+    // finish on the exact goal when it's walkable
+    if (navOpen(goalTx, goalTy)) { if (pts.length) pts[pts.length - 1] = { x: gx, y: gy }; else pts.push({ x: gx, y: gy }); }
+    return pts;
+  }
+
+  // Is the straight line between two points free of blocked tiles (with body width)?
+  function lineClear(x0, y0, x1, y1) {
+    const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+    if (d < 1) return true;
+    const px = -dy / d * 5, py = dx / d * 5;
+    const steps = Math.ceil(d / 6);
+    for (let i = 1; i <= steps; i++) {
+      const x = x0 + dx * i / steps, y = y0 + dy * i / steps;
+      if (navBlockedPt(x, y) || navBlockedPt(x + px, y + py) || navBlockedPt(x - px, y - py)) return false;
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Villagers
+  // ---------------------------------------------------------------------------
+  const VILLAGER_DEFS = [
+    {
+      id: 'bertram', name: 'Bertram', skin: '#e8b996', hair: '#d8d8d8', shirt: '#5b7f3a', pants: '#6b5134', hat: 'straw',
+      speed: 46, chase: 104, pitch: 150,
+      stops: [
+        { x: 12, y: 34.6, act: 'tend', dur: 7, face: 'down' },
+        { x: 16.5, y: 36.6, act: 'tend', dur: 7, face: 'down' },
+        { x: 11.5, y: 38.6, act: 'tend', dur: 6, face: 'up' },
+        { x: 14.5, y: 29.4, act: 'rest', dur: 3, face: 'down' },
+        { x: 24.5, y: 43, act: 'rest', dur: 6, face: 'down' },
+      ],
+      lines: { tend: ['Grow, little ones.', 'Hmm. Weeds.', '♪ hm hm hm ♪'], rest: ['Ooh, my back.', 'Fine day for carrots.'] },
+    },
+    {
+      id: 'fennick', name: 'Mrs. Fennick', skin: '#f0c8a8', hair: '#a4a4b0', shirt: '#7a4f8f', pants: '#5a3a6a', hat: 'bun', dress: true,
+      speed: 42, chase: 110, pitch: 270,
+      stops: [
+        { x: 12.5, y: 16.3, act: 'tidy', dur: 5, face: 'down' },
+        { x: 9, y: 16.6, act: 'water', dur: 4, face: 'left' },
+        { x: 28.5, y: 22.5, act: 'sit', dur: 9, face: 'down', needs: 'sandwich' },
+        { x: 33, y: 28.5, act: 'stroll', dur: 3, face: 'right' },
+        { x: 36, y: 31.6, act: 'sit', dur: 6, face: 'down', needs: 'hat' },
+      ],
+      lines: { tidy: ['Such a mess.', 'Hmph. That wind.'], water: ['There, my darlings.'], sit: ['Lovely day.', 'Tsk. Kids these days.'], stroll: ['Mm-hm.'] },
+    },
+    {
+      id: 'rosa', name: 'Rosa', skin: '#c98e66', hair: '#3a2418', shirt: '#b5523b', pants: '#5a3a24', hat: 'scarf', apron: true,
+      speed: 52, chase: 124, pitch: 210,
+      stops: [
+        { x: 49.5, y: 17, act: 'rest', dur: 4, face: 'down' },
+        { x: 47.5, y: 32.4, act: 'eat', dur: 10, face: 'up', needs: 'pie' },
+        { x: 52, y: 33.4, act: 'gaze', dur: 5, face: 'down' },
+        { x: 59.5, y: 25.6, act: 'gaze', dur: 4, face: 'right' },
+      ],
+      lines: { eat: ['Mmm, pie.', 'Perfect picnic.'], gaze: ['So peaceful.', 'Ducks!'], rest: ['Smells like rain.'] },
+    },
+    {
+      id: 'toby', name: 'Toby', skin: '#f2c9a0', hair: '#8a5a2e', shirt: '#e8453c', pants: '#3b6fb5', hat: 'cap', stripes: true, scale: 0.82,
+      speed: 60, chase: 132, pitch: 380,
+      stops: [
+        { x: 30, y: 28.5, act: 'play', dur: 16, face: 'down' },
+        { x: 42.5, y: 16.3, act: 'rest', dur: 4, face: 'down' },
+        { x: 45, y: 36.5, act: 'gaze', dur: 6, face: 'down' },
+      ],
+      lines: { play: ['Wheee!', 'Goal!!'], gaze: ['Quack quack!', 'Hi fishies!'], rest: ["Mom! I'm hungry!"] },
+    },
+  ];
+  const villagers = [];
+  const VILLAGER = {}; // by id
+  const rpick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const itemName = (it) => (it.owner && VILLAGER[it.owner] ? `${VILLAGER[it.owner].name}'s ${it.type.name}` : it.type.name);
+
+  function spawnVillagers() {
+    for (const d of VILLAGER_DEFS) {
+      const stops = d.stops.map((s) => ({ ...s, wx: s.x * TILE, wy: s.y * TILE }));
+      const v = {
+        ...d, stops, scale: d.scale || 1,
+        x: stops[0].wx, y: stops[0].wy, dir: stops[0].face, walk: 0, moving: false, seed: Math.random() * 6,
+        hop: 0, hopV: 0, bubble: null,
+        state: 'act', actT: stops[0].dur * (0.6 + Math.random() * 0.4), stopIdx: 0, stateT: 0, lineT: 1 + Math.random() * 4,
+        path: null, repathT: 0, target: null, held: null, lostT: 0, lastSeen: null,
+        cooldown: 0, startleCD: 0, kickCD: 0, tidyT: Math.random(), after: null, searching: false, lookT: 0,
+      };
+      villagers.push(v);
+      VILLAGER[v.id] = v;
+    }
+  }
+
+  function say(v, text, dur = 2.2, alert = false) {
+    v.bubble = { text, t: dur, alert };
+    if (!alert && Math.hypot(v.x - player.x, v.y - player.y) < 260) babble(v.pitch, text.length);
+  }
+
+  function displaced(it) {
+    const h = it.home;
+    if (!h) return false;
+    const far = it.kind === 'ball' ? 240 : 20;
+    return Math.hypot(it.x - h.x, it.y - h.y) > far || (h.planted && !it.planted) || (h.z > 0 && it.z < h.z - 4);
+  }
+  const ownedKind = (v, kind) => items.find((it) => it.owner === v.id && it.kind === kind);
+
+  function canSee(v, x, y) {
+    const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
+    if (d > 170) return false;
+    if (d > 45) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
+    return lineClear(v.x, v.y - 4, x, y);
+  }
+
+  function moveToward(v, x, y, speed, dt) {
+    const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
+    if (d < 0.5) return true;
+    const step = Math.min(d, speed * dt);
+    const nx = v.x + dx / d * step, ny = v.y + dy / d * step;
+    if (!navBlockedPt(nx, v.y)) v.x = nx;
+    if (!navBlockedPt(v.x, ny)) v.y = ny;
+    if (Math.abs(dx) > Math.abs(dy) * 1.1) v.dir = dx > 0 ? 'right' : 'left';
+    else v.dir = dy > 0 ? 'down' : 'up';
+    v.walk += dt * speed * 0.12;
+    v.moving = true;
+    return step >= d;
+  }
+
+  function followPath(v, speed, dt) {
+    if (!v.path || !v.path.length) return true;
+    while (v.path.length > 1 && lineClear(v.x, v.y, v.path[1].x, v.path[1].y)) v.path.shift();
+    const p = v.path[0];
+    if (Math.hypot(p.x - v.x, p.y - v.y) < 3 || moveToward(v, p.x, p.y, speed, dt)) v.path.shift();
+    return v.path.length === 0;
+  }
+
+  function toRoute(v) {
+    v.state = 'route'; v.path = null; v.target = null; v.searching = false;
+  }
+  function sulk(v, text) {
+    say(v, text);
+    sfx('hmph');
+    v.state = 'sulk'; v.stateT = 2.2; v.target = null; v.path = null;
+  }
+  function alertV(v) {
+    say(v, '!', 1.1, true);
+    v.hopV = 120; v.hop = 0.01;
+    sfx('alert');
+  }
+  function startChase(v, it) {
+    v.state = 'chase'; v.target = it; v.lostT = 0; v.path = null; v.repathT = 0;
+    v.lastSeen = { x: player.x, y: player.y };
+    v.stateT = 7;
+    alertV(v);
+  }
+
+  function villagerPick(v, it) {
+    Object.assign(it, { held: true, heldBy: v, air: false, planted: false, ghost: false, vx: 0, vy: 0, vz: 0, rot: 0, spin: 0, floating: false });
+    v.held = it; v.target = it; v.state = 'return'; v.path = null;
+  }
+  function villagerDrop(v) {
+    const it = v.held;
+    if (!it) return null;
+    v.held = null;
+    it.held = false; it.heldBy = null;
+    let x = v.x + DIRV[v.dir][0] * 10, y = v.y + DIRV[v.dir][1] * 6 + 2;
+    if (itemBlocked(it, x, y)) { x = v.x; y = v.y + 1; }
+    Object.assign(it, { x, y, z: 12, air: true, ghost: true, vz: 120, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 50, spin: (Math.random() - 0.5) * 10 });
+    return it;
+  }
+  function placeHome(v, it) {
+    const h = it.home;
+    v.held = null;
+    Object.assign(it, { held: false, heldBy: null, x: h.x, y: h.y, z: h.z, planted: h.planted, air: false, vx: 0, vy: 0, vz: 0, rot: 0, spin: 0, ghost: true });
+    say(v, rpick(['There.', 'Back where you belong.', 'Honestly!']));
+    toRoute(v);
+  }
+
+  // Startle: hop, shout, drop whatever they're carrying. `after` = what to do next.
+  function startleV(v, text, after) {
+    if (v.startleCD > 0 || v.state === 'startled') return false;
+    v.startleCD = 1.2;
+    v.hopV = 170; v.hop = 0.01;
+    say(v, text, 1.1);
+    const dropped = villagerDrop(v);
+    v.after = after || (dropped ? { state: 'fetch', target: dropped } : { state: v.state, target: v.target });
+    v.state = 'startled'; v.stateT = 0.75; v.path = null;
+    return true;
+  }
+  function afterStartle(v) {
+    const a = v.after || { state: 'route' };
+    v.after = null; v.path = null;
+    v.target = a.target || null;
+    v.state = a.state === 'act' ? 'route' : a.state;
+    if (v.state === 'fetch') v.stateT = 15;
+    if (v.state === 'chase') {
+      v.lostT = 0; v.lastSeen = { x: player.x, y: player.y };
+      if (!v.target) { v.stateT = 6; say(v, rpick(['Hey, you!', 'Why I oughta...']), 1.6); sfx('alert'); }
+    }
+  }
+
+  function catchPlayer(v) {
+    const it = v.target;
+    const dx = player.x - v.x, dy = player.y - v.y, d = Math.hypot(dx, dy) || 1;
+    player.vx = dx / d * 240; player.vy = dy / d * 240; player.stun = 0.4;
+    player.hopV = 100; player.hop = 0.01;
+    sfx('snatch');
+    if (it && player.held === it) {
+      player.held = null;
+      Object.assign(it, { held: true, heldBy: v });
+      v.held = it; v.state = 'return'; v.path = null; v.cooldown = 1.5;
+      say(v, rpick(['Gimme that!', 'Mine, you rascal!', 'Got you!']));
+    } else {
+      say(v, rpick(['Scram!', 'Shoo! Shoo!', 'Go on, git!']));
+      toRoute(v); v.cooldown = 3;
+    }
+  }
+
+  function playBall(v, stop, dt) {
+    const ball = ownedKind(v, 'ball');
+    if (!ball || ball.held || ball.floating || Math.hypot(ball.x - stop.wx, ball.y - stop.wy) > 220) return;
+    const d = Math.hypot(ball.x - v.x, ball.y - v.y);
+    if (d > 10) {
+      if (lineClear(v.x, v.y, ball.x, ball.y)) { moveToward(v, ball.x, ball.y, v.speed * 1.3, dt); v.path = null; }
+      else {
+        v.repathT -= dt;
+        if (!v.path || v.repathT <= 0) { v.path = findPath(v.x, v.y, ball.x, ball.y) || []; v.repathT = 1; }
+        followPath(v, v.speed * 1.3, dt);
+      }
+    } else if (v.kickCD <= 0 && ball.z < 4) {
+      v.kickCD = 1.2;
+      for (let tries = 0; tries < 6; tries++) {
+        const a = Math.random() * Math.PI * 2;
+        const lx = ball.x + Math.cos(a) * 90, ly = ball.y + Math.sin(a) * 60;
+        if (tileAt(lx, ly) === WATER || Math.hypot(lx - stop.wx, ly - stop.wy) > 170 || navBlockedPt(lx, ly)) continue;
+        Object.assign(ball, { vx: Math.cos(a) * 150, vy: Math.sin(a) * 110, vz: 90, air: true, spin: 0, kicker: v });
+        sfx('bounce');
+        break;
+      }
+    }
+  }
+
+  function routine(v, dt) {
+    const stop = v.stops[v.stopIdx];
+    if (v.state === 'route') {
+      if (!v.path) v.path = findPath(v.x, v.y, stop.wx, stop.wy) || [];
+      if (followPath(v, v.speed, dt)) {
+        v.path = null; v.state = 'act'; v.actT = stop.dur; v.dir = stop.face || v.dir;
+        v.lineT = 1 + Math.random() * 2; v.searching = false;
+        if (stop.needs) {
+          const it = ownedKind(v, stop.needs);
+          if (!it || it.held || displaced(it)) { say(v, `Where's my ${ITEM[stop.needs].name}?!`); v.searching = true; }
+        }
+      }
+      return;
+    }
+    v.actT -= dt;
+    if (v.searching) {
+      v.lookT -= dt;
+      if (v.lookT <= 0) { v.lookT = 0.7; v.dir = rpick(['left', 'right', 'up', 'down']); }
+    } else if (stop.act === 'play') {
+      playBall(v, stop, dt);
+    } else {
+      v.lineT -= dt;
+      if (v.lineT <= 0) {
+        v.lineT = 5 + Math.random() * 6;
+        const ls = v.lines[stop.act];
+        if (ls && Math.random() < 0.6) say(v, rpick(ls));
+      }
+    }
+    if (v.actT <= 0) { v.stopIdx = (v.stopIdx + 1) % v.stops.length; toRoute(v); }
+  }
+
+  // Notice your own things lying around in the wrong place
+  function tidyScan(v, dt) {
+    v.tidyT -= dt;
+    if (v.tidyT > 0 || v.held) return;
+    v.tidyT = 0.5;
+    for (const it of items) {
+      if (it.owner !== v.id || it.held || it.air || it.floating || !displaced(it)) continue;
+      if (canSee(v, it.x, it.y - 4)) {
+        v.state = 'fetch'; v.target = it; v.path = null; v.stateT = 15;
+        say(v, rpick(['Hm?', 'How did that get there?', 'Oh, for goodness sake.']));
+        return;
+      }
+    }
+  }
+
+  function fetchItem(v, dt, sees) {
+    const it = v.target;
+    v.stateT -= dt;
+    if (!it || !items.includes(it)) { sulk(v, 'Oh no...'); return; }
+    if (it.held) {
+      if (it.heldBy === v) { v.state = 'return'; return; }
+      if (!it.heldBy && sees) { startChase(v, it); return; }
+      if (!it.heldBy) { sulk(v, 'Thief!'); return; }
+      toRoute(v); return;
+    }
+    if (it.floating) { sulk(v, 'Hmph! In the pond?!'); return; }
+    if (v.stateT <= 0) { sulk(v, 'I give up.'); return; }
+    const d = Math.hypot(it.x - v.x, it.y - v.y);
+    if (d < 14 && !it.air) { villagerPick(v, it); return; }
+    const sp = v.speed * 1.3;
+    if (lineClear(v.x, v.y, it.x, it.y)) { moveToward(v, it.x, it.y, sp, dt); v.path = null; return; }
+    v.repathT -= dt;
+    if (!v.path || v.repathT <= 0) { v.path = findPath(v.x, v.y, it.x, it.y) || []; v.repathT = 0.6; }
+    if (followPath(v, sp, dt) && d < 34 && !it.air) villagerPick(v, it);
+  }
+
+  function returnHome(v, dt) {
+    const it = v.held;
+    if (!it) { toRoute(v); return; }
+    if (!v.path) v.path = findPath(v.x, v.y, it.home.x, it.home.y) || [];
+    if (followPath(v, v.speed, dt)) placeHome(v, it);
+  }
+
+  function chase(v, dt, sees) {
+    const it = v.target;
+    if (it) {
+      if (player.held !== it) { // the raccoon let go of it
+        if (!items.includes(it)) { sulk(v, `My ${it.type.name}!`); return; }
+        if (it.floating) { sulk(v, 'Hmph! In the pond?!'); return; }
+        if (it.held) { toRoute(v); return; }
+        v.state = 'fetch'; v.stateT = 15; v.path = null; return;
+      }
+    } else {
+      v.stateT -= dt;
+      if (v.stateT <= 0) { sulk(v, 'And stay out!'); v.cooldown = 2; return; }
+    }
+    if (sees) { v.lostT = 0; v.lastSeen = { x: player.x, y: player.y }; } else v.lostT += dt;
+    if (v.lostT > 3) { sulk(v, it ? 'Thief!' : 'Hmph.'); v.cooldown = 2.5; return; }
+    const d = Math.hypot(player.x - v.x, player.y - v.y);
+    if (d < 15) { catchPlayer(v); return; }
+    if (sees && lineClear(v.x, v.y, player.x, player.y)) { moveToward(v, player.x, player.y, v.chase, dt); v.path = null; return; }
+    v.repathT -= dt;
+    if (!v.path || v.repathT <= 0) { v.path = findPath(v.x, v.y, v.lastSeen.x, v.lastSeen.y) || []; v.repathT = 0.4; }
+    followPath(v, v.chase, dt);
+  }
+
+  function updateVillagers(dt) {
+    for (const v of villagers) {
+      v.moving = false;
+      v.cooldown = Math.max(0, v.cooldown - dt);
+      v.startleCD = Math.max(0, v.startleCD - dt);
+      v.kickCD -= dt;
+      if (v.bubble) { v.bubble.t -= dt; if (v.bubble.t <= 0) v.bubble = null; }
+      if (v.hop > 0 || v.hopV) { v.hopV -= 600 * dt; v.hop += v.hopV * dt; if (v.hop <= 0) { v.hop = 0; v.hopV = 0; } }
+
+      const sees = started && canSee(v, player.x, player.y - 6);
+      const ph = player.held;
+      if (ph && ph.owner === v.id && sees && v.cooldown <= 0 && !v.held && v.state !== 'chase' && v.state !== 'startled') startChase(v, ph);
+
+      switch (v.state) {
+        case 'route': case 'act': routine(v, dt); if (started) tidyScan(v, dt); break;
+        case 'chase': chase(v, dt, sees); break;
+        case 'fetch': fetchItem(v, dt, sees); break;
+        case 'return': returnHome(v, dt); break;
+        case 'sulk': v.stateT -= dt; if (v.stateT <= 0) toRoute(v); break;
+        case 'startled': v.stateT -= dt; if (v.stateT <= 0) afterStartle(v); break;
+      }
+
+      // Villagers are solid: nudge the raccoon out of the way
+      const dx = player.x - v.x, dy = player.y - v.y, d = Math.hypot(dx, dy);
+      if (d < 12 && d > 0.01) {
+        const push = 12 - d;
+        const nx = player.x + dx / d * push, ny = player.y + dy / d * push;
+        if (!collides(nx, player.y)) player.x = nx;
+        if (!collides(player.x, ny)) player.y = ny;
+      }
+    }
+  }
+
+  // Villager rendering -----------------------------------------------------------
+  function heldPosV(v) {
+    const it = v.held, s = v.scale;
+    if (it.type.heavy) return { x: v.x, y: v.y, z: 38 * s + v.hop };
+    const z = 11 * s + v.hop;
+    switch (v.dir) {
+      case 'right': return { x: v.x + 8 * s, y: v.y + 0.5, z };
+      case 'left': return { x: v.x - 8 * s, y: v.y + 0.5, z };
+      case 'up': return { x: v.x, y: v.y - 1, z: z + 2 };
+      default: return { x: v.x, y: v.y + 1, z };
+    }
+  }
+
+  function drawVillager(ctx, v, t) {
+    const moving = v.moving;
+    const bob = moving ? Math.abs(Math.sin(v.walk)) * 1.5 : Math.sin(t * 2 + v.seed) * 0.4;
+    const acting = v.state === 'act' && !v.searching;
+    const stop = v.stops[v.stopIdx];
+    const bend = acting && (stop.act === 'tend' || stop.act === 'water' || stop.act === 'tidy') ? (Math.sin(t * 3 + v.seed) * 0.5 + 0.5) * 2.5 : 0;
+    const carrying = !!v.held;
+    const alarmed = v.bubble && v.bubble.alert;
+    ctx.save();
+    ctx.translate(v.x, v.y);
+    ctx.fillStyle = 'rgba(20,30,10,0.28)';
+    ellipse(ctx, 0, 0, 9 * v.scale, 3.5 * v.scale);
+    ctx.translate(0, -v.hop);
+    ctx.scale(v.scale, v.scale);
+    const side = v.dir === 'left' || v.dir === 'right';
+    if (v.dir === 'left') ctx.scale(-1, 1);
+    const sw = moving ? Math.sin(v.walk) * 3 : 0;
+
+    // legs + shoes
+    if (side) {
+      ctx.fillStyle = v.pants;
+      roundRect(ctx, -3 - sw, -10, 4, 10, 2, true);
+      roundRect(ctx, -1 + sw, -10, 4, 10, 2, true);
+      ctx.fillStyle = '#3a2a1a';
+      ellipse(ctx, -0.5 - sw, -0.8, 3, 1.4); ellipse(ctx, 1.5 + sw, -0.8, 3, 1.4);
+    } else {
+      const l1 = moving ? Math.max(0, Math.sin(v.walk)) * 2 : 0, l2 = moving ? Math.max(0, -Math.sin(v.walk)) * 2 : 0;
+      ctx.fillStyle = v.pants;
+      roundRect(ctx, -5, -10, 4, 10 - l1, 2, true);
+      roundRect(ctx, 1, -10, 4, 10 - l2, 2, true);
+      ctx.fillStyle = '#3a2a1a';
+      ellipse(ctx, -3, -0.8 - l1, 2.6, 1.4); ellipse(ctx, 3, -0.8 - l2, 2.6, 1.4);
+    }
+
+    ctx.translate(side ? bend * 0.6 : 0, -bob + bend * 0.4);
+    // body
+    ctx.fillStyle = v.shirt;
+    if (v.dress) { poly(ctx, [[-6, -23], [6, -23], [8.5, -7], [-8.5, -7]]); ctx.fill(); }
+    else roundRect(ctx, -7, -23, 14, 15, 4, true);
+    if (v.stripes) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-7, -19, 14, 2); ctx.fillRect(-7, -14, 14, 2); }
+    if (v.apron && v.dir !== 'up') { ctx.fillStyle = '#f4f2ee'; roundRect(ctx, side ? 0 : -5, -20, side ? 7 : 10, 13, 2, true); }
+
+    // arms
+    const armCol = v.shirt;
+    if (side) {
+      ctx.fillStyle = armCol;
+      if (carrying) { roundRect(ctx, -1, -20, 10, 4, 2, true); ctx.fillStyle = v.skin; circle(ctx, 9, -18, 2.2); }
+      else { roundRect(ctx, -2 - sw * 0.8, -21, 4, 12, 2, true); ctx.fillStyle = v.skin; circle(ctx, -sw * 0.8, -9, 2.2); }
+    } else if (v.dir === 'down') {
+      ctx.fillStyle = armCol;
+      if (carrying) { roundRect(ctx, -9.5, -21, 3.5, 8, 2, true); roundRect(ctx, 6, -21, 3.5, 8, 2, true); ctx.fillStyle = v.skin; circle(ctx, -5, -14, 2.2); circle(ctx, 5, -14, 2.2); }
+      else { roundRect(ctx, -9.5, -21 + sw * 0.3, 3.5, 12, 2, true); roundRect(ctx, 6, -21 - sw * 0.3, 3.5, 12, 2, true); ctx.fillStyle = v.skin; circle(ctx, -7.8, -9 + sw * 0.3, 2.2); circle(ctx, 7.8, -9 - sw * 0.3, 2.2); }
+    } else {
+      ctx.fillStyle = armCol;
+      roundRect(ctx, -9.5, -21, 3.5, carrying ? 8 : 12, 2, true); roundRect(ctx, 6, -21, 3.5, carrying ? 8 : 12, 2, true);
+    }
+
+    // head
+    ctx.translate(side ? bend * 0.6 : 0, bend * 0.5);
+    const hy = -29;
+    ctx.fillStyle = v.skin; circle(ctx, 0, hy, 7);
+    ctx.fillStyle = v.hair;
+    if (v.dir === 'up') {
+      circle(ctx, 0, hy, 7.3);
+    } else if (side) {
+      ctx.beginPath(); ctx.moveTo(0, hy); ctx.arc(0, hy, 7.3, Math.PI * 0.62, Math.PI * 1.85); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#2b2d33'; circle(ctx, 3.6, hy + 0.5, alarmed ? 1.4 : 1);
+      ctx.fillStyle = v.skin; circle(ctx, 7, hy + 1.8, 1.6);
+    } else {
+      ctx.beginPath(); ctx.arc(0, hy, 7.3, Math.PI, Math.PI * 2); ctx.fill();
+      ellipse(ctx, -3, hy - 2.5, 4, 2.2); ellipse(ctx, 3.5, hy - 3, 3.5, 2);
+      ctx.fillStyle = '#2b2d33';
+      const er = alarmed ? 1.5 : 1;
+      circle(ctx, -2.6, hy + 1, er); circle(ctx, 2.6, hy + 1, er);
+      ctx.fillStyle = 'rgba(230,120,120,0.35)'; circle(ctx, -4.4, hy + 3.2, 1.4); circle(ctx, 4.4, hy + 3.2, 1.4);
+      ctx.fillStyle = '#7a3a2a';
+      if (alarmed || v.state === 'chase') circle(ctx, 0, hy + 4.2, 1.3);
+      else ctx.fillRect(-1.2, hy + 4, 2.4, 0.9);
+    }
+    // headwear
+    switch (v.hat) {
+      case 'straw':
+        ctx.fillStyle = '#e6c56a'; ellipse(ctx, 0, hy - 4, 11, 3.6);
+        ctx.fillStyle = '#d9b552'; roundRect(ctx, -5, hy - 11, 10, 7, 3, true);
+        ctx.fillStyle = '#7a5230'; ctx.fillRect(-5, hy - 6.5, 10, 1.5);
+        break;
+      case 'cap':
+        ctx.fillStyle = '#2e6da4';
+        ctx.beginPath(); ctx.arc(0, hy - 1, 7.5, Math.PI, Math.PI * 2); ctx.fill();
+        if (v.dir === 'down') ellipse(ctx, 0, hy - 1, 7.5, 2.2);
+        else if (side) ellipse(ctx, 6, hy - 1.5, 5, 1.8);
+        break;
+      case 'bun':
+        ctx.fillStyle = v.hair; circle(ctx, side ? -2 : 0, hy - 8, 3.6);
+        break;
+      case 'scarf':
+        ctx.fillStyle = '#d9a43a';
+        ctx.beginPath(); ctx.arc(0, hy - 0.5, 7.6, Math.PI, Math.PI * 2); ctx.fill();
+        if (side) circle(ctx, -7, hy + 1, 2.2);
+        if (v.dir === 'up') { circle(ctx, 0, hy + 5, 2.2); }
+        break;
+    }
+    ctx.restore();
+  }
+
+  function drawVillagerWithHeld(ctx, v, t) {
+    const it = v.held;
+    if (!it) { drawVillager(ctx, v, t); return; }
+    const behind = !it.type.heavy && v.dir === 'up';
+    const drawIt = () => { ctx.save(); ctx.translate(it.x, it.y - it.z); it.type.draw(ctx, it, t); ctx.restore(); };
+    if (behind) drawIt();
+    drawVillager(ctx, v, t);
+    if (!behind) drawIt();
   }
 
   // ---------------------------------------------------------------------------
@@ -1572,6 +2183,18 @@
       case 'bonk': tone(240, 120, 0.07, 'square', 0.05); break;
       case 'splash': noise(0.45, 0.3, 1200); tone(500, 140, 0.25, 'sine', 0.05); break;
       case 'chitter': for (let k = 0; k < 3; k++) tone(1300, 1750, 0.04, 'square', 0.03, k * 0.06); break;
+      case 'alert': tone(660, 880, 0.08, 'square', 0.06); tone(880, 1320, 0.12, 'square', 0.06, 0.09); break;
+      case 'snatch': noise(0.12, 0.15, 1800); tone(420, 200, 0.16, 'sawtooth', 0.05); break;
+      case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
+    }
+  }
+  // Villager "voices": a few pitched blips per sentence
+  function babble(pitch, len) {
+    if (!actx || muted || actx.state !== 'running') return;
+    const n = Math.min(6, 2 + Math.floor(len / 5));
+    for (let k = 0; k < n; k++) {
+      const f = pitch * (0.85 + Math.random() * 0.5);
+      tone(f, f * (0.8 + Math.random() * 0.4), 0.05, 'triangle', 0.035, k * 0.075);
     }
   }
 
@@ -1716,6 +2339,11 @@
       vis.push(it);
     }
 
+    for (const v of villagers) {
+      if (v.x < left - pad || v.x > left + viewW + pad || v.y < top - pad || v.y > top + viewH + pad + 40) continue;
+      vis.push({ y: v.y, isVillager: true, v });
+    }
+
     // Ground-level effects: dust and ripples
     for (const q of particles) {
       if (q.kind === 'ring') {
@@ -1735,6 +2363,7 @@
     for (const o of vis) {
       if (o.isPlayer) { drawPlayerWithHeld(ctx, t); continue; }
       if (o.isItem) { drawItem(ctx, o, t); continue; }
+      if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       let fade = false;
       if (o.canopy && player.y < o.y && player.y > o.canopy.cy - o.canopy.r && Math.abs(player.x - o.x) < o.canopy.r + 6) fade = true;
       o.draw(ctx, t, fade);
@@ -1751,6 +2380,7 @@
     }
     if (target && started) drawPrompt(ctx, target, t);
     drawBubble(ctx, player);
+    for (const v of villagers) if (v.bubble) drawBubbleAt(ctx, v.x, v.y - v.hop - 46 * v.scale, v.bubble);
 
     // Drifting cloud shadows
     ctx.fillStyle = 'rgba(20,35,60,0.07)';
@@ -1788,6 +2418,13 @@
       circle(ctx, mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3);
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3, 0, Math.PI * 2); ctx.stroke();
+      for (const v of villagers) {
+        const vx = mx + v.x / WORLD_W * mw, vy = my + v.y / WORLD_H * mh;
+        ctx.fillStyle = v.state === 'chase' ? '#e8453c' : v.shirt;
+        circle(ctx, vx, vy, v.state === 'chase' ? 3.2 : 2.4);
+        ctx.strokeStyle = '#fff4d6'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(vx, vy, v.state === 'chase' ? 3.2 : 2.4, 0, Math.PI * 2); ctx.stroke();
+      }
     }
   }
 
@@ -1801,6 +2438,7 @@
     time += dt;
     updatePlayer(dt, readInput());
     updateItems(dt);
+    updateVillagers(dt);
     updateAmbient(dt);
     target = findTarget();
     syncTouchButtons();
@@ -1816,7 +2454,9 @@
     buildMap();
     solidObjects = objects.filter((o) => o.hitbox);
     renderGround();
+    buildNav();
     placeItems();
+    spawnVillagers();
     spawnAmbient();
     if (data && data.player && !collides(data.player.x, data.player.y)) {
       player.x = data.player.x; player.y = data.player.y; player.dir = data.player.dir || 'down';
@@ -1828,7 +2468,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects };
+  window.mischief = { player, items, objects, villagers };
 
   // Keep the raccoon where it was when the page hot-reloads in the viewer
   try { window.claude?.hot?.snapshot?.(() => ({ player: { x: player.x, y: player.y, dir: player.dir }, started })); } catch (_) { /* optional */ }
