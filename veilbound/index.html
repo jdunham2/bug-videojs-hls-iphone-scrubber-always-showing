@@ -76,6 +76,7 @@ kbd{background:#000;border:1px solid var(--line);border-radius:4px;padding:0 5px
 <div id="banner"></div>
 <div id="topbtns" class="hidden">
   <button class="btn" id="bInv" title="Inventory (I)">Gear</button>
+  <button class="btn" id="bJournal" title="Journal (Q)">Journal</button>
   <button class="btn" id="bMenu" title="Menu (Esc)">Menu</button>
 </div>
 <div id="touch" class="hidden">
@@ -270,7 +271,7 @@ function effLvl(base){return Math.max(base,Math.floor(partyLevel()*.85))}
 class Enemy{
   constructor(type,x,y,lvl,skin,o={}){const b=EB[type];this.enemy=true;this.type=type;this.x=x;this.y=y;this.z=0;this.lvl=lvl;this.r=b.r;this.home={x,y};
     const coop=1+.4*(G.players.length-1);this.maxHp=b.hp*hpMul(lvl)*coop*(o.elite?3:1)*(o.hpm||1);this.hp=this.maxHp;this.dmg=b.dmg*dmgMul(lvl)*(o.elite?1.4:1)*(o.dm||1);this.spd=b.spd*(o.elite?1.1:1);
-    const sk=SKINS[skin][type];this.name=(o.elite?'Elite ':'')+sk[0];this.col=sk[1];this.elite=!!o.elite;this.state='idle';this.t=0;this.cd=rr(0,1);this.kx=0;this.ky=0;this.flash=0;this.burn=0;this.freeze=0;this.wanderT=0;this.wx=x;this.wy=y;this.aggro=o.aggro||0;this.camp=o.camp;this.anim=Math.random()*9;this.lootMul=o.lootMul||1}
+    const sk=SKINS[skin][type];this.name=(o.elite?'Elite ':'')+sk[0];this.col=sk[1];this.elite=!!o.elite;this.state='idle';this.t=0;this.cd=rr(0,1);this.kx=0;this.ky=0;this.flash=0;this.burn=0;this.freeze=0;this.wanderT=0;this.wx=x;this.wy=y;this.aggro=o.aggro||0;this.camp=o.camp;this.anim=Math.random()*9;this.lootMul=o.lootMul||1;this.skin=skin}
   update(dt){
     this.anim+=dt;if(this.flash>0)this.flash-=dt;
     if(this.burn>0){this.burn-=dt;this.burnTick=(this.burnTick||0)+dt;if(this.burnTick>.5){this.burnTick=0;hurtEnemy(this,this.burnDps*.5,this.burnSrc,{noProc:true,col:'#ff9a3a',noKb:true});if(Math.random()<.5)G.parts.push(part(this.x,this.y,'#ff7a1a',{vz:80}))}}
@@ -313,6 +314,10 @@ const BOSSES={
   captain:{n:'Raid Captain Morg',hp:240,r:22,col:'#9a62b0',spd:85,pats:['charge','slam','summon','radial'],dmg:14,skin:'hex'},
   thorn:{n:'The Thornmother',hp:700,r:36,col:'#3f8a2a',spd:42,pats:['radial','summon','roots','spiral','charge'],dmg:16,skin:'moss'},
   colossus:{n:'Magma Colossus',hp:650,r:38,col:'#a8452a',spd:48,pats:['slam','meteor','charge','radial','nova','summon'],dmg:20,skin:'ash'},
+  warlord:{n:'Warlord Vex',hp:420,r:24,col:'#7a3a9a',spd:90,pats:['charge','volley','summon','slam'],dmg:15,skin:'hex'},
+  grimbark:{n:'Grimbark the Elder',hp:600,r:36,col:'#6a5a2a',spd:35,pats:['roots','summon','lines','radial'],dmg:17,skin:'moss'},
+  kesh:{n:'Sandwyrm Kesh',hp:700,r:30,col:'#c89a4a',spd:70,pats:['burrow','lines','volley','radial','burrow'],dmg:21,skin:'ash'},
+  prism:{n:'Prism Sentinel',hp:620,r:30,col:'#55e0ff',spd:40,pats:['lines','spiral','nova','radial'],dmg:19,skin:'veil'},
   maw:{n:'Dusk Maw',hp:550,r:30,col:'#6a3ae0',spd:70,pats:['spiral','roots','blink','nova'],dmg:18,skin:'veil'}};
 class Boss extends Enemy{
   constructor(id,x,y,lvl){super('brute',x,y,lvl,BOSSES[id].skin);const B=BOSSES[id];this.boss=true;this.bid=id;this.name=B.n;this.col=B.col;this.r=B.r;
@@ -320,7 +325,8 @@ class Boss extends Enemy{
   update(dt){
     this.anim+=dt;if(this.flash>0)this.flash-=dt;if(this.burn>0){this.burn-=dt;this.burnTick=(this.burnTick||0)+dt;if(this.burnTick>.5){this.burnTick=0;hurtEnemy(this,this.burnDps*.5,this.burnSrc,{noProc:true,col:'#ff9a3a',noKb:true})}}
     if(this.dead)return;if(this.freeze>0){this.freeze-=dt*2;return}
-    const tg=nearestTarget(this,900);if(!tg)return;this.face=Math.atan2(tg.y-this.y,tg.x-this.x);
+    if(this.burrow){const b=this.burrow;b.t-=dt;if(Math.random()<.5)G.parts.push(part(b.x+rr(-30,30),b.y+rr(-30,30),'#c8a060',{vz:120}));if(b.t<=0){this.x=b.x;this.y=b.y;this.burrow=null;burst(this.x,this.y,'#c8a060',30,260);G.shake=6;sfx('boom')}return}
+    const tg=nearestTarget(this,900);if(!tg){this.idle=(this.idle||0)+dt;if(this.idle>5){this.hp=this.maxHp;this.phase=1;if(G.boss===this)G.boss=null}return}this.idle=0;if(!G.boss)G.boss=this;this.face=Math.atan2(tg.y-this.y,tg.x-this.x);
     if(this.phase===1&&this.hp<this.maxHp*.5){this.phase=2;banner(this.name,'enraged');burst(this.x,this.y,this.col,40,300)}
     if(this.charge){const c=this.charge;c.t-=dt;if(c.t<0){const s=560*dt;const nx=this.x+Math.cos(c.a)*s,ny=this.y+Math.sin(c.a)*s;if(G.world.blocked(nx,ny,this.r*.6,true)||c.t<-.7){this.charge=null;G.shake=6;sfx('boom')}else{this.x=nx;this.y=ny;for(const p of targets())if(D(p,this)<this.r+p.r&&p.z<25&&!c.hit.has(p)){c.hit.add(p);hurtTarget(p,this.dmg*1.3,this)}}}return}
     if(this.spiral>0){this.spiral-=dt;this.spT=(this.spT||0)+dt;if(this.spT>.07){this.spT=0;this.spA=(this.spA||0)+.42;for(let k=0;k<(this.phase>1?3:2);k++)shoot(this.x,this.y,this.spA+k*Math.PI*2/(this.phase>1?3:2),200,this.dmg*.6,'e',{col:this.col,z:16,r:7})}return}
@@ -333,6 +339,9 @@ class Boss extends Enemy{
     if(p==='summon'){const n=1+ph+Math.floor(G.players.length/2);for(let i=0;i<n;i++){const t=pick(['grunt','grunt','archer','exploder']);const e=new Enemy(t,this.x+rr(-70,70),this.y+rr(-70,70),this.lvl,BOSSES[this.bid].skin,{aggro:20,lootMul:.3});if(!G.world.blocked(e.x,e.y,10,true)){G.world.ents.push(e);burst(e.x,e.y,e.col,12,120)}}sfx('magic')}
     if(p==='slam'){for(const t of targets())addHaz({x:t.x,y:t.y,r:90,delay:1,dmg:dm*1.4,team:'e',ground:true,col:'255,90,60'})}
     if(p==='roots'){for(const t of targets())for(let i=0;i<3+ph*2;i++)addHaz({x:t.x+rr(-110,110),y:t.y+rr(-110,110),r:44,delay:.9+i*.08,dmg:dm,team:'e',ground:true,col:'120,255,90'})}
+    if(p==='lines'){for(const t of targets()){const a0=Math.atan2(t.y-this.y,t.x-this.x);for(let k=-1;k<=1;k++)addHaz({x:this.x,y:this.y,line:true,a:a0+k*.35,len:520,w:34,delay:.95,dmg:dm*1.1,team:'e',ground:true,col:'255,90,90'})}sfx('magic')}
+    if(p==='volley'){for(const t of targets()){const a0=Math.atan2(t.y-this.y,t.x-this.x);for(let k=-2;k<=2;k++)shoot(this.x,this.y,a0+k*.18,300,dm*.6,'e',{col:this.col,z:14,r:6})}sfx('shoot')}
+    if(p==='burrow'){const ok=!G.world.blocked(tg.x,tg.y,this.r*.6,true);if(ok){this.burrow={t:1.1,x:tg.x,y:tg.y};addHaz({x:tg.x,y:tg.y,r:85,delay:1.1,dmg:dm*1.4,team:'e',ground:true,col:'230,170,80'});burst(this.x,this.y,'#c8a060',30,200)}else this.doPat('radial',tg)}
     if(p==='meteor'){for(const t of targets())for(let i=0;i<3+ph;i++)addHaz({x:t.x+rr(-100,100),y:t.y+rr(-100,100),r:58,delay:1.1+i*.18,dmg:dm*1.1,team:'e',col:'255,140,40',meteor:true});sfx('magic')}
     if(p==='nova'){addHaz({x:this.x,y:this.y,r:190,delay:1.1,dmg:dm*1.5,team:'e',ground:true,col:'160,120,255',follow:this});toast('Jump to dodge the shockwave!','#a88aff')}
     if(p==='charge'){const a=Math.atan2(tg.y-this.y,tg.x-this.x);this.charge={a,t:.65,hit:new Set()};addHaz({x:this.x,y:this.y,line:true,a,len:420,w:this.r*2,delay:.65,dmg:0,team:'e',col:'255,80,60'})}
@@ -351,11 +360,11 @@ class Wolf{constructor(owner,mul){this.ally=true;this.owner=owner;this.x=owner.x
   draw(c){drawCreature(c,this,'#9fe8ff','wolf')}}
 // ---------- Interactables ----------
 class Thing{constructor(kind,x,y,o={}){Object.assign(this,{kind,x,y,z:0,r:14,anim:Math.random()*9},o)}}
-function interactLabel(t){return({npc:'Talk to '+t.name,chest:t.open?null:'Open chest',portal:t.label,shrine:t.cool>0?null:'Activate '+t.name,sign:'Read sign',bloom:t.grow<1?null:'Harvest soul bloom',critter:'Pet '+t.name,lore:'Read lore page',gate:null,waystone:'Use waystone'})[t.kind]}
+function interactLabel(t){return({npc:'Talk to '+t.name,chest:t.open?null:'Open chest',portal:t.label,shrine:t.cool>0?null:'Activate '+t.name,sign:'Read sign',bloom:t.grow<1?null:'Harvest soul bloom',critter:'Pet '+t.name,lore:'Read lore page',gate:null,waystone:'Use waystone',captive:'Free '+t.name,board:'Check bounty board',villager:'Talk to '+t.name})[t.kind]}
 
 // ================= COMBAT =================
 function hurtEnemy(e,amt,p,o={}){
-  if(e.dead)return;let crit=false;
+  if(e.dead||e.burrow)return;let crit=false;
   if(p&&!o.noCrit&&Math.random()<p.st.crit/100){amt*=1.6;crit=true}
   e.hp-=amt;e.flash=.1;e.aggro=8;
   G.texts.push({x:e.x+rr(-8,8),y:e.y-e.r-10,s:Math.round(amt)+(crit?'!':''),c:o.col||(crit?'#ffcd57':'#fff'),t:.8,big:crit});
@@ -376,6 +385,7 @@ function killEnemy(e,p){
   if(Math.random()<.06*lm)drop(e.x,e.y,'heal');
   const ichance=(e.boss?1:e.elite?.6:.07)*lm*(G.world.kind==='veil'&&veilPhase()==='endure'?2:1);
   if(Math.random()<ichance){const n=e.boss?3+G.players.length:1;for(let i=0;i<n;i++)drop(e.x+rr(-30,30),e.y+rr(-30,30),'item',makeItem(null,e.lvl+ri(0,1),e.boss?rollRar(i===0?2:1):rollRar()))}
+  questEvent('kill',e);
   if(e.boss)onBossDeath(e);
   if(e.camp)e.camp.alive--;
 }
@@ -487,6 +497,7 @@ function updateDrop(d,dt){d.age+=dt;d.x+=d.vx*dt;d.y+=d.vy*dt;d.vx*=.9;d.vy*=.9;
   if(d.type==='glimmer'){const n=Math.round(d.val*(1+p.st.gold/100));G.glimmer+=n;sfx('coin')}
   else if(d.type==='soul'){const n=Math.round(d.val*(1+p.st.soul/100));G.soul+=n;sfx('pick')}
   else if(d.type==='heal'){healP(p,p.maxHp*.3);sfx('pick')}
+  else if(d.type==='qitem'){const st=G.side[d.val.q];if(st){st.n=Math.min(SIDEQ[d.val.q].need,st.n+1);toast(`${d.val.name} ${st.n}/${SIDEQ[d.val.q].need}`,'#ffcd57');if(st.n>=SIDEQ[d.val.q].need)toast(`Return to ${GIVER[SIDEQ[d.val.q].giver]}`,'#ffcd57')}sfx('pick')}
   else if(d.type==='item'){if(p.bag.length>=60){const v=salvageVal(d.val);G.glimmer+=v;toast(`Bag full, salvaged for ${v} glimmer`)}else{p.bag.push(d.val);toast(`P${p.pid+1}: ${d.val.name}`,RAR[d.val.rar].c)}sfx('pick')}
 }
 function breakCrate(t){t.dead=true;burst(t.x,t.y,'#a07848',12,140);sfx('hit');if(Math.random()<.5)drop(t.x,t.y,'glimmer',ri(2,6));if(Math.random()<.15)drop(t.x,t.y,'heal')}
@@ -498,13 +509,16 @@ function interact(t,p){
   else if(t.kind==='chest')openChest(t);
   else if(t.kind==='portal')t.use(p);
   else if(t.kind==='waystone')useWaystone(t);
+  else if(t.kind==='board')openBoard();
+  else if(t.kind==='villager')dialog(t.name,pick(['"You came for me. I won\'t forget it."','"Hearthhold feels like home already. Thank you, hero."','"If you need anything, I\'ll be right here, staying far from cages."','"The Conclave\'s guards talked about a Hexlord. I hope you never meet him."']));
+  else if(t.kind==='captive'){if(G.world.ents.some(e=>e.enemy&&!e.dead&&D(e,t)<240)){toast('Defeat the guards first!','#ff5d6c');return}t.dead=true;F()['cap_'+t.id]=1;burst(t.x,t.y,'#ffcd57',30,200);sfx('level');G.glimmer+=40;gainXP(80);toast(`${t.name} rescued! They head for Hearthhold.`,'#ffcd57');addVillager(t.id,t.name);questEvent('rescue')}
   else if(t.kind==='sign')dialog(t.title||'Signpost',t.text);
   else if(t.kind==='lore'){t.dead=true;G.flags['lore_'+t.id]=1;dialog(t.title,t.text);G.glimmer+=25;gainXP(30)}
   else if(t.kind==='shrine'){t.cool=180;const b=t.buff;for(const q of G.players){q.buffs[b]=60;if(b==='vigor')q.hp=q.maxHp}toast(`${t.name}: ${t.desc} (60s)`,'#6af2df');burst(t.x,t.y,'#6af2df',40,220);sfx('level')}
-  else if(t.kind==='bloom'){const ph=veilPhase();const n=Math.round(ri(10,16)*(ph==='thrive'?1.6:.6)*(1+p.st.soul/100));G.soul+=n;t.grow=0;G.flags.blooms=(G.flags.blooms||0)+1;G.texts.push({x:t.x,y:t.y-30,s:'+'+n+' soul',c:'#6af2df',t:1});burst(t.x,t.y,'#6af2df',20,150);sfx('pick')}
+  else if(t.kind==='bloom'){const ph=veilPhase();const n=Math.round(ri(10,16)*(ph==='thrive'?1.6:.6)*(1+p.st.soul/100));G.soul+=n;t.grow=0;G.flags.blooms=(G.flags.blooms||0)+1;questEvent('bloom');G.texts.push({x:t.x,y:t.y-30,s:'+'+n+' soul',c:'#6af2df',t:1});burst(t.x,t.y,'#6af2df',20,150);sfx('pick')}
   else if(t.kind==='critter'){if((t.pet||0)<=0){t.pet=20;G.soul+=5;G.texts.push({x:t.x,y:t.y-24,s:'♥ +5 soul',c:'#ff9ad8',t:1});sfx('coin')}}
 }
-function openChest(t){if(t.open)return;t.open=true;G.stats.chests++;if(t.once)G.opened[t.id]=1;sfx('coin');burst(t.x,t.y,'#ffcd57',24,180);
+function openChest(t){if(t.open)return;t.open=true;G.stats.chests++;questEvent('chest');if(t.once)G.opened[t.id]=1;sfx('coin');burst(t.x,t.y,'#ffcd57',24,180);
   const lvl=G.world.kind==='dungeon'?G.world.lvl:effLvl(t.lvl||1);const n=t.big?3:ri(1,2);for(let i=0;i<n;i++)drop(t.x,t.y+10,'item',makeItem(null,lvl+ri(0,1),rollRar(t.big?2:0)));
   drop(t.x,t.y+10,'glimmer',ri(10,25)*(t.big?4:1));if(t.respawn)t.reset=t.respawn;}
 
@@ -591,6 +605,17 @@ function genOver(){
   [[165,90],[180,52],[195,132],[212,80],[170,122],[206,30]].forEach(([x,y])=>{clearArea(w,x,y,1,T.SAND);add(new Thing('chest',tp(x,y).x,tp(x,y).y,{lvl:8,respawn:300}))});
   [[166,76,7,'grunt,archer,grunt'],[176,56,7,'exploder,exploder,grunt,archer'],[186,78,8,'brute,archer,caster'],[196,66,8,'grunt,grunt,caster,archer'],[180,100,8,'brute,grunt,exploder'],[200,122,9,'caster,caster,brute'],[211,96,9,'grunt,grunt,brute,archer'],[170,136,8,'archer,archer,exploder'],[205,46,9,'brute,brute,caster'],[192,112,9,'grunt,archer,caster,brute',true]]
     .forEach(([x,y,l,types,elite])=>add(new Thing('camp',tp(x,y).x,tp(x,y).y,{lvl:l,types:types.split(','),skin:'ash',spawned:false,alive:0,reset:0,elite})));
+  // world bosses
+  clearArea(w,25,25,7,T.GRASS);for(let k=-6;k<=6;k++)for(const[a,b]of[[k,-6],[k,6],[-6,k],[6,k]])if(Math.abs(k)>1&&hash(25+a,25+b)<.8)w.t[(25+b)*NW+25+a]=T.WALL;
+  carve(w,[[45,46],[34,36],[25,31]],1,T.PATH);
+  clearArea(w,138,118,6,T.MOSS);carve(w,[[131,86],[134,102],[138,113]],1,T.PATH);
+  clearArea(w,205,134,6,T.SAND);carve(w,[[188,100],[198,120],[204,130]],1,T.PATH);
+  [['warlord',25,25,3,'The Ruined Fort. Warlord Vex holds court here.'],['grimbark',138,118,6,'The Old Glade. Something ancient walks among these trees.'],['kesh',205,134,10,'The Sunken Pit. The sand here moves on its own.']].forEach(([bid,x,y,l,txt])=>{add(new Thing('bosscamp',tp(x,y).x,tp(x,y).y,{bid,lvl:l,world:true,respawn:600}));add(new Thing('sign',tp(x+3,y+5).x,tp(x+3,y+5).y,{text:txt+'\nWorld boss · Level '+l+'+'}))});
+  // captives guarded by camps
+  [['c1','Miller Hanne',52,63],['c2','Woodcutter Bram',122,73],['c3','Tinker Juno',198,69]].forEach(([id,n,x,y])=>{if(!F()['cap_'+id]){clearArea(w,x,y,1,w.get(x,y)===T.SAND?T.SAND:T.GRASS);add(new Thing('captive',tp(x,y).x,tp(x,y).y,{id,name:n,r:14}))}});
+  for(const[id,n]of CAPTIVES)if(F()['cap_'+id])add(villagerThing(id,n));
+  add(new Thing('npc',tp(64,121).x,tp(64,121).y,{name:'Farmer Odo',role:'odo',col:'#a8c060'}));clearArea(w,64,121,1,T.GRASS);
+  add(new Thing('board',tp(71,48).x,tp(71,48).y,{r:18}));
   if(!F().captain)add(new Thing('bosscamp',tp(75,64).x,tp(75,64).y,{bid:'captain',lvl:2,flag:'captain'}));
   if(F().captain)openGates(w);
   buildMinimap(w);return w;
@@ -639,6 +664,9 @@ function genVeil(){
   w.spawn=tp(50,52);w.checkpoint=w.spawn;const E=w.ents;
   E.push(new Thing('portal',tp(50,47).x,tp(50,47).y,{label:'Return to Hearthhold',r:22,gate:'home',use(){exitVeil()}}));
   E.push(new Thing('npc',tp(54,50).x,tp(54,50).y,{name:'Warden Lio',role:'lio',col:'#6af2df'}));
+  clearArea(w,80,20,6,T.VEIL);E.push(new Thing('bosscamp',tp(80,20).x,tp(80,20).y,{bid:'prism',lvl:8,world:true,respawn:600}));
+  clearArea(w,20,80,4,T.VEIL);E.push(new Thing('camp',tp(22,82).x,tp(22,82).y,{lvl:6,types:['grunt','archer','caster'],skin:'veil',spawned:false,alive:0,reset:0}));
+  if(!F().cap_c4)E.push(new Thing('captive',tp(19,79).x,tp(19,79).y,{id:'c4',name:'Pilgrim Ash',r:14}));
   E.push(new Thing('sign',tp(46,53).x,tp(46,53).y,{title:'Veil Anchor',text:'The Veil breathes in two phases.\nTHRIVE: soul blooms swell, friendly lumen creatures roam, and the void is calm.\nENDURE: the light fails, hostile things hunt in packs, and loot doubles.\nStay near the Anchor if the night gets bad.'}));
   for(let i=0;i<40;i++){for(let tries=0;tries<30;tries++){const x=ri(4,95),y=ri(4,95);if(w.get(x,y)===T.VEIL&&Math.hypot(x-50,y-50)>8){E.push(new Thing('bloom',tp(x,y).x,tp(x,y).y,{grow:1,r:12}));break}}}
   for(let i=0;i<6;i++){for(let tries=0;tries<40;tries++){const x=ri(6,94),y=ri(6,94);if(w.get(x,y)===T.VEIL&&Math.hypot(x-50,y-50)>14){E.push(new Thing('chest',tp(x,y).x,tp(x,y).y,{lvl:6,big:i<2,respawn:400}));break}}}
@@ -656,6 +684,8 @@ function enterVeil(){if(!G.worlds.veil)G.worlds.veil=genVeil();if(!F().veilEnter
 function exitVeil(){setWorld(G.worlds.over,tp(75,37))}
 function onBossDeath(e){
   G.boss=null;const f=e.flagKey;if(f)F()[f]=1;
+  if(WORLD_BOSSES.includes(e.bid)){if(!F()['wb_'+e.bid]){drop(e.x,e.y,'item',makeItem(null,e.lvl+1,3));toast('First kill: a legendary dropped!','#ffb52e')}F()['wb_'+e.bid]=1;banner(e.name+' Defeated','World boss · returns in 10 minutes')}
+  questEvent('boss',e);
   if(e.bid==='captain'){openGates(G.worlds.over);banner('Hearthhold Opens','The gates are unbarred');G.worlds.over.checkpoint=tp(75,48)}
   if(e.bid==='thorn'){banner('Heartstone Claimed','The Veil Gate stirs, and the eastern rockslide shifts');openRubble(G.worlds.over)}
   if(e.bid==='colossus')banner('Second Heartstone Claimed','The Emberforge goes cold');
@@ -689,8 +719,9 @@ function updateCamp(c,dt){
     if(c.dungeon)w.checkpoint={x:c.x,y:c.y};}
   if(c.spawned&&c.alive<=0&&!c.cleared){c.cleared=true;if(!c.dungeon){c.reset=240;c.cleared=false}else{drop(c.x,c.y,'glimmer',ri(10,20));if(Math.random()<.3)drop(c.x,c.y,'heal')}}
 }
-function updateBossCamp(c){if(c.done)return;let near=Infinity;for(const p of G.players)near=Math.min(near,D(p,c));
-  if(near<(c.dungeon?260:420)){c.done=true;const b=new Boss(c.bid,c.x,c.y-(c.dungeon?60:0),c.dungeon?c.lvl:effLvl(c.lvl));b.flagKey=c.flag;G.world.ents.push(b);G.boss=b;banner(b.name,'Boss');sfx('boom');if(c.dungeon)G.world.checkpoint={x:c.x,y:c.y+c.room.rh*TILE-40}}}
+function updateBossCamp(c,dt){let near=Infinity;for(const p of G.players)near=Math.min(near,D(p,c));
+  if(c.done){if(c.respawn&&c.bossRef&&c.bossRef.dead){c.rt=(c.rt??c.respawn)-dt;if(c.rt<=0&&near>900){c.done=false;c.rt=null;c.bossRef=null}}return}
+  if(near<(c.dungeon?260:420)){c.done=true;const b=new Boss(c.bid,c.x,c.y-(c.dungeon?60:0),c.dungeon?c.lvl:effLvl(c.lvl));b.flagKey=c.flag;c.bossRef=b;G.world.ents.push(b);G.boss=b;banner(b.name,'Boss');sfx('boom');if(c.dungeon)G.world.checkpoint={x:c.x,y:c.y+c.room.rh*TILE-40}}}
 
 // ================= QUESTS =================
 const QUESTS=[
@@ -705,10 +736,76 @@ const QUESTS=[
   {t:'End of the Slice',d:()=>'You\'ve finished this vertical slice. Keep farming gear, beat the Dusk Maw, attune every waystone, and find every secret island chest.',done:()=>false,tgt:()=>null}];
 function updateQuest(){while(G.quest<QUESTS.length-1&&QUESTS[G.quest].done()){G.quest++;toast('Quest complete!','#ffcd57');G.glimmer+=50;gainXP(60);sfx('level');save()}
   const q=QUESTS[G.quest];const lore=['lore_0','lore_1','lore_2','lore_3','lore_v'].filter(k=>F()[k]).length;const isl=['isl1','isl2','isl3'].filter(k=>G.opened[k]).length;
-  const qh=`<h3>${q.t}</h3>${q.d()}<div class="side">Lore pages ${lore}/5 · Secret islands ${isl}/3${G.world&&G.world.kind==='veil'?`<br><b style="color:${veilPhase()==='thrive'?'#6af2df':'#a88aff'}">${veilPhase()==='thrive'?'☀ Thrive':'☾ Endure'}</b> · ${Math.ceil((veilPhase()==='thrive'?THRIVE_LEN-(G.veilT%VEIL_CYCLE):VEIL_CYCLE-(G.veilT%VEIL_CYCLE)))}s left`:''}</div>`;if(qh!==G.qhtml){G.qhtml=qh;$('#quest').innerHTML=qh}}
+  const sl=[...Object.entries(G.side).filter(([,s])=>s.st==='active').map(([id])=>{const sq=SIDEQ[id],n=sideProg(id);return n>=sq.need?`✓ ${sq.t}: see ${GIVER[sq.giver]}`:`◇ ${sq.t} ${n}/${sq.need}`}),...G.bounties.map(b=>`◆ ${b.t} ${b.n}/${b.need}`)].slice(0,5);
+  const qh=`<h3>${q.t}</h3>${q.d()}${sl.length?`<div class="side" style="color:var(--fg)">${sl.join('<br>')}</div>`:''}<div class="side">Lore pages ${lore}/5 · Secret islands ${isl}/3${G.world&&G.world.kind==='veil'?`<br><b style="color:${veilPhase()==='thrive'?'#6af2df':'#a88aff'}">${veilPhase()==='thrive'?'☀ Thrive':'☾ Endure'}</b> · ${Math.ceil((veilPhase()==='thrive'?THRIVE_LEN-(G.veilT%VEIL_CYCLE):VEIL_CYCLE-(G.veilT%VEIL_CYCLE)))}s left`:''}</div>`;if(qh!==G.qhtml){G.qhtml=qh;$('#quest').innerHTML=qh}}
 
 // ================= NPCs =================
+const WORLD_BOSSES=['warlord','grimbark','kesh','prism'];
+const WB_WHERE={warlord:'Greenmeadow · Ruined Fort (north-west)',grimbark:'Mossvale Woods · Old Glade (south-east)',kesh:'Cinder Dunes · Sunken Pit (far south-east)',prism:'The Veil · Crystal field (north-east)'};
+const CAPTIVES=[['c1','Miller Hanne'],['c2','Woodcutter Bram'],['c3','Tinker Juno'],['c4','Pilgrim Ash']];
+function villagerThing(id,n){const i=CAPTIVES.findIndex(c=>c[0]===id);const pos=[[66,40],[84,40],[70,46],[80,47]][i]||[75,46];return new Thing('villager',tp(pos[0],pos[1]).x,tp(pos[0],pos[1]).y,{name:n,col:['#c08060','#6a8a50','#5a7ac0','#a07ad0'][i]||'#888'})}
+function addVillager(id,n){if(G.worlds.over)G.worlds.over.ents.push(villagerThing(id,n))}
+const GIVER={odo:'Farmer Odo',smith:'Smith Brakka',scout:'Scout Tamsin',elder:'Elder Rowan',lio:'Warden Lio',nomad:'Nomad Sabe'};
+const SIDEQ={
+  harvest:{giver:'odo',t:'Stolen Harvest',type:'collect',skin:'hex',item:'Grain Sack',chance:.35,need:6,goal:'Recover 6 Grain Sacks from Hexer raiders.',
+    offer:'"Those raiders took my whole harvest, sack by sack. Every Hexer you cut down out here might be carrying one. Bring six back and I\'ll make it worth your while."',fin:'"My grain! You\'ve saved my winter. Here, this coin always brought me luck."',rw:{gl:120,xp:150,item:['talisman',1,'coin']}},
+  warlord:{giver:'elder',t:'The Warlord\'s Fort',type:'boss',bid:'warlord',need:1,goal:'Defeat Warlord Vex at the Ruined Fort, north-west of Hearthhold.',
+    offer:'"The raiders answer to a warlord named Vex. He\'s dug into the old fort north-west of here. Cut off the head and the raids stop."',fin:'"Vex is dead? Greenmeadow can breathe again. Take this, it belonged to my late captain."',rw:{gl:180,xp:250,item:['helmet',2]}},
+  villagers:{giver:'elder',t:'Missing Villagers',type:'rescue',need:4,goal:'Free 4 caged villagers: one in Greenmeadow, one in Mossvale, one in the Dunes, one in the Veil.',req:()=>F().boss_thorn,
+    offer:'"Four of our people were taken. Hanne, Bram, Juno, and a pilgrim who went looking for the Veil. The Conclave keeps prisoners caged at their camps. Clear the guards and set them free."',fin:'"All four, home safe. Hearthhold owes you a debt. Wear this."',rw:{gl:350,xp:500,item:['chest',2]}},
+  wild:{giver:'scout',t:'Elder of the Woods',type:'boss',bid:'grimbark',need:1,goal:'Defeat Grimbark the Elder in the Old Glade, south of Mossvale Hollow.',req:()=>F().elder,
+    offer:'"There\'s a treant in the Old Glade, south of Mossvale Hollow. Grimbark. The Conclave\'s rot got into its roots and now it attacks anything that walks by. Put it to rest?"',fin:'"The glade is quiet. Here, these boots will get you over the next ravine with room to spare."',rw:{gl:220,xp:350,item:['boots',2,'spring']}},
+  ore:{giver:'smith',t:'Ore for the Forge',type:'collect',skin:'ash',item:'Ember Ore',chance:.4,need:8,goal:'Collect 8 Ember Ore from creatures in the Cinder Dunes or Emberforge.',req:()=>F().boss_thorn,
+    offer:'"Dune creatures have ember ore lodged in their hides. Bring me eight chunks and I\'ll forge you something worth swinging."',fin:'"Beautiful ore. And here\'s what I made with the last batch. Don\'t drop it."',rw:{gl:250,xp:400,item:['melee',2]}},
+  wyrm:{giver:'nomad',t:'Sandwyrm Hunt',type:'boss',bid:'kesh',need:1,goal:'Slay Sandwyrm Kesh in the Sunken Pit, far south-east of the Dunes.',
+    offer:'"A sandwyrm named Kesh has been swallowing caravans whole. It lives in the Sunken Pit, south-east. Watch the sand. When it shakes under you, move."',fin:'"Kesh is gone? Ha! Then my caravans run again. Take my best bow, it\'s seen enough sand."',rw:{gl:400,xp:600,item:['ranged',3]}},
+  lantern:{giver:'lio',t:'Lantern Keeper',type:'blooms',need:15,goal:'Harvest 15 soul blooms in the Veil.',req:()=>F().anchor,
+    offer:'"The Anchor drinks, but it also needs tending. Harvest fifteen soul blooms. Thrive is the best time for it."',fin:'"The Anchor glows brighter. Carry this lantern. It gathers souls the way the blooms do."',rw:{gl:150,xp:350,item:['talisman',2,'lantern']}},
+  prism:{giver:'lio',t:'The Prism Sentinel',type:'boss',bid:'prism',need:1,goal:'Shatter the Prism Sentinel in the Veil\'s crystal field, north-east of the Anchor.',req:()=>F().anchor,
+    offer:'"A guardian of living crystal has woken north-east of the Anchor. It fires light that cuts like glass. It was built to protect the Veil, and now it attacks everything in it."',fin:'"It is still. Take this shard of what it guarded."',rw:{gl:300,xp:550,item:['artifact',2]}}};
+function sideProg(id){const q=SIDEQ[id],s=G.side[id];if(!s)return 0;if(q.type==='boss')return s.n;if(q.type==='rescue')return CAPTIVES.filter(c=>F()['cap_'+c[0]]).length;return s.n}
+function rwText(r){return`${r.gl} glimmer · ${r.xp} xp · ${RAR[r.item[1]].n}+ ${slotLabel(r.item[0])}`}
+function giveReward(r,p){G.glimmer+=r.gl;gainXP(r.xp);const it=makeItem(r.item[0],partyLevel()+1,rollRar(r.item[1]),r.item[2]);(p||G.players[0]).bag.push(it);toast('Received '+it.name,RAR[it.rar].c);sfx('level')}
+function npcMark(role){for(const[id,q]of Object.entries(SIDEQ)){if(q.giver!==role)continue;const s=G.side[id];if(s&&s.st==='active'&&sideProg(id)>=q.need)return'?'}
+  if(role==='elder'&&!F().elder)return F().captain?'!':null;for(const[id,q]of Object.entries(SIDEQ))if(q.giver===role&&!G.side[id]&&(!q.req||q.req()))return'!';if(role==='lio'&&!F().anchor)return'!';return null}
+function questEvent(type,d){
+  for(const id in G.side){const s=G.side[id],q=SIDEQ[id];if(s.st!=='active')continue;
+    if(q.type==='collect'&&type==='kill'&&d.skin===q.skin&&!d.boss&&s.n<q.need&&Math.random()<q.chance)drop(d.x,d.y,'qitem',{q:id,name:q.item});
+    if(q.type==='boss'&&type==='boss'&&d.bid===q.bid){s.n=1;toast(`${q.t}: return to ${GIVER[q.giver]}`,'#ffcd57')}
+    if(q.type==='blooms'&&type==='bloom'&&s.n<q.need){s.n++;if(s.n>=q.need)toast(`${q.t}: return to ${GIVER[q.giver]}`,'#ffcd57')}
+    if(q.type==='rescue'&&type==='rescue'&&sideProg(id)>=q.need)toast(`${q.t}: return to ${GIVER[q.giver]}`,'#ffcd57')}
+  for(const b of G.bounties){if(b.done)continue;
+    if(type==='kill'&&!d.boss&&((b.type==='kill'&&d.skin===b.skin)||(b.type==='elite'&&d.elite)))b.n++;
+    if(type==='chest'&&b.type==='chest')b.n++;if(type==='bloom'&&b.type==='blooms')b.n++;
+    if(type==='boss'&&((b.type==='boss'&&d.bid===b.bid)||(b.type==='dungeon'&&(d.bid==='thorn'||d.bid==='colossus'))))b.n++;
+    if(b.n>=b.need){b.done=true;G.glimmer+=b.gl;gainXP(b.xp);toast(`Bounty complete: ${b.t} (+${b.gl} glimmer)`,'#ffcd57');sfx('level');F().bounties=(F().bounties||0)+1;
+      if(Math.random()<.6){const it=makeItem(null,partyLevel()+1,rollRar(1));G.players[0].bag.push(it);toast('Bounty reward: '+it.name,RAR[it.rar].c)}}}
+  G.bounties=G.bounties.filter(b=>!b.done);
+}
+const SKIN_AREA={hex:'Hexer raiders (Greenmeadow)',moss:'Mossvale creatures',ash:'Cinder Dunes creatures',veil:'Veil creatures'};
+function genBounty(){const L=partyLevel(),o=[];
+  o.push(()=>({type:'kill',skin:'hex',need:ri(8,14),t:'Cull the Raiders'}),()=>({type:'kill',skin:'moss',need:ri(8,14),t:'Thin the Thorns'}),()=>({type:'elite',need:2,t:'Elite Hunter'}),()=>({type:'chest',need:ri(3,5),t:'Treasure Seeker'}),()=>({type:'boss',bid:'warlord',need:1,t:'Bounty: Warlord Vex'}),()=>({type:'boss',bid:'grimbark',need:1,t:'Bounty: Grimbark'}),()=>({type:'dungeon',need:1,t:'Delver'}));
+  if(F().boss_thorn)o.push(()=>({type:'kill',skin:'ash',need:ri(10,16),t:'Scour the Dunes'}),()=>({type:'boss',bid:'kesh',need:1,t:'Bounty: Sandwyrm Kesh'}));
+  if(F().veilEntered)o.push(()=>({type:'kill',skin:'veil',need:ri(10,16),t:'Veil Purge'}),()=>({type:'blooms',need:ri(6,10),t:'Bloom Gatherer'}),()=>({type:'boss',bid:'prism',need:1,t:'Bounty: Prism Sentinel'}));
+  const b=pick(o)();b.id=G.uid++;b.n=0;const big=b.type==='boss'||b.type==='dungeon';b.gl=Math.round((40+L*14)*(big?2.5:1));b.xp=Math.round((50+L*20)*(big?2.5:1));return b}
+function bountyGoal(b){return b.type==='kill'?`Defeat ${b.need} ${SKIN_AREA[b.skin]}`:b.type==='elite'?`Defeat ${b.need} elite enemies (gold ring)`:b.type==='chest'?`Open ${b.need} chests`:b.type==='blooms'?`Harvest ${b.need} soul blooms`:b.type==='boss'?`Defeat ${BOSSES[b.bid].n}: ${WB_WHERE[b.bid]}`:'Defeat a dungeon boss (Thornmother or Magma Colossus)'}
+function openBoard(){while(G.board.length<3)G.board.push(genBounty());
+  const card=(b,act)=>`<div class="card"><b>${b.t}</b><span>${bountyGoal(b)}</span><span style="color:var(--muted)">${act?`Progress ${b.n}/${b.need}`:`Reward: ${b.gl} glimmer · ${b.xp} xp · 60% gear`}</span>${act?'':`<button class="btn ${G.bounties.length<3?'primary':''}" data-acc="${b.id}" ${G.bounties.length<3?'':'disabled'}>Accept</button>`}</div>`;
+  openPanel('Bounty Board',`<p style="margin:0 0 10px;color:var(--muted)">Pinned notices from Hearthhold's folk. Take up to 3 at a time. Rewards pay out the moment a bounty is done. Completed so far: ${F().bounties||0}.</p><div class="sec">Active · ${G.bounties.length}/3</div><div class="shop">${G.bounties.map(b=>card(b,true)).join('')||'<span style="color:var(--muted)">None yet.</span>'}</div><div class="sec">Available</div><div class="shop">${G.board.map(b=>card(b,false)).join('')}</div><div class="row"><button class="btn" id="bdRe">New notices · 40 glimmer</button></div>`,'board');
+  $('#panelBox').querySelectorAll('[data-acc]').forEach(btn=>btn.onclick=()=>{const i=G.board.findIndex(b=>b.id===+btn.dataset.acc);if(i<0||G.bounties.length>=3)return;G.bounties.push(G.board.splice(i,1)[0]);sfx('ui');openBoard()});
+  $('#bdRe').onclick=()=>{if(G.glimmer<40)return;G.glimmer-=40;G.board=[];openBoard()}}
+function openJournal(){const q=QUESTS[G.quest];
+  const sides=Object.entries(SIDEQ).map(([id,sq])=>{const s=G.side[id];const st=!s?((!sq.req||sq.req())?`<span style="color:var(--accent)">Available from ${GIVER[sq.giver]}</span>`:'<span style="color:var(--muted)">Locked for now</span>'):s.st==='done'?'<span style="color:var(--good)">✓ Complete</span>':sideProg(id)>=sq.need?`<span style="color:var(--good)">Ready: return to ${GIVER[sq.giver]}</span>`:`${sideProg(id)}/${sq.need}`;
+    return`<div class="card"><b>${sq.t}</b><span>${sq.goal}</span><span>${st}</span><span style="color:var(--muted);font-size:12px">${rwText(sq.rw)}</span></div>`}).join('');
+  const wb=WORLD_BOSSES.map(b=>`<div class="card"><b>${BOSSES[b].n}</b><span>${WB_WHERE[b]}</span><span style="color:${F()['wb_'+b]?'var(--good)':'var(--muted)'}">${F()['wb_'+b]?'✓ Defeated · respawns every 10 min':'Not yet defeated · first kill drops a legendary'}</span></div>`).join('');
+  openPanel('Journal',`<div class="sec" style="margin-top:0">Main quest</div><div class="tip" style="margin-top:0"><h4>${q.t}</h4>${q.d()}</div><div class="sec">Side quests</div><div class="shop">${sides}</div><div class="sec">Bounties · ${G.bounties.length}/3 active</div><div class="shop">${G.bounties.map(b=>`<div class="card"><b>${b.t}</b><span>${bountyGoal(b)}</span><span>${b.n}/${b.need}</span></div>`).join('')||'<span style="color:var(--muted)">Pick up bounties at the board in Hearthhold.</span>'}</div><div class="sec">World bosses</div><div class="shop">${wb}</div><div class="sec">Villagers rescued · ${CAPTIVES.filter(c=>F()['cap_'+c[0]]).length}/4</div>`,'journal')}
 function npcTalk(t,p){
+  if(!(t.role==='elder'&&!F().elder)){
+    for(const[id,q]of Object.entries(SIDEQ)){if(q.giver!==t.role)continue;const s=G.side[id];if(s&&s.st==='active'&&sideProg(id)>=q.need){dialog(t.name+' · '+q.t,q.fin+'\n\nReward: '+rwText(q.rw),[['Claim reward',()=>{s.st='done';giveReward(q.rw,p);F().sides=(F().sides||0)+1;closePanel();save()}]]);return}}
+    for(const[id,q]of Object.entries(SIDEQ)){if(q.giver!==t.role||G.side[id]||(q.req&&!q.req()))continue;dialog(t.name+' · Side quest',q.offer+'\n\n<b>'+q.t+'</b>: '+q.goal+'\nReward: '+rwText(q.rw),[['Accept',()=>{G.side[id]={st:'active',n:0};toast('Side quest accepted: '+q.t,'#ffcd57');sfx('ui');closePanel()}],['Maybe later',()=>{closePanel();npcNormal(t,p)}]]);return}}
+  npcNormal(t,p)}
+function npcNormal(t,p){
+  if(t.role==='odo'){dialog('Farmer Odo',G.side.harvest&&G.side.harvest.st==='done'?'"Bread for everyone this winter, thanks to you."':`"Raiders, every night. Hearthhold's up the north road, past the ravine, if you're looking for safety."`);return}
   if(t.role==='elder'){if(!F().elder){F().elder=1;dialog('Elder Rowan','"You came up the south road? Then you\'ve seen what the Conclave is doing.\n\nThey are draining souls into the Veil, a realm that sits just behind ours. The old gate in our square was built to reach it. It sleeps now, but a Heartstone would wake it.\n\nThe Thornmother in Mossvale Hollow carries one. Kill her and bring the gate to life. Brakka will sharpen your gear, and Pell sells what the raiders leave behind."');}
     else if(!F().boss_thorn)dialog('Elder Rowan','"Mossvale Hollow lies east, past the woods. Gear up first. The Thornmother calls the whole forest to her side."');
     else if(!F().boss_colossus)dialog('Elder Rowan','"The gate hums with light, and Tamsin says the rockslide east of Mossvale has shifted. Beyond it lie the Cinder Dunes and the Emberforge, where the Conclave keeps a second Heartstone.\n\nGo through the Veil Gate, or go east. Both need doing. Use the waystones to save your legs."');
@@ -733,7 +830,8 @@ function togglePanel(k){if(G.panel){closePanel();return}if(k==='menu')openMenu()
 function uiKey(e){if(G.state!=='play')return;
   if(e.code==='Escape'){togglePanel('menu')}
   else if((e.code==='KeyI'||e.code==='Tab')&&!e.repeat){e.preventDefault();if(G.panel==='inv')closePanel();else if(!G.panel)openInventory(0)}
-  else if(e.code==='KeyM'&&!e.repeat&&!G.panel){G.bigMap=!G.bigMap}}
+  else if(e.code==='KeyM'&&!e.repeat&&!G.panel){G.bigMap=!G.bigMap}
+  else if(e.code==='KeyQ'&&!e.repeat){if(G.panel==='journal')closePanel();else if(!G.panel)openJournal()}}
 
 function itemTip(it,p,cmp){if(!it)return'<div class="tip k">Select an item to see its stats.</div>';
   let h=`<div class="tip"><h4 style="color:${RAR[it.rar].c}">${itemIcon(it)} ${it.name}</h4><div class="k">${RAR[it.rar].n} ${slotLabel(it.slot)} · Power ${ipow(it)}${it.up?` (+${it.up})`:''}</div>`;
@@ -795,7 +893,7 @@ function openLio(pid){const p=G.players.find(q=>q.pid===pid)||G.players[0];const
   const cost=it=>[0,60,120,260][it.rar];
   openPanel('Warden Lio · Soul Exchange',`<p style="margin:0 0 10px;color:var(--muted)">"Soul essence is the only coin the Veil respects." You have <b style="color:var(--veil)">${G.soul}</b> soul.</p><div class="shop">${G.lioStock.map((it,i)=>`<div class="card">${itemTip(it,p).replace('class="tip"','style="font-size:12px;line-height:1.45"')}<button class="btn ${G.soul>=cost(it)?'primary':''}" data-b="${i}" ${G.soul>=cost(it)?'':'disabled'}>Trade · ${cost(it)} soul</button></div>`).join('')}</div>`,'shop');
   $('#panelBox').querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{const i=+b.dataset.b,it=G.lioStock[i];if(G.soul<cost(it))return;G.soul-=cost(it);p.bag.push(it);G.lioStock[i]=makeItem(it.slot,L,it.rar);sfx('coin');openLio(pid)})}
-function controlsHTML(){return`<div class="ctrl"><div><h4>Player 1 · Keyboard + Mouse</h4><kbd>WASD</kbd> move · <kbd>Mouse</kbd> aim<br><kbd>Left click</kbd>/<kbd>J</kbd> melee (3-hit combo)<br><kbd>Right click</kbd>/<kbd>K</kbd> ranged, ammo recharges<br><kbd>Space</kbd> jump · attack in the air to slam<br><kbd>Shift</kbd>/<kbd>L</kbd> dodge roll<br><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> artifacts · <kbd>E</kbd> interact<br><kbd>I</kbd>/<kbd>Tab</kbd> gear · <kbd>M</kbd> big map · <kbd>Esc</kbd> menu</div>
+function controlsHTML(){return`<div class="ctrl"><div><h4>Player 1 · Keyboard + Mouse</h4><kbd>WASD</kbd> move · <kbd>Mouse</kbd> aim<br><kbd>Left click</kbd>/<kbd>J</kbd> melee (3-hit combo)<br><kbd>Right click</kbd>/<kbd>K</kbd> ranged, ammo recharges<br><kbd>Space</kbd> jump · attack in the air to slam<br><kbd>Shift</kbd>/<kbd>L</kbd> dodge roll<br><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> artifacts · <kbd>E</kbd> interact<br><kbd>I</kbd>/<kbd>Tab</kbd> gear · <kbd>Q</kbd> journal · <kbd>M</kbd> map · <kbd>Esc</kbd> menu</div>
   <div><h4>Player 2 · Keyboard (right side)</h4>Press <kbd>Enter</kbd> to join<br><kbd>Arrows</kbd> move (auto-aim)<br><kbd>,</kbd> or <kbd>Num1</kbd> melee · <kbd>.</kbd> or <kbd>Num2</kbd> ranged<br><kbd>/</kbd> or <kbd>Num0</kbd> jump · <kbd>RShift</kbd> or <kbd>Num3</kbd> dodge<br><kbd>8</kbd><kbd>9</kbd><kbd>0</kbd> artifacts · <kbd>Enter</kbd> interact</div>
   <div><h4>Players 2–4 · Gamepads</h4>Press <kbd>Start</kbd> to join<br>Left stick move · Right stick aim<br><kbd>A</kbd> jump · <kbd>X</kbd> melee · <kbd>RT</kbd> ranged · <kbd>B</kbd> dodge<br><kbd>LB</kbd> <kbd>RB</kbd> <kbd>D-pad up</kbd> artifacts<br><kbd>Y</kbd> interact · <kbd>Back</kbd> gear · <kbd>Start</kbd> menu</div>
   <div><h4>Co-op notes</h4>Up to 4 heroes on one screen. Each hero has their own 12 slots and bag; glimmer and soul are shared. Downed heroes are revived by standing next to them. Enemies scale with party size. Online play and matchmaking aren't in this slice.</div></div>`}
@@ -805,7 +903,7 @@ function openMenu(){openPanel('Paused',`<div class="row" style="margin-top:0"><b
 
 // ================= SAVE / LOAD =================
 const SAVE_KEY='veilbound_slice_v1';
-function save(){if(G.state!=='play')return;const data={v:1,glimmer:G.glimmer,soul:G.soul,flags:G.flags,opened:G.opened,quest:G.quest,uid:G.uid,veilT:G.veilT,
+function save(){if(G.state!=='play')return;const data={v:1,glimmer:G.glimmer,soul:G.soul,flags:G.flags,opened:G.opened,quest:G.quest,uid:G.uid,veilT:G.veilT,side:G.side,bounties:G.bounties,board:G.board,
   players:G.players.map(p=>({pid:p.pid,level:p.level,xp:p.xp,gear:p.gear,bag:p.bag})),where:G.world&&G.world.kind==='veil'?'veil':'over'};
   if(G.savedPlayers)for(const sp of Object.values(G.savedPlayers))if(!data.players.some(q=>q.pid===sp.pid))data.players.push(sp);store.set(SAVE_KEY,JSON.stringify(data))}
 function loadPlayer(p,d){p.level=d.level;p.xp=d.xp;p.gear=d.gear;p.bag=d.bag;p.calc();p.hp=p.maxHp}
@@ -831,7 +929,7 @@ function update(dt){
     if(e.enemy||e.ally)e.update(dt);
     else if(e.kind==='drop')updateDrop(e,dt);
     else if(e.kind==='camp')updateCamp(e,dt);
-    else if(e.kind==='bosscamp')updateBossCamp(e);
+    else if(e.kind==='bosscamp')updateBossCamp(e,dt);
     else if(e.kind==='chest'&&e.open&&e.reset>0){e.reset-=dt;if(e.reset<=0&&!G.players.some(p=>D(p,e)<500))e.open=false}
     else if(e.kind==='shrine'&&e.cool>0)e.cool-=dt;
     else if(e.kind==='bloom'&&e.grow<1)e.grow=Math.min(1,e.grow+dt/(veilPhase()==='thrive'?35:120));
@@ -851,7 +949,7 @@ function update(dt){
   G.projs=G.projs.filter(p=>p.life>0);
   // hazards
   for(const h of G.hazards){h.t+=dt;if(h.follow&&!h.follow.dead){h.x=h.follow.x;h.y=h.follow.y}if(h.t>=h.delay&&!h.done){h.done=true;
-    if(h.team==='e'){if(h.follow&&h.follow.dead&&h.follow.type!=='exploder')continue;if(h.follow&&h.follow.freeze>0)continue;for(const p of targets()){if(h.ground&&(p.z||0)>14)continue;if(!h.line&&Math.hypot(p.x-h.x,p.y-h.y)<h.r+p.r)hurtTarget(p,h.dmg,null)}if(h.dmg)burst(h.x,h.y,`rgb(${h.col})`,h.line?0:16,h.r*2)}
+    if(h.team==='e'){if(h.follow&&h.follow.dead&&h.follow.type!=='exploder')continue;if(h.follow&&h.follow.freeze>0)continue;for(const p of targets()){if(h.ground&&(p.z||0)>14)continue;if(h.line){if(h.dmg){const dx=p.x-h.x,dy=p.y-h.y,al=dx*Math.cos(h.a)+dy*Math.sin(h.a),pe=Math.abs(-dx*Math.sin(h.a)+dy*Math.cos(h.a));if(al>=0&&al<=h.len&&pe<h.w/2+p.r)hurtTarget(p,h.dmg,null)}}else if(Math.hypot(p.x-h.x,p.y-h.y)<h.r+p.r)hurtTarget(p,h.dmg,null)}if(h.dmg){if(h.line){for(let k=1;k<10;k++)burst(h.x+Math.cos(h.a)*h.len*k/10,h.y+Math.sin(h.a)*h.len*k/10,`rgb(${h.col})`,3,90)}else burst(h.x,h.y,`rgb(${h.col})`,16,h.r*2)}}
     else{aoe(h.owner,h.x,h.y,h.r,h.dmg,{burn:h.meteor,kb:200});burst(h.x,h.y,'#ff9a3a',40,300);G.shake=8;sfx('boom')}}}
   G.hazards=G.hazards.filter(h=>h.t<h.delay+.25);
   // particles/text
@@ -892,7 +990,7 @@ function draw(){
   // sortable
   const list=[];
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const t=w.t[y*w.w+x];if(TALL[t])list.push({y:y*TILE+TILE-1,tile:t,tx:x,ty:y})}
-  for(const e of w.ents){if(e.dead||e.kind==='camp'||e.kind==='bosscamp')continue;if(Math.abs(e.x-G.cam.x)>vw+60||Math.abs(e.y-G.cam.y)>vh+60)continue;list.push({y:e.y,e})}
+  for(const e of w.ents){if(e.dead||e.kind==='camp'||(e.kind==='bosscamp'&&!e.world))continue;if(Math.abs(e.x-G.cam.x)>vw+60||Math.abs(e.y-G.cam.y)>vh+60)continue;list.push({y:e.y,e})}
   for(const p of G.players)list.push({y:p.y,p});
   list.sort((a,b)=>a.y-b.y);
   for(const it of list){if(it.tile!=null)drawTall(it.tile,it.tx,it.ty,w);else if(it.p)drawPlayer(it.p);else drawThing(it.e)}
@@ -953,11 +1051,15 @@ function drawCreature(c,e,col,kind){const x=e.x,y=e.y;shadow(x,y,e.r,0);const wo
   if(e.freeze>0){ctx.fillStyle='rgba(160,220,255,.5)'}
   ctx.fillStyle=fl?'#fff':e.freeze>0?'#a0d8ff':col;
   if(kind==='wolf'){ctx.globalAlpha=.85;ctx.beginPath();ctx.ellipse(x,by+4,r*1.3,r*.8,0,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+Math.cos(e.face||0)*r,by-2,r*.6,0,7);ctx.fill();ctx.globalAlpha=1;return}
-  if(kind==='boss'){ctx.beginPath();ctx.arc(x+lunge,by,r,0,7);ctx.fill();ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.arc(x,by+r*.3,r*.8,0,Math.PI);ctx.fill();
+  if(kind==='boss'){if(e.burrow){ctx.fillStyle='rgba(160,120,60,.6)';ctx.beginPath();ctx.ellipse(e.burrow.x,e.burrow.y,30,12,0,0,7);ctx.fill();return}ctx.beginPath();ctx.arc(x+lunge,by,r,0,7);ctx.fill();ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.arc(x,by+r*.3,r*.8,0,Math.PI);ctx.fill();
     ctx.fillStyle=fl?'#fff':e.phase>1?'#ff5050':'#ffe070';const fx=Math.cos(e.face||0)*r*.4;ctx.beginPath();ctx.arc(x+fx-r*.3,by-r*.2,r*.13,0,7);ctx.arc(x+fx+r*.3,by-r*.2,r*.13,0,7);ctx.fill();
     if(e.bid==='thorn'){ctx.strokeStyle='#2a5a1a';ctx.lineWidth=4;for(let i=0;i<8;i++){const a=i/8*Math.PI*2+e.anim*.3;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r,by+Math.sin(a)*r);ctx.lineTo(x+Math.cos(a)*(r+14),by+Math.sin(a)*(r+14));ctx.stroke()}}
     if(e.bid==='colossus'){ctx.strokeStyle=`rgba(255,${150+Math.sin(e.anim*4)*60|0},40,.9)`;ctx.lineWidth=3;for(let i=0;i<5;i++){const a=i*1.3+.4;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r*.2,by+Math.sin(a)*r*.2);ctx.lineTo(x+Math.cos(a+.3)*r*.6,by+Math.sin(a+.3)*r*.6);ctx.lineTo(x+Math.cos(a)*r*.95,by+Math.sin(a)*r*.95);ctx.stroke()}}
     if(e.bid==='maw'){ctx.fillStyle='#120828';ctx.beginPath();ctx.ellipse(x,by+r*.35,r*.6,r*.25+Math.sin(e.anim*5)*4,0,0,7);ctx.fill()}
+    if(e.bid==='warlord'){ctx.fillStyle='#ffcd57';for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(x+i*r*.5-6,by-r*.8);ctx.lineTo(x+i*r*.5,by-r*1.5);ctx.lineTo(x+i*r*.5+6,by-r*.8);ctx.fill()}}
+    if(e.bid==='grimbark'){ctx.strokeStyle='#4a3a1a';ctx.lineWidth=5;for(let i=0;i<6;i++){const a=-Math.PI/2+(i-2.5)*.4;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r*.8,by+Math.sin(a)*r*.8);ctx.lineTo(x+Math.cos(a)*(r+18),by+Math.sin(a)*(r+18));ctx.stroke()}ctx.fillStyle='#4f8a30';ctx.beginPath();ctx.arc(x-r*.5,by-r-8,10,0,7);ctx.arc(x+r*.5,by-r-6,12,0,7);ctx.fill()}
+    if(e.bid==='kesh'){ctx.fillStyle=fl?'#fff':'#a87a3a';const fa=(e.face||0)+Math.PI;for(let i=1;i<=3;i++){ctx.beginPath();ctx.arc(x+Math.cos(fa)*r*.9*i+Math.sin(e.anim*5+i)*4,by+Math.sin(fa)*r*.9*i,r*(1-i*.2),0,7);ctx.fill()}}
+    if(e.bid==='prism'){ctx.fillStyle=`rgba(200,250,255,${.4+Math.sin(e.anim*3)*.2})`;ctx.beginPath();ctx.moveTo(x,by-r*1.5);ctx.lineTo(x+r*.7,by);ctx.lineTo(x,by+r*.6);ctx.lineTo(x-r*.7,by);ctx.fill()}
     if(e.bid==='captain'){ctx.fillStyle='#3a2a4a';ctx.beginPath();ctx.moveTo(x-r,by-r*.5);ctx.lineTo(x,by-r*1.6);ctx.lineTo(x+r,by-r*.5);ctx.fill()}
     return}
   const t=e.type;
@@ -974,11 +1076,12 @@ function drawThing(e){if(e.enemy||e.ally){e.draw(ctx);return}const x=e.x,y=e.y,t
   switch(e.kind){
     case'drop':{shadow(x,y,6,e.z);const yy=y-e.z-6;if(e.type==='glimmer'){ctx.fillStyle='#ffcd57';ctx.beginPath();ctx.moveTo(x,yy-6);ctx.lineTo(x+5,yy);ctx.lineTo(x,yy+6);ctx.lineTo(x-5,yy);ctx.fill()}
       else if(e.type==='soul'){ctx.fillStyle='#6af2df';ctx.beginPath();ctx.arc(x,yy+Math.sin(t*5+x)*2,5,0,7);ctx.fill()}
+      else if(e.type==='qitem'){ctx.fillStyle='#b08850';ctx.beginPath();ctx.ellipse(x,yy,7,8,0,0,7);ctx.fill();ctx.fillStyle='#ffcd57';ctx.fillRect(x-4,yy-8,8,3)}
       else if(e.type==='heal'){ctx.fillStyle='#e04848';ctx.beginPath();ctx.arc(x,yy,7,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(x-1.5,yy-4,3,8);ctx.fillRect(x-4,yy-1.5,8,3)}
       else{const c=RAR[e.val.rar].c;const g=ctx.createLinearGradient(x,yy-70,x,yy);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,c);ctx.globalAlpha=.55;ctx.fillStyle=g;ctx.fillRect(x-3,yy-70,6,70);ctx.globalAlpha=1;ctx.fillStyle=c;ctx.save();ctx.translate(x,yy+Math.sin(t*3)*2);ctx.rotate(t);ctx.fillRect(-6,-6,12,12);ctx.restore()}break}
     case'chest':{shadow(x,y,14,0);const big=e.big;ctx.fillStyle=e.open?'#5a3e22':big?'#7a4ab0':'#8a5a2a';ctx.fillRect(x-14,y-18,28,18);ctx.fillStyle=e.open?'#3a2814':big?'#ffcd57':'#c09040';ctx.fillRect(x-14,y-(e.open?26:22),28,e.open?6:6);ctx.fillStyle='#ffe080';ctx.fillRect(x-3,y-14,6,6);if(!e.open&&big){ctx.fillStyle=`rgba(255,205,87,${.3+Math.sin(t*3)*.2})`;ctx.beginPath();ctx.arc(x,y-10,22,0,7);ctx.fill()}break}
     case'crate':{shadow(x,y,11,0);ctx.fillStyle='#9a7040';ctx.fillRect(x-11,y-20,22,20);ctx.strokeStyle='#5a3e20';ctx.lineWidth=2;ctx.strokeRect(x-11,y-20,22,20);ctx.beginPath();ctx.moveTo(x-11,y-20);ctx.lineTo(x+11,y);ctx.stroke();break}
-    case'npc':{shadow(x,y,12,0);const by=y-12+Math.sin(t*2)*1;ctx.fillStyle=e.col;ctx.beginPath();ctx.roundRect(x-10,by-6,20,20,5);ctx.fill();ctx.fillStyle='#f0c8a0';ctx.beginPath();ctx.arc(x,by-12,8,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 11px Chakra Petch';ctx.textAlign='center';ctx.fillText(e.name,x,by-26);
+    case'npc':{const mk=npcMark(e.role);if(mk){ctx.fillStyle=mk==='?'?'#6ee07a':'#ffcd57';ctx.font='bold 20px Chakra Petch';ctx.textAlign='center';ctx.fillText(mk,x+16,y-46+Math.sin(t*4)*3)}shadow(x,y,12,0);const by=y-12+Math.sin(t*2)*1;ctx.fillStyle=e.col;ctx.beginPath();ctx.roundRect(x-10,by-6,20,20,5);ctx.fill();ctx.fillStyle='#f0c8a0';ctx.beginPath();ctx.arc(x,by-12,8,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 11px Chakra Petch';ctx.textAlign='center';ctx.fillText(e.name,x,by-26);
       const q=QUESTS[G.quest];if((e.role==='elder'&&!F().elder&&F().captain)||(e.role==='lio'&&!F().anchor)){ctx.fillStyle='#ffcd57';ctx.font='bold 20px Chakra Petch';ctx.fillText('!',x,by-38+Math.sin(t*4)*3)}break}
     case'portal':{const active=e.gate!=='veil'||F().boss_thorn;const c=e.col||(e.dungeon?'90,200,90':active?'106,242,223':'120,110,140');ctx.fillStyle='#2a2238';ctx.beginPath();ctx.ellipse(x,y+4,e.r+6,10,0,0,7);ctx.fill();
       for(let i=0;i<3;i++){ctx.strokeStyle=`rgba(${c},${.8-i*.2})`;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y-e.r,e.r*.7-i*4+Math.sin(t*3+i)*2,e.r+8-i*4,0,0,7);ctx.stroke()}
@@ -987,6 +1090,10 @@ function drawThing(e){if(e.enemy||e.ally){e.draw(ctx);return}const x=e.x,y=e.y,t
     case'sign':{shadow(x,y,8,0);ctx.fillStyle='#6b4a2a';ctx.fillRect(x-2,y-20,4,20);ctx.fillStyle='#b08850';ctx.fillRect(x-14,y-30,28,14);ctx.fillStyle='#5a3e20';ctx.fillRect(x-10,y-25,20,2);ctx.fillRect(x-10,y-21,14,2);
       if(G.players.some(p=>D(p,e)<120)){const lines=e.text.split('\n');ctx.font='12px Nunito Sans, sans-serif';const tw=Math.max(...lines.map(l=>ctx.measureText(l).width));ctx.fillStyle='rgba(13,10,20,.88)';ctx.fillRect(x-tw/2-8,y-44-lines.length*16,tw+16,lines.length*16+8);ctx.fillStyle='#efe9f8';ctx.textAlign='center';lines.forEach((l,i)=>ctx.fillText(l,x,y-32-(lines.length-1-i)*16-6))}break}
     case'waystone':{const on=F()['ws_'+e.id];shadow(x,y,12,0);ctx.fillStyle='#6a6478';ctx.beginPath();ctx.moveTo(x-10,y);ctx.lineTo(x-6,y-38);ctx.lineTo(x,y-44);ctx.lineTo(x+6,y-38);ctx.lineTo(x+10,y);ctx.fill();ctx.fillStyle=on?`rgba(106,242,223,${.7+Math.sin(t*3)*.3})`:'#3a3448';ctx.fillRect(x-2,y-34,4,10);ctx.fillRect(x-5,y-30,10,3);if(on){ctx.fillStyle='rgba(106,242,223,.18)';ctx.beginPath();ctx.arc(x,y-28,18,0,7);ctx.fill()}break}
+    case'captive':{shadow(x,y,14,0);ctx.fillStyle='#d8a070';ctx.beginPath();ctx.roundRect(x-7,y-22,14,16,4);ctx.fill();ctx.fillStyle='#f0c8a0';ctx.beginPath();ctx.arc(x,y-27,6,0,7);ctx.fill();ctx.strokeStyle='#5a5060';ctx.lineWidth=2.5;for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(x+k*6,y);ctx.lineTo(x+k*6,y-38);ctx.stroke()}ctx.strokeRect(x-13,y-38,26,38);ctx.fillStyle='#fff';ctx.font='bold 11px Chakra Petch';ctx.textAlign='center';ctx.fillText('Help!',x,y-46+Math.sin(t*4)*2);break}
+    case'villager':{shadow(x,y,10,0);const by=y-10+Math.sin(t*2+x)*1;ctx.fillStyle=e.col;ctx.beginPath();ctx.roundRect(x-8,by-4,16,16,4);ctx.fill();ctx.fillStyle='#f0c8a0';ctx.beginPath();ctx.arc(x,by-10,7,0,7);ctx.fill();break}
+    case'board':{shadow(x,y,16,0);ctx.fillStyle='#6b4a2a';ctx.fillRect(x-16,y-6,4,8);ctx.fillRect(x+12,y-6,4,8);ctx.fillStyle='#9a7040';ctx.fillRect(x-18,y-36,36,30);ctx.fillStyle='#f0e0b0';ctx.fillRect(x-14,y-32,10,12);ctx.fillRect(x-1,y-33,12,10);ctx.fillRect(x+3,y-20,10,10);ctx.fillRect(x-12,y-17,9,9);if(G.bounties.length<3){ctx.fillStyle='#ffcd57';ctx.font='bold 18px Chakra Petch';ctx.textAlign='center';ctx.fillText('!',x,y-44+Math.sin(t*4)*3)}break}
+    case'bosscamp':{const on=!e.done;ctx.fillStyle=on?`rgba(255,48,80,${.12+Math.sin(t*3)*.06})`:'rgba(0,0,0,.08)';ctx.beginPath();ctx.ellipse(x,y,70,40,0,0,7);ctx.fill();for(let k=0;k<6;k++){const a=k/6*Math.PI*2;const sx=x+Math.cos(a)*70,sy=y+Math.sin(a)*40;ctx.fillStyle='#6a6478';ctx.fillRect(sx-5,sy-22,10,22);ctx.fillStyle=on?'#ff3050':'#3a3448';ctx.fillRect(sx-2,sy-18,4,4)}break}
     case'lore':{ctx.fillStyle=`rgba(255,205,87,${.25+Math.sin(t*3)*.15})`;ctx.beginPath();ctx.arc(x,y-10,16,0,7);ctx.fill();ctx.fillStyle='#f0e0b0';ctx.save();ctx.translate(x,y-12+Math.sin(t*2)*3);ctx.rotate(.15);ctx.fillRect(-7,-9,14,18);ctx.fillStyle='#8a6a3a';ctx.fillRect(-4,-5,8,1.5);ctx.fillRect(-4,-1,8,1.5);ctx.fillRect(-4,3,6,1.5);ctx.restore();break}
     case'shrine':{shadow(x,y,14,0);ctx.fillStyle='#7a7290';ctx.fillRect(x-12,y-34,24,34);ctx.fillStyle=e.cool>0?'#444':'#6af2df';ctx.beginPath();ctx.arc(x,y-42+Math.sin(t*2)*3,7,0,7);ctx.fill();if(e.cool<=0){ctx.fillStyle='rgba(106,242,223,.2)';ctx.beginPath();ctx.arc(x,y-42,16,0,7);ctx.fill()}break}
     case'bloom':{const g=e.grow,c=veilPhase()==='thrive';ctx.fillStyle='#2a6a5a';ctx.fillRect(x-1.5,y-14*g,3,14*g);const rr2=4+g*9;ctx.fillStyle=g>=1?(c?'#6af2df':'#4a9a9a'):'#3a6a6a';for(let i=0;i<5;i++){const a=i/5*Math.PI*2+t*.5;ctx.beginPath();ctx.arc(x+Math.cos(a)*rr2*.6,y-14*g+Math.sin(a)*rr2*.6,rr2*.5,0,7);ctx.fill()}ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y-14*g,2.5,0,7);ctx.fill();break}
@@ -1019,7 +1126,7 @@ function drawHUD(){
     ctx.save();ctx.fillStyle='rgba(13,10,20,.85)';ctx.fillRect(X-2,Y-2,S+4,S+4);ctx.beginPath();ctx.rect(X,Y,S,S);ctx.clip();ctx.imageSmoothingEnabled=false;const sc=S/span;
     ctx.drawImage(w.mm,X+S/2-cxT*sc,Y+S/2-cyT*sc,w.w*sc,w.h*sc);
     const toM=(px,py)=>[X+S/2+(px/TILE-cxT)*sc,Y+S/2+(py/TILE-cyT)*sc];
-    for(const e of w.ents){if(e.dead)continue;let c=null,r=2;if(e.enemy){c=e.boss?'#ff3050':'#ff6b6b';r=e.boss?4:1.5}else if(e.kind==='npc')c='#ffcd57';else if(e.kind==='portal'){c='#6af2df';r=3.5}else if(e.kind==='chest'&&!e.open)c=e.big?'#c67bff':'#e0a040';else if(e.kind==='shrine')c='#6af2df';else if(e.kind==='lore')c='#fff';else if(e.kind==='waystone'){c='#6af2df';r=3}if(c){const[a,b]=toM(e.x,e.y);ctx.fillStyle=c;ctx.fillRect(a-r,b-r,r*2,r*2)}}
+    for(const e of w.ents){if(e.dead)continue;let c=null,r=2;if(e.enemy){c=e.boss?'#ff3050':'#ff6b6b';r=e.boss?4:1.5}else if(e.kind==='npc')c='#ffcd57';else if(e.kind==='portal'){c='#6af2df';r=3.5}else if(e.kind==='chest'&&!e.open)c=e.big?'#c67bff':'#e0a040';else if(e.kind==='shrine')c='#6af2df';else if(e.kind==='lore')c='#fff';else if(e.kind==='waystone'){c='#6af2df';r=3}else if(e.kind==='bosscamp'&&e.world&&!e.done){c='#ff3050';r=4}else if(e.kind==='captive'){c='#ffcd57';r=3}else if(e.kind==='board')c='#ffcd57';if(c){const[a,b]=toM(e.x,e.y);ctx.fillStyle=c;ctx.fillRect(a-r,b-r,r*2,r*2)}}
     const q=QUESTS[G.quest].tgt();if(q&&q.w===w.kind){const[a,b]=toM(q.x,q.y);ctx.strokeStyle='#ffcd57';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a,b,5+Math.sin(G.time*5)*1.5,0,7);ctx.stroke()}
     for(const p of G.players){const[a,b]=toM(p.x,p.y);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(a,b,3.5,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke()}
     ctx.restore();ctx.strokeStyle='#3b2e55';ctx.lineWidth=1;ctx.strokeRect(X-2,Y-2,S+4,S+4);
@@ -1035,10 +1142,10 @@ function drawTitleBg(t){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#0d0a14
 function showTitle(){$('#title').classList.remove('hidden');$('#quest').classList.add('hidden');$('#topbtns').classList.add('hidden');$('#touch').classList.add('hidden');$('#tContinue').classList.toggle('hidden',!store.get(SAVE_KEY))}
 function startGame(load){
   let data=null;if(load){try{data=JSON.parse(store.get(SAVE_KEY))}catch(e){}}
-  G.players=[];G.flags={};G.opened={};G.glimmer=0;G.soul=0;G.quest=0;G.uid=1;G.worlds={};G.veilT=0;G.stock=null;G.lioStock=null;G.savedPlayers=null;lastPhase=null;
-  if(data){G.glimmer=data.glimmer;G.soul=data.soul;G.flags=data.flags||{};G.opened=data.opened||{};G.quest=data.quest||0;G.uid=data.uid||1000;G.veilT=data.veilT||0;G.savedPlayers={};for(const sp of data.players)G.savedPlayers[sp.pid]=sp}
+  G.players=[];G.flags={};G.opened={};G.glimmer=0;G.soul=0;G.quest=0;G.uid=1;G.worlds={};G.veilT=0;G.stock=null;G.lioStock=null;G.savedPlayers=null;lastPhase=null;G.side={};G.bounties=[];G.board=[];
+  if(data){G.glimmer=data.glimmer;G.soul=data.soul;G.flags=data.flags||{};G.opened=data.opened||{};G.quest=data.quest||0;G.uid=data.uid||1000;G.veilT=data.veilT||0;G.side=data.side||{};G.bounties=data.bounties||[];G.board=data.board||[];G.savedPlayers={};for(const sp of data.players)G.savedPlayers[sp.pid]=sp}
   const p=new Player(0,'kbm');if(data&&G.savedPlayers[0])loadPlayer(p,G.savedPlayers[0]);G.players.push(p);
-  G.worlds.over=genOver();G.state='play';$('#title').classList.add('hidden');$('#quest').classList.remove('hidden');$('#topbtns').classList.remove('hidden');if(touchMode)$('#touch').classList.remove('hidden');
+  G.worlds.over=genOver();G.side=G.side||{};G.bounties=G.bounties||[];G.board=G.board||[];G.state='play';$('#title').classList.add('hidden');$('#quest').classList.remove('hidden');$('#topbtns').classList.remove('hidden');if(touchMode)$('#touch').classList.remove('hidden');
   if(data&&data.where==='veil'&&F().boss_thorn){enterVeil()}
   else if(data&&F().captain)setWorld(G.worlds.over,tp(75,47));
   else{setWorld(G.worlds.over);dialog('Greenmeadow, at dusk','Your village is burning. The Hexborne Conclave\'s raiders came out of nowhere, their adepts chanting while the ground glowed beneath them.\n\nThe only safe place left is Hearthhold, up the north road. Fight your way there.\n\nTip: read the signposts along the road to learn the controls.',[['Fight!',closePanel]])}
@@ -1046,7 +1153,7 @@ function startGame(load){
 $('#tNew').onclick=()=>{if(store.get(SAVE_KEY)&&!$('#tNew').dataset.confirm){$('#tNew').dataset.confirm=1;$('#tNew').textContent='Overwrite save? Click again';return}store.del(SAVE_KEY);startGame(false)};
 $('#tContinue').onclick=()=>startGame(true);
 $('#tControls').onclick=()=>{G.state='titlectrl';openPanel('Controls & Co-op',controlsHTML(),'ctrl');const old=closePanel;$('#pclose').onclick=()=>{$('#panel').classList.add('hidden');G.panel=null;G.state='title'}};
-$('#bInv').onclick=()=>{if(G.panel==='inv')closePanel();else openInventory(0)};$('#bMenu').onclick=()=>togglePanel('menu');
+$('#bInv').onclick=()=>{if(G.panel==='inv')closePanel();else openInventory(0)};$('#bMenu').onclick=()=>togglePanel('menu');$('#bJournal').onclick=()=>{if(G.panel==='journal')closePanel();else openJournal()};
 
 // ================= TOUCH =================
 const touchMode=('ontouchstart' in window)||navigator.maxTouchPoints>0;
