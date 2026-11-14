@@ -608,6 +608,9 @@ const GOODS = {
   // --- Eastreach ---
   blossom:{name:'Blossom',base:8,col:'#ffb8d8',kind:'mat'},
   porcelain:{name:'Porcelain',base:45,col:'#e8f0f8',kind:'good'},
+  clay_pot:{name:'Clay Pot',base:20,col:'#b06a3a',kind:'good',desc:'Lumpy, but it holds water. Mostly'},
+  fine_vase:{name:'Fine Vase',base:70,col:'#d8e8f0',kind:'good',desc:'A well-thrown vase from the Petalfall wheel'},
+  masterwork_vase:{name:'Masterwork Vase',base:220,col:'#f0f4ff',kind:'good',desc:'Flawless. Collectors would fight over this'},
   ochre:{name:'Ochre',base:22,col:'#c8702a',kind:'good'},
   incense:{name:'Incense',base:38,col:'#8a6aa8',kind:'good'},
   lion_mane:{name:'Sun Lion Mane',base:260,col:'#ffb040',kind:'trophy'},
@@ -2271,6 +2274,8 @@ const NPCS = [
    hello:["Fifty years without a proper rain, child.","The sky has a long memory.","Sit. Drink. Water is precious here."], rumors:["Every elder in Sunreach remembers the last great rain. None of them like to talk about the night it stopped."]},
   {id:'corwin',town:'highcairn',dx:4,dy:-3,name:'Corwin the Card Sharp',role:'Monster card duels',cols:{cloak:'#2a2a4a',skin:'#e0c0a0',hair:'#1a1a1a'},cardsharp:true,freeSpot:true,
    hello:["Got a deck? Let's see what it's worth.","Five cards, five rounds. Luck has nothing to do with it. Mostly.","Every monster card has three numbers. Learn them."], rumors:["A Rock Golem card guards like a wall, but a Coyote card is quicker than anything. Save your best cards for the right round."]},
+  {id:'lin',town:'petal',dx:-4,dy:-3,name:'Master Potter Lin',role:'Pottery wheel',cols:{cloak:'#7a5a8a',skin:'#e8c8a0',hair:'#2a2a2a'},potter:true,freeSpot:true,
+   hello:["The wheel is patient. Are you?","Clay remembers every touch.","Center yourself, then center the clay."], rumors:["Don't fight the wheel. Small, steady changes make a better vase than big ones."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
@@ -4500,10 +4505,63 @@ $('pauseSheet').addEventListener('click', e => {
 });
 addEventListener('keydown', e => {
   if (busk && busk.on) { const k = e.key.toLowerCase(); const lane = BUSK_KEYS.findIndex(ks => ks.includes(k)); if (lane >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) buskHit(lane); } else if (k === 'escape') { busk = null; } }
+  else if (wheel && wheel.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); wheel.push = true; } else if (k === 'escape') wheel = null; }
   else if (jump && jump.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e' || k === 'w' || k === 'arrowup') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) jumpPress(); } else if (k === 'escape') jump = null; }
   else if (stones && stones.on && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); stonesPlay(+e.key - 1); }
   else if (skit && skit.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) skitPress(); } else if (k === 'escape') skit = null; }
 }, {capture: true});
+// ===== pottery wheel (Master Potter Lin, Petalfall) =====
+let wheel = null;
+const WHW = 260, WHH = 240, WH_ROWS = 40;
+function potTalk(n) {
+  const today = S.potDay === S.day ? (S.potToday || 0) : 0;
+  say(`“The wheel spins and the clay rises. Hold Space, E or tap to push the clay out wider, and let go to let it draw in. Follow the pale outline as the clay rises, top to bottom. The closer you follow it, the finer the vase.”<br>“I have clay for three pots a day. Fifteen coin each, and you keep what you make.”${S.potBest ? `<br><span style="color:var(--muted)">Your best throw: ${S.potBest}% · Clay left today: ${3 - today}</span>` : ''}`, [
+    {label: today >= 3 ? 'No clay left today' : 'Throw a pot · 15◆', primary: true, disabled: today >= 3 || S.coins < 15, fn: () => { S.coins -= 15; if (S.potDay !== S.day) { S.potDay = S.day; S.potToday = 0; } S.potToday++; renderHUD(); potStart(); }}, back(n)]);
+}
+function potShape() {
+  const kinds = [
+    t => .45 + .35*Math.sin(t*Math.PI*1.1 + .2) - .1*t,
+    t => .3 + .45*Math.pow(Math.sin(t*Math.PI), 1.4) + (t > .85 ? (t - .85)*1.2 : 0),
+    t => .55 - .25*t + .2*Math.sin(t*Math.PI*2.2),
+    t => .35 + .4*Math.sin(Math.min(1, t*1.4)*Math.PI*.9) - (t > .7 ? (t - .7)*.6 : 0),
+  ], f = pick(kinds);
+  return Array.from({length: WH_ROWS}, (_, i) => Math.max(.18, Math.min(.92, f(i/(WH_ROWS - 1)))));
+}
+function potStart() {
+  wheel = {on: true, target: potShape(), got: [], w: .4, push: false, row: 0, rowT: 0, last: performance.now(), spin: 0, done: false};
+  openPanel('Pottery wheel', `<canvas id="wheelC" width="${WHW}" height="${WHH}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Hold Space / E / tap to widen · let go to narrow</div>`, [{label: 'Stop the wheel', fn: () => { wheel = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('wheelC'); if (!c) return; c.addEventListener('pointerdown', e => { e.preventDefault(); if (wheel) wheel.push = true; }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) c.addEventListener(ev, () => { if (wheel) wheel.push = false; }); }, 30);
+  requestAnimationFrame(potLoop);
+}
+function potLoop() {
+  const W = wheel; if (!W || !W.on) return; const c = document.getElementById('wheelC');
+  if (!c || mode !== 'talk') { wheel = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - W.last)/1000); W.last = now; W.spin += dt*9;
+  if (!W.done) {
+    W.w += (W.push ? .55 : -.5)*dt; W.w = Math.max(.12, Math.min(.98, W.w));
+    W.rowT += dt; if (W.rowT >= .16) { W.rowT -= .16; W.got.push(W.w); W.row++; if (W.row >= WH_ROWS) { W.done = true; setTimeout(() => { if (wheel === W) potEnd(); }, 700); } }
+  }
+  const g = c.getContext('2d'), cx = WHW/2, base = WHH - 34, rowH = 4.4, maxR = 92;
+  g.fillStyle = '#2a2230'; g.fillRect(0, 0, WHW, WHH);
+  g.fillStyle = '#5a4a3a'; g.beginPath(); g.ellipse(cx, base + 10, 108, 16, 0, 0, 7); g.fill(); g.fillStyle = '#7a6a5a'; g.beginPath(); g.ellipse(cx, base + 6, 100, 12, 0, 0, 7); g.fill();
+  for (let i = 0; i < 6; i++) { const a = W.spin + i*1.047; g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(cx + Math.cos(a)*90 - 2, base + 6 + Math.sin(a)*10 - 1, 4, 2); }
+  g.strokeStyle = 'rgba(240,240,255,.35)'; g.setLineDash([3, 3]); g.lineWidth = 1.5;
+  for (const sgn of [-1, 1]) { g.beginPath(); W.target.forEach((r, i) => { const y = base - i*rowH, x = cx + sgn*r*maxR; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+  g.setLineDash([]);
+  for (let i = 0; i < W.got.length; i++) { const r = W.got[i], y = base - i*rowH, err = Math.abs(r - W.target[i]); g.fillStyle = err < .05 ? '#c88a5a' : err < .12 ? '#b07a4a' : '#8a5a3a'; g.fillRect(cx - r*maxR, y - rowH, r*maxR*2, rowH + .5); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(cx - r*maxR + 3 + (Math.sin(W.spin + i)*.5 + .5)*r*maxR, y - rowH, 3, rowH); }
+  if (!W.done) { const y = base - W.row*rowH; g.fillStyle = '#d89a6a'; g.fillRect(cx - W.w*maxR, y - rowH, W.w*maxR*2, rowH); g.fillStyle = '#ffd040'; g.fillRect(cx - W.target[W.row]*maxR - 1, y - rowH - 2, 2, rowH + 4); g.fillRect(cx + W.target[W.row]*maxR - 1, y - rowH - 2, 2, rowH + 4); }
+  const acc = potScore(W); g.fillStyle = '#ebe4d3'; g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillText(`Match ${acc}%`, 8, 16); g.textAlign = 'right'; g.fillText(`${Math.min(100, Math.round(W.row/WH_ROWS*100))}% thrown`, WHW - 8, 16);
+  requestAnimationFrame(potLoop);
+}
+function potScore(W) { if (!W.got.length) return 100; const e = W.got.reduce((a, r, i) => a + Math.abs(r - W.target[i]), 0)/W.got.length; return Math.max(0, Math.round(100 - e*260)); }
+function potEnd() {
+  const W = wheel; wheel = null; const sc = potScore(W); S.potsThrown = (S.potsThrown || 0) + 1; S.potBest = Math.max(S.potBest || 0, sc);
+  const g = sc >= 90 ? 'masterwork_vase' : sc >= 70 ? 'fine_vase' : 'clay_pot'; addItem(g, 1); if (g === 'masterwork_vase') S.potMaster = (S.potMaster || 0) + 1;
+  renderHUD(); save(); SFX[g === 'clay_pot' ? 'click' : 'victory']();
+  const left = 3 - (S.potToday || 0);
+  openPanel('Pottery wheel', `Your vase matched the outline <b>${sc}%</b>. Lin fires it in the kiln and hands you a <b>${GOODS[g].name}</b>.<br>“${sc >= 90 ? 'Flawless. I could not have thrown it better myself.' : sc >= 70 ? 'A fine piece. Steady hands.' : 'It holds water. That is a start.'}”${g === 'clay_pot' ? '<br><span style="color:var(--muted)">70% makes a Fine Vase, 90% a Masterwork Vase.</span>' : ''}`,
+    [{label: left > 0 ? `Throw another · 15◆ (${left} left today)` : 'No clay left today', primary: true, disabled: left <= 0 || S.coins < 15, fn: () => { S.coins -= 15; S.potToday++; renderHUD(); potStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
 // ===== monster card duels (Corwin, Highcairn) =====
 let duel = null;
 const CSTAT = ['Power', 'Guard', 'Speed'];
@@ -5114,7 +5172,7 @@ addEventListener('keydown', e => {
   else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
-addEventListener('keyup', e => { if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
+addEventListener('keyup', e => { if (wheel) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') wheel.push = false; } if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
 const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
 const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
@@ -8134,6 +8192,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Pottery wheel', 'Master Potter Lin in Petalfall lets you throw three pots a day. Hold Space, E or tap to widen the clay and let go to narrow it, following the outline as it rises. A 70% match makes a Fine Vase and 90% a Masterwork Vase, which sell well.'],
   ['Monster card duels', 'Corwin the Card Sharp in Highcairn plays duels with monster cards. You need five different cards (album cards count). Each card has Power, Guard and Speed from 1 to 9. Each round Corwin names a stat, you both play a card, and the higher number wins. Win three rounds to win, and you might take one of his cards home.'],
   ['Heart scenes and the almanac', 'Give gifts to Odile, Garrick, Bertha, Warden Kessa, Elder Rowan or Captain Marisol. At three hearts, each one has a personal moment to share with you. The Almanac in the menu (Esc) lists festivals, tournaments, Blood Moons, eclipses and birthdays for the next ten days.'],
   ['The Last Rainmaker', 'Grandmother Amani in Sunreach remembers when it still rained on the savanna. Take the three rain stones from the Drought Spirits that guard them, then set them in the dry spring. The eighth story quest.'],
@@ -8775,6 +8834,7 @@ function padPoll(dt) {
   if (cut && cut.on) { if (down(OK) || down(BACK) || down(2) || down(3)) cutPress(); PAD.prev = B; return; }
   if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
   if (jump && jump.on) { if (down(OK) || down(2) || down(3)) jumpPress(); PAD.prev = B; return; }
+  if (wheel && wheel.on) { wheel.push = now(OK) || now(2) || now(3); PAD.prev = B; return; }
   const menu = mode !== 'play' && mode !== 'fish';
   // movement
   if (mode === 'play' || mode === 'photo') { PAD.vx = sx; PAD.vy = sy; } else { PAD.vx = PAD.vy = 0; }
@@ -10255,6 +10315,7 @@ function mainOptions(n) {
   if (n.huntmaster) o.push({label: 'Today\u2019s hunt', fn: () => huntTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
+  if (n.potter) o.push({label: 'Throw a pot on the wheel', primary: true, fn: () => potTalk(n)});
   if (n.cardsharp) o.push({label: 'Play a card duel', primary: true, fn: () => duelTalk(n)});
   if (n.shellstones) o.push({label: 'Play Shell Stones', primary: true, fn: () => stonesTalk(n)});
   if (n.jumpshow) o.push({label: 'Ride the jumping course', primary: true, fn: () => jumpTalk(n)});
@@ -13056,6 +13117,8 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['potter','Potter','Throw a pot on the Petalfall wheel', () => (S.potsThrown || 0) >= 1],
+  ['masterpot','Master Potter','Throw a Masterwork Vase (90% match)', () => (S.potMaster || 0) >= 1],
   ['card_win','Card Sharp','Beat Corwin at a monster card duel', () => (S.cardWins || 0) >= 1],
   ['card_sweep','Clean Hand','Win a card duel 3 rounds to 0', () => (S.cardSweeps || 0) >= 1],
   ['stones_win','Shell Shark','Beat Nan Cowrie at Shell Stones', () => (S.stonesWins || 0) >= 1],
@@ -13613,8 +13676,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 17;
+const WN_VER = 18;
 const WHATS_NEW = [
+  ['Pottery wheel', 'Master Potter Lin in Petalfall: shape a vase on the wheel by following the outline. A near-perfect throw makes a Masterwork Vase.'],
   ['Monster card duels', 'Your monster cards are playable now! Challenge Corwin the Card Sharp in Highcairn: five cards, five rounds, Power, Guard or Speed.'],
   ['Heart scenes', 'Make friends with Odile, Garrick, Bertha, Warden Kessa, Elder Rowan or Captain Marisol (three hearts from gifts) and they\u2019ll share a personal moment with you.'],
   ['Almanac', 'A calendar in the menu shows what\u2019s coming in the next ten days: festivals, tournaments, Blood Moons, eclipses and birthdays.'],
@@ -13676,7 +13740,7 @@ const RECORDS = [
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
   ['logBest', 'Log rolling', v => `${(+v).toFixed(1)} s`], ['snowBest', 'Snowball fight', v => `${v} hits`], ['castleBest', 'Sandcastle', v => `${v} layers`],
   ['kitchenBest', 'Kitchen', v => `${v} dishes served`], ['buskBest', 'Busking', v => `${v} points`], ['moleBest', 'Whack-a-mole', v => `${v} points`],
-  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
+  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
   ['Puzzles'],
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
@@ -13908,7 +13972,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
