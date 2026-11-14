@@ -139,6 +139,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .buy:disabled{opacity:.4;cursor:default;border-color:var(--muted)}
 .buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .buy b{color:var(--sun)}
+.char.rolling{border-color:var(--mint)}
+.btn:disabled{opacity:.5;cursor:default;transform:none}
 .char.locked{cursor:not-allowed}
 .char.locked img{filter:brightness(0) opacity(.5)}
 .char.locked .n{color:var(--muted)}
@@ -257,6 +259,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
     </div>
     <div class="row">
       <button class="btn ghost" id="btnBack">BACK</button>
+      <button class="btn ghost" id="btnRandom">RANDOM</button>
       <button class="btn" id="btnGo">FIGHT</button>
     </div>
     <button class="linkbtn" id="btnReset">Reset unlock progress</button>
@@ -3720,6 +3723,35 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
   game.startArena = b.dataset.a; store.set('koisle-arena', b.dataset.a); setArena(b.dataset.a); sfx('select'); syncSelect();
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
+// Random fighter: a short roulette across the unlocked fighters, slowing down before it lands
+let rolling = false;
+$('btnRandom').addEventListener('click', () => {
+  if (rolling) return;
+  const pool = Object.keys(PLAYABLE).filter(isUnlocked);
+  if (pool.length < 2) { sfx('clang'); toast('Unlock more fighters to use Random. Clear waves to earn them.'); return; }
+  const others = pool.filter(k => k !== game.charKey), pick = others[Math.random() * others.length | 0];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const steps = reduce ? 0 : 12 + pool.length + (Math.random() * pool.length | 0);
+  let i = Math.max(0, pool.indexOf(game.charKey)), n = 0;
+  rolling = true; for (const id of ['btnRandom', 'btnGo', 'btnBack']) $(id).disabled = true;
+  const cards = () => document.querySelectorAll('.char');
+  const land = () => {
+    cards().forEach(c => c.classList.remove('rolling'));
+    rolling = false; for (const id of ['btnRandom', 'btnGo', 'btnBack']) $(id).disabled = false;
+    game.charKey = pick; store.set('koisle-char', pick); syncSelect();
+    const card = $('char-' + pick); card.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    sfx('star'); toast(`Random pick: ${ROSTER[pick].name}!`);
+  };
+  const tick = () => {
+    if (n >= steps) { land(); return; }
+    i = (i + 1) % pool.length; n++;
+    if (n >= steps - pool.length && pool[i] === pick) { land(); return; } // stop on the chosen fighter during the last lap
+    cards().forEach(c => c.classList.toggle('rolling', c.dataset.k === pool[i]));
+    sfx('jump');
+    setTimeout(tick, 55 + Math.pow(n / steps, 2.2) * 260);
+  };
+  tick();
+});
 $('btnBack').addEventListener('click', () => { game.state = 'title'; updateTitleInfo(); show('scrTitle'); });
 $('btnChange').addEventListener('click', () => { sfx('select'); openSelect(); });
 let resetArmed = null;
