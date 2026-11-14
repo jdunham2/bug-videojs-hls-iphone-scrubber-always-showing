@@ -140,6 +140,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .buy b{color:var(--sun)}
 .char.rolling{border-color:var(--mint)}
+.bonus{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--mint);background:rgba(79,240,200,.12);border:1px solid rgba(79,240,200,.4);border-radius:10px;padding:6px 12px;max-width:62ch}
 .randmode{display:flex;flex-direction:column;align-items:center;gap:6px}
 .toggle{font-family:var(--display);font-size:13px;letter-spacing:.04em;border:2px solid var(--muted);background:var(--glass);color:var(--ink);border-radius:12px;padding:9px 16px;cursor:pointer}
 .toggle[aria-pressed="true"]{border-color:var(--mint);color:var(--mint);box-shadow:0 0 14px rgba(79,240,200,.35)}
@@ -280,6 +281,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
   <div class="panel">
     <h2 id="upTitle">WAVE 1 CLEARED</h2>
     <div class="unlocks" id="unlocks"></div>
+    <p class="bonus" id="randBonus" hidden></p>
     <p class="rule" id="nextUnlockUp"></p>
     <p class="tag">Pick one power-up. It lasts for the rest of the run.</p>
     <div class="ups" id="ups"></div>
@@ -3516,7 +3518,7 @@ function swapToRandomFighter() {
 }
 function startRun() {
   initAudio();
-  game.wave = 1; game.perks = []; game.perkObjs = []; game.gold = 0; game.startPerk = {};
+  game.wave = 1; game.perks = []; game.perkObjs = []; game.randAcc = 0; game.randBonusNow = false; game.gold = 0; game.startPerk = {};
   player.setDef(ROSTER[game.charKey]); player.stocks = 3;
   startWave();
 }
@@ -3548,7 +3550,12 @@ function onKO(f) {
   if (f === enemy) {
     if (enemy.stocks <= 0) {
       game.state = 'cleared'; game.timer = 1.8; game.timeScale = .35; banner('K.O.!', 'gold'); sfx('clear');
-      progress.waves++; saveProgress();
+      progress.waves++;
+      if (game.randomMode) { // random-mode rewards: +8 gold, and every second wave counts double toward unlocks
+        game.gold += RAND_GOLD; game.randAcc = (game.randAcc || 0) + .5;
+        game.randBonusNow = game.randAcc >= 1; if (game.randBonusNow) { game.randAcc -= 1; progress.waves++; }
+      }
+      saveProgress();
     }
     else banner('KO!', 'gold');
   } else {
@@ -3600,7 +3607,7 @@ function showUpgrades() {
   game.state = 'upgrade';
   if (document.pointerLockElement) document.exitPointerLock();
   $('upTitle').textContent = `WAVE ${game.wave} CLEARED`;
-  const pool = UPGRADES.filter(u => !u.ok || u.ok(player.stats)).sort(() => Math.random() - .5).slice(0, 3);
+  const pool = UPGRADES.filter(u => !u.ok || u.ok(player.stats)).sort(() => Math.random() - .5).slice(0, game.randomMode ? 4 : 3);
   const box = $('ups'); box.innerHTML = '';
   pool.forEach((u, i) => {
     const b = document.createElement('button'); b.className = 'up'; b.id = 'up' + i;
@@ -3625,6 +3632,9 @@ function showUpgrades() {
   }
   if (freshF.length || freshA.length) { saveProgress(); setTimeout(() => sfx('star'), 250); }
   $('nextUnlockUp').textContent = nextUnlockText();
+  $('randBonus').hidden = !game.randomMode;
+  if (game.randomMode) $('randBonus').textContent = `RANDOM MODE BONUS: +${RAND_GOLD} gold · 4 power-up choices · `
+    + (game.randBonusNow ? '+1 extra wave toward unlocks!' : 'next wave earns +1 extra toward unlocks');
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
 }
 function showGameOver() {
@@ -3748,6 +3758,7 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
 game.randomMode = store.get('koisle-randmode') === '1';
+const RAND_GOLD = 8;
 function syncRandMode() {
   const b = $('btnRandMode'), n = unlockedCount();
   b.setAttribute('aria-pressed', game.randomMode);
@@ -3755,6 +3766,7 @@ function syncRandMode() {
   $('randHint').textContent = !game.randomMode ? '' : n < 2
     ? 'You only have one fighter so far. Clear waves to unlock more for the shuffle.'
     : `You become one of your ${n} unlocked fighters at the start of every wave. Power-ups carry over.`;
+  if (game.randomMode) $('randHint').textContent += ` Rewards: unlocks come 1.5× faster, +${RAND_GOLD} gold every wave, and 4 power-up choices instead of 3.`;
 }
 $('btnRandMode').addEventListener('click', () => {
   game.randomMode = !game.randomMode; store.set('koisle-randmode', game.randomMode ? '1' : '0');
