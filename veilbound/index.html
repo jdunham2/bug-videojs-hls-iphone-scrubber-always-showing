@@ -84,7 +84,7 @@ kbd{background:#000;border:1px solid var(--line);border-radius:4px;padding:0 5px
 <div id="panel" class="hidden"><div id="panelBox"></div></div>
 <div id="title">
   <h1>VEIL<span>BOUND</span><br><small style="font-size:.32em;letter-spacing:.3em;color:var(--muted)">HEROES OF HEARTHHOLD</small></h1>
-  <p>The Hexborne Conclave is tearing open the Veil, a soul-lit realm beside our own. Fight your way to Hearthhold, gear up across twelve combat slots, and step through the Veil Gate. Vertical slice: one region, one dungeon, a first taste of the Veil. Solo or couch co-op for up to 4.</p>
+  <p>The Hexborne Conclave is tearing open the Veil, a soul-lit realm beside our own. Fight your way to Hearthhold, gear up across twelve combat slots, and step through the Veil Gate. Vertical slice: two regions, two dungeons, a first taste of the Veil. Solo or couch co-op for up to 4.</p>
   <div class="menu">
     <button class="btn primary" id="tContinue">Continue</button>
     <button class="btn" id="tNew">New Game</button>
@@ -123,9 +123,9 @@ function sfx(type){if(muted)return;const now=performance.now();if(sfxLast[type]&
   o.type=P[0];o.frequency.setValueAtTime(P[1],t);o.frequency.exponentialRampToValueAtTime(Math.max(20,P[2]),t+P[4]);g.gain.setValueAtTime(P[3],t);g.gain.exponentialRampToValueAtTime(.0001,t+P[4]);o.start(t);o.stop(t+P[4]+.02);}catch(e){}}
 
 // ================= TILES =================
-const T={GRASS:0,TREE:1,WATER:2,PATH:3,WALL:4,FLOOR:5,CHASM:6,BRIDGE:7,ROCK:8,FLOWER:9,DFLOOR:10,DWALL:11,VEIL:12,MUSH:13,CRYSTAL:14,VPOOL:15,GATE:16,MOSS:17};
-const SOLID=[];[1,2,4,8,11,13,14,15,16].forEach(i=>SOLID[i]=true);
-const TALL=[];[1,4,8,11,13,14,16].forEach(i=>TALL[i]=true);
+const T={GRASS:0,TREE:1,WATER:2,PATH:3,WALL:4,FLOOR:5,CHASM:6,BRIDGE:7,ROCK:8,FLOWER:9,DFLOOR:10,DWALL:11,VEIL:12,MUSH:13,CRYSTAL:14,VPOOL:15,GATE:16,MOSS:17,SAND:18,CACTUS:19,LAVA:20,RUBBLE:21};
+const SOLID=[];[1,2,4,8,11,13,14,15,16,19,21].forEach(i=>SOLID[i]=true);
+const TALL=[];[1,4,8,11,13,14,16,19,21].forEach(i=>TALL[i]=true);
 
 class World{
   constructor(id,w,h,o={}){this.id=id;this.w=w;this.h=h;this.t=new Uint8Array(w*h);this.ents=[];this.dark=o.dark||0;this.kind=o.kind||id;this.name=o.name||'';this.lvl=o.lvl||1;this.skin=o.skin||'hex';this.spawn={x:0,y:0};this.mm=null}
@@ -133,9 +133,9 @@ class World{
   set(x,y,v){if(x>=0&&y>=0&&x<this.w&&y<this.h){this.t[y*this.w+x]=v;if(this.mm){const c=this.mm.getContext('2d');c.fillStyle=mmColor(v,this);c.fillRect(x,y,1,1)}}}
   tileAt(px,py){return this.get(Math.floor(px/TILE),Math.floor(py/TILE))}
   blocked(x,y,r,enemy){const x0=Math.floor((x-r)/TILE),x1=Math.floor((x+r)/TILE),y0=Math.floor((y-r)/TILE),y1=Math.floor((y+r)/TILE);
-    for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){const t=this.get(tx,ty);if(SOLID[t]||(enemy&&t===T.CHASM))return true}return false}
+    for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){const t=this.get(tx,ty);if(SOLID[t]||(enemy&&(t===T.CHASM||t===T.LAVA)))return true}return false}
 }
-function mmColor(t,w){return({0:'#4f8f3a',1:'#2f5f25',2:'#2f6fc4',3:'#b59a68',4:'#5c5466',5:'#c2ae86',6:'#000',7:'#8a6a3e',8:'#6e665c',9:'#5a9a3f',10:w&&w.pal?w.pal.floor:'#3a3a3a',11:w&&w.pal?w.pal.wall:'#222',12:'#2a1f48',13:'#a14bd6',14:'#55e0ff',15:'#1fd3c0',16:'#7a4f2a',17:'#3d7a32'})[t]||'#f0f'}
+function mmColor(t,w){return({0:'#4f8f3a',1:'#2f5f25',2:'#2f6fc4',3:'#b59a68',4:'#5c5466',5:'#c2ae86',6:'#000',7:'#8a6a3e',8:'#6e665c',9:'#5a9a3f',10:w&&w.pal?w.pal.floor:'#3a3a3a',11:w&&w.pal?w.pal.wall:'#222',12:'#2a1f48',13:'#a14bd6',14:'#55e0ff',15:'#1fd3c0',16:'#7a4f2a',17:'#3d7a32',18:'#d8b872',19:'#5a8a3a',20:'#ff6a1a',21:'#7a5a40'})[t]||'#f0f'}
 
 // ================= GAME STATE =================
 const G={state:'title',world:null,worlds:{},players:[],projs:[],hazards:[],parts:[],texts:[],time:0,cam:{x:0,y:0},shake:0,glimmer:0,soul:0,flags:{},opened:{},boss:null,
@@ -261,7 +261,8 @@ function addPlayer(src){const pid=[0,1,2,3].find(i=>!G.players.some(p=>p.pid===i
 const SKINS={
   hex:{grunt:['Hexer Raider','#8b7cb3'],archer:['Hexer Bowman','#7f9a62'],brute:['Raid Ogre','#9a7552'],exploder:['Blight Bomber','#66b043'],caster:['Hex Adept','#b058d0']},
   moss:{grunt:['Thornling','#4f9a3a'],archer:['Spore Spitter','#a3c040'],brute:['Barkhide Brute','#7a5a35'],exploder:['Puffcap','#d8b04a'],caster:['Moss Witch','#3a9a7a']},
-  veil:{grunt:['Veil Stalker','#5ad8c8'],archer:['Soul Wraith','#a88aff'],brute:['Void Behemoth','#5a48a8'],exploder:['Soul Mite','#8af4ff'],caster:['Lumen Shaman','#f08ad8']}};
+  veil:{grunt:['Veil Stalker','#5ad8c8'],archer:['Soul Wraith','#a88aff'],brute:['Void Behemoth','#5a48a8'],exploder:['Soul Mite','#8af4ff'],caster:['Lumen Shaman','#f08ad8']},
+  ash:{grunt:['Ash Husk','#b07a48'],archer:['Dune Skirmisher','#c8a060'],brute:['Basalt Golem','#5a4848'],exploder:['Ember Mite','#ff7a2a'],caster:['Cinder Priest','#d0503a']}};
 const EB={grunt:{hp:32,dmg:9,spd:92,r:13,range:30,wind:.45,cd:1.1,xp:6},archer:{hp:24,dmg:7,spd:74,r:12,range:240,wind:.65,cd:1.7,xp:7},brute:{hp:100,dmg:20,spd:60,r:20,range:50,wind:.85,cd:2,xp:16},exploder:{hp:16,dmg:26,spd:135,r:11,range:38,wind:.6,cd:1,xp:5},caster:{hp:28,dmg:8,spd:66,r:13,range:210,wind:.8,cd:2.6,xp:9}};
 const hpMul=l=>1+(l-1)*.3, dmgMul=l=>1+(l-1)*.18;
 function effLvl(base){return Math.max(base,Math.floor(partyLevel()*.85))}
@@ -311,6 +312,7 @@ function nearestTarget(e,range){let best=null,bd=range;for(const p of targets())
 const BOSSES={
   captain:{n:'Raid Captain Morg',hp:240,r:22,col:'#9a62b0',spd:85,pats:['charge','slam','summon','radial'],dmg:14,skin:'hex'},
   thorn:{n:'The Thornmother',hp:700,r:36,col:'#3f8a2a',spd:42,pats:['radial','summon','roots','spiral','charge'],dmg:16,skin:'moss'},
+  colossus:{n:'Magma Colossus',hp:650,r:38,col:'#a8452a',spd:48,pats:['slam','meteor','charge','radial','nova','summon'],dmg:20,skin:'ash'},
   maw:{n:'Dusk Maw',hp:550,r:30,col:'#6a3ae0',spd:70,pats:['spiral','roots','blink','nova'],dmg:18,skin:'veil'}};
 class Boss extends Enemy{
   constructor(id,x,y,lvl){super('brute',x,y,lvl,BOSSES[id].skin);const B=BOSSES[id];this.boss=true;this.bid=id;this.name=B.n;this.col=B.col;this.r=B.r;
@@ -331,6 +333,7 @@ class Boss extends Enemy{
     if(p==='summon'){const n=1+ph+Math.floor(G.players.length/2);for(let i=0;i<n;i++){const t=pick(['grunt','grunt','archer','exploder']);const e=new Enemy(t,this.x+rr(-70,70),this.y+rr(-70,70),this.lvl,BOSSES[this.bid].skin,{aggro:20,lootMul:.3});if(!G.world.blocked(e.x,e.y,10,true)){G.world.ents.push(e);burst(e.x,e.y,e.col,12,120)}}sfx('magic')}
     if(p==='slam'){for(const t of targets())addHaz({x:t.x,y:t.y,r:90,delay:1,dmg:dm*1.4,team:'e',ground:true,col:'255,90,60'})}
     if(p==='roots'){for(const t of targets())for(let i=0;i<3+ph*2;i++)addHaz({x:t.x+rr(-110,110),y:t.y+rr(-110,110),r:44,delay:.9+i*.08,dmg:dm,team:'e',ground:true,col:'120,255,90'})}
+    if(p==='meteor'){for(const t of targets())for(let i=0;i<3+ph;i++)addHaz({x:t.x+rr(-100,100),y:t.y+rr(-100,100),r:58,delay:1.1+i*.18,dmg:dm*1.1,team:'e',col:'255,140,40',meteor:true});sfx('magic')}
     if(p==='nova'){addHaz({x:this.x,y:this.y,r:190,delay:1.1,dmg:dm*1.5,team:'e',ground:true,col:'160,120,255',follow:this});toast('Jump to dodge the shockwave!','#a88aff')}
     if(p==='charge'){const a=Math.atan2(tg.y-this.y,tg.x-this.x);this.charge={a,t:.65,hit:new Set()};addHaz({x:this.x,y:this.y,line:true,a,len:420,w:this.r*2,delay:.65,dmg:0,team:'e',col:'255,80,60'})}
     if(p==='blink'){for(let i=0;i<12;i++){const a=Math.random()*7,nx=tg.x+Math.cos(a)*220,ny=tg.y+Math.sin(a)*220;if(!G.world.blocked(nx,ny,this.r*.6,true)){burst(this.x,this.y,this.col,20,200);this.x=nx;this.y=ny;burst(nx,ny,this.col,20,200);break}}this.doPat('radial',tg)}
@@ -348,7 +351,7 @@ class Wolf{constructor(owner,mul){this.ally=true;this.owner=owner;this.x=owner.x
   draw(c){drawCreature(c,this,'#9fe8ff','wolf')}}
 // ---------- Interactables ----------
 class Thing{constructor(kind,x,y,o={}){Object.assign(this,{kind,x,y,z:0,r:14,anim:Math.random()*9},o)}}
-function interactLabel(t){return({npc:'Talk to '+t.name,chest:t.open?null:'Open chest',portal:t.label,shrine:t.cool>0?null:'Activate '+t.name,sign:'Read sign',bloom:t.grow<1?null:'Harvest soul bloom',critter:'Pet '+t.name,lore:'Read lore page',gate:null})[t.kind]}
+function interactLabel(t){return({npc:'Talk to '+t.name,chest:t.open?null:'Open chest',portal:t.label,shrine:t.cool>0?null:'Activate '+t.name,sign:'Read sign',bloom:t.grow<1?null:'Harvest soul bloom',critter:'Pet '+t.name,lore:'Read lore page',gate:null,waystone:'Use waystone'})[t.kind]}
 
 // ================= COMBAT =================
 function hurtEnemy(e,amt,p,o={}){
@@ -451,6 +454,7 @@ function updatePlayer(p,dt){
   if(I.interact){const t=nearestInteract(p);if(t)interact(t,p)}
   // terrain
   if(p.z<=0&&p.dodgeT<=0){const tt=w.tileAt(p.x,p.y);if(tt===T.CHASM){p.fall=.5;sfx('hurt');}else{const s=[[-1,-1],[1,-1],[-1,1],[1,1]].every(([a,b])=>w.tileAt(p.x+a*p.r,p.y+b*p.r)!==T.CHASM);if(s){p.lastSafe.x=p.x;p.lastSafe.y=p.y}}}
+  if(p.z<=0&&p.dodgeT<=0&&p.fall<=0&&w.tileAt(p.x,p.y)===T.LAVA){p.hp-=p.maxHp*.22*dt;p.combatT=0;if(Math.random()<.4)G.parts.push(part(p.x,p.y,'#ff8a2a',{vz:140}));if(Math.random()<dt*3)sfx('hurt');if(p.hp<=0)downPlayer(p)}
   // regen out of combat
   if(p.combatT>5)healP(p,p.maxHp*.02*dt,true);
 }
@@ -493,6 +497,7 @@ function interact(t,p){
   if(t.kind==='npc')npcTalk(t,p);
   else if(t.kind==='chest')openChest(t);
   else if(t.kind==='portal')t.use(p);
+  else if(t.kind==='waystone')useWaystone(t);
   else if(t.kind==='sign')dialog(t.title||'Signpost',t.text);
   else if(t.kind==='lore'){t.dead=true;G.flags['lore_'+t.id]=1;dialog(t.title,t.text);G.glimmer+=25;gainXP(30)}
   else if(t.kind==='shrine'){t.cool=180;const b=t.buff;for(const q of G.players){q.buffs[b]=60;if(b==='vigor')q.hp=q.maxHp}toast(`${t.name}: ${t.desc} (60s)`,'#6af2df');burst(t.x,t.y,'#6af2df',40,220);sfx('level')}
@@ -510,35 +515,42 @@ function burst(x,y,c,n,s){for(let i=0;i<n&&G.parts.length<900;i++){const a=Math.
 // ================= WORLD GEN =================
 function carve(w,pts,rad,tile){for(let i=0;i<pts.length-1;i++){const[a,b]=[pts[i],pts[i+1]];const n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*2);
   for(let k=0;k<=n;k++){const x=lerp(a[0],b[0],k/n),y=lerp(a[1],b[1],k/n);for(let dy=-rad;dy<=rad;dy++)for(let dx=-rad;dx<=rad;dx++){if(dx*dx+dy*dy>rad*rad+.5)continue;const tx=Math.round(x+dx),ty=Math.round(y+dy);const cur=w.get(tx,ty);
-    if(cur===T.FLOOR||cur===T.GATE||cur===T.WALL&&tile!==T.PATH)continue;if(cur===T.WATER||cur===T.CHASM||cur===T.VPOOL)w.set(tx,ty,T.BRIDGE);else w.set(tx,ty,tile)}}}}
+    if(cur===T.FLOOR||cur===T.GATE||cur===T.WALL&&tile!==T.PATH)continue;if(cur===T.WATER||cur===T.CHASM||cur===T.VPOOL||cur===T.LAVA)w.set(tx,ty,T.BRIDGE);else w.set(tx,ty,tile)}}}}
 function clearArea(w,cx,cy,r,tile){for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++)if(x*x+y*y<=r*r)w.set(cx+x,cy+y,tile)}
 const tp=(x,y)=>({x:x*TILE+16,y:y*TILE+16});
 function buildMinimap(w){const c=document.createElement('canvas');c.width=w.w;c.height=w.h;const x=c.getContext('2d');const img=x.createImageData(w.w,w.h);
   const cache={};for(let i=0;i<w.t.length;i++){const t=w.t[i];let col=cache[t];if(!col){const h=mmColor(t,w);col=cache[t]=[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]}img.data.set([col[0],col[1],col[2],255],i*4)}x.putImageData(img,0,0);w.mm=c}
 
 function genOver(){
-  const N=150,w=new World('over',N,N,{kind:'over',name:'Greenmeadow',lvl:1,skin:'hex'});const R=mulberry(4242),n1=makeNoise(R),n2=makeNoise(R);
+  const N=150,NW=220,w=new World('over',NW,N,{kind:'over',name:'Greenmeadow',lvl:1,skin:'hex'});const R=mulberry(4242),n1=makeNoise(R),n2=makeNoise(R);
   const hx=75,hy=42;
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++){const e=fbm(n1,x*.09,y*.09),m=fbm(n2,x*.11+40,y*.11);let t=T.GRASS;const forest=x>104;
-    if(forest)t=T.MOSS;
-    if(e>(forest?.53:.64))t=T.TREE;else if(m>.73)t=T.WATER;else if(m<.24&&e<.4&&hash(x,y)<.5)t=T.ROCK;else if(!forest&&hash(x,y)<.05)t=T.FLOWER;
-    if(x<3||y<3||x>N-4||y>N-4)t=T.TREE;w.t[y*N+x]=t}
+  for(let y=0;y<N;y++)for(let x=0;x<NW;x++){const e=fbm(n1,x*.09,y*.09),m=fbm(n2,x*.11+40,y*.11);let t=T.GRASS;const forest=x>104&&x<150,dunes=x>153;
+    if(dunes){t=T.SAND;if(e>.7)t=T.ROCK;else if(m>.74)t=T.LAVA;else if(hash(x,y)<.03)t=T.CACTUS}
+    else if(x>=150)t=T.ROCK;
+    else{if(forest)t=T.MOSS;if(e>(forest?.53:.64))t=T.TREE;else if(m>.73)t=T.WATER;else if(m<.24&&e<.4&&hash(x,y)<.5)t=T.ROCK;else if(!forest&&hash(x,y)<.05)t=T.FLOWER}
+    if(x<3||y<3||x>NW-4||y>N-4)t=dunes?T.ROCK:T.TREE;w.t[y*NW+x]=t}
   // hub
-  for(let y=-15;y<=15;y++)for(let x=-15;x<=15;x++){const d=Math.hypot(x,y);if(d<10.5)w.t[(hy+y)*N+hx+x]=T.FLOOR;else if(d<12.2)w.t[(hy+y)*N+hx+x]=T.GRASS;else if(d<13.6)w.t[(hy+y)*N+hx+x]=T.WALL;else if(d<15&&SOLID[w.t[(hy+y)*N+hx+x]])w.t[(hy+y)*N+hx+x]=T.GRASS}
-  const gates=[[0,1],[1,0],[-1,0],[0,-1]];for(const[gx,gy]of gates)for(let k=-1;k<=1;k++)for(let r=10;r<=14;r++){const x=hx+gx*r+(gy?k:0),y=hy+gy*r+(gx?k:0);w.t[y*N+x]=r>=12&&r<=13?T.GATE:T.PATH}
+  for(let y=-15;y<=15;y++)for(let x=-15;x<=15;x++){const d=Math.hypot(x,y);if(d<10.5)w.t[(hy+y)*NW+hx+x]=T.FLOOR;else if(d<12.2)w.t[(hy+y)*NW+hx+x]=T.GRASS;else if(d<13.6)w.t[(hy+y)*NW+hx+x]=T.WALL;else if(d<15&&SOLID[w.t[(hy+y)*NW+hx+x]])w.t[(hy+y)*NW+hx+x]=T.GRASS}
+  const gates=[[0,1],[1,0],[-1,0],[0,-1]];for(const[gx,gy]of gates)for(let k=-1;k<=1;k++)for(let r=10;r<=14;r++){const x=hx+gx*r+(gy?k:0),y=hy+gy*r+(gx?k:0);w.t[y*NW+x]=r>=12&&r<=13?T.GATE:T.PATH}
   // roads
   carve(w,[[75,140],[73,124],[77,108],[74,90],[76,70],[75,57]],1,T.PATH);
   carve(w,[[89,42],[104,46],[118,58],[128,72],[131,82]],1,T.PATH);
   carve(w,[[61,42],[45,46],[30,52],[22,62]],1,T.PATH);
   carve(w,[[75,28],[74,20],[75,13]],1,T.PATH);
   carve(w,[[40,47],[34,80],[42,100]],1,T.PATH);
+  carve(w,[[118,58],[138,60],[152,62],[170,68],[188,86],[200,101]],1,T.PATH);
+  carve(w,[[170,68],[180,50],[196,40]],1,T.PATH);carve(w,[[188,86],[184,118]],1,T.PATH);
+  if(!F().boss_thorn)for(let y=0;y<N;y++)for(let x=150;x<=153;x++){const t=w.t[y*NW+x];if(t===T.PATH||t===T.BRIDGE)w.t[y*NW+x]=T.RUBBLE}
+  // lava-lake secret island in the dunes
+  for(let y=-7;y<=7;y++)for(let x=-7;x<=7;x++){const d=Math.hypot(x,y);const i=(125+y)*NW+184+x;if(d<2.5)w.t[i]=T.SAND;else if(d<4.6)w.t[i]=T.LAVA;else if(d<6.5)w.t[i]=T.SAND}
   // ravine across the intro road (jump tutorial)
-  for(let x=3;x<N-3;x++){const yy=112+Math.round(Math.sin(x*.15)*1.5);for(let k=0;k<2;k++)w.t[(yy+k)*N+x]=T.CHASM}
+  for(let x=3;x<150;x++){const yy=112+Math.round(Math.sin(x*.15)*1.5);for(let k=0;k<2;k++)w.t[(yy+k)*NW+x]=T.CHASM}
   // secret island north
-  for(let y=-6;y<=6;y++)for(let x=-6;x<=6;x++){const d=Math.hypot(x,y);const i=(9+y)*N+75+x;if(d<3.3)w.t[i]=T.GRASS;else if(d<5.2)w.t[i]=T.CHASM;else if(d<6.5&&SOLID[w.t[i]])w.t[i]=T.GRASS}
+  for(let y=-6;y<=6;y++)for(let x=-6;x<=6;x++){const d=Math.hypot(x,y);const i=(9+y)*NW+75+x;if(d<3.3)w.t[i]=T.GRASS;else if(d<5.2)w.t[i]=T.CHASM;else if(d<6.5&&SOLID[w.t[i]])w.t[i]=T.GRASS}
   // second ravine pocket in west with island chest
-  for(let y=-5;y<=5;y++)for(let x=-5;x<=5;x++){const d=Math.hypot(x,y);const i=(102+y)*N+42+x;if(d<2.5)w.t[i]=T.GRASS;else if(d<4.4)w.t[i]=T.CHASM}
+  for(let y=-5;y<=5;y++)for(let x=-5;x<=5;x++){const d=Math.hypot(x,y);const i=(102+y)*NW+42+x;if(d<2.5)w.t[i]=T.GRASS;else if(d<4.4)w.t[i]=T.CHASM}
   clearArea(w,22,62,3,T.GRASS);clearArea(w,131,84,4,T.MOSS);clearArea(w,75,138,3,T.GRASS);
+  clearArea(w,200,104,4,T.SAND);clearArea(w,162,63,4,T.SAND);clearArea(w,176,40,2,T.SAND);clearArea(w,126,77,1,T.MOSS);
   w.spawn=tp(75,137);w.checkpoint=tp(75,137);
   const E=w.ents,add=t=>{E.push(t);return t};
   // hub NPCs and features
@@ -553,7 +565,7 @@ function genOver(){
   add(new Thing('sign',tp(77,116).x,tp(77,116).y,{text:'The ravine ahead is too wide to walk.\nPress SPACE to jump across.\nAttack mid-air to slam down on enemies.'}));
   add(new Thing('sign',tp(77,60).x,tp(77,60).y,{text:'Hearthhold, the last safe haven. Its gates are barred while raiders roam.\nDefeat the Raid Captain to open them.'}));
   add(new Thing('sign',tp(127,78).x,tp(127,78).y,{text:'Mossvale Hollow. The Thornmother waits below. Recommended level 4+.'}));
-  add(new Thing('portal',tp(131,84).x,tp(131,84).y,{label:'Descend into Mossvale Hollow',r:20,dungeon:true,use(p){dialog('Mossvale Hollow','A rot-choked cavern under the old woods. The Thornmother, warped by the Conclave, guards a Heartstone at its heart.\n\nRecommended level 4+.',[['Enter',()=>{closePanel();enterDungeon()}],['Not yet',closePanel]])}}));
+  add(new Thing('portal',tp(131,84).x,tp(131,84).y,{label:'Descend into Mossvale Hollow',r:20,dungeon:true,use(p){dialog('Mossvale Hollow','A rot-choked cavern under the old woods. The Thornmother, warped by the Conclave, guards a Heartstone at its heart.\n\nRecommended level 4+.',[['Enter',()=>{closePanel();enterDungeon('hollow')}],['Not yet',closePanel]])}}));
   add(new Thing('shrine',tp(22,62).x,tp(22,62).y,{name:'Shrine of Might',buff:'might',desc:'+30% damage',cool:0}));
   add(new Thing('shrine',tp(104,100).x,tp(104,100).y,{name:'Shrine of Haste',buff:'haste',desc:'+40% speed',cool:0}));
   clearArea(w,104,100,2,T.GRASS);
@@ -562,19 +574,40 @@ function genOver(){
   [[60,125],[95,95],[30,52],[50,80],[115,60],[120,100],[60,20],[95,22],[140,40],[20,120],[100,130]].forEach(([x,y],i)=>{clearArea(w,x,y,1,w.get(x,y)===T.MOSS?T.MOSS:T.GRASS);add(new Thing('chest',tp(x,y).x,tp(x,y).y,{lvl:x>104?4:2,respawn:300}))});
   const LORE=[['A Torn Journal','"The robed ones came at dusk. They did not burn the farms, they listened to them. Then the ground started to glow."'],['Conclave Decree','"By order of the Hexborne Conclave: every soul in Greenmeadow is to be tithed to the Veil. Resistance is a donation."'],['Scrawled Map','"Rowan says the old gate in Hearthhold was built by people who walked between worlds. If it can be opened, it can be closed."']];
   [[30,90],[118,92],[60,60]].forEach(([x,y],i)=>{if(!G.flags['lore_'+i]){clearArea(w,x,y,1,T.GRASS);add(new Thing('lore',tp(x,y).x,tp(x,y).y,{id:i,title:LORE[i][0],text:LORE[i][1]}))}});
-  for(let i=0;i<40;i++){const x=ri(10,140),y=ri(10,140);if(Math.hypot(x-hx,y-hy)<16)continue;if(!SOLID[w.get(x,y)]&&w.get(x,y)!==T.CHASM)add(new Thing('crate',tp(x,y).x,tp(x,y).y,{r:11}))}
+  for(let i=0;i<40;i++){const x=ri(10,NW-10),y=ri(10,140);if(Math.hypot(x-hx,y-hy)<16)continue;if(!SOLID[w.get(x,y)]&&w.get(x,y)!==T.CHASM)add(new Thing('crate',tp(x,y).x,tp(x,y).y,{r:11}))}
   // camps
   const camps=[[74,125,1,'grunt,grunt'],[70,98,1,'grunt,archer,grunt'],[82,85,2,'grunt,archer,exploder'],[55,110,2,'grunt,grunt,archer,brute'],[95,110,2,'archer,archer,grunt'],[50,60,2,'grunt,caster,grunt'],[30,75,3,'brute,archer,grunt'],[35,30,3,'caster,grunt,grunt,archer'],[100,30,3,'grunt,exploder,exploder,archer'],[112,50,4,'grunt,grunt,caster','moss'],[120,70,4,'brute,archer,archer','moss'],[135,95,5,'grunt,caster,exploder,brute','moss'],[115,120,5,'brute,brute,archer','moss'],[60,138,1,'grunt'],[130,30,5,'caster,caster,grunt,grunt','moss'],[20,100,3,'archer,archer,brute'],[90,60,3,'grunt,grunt,grunt,archer',null,true]];
   camps.forEach(([x,y,l,types,skin,elite])=>add(new Thing('camp',tp(x,y).x,tp(x,y).y,{lvl:l,types:types.split(','),skin:skin||'hex',spawned:false,alive:0,reset:0,elite})));
+  // Cinder Dunes
+  add(new Thing('sign',tp(156,64).x,tp(156,64).y,{text:'Cinder Dunes. The Emberforge burns beneath the sand.\nLava scorches anyone standing in it. Jump across it,\nor dodge-roll through quickly.'}));
+  add(new Thing('sign',tp(197,99).x,tp(197,99).y,{text:'Emberforge Depths. The Magma Colossus stirs below.\nRecommended level 8+.'}));
+  add(new Thing('npc',tp(164,65).x,tp(164,65).y,{name:'Nomad Sabe',role:'nomad',col:'#d89a50'}));
+  add(new Thing('portal',tp(200,104).x,tp(200,104).y,{label:'Descend into Emberforge Depths',r:20,dungeon:true,col:'255,140,60',use(p){dialog('Emberforge Depths','A Conclave foundry dug into the old volcano. Rivers of lava run between the halls, and the Magma Colossus guards a second Heartstone at the bottom.\n\nRecommended level 8+.',[['Enter',()=>{closePanel();enterDungeon('forge')}],['Not yet',closePanel]])}}));
+  add(new Thing('shrine',tp(176,40).x,tp(176,40).y,{name:'Shrine of Vigor',buff:'vigor',desc:'full heal',cool:0}));
+  for(const[id,n,x,y]of WAYS)add(new Thing('waystone',tp(x,y).x,tp(x,y).y,{id,name:n,r:14}));
+  if(!G.opened.isl3)add(new Thing('chest',tp(184,125).x,tp(184,125).y,{id:'isl3',once:true,big:true,lvl:9}));
+  if(!G.flags.lore_3)add(new Thing('lore',tp(205,60).x,tp(205,60).y,{id:3,title:'Foreman\'s Ledger',text:'"Week nine. The Colossus no longer needs the chains. It walks the forge on its own and the lava follows it. The Conclave calls this progress. I call it time to leave."'}));
+  clearArea(w,205,60,1,T.SAND);
+  [[165,90],[180,52],[195,132],[212,80],[170,122],[206,30]].forEach(([x,y])=>{clearArea(w,x,y,1,T.SAND);add(new Thing('chest',tp(x,y).x,tp(x,y).y,{lvl:8,respawn:300}))});
+  [[166,76,7,'grunt,archer,grunt'],[176,56,7,'exploder,exploder,grunt,archer'],[186,78,8,'brute,archer,caster'],[196,66,8,'grunt,grunt,caster,archer'],[180,100,8,'brute,grunt,exploder'],[200,122,9,'caster,caster,brute'],[211,96,9,'grunt,grunt,brute,archer'],[170,136,8,'archer,archer,exploder'],[205,46,9,'brute,brute,caster'],[192,112,9,'grunt,archer,caster,brute',true]]
+    .forEach(([x,y,l,types,elite])=>add(new Thing('camp',tp(x,y).x,tp(x,y).y,{lvl:l,types:types.split(','),skin:'ash',spawned:false,alive:0,reset:0,elite})));
   if(!F().captain)add(new Thing('bosscamp',tp(75,64).x,tp(75,64).y,{bid:'captain',lvl:2,flag:'captain'}));
   if(F().captain)openGates(w);
   buildMinimap(w);return w;
 }
+function openRubble(w){for(let y=0;y<w.h;y++)for(let x=0;x<w.w;x++)if(w.get(x,y)===T.RUBBLE)w.set(x,y,T.PATH)}
+const WAYS=[['hub','Hearthhold',70,37],['moss','Mossvale Hollow',126,77],['dunes','Dunes Outpost',160,61]];
+function useWaystone(t){if(!F()['ws_'+t.id]){F()['ws_'+t.id]=1;toast('Waystone attuned: '+t.name,'#6af2df');sfx('magic');burst(t.x,t.y,'#6af2df',24,160)}
+  const opts=WAYS.filter(([id])=>id!==t.id&&F()['ws_'+id]).map(([id,n,x,y])=>[n,()=>{closePanel();travelTo(tp(x,y+2))}]);
+  dialog(t.name+' Waystone',opts.length?'Choose a destination.':'Waystone attuned. Attune others to travel between them.',[...opts,['Stay',closePanel]])}
+function travelTo(pos){G.players.forEach((p,i)=>{p.x=pos.x+(i%2)*20-10;p.y=pos.y+(i>>1)*20;p.z=0;p.vz=0;p.lastSafe={x:p.x,y:p.y}});G.cam.x=pos.x;G.cam.y=pos.y;burst(pos.x,pos.y,'#6af2df',30,200);sfx('magic')}
 function openGates(w){for(let y=0;y<w.h;y++)for(let x=0;x<w.w;x++)if(w.get(x,y)===T.GATE)w.set(x,y,T.PATH)}
 
-function genDungeon(lvl){
-  const CW=16,GW=4,GH=4,N=CW*GW+2;const w=new World('dungeon',N,N,{kind:'dungeon',name:'Mossvale Hollow',lvl,skin:'moss',dark:.5});
-  w.pal={floor:'#4a5a3c',floor2:'#435236',wall:'#5d7048',wallTop:'#1a2416'};w.t.fill(T.DWALL);
+const DUNGEONS={hollow:{name:'Mossvale Hollow',skin:'moss',boss:'thorn',flag:'boss_thorn',pit:T.CHASM,dark:.5,base:4,pal:{floor:'#4a5a3c',floor2:'#435236',wall:'#5d7048',wallTop:'#2a3822'}},
+  forge:{name:'Emberforge Depths',skin:'ash',boss:'colossus',flag:'boss_colossus',pit:T.LAVA,dark:.45,base:8,pal:{floor:'#5e4838',floor2:'#564132',wall:'#8a5236',wallTop:'#3a2820'}}};
+function genDungeon(lvl,key){const DG=DUNGEONS[key];
+  const CW=16,GW=4,GH=4,N=CW*GW+2;const w=new World('dungeon',N,N,{kind:'dungeon',name:DG.name,lvl,skin:DG.skin,dark:DG.dark});w.dkey=key;
+  w.pal=DG.pal;w.t.fill(T.DWALL);
   let cells,cx,cy,vis,links;do{cells=[];cx=0;cy=ri(0,GH-1);vis=new Set([cx+','+cy]);cells.push([cx,cy]);links=[];
   while(cells.length<7){const opts=[[1,0],[0,1],[0,-1],[-1,0]].map(([a,b])=>[cx+a,cy+b]).filter(([a,b])=>a>=0&&b>=0&&a<GW&&b<GH&&!vis.has(a+','+b));if(!opts.length)break;const[nx,ny]=opts[Math.random()<.55&&opts.find(o=>o[0]>cx)?opts.findIndex(o=>o[0]>cx):ri(0,opts.length-1)];links.push([[cx,cy],[nx,ny]]);cx=nx;cy=ny;vis.add(cx+','+cy);cells.push([cx,cy])}}while(cells.length<5);
   const main=[...cells];const side=[];
@@ -583,13 +616,13 @@ function genDungeon(lvl){
   const roomOf={};
   [...main,...side].forEach((c,i)=>{const boss=c===main[main.length-1];const[mx,my]=center(c);const rw=boss?7:ri(4,6),rh=boss?7:ri(4,6);for(let y=-rh;y<=rh;y++)for(let x=-rw;x<=rw;x++)w.set(mx+x,my+y,T.DFLOOR);roomOf[c.join(',')]={mx,my,rw,rh,boss};
     if(!boss&&i>0&&Math.random()<.5){for(let k=0;k<3;k++){const px=mx+ri(-rw+2,rw-2),py=my+ri(-rh+2,rh-2);w.set(px,py,T.DWALL)}}
-    if(!boss&&i>0&&Math.random()<.35){const px=mx+ri(-rw+3,rw-3),py=my+ri(-rh+3,rh-3);for(let y=0;y<2;y++)for(let x=0;x<3;x++)w.set(px+x,py+y,T.CHASM)}});
+    if(!boss&&i>0&&Math.random()<(key==='forge'?.8:.35))for(let k=0;k<(key==='forge'?2:1);k++){const px=mx+ri(-rw+3,rw-3),py=my+ri(-rh+3,rh-3);for(let y=0;y<2;y++)for(let x=0;x<3;x++)w.set(px+x,py+y,DG.pit)}});
   for(const[a,b]of links){const[ax,ay]=center(a),[bx,by]=center(b);carve(w,[[ax,ay],[bx,ay],[bx,by]],1,T.DFLOOR)}
   const E=w.ents;const st=center(main[0]);w.spawn=tp(st[0],st[1]+2);w.checkpoint=w.spawn;
-  E.push(new Thing('portal',tp(st[0],st[1]-2).x,tp(st[0],st[1]-2).y,{label:'Leave the Hollow',r:18,use(){exitDungeon()}}));
-  main.slice(1,-1).forEach(c=>{const r=roomOf[c.join(',')];const types=[];const n=ri(3,4)+G.players.length;for(let i=0;i<n;i++)types.push(pick(['grunt','grunt','archer','exploder','caster','brute']));E.push(new Thing('camp',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{lvl,types,skin:'moss',spawned:false,alive:0,dungeon:true,elite:Math.random()<.25}))});
-  side.forEach(c=>{const r=roomOf[c.join(',')];E.push(new Thing('chest',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{lvl,big:Math.random()<.4}));E.push(new Thing('camp',tp(r.mx+2,r.my+2).x,tp(r.mx+2,r.my+2).y,{lvl,types:['grunt','archer','grunt'],skin:'moss',spawned:false,alive:0,dungeon:true}))});
-  for(const k in roomOf){const r=roomOf[k];if(r.boss){E.push(new Thing('bosscamp',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{bid:'thorn',lvl:lvl+1,flag:'boss_thorn',dungeon:true,room:r}))}
+  E.push(new Thing('portal',tp(st[0],st[1]-2).x,tp(st[0],st[1]-2).y,{label:'Leave '+DG.name,r:18,use(){exitDungeon()}}));
+  main.slice(1,-1).forEach(c=>{const r=roomOf[c.join(',')];const types=[];const n=ri(3,4)+G.players.length;for(let i=0;i<n;i++)types.push(pick(['grunt','grunt','archer','exploder','caster','brute']));E.push(new Thing('camp',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{lvl,types,skin:DG.skin,spawned:false,alive:0,dungeon:true,elite:Math.random()<.25}))});
+  side.forEach(c=>{const r=roomOf[c.join(',')];E.push(new Thing('chest',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{lvl,big:Math.random()<.4}));E.push(new Thing('camp',tp(r.mx+2,r.my+2).x,tp(r.mx+2,r.my+2).y,{lvl,types:['grunt','archer','grunt'],skin:DG.skin,spawned:false,alive:0,dungeon:true}))});
+  for(const k in roomOf){const r=roomOf[k];if(r.boss){E.push(new Thing('bosscamp',tp(r.mx,r.my).x,tp(r.mx,r.my).y,{bid:DG.boss,lvl:lvl+1,flag:DG.flag,dungeon:true,room:r}))}
     for(let i=0;i<3;i++){const x=r.mx+ri(-r.rw+1,r.rw-1),y=r.my+ri(-r.rh+1,r.rh-1);if(w.get(x,y)===T.DFLOOR&&!r.boss)E.push(new Thing('crate',tp(x,y).x,tp(x,y).y,{r:11}))}}
   buildMinimap(w);return w;
 }
@@ -617,14 +650,16 @@ function genVeil(){
 // ================= WORLD TRANSITIONS =================
 function setWorld(w,pos){G.world=w;G.projs=[];G.hazards=[];G.boss=null;const sp=pos||w.spawn;G.players.forEach((p,i)=>{p.x=sp.x+(i%2)*20-10;p.y=sp.y+(i>>1)*20;p.z=0;p.vz=0;p.lastSafe={x:p.x,y:p.y};p.phoenixUsed=false;p.downed=false;if(p.hp<=0)p.hp=p.maxHp*.5});
   G.cam.x=sp.x;G.cam.y=sp.y;banner(w.name,w.kind==='veil'?'The ethereal realm':w.kind==='dungeon'?'Dungeon':'');save()}
-function enterDungeon(){G.returnPos={x:G.players[0].x,y:G.players[0].y+40};const lvl=Math.max(4,effLvl(4));G.worlds.dungeon=genDungeon(lvl);setWorld(G.worlds.dungeon)}
+function enterDungeon(key){G.returnPos={x:G.players[0].x,y:G.players[0].y+40};const b=DUNGEONS[key].base;const lvl=Math.max(b,effLvl(b));G.worlds.dungeon=genDungeon(lvl,key);setWorld(G.worlds.dungeon)}
 function exitDungeon(){setWorld(G.worlds.over,G.returnPos||tp(131,86));delete G.worlds.dungeon}
 function enterVeil(){if(!G.worlds.veil)G.worlds.veil=genVeil();if(!F().veilEntered){F().veilEntered=1;}setWorld(G.worlds.veil)}
 function exitVeil(){setWorld(G.worlds.over,tp(75,37))}
 function onBossDeath(e){
   G.boss=null;const f=e.flagKey;if(f)F()[f]=1;
   if(e.bid==='captain'){openGates(G.worlds.over);banner('Hearthhold Opens','The gates are unbarred');G.worlds.over.checkpoint=tp(75,48)}
-  if(e.bid==='thorn'){banner('Heartstone Claimed','The Veil Gate stirs in Hearthhold');const w=G.world;w.ents.push(new Thing('portal',e.x,e.y+60,{label:'Leave the Hollow',r:18,use(){exitDungeon()}}));w.ents.push(new Thing('chest',e.x+50,e.y,{big:true,lvl:w.lvl+1}))}
+  if(e.bid==='thorn'){banner('Heartstone Claimed','The Veil Gate stirs, and the eastern rockslide shifts');openRubble(G.worlds.over)}
+  if(e.bid==='colossus')banner('Second Heartstone Claimed','The Emberforge goes cold');
+  if(G.world.kind==='dungeon'){const w=G.world;w.ents.push(new Thing('portal',e.x,e.y+60,{label:'Leave '+w.name,r:18,use(){exitDungeon()}}));w.ents.push(new Thing('chest',e.x+50,e.y,{big:true,lvl:w.lvl+1}))}
   if(e.bid==='maw'){banner('Dusk Maw Slain','The night loosens its grip');F().maw=1}
   save();
 }
@@ -665,19 +700,23 @@ const QUESTS=[
   {t:'Into the Veil',d:()=>'The Veil Gate in Hearthhold has awakened. Step through it.',done:()=>F().veilEntered,tgt:()=>({w:'over',...tp(75,34)})},
   {t:'Anchor of Souls',d:()=>`Gather soul essence from blooms and foes, then bring 150 to Warden Lio. (${Math.min(G.soul,150)}/150)`,done:()=>F().anchor,tgt:()=>({w:'veil',...tp(54,50)})},
   {t:'Endure the Night',d:()=>'Survive a full Endure phase in the Veil. Slay the Dusk Maw if you dare.',done:()=>F().night,tgt:()=>null},
-  {t:'End of the Slice',d:()=>'You\'ve finished this vertical slice. Keep farming gear, beat the Dusk Maw, and find every secret island chest.',done:()=>false,tgt:()=>null}];
+  {t:'Beyond the Rockslide',d:()=>'With the Thornmother gone, the rockslide east of Mossvale has shifted. Cross into the Cinder Dunes.',done:()=>F().dunes,tgt:()=>({w:'over',...tp(152,62)})},
+  {t:'The Second Heartstone',d:()=>'Find Emberforge Depths in the Cinder Dunes and destroy the Magma Colossus. Recommended level 8+.',done:()=>F().boss_colossus,tgt:()=>({w:'over',...tp(200,104)})},
+  {t:'End of the Slice',d:()=>'You\'ve finished this vertical slice. Keep farming gear, beat the Dusk Maw, attune every waystone, and find every secret island chest.',done:()=>false,tgt:()=>null}];
 function updateQuest(){while(G.quest<QUESTS.length-1&&QUESTS[G.quest].done()){G.quest++;toast('Quest complete!','#ffcd57');G.glimmer+=50;gainXP(60);sfx('level');save()}
-  const q=QUESTS[G.quest];const lore=['lore_0','lore_1','lore_2','lore_v'].filter(k=>F()[k]).length;const isl=['isl1','isl2'].filter(k=>G.opened[k]).length;
-  const qh=`<h3>${q.t}</h3>${q.d()}<div class="side">Lore pages ${lore}/4 · Secret islands ${isl}/2${G.world&&G.world.kind==='veil'?`<br><b style="color:${veilPhase()==='thrive'?'#6af2df':'#a88aff'}">${veilPhase()==='thrive'?'☀ Thrive':'☾ Endure'}</b> · ${Math.ceil((veilPhase()==='thrive'?THRIVE_LEN-(G.veilT%VEIL_CYCLE):VEIL_CYCLE-(G.veilT%VEIL_CYCLE)))}s left`:''}</div>`;if(qh!==G.qhtml){G.qhtml=qh;$('#quest').innerHTML=qh}}
+  const q=QUESTS[G.quest];const lore=['lore_0','lore_1','lore_2','lore_3','lore_v'].filter(k=>F()[k]).length;const isl=['isl1','isl2','isl3'].filter(k=>G.opened[k]).length;
+  const qh=`<h3>${q.t}</h3>${q.d()}<div class="side">Lore pages ${lore}/5 · Secret islands ${isl}/3${G.world&&G.world.kind==='veil'?`<br><b style="color:${veilPhase()==='thrive'?'#6af2df':'#a88aff'}">${veilPhase()==='thrive'?'☀ Thrive':'☾ Endure'}</b> · ${Math.ceil((veilPhase()==='thrive'?THRIVE_LEN-(G.veilT%VEIL_CYCLE):VEIL_CYCLE-(G.veilT%VEIL_CYCLE)))}s left`:''}</div>`;if(qh!==G.qhtml){G.qhtml=qh;$('#quest').innerHTML=qh}}
 
 // ================= NPCs =================
 function npcTalk(t,p){
   if(t.role==='elder'){if(!F().elder){F().elder=1;dialog('Elder Rowan','"You came up the south road? Then you\'ve seen what the Conclave is doing.\n\nThey are draining souls into the Veil, a realm that sits just behind ours. The old gate in our square was built to reach it. It sleeps now, but a Heartstone would wake it.\n\nThe Thornmother in Mossvale Hollow carries one. Kill her and bring the gate to life. Brakka will sharpen your gear, and Pell sells what the raiders leave behind."');}
     else if(!F().boss_thorn)dialog('Elder Rowan','"Mossvale Hollow lies east, past the woods. Gear up first. The Thornmother calls the whole forest to her side."');
-    else dialog('Elder Rowan','"The gate hums with light. Step through, find Warden Lio at the Veil Anchor, and mind the Endure. That realm grows teeth at night."');}
+    else if(!F().boss_colossus)dialog('Elder Rowan','"The gate hums with light, and Tamsin says the rockslide east of Mossvale has shifted. Beyond it lie the Cinder Dunes and the Emberforge, where the Conclave keeps a second Heartstone.\n\nGo through the Veil Gate, or go east. Both need doing. Use the waystones to save your legs."');
+    else dialog('Elder Rowan','"Two Heartstones. Two. The Conclave will be furious. Step through, find Warden Lio at the Veil Anchor, and mind the Endure. That realm grows teeth at night."');}
   else if(t.role==='smith')openSmith(p.pid);
   else if(t.role==='merchant')openMerchant(p.pid);
-  else if(t.role==='scout')dialog('Scout Tamsin','"Two islands sit out past the ravines. One north of town, one west of the south road. The old folk hid treasure there. Get a running jump and don\'t look down.\n\nAlso: stack your talismans with your armor. A crit hood plus a Hawk Eye hits hard."');
+  else if(t.role==='nomad')dialog('Nomad Sabe','"You came through the rockslide? Brave. The Emberforge is south-east, past the lava flats. Jump the lava where you can and don\'t stand in it.\n\nThere\'s a little island in a lava lake further south. Old smugglers\' cache. And I trade, if you have glimmer."',[['Trade',()=>openMerchant(p.pid)],['Later',closePanel]]);
+  else if(t.role==='scout')dialog('Scout Tamsin','"Three islands are out there: one north of town, one west of the south road, and one in a lava lake in the Cinder Dunes. The old folk hid treasure there. Get a running jump and don\'t look down.\n\nAlso: stack your talismans with your armor. A crit hood plus a Hawk Eye hits hard."');
   else if(t.role==='lio'){if(!F().anchor){if(G.soul>=150){G.soul-=150;F().anchor=1;dialog('Warden Lio','"You carry enough light to steady the Anchor. Thank you.\n\nTake this. And stay a while: the Endure is coming, and I need to know someone can survive it."');const it=makeItem('talisman',partyLevel()+1,2,'thrive');p.bag.push(it);toast('Received '+it.name,RAR[2].c)}else dialog('Warden Lio',`"The Anchor is starving. Harvest the glowing soul blooms. They swell during Thrive. Bring me 150 soul essence.\n\nYou have ${G.soul}."`)}
     else openLio(p.pid)}
 }
@@ -784,6 +823,7 @@ function update(dt){
   let cx=ref.reduce((a,p)=>a+p.x,0)/ref.length,cy=ref.reduce((a,p)=>a+p.y,0)/ref.length;
   G.cam.x=lerp(G.cam.x,cx,Math.min(1,dt*6));G.cam.y=lerp(G.cam.y,cy,Math.min(1,dt*6));
   if(G.players.length>1){const hw=W/2/ZOOM-30,hh=H/2/ZOOM-40;for(const p of G.players){p.x=clamp(p.x,G.cam.x-hw,G.cam.x+hw);p.y=clamp(p.y,G.cam.y-hh,G.cam.y+hh)}}
+  if(w.kind==='over'){const tx=G.cam.x/TILE,ty=G.cam.y/TILE;const rn=Math.hypot(tx-75,ty-42)<13?'Hearthhold':tx>153?'Cinder Dunes':tx>104?'Mossvale Woods':'Greenmeadow';if(rn!==G.region){if(G.region)banner(rn,rn==='Cinder Dunes'?'Region 2':'');G.region=rn;w.name=rn;if(rn==='Cinder Dunes')F().dunes=1}}
   if(w.kind==='veil')updateVeil(dt);
   // entities
   const ax=G.cam.x,ay=G.cam.y,AR=1100;
@@ -824,9 +864,9 @@ function update(dt){
 }
 
 // ================= DRAW =================
-const GROUND={0:['#5a9a40','#609f45'],3:['#b89c6a','#b0946a'],5:['#c4b088','#bba67e'],7:['#8a6a3e','#7d5f37'],9:['#5a9a40','#609f45'],12:['#2c2150','#271d48'],17:['#3f7d33','#447f37'],2:['#2f72c8','#3378cc'],6:['#07060c','#07060c'],15:['#1fd3c0','#22d8c6']};
+const GROUND={0:['#5a9a40','#609f45'],3:['#b89c6a','#b0946a'],5:['#c4b088','#bba67e'],7:['#8a6a3e','#7d5f37'],9:['#5a9a40','#609f45'],12:['#2c2150','#271d48'],17:['#3f7d33','#447f37'],2:['#2f72c8','#3378cc'],6:['#07060c','#07060c'],15:['#1fd3c0','#22d8c6'],18:['#e0c07a','#d8b872'],20:['#ff6a1a','#ff7a24']};
 function groundCol(t,x,y,w){if(t===T.DFLOOR)return(x+y)%2?w.pal.floor:w.pal.floor2;const g=GROUND[t];if(g)return g[(x*7+y*3)%5===0?1:0];
-  if(t===T.TREE||t===T.ROCK)return w.kind==='over'&&x>104?GROUND[17][0]:GROUND[0][0];if(t===T.MUSH||t===T.CRYSTAL)return GROUND[12][0];if(t===T.WALL||t===T.GATE)return'#5a9a40';return'#333'}
+  if(t===T.CACTUS||t===T.RUBBLE||(t===T.ROCK&&w.kind==='over'&&x>=150))return GROUND[18][0];if(t===T.TREE||t===T.ROCK)return w.kind==='over'&&x>104?GROUND[17][0]:GROUND[0][0];if(t===T.MUSH||t===T.CRYSTAL)return GROUND[12][0];if(t===T.WALL||t===T.GATE)return'#5a9a40';return'#333'}
 function draw(){
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#07060c';ctx.fillRect(0,0,cv.width,cv.height);
   const w=G.world,sx=G.shake?rr(-G.shake,G.shake):0,sy=G.shake?rr(-G.shake,G.shake):0;
@@ -840,6 +880,7 @@ function draw(){
     else if((t===T.GRASS||t===T.MOSS)&&hx<.3){ctx.fillStyle='rgba(0,40,0,.18)';ctx.fillRect(x*TILE+hx*90%28,y*TILE+hx*300%28,3,5)}
     else if(t===T.WATER){ctx.fillStyle='rgba(255,255,255,.15)';const o=Math.sin(tm*2+x+y)*4;ctx.fillRect(x*TILE+8+o,y*TILE+12,10,2)}
     else if(t===T.CHASM){const up=w.get(x,y-1);if(up!==T.CHASM){ctx.fillStyle=w.kind==='veil'?'#3a2a6a':'#3a2e22';ctx.fillRect(x*TILE,y*TILE,TILE,8)}if(w.kind==='veil'&&hx<.08){ctx.fillStyle='rgba(180,160,255,.6)';ctx.fillRect(x*TILE+hx*400%30,y*TILE+hx*900%30,2,2)}}
+    else if(t===T.LAVA){ctx.fillStyle=`rgba(255,225,100,${.3+Math.sin(tm*3+x*1.3+y)*.25})`;ctx.beginPath();ctx.arc(x*TILE+8+hx*16,y*TILE+8+(hx*37%1)*16,3+Math.sin(tm*4+hx*9)*1.5,0,7);ctx.fill()}
     else if(t===T.VPOOL){ctx.fillStyle=`rgba(200,255,250,${.15+Math.sin(tm*3+x*.7+y)*.1})`;ctx.fillRect(x*TILE+4,y*TILE+4,24,24)}
     else if(t===T.BRIDGE){ctx.fillStyle='rgba(0,0,0,.25)';for(let k=0;k<4;k++)ctx.fillRect(x*TILE,y*TILE+k*8,TILE,1)}
     else if(t===T.VEIL&&hx<.12){ctx.fillStyle=`rgba(120,255,230,${.25+Math.sin(tm*2+hx*50)*.15})`;ctx.beginPath();ctx.arc(x*TILE+hx*250%28+2,y*TILE+hx*700%28+2,2,0,7);ctx.fill()}
@@ -869,7 +910,7 @@ function draw(){
   if(dark>0){lctx.setTransform(1,0,0,1,0,0);lctx.globalCompositeOperation='source-over';lctx.clearRect(0,0,light.width,light.height);lctx.fillStyle=w.kind==='veil'?`rgba(8,4,26,${dark})`:`rgba(4,6,4,${dark})`;lctx.fillRect(0,0,light.width,light.height);lctx.globalCompositeOperation='destination-out';
     const lightAt=(x,y,r,a)=>{const X=(W/2+(x-G.cam.x)*ZOOM)*DPR,Y=(H/2+(y-G.cam.y)*ZOOM)*DPR,R=r*ZOOM*DPR;if(X<-R||Y<-R||X>light.width+R||Y>light.height+R)return;const g=lctx.createRadialGradient(X,Y,0,X,Y,R);g.addColorStop(0,`rgba(0,0,0,${a})`);g.addColorStop(1,'rgba(0,0,0,0)');lctx.fillStyle=g;lctx.fillRect(X-R,Y-R,R*2,R*2)};
     for(const p of G.players)lightAt(p.x,p.y,230,1);
-    let n=0;for(let y=y0;y<=y1&&n<70;y++)for(let x=x0;x<=x1&&n<70;x++){const t=w.t[y*w.w+x];if(t===T.CRYSTAL||t===T.MUSH||t===T.VPOOL){if(hash(x,y)<.4){lightAt(x*TILE+16,y*TILE+8,90,.7);n++}}}
+    let n=0;for(let y=y0;y<=y1&&n<70;y++)for(let x=x0;x<=x1&&n<70;x++){const t=w.t[y*w.w+x];if(t===T.CRYSTAL||t===T.MUSH||t===T.VPOOL||t===T.LAVA){if(hash(x,y)<.4){lightAt(x*TILE+16,y*TILE+8,90,.7);n++}}}
     for(const e of w.ents)if(!e.dead&&(e.kind==='bloom'&&e.grow>=1||e.kind==='portal'||e.kind==='critter'))lightAt(e.x,e.y,e.kind==='portal'?160:80,.8);
     for(const pr of G.projs)lightAt(pr.x,pr.y,40,.5);
     lctx.globalCompositeOperation='source-over';ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(light,0,0)}
@@ -878,7 +919,9 @@ function draw(){
 function drawTall(t,x,y,w){const px=x*TILE,py=y*TILE,h=hash(x,y);
   if(t===T.TREE){const moss=w.kind==='over'&&x>104;ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(px+16,py+26,16,7,0,0,7);ctx.fill();ctx.fillStyle='#6b4a2a';ctx.fillRect(px+12,py+10,8,18);
     const c1=moss?'#2f6a2a':'#3d8a30',c2=moss?'#3a7f33':'#4fa03c';ctx.fillStyle=c1;ctx.beginPath();ctx.arc(px+16,py+2-h*6,19,0,7);ctx.fill();ctx.fillStyle=c2;ctx.beginPath();ctx.arc(px+11,py-4-h*6,11,0,7);ctx.fill()}
-  else if(t===T.ROCK){ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(px+16,py+26,15,6,0,0,7);ctx.fill();ctx.fillStyle='#7a7266';ctx.beginPath();ctx.moveTo(px+2,py+26);ctx.lineTo(px+6,py+6);ctx.lineTo(px+20,py+1);ctx.lineTo(px+30,py+12);ctx.lineTo(px+30,py+26);ctx.fill();ctx.fillStyle='#958c7e';ctx.beginPath();ctx.moveTo(px+6,py+6);ctx.lineTo(px+20,py+1);ctx.lineTo(px+24,py+12);ctx.lineTo(px+9,py+14);ctx.fill()}
+  else if(t===T.ROCK){ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(px+16,py+26,15,6,0,0,7);ctx.fill();const dz=w.kind==='over'&&x>=150;ctx.fillStyle=dz?'#9a6a4a':'#7a7266';ctx.beginPath();ctx.moveTo(px+2,py+26);ctx.lineTo(px+6,py+6);ctx.lineTo(px+20,py+1);ctx.lineTo(px+30,py+12);ctx.lineTo(px+30,py+26);ctx.fill();ctx.fillStyle=dz?'#b88660':'#958c7e';ctx.beginPath();ctx.moveTo(px+6,py+6);ctx.lineTo(px+20,py+1);ctx.lineTo(px+24,py+12);ctx.lineTo(px+9,py+14);ctx.fill()}
+  else if(t===T.CACTUS){ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(px+16,py+27,10,4,0,0,7);ctx.fill();ctx.fillStyle='#4f8a3a';ctx.beginPath();ctx.roundRect(px+12,py-6,9,34,4);ctx.fill();ctx.beginPath();ctx.roundRect(px+3,py+4,7,12,3);ctx.roundRect(px+23,py-2,7,12,3);ctx.fill();ctx.fillRect(px+6,py+12,8,4);ctx.fillRect(px+19,py+6,8,4);ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(px+14,py-3,2,28)}
+  else if(t===T.RUBBLE){ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(px+16,py+26,18,7,0,0,7);ctx.fill();const cs=['#8a6a4a','#a07a56','#7a5a3c'];for(let k=0;k<4;k++){ctx.fillStyle=cs[(k+(h*3|0))%3];ctx.beginPath();ctx.arc(px+6+((k*11+h*20)%22),py+18-(k%2)*12-k*2,9-k,0,7);ctx.fill()}}
   else if(t===T.WALL||t===T.DWALL||t===T.GATE){const top=t===T.DWALL?w.pal.wallTop:t===T.GATE?'#8a5a2e':'#8a8296',front=t===T.DWALL?w.pal.wall:t===T.GATE?'#5e3b1c':'#5c5466';const below=w.get(x,y+1);
     ctx.fillStyle=top;ctx.fillRect(px,py-18,TILE+.5,TILE+.5);if(!TALL[below]||below!==t){ctx.fillStyle=front;ctx.fillRect(px,py+14,TILE+.5,18)}
     if(t===T.GATE){ctx.fillStyle='#3a2410';for(let k=0;k<4;k++)ctx.fillRect(px+3+k*8,py-16,3,46)}else if(t===T.WALL&&h<.5){ctx.fillStyle='rgba(0,0,0,.12)';ctx.fillRect(px+4,py-12,10,6)}}
@@ -913,6 +956,7 @@ function drawCreature(c,e,col,kind){const x=e.x,y=e.y;shadow(x,y,e.r,0);const wo
   if(kind==='boss'){ctx.beginPath();ctx.arc(x+lunge,by,r,0,7);ctx.fill();ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.arc(x,by+r*.3,r*.8,0,Math.PI);ctx.fill();
     ctx.fillStyle=fl?'#fff':e.phase>1?'#ff5050':'#ffe070';const fx=Math.cos(e.face||0)*r*.4;ctx.beginPath();ctx.arc(x+fx-r*.3,by-r*.2,r*.13,0,7);ctx.arc(x+fx+r*.3,by-r*.2,r*.13,0,7);ctx.fill();
     if(e.bid==='thorn'){ctx.strokeStyle='#2a5a1a';ctx.lineWidth=4;for(let i=0;i<8;i++){const a=i/8*Math.PI*2+e.anim*.3;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r,by+Math.sin(a)*r);ctx.lineTo(x+Math.cos(a)*(r+14),by+Math.sin(a)*(r+14));ctx.stroke()}}
+    if(e.bid==='colossus'){ctx.strokeStyle=`rgba(255,${150+Math.sin(e.anim*4)*60|0},40,.9)`;ctx.lineWidth=3;for(let i=0;i<5;i++){const a=i*1.3+.4;ctx.beginPath();ctx.moveTo(x+Math.cos(a)*r*.2,by+Math.sin(a)*r*.2);ctx.lineTo(x+Math.cos(a+.3)*r*.6,by+Math.sin(a+.3)*r*.6);ctx.lineTo(x+Math.cos(a)*r*.95,by+Math.sin(a)*r*.95);ctx.stroke()}}
     if(e.bid==='maw'){ctx.fillStyle='#120828';ctx.beginPath();ctx.ellipse(x,by+r*.35,r*.6,r*.25+Math.sin(e.anim*5)*4,0,0,7);ctx.fill()}
     if(e.bid==='captain'){ctx.fillStyle='#3a2a4a';ctx.beginPath();ctx.moveTo(x-r,by-r*.5);ctx.lineTo(x,by-r*1.6);ctx.lineTo(x+r,by-r*.5);ctx.fill()}
     return}
@@ -936,12 +980,13 @@ function drawThing(e){if(e.enemy||e.ally){e.draw(ctx);return}const x=e.x,y=e.y,t
     case'crate':{shadow(x,y,11,0);ctx.fillStyle='#9a7040';ctx.fillRect(x-11,y-20,22,20);ctx.strokeStyle='#5a3e20';ctx.lineWidth=2;ctx.strokeRect(x-11,y-20,22,20);ctx.beginPath();ctx.moveTo(x-11,y-20);ctx.lineTo(x+11,y);ctx.stroke();break}
     case'npc':{shadow(x,y,12,0);const by=y-12+Math.sin(t*2)*1;ctx.fillStyle=e.col;ctx.beginPath();ctx.roundRect(x-10,by-6,20,20,5);ctx.fill();ctx.fillStyle='#f0c8a0';ctx.beginPath();ctx.arc(x,by-12,8,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 11px Chakra Petch';ctx.textAlign='center';ctx.fillText(e.name,x,by-26);
       const q=QUESTS[G.quest];if((e.role==='elder'&&!F().elder&&F().captain)||(e.role==='lio'&&!F().anchor)){ctx.fillStyle='#ffcd57';ctx.font='bold 20px Chakra Petch';ctx.fillText('!',x,by-38+Math.sin(t*4)*3)}break}
-    case'portal':{const active=e.gate!=='veil'||F().boss_thorn;const c=e.dungeon?'90,200,90':active?'106,242,223':'120,110,140';ctx.fillStyle='#2a2238';ctx.beginPath();ctx.ellipse(x,y+4,e.r+6,10,0,0,7);ctx.fill();
+    case'portal':{const active=e.gate!=='veil'||F().boss_thorn;const c=e.col||(e.dungeon?'90,200,90':active?'106,242,223':'120,110,140');ctx.fillStyle='#2a2238';ctx.beginPath();ctx.ellipse(x,y+4,e.r+6,10,0,0,7);ctx.fill();
       for(let i=0;i<3;i++){ctx.strokeStyle=`rgba(${c},${.8-i*.2})`;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y-e.r,e.r*.7-i*4+Math.sin(t*3+i)*2,e.r+8-i*4,0,0,7);ctx.stroke()}
       if(active){ctx.fillStyle=`rgba(${c},.25)`;ctx.beginPath();ctx.ellipse(x,y-e.r,e.r*.6,e.r+4,0,0,7);ctx.fill();if(Math.random()<.3)G.parts.push(part(x+rr(-12,12),y,`rgb(${c})`,{vx:0,vy:0,vz:rr(40,90),life:.8,z:rr(0,30)}))}break}
     case'fountain':{ctx.fillStyle='#8a8296';ctx.beginPath();ctx.ellipse(x,y,26,14,0,0,7);ctx.fill();ctx.fillStyle='#3a8ad8';ctx.beginPath();ctx.ellipse(x,y-2,20,9,0,0,7);ctx.fill();ctx.fillStyle='#9a92a6';ctx.fillRect(x-4,y-26,8,24);ctx.fillStyle='rgba(180,220,255,.7)';for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(x+Math.sin(t*3+i*2)*8,y-26+((t*30+i*10)%20),2,0,7);ctx.fill()}break}
     case'sign':{shadow(x,y,8,0);ctx.fillStyle='#6b4a2a';ctx.fillRect(x-2,y-20,4,20);ctx.fillStyle='#b08850';ctx.fillRect(x-14,y-30,28,14);ctx.fillStyle='#5a3e20';ctx.fillRect(x-10,y-25,20,2);ctx.fillRect(x-10,y-21,14,2);
       if(G.players.some(p=>D(p,e)<120)){const lines=e.text.split('\n');ctx.font='12px Nunito Sans, sans-serif';const tw=Math.max(...lines.map(l=>ctx.measureText(l).width));ctx.fillStyle='rgba(13,10,20,.88)';ctx.fillRect(x-tw/2-8,y-44-lines.length*16,tw+16,lines.length*16+8);ctx.fillStyle='#efe9f8';ctx.textAlign='center';lines.forEach((l,i)=>ctx.fillText(l,x,y-32-(lines.length-1-i)*16-6))}break}
+    case'waystone':{const on=F()['ws_'+e.id];shadow(x,y,12,0);ctx.fillStyle='#6a6478';ctx.beginPath();ctx.moveTo(x-10,y);ctx.lineTo(x-6,y-38);ctx.lineTo(x,y-44);ctx.lineTo(x+6,y-38);ctx.lineTo(x+10,y);ctx.fill();ctx.fillStyle=on?`rgba(106,242,223,${.7+Math.sin(t*3)*.3})`:'#3a3448';ctx.fillRect(x-2,y-34,4,10);ctx.fillRect(x-5,y-30,10,3);if(on){ctx.fillStyle='rgba(106,242,223,.18)';ctx.beginPath();ctx.arc(x,y-28,18,0,7);ctx.fill()}break}
     case'lore':{ctx.fillStyle=`rgba(255,205,87,${.25+Math.sin(t*3)*.15})`;ctx.beginPath();ctx.arc(x,y-10,16,0,7);ctx.fill();ctx.fillStyle='#f0e0b0';ctx.save();ctx.translate(x,y-12+Math.sin(t*2)*3);ctx.rotate(.15);ctx.fillRect(-7,-9,14,18);ctx.fillStyle='#8a6a3a';ctx.fillRect(-4,-5,8,1.5);ctx.fillRect(-4,-1,8,1.5);ctx.fillRect(-4,3,6,1.5);ctx.restore();break}
     case'shrine':{shadow(x,y,14,0);ctx.fillStyle='#7a7290';ctx.fillRect(x-12,y-34,24,34);ctx.fillStyle=e.cool>0?'#444':'#6af2df';ctx.beginPath();ctx.arc(x,y-42+Math.sin(t*2)*3,7,0,7);ctx.fill();if(e.cool<=0){ctx.fillStyle='rgba(106,242,223,.2)';ctx.beginPath();ctx.arc(x,y-42,16,0,7);ctx.fill()}break}
     case'bloom':{const g=e.grow,c=veilPhase()==='thrive';ctx.fillStyle='#2a6a5a';ctx.fillRect(x-1.5,y-14*g,3,14*g);const rr2=4+g*9;ctx.fillStyle=g>=1?(c?'#6af2df':'#4a9a9a'):'#3a6a6a';for(let i=0;i<5;i++){const a=i/5*Math.PI*2+t*.5;ctx.beginPath();ctx.arc(x+Math.cos(a)*rr2*.6,y-14*g+Math.sin(a)*rr2*.6,rr2*.5,0,7);ctx.fill()}ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y-14*g,2.5,0,7);ctx.fill();break}
@@ -974,7 +1019,7 @@ function drawHUD(){
     ctx.save();ctx.fillStyle='rgba(13,10,20,.85)';ctx.fillRect(X-2,Y-2,S+4,S+4);ctx.beginPath();ctx.rect(X,Y,S,S);ctx.clip();ctx.imageSmoothingEnabled=false;const sc=S/span;
     ctx.drawImage(w.mm,X+S/2-cxT*sc,Y+S/2-cyT*sc,w.w*sc,w.h*sc);
     const toM=(px,py)=>[X+S/2+(px/TILE-cxT)*sc,Y+S/2+(py/TILE-cyT)*sc];
-    for(const e of w.ents){if(e.dead)continue;let c=null,r=2;if(e.enemy){c=e.boss?'#ff3050':'#ff6b6b';r=e.boss?4:1.5}else if(e.kind==='npc')c='#ffcd57';else if(e.kind==='portal'){c='#6af2df';r=3.5}else if(e.kind==='chest'&&!e.open)c=e.big?'#c67bff':'#e0a040';else if(e.kind==='shrine')c='#6af2df';else if(e.kind==='lore')c='#fff';if(c){const[a,b]=toM(e.x,e.y);ctx.fillStyle=c;ctx.fillRect(a-r,b-r,r*2,r*2)}}
+    for(const e of w.ents){if(e.dead)continue;let c=null,r=2;if(e.enemy){c=e.boss?'#ff3050':'#ff6b6b';r=e.boss?4:1.5}else if(e.kind==='npc')c='#ffcd57';else if(e.kind==='portal'){c='#6af2df';r=3.5}else if(e.kind==='chest'&&!e.open)c=e.big?'#c67bff':'#e0a040';else if(e.kind==='shrine')c='#6af2df';else if(e.kind==='lore')c='#fff';else if(e.kind==='waystone'){c='#6af2df';r=3}if(c){const[a,b]=toM(e.x,e.y);ctx.fillStyle=c;ctx.fillRect(a-r,b-r,r*2,r*2)}}
     const q=QUESTS[G.quest].tgt();if(q&&q.w===w.kind){const[a,b]=toM(q.x,q.y);ctx.strokeStyle='#ffcd57';ctx.lineWidth=2;ctx.beginPath();ctx.arc(a,b,5+Math.sin(G.time*5)*1.5,0,7);ctx.stroke()}
     for(const p of G.players){const[a,b]=toM(p.x,p.y);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(a,b,3.5,0,7);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke()}
     ctx.restore();ctx.strokeStyle='#3b2e55';ctx.lineWidth=1;ctx.strokeRect(X-2,Y-2,S+4,S+4);
