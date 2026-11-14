@@ -764,6 +764,7 @@ const GOODS = {
   treasure_map:{name:'Treasure Map',base:90,col:'#d8c090',kind:'map'},
   shovel:{name:'Shovel',base:30,col:'#8a8a96',kind:'tool',tool:'shovel',tier:1},
   pirate_gold:{name:'Pirate Gold',base:160,col:'#f0c040',kind:'good'},
+  trial_laurel:{name:'Victor\u2019s Laurel',base:400,col:'#d8c050',kind:'trinket',desc:'Deal 5% more damage. Won with five gold medals'},
   rain_stone:{name:'Rain Stone',base:0,col:'#6ab0e0',kind:'mat',desc:'Cool and damp to the touch, even in the sun'},
   rain_feather:{name:'Rainmaker\u2019s Feather',base:300,col:'#7ac0f0',kind:'trinket',desc:'Walk 6% faster. Light as falling rain'},
   jeweled_goblet:{name:'Jeweled Goblet',base:280,col:'#e86a8a',kind:'good'},
@@ -3612,7 +3613,7 @@ function hitEnemy(e, dmg, kx, ky, src) {
   if (e.type === 'dummy') { e.hurt = .15; e.phase = (e.phase || 0) + 1; e.log = e.log || []; const d0 = Math.round(dmg*(src === 'player' ? diff().dealt : 1)*10)/10; e.log.push([frameT, d0]); floatText(e.x, e.y - 1.4, String(d0), '#ffd27a'); SFX.hit(); return; }
   let crit = false;
   if (src === 'player') {
-    dmg *= 1 + setStat('dmg') + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (have('elspeth_lantern') && (S.time > .8 || S.time < .22) ? .15 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
+    dmg *= 1 + setStat('dmg') + (have('trial_laurel') ? .05 : 0) + .08*sk('str') + (BUFFS.might > 0 ? .3 : 0) + (have('abyss_charm') ? .1 : 0) + (have('lionheart') ? .05 : 0) + (have('champion_medal') ? .06 : 0) + (have('champion_belt') ? .1 : 0) + (have('crown_of_ages') ? .15 : 0) + (have('heroic_crest') ? .08 : 0) + (have('gauntlet_crown') ? .12 : 0) + (have('victors_cape') ? .06 : 0) + .08*gemSum('ruby') + .04*conHas('hunter') + (have('magma_charm') ? .04 : 0) + (have('royal_sash') ? .03 : 0) + (have('golden_conch') ? .05 : 0) + (perk('brawler') ? .08 : 0) + (monDone('crownfall') ? .05 : 0) + (have('sun_shell') ? .05 : 0) + (partyNear() ? .1 : 0) + (have('elspeth_lantern') && (S.time > .8 || S.time < .22) ? .15 : 0) + (POT.giant > 0 ? .25 : 0) + .04*facPerk('wardens') + (S.lovedDay === S.day ? .1 : 0);
     if (player.counter > 0) { player.counter = 0; dmg *= 1.25; crit = true; dmg *= 2; S.counters = (S.counters || 0) + 1; floatText(e.x, e.y - 1.6, 'COUNTER!', '#bfe8ff', true); }
     else if (Math.random() < .05 + .04*gemSum('sapphire') + .03*conHas('archer') + (S.pet === 'shadow_cat' ? .05 : 0) + (perk('keen') ? .05 : 0) + (have('scarab_amulet') ? .05 : 0) + (have('champion_medal') ? .04 : 0) + (have('crown_of_ages') ? .1 : 0) + (have('sun_charm') ? .05 : 0) + (have('curators_monocle') ? .06 : 0) + (have('detective_badge') ? .05 : 0) + (have('rune_ward') ? .08 : 0) + .02*sk('agi') + (BUFFS.luck > 0 ? .15 : 0) + (have('lucky_charm') ? .05 : 0) + (have('abyss_charm') ? .08 : 0) + (have('foxfire_lantern') ? .05 : 0) + (weapon().crit || 0) + eqStat('crit')) { dmg *= 2; crit = true; }
     if (!e.boss && (S.killsBy[e.type] || 0) >= MASTERY) dmg *= 1.1;
@@ -3723,7 +3724,7 @@ function hurtPlayer(dmg, from, ignoreInv) {
   if (player.inv > 0 && !ignoreInv) return;
   if (!ignoreInv && from && eqStat('block') && Math.random() < eqStat('block')) { player.inv = .35; SFX.craft(); floatText(S.x, S.y - 1.2, 'Blocked!', '#cfd6dc'); burst(S.x, S.y - .6, '#cfd6dc', 6, 3); return; }
   const taken = Math.max(.5, Math.round(dmg * (1 - armorCut()) * diff().taken * (compAbil('brann') ? .85 : 1) * 2) / 2);
-  S.hp -= taken; padRumble(.25 + Math.min(.6, taken*.06), 150); SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
+  S.hp -= taken; if (S.arena && S.arena.trial && S.arena.live) S.arena.hits++; padRumble(.25 + Math.min(.6, taken*.06), 150); SFX.hurt(); hurtFlash = Math.min(.9, .35 + taken*.08); if (!ignoreInv) player.inv = .8; player.sinceHit = 0; shake = Math.max(shake, .25); fishing = null;
   floatText(S.x, S.y - 1.2, `-${taken}`, '#e57a62');
   if (from && !(POT.giant > 0)) { const dx = S.x - from.x, dy = S.y - from.y, d = Math.hypot(dx, dy) || 1; player.kx = dx/d*6; player.ky = dy/d*6; }
   if (S.hp <= 0) {
@@ -8210,6 +8211,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Proving Grounds', 'Ask the Crownfall arena master about the Proving Grounds: five set challenges (Slime Swarm, Night Pack, Giant Slayer, Untouchable and Arrow Storm). Earn bronze, silver or gold by speed or by taking few hits. Each new medal pays a prize, and gold in all five wins the Victor\u2019s Laurel (+5% damage).'],
   ['New Game+', 'After you accept the Charter, the menu (Esc) offers New Game+. You start again in Port Wren with tougher monsters (50% more health and 35% more damage for each New Game+ level), keeping your level, skills, worn gear, mounts, pets, hats, title, achievements, records and card album.'],
   ['Pottery wheel', 'Master Potter Lin in Petalfall lets you throw three pots a day. Hold Space, E or tap to widen the clay and let go to narrow it, following the outline as it rises. A 70% match makes a Fine Vase and 90% a Masterwork Vase, which sell well.'],
   ['Monster card duels', 'Corwin the Card Sharp in Highcairn plays duels with monster cards. You need five different cards (album cards count). Each card has Power, Guard and Speed from 1 to 9. Each round Corwin names a stat, you both play a card, and the higher number wins. Win three rounds to win, and you might take one of his cards home.'],
@@ -13138,6 +13140,8 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['trial_gold','Proven','Win a gold medal in the Proving Grounds', () => Object.values(S.trials || {}).some(r => r.m === 3)],
+  ['trial_all','Victor\u2019s Laurel','Win gold in all five Proving Grounds trials', () => !!(S.flags && S.flags.laurel)],
   ['ngplus','Once More','Start a New Game+', () => (S.ngp || 0) >= 1],
   ['ngplus3','Road Without End','Reach New Game+ 3', () => (S.ngp || 0) >= 3],
   ['potter','Potter','Throw a pot on the Petalfall wheel', () => (S.potsThrown || 0) >= 1],
@@ -13514,6 +13518,7 @@ function enterArena(gauntlet) {
     S.arenaReturn = {x: S.x, y: S.y}; S.x = ARENA.gate.x + .5; S.y = ARENA.gate.y - .6; S.riding = false; petE = null; fishing = null; lastTile = -1;
     enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
     S.arena = {wave: 0, pot: 0, t: 3, live: false}; renderHUD(); renderRegion();
+    if (gauntlet && gauntlet.trial) { const T = TRIALS.find(t => t.id === gauntlet.trial); S.arena.trial = T.id; S.arena.t = 3; S.arena.hits = 0; S.arena.el = 0; toast(`<b>Proving Grounds: ${T.name}</b><br>${T.desc}`, 5000); return; }
     if (gauntlet && gauntlet.duel) { S.arena.duel = gauntlet.duel; S.arena.t = 3; toast(`<b>Duel: rank ${gauntlet.duel}</b><br>Vex steps into the ring, rapier raised. Beat them!`, 4000); return; }
     if (gauntlet) { S.arena.gauntlet = gauntletList(); S.arena.t = 4; toast(`<b>The Boss Gauntlet</b><br>${S.arena.gauntlet.length} echoes of fallen foes, one after another. You are healed between rounds. Leave between rounds to keep your winnings.`, 6500); return; }
     toast('<b>The Crownfall Arena</b><br>The crowd roars! Survive wave after wave. Leave through the gate between waves to collect your winnings.', 6500);
@@ -13521,6 +13526,7 @@ function enterArena(gauntlet) {
 }
 function arenaWave() {
   const A = S.arena; A.wave++; A.live = true;
+  if (A.trial) { trialSpawn(A); return; }
   if (A.duel) {
     const r = A.duel, e = makeEnemy('duelist', ARENA.cx + .5, ARENA.cy - 3, {dungeon: true, alert: true, arena: true});
     e.hp = e.max = Math.round(40*(1 + .55*r)*(1 + (S.level || 1)*.03)); e.dmgMul = 1 + .3*r; e.spd = 1 + .05*r; e.elite = {name: 'Vex the Bold', col: '#e04a7a'}; e.esize = 1.15; e.labelName = `Vex the Bold · rank ${r}`;
@@ -13546,6 +13552,7 @@ function arenaWave() {
 }
 function updateArena(dt) {
   const A = S.arena; if (!A || !inArena()) return;
+  if (A.live && A.trial) { trialUpdate(A, dt); return; }
   if (A.live) {
     if (!enemies.some(e => e.arena && !e.dead)) {
       if (A.duel) { A.live = false; A.t = 1e9; A.done = true; const msg = duelWon(A.duel); setTimeout(() => { if (S.arena) { SFX.travel(); fadeThen(() => leaveArena(false)); } toast(`<b>Vex yields!</b><br>${msg}`, 7000); }, 1800); return; }
@@ -13567,12 +13574,56 @@ function updateArena(dt) {
     }
   } else { A.t -= dt; if (A.t <= 0) arenaWave(); }
 }
+// ===== Proving Grounds: medal trials in the arena =====
+const TRIALS = [
+  {id: 'swarm', name: 'Slime Swarm', desc: 'Defeat 20 slimes as fast as you can.', kind: 'time', med: [90, 60, 40]},
+  {id: 'pack', name: 'Night Pack', desc: 'Defeat 10 shadow wolves as fast as you can.', kind: 'time', med: [120, 80, 55]},
+  {id: 'giant', name: 'Giant Slayer', desc: 'Topple a towering elite Rock Golem as fast as you can.', kind: 'time', med: [90, 60, 40]},
+  {id: 'clean', name: 'Untouchable', desc: 'Defeat 8 bandits. Medals depend on how few hits you take.', kind: 'hits', med: [5, 2, 0]},
+  {id: 'storm', name: 'Arrow Storm', desc: 'Survive 45 seconds against archers who keep coming. Medals depend on how few hits you take.', kind: 'survive', med: [6, 3, 0]},
+];
+const MEDAL = ['No medal', 'Bronze', 'Silver', 'Gold'], MEDAL_COL = ['var(--muted)', '#c88a5a', '#c8d0d8', '#f0c040'], MEDAL_PRIZE = [0, 60, 120, 250];
+function trialsTalk(n) {
+  const T = S.trials || {};
+  const lines = TRIALS.map(t => { const r = T[t.id]; return `<b>${t.name}</b> · <span style="color:${MEDAL_COL[r ? r.m : 0]}">${r ? MEDAL[r.m] : 'Not tried'}</span>${r && r.t ? ` <span style="color:var(--muted)">(best ${t.kind === 'time' ? r.t.toFixed(1) + 's' : r.h + ' hit' + (r.h === 1 ? '' : 's')})</span>` : ''}<br><span style="color:var(--muted);font-size:13px">${t.desc} Gold: ${t.kind === 'time' ? 'under ' + t.med[2] + 's' : 'no hits'}.</span>`; }).join('<br>');
+  say(`“The Proving Grounds! No waves, no winnings, just you against a set challenge. Earn bronze, silver or gold. Each new medal pays a prize, and five golds earn the Victor’s Laurel.”<br><br>${lines}`, [
+    ...TRIALS.map(t => ({label: `${t.name}${(T[t.id] || {}).m === 3 ? ' ★' : ''}`, fn: () => { closeTalk(); enterArena({trial: t.id}); }})), back(n)]);
+}
+function trialMob(type, k, mul, extra) { const a = Math.random()*6.28, x = ARENA.cx + .5 + Math.cos(a)*ARENA.rx*.7, y = ARENA.cy - 1 + Math.sin(a)*ARENA.ry*.5; const e = makeEnemy(type, x, y, {dungeon: true, alert: true, arena: true, ...(extra || {})}); e.hp = e.max = Math.round(e.max*mul); enemies.push(e); return e; }
+function trialSpawn(A) {
+  const lv = 1 + (S.level || 1)*.04;
+  if (A.trial === 'swarm') { for (let i = 0; i < 10; i++) trialMob('slime', i, lv); A.reserve = 10; }
+  if (A.trial === 'pack') for (let i = 0; i < 10; i++) { const e = trialMob('shadow_wolf', i, lv); e.dmgMul = .9; }
+  if (A.trial === 'giant') { const e = trialMob('rockgolem', 0, lv*6); makeElite(e); e.esize = 2.4; e.elite = {name: 'Colossus', col: '#a08a6a'}; e.labelName = 'The Colossus'; e.dmgMul = 1.2; }
+  if (A.trial === 'clean') for (let i = 0; i < 8; i++) trialMob('bandit', i, lv);
+  if (A.trial === 'storm') { for (let i = 0; i < 4; i++) trialMob('archer', i, lv*3); A.respawn = 0; }
+  SFX.roar(); shake = .3; $('raceUI').hidden = false; renderRegion();
+}
+function trialUpdate(A, dt) {
+  const T = TRIALS.find(t => t.id === A.trial); A.el += dt;
+  const alive = enemies.filter(e => e.arena && !e.dead).length, ui = $('raceUI');
+  const txt = `${T.name} · ${T.kind === 'survive' ? Math.max(0, 45 - A.el).toFixed(1) + 's left' : A.el.toFixed(1) + 's'} · hits ${A.hits}${T.kind === 'time' ? ` · ${alive + (A.reserve || 0)} left` : ''}`; if (ui.textContent !== txt) ui.textContent = txt;
+  if (A.trial === 'swarm' && A.reserve > 0 && alive <= 3) { const n = Math.min(A.reserve, 5); for (let i = 0; i < n; i++) trialMob('slime', i, 1 + (S.level || 1)*.04); A.reserve -= n; }
+  if (A.trial === 'storm') { if (alive < 4) { A.respawn -= dt; if (A.respawn <= 0) { trialMob('archer', 0, (1 + (S.level || 1)*.04)*3); A.respawn = 2.5; } } if (A.el >= 45) trialFinish(A, T); return; }
+  if (!alive && !(A.reserve > 0)) trialFinish(A, T);
+}
+function trialFinish(A, T) {
+  A.live = false; A.done = true; A.t = 1e9; for (const e of enemies) if (e.arena) e.dead = true; $('raceUI').hidden = true;
+  const v = T.kind === 'time' ? A.el : A.hits, m = T.kind === 'time' ? (v <= T.med[2] ? 3 : v <= T.med[1] ? 2 : v <= T.med[0] ? 1 : 0) : (v <= T.med[2] ? 3 : v <= T.med[1] ? 2 : v <= T.med[0] ? 1 : 0);
+  S.trials = S.trials || {}; const old = S.trials[T.id] || {m: 0}; let prize = 0; for (let k = old.m + 1; k <= m; k++) prize += MEDAL_PRIZE[k];
+  const r = S.trials[T.id] = {m: Math.max(old.m, m), t: T.kind === 'time' ? Math.min(old.t || 1e9, A.el) : A.el, h: Math.min(old.h == null ? 99 : old.h, A.hits)};
+  A.pot += prize; let extra = '';
+  if (TRIALS.every(t => (S.trials[t.id] || {}).m === 3) && !S.flags.laurel) { S.flags.laurel = true; addItem('trial_laurel', 1); extra = '<br>Five golds! The arena master crowns you with the <b>Victor’s Laurel</b> (+5% damage).'; }
+  SFX[m ? 'victory' : 'click'](); gainXP(30 + 20*m); save();
+  toast(`<b>${T.name}: <span style="color:${MEDAL_COL[m]}">${MEDAL[m]}${m ? ' medal' : ''}</span></b><br>${T.kind === 'time' ? `Time: ${A.el.toFixed(1)}s` : `Hits taken: ${A.hits}`}${prize ? ` · new medal prize: +${prize} coin` : r.m > m ? ` · your best is still ${MEDAL[r.m]}` : ''}.<br><span style="color:var(--muted)">Walk out through the gate.</span>${extra}`, 7000);
+}
 function leaveArena(died) {
   const A = S.arena, pot = A ? (died ? Math.floor(A.pot/2) : A.pot) : 0, best = A ? A.wave - (A.live ? 1 : 0) : 0;
-  const duel = A && A.duel; S.arena = null; S.coins += pot;
+  const duel = A && A.duel, trial = A && A.trial; S.arena = null; S.coins += pot; $('raceUI').hidden = true;
   enemies = []; eproj = []; hazards = []; arrows = []; bombs = [];
   const T0 = TOWNS.crownfall; S.x = T0.x - 1.5; S.y = T0.y + 3.6; lastTile = -1; petE = null;
   renderHUD(); renderRegion(); save();
+  if (trial) { toast(died ? '<b>Trial failed</b><br>The medics carry you out. Catch your breath and try again.' : `<b>You leave the Proving Grounds</b>${pot ? `<br>Medal prizes: <b>${pot} coin</b>.` : ''}`, 5000); return; }
   if (duel) { if (died) toast('<b>Vex wins this round!</b><br>“Better luck next time, rival.” Come back tomorrow for a rematch.', 6000); return; }
   toast(died ? `<b>Knocked out in the arena!</b><br>The medics drag you out. You keep half your winnings: <b>${pot} coin</b>.` : `<b>You leave the arena</b><br>Waves survived: ${best}. Winnings: <b>${pot} coin</b>.`, 6000);
 }
@@ -13638,6 +13689,7 @@ function anglerTalk(n) {
 function arenaTalk(n) {
   say(`“Step into the ring! Wave after wave of beasts, each tougher than the last. Every wave you beat adds to your winnings. Walk out between waves and the money is yours. Get knocked out and you keep only half.”<br><br>Your best: <b>${S.arenaBest || 0}</b> waves.${S.flags.arena10 ? '' : ' Reach wave 10 for a prize from the crowd.'}`, [
     {label: 'Enter the arena', primary: true, fn: () => { closeTalk(); enterArena(); }},
+    {label: 'Proving Grounds trials', fn: () => trialsTalk(n)},
     {label: gauntletList().length >= 3 ? `Boss Gauntlet (${gauntletList().length} echoes)` : 'Boss Gauntlet (defeat 3 world bosses first)', disabled: gauntletList().length < 3, fn: () => say(`“The Gauntlet! Our mages conjure echoes of the great beasts you've slain, and you face them one after another: ${gauntletList().map(k => esc(BOSSES[k].name)).join(', ')}. 150 coin per round times the round number, a 500 bonus for finishing${S.flags.gauntletCrown ? '' : ', and if you beat six, a crown'}.”<br><br>Gauntlets won: <b>${S.gauntletWins || 0}</b>`, [{label: 'Begin the Gauntlet', primary: true, fn: () => { closeTalk(); enterArena(true); }}, back(n)])},
     back(n)]);
 }
@@ -13699,8 +13751,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 19;
+const WN_VER = 20;
 const WHATS_NEW = [
+  ['Proving Grounds', 'Five combat trials at the Crownfall arena with bronze, silver and gold medals. Gold in all five wins the Victor\u2019s Laurel.'],
   ['New Game+', 'Finished the Charter? Start the road again with tougher monsters, keeping your level, gear, mounts and collections. Find it in the menu.'],
   ['Pottery wheel', 'Master Potter Lin in Petalfall: shape a vase on the wheel by following the outline. A near-perfect throw makes a Masterwork Vase.'],
   ['Monster card duels', 'Your monster cards are playable now! Challenge Corwin the Card Sharp in Highcairn: five cards, five rounds, Power, Guard or Speed.'],
@@ -13996,7 +14049,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
