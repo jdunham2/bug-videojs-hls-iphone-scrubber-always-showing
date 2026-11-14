@@ -1,10 +1,10 @@
 # Knockout Isle (vertical slice)
 
-A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: seven playable fighters, AI opponents, seven arenas, items, and a wave loop with power-ups.
+A third-person platform brawler roguelike built with three.js. The slice focuses on the core fight: nine playable fighters, AI opponents, eleven arenas, items, and a wave loop with power-ups.
 
 ## Content
 
-- **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) Tank-o (hold dash on the ground to shield, charged rocket punch) Whisk (frying-pan combo; smash throws the pan, which boomerangs back) Shade (dash teleports, behind the enemy if close; smash leaves a decoy that stuns whoever hits it), Bubbles (8 rapid slaps; smash traps the enemy in a floating bubble) and Rex (combo ends in a tail swipe; smash is a ground-pound). Enemies: Grub, Vex, Bolt, Moss.
+- **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) Tank-o (hold dash on the ground to shield, charged rocket punch) Whisk (frying-pan combo; smash throws the pan, which boomerangs back) Shade (dash teleports, behind the enemy if close; smash leaves a decoy that stuns whoever hits it), Bubbles (8 rapid slaps; smash traps the enemy in a floating bubble) Rex (combo ends in a tail swipe; smash is a ground-pound), Glitch (every hit rolls random power from weak to critical; smash is a random special) and Lady Bloom (smash plants a vine trap that roots enemies). Enemies: Grub, Vex, Bolt, Moss.
 - **Arenas** (alternate every wave):
   - **Sky Isle**: a floating island with three floating platforms.
   - **Lava Forge**: every 19 seconds the floor sinks into lava for about 4 seconds. Touching lava adds 7% and bounces you up, so get onto the raised pillars.
@@ -13,6 +13,10 @@ A third-person platform brawler roguelike built with three.js. The slice focuses
   - **Frozen Lake**: slippery ice where you keep sliding. Big hits crack holes in it, and falling into the freezing water costs 5%. The holes refreeze after a few seconds.
   - **Pirate Ship**: a long deck that rolls side to side and slides you downhill. Cannons light up a red lane across the deck, then fire. Fall overboard and you're out.
   - **Shrinking Arena**: every 10 seconds the outer ring glows red, then crumbles away, until only the center is left.
+  - **Bounce House**: a trampoline in the middle, and inflatable walls that bounce you back once each before deflating for 12s.
+  - **Night Market**: lantern-lit at night with fireworks. Food stalls toss snacks that heal 12%, and you can stand on the stall roofs.
+  - **Gravity Garden**: low gravity, so jumps go twice as high and launched fighters fly much farther.
+  - **Train Top**: fight on moving train cars. When a tunnel comes, jump down into the open wagon or get knocked back.
 - **Items** (drop every 7–11s, walk over to grab):
   - **Hammer**: 8s of big swings, no jumping.
   - **Bomb**: attack to throw, explodes on contact. It blows up in your hands after 5s.
