@@ -37,6 +37,9 @@ body{background:var(--ink);color:var(--bone);font-family:var(--ui);font-size:14p
 #clock{text-align:center;min-width:150px}
 #clock h2{font-family:var(--display);font-size:20px;margin:0;line-height:1.1}
 #clock .bar>i{background:var(--ember);transition:none}
+#netrow{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--dim)}
+#netrow .btn{padding:3px 8px;font-size:11px}
+#netwarn{margin-top:4px;font-size:12px;color:var(--ember);max-width:200px;text-wrap:balance}
 #boss{margin-top:8px}#clock #boss .bar>i{background:var(--blood);transition:width .15s}#boss .lbl{color:var(--blood)}
 #phase{font-variant-numeric:tabular-nums;color:var(--dim);font-size:12px}
 #goals{max-width:210px}
@@ -146,6 +149,8 @@ details.help[open] summary{margin-bottom:10px}
         <div id="score" class="lbl">Score 0</div>
         <div class="bar"><i id="tbar"></i></div>
         <div id="netinfo" class="lbl" hidden></div>
+        <div id="netrow" hidden><span id="netplayers"></span><button class="btn" id="copycode" type="button">Copy code</button></div>
+        <div id="netwarn" hidden></div>
         <div id="boss" hidden><div class="lbl" id="bossname"></div><div class="bar"><i id="bossbar"></i></div></div>
       </div>
       <div class="panel" id="goals">
@@ -252,6 +257,7 @@ details.help[open] summary{margin-bottom:10px}
         <dt>More builds</dt><dd>Iron door, arrow-slit wall (you can shoot through it, animals cannot pass), shock fence, ballista, landmine, fire grate, scarecrow (keeps flying animals away), torch post, and a garden plot and beehive that grow herbs, berries and honey over time.</dd>
         <dt>Mining</dt><dd>Coloured rocks are veins: rust is iron, yellow is gold, blue is crystal, black is coal. Coal and sulfur make powder rounds and dynamite. Gold makes a golden axe and plate armor; crystal and gold make a ward that slows animals.</dd>
         <dt>Pick-ups</dt><dd>New finds: berry bushes, honeycombs, resin, sulfur crystals, and wool from sheep. Also mushrooms (a little health), feathers (cheap arrows), bones (bone fence, pet charm) and gems. Walk over things to take them: herb bushes (Z makes a bandage from 2 herbs), scrap piles (iron), supply crates, and hides dropped by animals, which make boots, a vest and the sling.</dd>
+        <dt>Playing online</dt><dd>Copy code shares your game code. If the host leaves, a friend takes over and the game carries on. Stand next to a downed friend for a few seconds to revive them. The game keeps running if the host switches tabs, but slower, so hosts should keep the game in view.</dd>
         <dt>Pets and rides</dt><dd>You can keep three pets; click one you own to let it go. The balloon floats over walls and trees where only flying animals reach you, but it cannot fly at night, and the tank fires its own gun. The top bar buys companions with meat (dog, hawk, war bear) that fight beside you, and rides (horse, buggy, armored truck). B gets on or off your ride; the buggy and truck ram animals.</dd>
         <dt>Night rewards</dt><dd>Every night you survive brings a gift and unlocks something new: traps, iron walls, armor (V), turrets, grenades (H to make, G to throw) and a machine gun.</dd>
         <dt>1 – 9, 0, L, X</dt><dd>The crystal ward and bone fence have no key; click them. Pick a build piece, then click a nearby tile. Q returns to your weapon.</dd>
@@ -1431,7 +1437,7 @@ function netSend(dt) {
   if (P.swing > 0 && !NET.wasSw) NET.swSeq = (NET.swSeq + 1) % 1000; NET.wasSw = P.swing > 0;
   if ((NET.sendT -= dt) > 0) return; NET.sendT = .1;
   const p = {p: myState()};
-  if (host()) { p.w = worldState(); if ((NET.syncT -= .1) <= 0) { NET.syncT = 3; sendSync(); } }
+  if (host()) { p.w = worldState(); p.bg = document.hidden ? 1 : 0; if ((NET.syncT -= .1) <= 0) { NET.syncT = 3; sendSync(); } }
   NET.room.presence(p).catch(() => {});
 }
 function applyWorld(w) {
@@ -1476,11 +1482,29 @@ function netPoll(dt) {
       const v = a[8]; o.veh = Array.isArray(v) && VK[v[0]] ? {type: VK[v[0]], x: +v[1] || 0, y: +v[2] || 0, ang: (+v[3] || 0) / 100, riding: !!v[4]} : null;
       const pl = Array.isArray(a[9]) ? a[9].filter(q => Array.isArray(q) && PK[q[0]]).slice(0, 3) : []; o.pets = o.pets || []; o.pets.length = pl.length;
       pl.forEach((q, i) => { const e = o.pets[i] && o.pets[i].type === PK[q[0]] ? o.pets[i] : (o.pets[i] = {type: PK[q[0]], x: +q[1] || 0, y: +q[2] || 0, ang: 0, step: 0}); e.tx = +q[1] || 0; e.ty = +q[2] || 0; e.ang = (+q[3] || 0) / 100; });
-      if (client() && pr.w && p.peer === NET.hostPeer) applyWorld(pr.w);
+      if (client() && pr.w && p.peer === NET.hostPeer) { applyWorld(pr.w); NET.hostBg = !!pr.bg; }
     }
   }
   for (const [k, o] of NET.others) if (!seen.has(k)) { dropCompanions(o); if (o.m) scene.remove(o.m.g); NET.others.delete(k); toast('A player left.'); }
-  if (client()) { const now = performance.now(); if (seen.has(NET.hostPeer)) NET.hostMiss = now; else if (now - NET.hostMiss > 6000) quit('The host left the game. Your gear is saved.'); }
+  if (client()) {
+    const now = performance.now();
+    if (seen.has(NET.hostPeer) && NET.others.get(NET.hostPeer) && NET.others.get(NET.hostPeer).pr && NET.others.get(NET.hostPeer).pr.w) NET.hostMiss = now;
+    else if (now - NET.hostMiss > 6000) { // the host is gone: everyone picks the same successor, the lowest peer label
+      if (NET.waitedFor === NET.hostPeer && now - NET.hostMiss > 14000) return quit('The host left and nobody could take over. Your gear is saved.');
+      const cands = [NET.me, ...[...seen].filter(k => k !== NET.hostPeer)].filter(Boolean).sort();
+      if (!cands.length || cands[0] === NET.me) return becomeHost();
+      if (NET.hostPeer !== cands[0]) { NET.hostPeer = cands[0]; NET.waitedFor = cands[0]; NET.hostMiss = now - 6000; toast('The host left. A friend is taking over the game…'); }
+    }
+  }
+}
+function becomeHost() { // take over the world from what this guest last saw
+  NET.mode = 'host'; NET.hostPeer = null; NET.hostBg = false;
+  animals = animals.map(a => { const n = mk(a.type, a.x, a.y, 1); n.id = a.id; n.hp = n.max * clamp((+a.hp || 100) / 100, .01, 1); n.ang = a.ang || 0; return n; });
+  NET.amap.clear(); nid = animals.reduce((m, a) => Math.max(m, a.id), nid); iid = items.reduce((m, i) => Math.max(m, i.id), iid);
+  if (G.phase === 'night') { G.queue = Math.round(nightCount() * .4); G.spawnT = 3; } else G.queue = 0;
+  G.bossType = null; recalc(); NET.syncT = 0; NET.sendT = 0;
+  if (lobby) lobby.presence({game: NET.code}).catch(() => {});
+  toast('The host left. You are hosting game ' + NET.code + ' now, so keep this tab open.'); snd(520, .3, 'triangle', .07, 200);
 }
 function onAct(d) { // a guest did something; the host applies it
   if (d.k === 'p') { const i = items.findIndex(it => it.id === d.i); if (i >= 0) items.splice(i, 1); return; }
@@ -1543,6 +1567,7 @@ function wire() {
   r.on('sync', m => { if (client() && running && m.peer === NET.hostPeer && m.data) onSync(m.data); });
   r.on('fx', m => { // someone else fired: show the shot, it does no damage here
     const d = m.data || {}, w = WPN[d.w]; if (m.isMe || !running) return;
+    if (d.w === 'revive') { if (d.p === NET.me && P.dead) { P.revived = true; P.respawn = 0; } return; }
     if (d.w === 'grenade' && isFinite(d.x + d.y + d.tx + d.ty)) { shots.push({bomb: true, fx: true, x: d.x, y: d.y, x0: d.x, y0: d.y, tx: d.tx, ty: d.ty, t: 0, T: .65, vx: 1, vy: 0}); return; }
     if (d.w === 'turret' && isFinite(d.x + d.y + d.a)) { shots.push({x: d.x, y: d.y, vx: Math.cos(d.a) * 900, vy: Math.sin(d.a) * 900, life: .42, dmg: 0, pierce: 0, hit: new Set(), arrow: true, ghost: true, fx: true}); return; }
     if (!w || !w.ammo || !isFinite(d.x + d.y + d.a)) return;
@@ -1571,7 +1596,7 @@ async function joinGame(code) {
   audioOn(); menuNote('Joining ' + code + '…');
   let r; try { r = await lobby.join('th-' + code.toLowerCase()); } catch (e) { return menuNote('Could not join right now. Try again in a moment.'); }
   let w = null, hp = null;
-  for (let i = 0; i < 28 && !w; i++) { for (const p of r.peers()) if (!p.isMe && p.presence && p.presence.w) { w = p.presence.w; hp = p.peer; } if (!w) await new Promise(s => setTimeout(s, 250)); }
+  for (let i = 0; i < 48 && !w; i++) { if (i === 16) menuNote('Still looking for game ' + code + '…'); for (const p of r.peers()) if (!p.isMe && p.presence && p.presence.w) { w = p.presence.w; hp = p.peer; } if (!w) await new Promise(s => setTimeout(s, 250)); }
   if (!w || w.o) { r.leave().catch(() => {}); return menuNote('No game with the code ' + code + ' is running.'); }
   NET.room = r; NET.mode = 'client'; NET.code = code; NET.hostPeer = hp; NET.hostMiss = performance.now(); wire();
   reset(w.s, w.m); const g = await load('guest'); if (g && g.seed === w.s) { setInv(g.inv); gather(); } else applyKit();
@@ -1600,7 +1625,7 @@ function refreshMenu() {
 }
 function die() {
   if (!multi()) return end(false);
-  if (P.dead) return; P.dead = true; P.riding = false; P.respawn = 15; P.hp = 0; toast('You are down. Back on your feet in 15 seconds.'); snd(200, .8, 'sawtooth', .07, -150);
+  if (P.dead) return; P.dead = true; P.riding = false; P.respawn = 15; P.hp = 0; toast(NET.others.size ? 'You are down. A friend can stand next to you to revive you, or wait 15 seconds.' : 'You are down. Back on your feet in 15 seconds.'); snd(200, .8, 'sawtooth', .07, -150);
 }
 
 /* ---------- update ---------- */
@@ -1634,7 +1659,7 @@ function updDark(dt) {
 }
 function updPlayer(dt) {
   if (P.dead) { // downed in a shared game: wait, then get back up in the clearing
-    if ((P.respawn -= dt) <= 0) { P.dead = false; P.hp = 60; P.poison = 0; P.x = CX; P.y = CY; P.hurt = 1.5; toast('Back on your feet.'); }
+    if ((P.respawn -= dt) <= 0) { P.dead = false; P.hp = P.revived ? 50 : 60; P.poison = 0; if (!P.revived) { P.x = CX; P.y = CY; } P.hurt = 1.5; toast(P.revived ? 'A friend got you back up.' : 'Back on your feet.'); P.revived = false; }
     cam.x += (P.x - cam.x) * Math.min(1, dt * 8); cam.y += (P.y - cam.y) * Math.min(1, dt * 8); mouse.fresh = actFresh = keys.SpaceFresh = false; return;
   }
   // player
@@ -1779,7 +1804,16 @@ function update(dt) {
   }
   updOthers(dt); updFx(dt); netSend(dt);
 }
+function updRevive(dt) { // stand next to a downed friend for 2.5 seconds to get them back up
+  if (!multi() || P.dead || !NET.room) return;
+  for (const o of NET.others.values()) {
+    if (!o.dead) { o.revT = 0; continue; }
+    if (dist(o.x, o.y, P.x, P.y) < 48) { o.revT = (o.revT || 0) + dt; if (o.revT >= 2.5) { o.revT = 0; NET.room.emit('fx', {w: 'revive', p: o.peer}).catch(() => {}); toast('You helped ' + (o.name || 'your friend') + ' up.'); } }
+    else o.revT = Math.max(0, (o.revT || 0) - dt);
+  }
+}
 function updFx(dt) {
+  updRevive(dt);
   updPets(dt); updItems();
   for (let i = shots.length - 1; i >= 0; i--) { // arrows and bullets
     const s = shots[i]; let dead = false;
@@ -2497,7 +2531,7 @@ function render(now, dt) {
   for (const f of floats) { const [px, py] = proj(f.x, 40 + (.9 - f.life) * 50, f.y); ctx.globalAlpha = Math.min(1, f.life * 2.5); ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillText(f.txt, px + 1, py + 1); ctx.fillStyle = f.col; ctx.fillText(f.txt, px, py); }
   ctx.globalAlpha = 1;
   for (const o of NET.others.values()) { // friends: name and health
-    const [px, py] = proj(o.x, 62, o.y), name = o.dead ? 'down' : (o.name || 'Friend').slice(0, 18);
+    const [px, py] = proj(o.x, 62, o.y), name = o.dead ? (o.revT > 0 ? 'reviving ' + Math.round(o.revT / 2.5 * 100) + '%' : 'down · stand close to revive') : (o.name || 'Friend').slice(0, 18);
     ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillText(name, px + 1, py + 1); ctx.fillStyle = o.dead ? '#d1503a' : '#ebe6d3'; ctx.fillText(name, px, py);
     if (!o.dead) hpBar(o.x, 54, o.y, 30, o.hp / 100);
   }
@@ -2540,7 +2574,14 @@ function hud() {
   if (mmTick++ % 3 === 0) drawMinimap();
   $('hpbar').style.width = clamp(P.hp / P.max * 100, 0, 100) + '%';
   $('hpbar').style.background = P.poison > 0 ? '#7fbf5a' : '';
-  $('netinfo').hidden = !multi(); if (multi()) $('netinfo').textContent = 'Game ' + NET.code + ' · ' + (NET.others.size + 1) + (NET.others.size ? ' players' : ' player');
+  $('netinfo').hidden = $('netrow').hidden = !multi();
+  if (multi()) {
+    $('netinfo').textContent = 'Game ' + NET.code + ' · ' + (NET.others.size + 1) + (NET.others.size ? ' players' : ' player') + (host() ? ' · you host' : '');
+    $('netplayers').textContent = ['You', ...[...NET.others.values()].map(o => (o.name || 'Friend') + (o.peer === NET.hostPeer ? ' (host)' : '') + (o.dead ? ' (down)' : ''))].join(', ');
+    const off = NET.room && !NET.room.connected(), now = performance.now(); if (!off) NET.okAt = now;
+    const w = off && now - (NET.okAt || now) > 2000 ? 'Connection lost. Reconnecting…' : client() && NET.hostBg ? 'The host switched to another tab, so the world is running slowly.' : '';
+    $('netwarn').hidden = !w; $('netwarn').textContent = w;
+  } else $('netwarn').hidden = true;
   $('savebtn').textContent = client() ? 'Save gear (K)' : 'Save (K)';
   const bs = animals.find(isBoss); $('boss').hidden = !bs;
   if (bs) { $('bossname').textContent = A[bs.type].name; $('bossbar').style.width = clamp(bs.hp / bs.max * 100, 0, 100) + '%'; }
@@ -2666,6 +2707,11 @@ act.addEventListener('touchcancel', () => { actDown = false; });
 $('mkarrows').addEventListener('click', () => makeAmmo('arrows')); $('mkbullets').addEventListener('click', () => makeAmmo('bullets'));
 cv.addEventListener('wheel', e => { e.preventDefault(); if (running) cycleWeapon(e.deltaY > 0 ? 1 : -1); }, {passive: false});
 $('eat').addEventListener('click', eat); $('craft').addEventListener('click', craft);
+$('copycode').addEventListener('click', () => {
+  const c = NET.code; if (!c) return;
+  const done = () => toast('Code ' + c + ' copied. Friends type it on the start screen.');
+  try { navigator.clipboard.writeText(c).then(done, () => toast('Your game code is ' + c + '.')); } catch (e) { toast('Your game code is ' + c + '.'); }
+});
 $('kitsel').addEventListener('change', e => { prog.kit = e.target.value; saveProg(); });
 $('mapsel').addEventListener('change', e => { selMap = e.target.value; refreshMenu(); });
 $('gfxbtn').addEventListener('click', () => { HIGH = !HIGH; applyQuality(); try { localStorage.setItem('timberhold-gfx-chosen', '1'); } catch (e) {} });
@@ -2710,6 +2756,13 @@ window.__timberhold = {get G() { return G; }, get P() { return P; }, get animals
   }, () => {});
   refreshMenu();
 })();
+let bgLast = performance.now();
+document.addEventListener('visibilitychange', () => { bgLast = performance.now(); if (document.hidden && host() && NET.room) NET.room.presence({p: myState(), w: worldState(), bg: 1}).catch(() => {}); });
+setInterval(() => { // animation frames stop in background tabs; keep the shared world moving anyway
+  if (!document.hidden || !running || paused || !multi()) { bgLast = performance.now(); return; }
+  const now = performance.now(); let el = Math.min(1.5, (now - bgLast) / 1000); bgLast = now;
+  while (el > 0 && running) { update(Math.min(.05, el)); el -= .05; }
+}, 250);
 requestAnimationFrame(frame);
 })();
 </script>
