@@ -346,16 +346,38 @@ const ITEMS = {
   pearl:   { name: 'Sea Pearl', price: 200 },
   relic:   { name: 'Knight\'s Relic', price: 300 },
 };
+// Weapons and armor: craft them at the workbench, then equip one of each.
+const WEAPONS = {
+  wood:    { name: 'Wooden Sword', dmg: 1, col: '#d8c7a0', desc: 'Your trusty starter sword.' },
+  stone:   { name: 'Stone Sword', dmg: 2, col: '#cfcac2', cost: { wood: 4, stone: 6 }, desc: 'Double damage. Heavy and reliable.' },
+  crystal: { name: 'Crystal Blade', dmg: 2, col: '#b9a8ff', cost: { crystal: 3, wood: 3 }, reach: 8, desc: 'Double damage with a longer reach.' },
+  venom:   { name: 'Venom Fang', dmg: 2, col: '#7fd17a', cost: { goo: 8, herb: 4, crystal: 2 }, poison: true, desc: 'Poisons whatever it cuts, bosses included: 3 extra damage over time.' },
+  royal:   { name: 'Royal Blade', dmg: 3, col: '#f4b740', cost: { crown: 1, crystal: 4 }, lifesteal: true, desc: 'Forged from the Slime Crown. Triple damage, and each foe you defeat restores a heart.' },
+  arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
+  great:   { name: 'Bone Greatsword', dmg: 4, col: '#e6ecff', cost: { relic: 1, stone: 10 }, heavy: true, desc: 'The Bone Knight\'s blade. Quadruple damage in a wide arc, but slower swings.' },
+};
+const ARMORS = {
+  cloth:   { name: 'Traveler\'s Clothes', hearts: 0, desc: 'Comfortable, not protective.' },
+  plank:   { name: 'Plank Armor', hearts: 1, tint: ['#3b2414', '#8a5a32', '#c99a63'], cost: { planks: 3, goo: 2 }, desc: '+1 heart.' },
+  silk:    { name: 'Silk Cloak', hearts: 1, tint: ['#6b6878', '#d9d6e6', '#ffffff'], cost: { goo: 10, herb: 6 }, speed: 1.15, desc: '+1 heart and 15% faster movement.' },
+  stone:   { name: 'Stone Mail', hearts: 2, tint: ['#2c2a2a', '#6c6764', '#b4b1ab'], cost: { stone: 10, planks: 2 }, desc: '+2 hearts.' },
+  crystal: { name: 'Crystal Plate', hearts: 3, tint: ['#2b2060', '#6c5ce7', '#d8d0ff'], cost: { crystal: 4, stone: 6 }, sturdy: true, desc: '+3 hearts, and hits barely knock you back.' },
+  tide:    { name: 'Tide Mail', hearts: 3, tint: ['#0d4b5a', '#2fa6b8', '#d6f7ff'], cost: { pearl: 1, goo: 6 }, regen: true, desc: 'Woven around the Sea Pearl. +3 hearts, and slowly heals you anywhere.' },
+};
+const gearW = () => WEAPONS[S.gear.weapon] || WEAPONS.wood;
+const gearA = () => ARMORS[S.gear.armor] || ARMORS.cloth;
+const maxHp = () => 6 + gearA().hearts;
+const weaponDmg = () => gearW().dmg;
+let craftTab = 'items';
 const RECIPES = [
   { id: 'pickaxe', name: 'Stone Pickaxe', desc: 'Lets you mine crystals. Breaks rocks twice as fast and doubles stone.', cost: { wood: 5, stone: 4 }, tool: true },
   { id: 'planks', name: 'Plank Bundle', desc: 'Sells for 14g, much more than loose wood.', cost: { wood: 4 } },
   { id: 'potion', name: 'Meadow Tonic', desc: 'Restores 3 hearts (press Q). Sells for 20g.', cost: { herb: 2, goo: 1 } },
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
-  { id: 'blade', name: 'Crystal Blade', desc: 'Doubles sword damage. Makes the grove slimes easy.', cost: { crystal: 3, wood: 3 }, tool: true },
 ];
 function freshState() {
   return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0 }, defeated: {}, mineOpen: false, dgs: {},
-    tools: { pickaxe: false, blade: false }, hp: 6, maxHp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
+    tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
 let S = freshState();
@@ -516,7 +538,11 @@ const ICON_DRAW = {
   relic: c => { c.fillStyle = '#7a5a14'; c.beginPath(); c.moveTo(6, 5); c.lineTo(26, 5); c.lineTo(26, 16); c.quadraticCurveTo(16, 30, 16, 30); c.quadraticCurveTo(6, 22, 6, 16); c.closePath(); c.fill(); c.fillStyle = '#f4b740'; c.beginPath(); c.moveTo(8, 7); c.lineTo(24, 7); c.lineTo(24, 16); c.quadraticCurveTo(16, 27, 16, 27); c.quadraticCurveTo(8, 21, 8, 16); c.closePath(); c.fill(); c.fillStyle = '#c8d0e0'; c.fillRect(15, 9, 3, 14); c.fillRect(11, 13, 11, 3); },
   charm: c => { c.strokeStyle = '#f4b740'; c.lineWidth = 2.5; c.beginPath(); c.arc(16, 17, 10, 0, 7); c.stroke(); c.fillStyle = '#a593ff'; diamond(c, 16, 17, 5, 8); c.fillStyle = '#f4b740'; c.fillRect(14, 3, 4, 5); },
 };
-const ICON_ATLAS = { gem: 'gem', key: 'key', bosskey: 'bosskey', crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', blade: 'blade', gold: 'coin' };
+const ICON_ATLAS = { gem: 'gem', key: 'key', bosskey: 'bosskey', crown: 'crown', stone: 'rock_g', herb: 'herb_a', crystal: 'crystal', potion: 'potion', pickaxe: 'pickaxe', gold: 'coin' };
+function swordIcon(col, big) { return c => { c.strokeStyle = '#2a1a10'; c.lineWidth = big ? 7 : 6; c.beginPath(); c.moveTo(9, 24); c.lineTo(26, 6); c.stroke(); c.strokeStyle = col; c.lineWidth = big ? 5 : 3.5; c.beginPath(); c.moveTo(10, 23); c.lineTo(26, 6); c.stroke(); c.strokeStyle = '#ffffff'; c.lineWidth = 1; c.beginPath(); c.moveTo(13, 19); c.lineTo(24, 8); c.stroke(); c.strokeStyle = '#f4b740'; c.lineWidth = 3; c.beginPath(); c.moveTo(5, 18); c.lineTo(13, 27); c.stroke(); c.strokeStyle = '#7a4b27'; c.beginPath(); c.moveTo(8, 25); c.lineTo(4, 29); c.stroke(); }; }
+function armorIcon(t) { return c => { c.fillStyle = '#1b1a2e'; c.beginPath(); c.moveTo(5, 8); c.lineTo(11, 4); c.lineTo(21, 4); c.lineTo(27, 8); c.lineTo(25, 15); c.lineTo(23, 14); c.lineTo(23, 28); c.lineTo(9, 28); c.lineTo(9, 14); c.lineTo(7, 15); c.closePath(); c.fill(); c.fillStyle = t[1]; c.beginPath(); c.moveTo(7, 9); c.lineTo(12, 6); c.lineTo(20, 6); c.lineTo(25, 9); c.lineTo(24, 13); c.lineTo(21, 12); c.lineTo(21, 26); c.lineTo(11, 26); c.lineTo(11, 12); c.lineTo(8, 13); c.closePath(); c.fill(); c.fillStyle = t[2]; c.fillRect(13, 8, 3, 16); c.fillStyle = t[0]; c.fillRect(11, 18, 10, 2); }; }
+for (const [k, w] of Object.entries(WEAPONS)) ICON_DRAW['w_' + k] = swordIcon(w.col, w.heavy);
+for (const [k, a] of Object.entries(ARMORS)) ICON_DRAW['a_' + k] = armorIcon(a.tint || ['#3a2c25', '#2f7dd1', '#7fb6ee']);
 const ICON_CANVAS = {}, ICONS = {};
 function buildIcons() {
   for (const k of [...Object.keys(ICON_DRAW), ...Object.keys(ICON_ATLAS)]) {
@@ -545,7 +571,7 @@ function objectiveText() {
 }
 function updateHUD() {
   let h = '';
-  for (let i = 0; i < S.maxHp; i++) h += `<span class="${i < S.hp ? 'on' : 'off'}">♥</span>`;
+  for (let i = 0; i < maxHp(); i++) h += `<span class="${i < S.hp ? 'on' : 'off'}">♥</span>`;
   $('hearts').innerHTML = h;
   $('gold').textContent = S.gold;
   $('objective').textContent = objectiveText();
@@ -555,13 +581,14 @@ function updateHUD() {
   let inv = '';
   for (const k of INV_ORDER) if (!TROPHIES.includes(k) || S.inv[k]) inv += `<button class="slot ${S.inv[k] ? '' : 'zero'}" data-item="${k}" title="${ITEMS[k].name}" aria-label="${ITEMS[k].name}: ${S.inv[k]}"><img src="${ICONS[k]}" alt=""><b>${S.inv[k]}</b></button>`;
   if (S.tools.pickaxe) inv += `<div class="slot tool" title="Stone Pickaxe"><img src="${ICONS.pickaxe}" alt="Stone Pickaxe"></div>`;
-  if (S.tools.blade) inv += `<div class="slot tool" title="Crystal Blade"><img src="${ICONS.blade}" alt="Crystal Blade"></div>`;
+  inv += `<button class="slot tool" data-gear="1" title="${gearW().name}"><img src="${ICONS['w_' + S.gear.weapon]}" alt="${gearW().name}"></button>`;
+  inv += `<button class="slot tool" data-gear="1" title="${gearA().name}"><img src="${ICONS['a_' + S.gear.armor]}" alt="${gearA().name}"></button>`;
   const g = DL ? dgs(DL) : null;
   if (g && g.keys) inv += `<div class="slot tool" title="Small Key"><img src="${ICONS.key}" alt="Small Key"><b>${g.keys}</b></div>`;
   if (g && g.bossKey) inv += `<div class="slot tool" title="Boss Key"><img src="${ICONS.bosskey}" alt="Boss Key"></div>`;
   $('inventory').innerHTML = inv;
 }
-$('inventory').addEventListener('click', e => { const b = e.target.closest('[data-item]'); if (!b) return; if (b.dataset.item === 'potion') drinkTonic(); else toast(`${ITEMS[b.dataset.item].name} · sells for ${ITEMS[b.dataset.item].price}g`); });
+$('inventory').addEventListener('click', e => { const gb = e.target.closest('[data-gear]'); if (gb) { toast(`${gearW().name} · ${gearA().name}. Craft and equip gear at the village workbench.`); return; } const b = e.target.closest('[data-item]'); if (!b) return; if (b.dataset.item === 'potion') drinkTonic(); else toast(`${ITEMS[b.dataset.item].name} · sells for ${ITEMS[b.dataset.item].price}g`); });
 
 // ---------- dialogue ----------
 let dlg = null;
@@ -598,7 +625,16 @@ function renderPanel() {
         <button data-act="sell1" data-k="${k}" ${S.inv[k] ? '' : 'disabled'}>Sell 1</button><button data-act="sellk" data-k="${k}" ${S.inv[k] ? '' : 'disabled'}>All</button></div>`).join('') + '</div>';
   } else if (panel === 'craft') {
     $('panelTitle').textContent = 'Workbench';
-    html = `<p class="sub">Turn what you gather into tools and goods worth selling.</p><div class="rows">` + RECIPES.map(r => {
+    const tabs = [['items', 'Tools & goods'], ['weapons', 'Weapons'], ['armor', 'Armor']].map(([k, l]) => `<button class="tab ${craftTab === k ? 'on' : ''}" data-act="tab" data-k="${k}">${l}</button>`).join('');
+    const costHtml = cost => Object.entries(cost).map(([k, n]) => `<span class="cost ${S.inv[k] >= n ? 'ok' : 'no'}"><img src="${ICONS[k]}" alt="${ITEMS[k].name}">${S.inv[k]}/${n}</span>`).join('');
+    const gearRows = (list, owned, eq, prefix, kind) => Object.entries(list).map(([id, g]) => {
+      const have = owned.includes(id), equipped = eq === id, stat = kind === 'w' ? `Damage ${g.dmg}` : `+${g.hearts} hearts`;
+      const btn = equipped ? '<button disabled>Equipped</button>' : have ? `<button data-act="equip" data-k="${kind}:${id}">Equip</button>` : `<button data-act="craftgear" data-k="${kind}:${id}" ${canAfford(g.cost) ? '' : 'disabled'}>Craft</button>`;
+      return `<div class="row ${equipped ? 'eq' : ''}"><img src="${ICONS[prefix + id]}" alt=""><div class="meta"><b>${g.name} <small>${stat}</small></b><span>${g.desc}</span>${have || !g.cost ? '' : `<div class="costs">${costHtml(g.cost)}</div>`}</div>${btn}</div>`;
+    }).join('');
+    if (craftTab === 'weapons') { body.innerHTML = `<div class="tabs">${tabs}</div><p class="sub">The best blades need boss treasures. Equipped gear shows in the corner of your inventory.</p><div class="rows">${gearRows(WEAPONS, S.gear.weapons, S.gear.weapon, 'w_', 'w')}</div>`; return; }
+    if (craftTab === 'armor') { body.innerHTML = `<div class="tabs">${tabs}</div><p class="sub">Armor adds hearts. You'll see it on your hero.</p><div class="rows">${gearRows(ARMORS, S.gear.armors, S.gear.armor, 'a_', 'a')}</div>`; return; }
+    html = `<div class="tabs">${tabs}</div><p class="sub">Turn what you gather into tools and goods worth selling.</p><div class="rows">` + RECIPES.map(r => {
       const owned = r.tool && S.tools[r.id], can = !owned && canAfford(r.cost);
       const costs = Object.entries(r.cost).map(([k, n]) => `<span class="cost ${S.inv[k] >= n ? 'ok' : 'no'}"><img src="${ICONS[k]}" alt="${ITEMS[k].name}">${S.inv[k]}/${n}</span>`).join('');
       return `<div class="row"><img src="${ICONS[r.id]}" alt=""><div class="meta"><b>${r.name}</b><span>${r.desc}</span><div class="costs">${costs}</div></div>
@@ -619,6 +655,10 @@ function renderPanel() {
       <dt>M</dt><dd>Sound on or off</dd>
       <dt>Q</dt><dd>Drink a Meadow Tonic</dd>
       <dt>Esc</dt><dd>Close menus</dd></dl>
+      <div class="label">Gear</div>
+      <dl class="controls">
+      <dt>Workbench</dt><dd>Craft weapons and armor under the Weapons and Armor tabs, and switch what you have equipped.</dd>
+      <dt>Boss treasures</dt><dd>The Slime Crown, Hollow Gem, Sea Pearl and Knight's Relic sell for a lot, or forge the best gear in the game.</dd></dl>
       <div class="label">Special moves</div>
       <dl class="controls">
       <dt>3 moves in a row</dt><dd>Finisher: Power Slash (sword), Mighty Chop (axe), Rock Smash (pickaxe), Green Thumb (herbs, triple harvest). Double damage.</dd>
@@ -672,6 +712,16 @@ body.addEventListener('click', e => {
     for (const [kk, n] of Object.entries(r.cost)) S.inv[kk] -= n;
     if (r.tool) { S.tools[r.id] = true; P.pendingCheer = `${r.name}!`; } else S.inv[r.id]++;
     toast(`Crafted ${r.name}!`); SFX.play('craft');
+  } else if (act === 'tab') { craftTab = k;
+  } else if (act === 'craftgear' || act === 'equip') {
+    const [kind, id] = k.split(':'), list = kind === 'w' ? WEAPONS : ARMORS, g = list[id], owned = kind === 'w' ? S.gear.weapons : S.gear.armors;
+    if (act === 'craftgear') {
+      if (!canAfford(g.cost) || owned.includes(id)) return;
+      for (const [kk, n] of Object.entries(g.cost)) S.inv[kk] -= n;
+      owned.push(id); toast(`Crafted ${g.name}!`); SFX.play('craft'); P.pendingCheer = `${g.name}!`;
+    } else SFX.play('collect');
+    if (kind === 'w') S.gear.weapon = id;
+    else { const before = maxHp(); S.gear.armor = id; S.hp = Math.min(maxHp(), S.hp + Math.max(0, maxHp() - before)); }
   } else if (act === 'fund') {
     if (S.gold < GOAL) return; S.gold -= GOAL; S.bridge = true;
     for (const [x, y] of bridgeTiles) tiles[y * W + x] = PLANK;
@@ -744,6 +794,10 @@ const ACTS = {
 };
 function startAct(kind, onHit, special) {
   P.act = { kind, ...ACTS[kind], t: 0, hit: false, onHit, special }; P.idleT = 0;
+  if (['sword', 'backslash', 'power'].includes(kind)) {
+    if (gearW().heavy) { P.act.dur *= 1.35; P.act.hitAt *= 1.35; }
+    if (gearW().beam && S.hp >= maxHp()) projectiles.push({ kind: 'beam', friendly: true, x: P.x + P.fx * 20, y: P.y - 20 + P.fy * 20, vx: P.fx * 380, vy: P.fy * 380, ang: Math.atan2(P.fy, P.fx), t: -P.act.hitAt * 0.6, life: 0.7 });
+  }
   if (['sword', 'backslash', 'power', 'spin'].includes(kind)) SFX.play('swing');
   if (special) { SFX.play('special'); banner(special, special === 'Whirlwind' ? '#ffe08a' : '#f4b740'); if (special === 'Dash Strike') P.act.lunge = 260; }
 }
@@ -850,14 +904,15 @@ function interact(n) {
 function drinkTonic() {
   if (paused() || P.act) return;
   if (!S.inv.potion) { toast('No tonics left. Craft one from 2 herbs and 1 slime goo.'); return; }
-  if (S.hp >= S.maxHp) { toast('Your hearts are already full.'); return; }
+  if (S.hp >= maxHp()) { toast('Your hearts are already full.'); return; }
   S.inv.potion--; updateHUD(); SFX.play('drink');
-  startAct('drink', () => { S.hp = Math.min(S.maxHp, S.hp + 3); burst(P.x, P.y - 30, '#e45a8f', 12); updateHUD(); floatText(P.x, P.y - 52, '+3 ♥', '#ec5257'); });
+  startAct('drink', () => { S.hp = Math.min(maxHp(), S.hp + 3); burst(P.x, P.y - 30, '#e45a8f', 12); updateHUD(); floatText(P.x, P.y - 52, '+3 ♥', '#ec5257'); });
 }
 function damageEnemy(e, dmg, kx, ky) {
   const D = ENEMY[e.kind];
   if (D.ghostly && e.faded) { floatText(e.x, e.y - 44, 'Miss', '#c8d0e0'); burst(e.x, e.y - 20, '#c8d0e0', 4); return false; }
   e.hp -= dmg; e.hurt = 0.2; e.kx = kx * (D.heavy ? 0.4 : 1); e.ky = ky * (D.heavy ? 0.4 : 1);
+  if (gearW().poison) { e.poison = 3; e.poisonT = 1; }
   if (e.state !== 'move') { e.state = 'move'; e.cd = Math.max(e.cd, 0.8); } // a hit interrupts wind-ups
   burst(e.x, e.y - 14, D.col, 8); floatText(e.x + (rng() - 0.5) * 12, e.y - 46, String(dmg), '#ffffff');
   if (e.hp <= 0) killEnemy(e);
@@ -868,12 +923,13 @@ function deflect(hx, hy, rad) {
   for (const p of projectiles) if (p.kind === 'orb' && !p.returned && !p.dead && Math.hypot(p.x - hx, p.y - hy) < rad + 8) {
     p.returned = true; p.sp = 270; floatText(p.x, p.y - 20, 'Return!', '#ffe08a'); SFX.play('special'); impact(4); burst(p.x, p.y, '#ffe08a', 10);
   }
-  for (const p of projectiles) if (!p.dead && p.kind !== 'orb' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
+  for (const p of projectiles) if (!p.dead && !p.friendly && p.kind !== 'orb' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
   if (n) { floatText(hx, hy - 20, 'Deflect!', '#ffffff'); SFX.play('hit'); }
 }
 function hitEnemies(a) {
-  const sp = a && a.special, reach = sp ? 30 : 24, rad = sp ? 46 : 34;
-  const hx = P.x + P.fx * reach, hy = P.y - 10 + P.fy * reach, dmg = (S.tools.blade ? 2 : 1) * (sp ? 2 : 1);
+  const sp = a && a.special, reach = sp ? 30 : 24, rad = (sp ? 46 : 34) + (gearW().heavy ? 14 : 0);
+  const Wp = gearW(), wr = (Wp.reach || 0) + (Wp.heavy ? 6 : 0), wrad = Wp.heavy ? 14 : 0;
+  const hx = P.x + P.fx * (reach + wr), hy = P.y - 10 + P.fy * (reach + wr), dmg = weaponDmg() * (sp ? 2 : 1);
   let hit = false;
   for (const e of enemies) {
     if (!e.alive || Math.hypot(e.x - hx, e.y - 10 - hy) > rad + (ENEMY[e.kind].flyer ? 10 : 0)) continue;
@@ -887,7 +943,7 @@ function hitEnemies(a) {
   if (hit) SFX.play('hit');
 }
 function spinHit(a) {
-  const dmg = (S.tools.blade ? 2 : 1) * 2;
+  const dmg = weaponDmg() * 2;
   for (const e of enemies) {
     if (!e.alive) continue;
     const dx = e.x - P.x, dy = e.y - P.y, d = Math.hypot(dx, dy) || 1;
@@ -907,7 +963,7 @@ function hitResource(r, a) {
   const sp = a && a.special;
   r.shake = 0.2;
   if (r.type === 'crystal' && !S.tools.pickaxe) { toast('Too hard for a sword. Craft a Stone Pickaxe at the village workbench.'); burst(r.x, r.y - 14, '#cfc6ff', 4); return; }
-  const power = (r.type === 'rock' || r.type === 'crystal') ? (S.tools.pickaxe ? 2 : 1) : (S.tools.blade && r.type === 'tree' ? 2 : 1);
+  const power = (r.type === 'rock' || r.type === 'crystal') ? (S.tools.pickaxe ? 2 : 1) : (weaponDmg() >= 2 && r.type === 'tree' ? 2 : 1);
   r.hp -= power * (sp && sp !== 'Whirlwind' ? 2 : 1);
   if (sp && sp !== 'Whirlwind') { impact(6); burst(r.x, r.y - 18, '#ffe08a', 12); }
   const col = { tree: '#7a4b27', rock: '#9a978f', herb: '#5bbf55', crystal: '#a593ff' }[r.type];
@@ -932,6 +988,13 @@ function killEnemy(e) {
   e.alive = false; e.respawn = 25; e.dieT = 0.4; e.state = 'move'; e.faded = false; SFX.play('slime');
   burst(e.x, e.y - 10, D.col, 16);
   for (const [item, n] of D.drops) drop(e.x, e.y - 6, item, n);
+  if (gearW().lifesteal && S.hp < maxHp() && S.hp > 0) { S.hp++; floatText(P.x, P.y - 60, '+♥', '#ec5257'); updateHUD(); }
+}
+function tickPoison(o, dt, onHurt) {
+  if (!(o.poison > 0)) return;
+  o.poison -= dt; o.poisonT -= dt;
+  if (Math.random() < dt * 10) particles.push({ x: o.x + (Math.random() - 0.5) * 24, y: o.y - 20 - (o.z || 0), vx: 0, vy: -25, life: 0.4, color: '#7fd17a', size: 3 });
+  if (o.poisonT <= 0) { o.poisonT = 1; onHurt(); }
 }
 function drop(x, y, item, n, v = 1) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 60 + rng() * 60 + (n > 6 ? rng() * 80 : 0); pickups.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, item, t: 0, v }); } }
 function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = rng() * Math.PI * 2, s = 40 + rng() * 90; particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.5 + rng() * 0.3, color }); } }
@@ -940,13 +1003,13 @@ function damagePlayer(n, from) {
   if (P.inv > 0 || P.dash || (P.act && P.act.kind === 'faint')) return;
   S.hp -= n; P.inv = 1.0; P.idleT = 0; SFX.play('hurt');
   const hearts = $('hearts'); hearts.classList.remove('hit'); void hearts.offsetWidth; hearts.classList.add('hit');
-  const a = Math.atan2(P.y - from.y, P.x - from.x); P.kx = Math.cos(a) * 320; P.ky = Math.sin(a) * 320;
+  const a = Math.atan2(P.y - from.y, P.x - from.x), kb = gearA().sturdy ? 110 : 320; P.kx = Math.cos(a) * kb; P.ky = Math.sin(a) * kb;
   burst(P.x, P.y - 24, '#ec5257', 8);
   if (S.hp <= 0) {
     S.hp = 0; P.kx = P.ky = 0; P.inv = 3;
     startAct('faint', () => {
       const lost = Math.floor(S.gold * 0.1); S.gold -= lost;
-      S.hp = S.maxHp; P.x = cx * T; P.y = (cy + 2) * T; P.fx = 0; P.fy = 1;
+      S.hp = maxHp(); P.x = cx * T; P.y = (cy + 2) * T; P.fx = 0; P.fy = 1;
       toast(lost ? `You passed out and woke in the village. You dropped ${lost}g.` : 'You passed out and woke in the village.', 3500);
       updateHUD();
     });
@@ -1019,7 +1082,7 @@ function update(dt) {
   if (ml > 0.15 && moveMul > 0) {
     const n = Math.min(1, ml); mx /= ml; my /= ml;
     if (!P.act) { P.fx = mx; P.fy = my; }
-    const ox = P.x, oy = P.y, sp = 130 * n * moveMul * (P.running ? 1.65 : 1) * (P.slow > 0 ? 0.45 : 1);
+    const ox = P.x, oy = P.y, sp = 130 * n * moveMul * (P.running ? 1.65 : 1) * (P.slow > 0 ? 0.45 : 1) * (gearA().speed || 1);
     P.idleT = 0;
     if (P.running && Math.random() < dt * 10) particles.push({ x: P.x - mx * 8, y: P.y, vx: -mx * 30, vy: -30, life: 0.35, color: '#d9cfb0' });
     moveBody(P, mx * sp * dt, my * sp * dt, 9);
@@ -1031,7 +1094,8 @@ function update(dt) {
   if (!P.moving && !P.act && !P.dash && !P.held) P.idleT += dt; else P.idleT = 0;
   if (P.idleT > 7 && P.idleT - dt <= 7) floatText(P.x + 16, P.y - 60, 'z', '#eef3e6');
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt);
-  if (Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T && S.hp < S.maxHp && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
+  if (Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 2) * T) { edgeToast = true; toast('The mainland is just over the horizon. That is a story for the full game.', 4000); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -1167,6 +1231,8 @@ function updateEnemy(e, dt, fainted) {
     return;
   }
   e.hurt = Math.max(0, e.hurt - dt); if (e.spawnT > 0) e.spawnT -= dt;
+  tickPoison(e, dt, () => { e.hp -= 1; floatText(e.x, e.y - 46, '1', '#7fd17a'); if (e.hp <= 0) killEnemy(e); });
+  if (!e.alive) return;
   e.cd = Math.max(0, e.cd - dt); e.anim += dt;
   const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1;
   const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
@@ -1268,6 +1334,17 @@ function updateEnemy(e, dt, fainted) {
 function updateProjectiles(dt, fainted) {
   for (const p of projectiles) {
     p.t += dt;
+    if (p.friendly) {
+      if (p.t < 0) { p.x = P.x + P.fx * 20; p.y = P.y - 20 + P.fy * 20; continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (Math.random() < dt * 40) particles.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0.25, color: gearW().col, size: 3 });
+      for (const e of enemies) if (e.alive && !p.dead && Math.hypot(e.x - p.x, e.y - 14 - p.y) < 24) { damageEnemy(e, weaponDmg(), p.vx * 0.6, p.vy * 0.6); p.dead = true; }
+      const AB = activeBoss();
+      if (!p.dead && AB && bossHittable(AB) && Math.hypot(AB.x - p.x, AB.y - 30 - AB.z - p.y) < 44) { damageBoss(AB, weaponDmg()); p.dead = true; }
+      if (!p.dead && inDungeon(p.x) && !walkable(p.x, p.y + 20)) { p.dead = true; burst(p.x, p.y, gearW().col, 6); }
+      if (p.t > p.life) p.dead = true;
+      continue;
+    }
     if (p.kind === 'orb') {
       const o = p.owner, tx = p.returned ? o.x : P.x, ty = p.returned ? o.y - 30 - o.z : P.y - 14;
       const want = Math.atan2(ty - p.y, tx - p.x); let da = want - p.ang;
@@ -1344,6 +1421,8 @@ function damageBoss(B, n) {
   let dmg = n * (dazed ? 2 : 1);
   if (B.type === 'crab' && !dazed) { dmg = Math.max(1, Math.ceil(n / 2)); if (rng() < 0.3) floatText(B.x + 30, B.y - 70, 'Clang', '#c8d0ff'); }
   B.hp -= dmg; B.hurt = 0.15;
+  if (gearW().poison) { B.poison = 3; B.poisonT = 1; }
+  if (gearW().lifesteal && B.hp <= 0 && S.hp > 0) { S.hp = maxHp(); updateHUD(); }
   floatText(B.x + (rng() - 0.5) * 30, B.y - 90 - B.z, dazed ? `${dmg}!` : String(dmg), dazed ? '#ffe08a' : '#ffffff');
   burst(B.x, B.y - 30 - B.z, BOSS_INFO[B.type].col, 10); SFX.play('hit');
   const phase = B.hp / B.max > 0.66 ? 1 : B.hp / B.max > 0.33 ? 2 : 3;
@@ -1428,6 +1507,7 @@ function updateBosses(dt, fainted) {
   for (const B of BOSSES) {
     if ((S.defeated[B.type] || B.state === 'dead') && B.state !== 'dying') continue;
     B.anim += dt; B.hurt = Math.max(0, B.hurt - dt); B.shield = Math.max(0, B.shield - dt);
+    if (B.active && B.state !== 'dying') tickPoison(B, dt, () => { B.hp = Math.max(1, B.hp - 1); floatText(B.x, B.y - 90 - B.z, '1', '#7fd17a'); bossBar(); });
     const d = Math.hypot(P.x - B.x, P.y - B.y), I = BOSS_INFO[B.type];
     if (B.ring) {
       const R = B.ring; R.r += 250 * dt;
@@ -1837,6 +1917,14 @@ function drawCreature(c, e) {
 function drawStars(c, x, y, r) { c.fillStyle = '#ffe08a'; for (let i = 0; i < 3; i++) { const a = time * 5 + i * 2.1; c.fillRect(Math.round(x + Math.cos(a) * r - 2), Math.round(y + Math.sin(a) * r * 0.4 - 2), 4, 4); } }
 function drawProjectiles(c) {
   for (const p of projectiles) {
+    if (p.kind === 'beam') {
+      if (p.t < 0) continue;
+      c.save(); c.translate(p.x, p.y); c.rotate(p.ang);
+      c.strokeStyle = gearW().col; c.globalAlpha = 0.85; c.lineWidth = 5; c.beginPath(); c.arc(-6, 0, 16, -1.1, 1.1); c.stroke();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.beginPath(); c.arc(-6, 0, 16, -0.8, 0.8); c.stroke();
+      c.restore(); c.globalAlpha = 1;
+      continue;
+    }
     if (p.kind === 'rock') {
       const pulse = 0.5 + Math.sin(time * 16) * 0.3;
       c.strokeStyle = `rgba(236,82,87,${pulse})`; c.lineWidth = 2; c.beginPath(); c.ellipse(p.tx, p.ty, 22, 10, 0, 0, Math.PI * 2); c.stroke();
@@ -2065,10 +2153,33 @@ function drawSlime(c, e) {
   if (e.hp < e.max && !ENEMY[e.kind].small) healthBar(c, e.x, e.y - 38 - lift, e.hp / e.max);
 }
 function healthBar(c, x, y, f) { c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(x - 13, y, 26, 5); c.fillStyle = '#ec5257'; c.fillRect(x - 12, y + 1, 24 * f, 3); }
+const ARMOR_SHEET = { hero_walk: 'walk', hero_idle: 'idle', hero_run: 'run', hero_sit: 'sit', hero_emote: 'emote', hero_jump: 'jump', hero_combat_idle: 'combat_idle',
+  hero_thrust: 'thrust', hero_spellcast: 'spellcast', hero_hurt: 'hurt', hero_sword: 'slash', hero_axe: 'slash', hero_pick: 'slash', hero_backslash: 'backslash' };
+const armorCache = {};
+// recolor the plate-armor overlay into each armor's palette, once per sheet
+function armorSheet(armor, anim) {
+  const key = armor + ':' + anim; if (armorCache[key]) return armorCache[key];
+  const src = IMG['arm_' + anim], tint = ARMORS[armor].tint; if (!src || !tint) return null;
+  const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
+  const g = cv.getContext('2d'); g.drawImage(src, 0, 0);
+  const id = g.getImageData(0, 0, cv.width, cv.height), d = id.data, pal = tint.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const l = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255;
+    if (l < 0.12) continue; // keep the dark outline
+    const t = Math.min(1, Math.max(0, (l - 0.15) / 0.75)), a = t < 0.5 ? pal[0] : pal[1], b = t < 0.5 ? pal[1] : pal[2], u = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+    d[i] = a[0] + (b[0] - a[0]) * u; d[i + 1] = a[1] + (b[1] - a[1]) * u; d[i + 2] = a[2] + (b[2] - a[2]) * u;
+  }
+  g.putImageData(id, 0, 0); return (armorCache[key] = cv);
+}
 function drawLPC(c, sheet, frame, row, x, y, size) {
   const img = IMG[sheet]; if (!img) return;
   const ox = size === 128 ? 64 : 32, oy = size === 128 ? 94 : 62;
   c.drawImage(img, frame * size, row * size, size, size, Math.round(x - ox), Math.round(y - oy), size, size);
+  if (ARMOR_SHEET[sheet] && S.gear.armor !== 'cloth') {
+    const ov = armorSheet(S.gear.armor, ARMOR_SHEET[sheet]);
+    if (ov) c.drawImage(ov, frame * size, row * size, size, size, Math.round(x - ox), Math.round(y - oy), size, size);
+  }
 }
 const enemyNear = r => enemies.some(e => e.alive && Math.hypot(e.x - P.x, e.y - P.y) < r);
 function drawPlayer(c) {
@@ -2086,6 +2197,11 @@ function drawPlayer(c) {
   if (P.act) {
     const A = P.act, i = Math.min(A.frames.length - 1, Math.floor(A.t / A.dur * A.frames.length));
     drawLPC(c, A.sheet, A.frames[i], A.rows ? A.rows[i] : A.oneRow ? 0 : row, P.x, P.y, A.size);
+    if (!A.special && ['sword', 'backslash'].includes(A.kind) && S.gear.weapon !== 'wood' && Math.abs(A.t - A.hitAt) < 0.09) {
+      const base = Math.atan2(P.fy, P.fx), k = 1 - Math.abs(A.t - A.hitAt) / 0.09, R = gearW().heavy ? 44 : 34;
+      c.strokeStyle = gearW().col; c.globalAlpha = k * 0.75; c.lineWidth = gearW().heavy ? 8 : 5; c.lineCap = 'round';
+      c.beginPath(); c.arc(P.x, P.y - 22, R, base - 1.1, base + 1.1); c.stroke(); c.lineCap = 'butt'; c.globalAlpha = 1;
+    }
     if (A.special && A.kind !== 'spin' && Math.abs(A.t - A.hitAt) < 0.1) {
       const base = Math.atan2(P.fy, P.fx), k = 1 - Math.abs(A.t - A.hitAt) / 0.1;
       c.strokeStyle = `rgba(255,224,138,${k})`; c.lineWidth = 7; c.lineCap = 'round';
@@ -2256,7 +2372,12 @@ function applySave(d) {
   S = { ...base, ...d, inv: { ...base.inv, ...(d.inv || {}) }, tools: { ...base.tools, ...(d.tools || {}) }, met: { ...(d.met || {}) },
     defeated: { ...(d.defeated || {}), ...(d.bossDefeated ? { slime: true } : {}) }, dgs: dgsIn };
   delete S['bossDefeated']; delete S['dg'];
-  if (S.hp <= 0) S.hp = S.maxHp;
+  S.gear = { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'], ...(d.gear || {}) };
+  S.gear.weapons = [...new Set(['wood', ...(S.gear.weapons || [])])]; S.gear.armors = [...new Set(['cloth', ...(S.gear.armors || [])])];
+  if (d.tools && d.tools.blade && !S.gear.weapons.includes('crystal')) { S.gear.weapons.push('crystal'); S.gear.weapon = 'crystal'; }
+  delete S.tools.blade; delete S['maxHp'];
+  if (S.hp <= 0) S.hp = maxHp();
+  S.hp = Math.min(S.hp, maxHp());
 }
 
 // ---------- boot ----------

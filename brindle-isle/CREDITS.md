@@ -2,7 +2,7 @@
 
 ## Characters (hero, Oma Fen, Tobin)
 From the [Universal LPC Spritesheet Character Generator](https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator) (Liberated Pixel Cup).
-Layers: body, head, hair, long-sleeve shirt, pants, shoes, arming sword (slash and backslash), axe and pickaxe; animations walk, run, idle, combat idle, sit, emote, jump, slash, backslash, thrust, spellcast and hurt. Colors were adjusted for this game.
+Layers: body, head, hair, long-sleeve shirt, pants, shoes, arming sword (slash and backslash), axe, pickaxe and plate armour (recolored per armor); animations walk, run, idle, combat idle, sit, emote, jump, slash, backslash, thrust, spellcast and hurt. Colors were adjusted for this game.
 
 Authors: Benjamin K. Smith (BenCreating), bluecarrot16, Durrani, Eliza Wyatt (ElizaWy), Evert, JaidynReiman, Joe White, Johannes Sjölund (wulax), Manuel Riecke (MrBeast), Matthew Krohn (makrohn), MuffinElZangano, Nila122, Pierre Vigier (pvigier), Stephen Challener (Redshrike), TheraHedwig, Tuomo Untinen (reemax).
 
