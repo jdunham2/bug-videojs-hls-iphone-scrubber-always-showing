@@ -12,7 +12,7 @@ Licenses: CC-BY-SA 3.0, GPL 3.0, OGA-BY 3.0 (see the generator's CREDITS.csv for
 [Kenney](https://kenney.nl) Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs, CC0 (public domain).
 
 ## Hand-drawn
-The pixel rock, crystal and Slime King crown sprites and a few inventory icons were drawn for this game.
+The pixel rock, crystal and Slime King crown sprites, the temple and crypt entrances, crystal switches and a few inventory icons were drawn for this game.
 
 ## Rebuilding
 Edit `src/game.js` or `src/shell.html`, then run `python3 build.py` to regenerate the self-contained `index.html`.
