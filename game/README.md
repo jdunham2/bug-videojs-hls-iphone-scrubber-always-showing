@@ -32,6 +32,14 @@ A third-person platform brawler roguelike built with three.js. The slice focuses
   - **Freeze Ray**: 3 shots that freeze the enemy in an ice block for about 2s.
 - **Power-ups** (pick 1 of 3 after each wave): Iron Knuckles, Feather Boots, Anchor Belt, Cloud Step, Quickstep, Cyclone, Hot Blood, Spare Heart, **Vampire Fist** (hits heal 25% of damage dealt), **Second Wind** (one saved KO per wave), **Glass Cannon** (2× knockback dealt, 2× damage taken), **Thorns** (attackers take 3%), **Fire Trail** (dashes leave burning fire), **Chain Lightning** (every 3rd hit zaps for +6%), **Magnet** (items slide to you), **Shockwave Landing** (big landings knock enemies away), **Echo** (each attack repeats as a half-strength ghost hit), **Gold Rush** (hits drop coins; spend them in the shop between waves), **Pet Drone** (a drone follows you and zaps the enemy; take it twice for two).
 
+## Music and sound
+
+All audio is generated live with the Web Audio API, so there are no audio files.
+
+- **Music**: a small step sequencer plays a different theme in every arena, plus a menu theme. Each theme has its own tempo, key, scale, chord loop, instruments and drum pattern. The lead melody is generated from a seed, so each theme repeats as a recognizable 8-bar loop. Themes crossfade when the arena changes. Edit them in `THEMES`.
+- **Ambience**: a sound bed per arena (`AMB` and `updateAmbience`), for example a lava rumble with crackles, wind that swells with gusts, ticking gears, ice chimes, ocean swells with creaks and gulls, a crowd murmur with wind chimes, birdsong, and train clatter that roars when a tunnel passes.
+- **Controls**: the pause menu has Music and Sound effects volume sliders, and the M key turns music on or off. Settings are saved in the browser.
+
 ## Run it
 
 It's a single HTML file with no build step. three.js loads from a CDN through an import map.

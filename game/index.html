@@ -162,6 +162,10 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .linkbtn{font-family:var(--body);font-size:12px;color:var(--muted);background:none;border:0;text-decoration:underline;cursor:pointer;padding:4px}
 .linkbtn:focus-visible{outline:2px solid var(--mint)}
 @media (prefers-reduced-motion:reduce){ .unlock{animation:none} }
+.vols{display:grid;grid-template-columns:auto minmax(0,220px);gap:10px 14px;align-items:center;background:var(--glass);padding:14px 18px;border-radius:14px}
+.vols label{font-size:14px;font-weight:700;color:var(--ink);text-align:left}
+.vols input[type=range]{width:100%;accent-color:var(--sun)}
+.vols input[type=range]:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 @media (max-width:560px){ .pct{font-size:30px} .card{min-width:96px;padding:6px 10px 8px} #wave{font-size:12px}
   .chars{grid-template-columns:repeat(3,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
@@ -214,7 +218,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
       <b>K / Right click</b><span>Smash: hold to charge, release to launch</span>
       <b>Shift</b><span>Dash (dodges hits, works once in the air). Tank-o: hold to shield</span>
       <b>Mouse</b><span>Look around (click the game to capture). Q toggles lock-on</span>
-      <b>Esc</b><span>Pause</span>
+      <b>Esc</b><span>Pause (music and sound volume are in the pause menu)</span>
+      <b>M</b><span>Turn music on or off</span>
     </div>
     <div class="controls" id="ctlTouch" hidden>
       <b>Left thumb</b><span>Drag anywhere on the left to move</span>
@@ -287,6 +292,10 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 <section class="screen" id="scrPause" hidden>
   <div class="panel">
     <h2>PAUSED</h2>
+    <div class="vols">
+      <label for="musicVol">Music</label><input type="range" id="musicVol" min="0" max="100" step="5">
+      <label for="sfxVol">Sound effects</label><input type="range" id="sfxVol" min="0" max="100" step="5">
+    </div>
     <div class="row">
       <button class="btn" id="btnResume">RESUME</button>
       <button class="btn ghost" id="btnQuit">RESTART RUN</button>
@@ -1415,12 +1424,31 @@ function updatePopups(dt) {
 }
 
 /* ================= audio ================= */
-let AC = null, master = null, noiseBuf = null;
+let AC = null, master = null, noiseBuf = null, musicVolG = null, musicFade = null, ambG = null, loopNoise = null;
+const audioPrefs = {
+  music: clamp(+(store.get('koisle-music') ?? 70), 0, 100) / 100,
+  sfx: clamp(+(store.get('koisle-sfx') ?? 80), 0, 100) / 100,
+  musicOn: store.get('koisle-musicon') !== '0',
+};
+function applyVolumes() {
+  if (!AC) return;
+  const t = AC.currentTime;
+  master.gain.setTargetAtTime(.55 * audioPrefs.sfx, t, .05);
+  musicVolG.gain.setTargetAtTime(audioPrefs.musicOn ? .42 * audioPrefs.music : 0, t, .08);
+  ambG.gain.setTargetAtTime(.8 * audioPrefs.sfx, t, .08);
+}
 function initAudio() {
   if (AC) { AC.resume?.(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = .45; master.connect(AC.destination);
+    master = AC.createGain(); master.connect(AC.destination);
+    musicVolG = AC.createGain(); musicVolG.connect(AC.destination);
+    musicFade = AC.createGain(); musicFade.gain.value = 0; musicFade.connect(musicVolG);
+    ambG = AC.createGain(); ambG.connect(AC.destination);
+    loopNoise = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+    const ld = loopNoise.getChannelData(0); for (let i = 0; i < ld.length; i++) ld[i] = Math.random() * 2 - 1;
+    applyVolumes();
+    setInterval(musicTick, 30);
     noiseBuf = AC.createBuffer(1, AC.sampleRate * .6, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   } catch (e) { AC = null; }
@@ -1499,6 +1527,238 @@ function sfx(name, k = 1) {
       case 'glitch': tone(rand(200, 1800), rand(100, 2000), .08, 'square', .07); break;
     }
   } catch (e) {}
+}
+
+/* ================= music: a tiny sequencer with one theme per arena ================= */
+const SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], phrygian: [0, 1, 3, 5, 7, 8, 10],
+  mixo: [0, 2, 4, 5, 7, 9, 10], lydian: [0, 2, 4, 6, 7, 9, 11], harm: [0, 2, 3, 5, 7, 8, 11], hira: [0, 2, 3, 7, 8],
+};
+const _ = null;
+// Each theme: tempo, key, scale, a 4-bar chord loop (scale degrees), and instruments. The lead melody is generated once from the seed.
+const THEMES = {
+  menu: { bpm: 96, root: 60, scale: 'lydian', prog: [0, 4, 5, 3], seed: 7,
+    lead: { type: 'triangle', vol: .07, r: .45, cut: 3200, oct: 12, density: .45, rhythm: 'x..x..x.x..x..x.' },
+    bass: { type: 'sine', vol: .13, cut: 800, pat: [0, _, _, _, _, _, _, _, 7, _, _, _, _, _, _, _] },
+    pad: { type: 'sine', vol: .05, cut: 2000, mode: 'arp8' }, drums: null },
+  sky: { bpm: 118, root: 62, scale: 'major', prog: [0, 4, 5, 3], seed: 11,
+    lead: { type: 'square', vol: .04, r: .18, cut: 2400, oct: 12, density: .6, rhythm: 'x.xxx.x.x.xxx.x.' },
+    bass: { type: 'triangle', vol: .17, cut: 900, pat: [0, _, 0, _, 7, _, 0, _, 0, _, 0, _, 7, _, 12, _] },
+    pad: { type: 'sawtooth', vol: .03, cut: 900, mode: 'stab' },
+    drums: { k: 'x...x...x...x...', s: '....x.......x...', h: '..x...x...x...x.', vol: .5 } },
+  lava: { bpm: 136, root: 52, scale: 'phrygian', prog: [0, 0, 1, 6], seed: 23,
+    lead: { type: 'sawtooth', vol: .035, r: .2, cut: 1800, oct: 12, density: .55, rhythm: 'x..x..x...x.x...' },
+    bass: { type: 'sawtooth', vol: .16, cut: 500, pat: [0, 0, _, 0, 0, _, 0, 0, 0, 0, _, 0, 12, _, 0, _] },
+    pad: { type: 'square', vol: .025, cut: 700, mode: 'stab' },
+    drums: { k: 'x..x..x.x..x..x.', s: '....x.......x...', h: 'xxxxxxxxxxxxxxxx', vol: .55 } },
+  wind: { bpm: 108, root: 57, scale: 'dorian', prog: [0, 3, 0, 6], seed: 31,
+    lead: { type: 'triangle', vol: .075, a: .05, r: .35, cut: 3000, oct: 12, density: .5, rhythm: 'x...x.x.x...x.x.', vib: 5 },
+    bass: { type: 'sine', vol: .14, cut: 700, pat: [0, _, _, _, _, _, 7, _, 0, _, _, _, _, _, 5, _] },
+    pad: { type: 'sine', vol: .045, cut: 1500, mode: 'pad' },
+    drums: { k: 'x.......x.......', s: '........x.......', h: '....x.......x...', vol: .35 } },
+  gear: { bpm: 124, root: 55, scale: 'minor', prog: [0, 5, 3, 4], seed: 41,
+    lead: { type: 'square', vol: .04, r: .08, cut: 2000, oct: 12, density: .7, rhythm: 'x.x.xxx.x.x.xxx.' },
+    bass: { type: 'square', vol: .11, cut: 600, pat: [0, _, 12, _, 0, _, 12, _, 0, _, 12, _, 0, _, 12, _] },
+    pad: { type: 'triangle', vol: .03, cut: 2500, mode: 'arp16' },
+    drums: { k: 'x.......x.......', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', vol: .45 } },
+  ice: { bpm: 92, root: 54, scale: 'minor', prog: [0, 5, 2, 6], seed: 53,
+    lead: { type: 'sine', vol: .075, r: 1.2, cut: 5000, oct: 24, density: .4, rhythm: 'x...x...x.x.....' },
+    bass: { type: 'sine', vol: .12, cut: 600, pat: [0, _, _, _, _, _, _, _, 0, _, _, _, _, _, _, _] },
+    pad: { type: 'triangle', vol: .04, cut: 1500, mode: 'pad' },
+    drums: { k: 'x.........x.....', s: null, h: '..x...x...x...x.', vol: .25 } },
+  ship: { bpm: 138, root: 62, scale: 'minor', prog: [0, 6, 5, 4], seed: 61,
+    lead: { type: 'square', vol: .04, r: .15, cut: 2200, oct: 12, density: .65, rhythm: 'x.x.x.x.x.xxx.x.', det: 8 },
+    bass: { type: 'triangle', vol: .17, cut: 900, pat: [0, _, _, _, 7, _, _, _, 0, _, _, _, 7, _, _, _] },
+    pad: { type: 'square', vol: .028, cut: 1200, mode: 'stab' },
+    drums: { k: 'x.......x.......', s: '....x.......x...', h: null, vol: .45 } },
+  shrink: { bpm: 150, root: 48, scale: 'harm', prog: [0, 0, 5, 4], seed: 71,
+    lead: { type: 'sawtooth', vol: .035, r: .12, cut: 2600, oct: 24, density: .7, rhythm: 'xxx.xxx.xxx.x.x.' },
+    bass: { type: 'sawtooth', vol: .15, cut: 450, pat: [0, _, 0, _, 0, _, 0, _, 0, _, 0, _, 0, _, 0, _] },
+    pad: { type: 'square', vol: .022, cut: 1600, mode: 'arp16' },
+    drums: { k: 'x...x...x...x...', s: '....x.......x..x', h: 'xxxxxxxxxxxxxxxx', vol: .55 } },
+  bounce: { bpm: 128, root: 65, scale: 'major', prog: [0, 3, 4, 0], seed: 83,
+    lead: { type: 'square', vol: .04, r: .14, cut: 3000, oct: 12, density: .65, rhythm: 'x.xx.xx.x.xx.x..' },
+    bass: { type: 'sine', vol: .16, cut: 900, pat: [0, _, 12, _, 0, _, 12, _, 5, _, 17, _, 7, _, 19, _] },
+    pad: { type: 'triangle', vol: .04, cut: 2500, mode: 'arp8' },
+    drums: { k: 'x...x...x...x...', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.', vol: .45 } },
+  night: { bpm: 88, root: 57, scale: 'hira', prog: [0, 0, 3, 2], seed: 97,
+    lead: { type: 'triangle', vol: .08, r: .5, cut: 3500, oct: 12, density: .5, rhythm: 'x..x..x.x...x...' },
+    bass: { type: 'sine', vol: .13, cut: 600, pat: [0, _, _, _, _, _, _, _, 7, _, _, _, _, _, _, _] },
+    pad: { type: 'sine', vol: .035, cut: 1500, mode: 'pad' },
+    drums: { k: 'x.........x.....', s: '....x.......x...', h: null, vol: .3 } },
+  garden: { bpm: 84, root: 63, scale: 'lydian', prog: [0, 3, 5, 4], seed: 101,
+    lead: { type: 'sine', vol: .07, r: .8, cut: 5000, oct: 12, density: .45, rhythm: 'x...x.x.x...x...' },
+    bass: { type: 'sine', vol: .11, cut: 600, pat: [0, _, _, _, _, _, _, _, 7, _, _, _, _, _, _, _] },
+    pad: { type: 'triangle', vol: .03, cut: 2500, mode: 'arp16' },
+    drums: { k: null, s: null, h: '..x...x...x...x.', vol: .2 } },
+  train: { bpm: 146, root: 57, scale: 'mixo', prog: [0, 3, 0, 4], seed: 113,
+    lead: { type: 'square', vol: .04, r: .14, cut: 2400, oct: 12, density: .6, rhythm: 'x.x.xx.xx.x.x.x.' },
+    bass: { type: 'triangle', vol: .17, cut: 1000, pat: [0, _, 4, _, 7, _, 9, _, 10, _, 9, _, 7, _, 4, _] },
+    pad: { type: 'sawtooth', vol: .028, cut: 1000, mode: 'stab' },
+    drums: { k: 'x.......x.......', s: '....x.......x...', h: 'x.xx.xx.x.xx.xx.', vol: .5 } },
+};
+const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
+function degMidi(th, deg, base = 0) {
+  const sc = SCALES[th.scale], n = sc.length, o = Math.floor(deg / n), i = ((deg % n) + n) % n;
+  return th.root + base + sc[i] + 12 * o;
+}
+function seeded(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function melodyFor(th) { // 8 bars of 16th-note steps; chord tones on strong beats, small steps elsewhere
+  if (th._mel) return th._mel;
+  const rng = seeded(th.seed), n = SCALES[th.scale].length, mel = new Array(128).fill(null);
+  let cur = n; // start around the middle
+  for (let bar = 0; bar < 8; bar++) {
+    const chord = th.prog[bar % th.prog.length];
+    for (let i = 0; i < 16; i++) {
+      if (th.lead.rhythm[i] !== 'x' || rng() > th.lead.density) continue;
+      if (i % 4 === 0) { const tones = [chord, chord + 2, chord + 4, chord + n].map(t => t + (cur > n + 2 ? n : 0)); cur = tones.reduce((b, t) => Math.abs(t - cur) < Math.abs(b - cur) ? t : b, tones[0]); }
+      else cur += [-2, -1, -1, 1, 1, 2][rng() * 6 | 0];
+      cur = clamp(cur, 0, n * 2 + 2);
+      mel[bar * 16 + i] = cur;
+    }
+  }
+  return (th._mel = mel);
+}
+function voice(freq, t, dur, o) { // one synth note into the music bus
+  const osc = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+  osc.type = o.type; osc.frequency.setValueAtTime(freq, t);
+  if (o.vib) { const l = AC.createOscillator(), lg = AC.createGain(); l.frequency.value = o.vib; lg.gain.value = freq * .012; l.connect(lg).connect(osc.frequency); l.start(t); l.stop(t + dur + (o.r || .2) + .1); }
+  f.type = 'lowpass'; f.frequency.value = o.cut || 4000;
+  const a = o.a || .008, r = o.r || .2, v = o.vol;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.setValueAtTime(v, t + Math.max(a, dur));
+  g.gain.exponentialRampToValueAtTime(.0005, t + Math.max(a, dur) + r);
+  osc.connect(f).connect(g).connect(musicFade); osc.start(t); osc.stop(t + dur + r + .05);
+  if (o.det) { const o2 = AC.createOscillator(); o2.type = o.type; o2.frequency.setValueAtTime(freq, t); o2.detune.value = o.det; o2.connect(f); o2.start(t); o2.stop(t + dur + r + .05); }
+}
+function drum(kind, t, vol) {
+  if (kind === 'k') {
+    const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
+    g.gain.setValueAtTime(.9 * vol, t); g.gain.exponentialRampToValueAtTime(.001, t + .28); o.connect(g).connect(musicFade); o.start(t); o.stop(t + .3);
+  } else {
+    const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); src.buffer = noiseBuf;
+    const snare = kind === 's'; f.type = snare ? 'bandpass' : 'highpass'; f.frequency.value = snare ? 1800 : 7500;
+    const len = snare ? .14 : .035; g.gain.setValueAtTime((snare ? .45 : .16) * vol, t); g.gain.exponentialRampToValueAtTime(.001, t + len);
+    src.connect(f).connect(g).connect(musicFade); src.start(t, Math.random() * .4); src.stop(t + len + .02);
+    if (snare) { const o = AC.createOscillator(), og = AC.createGain(); o.frequency.value = 190; og.gain.setValueAtTime(.18 * vol, t); og.gain.exponentialRampToValueAtTime(.001, t + .08); o.connect(og).connect(musicFade); o.start(t); o.stop(t + .1); }
+  }
+}
+const music = { key: null, want: null, th: null, step: 0, next: 0, switching: false };
+function scheduleStep(th, step, t) {
+  const spb = 60 / th.bpm / 4, bar = Math.floor(step / 16) % 8, i = step % 16, chord = th.prog[bar % th.prog.length];
+  const mel = melodyFor(th), m = mel[bar * 16 + i];
+  if (m !== null) {
+    let len = 1; while (len < 4 && mel[(bar * 16 + i + len) % 128] === null) len++;
+    voice(midiHz(degMidi(th, m, th.lead.oct - 12)), t, len * spb * .85, th.lead);
+  }
+  const b = th.bass.pat[i];
+  if (b !== null && b !== undefined) voice(midiHz(degMidi(th, chord, -24) + b), t, spb * 1.6, { ...th.bass, r: .12 });
+  const P = th.pad, tones = [chord, chord + 2, chord + 4].map(d => degMidi(th, d, -12));
+  if (P.mode === 'pad' && i === 0) for (const tn of tones) voice(midiHz(tn), t, spb * 15, { ...P, a: .4, r: .6 });
+  else if (P.mode === 'arp8' && i % 2 === 0) voice(midiHz(tones[(i / 2) % 3] + (i >= 8 ? 12 : 0)), t, spb * 1.6, { ...P, r: .3 });
+  else if (P.mode === 'arp16') voice(midiHz([tones[0], tones[1], tones[2], tones[1] + 12][i % 4] + 12), t, spb * .8, { ...P, r: .15 });
+  else if (P.mode === 'stab' && i % 4 === 2) for (const tn of tones) voice(midiHz(tn + 12), t, spb * .9, { ...P, r: .08 });
+  const D = th.drums;
+  if (D) for (const k of ['k', 's', 'h']) if (D[k] && D[k][i] === 'x') drum(k, t, D.vol);
+}
+function musicTick() {
+  if (!AC || !music.th || music.switching) return;
+  const spb = 60 / music.th.bpm / 4;
+  if (music.next < AC.currentTime - .5) music.next = AC.currentTime + .05; // tab was asleep: resync
+  while (music.next < AC.currentTime + .15) { scheduleStep(music.th, music.step, music.next); music.next += spb; music.step = (music.step + 1) % 128; }
+}
+function playTheme(key) {
+  if (!AC || music.want === key) return;
+  music.want = key;
+  const start = () => {
+    music.switching = false; music.key = key; music.th = THEMES[key]; music.step = 0; music.next = AC.currentTime + .08;
+    musicFade.gain.cancelScheduledValues(AC.currentTime); musicFade.gain.setTargetAtTime(1, AC.currentTime, .3);
+  };
+  if (!music.th) { start(); return; }
+  music.switching = true;
+  musicFade.gain.cancelScheduledValues(AC.currentTime); musicFade.gain.setTargetAtTime(0, AC.currentTime, .12);
+  setTimeout(start, 450);
+}
+
+/* ================= ambience: a sound bed per arena ================= */
+const AMB = {
+  sky:    { type: 'bandpass', f: 600, q: .7, vol: .03 },
+  lava:   { type: 'lowpass', f: 220, q: .8, vol: .1 },
+  wind:   { type: 'bandpass', f: 700, q: 1.2, vol: .04 },
+  gear:   { type: 'lowpass', f: 300, q: .8, vol: .025 },
+  ice:    { type: 'highpass', f: 2600, q: .5, vol: .02 },
+  ship:   { type: 'lowpass', f: 500, q: .6, vol: .06 },
+  shrink: { type: 'lowpass', f: 170, q: .9, vol: .07 },
+  bounce: { type: 'bandpass', f: 900, q: .7, vol: .015 },
+  night:  { type: 'bandpass', f: 480, q: .5, vol: .035 },
+  garden: { type: 'bandpass', f: 1300, q: .6, vol: .014 },
+  train:  { type: 'lowpass', f: 180, q: .8, vol: .09 },
+};
+const amb = { key: null, src: null, filt: null, gain: null, t: 0, tick: 0, clack: 0 };
+function ablip(f1, f2, dur, type, vol, delay = 0) { // one-shot sound on the ambience bus
+  const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .005); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+  o.connect(g).connect(ambG); o.start(t); o.stop(t + dur + .05);
+}
+function anoise(dur, vol, freq, type = 'highpass', delay = 0) {
+  const t = AC.currentTime + delay, src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = noiseBuf; f.type = type; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+  src.connect(f).connect(g).connect(ambG); src.start(t, Math.random() * .4); src.stop(t + dur + .02);
+}
+function setAmbience(key) {
+  if (!AC || amb.key === key) return;
+  if (amb.src) { const old = amb; old.gain.gain.setTargetAtTime(0, AC.currentTime, .3); const s0 = old.src; setTimeout(() => { try { s0.stop(); } catch (e) {} }, 1500); }
+  amb.key = key; amb.src = null;
+  const d = AMB[key]; if (!d) return;
+  const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  src.buffer = loopNoise; src.loop = true; f.type = d.type; f.frequency.value = d.f; f.Q.value = d.q;
+  g.gain.value = 0; g.gain.setTargetAtTime(d.vol, AC.currentTime, .6);
+  src.connect(f).connect(g).connect(ambG); src.start();
+  Object.assign(amb, { src, filt: f, gain: g, base: d });
+}
+const chance = (perSec, dt) => Math.random() < perSec * dt;
+function updateAmbience(dt, duck) {
+  if (!AC || !amb.src) return;
+  amb.t += dt; const t = amb.t, d = amb.base, k = amb.key, now = AC.currentTime;
+  let vol = d.vol, freq = d.f;
+  const pent = [0, 2, 4, 7, 9];
+  if (k === 'sky') { freq = 600 + Math.sin(t * .3) * 250; vol = d.vol * (1 + .4 * Math.sin(t * .2)); }
+  else if (k === 'lava') {
+    if (arena.danger && arena.danger()) vol *= 2.2;
+    if (chance(5, dt)) anoise(rand(.01, .03), rand(.02, .06), rand(2500, 6000));
+    if (chance(.6, dt)) ablip(rand(60, 110), 40, .25, 'sine', .08);
+  } else if (k === 'wind') {
+    const w = arena.wind || 0; vol = d.vol + w * .2; freq = 600 + Math.sin(t * .4) * 200 + w * 1500;
+    if (arena.phase === 'warn') vol *= 1.6;
+  } else if (k === 'gear') {
+    amb.tick += dt; if (amb.tick > .5) { amb.tick -= .5; amb.clack = !amb.clack; ablip(amb.clack ? 2400 : 1800, amb.clack ? 2300 : 1700, .03, 'square', .03); }
+    if (chance(.15, dt)) anoise(.6, .04, 4500);
+  } else if (k === 'ice') {
+    freq = 2600 + Math.sin(t * .25) * 600;
+    if (chance(.35, dt)) { const m = 84 + pent[Math.random() * 5 | 0] + (Math.random() < .5 ? 12 : 0); ablip(midiHz(m), midiHz(m), 1.4, 'sine', .035); }
+  } else if (k === 'ship') {
+    vol = d.vol * (.5 + .9 * Math.pow(Math.sin(t * .55), 2)); freq = 400 + 300 * Math.pow(Math.sin(t * .55), 2);
+    if (chance(.18, dt)) ablip(rand(140, 200), rand(90, 120), .5, 'sawtooth', .02);
+    if (chance(.07, dt)) { const f0 = rand(1500, 2200); ablip(f0, f0 * 1.4, .12, 'sine', .03); ablip(f0 * 1.3, f0 * .9, .14, 'sine', .03, .14); }
+  } else if (k === 'shrink') {
+    if (arena.phase === 'warn') vol *= 2.5;
+    if (chance(1.2, dt)) anoise(rand(.02, .05), rand(.02, .05), rand(800, 2000), 'bandpass');
+  } else if (k === 'bounce') {
+    if (chance(.12, dt)) { const f0 = rand(500, 800); ablip(f0, f0 * 1.8, .1, 'sine', .03); ablip(f0 * 1.8, f0, .1, 'sine', .03, .1); }
+  } else if (k === 'night') {
+    vol = d.vol * (.8 + .35 * Math.sin(t * 1.3) * Math.sin(t * .7)); freq = 480 + Math.sin(t * .9) * 120;
+    if (chance(.1, dt)) for (let i = 0; i < 3; i++) { const m = 88 + pent[Math.random() * 5 | 0]; ablip(midiHz(m), midiHz(m), 1.1, 'sine', .025, i * rand(.08, .16)); }
+    if (chance(.15, dt)) anoise(.5, .025, 5000);
+  } else if (k === 'garden') {
+    if (chance(.4, dt)) { const f0 = rand(2200, 3600), n = 2 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) ablip(f0 * rand(.9, 1.1), f0 * rand(1.1, 1.5), .07, 'sine', .025, i * .09); }
+    if (chance(.2, dt)) ablip(rand(900, 1400), rand(400, 600), .12, 'sine', .03);
+  } else if (k === 'train') {
+    amb.clack += dt; if (amb.clack > .55) { amb.clack -= .55; anoise(.04, .09, 1200, 'bandpass'); anoise(.04, .07, 1100, 'bandpass', .09); }
+    if (arena.tun && arena.tun.on) vol *= 1 + 3 * Math.max(0, 1 - Math.abs(arena.tun.z) / 25);
+  }
+  amb.gain.gain.setTargetAtTime(vol * (duck ? .35 : 1), now, .15);
+  amb.filt.frequency.setTargetAtTime(freq, now, .2);
 }
 
 /* ================= characters ================= */
@@ -3056,7 +3316,7 @@ class Brain {
   }
 }
 const brain = new Brain(enemy);
-window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, vinePatches, progress, UNLOCKS, ARENA_UNLOCKS, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
+window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, music, amb, THEMES, audioPrefs, get AC() { return AC; }, get musicBus() { return musicVolG; }, get ambBus() { return ambG; }, vinePatches, progress, UNLOCKS, ARENA_UNLOCKS, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
 
 /* ================= input ================= */
 const keys = new Set(), pressed = new Set();
@@ -3065,6 +3325,7 @@ addEventListener('keydown', e => {
   if (GAME_KEYS.includes(e.code) && game.state !== 'title') e.preventDefault();
   if (e.repeat) return;
   keys.add(e.code); pressed.add(e.code);
+  if (e.code === 'KeyM') { audioPrefs.musicOn = !audioPrefs.musicOn; store.set('koisle-musicon', audioPrefs.musicOn ? '1' : '0'); applyVolumes(); toast(audioPrefs.musicOn ? 'Music on' : 'Music off'); }
   if (e.code === 'KeyQ' && game.state === 'fight') { cam.lock = !cam.lock; toast(cam.lock ? 'Camera: lock-on' : 'Camera: free'); }
   if ((e.code === 'Escape' || e.code === 'KeyP') && ['fight', 'intro'].includes(game.state)) pause(true);
   else if (e.code === 'KeyP' && game.state === 'paused') pause(false);
@@ -3356,6 +3617,10 @@ function pause(on) {
 $('btnPlay').addEventListener('click', () => { initAudio(); sfx('select'); openSelect(); });
 $('btnAgain').addEventListener('click', () => { sfx('select'); startRun(); });
 $('btnResume').addEventListener('click', () => { initAudio(); pause(false); });
+$('musicVol').value = Math.round(audioPrefs.music * 100); $('sfxVol').value = Math.round(audioPrefs.sfx * 100);
+$('musicVol').addEventListener('input', e => { audioPrefs.music = e.target.value / 100; if (audioPrefs.music > 0) audioPrefs.musicOn = true; store.set('koisle-music', e.target.value); store.set('koisle-musicon', '1'); applyVolumes(); });
+$('sfxVol').addEventListener('input', e => { audioPrefs.sfx = e.target.value / 100; store.set('koisle-sfx', e.target.value); applyVolumes(); });
+$('sfxVol').addEventListener('change', () => sfx('hit', .6));
 $('btnQuit').addEventListener('click', () => startRun());
 document.addEventListener('visibilitychange', () => { if (document.hidden && ['fight', 'intro'].includes(game.state)) pause(true); });
 if (isTouch) { $('ctlDesktop').hidden = true; $('ctlTouch').hidden = false; }
@@ -3513,6 +3778,13 @@ function frame(now) {
     else if (game.state === 'defeat' && game.timer <= 0) { game.timeScale = 1; showGameOver(); }
   } else if (game.state !== 'paused') { pressed.clear(); arena.update(dt, false); }
 
+  if (AC) { // music follows the screen; ambience follows the arena in view
+    const inGame = running || game.state === 'paused';
+    playTheme(inGame ? arena.key : 'menu');
+    setAmbience(arena.key);
+    updateAmbience(dt, !running);
+    if (musicFade && !music.switching) musicFade.gain.setTargetAtTime(game.state === 'paused' ? .35 : 1, AC.currentTime, .2);
+  }
   const vdt = game.state === 'paused' ? 0 : dt * (running ? game.timeScale : 1);
   player.animate(vdt); enemy.animate(vdt);
   marker.visible = enemy.alive && running;
