@@ -149,6 +149,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .toggle:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
 .randmode .hint{font-size:12px;color:var(--muted);max-width:52ch}
 .randmode .hint:empty{display:none}
+.toggle.full{font-size:16px;padding:11px 22px;border-color:var(--sun);color:var(--sun)}
+.toggle.full[aria-pressed="true"]{border-color:var(--coral);color:var(--ink);background:linear-gradient(90deg,rgba(255,90,110,.35),rgba(79,240,200,.35));box-shadow:0 0 18px rgba(255,90,110,.4)}
 .btn:disabled{opacity:.5;cursor:default;transform:none}
 .char.locked{cursor:not-allowed}
 .char.locked img{filter:brightness(0) opacity(.5)}
@@ -277,6 +279,8 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
       <span class="hint arenaHint" id="arenaRandHint"></span>
     </div>
     <div class="randmode">
+      <button class="toggle full" id="btnFullRandom" aria-pressed="false">FULLY RANDOM: OFF</button>
+      <span class="hint" id="fullHint"></span>
       <button class="toggle" id="btnRandMode" aria-pressed="false">RANDOM FIGHTER EVERY WAVE: OFF</button>
       <span class="hint" id="randHint"></span>
     </div>
@@ -3636,6 +3640,11 @@ function showUpgrades() {
   game.state = 'upgrade';
   if (document.pointerLockElement) document.exitPointerLock();
   $('upTitle').textContent = `WAVE ${game.wave} CLEARED`;
+  game.chaosFree = null;
+  if (fullRandom()) { // chaos bonus: a free random power-up on top of the one you pick
+    const free = UPGRADES.filter(u => !u.ok || u.ok(player.stats));
+    if (free.length) { const u = free[Math.random() * free.length | 0]; u.apply(player.stats); game.perks.push(u.name); game.perkObjs.push(u); game.chaosFree = u.name; }
+  }
   const pool = UPGRADES.filter(u => !u.ok || u.ok(player.stats)).sort(() => Math.random() - .5).slice(0, game.randomMode ? 4 : 3);
   const box = $('ups'); box.innerHTML = '';
   pool.forEach((u, i) => {
@@ -3664,6 +3673,7 @@ function showUpgrades() {
   const bonus = [];
   if (game.randomMode) bonus.push(`RANDOM FIGHTER BONUS: +${RAND_GOLD} gold, 4 power-up choices, ` + (game.randBonusNow ? '+1 extra wave toward unlocks!' : 'next wave earns +1 extra toward unlocks'));
   if (game.randomArena) { const left = 3 - (game.arenaCount % 3); bonus.push(`RANDOM ARENA BONUS: +${ARENA_GOLD} gold, a free Mystery Box next wave, ` + (game.arenaBonusNow ? '+1 extra wave toward unlocks!' : `+1 extra toward unlocks in ${left} wave${left === 1 ? '' : 's'}`)); }
+  if (game.chaosFree) bonus.push(`CHAOS BONUS: free power-up: ${game.chaosFree}!`);
   $('randBonus').hidden = !bonus.length;
   $('randBonus').innerHTML = bonus.map(b => `<span>${b}</span>`).join('');
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
@@ -3792,12 +3802,26 @@ $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
 game.randomMode = store.get('koisle-randmode') === '1';
 const RAND_GOLD = 8, ARENA_GOLD = 4;
 game.randomArena = store.get('koisle-randarena') === '1';
+const fullRandom = () => game.randomMode && game.randomArena;
+function syncFullRandom() {
+  const on = fullRandom(), b = $('btnFullRandom');
+  b.setAttribute('aria-pressed', on);
+  b.textContent = `FULLY RANDOM: ${on ? 'ON' : 'OFF'}`;
+  $('fullHint').textContent = on ? 'A random fighter in a random arena every wave. Every random reward stacks, plus a CHAOS BONUS: a free random power-up after every wave.' : '';
+}
+$('btnFullRandom').addEventListener('click', () => {
+  const on = !fullRandom();
+  game.randomMode = game.randomArena = on;
+  store.set('koisle-randmode', on ? '1' : '0'); store.set('koisle-randarena', on ? '1' : '0');
+  sfx(on ? 'star' : 'select'); syncRandMode(); syncRandArenaMode();
+});
 function syncRandArenaMode() {
   const b = $('btnRandArenaMode');
   b.setAttribute('aria-pressed', game.randomArena);
   b.textContent = `RANDOM ARENA EVERY WAVE: ${game.randomArena ? 'ON' : 'OFF'}`;
   $('arenaRandHint').textContent = game.randomArena ? `Every wave is fought in a random arena from your ${arenaUnlockedCount()} unlocked ones. The starting arena above is ignored. Rewards: a free Mystery Box every wave, +${ARENA_GOLD} gold every wave, and unlocks come about 1.33× faster.` : '';
   document.querySelectorAll('#arenaSeg button').forEach(x => x.style.opacity = game.randomArena && !x.classList.contains('locked') ? .75 : '');
+  syncFullRandom();
 }
 $('btnRandArenaMode').addEventListener('click', () => {
   game.randomArena = !game.randomArena; store.set('koisle-randarena', game.randomArena ? '1' : '0');
@@ -3811,6 +3835,7 @@ function syncRandMode() {
     ? 'You only have one fighter so far. Clear waves to unlock more for the shuffle.'
     : `You become one of your ${n} unlocked fighters at the start of every wave. Power-ups carry over.`;
   if (game.randomMode) $('randHint').textContent += ` Rewards: unlocks come 1.5× faster, +${RAND_GOLD} gold every wave, and 4 power-up choices instead of 3.`;
+  syncFullRandom();
 }
 $('btnRandMode').addEventListener('click', () => {
   game.randomMode = !game.randomMode; store.set('koisle-randmode', game.randomMode ? '1' : '0');
@@ -3818,7 +3843,7 @@ $('btnRandMode').addEventListener('click', () => {
 });
 // Random picks: a short roulette that slows down and lands on a different unlocked choice
 let rolling = false;
-const SPIN_LOCK = ['btnRandom', 'btnRandArena', 'btnRandArenaMode', 'btnRandMode', 'btnGo', 'btnBack'];
+const SPIN_LOCK = ['btnRandom', 'btnRandArena', 'btnRandArenaMode', 'btnRandMode', 'btnFullRandom', 'btnGo', 'btnBack'];
 function spinPick({ pool, current, mark, land }) {
   if (rolling) return;
   const others = pool.filter(k => k !== current), pick = others[Math.random() * others.length | 0];
