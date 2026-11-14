@@ -40,6 +40,13 @@ All audio is generated live with the Web Audio API, so there are no audio files.
 - **Ambience**: a sound bed per arena (`AMB` and `updateAmbience`), for example a lava rumble with crackles, wind that swells with gusts, ticking gears, ice chimes, ocean swells with creaks and gulls, a crowd murmur with wind chimes, birdsong, and train clatter that roars when a tunnel passes.
 - **Controls**: the pause menu has Music and Sound effects volume sliders, and the M key turns music on or off. Settings are saved in the browser.
 
+## Leaderboard
+
+Fully random runs (random fighter and random arena every wave) are ranked by waves cleared. The LEADERBOARD button is on the title and game-over screens.
+
+- **Everyone**: when the game is published as a claude.ai artifact, each person's best fully random run is stored at `leaderboard/<their id>` in the artifact's shared database (the `db` + `user` capabilities). Only ids are stored, and names are looked up when the board is shown. Anyone who can open the game can read the board. People with Contributor access or above can post their own entry, and only the owner can change other people's entries.
+- **This device**: your top 10 fully random runs, saved in the browser. This is the only board when you run `index.html` locally.
+
 ## Run it
 
 It's a single HTML file with no build step. three.js loads from a CDN through an import map.

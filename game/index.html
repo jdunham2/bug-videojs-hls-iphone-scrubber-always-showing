@@ -184,6 +184,18 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .vols label{font-size:14px;font-weight:700;color:var(--ink);text-align:left}
 .vols input[type=range]{width:100%;accent-color:var(--sun)}
 .vols input[type=range]:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+.board{list-style:none;margin:0;padding:0;width:100%;max-width:560px;display:flex;flex-direction:column;gap:6px}
+.board li{display:grid;grid-template-columns:34px 32px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:var(--glass);text-align:left}
+.board li.me{outline:2px solid var(--mint)}
+.board .rk{font-family:var(--display);font-size:18px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.board li:nth-child(1) .rk{color:#ffd34a}.board li:nth-child(2) .rk{color:#d8dde8}.board li:nth-child(3) .rk{color:#e09a5a}
+.board img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.board .who{min-width:0}
+.board .nm{display:block;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .meta{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .sc{font-family:var(--display);font-size:20px;color:var(--sun);font-variant-numeric:tabular-nums;text-align:right}
+.board .sc small{display:block;font-family:var(--body);font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+.board .empty{display:block;text-align:center;color:var(--muted);background:none}
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 @media (max-width:560px){ .pct{font-size:30px} .card{min-width:96px;padding:6px 10px 8px} #wave{font-size:12px}
   .chars{grid-template-columns:repeat(3,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
@@ -228,7 +240,10 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
   <div class="panel">
     <h1 class="logo">KNOCKOUT<br><span>ISLE</span></h1>
     <p class="tag">Knock every challenger off the floating island. Each wave is tougher. Pick a power-up after every win.</p>
-    <button class="btn" id="btnPlay">FIGHT</button>
+    <div class="row">
+      <button class="btn" id="btnPlay">FIGHT</button>
+      <button class="btn ghost" id="btnBoardTitle">LEADERBOARD</button>
+    </div>
     <div class="controls" id="ctlDesktop">
       <b>WASD</b><span>Move</span>
       <b>Space</b><span>Jump (twice in the air)</span>
@@ -312,11 +327,27 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
   <div class="panel">
     <h2>KNOCKED OUT</h2>
     <p class="tag" id="overText"></p>
+    <p class="bonus" id="boardResult" hidden></p>
     <p class="rule" id="nextUnlockOver"></p>
     <div class="row">
       <button class="btn" id="btnAgain">RUN IT BACK</button>
       <button class="btn ghost" id="btnChange">CHANGE FIGHTER</button>
+      <button class="btn ghost" id="btnBoardOver">LEADERBOARD</button>
     </div>
+  </div>
+</section>
+
+<section class="screen" id="scrBoard" hidden>
+  <div class="panel">
+    <h2>FULLY RANDOM LEADERBOARD</h2>
+    <p class="sub">Most waves cleared in a fully random run (random fighter and random arena every wave)</p>
+    <div class="seg" id="boardTabs">
+      <button id="tabShared" data-t="shared">EVERYONE</button>
+      <button id="tabLocal" data-t="local">THIS DEVICE</button>
+    </div>
+    <p class="rule" id="boardStatus"></p>
+    <ol class="board" id="boardList"></ol>
+    <button class="btn ghost" id="btnBoardBack">BACK</button>
   </div>
 </section>
 
@@ -3441,7 +3472,7 @@ function readPlayerInput() {
 /* ================= camera ================= */
 const cam = { yaw: 0, pitch: .32, manualT: 0, lock: true, focus: new THREE.Vector3(0, 1.5, 3), orbit: 0 };
 function updateCamera(dt) {
-  if (['title', 'select', 'upgrade', 'over'].includes(game.state)) {
+  if (['title', 'select', 'upgrade', 'over', 'board'].includes(game.state)) {
     cam.orbit += dt * .12;
     camera.position.set(Math.sin(cam.orbit) * 24, 9 + Math.sin(cam.orbit * .7) * 2, Math.cos(cam.orbit) * 24);
     camera.lookAt(0, 0, 0);
@@ -3519,7 +3550,7 @@ function banner(html, cls = '') {
 }
 let toastTimer = null;
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1300); }
-function show(id) { for (const s of ['scrTitle', 'scrSelect', 'scrUp', 'scrOver', 'scrPause']) $(s).hidden = s !== id; }
+function show(id) { for (const s of ['scrTitle', 'scrSelect', 'scrUp', 'scrOver', 'scrPause', 'scrBoard']) $(s).hidden = s !== id; }
 
 const ENEMY_ORDER = ['grub', 'vex', 'bolt', 'moss'];
 // Random-every-wave mode: become a different unlocked fighter each wave; stat power-ups are re-applied to the new body.
@@ -3539,6 +3570,7 @@ function swapToRandomFighter() {
 }
 function startRun() {
   initAudio();
+  game.fullRun = fullRandom();
   game.wave = 1; game.perks = []; game.perkObjs = []; game.randAcc = 0; game.randBonusNow = false; game.arenaCount = 0; game.arenaBonusNow = false; game.gold = 0; game.startPerk = {};
   player.setDef(ROSTER[game.charKey]); player.stocks = 3;
   startWave();
@@ -3690,8 +3722,108 @@ function showGameOver() {
   const best = Math.max(game.wave, +(store.get('koisle-best') || 0)); store.set('koisle-best', best);
   $('overText').textContent = `You reached wave ${game.wave}. Best run: wave ${best}.`;
   $('nextUnlockOver').textContent = nextUnlockText();
+  $('boardResult').hidden = true;
+  if (game.fullRun) recordFullRun({ waves: game.wave - 1, fighter: player.key, arena: arena.key, perks: game.perks.length, at: new Date().toISOString() });
   show('scrOver'); $('hud').hidden = true; $('touch').hidden = true;
 }
+
+/* ================= leaderboard: best fully random runs ================= */
+// Shared board: one document per person at leaderboard/<their id> holding their best run (needs the db + user
+// capabilities when published as an artifact). Local board: top 10 runs in this browser, always available.
+const board = { db: null, user: null, me: null, canWrite: null, rows: [], state: 'loading', tab: 'shared', from: 'title', started: false };
+const localRuns = () => { try { return JSON.parse(store.get('koisle-board') || '[]'); } catch (e) { return []; } };
+const byScore = (a, b) => (b.waves - a.waves) || String(a.at).localeCompare(String(b.at));
+async function initBoard() {
+  if (board.started) return; board.started = true;
+  const use = window.claude && window.claude.use;
+  if (!use) { board.state = 'off'; renderBoard(); return; }
+  let db = null, user = null;
+  try { [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]); } catch (e) {}
+  if (!db) { board.state = 'off'; renderBoard(); return; }
+  board.db = db; board.user = user;
+  if (user) { board.me = await user.id(); board.canWrite = await user.can('data.write'); }
+  const timer = setTimeout(() => { if (board.state === 'loading') { board.state = 'slow'; renderBoard(); } }, 10000);
+  db.collection('leaderboard').orderBy('waves', 'desc').limit(50).onSnapshot(snap => {
+    board.rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => typeof r.waves === 'number').sort(byScore);
+    if (!snap.metadata.fromCache) { clearTimeout(timer); board.state = 'ready'; } else if (board.state === 'loading') board.state = 'cached';
+    renderBoard();
+  }, () => { clearTimeout(timer); board.state = 'error'; renderBoard(); });
+}
+async function recordFullRun(run) {
+  if (run.waves < 1) return;
+  const list = localRuns(); list.push(run); list.sort(byScore);
+  const localRank = list.indexOf(run) + 1; store.set('koisle-board', JSON.stringify(list.slice(0, 10)));
+  const wv = `${run.waves} wave${run.waves === 1 ? '' : 's'} cleared`;
+  let msg = localRank <= 10 ? `Fully random run: ${wv} · #${localRank} on this device` : `Fully random run: ${wv}`;
+  if (board.db && board.me && board.canWrite !== false) {
+    try {
+      let mine = board.rows.find(r => r.id === board.me);
+      if (!mine) { const snap = await board.db.doc('leaderboard/' + board.me).get(); mine = snap.exists ? snap.data() : null; }
+      if (!mine || run.waves > mine.waves) {
+        await board.db.doc('leaderboard/' + board.me).set(run);
+        const rows = board.rows.filter(r => r.id !== board.me).concat([{ id: board.me, ...run }]).sort(byScore);
+        msg += ` · NEW PERSONAL BEST, #${rows.findIndex(r => r.id === board.me) + 1} on the shared board!`;
+      } else msg += ` · your shared best is ${mine.waves}`;
+    } catch (e) { if (e && e.code === 'invalid_argument') board.canWrite = false; }
+  }
+  $('boardResult').textContent = msg; $('boardResult').hidden = false;
+  renderBoard();
+}
+function boardLi(rank, name, meta, waves, avatar, isMe) {
+  const li = document.createElement('li'); if (isMe) li.className = 'me';
+  const rk = document.createElement('span'); rk.className = 'rk'; rk.textContent = rank;
+  const img = document.createElement('img'); img.alt = ''; if (avatar) img.src = avatar; else img.style.visibility = 'hidden';
+  const who = document.createElement('span'); who.className = 'who';
+  const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = name;
+  const mt = document.createElement('span'); mt.className = 'meta'; mt.textContent = meta;
+  who.append(nm, mt);
+  const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = waves;
+  const sm = document.createElement('small'); sm.textContent = 'WAVES'; sc.appendChild(sm);
+  li.append(rk, img, who, sc); return li;
+}
+const runMeta = r => `${ROSTER[r.fighter]?.name || '?'} · ${ARENAS[r.arena]?.name || '?'}` + (r.at ? ` · ${new Date(r.at).toLocaleDateString()}` : '');
+async function renderBoard() {
+  if ($('scrBoard').hidden) return;
+  document.querySelectorAll('#boardTabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === board.tab));
+  const list = $('boardList'), status = $('boardStatus');
+  if (board.tab === 'local') {
+    const runs = localRuns();
+    status.textContent = 'Your top 10 fully random runs in this browser.';
+    list.replaceChildren(...(runs.length ? runs.map((r, i) => boardLi(i + 1, 'You', runMeta(r), r.waves, '', false))
+      : [Object.assign(document.createElement('li'), { className: 'empty', textContent: 'No fully random runs yet. Turn on FULLY RANDOM and see how far you get.' })]));
+    return;
+  }
+  const states = {
+    off: 'The shared board needs the published game on claude.ai. Your runs are still saved on this device.',
+    loading: 'Loading the shared board…', slow: 'The shared board can’t be reached right now. Try again later.',
+    error: 'The shared board isn’t available here.', cached: 'Showing saved scores while the board updates…', ready: '',
+  };
+  let st = states[board.state] || '';
+  if (board.state === 'ready' || board.state === 'cached') {
+    if (!board.me) st = (st ? st + ' ' : '') + 'Sign in to post your own runs.';
+    else if (board.canWrite === false) st = (st ? st + ' ' : '') + 'You can view the board. Ask the owner for Contributor access to post your runs.';
+  }
+  status.textContent = st;
+  const rows = board.rows.slice(0, 25);
+  if (!rows.length) {
+    list.replaceChildren(Object.assign(document.createElement('li'), { className: 'empty', textContent: board.state === 'off' || board.state === 'error' ? '' : 'No scores yet. Be the first!' }));
+    return;
+  }
+  const ps = board.user ? await board.user.profiles(rows.map(r => r.id)) : {};
+  list.replaceChildren(...rows.map((r, i) => {
+    const p = ps[r.id] || {};
+    return boardLi(i + 1, (r.id === board.me ? (p.name || 'You') + ' (you)' : p.name || 'Someone'), runMeta(r), r.waves, p.avatarUrl, r.id === board.me);
+  }));
+}
+function openBoard(from) {
+  board.from = from; board.tab = board.db || board.state === 'loading' ? board.tab : 'local';
+  game.state = 'board'; show('scrBoard'); initBoard(); renderBoard();
+}
+$('btnBoardTitle').addEventListener('click', () => { initAudio(); sfx('select'); openBoard('title'); });
+$('btnBoardOver').addEventListener('click', () => { sfx('select'); openBoard('over'); });
+$('btnBoardBack').addEventListener('click', () => { sfx('select'); game.state = board.from; show(board.from === 'over' ? 'scrOver' : 'scrTitle'); if (board.from === 'title') updateTitleInfo(); });
+document.querySelectorAll('#boardTabs button').forEach(b => b.addEventListener('click', () => { board.tab = b.dataset.t; sfx('select'); renderBoard(); }));
+initBoard();
 let pausedFrom = null;
 function pause(on) {
   if (on) { pausedFrom = game.state; game.state = 'paused'; show('scrPause'); keys.clear(); if (document.pointerLockElement) document.exitPointerLock(); }
@@ -3813,7 +3945,7 @@ function syncFullRandom() {
   const on = fullRandom(), b = $('btnFullRandom');
   b.setAttribute('aria-pressed', on);
   b.textContent = `FULLY RANDOM: ${on ? 'ON' : 'OFF'}`;
-  $('fullHint').textContent = on ? 'A random fighter in a random arena every wave. Every random reward stacks, plus a CHAOS BONUS: a free random power-up after every wave. Watch out: enemies hit harder, are heavier and smarter, get extra lives sooner, and can be any fighter.' : '';
+  $('fullHint').textContent = on ? 'A random fighter in a random arena every wave. Every random reward stacks, plus a CHAOS BONUS: a free random power-up after every wave. Watch out: enemies hit harder, are heavier and smarter, get extra lives sooner, and can be any fighter. Fully random runs go on the LEADERBOARD.' : '';
 }
 $('btnFullRandom').addEventListener('click', () => {
   const on = !fullRandom();
