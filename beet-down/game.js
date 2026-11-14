@@ -26,26 +26,37 @@ function tinted(name,col){const k=name+'|'+col;let c=tintCache.get(k);if(c)retur
 const AW=1280, AH=960;
 const RAR=[{n:'Common',c:'#c9c2d6'},{n:'Rare',c:'#4fb3ff'},{n:'Epic',c:'#b86bff'},{n:'Legendary',c:'#ff6b3d'}];
 const TIERN=['I','II','III','IV'];
-const STAT={maxHp:'Max HP',regen:'HP Regen',lifesteal:'% Life Steal',dmg:'% Damage',melee:'Melee Damage',ranged:'Ranged Damage',atkSpd:'% Attack Speed',crit:'% Crit Chance',range:'Range',armor:'Armor',dodge:'% Dodge',speed:'% Speed',luck:'Luck',harvest:'Harvesting',pickup:'% Pickup Range',boom:'% Death Explosions',thorns:'Thorns'};
+const STAT={maxHp:'Max HP',regen:'HP Regen',lifesteal:'% Life Steal',dmg:'% Damage',melee:'Melee Damage',ranged:'Ranged Damage',atkSpd:'% Attack Speed',crit:'% Crit Chance',range:'Range',armor:'Armor',dodge:'% Dodge',speed:'% Speed',luck:'Luck',harvest:'Harvesting',pickup:'% Pickup Range',boom:'% Death Explosions',thorns:'Thorns',blast:'% Explosion Size'};
 const STAT_ORDER=['maxHp','regen','lifesteal','dmg','melee','ranged','atkSpd','crit','range','armor','dodge','speed','luck','harvest'];
 
 const WEAPONS={
-  hammer:{name:'Hammer',melee:true,dmg:15,cd:.9,range:120,hitR:34,knock:30,crit:3,critMul:2,price:22,len:46,pv:.14,desc:'Heavy bonk with huge knockback.'},
-  spear:{name:'Spear',melee:true,line:true,dmg:11,cd:1.05,range:195,hitR:16,knock:12,crit:5,critMul:2.2,price:26,len:68,pv:.2,desc:'Long thrust that skewers a whole line.'},
-  axe:{name:'Axe',melee:true,sweep:1.15,dmg:17,cd:1.15,range:125,knock:22,crit:5,critMul:2,price:30,len:48,pv:.14,desc:'Wide swing that cleaves everything in front.'},
-  sword:{name:'Sword',melee:true,sweep:.8,dmg:12,cd:.72,range:140,knock:12,crit:8,critMul:2,price:28,len:52,pv:.16,desc:'Fast slashing arc. Reliable all-rounder.'},
-  knife:{name:'Chef Knife',melee:true,dmg:6,cd:.38,range:100,hitR:18,knock:4,crit:25,critMul:2.5,price:20,len:40,pv:.22,desc:'Rapid stabs with 25% base crit chance.'},
-  pan:{name:'Frying Pan',melee:true,bonk:true,dmg:13,cd:1,range:112,hitR:38,knock:50,crit:12,critMul:2.5,price:24,len:46,pv:.14,desc:'Sends aliens flying. Crits go BONK.'},
-  pistol:{name:'Pistol',dmg:11,cd:.75,range:400,speed:980,pierce:1,knock:8,crit:5,critMul:2,price:20,len:36,pv:.32,desc:'Reliable shot. Pierces 1 enemy.'},
-  smg:{name:'SMG',dmg:4,cd:.16,range:340,speed:980,spread:.24,knock:3,crit:2,critMul:2,price:26,len:42,pv:.32,desc:'Sprays a stream of bullets.'},
-  shotgun:{name:'Shotgun',dmg:6,cd:1.2,range:290,speed:880,pellets:5,spread:.6,pierce:1,knock:16,crit:3,critMul:2,price:30,len:50,pv:.32,desc:'Five piercing pellets. Best up close.'},
-  rocket:{name:'Rocket',dmg:16,cd:1.7,range:440,speed:520,blast:78,knock:22,crit:3,critMul:2,price:36,len:54,pv:.36,desc:'Explodes on impact, hitting everything nearby.'},
-  zapper:{name:'Zapper',dmg:9,cd:.95,range:330,chains:3,knock:4,crit:5,critMul:2,price:32,len:44,pv:.32,desc:'Lightning that jumps between enemies.'},
-  sniper:{name:'Sniper',dmg:30,cd:1.1,range:650,speed:1900,pierce:4,knock:14,crit:15,critMul:2.5,price:38,len:62,pv:.32,desc:'Huge range. Pierces 4 enemies.'},
-  minigun:{name:'Minigun',spin:true,dmg:3.5,cd:.07,range:330,speed:1000,spread:.3,knock:2,crit:2,critMul:2,price:40,len:50,pv:.32,desc:'Spins up into a bullet storm.'},
-  flamer:{name:'Flamer',flame:true,dmg:2.2,cd:.085,range:185,speed:430,spread:.3,knock:1,crit:0,critMul:2,price:34,len:46,pv:.32,desc:'Short-range fire that burns through crowds.'},
-  bouncer:{name:'Bouncer',bounce:2,dmg:9,cd:.8,range:360,speed:720,knock:6,crit:5,critMul:2,price:30,len:42,pv:.32,desc:'Shots ricochet to 2 more enemies (+1 per tier).'},
-  lobber:{name:'Lobber',lob:true,dmg:18,cd:2,range:380,blast:88,knock:24,crit:3,critMul:2,price:38,len:50,pv:.32,desc:'Lobs grenades over the crowd. Big boom.'},
+  hammer:{name:'Hammer',sets:['blunt','heavy'],melee:true,dmg:15,cd:.9,range:120,hitR:34,knock:30,crit:3,critMul:2,price:22,len:46,pv:.14,desc:'Heavy bonk with huge knockback.'},
+  spear:{name:'Spear',sets:['blade','precise'],melee:true,line:true,dmg:11,cd:1.05,range:195,hitR:16,knock:12,crit:5,critMul:2.2,price:26,len:68,pv:.2,desc:'Long thrust that skewers a whole line.'},
+  axe:{name:'Axe',sets:['blade','blunt'],melee:true,sweep:1.15,dmg:17,cd:1.15,range:125,knock:22,crit:5,critMul:2,price:30,len:48,pv:.14,desc:'Wide swing that cleaves everything in front.'},
+  sword:{name:'Sword',sets:['blade'],melee:true,sweep:.8,dmg:12,cd:.72,range:140,knock:12,crit:8,critMul:2,price:28,len:52,pv:.16,desc:'Fast slashing arc. Reliable all-rounder.'},
+  knife:{name:'Chef Knife',sets:['blade','kitchen'],melee:true,dmg:6,cd:.38,range:100,hitR:18,knock:4,crit:25,critMul:2.5,price:20,len:40,pv:.22,desc:'Rapid stabs with 25% base crit chance.'},
+  pan:{name:'Frying Pan',sets:['blunt','kitchen'],melee:true,bonk:true,dmg:13,cd:1,range:112,hitR:38,knock:50,crit:12,critMul:2.5,price:24,len:46,pv:.14,desc:'Sends aliens flying. Crits go BONK.'},
+  pistol:{name:'Pistol',sets:['precise'],dmg:11,cd:.75,range:400,speed:980,pierce:1,knock:8,crit:5,critMul:2,price:20,len:36,pv:.32,desc:'Reliable shot. Pierces 1 enemy.'},
+  smg:{name:'SMG',sets:['rapid'],dmg:4,cd:.16,range:340,speed:980,spread:.24,knock:3,crit:2,critMul:2,price:26,len:42,pv:.32,desc:'Sprays a stream of bullets.'},
+  shotgun:{name:'Shotgun',sets:['heavy'],dmg:6,cd:1.2,range:290,speed:880,pellets:5,spread:.6,pierce:1,knock:16,crit:3,critMul:2,price:30,len:50,pv:.32,desc:'Five piercing pellets. Best up close.'},
+  rocket:{name:'Rocket',sets:['explosive','heavy'],dmg:16,cd:1.7,range:440,speed:520,blast:78,knock:22,crit:3,critMul:2,price:36,len:54,pv:.36,desc:'Explodes on impact, hitting everything nearby.'},
+  zapper:{name:'Zapper',sets:['elemental'],dmg:9,cd:.95,range:330,chains:3,knock:4,crit:5,critMul:2,price:32,len:44,pv:.32,desc:'Lightning that jumps between enemies.'},
+  sniper:{name:'Sniper',sets:['precise'],dmg:30,cd:1.1,range:650,speed:1900,pierce:4,knock:14,crit:15,critMul:2.5,price:38,len:62,pv:.32,desc:'Huge range. Pierces 4 enemies.'},
+  minigun:{name:'Minigun',sets:['rapid','heavy'],spin:true,dmg:3.5,cd:.07,range:330,speed:1000,spread:.3,knock:2,crit:2,critMul:2,price:40,len:50,pv:.32,desc:'Spins up into a bullet storm.'},
+  flamer:{name:'Flamer',sets:['rapid','elemental'],flame:true,dmg:2.2,cd:.085,range:185,speed:430,spread:.3,knock:1,crit:0,critMul:2,price:34,len:46,pv:.32,desc:'Short-range fire that burns through crowds.'},
+  bouncer:{name:'Bouncer',sets:['precise','elemental'],bounce:2,dmg:9,cd:.8,range:360,speed:720,knock:6,crit:5,critMul:2,price:30,len:42,pv:.32,desc:'Shots ricochet to 2 more enemies (+1 per tier).'},
+  lobber:{name:'Lobber',sets:['explosive'],lob:true,dmg:18,cd:2,range:380,blast:88,knock:24,crit:3,critMul:2,price:38,len:50,pv:.32,desc:'Lobs grenades over the crowd. Big boom.'},
+};
+/* Weapon sets: bonuses unlock at 2, 4 and 6 weapons of a set (duplicates count). Each tier replaces the one before. */
+const SETS={
+  blade:{name:'Blade',col:'#ff6b8a',tiers:[[2,{crit:5}],[4,{crit:10,lifesteal:3}],[6,{crit:16,lifesteal:6}]]},
+  blunt:{name:'Blunt',col:'#c9c2d6',tiers:[[2,{armor:2}],[4,{armor:4,melee:3}],[6,{armor:7,melee:6}]]},
+  kitchen:{name:'Kitchen',col:'#ffb36b',tiers:[[2,{harvest:8,regen:2}],[4,{harvest:16,regen:4}],[6,{harvest:30,regen:7}]]},
+  precise:{name:'Precise',col:'#9fd0ff',tiers:[[2,{range:30,crit:3}],[4,{range:60,crit:6}],[6,{range:110,crit:12}]]},
+  rapid:{name:'Rapid',col:'#6fe3ff',tiers:[[2,{atkSpd:6}],[4,{atkSpd:14}],[6,{atkSpd:25}]]},
+  explosive:{name:'Explosive',col:'#ff8a3d',tiers:[[2,{blast:20}],[4,{blast:40,dmg:8}],[6,{blast:70,dmg:15}]]},
+  elemental:{name:'Elemental',col:'#c08bff',tiers:[[2,{dmg:8}],[4,{dmg:16,speed:5}],[6,{dmg:25,speed:10}]]},
+  heavy:{name:'Heavy',col:'#e0b84f',tiers:[[2,{maxHp:4}],[4,{maxHp:10,armor:2}],[6,{maxHp:18,armor:4,speed:-5}]]},
 };
 const TIER_DMG=[1,1.65,2.5,3.7], TIER_CD=[1,.9,.8,.7], TIER_PRICE=[1,1.9,3.4,6];
 
@@ -213,25 +224,36 @@ const decal=document.createElement('canvas'); decal.width=AW; decal.height=AH; c
 
 /* ================= state ================= */
 let state='loading';
-let run=null, P=null, S=null;
+let run=null, P=null, S=null, B=null; // B = permanent stats, S = B + weapon set bonuses
 let enemies=[],bullets=[],ebullets=[],gems=[],pickups=[],parts=[],texts=[],fx=[],spawns=[],booms=[];
 let cam={x:AW/2,y:AH/2},shake=0,freezeT=0,timeScale=1,hurtFlash=0,banner=null;
 const keys={}; const joy={id:null,ox:0,oy:0,x:0,y:0,active:false};
 
 function newRun(ch){
-  S={maxHp:20,regen:0,lifesteal:0,dmg:0,melee:0,ranged:0,atkSpd:0,crit:0,range:0,armor:0,dodge:0,speed:0,luck:0,harvest:0,pickup:0,extraProj:0,thorns:0,boom:0};
-  for(const k in ch.mods)S[k]+=ch.mods[k];
+  B={maxHp:20,regen:0,lifesteal:0,dmg:0,melee:0,ranged:0,atkSpd:0,crit:0,range:0,armor:0,dodge:0,speed:0,luck:0,harvest:0,pickup:0,extraProj:0,thorns:0,boom:0,blast:0};
+  for(const k in ch.mods)B[k]+=ch.mods[k];
+  S=Object.assign({},B);
   run={char:ch,wave:0,mats:0,kills:0,pendingLv:0,crates:0,items:{},weapons:[],shop:[],rerolls:0,combo:0,comboT:0,bestCombo:0,gemChain:0,lastGem:0,lsCd:0,matBump:0,hpTrail:S.maxHp,time:0,totalMats:0,auraT:0};
   P={x:AW/2,y:AH/2,vx:0,vy:0,r:ch.r||18,hp:S.maxHp,iframes:0,walk:0,moving:false,lx:1,ly:0,level:0,xp:0,regenAcc:0,blink:2};
-  addWeapon(ch.weapon,0);
+  run.setLv={}; addWeapon(ch.weapon,0);
 }
+function setCounts(){const c={};for(const w of run.weapons)for(const k of WEAPONS[w.id].sets)c[k]=(c[k]||0)+1;return c}
+function setTier(set,n){let t=-1;SETS[set].tiers.forEach(([need],i)=>{if(n>=need)t=i});return t}
+function recalc(){
+  const c=setCounts(); const next=Object.assign({},B); const fresh=[];
+  for(const k in SETS){const t=setTier(k,c[k]||0);if(t>=0)for(const [st,v] of Object.entries(SETS[k].tiers[t][1]))next[st]=(next[st]||0)+v;
+    if(t>(run.setLv[k]??-1))fresh.push([k,t]); run.setLv[k]=t}
+  S=next; if(P)P.hp=Math.min(P.hp,maxHp());
+  if(fresh.length&&state==='shop'){const [k,t]=fresh[fresh.length-1];toast(`${SETS[k].name} set (${SETS[k].tiers[t][0]}): ${bonusText(SETS[k].tiers[t][1])}`);sfx('levelup')}
+}
+function bonusText(m){return Object.entries(m).map(([k,v])=>(v>0?'+':'')+v+(STAT[k][0]==='%'?'':' ')+STAT[k]).join(', ')}
 const maxHp=()=>Math.max(1,Math.round(S.maxHp));
 const xpNeed=l=>(l+3)*(l+3);
 
 /* ================= weapons ================= */
 function addWeapon(id,tier){
-  if(run.weapons.length>=6){const m=run.weapons.find(w=>w.id===id&&w.tier===tier&&tier<3);if(!m)return false;m.tier++;m.flash=1;return true}
-  run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); return true;
+  if(run.weapons.length>=6){const m=run.weapons.find(w=>w.id===id&&w.tier===tier&&tier<3);if(!m)return false;m.tier++;m.flash=1;recalc();return true}
+  run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); recalc(); return true;
 }
 function canAddWeapon(id,tier){return run.weapons.length<6||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
 function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));return Math.max(1,base*mul)}
@@ -363,6 +385,7 @@ function killEnemy(e,drops){
 function stamp(name,col,x,y,size,alpha,rot){const im=tinted(name,col);dctx.save();dctx.globalAlpha=alpha;dctx.translate(x,y);dctx.rotate(rot);dctx.drawImage(im,-size/2,-size/2*im.height/im.width,size,size*im.height/im.width);dctx.restore()}
 function splat(x,y,r,col){stamp('fx_splat',col,x,y,r*rand(3,4),.6,rand(0,TAU))}
 function explode(x,y,R,dmg,knock,hurtsPlayer){
+  if(!hurtsPlayer)R*=1+(S.blast||0)/100;
   for(const e of enemies){if(e.dead)continue;const dd=Math.sqrt(d2(x,y,e.x,e.y));if(dd<R+e.r){const crit=Math.random()*100<S.crit+3;hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?2:1))),crit,Math.atan2(e.y-y,e.x-x),knock)}}
   if(hurtsPlayer&&Math.hypot(P.x-x,P.y-y)<R+P.r)hurtPlayer(hurtsPlayer,null);
   fx.push({k:'ring',x,y,r0:R*.3,r1:R*1.15,t:0,life:.3,c:'#ffd27a',w:8});
@@ -502,7 +525,7 @@ function endWave(){
   showBanner('WAVE CLEARED','',1.4,'#7bd35a'); sfx('clear');
 }
 function afterWave(){
-  if(S.harvest>0){run.mats+=Math.round(S.harvest);run.totalMats+=Math.round(S.harvest);S.harvest=Math.round(S.harvest*1.05*10)/10}
+  if(S.harvest>0){run.mats+=Math.round(S.harvest);run.totalMats+=Math.round(S.harvest);B.harvest=Math.round(B.harvest*1.05*10)/10;recalc()}
   const best=store.get('bd_best',0); if(run.wave>best)store.set('bd_best',run.wave);
   nextStep();
 }
@@ -596,7 +619,7 @@ function collectGem(g){
 function addXp(v){
   P.xp+=v;
   while(P.xp>=xpNeed(P.level)){
-    P.xp-=xpNeed(P.level); P.level++; run.pendingLv++; S.maxHp+=1; P.hp+=1;
+    P.xp-=xpNeed(P.level); P.level++; run.pendingLv++; B.maxHp+=1; recalc(); P.hp+=1;
     texts.push({x:P.x,y:P.y-58,vy:-50,t:0,life:1.2,s:26,txt:'LEVEL UP!',c:'#ffcc4d'});
     fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:130,t:0,life:.5,c:'#ffcc4d',w:6});
     parts.push({x:P.x,y:P.y,vx:0,vy:0,t:0,life:.6,img:'fx_magic',col:'#ffd24d',s0:40,s1:150,add:1,rot:0,vr:2});
@@ -846,7 +869,7 @@ function buildMenu(){
     const c=cv.getContext('2d'); const r=Math.min(40,150/ch.k);
     drawVeg(c,ch,120,190-r*1.4,r,{t:1,lx:.3,ly:.2});
     c.save();c.translate(170,150);c.rotate(-.35);drawWeaponSprite(c,ch.weapon,0,WEAPONS[ch.weapon].len*1.6);c.restore();
-    const lines=modLines(ch.mods).concat(ch.lines).concat([['Starts with '+WEAPONS[ch.weapon].name,'neu']]);
+    const lines=modLines(ch.mods).concat(ch.lines).concat([['Starts with '+WEAPONS[ch.weapon].name+' ('+WEAPONS[ch.weapon].sets.map(k=>SETS[k].name).join(', ')+')','neu']]);
     b.appendChild(cv);
     b.insertAdjacentHTML('beforeend',`<span class="role">${ch.role}</span><b>${ch.name}</b><p>${ch.desc}</p><ul>${fmtLines(lines)}</ul>`);
     b.onclick=()=>{audioInit();sfx('click');startRun(ch)};
@@ -874,7 +897,7 @@ function showLevelUp(){
     const r=rollRarity(); const v=u[1][r];
     const card=document.createElement('button'); card.className='card pickable r'+r;
     card.innerHTML=`<div class="ic">${iconHTML(UPG_IC[u[0]],u[2],u[3])}</div><div class="ct">${RAR[r].n}</div><div class="cn">${STAT[u[0]].replace('% ','')}</div><ul><li class="pos">+${v}${STAT[u[0]][0]==='%'?'':' '}${STAT[u[0]]}</li></ul>`;
-    card.onclick=()=>{S[u[0]]+=v;if(u[0]==='maxHp')P.hp+=v;run.pendingLv--;sfx('buy');nextStep()};
+    card.onclick=()=>{B[u[0]]+=v;recalc();if(u[0]==='maxHp')P.hp+=v;run.pendingLv--;sfx('buy');nextStep()};
     box.appendChild(card);
   }
 }
@@ -890,7 +913,7 @@ function showCrate(){
   const rc=document.createElement('button');rc.className='ghost';rc.innerHTML=`Recycle for ${rec} <i class="gemI" style="width:10px;height:10px"></i>`;rc.onclick=()=>{run.mats+=rec;run.crates--;sfx('gem',8);nextStep()};
   bx.append(take,rc);
 }
-function applyItem(it){run.items[it.id]=(run.items[it.id]||0)+1;for(const k in it.mods){S[k]+=it.mods[k];if(k==='maxHp'&&it.mods[k]>0)P.hp+=it.mods[k]}}
+function applyItem(it){run.items[it.id]=(run.items[it.id]||0)+1;for(const k in it.mods)B[k]+=it.mods[k];recalc();if(it.mods.maxHp>0)P.hp+=it.mods.maxHp}
 function itemCard(it){
   const card=document.createElement('div'); card.className='card r'+it.r;
   const lines=modLines(it.mods); if(it.extra)lines.unshift([it.extra,'neu']);
@@ -898,11 +921,12 @@ function itemCard(it){
   return card;
 }
 function wStatLine(def,tier){return `${Math.round(wDmg(def,tier))}${def.pellets?'×'+(def.pellets+S.extraProj):''} dmg · ${wCd(def,tier).toFixed(2)}s · ${Math.round(wRange(def))} range`}
+function setPills(id,buying){const c=setCounts();return `<div class="pills">${WEAPONS[id].sets.map(k=>{const n=c[k]||0;const up=buying&&SETS[k].tiers.some(([q])=>q===n+1);return `<span class="pill${up?' up':''}" style="--sc:${SETS[k].col}" title="${up?'Buying this unlocks a set bonus':''}">${SETS[k].name}${buying?` ${n}→${n+1}`:n?` ${n}`:''}${up?' ★':''}</span>`}).join('')}</div>`}
 function weaponCard(id,tier){
   const def=WEAPONS[id]; const card=document.createElement('div'); card.className='card r'+tier;
   const ic=document.createElement('div'); ic.className='ic'; ic.appendChild(weaponIcon(id,tier)); card.appendChild(ic);
   const owned=run.weapons.some(w=>w.id===id&&w.tier===tier);
-  card.insertAdjacentHTML('beforeend',`<div class="ct">Tier ${TIERN[tier]} ${def.melee?'melee':'ranged'} weapon${owned&&tier<3?' · merges':''}</div><div class="cn">${def.name}</div><ul><li>${def.desc}</li><li class="neu">${wStatLine(def,tier)}</li></ul>`);
+  card.insertAdjacentHTML('beforeend',`<div class="ct">Tier ${TIERN[tier]} ${def.melee?'melee':'ranged'} weapon${owned&&tier<3?' · merges':''}</div><div class="cn">${def.name}</div>${setPills(id,!(run.weapons.length>=6&&owned))}<ul><li>${def.desc}</li><li class="neu">${wStatLine(def,tier)}</li></ul>`);
   return card;
 }
 function rollShop(fresh){
@@ -962,16 +986,24 @@ function renderShop(){
     const w=run.weapons[selW],def=WEAPONS[w.id]; pop.hidden=false;
     const sell=Math.max(1,Math.round(wPrice(w.id,w.tier)*.3));
     const mate=run.weapons.findIndex((o,j)=>j!==selW&&o.id===w.id&&o.tier===w.tier);
-    pop.innerHTML=`<div class="wt">${def.name} <span style="color:${RAR[w.tier].c}">${TIERN[w.tier]}</span></div><div class="ws2">${def.desc}<br>${wStatLine(def,w.tier)} · ${def.crit+S.crit}% crit</div><div class="row"></div>`;
+    pop.innerHTML=`<div class="wt">${def.name} <span style="color:${RAR[w.tier].c}">${TIERN[w.tier]}</span></div>${setPills(w.id)}<div class="ws2">${def.desc}<br>${wStatLine(def,w.tier)} · ${def.crit+S.crit}% crit</div><div class="row"></div>`;
     const row=pop.querySelector('.row');
-    if(mate>=0&&w.tier<3){const mb=document.createElement('button');mb.className='buy';mb.style.flex='0 0 auto';mb.style.padding='9px 16px';mb.textContent=`Merge → ${TIERN[w.tier+1]}`;mb.onclick=()=>{w.tier++;w.flash=1;run.weapons.splice(mate,1);selW=-1;sfx('levelup');toast(`${def.name} is now tier ${TIERN[w.tier]}`);renderShop()};row.appendChild(mb)}
+    if(mate>=0&&w.tier<3){const mb=document.createElement('button');mb.className='buy';mb.style.flex='0 0 auto';mb.style.padding='9px 16px';mb.textContent=`Merge → ${TIERN[w.tier+1]}`;mb.onclick=()=>{w.tier++;w.flash=1;run.weapons.splice(mate,1);recalc();selW=-1;sfx('levelup');toast(`${def.name} is now tier ${TIERN[w.tier]}`);renderShop()};row.appendChild(mb)}
     const sb=document.createElement('button');sb.className='ghost';sb.textContent=`Sell for ${sell}`;sb.disabled=run.weapons.length<=1;sb.style.opacity=run.weapons.length<=1?.5:1;
-    sb.onclick=()=>{if(run.weapons.length<=1)return;run.weapons.splice(selW,1);run.mats+=sell;selW=-1;sfx('gem',6);renderShop()};
+    sb.onclick=()=>{if(run.weapons.length<=1)return;run.weapons.splice(selW,1);recalc();run.mats+=sell;selW=-1;sfx('gem',6);renderShop()};
     row.appendChild(sb);
   }else pop.hidden=true;
+  renderSets();
   const oi=$('ownedItems'); const ids=Object.keys(run.items);
   oi.innerHTML=ids.length?ids.map(id=>{const it=ITEM_BY[id];return `<span class="oi" title="${it.name}">${itemIcon(it)}${it.name}${run.items[id]>1?' ×'+run.items[id]:''}</span>`}).join(''):'<span class="none">Nothing yet. Items stack.</span>';
   $('statList').innerHTML=STAT_ORDER.map(k=>{let v=S[k];if(k==='maxHp')v=maxHp();v=Math.round(v*10)/10;const c=v>0?'pos':v<0?'neg':'';return `<dt>${STAT[k].replace('% ','')}${STAT[k].startsWith('%')?' %':''}</dt><dd class="${k==='maxHp'?'':c}">${v}</dd>`}).join('');
+}
+function renderSets(){
+  const c=setCounts(); const keys=Object.keys(SETS).sort((a,b)=>(c[b]||0)-(c[a]||0));
+  $('setList').innerHTML=keys.filter(k=>c[k]).map(k=>{const S2=SETS[k],n=c[k],t=setTier(k,n);
+    const pips=[1,2,3,4,5,6].map(i=>`<i class="${i<=n?'on':''}${S2.tiers.some(([q])=>q===i)?' mk':''}"></i>`).join('');
+    return `<div class="set${t>=0?' act':''}" style="--sc:${S2.col}"><div class="sh"><b>${S2.name}</b><span class="pips">${pips}</span></div>${S2.tiers.map(([q,m],i)=>`<div class="st${i===t?' on':i<t?' past':''}">(${q}) ${bonusText(m)}</div>`).join('')}</div>`}).join('')
+    ||'<span class="none">Own 2 weapons of the same set to unlock a bonus.</span>';
 }
 function gameOver(win){
   state='over'; showUI('over');
