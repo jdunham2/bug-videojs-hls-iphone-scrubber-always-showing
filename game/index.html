@@ -139,6 +139,24 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .buy:disabled{opacity:.4;cursor:default;border-color:var(--muted)}
 .buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .buy b{color:var(--sun)}
+.char.locked{cursor:not-allowed}
+.char.locked img{filter:brightness(0) opacity(.5)}
+.char.locked .n{color:var(--muted)}
+.char .lock{display:none;flex-direction:column;align-items:center;gap:6px;width:100%;font-size:12px;font-weight:700;color:var(--muted);line-height:1.35}
+.char.locked .lock{display:flex}
+.char.locked .r,.char.locked .stat{display:none}
+.lockbar{width:100%;max-width:160px;height:7px;border-radius:4px;background:rgba(203,184,232,.22);overflow:hidden}
+.lockbar i{display:block;height:100%;background:var(--sun);border-radius:4px}
+.lockic{font-family:var(--display);font-size:11px;letter-spacing:.1em;color:var(--sun)}
+.sub{margin:-8px 0 0;font-size:14px;color:var(--muted)}
+.unlock{display:flex;align-items:center;gap:14px;padding:10px 18px 10px 10px;border-radius:16px;background:var(--glass);border:2px solid var(--sun);animation:glow 1.2s ease-in-out infinite alternate}
+.unlock img{width:84px;height:84px}
+.unlock .k{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--sun)}
+.unlock .n{display:block;font-family:var(--display);font-size:24px}
+@keyframes glow{to{box-shadow:0 0 22px rgba(255,179,71,.55)}}
+.linkbtn{font-family:var(--body);font-size:12px;color:var(--muted);background:none;border:0;text-decoration:underline;cursor:pointer;padding:4px}
+.linkbtn:focus-visible{outline:2px solid var(--mint)}
+@media (prefers-reduced-motion:reduce){ .unlock{animation:none} }
 .lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 @media (max-width:560px){ .pct{font-size:30px} .card{min-width:96px;padding:6px 10px 8px} #wave{font-size:12px}
   .chars{grid-template-columns:repeat(3,minmax(0,1fr))} .char{padding:10px 6px 12px} .char img{width:84px;height:84px} .char .n{font-size:15px} .char .r{font-size:11px;min-height:0} .stat{display:none} }
@@ -209,6 +227,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 <section class="screen" id="scrSelect" hidden>
   <div class="panel">
     <h2>CHOOSE YOUR FIGHTER</h2>
+    <p class="sub" id="unlockSummary"></p>
     <div class="chars" id="chars"></div>
     <div>
       <span class="lbl">Starting arena (arenas switch every wave)</span>
@@ -230,12 +249,15 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
       <button class="btn ghost" id="btnBack">BACK</button>
       <button class="btn" id="btnGo">FIGHT</button>
     </div>
+    <button class="linkbtn" id="btnReset">Reset unlock progress</button>
   </div>
 </section>
 
 <section class="screen" id="scrUp" hidden>
   <div class="panel">
     <h2 id="upTitle">WAVE 1 CLEARED</h2>
+    <div class="unlock" id="unlockBox" hidden><img id="unlockImg" alt=""><div><span class="k">NEW FIGHTER UNLOCKED</span><span class="n" id="unlockName"></span></div></div>
+    <p class="rule" id="nextUnlockUp"></p>
     <p class="tag">Pick one power-up. It lasts for the rest of the run.</p>
     <div class="ups" id="ups"></div>
     <div id="shop" hidden>
@@ -249,6 +271,7 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
   <div class="panel">
     <h2>KNOCKED OUT</h2>
     <p class="tag" id="overText"></p>
+    <p class="rule" id="nextUnlockOver"></p>
     <div class="row">
       <button class="btn" id="btnAgain">RUN IT BACK</button>
       <button class="btn ghost" id="btnChange">CHANGE FIGHTER</button>
@@ -1774,7 +1797,26 @@ const HAMMER_TIME = 8, BOMB_FUSE = 5;
 const GRAV = 32;
 
 const game = { state: 'title', wave: 1, timer: 0, hitstop: 0, shake: 0, timeScale: 1, simTime: 0, perks: [] };
+// Fighters unlock from the total number of waves cleared across all runs (saved in this browser).
+const UNLOCKS = { nova: 0, pyra: 2, tanko: 4, whisk: 7, shade: 10, bubbles: 14, rex: 18, glitch: 23, bloom: 30 };
+const progress = { waves: Math.max(0, +(store.get('koisle-waves') || 0) || 0), seen: new Set(['nova']) };
+try { for (const k of JSON.parse(store.get('koisle-seen') || '[]')) progress.seen.add(k); } catch (e) {}
+const isUnlocked = k => progress.waves >= (UNLOCKS[k] ?? 0);
+const unlockedCount = () => Object.keys(PLAYABLE).filter(isUnlocked).length;
+function nextUnlock() {
+  let best = null;
+  for (const k of Object.keys(PLAYABLE)) if (!isUnlocked(k) && (!best || UNLOCKS[k] < UNLOCKS[best])) best = k;
+  return best;
+}
+function nextUnlockText() {
+  const k = nextUnlock();
+  if (!k) return `All ${Object.keys(PLAYABLE).length} fighters unlocked. Waves cleared in total: ${progress.waves}.`;
+  const left = UNLOCKS[k] - progress.waves;
+  return `Next fighter unlocks in ${left} more wave${left === 1 ? '' : 's'} (${progress.waves} of ${UNLOCKS[k]} cleared in total).`;
+}
+function saveProgress() { store.set('koisle-waves', progress.waves); store.set('koisle-seen', JSON.stringify([...progress.seen])); }
 game.charKey = Object.keys(PLAYABLE).includes(store.get('koisle-char')) ? store.get('koisle-char') : 'nova';
+if (!isUnlocked(game.charKey)) game.charKey = 'nova';
 game.startArena = Object.keys(ARENAS).includes(store.get('koisle-arena')) ? store.get('koisle-arena') : 'sky';
 game.itemT = 6; game.gold = 0; game.startPerk = {};
 
@@ -2997,7 +3039,7 @@ class Brain {
   }
 }
 const brain = new Brain(enemy);
-window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, vinePatches, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
+window.__ko = { player, enemy, game, brain, items, projectiles, spawnItem, setArena, ARENAS, ROSTER, firePatches, echoes, vinePatches, progress, UNLOCKS, shockwave, coins, drones, iceHoles, crackIce, get decoy() { return decoy; }, get arena() { return arena; } }; // debug handle for the browser console
 
 /* ================= input ================= */
 const keys = new Set(), pressed = new Set();
@@ -3200,7 +3242,10 @@ function startWave() {
 function onKO(f) {
   if (f === enemy && player.stats.goldRush) { game.gold += 10; toast('+10 GOLD for the KO'); }
   if (f === enemy) {
-    if (enemy.stocks <= 0) { game.state = 'cleared'; game.timer = 1.8; game.timeScale = .35; banner('K.O.!', 'gold'); sfx('clear'); }
+    if (enemy.stocks <= 0) {
+      game.state = 'cleared'; game.timer = 1.8; game.timeScale = .35; banner('K.O.!', 'gold'); sfx('clear');
+      progress.waves++; saveProgress();
+    }
     else banner('KO!', 'gold');
   } else {
     if (player.stocks <= 0) { game.state = 'defeat'; game.timer = 2; game.timeScale = .35; banner('DOWN!'); sfx('lose'); }
@@ -3261,6 +3306,16 @@ function showUpgrades() {
   });
   game.gold += coins.length; clearCoins();
   renderShop();
+  const fresh = Object.keys(PLAYABLE).filter(k => isUnlocked(k) && !progress.seen.has(k));
+  $('unlockBox').hidden = !fresh.length;
+  if (fresh.length) {
+    const k = fresh[fresh.length - 1];
+    $('unlockName').textContent = fresh.map(f => ROSTER[f].name).join(' + ');
+    const src = getPortrait(k); if (src) $('unlockImg').src = src;
+    for (const f of fresh) progress.seen.add(f);
+    saveProgress(); setTimeout(() => sfx('star'), 250);
+  }
+  $('nextUnlockUp').textContent = nextUnlockText();
   show('scrUp'); $('hud').hidden = true; $('touch').hidden = true;
 }
 function showGameOver() {
@@ -3268,6 +3323,7 @@ function showGameOver() {
   if (document.pointerLockElement) document.exitPointerLock();
   const best = Math.max(game.wave, +(store.get('koisle-best') || 0)); store.set('koisle-best', best);
   $('overText').textContent = `You reached wave ${game.wave}. Best run: wave ${best}.`;
+  $('nextUnlockOver').textContent = nextUnlockText();
   show('scrOver'); $('hud').hidden = true; $('touch').hidden = true;
 }
 let pausedFrom = null;
@@ -3300,6 +3356,8 @@ function portrait(def) {
   ctx.putImageData(img, 0, 0);
   return c.toDataURL();
 }
+const portraitCache = {};
+function getPortrait(key) { if (!(key in portraitCache)) { try { portraitCache[key] = portrait(ROSTER[key]); } catch (e) { portraitCache[key] = ''; } } return portraitCache[key]; }
 let portraitsBuilt = false;
 function buildSelect() {
   const box = $('chars'); box.innerHTML = '';
@@ -3308,15 +3366,30 @@ function buildSelect() {
     b.className = 'char'; b.id = 'char-' + key; b.dataset.k = key;
     const bars = Object.entries(info.pips).map(([n, v]) =>
       `<div class="stat"><span>${n}</span><span class="pips">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= v ? 'on' : ''}"></i>`).join('')}</span></div>`).join('');
-    let src = ''; try { src = portrait(def); } catch (e) {}
-    b.innerHTML = `${src ? `<img alt="${def.name}" src="${src}">` : ''}<span class="n">${def.name}</span><span class="r">${info.role}</span>${bars}`;
-    b.addEventListener('click', () => { game.charKey = key; store.set('koisle-char', key); sfx('select'); syncSelect(); });
+    const src = getPortrait(key);
+    b.innerHTML = `${src ? `<img alt="${def.name}" src="${src}">` : ''}<span class="n">${def.name}</span><span class="r">${info.role}</span>${bars}
+      <span class="lock"><span class="lockic">LOCKED</span><span class="lt"></span><span class="lockbar"><i></i></span></span>`;
+    b.addEventListener('click', () => {
+      if (!isUnlocked(key)) { sfx('clang'); toast(`Clear ${UNLOCKS[key] - progress.waves} more waves to unlock ${def.name}.`); return; }
+      game.charKey = key; store.set('koisle-char', key); sfx('select'); syncSelect();
+    });
     box.appendChild(b);
   }
   portraitsBuilt = true;
 }
 function syncSelect() {
-  document.querySelectorAll('.char').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === game.charKey));
+  if (!isUnlocked(game.charKey)) game.charKey = 'nova';
+  document.querySelectorAll('.char').forEach(b => {
+    const k = b.dataset.k, open = isUnlocked(k);
+    b.classList.toggle('locked', !open); b.setAttribute('aria-disabled', !open);
+    b.setAttribute('aria-pressed', open && k === game.charKey);
+    if (!open) {
+      const left = UNLOCKS[k] - progress.waves;
+      b.querySelector('.lt').textContent = `Clear ${left} more wave${left === 1 ? '' : 's'} to unlock`;
+      b.querySelector('.lockbar i').style.width = Math.round(progress.waves / UNLOCKS[k] * 100) + '%';
+    }
+  });
+  $('unlockSummary').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters unlocked · ${progress.waves} waves cleared in total`;
   document.querySelectorAll('#arenaSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.a === game.startArena));
 }
 function openSelect() {
@@ -3328,10 +3401,21 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
   game.startArena = b.dataset.a; store.set('koisle-arena', b.dataset.a); setArena(b.dataset.a); sfx('select'); syncSelect();
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
-$('btnBack').addEventListener('click', () => { game.state = 'title'; show('scrTitle'); });
+$('btnBack').addEventListener('click', () => { game.state = 'title'; updateTitleInfo(); show('scrTitle'); });
 $('btnChange').addEventListener('click', () => { sfx('select'); openSelect(); });
+let resetArmed = null;
+$('btnReset').addEventListener('click', () => {
+  const b = $('btnReset');
+  if (!resetArmed) { b.textContent = 'Tap again to reset all unlocks'; resetArmed = setTimeout(() => { resetArmed = null; b.textContent = 'Reset unlock progress'; }, 3000); return; }
+  clearTimeout(resetArmed); resetArmed = null; b.textContent = 'Reset unlock progress';
+  progress.waves = 0; progress.seen = new Set(['nova']); saveProgress(); syncSelect(); toast('Unlock progress reset.');
+});
 const bestSaved = +(store.get('koisle-best') || 0);
-if (bestSaved) $('best').textContent = `Best run: wave ${bestSaved}`;
+function updateTitleInfo() {
+  const best = +(store.get('koisle-best') || 0) || bestSaved;
+  $('best').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters unlocked` + (best ? ` · Best run: wave ${best}` : '') + '. Clear waves to unlock more.';
+}
+updateTitleInfo();
 
 /* ================= main loop ================= */
 let last = performance.now();

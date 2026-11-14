@@ -5,6 +5,7 @@ A third-person platform brawler roguelike built with three.js. The slice focuses
 ## Content
 
 - **Fighters**: Nova (sword combo + charged smash), Pyra (fireballs from range, charged fire burst up close) Tank-o (hold dash on the ground to shield, charged rocket punch) Whisk (frying-pan combo; smash throws the pan, which boomerangs back) Shade (dash teleports, behind the enemy if close; smash leaves a decoy that stuns whoever hits it), Bubbles (8 rapid slaps; smash traps the enemy in a floating bubble) Rex (combo ends in a tail swipe; smash is a ground-pound), Glitch (every hit rolls random power from weak to critical; smash is a random special) and Lady Bloom (smash plants a vine trap that roots enemies). Enemies: Grub, Vex, Bolt, Moss.
+- **Unlocks**: you start with Nova. Clearing waves (counted across all runs and saved in the browser) unlocks the rest: Pyra at 2 waves, Tank-o 4, Whisk 7, Shade 10, Bubbles 14, Rex 18, Glitch 23 and Lady Bloom 30. A link on the select screen resets progress. Change the thresholds in `UNLOCKS`.
 - **Arenas** (alternate every wave):
   - **Sky Isle**: a floating island with three floating platforms.
   - **Lava Forge**: every 19 seconds the floor sinks into lava for about 4 seconds. Touching lava adds 7% and bounces you up, so get onto the raised pillars.
