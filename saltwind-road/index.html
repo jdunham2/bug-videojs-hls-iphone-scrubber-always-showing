@@ -33,6 +33,9 @@ body.ui-l #deeds,body.ui-xl #deeds{font-size:calc(11.5px*var(--ui));max-width:ca
 body.ui-l #talk,body.ui-xl #talk{width:min(calc(720px*var(--ui)),calc(100% - 20px))}
 body.ui-l #toasts,body.ui-xl #toasts{width:min(calc(440px*var(--ui)),calc(100% - 40px))}
 body.cb{--good:#62b0f0;--bad:#f0a040}
+#saveIco{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:6;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;padding:4px 8px;background:color-mix(in srgb,var(--panel) 80%,transparent);border-radius:4px;pointer-events:none;animation:tin .25s ease-out}
+#saveIco i{width:9px;height:9px;border:2px solid var(--brass);border-radius:2px;box-sizing:border-box;position:relative}
+#saveIco i::after{content:'';position:absolute;left:1px;right:1px;top:0;height:2px;background:var(--brass)}
 .recgrid{display:grid;grid-template-columns:1fr auto;gap:3px 16px;max-width:440px}
 .recgrid .rk{color:var(--muted)} .recgrid .rv{text-align:right;font-variant-numeric:tabular-nums} .recgrid .rh{grid-column:1/3;color:var(--brass);font-family:var(--f-display);margin-top:8px}
 .album{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
@@ -297,6 +300,7 @@ body.titling #hudTL,body.titling #bar,body.titling .hud-tr,body.titling #prompt{
   <div id="tagUI" class="panel" hidden></div>
   <div id="partyUI" class="panel" hidden></div>
   <div id="toasts"></div>
+  <div id="saveIco" hidden><i></i>Saved</div>
 
   <div id="talk" class="panel" hidden>
     <canvas id="portrait" width="72" height="72"></canvas>
@@ -2223,6 +2227,10 @@ const NPCS = [
    hello:["Wanna play? I'm the BEST hider!","Bet you can't find me!","Hee hee!"], rumors:["When I hide, I giggle. I can't help it. If you get close you'll hear me."]},
   {id:'melody',town:'lantern',dx:3,dy:3,name:'Melody',role:'Street musician',cols:{cloak:'#b0402a',skin:'#c89070',hair:'#2a1a1a'},busker:true,freeSpot:true,
    hello:["Music makes the coins fall!","Got rhythm, traveler?","La la laaa..."], rumors:["Lantern Bay crowds tip well for a good tune. Keep your rhythm and the coins come raining in."]},
+  {id:'cowrie',town:'reed',dx:3,dy:3,name:'Nan Cowrie',role:'Shell Stones player',cols:{cloak:'#4a6a7a',skin:'#e0b090',hair:'#e8e8e0'},shellstones:true,freeSpot:true,
+   hello:["Sit down, dear. Fancy a game of Shell Stones?","Six cups each and a store at the end. Simple as pie.","I've played this since before your grandmother was born."], rumors:["If your last stone lands in your own store, you go again. Plan for that and you'll string moves together."]},
+  {id:'hettie',town:'hollow',dx:-3,dy:3,name:'Hettie Hurdle',role:'Pony jumping show',cols:{cloak:'#8a2a3a',skin:'#d8a880',hair:'#a06a3a'},jumpshow:true,freeSpot:true,
+   hello:["Hop on Biscuit and clear the course!","Fifteen fences, and a ribbon for a tidy round.","Heels down, eyes up, and jump on time!"], rumors:["Jump a little early for the wide fences. Biscuit needs a running start to clear the long ones."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
@@ -3139,7 +3147,8 @@ function deserialize(str) {
   delete s.rle; delete s.ex0;
   return s;
 }
-function save() { try { localStorage.setItem(SAVE_KEY, serialize()); } catch (e) {} }
+let saveIcoT = 0;
+function save() { try { localStorage.setItem(SAVE_KEY, serialize()); const now = Date.now(); if (now - saveIcoT > 20000) { saveIcoT = now; const el = document.getElementById('saveIco'); if (el) { el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 1300); } } } catch (e) {} }
 function loadSaved() { try { const v = localStorage.getItem(SAVE_KEY); return v ? deserialize(v) : null; } catch (e) { return null; } }
 
 /* ================= helpers ================= */
@@ -4427,8 +4436,141 @@ $('pauseSheet').addEventListener('click', e => {
 });
 addEventListener('keydown', e => {
   if (busk && busk.on) { const k = e.key.toLowerCase(); const lane = BUSK_KEYS.findIndex(ks => ks.includes(k)); if (lane >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) buskHit(lane); } else if (k === 'escape') { busk = null; } }
+  else if (jump && jump.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e' || k === 'w' || k === 'arrowup') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) jumpPress(); } else if (k === 'escape') jump = null; }
+  else if (stones && stones.on && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); stonesPlay(+e.key - 1); }
   else if (skit && skit.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) skitPress(); } else if (k === 'escape') skit = null; }
 }, {capture: true});
+// ===== Shell Stones (a sowing game with Nan Cowrie) =====
+let stones = null;
+function stonesTalk(n) {
+  say(`“Six cups on your side, six on mine, four stones in each. Pick up all the stones in one of your cups and drop them one at a time to the right, round the board. Your store is on the right end.”<br><br>“Land your last stone in your store and you go again. Land it in an empty cup on your side and you capture my stones opposite. When one side runs empty, the game ends and whoever has more stones wins. Ten coin a game.”${S.stonesWins ? `<br><span style="color:var(--muted)">You’ve beaten her ${S.stonesWins} time${S.stonesWins > 1 ? 's' : ''}. Best win: by ${S.stonesBest || 0}.</span>` : ''}`, [
+    {label: 'Play a game · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); stonesStart(); }}, back(n)]);
+}
+function stonesStart() {
+  stones = {on: true, b: [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0], turn: 0, msg: 'Your turn. Choose one of your cups (or press 1–6).', busy: false, last: -1};
+  stonesRender();
+}
+function stonesSow(b, pit, who) {
+  b = b.slice(); let n = b[pit], i = pit; b[pit] = 0; const skip = who === 0 ? 13 : 6, store = who === 0 ? 6 : 13;
+  while (n > 0) { i = (i + 1) % 14; if (i === skip) continue; b[i]++; n--; }
+  let again = i === store, cap = 0;
+  const mine = who === 0 ? (i >= 0 && i <= 5) : (i >= 7 && i <= 12);
+  if (!again && mine && b[i] === 1 && b[12 - i] > 0) { cap = b[12 - i] + 1; b[store] += cap; b[i] = 0; b[12 - i] = 0; }
+  let over = false; const s0 = b.slice(0, 6).reduce((a, v) => a + v, 0), s1 = b.slice(7, 13).reduce((a, v) => a + v, 0);
+  if (!s0 || !s1) { b[6] += s0; b[13] += s1; for (let k = 0; k < 13; k++) if (k !== 6) b[k] = 0; over = true; }
+  return {b, again: again && !over, cap, over, end: i};
+}
+function stonesMoves(b, who) { const o = []; for (let k = 0; k < 6; k++) { const p = who === 0 ? k : 7 + k; if (b[p]) o.push(p); } return o; }
+function stonesSearch(b, who, depth) {
+  const mv = stonesMoves(b, who); if (!mv.length || depth <= 0) return {v: b[13] - b[6]};
+  let best = null;
+  for (const p of mv) {
+    const r = stonesSow(b, p, who); let v;
+    if (r.over) v = (r.b[13] - r.b[6])*10; else v = stonesSearch(r.b, r.again ? who : 1 - who, depth - (r.again ? 0.5 : 1)).v;
+    if (!best || (who === 1 ? v > best.v : v < best.v)) best = {v, p};
+  }
+  return best;
+}
+function stonesPlay(pit) {
+  const G = stones; if (!G || !G.on || G.busy || G.turn !== 0 || pit < 0 || pit > 5 || !G.b[pit]) return;
+  const r = stonesSow(G.b, pit, 0); G.b = r.b; G.last = r.end; SFX.click();
+  G.msg = r.cap ? `You captured ${r.cap} stones!` : r.again ? 'Last stone in your store. Go again!' : '';
+  if (r.over) { stonesEnd(); return; }
+  if (r.again) { G.msg += ' Your turn.'; stonesRender(); return; }
+  G.turn = 1; stonesRender(); stonesAI();
+}
+function stonesAI() {
+  const G = stones; if (!G || !G.on) return; G.busy = true;
+  setTimeout(() => {
+    if (stones !== G || !G.on) return;
+    const depth = 3 + Math.min(2, Math.floor((S.stonesWins || 0)/3)), pick = stonesSearch(G.b, 1, depth).p;
+    const r = stonesSow(G.b, pick, 1); G.b = r.b; G.last = r.end; SFX.click();
+    G.msg = r.cap ? `Nan captures ${r.cap} of your stones. “Oh, sorry, dear!”` : r.again ? 'Nan lands in her store and goes again…' : '';
+    if (r.over) { G.busy = false; stonesEnd(); return; }
+    if (r.again) { stonesRender(); stonesAI(); return; }
+    G.turn = 0; G.busy = false; G.msg += (G.msg ? ' ' : '') + 'Your turn.'; stonesRender();
+  }, 850);
+}
+function stonesRender() {
+  const G = stones; if (!G) return;
+  const cup = (p, mine) => `<button type="button" class="btn" data-pit="${p}" ${mine && G.turn === 0 && !G.busy && G.b[p] ? '' : 'disabled'} style="width:48px;height:48px;padding:0;border-radius:50%;font-family:var(--f-display);font-size:17px;${G.last === p ? 'border-color:var(--brass);' : ''}${mine ? '' : 'opacity:1;cursor:default;'}">${G.b[p]}</button>`;
+  const store = (p, who) => `<div style="width:56px;align-self:stretch;display:grid;place-items:center;border:1px solid ${G.last === p ? 'var(--brass)' : 'var(--line)'};border-radius:24px;background:var(--panel-2);text-align:center"><div><div style="font-family:var(--f-display);font-size:22px;color:var(--brass)">${G.b[p]}</div><div style="font-size:11px;color:var(--muted)">${who}</div></div></div>`;
+  const html = `<div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:nowrap;overflow-x:auto;padding:4px 0">
+    ${store(13, 'Nan')}
+    <div style="display:grid;gap:8px"><div style="display:flex;gap:6px">${[12, 11, 10, 9, 8, 7].map(p => cup(p, false)).join('')}</div><div style="display:flex;gap:6px">${[0, 1, 2, 3, 4, 5].map(p => cup(p, true)).join('')}</div></div>
+    ${store(6, 'You')}</div>
+    <div style="text-align:center;margin-top:8px;color:var(--muted);min-height:1.5em">${G.turn === 1 ? 'Nan is thinking… ' : ''}${G.msg}</div>`;
+  openPanel('Shell Stones', html, [{label: 'Give up', fn: () => { stones = null; openPanel('Shell Stones', '“No shame in it, dear. Come back any time.”', [{label: 'Close', primary: true, fn: closeTalk}]); }}]);
+  setTimeout(() => { for (const b of document.querySelectorAll('[data-pit]')) b.addEventListener('click', () => stonesPlay(+b.dataset.pit)); }, 20);
+}
+function stonesEnd() {
+  const G = stones; stones = null; const me = G.b[6], her = G.b[13], diff = me - her;
+  S.stonesGames = (S.stonesGames || 0) + 1; let txt, c = 0;
+  if (diff > 0) { S.stonesWins = (S.stonesWins || 0) + 1; S.stonesBest = Math.max(S.stonesBest || 0, diff); c = mgPay('stones', 35 + diff*2); S.coins += c; SFX.victory(); txt = `You win, <b>${me}</b> to ${her}! “Well played! You’ve got a sharp eye.”<br><span style="color:var(--good)">Nan pays you ${c} coin.</span>`; }
+  else if (diff === 0) { S.coins += 10; txt = `A tie, ${me} each! “We’re too well matched. Here’s your coin back.”`; }
+  else { txt = `Nan wins, ${her} to <b>${me}</b>. “Better luck next time, dear. Watch for captures!”`; SFX.hurt(); }
+  renderHUD(); save();
+  openPanel('Shell Stones', txt, [{label: 'Play again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); stonesStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== pony jumping show (Hettie Hurdle, Hollowpine) =====
+let jump = null;
+const JW = 360, JH = 200, JGROUND = 162, JFENCES = 15;
+function jumpTalk(n) {
+  say(`“Biscuit knows the course. You just tell him when to jump! Space, E, up or tap the arena. Fifteen fences. Knock a rail and that’s a fault. Four faults and you’re out.”<br>“No faults wins the blue ribbon! Ten coin to ride.”${S.jumpRounds ? `<br><span style="color:var(--muted)">Best round: ${S.jumpBest || 0} of ${JFENCES} fences clear${S.jumpClean ? ` · clear rounds: ${S.jumpClean}` : ''}</span>` : ''}`, [
+    {label: 'Ride the course · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); jumpStart(); }}, back(n)]);
+}
+function jumpStart() {
+  const fences = []; let x = 420;
+  for (let i = 0; i < JFENCES; i++) { const wide = i > 3 && Math.random() < .3; fences.push({x, h: 14 + Math.min(12, i) + Math.random()*4, w: wide ? 24 : 8, hit: false, done: false}); x += 150 + Math.random()*90 - i*3; }
+  jump = {on: true, y: 0, vy: 0, fences, clear: 0, faults: 0, sp: 140, dist: 0, last: performance.now(), msg: '', msgT: 0, legs: 0, over: false};
+  openPanel('Pony jumping show', `<canvas id="jumpC" width="${JW}" height="${JH}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;image-rendering:pixelated"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Space / E / up / tap: jump</div>`, [{label: 'Leave the arena', fn: () => { jump = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('jumpC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); jumpPress(); }); }, 30);
+  requestAnimationFrame(jumpLoop);
+}
+function jumpPress() { const J = jump; if (!J || !J.on || J.over) return; if (J.y === 0) { J.vy = 320; SFX.swing(); } }
+function jumpLoop() {
+  const J = jump; if (!J || !J.on) return; const c = document.getElementById('jumpC');
+  if (!c || mode !== 'talk') { jump = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - J.last)/1000); J.last = now; J.msgT -= dt;
+  if (!J.over) {
+    J.sp = Math.min(210, J.sp + dt*4); J.dist += J.sp*dt; J.legs += dt*J.sp/12;
+    if (J.y > 0 || J.vy > 0) { J.y += J.vy*dt; J.vy -= 800*dt; if (J.y <= 0) { J.y = 0; J.vy = 0; } }
+    for (const f of J.fences) {
+      const fx = f.x - J.dist; if (f.done) continue;
+      if (fx < 80 && fx + f.w > 56 && J.y < f.h - 2 && !f.hit) { f.hit = true; J.faults++; J.msg = J.faults >= 4 ? 'Eliminated!' : 'Rail down! Fault'; J.msgT = 1; SFX.hit(); }
+      if (fx + f.w < 56) { f.done = true; if (!f.hit) { J.clear++; SFX.click(); } }
+    }
+    const lastF = J.fences[J.fences.length - 1];
+    if (J.faults >= 4 || (lastF.done && lastF.x - J.dist < -40)) { J.over = true; setTimeout(() => { if (jump === J) jumpEnd(); }, 1100); }
+  }
+  const g = c.getContext('2d');
+  g.fillStyle = '#8ac8e8'; g.fillRect(0, 0, JW, JH); g.fillStyle = '#d8eef8'; for (let i = 0; i < 4; i++) { const cx = ((i*110 - J.dist*.2) % (JW + 80) + JW + 80) % (JW + 80) - 40; g.fillRect(cx, 24 + i*9, 34, 8); g.fillRect(cx + 8, 18 + i*9, 18, 6); }
+  g.fillStyle = '#5a9a4a'; g.fillRect(0, 120, JW, 50); g.fillStyle = '#c8a870'; g.fillRect(0, JGROUND, JW, JH - JGROUND);
+  g.fillStyle = '#ffffff'; for (let x = -((J.dist*.6) % 40); x < JW; x += 40) g.fillRect(x, 112, 3, 10); g.fillRect(0, 114, JW, 2);
+  for (const f of J.fences) {
+    const fx = f.x - J.dist; if (fx < -40 || fx > JW + 10) continue;
+    g.fillStyle = '#f4f0e8'; g.fillRect(fx, JGROUND - f.h - 4, 3, f.h + 4); g.fillRect(fx + f.w - 3, JGROUND - f.h - 4, 3, f.h + 4);
+    const rails = f.hit ? [[0, 6]] : [[f.h, 0], [f.h*.55, 0]];
+    for (const [rh, drop] of rails) { g.fillStyle = f.hit ? '#a05a4a' : '#d8443a'; g.fillRect(fx - 2, JGROUND - rh - 3 + drop, f.w + 4, 3); g.fillStyle = '#f4f0e8'; g.fillRect(fx + f.w/2 - 2, JGROUND - rh - 3 + drop, 4, 3); }
+  }
+  const hx = 54, hy = JGROUND - 22 - J.y, leg = J.y > 0 ? 0 : Math.sin(J.legs)*3;
+  g.fillStyle = '#a0683a'; g.fillRect(hx, hy, 28, 12); g.fillRect(hx + 24, hy - 9, 7, 12); g.fillRect(hx + 27, hy - 12, 9, 6);
+  g.fillStyle = '#5a3a1a'; g.fillRect(hx + 22, hy - 12, 4, 10); g.fillRect(hx - 4, hy + 1, 5, 8);
+  g.fillStyle = '#7a4a2a'; for (const [lx, d] of [[2, leg], [8, -leg], [19, -leg], [25, leg]]) g.fillRect(hx + lx, hy + 12, 3, 10 + (J.y > 0 ? -3 : d));
+  g.fillStyle = '#3a5a8a'; g.fillRect(hx + 10, hy - 12, 8, 10); g.fillStyle = '#e0b090'; g.fillRect(hx + 11, hy - 18, 6, 6); g.fillStyle = '#2a2a2a'; g.fillRect(hx + 10, hy - 20, 8, 3);
+  g.fillStyle = '#0d131b'; g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillText(`Clear ${J.clear}/${JFENCES}`, 8, 16); g.textAlign = 'right'; g.fillText(`Faults ${J.faults}`, JW - 8, 16);
+  if (J.msgT > 0) { g.textAlign = 'center'; g.font = 'bold 18px sans-serif'; g.fillStyle = '#0d131b'; g.fillText(J.msg, JW/2 + 1, 71); g.fillStyle = '#ffd040'; g.fillText(J.msg, JW/2, 70); }
+  requestAnimationFrame(jumpLoop);
+}
+function jumpEnd() {
+  const J = jump; jump = null; S.jumpRounds = (S.jumpRounds || 0) + 1; S.jumpBest = Math.max(S.jumpBest || 0, J.clear);
+  const out = J.faults >= 4, rib = out ? null : J.faults === 0 ? ['blue', 'Blue ribbon', 60] : J.faults === 1 ? ['red', 'Red ribbon', 35] : J.faults === 2 ? ['yellow', 'Yellow ribbon', 20] : ['white', 'White ribbon', 10];
+  if (rib && J.faults === 0) S.jumpClean = (S.jumpClean || 0) + 1;
+  const c = rib ? mgPay('jumps', rib[2]) : 0; S.coins += c; renderHUD(); save(); if (rib) SFX.victory(); else SFX.hurt();
+  openPanel('Pony jumping show', out ? `Biscuit refuses after four knocked rails. You cleared ${J.clear} fences. “Shake it off and try again. Watch the wide ones!”`
+    : `${J.faults === 0 ? '<b>A clear round!</b> ' : ''}You cleared <b>${J.clear}</b> of ${JFENCES} fences with ${J.faults} fault${J.faults === 1 ? '' : 's'}. Hettie pins a <b style="color:${({blue: '#5a8ae8', red: '#e5484d', yellow: '#e8c040', white: '#e8e8e8'})[rib[0]]}">${rib[1]}</b> on Biscuit’s bridle.<br><span style="color:var(--good)">Prize: ${c} coin.</span>`,
+    [{label: 'Ride again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); jumpStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
 // ===== skittles =====
 let skit = null;
 const SKIT_W = 180, SKIT_H = 330, PIN_R = 5, BALL_R = 8;
@@ -7814,6 +7956,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Shell Stones and pony jumping', 'Nan Cowrie at the Reedholm inn plays Shell Stones: sow stones round the board, land in your store to go again, and capture from empty cups. Hettie Hurdle in Hollowpine runs a pony jumping show: time your jumps over 15 fences, and a round with no faults wins the blue ribbon.'],
   ['Settings and accessibility', 'In the menu (Esc) you can change any key, make the text larger, and switch to colorblind-friendly colors (blue and orange instead of green and red). Records lists all your personal bests, and the Album keeps your last 12 photos.'],
   ['Minigame rewards', 'Most minigames (the rink, mine carts, sledding, darts, skittles, snowball fights, the kitchen, sandcastles, hide and seek, wrestling, golf, log rolling and Tides) pay full prizes for your first three games each day. After that, the prize drops to a fifth until tomorrow. Records, achievements and fun still count every time. Courier runs work the same way, and a metal detector finds mostly rusty coins after about a dozen digs in one day.'],
   ['Paper route and lottery', 'Ned the Newsboy in Port Wren hands over his paper route once a day: run past every marked house within 75 seconds. Lottie Luckpenny in Highcairn sells Saltwind Lottery tickets: pick three numbers, and the draw happens the next morning. Match all three for the 800 coin jackpot.'],
@@ -8448,6 +8591,7 @@ function padPoll(dt) {
   if (lock && lock.on) { if (down(OK) || down(BACK) || down(2) || down(3)) lockPress(); PAD.prev = B; return; }
   if (cut && cut.on) { if (down(OK) || down(BACK) || down(2) || down(3)) cutPress(); PAD.prev = B; return; }
   if (skit && skit.on) { if (down(OK) || down(BACK) || down(2) || down(3)) skitPress(); PAD.prev = B; return; }
+  if (jump && jump.on) { if (down(OK) || down(2) || down(3)) jumpPress(); PAD.prev = B; return; }
   const menu = mode !== 'play' && mode !== 'fish';
   // movement
   if (mode === 'play' || mode === 'photo') { PAD.vx = sx; PAD.vy = sy; } else { PAD.vx = PAD.vy = 0; }
@@ -9923,6 +10067,8 @@ function mainOptions(n) {
   if (n.huntmaster) o.push({label: 'Today\u2019s hunt', fn: () => huntTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
+  if (n.shellstones) o.push({label: 'Play Shell Stones', primary: true, fn: () => stonesTalk(n)});
+  if (n.jumpshow) o.push({label: 'Ride the jumping course', primary: true, fn: () => jumpTalk(n)});
   if (n.circus) o.push({label: 'Circus games 🎪', primary: true, fn: () => circusTalk(n)});
   if (n.exporter) o.push({label: 'Export orders', primary: !!(S.export && have(S.export.g) >= S.export.n), fn: () => exportTalk(n)});
   if (n.id === 'bess' && S.flags.boat) o.push({label: 'The regatta', fn: () => regattaTalk(n)});
@@ -12676,6 +12822,9 @@ $('skillsSheet').addEventListener('click', e => {
 /* ================= achievements ================= */
 const ACH = [
   ['first_blood','First Blood','Defeat your first enemy', () => S.kills >= 1],
+  ['stones_win','Shell Shark','Beat Nan Cowrie at Shell Stones', () => (S.stonesWins || 0) >= 1],
+  ['stones_rout','Clean Sweep','Beat Nan Cowrie at Shell Stones by 15 or more', () => (S.stonesBest || 0) >= 15],
+  ['clear_round','Clear Round','Ride a clear round at the pony jumping show', () => (S.jumpClean || 0) >= 1],
   ['hunter','Hunter','Defeat 100 enemies', () => S.kills >= 100],
   ['slayer','Beast Slayer','Defeat a great beast', () => BK.some(k => S.bosses[k])],
   ['legend','Legend of the Road','Defeat every great beast, dungeon guardians included', () => BKM.every(k => S.bosses[k])],
@@ -13227,8 +13376,10 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 11;
+const WN_VER = 12;
 const WHATS_NEW = [
+  ['Two new games', 'Shell Stones with Nan Cowrie in Reedholm (a classic pit-and-pebble board game), and the pony jumping show with Hettie Hurdle in Hollowpine.'],
+  ['Save reminders', 'A small Saved sign appears when the game saves, and the game reminds you to make a backup every couple of weeks.'],
   ['Your keys, your way', 'Open this menu and choose Change keys to put any action on the key you like. There\u2019s also a Text size setting and colorblind-friendly colors.'],
   ['Records and photo album', 'The Records button shows every minigame best and your biggest fish, and you\u2019ll hear a fanfare when you beat one. The Album keeps your last 12 photos so you can look back or save them.'],
   ['Fairer prizes', 'Minigames pay full prizes for your first three games each day, then smaller ones until tomorrow. The lottery is now a fun gamble rather than a sure profit: an 800 coin jackpot, and tickets are still 25 coin. Courier runs and the metal detector also taper off after lots of runs in one day.'],
@@ -13282,7 +13433,7 @@ const RECORDS = [
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
   ['logBest', 'Log rolling', v => `${(+v).toFixed(1)} s`], ['snowBest', 'Snowball fight', v => `${v} hits`], ['castleBest', 'Sandcastle', v => `${v} layers`],
   ['kitchenBest', 'Kitchen', v => `${v} dishes served`], ['buskBest', 'Busking', v => `${v} points`], ['moleBest', 'Whack-a-mole', v => `${v} points`],
-  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
+  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
   ['Puzzles'],
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
@@ -13303,6 +13454,13 @@ function recWatch() {
   recSnap = cur;
 }
 setInterval(recWatch, 1500);
+function backupNudge() {
+  if (typeof S === 'undefined' || !S || mode !== 'play') return;
+  if (S.bkStart == null) { S.bkStart = S.day; return; }
+  const since = S.day - Math.max(S.bkDay || 0, S.bkStart);
+  if (since >= 14 && S.bkRemDay !== S.day) { S.bkRemDay = S.day; toast(`<b>Time for a backup?</b><br>It’s been ${since} days since your last one. Open the menu (Esc) and choose <b>Save backup</b> so clearing your browser can’t erase your progress.`, 8000); }
+}
+setInterval(backupNudge, 20000);
 function statsPage() {
   const rows = [
     ['Days on the road', S.day], ['Level', S.level || 1], ['Monsters defeated', S.kills || 0], ['Elites defeated', S.eliteKills || 0], ['Bosses defeated', Object.keys(S.bosses || {}).filter(k => S.bosses[k]).length],
@@ -13316,8 +13474,8 @@ function statsPage() {
 function backupPanel() {
   save(); let code = ''; try { code = serialize(); } catch (e) {}
   openPanel('Save backup', `Your progress saves automatically in this browser, but clearing your browser data erases it. Keep a backup here.<br><br><b>Back up:</b> ${DLS ? 'save a backup file, or ' : ''}copy this save code somewhere safe.<textarea id="bkOut" readonly style="width:100%;height:60px;margin:6px 0;font:11px monospace;background:#0d131b;color:#cfd6dc;border:1px solid #444;border-radius:4px">${esc(code)}</textarea><b>Restore:</b> paste a save code below${'<span>, or choose a backup file</span>'}.<textarea id="bkIn" placeholder="Paste a save code here" style="width:100%;height:50px;margin:6px 0;font:11px monospace;background:#0d131b;color:#cfd6dc;border:1px solid #444;border-radius:4px"></textarea><input id="bkFile" type="file" accept=".json,.txt,application/json,text/plain" style="font-size:12px">`, [
-    ...(DLS ? [{label: 'Save backup file', primary: true, fn: () => { try { DLS.save({filename: `saltwind-road-save-day${S.day}.json`, data: new Blob([code], {type: 'application/json'})}).then(r => { if (r && r.status === 'saved') toast('Backup saved!', 2500); }).catch(() => {}); } catch (e) {} }}] : []),
-    {label: 'Copy save code', fn: () => { const t = document.getElementById('bkOut'); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} try { navigator.clipboard && navigator.clipboard.writeText(code).then(() => toast('Save code copied!', 2500)).catch(() => {}); } catch (e) {} if (ok) toast('Save code copied!', 2500); }},
+    ...(DLS ? [{label: 'Save backup file', primary: true, fn: () => { try { DLS.save({filename: `saltwind-road-save-day${S.day}.json`, data: new Blob([code], {type: 'application/json'})}).then(r => { if (r && r.status === 'saved') { S.bkDay = S.day; save(); } if (r && r.status === 'saved') toast('Backup saved!', 2500); }).catch(() => {}); } catch (e) {} }}] : []),
+    {label: 'Copy save code', fn: () => { S.bkDay = S.day; const t = document.getElementById('bkOut'); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} try { navigator.clipboard && navigator.clipboard.writeText(code).then(() => toast('Save code copied!', 2500)).catch(() => {}); } catch (e) {} if (ok) toast('Save code copied!', 2500); }},
     {label: 'Restore from code or file', fn: () => backupRestore()}, {label: 'Close', fn: closeTalk}]);
   setTimeout(() => { const f = document.getElementById('bkFile'); if (f) f.addEventListener('change', () => { const file = f.files && f.files[0]; if (!file) return; file.text().then(t => { const el = document.getElementById('bkIn'); if (el) el.value = t; toast('Backup file loaded. Press Restore to use it.', 3500); }).catch(() => {}); }); const ta = document.getElementById('bkIn'); if (ta) ta.addEventListener('keydown', e => e.stopPropagation()); }, 30);
 }
@@ -13486,7 +13644,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
