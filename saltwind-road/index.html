@@ -764,6 +764,7 @@ const GOODS = {
   treasure_map:{name:'Treasure Map',base:90,col:'#d8c090',kind:'map'},
   shovel:{name:'Shovel',base:30,col:'#8a8a96',kind:'tool',tool:'shovel',tier:1},
   pirate_gold:{name:'Pirate Gold',base:160,col:'#f0c040',kind:'good'},
+  sunken_relic:{name:'Sunken Relic',base:75,col:'#c8b060',kind:'good',desc:'A barnacled trinket from the drowned city'},
   trial_laurel:{name:'Victor\u2019s Laurel',base:400,col:'#d8c050',kind:'trinket',desc:'Deal 5% more damage. Won with five gold medals'},
   rain_stone:{name:'Rain Stone',base:0,col:'#6ab0e0',kind:'mat',desc:'Cool and damp to the touch, even in the sun'},
   rain_feather:{name:'Rainmaker\u2019s Feather',base:300,col:'#7ac0f0',kind:'trinket',desc:'Walk 6% faster. Light as falling rain'},
@@ -2277,6 +2278,8 @@ const NPCS = [
    hello:["Got a deck? Let's see what it's worth.","Five cards, five rounds. Luck has nothing to do with it. Mostly.","Every monster card has three numbers. Learn them."], rumors:["A Rock Golem card guards like a wall, but a Coyote card is quicker than anything. Save your best cards for the right round."]},
   {id:'lin',town:'petal',dx:-4,dy:-3,name:'Master Potter Lin',role:'Pottery wheel',cols:{cloak:'#7a5a8a',skin:'#e8c8a0',hair:'#2a2a2a'},potter:true,freeSpot:true,
    hello:["The wheel is patient. Are you?","Clay remembers every touch.","Center yourself, then center the clay."], rumors:["Don't fight the wheel. Small, steady changes make a better vase than big ones."]},
+  {id:'coralie',town:'lantern',dx:4,dy:3,name:'Coralie',role:'Ruin diver',cols:{cloak:'#2a6a8a',skin:'#c89070',hair:'#e8c860'},sunkendive:true,freeSpot:true,
+   hello:["There's a whole city under the bay. Want to see it?","Mind your air. The sea doesn't give it back.","Jellyfish sting, eels bite, and the treasure is worth it."], rumors:["The old city had stone tablets carved with its story. I've only ever found a piece of one."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
@@ -4529,6 +4532,73 @@ addEventListener('keydown', e => {
   else if (stones && stones.on && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); stonesPlay(+e.key - 1); }
   else if (skit && skit.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) skitPress(); } else if (k === 'escape') skit = null; }
 }, {capture: true});
+// ===== the sunken city (Coralie, Lantern Bay) =====
+let sdive = null;
+const SDW = 340, SDH = 260, SD_SURF = 26;
+const TABLET_TXT = ['The first tablet shows a proud city of white towers by the sea, and a king who wanted it to last forever.', 'The second shows the king bargaining with a great shape in the water. The sea would protect the city, and in return the city would belong to the sea.', 'The third shows the waves closing over the towers, and the people swimming down after them, singing. They were never meant to leave.'];
+function sdiveTalk(n) {
+  const today = S.sdDay === S.day ? (S.sdToday || 0) : 0, tabs = Object.keys(S.tablets || {}).length;
+  say(`“Under this bay is a drowned city. Swim down, grab what glitters, and get back to the boat before your air runs out. You bank everything you carry the moment you surface. Run out of air and you drop it all.”<br>“Watch out for jellyfish and eels. Twenty coin a dive, three dives a day. The boat’s air pumps need rest.”<br><span style="color:var(--muted)">Arrow keys, WASD, a stick or drag to swim. At the surface, press E to climb out. Stone tablets found: ${tabs}/3 · Dives left today: ${3 - today}</span>`, [
+    {label: today >= 3 ? 'No dives left today' : 'Dive · 20◆', primary: true, disabled: today >= 3 || S.coins < 20, fn: () => { S.coins -= 20; if (S.sdDay !== S.day) { S.sdDay = S.day; S.sdToday = 0; } S.sdToday++; renderHUD(); sdiveStart(); }}, back(n)]);
+}
+function sdiveStart() {
+  const relics = [], needTab = [0, 1, 2].filter(i => !(S.tablets || {})[i]);
+  for (let i = 0; i < 9; i++) relics.push({x: 30 + Math.random()*(SDW - 60), y: 90 + Math.random()*(SDH - 120), g: i === 0 && Math.random() < .6 ? 'pearl' : 'sunken_relic'});
+  if (needTab.length && Math.random() < .55) relics.push({x: 40 + Math.random()*(SDW - 80), y: SDH - 40 - Math.random()*20, g: 'tablet', tab: needTab[0]});
+  const cols = Array.from({length: 6}, (_, i) => ({x: 30 + i*55 + Math.random()*20, h: 40 + Math.random()*90, broken: Math.random() < .5}));
+  sdive = {on: true, x: 40, y: SD_SURF - 6, vx: 0, vy: 0, air: 100, bag: [], banked: [], relics, cols, jellies: Array.from({length: 4}, () => ({x: 60 + Math.random()*(SDW - 90), y: 70 + Math.random()*(SDH - 110), ph: Math.random()*6})), eels: [], eelT: 3, hitCd: 0, keys: new Set(), pvx: 0, pvy: 0, last: performance.now(), over: false, flash: 0, t: 0};
+  openPanel('The sunken city', `<canvas id="sdC" width="${SDW}" height="${SDH}" style="display:block;margin:0 auto;border-radius:6px;max-width:100%;image-rendering:pixelated"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Swim with arrows / WASD / drag · E at the surface to climb out</div>`, [{label: 'Climb out (at the surface)', fn: () => sdiveSurface()}]);
+  setTimeout(() => { const c = document.getElementById('sdC'); if (c) touchSteer(c, sdive, true, () => [sdive ? sdive.x : 0, sdive ? sdive.y : 0]); }, 30);
+  requestAnimationFrame(sdiveLoop);
+}
+function sdiveSurface() { const D = sdive; if (!D || !D.on || D.over) return; if (D.y > SD_SURF + 4) { toast('Swim up to the surface first!', 1800); return; } sdiveEnd(false); }
+function sdiveLoop() {
+  const D = sdive; if (!D || !D.on) return; const c = document.getElementById('sdC');
+  if (!c || mode !== 'talk') { sdive = null; return; }
+  const now = performance.now(), dt = Math.min(.033, (now - D.last)/1000); D.last = now; D.t += dt; D.hitCd -= dt; D.flash -= dt;
+  if (!D.over) {
+    let ax = D.pvx + (D.tdx || 0), ay = D.pvy + (D.tdy || 0); if (D.keys.has('arrowleft') || D.keys.has('a')) ax -= 1; if (D.keys.has('arrowright') || D.keys.has('d')) ax += 1; if (D.keys.has('arrowup') || D.keys.has('w')) ay -= 1; if (D.keys.has('arrowdown') || D.keys.has('s')) ay += 1;
+    const m = Math.hypot(ax, ay); if (m > 1) { ax /= m; ay /= m; }
+    const sp = D.bag.length > 3 ? 62 : 75; D.vx += (ax*sp - D.vx)*Math.min(1, dt*4); D.vy += (ay*sp - D.vy)*Math.min(1, dt*4) + 6*dt;
+    D.x = Math.max(8, Math.min(SDW - 8, D.x + D.vx*dt)); D.y = Math.max(SD_SURF - 8, Math.min(SDH - 10, D.y + D.vy*dt));
+    const atSurf = D.y <= SD_SURF;
+    if (atSurf) { D.air = Math.min(100, D.air + 45*dt); if (D.bag.length) { D.banked.push(...D.bag); D.bag = []; SFX.coin(); } }
+    else D.air -= (3.2 + (D.y/SDH)*5)*dt;
+    for (const r of D.relics) if (!r.got && Math.hypot(r.x - D.x, r.y - D.y) < 11) { r.got = true; D.bag.push(r); SFX.pickup(); }
+    for (const j of D.jellies) { j.y += Math.sin(D.t*.8 + j.ph)*10*dt; j.x += Math.cos(D.t*.5 + j.ph)*6*dt; if (D.hitCd <= 0 && Math.hypot(j.x - D.x, j.y - D.y) < 13) { D.air -= 18; D.hitCd = 1; D.flash = .3; D.vx = (D.x - j.x)*4; D.vy = (D.y - j.y)*4; SFX.hurt(); } }
+    D.eelT -= dt; if (D.eelT <= 0) { D.eelT = 2.5 + Math.random()*2.5; const dir = Math.random() < .5 ? 1 : -1; D.eels.push({x: dir > 0 ? -30 : SDW + 30, y: 110 + Math.random()*(SDH - 140), dir}); }
+    for (const e of D.eels) { e.x += e.dir*130*dt; if (D.hitCd <= 0 && Math.abs(e.x - D.x) < 18 && Math.abs(e.y - D.y) < 8) { D.air -= 25; D.hitCd = 1; D.flash = .3; SFX.hurt(); } }
+    D.eels = D.eels.filter(e => e.x > -40 && e.x < SDW + 40);
+    if (D.air <= 0) { D.air = 0; D.over = true; setTimeout(() => { if (sdive === D) sdiveEnd(true); }, 900); }
+  }
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, SDH); gr.addColorStop(0, '#3a9ac8'); gr.addColorStop(.25, '#2a6a9a'); gr.addColorStop(1, '#0a1a3a');
+  g.fillStyle = gr; g.fillRect(0, 0, SDW, SDH); g.fillStyle = '#8acef0'; g.fillRect(0, 0, SDW, SD_SURF - 8);
+  g.fillStyle = 'rgba(255,255,255,.05)'; for (let i = 0; i < 5; i++) { const x = (i*80 + D.t*8) % (SDW + 60) - 30; g.beginPath(); g.moveTo(x, SD_SURF); g.lineTo(x + 20, SD_SURF); g.lineTo(x + 60, SDH); g.lineTo(x + 30, SDH); g.fill(); }
+  g.fillStyle = '#7a4a2a'; g.fillRect(16, SD_SURF - 16, 40, 8); g.fillRect(22, SD_SURF - 10, 28, 4); g.fillStyle = '#e8e0d0'; g.fillRect(34, SD_SURF - 34, 2, 18); g.fillRect(36, SD_SURF - 32, 12, 10);
+  g.fillStyle = '#2a3a4a'; g.fillRect(0, SDH - 12, SDW, 12);
+  for (const cl of D.cols) { g.fillStyle = '#5a6a7a'; g.fillRect(cl.x, SDH - 12 - cl.h, 12, cl.h); g.fillStyle = '#6a7a8a'; g.fillRect(cl.x - 3, SDH - 12 - cl.h - (cl.broken ? 0 : 5), 18, cl.broken ? 3 : 5); g.fillStyle = 'rgba(80,140,90,.6)'; g.fillRect(cl.x + 2, SDH - 12 - cl.h*.6, 3, cl.h*.6); }
+  for (const r of D.relics) { if (r.got) continue; const bob = Math.sin(D.t*2 + r.x)*1.5; if (r.g === 'tablet') { g.fillStyle = '#9aa8b8'; g.fillRect(r.x - 6, r.y - 8 + bob, 12, 14); g.fillStyle = '#6a7888'; g.fillRect(r.x - 4, r.y - 5 + bob, 8, 1); g.fillRect(r.x - 4, r.y - 2 + bob, 8, 1); g.fillRect(r.x - 4, r.y + 1 + bob, 6, 1); } else { g.fillStyle = r.g === 'pearl' ? '#f0f0ff' : '#e0c050'; g.beginPath(); g.arc(r.x, r.y + bob, r.g === 'pearl' ? 4 : 5, 0, 7); g.fill(); g.fillStyle = 'rgba(255,240,180,.25)'; g.beginPath(); g.arc(r.x, r.y + bob, 9, 0, 7); g.fill(); } }
+  for (const j of D.jellies) { g.fillStyle = 'rgba(240,140,200,.75)'; g.beginPath(); g.arc(j.x, j.y, 8, Math.PI, 0); g.fill(); g.strokeStyle = 'rgba(240,160,210,.6)'; g.lineWidth = 1; for (let k = -6; k <= 6; k += 4) { g.beginPath(); g.moveTo(j.x + k, j.y); g.lineTo(j.x + k + Math.sin(D.t*4 + k)*2, j.y + 12); g.stroke(); } }
+  for (const e of D.eels) { g.fillStyle = '#4a8a3a'; for (let k = 0; k < 6; k++) g.fillRect(e.x - e.dir*k*5, e.y + Math.sin(D.t*12 + k)*2, 6, 5); g.fillStyle = '#ff4040'; g.fillRect(e.x + e.dir*3, e.y + 1, 2, 2); }
+  g.fillStyle = D.flash > 0 ? '#ff6a6a' : '#e88a2a'; g.fillRect(D.x - 6, D.y - 4, 12, 8); g.fillStyle = '#c0d8e8'; g.fillRect(D.x + (D.vx >= 0 ? 2 : -6), D.y - 7, 5, 5); g.fillStyle = '#e8c860'; g.fillRect(D.x - 9, D.y - 2, 3, 6);
+  if (D.y > SD_SURF && Math.floor(D.t*3) % 2) { g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(D.x + 3, D.y - 12 - (D.t*20 % 10), 2, 2); }
+  g.fillStyle = 'rgba(13,19,27,.7)'; g.fillRect(SDW - 112, 6, 106, 26); g.fillStyle = '#0d131b'; g.fillRect(SDW - 108, 10, 98, 7); g.fillStyle = D.air > 40 ? '#6ac8f0' : D.air > 20 ? '#f0c040' : '#f05a4a'; g.fillRect(SDW - 108, 10, 98*D.air/100, 7);
+  g.fillStyle = '#ebe4d3'; g.font = 'bold 10px sans-serif'; g.textAlign = 'left'; g.fillText(`Air · carrying ${D.bag.length} · banked ${D.banked.length}`, SDW - 108, 28);
+  if (D.over) { g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(0, 0, SDW, SDH); g.fillStyle = '#ffd040'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.fillText('Out of air!', SDW/2, SDH/2); }
+  requestAnimationFrame(sdiveLoop);
+}
+function sdiveEnd(drowned) {
+  const D = sdive; sdive = null; const got = drowned ? [] : D.banked.concat(D.y <= SD_SURF ? D.bag : []);
+  const tally = {}; let tabMsg = '';
+  for (const r of got) { if (r.g === 'tablet') { S.tablets = S.tablets || {}; if (!S.tablets[r.tab]) { S.tablets[r.tab] = true; tabMsg += `<br><br><b>Stone tablet ${r.tab + 1} of 3:</b> <i>${TABLET_TXT[r.tab]}</i>`; } continue; } addItem(r.g, 1); tally[r.g] = (tally[r.g] || 0) + 1; }
+  if (drowned) for (const r of D.banked) { if (r.g === 'tablet') { S.tablets = S.tablets || {}; if (!S.tablets[r.tab]) { S.tablets[r.tab] = true; tabMsg += `<br><br><b>Stone tablet ${r.tab + 1} of 3:</b> <i>${TABLET_TXT[r.tab]}</i>`; } continue; } addItem(r.g, 1); tally[r.g] = (tally[r.g] || 0) + 1; }
+  const n = Object.values(tally).reduce((a, b) => a + b, 0); S.sdRelics = (S.sdRelics || 0) + n; S.diveBest = Math.max(S.diveBest || 0, n);
+  if (Object.keys(S.tablets || {}).length >= 3 && !S.flags.tabletsDone) { S.flags.tabletsDone = true; S.coins += 700; if (!have('diving_mask') && GOODS.diving_mask) addItem('diving_mask', 1); else addItem('gem', 3); tabMsg += '<br><br>Coralie reads all three tablets twice, very quietly. “So they chose to stay. All this time I thought it was a curse.” She pays you 700 coin for the rubbings and gives you her best diving gear.'; SFX.victory(); }
+  renderHUD(); save(); if (!drowned) SFX.coin();
+  const list = Object.entries(tally).map(([g, k]) => `${k} ${GOODS[g].name}`).join(', ');
+  openPanel('The sunken city', `${drowned ? 'Your lungs burn and you kick for the surface, dropping what you carried. Coralie hauls you into the boat.' : 'You haul yourself into the boat, dripping.'}<br>${list ? `<span style="color:var(--good)">You bring up: ${list}.</span>` : 'You didn’t bring anything up this time.'}${tabMsg}`,
+    [{label: 'Close', primary: true, fn: closeTalk}]);
+}
 // ===== pottery wheel (Master Potter Lin, Petalfall) =====
 let wheel = null;
 const WHW = 260, WHH = 240, WH_ROWS = 40;
@@ -5175,6 +5245,7 @@ function cutPress() {
 }
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  if (sdive && sdive.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); sdive.keys.add(k); } else if (k === 'e' || k === ' ') { e.preventDefault(); e.stopImmediatePropagation(); sdiveSurface(); } else if (k === 'escape') sdive = null; }
   if (rink && rink.on) { if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); rink.keys.add(k); } else if (k === 'escape') rink = null; }
   else if (cut && cut.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) cutPress(); } }
   else if (logr && logr.on) { if (['arrowleft', 'arrowright', 'a', 'd'].includes(k)) { e.preventDefault(); e.stopImmediatePropagation(); logr.keys.add(k); } }
@@ -5191,7 +5262,7 @@ addEventListener('keydown', e => {
   else if (castle && castle.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) castleDrop(); } }
   else if (lock && lock.on) { if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) lockPress(); } }
 }, {capture: true});
-addEventListener('keyup', e => { if (wheel) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') wheel.push = false; } if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
+addEventListener('keyup', e => { if (sdive) sdive.keys.delete(e.key.toLowerCase()); if (wheel) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') wheel.push = false; } if (sled) sled.keys.delete(e.key.toLowerCase()); if (golf) golf.keys.delete(e.key.toLowerCase()); if (logr) logr.keys.delete(e.key.toLowerCase()); if (rink) rink.keys.delete(e.key.toLowerCase()); if (snow) snow.keys.delete(e.key.toLowerCase()); }, {capture: true});
 // ===== archaeology =====
 const DIG_FINDS = ['dig_idol', 'dig_horn', 'dig_scarab', 'dig_mask', 'dig_seal', 'dig_tablet', 'dig_amulet', 'dig_crest'];
 const DIG_TILES = [T.RUINS, T.DUNE, T.SAND, T.MESA, T.SAVANNA];
@@ -8211,6 +8282,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['The sunken city', 'Coralie in Lantern Bay takes you diving over a drowned city (three dives a day). Swim down for relics and pearls, dodge jellyfish and eels, and surface to bank what you carry before your air runs out. Three stone tablets tell the city\u2019s story.'],
   ['Proving Grounds', 'Ask the Crownfall arena master about the Proving Grounds: five set challenges (Slime Swarm, Night Pack, Giant Slayer, Untouchable and Arrow Storm). Earn bronze, silver or gold by speed or by taking few hits. Each new medal pays a prize, and gold in all five wins the Victor\u2019s Laurel (+5% damage).'],
   ['New Game+', 'After you accept the Charter, the menu (Esc) offers New Game+. You start again in Port Wren with tougher monsters (50% more health and 35% more damage for each New Game+ level), keeping your level, skills, worn gear, mounts, pets, hats, title, achievements, records and card album.'],
   ['Pottery wheel', 'Master Potter Lin in Petalfall lets you throw three pots a day. Hold Space, E or tap to widen the clay and let go to narrow it, following the outline as it rises. A 70% match makes a Fine Vase and 90% a Masterwork Vase, which sell well.'],
@@ -8839,6 +8911,7 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (sdive && sdive.on) { sdive.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); sdive.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK)) sdiveSurface(); PAD.prev = B; return; }
   if (logr && logr.on) { logr.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
   if (moles && moles.on) { const map9 = {12: 1, 13: 7, 14: 3, 15: 5}; for (const d in map9) if (down(+d)) moleCursor(map9[d]); if (down(OK) || down(2)) moleWhack(moles.cur); PAD.prev = B; return; }
   if (kitchen && kitchen.on) { const mp = {[OK]: 0, [BACK]: 1, 2: 2, 3: 3, 4: 4, 5: 5}; for (const i in mp) if (down(+i)) kitchenAdd(mp[i]); PAD.prev = B; return; }
@@ -10336,6 +10409,7 @@ function mainOptions(n) {
   if (n.huntmaster) o.push({label: 'Today\u2019s hunt', fn: () => huntTalk(n)});
   if (n.huntmaster) o.push({label: 'Buy a War Horn', primary: true, fn: () => shopTalk(n, [['war_horn', 150]], `“Blow it out in the wild and a Champion will answer. They hit hard and take a beating, so bring friends.”${S.champions ? `<br><span style="color:var(--muted)">Champions slain: ${S.champions}</span>` : ''}`)});
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
+  if (n.sunkendive) o.push({label: 'Dive the sunken city', primary: true, fn: () => sdiveTalk(n)});
   if (n.potter) o.push({label: 'Throw a pot on the wheel', primary: true, fn: () => potTalk(n)});
   if (n.cardsharp) o.push({label: 'Play a card duel', primary: true, fn: () => duelTalk(n)});
   if (n.shellstones) o.push({label: 'Play Shell Stones', primary: true, fn: () => stonesTalk(n)});
@@ -13140,6 +13214,8 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['sunken1','Ruin Diver','Bring up treasure from the sunken city', () => (S.sdRelics || 0) >= 1],
+  ['sunken_tabs','The Drowned King','Find all three stone tablets in the sunken city', () => Object.keys(S.tablets || {}).length >= 3],
   ['trial_gold','Proven','Win a gold medal in the Proving Grounds', () => Object.values(S.trials || {}).some(r => r.m === 3)],
   ['trial_all','Victor\u2019s Laurel','Win gold in all five Proving Grounds trials', () => !!(S.flags && S.flags.laurel)],
   ['ngplus','Once More','Start a New Game+', () => (S.ngp || 0) >= 1],
@@ -13751,8 +13827,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 20;
+const WN_VER = 21;
 const WHATS_NEW = [
+  ['The sunken city', 'Dive with Coralie in Lantern Bay: swim through drowned ruins for relics, watch your air, and find the three stone tablets.'],
   ['Proving Grounds', 'Five combat trials at the Crownfall arena with bronze, silver and gold medals. Gold in all five wins the Victor\u2019s Laurel.'],
   ['New Game+', 'Finished the Charter? Start the road again with tougher monsters, keeping your level, gear, mounts and collections. Find it in the menu.'],
   ['Pottery wheel', 'Master Potter Lin in Petalfall: shape a vase on the wheel by following the outline. A near-perfect throw makes a Masterwork Vase.'],
@@ -13817,7 +13894,7 @@ const RECORDS = [
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
   ['logBest', 'Log rolling', v => `${(+v).toFixed(1)} s`], ['snowBest', 'Snowball fight', v => `${v} hits`], ['castleBest', 'Sandcastle', v => `${v} layers`],
   ['kitchenBest', 'Kitchen', v => `${v} dishes served`], ['buskBest', 'Busking', v => `${v} points`], ['moleBest', 'Whack-a-mole', v => `${v} points`],
-  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
+  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['diveBest', 'Sunken city dive', v => `${v} treasures in one dive`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
   ['Puzzles'],
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
@@ -14049,7 +14126,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
