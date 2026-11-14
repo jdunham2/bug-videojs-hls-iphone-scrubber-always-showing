@@ -4202,7 +4202,12 @@ function savePhoto(url) {
   } catch (e) {}
 }
 const PHOTO_F = [{n: 'Natural', css: 'none'}, {n: 'Sepia', css: 'sepia(.85) contrast(1.05)'}, {n: 'Black & white', css: 'grayscale(1) contrast(1.1)'}, {n: 'Warm', css: 'saturate(1.3) hue-rotate(-12deg) brightness(1.05)'}, {n: 'Dreamy', css: 'saturate(1.4) brightness(1.1) blur(.6px)'}];
-function photoHint() { const L = PAD.active && PAD.id ? padLabel() : null; $('photoUI').innerHTML = `<b>Photo mode</b> · filter: ${PHOTO_F[photo.f].n}<br><span style="color:var(--muted)">${L ? `Stick: pan · ${L.ok}: snap · ${L.atk}/${L.bomb}: filter · ${L.back}: exit` : 'WASD/arrows: pan · Space: snap · F: filter · Esc: exit'}</span>`; }
+function photoHint() { const L = PAD.active && PAD.id ? padLabel() : null; $('photoUI').innerHTML = `<b>Photo mode</b> · filter: ${PHOTO_F[photo.f].n}<br><span style="color:var(--muted)">${L ? `Stick: pan · ${L.ok}: snap · ${L.atk}/${L.bomb}: filter · ${L.back}: exit` : isTouch ? 'Drag to pan the camera' : 'WASD/arrows or drag: pan · Space: snap · F: filter · Esc: exit'}</span><div style="display:flex;gap:6px;justify-content:center;margin-top:6px"><button class="btn primary" data-ph="snap">Snap</button><button class="btn" data-ph="filter">Filter</button><button class="btn" data-ph="exit">Exit</button></div>`; }
+$('photoUI').addEventListener('click', e => { const b = e.target.closest('[data-ph]'); if (!b) return; if (b.dataset.ph === 'snap') snapPhoto(); else if (b.dataset.ph === 'filter') photoFilter(); else endPhoto(); });
+let photoDrag = null;
+$('view').addEventListener('pointerdown', e => { if (mode === 'photo' && photo) { photoDrag = {x: e.clientX, y: e.clientY, ox: photo.ox, oy: photo.oy}; } });
+addEventListener('pointermove', e => { if (photoDrag && photo && mode === 'photo') { const k = dpr/Z/TS; photo.ox = Math.max(-10, Math.min(10, photoDrag.ox - (e.clientX - photoDrag.x)*k)); photo.oy = Math.max(-8, Math.min(8, photoDrag.oy - (e.clientY - photoDrag.y)*k)); } });
+addEventListener('pointerup', () => { photoDrag = null; });
 function startPhoto() {
   if (mode !== 'play') return; photo = {ox: 0, oy: 0, f: 0}; mode = 'photo'; keys.clear();
   document.body.classList.add('photo'); $('photoUI').hidden = false; photoHint(); SFX.click();
@@ -4290,7 +4295,8 @@ function startBusk(si) {
   for (let k = 0; k < sg.n; k++) { const lane = Math.floor(rnd()*4); notes.push({lane, t, hit: null}); if (si === 2 && rnd() < .2) notes.push({lane: (lane + 2) % 4, t, hit: null}); t += beat*(rnd() < .25 ? .5 : 1); }
   if (S.buskDay !== S.day) { S.buskDay = S.day; S.buskToday = 0; } S.buskToday++;
   busk = {on: true, si, notes, t: 0, end: t + 1.5, score: 0, combo: 0, maxCombo: 0, perfect: 0, flash: [0, 0, 0, 0], msg: '', msgT: 0, last: performance.now()};
-  openPanel(`Busking · ${sg.name}`, '<canvas id="buskC" width="280" height="300" style="display:block;margin:0 auto;background:#0d131b;border-radius:6px;max-width:100%"></canvas>', [{label: 'Stop', fn: () => { busk = null; closeTalk(); }}]);
+  openPanel(`Busking · ${sg.name}`, '<canvas id="buskC" width="280" height="300" style="display:block;margin:0 auto;background:#0d131b;border-radius:6px;max-width:100%;touch-action:none"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">Arrow keys, D F J K, the D-pad, or tap a lane</div>', [{label: 'Stop', fn: () => { busk = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('buskC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); const r = c.getBoundingClientRect(); buskHit(Math.max(0, Math.min(3, Math.floor((e.clientX - r.left)/r.width*4)))); }); }, 30);
   requestAnimationFrame(buskLoop);
 }
 function buskLoop(ts) {
@@ -4664,7 +4670,7 @@ const RINK_W = 300, RINK_H = 220;
 function startRink() {
   rink = {on: true, x: RINK_W/2, y: RINK_H/2, vx: 0, vy: 0, t: 45, stars: [], cracks: [], score: 0, combo: 0, stun: 0, keys: new Set(), pvx: 0, pvy: 0, last: performance.now(), trail: []};
   for (let k = 0; k < 3; k++) rinkStar();
-  openPanel('Ice rink', '<canvas id="rinkC" width="300" height="220" style="display:block;margin:0 auto;border-radius:10px;max-width:100%"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Arrows / WASD / stick to skate · grab the stars, avoid the cracks</div>', [{label: 'Stop', fn: () => { rink = null; closeTalk(); }}]);
+  openPanel('Ice rink', '<canvas id="rinkC" width="300" height="220" style="display:block;margin:0 auto;border-radius:10px;max-width:100%"></canvas><div style="text-align:center;margin-top:6px;color:var(--muted)">Arrows / WASD / stick, or hold your finger where you want to go · grab the stars, avoid the cracks</div>', [{label: 'Stop', fn: () => { rink = null; closeTalk(); }}]);
   requestAnimationFrame(rinkLoop);
 }
 function rinkStar() { rink.stars.push({x: 20 + Math.random()*(RINK_W - 40), y: 20 + Math.random()*(RINK_H - 40), ph: Math.random()*6}); }
@@ -4672,7 +4678,8 @@ function rinkLoop() {
   const K = rink; if (!K || !K.on) return; const c = document.getElementById('rinkC');
   if (!c || mode !== 'talk') { rink = null; return; }
   const now = performance.now(), dt = Math.min(.033, (now - K.last)/1000); K.last = now; K.t -= dt;
-  let ax = K.pvx, ay = K.pvy; if (K.keys.has('arrowleft') || K.keys.has('a')) ax -= 1; if (K.keys.has('arrowright') || K.keys.has('d')) ax += 1; if (K.keys.has('arrowup') || K.keys.has('w')) ay -= 1; if (K.keys.has('arrowdown') || K.keys.has('s')) ay += 1;
+  touchSteer(c, K, true, () => [K.x, K.y]);
+  let ax = K.pvx + (K.tdx || 0), ay = K.pvy + (K.tdy || 0); if (K.keys.has('arrowleft') || K.keys.has('a')) ax -= 1; if (K.keys.has('arrowright') || K.keys.has('d')) ax += 1; if (K.keys.has('arrowup') || K.keys.has('w')) ay -= 1; if (K.keys.has('arrowdown') || K.keys.has('s')) ay += 1;
   const am = Math.hypot(ax, ay); if (am > 1) { ax /= am; ay /= am; }
   if (K.stun > 0) { K.stun -= dt; ax = ay = 0; }
   K.vx += ax*260*dt; K.vy += ay*260*dt; K.vx *= Math.pow(.55, dt); K.vy *= Math.pow(.55, dt);
@@ -5178,14 +5185,14 @@ function moleLoop() {
 let logr = null;
 function logStart() {
   logr = {on: true, bal: 0, v: 0, t: 0, keys: new Set(), pad: 0, last: performance.now(), push: 0, pt: 0, spin: 0};
-  openPanel('Log rolling', '<canvas id="logC" width="300" height="180" style="display:block;margin:0 auto;border-radius:6px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → (or A/D, stick) to keep your balance. Stay on as long as you can!</div>', [{label: 'Jump off', fn: () => { if (logr) logr.bal = 99; }}]);
+  openPanel('Log rolling', '<canvas id="logC" width="300" height="180" style="display:block;margin:0 auto;border-radius:6px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → (or A/D, stick, or hold the left or right side) to keep your balance. Stay on as long as you can!</div>', [{label: 'Jump off', fn: () => { if (logr) logr.bal = 99; }}]);
   requestAnimationFrame(logLoop);
 }
 function logLoop() {
   const L = logr; if (!L || !L.on) return; const c = document.getElementById('logC'); if (!c || mode !== 'talk') { logr = null; return; }
   const now = performance.now(), dt = Math.min(.033, (now - L.last)/1000); L.last = now; L.t += dt; L.spin += dt*(2 + L.t*.15);
   L.pt -= dt; if (L.pt <= 0) { L.pt = .6 + Math.random()*1.2; L.push = (Math.random() < .5 ? -1 : 1)*(.5 + Math.random()*(.6 + L.t*.03)); }
-  let inp = L.pad; if (L.keys.has('arrowleft') || L.keys.has('a')) inp -= 1; if (L.keys.has('arrowright') || L.keys.has('d')) inp += 1; inp = Math.max(-1, Math.min(1, inp));
+  touchSteer(c, L); let inp = L.pad + (L.tdx || 0); if (L.keys.has('arrowleft') || L.keys.has('a')) inp -= 1; if (L.keys.has('arrowright') || L.keys.has('d')) inp += 1; inp = Math.max(-1, Math.min(1, inp));
   L.v += (L.push*1.2 + L.bal*1.6 + inp*2.6)*dt; L.v *= Math.pow(.4, dt); L.bal += L.v*dt;
   const g = c.getContext('2d'); g.fillStyle = '#6ab0d8'; g.fillRect(0, 0, 300, 180); g.fillStyle = '#4a90c0'; for (let i = 0; i < 6; i++) g.fillRect(((i*60 + L.t*30) % 330) - 30, 150 + (i % 2)*8, 30, 2);
   g.fillStyle = '#7a4a2a'; g.fillRect(40, 118, 220, 24); g.fillStyle = '#5a3418'; for (let x = 0; x < 220; x += 18) g.fillRect(40 + ((x + L.spin*20) % 220), 120, 3, 20); g.fillStyle = '#a07040'; g.beginPath(); g.ellipse(40, 130, 6, 12, 0, 0, 7); g.ellipse(260, 130, 6, 12, 0, 0, 7); g.fill();
@@ -5750,7 +5757,7 @@ function drawLost(q) { const px = q.x*TS, py = q.y*TS; if (Math.floor(frameT*3 +
 function dailyStreak() {
   let today; try { today = new Date().toISOString().slice(0, 10); } catch (e) { return; }
   if (S.streakDate === today) return; const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
-  S.streak = S.streakDate === y ? (S.streak || 0) + 1 : 1; S.streakDate = today; S.bestStreak = Math.max(S.bestStreak || 0, S.streak);
+  const firstVisit = !S.streakDate; S.streak = S.streakDate === y ? (S.streak || 0) + 1 : 1; S.streakDate = today; if (firstVisit) { save(); return; } S.bestStreak = Math.max(S.bestStreak || 0, S.streak);
   const c = Math.min(250, 30 + S.streak*20); S.coins += c; const bonus = S.streak % 7 === 0; if (bonus) addItem('gem', 2); renderHUD(); save();
   setTimeout(() => toast(`<b>Welcome back! Day ${S.streak} in a row</b><br><span style="color:var(--good)">+${c} coin${bonus ? ' and 2 gems for a full week!' : ''}</span>${S.streak > 1 ? '' : '<br><span style="color:var(--muted)">Come back tomorrow to build a streak.</span>'}`, 6000), 3000);
 }
@@ -5961,13 +5968,13 @@ const GOLF_HOLES = [
   {ball: [140, 295], hole: [140, 40], walls: [[40, 220, 80, 12], [160, 220, 80, 12], [100, 140, 80, 12], [20, 70, 90, 12], [170, 70, 90, 12]], par: 3},
 ];
 let golf = null;
-function golfStart() { golf = {on: true, h: 0, strokes: 0, total: 0, keys: new Set(), pad: 0, last: performance.now(), card: []}; golfHole(); openPanel('Mini golf', '<canvas id="golfC" width="280" height="320" style="display:block;margin:0 auto;border-radius:8px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → aim · Space / A: start the swing, press again to hit</div>', [{label: 'Swing', primary: true, fn: () => golfPress()}, {label: 'Quit', fn: () => { golf = null; closeTalk(); }}]); requestAnimationFrame(golfLoop); }
+function golfStart() { golf = {on: true, h: 0, strokes: 0, total: 0, keys: new Set(), pad: 0, last: performance.now(), card: []}; golfHole(); openPanel('Mini golf', '<canvas id="golfC" width="280" height="320" style="display:block;margin:0 auto;border-radius:8px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → (or hold the left or right side) to aim · Space / A / the Swing button: start the swing, press again to hit</div>', [{label: 'Swing', primary: true, fn: () => golfPress()}, {label: 'Quit', fn: () => { golf = null; closeTalk(); }}]); requestAnimationFrame(golfLoop); }
 function golfHole() { const G = golf, Hh = GOLF_HOLES[G.h]; G.bx = Hh.ball[0]; G.by = Hh.ball[1]; G.vx = G.vy = 0; G.aim = -Math.PI/2; G.phase = 'aim'; G.pow = 0; G.powDir = 1; G.strokes = 0; }
 function golfPress() { const G = golf; if (!G || !G.on) return; if (G.phase === 'aim') { G.phase = 'power'; G.pow = 0; G.powDir = 1; } else if (G.phase === 'power') { const sp = 60 + G.pow*360; G.vx = Math.cos(G.aim)*sp; G.vy = Math.sin(G.aim)*sp; G.phase = 'roll'; G.strokes++; AUD.tone(300, .05, 'square', .06); } }
 function golfLoop() {
   const G = golf; if (!G || !G.on) return; const c = document.getElementById('golfC'); if (!c || mode !== 'talk') { golf = null; return; }
   const now = performance.now(), dt = Math.min(.033, (now - G.last)/1000); G.last = now; const Hh = GOLF_HOLES[G.h];
-  if (G.phase === 'aim' || G.phase === 'power') { let t = G.pad; if (G.keys.has('arrowleft') || G.keys.has('a')) t -= 1; if (G.keys.has('arrowright') || G.keys.has('d')) t += 1; G.aim += t*dt*1.8; }
+  touchSteer(c, G); if (G.phase === 'aim' || G.phase === 'power') { let t = G.pad + (G.tdx || 0); if (G.keys.has('arrowleft') || G.keys.has('a')) t -= 1; if (G.keys.has('arrowright') || G.keys.has('d')) t += 1; G.aim += t*dt*1.8; }
   if (G.phase === 'power') { G.pow += G.powDir*dt*1.1; if (G.pow > 1 || G.pow < 0) { G.pow = Math.max(0, Math.min(1, G.pow)); G.powDir *= -1; } }
   if (G.phase === 'roll') {
     for (let st = 0; st < 4; st++) { const d = dt/4; G.bx += G.vx*d; G.by += G.vy*d; const f = Math.pow(.42, d); G.vx *= f; G.vy *= f;
@@ -6039,14 +6046,14 @@ function drawJack(h) { const px = (h.x + 1)*TS + 12, py = (h.y + 2)*TS - 3, fl =
 let sled = null;
 function sledStart() {
   sled = {on: true, x: 140, vx: 0, speed: 120, dist: 0, objs: [], next: 60, score: 0, gates: 0, keys: new Set(), pad: 0, last: performance.now(), crash: 0, trail: []};
-  openPanel('Sled run', '<canvas id="sledC" width="280" height="300" style="display:block;margin:0 auto;border-radius:8px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → / A D / stick to steer · go through the flags, dodge the trees</div>', [{label: 'Bail out', fn: () => { if (sled) sled.crash = .01; }}]);
+  openPanel('Sled run', '<canvas id="sledC" width="280" height="300" style="display:block;margin:0 auto;border-radius:8px;max-width:100%"></canvas><div style="text-align:center;color:var(--muted);margin-top:4px">← → / A D / stick, or hold the left or right side, to steer · go through the flags, dodge the trees</div>', [{label: 'Bail out', fn: () => { if (sled) sled.crash = .01; }}]);
   requestAnimationFrame(sledLoop);
 }
 function sledLoop() {
   const L = sled; if (!L || !L.on) return; const c = document.getElementById('sledC'); if (!c || mode !== 'talk') { sled = null; return; }
   const now = performance.now(), dt = Math.min(.033, (now - L.last)/1000); L.last = now; const PY = 70;
   if (!L.crash) {
-    let inp = L.pad; if (L.keys.has('arrowleft') || L.keys.has('a')) inp -= 1; if (L.keys.has('arrowright') || L.keys.has('d')) inp += 1;
+    touchSteer(c, L); let inp = L.pad + (L.tdx || 0); if (L.keys.has('arrowleft') || L.keys.has('a')) inp -= 1; if (L.keys.has('arrowright') || L.keys.has('d')) inp += 1;
     L.vx += Math.max(-1, Math.min(1, inp))*500*dt; L.vx *= Math.pow(.15, dt); L.x = Math.max(12, Math.min(268, L.x + L.vx*dt));
     L.speed = Math.min(420, L.speed + dt*9); const mv = L.speed*dt; L.dist += mv;
     for (const o of L.objs) o.y -= mv; L.objs = L.objs.filter(o => o.y > -40);
@@ -6107,6 +6114,16 @@ function warlordTick() {
   e.hp = e.max = Math.round(Math.max(60, ENEMIES[WL.type].hp*10)*lv*1.4); e.dmgMul = (e.dmgMul || 1)*1.7; e.esize = 2.6; e.elite = {name: 'Warlord', col: '#ff5a3a'}; e.labelName = WL.name; e.warlord = WL.wk; enemies.push(e);
   for (let k = 0; k < 3; k++) { const a = k/3*6.283, m = makeEnemy(WL.type === 'shadow_wolf' ? 'wolf' : WL.type, WL.x + Math.cos(a)*2, WL.y + Math.sin(a)*2, {alert: true}); if (enemyWalk(m.x, m.y)) { m.hp = m.max = Math.round(m.max*lv*1.5); m.dmgMul = lv; enemies.push(m); } }
   SFX.roar(); shake = .6; toast(`<b>${WL.name} emerges!</b><br>The warlord and its pack are ready for a fight.`, 5000);
+}
+// ===== touch helpers for minigames =====
+function touchSteer(c, obj, twoD, center) {
+  if (!c || c._ts) return; c._ts = true; c.style.touchAction = 'none';
+  const upd = e => { const r = c.getBoundingClientRect(), x = (e.clientX - r.left)/r.width, y = (e.clientY - r.top)/r.height;
+    if (twoD) { const cx = center ? center()[0]/c.width : .5, cy = center ? center()[1]/c.height : .5, dx = x - cx, dy = y - cy, m = Math.hypot(dx, dy); obj.tdx = m > .03 ? dx/Math.max(m, .12) : 0; obj.tdy = m > .03 ? dy/Math.max(m, .12) : 0; }
+    else obj.tdx = x < .4 ? -1 : x > .6 ? 1 : 0; };
+  c.addEventListener('pointerdown', e => { e.preventDefault(); obj.touching = true; try { c.setPointerCapture(e.pointerId); } catch (er) {} upd(e); });
+  c.addEventListener('pointermove', e => { if (obj.touching) upd(e); });
+  const end = () => { obj.touching = false; obj.tdx = 0; obj.tdy = 0; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
 }
 // ===== sky whale =====
 let skyWhale = null, whaleT = 200;
@@ -9461,9 +9478,28 @@ function rollDeeds() {
   const pool = DEED_TYPES.slice().sort(() => Math.random() - .5).slice(0, 3);
   S.deeds = {day: S.day, list: pool.map(t => { const n = t.n(); return {k: t.k, n, base: t.cur(), done: false, reward: Math.round(({kills: n*6, gather: n*3, fish: n*20, craft: n*12, elite: 130, loot: 60, trade: 70})[t.k] + (S.level || 1)*6)}; })};
 }
+const STARTER = [
+  {t: 'Talk to Odile, the Guildmistress', hint: 'She stands in the Port Wren town square. Walk up and press E.', ok: () => !!(S.met && S.met.odile)},
+  {t: 'Gather 5 things', hint: 'Press E next to branches, rocks and bushes outside town.', ok: () => (S.gathered || 0) >= 5, prog: () => `${Math.min(5, S.gathered || 0)}/5`},
+  {t: 'Craft something', hint: 'Press C to open crafting. A Stone Axe or a Club is a good start.', ok: () => (S.crafted || 0) >= 1},
+  {t: 'Defeat 3 monsters', hint: 'Press F (or click) to attack. Shift rolls out of the way.', ok: () => (S.kills || 0) >= 3, prog: () => `${Math.min(3, S.kills || 0)}/3`},
+  {t: 'Buy or sell at a trader', hint: 'Talk to a merchant in town. Buy cheap here, sell where it pays well.', ok: () => (S.trades || 0) >= 1},
+  {t: 'Reach a second town', hint: 'Follow the roads. Press M to see the map.', ok: () => Object.keys(S.towns || {}).filter(k => S.towns[k] && k !== 'isle').length >= 2},
+  {t: 'Reach level 3', hint: 'Fighting, gathering, crafting and trading all give XP.', ok: () => (S.level || 1) >= 3},
+];
+function starterHTML() {
+  if (S.starterDone) return '';
+  if (S.starterStep == null && (S.day > 3 || (S.level || 1) >= 6)) { S.starterDone = true; return ''; }
+  S.starterStep = S.starterStep || 0;
+  while (S.starterStep < STARTER.length && STARTER[S.starterStep].ok()) { S.starterStep++; S.coins += 40; gainXP(20); SFX.coin(); if (S.starterStep < STARTER.length) toast(`<b>Step done!</b> <span style="color:var(--good)">+40 coin</span><br>Next: ${STARTER[S.starterStep].t}. <span style="color:var(--muted)">${STARTER[S.starterStep].hint}</span>`, 6000); renderHUD(); }
+  if (S.starterStep >= STARTER.length) { S.starterDone = true; S.coins += 250; addItem('gem', 1); renderHUD(); save(); setTimeout(() => toast('<b>You’re ready for the road!</b> <span style="color:var(--good)">+250 coin and a gem</span><br>From here, follow whatever catches your eye. Press J for your journal and the Adventurer’s Guide, and check the map (M) for people offering work.', 9000), 600); return ''; }
+  const cur = STARTER[S.starterStep];
+  return `<div class="h">GETTING STARTED · ${S.starterStep + 1}/${STARTER.length}</div>${STARTER.map((q, i) => i < S.starterStep ? `<div class="dd ok"><span>✓ ${q.t}</span></div>` : i === S.starterStep ? `<div class="dd"><span><b>${q.t}</b></span><span>${q.prog ? q.prog() : ''}</span></div><div class="dd" style="color:var(--muted);font-size:11px"><span>${q.hint}</span></div>` : '').join('')}`;
+}
 function checkDeeds() {
   if (!S.deeds || S.deeds.day !== S.day) { if (S.deeds && !S.deeds.list.every(d => d.done)) S.deedStreak = 0; rollDeeds(); }
-  let html = '<div class="h">TODAY\'S DEEDS' + (S.deedStreak ? ` · streak ${S.deedStreak}` : '') + '</div>', changed = false;
+  const starter = starterHTML();
+  let html = starter || '<div class="h">TODAY\'S DEEDS' + (S.deedStreak ? ` · streak ${S.deedStreak}` : '') + '</div>', changed = false;
   for (const d of S.deeds.list) {
     const T0 = DEED_TYPES.find(t => t.k === d.k), prog = Math.min(d.n, T0.cur() - d.base);
     if (!d.done && prog >= d.n) {
@@ -9475,7 +9511,7 @@ function checkDeeds() {
         setTimeout(() => toast(`<b>All of today's deeds are done!</b><br>Streak ${S.deedStreak}: +${bonus} coin and ${1 + Math.floor(S.deedStreak/3)} Cut Gem${S.deedStreak >= 3 ? 's' : ''}. Come back tomorrow for more.`, 6000), 800);
       }
     }
-    html += `<div class="dd ${d.done ? 'ok' : ''}"><span>${d.done ? '✓ ' : ''}${T0.txt(d.n)}</span><span>${d.done ? '' : `${Math.max(0, prog)}/${d.n}`}</span></div>`;
+    if (!starter) html += `<div class="dd ${d.done ? 'ok' : ''}"><span>${d.done ? '✓ ' : ''}${T0.txt(d.n)}</span><span>${d.done ? '' : `${Math.max(0, prog)}/${d.n}`}</span></div>`;
   }
   const act = Object.keys(S.contracts).filter(k => S.contracts[k] === 'active' && CONTRACTS[k]).slice(-2);
   const extra = [];
@@ -13054,7 +13090,7 @@ $('travel').addEventListener('click', e => {
 function openPause() { mode = 'pause'; keys.clear(); renderPause(); $('pause').hidden = false; }
 function renderPause() {
   $('pauseSheet').innerHTML = `
-    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-stats="1">Stats</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
+    <div class="sheet-head"><h2>Paused</h2><div style="display:flex;gap:6px"><button class="btn" data-photo="1">Photo</button><button class="btn" data-emote="1">Emote</button><button class="btn" data-stats="1">Stats</button><button class="btn" data-quests="1">Story quests</button><button class="btn" data-whatsnew="1">What\u2019s new</button><button class="btn primary" data-x="1">Resume<kbd>Esc</kbd></button></div></div>
     <div style="margin-top:10px">
       <div class="setrow"><label for="sMusic">Music volume</label><input id="sMusic" type="range" min="0" max="1" step="0.05" value="${SETTINGS.music}"></div>
       <div class="setrow"><label for="sSfx">Sound effects volume</label><input id="sSfx" type="range" min="0" max="1" step="0.05" value="${SETTINGS.sfx}"></div>
@@ -13074,7 +13110,7 @@ function renderPause() {
   $('sShake').addEventListener('change', e => { SETTINGS.shake = e.target.checked; saveSettings(); });
   $('sDiff').addEventListener('change', e => { SETTINGS.diff = e.target.value; saveSettings(); toast(`Difficulty: <b>${diff().name}</b>`, 2500); });
 }
-$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } });
+$('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } });
 const WN_VER = 8;
 const WHATS_NEW = [
   ['A seventh story', 'The Pirate King\u2019s Map (One-Eyed Nell, Blackwater): defeat three pirate captains and dig up the treasure.'],
