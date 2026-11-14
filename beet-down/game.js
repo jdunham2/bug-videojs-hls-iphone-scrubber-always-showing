@@ -105,6 +105,28 @@ const CHARS=[
   {id:'pumpkin',name:'Pumpkin',role:'Big Gourd',desc:'Too big to fail. Too slow to dodge.',weapon:'axe',mods:{maxHp:20,thorns:10,dmg:-10,speed:-3},lines:[['Bigger body','neu']],r:23,k:2.3,fy:.58,es:.15,ez:.065},
 ];
 
+/* Unlocks: progress is kept in this browser (localStorage). Characters not listed start unlocked. */
+const UNLOCKS={
+  carrot:{txt:'Reach wave 5',goal:5,val:p=>p.best},
+  corn:{txt:'Collect 500 materials across runs',goal:500,val:p=>p.mats},
+  eggplant:{txt:'Hit a 100-kill combo',goal:100,val:p=>p.combo},
+  broccoli:{txt:'Heal 150 HP across runs',goal:150,val:p=>p.heal},
+  pepper:{txt:'Unlock a 4-weapon set bonus',goal:1,val:p=>p.set4},
+  mushroom:{txt:'Defeat 1,500 aliens across runs',goal:1500,val:p=>p.kills},
+  pumpkin:{txt:'Smash the Brood Queen',goal:1,val:p=>p.wins},
+};
+const PROF=Object.assign({best:store.get('bd_best',0),kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[]},store.get('bd_prof',{}));
+function saveProf(){store.set('bd_prof',PROF)}
+const isUnlocked=id=>!UNLOCKS[id]||PROF.unlocked.includes(id);
+function checkUnlocks(){
+  for(const id in UNLOCKS){const u=UNLOCKS[id];if(PROF.unlocked.includes(id)||u.val(PROF)<u.goal)continue;
+    PROF.unlocked.push(id); saveProf(); const ch=CHARS.find(c=>c.id===id);
+    if(run){(run.newUnlocks=run.newUnlocks||[]).push(id)}
+    if(state==='wave'||state==='waveEnd'||state==='winning'){showBanner('NEW VEGGIE!',ch.name+' unlocked',2.2,'#7bd35a');sfx('crate')}
+    else if(state==='shop'){toast(`New veggie unlocked: ${ch.name}!`);sfx('crate')}}
+}
+window.addEventListener('pagehide',saveProf);
+
 const ENEMIES={
   grub:{hp:7,spd:95,dmg:3,r:14,mats:1,col:'#3cd46f',dark:'#1d7a3e'},
   dasher:{hp:11,spd:72,dmg:5,r:15,mats:1,col:'#ff4d6d',dark:'#9c1f37'},
@@ -242,7 +264,7 @@ function setTier(set,n){let t=-1;SETS[set].tiers.forEach(([need],i)=>{if(n>=need
 function recalc(){
   const c=setCounts(); const next=Object.assign({},B); const fresh=[];
   for(const k in SETS){const t=setTier(k,c[k]||0);if(t>=0)for(const [st,v] of Object.entries(SETS[k].tiers[t][1]))next[st]=(next[st]||0)+v;
-    if(t>(run.setLv[k]??-1))fresh.push([k,t]); run.setLv[k]=t}
+    if(t>(run.setLv[k]??-1))fresh.push([k,t]); run.setLv[k]=t; if(t>=1&&!PROF.set4){PROF.set4=1;checkUnlocks()}}
   S=next; if(P)P.hp=Math.min(P.hp,maxHp());
   if(fresh.length&&state==='shop'){const [k,t]=fresh[fresh.length-1];toast(`${SETS[k].name} set (${SETS[k].tiers[t][0]}): ${bonusText(SETS[k].tiers[t][1])}`);sfx('levelup')}
 }
@@ -353,7 +375,7 @@ function hurtEnemy(e,d,crit,ang,knock,bonk){
   if(S.lifesteal>0&&run.lsCd<=0&&Math.random()*100<S.lifesteal){heal(1);run.lsCd=.12}
   if(e.hp<=0)killEnemy(e,true);
 }
-function heal(n){const m=maxHp();if(P.hp>=m)return;const h=Math.min(n,m-P.hp);P.hp+=h;texts.push({x:P.x,y:P.y-34,vy:-70,t:0,life:.7,s:16,txt:'+'+h,c:'#7bd35a'})}
+function heal(n){const m=maxHp();if(P.hp>=m)return;const h=Math.min(n,m-P.hp);P.hp+=h;PROF.heal+=h;texts.push({x:P.x,y:P.y-34,vy:-70,t:0,life:.7,s:16,txt:'+'+h,c:'#7bd35a'})}
 
 function killEnemy(e,drops){
   if(e.dead)return; e.dead=true;
@@ -365,7 +387,7 @@ function killEnemy(e,drops){
   sfx('kill');
   if(e.type==='bomber')booms.push({x:e.x,y:e.y,t:.05,r:80,dmg:28+run.wave*3,safe:true});
   if(!drops)return;
-  run.kills++; run.combo++; run.comboT=1.4; run.bestCombo=Math.max(run.bestCombo,run.combo);
+  run.kills++; PROF.kills++; run.combo++; run.comboT=1.4; run.bestCombo=Math.max(run.bestCombo,run.combo); PROF.combo=Math.max(PROF.combo,run.combo);
   if(run.combo%25===0){
     const bonus=Math.floor(run.combo/25)*3;
     for(let i=0;i<bonus;i++)dropGem(P.x+rand(-40,40),P.y+rand(-40,40),1,true);
@@ -506,6 +528,7 @@ function bossAI(e,dt,nx,ny,d){
 /* ================= wave flow ================= */
 function showBanner(txt,sub,life=1.6,col='#ffffff'){banner={txt,sub,t:0,life,col}}
 function startWave(n){
+  PROF.best=Math.max(PROF.best,n); store.set('bd_best',PROF.best);
   run.wave=n; const def=WAVES[n-1];
   run.timer=def.dur; run.spawnT=.5; run.eliteDone=false; run.bugT=def.bug?rand(def.dur*.25,def.dur*.6):-1; run.bossT=def.boss?1.5:-1; run.boss=null;
   run.combo=0; run.comboT=0; run.rerolls=0;
@@ -526,7 +549,7 @@ function endWave(){
 }
 function afterWave(){
   if(S.harvest>0){run.mats+=Math.round(S.harvest);run.totalMats+=Math.round(S.harvest);B.harvest=Math.round(B.harvest*1.05*10)/10;recalc()}
-  const best=store.get('bd_best',0); if(run.wave>best)store.set('bd_best',run.wave);
+  saveProf(); checkUnlocks();
   nextStep();
 }
 function nextStep(){if(run.pendingLv>0)showLevelUp();else if(run.crates>0)showCrate();else openShop()}
@@ -603,6 +626,7 @@ function update(dt){
       if(p.k==='fruit'){heal(3+Math.round(maxHp()*.08));sfx('heal');for(let k=0;k<4;k++)parts.push({x:P.x+rand(-14,14),y:P.y-10,vx:rand(-20,20),vy:rand(-90,-50),t:0,life:.7,img:'fx_heart',col:'#7bd35a',s0:14,s1:8,add:1})}
       else{run.crates++;sfx('crate');texts.push({x:P.x,y:P.y-44,vy:-60,t:0,life:1,s:22,txt:'+CRATE',c:'#ffcc4d'});fx.push({k:'ring',x:P.x,y:P.y,r0:10,r1:90,t:0,life:.4,c:'#ffcc4d',w:5})}}}
   if(run.comboT>0){run.comboT-=dt;if(run.comboT<=0)run.combo=0}
+  run.unT=(run.unT||0)-dt; if(run.unT<=0){run.unT=.5;checkUnlocks()}
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.t+=dt;if(p.t>=p.life){parts.splice(i,1);continue}if(p.drag){p.vx*=Math.exp(-dt*p.drag);p.vy*=Math.exp(-dt*p.drag)}if(p.g)p.vy+=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.vr)p.rot+=p.vr*dt}
   if(parts.length>700)parts.splice(0,parts.length-700);
   for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y+=t.vy*dt;t.vy*=Math.exp(-dt*4);if(t.t>=t.life)texts.splice(i,1)}
@@ -612,7 +636,7 @@ function update(dt){
   if(state==='waveEnd'){run.endT+=dt;if(run.endT>1.4&&enemies.length===0&&gems.length===0&&pickups.length===0){state='between';afterWave()}}
 }
 function collectGem(g){
-  run.mats+=g.val; run.totalMats+=g.val; run.matBump=1;
+  run.mats+=g.val; run.totalMats+=g.val; PROF.mats+=g.val; run.matBump=1;
   run.gemChain=run.time-run.lastGem<.35?run.gemChain+1:0; run.lastGem=run.time;
   sfx('gem',run.gemChain); addXp(g.val);
 }
@@ -863,10 +887,22 @@ function fmtLines(lines){return lines.map(([t,c])=>`<li class="${c}">${t}</li>`)
 
 function buildMenu(){
   const box=$('chars'); box.innerHTML='';
+  let nUn=0; const newly=[];
   CHARS.forEach(ch=>{
     const b=document.createElement('button'); b.className='char';
     const cv=document.createElement('canvas'); cv.width=280; cv.height=200;
     const c=cv.getContext('2d'); const r=Math.min(40,150/ch.k);
+    if(!isUnlocked(ch.id)){
+      const u=UNLOCKS[ch.id], v=Math.min(u.goal,u.val(PROF)), im=IMG['veg_'+ch.id];
+      if(im&&im.width){const Hs=r*ch.k,Ws=Hs*im.width/im.height;c.globalAlpha=.9;c.drawImage(tinted('veg_'+ch.id,'#120a18'),120-Ws/2,190-r*1.4+r*.95-r*.12-Hs,Ws,Hs);c.globalAlpha=1}
+      c.font=`54px ${FD}`;c.textAlign='center';c.textBaseline='middle';c.fillStyle='#ab96bb';c.fillText('?',120,190-r*1.4-r*ch.k*.35);
+      b.classList.add('locked'); b.appendChild(cv);
+      b.insertAdjacentHTML('beforeend',`<span class="role">Locked</span><b>${ch.name}</b><p class="req">${u.txt}</p><div class="prog"><i style="width:${Math.round(v/u.goal*100)}%"></i></div><p class="pv">${v.toLocaleString()} / ${u.goal.toLocaleString()}</p>`);
+      b.onclick=()=>{audioInit();sfx('deny');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake')};
+      box.appendChild(b); return;
+    }
+    nUn++;
+    if(UNLOCKS[ch.id]&&!PROF.seen.includes(ch.id)){newly.push(ch.id);b.insertAdjacentHTML('beforeend','<span class="newb">NEW</span>')}
     drawVeg(c,ch,120,190-r*1.4,r,{t:1,lx:.3,ly:.2});
     c.save();c.translate(170,150);c.rotate(-.35);drawWeaponSprite(c,ch.weapon,0,WEAPONS[ch.weapon].len*1.6);c.restore();
     const lines=modLines(ch.mods).concat(ch.lines).concat([['Starts with '+WEAPONS[ch.weapon].name+' ('+WEAPONS[ch.weapon].sets.map(k=>SETS[k].name).join(', ')+')','neu']]);
@@ -875,7 +911,9 @@ function buildMenu(){
     b.onclick=()=>{audioInit();sfx('click');startRun(ch)};
     box.appendChild(b);
   });
-  const best=store.get('bd_best',0); $('best').textContent=best?`Best run: wave ${best}${best>=LAST_WAVE?' (Queen smashed)':''}`:'';
+  if(newly.length){PROF.seen.push(...newly);saveProf()}
+  $('unlockCount').textContent=`${nUn} / ${CHARS.length} veggies unlocked`;
+  const best=PROF.best; $('best').textContent=best?`Best run: wave ${best}${PROF.wins?` · Queen smashed ${PROF.wins}×`:''} · ${PROF.kills.toLocaleString()} aliens defeated`:'';
 }
 function startRun(ch){newRun(ch);startWave(1)}
 
@@ -1011,7 +1049,11 @@ function gameOver(win){
   $('overTitle').style.color=win?'#7bd35a':'';
   $('overSub').textContent=win?`${run.char.name} smashed the Brood Queen and the crater is quiet again.`:`${run.char.name} fell on wave ${run.wave}.`;
   $('overStats').innerHTML=`<div><b>${run.wave}</b>wave</div><div><b>${run.kills}</b>kills</div><div><b>${run.bestCombo}</b>best combo</div><div><b>${run.totalMats}</b>materials</div><div><b>${P.level}</b>level</div>`;
-  const best=store.get('bd_best',0); if(run.wave>best)store.set('bd_best',run.wave);
+  if(win)PROF.wins++; checkUnlocks(); saveProf();
+  const nu=(run.newUnlocks||[]).map(id=>CHARS.find(c=>c.id===id));
+  const box=$('overUnlocks'); box.hidden=!nu.length;
+  if(nu.length){box.innerHTML='<div class="unlT">New veggie'+(nu.length>1?'s':'')+' unlocked!</div><div class="unlL"></div>';const L=box.querySelector('.unlL');
+    nu.forEach(ch=>{const cv=document.createElement('canvas');cv.width=160;cv.height=150;const c=cv.getContext('2d');const r=Math.min(32,118/ch.k);drawVeg(c,ch,80,140-r*1.3,r,{t:1,lx:.3,ly:.2});const d=document.createElement('div');d.className='unlC';d.appendChild(cv);d.insertAdjacentHTML('beforeend',`<b>${ch.name}</b><span>${ch.role}</span>`);L.appendChild(d)})}
 }
 
 /* ================= input ================= */
@@ -1050,8 +1092,8 @@ setMuted(AU.muted);
 /* ================= boot ================= */
 showUI('menu');
 loadAssets().then(()=>{
-  buildFloor(); state='menu'; buildMenu();
+  buildFloor(); checkUnlocks(); state='menu'; buildMenu();
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(state==='menu')buildMenu()});
 });
 requestAnimationFrame(loop);
-window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
+window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},PROF,checkUnlocks,buildMenu,startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
