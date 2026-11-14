@@ -805,6 +805,11 @@ const GOODS = {
   moonfish:{name:"Moonfish",base:120,col:'#d8e0ff',kind:'good'},
   pufferfish:{name:"Pufferfish",base:38,col:'#e0d070',kind:'good'},
   coelacanth:{name:"Ancient Coelacanth",base:320,col:'#5a6a8a',kind:'good'},
+  leg_brook:{name:'King of the Brook',base:600,col:'#d8c070',kind:'trophy',desc:'A legendary trout with a crown-shaped fin'},
+  leg_sail:{name:'The Golden Sail',base:700,col:'#f0b030',kind:'trophy',desc:'A legendary marlin that glitters like the noon sun'},
+  leg_whiskers:{name:'Old Whiskers',base:650,col:'#6a7a5a',kind:'trophy',desc:'A legendary marsh catfish older than any village'},
+  leg_frost:{name:'The Frost Leviathan',base:800,col:'#a8e0f8',kind:'trophy',desc:'A legendary ice pike as long as a rowboat'},
+  leg_ember:{name:'The Ember Koi',base:900,col:'#ff6a3a',kind:'trophy',desc:'A legendary koi that glows like a coal'},
   master_rod:{name:'Master Rod',base:400,col:'#e3a948',kind:'tool',tool:'rod',tier:3,desc:'The widest catch bar, and rare fish bite more often'},
   crown_of_ages:{name:'Crown of Ages',base:5000,col:'#c8a8ff',kind:'trinket',desc:'+15% damage, +10% critical chance, +2 armor. The crown of the first king.'},
   // --- festivals ---
@@ -7746,6 +7751,7 @@ function gazette() {
   const vis = Object.keys(TOWNS).filter(k => S.towns[k] && !TOWNS[k].pirate && k !== 'isle'); let best = null;
   for (const a of vis) for (const g of TOWNS[a].produce) { if (!GOODS[g]) continue; for (const b of vis) { if (b === a) continue; const m = price(b, g) - price(a, g); if (!best || m > best.m) best = {a, b, g, m}; } }
   if (best && best.m > 5) H.push(`<b>Trade tip:</b> merchants whisper that ${GOODS[best.g].name} bought in ${TOWNS[best.a].name} sells for about ${Math.round(best.m)} coin more in ${TOWNS[best.b].name}.`);
+  { const L = LEGEND_FISH.filter(L => !(S.legFish || {})[L.id]); if (L.length) H.push(`<b>Angler\u2019s corner:</b> old-timers swear ${L[S.day % L.length].hint}. You\u2019ll need a good rod.`); }
   if (festivalToday()) H.push(`<b>FESTIVAL TODAY!</b> ${festivalToday().name} celebrations in every town.`);
   if (eclipseDay()) H.push('<b>Sky watch:</b> a <span style="color:#c8a8ff">total eclipse of the sun</span> at noon today! Catch the shadow wisps that appear in the dark.');
   else if (dayOfSeason() === 1 && (seasonIdx() === 1 || seasonIdx() === 3)) H.push('<b>Sky watch:</b> astronomers predict a total eclipse at noon tomorrow.');
@@ -8282,6 +8288,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Legendary fish', 'Five legendary fish each bite in one kind of place, and some only in one season or at one time of day. You need at least a good rod (tier 2). They fight much harder than normal fish. The Gazette\u2019s angler\u2019s corner gives a hint each day. Catch all five for a big reward.'],
   ['The sunken city', 'Coralie in Lantern Bay takes you diving over a drowned city (three dives a day). Swim down for relics and pearls, dodge jellyfish and eels, and surface to bank what you carry before your air runs out. Three stone tablets tell the city\u2019s story.'],
   ['Proving Grounds', 'Ask the Crownfall arena master about the Proving Grounds: five set challenges (Slime Swarm, Night Pack, Giant Slayer, Untouchable and Arrow Storm). Earn bronze, silver or gold by speed or by taking few hits. Each new medal pays a prize, and gold in all five wins the Victor\u2019s Laurel (+5% damage).'],
   ['New Game+', 'After you accept the Charter, the menu (Esc) offers New Game+. You start again in Port Wren with tougher monsters (50% more health and 35% more damage for each New Game+ level), keeping your level, skills, worn gear, mounts, pets, hats, title, achievements, records and card album.'],
@@ -12830,6 +12837,19 @@ function deepTarget() {
   if (!S.flags.boat || fishing || inDungeon() || tileAt(Math.floor(S.x), Math.floor(S.y)) !== T.DEEP || !toolTier('rod') || balloonF || regatta) return null;
   return {key: 'deepfish', html: '<kbd style="margin:0 6px 0 0">E</kbd>Cast a deep-sea line', btn: 'Cast', fn: () => { fishing = {i: -1, deep: true, t: (2 + Math.random()*2.5)*(toolTier('rod') >= 2 ? .6 : 1)}; floatText(S.x, S.y - 1, 'Casting into the deep…'); }};
 }
+// ===== legendary fish: one each, in the right place, season and hour =====
+const LEGEND_FISH = [
+  {id: 'leg_brook', biomes: [T.GRASS, T.FOREST, T.HILL], season: 0, time: [.2, .34], diff: 1.7, hint: 'the King of the Brook rises in grassy and forest streams at dawn in spring'},
+  {id: 'leg_sail', biomes: [T.SAND, T.DUNE, T.SAVANNA], season: 1, time: [.44, .6], diff: 1.8, hint: 'the Golden Sail bites off sunny beaches and savanna at noon in summer'},
+  {id: 'leg_whiskers', biomes: [T.MARSH, T.GLOOM, T.MOOR], season: 2, night: true, diff: 1.75, hint: 'Old Whiskers prowls the marshes and moors on autumn nights'},
+  {id: 'leg_frost', biomes: [T.SNOW], season: 3, diff: 1.9, hint: 'the Frost Leviathan lurks under the snowfields all winter'},
+  {id: 'leg_ember', biomes: [T.ASH, T.LAVA], night: true, diff: 2.0, hint: 'the Ember Koi swims in the ash lands, but only after dark'},
+];
+for (const L of LEGEND_FISH) CATCH[L.id] = {diff: L.diff, xp: 250, col: GOODS[L.id].col};
+function legendFor(b) {
+  if (toolTier('rod') < 2) return null; const night = isNightish();
+  return LEGEND_FISH.find(L => !(S.legFish || {})[L.id] && (L.season == null || L.season === seasonIdx()) && (!L.time || (S.time >= L.time[0] && S.time <= L.time[1])) && (!L.night || night) && L.biomes.some(t => b.has(t))) || null;
+}
 const FISH_LOG_IDS = ['fish','silverfin','goldcarp', ...FISH_SPECIES.map(f => f.id)];
 for (const [id] of DEEP_FISH) FISH_LOG_IDS.push(id);
 function nodeBiomes(n) {
@@ -12840,6 +12860,7 @@ function nodeBiomes(n) {
 }
 function rollCatch(n) {
   const night = isNightish(), b = nodeBiomes(n), rare = toolTier('rod') >= 3 ? 1.6 : 1;
+  { const L = legendFor(b); if (L && Math.random() < .07*(toolTier('rod') >= 3 ? 1.5 : 1)) return L.id; }
   const pool = [['fish', 10], ['silverfin', 4], ['goldcarp', 1.2*rare], ['old_boot', 1.4], ['sunken_chest', .5*rare]];
   for (const f of FISH_SPECIES) {
     if (f.when === 'night' && !night || f.when === 'day' && night) continue;
@@ -12856,6 +12877,7 @@ function startFishGame() {
   FG = {c, diff: CATCH[c].diff, pos: Math.random(), target: Math.random(), tt: .5, zone: .4, zv: 0, size: (toolTier('rod') >= 3 ? .32 : toolTier('rod') >= 2 ? .27 : .2) + .01*sk('gat') + (S.pet === 'frog' ? .06 : 0), prog: .3, node: fishing.i};
   fishing = null; mode = 'fish'; keys.clear(); fishHold = false;
   $('fFish').style.background = CATCH[c].col;
+  if (c.startsWith('leg_')) { FG.size *= .85; shake = .3; SFX.roar(); toast(`<b>Something enormous takes the bait!</b><br>The line screams. This is no ordinary fish. Hold on!`, 4000); }
   $('fishUI').hidden = false; $('prompt').hidden = true; $('actBtn').hidden = true; SFX.fish();
 }
 function updateFishGame(dt) {
@@ -12875,6 +12897,14 @@ function endFishGame(win) {
   const G = FG; FG = null; $('fishUI').hidden = true; mode = 'play'; promptKey = null; keys.clear();
   if (!G) return;
   const n = G.node >= 0 && nodes[G.node] ? nodes[G.node] : {x: S.x - .5, y: S.y - 1};
+  if (!win && G.c.startsWith('leg_')) setTimeout(() => toast(`<b>The legend slips the hook\u2026</b><br>A huge shadow sinks back into the depths. It will be back.`, 5000), 200);
+  if (win && G.c.startsWith('leg_')) {
+    S.legFish = S.legFish || {}; const kg = Math.round((18 + Math.random()*30)*10)/10; S.legFish[G.c] = kg; addItem(G.c, 1); S.fishCaught = (S.fishCaught || 0) + 1; gainXP(250); const c = 500 + (S.level || 1)*10; S.coins += c;
+    const n2 = Object.keys(S.legFish).length; let extra = ''; if (n2 >= LEGEND_FISH.length && !S.flags.legendsAll) { S.flags.legendsAll = true; S.coins += 2000; addItem('gem', 5); extra = '<br><br><b>You have caught every legendary fish!</b> Anglers across the land will tell this story. +2,000 coin and 5 gems.'; }
+    SFX.victory(); shake = .4; burst(n.x + .5, n.y + .5, '#ffd040', 40, 6); renderHUD(); save();
+    openPanel('Legendary catch!', `After a long, hard fight you haul in <b style="color:${GOODS[G.c].col}">${GOODS[G.c].name}</b>, all <b>${kg} kg</b> of it! ${GOODS[G.c].desc}.<br><br><span style="color:var(--good)">+${c} coin and 250 XP. It\u2019s in your pack as a trophy.</span><br><span style="color:var(--muted)">Legendary fish caught: ${n2} of ${LEGEND_FISH.length}</span>${extra}`, [{label: 'What a fish!', primary: true, fn: closeTalk}]);
+    return;
+  }
   if (win) {
     const amt = (G.c === 'fish' ? rint(1, 2) + (toolTier('rod') >= 2 ? 1 : 0) : 1) + (S.pet === 'penguin' ? 1 : 0);
     addItem(G.c, amt); S.gathered++; S.fishCaught = (S.fishCaught || 0) + 1; if (G.c === fowFish()) { S.fowCaught = S.fowCaught || {}; const wk = Math.floor(S.day/7); if (!S.fowCaught[wk]) { S.fowCaught[wk] = 1; setTimeout(() => toast(`<b>You caught the fish of the week!</b><br>Take it to Tamsin in Port Wren for a bonus.`, 5000), 600); } } if (fcon && Date.now() < fcon.end) { fcon.pts += (GOODS[G.c].base || 10)*amt; fcon.n += amt; partyT = 0; floatText(S.x, S.y - 1.8, `+${(GOODS[G.c].base || 10)*amt} contest points`, '#6ab0ff'); }
@@ -13214,6 +13244,8 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['legend1','Fish Tale','Catch a legendary fish', () => Object.keys(S.legFish || {}).length >= 1],
+  ['legend5','Angler of Legend','Catch all five legendary fish', () => Object.keys(S.legFish || {}).length >= 5],
   ['sunken1','Ruin Diver','Bring up treasure from the sunken city', () => (S.sdRelics || 0) >= 1],
   ['sunken_tabs','The Drowned King','Find all three stone tablets in the sunken city', () => Object.keys(S.tablets || {}).length >= 3],
   ['trial_gold','Proven','Win a gold medal in the Proving Grounds', () => Object.values(S.trials || {}).some(r => r.m === 3)],
@@ -13827,8 +13859,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 21;
+const WN_VER = 22;
 const WHATS_NEW = [
+  ['Legendary fish', 'Five giant legendary fish lurk in the right place, season and hour. Check the Gazette for hints, bring a good rod, and hold on tight.'],
   ['The sunken city', 'Dive with Coralie in Lantern Bay: swim through drowned ruins for relics, watch your air, and find the three stone tablets.'],
   ['Proving Grounds', 'Five combat trials at the Crownfall arena with bronze, silver and gold medals. Gold in all five wins the Victor\u2019s Laurel.'],
   ['New Game+', 'Finished the Charter? Start the road again with tougher monsters, keeping your level, gear, mounts and collections. Find it in the menu.'],
@@ -13889,6 +13922,7 @@ const RECORDS = [
   ['abyssBest', 'Deepest Abyss floor', v => `floor ${v}`],
   ['mineBest', 'Deepest mine floor', v => `floor ${v}`],
   ['_fish', 'Biggest fish', null],
+  ['_legend', 'Legendary fish', null],
   ['Minigames'],
   ['skitBest', 'Skittles', v => `${v} of 27 pins`], ['dartBest', 'Darts', v => `${v} points`], ['archeryBest', 'Archery', v => `${v} points`],
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
@@ -13899,8 +13933,8 @@ const RECORDS = [
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
 function recFish() { let best = null; for (const [id, kg] of Object.entries(S.fishBest || {})) if (!best || kg > best[1]) best = [id, kg]; return best; }
-function recValue(k) { if (k === '_fish') { const f = recFish(); return f ? f[1] : null; } const v = S[k]; return v == null || v === 0 ? null : v; }
-function recText(r) { if (r[0] === '_fish') { const f = recFish(); return f ? `${f[1]} kg ${GOODS[f[0]] ? GOODS[f[0]].name : ''}` : null; } const v = recValue(r[0]); return v == null ? null : r[2](v); }
+function recValue(k) { if (k === '_legend') { const n = Object.keys(S.legFish || {}).length; return n || null; } if (k === '_fish') { const f = recFish(); return f ? f[1] : null; } const v = S[k]; return v == null || v === 0 ? null : v; }
+function recText(r) { if (r[0] === '_legend') { const n = Object.keys(S.legFish || {}).length; return n ? `${n} of ${LEGEND_FISH.length} caught` : null; } if (r[0] === '_fish') { const f = recFish(); return f ? `${f[1]} kg ${GOODS[f[0]] ? GOODS[f[0]].name : ''}` : null; } const v = recValue(r[0]); return v == null ? null : r[2](v); }
 function recordsPage() {
   const rows = RECORDS.map(r => r.length === 1 ? `<span class="rh">${r[0]}</span>` : (() => { const t = recText(r); return `<span class="rk">${r[1]}${r[3] ? ' <small>(lower is better)</small>' : ''}</span><span class="rv">${t ? `<b>${t}</b>` : '<span style="color:var(--muted)">not tried</span>'}</span>`; })()).join('');
   const set = RECORDS.filter(r => r.length > 1 && recValue(r[0]) != null).length, tot = RECORDS.filter(r => r.length > 1).length;
@@ -13911,7 +13945,7 @@ function recWatch() {
   if (typeof S === 'undefined' || !S) return;
   const cur = {}; for (const r of RECORDS) if (r.length > 1) cur[r[0]] = recValue(r[0]);
   if (recOwner !== S || !recSnap) { recOwner = S; recSnap = cur; return; }
-  for (const r of RECORDS) { if (r.length === 1) continue; const a = recSnap[r[0]], b = cur[r[0]]; if (a != null && b != null && b !== a && (r[3] ? b < a : b > a)) { SFX.victory(); setTimeout(() => toast(`<b>New personal record!</b><br>${r[1]}: ${recText(r)} (was ${r[0] === '_fish' ? a + ' kg' : r[2](a)})`, 5500), 1600); } }
+  for (const r of RECORDS) { if (r.length === 1) continue; const a = recSnap[r[0]], b = cur[r[0]]; if (r[0] !== '_legend' && a != null && b != null && b !== a && (r[3] ? b < a : b > a)) { SFX.victory(); setTimeout(() => toast(`<b>New personal record!</b><br>${r[1]}: ${recText(r)} (was ${r[0] === '_fish' ? a + ' kg' : r[2](a)})`, 5500), 1600); } }
   recSnap = cur;
 }
 setInterval(recWatch, 1500);
@@ -14126,7 +14160,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
