@@ -140,6 +140,12 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
 .buy:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .buy b{color:var(--sun)}
 .char.rolling{border-color:var(--mint)}
+.randmode{display:flex;flex-direction:column;align-items:center;gap:6px}
+.toggle{font-family:var(--display);font-size:13px;letter-spacing:.04em;border:2px solid var(--muted);background:var(--glass);color:var(--ink);border-radius:12px;padding:9px 16px;cursor:pointer}
+.toggle[aria-pressed="true"]{border-color:var(--mint);color:var(--mint);box-shadow:0 0 14px rgba(79,240,200,.35)}
+.toggle:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
+.randmode .hint{font-size:12px;color:var(--muted);max-width:52ch}
+.randmode .hint:empty{display:none}
 .btn:disabled{opacity:.5;cursor:default;transform:none}
 .char.locked{cursor:not-allowed}
 .char.locked img{filter:brightness(0) opacity(.5)}
@@ -256,6 +262,10 @@ h2{font-family:var(--display);font-size:clamp(30px,7vw,54px);margin:0;line-heigh
         <button id="arGarden" data-a="garden">GRAVITY GARDEN</button>
         <button id="arTrain" data-a="train">TRAIN TOP</button>
       </div>
+    </div>
+    <div class="randmode">
+      <button class="toggle" id="btnRandMode" aria-pressed="false">RANDOM FIGHTER EVERY WAVE: OFF</button>
+      <span class="hint" id="randHint"></span>
     </div>
     <div class="row">
       <button class="btn ghost" id="btnBack">BACK</button>
@@ -2105,7 +2115,8 @@ class Fighter {
   get alive() { return this.state !== 'dead'; }
   setDef(def, scale = {}) {
     if (this.model) scene.remove(this.model.root);
-    this.def = def; this.name = def.name; this.size = def.scale;
+    this.def = def; this.name = def.name; this.size = def.scale; this.isBig = false; this.bigT = 0;
+    this.key = Object.keys(ROSTER).find(k => ROSTER[k] === def);
     this.model = buildModel(def); scene.add(this.model.root);
     this.stats = { speed: def.speed * (scale.speed ?? 1), jump: 13, power: def.power * (scale.power ?? 1), weight: def.weight * (scale.weight ?? 1),
       jumps: 2, dashCd: .55, airRadius: 1, chargeRate: 1, lifesteal: 0, secondWind: false, glass: false, dmgTaken: 1, thorns: 0, fireTrail: false, chain: false, magnet: false, shock: false, echo: false, goldRush: false, drones: 0 };
@@ -3493,9 +3504,19 @@ function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add(
 function show(id) { for (const s of ['scrTitle', 'scrSelect', 'scrUp', 'scrOver', 'scrPause']) $(s).hidden = s !== id; }
 
 const ENEMY_ORDER = ['grub', 'vex', 'bolt', 'moss'];
+// Random-every-wave mode: become a different unlocked fighter each wave; stat power-ups are re-applied to the new body.
+function swapToRandomFighter() {
+  const pool = Object.keys(PLAYABLE).filter(isUnlocked), others = pool.filter(k => k !== player.key);
+  const pick = (others.length ? others : pool)[Math.random() * (others.length || pool.length) | 0];
+  if (pick !== player.key) {
+    player.setDef(ROSTER[pick]);
+    for (const u of game.perkObjs) if (u.stat !== false) u.apply(player.stats);
+  }
+  if (game.wave > 1 || pick !== game.charKey) setTimeout(() => toast(`You are now ${ROSTER[pick].name}!`), 300);
+}
 function startRun() {
   initAudio();
-  game.wave = 1; game.perks = []; game.gold = 0; game.startPerk = {};
+  game.wave = 1; game.perks = []; game.perkObjs = []; game.gold = 0; game.startPerk = {};
   player.setDef(ROSTER[game.charKey]); player.stocks = 3;
   startWave();
 }
@@ -3508,6 +3529,7 @@ function startWave() {
   game.arenaKey = w === 1 ? game.startArena : nextArenaAfter(game.arenaKey);
   setArena(game.arenaKey);
   clearArenaObjects(); game.itemT = rand(5, 8);
+  if (game.randomMode) swapToRandomFighter();
   player.spawn(false); player.facing = Math.PI; player.windUsed = false;
   if (game.startPerk.star) player.starT = 7.5;
   if (game.startPerk.jet) player.jetT = 11.5;
@@ -3517,7 +3539,8 @@ function startWave() {
   cam.yaw = 0; cam.pitch = .32; cam.manualT = 0; cam.focus.set(0, 1.5, 3);
   game.state = 'intro'; game.timer = 1.6; game.timeScale = 1;
   show(null); $('hud').hidden = false; $('touch').hidden = !isTouch;
-  banner(`WAVE ${w}<small>${arena.name} · vs ${enemy.def.name}: ${enemy.def.blurb}</small>`, 'gold');
+  banner(game.randomMode ? `WAVE ${w}<small>You are ${player.name} · ${arena.name} · vs ${enemy.def.name}</small>`
+    : `WAVE ${w}<small>${arena.name} · vs ${enemy.def.name}: ${enemy.def.blurb}</small>`, 'gold');
   lockPointer();
 }
 function onKO(f) {
@@ -3542,7 +3565,7 @@ const UPGRADES = [
   { name: 'Quickstep', tag: 'Mobility', desc: 'Dash recharges 35% faster.', apply: s => s.dashCd *= .65 },
   { name: 'Cyclone', tag: 'Air', desc: 'Your air spin hits 30% wider.', apply: s => s.airRadius *= 1.3 },
   { name: 'Hot Blood', tag: 'Smash', desc: 'Smash attacks charge 50% faster.', apply: s => s.chargeRate *= 1.5 },
-  { name: 'Spare Heart', tag: 'Life', desc: 'Gain one extra life.', ok: () => player.stocks < 5, apply: () => player.stocks++ },
+  { name: 'Spare Heart', tag: 'Life', desc: 'Gain one extra life.', ok: () => player.stocks < 5, apply: () => player.stocks++, stat: false },
   { name: 'Vampire Fist', tag: 'Sustain', desc: 'Each hit heals you for 25% of the damage it deals.', ok: s => s.lifesteal < .5, apply: s => s.lifesteal += .25 },
   { name: 'Second Wind', tag: 'Survival', desc: 'Once per wave, a KO bounces you back to the arena instead.', ok: s => !s.secondWind, apply: s => s.secondWind = true },
   { name: 'Thorns', tag: 'Defense', desc: 'Enemies take 3% damage every time they hit you.', ok: s => s.thorns < 6, apply: s => s.thorns += 3 },
@@ -3582,7 +3605,7 @@ function showUpgrades() {
   pool.forEach((u, i) => {
     const b = document.createElement('button'); b.className = 'up'; b.id = 'up' + i;
     b.innerHTML = `<span class="k">${u.tag}</span><span class="n">${u.name}</span><span class="d">${u.desc}</span>`;
-    b.addEventListener('click', () => { sfx('select'); u.apply(player.stats); game.perks.push(u.name); game.wave++; startWave(); });
+    b.addEventListener('click', () => { sfx('select'); u.apply(player.stats); game.perks.push(u.name); game.perkObjs.push(u); game.wave++; startWave(); });
     box.appendChild(b);
   });
   game.gold += coins.length; clearCoins();
@@ -3702,6 +3725,7 @@ function syncSelect() {
       b.querySelector('.lockbar i').style.width = Math.round(progress.waves / UNLOCKS[k] * 100) + '%';
     }
   });
+  syncRandMode();
   $('unlockSummary').textContent = `${unlockedCount()} of ${Object.keys(PLAYABLE).length} fighters unlocked · ${progress.waves} waves cleared in total`;
   if (!isArenaUnlocked(game.startArena)) game.startArena = 'sky';
   document.querySelectorAll('#arenaSeg button').forEach(b => {
@@ -3723,6 +3747,19 @@ document.querySelectorAll('#arenaSeg button').forEach(b => b.addEventListener('c
   game.startArena = b.dataset.a; store.set('koisle-arena', b.dataset.a); setArena(b.dataset.a); sfx('select'); syncSelect();
 }));
 $('btnGo').addEventListener('click', () => { sfx('select'); startRun(); });
+game.randomMode = store.get('koisle-randmode') === '1';
+function syncRandMode() {
+  const b = $('btnRandMode'), n = unlockedCount();
+  b.setAttribute('aria-pressed', game.randomMode);
+  b.textContent = `RANDOM FIGHTER EVERY WAVE: ${game.randomMode ? 'ON' : 'OFF'}`;
+  $('randHint').textContent = !game.randomMode ? '' : n < 2
+    ? 'You only have one fighter so far. Clear waves to unlock more for the shuffle.'
+    : `You become one of your ${n} unlocked fighters at the start of every wave. Power-ups carry over.`;
+}
+$('btnRandMode').addEventListener('click', () => {
+  game.randomMode = !game.randomMode; store.set('koisle-randmode', game.randomMode ? '1' : '0');
+  sfx(game.randomMode ? 'star' : 'select'); syncRandMode();
+});
 // Random fighter: a short roulette across the unlocked fighters, slowing down before it lands
 let rolling = false;
 $('btnRandom').addEventListener('click', () => {
