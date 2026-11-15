@@ -10,7 +10,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | --- | --- | --- |
 | Walk | WASD / Arrow keys | Drag anywhere |
 | Run | Hold Shift | Drag far |
-| Grab / drop | E | "grab" / "drop" button |
+| Grab / drop / pet the dog | E | "grab" / "drop" button |
 | Throw | F | "throw" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
@@ -19,7 +19,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 
 ## What's in the game
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 35, a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 41, a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -34,6 +34,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **~105 things to grab per village** (about a third indoors): pies, cakes, teapots, teddy bears, cookie jars, crops,
   crates, a wheelbarrow, parcels, milk bottles, a kite, a fishing rod, yarn, gnomes... Light things go in your mouth,
   heavy ones overhead. Throw them, sink them, float them, or stash them in your hideout.
+- **Hiding bushes**: big walk-in shrubs (about 18 per village, many beside houses and the garden). Inside one,
+  villagers can't see you unless they walk right into it; your eyes peek out and a "Hidden" pill shows. You can't
+  hide carrying something heavy, and running makes the leaves rustle. Duck in mid-chase and chasers lose track.
+- **Biscuit the dog** (Bertram's): wanders near his bed and sniffs you out (bushes don't fool his nose), barks so
+  villagers turn to look, and knocks things out of your mouth to carry back to his bed. Throw something near him
+  and he fetches it instead. Press E next to him to pet him and he follows you around as a friend for a while.
+  He guards his bone. The Dog Treats upgrade makes him start each day friendly.
 - **Hideout**: a hollow log at one end of the road. Things in its nest are safe, and villagers won't follow you in.
 
 ## Code layout (`game.js`)
@@ -45,6 +52,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   `updateDoors()`, villagers cross doors with `travel()`
 - **Villagers**: `VILLAGER_DEFS` (looks, speeds, lines), `stopsFor()` (daily round from the layout),
   `updateVillagers()` state machine (route → act, chase, fetch, return, sulk, startled), A* `findPath()`, `canSee()`
+- **Hiding & dog**: `makeHideBush()`, `updateHiding()`, `canSeePlayer()`; `spawnDog()`, `updateDog()` state machine
+  (sit, wander, alert, chase, fetch, return, happy, follow)
 - **Runs**: `TASK_POOL`, `setupRun()`, `endRun()`, `UPGRADES` + the den, save in `localStorage`
 - **To-do list**: run's task hand, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
   polled conditions; notepad markup + styles live in `index.html`
