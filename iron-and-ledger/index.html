@@ -217,6 +217,20 @@ const BASES={
   burstpistol:{name:'Burst Pistol',models:['Triad','Trigun','Volley-3'],dmg:14,rate:14,spread:.05,mag:18,reload:1.5,pellets:1,wear:.08,base:360,burst:3},
   golden :{name:'Golden Gun',models:['Midas','Midas','Midas'],                 dmg:60,rate:8,  spread:.01,mag:50,reload:1.5,pellets:1,wear:0,base:0,fixed:1000000,special:1,pierce:1,silent:1},
 };
+// ---- 100 themed weapon variants: each borrows an existing weapon's build, with its own colour, name, stats and sometimes a special power ----
+const VAR_THEMES=[
+  ['ruby','Ruby',0xd81a3a,{dm:1.1}],['emerald','Emerald',0x1ab85a,{rm:1.1}],['sapphire','Sapphire',0x1a4ae0,{sp:.7}],['shadow','Shadow',0x18161e,{silent:1}],
+  ['arctic','Arctic',0xcfeaff,{frost:1}],['inferno','Inferno',0xff5a10,{dm:1.2,rm:.95}],['toxic','Toxic',0x8aff20,{dm:1.05,rm:1.05}],['royal','Royal',0x7a2ad8,{dm:1.15,pm:1.6}],
+  ['candy','Candy',0xff7ac8,{dm:.85,rm:1.2}],['storm','Storm',0x30d8ff,{chain:1,dm:.9}],['jungle','Jungle',0x3a5a22,{silent:1,dm:1.05}],['desert','Desert',0xd8b070,{dm:1.08}],
+  ['neon','Neon',0xff20d0,{rm:1.15}],['bone','Bone',0xf0e6c8,{dm:1.1,rm:.95}],['lava','Lava',0x8a1a08,{dm:1.25,rm:.9}],['galaxy','Galaxy',0x1a1450,{pierce:1}],
+  ['honey','Honey',0xf2b01a,{mm:1.3}],['ocean','Ocean',0x0a8a9a,{rm:1.1,dm:.95}],['steam','Steampunk',0xb8862a,{dm:1.1,mm:1.2}],['titan','Titanium',0xb0b8c4,{dm:1.12,wm:.5}]];
+const VAR_LOOKS=['pistol','smg','shotgun','rifle','dmr','revolver','lmg','sniper','crossbow','carbine','minigun','blunderbuss','railgun','launcher','bullpup','handcannon','bow','harpoon','chainzap','katana','sword','hammer','plasma','laserpistol','shuriken'];
+const VARIANTS=[];
+VAR_THEMES.forEach(([tk,tn,tint,o],ti)=>{for(let jj=0;jj<5;jj++){const look=VAR_LOOKS[(ti*7+jj*5)%VAR_LOOKS.length],b=BASES[look],k=tk+'_'+look;
+  const v=Object.assign({},b,{name:tn+' '+b.name,models:b.models.map(m=>tn+' '+m),dmg:Math.max(1,Math.round(b.dmg*(o.dm||1))),rate:+(b.rate*(o.rm||1)).toFixed(2),spread:+(b.spread*(o.sp||1)).toFixed(4),
+    mag:b.melee?b.mag:Math.max(1,Math.round(b.mag*(o.mm||1))),wear:+(b.wear*(o.wm||1)).toFixed(3),base:Math.round(b.base*(o.pm||1.25)),look,tint,theme:tn});
+  for(const f of ['silent','frost','chain','pierce'])if(o[f])v[f]=1;BASES[k]=v;VARIANTS.push(k)}});
+
 const NORMAL_BASES=Object.keys(BASES).filter(k=>!BASES[k].special);
 const GOLDEN_CHANCE=.001;
 const RAR=[
@@ -489,7 +503,7 @@ const VIEWS={
       <div class="panel"><h3>Backpacks</h3>${PACKS.map((b,i)=>i?`<div class="slot"><div class="lab">${b.slots} slots</div><div>${b.n}</div><div>${S.pack>=i?'<span class="tag eq">Owned</span>':btn('pack',i,money(b.cost),'',S.cash<b.cost)}</div></div>`:'').join('')}<p class="help" style="margin:8px 0 0">More room for looted guns on each raid. Permanent upgrade.</p></div></div>
       <div class="grid2"><div class="panel"><h3>Supplies</h3><div class="slot"><div class="lab">+35 HP</div><div>Bandage <span class="wstats">you have ${S.meds}</span></div><div>${btn('med',0,'$40','',S.cash<40)}</div></div></div>
       <div class="panel"><h3>Fresh iron</h3>`;
-    for(const k of ['sword','katana','greatsword','hammer','pistol','revolver','smg','shotgun','netgun','crossbow','blunderbuss','mister','sling','pdw','twin','burstpistol','bow','flare','handshot','doublebarrel','snowball','shuriken','nailgun','flintlock','bubble','popper','throwknife','soaker','boomerang','blowgun','gumball','beecannon']){const price=Math.round(BASES[k].base*1.35);html+=`<div class="slot"><div class="lab">${BASES[k].name}</div><div>Standard ${BASES[k].models[0]} <span class="wstats">100% cond.</span></div><div>${btn('gun-'+k,0,money(price),'',S.cash<price)}</div></div>`}
+    for(const k of ['sword','katana','greatsword','hammer','pistol','revolver','smg','shotgun','netgun','crossbow','blunderbuss','mister','sling','pdw','twin','burstpistol','bow','flare','handshot','doublebarrel','snowball','shuriken','nailgun','flintlock','bubble','popper','throwknife','soaker','boomerang','blowgun','gumball','beecannon',...SHOP_VARIANTS]){const price=Math.round(BASES[k].base*1.35);html+=`<div class="slot"><div class="lab">${BASES[k].name}</div><div>Standard ${BASES[k].models[0]} <span class="wstats">100% cond.</span></div><div>${btn('gun-'+k,0,money(price),'',S.cash<price)}</div></div>`}
     return html+`<p class="help" style="margin:8px 0 0">Rifles, carbines, DMRs, LMGs, sniper rifles and miniguns don't come off the shelf. Tranq them off bears or buy from rivals.</p></div></div>`;
   },
 };
@@ -578,6 +592,9 @@ $('#hub').addEventListener('click',e=>{
 // ---------- audio (synthesized with Web Audio, positioned in 3D) ----------
 const VOLS=[0,.45,.9];
 const GUN_SFX={pistol:{crack:2600,body:150,len:.2,g:.9},smg:{crack:3200,body:170,len:.15,g:.75},shotgun:{crack:1500,body:85,len:.45,g:1.35},rifle:{crack:2700,body:120,len:.28,g:1.05},dmr:{crack:2100,body:80,len:.5,g:1.35},crossbow:{crack:1100,body:220,len:.12,g:.55},blunderbuss:{crack:1300,body:70,len:.55,g:1.5},railgun:{crack:4200,body:300,len:.6,g:1.2},mister:{crack:2000,body:200,len:.1,g:.3},launcher:{crack:700,body:90,len:.25,g:1},carbine:{crack:2800,body:140,len:.22,g:1},minigun:{crack:3300,body:150,len:.12,g:.75},golden:{crack:3600,body:180,len:.35,g:1.1},bullpup:{crack:2800,body:125,len:.26,g:1},scout:{crack:2200,body:90,len:.45,g:1.25},handcannon:{crack:1800,body:95,len:.45,g:1.4},pdw:{crack:3400,body:180,len:.12,g:.7},drumshot:{crack:1500,body:85,len:.42,g:1.3},bow:{crack:900,body:240,len:.1,g:.4},flare:{crack:800,body:140,len:.4,g:.9},harpoon:{crack:1000,body:110,len:.35,g:1.1},twin:{crack:2600,body:150,len:.18,g:.9},frost:{crack:1200,body:300,len:.35,g:.8},sling:{crack:700,body:300,len:.08,g:.3},antibear:{crack:1500,body:55,len:.8,g:1.8},whisper:{crack:2000,body:200,len:.1,g:.4},chainzap:{crack:5200,body:400,len:.3,g:.8},falcon:{crack:2300,body:100,len:.4,g:1.2},drumsmg:{crack:3100,body:160,len:.14,g:.8},doublebarrel:{crack:1400,body:80,len:.45,g:1.4},longbow:{crack:800,body:260,len:.12,g:.45},handshot:{crack:1500,body:90,len:.35,g:1.2},gausspistol:{crack:4400,body:320,len:.25,g:.9},beecannon:{crack:2600,body:300,len:.2,g:.8},tesla:{crack:2200,body:120,len:.35,g:1},blowgun:{crack:5000,body:900,len:.04,g:.15},gumball:{crack:1800,body:400,len:.1,g:.6},chainsaw:{crack:900,body:90,len:.2,g:.6},hammer:{crack:1200,body:70,len:.2,g:.3},sword:{crack:3000,body:500,len:.1,g:.2},katana:{crack:3400,body:600,len:.08,g:.2},greatsword:{crack:2400,body:300,len:.15,g:.25},plasmablade:{crack:1800,body:120,len:.2,g:.3},frostblade:{crack:3600,body:700,len:.1,g:.2},throwknife:{crack:4200,body:700,len:.05,g:.25},carrot:{crack:1500,body:160,len:.2,g:.9},soaker:{crack:6000,body:900,len:.06,g:.2},sonic:{crack:900,body:60,len:.5,g:1.2},boomerang:{crack:3000,body:400,len:.12,g:.3},laserpistol:{crack:5200,body:700,len:.12,g:.5},bubble:{crack:5000,body:600,len:.06,g:.25},thunderrod:{crack:2400,body:120,len:.4,g:1},trident:{crack:1800,body:160,len:.3,g:.9},popper:{crack:2600,body:200,len:.25,g:1.1},moonsniper:{crack:2200,body:70,len:.9,g:1.3},gatling:{crack:3200,body:150,len:.08,g:.7},shuriken:{crack:3000,body:500,len:.08,g:.3},nailgun:{crack:3600,body:240,len:.08,g:.6},plasma:{crack:4800,body:280,len:.3,g:.9},bazooka:{crack:700,body:70,len:.5,g:1.3},flintlock:{crack:1300,body:90,len:.6,g:1.3},icebeam:{crack:2000,body:300,len:.1,g:.3},snowball:{crack:600,body:260,len:.12,g:.4},burstpistol:{crack:2700,body:160,len:.16,g:.85},netgun:{crack:900,body:110,len:.25,g:.8},revolver:{crack:2000,body:110,len:.35,g:1.25},lmg:{crack:2900,body:130,len:.22,g:1},sniper:{crack:1800,body:65,len:.7,g:1.6}};
+for(const k of VARIANTS){const L=BASES[k].look;GUN_SFX[k]=GUN_SFX[L];for(const arr of [INTEGRAL_SCOPE,HOLSTERABLE,NO_SCOPE,RIVALPOOL])if(arr.includes(L))arr.push(k);
+  const pr=BASES[k].base,tier=pr<800?1:pr<1600?2:pr<3000?3:4;for(let r=tier;r<=4;r++)if(GUNPOOL[r])GUNPOOL[r].push(k)}
+const SHOP_VARIANTS=VARIANTS.filter(k=>!BASES[k].melee).sort((a,b)=>BASES[a].base-BASES[b].base).slice(0,20);
 const SFX={
   ctx:null,muted:false,
   init(){
@@ -1337,6 +1354,11 @@ const GEN_SHAPES={ // compact models for the newer weapons: each returns the muz
 };
 const FINISH=[0x1c1e20,0x8b7752,0x4b5337];
 function buildGun(w,isVM){
+  if(BASES[w.base]&&BASES[w.base].look){const VB=BASES[w.base],r=buildGun(Object.assign({},w,{base:VB.look}),isVM);SH.tintMats=SH.tintMats||{};
+    const keep=[SH.gunMat,SH.brassMat,SH.glowCyan,SH.zapGlow,SH.goldMat,SH.iceGlow].filter(Boolean);
+    r.g.traverse(o=>{if(!o.isMesh||!o.material||!o.material.isMeshStandardMaterial||keep.includes(o.material))return;const key=VB.tint+'_'+o.material.uuid;
+      let m=SH.tintMats[key];if(!m){m=o.material.clone();m.color=lc(VB.tint);if(['Shadow','Galaxy','Lava'].includes(VB.theme)){m.emissive=lc(VB.theme==='Lava'?0x601000:VB.theme==='Galaxy'?0x201060:0x000000);m.emissiveIntensity=.6}if(VB.theme==='Titanium'||VB.theme==='Royal'){m.metalness=.9;m.roughness=.25}SH.tintMats[key]=m}o.material=m});
+    return r}
   const g=new THREE.Group(),metal=SH.gunMat,wood=SH.woodMat,poly=SH.polyMat;
   const fin=SH.finMats[w.model%3],ext=w.mods.includes('ext')?1.45:1;
   const B=(sx,sy,sz,x,y,z,mat,rx=0)=>{const m=new THREE.Mesh(SH.box,mat);m.scale.set(sx,sy,sz);m.position.set(x,y,z);m.rotation.x=rx;m.castShadow=!isVM;g.add(m);return m};
