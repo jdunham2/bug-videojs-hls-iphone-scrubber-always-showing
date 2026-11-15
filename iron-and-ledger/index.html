@@ -111,7 +111,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-
       </aside>
     </div>
     <footer>
-      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>V</kbd> get in or out of a vehicle (helicopter: <kbd>Space</kbd> up, <kbd>Shift</kbd> down, click to fire) · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
+      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>1</kbd>–<kbd>0</kbd> switch between up to 10 carried weapons · <kbd>T</kbd> repair a vehicle · <kbd>V</kbd> get in or out of a vehicle (helicopter: <kbd>Space</kbd> up, <kbd>Shift</kbd> down, click to fire) · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
       <button class="b danger" id="wipe" data-act="wipe">Wipe save</button>
     </footer>
   </div>
@@ -194,7 +194,9 @@ const RIVALPOOL=['smg','rifle','carbine','dmr','shotgun','lmg','sniper','crossbo
 const CALLSIGNS=['Vex_77','Grimsby','Nadir','Halcyon','Rook','Mags','Tallow','Kestrel_9','Juno','Ashgrove','Drift','Picket','Ozzy.exe','Lark'];
 const BUYERS=['a dockside fence','a collector in Ward 6','an anonymous buyer','a militia quartermaster','a pawnbroker on Sixth'];
 const PACKS=[{n:'Sling Bag',slots:4,cost:0},{n:'Duffel',slots:6,cost:400},{n:'Rucksack',slots:8,cost:1200}];
-const GADGETS={gas:{n:'Sleep-gas grenade',key:'G',cost:120,desc:'Throw it. A cloud puts every bear inside to sleep.'},trap:{n:'Bear trap',key:'F',cost:90,desc:'Drop it at your feet. The first bear to step in is stuck for 7 s.'},honey:{n:'Honey jar',key:'H',cost:50,desc:'Throw it. Nearby bears go and eat instead of chasing you.'}};
+const GADGETS={gas:{n:'Sleep-gas grenade',key:'G',cost:120,desc:'Throw it. A cloud puts every bear inside to sleep.'},trap:{n:'Bear trap',key:'F',cost:90,desc:'Drop it at your feet. The first bear to step in is stuck for 7 s.'},honey:{n:'Honey jar',key:'H',cost:50,desc:'Throw it. Nearby bears go and eat instead of chasing you.'},repair:{n:'Repair kit',key:'T',cost:100,desc:'Hold T next to a vehicle for 3 s to fix it, even a wreck.'}};
+const MAX_CARRY=10;
+const carried=()=>[S.primary,S.secondary,...(S.extra||[])].filter(id=>id!=null&&byId(id));
 const PETS={
   dog:{n:'Biscuit the Dog',cost:600,desc:'Barks to reveal bears near you and gives them sleepy nips. Each nip counts as your tranq.'},
   owl:{n:'Hoot the Owl',cost:900,desc:'Circles overhead and marks every bear and coin critter within 60 m, even through walls.'},
@@ -215,7 +217,7 @@ let uid=1, S;
 function mkWeapon(base,rar,cond,appraised){return{id:uid++,base,model:ri(0,2),rar,cond,appraised:!!appraised,mods:[],insured:false}}
 function newSave(){
   uid=1;
-  const s={cash:350,stash:[],primary:null,secondary:null,vest:0,holster:0,meds:2,listings:[],offers:[],demand:{},log:[],raids:0,settings:{assist:2,markers:1,vol:2},gadgets:{gas:1,trap:1,honey:1},pack:0,pets:[],pet:null};
+  const s={cash:350,stash:[],primary:null,secondary:null,vest:0,holster:0,meds:2,listings:[],offers:[],demand:{},log:[],raids:0,settings:{assist:2,markers:1,vol:2},gadgets:{gas:1,trap:1,honey:1,repair:1},pack:0,pets:[],pet:null,extra:[]};
   for(const k in BASES)s.demand[k]=1;
   const a=mkWeapon('smg',0,70,true), b=mkWeapon('pistol',1,85,true);
   s.stash.push(a,b); s.primary=a.id; s.secondary=b.id;
@@ -223,7 +225,7 @@ function newSave(){
 }
 function save(){S.uid=uid;try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
 function load(){
-  try{const raw=localStorage.getItem(SAVE_KEY);if(raw){S=JSON.parse(raw);uid=S.uid||1000;S.settings=Object.assign({assist:2,markers:1,vol:2},S.settings);S.gadgets=Object.assign({gas:0,trap:0,honey:0},S.gadgets);S.pack=S.pack||0;S.pets=S.pets||[];if(S.pet===undefined)S.pet=null;S.demand=S.demand||{};for(const k in BASES)if(!(S.demand[k]>0))S.demand[k]=1;S.offers=(S.offers||[]).filter(o=>o&&o.w&&BASES[o.w.base]);S.listings=(S.listings||[]).filter(l=>l&&l.w&&BASES[l.w.base]);if(!S.offers.length)refreshOffers();return}}catch(e){}
+  try{const raw=localStorage.getItem(SAVE_KEY);if(raw){S=JSON.parse(raw);uid=S.uid||1000;S.settings=Object.assign({assist:2,markers:1,vol:2},S.settings);S.gadgets=Object.assign({gas:0,trap:0,honey:0,repair:1},S.gadgets);S.extra=(S.extra||[]).filter(id=>S.stash.some(w=>w.id===id));S.pack=S.pack||0;S.pets=S.pets||[];if(S.pet===undefined)S.pet=null;S.demand=S.demand||{};for(const k in BASES)if(!(S.demand[k]>0))S.demand[k]=1;S.offers=(S.offers||[]).filter(o=>o&&o.w&&BASES[o.w.base]);S.listings=(S.listings||[]).filter(l=>l&&l.w&&BASES[l.w.base]);if(!S.offers.length)refreshOffers();return}}catch(e){}
   S=newSave(); logMsg('You wake up in the safehouse with $350, a rusty SMG and a sidearm.','warn'); refreshOffers();
 }
 function logMsg(txt,cls=''){S.log.unshift({txt,cls});S.log.length=Math.min(S.log.length,40)}
@@ -246,7 +248,7 @@ function wStats(w){
     mag:Math.round(b.mag*(w.mods.includes('ext')?1.5:1)),reload:b.reload,pellets:b.pellets,wear:b.wear,quiet:w.mods.includes('supp')||!!b.silent};
 }
 const byId=id=>S.stash.find(w=>w.id===id)||null;
-function removeFromStash(w){S.stash=S.stash.filter(x=>x!==w);if(S.primary===w.id)S.primary=null;if(S.secondary===w.id)S.secondary=null}
+function removeFromStash(w){S.stash=S.stash.filter(x=>x!==w);if(S.primary===w.id)S.primary=null;if(S.secondary===w.id)S.secondary=null;S.extra=(S.extra||[]).filter(id=>id!==w.id)}
 
 // ---------- market ----------
 function refreshOffers(){
@@ -308,6 +310,8 @@ const VIEWS={
     let html=squadPanel()+`<div class="grid2"><div class="panel"><h3>Loadout</h3>
       ${slot('Primary',wslot(p),p?btn('unequip',1,'Remove'):'')}
       ${slot('Sidearm',wslot(s),s?btn('unequip',2,'Remove'):'')}
+      ${(S.extra||[]).map((id,i)=>slot('Slot '+(i+3),wslot(byId(id)),btn('uncarry',id,'Remove'))).join('')}
+      ${slot('Carrying',`${carried().length} / ${MAX_CARRY} weapons <span class="wstats">keys 1–9 and 0 switch in a raid</span>`)}
       ${slot('Vest',`${VESTS[S.vest].n} <span class="wstats">${VESTS[S.vest].ap} armor · lost on death</span>`)}
       ${slot('Holster',`${HOLSTERS[S.holster].n} <span class="wstats">${Math.round(HOLSTERS[S.holster].keep*100)}% chance to keep sidearm on death</span>`)}
       ${slot('Bandages',`${S.meds} <span class="wstats">+35 HP each</span>`)}
@@ -327,6 +331,7 @@ const VIEWS={
     for(const w of S.stash){
       html+=row(w,
         (S.primary!==w.id?btn('equip',w.id,'Equip'):'')+
+        (!carried().includes(w.id)?btn('carry',w.id,'Carry','',carried().length>=MAX_CARRY):'')+
         ((w.base==='pistol'||w.base==='revolver')&&S.secondary!==w.id?btn('holster',w.id,'Holster'):'')+
         (!w.insured?btn('insure',w.id,'Insure '+money(insureCost(w)),'',S.cash<insureCost(w)):''));
     }
@@ -405,8 +410,10 @@ $('#hub').addEventListener('click',e=>{
     case 'squad-copy':try{navigator.clipboard.writeText(NET.code).then(()=>logMsg('Squad code copied. Send it to your friends.'),()=>{})}catch(e){}break;
     case 'squad-joinraid':{const go=leaderGo();if(go){NET.lastEpoch=go.e;save();startRaid(go.z,{seed:go.s,epoch:go.e})}return}
     case 'unequip':if(id===1)S.primary=null;else S.secondary=null;break;
-    case 'equip':S.primary=id;if(S.secondary===id)S.secondary=null;break;
-    case 'holster':S.secondary=id;if(S.primary===id)S.primary=null;break;
+    case 'equip':S.extra=(S.extra||[]).filter(x=>x!==id);if(S.primary!==null&&S.primary!==id&&carried().length>=MAX_CARRY)S.primary=null;if(S.primary!==null&&S.primary!==id)S.extra.push(S.primary);S.primary=id;if(S.secondary===id)S.secondary=null;break;
+    case 'holster':S.extra=(S.extra||[]).filter(x=>x!==id);S.secondary=id;if(S.primary===id)S.primary=null;break;
+    case 'carry':if(carried().length<MAX_CARRY){if(S.primary==null)S.primary=id;else S.extra.push(id)}break;
+    case 'uncarry':S.extra=(S.extra||[]).filter(x=>x!==id);break;
     case 'insure':if(pay(insureCost(w))){w.insured=true;logMsg(`Insured ${wLabel(w)}.`)}break;
     case 'appraise':if(pay(APPRAISE_FEE)){w.appraised=true;logMsg(`Appraised: ${wLabel(w)}, worth ${money(wValue(w))}.`,w.rar>=2?'good':'')}break;
     case 'repair':if(pay(repairCost(w))){w.cond=100;logMsg(`Repaired ${wLabel(w)}.`)}break;
@@ -850,8 +857,8 @@ function startRaid(zi,mp){
     const side=ri(0,3),n=[[0,-1],[0,1],[-1,0],[1,0]][side],cx2=w.x+w.w/2,cy2=w.y+w.h/2;
     const lx=n[0]?(n[0]<0?w.x:w.x+w.w):cx2+rnd(-w.w*.3,w.w*.3),ly=n[1]?(n[1]<0?w.y:w.y+w.h):cy2+rnd(-w.h*.3,w.h*.3);
     R.ladders.push({x:lx+n[0]*12,y:ly+n[1]*12,nx:n[0],ny:n[1],w})}
-  const weps=[byId(S.primary),byId(S.secondary)];
-  R.player={x:spawn.x,y:spawn.y,z:0,vz:0,onGround:true,peakZ:0,r:14,hp:100,ap:VESTS[S.vest].ap,maxap:VESTS[S.vest].ap,faction:'player',name:'You',ang:0,weps,slot:weps[0]?0:1,cd:0,reloadT:0};
+  const weps=[byId(S.primary),byId(S.secondary),...(S.extra||[]).map(byId)].filter(Boolean).slice(0,MAX_CARRY);
+  R.player={x:spawn.x,y:spawn.y,z:0,vz:0,onGround:true,peakZ:0,r:14,hp:100,ap:VESTS[S.vest].ap,maxap:VESTS[S.vest].ap,faction:'player',name:'You',ang:0,weps,slot:0,cd:0,reloadT:0};
   R.yaw=Math.atan2(-(W/2-spawn.x),-(H/2-spawn.y));
   for(const w of weps)if(w)R.mags[w.id]=wStats(w).mag;
   for(let i=0;i<z.gang;i++)R.agents.push(mkAgent(false,z.risk,i));
@@ -1564,7 +1571,7 @@ function mkVehicleMesh(v,sc){
     v.rotorG=new THREE.Group();v.rotorG.position.set(.3,3.0,0);g.add(v.rotorG);for(const r of [0,Math.PI/2]){const b=new THREE.Mesh(SH.box,black);b.scale.set(11,.04,.32);b.rotation.y=r;v.rotorG.add(b)}
     v.tailRotor=new THREE.Group();v.tailRotor.position.set(-4.95,2.2,.12);g.add(v.tailRotor);for(const r of [0,Math.PI/2]){const b=new THREE.Mesh(SH.box,black);b.scale.set(1.5,.18,.03);b.rotation.z=r;v.tailRotor.add(b)}
     add(SH.box,lamp,.06,.1,.1,2.2,1.3,0);add(SH.box,tail,.06,.1,.1,-5.3,2.5,0);
-    if(v.pad){const pad=new THREE.Group();pad.position.set(v.pad.x*K,.02,v.pad.y*K);const pm=new THREE.Mesh(SH.box,new THREE.MeshStandardMaterial({map:SH.concrete.map,color:lc(0x55585e),roughness:.9}));pm.scale.set(10,.06,10);pm.receiveShadow=true;pad.add(pm);
+    if(v.pad&&!v.padDone){v.padDone=true;const pad=new THREE.Group();pad.position.set(v.pad.x*K,.02,v.pad.y*K);const pm=new THREE.Mesh(SH.box,new THREE.MeshStandardMaterial({map:SH.concrete.map,color:lc(0x55585e),roughness:.9}));pm.scale.set(10,.06,10);pm.receiveShadow=true;pad.add(pm);
       const ym=new THREE.MeshStandardMaterial({color:lc(0xf2c12e),roughness:.6});R.disp.push(pm.material,ym);for(const [sx2,sz,x,z] of [[.4,4,0,-1.2],[.4,4,0,1.2],[2.8,.4,0,0]]){const h=new THREE.Mesh(SH.box,ym);h.scale.set(sz,.08,sx2);h.position.set(x,.03,z);pad.add(h)}
       const ring=new THREE.Mesh(new THREE.RingGeometry(4.3,4.6,40),ym);ring.rotation.x=-Math.PI/2;ring.position.y=.04;pad.add(ring);R.disp.push(ring.geometry);sc.add(pad)}
   }else if(v.type==='boat'){
@@ -1585,6 +1592,7 @@ function mkVehicleMesh(v,sc){
   v.body.userData={vehicle:v};R.solid.push(v.body);v.paintMat=paint;if(v.hp<=0)setWrecked(v);
   g.position.set(v.x*K,0,v.y*K);g.rotation.y=-v.a;sc.add(g);v.mesh=g;
 }
+function nearestVehicleAny(){let best=null,bd=70;for(const v of R.vehicles||[]){if(v.driverPeer)continue;const d=dist(v,R.player)-v.r;if(d<bd&&Math.abs((R.player.z||0)-(v.alt||0))<1.5){bd=d;best=v}}return best}
 function nearestVehicle(){let best=null,bd=70;for(const v of R.vehicles||[]){if(v.driverPeer||v.wrecked)continue;const d=dist(v,R.player)-v.r;if(d<bd){bd=d;best=v}}return best}
 function vehicleDamage(v,d){
   if(v.wrecked||d<=0)return;v.hp-=d;
@@ -1594,6 +1602,20 @@ function vehicleDamage(v,d){
     for(let i=0;i<30;i++)emit(R.fxAdd,{x:c.x,y:c.y,z:c.z,vx:rnd(-5,5),vy:rnd(1,6),vz:rnd(-5,5),grav:8,drag:1,life:rnd(.3,.8),r:5,g:2.4,b:.6,s:.12,s2:.03});
     for(let i=0;i<16;i++)emit(R.fxMix,{x:c.x,y:c.y,z:c.z,vx:rnd(-1,1),vy:rnd(1,3),vz:rnd(-1,1),drag:.8,life:rnd(1.5,3),r:.12,g:.11,b:.1,a:.7,s:.8,s2:3});
     feed(`The ${VEHICLES[v.type].n} broke down!`,'#ff6a2a');netSend();}
+}
+function unwreckVehicle(v){
+  v.wrecked=false;v.fixedAt=R.clock;if(v.mesh)R.scene.remove(v.mesh);R.solid=R.solid.filter(o=>o!==v.body);v.wheels=[];mkVehicleMesh(v,R.scene);
+}
+function repairUpdate(dt){
+  const p=R.player;R.repairTgt=null;
+  if(R.driving||R.downed){R.repairT=0;return}
+  const v=nearestVehicleAny();if(!v)return;const V=VEHICLES[v.type];if(v.hp>=V.hp&&!v.wrecked){R.repairT=0;return}
+  R.repairTgt=v;
+  if(keys.KeyT&&S.gadgets.repair>0){R.repairT=(R.repairT||0)+dt;if(Math.random()<dt*5)SFX.click();
+    if(R.repairT>=3){R.repairT=0;S.gadgets.repair--;const was=v.wrecked;v.hp=was?V.hp*.4:Math.min(V.hp,v.hp+V.hp*.5);if(was)unwreckVehicle(v);
+      R.repairSeq=(R.repairSeq||0)+1;R.lastRepair={i:R.vehicles.indexOf(v),hp:Math.round(v.hp),s:R.repairSeq};
+      feed(was?`Got the ${V.n} running again!`:`Repaired the ${V.n}`,'#86b46b');SFX.chime();netSend()}}
+  else R.repairT=0;
 }
 function setWrecked(v){v.wrecked=true;v.spd=0;if(v.paintMat)v.paintMat.color.multiplyScalar(.25);if(v.mesh)v.mesh.traverse(o=>{if(o.isMesh&&o.material&&o.material.color&&o.material!==v.paintMat&&!o.material.isMeshBasicMaterial)o.material=o.material.clone(),o.material.color.multiplyScalar(.35),R.disp.push(o.material)})}
 function toggleVehicle(){
@@ -1700,7 +1722,7 @@ function update(dt){
   const fx=-Math.sin(R.yaw),fy=-Math.cos(R.yaw),rx=Math.cos(R.yaw),ry=-Math.sin(R.yaw);
   const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
   const sprint=(keys.ShiftLeft||keys.ShiftRight)&&f>0&&R.adsT<.2&&!R.downed;
-  const moved=R.driving?driveUpdate(dt,f,s):p.mantle?0:moveDirP(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1)*(R.downed?.2:1)*(R.reviveT>0?0:1),dt);
+  const moved=R.driving?driveUpdate(dt,f,s):p.mantle?0:moveDirP(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1)*(R.downed?.2:1)*(R.reviveT>0||R.repairT>0?0:1),dt);
   R.moving=moved>.5;R.sprint=sprint&&R.moving;
   if(!R.driving)playerVertical(dt,f);else{p.onGround=true;p.peakZ=p.z||0}
   if(R.moving){R.bobT+=dt*(sprint?1.5:1);R.stepAcc+=moved*K;if(R.stepAcc>(sprint?2.4:1.9)){R.stepAcc=0;SFX.step(null,sprint)}}
@@ -1787,7 +1809,7 @@ function update(dt){
     if(R.over)return;
   }
   R.bullets=R.bullets.filter(b=>b.life>0);
-  updateGadgets(dt);updateCritters(dt);updatePet(dt);reviveUpdate(dt);if(R.over)return;
+  updateGadgets(dt);updateCritters(dt);updatePet(dt);reviveUpdate(dt);repairUpdate(dt);if(R.over)return;
   R.inPool=null;for(const pl of R.pools)if((p.z||0)<.2&&dist(pl,p)<pl.r){R.inPool=pl.kind;break}
   if(!R.inPool&&(p.z||0)<.2&&inSea(p))R.inPool='water';
   if(R.inPool==='lava'&&R.driving){if(!VEHICLES[R.driving.type].fly)vehicleDamage(R.driving,45*dt)}
@@ -1870,7 +1892,7 @@ document.addEventListener('mousemove',e=>{
 hc.addEventListener('mousedown',e=>{if(!R||R.over)return;if(R.paused){lockMouse();return}if(R.driving&&e.button===0){if(VEHICLES[R.driving.type].fly){mouse.down=true;return}SFX.horn();noise(R.player,700);return}if(e.button===0)mouse.down=true;if(e.button===2)mouse.right=true});
 addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false;if(e.button===2)mouse.right=false});
 hc.addEventListener('contextmenu',e=>e.preventDefault());
-hc.addEventListener('wheel',e=>{if(R&&!R.over&&!R.paused)swapTo(1-R.player.slot)},{passive:true});
+hc.addEventListener('wheel',e=>{if(R&&!R.over&&!R.paused&&!R.driving){const n=R.player.weps.length;if(n>1)swapTo((R.player.slot+(e.deltaY>0?1:n-1))%n)}},{passive:true});
 addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(!R||R.over)return;
@@ -1879,6 +1901,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyP'||(e.code==='Escape'&&R.freeLook)){
     if(document.pointerLockElement===hc)document.exitPointerLock();else if(R.started)R.paused=!R.paused;return}
   if(R.paused)return;
+  if(e.code==='KeyT'&&!R.repairTgt&&!R.driving)feed(S.gadgets.repair?'Walk up to a damaged vehicle to repair it':'No repair kits left (buy them at the Outfitter)','#968f82');
   if(R.downed){if(e.code==='KeyX')endRaid(false,'You gave up while down');return}
   const p=R.player;
   if(e.code==='KeyV'){toggleVehicle();return}
@@ -1888,8 +1911,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyG')throwGadget('gas');
   if(e.code==='KeyH')throwGadget('honey');
   if(e.code==='KeyF')placeTrap();
-  if(e.code==='Digit1')swapTo(0);
-  if(e.code==='Digit2')swapTo(1);
+  if(/^Digit[0-9]$/.test(e.code)){const n=+e.code[5];swapTo(n===0?9:n-1)}
   if(e.code==='KeyQ'&&S.meds>0&&p.hp<100){S.meds--;p.hp=Math.min(100,p.hp+35);feed('Bandaged up (+35 HP)','#86b46b');SFX.bandage()}
   if(e.code==='KeyE'&&!R.reviveTgt){const it=nearestLoot();if(it){
     if(R.pack.length>=packSlots())feed(`Pack full (${packSlots()}/${packSlots()})`,'#e0573f');
@@ -2024,14 +2046,18 @@ function hud(){
   const bar=(x,y,wd,v,max,col,lab)=>{cx.fillStyle='rgba(0,0,0,.55)';cx.fillRect(x,y,wd,12);cx.fillStyle=col;cx.fillRect(x,y,wd*clamp(v/max,0,1),12);cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText(`${lab} ${Math.ceil(Math.max(0,v))}`,x+4,y+10)};
   bar(pad,VH-pad-12,220,p.hp,100,'#b8473a','HP');
   if(p.maxap)bar(pad,VH-pad-28,220,p.ap,p.maxap,'#4f86a8','ARMOR');
-  cx.fillStyle='#968f82';cx.font=mono(12);cx.fillText(`Bandages ${S.meds} [Q] · Gas ${S.gadgets.gas} [G] · Trap ${S.gadgets.trap} [F] · Honey ${S.gadgets.honey} [H]${SFX.muted?' · muted [M]':''}`,pad,VH-pad-(p.maxap?38:22));
+  cx.fillStyle='#968f82';cx.font=mono(12);cx.fillText(`Bandages ${S.meds} [Q] · Gas ${S.gadgets.gas} [G] · Trap ${S.gadgets.trap} [F] · Repair ${S.gadgets.repair} [T] · Honey ${S.gadgets.honey} [H]${SFX.muted?' · muted [M]':''}`,pad,VH-pad-(p.maxap?38:22));
   // weapon
   cx.textAlign='right';
   if(w){const st=wStats(w);
     cx.fillStyle=w.appraised?RAR[w.rar].c:'#e6dfcf';cx.font='700 18px "Chakra Petch", sans-serif';cx.fillText(wLabel(w),VW-pad,VH-pad-30);
     cx.fillStyle='#e6dfcf';cx.font=mono(22,'600');cx.fillText(p.reloadT>0?'RELOADING':BASES[w.base].spin&&R.spin<BASES[w.base].spin&&mouse.down?'SPINNING UP':`${R.mags[w.id]} / ${st.mag}`,VW-pad,VH-pad-4);
-    cx.fillStyle=w.cond<40?'#e0573f':'#968f82';cx.font=mono(12);cx.fillText(`${Math.round(w.cond)}% cond. · slot ${p.slot+1}${p.weps[1-p.slot]?' · [1/2] swap':''}`,VW-pad,VH-pad-54);
+    cx.fillStyle=w.cond<40?'#e0573f':'#968f82';cx.font=mono(12);cx.fillText(`${Math.round(w.cond)}% cond. · slot ${p.slot===9?0:p.slot+1}${p.weps.length>1?' · [1–'+Math.min(9,p.weps.length)+(p.weps.length>9?',0':'')+'] swap':''}`,VW-pad,VH-pad-54);
   }else{cx.fillStyle='#e0573f';cx.font=mono(16,'600');cx.fillText('NO WEAPON',VW-pad,VH-pad)}
+  // weapon slots strip
+  if(p.weps.length>1&&!R.driving){const bw=40,gap=4,n=p.weps.length,x0=VW-pad-n*(bw+gap)+gap,y0=VH-pad-104;cx.textAlign='center';
+    p.weps.forEach((ww,i)=>{const x=x0+i*(bw+gap),on=i===p.slot;cx.fillStyle=on?'rgba(214,166,75,.9)':'rgba(0,0,0,.5)';cx.fillRect(x,y0,bw,26);
+      cx.fillStyle=on?'#1a1408':'#968f82';cx.font=mono(9,'600');cx.fillText(String(i===9?0:i+1),x+6,y0+10);cx.fillStyle=on?'#1a1408':(ww.appraised?RAR[ww.rar].c:'#e6dfcf');cx.font=mono(10,'600');cx.fillText(BASES[ww.base].name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase(),x+bw/2,y0+21)})}
   // prompts
   cx.textAlign='center';
   const nl=nearestLoot();
@@ -2049,6 +2075,9 @@ function hud(){
     const hpK=v.hp/V.hp;cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-110,VH-74,220,10);cx.fillStyle=hpK>.5?'#86b46b':hpK>.25?'#e0a020':'#e0573f';cx.fillRect(VW/2-110,VH-74,220*hpK,10);
     cx.font=mono(11,'600');cx.fillStyle='#e6dfcf';cx.fillText(`${V.n.toUpperCase()} ${Math.ceil(v.hp)}/${V.hp}`,VW/2,VH-66+14);
     cx.font=mono(12);cx.fillStyle='#968f82';cx.fillText(V.fly?'W/S fly · A/D turn · Space up · Shift down · Click fire darts · V get out (land first)':V.boat?'W/S drive · A/D steer · Click horn · V get out':'W/S drive · A/D steer · Click horn · V get out',VW/2,VH-36)}
+  if(R.repairTgt&&!R.driving&&!R.downed){const v=R.repairTgt,V=VEHICLES[v.type],t=(R.repairT||0)/3;cx.textAlign='center';
+    if(t>0){cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-120,VH/2+118,240,14);cx.fillStyle='#e0a020';cx.fillRect(VW/2-120,VH/2+118,240*t,14);cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText(`REPAIRING ${V.n.toUpperCase()}`,VW/2,VH/2+129)}
+    else{cx.fillStyle=S.gadgets.repair?'#e0a020':'#968f82';cx.font=mono(13,'600');cx.fillText(S.gadgets.repair?`Hold [T] to ${v.wrecked?'fix the wrecked':'repair the'} ${V.n} (${S.gadgets.repair} kit${S.gadgets.repair>1?'s':''})`:`${V.n} is damaged: buy repair kits at the Outfitter`,VW/2,VH/2+124)}}
   else if(!R.downed){const nv=nearestVehicle();if(nv&&Math.abs((R.player.z||0)-(nv.alt||0))<1.5){cx.textAlign='center';cx.fillStyle='#86d4ff';cx.font=mono(13,'600');cx.fillText(`Press [V] to ${VEHICLES[nv.type].fly?'fly':'drive'} the ${VEHICLES[nv.type].n} · ${Math.round(nv.hp/VEHICLES[nv.type].hp*100)}% health`,VW/2,VH/2+100)}}
   if((R.ladderNear||R.ladderTop)&&!R.downed){cx.textAlign='center';cx.fillStyle='#d6a64b';cx.font=mono(13,'600');cx.fillText(R.onLadder?'[W] up · [S] down · [Space] jump off':R.ladderTop?'Hold [S] to climb down the ladder':'Hold [W] to climb the ladder',VW/2,VH/2+80)}
   if(R.reviveTgt&&!R.downed){cx.textAlign='center';const t=R.reviveT/3;
@@ -2129,7 +2158,7 @@ function netSend(){
   if(!NET.squad)return;
   const P={nick:NET.nick,color:NET.color,go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
   if(R&&R.net&&!R.over){const p=R.player,w=curW();
-    P.raid={e:R.net.epoch,z:R.zi,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
+    P.raid={e:R.net.epoch,z:R.zi,rp:R.lastRepair||null,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
     for(const [k,v] of Object.entries(NET.pend)){const [kind,idx]=k.split(':').map(Number);NET.seq++;NET.hitQ.push([NET.seq,kind,idx,Math.round(v.d*10)/10,v.f])}NET.pend={};
     while(NET.hitQ.length>16)NET.hitQ.shift();P.hits=NET.hitQ;
     if(R.net.isHost)P.net=snapshot();
@@ -2209,7 +2238,9 @@ function netTick(dt){
   }
   for(const v of R.vehicles||[]){const drv=inRaid.find(q=>Array.isArray(q.presence.raid.veh)&&R.vehicles[q.presence.raid.veh[0]|0]===v);
     if(drv&&!v.driver){const vv=drv.presence.raid.veh;v.driverPeer=drv.peer;v.tx=+vv[1]||v.x;v.ty=+vv[2]||v.y;v.ta=+vv[3]||0;v.tspd=+vv[4]||0;if(vv[5]!==undefined)v.hp=Math.min(v.hp,+vv[5]);v.talt=+vv[6]||0}else if(v.driverPeer){v.driverPeer=null;v.tspd=0}
-    if(!v.wrecked&&inRaid.some(q=>Array.isArray(q.presence.raid.wr)&&q.presence.raid.wr.includes(R.vehicles.indexOf(v)))){v.hp=0;setWrecked(v)}}
+    for(const q of inRaid){const rp=q.presence.raid.rp;if(!rp||R.vehicles[rp.i|0]!==v)continue;R.rpSeen=R.rpSeen||{};const key=q.peer;
+      if(R.rpSeen[key]===undefined){R.rpSeen[key]=rp.s|0;continue}if((rp.s|0)>R.rpSeen[key]){R.rpSeen[key]=rp.s|0;v.hp=Math.min(VEHICLES[v.type].hp,Math.max(1,+rp.hp||1));if(v.wrecked)unwreckVehicle(v)}}
+    if(!v.wrecked&&!(v.fixedAt!==undefined&&R.clock-v.fixedAt<5)&&inRaid.some(q=>Array.isArray(q.presence.raid.wr)&&q.presence.raid.wr.includes(R.vehicles.indexOf(v)))){v.hp=0;setWrecked(v)}}
   for(const r of Object.values(R.remotes)){const q=inRaid.find(q=>q.peer===r.peer);r.inVeh=!!(q&&q.presence.raid.veh);if(r.inVeh)r.mesh.position.y+=.45}
   for(const peer of Object.keys(R.remotes))if(!seenPeers[peer]){R.scene.remove(R.remotes[peer].mesh);feed(`${R.remotes[peer].nick} left the raid`,'#968f82');delete R.remotes[peer]}
   if(!R.net.isHost){const hq=NET.peers.find(q=>q.peer===host);const sn=hq&&hq.presence.net;if(sn&&sn.e===ep)applySnapshot(sn,host)}
@@ -2237,6 +2268,7 @@ function endRaid(ok,reason){
     const prim=byId(S.primary),sec=byId(S.secondary);
     if(prim)loseWeapon(prim,lines);
     if(sec){if(Math.random()<HOLSTERS[S.holster].keep)lines.push(['good',`Your ${HOLSTERS[S.holster].n} held: kept ${wLabel(sec)}`]);else loseWeapon(sec,lines)}
+    for(const id of [...(S.extra||[])]){const ew=byId(id);if(ew)loseWeapon(ew,lines)}
     R.pack.forEach(w=>lines.push(['bad',`Dropped loot: ${wLabel(w)}`]));
     if(R.raidCash)lines.push(['bad',`Dropped ${money(R.raidCash)} cash`]);
     if(S.vest){lines.push(['bad',`Lost ${VESTS[S.vest].n}`]);S.vest=0}
