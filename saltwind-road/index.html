@@ -966,7 +966,8 @@ masterwork_vase:{name:'Masterwork Vase',base:220,col:'#f0f4ff',kind:'good',desc:
   gear:{name:'Brass Gear',base:20,col:'#d8a848',kind:'mat'},
   display_case:{name:'Display Case',base:150,col:'#bfe8ff',kind:'place',desc:'Place with B. Show off a trophy or treasure.'},
   moon_mochi:{name:'Moon Mochi',base:40,col:'#f8f0ff',kind:'food',heal:6,buff:'luck',buff2:'speed',buffDur:600,desc:'Lucky and Swift for 10 minutes'},
-  moon_charm:{name:'Moon Charm',base:1200,col:'#e8e0ff',kind:'trinket',desc:'+10% experience. A gift from the moon rabbit.'},
+  shell_charm:{name:'Shellback Charm',base:300,col:'#4a8a6a',kind:'trinket',desc:'+3 max HP. A scute shed by the Wandering Isle.'},
+moon_charm:{name:'Moon Charm',base:1200,col:'#e8e0ff',kind:'trinket',desc:'+10% experience. A gift from the moon rabbit.'},
   painted_egg:{name:'Painted Egg',base:12,col:'#ff9ad0',kind:'good',desc:'A prize from the spring egg hunt.'},
   training_dummy:{name:'Training Dummy',base:60,col:'#c8a060',kind:'place',desc:'Place with B. Hit it to see your damage per second.'},
   aurora_shard:{name:'Aurora Shard',base:180,col:'#7af0c0',kind:'good',desc:'A sliver of the northern lights, cold to the touch.'},
@@ -1536,6 +1537,109 @@ const FESTIVALS = [
   {name:'Harvest Moon', town:'wren', cols:['#e07a2a','#c8402a','#f0c040','#5a3a1a'], special:'pumpkin_lantern', desc:'pumpkins, pies and fireworks over the harbor'},
   {name:'Winterlights', town:'frost', cols:['#9fe8ff','#ffffff','#e05a5a','#86c98f'], special:'snow_globe', desc:'candles, carols and sky lanterns on the ice'},
 ];
+// ===== the Wandering Isle: a giant sea turtle that surfaces on days 4 and 5 of each season =====
+const ISL_W = 15, ISL_H = 11;
+const ISL_FORAGE = [[3, 4], [11, 3], [7, 7], [5, 2], [10, 7]];
+const ISL_HATCH = [[2, 3], [1, 6], [4, 9], [10, 9], [13, 6], [12, 2]];
+const ISL_LOOT = [['coconut', 2], ['shells', 3], ['coral', 1], ['driftwood', 2], ['pearl', 1]];
+let islSpots = null, isl = null;
+const isleDay = () => !!S && (dayOfSeason() === 4 || dayOfSeason() === 5);
+const islWeek = () => Math.floor(((S ? S.day : 1) - 1)/7);
+function islShape(dx, dy) {
+  const nx = (dx - (ISL_W - 1)/2)/(ISL_W/2), ny = (dy - (ISL_H - 1)/2)/(ISL_H/2), r = nx*nx + ny*ny;
+  if (r > 1) return null; if (r > .58) return T.SAND; if ((dx === 6 && dy === 4) || (dx === 8 && dy === 6) || (dx === 9 && dy === 4)) return T.FOREST; return T.GRASS;
+}
+function islFindSpots() {
+  islSpots = [];
+  for (let y = 28; y + ISL_H + 20 < WORLD_H; y += 7) for (let x = 14; x + ISL_W + 14 < EAST_W; x += 7) {
+    let ok = true;
+    for (let yy = y - 5; yy < y + ISL_H + 5 && ok; yy++) for (let xx = x - 5; xx < x + ISL_W + 5; xx++) if (map[idx(xx, yy)] !== T.DEEP) { ok = false; break; }
+    if (ok && Object.values(TOWNS).some(t => Math.hypot(t.x - x - ISL_W/2, t.y - y - ISL_H/2) < 48)) islSpots.push([x, y]);
+  }
+}
+function islRedraw(x, y) {
+  for (let cy = Math.floor((y - 1)/CH); cy <= Math.floor((y + ISL_H + 1)/CH); cy++) for (let cx = Math.floor((x - 1)/CH); cx <= Math.floor((x + ISL_W + 1)/CH); cx++) {
+    const o = chunks[cy] && chunks[cy][cx]; if (o) { o.width = o.height = 0; chunks[cy][cx] = null; } }
+  mapCtx.putImageData(mapImg, 0, 0);
+}
+function islPick(wk) {
+  const n = islSpots.length, h = w => (Math.imul((w + 11) ^ 0x5bd1e995, 2654435761) >>> 0) % n;
+  let prev = h(Math.max(0, wk - 40));
+  for (let w = Math.max(0, wk - 40) + 1; w <= wk; w++) { let i = h(w); if (Math.abs(i - prev) < n/4) i = (i + Math.floor(n/2)) % n; prev = i; }
+  return prev;
+}
+function islApply() {
+  if (!islSpots) islFindSpots(); if (!islSpots.length) return;
+  const wk = islWeek(), [x, y] = islSpots[islPick(wk)], orig = [], set = new Set();
+  for (let dy = 0; dy < ISL_H; dy++) for (let dx = 0; dx < ISL_W; dx++) { const t = islShape(dx, dy); if (t == null) continue; const i = idx(x + dx, y + dy); orig.push([i, map[i]]); map[i] = t; set.add(i); revealMapPixel(i); }
+  isl = {x, y, orig, set, wk, ph: 0};
+  if (S.islWk !== wk) { S.islWk = wk; S.islGot = []; S.islHatch = []; S.islFed = false; }
+  islRedraw(x, y);
+}
+function islRemove() {
+  const o = isl; isl = null;
+  for (const [i, t] of o.orig) { map[i] = t; if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; } }
+  islRedraw(o.x, o.y);
+}
+function islNearTown() { let best = null, bd = 1e9; for (const k in TOWNS) { const d = Math.hypot(TOWNS[k].x - isl.x, TOWNS[k].y - isl.y); if (d < bd) { bd = d; best = k; } } return best; }
+function islDir(fx, fy, tx, ty) { const a = Math.atan2(ty - fy, tx - fx), d = ['east', 'southeast', 'south', 'southwest', 'west', 'northwest', 'north', 'northeast']; return d[((Math.round(a/(Math.PI/4)) % 8) + 8) % 8]; }
+function islTick(dt) {
+  if (!S || !map) return;
+  const want = isleDay();
+  if (isl && (!want || isl.wk !== islWeek())) {
+    const on = isl.set.has(idx(Math.floor(S.x), Math.floor(S.y)));
+    islRemove();
+    if (on && S.y < WORLD_H && !passable(S.x, S.y)) { const k = Object.keys(TOWNS).sort((a, b) => Math.hypot(TOWNS[a].x - S.x, TOWNS[a].y - S.y) - Math.hypot(TOWNS[b].x - S.x, TOWNS[b].y - S.y))[0]; S.x = TOWNS[k].x + .5; S.y = TOWNS[k].y + 2.3; lastTile = -1; toast(`<b>The island dives!</b><br>Old Shellback sinks beneath the waves. A passing fishing boat hauls you aboard and drops you at ${TOWNS[k].name}.`, 6000); }
+  }
+  if (want && !isl) {
+    islApply();
+    if (isl && S.islTold !== isl.wk && mode === 'play') { S.islTold = isl.wk; const k = islNearTown(); toast(`<b>The Wandering Isle has surfaced!</b><br>Sailors spotted the giant turtle Old Shellback ${islDir(TOWNS[k].x, TOWNS[k].y, isl.x + ISL_W/2, isl.y + ISL_H/2)} of ${TOWNS[k].name}. It’s marked on your map, and it dives again after tomorrow.`, 7000); }
+  }
+  if (isl) isl.ph += dt;
+}
+function islTarget() {
+  if (!isl) return null; const X = S.x - isl.x, Y = S.y - isl.y;
+  for (let k = 0; k < ISL_HATCH.length; k++) { if (S.islHatch.includes(k)) continue; const [hx, hy] = ISL_HATCH[k]; if (Math.hypot(X - hx - .5, Y - hy - .5) < 1.3) return {key: 'islb' + k, html: '<kbd style="margin:0 6px 0 0">E</kbd>Help the hatchling to the sea', btn: 'Help', fn: () => islHatch(k)}; }
+  for (let k = 0; k < ISL_FORAGE.length; k++) { if (S.islGot.includes(k)) continue; const [fx, fy] = ISL_FORAGE[k]; if (Math.hypot(X - fx - .5, Y - fy - .5) < 1.3) return {key: 'islf' + k, html: '<kbd style="margin:0 6px 0 0">E</kbd>Search the shell-moss', btn: 'Search', fn: () => islForage(k)}; }
+  if (Math.hypot(X - (ISL_W + .4), Y - ISL_H/2) < 1.9) return {key: 'islh', html: '<kbd style="margin:0 6px 0 0">E</kbd>Greet Old Shellback', btn: 'Greet', fn: islHead};
+  return null;
+}
+function islForage(k) {
+  S.islGot.push(k); const [g, n] = ISL_LOOT[Math.floor(Math.random()*ISL_LOOT.length)]; addItem(g, n); S.islFinds = (S.islFinds || 0) + 1;
+  burst(isl.x + ISL_FORAGE[k][0] + .5, isl.y + ISL_FORAGE[k][1], '#9ae0a0', 10, 3); SFX.pickup(); floatText(S.x, S.y - 1.6, `+${n} ${GOODS[g].name}`, '#9ae0a0'); renderHUD(); save();
+}
+function islHatch(k) {
+  S.islHatch.push(k); S.hatchlings = (S.hatchlings || 0) + 1; S.coins += 8; SFX.chime(); burst(isl.x + ISL_HATCH[k][0] + .5, isl.y + ISL_HATCH[k][1] + .3, '#7ac8e8', 12, 3);
+  if (S.islHatch.length === ISL_HATCH.length) { addItem('pearl', 2); S.hatchRuns = (S.hatchRuns || 0) + 1; gainXP(60); toast('<b>All six hatchlings reached the sea!</b><br>Old Shellback rumbles happily. You find 2 pearls in the sand where the nest was.', 5000); }
+  else floatText(S.x, S.y - 1.6, `Hatchling saved! (${S.islHatch.length}/${ISL_HATCH.length}) +8◆`, '#7ac8e8');
+  renderHUD(); save();
+}
+function islHead() {
+  const fish = Object.keys(CATCH).filter(f => GOODS[f] && have(f) > 0).sort((a, b) => GOODS[a].base - GOODS[b].base);
+  const fr = S.islFriend || 0;
+  const hello = fr === 0 ? '“Hrrrmmm. A little one, walking on my back. It has been a hundred years since anyone visited.”' : fr < 3 ? '“Hrrrmmm. The little one returns. My back itches less when you visit.”' : '“My old friend! Sit, sit. The sea is calm today.”';
+  const opts = [];
+  if (!S.islFed) opts.push({label: fish.length ? `Feed it a ${GOODS[fish[0]].name}` : 'Feed it a fish (you have none)', primary: !!fish.length, disabled: !fish.length, fn: () => {
+    addItem(fish[0], -1); S.islFed = true; S.islFriend = fr + 1; addItem('pearl', 1); gainXP(30); SFX.victory();
+    let extra = ''; if (S.islFriend === 3) { addItem('shell_charm', 1); extra = '<br>“Take this. I shed it last century. It will keep you sturdy.” <b style="color:var(--good)">You receive the Shellback Charm (+3 max HP)!</b>'; }
+    if (S.islFriend === 6) { addItem('black_pearl', 1); extra = '<br>“You are as patient as a turtle, little one. This pearl grew in my shell for two hundred years.” <b style="color:var(--good)">You receive a Black Pearl!</b>'; }
+    renderHUD(); save(); openPanel('Old Shellback', `Old Shellback swallows the fish in one slow gulp. “Mmm. Thank you.” A pearl rolls out from under its chin.${extra}<br><span style="color:var(--muted)">Friendship: ${S.islFriend}</span>`, [{label: 'Close', fn: closeTalk}]); }});
+  else opts.push({label: 'You already fed it this visit', disabled: true, fn: () => {}});
+  opts.push({label: 'Close', fn: closeTalk});
+  openPanel('Old Shellback', `${hello}<br>The great turtle blinks one enormous, ancient eye. Its whole island back rises and falls as it breathes.${S.islHatch.length < ISL_HATCH.length ? '<br><span style="color:var(--muted)">Baby turtles are hatching on the beach. Help them reach the water!</span>' : ''}<br><span style="color:var(--muted)">Friendship: ${fr} · visit days: 4 and 5 of every season</span>`, opts);
+}
+function drawIsle() {
+  const ox = isl.x*TS, oy = isl.y*TS, t = isl.ph;
+  ctx.strokeStyle = 'rgba(40,70,30,.35)'; ctx.lineWidth = 2;
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) { const cx = ox + (3.5 + c*2.7 + (r % 2)*1.35)*TS, cy = oy + (2.6 + r*2.6)*TS; ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = k*Math.PI/3 + Math.PI/6, px = cx + Math.cos(a)*TS*1.25, py = cy + Math.sin(a)*TS*1.1; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); ctx.stroke(); }
+  const hx = ox + (ISL_W + .2)*TS, hy = oy + (ISL_H/2)*TS + Math.sin(t*1.2)*2;
+  ctx.fillStyle = '#5a8a5a'; ctx.beginPath(); ctx.ellipse(hx, hy, 18, 13, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#4a7a4a'; ctx.beginPath(); ctx.ellipse(hx - 10, hy, 8, 11, 0, 0, 7); ctx.fill();
+  const blink = Math.sin(t*.7) > .97; ctx.fillStyle = '#1a1a1a'; ctx.fillRect(hx + 6, hy - 6, 5, blink ? 1 : 5); ctx.fillRect(hx + 6, hy + 2, 5, blink ? 1 : 5); ctx.fillStyle = '#3a5a3a'; ctx.fillRect(hx + 14, hy - 1, 4, 2);
+  for (const [fx, fy, s] of [[1.5, -.4, -1], [ISL_W - 2.5, -.4, -1], [1.5, ISL_H + .2, 1], [ISL_W - 2.5, ISL_H + .2, 1]]) { const w = Math.sin(t*1.5 + fx)*3; ctx.fillStyle = '#5a8a5a'; ctx.beginPath(); ctx.ellipse(ox + fx*TS + w, oy + fy*TS + s*4, 14, 7, s*.4, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; for (let k = 0; k < 8; k++) { const a = k/8*6.283 + t*.2; ctx.fillRect(ox + (ISL_W/2 + Math.cos(a)*(ISL_W/2 + 1.6))*TS, oy + (ISL_H/2 + Math.sin(a)*(ISL_H/2 + 1.4))*TS, 6, 2); }
+  for (let k = 0; k < ISL_FORAGE.length; k++) { if (S.islGot.includes(k)) continue; const [fx, fy] = ISL_FORAGE[k], px = ox + fx*TS + 8, py = oy + fy*TS + 10; ctx.fillStyle = '#3a8a4a'; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill(); ctx.fillStyle = '#e8e0c8'; ctx.fillRect(px - 2, py - 2, 4, 3); if (Math.sin(t*3 + k) > .6) { ctx.fillStyle = '#ffffff'; ctx.fillRect(px + 3, py - 6, 2, 2); } }
+  for (let k = 0; k < ISL_HATCH.length; k++) { if (S.islHatch.includes(k)) continue; const [bx, by] = ISL_HATCH[k], px = ox + bx*TS + 8 + Math.sin(t*4 + k)*1.5, py = oy + by*TS + 10; ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.ellipse(px - 5, py + 3, 4, 3, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3a7a5a'; ctx.beginPath(); ctx.ellipse(px, py, 4, 3, 0, 0, 7); ctx.fill(); ctx.fillRect(px + 3, py - 1, 3, 2); }
+}
 // ===== solar eclipse: noon on day 2 of summer and winter =====
 const eclipseDay = () => !!S && dayOfSeason() === 2 && (seasonIdx() === 1 || seasonIdx() === 3);
 function eclipseAmt() { if (!eclipseDay() || inDungeon() || inArena() || S.y >= WORLD_H) return 0; const d = Math.abs(S.time - .51); return d > .045 ? 0 : Math.min(1, (.045 - d)/.025); }
@@ -3343,7 +3447,7 @@ function setsHTML() {
 function armorVal() { return setStat('armor') + eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + setStat('speed')) * (have('rain_feather') ? 1.06 : 1) * (have('tide_bell') && S && [T.DEEP, T.SHAL].includes(tileAt(Math.floor(S.x), Math.floor(S.y))) ? 1.25 : 1) * (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + setStat('hp') + 2*sk('vit') + (S.bonusHP || 0) + restedHP() + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
+const maxHP = () => BASE_HP + setStat('hp') + 2*sk('vit') + (S.bonusHP || 0) + restedHP() + (have('shell_charm') ? 3 : 0) + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -3375,7 +3479,7 @@ function rebuildMapPixels() {
   for (let i = 0; i < W*H; i++) if (S.explored[i]) revealMapPixel(i); else { mapImg.data[i*4] = 14; mapImg.data[i*4+1] = 18; mapImg.data[i*4+2] = 25; }
   mapCtx.putImageData(mapImg, 0, 0);
 }
-const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
+const exploredPct = () => { let land = 0, seen = 0; for (let i = 0; i < W*WORLD_H; i++) { if (map[i] !== T.DEEP && !(isl && isl.set.has(i))) { land++; if (S.explored[i]) seen++; } } return Math.round(seen/land*100); };
 const sightRadius = () => (weatherNow() === 'fog' ? 5 : 7.5) + (S.equip.head === 'miner_helmet' && have('miner_helmet') ? 1.5 : 0) + (S.pet === 'hawk' || S.pet === 'meerkat' ? 2 : 0) + (S.pet === 'owl' && Math.cos((S.time - .5) * Math.PI * 2) < -.2 ? 3 : 0) + (have('spyglass') ? 1.5 : 0) + conHas('owl') + (S.pet === 'clockwork_owl' ? 2.5 : 0) + (have('ghost_lantern') ? 5 : have('foxfire_lantern') ? 4 : have('wisp_lantern') ? 3 : have('lantern') ? 2 : 0) + (have('cloak') ? 1.5 : 0);
 
 function checkDiscoveries() {
@@ -8528,6 +8632,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['The Wandering Isle', 'On days 4 and 5 of every season, Old Shellback, a turtle as big as an island, surfaces somewhere in the open sea of the western and central waters. It shows on your map. Sail out (you need the raft or boat), greet it, and feed it a fish once per visit for a pearl. At 3 visits it gives you the Shellback Charm (+3 max HP), and at 6 a Black Pearl. Search the shell-moss for coconuts, coral and pearls, and help the six hatchlings reach the sea. If you are still on its back when it dives, a fishing boat brings you to the nearest town.'],
   ['Decorating', 'At your homestead, open the house and choose Decorate. Buy furniture and place it on the grid. Wall pieces (windows, clocks, shelves and paintings) go on the top row. Paintings and vases from your bag can be placed too. Comfort adds up from each piece, plus a bonus for variety. At 20 (Cozy), 45 (Snug) and 80 (Lovely), sleeping at home gives +2, +4 or +6 max HP and +5%, +10% or +15% XP the next day. Keys: arrows to move, Space or E to place or pick up, Q, [ or ] to cycle pieces, X to put away. Controller: D-pad, A, bumpers, X.'],
   ['The easel', 'Pia Palette in Prismvale paints commissions with you (three a day). Mix red, yellow and blue, add white to lighten and black to darken, and match each target color. A 75% match makes a Landscape Painting and 92% makes a Masterpiece. Blue and yellow make green; all three make mud.'],
   ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays Fox and Geese for 10 coin. You move 13 geese (up, left or right, never back). The fox jumps a goose when the square behind it is empty. Trap him so he cannot move. Lose six geese and he wins. Keep your rows filled and never leave a gap behind a goose.'],
@@ -9807,6 +9912,7 @@ function render() {
   if (totOn()) for (const h of houses) if (h.town && inView(h.x + 1, h.y + 1.5)) { const key = h.x + ',' + h.y; if ((S.tot || {})[key] !== S.day) sprites.push({y: h.y + 2.1, f: () => drawJack(h)}); }
   for (const [i, q] of secretGlades().entries()) if (Math.hypot(q.x - S.x, q.y - S.y) < 6 && inView(q.x, q.y)) sprites.push({y: q.y - 1, f: () => drawGlade(q, i)});
   for (const w of eclWisps) if (inView(w.x, w.y)) sprites.push({y: w.y + .5, f: () => drawWisp(w)});
+  if (isl && x1 >= isl.x - 3 && x0 <= isl.x + ISL_W + 3 && y1 >= isl.y - 3 && y0 <= isl.y + ISL_H + 3) sprites.push({y: isl.y - 2, f: drawIsle});
   if (S.home && S.home.greenhouse && inView(HOME.x + 5, HOME.y - 2)) sprites.push({y: HOME.y - 1.6, f: drawGreenhouse});
   for (const q of (S.lostItems || [])) if (!q.got && inView(q.x, q.y)) sprites.push({y: q.y, f: () => drawLost(q)});
   for (const c of skyCrates) if (inView(c.x, c.y)) sprites.push({y: c.y, f: () => drawSkyCrate(c)});
@@ -10168,7 +10274,7 @@ function update(dt) {
   if (S.race) updateRace(dt);
   updateStars(dt);
   if (lastCoins != null && S.coins > lastCoins) S.earned = (S.earned || 0) + (S.coins - lastCoins); lastCoins = S.coins;
-  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck(); eclipseTick(); setWatch();
+  deedT -= dt; if (deedT <= 0) { deedT = .5; checkDeeds(); weeklyCheck(); smugCheck(); eclipseTick(); setWatch(); islTick(dt);
     if (S.starfall === S.day && S.time > .74 && S.time < .8 && S.sfWarned !== S.day) { S.sfWarned = S.day; toast('<b>A starfall night!</b><br>Shooting stars are streaking across the sky. Where they land, star fragments glow until morning. Go and find them!', 8000); SFX.chime(); }
     if (bloodMoonDay() && S.time > .72 && S.time < .8 && S.bmWarned !== S.day) { S.bmWarned = S.day; toast('<b>The moon is rising red...</b><br>Tonight is a Blood Moon. Monsters will be stronger and far more numerous, and elites will walk the land. Every kill pays double.', 8000); SFX.roar(); }
     if (S.day % 6 === 1 && S.time > .22 && S.time < .32 && S.bmWarned === S.day - 1 && S.bmSurvived !== S.day) { S.bmSurvived = S.day; S.bloodMoons = (S.bloodMoons || 0) + 1; toast('<b>The Blood Moon sets</b><br>You survived the night.', 5000); }
@@ -10263,7 +10369,7 @@ function update(dt) {
   const rvT = party ? reviveTarget() : null; if (rvT) best = null;
   nearNPC = best;
   nearBoard = best ? null : boardAt(S.x, S.y, 1.5);
-  nearHome = best || nearBoard ? null : (rvT || eclTarget() || hsTarget() || pkTarget() || rmTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
+  nearHome = best || nearBoard ? null : (rvT || eclTarget() || islTarget() || hsTarget() || pkTarget() || rmTarget() || totTarget() || gladeTarget() || rpTarget() || lostTarget() || tortoiseTarget() || crateTarget() || mwTarget() || leTarget() || detTarget() || bellTarget() || ghostTarget() || totemTarget() || essenceTarget() || digSiteTarget() || birdTarget() || homeTarget() || arenaTarget() || dungeonTarget() || digTarget() || starTarget() || weatherTarget() || shrineTarget() || lostPetTarget() || whaleTarget() || meteorTarget() || summitTarget() || moonTarget() || deepTarget() || mustangTarget() || waystoneTarget() || lmapTarget() || springTarget() || eggTarget() || amaraTarget() || auroraTarget() || shellTarget() || volcTarget() || snowTarget() || fairyTarget() || bugTarget() || vaultTarget() || stagTarget() || bottleTarget() || relicTarget() || wellTarget() || propertyTarget() || placedTarget() || critterTarget());
   nearNodeI = best || nearBoard || nearHome ? -1 : nearestNode();
   let key = '', html = '', btn = '';
   if (best) { key = 'n' + best.id; html = `<kbd style="margin:0 6px 0 0">E</kbd>Talk to <b>${esc(best.name)}</b>`; btn = 'Talk'; }
@@ -12797,6 +12903,7 @@ function openMap() {
     if (sv.length) { g.save(); g.font = `${Math.round(9*dpr)}px "Pixelify Sans", monospace`; for (let li = 0; li*2 < sv.length; li++) { const txt = sv.slice(li*2, li*2 + 2).join(' · '), w2 = g.measureText(txt).width/2 + 2, tx = Math.max(w2, Math.min(c.width - w2, (t.x+.5)*s)), ty = (t.y+.5)*s + (14 + li*10)*dpr; g.fillStyle = '#0d131b'; g.fillText(txt, tx + 1, ty + 1); g.fillStyle = '#e3a948'; g.fillText(txt, tx, ty); } g.restore(); }
   }
   g.fillStyle = '#86c98f'; g.fillRect((HOME.x+.5)*s - 4*dpr, (HOME.y+.5)*s - 4*dpr, 8*dpr, 8*dpr); g.fillStyle = '#ebe4d3'; g.fillText(S.home.level ? 'Home' : 'Homestead', (HOME.x+.5)*s, (HOME.y+.5)*s + 16*dpr);
+  if (isl) { const ix = (isl.x + ISL_W/2)*s, iy = (isl.y + ISL_H/2)*s; g.fillStyle = '#5a8a5a'; g.beginPath(); g.ellipse(ix, iy, 7*dpr, 5*dpr, 0, 0, 7); g.fill(); g.strokeStyle = '#ebe4d3'; g.lineWidth = dpr; g.stroke(); g.fillStyle = '#0d131b'; g.fillText('Wandering Isle', ix + 1, iy - 9*dpr + 1); g.fillStyle = '#9ae0a0'; g.fillText('Wandering Isle', ix, iy - 9*dpr); }
   for (const k of DK) if (S.dungeonsSeen[k]) { const E = DUNGEONS[k].entrance; g.fillStyle = S.bosses[DUNGEONS[k].boss] ? '#6a5a7a' : '#b07aff'; g.beginPath(); g.moveTo((E.x+.5)*s, (E.y+.5)*s - 6*dpr); g.lineTo((E.x+.5)*s + 6*dpr, (E.y+.5)*s + 5*dpr); g.lineTo((E.x+.5)*s - 6*dpr, (E.y+.5)*s + 5*dpr); g.fill(); g.fillStyle = '#ebe4d3'; g.fillText(DUNGEONS[k].name.replace('The ', ''), (E.x+.5)*s, (E.y+.5)*s + 18*dpr); }
   { const mk = (x, y, col, txt, r = 4) => { const tx = x*s, ty = y*s; g.fillStyle = col; g.beginPath(); g.arc(tx, ty, r*dpr, 0, 7); g.fill(); g.strokeStyle = '#0d131b'; g.lineWidth = 1.5*dpr; g.stroke(); if (txt) { g.fillStyle = col; g.fillText(txt, tx, ty - 8*dpr); } };
     (S.dens || []).forEach((d, i) => { if ((S.densSeen || {})[i]) mk(d.x + .5, d.y + .5, S.day - d.broken >= 7 ? '#d05a4a' : '#6a6a72', S.day - d.broken >= 7 ? 'Den' : ''); });
@@ -13614,6 +13721,9 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['shellback','Turtle Talker','Greet Old Shellback on the Wandering Isle', () => (S.islFriend || 0) >= 1],
+  ['shellback6','Old Friends','Feed Old Shellback six times', () => (S.islFriend || 0) >= 6],
+  ['hatchlings','Hatchling Helper','Help all six hatchlings reach the sea in one visit', () => (S.hatchRuns || 0) >= 1],
   ['cozy_home','Home Sweet Home','Decorate your homestead room to Lovely comfort', () => roomComfort() >= 80],
   ['well_rested','Well Rested','Wake up well rested 10 times', () => (S.restedNights || 0) >= 10],
   ['old_master','Old Master','Paint a masterpiece at Pia’s easel', () => (S.paintMaster || 0) > 0],
@@ -14278,8 +14388,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 27;
+const WN_VER = 28;
 const WHATS_NEW = [
+  ['The Wandering Isle', 'On days 4 and 5 of every season a turtle the size of an island surfaces at sea. Sail out to befriend Old Shellback, forage its shell and help the hatchlings.'],
   ['Decorate your home', 'Open your homestead house and choose Decorate. Place furniture, paintings and vases. A cozy room makes you well rested: extra max HP and XP the next day.'],
   ['The easel', 'Pia Palette in Prismvale teaches color mixing. Match a scene’s colors from red, yellow, blue, white and black to paint landscapes and masterpieces.'],
   ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays the old board game: march your 13 geese forward and pen in the fox.'],
@@ -14585,7 +14696,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get isl(){return isl;}, islTick: () => islTick(0), get islSpots(){return islSpots;}, openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
