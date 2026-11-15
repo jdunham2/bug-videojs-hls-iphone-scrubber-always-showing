@@ -392,25 +392,37 @@
     const set = shuffled([who.includes('rosa') ? 'stove' : 'fireplace', 'shelf', 'wardrobe']);
     set.forEach((kind, i) => objects.push(makeFurniture(kind, slots[i] * T, back)));
     objects.push(makeTableIn((x0 + 5.5) * T, (y0 + 5) * T));
-    objects.push(makeArmchair((bedLeft ? x0 + 8.8 : x0 + 2.2) * T, (y0 + 6.8) * T, h.room.rug));
+    h.room.armchair = { x: (bedLeft ? x0 + 8.8 : x0 + 2.2) * T, y: (y0 + 6.8) * T };
+    objects.push(makeArmchair(h.room.armchair.x, h.room.armchair.y, h.room.rug));
     objects.push(makePlant((bedLeft ? x0 + 1.5 : x0 + 9.5) * T, (y0 + 6.8) * T));
   }
 
   // Furniture ------------------------------------------------------------------
   function makeBed(x, y, blanket) {
-    return {
-      kind: 'bed', x, y, hitbox: box(x - 30, y - 42, 60, 42),
+    const o = {
+      // Only the headboard is solid for the raccoon, so it can crawl under the blanket;
+      // navBox keeps villagers walking round the whole bed.
+      kind: 'bed', x, y, hitbox: box(x - 30, y - 46, 60, 8), navBox: box(x - 30, y - 42, 60, 42), rustle: 0,
       bounds: { l: x - 34, r: x + 34, t: y - 64, b: y + 4 },
+      contains(px, py) { return px > x - 26 && px < x + 26 && py > y - 31 && py < y + 3; },
       shadow(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x - 28, y - 4, 62, 6); },
-      draw(ctx) {
+      draw(ctx, t) {
+        const wob = o.rustle > 0 ? Math.sin(t * 40) * 1.2 : 0;
         ctx.fillStyle = '#5a3a24'; roundRect(ctx, x - 31, y - 62, 62, 18, 4, true);       // headboard
         ctx.fillStyle = '#f4f2ee'; roundRect(ctx, x - 29, y - 48, 58, 46, 5, true);       // mattress
         ctx.fillStyle = '#ffffff'; roundRect(ctx, x - 21, y - 46, 42, 10, 4, true);       // pillow
-        ctx.fillStyle = blanket; roundRect(ctx, x - 29, y - 34, 58, 32, 5, true);         // blanket
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 29, y - 34, 58, 4);
+        ctx.fillStyle = blanket; roundRect(ctx, x - 29 + wob, y - 34, 58, 32, 5, true);   // blanket
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 29 + wob, y - 34, 58, 4);
+        if (player.hidden && player.hidingIn === o) { // a lump under the covers... and two eyes
+          ctx.fillStyle = shade(blanket, 0.12); ellipse(ctx, player.x, player.y - 14, 13, 8);
+          ctx.fillStyle = shade(blanket, -0.35); ctx.fillRect(x - 29, y - 6, 58, 5);
+          ctx.fillStyle = '#ffffff'; circle(ctx, player.x - 3, y - 3.5, 1.5); circle(ctx, player.x + 3, y - 3.5, 1.5);
+          ctx.fillStyle = NOSE; const look = Math.sin(t * 0.9) * 0.6; circle(ctx, player.x - 3 + look, y - 3.5, 0.75); circle(ctx, player.x + 3 + look, y - 3.5, 0.75);
+        }
         ctx.fillStyle = '#5a3a24'; ctx.fillRect(x - 31, y - 4, 4, 4); ctx.fillRect(x + 27, y - 4, 4, 4);
       },
     };
+    return o;
   }
   function makeFurniture(kind, x, y) {
     const o = { kind, x, y, hitbox: box(x - 20, y - 12, 40, 12), bounds: { l: x - 30, r: x + 30, t: y - 80, b: y + 4 } };
@@ -1332,6 +1344,7 @@
     sfx('chitter');
     // You can't chitter with your mouth full: light things fall out
     if (player.held && !player.held.type.heavy) dropHeld(true);
+    if (cat && cat.state !== 'flee' && Math.hypot(cat.x - player.x, cat.y - player.y) < chitterRadius()) catFlee(player.x, player.y);
     for (const v of villagers) {
       if (Math.hypot(v.x - player.x, v.y - player.y) < chitterRadius() && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
     }
@@ -1570,7 +1583,7 @@
       q.life -= dt;
       if (q.kind === 'ring') q.r += dt * 26;
       else if (q.kind === 'heart') { q.z += 26 * dt; q.x += Math.sin(q.life * 9) * 0.4; }
-      else if (q.kind === 'drop' || q.kind === 'spark') {
+      else if (q.kind === 'drop' || q.kind === 'spark' || q.kind === 'shard') {
         q.x += q.vx * dt; q.y += q.vy * dt;
         q.vz -= 500 * dt; q.z += q.vz * dt;
         if (q.z < 0) q.life = 0;
@@ -1894,6 +1907,7 @@
     } },
   };
 
+  for (const k of ['vase', 'teapot', 'frame', 'cookies', 'milk']) ITEM[k].fragile = true;
   const items = [];
   let target = null; // item the raccoon would grab right now
   const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
@@ -1940,7 +1954,7 @@
   function spotFree(x, y, r) {
     if (tileAt(x, y) === WATER || tileAt(x, y) === WALL || tileAt(x - r, y - 4) === WALL || tileAt(x + r, y - 4) === WALL) return false;
     const b = box(x - r, y - 7, r * 2, 8);
-    for (const o of solidObjects) if (boxesOverlap(b, o.hitbox)) return false;
+    for (const o of solidObjects) if (boxesOverlap(b, o.navBox || o.hitbox)) return false;
     for (const it of items) if (it.type.heavy && boxesOverlap(b, itemBox(it))) return false;
     return true;
   }
@@ -2084,6 +2098,14 @@
   // How far something is from the spot just in front of the raccoon's nose
   function reachPoint() { const d = DIRV[player.dir]; return [player.x + d[0] * 12, player.y + d[1] * 9 - 3]; }
   function itemReach(it) { const [rx, ry] = reachPoint(); return Math.hypot(it.x - rx, it.y - ry) - it.type.r * 0.5; }
+  // Which animal (if any) E would pet: whichever is closest to your nose, ahead of any item
+  function petChoice() {
+    if (!started || paused || player.held) return null;
+    let best = null, bd = target ? itemReach(target) : Infinity;
+    if (dogCanPet() && dogReach() < bd) { best = 'dog'; bd = dogReach(); }
+    if (catCanPet() && catReach() < bd) best = 'cat';
+    return best;
+  }
   function dogReach() { const [rx, ry] = reachPoint(); return Math.hypot(dog.x - rx, dog.y - ry) - 8; }
 
   function findTarget() {
@@ -2102,7 +2124,9 @@
   function grabOrDrop() {
     if (!started) return;
     if (player.held) { dropHeld(false); return; }
-    if (dogCanPet() && (!target || dogReach() < itemReach(target))) { petDog(); return; }
+    const pc = petChoice();
+    if (pc === 'dog') { petDog(); return; }
+    if (pc === 'cat') { petCat(); return; }
     if (target) pickUp(target);
   }
 
@@ -2164,7 +2188,7 @@
       vy: d[1] * sp * 0.75 + player.vy * 0.6,
       vz: heavy ? 110 : 150,
       air: true, ghost: true, kicker: null, noticed: false, thrownByPlayer: true,
-      spin: heavy ? (d[0] || 1) * 4 : (Math.random() - 0.5) * 18 + d[0] * 8,
+      spin: heavy ? (d[0] || 1) * 4 : (Math.random() - 0.5) * 18 + d[0] * 8, byCat: false,
     });
     sfx('throw');
     if (heavy) completeTask('heavythrow');
@@ -2229,6 +2253,7 @@
           continue;
         }
         if (!it.noticed) { it.noticed = true; dogNotice(it); }
+        if (it.type.fragile && it.vz < -165) { shatter(it); items.splice(i, 1); continue; } // crash!
         if (it.vz < -110) {
           it.vz = -it.vz * (it.kind === 'ball' ? 0.6 : 0.3);
           it.vx *= 0.75; it.vy *= 0.75;
@@ -2346,7 +2371,7 @@
     nav = new Uint8Array(MW * MH_ALL);
     for (let i = 0; i < MW * MH_ALL; i++) if (map[i] === WATER || map[i] === WALL) nav[i] = 1;
     for (const o of solidObjects) {
-      const h = o.hitbox;
+      const h = o.navBox || o.hitbox;
       const x0 = Math.floor((h.x + 3) / TILE), x1 = Math.floor((h.x + h.w - 3) / TILE);
       const y0 = Math.floor((h.y + 2) / TILE), y1 = Math.floor((h.y + h.h - 2) / TILE);
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) nav[idx(x, y)] = 1;
@@ -3108,6 +3133,8 @@
     { id: 'burgle', tier: 'Easy', text: "Sneak into someone's house" },
     { id: 'hide', tier: 'Easy', text: 'Hide in a bush' },
     { id: 'pet', tier: 'Easy', text: 'Pet Biscuit the dog' },
+    { id: 'bed', tier: 'Easy', text: 'Hide under a bed' },
+    { id: 'petcat', tier: 'Easy', text: 'Get a purr out of Marmalade the cat' },
     { id: 'parcel', tier: 'Easy', text: "Swipe one of Percy's parcels" },
     { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
     { id: 'bonk', tier: 'Medium', text: 'Bonk Mrs. Fennick' },
@@ -3121,6 +3148,8 @@
     { id: 'bushescape', tier: 'Medium', text: 'Shake off a chaser by hiding in a bush' },
     { id: 'fetch', tier: 'Medium', text: 'Get Biscuit to fetch something you threw' },
     { id: 'outrun', tier: 'Medium', text: 'Outrun Biscuit' },
+    { id: 'smash', tier: 'Medium', text: 'Smash something fragile' },
+    { id: 'catswat', tier: 'Medium', text: 'Watch Marmalade knock something off a table' },
     { id: 'cake', tier: 'Medium', text: "Pinch Rosa's cake", hint: "it's on her kitchen table" },
     { id: 'rod', tier: 'Medium', text: "Steal Ollie's fishing rod" },
     { id: 'stash3', tier: 'Medium', text: 'Stash 3 things in your hideout', goal: 3, group: 'stash' },
@@ -3133,6 +3162,8 @@
     { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
     { id: 'bone', tier: 'Hard', text: "Stash Biscuit's bone in your hideout" },
+    { id: 'bedhome', tier: 'Hard', text: "Hide under a bed while someone's home" },
+    { id: 'catdog', tier: 'Hard', text: 'Get Biscuit to chase Marmalade', hint: 'chitter to herd her' },
     { id: 'yarn', tier: 'Hard', text: "Take Granny Mabel's yarn while she knits" },
     { id: 'tour', tier: 'Hard', text: 'Sneak into 4 different houses', goal: 4 },
     { id: 'feast', tier: 'Final', final: true, text: 'Have a feast', hint: 'pie, sandwich and an apple in your hideout' },
@@ -3570,14 +3601,15 @@
     for (const o of hideBushes) o.rustle = Math.max(0, o.rustle - dt);
     const wasHidden = player.hidden;
     let bush = null;
-    if (areaOf(player.x, player.y) === 0) for (const o of hideBushes) if (o.contains(player.x, player.y)) { bush = o; break; }
+    for (const o of hideBushes) if (o.contains(player.x, player.y)) { bush = o; break; }
     if (bush && player.speed > 20) bush.rustle = 0.3;
     if (bush && bush !== player.hidingIn) { sfx('rustle'); bush.rustle = 0.4; }
     player.hidingIn = bush;
     const heavy = player.held && player.held.type.heavy;
     player.hidden = !!bush && !heavy && player.speed < WALK_SPEED * 1.15;
+    if (player.hidden && bush.kind === 'bed' && villagers.some((v) => areaOf(v.x, v.y) === areaOf(player.x, player.y))) completeTask('bedhome');
     if (player.hidden && !wasHidden) {
-      completeTask('hide');
+      completeTask(bush.kind === 'bed' ? 'bed' : 'hide');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -3636,19 +3668,12 @@
   }
 
   function dogSay(text, t = 1.4) { dog.bubble = { text, t }; }
-  function dogBark() {
+  function dogBark(lx = player.x, ly = player.y) {
     dogSay(rpick(DOG_LINES.bark), 1);
     dog.hopV = 90; dog.hop = 0.01;
     if (Math.hypot(dog.x - player.x, dog.y - player.y) < 420) sfx('bark');
     // Everyone nearby turns to look where Biscuit is barking
-    for (const v of villagers) {
-      if (areaOf(v.x, v.y) !== 0 || Math.hypot(v.x - dog.x, v.y - dog.y) > 260) continue;
-      if (v.state !== 'act' && v.state !== 'route') continue;
-      const dx = player.x - v.x, dy = player.y - v.y;
-      v.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-      if ((v.barkCD || 0) <= 0) { say(v, v.id === 'bertram' ? 'What is it, Biscuit?' : rpick(['Hm? Biscuit?', "Who's there?", 'What was that?']), 1.6); v.barkCD = 6; }
-      if (v.state === 'act') v.actT = Math.max(v.actT, 1.5); // stop and look for a moment
-    }
+    lookTowards(lx, ly, 280, (v) => (v.id === 'bertram' ? 'What is it, Biscuit?' : rpick(['Hm? Biscuit?', "Who's there?", 'What was that?'])));
   }
 
   function heldPosDog() {
@@ -3683,7 +3708,7 @@
     sfx('happy');
     completeTask('pet');
   }
-  const dogCanPet = () => dog && !player.held && dog.state !== 'chase' && dog.state !== 'happy' && dog.state !== 'fetch' && dog.state !== 'return' && Math.hypot(dog.x - player.x, dog.y - player.y) < 26;
+  const dogCanPet = () => dog && !player.held && dog.state !== 'chase' && dog.state !== 'catchase' && dog.state !== 'happy' && dog.state !== 'fetch' && dog.state !== 'return' && Math.hypot(dog.x - player.x, dog.y - player.y) < 26;
 
   function dogCatch() {
     const dx = player.x - dog.x, dy = player.y - dog.y, d = Math.hypot(dx, dy) || 1;
@@ -3724,6 +3749,14 @@
     switch (d.state) {
       case 'sit': case 'wander': {
         if (smells) { d.state = 'alert'; d.t = 0.7; d.path = null; dogSay('?', 0.8); break; }
+        // Spot the cat outside? Forget everything else.
+        if (cat && cat.state !== 'flee' && cat.z === 0 && areaOf(cat.x, cat.y) === 0 && d.calm <= 0 && d.friendly <= 0 &&
+            Math.hypot(cat.x - d.x, cat.y - d.y) < 150 && lineClear(d.x, d.y, cat.x, cat.y)) {
+          d.state = 'catchase'; d.chaseT = 5; d.barkT = 0; d.path = null;
+          catFlee(d.x, d.y, 'MROW!');
+          completeTask('catdog');
+          break;
+        }
         if (d.friendly > 0 && outside && dp < 260) { d.state = 'follow'; break; }
         if (d.state === 'sit') {
           if (d.t <= 0) {
@@ -3757,6 +3790,19 @@
         if (d.chaseT <= 0) { d.state = 'sit'; d.t = 3; d.calm = 6; dogSay('*pant pant*', 1.4); completeTask('outrun'); break; }
         if (dp < 14) { dogCatch(); break; }
         dogWalkTo(player.x, player.y, 172, dt);
+        break;
+      }
+      case 'catchase': {
+        d.chaseT -= dt; d.barkT -= dt;
+        if (d.barkT <= 0) { dogBark(cat.x, cat.y); d.barkT = 0.8; }
+        if (areaOf(cat.x, cat.y) !== 0 || d.chaseT <= 0) { d.state = 'sit'; d.t = 2; d.calm = 8; d.path = null; dogSay(areaOf(cat.x, cat.y) !== 0 ? 'Woof?' : '*pant pant*', 1.3); break; }
+        if (Math.hypot(cat.x - d.x, cat.y - d.y) < 12 && d.chaseT < 3.5) { // cornered, the cat stands her ground
+          catSay('HSSS!', 1.2); cat.hopV = 160; cat.hop = 0.01; sfx('hiss');
+          d.state = 'sit'; d.t = 2.5; d.calm = 10; d.path = null; dogSay('Yip!', 1.2);
+          break;
+        }
+        if (cat.state !== 'flee' || cat.t < 1) catFlee(d.x, d.y, 'Mrow!');
+        dogWalkTo(cat.x, cat.y, 165, dt);
         break;
       }
       case 'fetch': {
@@ -3869,6 +3915,240 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Villagers turn to look at a noise (a bark, a smash) within earshot
+  // ---------------------------------------------------------------------------
+  function lookTowards(x, y, radius, lineFor) {
+    const area = areaOf(x, y);
+    for (const v of villagers) {
+      if (areaOf(v.x, v.y) !== area || Math.hypot(v.x - x, v.y - y) > radius) continue;
+      if (v.state !== 'act' && v.state !== 'route') continue;
+      const dx = x - v.x, dy = y - v.y;
+      v.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      if ((v.barkCD || 0) <= 0) { say(v, lineFor(v), 1.6); v.barkCD = 6; }
+      if (v.state === 'act') v.actT = Math.max(v.actT, 1.5); // stop and look for a moment
+    }
+  }
+
+  // Fragile things smash when they hit the floor hard
+  function shatter(it) {
+    sfx('crash');
+    const col = { vase: '#4f6fa8', teapot: '#7fb3d5', frame: '#c9a33a', cookies: '#dcebf5', milk: '#f7f7f2' }[it.kind] || '#dddddd';
+    for (let k = 0; k < 12; k++) {
+      const a = Math.random() * Math.PI * 2, s = 30 + Math.random() * 60;
+      particles.push({ kind: 'shard', col, x: it.x, y: it.y, z: 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, vz: 60 + Math.random() * 90, life: 0.7, max: 0.7 });
+    }
+    puff(it.x, it.y, 3);
+    lookTowards(it.x, it.y, 280, (v) => (it.owner === v.id ? `My ${it.type.name}!` : rpick(['What was that?!', 'Who broke that?', 'Oh dear...'])));
+    if (!it.byCat) completeTask('smash');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Marmalade, Mrs. Fennick's cat. Ignores you, naps in cosy spots, knocks
+  // things off tables (fragile ones smash), and is Biscuit's favourite thing
+  // to chase. Chitter at her and she hisses and bolts.
+  // ---------------------------------------------------------------------------
+  let cat = null;
+
+  function spawnCat() {
+    const T = TILE, P = L.plaza, g = L.garden;
+    const fh = L.houses[L.homes.fennick];
+    const spots = [];
+    if (fh.room && fh.room.armchair) spots.push({ x: fh.room.armchair.x, y: fh.room.armchair.y + 1, z: 13, indoor: true });
+    spots.push({ x: (fh.doorX + 0.5) * T - 22, y: (fh.y + fh.h + 0.9) * T, z: 0 });
+    spots.push({ x: (P.x + 10) * T - 8, y: (P.y + 1.4) * T + 1, z: 12 });
+    spots.push({ x: (g.x + 7) * T, y: (g.y + 5.6) * T, z: 0 });
+    const s0 = spots[0];
+    cat = {
+      x: s0.x, y: s0.y, z: s0.z, dir: 'down', walk: 0, moving: false, hop: 0, hopV: 0,
+      state: 'nap', t: rr(6, 14), spots, goal: null, path: null, pathGoal: null, repathT: 0, bubble: null, zzzT: 1,
+    };
+  }
+
+  function catSay(text, t = 1.3) { cat.bubble = { text, t }; }
+  function catLeaveSpot() {
+    if (cat.z > 0) {
+      cat.z = 0;
+      if (navBlockedPt(cat.x, cat.y)) { const o = nearestOpen(Math.floor(cat.x / TILE), Math.floor(cat.y / TILE)); if (o) { cat.x = (o[0] + 0.5) * TILE; cat.y = (o[1] + 0.6) * TILE; } }
+    }
+    cat.path = null; cat.pathGoal = null;
+  }
+  function catPickNext() {
+    catLeaveSpot();
+    const roll = Math.random();
+    const onTables = items.filter((it) => !it.held && !it.air && it.z > 4 && !it.floating);
+    if (roll < 0.4 && onTables.length) {
+      const it = rpick(onTables);
+      cat.goal = { kind: 'swat', item: it, x: it.x + (Math.random() < 0.5 ? -16 : 16), y: it.y + 12 };
+    } else {
+      const s = rpick(cat.spots);
+      cat.goal = { kind: 'nap', ...s };
+    }
+    cat.state = 'stroll'; cat.t = 40;
+  }
+  function catFlee(fromX, fromY, text = 'HSSS!') {
+    catLeaveSpot();
+    catSay(text, 1.2);
+    cat.hopV = 140; cat.hop = 0.01;
+    // Bolt for home if it's nearby, otherwise just away
+    const home = cat.spots.find((s) => s.indoor);
+    const a = Math.atan2(cat.y - fromY, cat.x - fromX);
+    let gx = clamp(cat.x + Math.cos(a) * 180, 4 * TILE, WORLD_W - 4 * TILE), gy = clamp(cat.y + Math.sin(a) * 140, 4 * TILE, WORLD_H - 4 * TILE);
+    if (areaOf(cat.x, cat.y) !== 0) { gx = cat.x + Math.cos(a) * 60; gy = cat.y + Math.sin(a) * 40; }
+    else if (home) { // run home only if home is away from whatever she's fleeing
+      const hd = home.indoor ? L.houses[L.homes.fennick].doorOut : home;
+      if ((hd.x - cat.x) * Math.cos(a) + (hd.y - cat.y) * Math.sin(a) > 0) { gx = home.x; gy = home.y; }
+    }
+    cat.goal = { kind: 'flee', x: gx, y: gy };
+    cat.state = 'flee'; cat.t = 4;
+    if (Math.hypot(cat.x - player.x, cat.y - player.y) < 400) sfx('hiss');
+  }
+  function catSwat() {
+    const it = cat.goal && cat.goal.item;
+    if (!it || it.held || it.air || it.z <= 4 || Math.hypot(it.x - cat.x, it.y - cat.y) > 34) return false;
+    const dir = it.x >= cat.x ? 1 : -1;
+    Object.assign(it, { vx: dir * 70, vy: 25, vz: 70, air: true, ghost: true, byCat: true, noticed: true, thrownByPlayer: false });
+    cat.dir = dir > 0 ? 'right' : 'left';
+    catSay('Mrrp.', 1.1);
+    if (Math.hypot(player.x - cat.x, player.y - cat.y) < 280 && areaOf(player.x, player.y) === areaOf(cat.x, cat.y)) completeTask('catswat');
+    for (const v of villagers) {
+      if (canSee(v, cat.x, cat.y) && Math.hypot(v.x - cat.x, v.y - cat.y) < 220) { say(v, v.id === 'fennick' ? 'Marmalade, NO!' : 'Shoo, cat!', 1.6); break; }
+    }
+    return true;
+  }
+  const catCanPet = () => cat && !player.held && cat.state !== 'flee' && (cat.petCD || 0) <= 0 && Math.hypot(cat.x - player.x, cat.y - player.y) < 26;
+  function catReach() { const [rx, ry] = reachPoint(); return Math.hypot(cat.x - rx, cat.y - cat.z * 0.3 - ry) - 8; }
+  function petCat() {
+    cat.petCD = 2.5;
+    if (cat.state === 'nap' || Math.random() < 0.5) {
+      catSay('prrrr ♥', 1.6);
+      for (let k = 0; k < 4; k++) particles.push({ kind: 'heart', x: cat.x + rr(-6, 6), y: cat.y, z: 16 + cat.z + k * 3, life: 1, max: 1 });
+      sfx('purr');
+      if (cat.state !== 'nap') { cat.state = 'sit'; cat.t = 3; }
+      else cat.t = Math.max(cat.t, 4);
+      completeTask('petcat');
+    } else {
+      catFlee(player.x, player.y, 'Hss!');
+    }
+  }
+
+  function updateCat(dt) {
+    if (!cat) return;
+    const c = cat;
+    c.moving = false;
+    if (c.bubble) { c.bubble.t -= dt; if (c.bubble.t <= 0) c.bubble = null; }
+    c.petCD = Math.max(0, (c.petCD || 0) - dt);
+    if (c.hop > 0 || c.hopV) { c.hopV -= 600 * dt; c.hop += c.hopV * dt; if (c.hop <= 0) { c.hop = 0; c.hopV = 0; } }
+    c.t -= dt;
+    switch (c.state) {
+      case 'nap':
+        c.zzzT -= dt;
+        if (c.zzzT <= 0) { c.zzzT = 3; if (!c.bubble) catSay('z z z', 1.4); }
+        if (c.t <= 0) { catSay(rpick(['*yaaawn*', '*stretch*']), 1.2); catPickNext(); }
+        break;
+      case 'sit':
+        if (c.t <= 0) catPickNext();
+        break;
+      case 'stroll': {
+        const g = c.goal;
+        if (!g || c.t <= 0) { catPickNext(); break; }
+        if (g.kind === 'swat' && (g.item.held || g.item.air || g.item.z <= 4 || !items.includes(g.item))) { catPickNext(); break; }
+        if (travel(c, g.x, g.y, 50, dt)) {
+          if (g.kind === 'nap') {
+            Object.assign(c, { x: g.x, y: g.y, z: g.z, dir: 'down', state: 'nap', t: rr(10, 20), zzzT: 2 });
+            if (g.z > 0) { c.hopV = 60; c.hop = 0.01; }
+          } else { c.state = 'swat'; c.t = 0.7; c.dir = g.item.x >= c.x ? 'right' : 'left'; }
+        }
+        break;
+      }
+      case 'swat':
+        if (c.t <= 0) { catSwat(); c.state = 'sit'; c.t = 1.5; }
+        break;
+      case 'flee':
+        if (travel(c, c.goal.x, c.goal.y, 195, dt) || c.t <= 0) { c.state = 'sit'; c.t = 2.5; c.path = null; c.pathGoal = null; }
+        break;
+    }
+  }
+
+  function drawCat(ctx, c, t) {
+    const O = '#e8913a', D = '#b8642a', W = '#f6d6b0', EYE = '#7ac74f';
+    const moving = c.moving;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.fillStyle = 'rgba(20,30,10,0.25)';
+    ellipse(ctx, 0, -c.z * 0.15, 9, 3);
+    ctx.translate(0, -c.z - c.hop);
+    if (c.state === 'nap') { // curled-up ball with the tail wrapped round
+      const br = 1 + Math.sin(t * 2) * 0.04;
+      ctx.scale(br, br);
+      ctx.fillStyle = O; ellipse(ctx, 0, -6, 10, 6.5);
+      ctx.strokeStyle = D; ctx.lineWidth = 1.4;
+      for (const k of [-4, 0, 4]) { ctx.beginPath(); ctx.arc(k, -6, 4, Math.PI * 1.15, Math.PI * 1.65); ctx.stroke(); }
+      ctx.strokeStyle = O; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, -4, 9, 0.2, Math.PI * 0.9); ctx.stroke();
+      ctx.fillStyle = O; circle(ctx, 6.5, -7, 4.6);
+      poly(ctx, [[3.5, -10], [4.5, -14], [6.8, -11]]); ctx.fill(); poly(ctx, [[7.5, -11], [10, -13.5], [10, -9.5]]); ctx.fill();
+      ctx.fillStyle = W; ellipse(ctx, 8, -5.5, 2.4, 1.6);
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(5, -7.5); ctx.lineTo(6.6, -7.2); ctx.moveTo(7.8, -7.2); ctx.lineTo(9.4, -7.5); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const side = c.dir === 'left' || c.dir === 'right';
+    if (c.dir === 'left') ctx.scale(-1, 1);
+    const sw = moving ? Math.sin(c.walk) * 3 : 0;
+    const bob = moving ? Math.abs(Math.sin(c.walk)) * 1.2 : 0;
+    const flee = c.state === 'flee';
+    const tailSway = Math.sin(t * 2.5) * 2;
+    if (side) {
+      const by = -10 - bob - (flee ? 2 : 0);
+      leg(ctx, -6 - sw, 0, 7, D); leg(ctx, 6 + sw, 0, 7, D);
+      ctx.strokeStyle = O; ctx.lineWidth = flee ? 4.5 : 2.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-9, by); ctx.bezierCurveTo(-15, by - 4, -12 + tailSway, by - 12, -14 + tailSway, by - 17); ctx.stroke();
+      ctx.fillStyle = O; ellipse(ctx, 0, by, 10, flee ? 6.5 : 5.5);
+      ctx.strokeStyle = D; ctx.lineWidth = 1.3;
+      for (const k of [-5, -1, 3]) { ctx.beginPath(); ctx.moveTo(k, by - 5); ctx.lineTo(k + 1, by - 1.5); ctx.stroke(); }
+      ctx.fillStyle = W; ellipse(ctx, 5, by + 2.5, 3.5, 2.5);
+      leg(ctx, -6 + sw, 0, 7, O); leg(ctx, 6 - sw, 0, 7, O);
+      const hx = 10, hy = by - 5;
+      ctx.fillStyle = O; circle(ctx, hx, hy, 5.2);
+      poly(ctx, [[hx - 3.5, hy - 3], [hx - 2.5, hy - 9], [hx + 0.5, hy - 4]]); ctx.fill();
+      poly(ctx, [[hx + 1, hy - 4.5], [hx + 3.5, hy - 9.5], [hx + 4.5, hy - 3]]); ctx.fill();
+      ctx.fillStyle = W; ellipse(ctx, hx + 3.5, hy + 1.8, 2.6, 2);
+      ctx.fillStyle = EYE; ellipse(ctx, hx + 2.2, hy - 1, 1.3, 1.6);
+      ctx.fillStyle = '#1d1d22'; ellipse(ctx, hx + 2.4, hy - 1, 0.4, 1.2);
+      ctx.fillStyle = '#e8957a'; circle(ctx, hx + 5.6, hy + 0.8, 0.9);
+    } else {
+      const by = -10 - bob;
+      const lift = moving ? Math.sin(c.walk) * 2 : 0;
+      const back = c.dir === 'up';
+      if (!back) {
+        ctx.strokeStyle = O; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(3, by - 2); ctx.quadraticCurveTo(9 + tailSway, by - 8, 7 + tailSway, by - 15); ctx.stroke();
+      }
+      leg(ctx, -3.5, -Math.max(0, lift), 6, back ? D : O); leg(ctx, 3.5, -Math.max(0, -lift), 6, back ? D : O);
+      ctx.fillStyle = O; ellipse(ctx, 0, by, 7.5, 7);
+      if (!back) { ctx.fillStyle = W; ellipse(ctx, 0, by + 1.5, 4, 5); }
+      else { ctx.strokeStyle = D; ctx.lineWidth = 1.3; for (const k of [-3, 0, 3]) { ctx.beginPath(); ctx.moveTo(-3.5, by + k); ctx.lineTo(3.5, by + k - 1); ctx.stroke(); } }
+      const hy = by - 8;
+      ctx.fillStyle = O; circle(ctx, 0, hy, 6);
+      poly(ctx, [[-5.5, hy - 2], [-4.5, hy - 9.5], [-1, hy - 4.5]]); ctx.fill();
+      poly(ctx, [[5.5, hy - 2], [4.5, hy - 9.5], [1, hy - 4.5]]); ctx.fill();
+      if (!back) {
+        ctx.fillStyle = W; ellipse(ctx, 0, hy + 2.6, 3.4, 2.4);
+        ctx.fillStyle = EYE; ellipse(ctx, -2.4, hy - 0.8, 1.3, 1.6); ellipse(ctx, 2.4, hy - 0.8, 1.3, 1.6);
+        ctx.fillStyle = '#1d1d22'; ellipse(ctx, -2.4, hy - 0.8, 0.4, 1.2); ellipse(ctx, 2.4, hy - 0.8, 0.4, 1.2);
+        ctx.fillStyle = '#e8957a'; circle(ctx, 0, hy + 1.6, 0.9);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(-1.5, hy + 2.5); ctx.lineTo(-7, hy + 1.5); ctx.moveTo(1.5, hy + 2.5); ctx.lineTo(7, hy + 1.5); ctx.stroke();
+      } else {
+        ctx.strokeStyle = O; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(0, by + 5); ctx.quadraticCurveTo(tailSway * 2, by + 2, tailSway * 2.5, by - 6); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -3921,6 +4201,9 @@
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
       case 'bark': tone(420, 250, 0.09, 'square', 0.08); tone(400, 230, 0.1, 'square', 0.07, 0.13); break;
       case 'rustle': noise(0.18, 0.09, 3000); break;
+      case 'crash': noise(0.3, 0.3, 4500); tone(1800, 900, 0.12, 'square', 0.04); tone(2400, 1400, 0.1, 'triangle', 0.04, 0.05); break;
+      case 'hiss': noise(0.35, 0.12, 6000); break;
+      case 'purr': for (let k = 0; k < 6; k++) tone(70, 64, 0.09, 'sawtooth', 0.05, k * 0.1); break;
       case 'happy': [880, 1100, 1320].forEach((f, k) => tone(f, f * 1.05, 0.08, 'sine', 0.05, k * 0.07)); break;
       case 'door': tone(520, 360, 0.07, 'triangle', 0.07); tone(360, 300, 0.09, 'triangle', 0.05, 0.07); noise(0.05, 0.08, 900); break;
       case 'ding': tone(988, 988, 0.12, 'triangle', 0.09); tone(1319, 1319, 0.22, 'triangle', 0.09, 0.1); break;
@@ -4011,9 +4294,9 @@
   grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) grabOrDrop(); });
   throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) throwHeld(); });
   function syncTouchButtons() {
-    const label = player.held ? 'drop' : dogCanPet() && (!target || dogReach() < itemReach(target)) ? 'pet' : 'grab';
+    const label = player.held ? 'drop' : petChoice() ? 'pet' : 'grab';
     if (grabBtn.textContent !== label) grabBtn.textContent = label;
-    grabBtn.classList.toggle('ready', !!(player.held || target || dogCanPet()));
+    grabBtn.classList.toggle('ready', !!(player.held || target || petChoice()));
     if (throwBtn.hidden === !!player.held) throwBtn.hidden = !player.held;
   }
 
@@ -4096,6 +4379,7 @@
       vis.push({ y: v.y, isVillager: true, v });
     }
     if (dog && dog.x > left - pad && dog.x < left + viewW + pad && dog.y > top - pad && dog.y < top + viewH + pad + 40) vis.push({ y: dog.y, isDog: true });
+    if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
     // Ground-level effects: dust and ripples
     for (const q of particles) {
@@ -4120,6 +4404,7 @@
       if (o.isItem) { drawItem(ctx, o, t); continue; }
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
+      if (o.isCat) { drawCat(ctx, cat, t); continue; }
       let fade = false;
       if (o.canopy && player.y < o.y && player.y > o.canopy.cy - o.canopy.r && Math.abs(player.x - o.x) < o.canopy.r + 6) fade = true;
       o.draw(ctx, t, fade);
@@ -4148,16 +4433,19 @@
         ctx.beginPath(); ctx.moveTo(hx - 3.5, hy + 0.6); ctx.lineTo(hx + 3.5, hy + 0.6); ctx.lineTo(hx, hy + 4.5); ctx.fill();
         continue;
       }
+      if (q.kind === 'shard') { ctx.fillStyle = q.col; ctx.globalAlpha = q.life / q.max; ctx.fillRect(q.x - 1.2, q.y - q.z - 1.2, 2.6, 2); ctx.globalAlpha = 1; continue; }
       if (q.kind !== 'drop' && q.kind !== 'spark') continue;
       ctx.fillStyle = q.kind === 'drop' ? `rgba(200,230,255,${q.life / q.max})` : `rgba(255,236,160,${q.life / q.max})`;
       circle(ctx, q.x, q.y - q.z, q.kind === 'drop' ? 1.8 : 1.4);
     }
-    const petFirst = started && !paused && dogCanPet() && (!target || dogReach() < itemReach(target));
-    if (target && started && !petFirst) drawPrompt(ctx, target, t);
-    else if (petFirst) drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
+    const pc = petChoice();
+    if (pc === 'dog') drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
+    else if (pc === 'cat') drawPrompt(ctx, { x: cat.x, y: cat.y, z: cat.z, owner: null, type: { h: 18, name: 'pet Marmalade' } }, t);
+    else if (target && started) drawPrompt(ctx, target, t);
     drawBubble(ctx, player);
     for (const v of villagers) if (v.bubble) drawBubbleAt(ctx, v.x, v.y - v.hop - 46 * v.scale, v.bubble);
     if (dog && dog.bubble) drawBubbleAt(ctx, dog.x, dog.y - dog.hop - 38, dog.bubble);
+    if (cat && cat.bubble) drawBubbleAt(ctx, cat.x, cat.y - cat.z - cat.hop - 32, cat.bubble);
 
     drawDoorHint(ctx, t);
 
@@ -4203,6 +4491,10 @@
       ctx.fillStyle = '#ffb547'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
+      if (cat) {
+        const cp = outdoorPos(cat.x, cat.y);
+        ctx.fillStyle = '#e8913a'; circle(ctx, mx + cp.x / WORLD_W * mw, my + cp.y / WORLD_H * mh, 1.7);
+      }
       if (dog) {
         ctx.fillStyle = dog.state === 'chase' ? '#e8453c' : '#c8945a';
         circle(ctx, mx + dog.x / WORLD_W * mw, my + dog.y / WORLD_H * mh, 2);
@@ -4231,6 +4523,7 @@
       updateItems(dt);
       updateVillagers(dt);
       updateDog(dt);
+      updateCat(dt);
       updateHiding(dt);
       checkTasks(dt);
       if (started && !run.over) {
@@ -4266,7 +4559,8 @@
     placeItems();
     spawnVillagers();
     spawnDog();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush');
+    spawnCat();
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed'); // places to hide
     spawnAmbient();
     Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null });
     target = null;
@@ -4305,7 +4599,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get hideBushes() { return hideBushes; } };
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
 
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(() => boot()); else boot();

@@ -10,7 +10,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | --- | --- | --- |
 | Walk | WASD / Arrow keys | Drag anywhere |
 | Run | Hold Shift | Drag far |
-| Grab / drop / pet the dog | E | "grab" / "drop" button |
+| Grab / drop / pet an animal | E | "grab" / "drop" button |
 | Throw | F | "throw" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
@@ -19,7 +19,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 
 ## What's in the game
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 41, a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 47, a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -41,6 +41,13 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   villagers turn to look, and knocks things out of your mouth to carry back to his bed. Throw something near him
   and he fetches it instead. Press E next to him to pet him and he follows you around as a friend for a while.
   He guards his bone. The Dog Treats upgrade makes him start each day friendly.
+- **Hiding under beds**: crawl under any bed from its foot end. Same rules as bushes; a lump appears under the
+  blanket and your eyes peek out. Villagers walk round beds, so they won't find you unless they bump into you.
+- **Marmalade the cat** (Mrs. Fennick's): ignores you. Naps in cosy spots (armchair, bench, doorstep, garden),
+  wanders through doors, and knocks things off tables. Biscuit chases her on sight, which keeps him off your back;
+  chitter at her and she hisses and bolts, so you can herd her toward him. Pet her while she naps for a purr.
+- **Fragile things** (vases, teapots, frames, cookie jars, milk bottles) smash if they hit the floor hard, whether
+  you threw them or the cat swatted them. Nearby villagers turn to see what broke.
 - **Hideout**: a hollow log at one end of the road. Things in its nest are safe, and villagers won't follow you in.
 
 ## Code layout (`game.js`)
@@ -53,7 +60,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Villagers**: `VILLAGER_DEFS` (looks, speeds, lines), `stopsFor()` (daily round from the layout),
   `updateVillagers()` state machine (route → act, chase, fetch, return, sulk, startled), A* `findPath()`, `canSee()`
 - **Hiding & dog**: `makeHideBush()`, `updateHiding()`, `canSeePlayer()`; `spawnDog()`, `updateDog()` state machine
-  (sit, wander, alert, chase, fetch, return, happy, follow)
+  (sit, wander, alert, chase, catchase, fetch, return, happy, follow); `spawnCat()`, `updateCat()` (nap, stroll,
+  swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
 - **Runs**: `TASK_POOL`, `setupRun()`, `endRun()`, `UPGRADES` + the den, save in `localStorage`
 - **To-do list**: run's task hand, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
   polled conditions; notepad markup + styles live in `index.html`
