@@ -116,7 +116,7 @@ const UNLOCKS={
   mushroom:{txt:'Defeat 1,500 aliens across runs',goal:1500,val:p=>p.kills},
   pumpkin:{txt:'Smash the Brood Queen',goal:1,val:p=>p.wins},
 };
-const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},wunlocked:[],wseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
+const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},fmedals:{},len:10,wunlocked:[],wseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
 const PROF=Object.assign(profDefaults(),{best:store.get('bd_best',0)},store.get('bd_prof',{}));
 /* Danger levels stack: each one includes every level below it. Win on your highest unlocked level to open the next. */
 const DANGERS=[
@@ -183,6 +183,22 @@ const WAVES=[
   {dur:0,int:2.6,grp:[3,5],mix:{grub:2,dasher:1,spitter:1,hopper:1},boss:true},
 ];
 const LAST_WAVE=WAVES.length;
+/* Full run: the same first nine waves, then ten longer, denser waves and a tougher Brood Queen on wave 20. */
+const MIXL={grub:2.5,dasher:1.5,spitter:1.3,splitter:1.3,brute:1.2,bomber:1.1,hopper:1.5};
+const WAVES_FULL=WAVES.slice(0,9).concat([
+  {dur:60,int:.95,grp:[6,8],mix:MIXL,elite:2,bug:true,half:true},
+  {dur:60,int:.9,grp:[6,9],mix:MIXL},
+  {dur:60,int:.88,grp:[7,9],mix:MIXL,elite:1,bug:true},
+  {dur:60,int:.85,grp:[7,10],mix:{...MIXL,brute:1.5}},
+  {dur:60,int:.82,grp:[7,10],mix:{...MIXL,bomber:1.6},bug:true},
+  {dur:60,int:.8,grp:[8,10],mix:{...MIXL,brute:1.6},elite:2},
+  {dur:60,int:.78,grp:[8,11],mix:{...MIXL,hopper:2},bug:true},
+  {dur:60,int:.75,grp:[8,11],mix:{...MIXL,brute:1.8,bomber:1.6}},
+  {dur:60,int:.72,grp:[9,12],mix:{...MIXL,brute:2},elite:2,bug:true},
+  {dur:60,int:.7,grp:[9,12],mix:{...MIXL,brute:2,dasher:2,hopper:2},elite:1},
+  {dur:0,int:2.2,grp:[4,6],mix:{grub:2,dasher:1,spitter:1,hopper:1,brute:.5,bomber:.5},boss:true},
+]);
+const RUN_LENS={10:{name:'Quick',waves:WAVES},20:{name:'Full',waves:WAVES_FULL}};
 
 /* ================= audio ================= */
 const AU={ctx:null,master:null,noise:null,muted:store.get('bd_muted',false),last:{}};
@@ -286,7 +302,8 @@ function newRun(ch){
   B={maxHp:20,regen:0,lifesteal:0,dmg:0,melee:0,ranged:0,atkSpd:0,crit:0,range:0,armor:0,dodge:0,speed:0,luck:0,harvest:0,pickup:0,extraProj:0,thorns:0,boom:0,blast:0};
   for(const k in ch.mods)B[k]+=ch.mods[k];
   S=Object.assign({},B);
-  run={char:ch,danger:Math.min(PROF.dsel,PROF.danger),bosses:[],wave:0,mats:0,kills:0,pendingLv:0,crates:0,items:{},weapons:[],shop:[],rerolls:0,combo:0,comboT:0,bestCombo:0,gemChain:0,lastGem:0,lsCd:0,matBump:0,hpTrail:S.maxHp,time:0,totalMats:0,auraT:0};
+  const len=RUN_LENS[PROF.len]?PROF.len:10;
+  run={char:ch,len,waves:RUN_LENS[len].waves,last:RUN_LENS[len].waves.length,danger:Math.min(PROF.dsel,PROF.danger),bosses:[],wave:0,mats:0,kills:0,pendingLv:0,crates:0,items:{},weapons:[],shop:[],rerolls:0,combo:0,comboT:0,bestCombo:0,gemChain:0,lastGem:0,lsCd:0,matBump:0,hpTrail:S.maxHp,time:0,totalMats:0,auraT:0};
   P={x:AW/2,y:AH/2,vx:0,vy:0,r:ch.r||18,hp:S.maxHp,iframes:0,walk:0,moving:false,lx:1,ly:0,level:0,xp:0,regenAcc:0,blink:2};
   run.setLv={}; addWeapon(ch.weapon,0);
 }
@@ -472,7 +489,7 @@ function hurtPlayer(d,src){
 }
 
 /* ================= enemies ================= */
-function waveMul(){const w=run.wave;return{hp:1+.36*(w-1)+.035*(w-1)*(w-1),dmg:1+.17*(w-1)}}
+function waveMul(){const w=run.wave,q=run.len===20?.02:.035;return{hp:1+.36*(w-1)+q*(w-1)*(w-1),dmg:1+.17*(w-1)}}
 function makeEnemy(type,x,y,elite){
   const def=ENEMIES[type]; const m=type==='boss'?{hp:1,dmg:1}:waveMul();
   const e={type,def,x,y,z:0,kx:0,ky:0,hp:def.hp*m.hp,dmg:Math.round(def.dmg*m.dmg),r:def.r,spd:def.spd*rand(.92,1.08),flash:0,t:0,wob:rand(0,TAU),st:'chase',stT:rand(.4,1.2),cool:rand(1,2.5),dead:false,mats:def.mats,sq:0,popT:null,born:0};
@@ -483,12 +500,13 @@ function makeEnemy(type,x,y,elite){
   if(DZ(1)){e.hp*=1.2;e.dmg=Math.round(e.dmg*1.2)}
   if(DZ(3))e.spd*=1.12;
   if(type==='boss'&&DZ(4))e.hp*=1.4;
+  if(type==='boss'&&run.len===20){e.hp*=3;e.dmg=Math.round(e.dmg*1.8)}
   e.maxHp=e.hp; return e;
 }
 function spawnPoint(minD){for(let i=0;i<30;i++){const x=rand(60,AW-60),y=rand(60,AH-60);if(d2(x,y,P.x,P.y)>minD*minD)return{x,y}}return{x:P.x<AW/2?AW-80:80,y:P.y<AH/2?AH-80:80}}
 function queueSpawn(type,x,y,elite,delay=.9){spawns.push({type,x,y,elite,t:0,life:delay})}
 function updateSpawning(dt){
-  const def=WAVES[run.wave-1];
+  const def=run.waves[run.wave-1];
   run.spawnT-=dt;
   const alive=enemies.length+spawns.length;
   if(run.spawnT<=0){
@@ -496,7 +514,8 @@ function updateSpawning(dt){
     const c=spawnPoint(260); const n=Math.round(randi(def.grp[0],def.grp[1])*(DZ(2)?1.25:1));
     for(let i=0;i<n;i++){const t=weighted(def.mix);queueSpawn(t,clamp(c.x+rand(-70,70),40,AW-40),clamp(c.y+rand(-70,70),40,AH-40),false,.9+i*.05)}
   }
-  if((def.elite||(DZ(2)&&run.wave>=3&&!def.boss))&&!run.eliteDone&&run.timer<def.dur*.55){run.eliteDone=true;const c=spawnPoint(300);queueSpawn('brute',c.x,c.y,true,1.4);showBanner('ELITE INCOMING','Drops a crate',.9,'#ffcc4d')}
+  const ne=(def.elite===true?1:(def.elite||0))+(DZ(2)&&run.wave>=3&&!def.boss&&!def.elite?1:0);
+  if(run.eliteN<ne&&run.timer<def.dur*(1-(run.eliteN+1)/(ne+1))){run.eliteN++;const c=spawnPoint(300);queueSpawn('brute',c.x,c.y,true,1.4);showBanner('ELITE INCOMING','Drops a crate',.9,'#ffcc4d')}
   if(def.bug&&run.bugT>0){run.bugT-=dt;if(run.bugT<=0){const c=spawnPoint(250);queueSpawn('lootbug',c.x,c.y,false,.6)}}
   if(def.boss&&run.bossT>0){run.bossT-=dt;if(run.bossT<=0){if(DZ(5)){queueSpawn('boss',AW*.3,AH*.25,false,2);queueSpawn('boss',AW*.7,AH*.25,false,2.3);showBanner('TWIN QUEENS','Smash them both to win',1.4,'#c43bff')}else{queueSpawn('boss',AW/2,AH*.25,false,2);showBanner('THE BROOD QUEEN','Smash her to win',1.2,'#ff6b9d')}sfx('roar');shake=14}}
   for(let i=spawns.length-1;i>=0;i--){const s=spawns[i];s.t+=dt;if(s.t>=s.life){spawns.splice(i,1);const e=makeEnemy(s.type,s.x,s.y,s.elite);enemies.push(e);if(s.type==='boss'){run.boss=e;run.bosses.push(e)}parts.push({x:s.x,y:s.y,vx:0,vy:0,t:0,life:.35,img:'fx_puff',col:'#d8c8e0',s0:e.r*1.5,s1:e.r*3.2,rot:rand(0,TAU),a0:.5})}}
@@ -566,15 +585,15 @@ function bossAI(e,dt,nx,ny,d){
 function showBanner(txt,sub,life=1.6,col='#ffffff'){banner={txt,sub,t:0,life,col}}
 function startWave(n){
   PROF.best=Math.max(PROF.best,n); store.set('bd_best',PROF.best);
-  run.wave=n; const def=WAVES[n-1];
-  run.timer=def.dur; run.spawnT=.5; run.eliteDone=false; run.bugT=def.bug?rand(def.dur*.25,def.dur*.6):-1; run.bossT=def.boss?1.5:-1; run.boss=null; run.bosses=[];
+  run.wave=n; const def=run.waves[n-1];
+  run.timer=def.dur; run.spawnT=.5; run.eliteN=0; run.bugT=def.bug?rand(def.dur*.25,def.dur*.6):-1; run.bossT=def.boss?1.5:-1; run.boss=null; run.bosses=[];
   run.combo=0; run.comboT=0; run.rerolls=0;
   enemies=[];bullets=[];ebullets=[];gems=[];pickups=[];parts=[];texts=[];fx=[];spawns=[];booms=[];
   dctx.clearRect(0,0,AW,AH);
   P.x=AW/2;P.y=AH/2;P.vx=P.vy=0;P.hp=maxHp();P.iframes=1;run.hpTrail=P.hp;
   run.weapons.forEach(w=>{w.cd=rand(.2,.6);w.thrust=null;w.ext=0;w.spin=0});
   state='wave'; showUI(null);
-  showBanner('WAVE '+n,def.boss?'Final wave':n===1?'Survive '+def.dur+' seconds':'',1.6,'#ffffff'); sfx('wave');
+  showBanner('WAVE '+n,def.boss?'Final wave':def.half?'Halfway there! Double elites':n===1?'Survive '+def.dur+' seconds':'',1.6,'#ffffff'); sfx('wave');
 }
 function endWave(){
   state='waveEnd'; run.endT=0;
@@ -619,7 +638,7 @@ function update(dt){
   if(state==='wave'&&S.regen>0){P.regenAcc+=dt*S.regen*.12;while(P.regenAcc>=1){P.regenAcc-=1;heal(1)}}
   run.hpTrail=P.hp<run.hpTrail?lerp(run.hpTrail,P.hp,1-Math.exp(-dt*4)):P.hp;
   if(state==='wave'){
-    if(!WAVES[run.wave-1].boss){run.timer-=dt;if(run.timer<=0){run.timer=0;endWave()}}else run.timer+=dt;
+    if(!run.waves[run.wave-1].boss){run.timer-=dt;if(run.timer<=0){run.timer=0;endWave()}}else run.timer+=dt;
     updateSpawning(dt);
     if(run.char.aura){run.auraT-=dt;if(run.auraT<=0){run.auraT=.5;const ad=Math.round(2+run.wave*.5+S.melee*.5);for(const e of enemies){if(e.dead||e.popT!=null)continue;if(Math.hypot(e.x-P.x,e.y-P.y)<80+e.r)hurtEnemy(e,ad,false,Math.atan2(e.y-P.y,e.x-P.x),3)}}}
   }
@@ -877,9 +896,9 @@ function drawHUD(t){
   ctx.save();ctx.translate(x0+10,y2+2);ctx.scale(sc,sc);ctx.rotate(Math.PI/4);ctx.fillStyle='#5ef2b0';ctx.shadowColor='#5ef2b0';ctx.shadowBlur=10;ctx.fillRect(-6,-6,12,12);ctx.restore();
   ctx.font=`${Math.round(22*sc)}px ${FD}`;ctx.textAlign='left';ctx.strokeText(run.mats,x0+26,y2+3);ctx.fillStyle='#fff';ctx.fillText(run.mats,x0+26,y2+3);
   if(run.crates>0){const im=IMG.p_crate;const cx=x0+26+ctx.measureText(String(run.mats)).width+14;if(im&&im.width)ctx.drawImage(im,cx,y2-10,24,24*im.height/im.width);ctx.font=`15px ${FD}`;ctx.fillStyle='#ffcc4d';ctx.lineWidth=3;ctx.strokeStyle='rgba(20,6,16,.8)';ctx.strokeText('x'+run.crates,cx+30,y2+2);ctx.fillText('x'+run.crates,cx+30,y2+2)}
-  const cx=W/2; const boss=WAVES[run.wave-1].boss; const narrow=W<640; const ty0=narrow?y0+52:y0;
+  const cx=W/2; const boss=run.waves[run.wave-1].boss; const narrow=W<640; const ty0=narrow?y0+52:y0;
   ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(20,6,16,.85)';
-  ctx.font=`16px ${FD}`;const wl='WAVE '+run.wave+' / '+LAST_WAVE;ctx.strokeText(wl,cx,ty0+8);ctx.fillStyle='#cdb8da';ctx.fillText(wl,cx,ty0+8);
+  ctx.font=`16px ${FD}`;const wl='WAVE '+run.wave+' / '+run.last;ctx.strokeText(wl,cx,ty0+8);ctx.fillStyle='#cdb8da';ctx.fillText(wl,cx,ty0+8);
   if(run.danger>0){const dz=DANGERS[run.danger];const dx=cx+ctx.measureText(wl).width/2+10;ctx.textAlign='left';ctx.font=`13px ${FD}`;ctx.lineWidth=4;ctx.strokeText('D'+run.danger+' '+dz.name.toUpperCase(),dx,ty0+8);ctx.fillStyle=dz.col;ctx.fillText('D'+run.danger+' '+dz.name.toUpperCase(),dx,ty0+8);ctx.textAlign='center';ctx.lineWidth=5}
   if(!boss){
     const tm=Math.ceil(run.timer);const low=tm<=5&&state==='wave';const s=low?1+.15*Math.abs(Math.sin(t*Math.PI)):1;
@@ -942,7 +961,7 @@ function buildMenu(){
     nUn++;
     if(UNLOCKS[ch.id]&&!PROF.seen.includes(ch.id)){newly.push(ch.id);b.insertAdjacentHTML('beforeend','<span class="newb">NEW</span>')}
     drawVeg(c,ch,120,190-r*1.4,r,{t:1,lx:.3,ly:.2});
-    const md=PROF.medals[ch.id]; if(md!=null)b.insertAdjacentHTML('beforeend',`<span class="medal" style="--dc:${DANGERS[md].col}" title="Won on Danger ${md} (${DANGERS[md].name})">★ D${md}</span>`);
+    const fm=PROF.fmedals[ch.id], md=fm??PROF.medals[ch.id]; if(md!=null)b.insertAdjacentHTML('beforeend',`<span class="medal" style="--dc:${DANGERS[md].col}" title="Won ${fm!=null?'a Full 20-wave run':'a run'} on Danger ${md} (${DANGERS[md].name})">${fm!=null?'★★':'★'} D${md}</span>`);
     c.save();c.translate(170,150);c.rotate(-.35);drawWeaponSprite(c,ch.weapon,0,WEAPONS[ch.weapon].len*1.6);c.restore();
     const lines=modLines(ch.mods).concat(ch.lines).concat([['Starts with '+WEAPONS[ch.weapon].name+' ('+WEAPONS[ch.weapon].sets.map(k=>SETS[k].name).join(', ')+')','neu']]);
     b.appendChild(cv);
@@ -969,7 +988,14 @@ function renderArmory(){
   if(fresh.length){PROF.wseen.push(...fresh);saveProf()}
   $('armCount').textContent=`${n} / ${Object.keys(WEAPONS).length} in the shop`;
 }
+function renderLen(){
+  const box=$('lenSel'); box.innerHTML='';
+  for(const L of [10,20]){const b=document.createElement('button');b.className='lenBtn'+((PROF.len||10)===L?' on':'');b.innerHTML=`<b>${RUN_LENS[L].name}</b><span>${L} waves</span>`;
+    b.onclick=()=>{audioInit();PROF.len=L;saveProf();sfx('click');renderLen()};box.appendChild(b)}
+  $('lenDesc').textContent=(PROF.len||10)===20?'Ten extra waves of bigger swarms and double elites, then a far tougher Brood Queen. Wins earn a ★★ medal.':'The classic run: 10 waves, then the Brood Queen.';
+}
 function renderDanger(){
+  renderLen();
   PROF.dsel=Math.min(PROF.dsel,PROF.danger);
   const box=$('danger'); box.innerHTML='';
   DANGERS.forEach((d,i)=>{const b=document.createElement('button');b.className='dbtn'+(i===PROF.dsel?' on':'')+(i>PROF.danger?' lk':'');b.style.setProperty('--dc',d.col);
@@ -1049,7 +1075,7 @@ function openShop(){state='shop';run.rerolls=0;selW=-1;rollShop(true);showUI('sh
 function renderShop(){
   $('shopMats').textContent=run.mats; $('shopLv').textContent=P.level;
   $('shopSub').textContent=`Wave ${run.wave} cleared · ${run.kills} kills`;
-  $('btnGo').textContent=run.wave+1===LAST_WAVE?'Fight the Queen':`Start Wave ${run.wave+1}`;
+  $('btnGo').textContent=run.wave+1===run.last?'Fight the Queen':`Start Wave ${run.wave+1}`;
   const rc=rerollCost(); const rb=$('btnReroll'); rb.innerHTML=`Reroll · ${rc} <i class="gemI" style="width:10px;height:10px"></i>`; rb.disabled=run.mats<rc; rb.style.opacity=run.mats<rc?.5:1;
   const box=$('shopCards'); box.innerHTML='';
   run.shop.forEach(s=>{
@@ -1110,10 +1136,10 @@ function gameOver(win){
   state='over'; showUI('over');
   $('overTitle').textContent=win?'YOU WIN!':'PICKLED';
   $('overTitle').style.color=win?'#7bd35a':'';
-  $('overSub').textContent=win?`${run.char.name} smashed ${run.bosses.length>1?'both Brood Queens':'the Brood Queen'} on ${DANGERS[run.danger].name} and the crater is quiet again.`:`${run.char.name} fell on wave ${run.wave}.`;
-  $('overStats').innerHTML=`<div><b>${run.wave}</b>wave</div><div><b>${run.kills}</b>kills</div><div><b>${run.bestCombo}</b>best combo</div><div><b>${run.totalMats}</b>materials</div><div><b>${P.level}</b>level</div><div><b style="color:${DANGERS[run.danger].col}">${run.danger}</b>danger</div>`;
+  $('overSub').textContent=win?`${run.char.name} smashed ${run.bosses.length>1?'both Brood Queens':'the Brood Queen'} on ${DANGERS[run.danger].name} ${run.len===20?'after all 20 waves ':''}and the crater is quiet again.`:`${run.char.name} fell on wave ${run.wave} of ${run.last}.`;
+  $('overStats').innerHTML=`<div><b>${run.wave}/${run.last}</b>wave</div><div><b>${run.kills}</b>kills</div><div><b>${run.bestCombo}</b>best combo</div><div><b>${run.totalMats}</b>materials</div><div><b>${P.level}</b>level</div><div><b style="color:${DANGERS[run.danger].col}">${run.danger}</b>danger</div>`;
   let newDanger=-1;
-  if(win){PROF.wins++;PROF.medals[run.char.id]=Math.max(PROF.medals[run.char.id]??-1,run.danger);if(run.danger===PROF.danger&&PROF.danger<DANGERS.length-1){PROF.danger++;PROF.dsel=PROF.danger;newDanger=PROF.danger}}
+  if(win){PROF.wins++;PROF.medals[run.char.id]=Math.max(PROF.medals[run.char.id]??-1,run.danger);if(run.len===20)PROF.fmedals[run.char.id]=Math.max(PROF.fmedals[run.char.id]??-1,run.danger);if(run.danger===PROF.danger&&PROF.danger<DANGERS.length-1){PROF.danger++;PROF.dsel=PROF.danger;newDanger=PROF.danger}}
   checkUnlocks(); saveProf();
   const nu=(run.newUnlocks||[]).map(id=>CHARS.find(c=>c.id===id));
   const nw=run.newWeapons||[];
@@ -1172,4 +1198,4 @@ loadAssets().then(()=>{
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(state==='menu')buildMenu()});
 });
 requestAnimationFrame(loop);
-window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},PROF,wUnlocked,checkUnlocks,buildMenu,startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
+window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},PROF,WAVES_FULL,wUnlocked,checkUnlocks,buildMenu,startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
