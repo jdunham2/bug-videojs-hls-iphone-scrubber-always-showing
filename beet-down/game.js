@@ -489,7 +489,7 @@ function hurtPlayer(d,src){
 }
 
 /* ================= enemies ================= */
-function waveMul(){const w=run.wave,q=run.len===20?.02:.035;return{hp:1+.36*(w-1)+q*(w-1)*(w-1),dmg:1+.17*(w-1)}}
+function waveMul(){const w=run.wave,q=run.len===20?.027:.035;return{hp:1+.36*(w-1)+q*(w-1)*(w-1),dmg:1+.17*(w-1)}}
 function makeEnemy(type,x,y,elite){
   const def=ENEMIES[type]; const m=type==='boss'?{hp:1,dmg:1}:waveMul();
   const e={type,def,x,y,z:0,kx:0,ky:0,hp:def.hp*m.hp,dmg:Math.round(def.dmg*m.dmg),r:def.r,spd:def.spd*rand(.92,1.08),flash:0,t:0,wob:rand(0,TAU),st:'chase',stT:rand(.4,1.2),cool:rand(1,2.5),dead:false,mats:def.mats,sq:0,popT:null,born:0};
@@ -640,7 +640,7 @@ function update(dt){
   if(state==='wave'){
     if(!run.waves[run.wave-1].boss){run.timer-=dt;if(run.timer<=0){run.timer=0;endWave()}}else run.timer+=dt;
     updateSpawning(dt);
-    if(run.char.aura){run.auraT-=dt;if(run.auraT<=0){run.auraT=.5;const ad=Math.round(2+run.wave*.5+S.melee*.5);for(const e of enemies){if(e.dead||e.popT!=null)continue;if(Math.hypot(e.x-P.x,e.y-P.y)<80+e.r)hurtEnemy(e,ad,false,Math.atan2(e.y-P.y,e.x-P.x),3)}}}
+    if(run.char.aura){run.auraT-=dt;if(run.auraT<=0){run.auraT=.5;const ad=Math.round(2+run.wave*.3+S.melee*.4);for(const e of enemies){if(e.dead||e.popT!=null)continue;if(Math.hypot(e.x-P.x,e.y-P.y)<80+e.r)hurtEnemy(e,ad,false,Math.atan2(e.y-P.y,e.x-P.x),3)}}}
   }
   if(state==='wave'||state==='winning')updateWeapons(dt);
   for(let i=booms.length-1;i>=0;i--){const b=booms[i];b.t-=dt;if(b.t<=0){booms.splice(i,1);explode(b.x,b.y,b.r,b.dmg,18,b.safe?0:0)}}
