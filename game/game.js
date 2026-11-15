@@ -464,12 +464,33 @@
         ctx.fillStyle = '#9c3a3a'; roundRect(ctx, x - 9, y - 54, 18, 12, 3, true); // a pot
         ctx.fillStyle = 'rgba(255,255,255,0.35)'; circle(ctx, x - 2, y - 60 - Math.sin(t * 2) * 2, 3); circle(ctx, x + 3, y - 66 - Math.sin(t * 2 + 1) * 2, 2.5);
       };
-    } else { // wardrobe
-      o.draw = (ctx) => {
+    } else { // wardrobe: climb in to hide
+      o.wardrobe = true; o.creak = 0;
+      o.front = { x, y: y + 16 };
+      o.draw = (ctx, t) => {
+        const occupied = player.inWardrobe === o;
+        const open = o.creak > 0 ? Math.sin(o.creak * Math.PI) * 9 : occupied ? 2.5 : 0; // door swing / crack
         ctx.fillStyle = '#7a4f2e'; roundRect(ctx, x - 19, y - 70, 38, 70, 3, true);
-        ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 16, y - 66, 15, 60); ctx.strokeRect(x + 1, y - 66, 15, 60);
-        ctx.fillStyle = '#f2c14e'; circle(ctx, x - 3, y - 36, 1.6); circle(ctx, x + 3, y - 36, 1.6);
+        if (open > 0) { // the dark gap between the doors, and who's in it
+          ctx.fillStyle = '#1d1410'; ctx.fillRect(x - open, y - 66, open * 2, 60);
+          if (occupied) {
+            const ey = y - 40 + Math.sin(t * 0.8) * 1.5;
+            ctx.fillStyle = '#ffffff'; circle(ctx, x - 1.6, ey, 1.4); circle(ctx, x + 1.6, ey, 1.4);
+            ctx.fillStyle = NOSE; circle(ctx, x - 1.6 + Math.sin(t * 0.9) * 0.4, ey, 0.7); circle(ctx, x + 1.6 + Math.sin(t * 0.9) * 0.4, ey, 0.7);
+          }
+        }
+        ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - 16 - open * 0.3, y - 66, 15, 60); ctx.strokeRect(x + 1 + open * 0.3, y - 66, 15, 60);
+        ctx.fillStyle = '#f2c14e'; circle(ctx, x - 3 - open, y - 36, 1.6); circle(ctx, x + 3 + open, y - 36, 1.6);
         ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 21, y - 72, 42, 4);
+        if (occupied && !paused && o.creak <= 0) { // how to get out
+          const text = isTouch ? 'move to step out' : 'E / move: step out';
+          ctx.font = '800 7px Nunito, sans-serif';
+          const w = ctx.measureText(text).width + 10;
+          ctx.fillStyle = 'rgba(28,36,24,0.85)'; roundRect(ctx, x - w / 2, y - 92, w, 11, 4, true);
+          ctx.fillStyle = '#ffb547'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(text, x, y - 86.2);
+        }
       };
     }
     o.shadow = (ctx) => { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x - 18, y - 2, 40, 5); };
@@ -1284,7 +1305,12 @@
   function updatePlayer(dt, input) {
     let ix = input.x, iy = input.y;
     if (player.stun > 0) { player.stun -= dt; ix = 0; iy = 0; }
-    const mag = Math.hypot(ix, iy);
+    let mag = Math.hypot(ix, iy);
+    if (player.inWardrobe) {
+      if (mag > 0.3 && (player.wardCD || 0) <= 0) exitWardrobe();
+      else { ix = 0; iy = 0; mag = 0; }
+    }
+    player.wardCD = Math.max(0, (player.wardCD || 0) - dt);
     if (mag > 1) { ix /= mag; iy /= mag; }
     const heavy = player.held && player.held.type.heavy;
     const running = input.run && !heavy;
@@ -1345,6 +1371,7 @@
     player.hop = 0.01;
     player.bubble = { text: CHITTERS[Math.floor(Math.random() * CHITTERS.length)], t: 1.3 };
     sfx('chitter');
+    online.chit++;
     // You can't chitter with your mouth full: light things fall out
     if (player.held && !player.held.type.heavy) dropHeld(true);
     if (cat && cat.state !== 'flee' && Math.hypot(cat.x - player.x, cat.y - player.y) < chitterRadius()) catFlee(player.x, player.y);
@@ -2104,12 +2131,46 @@
   function reachPoint() { const d = DIRV[player.dir]; return [player.x + d[0] * 12, player.y + d[1] * 9 - 3]; }
   function itemReach(it) { const [rx, ry] = reachPoint(); return Math.hypot(it.x - rx, it.y - ry) - it.type.r * 0.5; }
   // Which animal (if any) E would pet: whichever is closest to your nose, ahead of any item
+  let nearWardrobe = null;
   function petChoice() {
-    if (!started || paused || player.held) return null;
-    let best = null, bd = target ? itemReach(target) : Infinity;
-    if (dogCanPet() && dogReach() < bd) { best = 'dog'; bd = dogReach(); }
-    if (catCanPet() && catReach() < bd) best = 'cat';
+    if (!started || paused || player.inWardrobe) return null;
+    let best = null, bd = target && !player.held ? itemReach(target) : Infinity;
+    if (!player.held) {
+      if (dogCanPet() && dogReach() < bd) { best = 'dog'; bd = dogReach(); }
+      if (catCanPet() && catReach() < bd) { best = 'cat'; bd = catReach(); }
+    }
+    // A wardrobe right in front of you (you can't squeeze in with something heavy)
+    nearWardrobe = null;
+    if (!(player.held && player.held.type.heavy) && areaOf(player.x, player.y) > 0) {
+      const [rx, ry] = reachPoint();
+      for (const o of solidObjects) {
+        if (!o.wardrobe) continue;
+        const d = Math.hypot(o.x - rx, o.y - ry);
+        if (d < 26 && d - 4 < bd) { best = 'wardrobe'; bd = d - 4; nearWardrobe = o; }
+      }
+    }
     return best;
+  }
+
+  function enterWardrobe(o) {
+    if (!o) return;
+    // Anyone chasing who sees you climb in knows exactly where you went
+    for (const v of villagers) if (v.state === 'chase' && canSeePlayer(v)) v.knowsWardrobe = o;
+    player.eating = null;
+    Object.assign(player, { inWardrobe: o, x: o.front.x, y: o.front.y, vx: 0, vy: 0, dir: 'up', wardCD: 0.4 });
+    o.creak = 1;
+    sfx('creak');
+  }
+  function exitWardrobe() {
+    const o = player.inWardrobe;
+    if (!o) return;
+    player.inWardrobe = null;
+    player.wardCD = 0.3;
+    Object.assign(player, { x: o.front.x, y: o.front.y, dir: 'down' });
+    if (collides(player.x, player.y)) player.y += 10;
+    o.creak = 1;
+    sfx('creak');
+    for (const v of villagers) v.knowsWardrobe = null;
   }
   function dogReach() { const [rx, ry] = reachPoint(); return Math.hypot(dog.x - rx, dog.y - ry) - 8; }
 
@@ -2128,10 +2189,12 @@
 
   function grabOrDrop() {
     if (!started) return;
-    if (player.held) { dropHeld(false); return; }
+    if (player.inWardrobe) { exitWardrobe(); return; }
+    if (player.held && !(petChoice() === 'wardrobe')) { dropHeld(false); return; }
     const pc = petChoice();
     if (pc === 'dog') { petDog(); return; }
     if (pc === 'cat') { petCat(); return; }
+    if (pc === 'wardrobe') { enterWardrobe(nearWardrobe); return; }
     if (target) pickUp(target);
   }
 
@@ -2181,7 +2244,7 @@
 
   function throwHeld() {
     const it = player.held;
-    if (!it) return;
+    if (!it || player.inWardrobe) return;
     player.held = null;
     it.held = false;
     const d = DIRV[player.dir];
@@ -2323,6 +2386,7 @@
   }
 
   function drawPlayerWithHeld(ctx, t) {
+    if (player.inWardrobe) return; // only the eyes in the crack show
     const it = player.held;
     if (!it) { drawRaccoon(ctx, player, t); return; }
     const behind = !it.type.heavy && player.dir === 'up';
@@ -2885,6 +2949,13 @@
       v.stateT -= dt;
       if (v.stateT <= 0) { sulk(v, 'And stay out!'); v.cooldown = 2; return; }
     }
+    if (player.inWardrobe && v.knowsWardrobe === player.inWardrobe) {
+      const f = player.inWardrobe.front;
+      v.lostT = 0;
+      if (Math.hypot(f.x - v.x, f.y - v.y) < 22) { exitWardrobe(); catchPlayer(v); say(v, 'Aha! Found you!', 1.8); return; }
+      travel(v, f.x, f.y, v.chase, dt);
+      return;
+    }
     if (sees) { v.lostT = 0; v.lastSeen = { x: player.x, y: player.y }; } else v.lostT += dt;
     if (playerInHideout()) { // nobody follows a raccoon into its den
       if (it && player.held === it) completeTask('escape');
@@ -3139,6 +3210,7 @@
     { id: 'hide', tier: 'Easy', text: 'Hide in a bush' },
     { id: 'pet', tier: 'Easy', text: 'Pet Biscuit the dog' },
     { id: 'bed', tier: 'Easy', text: 'Hide under a bed' },
+    { id: 'wardrobe', tier: 'Easy', text: 'Hide in a wardrobe' },
     { id: 'eat', tier: 'Easy', text: "Eat someone's food" },
     { id: 'petcat', tier: 'Easy', text: 'Get a purr out of Marmalade the cat' },
     { id: 'parcel', tier: 'Easy', text: "Swipe one of Percy's parcels" },
@@ -3155,6 +3227,7 @@
     { id: 'fetch', tier: 'Medium', text: 'Get Biscuit to fetch something you threw' },
     { id: 'outrun', tier: 'Medium', text: 'Outrun Biscuit' },
     { id: 'smash', tier: 'Medium', text: 'Smash something fragile' },
+    { id: 'wardrobehome', tier: 'Medium', text: "Hide in a wardrobe while someone's in the room" },
     { id: 'eatpie', tier: 'Medium', text: "Eat Rosa's pie" },
     { id: 'sugar', tier: 'Medium', text: 'Get a sugar rush', hint: 'eat something sweet' },
     { id: 'stuffed', tier: 'Medium', text: "Eat until you're stuffed" },
@@ -3319,9 +3392,11 @@
     const dayBonus = win ? run.day : 0;
     const total = run.earned + timeBonus + dayBonus;
     save.shinies += total;
+    save.earnedTotal = (save.earnedTotal || 0) + total;
     save.runs++;
     if (win) { save.bestDay = Math.max(save.bestDay, run.day); save.day = run.day + 1; } else save.day = 1;
     writeSave();
+    postScore();
     sfx(win ? 'fanfare' : 'hmph');
 
     const titles = { win: `Day ${run.day} done!`, caught: 'Caught red-pawed!', sunset: 'Sunset!' };
@@ -3365,8 +3440,9 @@
 
   function startDay() {
     setupRun(save.day);
-    run.seed = (Math.random() * 2 ** 31) >>> 0;
+    run.seed = dailySeed(save.day); // the same village for everyone on this day number today
     newVillage(run.seed);
+    joinVillageRoom(run.seed);
     showRunCard();
   }
   function showRunCard() {
@@ -3378,6 +3454,7 @@
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
     document.getElementById('rc-strikes').textContent = `${run.maxStrikes} strikes`;
+    updateOnlineHud();
     showOverlay('runcard');
   }
   function goRun() {
@@ -3610,6 +3687,15 @@
 
   function updateHiding(dt) {
     for (const o of hideBushes) o.rustle = Math.max(0, o.rustle - dt);
+    for (const o of solidObjects) if (o.wardrobe && o.creak > 0) o.creak = Math.max(0, o.creak - dt * 2.5);
+    if (player.inWardrobe) {
+      player.hidden = true; player.hidingIn = player.inWardrobe;
+      completeTask('wardrobe');
+      if (villagers.some((v) => areaOf(v.x, v.y) === areaOf(player.x, player.y))) completeTask('wardrobehome');
+      const pill = document.getElementById('hidden-pill');
+      if (pill.hidden === !paused) pill.hidden = paused;
+      return;
+    }
     const wasHidden = player.hidden;
     let bush = null;
     for (const o of hideBushes) if (o.contains(player.x, player.y)) { bush = o; break; }
@@ -3637,6 +3723,7 @@
   }
   // Villagers only spot a hidden raccoon if they're practically in the bush with it
   function canSeePlayer(v) {
+    if (player.inWardrobe) return false;
     if (!canSee(v, player.x, player.y - 6)) return false;
     return !player.hidden || Math.hypot(v.x - player.x, v.y - player.y) < 20;
   }
@@ -4272,6 +4359,224 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Online. Two parts, both optional (the game is complete without them):
+  //  - Play together live: villages are "daily" (same seed for everyone on the
+  //    same day number today, UTC), and each village has its own live room.
+  //    You see the other raccoons there move, carry, chitter, eat and hide.
+  //    Only raccoons are shared; each player's villagers and items are their own.
+  //  - A shared leaderboard of best days, kept in the artifact's database.
+  // ---------------------------------------------------------------------------
+  const online = {
+    lobby: null, room: null, user: null, db: null, myId: null,
+    peers: new Map(), names: {}, colors: {}, lastSent: '', sendT: 0, chit: 0,
+    scores: [], scoresState: 'off', lastScore: '', scoreBlocked: false, unsubPeers: null,
+  };
+
+  function dailySeed(day) {
+    const d = new Date().toISOString().slice(0, 10);
+    let h = 2166136261;
+    for (const ch of `${d}#${day}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
+  async function initOnline() {
+    const use = window.claude && typeof window.claude.use === 'function' ? window.claude.use : null;
+    if (!use) { renderBoard(); return; }
+    try {
+      const [room, user, db] = await Promise.all([use('room'), use('user'), use('db')]);
+      online.lobby = room; online.user = user; online.db = db;
+      if (user) online.myId = await user.id();
+      if (db) subscribeScores(); else renderBoard();
+      if (room) joinVillageRoom(run.seed);
+    } catch (_) { renderBoard(); }
+  }
+
+  async function joinVillageRoom(seed) {
+    if (!online.lobby) return;
+    const name = 'village-' + seed;
+    if (online.room && online.room.name === name) return;
+    const old = online.room;
+    online.room = null; online.peers.clear(); updateOnlineHud();
+    if (old) { try { if (online.unsubPeers) online.unsubPeers(); await old.leave(); } catch (_) { /* already gone */ } }
+    try {
+      const r = await online.lobby.join(name);
+      if (run.seed !== seed) { r.leave().catch(() => {}); return; } // a newer day started meanwhile
+      online.room = r;
+      online.lastSent = '';
+      online.unsubPeers = r.onPeers((ch) => syncPeers(ch.peers), () => { online.room = null; online.peers.clear(); updateOnlineHud(); });
+    } catch (_) { online.room = null; }
+  }
+
+  // Read other raccoons' presence (untrusted: validate everything)
+  function syncPeers(list) {
+    const seen = new Set();
+    for (const p of list) {
+      if (p.isMe || p.kind !== 'viewer') continue;
+      const pr = p.presence || {};
+      if (typeof pr.x !== 'number' || typeof pr.y !== 'number' || !isFinite(pr.x) || !isFinite(pr.y)) continue;
+      seen.add(p.peer);
+      let r = online.peers.get(p.peer);
+      if (!r) { r = { x: pr.x, y: pr.y, walk: 0, hop: 0, hopV: 0, speed: 0, bubble: null, chit: +pr.chit || 0 }; online.peers.set(p.peer, r); }
+      r.tx = clamp(pr.x, 0, WORLD_W); r.ty = clamp(pr.y, 0, MH_ALL * TILE);
+      r.dir = ['up', 'down', 'left', 'right'].includes(pr.dir) ? pr.dir : 'down';
+      r.held = typeof pr.held === 'string' && Object.prototype.hasOwnProperty.call(ITEM, pr.held) ? pr.held : null;
+      r.hidden = pr.hidden === true; r.eating = pr.eat === true;
+      r.tummy = clamp(Number(pr.tummy) || 0, 0, 100);
+      r.by = p.by || (typeof pr.uid === 'string' && pr.uid.length < 80 ? pr.uid : null);
+      const chit = Number(pr.chit) || 0;
+      if (chit !== r.chit) {
+        r.chit = chit; r.hopV = 140; r.hop = 0.01; r.bubble = { text: rpick(CHITTERS), t: 1.2 };
+        if (Math.hypot(r.x - player.x, r.y - player.y) < 300) sfx('chitter');
+      }
+    }
+    for (const k of [...online.peers.keys()]) if (!seen.has(k)) online.peers.delete(k);
+    refreshNames();
+    updateOnlineHud();
+  }
+
+  async function refreshNames() {
+    if (!online.user) return;
+    const ids = new Set();
+    for (const r of online.peers.values()) if (r.by) ids.add(r.by);
+    for (const s of online.scores) ids.add(s.id);
+    if (!ids.size) return;
+    try {
+      const ps = await online.user.profiles([...ids]);
+      for (const id of ids) if (ps[id]) { online.names[id] = ps[id].name || ''; online.colors[id] = ps[id].color; }
+      renderBoard();
+    } catch (_) { /* names are optional */ }
+  }
+  const peerName = (r) => (r.by && online.names[r.by]) || 'A raccoon';
+
+  function updateOnline(dt) {
+    for (const r of online.peers.values()) {
+      const ox = r.x, oy = r.y;
+      if (Math.hypot(r.tx - r.x, r.ty - r.y) > 200) { r.x = r.tx; r.y = r.ty; } // teleports (doors, new day)
+      else { const k = Math.min(1, dt * 10); r.x += (r.tx - r.x) * k; r.y += (r.ty - r.y) * k; }
+      r.speed = dt > 0 ? Math.hypot(r.x - ox, r.y - oy) / dt : 0;
+      if (r.speed > 4) r.walk += dt * r.speed * 0.11;
+      if (r.hop > 0 || r.hopV) { r.hopV -= 600 * dt; r.hop += r.hopV * dt; if (r.hop <= 0) { r.hop = 0; r.hopV = 0; } }
+      if (r.bubble) { r.bubble.t -= dt; if (r.bubble.t <= 0) r.bubble = null; }
+    }
+    // Share where I am (absolute state, a dozen times a second at most, only when it changed)
+    online.sendT -= dt;
+    if (!online.room || online.sendT > 0 || !started) return;
+    online.sendT = 0.08;
+    const me = {
+      x: Math.round(player.x), y: Math.round(player.y), dir: player.dir,
+      held: player.held ? player.held.kind : null, hidden: !!player.hidden, eat: !!player.eating,
+      tummy: Math.round(player.tummy || 0), chit: online.chit, day: run.day, uid: online.myId,
+    };
+    const key = JSON.stringify(me);
+    if (key === online.lastSent) return;
+    online.lastSent = key;
+    online.room.presence(me).catch(() => {});
+  }
+
+  function drawRemote(ctx, r, t) {
+    if (r.hidden) { // just a pair of eyes in the leaves
+      const ey = r.y - 15;
+      ctx.fillStyle = MASK; ellipse(ctx, r.x, ey, 7, 2.8);
+      ctx.fillStyle = '#ffffff'; circle(ctx, r.x - 3, ey, 1.6); circle(ctx, r.x + 3, ey, 1.6);
+      ctx.fillStyle = NOSE; circle(ctx, r.x - 3, ey, 0.8); circle(ctx, r.x + 3, ey, 0.8);
+      return;
+    }
+    const p = { x: r.x, y: r.y, dir: r.dir, speed: r.speed, walk: r.walk, hop: r.hop, tummy: r.tummy, eating: r.eating };
+    const drawHeld = () => {
+      if (!r.held) return;
+      const ty = ITEM[r.held];
+      const fake = { kind: r.held, type: ty, bites: 0, planted: false, roll: 0 };
+      let hx = r.x, hz = 7;
+      if (ty.heavy) hz = 29; else if (r.dir === 'right') hx += 17; else if (r.dir === 'left') hx -= 17; else hz = r.dir === 'up' ? 17 : 5;
+      ctx.save(); ctx.translate(hx, r.y + (r.dir === 'down' ? 1 : 0) - hz - r.hop); ty.draw(ctx, fake, t); ctx.restore();
+    };
+    const behind = r.held && !ITEM[r.held].heavy && r.dir === 'up';
+    if (behind) drawHeld();
+    drawRaccoon(ctx, p, t);
+    // a scarf in their own colour, so friends are easy to tell apart
+    ctx.fillStyle = (r.by && online.colors[r.by]) || '#7fe3ff';
+    ctx.beginPath(); ctx.ellipse(r.x + (r.dir === 'left' ? -7 : r.dir === 'right' ? 7 : 0), r.y - 13 - r.hop, 5.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+    if (!behind) drawHeld();
+  }
+  function drawRemoteTag(ctx, r) {
+    const name = peerName(r);
+    ctx.font = '800 7px Nunito, sans-serif';
+    const w = ctx.measureText(name).width + 10;
+    const y = r.y - r.hop - (r.hidden ? 26 : 40);
+    ctx.fillStyle = 'rgba(28,36,24,0.8)'; roundRect(ctx, r.x - w / 2, y - 6, w, 11, 4, true);
+    ctx.fillStyle = (r.by && online.colors[r.by]) || '#7fe3ff';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(name, r.x, y - 0.2);
+    if (r.bubble) drawBubbleAt(ctx, r.x, y - 14, r.bubble);
+  }
+
+  function updateOnlineHud() {
+    const chip = document.getElementById('rb-online');
+    if (!chip) return;
+    const n = online.peers.size;
+    chip.hidden = n === 0;
+    chip.textContent = n === 1 ? '1 other raccoon here' : `${n} other raccoons here`;
+    const rc = document.getElementById('rc-online');
+    if (rc) rc.textContent = online.lobby
+      ? (n ? `${n === 1 ? '1 other raccoon is' : n + ' other raccoons are'} in this village right now.` : 'Friends on the same day number today get this same village and play alongside you.')
+      : '';
+  }
+
+  // Leaderboard ------------------------------------------------------------------
+  function subscribeScores() {
+    online.scoresState = 'loading';
+    renderBoard();
+    const timer = setTimeout(() => { if (online.scoresState === 'loading') { online.scoresState = 'slow'; renderBoard(); } }, 10000);
+    try {
+      online.db.collection('scores').orderBy('best', 'desc').limit(20).onSnapshot((snap) => {
+        if (!snap.metadata.fromCache) clearTimeout(timer);
+        online.scores = snap.docs.map((d) => {
+          const v = d.data() || {};
+          return { id: d.id, best: clamp(Math.floor(Number(v.best) || 0), 0, 9999), shinies: clamp(Math.floor(Number(v.shinies) || 0), 0, 1e7) };
+        }).filter((s) => s.best > 0);
+        online.scoresState = 'ok';
+        refreshNames();
+        renderBoard();
+      }, () => { clearTimeout(timer); online.scoresState = 'error'; renderBoard(); });
+    } catch (_) { clearTimeout(timer); online.scoresState = 'error'; renderBoard(); }
+  }
+  async function postScore() {
+    if (!online.db || !online.myId || !save.bestDay) return;
+    const body = { best: save.bestDay, shinies: save.earnedTotal || 0, runs: save.runs, updatedAt: new Date().toISOString() };
+    const key = JSON.stringify([body.best, body.shinies, body.runs]);
+    if (key === online.lastScore) return;
+    try { await online.db.doc('scores/' + online.myId).set(body); online.lastScore = key; online.scoreBlocked = false; }
+    catch (_) { online.scoreBlocked = true; }
+    renderBoard();
+  }
+  function renderBoard() {
+    const list = document.getElementById('den-board'), note = document.getElementById('board-note');
+    if (!list || !note) return;
+    list.innerHTML = '';
+    const notes = {
+      off: 'The leaderboard shows up when the game is opened from its claude.ai link.',
+      loading: 'Loading scores…',
+      slow: 'Can’t reach the leaderboard right now.',
+      error: 'The leaderboard isn’t available here.',
+    };
+    if (online.scoresState !== 'ok') { note.textContent = notes[online.scoresState] || notes.off; return; }
+    online.scores.slice(0, 10).forEach((s, i) => {
+      const li = document.createElement('li');
+      if (s.id === online.myId) li.className = 'me';
+      const rank = document.createElement('span'); rank.className = 'rank'; rank.textContent = String(i + 1);
+      const nm = document.createElement('span'); nm.className = 'who';
+      nm.textContent = (online.names[s.id] || 'A raccoon') + (s.id === online.myId ? ' (you)' : '');
+      const best = document.createElement('span'); best.className = 'best'; best.textContent = `Day ${s.best}`;
+      const sh = document.createElement('span'); sh.className = 'sh'; sh.textContent = `${s.shinies} ✦`;
+      li.append(rank, nm, best, sh);
+      list.appendChild(li);
+    });
+    note.textContent = online.scoreBlocked
+      ? 'Your score couldn’t be saved. Ask the game’s owner for Contributor access.'
+      : online.scores.length ? 'Best day reached. Finish a day to get on the board.' : 'No scores yet. Finish a day to get on the board.';
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -4324,6 +4629,7 @@
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
       case 'bark': tone(420, 250, 0.09, 'square', 0.08); tone(400, 230, 0.1, 'square', 0.07, 0.13); break;
       case 'rustle': noise(0.18, 0.09, 3000); break;
+      case 'creak': tone(180, 240, 0.25, 'sawtooth', 0.025); tone(240, 160, 0.2, 'triangle', 0.03, 0.18); break;
       case 'chomp': noise(0.08, 0.14, 2200); tone(260, 180, 0.06, 'square', 0.04, 0.02); break;
       case 'gulp': tone(300, 120, 0.14, 'sine', 0.09); tone(260, 110, 0.12, 'sine', 0.07, 0.15); break;
       case 'burp': tone(110, 70, 0.35, 'sawtooth', 0.09); break;
@@ -4423,7 +4729,8 @@
   grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) grabOrDrop(); });
   throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) throwHeld(); });
   function syncTouchButtons() {
-    const label = player.held ? 'drop' : petChoice() ? 'pet' : 'grab';
+    const pcl = petChoice();
+    const label = player.inWardrobe ? 'out' : pcl === 'wardrobe' ? 'hide' : player.held ? 'drop' : pcl ? 'pet' : 'grab';
     if (grabBtn.textContent !== label) grabBtn.textContent = label;
     grabBtn.classList.toggle('ready', !!(player.held || target || petChoice()));
     if (throwBtn.hidden === !!player.held) throwBtn.hidden = !player.held;
@@ -4512,6 +4819,9 @@
       vis.push({ y: v.y, isVillager: true, v });
     }
     if (dog && dog.x > left - pad && dog.x < left + viewW + pad && dog.y > top - pad && dog.y < top + viewH + pad + 40) vis.push({ y: dog.y, isDog: true });
+    for (const r of online.peers.values()) {
+      if (r.x > left - pad && r.x < left + viewW + pad && r.y > top - pad && r.y < top + viewH + pad + 40) vis.push({ y: r.y, isRemote: true, r });
+    }
     if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
     // Ground-level effects: dust and ripples
@@ -4538,6 +4848,7 @@
       if (o.isVillager) { drawVillagerWithHeld(ctx, o.v, t); continue; }
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
       if (o.isCat) { drawCat(ctx, cat, t); continue; }
+      if (o.isRemote) { drawRemote(ctx, o.r, t); continue; }
       let fade = false;
       if (o.canopy && player.y < o.y && player.y > o.canopy.cy - o.canopy.r && Math.abs(player.x - o.x) < o.canopy.r + 6) fade = true;
       o.draw(ctx, t, fade);
@@ -4572,13 +4883,17 @@
       circle(ctx, q.x, q.y - q.z, q.kind === 'drop' ? 1.8 : 1.4);
     }
     const pc = petChoice();
-    if (pc === 'dog') drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
+    if (pc === 'wardrobe') drawPrompt(ctx, { x: nearWardrobe.x, y: nearWardrobe.y, z: 0, owner: null, type: { h: 74, name: 'hide in wardrobe' } }, t);
+    else if (pc === 'dog') drawPrompt(ctx, { x: dog.x, y: dog.y, z: 0, owner: null, type: { h: 24, name: 'pet Biscuit' } }, t);
     else if (pc === 'cat') drawPrompt(ctx, { x: cat.x, y: cat.y, z: cat.z, owner: null, type: { h: 18, name: 'pet Marmalade' } }, t);
     else if (target && started) drawPrompt(ctx, target, t);
     drawBubble(ctx, player);
     for (const v of villagers) if (v.bubble) drawBubbleAt(ctx, v.x, v.y - v.hop - 46 * v.scale, v.bubble);
     if (dog && dog.bubble) drawBubbleAt(ctx, dog.x, dog.y - dog.hop - 38, dog.bubble);
     if (cat && cat.bubble) drawBubbleAt(ctx, cat.x, cat.y - cat.z - cat.hop - 32, cat.bubble);
+    for (const r of online.peers.values()) {
+      if (r.x > left - 60 && r.x < left + viewW + 60 && r.y > top - 60 && r.y < top + viewH + 80) drawRemoteTag(ctx, r);
+    }
 
     drawDoorHint(ctx, t);
     drawEatHint(ctx, t);
@@ -4625,6 +4940,13 @@
       ctx.fillStyle = '#ffb547'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
+      for (const r of online.peers.values()) {
+        const rp = outdoorPos(r.x, r.y);
+        ctx.fillStyle = (r.by && online.colors[r.by]) || '#7fe3ff';
+        circle(ctx, mx + rp.x / WORLD_W * mw, my + rp.y / WORLD_H * mh, 2.6);
+        ctx.strokeStyle = '#1c2418'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(mx + rp.x / WORLD_W * mw, my + rp.y / WORLD_H * mh, 2.6, 0, Math.PI * 2); ctx.stroke();
+      }
       if (cat) {
         const cp = outdoorPos(cat.x, cat.y);
         ctx.fillStyle = '#e8913a'; circle(ctx, mx + cp.x / WORLD_W * mw, my + cp.y / WORLD_H * mh, 1.7);
@@ -4669,6 +4991,7 @@
       run.shake = Math.max(0, run.shake - dt);
     }
     updateAmbient(dt);
+    updateOnline(dt);
     target = paused ? null : findTarget();
     syncTouchButtons();
     // camera eases toward the player, with a little look-ahead
@@ -4697,7 +5020,7 @@
     spawnCat();
     hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, tummy: 0, stuffed: false, sugar: 0, eating: null });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }
@@ -4705,13 +5028,14 @@
   function boot() {
     loadSave();
     setupRun(save.day);
-    run.seed = (Math.random() * 2 ** 31) >>> 0;
+    run.seed = dailySeed(save.day);
     newVillage(run.seed);
     initTodoToggle();
     buildTodo();
     updateRunBar();
     resize();
     requestAnimationFrame((n) => { last = n; frame(n); });
+    initOnline();
   }
 
   // Debug: draw the whole village into one picture (used for testing layouts)
@@ -4734,7 +5058,7 @@
   }
 
   // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture, get dog() { return dog; }, online, dailySeed, get cat() { return cat; }, get hideBushes() { return hideBushes; } };
 
   const hot = window.claude?.hot;
   if (hot?.ready) hot.ready(() => boot()); else boot();

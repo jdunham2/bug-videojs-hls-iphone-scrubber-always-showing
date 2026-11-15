@@ -20,7 +20,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 
 ## What's in the game
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 53, a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 55, a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -54,6 +54,15 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   the run bar) and slowly digests. Overeat and you're Stuffed: rounder, slower, no running. Sweets give a 12 s
   sugar rush. Munching is noisy (nearby villagers turn to look), Biscuit smells food from farther away, and owners
   who watch you finish their food are outraged.
+- **Hiding in wardrobes**: stand in front of one and press E to climb in (not with anything heavy); move or press E
+  to step out. Nobody can see you in there, but a villager who watched you climb in will open the doors.
+- **Online** (when opened from the claude.ai link; offline play is unchanged):
+  - *Play together live*: villages are daily (the same village for everyone on the same day number today, UTC),
+    and each village has a live room. Friends in it show up as raccoons with name tags, colour scarves and minimap
+    dots; you see them move, carry things, eat, chitter and hide. Only raccoons are shared: each player's villagers
+    and items are their own.
+  - *Leaderboard*: best day reached and lifetime shinies, shown in the den. Saving a score needs Contributor
+    access (or ownership) on the artifact.
 - **Hideout**: a hollow log at one end of the road. Things in its nest are safe, and villagers won't follow you in.
 
 ## Code layout (`game.js`)
@@ -68,6 +77,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Hiding & dog**: `makeHideBush()`, `updateHiding()`, `canSeePlayer()`; `spawnDog()`, `updateDog()` state machine
   (sit, wander, alert, chase, catchase, fetch, return, happy, follow); `spawnCat()`, `updateCat()` (nap, stroll,
   swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
+- **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
+  `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
 - **Runs**: `TASK_POOL`, `setupRun()`, `endRun()`, `UPGRADES` + the den, save in `localStorage`
 - **To-do list**: run's task hand, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
