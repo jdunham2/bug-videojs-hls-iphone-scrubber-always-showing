@@ -17,43 +17,36 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Show / hide to-do list | T | "To-do" tab |
 | Mute sound | N | — |
 
-## What's in the slice
-- Hand-drawn (procedural canvas) raccoon with 4 facing directions, walk cycle, ringed tail, idle breathing
-- 72×52 tile village: plaza with well, roads, 6 houses, fenced vegetable garden, pond with lily pads, stream + bridge, forest border
-- Collision against water, houses, trees, fences and props (slides along walls)
-- Y-sorted depth: walk behind trees and houses; tree canopies fade when you're behind them
-- **Picking things up**: ~55 items (pie, crops, crates, barrels, gnomes, hats, apples, a rubber duck, ...)
-  - Light items go in your mouth; heavy ones (crates, barrels) are carried overhead, slow you down and block movement when set down
-  - Throw with arcs, bounces, spin; things fly over low fences
-  - Things that land in the pond splash: some float and drift, others sink for good
-  - Crops start planted and get pulled up; kick the beach ball by running into it
-  - Synthesized sound effects (no audio files)
-- **Villagers**: Bertram (gardener), Mrs. Fennick (neighbour), Rosa (picnicker), Toby (kid)
-  - Daily routines with A* pathfinding around houses, fences and water; idle chatter with little voice blips
-  - Each owns certain items (the prompt says whose: "Rosa's pie"). If they **see** you holding their stuff: "!" and a chase
-  - Vision is a cone in front of them blocked by houses/trees, so sneak up from behind
-  - Caught? They snatch it back, shove you, and carry it home (crops get replanted, the pie goes back on the table)
-  - They notice their things lying in the wrong place and tidy them up; floating/sunk items make them sulk
-  - Chitter near them or hit them with a thrown item and they jump, dropping whatever they carry. Hit them with
-    something that isn't theirs and they chase you off
-  - Toby plays with his beach ball; Rosa and Mrs. Fennick complain when their pie/sandwich/hat is missing
-- **Mischief to-do list**: 16 tasks on a notepad (Easy / Medium / Hard / Final), crossed off with a scribble,
-  a toast and a jingle; a "Village ransacked!" screen with your time when everything's done
-  - Easy: pull up a carrot, steal Rosa's pie, make someone jump, kick Toby's ball, throw something in the pond
-  - Medium: ball into the pond, bonk Mrs. Fennick, make Bertram drop what he's carrying, escape a chase, pull up 5 crops
-  - Hard: ruin the picnic, steal the hat from under her nose, get chased by two villagers at once, empty the garden,
-    stash 5 things in your hideout
-  - Final (unlocks last): have a feast (pie, sandwich and an apple in your hideout)
-- **Hideout**: a hollow log in a clearing by the west road. Things in its nest count as stashed; villagers won't
-  take them back and won't follow you in, so it's also a safe spot to end a chase
-- Smooth camera with look-ahead, minimap, drifting cloud shadows, butterflies that flee, running dust
+## What's in the game
+- **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
+  around), a hand of tasks from a pool of 35, a clock until sunset (the world warms and dims as it runs out) and a
+  few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
+- **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
+  Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
+  Losing a day resets the streak to Day 1, but upgrades stay.
+- **Houses you can go into**: push up into a front door to go in, walk out over the mat to leave. Every house has a
+  furnished room (bed, fireplace or stove, shelves, wardrobe, table, rug) with things on the table and lying around.
+  Villagers go home during their rounds, so a house isn't always empty, and they'll chase you round their own kitchen.
+- **Seven villagers**: Bertram (gardener), Mrs. Fennick (neighbour), Rosa (picnicker), Toby (her son), Percy (postman,
+  fast), Granny Mabel (knits on her doorstep, slow) and Ollie (fisherman). Each has a daily round worked out from the
+  village layout, owns certain things, and will chase you if they see you carrying them. Vision is a cone, blocked by
+  houses and walls. Caught? They snatch it back, shove you, and you lose a strike.
+- **~105 things to grab per village** (about a third indoors): pies, cakes, teapots, teddy bears, cookie jars, crops,
+  crates, a wheelbarrow, parcels, milk bottles, a kite, a fishing rod, yarn, gnomes... Light things go in your mouth,
+  heavy ones overhead. Throw them, sink them, float them, or stash them in your hideout.
+- **Hideout**: a hollow log at one end of the road. Things in its nest are safe, and villagers won't follow you in.
 
 ## Code layout (`game.js`)
 - **Map**: `buildMap()` lays out tiles and places objects (seeded RNG, same village every time)
 - **Items**: `ITEM` table (name, size, heavy, floats, draw), `placeItems()`, `updateItems()` physics, `grabOrDrop()` / `throwHeld()`
-- **Villagers**: `VILLAGER_DEFS` (looks, speeds, routine stops, lines), `updateVillagers()` state machine
-  (route → act, chase, fetch, return, sulk, startled), `findPath()` A* over the `nav` grid, `canSee()`
-- **To-do list**: `TASKS` table, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
+- **Village generator**: `genLayout()` + `buildMap()` (roads, plaza, pond, garden, houses, carved paths),
+  `newVillage(seed)` rebuilds everything for a run
+- **Interiors**: `buildInteriors()` puts a room per house in a hidden strip below the map; `areaOf()`, doors in
+  `updateDoors()`, villagers cross doors with `travel()`
+- **Villagers**: `VILLAGER_DEFS` (looks, speeds, lines), `stopsFor()` (daily round from the layout),
+  `updateVillagers()` state machine (route → act, chase, fetch, return, sulk, startled), A* `findPath()`, `canSee()`
+- **Runs**: `TASK_POOL`, `setupRun()`, `endRun()`, `UPGRADES` + the den, save in `localStorage`
+- **To-do list**: run's task hand, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
   polled conditions; notepad markup + styles live in `index.html`
 - **Objects**: `make*()` factories return `{x, y, hitbox, bounds, draw, shadow}`; add new props here
 - **Player**: `updatePlayer()` (movement/collision) and `drawRaccoon*()` (rendering)

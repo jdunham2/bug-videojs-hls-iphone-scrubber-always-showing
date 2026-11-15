@@ -12,13 +12,15 @@
   const MH = 52;            // map height in tiles
   const WORLD_W = MW * TILE;
   const WORLD_H = MH * TILE;
+  const IH = 12;            // extra rows below the village that hold house interiors
+  const MH_ALL = MH + IH;
   const WALK_SPEED = 105;   // px / s
   const RUN_SPEED = 185;
   const ACCEL = 900;
   const FRICTION = 1100;
 
   // Tile types
-  const GRASS = 0, PATH = 1, WATER = 2, SAND = 3, SOIL = 4, STONE = 5, BRIDGE = 6;
+  const GRASS = 0, PATH = 1, WATER = 2, SAND = 3, SOIL = 4, STONE = 5, BRIDGE = 6, FLOOR = 7, WALL = 8;
 
   // ---------------------------------------------------------------------------
   // Deterministic RNG so the village is the same every time
@@ -40,9 +42,9 @@
   // ---------------------------------------------------------------------------
   // Map
   // ---------------------------------------------------------------------------
-  const map = new Uint8Array(MW * MH);
-  const used = new Uint8Array(MW * MH); // tiles reserved by objects / features
-  const inb = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
+  const map = new Uint8Array(MW * MH_ALL);
+  const used = new Uint8Array(MW * MH_ALL); // tiles reserved by objects / features
+  const inb = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH_ALL;
   const idx = (x, y) => y * MW + x;
   const getT = (x, y) => (inb(x, y) ? map[idx(x, y)] : WATER);
   const setT = (x, y, t) => { if (inb(x, y)) map[idx(x, y)] = t; };
@@ -243,7 +245,9 @@
       const byDist = L.houses.map((h, i) => [i, Math.hypot(h.x - gcx, h.y - gcy)]).sort((a, b) => a[1] - b[1]);
       const bert = byDist[0][0];
       const rest = shuffled(L.houses.map((_, i) => i).filter((i) => i !== bert));
-      L.homes = { bertram: bert, fennick: rest[0] ?? bert, rosa: rest[1] ?? rest[0] ?? bert, toby: rest[2] ?? rest[0] ?? bert };
+      L.homes = { bertram: bert };
+      ['fennick', 'rosa', 'percy', 'mabel', 'ollie'].forEach((id, i) => { L.homes[id] = rest.length ? rest[i % rest.length] : bert; });
+      L.homes.toby = L.homes.rosa; // Toby lives with his mum
     }
 
     // Picnic table on the pond's road-facing side
@@ -268,6 +272,8 @@
 
     // Reserve roads and plaza so nothing grows on them
     for (let i = 0; i < MW * MH; i++) if (map[i] !== GRASS) used[i] = 1;
+
+    buildInteriors();
 
     // Houses + mailboxes
     for (const h of L.houses) {
@@ -339,6 +345,263 @@
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (getT(x, y) === SAND && rand() < 0.16) objects.push(makeReeds((x + rr(0.2, 0.8)) * TILE, (y + rr(0.5, 0.9)) * TILE));
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // House interiors. Each house gets a room in a hidden strip of tiles below
+  // the village (rows MH..MH_ALL). Doors move you between the two, so items,
+  // physics, villagers and pathfinding all work indoors with no extra engine.
+  // ---------------------------------------------------------------------------
+  const ROOM_STRIDE = 12; // each room takes 12 columns of the strip
+  const areaOf = (x, y) => (y < WORLD_H ? 0 : 1 + Math.floor(x / (ROOM_STRIDE * TILE)));
+  const houseOfArea = (a) => (a > 0 && L && L.rooms ? L.rooms[a - 1] : null);
+  const residentsOf = (h) => Object.keys(L.homes).filter((id) => L.houses[L.homes[id]] === h);
+  const BLANKETS = ['#c0392b', '#4f6fa8', '#7a4f8f', '#3f7f6a', '#d9a43a', '#d94f7a'];
+
+  function buildInteriors() {
+    rectT(0, MH, MW, IH, WALL);
+    L.rooms = [];
+    const papers = shuffled(['#e8c9a0', '#c9d8b6', '#d8c4e0', '#f0d9a8', '#bcd3e0', '#e6b8a8']);
+    const floors = shuffled(['#b07d48', '#a0703f', '#c08a52', '#9a6a3c']);
+    const rugs = shuffled(['#b5523b', '#3f7f6a', '#4f6fa8', '#7a4f8f', '#c08a2e', '#2f6b5a']);
+    L.houses.forEach((h, k) => {
+      if (k >= 6) return; // six rooms fit in the strip; any extra house stays locked
+      const x0 = 1 + k * ROOM_STRIDE, y0 = MH + 2;
+      rectT(x0 + 1, y0 + 2, 9, 5, FLOOR);
+      setT(x0 + 5, y0 + 7, FLOOR); // door mat
+      h.room = { k, x0, y0, wall: papers[k % 6], floor: floors[k % 4], rug: rugs[k % 6], windowX: rand() < 0.5 ? 3.3 : 6.4 };
+      h.area = k + 1;
+      h.doorOut = { x: (h.doorX + 0.5) * TILE, y: (h.y + h.h) * TILE + 20 };
+      h.exitIn = { x: (x0 + 5.5) * TILE, y: (y0 + 6.6) * TILE };
+      L.rooms[k] = h;
+      furnish(h);
+    });
+  }
+
+  function furnish(h) {
+    const T = TILE, { x0, y0 } = h.room;
+    const who = residentsOf(h);
+    const back = (y0 + 2.85) * T; // foot line of furniture against the back wall
+    const bedLeft = rand() < 0.5;
+    h.room.bedLeft = bedLeft;
+    objects.push(makeBed((bedLeft ? x0 + 2.1 : x0 + 8.9) * T, (y0 + 3.9) * T, pick(BLANKETS)));
+    const slots = bedLeft ? [x0 + 4.4, x0 + 6.6, x0 + 8.9] : [x0 + 2.1, x0 + 4.4, x0 + 6.6];
+    const set = shuffled([who.includes('rosa') ? 'stove' : 'fireplace', 'shelf', 'wardrobe']);
+    set.forEach((kind, i) => objects.push(makeFurniture(kind, slots[i] * T, back)));
+    objects.push(makeTableIn((x0 + 5.5) * T, (y0 + 5) * T));
+    objects.push(makeArmchair((bedLeft ? x0 + 8.8 : x0 + 2.2) * T, (y0 + 6.8) * T, h.room.rug));
+    objects.push(makePlant((bedLeft ? x0 + 1.5 : x0 + 9.5) * T, (y0 + 6.8) * T));
+  }
+
+  // Furniture ------------------------------------------------------------------
+  function makeBed(x, y, blanket) {
+    return {
+      kind: 'bed', x, y, hitbox: box(x - 30, y - 42, 60, 42),
+      bounds: { l: x - 34, r: x + 34, t: y - 64, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x - 28, y - 4, 62, 6); },
+      draw(ctx) {
+        ctx.fillStyle = '#5a3a24'; roundRect(ctx, x - 31, y - 62, 62, 18, 4, true);       // headboard
+        ctx.fillStyle = '#f4f2ee'; roundRect(ctx, x - 29, y - 48, 58, 46, 5, true);       // mattress
+        ctx.fillStyle = '#ffffff'; roundRect(ctx, x - 21, y - 46, 42, 10, 4, true);       // pillow
+        ctx.fillStyle = blanket; roundRect(ctx, x - 29, y - 34, 58, 32, 5, true);         // blanket
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 29, y - 34, 58, 4);
+        ctx.fillStyle = '#5a3a24'; ctx.fillRect(x - 31, y - 4, 4, 4); ctx.fillRect(x + 27, y - 4, 4, 4);
+      },
+    };
+  }
+  function makeFurniture(kind, x, y) {
+    const o = { kind, x, y, hitbox: box(x - 20, y - 12, 40, 12), bounds: { l: x - 30, r: x + 30, t: y - 80, b: y + 4 } };
+    if (kind === 'shelf') {
+      const spines = Array.from({ length: 15 }, () => [pick(['#b5523b', '#4f6fa8', '#3f7f6a', '#d9a43a', '#7a4f8f', '#e8e3d6']), rr(3, 5), rr(9, 12)]);
+      o.draw = (ctx) => {
+        ctx.fillStyle = '#6b4226'; ctx.fillRect(x - 21, y - 66, 42, 66);
+        ctx.fillStyle = '#4a2c18'; ctx.fillRect(x - 18, y - 63, 36, 60);
+        let k = 0;
+        for (let row = 0; row < 3; row++) {
+          const sy = y - 63 + row * 20 + 18;
+          ctx.fillStyle = '#6b4226'; ctx.fillRect(x - 18, sy, 36, 3);
+          for (let bx = x - 17; bx < x + 15 && k < spines.length; k++) {
+            const [col, w, hgt] = spines[k];
+            ctx.fillStyle = col; ctx.fillRect(bx, sy - hgt, w, hgt);
+            bx += w + 0.6;
+          }
+        }
+      };
+    } else if (kind === 'fireplace') {
+      o.draw = (ctx, t) => {
+        ctx.fillStyle = '#8f8a7c'; roundRect(ctx, x - 24, y - 50, 48, 50, 4, true);
+        ctx.fillStyle = '#a8a396';
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 4; c++) ctx.fillRect(x - 23 + c * 12 + (r % 2) * 6, y - 49 + r * 10, 10, 8);
+        ctx.fillStyle = '#6b4226'; ctx.fillRect(x - 27, y - 54, 54, 6);
+        ctx.fillStyle = '#1d1410'; roundRect(ctx, x - 13, y - 30, 26, 28, 10, true);
+        const f = Math.sin(t * 9 + x) * 1.5;
+        ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.ellipse(x, y - 9, 8, 10 + f, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.ellipse(x, y - 7, 4, 6 - f * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,170,80,0.12)'; circle(ctx, x, y - 10, 30);
+      };
+    } else if (kind === 'stove') {
+      o.draw = (ctx, t) => {
+        ctx.fillStyle = '#3a3d42'; roundRect(ctx, x - 20, y - 42, 40, 42, 4, true);
+        ctx.fillStyle = '#55595f'; ctx.fillRect(x - 20, y - 42, 40, 6);
+        ctx.fillStyle = '#23252a'; roundRect(ctx, x - 14, y - 30, 28, 20, 3, true);
+        ctx.fillStyle = `rgba(255,140,60,${0.35 + Math.sin(t * 4) * 0.1})`; ctx.fillRect(x - 11, y - 27, 22, 14);
+        ctx.fillStyle = '#c0c4c8'; ctx.fillRect(x - 10, y - 40, 20, 3);
+        ctx.fillStyle = '#9c3a3a'; roundRect(ctx, x - 9, y - 54, 18, 12, 3, true); // a pot
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; circle(ctx, x - 2, y - 60 - Math.sin(t * 2) * 2, 3); circle(ctx, x + 3, y - 66 - Math.sin(t * 2 + 1) * 2, 2.5);
+      };
+    } else { // wardrobe
+      o.draw = (ctx) => {
+        ctx.fillStyle = '#7a4f2e'; roundRect(ctx, x - 19, y - 70, 38, 70, 3, true);
+        ctx.strokeStyle = '#5a3a20'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 16, y - 66, 15, 60); ctx.strokeRect(x + 1, y - 66, 15, 60);
+        ctx.fillStyle = '#f2c14e'; circle(ctx, x - 3, y - 36, 1.6); circle(ctx, x + 3, y - 36, 1.6);
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 21, y - 72, 42, 4);
+      };
+    }
+    o.shadow = (ctx) => { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x - 18, y - 2, 40, 5); };
+    return o;
+  }
+  function makeTableIn(x, y) {
+    return {
+      kind: 'table', x, y, hitbox: box(x - 32, y - 24, 64, 24),
+      bounds: { l: x - 46, r: x + 46, t: y - 44, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ellipse(ctx, x + 4, y - 2, 36, 7); },
+      draw(ctx) {
+        for (const s of [-1, 1]) { // chairs
+          ctx.fillStyle = '#7a4f2e'; roundRect(ctx, x + s * 40 - 8, y - 26, 16, 18, 3, true);
+          ctx.fillStyle = '#5a3a20'; ctx.fillRect(x + s * 40 - 8, y - 34, 16, 8);
+        }
+        ctx.fillStyle = '#5a3a20'; ctx.fillRect(x - 28, y - 16, 5, 16); ctx.fillRect(x + 23, y - 16, 5, 16);
+        ctx.fillStyle = '#9a6a3c'; roundRect(ctx, x - 33, y - 38, 66, 24, 4, true);
+        ctx.fillStyle = '#b07d48'; roundRect(ctx, x - 33, y - 38, 66, 20, 4, true);
+        ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(x - 12, y - 38, 24, 20); // runner
+      },
+    };
+  }
+  function makeArmchair(x, y, color) {
+    return {
+      kind: 'armchair', x, y, hitbox: box(x - 14, y - 12, 28, 12),
+      bounds: { l: x - 20, r: x + 20, t: y - 40, b: y + 4 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ellipse(ctx, x + 2, y - 1, 16, 4); },
+      draw(ctx) {
+        ctx.fillStyle = shade(color, -0.25); roundRect(ctx, x - 15, y - 34, 30, 20, 6, true);
+        ctx.fillStyle = color; roundRect(ctx, x - 16, y - 20, 32, 18, 5, true);
+        ctx.fillStyle = shade(color, -0.15); roundRect(ctx, x - 18, y - 24, 7, 20, 3, true); roundRect(ctx, x + 11, y - 24, 7, 20, 3, true);
+      },
+    };
+  }
+  function makePlant(x, y) {
+    return {
+      kind: 'plant', x, y, hitbox: box(x - 7, y - 8, 14, 8),
+      bounds: { l: x - 18, r: x + 18, t: y - 44, b: y + 4 },
+      draw(ctx, t) {
+        ctx.fillStyle = '#c0643a'; poly(ctx, [[-8, -14], [8, -14], [6, 0], [-6, 0]].map(([a, b]) => [x + a, y + b])); ctx.fill();
+        ctx.fillStyle = '#3f8a35';
+        for (let k = 0; k < 6; k++) {
+          const a = -Math.PI / 2 + (k - 2.5) * 0.45 + Math.sin(t + k) * 0.03;
+          ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 10, y - 18 + Math.sin(a) * 12, 4, 9, a + Math.PI / 2, 0, Math.PI * 2); ctx.fill();
+        }
+      },
+    };
+  }
+
+  // Room shell drawn into the ground layer: floorboards, wallpaper, walls, rug, mat
+  function drawRoomShell(g, h) {
+    const T = TILE, R = h.room, X = R.x0 * T, Y = R.y0 * T;
+    g.fillStyle = R.floor; g.fillRect(X + T, Y + 2 * T, 9 * T, 6 * T);
+    g.fillStyle = 'rgba(0,0,0,0.13)';
+    for (let yy = Y + 2 * T; yy < Y + 7 * T; yy += 12) {
+      g.fillRect(X + T, yy, 9 * T, 1.2);
+      const off = ((yy / 12) | 0) % 3 * 23;
+      for (let xx = X + T + off; xx < X + 10 * T; xx += 70) g.fillRect(xx, yy, 1.2, 12);
+    }
+    // rug under the table
+    g.fillStyle = shade(R.rug, -0.25); ellipse(g, X + 5.5 * T, Y + 4.7 * T, 3.4 * T, 1.55 * T);
+    g.fillStyle = R.rug; ellipse(g, X + 5.5 * T, Y + 4.7 * T, 3.15 * T, 1.35 * T);
+    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 2;
+    g.beginPath(); g.ellipse(X + 5.5 * T, Y + 4.7 * T, 2.5 * T, 1 * T, 0, 0, Math.PI * 2); g.stroke();
+    // back wall: wallpaper, wainscot, window, picture
+    g.fillStyle = R.wall; g.fillRect(X + T, Y, 9 * T, 2 * T);
+    g.fillStyle = 'rgba(255,255,255,0.2)';
+    for (let xx = X + T + 6; xx < X + 10 * T; xx += 14) g.fillRect(xx, Y, 4, 2 * T - 16);
+    g.fillStyle = shade(R.floor, -0.3); g.fillRect(X + T, Y + 2 * T - 16, 9 * T, 16);
+    g.fillStyle = shade(R.floor, 0.12); g.fillRect(X + T, Y + 2 * T - 18, 9 * T, 3);
+    const wx = X + R.windowX * T;
+    g.fillStyle = '#f4f2ee'; g.fillRect(wx - 2, Y + 6, 44, 32);
+    g.fillStyle = '#9fd3e8'; g.fillRect(wx + 1, Y + 9, 38, 26);
+    g.fillStyle = '#ffffff'; ellipse(g, wx + 12, Y + 18, 7, 3);
+    g.fillStyle = '#f4f2ee'; g.fillRect(wx + 19, Y + 9, 2, 26); g.fillRect(wx + 1, Y + 21, 38, 2);
+    g.fillStyle = R.rug; g.fillRect(wx - 7, Y + 4, 7, 36); g.fillRect(wx + 40, Y + 4, 7, 36);
+    // walls (dark wood) and the front wall with the door gap
+    g.fillStyle = '#3a2a1e';
+    g.fillRect(X, Y - 8, T, 8 * T + 8); g.fillRect(X + 10 * T, Y - 8, T, 8 * T + 8);
+    g.fillRect(X, Y - 8, 11 * T, 8);
+    g.fillRect(X, Y + 7 * T, 5 * T, T); g.fillRect(X + 6 * T, Y + 7 * T, 5 * T, T);
+    g.fillStyle = '#5a4030';
+    g.fillRect(X + T - 3, Y, 3, 7 * T); g.fillRect(X + 10 * T, Y, 3, 7 * T);
+    g.fillRect(X, Y + 7 * T, 5 * T, 5); g.fillRect(X + 6 * T, Y + 7 * T, 5 * T, 5);
+    // door mat
+    g.fillStyle = '#8a3a2a'; roundRect(g, X + 5 * T + 3, Y + 7 * T + 3, T - 6, T - 8, 4, true);
+    g.fillStyle = '#c0643a'; g.fillRect(X + 5 * T + 7, Y + 7 * T + 10, T - 14, 2); g.fillRect(X + 5 * T + 7, Y + 7 * T + 16, T - 14, 2);
+  }
+
+  // Doors ------------------------------------------------------------------------
+  function enterHouse(h) {
+    Object.assign(player, { x: h.exitIn.x, y: h.exitIn.y, vx: 0, vy: 0, dir: 'up', doorCD: 0.6 });
+    cam.x = player.x; cam.y = player.y;
+    sfx('door');
+    run.visited.add(h.area);
+    completeTask('burgle');
+    setProgress('tour', run.visited.size);
+  }
+  function exitHouse(h) {
+    Object.assign(player, { x: h.doorOut.x, y: h.doorOut.y, vx: 0, vy: 0, dir: 'down', doorCD: 0.6 });
+    cam.x = player.x; cam.y = player.y;
+    sfx('door');
+    const it = player.held;
+    if (it && it.home && areaOf(it.home.x, it.home.y) === h.area) completeTask('heist');
+  }
+  function updateDoors(dt, iy) {
+    player.doorCD = Math.max(0, (player.doorCD || 0) - dt);
+    if (player.doorCD > 0 || !L || !L.rooms) return;
+    const a = areaOf(player.x, player.y);
+    if (a === 0) {
+      if (iy > -0.3) return;
+      for (const h of L.rooms) {
+        if (!h) continue;
+        const wall = (h.y + h.h) * TILE;
+        if (Math.abs(player.x - h.doorOut.x) < 12 && player.y > wall && player.y - wall < 14) { enterHouse(h); return; }
+      }
+    } else {
+      const h = houseOfArea(a);
+      if (h && player.y > (h.room.y0 + 7) * TILE + 8) exitHouse(h);
+    }
+  }
+  // Where something indoors shows up on the minimap: its house's front door
+  function outdoorPos(x, y) {
+    const h = houseOfArea(areaOf(x, y));
+    return h ? h.doorOut : { x, y };
+  }
+  // "go in" / "go out" hints by doors
+  function drawDoorHint(ctx, t) {
+    if (!L || !L.rooms || paused) return;
+    const a = areaOf(player.x, player.y);
+    let x, y, text;
+    if (a === 0) {
+      for (const h of L.rooms) {
+        if (!h || Math.hypot(player.x - h.doorOut.x, player.y - h.doorOut.y) > 46) continue;
+        x = h.doorOut.x; y = (h.y + h.h) * TILE - 50; text = isTouch ? 'push up: go in' : '↑ go in';
+      }
+    } else {
+      const h = houseOfArea(a);
+      if (h && Math.hypot(player.x - h.exitIn.x, player.y - h.exitIn.y) < 60) { x = h.exitIn.x; y = (h.room.y0 + 7) * TILE + 30; text = '↓ go out'; }
+    }
+    if (!text) return;
+    ctx.font = '800 7px Nunito, sans-serif';
+    const w = ctx.measureText(text).width + 10;
+    const by = y + Math.sin(t * 4) * 1.2;
+    ctx.fillStyle = 'rgba(28,36,24,0.85)'; roundRect(ctx, x - w / 2, by - 6, w, 11, 4, true);
+    ctx.fillStyle = '#ffb547'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, by - 0.2);
   }
 
   // ---------------------------------------------------------------------------
@@ -809,7 +1072,7 @@
   let ground, mini;
   function renderGround(seed = 99) {
     ground = document.createElement('canvas');
-    ground.width = WORLD_W; ground.height = WORLD_H;
+    ground.width = WORLD_W; ground.height = MH_ALL * TILE;
     const g = ground.getContext('2d');
     const grng = mulberry32((seed ^ 0x5bd1e995) >>> 0);
     const gr = (a, b) => a + grng() * (b - a);
@@ -942,13 +1205,18 @@
       ellipse(g, HX + gr(-40, 40), HY + gr(-19, 19), 2.6, 1.4);
     }
 
+    // House interiors live in the strip below the village
+    g.fillStyle = '#120d0a'; g.fillRect(0, WORLD_H, WORLD_W, IH * TILE);
+    for (const h of L.houses) if (h.room) drawRoomShell(g, h);
+
     // Minimap
     mini = document.createElement('canvas');
     mini.width = MW * 3; mini.height = MH * 3;
     const m = mini.getContext('2d');
     m.imageSmoothingEnabled = true;
-    m.drawImage(ground, 0, 0, mini.width, mini.height);
+    m.drawImage(ground, 0, 0, WORLD_W, WORLD_H, 0, 0, mini.width, mini.height);
     for (const o of objects) {
+      if (o.y > WORLD_H) continue;
       if (o.kind === 'house') {
         m.fillStyle = '#7a3e2c';
         const hb = o.hitbox;
@@ -978,11 +1246,12 @@
   const PLAYER_HB = { w: 16, h: 9 };
 
   function solidAt(px, py) {
-    return getT(Math.floor(px / TILE), Math.floor(py / TILE)) === WATER;
+    const t = getT(Math.floor(px / TILE), Math.floor(py / TILE));
+    return t === WATER || t === WALL;
   }
   function collides(x, y) {
     const l = x - PLAYER_HB.w / 2, r = x + PLAYER_HB.w / 2, t = y - PLAYER_HB.h, b = y;
-    if (l < 0 || t < 0 || r > WORLD_W || b > WORLD_H) return true;
+    if (l < 0 || t < 0 || r > WORLD_W || b > MH_ALL * TILE) return true;
     if (solidAt(l, t) || solidAt(r, t) || solidAt(l, b) || solidAt(r, b) || solidAt(x, t) || solidAt(x, b)) return true;
     for (const o of solidObjects) {
       const h = o.hitbox;
@@ -1029,6 +1298,8 @@
       else if (Math.abs(iy) > 0.01) player.dir = iy > 0 ? 'down' : 'up';
     }
     if (speed > 4) player.walk += dt * speed * 0.11;
+
+    updateDoors(dt, iy);
 
     // Dust when running
     player.dustT -= dt;
@@ -1444,12 +1715,179 @@
       c.fillStyle = '#d23b3b'; c.fillRect(-5.5, -5.2, 11, 1.2);
       c.fillStyle = '#e9c27a'; poly(c, [[-6, -5], [6, -5], [4, -8], [-4, -8]]); c.fill();
     } },
+    // --- outdoors ---
+    parcel: { name: 'parcel', h: 11, r: 7, draw(c) {
+      c.fillStyle = '#c99b63'; c.fillRect(-7, -10, 14, 10);
+      c.fillStyle = '#a87a45'; c.fillRect(-7, -10, 14, 2.5);
+      c.fillStyle = '#8a5a32'; c.fillRect(-1, -10, 2, 10);
+      c.fillStyle = '#f4f2ee'; c.fillRect(2, -7, 4, 3);
+    } },
+    yarn: { name: 'ball of yarn', h: 10, r: 5, floats: true, draw(c) {
+      c.fillStyle = '#d94f7a'; circle(c, 0, -5, 5);
+      c.strokeStyle = '#f28cab'; c.lineWidth = 1;
+      for (const a of [-0.6, 0, 0.6]) { c.beginPath(); c.ellipse(0, -5, 4.4, 1.8, a, 0, Math.PI * 2); c.stroke(); }
+      c.strokeStyle = '#d94f7a'; c.beginPath(); c.moveTo(4, -3); c.quadraticCurveTo(9, 0, 12, -1); c.stroke();
+    } },
+    rod: { name: 'fishing rod', h: 7, r: 9, draw(c) {
+      c.strokeStyle = '#6b4a2e'; c.lineWidth = 1.8; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-11, -1); c.lineTo(10, -6); c.stroke();
+      c.fillStyle = '#3a3a3a'; circle(c, -7, -2, 2);
+      c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 0.6;
+      c.beginPath(); c.moveTo(10, -6); c.lineTo(12, -1); c.stroke();
+      c.fillStyle = '#e8453c'; circle(c, 12, -1, 1.4);
+    } },
+    shovel: { name: 'shovel', h: 7, r: 9, draw(c) {
+      c.strokeStyle = '#8a5a32'; c.lineWidth = 2; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-10, -2); c.lineTo(5, -4); c.stroke();
+      c.fillStyle = '#6b4a2e'; c.fillRect(-13, -4.5, 4, 5);
+      c.fillStyle = '#9aa3a8'; poly(c, [[5, -7.5], [12, -6], [12, -1], [5, -1]]); c.fill();
+    } },
+    rake: { name: 'rake', h: 7, r: 9, draw(c) {
+      c.strokeStyle = '#8a5a32'; c.lineWidth = 2; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-11, -2); c.lineTo(7, -4); c.stroke();
+      c.strokeStyle = '#7a8388'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(7, -9); c.lineTo(8, 1); c.stroke();
+      for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(7.3 + k * 0.25, -8 + k * 3); c.lineTo(10.5, -8 + k * 3); c.stroke(); }
+    } },
+    wheelbarrow: { name: 'wheelbarrow', h: 18, r: 12, heavy: true, draw(c) {
+      c.strokeStyle = '#6b4a2e'; c.lineWidth = 2.2; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-6, -10); c.lineTo(-15, -4); c.moveTo(4, -10); c.lineTo(-5, -4); c.stroke();
+      c.fillStyle = '#3f7f56'; poly(c, [[-10, -18], [13, -18], [9, -6], [-6, -6]]); c.fill();
+      c.fillStyle = '#4f9a6a'; c.fillRect(-10, -18, 23, 3);
+      c.fillStyle = '#2b2d33'; circle(c, 9, -4, 4.2);
+      c.fillStyle = '#9aa3a8'; circle(c, 9, -4, 1.5);
+    } },
+    birdhouse: { name: 'birdhouse', h: 18, r: 6, draw(c) {
+      c.fillStyle = '#c0643a'; c.fillRect(-6, -13, 12, 12);
+      c.fillStyle = '#7a3e2c'; poly(c, [[-8, -12], [8, -12], [0, -19]]); c.fill();
+      c.fillStyle = '#2b1a10'; circle(c, 0, -8, 2.2);
+      c.fillStyle = '#6b4a2e'; c.fillRect(-1, -4, 2, 4); c.fillRect(-3, -4.5, 6, 1);
+    } },
+    kite: { name: 'kite', h: 15, r: 8, floats: true, draw(c) {
+      c.strokeStyle = '#3a2a1a'; c.lineWidth = 0.7;
+      c.beginPath(); c.moveTo(0, -1); c.quadraticCurveTo(6, 2, 10, 0); c.stroke();
+      c.fillStyle = '#ff6f91'; poly(c, [[0, -15], [6, -8], [0, -1], [0, -15]]); c.fill();
+      c.fillStyle = '#ffd166'; poly(c, [[0, -15], [-6, -8], [0, -1]]); c.fill();
+      c.fillStyle = '#3b7dd8'; poly(c, [[4, 0.5], [6, -1.5], [6.5, 1.5]]); c.fill();
+    } },
+    basket: { name: 'picnic basket', h: 13, r: 8, draw(c) {
+      c.strokeStyle = '#8a5a32'; c.lineWidth = 1.4;
+      c.beginPath(); c.arc(0, -9, 6, Math.PI, 0); c.stroke();
+      c.fillStyle = '#c9a06a'; roundRect(c, -8, -10, 16, 10, 2, true);
+      c.fillStyle = '#a8804e'; c.fillRect(-8, -7, 16, 1); c.fillRect(-8, -4, 16, 1);
+      c.fillStyle = '#d24a4a'; poly(c, [[-5, -10], [0, -13], [4, -10]]); c.fill();
+    } },
+    milk: { name: 'milk bottle', h: 14, r: 4, draw(c) {
+      c.fillStyle = '#f7f7f2'; roundRect(c, -3.5, -11, 7, 11, 2.5, true); c.fillRect(-2, -14, 4, 4);
+      c.fillStyle = '#c0c4c8'; c.fillRect(-2.2, -15, 4.4, 2);
+      c.fillStyle = '#4f93c7'; c.fillRect(-3.5, -6, 7, 2);
+    } },
+    pumpkin: { name: 'pumpkin', h: 13, r: 9, floats: true, draw(c) {
+      c.fillStyle = '#e07b2a'; ellipse(c, -4, -6, 5, 6); ellipse(c, 4, -6, 5, 6);
+      c.fillStyle = '#f2913a'; ellipse(c, 0, -6, 5, 6.5);
+      c.fillStyle = '#5a7a2a'; c.fillRect(-1, -14, 2.5, 4);
+    } },
+    pinecone: { name: 'pinecone', h: 8, r: 4, draw(c) {
+      c.fillStyle = '#7a5230'; ellipse(c, 0, -4, 3.4, 4.5);
+      c.strokeStyle = '#5a3a20'; c.lineWidth = 0.8;
+      for (let k = 0; k < 3; k++) { c.beginPath(); c.arc(0, -7 + k * 2.5, 3, 0.2, Math.PI - 0.2); c.stroke(); }
+    } },
+    // --- indoors ---
+    teapot: { name: 'teapot', h: 12, r: 6, draw(c) {
+      c.strokeStyle = '#4f86b0'; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(5, -5); c.quadraticCurveTo(9, -7, 9, -10); c.stroke();
+      c.beginPath(); c.arc(-6, -6, 2.6, Math.PI * 0.5, Math.PI * 1.5); c.stroke();
+      c.fillStyle = '#7fb3d5'; ellipse(c, 0, -5, 6, 5);
+      c.fillStyle = '#ffffff'; circle(c, -2, -6, 1.2); circle(c, 2, -4, 1);
+      c.fillStyle = '#4f86b0'; ellipse(c, 0, -10, 3, 1.4); circle(c, 0, -11.5, 1.1);
+    } },
+    vase: { name: 'vase of flowers', h: 19, r: 5, draw(c) {
+      c.strokeStyle = '#3f8a35'; c.lineWidth = 1;
+      for (const a of [-0.4, 0, 0.4]) { c.beginPath(); c.moveTo(0, -8); c.lineTo(Math.sin(a) * 6, -15); c.stroke(); }
+      for (const [fx, col] of [[-2.6, '#ff6f91'], [0, '#ffd166'], [2.6, '#b39cff']]) { c.fillStyle = col; circle(c, fx, -16, 2.2); }
+      c.fillStyle = '#4f6fa8'; c.beginPath(); c.moveTo(-3, -9); c.quadraticCurveTo(-6, -3, -3.5, 0); c.lineTo(3.5, 0); c.quadraticCurveTo(6, -3, 3, -9); c.closePath(); c.fill();
+    } },
+    book: { name: 'book', h: 5, r: 6, draw(c, it) {
+      c.fillStyle = it.color || (it.color = pick(['#b5523b', '#3f7f6a', '#4f6fa8', '#7a4f8f']));
+      roundRect(c, -6, -5, 12, 5, 1, true);
+      c.fillStyle = '#f4f2ee'; c.fillRect(-5, -2, 11, 1.6);
+    } },
+    candle: { name: 'candlestick', h: 15, r: 3, draw(c, it, t) {
+      c.fillStyle = '#c9a33a'; ellipse(c, 0, -1, 4, 1.6); c.fillRect(-1, -4, 2, 3);
+      c.fillStyle = '#f4f2ee'; c.fillRect(-1.6, -11, 3.2, 7);
+      c.fillStyle = '#ffb547'; ellipse(c, 0, -13 + Math.sin((t || 0) * 12) * 0.3, 1.4, 2.4);
+    } },
+    teddy: { name: 'teddy bear', h: 14, r: 6, floats: true, draw(c) {
+      c.fillStyle = '#a8743f'; ellipse(c, 0, -5, 5, 5); circle(c, 0, -11, 4);
+      circle(c, -3.3, -14, 1.7); circle(c, 3.3, -14, 1.7); circle(c, -5, -2, 1.8); circle(c, 5, -2, 1.8);
+      c.fillStyle = '#d9b38a'; ellipse(c, 0, -10, 2, 1.5); ellipse(c, 0, -5, 3, 3);
+      c.fillStyle = '#2b2d33'; circle(c, -1.4, -12, 0.6); circle(c, 1.4, -12, 0.6);
+      c.fillStyle = '#c0392b'; c.fillRect(-3, -8, 6, 1.5);
+    } },
+    clock: { name: 'alarm clock', h: 13, r: 5, draw(c) {
+      c.fillStyle = '#c0392b'; circle(c, -3.5, -11, 2); circle(c, 3.5, -11, 2);
+      circle(c, 0, -6.5, 5.5);
+      c.fillStyle = '#f4f2ee'; circle(c, 0, -6.5, 4.2);
+      c.strokeStyle = '#2b2d33'; c.lineWidth = 0.9; c.beginPath(); c.moveTo(0, -6.5); c.lineTo(0, -9.5); c.moveTo(0, -6.5); c.lineTo(2, -6.5); c.stroke();
+      c.fillStyle = '#2b2d33'; c.fillRect(-3, -1.5, 1.5, 1.5); c.fillRect(1.5, -1.5, 1.5, 1.5);
+    } },
+    bread: { name: 'loaf of bread', h: 8, r: 7, draw(c) {
+      c.fillStyle = '#c98a3e'; ellipse(c, 0, -4, 7.5, 4);
+      c.fillStyle = '#e2a85a'; ellipse(c, 0, -5, 6.5, 3);
+      c.strokeStyle = '#a86a2a'; c.lineWidth = 1;
+      for (const k of [-3, 0, 3]) { c.beginPath(); c.moveTo(k - 1.5, -6.5); c.lineTo(k + 1.5, -3.5); c.stroke(); }
+    } },
+    cookies: { name: 'cookie jar', h: 14, r: 6, draw(c) {
+      c.fillStyle = 'rgba(220,235,245,0.85)'; roundRect(c, -6, -12, 12, 12, 3, true);
+      c.fillStyle = '#c98a3e'; circle(c, -2.5, -4, 2.4); circle(c, 2.5, -5, 2.4); circle(c, 0, -8, 2.4);
+      c.fillStyle = '#5a3a24'; circle(c, -3, -4.5, 0.6); circle(c, 2.8, -5.3, 0.6);
+      c.fillStyle = '#c0392b'; roundRect(c, -6.5, -14, 13, 3, 1, true);
+    } },
+    slippers: { name: 'fluffy slippers', h: 5, r: 7, draw(c) {
+      c.fillStyle = '#f2b8c6'; ellipse(c, -3, -2.5, 3, 4.5); ellipse(c, 3.5, -2, 3, 4.5);
+      c.fillStyle = '#ffffff'; ellipse(c, -3, -5, 3.2, 1.6); ellipse(c, 3.5, -4.5, 3.2, 1.6);
+    } },
+    frame: { name: 'picture frame', h: 13, r: 6, draw(c) {
+      c.fillStyle = '#c9a33a'; c.fillRect(-6, -13, 12, 12);
+      c.fillStyle = '#9fd3e8'; c.fillRect(-4.5, -11.5, 9, 9);
+      c.fillStyle = '#4f9a3c'; poly(c, [[-4.5, -2.5], [-1, -7], [2, -4], [4.5, -6], [4.5, -2.5]]); c.fill();
+      c.fillStyle = '#ffd166'; circle(c, 2.5, -9.5, 1.3);
+    } },
+    cake: { name: 'cake', h: 13, r: 8, draw(c) {
+      c.fillStyle = '#f2d0b8'; ellipse(c, 0, -2, 8, 3);
+      c.fillStyle = '#e8b0c0'; c.fillRect(-8, -9, 16, 7);
+      c.fillStyle = '#fff4f6'; ellipse(c, 0, -9, 8, 3);
+      c.fillStyle = '#d23b3b'; circle(c, -3, -10, 1.3); circle(c, 2, -10.5, 1.3); circle(c, 0, -8.5, 1.3);
+      c.fillStyle = '#fff4f6'; for (let k = -6; k <= 6; k += 3) ellipse(c, k, -6.5, 1.2, 2);
+    } },
+    cheese: { name: 'wedge of cheese', h: 8, r: 6, draw(c) {
+      c.fillStyle = '#f2c94e'; poly(c, [[-7, 0], [7, 0], [7, -6], [-7, -2]]); c.fill();
+      c.fillStyle = '#ffe08a'; poly(c, [[-7, -2], [7, -6], [7, -7.5], [-7, -3]]); c.fill();
+      c.fillStyle = '#d9a43a'; circle(c, 2, -2.5, 1.1); circle(c, -2.5, -1.3, 0.9); circle(c, 5, -1.5, 0.8);
+    } },
+    trophy: { name: 'fishing trophy', h: 15, r: 5, draw(c) {
+      c.fillStyle = '#6b4226'; c.fillRect(-5, -3, 10, 3);
+      c.fillStyle = '#e0b84a'; c.fillRect(-1, -7, 2, 4);
+      c.beginPath(); c.moveTo(-5, -14); c.lineTo(5, -14); c.quadraticCurveTo(5, -7, 0, -7); c.quadraticCurveTo(-5, -7, -5, -14); c.fill();
+      c.fillStyle = '#4f93c7'; ellipse(c, 0, -15.5, 3.5, 1.4);
+    } },
+    toyboat: { name: 'toy boat', h: 13, r: 7, floats: true, draw(c) {
+      c.fillStyle = '#c0392b'; poly(c, [[-7, -4], [7, -4], [5, 0], [-5, 0]]); c.fill();
+      c.fillStyle = '#6b4a2e'; c.fillRect(-0.5, -13, 1, 9);
+      c.fillStyle = '#f4f2ee'; poly(c, [[0.5, -13], [6, -5], [0.5, -5]]); c.fill();
+    } },
+    umbrella: { name: 'umbrella', h: 5, r: 9, draw(c) {
+      c.strokeStyle = '#3a2a1a'; c.lineWidth = 1.4; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(-11, -2); c.lineTo(9, -2); c.stroke();
+      c.beginPath(); c.arc(-11, -4, 2, Math.PI * 0.5, Math.PI * 1.5, true); c.stroke();
+      c.fillStyle = '#3b5fa8'; poly(c, [[-6, -2], [8, -5], [8, 1]]); c.fill();
+    } },
   };
 
   const items = [];
   let target = null; // item the raccoon would grab right now
   const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-  const LOW_KINDS = new Set(['fence', 'bench', 'rock', 'bush', 'mailbox', 'picnic', 'reeds']);
+  const LOW_KINDS = new Set(['fence', 'bench', 'rock', 'bush', 'mailbox', 'picnic', 'reeds', 'table', 'bed', 'armchair', 'plant']);
   const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   const tileAt = (x, y) => getT(Math.floor(x / TILE), Math.floor(y / TILE));
 
@@ -1475,7 +1913,8 @@
   // Can an item occupy (x, y)? Thrown things fly over low props.
   function itemBlocked(it, x, y) {
     const r = Math.max(3, it.type.r * 0.6);
-    if (x - r < 0 || y - 5 < 0 || x + r > WORLD_W || y > WORLD_H) return true;
+    if (x - r < 0 || y - 5 < 0 || x + r > WORLD_W || y > MH_ALL * TILE) return true;
+    if (tileAt(x, y) === WALL || tileAt(x - r, y - 3) === WALL || tileAt(x + r, y - 3) === WALL) return true;
     const b = box(x - r, y - 5, r * 2, 5);
     for (const o of solidObjects) {
       if (it.z > 14 && LOW_KINDS.has(o.kind)) continue;
@@ -1489,7 +1928,7 @@
   }
 
   function spotFree(x, y, r) {
-    if (tileAt(x, y) === WATER) return false;
+    if (tileAt(x, y) === WATER || tileAt(x, y) === WALL || tileAt(x - r, y - 4) === WALL || tileAt(x + r, y - 4) === WALL) return false;
     const b = box(x - r, y - 7, r * 2, 8);
     for (const o of solidObjects) if (boxesOverlap(b, o.hitbox)) return false;
     for (const it of items) if (it.type.heavy && boxesOverlap(b, itemBox(it))) return false;
@@ -1559,7 +1998,58 @@
     // Toby's duck on the far shore
     const dp = shorePoint(plazaAngleFromPond() + Math.PI * 0.8);
     placeFree('duck', dp.x, dp.y, { owner: 'toby' });
-    // Apples fallen under some trees
+    // Postie's parcels waiting on doorsteps
+    const percyHome = hs[L.homes.percy];
+    let parcels = 0;
+    for (let k = 0; k < hs.length && parcels < 2; k++) {
+      const h = H(k + 2);
+      if (h === percyHome) continue;
+      placeFree('parcel', (h.x + 0.8) * T, (h.y + h.h + 0.5) * T, { owner: 'percy' });
+      parcels++;
+    }
+    // Milk on a couple of doorsteps, a birdhouse, a kite in the plaza
+    for (let k = 4; k <= 5; k++) { const h = H(k); placeFree('milk', (h.doorX + 0.5) * T + 14, (h.y + h.h + 0.45) * T); }
+    placeFree('birdhouse', ...beside(H(1), 0.8, 0.4));
+    placeFree('kite', (P.x + 9) * T, (P.y + 8.5) * T, { owner: 'toby' });
+    // Bertram's tools and harvest
+    const gateOut = g.gateTop ? g.gateY - 1.2 : g.gateY + 1.6;
+    placeFree('shovel', (g.gateX - 1.5) * T, gateOut * T, { owner: 'bertram' });
+    placeFree('rake', (g.gateX + 2.5) * T, gateOut * T, { owner: 'bertram' });
+    placeFree('wheelbarrow', (g.x - 2.4) * T, (g.y + 3) * T, { owner: 'bertram' });
+    placeFree('pumpkin', (g.x + 9.8) * T, (g.y + 9.4) * T, { owner: 'bertram' });
+    // Rosa's picnic basket, Granny Mabel's yarn, Ollie's rod
+    placeFree('basket', (L.picnic.x - 1.6) * T, (L.picnic.y + 0.7) * T, { owner: 'rosa' });
+    const mab = hs[L.homes.mabel];
+    placeFree('yarn', (mab.doorX + 0.5) * T + 34, (mab.y + mab.h + 1.5) * T, { owner: 'mabel' });
+    const fishPt = shorePoint(plazaAngleFromPond() + 1.6);
+    placeFree('rod', fishPt.x + 16, fishPt.y + 6, { owner: 'ollie' });
+
+    // Inside every house: things on the table and around the room
+    for (const h of hs) {
+      if (!h.room) continue;
+      const { x0, y0 } = h.room;
+      const who = residentsOf(h);
+      const owner = who.includes('rosa') ? 'rosa' : who[0] || null;
+      const tableY = (y0 + 5) * T + 1;
+      const onTable = who.includes('rosa') ? ['cake', 'teapot'] : who.includes('mabel') ? ['cookies', 'teapot'] : [pick(['bread', 'cheese', 'teapot', 'cookies']), pick(['bread', 'cheese', 'vase'])];
+      addItem(onTable[0], (x0 + 5.5) * T - 15, tableY, { z: 22, owner });
+      addItem(onTable[1], (x0 + 5.5) * T + 15, tableY, { z: 22, owner });
+      const floorKinds = shuffled(['slippers', 'book', 'vase', 'clock', 'frame', 'candle', 'umbrella', 'book']).slice(0, 3);
+      if (who.includes('toby')) floorKinds.push('teddy', 'toyboat');
+      if (who.includes('ollie')) floorKinds.push('trophy');
+      if (who.includes('percy')) floorKinds.push('parcel');
+      for (const kind of floorKinds) {
+        const own = (kind === 'teddy' || kind === 'toyboat') ? 'toby' : owner;
+        placeFree(kind, (x0 + rr(1.8, 9.2)) * T, (y0 + rr(3.4, 6.6)) * T, { owner: own });
+      }
+    }
+
+    // Apples fallen under some trees, pinecones too
+    const cones = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
+    for (let n = 0; n < 4 && cones.length; n++) {
+      const tr = cones.splice(Math.floor(rand() * cones.length), 1)[0];
+      placeFree('pinecone', tr.x + rr(-16, 16), tr.y + rr(6, 12));
+    }
     const trees = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
     for (let n = 0; n < 10 && trees.length; n++) {
       const tr = trees.splice(Math.floor(rand() * trees.length), 1)[0];
@@ -1615,6 +2105,13 @@
     if (it.kind === 'pie') completeTask('pie');
     if (it.kind === 'newspaper') completeTask('paper');
     if (it.kind === 'gnome') completeTask('gnome');
+    if (it.kind === 'parcel') completeTask('parcel');
+    if (it.kind === 'cake') completeTask('cake');
+    if (it.kind === 'rod') completeTask('rod');
+    if (it.kind === 'yarn') {
+      const m = VILLAGER.mabel;
+      if (m && m.state === 'act' && m.stops[m.stopIdx].act === 'knit' && Math.hypot(m.x - it.x, m.y - it.y) < 90) completeTask('yarn');
+    }
     if (it.type.heavy) completeTask('lift');
     if (it.droppedAt && time - it.droppedAt < 5) completeTask('snatchback');
     it.droppedAt = 0;
@@ -1829,8 +2326,8 @@
   // ---------------------------------------------------------------------------
   let nav = null; // 1 = blocked
   function buildNav() {
-    nav = new Uint8Array(MW * MH);
-    for (let i = 0; i < MW * MH; i++) if (map[i] === WATER) nav[i] = 1;
+    nav = new Uint8Array(MW * MH_ALL);
+    for (let i = 0; i < MW * MH_ALL; i++) if (map[i] === WATER || map[i] === WALL) nav[i] = 1;
     for (const o of solidObjects) {
       const h = o.hitbox;
       const x0 = Math.floor((h.x + 3) / TILE), x1 = Math.floor((h.x + h.w - 3) / TILE);
@@ -1861,7 +2358,7 @@
     const goalTx = Math.floor(gx / TILE), goalTy = Math.floor(gy / TILE);
     const g = nearestOpen(goalTx, goalTy);
     if (!s || !g) return null;
-    const N = MW * MH, si = idx(s[0], s[1]), gi = idx(g[0], g[1]);
+    const N = MW * MH_ALL, si = idx(s[0], s[1]), gi = idx(g[0], g[1]);
     const gs = new Float32Array(N).fill(Infinity);
     const came = new Int32Array(N).fill(-1);
     const closed = new Uint8Array(N);
@@ -1952,6 +2449,24 @@
       lines: { play: ['Wheee!', 'Goal!!'], gaze: ['Quack quack!', 'Hi fishies!'], rest: ["Mom! I'm hungry!"] },
     },
   ];
+  VILLAGER_DEFS.push(
+    {
+      id: 'percy', name: 'Percy', skin: '#e0a982', hair: '#4a3020', shirt: '#3b5fa8', pants: '#2c3d63', hat: 'cap', capColor: '#2c3d63', bag: true,
+      speed: 58, chase: 130, pitch: 240,
+      lines: { deliver: ['Post!', 'Parcel for you!', 'Sign here, please.'], rest: ['My feet...', 'Lovely day for it.'], home: ['Kettle on.'] },
+    },
+    {
+      id: 'mabel', name: 'Granny Mabel', skin: '#f2d0b8', hair: '#e8e8ee', shirt: '#c56b8a', pants: '#8a4a66', hat: 'bun', dress: true, glasses: true, scale: 0.94,
+      speed: 34, chase: 86, pitch: 300,
+      lines: { knit: ['Knit one, purl two.', 'Mm, lovely weather.', 'Who goes there?'], sit: ['Ahh, sunshine.'], home: ['Where are my spectacles?', 'Time for a biscuit.'] },
+    },
+    {
+      id: 'ollie', name: 'Ollie', skin: '#d9a07a', hair: '#7a5a3a', shirt: '#3f7f6a', pants: '#4a4e57', hat: 'beanie', capColor: '#c0392b', beard: true,
+      speed: 48, chase: 114, pitch: 120,
+      lines: { fish: ['Bite? No bite.', 'Shh. Fish are listening.', 'It was THIS big.'], stroll: ['Morning.'], home: ['Smells fishy in here.'] },
+    },
+  );
+  const HOME_LINES = ['Home sweet home.', 'Now where did I put that...', 'Ahh, my own chair.'];
   const villagers = [];
   const VILLAGER = {}; // by id
   const rpick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -1964,6 +2479,8 @@
     const S = (wx, wy, act, dur, face, needs) => ({ wx, wy, act, dur, face, needs });
     const faceTo = (pt, x, y) => (Math.abs(x - pt.x) > Math.abs(y - pt.y) ? (x > pt.x ? 'right' : 'left') : (y > pt.y ? 'down' : 'up'));
     const pondPx = [L.pond.cx * T, L.pond.cy * T];
+    // A visit inside their own house (falls back to the doorstep if it has no room)
+    const homeStop = (fx, fy, dur, face = 'down') => (h.room ? S((h.room.x0 + fx) * T, (h.room.y0 + fy) * T, 'home', dur, face) : S(...door, 'rest', dur, 'down'));
     switch (id) {
       case 'bertram': {
         const gateOut = g.gateTop ? g.gateY - 1.6 : g.gateY + 1.9;
@@ -1972,7 +2489,7 @@
           S((g.x + 7.5) * T, (g.y + 4.6) * T, 'tend', 7, 'down'),
           S((g.x + 2.5) * T, (g.y + 6.6) * T, 'tend', 6, 'up'),
           S((g.gateX + 0.5) * T, gateOut * T, 'rest', 3, 'down'),
-          S(...door, 'rest', 6, 'down'),
+          homeStop(3, 5.6, 8),
         ];
       }
       case 'fennick': return [
@@ -1981,6 +2498,7 @@
         S((P.x + 2.5) * T, (P.y + 2.5) * T, 'sit', 9, 'down', 'sandwich'),
         S((P.x + 7) * T, (P.y + 8.5) * T, 'stroll', 3, 'right'),
         S((P.x + 10) * T, (P.y + 11.6) * T, 'sit', 6, 'down', 'hat'),
+        homeStop(7.5, 5.8, 6),
       ];
       case 'rosa': {
         const sp = shorePoint(plazaAngleFromPond() + 0.6);
@@ -1989,13 +2507,37 @@
           S((L.picnic.x + 0.5) * T, (L.picnic.y + 1.4) * T, 'eat', 10, 'up', 'pie'),
           S(sp.x, sp.y, 'gaze', 5, faceTo(sp, ...pondPx)),
           S((P.x + 3) * T, (P.y + 7) * T, 'stroll', 4, 'right'),
+          homeStop(h.room && h.room.bedLeft ? 6.6 : 4.4, 3.6, 7, 'up'),
+        ];
+      }
+      case 'percy': {
+        const others = shuffled(L.houses.filter((x) => x !== h)).slice(0, 3);
+        return [
+          ...others.map((o) => S((o.doorX + 0.5) * T, (o.y + o.h + 1.2) * T, 'deliver', 2.5, 'up')),
+          S((P.x + 7) * T, (P.y + 3) * T, 'rest', 4, 'down'),
+          homeStop(5.5, 6, 5),
+        ];
+      }
+      case 'mabel': return [
+        S((h.doorX + 0.5) * T + 22, (h.y + h.h + 1.4) * T, 'knit', 14, 'down'),
+        S((P.x + 2.5) * T, (P.y + 11.6) * T, 'sit', 8, 'down'),
+        homeStop(3.5, 6, 10),
+      ];
+      case 'ollie': {
+        const a = shorePoint(plazaAngleFromPond() + 1.6), b = shorePoint(plazaAngleFromPond() - 1.8);
+        return [
+          S(a.x, a.y, 'fish', 14, faceTo(a, ...pondPx)),
+          S(b.x, b.y, 'fish', 10, faceTo(b, ...pondPx)),
+          S((P.x + 9) * T, (P.y + 5) * T, 'stroll', 3, 'left'),
+          homeStop(6.5, 6, 6),
         ];
       }
       default: { // toby
         const sp = shorePoint(plazaAngleFromPond() - 0.7);
         return [
           S((P.x + 4) * T, (P.y + 8.5) * T, 'play', 16, 'down'),
-          S(...door, 'rest', 4, 'down'),
+          S(...door, 'rest', 3, 'down'),
+          homeStop(h.room && h.room.bedLeft ? 2.6 : 8.4, 4.8, 5),
           S(sp.x, sp.y, 'gaze', 6, faceTo(sp, ...pondPx)),
         ];
       }
@@ -2040,7 +2582,7 @@
 
   function canSee(v, x, y) {
     const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
-    if (d > run.vision) return false;
+    if (d > run.vision || areaOf(v.x, v.y) !== areaOf(x, y)) return false;
     if (d > 45) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
     return lineClear(v.x, v.y - 4, x, y);
   }
@@ -2065,6 +2607,31 @@
     const p = v.path[0];
     if (Math.hypot(p.x - v.x, p.y - v.y) < 3 || moveToward(v, p.x, p.y, speed, dt)) v.path.shift();
     return v.path.length === 0;
+  }
+
+  // Walk to (gx, gy), going through house doors when the goal is in another area.
+  // Returns true on arrival.
+  function travel(v, gx, gy, speed, dt) {
+    const va = areaOf(v.x, v.y), ga = areaOf(gx, gy);
+    let tx = gx, ty = gy, portal = null;
+    if (va !== ga) {
+      if (va === 0) { const h = houseOfArea(ga); if (h) { tx = h.doorOut.x; ty = h.doorOut.y; portal = h; } }
+      else { const h = houseOfArea(va); if (h) { tx = h.exitIn.x; ty = h.exitIn.y; portal = h; } }
+    }
+    if (!v.path || !v.pathGoal || v.pathGoal.x !== tx || v.pathGoal.y !== ty) {
+      v.path = findPath(v.x, v.y, tx, ty) || [];
+      v.pathGoal = { x: tx, y: ty };
+    }
+    if (!followPath(v, speed, dt)) return false;
+    v.path = null; v.pathGoal = null;
+    if (portal) {
+      const near = Math.hypot(player.x - v.x, player.y - v.y) < 300;
+      if (va === 0) { v.x = portal.exitIn.x; v.y = portal.exitIn.y - 2; v.dir = 'up'; }
+      else { v.x = portal.doorOut.x; v.y = portal.doorOut.y + 2; v.dir = 'down'; }
+      if (near || Math.hypot(player.x - v.x, player.y - v.y) < 300) sfx('door');
+      return false;
+    }
+    return true;
   }
 
   function toRoute(v) {
@@ -2185,8 +2752,7 @@
   function routine(v, dt) {
     const stop = v.stops[v.stopIdx];
     if (v.state === 'route') {
-      if (!v.path) v.path = findPath(v.x, v.y, stop.wx, stop.wy) || [];
-      if (followPath(v, v.speed, dt)) {
+      if (travel(v, stop.wx, stop.wy, v.speed, dt)) {
         v.path = null; v.state = 'act'; v.actT = stop.dur; v.dir = stop.face || v.dir;
         v.lineT = 1 + Math.random() * 2; v.searching = false;
         if (stop.needs) {
@@ -2209,7 +2775,7 @@
       v.lineT -= dt;
       if (v.lineT <= 0) {
         v.lineT = 5 + Math.random() * 6;
-        const ls = v.lines[stop.act];
+        const ls = v.lines[stop.act] || (stop.act === 'home' ? HOME_LINES : null);
         if (ls && Math.random() < 0.6) say(v, rpick(ls));
       }
     }
@@ -2247,17 +2813,16 @@
     const d = Math.hypot(it.x - v.x, it.y - v.y);
     if (d < 14 && !it.air) { villagerPick(v, it); return; }
     const sp = v.speed * 1.3;
-    if (lineClear(v.x, v.y, it.x, it.y)) { moveToward(v, it.x, it.y, sp, dt); v.path = null; return; }
+    if (areaOf(v.x, v.y) === areaOf(it.x, it.y) && lineClear(v.x, v.y, it.x, it.y)) { moveToward(v, it.x, it.y, sp, dt); v.path = null; return; }
     v.repathT -= dt;
-    if (!v.path || v.repathT <= 0) { v.path = findPath(v.x, v.y, it.x, it.y) || []; v.repathT = 0.6; }
-    if (followPath(v, sp, dt) && d < 34 && !it.air) villagerPick(v, it);
+    if (v.repathT <= 0) { v.path = null; v.repathT = 0.8; } // the item may have moved
+    if (travel(v, it.x, it.y, sp, dt) && Math.hypot(it.x - v.x, it.y - v.y) < 34 && !it.air) villagerPick(v, it);
   }
 
   function returnHome(v, dt) {
     const it = v.held;
     if (!it) { toRoute(v); return; }
-    if (!v.path) v.path = findPath(v.x, v.y, it.home.x, it.home.y) || [];
-    if (followPath(v, v.speed, dt)) placeHome(v, it);
+    if (travel(v, it.home.x, it.home.y, v.speed, dt)) placeHome(v, it);
   }
 
   function chase(v, dt, sees) {
@@ -2338,7 +2903,7 @@
     const bob = moving ? Math.abs(Math.sin(v.walk)) * 1.5 : Math.sin(t * 2 + v.seed) * 0.4;
     const acting = v.state === 'act' && !v.searching;
     const stop = v.stops[v.stopIdx];
-    const bend = acting && (stop.act === 'tend' || stop.act === 'water' || stop.act === 'tidy') ? (Math.sin(t * 3 + v.seed) * 0.5 + 0.5) * 2.5 : 0;
+    const bend = acting && (stop.act === 'tend' || stop.act === 'water' || stop.act === 'tidy' || stop.act === 'deliver') ? (Math.sin(t * 3 + v.seed) * 0.5 + 0.5) * 2.5 : 0;
     const carrying = !!v.held;
     const alarmed = v.bubble && v.bubble.alert;
     ctx.save();
@@ -2373,6 +2938,23 @@
     if (v.dress) { poly(ctx, [[-6, -23], [6, -23], [8.5, -7], [-8.5, -7]]); ctx.fill(); }
     else roundRect(ctx, -7, -23, 14, 15, 4, true);
     if (v.stripes) { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-7, -19, 14, 2); ctx.fillRect(-7, -14, 14, 2); }
+    if (v.bag) { // postbag strap + satchel
+      ctx.strokeStyle = '#6b4226'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(5, -11); ctx.stroke();
+      ctx.fillStyle = '#8a5a32'; roundRect(ctx, side ? -9 : 3, -14, 8, 7, 2, true);
+    }
+    if (acting && stop.act === 'fish') { // rod out over the water
+      ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = 1.6;
+      const fx = side ? 26 : 10, fy = v.dir === 'up' ? -40 : v.dir === 'down' ? -6 : -30;
+      ctx.beginPath(); ctx.moveTo(side ? 6 : 6, -16); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx + 2, fy + 18 + Math.sin(t * 2) * 2); ctx.stroke();
+    }
+    if (acting && stop.act === 'knit') { // needles and a little scarf
+      ctx.fillStyle = '#d94f7a'; roundRect(ctx, -5, -14 + Math.sin(t * 6) * 0.5, 10, 5, 2, true);
+      ctx.strokeStyle = '#c9c9c9'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(-6, -17); ctx.lineTo(1, -11); ctx.moveTo(6, -17); ctx.lineTo(-1, -11); ctx.stroke();
+    }
     if (v.apron && v.dir !== 'up') { ctx.fillStyle = '#f4f2ee'; roundRect(ctx, side ? 0 : -5, -20, side ? 7 : 10, 13, 2, true); }
 
     // arms
@@ -2412,6 +2994,17 @@
       if (alarmed || v.state === 'chase') circle(ctx, 0, hy + 4.2, 1.3);
       else ctx.fillRect(-1.2, hy + 4, 2.4, 0.9);
     }
+    // face extras
+    if (v.beard && v.dir !== 'up') {
+      ctx.fillStyle = v.hair;
+      if (side) { ctx.beginPath(); ctx.ellipse(3, hy + 4, 4, 3.5, 0.3, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.beginPath(); ctx.ellipse(0, hy + 4.5, 5.5, 3.6, 0, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (v.glasses && v.dir !== 'up') {
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.8;
+      if (side) { ctx.beginPath(); ctx.arc(3.6, hy + 0.5, 2, 0, Math.PI * 2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(-2.6, hy + 1, 2, 0, Math.PI * 2); ctx.moveTo(4.6, hy + 1); ctx.arc(2.6, hy + 1, 2, 0, Math.PI * 2); ctx.stroke(); }
+    }
     // headwear
     switch (v.hat) {
       case 'straw':
@@ -2420,10 +3013,16 @@
         ctx.fillStyle = '#7a5230'; ctx.fillRect(-5, hy - 6.5, 10, 1.5);
         break;
       case 'cap':
-        ctx.fillStyle = '#2e6da4';
+        ctx.fillStyle = v.capColor || '#2e6da4';
         ctx.beginPath(); ctx.arc(0, hy - 1, 7.5, Math.PI, Math.PI * 2); ctx.fill();
         if (v.dir === 'down') ellipse(ctx, 0, hy - 1, 7.5, 2.2);
         else if (side) ellipse(ctx, 6, hy - 1.5, 5, 1.8);
+        break;
+      case 'beanie':
+        ctx.fillStyle = v.capColor || '#c0392b';
+        ctx.beginPath(); ctx.arc(0, hy - 1.5, 7.6, Math.PI, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = shade(v.capColor || '#c0392b', -0.2); ctx.fillRect(-7.6, hy - 3, 15.2, 3);
+        circle(ctx, 0, hy - 9.5, 2);
         break;
       case 'bun':
         ctx.fillStyle = v.hair; circle(ctx, side ? -2 : 0, hy - 8, 3.6);
@@ -2483,6 +3082,8 @@
     { id: 'paper', tier: 'Easy', text: 'Swipe a newspaper' },
     { id: 'gnome', tier: 'Easy', text: 'Kidnap a garden gnome' },
     { id: 'lift', tier: 'Easy', text: 'Lift something heavy' },
+    { id: 'burgle', tier: 'Easy', text: "Sneak into someone's house" },
+    { id: 'parcel', tier: 'Easy', text: "Swipe one of Percy's parcels" },
     { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
     { id: 'bonk', tier: 'Medium', text: 'Bonk Mrs. Fennick' },
     { id: 'bertdrop', tier: 'Medium', text: "Make Bertram drop what he's carrying" },
@@ -2491,6 +3092,9 @@
     { id: 'duck', tier: 'Medium', text: "Set Toby's duck afloat" },
     { id: 'boot', tier: 'Medium', text: 'Give Rosa the boot', hint: 'hit her with the old boot' },
     { id: 'heavythrow', tier: 'Medium', text: 'Throw a crate or barrel' },
+    { id: 'heist', tier: 'Medium', text: 'Carry something out of a house' },
+    { id: 'cake', tier: 'Medium', text: "Pinch Rosa's cake", hint: "it's on her kitchen table" },
+    { id: 'rod', tier: 'Medium', text: "Steal Ollie's fishing rod" },
     { id: 'stash3', tier: 'Medium', text: 'Stash 3 things in your hideout', goal: 3, group: 'stash' },
     { id: 'picnic', tier: 'Hard', text: 'Ruin the picnic' },
     { id: 'hat', tier: 'Hard', text: 'Steal the hat from under her nose' },
@@ -2500,9 +3104,11 @@
     { id: 'sink3', tier: 'Hard', text: 'Sink 3 things in the pond', goal: 3 },
     { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
+    { id: 'yarn', tier: 'Hard', text: "Take Granny Mabel's yarn while she knits" },
+    { id: 'tour', tier: 'Hard', text: 'Sneak into 4 different houses', goal: 4 },
     { id: 'feast', tier: 'Final', final: true, text: 'Have a feast', hint: 'pie, sandwich and an apple in your hideout' },
     { id: 'loot8', tier: 'Final', final: true, text: 'Fill the den', hint: '8 things in your hideout', goal: 8, group: 'stash' },
-    { id: 'everyone', tier: 'Final', final: true, text: 'Rob the whole village', hint: "something of each villager's in your hideout" },
+    { id: 'everyone', tier: 'Final', final: true, text: 'Rob the whole village', hint: 'things from 5 different villagers in your hideout', goal: 5 },
   ];
   const TASK_BY_ID = Object.fromEntries(TASK_POOL.map((t) => [t.id, t]));
   const SHINIES = { Easy: 1, Medium: 2, Hard: 3, Final: 5 };
@@ -2541,7 +3147,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(540, 360 + 30 * (day - 1)) + 60 * lvl('day');
     run.timeLeft = run.timeTotal;
@@ -2612,7 +3218,7 @@
     if (['pie', 'sandwich', 'apple'].every((k) => stashed.some((it) => it.kind === k))) completeTask('feast');
     const gnomes = items.filter((it) => it.kind === 'gnome');
     if (gnomes.length >= 2 && gnomes.every(inHideout)) completeTask('gnomes');
-    if (villagers.every((v) => stashed.some((it) => it.owner === v.id))) completeTask('everyone');
+    setProgress('everyone', new Set(stashed.filter((it) => it.owner).map((it) => it.owner)).size);
   }
 
   // Getting caught ---------------------------------------------------------------
@@ -2910,6 +3516,7 @@
       case 'alert': tone(660, 880, 0.08, 'square', 0.06); tone(880, 1320, 0.12, 'square', 0.06, 0.09); break;
       case 'snatch': noise(0.12, 0.15, 1800); tone(420, 200, 0.16, 'sawtooth', 0.05); break;
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
+      case 'door': tone(520, 360, 0.07, 'triangle', 0.07); tone(360, 300, 0.09, 'triangle', 0.05, 0.07); noise(0.05, 0.08, 900); break;
       case 'ding': tone(988, 988, 0.12, 'triangle', 0.09); tone(1319, 1319, 0.22, 'triangle', 0.09, 0.1); break;
       case 'fanfare': [523, 659, 784, 1047].forEach((f, k) => tone(f, f, k === 3 ? 0.4 : 0.14, 'square', 0.05, k * 0.12)); break;
     }
@@ -3021,24 +3628,29 @@
 
   function render(t) {
     const viewW = vw / zoom, viewH = vh / zoom;
-    cam.x = clamp(cam.x, viewW / 2, WORLD_W - viewW / 2);
-    cam.y = clamp(cam.y, viewH / 2, WORLD_H - viewH / 2);
-    if (viewW >= WORLD_W) cam.x = WORLD_W / 2;
-    if (viewH >= WORLD_H) cam.y = WORLD_H / 2;
+    const indoors = houseOfArea(areaOf(player.x, player.y));
+    if (indoors) { // frame the whole room
+      cam.x = (indoors.room.x0 + 5.5) * TILE; cam.y = (indoors.room.y0 + 4.3) * TILE;
+    } else {
+      cam.x = clamp(cam.x, viewW / 2, WORLD_W - viewW / 2);
+      cam.y = clamp(cam.y, viewH / 2, WORLD_H - viewH / 2);
+      if (viewW >= WORLD_W) cam.x = WORLD_W / 2;
+      if (viewH >= WORLD_H) cam.y = WORLD_H / 2;
+    }
     const shake = run.shake > 0 ? run.shake * 10 : 0;
     const left = cam.x - viewW / 2 + (Math.random() - 0.5) * shake, top = cam.y - viewH / 2 + (Math.random() - 0.5) * shake;
     const s = dpr * zoom;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#2f5a28';
+    ctx.fillStyle = indoors ? '#120d0a' : '#2f5a28';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(s, 0, 0, s, -Math.round(left * s), -Math.round(top * s));
     ctx.imageSmoothingEnabled = true;
 
     // Ground (only the visible slice)
     const sx = Math.max(0, Math.floor(left)), sy = Math.max(0, Math.floor(top));
-    const sw = Math.min(WORLD_W - sx, Math.ceil(viewW) + 2), sh = Math.min(WORLD_H - sy, Math.ceil(viewH) + 2);
-    ctx.drawImage(ground, sx, sy, sw, sh, sx, sy, sw, sh);
+    const sw = Math.min(WORLD_W - sx, Math.ceil(viewW) + 2), sh = Math.min(ground.height - sy, Math.ceil(viewH) + 2);
+    if (sw > 0 && sh > 0) ctx.drawImage(ground, sx, sy, sw, sh, sx, sy, sw, sh);
 
     // Water shimmer
     const tx0 = Math.max(0, Math.floor(left / TILE)), ty0 = Math.max(0, Math.floor(top / TILE));
@@ -3105,6 +3717,17 @@
       o.draw(ctx, t, fade);
     }
 
+    // Indoors: black out everything beyond this room's walls (other rooms share the strip)
+    if (indoors) {
+      const R = indoors.room, rx = R.x0 * TILE, ry = R.y0 * TILE - 10, rw = 11 * TILE, rh = 8 * TILE + 10;
+      const l0 = left - 20, t0 = top - 20, r0 = left + viewW + 20, b0 = top + viewH + 20;
+      ctx.fillStyle = '#120d0a';
+      ctx.fillRect(l0, t0, rx - l0, b0 - t0);
+      ctx.fillRect(rx + rw, t0, r0 - rx - rw, b0 - t0);
+      ctx.fillRect(rx, t0, rw, ry - t0);
+      ctx.fillRect(rx, ry + rh, rw, b0 - ry - rh);
+    }
+
     for (const b of butterflies) {
       if (b.x > left - 20 && b.x < left + viewW + 20 && b.y > top - 20 && b.y < top + viewH + 80) drawButterfly(ctx, b);
     }
@@ -3118,9 +3741,11 @@
     drawBubble(ctx, player);
     for (const v of villagers) if (v.bubble) drawBubbleAt(ctx, v.x, v.y - v.hop - 46 * v.scale, v.bubble);
 
-    // Drifting cloud shadows
+    drawDoorHint(ctx, t);
+
+    // Drifting cloud shadows (outdoors only)
     ctx.fillStyle = 'rgba(20,35,60,0.07)';
-    for (const c of clouds) {
+    if (!indoors) for (const c of clouds) {
       ellipse(ctx, c.x, c.y, c.rx, c.ry);
       ellipse(ctx, c.x + c.rx * 0.5, c.y - c.ry * 0.3, c.rx * 0.6, c.ry * 0.7);
     }
@@ -3150,17 +3775,19 @@
       roundRect(ctx, mx, my, mw, mh, 5, false); ctx.clip();
       ctx.drawImage(mini, mx, my, mw, mh);
       ctx.strokeStyle = 'rgba(255,244,214,0.7)'; ctx.lineWidth = 1;
-      ctx.strokeRect(mx + left / WORLD_W * mw, my + top / WORLD_H * mh, viewW / WORLD_W * mw, viewH / WORLD_H * mh);
+      if (!indoors) ctx.strokeRect(mx + left / WORLD_W * mw, my + top / WORLD_H * mh, viewW / WORLD_W * mw, viewH / WORLD_H * mh);
       ctx.restore();
+      const pp = outdoorPos(player.x, player.y);
       ctx.fillStyle = '#ffb547';
-      circle(ctx, mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3);
+      circle(ctx, mx + pp.x / WORLD_W * mw, my + pp.y / WORLD_H * mh, 3);
       ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(mx + player.x / WORLD_W * mw, my + player.y / WORLD_H * mh, 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(mx + pp.x / WORLD_W * mw, my + pp.y / WORLD_H * mh, 3, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#ffb547'; ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#24170e'; circle(ctx, mx + HIDEOUT.x / WORLD_W * mw, my + HIDEOUT.y / WORLD_H * mh, 1.4);
       for (const v of villagers) {
-        const vx = mx + v.x / WORLD_W * mw, vy = my + v.y / WORLD_H * mh;
+        const vp = outdoorPos(v.x, v.y);
+        const vx = mx + vp.x / WORLD_W * mw, vy = my + vp.y / WORLD_H * mh;
         ctx.fillStyle = v.state === 'chase' ? '#e8453c' : v.shirt;
         circle(ctx, vx, vy, v.state === 'chase' ? 3.2 : 2.4);
         ctx.strokeStyle = '#fff4d6'; ctx.lineWidth = 0.8;
@@ -3235,7 +3862,7 @@
   // Debug: draw the whole village into one picture (used for testing layouts)
   function worldPicture(scale = 0.5) {
     const c = document.createElement('canvas');
-    c.width = WORLD_W * scale; c.height = WORLD_H * scale;
+    c.width = WORLD_W * scale; c.height = ground.height * scale;
     const g = c.getContext('2d');
     g.scale(scale, scale);
     g.drawImage(ground, 0, 0);
