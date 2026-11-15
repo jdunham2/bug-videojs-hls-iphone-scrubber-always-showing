@@ -111,7 +111,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-
       </aside>
     </div>
     <footer>
-      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
+      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>V</kbd> get in or out of a vehicle · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
       <button class="b danger" id="wipe" data-act="wipe">Wipe save</button>
     </footer>
   </div>
@@ -200,6 +200,10 @@ const PETS={
   owl:{n:'Hoot the Owl',cost:900,desc:'Circles overhead and marks every bear and coin critter within 60 m, even through walls.'},
   raccoon:{n:'Bandit the Raccoon',cost:750,desc:'Grabs cash and coins near you and tackles coin critters for you.'},
   drone:{n:'Medi-Drone',cost:1200,desc:'Hovers at your shoulder and slowly heals you whenever you are hurt.'},
+};
+const VEHICLES={
+  atv:{n:'ATV',r:20,max:440,acc:360,turn:2.5,cols:[0xc0392b,0xe0a020,0x2e8b57,0x2f6ad6],back:5.5},
+  truck:{n:'Pickup truck',r:32,max:370,acc:230,turn:1.75,cols:[0x34495e,0x8e2a2a,0x5a6b3a,0xd8d0c0],back:8,armor:.5},
 };
 const packSlots=()=>PACKS[S.pack||0].slots, APPRAISE_FEE=25, MARKET_FEE=.08;
 
@@ -509,6 +513,12 @@ const SFX={
   bark(pos){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(pos,.1);for(const o of [0,.16]){this.tone(d,t+o,.09,{f:520,f2:300,g:.5,w:'sawtooth'});this.nz(d,t+o,.08,{f:900,q:2,g:.3})}},
   hoot(pos){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(pos,.3);this.tone(d,t,.3,{f:420,f2:380,g:.3,a:.05});this.tone(d,t+.45,.5,{f:400,f2:340,g:.3,a:.05})},
   chitter(pos){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(pos,.1);for(let i=0;i<4;i++)this.tone(d,t+i*.05,.04,{f:2400+i*200,g:.15,w:'square'})},
+  horn(){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(null,.2);this.tone(d,t,.4,{f:392,g:.22,w:'square',a:.01});this.tone(d,t,.4,{f:494,g:.18,w:'square',a:.01})},
+  engineStart(){if(!this.ctx||this.eng)return;const c=this.ctx,o1=c.createOscillator(),o2=c.createOscillator(),f=c.createBiquadFilter(),g=c.createGain();
+    o1.type='sawtooth';o2.type='square';o1.frequency.value=38;o2.frequency.value=57;f.type='lowpass';f.frequency.value=380;g.gain.value=0;
+    o1.connect(f);o2.connect(f);f.connect(g);g.connect(this.master);o1.start();o2.start();g.gain.linearRampToValueAtTime(this.ok()?.12:0,c.currentTime+.3);this.eng={o1,o2,f,g}},
+  engineUpdate(k){if(!this.eng)return;const t=this.ctx.currentTime;this.eng.o1.frequency.setTargetAtTime(38+k*95,t,.1);this.eng.o2.frequency.setTargetAtTime(57+k*140,t,.1);this.eng.f.frequency.setTargetAtTime(380+k*900,t,.1);this.eng.g.gain.setTargetAtTime(this.ok()?.1+k*.08:0,t,.1)},
+  engineStop(){if(!this.eng)return;const e=this.eng;this.eng=null;try{e.g.gain.setTargetAtTime(0,this.ctx.currentTime,.1);setTimeout(()=>{try{e.o1.stop();e.o2.stop()}catch(_){}},500)}catch(_){}},
   thunk(){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(null,0);this.tone(d,t,.06,{f:620,f2:300,g:.14,w:'triangle'})},
   snore(pos){if(!this.ok())return;const t=this.ctx.currentTime,d=this.out(pos,.1);this.nz(d,t,1.3,{brown:1,type:'lowpass',f:420,q:3,g:.7,a:.6});this.tone(d,t+.2,1,{f:58,f2:48,g:.12,w:'sawtooth',a:.5})},
   growl(pos,big){if(!this.ok())return;const c=this.ctx,t=c.currentTime,d=this.out(pos,.2),dur=big?1:.8;
@@ -714,6 +724,7 @@ function collideP(o){ // the player can stand on anything lower than their feet
       if(m===l)o.x=w.x-o.r;else if(m===r)o.x=w.x+w.w+o.r;else if(m===t)o.y=w.y-o.r;else o.y=w.y+w.h+o.r;continue}
     const d=Math.sqrt(d2);o.x=qx+dx/d*o.r;o.y=qy+dy/d*o.r;
   }
+  if((o.z||0)<1)pushFromVehicles(o);
   return touch;
 }
 function moveDirP(o,vx,vy,spd,dt){const l=Math.hypot(vx,vy);R.touch=null;if(l<.01)return 0;const x0=o.x,y0=o.y;o.x+=vx/l*spd*dt;o.y+=vy/l*spd*dt;R.touch=collideP(o);return Math.hypot(o.x-x0,o.y-y0)}
@@ -750,7 +761,9 @@ function collide(o){
       if(m===l)o.x=w.x-o.r;else if(m===r)o.x=w.x+w.w+o.r;else if(m===t)o.y=w.y-o.r;else o.y=w.y+w.h+o.r;continue}
     const d=Math.sqrt(d2);o.x=qx+dx/d*o.r;o.y=qy+dy/d*o.r;
   }
+  pushFromVehicles(o);
 }
+function pushFromVehicles(o){if(!R.vehicles)return;for(const v of R.vehicles){if(v===o||(R.driving===v&&o===R.player))continue;const dx=o.x-v.x,dy=o.y-v.y,d=Math.hypot(dx,dy),m=o.r+v.r;if(d<m&&d>.01){o.x=v.x+dx/d*m;o.y=v.y+dy/d*m}}}
 function freeSpot(r,avoid,minD){
   for(let i=0;i<400;i++){const p={x:rnd(80,R.W-80),y:rnd(80,R.H-80)};
     if(R.walls.some(w=>circRect(p.x,p.y,r+6,w)))continue;
@@ -815,6 +828,12 @@ function startRaid(zi,mp){
     if(R.walls.some(o=>w.x<o.x+o.w+36&&w.x+w.w+36>o.x&&w.y<o.y+o.h+36&&w.y+w.h+36>o.y))continue;
     R.walls.push(w);R.props.push(w);i++;
   }
+  // vehicles: one parked close to the spawn, the rest scattered
+  R.vehicles=[];
+  for(let i=0;i<3;i++){const type=i===1?'truck':'atv',V=VEHICLES[type];let pos=null;
+    for(let t=0;t<300&&!pos;t++){const c=i===0?{x:spawn.x+Math.cos(t)*rnd(140,300),y:spawn.y+Math.sin(t)*rnd(140,300)}:{x:rnd(150,W-150),y:rnd(150,H-150)};
+      if(c.x<80||c.y<80||c.x>W-80||c.y>H-80)continue;if(R.walls.some(w=>circRect(c.x,c.y,V.r+10,w)))continue;if(R.vehicles.some(v=>dist(v,c)<120))continue;pos=c}
+    if(pos)R.vehicles.push({type,x:pos.x,y:pos.y,a:rnd(0,6.28),spd:0,r:V.r,col:pick(V.cols),spin:0})}
   // ladders up the side of big buildings and rock stacks
   R.ladders=[];
   for(const w of R.walls){if(!w.big||w.tent||w.ferris||w.cabin||w.border)continue;
@@ -959,6 +978,8 @@ function buildScene(){
     else{const bm=new THREE.MeshStandardMaterial({color:lc(pick([0x7a2a22,0x2b4c7a,0x4a5a2a,0x8a6a2a])),roughness:.5,metalness:.5,normalMap:SH.ribs.normal});R.disp.push(bm);
       for(let k=0;k<ri(1,3);k++){const b=new THREE.Mesh(barrelGeo,bm);b.position.set(x+rnd(-.35,.35),.45,z+rnd(-.35,.35));b.castShadow=b.receiveShadow=true;sc.add(b)}}
   }
+  // vehicles
+  for(const v of R.vehicles||[])mkVehicleMesh(v,sc);
   // ladders
   if(R.ladders&&R.ladders.length){const lm=new THREE.MeshStandardMaterial({color:lc(0xb8a040),roughness:.5,metalness:.7});R.disp.push(lm);
     for(const L of R.ladders){const h=L.w.ht||6,g=new THREE.Group();g.position.set((L.x-L.nx*10)*K,0,(L.y-L.ny*10)*K);g.rotation.y=Math.atan2(L.nx,L.ny);
@@ -1348,6 +1369,7 @@ function playerFire(st,w){ // hitscan from the camera, tracer from the muzzle
 function noise(src,radius){for(const a of R.agents)if(!a.dead&&dist(a,src)<radius&&!a.target){a.alert=5;a.lastSeen={x:src.x,y:src.y}}}
 function damage(t,dmg,src){
   if(t.dead)return;
+  if(t===R.player&&R.driving)dmg*=VEHICLES[R.driving.type].armor||1;
   if(t.remote){if(R.net)R.net.claws[t.peer]=(R.net.claws[t.peer]||0)+dmg;return}
   if(R.net&&!R.net.isHost&&t!==R.player){ // squad client: the host owns the bears; send it our hits
     if(src&&src.faction==='player'&&!src.remote){netHit(0,R.agents.indexOf(t),dmg,t.netT>4.9?1:0);t.lastMyHit=R.clock}return}
@@ -1489,6 +1511,7 @@ const livingMates=()=>R.remotes?Object.values(R.remotes).filter(r=>!r.dn&&!r.ko)
 function playerDown(reason){
   const p=R.player;
   if(R.downed)return;
+  if(R.driving)exitVehicle();
   if(!R.net||!livingMates().length){endRaid(false,reason);return}
   R.downed=true;R.downAt=R.clock;R.revSeen={};for(const q of NET.peers)if(q.presence&&q.presence.rev&&q.presence.rev.p===NET.me)R.revSeen[q.peer]=q.presence.rev.s|0;R.bleed=45;R.downReason=reason;R.alone=0;p.hp=0;p.dead=true;mouse.down=false;R.adsT=0;
   feed('You are down! A squadmate can revive you (hold E).','#ff5a3c');SFX.hurt();netSend();
@@ -1512,6 +1535,62 @@ function reviveUpdate(dt){
     if(R.reviveT>=3){NET.revSeq=(NET.revSeq||0)+1;NET.rev={p:tgt.peer,s:NET.revSeq};R.reviveT=0;R.reviving=null;feed(`You revived ${tgt.nick}!`,'#86b46b');SFX.chime();netSend()}}
   else{R.reviveT=0;R.reviving=null}
 }
+function mkVehicleMesh(v,sc){
+  const g=new THREE.Group(),M=(c,o={})=>{const m=new THREE.MeshStandardMaterial(Object.assign({color:lc(c),roughness:.45,metalness:.5},o));R.disp.push(m);return m};
+  const paint=M(R.z.polar&&v.type==='atv'?0xe8eef4:v.col),black=M(0x141414,{roughness:.8,metalness:.1}),chrome=M(0xc8ccd0,{roughness:.2,metalness:1}),glass=M(0x0e141c,{roughness:.05,metalness:.9});
+  const lamp=new THREE.MeshBasicMaterial({color:new THREE.Color(4,3.6,2.6)}),tail=new THREE.MeshBasicMaterial({color:new THREE.Color(3,.2,.1)});R.disp.push(lamp,tail);
+  const add=(geo,mat,sx,sy,sz,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.scale.set(sx,sy,sz);m.position.set(x,y,z);m.castShadow=true;g.add(m);return m};
+  v.wheels=[];const wheel=(x,z,r,w)=>{const wg=new THREE.Group();wg.position.set(x,r,z);g.add(wg);const t=new THREE.Mesh(SH.cyl,black);t.scale.set(r,w,r);t.rotation.x=Math.PI/2;t.castShadow=true;wg.add(t);const h=new THREE.Mesh(SH.cyl,chrome);h.scale.set(r*.5,w+.01,r*.5);h.rotation.x=Math.PI/2;wg.add(h);v.wheels.push(wg);return wg};
+  if(v.type==='atv'){
+    v.body=add(SH.box,paint,1.5,.38,.9,0,.62,0);add(SH.box,paint,.55,.18,1.1,.55,.78,0);add(SH.box,paint,.5,.16,1.05,-.55,.76,0);
+    add(SH.box,black,.6,.14,.42,-.1,.9,0);add(SH.cyl,chrome,.025,.75,.025,.62,1.08,0).rotation.x=Math.PI/2;add(SH.box,black,.06,.32,.06,.55,.92,0);
+    add(SH.box,lamp,.04,.08,.18,.8,.74,0);for(const z of [-.42,.42])for(const x of [-.48,.5])wheel(x,z,.3,.24);
+  }else{
+    v.body=add(SH.box,paint,3.6,.75,1.7,0,.95,0);add(SH.box,paint,1.5,.7,1.62,.25,1.65,0);add(SH.box,glass,.06,.5,1.4,1.0,1.68,0);add(SH.box,glass,1.2,.45,.04,.25,1.7,.82);add(SH.box,glass,1.2,.45,.04,.25,1.7,-.82);
+    add(SH.box,black,1.55,.5,1.5,-1.05,1.5,0).material=paint;add(SH.box,black,.08,.25,1.7,1.82,.72,0);
+    for(const z of [-.62,.62]){add(SH.box,lamp,.04,.14,.3,1.81,1.05,z);add(SH.box,tail,.04,.14,.2,-1.81,1.05,z)}
+    for(const z of [-.78,.78])for(const x of [-1.2,1.15])wheel(x,z,.42,.3);
+  }
+  v.body.userData={vehicle:v};R.solid.push(v.body);
+  g.position.set(v.x*K,0,v.y*K);g.rotation.y=-v.a;sc.add(g);v.mesh=g;
+}
+function nearestVehicle(){let best=null,bd=70;for(const v of R.vehicles||[]){if(v.driverPeer)continue;const d=dist(v,R.player)-v.r;if(d<bd){bd=d;best=v}}return best}
+function toggleVehicle(){
+  const p=R.player;
+  if(R.driving){exitVehicle();return}
+  if(R.downed||(p.z||0)>1)return;const v=nearestVehicle();if(!v)return;
+  R.driving=v;v.driver=true;p.z=0;R.adsT=0;mouse.right=false;SFX.engineStart();feed(`Driving the ${VEHICLES[v.type].n}. V to get out.`,'#86d4ff');
+  if(['night','carnival'].includes(R.z.theme)||R.z.risk>=3){const L=new THREE.SpotLight(new THREE.Color(1,.95,.8),5,50,.5,.5,1.5);L.position.set(v.type==='truck'?1.8:.8,1,0);const T=new THREE.Object3D();T.position.set(12,0,0);v.mesh.add(L,T);L.target=T;v.light=L}
+}
+function exitVehicle(){
+  const v=R.driving,p=R.player;if(!v)return;R.driving=null;v.driver=false;v.spd=0;SFX.engineStop();
+  if(v.light){v.mesh.remove(v.light);v.light=null}
+  for(const sd of [1,-1,2]){const nx=Math.cos(v.a+Math.PI/2*sd),ny=Math.sin(v.a+Math.PI/2*sd);p.x=v.x+nx*(v.r+22);p.y=v.y+ny*(v.r+22);if(!R.walls.some(w=>circRect(p.x,p.y,p.r,w)))break}
+  collideP(p);
+}
+function driveUpdate(dt,f,s){
+  const v=R.driving,V=VEHICLES[v.type],p=R.player;
+  const wet=R.inPool==='water'?.5:1;
+  if(f>0)v.spd=Math.min(V.max*wet,v.spd+V.acc*dt);else if(f<0)v.spd=Math.max(-V.max*.4,v.spd-V.acc*1.5*dt);else v.spd*=Math.exp(-1.1*dt);
+  v.a+=s*V.turn*dt*Math.min(1,Math.abs(v.spd)/110)*(v.spd<0?-1:1);
+  const ox=v.x,oy=v.y,ex=Math.cos(v.a)*v.spd*dt,ey=Math.sin(v.a)*v.spd*dt;v.x+=ex;v.y+=ey;collide(v);
+  const moved=Math.hypot(v.x-ox,v.y-oy),want=Math.hypot(ex,ey);
+  if(want>1&&moved<want*.5){if(Math.abs(v.spd)>150){SFX.impact(v3(v.x*K,.6,v.y*K),false);R.shake=Math.min(.5,Math.abs(v.spd)/800)}v.spd*=-.25}
+  for(const a of R.agents){if(a.dead)continue;a.bonkT=Math.max(0,(a.bonkT||0)-dt);
+    if(dist(a,v)<a.r+v.r+4&&Math.abs(v.spd)>110&&!a.bonkT){a.bonkT=.8;const k=Math.atan2(a.y-v.y,a.x-v.x);a.x+=Math.cos(k)*30;a.y+=Math.sin(k)*30;collide(a);
+      damage(a,Math.abs(v.spd)*(v.type==='truck'?.22:.14),p);v.spd*=.6;SFX.impact(v3(a.x*K,1,a.y*K),true);R.hitmark=.2;feed('Bonk!','#8fd3ff')}}
+  for(const c of R.critters||[])if(!c.asleep&&dist(c,v)<v.r+10&&Math.abs(v.spd)>80)tranqCritter(c,p);
+  p.x=v.x;p.y=v.y;p.z=0;p.ang=v.a;
+  R.engineNoiseT=(R.engineNoiseT||0)-dt;if(R.engineNoiseT<=0){R.engineNoiseT=1;if(Math.abs(v.spd)>60)noise(p,450)}
+  SFX.engineUpdate(Math.abs(v.spd)/V.max);
+  return 0;
+}
+function driveCamera(){
+  const v=R.driving,V=VEHICLES[v.type],fwd=v3(-Math.sin(R.yaw)*Math.cos(R.pitch),Math.sin(R.pitch),-Math.cos(R.yaw)*Math.cos(R.pitch));
+  const tgt=v3(v.x*K,1.4,v.y*K),back=fwd.clone().negate().add(v3(0,.2,0)).normalize();let dd=V.back;
+  _ray.set(tgt,back);_ray.far=V.back;const hit=_ray.intersectObjects(R.solid.filter(o=>o!==v.body),false)[0];if(hit)dd=Math.max(1.2,hit.distance-.4);
+  camera.position.copy(tgt).addScaledVector(back,dd);camera.position.y=Math.max(.6,camera.position.y+.45);
+}
 function wakeBear(a){
   a.dead=false;a.hp=a.maxhp*.6;a.dieT=0;a.stirring=false;a.wakes=(a.wakes||0)+1;a.groggy=3;a.alert=6;a.react=0;a.quadGoal=1;
   a.lastSeen={x:R.player.x,y:R.player.y};a.mesh.rotation.x=0;a.bodyG.scale.setScalar(1);if(a.label)a.label.visible=true;
@@ -1521,7 +1600,7 @@ function findTarget(a){
   const range=a.rival?650:520;let best=null,bd=1e9;
   for(const c of [R.player,...(R.remoteProxies||[]),...R.agents]){
     if(c===a||c.dead||c.faction===a.faction)continue;
-    const d=dist(a,c);if(d>=range||d>=bd)continue;
+    const d=dist(a,c);if(d>=range+((c.z||0)>1.3?260:0)||d>=bd)continue;
     if(a.alert<=0&&d>170&&Math.abs(norm(Math.atan2(c.y-a.y,c.x-a.x)-a.ang))>1.1)continue; // unalerted: forward vision cone only
     if(los(a,c)){best=c;bd=d}
   }
@@ -1537,7 +1616,7 @@ function update(dt){
   if(R.time<=0){endRaid(false,'Missing in action. The zone closed with you inside');return}
   if(R.freeLook){const dz=v=>Math.abs(v)<.2?0:(v-Math.sign(v)*.2)/.8;R.yaw-=dz((mouse.x-VW/2)/(VW/2))*2.6*dt;R.pitch-=dz((mouse.y-VH/2)/(VH/2))*1.6*dt}
   // aim down sights
-  const w=curW();R.adsT=clamp(R.adsT+(mouse.right&&w&&p.reloadT<=0&&!R.downed?1:-1)*dt*7,0,1);
+  const w=curW();R.adsT=clamp(R.adsT+(mouse.right&&w&&p.reloadT<=0&&!R.downed&&!R.driving?1:-1)*dt*7,0,1);
   // aim assist: pull toward the nearest enemy near the crosshair while aiming or firing
   R.assist=assistTarget(AS.cone);
   if(R.assist&&(mouse.down||R.adsT>.3)&&AS.pull){const k=Math.min(1,AS.pull*dt*(R.adsT>.3?1.3:1));R.yaw+=norm(R.assist.yaw-R.yaw)*k;R.pitch+=((R.assist.pitch-R.recoil)-R.pitch)*k}
@@ -1546,16 +1625,17 @@ function update(dt){
   const fx=-Math.sin(R.yaw),fy=-Math.cos(R.yaw),rx=Math.cos(R.yaw),ry=-Math.sin(R.yaw);
   const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
   const sprint=(keys.ShiftLeft||keys.ShiftRight)&&f>0&&R.adsT<.2&&!R.downed;
-  const moved=p.mantle?0:moveDirP(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1)*(R.downed?.2:1)*(R.reviveT>0?0:1),dt);
+  const moved=R.driving?driveUpdate(dt,f,s):p.mantle?0:moveDirP(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1)*(R.downed?.2:1)*(R.reviveT>0?0:1),dt);
   R.moving=moved>.5;R.sprint=sprint&&R.moving;
-  playerVertical(dt,f);
+  if(!R.driving)playerVertical(dt,f);else{p.onGround=true;p.peakZ=0}
   if(R.moving){R.bobT+=dt*(sprint?1.5:1);R.stepAcc+=moved*K;if(R.stepAcc>(sprint?2.4:1.9)){R.stepAcc=0;SFX.step(null,sprint)}}
   R.strafe+=((s*(R.moving?1:0))-R.strafe)*Math.min(1,dt*6);
   p.ang=Math.atan2(fy,fx);
   R.recoil-=R.recoil*Math.min(1,dt*7);
   camera.position.set(p.x*K,(p.z||0)+(R.downed?.45:EYE)+(R.moving&&!R.downed&&p.onGround?Math.abs(Math.sin(R.bobT*9))*.035*(1-R.adsT):0),p.y*K);
   R.shake=Math.max(0,(R.shake||0)-dt);const sk=R.shake*.05;
-  camera.rotation.set(R.pitch+R.recoil+rnd(-sk,sk),R.yaw+rnd(-sk,sk),-R.strafe*.018);
+  camera.rotation.set(R.pitch+R.recoil+rnd(-sk,sk),R.yaw+rnd(-sk,sk),R.driving?0:-R.strafe*.018);
+  if(R.driving)driveCamera();
   const zoomFov=R.optic==='scope'?(w&&w.base==='sniper'?16:24):R.optic==='dot'?48:54;
   const fov=72-(72-zoomFov)*R.adsT+(R.sprint?6:0);
   if(Math.abs(camera.fov-fov)>.05){camera.fov+=(fov-camera.fov)*Math.min(1,dt*14);camera.updateProjectionMatrix()}
@@ -1567,8 +1647,8 @@ function update(dt){
     if(p.reloadT>0){p.reloadT-=dt;if(p.reloadT<=0)R.mags[w.id]=st.mag}
     else{const B0=BASES[w.base];
       if(B0.spin)R.spin=clamp(R.spin+(mouse.down&&!R.sprint?dt:-dt*1.5),0,B0.spin);
-      if(B0.burst&&mouse.down&&!p.burst&&p.cd<=0&&!R.sprint&&!R.downed)p.burst=B0.burst;
-      if((B0.burst?p.burst>0:mouse.down)&&p.cd<=0&&!R.sprint&&!R.downed&&!(R.reviveT>0)&&(!B0.spin||R.spin>=B0.spin)){
+      if(B0.burst&&mouse.down&&!p.burst&&p.cd<=0&&!R.sprint&&!R.downed&&!R.driving)p.burst=B0.burst;
+      if((B0.burst?p.burst>0:mouse.down)&&p.cd<=0&&!R.sprint&&!R.downed&&!R.driving&&!(R.reviveT>0)&&(!B0.spin||R.spin>=B0.spin)){
       if(R.mags[w.id]>0){
         if(w.cond<40&&Math.random()<(40-w.cond)/250){p.cd=.7;feed('Weapon jammed','#e0573f');SFX.click()}
         else{playerFire(st,w);R.mags[w.id]--;p.cd=1/st.rate;noise(p,st.quiet?220:750);if(B0.burst){p.burst--;if(p.burst<=0){p.burst=0;p.cd=.32}}}
@@ -1600,12 +1680,12 @@ function update(dt){
       if(a.boss&&!a.summoned&&t.faction==='player'){a.summoned=true;SFX.roar(v3(a.x*K,2.5,a.y*K));feed(`${a.name} roars! Every bear is coming!`,'#ff5a3c');R.bossSeen=true;
         for(const b of R.agents)if(b!==a&&!b.dead&&dist(b,a)<1100){b.alert=8;b.lastSeen={x:p.x,y:p.y}}}
       if(a.boss){a.slamCd-=dt;if(d<130&&a.slamCd<=0){a.slamCd=5;a.swipeT=.5;bossSlam(a)}}
-      const charge=d>(!a.w?40:a.boss?220:a.rival?260:150);a.quadGoal=charge?1:0;
+      const high=(t.z||0)>1.3;const charge=!high&&d>(!a.w?40:a.boss?220:a.rival?260:150);a.quadGoal=charge?1:0;
       if(a.w&&!charge&&a.quadT<.3&&a.react>.65&&a.cd<=0&&a.reloadT<=0){
         if(a.mag>0){aiFire(a,a.ang+(Math.random()-.5)*2*a.err,a.rival?.5:.35);a.mag--;a.cd=1/(a.st.rate*.55)+(Math.random()<.15?.5:0)}
         else a.reloadT=a.st.reload*1.2;
       }
-      const pref=a.rival&&a.w?(a.w.base==='shotgun'?130:220):5,ux=(t.x-a.x)/d,uy=(t.y-a.y)/d;
+      const pref=high?(a.w?200:30):a.rival&&a.w?(a.w.base==='shotgun'?130:220):5,ux=(t.x-a.x)/d,uy=(t.y-a.y)/d;
       let vx=0,vy=0;if(d>pref+40){vx=ux;vy=uy}else if(d<pref-60){vx=-ux;vy=-uy}
       vx+=-uy*a.strafe*.7;vy+=ux*a.strafe*.7;if(Math.random()<dt*.5)a.strafe*=-1;
       const drowsy=(.45+.55*a.hp/a.maxhp)*(a.groggy>0?.55:1);
@@ -1710,7 +1790,7 @@ document.addEventListener('mousemove',e=>{
     const sens=SENS*(1-.4*R.adsT)*(R.assist?ASSIST[S.settings.assist].fric:1)*(camera.fov/72);
     R.yaw-=e.movementX*sens;R.pitch-=e.movementY*sens}
 });
-hc.addEventListener('mousedown',e=>{if(!R||R.over)return;if(R.paused){lockMouse();return}if(e.button===0)mouse.down=true;if(e.button===2)mouse.right=true});
+hc.addEventListener('mousedown',e=>{if(!R||R.over)return;if(R.paused){lockMouse();return}if(R.driving&&e.button===0){SFX.horn();noise(R.player,700);return}if(e.button===0)mouse.down=true;if(e.button===2)mouse.right=true});
 addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false;if(e.button===2)mouse.right=false});
 hc.addEventListener('contextmenu',e=>e.preventDefault());
 hc.addEventListener('wheel',e=>{if(R&&!R.over&&!R.paused)swapTo(1-R.player.slot)},{passive:true});
@@ -1724,6 +1804,8 @@ addEventListener('keydown',e=>{
   if(R.paused)return;
   if(R.downed){if(e.code==='KeyX')endRaid(false,'You gave up while down');return}
   const p=R.player;
+  if(e.code==='KeyV'){toggleVehicle();return}
+  if(R.driving&&['Space','KeyE','KeyR','KeyF','KeyQ','Digit1','Digit2'].includes(e.code))return;
   if(e.code==='Space'){if(p.onGround&&!p.mantle){p.vz=6.1;p.onGround=false;p.peakZ=p.z;SFX.step(null,false)}else if(R.onLadder){p.vz=3;R.jumped=true;R.onLadder=false}}
   if(e.code==='KeyR')startReload();
   if(e.code==='KeyG')throwGadget('gas');
@@ -1744,6 +1826,8 @@ function render3D(dt){
   const p=R.player;
   for(const a of R.agents)syncAgent(a,dt);
   for(const c of R.critters)syncCritter(c,dt);
+  for(const v of R.vehicles||[]){if(!v.mesh)continue;if(v.tx!==undefined&&!v.driver){v.x+=(v.tx-v.x)*Math.min(1,dt*10);v.y+=(v.ty-v.y)*Math.min(1,dt*10);v.a=v.ta;v.spd=v.tspd||0}
+    v.mesh.position.set(v.x*K,0,v.y*K);v.mesh.rotation.y=-v.a;v.spin+=v.spd*K*dt/.35;for(const wh of v.wheels)wh.rotation.z=-v.spin}
   syncPet(dt);
   for(const it of R.items){it.mesh.rotation.y+=dt*(it.kind==='w'?.3:1.4)}
   R.sun.position.set(p.x*K+SUN_DIR.x*80,SUN_DIR.y*80,p.y*K+SUN_DIR.z*80);R.sun.target.position.set(p.x*K,0,p.y*K);
@@ -1751,7 +1835,7 @@ function render3D(dt){
   const a=R.adsT,rl=p.reloadT>0,bob=R.moving?Math.sin(R.bobT*9)*.012*(1-a*.8):0,sp=R.sprint?1:0,adsZ=R.optic==='iron'?-.3:-.26;
   R.vm.position.set((.19+(R.moving?Math.cos(R.bobT*4.5)*.01:0))*(1-a)+sp*.04,(-.17+bob-(rl?.1:0))*(1-a)-(R.sightY||.03)*VM_S*a-sp*.04,(-.4+R.kick*.05)*(1-a)+(adsZ+R.kick*.02)*a);
   R.vm.rotation.set(R.kick*.1*(1-a*.6)+(rl?-.6:0)-sp*.3,sp*.6,(rl?.35:0)+R.strafe*.03);
-  R.vm.visible=!(R.optic==='scope'&&a>.92);
+  R.vm.visible=!(R.optic==='scope'&&a>.92)&&!R.driving;
   R.kick=Math.max(0,R.kick-dt*9);R.flashT-=dt;if(R.spinner){R.spinA=(R.spinA||0)+(R.spin||0)*45*dt;R.spinner.rotation.z=R.spinA}
   const fl=R.flashT>0;R.flash.intensity=fl?1.2:0;R.flashSprite.visible=fl;
   if(fl){R.flashSprite.position.set(R.vm.position.x,R.vm.position.y+R.tipY*VM_S,R.vm.position.z+(R.tipZ-.05)*VM_S);R.flashSprite.material.rotation=Math.random()*6;R.flashSprite.scale.setScalar(rnd(.07,.11)*(a>.5?.7:1))}
@@ -1802,7 +1886,7 @@ function hud(){
   }
   if(p.hp<35){cx.fillStyle=`rgba(120,0,0,${(.35-p.hp/100)*(.6+.4*Math.sin(R.clock*7))})`;cx.fillRect(0,0,VW,VH)}
   // crosshair: hip lines that close up when assist has a target; red dot when aiming down sights
-  if(w&&!R.paused){
+  if(w&&!R.paused&&!R.driving){
     if(a<.6){const gap=(5+wStats(w).spread*70*(R.moving?1.3:1))*(1-a);cx.strokeStyle=R.assist?'rgba(255,120,100,.95)':'rgba(230,223,207,.9)';cx.lineWidth=2;cx.beginPath();
       for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){cx.moveTo(VW/2+dx*gap,VH/2+dy*gap);cx.lineTo(VW/2+dx*(gap+8),VH/2+dy*(gap+8))}cx.stroke()}
     if(!(R.optic==='scope'&&a>.92)){cx.fillStyle=a>.6?'#ff3b2b':'rgba(230,223,207,.9)';cx.beginPath();cx.arc(VW/2,VH/2,a>.6?2.5:1.2,0,7);cx.fill()}
@@ -1841,6 +1925,7 @@ function hud(){
   for(const wl of R.walls){cx.fillStyle=wl.low?'#2a2e35':'#3b4049';cx.fillRect(tx(wl.x),ty(wl.y),wl.w*sc,wl.h*sc)}
   for(const pl of R.pools){cx.fillStyle=pl.kind==='lava'?'rgba(255,90,20,.7)':'rgba(60,110,70,.6)';cx.beginPath();cx.arc(tx(pl.x),ty(pl.y),pl.r*sc,0,7);cx.fill()}
   if(R.remotes)for(const r of Object.values(R.remotes)){cx.fillStyle=safeColor(r.color);cx.beginPath();cx.arc(tx(r.x),ty(r.y),3.5,0,7);cx.fill()}
+  for(const v of R.vehicles||[]){cx.fillStyle=v.driverPeer?'#86d4ff':'#c8ccd0';cx.fillRect(tx(v.x)-3,ty(v.y)-3,6,6)}
   if(R.pet){cx.fillStyle='#86d4ff';cx.beginPath();cx.arc(tx(R.pet.x),ty(R.pet.y),2.5,0,7);cx.fill()}
   cx.strokeStyle='#86b46b';cx.lineWidth=1.5;for(const e of R.extracts){cx.beginPath();cx.arc(tx(e.x),ty(e.y),80*sc,0,7);cx.stroke()}
   cx.fillStyle='#d6a64b';for(const it of R.items)if(it.kind==='w')cx.fillRect(tx(it.x)-1.5,ty(it.y)-1.5,3,3);
@@ -1869,12 +1954,15 @@ function hud(){
   if(R.extractT>0){cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-120,VH/2+84,240,16);cx.fillStyle='#86b46b';cx.fillRect(VW/2-120,VH/2+84,240*R.extractT/4,16);
     cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText('EXTRACTING · HOLD POSITION',VW/2,VH/2+96)}
   if(R.intro>0&&!R.paused){cx.globalAlpha=Math.min(1,R.intro);cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-330,VH-140,660,48);cx.fillStyle='#e6dfcf';cx.font=mono(12);
-    cx.fillText('WASD move · Space jump (hold at a ledge to climb) · Shift sprint · Left click fire · Right click aim · R reload',VW/2,VH-121);cx.fillText('E loot · Q bandage · G gas · F trap · H honey · M mute · Follow the compass to EXFIL',VW/2,VH-103);cx.globalAlpha=1}
+    cx.fillText('WASD move · Space jump/climb · Shift sprint · Click fire · Right click aim · R reload',VW/2,VH-121);cx.fillText('E loot · V drive · Q bandage · G/F/H gadgets · M mute · Follow the compass to EXFIL',VW/2,VH-103);cx.globalAlpha=1}
   // downed squadmates: on-screen markers (through walls) and the revive prompt
   if(R.remotes)for(const r of Object.values(R.remotes)){if(!r.dn)continue;const v=v3(r.x*K,1,r.y*K).project(camera);if(v.z>1)continue;
     const sx=clamp((v.x*.5+.5)*VW,30,VW-30),sy=clamp((-v.y*.5+.5)*VH,60,VH-60),pulse=.6+.4*Math.sin(R.clock*6);
     cx.textAlign='center';cx.fillStyle=`rgba(255,90,60,${pulse})`;cx.font='700 22px "Chakra Petch", sans-serif';cx.fillText('✚',sx,sy);
     cx.font=mono(11,'600');cx.fillStyle='#ffb0a0';cx.fillText(`${r.nick} · ${r.dn}s · ${Math.round(dist(r,p)*K)}m`,sx,sy+16)}
+  if(R.driving){const v=R.driving,V=VEHICLES[v.type];cx.textAlign='center';cx.fillStyle='#e6dfcf';cx.font='700 26px "IBM Plex Mono", monospace';cx.fillText(`${Math.round(Math.abs(v.spd)*K*3.6)} km/h`,VW/2,VH-70);
+    cx.font=mono(12);cx.fillStyle='#968f82';cx.fillText(`${V.n} · W/S drive · A/D steer · Click horn · V get out`,VW/2,VH-50)}
+  else if(!R.downed&&(R.player.z||0)<1){const nv=nearestVehicle();if(nv){cx.textAlign='center';cx.fillStyle='#86d4ff';cx.font=mono(13,'600');cx.fillText(`Press [V] to drive the ${VEHICLES[nv.type].n}`,VW/2,VH/2+100)}}
   if((R.ladderNear||R.ladderTop)&&!R.downed){cx.textAlign='center';cx.fillStyle='#d6a64b';cx.font=mono(13,'600');cx.fillText(R.onLadder?'[W] up · [S] down · [Space] jump off':R.ladderTop?'Hold [S] to climb down the ladder':'Hold [W] to climb the ladder',VW/2,VH/2+80)}
   if(R.reviveTgt&&!R.downed){cx.textAlign='center';const t=R.reviveT/3;
     if(t>0){cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-120,VH/2+40,240,14);cx.fillStyle='#86b46b';cx.fillRect(VW/2-120,VH/2+40,240*t,14);cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText(`REVIVING ${R.reviveTgt.nick.toUpperCase()}`,VW/2,VH/2+51)}
@@ -1954,7 +2042,7 @@ function netSend(){
   if(!NET.squad)return;
   const P={nick:NET.nick,color:NET.color,go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
   if(R&&R.net&&!R.over){const p=R.player,w=curW();
-    P.raid={e:R.net.epoch,z:R.zi,h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
+    P.raid={e:R.net.epoch,z:R.zi,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd)]:null,h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
     for(const [k,v] of Object.entries(NET.pend)){const [kind,idx]=k.split(':').map(Number);NET.seq++;NET.hitQ.push([NET.seq,kind,idx,Math.round(v.d*10)/10,v.f])}NET.pend={};
     while(NET.hitQ.length>16)NET.hitQ.shift();P.hits=NET.hitQ;
     if(R.net.isHost)P.net=snapshot();
@@ -2032,6 +2120,9 @@ function netTick(dt){
           else if(h[1]===1){const c=R.critters[h[2]|0];if(c&&!c.asleep){c.hp-=dmg;if(c.hp<=0)tranqCritter(c,proxy)}}}
         R.net.seen[q.peer]=seen}}
   }
+  for(const v of R.vehicles||[]){const drv=inRaid.find(q=>Array.isArray(q.presence.raid.veh)&&R.vehicles[q.presence.raid.veh[0]|0]===v);
+    if(drv&&!v.driver){const vv=drv.presence.raid.veh;v.driverPeer=drv.peer;v.tx=+vv[1]||v.x;v.ty=+vv[2]||v.y;v.ta=+vv[3]||0;v.tspd=+vv[4]||0}else if(v.driverPeer){v.driverPeer=null;v.tspd=0}}
+  for(const r of Object.values(R.remotes)){const q=inRaid.find(q=>q.peer===r.peer);r.inVeh=!!(q&&q.presence.raid.veh);if(r.inVeh)r.mesh.position.y+=.45}
   for(const peer of Object.keys(R.remotes))if(!seenPeers[peer]){R.scene.remove(R.remotes[peer].mesh);feed(`${R.remotes[peer].nick} left the raid`,'#968f82');delete R.remotes[peer]}
   if(!R.net.isHost){const hq=NET.peers.find(q=>q.peer===host);const sn=hq&&hq.presence.net;if(sn&&sn.e===ep)applySnapshot(sn,host)}
   NET.sendT-=dt;if(NET.sendT<=0){NET.sendT=R.net.isHost?.1:.08;netSend()}
@@ -2045,7 +2136,7 @@ function loseWeapon(w,lines){
 function endRaid(ok,reason){
   if(R.over)return;R.over=true;mouse.down=false;mouse.right=false;
   if(document.pointerLockElement)document.exitPointerLock();
-  SFX.ambStop();
+  SFX.ambStop();SFX.engineStop();if(R.driving){R.driving.driver=false;R.driving=null}
   const lines=[];S.raids++;
   if(ok){
     S.cash+=R.raidCash;S.stash.push(...R.pack);
