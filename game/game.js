@@ -1288,7 +1288,9 @@
     if (mag > 1) { ix /= mag; iy /= mag; }
     const heavy = player.held && player.held.type.heavy;
     const running = input.run && !heavy;
-    const maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
+    let maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
+    if (player.stuffed) maxSpd = Math.min(maxSpd, WALK_SPEED * 0.75); // waddle
+    else if (player.sugar > 0) maxSpd *= 1.25;                         // zoom
     const tx = ix * maxSpd, ty = iy * maxSpd;
 
     const approach = (v, target, rate) => {
@@ -1315,6 +1317,7 @@
     if (speed > 4) player.walk += dt * speed * 0.11;
 
     updateDoors(dt, iy);
+    updateEating(dt, mag > 0.2);
 
     // Dust when running
     player.dustT -= dt;
@@ -1365,7 +1368,9 @@
     const s = 1 - Math.min(p.hop, 30) / 60;
     ctx.fillStyle = 'rgba(20,30,10,0.28)';
     ellipse(ctx, 0, 0, 12 * s, 4.2 * s);
-    ctx.translate(0, -p.hop);
+    ctx.translate(0, -p.hop - (p.eating ? Math.abs(Math.sin(t * 16)) * 1.3 : 0));
+    const fat = (p.tummy || 0) / 100;
+    ctx.scale(1 + fat * 0.28, 1 + fat * 0.06);
     if (p.dir === 'left' || p.dir === 'right') {
       if (p.dir === 'left') ctx.scale(-1, 1);
       drawRaccoonSide(ctx, p, t, moving, bob);
@@ -2313,7 +2318,7 @@
     }
     ctx.translate(it.x, it.y - z);
     if (it.rot) { const h = it.type.h / 2; ctx.translate(0, -h); ctx.rotate(it.rot); ctx.translate(0, h); }
-    it.type.draw(ctx, it, t);
+    drawItemBody(ctx, it, t);
     ctx.restore();
   }
 
@@ -2324,7 +2329,7 @@
     const draw = () => {
       ctx.save();
       ctx.translate(it.x, it.y - it.z);
-      it.type.draw(ctx, it, t);
+      drawItemBody(ctx, it, t);
       ctx.restore();
       if (it.type.heavy) { // arms up, paws gripping the sides
         const py = it.y - it.z - it.type.h * 0.3;
@@ -3089,7 +3094,7 @@
     const it = v.held;
     if (!it) { drawVillager(ctx, v, t); return; }
     const behind = !it.type.heavy && v.dir === 'up';
-    const drawIt = () => { ctx.save(); ctx.translate(it.x, it.y - it.z); it.type.draw(ctx, it, t); ctx.restore(); };
+    const drawIt = () => { ctx.save(); ctx.translate(it.x, it.y - it.z); drawItemBody(ctx, it, t); ctx.restore(); };
     if (behind) drawIt();
     drawVillager(ctx, v, t);
     if (!behind) drawIt();
@@ -3134,6 +3139,7 @@
     { id: 'hide', tier: 'Easy', text: 'Hide in a bush' },
     { id: 'pet', tier: 'Easy', text: 'Pet Biscuit the dog' },
     { id: 'bed', tier: 'Easy', text: 'Hide under a bed' },
+    { id: 'eat', tier: 'Easy', text: "Eat someone's food" },
     { id: 'petcat', tier: 'Easy', text: 'Get a purr out of Marmalade the cat' },
     { id: 'parcel', tier: 'Easy', text: "Swipe one of Percy's parcels" },
     { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
@@ -3149,6 +3155,9 @@
     { id: 'fetch', tier: 'Medium', text: 'Get Biscuit to fetch something you threw' },
     { id: 'outrun', tier: 'Medium', text: 'Outrun Biscuit' },
     { id: 'smash', tier: 'Medium', text: 'Smash something fragile' },
+    { id: 'eatpie', tier: 'Medium', text: "Eat Rosa's pie" },
+    { id: 'sugar', tier: 'Medium', text: 'Get a sugar rush', hint: 'eat something sweet' },
+    { id: 'stuffed', tier: 'Medium', text: "Eat until you're stuffed" },
     { id: 'catswat', tier: 'Medium', text: 'Watch Marmalade knock something off a table' },
     { id: 'cake', tier: 'Medium', text: "Pinch Rosa's cake", hint: "it's on her kitchen table" },
     { id: 'rod', tier: 'Medium', text: "Steal Ollie's fishing rod" },
@@ -3162,6 +3171,8 @@
     { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
     { id: 'bone', tier: 'Hard', text: "Stash Biscuit's bone in your hideout" },
+    { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
+    { id: 'eatfront', tier: 'Hard', text: "Finish someone's food while they watch" },
     { id: 'bedhome', tier: 'Hard', text: "Hide under a bed while someone's home" },
     { id: 'catdog', tier: 'Hard', text: 'Get Biscuit to chase Marmalade', hint: 'chitter to herd her' },
     { id: 'yarn', tier: 'Hard', text: "Take Granny Mabel's yarn while she knits" },
@@ -3208,7 +3219,7 @@
   const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
 
   function setupRun(day) {
-    Object.assign(run, { day, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    Object.assign(run, { day, eaten: 0, visited: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
     run.maxStrikes = 3 + lvl('fur');
     run.timeTotal = Math.min(540, 360 + 30 * (day - 1)) + 60 * lvl('day');
     run.timeLeft = run.timeTotal;
@@ -3743,7 +3754,8 @@
     const outside = areaOf(player.x, player.y) === 0 && !playerInHideout();
     const dp = Math.hypot(player.x - d.x, player.y - d.y);
     const hasBone = player.held && player.held.owner === 'biscuit';
-    const smells = outside && started && !d.held && d.calm <= 0 && (hasBone ? dp < 230 : d.friendly <= 0 && dp < 140);
+    const smellR = isFood(player.held) ? 190 : 140; // food smells delicious
+    const smells = outside && started && !d.held && d.calm <= 0 && (hasBone ? dp < 230 : d.friendly <= 0 && dp < smellR);
     d.t -= dt;
 
     switch (d.state) {
@@ -3908,7 +3920,7 @@
   }
   function drawDogWithHeld(ctx, t) {
     const it = dog.held;
-    const drawIt = () => { if (!it) return; ctx.save(); ctx.translate(it.x, it.y - it.z); it.type.draw(ctx, it, t); ctx.restore(); };
+    const drawIt = () => { if (!it) return; ctx.save(); ctx.translate(it.x, it.y - it.z); drawItemBody(ctx, it, t); ctx.restore(); };
     if (it && dog.dir === 'up') drawIt();
     drawDog(ctx, dog, t);
     if (it && dog.dir !== 'up') drawIt();
@@ -4149,6 +4161,117 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Eating people's food. Hold something edible and press Q (or "eat") to
+  // munch: stand still, bite by bite. Fills your tummy; too much and you're
+  // stuffed (rounder, slower, no running). Sweets give a sugar rush. Munching
+  // is noisy, and owners are outraged if they watch you finish their food.
+  // ---------------------------------------------------------------------------
+  const FOOD = {
+    pie: { bites: 3, fill: 45, sweet: true }, cake: { bites: 3, fill: 45, sweet: true }, cookies: { bites: 3, fill: 30, sweet: true },
+    sandwich: { bites: 2, fill: 35 }, bread: { bites: 2, fill: 30 }, cheese: { bites: 2, fill: 25 },
+    apple: { bites: 1, fill: 14 }, carrot: { bites: 1, fill: 12 }, cabbage: { bites: 2, fill: 18 }, pumpkin: { bites: 3, fill: 40 },
+    milk: { bites: 1, fill: 15, drink: true },
+  };
+  const BITE_TIME = 0.85;
+  const isFood = (it) => !!(it && FOOD[it.kind]);
+
+  // Draw an item, shrunk a little for every bite taken out of it
+  function drawItemBody(ctx, it, t) {
+    const f = FOOD[it.kind];
+    if (f && it.bites) {
+      const s = 1 - 0.55 * (it.bites / f.bites);
+      ctx.scale(s, s);
+    }
+    it.type.draw(ctx, it, t);
+  }
+
+  function startEating() {
+    const it = player.held;
+    if (!started || paused || !isFood(it)) return;
+    if (player.eating) { player.eating = null; return; } // press again to stop
+    player.eating = { it, t: BITE_TIME };
+    player.bubble = null;
+  }
+
+  function crumbs(x, y, z, n, col) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, s = 15 + Math.random() * 35;
+      particles.push({ kind: 'shard', col, x, y, z, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, vz: 30 + Math.random() * 50, life: 0.6, max: 0.6 });
+    }
+  }
+  const CRUMB = { pie: '#e2a85a', cake: '#fff4f6', cookies: '#c98a3e', sandwich: '#e9c27a', bread: '#e2a85a', cheese: '#f2c94e', apple: '#f4e6cc', carrot: '#e07b2a', cabbage: '#8fd16a', pumpkin: '#f2913a', milk: '#ffffff' };
+
+  function takeBite() {
+    const it = player.eating.it, f = FOOD[it.kind];
+    it.bites = (it.bites || 0) + 1;
+    player.tummy = Math.min(100, (player.tummy || 0) + f.fill / f.bites);
+    crumbs(it.x, it.y, it.z, f.drink ? 0 : 6, CRUMB[it.kind] || '#e2a85a');
+    sfx(f.drink ? 'gulp' : 'chomp');
+    // Munching is noisy: anyone close by turns to look
+    lookTowards(player.x, player.y, 95, () => rpick(["What's that munching?", 'Who’s chewing?', 'Hm? Crunching?']));
+    if (it.bites < f.bites) { player.eating.t = BITE_TIME; return; }
+    finishFood(it, f);
+  }
+
+  function finishFood(it, f) {
+    player.eating = null;
+    player.held = null;
+    const idx = items.indexOf(it);
+    if (idx >= 0) items.splice(idx, 1);
+    crumbs(player.x, player.y, 8, 10, CRUMB[it.kind] || '#e2a85a');
+    run.eaten = (run.eaten || 0) + 1;
+    completeTask('eat');
+    setProgress('eat5', run.eaten);
+    if (it.kind === 'pie') completeTask('eatpie');
+    if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom'); }
+    // Did the owner watch you finish it?
+    const owner = it.owner && VILLAGER[it.owner];
+    if (owner && canSee(owner, player.x, player.y - 6) && Math.hypot(owner.x - player.x, owner.y - player.y) < run.vision) {
+      say(owner, `You ATE my ${it.type.name}!`, 2.4);
+      owner.hopV = 150; owner.hop = 0.01;
+      completeTask('eatfront');
+    }
+    if (player.tummy >= 80 && !player.stuffed) { player.stuffed = true; completeTask('stuffed'); player.bubble = { text: '*BURP*', t: 1.3 }; sfx('burp'); }
+    else player.bubble = { text: rpick(['nom!', 'mmm!', '*munch*', 'delish.']), t: 1.1 };
+  }
+
+  function updateEating(dt, moving) {
+    // Digest slowly; stuffed until the tummy settles
+    player.tummy = Math.max(0, (player.tummy || 0) - 1.1 * dt);
+    if (player.stuffed && player.tummy < 50) { player.stuffed = false; player.bubble = { text: 'ahh, better', t: 1.2 }; }
+    player.sugar = Math.max(0, (player.sugar || 0) - dt);
+    if (player.sugar > 0 && player.speed > 40 && Math.random() < 0.4) particles.push({ kind: 'spark', x: player.x + rr(-6, 6), y: player.y, z: rr(4, 16), vx: 0, vy: 0, vz: 20, life: 0.4, max: 0.4 });
+    const e = player.eating;
+    if (!e) return;
+    if (player.held !== e.it || moving) { player.eating = null; return; } // dropped it, or walked off
+    e.t -= dt;
+    if (Math.random() < dt * 8) crumbs(e.it.x, e.it.y, e.it.z, 1, CRUMB[e.it.kind] || '#e2a85a');
+    if (e.t <= 0) takeBite();
+  }
+
+  // Little "Q eat" hint over your head when you're carrying food
+  function drawEatHint(ctx, t) {
+    if (!started || paused || !isFood(player.held) || player.eating || player.bubble) return;
+    const text = isTouch ? 'tap eat' : 'Q eat';
+    ctx.font = '800 7px Nunito, sans-serif';
+    const w = ctx.measureText(text).width + 10;
+    const x = player.x, y = player.y - player.hop - 46 + Math.sin(t * 4) * 1.2;
+    ctx.fillStyle = 'rgba(28,36,24,0.85)'; roundRect(ctx, x - w / 2, y - 6, w, 11, 4, true);
+    ctx.fillStyle = '#ffb547'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y - 0.2);
+  }
+
+  function updateBellyHud() {
+    const fill = document.getElementById('rb-tummy-fill');
+    if (!fill) return;
+    const pct = Math.round(player.tummy || 0);
+    if (fill.dataset.v !== String(pct)) { fill.dataset.v = String(pct); fill.style.width = `${pct}%`; }
+    document.getElementById('rb-tummy').classList.toggle('full', !!player.stuffed);
+    const pills = { 'stuffed-pill': player.stuffed && !paused, 'sugar-pill': player.sugar > 0 && !paused };
+    for (const [id, show] of Object.entries(pills)) { const el = document.getElementById(id); if (el.hidden === show) el.hidden = !show; }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -4201,6 +4324,9 @@
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
       case 'bark': tone(420, 250, 0.09, 'square', 0.08); tone(400, 230, 0.1, 'square', 0.07, 0.13); break;
       case 'rustle': noise(0.18, 0.09, 3000); break;
+      case 'chomp': noise(0.08, 0.14, 2200); tone(260, 180, 0.06, 'square', 0.04, 0.02); break;
+      case 'gulp': tone(300, 120, 0.14, 'sine', 0.09); tone(260, 110, 0.12, 'sine', 0.07, 0.15); break;
+      case 'burp': tone(110, 70, 0.35, 'sawtooth', 0.09); break;
       case 'crash': noise(0.3, 0.3, 4500); tone(1800, 900, 0.12, 'square', 0.04); tone(2400, 1400, 0.1, 'triangle', 0.04, 0.05); break;
       case 'hiss': noise(0.35, 0.12, 6000); break;
       case 'purr': for (let k = 0; k < 6; k++) tone(70, 64, 0.09, 'sawtooth', 0.05, k * 0.1); break;
@@ -4269,6 +4395,7 @@
     if (e.code === 'KeyM' && !e.repeat) showMap = !showMap;
     if (e.code === 'KeyE' && !e.repeat) grabOrDrop();
     if (e.code === 'KeyF' && !e.repeat) throwHeld();
+    if (e.code === 'KeyQ' && !e.repeat) startEating();
     if (e.code === 'KeyN' && !e.repeat) muted = !muted;
     if (e.code === 'KeyT' && !e.repeat) setTodoOpen(!todoEl.classList.contains('open'));
   });
@@ -4291,6 +4418,8 @@
   document.getElementById('chitter').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) chitter(); });
   const grabBtn = document.getElementById('grab');
   const throwBtn = document.getElementById('throw');
+  const eatBtn = document.getElementById('eat');
+  eatBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) startEating(); });
   grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) grabOrDrop(); });
   throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) throwHeld(); });
   function syncTouchButtons() {
@@ -4298,6 +4427,10 @@
     if (grabBtn.textContent !== label) grabBtn.textContent = label;
     grabBtn.classList.toggle('ready', !!(player.held || target || petChoice()));
     if (throwBtn.hidden === !!player.held) throwBtn.hidden = !player.held;
+    const canEat = isFood(player.held);
+    if (eatBtn.hidden === canEat) eatBtn.hidden = !canEat;
+    const eatLabel = player.eating ? 'stop' : 'eat';
+    if (eatBtn.textContent !== eatLabel) eatBtn.textContent = eatLabel;
   }
 
   // ---------------------------------------------------------------------------
@@ -4448,6 +4581,7 @@
     if (cat && cat.bubble) drawBubbleAt(ctx, cat.x, cat.y - cat.z - cat.hop - 32, cat.bubble);
 
     drawDoorHint(ctx, t);
+    drawEatHint(ctx, t);
 
     // Drifting cloud shadows (outdoors only)
     ctx.fillStyle = 'rgba(20,35,60,0.07)';
@@ -4526,6 +4660,7 @@
       updateCat(dt);
       updateHiding(dt);
       checkTasks(dt);
+      updateBellyHud();
       if (started && !run.over) {
         run.timeLeft -= dt;
         updateTimer();
@@ -4562,7 +4697,7 @@
     spawnCat();
     hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed'); // places to hide
     spawnAmbient();
-    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null });
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, tummy: 0, stuffed: false, sugar: 0, eating: null });
     target = null;
     cam.x = player.x; cam.y = player.y;
   }

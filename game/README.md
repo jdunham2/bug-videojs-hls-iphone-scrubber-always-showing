@@ -11,7 +11,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Walk | WASD / Arrow keys | Drag anywhere |
 | Run | Hold Shift | Drag far |
 | Grab / drop / pet an animal | E | "grab" / "drop" button |
-| Throw | F | "throw" button |
+| Throw | F |
+| Eat what you're carrying | Q | "eat" button | "throw" button |
 | Chitter (hop, scare butterflies, drop what's in your mouth) | Space | "chitter" button |
 | Toggle minimap | M | — |
 | Show / hide to-do list | T | "To-do" tab |
@@ -19,7 +20,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 
 ## What's in the game
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 47, a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 53, a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -48,6 +49,11 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   chitter at her and she hisses and bolts, so you can herd her toward him. Pet her while she naps for a purr.
 - **Fragile things** (vases, teapots, frames, cookie jars, milk bottles) smash if they hit the floor hard, whether
   you threw them or the cat swatted them. Nearby villagers turn to see what broke.
+- **Eating people's food**: carrying pie, cake, cookies, a sandwich, bread, cheese, an apple, a carrot, cabbage,
+  a pumpkin or milk? Press Q to eat it, bite by bite (stand still; it shrinks each bite). Your tummy fills (bar in
+  the run bar) and slowly digests. Overeat and you're Stuffed: rounder, slower, no running. Sweets give a 12 s
+  sugar rush. Munching is noisy (nearby villagers turn to look), Biscuit smells food from farther away, and owners
+  who watch you finish their food are outraged.
 - **Hideout**: a hollow log at one end of the road. Things in its nest are safe, and villagers won't follow you in.
 
 ## Code layout (`game.js`)
@@ -62,6 +68,7 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Hiding & dog**: `makeHideBush()`, `updateHiding()`, `canSeePlayer()`; `spawnDog()`, `updateDog()` state machine
   (sit, wander, alert, chase, catchase, fetch, return, happy, follow); `spawnCat()`, `updateCat()` (nap, stroll,
   swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
+- **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
 - **Runs**: `TASK_POOL`, `setupRun()`, `endRun()`, `UPGRADES` + the den, save in `localStorage`
 - **To-do list**: run's task hand, `completeTask()` / `setProgress()` called from game events, `checkTasks()` for
   polled conditions; notepad markup + styles live in `index.html`
