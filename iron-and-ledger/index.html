@@ -111,7 +111,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-
       </aside>
     </div>
     <footer>
-      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>1</kbd>–<kbd>0</kbd> switch between up to 10 carried weapons · <kbd>T</kbd> repair a vehicle · <kbd>V</kbd> get in or out of a vehicle (helicopter: <kbd>Space</kbd> up, <kbd>Shift</kbd> down, click to fire) · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
+      <p class="help">Every gun fires tranquilizer darts: bears fall asleep instead of dying. Raid controls (first person): click to lock the mouse · <kbd>Z</kbd> drop the weapon in your hands (E picks weapons up into your hands) · <kbd>1</kbd>–<kbd>0</kbd> switch between up to 10 carried weapons · <kbd>T</kbd> repair a vehicle · <kbd>V</kbd> get in or out of a vehicle (helicopter: <kbd>Space</kbd> up, <kbd>Shift</kbd> down, click to fire) · <kbd>Space</kbd> jump (hold it at a ledge to climb up; ladders climb with <kbd>W</kbd>) · <kbd>G</kbd> gas grenade · <kbd>F</kbd> bear trap · <kbd>H</kbd> honey · <kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · mouse look · left click fire · right click aim down sights · <kbd>M</kbd> mute · <kbd>R</kbd> reload · <kbd>1</kbd>/<kbd>2</kbd> swap · <kbd>E</kbd> loot · <kbd>Q</kbd> bandage · <kbd>Esc</kbd> pause. Reach an EXFIL zone and hold position for 4 seconds. Needs a keyboard and mouse.</p>
       <button class="b danger" id="wipe" data-act="wipe">Wipe save</button>
     </footer>
   </div>
@@ -311,7 +311,7 @@ const VIEWS={
     const p=byId(S.primary),s=byId(S.secondary);
     const slot=(lab,body,act='')=>`<div class="slot"><div class="lab">${lab}</div><div style="min-width:0">${body}</div><div>${act}</div></div>`;
     const wslot=w=>w?`<div class="wname" style="font-size:14px;color:${w.appraised?RAR[w.rar].c:'var(--dim)'}">${wLabel(w)}</div><div class="wstats">${Math.round(w.cond)}% cond.${w.insured?' · insured':''}</div>`:'<span class="empty">Empty</span>';
-    let html=squadPanel()+`<div class="grid2"><div class="panel"><h3>Loadout</h3>
+    let html=tradePanel()+squadPanel()+`<div class="grid2"><div class="panel"><h3>Loadout</h3>
       ${slot('Primary',wslot(p),p?btn('unequip',1,'Remove'):'')}
       ${slot('Sidearm',wslot(s),s?btn('unequip',2,'Remove'):'')}
       ${(S.extra||[]).map((id,i)=>slot('Slot '+(i+3),wslot(byId(id)),btn('uncarry',id,'Remove'))).join('')}
@@ -388,7 +388,9 @@ function renderHub(){
   $('#cash').textContent=Math.round(S.cash).toLocaleString();
   $('#raids').textContent=S.raids;
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  const keep={};document.querySelectorAll('#view input[id],#view select[id]').forEach(el=>{keep[el.id]=el.value});
   $('#view').innerHTML=VIEWS[tab]();
+  for(const id in keep){const el=document.getElementById(id);if(!el||keep[id]==='')continue;if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===keep[id]))continue;el.value=keep[id]}
   $('#ledger').innerHTML=S.log.map(l=>`<div class="${l.cls}">${l.txt}</div>`).join('')||'<div>No entries yet.</div>';
   const wb=$('#wipe');wb.textContent=armed==='wipe'?'Click again to wipe everything':'Wipe save';wb.classList.toggle('armed',armed==='wipe');
 }
@@ -417,7 +419,15 @@ $('#hub').addEventListener('click',e=>{
       if(cash>S.cash){logMsg(`You only have ${money(S.cash)}.`,'bad');break}if(S.outbox.length>=3){logMsg('Wait for your other gifts to arrive first.','bad');break}
       if(gw)removeFromStash(gw);S.cash-=cash;
       const g={gid:'g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),to,toNick:String(mate.presence.nick||'Ranger').slice(0,16),w:gw?{base:gw.base,model:gw.model,rar:gw.rar,cond:Math.round(gw.cond),mods:gw.mods.slice(),appraised:gw.appraised}:null,cash};
-      S.outbox.push(g);logMsg(`Sending ${g.w?wLabel(gw):''}${g.w&&cash?' and ':''}${cash?money(cash):''} to ${g.toNick}.`,'warn');save();netSend();break}
+      S.outbox.push(g);if($('#giftCash'))$('#giftCash').value='';logMsg(`Sending ${g.w?wLabel(gw):''}${g.w&&cash?' and ':''}${cash?money(cash):''} to ${g.toNick}.`,'warn');save();netSend();break}
+    case 'trade-start':{const q=NET.peers[id];if(q&&!q.sameTab&&!NET.trade){NET.trade={with:q.peer,nick:String(q.presence.nick||'Ranger').slice(0,16),tid:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),items:[],cash:0,ok:''};logMsg(`Asked ${NET.trade.nick} to trade.`);netSend()}break}
+    case 'trade-join':{const q=NET.peers[id],T=q&&q.presence.trade;if(T&&T.w===NET.me&&!NET.trade){NET.trade={with:q.peer,nick:String(q.presence.nick||'Ranger').slice(0,16),tid:String(T.t),items:[],cash:0,ok:''};netSend()}break}
+    case 'trade-decline':{const q=NET.peers[id],T=q&&q.presence.trade;if(T)NET.declined.add(String(T.t));break}
+    case 'trade-add':{const v=$('#tradeAdd')&&+$('#tradeAdd').value;const w=byId(v);if(NET.trade&&w&&!NET.trade.items.includes(w.id)&&NET.trade.items.length<4){NET.trade.items.push(w.id);NET.trade.ok='';netSend()}break}
+    case 'trade-rm':if(NET.trade){NET.trade.items=NET.trade.items.filter(x=>x!==id);NET.trade.ok='';netSend()}break;
+    case 'trade-cash':if(NET.trade){const c=Math.max(0,Math.floor(+($('#tradeCash')&&$('#tradeCash').value)||0));if(c>S.cash){logMsg(`You only have ${money(S.cash)}.`,'bad');break}NET.trade.cash=c;NET.trade.ok='';netSend()}break;
+    case 'trade-ok':{const st=tradeState();if(st&&st.joined){NET.trade.ok=st.sig;netSend();processTrade()}break}
+    case 'trade-cancel':if(NET.trade){logMsg(`Trade with ${NET.trade.nick} cancelled.`);NET.trade=null;netSend()}break;
     case 'gift-cancel':{const g=S.outbox.splice(id,1)[0];if(g){if(g.w){const w=mkWeapon(g.w.base,g.w.rar,g.w.cond,g.w.appraised);w.model=g.w.model;w.mods=g.w.mods;S.stash.push(w)}S.cash+=g.cash;logMsg('Gift cancelled. You got it back.');netSend()}break}
     case 'squad-copy':try{navigator.clipboard.writeText(NET.code).then(()=>logMsg('Squad code copied. Send it to your friends.'),()=>{})}catch(e){}break;
     case 'squad-joinraid':{const go=leaderGo();if(go){NET.lastEpoch=go.e;save();startRaid(go.z,{seed:go.s,epoch:go.e})}return}
@@ -1891,6 +1901,24 @@ function updateGadgets(dt){
   R.honey=R.honey.filter(h=>{h.t-=dt;if(h.t<=0){R.scene.remove(h.m);return false}return true});
   R.traps=R.traps.filter(tr=>{if(tr.armed)return true;tr.t-=dt;if(tr.t<=0){R.scene.remove(tr.m);return false}return true});
 }
+function dropWeapon(){
+  const p=R.player;if(R.driving||R.downed||!p.weps.length)return;
+  const w=p.weps[p.slot];p.weps.splice(p.slot,1);removeFromStash(w);p.slot=Math.min(p.slot,Math.max(0,p.weps.length-1));p.reloadT=0;p.burst=0;
+  const fx=-Math.sin(R.yaw),fy=-Math.cos(R.yaw);let x=p.x+fx*28,y=p.y+fy*28;if(R.walls.some(wl=>!wl.low&&circRect(x,y,6,wl))){x=p.x;y=p.y}
+  const it={x,y,kind:'w',w,dropId:'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),mine:true,justDropped:1};
+  addItem(it);R.myDrops=(R.myDrops||[]).concat(it).slice(-3);R.picked=(R.picked||[]).filter(x=>x!==w);
+  buildVM();SFX.loot();feed(`Dropped ${wLabel(w)} · E to pick it back up`,'#d6a64b');netSend();
+}
+function pickUpWeapon(it){
+  const p=R.player,w=it.w;
+  if(p.weps.length<MAX_CARRY){p.weps.push(w);S.stash.push(w);if(S.primary==null&&!S.extra.length&&S.secondary!==w.id)S.primary=w.id;else S.extra.push(w.id);R.mags[w.id]=R.mags[w.id]??wStats(w).mag;
+    R.picked=(R.picked||[]).concat(w);if(p.weps.length===1){p.slot=0;buildVM()}feed(`Picked up ${wLabel(w)} · slot ${p.weps.length===10?0:p.weps.length}`,'#d6a64b')}
+  else if(R.pack.length<packSlots()){R.pack.push(w);feed(`Weapon slots full: put ${wLabel(w)} in your pack`,'#d6a64b')}
+  else{feed(`Weapon slots and pack are full (drop something with Z)`,'#e0573f');return}
+  R.items=R.items.filter(x=>x!==it);R.scene.remove(it.mesh);SFX.loot();
+  if(it.dropId){if(it.mine)R.myDrops=(R.myDrops||[]).filter(x=>x!==it);else{R.took=(R.took||[]).concat(it.dropId).slice(-8)}}
+  netSend();
+}
 function nearestLoot(){const p=R.player;let best=null,bd=50;for(const it of R.items)if(it.kind==='w'){const d=dist(it,p);if(d<bd){bd=d;best=it}}return best}
 
 // --- input ---
@@ -1935,9 +1963,8 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyF')placeTrap();
   if(/^Digit[0-9]$/.test(e.code)){const n=+e.code[5];swapTo(n===0?9:n-1)}
   if(e.code==='KeyQ'&&S.meds>0&&p.hp<100){S.meds--;p.hp=Math.min(100,p.hp+35);feed('Bandaged up (+35 HP)','#86b46b');SFX.bandage()}
-  if(e.code==='KeyE'&&!R.reviveTgt){const it=nearestLoot();if(it){
-    if(R.pack.length>=packSlots())feed(`Pack full (${packSlots()}/${packSlots()})`,'#e0573f');
-    else{R.pack.push(it.w);R.items=R.items.filter(x=>x!==it);R.scene.remove(it.mesh);feed(`Looted ${wLabel(it.w)}`,'#d6a64b');SFX.loot()}}}
+  if(e.code==='KeyZ')dropWeapon();
+  if(e.code==='KeyE'&&!R.reviveTgt){const it=nearestLoot();if(it)pickUpWeapon(it)}
 });
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouse.down=false;mouse.right=false;if(R&&!R.over&&R.started)R.paused=true});
@@ -2086,7 +2113,8 @@ function hud(){
   // prompts
   cx.textAlign='center';
   const nl=nearestLoot();
-  if(nl){cx.fillStyle='#d6a64b';cx.font=mono(14,'600');cx.fillText(`[E] Loot ${wLabel(nl.w)}`,VW/2,VH/2+64)}
+  if(nl){cx.fillStyle='#d6a64b';cx.font=mono(14,'600');cx.fillText(`[E] Pick up ${wLabel(nl.w)}${nl.remote?' (dropped by a squadmate)':''} · ${p.weps.length<MAX_CARRY?'to your hands':R.pack.length<packSlots()?'to your pack':'no room'}`,VW/2,VH/2+64)}
+  if(p.weps.length&&!R.driving&&R.intro<=0&&R.clock<40){cx.fillStyle='#968f82';cx.font=mono(11);cx.fillText('Z drops the weapon in your hands',VW/2,VH/2+84)}
   if(R.extractT>0){cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-120,VH/2+84,240,16);cx.fillStyle='#86b46b';cx.fillRect(VW/2-120,VH/2+84,240*R.extractT/4,16);
     cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText('EXTRACTING · HOLD POSITION',VW/2,VH/2+96)}
   if(R.intro>0&&!R.paused){cx.globalAlpha=Math.min(1,R.intro);cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-330,VH-140,660,48);cx.fillStyle='#e6dfcf';cx.font=mono(12);
@@ -2126,7 +2154,7 @@ function hud(){
 }
 
 // ---------- multiplayer: squads over the room capability (presence only, so any signed-in viewer can take part) ----------
-const NET={room:null,checked:false,squad:null,code:'',peers:[],me:null,nick:'',color:'',go:null,lastEpoch:0,seq:0,hitQ:[],pend:{},sendT:0,renderT:0};
+const NET={trade:null,tradeDone:null,declined:new Set(),room:null,checked:false,squad:null,code:'',peers:[],me:null,nick:'',color:'',go:null,lastEpoch:0,seq:0,hitQ:[],pend:{},sendT:0,renderT:0};
 const SQUAD_COLORS=['#4fa3e0','#e0b84f','#6ad07a','#d06ab8','#e07a4f','#8f7ae0'];
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2170,8 +2198,52 @@ function processGifts(){
   }
   if(changed){save();netSend();if(!R)renderHub()}
 }
+const tradeItemPub=w=>({id:w.id,base:w.base,model:w.model|0,rar:w.rar,cond:Math.round(w.cond),mods:w.mods.slice(0,5),appraised:!!w.appraised});
+const offerSig=(items,cash)=>items.map(w=>[w.base,w.rar,Math.round(w.cond),(w.mods||[]).join('+'),w.model|0,w.appraised?1:0].join(':')).join(',')+'|'+cash;
+function myTradeItems(){return NET.trade?NET.trade.items.map(byId).filter(Boolean):[]}
+function tradeState(){
+  const T=NET.trade;if(!T)return null;const q=NET.peers.find(x=>x.peer===T.with);if(!q)return{gone:true};
+  const P=q.presence.trade;const joined=!!(P&&P.w===NET.me&&String(P.t)===T.tid);
+  const done=!!(P&&P.done===T.tid);
+  const theirs=done?(T.lastTheirs||[]):joined&&Array.isArray(P.it)?P.it.slice(0,4):[],theirCash=done?(T.lastTheirCash||0):joined?clamp(Math.floor(+P.c||0),0,5000000):0;
+  const mine=myTradeItems().map(tradeItemPub);
+  const a=NET.me+'='+offerSig(mine,T.cash),b=T.with+'='+offerSig(theirs,theirCash);
+  return{q,P,joined,done,theirs,theirCash,mine,sig:T.tid+'#'+(NET.me<T.with?a+'#'+b:b+'#'+a)};
+}
+function processTrade(){
+  const T=NET.trade;if(!T)return;const st=tradeState();
+  if(!st||st.gone){logMsg(`${T.nick} left, so the trade was cancelled.`,'bad');NET.trade=null;netSend();return}
+  if(T.seenJoin&&!st.joined&&!(st.P&&st.P.done===T.tid)){logMsg(`${T.nick} cancelled the trade.`,'bad');NET.trade=null;netSend();return}
+  if(st.joined)T.seenJoin=true;
+  if(!st.done){T.lastTheirs=st.theirs;T.lastTheirCash=st.theirCash}
+  if(T.ok&&T.ok!==st.sig)T.ok='';
+  const theyOk=st.P&&st.P.ok===st.sig&&st.sig===T.ok;
+  if(T.ok&&theyOk){
+    for(const w of myTradeItems())removeFromStash(w);S.cash-=Math.min(S.cash,T.cash);
+    const got=st.theirs.map(cleanGiftWeapon).filter(Boolean);S.stash.push(...got);S.cash+=st.theirCash;
+    logMsg(`Trade with ${T.nick} complete: you got ${got.map(wLabel).join(', ')||'no weapons'}${st.theirCash?' and '+money(st.theirCash):''}.`,'good');SFX.chime();
+    NET.tradeDone={w:T.with,t:T.tid,ok:T.ok,done:T.tid,until:Date.now()+15000};NET.trade=null;save();netSend();
+  }
+}
+function tradePanel(){
+  if(!NET.squad)return '';
+  let h='';
+  const reqs=NET.peers.filter(q=>!q.sameTab&&q.presence.trade&&q.presence.trade.w===NET.me&&!q.presence.trade.done&&!NET.declined.has(String(q.presence.trade.t))&&!(NET.trade&&NET.trade.with===q.peer));
+  if(!NET.trade&&reqs.length){h+=`<div class="panel"><h3>Trade requests</h3>${reqs.map(q=>`<div class="slot"><div class="lab">Trade</div><div><b>${esc(q.presence.nick||'Ranger')}</b> wants to trade with you.</div><div class="acts">${btn('trade-join',NET.peers.indexOf(q),'Open trade','primary')}${btn('trade-decline',NET.peers.indexOf(q),'No thanks')}</div></div>`).join('')}</div>`}
+  const T=NET.trade;if(!T)return h;const st=tradeState()||{};
+  const list=(items,cash,mine)=>items.length||cash?items.map(w=>`<div class="slot"><div class="lab">Weapon</div><div style="min-width:0"><span class="wname" style="font-size:14px;color:${w.appraised&&RAR[w.rar]?RAR[w.rar].c:'var(--dim)'}">${esc(BASES[w.base]?wLabel({...w,mods:w.mods||[]}):'?')}</span> <span class="wstats">${Math.round(w.cond)}% cond.${w.appraised&&BASES[w.base]?' · '+money(wValue({...w,mods:w.mods||[]})):''}</span></div><div>${mine?btn('trade-rm',w.id,'Remove'):''}</div></div>`).join('')+(cash?`<div class="slot"><div class="lab">Cash</div><div>${money(cash)}</div><div></div></div>`:''):'<div class="empty">Nothing yet.</div>';
+  const myOk=!!T.ok,theyOk=!!(st.P&&st.P.ok&&st.P.ok===st.sig);
+  h+=`<div class="panel"><h3>Trading with ${esc(T.nick)} <span>${!st.joined?'Waiting for them to open the trade':myOk&&theyOk?'Finishing…':theyOk?'They accepted. Accept to finish':myOk?'You accepted. Waiting for them':'Add weapons or cash, then both accept'}</span></h3>
+    <div class="grid2"><div><div class="lab" style="margin-bottom:4px">You give</div>${list(st.mine||[],T.cash,true)}
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><select class="price" style="width:auto;max-width:230px" id="tradeAdd" aria-label="Weapon to offer">${S.stash.filter(w=>!T.items.includes(w.id)).map(w=>`<option value="${w.id}">${esc(wLabel(w))}${w.appraised?' · '+money(wValue(w)):''}</option>`).join('')}</select>${btn('trade-add',0,'Add','',T.items.length>=4||!S.stash.length)}
+      <input class="price" type="number" min="0" step="10" id="tradeCash" placeholder="$ cash" value="${T.cash||''}" aria-label="Cash to offer">${btn('trade-cash',0,'Set cash')}</div></div>
+    <div><div class="lab" style="margin-bottom:4px">${esc(T.nick)} gives</div>${st.joined?list((st.theirs||[]).filter(w=>w&&BASES[w.base]),st.theirCash,false):'<div class="empty">Waiting for them to open the trade.</div>'}</div></div>
+    <div class="acts" style="justify-content:flex-start;margin-top:10px">${btn('trade-ok',0,myOk?'Accepted ✓':'Accept trade','primary',!st.joined||myOk)}${btn('trade-cancel',0,'Cancel trade','danger')}</div>
+    <p class="help" style="margin:8px 0 0">Changing either offer un-accepts both sides, so you always see exactly what you get.</p></div>`;
+  return h;
+}
 function onSquadChange(){
-  processGifts();
+  processGifts();processTrade();
   // follow the leader into a new raid
   const L=NET.peers.find(q=>q.peer===leaderPeer());const go=L&&L.presence.go;
   if(go&&go.e>NET.lastEpoch&&!R&&L.peer!==NET.me){NET.lastEpoch=go.e;if(Date.now()-go.e<120000&&typeof go.z==='number'&&ZONES[go.z]){save();startRaid(go.z,{seed:go.s|0,epoch:go.e});return}}
@@ -2188,7 +2260,7 @@ function squadPanel(){
   }else{
     const L=leaderPeer();
     for(const q of NET.peers){const P=q.presence||{},r=P.raid;
-      h+=`<div class="slot"><div class="lab">${q.peer===L?'Leader':'Member'}</div><div><span style="color:${safeColor(P.color)}">●</span> ${esc(P.nick||'Ranger')}${q.sameTab?' <span class="tag eq">You</span>':''}${q.guest?' <span class="tag">Guest</span>':''} <span class="wstats">${r?'In a raid · '+esc((ZONES[r.z]||{}).n||''):'In the safehouse'}</span></div><div></div></div>`}
+      h+=`<div class="slot"><div class="lab">${q.peer===L?'Leader':'Member'}</div><div><span style="color:${safeColor(P.color)}">●</span> ${esc(P.nick||'Ranger')}${q.sameTab?' <span class="tag eq">You</span>':''}${q.guest?' <span class="tag">Guest</span>':''} <span class="wstats">${r?'In a raid · '+esc((ZONES[r.z]||{}).n||''):'In the safehouse'}</span></div><div>${!q.sameTab&&!NET.trade&&!r?btn('trade-start',NET.peers.indexOf(q),'Trade'):''}</div></div>`}
     const go=leaderGo();
     h+=`<p class="help" style="margin:8px 0">${isLeader()?'You lead. Pick a map below and the whole squad deploys with you.':'The leader picks the map. You deploy with them automatically.'} Bears are shared; everyone gets their own loot.</p>
       <div class="acts" style="justify-content:flex-start">${go&&!isLeader()?btn('squad-joinraid',0,'Join the squad raid','primary'):''}${btn('squad-copy',0,'Copy code')}${btn('squad-leave',0,'Leave squad','danger')}</div>`;
@@ -2212,9 +2284,10 @@ function snapshot(){
 }
 function netSend(){
   if(!NET.squad)return;
-  const P={nick:NET.nick,color:NET.color,gifts:(S.outbox||[]).map(g=>({g:g.gid,to:g.to,w:g.w,c:g.cash})),acks:(S.claimed||[]).slice(-10),go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
+  const td=NET.tradeDone&&Date.now()<NET.tradeDone.until?NET.tradeDone:null;
+  const P={nick:NET.nick,color:NET.color,trade:R?null:NET.trade?{w:NET.trade.with,t:NET.trade.tid,it:myTradeItems().map(tradeItemPub),c:NET.trade.cash,ok:NET.trade.ok||''}:td?{w:td.w,t:td.t,ok:td.ok,done:td.done,it:[],c:0}:null,gifts:(S.outbox||[]).map(g=>({g:g.gid,to:g.to,w:g.w,c:g.cash})),acks:(S.claimed||[]).slice(-10),go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
   if(R&&R.net&&!R.over){const p=R.player,w=curW();
-    P.raid={e:R.net.epoch,z:R.zi,rp:R.lastRepair||null,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
+    P.raid={e:R.net.epoch,z:R.zi,drops:(R.myDrops||[]).filter(it=>R.items.includes(it)).map(it=>({d:it.dropId,x:Math.round(it.x),y:Math.round(it.y),w:{base:it.w.base,model:it.w.model|0,rar:it.w.rar,cond:Math.round(it.w.cond),mods:it.w.mods,appraised:it.w.appraised}})),took:R.took||[],rp:R.lastRepair||null,veh:R.driving?[R.vehicles.indexOf(R.driving),Math.round(R.driving.x),Math.round(R.driving.y),Math.round(R.driving.a*100)/100,Math.round(R.driving.spd),Math.round(R.driving.hp),Math.round((R.driving.alt||0)*10)/10]:null,wr:R.vehicles?R.vehicles.map((v,i)=>v.wrecked?i:-1).filter(i=>i>=0):[],h:Math.round((p.z||0)*10)/10,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
     for(const [k,v] of Object.entries(NET.pend)){const [kind,idx]=k.split(':').map(Number);NET.seq++;NET.hitQ.push([NET.seq,kind,idx,Math.round(v.d*10)/10,v.f])}NET.pend={};
     while(NET.hitQ.length>16)NET.hitQ.shift();P.hits=NET.hitQ;
     if(R.net.isHost)P.net=snapshot();
@@ -2298,6 +2371,15 @@ function netTick(dt){
       if(R.rpSeen[key]===undefined){R.rpSeen[key]=rp.s|0;continue}if((rp.s|0)>R.rpSeen[key]){R.rpSeen[key]=rp.s|0;v.hp=Math.min(VEHICLES[v.type].hp,Math.max(1,+rp.hp||1));if(v.wrecked)unwreckVehicle(v)}}
     if(!v.wrecked&&!(v.fixedAt!==undefined&&R.clock-v.fixedAt<5)&&inRaid.some(q=>Array.isArray(q.presence.raid.wr)&&q.presence.raid.wr.includes(R.vehicles.indexOf(v)))){v.hp=0;setWrecked(v)}}
   for(const r of Object.values(R.remotes)){const q=inRaid.find(q=>q.peer===r.peer);r.inVeh=!!(q&&q.presence.raid.veh);if(r.inVeh)r.mesh.position.y+=.45}
+  { // weapons squadmates dropped
+    const listed=new Set(),taken=new Set();
+    for(const q of inRaid){const rd=q.presence.raid;for(const t of (Array.isArray(rd.took)?rd.took:[]))taken.add(String(t));
+      for(const d of (Array.isArray(rd.drops)?rd.drops.slice(0,3):[])){if(!d||typeof d.d!=='string')continue;listed.add(d.d);
+        if(taken.has(d.d)||(R.took||[]).includes(d.d)||R.items.some(it=>it.dropId===d.d))continue;const w=cleanGiftWeapon(d.w);if(!w)continue;
+        addItem({x:clamp(+d.x||0,0,R.W),y:clamp(+d.y||0,0,R.H),kind:'w',w,dropId:d.d,remote:q.peer})}}
+    for(const it of [...R.items]){if(!it.dropId)continue;
+      if((it.remote&&(!listed.has(it.dropId)||taken.has(it.dropId)))||(it.mine&&taken.has(it.dropId))){R.items=R.items.filter(x=>x!==it);R.scene.remove(it.mesh);if(it.mine){R.myDrops=(R.myDrops||[]).filter(x=>x!==it);feed(`A squadmate picked up your ${wLabel(it.w)}`,'#86d4ff')}}}
+  }
   for(const peer of Object.keys(R.remotes))if(!seenPeers[peer]){R.scene.remove(R.remotes[peer].mesh);feed(`${R.remotes[peer].nick} left the raid`,'#968f82');delete R.remotes[peer]}
   if(!R.net.isHost){const hq=NET.peers.find(q=>q.peer===host);const sn=hq&&hq.presence.net;if(sn&&sn.e===ep)applySnapshot(sn,host)}
   NET.sendT-=dt;if(NET.sendT<=0){NET.sendT=R.net.isHost?.1:.08;netSend()}
@@ -2317,7 +2399,8 @@ function endRaid(ok,reason){
     S.cash+=R.raidCash;S.stash.push(...R.pack);
     lines.push(['good',`Extracted with ${money(R.raidCash)} cash`]);
     R.pack.forEach(w=>lines.push(['good',`Secured ${wLabel(w)}`]));
-    if(!R.pack.length)lines.push(['','No weapons looted this run']);
+    (R.picked||[]).forEach(w=>{if(byId(w.id))lines.push(['good',`Brought home ${wLabel(w)}`])});
+    if(!R.pack.length&&!(R.picked||[]).length)lines.push(['','No weapons looted this run']);
     logMsg(`Extracted from ${R.z.n}: ${R.kills} bears tranqed, ${R.pack.length} guns, ${money(R.raidCash)}.`,'good');
   }else{
     lines.push(['bad',reason]);
