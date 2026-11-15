@@ -217,7 +217,7 @@ function newSave(){
 }
 function save(){S.uid=uid;try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
 function load(){
-  try{const raw=localStorage.getItem(SAVE_KEY);if(raw){S=JSON.parse(raw);uid=S.uid||1000;S.settings=Object.assign({assist:2,markers:1,vol:2},S.settings);S.gadgets=Object.assign({gas:0,trap:0,honey:0},S.gadgets);S.pack=S.pack||0;S.pets=S.pets||[];if(S.pet===undefined)S.pet=null;return}}catch(e){}
+  try{const raw=localStorage.getItem(SAVE_KEY);if(raw){S=JSON.parse(raw);uid=S.uid||1000;S.settings=Object.assign({assist:2,markers:1,vol:2},S.settings);S.gadgets=Object.assign({gas:0,trap:0,honey:0},S.gadgets);S.pack=S.pack||0;S.pets=S.pets||[];if(S.pet===undefined)S.pet=null;S.demand=S.demand||{};for(const k in BASES)if(!(S.demand[k]>0))S.demand[k]=1;S.offers=(S.offers||[]).filter(o=>o&&o.w&&BASES[o.w.base]);S.listings=(S.listings||[]).filter(l=>l&&l.w&&BASES[l.w.base]);if(!S.offers.length)refreshOffers();return}}catch(e){}
   S=newSave(); logMsg('You wake up in the safehouse with $350, a rusty SMG and a sidearm.','warn'); refreshOffers();
 }
 function logMsg(txt,cls=''){S.log.unshift({txt,cls});S.log.length=Math.min(S.log.length,40)}
@@ -253,7 +253,7 @@ function refreshOffers(){
 }
 function marketCycle(){
   const news=[];
-  for(const k in BASES){const d=S.demand[k];S.demand[k]=+clamp(d*rnd(.88,1.13)+(1-d)*.15,.6,1.5).toFixed(2)}
+  for(const k in BASES){const d=S.demand[k]||1;S.demand[k]=+clamp(d*rnd(.88,1.13)+(1-d)*.15,.6,1.5).toFixed(2)}
   S.listings=S.listings.filter(l=>{
     const ratio=l.price/Math.max(1,wValue(l.w));
     if(Math.random()<clamp(1.25-ratio,.04,.9)){
@@ -341,7 +341,7 @@ const VIEWS={
   },
   market(){
     let html=`<div class="panel"><h3>Street demand</h3><div class="chips">`;
-    for(const k in BASES){const d=S.demand[k];html+=`<span class="chip">${BASES[k].name} <span class="${d>=1?'up':'down'}">${d>=1?'▲':'▼'} ${d.toFixed(2)}×</span></span>`}
+    for(const k in BASES){const d=S.demand[k]||1;html+=`<span class="chip">${BASES[k].name} <span class="${d>=1?'up':'down'}">${d>=1?'▲':'▼'} ${d.toFixed(2)}×</span></span>`}
     html+=`</div><p class="help" style="margin:8px 0 0">Demand shifts after every raid and scales every price. Listings resolve when you return from a raid: price near value sells fast, overpriced iron sits. Buyers pay an ${MARKET_FEE*100}% broker fee.</p></div>`;
     html+=`<div class="panel"><h3>Your listings <span>${S.listings.length}</span></h3>`;
     if(!S.listings.length)html+='<div class="empty">Nothing listed. List appraised weapons below.</div>';
