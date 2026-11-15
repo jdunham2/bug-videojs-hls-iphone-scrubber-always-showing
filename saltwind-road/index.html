@@ -3343,7 +3343,7 @@ function setsHTML() {
 function armorVal() { return setStat('armor') + eqStat('armor') + gemSum('topaz') + (have('frost_fang') ? 1 : 0) + (have('crown_of_ages') ? 2 : 0) + (have('heroic_crest') ? 1 : 0) + (have('rune_ward') ? 2 : 0) + (have('cloak') ? 1 : 0) + (have('alpha_cloak') ? 1 : 0) + (have('circlet') ? 1 : 0) + (BUFFS.iron > 0 ? 2 : 0) + (S.pet === 'turtle' ? 1 : 0); }
 const speedMult = () => (1 + setStat('speed')) * (have('rain_feather') ? 1.06 : 1) * (have('tide_bell') && S && [T.DEEP, T.SHAL].includes(tileAt(Math.floor(S.x), Math.floor(S.y))) ? 1.25 : 1) * (POT.swift > 0 ? 1.4 : 1) * (POT.giant > 0 ? .9 : 1) * (POT.tiny > 0 ? 1.1 : 1) * (1 + .02*sk('agi') + (S.pet === 'bunny' ? .08 : 0)) * (BUFFS.speed > 0 ? 1.3 : 1) * weatherSlow() * Math.max(1, have('boots') ? 1.15 : 1, have('windstep_boots') ? 1.25 : 1) * (have('alpha_cloak') ? 1.1 : 1) * (1 + eqStat('speed')) * (have('golden_horseshoe') ? 1.08 : 1) * (have('wings_of_legend') ? 1.1 : 1) * (have('wayfarer_boots') ? 1.06 : 1) * (have('victors_cape') ? 1.05 : 1) * (have('explorers_atlas') ? 1.08 : 1) * (1 + .04*gemSum('amethyst')) * (1 + .03*conHas('stag')) * (have('white_antler') ? 1.04 : 1) * (have('shell_horn') ? 1.05 : 1) * (perk('fleet') ? 1.06 : 1) * (have('storm_charm') && (WX.type === 'rain' || WX.type === 'storm') ? 1.1 : 1);
 const armorCut = () => Math.min(.8, armorVal() * .12 + .03*sk('def'));
-const maxHP = () => BASE_HP + setStat('hp') + 2*sk('vit') + (S.bonusHP || 0) + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
+const maxHP = () => BASE_HP + setStat('hp') + 2*sk('vit') + (S.bonusHP || 0) + restedHP() + (have('royal_ring') ? 3 : 0) + (have('pale_cloak') ? 2 : 0) + (S.partner ? 6 : 0) + (have('heart_amulet') ? 5 : 0) + (have('circlet') ? 3 : 0) + (have('lionheart') ? 4 : 0) + (have('gauntlet_crown') ? 5 : 0) + (have('sunstone_amulet') ? 6 : 0) + 3*gemSum('emerald') + 4*conHas('bear') + (have('white_antler') ? 3 : 0) + (have('royal_sash') ? 3 : 0) + (have('golden_conch') ? 6 : 0) + (perk('tough') ? 8 : 0) + (monDone('frost') ? 5 : 0) + (have('frost_fang') ? 3 : 0);
 const canClimb = () => toolTier('climb') > 0;
 function townAt(x, y, r = 8) { for (const k in TOWNS) if (Math.hypot(x - TOWNS[k].x - .5, y - TOWNS[k].y - .5) < r) return k; if (Math.hypot(x - HOME.x - .5, y - HOME.y - .5) < r) return 'home'; return null; }
 const homeBlocked = (tx, ty) => !!(S && S.home && S.home.level >= 1 && tx >= HOME.x - 1 && tx <= HOME.x + 1 && ty >= HOME.y - 3 && ty <= HOME.y - 2 || S && S.home && S.home.level >= 2 && tx >= HOME.x + 3 && tx <= HOME.x + 5 && ty >= HOME.y + 1 && ty <= HOME.y + 2);
@@ -4541,6 +4541,7 @@ addEventListener('keydown', e => {
   if (busk && busk.on) { const k = e.key.toLowerCase(); const lane = BUSK_KEYS.findIndex(ks => ks.includes(k)); if (lane >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) buskHit(lane); } else if (k === 'escape') { busk = null; } }
   else if (wheel && wheel.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); wheel.push = true; } else if (k === 'escape') wheel = null; }
   else if (pie && pie.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) pieBite(); } else if (k === 'escape') pie = null; }
+  else if (deco && deco.on && mode === 'talk') { const k = e.key.toLowerCase(), dm = {arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); decoMove(...dm[k]); } else if (k === ' ' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) decoAct(); } else if (k === 'q' || k === '[' || k === ']') { e.preventDefault(); e.stopImmediatePropagation(); decoCycle(k === 'q' || k === '[' ? -1 : 1); } else if (k === 'x' || k === 'delete' || k === 'backspace') { e.preventDefault(); e.stopImmediatePropagation(); decoStore(); } else if (k === 'escape') { if (deco.hold) { e.preventDefault(); e.stopImmediatePropagation(); if (deco.hold.from) decoReturn(); else deco.hold = null; decoUI(); } else deco = null; } }
   else if (gzg && gzg.on) { const k = e.key.toLowerCase(), dm = {arrowup: [-1, 0], w: [-1, 0], arrowdown: [1, 0], s: [1, 0], arrowleft: [0, -1], a: [0, -1], arrowright: [0, 1], d: [0, 1]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); gzCursor(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) gzAct(); } else if (k === 'escape') gzg = null; }
   else if (jump && jump.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e' || k === 'w' || k === 'arrowup') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) jumpPress(); } else if (k === 'escape') jump = null; }
   else if (stones && stones.on && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); stonesPlay(+e.key - 1); }
@@ -8527,6 +8528,7 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['Decorating', 'At your homestead, open the house and choose Decorate. Buy furniture and place it on the grid. Wall pieces (windows, clocks, shelves and paintings) go on the top row. Paintings and vases from your bag can be placed too. Comfort adds up from each piece, plus a bonus for variety. At 20 (Cozy), 45 (Snug) and 80 (Lovely), sleeping at home gives +2, +4 or +6 max HP and +5%, +10% or +15% XP the next day. Keys: arrows to move, Space or E to place or pick up, Q, [ or ] to cycle pieces, X to put away. Controller: D-pad, A, bumpers, X.'],
   ['The easel', 'Pia Palette in Prismvale paints commissions with you (three a day). Mix red, yellow and blue, add white to lighten and black to darken, and match each target color. A 75% match makes a Landscape Painting and 92% makes a Masterpiece. Blue and yellow make green; all three make mud.'],
   ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays Fox and Geese for 10 coin. You move 13 geese (up, left or right, never back). The fox jumps a goose when the square behind it is empty. Trap him so he cannot move. Lose six geese and he wins. Keep your rows filled and never leave a gap behind a goose.'],
   ['Greenhouse', 'Once you own the homestead, Pell the land agent can build a greenhouse (900 coin, 10 glass, 8 planks and 4 iron). Your crops stop slowing down in winter, and out-of-season crops grow 15% faster.'],
@@ -9162,6 +9164,7 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (deco && deco.on && mode === 'talk') { [[12, 0, -1], [13, 0, 1], [14, -1, 0], [15, 1, 0]].forEach(([d, dx, dy]) => { if (down(d)) decoMove(dx, dy); }); if (down(OK)) decoAct(); if (down(4)) decoCycle(-1); if (down(5)) decoCycle(1); if (down(2)) decoStore(); if (down(BACK)) { if (deco.hold) { if (deco.hold.from) decoReturn(); else deco.hold = null; decoUI(); } else { deco = null; save(); closeTalk(); } } PAD.prev = B; return; }
   if (gzg && gzg.on) { [[12, -1, 0], [13, 1, 0], [14, 0, -1], [15, 0, 1]].forEach(([d, dr, dc]) => { if (down(d)) gzCursor(dr, dc); }); if (down(OK)) gzAct(); if (down(BACK) && gzg) { gzg.sel = -1; gzDraw(); } PAD.prev = B; return; }
   if (lhw && lhw.on) { lhw.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
   if (sdive && sdive.on) { sdive.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); sdive.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK)) sdiveSurface(); PAD.prev = B; return; }
@@ -12415,8 +12418,122 @@ function homesteadTalk(n) {
 }
 function sleep() {
   if (S.time > .27) { S.time = .27; newDay(); } else S.time = .27;
+  const ct = !homeCtx ? comfortTier(roomComfort()) : null; S.rested = ct ? {day: S.day, hp: ct[2], xp: ct[3], name: ct[1]} : null; if (ct) S.restedNights = (S.restedNights || 0) + 1;
   S.hp = maxHP(); enemies = []; eproj = []; hazards = [];
-  closeModal('home'); SFX.lullaby(); fadeThen(() => {}); toast('<b>Good morning</b><br>You wake rested in your own bed.'); renderHUD(); save();
+  closeModal('home'); SFX.lullaby(); fadeThen(() => {}); toast(ct ? `<b>Good morning</b><br>You wake up well rested in your ${ct[1].toLowerCase()} room: +${ct[2]} max HP and +${Math.round(ct[3]*100)}% XP today.` : '<b>Good morning</b><br>You wake rested in your own bed.', ct ? 6000 : undefined); renderHUD(); save();
+}
+// ===== homestead room decorating =====
+const DECO_W = 10, DECO_H = 7, DECO_C = 32;
+const FURNITURE = {
+  bed_quilt:  {name: 'Quilted bed', w: 2, h: 2, cost: 180, comfort: 8},
+  rug:        {name: 'Woven rug', w: 2, h: 2, cost: 90, comfort: 4, flat: true},
+  table:      {name: 'Oak table', w: 2, h: 1, cost: 120, comfort: 3},
+  chair:      {name: 'Wooden chair', w: 1, h: 1, cost: 40, comfort: 2},
+  armchair:   {name: 'Armchair', w: 1, h: 1, cost: 150, comfort: 5},
+  bookshelf:  {name: 'Bookshelf', w: 2, h: 1, cost: 200, comfort: 5},
+  hearth:     {name: 'Stone hearth', w: 2, h: 1, cost: 320, comfort: 9},
+  plant:      {name: 'Potted fern', w: 1, h: 1, cost: 35, comfort: 2},
+  lamp:       {name: 'Oil lamp', w: 1, h: 1, cost: 60, comfort: 3},
+  drawers:    {name: 'Chest of drawers', w: 1, h: 1, cost: 110, comfort: 3},
+  fishtank:   {name: 'Fish tank', w: 2, h: 1, cost: 450, comfort: 8},
+  piano:      {name: 'Upright piano', w: 2, h: 1, cost: 700, comfort: 12},
+  window:     {name: 'Glass window', w: 1, h: 1, cost: 80, comfort: 3, wall: true},
+  clock:      {name: 'Wall clock', w: 1, h: 1, cost: 95, comfort: 2, wall: true},
+  shelf:      {name: 'Wall shelf', w: 2, h: 1, cost: 70, comfort: 2, wall: true},
+  landscape_painting:   {name: 'Landscape Painting', w: 1, h: 1, comfort: 5, wall: true, item: true},
+  masterpiece_painting: {name: 'Masterpiece Painting', w: 1, h: 1, comfort: 12, wall: true, item: true},
+  fine_vase:       {name: 'Fine Vase', w: 1, h: 1, comfort: 4, item: true},
+  masterwork_vase: {name: 'Masterwork Vase', w: 1, h: 1, comfort: 10, item: true}};
+const DECO_KEYS = Object.keys(FURNITURE);
+const COMFORT_TIERS = [[20, 'Cozy', 2, .05], [45, 'Snug', 4, .1], [80, 'Lovely', 6, .15]];
+function roomState() { S.room = S.room || {items: [], stash: {}}; return S.room; }
+function roomComfort() { const R = roomState(), kinds = new Set(R.items.map(i => i.k)); return R.items.reduce((a, i) => a + FURNITURE[i.k].comfort, 0) + kinds.size*2; }
+function comfortTier(c) { let t = null; for (const T of COMFORT_TIERS) if (c >= T[0]) t = T; return t; }
+const restedHP = () => (S && S.rested && S.rested.day === S.day ? S.rested.hp : 0);
+const restedXP = () => (S && S.rested && S.rested.day === S.day ? 1 + S.rested.xp : 1);
+function decoFree(k) { const F = FURNITURE[k]; return F.item ? have(k) : (roomState().stash[k] || 0); }
+function decoFits(k, x, y, skip) {
+  const F = FURNITURE[k]; if (x < 0 || x + F.w > DECO_W || y < 0 || y + F.h > DECO_H) return false;
+  if (F.wall ? y !== 0 : y < 1) return false;
+  for (const it of roomState().items) { if (it === skip) continue; const G = FURNITURE[it.k]; if (!!G.flat !== !!F.flat) continue;
+    if (x < it.x + G.w && x + F.w > it.x && y < it.y + G.h && y + F.h > it.y) return false; }
+  return true;
+}
+function decoAt(x, y) { const its = roomState().items.slice().reverse(); return its.find(it => { const F = FURNITURE[it.k]; return !F.flat && x >= it.x && x < it.x + F.w && y >= it.y && y < it.y + F.h; }) || its.find(it => { const F = FURNITURE[it.k]; return x >= it.x && x < it.x + F.w && y >= it.y && y < it.y + F.h; }); }
+let deco = null;
+function decoOpen() {
+  closeModal('home'); roomState();
+  deco = {on: true, hold: null, cur: {x: 4, y: 3}, tab: 'place', msg: ''};
+  openPanel('Decorate your home', `<canvas id="decoC" width="${DECO_W*DECO_C}" height="${DECO_H*DECO_C}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div id="decoInfo" style="text-align:center;margin:6px 0;color:var(--muted)"></div><div id="decoPal" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-height:150px;overflow:auto"></div>`,
+    [{label: 'Done', primary: true, fn: () => { deco = null; save(); closeTalk(); }}]);
+  setTimeout(() => {
+    const c = document.getElementById('decoC'); if (!c) return;
+    c.addEventListener('pointerdown', e => { e.preventDefault(); const r = c.getBoundingClientRect(), s = c.width/r.width; deco.cur = {x: Math.floor((e.clientX - r.left)*s/DECO_C), y: Math.floor((e.clientY - r.top)*s/DECO_C)}; decoAct(); });
+    c.addEventListener('pointermove', e => { if (!deco || !deco.hold) return; const r = c.getBoundingClientRect(), s = c.width/r.width; deco.cur = {x: Math.floor((e.clientX - r.left)*s/DECO_C), y: Math.floor((e.clientY - r.top)*s/DECO_C)}; decoDraw(); });
+    document.getElementById('decoPal').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !deco) return; if (b.dataset.store) { decoStore(); return; } if (b.dataset.tab) { deco.tab = b.dataset.tab; decoUI(); return; } const k = b.dataset.dk; if (!k) return;
+      if (deco.tab === 'buy') { const F = FURNITURE[k]; if (S.coins >= F.cost) { S.coins -= F.cost; roomState().stash[k] = (roomState().stash[k] || 0) + 1; SFX.coin(); deco.msg = `Bought: ${F.name}`; renderHUD(); save(); } decoUI(); return; }
+      decoPick(k); });
+    decoUI();
+  }, 30);
+}
+function decoPick(k) { if (!deco) return; if (deco.hold && deco.hold.from) decoReturn(); if (decoFree(k) <= 0) return; deco.hold = {k}; const F = FURNITURE[k]; deco.msg = `Holding: ${F.name}${F.wall ? ' (goes on the wall)' : ''}`; if (F.wall) deco.cur.y = 0; else if (deco.cur.y < 1) deco.cur.y = 1; SFX.click(); decoUI(); }
+function decoReturn() { const h = deco.hold; if (h && h.from) roomState().items.push(h.from); deco.hold = null; }
+function decoCycle(d) { const ks = DECO_KEYS.filter(k => decoFree(k) > 0); if (!ks.length) { deco.msg = 'Nothing to place. Buy furniture first.'; decoUI(); return; } const i = deco.hold ? ks.indexOf(deco.hold.k) : -1; decoPick(ks[((i + d) % ks.length + ks.length) % ks.length]); }
+function decoAct() {
+  const D = deco; if (!D || !D.on) return; const {x, y} = D.cur, R = roomState();
+  if (D.hold) {
+    const k = D.hold.k;
+    if (!decoFits(k, x, y)) { D.msg = 'It doesn’t fit there.'; SFX.click(); decoUI(); return; }
+    if (!D.hold.from) { if (FURNITURE[k].item) addItem(k, -1); else R.stash[k]--; }
+    R.items.push({k, x, y}); D.hold = null; D.msg = `Placed: ${FURNITURE[k].name}`; SFX.craft(); save(); decoUI(); return;
+  }
+  const it = decoAt(x, y); if (!it) return;
+  R.items.splice(R.items.indexOf(it), 1); D.hold = {k: it.k, from: it}; D.msg = `Moving: ${FURNITURE[it.k].name}. Place it, or press Store to put it away.`; SFX.click(); decoUI();
+}
+function decoStore() { const D = deco; if (!D || !D.hold) return; const k = D.hold.k; if (D.hold.from) { if (FURNITURE[k].item) addItem(k, 1); else roomState().stash[k] = (roomState().stash[k] || 0) + 1; } D.hold = null; D.msg = `Put away: ${FURNITURE[k].name}`; save(); decoUI(); }
+function decoMove(dx, dy) { const D = deco; if (!D) return; D.cur.x = Math.max(0, Math.min(DECO_W - 1, D.cur.x + dx)); D.cur.y = Math.max(0, Math.min(DECO_H - 1, D.cur.y + dy)); decoDraw(); }
+function decoUI() {
+  const D = deco; if (!D) return; const pal = document.getElementById('decoPal'), info = document.getElementById('decoInfo'); if (!pal) return;
+  const c = roomComfort(), t = comfortTier(c), nt = COMFORT_TIERS.find(T => c < T[0]);
+  info.innerHTML = `Comfort <b>${c}</b>${t ? ` · <span style="color:var(--good)">${t[1]}: sleeping here gives +${t[2]} max HP and +${Math.round(t[3]*100)}% XP the next day</span>` : ''}${nt ? ` · ${nt[0] - c} more for ${nt[1]}` : ''}<br>${D.msg || 'Pick something below, then click the room to place it. Click a placed piece to move it.'}`;
+  const tabs = `<div style="width:100%;display:flex;gap:4px;justify-content:center;margin-bottom:2px"><button class="btn sm ${D.tab === 'place' ? 'primary' : ''}" data-tab="place">Place</button><button class="btn sm ${D.tab === 'buy' ? 'primary' : ''}" data-tab="buy">Buy furniture</button>${D.hold && D.hold.from ? '<button class="btn sm" data-store="1">Store held piece</button>' : ''}</div>`;
+  const list = D.tab === 'buy' ? DECO_KEYS.filter(k => !FURNITURE[k].item).map(k => { const F = FURNITURE[k]; return `<button class="btn sm" data-dk="${k}" ${S.coins < F.cost ? 'disabled' : ''}>${F.name} · ${F.cost}◆ <small style="opacity:.7">+${F.comfort}${F.wall ? ' wall' : ''}${roomState().stash[k] ? ` · own ${roomState().stash[k]}` : ''}</small></button>`; }).join('')
+    : (DECO_KEYS.filter(k => decoFree(k) > 0).map(k => `<button class="btn sm ${D.hold && D.hold.k === k ? 'primary' : ''}" data-dk="${k}">${FURNITURE[k].name} ×${decoFree(k)} <small style="opacity:.7">+${FURNITURE[k].comfort}</small></button>`).join('') || '<div class="none">Nothing to place. Buy furniture, or bring paintings and vases home in your bag.</div>');
+  pal.innerHTML = tabs + list; decoDraw();
+}
+function decoPiece(g, k, x, y, w, h, ghost) {
+  g.globalAlpha = ghost ? .6 : 1; const X = x + 2, Y = y + 2, W = w - 4, H = h - 4;
+  const box = (c, a, b, cw, ch) => { g.fillStyle = c; g.fillRect(X + a, Y + b, cw, ch); };
+  switch (k) {
+    case 'bed_quilt': box('#6a4a2a', 0, 0, W, H); box('#f0ece0', 3, 3, W - 6, 14); box('#c84a4a', 3, 18, W - 6, H - 21); box('#e87a6a', 3, 30, W - 6, 3); break;
+    case 'rug': g.fillStyle = '#8a3a5a'; g.beginPath(); g.ellipse(X + W/2, Y + H/2, W/2, H/2 - 4, 0, 0, 7); g.fill(); g.strokeStyle = '#e8c070'; g.lineWidth = 2; g.beginPath(); g.ellipse(X + W/2, Y + H/2, W/2 - 6, H/2 - 10, 0, 0, 7); g.stroke(); break;
+    case 'table': box('#8a5a2a', 0, 4, W, 14); box('#6a4020', 3, 18, 4, 8); box('#6a4020', W - 7, 18, 4, 8); box('#f0f0f0', W/2 - 4, 6, 8, 5); break;
+    case 'chair': box('#8a5a2a', 4, 0, W - 8, 10); box('#a06a3a', 4, 10, W - 8, 8); box('#6a4020', 4, 18, 3, 8); box('#6a4020', W - 7, 18, 3, 8); break;
+    case 'armchair': box('#3a6a8a', 2, 2, W - 4, 22); box('#4a8aaa', 6, 10, W - 12, 12); box('#2a4a6a', 0, 8, 5, 16); box('#2a4a6a', W - 5, 8, 5, 16); break;
+    case 'bookshelf': box('#6a4020', 0, 0, W, H); for (let r = 0; r < 3; r++) for (let i = 0; i < 9; i++) box(['#c84a4a', '#4a7ac8', '#e8c040', '#4a9a5a'][(i + r) % 4], 3 + i*6, 2 + r*9, 5, 7); break;
+    case 'hearth': box('#8a8a8a', 0, 0, W, H); box('#6a6a6a', 0, 0, W, 5); box('#1a1a1a', 14, 8, W - 28, H - 8); box('#ff8a2a', 18, 16, W - 36, H - 18); box('#ffd040', 24, 20, W - 48, H - 22); break;
+    case 'plant': box('#a0603a', 8, 16, W - 16, 10); g.fillStyle = '#3a9a3a'; g.beginPath(); g.arc(X + W/2, Y + 10, 9, 0, 7); g.fill(); break;
+    case 'lamp': box('#5a4a3a', W/2 - 2, 10, 4, 14); box('#3a3a3a', W/2 - 6, 23, 12, 3); g.fillStyle = 'rgba(255,220,120,.35)'; g.beginPath(); g.arc(X + W/2, Y + 8, 12, 0, 7); g.fill(); box('#ffe08a', W/2 - 5, 3, 10, 8); break;
+    case 'drawers': box('#7a4a2a', 2, 0, W - 4, H); for (let i = 0; i < 3; i++) { box('#9a6a3a', 4, 2 + i*8, W - 8, 6); box('#e8c070', W/2 - 1, 4 + i*8, 3, 2); } break;
+    case 'fishtank': box('#3a3a3a', 0, 18, W, 8); box('#5ab8e8', 0, 0, W, 18); box('#e8902a', 12, 6, 6, 3); box('#e8e04a', 34, 10, 6, 3); box('#3a9a3a', 50, 8, 3, 10); break;
+    case 'piano': box('#2a1a1a', 0, 0, W, H); box('#f4f4ee', 3, 14, W - 6, 6); for (let i = 0; i < 9; i++) box('#1a1a1a', 6 + i*6, 14, 3, 4); break;
+    case 'window': box('#e8e0d0', 0, 2, W, H - 4); box('#9ad0f0', 3, 5, W - 6, H - 10); box('#e8e0d0', W/2 - 1, 5, 2, H - 10); box('#e8e0d0', 3, H/2 - 1, W - 6, 2); break;
+    case 'clock': g.fillStyle = '#7a4a2a'; g.beginPath(); g.arc(X + W/2, Y + H/2, 11, 0, 7); g.fill(); g.fillStyle = '#f4f0e0'; g.beginPath(); g.arc(X + W/2, Y + H/2, 8, 0, 7); g.fill(); box('#1a1a1a', W/2 - 1, H/2 - 6, 2, 6); box('#1a1a1a', W/2, H/2 - 1, 5, 2); break;
+    case 'shelf': box('#7a4a2a', 0, 18, W, 4); box('#c84a4a', 6, 8, 6, 10); box('#e8c040', 16, 4, 8, 14); box('#4a9a5a', 40, 10, 10, 8); break;
+    case 'landscape_painting': case 'masterpiece_painting': { const m = k === 'masterpiece_painting'; box(m ? '#d8a840' : '#6a4a2a', 0, 2, W, H - 4); box('#8ac8e8', 3, 5, W - 6, 10); box(m ? '#e8a040' : '#5a9a4a', 3, 15, W - 6, H - 20); if (m) box('#fff0b0', W - 10, 7, 4, 4); break; }
+    case 'fine_vase': case 'masterwork_vase': { const m = k === 'masterwork_vase'; g.fillStyle = m ? '#f0f4ff' : '#d8e8f0'; g.beginPath(); g.ellipse(X + W/2, Y + 16, 8, 10, 0, 0, 7); g.fill(); box(m ? '#f0f4ff' : '#d8e8f0', W/2 - 3, 2, 6, 6); box(m ? '#d8a840' : '#4a7ab8', W/2 - 8, 14, 16, 3); break; }
+  }
+  g.globalAlpha = 1;
+}
+function decoDraw() {
+  const D = deco, c = document.getElementById('decoC'); if (!D || !c) return; const g = c.getContext('2d'), R = roomState();
+  g.fillStyle = '#c8b090'; g.fillRect(0, 0, c.width, DECO_C); g.fillStyle = '#b89a78'; for (let x = 8; x < c.width; x += 16) g.fillRect(x, 0, 2, DECO_C); g.fillStyle = '#7a5a3a'; g.fillRect(0, DECO_C - 4, c.width, 4);
+  for (let y = 1; y < DECO_H; y++) for (let x = 0; x < DECO_W; x++) { g.fillStyle = (x + y) % 2 ? '#a07a50' : '#a8825a'; g.fillRect(x*DECO_C, y*DECO_C, DECO_C, DECO_C); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x*DECO_C, y*DECO_C + DECO_C - 1, DECO_C, 1); }
+  const order = R.items.slice().sort((a, b) => (FURNITURE[b.k].flat ? 1 : 0) - (FURNITURE[a.k].flat ? 1 : 0) || a.y - b.y);
+  for (const it of order) { const F = FURNITURE[it.k]; decoPiece(g, it.k, it.x*DECO_C, it.y*DECO_C, F.w*DECO_C, F.h*DECO_C); }
+  const {x, y} = D.cur;
+  if (D.hold) { const F = FURNITURE[D.hold.k], ok = decoFits(D.hold.k, x, y); decoPiece(g, D.hold.k, x*DECO_C, y*DECO_C, F.w*DECO_C, F.h*DECO_C, true); g.strokeStyle = ok ? '#7aff8a' : '#ff5a5a'; g.lineWidth = 2; g.strokeRect(x*DECO_C + 1, y*DECO_C + 1, F.w*DECO_C - 2, F.h*DECO_C - 2); }
+  else { g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.strokeRect(x*DECO_C + 1, y*DECO_C + 1, DECO_C - 2, DECO_C - 2); }
 }
 let homeCtx = null;
 function openHome() { homeCtx = null; mode = 'home'; keys.clear(); fishing = null; renderHome(); $('home').hidden = false; }
@@ -12432,6 +12549,7 @@ function renderHome() {
     <div class="vals" style="margin-top:6px">${homeCtx ? `A house in ${placeName(homeCtx)} · earns ${rentOf(homeCtx)} coin rent each morning · ${S.respawn === homeCtx ? 'you wake up here if knocked out' : 'not your respawn point'} · the chest is shared with all your homes` : `${L.plots} crop beds`}${homeCtx ? '<!--' : ''}${H.level >= 2 ? ` · coop with ${H.chickens} hens · workbench` : ''}${H.level >= 3 ? ' · forge' : ''} · you wake up here if you're knocked out${homeCtx ? '-->' : ''}</div>
     <div class="jgrid" style="margin-top:12px">
       <div class="jcard"><div class="t">Bed</div><div class="s">Sleep until morning and wake fully healed. Crops keep growing while you sleep.</div><div style="margin-top:8px"><button class="btn sm primary" data-sleep="1">Sleep</button></div></div>
+      ${!homeCtx ? (() => { const c = roomComfort(), t = comfortTier(c); return `<div class="jcard"><div class="t">Decorate</div><div class="s">Comfort ${c}${t ? ` (${t[1]})` : ''}. Furniture, paintings and vases make your room cozier. A cozy room gives you a max HP and XP boost the day after you sleep here.</div><div style="margin-top:8px"><button class="btn sm" data-deco="1">Decorate</button></div></div>`; })() : ''}
       ${homeCtx ? (() => { const L = propLv(homeCtx); if (L >= FURNISH_MAX) return `<div class="jcard"><div class="t">Furnishings <span style="color:var(--brass)">${stars(L, FURNISH_MAX)}</span></div><div class="s">Fully furnished. Rent is ${rentOf(homeCtx)} coin a day.</div></div>`; const c = furnishCost(homeCtx, L + 1), ok = upCanPay(c); return `<div class="jcard"><div class="t">Furnishings <span style="color:var(--brass)">${stars(L, FURNISH_MAX)}</span></div><div class="s">${['Add rugs and a proper table.','Add glass windows and a fireplace.','Add silk curtains and fine furniture.'][L]} Rent goes from ${rentOf(homeCtx)} to <b>${Math.round(PROPERTIES[homeCtx].price*.02*(1 + .5*(L + 1)))}</b> coin a day.</div><div class="req" style="margin-top:6px">${upCostHTML(c)}</div><div style="margin-top:8px"><button class="btn sm ${ok ? 'primary' : ''}" data-hup="1" ${ok ? '' : 'disabled'}>Furnish</button></div></div>`; })() : ''}
       ${homeCtx ? `<div class="jcard"><div class="t">Respawn point</div><div class="s">${S.respawn === homeCtx ? 'You wake up here when knocked out.' : 'Wake up here instead of your homestead when knocked out.'}</div><div style="margin-top:8px"><button class="btn sm ${S.respawn === homeCtx ? '' : 'primary'}" data-resp="1" ${S.respawn === homeCtx ? 'disabled' : ''}>Set as respawn point</button></div></div>` : up}
     </div>
@@ -12445,6 +12563,7 @@ $('homeSheet').addEventListener('click', e => {
   const H = S.home;
   if (b.dataset.x) { closeModal('home'); return; }
   if (b.dataset.sleep) { sleep(); return; }
+  if (b.dataset.deco) { decoOpen(); return; }
   if (b.dataset.hup) { const L = propLv(homeCtx), c = furnishCost(homeCtx, L + 1); if (L < FURNISH_MAX && upCanPay(c)) { upPay(c); S.propLv = S.propLv || {}; S.propLv[homeCtx] = L + 1; SFX.craft(); toast(`Your ${PROPERTIES[homeCtx].name} is more comfortable now. Rent: <b>${rentOf(homeCtx)} coin</b> a day.`); renderHUD(); save(); } }
   if (b.dataset.resp) { S.respawn = homeCtx; toast(`You'll wake up in your ${PROPERTIES[homeCtx].name} from now on.`); }
   if (b.dataset.up) { const next = HOME_LEVELS[H.level + 1]; if (next && canAfford(next.cost)) { pay(next.cost); H.level++; toast(`Built: <b>${next.name}</b><br>${next.perks}.`, 6000); } }
@@ -13450,7 +13569,7 @@ function offerPerk() {
 }
 function gainXP(n) {
   if (!S || mode === 'title' || n <= 0) return;
-  S.xp = (S.xp || 0) + Math.round(n * (S.pet === 'crane' ? 1.1 : 1) * (have('star_pendant') ? 1.15 : 1) * (perk('scholar') ? 1.15 : 1) * (have('moon_charm') ? 1.1 : 1) * (have('spirit_charm') ? 1.1 : 1));
+  S.xp = (S.xp || 0) + Math.round(n * restedXP() * (S.pet === 'crane' ? 1.1 : 1) * (have('star_pendant') ? 1.15 : 1) * (perk('scholar') ? 1.15 : 1) * (have('moon_charm') ? 1.1 : 1) * (have('spirit_charm') ? 1.1 : 1));
   let ups = 0;
   while (S.level < MAX_LEVEL && S.xp >= xpNeed(S.level)) { S.xp -= xpNeed(S.level); S.level++; S.skillPts++; if (S.level % 10 === 0) S.skillPts++; ups++; }
   if (ups) { S.hp = maxHP(); levelUpFX(); if (perksDue() > 0) setTimeout(offerPerk, 2600); }
@@ -13495,6 +13614,8 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['cozy_home','Home Sweet Home','Decorate your homestead room to Lovely comfort', () => roomComfort() >= 80],
+  ['well_rested','Well Rested','Wake up well rested 10 times', () => (S.restedNights || 0) >= 10],
   ['old_master','Old Master','Paint a masterpiece at Pia’s easel', () => (S.paintMaster || 0) > 0],
   ['easel10','Steady Brush','Finish 10 paintings at the easel', () => (S.paintings || 0) >= 10],
   ['gz_win','Fox Trapper','Trap the fox in Fox and Geese', () => (S.gzWins || 0) > 0],
@@ -14157,8 +14278,9 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 26;
+const WN_VER = 27;
 const WHATS_NEW = [
+  ['Decorate your home', 'Open your homestead house and choose Decorate. Place furniture, paintings and vases. A cozy room makes you well rested: extra max HP and XP the next day.'],
   ['The easel', 'Pia Palette in Prismvale teaches color mixing. Match a scene’s colors from red, yellow, blue, white and black to paint landscapes and masterpieces.'],
   ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays the old board game: march your 13 geese forward and pen in the fox.'],
   ['Greenhouse', 'Ask Pell, the land agent, to build a greenhouse on your homestead so winter stops slowing your crops.'],
@@ -14463,7 +14585,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {openHome: () => openHome(), get deco(){return deco;}, decoOpen: () => decoOpen(), roomComfort: () => roomComfort(), get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
