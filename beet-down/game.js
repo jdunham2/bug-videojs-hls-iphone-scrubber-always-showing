@@ -186,16 +186,16 @@ const LAST_WAVE=WAVES.length;
 /* Full run: the same first nine waves, then ten longer, denser waves and a tougher Brood Queen on wave 20. */
 const MIXL={grub:2.5,dasher:1.5,spitter:1.3,splitter:1.3,brute:1.2,bomber:1.1,hopper:1.5};
 const WAVES_FULL=WAVES.slice(0,9).concat([
-  {dur:60,int:.95,grp:[6,8],mix:MIXL,elite:2,bug:true,half:true},
-  {dur:60,int:.9,grp:[6,9],mix:MIXL},
-  {dur:60,int:.88,grp:[7,9],mix:MIXL,elite:1,bug:true},
-  {dur:60,int:.85,grp:[7,10],mix:{...MIXL,brute:1.5}},
-  {dur:60,int:.82,grp:[7,10],mix:{...MIXL,bomber:1.6},bug:true},
-  {dur:60,int:.8,grp:[8,10],mix:{...MIXL,brute:1.6},elite:2},
-  {dur:60,int:.78,grp:[8,11],mix:{...MIXL,hopper:2},bug:true},
-  {dur:60,int:.75,grp:[8,11],mix:{...MIXL,brute:1.8,bomber:1.6}},
-  {dur:60,int:.72,grp:[9,12],mix:{...MIXL,brute:2},elite:2,bug:true},
-  {dur:60,int:.7,grp:[9,12],mix:{...MIXL,brute:2,dasher:2,hopper:2},elite:1},
+  {dur:55,int:1,grp:[5,7],mix:MIXL,elite:2,bug:true,half:true},
+  {dur:55,int:.98,grp:[5,7],mix:MIXL},
+  {dur:60,int:.95,grp:[5,8],mix:MIXL,elite:1,bug:true},
+  {dur:60,int:.93,grp:[6,8],mix:{...MIXL,brute:1.5}},
+  {dur:60,int:.9,grp:[6,8],mix:{...MIXL,bomber:1.6},bug:true},
+  {dur:60,int:.88,grp:[6,9],mix:{...MIXL,brute:1.6},elite:2},
+  {dur:60,int:.86,grp:[6,9],mix:{...MIXL,hopper:2},bug:true},
+  {dur:60,int:.84,grp:[7,9],mix:{...MIXL,brute:1.8,bomber:1.6}},
+  {dur:60,int:.82,grp:[7,10],mix:{...MIXL,brute:2},elite:2,bug:true},
+  {dur:60,int:.8,grp:[7,10],mix:{...MIXL,brute:2,dasher:2,hopper:2},elite:1},
   {dur:0,int:2.2,grp:[4,6],mix:{grub:2,dasher:1,spitter:1,hopper:1,brute:.5,bomber:.5},boss:true},
 ]);
 const RUN_LENS={10:{name:'Quick',waves:WAVES},20:{name:'Full',waves:WAVES_FULL}};
@@ -489,7 +489,7 @@ function hurtPlayer(d,src){
 }
 
 /* ================= enemies ================= */
-function waveMul(){const w=run.wave,q=run.len===20?.027:.035;return{hp:1+.36*(w-1)+q*(w-1)*(w-1),dmg:1+.17*(w-1)}}
+function waveMul(){const w=run.wave;if(run.len===20)return{hp:1+.32*(w-1)+.018*(w-1)*(w-1),dmg:1+.14*(w-1)};return{hp:1+.36*(w-1)+.035*(w-1)*(w-1),dmg:1+.17*(w-1)}}
 function makeEnemy(type,x,y,elite){
   const def=ENEMIES[type]; const m=type==='boss'?{hp:1,dmg:1}:waveMul();
   const e={type,def,x,y,z:0,kx:0,ky:0,hp:def.hp*m.hp,dmg:Math.round(def.dmg*m.dmg),r:def.r,spd:def.spd*rand(.92,1.08),flash:0,t:0,wob:rand(0,TAU),st:'chase',stT:rand(.4,1.2),cool:rand(1,2.5),dead:false,mats:def.mats,sq:0,popT:null,born:0};
