@@ -1302,7 +1302,7 @@ function damage(t,dmg,src){
   if(R.net&&!R.net.isHost&&t!==R.player){ // squad client: the host owns the bears; send it our hits
     if(src&&src.faction==='player'&&!src.remote){netHit(0,R.agents.indexOf(t),dmg,t.netT>4.9?1:0);t.lastMyHit=R.clock}return}
   const ab=Math.min(t.ap,dmg*.6);t.ap-=ab;t.hp-=dmg-ab;
-  if(t===R.player){R.hurt=.45;R.hurtDir=Math.atan2(src.x-t.x,-(src.y-t.y));SFX.hurt();if(t.hp<=0)endRaid(false,`Knocked out by ${src.rival?src.name:'a bear'}`);return}
+  if(t===R.player){R.hurt=.45;R.hurtDir=Math.atan2(src.x-t.x,-(src.y-t.y));SFX.hurt();if(t.hp<=0)playerDown(`Knocked out by ${src.remote?'a bear':src.rival?src.name:'a bear'}`);return}
   if(src&&!t.target){t.alert=5;t.lastSeen={x:src.x,y:src.y}}
   if(src===R.player)t.provokedT=6;
   if(t.hp<=0){kill(t,src);if(src===R.player){R.hitmark=.4;R.killmark=true;SFX.hit(false,true)}}
@@ -1435,6 +1435,33 @@ function syncPet(dt){
   for(const w of P.wings)w.wg.rotation.x=w.sd*Math.sin(pet.t*14)*.7;
   for(const r of P.rotors)r.rotation.y+=dt*60;
 }
+const livingMates=()=>R.remotes?Object.values(R.remotes).filter(r=>!r.dn&&!r.ko):[];
+function playerDown(reason){
+  const p=R.player;
+  if(R.downed)return;
+  if(!R.net||!livingMates().length){endRaid(false,reason);return}
+  R.downed=true;R.downAt=R.clock;R.revSeen={};for(const q of NET.peers)if(q.presence&&q.presence.rev&&q.presence.rev.p===NET.me)R.revSeen[q.peer]=q.presence.rev.s|0;R.bleed=45;R.downReason=reason;R.alone=0;p.hp=0;p.dead=true;mouse.down=false;R.adsT=0;
+  feed('You are down! A squadmate can revive you (hold E).','#ff5a3c');SFX.hurt();netSend();
+}
+function revivePlayer(by){
+  const p=R.player;R.downed=false;p.dead=false;p.hp=40;R.hurt=0;
+  feed(`${by} revived you!`,'#86b46b');SFX.chime();netSend();
+}
+function reviveUpdate(dt){
+  if(!R.net)return;const p=R.player;
+  if(R.downed){
+    R.bleed-=dt;R.alone=livingMates().length?0:R.alone+dt;
+    if(R.bleed<=0){endRaid(false,`${R.downReason}. Nobody reached you in time`);return}
+    if(R.alone>2){endRaid(false,`${R.downReason}. No squadmates left to revive you`);return}
+    return;
+  }
+  // reviving a downed squadmate: stand close and hold E
+  let tgt=null,bd=70;for(const r of Object.values(R.remotes||{}))if(r.dn&&!r.ko){const d=dist(r,p);if(d<bd){bd=d;tgt=r}}
+  R.reviveTgt=tgt;
+  if(tgt&&keys.KeyE){R.reviveT=(R.reviveT||0)+dt;R.reviving={p:tgt.peer,t:Math.round(R.reviveT/3*100)/100};
+    if(R.reviveT>=3){NET.revSeq=(NET.revSeq||0)+1;NET.rev={p:tgt.peer,s:NET.revSeq};R.reviveT=0;R.reviving=null;feed(`You revived ${tgt.nick}!`,'#86b46b');SFX.chime();netSend()}}
+  else{R.reviveT=0;R.reviving=null}
+}
 function wakeBear(a){
   a.dead=false;a.hp=a.maxhp*.6;a.dieT=0;a.stirring=false;a.wakes=(a.wakes||0)+1;a.groggy=3;a.alert=6;a.react=0;a.quadGoal=1;
   a.lastSeen={x:R.player.x,y:R.player.y};a.mesh.rotation.x=0;a.bodyG.scale.setScalar(1);if(a.label)a.label.visible=true;
@@ -1460,7 +1487,7 @@ function update(dt){
   if(R.time<=0){endRaid(false,'Missing in action. The zone closed with you inside');return}
   if(R.freeLook){const dz=v=>Math.abs(v)<.2?0:(v-Math.sign(v)*.2)/.8;R.yaw-=dz((mouse.x-VW/2)/(VW/2))*2.6*dt;R.pitch-=dz((mouse.y-VH/2)/(VH/2))*1.6*dt}
   // aim down sights
-  const w=curW();R.adsT=clamp(R.adsT+(mouse.right&&w&&p.reloadT<=0?1:-1)*dt*7,0,1);
+  const w=curW();R.adsT=clamp(R.adsT+(mouse.right&&w&&p.reloadT<=0&&!R.downed?1:-1)*dt*7,0,1);
   // aim assist: pull toward the nearest enemy near the crosshair while aiming or firing
   R.assist=assistTarget(AS.cone);
   if(R.assist&&(mouse.down||R.adsT>.3)&&AS.pull){const k=Math.min(1,AS.pull*dt*(R.adsT>.3?1.3:1));R.yaw+=norm(R.assist.yaw-R.yaw)*k;R.pitch+=((R.assist.pitch-R.recoil)-R.pitch)*k}
@@ -1468,14 +1495,14 @@ function update(dt){
   // movement relative to view
   const fx=-Math.sin(R.yaw),fy=-Math.cos(R.yaw),rx=Math.cos(R.yaw),ry=-Math.sin(R.yaw);
   const f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
-  const sprint=(keys.ShiftLeft||keys.ShiftRight)&&f>0&&R.adsT<.2;
-  const moved=moveDir(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1),dt);
+  const sprint=(keys.ShiftLeft||keys.ShiftRight)&&f>0&&R.adsT<.2&&!R.downed;
+  const moved=moveDir(p,fx*f+rx*s,fy*f+ry*s,(sprint?240:150)*(1-.45*R.adsT)*(w&&w.base==='minigun'?.72:1)*(R.inPool==='water'?.55:1)*(R.downed?.2:1)*(R.reviveT>0?0:1),dt);
   R.moving=moved>.5;R.sprint=sprint&&R.moving;
   if(R.moving){R.bobT+=dt*(sprint?1.5:1);R.stepAcc+=moved*K;if(R.stepAcc>(sprint?2.4:1.9)){R.stepAcc=0;SFX.step(null,sprint)}}
   R.strafe+=((s*(R.moving?1:0))-R.strafe)*Math.min(1,dt*6);
   p.ang=Math.atan2(fy,fx);
   R.recoil-=R.recoil*Math.min(1,dt*7);
-  camera.position.set(p.x*K,EYE+(R.moving?Math.abs(Math.sin(R.bobT*9))*.035*(1-R.adsT):0),p.y*K);
+  camera.position.set(p.x*K,(R.downed?.45:EYE)+(R.moving&&!R.downed?Math.abs(Math.sin(R.bobT*9))*.035*(1-R.adsT):0),p.y*K);
   R.shake=Math.max(0,(R.shake||0)-dt);const sk=R.shake*.05;
   camera.rotation.set(R.pitch+R.recoil+rnd(-sk,sk),R.yaw+rnd(-sk,sk),-R.strafe*.018);
   const zoomFov=R.optic==='scope'?(w&&w.base==='sniper'?16:24):R.optic==='dot'?48:54;
@@ -1489,8 +1516,8 @@ function update(dt){
     if(p.reloadT>0){p.reloadT-=dt;if(p.reloadT<=0)R.mags[w.id]=st.mag}
     else{const B0=BASES[w.base];
       if(B0.spin)R.spin=clamp(R.spin+(mouse.down&&!R.sprint?dt:-dt*1.5),0,B0.spin);
-      if(B0.burst&&mouse.down&&!p.burst&&p.cd<=0&&!R.sprint)p.burst=B0.burst;
-      if((B0.burst?p.burst>0:mouse.down)&&p.cd<=0&&!R.sprint&&(!B0.spin||R.spin>=B0.spin)){
+      if(B0.burst&&mouse.down&&!p.burst&&p.cd<=0&&!R.sprint&&!R.downed)p.burst=B0.burst;
+      if((B0.burst?p.burst>0:mouse.down)&&p.cd<=0&&!R.sprint&&!R.downed&&!(R.reviveT>0)&&(!B0.spin||R.spin>=B0.spin)){
       if(R.mags[w.id]>0){
         if(w.cond<40&&Math.random()<(40-w.cond)/250){p.cd=.7;feed('Weapon jammed','#e0573f');SFX.click()}
         else{playerFire(st,w);R.mags[w.id]--;p.cd=1/st.rate;noise(p,st.quiet?220:750);if(B0.burst){p.burst--;if(p.burst<=0){p.burst=0;p.cd=.32}}}
@@ -1554,9 +1581,9 @@ function update(dt){
     if(R.over)return;
   }
   R.bullets=R.bullets.filter(b=>b.life>0);
-  updateGadgets(dt);updateCritters(dt);updatePet(dt);
+  updateGadgets(dt);updateCritters(dt);updatePet(dt);reviveUpdate(dt);if(R.over)return;
   R.inPool=null;for(const pl of R.pools)if(dist(pl,p)<pl.r){R.inPool=pl.kind;break}
-  if(R.inPool==='lava'){p.hp-=16*dt;R.hurt=Math.max(R.hurt,.3);R.lavaT=(R.lavaT||0)-dt;if(R.lavaT<=0){R.lavaT=2;feed('Lava! Get out!','#ff6a2a');SFX.hurt()}if(p.hp<=0){endRaid(false,'Fell into the lava');return}}
+  if(R.inPool==='lava'){p.hp-=16*dt;R.hurt=Math.max(R.hurt,.3);R.lavaT=(R.lavaT||0)-dt;if(R.lavaT<=0){R.lavaT=2;feed('Lava! Get out!','#ff6a2a');SFX.hurt()}if(p.hp<=0){playerDown('Fell into the lava');if(R.over)return}}
   // pickups
   R.items=R.items.filter(it=>{
     if(it.kind==='w'||dist(it,p)>30)return true;
@@ -1644,6 +1671,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyP'||(e.code==='Escape'&&R.freeLook)){
     if(document.pointerLockElement===hc)document.exitPointerLock();else if(R.started)R.paused=!R.paused;return}
   if(R.paused)return;
+  if(R.downed){if(e.code==='KeyX')endRaid(false,'You gave up while down');return}
   const p=R.player;
   if(e.code==='KeyR')startReload();
   if(e.code==='KeyG')throwGadget('gas');
@@ -1652,7 +1680,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit1')swapTo(0);
   if(e.code==='Digit2')swapTo(1);
   if(e.code==='KeyQ'&&S.meds>0&&p.hp<100){S.meds--;p.hp=Math.min(100,p.hp+35);feed('Bandaged up (+35 HP)','#86b46b');SFX.bandage()}
-  if(e.code==='KeyE'){const it=nearestLoot();if(it){
+  if(e.code==='KeyE'&&!R.reviveTgt){const it=nearestLoot();if(it){
     if(R.pack.length>=packSlots())feed(`Pack full (${packSlots()}/${packSlots()})`,'#e0573f');
     else{R.pack.push(it.w);R.items=R.items.filter(x=>x!==it);R.scene.remove(it.mesh);feed(`Looted ${wLabel(it.w)}`,'#d6a64b');SFX.loot()}}}
 });
@@ -1752,7 +1780,7 @@ function hud(){
   cx.textAlign='left';cx.fillStyle='#e6dfcf';cx.font='700 20px "Chakra Petch", sans-serif';
   const m=Math.max(0,R.time);cx.fillText(`${R.z.n.toUpperCase()}  ${Math.floor(m/60)}:${String(Math.floor(m%60)).padStart(2,'0')}`,pad,pad+16);
   cx.font=mono(12);cx.fillStyle='#d6a64b';cx.fillText(`Cash ${money(R.raidCash)} · Bears tranqed ${R.kills} · Pack ${R.pack.length}/${packSlots()}`,pad,pad+36);
-  if(R.remotes){let i=0;for(const r of Object.values(R.remotes)){cx.fillStyle=safeColor(r.color);cx.font=mono(12,'600');cx.fillText(`● ${r.nick}  ${r.ko?'KO':Math.max(0,Math.round(r.hp))+' HP'}`,pad,pad+84+i*16);i++}}
+  if(R.remotes){let i=0;for(const r of Object.values(R.remotes)){cx.fillStyle=safeColor(r.color);cx.font=mono(12,'600');cx.fillText(`● ${r.nick}  ${r.dn?'DOWN '+r.dn+'s':r.ko?'KO':Math.max(0,Math.round(r.hp))+' HP'}`,pad,pad+84+i*16);i++}}
   R.pack.forEach((it,i)=>{cx.fillStyle='rgba(0,0,0,.5)';cx.fillRect(pad+i*36,pad+46,32,18);cx.fillStyle='#e6dfcf';cx.font=mono(10);cx.fillText(BASES[it.base].name.slice(0,4),pad+4+i*36,pad+59)});
   // minimap (north up)
   const ms=170,mx0=VW-pad-ms,my0=pad,sc=ms/1600;
@@ -1790,6 +1818,23 @@ function hud(){
     cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText('EXTRACTING · HOLD POSITION',VW/2,VH/2+96)}
   if(R.intro>0&&!R.paused){cx.globalAlpha=Math.min(1,R.intro);cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-330,VH-140,660,48);cx.fillStyle='#e6dfcf';cx.font=mono(12);
     cx.fillText('WASD move · Shift sprint · Left click fire · Right click aim · R reload · 1/2 swap',VW/2,VH-121);cx.fillText('E loot · Q bandage · G gas · F trap · H honey · M mute · Follow the compass to EXFIL',VW/2,VH-103);cx.globalAlpha=1}
+  // downed squadmates: on-screen markers (through walls) and the revive prompt
+  if(R.remotes)for(const r of Object.values(R.remotes)){if(!r.dn)continue;const v=v3(r.x*K,1,r.y*K).project(camera);if(v.z>1)continue;
+    const sx=clamp((v.x*.5+.5)*VW,30,VW-30),sy=clamp((-v.y*.5+.5)*VH,60,VH-60),pulse=.6+.4*Math.sin(R.clock*6);
+    cx.textAlign='center';cx.fillStyle=`rgba(255,90,60,${pulse})`;cx.font='700 22px "Chakra Petch", sans-serif';cx.fillText('✚',sx,sy);
+    cx.font=mono(11,'600');cx.fillStyle='#ffb0a0';cx.fillText(`${r.nick} · ${r.dn}s · ${Math.round(dist(r,p)*K)}m`,sx,sy+16)}
+  if(R.reviveTgt&&!R.downed){cx.textAlign='center';const t=R.reviveT/3;
+    if(t>0){cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-120,VH/2+40,240,14);cx.fillStyle='#86b46b';cx.fillRect(VW/2-120,VH/2+40,240*t,14);cx.fillStyle='#e6dfcf';cx.font=mono(11,'600');cx.fillText(`REVIVING ${R.reviveTgt.nick.toUpperCase()}`,VW/2,VH/2+51)}
+    else{cx.fillStyle='#86b46b';cx.font=mono(14,'600');cx.fillText(`Hold [E] to revive ${R.reviveTgt.nick}`,VW/2,VH/2+50)}}
+  if(R.downed){
+    cx.fillStyle='rgba(60,0,0,.45)';cx.fillRect(0,0,VW,VH);
+    const g=cx.createRadialGradient(VW/2,VH/2,VH*.2,VW/2,VH/2,VH*.8);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.75)');cx.fillStyle=g;cx.fillRect(0,0,VW,VH);
+    cx.textAlign='center';cx.fillStyle='#ff6a4a';cx.font='700 40px "Chakra Petch", sans-serif';cx.fillText('YOU ARE DOWN',VW/2,VH/2-40);
+    const helper=R.remotes&&Object.values(R.remotes).find(r=>r.rv>0);
+    cx.font=mono(14,'600');cx.fillStyle='#e6dfcf';cx.fillText(helper?`${helper.nick} is reviving you…`:'Crawl toward a squadmate. They can revive you by holding E.',VW/2,VH/2-8);
+    cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(VW/2-150,VH/2+10,300,12);cx.fillStyle=helper?'#86b46b':'#e0573f';cx.fillRect(VW/2-150,VH/2+10,300*(helper?helper.rv:R.bleed/45),12);
+    cx.font=mono(12);cx.fillStyle='#968f82';cx.fillText(helper?'Hang on!':`Bleeding out in ${Math.ceil(R.bleed)}s · press X to give up`,VW/2,VH/2+40);
+  }
   if(R.paused){
     cx.fillStyle='rgba(10,11,13,.72)';cx.fillRect(0,0,VW,VH);cx.fillStyle='#e6dfcf';cx.font='700 44px "Chakra Petch", sans-serif';
     cx.fillText(R.started?'PAUSED':R.z.n.toUpperCase(),VW/2,VH/2-10);
@@ -1854,9 +1899,9 @@ function snapshot(){
 }
 function netSend(){
   if(!NET.squad)return;
-  const P={nick:NET.nick,color:NET.color,go:NET.go||null,raid:null,net:null,hits:[]};
+  const P={nick:NET.nick,color:NET.color,go:NET.go||null,rev:NET.rev||null,raid:null,net:null,hits:[]};
   if(R&&R.net&&!R.over){const p=R.player,w=curW();
-    P.raid={e:R.net.epoch,z:R.zi,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
+    P.raid={e:R.net.epoch,z:R.zi,dn:R.downed?Math.max(1,Math.ceil(R.bleed)):0,rv:R.reviving||null,x:Math.round(p.x),y:Math.round(p.y),yaw:Math.round(R.yaw*100)/100,hp:Math.round(p.hp),w:w?w.base:null,m:w?w.model%3:0,f:R.shotCount,hon:R.honey.slice(0,4).map(h=>[Math.round(h.x),Math.round(h.y)])};
     for(const [k,v] of Object.entries(NET.pend)){const [kind,idx]=k.split(':').map(Number);NET.seq++;NET.hitQ.push([NET.seq,kind,idx,Math.round(v.d*10)/10,v.f])}NET.pend={};
     while(NET.hitQ.length>16)NET.hitQ.shift();P.hits=NET.hitQ;
     if(R.net.isHost)P.net=snapshot();
@@ -1915,13 +1960,16 @@ function netTick(dt){
   R.remoteProxies=[];R.honeyRemote=[];
   for(const q of inRaid){const P=q.presence,rd=P.raid;seenPeers[q.peer]=1;
     let r=R.remotes[q.peer];if(!r){r=R.remotes[q.peer]={peer:q.peer,nick:String(P.nick||'Ranger').slice(0,16),color:P.color,x:+rd.x,y:+rd.y,yaw:+rd.yaw,f:rd.f|0,walkT:0};mkRemoteMesh(r)}
-    const ox=r.x,oy=r.y,k=Math.min(1,dt*12);r.x+=((+rd.x||r.x)-r.x)*k;r.y+=((+rd.y||r.y)-r.y)*k;r.yaw=+rd.yaw||0;r.hp=+rd.hp;r.ko=r.hp<=0;r.walkT+=Math.hypot(r.x-ox,r.y-oy)*K;
+    const ox=r.x,oy=r.y,k=Math.min(1,dt*12);r.x+=((+rd.x||r.x)-r.x)*k;r.y+=((+rd.y||r.y)-r.y)*k;r.yaw=+rd.yaw||0;r.hp=+rd.hp;r.dn=+rd.dn||0;r.ko=r.hp<=0&&!r.dn;r.rv=rd.rv&&rd.rv.p===NET.me?Math.min(1,+rd.rv.t||0):0;
+    if(R.downed&&P.rev&&P.rev.p===NET.me){R.revSeen=R.revSeen||{};const sq=P.rev.s|0;if(R.revSeen[q.peer]===undefined)R.revSeen[q.peer]=0;if(sq>R.revSeen[q.peer]){R.revSeen[q.peer]=sq;revivePlayer(r.nick)}}
+    if(P.rev&&!R.downed){R.revSeen=R.revSeen||{};R.revSeen[q.peer]=P.rev.s|0}r.walkT+=Math.hypot(r.x-ox,r.y-oy)*K;
     const gk=String(rd.w||'')+(rd.m|0);if(gk!==r.gunKey&&BASES[rd.w]){r.gunKey=gk;if(r.gun)r.mesh.remove(r.gun);const G=buildGun({base:rd.w,model:rd.m|0,mods:[],rar:1,appraised:false},false);G.g.rotation.y=-Math.PI/2;G.g.position.set(.16,1.33,.08);r.mesh.add(G.g);r.gun=G.g;r.tip=.16-G.tip}
     const ang=Math.atan2(-Math.cos(r.yaw),-Math.sin(r.yaw));r.mesh.position.set(r.x*K,0,r.y*K);r.mesh.rotation.y=-ang;
-    const s=Math.sin(r.walkT*4.5);for(const L of r.legs)L.hip.rotation.z=L.sd*s*.5;
+    const s=Math.sin(r.walkT*4.5);for(const L of r.legs)L.hip.rotation.z=r.dn?0:L.sd*s*.5;
+    r.mesh.rotation.order='YXZ';r.mesh.rotation.x+=((r.dn?1.4:0)-r.mesh.rotation.x)*Math.min(1,dt*6);r.mesh.position.y=r.dn?.25:0;
     if((rd.f|0)>r.f){r.f=rd.f|0;const mz=v3(r.x*K+Math.cos(ang)*(r.tip||.8),1.32,r.y*K+Math.sin(ang)*(r.tip||.8)),end=mz.clone().add(v3(Math.cos(ang)*60,0,Math.sin(ang)*60));
       R.tracers.push({a:mz,b:end,t:0,len:60});emit(R.fxMix,{x:mz.x,y:mz.y,z:mz.z,vx:Math.cos(ang),vy:.3,vz:Math.sin(ang),drag:3,life:.4,r:.75,g:.8,b:.82,a:.35,s:.05,s2:.2});SFX.shot(rd.w&&GUN_SFX[rd.w]?rd.w:'pistol',mz,true)}
-    if(R.net.isHost){R.remoteProxies.push({x:r.x,y:r.y,r:14,faction:'player',remote:true,peer:q.peer,nick:r.nick,dead:r.ko,hp:r.hp});
+    if(R.net.isHost){R.remoteProxies.push({x:r.x,y:r.y,r:14,faction:'player',remote:true,peer:q.peer,nick:r.nick,dead:r.ko||r.dn>0,hp:r.hp});
       for(const h of (Array.isArray(rd.hon)?rd.hon:[]).slice(0,4))R.honeyRemote.push({x:+h[0],y:+h[1]});
       const hits=Array.isArray(P.hits)?P.hits:[];let seen=R.net.seen[q.peer];
       if(seen===undefined){R.net.seen[q.peer]=hits.reduce((m,h)=>Math.max(m,h[0]|0),0)}
