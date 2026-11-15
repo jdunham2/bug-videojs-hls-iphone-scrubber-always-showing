@@ -610,7 +610,9 @@ const GOODS = {
   porcelain:{name:'Porcelain',base:45,col:'#e8f0f8',kind:'good'},
   clay_pot:{name:'Clay Pot',base:20,col:'#b06a3a',kind:'good',desc:'Lumpy, but it holds water. Mostly'},
   fine_vase:{name:'Fine Vase',base:70,col:'#d8e8f0',kind:'good',desc:'A well-thrown vase from the Petalfall wheel'},
-  masterwork_vase:{name:'Masterwork Vase',base:220,col:'#f0f4ff',kind:'good',desc:'Flawless. Collectors would fight over this'},
+  landscape_painting:{name:'Landscape Painting',base:65,col:'#5a8ac8',kind:'good',desc:'A fine landscape from Pia’s easel'},
+masterpiece_painting:{name:'Masterpiece Painting',base:240,col:'#d8a840',kind:'good',desc:'Colors so true you can almost feel the breeze'},
+masterwork_vase:{name:'Masterwork Vase',base:220,col:'#f0f4ff',kind:'good',desc:'Flawless. Collectors would fight over this'},
   ochre:{name:'Ochre',base:22,col:'#c8702a',kind:'good'},
   incense:{name:'Incense',base:38,col:'#8a6aa8',kind:'good'},
   lion_mane:{name:'Sun Lion Mane',base:260,col:'#ffb040',kind:'trophy'},
@@ -2286,6 +2288,10 @@ const NPCS = [
    hello:["The wheel is patient. Are you?","Clay remembers every touch.","Center yourself, then center the clay."], rumors:["Don't fight the wheel. Small, steady changes make a better vase than big ones."]},
   {id:'coralie',town:'lantern',dx:4,dy:3,name:'Coralie',role:'Ruin diver',cols:{cloak:'#2a6a8a',skin:'#c89070',hair:'#e8c860'},sunkendive:true,freeSpot:true,
    hello:["There's a whole city under the bay. Want to see it?","Mind your air. The sea doesn't give it back.","Jellyfish sting, eels bite, and the treasure is worth it."], rumors:["The old city had stone tablets carved with its story. I've only ever found a piece of one."]},
+  {id:'pia',town:'prismvale',dx:3,dy:3,name:'Pia Palette',role:'Landscape painter',cols:{cloak:'#6a3a8a',skin:'#e8c0a0',hair:'#d86a3a'},painter:true,freeSpot:true,
+   hello:["Hold still, the light is perfect!","Three pots, endless colors.","Every color in Prismvale started as red, yellow or blue."], rumors:["Too many colors make mud. When a mix goes brown, clear the palette and start again with fewer drops."]},
+  {id:'nedda',town:'mossbridge',dx:-3,dy:3,name:'Nedda Goosegirl',role:'Fox and Geese board',cols:{cloak:'#7a8a4a',skin:'#e0b898',hair:'#e8d8a0'},foxgeese:true,freeSpot:true,
+   hello:["Honk! Oh, sorry, habit.","Fancy a game of Fox and Geese?","My geese are smarter than most foxes. Most."], rumors:["The fox can only eat a goose if the square behind it is empty. March your geese in pairs and he’ll go hungry."]},
   {id:'bertha',town:'highcairn',dx:-4,dy:3,name:'Big Bertha',role:'Skittles alley',cols:{cloak:'#6a3a2a',skin:'#d8a080',hair:'#c0c0b0'},skittles:true,freeSpot:true,
    hello:["Fancy a game of skittles?","Knock 'em down, love!","Nine pins, two balls, no crying."], rumors:["Aim a touch off center and the pins knock each other down. That's the secret to a strike."]},
   {id:'garrick',town:'hollow',dx:3,dy:-3,name:'Huntmaster Garrick',role:'Champion hunts',cols:{cloak:'#5a4a2a',skin:'#c89070',hair:'#4a3a2a'},huntmaster:true,freeSpot:true,
@@ -4535,6 +4541,7 @@ addEventListener('keydown', e => {
   if (busk && busk.on) { const k = e.key.toLowerCase(); const lane = BUSK_KEYS.findIndex(ks => ks.includes(k)); if (lane >= 0) { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) buskHit(lane); } else if (k === 'escape') { busk = null; } }
   else if (wheel && wheel.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); wheel.push = true; } else if (k === 'escape') wheel = null; }
   else if (pie && pie.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) pieBite(); } else if (k === 'escape') pie = null; }
+  else if (gzg && gzg.on) { const k = e.key.toLowerCase(), dm = {arrowup: [-1, 0], w: [-1, 0], arrowdown: [1, 0], s: [1, 0], arrowleft: [0, -1], a: [0, -1], arrowright: [0, 1], d: [0, 1]}; if (dm[k]) { e.preventDefault(); e.stopImmediatePropagation(); gzCursor(...dm[k]); } else if (k === ' ' || k === 'e' || k === 'enter') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) gzAct(); } else if (k === 'escape') gzg = null; }
   else if (jump && jump.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e' || k === 'w' || k === 'arrowup') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) jumpPress(); } else if (k === 'escape') jump = null; }
   else if (stones && stones.on && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); stonesPlay(+e.key - 1); }
   else if (skit && skit.on) { const k = e.key.toLowerCase(); if (k === ' ' || k === 'enter' || k === 'e') { e.preventDefault(); e.stopImmediatePropagation(); if (!e.repeat) skitPress(); } else if (k === 'escape') skit = null; }
@@ -4795,6 +4802,168 @@ function stonesEnd() {
   else { txt = `Nan wins, ${her} to <b>${me}</b>. “Better luck next time, dear. Watch for captures!”`; SFX.hurt(); }
   renderHUD(); save();
   openPanel('Shell Stones', txt, [{label: 'Play again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); stonesStart(); }}, {label: 'Close', fn: closeTalk}]);
+}
+// ===== the easel (Pia Palette, Prismvale) =====
+const PIGMENTS = [['Red', '#d8302a'], ['Yellow', '#f0c828'], ['Blue', '#2a5ab8'], ['White', '#f8f8f4'], ['Black', '#1a1a1a']];
+const PAINT_SUBJECTS = [
+  {name: 'Sunset over the bay', parts: [['Sky', [2, 1, 0, 0, 0]], ['Sea', [0, 0, 2, 0, 1]], ['Sand', [1, 3, 0, 3, 0]]]},
+  {name: 'Spring meadow', parts: [['Sky', [0, 0, 1, 2, 0]], ['Hills', [0, 2, 1, 0, 0]], ['Flowers', [2, 0, 1, 1, 0]]]},
+  {name: 'Winter pines', parts: [['Sky', [0, 0, 1, 3, 1]], ['Pines', [0, 1, 2, 0, 1]], ['Snow', [0, 0, 1, 5, 0]]]},
+  {name: 'Autumn wood', parts: [['Sky', [0, 1, 0, 3, 0]], ['Leaves', [3, 2, 0, 0, 0]], ['Trunks', [1, 1, 1, 0, 0]]]},
+  {name: 'Night harbor', parts: [['Sky', [1, 0, 3, 0, 2]], ['Water', [0, 1, 2, 0, 2]], ['Lanterns', [1, 3, 0, 1, 0]]]},
+  {name: 'Desert dunes', parts: [['Sky', [0, 0, 1, 4, 0]], ['Dunes', [1, 2, 0, 1, 0]], ['Shadows', [2, 1, 1, 0, 1]]]}];
+const PAINT_MAX = 12, PAINT_DAILY = 3;
+function rybRgb(r, y, b) {
+  const C = [[1, 1, 1], [1, 0, 0], [1, 1, 0], [1, .5, 0], [.163, .373, .6], [.5, 0, .5], [0, .66, .2], [.2, .094, 0]];
+  const w = [(1-r)*(1-y)*(1-b), r*(1-y)*(1-b), (1-r)*y*(1-b), r*y*(1-b), (1-r)*(1-y)*b, r*(1-y)*b, (1-r)*y*b, r*y*b];
+  return [0, 1, 2].map(i => w.reduce((s, wi, k) => s + wi*C[k][i], 0));
+}
+function paintMix(d) {
+  const n = d.reduce((a, v) => a + v, 0); if (!n) return null;
+  const cn = d[0] + d[1] + d[2], wf = d[3]/n, kf = d[4]/n; let rgb;
+  if (cn) { const m = Math.max(d[0], d[1], d[2]); rgb = rybRgb(d[0]/m, d[1]/m, d[2]/m).map(v => v*(1 - wf - kf) + .97*wf + .08*kf); }
+  else rgb = [0, 0, 0].map(() => .97*wf + .08*kf);
+  return rgb.map(v => Math.round(Math.max(0, Math.min(1, v))*255));
+}
+const rgbCss = c => c ? `rgb(${c[0]},${c[1]},${c[2]})` : 'transparent';
+function paintScore(a, b) { if (!a || !b) return 0; const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); return Math.max(0, Math.round(100 - d*.45)); }
+let easel = null;
+function paintTalk(n) {
+  if (S.paintDay !== S.day) { S.paintDay = S.day; S.paintToday = 0; }
+  const left = PAINT_DAILY - S.paintToday;
+  say(`“Every painter starts with three pots and a mess! I’ll show you the colors a scene needs. Mix red, yellow and blue, lighten with white, darken with black, and match each one as closely as you can.”<br>“Blue and yellow make green, red and yellow make orange, and all three make mud. A match of 92% or better is a masterpiece, and I’ll buy it from you!”${S.paintings ? `<br><span style="color:var(--muted)">Paintings: ${S.paintings} · masterpieces: ${S.paintMaster || 0} · best match: ${S.paintBest || 0}%</span>` : ''}`, [
+    {label: left > 0 ? `Paint a commission (${left} left today)` : 'No more commissions today', primary: left > 0, disabled: left <= 0, fn: () => paintStart(n)}, back(n)]);
+}
+function paintStart(n) {
+  const subj = PAINT_SUBJECTS[Math.floor(Math.random()*PAINT_SUBJECTS.length)];
+  const parts = subj.parts.map(([nm, rec]) => { const r = rec.slice(); const i = Math.floor(Math.random()*5); if (Math.random() < .5 && r[i] > 0 && r.reduce((a, v) => a + v, 0) > 2) r[i]--; else if (r[i] > 0 || Math.random() < .3) r[i]++; return {name: nm, target: paintMix(r), mix: null, score: 0}; });
+  easel = {n, subj, parts, i: 0, drops: [0, 0, 0, 0, 0]}; paintShow();
+}
+function paintSw(c, label, size) { return `<div style="text-align:center;font-size:12px;color:var(--muted)"><div style="width:${size}px;height:${size}px;border-radius:8px;border:2px solid rgba(255,255,255,.35);margin:0 auto 3px;background:${c ? rgbCss(c) : 'repeating-linear-gradient(45deg,#2a3340 0 6px,#1e2630 6px 12px)'}"></div>${label}</div>`; }
+function paintShow() {
+  const E = easel; if (!E) return; const P = E.parts[E.i], mix = paintMix(E.drops), tot = E.drops.reduce((a, v) => a + v, 0);
+  const done = E.parts.slice(0, E.i).map(p => paintSw(p.mix, `${p.name} ${p.score}%`, 30)).join('');
+  const recipe = E.drops.map((v, k) => v ? `${v} ${PIGMENTS[k][0].toLowerCase()}` : '').filter(Boolean).join(', ') || 'empty palette';
+  say(`<b>${E.subj.name}</b> · color ${E.i + 1} of 3: <b>${P.name}</b>
+<div style="display:flex;gap:18px;justify-content:center;align-items:flex-end;margin:8px 0">${paintSw(P.target, 'Target', 64)}${paintSw(mix, mix ? `Your mix · ${paintScore(mix, P.target)}%` : 'Your mix', 64)}${done ? `<div style="display:flex;gap:6px;margin-left:8px">${done}</div>` : ''}</div>
+<div id="easelRecipe" style="text-align:center;color:var(--muted)">${recipe} (${tot}/${PAINT_MAX} drops)</div>`,
+    [...PIGMENTS.map(([nm, col], k) => ({label: `+ ${nm}`, disabled: tot >= PAINT_MAX, fn: () => { E.drops[k]++; SFX.click(); paintShow(); }})),
+     {label: 'Clear palette', disabled: !tot, fn: () => { E.drops = [0, 0, 0, 0, 0]; paintShow(); }},
+     {label: E.i < 2 ? 'Brush it on' : 'Finish the painting', primary: !!mix, disabled: !mix, fn: () => { P.mix = mix; P.score = paintScore(mix, P.target); E.i++; E.drops = [0, 0, 0, 0, 0]; if (E.i >= 3) paintEnd(); else paintShow(); }},
+     {label: 'Abandon it', fn: () => { const n = E.n; easel = null; say(hello(n), mainOptions(n)); }}]);
+}
+function paintCanvas(id, cols, seed) {
+  const c = document.getElementById(id); if (!c) return; const g = c.getContext('2d'), W = c.width, H = c.height;
+  g.fillStyle = '#6a4a2a'; g.fillRect(0, 0, W, H); const x0 = 8, y0 = 8, w = W - 16, h = H - 16;
+  g.fillStyle = rgbCss(cols[0]); g.fillRect(x0, y0, w, h);
+  g.fillStyle = 'rgba(255,240,200,.75)'; g.beginPath(); g.arc(x0 + w*.72, y0 + h*.25, 9, 0, 7); g.fill();
+  g.fillStyle = rgbCss(cols[1]); g.beginPath(); g.moveTo(x0, y0 + h*.55);
+  for (let i = 0; i <= 12; i++) g.lineTo(x0 + w*i/12, y0 + h*(.5 + .06*Math.sin(i*1.3 + seed)));
+  g.lineTo(x0 + w, y0 + h); g.lineTo(x0, y0 + h); g.fill();
+  g.fillStyle = rgbCss(cols[2]); g.beginPath(); g.moveTo(x0, y0 + h*.8);
+  for (let i = 0; i <= 8; i++) g.lineTo(x0 + w*i/8, y0 + h*(.76 + .05*Math.cos(i*1.7 + seed)));
+  g.lineTo(x0 + w, y0 + h); g.lineTo(x0, y0 + h); g.fill();
+  for (let i = 0; i < 6; i++) { g.fillStyle = rgbCss(cols[2]); g.fillRect(x0 + 10 + i*w/6, y0 + h*.66 - (i % 2)*6, 4, 10 + (i % 2)*6); }
+}
+function paintEnd() {
+  const E = easel; easel = null; const n = E.n, avg = Math.round(E.parts.reduce((a, p) => a + p.score, 0)/3);
+  S.paintToday = (S.paintToday || 0) + 1; S.paintings = (S.paintings || 0) + 1; S.paintBest = Math.max(S.paintBest || 0, avg);
+  let tier, item = null;
+  if (avg >= 92) { tier = '<b style="color:#ffd040">A masterpiece!</b> “I’m speechless. This one’s going in the front window.”'; item = 'masterpiece_painting'; S.paintMaster = (S.paintMaster || 0) + 1; }
+  else if (avg >= 75) { tier = '<b>A fine landscape.</b> “The colors sing! You have a real eye.”'; item = 'landscape_painting'; }
+  else if (avg >= 50) tier = '“A decent study. The shapes are there, but the colors wander. Keep at it!”';
+  else tier = '“Well… it’s certainly bold. Remember: white lightens, black darkens, and too many colors make mud.”';
+  const c = mgPay('paint', Math.round(avg*.6)); S.coins += c; if (item) addItem(item, 1); gainXP(20 + Math.round(avg/5));
+  if (avg >= 75) SFX.victory(); else SFX.click(); renderHUD(); save();
+  const left = PAINT_DAILY - S.paintToday;
+  say(`<b>${E.subj.name}</b><canvas id="easelArt" width="240" height="150" style="display:block;margin:8px auto;border-radius:4px;max-width:100%"></canvas>
+<div style="text-align:center">${E.parts.map(p => `${p.name} ${p.score}%`).join(' · ')} · overall <b>${avg}%</b></div>${tier}<br><span style="color:var(--good)">Pia pays you ${c} coin.${item ? ` You keep the ${GOODS[item].name}.` : ''}</span>`,
+    [{label: left > 0 ? `Paint another (${left} left today)` : 'No more commissions today', primary: left > 0, disabled: left <= 0, fn: () => paintStart(n)}, back(n)]);
+  setTimeout(() => paintCanvas('easelArt', E.parts.map(p => p.mix), S.paintings), 30);
+}
+// ===== fox and geese (Nedda, Mossbridge) =====
+const GZ_OK = (r, c) => r >= 0 && r < 7 && c >= 0 && c < 7 && ((r >= 2 && r <= 4) || (c >= 2 && c <= 4));
+const GZ_D = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+function gzNew() { const b = new Array(49).fill(0); for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) if (!GZ_OK(r, c)) b[r*7 + c] = -1; for (let c = 0; c < 7; c++) b[28 + c] = 1; for (const r of [5, 6]) for (let c = 2; c <= 4; c++) b[r*7 + c] = 1; b[17] = 2; return b; }
+function gzGooseMoves(b) { const m = []; for (let i = 0; i < 49; i++) if (b[i] === 1) { const r = i/7 | 0, c = i % 7; for (const [dr, dc] of [[-1, 0], [0, -1], [0, 1]]) { const rr = r + dr, cc = c + dc; if (GZ_OK(rr, cc) && b[rr*7 + cc] === 0) m.push([i, rr*7 + cc]); } } return m; }
+function gzFoxJumps(b, f) {
+  const res = []; const rec = (bb, pos, path, caps) => { let any = false; const r = pos/7 | 0, c = pos % 7;
+    for (const [dr, dc] of GZ_D) { const mr = r + dr, mc = c + dc, lr = r + 2*dr, lc = c + 2*dc;
+      if (GZ_OK(lr, lc) && bb[mr*7 + mc] === 1 && bb[lr*7 + lc] === 0) { any = true; const nb = bb.slice(); nb[pos] = 0; nb[mr*7 + mc] = 0; nb[lr*7 + lc] = 2; rec(nb, lr*7 + lc, path.concat(lr*7 + lc), caps.concat(mr*7 + mc)); } }
+    if (!any && caps.length) res.push({path, caps}); };
+  rec(b, f, [f], []); return res;
+}
+function gzFoxMoves(b) { const f = b.indexOf(2), r = f/7 | 0, c = f % 7, m = gzFoxJumps(b, f); for (const [dr, dc] of GZ_D) { const rr = r + dr, cc = c + dc; if (GZ_OK(rr, cc) && b[rr*7 + cc] === 0) m.push({path: [f, rr*7 + cc], caps: []}); } return m; }
+function gzApplyFox(b, mv) { const nb = b.slice(); nb[mv.path[0]] = 0; for (const k of mv.caps) nb[k] = 0; nb[mv.path[mv.path.length - 1]] = 2; return nb; }
+function gzApplyGoose(b, mv) { const nb = b.slice(); nb[mv[0]] = 0; nb[mv[1]] = 1; return nb; }
+function gzFoxEval(b) { const ms = gzFoxMoves(b); if (!ms.length) return -1000; let best = 0; for (const m of ms) best = Math.max(best, m.caps.length); return best*12 + ms.length; }
+function gzFoxAI(b, noise) {
+  const ms = gzFoxMoves(b); if (!ms.length) return null;
+  const sc = ms.map(m => { const nb = gzApplyFox(b, m), gm = gzGooseMoves(nb); let worst = gm.length ? Infinity : 500; for (const g of gm) worst = Math.min(worst, gzFoxEval(gzApplyGoose(nb, g))); return {m, v: m.caps.length*30 + worst + Math.random()*noise}; });
+  sc.sort((a, b) => b.v - a.v); return sc[0].m;
+}
+const GZ_FOX_WIN = 6, GZ_TURNS = 120, GZ_CELL = 40, GZ_PAD = 20;
+let gzg = null;
+function gzTalk(n) {
+  say(`“Thirteen geese and one hungry fox! You play the geese. Geese step up, left or right, never backward. The fox moves any way, and jumps a goose to eat it if the square behind is empty. Pen him in so he can’t move and you win. Lose six geese and the fox wins.”<br>“Keep your flock in tight rows and never leave a gap behind a goose. Ten coin a game, and I pay well for a trapped fox.”${S.gzGames ? `<br><span style="color:var(--muted)">Games: ${S.gzGames} · foxes trapped: ${S.gzWins || 0}${S.gzFast ? ` · fastest: ${S.gzFast} moves` : ''}</span>` : ''}`, [
+    {label: 'Play a game · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); gzStart(); }}, back(n)]);
+}
+function gzStart() {
+  gzg = {on: true, b: gzNew(), sel: -1, cur: 38, turn: 'g', caps: 0, moves: 0, msg: 'Your move', over: false, last: -1, foxPath: null};
+  const W = GZ_CELL*6 + GZ_PAD*2;
+  openPanel('Fox and Geese', `<canvas id="gzC" width="${W}" height="${W}" style="display:block;margin:0 auto;border-radius:6px;cursor:pointer;max-width:100%;touch-action:none"></canvas><div id="gzInfo" style="text-align:center;margin-top:6px;color:var(--muted)">Arrows: move · Space/E: pick a goose, then its square · tap works too</div>`, [{label: 'Give up', fn: () => { gzg = null; closeTalk(); }}]);
+  setTimeout(() => { const c = document.getElementById('gzC'); if (c) c.addEventListener('pointerdown', e => { e.preventDefault(); const r = c.getBoundingClientRect(), k = c.width/r.width; const col = Math.round(((e.clientX - r.left)*k - GZ_PAD)/GZ_CELL), row = Math.round(((e.clientY - r.top)*k - GZ_PAD)/GZ_CELL); if (GZ_OK(row, col)) { gzg.cur = row*7 + col; gzAct(); } }); gzDraw(); }, 30);
+}
+function gzCursor(dr, dc) {
+  const G = gzg; if (!G || !G.on) return; let r = G.cur/7 | 0, c = G.cur % 7;
+  for (let s = 0; s < 7; s++) { r += dr; c += dc; if (r < 0 || r > 6 || c < 0 || c > 6) return; if (GZ_OK(r, c)) { G.cur = r*7 + c; gzDraw(); return; } }
+}
+function gzAct() {
+  const G = gzg; if (!G || !G.on || G.over || G.turn !== 'g') return; const i = G.cur;
+  if (G.b[i] === 1) { G.sel = G.sel === i ? -1 : i; SFX.click(); gzDraw(); return; }
+  if (G.sel >= 0) {
+    const mv = gzGooseMoves(G.b).find(m => m[0] === G.sel && m[1] === i);
+    if (mv) { G.b = gzApplyGoose(G.b, mv); G.sel = -1; G.moves++; G.last = i; G.turn = 'f'; G.msg = 'The fox is thinking…'; SFX.swing(); gzDraw(); setTimeout(gzFoxTurn, 450); return; }
+    G.sel = -1; gzDraw();
+  }
+}
+function gzFoxTurn() {
+  const G = gzg; if (!G || !G.on || G.turn !== 'f') return;
+  const mv = gzFoxAI(G.b, 4);
+  if (!mv) return gzOver('g');
+  G.b = gzApplyFox(G.b, mv); G.caps += mv.caps.length; G.foxPath = mv.path;
+  if (mv.caps.length) { G.msg = mv.caps.length > 1 ? `The fox snatches ${mv.caps.length} geese!` : 'The fox snatches a goose!'; SFX.hit(); } else G.msg = 'Your move';
+  if (G.caps >= GZ_FOX_WIN) return gzOver('f');
+  if (!gzGooseMoves(G.b).length) return gzOver('f');
+  if (!gzFoxMoves(G.b).length) return gzOver('g');
+  if (G.moves >= GZ_TURNS) return gzOver('d');
+  G.turn = 'g'; gzDraw();
+}
+function gzDraw() {
+  const G = gzg, c = document.getElementById('gzC'); if (!G || !c) return; const g = c.getContext('2d'), W = c.width, P = (i) => [GZ_PAD + (i % 7)*GZ_CELL, GZ_PAD + (i/7 | 0)*GZ_CELL];
+  g.fillStyle = '#7aa858'; g.fillRect(0, 0, W, W); g.strokeStyle = '#4a6a34'; g.lineWidth = 3;
+  for (let i = 0; i < 49; i++) { if (G.b[i] < 0) continue; const [x, y] = P(i), r = i/7 | 0, cc = i % 7;
+    if (GZ_OK(r, cc + 1)) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + GZ_CELL, y); g.stroke(); }
+    if (GZ_OK(r + 1, cc)) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + GZ_CELL); g.stroke(); } }
+  const targets = G.sel >= 0 ? gzGooseMoves(G.b).filter(m => m[0] === G.sel).map(m => m[1]) : [];
+  if (G.foxPath && G.foxPath.length > 1) { g.strokeStyle = 'rgba(230,120,40,.55)'; g.lineWidth = 4; g.beginPath(); G.foxPath.forEach((p, k) => { const [x, y] = P(p); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+  for (let i = 0; i < 49; i++) { if (G.b[i] < 0) continue; const [x, y] = P(i);
+    g.fillStyle = '#4a6a34'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill();
+    if (targets.includes(i)) { g.fillStyle = 'rgba(255,230,90,.85)'; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); }
+    if (G.b[i] === 1) { g.fillStyle = i === G.sel ? '#fff6c0' : '#f4f4ee'; g.beginPath(); g.ellipse(x, y + 2, 13, 10, 0, 0, 7); g.fill(); g.beginPath(); g.arc(x, y - 7, 6, 0, 7); g.fill(); g.fillStyle = '#e8902a'; g.fillRect(x - 2, y - 15, 4, 4); g.fillStyle = '#1a1a1a'; g.fillRect(x + 1, y - 9, 2, 2); }
+    if (G.b[i] === 2) { g.fillStyle = '#d8682a'; g.beginPath(); g.ellipse(x, y + 2, 13, 10, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(x - 8, y - 4); g.lineTo(x - 10, y - 16); g.lineTo(x - 2, y - 8); g.moveTo(x + 8, y - 4); g.lineTo(x + 10, y - 16); g.lineTo(x + 2, y - 8); g.fill(); g.fillStyle = '#f4f0e8'; g.beginPath(); g.arc(x, y + 3, 5, 0, 7); g.fill(); g.fillStyle = '#1a1a1a'; g.fillRect(x - 5, y - 5, 2, 2); g.fillRect(x + 3, y - 5, 2, 2); }
+    if (i === G.sel) { g.strokeStyle = '#ffd040'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 16, 0, 7); g.stroke(); } }
+  if (!isTouch || PAD.active) { const [x, y] = P(G.cur); g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.strokeRect(x - 18, y - 18, 36, 36); }
+  g.fillStyle = 'rgba(13,19,27,.75)'; g.fillRect(0, 0, W, 16); g.fillStyle = '#ffffff'; g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillText(`Geese ${13 - G.caps} · lost ${G.caps}/${GZ_FOX_WIN}`, 6, 12); g.textAlign = 'right'; g.fillText(G.msg, W - 6, 12);
+}
+function gzOver(res) {
+  const G = gzg; G.over = true; G.on = false; gzDraw(); gzg = null;
+  S.gzGames = (S.gzGames || 0) + 1; let txt, c = 0;
+  if (res === 'g') { S.gzWins = (S.gzWins || 0) + 1; S.gzFast = S.gzFast ? Math.min(S.gzFast, G.moves) : G.moves; if (!G.caps) S.gzPerfect = true; c = mgPay('geese', 55 - G.caps*5); S.coins += c; SFX.victory(); txt = `<b>The fox is trapped!</b> He sits in the middle of your flock and sulks. You won in ${G.moves} moves${G.caps ? ` and lost ${G.caps} geese` : ' without losing a single goose'}.<br>“Ha! That’s the way. Tight rows, no gaps!”<br><span style="color:var(--good)">Nedda pays you ${c} coin.</span>`; }
+  else if (res === 'd') { S.coins += 10; txt = 'The sun sets on a game that will never end. “Neither of you will budge! Here’s your coin back.”'; }
+  else { SFX.hurt(); txt = `The fox wins after ${G.moves} moves. “He found the gaps in your flock. Keep the back rows filled before you march forward!”`; }
+  renderHUD(); save();
+  setTimeout(() => { if (mode !== 'talk') return; openPanel('Fox and Geese', txt, [{label: 'Play again · 10◆', primary: true, disabled: S.coins < 10, fn: () => { S.coins -= 10; renderHUD(); gzStart(); }}, {label: 'Close', fn: closeTalk}]); }, 900);
 }
 // ===== pony jumping show (Hettie Hurdle, Hollowpine) =====
 let jump = null;
@@ -8358,6 +8527,8 @@ const GUIDE = [
   ['Photo requests', 'Iris in Maplehold wants pictures for her gallery: a wolf, a sunset, the open sea, a boss, a party member and more. Use photo mode (H) to snap each one, then visit her to get paid.'],
   ['Tornadoes', 'On sunny days out in open country, a tornado sometimes touches down. It wanders around and drops jars of Storm Essence, which sell well. Get too close and the funnel pulls you in and flings you away!'],
   ['Mine cart and snowball fights', 'Dusty in Redrock runs a mine cart ride: jump the gaps, grab gold nuggets, and see how far you get as the cart speeds up. Sven in Stormwatch starts snowball fights: aim at his friends as they pop up from the snow forts, and hit them before they hit you.'],
+  ['The easel', 'Pia Palette in Prismvale paints commissions with you (three a day). Mix red, yellow and blue, add white to lighten and black to darken, and match each target color. A 75% match makes a Landscape Painting and 92% makes a Masterpiece. Blue and yellow make green; all three make mud.'],
+  ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays Fox and Geese for 10 coin. You move 13 geese (up, left or right, never back). The fox jumps a goose when the square behind it is empty. Trap him so he cannot move. Lose six geese and he wins. Keep your rows filled and never leave a gap behind a goose.'],
   ['Greenhouse', 'Once you own the homestead, Pell the land agent can build a greenhouse (900 coin, 10 glass, 8 planks and 4 iron). Your crops stop slowing down in winter, and out-of-season crops grow 15% faster.'],
   ['Lighthouse night watch', 'Once the Tidewatch lighthouse is restored, Mara lets you keep the night watch (once a night, after dark). Swing the beam onto ships with left and right. A lit ship steers for the gap between the rocks, while a ship left in the dark drifts. Guide all ten home for a bonus.'],
   ['Pie-eating contest', 'On festival days, the festival merchant runs a pie-eating contest (once per day, free). Mash Space, E or tap for twenty seconds. Eight bites make a pie, and the most pies wins the Golden Pie Tin.'],
@@ -8991,6 +9162,7 @@ function padPoll(dt) {
   const OK = PAD.nin ? 1 : 0, BACK = PAD.nin ? 0 : 1;
   if (busk && busk.on) { [[14, 2], [13, 0], [12, 3], [15, 1]].forEach(([d, f], lane) => { if (down(d) || down(f)) buskHit(lane); }); PAD.prev = B; return; }
   if (rink && rink.on) { rink.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); rink.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); PAD.prev = B; return; }
+  if (gzg && gzg.on) { [[12, -1, 0], [13, 1, 0], [14, 0, -1], [15, 0, 1]].forEach(([d, dr, dc]) => { if (down(d)) gzCursor(dr, dc); }); if (down(OK)) gzAct(); if (down(BACK) && gzg) { gzg.sel = -1; gzDraw(); } PAD.prev = B; return; }
   if (lhw && lhw.on) { lhw.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
   if (sdive && sdive.on) { sdive.pvx = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); sdive.pvy = sy + (now(13) ? 1 : 0) - (now(12) ? 1 : 0); if (down(OK)) sdiveSurface(); PAD.prev = B; return; }
   if (logr && logr.on) { logr.pad = sx + (now(15) ? 1 : 0) - (now(14) ? 1 : 0); PAD.prev = B; return; }
@@ -10495,6 +10667,8 @@ function mainOptions(n) {
   if (n.skittles) o.push({label: 'Play skittles', primary: true, fn: () => skitTalk(n)});
   if (n.sunkendive) o.push({label: 'Dive the sunken city', primary: true, fn: () => sdiveTalk(n)});
   if (n.potter) o.push({label: 'Throw a pot on the wheel', primary: true, fn: () => potTalk(n)});
+  if (n.painter) o.push({label: 'Paint at the easel', primary: true, fn: () => paintTalk(n)});
+  if (n.foxgeese) o.push({label: 'Play Fox and Geese', primary: true, fn: () => gzTalk(n)});
   if (n.cardsharp) o.push({label: 'Play a card duel', primary: true, fn: () => duelTalk(n)});
   if (n.shellstones) o.push({label: 'Play Shell Stones', primary: true, fn: () => stonesTalk(n)});
   if (n.jumpshow) o.push({label: 'Ride the jumping course', primary: true, fn: () => jumpTalk(n)});
@@ -13321,6 +13495,10 @@ const ACH = [
   ['all_sets','Fashion Plate','Wear all six armor sets at least once', () => Object.keys(S.setsWorn || {}).length >= 6],
   ['totality','Totality','Witness a total eclipse of the sun', () => (S.eclipses || 0) >= 1],
   ['shadow_catcher','Shadow Catcher','Catch 6 shadow wisps during eclipses', () => (S.eclShards || 0) >= 6],
+  ['old_master','Old Master','Paint a masterpiece at Pia’s easel', () => (S.paintMaster || 0) > 0],
+  ['easel10','Steady Brush','Finish 10 paintings at the easel', () => (S.paintings || 0) >= 10],
+  ['gz_win','Fox Trapper','Trap the fox in Fox and Geese', () => (S.gzWins || 0) > 0],
+  ['gz_perfect','Not One Feather','Trap the fox without losing a goose', () => !!S.gzPerfect],
   ['greenhouse','Glass Gardener','Build a greenhouse on your homestead', () => !!(S.home && S.home.greenhouse)],
   ['lh_watch','Lamplighter','Keep a night watch at the Tidewatch lighthouse', () => (S.lhShifts || 0) >= 1],
   ['lh_perfect','Not One Lost','Guide all ten ships home in one night watch', () => (S.lhPerfect || 0) >= 1],
@@ -13979,8 +14157,10 @@ function renderPause() {
   $('sCb').addEventListener('change', e => { SETTINGS.cb = e.target.checked; saveSettings(); applyLook(); });
 }
 $('pauseSheet').addEventListener('click', e => { if (e.target.closest('[data-x]')) closeModal('pause'); if (e.target.closest('[data-whatsnew]')) { closeModal('pause'); whatsNew(); } if (e.target.closest('[data-quests]')) { closeModal('pause'); questLog(); } if (e.target.closest('[data-stats]')) { closeModal('pause'); statsPage(); } if (e.target.closest('[data-photo]')) { closeModal('pause'); startPhoto(); } if (e.target.closest('[data-backup]')) { closeModal('pause'); backupPanel(); } if (e.target.closest('[data-emote]')) { closeModal('pause'); emotePanel(); } if (e.target.closest('[data-records]')) { closeModal('pause'); recordsPage(); } if (e.target.closest('[data-almanac]')) { closeModal('pause'); almanacPage(); } if (e.target.closest('[data-ngplus]')) { closeModal('pause'); ngPlusPanel(); } if (e.target.closest('[data-album]')) { closeModal('pause'); albumPage(); } });
-const WN_VER = 25;
+const WN_VER = 26;
 const WHATS_NEW = [
+  ['The easel', 'Pia Palette in Prismvale teaches color mixing. Match a scene’s colors from red, yellow, blue, white and black to paint landscapes and masterpieces.'],
+  ['Fox and Geese', 'Nedda Goosegirl in Mossbridge plays the old board game: march your 13 geese forward and pen in the fox.'],
   ['Greenhouse', 'Ask Pell, the land agent, to build a greenhouse on your homestead so winter stops slowing your crops.'],
   ['Lighthouse night watch', 'Restored the Tidewatch lighthouse? Keep the night watch and swing the beam to guide ships past the rocks.'],
   ['Pie-eating contest', 'Every festival day: mash your way through as many pies as you can in twenty seconds to win the Golden Pie Tin.'],
@@ -14051,7 +14231,7 @@ const RECORDS = [
   ['rinkBest', 'Ice rink', v => `${v} points`], ['cartBest', 'Mine cart', v => `${v} m`], ['sledBest', 'Sled run', v => `${v} m`],
   ['logBest', 'Log rolling', v => `${(+v).toFixed(1)} s`], ['snowBest', 'Snowball fight', v => `${v} hits`], ['castleBest', 'Sandcastle', v => `${v} layers`],
   ['kitchenBest', 'Kitchen', v => `${v} dishes served`], ['buskBest', 'Busking', v => `${v} points`], ['moleBest', 'Whack-a-mole', v => `${v} points`],
-  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['lhBest', 'Lighthouse night watch', v => `${v} of 10 ships saved`], ['pieBest', 'Pie-eating contest', v => `${v} pies`], ['diveBest', 'Sunken city dive', v => `${v} treasures in one dive`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
+  ['golfBest', 'Golf', v => `${v} strokes`, 1], ['jumpBest', 'Pony jumping', v => `${v} of 15 fences clear`], ['stonesBest', 'Shell Stones', v => `won by ${v}`], ['cardBest', 'Card duel', v => `${v} rounds in a game`], ['potBest', 'Pottery wheel', v => `${v}% match`], ['lhBest', 'Lighthouse night watch', v => `${v} of 10 ships saved`], ['pieBest', 'Pie-eating contest', v => `${v} pies`], ['paintBest', 'Best painting', v => `${v}% match`], ['gzFast', 'Fastest fox trapped', v => `${v} moves`], ['diveBest', 'Sunken city dive', v => `${v} treasures in one dive`], ['quizBest', 'Tavern quiz', v => `${v} right`], ['starBest', 'Star pattern', v => `${v} rounds`],
   ['Puzzles'],
   ['slideBest', 'Slide puzzle', v => `${v} moves`, 1], ['memBest', 'Memory cards', v => `${v} tries`, 1], ['mmBest', 'Code-breaker', v => `${v} guesses`, 1], ['paperBest', 'Paper route', v => `${v} s`, 1],
 ];
@@ -14283,7 +14463,7 @@ if (hotData && hotData.save) { try { begin(deserialize(hotData.save)); } catch (
 renderHUD();
 window.__gs = () => ghostSpot(); window.__wl = () => warlord(); window.__sled = () => sled; window.__houses = () => houses; window.__glades = () => secretGlades(); window.__golf = () => golf; window.__GH = GOLF_HOLES; window.__star = () => starG; window.__oca = () => oca; window.__darts = () => darts; window.__c4 = () => c4; window.__rp = () => ({rpPrincess, mm}); window.__tt = () => ({tortoise, airship, skyCrates}); window.__ttgo = () => { tortoiseT = 0; airshipT = 0; }; window.__pz = () => ({slide, mem}); window.__fc = () => fcon; window.__tag = () => ({tag, myTag, sid: NET_SID}); window.__tagEnd = t => { if (tag) tag.end = t; if (myTag) myTag.end = t; }; window.__raid = () => { raidT = 0; }; window.__HOME = HOME; window.__kit = () => kitchen; window.__det = () => det; window.__twin = () => twinSites();
 window.__b2 = {get moles(){return moles;}, get logr(){return logr;}, get tornado(){return tornado;}, set tornadoT(v){tornadoT=v;}, get essences(){return essences;}, get cart(){return cart;}, get snow(){return snow;}, get paper(){return paper;}, newDay: () => newDay(), get POT(){return POT;}, bossHp: v => { const e = enemies.find(e => e.boss && !e.net); if (e) e.hp = v; return e && [e.boss, e.hp]; }, bossInfo: () => enemies.filter(e => e.boss).map(e => [e.boss, !!e.net, Math.round(e.hp), +e.x.toFixed(1), +e.y.toFixed(1)]), get wrestle(){return wrestle;}, get castle(){return castle;}, get lock(){return lock;}, get prace(){return prace;}, get rink(){return rink;}, get cut(){return cut;}, cutPress: () => cutPress(), get spar(){return spar;}, get birds(){return birds;}, set birdT(v){birdT=v;}, BIRDS};
-window.__vg = {get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
+window.__vg = {get gzg(){return gzg;}, gzLogic: {gzNew, gzGooseMoves, gzFoxMoves, gzApplyGoose, gzApplyFox, gzFoxEval}, gzFoxTurn: () => gzFoxTurn(), gzDraw: () => gzDraw(), get easel(){return easel;}, paintMix: d => paintMix(d), paintScore: (a, b) => paintScore(a, b), get lhw(){return lhw;}, lhStart: () => lhStart(), get pie(){return pie;}, startFG: c => { fishing = {i: -1, deep: true, t: 0}; startFishGame(); FG.c = c; FG.diff = CATCH[c].diff; }, get FG(){return FG;}, legendFor: b => legendFor(new Set(b)), get sdive(){return sdive;}, enterArena: g => enterArena(g), get wheel(){return wheel;}, get duel(){return duel;}, cardStats: () => cardStats(), kill: e => killEnemy(e), get enemies(){return enemies;}, rmTalk: () => rmTalk(NPCS.find(n => n.id === 'amani')), get eclWisps(){return eclWisps;}, get jump(){return jump;}, get stones(){return stones;}, champHp: v => { const e = enemies.find(e => e.champion); if (e) e.hp = v; return !!e; }, goWild: () => { for (let r = 16; r < 60; r++) for (let a = 0; a < 24; a++) { const x = S.x + Math.cos(a/24*6.283)*r, y = S.y + Math.sin(a/24*6.283)*r; if (inB(Math.floor(x), Math.floor(y)) && passable(x, y) && enemyWalk(x, y) && !townAt(x, y, 15)) { S.x = x; S.y = y; return [x, y]; } } }, use: g => useItem(g), get rockets(){return rockets.length;}, get picnics(){return picnics.length;}, get regen(){return BUFFS.regen;}, get hs(){return hideSeek;}, get busk(){return busk;}, get skit(){return skit;}, hit: l => buskHit(l), press: () => skitPress(), npc: id => { const n = NPC_BY[id]; return [n.x, n.y]; }, talk: id => openTalk(NPC_BY[id])};
 window.__px = {remote: () => remote, pings: () => pings, die: () => die(), downed: () => downed && Math.ceil(downed.t), get photo(){return photo;}};
 window.__net = {get on(){return netOn;}, list: () => enemies.map(e => [e.type, e.nid || 0, e.net || 0, Math.round(e.hp*10)/10, +e.x.toFixed(1), +e.y.toFixed(1)]), spawn: (t, x, y) => { const e = makeEnemy(t, x, y, {alert: true}); enemies.push(e); return e.hp; }, get pad(){return {active: PAD.active, focus: PAD.focus && PAD.focus.textContent, vx: PAD.vx, mode, root: (padRoot() || {}).id};}};
 window.__coop = full => full ? chatLog.map(c => c.name + ": " + c.m) : Object.values(remote).map(r => r.name + "@" + r.x.toFixed(0) + "," + r.y.toFixed(0));
