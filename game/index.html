@@ -29,7 +29,7 @@
 
   .hud {
     position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     left: calc(12px + env(safe-area-inset-left, 0px));
     background: var(--plate);
     border: 1px solid var(--plate-edge);
@@ -40,9 +40,9 @@
     max-width: calc(100vw - 24px);
     pointer-events: none;
   }
-  @media (max-width: 640px) {
-    .hud { max-width: calc(100vw - 150px); font-size: 12px; }
-    .hud h1 { font-size: 19px; }
+  .hud h1 { display: none; }
+  @media (max-width: 640px), (pointer: coarse) {
+    .hud { display: none; }
   }
   .hud h1 {
     margin: 0;
@@ -181,25 +181,99 @@
   @media (prefers-reduced-motion: reduce) { .toast.show { animation: none; } }
   @media (max-width: 640px) { .toast { top: calc(64px + env(safe-area-inset-top, 0px)); } }
 
-  /* ---- Win screen ---- */
-  #win {
-    position: fixed; inset: 0; display: grid; place-items: center; z-index: 4;
-    background: radial-gradient(ellipse at center, rgba(20, 30, 16, 0.45), rgba(20, 30, 16, 0.82));
+
+  /* ---- Run bar: day, time until sunset, strikes, shinies ---- */
+  .runbar {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: calc(12px + env(safe-area-inset-left, 0px));
+    display: flex; align-items: center; gap: 12px;
+    background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 10px;
+    padding: 7px 12px;
+    max-width: calc(100vw - 150px);
+    pointer-events: none;
+    z-index: 2;
   }
-  #win .card { text-align: center; padding: 24px 28px; max-width: 440px; }
-  #win h2 {
-    margin: 0; font-family: var(--font-display); font-weight: 400;
-    font-size: clamp(42px, 10vw, 72px); line-height: 1; color: var(--accent);
+  .rb-day { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+  #rb-day { font-family: var(--font-display); font-size: 19px; color: var(--accent); white-space: nowrap; }
+  #rb-town { font-size: 11px; font-weight: 800; color: var(--ink-dim); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb-sun { display: flex; align-items: center; gap: 7px; }
+  .rb-track {
+    width: 92px; height: 8px; border-radius: 99px; overflow: hidden;
+    background: rgba(255, 244, 214, 0.14);
+  }
+  .rb-fill { height: 100%; width: 100%; border-radius: 99px; background: linear-gradient(90deg, #ff9a4d, #ffd166); transition: width 0.9s linear; }
+  .runbar.dusk .rb-fill { background: linear-gradient(90deg, #8a5ad0, #ff7a59); }
+  #rb-time { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 34px; }
+  .runbar.dusk #rb-time { color: #ff9a7a; }
+  .rb-strikes { display: flex; gap: 2px; }
+  .paw svg { width: 17px; height: 17px; display: block; fill: var(--ink); }
+  .paw.lost svg { fill: none; stroke: rgba(255, 244, 214, 0.35); stroke-width: 1.4; }
+  .rb-shiny { display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .gem { color: #7fe3ff; text-shadow: 0 0 6px rgba(127, 227, 255, 0.6); }
+  @media (max-width: 640px) {
+    .runbar { gap: 8px; padding: 6px 9px; }
+    #rb-town { display: none; }
+    #rb-day { font-size: 16px; }
+    .rb-track { width: 48px; }
+  }
+
+  /* ---- Panels: day card, results, den ---- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 4;
+    display: grid; place-items: center;
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
+    background: radial-gradient(ellipse at center, rgba(20, 30, 16, 0.45), rgba(20, 30, 16, 0.85));
+    overflow-y: auto;
+  }
+  .panel { text-align: center; max-width: 520px; width: 100%; }
+  .panel .eyebrow { font-weight: 800; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+  .panel h2 {
+    margin: 4px 0 0; font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(40px, 10vw, 68px); line-height: 1; color: var(--accent);
     text-shadow: 0 4px 0 #6b3d10, 0 8px 24px rgba(0,0,0,0.4); text-wrap: balance;
   }
-  #win p { margin: 14px 0 0; font-size: 17px; }
-  #win-time { font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
-  #win button {
-    margin-top: 22px; font-family: var(--font-display); font-size: 20px; color: #3a2a1a;
-    background: var(--accent); border: 0; border-radius: 999px; padding: 10px 24px; cursor: pointer;
+  .panel .lede { margin: 12px auto 0; font-size: 16px; max-width: 40ch; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .chip { background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 99px; padding: 5px 12px; font-weight: 800; font-size: 13px; }
+  .primary {
+    margin-top: 22px; font-family: var(--font-display); font-size: 21px; color: #3a2a1a;
+    background: var(--accent); border: 0; border-radius: 999px; padding: 10px 28px; cursor: pointer;
     box-shadow: 0 4px 0 #9a5a12;
   }
-  #win button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .primary:active { transform: translateY(2px); box-shadow: 0 2px 0 #9a5a12; }
+  .primary:focus-visible, .buy:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .hint { margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+
+  .stats { margin: 18px auto 0; max-width: 300px; display: grid; gap: 4px; text-align: left; }
+  .stats .row { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+  .stats dt { color: var(--ink-dim); }
+  .stats dd { margin: 0; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stats .row.total { border-top: 1px solid var(--plate-edge); padding-top: 6px; margin-top: 4px; font-size: 17px; }
+  .stats .row.total dd { color: #7fe3ff; }
+
+  .den-purse { margin-top: 10px; display: flex; justify-content: center; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .den-purse .amount { font-weight: 800; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .den-purse .best { font-size: 13px; color: var(--ink-dim); }
+  .ups { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; text-align: left; }
+  .up {
+    background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 10px;
+    padding: 9px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  }
+  .up-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .up-name { font-weight: 800; font-size: 14px; }
+  .pips { display: flex; gap: 3px; flex: none; }
+  .pip { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--ink-dim); }
+  .pip.on { background: var(--accent); border-color: var(--accent); }
+  .up-desc { margin: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.35; flex: 1; }
+  .buy {
+    align-self: flex-start; margin-top: 2px;
+    font-family: var(--font-body); font-weight: 800; font-size: 13px;
+    background: rgba(127, 227, 255, 0.14); color: #bff1ff; border: 1px solid rgba(127, 227, 255, 0.45);
+    border-radius: 99px; padding: 3px 11px; cursor: pointer;
+  }
+  .buy:disabled { opacity: 0.45; cursor: default; }
+  .up.maxed .buy { background: none; border-color: var(--plate-edge); color: var(--ink-dim); opacity: 1; }
 
   #start {
     position: fixed; inset: 0; z-index: 5;
@@ -248,7 +322,7 @@
   <div class="card">
     <h2>Mischief Lane</h2>
     <p>You're a raccoon. There's a whole village full of other people's stuff.</p>
-    <p class="sub">Grab it. Don't get caught. Work through your to-do list.</p>
+    <p class="sub">Every day: a new village, a new to-do list, and until sunset to finish it.</p>
     <span class="go desktop-only">Press any key to start</span>
     <span class="go touch-only">Tap to start</span>
   </div>
@@ -264,12 +338,43 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<div id="win" hidden>
-  <div class="card">
-    <h2>Village ransacked!</h2>
-    <p>Every task done in <span id="win-time">0:00</span>. The villagers will be talking about this for weeks.</p>
-    <button id="win-close" type="button">Keep causing trouble</button>
+<div class="runbar" id="runbar" hidden>
+  <div class="rb-day"><span id="rb-day">Day 1</span><span id="rb-town"></span></div>
+  <div class="rb-sun" aria-label="Time until sunset"><div class="rb-track"><div class="rb-fill" id="rb-fill"></div></div><span id="rb-time">6:00</span></div>
+  <div class="rb-strikes" id="rb-strikes"></div>
+  <div class="rb-shiny" aria-label="Shinies"><span class="gem" aria-hidden="true">&#10022;</span><span id="rb-shiny">0</span></div>
+</div>
+
+<div class="overlay" id="runcard" hidden>
+  <div class="panel">
+    <div class="eyebrow">Welcome to <span id="rc-town"></span></div>
+    <h2 id="rc-day">Day 1</h2>
+    <div class="chips"><span class="chip" id="rc-tasks"></span><span class="chip" id="rc-time"></span><span class="chip" id="rc-strikes"></span></div>
+    <p class="lede">Your to-do list is pinned top right. Get caught too often, or still be out at sunset, and the day's over. Your hideout is the log right here.</p>
+    <button class="primary" id="rc-go" type="button">Let's go</button>
+    <div class="hint desktop-only">or press Enter</div>
   </div>
 </div>
+
+<div class="overlay" id="results" hidden>
+  <div class="panel">
+    <h2 id="res-title">Day 1 done!</h2>
+    <p class="lede" id="res-sub"></p>
+    <dl class="stats" id="res-stats"></dl>
+    <p class="hint" id="res-next"></p>
+    <button class="primary" id="res-den" type="button">Back to the den</button>
+  </div>
+</div>
+
+<div class="overlay" id="den" hidden>
+  <div class="panel">
+    <div class="eyebrow">Between days</div>
+    <h2>The Den</h2>
+    <div class="den-purse"><span class="amount"><span class="gem" aria-hidden="true">&#10022;</span> <span id="den-shinies">0</span> shinies</span><span class="best" id="den-best"></span></div>
+    <ul class="ups" id="den-ups"></ul>
+    <button class="primary" id="den-go" type="button">Start Day 1</button>
+  </div>
+</div>
+
 
 <script src="game.js"></script>

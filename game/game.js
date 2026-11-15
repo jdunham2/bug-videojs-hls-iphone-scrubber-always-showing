@@ -31,7 +31,7 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  const rand = mulberry32(20261114);
+  let rand = mulberry32(20261114); // re-seeded for every new village
   const rr = (a, b) => a + rand() * (b - a);
   const pick = (arr) => arr[Math.floor(rand() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -52,109 +52,271 @@
 
   const objects = [];
 
-  function buildMap() {
-    // Pond
-    const pond = { cx: 54, cy: 40, rx: 9, ry: 6 };
-    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-      const dx = (x + 0.5 - pond.cx) / pond.rx, dy = (y + 0.5 - pond.cy) / pond.ry;
-      const d = dx * dx + dy * dy + Math.sin(x * 1.7 + y * 0.9) * 0.08;
-      if (d < 1) setT(x, y, WATER);
-      else if (d < 1.5) setT(x, y, SAND);
-    }
-    // Stream flowing from the north edge into the pond
-    for (let y = 0; y <= 36; y++) {
-      const cx = 60 + Math.round(Math.sin(y * 0.25) * 1.5);
-      for (let x = cx - 1; x <= cx + 1; x++) setT(x, y, WATER);
-      for (const x of [cx - 2, cx + 2]) if (getT(x, y) === GRASS) setT(x, y, SAND);
-    }
-    // Main roads
-    for (let x = 2; x < MW - 2; x++) for (let y = 25; y <= 26; y++) {
-      setT(x, y, getT(x, y) === WATER ? BRIDGE : PATH);
-    }
-    for (let y = 3; y < MH - 3; y++) for (let x = 31; x <= 32; x++) setT(x, y, PATH);
+  // ---------------------------------------------------------------------------
+  // Village generator. Each run rolls a new layout from a seed:
+  // two crossing roads with the plaza on the crossing, and the four corners
+  // shuffled between the pond, the garden and two clusters of houses.
+  // ---------------------------------------------------------------------------
+  let L = null; // current layout
 
-    // Village plaza
-    rectT(26, 20, 12, 12, STONE);
+  const VILLAGE_A = ['Bramble', 'Thistle', 'Puddle', 'Clover', 'Hazel', 'Mossy', 'Willow', 'Nettle', 'Acorn', 'Fern', 'Badger', 'Rook'];
+  const VILLAGE_B = ['wick', 'ford', 'ton', 'bury', 'dale', 'by', 'field', 'combe', 'stead', 'hollow', 'mere', 'ley'];
 
-    // Garden plot with fence (fence line sits one tile outside the soil)
-    rectT(9, 32, 11, 10, SOIL);
-    reserve(8, 31, 13, 12);
-    for (let y = 27; y <= 31; y++) setT(14, y, PATH); // gate path to road
+  function shuffled(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  const rectsOverlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-    // Houses: [x, y, w, h, roof color]
-    const houses = [
-      [9, 11, 6, 4, '#b5523b'],
-      [17, 10, 5, 4, '#4f6fa8'],
-      [39, 11, 6, 4, '#7a4f8f'],
-      [47, 12, 5, 4, '#b5523b'],
-      [38, 33, 6, 4, '#3f7f6a'],
-      [22, 38, 5, 4, '#c08a2e'],
-    ];
-    for (const [hx, hy, hw, hh, roof] of houses) {
-      reserve(hx - 1, hy - 2, hw + 2, hh + 3);
-      const doorX = hx + Math.floor(hw / 2);
-      if (hy < 25) {
-        for (let y = hy + hh; y < 25; y++) setT(doorX, y, PATH);
-      } else {
-        // houses south of the road connect sideways to the north–south road
-        const y = hy + hh;
-        setT(doorX, y, PATH);
-        const dir = doorX < 31 ? 1 : -1;
-        for (let x = doorX; x !== (dir > 0 ? 31 : 32); x += dir) setT(x, y, PATH);
+  function genLayout() {
+    const roadY = 22 + Math.floor(rand() * 7);  // top row of the 2-wide east–west road
+    const roadX = 28 + Math.floor(rand() * 15); // left column of the 2-wide north–south road
+    const quads = {
+      NW: { x0: 4, y0: 4, x1: roadX - 1, y1: roadY - 1, north: true },
+      NE: { x0: roadX + 3, y0: 4, x1: MW - 4, y1: roadY - 1, north: true },
+      SW: { x0: 4, y0: roadY + 3, x1: roadX - 1, y1: MH - 4, north: false },
+      SE: { x0: roadX + 3, y0: roadY + 3, x1: MW - 4, y1: MH - 4, north: false },
+    };
+    const order = shuffled(['NW', 'NE', 'SW', 'SE']);
+    return {
+      name: pick(VILLAGE_A) + pick(VILLAGE_B),
+      roadY, roadX,
+      plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
+      quads,
+      pondQ: quads[order[0]], gardenQ: quads[order[1]], homeQs: [quads[order[2]], quads[order[3]]],
+      hideSide: rand() < 0.5 ? 'W' : 'E',
+      houses: [], pond: null, garden: null, picnic: null,
+    };
+  }
+
+  // Find a free w×h tile rect inside a quadrant (grass only, nothing reserved, clear of the plaza)
+  function fitRect(q, w, h, tries = 80) {
+    const keepOut = { x: L.plaza.x - 2, y: L.plaza.y - 2, w: L.plaza.w + 4, h: L.plaza.h + 4 };
+    for (let n = 0; n < tries; n++) {
+      const x = q.x0 + Math.floor(rand() * Math.max(1, q.x1 - q.x0 - w + 1));
+      const y = q.y0 + Math.floor(rand() * Math.max(1, q.y1 - q.y0 - h + 1));
+      if (x + w > q.x1 || y + h > q.y1) continue;
+      const r = { x, y, w, h };
+      if (rectsOverlap(r, keepOut)) continue;
+      let ok = true;
+      for (let j = y; j < y + h && ok; j++) for (let i = x; i < x + w; i++) {
+        if (isUsed(i, j) || getT(i, j) !== GRASS) { ok = false; break; }
       }
-      objects.push(makeHouse(hx, hy, hw, hh, roof));
-      objects.push(makeMailbox((doorX + 1.2) * TILE, (hy + hh + 0.7) * TILE));
+      if (ok) return r;
+    }
+    return null;
+  }
+
+  // Carve a dirt path from (sx, sy) to the nearest existing path/plaza tile
+  function carvePath(sx, sy, solid) {
+    const prev = new Int32Array(MW * MH).fill(-1);
+    const start = idx(sx, sy);
+    prev[start] = start;
+    const queue = [start];
+    for (let qi = 0; qi < queue.length; qi++) {
+      const cur = queue[qi], cx = cur % MW, cy = Math.floor(cur / MW);
+      const t = map[cur];
+      if (cur !== start && (t === PATH || t === STONE || t === BRIDGE)) {
+        for (let i = prev[cur]; i !== start; i = prev[i]) setT(i % MW, Math.floor(i / MW), PATH);
+        setT(sx, sy, PATH);
+        return true;
+      }
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 2 || ny < 2 || nx >= MW - 2 || ny >= MH - 2) continue;
+        const ni = idx(nx, ny);
+        if (prev[ni] !== -1 || solid[ni] || map[ni] === WATER) continue;
+        prev[ni] = cur;
+        queue.push(ni);
+      }
+    }
+    return false;
+  }
+
+  function buildMap() {
+    const { roadY, roadX, plaza } = L;
+    const solid = new Uint8Array(MW * MH); // footprints paths must route around
+    const markSolid = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (inb(i, j)) solid[idx(i, j)] = 1; };
+
+    // Hideout clearing first, at one end of the east–west road
+    const hx = L.hideSide === 'W' ? 4.8 : MW - 4.8;
+    reserve(Math.floor(hx) - 3, roadY - 5, 7, 5);
+    markSolid(Math.floor(hx) - 1, roadY - 3, 3, 1);
+    HIDEOUT = { x: hx * TILE, y: (roadY - 1.2) * TILE, rx: 50, ry: 28 };
+
+    // Roads + plaza
+    for (let x = 2; x < MW - 2; x++) for (let y = roadY; y <= roadY + 1; y++) setT(x, y, PATH);
+    for (let y = 3; y < MH - 3; y++) for (let x = roadX; x <= roadX + 1; x++) setT(x, y, PATH);
+    rectT(plaza.x, plaza.y, plaza.w, plaza.h, STONE);
+
+    // Pond (+ a stream running off to the nearest map edge)
+    {
+      const q = L.pondQ;
+      // Start big and shrink until it fits in its corner
+      let rx = 7 + Math.floor(rand() * 3), ry = 5 + Math.floor(rand() * 2), r = null, w = 0, h = 0;
+      for (;;) {
+        w = Math.ceil(rx * 2.5) + 2; h = Math.ceil(ry * 2.5) + 2;
+        r = fitRect(q, w, h, 120);
+        if (r || (rx <= 4 && ry <= 3)) break;
+        if (rx > 4) rx--;
+        if (ry > 3 && (ry * 1.4 > rx || rx <= 4)) ry--;
+      }
+      if (!r) r = { x: q.x0, y: q.y0, w, h };
+      const cx = r.x + w / 2, cy = r.y + h / 2;
+      L.pond = { cx, cy, rx, ry };
+      for (let y = r.y - 1; y <= r.y + h; y++) for (let x = r.x - 1; x <= r.x + w; x++) {
+        if (!inb(x, y) || getT(x, y) !== GRASS) continue;
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+        const d = dx * dx + dy * dy + Math.sin(x * 1.7 + y * 0.9) * 0.08;
+        if (d < 1) setT(x, y, WATER);
+        else if (d < 1.5) setT(x, y, SAND);
+      }
+      reserve(r.x, r.y, w, h);
+      const sx0 = Math.round(cx + rx * 0.45);
+      const dir = q.north ? -1 : 1;
+      for (let y = Math.round(cy); y >= 0 && y < MH; y += dir) {
+        const sx = sx0 + Math.round(Math.sin(y * 0.25) * 1.5);
+        for (let x = sx - 1; x <= sx + 1; x++) if (getT(x, y) === GRASS || getT(x, y) === SAND) setT(x, y, WATER);
+        for (const x of [sx - 2, sx + 2]) if (getT(x, y) === GRASS) setT(x, y, SAND);
+        reserve(sx - 2, y, 5, 1);
+      }
+    }
+
+    // Garden: 11×10 soil inside a fence, gate facing the road
+    {
+      const r = fitRect(L.gardenQ, 15, 14, 200) || { x: L.gardenQ.x0, y: L.gardenQ.y0 };
+      const gx = r.x + 1, gy = r.y + 1;
+      const gateTop = !L.gardenQ.north; // road is to the north of southern gardens
+      L.garden = { x: gx, y: gy, w: 11, h: 10, gateX: gx + 5, gateY: gateTop ? gy - 1 : gy + 10, gateTop };
+      rectT(gx, gy, 11, 10, SOIL);
+      reserve(gx - 1, gy - 1, 13, 12);
+      markSolid(gx - 1, gy - 1, 13, 12);
+    }
+
+    // Houses: up to three per home quadrant, rows nearest the road first
+    const roofs = shuffled(['#b5523b', '#4f6fa8', '#7a4f8f', '#3f7f6a', '#c08a2e', '#b5523b', '#4f6fa8']);
+    const keepOut = { x: plaza.x - 2, y: plaza.y - 2, w: plaza.w + 4, h: plaza.h + 4 };
+    const tryHouse = (hx0, hy0, hw, hh) => {
+      const res = { x: hx0 - 1, y: hy0 - 2, w: hw + 2, h: hh + 4 };
+      if (res.x < 3 || res.y < 3 || res.x + res.w > MW - 3 || res.y + res.h > MH - 3) return false;
+      if (rectsOverlap(res, keepOut)) return false;
+      for (let j = res.y; j < res.y + res.h; j++) for (let i = res.x; i < res.x + res.w; i++) {
+        if (isUsed(i, j) || getT(i, j) !== GRASS) return false;
+      }
+      reserve(res.x, res.y, res.w, res.h);
+      markSolid(hx0, hy0, hw, hh);
+      L.houses.push({ x: hx0, y: hy0, w: hw, h: hh, doorX: hx0 + Math.floor(hw / 2), roof: roofs[L.houses.length % roofs.length] });
+      return true;
+    };
+    for (const q of L.homeQs) {
+      let placed = 0;
+      for (let row = 0; row < 3 && placed < 3; row++) {
+        const hh = 4;
+        const hy0 = q.north ? q.y1 - hh - 2 - row * 8 : q.y0 + 2 + row * 8;
+        if (hy0 < q.y0 + 1 || hy0 + hh > q.y1 - 1) continue;
+        for (let x = q.x0 + Math.floor(rand() * 3); x < q.x1 - 5 && placed < 3; ) {
+          const hw = rand() < 0.5 ? 5 : 6;
+          if (tryHouse(x, hy0, hw, hh)) { placed++; x += hw + 2 + Math.floor(rand() * 3); } else x += 1;
+        }
+      }
+    }
+    // Make sure there are at least four homes
+    for (let n = 0; n < 200 && L.houses.length < 4; n++) {
+      const q = L.quads[pick(['NW', 'NE', 'SW', 'SE'])];
+      const r = fitRect(q, 8, 8, 1);
+      if (r) tryHouse(r.x + 1, r.y + 2, 6, 4);
+    }
+
+    // Paths from every door (and the garden gate) to the road network
+    for (const h of L.houses) carvePath(h.doorX, h.y + h.h, solid);
+    {
+      const g = L.garden;
+      const outY = g.gateTop ? g.gateY - 1 : g.gateY + 1;
+      setT(g.gateX, g.gateY, PATH);
+      carvePath(g.gateX, outY, solid);
+    }
+
+    // Who lives where: Bertram nearest his garden, everyone else at random
+    {
+      const gcx = L.garden.x + 5, gcy = L.garden.y + 5;
+      const byDist = L.houses.map((h, i) => [i, Math.hypot(h.x - gcx, h.y - gcy)]).sort((a, b) => a[1] - b[1]);
+      const bert = byDist[0][0];
+      const rest = shuffled(L.houses.map((_, i) => i).filter((i) => i !== bert));
+      L.homes = { bertram: bert, fennick: rest[0] ?? bert, rosa: rest[1] ?? rest[0] ?? bert, toby: rest[2] ?? rest[0] ?? bert };
+    }
+
+    // Picnic table on the pond's road-facing side
+    {
+      const p = L.pond;
+      const pcx = plaza.x + 6, pcy = plaza.y + 6;
+      const base = Math.atan2(pcy - p.cy, pcx - p.cx);
+      outer: for (const da of [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.6, -1.6, Math.PI]) {
+        for (let k = 1.6; k <= 2.6; k += 0.25) {
+          const tx = Math.round(p.cx + Math.cos(base + da) * p.rx * k * 0.85);
+          const ty = Math.round(p.cy + Math.sin(base + da) * p.ry * k * 0.85);
+          let ok = true;
+          for (let j = ty - 2; j <= ty + 1 && ok; j++) for (let i = tx - 2; i <= tx + 1; i++) {
+            if (!inb(i, j) || getT(i, j) !== GRASS || (isUsed(i, j) && !(Math.abs(i - p.cx) < p.rx * 1.6 && Math.abs(j - p.cy) < p.ry * 1.6))) { ok = false; break; }
+          }
+          if (ok) { L.picnic = { x: tx, y: ty }; break outer; }
+        }
+      }
+      if (!L.picnic) L.picnic = { x: Math.round(pcx + 8), y: Math.round(pcy + 8) };
+      reserve(L.picnic.x - 2, L.picnic.y - 2, 4, 3);
     }
 
     // Reserve roads and plaza so nothing grows on them
-    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-      const t = getT(x, y);
-      if (t !== GRASS) used[idx(x, y)] = 1;
+    for (let i = 0; i < MW * MH; i++) if (map[i] !== GRASS) used[i] = 1;
+
+    // Houses + mailboxes
+    for (const h of L.houses) {
+      objects.push(makeHouse(h.x, h.y, h.w, h.h, h.roof));
+      objects.push(makeMailbox((h.doorX + 1.2) * TILE, (h.y + h.h + 0.7) * TILE));
     }
 
     // Plaza props
-    objects.push(makeWell(32 * TILE, 24.2 * TILE));
-    objects.push(makeBench(28 * TILE, 21.4 * TILE));
-    objects.push(makeBench(36 * TILE, 21.4 * TILE));
-    objects.push(makeBench(28 * TILE, 30.6 * TILE));
-    objects.push(makeBench(36 * TILE, 30.6 * TILE));
-    for (const [lx, ly] of [[26.5, 20.6], [37.5, 20.6], [26.5, 31.6], [37.5, 31.6]]) {
-      objects.push(makeLamp(lx * TILE, ly * TILE));
+    const px = plaza.x, py = plaza.y;
+    objects.push(makeWell((px + 6) * TILE, (py + 4.2) * TILE));
+    objects.push(makeBench((px + 2) * TILE, (py + 1.4) * TILE));
+    objects.push(makeBench((px + 10) * TILE, (py + 1.4) * TILE));
+    objects.push(makeBench((px + 2) * TILE, (py + 10.6) * TILE));
+    objects.push(makeBench((px + 10) * TILE, (py + 10.6) * TILE));
+    for (const [lx, ly] of [[0.5, 0.6], [11.5, 0.6], [0.5, 11.6], [11.5, 11.6]]) objects.push(makeLamp((px + lx) * TILE, (py + ly) * TILE));
+    {
+      const pcx = px + 6;
+      const gcx = L.garden.x + 5.5;
+      const right = L.pond.cx > pcx ? 'POND' : gcx > pcx ? 'GARDEN' : 'HOMES';
+      const left = L.pond.cx <= pcx ? 'POND' : gcx <= pcx ? 'GARDEN' : 'HOMES';
+      objects.push(makeSign((px + 8.2) * TILE, (py + 7.4) * TILE, right, left === right ? 'HOMES' : left));
     }
-    objects.push(makeSign(34.2 * TILE, 27.4 * TILE));
 
-    // Garden: fence + crops
-    for (let x = 8; x <= 20; x++) {
-      if (x !== 14) objects.push(makeFence(x, 31, 'h'));
-      objects.push(makeFence(x, 42, 'h'));
+    // Garden fence + scarecrow
+    {
+      const { x: gx, y: gy, gateX, gateY } = L.garden;
+      for (let x = gx - 1; x <= gx + 11; x++) {
+        if (!(x === gateX && gateY === gy - 1)) objects.push(makeFence(x, gy - 1, 'h'));
+        if (!(x === gateX && gateY === gy + 10)) objects.push(makeFence(x, gy + 10, 'h'));
+      }
+      for (let y = gy; y <= gy + 9; y++) { objects.push(makeFence(gx - 1, y, 'v')); objects.push(makeFence(gx + 11, y, 'v')); }
+      objects.push(makeScarecrow((gx + 8.5) * TILE, (gy + 4.9) * TILE));
     }
-    for (let y = 32; y <= 41; y++) {
-      objects.push(makeFence(8, y, 'v'));
-      objects.push(makeFence(20, y, 'v'));
-    }
-    objects.push(makeScarecrow(17.5 * TILE, 36.9 * TILE));
-    // (crops, crates, barrels and other loose things are pickable items: see placeItems)
 
-    // Picnic spot by the pond
-    objects.push(makePicnicTable(47 * TILE, 31 * TILE));
-    reserve(45, 29, 4, 3);
-
-    // The raccoon's hideout: a hollow log in a clearing by the west road
-    reserve(3, 20, 6, 5);
-    objects.push(makeHideoutLog(4.8 * TILE, 22.5 * TILE));
+    objects.push(makePicnicTable(L.picnic.x * TILE, L.picnic.y * TILE));
+    objects.push(makeHideoutLog(hx * TILE, (roadY - 2.5) * TILE));
 
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       const edge = Math.min(x, y, MW - 1 - x, MH - 1 - y);
-      if (edge > 2) continue;
-      if (getT(x, y) !== GRASS) continue;
+      if (edge > 2 || getT(x, y) !== GRASS || isUsed(x, y)) continue;
       if (rand() < (edge === 0 ? 0.9 : edge === 1 ? 0.7 : 0.35)) {
         objects.push(makeTree((x + rr(0.2, 0.8)) * TILE, (y + rr(0.4, 0.9)) * TILE));
         used[idx(x, y)] = 1;
       }
     }
     // Close the road ends with trees so the world edge feels solid
-    for (const [x, y] of [[1, 25], [1, 26], [MW - 2, 25], [MW - 2, 26], [31, 1], [32, 1], [31, MH - 2], [32, MH - 2], [0, 25], [0, 26], [MW - 1, 25], [MW - 1, 26], [31, 0], [32, 0], [31, MH - 1], [32, MH - 1]]) {
+    for (const [x, y] of [[1, roadY], [1, roadY + 1], [MW - 2, roadY], [MW - 2, roadY + 1], [roadX, 1], [roadX + 1, 1], [roadX, MH - 2], [roadX + 1, MH - 2],
+      [0, roadY], [0, roadY + 1], [MW - 1, roadY], [MW - 1, roadY + 1], [roadX, 0], [roadX + 1, 0], [roadX, MH - 1], [roadX + 1, MH - 1]]) {
       objects.push(makeTree((x + 0.5) * TILE, (y + 0.8) * TILE));
     }
 
@@ -173,9 +335,9 @@
     for (let n = 0; n < 75; n++) { const s = openSpot(1); if (s) objects.push(makeTree((s[0] + rr(0.3, 0.7)) * TILE, (s[1] + rr(0.5, 0.9)) * TILE)); }
     for (let n = 0; n < 45; n++) { const s = openSpot(0); if (s) objects.push(makeBush((s[0] + 0.5) * TILE, (s[1] + 0.75) * TILE)); }
     for (let n = 0; n < 25; n++) { const s = openSpot(0); if (s) objects.push(makeRock((s[0] + 0.5) * TILE, (s[1] + 0.7) * TILE)); }
-    // Reeds along the pond sand
-    for (let y = 0; y < MH; y++) for (let x = 40; x < MW; x++) {
-      if (getT(x, y) === SAND && rand() < 0.18) objects.push(makeReeds((x + rr(0.2, 0.8)) * TILE, (y + rr(0.5, 0.9)) * TILE));
+    // Reeds along the water's sandy edge
+    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+      if (getT(x, y) === SAND && rand() < 0.16) objects.push(makeReeds((x + rr(0.2, 0.8)) * TILE, (y + rr(0.5, 0.9)) * TILE));
     }
   }
 
@@ -522,7 +684,7 @@
     };
   }
 
-  function makeSign(x, y) {
+  function makeSign(x, y, rightLabel = 'POND', leftLabel = 'GARDEN') {
     return {
       kind: 'sign', x, y,
       hitbox: box(x - 3, y - 5, 6, 6),
@@ -536,8 +698,8 @@
         ctx.fillStyle = '#4a3220';
         ctx.font = 'bold 6px Nunito, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('POND', x + 13, y - 36);
-        ctx.fillText('GARDEN', x - 13, y - 21);
+        ctx.fillText(rightLabel, x + 13, y - 36);
+        ctx.fillText(leftLabel, x - 13, y - 21);
       },
     };
   }
@@ -645,11 +807,11 @@
   // Ground layer: rendered once to an offscreen canvas
   // ---------------------------------------------------------------------------
   let ground, mini;
-  function renderGround() {
+  function renderGround(seed = 99) {
     ground = document.createElement('canvas');
     ground.width = WORLD_W; ground.height = WORLD_H;
     const g = ground.getContext('2d');
-    const grng = mulberry32(99);
+    const grng = mulberry32((seed ^ 0x5bd1e995) >>> 0);
     const gr = (a, b) => a + grng() * (b - a);
 
     // Grass base with soft patches
@@ -686,22 +848,24 @@
     g.fillStyle = '#4c93c7';
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (waterLike(x, y)) circle(g, (x + 0.5) * TILE, (y + 0.5) * TILE, 23);
     // deeper water in the pond middle
+    const P = L.pond;
     g.fillStyle = 'rgba(30,80,130,0.35)';
-    ellipse(g, 54 * TILE, 40 * TILE, 6 * TILE, 3.5 * TILE);
+    ellipse(g, P.cx * TILE, P.cy * TILE, (P.rx - 3) * TILE, (P.ry - 2.5) * TILE);
     // lily pads
     for (let i = 0; i < 14; i++) {
       const a = gr(0, Math.PI * 2), d = gr(0.2, 0.75);
-      const lx = 54 * TILE + Math.cos(a) * 9 * TILE * d, ly = 40 * TILE + Math.sin(a) * 6 * TILE * d;
+      const lx = P.cx * TILE + Math.cos(a) * P.rx * TILE * d, ly = P.cy * TILE + Math.sin(a) * P.ry * TILE * d;
       g.fillStyle = '#4f9a3c';
       g.beginPath(); g.moveTo(lx, ly); g.arc(lx, ly, gr(6, 10), a + 0.4, a + Math.PI * 2 - 0.1); g.closePath(); g.fill();
       if (grng() < 0.35) { g.fillStyle = '#ffc6dd'; circle(g, lx + 2, ly - 2, 3); }
     }
 
     // Garden soil with furrows
+    const G = L.garden;
     g.fillStyle = '#7a5434';
-    g.fillRect(9 * TILE, 32 * TILE, 11 * TILE, 10 * TILE);
+    g.fillRect(G.x * TILE, G.y * TILE, G.w * TILE, G.h * TILE);
     g.fillStyle = '#6a462a';
-    for (let y = 32 * TILE + 10; y < 42 * TILE; y += 16) g.fillRect(9 * TILE + 4, y, 11 * TILE - 8, 5);
+    for (let y = G.y * TILE + 10; y < (G.y + G.h) * TILE; y += 16) g.fillRect(G.x * TILE + 4, y, G.w * TILE - 8, 5);
 
     // Paths
     blobs(PATH, '#b08b55', 25);
@@ -714,20 +878,21 @@
     });
 
     // Plaza cobbles
+    const PX = L.plaza.x * TILE, PY = L.plaza.y * TILE;
     g.fillStyle = '#9b9688';
-    roundRect(g, 26 * TILE - 4, 20 * TILE - 4, 12 * TILE + 8, 12 * TILE + 8, 14, true);
+    roundRect(g, PX - 4, PY - 4, 12 * TILE + 8, 12 * TILE + 8, 14, true);
     g.fillStyle = '#b7b2a3';
-    roundRect(g, 26 * TILE, 20 * TILE, 12 * TILE, 12 * TILE, 10, true);
-    for (let y = 20 * TILE; y < 32 * TILE; y += 12) {
-      const row = (y - 20 * TILE) / 12;
-      for (let x = 26 * TILE + (row % 2) * 8; x < 38 * TILE - 4; x += 16) {
+    roundRect(g, PX, PY, 12 * TILE, 12 * TILE, 10, true);
+    for (let y = PY; y < PY + 12 * TILE; y += 12) {
+      const row = (y - PY) / 12;
+      for (let x = PX + (row % 2) * 8; x < PX + 12 * TILE - 4; x += 16) {
         g.fillStyle = grng() < 0.5 ? '#c4bfb0' : '#aaa596';
         roundRect(g, x + 1, y + 1, 14, 10, 3, true);
       }
     }
     // Plaza mosaic circle
     g.strokeStyle = '#8f8a7c'; g.lineWidth = 4;
-    g.beginPath(); g.arc(32 * TILE, 26 * TILE, 3.3 * TILE, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(PX + 6 * TILE, PY + 6 * TILE, 3.3 * TILE, 0, Math.PI * 2); g.stroke();
 
     // Bridge
     forTiles(BRIDGE, (x, y) => {
@@ -737,16 +902,12 @@
       g.fillStyle = '#b8834f';
       for (let px = X; px < X + TILE; px += 8) g.fillRect(px + 1, Y, 6, TILE);
     });
-    // Bridge rails along the top and bottom of the crossing
-    for (let x = 0; x < MW; x++) {
-      if (map[idx(x, 25)] === BRIDGE) {
-        g.fillStyle = '#6b4a2e';
-        g.fillRect(x * TILE - 2, 25 * TILE - 3, TILE + 4, 4);
-        g.fillRect(x * TILE - 2, 27 * TILE - 1, TILE + 4, 4);
-        g.fillRect(x * TILE, 25 * TILE - 9, 4, 8);
-        g.fillRect(x * TILE, 27 * TILE - 7, 4, 8);
-      }
-    }
+    // Bridge rails wherever a bridge tile meets water
+    g.fillStyle = '#6b4a2e';
+    forTiles(BRIDGE, (x, y) => {
+      if (getT(x, y - 1) !== BRIDGE) { g.fillRect(x * TILE - 2, y * TILE - 3, TILE + 4, 4); g.fillRect(x * TILE, y * TILE - 9, 4, 8); }
+      if (getT(x, y + 1) !== BRIDGE) { g.fillRect(x * TILE - 2, (y + 1) * TILE - 1, TILE + 4, 4); g.fillRect(x * TILE, (y + 1) * TILE - 7, 4, 8); }
+    });
 
     // Flowers & clover on open grass
     const petals = ['#ffffff', '#ffd166', '#ff8fab', '#b39cff', '#ff7a59'];
@@ -766,18 +927,19 @@
 
     // Hideout nest: trampled straw and leaves in front of the log
     g.fillStyle = 'rgba(120,90,45,0.45)';
-    ellipse(g, 4.8 * TILE, 23.8 * TILE, 48, 26);
+    const HX = HIDEOUT.x, HY = HIDEOUT.y;
+    ellipse(g, HX, HY, 48, 26);
     g.lineCap = 'round'; g.lineWidth = 1.3;
     for (let k = 0; k < 70; k++) {
       const a = grng() * Math.PI * 2, d = Math.sqrt(grng());
-      const sx = 4.8 * TILE + Math.cos(a) * 44 * d, sy = 23.8 * TILE + Math.sin(a) * 23 * d;
+      const sx = HX + Math.cos(a) * 44 * d, sy = HY + Math.sin(a) * 23 * d;
       g.strokeStyle = grng() < 0.5 ? 'rgba(230,200,120,0.8)' : 'rgba(180,140,70,0.8)';
       const ang = grng() * Math.PI;
       g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + Math.cos(ang) * 5, sy + Math.sin(ang) * 2); g.stroke();
     }
     for (let k = 0; k < 12; k++) {
       g.fillStyle = ['#c0643a', '#d9a43a', '#8a5a2e'][k % 3];
-      ellipse(g, 4.8 * TILE + gr(-40, 40), 23.8 * TILE + gr(-19, 19), 2.6, 1.4);
+      ellipse(g, HX + gr(-40, 40), HY + gr(-19, 19), 2.6, 1.4);
     }
 
     // Minimap
@@ -842,7 +1004,7 @@
     if (mag > 1) { ix /= mag; iy /= mag; }
     const heavy = player.held && player.held.type.heavy;
     const running = input.run && !heavy;
-    const maxSpd = heavy ? WALK_SPEED * 0.62 : running ? RUN_SPEED : WALK_SPEED;
+    const maxSpd = heavy ? WALK_SPEED * heavyMult() : running ? runSpeed() : WALK_SPEED;
     const tx = ix * maxSpd, ty = iy * maxSpd;
 
     const approach = (v, target, rate) => {
@@ -897,7 +1059,7 @@
     // You can't chitter with your mouth full: light things fall out
     if (player.held && !player.held.type.heavy) dropHeld(true);
     for (const v of villagers) {
-      if (Math.hypot(v.x - player.x, v.y - player.y) < 95 && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
+      if (Math.hypot(v.x - player.x, v.y - player.y) < chitterRadius() && startleV(v, rpick(['Eek!', 'Gah!', 'Yikes!']))) completeTask('jump');
     }
     for (const b of butterflies) {
       if (Math.hypot(b.x - player.x, b.y - player.y) < 140) b.flee = 1.5;
@@ -1346,36 +1508,57 @@
     return null;
   }
 
-  function placeItems() {
-    const T = TILE;
-    // Garden crops (planted until pulled)
-    for (let y = 33; y <= 40; y += 2) for (let x = 10; x <= 18; x += 1.5) {
-      addItem(y % 4 === 1 ? 'cabbage' : 'carrot', (x + 0.5) * T, (y + 0.6) * T, { planted: true, owner: 'bertram' });
+  // A walkable spot on the pond's shore in direction `a` (radians)
+  function shorePoint(a) {
+    const p = L.pond;
+    for (let k = 1.0; k <= 2.4; k += 0.08) {
+      const x = (p.cx + Math.cos(a) * p.rx * k) * TILE, y = (p.cy + Math.sin(a) * p.ry * k) * TILE;
+      if (tileAt(x, y) !== WATER && !navBlockedPt(x, y)) return { x, y };
     }
-    // Heavy things
-    placeFree('crate', 15.6 * T, 14.6 * T);
-    placeFree('crate', 16.4 * T, 15.3 * T);
-    placeFree('crate', 37.2 * T, 37.4 * T);
-    placeFree('barrel', 45.7 * T, 14.4 * T);
-    placeFree('barrel', 44.6 * T, 37.6 * T);
+    return { x: (p.cx + Math.cos(a) * p.rx * 1.6) * TILE, y: (p.cy + Math.sin(a) * p.ry * 1.6) * TILE };
+  }
+  const plazaAngleFromPond = () => Math.atan2(L.plaza.y + 6 - L.pond.cy, L.plaza.x + 6 - L.pond.cx);
+
+  function placeItems() {
+    const T = TILE, g = L.garden, P = L.plaza, hs = L.houses;
+    // Garden crops (planted until pulled)
+    for (let row = 0; row < 4; row++) for (let x = g.x + 1; x <= g.x + 9; x += 1.5) {
+      addItem(row % 2 === 0 ? 'cabbage' : 'carrot', (x + 0.5) * T, (g.y + 1 + row * 2 + 0.6) * T, { planted: true, owner: 'bertram' });
+    }
+    const order = shuffled(hs.map((_, i) => i));
+    const H = (k) => hs[order[k % hs.length]];
+    const beside = (h, dx, dy) => [(h.x + h.w + dx) * T, (h.y + h.h + dy) * T];
+    // Heavy things stacked beside houses
+    placeFree('crate', ...beside(H(0), 0.6, -0.4));
+    placeFree('crate', ...beside(H(0), 1.3, 0.3));
+    placeFree('crate', ...beside(H(1), 0.6, -0.4));
+    placeFree('barrel', ...beside(H(2), 0.7, -0.6));
+    placeFree('barrel', ...beside(H(3), 0.7, -0.6));
     // Things resting on furniture
-    addItem('pie', 47 * T + 16, 31 * T + 1, { z: 19, owner: 'rosa' });
-    addItem('hat', 36 * T - 6, 30.6 * T + 1, { z: 12, owner: 'fennick' });
-    addItem('sandwich', 28 * T + 8, 21.4 * T + 1, { z: 12, owner: 'fennick' });
-    // Loose stuff around the village
-    placeFree('bucket', 32 * T + 30, 24.2 * T + 4, { owner: 'rosa' });
-    placeFree('ball', 30 * T, 28.5 * T, { owner: 'toby' });
-    placeFree('newspaper', 12.5 * T - 18, 15.5 * T, { owner: 'fennick' });
-    placeFree('newspaper', 42.5 * T - 18, 15.5 * T);
-    placeFree('newspaper', 49.5 * T - 18, 16.5 * T);
-    placeFree('gnome', 22.6 * T, 13.8 * T, { owner: 'fennick' });
-    placeFree('gnome', 21 * T, 33 * T, { owner: 'bertram' });
-    placeFree('duck', 44.4 * T, 40.5 * T, { owner: 'toby' });
-    placeFree('can', 9.8 * T, 32.8 * T, { owner: 'bertram' });
-    placeFree('boot', 36.4 * T, 36.4 * T);
-    placeFree('pot', 8.3 * T, 15.6 * T, { owner: 'fennick' });
-    placeFree('pot', 21.8 * T, 14.6 * T);
-    placeFree('pot', 44.2 * T, 15.8 * T);
+    addItem('pie', L.picnic.x * T + 16, L.picnic.y * T + 1, { z: 19, owner: 'rosa' });
+    addItem('hat', (P.x + 10) * T - 6, (P.y + 10.6) * T + 1, { z: 12, owner: 'fennick' });
+    addItem('sandwich', (P.x + 2) * T + 8, (P.y + 1.4) * T + 1, { z: 12, owner: 'fennick' });
+    // Plaza
+    placeFree('bucket', (P.x + 6) * T + 30, (P.y + 4.2) * T + 4, { owner: 'rosa' });
+    placeFree('ball', (P.x + 4) * T, (P.y + 8.5) * T, { owner: 'toby' });
+    // Mrs. Fennick's doorstep, then a couple of other houses
+    const fen = hs[L.homes.fennick];
+    placeFree('newspaper', (fen.doorX + 0.5) * T - 18, (fen.y + fen.h + 0.5) * T, { owner: 'fennick' });
+    placeFree('pot', (fen.x - 0.7) * T, (fen.y + fen.h + 0.6) * T, { owner: 'fennick' });
+    placeFree('gnome', (fen.x + fen.w + 0.6) * T, (fen.y + fen.h - 0.2) * T, { owner: 'fennick' });
+    for (let k = 2; k <= 3; k++) {
+      const h = H(k);
+      if (h === fen) continue;
+      placeFree('newspaper', (h.doorX + 0.5) * T - 18, (h.y + h.h + 0.5) * T);
+      placeFree('pot', (h.x - 0.7) * T, (h.y + h.h + 0.6) * T);
+    }
+    placeFree('boot', ...beside(H(4), 0.5, 0.8));
+    // Garden things
+    placeFree('can', (g.x + 0.8) * T, (g.y + 0.8) * T, { owner: 'bertram' });
+    placeFree('gnome', (g.x + 12.3) * T, (g.y + 0.8) * T, { owner: 'bertram' });
+    // Toby's duck on the far shore
+    const dp = shorePoint(plazaAngleFromPond() + Math.PI * 0.8);
+    placeFree('duck', dp.x, dp.y, { owner: 'toby' });
     // Apples fallen under some trees
     const trees = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
     for (let n = 0; n < 10 && trees.length; n++) {
@@ -1430,6 +1613,11 @@
       if (it.kind === 'carrot') completeTask('carrot');
     }
     if (it.kind === 'pie') completeTask('pie');
+    if (it.kind === 'newspaper') completeTask('paper');
+    if (it.kind === 'gnome') completeTask('gnome');
+    if (it.type.heavy) completeTask('lift');
+    if (it.droppedAt && time - it.droppedAt < 5) completeTask('snatchback');
+    it.droppedAt = 0;
     if (it.kind === 'hat') {
       const f = VILLAGER.fennick;
       if (f && f.state === 'act' && f.stops[f.stopIdx].needs === 'hat' && Math.hypot(f.x - it.x, f.y - it.y) < 90) completeTask('hat');
@@ -1466,6 +1654,7 @@
       spin: heavy ? (d[0] || 1) * 4 : (Math.random() - 0.5) * 18 + d[0] * 8,
     });
     sfx('throw');
+    if (heavy) completeTask('heavythrow');
   }
 
   function updateItems(dt) {
@@ -1506,6 +1695,7 @@
           it.vx *= -0.3; it.vy *= -0.3;
           sfx('bonk');
           if (v.id === 'fennick') completeTask('bonk');
+          if (v.id === 'rosa' && it.kind === 'boot') completeTask('boot');
           startleV(v, 'Ow!', it.owner === v.id ? { state: 'fetch', target: it } : { state: 'chase', target: null });
           break;
         }
@@ -1515,7 +1705,12 @@
         it.z = 0;
         if (tileAt(it.x, it.y) === WATER) {
           splash(it.x, it.y, it.type.heavy);
-          if (!it.kicker) { completeTask('splash'); if (it.kind === 'ball') completeTask('ballpond'); }
+          if (!it.kicker) {
+            completeTask('splash');
+            if (it.kind === 'ball') completeTask('ballpond');
+            if (it.kind === 'duck') completeTask('duck');
+            if (!it.type.floats) { run.sunk++; setProgress('sink3', run.sunk); }
+          }
           if (it.type.floats) Object.assign(it, { floating: true, air: false, vz: 0, rot: 0, spin: 0, vx: it.vx * 0.3, vy: it.vy * 0.3 });
           else items.splice(i, 1); // glub glub
           continue;
@@ -1739,46 +1934,21 @@
     {
       id: 'bertram', name: 'Bertram', skin: '#e8b996', hair: '#d8d8d8', shirt: '#5b7f3a', pants: '#6b5134', hat: 'straw',
       speed: 46, chase: 104, pitch: 150,
-      stops: [
-        { x: 12, y: 34.6, act: 'tend', dur: 7, face: 'down' },
-        { x: 16.5, y: 36.6, act: 'tend', dur: 7, face: 'down' },
-        { x: 11.5, y: 38.6, act: 'tend', dur: 6, face: 'up' },
-        { x: 14.5, y: 29.4, act: 'rest', dur: 3, face: 'down' },
-        { x: 24.5, y: 43, act: 'rest', dur: 6, face: 'down' },
-      ],
       lines: { tend: ['Grow, little ones.', 'Hmm. Weeds.', '♪ hm hm hm ♪'], rest: ['Ooh, my back.', 'Fine day for carrots.'] },
     },
     {
       id: 'fennick', name: 'Mrs. Fennick', skin: '#f0c8a8', hair: '#a4a4b0', shirt: '#7a4f8f', pants: '#5a3a6a', hat: 'bun', dress: true,
       speed: 42, chase: 110, pitch: 270,
-      stops: [
-        { x: 12.5, y: 16.3, act: 'tidy', dur: 5, face: 'down' },
-        { x: 9, y: 16.6, act: 'water', dur: 4, face: 'left' },
-        { x: 28.5, y: 22.5, act: 'sit', dur: 9, face: 'down', needs: 'sandwich' },
-        { x: 33, y: 28.5, act: 'stroll', dur: 3, face: 'right' },
-        { x: 36, y: 31.6, act: 'sit', dur: 6, face: 'down', needs: 'hat' },
-      ],
       lines: { tidy: ['Such a mess.', 'Hmph. That wind.'], water: ['There, my darlings.'], sit: ['Lovely day.', 'Tsk. Kids these days.'], stroll: ['Mm-hm.'] },
     },
     {
       id: 'rosa', name: 'Rosa', skin: '#c98e66', hair: '#3a2418', shirt: '#b5523b', pants: '#5a3a24', hat: 'scarf', apron: true,
       speed: 52, chase: 124, pitch: 210,
-      stops: [
-        { x: 49.5, y: 17, act: 'rest', dur: 4, face: 'down' },
-        { x: 47.5, y: 32.4, act: 'eat', dur: 10, face: 'up', needs: 'pie' },
-        { x: 52, y: 33.4, act: 'gaze', dur: 5, face: 'down' },
-        { x: 59.5, y: 25.6, act: 'gaze', dur: 4, face: 'right' },
-      ],
-      lines: { eat: ['Mmm, pie.', 'Perfect picnic.'], gaze: ['So peaceful.', 'Ducks!'], rest: ['Smells like rain.'] },
+      lines: { eat: ['Mmm, pie.', 'Perfect picnic.'], gaze: ['So peaceful.', 'Ducks!'], rest: ['Smells like rain.'], stroll: ['Morning!', 'Smells like fresh bread.'] },
     },
     {
       id: 'toby', name: 'Toby', skin: '#f2c9a0', hair: '#8a5a2e', shirt: '#e8453c', pants: '#3b6fb5', hat: 'cap', stripes: true, scale: 0.82,
       speed: 60, chase: 132, pitch: 380,
-      stops: [
-        { x: 30, y: 28.5, act: 'play', dur: 16, face: 'down' },
-        { x: 42.5, y: 16.3, act: 'rest', dur: 4, face: 'down' },
-        { x: 45, y: 36.5, act: 'gaze', dur: 6, face: 'down' },
-      ],
       lines: { play: ['Wheee!', 'Goal!!'], gaze: ['Quack quack!', 'Hi fishies!'], rest: ["Mom! I'm hungry!"] },
     },
   ];
@@ -1787,11 +1957,63 @@
   const rpick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const itemName = (it) => (it.owner && VILLAGER[it.owner] ? `${VILLAGER[it.owner].name}'s ${it.type.name}` : it.type.name);
 
+  // Each villager's daily round, worked out from this village's layout
+  function stopsFor(id) {
+    const T = TILE, P = L.plaza, g = L.garden, h = L.houses[L.homes[id]];
+    const door = [(h.doorX + 0.5) * T, (h.y + h.h + 1.3) * T];
+    const S = (wx, wy, act, dur, face, needs) => ({ wx, wy, act, dur, face, needs });
+    const faceTo = (pt, x, y) => (Math.abs(x - pt.x) > Math.abs(y - pt.y) ? (x > pt.x ? 'right' : 'left') : (y > pt.y ? 'down' : 'up'));
+    const pondPx = [L.pond.cx * T, L.pond.cy * T];
+    switch (id) {
+      case 'bertram': {
+        const gateOut = g.gateTop ? g.gateY - 1.6 : g.gateY + 1.9;
+        return [
+          S((g.x + 3) * T, (g.y + 2.6) * T, 'tend', 7, 'down'),
+          S((g.x + 7.5) * T, (g.y + 4.6) * T, 'tend', 7, 'down'),
+          S((g.x + 2.5) * T, (g.y + 6.6) * T, 'tend', 6, 'up'),
+          S((g.gateX + 0.5) * T, gateOut * T, 'rest', 3, 'down'),
+          S(...door, 'rest', 6, 'down'),
+        ];
+      }
+      case 'fennick': return [
+        S(...door, 'tidy', 5, 'down'),
+        S(h.x * T, (h.y + h.h + 1.6) * T, 'water', 4, 'left'),
+        S((P.x + 2.5) * T, (P.y + 2.5) * T, 'sit', 9, 'down', 'sandwich'),
+        S((P.x + 7) * T, (P.y + 8.5) * T, 'stroll', 3, 'right'),
+        S((P.x + 10) * T, (P.y + 11.6) * T, 'sit', 6, 'down', 'hat'),
+      ];
+      case 'rosa': {
+        const sp = shorePoint(plazaAngleFromPond() + 0.6);
+        return [
+          S(...door, 'rest', 4, 'down'),
+          S((L.picnic.x + 0.5) * T, (L.picnic.y + 1.4) * T, 'eat', 10, 'up', 'pie'),
+          S(sp.x, sp.y, 'gaze', 5, faceTo(sp, ...pondPx)),
+          S((P.x + 3) * T, (P.y + 7) * T, 'stroll', 4, 'right'),
+        ];
+      }
+      default: { // toby
+        const sp = shorePoint(plazaAngleFromPond() - 0.7);
+        return [
+          S((P.x + 4) * T, (P.y + 8.5) * T, 'play', 16, 'down'),
+          S(...door, 'rest', 4, 'down'),
+          S(sp.x, sp.y, 'gaze', 6, faceTo(sp, ...pondPx)),
+        ];
+      }
+    }
+  }
+
   function spawnVillagers() {
+    const mult = run.villagerSpeed;
     for (const d of VILLAGER_DEFS) {
-      const stops = d.stops.map((s) => ({ ...s, wx: s.x * TILE, wy: s.y * TILE }));
+      const stops = stopsFor(d.id).map((s) => {
+        if (navBlockedPt(s.wx, s.wy)) {
+          const o = nearestOpen(Math.floor(s.wx / TILE), Math.floor(s.wy / TILE));
+          if (o) { s.wx = (o[0] + 0.5) * TILE; s.wy = (o[1] + 0.6) * TILE; }
+        }
+        return s;
+      });
       const v = {
-        ...d, stops, scale: d.scale || 1,
+        ...d, stops, scale: d.scale || 1, speed: d.speed * mult, chase: d.chase * mult,
         x: stops[0].wx, y: stops[0].wy, dir: stops[0].face, walk: 0, moving: false, seed: Math.random() * 6,
         hop: 0, hopV: 0, bubble: null,
         state: 'act', actT: stops[0].dur * (0.6 + Math.random() * 0.4), stopIdx: 0, stateT: 0, lineT: 1 + Math.random() * 4,
@@ -1818,7 +2040,7 @@
 
   function canSee(v, x, y) {
     const dx = x - v.x, dy = y - v.y, d = Math.hypot(dx, dy);
-    if (d > 170) return false;
+    if (d > run.vision) return false;
     if (d > 45) { const f = DIRV[v.dir]; if ((dx * f[0] + dy * f[1]) / d < 0.2) return false; }
     return lineClear(v.x, v.y - 4, x, y);
   }
@@ -1876,6 +2098,7 @@
     it.held = false; it.heldBy = null;
     let x = v.x + DIRV[v.dir][0] * 10, y = v.y + DIRV[v.dir][1] * 6 + 2;
     if (itemBlocked(it, x, y)) { x = v.x; y = v.y + 1; }
+    it.droppedAt = time;
     Object.assign(it, { x, y, z: 12, air: true, ghost: true, vz: 120, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 50, spin: (Math.random() - 0.5) * 10 });
     return it;
   }
@@ -1917,6 +2140,13 @@
     player.vx = dx / d * 240; player.vy = dy / d * 240; player.stun = 0.4;
     player.hopV = 100; player.hop = 0.01;
     sfx('snatch');
+    if (lvl('slip') && Math.random() < 0.34) { // Slippery upgrade
+      say(v, 'Slippery little...!');
+      player.bubble = { text: 'wriggle!', t: 1 };
+      toRoute(v); v.cooldown = 2.5;
+      return;
+    }
+    addStrike();
     if (it && player.held === it) {
       player.held = null;
       Object.assign(it, { held: true, heldBy: v });
@@ -2221,7 +2451,7 @@
   // ---------------------------------------------------------------------------
   // The raccoon's hideout (a hollow log at the forest edge) — a safe zone
   // ---------------------------------------------------------------------------
-  const HIDEOUT = { x: 4.8 * TILE, y: 23.8 * TILE, rx: 50, ry: 28 };
+  let HIDEOUT = { x: 4.8 * TILE, y: 23.8 * TILE, rx: 50, ry: 28 }; // set by buildMap
   function inHideoutPt(x, y) {
     const dx = (x - HIDEOUT.x) / HIDEOUT.rx, dy = (y - HIDEOUT.y) / HIDEOUT.ry;
     return dx * dx + dy * dy <= 1;
@@ -2242,67 +2472,314 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Mischief to-do list
+  // Mischief to-do list: a pool of tasks; each run (a "day") draws a hand
   // ---------------------------------------------------------------------------
-  const TASKS = [
+  const TASK_POOL = [
     { id: 'carrot', tier: 'Easy', text: 'Pull up a carrot' },
     { id: 'pie', tier: 'Easy', text: "Steal Rosa's pie" },
     { id: 'jump', tier: 'Easy', text: 'Make someone jump' },
     { id: 'kick', tier: 'Easy', text: "Kick Toby's ball" },
     { id: 'splash', tier: 'Easy', text: 'Throw something in the pond' },
+    { id: 'paper', tier: 'Easy', text: 'Swipe a newspaper' },
+    { id: 'gnome', tier: 'Easy', text: 'Kidnap a garden gnome' },
+    { id: 'lift', tier: 'Easy', text: 'Lift something heavy' },
     { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
     { id: 'bonk', tier: 'Medium', text: 'Bonk Mrs. Fennick' },
     { id: 'bertdrop', tier: 'Medium', text: "Make Bertram drop what he's carrying" },
     { id: 'escape', tier: 'Medium', text: 'Escape a chase' },
     { id: 'crops5', tier: 'Medium', text: 'Pull up 5 crops', goal: 5 },
+    { id: 'duck', tier: 'Medium', text: "Set Toby's duck afloat" },
+    { id: 'boot', tier: 'Medium', text: 'Give Rosa the boot', hint: 'hit her with the old boot' },
+    { id: 'heavythrow', tier: 'Medium', text: 'Throw a crate or barrel' },
+    { id: 'stash3', tier: 'Medium', text: 'Stash 3 things in your hideout', goal: 3, group: 'stash' },
     { id: 'picnic', tier: 'Hard', text: 'Ruin the picnic' },
     { id: 'hat', tier: 'Hard', text: 'Steal the hat from under her nose' },
     { id: 'double', tier: 'Hard', text: 'Get chased by two villagers at once' },
     { id: 'garden', tier: 'Hard', text: 'Empty the garden' },
-    { id: 'stash5', tier: 'Hard', text: 'Stash 5 things in your hideout', goal: 5 },
-    { id: 'feast', tier: 'Final', text: 'Have a feast', hint: 'Pie, sandwich and an apple in your hideout', final: true },
+    { id: 'stash5', tier: 'Hard', text: 'Stash 5 things in your hideout', goal: 5, group: 'stash' },
+    { id: 'sink3', tier: 'Hard', text: 'Sink 3 things in the pond', goal: 3 },
+    { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
+    { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
+    { id: 'feast', tier: 'Final', final: true, text: 'Have a feast', hint: 'pie, sandwich and an apple in your hideout' },
+    { id: 'loot8', tier: 'Final', final: true, text: 'Fill the den', hint: '8 things in your hideout', goal: 8, group: 'stash' },
+    { id: 'everyone', tier: 'Final', final: true, text: 'Rob the whole village', hint: "something of each villager's in your hideout" },
   ];
-  const tasks = { done: new Set(), progress: {}, cropPulls: 0, startedAt: 0, finished: false, checkT: 0 };
-  const TASK_BY_ID = Object.fromEntries(TASKS.map((t) => [t.id, t]));
-  const regularTasksDone = () => TASKS.every((t) => t.final || tasks.done.has(t.id));
+  const TASK_BY_ID = Object.fromEntries(TASK_POOL.map((t) => [t.id, t]));
+  const SHINIES = { Easy: 1, Medium: 2, Hard: 3, Final: 5 };
+
+  const run = {
+    day: 1, seed: 0, tasks: [], taskSet: new Set(), done: new Set(), progress: {}, cropPulls: 0, sunk: 0,
+    timeLeft: 360, timeTotal: 360, strikes: 0, maxStrikes: 3, earned: 0, over: false, ended: false,
+    startedAt: 0, checkT: 0, vision: 170, villagerSpeed: 1, shake: 0,
+  };
+  const tasks = run; // older code refers to the to-do state as `tasks`
+  let paused = true;  // true while any overlay (title, day card, results, den) is up
+
+  // Meta-progression, kept in this browser between visits ---------------------
+  const SAVE_KEY = 'mischief-lane-save-v1';
+  const save = { shinies: 0, up: {}, day: 1, bestDay: 0, runs: 0 };
+  function loadSave() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (s && typeof s === 'object') Object.assign(save, s, { up: { ...(s.up || {}) } });
+    } catch (_) { /* no storage: start fresh */ }
+  }
+  function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) { /* no storage */ } }
+  const lvl = (id) => save.up[id] || 0;
+
+  const UPGRADES = [
+    { id: 'paws', name: 'Quick Paws', desc: 'Run 12% faster per level.', costs: [3, 6, 10] },
+    { id: 'back', name: 'Strong Back', desc: 'Carry crates and barrels faster.', costs: [4, 8] },
+    { id: 'step', name: 'Light Step', desc: 'Villagers spot you from 15% less far per level.', costs: [4, 8] },
+    { id: 'chitter', name: 'Big Chitter', desc: 'Startle villagers from farther away.', costs: [3, 6] },
+    { id: 'fur', name: 'Thick Fur', desc: 'One more strike before you’re out.', costs: [5, 10] },
+    { id: 'day', name: 'Long Day', desc: 'One more minute before sunset per level.', costs: [3, 6] },
+    { id: 'slip', name: 'Slippery', desc: '1 in 3 chance to wriggle free when caught.', costs: [8] },
+  ];
+  const runSpeed = () => RUN_SPEED * (1 + 0.12 * lvl('paws'));
+  const heavyMult = () => [0.62, 0.8, 0.95][lvl('back')];
+  const chitterRadius = () => 95 * (1 + 0.35 * lvl('chitter'));
+
+  function setupRun(day) {
+    Object.assign(run, { day, done: new Set(), progress: {}, cropPulls: 0, sunk: 0, strikes: 0, earned: 0, over: false, ended: false, checkT: 0, shake: 0 });
+    run.maxStrikes = 3 + lvl('fur');
+    run.timeTotal = Math.min(540, 360 + 30 * (day - 1)) + 60 * lvl('day');
+    run.timeLeft = run.timeTotal;
+    run.villagerSpeed = Math.min(1.4, 1 + 0.06 * (day - 1));
+    run.vision = 170 * Math.min(1.35, 1 + 0.06 * (day - 1)) * (1 - 0.15 * lvl('step'));
+    // Draw the hand of tasks: harder days ask for more
+    const counts = { Easy: 3, Medium: Math.min(4, 2 + Math.floor((day - 1) / 2)), Hard: Math.min(3, 1 + Math.floor(day / 3)) };
+    const groups = new Set();
+    const chosen = [];
+    const finale = rpick(TASK_POOL.filter((t) => t.final));
+    if (finale.group) groups.add(finale.group);
+    for (const tier of ['Easy', 'Medium', 'Hard']) {
+      let n = counts[tier];
+      const pool = TASK_POOL.filter((t) => t.tier === tier).sort(() => Math.random() - 0.5);
+      for (const t of pool) {
+        if (n <= 0) break;
+        if (t.group && groups.has(t.group)) continue;
+        if (t.group) groups.add(t.group);
+        chosen.push(t); n--;
+      }
+    }
+    chosen.push(finale);
+    run.tasks = chosen;
+    run.taskSet = new Set(chosen.map((t) => t.id));
+  }
+
+  const regularTasksDone = () => run.tasks.every((t) => t.final || run.done.has(t.id));
 
   function completeTask(id) {
     const task = TASK_BY_ID[id];
-    if (!started || !task || tasks.done.has(id)) return;
+    if (!started || paused || run.over || !task || !run.taskSet.has(id) || run.done.has(id)) return;
     if (task.final && !regularTasksDone()) return;
-    tasks.done.add(id);
-    tasks.progress[id] = task.goal;
+    run.done.add(id);
+    run.progress[id] = task.goal;
+    const earn = SHINIES[task.tier];
+    run.earned += earn;
     sfx(task.final ? 'fanfare' : 'ding');
-    toast(task.text, task.final ? 'Feast had!' : 'Done!');
+    toast(task.text, `${task.final ? 'Finale!' : 'Done!'} +${earn} ✦`);
     for (let k = 0; k < 3; k++) sparkle(player.x + rr(-10, 10), player.y, 20 + k * 6);
     renderTodo(id);
-    if (!task.final && regularTasksDone()) {
-      setTimeout(() => { sfx('fanfare'); toast('Have a feast', 'Final task unlocked!'); renderTodo(); }, 1600);
+    updateRunBar();
+    if (run.done.size === run.tasks.length) {
+      run.over = true;
+      setTimeout(() => endRun('win'), 1600);
+    } else if (!task.final && regularTasksDone()) {
+      const fin = run.tasks.find((t) => t.final);
+      setTimeout(() => { sfx('fanfare'); toast(fin.text, 'Finale unlocked!'); renderTodo(); }, 1600);
     }
-    if (tasks.done.size === TASKS.length) setTimeout(showWin, 1800);
   }
   function setProgress(id, n) {
     const task = TASK_BY_ID[id];
-    if (tasks.done.has(id) || tasks.progress[id] === n) return;
-    tasks.progress[id] = Math.min(n, task.goal);
+    if (!run.taskSet.has(id) || run.done.has(id) || run.progress[id] === n) return;
+    run.progress[id] = Math.min(n, task.goal);
     renderTodo();
     if (n >= task.goal) completeTask(id);
   }
 
   // Conditions that are easier to poll than to catch as events
   function checkTasks(dt) {
-    tasks.checkT -= dt;
-    if (tasks.checkT > 0 || !started) return;
-    tasks.checkT = 0.25;
+    run.checkT -= dt;
+    if (run.checkT > 0 || !started) return;
+    run.checkT = 0.25;
     if (villagers.filter((v) => v.state === 'chase').length >= 2) completeTask('double');
     const crops = items.filter((it) => it.home && it.home.planted);
     if (crops.every((c) => !c.planted)) completeTask('garden');
     const stashed = items.filter(inHideout);
-    setProgress('stash5', stashed.length);
+    for (const id of ['stash3', 'stash5', 'loot8']) setProgress(id, stashed.length);
     if (['pie', 'sandwich', 'apple'].every((k) => stashed.some((it) => it.kind === k))) completeTask('feast');
+    const gnomes = items.filter((it) => it.kind === 'gnome');
+    if (gnomes.length >= 2 && gnomes.every(inHideout)) completeTask('gnomes');
+    if (villagers.every((v) => stashed.some((it) => it.owner === v.id))) completeTask('everyone');
   }
 
-  // UI ---------------------------------------------------------------------------
+  // Getting caught ---------------------------------------------------------------
+  function addStrike() {
+    if (run.over) return;
+    run.strikes++;
+    run.shake = 0.4;
+    updateRunBar();
+    const left = run.maxStrikes - run.strikes;
+    if (left <= 0) {
+      run.over = true;
+      toast('No strikes left', 'Caught!');
+      setTimeout(() => endRun('caught'), 1200);
+    } else {
+      toast(`${left} strike${left === 1 ? '' : 's'} left`, 'Caught!');
+    }
+  }
+
+  function endRun(reason) {
+    if (run.ended) return;
+    run.ended = true; run.over = true; paused = true;
+    keys.clear();
+    const win = reason === 'win';
+    const timeBonus = win ? Math.floor(run.timeLeft / 30) : 0;
+    const dayBonus = win ? run.day : 0;
+    const total = run.earned + timeBonus + dayBonus;
+    save.shinies += total;
+    save.runs++;
+    if (win) { save.bestDay = Math.max(save.bestDay, run.day); save.day = run.day + 1; } else save.day = 1;
+    writeSave();
+    sfx(win ? 'fanfare' : 'hmph');
+
+    const titles = { win: `Day ${run.day} done!`, caught: 'Caught red-pawed!', sunset: 'Sunset!' };
+    const subs = {
+      win: `${L.name} has been thoroughly ransacked.`,
+      caught: 'The villagers have had quite enough of you for one day.',
+      sunset: 'The villagers lock their doors for the night.',
+    };
+    document.getElementById('res-title').textContent = titles[reason];
+    document.getElementById('res-sub').textContent = subs[reason];
+    const rows = [
+      ['Tasks done', `${run.done.size} / ${run.tasks.length}`],
+      ['Shinies from tasks', `+${run.earned}`],
+    ];
+    if (win) rows.push(['Time left bonus', `+${timeBonus}`], [`Day ${run.day} bonus`, `+${dayBonus}`]);
+    rows.push(['Shinies earned', `+${total} ✦`]);
+    const dl = document.getElementById('res-stats');
+    dl.innerHTML = '';
+    rows.forEach(([k, v], i) => {
+      const row = document.createElement('div');
+      row.className = i === rows.length - 1 ? 'row total' : 'row';
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.textContent = v;
+      row.append(dt, dd); dl.appendChild(row);
+    });
+    document.getElementById('res-next').textContent = win
+      ? `Next: Day ${run.day + 1}. More tasks, sharper villagers.`
+      : 'Your streak goes back to Day 1. Upgrades you’ve bought stay.';
+    showOverlay('results');
+  }
+
+  // Overlays -------------------------------------------------------------------
+  const OVERLAYS = ['runcard', 'results', 'den'];
+  function showOverlay(id) {
+    for (const o of OVERLAYS) document.getElementById(o).hidden = o !== id;
+    document.getElementById('runbar').hidden = id !== null && id !== 'runcard';
+    todoEl.hidden = id === 'den' || id === 'results';
+    paused = id !== null;
+    if (id) { const btn = document.querySelector(`#${id} .primary`); setTimeout(() => btn && btn.focus(), 50); }
+  }
+
+  function startDay() {
+    setupRun(save.day);
+    run.seed = (Math.random() * 2 ** 31) >>> 0;
+    newVillage(run.seed);
+    showRunCard();
+  }
+  function showRunCard() {
+    buildTodo();
+    updateRunBar();
+    document.getElementById('rc-day').textContent = `Day ${run.day}`;
+    document.getElementById('rc-town').textContent = L.name;
+    const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
+    document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
+    document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
+    document.getElementById('rc-strikes').textContent = `${run.maxStrikes} strikes`;
+    showOverlay('runcard');
+  }
+  function goRun() {
+    if (document.getElementById('runcard').hidden) return;
+    keys.clear();
+    run.startedAt = performance.now();
+    showOverlay(null);
+    document.getElementById('runbar').hidden = false;
+  }
+  document.getElementById('rc-go').addEventListener('click', goRun);
+  document.getElementById('res-den').addEventListener('click', showDen);
+  document.getElementById('den-go').addEventListener('click', startDay);
+
+  function showDen() {
+    renderDen();
+    showOverlay('den');
+  }
+  function renderDen() {
+    document.getElementById('den-shinies').textContent = save.shinies;
+    document.getElementById('den-best').textContent = save.bestDay ? `Best: Day ${save.bestDay}` : 'No days finished yet';
+    document.getElementById('den-go').textContent = `Start Day ${save.day}`;
+    const list = document.getElementById('den-ups');
+    list.innerHTML = '';
+    for (const u of UPGRADES) {
+      const l = lvl(u.id), max = u.costs.length, cost = u.costs[l];
+      const li = document.createElement('li');
+      li.className = 'up' + (l >= max ? ' maxed' : '');
+      const pips = Array.from({ length: max }, (_, i) => `<span class="pip${i < l ? ' on' : ''}"></span>`).join('');
+      li.innerHTML = `<div class="up-head"><span class="up-name"></span><span class="pips">${pips}</span></div><p class="up-desc"></p><button type="button" class="buy"></button>`;
+      li.querySelector('.up-name').textContent = u.name;
+      li.querySelector('.up-desc').textContent = u.desc;
+      const b = li.querySelector('.buy');
+      if (l >= max) { b.textContent = 'Maxed'; b.disabled = true; }
+      else {
+        b.textContent = `${cost} ✦`;
+        b.disabled = save.shinies < cost;
+        b.setAttribute('aria-label', `Buy ${u.name} for ${cost} shinies`);
+        b.addEventListener('click', () => {
+          if (save.shinies < cost) return;
+          save.shinies -= cost;
+          save.up[u.id] = l + 1;
+          writeSave();
+          audioInit(); sfx('ding');
+          renderDen();
+        });
+      }
+      list.appendChild(li);
+    }
+  }
+
+  // Run bar (top of screen) -----------------------------------------------------
+  const PAW_SVG = '<svg viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="13.5" rx="5" ry="4.2"/><circle cx="4.2" cy="8" r="2.1"/><circle cx="8" cy="4.8" r="2.1"/><circle cx="12" cy="4.8" r="2.1"/><circle cx="15.8" cy="8" r="2.1"/></svg>';
+  let lastBarSecond = -1;
+  function updateRunBar() {
+    document.getElementById('rb-day').textContent = `Day ${run.day}`;
+    document.getElementById('rb-town').textContent = L ? L.name : '';
+    document.getElementById('rb-shiny').textContent = save.shinies + run.earned;
+    const st = document.getElementById('rb-strikes');
+    st.innerHTML = '';
+    for (let i = 0; i < run.maxStrikes; i++) {
+      const s = document.createElement('span');
+      s.className = 'paw' + (i < run.maxStrikes - run.strikes ? '' : ' lost');
+      s.innerHTML = PAW_SVG;
+      st.appendChild(s);
+    }
+    st.setAttribute('aria-label', `${run.maxStrikes - run.strikes} strikes left`);
+    lastBarSecond = -1;
+    updateTimer();
+  }
+  function updateTimer() {
+    const secs = Math.max(0, Math.ceil(run.timeLeft));
+    if (secs === lastBarSecond) return;
+    lastBarSecond = secs;
+    document.getElementById('rb-time').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    const frac = run.timeLeft / run.timeTotal;
+    const fill = document.getElementById('rb-fill');
+    fill.style.width = `${Math.max(0, frac) * 100}%`;
+    document.getElementById('runbar').classList.toggle('dusk', frac < 0.3);
+  }
+
+  // To-do notepad ----------------------------------------------------------------
   const todoEl = document.getElementById('todo');
   const todoList = document.getElementById('todo-list');
   const todoCount = document.getElementById('todo-count');
@@ -2312,12 +2789,12 @@
   function buildTodo() {
     let tier = '';
     todoList.innerHTML = '';
-    for (const task of TASKS) {
+    for (const task of run.tasks) {
       if (task.tier !== tier) {
         tier = task.tier;
         const h = document.createElement('li');
         h.className = 'tier';
-        h.textContent = tier;
+        h.textContent = tier === 'Final' ? 'Finale' : tier;
         todoList.appendChild(h);
       }
       const li = document.createElement('li');
@@ -2328,7 +2805,8 @@
       todoList.appendChild(li);
     }
     renderTodo();
-    // Open by default on big screens, collapsed on phones
+  }
+  function initTodoToggle() {
     let open = !isTouch && window.innerWidth > 700;
     try { const s = localStorage.getItem('mischief-todo-open'); if (s !== null) open = s === '1'; } catch (_) { /* no storage */ }
     setTodoOpen(open);
@@ -2343,15 +2821,15 @@
     const unlocked = regularTasksDone();
     for (const li of todoList.querySelectorAll('.task')) {
       const task = TASK_BY_ID[li.dataset.id];
-      const done = tasks.done.has(task.id);
+      const done = run.done.has(task.id);
       const locked = task.final && !unlocked;
       li.classList.toggle('done', done);
       li.classList.toggle('locked', locked);
       li.classList.toggle('fresh', task.id === justDone);
       li.querySelector('.txt').textContent = locked ? 'Finish everything else first' : task.text + (task.hint && !done ? ` (${task.hint})` : '');
-      li.querySelector('.prog').textContent = task.goal && !done ? `${tasks.progress[task.id] || 0}/${task.goal}` : '';
+      li.querySelector('.prog').textContent = task.goal && !done && !locked ? `${run.progress[task.id] || 0}/${task.goal}` : '';
     }
-    todoCount.textContent = `${tasks.done.size}/${TASKS.length}`;
+    todoCount.textContent = `${run.done.size}/${run.tasks.length}`;
   }
   function toast(text, label) {
     toastEl.innerHTML = '';
@@ -2363,14 +2841,23 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2600);
   }
-  function showWin() {
-    if (tasks.finished) return;
-    tasks.finished = true;
-    const secs = Math.round((performance.now() - tasks.startedAt) / 1000);
-    document.getElementById('win-time').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-    document.getElementById('win').hidden = false;
+
+  // Dusk: the world warms, then dims, as sunset nears
+  function drawDusk(ctx, left, top, viewW, viewH) {
+    if (!started || run.timeTotal <= 0) return;
+    const p = 1 - run.timeLeft / run.timeTotal;
+    if (p < 0.55) return;
+    const k = Math.min(1, (p - 0.55) / 0.45);
+    const mix = (a, b, t) => Math.round(a + (b - a) * t);
+    let r, g, b;
+    if (k < 0.6) { const t = k / 0.6; r = 255; g = mix(255, 196, t); b = mix(255, 150, t); }
+    else { const t = (k - 0.6) / 0.4; r = mix(255, 170, t); g = mix(196, 140, t); b = mix(150, 200, t); }
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(left - 10, top - 10, viewW + 20, viewH + 20);
+    ctx.restore();
   }
-  document.getElementById('win-close').addEventListener('click', () => { document.getElementById('win').hidden = true; });
 
   // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
@@ -2461,7 +2948,7 @@
         run = d > 70;
       }
     }
-    if (!started) return { x: 0, y: 0, run: false };
+    if (!started || paused) return { x: 0, y: 0, run: false };
     return { x, y, run };
   }
 
@@ -2469,13 +2956,18 @@
     audioInit();
     if (started) return;
     started = true;
-    tasks.startedAt = performance.now();
     document.getElementById('start').hidden = true;
+    // First visit: straight into Day 1. Returning: stop by the den to spend shinies.
+    if (save.runs > 0) showDen(); else showRunCard();
   }
 
   window.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (!started) { start(); return; }
+    if (paused) {
+      if (!document.getElementById('runcard').hidden && ['Enter', 'Space', 'KeyE'].includes(e.code) && !e.repeat) { e.preventDefault(); goRun(); }
+      return;
+    }
     keys.add(e.code);
     if (e.code === 'Space' && !e.repeat) chitter();
     if (e.code === 'KeyM' && !e.repeat) showMap = !showMap;
@@ -2500,11 +2992,11 @@
   const endTouch = (e) => { if (e.pointerId === touch.id) touch.id = null; };
   canvas.addEventListener('pointerup', endTouch);
   canvas.addEventListener('pointercancel', endTouch);
-  document.getElementById('chitter').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); start(); chitter(); });
+  document.getElementById('chitter').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) chitter(); });
   const grabBtn = document.getElementById('grab');
   const throwBtn = document.getElementById('throw');
-  grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); start(); grabOrDrop(); });
-  throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); start(); throwHeld(); });
+  grabBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) grabOrDrop(); });
+  throwBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (!started) { start(); return; } if (!paused) throwHeld(); });
   function syncTouchButtons() {
     const label = player.held ? 'drop' : 'grab';
     if (grabBtn.textContent !== label) grabBtn.textContent = label;
@@ -2533,7 +3025,8 @@
     cam.y = clamp(cam.y, viewH / 2, WORLD_H - viewH / 2);
     if (viewW >= WORLD_W) cam.x = WORLD_W / 2;
     if (viewH >= WORLD_H) cam.y = WORLD_H / 2;
-    const left = cam.x - viewW / 2, top = cam.y - viewH / 2;
+    const shake = run.shake > 0 ? run.shake * 10 : 0;
+    const left = cam.x - viewW / 2 + (Math.random() - 0.5) * shake, top = cam.y - viewH / 2 + (Math.random() - 0.5) * shake;
     const s = dpr * zoom;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2632,6 +3125,8 @@
       ellipse(ctx, c.x + c.rx * 0.5, c.y - c.ry * 0.3, c.rx * 0.6, c.ry * 0.7);
     }
 
+    drawDusk(ctx, left, top, viewW, viewH);
+
     // ---- Screen space UI ----
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // Touch joystick
@@ -2682,12 +3177,20 @@
     const dt = Math.min(0.05, (now - last) / 1000 || 0);
     last = now;
     time += dt;
-    updatePlayer(dt, readInput());
-    updateItems(dt);
-    updateVillagers(dt);
-    checkTasks(dt);
+    if (!paused) {
+      updatePlayer(dt, readInput());
+      updateItems(dt);
+      updateVillagers(dt);
+      checkTasks(dt);
+      if (started && !run.over) {
+        run.timeLeft -= dt;
+        updateTimer();
+        if (run.timeLeft <= 0) { run.timeLeft = 0; endRun('sunset'); }
+      }
+      run.shake = Math.max(0, run.shake - dt);
+    }
     updateAmbient(dt);
-    target = findTarget();
+    target = paused ? null : findTarget();
     syncTouchButtons();
     // camera eases toward the player, with a little look-ahead
     const lx = player.x + player.vx * 0.25, ly = player.y - 10 + player.vy * 0.25;
@@ -2697,30 +3200,60 @@
     requestAnimationFrame(frame);
   }
 
-  function boot(data) {
+  // Wipe the world and generate a fresh village from a seed
+  function newVillage(seed) {
+    rand = mulberry32(seed);
+    map.fill(0); used.fill(0);
+    objects.length = 0; items.length = 0; villagers.length = 0;
+    particles.length = 0; butterflies.length = 0; clouds.length = 0;
+    for (const k of Object.keys(VILLAGER)) delete VILLAGER[k];
+    L = genLayout();
     buildMap();
     solidObjects = objects.filter((o) => o.hitbox);
-    renderGround();
+    renderGround(seed);
     buildNav();
     placeItems();
     spawnVillagers();
     spawnAmbient();
-    buildTodo();
-    if (data && Array.isArray(data.tasksDone)) { for (const id of data.tasksDone) if (TASK_BY_ID[id]) tasks.done.add(id); renderTodo(); }
-    if (data && data.player && !collides(data.player.x, data.player.y)) {
-      player.x = data.player.x; player.y = data.player.y; player.dir = data.player.dir || 'down';
-      if (data.started) start();
-    }
+    Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0 });
+    target = null;
     cam.x = player.x; cam.y = player.y;
+  }
+
+  function boot() {
+    loadSave();
+    setupRun(save.day);
+    run.seed = (Math.random() * 2 ** 31) >>> 0;
+    newVillage(run.seed);
+    initTodoToggle();
+    buildTodo();
+    updateRunBar();
     resize();
     requestAnimationFrame((n) => { last = n; frame(n); });
   }
 
-  // Handy for poking at the game from the browser console
-  window.mischief = { player, items, objects, villagers, tasks, completeTask };
+  // Debug: draw the whole village into one picture (used for testing layouts)
+  function worldPicture(scale = 0.5) {
+    const c = document.createElement('canvas');
+    c.width = WORLD_W * scale; c.height = WORLD_H * scale;
+    const g = c.getContext('2d');
+    g.scale(scale, scale);
+    g.drawImage(ground, 0, 0);
+    for (const o of objects) if (o.shadow) o.shadow(g);
+    const list = [...objects, ...items.filter((i) => !i.held), ...villagers.map((v) => ({ y: v.y, isVillager: true, v })), { y: player.y, isPlayer: true }];
+    list.sort((a, b) => a.y - b.y);
+    for (const o of list) {
+      if (o.isPlayer) drawRaccoon(g, player, 0);
+      else if (o.isVillager) drawVillager(g, o.v, 0);
+      else if (o.isItem) drawItem(g, o, 0);
+      else o.draw(g, 0, false);
+    }
+    return c.toDataURL('image/png');
+  }
 
-  // Keep the raccoon where it was when the page hot-reloads in the viewer
-  try { window.claude?.hot?.snapshot?.(() => ({ player: { x: player.x, y: player.y, dir: player.dir }, started, tasksDone: [...tasks.done] })); } catch (_) { /* optional */ }
+  // Handy for poking at the game from the browser console
+  window.mischief = { player, items, objects, villagers, run, save, completeTask, endRun, get layout() { return L; }, newVillage, startDay, findPath, worldPicture };
+
   const hot = window.claude?.hot;
-  if (hot?.ready) hot.ready(boot); else boot(hot?.data ?? {});
+  if (hot?.ready) hot.ready(() => boot()); else boot();
 })();
