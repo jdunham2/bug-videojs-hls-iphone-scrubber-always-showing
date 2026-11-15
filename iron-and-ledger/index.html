@@ -97,6 +97,7 @@ footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-
       <div class="cash">$<span id="cash">0</span></div>
     </header>
     <nav>
+      <button data-tab="story">📖 Story</button>
       <button data-tab="quests">⭐ Quests</button>
       <button data-tab="loadout">Loadout</button>
       <button data-tab="terminal">Terminal</button>
@@ -334,6 +335,65 @@ const petDmg=x=>x*(S.char==='tamer'?1.5:1);
 const packSlots=()=>PACKS[S.pack||0].slots, APPRAISE_FEE=25, MARKET_FEE=.08;
 
 // ---------- save ----------
+// ---------- story ----------
+const STORY_CAST={marlow:{n:'Marlow',icon:'🧔',role:'the safehouse fixer'},pip:{n:'Pip',icon:'🐰',role:'a coin bunny who switched sides'},ursus:{n:'King Ursus',icon:'👑',role:'ruler of the Ursine Syndicate'}};
+const STORY=[
+  {t:'Wake-Up Call',who:'marlow',obj:{type:'tranq',need:5},rw:300,
+   intro:"Finally, you're awake. Bad news, ranger: last night bears broke into the armory and walked off with every gun we had. Bears. With guns. Somebody is organising them. Get out there and tranq five of them so we can find out who.",
+   outro:"Five bears, sleeping like babies. Look what one had in its pocket: a gold coin stamped with a crown and the words 'Ursine Syndicate'. I've heard that name before. I don't like it."},
+  {t:'Follow the Money',who:'marlow',obj:{type:'bunny',need:3},rw:400,
+   intro:"Those Syndicate coins keep turning up on the coin bunnies. The bunnies must be carrying the bears' money for them. Catch three and let's see what they know.",
+   outro:"One of the bunnies wants to talk. Says her name is Pip. She doesn't like the bears any more than we do."},
+  {t:'The Bunny Informant',who:'pip',obj:{type:'chest',need:3},rw:450,
+   intro:"Hi! Don't tranq me, I'm on your side now. The Syndicate hides its loot in treasure chests all over the maps. Open three and you'll find their secret orders. Watch out for my cousins. Some of them have knives and they are NOT friendly.",
+   outro:"The orders are signed with a paw print and a crown. They say: 'Old Grizzly guards the first vault.' The Syndicate has captains. Lots of them."},
+  {t:'The First Captain',who:'marlow',obj:{type:'bosstype',btype:'grizz',need:1},rw:700,gift:1,
+   intro:"Old Grizzly is the Syndicate's muscle: a big brown boss bear who's been running the Scrapyard. Find him on any map and put him to sleep. He'll be easier to spot than you'd think.",
+   outro:"While Old Grizzly snored, Pip found a map in his fur. It has six marks on it, each with a little drawing of a different boss bear. And in the middle: a crown."},
+  {t:'Sticky Situation',who:'pip',obj:{type:'bosstype',btype:'honey',zone:'Sunny Farm',need:1},rw:800,
+   intro:"The first mark on the map is Sunny Farm. The Honey Baron lives there: he pays the other bears in honey jars. Go to Sunny Farm and tranq him! Bring some honey of your own, it distracts bears.",
+   outro:"No more honey pay-day for the Syndicate! The Baron's ledger mentions a 'Frost King' up north, guarding something called 'the Crown's Key'."},
+  {t:'Cold Trail',who:'marlow',obj:{type:'bosstype',btype:'frost',zone:'Arctic Village',need:1},rw:950,gift:1,
+   intro:"Arctic Village. The Frost King breathes ice that slows you right down, so keep moving and stay out of his cone. Wrap up warm. The Polar Explorer shrugs off his breath, if you've got the cash.",
+   outro:"You got the Crown's Key off the Frost King. It's cold enough to burn your fingers. Pip says it opens the Syndicate's tomb in the graveyard. Of course it's a graveyard."},
+  {t:'Things That Go Bump',who:'pip',obj:{type:'bosstype',btype:'phantom',zone:'Haunted Graveyard',need:1},rw:1100,
+   intro:"The Haunted Graveyard. The Phantom Bear guards the tomb, and he turns invisible! When he vanishes, back up and watch for the flicker. I'll be… waiting here. Not scared. Just waiting.",
+   outro:"Inside the tomb: a scroll saying King Ursus trains his elite bears in the Bamboo Forest, under a ninja master. The Syndicate even has ninjas now."},
+  {t:'Ride or Die',who:'marlow',obj:{type:'bonk',need:4},rw:900,
+   intro:"Before you take on ninjas, you need to learn to move fast. Grab any vehicle (a kart, a monster truck, even the tank) and bonk four bears with it. Consider it driving school.",
+   outro:"Not bad. You drive like a maniac, which is exactly what we need. Now go get that ninja."},
+  {t:'Way of the Paw',who:'pip',obj:{type:'bosstype',btype:'ninja',zone:'Bamboo Forest',need:1},rw:1300,gift:1,
+   intro:"Bamboo Forest. The Ninja Bear throws fans of throwing stars and side-steps in a puff of smoke. A sword is perfect for this fight: get close and keep swinging!",
+   outro:"The Ninja Bear bowed before he fell asleep. Polite! His scroll says King Ursus's dragon is guarding the Syndicate's treasure on Volcano Island."},
+  {t:'Here Be Dragons',who:'marlow',obj:{type:'bosstype',btype:'drake',zone:'Volcano Island',need:1},rw:1600,
+   intro:"Volcano Island. The Dragon Bear breathes rivers of fire across the ground. Don't stand in the flames, and don't fall in the lava. Take a boat around the island if you need to.",
+   outro:"The Syndicate's treasure is ours! And the dragon talked in its sleep: 'The King… waits… in Neon City.' But first we need to cut off his money."},
+  {t:'Break the Bank',who:'pip',obj:{type:'cash',need:1500},rw:1200,
+   intro:"The Syndicate pays its bears out of cash it steals from rangers like you. Grab $1,500 in one raid and get out alive. Every coin you take is one King Ursus can't spend!",
+   outro:"The King's pockets are empty. His bears are grumbling. He's alone in Neon City now, with only his royal guard. This is it."},
+  {t:'Long Live the King',who:'ursus',obj:{type:'bosstype',btype:'king',zone:'Neon City',need:1},rw:5000,gift:2,
+   intro:"So, you're the little ranger who has been tranqing my captains. I am King Ursus, ruler of the Ursine Syndicate! Come to Neon City, if you dare. My crown, my guards and my ground-shaking slam are waiting for you. ROAAAR!",
+   outro:"King Ursus is snoring under his own crown. The Syndicate is finished! Marlow: 'The armory is full again, the bunnies are free, and you, ranger, are a legend.' Pip: 'Can we still go on raids? Please?' THE END… for now."},
+];
+function storyCh(){return STORY[S.story|0]||null}
+function storyTxt(c){const o=c.obj;return o.type==='tranq'?`Tranq ${o.need} bears`:o.type==='bunny'?`Catch ${o.need} coin bunnies`:o.type==='chest'?`Open ${o.need} treasure chests`:o.type==='bonk'?`Bonk ${o.need} bears with a vehicle`:o.type==='cash'?`Extract with ${money(o.need)}+ cash in one raid`:
+  `Tranq the ${BOSS_TYPES[o.btype].title}${o.zone?' in '+o.zone:' on any map'}`}
+function storyBossFor(z){const c=storyCh();if(!c||c.obj.type!=='bosstype')return null;if(c.obj.zone&&c.obj.zone!==z.n)return null;return c.obj.btype}
+function storyEv(type,amt,extra){const c=storyCh();if(!c||!R||R.pvp)return;const o=c.obj;
+  if(o.type==='bosstype'){if(type!=='bosstype'||extra!==o.btype||(o.zone&&R.z.n!==o.zone))return;S.storyHave=1}
+  else if(o.type===type){if(type==='cash'){if(amt<o.need)return;S.storyHave=o.need}else S.storyHave=Math.min(o.need,(S.storyHave|0)+amt)}else return;
+  if((S.storyHave|0)>=o.need){S.cash+=c.rw;let ex='';for(let k=0;k<(c.gift||0);k++){const w=mkWeapon(pick(VARIANTS),k?4:3,100,true);S.stash.push(w);ex+=` + ${wLabel(w)}`}
+    logMsg(`📖 Chapter ${(S.story|0)+1} complete: ${c.t} · +${money(c.rw)}${ex}`,'good');S.storyOutro=S.story|0;S.story=(S.story|0)+1;S.storyHave=0;
+    if(!R.over){feed(`📖 CHAPTER COMPLETE: ${c.t}! +${money(c.rw)}${ex}`,'#f2d24b');R.questFlash=4;R.questMsg='📖 Chapter complete: '+c.t}}
+  else if(!R.over&&o.type!=='cash')feed(`📖 Story: ${storyTxt(c)} ${S.storyHave}/${o.need}`,'#9ad8ff');save()}
+function storyModal(){if(document.getElementById('storyBox'))return;let html='',title='';
+  if(S.storyOutro!==undefined&&S.storyOutro!==null&&STORY[S.storyOutro]){const c=STORY[S.storyOutro],P=STORY_CAST[c.who];title=`Chapter ${S.storyOutro+1} complete: ${c.t}`;html=`<div style="font-size:44px">${P.icon}</div><p><b>${P.n}</b> <span style="opacity:.6">${P.role}</span></p><p>${c.outro}</p>`;S.storyOutro=null}
+  else if(storyCh()&&S.storySeen!==(S.story|0)){const c=storyCh(),P=STORY_CAST[c.who];title=`Chapter ${(S.story|0)+1}: ${c.t}`;html=`<div style="font-size:44px">${P.icon}</div><p><b>${P.n}</b> <span style="opacity:.6">${P.role}</span></p><p>${c.intro}</p><p style="color:#d6a64b">📖 Objective: ${storyTxt(c)} · reward ${money(c.rw)}${c.gift?' + weapon':''}</p>`;S.storySeen=S.story|0}
+  else return;save();
+  const d=document.createElement('div');d.id='storyBox';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px';
+  d.innerHTML=`<div class="panel" style="max-width:520px;width:100%;text-align:center;border-color:#d6a64b"><h3 style="justify-content:center">${esc(title)}</h3>${html}<button class="b primary" id="storyNext" style="margin-top:8px">Continue</button></div>`;
+  document.body.appendChild(d);d.querySelector('#storyNext').onclick=()=>{d.remove();SFX.init();SFX.ui&&SFX.ui();storyModal();renderHub()}}
+
 // ---------- quests ----------
 const QUESTS={
   tranq:{w:3,mk:()=>({need:ri(2,5)*4}),txt:q=>`Tranq ${q.need} bears`,rw:q=>q.need*35},
@@ -350,7 +410,7 @@ const QUESTS={
 function newQuest(){const act=(S.quests||[]).map(q=>q.type),pool=[];for(const k in QUESTS)if(!act.includes(k))for(let i=0;i<QUESTS[k].w;i++)pool.push(k);const type=pick(pool);
   return Object.assign({type,have:0,gift:Math.random()<.3},QUESTS[type].mk())}
 function ensureQuests(){S.quests=Array.isArray(S.quests)?S.quests.filter(q=>q&&QUESTS[q.type]&&q.need>0):[];while(S.quests.length<3)S.quests.push(newQuest());S.questsDone=S.questsDone|0}
-function questEv(type,amt=1,extra){if(!S||!S.quests)return;let changed=false;
+function questEv(type,amt=1,extra){if(!S)return;try{storyEv(type,amt,extra)}catch(e){}if(!S.quests)return;let changed=false;
   for(let i=0;i<S.quests.length;i++){const q=S.quests[i];if(q.type!==type)continue;if(type==='zone'&&extra!==q.zi)continue;
     const before=q.have;q.have=type==='cash'?(amt>=q.need?q.need:q.have):Math.min(q.need,q.have+amt);if(q.have===before)continue;changed=true;
     if(q.have>=q.need){const cash=QUESTS[type].rw(q);S.cash+=cash;S.questsDone++;let extraTxt='';
@@ -445,6 +505,19 @@ function row(w,acts,valHtml){return`<div class="row">${wInfo(w)}${condBar(w)}<di
 
 const PET_ICON={dog:'🐕',owl:'🦉',raccoon:'🦝',drone:'🛸',wolf:'🐺',eagle:'🦅',sentry:'🤖',minimecha:'🦾',thunderpup:'⚡',honeycub:'🍯',penguin:'🐧',turtle:'🐢',unicorn:'🦄',dragon:'🐉'};
 const VIEWS={
+  story(){const c=storyCh(),n=S.story|0;
+    let html=`<div class="panel"><h3>The Ursine Syndicate <span>Chapter ${Math.min(n+1,STORY.length)} of ${STORY.length}</span></h3>`;
+    if(c){const P=STORY_CAST[c.who],o=c.obj,have=S.storyHave|0;
+      html+=`<div class="row" style="grid-template-columns:52px minmax(0,1fr) auto"><div style="font-size:40px;line-height:1">${P.icon}</div><div style="min-width:0"><div class="wname">Chapter ${n+1}: ${esc(c.t)}</div>
+        <div class="wstats" style="margin:4px 0">${esc(c.intro)}</div>
+        <div style="height:8px;background:var(--line);margin:6px 0 4px;max-width:340px"><div style="height:100%;width:${Math.round(have/o.need*100)}%;background:#9ad8ff"></div></div>
+        <div class="wstats">📖 ${storyTxt(c)} · ${have}/${o.need} · reward ${money(c.rw)}${c.gift?' + weapon':''}${o.type==='bosstype'?' · In solo raids this boss is sure to show up'+(o.zone?' on '+o.zone:''):''}</div></div>
+        <div class="acts">${btn('story-replay',0,'Replay intro')}</div></div>`}
+    else html+=`<p>👑 You defeated King Ursus and finished the story! The Syndicate is history. Keep raiding, finishing quests and collecting weapons.</p><div class="acts">${btn('story-restart',0,'Play the story again')}</div>`;
+    html+=`<h3 style="margin-top:14px">Story so far</h3>`;
+    for(let i=n-1;i>=0;i--){const ch=STORY[i];html+=`<div class="row" style="grid-template-columns:28px minmax(0,1fr)"><div>${STORY_CAST[ch.who].icon}</div><div style="min-width:0"><div class="wname">${i+1}. ${esc(ch.t)} ✅</div><div class="wstats">${esc(ch.outro)}</div></div></div>`}
+    if(!n)html+=`<p class="help">Nothing yet. Your story starts with your first raid.</p>`;
+    return html+'</div>'},
   quests(){ensureQuests();
     let html=`<div class="panel"><h3>Quests <span>${S.questsDone} completed · next bonus Legendary in ${5-S.questsDone%5}</span></h3><p class="help" style="margin:0 0 8px">Finish quests during raids for cash. Some also give a mystery weapon, and every 5th quest gives a free Legendary. Rewards are paid the moment a quest is done, even if you get knocked out later.</p>`;
     S.quests.forEach((q,i)=>{const pct=Math.round(q.have/q.need*100);
@@ -485,7 +558,7 @@ const VIEWS={
       ${slot('Backpack',`${PACKS[S.pack].n} <span class="wstats">${packSlots()} loot slots</span>`)}
       ${slot('Gadgets',Object.keys(GADGETS).map(k=>`${GADGETS[k].n} ×${S.gadgets[k]}`).join('<br>'))}
       </div><div class="panel"><h3>Deploy</h3>`;
-    ZONES.forEach((z,i)=>{html+=`<div class="zone"><div><span class="wname">${z.n}</span> <span class="risk">${'■'.repeat(z.risk)}${'□'.repeat(4-z.risk)}</span></div>
+    ZONES.forEach((z,i)=>{html+=`<div class="zone"><div><span class="wname">${z.n}</span>${storyCh()&&storyCh().obj.zone===z.n?' <span class="tag eq">📖 Story</span>':''} <span class="risk">${'■'.repeat(z.risk)}${'□'.repeat(4-z.risk)}</span></div>
       <button class="b primary" data-act="deploy" data-id="${i}" ${S.cash<z.fee||(NET.squad&&!isLeader())?'disabled':''}>Deploy${z.fee?' · '+money(z.fee):''}</button><p>${z.desc} Boss bear and coin critters roam here.</p></div>`});
     const opt=(act,cur,labels)=>labels.map((l,i)=>`<button class="b ${cur===i?'primary':''}" data-act="${act}" data-id="${i}">${l}</button>`).join('');
     html+=`</div></div><div class="panel"><h3>Settings</h3>
@@ -547,7 +620,7 @@ const VIEWS={
   },
 };
 function renderHub(){
-  ensureQuests();
+  ensureQuests();if(S.story===undefined){S.story=0;S.storyHave=0}setTimeout(()=>{if(!$('#hub').hidden)storyModal()},0);
   $('#cash').textContent=Math.round(S.cash).toLocaleString();
   $('#raids').textContent=S.raids;
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
@@ -618,6 +691,8 @@ $('#hub').addEventListener('click',e=>{
     case 'char-buy':{const k=Object.keys(CHARS)[id];if(pay(CHARS[k].cost)){S.chars.push(k);S.char=k;logMsg(`Unlocked ${CHARS[k].n}!`,'good')}break}
     case 'char-use':S.char=Object.keys(CHARS)[id];break;
     case 'pet-off':S.pet=null;break;
+    case 'story-replay':S.storySeen=-1;setTimeout(storyModal,0);break;
+    case 'story-restart':S.story=0;S.storyHave=0;S.storySeen=-1;setTimeout(storyModal,0);break;
     case 'q-reroll':if(S.quests&&S.quests[id]&&pay(50)){S.quests[id]=null;S.quests=S.quests.filter(Boolean);const nq=newQuest();S.quests.splice(id,0,nq);logMsg('Swapped a quest.')}break;
     case 'set-assist':S.settings.assist=id;break;
     case 'set-markers':S.settings.markers=id;break;
@@ -1067,7 +1142,7 @@ function startRaid(zi,mp){
   for(const w of weps)if(w)R.mags[w.id]=wStats(w).mag;
   for(let i=0;i<z.gang;i++)R.agents.push(mkAgent(false,z.risk,i));
   for(let i=0;i<z.rivals;i++)R.agents.push(mkAgent(true,z.risk,i));
-  if(!z.pvp){const types=Object.keys(BOSS_TYPES),t1=pick(types);R.agents.push(mkAgent(true,z.risk,9,t1));if(z.risk>=3)R.agents.push(mkAgent(true,z.risk,8,pick(types.filter(t=>t!==t1))))}
+  if(!z.pvp){const types=Object.keys(BOSS_TYPES);let t1=pick(types);const sb=!(NET.squad&&mp)&&storyBossFor(z);if(sb)t1=sb;R.agents.push(mkAgent(true,z.risk,9,t1));if(z.risk>=3)R.agents.push(mkAgent(true,z.risk,8,pick(types.filter(t=>t!==t1))))}
   R.rockets=[];R.globs=[];R.sticky=[];R.fires=[];R.chill=0;
   R.critters=[];for(let i=0,n=ri(7,10);i<n;i++){const c=mkCritter();if(!z.pvp)R.critters.push(c)}
   buildScene();
@@ -1079,7 +1154,7 @@ function startRaid(zi,mp){
   $('#hub').hidden=true;$('#result').hidden=true;gameEl.hidden=false;resize();
   feed(`Deployed to ${z.n}. Find an EXFIL.`,'#d6a64b');if(S.pet)feed(`${PETS[S.pet].n} is with you`,'#86b46b');
   SH.sleeveMat.color=lc(CHARS[S.char].suit);
-  SFX.init();SFX.ambStart();if(mp)feed(`Squad raid: ${NET.code}`,'#86d4ff');ensureQuests();if(!R.pvp)feed(`⭐ Quests: ${S.quests.map(q=>QUESTS[q.type].txt(q)).join(' · ')}`,'#e6c86a');
+  SFX.init();SFX.ambStart();if(mp)feed(`Squad raid: ${NET.code}`,'#86d4ff');ensureQuests();if(!R.pvp&&storyCh())feed(`📖 Chapter ${(S.story|0)+1}: ${storyTxt(storyCh())}`,'#9ad8ff');if(!R.pvp)feed(`⭐ Quests: ${S.quests.map(q=>QUESTS[q.type].txt(q)).join(' · ')}`,'#e6c86a');
   netSend();last=performance.now();
 }
 function mkAgent(rival,risk,i,boss){
@@ -1813,7 +1888,7 @@ function damage(t,dmg,src){
   if(t.hp<=0){kill(t,src);if(src===R.player){R.hitmark=.4;R.killmark=true;SFX.hit(false,true)}}
 }
 function kill(a,src){
-  if(!(a.boss&&a.btype==='zombie'&&!a.revived)&&!a.dead&&src===R.player){questEv('tranq');if(a.boss)questEv('boss');const cw=curW();if(cw&&BASES[cw.base]&&BASES[cw.base].melee&&!R.petHit)questEv('melee');if(R.petHit)questEv('pet')}
+  if(!(a.boss&&a.btype==='zombie'&&!a.revived)&&!a.dead&&src===R.player){questEv('tranq');if(a.boss)questEv('boss');const cw=curW();if(cw&&BASES[cw.base]&&BASES[cw.base].melee&&!R.petHit)questEv('melee');if(R.petHit)questEv('pet');if(a.boss)questEv('bosstype',1,a.btype||'grizz')}
   if(a.boss&&a.btype==='zombie'&&!a.revived){a.revived=1;a.hp=a.maxhp*.6;for(let i=0;i<30;i++)emit(R.fxAdd,{x:a.x*K+rnd(-1,1),y:rnd(.2,3),z:a.y*K+rnd(-1,1),vy:1.5,life:1,r:.8,g:3,b:.6,s:.15,s2:.03});SFX.roar(v3(a.x*K,2,a.y*K));feed(`${a.name} won't stay down! It got back up!`,'#9ad86a');return}
   a.dead=true;const risk=R.z.risk;if(dist(a,R.player)<1200)SFX.growl(v3(a.x*K,1.5,a.y*K),false);
   a.sleepT=(a.boss?90:rnd(45,70)*(a.rival?.8:1))/(1+(a.wakes||0)*.35);a.stirring=false;a.netT=0;a.trapT=0;
@@ -2742,7 +2817,7 @@ function hud(){
   cx.textAlign='left';cx.fillStyle='#e6dfcf';cx.font='700 20px "Chakra Petch", sans-serif';
   const m=Math.max(0,R.time);cx.fillText(`${R.z.n.toUpperCase()}  ${Math.floor(m/60)}:${String(Math.floor(m%60)).padStart(2,'0')}`,pad,pad+16);
   cx.font=mono(12);cx.fillStyle='#d6a64b';cx.fillText(`Cash ${money(R.raidCash)} · Bears tranqed ${R.kills} · Pack ${R.pack.length}/${packSlots()}`,pad,pad+36);
-  if(!R.pvp&&S.quests){cx.font=mono(11);S.quests.forEach((q,i)=>{cx.fillStyle=q.have>=q.need?'#86b46b':'#c8b88a';cx.fillText(`⭐ ${QUESTS[q.type].txt(q)}  ${q.have}/${q.need}`,pad,pad+54+i*15)})}
+  if(!R.pvp&&S.quests){cx.font=mono(11);const sc0=storyCh();let yy=pad+54;if(sc0){cx.fillStyle='#9ad8ff';cx.fillText(`📖 ${storyTxt(sc0)}  ${S.storyHave|0}/${sc0.obj.need}`,pad,yy);yy+=15}S.quests.forEach((q,i)=>{cx.fillStyle=q.have>=q.need?'#86b46b':'#c8b88a';cx.fillText(`⭐ ${QUESTS[q.type].txt(q)}  ${q.have}/${q.need}`,pad,yy+i*15)})}
   if(R.questFlash>0){R.questFlash-=1/60;cx.textAlign='center';cx.font='700 22px "IBM Plex Mono", monospace';cx.fillStyle=`rgba(242,210,75,${Math.min(1,R.questFlash)})`;cx.fillText('⭐ QUEST COMPLETE ⭐',VW/2,VH*.28);cx.font=mono(13);cx.fillText(R.questMsg||'',VW/2,VH*.28+22);cx.textAlign='left'}
   if(R.remotes){let i=0;for(const r of Object.values(R.remotes)){cx.fillStyle=safeColor(r.color);cx.font=mono(12,'600');cx.fillText(`● ${r.nick}  ${r.dn?'DOWN '+r.dn+'s':r.ko?'KO':Math.max(0,Math.round(r.hp))+' HP'}`,pad,pad+84+i*16);i++}}
   R.pack.forEach((it,i)=>{cx.fillStyle='rgba(0,0,0,.5)';cx.fillRect(pad+i*36,pad+46,32,18);cx.fillStyle='#e6dfcf';cx.font=mono(10);cx.fillText(BASES[it.base].name.slice(0,4),pad+4+i*36,pad+59)});
