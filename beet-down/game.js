@@ -58,6 +58,7 @@ const SETS={
   elemental:{name:'Elemental',col:'#c08bff',tiers:[[2,{dmg:8}],[4,{dmg:16,speed:5}],[6,{dmg:25,speed:10}]]},
   heavy:{name:'Heavy',col:'#e0b84f',tiers:[[2,{maxHp:4}],[4,{maxHp:10,armor:2}],[6,{maxHp:18,armor:4,speed:-5}]]},
 };
+for(const k in WEAPONS)WEAPONS[k].id=k;
 const TIER_DMG=[1,1.65,2.5,3.7], TIER_CD=[1,.9,.8,.7], TIER_PRICE=[1,1.9,3.4,6];
 
 const ITEMS=[
@@ -115,7 +116,7 @@ const UNLOCKS={
   mushroom:{txt:'Defeat 1,500 aliens across runs',goal:1500,val:p=>p.kills},
   pumpkin:{txt:'Smash the Brood Queen',goal:1,val:p=>p.wins},
 };
-const PROF=Object.assign({best:store.get('bd_best',0),kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{}},store.get('bd_prof',{}));
+const PROF=Object.assign({best:store.get('bd_best',0),kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},wunlocked:[],wseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}},store.get('bd_prof',{}));
 /* Danger levels stack: each one includes every level below it. Win on your highest unlocked level to open the next. */
 const DANGERS=[
   {name:'Mild',col:'#7bd35a',desc:'The standard run.'},
@@ -128,7 +129,25 @@ const DANGERS=[
 const DZ=n=>!!run&&run.danger>=n;
 function saveProf(){store.set('bd_prof',PROF)}
 const isUnlocked=id=>!UNLOCKS[id]||PROF.unlocked.includes(id);
+/* Weapons not listed here are in the shop from the start. A veggie's starting weapon can always appear in its own shop. */
+const WUNLOCKS={
+  knife:{txt:'Land 200 critical hits',goal:200,val:p=>p.crits},
+  axe:{txt:'Defeat 300 aliens with melee weapons',goal:300,val:p=>p.meleeK},
+  sniper:{txt:'Defeat 250 aliens with the Pistol',goal:250,val:p=>p.wk.pistol||0},
+  minigun:{txt:'Defeat 400 aliens with the SMG',goal:400,val:p=>p.wk.smg||0},
+  flamer:{txt:'Defeat 250 aliens with the Zapper',goal:250,val:p=>p.wk.zapper||0},
+  rocket:{txt:'Defeat 150 aliens with explosions',goal:150,val:p=>p.boomK},
+  bouncer:{txt:'Carry 6 weapons at once',goal:1,val:p=>p.full6},
+  lobber:{txt:'Defeat 10 elite aliens',goal:10,val:p=>p.elites},
+};
+const wUnlocked=id=>!WUNLOCKS[id]||PROF.wunlocked.includes(id);
+function creditKill(def){PROF.wk[def.id]=(PROF.wk[def.id]||0)+1;if(def.melee)PROF.meleeK++}
 function checkUnlocks(){
+  for(const id in WUNLOCKS){const u=WUNLOCKS[id];if(PROF.wunlocked.includes(id)||u.val(PROF)<u.goal)continue;
+    PROF.wunlocked.push(id); saveProf(); const nm=WEAPONS[id].name;
+    if(run){(run.newWeapons=run.newWeapons||[]).push(id)}
+    if(state==='wave'||state==='waveEnd'||state==='winning'){showBanner('NEW WEAPON!',nm+' added to the shop',2.2,'#4fb3ff');sfx('crate')}
+    else if(state==='shop'){toast(`New weapon unlocked: ${nm}!`);sfx('crate')}}
   for(const id in UNLOCKS){const u=UNLOCKS[id];if(PROF.unlocked.includes(id)||u.val(PROF)<u.goal)continue;
     PROF.unlocked.push(id); saveProf(); const ch=CHARS.find(c=>c.id===id);
     if(run){(run.newUnlocks=run.newUnlocks||[]).push(id)}
@@ -285,7 +304,7 @@ const xpNeed=l=>(l+3)*(l+3);
 /* ================= weapons ================= */
 function addWeapon(id,tier){
   if(run.weapons.length>=6){const m=run.weapons.find(w=>w.id===id&&w.tier===tier&&tier<3);if(!m)return false;m.tier++;m.flash=1;recalc();return true}
-  run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); recalc(); return true;
+  run.weapons.push({id,tier,cd:rand(.1,.5),aim:-Math.PI/2,ext:0,thrust:null,recoil:0,flash:0,spin:0}); recalc(); if(run.weapons.length>=6&&!PROF.full6){PROF.full6=1;checkUnlocks()} return true;
 }
 function canAddWeapon(id,tier){return run.weapons.length<6||run.weapons.some(w=>w.id===id&&w.tier===tier&&tier<3)}
 function wDmg(def,t){const base=def.dmg*TIER_DMG[t]+(def.melee?S.melee:S.ranged)*(def.flame||def.spin?.4:1);const mul=(1+S.dmg/100)*(def.melee?1:(run.char.rangedMul||1));return Math.max(1,base*mul)}
@@ -371,8 +390,9 @@ function jag(pts){const out=[pts[0]];for(let i=1;i<pts.length;i++){const a=pts[i
 
 /* ================= combat ================= */
 function dealHit(e,dmg,def,ang,knock){
-  const crit=Math.random()*100<(def.crit+S.crit);
-  hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?def.critMul:1))),crit,ang,knock,crit&&def.bonk);
+  const crit=Math.random()*100<(def.crit+S.crit); if(crit)PROF.crits++;
+  const was=!e.dead; hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?def.critMul:1))),crit,ang,knock,crit&&def.bonk);
+  if(was&&e.dead)creditKill(def);
 }
 function hurtEnemy(e,d,crit,ang,knock,bonk){
   if(e.dead||e.popT!=null)return;
@@ -409,6 +429,7 @@ function killEnemy(e,drops){
   if(m>=8){const b5=Math.floor(m/5);for(let i=0;i<b5;i++)dropGem(e.x,e.y,5);m-=b5*5}
   for(let i=0;i<m;i++)dropGem(e.x,e.y,1);
   if(Math.random()<.025*(1+S.luck/100))pickups.push({k:'fruit',x:e.x,y:e.y,t:0,vx:rand(-60,60),vy:rand(-60,60)});
+  if(e.elite)PROF.elites++;
   if(e.crate)pickups.push({k:'crate',x:e.x,y:e.y,t:0,vx:0,vy:0});
   if(S.boom>0&&Math.random()*100<S.boom)booms.push({x:e.x,y:e.y,t:.07,r:55,dmg:8+S.dmg*.1+run.wave,safe:true});
   if(e.type==='splitter')for(let k=0;k<2;k++){const m2=makeEnemy('mini',e.x+rand(-6,6),e.y+rand(-6,6));const a=rand(0,TAU);m2.kx=Math.cos(a)*260;m2.ky=Math.sin(a)*260;enemies.push(m2)}
@@ -417,9 +438,9 @@ function killEnemy(e,drops){
 }
 function stamp(name,col,x,y,size,alpha,rot){const im=tinted(name,col);dctx.save();dctx.globalAlpha=alpha;dctx.translate(x,y);dctx.rotate(rot);dctx.drawImage(im,-size/2,-size/2*im.height/im.width,size,size*im.height/im.width);dctx.restore()}
 function splat(x,y,r,col){stamp('fx_splat',col,x,y,r*rand(3,4),.6,rand(0,TAU))}
-function explode(x,y,R,dmg,knock,hurtsPlayer){
+function explode(x,y,R,dmg,knock,hurtsPlayer,def){
   if(!hurtsPlayer)R*=1+(S.blast||0)/100;
-  for(const e of enemies){if(e.dead)continue;const dd=Math.sqrt(d2(x,y,e.x,e.y));if(dd<R+e.r){const crit=Math.random()*100<S.crit+3;hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?2:1))),crit,Math.atan2(e.y-y,e.x-x),knock)}}
+  for(const e of enemies){if(e.dead)continue;const dd=Math.sqrt(d2(x,y,e.x,e.y));if(dd<R+e.r){const crit=Math.random()*100<S.crit+3;const was=!e.dead;hurtEnemy(e,Math.max(1,Math.round(dmg*(crit?2:1))),crit,Math.atan2(e.y-y,e.x-x),knock);if(was&&e.dead&&dmg>0){PROF.boomK++;if(def)creditKill(def)}}}
   if(hurtsPlayer&&Math.hypot(P.x-x,P.y-y)<R+P.r)hurtPlayer(hurtsPlayer,null);
   fx.push({k:'ring',x,y,r0:R*.3,r1:R*1.15,t:0,life:.3,c:'#ffd27a',w:8});
   parts.push({x,y,vx:0,vy:0,t:0,life:.3,img:'fx_fire',col:'#ffb347',s0:R*.8,s1:R*2.2,rot:rand(0,TAU),add:1,a0:1});
@@ -605,19 +626,19 @@ function update(dt){
   // bullets
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
-    if(b.lob){b.t+=dt;const p=Math.min(1,b.t/b.T);b.x=lerp(b.sx,b.tx,p);b.y=lerp(b.sy,b.ty,p);b.z=Math.sin(p*Math.PI)*90;b.rot+=dt*12;if(p>=1){bullets.splice(i,1);explode(b.tx,b.ty,b.def.blast,b.dmg,b.def.knock)}continue}
+    if(b.lob){b.t+=dt;const p=Math.min(1,b.t/b.T);b.x=lerp(b.sx,b.tx,p);b.y=lerp(b.sy,b.ty,p);b.z=Math.sin(p*Math.PI)*90;b.rot+=dt*12;if(p>=1){bullets.splice(i,1);explode(b.tx,b.ty,b.def.blast,b.dmg,b.def.knock,0,b.def)}continue}
     b.x+=b.vx*dt; b.y+=b.vy*dt; b.trav+=b.spd*dt;
     let gone=b.trav>b.range||b.x<-20||b.x>AW+20||b.y<-20||b.y>AH+20;
     if(!gone)for(const e of enemies){
       if(e.dead||e.popT!=null||b.hit.has(e)||e.z>20)continue;
       const rr=e.r+b.r; if(d2(b.x,b.y,e.x,e.y)<rr*rr){
-        if(b.rocket){explode(b.x,b.y,b.def.blast,b.dmg,b.def.knock);gone=true;break}
+        if(b.rocket){explode(b.x,b.y,b.def.blast,b.dmg,b.def.knock,0,b.def);gone=true;break}
         b.hit.add(e); dealHit(e,b.dmg,b.def,b.a,b.def.knock);
         if(b.bounce>0){const nx=nearestEnemy(b.x,b.y,260,b.hit);if(nx){b.bounce--;const a=Math.atan2(nx.y-b.y,nx.x-b.x);b.vx=Math.cos(a)*b.spd;b.vy=Math.sin(a)*b.spd;b.a=a;b.trav=Math.max(0,b.range-300);sfx('bounce');parts.push({x:b.x,y:b.y,vx:0,vy:0,t:0,life:.15,img:'fx_glow',col:'#ffe066',s0:12,s1:36,add:1});break}}
         if(--b.pierce<0){gone=true;break}
       }
     }
-    if(gone){if(b.rocket&&b.trav>b.range)explode(b.x,b.y,b.def.blast,b.dmg,b.def.knock);bullets.splice(i,1)}
+    if(gone){if(b.rocket&&b.trav>b.range)explode(b.x,b.y,b.def.blast,b.dmg,b.def.knock,0,b.def);bullets.splice(i,1)}
     else if(b.rocket&&Math.random()<.7)parts.push({x:b.x,y:b.y,vx:rand(-20,20),vy:rand(-20,20),t:0,life:.4,img:'fx_puff',col:'#9a8a9a',s0:6,s1:18,rot:rand(0,TAU),a0:.5});
   }
   updateEnemies(dt);
@@ -930,7 +951,21 @@ function buildMenu(){
   if(newly.length){PROF.seen.push(...newly);saveProf()}
   renderDanger();
   $('unlockCount').textContent=`${nUn} / ${CHARS.length} veggies unlocked`;
+  renderArmory();
   const best=PROF.best; $('best').textContent=best?`Best run: wave ${best}${PROF.wins?` · Queen smashed ${PROF.wins}×`:''} · ${PROF.kills.toLocaleString()} aliens defeated`:'';
+}
+function renderArmory(){
+  const box=$('armory'); box.innerHTML=''; let n=0; const fresh=[];
+  for(const id in WEAPONS){const def=WEAPONS[id]; const ok=wUnlocked(id); const d=document.createElement('div'); d.className='arm'+(ok?'':' locked');
+    const cv=weaponIcon(id,0); if(!ok){const c=cv.getContext('2d');c.globalCompositeOperation='source-in';c.fillStyle='#120a18';c.fillRect(0,0,cv.width,cv.height)}
+    d.appendChild(cv);
+    if(ok){n++; if(WUNLOCKS[id]&&!PROF.wseen.includes(id)){fresh.push(id);d.insertAdjacentHTML('beforeend','<span class="newb">NEW</span>')}
+      d.insertAdjacentHTML('beforeend',`<b>${def.name}</b><div class="pills">${def.sets.map(k=>`<span class="pill" style="--sc:${SETS[k].col}">${SETS[k].name}</span>`).join('')}</div><p>${def.desc}</p>`)}
+    else{const u=WUNLOCKS[id],v=Math.min(u.goal,u.val(PROF));
+      d.insertAdjacentHTML('beforeend',`<b>${def.name}</b><p class="req">${u.txt}</p><div class="prog"><i style="width:${Math.round(v/u.goal*100)}%"></i></div><p class="pv">${v.toLocaleString()} / ${u.goal.toLocaleString()}</p>`)}
+    box.appendChild(d)}
+  if(fresh.length){PROF.wseen.push(...fresh);saveProf()}
+  $('armCount').textContent=`${n} / ${Object.keys(WEAPONS).length} in the shop`;
 }
 function renderDanger(){
   PROF.dsel=Math.min(PROF.dsel,PROF.danger);
@@ -998,7 +1033,7 @@ function rollShop(fresh){
   let guard=0;
   while(out.length<4&&guard++<60){
     const r=rollRarity(); let o;
-    if(Math.random()<.4){const owned=run.weapons.map(w=>w.id);const id=(owned.length&&Math.random()<.35)?pick(owned):pick(Object.keys(WEAPONS));o={kind:'w',id,tier:Math.min(3,r),locked:false,sold:false}}
+    if(Math.random()<.4){const owned=run.weapons.map(w=>w.id);const pool=Object.keys(WEAPONS).filter(k=>wUnlocked(k)||k===run.char.weapon);const id=(owned.length&&Math.random()<.35)?pick(owned):pick(pool);o={kind:'w',id,tier:Math.min(3,r),locked:false,sold:false}}
     else{const it=randomItem(r);o={kind:'i',id:it.id,locked:false,sold:false}}
     if(guard<50&&out.some(x=>x.kind===o.kind&&x.id===o.id))continue;
     out.push(o);
@@ -1079,10 +1114,13 @@ function gameOver(win){
   if(win){PROF.wins++;PROF.medals[run.char.id]=Math.max(PROF.medals[run.char.id]??-1,run.danger);if(run.danger===PROF.danger&&PROF.danger<DANGERS.length-1){PROF.danger++;PROF.dsel=PROF.danger;newDanger=PROF.danger}}
   checkUnlocks(); saveProf();
   const nu=(run.newUnlocks||[]).map(id=>CHARS.find(c=>c.id===id));
-  const box=$('overUnlocks'); box.hidden=!nu.length&&newDanger<0;
+  const nw=run.newWeapons||[];
+  const box=$('overUnlocks'); box.hidden=!nu.length&&newDanger<0&&!nw.length;
   if(!nu.length)box.innerHTML='';
   if(nu.length){box.innerHTML='<div class="unlT">New veggie'+(nu.length>1?'s':'')+' unlocked!</div><div class="unlL"></div>';const L=box.querySelector('.unlL');
     nu.forEach(ch=>{const cv=document.createElement('canvas');cv.width=160;cv.height=150;const c=cv.getContext('2d');const r=Math.min(32,118/ch.k);drawVeg(c,ch,80,140-r*1.3,r,{t:1,lx:.3,ly:.2});const d=document.createElement('div');d.className='unlC';d.appendChild(cv);d.insertAdjacentHTML('beforeend',`<b>${ch.name}</b><span>${ch.role}</span>`);L.appendChild(d)})}
+  if(nw.length){box.insertAdjacentHTML('beforeend','<div class="unlT" style="color:var(--r1)">New weapon'+(nw.length>1?'s':'')+' in the shop!</div><div class="unlL wl"></div>');const L=box.querySelector('.unlL.wl');
+    nw.forEach(id=>{const d=document.createElement('div');d.className='unlC wpn';d.appendChild(weaponIcon(id,0));d.insertAdjacentHTML('beforeend',`<b>${WEAPONS[id].name}</b><span>${WEAPONS[id].sets.map(k=>SETS[k].name).join(' · ')}</span>`);L.appendChild(d)})}
   if(newDanger>=0){const dz=DANGERS[newDanger];box.insertAdjacentHTML('afterbegin',`<div class="dUn" style="--dc:${dz.col}"><b>Danger ${newDanger} unlocked: ${dz.name}</b><span>${dz.desc}</span></div>`)}
 }
 
@@ -1126,4 +1164,4 @@ loadAssets().then(()=>{
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(state==='menu')buildMenu()});
 });
 requestAnimationFrame(loop);
-window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},PROF,checkUnlocks,buildMenu,startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
+window.BD={get run(){return run},get P(){return P},get S(){return S},get state(){return state},get enemies(){return enemies},get eb(){return ebullets},PROF,wUnlocked,checkUnlocks,buildMenu,startRun,CHARS,WEAPONS,startWave,endWave,addWeapon};
