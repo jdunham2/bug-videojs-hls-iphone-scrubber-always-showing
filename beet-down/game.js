@@ -116,7 +116,8 @@ const UNLOCKS={
   mushroom:{txt:'Defeat 1,500 aliens across runs',goal:1500,val:p=>p.kills},
   pumpkin:{txt:'Smash the Brood Queen',goal:1,val:p=>p.wins},
 };
-const PROF=Object.assign({best:store.get('bd_best',0),kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},wunlocked:[],wseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}},store.get('bd_prof',{}));
+const profDefaults=()=>({best:0,kills:0,mats:0,heal:0,combo:0,set4:0,wins:0,unlocked:[],seen:[],danger:0,dsel:0,medals:{},wunlocked:[],wseen:[],crits:0,meleeK:0,boomK:0,full6:0,elites:0,wk:{}});
+const PROF=Object.assign(profDefaults(),{best:store.get('bd_best',0)},store.get('bd_prof',{}));
 /* Danger levels stack: each one includes every level below it. Win on your highest unlocked level to open the next. */
 const DANGERS=[
   {name:'Mild',col:'#7bd35a',desc:'The standard run.'},
@@ -128,6 +129,7 @@ const DANGERS=[
 ];
 const DZ=n=>!!run&&run.danger>=n;
 function saveProf(){store.set('bd_prof',PROF)}
+function resetProgress(){for(const k of Object.keys(PROF))delete PROF[k];Object.assign(PROF,profDefaults());saveProf();store.set('bd_best',0)}
 const isUnlocked=id=>!UNLOCKS[id]||PROF.unlocked.includes(id);
 /* Weapons not listed here are in the shop from the start. A veggie's starting weapon can always appear in its own shop. */
 const WUNLOCKS={
@@ -915,7 +917,7 @@ function loop(now){
 }
 
 /* ================= UI ================= */
-const overlays=['menu','lvl','shop','pause','over'];
+const overlays=['menu','lvl','shop','pause','over','reset'];
 function showUI(id){overlays.forEach(o=>$(o).hidden=o!==id);$('hudBtns').hidden=!(id===null||id==='shop');$('btnPause').hidden=id==='shop'}
 function toast(msg){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.style.opacity=1;clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,1500)}
 function modLines(mods){const out=[];for(const k in mods){if(!STAT[k])continue;const v=mods[k];out.push([(v>0?'+':'')+v+(STAT[k][0]==='%'?'':' ')+STAT[k],v>0?'pos':'neg'])}return out}
@@ -1153,6 +1155,12 @@ $('btnResume').onclick=resume;
 $('btnQuit').onclick=()=>{run=null;state='menu';buildMenu();showUI('menu')};
 $('btnReroll').onclick=()=>{const c=rerollCost();if(run.mats<c){sfx('deny');return}run.mats-=c;run.rerolls++;run.shop.forEach(s=>{if(s.sold)s.locked=false});rollShop();sfx('click');renderShop();document.querySelectorAll('#shopCards .card').forEach(c=>c.classList.add('pop'))};
 $('btnGo').onclick=()=>{sfx('click');startWave(run.wave+1)};
+$('btnReset').onclick=()=>{audioInit();sfx('click');
+  const n=PROF.unlocked.length, w=PROF.wunlocked.length, m=Object.keys(PROF.medals).length;
+  $('resetList').innerHTML=`<li>${n} unlocked veggie${n===1?'':'s'} (back to Beet, Onion and Radish)</li><li>${w} unlocked weapon${w===1?'':'s'}</li><li>Danger levels up to ${PROF.danger} and ${m} medal${m===1?'':'s'}</li><li>Best wave ${PROF.best}, ${PROF.kills.toLocaleString()} aliens defeated and all other stats</li>`;
+  showUI('reset');$('btnResetNo').focus()};
+$('btnResetNo').onclick=()=>{sfx('click');showUI('menu')};
+$('btnResetYes').onclick=()=>{resetProgress();sfx('boom');buildMenu();showUI('menu');$('menu').scrollTop=0;toast('Progress reset. Fresh crater!')};
 $('btnAgain').onclick=()=>{startRun(run.char)};
 $('btnMenu').onclick=()=>{run=null;state='menu';buildMenu();showUI('menu')};
 setMuted(AU.muted);
