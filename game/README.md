@@ -29,8 +29,18 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
     downstream) or *seaside* (a beach and sea along the south edge, a pier, a rowing boat, seashells, Ollie's fish).
   - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
     and their eggs can be stolen, eaten or smashed.
+- **Weather**: each village also rolls weather that suits its season.
+  - *Rain*: rain, a darker sky, puddles to splash through, villagers under umbrellas who see and hear less.
+  - *Thunderstorm*: rain plus lightning; every thunderclap makes villagers jump (dropping things), panics the
+    hens, sends the cat running and has Biscuit whimpering.
+  - *Fog* (autumn, winter): thick mist with a clear patch around you; villagers can barely see.
+  - *Snowstorm* (winter): heavy, wind-blown snow and poor visibility. *Windy*: thrown things drift off course.
+- **Animals**: ducks on the pond and river (they quack and flee, and eat any food dropped near them),
+  sparrow flocks that scatter when you run at them (they shelter from bad weather), squirrels that dash up
+  trees (and Biscuit barks up the tree, drawing villagers' eyes), frogs by the water in rain and spring, and
+  seaside seagulls that swoop down and steal food out of your mouth (chitter to scare them off).
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 72 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 81 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -88,7 +98,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
   (sit, wander, alert, chase, catchase, fetch, return, happy, follow); `spawnCat()`, `updateCat()` (nap, stroll,
   swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
 - **Seasons**: `SEASON_LOOK`, `placeSeasonal()` / `placeSeasonalItems()`, `updateSeason()`, hens (`updateHens()`),
-  weather and tint; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
+  `pickWeather()`, `updateWeatherFx()` (puddles, lightning), `spawnCritters()` / `updateCritters()` (ducks,
+  sparrows, squirrels, frogs, gulls); tint; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`
