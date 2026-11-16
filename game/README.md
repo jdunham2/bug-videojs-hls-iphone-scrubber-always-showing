@@ -19,8 +19,18 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 | Mute sound | N | — |
 
 ## What's in the game
+- **Seasons and village kinds**: every daily village rolls one of four seasons and one of three kinds.
+  - *Spring*: blossom trees, drifting petals, Mrs. Fennick's tulip beds to trample, painted eggs hidden by bushes.
+  - *Summer*: washing drying on lines (steal it), Rosa's lemonade on the picnic table.
+  - *Autumn*: orange and red trees, falling leaves, chimney smoke, leaf piles to jump in (noisy) or hide in.
+  - *Winter*: snow, bare and snowy trees, snow on roofs, scarves, falling snow, pawprints, frozen ponds and rivers
+    you can slide across, snowmen to knock down, and E on the snow scoops a snowball to throw.
+  - *Pond*, *riverside* (a river runs across the map; the road crosses on bridges; floating things drift
+    downstream) or *seaside* (a beach and sea along the south edge, a pier, a rowing boat, seashells, Ollie's fish).
+  - Every village also has a hen house: hens panic and squawk when chased (loud enough to make villagers look)
+    and their eggs can be stolen, eaten or smashed.
 - **Runs ("days")**: every day is a freshly generated village (roads, plaza, pond, garden and houses shuffled
-  around), a hand of tasks from a pool of 55, a clock until sunset (the world warms and dims as it runs out) and a
+  around), a hand of tasks from a pool of 72 (filtered to what the season and village allow), a clock until sunset (the world warms and dims as it runs out) and a
   few strikes before you're out. Harder days ask for more and villagers get faster and sharper-eyed.
 - **The den**: shinies from tasks (plus time and day bonuses on a win) buy upgrades that carry over between days:
   Quick Paws, Strong Back, Light Step, Big Chitter, Thick Fur, Long Day, Slippery. Progress is saved in your browser.
@@ -77,6 +87,8 @@ Open `game/index.html` in any browser. There's no build step and no dependencies
 - **Hiding & dog**: `makeHideBush()`, `updateHiding()`, `canSeePlayer()`; `spawnDog()`, `updateDog()` state machine
   (sit, wander, alert, chase, catchase, fetch, return, happy, follow); `spawnCat()`, `updateCat()` (nap, stroll,
   swat, sit, flee), `shatter()` for fragile items, `lookTowards()` for noises
+- **Seasons**: `SEASON_LOOK`, `placeSeasonal()` / `placeSeasonalItems()`, `updateSeason()`, hens (`updateHens()`),
+  weather and tint; `buildSea()` and the river in `buildMap()`; `taskFits()` + `dealTasks()`
 - **Online**: `dailySeed()`, `initOnline()`, `joinVillageRoom()`, `syncPeers()`/`updateOnline()` (room presence),
   `subscribeScores()`/`postScore()`/`renderBoard()` (db `scores/<user id>`)
 - **Eating**: `FOOD` table, `startEating()`, `updateEating()` (bites, tummy, stuffed, sugar rush), `finishFood()`

@@ -20,7 +20,7 @@
   const FRICTION = 1100;
 
   // Tile types
-  const GRASS = 0, PATH = 1, WATER = 2, SAND = 3, SOIL = 4, STONE = 5, BRIDGE = 6, FLOOR = 7, WALL = 8;
+  const GRASS = 0, PATH = 1, WATER = 2, SAND = 3, SOIL = 4, STONE = 5, BRIDGE = 6, FLOOR = 7, WALL = 8, ICE = 9;
 
   // ---------------------------------------------------------------------------
   // Deterministic RNG so the village is the same every time
@@ -72,19 +72,23 @@
   }
   const rectsOverlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-  function genLayout() {
-    const roadY = 22 + Math.floor(rand() * 7);  // top row of the 2-wide east–west road
+  const VILLAGE_B_RIVER = ['ford', 'bridge', 'brook', 'wade', 'water', 'burn'];
+  const VILLAGE_B_SEA = ['haven', 'port', 'sands', 'cove', 'bay', 'quay'];
+  function genLayout(opts = {}) {
+    const kind = opts.kind || pick(KIND_NAMES);
+    const season = opts.season || pick(SEASON_NAMES);
+    const roadY = kind === 'seaside' ? 18 + Math.floor(rand() * 6) : 22 + Math.floor(rand() * 7);  // top row of the 2-wide east–west road
     const roadX = 28 + Math.floor(rand() * 15); // left column of the 2-wide north–south road
     const quads = {
       NW: { x0: 4, y0: 4, x1: roadX - 1, y1: roadY - 1, north: true },
       NE: { x0: roadX + 3, y0: 4, x1: MW - 4, y1: roadY - 1, north: true },
-      SW: { x0: 4, y0: roadY + 3, x1: roadX - 1, y1: MH - 4, north: false },
-      SE: { x0: roadX + 3, y0: roadY + 3, x1: MW - 4, y1: MH - 4, north: false },
+      SW: { x0: 4, y0: roadY + 3, x1: roadX - 1, y1: kind === 'seaside' ? MH - 11 : MH - 4, north: false },
+      SE: { x0: roadX + 3, y0: roadY + 3, x1: MW - 4, y1: kind === 'seaside' ? MH - 11 : MH - 4, north: false },
     };
     const order = shuffled(['NW', 'NE', 'SW', 'SE']);
     return {
-      name: pick(VILLAGE_A) + pick(VILLAGE_B),
-      roadY, roadX,
+      name: pick(VILLAGE_A) + pick(kind === 'seaside' ? VILLAGE_B_SEA : kind === 'river' ? VILLAGE_B_RIVER : VILLAGE_B),
+      kind, season, roadY, roadX,
       plaza: { x: roadX - 5, y: roadY - 5, w: 12, h: 12 },
       quads,
       pondQ: quads[order[0]], gardenQ: quads[order[1]], homeQs: [quads[order[2]], quads[order[3]]],
@@ -129,12 +133,28 @@
         const nx = cx + dx, ny = cy + dy;
         if (nx < 2 || ny < 2 || nx >= MW - 2 || ny >= MH - 2) continue;
         const ni = idx(nx, ny);
-        if (prev[ni] !== -1 || solid[ni] || map[ni] === WATER) continue;
+        if (prev[ni] !== -1 || solid[ni] || map[ni] === WATER || map[ni] === ICE) continue;
         prev[ni] = cur;
         queue.push(ni);
       }
     }
     return false;
+  }
+
+  // Seaside villages: a sea along the south edge with a sandy beach and a pier
+  function buildSea() {
+    L.shore = [];
+    for (let x = 0; x < MW; x++) {
+      const sy = Math.round(MH - 8 + Math.sin(x * 0.21) * 1.2 + Math.sin(x * 0.07 + 1) * 1.6);
+      L.shore[x] = sy;
+      for (let y = sy - 2; y < MH; y++) setT(x, y, y > sy ? WATER : SAND);
+      reserve(x, sy - 3, 1, MH - sy + 3);
+    }
+    const px = L.roadX, sy = Math.max(L.shore[px], L.shore[px + 1]);
+    for (let y = sy - 3; y <= sy; y++) { setT(px, y, PATH); setT(px + 1, y, PATH); }
+    for (let y = sy + 1; y <= sy + 6; y++) { setT(px, y, BRIDGE); setT(px + 1, y, BRIDGE); }
+    L.pier = { x: (px + 1) * TILE, baseY: (sy + 1) * TILE, endY: (sy + 7) * TILE };
+    L.pond = { cx: px + 1, cy: MH - 3, rx: 9, ry: 3 }; // stands in for "the water" for shore spots
   }
 
   function buildMap() {
@@ -153,8 +173,9 @@
     for (let y = 3; y < MH - 3; y++) for (let x = roadX; x <= roadX + 1; x++) setT(x, y, PATH);
     rectT(plaza.x, plaza.y, plaza.w, plaza.h, STONE);
 
-    // Pond (+ a stream running off to the nearest map edge)
-    {
+    if (L.kind === 'seaside') buildSea();
+    // Pond (+ a stream running off to the nearest map edge; a river village's runs right across)
+    else {
       const q = L.pondQ;
       // Start big and shrink until it fits in its corner
       let rx = 7 + Math.floor(rand() * 3), ry = 5 + Math.floor(rand() * 2), r = null, w = 0, h = 0;
@@ -176,15 +197,28 @@
         else if (d < 1.5) setT(x, y, SAND);
       }
       reserve(r.x, r.y, w, h);
-      const sx0 = Math.round(cx + rx * 0.45);
-      const dir = q.north ? -1 : 1;
-      for (let y = Math.round(cy); y >= 0 && y < MH; y += dir) {
+      let sx0 = Math.round(cx + rx * 0.45);
+      let dirs = [q.north ? -1 : 1];
+      if (L.kind === 'river') {
+        // keep the river clear of the plaza, the north–south road and the hideout
+        const hxT = L.hideSide === 'W' ? 4 : MW - 5;
+        const bad = (x) => (x >= plaza.x - 4 && x <= plaza.x + 15) || Math.abs(x - roadX - 0.5) < 5 || Math.abs(x - hxT) < 6 || x < 3 || x > MW - 4;
+        if (bad(sx0)) sx0 = Math.round(cx - rx * 0.45);
+        if (!bad(sx0)) { dirs = [-1, 1]; L.river = { x: sx0 }; }
+      }
+      for (const dir of dirs) for (let y = Math.round(cy); y >= 0 && y < MH; y += dir) {
         const sx = sx0 + Math.round(Math.sin(y * 0.25) * 1.5);
-        for (let x = sx - 1; x <= sx + 1; x++) if (getT(x, y) === GRASS || getT(x, y) === SAND) setT(x, y, WATER);
+        for (let x = sx - 1; x <= sx + 1; x++) {
+          const t0 = getT(x, y);
+          if (t0 === GRASS || t0 === SAND) setT(x, y, WATER);
+          else if (t0 === PATH) setT(x, y, BRIDGE); // the road crosses on a bridge
+        }
         for (const x of [sx - 2, sx + 2]) if (getT(x, y) === GRASS) setT(x, y, SAND);
         reserve(sx - 2, y, 5, 1);
       }
     }
+    // In winter, ponds and rivers freeze over
+    if (hasIce()) for (let i = 0; i < MW * MH; i++) if (map[i] === WATER) map[i] = ICE;
 
     // Garden: 11×10 soil inside a fence, gate facing the road
     {
@@ -313,6 +347,7 @@
     objects.push(makeHideoutLog(hx * TILE, (roadY - 2.5) * TILE));
 
     placeHideBushes();
+    placeSeasonal();
 
     // Forest border: dense trees around the edge
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
@@ -326,6 +361,8 @@
     // Close the road ends with trees so the world edge feels solid
     for (const [x, y] of [[1, roadY], [1, roadY + 1], [MW - 2, roadY], [MW - 2, roadY + 1], [roadX, 1], [roadX + 1, 1], [roadX, MH - 2], [roadX + 1, MH - 2],
       [0, roadY], [0, roadY + 1], [MW - 1, roadY], [MW - 1, roadY + 1], [roadX, 0], [roadX + 1, 0], [roadX, MH - 1], [roadX + 1, MH - 1]]) {
+      const t0 = getT(x, y);
+      if (t0 === WATER || t0 === BRIDGE || t0 === ICE || t0 === SAND) continue; // not on the pier or in the sea
       objects.push(makeTree((x + 0.5) * TILE, (y + 0.8) * TILE));
     }
 
@@ -739,6 +776,22 @@
         ctx.fillRect(X - 8, eave - 5, W + 16, 5);
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.fillRect(X, eave, W, 5); // shadow under eave
+        if (isWinter()) {
+          const snowH = (eave - roofTop) * 0.5;
+          ctx.fillStyle = '#f4f8fb'; ctx.fillRect(X - 8, roofTop - 2, W + 16, snowH);
+          for (let xx = X - 8; xx < X + W + 8; xx += 12) circle(ctx, xx + 6, roofTop - 2 + snowH, 6);
+          ctx.fillStyle = '#dff3ff';
+          for (let xx = X - 4; xx < X + W + 4; xx += 9) poly(ctx, [[xx, eave], [xx + 4, eave], [xx + 2, eave + 5 + (xx % 3)]]), ctx.fill();
+          ctx.fillStyle = '#f4f8fb'; ctx.fillRect(chimneyX - 9, roofTop - 19, 18, 4);
+        }
+        if (L && (L.season === 'winter' || L.season === 'autumn')) { // wood smoke
+          const tt = (performance.now() / 1000) + chimneyX * 0.01;
+          for (let k = 0; k < 4; k++) {
+            const ph = (tt * 0.5 + k / 4) % 1;
+            ctx.fillStyle = `rgba(230,230,235,${0.45 * (1 - ph)})`;
+            circle(ctx, chimneyX + Math.sin(ph * 5 + k) * 5 + ph * 10, roofTop - 18 - ph * 40, 4 + ph * 7);
+          }
+        }
       },
     };
   }
@@ -747,7 +800,12 @@
     const r = rr(18, 27);
     const trunkH = rr(14, 20);
     const phase = rand() * Math.PI * 2;
-    const hue = pick([['#2f6b2a', '#3f8a35', '#5aa848'], ['#2b5f33', '#3a7d40', '#55a05a'], ['#3b6b25', '#4e8c2f', '#6daa42']]);
+    const S = (L && L.season) || 'summer';
+    const hue = S === 'winter' ? ['#2b5a3a', '#3a6e48', '#4f8a5a'] : pick(SEASON_LOOK[S].trees);
+    const pine = S === 'winter' && rand() < 0.45;            // evergreens keep their needles
+    const bare = S === 'winter' && !pine;                     // everything else is bare branches
+    const blossom = S === 'spring' && rand() < 0.5 ? Array.from({ length: 14 }, () => [rr(-1, 1), rr(-1, 0.6)]) : null;
+    const branches = bare ? Array.from({ length: 5 }, (_, i) => [(i - 2) * 0.45 + rr(-0.15, 0.15), rr(0.6, 1)]) : null;
     const blobs = [];
     const n = 4 + Math.floor(rand() * 3);
     for (let i = 0; i < n; i++) {
@@ -766,11 +824,34 @@
       },
       draw(ctx, t, fade) {
         const sway = Math.sin(t * 1.3 + phase) * 1.2;
+        if (pine) { // a snowy evergreen
+          ctx.fillStyle = '#5a3a24'; ctx.fillRect(x - 3, y - 12, 6, 12);
+          ctx.save(); if (fade) ctx.globalAlpha = 0.42;
+          for (let k = 0; k < 3; k++) {
+            const wy = y - 10 - k * r * 0.55, ww = r * (1.05 - k * 0.25);
+            ctx.fillStyle = hue[0]; poly(ctx, [[x - ww + sway * 0.3, wy], [x + ww + sway * 0.3, wy], [x + sway, wy - r * 0.9]]); ctx.fill();
+            ctx.fillStyle = '#f4f8fb'; poly(ctx, [[x - ww * 0.55 + sway * 0.3, wy - r * 0.4], [x + ww * 0.3 + sway * 0.3, wy - r * 0.48], [x + sway, wy - r * 0.9]]); ctx.fill();
+          }
+          ctx.restore();
+          return;
+        }
         // trunk
         ctx.fillStyle = '#6b4a2e';
         roundRect(ctx, x - 4.5, y - trunkH - 6, 9, trunkH + 6, 3, true);
         ctx.fillStyle = '#563a22';
         ctx.fillRect(x + 1, y - trunkH - 4, 3, trunkH + 3);
+        if (bare) { // winter branches dusted with snow
+          ctx.save(); if (fade) ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = '#5a3a24'; ctx.lineCap = 'round';
+          for (const [a, len] of branches) {
+            const ex = x + Math.sin(a) * r * len + sway, ey = y - trunkH - 4 - Math.cos(a) * r * 1.3 * len;
+            ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y - trunkH - 2); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo((x + ex) / 2, (y - trunkH + ey) / 2); ctx.lineTo(ex + Math.sin(a + 0.6) * 8, ey - 6); ctx.stroke();
+            ctx.fillStyle = '#f4f8fb'; ellipse(ctx, ex, ey - 1, 3.5, 1.6);
+          }
+          ctx.restore();
+          return;
+        }
         ctx.save();
         if (fade) ctx.globalAlpha = 0.42;
         ctx.translate(x + sway, y + cy);
@@ -783,6 +864,7 @@
         ctx.fillStyle = hue[2];
         circle(ctx, -r * 0.25, -r * 0.3, r * 0.38);
         circle(ctx, r * 0.15, -r * 0.42, r * 0.22);
+        if (blossom) { ctx.fillStyle = '#ffc6dd'; for (const [bx, by] of blossom) circle(ctx, bx * r * 0.8, by * r * 0.7, 2.2); }
         ctx.restore();
       },
     };
@@ -799,14 +881,16 @@
       bounds: { l: x - r * 1.5, r: x + r * 1.5, t: y - r * 2.2, b: y + 6 },
       shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ellipse(ctx, x + 4, y, r * 1.3, r * 0.45); },
       draw(ctx) {
-        ctx.fillStyle = '#2f6b2a';
+        const bc = look().bush;
+        ctx.fillStyle = bc[0];
         circle(ctx, x - r * 0.6, y - r * 0.7, r * 0.8);
         circle(ctx, x + r * 0.6, y - r * 0.7, r * 0.8);
         circle(ctx, x, y - r, r);
-        ctx.fillStyle = '#479a3c';
+        ctx.fillStyle = bc[1];
         circle(ctx, x - r * 0.3, y - r * 1.2, r * 0.55);
-        ctx.fillStyle = '#d93f5b';
-        for (const [dx, dy] of dots) circle(ctx, x + dx, y + dy, 1.8);
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; ellipse(ctx, x, y - r * 1.7, r * 0.8, r * 0.35); ellipse(ctx, x - r * 0.6, y - r * 1.3, r * 0.45, r * 0.22); }
+        ctx.fillStyle = L && L.season === 'spring' ? '#ffd1e3' : '#d93f5b';
+        if (!isWinter()) for (const [dx, dy] of dots) circle(ctx, x + dx, y + dy, 1.8);
       },
     };
   }
@@ -1113,18 +1197,19 @@
     const grng = mulberry32((seed ^ 0x5bd1e995) >>> 0);
     const gr = (a, b) => a + grng() * (b - a);
 
-    // Grass base with soft patches
-    g.fillStyle = '#6fae4b';
+    // Grass (or snow) base with soft patches
+    const LK = look();
+    g.fillStyle = LK.grass;
     g.fillRect(0, 0, WORLD_W, WORLD_H);
     for (let i = 0; i < 260; i++) {
-      g.fillStyle = grng() < 0.5 ? 'rgba(90,150,60,0.35)' : 'rgba(140,195,90,0.25)';
+      g.fillStyle = grng() < 0.5 ? LK.patch[0] : LK.patch[1];
       ellipse(g, gr(0, WORLD_W), gr(0, WORLD_H), gr(30, 90), gr(20, 60));
     }
     // Grass blades
     g.lineCap = 'round';
-    for (let i = 0; i < 9000; i++) {
+    for (let i = 0; i < LK.blades; i++) {
       const x = gr(0, WORLD_W), y = gr(0, WORLD_H);
-      g.strokeStyle = grng() < 0.6 ? 'rgba(60,120,45,0.55)' : 'rgba(160,210,110,0.5)';
+      g.strokeStyle = grng() < 0.6 ? LK.blade[0] : LK.blade[1];
       g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + gr(-2, 2), y - gr(3, 6)); g.stroke();
     }
@@ -1138,20 +1223,37 @@
     };
 
     // Sand
-    blobs(SAND, '#c9b57e', 25);
-    blobs(SAND, '#e3cf96', 23);
+    blobs(SAND, LK.sand[0], 25);
+    blobs(SAND, LK.sand[1], 23);
     // Water (bridge tiles sit over water too)
     const waterLike = (x, y) => map[idx(x, y)] === WATER || map[idx(x, y)] === BRIDGE;
     g.fillStyle = '#356f9a';
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (waterLike(x, y)) circle(g, (x + 0.5) * TILE, (y + 0.5) * TILE, 25);
     g.fillStyle = '#4c93c7';
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (waterLike(x, y)) circle(g, (x + 0.5) * TILE, (y + 0.5) * TILE, 23);
+    // Ice (frozen ponds and rivers): pale, with cracks and skate marks
+    blobs(ICE, '#8fbcd4', 25);
+    blobs(ICE, '#cfe8f3', 23);
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1;
+    forTiles(ICE, (x, y) => { if (grng() < 0.35) { const cx0 = (x + grng()) * TILE, cy0 = (y + grng()) * TILE; g.beginPath(); g.moveTo(cx0, cy0); g.lineTo(cx0 + gr(-14, 14), cy0 + gr(-8, 8)); g.lineTo(cx0 + gr(-14, 14), cy0 + gr(-8, 8)); g.stroke(); } });
+    g.strokeStyle = 'rgba(120,160,190,0.35)';
+    forTiles(ICE, (x, y) => { if (grng() < 0.15) { const cx0 = (x + 0.5) * TILE; g.beginPath(); g.arc(cx0, (y + 0.5) * TILE, gr(6, 14), 0, Math.PI * 1.4); g.stroke(); } });
     // deeper water in the pond middle
     const P = L.pond;
+    if (L.kind === 'seaside') { // foam along the shore, waves further out
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2.5;
+      g.beginPath();
+      for (let x = 0; x <= MW; x++) { const sy = (L.shore[Math.min(MW - 1, x)] + 1.15) * TILE; if (x === 0) g.moveTo(0, sy); else g.lineTo(x * TILE, sy + Math.sin(x * 1.3) * 3); }
+      g.stroke();
+      g.fillStyle = 'rgba(30,80,130,0.25)'; g.fillRect(0, (MH - 4) * TILE, WORLD_W, 4 * TILE);
+      g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1.4;
+      for (let i = 0; i < 60; i++) { const wx = gr(0, WORLD_W), wy = gr((MH - 5) * TILE, WORLD_H - 8); g.beginPath(); g.arc(wx, wy, gr(6, 12), Math.PI * 1.15, Math.PI * 1.85); g.stroke(); }
+    } else if (!hasIce()) {
     g.fillStyle = 'rgba(30,80,130,0.35)';
     ellipse(g, P.cx * TILE, P.cy * TILE, (P.rx - 3) * TILE, (P.ry - 2.5) * TILE);
+    }
     // lily pads
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (L.kind === 'seaside' || hasIce() ? 0 : 14); i++) {
       const a = gr(0, Math.PI * 2), d = gr(0.2, 0.75);
       const lx = P.cx * TILE + Math.cos(a) * P.rx * TILE * d, ly = P.cy * TILE + Math.sin(a) * P.ry * TILE * d;
       g.fillStyle = '#4f9a3c';
@@ -1161,14 +1263,14 @@
 
     // Garden soil with furrows
     const G = L.garden;
-    g.fillStyle = '#7a5434';
+    g.fillStyle = isWinter() ? '#6e6052' : '#7a5434';
     g.fillRect(G.x * TILE, G.y * TILE, G.w * TILE, G.h * TILE);
-    g.fillStyle = '#6a462a';
+    g.fillStyle = isWinter() ? '#e8eef4' : '#6a462a';
     for (let y = G.y * TILE + 10; y < (G.y + G.h) * TILE; y += 16) g.fillRect(G.x * TILE + 4, y, G.w * TILE - 8, 5);
 
     // Paths
-    blobs(PATH, '#b08b55', 25);
-    blobs(PATH, '#cfac72', 23);
+    blobs(PATH, LK.path[0], 25);
+    blobs(PATH, LK.path[1], 23);
     forTiles(PATH, (x, y) => {
       for (let k = 0; k < 4; k++) {
         g.fillStyle = grng() < 0.5 ? 'rgba(120,90,50,0.4)' : 'rgba(240,220,170,0.5)';
@@ -1208,9 +1310,24 @@
       if (getT(x, y + 1) !== BRIDGE) { g.fillRect(x * TILE - 2, (y + 1) * TILE - 1, TILE + 4, 4); g.fillRect(x * TILE, (y + 1) * TILE - 7, 4, 8); }
     });
 
+    if (isWinter()) { // snow drifting over the plaza and the edges of paths
+      for (let i = 0; i < 500; i++) {
+        const x = gr(0, WORLD_W), y = gr(0, WORLD_H), t0 = map[idx(Math.floor(x / TILE), Math.floor(y / TILE))];
+        if (t0 !== STONE && t0 !== PATH) continue;
+        g.fillStyle = 'rgba(255,255,255,0.6)'; ellipse(g, x, y, gr(6, 18), gr(3, 8));
+      }
+    }
+    if (LK.leaves) { // fallen leaves everywhere
+      for (let i = 0; i < LK.leaves; i++) {
+        const x = gr(0, WORLD_W), y = gr(0, WORLD_H), t0 = map[idx(Math.floor(x / TILE), Math.floor(y / TILE))];
+        if (t0 !== GRASS && t0 !== PATH && t0 !== STONE) continue;
+        g.fillStyle = ['#c0392b', '#e07b2a', '#f0a040', '#d9a43a', '#8a5a2e'][Math.floor(grng() * 5)];
+        g.beginPath(); g.ellipse(x, y, 3, 1.7, grng() * 3, 0, Math.PI * 2); g.fill();
+      }
+    }
     // Flowers & clover on open grass
-    const petals = ['#ffffff', '#ffd166', '#ff8fab', '#b39cff', '#ff7a59'];
-    for (let i = 0; i < 700; i++) {
+    const petals = LK.petals || [];
+    for (let i = 0; i < (petals.length ? LK.flowers : 0); i++) {
       const x = gr(0, WORLD_W), y = gr(0, WORLD_H);
       const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
       if (map[idx(tx, ty)] !== GRASS) continue;
@@ -1323,8 +1440,9 @@
       if (v < target) return Math.min(target, v + rate * dt);
       return Math.max(target, v - rate * dt);
     };
-    const rateX = Math.abs(tx) > 0.01 ? ACCEL : FRICTION;
-    const rateY = Math.abs(ty) > 0.01 ? ACCEL : FRICTION;
+    const slip = onIce(player.x, player.y) ? 0.14 : 1; // ice: hard to start, harder to stop
+    const rateX = (Math.abs(tx) > 0.01 ? ACCEL : FRICTION) * slip;
+    const rateY = (Math.abs(ty) > 0.01 ? ACCEL : FRICTION) * slip;
     player.vx = approach(player.vx, tx, rateX);
     player.vy = approach(player.vy, ty, rateY);
 
@@ -1580,7 +1698,8 @@
   const clouds = [];
   function spawnAmbient() {
     const colors = ['#ffd166', '#ff8fab', '#ffffff', '#9ad1ff'];
-    for (let i = 0; i < 14; i++) {
+    const nb = { spring: 18, summer: 14, autumn: 5, winter: 0 }[L.season] ?? 14;
+    for (let i = 0; i < nb; i++) {
       const x = rr(4, MW - 4) * TILE, y = rr(4, MH - 4) * TILE;
       butterflies.push({ x, y, hx: x, hy: y, tx: x, ty: y, z: rr(14, 26), c: colors[i % colors.length], ph: rand() * 6, flee: 0 });
     }
@@ -1619,7 +1738,8 @@
         q.x += q.vx * dt; q.y += q.vy * dt;
         q.vz -= 500 * dt; q.z += q.vz * dt;
         if (q.z < 0) q.life = 0;
-      } else { q.y += q.vy * dt; q.r += dt * 6; }
+      } else if (q.kind === 'print') { /* fades where it is */ }
+      else { q.y += q.vy * dt; q.r += dt * 6; }
       if (q.life <= 0) particles.splice(i, 1);
     }
     for (const c of clouds) {
@@ -2087,7 +2207,8 @@
       const who = residentsOf(h);
       const owner = who.includes('rosa') ? 'rosa' : who[0] || null;
       const tableY = (y0 + 5) * T + 1;
-      const onTable = who.includes('rosa') ? ['cake', 'teapot'] : who.includes('mabel') ? ['cookies', 'teapot'] : [pick(['bread', 'cheese', 'teapot', 'cookies']), pick(['bread', 'cheese', 'vase'])];
+      const warm = isWinter() ? 'cocoa' : 'teapot';
+      const onTable = who.includes('rosa') ? ['cake', warm] : who.includes('mabel') ? ['cookies', warm] : [pick(['bread', 'cheese', 'teapot', 'cookies']), pick(['bread', 'cheese', 'vase'])];
       addItem(onTable[0], (x0 + 5.5) * T - 15, tableY, { z: 22, owner });
       addItem(onTable[1], (x0 + 5.5) * T + 15, tableY, { z: 22, owner });
       const floorKinds = shuffled(['slippers', 'book', 'vase', 'clock', 'frame', 'candle', 'umbrella', 'book']).slice(0, 3);
@@ -2106,6 +2227,7 @@
       const tr = cones.splice(Math.floor(rand() * cones.length), 1)[0];
       placeFree('pinecone', tr.x + rr(-16, 16), tr.y + rr(6, 12));
     }
+    placeSeasonalItems();
     const trees = objects.filter((o) => o.kind === 'tree' && o.x > 5 * T && o.x < WORLD_W - 5 * T && o.y > 5 * T && o.y < WORLD_H - 5 * T);
     for (let n = 0; n < 10 && trees.length; n++) {
       const tr = trees.splice(Math.floor(rand() * trees.length), 1)[0];
@@ -2195,7 +2317,8 @@
     if (pc === 'dog') { petDog(); return; }
     if (pc === 'cat') { petCat(); return; }
     if (pc === 'wardrobe') { enterWardrobe(nearWardrobe); return; }
-    if (target) pickUp(target);
+    if (target) { pickUp(target); return; }
+    if (canScoop()) scoopSnowball();
   }
 
   function pickUp(it) {
@@ -2211,6 +2334,10 @@
       if (it.kind === 'carrot') completeTask('carrot');
     }
     if (it.kind === 'pie') completeTask('pie');
+    if (it.kind === 'egg') completeTask('egg');
+    if (it.kind === 'paintegg') { run.eggs = (run.eggs || 0) + 1; setProgress('eggs3', run.eggs); }
+    if (it.kind === 'sock' || it.kind === 'shirt') completeTask('washing');
+    if (it.kind === 'fish' && it.owner === 'ollie') completeTask('fish');
     if (it.kind === 'newspaper') completeTask('paper');
     if (it.kind === 'gnome') completeTask('gnome');
     if (it.kind === 'parcel') completeTask('parcel');
@@ -2265,6 +2392,7 @@
   function updateItems(dt) {
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
+      if (it.held && !it.heldBy && player.held !== it) Object.assign(it, { held: false, air: true, vz: 0 }); // let go somehow: just drop it
       if (it.held) { const hp = it.heldBy ? (it.heldBy === dog ? heldPosDog() : heldPosV(it.heldBy)) : heldPos(time); it.x = hp.x; it.y = hp.y; it.z = hp.z; continue; }
       if (it.ghost && !overlapsPlayer(it)) it.ghost = false;
 
@@ -2278,6 +2406,11 @@
       }
 
       if (it.floating) {
+        if (L.river && Math.abs(it.x - (L.river.x + 0.5) * TILE) < 2.6 * TILE) { // carried downstream
+          it.vy = Math.max(it.vy, 26);
+          it.floatDist = (it.floatDist || 0) + 26 * dt;
+          if (it.floatDist > 240 && !it.kicker) completeTask('downriver');
+        }
         it.x += it.vx * dt; it.y += it.vy * dt;
         const f = Math.pow(0.4, dt); it.vx *= f; it.vy *= f;
         it.x += Math.sin(time * 0.4 + it.ph0) * 3 * dt;
@@ -2293,14 +2426,27 @@
       if (itemBlocked(it, nx, it.y)) { if (Math.abs(it.vx) > 60) sfx('bonk'); it.vx = -it.vx * 0.45; } else it.x = nx;
       const ny = it.y + it.vy * dt;
       if (itemBlocked(it, it.x, ny)) { if (Math.abs(it.vy) > 60) sfx('bonk'); it.vy = -it.vy * 0.45; } else it.y = ny;
+      // Thrown things knock snowmen over
+      if (L.extra && Math.hypot(it.vx, it.vy) > 80 && it.z < 40) {
+        for (const s of L.extra.snowmen) {
+          if (s.down || Math.hypot(it.x - s.x, it.y - s.y) > 15) continue;
+          s.down = true; s.hitbox = box(s.x - 4, s.y - 4, 8, 4);
+          for (let k = 0; k < 14; k++) particles.push({ kind: 'shard', col: '#f4f8fb', x: s.x, y: s.y, z: 20, vx: rr(-60, 60), vy: rr(-30, 30), vz: rr(40, 120), life: 0.9, max: 0.9 });
+          sfx('splat');
+          lookTowards(s.x, s.y, 220, () => rpick(['My snowman!', 'Who did that?!', 'Aww, the snowman!']));
+          completeTask('snowman');
+          it.vx *= -0.3; it.vy *= -0.3;
+        }
+      }
       // Bonk! Thrown things hit villagers
-      if (Math.hypot(it.vx, it.vy) > 80 && it.z < 34 && !it.kicker) { // villagers don't bonk themselves
+      if (items[i] === it && Math.hypot(it.vx, it.vy) > 80 && it.z < 34 && !it.kicker) { // villagers don't bonk themselves
         for (const v of villagers) {
           if (Math.hypot(it.x - v.x, it.y - v.y) > 11) continue;
           it.vx *= -0.3; it.vy *= -0.3;
           sfx('bonk');
           if (v.id === 'fennick') completeTask('bonk');
           if (v.id === 'rosa' && it.kind === 'boot') completeTask('boot');
+          if (it.kind === 'snowball') { completeTask('snowballhit'); shatter(it); items.splice(i, 1); }
           startleV(v, 'Ow!', it.owner === v.id ? { state: 'fetch', target: it } : { state: 'chase', target: null });
           break;
         }
@@ -2321,7 +2467,7 @@
           continue;
         }
         if (!it.noticed) { it.noticed = true; dogNotice(it); }
-        if (it.type.fragile && it.vz < -165) { shatter(it); items.splice(i, 1); continue; } // crash!
+        if (it.type.fragile && it.vz < (it.kind === 'snowball' ? -40 : -165)) { shatter(it); items.splice(i, 1); continue; } // crash!
         if (it.vz < -110) {
           it.vz = -it.vz * (it.kind === 'ball' ? 0.6 : 0.3);
           it.vx *= 0.75; it.vy *= 0.75;
@@ -2330,7 +2476,7 @@
         } else {
           if (it.vz < -30) { sfx(it.type.heavy ? 'thud' : 'tap'); puff(it.x, it.y, it.type.heavy ? 4 : 1); }
           it.vz = 0;
-          const f = Math.pow(it.kind === 'ball' ? 0.3 : 0.002, dt);
+          const f = Math.pow(onIce(it.x, it.y) ? 0.6 : it.kind === 'ball' ? 0.3 : 0.002, dt);
           it.vx *= f; it.vy *= f;
           it.rot *= Math.pow(0.001, dt);
           if (Math.hypot(it.vx, it.vy) < 4) Object.assign(it, { air: false, vx: 0, vy: 0, rot: 0, spin: 0 });
@@ -2635,7 +2781,8 @@
         homeStop(3.5, 6, 10),
       ];
       case 'ollie': {
-        const a = shorePoint(plazaAngleFromPond() + 1.6), b = shorePoint(plazaAngleFromPond() - 1.8);
+        const a = L.pier ? { x: L.pier.x + 6, y: L.pier.endY - 26 } : shorePoint(plazaAngleFromPond() + 1.6);
+        const b = shorePoint(plazaAngleFromPond() - 1.8);
         return [
           S(a.x, a.y, 'fish', 14, faceTo(a, ...pondPx)),
           S(b.x, b.y, 'fish', 10, faceTo(b, ...pondPx)),
@@ -3096,6 +3243,11 @@
       roundRect(ctx, -9.5, -21, 3.5, carrying ? 8 : 12, 2, true); roundRect(ctx, 6, -21, 3.5, carrying ? 8 : 12, 2, true);
     }
 
+    if (isWinter()) { // everyone's wrapped up warm
+      ctx.fillStyle = v.scarf || (v.scarf = pick(['#c0392b', '#2e6da4', '#d9a43a', '#3f7f56', '#7a4f8f']));
+      roundRect(ctx, -7.5, -25, 15, 4.5, 2, true);
+      if (v.dir !== 'up') roundRect(ctx, side ? -6 : 2, -23, 3.5, 9, 1.5, true);
+    }
     // head
     ctx.translate(side ? bend * 0.6 : 0, bend * 0.5);
     const hy = -29;
@@ -3202,7 +3354,7 @@
     { id: 'pie', tier: 'Easy', text: "Steal Rosa's pie" },
     { id: 'jump', tier: 'Easy', text: 'Make someone jump' },
     { id: 'kick', tier: 'Easy', text: "Kick Toby's ball" },
-    { id: 'splash', tier: 'Easy', text: 'Throw something in the pond' },
+    { id: 'splash', tier: 'Easy', text: 'Throw something in the water', req: ['water'] },
     { id: 'paper', tier: 'Easy', text: 'Swipe a newspaper' },
     { id: 'gnome', tier: 'Easy', text: 'Kidnap a garden gnome' },
     { id: 'lift', tier: 'Easy', text: 'Lift something heavy' },
@@ -3211,15 +3363,21 @@
     { id: 'pet', tier: 'Easy', text: 'Pet Biscuit the dog' },
     { id: 'bed', tier: 'Easy', text: 'Hide under a bed' },
     { id: 'wardrobe', tier: 'Easy', text: 'Hide in a wardrobe' },
+    { id: 'chicken', tier: 'Easy', text: 'Chase a chicken' },
+    { id: 'egg', tier: 'Easy', text: 'Steal an egg from the hen house' },
+    { id: 'skate', tier: 'Easy', text: 'Go skating on the ice', req: ['ice'] },
+    { id: 'leafjump', tier: 'Easy', text: 'Jump in a leaf pile', req: ['autumn'] },
+    { id: 'washing', tier: 'Easy', text: 'Steal washing off the line', req: ['summer'] },
+    { id: 'pier', tier: 'Easy', text: 'Walk to the end of the pier', req: ['seaside'] },
     { id: 'eat', tier: 'Easy', text: "Eat someone's food" },
     { id: 'petcat', tier: 'Easy', text: 'Get a purr out of Marmalade the cat' },
     { id: 'parcel', tier: 'Easy', text: "Swipe one of Percy's parcels" },
-    { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the pond" },
+    { id: 'ballpond', tier: 'Medium', text: "Get Toby's ball into the water", req: ['water'] },
     { id: 'bonk', tier: 'Medium', text: 'Bonk Mrs. Fennick' },
     { id: 'bertdrop', tier: 'Medium', text: "Make Bertram drop what he's carrying" },
     { id: 'escape', tier: 'Medium', text: 'Escape a chase' },
     { id: 'crops5', tier: 'Medium', text: 'Pull up 5 crops', goal: 5 },
-    { id: 'duck', tier: 'Medium', text: "Set Toby's duck afloat" },
+    { id: 'duck', tier: 'Medium', text: "Set Toby's duck afloat", req: ['water'] },
     { id: 'boot', tier: 'Medium', text: 'Give Rosa the boot', hint: 'hit her with the old boot' },
     { id: 'heavythrow', tier: 'Medium', text: 'Throw a crate or barrel' },
     { id: 'heist', tier: 'Medium', text: 'Carry something out of a house' },
@@ -3227,6 +3385,15 @@
     { id: 'fetch', tier: 'Medium', text: 'Get Biscuit to fetch something you threw' },
     { id: 'outrun', tier: 'Medium', text: 'Outrun Biscuit' },
     { id: 'smash', tier: 'Medium', text: 'Smash something fragile' },
+    { id: 'snowman', tier: 'Medium', text: 'Knock down a snowman', hint: 'throw something at it', req: ['winter'] },
+    { id: 'snowballhit', tier: 'Medium', text: 'Hit someone with a snowball', req: ['winter'] },
+    { id: 'leafhide', tier: 'Medium', text: 'Hide in a leaf pile', hint: 'walk in slowly', req: ['autumn'] },
+    { id: 'pumpkinsmash', tier: 'Medium', text: 'Smash a pumpkin', req: ['autumn'] },
+    { id: 'tulips', tier: 'Medium', text: "Trample Mrs. Fennick's tulips", req: ['spring'] },
+    { id: 'lemonade', tier: 'Medium', text: "Drink Rosa's lemonade", req: ['summer'] },
+    { id: 'fish', tier: 'Medium', text: "Steal one of Ollie's fish", hint: 'by the pier', req: ['seaside'] },
+    { id: 'shells', tier: 'Medium', text: 'Stash 3 seashells in your hideout', goal: 3, req: ['seaside'] },
+    { id: 'downriver', tier: 'Medium', text: 'Send something floating down the river', req: ['river', 'water'] },
     { id: 'wardrobehome', tier: 'Medium', text: "Hide in a wardrobe while someone's in the room" },
     { id: 'eatpie', tier: 'Medium', text: "Eat Rosa's pie" },
     { id: 'sugar', tier: 'Medium', text: 'Get a sugar rush', hint: 'eat something sweet' },
@@ -3240,10 +3407,12 @@
     { id: 'double', tier: 'Hard', text: 'Get chased by two villagers at once' },
     { id: 'garden', tier: 'Hard', text: 'Empty the garden' },
     { id: 'stash5', tier: 'Hard', text: 'Stash 5 things in your hideout', goal: 5, group: 'stash' },
-    { id: 'sink3', tier: 'Hard', text: 'Sink 3 things in the pond', goal: 3 },
+    { id: 'sink3', tier: 'Hard', text: 'Sink 3 things in the water', goal: 3, req: ['water'] },
     { id: 'snatchback', tier: 'Hard', text: 'Steal something back from a villager' },
     { id: 'gnomes', tier: 'Hard', text: 'Stash both garden gnomes' },
     { id: 'bone', tier: 'Hard', text: "Stash Biscuit's bone in your hideout" },
+    { id: 'hens', tier: 'Hard', text: 'Get every hen squawking at once' },
+    { id: 'eggs3', tier: 'Hard', text: 'Find 3 painted eggs', goal: 3, req: ['spring'] },
     { id: 'eat5', tier: 'Hard', text: 'Eat 5 things', goal: 5 },
     { id: 'eatfront', tier: 'Hard', text: "Finish someone's food while they watch" },
     { id: 'bedhome', tier: 'Hard', text: "Hide under a bed while someone's home" },
@@ -3298,15 +3467,31 @@
     run.timeLeft = run.timeTotal;
     run.villagerSpeed = Math.min(1.4, 1 + 0.06 * (day - 1));
     run.vision = 170 * Math.min(1.35, 1 + 0.06 * (day - 1)) * (1 - 0.15 * lvl('step'));
-    // Draw the hand of tasks: harder days ask for more
+  }
+
+  // Can this village support a task? (seasons, water, village kind)
+  function taskFits(t) {
+    for (const r of t.req || []) {
+      if (r === 'water' && !hasOpenWater()) return false;
+      if (r === 'ice' && !hasIce()) return false;
+      if (SEASON_NAMES.includes(r) && L.season !== r) return false;
+      if (KIND_NAMES.includes(r) && L.kind !== r) return false;
+    }
+    return true;
+  }
+  // Deal the day's hand of tasks once the village exists: harder days ask for more
+  function dealTasks() {
+    const day = run.day;
     const counts = { Easy: 3, Medium: Math.min(4, 2 + Math.floor((day - 1) / 2)), Hard: Math.min(3, 1 + Math.floor(day / 3)) };
     const groups = new Set();
     const chosen = [];
-    const finale = rpick(TASK_POOL.filter((t) => t.final));
+    const finale = rpick(TASK_POOL.filter((t) => t.final && taskFits(t)));
     if (finale.group) groups.add(finale.group);
     for (const tier of ['Easy', 'Medium', 'Hard']) {
       let n = counts[tier];
-      const pool = TASK_POOL.filter((t) => t.tier === tier).sort(() => Math.random() - 0.5);
+      // this place and season's own tasks first, so every day feels different
+      const pool = TASK_POOL.filter((t) => t.tier === tier && taskFits(t)).sort(() => Math.random() - 0.5)
+        .sort((a, b) => (b.req ? 1 : 0) - (a.req ? 1 : 0) || 0);
       for (const t of pool) {
         if (n <= 0) break;
         if (t.group && groups.has(t.group)) continue;
@@ -3334,7 +3519,7 @@
     for (let k = 0; k < 3; k++) sparkle(player.x + rr(-10, 10), player.y, 20 + k * 6);
     renderTodo(id);
     updateRunBar();
-    if (run.done.size === run.tasks.length) {
+    if (run.tasks.every((t) => run.done.has(t.id))) {
       run.over = true;
       setTimeout(() => endRun('win'), 1600);
     } else if (!task.final && regularTasksDone()) {
@@ -3362,6 +3547,7 @@
     for (const id of ['stash3', 'stash5', 'loot8']) setProgress(id, stashed.length);
     if (['pie', 'sandwich', 'apple'].every((k) => stashed.some((it) => it.kind === k))) completeTask('feast');
     if (stashed.some((it) => it.kind === 'bone')) completeTask('bone');
+    setProgress('shells', stashed.filter((it) => it.kind === 'shell').length);
     const gnomes = items.filter((it) => it.kind === 'gnome');
     if (gnomes.length >= 2 && gnomes.every(inHideout)) completeTask('gnomes');
     setProgress('everyone', new Set(stashed.filter((it) => it.owner).map((it) => it.owner)).size);
@@ -3442,6 +3628,7 @@
     setupRun(save.day);
     run.seed = dailySeed(save.day); // the same village for everyone on this day number today
     newVillage(run.seed);
+    dealTasks();
     joinVillageRoom(run.seed);
     showRunCard();
   }
@@ -3450,6 +3637,8 @@
     updateRunBar();
     document.getElementById('rc-day').textContent = `Day ${run.day}`;
     document.getElementById('rc-town').textContent = L.name;
+    document.getElementById('rc-season').textContent = `${cap(L.season)} \u00b7 ${L.kind === 'seaside' ? 'Seaside' : L.kind === 'river' ? 'Riverside' : 'Pond'} village`;
+    document.getElementById('rc-tip').textContent = [SEASON_TIP[L.season], KIND_TIP[L.kind]].filter(Boolean).join(' ');
     const m = Math.floor(run.timeTotal / 60), s = run.timeTotal % 60;
     document.getElementById('rc-tasks').textContent = `${run.tasks.length} tasks`;
     document.getElementById('rc-time').textContent = `${m}:${String(s).padStart(2, '0')} until sunset`;
@@ -3510,7 +3699,7 @@
   let lastBarSecond = -1;
   function updateRunBar() {
     document.getElementById('rb-day').textContent = `Day ${run.day}`;
-    document.getElementById('rb-town').textContent = L ? L.name : '';
+    document.getElementById('rb-town').textContent = L ? `${L.name} \u00b7 ${cap(L.season)}` : '';
     document.getElementById('rb-shiny').textContent = save.shinies + run.earned;
     const st = document.getElementById('rb-strikes');
     st.innerHTML = '';
@@ -3634,16 +3823,17 @@
       draw(ctx, t) {
         const shake = o.rustle > 0 ? Math.sin(t * 40) * 1.6 * Math.min(1, o.rustle * 3) : 0;
         ctx.save(); ctx.translate(x + shake, y - r * 0.75);
-        ctx.fillStyle = '#2a5e2a';
+        const bc = look().bush;
+        ctx.fillStyle = shade(bc[0], -0.1);
         for (const [bx, by, br] of blobs) circle(ctx, bx, by + 4, br);
         circle(ctx, 0, 2, r * 0.7);
-        ctx.fillStyle = '#3c8034';
+        ctx.fillStyle = bc[0];
         for (const [bx, by, br] of blobs) circle(ctx, bx - 1, by - 1, br * 0.85);
         circle(ctx, 0, -2, r * 0.62);
-        ctx.fillStyle = '#56a046';
+        ctx.fillStyle = bc[1];
         circle(ctx, -r * 0.3, -r * 0.32, r * 0.3); circle(ctx, r * 0.25, -r * 0.4, r * 0.2);
-        ctx.fillStyle = '#ffe9f0';
-        for (const [fx, fy] of flowers) circle(ctx, fx, fy + r * 0.75, 1.8);
+        if (isWinter()) { ctx.fillStyle = '#f4f8fb'; ellipse(ctx, -2, -r * 0.62, r * 0.75, r * 0.3); ellipse(ctx, r * 0.45, -r * 0.3, r * 0.35, r * 0.16); }
+        else { ctx.fillStyle = '#ffe9f0'; for (const [fx, fy] of flowers) circle(ctx, fx, fy + r * 0.75, 1.8); }
         ctx.restore();
         // the raccoon peeking out
         if (player.hidden && player.hidingIn === o) {
@@ -3700,13 +3890,16 @@
     let bush = null;
     for (const o of hideBushes) if (o.contains(player.x, player.y)) { bush = o; break; }
     if (bush && player.speed > 20) bush.rustle = 0.3;
-    if (bush && bush !== player.hidingIn) { sfx('rustle'); bush.rustle = 0.4; }
+    if (bush && bush !== player.hidingIn) {
+      if (bush.kind === 'leafpile' && player.speed > 60) scatterLeaves(bush);
+      else { sfx('rustle'); bush.rustle = 0.4; }
+    }
     player.hidingIn = bush;
     const heavy = player.held && player.held.type.heavy;
-    player.hidden = !!bush && !heavy && player.speed < WALK_SPEED * 1.15;
+    player.hidden = !!bush && !heavy && player.speed < WALK_SPEED * 1.15 && !(bush.kind === 'leafpile' && bush.h < 0.6);
     if (player.hidden && bush.kind === 'bed' && villagers.some((v) => areaOf(v.x, v.y) === areaOf(player.x, player.y))) completeTask('bedhome');
     if (player.hidden && !wasHidden) {
-      completeTask(bush.kind === 'bed' ? 'bed' : 'hide');
+      completeTask(bush.kind === 'bed' ? 'bed' : bush.kind === 'leafpile' ? 'leafhide' : 'hide');
       // Chasers who weren't right on top of you lose track in the leaves
       for (const v of villagers) {
         if (v.state === 'chase' && Math.hypot(v.x - player.x, v.y - player.y) > 60) {
@@ -4030,8 +4223,14 @@
 
   // Fragile things smash when they hit the floor hard
   function shatter(it) {
+    if (it.kind === 'snowball') { // a soft white splat, not a crash
+      for (let k = 0; k < 8; k++) particles.push({ kind: 'shard', col: '#f4f8fb', x: it.x, y: it.y, z: Math.max(2, it.z), vx: rr(-40, 40), vy: rr(-20, 20), vz: rr(30, 80), life: 0.5, max: 0.5 });
+      sfx('splat');
+      return;
+    }
+    if (it.kind === 'pumpkin') completeTask('pumpkinsmash');
     sfx('crash');
-    const col = { vase: '#4f6fa8', teapot: '#7fb3d5', frame: '#c9a33a', cookies: '#dcebf5', milk: '#f7f7f2' }[it.kind] || '#dddddd';
+    const col = { vase: '#4f6fa8', teapot: '#7fb3d5', frame: '#c9a33a', cookies: '#dcebf5', milk: '#f7f7f2', pumpkin: '#f2913a', egg: '#f2e6d0', paintegg: '#ffd166' }[it.kind] || '#dddddd';
     for (let k = 0; k < 12; k++) {
       const a = Math.random() * Math.PI * 2, s = 30 + Math.random() * 60;
       particles.push({ kind: 'shard', col, x: it.x, y: it.y, z: 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.6, vz: 60 + Math.random() * 90, life: 0.7, max: 0.7 });
@@ -4310,6 +4509,7 @@
     completeTask('eat');
     setProgress('eat5', run.eaten);
     if (it.kind === 'pie') completeTask('eatpie');
+    if (it.kind === 'lemonade') completeTask('lemonade');
     if (f.sweet) { player.sugar = 12; completeTask('sugar'); toast('Sugar rush!', 'Zoom zoom'); }
     // Did the owner watch you finish it?
     const owner = it.owner && VILLAGER[it.owner];
@@ -4577,6 +4777,450 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Seasons and village kinds. Each daily village rolls a season (spring,
+  // summer, autumn, winter) and a kind (pond, river, seaside); both change how
+  // it looks and what there is to do.
+  // ---------------------------------------------------------------------------
+  const SEASON_NAMES = ['spring', 'summer', 'autumn', 'winter'];
+  const KIND_NAMES = ['pond', 'river', 'seaside'];
+  const SEASON_LOOK = {
+    spring: { grass: '#7cba55', patch: ['rgba(110,170,70,0.35)', 'rgba(175,220,120,0.3)'], blade: ['rgba(70,135,50,0.55)', 'rgba(175,225,120,0.5)'], blades: 9000,
+      flowers: 1200, petals: ['#ffffff', '#ffd1e3', '#ff9ec4', '#c9b3ff', '#fff3a8'], path: ['#b08b55', '#cfac72'], sand: ['#c9b57e', '#e3cf96'],
+      trees: [['#3f8a35', '#56a646', '#7cc45a'], ['#3a7d40', '#55a05a', '#86c870']], blossom: '#ffc6dd', bush: ['#3a7d34', '#56a646'] },
+    summer: { grass: '#6fae4b', patch: ['rgba(90,150,60,0.35)', 'rgba(140,195,90,0.25)'], blade: ['rgba(60,120,45,0.55)', 'rgba(160,210,110,0.5)'], blades: 9000,
+      flowers: 700, petals: ['#ffffff', '#ffd166', '#ff8fab', '#b39cff', '#ff7a59'], path: ['#b08b55', '#cfac72'], sand: ['#c9b57e', '#e3cf96'],
+      trees: [['#2f6b2a', '#3f8a35', '#5aa848'], ['#2b5f33', '#3a7d40', '#55a05a'], ['#3b6b25', '#4e8c2f', '#6daa42']], bush: ['#2f6b2a', '#479a3c'] },
+    autumn: { grass: '#9ea64f', patch: ['rgba(150,140,60,0.35)', 'rgba(195,175,90,0.3)'], blade: ['rgba(120,110,50,0.5)', 'rgba(205,185,100,0.45)'], blades: 7000,
+      flowers: 0, leaves: 1100, path: ['#a8824e', '#c7a26a'], sand: ['#c2ad78', '#dcc690'],
+      trees: [['#a8461e', '#d0662a', '#f0a040'], ['#8a5a1e', '#c08a2a', '#e8c04a'], ['#7a2e1e', '#b5442a', '#e07a3a'], ['#3b6b25', '#6a8a2f', '#a8aa42']], bush: ['#8a4a1e', '#c0782a'] },
+    winter: { grass: '#e9eff5', patch: ['rgba(190,205,225,0.45)', 'rgba(255,255,255,0.7)'], blade: ['rgba(90,105,85,0.45)', 'rgba(150,160,140,0.4)'], blades: 1600,
+      flowers: 0, path: ['#a59d90', '#c9c2b7'], sand: ['#cfcabd', '#e4e0d6'], trees: null, bush: ['#3a6a4a', '#4f8a5a'] },
+  };
+  const look = () => SEASON_LOOK[(L && L.season) || 'summer'];
+  const isWinter = () => !!L && L.season === 'winter';
+  const hasIce = () => isWinter() && L.kind !== 'seaside';
+  const hasOpenWater = () => !L || !(isWinter() && L.kind !== 'seaside');
+
+  const SEASON_TIP = {
+    spring: "Spring: Mrs. Fennick's tulips are out, and someone has hidden painted eggs around the village.",
+    summer: 'Summer: washing is drying on the lines, and Rosa has made lemonade.',
+    autumn: 'Autumn: leaf piles are perfect for jumping in, and for hiding in.',
+    winter: 'Winter: press E on the snow to scoop a snowball. Watch out, the ice is slippery.',
+  };
+  const KIND_TIP = { pond: '', river: 'A river runs right through the village.', seaside: 'The village sits by the sea, with a pier.' };
+  const cap = (s) => s[0].toUpperCase() + s.slice(1);
+
+  // --- Seasonal objects ---------------------------------------------------------
+  function makeSnowman(x, y) {
+    const o = {
+      kind: 'snowman', x, y, down: false, hitbox: box(x - 9, y - 8, 18, 9),
+      bounds: { l: x - 26, r: x + 26, t: y - 60, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(60,80,110,0.2)'; ellipse(ctx, x + 5, y, 14, 4.5); },
+      draw(ctx) {
+        if (o.down) { // a sad heap with the hat on top
+          ctx.fillStyle = '#f4f8fb'; ellipse(ctx, x - 4, y - 5, 12, 6); ellipse(ctx, x + 7, y - 4, 8, 5);
+          ctx.fillStyle = '#2b2d33'; ctx.fillRect(x + 2, y - 12, 10, 3); ctx.fillRect(x + 4, y - 18, 6, 6);
+          ctx.fillStyle = '#e07b2a'; poly(ctx, [[x - 10, y - 6], [x - 3, y - 7], [x - 3, y - 5]]); ctx.fill();
+          return;
+        }
+        ctx.fillStyle = '#f4f8fb'; circle(ctx, x, y - 10, 11); circle(ctx, x, y - 27, 8.5); circle(ctx, x, y - 40, 6.5);
+        ctx.fillStyle = 'rgba(160,185,215,0.5)'; circle(ctx, x + 3, y - 7, 7); circle(ctx, x + 2.5, y - 25, 5);
+        ctx.fillStyle = '#2b2d33'; for (const k of [-31, -27, -23]) circle(ctx, x, y + k, 1.1);
+        circle(ctx, x - 2.4, y - 42, 1); circle(ctx, x + 2.4, y - 42, 1);
+        ctx.fillStyle = '#e07b2a'; poly(ctx, [[x, y - 40], [x + 7, y - 39], [x, y - 38]]); ctx.fill();
+        ctx.fillStyle = '#2b2d33'; ctx.fillRect(x - 7, y - 47, 14, 2.5); ctx.fillRect(x - 4.5, y - 55, 9, 8);
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(x - 4.5, y - 50, 9, 2);
+        ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x - 7, y - 28); ctx.lineTo(x - 17, y - 34); ctx.moveTo(x + 7, y - 28); ctx.lineTo(x + 16, y - 36); ctx.stroke();
+        ctx.fillStyle = '#c0392b'; ctx.fillRect(x - 7, y - 35, 14, 3); ctx.fillRect(x + 3, y - 35, 3, 9);
+      },
+    };
+    return o;
+  }
+
+  function makeLeafPile(x, y) {
+    const r = rr(18, 22);
+    const leaves = Array.from({ length: 34 }, () => [rr(-1, 1), rr(-1, 0.2), pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a', '#8a5a2e']), rr(0, Math.PI)]);
+    const o = {
+      kind: 'leafpile', x, y, r, h: 1, hitbox: null, rustle: 0,
+      bounds: { l: x - r * 1.4, r: x + r * 1.4, t: y - r * 1.4, b: y + 6 },
+      contains(px, py) { const dx = (px - x) / (r * 0.85), dy = (py - (y - 6)) / (r * 0.5); return dx * dx + dy * dy < 1; },
+      draw(ctx, t) {
+        const hh = 0.35 + o.h * 0.65;
+        const sh = o.rustle > 0 ? Math.sin(t * 40) * 1.2 : 0;
+        ctx.fillStyle = '#9a5a26'; ellipse(ctx, x + sh, y - 4, r * 1.05, r * 0.42);
+        for (const [lx, ly, col, a] of leaves) {
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.ellipse(x + sh + lx * r * 0.95, y - 4 + ly * r * 0.75 * hh, 3.2, 1.8, a, 0, Math.PI * 2); ctx.fill();
+        }
+        if (player.hidden && player.hidingIn === o) {
+          const ey = player.y - 10;
+          ctx.fillStyle = '#ffffff'; circle(ctx, player.x - 3, ey, 1.6); circle(ctx, player.x + 3, ey, 1.6);
+          ctx.fillStyle = NOSE; circle(ctx, player.x - 3, ey, 0.8); circle(ctx, player.x + 3, ey, 0.8);
+        }
+      },
+    };
+    return o;
+  }
+
+  function makeFlowerBed(x, y) { // Mrs. Fennick's tulips (x, y = top-left in px)
+    const w = 2.6 * TILE, hgt = 1.1 * TILE;
+    const tulips = Array.from({ length: 16 }, (_, i) => [8 + (i % 8) * (w - 16) / 7 + rr(-2, 2), 10 + Math.floor(i / 8) * 14 + rr(-2, 2), pick(['#e8453c', '#ff6f91', '#ffd166', '#b39cff'])]);
+    const o = {
+      kind: 'flowerbed', x: x + w / 2, y: y + hgt, trample: 0, hitbox: null, rect: { x, y, w, h: hgt },
+      bounds: { l: x - 6, r: x + w + 6, t: y - 16, b: y + hgt + 6 },
+      draw(ctx) {
+        ctx.fillStyle = '#6a462a'; roundRect(ctx, x, y, w, hgt, 6, true);
+        ctx.fillStyle = '#7a5434'; roundRect(ctx, x + 2, y + 2, w - 4, hgt - 4, 5, true);
+        for (const [tx, ty, col] of tulips) {
+          const flat = o.trample;
+          ctx.strokeStyle = '#3f8a35'; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(x + tx, y + ty + 6); ctx.lineTo(x + tx + flat * 6, y + ty - 6 * (1 - flat)); ctx.stroke();
+          ctx.fillStyle = col;
+          if (flat > 0.5) { ctx.beginPath(); ctx.ellipse(x + tx + 6, y + ty + 2, 3, 1.4, 0.3, 0, Math.PI * 2); ctx.fill(); }
+          else { ctx.beginPath(); ctx.ellipse(x + tx + flat * 6, y + ty - 8 * (1 - flat), 2.6, 3.4, 0, 0, Math.PI * 2); ctx.fill(); }
+        }
+      },
+    };
+    return o;
+  }
+
+  function makeWashLine(x, y) { // posts 3.5 tiles apart, rope at ~26px
+    const w = 3.5 * TILE;
+    return {
+      kind: 'washline', x: x + w / 2, y, hitbox: box(x - 3, y - 5, 6, 6), hitbox2: box(x + w - 3, y - 5, 6, 6),
+      bounds: { l: x - 10, r: x + w + 10, t: y - 40, b: y + 6 },
+      draw(ctx) {
+        ctx.fillStyle = '#6b4a2e'; ctx.fillRect(x - 2, y - 32, 4, 32); ctx.fillRect(x + w - 2, y - 32, 4, 32);
+        ctx.strokeStyle = '#d8d0c0'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, y - 30); ctx.quadraticCurveTo(x + w / 2, y - 24, x + w, y - 30); ctx.stroke();
+      },
+    };
+  }
+
+  function makeCoop(x, y) {
+    return {
+      kind: 'coop', x, y, hitbox: box(x - 26, y - 14, 52, 15),
+      bounds: { l: x - 34, r: x + 34, t: y - 60, b: y + 10 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,10,0.22)'; ctx.fillRect(x - 22, y - 2, 56, 7); },
+      draw(ctx) {
+        ctx.fillStyle = '#8a5a32'; ctx.fillRect(x - 22, y - 8, 4, 8); ctx.fillRect(x + 18, y - 8, 4, 8);
+        ctx.fillStyle = '#b5523b'; ctx.fillRect(x - 24, y - 38, 48, 30);
+        ctx.fillStyle = '#9c4430'; for (let k = 0; k < 5; k++) ctx.fillRect(x - 24 + k * 10, y - 38, 1.5, 30);
+        ctx.fillStyle = '#7a3e2c'; poly(ctx, [[x - 30, y - 36], [x, y - 56], [x + 30, y - 36]]); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; ctx.fillRect(x - 30, y - 38, 60, 3);
+        ctx.fillStyle = '#2b1a10'; roundRect(ctx, x - 7, y - 26, 14, 18, 6, true);
+        ctx.strokeStyle = '#c9a06a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 4, y - 8); ctx.lineTo(x - 10, y + 6); ctx.stroke();
+        ctx.fillStyle = '#e6c56a'; ellipse(ctx, x + 14, y - 1, 9, 3); // straw
+      },
+    };
+  }
+
+  function makeBoat(x, y) {
+    return {
+      kind: 'boat', x, y, hitbox: box(x - 26, y - 10, 52, 11),
+      bounds: { l: x - 34, r: x + 34, t: y - 26, b: y + 6 },
+      shadow(ctx) { ctx.fillStyle = 'rgba(20,40,60,0.2)'; ellipse(ctx, x + 4, y, 30, 6); },
+      draw(ctx) {
+        ctx.fillStyle = '#3f6fa8'; ctx.beginPath(); ctx.moveTo(x - 30, y - 16); ctx.lineTo(x + 30, y - 16); ctx.lineTo(x + 22, y); ctx.lineTo(x - 24, y); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#f4f2ee'; ctx.fillRect(x - 30, y - 16, 60, 3);
+        ctx.fillStyle = '#8a5a32'; ctx.fillRect(x - 18, y - 13, 6, 10); ctx.fillRect(x + 8, y - 13, 6, 10);
+        ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 10, y - 10); ctx.lineTo(x + 30, y - 2); ctx.stroke();
+      },
+    };
+  }
+
+  // Find a free spot on open grass near (tx, ty) for something w×h tiles
+  function freeSpotNear(tx, ty, w = 1, h = 1, spread = 3) {
+    for (let ring = 0; ring <= spread; ring++) {
+      for (let dy = -ring; dy <= ring; dy++) for (let dx = -ring; dx <= ring; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        const x = Math.floor(tx + dx), y = Math.floor(ty + dy);
+        let ok = true;
+        for (let j = y; j < y + h && ok; j++) for (let i = x; i < x + w; i++) if (isUsed(i, j) || getT(i, j) !== GRASS) { ok = false; break; }
+        if (ok) { reserve(x, y, w, h); return [x, y]; }
+      }
+    }
+    return null;
+  }
+  function randomFreeSpot(w = 1, h = 1) {
+    for (let n = 0; n < 80; n++) { const s = freeSpotNear(rr(5, MW - 6), rr(5, MH - 6), w, h, 0); if (s) return s; }
+    return null;
+  }
+
+  // Objects that depend on the season (called while building the map)
+  function placeSeasonal() {
+    const T = TILE, g = L.garden, P = L.plaza;
+    L.extra = { snowmen: [], leafpiles: [], beds: [], lines: [] };
+    // Hen house beside the garden, for every village
+    {
+      const tries = [[g.x - 5, g.y + 3], [g.x + 13, g.y + 3], [g.x + 4, g.gateTop ? g.y + 12 : g.y - 5], [g.x - 5, g.y + 7]];
+      let s = null;
+      for (const [tx, ty] of tries) { s = freeSpotNear(tx, ty, 3, 3, 2); if (s) break; }
+      if (!s) s = randomFreeSpot(3, 3);
+      if (s) { L.coop = { x: (s[0] + 1.5) * T, y: (s[1] + 1.6) * T }; objects.push(makeCoop(L.coop.x, L.coop.y)); }
+    }
+    if (L.kind === 'seaside') { // a rowing boat pulled up on the beach
+      for (let n = 0; n < 30; n++) {
+        const x = Math.floor(rr(6, MW - 6));
+        if (Math.abs(x - L.roadX) < 5) continue;
+        const y = L.shore[x] - 1;
+        if (getT(x, y) === SAND && getT(x + 1, y) === SAND && getT(x - 1, y) === SAND) { objects.push(makeBoat((x + 0.5) * T, (y + 0.8) * T)); reserve(x - 1, y, 3, 1); break; }
+      }
+    }
+    if (L.season === 'winter') {
+      for (const [tx, ty] of [[P.x - 3, P.y + 8], [P.x + 14, P.y + 3], [g.x + 5, g.gateTop ? g.y - 3 : g.y + 12]]) {
+        const s = freeSpotNear(tx, ty, 1, 1, 3) || randomFreeSpot();
+        if (s) { const o = makeSnowman((s[0] + 0.5) * T, (s[1] + 0.85) * T); objects.push(o); L.extra.snowmen.push(o); }
+      }
+    } else if (L.season === 'autumn') {
+      for (let n = 0; n < 7; n++) {
+        const h = L.houses[n % L.houses.length];
+        const s = n < 4 ? freeSpotNear(h.x + h.w + 1, h.y + h.h + 1, 2, 1, 3) : randomFreeSpot(2, 1);
+        if (s) { const o = makeLeafPile((s[0] + 1) * T, (s[1] + 0.9) * T); objects.push(o); L.extra.leafpiles.push(o); }
+      }
+    } else if (L.season === 'spring') {
+      const fh = L.houses[L.homes ? L.homes.fennick : 0] || L.houses[0];
+      for (const [tx, ty] of [[fh.x - 4, fh.y + fh.h - 1], [fh.x + fh.w + 1, fh.y + 1], [P.x + 4.5, P.y - 3]]) {
+        const s = freeSpotNear(tx, ty, 3, 2, 3);
+        if (s) { const o = makeFlowerBed(s[0] * T, s[1] * T + 6); objects.push(o); L.extra.beds.push(o); }
+      }
+    } else { // summer: washing lines beside a couple of houses
+      for (let n = 0; n < Math.min(2, L.houses.length); n++) {
+        const h = L.houses[(n * 3 + 1) % L.houses.length];
+        const s = freeSpotNear(h.x + h.w + 1, h.y + 1, 4, 2, 3) || freeSpotNear(h.x - 5, h.y + 1, 4, 2, 3);
+        if (s) { const o = makeWashLine(s[0] * T + 4, (s[1] + 1.6) * T); objects.push(o); objects.push({ ...o, kind: 'washpost', hitbox: o.hitbox2, draw() {}, bounds: o.bounds }); L.extra.lines.push({ o, house: h }); }
+      }
+    }
+  }
+
+  // --- New items -------------------------------------------------------------------
+  Object.assign(ITEM, {
+    snowball: { name: 'snowball', h: 8, r: 4, fragile: true, draw(c) { c.fillStyle = '#f4f8fb'; circle(c, 0, -4, 4); c.fillStyle = 'rgba(160,185,215,0.6)'; circle(c, 1.2, -3, 2.4); } },
+    egg: { name: 'egg', h: 7, r: 3, fragile: true, draw(c) { c.fillStyle = '#f2e6d0'; ellipse(c, 0, -3.5, 3, 3.8); c.fillStyle = 'rgba(255,255,255,0.6)'; circle(c, -1, -5, 1); } },
+    paintegg: { name: 'painted egg', h: 7, r: 3, fragile: true, draw(c, it) {
+      const col = it.color || (it.color = pick(['#ff8fab', '#7fe3ff', '#ffd166', '#b39cff', '#8fd16a']));
+      c.fillStyle = col; ellipse(c, 0, -3.5, 3, 3.8);
+      c.fillStyle = '#ffffff'; c.fillRect(-3, -4, 6, 1); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(-3, -2.4, 6, 0.8);
+    } },
+    cocoa: { name: 'mug of cocoa', h: 10, r: 4, draw(c) {
+      c.strokeStyle = '#c0392b'; c.lineWidth = 1.4; c.beginPath(); c.arc(4, -5, 2.2, -1.2, 1.2); c.stroke();
+      c.fillStyle = '#c0392b'; c.fillRect(-4, -9, 8, 9); c.fillStyle = '#5a3a24'; ellipse(c, 0, -9, 4, 1.4);
+      c.fillStyle = '#ffffff'; circle(c, -1.2, -9.5, 1.1); circle(c, 1.4, -9.8, 1);
+    } },
+    lemonade: { name: 'jug of lemonade', h: 14, r: 5, draw(c) {
+      c.fillStyle = 'rgba(255,240,140,0.9)'; roundRect(c, -5, -12, 10, 12, 2, true);
+      c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(-4, -11, 2, 9);
+      c.fillStyle = '#f2c14e'; circle(c, 1.5, -7, 2); c.strokeStyle = '#d8d0c0'; c.lineWidth = 1.4; c.beginPath(); c.arc(5.5, -7, 3, -1.3, 1.3); c.stroke();
+    } },
+    sock: { name: 'stripy sock', h: 11, r: 4, draw(c) {
+      c.fillStyle = '#e8453c'; roundRect(c, -2.5, -11, 5, 9, 2, true); roundRect(c, -2.5, -4, 7, 4, 2, true);
+      c.fillStyle = '#ffffff'; c.fillRect(-2.5, -9, 5, 1.4); c.fillRect(-2.5, -6, 5, 1.4);
+    } },
+    shirt: { name: 'shirt', h: 13, r: 7, draw(c, it) {
+      c.fillStyle = it.color || (it.color = pick(['#4f6fa8', '#ffd166', '#8fd16a', '#ff8fab']));
+      poly(c, [[-4, -13], [4, -13], [8, -10], [6, -7], [4, -8.5], [4, 0], [-4, 0], [-4, -8.5], [-6, -7], [-8, -10]]); c.fill();
+      c.fillStyle = 'rgba(0,0,0,0.15)'; c.fillRect(-1, -13, 2, 2);
+    } },
+    shell: { name: 'seashell', h: 5, r: 4, draw(c) {
+      c.fillStyle = '#f7d9c4'; c.beginPath(); c.arc(0, -2, 4.5, Math.PI, 0); c.closePath(); c.fill();
+      c.strokeStyle = '#d9a08a'; c.lineWidth = 0.7; for (const a of [-1.2, -0.6, 0, 0.6, 1.2]) { c.beginPath(); c.moveTo(0, -0.5); c.lineTo(Math.sin(a) * 4.3, -2 - Math.cos(a) * 4); c.stroke(); }
+    } },
+    fish: { name: 'fish', h: 5, r: 7, draw(c) {
+      c.fillStyle = '#9ab4c4'; ellipse(c, 0, -3, 6.5, 2.6);
+      c.beginPath(); c.moveTo(-5.5, -3); c.lineTo(-9, -6); c.lineTo(-9, 0); c.closePath(); c.fill();
+      c.fillStyle = '#1d1d22'; circle(c, 4, -3.6, 0.7); c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(-3, -4.5, 6, 1);
+    } },
+  });
+  ITEM.pumpkin.fragile = true;
+  Object.assign(FOOD, {
+    egg: { bites: 1, fill: 10 }, paintegg: { bites: 1, fill: 10 }, fish: { bites: 2, fill: 22 },
+    cocoa: { bites: 1, fill: 15, sweet: true, drink: true }, lemonade: { bites: 2, fill: 20, sweet: true, drink: true },
+  });
+  Object.assign(CRUMB, { egg: '#f2e6d0', paintegg: '#ffd166', fish: '#9ab4c4', cocoa: '#5a3a24', lemonade: '#fff08c' });
+
+  // Items that depend on the season / kind (called at the end of placeItems)
+  function placeSeasonalItems() {
+    const T = TILE, P = L.plaza;
+    if (L.coop) for (let k = 0; k < 3; k++) placeFree('egg', L.coop.x + 18 + k * 6, L.coop.y + 4, { owner: 'bertram' });
+    if (L.season === 'winter') {
+      for (const s of L.extra.snowmen) for (let k = 0; k < 2; k++) placeFree('snowball', s.x + 16 + k * 8, s.y + 6);
+    }
+    if (L.season === 'spring') { // painted eggs tucked by hiding bushes
+      const spots = shuffled(objects.filter((o) => o.kind === 'hidebush'));
+      for (let k = 0; k < Math.min(5, spots.length); k++) placeFree('paintegg', spots[k].x + rr(-26, 26), spots[k].y + rr(6, 14));
+    }
+    if (L.season === 'summer') {
+      addItem('lemonade', L.picnic.x * T - 12, L.picnic.y * T + 1, { z: 19, owner: 'rosa' });
+      for (const { o, house } of L.extra.lines) {
+        const owner = residentsOf(house)[0] || null;
+        const x0 = o.x - 1.75 * T;
+        ['shirt', 'sock', 'shirt', 'sock'].forEach((k, i) => addItem(k, x0 + 18 + i * 24, o.y + 2, { z: 18 - Math.sin((i + 0.5) / 4 * Math.PI) * 4, owner }));
+      }
+    }
+    if (L.kind === 'seaside') {
+      for (let k = 0; k < 6; k++) { const x = Math.floor(rr(5, MW - 5)); placeFree('shell', (x + 0.5) * T, (L.shore[x] - 0.3) * T); }
+      for (let k = 0; k < 3; k++) placeFree('fish', L.pier.x + (k - 1) * 12 + 24, L.pier.baseY - 10, { owner: 'ollie' });
+    }
+  }
+
+  // --- Hens ------------------------------------------------------------------------
+  let hens = [];
+  function spawnHens() {
+    hens = [];
+    if (!L.coop) return;
+    for (let k = 0; k < 4; k++) {
+      hens.push({ x: L.coop.x + rr(-30, 40), y: L.coop.y + rr(14, 34), dir: 'down', walk: 0, moving: false, panic: 0, fleeA: 0, alarmCD: 0, bubble: null, tx: 0, ty: 0, wait: rr(0, 2), peck: 0, path: null });
+    }
+  }
+  function updateHens(dt) {
+    let panicking = 0;
+    const outside = areaOf(player.x, player.y) === 0;
+    for (const h of hens) {
+      h.moving = false;
+      h.panic = Math.max(0, h.panic - dt); h.alarmCD = Math.max(0, h.alarmCD - dt);
+      if (h.bubble) { h.bubble.t -= dt; if (h.bubble.t <= 0) h.bubble = null; }
+      const d = Math.hypot(player.x - h.x, player.y - h.y);
+      if (outside && started && d < 60 && player.speed > 25 && !player.hidden) {
+        if (h.panic <= 0.4) {
+          h.bubble = { text: rpick(['BAWK!', 'Bwaak!', 'BUK-BUK!']), t: 1 };
+          for (let k = 0; k < 3; k++) particles.push({ kind: 'shard', col: '#ffffff', x: h.x, y: h.y, z: 10, vx: rr(-30, 30), vy: rr(-15, 15), vz: rr(40, 90), life: 0.8, max: 0.8 });
+          if (d < 260) sfx('cluck');
+          completeTask('chicken');
+        }
+        h.panic = 1.6;
+        h.fleeA = Math.atan2(h.y - player.y, h.x - player.x) + rr(-0.5, 0.5);
+        if (player.speed > 110 && h.alarmCD <= 0) {
+          h.alarmCD = 4;
+          lookTowards(h.x, h.y, 230, (v) => (v.id === 'bertram' ? 'Oi! Leave my hens be!' : "What's got the hens going?"));
+        }
+      }
+      if (h.panic > 0) {
+        panicking++;
+        moveToward(h, h.x + Math.cos(h.fleeA) * 40, h.y + Math.sin(h.fleeA) * 40, 140, dt);
+      } else {
+        h.wait -= dt;
+        if (h.wait > 0) { h.peck += dt * 9; continue; }
+        if (!h.tx || Math.hypot(h.tx - h.x, h.ty - h.y) < 4) {
+          h.tx = L.coop.x + rr(-60, 60); h.ty = L.coop.y + rr(10, 60);
+          if (navBlockedPt(h.tx, h.ty)) { h.tx = h.x; h.ty = h.y; }
+          h.wait = rr(0.6, 2.5);
+        }
+        moveToward(h, h.tx, h.ty, 26, dt);
+      }
+    }
+    if (hens.length >= 3 && panicking >= hens.length) completeTask('hens');
+  }
+  function drawHen(ctx, h, t) {
+    ctx.save();
+    ctx.translate(h.x, h.y);
+    ctx.fillStyle = 'rgba(20,30,10,0.22)'; ellipse(ctx, 0, 0, 7, 2.5);
+    const flap = h.panic > 0 ? Math.sin(t * 40) * 3 : 0;
+    const hop = h.panic > 0 ? Math.abs(Math.sin(t * 20)) * 3 : 0;
+    ctx.translate(0, -hop);
+    if (h.dir === 'left') ctx.scale(-1, 1);
+    const pk = h.panic <= 0 && h.wait > 0 ? Math.max(0, Math.sin(h.peck)) * 3 : 0;
+    ctx.strokeStyle = '#e8a33a'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-1.5, -4); ctx.lineTo(-2, 0); ctx.moveTo(1.5, -4); ctx.lineTo(2, 0); ctx.stroke();
+    ctx.fillStyle = '#f7f3ea'; ellipse(ctx, 0, -7, 6, 4.5);
+    ctx.fillStyle = '#e8e2d4'; ellipse(ctx, -1, -7 - flap * 0.3, 3.5, 2.5 + Math.abs(flap) * 0.4); // wing
+    ctx.fillStyle = '#f7f3ea'; poly(ctx, [[-5, -9], [-8, -13], [-4, -11]]); ctx.fill(); // tail
+    const hx = 4.5, hy = -11 + pk;
+    ctx.fillStyle = '#f7f3ea'; circle(ctx, hx, hy, 2.8);
+    ctx.fillStyle = '#e8453c'; circle(ctx, hx - 0.5, hy - 2.8, 1.2); circle(ctx, hx + 0.8, hy - 2.6, 1); ellipse(ctx, hx + 1.6, hy + 2, 0.8, 1.2);
+    ctx.fillStyle = '#e8a33a'; poly(ctx, [[hx + 2.4, hy - 0.6], [hx + 5, hy + 0.2], [hx + 2.4, hy + 0.8]]); ctx.fill();
+    ctx.fillStyle = '#1d1d22'; circle(ctx, hx + 0.8, hy - 0.6, 0.6);
+    ctx.restore();
+  }
+
+  // --- Weather, tint, footprints, ice, snowballs ----------------------------------------
+  const weather = [];
+  function spawnWeather() {
+    weather.length = 0;
+    const n = { winter: 150, autumn: 34, spring: 44 }[L.season] || 0;
+    for (let i = 0; i < n; i++) weather.push({ x: Math.random(), y: Math.random(), s: Math.random(), ph: Math.random() * 6, col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']) });
+  }
+  function drawWeather(ctx, left, top, viewW, viewH, t, dt) {
+    if (!weather.length) return;
+    const S = L.season;
+    for (const w of weather) {
+      if (S === 'winter') { w.y += (0.05 + w.s * 0.05) * dt; w.x += Math.sin(t * 0.8 + w.ph) * 0.004 * dt; }
+      else { w.y += (0.03 + w.s * 0.03) * dt; w.x += (Math.sin(t * 0.6 + w.ph) * 0.02 + 0.01) * dt; }
+      if (w.y > 1.05) { w.y = -0.05; w.x = Math.random(); }
+      if (w.x > 1.05) w.x = -0.05; else if (w.x < -0.05) w.x = 1.05;
+      const x = left + w.x * viewW, y = top + w.y * viewH;
+      if (S === 'winter') { ctx.fillStyle = `rgba(255,255,255,${0.55 + w.s * 0.4})`; circle(ctx, x, y, 0.8 + w.s * 1.6); }
+      else {
+        ctx.fillStyle = S === 'spring' ? (w.s > 0.5 ? '#ffd1e3' : '#ffffff') : w.col;
+        ctx.beginPath(); ctx.ellipse(x, y, S === 'spring' ? 2 : 3, S === 'spring' ? 1.3 : 1.7, t * 2 + w.ph, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+  function drawSeasonTint(ctx, left, top, viewW, viewH) {
+    const tint = { winter: 'rgb(226,234,252)', autumn: 'rgb(255,238,214)', spring: 'rgb(255,250,248)' }[L && L.season];
+    if (!tint) return;
+    ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = tint;
+    ctx.fillRect(left - 10, top - 10, viewW + 20, viewH + 20); ctx.restore();
+  }
+  const onSnow = (x, y) => isWinter() && areaOf(x, y) === 0 && [GRASS, SAND, SOIL].includes(tileAt(x, y));
+  const onIce = (x, y) => tileAt(x, y) === ICE;
+  const canScoop = () => onSnow(player.x, player.y) && !player.held && !player.inWardrobe;
+  function scoopSnowball() {
+    const it = addItem('snowball', player.x, player.y + 1);
+    sfx('rustle');
+    puff(player.x, player.y, 3);
+    pickUp(it);
+  }
+  function drawScoopHint(ctx, t) {
+    if (!started || paused || !canScoop() || target || petChoice() || (player.idleT || 0) < 1.2 || player.bubble) return;
+    const text = isTouch ? 'grab: scoop snow' : 'E scoop a snowball';
+    ctx.font = '800 7px Nunito, sans-serif';
+    const w = ctx.measureText(text).width + 10;
+    const x = player.x, y = player.y - player.hop - 46 + Math.sin(t * 4) * 1.2;
+    ctx.fillStyle = 'rgba(28,36,24,0.85)'; roundRect(ctx, x - w / 2, y - 6, w, 11, 4, true);
+    ctx.fillStyle = '#bff1ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y - 0.2);
+  }
+
+  // Per-frame seasonal goings-on
+  function updateSeason(dt) {
+    if (!L || !L.extra) return;
+    player.idleT = player.speed < 5 ? (player.idleT || 0) + dt : 0;
+    // pawprints in the snow
+    player.printT = (player.printT || 0) - dt;
+    if (player.speed > 20 && player.printT <= 0 && onSnow(player.x, player.y)) {
+      player.printT = 0.17;
+      player.printSide = -(player.printSide || 1);
+      const d = DIRV[player.dir];
+      particles.push({ kind: 'print', x: player.x + d[1] * 3 * player.printSide, y: player.y - 1 + d[0] * 2 * player.printSide, life: 9, max: 9 });
+    }
+    if (onIce(player.x, player.y) && player.speed > 95) completeTask('skate');
+    if (L.pier && tileAt(player.x, player.y) === BRIDGE && player.y > L.pier.endY - 40) completeTask('pier');
+    for (const o of L.extra.leafpiles) { o.h = Math.min(1, o.h + dt * 0.08); o.rustle = Math.max(0, o.rustle - dt); }
+    for (const b of L.extra.beds) {
+      const r = b.rect;
+      if (player.speed > 20 && player.x > r.x && player.x < r.x + r.w && player.y > r.y && player.y < r.y + r.h + 6) {
+        const before = b.trample;
+        b.trample = Math.min(1, b.trample + dt * 1.6);
+        if (Math.random() < dt * 10) particles.push({ kind: 'shard', col: pick(['#e8453c', '#ff6f91', '#ffd166']), x: player.x, y: player.y, z: 4, vx: rr(-30, 30), vy: rr(-15, 15), vz: rr(30, 60), life: 0.6, max: 0.6 });
+        if (before < 0.45 && b.trample >= 0.45) {
+          completeTask('tulips');
+          const f = VILLAGER.fennick;
+          if (f && canSeePlayer(f) && Math.hypot(f.x - player.x, f.y - player.y) < 240) startleV(f, 'My TULIPS!', { state: 'chase', target: null });
+        }
+      }
+    }
+  }
+  // A leaf pile you barge into explodes noisily
+  function scatterLeaves(o) {
+    o.h = 0.3; o.rustle = 0.5;
+    for (let k = 0; k < 18; k++) particles.push({ kind: 'shard', col: pick(['#c0392b', '#e07b2a', '#f0a040', '#d9a43a']), x: o.x + rr(-12, 12), y: o.y - 4, z: 6, vx: rr(-60, 60), vy: rr(-30, 30), vz: rr(60, 140), life: 1.1, max: 1.1 });
+    sfx('rustle'); sfx('rustle');
+    lookTowards(o.x, o.y, 150, () => rpick(['Who’s in the leaves?', 'Hey! My leaf pile!', 'Hm? Rustling?']));
+    completeTask('leafjump');
+  }
+
+  // ---------------------------------------------------------------------------
   // Sound: tiny synthesized blips (starts after the first key press / tap)
   // ---------------------------------------------------------------------------
   let actx = null, master = null, muted = false;
@@ -4629,6 +5273,8 @@
       case 'hmph': tone(220, 150, 0.22, 'triangle', 0.08); break;
       case 'bark': tone(420, 250, 0.09, 'square', 0.08); tone(400, 230, 0.1, 'square', 0.07, 0.13); break;
       case 'rustle': noise(0.18, 0.09, 3000); break;
+      case 'cluck': [700, 900, 760].forEach((f, k) => tone(f, f * 0.7, 0.06, 'square', 0.035, k * 0.07)); break;
+      case 'splat': noise(0.12, 0.12, 1500); break;
       case 'creak': tone(180, 240, 0.25, 'sawtooth', 0.025); tone(240, 160, 0.2, 'triangle', 0.03, 0.18); break;
       case 'chomp': noise(0.08, 0.14, 2200); tone(260, 180, 0.06, 'square', 0.04, 0.02); break;
       case 'gulp': tone(300, 120, 0.14, 'sine', 0.09); tone(260, 110, 0.12, 'sine', 0.07, 0.15); break;
@@ -4822,6 +5468,7 @@
     for (const r of online.peers.values()) {
       if (r.x > left - pad && r.x < left + viewW + pad && r.y > top - pad && r.y < top + viewH + pad + 40) vis.push({ y: r.y, isRemote: true, r });
     }
+    for (const h of hens) if (h.x > left - pad && h.x < left + viewW + pad && h.y > top - pad && h.y < top + viewH + pad) vis.push({ y: h.y, isHen: true, h });
     if (cat && cat.x > left - pad && cat.x < left + viewW + pad && cat.y > top - pad && cat.y < top + viewH + pad + 40) vis.push({ y: cat.y + 0.5, isCat: true });
 
     // Ground-level effects: dust and ripples
@@ -4830,6 +5477,9 @@
         ctx.strokeStyle = `rgba(255,255,255,${(q.life / q.max) * 0.7})`;
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r, q.r * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+      } else if (q.kind === 'print') {
+        ctx.fillStyle = `rgba(110,130,165,${(q.life / q.max) * 0.45})`;
+        ellipse(ctx, q.x, q.y, 2.2, 1.4); circle(ctx, q.x - 1.6, q.y - 2.2, 0.8); circle(ctx, q.x + 1.6, q.y - 2.2, 0.8);
       } else if (!q.kind) {
         ctx.fillStyle = q.soil ? `rgba(110,75,45,${(q.life / q.max) * 0.7})` : `rgba(230,215,180,${(q.life / q.max) * 0.6})`;
         circle(ctx, q.x, q.y, q.r);
@@ -4849,6 +5499,7 @@
       if (o.isDog) { drawDogWithHeld(ctx, t); continue; }
       if (o.isCat) { drawCat(ctx, cat, t); continue; }
       if (o.isRemote) { drawRemote(ctx, o.r, t); continue; }
+      if (o.isHen) { drawHen(ctx, o.h, t); continue; }
       let fade = false;
       if (o.canopy && player.y < o.y && player.y > o.canopy.cy - o.canopy.r && Math.abs(player.x - o.x) < o.canopy.r + 6) fade = true;
       o.draw(ctx, t, fade);
@@ -4889,6 +5540,7 @@
     else if (target && started) drawPrompt(ctx, target, t);
     drawBubble(ctx, player);
     for (const v of villagers) if (v.bubble) drawBubbleAt(ctx, v.x, v.y - v.hop - 46 * v.scale, v.bubble);
+    for (const h of hens) if (h.bubble) drawBubbleAt(ctx, h.x, h.y - 28, h.bubble);
     if (dog && dog.bubble) drawBubbleAt(ctx, dog.x, dog.y - dog.hop - 38, dog.bubble);
     if (cat && cat.bubble) drawBubbleAt(ctx, cat.x, cat.y - cat.z - cat.hop - 32, cat.bubble);
     for (const r of online.peers.values()) {
@@ -4897,6 +5549,7 @@
 
     drawDoorHint(ctx, t);
     drawEatHint(ctx, t);
+    drawScoopHint(ctx, t);
 
     // Drifting cloud shadows (outdoors only)
     ctx.fillStyle = 'rgba(20,35,60,0.07)';
@@ -4905,6 +5558,8 @@
       ellipse(ctx, c.x + c.rx * 0.5, c.y - c.ry * 0.3, c.rx * 0.6, c.ry * 0.7);
     }
 
+    if (!indoors) { drawWeather(ctx, left, top, viewW, viewH, t, Math.min(0.05, t - (render.lastT || t))); drawSeasonTint(ctx, left, top, viewW, viewH); }
+    render.lastT = t;
     drawDusk(ctx, left, top, viewW, viewH);
 
     // ---- Screen space UI ----
@@ -4980,6 +5635,8 @@
       updateVillagers(dt);
       updateDog(dt);
       updateCat(dt);
+      updateHens(dt);
+      updateSeason(dt);
       updateHiding(dt);
       checkTasks(dt);
       updateBellyHud();
@@ -5003,13 +5660,13 @@
   }
 
   // Wipe the world and generate a fresh village from a seed
-  function newVillage(seed) {
+  function newVillage(seed, opts = {}) {
     rand = mulberry32(seed);
     map.fill(0); used.fill(0);
     objects.length = 0; items.length = 0; villagers.length = 0;
     particles.length = 0; butterflies.length = 0; clouds.length = 0;
     for (const k of Object.keys(VILLAGER)) delete VILLAGER[k];
-    L = genLayout();
+    L = genLayout(opts);
     buildMap();
     solidObjects = objects.filter((o) => o.hitbox);
     renderGround(seed);
@@ -5018,7 +5675,9 @@
     spawnVillagers();
     spawnDog();
     spawnCat();
-    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed'); // places to hide
+    spawnHens();
+    spawnWeather();
+    hideBushes = objects.filter((o) => o.kind === 'hidebush' || o.kind === 'bed' || o.kind === 'leafpile'); // places to hide
     spawnAmbient();
     Object.assign(player, { x: HIDEOUT.x, y: HIDEOUT.y + 6, vx: 0, vy: 0, held: null, stun: 0, hop: 0, hopV: 0, bubble: null, dir: 'down', speed: 0, hidden: false, hidingIn: null, inWardrobe: null, tummy: 0, stuffed: false, sugar: 0, eating: null });
     target = null;
@@ -5030,6 +5689,7 @@
     setupRun(save.day);
     run.seed = dailySeed(save.day);
     newVillage(run.seed);
+    dealTasks();
     initTodoToggle();
     buildTodo();
     updateRunBar();
