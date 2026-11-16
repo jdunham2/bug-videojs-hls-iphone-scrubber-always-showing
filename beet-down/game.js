@@ -173,10 +173,10 @@ const ENEMIES={
   mole:{hp:20,spd:115,dmg:7,r:15,mats:2,col:'#7a6250',dark:'#2e2219'},
   medic:{hp:16,spd:80,dmg:2,r:15,mats:2,col:'#f2eef0',dark:'#8a8090'},
   hive:{hp:140,spd:0,dmg:4,r:30,mats:8,col:'#ffc21f',dark:'#9a6f00',heavy:true},
-  boss:{hp:3400,spd:70,dmg:10,r:62,mats:60,col:'#ff4d6d',dark:'#7a1530',heavy:true,isBoss:true},
-  bking:{hp:3200,spd:80,dmg:10,r:60,mats:60,col:'#7a6250',dark:'#2e2219',heavy:true,isBoss:true,riseR:110},
-  otitan:{hp:3800,spd:50,dmg:10,r:66,mats:60,col:'#3cd46f',dark:'#1d7a3e',heavy:true,isBoss:true},
-  slord:{hp:3000,spd:120,dmg:9,r:56,mats:60,col:'#45d6e8',dark:'#1d7584',heavy:true,isBoss:true},
+  boss:{hp:7500,spd:70,dmg:10,r:62,mats:60,col:'#ff4d6d',dark:'#7a1530',heavy:true,isBoss:true},
+  bking:{hp:7000,spd:80,dmg:10,r:60,mats:60,col:'#7a6250',dark:'#2e2219',heavy:true,isBoss:true,riseR:110},
+  otitan:{hp:8400,spd:50,dmg:10,r:66,mats:60,col:'#3cd46f',dark:'#1d7a3e',heavy:true,isBoss:true},
+  slord:{hp:6600,spd:120,dmg:9,r:56,mats:60,col:'#45d6e8',dark:'#1d7584',heavy:true,isBoss:true},
 };
 const WAVES=[
   {dur:20,int:1.5,grp:[2,4],mix:{grub:1}},
@@ -515,7 +515,7 @@ function makeEnemy(type,x,y,elite){
   if(DZ(1)){e.hp*=1.2;e.dmg=Math.round(e.dmg*1.2)}
   if(DZ(3))e.spd*=1.12;
   if(def.isBoss&&DZ(4))e.hp*=1.4;
-  if(def.isBoss&&run.len===20&&!(run.waves[run.wave-1]||{}).mid){e.hp*=3;e.dmg=Math.round(e.dmg*1.8)}
+  if(def.isBoss&&run.len===20&&!(run.waves[run.wave-1]||{}).mid){e.hp*=2.5;e.dmg=Math.round(e.dmg*1.8)}
   e.maxHp=e.hp; return e;
 }
 function spawnPoint(minD){for(let i=0;i<30;i++){const x=rand(60,AW-60),y=rand(60,AH-60);if(d2(x,y,P.x,P.y)>minD*minD)return{x,y}}return{x:P.x<AW/2?AW-80:80,y:P.y<AH/2?AH-80:80}}
