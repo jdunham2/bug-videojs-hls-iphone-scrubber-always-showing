@@ -207,6 +207,23 @@ compose('e_hive', 'body_yellowA.png', [
     ('eye_red.png', 0, -40, .8, 0, False), ('eye_red.png', -45, -5, .6, 0, False), ('eye_red.png', 45, -5, .6, 0, True), ('eye_red.png', -20, 22, .45, 0, False), ('eye_red.png', 22, 22, .45, 0, True),
     ('mouthE.png', 0, 55, 1.0, 0, False)], maxpx=200)
 
+# bosses
+compose('e_bking', 'body_darkB.png', [
+    ('detail_dark_ear_round.png', -78, -80, 1.2, 0, False, L), ('detail_dark_ear_round.png', 78, -80, 1.2, 0, True, L),
+    ('arm_darkD.png', -122, 40, .75, -35, False, L), ('arm_darkD.png', 122, 40, .75, 35, True, L),
+    ('detail_yellow_horn_large.png', -40, -102, 1.5, 15, False, L), ('detail_yellow_horn_large.png', 0, -114, 1.5, 0, False, L), ('detail_yellow_horn_large.png', 40, -102, 1.5, -15, True, L),
+    ('eye_angry_red.png', -40, -36, 1.0, 0, False), ('eye_angry_red.png', 40, -36, 1.0, 0, True),
+    ('nose_brown.png', 0, 8, 1.1, 0, False), ('mouthI.png', 0, 60, 1.4, 0, False)], maxpx=300)
+compose('e_otitan', 'body_greenB.png', [
+    ('detail_green_antenna_large.png', -40, -118, 1.4, 15, False, L), ('detail_green_antenna_large.png', 40, -118, 1.4, -15, True, L),
+    ('eye_yellow.png', 0, -48, 1.0, 0, False), ('eye_yellow.png', -52, -14, .7, 0, False), ('eye_yellow.png', 52, -14, .7, 0, True),
+    ('mouthJ.png', 0, 48, 1.5, 0, False), ('snot_large.png', 54, 88, 1.4, 0, False), ('snot_large.png', -60, 80, 1.1, 0, False), ('snot_small.png', 10, 100, 1.2, 0, False)], maxpx=300)
+compose('e_slord', 'body_blueF.png', [
+    ('arm_blueE.png', -110, -20, .8, -70, False, L), ('arm_blueE.png', 110, -20, .8, 70, True, L),
+    ('detail_blue_antenna_large.png', -34, -140, 1.5, 20, False, L), ('detail_blue_antenna_large.png', 34, -140, 1.5, -20, True, L),
+    ('eye_angry_blue.png', -34, -60, .95, 0, False), ('eye_angry_blue.png', 34, -60, .95, 0, True), ('eye_angry_blue.png', 0, -22, .8, 0, False),
+    ('mouthB.png', 0, 30, 1.3, 0, False)], maxpx=300)
+
 # ---------- particles ----------
 PART = {'smoke': ('smoke_07.png', 128), 'puff': ('smoke_04.png', 96), 'fire': ('fire_01.png', 96), 'flame': ('flame_05.png', 64),
         'muzzle': ('muzzle_02.png', 64), 'slash': ('slash_03.png', 128), 'scorch': ('scorch_02.png', 128), 'splat': ('dirt_02.png', 128),
