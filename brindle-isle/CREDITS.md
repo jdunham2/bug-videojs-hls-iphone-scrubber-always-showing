@@ -12,7 +12,7 @@ Licenses: CC-BY-SA 3.0, GPL 3.0, OGA-BY 3.0 (see the generator's CREDITS.csv for
 [Kenney](https://kenney.nl) Tiny Town, Tiny Battle, Tiny Farm and Tiny Dungeon packs, CC0 (public domain).
 
 ## Hand-drawn
-The pixel rock, crystal and Slime King crown sprites, the temple and crypt entrances, crystal switches, furniture and village props (beds, hearths, wells, lamps, boats, market stalls, cacti, palm trees, ruins and more), the Sand Wyrm, the pyramid entrance, spike traps, sunbeams and sun-balls, giant mushrooms, bogs, rafts, the Rotting Hollow, the Bog Hag and the Rotroot, lava, flame vents, obsidian, the forge, the sky balloon, the shroomling, toad, wisp, magmite, ember imp, boulderback and salamander creatures and a few inventory icons were drawn for this game.
+The pixel rock, crystal and Slime King crown sprites, the temple and crypt entrances, crystal switches, furniture and village props (beds, hearths, wells, lamps, boats, market stalls, cacti, palm trees, ruins and more), the Sand Wyrm, the pyramid entrance, spike traps, sunbeams and sun-balls, giant mushrooms, bogs, rafts, the Rotting Hollow, the Bog Hag and the Rotroot, the Molten Forge, the Forgemaster, the Magma Drake, lava, flame vents, obsidian, the forge, the sky balloon, the shroomling, toad, wisp, magmite, ember imp, boulderback and salamander creatures and a few inventory icons were drawn for this game.
 
 ## Rebuilding
 Edit `src/game.js` or `src/shell.html`, then run `python3 build.py` to regenerate the self-contained `index.html`.
