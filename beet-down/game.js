@@ -676,9 +676,9 @@ function bkingAI(e,dt,nx,ny,d){
     case 'rise': if(e.stT<=0){e.under=false;e.sq=1;shake=16;sfx('boom');
         fx.push({k:'ring',x:e.x,y:e.y,r0:20,r1:150,t:0,life:.4,c:'#a08060',w:9});parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.55,img:'fx_puff',col:'#8a7060',s0:80,s1:230,rot:rand(0,TAU),a0:.7});
         if(state==='wave'&&Math.hypot(P.x-e.x,P.y-e.y)<110+P.r)hurtPlayer(e.dmg+4,e);
-        ring(e,ph2?20:14,200,9,6,'#b0906e',rand(0,1)); e.st='chase';e.stT=ph2?1.4:2}
+        ring(e,ph2?24:18,240,9,7,'#b0906e',rand(0,1)); e.st='chase';e.stT=ph2?1.4:2}
       break;
-    case 'rocks': e.volT-=dt; if(e.volT<=0){e.volT=ph2?.45:.6;fan(e,ph2?7:5,.16,260,10,6,'#b0906e');e.sq=1;sfx('shotgun')} if(e.stT<=0){e.st='chase';e.stT=1.8} break;
+    case 'rocks': e.volT-=dt; if(e.volT<=0){e.volT=ph2?.4:.5;fan(e,ph2?9:7,.15,290,10,7,'#b0906e');e.sq=1;sfx('shotgun')} if(e.stT<=0){e.st='chase';e.stT=1.8} break;
     case 'summon': if(e.stT<=0){const k=ph2?5:4;for(let i=0;i<k;i++){const a=i/k*TAU;queueSpawn('mole',clamp(e.x+Math.cos(a)*130,40,AW-40),clamp(e.y+Math.sin(a)*130,40,AH-40),false,.5)}e.st='chase';e.stT=2;sfx('roar')} break;
   }
   return[mx,my];
@@ -689,11 +689,11 @@ function otitanAI(e,dt,nx,ny,d){
   switch(e.st){
     case 'chase': mx=nx*e.spd*(ph2?1.3:1);my=ny*e.spd*(ph2?1.3:1);
       if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
-        if(e.st==='rain'){const k=ph2?8:6;for(let i=0;i<k;i++){const x=i?P.x+rand(-170,170):P.x,y=i?P.y+rand(-130,130):P.y;marks.push({x:clamp(x,30,AW-30),y:clamp(y,30,AH-30),r:50,t:-i*.12,life:1.1,dmg:8})}e.stT=1.4;e.sq=1;sfx('lob')}
+        if(e.st==='rain'){const k=ph2?10:8;for(let i=0;i<k;i++){const x=i?P.x+rand(-170,170):P.x,y=i?P.y+rand(-130,130):P.y;marks.push({x:clamp(x,30,AW-30),y:clamp(y,30,AH-30),r:50,t:-i*.12,life:1.1,dmg:8})}e.stT=1.4;e.sq=1;sfx('lob')}
         else if(e.st==='wave'){e.stT=1.6;e.vol=0;e.volT=0}else e.stT=.9}
       break;
     case 'rain': mx=nx*e.spd*.4;my=ny*e.spd*.4; if(e.stT<=0){e.st='chase';e.stT=ph2?1.5:2.1} break;
-    case 'wave': e.volT-=dt; if(e.volT<=0){e.volT=.7;ring(e,ph2?20:16,120,13,6,'#7dff4a',e.vol++*.2);e.sq=1;sfx('lob')} if(e.stT<=0){e.st='chase';e.stT=1.8} break;
+    case 'wave': e.volT-=dt; if(e.volT<=0){e.volT=.7;ring(e,ph2?22:18,145,13,7,'#7dff4a',e.vol++*.2);e.sq=1;sfx('lob')} if(e.stT<=0){e.st='chase';e.stT=1.8} break;
     case 'summon': if(e.stT<=0){for(let i=0;i<(ph2?4:3);i++){const a=i/3*TAU;queueSpawn('oozer',clamp(e.x+Math.cos(a)*120,40,AW-40),clamp(e.y+Math.sin(a)*120,40,AH-40),false,.5)}e.st='chase';e.stT=2;sfx('roar')} break;
   }
   return[mx,my];
@@ -703,7 +703,7 @@ function slordAI(e,dt,nx,ny,d){
   switch(e.st){
     case 'chase':{const side=e.wob>Math.PI?1:-1;if(d>280){mx=nx*e.spd;my=ny*e.spd}else{mx=(-ny*side*.9-nx*.2)*e.spd;my=(nx*side*.9-ny*.2)*e.spd}
       if(e.stT<=0){e.st=cycle[e.phaseIdx++%cycle.length];
-        if(e.st==='dash'){e.dn=ph2?4:3;e.st='aim';e.stT=.65;e.da=Math.atan2(ny,nx)}
+        if(e.st==='dash'){e.dn=ph2?5:4;e.st='aim';e.stT=.55;e.da=Math.atan2(ny,nx)}
         else if(e.st==='fan'){e.stT=1.8;e.volT=.15}else e.stT=.6}
       break}
     case 'aim': e.da=angLerp(e.da,Math.atan2(ny,nx),dt*2.5);e.shk=1; if(e.stT<=0){e.st='dashing';e.stT=.42;e.shk=0;sfx('swing')} break;
@@ -711,7 +711,7 @@ function slordAI(e,dt,nx,ny,d){
       if(Math.random()<.8)parts.push({x:e.x,y:e.y,vx:0,vy:0,t:0,life:.3,c:e.def.col,s:e.r*.45,fade:1});
       if(e.stT<=0||e.x<=e.r+2||e.x>=AW-e.r-2||e.y<=e.r+2||e.y>=AH-e.r-2){e.dn--;shake=Math.max(shake,5);if(e.dn>0){e.st='aim';e.stT=.5}else{e.st='chase';e.stT=1.8}}
       break;
-    case 'fan': e.volT-=dt; if(e.volT<=0){e.volT=.55;fan(e,ph2?9:7,.14,250,8,6,'#45d6e8');e.sq=1;sfx('smg')} if(e.stT<=0){e.st='chase';e.stT=1.6} break;
+    case 'fan': e.volT-=dt; if(e.volT<=0){e.volT=.45;fan(e,ph2?11:9,.13,290,8,7,'#45d6e8');e.sq=1;sfx('smg')} if(e.stT<=0){e.st='chase';e.stT=1.6} break;
     case 'swarm': if(e.stT<=0){const k=ph2?14:10;if(enemies.length<140)for(let i=0;i<k;i++){const g=makeEnemy('gnat',e.x+rand(-20,20),e.y+rand(-20,20));const a=i/k*TAU;g.kx=Math.cos(a)*300;g.ky=Math.sin(a)*300;enemies.push(g)}introEnemy('gnat');e.st='chase';e.stT=2;sfx('roar')} break;
   }
   return[mx,my];
