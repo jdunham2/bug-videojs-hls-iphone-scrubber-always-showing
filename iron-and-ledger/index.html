@@ -1163,7 +1163,7 @@ function playerVertical(dt,f){
   const g=groundUnder(p);
   p.vz-=(R.z.lowg?5.5:17)*dt;p.z+=p.vz*dt;if(!p.onGround)p.peakZ=Math.max(p.peakZ,p.z);
   if(p.z<=g){
-    if(!p.onGround){const drop=p.peakZ-g;if(drop>.6)SFX.step(null,true);if(drop>4.5&&!R.z.lowg){damage(p,(drop-4.5)*9,{x:p.x+1,y:p.y,rival:false});feed('Ouch! Hard landing','#e0573f')}}
+    if(!p.onGround){const drop=p.peakZ-g;if(drop>.6)SFX.step(null,true);}
     p.z=g;p.vz=0;p.onGround=true;p.peakZ=g;
   }else if(p.z>g+.05)p.onGround=false;
 }
@@ -1262,9 +1262,18 @@ function startRaid(zi,mp){
   // treasure chests
   R.chests=[];for(let i=0,n=ri(5,8),tries=0;i<n&&tries<300;tries++){const c=freeSpot(20,spawn,220);if(R.chests.some(o=>dist(o,c)<200))continue;R.chests.push({x:c.x,y:c.y,a:rnd(0,6.28),gold:Math.random()<.07,opened:false});i++}
   if(z.pvp)R.chests=[];
+  // walk-in buildings: many buildings become 4 thin walls with a doorway (and often a chest inside)
+  const T=14,DOOR=64;
+  for(const w of R.walls){if(!(w.big||w.cabin)||w.border||w.rock||w.ferris||w.pyr||w.tent||w.tree||w.w<96||w.h<96)continue;if(Math.random()>.65)continue;
+    const side=ri(0,3),segs=[];const horiz=(y,cut)=>{if(!cut){segs.push({x:w.x,y,w:w.w,h:T});return}const dx=w.x+rnd(T+10,w.w-T-10-DOOR);w.door={x:dx,y,w:DOOR,h:T};segs.push({x:w.x,y,w:dx-w.x,h:T},{x:dx+DOOR,y,w:w.x+w.w-dx-DOOR,h:T})};
+    const vert=(x,cut)=>{const y0=w.y+T,len=w.h-2*T;if(!cut){segs.push({x,y:y0,w:T,h:len});return}const dy=y0+rnd(10,len-10-DOOR);w.door={x,y:dy,w:T,h:DOOR};segs.push({x,y:y0,w:T,h:dy-y0},{x,y:dy+DOOR,w:T,h:y0+len-dy-DOOR})};
+    horiz(w.y,side===0);horiz(w.y+w.h-T,side===1);vert(w.x,side===2);vert(w.x+w.w-T,side===3);
+    w.hollow=1;w.segs=segs.filter(q=>q.w>2&&q.h>2).map(q=>Object.assign(q,{inside:1,cabin:w.cabin,owner:w}));
+    if(!z.pvp&&Math.random()<.45)R.chests.push({x:w.x+w.w/2+rnd(-w.w*.2,w.w*.2),y:w.y+w.h/2+rnd(-w.h*.2,w.h*.2),a:rnd(0,6.28),gold:Math.random()<.1,opened:false});
+  }
   // ladders up the side of big buildings and rock stacks
   R.ladders=[];
-  for(const w of R.walls){if(!w.big||w.tent||w.ferris||w.cabin||w.border||w.pyr)continue;
+  for(const w of R.walls){if(!w.big||w.tent||w.ferris||w.cabin||w.border||w.pyr||w.hollow)continue;
     const side=ri(0,3),n=[[0,-1],[0,1],[-1,0],[1,0]][side],cx2=w.x+w.w/2,cy2=w.y+w.h/2;
     const lx=n[0]?(n[0]<0?w.x:w.x+w.w):cx2+rnd(-w.w*.3,w.w*.3),ly=n[1]?(n[1]<0?w.y:w.y+w.h):cy2+rnd(-w.h*.3,w.h*.3);
     R.ladders.push({x:lx+n[0]*12,y:ly+n[1]*12,nx:n[0],ny:n[1],w})}
@@ -1423,6 +1432,13 @@ function buildScene(){
     const tile=w.tent?3:w.border||w.big?(mat.map===SH.concrete.map?4:2.6):2.4;
     const geo=boxGeo(bw,ht,bd,tile),m=new THREE.Mesh(geo,mat);
     m.position.set((w.x+w.w/2)*K,ht/2,(w.y+w.h/2)*K);m.castShadow=m.receiveShadow=true;sc.add(m);R.solid.push(m);R.disp.push(mat,geo);
+    if(w.hollow){m.visible=false;R.solid.pop();
+      for(const sg of w.segs){const sgeo=boxGeo(sg.w*K,ht,sg.h*K,tile),sm=new THREE.Mesh(sgeo,mat);sm.position.set((sg.x+sg.w/2)*K,ht/2,(sg.y+sg.h/2)*K);sm.castShadow=sm.receiveShadow=true;sc.add(sm);R.solid.push(sm);R.disp.push(sgeo);sg.ht=ht}
+      if(w.door&&ht>3.2){const D=w.door,lh=ht-2.8,li=new THREE.Mesh(SH.box,mat);li.scale.set(D.w*K,lh,D.h*K);li.position.set((D.x+D.w/2)*K,2.8+lh/2,(D.y+D.h/2)*K);li.castShadow=true;sc.add(li);
+        const fr=new THREE.Mesh(SH.box,SH.crateMat);fr.scale.set(D.w*K+(D.w>D.h?.3:.05),.18,D.h*K+(D.h>D.w?.3:.05));fr.position.set((D.x+D.w/2)*K,2.8,(D.y+D.h/2)*K);sc.add(fr)}
+      const roof=new THREE.Mesh(SH.box,mat);roof.scale.set(bw,.3,bd);roof.position.set(m.position.x,ht-.15,m.position.z);roof.castShadow=true;roof.receiveShadow=true;sc.add(roof);
+      const fl=new THREE.Mesh(SH.box,SH.floorMat||(SH.floorMat=new THREE.MeshStandardMaterial({map:SH.ribs.map,color:lc(0x8a6a48),roughness:.8})));fl.scale.set(bw-.6,.05,bd-.6);fl.position.set(m.position.x,.03,m.position.z);fl.receiveShadow=true;sc.add(fl);
+      if(Math.random()<.5){const lp=new THREE.Mesh(SH.sphere,SH.lampGlow||(SH.lampGlow=new THREE.MeshBasicMaterial({color:new THREE.Color(3,2.6,1.6)})));lp.scale.setScalar(.18);lp.position.set(m.position.x,ht-.5,m.position.z);sc.add(lp)}}
     if(TH==='castle'&&w.big&&!w.border&&!w.cabin){const mm=mat;for(const [fx,fz,len] of [[0,1,bw],[0,-1,bw],[1,0,bd],[-1,0,bd]]){const n=Math.max(2,Math.floor(len/1.6));for(let k=0;k<n;k+=2){const off=(k+.5)*len/n-len/2,mb=new THREE.Mesh(SH.box,mm);mb.scale.set(fx?.5:len/n,.8,fz?.5:len/n);mb.position.set(m.position.x+(fx?fx*(bw/2-.25):off),ht+.4,m.position.z+(fz?fz*(bd/2-.25):off));mb.castShadow=true;sc.add(mb)}}
       if(Math.random()<.5){const fl=new THREE.Mesh(SH.box,new THREE.MeshStandardMaterial({color:lc(pick([0xd63a3a,0x2a6ae8,0xf2c12e])),roughness:.7}));fl.scale.set(.05,2,1.2);fl.position.set(m.position.x+bw/2+.03,ht-1.5,m.position.z);sc.add(fl);R.disp.push(fl.material)}}
     if(w.pyr){const pg=new THREE.ConeGeometry(Math.SQRT1_2,1,4);pg.rotateY(Math.PI/4);m.geometry=pg;m.scale.set(bw,ht,bd);R.disp.push(pg)}
@@ -1433,6 +1449,8 @@ function buildScene(){
     else if(w.big&&TH==='clouds'&&!w.border){const cap=new THREE.Mesh(SH.box,SH.goldMat);cap.scale.set(bw+.4,.4,bd+.4);cap.position.set(m.position.x,ht+.2,m.position.z);cap.castShadow=true;sc.add(cap)}
     else if(w.big&&!w.rock&&!w.tent&&!w.ferris&&!w.pyr){const cap=new THREE.Mesh(SH.box,SH.poleMat);cap.scale.set(bw+.3,.35,bd+.3);cap.position.set(m.position.x,ht+.17,m.position.z);cap.castShadow=true;sc.add(cap)}
   }
+  // swap walk-in buildings for their walls so you can walk through the doorway
+  R.walls=R.walls.flatMap(w=>w.hollow?w.segs:[w]);
   if(trees.length){ // instanced pines: trunks are solid, needles are not
     const bamboo=TH==='bamboo',bare=TH==='swamp'||TH==='graveyard'||TH==='pumpkin'||TH==='haunted'||bamboo,palm=TH==='jungle'||TH==='beach'||TH==='pirate'||TH==='dino',candy=TH==='candy',mush=TH==='mushroom'||candy,tg=bamboo?new THREE.CylinderGeometry(.13,.15,1,7):candy?new THREE.CylinderGeometry(.09,.09,1,8):mush?new THREE.CylinderGeometry(.35,.5,1,10):new THREE.CylinderGeometry(bare?.16:.22,bare?.4:.32,1,8),cg=candy?new THREE.SphereGeometry(1,16,12):mush?new THREE.SphereGeometry(1,14,8,0,Math.PI*2,0,Math.PI/2):bare?new THREE.CylinderGeometry(.04,.09,1,5):palm?new THREE.ConeGeometry(1,1,7):new THREE.ConeGeometry(1,1,9),tm=new THREE.MeshStandardMaterial({color:lc(bamboo?0x7aa83a:candy?0xffffff:mush?0xe8e0d0:bare?0x3a3a30:0x4a3424),roughness:.95}),
       cm=mush?new THREE.MeshStandardMaterial({color:0xffffff,roughness:candy?.25:.6,emissive:lc(candy?0x200818:0x301040),emissiveIntensity:candy?.4:.8}):new THREE.MeshStandardMaterial({color:lc(bamboo?0x5aa83a:bare?0x3a3a30:palm?0x2f6a2a:R.z.polar?0x9fb0a8:TH==='sakura'?0xff6aa8:TH==='autumn'?0xffffff:TH==='farm'?0x3a7a2a:0x1f3a24),roughness:.9,emissive:lc(TH==='sakura'?0x401020:0),emissiveIntensity:TH==='sakura'?.5:0});R.disp.push(tg,cg,tm,cm);
