@@ -186,6 +186,27 @@ compose('e_hopper', 'body_greenE.png', [
     ('leg_greenA.png', -42, 115, .55, 10, False, L), ('leg_greenA.png', 42, 115, .55, -10, True, L),
     ('eye_cute_dark.png', 0, -60, 1.0, 0, False), ('mouth_closed_teeth.png', 0, 0, .9, 0, False)], bscale=.8)
 
+compose('e_gnat', 'body_blueB.png', [
+    ('detail_blue_antenna_small.png', -26, -102, 1.3, 20, False, L), ('detail_blue_antenna_small.png', 26, -102, 1.3, -20, True, L),
+    ('eye_angry_blue.png', 0, -10, 1.5, 0, False), ('mouth_closed_fangs.png', 0, 50, 1.1, 0, False)], bscale=.85, maxpx=70)
+compose('e_oozer', 'body_greenD.png', [
+    ('eye_closed_happy.png', -34, -30, 1.1, 0, False), ('eye_closed_happy.png', 34, -30, 1.1, 0, True),
+    ('mouthH.png', 0, 30, 1.1, 0, False), ('snot_large.png', 30, 70, 1.1, 0, False), ('snot_small.png', -48, 60, 1.0, 0, False)], maxpx=150)
+compose('e_mole', 'body_darkD.png', [
+    ('detail_dark_ear_round.png', -62, -80, .9, 0, False, L), ('detail_dark_ear_round.png', 62, -80, .9, 0, True, L),
+    ('arm_darkB.png', -88, 40, .45, -40, False, L), ('arm_darkB.png', 88, 40, .45, 40, True, L),
+    ('eye_human.png', -30, -38, .55, 0, False), ('eye_human.png', 30, -38, .55, 0, False),
+    ('nose_brown.png', 0, 0, .8, 0, False), ('mouthC.png', 0, 52, .9, 0, False)], maxpx=150)
+compose('e_medic', 'body_whiteC.png', [
+    ('detail_white_antenna_large.png', 0, -122, 1.3, 0, False, L),
+    ('arm_whiteA.png', -78, 30, .5, -30, False, L), ('arm_whiteA.png', 78, 30, .5, 30, True, L),
+    ('eye_human_green.png', -26, -36, .75, 0, False), ('eye_human_green.png', 26, -36, .75, 0, False),
+    ('mouth_closed_happy.png', 0, 30, .8, 0, False)], maxpx=150)
+compose('e_hive', 'body_yellowA.png', [
+    ('detail_yellow_horn_large.png', -60, -92, 1.4, 20, False, L), ('detail_yellow_horn_large.png', 60, -92, 1.4, -20, True, L),
+    ('eye_red.png', 0, -40, .8, 0, False), ('eye_red.png', -45, -5, .6, 0, False), ('eye_red.png', 45, -5, .6, 0, True), ('eye_red.png', -20, 22, .45, 0, False), ('eye_red.png', 22, 22, .45, 0, True),
+    ('mouthE.png', 0, 55, 1.0, 0, False)], maxpx=200)
+
 # ---------- particles ----------
 PART = {'smoke': ('smoke_07.png', 128), 'puff': ('smoke_04.png', 96), 'fire': ('fire_01.png', 96), 'flame': ('flame_05.png', 64),
         'muzzle': ('muzzle_02.png', 64), 'slash': ('slash_03.png', 128), 'scorch': ('scorch_02.png', 128), 'splat': ('dirt_02.png', 128),
