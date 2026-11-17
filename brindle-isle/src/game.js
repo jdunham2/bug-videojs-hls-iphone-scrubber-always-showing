@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 14, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 15, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -510,6 +510,27 @@ const OSS_D = makeDungeon('ossuary', 'The Moonveil Ossuary', 13, OSS, { tint: 'r
   for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 6, 32], [4, 33, 32]]) D.switches.push({ id: 'b' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
   for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
 }
+// ---------- Glimmerdeep: a crystal cavern far below the Old Mine ----------
+const CAVE_D = makeDungeon('cave', 'Glimmerdeep', 14, null, { outdoor: true, theme: 'cave',
+  objective: g => 'Glimmer Camp sits by the lift. Prospector Quill needs a hand. Chasms split the caverns: ride the mine carts across, and follow the glow of the crystals.' });
+const RAILS = [];
+{
+  const D = CAVE_D, X = D.x0;
+  for (let y = 0; y < H; y++) for (let lx = 0; lx < DW; lx++) { tiles[y * W + X + lx] = DEEP; region[y * W + X + lx] = 13; }
+  const cavern = (cx0, cy0, rx, ry) => { for (let y = cy0 - ry - 2; y <= cy0 + ry + 2; y++) for (let lx = cx0 - rx - 2; lx <= cx0 + rx + 2; lx++) { if (lx < 1 || lx > DW - 2 || y < 1 || y > 42) continue; if (Math.hypot((lx - cx0) / rx, (y - cy0) / ry) + (vnoise((X + lx) / 3 + 200, y / 3) - 0.5) * 0.3 < 1) tiles[y * W + X + lx] = LAND; } };
+  cavern(20, 9, 10, 5); cavern(9, 25, 6, 7); cavern(32, 23, 5, 5); cavern(24, 37, 9, 4);
+  for (let y = 3; y <= 6; y++) for (let lx = 17; lx <= 23; lx++) tiles[y * W + X + lx] = LAND;
+  const walk = (x0, y0, x1, y1) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2 || 1; for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n); for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) tiles[(y + oy) * W + X + x + ox] = LAND; } };
+  walk(14, 12, 10, 19); walk(31, 27, 27, 34);
+  pathLine(X + 20, 4, X + 20, 12);
+  // mine cart rails: hub to east cavern, and west cavern to the south cavern
+  const rail = pts => RAILS.push({ pts: pts.map(([lx, y]) => [(X + lx) * T + 16, y * T + 16]) });
+  rail([[26, 11], [28, 14], [30, 17], [31, 20]]);
+  rail([[11, 30], [13, 33], [16, 36], [18, 37]]);
+  D.camp = { x: (X + 20) * T, y: 9 * T };
+  D.start = { x: (X + 20) * T, y: 4 * T + 8 };
+}
+const nearCaveSite = (tx, ty, d) => Math.hypot(tx - CAVE_D.camp.x / T, ty - CAVE_D.camp.y / T) < d || Math.hypot(tx - CAVE_D.x0 - 20, ty - 4) < 3 || RAILS.some(R => R.pts.some(([x, y]) => Math.hypot(tx - x / T, ty - y / T) < 2.5));
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -638,6 +659,7 @@ const notPath = (x, y) => tileAt(x, y) !== PATH;
 const floorLike = t => t === FLOOR || t === STAIRS || t === BOG || t === WIND || t === GATE || t === LOCK || t === BDOOR;
 function drawOutdoorTile(c, x, y, px, py, t) {
   if (dungeonAt(px).theme === 'sky') { drawSkyTile(c, x, y, px, py, t); return; }
+  if (dungeonAt(px).theme === 'cave') { drawCaveTile(c, x, y, px, py, t); return; }
   if (t === BOG) {
     const hb = hash(x, y); c.fillStyle = '#2e3a1e'; c.fillRect(px, py, T, T); c.fillStyle = '#3d4a26'; c.fillRect(px + 2, py + 2, T - 4, T - 4);
     c.fillStyle = 'rgba(120,140,60,.35)'; ellipse(c, px + 8 + hb * 16, py + 10 + hb * 10, 4, 2); ellipse(c, px + 22 - hb * 10, py + 22, 3, 1.5);
@@ -791,6 +813,7 @@ const ITEMS = {
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
+  glimmer: { name: 'Glimmerstone', price: 12 },
   sunstone: { name: 'Sunstone', price: 450 },
 };
 // Weapons and armor: craft them at the workbench, then equip one of each.
@@ -803,6 +826,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  prism:   { name: 'Prism Blade', dmg: 3, col: '#c8bcff', cost: { glimmer: 6, crystal: 4 }, crit: true, desc: 'Cut from glimmerstone. Triple damage, and one swing in four strikes twice as hard.' },
   soul:    { name: 'Soulreaver', dmg: 5, col: '#7fe07a', cost: { soulgem: 1, ectoplasm: 8 }, lifesteal: true, desc: 'Bound to the Soul Gem. Five times damage, the strongest blade there is, and each foe you defeat restores a heart.' },
   storm:   { name: 'Stormbrand', dmg: 4, col: '#fff6a8', cost: { stormcore: 1, feather: 6 }, beam: true, reach: 8, desc: 'Forged around the Storm Core. Quadruple damage, long reach, and fires a lightning beam while your hearts are full.' },
   moon:    { name: 'Moonblade', dmg: 3, col: '#d6e2ff', cost: { ectoplasm: 6, crystal: 4 }, glow: true, desc: 'Silvered with ectoplasm. Triple damage, lights up the dark, and strikes shades anywhere.' },
@@ -820,6 +844,7 @@ const ARMORS = {
   fur:     { name: 'Jarl\'s Fur Mantle', hearts: 4, tint: ['#4a3524', '#a07b56', '#efe6d8'], cost: { horn: 1, goo: 8 }, warm: true, desc: '+4 hearts, and too warm to be slowed by ice, webs or chills.' },
   dragonscale: { name: 'Dragonscale Mail', hearts: 6, tint: ['#3a0e0a', '#8a2a1a', '#ffb347'], cost: { dragonscale: 1, obsidian: 6 }, sturdy: true, fireproof: true, desc: 'Scales of the Magma Drake. +6 hearts, barely knocked back, and fire only deals 1 damage.' },
   barkskin: { name: 'Barkskin Mail', hearts: 5, tint: ['#2a1c10', '#5a3e26', '#7fb85a'], cost: { heartwood: 1, herb: 10 }, regen: true, desc: 'Grown from the Rotroot\'s heart. +5 hearts, and slowly heals you anywhere.' },
+  glimmermail: { name: 'Glimmer Mail', hearts: 4, tint: ['#2a3a6a', '#5a7ab0', '#9fe8ff'], cost: { glimmer: 8, crystal: 4 }, speed: 1.1, desc: 'Light crystal scales. +4 hearts and 10% faster movement.' },
   gravecoat: { name: 'Gravewarden Coat', hearts: 4, tint: ['#14121a', '#3a3650', '#b8a8ff'], cost: { ectoplasm: 8, stone: 4 }, sturdy: true, desc: '+4 hearts, and hits barely knock you back.' },
   windweave: { name: 'Windweave Cloak', hearts: 3, tint: ['#3a5a7a', '#9fd4f5', '#ffffff'], cost: { feather: 8, goo: 4 }, speed: 1.25, desc: 'Woven from gale feathers. +3 hearts and 25% faster movement.' },
   ashguard: { name: 'Ashguard Plate', hearts: 3, tint: ['#1a1414', '#4a3e3a', '#ff7a2a'], cost: { obsidian: 8, stone: 6 }, sturdy: true, fireproof: true, desc: '+3 hearts, barely knocked back, and fire, flame vents and fireballs only deal 1 damage.' },
@@ -828,7 +853,7 @@ const ARMORS = {
 const gearW = () => WEAPONS[S.gear.weapon] || WEAPONS.wood;
 const gearA = () => ARMORS[S.gear.armor] || ARMORS.cloth;
 const maxHp = () => 6 + gearA().hearts;
-const weaponDmg = () => gearW().dmg;
+const weaponDmg = () => { if (gearW().crit && rng() < 0.25) { floatText(P.x, P.y - 70, 'Prism crit!', '#c8bcff'); return gearW().dmg * 2; } return gearW().dmg; };
 let craftTab = 'items', shopName = 'Oma Fen\'s Shop';
 // ---------- quests ----------
 const QUESTS = [
@@ -868,6 +893,15 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'shards', giver: 'quill', name: 'Prickly Neighbors', goal: { kill: [['shardback', 4], ['geode', 2]] }, reward: { gold: 150, items: { glimmer: 4 } },
+    offer: ['Careful where you step, friend! Shardbacks fire splinters when you hit them, and the geode golems pack a punch.', 'Clear out four shardbacks and two geodes so I can get back to digging. Hit a shardback, then step back!'],
+    done: ['Ha! The tunnels are mine again. Here, some glimmerstone. It makes a mighty sharp blade.'] },
+  { id: 'goldpick', giver: 'quill', name: 'The Golden Pick', req: 'shards', hint: 'Search Glimmerdeep for Quill\'s golden pickaxe', foundText: 'Found it! Bring it to Quill.', goal: { find: 'goldpick' }, reward: { gold: 170, items: { potion: 3 } },
+    offer: ['I dropped my lucky golden pickaxe when the burrowers chased me. Somewhere out past the chasms.', 'Take the mine carts across. They\'re rickety, but they\'ve never thrown anyone off. Well. Rarely.'],
+    done: ['My lucky pick! Fifty years I\'ve had this. Thank you kindly.'] },
+  { id: 'deep', giver: 'quill', name: 'Things That Dig', req: 'goldpick', goal: { kill: [['glimbat', 6], ['burrower', 4]] }, reward: { gold: 260, items: { crystal: 8 } },
+    offer: ['Glimmerbats swarm the high caves, and burrowers pop up and pelt my carts with rocks.', 'Six glimmerbats and four burrowers. A burrower is safe underground: wait for it to pop up, then strike!'],
+    done: ['Peace and quiet, and plenty of crystals. You\'re welcome down here any time.'] },
   { id: 'ossuary', giver: 'morrow', name: 'The Moonveil Ossuary', req: 'restless', goal: { boss: ['shadow', 'lich'] }, reward: { gold: 500, items: { crystal: 12 } },
     offer: ['Beneath the ruined chapel lies the ossuary. The Lich King sleeps there, and his magic is what keeps the dead from resting.', 'They say whoever enters must first face their own shadow. Take a light, and end this curse.'],
     done: ['The vale is quiet. Truly quiet. That Soul Gem is yours: bind it to a blade, and nothing will stand against you.'] },
@@ -980,7 +1014,7 @@ function spawnFind(item, rg, x0, w) {
   if (S.found[item] || pickups.some(p => p.item === item)) return;
   for (let i = 0; i < 4000; i++) {
     const x = x0 + 2 + Math.floor(hash(i, 131) * (w - 4)), y = 2 + Math.floor(hash(131, i) * 40);
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearSunSite(x, y, 7) && !nearHouse(x, y, 4) && !(rg === 11 && nearSkySite(x, y, 9)) && !(rg === 13 && (nearCaveSite(x, y, 8) || y < 14)) && !(rg === 10 && (nearCinderSite(x, y, 8) || VENTS.some(v => Math.hypot(v.tx - x, v.ty - y) < 2)))) { pickups.push({ x: x * T + 16, y: y * T + 16, vx: 0, vy: 0, item, t: 0.4, keep: true }); return; }
   }
 }
 function spawnRing() {
@@ -996,6 +1030,7 @@ function acceptQuest(q) {
   if (q.goal.find === 'idol') spawnFind('idol', 8, SUN_D.x0, DW);
   if (q.goal.find === 'bloom') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (q.goal.find === 'chime') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (q.goal.find === 'goldpick') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   banner(`New quest: ${q.name}`, '#ffe08a'); SFX.play('collect'); questTick(); save();
 }
 function completeQuest(q) {
@@ -1022,7 +1057,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0, glimmer: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1038,7 +1073,7 @@ const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const resources = [], enemies = [], pickups = [], particles = [], floats = [], decor = [], animals = [], ambient = [];
 const SOLID = { tree: 11, rock: 12, crystal: 11, pot: 8, crate: 11, vine: 15, obsidian: 12 };
 const RES_HP = { tree: 3, rock: 4, herb: 1, crystal: 5, pot: 1, crate: 2, vine: 2, obsidian: 5 };
-const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp']];
+const TREE_KINDS = [null, ['tree_grove'], ['tree_tall', 'tree_small'], ['tree_orange', 'tree_autumn', 'tree_round'], ['tree_round', 'tree_pine', 'tree_fir'], null, ['tree_snow'], null, ['palm'], ['tree_swamp', 'tree_dead'], ['tree_dead'], ['tree_round'], ['tree_dead', 'tree_swamp'], ['tree_dead']];
 function addRes(type, tx, ty) {
   const r = { type, x: tx * T + 16 + (rng() - 0.5) * 10, y: ty * T + 20 + (rng() - 0.5) * 6, hp: RES_HP[type], max: RES_HP[type], alive: true, respawn: 0, shake: 0, seed: rng() };
   if (type === 'tree') { const k = TREE_KINDS[region[ty * W + tx]] || TREE_KINDS[4]; r.key = k[Math.floor(r.seed * k.length)]; }
@@ -1098,6 +1133,12 @@ for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
   if (r < 0.1) addRes('tree', x, y); else if (r < 0.13) addRes('herb', x, y); else if (r < 0.15) addRes('rock', x, y); else if (r < 0.18) decor.push({ key: 'mush', x: x * T + 16, y: y * T + 22, s: 2 });
 }
 for (const L of LANTERNS) decor.push({ lantern: L, x: L.x, y: L.y, solid: 10 });
+for (let y = 1; y < 43; y++) for (let lx = 1; lx < DW - 1; lx++) {
+  const x = CAVE_D.x0 + lx, t = tiles[y * W + x];
+  if (t !== LAND || nearCaveSite(x, y, 5) || !isLand(tileAt(x, y + 1)) || !isLand(tileAt(x, y - 1)) || !isLand(tileAt(x - 1, y)) || !isLand(tileAt(x + 1, y))) continue;
+  const r = rng();
+  if (r < 0.08) addRes('crystal', x, y); else if (r < 0.13) addRes('rock', x, y); else if (r < 0.19) decor.push({ glowcap: true, x: x * T + 16, y: y * T + 22, v: Math.floor(r * 1000) % 3 });
+}
 {
   let v = 0; const Y = DUSK_D.yard, C = DUSK_D.chapel;
   for (let gy = -2; gy <= 2; gy++) for (let gx = -2; gx <= 2; gx++) { const x = Math.round(Y.x / T) + gx * 2, y = Math.round(Y.y / T) + gy * 2; if (tiles[y * W + x] === LAND && (gx || gy)) decor.push({ grave: true, v: v++, x: x * T + 16 + (hash(x, y) - 0.5) * 10, y: y * T + 20, solid: 10 }); }
@@ -1107,8 +1148,8 @@ for (const L of LANTERNS) decor.push({ lantern: L, x: L.x, y: L.y, solid: 10 });
 for (let i = decor.length - 1; i >= 0; i--) if (decor[i].grave && Math.hypot(decor[i].x - OSS.x, decor[i].y - OSS.y) < 3.2 * T) decor.splice(i, 1);
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
-    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
-    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
+    const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 13 ? CAVE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
+    if (tiles[y * W + x] === LAND && region[y * W + x] === rg && !nearVillage(x, y, minDist) && !nearArena(x, y, 9) && !nearMine(x, y, 5) && !(rg === 6 && nearFrostSite(x, y, 8)) && !(rg === 8 && nearSunSite(x, y, 8)) && !(rg === 9 && nearMireSite(x, y, 8)) && !(rg === 10 && nearCinderSite(x, y, 9)) && !(rg === 11 && nearSkySite(x, y, 8)) && !(rg === 12 && nearDuskSite(x, y, 8)) && !(rg === 13 && nearCaveSite(x, y, 7)) && !nearHouse(x, y, 6)) return [x * T + 16, y * T + 16];
   }
   return [cx * T + 300, cy * T];
 }
@@ -1150,6 +1191,10 @@ const ENEMY = {
   shade:   { name: 'Shade', proc: 'shade', ai: 'shade', hp: 3, sp: 55, dmg: 1, aggro: 220, drops: [['ectoplasm', 1]], col: '#6a5a9a', flyer: true },
   banshee: { name: 'Banshee', proc: 'banshee', ai: 'banshee', hp: 3, sp: 60, dmg: 1, aggro: 240, drops: [['ectoplasm', 2], ['crystal', 1]], col: '#d6e2ff', flyer: true },
   hound:   { name: 'Gloom Hound', proc: 'hound', ai: 'hound', hp: 3, sp: 95, dmg: 1, aggro: 220, drops: [['gold', 2], ['goo', 1]], col: '#4a4660' },
+  shardback: { name: 'Shardback', proc: 'shardback', ai: 'shardback', hp: 4, sp: 40, dmg: 1, aggro: 170, drops: [['glimmer', 1], ['crystal', 1]], col: '#a593ff' },
+  glimbat: { name: 'Glimmerbat', proc: 'glimbat', ai: 'glimbat', hp: 1, sp: 130, dmg: 1, aggro: 210, drops: [['gold', 1]], col: '#9fe8ff', flyer: true },
+  burrower: { name: 'Burrower', proc: 'burrower', ai: 'burrower', hp: 3, sp: 70, dmg: 1, aggro: 200, drops: [['stone', 2], ['gold', 2]], col: '#7a5a40' },
+  geode:   { name: 'Geode Golem', proc: 'geode', ai: 'geode', hp: 7, sp: 28, dmg: 1, aggro: 200, drops: [['glimmer', 2], ['crystal', 2]], col: '#a593ff', heavy: true },
   icemage: { name: 'Ice Mage', sprite: 'mage_ice', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 2], ['gold', 3]], col: '#9fe8ff' },
   mage:    { name: 'Cultist', sprite: 'mage', hp: 3, sp: 40, dmg: 1, aggro: 250, drops: [['crystal', 1], ['gold', 3]], col: '#e08a3c' },
 };
@@ -1161,8 +1206,10 @@ function addEnemy(kind, rg) { const [x, y] = randomTileIn(rg, 11); enemies.push(
 for (const [kind, rg, n] of [['green', 4, 3], ['bat', 4, 3], ['bandit', 4, 2], ['green', 3, 3], ['crab', 3, 3], ['snail', 3, 4], ['green', 2, 2], ['spider', 2, 2], ['cyclops', 2, 2], ['bandit', 2, 2], ['rat', 2, 4], ['purple', 1, 4], ['ghost', 1, 3], ['mage', 1, 2], ['frostslime', 6, 5], ['raider', 6, 3], ['icemage', 6, 3], ['ghost', 6, 2], ['scorpion', 8, 5], ['sandraider', 8, 3], ['dustspirit', 8, 3], ['bogslime', 9, 4], ['shroom', 9, 4], ['toad', 9, 4], ['wisp', 9, 3], ['hexer', 9, 3], ['toad', 3, 2], ['shroom', 4, 2], ['wisp', 1, 2],
   ['magmite', 10, 7], ['imp', 10, 4], ['boulderback', 10, 3], ['salamander', 10, 4], ['mage', 10, 2], ['bat', 10, 2], ['salamander', 8, 3], ['boulderback', 2, 2], ['imp', 2, 2],
   ['hawk', 11, 5], ['puff', 11, 4], ['windling', 11, 4], ['sentinel', 11, 3], ['hawk', 6, 2], ['hawk', 2, 2], ['windling', 8, 2],
-  ['skeleton', 12, 6], ['shade', 12, 4], ['banshee', 12, 3], ['hound', 12, 4], ['bat', 12, 2], ['skeleton', 2, 2], ['hound', 4, 3], ['banshee', 6, 1]])
+  ['skeleton', 12, 6], ['shade', 12, 4], ['banshee', 12, 3], ['hound', 12, 4], ['bat', 12, 2], ['skeleton', 2, 2], ['hound', 4, 3], ['banshee', 6, 1],
+  ['shardback', 13, 4], ['geode', 13, 3], ['burrower', 13, 4], ['shardback', 1, 2], ['burrower', 3, 2]])
   for (let i = 0; i < n; i++) addEnemy(kind, rg);
+for (let g = 0; g < 4; g++) { const [x, y] = randomTileIn(13, 9); for (let i = 0; i < 3; i++) enemies.push(makeEnemy('glimbat', x + (i - 1) * 24, y + (i % 2) * 18)); }
 // dungeon creatures never respawn; clearing a room opens its gate
 function dSpawn(D, list) {
   for (const [kind, x, y] of list) { const e = makeEnemy(kind, (D.x0 + x) * T + 16, y * T + 16); e.noRespawn = true; e.dreg = dreg[y * W + D.x0 + x]; enemies.push(e); }
@@ -1317,6 +1364,7 @@ const NPCS = [
   { id: 'zahir', name: 'Zahir', x: SUN_D.mirra.x - 70, y: SUN_D.mirra.y + 36, sheet: 'zahir_idle', walk: 'zahir_walk', verb: 'Trade with', path: [[SUN_D.mirra.x - 70, SUN_D.mirra.y + 36], [SUN_D.mirra.x - 110, SUN_D.mirra.y + 40]] },
   { id: 'amara', name: 'Amara', x: SUN_D.mirra.x + 80, y: SUN_D.mirra.y + 40, sheet: 'amara_idle', walk: 'amara_walk', verb: 'Talk to', path: [[SUN_D.mirra.x + 80, SUN_D.mirra.y + 40], [SUN_D.mirra.x + 120, SUN_D.mirra.y + 50]] },
   { id: 'rosa', name: 'Captain Rosa', x: SUN_D.cove.x - 40, y: SUN_D.cove.y - 10, sheet: 'rosa_idle', walk: 'rosa_walk', verb: 'Talk to', path: [[SUN_D.cove.x - 40, SUN_D.cove.y - 10], [SUN_D.cove.x + 10, SUN_D.cove.y + 20]] },
+  { id: 'quill', name: 'Prospector Quill', x: CAVE_D.camp.x + 60, y: CAVE_D.camp.y + 30, sheet: 'quill_idle', walk: 'quill_walk', verb: 'Talk to', path: [[CAVE_D.camp.x + 60, CAVE_D.camp.y + 30], [CAVE_D.camp.x + 100, CAVE_D.camp.y + 50]] },
   { id: 'morrow', name: 'Old Morrow', x: DUSK_D.camp.x + 60, y: DUSK_D.camp.y + 30, sheet: 'morrow_idle', walk: 'morrow_walk', verb: 'Talk to', path: [[DUSK_D.camp.x + 60, DUSK_D.camp.y + 30], [DUSK_D.camp.x + 90, DUSK_D.camp.y + 50]] },
   { id: 'aeris', name: 'Aeris the Windkeeper', x: SKY_D.roost.x + 60, y: SKY_D.roost.y + 30, sheet: 'aeris_idle', walk: 'aeris_walk', verb: 'Talk to', path: [[SKY_D.roost.x + 60, SKY_D.roost.y + 30], [SKY_D.roost.x + 100, SKY_D.roost.y + 50]] },
   { id: 'brakka', name: 'Brakka the Smith', x: CINDER_D.camp.x + 70, y: CINDER_D.camp.y + 30, sheet: 'brakka_idle', walk: 'brakka_walk', verb: 'Talk to', path: [[CINDER_D.camp.x + 70, CINDER_D.camp.y + 30], [CINDER_D.camp.x + 40, CINDER_D.camp.y + 50]] },
@@ -1428,6 +1476,17 @@ if (HAMLET) {
   for (const [ox, oy, k] of [[-80, 10, 'barrel'], [-96, 24, 'barrel2'], [110, 10, 'barrel']]) decor.push({ key: k, x: DUSK_D.camp.x + ox, y: DUSK_D.camp.y + oy, s: 2, solid: 10 });
   addSign('Lanternrest', 'Lanternrest. Stay in the light. The dead do not rest easy in Duskhollow.', DUSK_D.camp.x - 60, DUSK_D.camp.y + 80);
 }
+// the deep lift beside the Old Mine, and the mine carts of Glimmerdeep
+{
+  const LS = findSpot(range(MINE.tx - 3, MINE.tx + 7), range(MINE.ty + 4, MINE.ty + 8)) || findSpot(range(MINE.tx - 8, MINE.tx + 8), range(MINE.ty - 8, MINE.ty + 10)) || { x: MINE.x + 4 * T, y: MINE.y + 5 * T };
+  addFerry('lift_out', 'Deep Lift', LS.x + 16, LS.y + 8); NPCS[NPCS.length - 1].verb = 'Ride down';
+  addFerry('lift_home', 'Lift to Brindle Isle', (CAVE_D.x0 + 23) * T + 16, 4 * T + 8); NPCS[NPCS.length - 1].verb = 'Ride up';
+  addSign('Lift sign', 'Deep Lift to Glimmerdeep. The crystals down there glow brighter than any lamp. Mind the chasms.', LS.x - 50, LS.y + 40);
+  RAILS.forEach((R, i) => { const a = R.pts[0], b = R.pts[R.pts.length - 1]; addFerry(`cart_${i}_a`, 'Mine Cart', a[0], a[1]); NPCS[NPCS.length - 1].verb = 'Ride'; addFerry(`cart_${i}_b`, 'Mine Cart', b[0], b[1]); NPCS[NPCS.length - 1].verb = 'Ride'; });
+  decor.push({ fire: true, x: CAVE_D.camp.x + 10, y: CAVE_D.camp.y + 60, solid: 12 });
+  for (const [ox, oy, k] of [[-80, 10, 'crate'], [-96, 26, 'barrel'], [110, 10, 'crate']]) decor.push({ key: k, x: CAVE_D.camp.x + ox, y: CAVE_D.camp.y + oy, s: 2, solid: 10 });
+  addSign('Glimmer Camp', 'Glimmer Camp. Carts cross the chasms. Crystals light the way. Stay out of the dark corners.', CAVE_D.camp.x - 60, CAVE_D.camp.y + 80);
+}
 addFerry('ferry_home', 'Boat to Saltmarsh', (SUN_D.x0 + 21) * T + 6, 3 * T + 16);
 addSign('Mirra Oasis', 'Mirra Oasis. Shade, cool water and Zahir\'s bazaar. Corsair\'s Cove lies down the east path, the Sunken Ruins to the southwest.', SUN_D.mirra.x + 40, SUN_D.mirra.y - 20);
 addSign('Corsair\'s Cove', 'Corsair\'s Cove. No questions asked, no gold returned.', SUN_D.cove.x - 90, SUN_D.cove.y - 40);
@@ -1488,6 +1547,8 @@ const ICON_DRAW = {
   sunstone: c => { c.fillStyle = '#b8862a'; diamond(c, 16, 18, 11, 14); c.fillStyle = '#f4b740'; diamond(c, 16, 18, 9, 11); c.fillStyle = '#ffe9a8'; diamond(c, 14, 15, 3, 5); c.strokeStyle = 'rgba(255,214,90,.8)'; c.lineWidth = 2; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; c.beginPath(); c.moveTo(16 + Math.cos(a) * 12, 16 + Math.sin(a) * 12); c.lineTo(16 + Math.cos(a) * 15, 16 + Math.sin(a) * 15); c.stroke(); } },
   idol: c => { c.fillStyle = '#7a5a14'; c.fillRect(9, 6, 14, 22); c.fillStyle = '#f4b740'; c.fillRect(10, 7, 12, 20); c.fillStyle = '#7a5a14'; c.fillRect(12, 11, 3, 3); c.fillRect(17, 11, 3, 3); c.fillRect(13, 18, 6, 2); c.fillStyle = '#ec5257'; c.fillRect(15, 3, 2, 4); c.fillStyle = '#ffe9a8'; c.fillRect(11, 8, 2, 6); },
   obsidian: c => { c.fillStyle = '#16121c'; c.beginPath(); c.moveTo(6, 28); c.lineTo(10, 10); c.lineTo(16, 3); c.lineTo(21, 12); c.lineTo(26, 28); c.closePath(); c.fill(); c.fillStyle = '#4a3a62'; c.beginPath(); c.moveTo(11, 26); c.lineTo(13, 12); c.lineTo(16, 7); c.lineTo(17, 22); c.closePath(); c.fill(); c.fillStyle = '#c8b8ff'; c.fillRect(14, 9, 2, 6); },
+  glimmer: c => { c.fillStyle = 'rgba(159,232,255,.3)'; circle(c, 16, 16, 12); c.fillStyle = '#5a7ab0'; c.beginPath(); c.moveTo(16, 4); c.lineTo(26, 14); c.lineTo(20, 28); c.lineTo(12, 28); c.lineTo(6, 14); c.closePath(); c.fill(); c.fillStyle = '#9fe8ff'; c.beginPath(); c.moveTo(16, 6); c.lineTo(23, 14); c.lineTo(16, 26); c.lineTo(9, 14); c.closePath(); c.fill(); c.fillStyle = '#ffffff'; c.fillRect(13, 10, 2, 6); },
+  goldpick: c => { c.save(); c.translate(16, 16); c.rotate(-0.7); c.fillStyle = '#6a4a2a'; c.fillRect(-1.5, -4, 3, 18); c.fillStyle = '#d9a23c'; c.beginPath(); c.moveTo(-12, -6); c.quadraticCurveTo(0, -12, 12, -6); c.lineTo(10, -3); c.quadraticCurveTo(0, -8, -10, -3); c.closePath(); c.fill(); c.fillStyle = '#ffe9a8'; c.fillRect(-4, -9, 6, 2); c.restore(); },
   ectoplasm: c => { c.fillStyle = 'rgba(184,168,255,.35)'; circle(c, 16, 18, 12); c.fillStyle = '#9a88e0'; c.beginPath(); c.moveTo(8, 26); c.quadraticCurveTo(6, 10, 16, 6); c.quadraticCurveTo(26, 10, 24, 26); c.lineTo(20, 22); c.lineTo(16, 27); c.lineTo(12, 22); c.closePath(); c.fill(); c.fillStyle = '#e6deff'; c.fillRect(12, 13, 3, 3); c.fillRect(18, 13, 3, 3); },
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
@@ -1518,7 +1579,7 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'glimmer', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
 const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
@@ -1639,6 +1700,13 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">Glimmerdeep</div>
+      <dl class="controls">
+      <dt>Getting there</dt><dd>Ride the Deep Lift beside the Old Mine entrance. The lift at Glimmer Camp takes you back up.</dd>
+      <dt>Getting around</dt><dd>Chasms split the caverns. Hop in a mine cart to ride the rails across. Glowing crystals and mushrooms light the dark.</dd>
+      <dt>Creatures</dt><dd>Shardbacks fire crystal splinters when you hit them: strike, then step back. Glimmerbats swarm and dive in groups. Burrowers tunnel under you, pop up to throw rocks, then dig back down. Geode golems raise their fists and slam the ground.</dd>
+      <dt>Glimmerstone</dt><dd>Shardbacks and geodes drop glimmerstone. It crafts the Prism Blade, which sometimes strikes twice as hard, and the light Glimmer Mail.</dd>
+      <dt>Elsewhere</dt><dd>Shardbacks now creep through the crystal grove, and burrowers dig under the meadow.</dd></dl>
       <div class="label">The Moonveil Ossuary</div>
       <dl class="controls">
       <dt>Getting in</dt><dd>A bone-decked crypt door in the ruined chapel, southwest in Duskhollow.</dd>
@@ -1914,6 +1982,7 @@ function findTarget() {
   return { enemy, res };
 }
 function onAction() {
+  if (P.ride) return false;
   if (dlg) { advanceDialogue(); return false; }
   if (!$('victory').hidden || panel || P.dash) return false;
   if (P.act) { if (!['faint', 'drink', 'spin'].includes(P.act.kind)) P.queued = true; return true; }
@@ -1952,6 +2021,10 @@ function interact(n) {
   }
   if (n.sign) { say(n.name, [n.text]); return; }
   if (n.id === 'ysolde') { shopName = 'Ysolde\'s Trading Post'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
+  if (n.boat && n.id.startsWith('cart_')) { const [, ri, end] = n.id.split('_'); startRide(RAILS[+ri], end === 'a'); return; }
+  if (n.boat && n.id === 'lift_out') { const first = !S.found.cave; S.found.cave = true; travel(CAVE_D.start.x, CAVE_D.start.y, 0, 1, 'Glimmerdeep'); if (first) setTimeout(() => toast('Far below the island, crystals glow in the dark. Glimmer Camp is just south of the lift.', 4500), 1200); return; }
+  if (n.boat && n.id === 'lift_home') { const L = NPCS.find(m => m.id === 'lift_out'); travel(L.x, L.y + 50, 0, 1, 'Brindle Isle'); return; }
+  if (n.id === 'quill') { shopName = 'Quill\'s Prospecting Supplies'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
   if (n.boat && n.id === 'gate_out') { const first = !S.found.dusk; S.found.dusk = true; travel(DUSK_D.start.x, DUSK_D.start.y, 0, 1, 'Duskhollow'); if (first) setTimeout(() => toast('Eternal night. Lanternrest glows just south of the gate. Light the spirit lanterns to push back the dark.', 4500), 1200); return; }
   if (n.boat && n.id === 'gate_home') { const G = NPCS.find(m => m.id === 'gate_out'); travel(G.x, G.y + 50, 0, 1, 'Brindle Isle'); return; }
   if (n.id === 'morrow') { shopName = 'Morrow\'s Lantern Shop'; if (!questInteract(n, () => openPanel('shop'))) openPanel('shop'); return; }
@@ -2008,6 +2081,8 @@ let skelHint = false, shadeHint = false;
 function damageEnemy(e, dmg, kx, ky) {
   const D = ENEMY[e.kind];
   if (D.ghostly && e.faded) { floatText(e.x, e.y - 44, 'Miss', '#c8d0e0'); burst(e.x, e.y - 20, '#c8d0e0', 4); return false; }
+  if (e.kind === 'burrower' && e.state === 'under') { floatText(e.x, e.y - 20, 'It\'s underground!', '#c8b89a'); return false; }
+  if (e.kind === 'shardback' && !(e.shardT > time)) { e.shardT = time + 0.9; shardBurst(e); }
   if (e.kind === 'skeleton') {
     if (e.state === 'buried') return false;
     if (e.state === 'pile') { e.hp = 0; burst(e.x, e.y - 6, '#e6dcc8', 14); floatText(e.x, e.y - 40, 'Smashed for good!', '#ffe08a'); killEnemy(e); return true; }
@@ -2036,7 +2111,7 @@ function deflect(hx, hy, rad) {
   for (const p of projectiles) if (p.kind === 'orb' && !p.returned && !p.dead && Math.hypot(p.x - hx, p.y - hy) < rad + 8) {
     p.returned = true; p.sp = 270; floatText(p.x, p.y - 20, 'Return!', '#ffe08a'); SFX.play('special'); impact(4); burst(p.x, p.y, '#ffe08a', 10);
   }
-  for (const p of projectiles) if (!p.dead && !p.friendly && p.kind !== 'orb' && p.kind !== 'axe' && p.kind !== 'spike' && p.kind !== 'bolt' && p.kind !== 'sunball' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
+  for (const p of projectiles) if (!p.dead && !p.friendly && p.kind !== 'orb' && p.kind !== 'axe' && p.kind !== 'spike' && p.kind !== 'bolt' && p.kind !== 'shard' && p.kind !== 'sunball' && (p.kind !== 'rock' || p.z < 50) && Math.hypot(p.x - hx, p.y - (p.z || 0) - hy) < rad) { p.dead = true; n++; burst(p.x, p.y - (p.z || 0), '#ffffff', 8); }
   if (n) { floatText(hx, hy - 20, 'Deflect!', '#ffffff'); SFX.play('hit'); }
 }
 function hitEnemies(a) {
@@ -2185,7 +2260,8 @@ function update(dt) {
   if (hitStop > 0) { hitStop -= dt; return; }
   S.time += dt;
   // hero action
-  let moveMul = 1;
+  let moveMul = P.ride ? 0 : 1;
+  if (P.ride) updateRide(dt);
   P.dashCd = Math.max(0, P.dashCd - dt);
   if (P.dash) {
     const D = P.dash; D.t += dt; moveMul = 0;
@@ -2228,7 +2304,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt); P.slow = Math.max(0, (P.slow || 0) - dt); P.hex = Math.max(0, (P.hex || 0) - dt);
   if (!P.dash && dungeonAt(P.x) === TOMB_D) for (const tr of TRAPS) if (trapState(tr) === 2 && P.x > tr.x + 2 && P.x < tr.x + 30 && P.y > tr.y + 4 && P.y < tr.y + 34) { damagePlayer(1, { x: tr.x + 16, y: tr.y + 40 }); break; }
   if (gearA().regen && S.hp > 0 && S.hp < maxHp()) { P.regenT = (P.regenT || 0) + dt; if (P.regenT > 8) { P.regenT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#7fe0f0'); } }
-  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
+  if ((Math.hypot(P.x - cx * T, P.y - cy * T) < 6 * T || Math.hypot(P.x - MIRE_D.camp.x - 100, P.y - MIRE_D.camp.y - 40) < 3 * T || Math.hypot(P.x - CINDER_D.camp.x, P.y - CINDER_D.camp.y - 40) < 3 * T || Math.hypot(P.x - SKY_D.roost.x - 10, P.y - SKY_D.roost.y - 70) < 3 * T || Math.hypot(P.x - DUSK_D.camp.x - 10, P.y - DUSK_D.camp.y - 60) < 3 * T || Math.hypot(P.x - CAVE_D.camp.x - 10, P.y - CAVE_D.camp.y - 60) < 3 * T || Math.hypot(P.x - FROST_D.fire.x, P.y - FROST_D.fire.y) < 3 * T) && S.hp < maxHp() && S.hp > 0) { P.healT += dt; if (P.healT > 3) { P.healT = 0; S.hp++; updateHUD(); floatText(P.x, P.y - 56, '+♥', '#ec5257'); } } else P.healT = 0;
   if (S.bridge && !edgeToast && P.y > (H - 6) * T && !inDungeon(P.x)) { edgeToast = true; toast('The mainland lies at the end of the bridge. Keep walking south.', 3500); }
   for (const r of resources) {
     r.shake = Math.max(0, r.shake - dt);
@@ -2251,6 +2327,7 @@ function update(dt) {
       pickups.splice(i, 1);
       if (p.item === 'gold') { addGold(p.v || 1); floatText(P.x, P.y - 56, `+${p.v || 1}g`, '#f4b740'); SFX.play('coin'); }
       else if (p.item === 'idol') { S.found.idol = true; banner('Found the golden idol!', '#ffe08a'); SFX.play('lucky'); questTick(); }
+      else if (p.item === 'goldpick') { S.found.goldpick = true; banner('Found the golden pickaxe!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'chime') { S.found.chime = true; banner('Found the wind chime!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'bloom') { S.found.bloom = true; banner('Found the Ember Bloom!', '#ffe08a'); SFX.play('lucky'); questTick(); }
       else if (p.item === 'ring') { S.found.ring = true; banner('Found the lost ring!', '#ffe08a'); SFX.play('lucky'); questTick(); }
@@ -4316,7 +4393,7 @@ function updateDuskFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
     if (chase) { moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (d < 120 && e.cd <= 0) { e.state = 'crouch'; e.st = 0.35; } } else wander(D.sp * 0.6);
     touch(D.dmg); return true;
   }
-  return false;
+  return updateCaveFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander);
 }
 Object.assign(PROC_DRAW, {
   skel(c, e, k) {
@@ -4401,7 +4478,12 @@ function drawDarkness(c, camX, camY, k) {
   const light = (wx, wy, r) => { const x = sx(wx), y = sy(wy), R = r * k; if (x < -R || y < -R || x > darkCv.width + R || y > darkCv.height + R) return; const g = d.createRadialGradient(x, y, R * 0.25, x, y, R); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); d.fillStyle = g; d.fillRect(x - R, y - R, R * 2, R * 2); };
   light(P.x, P.y - 20, gearW().glow ? 230 : 160);
   const HD = dungeonAt(P.x);
-  if (HD === OSS_D) {
+  if (HD === CAVE_D) {
+    for (const r of resources) if (r.alive && r.type === 'crystal' && r.x > CAVE_D.x0 * T && r.x < (CAVE_D.x0 + DW) * T) light(r.x, r.y - 16, 85 + Math.sin(time * 2 + r.seed * 9) * 6);
+    for (const o of decor) if (o.glowcap) light(o.x, o.y - 8, 46);
+    light(CAVE_D.camp.x + 10, CAVE_D.camp.y + 60, 210 + Math.sin(time * 9) * 6);
+    for (const n of NPCS) if (n.id === 'lift_home' || n.id.startsWith('cart_')) light(n.x, n.y - 20, 80);
+  } else if (HD === OSS_D) {
     const g = dgs(OSS_D);
     for (const sw of OSS_D.switches) light(sw.x, sw.y - 30, g.switches[sw.id] ? 185 + Math.sin(time * 6 + sw.x) * 6 : 24);
     for (const t of OSS_D.torches) light((OSS_D.x0 + t.x) * T + 16, t.y * T + 24, 70 + Math.sin(time * 9 + t.x) * 4);
@@ -4540,6 +4622,140 @@ function drawOssGate(c) {
   c.fillStyle = '#efe6d8'; for (const [ox, oy] of [[-30, -40], [26, -46], [-34, -18], [30, -14]]) { circle(c, x + ox, y + oy, 5); c.fillStyle = '#1a1210'; c.fillRect(x + ox - 3, y + oy - 2, 2, 2); c.fillRect(x + ox + 1, y + oy - 2, 2, 2); c.fillStyle = '#efe6d8'; }
   const g = 0.3 + Math.sin(time * 2) * 0.12; c.fillStyle = `rgba(127,224,122,${g})`; c.fillRect(x - 12, y - 10, 24, 10);
 }
+// ---------- Glimmerdeep creatures: shardbacks, glimmerbats, burrowers, geodes ----------
+function updateCaveFoe(e, D, dt, d, dx, dy, chase, fainted, touch, wander) {
+  const ai = AI(e.kind);
+  if (ai === 'shardback') {
+    if (chase) { if (d > 34) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); } else wander(D.sp);
+    touch(D.dmg); return true;
+  }
+  if (ai === 'glimbat') {
+    if (e.state === 'dive') { e.st -= dt; moveEnemy(e, e.lx * dt, e.ly * dt); if (!e.hit && d < 20 && !fainted) { e.hit = true; damagePlayer(D.dmg, e); } if (e.st <= 0) { e.state = 'move'; e.cd = 1.4 + rng() * 1.2; } return true; }
+    if (chase) {
+      const a = e.anim * 3 + e.hx, tx = P.x + Math.cos(a) * 70, ty = P.y - 10 + Math.sin(a * 1.3) * 50, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1;
+      moveEnemy(e, ex / el * Math.min(el, D.sp * dt) + (rng() - 0.5) * 60 * dt, ey / el * Math.min(el, D.sp * dt) + (rng() - 0.5) * 60 * dt);
+      if (e.cd <= 0) { e.state = 'dive'; e.st = 0.35; e.lx = dx / d * 320; e.ly = dy / d * 320; e.hit = false; }
+    } else moveEnemy(e, Math.cos(e.anim * 2) * 40 * dt + (e.hx - e.x) * 0.4 * dt, Math.sin(e.anim * 2.6) * 30 * dt + (e.hy - e.y) * 0.4 * dt);
+    return true;
+  }
+  if (ai === 'burrower') {
+    if (e.state === 'move') e.state = 'under';
+    if (e.state === 'under') { if (chase) { const tx = P.x + Math.cos(e.anim) * 60, ty = P.y + Math.sin(e.anim) * 40, ex = tx - e.x, ey = ty - e.y, el = Math.hypot(ex, ey) || 1; moveEnemy(e, ex / el * D.sp * dt, ey / el * D.sp * dt); if (e.cd <= 0 && el < 30) { e.state = 'surface'; e.st = 0.4; SFX.play('crumble'); burst(e.x, e.y, '#6a5a4a', 10); } } else wander(D.sp * 0.5); if (Math.random() < dt * 8) particles.push({ x: e.x + (Math.random() - 0.5) * 12, y: e.y, vx: 0, vy: -20, life: 0.3, color: '#6a5a4a', size: 3 }); return true; }
+    if (e.state === 'surface') { e.st -= dt; if (e.st <= 0) { e.state = 'throw'; e.st = 1.1; e.shots = 0; } return true; }
+    if (e.state === 'throw') {
+      e.st -= dt;
+      if (e.shots < 2 && e.st < 0.9 - e.shots * 0.4) { e.shots++; projectiles.push({ kind: 'rock', sx: e.x, sy: e.y - 20, x: e.x, y: e.y - 20, tx: P.x + (rng() - 0.5) * 30, ty: P.y + (rng() - 0.5) * 20, t: 0, dur: 0.7, z: 0 }); SFX.play('swing'); }
+      if (e.st <= 0) { e.state = 'under'; e.cd = 2.2 + rng(); burst(e.x, e.y, '#6a5a4a', 8); }
+      return true;
+    }
+    return true;
+  }
+  if (ai === 'geode') {
+    if (e.state === 'windup') { e.st -= dt; if (e.st <= 0) { e.state = 'move'; e.cd = 2.6 + rng(); impact(6); SFX.play('slam'); burst(e.x, e.y, '#a593ff', 14); e.ring = 0.35; if (!fainted && !P.dash && d < 70) damagePlayer(2, e); } return true; }
+    e.ring = Math.max(0, (e.ring || 0) - dt);
+    if (chase) { if (d > 44) moveEnemy(e, dx / d * D.sp * dt, dy / d * D.sp * dt); if (d < 80 && e.cd <= 0) { e.state = 'windup'; e.st = 0.8; } } else wander(D.sp);
+    touch(D.dmg, 24); return true;
+  }
+  return false;
+}
+function shardBurst(e) {
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + rng() * 0.3; projectiles.push({ kind: 'shard', x: e.x, y: e.y - 14, vx: Math.cos(a) * 180, vy: Math.sin(a) * 180, ang: a, t: 0, life: 0.9 }); }
+  SFX.play('mine');
+}
+Object.assign(PROC_DRAW, {
+  shardback(c, e, k) {
+    const walk = Math.sin(e.anim * 10) * 2, f = P.x < e.x ? -1 : 1;
+    shadow(c, e.x, e.y + 2, 14 * k, 4 * k);
+    c.fillStyle = '#5a4a6a'; for (const ox of [-10, -5, 5, 10]) c.fillRect(e.x + ox * k - 1, e.y - 6 + (ox > 0 ? walk : -walk), 3, 7);
+    c.fillStyle = '#6a5a8a'; ellipse(c, e.x, e.y - 9 * k, 13 * k, 7 * k);
+    for (const [ox, h, col] of [[-8, 14, '#a593ff'], [-2, 20, '#c8bcff'], [5, 16, '#a593ff'], [10, 10, '#8a7ae0']]) { c.fillStyle = col; c.beginPath(); c.moveTo(e.x + ox * k - 3, e.y - 12 * k); c.lineTo(e.x + ox * k, e.y - (12 + h) * k); c.lineTo(e.x + ox * k + 3, e.y - 12 * k); c.closePath(); c.fill(); }
+    c.fillStyle = '#ffe08a'; c.fillRect(e.x + f * 11 * k - 1, e.y - 11 * k, 2, 2);
+    c.strokeStyle = '#6a5a8a'; c.lineWidth = 3; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(e.x + s * 10 * k, e.y - 8); c.lineTo(e.x + s * 17 * k, e.y - 14); c.stroke(); }
+  },
+  glimbat(c, e, k) {
+    const y = e.y - 26 + Math.sin(e.anim * 6) * 3, flap = Math.sin(time * 28 + e.hx) * 5;
+    c.fillStyle = 'rgba(130,200,255,.25)'; circle(c, e.x, y, 10 * k);
+    c.fillStyle = '#2a2a4a'; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(e.x, y); c.lineTo(e.x + s * 11 * k, y - 4 - flap * s * s); c.lineTo(e.x + s * 8 * k, y + 3); c.closePath(); c.fill(); }
+    c.fillStyle = '#3a3a6a'; circle(c, e.x, y, 4 * k); c.fillStyle = '#9fe8ff'; c.fillRect(e.x - 2, y - 1, 1.5, 1.5); c.fillRect(e.x + 1, y - 1, 1.5, 1.5);
+  },
+  burrower(c, e, k) {
+    if (e.state === 'under') { c.fillStyle = '#4a3a2a'; ellipse(c, e.x, e.y, 12, 5); c.fillStyle = '#6a5a4a'; for (let i = 0; i < 3; i++) circle(c, e.x - 6 + i * 6, e.y - 2 + Math.sin(time * 10 + i) * 1.5, 3); return; }
+    const up = e.state === 'surface' ? 1 - e.st / 0.4 : 1, y = e.y + (1 - up) * 14;
+    c.fillStyle = '#4a3a2a'; ellipse(c, e.x, e.y + 2, 15, 6);
+    c.save(); c.beginPath(); c.rect(e.x - 20, e.y - 40, 40, 42); c.clip();
+    c.fillStyle = '#7a5a40'; ellipse(c, e.x, y - 10, 11, 12); c.fillStyle = '#c9a37a'; ellipse(c, e.x, y - 6, 7, 6);
+    c.fillStyle = '#f2b0a0'; circle(c, e.x, y - 14, 3); c.fillStyle = '#1a1210'; c.fillRect(e.x - 6, y - 18, 3, 2); c.fillRect(e.x + 3, y - 18, 3, 2);
+    c.fillStyle = '#efe6d8'; for (const s of [-1, 1]) { c.fillRect(e.x + s * 10 - 2, y - 8, 4, 2); }
+    c.restore();
+  },
+  geode(c, e, k) {
+    const raise = e.state === 'windup' ? 1 - e.st / 0.8 : 0, walk = Math.sin(e.anim * 6) * 2;
+    if (e.ring > 0) { const r = (1 - e.ring / 0.35) * 70; c.strokeStyle = `rgba(165,147,255,${e.ring * 2})`; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, r, r * 0.6, 0, 0, Math.PI * 2); c.stroke(); }
+    shadow(c, e.x, e.y + 2, 18 * k, 5 * k);
+    c.fillStyle = '#4a4458'; c.fillRect(e.x - 12, e.y - 12 + walk, 8, 12); c.fillRect(e.x + 4, e.y - 12 - walk, 8, 12);
+    c.fillStyle = '#5a5468'; ellipse(c, e.x, e.y - 26, 18 * k, 16 * k); c.fillStyle = '#6a6478'; ellipse(c, e.x - 4, e.y - 30, 12 * k, 10 * k);
+    c.fillStyle = '#a593ff'; c.beginPath(); c.ellipse(e.x, e.y - 24, 9 * k, 7 * k, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e6e0ff'; for (const [ox, oy] of [[-3, -26], [2, -22], [4, -27]]) c.fillRect(e.x + ox, e.y + oy, 2, 3);
+    c.fillStyle = '#4a4458'; for (const s of [-1, 1]) { const ay = e.y - 30 - raise * 22; c.fillRect(e.x + s * 20 - 5, ay, 10, 14); c.fillStyle = '#a593ff'; c.fillRect(e.x + s * 20 - 3, ay + 2, 6, 3); c.fillStyle = '#4a4458'; }
+    c.fillStyle = '#ffe08a'; c.fillRect(e.x - 6, e.y - 36, 3, 2); c.fillRect(e.x + 3, e.y - 36, 3, 2);
+  },
+});
+function drawCaveTile(c, x, y, px, py, t) {
+  const h = hash(x, y), floor = q => isLand(q);
+  if (t === LAND || t === PATH) {
+    spr(c, 'p_c', px, py); c.fillStyle = t === PATH ? 'rgba(70,60,60,.55)' : 'rgba(46,44,66,.72)'; c.fillRect(px, py, T, T);
+    if (h > 0.82) { c.fillStyle = 'rgba(130,180,255,.35)'; c.fillRect(px + h * 22, py + 6 + h * 14, 3, 2); }
+    if (h < 0.08) { c.fillStyle = 'rgba(20,18,30,.5)'; ellipse(c, px + 16, py + 18, 6, 3); }
+    return;
+  }
+  c.fillStyle = '#06060c'; c.fillRect(px, py, T, T);
+  if (floor(tileAt(x, y - 1))) { c.fillStyle = '#3a3448'; c.fillRect(px, py, T, 16); c.fillStyle = '#2a2638'; c.fillRect(px, py + 10, T, 6); c.fillStyle = '#2a2638'; c.beginPath(); c.moveTo(px, py + 16); c.lineTo(px + 6 + h * 6, py + 24); c.lineTo(px + 14, py + 16); c.lineTo(px + 22 - h * 4, py + 22); c.lineTo(px + T, py + 16); c.closePath(); c.fill(); }
+  else if (floor(tileAt(x, y + 1)) || floor(tileAt(x - 1, y)) || floor(tileAt(x + 1, y))) { c.fillStyle = '#1a1826'; c.fillRect(px, py, T, T); c.fillStyle = '#26223a'; c.fillRect(px + 2, py + 2, T - 4, T - 10); if (h > 0.7) { c.fillStyle = '#a593ff'; c.beginPath(); c.moveTo(px + 10, py + 24); c.lineTo(px + 14, py + 8); c.lineTo(px + 18, py + 24); c.closePath(); c.fill(); } }
+}
+function drawRails(c, inView) {
+  for (const R of RAILS) {
+    for (let i = 0; i < R.pts.length - 1; i++) {
+      const [ax, ay] = R.pts[i], [bx, by] = R.pts[i + 1], len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len, nx = -uy, ny = ux;
+      if (!inView((ax + bx) / 2, (ay + by) / 2, len)) continue;
+      c.fillStyle = '#4a3220'; for (let s = 0; s < len; s += 12) { const sx = ax + ux * s, sy = ay + uy * s; c.save(); c.translate(sx, sy); c.rotate(Math.atan2(uy, ux)); c.fillRect(-2, -11, 5, 22); c.restore(); }
+      c.strokeStyle = '#9a9aa8'; c.lineWidth = 2; for (const o of [-7, 7]) { c.beginPath(); c.moveTo(ax + nx * o, ay + ny * o); c.lineTo(bx + nx * o, by + ny * o); c.stroke(); }
+    }
+  }
+}
+function drawCart(c, x, y) {
+  shadow(c, x, y + 4, 18, 5);
+  c.fillStyle = '#2a2a30'; circle(c, x - 10, y + 2, 4); circle(c, x + 10, y + 2, 4);
+  c.fillStyle = '#5a3a22'; c.beginPath(); c.moveTo(x - 18, y - 18); c.lineTo(x + 18, y - 18); c.lineTo(x + 14, y); c.lineTo(x - 14, y); c.closePath(); c.fill();
+  c.fillStyle = '#8a5a32'; c.fillRect(x - 18, y - 18, 36, 4); c.fillStyle = '#4a4a54'; c.fillRect(x - 16, y - 10, 32, 2);
+}
+function drawCartFront(c, x, y) { c.fillStyle = '#5a3a22'; c.beginPath(); c.moveTo(x - 17, y - 12); c.lineTo(x + 17, y - 12); c.lineTo(x + 14, y); c.lineTo(x - 14, y); c.closePath(); c.fill(); c.fillStyle = '#4a4a54'; c.fillRect(x - 16, y - 8, 32, 2); }
+function startRide(R, fromA) {
+  const pts = fromA ? R.pts.slice() : R.pts.slice().reverse();
+  P.ride = { pts, seg: 0, d: 0 }; P.x = pts[0][0]; P.y = pts[0][1]; SFX.play('dash');
+}
+function updateRide(dt) {
+  const R = P.ride; P.inv = Math.max(P.inv, 0.3);
+  let move = 300 * dt;
+  while (move > 0 && R.seg < R.pts.length - 1) {
+    const [ax, ay] = R.pts[R.seg], [bx, by] = R.pts[R.seg + 1], len = Math.hypot(bx - ax, by - ay), left = len - R.d;
+    if (move < left) { R.d += move; move = 0; } else { move -= left; R.seg++; R.d = 0; }
+    const [cx0, cy0] = R.pts[R.seg], nxt = R.pts[Math.min(R.seg + 1, R.pts.length - 1)], l2 = Math.hypot(nxt[0] - cx0, nxt[1] - cy0) || 1;
+    P.x = cx0 + (nxt[0] - cx0) / l2 * R.d; P.y = cy0 + (nxt[1] - cy0) / l2 * R.d; P.fx = (nxt[0] - cx0) / l2 || P.fx; P.fy = (nxt[1] - cy0) / l2 || P.fy;
+  }
+  if (Math.random() < dt * 20) particles.push({ x: P.x + (Math.random() - 0.5) * 20, y: P.y + 4, vx: (Math.random() - 0.5) * 40, vy: -30, life: 0.3, color: '#ffe08a', size: 2 });
+  if (R.seg >= R.pts.length - 1) { const [ex, ey] = R.pts[R.pts.length - 1]; P.ride = null; P.x = ex; P.y = ey + 34; if (!walkable(P.x, P.y)) P.y = ey - 30; SFX.play('crumble'); }
+}
+function drawLift(c, x, y) {
+  shadow(c, x, y + 2, 26, 7);
+  c.fillStyle = '#5a3a22'; c.fillRect(x - 26, y - 90, 6, 92); c.fillRect(x + 20, y - 90, 6, 92); c.fillRect(x - 30, y - 96, 60, 8);
+  c.strokeStyle = '#8a8a94'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 12, y - 88); c.lineTo(x - 12, y - 20); c.moveTo(x + 12, y - 88); c.lineTo(x + 12, y - 20); c.stroke();
+  c.fillStyle = '#6a4a2a'; c.fillRect(x - 18, y - 20, 36, 20); c.fillStyle = '#8a6440'; c.fillRect(x - 18, y - 20, 36, 3); c.fillRect(x - 18, y - 10, 36, 2);
+  c.fillStyle = '#2a2a30'; circle(c, x, y - 92, 6); c.fillStyle = '#ffe08a'; c.fillRect(x - 2, y - 70, 4, 6);
+}
+function drawGlowcap(c, o) {
+  const g = 0.6 + Math.sin(time * 2 + o.x) * 0.3, col = ['#7fe0f0', '#a593ff', '#7fe07a'][o.v % 3];
+  c.fillStyle = `rgba(160,220,255,${g * 0.25})`; circle(c, o.x, o.y - 8, 14);
+  for (const [ox, h] of [[-5, 8], [2, 12], [7, 6]]) { c.fillStyle = '#d8ccb4'; c.fillRect(o.x + ox - 1, o.y - h, 2, h); c.fillStyle = col; ellipse(c, o.x + ox, o.y - h, 4, 2.5); }
+}
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
 function updateAmbient(dt) {
@@ -4549,6 +4765,7 @@ function updateAmbient(dt) {
     if (isLand(tileAt(tx, ty))) {
       if (rg === 4) ambient.push({ kind: 'leaf', x, y: y - 60, life: 4, ph: Math.random() * 6, col: Math.random() < 0.5 ? '#5aa65c' : '#d9a23c' });
       else if (rg === 3) ambient.push({ kind: 'fly', x, y, life: 6, ph: Math.random() * 6, col: ['#ffffff', '#ffd65a', '#f28fb4'][Math.floor(Math.random() * 3)], vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 20 });
+      else if (rg === 13) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 4 });
       else if (rg === 12) ambient.push({ kind: 'glow', x, y, life: 5, ph: Math.random() * 6, vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12 });
       else if (rg === 11) ambient.push({ kind: 'mote', x, y, life: 5, ph: Math.random() * 6, vx: 8 + Math.random() * 8, vy: -2 - Math.random() * 4 });
       else if (rg === 10) ambient.push(Math.random() < 0.6 ? { kind: 'ember', x, y: y + 40, life: 3, ph: Math.random() * 6 } : { kind: 'ash', x, y: y - 60, life: 4, ph: Math.random() * 6 });
@@ -4725,6 +4942,8 @@ function drawProjectiles(c) {
       c.save(); c.translate(p.x, p.y); c.rotate(p.t * 10); c.fillStyle = 'rgba(181,140,255,.35)'; circle(c, 0, 0, 11); c.fillStyle = '#b58cff'; for (let i = 0; i < 3; i++) { c.rotate(Math.PI * 2 / 3); c.fillRect(-2, -9, 4, 7); } c.restore(); c.fillStyle = '#f0e6ff'; circle(c, p.x, p.y, 3);
     } else if (p.kind === 'sand') {
       c.fillStyle = 'rgba(232,200,138,.45)'; circle(c, p.x, p.y, 10); c.fillStyle = '#c99a5a'; circle(c, p.x, p.y, 6); c.fillStyle = '#f2dcae'; circle(c, p.x - 2, p.y - 2, 2);
+    } else if (p.kind === 'shard') {
+      c.save(); c.translate(p.x, p.y); c.rotate((p.ang || 0) + Math.PI / 2); c.fillStyle = 'rgba(165,147,255,.4)'; circle(c, 0, 0, 7); c.fillStyle = '#c8bcff'; diamond(c, 0, 0, 3, 8); c.fillStyle = '#ffffff'; diamond(c, -1, -1, 1, 4); c.restore();
     } else if (p.kind === 'ice') {
       c.save(); c.translate(p.x, p.y); c.rotate((p.ang || 0) + Math.PI / 2); c.fillStyle = 'rgba(190,240,255,.4)'; circle(c, 0, 0, 9); c.fillStyle = '#9fe8ff'; diamond(c, 0, 0, 4, 9); c.fillStyle = '#ffffff'; diamond(c, -1, -1, 1.5, 5); c.restore();
     } else if (p.kind === 'bolt') {
@@ -5206,7 +5425,7 @@ function drawProp(c, o) {
 
 function drawNPC(c, n) {
   const near = Math.hypot(n.x - P.x, n.y - P.y) < 50;
-  if (n.boat) { if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
+  if (n.boat) { if (n.id.startsWith('cart_')) drawCart(c, n.x, n.y); else if (n.id.startsWith('lift')) drawLift(c, n.x, n.y); else if (n.id.startsWith('gate')) drawSpiritGate(c, n.x, n.y, n.id === 'gate_home'); else if (n.id.startsWith('thermal')) drawThermal(c, n.x, n.y, n.id === 'thermal_home'); else if (n.id.startsWith('balloon')) drawBalloon(c, n.x, n.y); else drawProp(c, { prop: n.id.startsWith('raft') ? 'raft' : 'boat', x: n.x, y: n.y }); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bed) { drawBed(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText('Bed').width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText('Bed', n.x, n.y + 17); } return; }
   if (n.sign) { drawSign(c, n); if (near) { c.font = '600 11px "Atkinson Hyperlegible", sans-serif'; c.textAlign = 'center'; const w = c.measureText(n.name).width + 10; c.fillStyle = 'rgba(18,35,42,.85)'; c.fillRect(n.x - w / 2, n.y + 6, w, 15); c.fillStyle = '#eef3e6'; c.fillText(n.name, n.x, n.y + 17); } return; }
   if (n.bench) {
@@ -5267,6 +5486,7 @@ function render() {
   const inViewT = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   if (CD === TOMB_D) drawTraps(ctx, inViewT);
   if (CD === CINDER_D || CD === FORGE_D) drawCinderGround(ctx, camX, camY, viewW, viewH, inViewT);
+  if (CD === CAVE_D) drawRails(ctx, inViewT);
   if (CD === SKY_D || CD === SPIRE_D) drawSkyOverlay(ctx, camX, camY, viewW, viewH, CD === SKY_D);
   const inView = (x, y, m = 70) => x > camX - m && x < camX + viewW + m && y > camY - m && y < camY + viewH + m * 1.5;
   for (const p of pickups) {
@@ -5298,13 +5518,14 @@ function render() {
     else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : drawCryptDoor)(ctx);
     else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
-    else if (kind === 3) drawPlayer(ctx);
+    else if (kind === 3) { if (P.ride) drawCart(ctx, P.x, P.y + 6); drawPlayer(ctx); if (P.ride) drawCartFront(ctx, P.x, P.y + 6); }
     else if (kind === 4) drawHouse(ctx, o);
     else if (kind === 5 && o.prop) { if (o.prop === 'rug') continue; drawProp(ctx, o); }
     else if (kind === 5 && o.bigshroom) drawBigShroom(ctx, o);
     else if (kind === 5 && o.forge) drawForge(ctx, o);
     else if (kind === 5 && o.windmill) drawWindmill(ctx, o);
     else if (kind === 5 && o.lantern) drawLantern(ctx, o.lantern);
+    else if (kind === 5 && o.glowcap) drawGlowcap(ctx, o);
     else if (kind === 5 && o.grave) drawGrave(ctx, o);
     else if (kind === 5 && o.fire) drawCampfire(ctx, o);
     else if (kind === 5 && o.tent) drawTent(ctx, o);
@@ -5347,7 +5568,7 @@ function render() {
     if (CD === MIRE_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.25, cvs.width / 2, cvs.height / 2, cvs.height * 0.8); g.addColorStop(0, 'rgba(150,190,140,0)'); g.addColorStop(1, `rgba(150,190,140,${0.42 + Math.sin(time * 0.5) * 0.06})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (blizzard > 0) { ctx.fillStyle = `rgba(235,245,255,${Math.min(0.6, blizzard * 0.6)})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (inD && !CD.outdoor && CD !== OSS_D) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
-    if (CD === DUSK_D || CD === OSS_D) drawDarkness(ctx, camX, camY, k);
+    if (CD === DUSK_D || CD === OSS_D || CD === CAVE_D) drawDarkness(ctx, camX, camY, k);
     if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
   }
   mctx.imageSmoothingEnabled = false;
@@ -5406,6 +5627,7 @@ async function start(hot) {
   if (qState('idol') && qState('idol').state === 'active') spawnFind('idol', 8, SUN_D.x0, DW);
   if (qState('bloom') && qState('bloom').state === 'active') spawnFind('bloom', 10, CINDER_D.x0, DW);
   if (qState('chime') && qState('chime').state === 'active') spawnFind('chime', 11, SKY_D.x0, DW);
+  if (qState('goldpick') && qState('goldpick').state === 'active') spawnFind('goldpick', 13, CAVE_D.x0, DW);
   for (const q of QUESTS) if (questReady(q)) questReadyNotified[q.id] = true;
   P.x = S.px; P.y = S.py;
   camFocus.x = P.x; camFocus.y = P.y;
