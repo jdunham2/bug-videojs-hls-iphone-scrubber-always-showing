@@ -4,7 +4,7 @@
 const ASSETS = __ASSETS__;
 const ATLAS = __ATLAS__;
 // The overworld (OW wide) and the dungeons (each DW wide, side by side east of it) share one tile grid.
-const T = 32, OW = 72, DW = 40, NDUN = 13, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
+const T = 32, OW = 72, DW = 40, NDUN = 14, W = OW + 2 + DW * NDUN, H = 56, GOAL = 400, SEED = 7;
 const SAVE_KEY = 'brindle-isle-save-v1';
 const $ = id => document.getElementById(id);
 const cvs = $('game'), ctx = cvs.getContext('2d');
@@ -483,7 +483,33 @@ const LANTERNS = [[8, 14], [32, 13], [6, 25], [34, 23], [14, 21], [26, 19], [13,
 });
 const lanternLit = L => !!(S.found && S.found['lan' + L.i]);
 const litLanterns = () => LANTERNS.filter(lanternLit).length;
-const inLanternLight = (x, y) => LANTERNS.some(L => lanternLit(L) && Math.hypot(L.x - x, (L.y - y) / 0.8) < 165) || Math.hypot(x - DUSK_D.camp.x - 10, y - DUSK_D.camp.y - 60) < 150;
+const inLanternLight = (x, y) => LANTERNS.some(L => lanternLit(L) && Math.hypot(L.x - x, (L.y - y) / 0.8) < 165) || Math.hypot(x - DUSK_D.camp.x - 10, y - DUSK_D.camp.y - 60) < 150 || (dungeonAt(x) === OSS_D && OSS_D.switches.some(sw => dgs(OSS_D).switches[sw.id] && Math.hypot(sw.x - x, (sw.y - y) / 0.8) < 165));
+// ---------- the Moonveil Ossuary: a dark crypt beneath Duskhollow's ruined chapel ----------
+const OSS = { x: DUSK_D.chapel.x + 16, y: DUSK_D.chapel.y + 4, tx: Math.round(DUSK_D.chapel.x / T), ty: Math.round(DUSK_D.chapel.y / T) };
+for (let y = OSS.ty - 2; y <= OSS.ty + 2; y++) for (let x = OSS.tx - 3; x <= OSS.tx + 3; x++) if (tiles[y * W + x] === DEEP) tiles[y * W + x] = LAND;
+ENTRANCES.push(OSS); pathLine(DUSK_D.x0 + 10, 28, OSS.tx, OSS.ty + 2);
+const OSS_D = makeDungeon('ossuary', 'The Moonveil Ossuary', 13, OSS, { tint: 'rgb(190,190,225)',
+  gateMsg: 'The bone gate is sealed. Light the four braziers in the ossuary.', bossDoorMsg: 'A door of fused bones. Your Shadow keeps its key.',
+  objective: g => !g.open.sw ? 'Light the four braziers in the dark ossuary. Shades can only be hurt in their light.'
+    : !g.open.lock ? (g.keys ? 'Use the small key on the door in the west wall of the Hall of Braziers.' : 'Find a small key. Look in the alcove east of the Hall of Braziers.')
+    : !S.defeated.shadow ? 'Defeat your Shadow. It mirrors you, and can only be hurt inside the lit circle.'
+    : !g.open.boss ? 'Open the bone door north of the Hall of Braziers with the Boss Key.'
+    : !S.defeated.lich ? 'Defeat the Lich King. Smash his soul jars to break his shield.' : 'The dead rest at last. Take the stairs back up.' });
+{
+  const D = OSS_D;
+  carve(D, 6, 1, 33, 10);                          // the Lich King's throne hall
+  carve(D, 19, 11, 20, 12);
+  carve(D, 12, 13, 27, 24);                        // Hall of Braziers
+  carve(D, 28, 20, 30, 22);                        // key alcove
+  carve(D, 1, 13, 10, 24);                         // the Hall of Mirrors
+  carve(D, 3, 26, 36, 33);                         // the ossuary
+  carve(D, 19, 34, 20, 34); entryHall(D);
+  addDoor(D, 'sw', 'switch', [[19, 25], [20, 25]], GATE);
+  addDoor(D, 'lock', 'lock', [[11, 14], [11, 15]], LOCK, [10, 14]);
+  addDoor(D, 'boss', 'boss', [[19, 11], [20, 11]], BDOOR);
+  for (const [i, x, y] of [[1, 5, 27], [2, 34, 27], [3, 6, 32], [4, 33, 32]]) D.switches.push({ id: 'b' + i, x: (D.x0 + x) * T + 16, y: y * T + 22 });
+  for (const [x, y] of [[15, 34], [24, 34], [8, 25], [30, 25], [14, 12], [25, 12], [10, 0], [29, 0], [3, 12], [8, 12]]) D.torches.push({ x, y });
+}
 const trapState = tr => { const ph = (time + tr.off) % 2.4; return ph < 1.3 ? 0 : ph < 1.75 ? 1 : 2; };
 
 
@@ -761,6 +787,7 @@ const ITEMS = {
   heartwood: { name: 'Heartwood', price: 500 },
   dragonscale: { name: 'Dragon Scale', price: 600 },
   stormcore: { name: 'Storm Core', price: 650 },
+  soulgem: { name: 'Soul Gem', price: 700 },
   obsidian: { name: 'Obsidian', price: 10 },
   feather: { name: 'Gale Feather', price: 8 },
   ectoplasm: { name: 'Ectoplasm', price: 9 },
@@ -776,6 +803,7 @@ const WEAPONS = {
   arcane:  { name: 'Arcane Edge', dmg: 3, col: '#d6b8ff', cost: { gem: 1, crystal: 5 }, beam: true, desc: 'Cut from the Hollow Gem. Triple damage, and fires a sword beam while your hearts are full.' },
   frost:   { name: 'Frostbite Blade', dmg: 3, col: '#9fe8ff', cost: { frostheart: 1, crystal: 6 }, freeze: true, desc: 'Forged from the Frost Heart. Triple damage, and freezes foes so they move at a crawl.' },
   sun:     { name: 'Sunblade', dmg: 4, col: '#ffd65a', cost: { sunstone: 1, crystal: 8 }, beam: true, beamAlways: true, desc: 'Forged from the Sunstone. Quadruple damage, and every swing fires a beam of sunlight.' },
+  soul:    { name: 'Soulreaver', dmg: 5, col: '#7fe07a', cost: { soulgem: 1, ectoplasm: 8 }, lifesteal: true, desc: 'Bound to the Soul Gem. Five times damage, the strongest blade there is, and each foe you defeat restores a heart.' },
   storm:   { name: 'Stormbrand', dmg: 4, col: '#fff6a8', cost: { stormcore: 1, feather: 6 }, beam: true, reach: 8, desc: 'Forged around the Storm Core. Quadruple damage, long reach, and fires a lightning beam while your hearts are full.' },
   moon:    { name: 'Moonblade', dmg: 3, col: '#d6e2ff', cost: { ectoplasm: 6, crystal: 4 }, glow: true, desc: 'Silvered with ectoplasm. Triple damage, lights up the dark, and strikes shades anywhere.' },
   gale:    { name: 'Gale Blade', dmg: 3, col: '#bfefff', cost: { feather: 5, crystal: 4 }, reach: 12, desc: 'Light as the wind. Triple damage with the longest reach of any blade.' },
@@ -840,6 +868,9 @@ const QUESTS = [
   { id: 'hexes', giver: 'moss', name: 'Hex Breaker', req: 'spores', goal: { kill: [['hexer', 3], ['bogslime', 3]] }, reward: { gold: 140, items: { crystal: 4 } },
     offer: ['Hooded hexers are cursing the bog, and the bog slimes grow fat on their magic.', 'Three hexers and three bog slimes, dearie. Mind the purple light: it turns your feet around.'],
     done: ['The curse is weakening already. You\'re braver than you look.'] },
+  { id: 'ossuary', giver: 'morrow', name: 'The Moonveil Ossuary', req: 'restless', goal: { boss: ['shadow', 'lich'] }, reward: { gold: 500, items: { crystal: 12 } },
+    offer: ['Beneath the ruined chapel lies the ossuary. The Lich King sleeps there, and his magic is what keeps the dead from resting.', 'They say whoever enters must first face their own shadow. Take a light, and end this curse.'],
+    done: ['The vale is quiet. Truly quiet. That Soul Gem is yours: bind it to a blade, and nothing will stand against you.'] },
   { id: 'lanterns', giver: 'morrow', name: 'Light the Way', goal: { lanterns: 8 }, reward: { gold: 150, items: { potion: 3 } },
     offer: ['A living soul? In Duskhollow? Well, well. I\'m Morrow. I keep the lanterns, or I did, until my knees gave out.', 'Eight spirit lanterns stand across the vale. Strike each one to light it. The shades fear their glow, and in it they can be hurt.'],
     done: ['Look at them shine! The vale hasn\'t been this bright in a hundred years. Take these, you\'ve earned them.'] },
@@ -991,7 +1022,7 @@ const RECIPES = [
   { id: 'charm', name: 'Crystal Charm', desc: 'A collector\'s piece. Sells for 70g.', cost: { crystal: 2, stone: 2 } },
 ];
 function freshState() {
-  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
+  return { gold: 0, inv: { wood: 0, stone: 0, herb: 0, goo: 0, crystal: 0, planks: 0, potion: 0, charm: 0, crown: 0, gem: 0, pearl: 0, relic: 0, horn: 0, frostheart: 0, fang: 0, sunstone: 0, heartwood: 0, obsidian: 0, dragonscale: 0, feather: 0, stormcore: 0, ectoplasm: 0, soulgem: 0 }, quests: {}, kills: {}, found: {}, defeated: {}, mineOpen: false, dgs: {},
     tools: { pickaxe: false }, gear: { weapon: 'wood', armor: 'cloth', weapons: ['wood'], armors: ['cloth'] }, hp: 6, bridge: false, met: {}, intro: false, time: 0, earned: 0,
     px: cx * T, py: (cy + 2) * T };
 }
@@ -1073,6 +1104,7 @@ for (const L of LANTERNS) decor.push({ lantern: L, x: L.x, y: L.y, solid: 10 });
   for (const [ox, oy] of [[-3, -3], [3, -3], [-3, 2], [3, 2], [-1, -3], [1, -3]]) decor.push({ key: 'pillar', x: C.x + ox * T, y: C.y + oy * T, s: 2.5, solid: 13 });
   for (let i = 0; i < 6; i++) { const x = Math.round(C.x / T) - 2 + (i % 3) * 2, y = Math.round(C.y / T) + (i < 3 ? -1 : 1); if (tiles[y * W + x] === LAND) decor.push({ grave: true, v: v++, x: x * T + 16, y: y * T + 20, solid: 10 }); }
 }
+for (let i = decor.length - 1; i >= 0; i--) if (decor[i].grave && Math.hypot(decor[i].x - OSS.x, decor[i].y - OSS.y) < 3.2 * T) decor.splice(i, 1);
 function randomTileIn(rg, minDist) {
   for (let i = 0; i < 800; i++) {
     const x = rg === 6 ? FROST_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 8 ? SUN_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 9 ? MIRE_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 10 ? CINDER_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 11 ? SKY_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : rg === 12 ? DUSK_D.x0 + 1 + Math.floor(rng() * (DW - 2)) : 2 + Math.floor(rng() * (OW - 4)), y = 2 + Math.floor(rng() * (H - 4));
@@ -1159,6 +1191,11 @@ dSpawn(TOMB_D, [['scarab', 15, 37], ['scarab', 24, 37], ['scarab', 21, 40], ['mu
 dChest(TOMB_D, 'key', 'key', 37, 26); dChest(TOMB_D, 'hall', 'gold', 32, 13);
 dPillars(TOMB_D, [[15, 14], [29, 14], [15, 19], [29, 19]]);
 for (const [x, y] of [[14, 41], [25, 41], [5, 23], [34, 23]]) addRes('pot', TOMB_D.x0 + x, y);
+dSpawn(OSS_D, [['skeleton', 15, 38], ['bat', 24, 37], ['skeleton', 24, 39], ['skeleton', 10, 30], ['skeleton', 29, 29], ['shade', 14, 28], ['shade', 26, 31], ['hound', 20, 29], ['banshee', 32, 30],
+  ['skeleton', 16, 17], ['shade', 22, 20], ['banshee', 25, 15], ['hound', 14, 22]]);
+dChest(OSS_D, 'key', 'key', 30, 21); dChest(OSS_D, 'hall', 'gold', 13, 14);
+dPillars(OSS_D, [[15, 19], [24, 17], [12, 28], [27, 31]]);
+for (const [x, y] of [[14, 41], [25, 41], [36, 33], [3, 26], [27, 23]]) addRes('pot', OSS_D.x0 + x, y);
 dSpawn(SPIRE_D, [['windling', 15, 38], ['puff', 24, 37], ['hawk', 20, 39], ['windling', 10, 33], ['windling', 28, 32], ['puff', 14, 27], ['puff', 30, 27], ['hawk', 22, 32],
   ['sentinel', 16, 17], ['sentinel', 24, 21], ['hawk', 20, 15], ['puff', 14, 22], ['windling', 26, 15]]);
 dChest(SPIRE_D, 'key', 'key', 30, 21); dChest(SPIRE_D, 'hall', 'gold', 13, 14);
@@ -1201,6 +1238,12 @@ const BOSS_INFO = {
   scarab: { name: 'The Golden Scarab', hp: 80, contact: 40, wake: 5 * T, col: '#ffd65a',
     seq: { 1: ['scuttle', 'roll', 'scuttle', 'beam'], 2: ['roll', 'dive', 'beam', 'scuttle', 'roll'], 3: ['beam', 'roll', 'dive', 'roll', 'beam', 'scuttle'] },
     lines: { 2: 'The Golden Scarab takes flight!', 3: 'The Golden Scarab blazes like the sun!' } },
+  shadow: { name: 'Your Shadow', hp: 50, contact: 0, wake: 4 * T, col: '#6a5a9a',
+    seq: { 1: ['mirror', 'mirror', 'daggers'], 2: ['mirror', 'daggers', 'lunge', 'mirror'], 3: ['mirror', 'daggers', 'lunge', 'mirror', 'lunge'] },
+    lines: { 2: 'Your Shadow learns your tricks!', 3: 'Your Shadow mirrors you from every side!' } },
+  lich:   { name: 'The Lich King', hp: 90, contact: 30, wake: 5.5 * T, col: '#7fe07a',
+    seq: { 1: ['float', 'bones', 'skulls', 'float', 'raise'], 2: ['bones', 'blink', 'skulls', 'raise', 'bones'], 3: ['deathring', 'bones', 'blink', 'skulls', 'raise', 'deathring'] },
+    lines: { 2: 'The Lich King raises new soul jars!', 3: 'The Lich King unleashes the power of death!' } },
   aegis:  { name: 'The Colossus Sentinel', hp: 70, contact: 34, wake: 4 * T, col: '#7fe0f0',
     seq: { 1: ['hover', 'orbs', 'laser', 'hover', 'slam'], 2: ['laser', 'slam', 'orbs', 'hover', 'laser'], 3: ['laser', 'summon', 'slam', 'laser', 'orbs', 'slam'] },
     lines: { 2: 'The Colossus Sentinel\'s eye burns brighter!', 3: 'The Colossus Sentinel turns faster!' } },
@@ -1249,6 +1292,8 @@ const BOSSES = [
   makeBoss('jarl', FROST_D.camp.x, FROST_D.camp.y, { cx: FROST_D.camp.x, cy: FROST_D.camp.y, r: 5.6 * T }),
   makeBoss('mummy', (TOMB_D.x0 + 5) * T + 16, 16 * T, roomArena(TOMB_D, 1, 12, 10, 20)),
   makeBoss('scarab', (TOMB_D.x0 + 20) * T, 5 * T, roomArena(TOMB_D, 8, 1, 31, 10)),
+  makeBoss('shadow', (OSS_D.x0 + 5) * T + 16, 19 * T, roomArena(OSS_D, 1, 13, 10, 24)),
+  makeBoss('lich', (OSS_D.x0 + 20) * T, 5 * T, roomArena(OSS_D, 6, 1, 33, 10)),
   makeBoss('aegis', (SPIRE_D.x0 + 5) * T + 16, 19 * T, roomArena(SPIRE_D, 1, 13, 10, 24)),
   makeBoss('storm', (SPIRE_D.x0 + 20) * T, 6 * T, roomArena(SPIRE_D, 6, 1, 33, 10)),
   makeBoss('forge', (FORGE_D.x0 + 5) * T + 16, 19 * T, roomArena(FORGE_D, 1, 13, 10, 24)),
@@ -1447,6 +1492,7 @@ const ICON_DRAW = {
   feather: c => { c.save(); c.translate(16, 16); c.rotate(-0.6); c.fillStyle = '#c8b89a'; c.beginPath(); c.ellipse(0, -2, 5, 12, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#efe6d8'; c.beginPath(); c.ellipse(-1, -3, 3, 10, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6a4a2a'; c.fillRect(-0.5, -12, 1.5, 26); c.restore(); },
   chime: c => { c.fillStyle = '#8a6a44'; c.fillRect(6, 4, 20, 3); c.strokeStyle = '#c8c0b0'; c.lineWidth = 1; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(9 + i * 5, 7); c.lineTo(9 + i * 5, 12); c.stroke(); } for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#7fe0f0' : '#bfefff'; c.fillRect(8 + i * 5, 12, 3, 10 + (i % 2) * 6); } c.fillStyle = '#ffffff'; c.fillRect(8, 13, 1, 6); },
   bloom: c => { c.fillStyle = '#3d6a44'; c.fillRect(15, 18, 2, 12); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; c.fillStyle = i % 2 ? '#ff7a2a' : '#ffb347'; c.beginPath(); c.ellipse(16 + Math.cos(a) * 6, 13 + Math.sin(a) * 6, 5, 3, a, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe08a'; circle(c, 16, 13, 3.5); },
+  soulgem: c => { c.fillStyle = 'rgba(127,224,122,.3)'; circle(c, 16, 16, 13); c.fillStyle = '#2a4a2a'; diamond(c, 16, 16, 9, 12); c.fillStyle = '#7fe07a'; diamond(c, 16, 16, 7, 9); c.fillStyle = '#e6ffe0'; c.fillRect(12, 13, 3, 3); c.fillRect(17, 13, 3, 3); c.fillStyle = '#2a4a2a'; c.fillRect(14, 19, 4, 1); },
   stormcore: c => { c.fillStyle = 'rgba(127,224,240,.35)'; circle(c, 16, 16, 13); c.fillStyle = '#3a4a6a'; circle(c, 16, 16, 9); c.fillStyle = '#7fe0f0'; circle(c, 16, 16, 6); c.strokeStyle = '#fff6a8'; c.lineWidth = 2; c.beginPath(); c.moveTo(18, 6); c.lineTo(13, 16); c.lineTo(19, 16); c.lineTo(14, 26); c.stroke(); },
   dragonscale: c => { c.fillStyle = '#5a1a14'; c.beginPath(); c.moveTo(16, 3); c.quadraticCurveTo(29, 12, 16, 29); c.quadraticCurveTo(3, 12, 16, 3); c.fill(); c.fillStyle = '#c8402a'; c.beginPath(); c.moveTo(16, 6); c.quadraticCurveTo(25, 13, 16, 25); c.quadraticCurveTo(7, 13, 16, 6); c.fill(); c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(16, 9); c.quadraticCurveTo(21, 14, 16, 20); c.quadraticCurveTo(11, 14, 16, 9); c.fill(); c.fillStyle = '#fff2c4'; c.fillRect(14, 11, 2, 4); },
   heartwood: c => { c.fillStyle = '#3d2a1a'; c.fillRect(8, 6, 16, 22); c.fillStyle = '#7a5232'; c.fillRect(10, 8, 12, 18); c.strokeStyle = '#5a3a22'; c.lineWidth = 1.5; for (const r of [3, 6]) { c.beginPath(); c.ellipse(16, 17, r, r * 1.4, 0, 0, Math.PI * 2); c.stroke(); } c.fillStyle = '#7fe07a'; circle(c, 16, 17, 2.5); c.fillStyle = '#4f8a3a'; c.beginPath(); c.ellipse(22, 6, 5, 3, -0.6, 0, Math.PI * 2); c.fill(); },
@@ -1472,8 +1518,8 @@ function buildIcons() {
 // ---------- HUD ----------
 const toastEl = $('toast'); let toastTimer = 0;
 function toast(msg, ms = 2600) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms); }
-const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore'];
-const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore'];
+const INV_ORDER = ['wood', 'stone', 'herb', 'goo', 'crystal', 'obsidian', 'feather', 'ectoplasm', 'planks', 'potion', 'charm', 'crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
+const TROPHIES = ['crown', 'gem', 'pearl', 'relic', 'horn', 'frostheart', 'fang', 'sunstone', 'heartwood', 'dragonscale', 'stormcore', 'soulgem'];
 function objectiveText() {
   const DH = interiorAt(P.x, P.y) ? null : dungeonAt(P.x);
   if (DH) return DH.objective(dgs(DH));
@@ -1593,6 +1639,12 @@ function renderPanel() {
       <dt>Hazards</dt><dd>Bog patches slow you. Spore clouds sting and slow while you stand in them.</dd>
       <dt>Creatures</dt><dd>Bog slimes split in two, shroomlings puff spores, toads leap and lash their tongues, wisps circle then explode, and hexers' purple curses reverse your controls for a moment.</dd>
       <dt>Elsewhere</dt><dd>Toads now hop around the meadow, shroomlings sprout in the forest, and wisps drift through the crystal grove.</dd></dl>
+      <div class="label">The Moonveil Ossuary</div>
+      <dl class="controls">
+      <dt>Getting in</dt><dd>A bone-decked crypt door in the ruined chapel, southwest in Duskhollow.</dd>
+      <dt>Braziers</dt><dd>The ossuary is pitch dark. Strike the four braziers to light them: they open the bone gate, and shades turn solid in their glow.</dd>
+      <dt>Your Shadow</dt><dd>It mirrors your every move across the hall. It is only solid inside the one lit circle: walk so you meet it there, then strike. Later it mirrors you from both sides.</dd>
+      <dt>Lich King</dt><dd>Three soul jars shield him. Smash all three to break the shield and stun him. He raises new jars as the fight goes on. Step out of his bone spikes and his death ring.</dd></dl>
       <div class="label">Duskhollow</div>
       <dl class="controls">
       <dt>Getting there</dt><dd>Step through the Spirit Gate, a glowing stone arch near the crypt on Brindle Isle. Its twin at Lanternrest brings you back.</dd>
@@ -1876,6 +1928,8 @@ function onAction() {
   const AB = activeBoss();
   const brl = AB && AB.type === 'forge' && !(AB.cool > 0) && forgeBarrels(AB).find(r => r.cd <= 0 && Math.hypot(r.x - P.x, r.y - P.y) < 70);
   if (brl) { face({ x: brl.x, y: brl.y }); doAct('sword', hitEnemies); return true; }
+  const jar = AB && AB.type === 'lich' && AB.jars && AB.state !== 'dazed' && AB.jars.find(j => j.hp > 0 && Math.hypot(j.x - P.x, j.y - P.y) < 70);
+  if (jar) { face({ x: jar.x, y: jar.y }); doAct('sword', hitEnemies); return true; }
   if (AB && bossHittable(AB) && Math.hypot(AB.x - P.x, AB.y - P.y) < 110) { face(AB); doAct('sword', hitEnemies); return true; }
   if (res) {
     face(res);
@@ -1996,7 +2050,7 @@ function hitEnemies(a) {
   }
   const AB = activeBoss();
   if (AB && AB.decoys) for (const dc of AB.decoys) if (!dc.popped && Math.hypot(dc.x - hx, dc.y - 26 - AB.z - hy) < rad + 26) { dc.popped = true; burst(dc.x, dc.y - 40, '#dff6ff', 16); floatText(dc.x, dc.y - 80, 'Just a reflection!', '#c8e8ff'); SFX.play('mine'); hit = true; }
-  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
+  hitCauldrons(AB || {}, hx, hy, rad); hitBarrels(AB || {}, hx, hy, rad); hitJars(AB || {}, hx, hy, rad); hitLanterns(hx, hy, rad);
   if (AB && bossHittable(AB) && Math.hypot(AB.x - hx, AB.y - (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 50 : 26) - AB.z - hy) < rad + (AB.type === 'treant' || AB.type === 'forge' || AB.type === 'aegis' ? 40 : 30)) { if (AB.decoys && AB.decoys.some(dc => !dc.popped)) { AB.decoys = []; wizardDazeQuiet(AB, 'Found her! Strike now!'); } damageBoss(AB, dmg); hit = true; }
   deflect(hx, hy, rad + 6);
   hitSwitches(hx, hy, rad);
@@ -2583,6 +2637,8 @@ function damageBoss(B, n) {
   }
   const dazed = B.state === 'dazed';
   let dmg = n * (dazed ? 2 : 1);
+  if (B.type === 'shadow' && B.state !== 'dazed' && !shadowInLight(B)) { B.shield = 0.3; floatText(B.x, B.y - 80, 'It passes through!', '#b8a8ff'); if (!shadowHint) { shadowHint = true; toast('Your Shadow mirrors your moves. Meet it inside the lit circle, where it turns solid!', 4500); } return; }
+  if (B.type === 'lich' && B.state !== 'dazed' && B.jars && B.jars.some(j => j.hp > 0)) { B.shield = 0.35; floatText(B.x, B.y - 110, 'Shielded!', '#bfffb0'); SFX.play('mine'); if (!lichHint) { lichHint = true; toast('His soul jars shield him. Smash all three jars to break the shield!', 4500); } return; }
   if (B.type === 'aegis' && B.state !== 'dazed') {
     let da = Math.atan2(P.y - B.y, P.x - B.x) - (B.dir || 0); while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
     if (Math.abs(da) < 1.1) { B.shield = 0.35; floatText(B.x, B.y - 120, 'Blocked!', '#c8d0ff'); SFX.play('mine'); if (!aegisHint) { aegisHint = true; toast('Its shield blocks you from the front. Get behind it, or strike when its laser overheats!', 4500); } return; }
@@ -2665,6 +2721,17 @@ function bossStart(B, action) {
     else if (action === 'lash') { B.state = 'lashWind'; B.st = B.phase === 3 ? 0.45 : 0.6; }
     else if (action === 'curse') { B.state = 'curse'; B.st = 0.8; }
     else if (action === 'sarcophagus') { B.state = 'sink'; B.st = 0.5; SFX.play('wisp'); }
+  } else if (B.type === 'shadow') {
+    if (action === 'mirror') B.state = 'mirror';
+    else if (action === 'daggers') { B.state = 'daggers'; B.st = 0.6; }
+    else if (action === 'lunge') { B.state = 'lunge'; B.st = 0.7; }
+  } else if (B.type === 'lich') {
+    if (action === 'float') B.state = 'float';
+    else if (action === 'bones') { B.state = 'bones'; B.st = 0.7; }
+    else if (action === 'skulls') { B.state = 'skulls'; B.st = 0.6; }
+    else if (action === 'raise') { B.state = 'raise'; B.st = 0.8; }
+    else if (action === 'blink') { B.state = 'blink'; B.st = 0.4; }
+    else if (action === 'deathring') { B.state = 'deathring'; B.st = 0.8; }
   } else if (B.type === 'aegis') {
     if (action === 'hover') B.state = 'hover';
     else if (action === 'laser') { B.state = 'laserWind'; B.st = 0.8; }
@@ -2737,6 +2804,8 @@ function finishBoss(B) {
   if (B.type === 'jarl') { drop(B.x, B.y - 10, 'gold', 20, 10); drop(B.x, B.y - 10, 'horn', 1); banner('Jarl Frostbeard defeated!', '#ffe08a'); }
   if (B.type === 'mummy') { drop(B.x, B.y - 10, 'gold', 16, 5); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Mummy King crumbles!', '#ffe08a'); }
   if (B.type === 'scarab') { drop(B.x, B.y - 10, 'gold', 30, 10); drop(B.x, B.y - 10, 'sunstone', 1); banner('The Golden Scarab falls!', '#ffe08a'); }
+  if (B.type === 'shadow') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'ectoplasm', 3); drop(B.x, B.y - 10, 'bosskey', 1); banner('Your Shadow fades into the light!', '#ffe08a'); }
+  if (B.type === 'lich') { B.jars = []; drop(B.x, B.y - 10, 'gold', 45, 10); drop(B.x, B.y - 10, 'soulgem', 1); banner('The Lich King is destroyed! The dead rest at last.', '#ffe08a'); }
   if (B.type === 'aegis') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'crystal', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Colossus Sentinel crumbles!', '#ffe08a'); }
   if (B.type === 'storm') { B.gust = null; drop(B.x, B.y - 10, 'gold', 40, 10); drop(B.x, B.y - 10, 'stormcore', 1); banner('The Stormlord is defeated! The skies clear.', '#ffe08a'); }
   if (B.type === 'forge') { drop(B.x, B.y - 10, 'gold', 18, 5); drop(B.x, B.y - 10, 'obsidian', 4); drop(B.x, B.y - 10, 'bosskey', 1); banner('The Forgemaster cools for good!', '#ffe08a'); }
@@ -2766,7 +2835,7 @@ function updateBosses(dt, fainted) {
       Object.assign(B, { active: false, state: 'sleep', hp: B.max, phase: 1, seq: 0, x: B.hx, y: B.hy, z: 0, ring: null, alpha: 1 });
       for (const e of enemies) if (e.minion) e.remove = true;
       projectiles.length = 0; bossBar();
-      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; if (B.type === 'wraith') blizzard = 0;
+      B.decoys = []; B.under = false; B.trail = []; B.lash = null; B.hidden = -1; B.rocks = []; B.cool = 0; B.gust = null; B.jars = null; B.jarPhase = 0; if (B.type === 'wraith') blizzard = 0;
     if (!fainted) toast(`${B.name} waits for your return.`);
       continue;
     }
@@ -2783,7 +2852,7 @@ function updateBosses(dt, fainted) {
       continue;
     }
     if (B.state === 'wake' || B.state === 'rest') { B.st -= dt; if (B.type === 'wraith') B.z += (20 + Math.sin(B.anim * 2) * 6 - B.z) * Math.min(1, dt * 4); if (B.type === 'wizard') B.z += (16 + Math.sin(B.anim * 2) * 6 - B.z) * 0.1; if (B.type === 'bat') B.z += (46 - B.z) * Math.min(1, dt * 4); if (B.st <= 0) bossNext(B); }
-    else ({ aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
+    else ({ shadow: updateShadow, lich: updateLich, aegis: updateAegis, storm: updateStorm, forge: updateForge, drake: updateDrake, hag: updateHag, treant: updateTreant, mummy: updateMummy, scarab: updateScarab, wyrm: updateWyrm, jarl: updateJarl, wraith: updateWraith, slime: updateSlimeKing, golem: updateGolem, wizard: updateWizard, queen: updateQueen, crab: updateCrab, bat: updateBat, knight: updateKnight })[B.type](B, dt, fainted, d);
     const harmless = ['dazed', 'vanish', 'appear', 'dying', 'wake', 'dead', 'sink', 'lurk', 'recover', 'perch', 'burrow', 'under', 'hidden', 'diving'].includes(B.state);
     if (B.active && !harmless && B.z < 14 && d < I.contact && !fainted) damagePlayer(2, B);
   }
@@ -4331,18 +4400,145 @@ function drawDarkness(c, camX, camY, k) {
   d.globalCompositeOperation = 'destination-out';
   const light = (wx, wy, r) => { const x = sx(wx), y = sy(wy), R = r * k; if (x < -R || y < -R || x > darkCv.width + R || y > darkCv.height + R) return; const g = d.createRadialGradient(x, y, R * 0.25, x, y, R); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); d.fillStyle = g; d.fillRect(x - R, y - R, R * 2, R * 2); };
   light(P.x, P.y - 20, gearW().glow ? 230 : 160);
-  for (const L of LANTERNS) if (lanternLit(L)) light(L.x, L.y - 40, 190 + Math.sin(time * 4 + L.i) * 6); else light(L.x, L.y - 50, 26);
-  light(DUSK_D.camp.x + 10, DUSK_D.camp.y + 60, 210 + Math.sin(time * 9) * 6);
-  for (const n of NPCS) if (n.id === 'gate_home') light(n.x, n.y - 30, 90);
+  const HD = dungeonAt(P.x);
+  if (HD === OSS_D) {
+    const g = dgs(OSS_D);
+    for (const sw of OSS_D.switches) light(sw.x, sw.y - 30, g.switches[sw.id] ? 185 + Math.sin(time * 6 + sw.x) * 6 : 24);
+    for (const t of OSS_D.torches) light((OSS_D.x0 + t.x) * T + 16, t.y * T + 24, 70 + Math.sin(time * 9 + t.x) * 4);
+    light((OSS_D.x0 + 20) * T, 42 * T, 90);
+    for (const B of BOSSES) if (B.active && (B.type === 'shadow' || B.type === 'lich')) {
+      if (B.type === 'shadow') { const i = shadowPoolLit(B); if (i >= 0) { const pl = shadowPools(B)[i]; light(pl.x, pl.y - 10, 110); } }
+      else { for (const j of B.jars || []) if (j.hp > 0) light(j.x, j.y - 20, 70); light(B.x, B.y - 50, 80); }
+    }
+  } else {
+    for (const L of LANTERNS) if (lanternLit(L)) light(L.x, L.y - 40, 190 + Math.sin(time * 4 + L.i) * 6); else light(L.x, L.y - 50, 26);
+    light(DUSK_D.camp.x + 10, DUSK_D.camp.y + 60, 210 + Math.sin(time * 9) * 6);
+    for (const n of NPCS) if (n.id === 'gate_home') light(n.x, n.y - 30, 90);
+  }
   for (const p of projectiles) if (p.kind === 'fire' || p.kind === 'wisp') light(p.x, p.y, 40);
   c.drawImage(darkCv, 0, 0);
   // glowing eyes in the dark
   for (const e of enemies) {
-    if (!e.alive || e.state === 'buried' || e.state === 'pile' || e.x < DUSK_D.x0 * T || e.x > (DUSK_D.x0 + DW) * T) continue;
+    if (!e.alive || e.state === 'buried' || e.state === 'pile' || !HD || e.x < HD.x0 * T || e.x > (HD.x0 + DW) * T) continue;
     const x = sx(e.x), y = sy(e.y - (e.kind === 'banshee' ? 40 : e.kind === 'shade' ? 34 : e.kind === 'hound' ? 16 : 32)); if (x < 0 || y < 0 || x > darkCv.width || y > darkCv.height) continue;
     c.fillStyle = e.kind === 'hound' ? 'rgba(255,80,80,.85)' : 'rgba(200,190,255,.75)'; c.fillRect(x - 4 * k, y, 2 * k, 2 * k); c.fillRect(x + 2 * k, y, 2 * k, 2 * k);
   }
   c.fillStyle = 'rgba(70,90,160,.10)'; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+}
+// ---------- the Shadow: your mirror image, solid only inside the lit circle ----------
+function shadowPools(B) { const A = B.arena; return [[A.cx, A.y0 + 2.2 * T], [A.cx, A.cy], [A.cx, A.y1 - 2 * T]].map(([x, y]) => ({ x, y })); }
+function shadowPoolLit(B) {
+  if (B.phase === 3) return ((time % 4) < 2.6) ? 1 : -1;
+  return Math.floor(time / 4.5) % 3;
+}
+function shadowInLight(B) { const i = shadowPoolLit(B); if (i < 0) return false; const pl = shadowPools(B)[i]; return Math.hypot(B.x - pl.x, (B.y - pl.y) / 0.8) < 62; }
+let shadowHint = false;
+function updateShadow(B, dt, fainted, d) {
+  const A = B.arena, point = B.phase === 3;
+  const tx = Math.max(A.x0 + 30, Math.min(A.x1 - 30, 2 * A.cx - P.x)), ty = Math.max(A.y0 + 44, Math.min(A.y1 - 12, point ? 2 * A.cy - P.y : P.y));
+  const follow = sp => { const dx = tx - B.x, dy = ty - B.y, dd = Math.hypot(dx, dy) || 1; B.x += dx / dd * Math.min(dd, sp * dt); B.y += dy / dd * Math.min(dd, sp * dt); };
+  switch (B.state) {
+    case 'mirror': B.st += dt; follow(230); if (d < 56 && B.st > 0.6) { B.state = 'slashWind'; B.st = 0.45; } else if (B.st > 2.6) bossRest(B, 0.1); break;
+    case 'slashWind': B.st -= dt; if (B.st <= 0) { SFX.play('swing'); if (!fainted && !P.dash && d < 60) damagePlayer(2, B); bossRest(B, 0.5); } break;
+    case 'daggers':
+      B.st -= dt; follow(120);
+      if (B.st <= 0) { const a = Math.atan2(P.y - 14 - (B.y - 30), P.x - B.x), n = B.phase === 1 ? 1 : 3; for (let i = 0; i < n; i++) { const o = (i - (n - 1) / 2) * 0.35; projectiles.push({ kind: 'hex', x: B.x, y: B.y - 30, vx: Math.cos(a + o) * 170, vy: Math.sin(a + o) * 170, ang: a + o, t: 0, life: 2.2 }); } SFX.play('wisp'); bossRest(B, 0.4); }
+      break;
+    case 'lunge': B.st -= dt; if (B.st > 0.3) follow(60); else { B.x += B.vx * dt; B.y += B.vy * dt; clampBoss(B); if (!B.lhit && !fainted && !P.dash && d < 30) { B.lhit = true; damagePlayer(2, B); } } if (B.st <= 0) { B.lhit = false; bossRest(B, 0.5); } if (B.st > 0.3 && B.st - dt <= 0.3) { const dx = P.x - B.x, dy = P.y - B.y, dd = Math.hypot(dx, dy) || 1; B.vx = dx / dd * 420; B.vy = dy / dd * 420; SFX.play('dash'); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+  if (B.state === 'rest') follow(200);
+}
+function drawShadowBoss(c, B) {
+  const pools = shadowPools(B), lit = shadowPoolLit(B);
+  pools.forEach((pl, i) => { const on = i === lit && B.active; c.fillStyle = on ? 'rgba(255,240,190,.28)' : 'rgba(120,110,160,.10)'; ellipse(c, pl.x, pl.y, 62, 50); c.strokeStyle = on ? 'rgba(255,240,190,.6)' : 'rgba(150,140,200,.25)'; c.lineWidth = 2; c.beginPath(); c.ellipse(pl.x, pl.y, 62, 50, 0, 0, Math.PI * 2); c.stroke(); });
+  if (B.active) { c.strokeStyle = 'rgba(184,168,255,.18)'; c.lineWidth = 1; c.setLineDash([4, 8]); c.beginPath(); c.moveTo(B.arena.cx, B.arena.y0 + 40); c.lineTo(B.arena.cx, B.arena.y1); c.stroke(); c.setLineDash([]); }
+  const solid = shadowInLight(B) || B.state === 'dazed';
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, B.x, B.y + 4, 16, 5);
+  c.save(); c.globalAlpha = (solid ? 0.95 : 0.55) * (B.hurt > 0 ? 0.6 : 1);
+  const fx = B.state === 'mirror' ? -(P.fx || 0) : P.x < B.x ? -1 : 1, swing = B.state === 'slashWind' ? (1 - B.st / 0.45) : 0;
+  c.fillStyle = '#14101e'; ellipse(c, B.x, B.y - 18, 11, 16); circle(c, B.x, B.y - 40, 9); c.fillRect(B.x - 8, B.y - 6, 5, 8); c.fillRect(B.x + 3, B.y - 6, 5, 8);
+  c.fillStyle = '#2a2040'; c.beginPath(); c.moveTo(B.x - 9, B.y - 44); c.lineTo(B.x - 13, B.y - 52); c.lineTo(B.x - 3, B.y - 48); c.lineTo(B.x + 4, B.y - 54); c.lineTo(B.x + 10, B.y - 46); c.closePath(); c.fill();
+  c.fillStyle = solid ? '#ffe08a' : '#b8a8ff'; c.fillRect(B.x - 5 + fx * 2, B.y - 42, 3, 2); c.fillRect(B.x + 2 + fx * 2, B.y - 42, 3, 2);
+  c.save(); c.translate(B.x + fx * 10, B.y - 22); c.rotate(fx * (-1.2 + swing * 2.4)); c.fillStyle = '#3a2e5a'; c.fillRect(-2, -30, 4, 30); c.fillStyle = '#b8a8ff'; c.fillRect(-1, -28, 2, 24); c.restore();
+  c.restore();
+  if (B.state === 'slashWind' || B.state === 'lunge' && B.st > 0.3) bossWarn(c, B, B.y - 70);
+  if (B.state === 'sleep') bossZ(c, { x: B.x, y: B.y - 30, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, B.x, B.y - 60, 16);
+}
+// ---------- the Lich King: shielded by soul jars ----------
+function makeJars(B) { return [[9, 3], [30, 3], [19.5, 9.2]].map(([x, y]) => ({ x: (OSS_D.x0 + x) * T, y: y * T + 16, hp: 3 })); }
+let lichHint = false;
+function hitJars(B, hx, hy, rad) {
+  if (B.type !== 'lich' || !B.jars || !B.active) return;
+  for (const j of B.jars) {
+    if (j.hp <= 0 || Math.hypot(j.x - hx, j.y - 16 - hy) > rad + 16) continue;
+    j.hp--; burst(j.x, j.y - 20, '#7fe07a', 10); SFX.play('mine');
+    if (j.hp <= 0) { SFX.play('crumble'); burst(j.x, j.y - 20, '#bfffb0', 24); floatText(j.x, j.y - 50, 'Soul jar shattered!', '#bfffb0');
+      if (B.jars.every(q => q.hp <= 0)) { B.state = 'dazed'; B.st = 2.6; B.z = 0; impact(10); floatText(B.x, B.y - 110, 'His shield breaks! Strike now!', '#ffe08a'); } }
+  }
+}
+function updateLich(B, dt, fainted, d) {
+  const A = B.arena;
+  if (B.jarPhase !== B.phase) { B.jarPhase = B.phase; B.jars = makeJars(B); }
+  switch (B.state) {
+    case 'float': {
+      B.st += dt; const live = B.jars.filter(j => j.hp > 0), tgt = live.length ? live[Math.floor(B.anim / 3) % live.length] : { x: A.cx, y: A.cy };
+      const dx = tgt.x - B.x, dy = tgt.y + 40 - B.y, dd = Math.hypot(dx, dy) || 1; if (dd > 40) { B.x += dx / dd * 70 * dt; B.y += dy / dd * 70 * dt; clampBoss(B); }
+      if (B.st > 1.6) bossRest(B, 0.1);
+      break;
+    }
+    case 'bones':
+      B.st -= dt;
+      if (B.st <= 0) { const lines = B.phase === 1 ? 3 : 5, base = Math.atan2(P.y - B.y, P.x - B.x); for (let l = 0; l < lines; l++) { const a = base + (l - (lines - 1) / 2) * 0.35; for (let i = 1; i <= 9; i++) projectiles.push({ kind: 'spike', bonespike: true, vx: 0, vy: 0, x: B.x + Math.cos(a) * i * 32, y: B.y + Math.sin(a) * i * 24, t: -i * 0.06, life: 0.95 }); } SFX.play('crumble'); bossRest(B, 0.7); }
+      break;
+    case 'skulls': B.st -= dt; if (B.st <= 0) { for (const o of [-0.6, 0, 0.6]) projectiles.push({ kind: 'wisp', x: B.x, y: B.y - 50, ang: Math.atan2(P.y - B.y, P.x - B.x) + o, t: 0, life: 3.4 }); SFX.play('wisp'); bossRest(B, 0.6); } break;
+    case 'raise': B.st -= dt; if (B.st <= 0) { summonMinions(B, ['skeleton', 'shade'], 4); for (const e of enemies) if (e.minion && e.kind === 'skeleton' && e.rise === undefined) { e.rise = 1; e.state = 'rising'; e.st = 0.8; } SFX.play('boss'); bossRest(B, 0.5); } break;
+    case 'blink': B.st -= dt; if (B.st <= 0) { burst(B.x, B.y - 40, '#7fe07a', 16); B.x = A.x0 + 80 + rng() * (A.x1 - A.x0 - 160); B.y = A.y0 + 90 + rng() * (A.y1 - A.y0 - 120); burst(B.x, B.y - 40, '#7fe07a', 16); SFX.play('wisp'); bossRest(B, 0.3); } break;
+    case 'deathring': B.st -= dt; if (B.st <= 0) { B.ring = { x: B.x, y: B.y, r: 30, max: 260, hit: false }; impact(8); SFX.play('slam'); bossRest(B, 0.8); } break;
+    case 'dazed': B.st -= dt; if (B.st <= 0) bossRest(B, 0.3); break;
+  }
+}
+function drawLich(c, B) {
+  for (const j of B.jars || []) {
+    shadow(c, j.x, j.y + 2, 12, 4);
+    if (j.hp <= 0) { c.fillStyle = '#3a4a3a'; for (const [ox, oy] of [[-8, -2], [4, -3], [-2, 0], [7, 1]]) c.fillRect(j.x + ox, j.y + oy, 5, 3); continue; }
+    const g = 0.5 + Math.sin(time * 4 + j.x) * 0.25; c.fillStyle = `rgba(127,224,122,${g * 0.3})`; circle(c, j.x, j.y - 18, 22);
+    c.fillStyle = '#2a3a2a'; c.fillRect(j.x - 9, j.y - 28, 18, 28); c.fillStyle = `rgba(127,224,122,${0.5 + g * 0.4})`; c.fillRect(j.x - 7, j.y - 24, 14, 22); c.fillStyle = '#4a5a4a'; c.fillRect(j.x - 10, j.y - 32, 20, 5);
+    c.fillStyle = '#e6ffe0'; c.fillRect(j.x - 3, j.y - 18, 2, 2); c.fillRect(j.x + 2, j.y - 18, 2, 2);
+    if (j.hp < 3) { c.strokeStyle = '#1a2a1a'; c.lineWidth = 1; c.beginPath(); c.moveTo(j.x - 5, j.y - 22); c.lineTo(j.x + 2, j.y - 12); c.stroke(); }
+  }
+  const shielded = B.jars && B.jars.some(j => j.hp > 0) && B.state !== 'dazed', x = B.x + (B.state === 'dying' ? Math.sin(time * 70) * 4 : 0), y = B.y - 8 + Math.sin(B.anim * 2) * 4;
+  if (shielded && B.active) { for (const j of B.jars) if (j.hp > 0) { c.strokeStyle = `rgba(127,224,122,${0.25 + Math.sin(time * 6) * 0.1})`; c.lineWidth = 2; c.beginPath(); c.moveTo(j.x, j.y - 26); c.lineTo(x, y - 50); c.stroke(); } c.strokeStyle = 'rgba(127,224,122,.5)'; c.lineWidth = 3; c.beginPath(); c.ellipse(x, y - 40, 34, 46, 0, 0, Math.PI * 2); c.stroke(); }
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, B.x, B.y + 4, 26, 8);
+  c.globalAlpha = 1; bossFlash(c, B);
+  c.fillStyle = '#1e1a2a'; c.beginPath(); c.moveTo(x - 22, y); c.lineTo(x - 14, y - 60); c.lineTo(x + 14, y - 60); c.lineTo(x + 22, y); for (let i = 0; i < 5; i++) c.lineTo(x + 22 - (i + 0.5) * 9, y + (i % 2 ? -6 : 4)); c.closePath(); c.fill();
+  c.fillStyle = '#3a2e5a'; c.fillRect(x - 12, y - 56, 6, 50);
+  c.fillStyle = '#efe6d8'; circle(c, x, y - 68, 10); c.fillStyle = '#1a1210'; c.fillRect(x - 6, y - 71, 4, 4); c.fillRect(x + 2, y - 71, 4, 4); c.fillRect(x - 3, y - 62, 6, 2);
+  c.fillStyle = B.state === 'dazed' ? '#ffe08a' : '#7fe07a'; c.fillRect(x - 5, y - 70, 2, 2); c.fillRect(x + 3, y - 70, 2, 2);
+  c.fillStyle = '#d9a23c'; for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * 5 - 3, y - 76); c.lineTo(x + i * 5, y - 86 - (i === 0 ? 4 : 0)); c.lineTo(x + i * 5 + 3, y - 76); c.fill(); }
+  c.strokeStyle = '#5a4a3a'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 20, y + 2); c.lineTo(x + 24, y - 80); c.stroke(); c.fillStyle = '#7fe07a'; circle(c, x + 24, y - 84, 6);
+  c.globalAlpha = 1;
+  if (B.state === 'bones' || B.state === 'deathring' || B.state === 'raise') bossWarn(c, { x }, y - 110);
+  if (B.state === 'sleep') bossZ(c, { x, y: y - 50, z: 0, anim: B.anim });
+  if (B.state === 'dazed') drawStars(c, x, y - 100, 22);
+}
+function drawBrazier(c, sw, lit) {
+  shadow(c, sw.x, sw.y + 3, 12, 4);
+  c.fillStyle = '#3a3640'; c.fillRect(sw.x - 3, sw.y - 22, 6, 24); c.fillStyle = '#5a5662'; c.fillRect(sw.x - 9, sw.y - 2, 18, 5);
+  c.fillStyle = '#2a2630'; c.beginPath(); c.moveTo(sw.x - 13, sw.y - 30); c.lineTo(sw.x + 13, sw.y - 30); c.lineTo(sw.x + 8, sw.y - 20); c.lineTo(sw.x - 8, sw.y - 20); c.closePath(); c.fill();
+  if (lit) { for (let i = 0; i < 4; i++) { const fh = 10 + Math.sin(time * 14 + i * 2) * 4; c.fillStyle = i % 2 ? 'rgba(150,200,255,.85)' : 'rgba(220,235,255,.9)'; ellipse(c, sw.x - 6 + i * 4, sw.y - 32 - fh * 0.5, 3, fh * 0.6); } }
+  else { c.fillStyle = '#14121a'; ellipse(c, sw.x, sw.y - 30, 11, 3); }
+}
+function drawOssGate(c) {
+  const x = OSS.x, y = OSS.y;
+  c.fillStyle = 'rgba(0,0,0,.3)'; ellipse(c, x, y - 2, 54, 12);
+  c.fillStyle = '#4a4652'; c.fillRect(x - 44, y - 64, 88, 64); c.fillStyle = '#5a5662'; c.fillRect(x - 40, y - 64, 36, 64);
+  c.fillStyle = '#3a3640'; c.beginPath(); c.moveTo(x - 50, y - 64); c.lineTo(x, y - 96); c.lineTo(x + 50, y - 64); c.closePath(); c.fill();
+  c.fillStyle = '#6a6672'; c.fillRect(x - 3, y - 118, 6, 26); c.fillRect(x - 11, y - 110, 22, 6);
+  c.fillStyle = '#0a0812'; c.beginPath(); c.moveTo(x - 16, y); c.lineTo(x - 16, y - 34); c.quadraticCurveTo(x, y - 50, x + 16, y - 34); c.lineTo(x + 16, y); c.closePath(); c.fill();
+  c.fillStyle = '#efe6d8'; for (const [ox, oy] of [[-30, -40], [26, -46], [-34, -18], [30, -14]]) { circle(c, x + ox, y + oy, 5); c.fillStyle = '#1a1210'; c.fillRect(x + ox - 3, y + oy - 2, 2, 2); c.fillRect(x + ox + 1, y + oy - 2, 2, 2); c.fillStyle = '#efe6d8'; }
+  const g = 0.3 + Math.sin(time * 2) * 0.12; c.fillStyle = `rgba(127,224,122,${g})`; c.fillRect(x - 12, y - 10, 24, 10);
 }
 // ---------- ambient life: falling leaves in the forest, butterflies in the meadow, fireflies in the grove ----------
 let viewRect = { x: 0, y: 0, w: 800, h: 600 };
@@ -4538,6 +4734,11 @@ function drawProjectiles(c) {
       else { c.fillStyle = 'rgba(40,40,50,.4)'; ellipse(c, p.x, p.y, 14, 6); }
     } else if (p.kind === 'spike') {
       if (p.t < 0) continue;
+      if (p.bonespike) {
+        if (p.t < 0.5) { c.fillStyle = `rgba(60,50,70,${0.3 + p.t})`; ellipse(c, p.x, p.y, 8 + p.t * 10, 4 + p.t * 5); }
+        else { const k = Math.min(1, (p.t - 0.5) / 0.08); c.fillStyle = '#e6dcc8'; c.beginPath(); c.moveTo(p.x - 10, p.y + 3); c.lineTo(p.x - 5, p.y - 26 * k); c.lineTo(p.x, p.y + 2); c.lineTo(p.x + 5, p.y - 18 * k); c.lineTo(p.x + 10, p.y + 3); c.closePath(); c.fill(); c.strokeStyle = '#8a8070'; c.lineWidth = 1; c.stroke(); }
+        continue;
+      }
       if (p.flame) {
         if (p.t < 0.5) { c.fillStyle = `rgba(255,120,40,${0.2 + p.t * 0.8})`; ellipse(c, p.x, p.y, 8 + p.t * 10, 4 + p.t * 5); }
         else { const k = Math.min(1, (p.t - 0.5) / 0.08) * (1 - Math.max(0, p.t - 0.8) * 4); c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(255,120,40,.6)'; ellipse(c, p.x, p.y - 14 * k, 9, 16 * k + 1); c.fillStyle = 'rgba(255,230,140,.6)'; ellipse(c, p.x, p.y - 10 * k, 4, 10 * k + 1); c.restore(); }
@@ -4585,7 +4786,7 @@ function drawTent(c, o) {
   c.fillStyle = 'rgba(242,248,255,.85)'; c.beginPath(); c.moveTo(o.x - 10, o.y - 40); c.lineTo(o.x, o.y - 52); c.lineTo(o.x + 10, o.y - 40); c.closePath(); c.fill();
   c.fillStyle = '#c0392b'; c.fillRect(o.x - 1, o.y - 66, 2, 16); c.fillRect(o.x + 1, o.y - 66, 10, 6);
 }
-function drawBossAny(c, B) { ({ aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
+function drawBossAny(c, B) { ({ shadow: drawShadowBoss, lich: drawLich, aegis: drawAegis, storm: drawStormlord, forge: drawForgemaster, drake: drawDrake, hag: drawHag, treant: drawTreant, mummy: drawMummy, scarab: drawScarab, wyrm: drawWyrm, jarl: drawJarl, wraith: drawWraith, slime: drawBoss, golem: drawGolem, wizard: drawWizard, queen: drawQueen, crab: drawCrab, bat: drawBat, knight: drawKnight })[B.type](c, B); }
 function drawJarl(c, B) {
   let sx = 1, sy = 1, ox = 0;
   if (B.state === 'stride') { const k = Math.abs(Math.sin(B.anim * 7)); sy = 1 - k * 0.05; sx = 1 + k * 0.03; }
@@ -5094,8 +5295,8 @@ function render() {
     else if (kind === 1) drawEnemy(ctx, o);
     else if (kind === 7) drawBossAny(ctx, o);
     else if (kind === 8) drawChest(ctx, o);
-    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : drawCryptDoor)(ctx);
-    else if (kind === 10) drawSwitch(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
+    else if (kind === 9) (o.id === 'mine' ? drawMine : o.id === 'temple' ? drawTempleGate : o.id === 'tomb' ? drawPyramid : o.id === 'hollow' ? drawHollowTree : o.id === 'forge' ? drawForgeGate : o.id === 'spire' ? drawSpireGate : o.id === 'ossuary' ? drawOssGate : drawCryptDoor)(ctx);
+    else if (kind === 10) (dungeonAt(o.x) === OSS_D ? drawBrazier : drawSwitch)(ctx, o, !!dgs(dungeonAt(o.x)).switches[o.id]);
     else if (kind === 2) drawNPC(ctx, o);
     else if (kind === 3) drawPlayer(ctx);
     else if (kind === 4) drawHouse(ctx, o);
@@ -5145,8 +5346,8 @@ function render() {
     if (CD === CINDER_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.3, cvs.width / 2, cvs.height / 2, cvs.height * 0.85); g.addColorStop(0, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(140,40,20,${0.36 + Math.sin(time * 0.8) * 0.05})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (CD === MIRE_D) { const g = ctx.createRadialGradient(cvs.width / 2, cvs.height / 2, cvs.height * 0.25, cvs.width / 2, cvs.height / 2, cvs.height * 0.8); g.addColorStop(0, 'rgba(150,190,140,0)'); g.addColorStop(1, `rgba(150,190,140,${0.42 + Math.sin(time * 0.5) * 0.06})`); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
     if (blizzard > 0) { ctx.fillStyle = `rgba(235,245,255,${Math.min(0.6, blizzard * 0.6)})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
-    if (inD && !CD.outdoor) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
-    if (CD === DUSK_D) drawDarkness(ctx, camX, camY, k);
+    if (inD && !CD.outdoor && CD !== OSS_D) { const px = (P.x - camX) * k, py = (P.y - 20 - camY) * k, g = ctx.createRadialGradient(px, py, 90 * k, px, py, 340 * k); g.addColorStop(0, 'rgba(6,4,12,0)'); g.addColorStop(1, 'rgba(6,4,12,.72)'); ctx.fillStyle = g; ctx.fillRect(0, 0, cvs.width, cvs.height); }
+    if (CD === DUSK_D || CD === OSS_D) drawDarkness(ctx, camX, camY, k);
     if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, cvs.width, cvs.height); }
   }
   mctx.imageSmoothingEnabled = false;
